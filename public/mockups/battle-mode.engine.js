@@ -3429,6 +3429,17 @@
   // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
   // zurueck() (MOTOREN.basketball) sie mit einer Zeile mitnehmen koennen.
   let fsLive=null;
+  // SCHIEDSRICHTER (Chris' Auftrag, 29.08.: "wir brauchen einen schiedsrichter der fouls
+  // pfeifen kann"). Bewusst NICHT in FSTEAM: er ist kein Spieler, hat keine Sub-Skills,
+  // keinen Slot, keine Deckung und darf in keiner der Spieler-Schleifen (zuordneDeckung,
+  // bewegeSpielerLive, Rebound-Kandidaten, Separation) auftauchen — ein eigenes, kleines
+  // Objekt mit x/y/Ziel und einem eigenen Pfiff-Timer ist deshalb billiger und sicherer
+  // als ein 13. Eintrag in einem der beiden Teams.
+  //
+  // ZEITBASIS BEWUSST dt STATT fsT: die Standphase haelt die Spieluhr an (s.
+  // stepBasketballLive), fsT steht waehrend des Pfiffs also still — ein `pfiffBis`-
+  // Zeitstempel gegen fsT waere genau dann eingefroren, wenn die Geste laufen soll.
+  let fsSchiri=null;
   // Debug-Anzeige der rollenbasierten Ziel-Position VOR der Separation (s.
   // bewegeSpielerLive), nur ueber window.__arena.debugZiele(true) einschaltbar — im
   // normalen Spiel unsichtbar, dient nur der Spacing-Abnahme/Feinjustage.
@@ -3450,6 +3461,16 @@
   // BASKETBALL-LIVE-ENGINE — Konstanten. Alle PLATZHALTER, wie ueberall in diesem
   // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
   // ARENA_INTERAKTION_KONZEPT.md).
+  // STANDPHASE FREIWURF — alle vier PLATZHALTER, in SPIELZEIT-Sekunden (die Uhr steht
+  // waehrend der Phase still, s. stepBasketballLive; ZEIT_DEHNUNG.basketball=2 streckt sie
+  // fuer den Zuschauer wie jede andere Sekunde auch). Summe fuer zwei Freiwuerfe: 1,6 +
+  // 2x(0,9+0,5+0,7) = 5,8s Zuschauerzeit.
+  const FW_FORMATION=1.6;           // Aufstellen an der Linie/an der Zone, bevor der erste Ball fliegt
+  const FW_ANLAUF=0.9;              // Ritual am Ball, bevor der Schuetze abdrueckt
+  const FW_FLUG=0.5;                // Ballflug zum Ring (Muster wie flug.dauer bei einem Feldwurf)
+  const FW_NACH=0.7;                // Nachklang, bevor der naechste Freiwurf beginnt bzw. die Phase endet
+  const PFIFF_DAUER=1.8;            // wie lange der Schiedsrichter die Foul-Geste haelt (echte Sekunden)
+  const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
   const SPIELDAUER_BASKETBALL=120;  // Chris' Wunsch (25.08.: 45->90; 29.08.: nochmal laenger)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
@@ -3598,7 +3619,7 @@
   };
   function bauFeldspiel(saat){
     seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
-    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null;
+    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -3756,7 +3777,7 @@
         team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++;
         // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als FG 3/6 im Boxscore"): ein Freiwurf
-        // (e.freiwurf, s. schiesseFreiwuerfe) ist kein Feldwurf-Versuch, zaehlt hier also
+        // (e.freiwurf, s. verbucheFreiwurf) ist kein Feldwurf-Versuch, zaehlt hier also
         // NICHT mit — real-basketball-konform (FT% und FG% sind getrennte Statistiken).
         if(!e.freiwurf){ s(e.spieler).feldwuerfe++; s(e.spieler).feldwuerfeTreffer++; }
       }
@@ -3886,8 +3907,19 @@
         screenRuf:0,rangeSeit:null});
     }
     zuordneSlots(0); zuordneSlots(1);
+    // `phase` ist der EINE Zustand, der entscheidet, ob die freie Simulation laeuft
+    // ("laufend") oder eine Standsituation die Spieler in eine feste Formation stellt
+    // ("freiwurf"). Bewusst ein benannter Zustand statt eines basketball-eigenen
+    // Sonderflags: Football (Snap-Formation), Hockey (Bully) und Tennis (Aufschlag)
+    // brauchen exakt dieselbe Struktur — eine Phase, eine Aufstellungsfunktion, ein
+    // Schritt-Handler — sobald sie eine Live-Engine bekommen (s. docs/design/
+    // battle-arena-multi-disziplin-plan.md). Verallgemeinert wird erst dann, hier steht
+    // nur die Naht dafuer; `freiwurf` haelt die phasen-eigenen Daten und ist ausserhalb
+    // der Phase immer null.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null};
+      fastbreak:null, phase:"laufend", freiwurf:null};
+    const ruhe=schiriRuhePos();
+    fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
   }
 
@@ -4337,7 +4369,7 @@
     von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
     // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als % oder FG 3/6 im Boxscore zeigen"):
     // jeder wirf()-Aufruf IST ein Feldwurf-Versuch (Freiwuerfe laufen nie durch wirf(),
-    // s. schiesseFreiwuerfe) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
+    // s. verbucheFreiwurf) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
     // sobald flug.treffer bekannt ist.
     schuetze.feldwuerfe++;
     const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
@@ -4402,24 +4434,254 @@
   // (Ziel: +5 Pp, Toleranz ±1). Bei ABSCHLUSS=84 (staerkster real gemessener Schuetze)
   // liegt die Quote bei ~87 %, der Deckel bei 0,90 greift dort noch nicht — erst jenseits
   // von ABSCHLUSS~88, und dann bei einer fuer Elite-Schuetzen realistischen ~90 %-Quote.
-  function schiesseFreiwuerfe(schuetze,anzahl){
-    let gemacht=0;
-    for(let i=0;i<anzahl;i++){
-      const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
-      const chance=Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
-      const treffer=rr()<chance;
-      if(treffer){
-        gemacht++; schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
-        logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:null,punkte:1,zug:null,freiwurf:true});
-      }
-      // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
-      // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
-      // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
-      logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
-      schuetze.freiwuerfe++;
-      if(treffer)schuetze.freiwurfTreffer++;
+  // EIN Freiwurf, rein rechnerisch — die Formel selbst ist gegenueber der frueheren
+  // Schleifen-Fassung (schiesseFreiwuerfe) Zeichen fuer Zeichen unveraendert, nur die
+  // Schleife darum ist weg: sie ist jetzt die Standphase (s. stepFreiwurfPhase), damit
+  // jeder einzelne Wurf einen sichtbaren Ballflug bekommt statt im Hintergrund
+  // durchgerechnet zu werden. Pro Aufruf genau EIN rr() wie zuvor.
+  function verbucheFreiwurf(schuetze){
+    const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
+    const chance=Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
+    const treffer=rr()<chance;
+    if(treffer){
+      schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:null,punkte:1,zug:null,freiwurf:true});
     }
-    return gemacht;
+    // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
+    // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
+    // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
+    logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
+    schuetze.freiwuerfe++;
+    if(treffer)schuetze.freiwurfTreffer++;
+    return treffer;
+  }
+
+  // ---------------------------------------------------------------------------------
+  // STANDPHASE FREIWURF (Chris' Auftrag, 29.08.: "Wenn gefoult wird soll es auch
+  // freiwuerfe geben wo die spieler sich auch auf den entsprechenden positionen
+  // stellen"). Die Foul-/Freiwurf-MECHANIK gab es schon lange (foulChance in wirf(),
+  // Aufloesung in loeseFlugAuf) — sie lief nur komplett unsichtbar: waehrend im
+  // Hintergrund zwei Freiwuerfe durchgerechnet wurden, dribbelte, deckte und lief das
+  // Feld normal weiter, als sei nichts passiert. Neu ist hier ausschliesslich die
+  // Sichtbarkeit: dieselbe Wurfformel, dieselbe Anzahl, derselbe Ballbesitz-Ausgang.
+  // ---------------------------------------------------------------------------------
+
+  // Die Geometrie der Freiwurfsituation wird NICHT frei erfunden, sondern aus denselben
+  // Werten abgeleitet, mit denen bodenFeldspiel() Zone, Freiwurflinie und Korb zeichnet —
+  // sonst stellen sich die Spieler neben die Linie, die der Zuschauer sieht (genau der
+  // Fehler, den der Korb bis PR #683 hatte: Sprite an `grundX`, Ballflug an `korbX`).
+  function freiwurfGeo(seite){
+    const korbX=korbXVon(seite);
+    const links=korbX<W/2;                       // welcher der beiden Koerbe angegriffen wird
+    const grundX=links?W*0.06:W*0.94;            // exakt der Wert aus bodenFeldspiel
+    const zumFeld=links?1:-1;                    // Richtung von der Grundlinie ins Feld
+    const zonenTiefe=H*0.16, zonenHalb=H*0.08;   // exakt die Werte aus bodenFeldspiel
+    return {korbX,links,grundX,zumFeld,zonenTiefe,zonenHalb,
+      linieX:grundX+zumFeld*zonenTiefe};         // Freiwurflinie = Mittelpunkt des gezeichneten Halbkreises
+  }
+
+  // Wer wohin: Schuetze hinter die Linie, je drei Rebound-Plaetze pro Zonenseite,
+  // abwechselnd Abwehr/Angriff/Abwehr von der Grundlinie nach aussen (die reale
+  // Aufstellung — der Verteidiger steht innen, weil ihm der Rebound zusteht). Wer keinen
+  // Zonenplatz bekommt, faechert hinter dem Freiwurfkreis auf. Einmal beim Betreten der
+  // Phase berechnet und festgehalten (nicht je Tick neu), damit niemand flackert.
+  function freiwurfAufstellung(schuetze){
+    const geo=freiwurfGeo(schuetze.side), plaetze={};
+    plaetze[schuetze.id]={x:geo.linieX+geo.zumFeld*14,y:H/2};
+    // Beste Rebounder zuerst an die inneren Plaetze — dieselbe Groesse, die auch den
+    // Rebound-Zweikampf entscheidet (ZWEITCHANCE, s. stepBasketballLive).
+    const angreifer=FSTEAM[schuetze.side].filter(u=>u!==schuetze).sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    const verteidiger=[...FSTEAM[1-schuetze.side]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    const gassen=[{anteil:0.25,abwehr:true},{anteil:0.65,abwehr:false},{anteil:1.05,abwehr:true}];
+    for(const g of gassen)for(const vz of [-1,1]){
+      const u=(g.abwehr?verteidiger:angreifer).shift();
+      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*geo.zonenHalb};
+    }
+    // Rest abwechselnd, damit sich die beiden Teams auch hinten nicht zu einem Klumpen
+    // je Farbe sortieren (dieselbe Spacing-Idee wie SLOTS/SEPARATION oben).
+    const rest=[];
+    while(angreifer.length||verteidiger.length){
+      if(angreifer.length)rest.push(angreifer.shift());
+      if(verteidiger.length)rest.push(verteidiger.shift());
+    }
+    rest.forEach((u,i)=>{
+      const vz=(i%2)?1:-1, reihe=Math.floor(i/2);
+      plaetze[u.id]={x:geo.linieX+geo.zumFeld*(58+reihe*46),
+        y:Math.max(96,Math.min(H-96,H/2+vz*(62+reihe*34)))};
+    });
+    return plaetze;
+  }
+
+  // Betreten der Phase. Wird an GENAU den beiden Stellen gerufen, an denen frueher
+  // schiesseFreiwuerfe() stand (und-eins nach Treffer, Wurffoul nach Fehlwurf) — die
+  // Entscheidung WANN es Freiwuerfe gibt und WIE VIELE bleibt unveraendert in
+  // wirf()/loeseFlugAuf.
+  function starteFreiwuerfe(schuetze,anzahl,verteidiger,undEins){
+    fsLive.phase="freiwurf";
+    fsLive.freiwurf={schuetze,verteidiger,anzahl,idx:0,gemacht:0,undEins:!!undEins,
+      stufe:"formation",t:0,plaetze:freiwurfAufstellung(schuetze),treffer:false};
+    // Ballzustand hart auf "niemand hat ihn" — der Ball liegt fuer die Dauer der Phase in
+    // der Hand des Schuetzen und wird ausschliesslich von stepFreiwurfPhase gezeichnet.
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.ball.frei=null;
+    fsLive.reboundKampf=null; fsLive.fastbreak=null;
+    // Laufende Spielzuege aufloesen: ein Screen/Roll aus dem Angriff davor wuerde sonst
+    // waehrend der Standphase weiterlaufen (dieselbe Aufraeumung wie in zuordneSlots).
+    for(const team of FSTEAM)for(const u of team){
+      u.hatBall=false; u.screent=null; u.rollBis=0; u.hilfeBis=0; u.frischerPassVon=null;
+    }
+    fsAktuell={spieler:schuetze,verteidiger:verteidiger||null,passgeber:null,rebounder:null};
+    schiriPfeift(schuetze,verteidiger);
+  }
+
+  // Ein Schritt der Standphase. Vier Stufen je Sequenz: einmal `formation` (alle laufen
+  // sich zurecht), danach je Freiwurf `anlauf` -> `flug` -> `nach`.
+  function stepFreiwurfPhase(dt){
+    const fw=fsLive.freiwurf, schuetze=fw.schuetze;
+    fw.t+=dt;
+    if(fw.stufe==="formation"){
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18};
+      if(fw.t>=FW_FORMATION){ fw.stufe="anlauf"; fw.t=0; }
+      return;
+    }
+    if(fw.stufe==="anlauf"){
+      // Ball in der Hand, leicht wippend — dasselbe sin-Muster wie der Dribbel-Bounce,
+      // nur flacher (der Schuetze prellt an der Linie, er dribbelt nicht durchs Feld).
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18+Math.sin(fw.t/FW_ANLAUF*Math.PI*3)*7};
+      if(fw.t>=FW_ANLAUF){
+        schuetze.lunge=0.5;                     // Wurf-Pose, selbes Feld wie in wirf()
+        // Gewuerfelt beim Abwurf, enthuellt bei Ankunft — exakt das Muster von
+        // `treffer` in wirf(): der Ausgang steht fest, bevor der Ball fliegt.
+        fw.treffer=verbucheFreiwurf(schuetze);
+        if(fw.treffer)fw.gemacht++;
+        fw.stufe="flug"; fw.t=0;
+      }
+      return;
+    }
+    const korb={x:korbXVon(schuetze.side),y:H/2};
+    if(fw.stufe==="flug"){
+      const phase=Math.min(1,fw.t/FW_FLUG);
+      fsBall={sichtbar:true,
+        x:schuetze.x+(korb.x-schuetze.x)*phase,
+        y:schuetze.y+(korb.y-schuetze.y)*phase-Math.sin(phase*Math.PI)*44};
+      if(phase>=1){
+        fw.idx++;
+        if(feldspielDisc==="basketball"){
+          if(fw.treffer){ bkSfx("korb_treffer.mp3",0.6); bkSfx("publikum_jubel.mp3",0.25); }
+          else bkSfx("ballaufprall.mp3",0.45);
+        }
+        if(fw.treffer)schwebe({x:0,y:0,txt:"+1",life:1,crit:true,_spieler:schuetze.id});
+        fw.stufe="nach"; fw.t=0;
+      }
+      return;
+    }
+    // `nach`: der Ball faellt am Ring aus, dann geht es weiter bzw. die Phase endet.
+    fsBall={sichtbar:true,x:korb.x,y:korb.y+Math.min(26,fw.t*60)};
+    if(fw.t<FW_NACH)return;
+    if(fw.idx<fw.anzahl){ fw.stufe="anlauf"; fw.t=0; return; }
+    beendeFreiwuerfe();
+  }
+
+  // Verlassen der Phase. BALLBESITZ UNVERAENDERT gegenueber der frueheren Fassung: beide
+  // Aufrufstellen liessen nach den Freiwuerfen bedingungslos `naechsterAngriff(1-side)`
+  // folgen — kein Rebound nach einem verworfenen letzten Freiwurf, kein 1-und-1/Bonus.
+  // Das bleibt bewusst so (s. Bericht: die Regelvariante ist ein eigener Auftrag, nicht
+  // einer, den die Sichtbarkeits-Runde nebenbei mitkippt).
+  function beendeFreiwuerfe(){
+    const fw=fsLive.freiwurf, schuetze=fw.schuetze;
+    if(fw.undEins)feed(schuetze.side,schuetze.n+(fw.gemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+    else feed(schuetze.side,schuetze.n+" verwandelt "+fw.gemacht+" von "+fw.anzahl+" Freiwürfen.");
+    fsLive.phase="laufend"; fsLive.freiwurf=null;
+    fsBall={sichtbar:false,x:0,y:0};
+    naechsterAngriff(1-schuetze.side);
+  }
+
+  // ---------------------------------------------------------------------------------
+  // SCHIEDSRICHTER. Ausserhalb von Foul-Momenten steht er ruhig an der Seitenlinie auf
+  // Hoehe der Mittellinie; bei einem Foul laeuft er zum Foul-Ort, reisst den Arm hoch und
+  // pfeift. Kein eigenes Sprite: public/sprites/ hat keinen neutralen Offiziellen, und ein
+  // neues Bild-Asset zu erfinden war ausdruecklich ausgeschlossen — gezeichnet wird er
+  // deshalb mit denselben Canvas-Primitiven wie der Rueckfall-Korb in bodenFeldspiel.
+  // Das schwarz-weiss gestreifte Trikot ist das Erkennungszeichen und in 26px Hoehe
+  // lesbarer als jede Figur es waere.
+  // RUHEPOSITION: an der unteren Seitenlinie, auf Hoehe des Geschehens. Nicht starr an der
+  // Mittellinie — ein Schiedsrichter, der bei einem Foul unter dem Korb erst eine halbe
+  // Feldlaenge anlaufen muesste, kaeme sichtbar zu spaet zu seinem eigenen Pfiff (in der
+  // ersten Fassung nachgemessen: er war beim Ablauf der Pfiff-Geste noch auf halbem Weg).
+  // Er laeuft deshalb wie ein echter Offizieller im Ballbesitz mit, bleibt aber immer
+  // ausserhalb der Laufwege (feste y an der Seitenlinie, x gedeckelt).
+  function schiriRuhePos(){
+    const b=fsLive&&(fsLive.ball.traeger||fsLive.ball.frei
+      ||(fsLive.ball.flug?fsLive.ball.flug.nach:null));
+    return {x:b?Math.max(W*0.12,Math.min(W*0.88,b.x)):W/2, y:H-78};
+  }
+
+  function schiriPfeift(schuetze,verteidiger){
+    if(!fsSchiri)return;
+    const ort=verteidiger||schuetze;
+    fsSchiri.pfiffT=PFIFF_DAUER;
+    fsSchiri.zielX=Math.max(W*0.10,Math.min(W*0.90,ort.x));
+    fsSchiri.zielY=Math.max(90,Math.min(H-90,ort.y+46));
+    // PLATZHALTER-TON: public/sound/basketball/ hat keine Trillerpfeife (nachgesehen:
+    // ballaufprall/buzzer/dribbeln/korb_treffer/publikum_*). buzzer.mp3 ist der einzige
+    // kurze, schrille Signalton im Bestand und steht hier leise fuer den Pfiff, bis eine
+    // echte pfiff.mp3 im Repo liegt — eine Audiodatei zu erfinden war ausgeschlossen.
+    if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.30);
+    schwebe({x:0,y:0,txt:"FOUL!",life:1.2,crit:true,_def:true,_spieler:ort.id});
+  }
+
+  function bewegeSchiri(dt){
+    const s=fsSchiri; if(!s)return;
+    if(s.pfiffT>0)s.pfiffT=Math.max(0,s.pfiffT-dt);
+    if(s.pfiffT<=0){
+      if(fsLive&&fsLive.phase==="freiwurf"){
+        // Waehrend der Freiwuerfe stellt er sich neben die Freiwurflinie, ausserhalb der
+        // Zone — dort steht auch der echte Schiedsrichter, der den Ball anreicht.
+        const geo=freiwurfGeo(fsLive.freiwurf.schuetze.side);
+        s.zielX=geo.linieX; s.zielY=H/2-geo.zonenHalb-40;
+      } else {
+        const r=schiriRuhePos(); s.zielX=r.x; s.zielY=r.y;
+      }
+    }
+    const dx=s.zielX-s.x, dy=s.zielY-s.y, d=Math.hypot(dx,dy);
+    if(d>1){ const schritt=Math.min(d,SCHIRI_TEMPO*dt); s.x+=dx/d*schritt; s.y+=dy/d*schritt; }
+  }
+
+  function zeichneSchiri(){
+    const s=fsSchiri; if(!s)return;
+    // Masse an den Spieler-Sprites orientiert (zeichneSprite zeichnet 64px hohe Figuren mit
+    // Fuessen bei y+18) — eine deutlich kleinere Figur wirkte in der ersten Fassung wie ein
+    // Requisit statt wie eine Person. Dunkle Kontur ueberall, weil Weiss auf hellem Parkett
+    // sonst ausbleicht.
+    const pfeift=s.pfiffT>0, kH=32, kB=17, oben=s.y+8-kH;
+    ctx.save();
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.fillStyle="rgba(0,0,0,.35)";
+    ctx.beginPath();ctx.ellipse(s.x,s.y+18,12,4.5,0,0,6.3);ctx.fill();
+    ctx.fillStyle="#20242a";ctx.fillRect(s.x-kB/2,s.y+6,kB,12);            // Hose
+    ctx.fillStyle="#f4f4f4";ctx.fillRect(s.x-kB/2,oben,kB,kH);             // Trikot
+    ctx.fillStyle="#15171b";                                               // ... mit Streifen
+    for(let i=0;i<3;i++)ctx.fillRect(s.x-kB/2+3+i*5,oben,2.6,kH);
+    ctx.strokeStyle="rgba(10,12,16,.9)";ctx.lineWidth=1.5;
+    ctx.strokeRect(s.x-kB/2,oben,kB,kH);
+    ctx.fillStyle="#d8b48a";                                               // Kopf
+    ctx.beginPath();ctx.arc(s.x,oben-7,7.5,0,6.3);ctx.fill();ctx.stroke();
+    ctx.strokeStyle="#f4f4f4";ctx.lineWidth=3.5;
+    ctx.beginPath();ctx.moveTo(s.x+kB/2-2,oben+6);
+    // Arm hoch = die reale Foul-Anzeige; sonst haengt er am Koerper.
+    if(pfeift)ctx.lineTo(s.x+kB/2+7,oben-14); else ctx.lineTo(s.x+kB/2+4,s.y+2);
+    ctx.stroke();
+    if(pfeift){
+      const p=1-s.pfiffT/PFIFF_DAUER;
+      ctx.strokeStyle="rgba(255,238,140,"+Math.max(0,0.8-p*0.8).toFixed(3)+")";
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(s.x,s.y-8,15+p*34,0,6.3);ctx.stroke();
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.lineWidth=3.5;ctx.strokeStyle="rgba(8,10,14,.9)";
+      ctx.strokeText("PFIFF!",s.x,oben-24);
+      ctx.fillStyle="#ffe98a";ctx.fillText("PFIFF!",s.x,oben-24);
+    }
+    ctx.restore();
   }
 
   // Kuerzester Abstand eines Punkts zur STRECKE a-b (nicht zur unendlichen Geraden) —
@@ -4599,8 +4861,10 @@
         verteidiger.fouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
         feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!");
-        const ftGemacht=schiesseFreiwuerfe(schuetze,1);
-        feed(schuetze.side,schuetze.n+(ftGemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+        // Der Zusatz-Freiwurf laeuft jetzt sichtbar ab (Standphase) statt im Hintergrund;
+        // der Ballwechsel danach passiert in beendeFreiwuerfe, nicht mehr hier.
+        starteFreiwuerfe(schuetze,1,verteidiger,true);
+        return;
       }
       // Opus-Review-Fund #10: die fruehere "Einwurf-Pause" (fsLive.einwurfBis) sperrte nur
       // entscheideBallaktion — Bewegung, Schussuhr und Steal liefen waehrenddessen
@@ -4620,10 +4884,9 @@
       logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
       feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
-      const gemacht=schiesseFreiwuerfe(schuetze,anzahl);
-      feed(schuetze.side,schuetze.n+" verwandelt "+gemacht+" von "+anzahl+" Freiwürfen.");
-      fsAktuell={spieler:schuetze,verteidiger,passgeber:flug.passgeber,rebounder:null};
-      naechsterAngriff(1-schuetze.side);
+      // Standphase statt Sofort-Abrechnung: Aufstellung, Pfiff, je Wurf ein Ballflug —
+      // Anzahl, Formel und der Ballwechsel danach bleiben unveraendert (beendeFreiwuerfe).
+      starteFreiwuerfe(schuetze,anzahl,verteidiger,false);
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
       // Ein bedraengter Fehlwurf zaehlt anteilig als Block statt als bloßer Fehlwurf —
@@ -4694,7 +4957,15 @@
       // veraendern (durchgemessen).
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
-      if(u.hatBall){
+      const stehtStill=fsLive.phase==="freiwurf";
+      if(stehtStill){
+        // STANDPHASE: EIN Ziel, sonst nichts — kein Dribbeln, keine Deckung, kein
+        // Freilaufen, kein Zug zum freien Ball. Der Zweig steht bewusst GANZ oben in der
+        // Kette, damit keiner der spaeteren Zweige ihn ueberschreiben kann; alle uebrigen
+        // Zweige bleiben Zeichen fuer Zeichen unveraendert.
+        const p=fsLive.freiwurf.plaetze[u.id];
+        if(p){ zx=p.x; zy=p.y; }
+      } else if(u.hatBall){
         // WUNSCHDISTANZ statt "immer zum Korb" (Archetypen-Runde). Bisher stand hier
         // `zx=korbX` fuer JEDEN Ballfuehrer: wer den Ball hatte, zog los Richtung Ring,
         // egal ob er von dort ueberhaupt trifft. Das war der Grund, warum ein reiner
@@ -4848,7 +5119,12 @@
         zx=p.x; zy=p.y;
       }
       u._zielHomeX=zx; u._zielHomeY=zy; // Debug-Anzeige (window.__arena.debugZiele), s.u.
-      { // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
+      // SEPARATION AUS WAEHREND DER STANDPHASE: die Zonenplaetze liegen konstruktions-
+      // bedingt eng beieinander (Gassenabstand ~30px, quer ueber die Zone 75px) — alles
+      // innerhalb von SEP_RADIUS=60. Die Abstossung wuerde genau die Formation
+      // auseinandertreiben, die die Phase zeigen soll. In der freien Simulation bleibt sie
+      // unveraendert aktiv.
+      if(!stehtStill){ // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
         let sepX=0, sepY=0;
         for(const other of ALLE_SPIELER){
           if(other===u||u.deckt===other||other.deckt===u)continue;
@@ -4943,8 +5219,29 @@
     // (ohne entscheideBallaktion/versucheSteal, die neue Ballwechsel ausloesen wuerden)
     // laesst die Spieler sanft in ihre letzte Ziel-Position auslaufen statt einzufrieren.
     if(done){bewegeSpielerLive(dt);return;}
+    // STANDPHASE: die freie Simulation ist ausgesetzt — kein entscheideBallaktion, kein
+    // Steal, keine Manndeckung, kein Rebound-Kampf; die Spieler laufen ausschliesslich auf
+    // ihre Freiwurf-Plaetze (Zweig ganz oben in bewegeSpielerLive).
+    //
+    // DIE UHR STEHT. Bewusste Entscheidung, kein Nebeneffekt: eine Sequenz kostet 3,7s
+    // (ein Freiwurf) bis 7,9s (drei) Spielzeit — bei vier bis sechs Foulpfiffen waeren das
+    // 20-40s der 120s Spieldauer, also bis zu einem Drittel aller Angriffe, nur weil eine
+    // Animation sichtbar geworden ist. Die Boxscore-Kalibrierung (Wurfquoten, Pp-Messung)
+    // haengt an der Zahl der Possessions; ein Sichtbarkeits-Umbau darf sie nicht
+    // verschieben. In echtem Basketball steht die Uhr bei Freiwuerfen ebenfalls. Alles,
+    // was gegen fsT laeuft (fastbreak.bis, screent.bis, rollBis, hilfeCd, frischerPassBis),
+    // wird beim Betreten der Phase ohnehin geloescht — deshalb friert das Anhalten keine
+    // halb abgelaufene Frist ein. Der Schiedsrichter zaehlt aus genau diesem Grund in dt
+    // statt in fsT (s. fsSchiri).
+    if(fsLive.phase==="freiwurf"){
+      stepFreiwurfPhase(dt);
+      bewegeSchiri(dt);
+      bewegeSpielerLive(dt);
+      return;
+    }
     fsT+=dt;
     if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
+      fsLive.phase="laufend"; fsLive.freiwurf=null;
       bkSfx("buzzer.mp3",0.8); bkLoopStop();
       // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
       // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
@@ -5079,7 +5376,11 @@
       }
     }
 
-    zuordneDeckung(false);
+    // Loeste dieser Tick gerade ein Foul aus (loeseFlugAuf -> starteFreiwuerfe), steht die
+    // Phase schon — dann keine Manndeckung mehr zuteilen, sonst zieht sie die Spieler im
+    // selben Bild noch einmal auf ihre Gegenspieler statt auf die Freiwurf-Plaetze.
+    if(fsLive.phase!=="freiwurf")zuordneDeckung(false);
+    bewegeSchiri(dt);
     bewegeSpielerLive(dt);
   }
 
@@ -5442,6 +5743,10 @@
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
       });
     });
+    // Schiedsrichter NACH den Spielern, VOR dem Ball: beim Pfiff steht er dicht am
+    // Foul-Ort und darf dort nicht hinter einer Figur verschwinden — der Ball wiederum
+    // bleibt das oberste Element, wie bisher.
+    zeichneSchiri();
     // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
     // weiter zum Korb, bei Steal zum Verteidiger. Fables Fund (Polish-Runde, 24.08.): der
     // echte Basketball-Sprite (public/sprites/basketball/ball.png) lag seit der ersten
@@ -10488,10 +10793,10 @@
       // fsLive: nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive), fuer
       // die drei Vorab-Disziplinen bleibt es null — kein Sonderfall im Motor, einfach
       // mitgesichert wie alles andere.
-      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive}),
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive, fsSchiri}),
       zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
                     fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
-                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive;},
+                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive; fsSchiri=a.fsSchiri;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
       bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
@@ -10755,6 +11060,14 @@
     // Basketball-Live-Engine, dieselbe Quelle wie fsBisher(). Read-only, wie kader()/
     // einheiten() daneben.
     fsZuege:()=>fsZuege,
+    // Abnahme der Standphase (Freiwurf/Schiedsrichter, 29.08.): read-only wie fsZuege
+    // daneben — der Phasenzustand plus die Position des Schiedsrichters, damit sich von
+    // aussen (Playwright) exakt der Moment abpassen laesst, in dem die Formation steht.
+    fsPhase:()=>fsLive?{phase:fsLive.phase,
+      freiwurf:fsLive.freiwurf?{schuetze:fsLive.freiwurf.schuetze.n,seite:fsLive.freiwurf.schuetze.side,
+        anzahl:fsLive.freiwurf.anzahl,idx:fsLive.freiwurf.idx,gemacht:fsLive.freiwurf.gemacht,
+        stufe:fsLive.freiwurf.stufe,undEins:fsLive.freiwurf.undEins}:null,
+      schiri:fsSchiri?{x:Math.round(fsSchiri.x),y:Math.round(fsSchiri.y),pfiffT:+fsSchiri.pfiffT.toFixed(2)}:null}:null,
     fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
