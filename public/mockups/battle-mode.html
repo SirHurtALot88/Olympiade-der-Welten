@@ -128,6 +128,17 @@
         <button class="btn g" id="fokusweg" type="button">Fokus aufheben</button>
         <button class="btn g" id="ansageweg" type="button" hidden>Ansage aufheben</button>
       </div>
+      <!-- RENNPLAN-ANSAGE (nur die fuenf Bahn-Disziplinen). Das Gegenstueck zur
+           Fokuszeile darueber: dort markiert man einen Gegner, hier sagt man einem
+           EIGENEN Laeufer mitten im Rennen einen anderen Plan an. Steht aus demselben
+           Grund direkt unter der Kaderleiste — dort liegen die Namen, ueber die man
+           auswaehlt. Die Knopfreihe fuellt die Engine aus BAHN_ART, weil jede Bahn
+           ihre eigenen drei Plaene mit eigenen Namen hat. -->
+      <div class="rennplanzeile" id="rennplanzeile" hidden>
+        <span id="rennplantext"></span>
+        <span class="rpknoepfe" id="rennplanknoepfe"></span>
+        <button class="btn g" id="rennplanzu" type="button" hidden>Schließen</button>
+      </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>

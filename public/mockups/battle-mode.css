@@ -368,6 +368,40 @@
   .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
   .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
     background:var(--fokus);margin-right:5px;vertical-align:-1px}
+  /* RENNPLAN-ANSAGE. --ansage ist das CSS-Gegenstueck zu ANSAGE_FARBE in
+     battle-mode.engine.js (Ring am Boden, Marke ueber dem Kopf, Ruf beim Wechsel) —
+     beide muessen denselben Ton tragen, damit Kachel und Bahn als EIN Zustand lesbar
+     sind. Bewusst nicht --fokus: die beiden Mechaniken sitzen in verschiedenen
+     Disziplinen, und wer sie nebeneinander sieht (in zwei Laeufen), soll sie nicht
+     fuer dieselbe halten. Und bewusst kein Ton, der auf der Bahn schon etwas bedeutet:
+     Team-Orange/Cyan, Reserve-Gruen/Orange/Rot, Sog-Blau sind alle vergeben.
+     Klasse bewusst .kk.rennplan-ansage statt .kk.ansage: der Kampf (PR #691) hat
+     .kk.ansage bereits fuer die Zielansage vergeben, und .kk ist die Kader-Kachel-
+     Basis ueber alle Disziplinen hinweg — derselbe Klassenname haette beide Zustaende
+     global ueberlagert. */
+  .oly-battle-arena.oly-battle-arena{--ansage:#b98cff}
+  .oly-battle-arena.oly-battle-arena .kk.rennplan-ansage{border-color:var(--ansage);
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--ansage) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.rennplan-ansage b{color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile b{color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile .amarke{display:inline-block;width:9px;height:9px;border-radius:50%;
+    background:var(--ansage);margin-right:5px;vertical-align:-1px}
+  .oly-battle-arena.oly-battle-arena .rpknoepfe{display:flex;gap:6px;flex-wrap:wrap}
+  .oly-battle-arena.oly-battle-arena .rpknopf{border:1px solid var(--line);background:var(--surface);
+    color:var(--muted);border-radius:5px;padding:3px 9px;cursor:pointer;
+    font:600 11px/1.3 var(--sans,inherit)}
+  .oly-battle-arena.oly-battle-arena .rpknopf:hover{color:var(--ink);border-color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rpknopf:focus-visible{outline:2px solid var(--ansage);outline-offset:1px}
+  /* Der laufende Plan ist markiert, aber NICHT gesperrt: ein Klick darauf ist folgenlos
+     (planWechsel steigt bei gleichem Plan aus), und ein disabled-Knopf traegt keinen
+     Titel — genau den will man hier aber lesen koennen. */
+  .oly-battle-arena.oly-battle-arena .rpknopf.an{color:var(--ansage);border-color:var(--ansage);
+    background:color-mix(in srgb,var(--ansage) 14%,transparent)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile .btn[hidden]{display:none}
   /* ZIELANSAGE (Kampf). Erbt Farbe und Kachel-Zustaende vom Fokus-Doppeln darueber — es
      ist dieselbe Geste, nur in einer anderen Disziplin, und zwei Signalfarben fuer dasselbe
      waeren zwei Dinge zum Lernen. Eigen ist nur die SPERRUHR: ein Kreisausschnitt, der mit
