@@ -358,6 +358,23 @@
   .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
   .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
     background:var(--fokus);margin-right:5px;vertical-align:-1px}
+  /* ZIELANSAGE (Kampf). Erbt Farbe und Kachel-Zustaende vom Fokus-Doppeln darueber — es
+     ist dieselbe Geste, nur in einer anderen Disziplin, und zwei Signalfarben fuer dasselbe
+     waeren zwei Dinge zum Lernen. Eigen ist nur die SPERRUHR: ein Kreisausschnitt, der mit
+     der Restzeit schrumpft (--p von 100 auf 0, je Bild aus der Engine gesetzt) und die
+     Restsekunden in der Mitte traegt. Kein Timer in Textform daneben: der Ring sagt "noch
+     nicht", die Zahl sagt "wie lange", und beide stehen an dem Knopf, den sie sperren. */
+  .oly-battle-arena.oly-battle-arena .kk.ansage{border-color:var(--fokus);box-shadow:0 0 0 2px color-mix(in srgb,var(--fokus) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.ansage b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .kk.gesperrt{cursor:not-allowed;opacity:.72}
+  .oly-battle-arena.oly-battle-arena .kk.gesperrt:hover{border-color:var(--line)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr{position:relative;flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+    margin-right:auto;
+    background:conic-gradient(var(--fokus) calc(var(--p,0) * 1%),color-mix(in srgb,var(--fokus) 16%,transparent) 0)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ansageuhr::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sunk)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr b{position:absolute;inset:0;z-index:1;display:flex;align-items:center;
+    justify-content:center;font:700 9px/1 var(--mono,ui-monospace,monospace);color:var(--fokus)}
   /* Endstand */
   .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
     gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}

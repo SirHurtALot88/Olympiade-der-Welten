@@ -117,9 +117,16 @@
            Worten, was der orange Ring auf dem Feld zeigt: wen die eigene Hilfsverteidigung
            gerade bevorzugt doppelt. Steht direkt unter der Kaderleiste, weil dort die
            Namen liegen, ueber die man auswaehlt. -->
+      <!-- ZIELANSAGE (nur Kampf-Disziplinen). Dieselbe Zeile, dieselbe Signalfarbe, andere
+           Mechanik: links die Sperruhr (ein schrumpfender Ring mit Restsekunden — sie ist
+           der Preis der Ansage und muss deshalb sichtbar sein, nicht nur spuerbar), rechts
+           der eigene Aufheben-Knopf. Der Basketball-Knopf daneben bleibt unberuehrt; beide
+           blenden sich gegenseitig aus, je nachdem welche Disziplin laeuft. -->
       <div class="fokuszeile" id="fokuszeile" hidden>
+        <span class="ansageuhr" id="ansageuhr" hidden title="Sperre bis zur nächsten Zielansage"><b id="ansageuhrzahl"></b></span>
         <span id="fokustext"></span>
         <button class="btn g" id="fokusweg" type="button">Fokus aufheben</button>
+        <button class="btn g" id="ansageweg" type="button" hidden>Ansage aufheben</button>
       </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
