@@ -3450,7 +3450,7 @@
   // BASKETBALL-LIVE-ENGINE — Konstanten. Alle PLATZHALTER, wie ueberall in diesem
   // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
   // ARENA_INTERAKTION_KONZEPT.md).
-  const SPIELDAUER_BASKETBALL=90;   // Chris' Wunsch (25.08.): doppelte Spieldauer (vorher 45s)
+  const SPIELDAUER_BASKETBALL=120;  // Chris' Wunsch (25.08.: 45->90; 29.08.: nochmal laenger)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
   const DUNK_RADIUS=42;             // Fable-Fund (Wurfmechanik-Runde, 25.08.): ganz nah dran ist in echtem
@@ -3561,10 +3561,18 @@
   // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
   const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
   const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
-  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,115/0,885) —
+  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,085/0,915) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
-  const korbXVon=(side)=>side===0?W*0.885:W*0.115;
+  //
+  // KORB-ABSTAND ZUR GRUNDLINIE (Chris' Fund, 29.08.): mit 0,115/0,885 haengte der Korb
+  // 0,055*W (~68px) hinter der Grundlinie (grundX bei 0,06/0,94) — fast am Freiwurf-
+  // kreis, optisch als wuerde der Korb mitten im Feld schweben statt an der Wand.
+  // Realer Abstand Brett-zu-Grundlinie ist klein; 0,025*W (~31px) haengt den Ring
+  // sichtbar an die Grundlinie, ohne Brett/Ring hinter dem Spielfeldrand zu zeichnen.
+  // KORB_NAH_RADIUS/DREIER_RADIUS haengen relativ an korbX, nicht an einer absoluten
+  // Position — die Verschiebung aendert nur die Optik, keine Distanz-Klassifizierung.
+  const korbXVon=(side)=>side===0?W*0.915:W*0.085;
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -4499,6 +4507,11 @@
     if(rr()<proVersuch){
       decker.steals++; traeger.verluste++;
       feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
+      // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
+      // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
+      // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
+      // Float-Rendering, das jetzt zwischen Angriffs- und Abwehr-Highlight unterscheidet.
+      schwebe({x:0,y:0,txt:art.wortAbwehr.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
@@ -4522,6 +4535,7 @@
         const f=flug.abgefangenVon;
         f.steals++; flug.passgeber.verluste++; f.lunge=0.4;
         feed(f.side,f.n+" fängt den Pass ab — Steal.");
+        schwebe({x:0,y:0,txt:"STEAL!",life:1.1,crit:true,_def:true,_spieler:f.id});
         logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
         fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
@@ -4622,6 +4636,7 @@
       if(flug.blockKandidat&&rr()<blockChance){
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
+        schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:flug.blockKandidat.id});
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
@@ -5303,7 +5318,10 @@
     // und bleibt die knappe Achse, auch nachdem die Spielrichtung auf X gedreht ist —
     // ein an W bemessener Radius wuerde ueber die Seitenlinien hinausschiessen.
     for(const links of [true,false]){
-      const grundX=links?W*0.06:W*0.94, korbX=links?W*0.115:W*0.885;
+      // korbX kommt aus derselben korbXVon()-Referenz wie Ballflug/Distanzklassifizierung
+      // (nicht mehr eigene Literale hier) — sonst laeuft die Zeichnung wieder aus dem
+      // Ruder, sobald korbXVon() an anderer Stelle nachjustiert wird.
+      const grundX=links?W*0.06:W*0.94, korbX=korbXVon(links?1:0);
       // Zone (die Zahnstocher-Box unterm Korb)
       ctx.strokeRect(links?grundX:grundX-H*0.16,H/2-H*0.08,H*0.16,H*0.16);
       // Freiwurflinie mit Halbkreis
@@ -5342,9 +5360,6 @@
   function zeichneFeldspiel(){
     bodenFeldspiel();
     const art=FB();
-    // Enthuellte Werte, einmal je Bild — siehe fsBisher(). Fehlt ein Spieler noch in der
-    // Map (kein Zug bisher enthuellt, an dem er beteiligt war), ist er bei null Werten.
-    const bisher=fsBisher(), NULLWERTE={punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0};
     FSTEAM.forEach((g,side)=>{
       const c=side===0?css("--home"):css("--away");
       g.forEach(u=>{
@@ -5421,9 +5436,10 @@
         // dann, wenn x/y (fuer Deckung/Steal/Bedraengnis absichtlich) fast identisch sind.
         const istAbwehr=fsLive&&fsLive.amBall!=null&&side!==fsLive.amBall, vz=istAbwehr?-1:1;
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
-        const stat=bisher.spieler.get(u.id)||NULLWERTE;
-        if(stat.punkte||stat.rebounds||stat.steals||stat.bloecke||stat.assists)
-          schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56*vz,"#dfe6ef",8);
+        // Chris' Fund (29.08.): eine Box-Score-Zeile UNTER JEDER der zwoelf Figuren
+        // gleichzeitig war unlesbar — zwoelf ueberlappende Zahlenwolken auf engem Raum.
+        // Die vollen Werte stehen bereits geordnet in der Wertungstabelle (renderWertung-
+        // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
       });
     });
     // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
@@ -5444,7 +5460,10 @@
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
-      ctx.fillStyle=f._gross?css("--warn"):css("--ok");
+      // _def (Chris' Fund, 29.08.: Highlights auch fuer Steal/Block, nicht nur fuer
+      // Treffer) bekommt eine eigene Farbe (--crit), damit Abwehr- und Angriffs-Jubel
+      // auf den ersten Blick auseinanderzuhalten sind.
+      ctx.fillStyle=f._def?css("--crit"):f._gross?css("--warn"):css("--ok");
       ctx.font=(f._gross?"800 22px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
@@ -8162,32 +8181,42 @@
   }
 
   function renderWertung(){
-    const tb=document.getElementById("wbody");if(!tb)return;
-    const reihen=[...U].sort((a,b)=>beitragVon(b)-beitragVon(a));
+    // ZWEI TABELLEN STATT EINER (Chris' Fund, 29.08., s. .wsplit in battle-mode.html):
+    // eigenes Team links (wbodyL), Gegner rechts (wbodyR) — jede Seite fuer sich nach
+    // Beitrag sortiert, statt einer gemeinsam gemischten Liste.
+    const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
+    if(!tbL||!tbR)return;
     const maxD=Math.max(1,...U.map(u=>u.st.dmg)),maxH=Math.max(1,...U.map(u=>u.st.heal)),
           maxT=Math.max(1,...U.map(u=>u.st.tank)),maxV=Math.max(1,...U.map(u=>u.st.verh));
-    tb.textContent="";
-    for(const u of reihen){
-      const tr=el("tr",(u.side===0?"eigen":"gegner")+(u.down?" raus":""));
-      tr.appendChild(el("td",null,u.n.length>15?u.n.slice(0,14)+"…":u.n));
-      const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(Math.round(v)):"—";return td;};
-      tr.appendChild(c(u.st.dmg,maxD));
-      tr.appendChild(c(u.st.heal,maxH));
-      tr.appendChild(c(u.st.verh,maxV));
-      tr.appendChild(c(u.st.tank,maxT));
-      tr.appendChild(c(u.st.ko,99));
-      const l=leistungVon(u,U);
-      const td=el("td","n");
-      if(l==null){td.textContent="—";}
-      else{td.textContent=l+" %";
-        td.style.color=l>=140?"var(--ok)":l<=60?"var(--crit)":"var(--muted)";
-        td.style.fontWeight=l>=140||l<=60?"600":"400";}
-      td.title="Beitrag gemessen an dem, was der Einsatzwert erwarten lässt";
-      tr.appendChild(td);
-      // 7. Spalte existiert nur fuers Feldspiel (FG-Quote, s. renderWertungFeldspiel) —
-      // hier ein leerer Platzhalter, damit Kopf- und Zeilen-Spaltenzahl uebereinstimmen.
-      tr.appendChild(el("td","n","–"));
-      tb.appendChild(tr);
+    tbL.textContent="";tbR.textContent="";
+    for(const seite of[0,1]){
+      const tb=seite===0?tbL:tbR;
+      const reihen=U.filter(u=>u.side===seite).sort((a,b)=>beitragVon(b)-beitragVon(a));
+      for(const u of reihen){
+        const tr=el("tr",(u.side===0?"eigen":"gegner")+(u.down?" raus":""));
+        tr.appendChild(el("td",null,u.n.length>10?u.n.slice(0,9)+"…":u.n));
+        const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(Math.round(v)):"—";return td;};
+        tr.appendChild(c(u.st.dmg,maxD));
+        tr.appendChild(c(u.st.heal,maxH));
+        tr.appendChild(c(u.st.verh,maxV));
+        tr.appendChild(c(u.st.tank,maxT));
+        tr.appendChild(c(u.st.ko,99));
+        const l=leistungVon(u,U);
+        const td=el("td","n");
+        if(l==null){td.textContent="—";}
+        else{td.textContent=l+" %";
+          td.style.color=l>=140?"var(--ok)":l<=60?"var(--crit)":"var(--muted)";
+          td.style.fontWeight=l>=140||l<=60?"600":"400";}
+        td.title="Beitrag gemessen an dem, was der Einsatzwert erwarten lässt";
+        tr.appendChild(td);
+        // Spalten 7/8 existieren nur fuers Feldspiel (FG%/Impact, s.
+        // renderWertungFeldspiel) — hier Platzhalter, damit Kopf- und Zeilen-
+        // Spaltenzahl uebereinstimmen. Spalte 9 (Eignung) gilt ueberall, s. dort.
+        tr.appendChild(el("td","n","–"));
+        tr.appendChild(el("td","n","–"));
+        tr.appendChild(el("td","n",u.eig?String(Math.round(u.eig)):"—"));
+        tb.appendChild(tr);
+      }
     }
   }
 
@@ -8198,21 +8227,38 @@
   // Einheit (bauSpieler) und werden von der Basketball-Live-Engine schon befuellt
   // (wirf/versucheSteal/loeseFlugAuf) — es fehlte nur die Anzeige. Header-Beschriftung
   // wird in setWertungKopf() passend zur Disziplin umgeschaltet.
+  // Spalten 0-8 wie zuvor, 9. Spalte (Eignung) neu und gilt fuer BEIDE Modi (Chris'
+  // Fund, 29.08.: der erwartete Einsatzwert soll direkt neben der tatsaechlichen
+  // Leistung stehen, nicht nur indirekt ueber die Leistungs-Prozentzahl). Feldspiel
+  // bekommt zusaetzlich FG% (7) und Impact (8, dieselbe Formel wie MOTOREN[disc].wert()
+  // in der Messreihe — ein Boxscore-Kompositwert, kein neu erfundener).
+  //
+  // Kurze Kopf-Woerter (Chris' Fund, 29.08.): zehn Spalten je Team-Block bei ~450px
+  // Breite (zwei Bloecke aus ~900-960px Gesamtbreite, s. .wsplit) lassen fuer jede nur
+  // ~45px — "Verhindert"/"Steals"/"Impact" sprengten das. Reale Boxscore-Kuerzel
+  // (PTS/REB/AST/STL/BLK/TO/FG%) sind ausserdem vertrauter als ausgeschriebene Woerter;
+  // die volle Bedeutung steht weiterhin in wfuss.
   const WERTUNG_KOPF={
-    kampf:["Schaden","Heilung","Verhindert","Getankt","KO","Leistung","–"],
-    feldspiel:["Punkte","Rebounds","Assists","Steals","Blocks","Verluste","FG"]};
+    kampf:["Schd","Heil","Verh","Tank","KO","Leist","–","–","–","Eig"],
+    feldspiel:["Pkt","Reb","Ast","Stl","Blk","TO","FG","FG%","Imp","Eig"]};
   function setWertungKopf(feldspiel){
     const kopf=feldspiel?WERTUNG_KOPF.feldspiel:WERTUNG_KOPF.kampf;
     for(let i=0;i<kopf.length;i++){
-      const th=document.getElementById("wth"+i); if(th)th.textContent=kopf[i];
+      // Jede Kopfzeile existiert zweimal (eigenes Team/Gegner, s. .wsplit) — beide mit
+      // demselben Durchlauf beschriften, das "r"-Suffix ist die einzige Abweichung.
+      for(const suf of["","r"]){
+        const th=document.getElementById("wth"+i+suf); if(th)th.textContent=kopf[i];
+      }
     }
     const fuss=document.getElementById("wfuss");
     if(fuss)fuss.textContent=feldspiel
-      ? "„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit)."
-      : "„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.";
+      ? "„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" gewichtet Punkte/Rebounds/Steals+Blocks/Ballverluste zu einem Kompositwert. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
+      : "„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet. „Eignung\" ist dieser Einsatzwert selbst.";
   }
   function renderWertungFeldspiel(){
-    const tb=document.getElementById("wbody");if(!tb)return;
+    // ZWEI TABELLEN STATT EINER, s. renderWertung() oben fuer dieselbe Begruendung.
+    const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
+    if(!tbL||!tbR)return;
     // Ueber fsBisher() statt direkt u.punkte/u.rebounds/... zu lesen — sonst waeren die
     // Objektfelder (bei Football/Hockey/Tennis vorab durchgerechnet) ein Spoiler, derselbe
     // Fehler, den fsBisher() fuer Score und Kader-Panel schon behebt. Fuer die Basketball-
@@ -8221,27 +8267,42 @@
     const alle=[...FSTEAM[0],...FSTEAM[1]];
     const bisher=fsBisher().spieler;
     const s=(u)=>bisher.get(u.id)||{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0,feldwuerfe:0,feldwuerfeTreffer:0};
-    const reihen=[...alle].sort((a,b)=>s(b).punkte-s(a).punkte||s(b).assists-s(a).assists);
     const maxP=Math.max(1,...alle.map(u=>s(u).punkte));
-    tb.textContent="";
-    for(const u of reihen){
-      const st=s(u);
-      const tr=el("tr",u.side===0?"eigen":"gegner");
-      tr.appendChild(el("td",null,u.n.length>15?u.n.slice(0,14)+"…":u.n));
-      const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(v):"—";return td;};
-      tr.appendChild(c(st.punkte,maxP));
-      tr.appendChild(c(st.rebounds,99));
-      tr.appendChild(c(st.assists,99));
-      tr.appendChild(c(st.steals,99));
-      tr.appendChild(c(st.bloecke,99));
-      tr.appendChild(c(st.verluste,99));
-      // FG-SPALTE (Chris' Fund): Feldwurf-Treffer/Versuche, nicht nur Punkte — "FG 3/6"
-      // liest sich sofort als Trefferquote, waehrend eine reine Prozentzahl bei kleinen
-      // Versuchszahlen (ein 1/1-Spiel = 100 %) irrefuehrend waere. "—" ohne jeden Versuch.
-      const fg=el("td","n");
-      fg.textContent=st.feldwuerfe?st.feldwuerfeTreffer+"/"+st.feldwuerfe:"—";
-      tr.appendChild(fg);
-      tb.appendChild(tr);
+    tbL.textContent="";tbR.textContent="";
+    for(const seite of[0,1]){
+      const tb=seite===0?tbL:tbR;
+      const reihen=alle.filter(u=>u.side===seite).sort((a,b)=>s(b).punkte-s(a).punkte||s(b).assists-s(a).assists);
+      for(const u of reihen){
+        const st=s(u);
+        const tr=el("tr",u.side===0?"eigen":"gegner");
+        tr.appendChild(el("td",null,u.n.length>10?u.n.slice(0,9)+"…":u.n));
+        const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(v):"—";return td;};
+        tr.appendChild(c(st.punkte,maxP));
+        tr.appendChild(c(st.rebounds,99));
+        tr.appendChild(c(st.assists,99));
+        tr.appendChild(c(st.steals,99));
+        tr.appendChild(c(st.bloecke,99));
+        tr.appendChild(c(st.verluste,99));
+        // FG-SPALTE (Chris' Fund): Feldwurf-Treffer/Versuche, nicht nur Punkte — "FG 3/6"
+        // liest sich sofort als Trefferquote, waehrend eine reine Prozentzahl bei kleinen
+        // Versuchszahlen (ein 1/1-Spiel = 100 %) irrefuehrend waere. "—" ohne jeden Versuch.
+        const fg=el("td","n");
+        fg.textContent=st.feldwuerfe?st.feldwuerfeTreffer+"/"+st.feldwuerfe:"—";
+        tr.appendChild(fg);
+        // FG%-SPALTE (Chris' Fund, 29.08.): dieselbe Quote als Prozentzahl neben der
+        // Treffer/Versuche-Spalte — beide zusammen sagen mehr als jede fuer sich.
+        const fgp=el("td","n");
+        fgp.textContent=st.feldwuerfe?Math.round(st.feldwuerfeTreffer/st.feldwuerfe*100)+"%":"—";
+        tr.appendChild(fgp);
+        // IMPACT-SPALTE (Chris' Fund, 29.08.): derselbe Boxscore-Kompositwert wie
+        // MOTOREN[disc].wert() in der Messreihe (s. dort) — keine zweite Formel.
+        const impact=st.punkte+st.assists*1.0+st.rebounds*1.2+(st.steals+st.bloecke)*1.5-st.verluste*0.8;
+        tr.appendChild(el("td","n",impact?impact.toFixed(1):"—"));
+        // EIGNUNG-SPALTE: der erwartete Einsatzwert dieser Disziplin (s. baueEinheit/
+        // eigWert) — direkter Vergleich zur tatsaechlichen Leistung oben.
+        tr.appendChild(el("td","n",u.eig?String(Math.round(u.eig)):"—"));
+        tb.appendChild(tr);
+      }
     }
   }
 
@@ -9621,7 +9682,15 @@
   // Buehne und Feldspiel, die ihr Tempo schon anders steuern).
   const ZEIT_DEHNUNG={
     tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
-    spurt:5.36, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17
+    spurt:5.36, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
+    // Chris' Fund (29.08.): die Bewegung auf dem Court wirkt zu hektisch, um ihr zu
+    // folgen. tempoPx selbst anzufassen wuerde die Matrix-Balance neu aufrollen (s.
+    // die ausfuehrliche Herleitung beim tempoPx-Koeffizienten, bewegeSpielerLive) — der
+    // Kommentar direkt ueber dieser Tabelle sagt es selbst: eine reine dt-Streckung
+    // aendert an der INNEREN Balance nichts, nur an der Erzaehlgeschwindigkeit. Faktor 2
+    // heisst doppelt so viele echte Sekunden fuer dieselbe Spielsekunde — Bewegung wirkt
+    // halb so schnell, ohne dass sich verschiebt, wer zuerst am Ball/Rebound/Slot ist.
+    basketball:2
   };
   const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
 
