@@ -237,6 +237,7 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
 import type {
+  GameMode,
   SeasonSnapshotRecord,
   SponsorNegotiationProfile,
   SponsorLeihgabeRecord,
@@ -1057,7 +1058,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -6330,6 +6331,21 @@ export function useFoundationShellRouterBodyScope({
     setNewGameSuccess(null);
   }
 
+  /**
+   * Moduswahl im Anlege-Assistenten (docs/design/battle-mode-spielmodus-plan.md, 3.1).
+   *
+   * Verwirft wie `applyNewGamePreset()` die vorhandene Vorschau: der Modus entscheidet, ob der
+   * neue Save mit Liga-Split (`leagueByTeamId`) angelegt wird, also beschreibt eine vor dem
+   * Wechsel geprüfte Vorschau danach ein anderes Spiel. Der `confirmToken` aus dieser Vorschau
+   * darf nicht in ein Anlegen mit dem neuen Modus durchrutschen.
+   */
+  function selectNewGameMode(mode: GameMode) {
+    setNewGameMode(mode);
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+  }
+
   function setNewGameSoloTeam(teamId: string) {
     setNewGameChrisTeamIds([teamId]);
     setNewGameFrankyTeamIds([]);
@@ -6399,6 +6415,9 @@ export function useFoundationShellRouterBodyScope({
         },
         body: JSON.stringify({
           presetId: newGamePresetId,
+          // Vorschau (dryRun) und Anlegen laufen durch DENSELBEN Aufruf — beide sehen damit
+          // garantiert denselben Modus (Plan 2.3), es gibt keinen zweiten Payload-Bauplatz.
+          gameMode: newGameMode,
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
           sandbox: newGameSandbox,
@@ -12768,6 +12787,7 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameMode,
     newGamePresetId,
     newGamePreview,
     newGameSandbox,
@@ -12908,6 +12928,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
     seasonV2TopPlayers,
+    selectNewGameMode,
     selectTeamSettingsTeam,
     selectedBoardConfidence,
     selectedEncyclopediaEntry,

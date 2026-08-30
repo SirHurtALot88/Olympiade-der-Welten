@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { previewNewGameSetup } from "@/lib/game/new-game-setup-service";
+import { buildNewGameStateFromBaseline, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 
 // FoundationPageClient.tsx is now a 25-line wrapper; the New Game wizard and
 // team-settings markup live in FoundationTeamSettingsNewLook.tsx, and the
@@ -17,6 +17,7 @@ const shellRouterBodyScopePath = path.join(
   "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
 );
 const shellRouterBodyPath = path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx");
+const pageStatePath = path.join(process.cwd(), "lib/foundation/tabs/use-foundation-page-state.ts");
 const foundationPageTypesPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-types.ts");
 
 describe("new game setup UI contract", () => {
@@ -95,6 +96,61 @@ describe("new game setup UI contract", () => {
     expect(newLookSource).toContain('data-testid="game-mode-ownership-readonly"');
     expect(newLookSource).toContain("nl-newgame-clubgrid");
   });
+
+  /**
+   * Moduswahl im Anlege-Assistenten (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.1 /
+   * Abschnitt 4 PR 4). Drei Aussagen, in genau der Reihenfolge, in der ein Nutzer sie erlebt:
+   * der Umschalter ist da, er steht auf Manager Mode, und die Wahl landet wirklich im Payload.
+   */
+  it("bietet die Moduswahl an, startet auf Manager Mode und schickt den Wert mit", () => {
+    const newLookSource = fs.readFileSync(teamSettingsNewLookPath, "utf8");
+    const scopeSource = fs.readFileSync(shellRouterBodyScopePath, "utf8");
+    const pageStateSource = fs.readFileSync(pageStatePath, "utf8");
+
+    // (a) Sichtbar: der Umschalter samt beider Kacheln, VOR dem Klub-Raster.
+    expect(newLookSource).toContain('data-testid="new-game-mode-picker"');
+    expect(newLookSource).toContain('data-testid="new-game-mode-manager"');
+    expect(newLookSource).toContain('data-testid="new-game-mode-battle"');
+    expect(newLookSource).toContain("Manager Mode");
+    expect(newLookSource).toContain("Battle Mode");
+    expect(newLookSource.indexOf('data-testid="new-game-mode-picker"')).toBeLessThan(
+      newLookSource.indexOf('data-testid="new-game-ownership-picker"'),
+    );
+
+    // (b) Default: "manager" — ein neues Spiel ohne bewusste Wahl bleibt der heutige Standard.
+    expect(pageStateSource).toContain('const [newGameMode, setNewGameMode] = useState<GameMode>("manager");');
+
+    // (c) Die Auswahl aendert den Payload-Wert: EIN Aufruf an /api/new-game (Vorschau wie
+    //     Anlegen laufen durch `runNewGameSetup(dryRun)`), und dessen Body traegt `newGameMode`.
+    //     Ein zweiter Aufruf-Ort waere die Stelle, an der Vorschau und Anlegen auseinanderlaufen
+    //     koennten — deshalb wird hier auf genau einen gezaehlt (Plan-Abschnitt 2.3).
+    expect(scopeSource.match(/fetch\("\/api\/new-game"/g) ?? []).toHaveLength(1);
+    expect(scopeSource).toContain("gameMode: newGameMode,");
+    // Der Wechsel verwirft die geprüfte Vorschau — sonst legte der alte confirmToken ein Spiel
+    // im alten Modus an.
+    expect(scopeSource).toContain("function selectNewGameMode(mode: GameMode)");
+    expect(scopeSource).toMatch(/function selectNewGameMode[\s\S]*?setNewGamePreview\(null\);/);
+  });
+
+  it("die beiden Kachel-Werte legen wirklich unterschiedliche Spielstaende an", () => {
+    /*
+     * Der Wert-Nachweis zu (c) oben, im Stil des Solo-Falls weiter oben: die beiden Zeichenketten,
+     * die die Kacheln senden ("manager"/"battle"), sind genau die, die der Aufbau versteht — ein
+     * Vertipper an der Kachel liefe sonst still als Manager Mode durch, weil `normalizeBody()` in
+     * app/api/new-game/route.ts alles ausser "battle" auf "manager" faellt.
+     * Der vollstaendige Nachweis am Spielstand steht in tests/new-game-setup-service.test.ts.
+     */
+    const manager = buildNewGameStateFromBaseline({ presetId: "custom", chrisTeamIds: ["M-M"], gameMode: "manager" });
+    const battle = buildNewGameStateFromBaseline({ presetId: "custom", chrisTeamIds: ["M-M"], gameMode: "battle" });
+
+    expect(manager.gameState.scenarioMeta?.gameMode).toBe("manager");
+    expect(Object.keys(manager.gameState.seasonState.leagueByTeamId ?? {})).toHaveLength(0);
+
+    expect(battle.gameState.scenarioMeta?.gameMode).toBe("battle");
+    expect(Object.keys(battle.gameState.seasonState.leagueByTeamId ?? {})).toHaveLength(
+      battle.gameState.teams.length,
+    );
+  }, 120_000);
 
   it("keeps Online 4v4 ownership preset visible in the client", () => {
     const source = fs.readFileSync(teamSettingsNewLookPath, "utf8");
