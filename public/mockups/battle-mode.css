@@ -326,9 +326,16 @@
   .oly-battle-arena.oly-battle-arena .kseite{display:flex;gap:6px;flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .kseite.r{justify-content:flex-end}
   .oly-battle-arena.oly-battle-arena .kmitte{font:700 14px/1 ui-monospace,monospace;color:var(--ink);white-space:nowrap}
-  .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:74px;padding:4px 6px;border-radius:6px;
+  .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:86px;padding:4px 5px;border-radius:6px;
     background:var(--surface);border:1px solid var(--line)}
-  .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
+  /* SPRITE IN DER KACHEL (30.08., Chris: "bei den health Bars unten noch jeweils das
+     sprite vom spieler sichtbar"). Der Canvas kommt aus figur() (s. kaderFigur in
+     battle-mode.engine.js), also aus demselben Ebenen-Baukasten wie die Arena — hier nur
+     auf Kachelgroesse heruntergerechnet. image-rendering:pixelated wie ueberall sonst,
+     sonst matscht die Verkleinerung die Pixelfiguren weich. */
+  .oly-battle-arena.oly-battle-arena .kk .kkkopf{display:flex;align-items:center;gap:5px;min-width:0}
+  .oly-battle-arena.oly-battle-arena .kk .kkfigur{width:19px;height:24px;flex:none;image-rendering:pixelated}
+  .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
