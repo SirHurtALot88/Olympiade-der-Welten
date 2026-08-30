@@ -882,7 +882,20 @@ describe("foundation performance architecture helpers", () => {
     // Uebernahme-Zustaende gehoeren naeher an die Sponsorenseite, die sie verbraucht, als
     // in die Wurzel aller Foundation-Zustaende. Das ist ein eigener Umbau — die Ratsche
     // haelt nur fest, dass er noch aussteht, statt ihn zu erzwingen.
+    //
+    // 239 -> 241, zum dritten Mal bewusst statt heimlich: die Spielart-Auswahl im Neuspiel-
+    // Assistenten (Battle-Modus) hat genau zwei zusammengehoerende Zustaende ergaenzt —
+    // `newGamePlayMode` (Management oder Battle) und `newGameTeamPool` (die Klubs, die ein
+    // Spielstand DIESER Spielart haette). Der zweite ist kein Beiwerk: der Klub-Waehler rendert
+    // bisher `gameState.teams`, also den Team-Satz des LAUFENDEN Saves — im Battle-Modus waeren
+    // das 32 Klubs, von denen 16 im neuen Spielstand nicht existieren.
+    //
+    // Beide gehoeren zum Neuspiel-Assistenten und damit in dieselbe Nachbarschaft wie die
+    // uebrigen `newGame*`-Zustaende, die schon hier stehen (`newGamePresetId`,
+    // `newGameChrisTeamIds`, `newGamePreview`, ...). Sie an die Verbrauchsstelle zu ziehen hiesse,
+    // den ganzen `newGame*`-Block zu verschieben — derselbe eigene Umbau, den die Anmerkung oben
+    // schon zweimal benennt, nicht ein dritter Einzelfall.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(239);
+    expect(useStateCallCount).toBeLessThanOrEqual(241);
   });
 });

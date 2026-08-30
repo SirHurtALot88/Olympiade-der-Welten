@@ -158,12 +158,35 @@ describe("buildOwnershipForPreset -- Charakterisierung (Paket 1, unveraendertes 
     expect(aiEintrag).toEqual({ teamId: "A-A", controllerType: "ai", ownerDisplayName: "AI" });
   });
 
+  /**
+   * ══ ABSICHTLICH GEAENDERT (Battle-Modus, 30.08.) — ZWEI ERWARTUNGEN IN DIESER DATEI ══════════
+   *
+   * `buildOwnershipForPreset` filtert die Preset-Teams nicht mehr nur gegen `teamIds`, sondern
+   * FUELLT aus `teamIds` AUF, bis die vom Preset versprochene Anzahl steht
+   * (`loesePresetTeamsFuerBeideSeiten`, lib/game/preset-team-pool.ts). Grund: im Battle-Modus
+   * umfasst der Pool nur 16 Teams, und `P-S`/`V-W` sind nicht darunter -- gefiltert bekam der Host
+   * im 1v1-Raum NULL Teams (sein einziges Preset-Team ist `P-S`) und konnte den Raum nicht starten.
+   *
+   * DIE EIGENSCHAFT, DIE DIESE ZWEI FAELLE PRUEFEN, GILT WEITER und ist der Grund, warum sie
+   * bleiben: kein Team ausserhalb von `teamIds` taucht auf, die Ergebnislaenge ist die des Pools.
+   * Geaendert hat sich nur, WELCHE Teams aus dem Pool jemand bekommt, wenn der Pool die
+   * Wunschteams nicht hergibt -- vorher "dann eben weniger", jetzt "dann eben andere".
+   *
+   * Beide Faelle benutzen einen kuenstlichen Drei-Team-Pool, der so nirgends vorkommt (die echten
+   * Pools sind 32 bzw. 16 Teams gross). Fuer den ECHTEN Management-Pool ist die Zuteilung
+   * zeichengleich zu vorher — das haelt der Rest dieser Datei fest, unveraendert.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
   it("GEGENPROBE (Eigenschaft 4): die Beschraenkung auf den teamIds-Parameter wirkt weiter -- ein Team ausserhalb der Liste taucht nicht auf", () => {
     const restringiert = ["A-A", "P-S", "M-S"];
     const ergebnis = buildOwnershipForPreset([host, franky], "chris_4_franky_4_rest_ai", restringiert);
     expect(ergebnis).toHaveLength(3);
+    // Drei Teams fuer ein 4+4-Preset: beide bekommen ihr Wunschteam (`P-S` bzw. `M-S`), das
+    // uebrige `A-A` geht in die Auffuellung des Hosts. Entscheidend ist, dass Franky sein `M-S`
+    // BEHAELT -- eine reine Host-zuerst-Auffuellung haette es ihm weggenommen (siehe den
+    // Kommentar an `loesePresetTeamsFuerBeideSeiten`).
     expect(ergebnis).toEqual([
-      { teamId: "A-A", controllerType: "ai", ownerDisplayName: "AI" },
+      { teamId: "A-A", controllerType: "human", participantId: "p-host", userId: "u-host", ownerDisplayName: "Chris" },
       { teamId: "P-S", controllerType: "human", participantId: "p-host", userId: "u-host", ownerDisplayName: "Chris" },
       { teamId: "M-S", controllerType: "human", participantId: "p-franky", userId: "u-franky", ownerDisplayName: "Franky" },
     ]);
@@ -172,10 +195,15 @@ describe("buildOwnershipForPreset -- Charakterisierung (Paket 1, unveraendertes 
   it("GEGENPROBE (Eigenschaft 4, zaehlenbasierter Preset): teamIds-Beschraenkung wirkt auch fuer chris_2_rest_ai", () => {
     const restringiert = ["A-A", "P-S", "M-S"];
     const ergebnis = buildOwnershipForPreset([host, franky], "chris_2_rest_ai", restringiert);
+    // Ohne Wunschliste fuellt der zaehlenbasierte Preset ALPHABETISCH aus dem Pool auf, nicht mehr
+    // in der Reihenfolge des uebergebenen Arrays (`teamIds.slice(0, 2)`). Fuer die echten Pools ist
+    // das derselbe Griff -- `ONLINE_ROOM_TEAM_IDS` und die 16 Battle-Teams sind alphabetisch
+    // sortiert; nur dieser handgebaute Pool ist es nicht. Begruendung fuer die Sortierung statt der
+    // Array-Reihenfolge: `sortiereNachTeamId` in lib/game/preset-team-pool.ts.
     expect(ergebnis).toEqual([
       { teamId: "A-A", controllerType: "human", participantId: "p-host", userId: "u-host", ownerDisplayName: "Chris" },
-      { teamId: "P-S", controllerType: "human", participantId: "p-host", userId: "u-host", ownerDisplayName: "Chris" },
-      { teamId: "M-S", controllerType: "ai", ownerDisplayName: "AI" },
+      { teamId: "P-S", controllerType: "ai", ownerDisplayName: "AI" },
+      { teamId: "M-S", controllerType: "human", participantId: "p-host", userId: "u-host", ownerDisplayName: "Chris" },
     ]);
   });
 });

@@ -2117,6 +2117,32 @@ export type NewGameSetupApiResponse = {
 
 export const NEW_GAME_VISIBLE_PRESET_IDS: NewGamePresetId[] = ["solo_1", "online_4v4"];
 
+/**
+ * BEKANNTE ZWEITE KOPIE — bewusst stehen gelassen, mit einem Test darunter, der sie festnagelt.
+ *
+ * Dieselben Zahlen stehen ein zweites Mal in `NEW_GAME_PRESETS` (lib/game/new-game-setup-service.ts).
+ * Das ist eine Verletzung der Hausregel „eine Quelle pro Groesse", und sie ist hier NICHT neu: die
+ * `NewGamePresetId`-Union selbst liegt aus demselben Grund an vier Stellen (siehe den Kommentar an
+ * `saveMode` in lib/data/olyDataTypes.ts, wo ein frueheres Paket dieselbe Entscheidung schon
+ * einmal getroffen und begruendet hat).
+ *
+ * WARUM NICHT JETZT ZUSAMMENGELEGT: diese Datei traegt AUSSCHLIESSLICH `import type`-Zeilen — sie
+ * ist der typenreine Modulkopf des Foundation-Clients. `NEW_GAME_PRESETS` liegt dagegen in
+ * `new-game-setup-service.ts`, und das zieht ueber `persistence-service` `better-sqlite3` nach.
+ * Ein Import von dort waere ein Server-Modul im Client-Bundle. Der saubere Weg waere, die
+ * Preset-Tabelle in ein eigenes importfreies Blatt-Modul zu heben — ein Umbau an einem Dutzend
+ * unbeteiligter Aufrufer, der in diesen Korrekturlauf nicht gehoert.
+ *
+ * GEFAEHRLICH IST HIER OHNEHIN NUR DAS AUSEINANDERLAUFEN, nicht die Kopie an sich: der Assistent
+ * ruft `applyNewGamePreset` seit dem Umbau auf freie Team-Auswahl ausschliesslich mit `"custom"`
+ * auf (FoundationTeamSettingsNewLook.tsx), gelesen werden also nur `custom` und der Startwert
+ * `solo_1` — beide `["M-M"]`, und `M-M` gibt es in BEIDEN Team-Poolen (Management 32 wie Battle 16).
+ * Die `P-S`/`V-W`-Listen darunter erreicht zur Laufzeit niemand.
+ *
+ * DAMIT DAS SO BLEIBT: `tests/new-game-preset-defaults-sind-eine-kopie.test.ts` vergleicht diese
+ * Tabelle Feld fuer Feld mit `NEW_GAME_PRESETS`. Wer dort etwas aendert und hier nicht, faellt auf
+ * — statt dass die zwei Kopien still auseinanderlaufen, bis es jemandem im Spiel auffaellt.
+ */
 export const NEW_GAME_PRESET_DEFAULTS: Record<NewGamePresetId, { label: string; chrisTeamIds: string[]; frankyTeamIds: string[]; online: boolean }> = {
   solo_1: { label: "Solo 1 Team", chrisTeamIds: ["M-M"], frankyTeamIds: [], online: false },
   solo_2: { label: "Solo 2 Teams", chrisTeamIds: ["M-M", "D-P"], frankyTeamIds: [], online: false },

@@ -15,6 +15,10 @@ import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
 import { matchesArenaScope, roomMatchdayScopeId } from "@/lib/room/arena-sync-state";
 import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
+import { resolvePlayMode } from "@/lib/season/season-discipline-schedule";
+import { waehleBattleModeTeamIds } from "@/lib/season/battle-mode-spielplan";
+import { loesePresetTeamsFuerBeideSeiten } from "@/lib/game/preset-team-pool";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -53,6 +57,26 @@ export const ONLINE_ROOM_TEAM_IDS = [
 
 const FOUR_PLUS_FOUR_HOST_TEAM_IDS = ["P-S", "D-P", "M-M", "V-W"];
 const FOUR_PLUS_FOUR_FRANKY_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
+
+/**
+ * Der Team-Pool eines Raums, abhaengig von der Spielart des Spielstands, an dem er haengt.
+ *
+ * Battle-Raeume duerfen nur die 16 Battle-Teams verteilen — sonst bekommt der Host `P-S`
+ * (`FOUR_PLUS_FOUR_HOST_TEAM_IDS[0]`, im 1v1-Preset sein einziges Team), das es in einem
+ * Battle-Spielstand nicht gibt, und steht anschliessend mit null Teams vor "weise dir zuerst ein
+ * Team zu". Nachgemessen, nicht vermutet.
+ *
+ * BEWUSST UEBER `waehleBattleModeTeamIds` STATT UEBER EINE ZWEITE 16er-LISTE HIER: welche 16 Teams
+ * es sind, ist ein PLATZHALTER, ueber den Chris noch entscheidet (siehe den Kopfkommentar dort).
+ * Eine Kopie der Liste hier waere die zweite Stelle, die beim Austausch vergessen wird — der Raum
+ * fragt dieselbe Funktion, die auch der Daten-Adapter fragt. `ONLINE_ROOM_TEAM_IDS` traegt alle 32
+ * Team-IDs, ist also fuer jede kuenftige Auswahl der 16 eine ausreichende Grundmenge.
+ */
+export function resolveRoomTeamPool(playMode?: PlayMode | null): string[] {
+  return resolvePlayMode(playMode) === "battle"
+    ? waehleBattleModeTeamIds(ONLINE_ROOM_TEAM_IDS.map((teamId) => ({ teamId })))
+    : ONLINE_ROOM_TEAM_IDS;
+}
 
 /**
  * Findet den zweiten menschlichen Teilnehmer ("Franky") strukturell ueber die Sitzrolle, NICHT
@@ -145,6 +169,8 @@ export function createMultiplayerRoomMeta(input: {
   saveId?: string | null;
   createdByUserId: string;
   now?: string;
+  /** Siehe `MultiplayerRoomMeta.playMode` (types/game.ts). Fehlt = Management, wie bisher. */
+  playMode?: PlayMode | null;
 }): MultiplayerRoomMeta {
   const now = input.now ?? new Date().toISOString();
   return {
@@ -161,6 +187,10 @@ export function createMultiplayerRoomMeta(input: {
     // Siehe Kommentar am Feld (types/game.ts): erst eine explizite Lobby-Aktion setzt das auf
     // true, nicht diese Erst-Anlage.
     ownershipAssignedByHost: false,
+    // NUR IM BATTLE-MODUS GESETZT -- dieselbe Regel wie beim `playMode` des Spielstands
+    // (new-game-setup-service.ts): ein Management-Raum traegt das Feld GAR NICHT und ist damit
+    // byteweise der von vorher, statt sich nur gleichbedeutend zu verhalten.
+    ...(resolvePlayMode(input.playMode) === "battle" ? { playMode: "battle" as const } : {}),
   };
 }
 
@@ -455,18 +485,35 @@ export function buildOwnershipForPreset(
     throw new UnknownRoomOwnershipPresetError(preset);
   }
 
-  // `.filter(teamIds.includes)` war im alten Code nur fuer die feste 4+4-Liste noetig (Beschraenkung
-  // auf den `teamIds`-Parameter, Gegenprobe 4 im Auftrag). Fuer die slice-Variante ist er ein
-  // No-op, weil deren Eintraege schon aus `teamIds` stammen -- deshalb hier einheitlich statt wie
-  // vorher zweigeteilt.
-  const hostTeamIds = host
-    ? (spec.hostTeamIds ?? teamIds.slice(0, spec.hostCount)).filter((teamId) => teamIds.includes(teamId))
-    : [];
-  const guestTeamIds = franky
-    ? (spec.guestTeamIds ?? teamIds.slice(spec.hostCount, spec.hostCount + spec.guestCount)).filter((teamId) =>
-        teamIds.includes(teamId),
-      )
-    : [];
+  /**
+   * AUS "FESTE LISTE, GEGEN DEN POOL GEFILTERT" WURDE "ANZAHL PLUS WUNSCHLISTE, AUS DEM POOL
+   * AUFGEFUELLT" (Begruendung ausfuehrlich in lib/game/preset-team-pool.ts).
+   *
+   * Vorher stand hier ein blosses `.filter((teamId) => teamIds.includes(teamId))`. Fuer den
+   * 32er-Pool war das ein No-op — jede Preset-ID ist darin enthalten. Fuer den 16er-Battle-Pool
+   * war es ein lautloser Verlust: `chris_1_franky_1_rest_ai` gibt dem Host genau
+   * `FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0,1)` = `P-S`, und `P-S` ist kein Battle-Team. Der Host
+   * bekam null Teams, der Raum liess sich nicht starten.
+   *
+   * MANAGEMENT BLEIBT ZEICHENGLEICH: bei vollem 32er-Pool ist jede bevorzugte ID vorhanden, es
+   * wird nie aufgefuellt, und die zaehlenbasierten Presets ohne Wunschliste fuellen alphabetisch
+   * aus dem Pool — was fuer das alphabetisch sortierte `ONLINE_ROOM_TEAM_IDS` genau das alte
+   * `teamIds.slice(0, hostCount)` ergibt. Das positionsbasierte `slice(hostCount, ...)` fuer den
+   * Gast ist durch `bereitsVergeben` ersetzt: dieselbe Zusage ("keine Ueberschneidung"), nur nicht
+   * mehr an die Reihenfolge des Pools gebunden.
+   */
+  const aufgeloest = loesePresetTeamsFuerBeideSeiten({
+    pool: teamIds,
+    hostBevorzugt: spec.hostTeamIds,
+    // Ohne den jeweiligen Teilnehmer wird gar nichts zugeteilt -- unveraendertes Verhalten: ein
+    // Solo-Preset gibt einem anwesenden Franky keine Teams, und die Teams eines abwesenden
+    // Teilnehmers bleiben offen (KI), bis er beitritt.
+    hostAnzahl: host ? spec.hostCount : 0,
+    gastBevorzugt: spec.guestTeamIds,
+    gastAnzahl: franky ? spec.guestCount : 0,
+  });
+  const hostTeamIds = aufgeloest.host.teamIds;
+  const guestTeamIds = aufgeloest.gast.teamIds;
   const humanTeamIds = new Set([...hostTeamIds, ...guestTeamIds]);
 
   return teamIds.map((teamId) => {
@@ -600,7 +647,14 @@ export function applyExplicitTeamOwnershipToState(
   state: OlyRoomState,
   selection: ExplicitTeamSelectionInput,
 ): { ok: true; state: OlyRoomState } | { ok: false; reason: ExplicitTeamOwnershipValidationReason; message: string } {
-  const validated = buildExplicitTeamOwnership(state.roomParticipants, selection);
+  // Derselbe Pool wie beim Preset-Weg (`applyOwnershipPresetToState`): eine ausdrueckliche
+  // Host-Auswahl darf in einem Battle-Raum ebenso wenig ein Team vergeben, das es im Spielstand
+  // nicht gibt -- sie faellt dann in `unknown_team_id` und sagt WELCHES, statt es stumm zu schlucken.
+  const validated = buildExplicitTeamOwnership(
+    state.roomParticipants,
+    selection,
+    resolveRoomTeamPool(state.multiplayerRoom.playMode),
+  );
   if (!validated.ok) {
     return validated;
   }
@@ -755,7 +809,10 @@ export function isRoomMatchdayInProgress(
 }
 
 export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwnershipPreset): OlyRoomState {
-  const ownership = buildOwnershipForPreset(state.roomParticipants, preset);
+  // Der Pool kommt aus der Spielart DES RAUMS, nicht aus einer festen Liste: ein Battle-Raum darf
+  // nur die 16 Battle-Teams verteilen (siehe `resolveRoomTeamPool`). Fehlt das Feld -- jeder Raum,
+  // der vor diesem Feld angelegt wurde --, ist es "management", also die alten 32.
+  const ownership = buildOwnershipForPreset(state.roomParticipants, preset, resolveRoomTeamPool(state.multiplayerRoom.playMode));
   const participants = syncParticipantControlledTeams(state.roomParticipants, ownership);
   const multiplayerRoom = {
     ...state.multiplayerRoom,

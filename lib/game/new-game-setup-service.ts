@@ -23,6 +23,7 @@ import {
   createMultiplayerRoomMeta,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
+import { loesePresetTeamsAusPool, loesePresetTeamsFuerBeideSeiten } from "@/lib/game/preset-team-pool";
 import type { RoomParticipant, TeamOwnershipRecord } from "@/types/game";
 
 export type NewGamePresetId = "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
@@ -125,28 +126,71 @@ export type NewGameSetupApplyResult = {
 const CHRIS_ONLINE_4V4_TEAM_IDS = ["P-S", "D-P", "M-M", "V-W"];
 const FRANKY_ONLINE_4V4_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
 
+/**
+ * `chrisTeamIds`/`frankyTeamIds` sind seit dem Battle-Modus WUNSCHLISTEN, keine Zuteilungen mehr —
+ * verbindlich ist `chrisCount`/`frankyCount`. Warum, ausfuehrlich: `lib/game/preset-team-pool.ts`.
+ * Kurz: die alten festen Listen enthalten `P-S`/`V-W`, die es in einem 16-Team-Battle-Spielstand
+ * nicht gibt; sie fielen beim Filtern lautlos weg und `solo_4` gab Chris zwei Teams statt vier.
+ *
+ * Die Zahlen stehen bewusst ALS ZAHL da und nicht als `chrisTeamIds.length`: sie sind das
+ * Versprechen des Presets ("Solo 4 Teams" heisst vier), die Liste ist nur der Wunsch, mit WELCHEN
+ * vier man anfaengt. Beides auseinanderzuhalten ist der ganze Punkt — `new_game_preset_team_count_mismatch`
+ * (unten) prueft genau die Zahl.
+ */
 export const NEW_GAME_PRESETS: Array<{
   presetId: NewGamePresetId;
   label: string;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
+  chrisCount: number;
+  frankyCount: number;
   isOnline: boolean;
 }> = [
-  { presetId: "solo_1", label: "Solo 1 Team", chrisTeamIds: ["M-M"], frankyTeamIds: [], isOnline: false },
-  { presetId: "solo_2", label: "Solo 2 Teams", chrisTeamIds: ["M-M", "D-P"], frankyTeamIds: [], isOnline: false },
-  { presetId: "solo_4", label: "Solo 4 Teams", chrisTeamIds: CHRIS_ONLINE_4V4_TEAM_IDS, frankyTeamIds: [], isOnline: false },
+  { presetId: "solo_1", label: "Solo 1 Team", chrisTeamIds: ["M-M"], frankyTeamIds: [], chrisCount: 1, frankyCount: 0, isOnline: false },
+  {
+    presetId: "solo_2",
+    label: "Solo 2 Teams",
+    chrisTeamIds: ["M-M", "D-P"],
+    frankyTeamIds: [],
+    chrisCount: 2,
+    frankyCount: 0,
+    isOnline: false,
+  },
+  {
+    presetId: "solo_4",
+    label: "Solo 4 Teams",
+    chrisTeamIds: CHRIS_ONLINE_4V4_TEAM_IDS,
+    frankyTeamIds: [],
+    chrisCount: 4,
+    frankyCount: 0,
+    isOnline: false,
+  },
   {
     presetId: "online_4v4",
     label: "Online 4v4",
     chrisTeamIds: CHRIS_ONLINE_4V4_TEAM_IDS,
     frankyTeamIds: FRANKY_ONLINE_4V4_TEAM_IDS,
+    chrisCount: 4,
+    frankyCount: 4,
     isOnline: true,
   },
-  { presetId: "custom", label: "Custom", chrisTeamIds: ["M-M"], frankyTeamIds: [], isOnline: false },
+  /**
+   * `custom` heisst "der Anrufer benennt seine Teams selbst" — der Assistent schickt seit dem
+   * Umbau auf freie Team-Auswahl ausschliesslich dieses Preset (siehe den `applyNewGamePreset`-
+   * Effekt in FoundationTeamSettingsNewLook.tsx). Die Zahl 1 gilt deshalb NUR fuer den Fall, dass
+   * gar keine Auswahl mitkommt; sobald der Anrufer eine Liste schickt, ist SIE die Ansage und die
+   * Anzahl-Pruefung greift bewusst nicht (Kommentar an `presetVorgabeBenutzt` unten).
+   */
+  { presetId: "custom", label: "Custom", chrisTeamIds: ["M-M"], frankyTeamIds: [], chrisCount: 1, frankyCount: 0, isOnline: false },
 ];
 
 function uniqueTeamIds(teamIds: string[] | undefined, validTeamIds: Set<string>) {
   return Array.from(new Set((teamIds ?? []).map((teamId) => teamId.trim()).filter((teamId) => validTeamIds.has(teamId))));
+}
+
+/** Vom Anrufer benannte Teams, die es in DIESEM Spielstand nicht gibt — vorher fielen sie stumm weg. */
+function unbekannteTeamIds(teamIds: string[] | undefined, validTeamIds: Set<string>) {
+  return Array.from(new Set((teamIds ?? []).map((teamId) => teamId.trim()).filter((teamId) => teamId && !validTeamIds.has(teamId))));
 }
 
 function getPreset(presetId: NewGamePresetId) {
@@ -167,6 +211,18 @@ function createScenarioRoomMeta(input: {
   now: string;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
+  /**
+   * DIE TEAMS, DIE ES IN DIESEM SPIELSTAND WIRKLICH GIBT.
+   *
+   * GEMESSENER FEHLER: `buildOwnershipForPreset` wurde hier ohne diesen dritten Parameter
+   * aufgerufen und fiel damit auf `ONLINE_ROOM_TEAM_IDS` zurueck — die 32er-Liga, fest verdrahtet.
+   * Ein Battle-Spielstand (16 Teams) bekam so 32 Besitz-Zeilen in `scenarioMeta.teamOwnership`,
+   * 16 davon fuer Teams, die in genau diesem Spielstand nicht existieren. Geister-Zeilen fallen
+   * nirgends auf, bis irgendetwas ueber `teamOwnership` iteriert und ein Team sucht, das es nicht
+   * gibt. Im Management-Modus sind beide Listen deckungsgleich (32 = 32), das Ergebnis dort also
+   * unveraendert.
+   */
+  teamIds: string[];
 }) {
   if (!input.enabled) {
     return {
@@ -206,7 +262,7 @@ function createScenarioRoomMeta(input: {
     ],
     [],
   );
-  const ownership = buildOwnershipForPreset(participants, "chris_4_franky_4_rest_ai");
+  const ownership = buildOwnershipForPreset(participants, "chris_4_franky_4_rest_ai", input.teamIds);
   const patchedOwnership = ownership.map((entry) => {
     if (input.chrisTeamIds.includes(entry.teamId)) {
       return {
@@ -308,23 +364,118 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const baseGameState = createFreshSeasonOneGameState(input.saveId, { playMode });
   const validTeamIds = new Set(baseGameState.teams.map((team) => team.teamId));
   const preset = getPreset(input.presetId);
-  const chrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);
-  const frankyTeamIds = uniqueTeamIds(input.frankyTeamIds ?? preset.frankyTeamIds, validTeamIds).filter(
-    (teamId) => !chrisTeamIds.includes(teamId),
-  );
-  const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds]);
-  const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
   const warnings: string[] = [];
   const blockers: string[] = [];
+
+  /**
+   * ZWEI GRUNDVERSCHIEDENE FAELLE, DIE VORHER EINER WAREN.
+   *
+   * (a) Der Anrufer benennt seine Teams (`input.chrisTeamIds`) — das ist der Normalfall aus dem
+   *     Assistenten, der seit dem Umbau auf freie Auswahl IMMER `custom` plus eine Liste schickt.
+   *     Dann gilt seine Liste, gefiltert gegen den Spielstand, und die Anzahl ist SEINE Sache:
+   *     wer bewusst zwei Teams anklickt, will zwei, egal welches Preset im Feld steht.
+   * (b) Es kommt keine Liste — dann gilt die Preset-Vorgabe, und die ist ein Versprechen ueber die
+   *     ANZAHL. Nur hier wird aus dem Pool aufgefuellt, und nur hier ist eine Abweichung ein Fehler.
+   *
+   * Vorher lief beides durch dieselbe Zeile (`uniqueTeamIds(input.chrisTeamIds ?? preset.chris...)`),
+   * und die verlor im Battle-Modus stillschweigend die Haelfte der Preset-Teams.
+   */
+  const chrisVorgabeBenutzt = input.chrisTeamIds === undefined;
+  const frankyVorgabeBenutzt = input.frankyTeamIds === undefined;
+
+  /**
+   * FRANKYS AUSDRUECKLICHE LISTE MUSS SCHON HIER STEHEN, VOR CHRIS' AUFLOESUNG.
+   *
+   * GEMESSENER FEHLER (Review-Befund F2, nachgestellt):
+   * `buildNewGameStateFromBaseline({presetId:"online_4v4", playMode:"battle", frankyTeamIds:["A-A"]})`
+   * — Chris ohne Liste (also Preset-Vorgabe), Franky mit einer — ergab
+   * Chris `["D-P","M-M","A-A","B-B"]` und Franky `[]`, OHNE Warnung und OHNE Blocker.
+   *
+   * Ursache: hier stand `gastAnzahl: frankyVorgabeBenutzt ? preset.frankyCount : 0`. Bei einer
+   * AUSDRUECKLICHEN Franky-Liste wurde also NICHTS fuer ihn zurueckgelegt; Chris' Auffuellung griff
+   * sich `A-A` — Frankys einziges Wunschteam —, und die Zeile darunter
+   * (`.filter((id) => !chrisTeamIds.includes(id))`) strich es ihm anschliessend weg. Uebrig blieb
+   * ein Spieler mit null Teams, und weil eine ausdrueckliche Liste bewusst keiner Anzahl-Pruefung
+   * unterliegt, sagte das niemand.
+   *
+   * Richtig ist: eine ausdrueckliche Liste ist eine STAERKERE Ansage als eine Wunschliste, nicht
+   * eine schwaechere. Sie geht deshalb als `gastBevorzugt` mit IHRER EIGENEN Laenge als
+   * `gastAnzahl` in die zweiseitige Aufloesung — die legt Frankys Teams im ersten Durchgang
+   * beiseite, bevor Chris im zweiten auffuellt. Ueberschneiden sich beide Listen, gewinnt weiter
+   * der Host: dieselbe Regel wie im `.filter(...)` unten, nur eine Stufe frueher angewandt.
+   */
+  const frankyAusdruecklicheTeamIds = frankyVorgabeBenutzt ? [] : uniqueTeamIds(input.frankyTeamIds, validTeamIds);
+
+  /**
+   * DIE ZWEISEITIGE AUFLOESUNG IMMER DANN, WENN CHRIS AUS DER VORGABE KOMMT. Nur dann wird auf
+   * seiner Seite ueberhaupt aufgefuellt, und nur eine Auffuellung kann der anderen Seite etwas
+   * wegnehmen (Begruendung an `loesePresetTeamsFuerBeideSeiten`). Was Franky beizusteuern hat —
+   * die Preset-Wunschliste oder seine ausdrueckliche Auswahl —, entscheidet `frankyVorgabeBenutzt`;
+   * beides wird gleichermassen vorab reserviert. Benennt Chris seine Teams selbst, wird auf seiner
+   * Seite nicht aufgefuellt, und es genuegt, sie Franky unten als `bereitsVergeben` vorzulegen.
+   */
+  const chrisTeamIds = chrisVorgabeBenutzt
+    ? loesePresetTeamsFuerBeideSeiten({
+        pool: validTeamIds,
+        hostBevorzugt: preset.chrisTeamIds,
+        hostAnzahl: preset.chrisCount,
+        gastBevorzugt: frankyVorgabeBenutzt ? preset.frankyTeamIds : frankyAusdruecklicheTeamIds,
+        gastAnzahl: frankyVorgabeBenutzt ? preset.frankyCount : frankyAusdruecklicheTeamIds.length,
+      }).host.teamIds
+    : uniqueTeamIds(input.chrisTeamIds, validTeamIds);
+  const frankyTeamIds = frankyVorgabeBenutzt
+    ? loesePresetTeamsAusPool({
+        bevorzugt: preset.frankyTeamIds,
+        anzahl: preset.frankyCount,
+        pool: validTeamIds,
+        bereitsVergeben: chrisTeamIds,
+      }).teamIds
+    : frankyAusdruecklicheTeamIds.filter((teamId) => !chrisTeamIds.includes(teamId));
+  const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds]);
+  const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
 
   if (chrisTeamIds.length === 0) {
     blockers.push("new_game_requires_at_least_one_chris_team");
   }
-  if (input.presetId === "online_4v4" && frankyTeamIds.length !== 4) {
-    warnings.push("online_4v4_expected_four_franky_teams");
+
+  /**
+   * AUS ZWEI WARNUNGEN NUR FUER `online_4v4` WURDE EIN BLOCKER FUER JEDES PRESET.
+   *
+   * Die alten Warnungen (`online_4v4_expected_four_chris_teams`/`..._franky_teams`) waren eine
+   * Beobachtung ohne Folgen — bei battle/online_4v4 lief das Spiel mit 2 gegen 4 weiter, und
+   * `solo_4` hatte ueberhaupt keine Pruefung, gab Chris zwei Teams statt vier und sagte nichts.
+   *
+   * Seit der Pool-Aufloesung oben KANN ein Preset seine Anzahl aus jedem hinreichend grossen Pool
+   * liefern (16 Teams reichen fuer 4+4 dreifach). Eine Abweichung ist damit keine unguenstige Lage
+   * mehr, sondern eine verletzte Zusage — also ein Blocker und keine Warnung. Ein Neuspiel mit
+   * schiefer Aufstellung entsteht so gar nicht erst, statt hinterher auffallen zu muessen.
+   *
+   * Nur fuer die Preset-Vorgabe (Fall b oben): eine ausdrueckliche Team-Auswahl des Anrufers darf
+   * jede Anzahl haben — sonst wuerde der Assistent, der immer `custom` schickt, bei jeder Auswahl
+   * ausser genau einem Team blockieren.
+   */
+  if (chrisVorgabeBenutzt && chrisTeamIds.length !== preset.chrisCount) {
+    blockers.push(`new_game_preset_team_count_mismatch:chris:${input.presetId}:${preset.chrisCount}:${chrisTeamIds.length}`);
   }
-  if (input.presetId === "online_4v4" && chrisTeamIds.length !== 4) {
-    warnings.push("online_4v4_expected_four_chris_teams");
+  if (frankyVorgabeBenutzt && frankyTeamIds.length !== preset.frankyCount) {
+    blockers.push(`new_game_preset_team_count_mismatch:franky:${input.presetId}:${preset.frankyCount}:${frankyTeamIds.length}`);
+  }
+
+  /**
+   * Vom Anrufer BENANNTE Teams, die es in diesem Spielstand nicht gibt, verschwanden bisher ohne
+   * ein Wort — genau die Klasse Fehler, aus der die Battle-Schieflage entstand. Bewusst eine
+   * Warnung und kein Blocker: der Assistent baut seinen Klub-Waehler aus dem Team-Satz des neuen
+   * Spielstands, kann also gar keine unbekannte ID schicken; eine unbekannte ID kommt von einem
+   * alten Client oder einem Skript, und dem soll das Neuspiel nicht komplett verweigert werden,
+   * solange mindestens ein gueltiges Team uebrig bleibt (`new_game_requires_at_least_one_chris_team`
+   * faengt den Rest ab).
+   */
+  const unbekannte = [
+    ...unbekannteTeamIds(chrisVorgabeBenutzt ? [] : input.chrisTeamIds, validTeamIds),
+    ...unbekannteTeamIds(frankyVorgabeBenutzt ? [] : input.frankyTeamIds, validTeamIds),
+  ];
+  if (unbekannte.length > 0) {
+    warnings.push(`new_game_unknown_team_ids:${Array.from(new Set(unbekannte)).join(",")}`);
   }
 
   const baselineReset = createNewGameFromPlayerBaseline({ gameState: baseGameState });
@@ -361,6 +512,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     now,
     chrisTeamIds,
     frankyTeamIds,
+    teamIds: baseGameState.teams.map((team) => team.teamId),
   });
 
   const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(baseGameState.teams, chrisTeamIds, frankyTeamIds);
@@ -633,6 +785,14 @@ export function createRoomCoopSave(
      * vor dieser Korrektur).
      */
     hostOwnerId?: string | null;
+    /**
+     * Spielart des Koop-Spielstands. Fehlt sie, entsteht wie bisher ein Management-Save — jeder
+     * aeltere Aufrufer verhaelt sich also unveraendert. `startRoom` (lib/room/room-store.ts) reicht
+     * hier die Spielart durch, mit der der RAUM angelegt wurde: die Entscheidung faellt beim
+     * Anlegen des Raums und nicht erst beim Start, weil schon die Team-Zuteilung in der Lobby aus
+     * dem richtigen Pool kommen muss (16 statt 32).
+     */
+    playMode?: PlayMode;
   },
   persistence: PersistenceService = createPersistenceService(),
 ): { saveId: string; name: string } {
@@ -640,6 +800,7 @@ export function createRoomCoopSave(
   const saveName = `Oly Online 4v4 - Raum ${input.roomCode}`;
   const prepared = buildNewGameStateFromBaseline({
     presetId: "online_4v4",
+    playMode: input.playMode,
     chrisTeamIds: input.chrisTeamIds,
     frankyTeamIds: input.frankyTeamIds,
     saveId,

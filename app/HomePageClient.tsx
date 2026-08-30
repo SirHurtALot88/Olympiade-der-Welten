@@ -8,6 +8,7 @@ import { LobbyCard } from "@/components/LobbyCard";
 import { getClientSocket } from "@/lib/socket/client";
 import { ROOM_OWNERSHIP_PRESET_IDS } from "@/lib/room/online-room-model";
 import type { RoomOwnershipPreset } from "@/types/events";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
 import type { RoomErrorPayload, RoomJoinedPayload } from "@/types/events";
 
 // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E3): die MENGE der Presets kommt jetzt aus
@@ -43,6 +44,17 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
   const [displayName, setDisplayName] = useState("Chris");
   const [joinDisplayName, setJoinDisplayName] = useState("Franky");
   const [preset, setPreset] = useState<RoomOwnershipPreset>("chris_1_rest_ai");
+  /**
+   * SPIELART des Raums. Steht SENKRECHT zur Team-Verteilung oben: jene sagt, wer wie viele Teams
+   * führt, diese, welche Teams es überhaupt gibt (Management 32, Battle 16). Chris' Vorgabe war
+   * „battle mode muss in allen modi verfügbar sein also solo und multiplayer" — der Solo-Weg hat
+   * seine Auswahl im Neuspiel-Assistenten, das hier ist der Mehrspieler-Weg.
+   *
+   * Wirkt nur für einen Raum OHNE bestehenden Spielstand. Hängt der Raum an einem echten Save,
+   * erbt er dessen Spielart — sie steht dort seit dem Neuspiel fest (siehe `createRoom`,
+   * lib/room/room-store.ts), und ein Raum darf sie nicht neu behaupten.
+   */
+  const [playMode, setPlayMode] = useState<PlayMode>("management");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [activeSaveId, setActiveSaveId] = useState<string | null>(null);
@@ -231,6 +243,27 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
                 ))}
               </select>
             </label>
+            {/* Ausgegraut, sobald der Raum an einem bestehenden Save hängt: dort ist die Spielart
+                längst entschieden und unveränderlich — eine Auswahl, die nichts bewirkt, wäre eine
+                Lüge. Der Server ignoriert das Feld in diesem Fall ohnehin. */}
+            <label className="filter-field">
+              <span>Spielart</span>
+              <select
+                className="input"
+                value={playMode}
+                disabled={Boolean(activeSaveId)}
+                data-testid="create-room-playmode"
+                title={
+                  activeSaveId
+                    ? "Der Raum übernimmt die Spielart des bestehenden Spielstands."
+                    : "Management: 32 Teams, 10 Spieltage. Battle: 16 Teams, 20 Spieltage, echte Paarungen."
+                }
+                onChange={(event) => setPlayMode(event.target.value as PlayMode)}
+              >
+                <option value="management">Management — 32 Teams, 10 Spieltage</option>
+                <option value="battle">Battle — 16 Teams, 20 Spieltage</option>
+              </select>
+            </label>
             <button
               className="primary-button"
               type="button"
@@ -238,7 +271,14 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
               onClick={() => {
                 setError(null);
                 setIsBusy(true);
-                getClientSocket().emit("createRoom", { displayName, preset, saveId: activeSaveId ?? undefined });
+                getClientSocket().emit("createRoom", {
+                  displayName,
+                  preset,
+                  saveId: activeSaveId ?? undefined,
+                  // NUR im Battle-Modus mitgeschickt: ein Management-Raum sendet denselben
+                  // Rumpf wie vor dem Battle-Modus, also kein neues Feld und kein anderer Weg.
+                  ...(playMode === "battle" ? { playMode: "battle" as const } : {}),
+                });
               }}
             >
               Raum erstellen

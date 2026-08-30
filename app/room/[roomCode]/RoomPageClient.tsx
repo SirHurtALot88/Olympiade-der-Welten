@@ -6,11 +6,11 @@ import { useParams } from "next/navigation";
 
 import {
   MAX_TEAMS_PER_HUMAN_PARTICIPANT,
-  ONLINE_ROOM_TEAM_IDS,
   ROOM_OWNERSHIP_PRESET_IDS,
   isRoomMatchdayInProgress,
   resolveFrankyParticipant,
   resolveRoomParticipantActiveOwnerId,
+  resolveRoomTeamPool,
 } from "@/lib/room/online-room-model";
 import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { emitRoomFlowButtonAction } from "@/lib/room/room-flow-socket-actions";
@@ -277,8 +277,27 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       }
     }
   }
-  const pickerChrisTeamIds = ONLINE_ROOM_TEAM_IDS.filter((teamId) => teamAssignment[teamId] === "chris");
-  const pickerFrankyTeamIds = ONLINE_ROOM_TEAM_IDS.filter((teamId) => teamAssignment[teamId] === "franky");
+  /**
+   * DIE TEAMS, DIE ES IN DIESEM RAUM WIRKLICH GIBT -- aus der Spielart des Raums, nicht aus einer
+   * festen Liste.
+   *
+   * GEMESSENER FEHLER (Review-Befund F1): hier stand dreimal `ONLINE_ROOM_TEAM_IDS`, also die
+   * 32er-Liga, fest verdrahtet. Solange kein Raum je `playMode: "battle"` tragen konnte, war das
+   * toter, harmloser Code. Seit die Startseite Battle-Raeume anlegen kann (Spielart-Auswahl in
+   * app/HomePageClient.tsx), war es ein echter Fehler: der Waehler bot in einem Battle-Raum alle
+   * 32 Karten an, und ein Klick auf eines der 16 Teams, die es dort NICHT gibt, lief ueber
+   * `setTeamSelection` -> `applyExplicitTeamOwnershipToState` -> `buildExplicitTeamOwnership(...,
+   * resolveRoomTeamPool("battle"))` in `unknown_team_id` und kam als „Unbekanntes Team: <id>."
+   * zurueck -- fuer ein Team, das die Bedienung selbst gerade als anklickbar hingestellt hatte.
+   *
+   * Es ist DIESELBE Funktion, aus der der Server den Pool nimmt (online-room-model.ts). Genau
+   * deshalb hier und nicht per eigener Ableitung: die Bedienung darf nichts anbieten, was der
+   * Server danach ablehnt. Im Management-Raum (und in jedem Raum aus der Zeit vor dem Feld, wo
+   * `playMode` fehlt) liefert sie unveraendert die 32.
+   */
+  const roomTeamIds = resolveRoomTeamPool(state?.multiplayerRoom.playMode);
+  const pickerChrisTeamIds = roomTeamIds.filter((teamId) => teamAssignment[teamId] === "chris");
+  const pickerFrankyTeamIds = roomTeamIds.filter((teamId) => teamAssignment[teamId] === "franky");
 
   function assignTeam(teamId: string, target: TeamAssignmentTarget) {
     if (!seatToken) return;
@@ -470,7 +489,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {ONLINE_ROOM_TEAM_IDS.map((teamId) => {
+                      {roomTeamIds.map((teamId) => {
                         const assignment = teamAssignment[teamId] ?? "ai";
                         const chrisDisabled = assignment !== "chris" && pickerChrisTeamIds.length >= MAX_TEAMS_PER_HUMAN;
                         const frankyDisabled =

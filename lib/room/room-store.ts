@@ -63,6 +63,7 @@ import {
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
 import type { RoomOwnershipPreset } from "@/types/events";
 import type { CoachRole, RoomRealtimeEventType } from "@/types/game";
 import type { RoomSeat, RuntimeRoom } from "@/types/room";
@@ -237,6 +238,17 @@ function syncPlayers(room: RuntimeRoom) {
  *
  * `null`, wenn der Spielstand keine ausdrueckliche Zuordnung traegt -- der ehrliche Rueckfall.
  */
+/**
+ * Die Spielart eines BESTEHENDEN Spielstands — die einzige ehrliche Quelle fuer einen Raum, der an
+ * ihm haengt. `playMode` faellt beim Neuspiel und ist danach unveraenderlich; ein Raum darf sie
+ * nicht neu behaupten, sonst verteilt die Lobby aus einem anderen Team-Satz als der Spielstand hat.
+ * `null` fuer einen unbekannten Save und fuer jeden Management-Stand (der traegt das Feld gar nicht).
+ */
+function leiteSpielartAusSaveAb(saveId: string, persistence?: PersistenceService): PlayMode | null {
+  const service = persistence ?? createPersistenceService();
+  return service.getSaveById(saveId)?.gameState.playMode ?? null;
+}
+
 function leiteTeamZuordnungAusSaveAb(
   saveId: string,
   persistence?: PersistenceService,
@@ -271,6 +283,18 @@ export function createRoom(
     displayName?: string | null;
     saveId?: string | null;
     preset?: RoomOwnershipPreset | null;
+    /**
+     * SPIELART des Raums — "management" (Vorgabe, wenn das Feld fehlt) oder "battle". Steht
+     * SENKRECHT zu `preset`: jenes sagt, wer wie viele Teams fuehrt, dieses, welche Teams es
+     * ueberhaupt gibt. Chris' Vorgabe zum Battle-Modus war ausdruecklich „battle mode muss in allen
+     * modi verfügbar sein also solo und multiplayer" — ohne diesen Parameter war die Mehrspieler-
+     * Haelfte davon von aussen gar nicht erreichbar.
+     *
+     * Wirkt nur beim ANLEGEN eines frischen Raums. Der "Ersatzraum"/"weiterspielen"-Zweig oben
+     * uebernimmt die Spielart des bestehenden Spielstands, nicht diese Angabe — dort ist sie
+     * laengst entschieden und unveraenderlich.
+     */
+    playMode?: PlayMode | null;
   },
   // Phase-1-Login (nur bei OLY_AUTH_ENABLED=1 gesetzt): wenn eine Session
   // vorliegt, gewinnt die echte Identitaet gegenueber dem frei eingegebenen
@@ -365,6 +389,11 @@ export function createRoom(
       hostParticipantId: participantId,
       hostUserId: sessionUser?.ownerId || `user-${participantId}`,
       hostDisplayName: sessionUser?.displayName || input?.displayName?.trim() || "Chris",
+      // Ein Raum fuer einen SCHON EXISTIERENDEN Spielstand erbt dessen Spielart -- sie steht dort
+      // seit dem Neuspiel fest und laesst sich nicht mehr aendern; eine abweichende Angabe des
+      // Anrufers waere schlicht falsch. Nur ein Raum ohne echten Spielstand (frischer Koop-Save,
+      // entsteht erst in `startRoom`) nimmt die Angabe des Hosts.
+      playMode: isRealSaveId ? leiteSpielartAusSaveAb(requestedSaveId!, options?.persistence) : input?.playMode,
     }),
     seats: {
       A: buildSeat("A", socketId, participantId),
@@ -1413,6 +1442,10 @@ export function startRoom(
           // nie wieder veraendert (save-repository.ts) -- genau die Groesse, die
           // app/api/singleplayer-state/route.ts beim Loeschen gegen den Anrufer prueft.
           hostOwnerId: host?.userId ?? null,
+          // Die Spielart des RAUMS wird die des frisch entstehenden Spielstands. Sie steht seit
+          // `createRoom` fest (siehe `MultiplayerRoomMeta.playMode`) -- der Raum hat seine Teams
+          // die ganze Lobby ueber schon aus diesem Pool verteilt, der Save muss denselben haben.
+          playMode: room.state.multiplayerRoom.playMode ?? undefined,
         },
         persistence,
       ).saveId;

@@ -237,6 +237,7 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
 import type {
+  PlayMode,
   SeasonSnapshotRecord,
   SponsorNegotiationProfile,
   SponsorLeihgabeRecord,
@@ -1057,7 +1058,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGamePlayMode, setNewGamePlayMode, newGameTeamPool, setNewGameTeamPool, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -6367,6 +6368,57 @@ export function useFoundationShellRouterBodyScope({
     );
   }
 
+  /**
+   * Holt den Team-Satz, den ein neuer Spielstand DIESER Spielart haette — die Antwort auf "welche
+   * Klubs darf ich ueberhaupt anklicken".
+   *
+   * WARUM UEBER DEN SERVER UND NICHT IM CLIENT GERECHNET: welche 16 Teams der Battle-Modus nimmt,
+   * ist ein PLATZHALTER, ueber den Chris noch entscheidet (`waehleBattleModeTeamIds`,
+   * lib/season/battle-mode-spielplan.ts). Eine Nachbildung im Client waere die zweite Stelle, die
+   * beim Austausch vergessen wird — und sie waere genau die Sorte Kopie, die erst dann auffaellt,
+   * wenn der Waehler Klubs anbietet, die es im neuen Spielstand nicht gibt. Die Vorschau kennt den
+   * echten Satz, weil sie den Spielstand tatsaechlich baut.
+   *
+   * BEWUSST OHNE `chrisTeamIds`: dann greift die Preset-Vorgabe, und die Vorschau kommt ohne
+   * Blocker zurueck. Mit einer leeren Auswahl haette sie `new_game_requires_at_least_one_chris_team`
+   * gemeldet — ein roter Hinweis, bevor der Spieler ueberhaupt etwas anklicken konnte.
+   * Das Ergebnis landet in `newGameTeamPool`, NICHT in `newGamePreview`: es ist eine Auskunft ueber
+   * die Klub-Auswahl, keine geprueft-und-bereit-Vorschau des Spielstands, den Chris anlegen will.
+   */
+  async function ladeNewGameTeamPool(playMode: PlayMode) {
+    try {
+      const response = await fetch("/api/new-game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ presetId: "solo_1", playMode, dryRun: true }),
+      });
+      const payload = (await response.json()) as NewGameSetupApiResponse;
+      if (response.ok && payload.preview) {
+        setNewGameTeamPool(payload.preview.teams);
+      }
+    } catch {
+      // Kein Fehlerbanner: der Waehler faellt still auf `gameState.teams` zurueck (siehe Kommentar
+      // an `newGameTeamPool`). Eine Fehlermeldung fuer eine Hintergrund-Auskunft, die der Spieler
+      // nie angefordert hat, waere lauter als der Schaden.
+      setNewGameTeamPool(null);
+    }
+  }
+
+  /**
+   * Spielart umstellen. Verwirft ALLES, was an der alten Spielart hing: die Klub-Auswahl (die
+   * Teams gibt es im anderen Modus womoeglich gar nicht) und die geprueft-Vorschau samt ihrem
+   * Bestaetigungscode (der traegt die Spielart, siehe `createConfirmToken`) — dasselbe
+   * Verwerfen, das `setNewGamePreview(null)` schon bei Save-Name und Sandbox-Haken macht.
+   */
+  function waehleNewGamePlayMode(playMode: PlayMode) {
+    setNewGamePlayMode(playMode);
+    setNewGameChrisTeamIds([]);
+    setNewGameFrankyTeamIds([]);
+    setNewGamePreview(null);
+    setNewGameTeamPool(null);
+    void ladeNewGameTeamPool(playMode);
+  }
+
   async function runNewGameSetup(dryRun: boolean) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -6399,6 +6451,10 @@ export function useFoundationShellRouterBodyScope({
         },
         body: JSON.stringify({
           presetId: newGamePresetId,
+          // NUR IM BATTLE-MODUS MITGESCHICKT. Ein Management-Neuspiel schickt denselben Rumpf wie
+          // vor dem Battle-Modus — kein neues Feld, kein anderer Bestaetigungscode (der haengt an
+          // der Spielart, siehe `createConfirmToken`), kein Verhaltensunterschied.
+          ...(newGamePlayMode === "battle" ? { playMode: "battle" as const } : {}),
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
           sandbox: newGameSandbox,
@@ -12767,9 +12823,11 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGamePlayMode,
     newGamePresetId,
     newGamePreview,
     newGameSandbox,
+    newGameTeamPool,
     newGameSaveName,
     newGameSuccess,
     openContractRenewalNegotiation,
@@ -12857,6 +12915,8 @@ export function useFoundationShellRouterBodyScope({
     runSeasonTransition,
     runFoundationCommand,
     runNewGameSetup,
+    ladeNewGameTeamPool,
+    waehleNewGamePlayMode,
     runSaveAction,
     runSeasonStartReset,
     savePlayerGeneratorDrafts,

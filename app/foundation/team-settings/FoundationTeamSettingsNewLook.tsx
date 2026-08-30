@@ -303,11 +303,13 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGamePlayMode,
     newGamePresetId,
     newGamePreview,
     newGameSandbox,
     newGameSaveName,
     newGameSuccess,
+    newGameTeamPool,
     normalizeFoundationSaveMode,
     normalizeTeamStrategyLevel,
     openTeamProfileById,
@@ -369,6 +371,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     updateTeamControlDraft,
     updateTeamIdentityDraft,
     updateTeamStrategyDraft,
+    ladeNewGameTeamPool,
+    waehleNewGamePlayMode,
     withSynchronizedStrategyAliases,
   } = props;
 
@@ -504,6 +508,22 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Beim AUFKLAPPEN einmal den Klub-Satz des neuen Spielstands holen — nicht erst beim Umstellen
+   * der Spielart. Sonst zeigt der Wähler bis zur ersten Modus-Änderung die Klubs des LAUFENDEN
+   * Saves, und das ist genau dann falsch, wenn es niemand erwartet: wer in einem Battle-Save sitzt
+   * und ein Management-Spiel anlegen will, sähe 16 statt 32 Klubs.
+   *
+   * `newGameTeamPool === null` als Bedingung: einmal je Aufklappen, und ein bereits geladener Satz
+   * (etwa nach einem Moduswechsel) wird nicht erneut geholt.
+   */
+  useEffect(() => {
+    if (newGameWizardOpen && !newGameTeamPool) {
+      void ladeNewGameTeamPool(newGamePlayMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newGameWizardOpen]);
+
   const exportDisabledReason = !selectedTeam
     ? "Wähle zuerst ein Team aus."
     : !selectedIdentityDraft || !selectedTeamStrategyDraft
@@ -540,6 +560,19 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   }
 
   function renderNewGameWizard() {
+    /**
+     * DIE KLUBS DES NEUEN SPIELSTANDS — nicht die des gerade geöffneten.
+     *
+     * FUND: hier stand `gameState.teams`, also der Team-Satz des LAUFENDEN Saves. Im
+     * Management-Modus fällt das nicht auf (32 = 32), im Battle-Modus wären 32 Klubs zur Auswahl
+     * gestellt, von denen 16 im neuen Spielstand gar nicht existieren — und wer gerade in einem
+     * Battle-Save sitzt, sähe umgekehrt für ein Management-Neuspiel nur 16 von 32.
+     * `newGameTeamPool` kommt aus einer Vorschau und kennt den echten Satz (siehe dort);
+     * `gameState.teams` bleibt der Rückfall, solange die Vorschau noch nicht geladen ist.
+     */
+    const auswahlTeams: Array<Pick<Team, "teamId" | "name" | "shortCode" | "budget"> & { logoPath?: string | null }> =
+      newGameTeamPool ?? gameState.teams;
+
     return (
       <section
         className={`nl-teamsettings-subpanel nl-newgame${newGameWizardOpen ? "" : " is-eingeklappt"}`}
@@ -575,6 +608,57 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
         {newGameWizardOpen ? (
         <>
+        {/*
+          SPIELART ZUERST — VOR dem Klub-Picker, und das ist keine Geschmacksfrage: die Spielart
+          entscheidet, welche Klubs überhaupt zur Wahl stehen (Management 32, Battle 16). Stünde
+          sie hinter der Auswahl, müsste ein Moduswechsel eine bereits getroffene Klub-Wahl
+          verwerfen, ohne dass der Grund sichtbar wäre. Sie ist außerdem die einzige Entscheidung
+          im ganzen Assistenten, die sich später nicht mehr ändern lässt.
+        */}
+        <div className="nl-newgame-pickerhead">
+          <strong>Spielart wählen</strong>
+          <span className="nl-teamsettings-hint">Steht beim Anlegen fest und lässt sich später nicht mehr ändern</span>
+        </div>
+        <div className="nl-newgame-options" role="radiogroup" aria-label="Spielart" data-testid="new-game-playmode-picker">
+          {([
+            {
+              playMode: "management" as const,
+              titel: "Management",
+              hinweis: "32 Teams · 10 Spieltage · eine gemeinsame Rangliste",
+            },
+            {
+              playMode: "battle" as const,
+              titel: "Battle",
+              hinweis: "16 Teams · 20 Spieltage · echte Kopf-an-Kopf-Paarungen",
+            },
+          ]).map((option) => (
+            <label
+              key={`new-game-playmode-${option.playMode}`}
+              className={`nl-teamsettings-check nl-newgame-sandbox${newGamePlayMode === option.playMode ? " is-picked" : ""}`}
+            >
+              <input
+                type="radio"
+                name="new-game-playmode"
+                value={option.playMode}
+                checked={newGamePlayMode === option.playMode}
+                disabled={newGameBusy || readMeta.readOnly}
+                data-testid={`new-game-playmode-${option.playMode}`}
+                title={
+                  readMeta.readOnly
+                    ? getReadOnlyActionReason("die Spielart")
+                    : newGameBusy
+                      ? getBusyActionReason("Das New-Game-Setup")
+                      : option.hinweis
+                }
+                onChange={() => waehleNewGamePlayMode(option.playMode)}
+              />
+              <span>
+                <strong>{option.titel}</strong> — {option.hinweis}
+              </span>
+            </label>
+          ))}
+        </div>
+
         {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. */}
         <div className="nl-newgame-hero">
           <div className="nl-newgame-hero-lead">
@@ -586,7 +670,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 value={newGameChrisTeamIds.length}
                 format={(value) => String(Math.round(value))}
               />{" "}
-              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
+              <span className="nl-newgame-hero-of">von {auswahlTeams.length}</span> Teams
             </p>
             <span className="nl-newgame-hero-hint">
               {newGameChrisTeamIds.length === 0
@@ -603,7 +687,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             />
             <StatChip
               label="KI-Teams"
-              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+              value={Math.max(0, auswahlTeams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
               sub="automatisch"
             />
             {newGameFrankyTeamIds.length > 0 ? (
@@ -659,7 +743,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <span className="nl-teamsettings-hint">Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI</span>
         </div>
         <div className="nl-newgame-clubgrid" data-testid="new-game-ownership-picker">
-          {[...gameState.teams]
+          {[...auswahlTeams]
             .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
             .map((team) => {
               const isChris = newGameChrisTeamIds.includes(team.teamId);
@@ -740,7 +824,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             />
           </div>
           <div className="nl-teamsettings-team-grid">
-            {[...gameState.teams]
+            {[...auswahlTeams]
               .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
               .map((team) => {
                 const isChris = newGameChrisTeamIds.includes(team.teamId);

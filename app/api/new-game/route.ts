@@ -7,6 +7,7 @@ import {
   previewNewGameSetup,
   type NewGamePresetId,
 } from "@/lib/game/new-game-setup-service";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -15,6 +16,16 @@ import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonfli
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
+  /**
+   * SPIELART des neuen Spielstands (siehe `NewGameSetupInput.playMode`). Bis hierher war der
+   * Battle-Modus ueber HTTP ueberhaupt nicht erreichbar -- er existierte nur fuer direkte
+   * Funktionsaufrufe, also fuer Tests. Chris' Vorgabe war „battle mode muss in allen modi
+   * verfügbar sein also solo und multiplayer"; ohne dieses Feld war er in keinem.
+   *
+   * Fehlt das Feld, bleibt alles wie bisher: `normalizeBody` reicht `undefined` weiter,
+   * `resolvePlayMode` macht daraus "management". Kein bestehender Client aendert sein Verhalten.
+   */
+  playMode?: PlayMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
   sandbox?: boolean;
@@ -26,6 +37,12 @@ type NewGameRequestBody = {
 function normalizeBody(body: NewGameRequestBody) {
   return {
     presetId: body.presetId ?? "solo_1",
+    // BEWUSST OHNE VORGABEWERT (kein `?? "management"`): der Vorschau-Bestaetigungscode haengt an
+    // der Spielart, und der Management-Modus haengt dort ausdruecklich GAR KEIN Segment an (siehe
+    // `createConfirmToken`, new-game-setup-service.ts). `undefined` und "management" sind dort
+    // dasselbe -- aber nur, solange hier nichts erfunden wird, was der Aufrufer nicht geschickt hat.
+    // Ein unbekannter Wert faellt in `resolvePlayMode` ohnehin auf "management" zurueck.
+    playMode: body.playMode,
     chrisTeamIds: body.chrisTeamIds,
     frankyTeamIds: body.frankyTeamIds,
     sandbox: Boolean(body.sandbox),

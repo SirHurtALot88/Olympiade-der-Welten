@@ -29,6 +29,7 @@ import type {
   PlayerGeneratorDraft,
   ContractNegotiationDraft,
   ContractShape,
+  PlayMode,
   RosterEntry,
   Team,
   TeamControlMode,
@@ -535,6 +536,25 @@ export function useFoundationPageState({
   const [seasonBriefingOpen, setSeasonBriefingOpen] = useState<boolean>(false);
   const [freshSeasonStartMessage, setFreshSeasonStartMessage] = useState<string | null>(null);
   const [newGamePresetId, setNewGamePresetId] = useState<NewGamePresetId>("solo_1");
+  /**
+   * SPIELART des zu erstellenden Spielstands — die eine Entscheidung, die sich hinterher nicht
+   * mehr aendern laesst, deshalb steht sie im Assistenten VOR der Klub-Auswahl: sie bestimmt, aus
+   * welchen Teams ueberhaupt gewaehlt werden kann (32 gegen 16). "management" ist die Vorgabe, ein
+   * unveraendert gelassener Assistent verhaelt sich also genau wie bisher.
+   */
+  const [newGamePlayMode, setNewGamePlayMode] = useState<PlayMode>("management");
+  /**
+   * Die Teams des NEUEN Spielstands, aus einer Vorschau geholt — NICHT die des gerade geoeffneten.
+   *
+   * FUND: der Klub-Waehler rendert `gameState.teams`, also den Team-Satz des LAUFENDEN Saves. Fuer
+   * den Management-Modus faellt das nicht auf (32 = 32), im Battle-Modus ist es schlicht falsch:
+   * angeboten wuerden 32 Klubs, von denen 16 im neuen Spielstand gar nicht existieren. Und wer
+   * gerade IN einem Battle-Save sitzt und ein Management-Spiel anlegen will, saehe umgekehrt nur
+   * 16 von 32. Der aktive Save ist fuer diese Frage die falsche Quelle, in beide Richtungen.
+   *
+   * `null`, solange keine Vorschau geladen ist — dann bleibt `gameState.teams` der Rueckfall.
+   */
+  const [newGameTeamPool, setNewGameTeamPool] = useState<NewGameTeamPreview[] | null>(null);
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
   const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
   const [newGameSandbox, setNewGameSandbox] = useState<boolean>(false);
@@ -942,6 +962,10 @@ export function useFoundationPageState({
     setFreshSeasonStartMessage,
     newGamePresetId,
     setNewGamePresetId,
+    newGamePlayMode,
+    setNewGamePlayMode,
+    newGameTeamPool,
+    setNewGameTeamPool,
     newGameChrisTeamIds,
     setNewGameChrisTeamIds,
     newGameFrankyTeamIds,

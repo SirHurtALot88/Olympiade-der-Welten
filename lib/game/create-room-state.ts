@@ -7,9 +7,11 @@ import {
   buildTurnState,
   createRoomEvent,
   createMultiplayerRoomMeta,
+  resolveRoomTeamPool,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
 import type { OlyRoomState } from "@/types/game";
 
 export function createInitialRoomState(
@@ -19,6 +21,12 @@ export function createInitialRoomState(
     hostParticipantId?: string;
     hostUserId?: string;
     hostDisplayName?: string;
+    /**
+     * Spielart des Raums (siehe `MultiplayerRoomMeta.playMode`, types/game.ts). Sie muss SCHON
+     * HIER stehen und nicht erst beim Start: die erste Zuteilung ("1 Team, Rest KI") faellt in
+     * genau dieser Funktion, und sie darf im Battle-Raum nur aus den 16 Battle-Teams greifen.
+     */
+    playMode?: PlayMode | null;
   },
 ): OlyRoomState {
   const host = buildParticipant({
@@ -31,8 +39,9 @@ export function createInitialRoomState(
     roomCode,
     saveId: input?.saveId,
     createdByUserId: host.userId,
+    playMode: input?.playMode,
   });
-  const ownership = buildOwnershipForPreset([host], "chris_1_rest_ai");
+  const ownership = buildOwnershipForPreset([host], "chris_1_rest_ai", resolveRoomTeamPool(multiplayerRoom.playMode));
   const participants = syncParticipantControlledTeams([host], ownership);
   const turnState = buildTurnState({
     roomStatus: multiplayerRoom.status,

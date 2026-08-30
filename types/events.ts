@@ -1,5 +1,6 @@
 import type { CoachRole, OlyRoomState, RoomOwnershipPreset, RoomRealtimeEvent } from "@/types/game";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
+import type { PlayMode } from "@/lib/data/olyDataTypes";
 
 // Definiert in types/game.ts (dort auch die Begruendung), hier nur weitergereicht — damit die
 // vielen bestehenden Importe aus dieser Datei unveraendert gelten und es EINE Definition gibt.
@@ -10,6 +11,15 @@ export type CreateRoomRequest = {
   displayName?: string;
   saveId?: string;
   preset?: RoomOwnershipPreset;
+  /**
+   * SPIELART des Raums — "management" (Vorgabe, wenn das Feld fehlt) oder "battle". Steht
+   * SENKRECHT zu `preset`: jenes sagt, wer wie viele Teams fuehrt, dieses, welche Teams es
+   * ueberhaupt gibt (32 gegen 16). Chris' Vorgabe war „battle mode muss in allen modi verfügbar
+   * sein also solo und multiplayer" — ohne dieses Feld war die Mehrspieler-Haelfte davon nicht
+   * erreichbar. Wirkt nur beim Anlegen eines Raums OHNE bestehenden Spielstand; haengt der Raum an
+   * einem echten Save, erbt er dessen Spielart (siehe `createRoom`, lib/room/room-store.ts).
+   */
+  playMode?: PlayMode;
 };
 
 export type JoinRoomRequest = {

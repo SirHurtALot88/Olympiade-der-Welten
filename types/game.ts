@@ -1,3 +1,9 @@
+// EINZIGER Import in dieser Datei, und bewusst nur ein Typ-Import: `PlayMode` gehoert zum
+// Spielstand (lib/data/olyDataTypes.ts) und wird hier nur MITGEFUEHRT (siehe
+// `MultiplayerRoomMeta.playMode`). Eine zweite Definition waere die zweite Quelle, aus der die zwei
+// Welten spaeter auseinanderlaufen. Kein Ring: `olyDataTypes.ts` importiert nichts aus types/game.ts.
+import type { PlayMode } from "@/lib/data/olyDataTypes";
+
 export type CoachRole = "A" | "B";
 
 export type RoomStatus = "waiting" | "active";
@@ -84,6 +90,21 @@ export type MultiplayerRoomMeta = {
    * Feld entstanden sind und aus der Ablage zurueckkommen.
    */
   createdWithPreset?: RoomOwnershipPreset | null;
+  /**
+   * SPIELART des Spielstands, an dem dieser Raum haengt — "management" (Vorgabe, wenn das Feld
+   * fehlt) oder "battle". NICHT ZU VERWECHSELN MIT `createdWithPreset`: jenes sagt, WER wie viele
+   * Teams fuehrt, dieses sagt, WELCHE Teams es ueberhaupt gibt (32 gegen 16). Beides steht
+   * senkrecht zueinander — ein Battle-Raum kann 1v1 wie 4v4 sein.
+   *
+   * WOZU IM RAUM UND NICHT ERST IM SPIELSTAND: die Team-Zuteilung passiert in der LOBBY, lange
+   * bevor `startRoom` den Koop-Save anlegt. Ohne diese Angabe verteilt die Lobby aus den 32
+   * Management-Teams, und der Host bekaeme im 1v1-Battle-Raum `P-S` zugewiesen — ein Team, das im
+   * spaeter entstehenden Battle-Save gar nicht existiert.
+   *
+   * Optional/`undefined` fuer Rueckwaertskompatibilitaet: jeder vor diesem Feld angelegte Raum aus
+   * der Ablage verhaelt sich unveraendert wie ein Management-Raum.
+   */
+  playMode?: PlayMode | null;
 };
 
 // A room participant is a real connected browser/user session in an online room.
