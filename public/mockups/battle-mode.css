@@ -336,6 +336,16 @@
   .oly-battle-arena.oly-battle-arena .kk .kkkopf{display:flex;align-items:center;gap:5px;min-width:0}
   .oly-battle-arena.oly-battle-arena .kk .kkfigur{width:19px;height:24px;flex:none;image-rendering:pixelated}
   .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+  /* NAMEN IN TEAMFARBE (Chris, 30.08.). Auf dem FELD war das schon so — zeichneFeldspiel
+     zieht seine Textfarbe seit jeher aus `c` (--home/--away), derselben Farbe wie
+     Team-Ring, Schatten und Bewegungs-Schweif. Die Kaderleiste war die eine Stelle, an
+     der ein Spielername neutral (--ink) stand: sie kam erst mit der Kaderleisten-Runde
+     dazu, als die Feldnamen auf den Ballbereich reduziert wurden (s. NAME_NAH_RADIUS).
+     Damit trug ausgerechnet die Liste, die die Zuordnung Figur->Person jetzt traegt, als
+     einzige keine Seitenkodierung. kaderL ist immer Heim, kaderR immer Gast (renderKader,
+     seite 0/1) — dieselbe Zuordnung wie bei .wteamlabel und .feed .h/.a weiter unten. */
+  .oly-battle-arena.oly-battle-arena #kaderL .kk b{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena #kaderR .kk b{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
