@@ -9855,6 +9855,10 @@
   const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
+  // ausgewaehlt ist (u.id) — oder null. Reine Anzeigegroesse: die Simulation liest sie
+  // nirgends, ein Rennen ohne Eingriff laeuft damit Tick fuer Tick wie vorher.
+  let bahnWahl=null;
 
   // ===================================================================================
   // KAMERA. Chris: "man kann ja auch raus zoomen oder rein zoomen und dann die ganze
@@ -9898,7 +9902,7 @@
 
   function bauSpurt(saat){
     seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
-    cam={zoom:1,cx:0.5};
+    cam={zoom:1,cx:0.5}; bahnWahl=null;
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
     // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
@@ -10024,6 +10028,64 @@
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
   }
 
+  // ===================================================================================
+  // RENNPLAN-ANSAGE — der Plan eines eigenen Laeufers, MITTEN IM RENNEN gewechselt.
+  //
+  // Das Gegenstueck zum Fokus-Doppeln im Basketball (#685): auf der Bahn gibt es keine
+  // Verteidigung zu verschieben, aber es gibt die eine Entscheidung, die ein Rennen
+  // ausmacht — WANN gehe ich? Bisher stand sie vor dem Start fest (planJeSlot) und lief
+  // dann elf Sekunden lang von allein ab. Zuschauen heisst dabei: sehen, dass der Plan
+  // nicht aufgeht, und nichts tun koennen.
+  //
+  // WARUM DAS FAST NICHTS KOSTET. Der Plan ist keine Zustandsmaschine, sondern reine
+  // Zahlen: `tempo`, `sucht`, `ab`. tempoVon() (oben) und der Kraftverbrauch in
+  // stepSpurt lesen sie JEDEN TICK neu. Ein Wechsel ist damit eine Zuweisung — kein
+  // Nachrechnen, keine Umschaltphase, kein zweiter Codepfad neben dem, den die
+  // KI-Aufstellung ohnehin nimmt.
+  //
+  // DER EINE STOLPERSTEIN IST `ab`. Das ist der ANGRIFFSPUNKT: eine Position im
+  // Rennverlauf (0..1), ab der der Laeufer alles gibt (`planT = pos>=ab ? 1.0 : tempo`).
+  // Er ist eine SCHWELLE, kein Ereignis — deshalb muss man beim Wechsel zwei Faelle
+  // trennen, sonst wirkt der neue Plan rueckwaerts in die schon gelaufene Strecke:
+  //
+  //   1. Er ist noch NICHT angegangen (pos < ab). Dann gilt der neue Angriffspunkt
+  //      unveraendert. Liegt er bereits hinter ihm, geht er JETZT los — das ist eine
+  //      Entscheidung in diesem Moment, keine rueckwirkende: nachgezahlt wird nichts,
+  //      weil `zehr` und `planT` je Tick aus den AKTUELLEN Werten entstehen. Genau das
+  //      ist die Ansage "Schlusssprint, sofort".
+  //   2. Er ist schon angegangen (pos >= ab). Dann darf ein Plan mit spaeterem
+  //      Angriffspunkt den Antritt NICHT zurueckdrehen — man kann einen Sprint nicht
+  //      ungeschehen machen. Der Angriffspunkt wird deshalb auf hoechstens die aktuelle
+  //      Position geklemmt: der Laeufer bleibt vorn, uebernimmt aber `tempo`/`sucht` des
+  //      neuen Plans fuer alles Weitere (im Sprint heisst das: er sucht wieder Sog und
+  //      spart darin ein Drittel Reserve).
+  //
+  // KEIN KONTINGENT, KEINE ABKLINGZEIT. Der Preis steht schon in der Fiktion und ist
+  // vollstaendig simuliert: ein falscher Plan verbrennt Reserve (`reserve`, s.
+  // KRAFT_VON) und auf Takeshis Bahn zusaetzlich Nerven. Wer dreimal umdisponiert,
+  // laeuft dreimal ueber seiner Schwelle und ist vor dem Ziel leer. Ein zweites
+  // Kostenmodell obendrauf wuerde dieselbe Sache doppelt berechnen.
+  //
+  // GILT FUER ALLE FUENF BAHNEN. Jede fuehrt in BAHN_ART ihre eigenen drei Plaene, und
+  // alle drei Felder werden vom gemeinsamen Motor gelesen — Spurt und Staffel nutzen
+  // zusaetzlich `sucht` (Windschatten), Zeitfahren/Wand/Takeshi fuehren es mit 0. Die
+  // Staffel ist der einzige Sonderfall, und er ist harmlos: dort laeuft je Mannschaft
+  // nur einer (`u.aktiv`), die Wartenden stehen in ihrer Wechselzone. Eine Ansage an
+  // einen Wartenden ist trotzdem sinnvoll — sie stellt seinen Abschnitt ein, bevor er
+  // den Stab bekommt.
+  const ANSAGE_NACHLEUCHTEN=1.4;   // Sekunden Rennzeit, die die Marke am Kopf nachleuchtet
+  function planWechsel(u,planId){
+    const p=(BA().plaene||{})[planId];
+    if(!p||u.plan===planId)return false;
+    const schonAngegangen=u.pos>=u.ab;
+    u.plan=planId;
+    u.tempo=p.tempo; u.sucht=p.sucht; u.label=p.label; u.text=p.text;
+    u.ab=schonAngegangen?Math.min(p.ab,u.pos):p.ab;
+    u.ansagen=(u.ansagen||0)+1;
+    u.ansageBei=rennT;               // nur fuer die Anzeige, s. zeichneSpurt
+    return true;
+  }
+
   function stepSpurt(dt){
     if(done)return;
     rennT+=dt;
@@ -10097,7 +10159,7 @@
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
         feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
@@ -10132,7 +10194,7 @@
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
@@ -10170,12 +10232,12 @@
           if(BA().nervenKosten && u.nerven<=0){
             u.raus=true; u.fertig=90+rennFertig.length*0.001;
             rennFertig.push(u);
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
           }
-          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
+          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
       }
@@ -10206,10 +10268,10 @@
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true,_laeufer:o.id});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
             feed(o.seite,o.n+" steckt den Rempler weg.");
           }
         }
@@ -10234,10 +10296,10 @@
               *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
           } else {
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
           }
         }
@@ -10264,6 +10326,10 @@
 
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
+  // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
+  // Violett: es darf mit keiner Farbe verwechselbar sein, die auf der Bahn schon etwas
+  // bedeutet — Team-Orange/Cyan (Namen), Gruen/Orange/Rot (Reserve), Blau (Sog).
+  const ANSAGE_FARBE="#b98cff";
   function zeichneSpurt(){
     zeichneBoden();
     for(const u of LAEUFER){
@@ -10298,17 +10364,76 @@
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
+      //
+      // ER LIEST u.plan JEDES BILD NEU — deshalb braucht die Rennplan-Ansage hier gar
+      // nichts Eigenes, um zu wirken: in dem Bild, in dem planWechsel() zugewiesen hat,
+      // steht der neue Name ueber dem Kopf. Was dazukommt, ist nur die Aufmerksamkeit:
+      // fuer ANSAGE_NACHLEUCHTEN Sekunden steht er fett und in der Ansage-Farbe, damit
+      // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
       if(u.fertig==null){
-        ctx.font="400 8px 'IBM Plex Mono',monospace";
+        const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
+        ctx.font=(frisch?"700 9px":"400 8px")+" 'IBM Plex Mono',monospace";
         const pl=((BA().plaene)[u.plan]||{}).label||"";
-        const zus=u.leer?" · leer":(u.imSchatten?" · Sog":"");
+        const zus=frisch?" ◂ neu":(u.leer?" · leer":(u.imSchatten?" · Sog":""));
         ctx.strokeText(pl+zus,x,y-40);
-        ctx.fillStyle=u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9");
+        ctx.fillStyle=frisch?ANSAGE_FARBE:(u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9"));
         ctx.fillText(pl+zus,x,y-40);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
+    }
+    // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
+    // Im Pulk (die Kamera zoomt bis 3,4x heran) malen die spaeter gezeichneten Sprites
+    // sonst ueber die Marke des frueher gezeichneten Laeufers, und ausgerechnet im
+    // dichten Feld — dort, wo man sie braucht — ist sie dann weg.
+    //
+    // Sie liegt am BODEN, nicht ueber dem Kopf: dort stehen schon Name (y-30) und Plan
+    // (y-40), und die Bahnen liegen nur rund 30 px auseinander. Zwei Ringe statt eines
+    // dicken — der aeussere hebt sich vor der hellen Bahn ab, der innere vor dem
+    // dunklen Schatten darunter. Dazu ein kurzer Strich nach unten, damit die Marke
+    // auch dann noch zu finden ist, wenn zwei Figuren uebereinanderstehen.
+    const gewaehlt=bahnWahl==null?null:LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null);
+    if(gewaehlt){
+      const gx=camX(gewaehlt.pos), gy=bahnY(gewaehlt.bahnZ);
+      ctx.save();
+      ctx.strokeStyle=ANSAGE_FARBE;ctx.lineWidth=2;
+      ctx.beginPath();ctx.ellipse(gx,gy+16,18,7.5,0,0,6.283);ctx.stroke();
+      ctx.globalAlpha=0.65;ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.ellipse(gx,gy+16,12,5,0,0,6.283);ctx.stroke();
+      ctx.globalAlpha=1;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(gx,gy+24);ctx.lineTo(gx,gy+30);ctx.stroke();
+      ctx.restore();
+    }
+    // SCHWEBETEXTE. Sie fehlten auf der Bahn komplett: stepSpurt ruft schwebe() an acht
+    // Stellen ("stolpert", "getackelt", "eingebrochen", "Stab weiter", "ausgeschieden"
+    // ...), gezeichnet wurden sie aber nur im Kampf (draw), im Feldspiel und auf der
+    // Buehne — draw() springt fuer die Bahn vorher mit `return` hier herein. Die
+    // Ereignisse standen damit nur im Ticker, nie am Laeufer.
+    //
+    // Verankert am LAEUFER (_laeufer), nicht an den festen Koordinaten aus dem Moment
+    // des Ereignisses: die Bahnkamera zoomt und schwenkt (kameraUpdate), ein fester
+    // Punkt waere schon nach einem halben Sekundenbruchteil neben der Figur. Dieselbe
+    // Loesung wie im Feldspiel (_spieler dort). Ohne Anker bleibt x/y als Rueckfall.
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.ansage?ANSAGE_FARBE:f.crit?css("--crit"):css("--ink");
+      ctx.font=(f.ansage?"800 17px":f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      // SIE STEHEN NEBEN DEM KOPF, NICHT DARUEBER. Ueber dem Kopf ist die Spalte voll
+      // (Name y-30, Plan y-40) — und zwoelf Laeufer liegen bei enger Kamera nur rund
+      // 30 px auseinander, ein hoch gesetzter Text landet also im Namen des Laeufers
+      // ZWEI BAHNEN WEITER OBEN. Seitlich ist Platz: die Bahn ist breit, und in einer
+      // Spur laeuft nur einer. Die Ansage rechts, alles Uebrige links — so ueberdeckt
+      // der Ruf nie das Ereignis, das ihn ausgeloest haben koennte.
+      ctx.textAlign=f.ansage?"left":"right";
+      let fx=f.x, fy=f.y;
+      if(f._laeufer!=null){
+        const u=LAEUFER.find(x=>x.id===f._laeufer);
+        if(u){ fx=camX(u.pos)+(f.ansage?20:-20);
+               fy=bahnY(u.bahnZ)-22-((1-f.life)*14); }
+      }
+      ctx.fillText(f.txt,fx,fy);
+      ctx.globalAlpha=1;
     }
   }
 
@@ -11102,6 +11227,142 @@
     if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
   }
 
+  // ===================================================================================
+  // RENNPLAN-ANSAGE — die Bedienseite.
+  //
+  // Die Wirkung selbst steht bei planWechsel() (dort auch, warum `ab` beim Wechsel
+  // geklemmt wird und warum es kein zusaetzliches Kontingent gibt); hier steht nur, WIE
+  // man einen Laeufer waehlt und ihm einen Plan ansagt.
+  //
+  // ZWEI WEGE, dieselben zwei wie beim Fokus-Doppeln und aus demselben Grund: auf der
+  // Bahn anklicken ist das Naheliegende, aber die Figuren laufen — und die Kamera zoomt
+  // dabei auch noch (kameraUpdate). Die Kaderleiste steht still und traegt dieselben
+  // Namen. Beide fuehren durch rennplanWaehlen(), es gibt also einen Zustand und eine
+  // Regel. Die eigentliche Ansage laeuft danach ueber die Knopfreihe: drei Plaene je
+  // Bahn, sie heissen ueberall anders (Von vorn/Windschatten/Schlusssprint im Sprint,
+  // Gleichmass/Negativ-Split/Attacke im Zeitfahren ...), also werden sie aus BAHN_ART
+  // gelesen statt fest verdrahtet.
+  //
+  // NUR DIE EIGENE SEITE. Einem gegnerischen Laeufer etwas anzusagen ergibt keinen Sinn
+  // — das ist die genaue Umkehrung des Fokus-Doppelns, das nur Gegner zulaesst.
+  const BAHN_GREIF_RADIUS=30;
+  function rennplanMoeglich(){ return istBahn(disc)&&LAEUFER.length>0; }
+  // `fertig==null` gehoert in die Abfrage, nicht nur in den Klick: wer waehrend der
+  // offenen Ansage ins Ziel laeuft oder ausscheidet, ist nicht mehr ansprechbar — die
+  // Zeile faellt dann von selbst auf ihren Hinweistext zurueck, statt Knoepfe zu zeigen,
+  // die nichts mehr tun.
+  function rennplanLaeufer(){
+    if(bahnWahl==null)return null;
+    return LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null)||null;
+  }
+  // Ein Klick auf denselben Laeufer schliesst die Ansage, ein Klick auf einen anderen
+  // wechselt sie — ein Zustand, kein Stapel. Wer im Ziel oder ausgeschieden ist
+  // (fertig!=null), ist nicht mehr ansprechbar.
+  function rennplanWaehlen(id){
+    if(!rennplanMoeglich())return;
+    const u=LAEUFER.find(x=>x.id===id&&x.seite===0&&x.fertig==null);
+    if(!u)return;
+    bahnWahl=(bahnWahl===id)?null:id;
+    renderKader();
+  }
+  function rennplanAnsagen(planId){
+    const u=rennplanLaeufer();
+    if(!u||u.seite!==0||u.fertig!=null)return false;
+    if(!planWechsel(u,planId))return false;
+    const p=BA().plaene[planId];
+    // DER RUF IM MOMENT DES WECHSELS — das Gegenstueck zu "STEAL!"/"BLOCK!" im
+    // Basketball. Er haengt am Laeufer (_laeufer), nicht in der Bildmitte: bei zwoelf
+    // Laeufern muss man sehen, WER umgestellt hat, nicht nur DASS jemand. Wo genau er
+    // neben dem Kopf landet, entscheidet zeichneSpurt (s. dort) — hier steht nur, an
+    // wen er gehoert.
+    schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-56,txt:p.label.toUpperCase()+"!",
+             life:1.35,ansage:true,_laeufer:u.id});
+    feed(0,u.n+" bekommt "+p.label.toUpperCase()+" angesagt — bei "
+      +Math.round(u.pos*100)+" % der Strecke.");
+    renderKader();
+    return true;
+  }
+  // Die Knopfreihe wird NICHT je Bild neu gebaut. renderKader laeuft waehrend des Rennens
+  // sechzigmal je Sekunde durch (s. der Kommentar beim Fokus-Klick oben) — ein Knopf, der
+  // zwischen mousedown und mouseup ersetzt wird, verschluckt seinen Klick. Deshalb: eine
+  // Signatur aus allem, was die Zeile zeigt; aendert sie sich nicht, bleibt das DOM stehen.
+  let rennplanSig="";
+  function renderRennplanZeile(){
+    const zeile=document.getElementById("rennplanzeile");
+    if(!zeile)return;
+    if(!rennplanMoeglich()){ zeile.hidden=true; rennplanSig=""; return; }
+    zeile.hidden=false;
+    const u=rennplanLaeufer();
+    const sig=bahnDisc+"|"+(u?u.id+"|"+u.plan:"-");
+    if(sig===rennplanSig)return;
+    rennplanSig=sig;
+    const txt=document.getElementById("rennplantext");
+    const knoepfe=document.getElementById("rennplanknoepfe");
+    const zu=document.getElementById("rennplanzu");
+    if(!txt||!knoepfe)return;
+    // Aus Textknoten zusammengesetzt statt per innerHTML: die Namen kommen aus dem
+    // Spielstand und duerfen nie als Markup ankommen (dieselbe Regel wie bei der
+    // Fokuszeile daneben).
+    txt.textContent=""; knoepfe.textContent="";
+    if(!u){
+      txt.appendChild(document.createTextNode(
+        "Rennplan-Ansage — eigenen Läufer auf der Bahn oder in der Kaderleiste anklicken."));
+      if(zu)zu.hidden=true;
+      return;
+    }
+    const P=BA().plaene||{};
+    txt.appendChild(el("i","amarke"));
+    txt.appendChild(el("b",null,u.n));
+    txt.appendChild(document.createTextNode(" läuft "));
+    txt.appendChild(el("b",null,(P[u.plan]||{}).label||"—"));
+    txt.appendChild(document.createTextNode(" — ansagen:"));
+    for(const id of Object.keys(P)){
+      const b=el("button","rpknopf"+(id===u.plan?" an":""),P[id].label);
+      b.type="button";
+      b.dataset.plan=id;
+      b.setAttribute("aria-pressed",id===u.plan?"true":"false");
+      b.title=P[id].text||"";
+      knoepfe.appendChild(b);
+    }
+    if(zu)zu.hidden=false;
+  }
+  function verdrahteRennplanAnsage(){
+    // 1) Kaderleiste, linke (eigene) Seite. mousedown statt click aus genau dem Grund,
+    //    der beim Fokus-Doppeln ausfuehrlich steht: die Kacheln werden je Bild neu gebaut.
+    const box=document.getElementById("kaderL");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-planid]"):null;
+      if(k){ ev.preventDefault(); rennplanWaehlen(Number(k.dataset.planid)); }
+    });
+    // 2) Direkt auf der Bahn. Zurueckskalieren wie beim Fokus-Klick; getroffen wird die
+    //    ZEICHENposition (camX/bahnY, inklusive des Versatzes fuer schon Eingelaufene),
+    //    denn das ist die Figur, die der Nutzer unter dem Zeiger sieht.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!rennplanMoeglich())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      let treffer=null,minD=BAHN_GREIF_RADIUS;
+      for(const u of LAEUFER){
+        if(u.seite!==0||u.fertig!=null)continue;
+        const d=Math.hypot(camX(u.pos)-mx,bahnY(u.bahnZ)-my);
+        if(d<minD){ minD=d; treffer=u; }
+      }
+      if(treffer)rennplanWaehlen(treffer.id);
+    });
+    // 3) Die Knopfreihe. Auch hier delegiert und auf mousedown — die Reihe selbst steht
+    //    zwar still (s. rennplanSig), aber der Container ist der stabile Anker.
+    const knoepfe=document.getElementById("rennplanknoepfe");
+    if(knoepfe)knoepfe.addEventListener("mousedown",ev=>{
+      const b=ev.target.closest?ev.target.closest(".rpknopf[data-plan]"):null;
+      if(b){ ev.preventDefault(); rennplanAnsagen(b.dataset.plan); }
+    });
+    const zu=document.getElementById("rennplanzu");
+    if(zu)zu.addEventListener("click",()=>{ bahnWahl=null; renderKader(); });
+  }
+
   // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
   // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
   // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
@@ -11133,7 +11394,11 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
-      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
+          // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
+          // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
+          // Identitaet wie die Figur auf der Bahn.
+          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
@@ -11166,6 +11431,18 @@
           k.title=u.n+(gewaehlt?" — wird gedoppelt (klicken hebt den Fokus auf)"
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
+        // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
+        // spiegelverkehrt — hier ist die EIGENE Seite waehlbar, denn einem gegnerischen
+        // Laeufer sagt man nichts an. Wer im Ziel oder ausgeschieden ist, faellt raus.
+        if(rennplanMoeglich()&&seite===0&&u.id!=null&&u.fertig==null){
+          k.dataset.planid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=bahnWahl===u.id;
+          if(gewaehlt)k.classList.add("ansage");
+          const plan=((BA().plaene||{})[u.plan]||{}).label||"—";
+          k.title=u.n+" — Rennplan "+plan+(gewaehlt?" (klicken schließt die Ansage)"
+                                                   :" · anklicken, um ihn zu wechseln");
+        }
         box.appendChild(k);
       }
     }
@@ -11182,6 +11459,7 @@
       ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
     renderFokusZeile();
+    renderRennplanZeile();
   }
 
   // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
@@ -11272,6 +11550,7 @@
   });
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
+  verdrahteRennplanAnsage();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
@@ -11420,7 +11699,13 @@
     MOTOREN[bd]={
       sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
-                    rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;},
+                    rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
+                    // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
+                    // Rennen: ihre _laeufer-Verweise zeigen auf die Laeufer des Durchgangs,
+                    // den es nicht mehr gibt — die ids gibt es im echten Rennen aber auch,
+                    // also klebten sie sonst am falschen Mann. Vorher fiel das nicht auf,
+                    // weil zeichneSpurt Schwebetexte gar nicht gezeichnet hat.
+                    floats.length=0;},
       vorher:()=>{disc=bd; bahnDisc=bd;},
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
@@ -11857,6 +12142,54 @@
       while(!done&&fsT<SPIELDAUER_BASKETBALL+5&&guard<20000){ stepFeldspiel(1/60); guard++; }
       return fsZuege;
     },
+    // ABNAHME DER RENNPLAN-ANSAGE. Spielt EIN Rennen einer beliebigen Bahn headless
+    // durch (feste 1/60-Ticks, kein Rendering — dasselbe Muster wie spieleBasketball
+    // darueber) und kann dabei Ansagen ausloesen: `ansagen` ist eine Liste
+    // {n, plan, bei}, also "wenn <n> die Streckenmarke <bei> (0..1) erreicht hat, sag
+    // ihm <plan> an". Ohne die Liste ist der Durchlauf zeichenweise der von vorher —
+    // genau das ist die Determinismus-Kontrolle: zweimal derselbe Aufruf, einmal mit und
+    // einmal ohne Liste, und ohne Liste muessen alle Zeiten identisch sein.
+    //
+    // Geht durch planWechsel(), also durch DIESELBE Funktion, die auch der Klick in der
+    // UI aufruft — es gibt keine zweite Wechsel-Logik fuer die Messung.
+    bahnLauf:(d,saat,ansagen)=>{
+      const bd=d||"spurt";
+      if(!BAHN_ART[bd])throw new Error("bahnLauf: \""+bd+"\" ist keine Bahn-Disziplin");
+      const M=MOTOREN[bd];
+      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+      const offen=(ansagen||[]).map(a=>({n:a.n,plan:a.plan,bei:a.bei||0,getan:false}));
+      let guard=0;
+      // stumm: die Messung soll den Ticker nicht vollschreiben und keine Schwebetexte
+      // hinterlassen — dieselbe Klammer wie stepSimStumm im Kampf.
+      stumm=true;
+      try{
+        while(!done&&rennT<90&&guard<20000){
+          for(const a of offen){
+            if(a.getan)continue;
+            const u=LAEUFER.find(x=>x.n===a.n&&x.seite===0&&x.fertig==null);
+            if(u&&u.pos>=a.bei)a.getan=planWechsel(u,a.plan);
+          }
+          stepSpurt(1/60); guard++;
+        }
+      } finally { stumm=false; }
+      const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
+        laeufer:[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99)).map((u,pl)=>({
+          platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
+          ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
+          zeit:u.fertig==null?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+          bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
+          reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+          sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
+          ansagen:u.ansagen||0}))};
+      M.zurueck(gesichert);
+      return erg;
+    },
+    // Read-only wie fsFokus daneben: wer gerade fuer eine Ansage ausgewaehlt ist und
+    // welchen Plan die eigenen Laeufer fahren — damit sich ein Klick in der UI von
+    // aussen (Playwright) abnehmen laesst, ohne in die Leinwand hineinzumessen.
+    bahnWahl:()=>{ const u=LAEUFER.find(x=>x.id===bahnWahl); return u?{id:u.id,n:u.n,plan:u.plan}:null; },
+    bahnPlaene:()=>LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,plan:u.plan,
+      ab:+u.ab.toFixed(4),pos:+u.pos.toFixed(4),ansagen:u.ansagen||0})),
     setDisc:(d)=>{ disc=d; reset(); },
     debugZiele:(an)=>{ FS_DEBUG_ZIELE=!!an; },
     // Nur fuer die Wurfmechanik-Abnahme (Fable, 25.08.): rohes Ereignisprotokoll der
