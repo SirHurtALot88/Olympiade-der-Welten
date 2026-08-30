@@ -410,17 +410,41 @@
   .oly-battle-arena.oly-battle-arena .btn.g{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
   .oly-battle-arena.oly-battle-arena .btn.g:hover{filter:none;border-color:var(--faint);background:var(--surface)}
   .oly-battle-arena.oly-battle-arena .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-  .oly-battle-arena.oly-battle-arena .untenraum{display:grid;grid-template-columns:1fr 380px;border-top:1px solid var(--line-soft)}
+  /* Chris' Fund (29.08.): der Ticker nahm die Mehrheit der Breite, waehrend die
+     Wertungstabelle (jetzt zwei Team-Bloecke nebeneinander, s. .wsplit) auf 380px
+     gequetscht war. Verhaeltnis umgedreht statt nur verschoben: der Ticker ist eine
+     einzeilige Textliste und braucht keine Breite, die Tabelle mit zehn Spalten je
+     Team schon. */
+  .oly-battle-arena.oly-battle-arena .untenraum{display:grid;grid-template-columns:340px 1fr;border-top:1px solid var(--line-soft)}
   @media (max-width:960px){.oly-battle-arena.oly-battle-arena .untenraum{grid-template-columns:1fr}}
   .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
   .oly-battle-arena.oly-battle-arena .wertung{border-left:1px solid var(--line-soft);padding:9px 14px;height:210px;overflow-y:auto;display:flex;flex-direction:column}
+  /* Kein flex:1/min-height:0 hier (Chris' Fund, 29.08.): das gab .wsplit eine vom
+     Flex-Elternelement VERHANDELTE Hoehe statt der eigenen Inhaltshoehe — bei mehr
+     Zeilen als in die 210px passen, ragte die Tabelle ueber diese Box hinaus und der
+     .wfuss-Text (naechstes Geschwisterelement) rutschte dadurch MITTEN in die
+     Tabellenzeilen, statt darunter zu stehen. Mit natuerlicher Inhaltshoehe stapelt
+     .wertung (flex-column) alle drei Kinder (Titel/wsplit/wfuss) normal untereinander,
+     und overflow-y:auto auf .wertung scrollt sie gemeinsam. */
+  .oly-battle-arena.oly-battle-arena .wsplit{display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-shrink:0}
+  /* Zehn Spalten je Team-Tabelle sprengen bei width:100% ihre Grid-Spalte, weil
+     Tabellen ohne table-layout:fixed ihrem Inhalt folgen statt der Vorgabe (Chris'
+     Fund, 29.08.: die Eignungs-Spalte der linken Tabelle ueberlappte den Namen der
+     rechten). overflow-x:auto haelt jede Tabelle in ihrer eigenen Spalte, mit
+     eigenem horizontalen Scrollbalken statt Bluten in den Nachbarblock. */
+  .oly-battle-arena.oly-battle-arena .wteam .tbl-wrap{overflow-x:auto}
+  .oly-battle-arena.oly-battle-arena .wteam{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .wteam:first-child{border-right:1px solid var(--line-soft);padding-right:16px}
+  .oly-battle-arena.oly-battle-arena .wteamlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+  .oly-battle-arena.oly-battle-arena .wteam:first-child .wteamlabel{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .wteam:last-child .wteamlabel{color:var(--away)}
   @media (max-width:960px){.oly-battle-arena.oly-battle-arena .wertung{border-left:0;border-top:1px solid var(--line-soft)}}
   .oly-battle-arena.oly-battle-arena .wtitel{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
   .oly-battle-arena.oly-battle-arena .wtitel em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.1em;margin-left:6px}
-  .oly-battle-arena.oly-battle-arena .wtbl{width:100%;border-collapse:collapse;font-size:11.5px}
-  .oly-battle-arena.oly-battle-arena .wtbl th{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--faint);font-weight:500;text-align:left;padding:0 5px 4px 0;position:sticky;top:0;background:var(--surface)}
-  .oly-battle-arena.oly-battle-arena .wtbl td{padding:3px 5px 3px 0;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .wtbl{width:100%;border-collapse:collapse;font-size:10.5px}
+  .oly-battle-arena.oly-battle-arena .wtbl th{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--faint);font-weight:500;text-align:left;padding:0 3px 4px 0;position:sticky;top:0;background:var(--surface)}
+  .oly-battle-arena.oly-battle-arena .wtbl td{padding:3px 3px 3px 0;border-bottom:1px solid var(--line-soft);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .wtbl td.n, .oly-battle-arena.oly-battle-arena .wtbl th.n{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
   .oly-battle-arena.oly-battle-arena .wtbl tr.eigen td:first-child{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .wtbl tr.gegner td:first-child{color:var(--away)}
