@@ -3600,6 +3600,87 @@
   // draussen trifft niemanden und laesst den Fokus stehen, statt ihn versehentlich zu
   // loeschen.
   const FOKUS_GREIF_RADIUS=30;
+
+  // ===================================================================================
+  // BEWEGUNGS-DYNAMIK (Chris, 30.08., woertlich): "Momentan gibt's quasi immer nur eine
+  // Manndeckung und keine verschiedenen Bewegungen. Agile Spieler sollten zum Beispiel
+  // das nutzen koennen, dass sie schneller sind und dann schneller zum anderen Korb
+  // kommen, falls sie dann den Pass kriegen, um den Dunk zu machen. Und schlechte
+  // Verteidiger koennten sie vielleicht aus den Augen verlieren oder haben nicht die
+  // Power, um starke Angreifer zu verteidigen."
+  //
+  // Zwei Mechaniken, beide bewusst ALS AUFSATZ auf das Vorhandene gebaut, nicht als
+  // zweites System daneben:
+  //
+  //   1. AUSBRUCH — das Fastbreak-Fenster (startFastbreak, seit der Dynamik-Runde da)
+  //      bekommt einen benannten Spieler. Bisher sprinteten pauschal "die ersten beiden
+  //      im Array" mit (PLATZHALTER, reine Aufstellungsreihenfolge, s. bewegeSpielerLive),
+  //      und niemand lief ueberhaupt an den gegnerischen Korb — der Ballfuehrer trug den
+  //      Ball selbst hoch. Jetzt loest sich der SCHNELLSTE Spieler des Teams vom Feld,
+  //      laeuft direkt an den Ring, ist bevorzugtes Passziel und zieht mit dem Ball ohne
+  //      Aufbauspiel durch. Wer nicht schneller ist als der schnellste Gegner, bricht
+  //      auch nicht aus — der Vorsprung ist RELATIV, nicht absolut.
+  //
+  //   2. MISMATCH — die Manndeckung (zuordneDeckung) war bis hierher attributblind in
+  //      der ZUORDNUNG (naechster freier Angreifer) und kannte nur EINEN Attributkanal
+  //      (reevDeckung ueber ABWEHR). Jetzt traegt jeder Verteidiger zwei Abstaende zu
+  //      SEINEM Mann mit sich, und beide wirken ausschliesslich ueber Bewegung: Tempo-
+  //      Vorsprung, Laufziel, Abstand. Die Erfolgsformel-Zone (technikMake/technikGate/
+  //      GEO_BONUS/bedraengnisGate/bedraengnisMake/kontestFaktor/0,92-Deckel) ist
+  //      unangetastet — die schwaechere Kontest-Wirkung entsteht allein daraus, dass ein
+  //      ueberforderter Verteidiger WEITER WEG steht, gemessen von derselben dist(), die
+  //      entscheideBallaktion ohnehin schon liest.
+  //
+  // WELCHE ATTRIBUTE — aus den fertigen Basketball-Rezepten (s. rezept: oben), nicht
+  // geraten. Es gibt in dieser Disziplin genau EINEN Verteidigungswert, ABWEHR
+  // (torment 26 / speed 24 / awareness 20 / intelligence 12 / dexterity 10 / charisma 8);
+  // "Antizipation" und "Haerte im Zweikampf" stecken beide schon darin, ein zweiter,
+  // separat gebauter Verteidigungswert waere eine Doppelzaehlung derselben Attribute.
+  // Ihm gegenueber stehen zwei Angreiferwerte:
+  //   * "verliert ihn aus den Augen"  -> LAUFTEMPO (speed 52/stamina 32/dexterity 16)
+  //     zusammen mit AUFBAU (charisma 36/dexterity 26/intelligence 14/awareness 12/
+  //     speed 8/spirit 4) — Antritt plus Ballbehandlung, das, womit ein Angreifer sich
+  //     tatsaechlich loest.
+  //   * "nicht die Power, ihn zu verteidigen" -> SCHUSS_NAH (power 34/spirit 30/
+  //     stamina 16/awareness 12/dexterity 6/torment 2) — der einzige Rezeptwert der
+  //     Disziplin, den power anfuehrt, und zugleich genau der Spielertyp, gegen den
+  //     Koerperlichkeit am Ring zaehlt.
+  // Alle Zahlen unten sind PLATZHALTER.
+  const AUSBRUCH_VORSPRUNG_MIN=6;   // LAUFTEMPO-Vorsprung vor dem SCHNELLSTEN Gegner, ab dem ein Ausbruch ueberhaupt zur Debatte steht
+  const AUSBRUCH_CHANCE_BASIS=0.15; // Chance genau an der Schwelle
+  const AUSBRUCH_CHANCE_K=0.022;    // Zuwachs je weiterem Punkt Vorsprung
+  const AUSBRUCH_CHANCE_MAX=0.85;   // nie Gewissheit — ein Ausbruch bleibt eine Gelegenheit, kein Automatismus
+  const AUSBRUCH_FENSTER=3;         // Sekunden, dieselbe Dauer wie das Fastbreak-Fenster selbst (s. startFastbreak)
+  const AUSBRUCH_TEMPO_MUL=1.55;    // Lauftempo des Ausbrechers; der uebrige Fastbreak bleibt beim bekannten 1,3x
+  const AUSBRUCH_PASS_MUL=2;        // Passgewicht, solange sein Fenster laeuft — knapp unter dem bestehenden Roll-Bonus (3, s. offensterMitspieler), s. BALANCE unten
+  const AUSBRUCH_PASS_ABSCHLAG=0.55;// wie stark der Ausbrecher MIT Ball seine eigene Passbereitschaft drosselt (er zieht durch, statt aufzubauen)
+  const AUSBRUCH_SUCHT_PASS_MUL=0.2;// derselbe Gedanke eine Stufe frueher: er laesst eine Wurfgelegenheit im Ausbruch kaum noch fuer ein Zuspiel liegen
+  // BALANCE DIESER DREI ZAHLEN — durchgemessen, nicht gewaehlt (messe-arena-einfluss.mjs
+  // basketball 48, jeweils gegen den eingefrorenen Stand von origin/main mit 31,6 Pp):
+  //   PASS_MUL 3 / ABSCHLAG 0,25 / SUCHT_PASS 0 (= harte Sperre)   37,7 Pp
+  //   PASS_MUL 2 / ABSCHLAG 0,55 / SUCHT_PASS 0,2 (gewaehlt)       32,6 Pp
+  // Der Unterschied sitzt genau da, wo die Kommentare in dieser Datei ihn immer wieder
+  // verorten: in der Pass-LOTTERIE (offensterMitspieler) und in der Passbereitschaft, also
+  // darin, WER den Ball bekommt — nicht in einem Erfolgswert. Die schaerfere Fassung nahm
+  // dem Spielmacher-Kanal (AUFBAU/charisma) zu viel weg; die gewaehlte laesst den Ausbruch
+  // sichtbar (Fastbreak-Wuerfe und Dunks steigen weiterhin deutlich, s. Commit-Text) und
+  // liest speed mit 10,3 % bei Matrixvorgabe 10 — genauer als der Ausgangsstand mit 8,7 %.
+  // MISMATCH_SPANNE — der Attributabstand, ab dem ein Mismatch VOLL zaehlt. Erster
+  // Anlauf normierte auf 100 (also "0 bis maximal moeglicher Abstand"); nachgemessen war
+  // das praktisch wirkungslos: in einer echten Paarung liegen die Rezeptwerte zweier
+  // Spieler selten mehr als 10-25 Punkte auseinander, der Faktor blieb damit unter 0,25
+  // und der Mann wurde in 0,6 % der Ticks verloren — nicht sichtbar, also keine Mechanik.
+  // 40 Punkte Abstand sind ein GROSSER Unterschied (etwa der zwischen einem Spezialisten
+  // und einem Mitlaeufer) und stehen jetzt fuer die volle Wirkung; darueber wird gedeckelt.
+  const MISMATCH_SPANNE=40;
+  const VERLIEREN_CD=1.3;           // Sekunden Sperre gegen staendiges Neuwuerfeln, Muster wie hilfeCd
+  const VERLIEREN_FENSTER=0.6;      // so lange laeuft der Verteidiger noch zur LETZTEN gesehenen Position seines Mannes
+  const VERLIEREN_K=0.70;           // Chance je Gelegenheit, linear im Beweglichkeits-Abstand
+  const VERLIEREN_MAX=0.30;         // Deckel: auch der hoffnungslos unterlegene Verteidiger verliert ihn nicht bei jeder Gelegenheit
+  const MISMATCH_TEMPO_ABZUG=0.22;  // wie viel vom 1,15x-Deckungsvorsprung der Beweglichkeits-Abstand hoechstens frisst
+  const MISMATCH_TEMPO_MIN=0.95;    // Untergrenze: er faellt nicht hinter seinen Mann zurueck, er holt ihn nur nicht mehr ein
+  const MISMATCH_WUCHT_SAG=0.45;     // wie stark der Wucht-Abstand den ohnehin vorhandenen Rueckzug (`sag`) aufweitet
+
   // ASSIST-FENSTER (Playmaker-Runde, s. passChance/frischerPassVon unten): wie lange nach
   // einem Zuspiel ein Abschluss noch als vom Passgeber vorbereitet gilt. Vorher gab es gar
   // kein Zeitfenster, sondern ein ENTSCHEIDUNGS-Fenster von genau eins: `frischerPassVon`
@@ -3933,7 +4014,15 @@
     // Verteidiger bis zu 1,5s weiter zu seinem alten Blockpunkt bzw. Richtung GEGNERischem
     // Korb (rollBis), statt seinen Mann zu decken (26 % aller Roll-Ticks liefen so,
     // gemessen). Jetzt beide Teams.
-    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null; }
+    // BEWEGUNGS-DYNAMIK: dieselbe Aufraeumung, aus demselben Grund. Ein Ausbruchsfenster
+    // gehoert zu GENAU EINER Umschaltsituation — ueberlebte es den Possession-Wechsel,
+    // liefe der Ausbrecher im naechsten, ganz gewoehnlichen Halbfeld-Angriff weiter stur
+    // auf den Ring zu (derselbe Fehler, den Opus-Review-Fund #11 fuer fsLive.fastbreak
+    // beschreibt). startFastbreak wird bewusst NACH zuordneSlots gerufen und setzt ein
+    // frisches Fenster, falls die Lage eines hergibt. Das Sichtverlust-Fenster faellt aus
+    // demselben Grund mit weg: die Zuteilung wird gleich ohnehin neu gemacht.
+    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null;
+      u.ausbruchBis=0; u.verlorenBis=0; u.letzteSicht=null; }
   }
 
   function initBasketballLive(art){
@@ -3946,7 +4035,13 @@
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
         wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
-        screenRuf:0,rangeSeit:null});
+        screenRuf:0,rangeSeit:null,
+        // BEWEGUNGS-DYNAMIK (s. Konstantenblock oben): Ausbruchsfenster des Angreifers,
+        // Mismatch-Abstaende und Sichtverlust-Fenster des Verteidigers. Alle vier sind
+        // im Ausgangszustand aus (0 bzw. null) — ohne einen gestarteten Fastbreak bzw.
+        // ohne eine Zuteilung mit Attributgefaelle wirkt keiner von ihnen.
+        ausbruchBis:0,mismatchTempo:0,mismatchWucht:0,
+        verlorenBis:0,sichtCd:0,letzteSicht:null});
     }
     zuordneSlots(0); zuordneSlots(1);
     // `phase` ist der EINE Zustand, der entscheidet, ob die freie Simulation laeuft
@@ -3995,7 +4090,24 @@
         let naechster=null,minD=Infinity;
         for(const a of frei){ const d=dist(v,a); if(d<minD){minD=d;naechster=a;} }
         if(naechster){ v.deckt=naechster; frei.splice(frei.indexOf(naechster),1); }
-        v.reevDeckung=0.5+(100-v.ABWEHR)/100*1.5; // PLATZHALTER, nach Fables Vorschlag (Awareness liest das Feld)
+        // MISMATCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben): zwei Abstaende zwischen
+        // dem EINEN Verteidigungswert der Disziplin (ABWEHR) und dem, was der zugeteilte
+        // Angreifer mitbringt — auf 0..1 normiert, bei Gleichstand oder Ueberlegenheit
+        // des Verteidigers exakt 0. Ein 0er-Mismatch schaltet unten JEDEN Effekt aus
+        // (kein veraendertes Tempo, kein veraenderter Abstand, kein rr()-Wurf), die
+        // Deckung eines ebenbuertigen Paares ist also zeichenweise die von vorher.
+        // Hier berechnet und nicht in bewegeSpielerLive: die Werte gehoeren zur
+        // ZUTEILUNG, nicht zum Tick, und aendern sich nur mit ihr.
+        if(v.deckt){
+          const spanne=(x)=>Math.max(0,Math.min(1,x/MISMATCH_SPANNE));
+          v.mismatchTempo=spanne((v.deckt.LAUFTEMPO+v.deckt.AUFBAU)/2-v.ABWEHR);
+          v.mismatchWucht=spanne(v.deckt.SCHUSS_NAH-v.ABWEHR);
+        } else { v.mismatchTempo=0; v.mismatchWucht=0; }
+        // PLATZHALTER, nach Fables Vorschlag (Awareness liest das Feld). Der Mismatch-
+        // Aufschlag steht bewusst HIER und nicht als weiterer Multiplikator im Tick: wer
+        // seinem Mann klar unterlegen ist, sortiert die Lage auch seltener neu — dieselbe
+        // Groessenordnung wie der ABWEHR-Term selbst (0,5-2,0s -> hoechstens ~+0,9s).
+        v.reevDeckung=(0.5+(100-v.ABWEHR)/100*1.5)*(1+(v.mismatchTempo||0)*0.6);
       }
     }
   }
@@ -4119,8 +4231,17 @@
     // exakt wie vor der Wurf-Distanz-Aufspaltung — die Distanz-Differenzierung sitzt
     // bereits dort, wo sie hin muss (technikMake in entscheideBallaktion), nicht hier.
     const qualitaet=(m)=>Math.max(0.01,0.16+m.TECHNIK*0.0050+m.TEAMGEIST*0.0060);
+    // AUSBRUCH (Chris: "falls sie dann den Pass kriegen"): derselbe Bonus und dieselbe
+    // Bauform wie beim Roll-Fenster daneben — ein Spieler, der gerade allein Richtung
+    // Korb davonlaeuft, ist die naheliegende Anspielstation, unabhaengig von seiner
+    // sonstigen Bewertung. Ohne diesen Faktor bleibt der Ausbruch reine Optik: der
+    // Ballfuehrer traegt den Ball selbst hoch und der Schnelle laeuft nebenher.
+    // Multiplikator statt Sonderfall, damit ein schlechter Abschlussspieler auch im
+    // Ausbruch nicht zum bevorzugten Ziel wird, sondern nur ein wahrscheinlicheres.
+    const ausbrecher=fsLive&&fsLive.fastbreak?fsLive.fastbreak.ausbrecher:null;
     return gewichtetesLosNach(mitspieler,m=>
-      m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
+      m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1)
+      *(m===ausbrecher&&fsT<(m.ausbruchBis||0)?AUSBRUCH_PASS_MUL:1));
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -4226,7 +4347,15 @@
     // Liga-Mittelwert bleibt, nur die Spanne oeffnet sich). Ein Spielmacher mit AUFBAU 83
     // laesst gut jede fuenfte Wurfgelegenheit liegen und sucht stattdessen den freien Mann.
     // Beim Zwangswurf (Schussuhr) gilt das nicht — dann wird geworfen.
-    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080));
+    //
+    // AUSBRUCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben): wer gerade allein im offenen
+    // Feld auf den Ring zulaeuft und den Ball bekommt, sucht NICHT den freien Mann — er
+    // zieht durch. Umgesetzt als Schwelle 0 statt als vorgezogenes `return`, damit der
+    // rr()-Wurf an genau derselben Stelle stehen bleibt: `rr()<0` ist immer falsch, die
+    // Anzahl der Wuerfe (und damit die Zufallsfolge fuer alles Nachfolgende) aendert sich
+    // durch diesen Zweig nicht. Dieselbe Vorsicht wie beim Fokus-Doppeln, s. dort.
+    const imAusbruch=fsT<(u.ausbruchBis||0);
+    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080))*(imAusbruch?AUSBRUCH_SUCHT_PASS_MUL:1);
 
     if(tier&&!suchtPass){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
@@ -4354,7 +4483,13 @@
       // ausserdem deutlich haeufiger wirklich ein Assist — der Tausch lohnt sich fuer den
       // Passgeber jetzt auch im Boxscore-Mass. Gemessen (s. Bericht): der intelligence-
       // Anteil bleibt positiv, die Abweichung faellt statt zu steigen.
-      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040));
+      // AUSBRUCH: derselbe Gedanke wie bei `suchtPass` oben, eine Stufe spaeter — auch
+      // wer den Wurf gerade nicht nimmt, spielt im Ausbruch nicht zurueck ins Aufbauspiel,
+      // sondern dribbelt weiter Richtung Ring (der naechste Tick findet ihn dann naeher am
+      // Korb, s. bewegeSpielerLive). Abschlag statt Sperre und wieder OHNE Verschiebung
+      // der rr()-Reihenfolge: der Wurf steht unveraendert da, nur sein Schwellwert sinkt.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040))
+        *(imAusbruch?AUSBRUCH_PASS_ABSCHLAG:1);
       if(rr()<passChance){
         // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
         // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen
@@ -4843,7 +4978,35 @@
   // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
   // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
   function startFastbreak(seite){
-    fsLive.fastbreak={seite, bis:fsT+3};
+    fsLive.fastbreak={seite, bis:fsT+3, ausbrecher:null};
+    // AUSBRUCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben). Der Fastbreak selbst gab es
+    // schon; was fehlte, war ein Grund, warum ein SCHNELLER Spieler davon mehr hat als
+    // ein langsamer. Genau das ist dieser Block: er sucht den schnellsten Mann des
+    // Teams, misst seinen Vorsprung nicht gegen den Ligadurchschnitt, sondern gegen den
+    // SCHNELLSTEN GEGNER — denn der ist es, der ihn einholen muesste — und laesst ihn
+    // mit einer daran haengenden Chance losziehen.
+    //
+    // Der Ballfuehrer selbst kann nicht ausbrechen: er hat den Ball schon (startFastbreak
+    // wird bewusst NACH ballUebernehmen gerufen, s. dort), fuer ihn gilt der bestehende
+    // 1,3x-Fastbreak-Bonus. Der Ausbrecher ist der Mann VOR dem Ball.
+    const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
+    const kandidaten=team.filter(u=>!u.hatBall);
+    if(!kandidaten.length||!gegner.length)return;
+    let schnellsterGegner=gegner[0].LAUFTEMPO;
+    for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
+    let bester=kandidaten[0];
+    for(const u of kandidaten)if(u.LAUFTEMPO>bester.LAUFTEMPO)bester=u;
+    const vorsprung=bester.LAUFTEMPO-schnellsterGegner;
+    // Kein Vorsprung, kein Ausbruch — und ausdruecklich auch KEIN rr()-Wurf: ein Team
+    // ohne schnellen Mann laeuft damit exakt die rr()-Folge von vorher.
+    if(vorsprung<AUSBRUCH_VORSPRUNG_MIN)return;
+    const chance=Math.min(AUSBRUCH_CHANCE_MAX,
+      AUSBRUCH_CHANCE_BASIS+(vorsprung-AUSBRUCH_VORSPRUNG_MIN)*AUSBRUCH_CHANCE_K);
+    if(rr()<chance){
+      fsLive.fastbreak.ausbrecher=bester;
+      bester.ausbruchBis=fsT+AUSBRUCH_FENSTER;
+      feed(seite,bester.n+" reißt aus — allein Richtung Korb.");
+    }
   }
 
   function loeseFlugAuf(flug,art){
@@ -5003,6 +5166,13 @@
     // naechste Gegner/das Ziel statt des Balls) durch denselben Term; hier bewusst nur fuer
     // Basketball verdrahtet.
     const ALLE_SPIELER=[...FSTEAM[0],...FSTEAM[1]];
+    // WER IM FASTBREAK MITSPRINTET. Hier stand bisher `team.indexOf(u)<2` — die zwei
+    // ERSTEN im Team-Array, also die Aufstellungsreihenfolge, im Kommentar selbst als
+    // PLATZHALTER markiert. Chris' Punkt ("agile Spieler sollten nutzen koennen, dass sie
+    // schneller sind") faellt genau in diese Luecke: es waren nie die Schnellen, die
+    // mitsprinteten. Jetzt die zwei mit dem hoechsten LAUFTEMPO (speed/stamina/dexterity,
+    // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
+    const SPRINTER=FSTEAM.map(t=>[...t].sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -5075,6 +5245,18 @@
         // als seine freilaufenden Mitspieler, aber schneller als die zurueckweichende
         // Verteidigung (deren Bonus gleichzeitig von 1,25× auf 1,0× sinkt, s. unten).
         if(imFastbreak&&fastbreak.seite===u.side){ tempoMul=1.3; dribbelFaktor=0.85; }
+        // AUSBRUCH MIT BALL (Chris: "um den Dunk zu machen"). Der Ausbrecher hat den Pass
+        // bekommen — jetzt gilt fuer die Dauer seines Fensters KEINE Wunschdistanz: er
+        // zieht bis unter den Ring durch, wo klassifiziereWurfdistanz "dunk" liest und
+        // GEO_BONUS.dunk (unveraendert) den Abschluss traegt. Das ist bewusst dieselbe
+        // Bauform wie die Wunschdistanz darueber — ein anderes LAUFZIEL, keine neue
+        // Wahrscheinlichkeit. Steht NACH dem Fastbreak-Zweig, damit es ihn ueberschreibt,
+        // und gilt auch dann noch, wenn das 3s-Fastbreak-Fenster mit dem Ballwechsel
+        // schon geloescht wurde (ballUebernehmen) — sein eigenes Fenster laeuft weiter.
+        if(fsT<(u.ausbruchBis||0)){
+          zx=korbX; zy=H/2;
+          tempoMul=Math.max(tempoMul,AUSBRUCH_TEMPO_MUL); dribbelFaktor=0.85;
+        }
       } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
@@ -5129,7 +5311,18 @@
           u.slotSeit=0;
         }
         zx=bx; zy=by;
-        if(imFastbreak&&fastbreak.seite===u.side&&team.indexOf(u)<2)tempoMul=1.3; // PLATZHALTER: die ersten beiden sprinten mit
+        if(imFastbreak&&fastbreak.seite===u.side){
+          if(fastbreak.ausbrecher===u&&fsT<(u.ausbruchBis||0)){
+            // AUSBRUCH OHNE BALL: er laeuft nicht in seinen Slot, sondern DURCH — an den
+            // gegnerischen Korb, mit einer kleinen Y-Ablage, damit er nicht exakt auf dem
+            // Ring parkt und die Separation ihn dort wieder wegdrueckt. Genau das war der
+            // fehlende Teil ("schneller zum anderen Korb kommen"): das Fastbreak-Fenster
+            // gab bisher nur Tempo, aber niemandem ein anderes ZIEL — alle liefen ihre
+            // Halbfeld-Slots an, nur schneller.
+            zx=korbX; zy=H/2+(u.id%2?26:-26);
+            tempoMul=AUSBRUCH_TEMPO_MUL;
+          } else if(SPRINTER[u.side].indexOf(u)>=0)tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
+        }
       } else if(u.deckt){
         if(imFastbreak&&fastbreak.seite!==u.side){
           // FASTBREAK-VERTEIDIGUNG: erst zurueck zum eigenen Korb sprinten, Manndeckung
@@ -5191,10 +5384,44 @@
             // 33 -> 97px gemessen, bedraengte Entscheidungen -77 %). Ein kleiner Vorsprung
             // (1,15×, PLATZHALTER) gibt "Deckung halten" ueberhaupt eine Chance, ohne sie
             // unbeatbar zu machen.
-            tempoMul=1.15;
+            // AUS DEN AUGEN VERLIEREN (Chris: "schlechte Verteidiger koennten sie
+            // vielleicht aus den Augen verlieren"). Muster 1:1 vom Hilfe-Wurf darueber
+            // uebernommen: eine Gelegenheit je VERLIEREN_CD, eine Chance daran, ein
+            // Fenster als Ergebnis. Gewuerfelt wird NUR, wenn ueberhaupt ein
+            // Beweglichkeits-Abstand besteht (mismatchTempo>0, s. zuordneDeckung) — ein
+            // ebenbuertiges oder ueberlegenes Paar wuerfelt nicht und laeuft damit die
+            // rr()-Folge von vorher. Der Verlust ist eine reine BEWEGUNG: der Verteidiger
+            // laeuft weiter dorthin, wo sein Mann WAR, verliert dabei seinen
+            // Tempo-Vorsprung und steht danach zu weit weg — die geringere Kontest-
+            // Wirkung entsteht allein ueber diesen Abstand (dist(), gelesen von
+            // entscheideBallaktion), nicht ueber einen Eingriff in die Erfolgsformel.
+            if((u.mismatchTempo||0)>0&&fsT>=(u.sichtCd||0)){
+              u.sichtCd=fsT+VERLIEREN_CD;
+              if(rr()<Math.min(VERLIEREN_MAX,u.mismatchTempo*VERLIEREN_K)){
+                u.verlorenBis=fsT+VERLIEREN_FENSTER;
+                u.letzteSicht={x:u.deckt.x,y:u.deckt.y};
+              }
+            }
+            // MISMATCH, Tempo: der 1,15x-Deckungsvorsprung ist das, was "Deckung halten"
+            // ueberhaupt moeglich macht (s. Opus-Review-Fund #3 im Kommentar oben). Wer
+            // seinem Mann in Antritt und Ballbehandlung deutlich unterlegen ist, verliert
+            // genau diesen Vorsprung: die einmal gerissene Luecke bleibt offen, statt
+            // sich Tick fuer Tick wieder zu schliessen.
+            tempoMul=Math.max(MISMATCH_TEMPO_MIN,1.15-(u.mismatchTempo||0)*MISMATCH_TEMPO_ABZUG);
             const zumEigenenKorb=eigenerKorbX-u.deckt.x;
-            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
+            // MISMATCH, Wucht: "hat nicht die Power, um starke Angreifer zu verteidigen"
+            // — er weicht zurueck. `sag` (der Zug Richtung eigenen Korb) gab es schon;
+            // gegen einen koerperlich ueberlegenen Angreifer faellt er groesser aus, der
+            // Verteidiger steht also weiter vom Ball weg und bedraengt schwaecher.
+            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3)   // PLATZHALTER, gedeckelt
+              *(1+(u.mismatchWucht||0)*MISMATCH_WUCHT_SAG);
             zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+            // Solange das Sichtverlust-Fenster laeuft: das alte Bild statt der aktuellen
+            // Position, und ohne jeden Tempo-Bonus. Steht NACH der Zielsetzung, damit es
+            // sie ueberschreibt, aber VOR der Screen-Bremse, die weiterhin gewinnt.
+            if(fsT<(u.verlorenBis||0)&&u.letzteSicht){
+              zx=u.letzteSicht.x; zy=u.letzteSicht.y; tempoMul=1;
+            }
             const screener=FSTEAM[u.deckt.side].find(s=>s.screent&&s.screent.fuer===u.deckt&&fsT<s.screent.bis);
             if(screener&&dist(screener,{x:(u.x+u.deckt.x)/2,y:(u.y+u.deckt.y)/2})<26)tempoMul=0.35; // PLATZHALTER
           }
@@ -7352,7 +7579,32 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
-  const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+  // FARB-TOKENS DER LEINWAND (Chris, 30.08.: "Spielernamen auf dem Feld in Teamfarbe").
+  //
+  // BEFUND, nachgemessen statt vermutet. Der Aufruf las bisher `document.body` — die
+  // Design-Tokens (--home/--away/--ink/--ok/--crit/--pitch, 21 Aufrufstellen) stehen aber
+  // auf `.oly-battle-arena`, also einem NACHFAHREN von body. Custom Properties vererben
+  // nach UNTEN, nicht nach oben: getComputedStyle(document.body).getPropertyValue("--home")
+  // liefert deshalb den leeren String — im Browser nachgeprueft, sowohl standalone als
+  // auch eingebettet (dort setzt der Host seine --nl-*-Tokens ebenfalls auf den Container,
+  // nicht auf body).
+  //
+  // WARUM DAS NIEMANDEM AUFFIEL: `ctx.fillStyle=""` ist im Canvas kein Fehler, sondern
+  // ein STILLER NO-OP — die zuletzt gesetzte Farbe bleibt einfach stehen (im Browser
+  // verifiziert: fillStyle "#ff0000", dann "" -> weiterhin "#ff0000"). Jede dieser 21
+  // Stellen zeichnete also in der Farbe, die zufaellig davor an der Reihe war. Auf dem
+  // Feld hiess das konkret: die Namenslabels trugen die Farbe des zuletzt gezeichneten
+  // Objekts statt ihrer Teamfarbe — im Screenshot stand die GAST-Spielerin Cassandra in
+  // Heim-Bernstein neben dem Gast-Mitspieler Krag'Zul in Cyan. Genau das hat Chris
+  // gesehen. Der Rest (Team-Ring, Bewegungs-Schweif, Bodenfarben, Highlight-Farben) hing
+  // an derselben kaputten Quelle.
+  //
+  // FIX an der Wurzel statt an der einen Aufrufstelle: der Container der Leinwand ist der
+  // Knoten, auf dem die Tokens tatsaechlich stehen. `closest` findet ihn standalone wie
+  // eingebettet; der body-Rueckfall haelt den Aufruf am Leben, falls die Klasse einmal
+  // fehlt (dann verhaelt es sich exakt wie bisher, es wird also nichts schlechter).
+  const FARBWURZEL=cv.closest(".oly-battle-arena")||document.body;
+  const css=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
 
   function homeFor(side,row,i,n){
@@ -11495,6 +11747,73 @@
         mittlererMin:z.frames?+(z.summeMin/z.frames).toFixed(1):null,
         anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
       return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
+    },
+    // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der
+    // Schnelle jetzt WIRKLICH frueher an, oder sieht es nur so aus?"). Spielt N Spiele
+    // headless durch (Muster von diagAbstaende/spieleBasketball daneben, read-only) und
+    // zaehlt genau die drei Dinge, an denen die neue Mechanik haengt:
+    //   * ausbrueche  — wie oft ueberhaupt ein Ausbruch gestartet wurde, und wie oft der
+    //                   Ausbrecher den Ball dann auch bekam,
+    //   * vorstoss    — der X-Vorsprung des Ausbrechers vor dem Ballfuehrer waehrend
+    //                   seines Fensters (in Feldbreiten-Prozent), also das, was Chris
+    //                   sieht: laeuft da wirklich einer vorweg?
+    //   * deckung     — mittlerer Deckerabstand, getrennt nach Mismatch-Staerke, plus
+    //                   der Anteil der Ticks, in denen ein Verteidiger seinen Mann
+    //                   gerade aus den Augen verloren hat.
+    diagDynamik:(saaten,bis)=>{
+      const n=saaten||8, dauer=bis||90;
+      let ausbrueche=0, mitBall=0, spiele=0;
+      let vorsprungSumme=0, vorsprungTicks=0;
+      const deck={schwach:{s:0,n:0},stark:{s:0,n:0}};
+      let verlorenTicks=0, deckTicks=0, verlorenEreignisse=0, mismatchSumme=0;
+      // Merkt je Spieler den zuletzt gesehenen Wert von verlorenBis — steigt er, ist das
+      // ein NEUER Sichtverlust (und nicht derselbe, der noch laeuft).
+      const zuletztVerloren=new Map();
+      for(let i=0;i<n;i++){
+        feldspielDisc="basketball"; bauFeldspiel(1337+i*7919); spiele++;
+        // EIN Ausbruch = ein Fenster, erkannt an `ausbruchBis` (nicht an der Person: der
+        // schnellste Spieler bricht ueber ein Spiel hinweg mehrfach aus, und `fastbreak`
+        // selbst wird bei jedem Ballwechsel geloescht).
+        let laeuft=null, laeuftBis=0, hatteBall=false, guard=0;
+        while(!done&&fsT<dauer&&guard<40000){
+          stepFeldspiel(1/60); guard++;
+          if(!fsLive)continue;
+          const a=fsLive.fastbreak?fsLive.fastbreak.ausbrecher:null;
+          if(a&&(a!==laeuft||a.ausbruchBis!==laeuftBis)){
+            ausbrueche++; laeuft=a; laeuftBis=a.ausbruchBis; hatteBall=false;
+          }
+          if(laeuft&&fsT<laeuftBis){
+            if(laeuft.hatBall&&!hatteBall){ mitBall++; hatteBall=true; }
+            const t=fsLive.ball.traeger;
+            if(t&&t!==laeuft){
+              // Vorsprung Richtung ANGRIFFSKORB, auf die Feldbreite normiert.
+              const richtung=laeuft.side===0?1:-1;
+              vorsprungSumme+=(laeuft.x-t.x)*richtung/W*100; vorsprungTicks++;
+            }
+          }
+          // Gezaehlt wird NUR, wer gerade wirklich verteidigt (sein Team hat den Ball
+          // nicht) — `deckt` traegt jeder der zwoelf Spieler dauerhaft, auch im eigenen
+          // Angriff, und ein Nenner ueber alle zwoelf halbierte jede Quote hier optisch.
+          for(const team of FSTEAM)for(const u of team){
+            if(!u.deckt||u.side===fsLive.amBall)continue;
+            deckTicks++;
+            mismatchSumme+=(u.mismatchTempo||0);
+            if(fsT<(u.verlorenBis||0))verlorenTicks++;
+            if((u.verlorenBis||0)>zuletztVerloren.get(u)){ verlorenEreignisse++; }
+            zuletztVerloren.set(u,u.verlorenBis||0);
+            const eimer=(u.mismatchTempo||0)>0.25?deck.schwach:deck.stark;
+            eimer.s+=dist(u,u.deckt); eimer.n++;
+          }
+        }
+      }
+      const mit=(z)=>z.n?+(z.s/z.n).toFixed(1):null;
+      return {spiele, ausbrueche, ausbruecheJeSpiel:+(ausbrueche/spiele).toFixed(2),
+        ausbrecherMitBall:mitBall,
+        vorsprungProzentFeld:vorsprungTicks?+(vorsprungSumme/vorsprungTicks).toFixed(1):null,
+        mismatchMittel:deckTicks?+(mismatchSumme/deckTicks).toFixed(2):0,
+        deckerAbstandMismatch:mit(deck.schwach), deckerAbstandEbenbuertig:mit(deck.stark),
+        mannVerlorenJeSpiel:+(verlorenEreignisse/spiele).toFixed(1),
+        anteilMannVerloren:deckTicks?+(verlorenTicks/deckTicks*100).toFixed(1):0};
     },
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
