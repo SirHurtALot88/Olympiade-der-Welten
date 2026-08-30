@@ -334,6 +334,23 @@
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}
+  /* FOKUS-DOPPELN. --fokus ist das CSS-Gegenstueck zu FOKUS_FARBE in battle-mode.engine.js
+     (Ring und Pfeil auf der Leinwand) — beide muessen denselben Ton tragen, damit die
+     Kachel in der Kaderleiste und die Markierung auf dem Feld als EIN Zustand lesbar
+     sind. Bewusst ein fester Wert statt einer Themenfarbe: er darf mit keiner der beiden
+     Teamfarben (--home/--away) verwechselbar sein. */
+  .oly-battle-arena.oly-battle-arena{--fokus:#ffb02e}
+  .oly-battle-arena.oly-battle-arena .kk.waehlbar{cursor:pointer}
+  .oly-battle-arena.oly-battle-arena .kk.waehlbar:hover{border-color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .kk.fokus{border-color:var(--fokus);box-shadow:0 0 0 2px color-mix(in srgb,var(--fokus) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.fokus b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile{display:flex;gap:10px;align-items:center;justify-content:flex-end;
+    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
+    background:var(--fokus);margin-right:5px;vertical-align:-1px}
   /* Endstand */
   .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
     gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}

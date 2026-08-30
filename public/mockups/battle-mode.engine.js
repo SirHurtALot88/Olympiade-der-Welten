@@ -3558,6 +3558,44 @@
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
   const HILFE_RADIUS=90;            // ab wann ein NICHT zustaendiger Verteidiger als Doppel-Helfer in Frage kommt (s. bewegeSpielerLive)
+  // FOKUS-DOPPELN (Chris, 29.08.: „ich kann zb einen spieler der gegner selektieren und
+  // der wird dann mehr von help defense gedoppelt"). Die Hilfsverteidigung existierte
+  // bereits (s. bewegeSpielerLive, HILFE_RADIUS oben) — neu ist ausschliesslich eine
+  // GEWICHTUNG ihrer Tore, wenn der Ballfuehrer der vom Nutzer gewaehlte Spieler ist
+  // (fsLive.fokusZiel). Bewusst ein Bias, keine Sperre: der Fokussierte darf weiter
+  // alles tun, es kommt nur oefter und frueher ein zweiter Mann.
+  //
+  // WICHTIGSTE NEBENBEDINGUNG: ohne gesetzten Fokus (fsLive.fokusZiel===null) muss JEDER
+  // dieser Faktoren wirkungslos sein UND die Zahl der rr()-Wuerfe unveraendert bleiben —
+  // sonst verschoebe sich die in PR #682 eingestellte Pp-Balance. Deshalb steht der
+  // Wuerfel unten weiterhin an genau derselben Stelle, nur sein Schwellwert aendert sich.
+  // Nachgewiesen, nicht behauptet: ohne Fokus liefert die Engine ueber 60 volle Spiele
+  // (Saaten 1337 + i*7919) bit-identische Ereignisprotokolle wie der Stand vor dieser
+  // Aenderung.
+  //
+  // Signalfarbe der Fokus-Markierung (Feld-Ring, Kopf-Pfeil, HUD-Zeile, Kaderleiste) —
+  // EINE Konstante, damit Canvas und CSS nicht auseinanderlaufen koennen; das Gegenstueck
+  // in battle-mode.css heisst --fokus.
+  const FOKUS_FARBE="#ffb02e";
+  const FOKUS_RADIUS_MUL=2.2;       // PLATZHALTER: Helfer-Suchradius 90 -> 198px
+  const FOKUS_BEDRAENGT_MUL=2.6;    // PLATZHALTER: der Erstverteidiger muss weniger dicht dran sein (30 -> 78px), damit Hilfe ueberhaupt anlaeuft
+  const FOKUS_CHANCE_MUL=3.2;       // PLATZHALTER: Hilfe-Chance je Gelegenheit, gedeckelt auf 0,95
+  const FOKUS_FENSTER=2.2;          // PLATZHALTER: Dauer des Hilfe-Fensters (statt 1,0s)
+  const FOKUS_CD=0.5;               // PLATZHALTER: Sperre gegen Neuwuerfeln (statt 1,2s)
+  // Der Helfer muss auch ANKOMMEN. Nachgemessen (fokus-mess.mjs, erste Fassung): mit dem
+  // urspruenglichen 1,15x-Anlauftempo und einem 1,7-fachen Suchradius startete der Helfer
+  // oft so weit weg, dass das Hilfe-Fenster ablief, bevor er nah genug stand, um
+  // ueberhaupt als zweiter Mann zu zaehlen (BEDRAENGT_RADIUS, s. entscheideBallaktion) —
+  // die gemessene Doppel-Dichte am markierten Spieler stieg nur von 5,1 auf 7,0 %. Nur im
+  // Fokus-Fall und nur solange das Fenster laeuft; ohne Fokus bleibt es beim unveraenderten
+  // 1,15x, das jeder Verteidiger ohnehin traegt.
+  const FOKUS_ANLAUF_MUL=1.35;      // PLATZHALTER: Tempo des Helfers im Fokus-Hilfe-Fenster
+  // Greifradius fuer den Klick AUF DAS FELD (s. verdrahteFokusAuswahl): grosszuegiger als
+  // der gezeichnete Team-Ring (r=20), weil die Figuren waehrend des Spiels laufen — wer
+  // knapp danebenklickt, soll trotzdem den gemeinten Spieler bekommen. Ein Klick weiter
+  // draussen trifft niemanden und laesst den Fokus stehen, statt ihn versehentlich zu
+  // loeschen.
+  const FOKUS_GREIF_RADIUS=30;
   // ASSIST-FENSTER (Playmaker-Runde, s. passChance/frischerPassVon unten): wie lange nach
   // einem Zuspiel ein Abschluss noch als vom Passgeber vorbereitet gilt. Vorher gab es gar
   // kein Zeitfenster, sondern ein ENTSCHEIDUNGS-Fenster von genau eins: `frischerPassVon`
@@ -3916,8 +3954,12 @@
     // battle-arena-multi-disziplin-plan.md). Verallgemeinert wird erst dann, hier steht
     // nur die Naht dafuer; `freiwurf` haelt die phasen-eigenen Daten und ist ausserhalb
     // der Phase immer null.
+    // `fokusZiel` haelt die u.id des vom Nutzer gewaehlten GEGNERISCHEN Spielers, den die
+    // eigene Hilfsverteidigung bevorzugt doppeln soll (s. FOKUS_*-Konstanten oben und die
+    // Hilfe-Logik in bewegeSpielerLive). null = niemand gewaehlt = exakt das Verhalten
+    // von vorher; ein neues Spiel startet immer ohne Fokus.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null, phase:"laufend", freiwurf:null};
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null};
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
@@ -4956,6 +4998,10 @@
       // dadurch redundant, aber harmlos) hebt das auf ~11/Spiel, ohne die Pp-Abweichung zu
       // veraendern (durchgemessen).
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
+      // Wird unten im Hilfe-Zweig gesetzt: dieser Spieler laeuft GERADE als Doppel-Helfer
+      // auf den vom Nutzer markierten Ballfuehrer zu (s. FOKUS_*). Braucht die Separation
+      // weiter unten, deshalb steht das Flag hier oben und nicht im Zweig selbst.
+      let fokusHelfer=false;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       const stehtStill=fsLive.phase==="freiwurf";
       if(stehtStill){
@@ -5079,23 +5125,35 @@
           // angelaufen — sein deckerAbstand steigt dadurch ganz natuerlich ueber dieselbe
           // dist()-Messung, die entscheideBallaktion ohnehin schon liest.
           const traeger=fsLive.ball.traeger;
+          // FOKUS-DOPPELN, s. FOKUS_*-Konstanten oben: der Nutzer hat GENAU DIESEN
+          // Ballfuehrer als Doppel-Ziel markiert. Dann — und nur dann — weiten sich die
+          // drei Tore der Hilfe-Entscheidung. Ist kein Fokus gesetzt (oder hat gerade ein
+          // anderer den Ball), sind alle Faktoren 1 und der Block ist zeichenweise das
+          // Verhalten von vorher, inklusive identischer rr()-Reihenfolge.
+          const fokus=!!(traeger&&fsLive.fokusZiel!=null&&traeger.id===fsLive.fokusZiel);
           if(traeger&&traeger.side!==u.side&&u.deckt!==traeger&&fsT>=(u.hilfeCd||0)){
             const primaerDecker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger);
-            if(primaerDecker&&primaerDecker!==u&&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS
-               &&dist(u,traeger)<HILFE_RADIUS){
+            if(primaerDecker&&primaerDecker!==u
+               &&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS*(fokus?FOKUS_BEDRAENGT_MUL:1)
+               &&dist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
               // Chance haengt an der eigenen ABWEHR (koordinierte Hilfe ist Verteidiger-
               // Skill, kein reiner Zufall) — PLATZHALTER-Koeffizienten, s. Bericht fuer die
-              // gemessene Doppel-Rate.
-              const hilfeChance=Math.min(0.6,Math.max(0.05,(u.ABWEHR-30)*0.008));
-              if(rr()<hilfeChance)u.hilfeBis=fsT+1.0; // PLATZHALTER: Dauer des Hilfe-Fensters
-              u.hilfeCd=fsT+1.2; // PLATZHALTER: Sperre gegen staendiges Neuwuerfeln
+              // gemessene Doppel-Rate. Der Fokus hebt die Chance UND die Kappe an, macht
+              // sie aber nie zur Gewissheit: auch ein markierter Spieler wird nicht bei
+              // jeder Gelegenheit gedoppelt, sonst waere es eine Sperre statt eines Bias.
+              const hilfeChance=fokus
+                ? Math.min(0.95,Math.max(0.05,(u.ABWEHR-30)*0.008)*FOKUS_CHANCE_MUL)
+                : Math.min(0.6,Math.max(0.05,(u.ABWEHR-30)*0.008));
+              if(rr()<hilfeChance)u.hilfeBis=fsT+(fokus?FOKUS_FENSTER:1.0); // PLATZHALTER: Dauer des Hilfe-Fensters
+              u.hilfeCd=fsT+(fokus?FOKUS_CD:1.2); // PLATZHALTER: Sperre gegen staendiges Neuwuerfeln
             }
           }
           if(u.hilfeBis&&fsT<u.hilfeBis&&traeger){
             // Im Hilfe-Fenster: Ziel ist der Ballfuehrer, seitlich leicht versetzt, damit
             // Helfer und Erstverteidiger nicht exakt uebereinanderstehen.
             zx=traeger.x; zy=traeger.y+(u.id%2?18:-18);
-            tempoMul=1.15;
+            tempoMul=fokus?FOKUS_ANLAUF_MUL:1.15;
+            fokusHelfer=fokus; // s. SEPARATION weiter unten
           } else {
             // Verteidigung: nah am gedeckten Mann bleiben, mit gedeckeltem Zug zum eigenen
             // Korb (Opus-Review-Fund, History). SCREEN-BREMSE: steht ein gegnerischer
@@ -5128,6 +5186,16 @@
         let sepX=0, sepY=0;
         for(const other of ALLE_SPIELER){
           if(other===u||u.deckt===other||other.deckt===u)continue;
+          // FOKUS-DOPPELN: die Abstossung ist genau das, was ein Doppel verhindert. Sie
+          // nimmt den eigenen Mann aus (u.deckt===other oben) — ein HELFER deckt den
+          // Ballfuehrer aber per Definition nicht, wurde also mit voller Kraft von ihm
+          // weggedrueckt, kaum dass er nah genug war, um als zweiter Mann zu zaehlen
+          // (BEDRAENGT_RADIUS 30 < SEP_RADIUS 60). Nachgemessen war das der eigentliche
+          // Grund, warum ein groesserer Suchradius allein fast nichts brachte. Fuer die
+          // Dauer des Fokus-Hilfe-Fensters gilt der Ballfuehrer deshalb wie der eigene
+          // Mann. Nur im Fokus-Fall: ohne Fokus bleibt die Abstossung Zeichen fuer
+          // Zeichen die von vorher, sonst verschoebe sich die Balance aus PR #682.
+          if(fokusHelfer&&other===fsLive.ball.traeger)continue;
           const ddx=u.x-other.x, ddy=u.y-other.y, dd=Math.hypot(ddx,ddy)||0.01;
           if(dd<SEP_RADIUS){ const f=(SEP_RADIUS-dd)/SEP_RADIUS; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
         }
@@ -5661,6 +5729,7 @@
   function zeichneFeldspiel(){
     bodenFeldspiel();
     const art=FB();
+    let fokusMarke=null; // gefuellt in der Spieler-Schleife, gezeichnet danach (s. unten)
     FSTEAM.forEach((g,side)=>{
       const c=side===0?css("--home"):css("--away");
       g.forEach(u=>{
@@ -5682,6 +5751,11 @@
         // getroffene BAU-Looks wieder verwaschen).
         ctx.strokeStyle=c;ctx.globalAlpha=aktiv?0.55:0.28;ctx.lineWidth=aktiv?2:1.5;
         ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
+        // FOKUS-MARKIERUNG: nur die Position merken, GEZEICHNET wird sie nach der Schleife
+        // (s. unten) — hier stuende sie unter allen Figuren, und der Pfeil ueber dem Kopf
+        // verschwaende hinter dem naechsten Sprite. Erster Anlauf war genau das, im
+        // Screenshot war vom Pfeil nichts zu sehen.
+        if(fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel)fokusMarke={x,y};
         // SPEED-SICHTBARKEIT, kosmetischer Teil (s. Bericht/Kommentar bei `tempoPx` in
         // bewegeSpielerLive): ein kurzer Bewegungs-Schweif macht den Tempo-Unterschied
         // fuer das Auge sichtbar, OHNE irgendetwas an der tatsaechlichen Bewegung zu
@@ -5743,6 +5817,28 @@
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
       });
     });
+    // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
+    // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
+    // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
+    // kraeftiger). Deshalb eine eigene, in keiner Teamfarbe vorkommende Signalfarbe, ein
+    // groesserer GESTRICHELTER Ring (r=27, wandert langsam, damit er auch im Standbild
+    // nicht wie eine Feldmarkierung aussieht) und ein Pfeil ueber dem Kopf, der auch dann
+    // noch zu finden ist, wenn zehn Figuren dicht beieinanderstehen. Hier statt in der
+    // Schleife, damit keine spaeter gezeichnete Figur ihn verdeckt.
+    if(fokusMarke){
+      const {x,y}=fokusMarke;
+      ctx.save();
+      ctx.strokeStyle=FOKUS_FARBE;ctx.lineWidth=2.5;ctx.globalAlpha=0.95;
+      ctx.setLineDash([7,5]);ctx.lineDashOffset=-(fsT*22)%12;
+      ctx.beginPath();ctx.arc(x,y,27,0,6.3);ctx.stroke();
+      ctx.setLineDash([]);
+      const pf=y-40-Math.sin(fsT*4)*2.5; // leichtes Wippen, damit der Pfeil auffaellt
+      ctx.fillStyle=FOKUS_FARBE;
+      ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineWidth=2;ctx.lineJoin="round";
+      ctx.beginPath();ctx.moveTo(x,pf+11);ctx.lineTo(x-7,pf);ctx.lineTo(x+7,pf);ctx.closePath();
+      ctx.stroke();ctx.fill();
+      ctx.restore();
+    }
     // Schiedsrichter NACH den Spielern, VOR dem Ball: beim Pfiff steht er dicht am
     // Foul-Ort und darf dort nicht hinter einer Figur verschwinden — der Ball wiederum
     // bleibt das oberste Element, wie bisher.
@@ -10465,6 +10561,105 @@
     return z;
   }
 
+  // ===================================================================================
+  // FOKUS-DOPPELN — die Bedienseite.
+  //
+  // Chris (29.08.): „vllt waere es cool wenn man fokussieren koennte also ich kann zb
+  // einen spieler der gegner selektieren und der wird dann mehr von help defense
+  // gedoppelt." Die Wirkung selbst sitzt in bewegeSpielerLive (FOKUS_*-Konstanten dort);
+  // hier steht nur, WIE man den Spieler waehlt und woran man sieht, dass er gewaehlt ist.
+  //
+  // ZWEI Wege zur Auswahl, absichtlich beide: auf dem Feld anklicken ist das, was Chris
+  // beschreibt — aber die Figuren laufen, und im Getuemmel trifft man daneben. Die
+  // Kaderleiste steht still und traegt dieselben Namen. Beide fuehren durch dieselbe
+  // Funktion (fokusUmschalten), es gibt also nur einen Zustand und eine Regel.
+  //
+  // Nur Basketball: es ist die einzige Disziplin mit einer Live-Engine. Football/Hockey/
+  // Tennis rechnen ihren Verlauf weiter vorab durch — dort gaebe es waehrend des Spiels
+  // gar nichts zu beeinflussen. Verallgemeinert wird, wenn die zweite Live-Disziplin
+  // kommt (s. docs/design/battle-arena-multi-disziplin-plan.md), nicht vorher.
+  function fokusAuswahlMoeglich(){
+    return feldspielDisc==="basketball"&&istFeldspiel(disc)&&!!fsLive;
+  }
+  function fokusSpieler(){
+    if(!fsLive||fsLive.fokusZiel==null)return null;
+    return FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsLive.fokusZiel)||null;
+  }
+  // Ein Klick auf denselben Spieler hebt den Fokus auf, ein Klick auf einen anderen
+  // ersetzt ihn — ein Zustand, kein Stapel. Nur Gegner (side 1) sind zulaessig.
+  function fokusUmschalten(id){
+    if(!fokusAuswahlMoeglich())return;
+    const u=FSTEAM[1].find(x=>x.id===id);
+    if(!u)return;
+    fsLive.fokusZiel=(fsLive.fokusZiel===id)?null:id;
+    renderKader();
+  }
+  function renderFokusZeile(){
+    const zeile=document.getElementById("fokuszeile");
+    if(!zeile)return;
+    // Nur waehrend eines laufenden Basketballspiels ueberhaupt sichtbar — in TDM/Bahn/
+    // Buehne gibt es nichts zu fokussieren, und eine leere Zeile waere nur Rauschen.
+    if(!fokusAuswahlMoeglich()){ zeile.hidden=true; return; }
+    zeile.hidden=false;
+    const u=fokusSpieler();
+    // Zusammengesetzt aus Textknoten statt innerHTML: der Name kommt aus dem Spielstand
+    // und darf nie als Markup ankommen.
+    const txt=document.getElementById("fokustext");
+    txt.textContent="";
+    if(u){
+      txt.appendChild(el("i","fmarke"));
+      txt.appendChild(document.createTextNode("Fokus-Doppeln auf "));
+      txt.appendChild(el("b",null,u.n));
+      txt.appendChild(document.createTextNode(" — die Hilfsverteidigung geht bevorzugt auf ihn."));
+    } else {
+      txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
+    }
+    const weg=document.getElementById("fokusweg");
+    if(weg)weg.hidden=!u;
+  }
+  function verdrahteFokusAuswahl(){
+    // 1) Kaderleiste, delegiert an den (stabilen) Container.
+    //
+    // WARUM mousedown UND NICHT click: renderKader() baut die Kacheln bei jedem Bild neu
+    // (box.textContent="" und dann frisch), waehrend das Spiel laeuft — also rund
+    // sechzigmal je Sekunde. Ein `click` wird aber erst dem naechsten GEMEINSAMEN
+    // VORFAHREN von mousedown- und mouseup-Ziel zugestellt; wird die Kachel zwischen
+    // Druecken und Loslassen ersetzt, ist dieser Vorfahr der Container, und die Kachel
+    // (samt data-fokusid) ist im Ereignis nicht mehr zu finden — der Klick geht in den
+    // meisten Faellen ins Leere. Nachgemessen mit Playwright, das dieselbe Stelle als
+    // "element was detached from the DOM" meldete. mousedown wird dagegen der Kachel
+    // zugestellt, die im Moment des Druckens unter dem Zeiger liegt; die gibt es immer.
+    // Der saubere Gegenentwurf waere, renderKader die Kacheln wiederverwenden zu lassen
+    // statt sie neu zu bauen — das betrifft alle vier Disziplin-Familien und ist eine
+    // eigene Aufraeum-Aufgabe, nicht diese.
+    const box=document.getElementById("kaderR");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-fokusid]"):null;
+      if(k){ ev.preventDefault(); fokusUmschalten(Number(k.dataset.fokusid)); }
+    });
+    // 2) Direkt auf dem Feld. Die Leinwand ist per CSS skaliert, der Klick kommt in
+    //    CSS-Pixeln — erst auf die Zeichenflaeche zurueckskalieren (cv.width/rect.width),
+    //    dann den naechsten GEGNER innerhalb eines Greifradius suchen. Getroffen wird die
+    //    Bodenposition (u.x/u.y), nicht die um Hop/Wobble verschobene Zeichenposition:
+    //    die Bodenposition ist die, die auch der Schatten und der Team-Ring markieren.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!fokusAuswahlMoeglich())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      let treffer=null,minD=FOKUS_GREIF_RADIUS;
+      for(const g of FSTEAM[1]){
+        const d=Math.hypot(g.x-mx,g.y-my);
+        if(d<minD){ minD=d; treffer=g; }
+      }
+      if(treffer)fokusUmschalten(treffer.id);
+    });
+    const weg=document.getElementById("fokusweg");
+    if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -10476,7 +10671,7 @@
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
-        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
         :U.filter(x=>x.side===seite))){
@@ -10486,6 +10681,21 @@
         const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
         bar.appendChild(f); k.appendChild(bar);
         k.title=u.n+(u.down?" — ausgeschieden":" — "+Math.round(u.hp)+" von "+u.max+" Leben");
+        // FOKUS-DOPPELN: die Kaderleiste ist die zweite (und die verlaesslichere)
+        // Auswahlflaeche neben dem Klick aufs Feld — die Kacheln stehen still, waehrend
+        // die Figuren auf der Leinwand laufen. Nur die GEGNER-Seite ist waehlbar: die
+        // eigene Hilfsverteidigung kann per Definition nur einen Gegner doppeln.
+        // Der Klick selbst haengt delegiert am Container (s. verdrahteFokusAuswahl) —
+        // renderKader baut die Kacheln jeden Frame neu, einzelne Listener waeren sonst
+        // sechzig Mal je Sekunde neu zu setzen.
+        if(fokusAuswahlMoeglich()&&seite===1&&u.id!=null){
+          k.dataset.fokusid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=fsLive.fokusZiel===u.id;
+          if(gewaehlt)k.classList.add("fokus");
+          k.title=u.n+(gewaehlt?" — wird gedoppelt (klicken hebt den Fokus auf)"
+                               :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
+        }
         box.appendChild(k);
       }
     }
@@ -10501,6 +10711,7 @@
       : istFeldspiel(disc)
       ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
+    renderFokusZeile();
   }
 
   // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
@@ -10590,6 +10801,7 @@
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
   });
   document.getElementById("reset").addEventListener("click",reset);
+  verdrahteFokusAuswahl();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
@@ -11025,8 +11237,12 @@
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
     // zieht, nicht nur die nackte Punktwolke — s. SEITEN-BALANCE-FIX-Kommentar bei SLOTS oben.
-    diagDetail:(saat,bis)=>{
+    diagDetail:(saat,bis,fokusName)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      // fokusName wie bei spieleBasketball (s. dort): erlaubt es, die Doppel-Dichte um
+      // einen markierten Spieler direkt aus den Positionen zu messen, statt sie aus
+      // Wurfereignissen zu erschliessen.
+      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z)fsLive.fokusZiel=z.id; }
       const eimer=[]; let naechster=0;
       while(!done&&fsT<(bis||30)){
         stepFeldspiel(1/60);
@@ -11048,8 +11264,14 @@
     // rohe fsZuege()-Ereignisprotokoll zurueck — read-only wie diagPositionen/fsZuege
     // daneben, damit sich FG% nach Deckerabstand/Doppeln ueber viele Spiele auswerten
     // laesst (s. Bericht), ohne die UI zu bedienen.
-    spieleBasketball:(saat)=>{
+    spieleBasketball:(saat,fokusName)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      // ABNAHME DES FOKUS-DOPPELNS (29.08.): optional der Name eines GEGNERISCHEN
+      // Spielers, der vor dem ersten Tick als fsLive.fokusZiel gesetzt wird — dieselbe
+      // eine Zustandsvariable, die auch der Klick in der UI setzt, nur ohne UI. Ohne das
+      // Argument bleibt fokusZiel null, und der Durchlauf ist zeichenweise der von
+      // vorher (das ist die Balance-Kontrolle, s. scripts/messe-arena-einfluss.mjs).
+      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z)fsLive.fokusZiel=z.id; }
       let guard=0;
       while(!done&&fsT<SPIELDAUER_BASKETBALL+5&&guard<20000){ stepFeldspiel(1/60); guard++; }
       return fsZuege;
@@ -11063,6 +11285,11 @@
     // Abnahme der Standphase (Freiwurf/Schiedsrichter, 29.08.): read-only wie fsZuege
     // daneben — der Phasenzustand plus die Position des Schiedsrichters, damit sich von
     // aussen (Playwright) exakt der Moment abpassen laesst, in dem die Formation steht.
+    // Fokus-Doppeln, read-only: WER gerade markiert ist (Name statt roher id, damit sich
+    // ein Klick in der UI von aussen abnehmen laesst). null = niemand.
+    fsFokus:()=>{ if(!fsLive||fsLive.fokusZiel==null)return null;
+      const u=FSTEAM[0].concat(FSTEAM[1]).find(x=>x.id===fsLive.fokusZiel);
+      return u?{id:u.id,n:u.n,side:u.side}:null; },
     fsPhase:()=>fsLive?{phase:fsLive.phase,
       freiwurf:fsLive.freiwurf?{schuetze:fsLive.freiwurf.schuetze.n,seite:fsLive.freiwurf.schuetze.side,
         anzahl:fsLive.freiwurf.anzahl,idx:fsLive.freiwurf.idx,gemacht:fsLive.freiwurf.gemacht,
