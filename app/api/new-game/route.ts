@@ -16,8 +16,9 @@ import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonfli
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
-  // Battle-Mode-Spielmodus-Wahl (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.3). Noch
-  // nicht ans UI angebunden (PR 4) -- nur der Passthrough-Pfad zu buildNewGameStateFromBaseline.
+  // Battle-Mode-Spielmodus-Wahl (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.3).
+  // Kommt seit PR 4 aus dem Kachel-Umschalter oben im Anlege-Assistenten
+  // (`data-testid="new-game-mode-picker"`), Default "manager".
   gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];

@@ -882,7 +882,19 @@ describe("foundation performance architecture helpers", () => {
     // Uebernahme-Zustaende gehoeren naeher an die Sponsorenseite, die sie verbraucht, als
     // in die Wurzel aller Foundation-Zustaende. Das ist ein eigener Umbau — die Ratsche
     // haelt nur fest, dass er noch aussteht, statt ihn zu erzwingen.
+    // 239 -> 240, wieder bewusst statt heimlich: die Battle-Mode-Moduswahl im Anlege-Assistenten
+    // (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.1 / PR 4) ergaenzt GENAU EINEN
+    // Zustand — `newGameMode`, den Modus des neu anzulegenden Spielstands. Er sitzt bewusst hier
+    // und nicht in der Ansicht: er gehoert zum selben Bausatz wie `newGamePresetId`,
+    // `newGameChrisTeamIds` und `newGameSandbox` direkt daneben, aus dem `runNewGameSetup()` den
+    // `/api/new-game`-Payload baut. Ihn allein an die Verbrauchsstelle zu ziehen, waehrend seine
+    // vier Geschwister in der Wurzel bleiben, wuerde den Anlege-Payload auf zwei Zustandsquellen
+    // aufteilen — genau das, was der Wizard-Umbau ("genau ein Weg") vermeiden wollte.
+    //
+    // DIESELBE ANMERKUNG WIE BEIM LETZTEN MAL: der ganze `newGame*`-Block gehoert naeher an den
+    // Assistenten, der ihn verbraucht. Das ist ein eigener Umbau; die Ratsche haelt nur fest,
+    // dass er weiter aussteht.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(239);
+    expect(useStateCallCount).toBeLessThanOrEqual(240);
   });
 });
