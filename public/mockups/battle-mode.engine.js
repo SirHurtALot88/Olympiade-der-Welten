@@ -3066,82 +3066,256 @@
       // sie sind gegen reale FG%-Referenzwerte kalibriert, und jeder frueherer Versuch,
       // die Matrix ueber sie statt ueber die Rezepte einzuloesen, hat die Abweichung
       // gesprengt (s. dortige Kommentare). Der einzige Hebel hier sind die zehn Rezepte.
+      //
+      // ===============================================================================
+      // ARCHETYPEN-RUNDE (Chris: "die stars sollen wirklich herausstechen in playmaking,
+      // scorer long/short range, defense"). Der Stand davor — 17,3 Pp mit den Rezepten aus
+      // PR #680/#681 — war matrixtreu und trotzdem falsch: eine Vier-Archetypen-Demo
+      // (240 Spiele, vier Extrem-Builds gegen sonst durchweg neutrale Spieler) zeigte, dass
+      // KEINER der vier in seiner eigenen Kategorie fuehrte. Der Spielmacher war der beste
+      // Scorer, der Distanzschuetze der beste Rebounder, der Korbschuetze traf am
+      // schlechtesten aus der Zone. Die Rezepte alleine konnten das nicht heilen — vier
+      // MECHANISCHE Befunde standen davor, jeder einzeln nachgemessen und unten an seiner
+      // Stelle dokumentiert:
+      //
+      //   1. zuordneSlots() verteilte die Korbnaehe nach ZWEITCHANCE. Rebounds und
+      //      Korbpunkte hingen damit an EINEM Wert und waren ueber kein Rezept trennbar.
+      //      Jetzt nach SCHUSS_NAH.
+      //   2. Jeder Ballfuehrer lief stur auf den Korb zu (bewegeSpielerLive). Ein
+      //      Distanzschuetze kam so gar nicht erst zum Dreier. Jetzt bestimmt sein
+      //      Wurfprofil die Wunschdistanz.
+      //   3. Der Wurf-Zweig stand VOR dem Pass-Zweig und verliess die Funktion mit return —
+      //      wer in Reichweite stand, kam an `passChance` praktisch nie vorbei. Ein
+      //      Spielmacher war mechanisch unmoeglich. Jetzt `suchtPass`.
+      //   4. Der Assist zaehlte nur, wenn der Empfaenger in GENAU der naechsten
+      //      Entscheidung warf; das Rebound-Los war linear und damit fast ein Muenzwurf.
+      //      Jetzt ein Zeitfenster (ASSIST_FENSTER) und ein quadratischer Zweikampf.
+      //
+      // ERGEBNIS (messe-arena-einfluss.mjs basketball 48 / Vier-Archetypen-Demo, 320 Spiele
+      // je Build): 20,4 Pp, und alle vier Builds fuehren in ihrer eigenen Kategorie —
+      // Vorlagen +16 %, getroffene Dreier +173 %, getroffene Korbwuerfe +76 %,
+      // Steals+Bloecke+Rebounds +17 % gegenueber dem jeweils naechstbesten Build. Zweite
+      // Stichprobe zur Kontrolle, wie beim ZWEITCHANCE-Nachzug davor: n=60 liest 25,5 Pp
+      // (der Stand davor las dort 20,8 gegen seine 17,3 bei n=48) — der Aufschlag ist in
+      // beiden Stichproben derselbe, rund +3 bis +5 Pp.
+      //
+      // WAS DAS GEKOSTET HAT, ehrlich: 17,3 -> 20,4 Pp. Die vier Mechanik-Aenderungen allein
+      // (mit den alten Rezepten) lagen bei 37,2 Pp; die 20,4 sind das Ergebnis von zwoelf
+      // durchgemessenen Rezeptfassungen darauf (v4 29,7 | v5 22,4 | v6 35,3 | v7 40,1 |
+      // v8 35,0 | v9 37,1 | w1 44,0 | w2 29,4 | x1 44,0 | y1 34,2 | z2 36,0 | s1 23,1).
+      // Die Metrik reagiert dabei NICHT monoton auf kleine Rezeptaenderungen: sie normiert
+      // ueber die positiven Gewinne, ein Attribut mit Nettogewinn <= 0 liest exakt 0,0 % und
+      // kostet dann sein volles Matrixgewicht. Zwei Fassungen mit identischer
+      // dexterity-Verteilung lasen 7,2 % und 1,1 %. Wer hier weiterdreht: nach JEDEM Punkt
+      // messen, und die Fassung behalten, in der ALLE neun Attribute positiv lesen — das
+      // ist der zuverlaessigste Indikator fuer eine niedrige Abweichung.
+      //
+      // Ein Sondierungslauf mit ORTHOGONALEN Rezepten (jeder Sub-Skill von genau einem
+      // Attribut gespeist, so dass der gemessene Attributanteil das mechanische Gewicht des
+      // Sub-Skills IST) hat die Arbeit ueberhaupt erst steuerbar gemacht. Vorher/nachher:
+      //   ZWEITCHANCE 54,8 -> 10,3 | ABWEHR 13,3 -> 21,8 | TEAMGEIST 21,6 -> 11,4
+      //   SCHUSS_NAH   0,0 -> 17,5 | LAUFTEMPO 1,4 -> 14,8 | TECHNIK 2,0 -> 8,2
+      //   AUFBAU       0,0 ->  7,9 | ABSCHLUSS 5,5 -> 6,2 | SCHUSS_FERN 1,5 -> 1,2
+      //   AUSDAUER     0,0 ->  0,1 (mechanisch tot, s. dortiger Kommentar)
+      // Vorher trug EIN Sub-Skill mehr als die Haelfte; jetzt haben acht von zehn ein
+      // Gewicht, mit dem sich ein Rezept ueberhaupt lenken laesst. Der Lauf ist billig
+      // (eine Messung) und lohnt sich vor jeder groesseren Mechanik-Aenderung wieder.
       // ===============================================================================
       rezept:{
-        // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Zuerst
-        // Spielverstaendnis (wer sieht die Struktur), dann Charisma — der Aufbauspieler
-        // dirigiert die anderen fuenf, und Charisma hat ausserhalb von TEAMGEIST/AUFBAU/
-        // ABSCHLUSS logisch keine Heimat. Kein power/stamina/torment: den Ball
-        // hochzubringen ist keine Kraftfrage.
-        AUFBAU:      {intelligence:36,charisma:22,awareness:16,spirit:14,dexterity:8,speed:4},
+        // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Charisma fuehrt —
+        // der Aufbauspieler dirigiert die anderen fuenf —, dahinter das Handling
+        // (dexterity); erst danach Spielverstaendnis und Uebersicht. Kein power/stamina/
+        // torment: den Ball hochzubringen ist keine Kraftfrage.
+        //
+        // FRUEHER intelligence-gefuehrt (36), und genau das machte den Spielmacher zum
+        // Distanzschuetzen: intelligence fuehrt auch SCHUSS_FERN (Chris' Vorgabe, s. dort),
+        // ein Build auf "AUFBAU hoch" bekam den Dreierschuetzen also gratis dazu — dieselbe
+        // Ueberlappung, die PR #681 bei ABWEHR aufgeloest hat. charisma ist der einzige
+        // Wert, der ausserhalb von TEAMGEIST keine zweite Heimat hat und deshalb einen
+        // Archetyp allein tragen kann; die Signatur des Spielmacher-Builds ist jetzt
+        // charisma + dexterity und ueberschneidet sich mit keinem der drei anderen.
+        AUFBAU:      {charisma:36,dexterity:26,intelligence:14,awareness:12,speed:8,spirit:4},
         // ABSCHLUSS ist KEIN Erfolgswert (das sind SCHUSS_NAH/SCHUSS_FERN), sondern
         // "generische Abschlussstaerke" fuer drei Auswahl-Entscheidungen: wer als
         // Zielspieler angespielt wird (offensterMitspieler), wie frueh sich ein
         // Ballfuehrer einen Wurf zutraut (schwelle) und die Freiwurfquote. Genau dafuer
         // steht hier Handling (dexterity) vor Selbstvertrauen (charisma/spirit) —
         // "der Typ, der den Ball haben WILL, wenn es eng wird".
-        ABSCHLUSS:   {spirit:24,dexterity:20,charisma:16,power:14,awareness:12,intelligence:9,speed:5},
+        ABSCHLUSS:   {spirit:22,dexterity:20,charisma:16,power:14,awareness:10,stamina:10,intelligence:8},
         // Wurfauswahl und Geduld ("Shot Intelligence", Chris' Wort). Bleibt
         // intelligence-gefuehrt wie bisher; das Rezept ist logisch richtig, sein
         // MECHANISCHER Einfluss ist nur klein, weil technikGate bei Durchschnittswerten
         // immer ueber der Schwelle liegt (s. Punkt 1 oben) — das ist eine Eigenschaft
         // der Formel, kein Grund, das Rezept unlogisch zu machen.
-        TECHNIK:     {intelligence:49,awareness:23,spirit:18,dexterity:10},
+        TECHNIK:     {intelligence:50,awareness:22,spirit:16,dexterity:12},
         // SCHUSS_NAH/SCHUSS_FERN (Chris' Wunsch: "scorst du 2P/3P separat und laesst die
         // Gewichtung da reinlaufen") tragen die eigentliche Trefferchance in technikMake.
         // Nur aus den fuer Basketball erlaubten 9 Attributen, KEIN speed (Doppel-Zaehlung
         // mit dem Fastbreak/Bedraengnis-Mechanismus, s. schussSkillFuer oben).
         // Die Asymmetrie, die einen Korbleger von einem Distanzschuetzen unterscheidbar
-        // macht, bleibt und ist sogar schaerfer als vorher: power NUR nah (Kraft am
-        // Ring, dort auch das groesste Einzelgewicht), intelligence NUR fern
-        // (Wurftechnik/Bogenwahl — Chris woertlich: "um 3P-Wuerfe zu machen braucht man
-        // mehr intelligence als power, ist ja logischer"). dexterity/awareness/spirit
-        // liegen auf beiden Distanzen, weil sauberes Handling, Timing und der Wille,
-        // den Wurf zu nehmen, distanzunabhaengig sind.
-        SCHUSS_NAH:  {power:28,spirit:26,awareness:22,dexterity:14,stamina:6,torment:4},
-        SCHUSS_FERN: {intelligence:48,spirit:21,awareness:19,dexterity:12},
-        // DER GROSSE HEBEL DIESER RUNDE. ZWEITCHANCE bestimmt ueber zuordneSlots(), wer
-        // korbnah steht — und damit indirekt, wer die hochprozentigen Wuerfe bekommt;
-        // gemessen traegt der Sub-Skill fast 40 % des gesamten Einflusses. Bisher stand
-        // dort {power 45, awareness 30, stamina 25}, also fast nur Attribute, die die
-        // Matrix ganz unten fuehrt (power 7, stamina 6) — genau daher kamen die
-        // +15,6 Pp power und +7,7 Pp stamina der Ausgangsmessung.
-        // Logisch begruendet neu: der zweite Ball gehoert dem, der ihn am meisten WILL
-        // (spirit — der hoechste Matrixwert der Disziplin), der frueher liest, wohin er
-        // abprallt (intelligence/awareness), und der sich am Ring behauptet
-        // (power/stamina). Kraft bleibt also drin, wie von Chris verlangt — aber als
-        // vierter Faktor, nicht als erster.
-        ZWEITCHANCE: {spirit:27,intelligence:23,awareness:15,power:9,stamina:8,torment:6,dexterity:6,speed:6},
-        // Verteidigung ist der zweitgroesste Kanal (Steal/Interception/Block zaehlen im
-        // Boxscore je 1,5). torment sitzt hier als einziger echter Heimatplatz — die
-        // Haerte im Zweikampf; damit ist ein torment-lastiger Spieler auch der einzige
-        // Attributtyp, der sich EINDEUTIG als Verteidiger lesen laesst (Archetyp-Test).
-        // Dazu Lesen des Feldes (awareness/intelligence), Antizipation und
-        // Kommunikation (spirit/charisma — Chris: "das Team pushen" gilt auch defensiv),
-        // Herauslaufen (speed) und Haende am Ball (dexterity).
-        ABWEHR:      {awareness:22,intelligence:18,torment:16,spirit:14,speed:12,charisma:6,dexterity:5,power:4,stamina:3},
+        // macht, ist jetzt vollstaendig: power NUR nah (Kraft am Ring, dort das groesste
+        // Einzelgewicht), intelligence NUR fern (Wurftechnik/Bogenwahl — Chris woertlich:
+        // "um 3P-Wuerfe zu machen braucht man mehr intelligence als power, ist ja
+        // logischer"). Die beiden Rezepte teilen sich KEIN einziges fuehrendes Attribut
+        // mehr: nah traegt power+spirit (Kraft und Wille am Ring), fern
+        // intelligence+awareness (Technik und Timing aus der Distanz).
+        //
+        // power MUSS hier fuehren, nicht bloss vorkommen — das ist der eine Punkt, an dem
+        // sich das Rezept nicht frei waehlen laesst. SCHUSS_NAH speist seit dieser Runde
+        // zuordneSlots(), und dieser Kanal ist ein RANGWECHSEL: eine Attributanhebung wirkt
+        // nur, wenn sie den Spieler in der Sortierung ueberhaupt verschiebt. Mit power auf
+        // Platz zwei (30 gegen spirit 34) bewegte dieselbe Anhebung SCHUSS_NAH um zu wenig,
+        // und power las in drei aufeinanderfolgenden Messungen 0,0-1,8 % statt seiner
+        // Matrixvorgabe 7 (z1, y1, q1). Mit power an der Spitze liest es 5,3 %.
+        // stamina fuer die Arbeit im Low Post, awareness fuers Timing, torment nur als
+        // Spur — Haerte gehoert an die Bretter (ZWEITCHANCE), nicht in den Wurf.
+        SCHUSS_NAH:  {power:34,spirit:30,stamina:16,awareness:12,dexterity:6,torment:2},
+        SCHUSS_FERN: {intelligence:50,awareness:22,spirit:16,dexterity:12},
+        // WER DEN ZWEITEN BALL HOLT — und seit dieser Runde NUR noch das. ZWEITCHANCE
+        // entschied frueher zwei voellig verschiedene Dinge: den Kampf um den Abpraller
+        // (reboundKampf, richtig) UND die Aufstellung, also wer korbnah steht (falsch,
+        // s. zuordneSlots). Weil korbnah der groesste Term der Wurfformel steht
+        // (GEO_BONUS.dunk 0,70), war jeder gute Rebounder zwangslaeufig auch der beste
+        // Punktesammler; acht durchgemessene Rezeptfassungen drehten Rebounds und Punkte
+        // immer zusammen. Das war eine Mechanik-Frage, keine Rezept-Frage, und sie ist in
+        // zuordneSlots() beantwortet. Hier steht seitdem nur noch der Zweikampf am Brett.
+        //
+        // REBOUND-BEFUND (Chris, aus der Runde davor): "der defense star hat deutlich
+        // weniger rebounds als sein gegenueber". Mit dem alten, intelligence-lastigen
+        // Rezept (23) las der reine Distanzschuetzen-Build hier 83 gegen 72 des
+        // Verteidiger-Builds — der Scorer gewann also auch noch die Bretter. Inhaltlich
+        // falsch: Rebounding ist Zweikampfhaerte und Stellungsspiel, nicht Wurf-IQ.
+        //
+        // JETZT fuehrt torment (Haerte am Brett), dahinter intelligence (Antizipation —
+        // wo der Ball hinspringt, weiss man vor dem Absprung) und spirit (den Ball WOLLEN),
+        // dann speed (wer zuerst da ist). Die Signatur des Verteidiger-Builds ist
+        // torment + speed und traegt damit 42 der 100 Punkte; der Distanzschuetze
+        // (intelligence + awareness) kommt auf 34 — genug Abstand, dass der Verteidiger die
+        // Bretter gewinnt, ohne dass Antizipation aus dem Rezept fliegt. Kein power und kein
+        // dexterity: beides sind in dieser Disziplin Wurf-Attribute, und solange sie hier
+        // mitwiegen, kauft sich der Scorer-Build ueber sie die Bretter zurueck.
+        //
+        // WIRKUNG (Vier-Archetypen-Demo, 320 Spiele je Build): Rebounds Verteidiger 2,41
+        // gegen 1,96 des Distanzschuetzen und 1,72 des Korbschuetzen — vor der Runde stand
+        // es 1,29 zu 2,90 gegen ihn. Der Rebound-Zweikampf selbst (reboundKampf) traegt
+        // dazu bei: er lost seit dieser Runde quadratisch statt linear und laesst einem
+        // heranstuermenden Rebounder ueberhaupt Zeit anzukommen (s. dort).
+        ZWEITCHANCE: {torment:26,intelligence:24,spirit:20,speed:16,awareness:10,stamina:4},
+        // ===========================================================================
+        // VERTEIDIGER-DIFFERENZIERUNG — der eine Punkt, an dem das Rezept aus PR #680
+        // einen echten Nebeneffekt hatte. torment fuehrt jetzt, intelligence ist raus.
+        //
+        // BEFUND. Ein Demo-Lauf mit zwei extremen Builds (Verteidiger awareness/
+        // intelligence/torment/spirit 92-98 gegen Scorer intelligence/power/dexterity/
+        // awareness 90-97) machte BEIDE zu Top-Scorern — der "Verteidiger" sogar zum
+        // besten: 3,44 PTS bei 60,5 FG% gegen 2,41 PTS bei 54,7 FG% des Scorers
+        // (360 Spiele). Die Engine gab ihm SCHUSS_FERN 99 und TECHNIK 99, WEIL er
+        // Verteidiger sein sollte. Ursache: ABWEHR fuehrte mit awareness 22 +
+        // intelligence 18 = 40 % genau die zwei Attribute, die SCHUSS_FERN
+        // (intelligence 48 + awareness 19 = 67 %) und TECHNIK (49 + 23 = 72 %) fuehren.
+        // Wer ABWEHR ueber 90 wollte, MUSSTE beide hochziehen — und bekam den
+        // Distanzschuetzen gratis dazu.
+        //
+        // NACHTRAG ARCHETYPEN-RUNDE (die Zahlen unten beschreiben den Stand davor, die
+        // Begruendung gilt unveraendert): torment fuehrt weiter, aber speed steht jetzt
+        // dicht dahinter (24 statt 9) — nicht als Widerruf des SPEED-Absatzes weiter unten,
+        // sondern weil sich die Lage darunter geaendert hat. Der Absatz argumentiert gegen
+        // speed, weil speed ueber LAUFTEMPO auch scort; das galt, solange jeder Ballfuehrer
+        // stur auf den Korb zulief und Tempo damit direkt Punkte war. Seit die Wunschdistanz
+        // am Wurfprofil haengt (s. bewegeSpielerLive), zahlt Tempo vor allem noch auf lose
+        // Baelle und Rueckwaertsbewegung ein. Gemessen liegt der speed-Anteil mit
+        // torment 26/speed 24 bei 9,1 % gegen die Matrixvorgabe 10 — also unter Vorgabe,
+        // waehrend die alte Fassung mit speed 17 noch 13,8 % las. Der Verteidiger-Build
+        // braucht ein ZWEITES eigenes Attribut, sonst traegt ihn torment allein und er
+        // bleibt gegen jeden anderen Build zu schwach; torment + speed ist die einzige
+        // Paarung, die sich mit keinem der drei Scorer-Archetypen ueberschneidet.
+        // intelligence steht wieder mit 12 drin (statt 4) — Antizipation gehoert in eine
+        // Verteidigung, und auf Platz vier kann sie den Distanzschuetzen nicht mehr
+        // gratis mitliefern, gegen den der BEFUND oben geschrieben wurde.
+        //
+        // AENDERUNG (Stand PR #681). intelligence 18 -> 4, torment 16 -> 26 (fuehrt jetzt),
+        // awareness 22 -> 20, charisma 6 -> 10, dexterity 5 -> 8, power 4 -> 6, speed 12 -> 9.
+        // Logisch tragbar: Verteidigung braucht Spielverstaendnis, aber nicht in dem
+        // Ausmass, in dem ein Distanzwurf es braucht. Die Haerte im Zweikampf (torment)
+        // ist das, was einen Verteidiger von einem Werfer UNTERSCHEIDET; das Lesen des
+        // Feldes (awareness) ist das, was beide teilen, und darf deshalb nicht fuehren.
+        // charisma steht fuer die Kommunikation in der Verteidigung, dexterity fuer die
+        // Haende am Ball, power fuer das Behaupten der Position.
+        //
+        // WARUM SPEED RUNTER STATT HOCH — der Auftrag schlug das Gegenteil vor, die
+        // Messung widerspricht zweimal. (1) Matrix: jeder Punkt speed mehr in ABWEHR hob
+        // den gemessenen speed-Anteil um rund einen Prozentpunkt; die Fassung mit
+        // speed 17 las 13,8 % (Matrixvorgabe 10) und riss die Abweichung in der zweiten
+        // Saatfamilie auf 51,5 Pp. (2) Differenzierung: speed treibt ueber LAUFTEMPO
+        // (speed 60) die Laufgeschwindigkeit tempoPx und damit die Rennen um lose Baelle,
+        // Rebounds und Fastbreaks. speed ist also DUAL USE — ein Verteidiger, den man
+        // ueber speed baut, scort in der Umschaltbewegung, ohne einen einzigen Wurf-Skill
+        // zu brauchen. Gemessen (480 Spiele, spirit bei beiden Builds gleich 90, damit
+        // TEAMGEIST herausfaellt): derselbe Verteidiger mit speed 95 schlaegt den Scorer
+        // 3,29 zu 3,01 PTS bei 61,1 zu 56,6 FG%; mit speed 78 liegt er bei 2,38 zu 3,35
+        // PTS und 51,3 zu 60,9 FG%; mit speed 50 bei 2,08 zu 3,36. torment ist das
+        // einzige Attribut der Disziplin, das AUSSCHLIESSLICH Verteidigung bezahlt —
+        // deshalb traegt es hier den Hauptteil, nicht speed.
+        //
+        // GEMESSEN. messe-arena-einfluss.mjs basketball 48: 17,2 Pp (PR #680) -> 20,3 Pp.
+        // Zusaetzlich gegen eine ZWEITE, unabhaengige Saatfamilie geprueft (die Saaten in
+        // einflussVon sind fest verdrahtet, fuer den Gegenlauf einmalig auf
+        // zieheFormkarten(20260824+i*15485863)/M.bau(4241+i*32452843) gesetzt): dort
+        // 31,3 Pp (PR #680) -> 32,5 Pp. Der Aufschlag ist also in BEIDEN Familien klein
+        // (+3,1 / +1,2) — das war bei den verworfenen Fassungen nicht so.
+        //
+        // VERWORFEN, alle gemessen (Saatfamilie A / zweite Familie):
+        //   torment30 speed24 aware13 dex10 spirit7, dazu ZWEITCHANCE- und
+        //     SCHUSS_NAH-Umbau                                    38,5 / —
+        //   dieselbe ABWEHR ohne die zwei anderen Rezepte         24,8 / —
+        //   torment30 speed16 aware18 dex12 spirit8 cha8          32,2 / —
+        //   torment27 aware20 speed17 spirit14 cha7               21,5 / 51,5
+        //   torment23 aware20 spirit14 speed13 cha10 pow8         25,4 / 33,1
+        // Die Reihenfolge ist NICHT monoton in irgendeinem Gewicht — dieselbe Sprung-
+        // haftigkeit, vor der der Block ganz oben warnt. Wer hier weitermacht: nach jeder
+        // einzelnen Zahl messen, und immer gegen BEIDE Saatfamilien.
+        //
+        // WAS DAS NICHT LOEST — nachgemessen, damit es niemand fuer einen Fehler haelt:
+        // ein Build mit spirit 90+ bleibt auch als "Verteidiger" ein ordentlicher Scorer,
+        // und das ist KEIN Rezeptfehler. spirit ist mit 22 der hoechste Matrixwert der
+        // Disziplin, und TEAMGEIST (spirit 41) geht mit Koeffizient 0,0030 in technikMake
+        // ein — mehr als der Wurf-Skill selbst mit 0,0022. Ein spirit-90-Spieler ist per
+        // Matrix-Ansage ueberall gut; wer das aendern will, aendert die Matrix, nicht das
+        // Rezept.
+        // ===========================================================================
+        ABWEHR:      {torment:26,speed:24,awareness:20,intelligence:12,dexterity:10,charisma:8},
         // TEAMGEIST geht in technikMake UND in die Pass-Lotterie (qualitaet hoch zwei)
         // ein — ein starker, aber wegen des 0,92-Deckels stark nichtlinearer Kanal (ein
         // frueherer Versuch, spirit hier NOCH weiter hochzuziehen, hob die Abweichung auf
-        // 44+ Pp). Deshalb geht der Weg diesmal andersherum: charisma fuehrt, spirit holt
-        // sich seinen Anteil ueber ZWEITCHANCE. Logisch traegt das: Mannschaftsgeist ist
-        // die Verbindung zur Mannschaft, und die entsteht ueber Ausstrahlung mindestens
-        // so sehr wie ueber eigenen Willen. Es ist zugleich der einzige Kanal, ueber den
-        // charisma (Matrix 11) ueberhaupt nennenswert durchschlagen kann.
-        TEAMGEIST:   {charisma:59,spirit:41},
+        // 44+ Pp). Deshalb geht der Weg andersherum: charisma fuehrt, spirit holt sich
+        // seinen Anteil ueber SCHUSS_NAH und ZWEITCHANCE. Logisch traegt das:
+        // Mannschaftsgeist ist die Verbindung zur Mannschaft, und die entsteht ueber
+        // Ausstrahlung mindestens so sehr wie ueber eigenen Willen.
+        //
+        // 59/41 -> 56/44 (Archetypen-Runde): TEAMGEIST ist fuer charisma nicht mehr der
+        // einzige Kanal, sondern der einzige POSITIVE. AUFBAU, das charisma seit dieser
+        // Runde anfuehrt, nimmt seinem Traeger im Boxscore-Mass zuerst etwas weg — wer
+        // abgibt, tauscht rund 1,2 erwartete eigene Punkte gegen eine Vorlage zu 1,0
+        // (s. suchtPass/passChance in entscheideBallaktion). Genau daran ist charisma in
+        // mehreren Fassungen auf 0,6-4,2 % eingebrochen, obwohl die Matrix es mit 11
+        // bepreist. Vier Punkte zurueck zu spirit halten den Ausgleich: gemessen liest
+        // charisma jetzt 11,4 % bei Vorgabe 11 und spirit 19,9 % bei Vorgabe 22.
+        TEAMGEIST:   {charisma:56,spirit:44},
         // MECHANISCH FOLGENLOS in der Basketball-Live-Engine: kein einziger Aufruf liest
         // u.AUSDAUER (der `ermued`-Term sitzt im Vorab-Modell, das nur Football/Hockey/
         // Tennis fahren). Bewusst trotzdem logisch richtig belegt statt als Ablage fuer
         // unerwuenschte Attribute missbraucht — wenn die Live-Engine spaeter einen
         // Ermuedungsterm bekommt, stimmt das Rezept dann sofort, und die Budgetrechnung
         // oben zieht ihm zugleich keinem Attribut etwas ab.
-        AUSDAUER:    {stamina:44,spirit:25,torment:20,speed:11},
+        AUSDAUER:    {stamina:48,spirit:22,torment:18,speed:12},
         // Fables Dynamik-Runde: Lauftempo treibt die tatsaechliche Laufgeschwindigkeit
-        // (tempoPx) und entscheidet damit die Rennen um freie Baelle. Praktisch
-        // unveraendert zum Vorgaenger — speed las in der Ausgangsmessung mit 10,0 %
-        // exakt seine Matrixvorgabe, das war die einzige punktgenaue Zeile der Tabelle
-        // und wird deshalb nicht angefasst.
-        LAUFTEMPO:   {speed:60,stamina:26,dexterity:14}
+        // (tempoPx) und entscheidet damit die Rennen um freie Baelle. speed 60 -> 52,
+        // stamina 26 -> 32 (Archetypen-Runde): speed traegt jetzt zusaetzlich 24 in ABWEHR
+        // (s. dort) und wuerde ueber beide Kanaele zusammen ueberschiessen; stamina hat
+        // ausser hier und in SCHUSS_NAH keine mechanische Heimat mehr, seit AUSDAUER in der
+        // Live-Engine nichts mehr auszahlt (s. dortiger Kommentar) — es las in mehreren
+        // Fassungen 0,1-0,3 % bei Vorgabe 6. Mit 32 liest es 9,6 %.
+        LAUFTEMPO:   {speed:52,stamina:32,dexterity:16}
       },
       // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
       // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
@@ -3255,6 +3429,17 @@
   // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
   // zurueck() (MOTOREN.basketball) sie mit einer Zeile mitnehmen koennen.
   let fsLive=null;
+  // SCHIEDSRICHTER (Chris' Auftrag, 29.08.: "wir brauchen einen schiedsrichter der fouls
+  // pfeifen kann"). Bewusst NICHT in FSTEAM: er ist kein Spieler, hat keine Sub-Skills,
+  // keinen Slot, keine Deckung und darf in keiner der Spieler-Schleifen (zuordneDeckung,
+  // bewegeSpielerLive, Rebound-Kandidaten, Separation) auftauchen — ein eigenes, kleines
+  // Objekt mit x/y/Ziel und einem eigenen Pfiff-Timer ist deshalb billiger und sicherer
+  // als ein 13. Eintrag in einem der beiden Teams.
+  //
+  // ZEITBASIS BEWUSST dt STATT fsT: die Standphase haelt die Spieluhr an (s.
+  // stepBasketballLive), fsT steht waehrend des Pfiffs also still — ein `pfiffBis`-
+  // Zeitstempel gegen fsT waere genau dann eingefroren, wenn die Geste laufen soll.
+  let fsSchiri=null;
   // Debug-Anzeige der rollenbasierten Ziel-Position VOR der Separation (s.
   // bewegeSpielerLive), nur ueber window.__arena.debugZiele(true) einschaltbar — im
   // normalen Spiel unsichtbar, dient nur der Spacing-Abnahme/Feinjustage.
@@ -3276,6 +3461,20 @@
   // BASKETBALL-LIVE-ENGINE — Konstanten. Alle PLATZHALTER, wie ueberall in diesem
   // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
   // ARENA_INTERAKTION_KONZEPT.md).
+  // STANDPHASE FREIWURF — alle vier PLATZHALTER, in SPIELZEIT-Sekunden (die Uhr steht
+  // waehrend der Phase still, s. stepBasketballLive; ZEIT_DEHNUNG.basketball=2 streckt sie
+  // fuer den Zuschauer wie jede andere Sekunde auch). Summe fuer zwei Freiwuerfe: 1,6 +
+  // 2x(0,9+0,5+0,7) = 5,8s Zuschauerzeit.
+  const FW_FORMATION=1.6;           // Aufstellen an der Linie/an der Zone, bevor der erste Ball fliegt
+  const FW_ANLAUF=0.9;              // Ritual am Ball, bevor der Schuetze abdrueckt
+  const FW_FLUG=0.5;                // Ballflug zum Ring (Muster wie flug.dauer bei einem Feldwurf)
+  const FW_NACH=0.7;                // Nachklang, bevor der naechste Freiwurf beginnt bzw. die Phase endet
+  // Opus-Review-Fund (30.08.): NICHT "echte Sekunden" — bewegeSchiri()/pfiffT zaehlen in
+  // `dt`, und `dt` kommt im interaktiven Spiel bereits durch zeitFaktor() geteilt (Faktor 2
+  // fuer Basketball, s. ZEIT_DEHNUNG) beim Aufrufer an. Die Geste haelt also 1,8 Simulations-
+  // sekunden, was bei laufendem Spiel ~3,6 echten Sekunden entspricht.
+  const PFIFF_DAUER=1.8;            // Simulationssekunden, s. Kommentar oben
+  const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
   const SPIELDAUER_BASKETBALL=120;  // Chris' Wunsch (25.08.: 45->90; 29.08.: nochmal laenger)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
@@ -3363,6 +3562,55 @@
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
   const HILFE_RADIUS=90;            // ab wann ein NICHT zustaendiger Verteidiger als Doppel-Helfer in Frage kommt (s. bewegeSpielerLive)
+  // FOKUS-DOPPELN (Chris, 29.08.: „ich kann zb einen spieler der gegner selektieren und
+  // der wird dann mehr von help defense gedoppelt"). Die Hilfsverteidigung existierte
+  // bereits (s. bewegeSpielerLive, HILFE_RADIUS oben) — neu ist ausschliesslich eine
+  // GEWICHTUNG ihrer Tore, wenn der Ballfuehrer der vom Nutzer gewaehlte Spieler ist
+  // (fsLive.fokusZiel). Bewusst ein Bias, keine Sperre: der Fokussierte darf weiter
+  // alles tun, es kommt nur oefter und frueher ein zweiter Mann.
+  //
+  // WICHTIGSTE NEBENBEDINGUNG: ohne gesetzten Fokus (fsLive.fokusZiel===null) muss JEDER
+  // dieser Faktoren wirkungslos sein UND die Zahl der rr()-Wuerfe unveraendert bleiben —
+  // sonst verschoebe sich die in PR #682 eingestellte Pp-Balance. Deshalb steht der
+  // Wuerfel unten weiterhin an genau derselben Stelle, nur sein Schwellwert aendert sich.
+  // Nachgewiesen, nicht behauptet: ohne Fokus liefert die Engine ueber 60 volle Spiele
+  // (Saaten 1337 + i*7919) bit-identische Ereignisprotokolle wie der Stand vor dieser
+  // Aenderung.
+  //
+  // Signalfarbe der Fokus-Markierung (Feld-Ring, Kopf-Pfeil, HUD-Zeile, Kaderleiste) —
+  // EINE Konstante, damit Canvas und CSS nicht auseinanderlaufen koennen; das Gegenstueck
+  // in battle-mode.css heisst --fokus.
+  const FOKUS_FARBE="#ffb02e";
+  const FOKUS_RADIUS_MUL=2.2;       // PLATZHALTER: Helfer-Suchradius 90 -> 198px
+  const FOKUS_BEDRAENGT_MUL=2.6;    // PLATZHALTER: der Erstverteidiger muss weniger dicht dran sein (30 -> 78px), damit Hilfe ueberhaupt anlaeuft
+  const FOKUS_CHANCE_MUL=3.2;       // PLATZHALTER: Hilfe-Chance je Gelegenheit, gedeckelt auf 0,95
+  const FOKUS_FENSTER=2.2;          // PLATZHALTER: Dauer des Hilfe-Fensters (statt 1,0s)
+  const FOKUS_CD=0.5;               // PLATZHALTER: Sperre gegen Neuwuerfeln (statt 1,2s)
+  // Der Helfer muss auch ANKOMMEN. Nachgemessen (fokus-mess.mjs, erste Fassung): mit dem
+  // urspruenglichen 1,15x-Anlauftempo und einem 1,7-fachen Suchradius startete der Helfer
+  // oft so weit weg, dass das Hilfe-Fenster ablief, bevor er nah genug stand, um
+  // ueberhaupt als zweiter Mann zu zaehlen (BEDRAENGT_RADIUS, s. entscheideBallaktion) —
+  // die gemessene Doppel-Dichte am markierten Spieler stieg nur von 5,1 auf 7,0 %. Nur im
+  // Fokus-Fall und nur solange das Fenster laeuft; ohne Fokus bleibt es beim unveraenderten
+  // 1,15x, das jeder Verteidiger ohnehin traegt.
+  const FOKUS_ANLAUF_MUL=1.35;      // PLATZHALTER: Tempo des Helfers im Fokus-Hilfe-Fenster
+  // Greifradius fuer den Klick AUF DAS FELD (s. verdrahteFokusAuswahl): grosszuegiger als
+  // der gezeichnete Team-Ring (r=20), weil die Figuren waehrend des Spiels laufen — wer
+  // knapp danebenklickt, soll trotzdem den gemeinten Spieler bekommen. Ein Klick weiter
+  // draussen trifft niemanden und laesst den Fokus stehen, statt ihn versehentlich zu
+  // loeschen.
+  const FOKUS_GREIF_RADIUS=30;
+  // ASSIST-FENSTER (Playmaker-Runde, s. passChance/frischerPassVon unten): wie lange nach
+  // einem Zuspiel ein Abschluss noch als vom Passgeber vorbereitet gilt. Vorher gab es gar
+  // kein Zeitfenster, sondern ein ENTSCHEIDUNGS-Fenster von genau eins: `frischerPassVon`
+  // wurde bei der naechsten Ballaktion des Empfaengers gelesen UND sofort geleert — wer den
+  // Ball annahm, einmal andribbelte und ERST DANN warf, brachte seinem Passgeber nie einen
+  // Assist ein. Da `reevBall` nach der Annahme 0,25s betraegt und danach 0,4-1,2s je
+  // Entscheidung, deckt 1,6s zuverlaessig die Annahme plus eine Zwischen-Entscheidung ab —
+  // und bleibt zugleich innerhalb dessen, was real als Assist gilt (Abschluss unmittelbar
+  // aus dem Zuspiel, ein bis zwei Dribblings). Laenger waere kein Assist mehr, sondern nur
+  // noch "hat den Ball irgendwann mal beruehrt".
+  const ASSIST_FENSTER=1.6;         // Sekunden Spielzeit, s. frischerPassBis
   // Dribbel-Animation (Fables Animations-Runde, 25.08.): der gehaltene Ball sass bisher
   // auf fester Handhoehe (traeger.y+18, s. fsBall dort) — kein Auf-und-Ab, keine
   // Dribbel-Bewegung zu sehen. Kurze Recherche zum ueblichen Muster (gamedev.net/
@@ -3413,7 +3661,7 @@
   };
   function bauFeldspiel(saat){
     seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
-    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null;
+    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -3571,7 +3819,7 @@
         team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++;
         // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als FG 3/6 im Boxscore"): ein Freiwurf
-        // (e.freiwurf, s. schiesseFreiwuerfe) ist kein Feldwurf-Versuch, zaehlt hier also
+        // (e.freiwurf, s. verbucheFreiwurf) ist kein Feldwurf-Versuch, zaehlt hier also
         // NICHT mit — real-basketball-konform (FT% und FG% sind getrennte Statistiken).
         if(!e.freiwurf){ s(e.spieler).feldwuerfe++; s(e.spieler).feldwuerfeTreffer++; }
       }
@@ -3652,12 +3900,33 @@
     {radius:145, seitlich:1.45},
     {radius:145, seitlich:-1.45}
   ];
-  // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
-  // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
-  // bleiben nah dran, Schuetzen ziehen weit raus". Neu bei jedem Possession-Wechsel
-  // (naechsterAngriff), nicht bei jedem einzelnen Pass innerhalb derselben Possession.
+  // Rollenbasierte Slot-Vergabe: der staerkste SCHUSS_NAH-Wert zuerst auf den innersten
+  // Slot, der Rest nach aussen — "wer aus der Zone trifft, steht in der Zone; wer das
+  // nicht kann, zieht raus". Neu bei jedem Possession-Wechsel (naechsterAngriff), nicht
+  // bei jedem einzelnen Pass innerhalb derselben Possession.
+  //
+  // FRUEHER: sortiert nach ZWEITCHANCE. Der Rebound-Rezeptkommentar oben notierte den
+  // Nebeneffekt schon als offen ("MECHANIK-Frage, keine Rezept-Frage") — hier ist er
+  // behoben. ZWEITCHANCE hing an ZWEI voellig verschiedenen Dingen: wer den Abpraller holt
+  // (reboundKampf, richtig) UND wer korbnah aufgestellt wird (falsch). Weil korbnah der
+  // groesste Term der Wurfformel steht (GEO_BONUS.dunk 0,70), war jeder gute Rebounder
+  // damit automatisch auch der beste Punktesammler — Rebounds und Korbpunkte liessen sich
+  // ueber kein Rezept mehr trennen (acht durchgemessene Fassungen, alle drehten beides
+  // zusammen).
+  //
+  // VERWORFEN, weil durchgemessen: nach der DIFFERENZ SCHUSS_NAH minus SCHUSS_FERN zu
+  // sortieren (der Korbschuetze innen, der Distanzschuetze in die Ecke) klingt richtiger und
+  // gaebe SCHUSS_FERN endlich einen mechanischen Kanal — es zerstoert aber beide. Im
+  // Sondierungslauf (orthogonale Rezepte, jeder Sub-Skill von genau einem Attribut gespeist,
+  // so dass der gemessene Attributanteil das mechanische Gewicht des Sub-Skills IST) fielen
+  // SCHUSS_NAH von 17,5 auf 0,0 % und SCHUSS_FERN von 1,2 auf 0,0 %; die Gesamtabweichung
+  // stieg von 37,2 auf 78,0 Pp. Grund: der Positionskanal ist ein RANGWECHSEL, kein
+  // Zahlenwert. Haengt der Rang an der Differenz zweier Werte, verdoppelt sich die Streuung
+  // des Sortierschluessels, und dieselbe Attributanhebung kippt nur noch halb so oft einen
+  // Rang — beide Wurfwerte rutschen unter die Rauschschwelle der Messung statt sich den
+  // Kanal zu teilen.
   function zuordneSlots(seite){
-    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.SCHUSS_NAH-a.SCHUSS_NAH);
     sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
     // sitzen aber immer beim Team, das den Ball gerade VERLOR. Ohne Raeumen lief ein
@@ -3676,13 +3945,28 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
         screenRuf:0,rangeSeit:null});
     }
     zuordneSlots(0); zuordneSlots(1);
+    // `phase` ist der EINE Zustand, der entscheidet, ob die freie Simulation laeuft
+    // ("laufend") oder eine Standsituation die Spieler in eine feste Formation stellt
+    // ("freiwurf"). Bewusst ein benannter Zustand statt eines basketball-eigenen
+    // Sonderflags: Football (Snap-Formation), Hockey (Bully) und Tennis (Aufschlag)
+    // brauchen exakt dieselbe Struktur — eine Phase, eine Aufstellungsfunktion, ein
+    // Schritt-Handler — sobald sie eine Live-Engine bekommen (s. docs/design/
+    // battle-arena-multi-disziplin-plan.md). Verallgemeinert wird erst dann, hier steht
+    // nur die Naht dafuer; `freiwurf` haelt die phasen-eigenen Daten und ist ausserhalb
+    // der Phase immer null.
+    // `fokusZiel` haelt die u.id des vom Nutzer gewaehlten GEGNERISCHEN Spielers, den die
+    // eigene Hilfsverteidigung bevorzugt doppeln soll (s. FOKUS_*-Konstanten oben und die
+    // Hilfe-Logik in bewegeSpielerLive). null = niemand gewaehlt = exakt das Verhalten
+    // von vorher; ein neues Spiel startet immer ohne Fokus.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null};
-    ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null};
+    const ruhe=schiriRuhePos();
+    fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
+    ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
   }
 
   // Mann-gegen-Mann-Zuteilung: jeder Verteidiger nimmt den ihm naechsten noch freien
@@ -3719,6 +4003,9 @@
   function ballUebernehmen(u){
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    // Kein Assist-Fenster: hierher kommt man ueber Rebound, Steal, Anwurf oder neuen
+    // Angriff — nie ueber ein Zuspiel (das laeuft ueber loeseFlugAuf, s. dort).
+    u.frischerPassVon=null;
     // Neuer Ballfuehrer beginnt seinen Dribbel-Zyklus bei Handhoehe (Phase 0), nicht
     // mitten in einem fremden Bounce — sonst haette der Ball beim Passwechsel einen
     // sichtbaren Sprung in der Hoehe.
@@ -3750,7 +4037,17 @@
   function naechsterAngriff(seite){
     fsLive.angriffSeit=0;
     zuordneSlots(seite);
-    ballUebernehmen(gewichtetesLos(FSTEAM[seite],"AUFBAU"));
+    ballUebernehmen(spielmacherLos(FSTEAM[seite]));
+  }
+
+  // WER DEN ANGRIFF EROEFFNET. Frueher ein lineares gewichtetesLos ueber AUFBAU — bei
+  // realistischen Werten (Spielmacher 83, Rest 54) sind das 26 % gegen 17 % je Mitspieler,
+  // also fast Reihum. Derselbe Nullpunkt/Exponent wie beim Rebound-Zweikampf (s. dort):
+  // der Spielmacher bringt den Ball jetzt in gut der Haelfte aller Angriffe selbst hoch,
+  // der Rest verteilt sich weiter. Ohne das gibt es kein Spielmacher-Profil im Boxscore —
+  // ein hoher AUFBAU-Wert wirkt nur, wenn der Spieler den Ball auch in die Hand bekommt.
+  function spielmacherLos(team){
+    return gewichtetesLosNach(team,u=>Math.pow(Math.max(1,u.AUFBAU-20),2));
   }
 
   function logZug(seite,art,extra){
@@ -3896,14 +4193,42 @@
     // kontestFaktor) — zwei Verteidiger sind mehr als ein staerkerer einer.
     const doppelMalus=gedoppelt?0.26:0; // PLATZHALTER, s. Bericht
     const bedraengnisMake=bedraengnisGate*kontestFaktor+doppelMalus;
-    // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
-    // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
-    // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
-    // `passgeber` beim normalen Pass gar nicht bis zum Wurf durchgereicht, Assists
-    // entstanden dadurch faktisch nur noch beim Alley-Oop).
-    const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
+    // War der letzte Ballwechsel ein Pass AN u, gilt der Abschluss noch als vom Passgeber
+    // vorbereitet — solange er INNERHALB von ASSIST_FENSTER faellt (s. dort).
+    //
+    // PLAYMAKER-BEFUND (Chris: "die stars sollen in playmaking herausstechen"): hier stand
+    // `const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;` — gelesen und im
+    // selben Atemzug geleert, egal was der Empfaenger daraufhin tat. Genau ein Bruchteil
+    // der Abschluesse faellt aber in DIESER einen Entscheidung; wer annahm, andribbelte und
+    // erst in der naechsten Runde warf, loeschte den Assist selbst. Gemessen ueber 240
+    // Spiele lag die Assistquote der Builds dadurch bei 0,4-0,7 je Spiel, voellig
+    // unabhaengig von AUFBAU. Das Fenster laeuft jetzt ueber die Zeit (frischerPassBis) und
+    // wird dort geleert, wo der Ball den Empfaenger wirklich verlaesst: in wirf() und
+    // passeAb() (er hat abgeschlossen bzw. weitergegeben) sowie in ballUebernehmen() (er
+    // hat den Ball ueber einen anderen Weg als ein Zuspiel bekommen — Rebound, Einwurf,
+    // erobert). Ohne diese drei Loeschungen wuerde derselbe Passgeber zweimal gutgeschrieben.
+    const moeglicherAssist=(u.frischerPassVon&&fsT<(u.frischerPassBis||0))?u.frischerPassVon:null;
+    if(!moeglicherAssist)u.frischerPassVon=null;
 
-    if(tier){
+    // SPIELMACHER SUCHT ZUERST DEN PASS. Ohne diese Zeile kann es keinen Spielmacher
+    // geben, und das liegt an der Reihenfolge, nicht an einer Wahrscheinlichkeit: der
+    // Wurf-Zweig unten steht VOR dem Pass-Zweig und verlaesst die Funktion mit `return`.
+    // Wer in Wurfreichweite steht, kam an `passChance` also nur, wenn er den Wurf vorher
+    // ablehnte — und das tut hier praktisch niemand, weil `technikGate` (0,16 + TECHNIK
+    // + TEAMGEIST) bei normalen Werten um 0,9 liegt und damit immer ueber `schwelle`
+    // (hoechstens 0,42). Gemessen: der Playmaker-Build nahm 2,4 eigene Wuerfe je Spiel und
+    // gab 0,65 Vorlagen — er war ein mittelmaessiger Scorer, kein Spielmacher.
+    //
+    // `suchtPass` ueberspringt den Wurf-Zweig und faellt in dieselbe Pass-/Spielzug-Logik
+    // durch, die auch ausserhalb der Wurfreichweite greift. Der Nullpunkt liegt bei
+    // AUFBAU 55: ein durchschnittlicher Spieler wuerfelt hier NIE, fuer ihn aendert sich
+    // gar nichts (dieselbe Vorsicht wie beim zentrierten passChance darunter — der
+    // Liga-Mittelwert bleibt, nur die Spanne oeffnet sich). Ein Spielmacher mit AUFBAU 83
+    // laesst gut jede fuenfte Wurfgelegenheit liegen und sucht stattdessen den freien Mann.
+    // Beim Zwangswurf (Schussuhr) gilt das nicht — dann wird geworfen.
+    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080));
+
+    if(tier&&!suchtPass){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
       // mechanischste Moment der Engine (Fables Fund). Die Wurfqualitaet (dieselbe
       // Erfolgsformel wie zuvor) muss eine mit der Zeit IN Wurfreichweite sinkende
@@ -4011,8 +4336,25 @@
       // ueber TEAMGEIST (55 % Anteil, hoechster Koeffizient in der Wurfformel) profitierte.
       // Koeffizient testweise durchgemessen (messe-arena-einfluss.mjs basketball 48):
       // 0,0030 (Original) 48,2 Pp, 0,0010 48,3 Pp, 0,0005 40,7 Pp, 0,0003 36,6 Pp,
-      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt. PLATZHALTER, kein Endwert.
-      const passChance=Math.min(0.75,Math.max(0.20,0.35+u.AUFBAU*0.0002));
+      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt.
+      //
+      // PLAYMAKER-RUNDE: 0,0002 war zu klein, um ueberhaupt noch ein Spielmacher-Profil zu
+      // erzeugen — ueber die volle AUFBAU-Spanne 0-100 bewegte sich die Passbereitschaft um
+      // ganze 0,02. Der Ausweg ist NICHT, den alten Koeffizienten wiederzuholen, sondern zu
+      // sehen, WAS der Messreihe oben eigentlich wehtat: `0,35 + AUFBAU*k` hob mit k den
+      // Mittelwert MIT — bei k=0,0030 passte die ganze Liga mit 0,50 statt 0,35, jeder
+      // Angriff bestand aus mehr Paessen und weniger eigenen Abschluessen, und weil ein
+      // abgegebener Wurf im Boxscore-Mass weniger wert ist als ein genommener (Assist 1,0
+      // gegen ~1,2 erwartete Punkte, plus Abfang-Risiko), lief das fuehrende AUFBAU-Attribut
+      // negativ ein. Jetzt ist der Term um AUFBAU=50 ZENTRIERT: die Liga passt im Mittel
+      // weiter mit 0,35 wie bisher, nur die Spanne oeffnet sich (AUFBAU 20 -> 0,26,
+      // AUFBAU 80 -> 0,44). Der Mittelwert-Effekt, der die alte Messreihe trug, faellt damit
+      // weg; uebrig bleibt genau der Unterschied zwischen Spielmacher und Abschlussspieler.
+      // Zusammen mit dem Assist-Fenster (s. ASSIST_FENSTER) ist ein abgegebener Ball
+      // ausserdem deutlich haeufiger wirklich ein Assist — der Tausch lohnt sich fuer den
+      // Passgeber jetzt auch im Boxscore-Mass. Gemessen (s. Bericht): der intelligence-
+      // Anteil bleibt positiv, die Abweichung faellt statt zu steigen.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040));
       if(rr()<passChance){
         // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
         // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen
@@ -4067,10 +4409,13 @@
   // Ball fliegt direkt zum Korb, der Finisher wird ihn nie kontrollieren.
   function wirf(von,schuetze,art,tier,technik,passgeber,zug,blockKandidat){
     von.hatBall=false; fsLive.ball.traeger=null;
+    // Assist-Fenster schliessen: der Abschluss ist raus, ein zweiter Assist aus demselben
+    // Zuspiel darf nicht entstehen (s. ASSIST_FENSTER).
+    von.frischerPassVon=null;
     von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
     // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als % oder FG 3/6 im Boxscore zeigen"):
     // jeder wirf()-Aufruf IST ein Feldwurf-Versuch (Freiwuerfe laufen nie durch wirf(),
-    // s. schiesseFreiwuerfe) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
+    // s. verbucheFreiwurf) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
     // sobald flug.treffer bekannt ist.
     schuetze.feldwuerfe++;
     const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
@@ -4135,24 +4480,263 @@
   // (Ziel: +5 Pp, Toleranz ±1). Bei ABSCHLUSS=84 (staerkster real gemessener Schuetze)
   // liegt die Quote bei ~87 %, der Deckel bei 0,90 greift dort noch nicht — erst jenseits
   // von ABSCHLUSS~88, und dann bei einer fuer Elite-Schuetzen realistischen ~90 %-Quote.
-  function schiesseFreiwuerfe(schuetze,anzahl){
-    let gemacht=0;
-    for(let i=0;i<anzahl;i++){
-      const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
-      const chance=Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
-      const treffer=rr()<chance;
-      if(treffer){
-        gemacht++; schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
-        logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:null,punkte:1,zug:null,freiwurf:true});
-      }
-      // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
-      // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
-      // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
-      logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
-      schuetze.freiwuerfe++;
-      if(treffer)schuetze.freiwurfTreffer++;
+  // EIN Freiwurf, rein rechnerisch — die Formel selbst ist gegenueber der frueheren
+  // Schleifen-Fassung (schiesseFreiwuerfe) Zeichen fuer Zeichen unveraendert, nur die
+  // Schleife darum ist weg: sie ist jetzt die Standphase (s. stepFreiwurfPhase), damit
+  // jeder einzelne Wurf einen sichtbaren Ballflug bekommt statt im Hintergrund
+  // durchgerechnet zu werden. Pro Aufruf genau EIN rr() wie zuvor.
+  function verbucheFreiwurf(schuetze){
+    const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
+    const chance=Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
+    const treffer=rr()<chance;
+    if(treffer){
+      schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:null,punkte:1,zug:null,freiwurf:true});
     }
-    return gemacht;
+    // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
+    // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
+    // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
+    logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
+    schuetze.freiwuerfe++;
+    if(treffer)schuetze.freiwurfTreffer++;
+    return treffer;
+  }
+
+  // ---------------------------------------------------------------------------------
+  // STANDPHASE FREIWURF (Chris' Auftrag, 29.08.: "Wenn gefoult wird soll es auch
+  // freiwuerfe geben wo die spieler sich auch auf den entsprechenden positionen
+  // stellen"). Die Foul-/Freiwurf-MECHANIK gab es schon lange (foulChance in wirf(),
+  // Aufloesung in loeseFlugAuf) — sie lief nur komplett unsichtbar: waehrend im
+  // Hintergrund zwei Freiwuerfe durchgerechnet wurden, dribbelte, deckte und lief das
+  // Feld normal weiter, als sei nichts passiert. Neu ist hier ausschliesslich die
+  // Sichtbarkeit: dieselbe Wurfformel, dieselbe Anzahl, derselbe Ballbesitz-Ausgang.
+  // ---------------------------------------------------------------------------------
+
+  // Die Geometrie der Freiwurfsituation wird NICHT frei erfunden, sondern aus denselben
+  // Werten abgeleitet, mit denen bodenFeldspiel() Zone, Freiwurflinie und Korb zeichnet —
+  // sonst stellen sich die Spieler neben die Linie, die der Zuschauer sieht (genau der
+  // Fehler, den der Korb bis PR #683 hatte: Sprite an `grundX`, Ballflug an `korbX`).
+  function freiwurfGeo(seite){
+    const korbX=korbXVon(seite);
+    const links=korbX<W/2;                       // welcher der beiden Koerbe angegriffen wird
+    const grundX=links?W*0.06:W*0.94;            // exakt der Wert aus bodenFeldspiel
+    const zumFeld=links?1:-1;                    // Richtung von der Grundlinie ins Feld
+    const zonenTiefe=H*0.16, zonenHalb=H*0.08;   // exakt die Werte aus bodenFeldspiel
+    return {korbX,links,grundX,zumFeld,zonenTiefe,zonenHalb,
+      linieX:grundX+zumFeld*zonenTiefe};         // Freiwurflinie = Mittelpunkt des gezeichneten Halbkreises
+  }
+
+  // Wer wohin: Schuetze hinter die Linie, je drei Rebound-Plaetze pro Zonenseite,
+  // abwechselnd Abwehr/Angriff/Abwehr von der Grundlinie nach aussen (die reale
+  // Aufstellung — der Verteidiger steht innen, weil ihm der Rebound zusteht). Wer keinen
+  // Zonenplatz bekommt, faechert hinter dem Freiwurfkreis auf. Einmal beim Betreten der
+  // Phase berechnet und festgehalten (nicht je Tick neu), damit niemand flackert.
+  function freiwurfAufstellung(schuetze){
+    const geo=freiwurfGeo(schuetze.side), plaetze={};
+    plaetze[schuetze.id]={x:geo.linieX+geo.zumFeld*14,y:H/2};
+    // Beste Rebounder zuerst an die inneren Plaetze — dieselbe Groesse, die auch den
+    // Rebound-Zweikampf entscheidet (ZWEITCHANCE, s. stepBasketballLive).
+    const angreifer=FSTEAM[schuetze.side].filter(u=>u!==schuetze).sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    const verteidiger=[...FSTEAM[1-schuetze.side]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    // GASSENABSTAND (30.08., Anti-Stacking-Runde): die Anteile lagen bei 0,25/0,65/1,05,
+    // also 0,40 x zonenTiefe = 30,1px auseinander — GENAU die Breite einer gezeichneten
+    // Figur. Im Screenshot (scratchpad/freiwurf-nah.png) standen die drei Rebounder je
+    // Gasse deshalb sichtbar ineinander, obwohl die Formation rechnerisch stimmte. Jetzt
+    // 0,18/0,68/1,18, also 0,50 x zonenTiefe = 37,6px — der Abstand liegt damit UEBER
+    // SEP_RADIUS_STAND (30, s. bewegeSpielerLive) und ueber ZEICH_MIN_ABSTAND, die fertige
+    // Formation wird also von keiner der beiden Entzerrungen mehr angefasst. Reine
+    // Zeichen-/Stellungsfrage: die Freiwurfquote rechnet verbucheFreiwurf() aus
+    // Attributen, nicht aus Positionen.
+    const gassen=[{anteil:0.18,abwehr:true},{anteil:0.68,abwehr:false},{anteil:1.18,abwehr:true}];
+    for(const g of gassen)for(const vz of [-1,1]){
+      const u=(g.abwehr?verteidiger:angreifer).shift();
+      if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*geo.zonenHalb};
+    }
+    // Rest abwechselnd, damit sich die beiden Teams auch hinten nicht zu einem Klumpen
+    // je Farbe sortieren (dieselbe Spacing-Idee wie SLOTS/SEPARATION oben).
+    const rest=[];
+    while(angreifer.length||verteidiger.length){
+      if(angreifer.length)rest.push(angreifer.shift());
+      if(verteidiger.length)rest.push(verteidiger.shift());
+    }
+    rest.forEach((u,i)=>{
+      const vz=(i%2)?1:-1, reihe=Math.floor(i/2);
+      plaetze[u.id]={x:geo.linieX+geo.zumFeld*(58+reihe*46),
+        y:Math.max(96,Math.min(H-96,H/2+vz*(62+reihe*34)))};
+    });
+    return plaetze;
+  }
+
+  // Betreten der Phase. Wird an GENAU den beiden Stellen gerufen, an denen frueher
+  // schiesseFreiwuerfe() stand (und-eins nach Treffer, Wurffoul nach Fehlwurf) — die
+  // Entscheidung WANN es Freiwuerfe gibt und WIE VIELE bleibt unveraendert in
+  // wirf()/loeseFlugAuf.
+  function starteFreiwuerfe(schuetze,anzahl,verteidiger,undEins){
+    fsLive.phase="freiwurf";
+    fsLive.freiwurf={schuetze,verteidiger,anzahl,idx:0,gemacht:0,undEins:!!undEins,
+      stufe:"formation",t:0,plaetze:freiwurfAufstellung(schuetze),treffer:false};
+    // Ballzustand hart auf "niemand hat ihn" — der Ball liegt fuer die Dauer der Phase in
+    // der Hand des Schuetzen und wird ausschliesslich von stepFreiwurfPhase gezeichnet.
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.ball.frei=null;
+    fsLive.reboundKampf=null; fsLive.fastbreak=null;
+    // Laufende Spielzuege aufloesen: ein Screen/Roll aus dem Angriff davor wuerde sonst
+    // waehrend der Standphase weiterlaufen (dieselbe Aufraeumung wie in zuordneSlots).
+    for(const team of FSTEAM)for(const u of team){
+      u.hatBall=false; u.screent=null; u.rollBis=0; u.hilfeBis=0; u.frischerPassVon=null;
+    }
+    fsAktuell={spieler:schuetze,verteidiger:verteidiger||null,passgeber:null,rebounder:null};
+    schiriPfeift(schuetze,verteidiger);
+  }
+
+  // Ein Schritt der Standphase. Vier Stufen je Sequenz: einmal `formation` (alle laufen
+  // sich zurecht), danach je Freiwurf `anlauf` -> `flug` -> `nach`.
+  function stepFreiwurfPhase(dt){
+    const fw=fsLive.freiwurf, schuetze=fw.schuetze;
+    fw.t+=dt;
+    if(fw.stufe==="formation"){
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18,traegerId:schuetze.id};
+      if(fw.t>=FW_FORMATION){ fw.stufe="anlauf"; fw.t=0; }
+      return;
+    }
+    if(fw.stufe==="anlauf"){
+      // Ball in der Hand, leicht wippend — dasselbe sin-Muster wie der Dribbel-Bounce,
+      // nur flacher (der Schuetze prellt an der Linie, er dribbelt nicht durchs Feld).
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18+Math.sin(fw.t/FW_ANLAUF*Math.PI*3)*7,traegerId:schuetze.id};
+      if(fw.t>=FW_ANLAUF){
+        schuetze.lunge=0.5;                     // Wurf-Pose, selbes Feld wie in wirf()
+        // Gewuerfelt beim Abwurf, enthuellt bei Ankunft — exakt das Muster von
+        // `treffer` in wirf(): der Ausgang steht fest, bevor der Ball fliegt.
+        fw.treffer=verbucheFreiwurf(schuetze);
+        if(fw.treffer)fw.gemacht++;
+        fw.stufe="flug"; fw.t=0;
+      }
+      return;
+    }
+    const korb={x:korbXVon(schuetze.side),y:H/2};
+    if(fw.stufe==="flug"){
+      const phase=Math.min(1,fw.t/FW_FLUG);
+      fsBall={sichtbar:true,
+        x:schuetze.x+(korb.x-schuetze.x)*phase,
+        y:schuetze.y+(korb.y-schuetze.y)*phase-Math.sin(phase*Math.PI)*44};
+      if(phase>=1){
+        fw.idx++;
+        if(feldspielDisc==="basketball"){
+          if(fw.treffer){ bkSfx("korb_treffer.mp3",0.6); bkSfx("publikum_jubel.mp3",0.25); }
+          else bkSfx("ballaufprall.mp3",0.45);
+        }
+        if(fw.treffer)schwebe({x:0,y:0,txt:"+1",life:1,crit:true,_spieler:schuetze.id});
+        fw.stufe="nach"; fw.t=0;
+      }
+      return;
+    }
+    // `nach`: der Ball faellt am Ring aus, dann geht es weiter bzw. die Phase endet.
+    fsBall={sichtbar:true,x:korb.x,y:korb.y+Math.min(26,fw.t*60)};
+    if(fw.t<FW_NACH)return;
+    if(fw.idx<fw.anzahl){ fw.stufe="anlauf"; fw.t=0; return; }
+    beendeFreiwuerfe();
+  }
+
+  // Verlassen der Phase. BALLBESITZ UNVERAENDERT gegenueber der frueheren Fassung: beide
+  // Aufrufstellen liessen nach den Freiwuerfen bedingungslos `naechsterAngriff(1-side)`
+  // folgen — kein Rebound nach einem verworfenen letzten Freiwurf, kein 1-und-1/Bonus.
+  // Das bleibt bewusst so (s. Bericht: die Regelvariante ist ein eigener Auftrag, nicht
+  // einer, den die Sichtbarkeits-Runde nebenbei mitkippt).
+  function beendeFreiwuerfe(){
+    const fw=fsLive.freiwurf, schuetze=fw.schuetze;
+    if(fw.undEins)feed(schuetze.side,schuetze.n+(fw.gemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+    else feed(schuetze.side,schuetze.n+" verwandelt "+fw.gemacht+" von "+fw.anzahl+" Freiwürfen.");
+    fsLive.phase="laufend"; fsLive.freiwurf=null;
+    fsBall={sichtbar:false,x:0,y:0};
+    naechsterAngriff(1-schuetze.side);
+  }
+
+  // ---------------------------------------------------------------------------------
+  // SCHIEDSRICHTER. Ausserhalb von Foul-Momenten steht er ruhig an der Seitenlinie auf
+  // Hoehe der Mittellinie; bei einem Foul laeuft er zum Foul-Ort, reisst den Arm hoch und
+  // pfeift. Kein eigenes Sprite: public/sprites/ hat keinen neutralen Offiziellen, und ein
+  // neues Bild-Asset zu erfinden war ausdruecklich ausgeschlossen — gezeichnet wird er
+  // deshalb mit denselben Canvas-Primitiven wie der Rueckfall-Korb in bodenFeldspiel.
+  // Das schwarz-weiss gestreifte Trikot ist das Erkennungszeichen und in 26px Hoehe
+  // lesbarer als jede Figur es waere.
+  // RUHEPOSITION: an der unteren Seitenlinie, auf Hoehe des Geschehens. Nicht starr an der
+  // Mittellinie — ein Schiedsrichter, der bei einem Foul unter dem Korb erst eine halbe
+  // Feldlaenge anlaufen muesste, kaeme sichtbar zu spaet zu seinem eigenen Pfiff (in der
+  // ersten Fassung nachgemessen: er war beim Ablauf der Pfiff-Geste noch auf halbem Weg).
+  // Er laeuft deshalb wie ein echter Offizieller im Ballbesitz mit, bleibt aber immer
+  // ausserhalb der Laufwege (feste y an der Seitenlinie, x gedeckelt).
+  function schiriRuhePos(){
+    const b=fsLive&&(fsLive.ball.traeger||fsLive.ball.frei
+      ||(fsLive.ball.flug?fsLive.ball.flug.nach:null));
+    return {x:b?Math.max(W*0.12,Math.min(W*0.88,b.x)):W/2, y:H-78};
+  }
+
+  function schiriPfeift(schuetze,verteidiger){
+    if(!fsSchiri)return;
+    const ort=verteidiger||schuetze;
+    fsSchiri.pfiffT=PFIFF_DAUER;
+    fsSchiri.zielX=Math.max(W*0.10,Math.min(W*0.90,ort.x));
+    fsSchiri.zielY=Math.max(90,Math.min(H-90,ort.y+46));
+    // PLATZHALTER-TON: public/sound/basketball/ hat keine Trillerpfeife (nachgesehen:
+    // ballaufprall/buzzer/dribbeln/korb_treffer/publikum_*). buzzer.mp3 ist der einzige
+    // kurze, schrille Signalton im Bestand und steht hier leise fuer den Pfiff, bis eine
+    // echte pfiff.mp3 im Repo liegt — eine Audiodatei zu erfinden war ausgeschlossen.
+    if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.30);
+    schwebe({x:0,y:0,txt:"FOUL!",life:1.2,crit:true,_def:true,_spieler:ort.id});
+  }
+
+  function bewegeSchiri(dt){
+    const s=fsSchiri; if(!s)return;
+    if(s.pfiffT>0)s.pfiffT=Math.max(0,s.pfiffT-dt);
+    if(s.pfiffT<=0){
+      if(fsLive&&fsLive.phase==="freiwurf"){
+        // Waehrend der Freiwuerfe stellt er sich neben die Freiwurflinie, ausserhalb der
+        // Zone — dort steht auch der echte Schiedsrichter, der den Ball anreicht.
+        const geo=freiwurfGeo(fsLive.freiwurf.schuetze.side);
+        s.zielX=geo.linieX; s.zielY=H/2-geo.zonenHalb-40;
+      } else {
+        const r=schiriRuhePos(); s.zielX=r.x; s.zielY=r.y;
+      }
+    }
+    const dx=s.zielX-s.x, dy=s.zielY-s.y, d=Math.hypot(dx,dy);
+    if(d>1){ const schritt=Math.min(d,SCHIRI_TEMPO*dt); s.x+=dx/d*schritt; s.y+=dy/d*schritt; }
+  }
+
+  function zeichneSchiri(){
+    const s=fsSchiri; if(!s)return;
+    // Masse an den Spieler-Sprites orientiert (zeichneSprite zeichnet 64px hohe Figuren mit
+    // Fuessen bei y+18) — eine deutlich kleinere Figur wirkte in der ersten Fassung wie ein
+    // Requisit statt wie eine Person. Dunkle Kontur ueberall, weil Weiss auf hellem Parkett
+    // sonst ausbleicht.
+    const pfeift=s.pfiffT>0, kH=32, kB=17, oben=s.y+8-kH;
+    ctx.save();
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.fillStyle="rgba(0,0,0,.35)";
+    ctx.beginPath();ctx.ellipse(s.x,s.y+18,12,4.5,0,0,6.3);ctx.fill();
+    ctx.fillStyle="#20242a";ctx.fillRect(s.x-kB/2,s.y+6,kB,12);            // Hose
+    ctx.fillStyle="#f4f4f4";ctx.fillRect(s.x-kB/2,oben,kB,kH);             // Trikot
+    ctx.fillStyle="#15171b";                                               // ... mit Streifen
+    for(let i=0;i<3;i++)ctx.fillRect(s.x-kB/2+3+i*5,oben,2.6,kH);
+    ctx.strokeStyle="rgba(10,12,16,.9)";ctx.lineWidth=1.5;
+    ctx.strokeRect(s.x-kB/2,oben,kB,kH);
+    ctx.fillStyle="#d8b48a";                                               // Kopf
+    ctx.beginPath();ctx.arc(s.x,oben-7,7.5,0,6.3);ctx.fill();ctx.stroke();
+    ctx.strokeStyle="#f4f4f4";ctx.lineWidth=3.5;
+    ctx.beginPath();ctx.moveTo(s.x+kB/2-2,oben+6);
+    // Arm hoch = die reale Foul-Anzeige; sonst haengt er am Koerper.
+    if(pfeift)ctx.lineTo(s.x+kB/2+7,oben-14); else ctx.lineTo(s.x+kB/2+4,s.y+2);
+    ctx.stroke();
+    if(pfeift){
+      const p=1-s.pfiffT/PFIFF_DAUER;
+      ctx.strokeStyle="rgba(255,238,140,"+Math.max(0,0.8-p*0.8).toFixed(3)+")";
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(s.x,s.y-8,15+p*34,0,6.3);ctx.stroke();
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.lineWidth=3.5;ctx.strokeStyle="rgba(8,10,14,.9)";
+      ctx.strokeText("PFIFF!",s.x,oben-24);
+      ctx.fillStyle="#ffe98a";ctx.fillText("PFIFF!",s.x,oben-24);
+    }
+    ctx.restore();
   }
 
   // Kuerzester Abstand eines Punkts zur STRECKE a-b (nicht zur unendlichen Geraden) —
@@ -4168,6 +4752,9 @@
 
   function passeAb(von,nach,druckBonus=0){
     von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
+    // Assist-Fenster schliessen: wer weitergibt, hat nicht abgeschlossen — der Assist
+    // gehoert dann (falls ueberhaupt) dem naechsten Passgeber (s. ASSIST_FENSTER).
+    von.frischerPassVon=null;
     // PASS-INTERCEPTION: ohne diesen Zweig konnte Verteidigung ausschliesslich stehlen,
     // wenn sie direkt am Ballfuehrer klebte (versucheSteal) — ein abgespielter Pass war
     // IMMER sicher, egal wie nah ein Verteidiger an der Flugbahn stand. Chris wollte
@@ -4195,7 +4782,15 @@
     // invers mit AUFBAU (schwache Ballfuehrer werfen den Ball auch ungedeckt mal weg) —
     // klein gehalten (Deckel 2-5 %), damit es ein seltenes, glaubwuerdiges Ereignis
     // bleibt, kein staendiges Rauschen.
-    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0006);
+    // Koeffizient 0,0006 -> 0,0016 (Archetypen-Runde): AUFBAU ist seit dem Spielmacher-
+    // Umbau ein Sub-Skill, der seinem Traeger im Boxscore-Mass zuerst etwas WEGNIMMT — wer
+    // abgibt, tauscht rund 1,2 erwartete eigene Punkte gegen eine Vorlage zu 1,0. Der
+    // Ausgleich dafuer gehoert dorthin, wo Ballfuehrung wirklich zaehlt: in die
+    // Ballsicherheit. Ein Ballfuehrer mit AUFBAU 85 wirft den Ball jetzt in 1,5 % statt
+    // 3,9 % der Paesse selbst weg (Deckel unveraendert bei 1,5 %), ein schwacher mit
+    // AUFBAU 30 in 5,0 % — der Ballverlust zieht im Mass 0,8 ab und war vorher praktisch
+    // skillunabhaengig.
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0016);
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
       abgefangenVon,eigenerFehler};
@@ -4209,8 +4804,14 @@
   // Schussuhr-Fenster), sonst waere die Gesamt-Stealrate viel hoeher als vorher und der
   // Einflussvektor von ABWEHR liefe aus dem Ruder.
   function versucheSteal(decker,traeger,art){
+    // Koeffizient 0,0035 -> 0,0050 (Archetypen-Runde): der Verteidiger-Build hatte zwar die
+    // knapp dreifache Chance JE VERSUCH, kam aber auf weniger Steals je Spiel als der
+    // korbnah aufgestellte Korbschuetze — weil der schlicht oefter neben dem Ball steht und
+    // damit mehr Versuche bekommt. Die Zahl der Gelegenheiten haengt an der Aufstellung, die
+    // Chance je Gelegenheit an ABWEHR; wenn ein Verteidiger sich gegen die Aufstellung
+    // durchsetzen soll, muss der zweite Hebel schwerer wiegen.
     const basis=Math.min(0.94,Math.max(0.20,
-      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0035+traeger.TEAMGEIST*0.0060));
+      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0050+traeger.TEAMGEIST*0.0060));
     const proVersuch=1-Math.pow(basis,1/3);
     decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
     // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
@@ -4275,10 +4876,17 @@
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
-      // Merkt sich den Passgeber fuer GENAU die naechste Ballaktions-Entscheidung des
-      // Empfaengers (dort sofort wieder geleert) — sonst gibt es beim normalen Pass nie
-      // einen Assist, weil `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
-      flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.lunge=0.2;
+      // Merkt sich den Passgeber fuer ASSIST_FENSTER Sekunden (s. dort und
+      // entscheideBallaktion) — sonst gibt es beim normalen Pass nie einen Assist, weil
+      // `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
+      // Fensterlaenge nach dem AUFBAU des PASSGEBERS: ein Zuspiel des Spielmachers kommt
+      // im Rhythmus (der Abschluss folgt unmittelbar), ein hingeworfener Ball muss erst
+      // sortiert werden und ist bis zum Wurf laengst kein Assist mehr. Faktor 0,70 bei
+      // AUFBAU 50 bis 1,00 bei AUFBAU 100 — das Fenster wird also nie laenger als
+      // ASSIST_FENSTER, nur kuerzer, wenn der Passgeber keiner ist.
+      const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(flug.passgeber.AUFBAU-50)*0.0060));
+      flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.frischerPassBis=fsT+ASSIST_FENSTER*fensterFaktor;
+      flug.ziel.lunge=0.2;
       feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
       fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
       return;
@@ -4308,8 +4916,10 @@
         verteidiger.fouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
         feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!");
-        const ftGemacht=schiesseFreiwuerfe(schuetze,1);
-        feed(schuetze.side,schuetze.n+(ftGemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+        // Der Zusatz-Freiwurf laeuft jetzt sichtbar ab (Standphase) statt im Hintergrund;
+        // der Ballwechsel danach passiert in beendeFreiwuerfe, nicht mehr hier.
+        starteFreiwuerfe(schuetze,1,verteidiger,true);
+        return;
       }
       // Opus-Review-Fund #10: die fruehere "Einwurf-Pause" (fsLive.einwurfBis) sperrte nur
       // entscheideBallaktion — Bewegung, Schussuhr und Steal liefen waehrenddessen
@@ -4329,10 +4939,9 @@
       logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
       feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
-      const gemacht=schiesseFreiwuerfe(schuetze,anzahl);
-      feed(schuetze.side,schuetze.n+" verwandelt "+gemacht+" von "+anzahl+" Freiwürfen.");
-      fsAktuell={spieler:schuetze,verteidiger,passgeber:flug.passgeber,rebounder:null};
-      naechsterAngriff(1-schuetze.side);
+      // Standphase statt Sofort-Abrechnung: Aufstellung, Pfiff, je Wurf ein Ballflug —
+      // Anzahl, Formel und der Ballwechsel danach bleiben unveraendert (beendeFreiwuerfe).
+      starteFreiwuerfe(schuetze,anzahl,verteidiger,false);
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
       // Ein bedraengter Fehlwurf zaehlt anteilig als Block statt als bloßer Fehlwurf —
@@ -4395,6 +5004,20 @@
     // Basketball verdrahtet.
     const ALLE_SPIELER=[...FSTEAM[0],...FSTEAM[1]];
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
+    // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
+    // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
+    // Radius von 60 wuerde die Zonen-Gassen (Abstand 30px) auseinandertreiben. Richtig
+    // war die Diagnose, falsch die Konsequenz: gemessen (window.__arena.diagAbstaende,
+    // 5 Saaten x 120s) fielen die Figuren waehrend der Phase bis auf 1,2px zusammen —
+    // nicht auf den Zonenplaetzen, sondern auf dem WEG dorthin, wo sich zwoelf Laufwege
+    // durch eine Zone kreuzen. Jetzt laeuft die Separation auch in der Standphase, aber
+    // mit einem Radius UNTERHALB des Gassenabstands (der gleichzeitig auf 37,6px
+    // aufgemacht wurde, s. freiwurfAufstellung): die fertige Formation liegt damit
+    // ausserhalb der Abstossung und bleibt Pixel fuer Pixel die geplante, waehrend sich
+    // die Laufwege dorthin trotzdem entzerren. Pp-neutral per Konstruktion — waehrend der
+    // Standphase ist die freie Simulation ohnehin ausgesetzt (kein entscheideBallaktion,
+    // kein Steal, keine Deckung), es liest also niemand diese Abstaende.
+    const SEP_RADIUS_STAND=30, SEP_STAERKE_STAND=0.45; // PLATZHALTER
     for(const team of FSTEAM)for(const u of team){
       // Opus-Review-2-Fund (Volumen-Hebel, Pp-neutral): das Spiel produzierte nur ~6,7
       // Wuerfe/Spiel — zu wenig, damit sich Spezialisierung ueberhaupt zeigen kann, egal
@@ -4402,9 +5025,46 @@
       // dadurch redundant, aber harmlos) hebt das auf ~11/Spiel, ohne die Pp-Abweichung zu
       // veraendern (durchgemessen).
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
+      // Wird unten im Hilfe-Zweig gesetzt: dieser Spieler laeuft GERADE als Doppel-Helfer
+      // auf den vom Nutzer markierten Ballfuehrer zu (s. FOKUS_*). Braucht die Separation
+      // weiter unten, deshalb steht das Flag hier oben und nicht im Zweig selbst.
+      let fokusHelfer=false;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
-      if(u.hatBall){
-        zx=korbX; zy=H/2+(u.id%2?40:-40);
+      const stehtStill=fsLive.phase==="freiwurf";
+      if(stehtStill){
+        // STANDPHASE: EIN Ziel, sonst nichts — kein Dribbeln, keine Deckung, kein
+        // Freilaufen, kein Zug zum freien Ball. Der Zweig steht bewusst GANZ oben in der
+        // Kette, damit keiner der spaeteren Zweige ihn ueberschreiben kann; alle uebrigen
+        // Zweige bleiben Zeichen fuer Zeichen unveraendert.
+        const p=fsLive.freiwurf.plaetze[u.id];
+        if(p){ zx=p.x; zy=p.y; }
+      } else if(u.hatBall){
+        // WUNSCHDISTANZ statt "immer zum Korb" (Archetypen-Runde). Bisher stand hier
+        // `zx=korbX` fuer JEDEN Ballfuehrer: wer den Ball hatte, zog los Richtung Ring,
+        // egal ob er von dort ueberhaupt trifft. Das war der Grund, warum ein reiner
+        // Distanzschuetze im Boxscore keiner war — gemessen ueber 240 Spiele nahm ein Build
+        // mit SCHUSS_FERN 93 gegen SCHUSS_NAH 57 trotzdem 1,70 Zweier gegen 0,63 Dreier,
+        // weil ihn die Bewegung jedes Mal unter den Korb trug, bevor er ueberhaupt zum Wurf
+        // kam. Die Aufstellung (zuordneSlots) konnte das nicht heilen: sie gilt nur, solange
+        // man den Ball NICHT hat.
+        //
+        // Jetzt bestimmt das Wurfprofil, wie weit er faehrt: `profil` ist der Vorsprung des
+        // Fernwurfs vor dem Nahwurf. Ab +14 will er hinter die Dreierlinie (DREIER_RADIUS
+        // plus 18px Sicherheitsabstand, damit die Klassifizierung im Wurfmoment nicht auf
+        // "mit" kippt), ab -12 zieht er ganz durch bis unter den Ring, dazwischen linear —
+        // der ausgeglichene Schuetze landet im Mitteldistanzbereich. Das ist keine neue
+        // Wahrscheinlichkeit, nur ein anderes LAUFZIEL; Trefferchance, Bedraengnis und
+        // Wurfauswahl rechnen unveraendert weiter.
+        const profil=u.SCHUSS_FERN-u.SCHUSS_NAH;
+        const anteil=Math.max(0,Math.min(1,(profil+12)/26));
+        const wunsch=(DREIER_RADIUS+18)*anteil;
+        const zumFeldB=u.side===0?-1:1;
+        zy=H/2+(u.id%2?40:-40);
+        // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
+        // Rechnung wie bei den Slot-Zielen unten); passt sie nicht mehr in die Y-Ablage,
+        // wird direkt der Korb angelaufen.
+        const yAbl=zy-H/2;
+        zx=korbX+zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl));
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -4492,23 +5152,35 @@
           // angelaufen — sein deckerAbstand steigt dadurch ganz natuerlich ueber dieselbe
           // dist()-Messung, die entscheideBallaktion ohnehin schon liest.
           const traeger=fsLive.ball.traeger;
+          // FOKUS-DOPPELN, s. FOKUS_*-Konstanten oben: der Nutzer hat GENAU DIESEN
+          // Ballfuehrer als Doppel-Ziel markiert. Dann — und nur dann — weiten sich die
+          // drei Tore der Hilfe-Entscheidung. Ist kein Fokus gesetzt (oder hat gerade ein
+          // anderer den Ball), sind alle Faktoren 1 und der Block ist zeichenweise das
+          // Verhalten von vorher, inklusive identischer rr()-Reihenfolge.
+          const fokus=!!(traeger&&fsLive.fokusZiel!=null&&traeger.id===fsLive.fokusZiel);
           if(traeger&&traeger.side!==u.side&&u.deckt!==traeger&&fsT>=(u.hilfeCd||0)){
             const primaerDecker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger);
-            if(primaerDecker&&primaerDecker!==u&&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS
-               &&dist(u,traeger)<HILFE_RADIUS){
+            if(primaerDecker&&primaerDecker!==u
+               &&dist(primaerDecker,traeger)<BEDRAENGT_RADIUS*(fokus?FOKUS_BEDRAENGT_MUL:1)
+               &&dist(u,traeger)<HILFE_RADIUS*(fokus?FOKUS_RADIUS_MUL:1)){
               // Chance haengt an der eigenen ABWEHR (koordinierte Hilfe ist Verteidiger-
               // Skill, kein reiner Zufall) — PLATZHALTER-Koeffizienten, s. Bericht fuer die
-              // gemessene Doppel-Rate.
-              const hilfeChance=Math.min(0.6,Math.max(0.05,(u.ABWEHR-30)*0.008));
-              if(rr()<hilfeChance)u.hilfeBis=fsT+1.0; // PLATZHALTER: Dauer des Hilfe-Fensters
-              u.hilfeCd=fsT+1.2; // PLATZHALTER: Sperre gegen staendiges Neuwuerfeln
+              // gemessene Doppel-Rate. Der Fokus hebt die Chance UND die Kappe an, macht
+              // sie aber nie zur Gewissheit: auch ein markierter Spieler wird nicht bei
+              // jeder Gelegenheit gedoppelt, sonst waere es eine Sperre statt eines Bias.
+              const hilfeChance=fokus
+                ? Math.min(0.95,Math.max(0.05,(u.ABWEHR-30)*0.008)*FOKUS_CHANCE_MUL)
+                : Math.min(0.6,Math.max(0.05,(u.ABWEHR-30)*0.008));
+              if(rr()<hilfeChance)u.hilfeBis=fsT+(fokus?FOKUS_FENSTER:1.0); // PLATZHALTER: Dauer des Hilfe-Fensters
+              u.hilfeCd=fsT+(fokus?FOKUS_CD:1.2); // PLATZHALTER: Sperre gegen staendiges Neuwuerfeln
             }
           }
           if(u.hilfeBis&&fsT<u.hilfeBis&&traeger){
             // Im Hilfe-Fenster: Ziel ist der Ballfuehrer, seitlich leicht versetzt, damit
             // Helfer und Erstverteidiger nicht exakt uebereinanderstehen.
             zx=traeger.x; zy=traeger.y+(u.id%2?18:-18);
-            tempoMul=1.15;
+            tempoMul=fokus?FOKUS_ANLAUF_MUL:1.15;
+            fokusHelfer=fokus; // s. SEPARATION weiter unten
           } else {
             // Verteidigung: nah am gedeckten Mann bleiben, mit gedeckeltem Zug zum eigenen
             // Korb (Opus-Review-Fund, History). SCREEN-BREMSE: steht ein gegnerischer
@@ -4532,14 +5204,30 @@
         zx=p.x; zy=p.y;
       }
       u._zielHomeX=zx; u._zielHomeY=zy; // Debug-Anzeige (window.__arena.debugZiele), s.u.
-      { // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
+      // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf). In der Standphase
+      // mit dem kleineren Paar SEP_RADIUS_STAND/SEP_STAERKE_STAND (Begruendung dort) —
+      // frueher war sie hier ganz aus, was die Figuren auf dem Weg in die Formation
+      // ineinanderlaufen liess.
+      {
+        const sepR=stehtStill?SEP_RADIUS_STAND:SEP_RADIUS;
+        const sepS=stehtStill?SEP_STAERKE_STAND:SEP_STAERKE;
         let sepX=0, sepY=0;
         for(const other of ALLE_SPIELER){
           if(other===u||u.deckt===other||other.deckt===u)continue;
+          // FOKUS-DOPPELN: die Abstossung ist genau das, was ein Doppel verhindert. Sie
+          // nimmt den eigenen Mann aus (u.deckt===other oben) — ein HELFER deckt den
+          // Ballfuehrer aber per Definition nicht, wurde also mit voller Kraft von ihm
+          // weggedrueckt, kaum dass er nah genug war, um als zweiter Mann zu zaehlen
+          // (BEDRAENGT_RADIUS 30 < SEP_RADIUS 60). Nachgemessen war das der eigentliche
+          // Grund, warum ein groesserer Suchradius allein fast nichts brachte. Fuer die
+          // Dauer des Fokus-Hilfe-Fensters gilt der Ballfuehrer deshalb wie der eigene
+          // Mann. Nur im Fokus-Fall: ohne Fokus bleibt die Abstossung Zeichen fuer
+          // Zeichen die von vorher, sonst verschoebe sich die Balance aus PR #682.
+          if(fokusHelfer&&other===fsLive.ball.traeger)continue;
           const ddx=u.x-other.x, ddy=u.y-other.y, dd=Math.hypot(ddx,ddy)||0.01;
-          if(dd<SEP_RADIUS){ const f=(SEP_RADIUS-dd)/SEP_RADIUS; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
+          if(dd<sepR){ const f=(sepR-dd)/sepR; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
         }
-        zx+=sepX*SEP_RADIUS*SEP_STAERKE; zy+=sepY*SEP_RADIUS*SEP_STAERKE;
+        zx+=sepX*sepR*sepS; zy+=sepY*sepR*sepS;
       }
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
@@ -4627,8 +5315,31 @@
     // (ohne entscheideBallaktion/versucheSteal, die neue Ballwechsel ausloesen wuerden)
     // laesst die Spieler sanft in ihre letzte Ziel-Position auslaufen statt einzufrieren.
     if(done){bewegeSpielerLive(dt);return;}
+    // STANDPHASE: die freie Simulation ist ausgesetzt — kein entscheideBallaktion, kein
+    // Steal, keine Manndeckung, kein Rebound-Kampf; die Spieler laufen ausschliesslich auf
+    // ihre Freiwurf-Plaetze (Zweig ganz oben in bewegeSpielerLive).
+    //
+    // DIE UHR STEHT. Bewusste Entscheidung, kein Nebeneffekt: eine Sequenz kostet 3,7s
+    // (ein Freiwurf) bis 7,9s (drei) Spielzeit — bei vier bis sechs Foulpfiffen waeren das
+    // 20-40s der 120s Spieldauer, also bis zu einem Drittel aller Angriffe, nur weil eine
+    // Animation sichtbar geworden ist. Die Boxscore-Kalibrierung (Wurfquoten, Pp-Messung)
+    // haengt an der Zahl der Possessions; ein Sichtbarkeits-Umbau darf sie nicht
+    // verschieben. In echtem Basketball steht die Uhr bei Freiwuerfen ebenfalls. Alles,
+    // was gegen fsT laeuft (fastbreak.bis, screent.bis, rollBis, hilfeCd, frischerPassBis),
+    // wird beim Betreten der Phase ohnehin geloescht — deshalb friert das Anhalten keine
+    // halb abgelaufene Frist ein. Der Schiedsrichter zaehlt aus genau diesem Grund in dt
+    // statt in fsT (s. fsSchiri).
+    if(fsLive.phase==="freiwurf"){
+      stepFreiwurfPhase(dt);
+      bewegeSchiri(dt);
+      bewegeSpielerLive(dt);
+      return;
+    }
     fsT+=dt;
     if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
+      // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
+      // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
+      // returnt vorher), das erneute Setzen aenderte also nie etwas.
       bkSfx("buzzer.mp3",0.8); bkLoopStop();
       // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
       // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
@@ -4683,7 +5394,16 @@
       // (Chris' Fund). Bei nur einem Spieler in Reichweite bleibt es beim sofortigen
       // Greifen — da gibt es niemanden, mit dem er sich prügeln könnte.
       if(nah.length&&!fsLive.reboundKampf){
-        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.08}; // PLATZHALTER
+        // ZWEITE ZAHL ANGEHOBEN (0,08 -> 0,40, Playmaker/Archetypen-Runde): der Fall "genau
+        // einer ist schon da" war faktisch ein Erstkontakt-Zuschlag — der Ball gehoerte, wem
+        // die Aufstellung ihn vor die Fuesse legte, und ein heranstuermender Rebounder kam
+        // nie ins Gerangel. Gemessen ueber 60 Spiele hatten 64 % aller Rebounds hoechstens
+        // drei Kandidaten; der korbnah aufgestellte Spieler holte dadurch mehr als doppelt so
+        // viele Bretter wie der deutlich bessere Rebounder (2,90 gegen 1,29 je Spiel), obwohl
+        // ZWEITCHANCE die Entscheidung tragen soll. 0,40s reicht einem schnellen Spieler aus
+        // der zweiten Reihe, um in GREIF_REICHWEITE zu kommen — und bleibt kurz genug, dass
+        // ein wirklich freier Ball weiter sofort aufgenommen aussieht.
+        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.40}; // PLATZHALTER
         if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
@@ -4698,7 +5418,14 @@
           // ein Steal-Versuch (s. versucheSteal, selbes Muster), ausgeloest im selben
           // Frame wie der Feed-Text/das Outcome direkt darunter.
           for(const k of kandidaten)k.lunge=0.4;
-          const gewinner=gewichtetesLos(kandidaten,"ZWEITCHANCE");
+          // ZWEIKAMPF STATT LOSTOPF: gewichtetesLos() loste linear ueber den Rohwert — bei
+          // realistischen Werten (etwa 73 gegen 60) sind das 55 zu 45, also praktisch ein
+          // Muenzwurf zwischen einem sehr guten und einem mittelmaessigen Rebounder. Der
+          // Nullpunkt liegt jetzt bei 20 statt bei 0 und die Differenz geht quadratisch ein:
+          // 53² zu 40² = 64 zu 36. Immer noch kein Automatismus (der schwaechere gewinnt gut
+          // jeden dritten Ball, wie es sich fuer ein Gerangel gehoert), aber der Unterschied
+          // zwischen zwei Spielern ist im Boxscore jetzt zu sehen.
+          const gewinner=gewichtetesLosNach(kandidaten,k=>Math.pow(Math.max(1,k.ZWEITCHANCE-20),2));
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
@@ -4736,7 +5463,7 @@
         if(neuIdx!==altIdx&&(neuIdx%2)===1)bkSfx("ballaufprall.mp3",0.32);
         const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
         const dribbelDip=Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
-        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip};
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip,traegerId:traeger.id};
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
@@ -4747,7 +5474,11 @@
       }
     }
 
-    zuordneDeckung(false);
+    // Loeste dieser Tick gerade ein Foul aus (loeseFlugAuf -> starteFreiwuerfe), steht die
+    // Phase schon — dann keine Manndeckung mehr zuteilen, sonst zieht sie die Spieler im
+    // selben Bild noch einmal auf ihre Gegenspieler statt auf die Freiwurf-Plaetze.
+    if(fsLive.phase!=="freiwurf")zuordneDeckung(false);
+    bewegeSchiri(dt);
     bewegeSpielerLive(dt);
   }
 
@@ -5025,14 +5756,150 @@
     }
   }
 
+  // ===================================================================================
+  // ZEICHEN-ENTZERRUNG (Chris, 30.08.: "du musst schauen dass nicht alle aufeinander
+  // haengen — die spieler brauchen richtige models dass man nicht 2 uebereinander stapeln
+  // kann ausser um darzustellen dass einer etwas dahinter ist").
+  //
+  // WARUM NOCH EINE SCHICHT NEBEN DER SEPARATION IN bewegeSpielerLive. Nachgemessen, nicht
+  // vermutet (window.__arena.diagAbstaende + eine Paar-Zuordnung ueber diagDetail, Saat
+  // 1337, 120s): der kleinste paarweise Abstand der zwoelf Figuren lag ueber fuenf Saaten
+  // bei 0,0px, im Mittel bei 15,8px, und in 34-41 % aller Frames war irgendein Paar naeher
+  // als 12px. Von den Paaren unter 24px waren 63,8 % das MANNDECKUNGS-PAAR — genau das
+  // eine Paar, das die Separation ausdruecklich ausnimmt (`u.deckt===other`), und zwar aus
+  // gutem Grund: seinen Abstand LIEST die Spiellogik als stetige Groesse (`offen` in
+  // waehleZiel, `bedraengnisGate` in entscheideBallaktion, STEAL_REICHWEITE in
+  // versucheSteal). Ihn auseinanderzudruecken waere keine Optik-, sondern eine
+  // Balance-Aenderung — genau das, was der Kommentar im Funktionskopf von
+  // bewegeSpielerLive verbietet. Verschaerfend: das Deckungsziel ist
+  // `u.deckt.x + sign*min(35,|Korbabstand|*0,3)` — faehrt der Angreifer zum Ring, geht
+  // dieser Versatz gegen NULL, der Verteidiger steht also per Formel exakt auf ihm. Das
+  // ist die Ballung in der Zone aus scratchpad/fokus-feld.png.
+  //
+  // Loesung deshalb wie beim Bewegungs-Schweif (s. Kommentar dort): die SICHTBARE Position
+  // von der Spiel-Position trennen. Diese Funktion laesst u.x/u.y unberuehrt und schreibt
+  // nur einen Zeichen-Versatz (u._zvx/u._zvy), den ausschliesslich zeichneFeldspiel liest.
+  // Per Konstruktion Pp-neutral: kein Simulationszweig fragt _zv* je ab.
+  //
+  // Verfahren: ein paar Runden paarweise Relaxation (Reynolds-Separation, aber auf
+  // POSITIONEN statt auf Zielen — deshalb wirkt sie, wo die Ziel-Variante versagt), dann
+  // ein Deckel auf den Versatz und eine Glaettung ueber die Frames.
+  //   ZEICH_MIN_ABSTAND  Sprites sind ~28px breit; darunter beruehren sie sich sichtbar.
+  //   ZEICH_MAX_VERSATZ  wie weit eine Figur hoechstens von ihrem echten Ort wegrutschen
+  //                      darf — ohne Deckel koennte eine Sechser-Ballung jemanden aus dem
+  //                      Bild schieben, und Ring/Schatten wuerden zur Luege.
+  //   ZEICH_NACHZIEHEN   Anteil je Bild; ohne Glaettung springen Figuren, sobald sich die
+  //                      Relaxation umsortiert.
+  // Absichtlich NICHT vollstaendig: der Deckel laesst in echten Ballungen einen Rest
+  // Ueberlappung zu — das ist der von Chris ausdruecklich erlaubte "einer steht dahinter"-
+  // Fall, und die Zeichenreihenfolge unten (nach y sortiert) macht ihn lesbar.
+  const ZEICH_MIN_ABSTAND=30;   // PLATZHALTER, an der Sprite-Breite (~28px) ausgerichtet
+  const ZEICH_MAX_VERSATZ=24;   // PLATZHALTER
+  const ZEICH_NACHZIEHEN=0.3;   // PLATZHALTER, Anteil je Bild
+  const ZEICH_HARTGRENZE=18;    // PLATZHALTER, s. Notbremse unten
+  // Eine Runde paarweiser Relaxation auf einer Punktliste [{x,y},...] — dieselbe Formel
+  // fuer beide Durchgaenge unten (weicher Zielabstand und harte Notbremse), nur mit
+  // anderem Mindestabstand. Gibt zurueck, ob ueberhaupt etwas zu schieben war.
+  function zeichRelax(p,minAbstand,runden){
+    let bewegtIrgendwann=false;
+    for(let runde=0;runde<runden;runde++){
+      let bewegt=false;
+      for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
+        const a=p[i], b=p[j];
+        let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+        if(d>=minAbstand)continue;
+        if(d<0.001){
+          // Exakt uebereinander: es gibt keine Richtung mehr, aus der sich eine ergaebe.
+          // Ein Zufallswert wuerde flackern — deshalb ein fester, aus den beiden Indizes
+          // abgeleiteter Winkel, der fuer dasselbe Paar in jedem Bild derselbe ist.
+          const w=i*2.399+j*0.7; dx=Math.cos(w); dy=Math.sin(w); d=1;
+        }
+        const schub=(minAbstand-d)*0.5*0.55; // 0,55 = Daempfung, sonst schwingt es
+        const nx=dx/d*schub, ny=dy/d*schub;
+        a.x-=nx; a.y-=ny; b.x+=nx; b.y+=ny; bewegt=true; bewegtIrgendwann=true;
+      }
+      if(!bewegt)break;
+    }
+    return bewegtIrgendwann;
+  }
+  function zeichenVersatzSchritt(){
+    if(!FSTEAM[0]||!FSTEAM[0].length)return;
+    const alle=[...FSTEAM[0],...FSTEAM[1]];
+    const decke=(u,dx,dy)=>{
+      const m=Math.hypot(dx,dy);
+      return m>ZEICH_MAX_VERSATZ?[dx/m*ZEICH_MAX_VERSATZ,dy/m*ZEICH_MAX_VERSATZ]:[dx,dy];
+    };
+    // 1. Durchgang: Ziel-Versatz aus den echten Positionen, gedeckelt, dann geglaettet.
+    const p=alle.map(u=>({u,x:u.x,y:u.y}));
+    zeichRelax(p,ZEICH_MIN_ABSTAND,8);
+    for(const {u,x,y} of p){
+      const [dx,dy]=decke(u,x-u.x,y-u.y);
+      u._zvx=(u._zvx||0)+(dx-(u._zvx||0))*ZEICH_NACHZIEHEN;
+      u._zvy=(u._zvy||0)+(dy-(u._zvy||0))*ZEICH_NACHZIEHEN;
+    }
+    // 2. Durchgang, NOTBREMSE: die Glaettung oben braucht ein paar Bilder — springen zwei
+    // Figuren schlagartig aufeinander (Ballwechsel, neue Slot-Zuordnung), zeigt das Bild in
+    // der Zwischenzeit trotzdem ein Ineinander. Gemessen blieben so 1,8 % der Frames unter
+    // 12px, obwohl der Zielversatz laengst stimmte. Deshalb ein zweiter Lauf DIREKT auf den
+    // schon geglaetteten Zeichenpositionen, mit einer kleineren, dafuer sofort wirkenden
+    // Grenze: naeher als ZEICH_HARTGRENZE kommen sich zwei Sprites in keinem einzigen Bild.
+    // Der Sprung dabei ist klein (Differenz zu 18px), er faellt weniger auf als das
+    // Ineinanderfallen, das er verhindert.
+    const q=alle.map(u=>({u,x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)}));
+    if(zeichRelax(q,ZEICH_HARTGRENZE,6)){
+      for(const {u,x,y} of q){
+        const [dx,dy]=decke(u,x-u.x,y-u.y);
+        u._zvx=dx; u._zvy=dy;
+      }
+    }
+  }
+
+  // NAMEN NUR IM BALLBEREICH (Chris, 30.08.: "nur die Namen von der person am Ball und in
+  // direkter naehe sichtbar auf dem Feld — dann erkennt man die leute auch so wieder").
+  // Zwoelf Schriftzuege gleichzeitig waren derselbe Fehler wie die Box-Score-Zahlenwolke,
+  // die PR #683 entfernt hat: im Gewuehl ueberlagern sie sich zu Buchstabensalat
+  // (s. scratchpad/fokus-feld.png). Das "auch so wieder" ist Chris' eigene Begruendung —
+  // die Kaderleiste unten zeigt seit dieser Runde Sprite UND Name (s. renderKader), die
+  // Zuordnung Figur->Person haengt also nicht mehr am Feld-Label.
+  // Radius im Mass der bestehenden Reichweiten gewaehlt, nicht frei gegriffen: gerade so
+  // weit wie EIN Separationsabstand (SEP_RADIUS 60), also der Ring der Spieler, die sich
+  // ueberhaupt noch gegenseitig wegdruecken — "wer am Geschehen beteiligt ist", nicht "wer
+  // im selben Drittel steht". Zum Vergleich: STEAL_REICHWEITE 45 waere nur der eine
+  // Manndecker, HILFE_RADIUS 90 schon die halbe Haelfte. PLATZHALTER, an Chris' Auge
+  // abzunehmen ("in direkter naehe").
+  const NAME_NAH_RADIUS=62;
+
   function zeichneFeldspiel(){
     bodenFeldspiel();
+    zeichenVersatzSchritt();
     const art=FB();
-    FSTEAM.forEach((g,side)=>{
-      const c=side===0?css("--home"):css("--away");
-      g.forEach(u=>{
-        const gx=u.x||fsIdlePos(side,g.indexOf(u),g.length).x;
-        const gy=u.y||fsIdlePos(side,g.indexOf(u),g.length).y;
+    let fokusMarke=null; // gefuellt in der Spieler-Schleife, gezeichnet danach (s. unten)
+    // WER TRAEGT DEN NAMEN: Ankerpunkt fuer NAME_NAH_RADIUS (s. dort). Im laufenden Spiel
+    // der Ballfuehrer, in der Standphase der Freiwerfer (dort hat niemand `hatBall`).
+    // Ohne fsLive — die uebrigen Feldspiel-Disziplinen laufen ueber fsLerpPositionen —
+    // bleibt der Anker null und es sind wie bisher ALLE Namen zu sehen.
+    const namensAnker=fsLive
+      ? (fsLive.ball.traeger||(fsLive.freiwurf&&fsLive.freiwurf.schuetze)||null)
+      : null;
+    // ZEICHENREIHENFOLGE NACH y STATT NACH TEAM. Vorher zeichnete Team 0 komplett vor
+    // Team 1 — wer "dahinter" stand, konnte trotzdem obenauf liegen, und der von Chris
+    // erlaubte Rest-Versatz ("einer etwas dahinter") las sich als Fehler statt als Tiefe.
+    // Jetzt liegt die weiter unten stehende Figur vorn, wie in jeder 2,5D-Ansicht.
+    const zuZeichnen=[]
+      .concat(FSTEAM[0].map((u,i)=>({u,side:0,i,g:FSTEAM[0]})))
+      .concat(FSTEAM[1].map((u,i)=>({u,side:1,i,g:FSTEAM[1]})))
+      .sort((a,b)=>(a.u.y+(a.u._zvy||0))-(b.u.y+(b.u._zvy||0)));
+    zuZeichnen.forEach(({u,side,i,g})=>{
+      { // Block ohne eigene Bedeutung: er haelt den unveraenderten Rumpf auf seiner alten
+        // Einrueckung, damit der Diff dieser Runde die Zeichenlogik nicht komplett neu
+        // formatiert (frueher war das die innere `g.forEach(u=>{`-Ebene).
+        const c=side===0?css("--home"):css("--away");
+        // ZEICHEN-VERSATZ (s. zeichenVersatzSchritt): Schatten, Ring, Figur, Name und
+        // Fokus-Marke wandern GEMEINSAM — die Einheit bleibt in sich stimmig, sie steht
+        // nur ein paar Pixel neben ihrer Spielkoordinate.
+        const vx=u._zvx||0, vy=u._zvy||0;
+        const gx=(u.x||fsIdlePos(side,i,g.length).x)+vx;
+        const gy=(u.y||fsIdlePos(side,i,g.length).y)+vy;
         // Bei Alley-Oop/Screen-Play verschiebt sich die SICHTBARE Position kurz vom
         // Bodenwert weg (Sprung-Hop, seitliches Schlaengeln) — der Schatten bleibt am
         // Boden, Figur/Name/Statzeile folgen der verschobenen Position.
@@ -5049,6 +5916,11 @@
         // getroffene BAU-Looks wieder verwaschen).
         ctx.strokeStyle=c;ctx.globalAlpha=aktiv?0.55:0.28;ctx.lineWidth=aktiv?2:1.5;
         ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
+        // FOKUS-MARKIERUNG: nur die Position merken, GEZEICHNET wird sie nach der Schleife
+        // (s. unten) — hier stuende sie unter allen Figuren, und der Pfeil ueber dem Kopf
+        // verschwaende hinter dem naechsten Sprite. Erster Anlauf war genau das, im
+        // Screenshot war vom Pfeil nichts zu sehen.
+        if(fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel)fokusMarke={x,y};
         // SPEED-SICHTBARKEIT, kosmetischer Teil (s. Bericht/Kommentar bei `tempoPx` in
         // bewegeSpielerLive): ein kurzer Bewegungs-Schweif macht den Tempo-Unterschied
         // fuer das Auge sichtbar, OHNE irgendetwas an der tatsaechlichen Bewegung zu
@@ -5103,26 +5975,70 @@
         // statt darunter, die angreifende bleibt darunter — trennt die beiden Zeilen auch
         // dann, wenn x/y (fuer Deckung/Steal/Bedraengnis absichtlich) fast identisch sind.
         const istAbwehr=fsLive&&fsLive.amBall!=null&&side!==fsLive.amBall, vz=istAbwehr?-1:1;
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
+        // NAME NUR IM BALLBEREICH (s. NAME_NAH_RADIUS oben). Gemessen wird am ECHTEN
+        // Spielort (u.x/u.y), nicht am entzerrten Zeichenort — sonst haenge eine reine
+        // Optikkorrektur daran, wessen Name erscheint. Der fokussierte Gegner behaelt
+        // seinen Namen immer: er ist die eine Figur, die der Nutzer selbst markiert hat.
+        const istFokus=fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel;
+        const zeigName=!namensAnker||u===namensAnker||istFokus
+          ||dist(u,namensAnker)<NAME_NAH_RADIUS;
+        if(zeigName)schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
         // Chris' Fund (29.08.): eine Box-Score-Zeile UNTER JEDER der zwoelf Figuren
         // gleichzeitig war unlesbar — zwoelf ueberlappende Zahlenwolken auf engem Raum.
         // Die vollen Werte stehen bereits geordnet in der Wertungstabelle (renderWertung-
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
-      });
+      }
     });
+    // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
+    // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
+    // (Teamfarbe, duenn, r=20) und von der Aktiv-Hervorhebung (dieselbe Teamfarbe, nur
+    // kraeftiger). Deshalb eine eigene, in keiner Teamfarbe vorkommende Signalfarbe, ein
+    // groesserer GESTRICHELTER Ring (r=27, wandert langsam, damit er auch im Standbild
+    // nicht wie eine Feldmarkierung aussieht) und ein Pfeil ueber dem Kopf, der auch dann
+    // noch zu finden ist, wenn zehn Figuren dicht beieinanderstehen. Hier statt in der
+    // Schleife, damit keine spaeter gezeichnete Figur ihn verdeckt.
+    if(fokusMarke){
+      const {x,y}=fokusMarke;
+      ctx.save();
+      ctx.strokeStyle=FOKUS_FARBE;ctx.lineWidth=2.5;ctx.globalAlpha=0.95;
+      ctx.setLineDash([7,5]);ctx.lineDashOffset=-(fsT*22)%12;
+      ctx.beginPath();ctx.arc(x,y,27,0,6.3);ctx.stroke();
+      ctx.setLineDash([]);
+      const pf=y-40-Math.sin(fsT*4)*2.5; // leichtes Wippen, damit der Pfeil auffaellt
+      ctx.fillStyle=FOKUS_FARBE;
+      ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineWidth=2;ctx.lineJoin="round";
+      ctx.beginPath();ctx.moveTo(x,pf+11);ctx.lineTo(x-7,pf);ctx.lineTo(x+7,pf);ctx.closePath();
+      ctx.stroke();ctx.fill();
+      ctx.restore();
+    }
+    // Schiedsrichter NACH den Spielern, VOR dem Ball: beim Pfiff steht er dicht am
+    // Foul-Ort und darf dort nicht hinter einer Figur verschwinden — der Ball wiederum
+    // bleibt das oberste Element, wie bisher.
+    zeichneSchiri();
     // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
     // weiter zum Korb, bei Steal zum Verteidiger. Fables Fund (Polish-Runde, 24.08.): der
     // echte Basketball-Sprite (public/sprites/basketball/ball.png) lag seit der ersten
     // Court-Runde ungenutzt im Repo — der Ball war bis eben ein reiner Vektor-Punkt. Selber
     // Rueckfall wie beim Korb: laedt das Bild nicht, bleibt der alte Kreis stehen.
     if(fsBall.sichtbar){
+      // Haelt eine Figur den Ball (Dribbeln, Freiwurf-Formation/-Anlauf), dann setzen die
+      // Schrittfunktionen fsBall auf deren SPIEL-Koordinate und legen `traegerId` dazu.
+      // Damit der Ball nicht neben der entzerrt gezeichneten Hand schwebt, bekommt er
+      // denselben Zeichen-Versatz. Ein FLIEGENDER Ball (Pass/Wurf) traegt keine traegerId
+      // und bleibt unveraendert auf seiner interpolierten Bahn.
+      let bvx=0, bvy=0;
+      if(fsBall.traegerId!=null){
+        const h=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
+        if(h){ bvx=h._zvx||0; bvy=h._zvy||0; }
+      }
+      const bx=fsBall.x+bvx, by=fsBall.y+bvy;
       if(bkDa("ball")){
-        ctx.drawImage(bkBild.ball,fsBall.x-9,fsBall.y-35,18,18);
+        ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
       } else {
         ctx.fillStyle="#e8823a";
-        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
+        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
         ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
       }
     }
     for(const f of floats){
@@ -5136,7 +6052,8 @@
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
         const u=FSTEAM[side].find(x=>x.id===f._spieler);
-        if(u)ort={x:u.x,y:u.y-30-((1-f.life)*20)};
+        // Zeichen-Versatz mitnehmen, sonst schwebt das "+2" neben dem Kopf, zu dem es gehoert.
+        if(u)ort={x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)-30-((1-f.life)*20)};
       }
       if(ort)ctx.fillText(f.txt,ort.x,ort.y);
       ctx.globalAlpha=1;
@@ -7900,6 +8817,7 @@
   // Leistung stehen, nicht nur indirekt ueber die Leistungs-Prozentzahl). Feldspiel
   // bekommt zusaetzlich FG% (7) und Impact (8, dieselbe Formel wie MOTOREN[disc].wert()
   // in der Messreihe — ein Boxscore-Kompositwert, kein neu erfundener).
+  //
   // Kurze Kopf-Woerter (Chris' Fund, 29.08.): zehn Spalten je Team-Block bei ~450px
   // Breite (zwei Bloecke aus ~900-960px Gesamtbreite, s. .wsplit) lassen fuer jede nur
   // ~45px — "Verhindert"/"Steals"/"Impact" sprengten das. Reale Boxscore-Kuerzel
@@ -7916,6 +8834,11 @@
       for(const suf of["","r"]){
         const th=document.getElementById("wth"+i+suf); if(th)th.textContent=kopf[i];
       }
+    }
+    // Opus-Review-Fund (30.08.): die Namensspalte selbst (wthN/wthNr) wurde nie
+    // umgeschrieben — hiess deshalb auch im Feldspiel immer "Kämpfer".
+    for(const suf of["","r"]){
+      const thN=document.getElementById("wthN"+suf); if(thN)thN.textContent=feldspiel?"Spieler":"Kämpfer";
     }
     const fuss=document.getElementById("wfuss");
     if(fuss)fuss.textContent=feldspiel
@@ -9827,6 +10750,129 @@
     return z;
   }
 
+  // ===================================================================================
+  // FOKUS-DOPPELN — die Bedienseite.
+  //
+  // Chris (29.08.): „vllt waere es cool wenn man fokussieren koennte also ich kann zb
+  // einen spieler der gegner selektieren und der wird dann mehr von help defense
+  // gedoppelt." Die Wirkung selbst sitzt in bewegeSpielerLive (FOKUS_*-Konstanten dort);
+  // hier steht nur, WIE man den Spieler waehlt und woran man sieht, dass er gewaehlt ist.
+  //
+  // ZWEI Wege zur Auswahl, absichtlich beide: auf dem Feld anklicken ist das, was Chris
+  // beschreibt — aber die Figuren laufen, und im Getuemmel trifft man daneben. Die
+  // Kaderleiste steht still und traegt dieselben Namen. Beide fuehren durch dieselbe
+  // Funktion (fokusUmschalten), es gibt also nur einen Zustand und eine Regel.
+  //
+  // Nur Basketball: es ist die einzige Disziplin mit einer Live-Engine. Football/Hockey/
+  // Tennis rechnen ihren Verlauf weiter vorab durch — dort gaebe es waehrend des Spiels
+  // gar nichts zu beeinflussen. Verallgemeinert wird, wenn die zweite Live-Disziplin
+  // kommt (s. docs/design/battle-arena-multi-disziplin-plan.md), nicht vorher.
+  function fokusAuswahlMoeglich(){
+    return feldspielDisc==="basketball"&&istFeldspiel(disc)&&!!fsLive;
+  }
+  function fokusSpieler(){
+    if(!fsLive||fsLive.fokusZiel==null)return null;
+    return FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsLive.fokusZiel)||null;
+  }
+  // Ein Klick auf denselben Spieler hebt den Fokus auf, ein Klick auf einen anderen
+  // ersetzt ihn — ein Zustand, kein Stapel. Nur Gegner (side 1) sind zulaessig.
+  function fokusUmschalten(id){
+    if(!fokusAuswahlMoeglich())return;
+    const u=FSTEAM[1].find(x=>x.id===id);
+    if(!u)return;
+    fsLive.fokusZiel=(fsLive.fokusZiel===id)?null:id;
+    renderKader();
+  }
+  function renderFokusZeile(){
+    const zeile=document.getElementById("fokuszeile");
+    if(!zeile)return;
+    // Nur waehrend eines laufenden Basketballspiels ueberhaupt sichtbar — in TDM/Bahn/
+    // Buehne gibt es nichts zu fokussieren, und eine leere Zeile waere nur Rauschen.
+    if(!fokusAuswahlMoeglich()){ zeile.hidden=true; return; }
+    zeile.hidden=false;
+    const u=fokusSpieler();
+    // Zusammengesetzt aus Textknoten statt innerHTML: der Name kommt aus dem Spielstand
+    // und darf nie als Markup ankommen.
+    const txt=document.getElementById("fokustext");
+    if(!txt)return; // Opus-Review-Fund (30.08.): gleicher Null-Guard wie bei `zeile` oben
+    txt.textContent="";
+    if(u){
+      txt.appendChild(el("i","fmarke"));
+      txt.appendChild(document.createTextNode("Fokus-Doppeln auf "));
+      txt.appendChild(el("b",null,u.n));
+      txt.appendChild(document.createTextNode(" — die Hilfsverteidigung geht bevorzugt auf ihn."));
+    } else {
+      txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
+    }
+    const weg=document.getElementById("fokusweg");
+    if(weg)weg.hidden=!u;
+  }
+  function verdrahteFokusAuswahl(){
+    // 1) Kaderleiste, delegiert an den (stabilen) Container.
+    //
+    // WARUM mousedown UND NICHT click: renderKader() baut die Kacheln bei jedem Bild neu
+    // (box.textContent="" und dann frisch), waehrend das Spiel laeuft — also rund
+    // sechzigmal je Sekunde. Ein `click` wird aber erst dem naechsten GEMEINSAMEN
+    // VORFAHREN von mousedown- und mouseup-Ziel zugestellt; wird die Kachel zwischen
+    // Druecken und Loslassen ersetzt, ist dieser Vorfahr der Container, und die Kachel
+    // (samt data-fokusid) ist im Ereignis nicht mehr zu finden — der Klick geht in den
+    // meisten Faellen ins Leere. Nachgemessen mit Playwright, das dieselbe Stelle als
+    // "element was detached from the DOM" meldete. mousedown wird dagegen der Kachel
+    // zugestellt, die im Moment des Druckens unter dem Zeiger liegt; die gibt es immer.
+    // Der saubere Gegenentwurf waere, renderKader die Kacheln wiederverwenden zu lassen
+    // statt sie neu zu bauen — das betrifft alle vier Disziplin-Familien und ist eine
+    // eigene Aufraeum-Aufgabe, nicht diese.
+    const box=document.getElementById("kaderR");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-fokusid]"):null;
+      if(k){ ev.preventDefault(); fokusUmschalten(Number(k.dataset.fokusid)); }
+    });
+    // 2) Direkt auf dem Feld. Die Leinwand ist per CSS skaliert, der Klick kommt in
+    //    CSS-Pixeln — erst auf die Zeichenflaeche zurueckskalieren (cv.width/rect.width),
+    //    dann den naechsten GEGNER innerhalb eines Greifradius suchen. Getroffen wird die
+    //    Bodenposition (u.x/u.y), nicht die um Hop/Wobble verschobene Zeichenposition:
+    //    die Bodenposition ist die, die auch der Schatten und der Team-Ring markieren.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!fokusAuswahlMoeglich())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      let treffer=null,minD=FOKUS_GREIF_RADIUS;
+      for(const g of FSTEAM[1]){
+        const d=Math.hypot(g.x-mx,g.y-my);
+        if(d<minD){ minD=d; treffer=g; }
+      }
+      if(treffer)fokusUmschalten(treffer.id);
+    });
+    const weg=document.getElementById("fokusweg");
+    if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
+  }
+
+  // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
+  // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
+  // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
+  // der Ballbereich beschriftet ist, muss die Zuordnung Figur->Person woanders stehen.
+  //
+  // KEINE ZWEITE ZEICHENROUTINE. Es ist figur() — dieselbe Funktion, mit der Kaderliste
+  // und Aufstellungs-Board zeichnen, und damit derselbe Ebenen-Baukasten (B_FIGUR bzw. der
+  // BAU/VOLLBILD-Rueckfall), aus dem auch zeichneSprite() auf dem Feld schoepft. Ein
+  // <img> mit fertigem Pfad geht nicht: die Figuren sind aus bis zu einem Dutzend
+  // eingefaerbter Ebenen zusammengesetzt, es gibt gar keine einzelne Datei je Spieler.
+  //
+  // ZWISCHENSPEICHER, weil renderKader je Bild neu baut (s. Kommentar beim Fokus-Klick
+  // unten): ohne ihn liefe ein zwoelffacher Ebenen-Aufbau sechzig Mal je Sekunde. Je Name
+  // wird der Canvas EINMAL gebaut; box.textContent="" haengt ihn nur aus dem DOM, das
+  // Objekt bleibt in der Map und wird im naechsten Bild wieder eingehaengt. Ein Name kommt
+  // je Bild hoechstens einmal vor (beide Kader sind disjunkt), ein Knoten reicht also.
+  const KADER_FIGUREN=new Map();
+  function kaderFigur(name){
+    let c=KADER_FIGUREN.get(name);
+    if(!c){ c=figur({n:name}); c.className="kkfigur"; KADER_FIGUREN.set(name,c); }
+    return c;
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -9838,16 +10884,36 @@
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
-        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
-        k.appendChild(el("b",null,u.n));
+        // Sprite links, Name rechts daneben — die Lebens-/Punkteleiste bleibt darunter
+        // ueber die volle Kachelbreite, damit sie ablesbar bleibt.
+        const kopf=el("div","kkkopf");
+        kopf.appendChild(kaderFigur(u.n));
+        kopf.appendChild(el("b",null,u.n));
+        k.appendChild(kopf);
         const bar=el("div","kbar");
         const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
         bar.appendChild(f); k.appendChild(bar);
         k.title=u.n+(u.down?" — ausgeschieden":" — "+Math.round(u.hp)+" von "+u.max+" Leben");
+        // FOKUS-DOPPELN: die Kaderleiste ist die zweite (und die verlaesslichere)
+        // Auswahlflaeche neben dem Klick aufs Feld — die Kacheln stehen still, waehrend
+        // die Figuren auf der Leinwand laufen. Nur die GEGNER-Seite ist waehlbar: die
+        // eigene Hilfsverteidigung kann per Definition nur einen Gegner doppeln.
+        // Der Klick selbst haengt delegiert am Container (s. verdrahteFokusAuswahl) —
+        // renderKader baut die Kacheln jeden Frame neu, einzelne Listener waeren sonst
+        // sechzig Mal je Sekunde neu zu setzen.
+        if(fokusAuswahlMoeglich()&&seite===1&&u.id!=null){
+          k.dataset.fokusid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=fsLive.fokusZiel===u.id;
+          if(gewaehlt)k.classList.add("fokus");
+          k.title=u.n+(gewaehlt?" — wird gedoppelt (klicken hebt den Fokus auf)"
+                               :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
+        }
         box.appendChild(k);
       }
     }
@@ -9863,6 +10929,7 @@
       : istFeldspiel(disc)
       ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
+    renderFokusZeile();
   }
 
   // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
@@ -9952,6 +11019,7 @@
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
   });
   document.getElementById("reset").addEventListener("click",reset);
+  verdrahteFokusAuswahl();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
@@ -10155,13 +11223,20 @@
       // fsLive: nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive), fuer
       // die drei Vorab-Disziplinen bleibt es null — kein Sonderfall im Motor, einfach
       // mitgesichert wie alles andere.
-      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive}),
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive, fsSchiri}),
       zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
                     fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
-                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive;},
+                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive; fsSchiri=a.fsSchiri;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
       bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
-      lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
+      // Opus-Review-Fund (30.08.): das Budget stand bei 120 — exakt SPIELDAUER_BASKETBALL,
+      // also OHNE Reserve. Waehrend jeder Freiwurf-Standphase steht die Uhr (fsT), aber
+      // dieses `g` zaehlt echte Simulationssekunden weiter — jede Sequenz (3,7-7,9s) ging
+      // also voll zulasten des Budgets, bevor `fsT` je 120 erreichte. Foulstarke Builds
+      // brachen ihr eigenes Spiel dadurch systematisch frueher ab, mit direkter Wirkung auf
+      // einflussVon()/boxscoreSerie() (die Pp-Messung selbst). 60s Reserve deckt den
+      // schlimmsten plausiblen Fall (mehrere Sequenzen a ~8s) sicher ab.
+      lauf:()=>{let g=0; while(!done&&g<180){ stepFeldspiel(1/60); g+=1/60; }},
       namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
       wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
         o[u.n]=u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
@@ -10384,11 +11459,52 @@
       }
       return eimer;
     },
+    // ANTI-STACKING-MESSUNG (30.08.): der paarweise MINDESTABSTAND aller zwoelf Figuren,
+    // je Tick gemessen (nicht alle 0,5s wie diagDetail — ein Ineinanderfallen dauert oft
+    // nur ein paar Frames und faellt aus einem 0,5s-Raster heraus). Gibt sowohl die
+    // SIMULATIONS-Positionen (u.x/u.y) als auch die ZEICHEN-Positionen zurueck (dieselben
+    // plus dem Versatz aus zeichenVersatzSchritt, s. dort) — genau die Trennung, um die es
+    // beim Stacking geht: die Spiellogik darf ihre Abstaende behalten, das Bild nicht.
+    // Read-only wie diagDetail/diagPositionen daneben.
+    diagAbstaende:(saat,bis)=>{
+      feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      const stufen=[12,18,24,30];
+      const leer=()=>({min:1e9,frames:0,unter:stufen.map(()=>0),summeMin:0});
+      const sim=leer(), zei=leer(), fw=leer();
+      const paarMin=(hol)=>{
+        const a=[...FSTEAM[0],...FSTEAM[1]].map(hol);
+        let m=1e9;
+        for(let i=0;i<a.length;i++)for(let j=i+1;j<a.length;j++)
+          m=Math.min(m,Math.hypot(a[i].x-a[j].x,a[i].y-a[j].y));
+        return m;
+      };
+      const buche=(z,m)=>{ z.frames++; z.min=Math.min(z.min,m); z.summeMin+=m;
+        stufen.forEach((s,i)=>{ if(m<s)z.unter[i]++; }); };
+      let guard=0;
+      while(!done&&fsT<(bis||60)&&guard<40000){
+        stepFeldspiel(1/60); guard++;
+        const mSim=paarMin(u=>({x:u.x,y:u.y}));
+        buche(sim,mSim);
+        // Zeichen-Versatz genauso fortschreiben, wie es zeichneFeldspiel je Bild tut —
+        // sonst misst man die Zielwerte statt der wirklich gezeigten (eingeschwungenen).
+        if(typeof zeichenVersatzSchritt==="function")zeichenVersatzSchritt();
+        buche(zei,paarMin(u=>({x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)})));
+        if(fsLive&&fsLive.phase==="freiwurf")buche(fw,paarMin(u=>({x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)})));
+      }
+      const fasse=(z)=>({minAbstand:+z.min.toFixed(1),frames:z.frames,
+        mittlererMin:z.frames?+(z.summeMin/z.frames).toFixed(1):null,
+        anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
+      return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
+    },
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
     // zieht, nicht nur die nackte Punktwolke — s. SEITEN-BALANCE-FIX-Kommentar bei SLOTS oben.
-    diagDetail:(saat,bis)=>{
+    diagDetail:(saat,bis,fokusName)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      // fokusName wie bei spieleBasketball (s. dort): erlaubt es, die Doppel-Dichte um
+      // einen markierten Spieler direkt aus den Positionen zu messen, statt sie aus
+      // Wurfereignissen zu erschliessen.
+      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z)fsLive.fokusZiel=z.id; }
       const eimer=[]; let naechster=0;
       while(!done&&fsT<(bis||30)){
         stepFeldspiel(1/60);
@@ -10410,8 +11526,14 @@
     // rohe fsZuege()-Ereignisprotokoll zurueck — read-only wie diagPositionen/fsZuege
     // daneben, damit sich FG% nach Deckerabstand/Doppeln ueber viele Spiele auswerten
     // laesst (s. Bericht), ohne die UI zu bedienen.
-    spieleBasketball:(saat)=>{
+    spieleBasketball:(saat,fokusName)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      // ABNAHME DES FOKUS-DOPPELNS (29.08.): optional der Name eines GEGNERISCHEN
+      // Spielers, der vor dem ersten Tick als fsLive.fokusZiel gesetzt wird — dieselbe
+      // eine Zustandsvariable, die auch der Klick in der UI setzt, nur ohne UI. Ohne das
+      // Argument bleibt fokusZiel null, und der Durchlauf ist zeichenweise der von
+      // vorher (das ist die Balance-Kontrolle, s. scripts/messe-arena-einfluss.mjs).
+      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z)fsLive.fokusZiel=z.id; }
       let guard=0;
       while(!done&&fsT<SPIELDAUER_BASKETBALL+5&&guard<20000){ stepFeldspiel(1/60); guard++; }
       return fsZuege;
@@ -10422,6 +11544,19 @@
     // Basketball-Live-Engine, dieselbe Quelle wie fsBisher(). Read-only, wie kader()/
     // einheiten() daneben.
     fsZuege:()=>fsZuege,
+    // Abnahme der Standphase (Freiwurf/Schiedsrichter, 29.08.): read-only wie fsZuege
+    // daneben — der Phasenzustand plus die Position des Schiedsrichters, damit sich von
+    // aussen (Playwright) exakt der Moment abpassen laesst, in dem die Formation steht.
+    // Fokus-Doppeln, read-only: WER gerade markiert ist (Name statt roher id, damit sich
+    // ein Klick in der UI von aussen abnehmen laesst). null = niemand.
+    fsFokus:()=>{ if(!fsLive||fsLive.fokusZiel==null)return null;
+      const u=FSTEAM[0].concat(FSTEAM[1]).find(x=>x.id===fsLive.fokusZiel);
+      return u?{id:u.id,n:u.n,side:u.side}:null; },
+    fsPhase:()=>fsLive?{phase:fsLive.phase,
+      freiwurf:fsLive.freiwurf?{schuetze:fsLive.freiwurf.schuetze.n,seite:fsLive.freiwurf.schuetze.side,
+        anzahl:fsLive.freiwurf.anzahl,idx:fsLive.freiwurf.idx,gemacht:fsLive.freiwurf.gemacht,
+        stufe:fsLive.freiwurf.stufe,undEins:fsLive.freiwurf.undEins}:null,
+      schiri:fsSchiri?{x:Math.round(fsSchiri.x),y:Math.round(fsSchiri.y),pfiffT:+fsSchiri.pfiffT.toFixed(2)}:null}:null,
     fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,

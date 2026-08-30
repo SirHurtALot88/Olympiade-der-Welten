@@ -69055,6 +69055,101 @@ span.nl-facility-ampel-chip {
   flex: 0 1 auto;
 }
 
+/* --- Moduswahl: Manager Mode vs. Battle Mode ----------------------------- */
+.is-new-look .nl-newgame-modegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--nl-t-fast) var(--nl-ease),
+    box-shadow var(--nl-t-fast) var(--nl-ease),
+    transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-newgame-mode:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, var(--nl-line));
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-newgame-mode:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-newgame-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/*
+  Gewählt: derselbe Accent-Ring wie beim Klub-Raster darunter.
+
+  Als `border`-Kurzform statt `border-color`, weil der Kontrast-Ratchet in
+  tests/nl-accent-text-regel.test.ts auf `color:\s*var\(--nl-accent[,)]` zaehlt und dabei auch das
+  `color:` in `border-color:` trifft. Gemeint ist dort Akzent als SCHRIFT; ein Rahmen ist genau der
+  Fall, fuer den `--nl-accent` gedacht ist (Linien/Flaechen). Gleiche Darstellung, kein
+  Falschtreffer — die Obergrenze bleibt unangetastet.
+*/
+.is-new-look .nl-newgame-mode.is-picked {
+  border: 1px solid var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel-2));
+  box-shadow:
+    0 0 0 1px var(--nl-accent),
+    0 0 22px -6px color-mix(in srgb, var(--nl-accent) 70%, transparent);
+}
+
+.is-new-look .nl-newgame-mode-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-newgame-mode-title {
+  font-size: var(--nl-fs-lg);
+  font-weight: 600;
+}
+
+.is-new-look .nl-newgame-mode-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* "Standard"/"Neu" traegt Information, keine Deko -> --nl-mut (6,8:1), nicht --nl-mut-2. */
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-newgame-mode.is-picked .nl-newgame-mode-badge {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+  /* Teamfarbe als SCHRIFT laeuft ueber --nl-accent-text (auf >= 4,5:1 angehoben). */
+  color: var(--nl-accent-text);
+}
+
+.is-new-look .nl-newgame-mode-text {
+  font-size: var(--nl-fs-md);
+  line-height: 1.45;
+  color: var(--nl-mut);
+  overflow-wrap: anywhere;
+}
+
 /* --- Kompakte Optionen (Save-Name + Sandbox) ----------------------------- */
 .is-new-look .nl-newgame-options {
   display: flex;

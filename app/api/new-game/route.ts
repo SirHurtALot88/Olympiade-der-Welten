@@ -7,6 +7,7 @@ import {
   previewNewGameSetup,
   type NewGamePresetId,
 } from "@/lib/game/new-game-setup-service";
+import type { GameMode } from "@/lib/data/olyDataTypes";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -15,6 +16,10 @@ import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonfli
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
+  // Battle-Mode-Spielmodus-Wahl (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.3).
+  // Kommt seit PR 4 aus dem Kachel-Umschalter oben im Anlege-Assistenten
+  // (`data-testid="new-game-mode-picker"`), Default "manager".
+  gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
   sandbox?: boolean;
@@ -26,6 +31,9 @@ type NewGameRequestBody = {
 function normalizeBody(body: NewGameRequestBody) {
   return {
     presetId: body.presetId ?? "solo_1",
+    // Default "manager", nicht `undefined`, damit Preview und Create garantiert denselben Wert
+    // sehen -- derselbe Grund, aus dem `presetId` hier schon einen Default bekommt.
+    gameMode: body.gameMode === "battle" ? "battle" : ("manager" as GameMode),
     chrisTeamIds: body.chrisTeamIds,
     frankyTeamIds: body.frankyTeamIds,
     sandbox: Boolean(body.sandbox),

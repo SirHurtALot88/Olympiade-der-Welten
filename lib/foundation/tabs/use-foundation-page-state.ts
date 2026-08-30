@@ -23,6 +23,7 @@ import type {
 	  GameInboxItem,
 	  MappingWarning,
   AdminBalancingConfig,
+  GameMode,
   NewGameFlowStepId,
   NewGameFlowStepStatus,
   Player,
@@ -535,6 +536,12 @@ export function useFoundationPageState({
   const [seasonBriefingOpen, setSeasonBriefingOpen] = useState<boolean>(false);
   const [freshSeasonStartMessage, setFreshSeasonStartMessage] = useState<string | null>(null);
   const [newGamePresetId, setNewGamePresetId] = useState<NewGamePresetId>("solo_1");
+  /**
+   * Spielmodus des NEU anzulegenden Saves (docs/design/battle-mode-spielmodus-plan.md, 3.1).
+   * Default "manager" — bit-identisch zum Verhalten ohne Moduswahl; der Wert fliesst als
+   * `gameMode` in den `/api/new-game`-Payload (Vorschau UND Anlegen, derselbe Aufruf).
+   */
+  const [newGameMode, setNewGameMode] = useState<GameMode>("manager");
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
   const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
   const [newGameSandbox, setNewGameSandbox] = useState<boolean>(false);
@@ -942,6 +949,8 @@ export function useFoundationPageState({
     setFreshSeasonStartMessage,
     newGamePresetId,
     setNewGamePresetId,
+    newGameMode,
+    setNewGameMode,
     newGameChrisTeamIds,
     setNewGameChrisTeamIds,
     newGameFrankyTeamIds,

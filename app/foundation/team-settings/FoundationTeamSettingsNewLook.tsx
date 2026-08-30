@@ -8,6 +8,7 @@ import {
   deriveBlockedBreakdownFromReasons,
 } from "@/lib/ai/ai-action-breakdown";
 import type { AiPreseasonAutomationRunRecord, MappingWarning } from "@/lib/data/olyDataTypes";
+import { LEAGUE_SIZE } from "@/lib/season/league-split";
 
 import {
   NlCard,
@@ -303,6 +304,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameMode,
     newGamePresetId,
     newGamePreview,
     newGameSandbox,
@@ -337,6 +339,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     selectedTeamGmBiasHighlights,
     selectedTeamHasUnsavedChanges,
     selectedTeamId,
+    selectNewGameMode,
     selectedTeamStrategyDraft,
     selectedTeamStrategyProfile,
     setActiveView,
@@ -540,6 +543,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   }
 
   function renderNewGameWizard() {
+    // Beide Modus-Kacheln teilen sich denselben Sperrgrund (Read-Only bzw. laufendes Setup) —
+    // gleiche Formulierung wie an den Klub-Karten darunter, nur einmal gebaut.
+    const newGameModePickerReason = readMeta.readOnly
+      ? getReadOnlyActionReason("den Spielmodus")
+      : newGameBusy
+        ? getBusyActionReason("Das New-Game-Setup")
+        : null;
+
     return (
       <section
         className={`nl-teamsettings-subpanel nl-newgame${newGameWizardOpen ? "" : " is-eingeklappt"}`}
@@ -610,6 +621,68 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
             ) : null}
           </StatChipRow>
+        </div>
+
+        {/*
+          Moduswahl (docs/design/battle-mode-spielmodus-plan.md, 3.1): die erste Entscheidung des
+          Assistenten, noch vor dem Klub-Raster. Sie gilt fuer den neuen Save DAUERHAFT — es gibt
+          bewusst kein UI, den Modus eines laufenden Spielstands nachtraeglich zu drehen (neue
+          Idee, neuer Spielstand). Genau EIN Bedienelement, nach demselben Grundsatz wie das
+          Klub-Raster darunter.
+        */}
+        <div className="nl-newgame-pickerhead">
+          <strong>Wähle deinen Spielmodus</strong>
+          <span className="nl-teamsettings-hint">
+            gilt dauerhaft für diesen Spielstand · später nicht mehr umstellbar
+          </span>
+        </div>
+        <div
+          className="nl-newgame-modegrid"
+          role="radiogroup"
+          aria-label="Spielmodus für den neuen Spielstand"
+          data-testid="new-game-mode-picker"
+        >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={newGameMode !== "battle"}
+            className={`nl-newgame-mode${newGameMode !== "battle" ? " is-picked" : ""}`}
+            disabled={newGameBusy || readMeta.readOnly}
+            data-testid="new-game-mode-manager"
+            title={newGameModePickerReason ?? "Neuen Spielstand im Manager Mode anlegen."}
+            onClick={() => selectNewGameMode("manager")}
+          >
+            <span className="nl-newgame-mode-head">
+              <strong className="nl-newgame-mode-title">Manager Mode</strong>
+              <span className="nl-newgame-mode-badge">Standard</span>
+            </span>
+            <span className="nl-newgame-mode-text">
+              Alle {gameState.teams.length} Klubs spielen in einem gemeinsamen Rangraum: eine
+              Tabelle, ein Feld, jede Disziplin wird über die Punkteformel ausgewertet. So läuft
+              die Olympiade bisher — unverändert.
+            </span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={newGameMode === "battle"}
+            className={`nl-newgame-mode${newGameMode === "battle" ? " is-picked" : ""}`}
+            disabled={newGameBusy || readMeta.readOnly}
+            data-testid="new-game-mode-battle"
+            title={newGameModePickerReason ?? "Neuen Spielstand im Battle Mode anlegen."}
+            onClick={() => selectNewGameMode("battle")}
+          >
+            <span className="nl-newgame-mode-head">
+              <strong className="nl-newgame-mode-title">Battle Mode</strong>
+              <span className="nl-newgame-mode-badge">Neu</span>
+            </span>
+            <span className="nl-newgame-mode-text">
+              Zwei getrennte Ligen zu je {LEAGUE_SIZE} Klubs: eigene Tabelle, eigener Spielplan,
+              Punkte und Sponsor-/Gebäudekosten rechnen liga-intern. Basketball soll hier später
+              als echtes Duell in der Arena ausgespielt werden — das kommt noch, vorerst zählt
+              auch dort die Punkteformel.
+            </span>
+          </button>
         </div>
 
         {/* Kompakte Optionen: Save-Name + Sandbox (Bindings/Titel unverändert). */}

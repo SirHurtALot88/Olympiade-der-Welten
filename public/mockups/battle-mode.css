@@ -326,14 +326,38 @@
   .oly-battle-arena.oly-battle-arena .kseite{display:flex;gap:6px;flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .kseite.r{justify-content:flex-end}
   .oly-battle-arena.oly-battle-arena .kmitte{font:700 14px/1 ui-monospace,monospace;color:var(--ink);white-space:nowrap}
-  .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:74px;padding:4px 6px;border-radius:6px;
+  .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:86px;padding:4px 5px;border-radius:6px;
     background:var(--surface);border:1px solid var(--line)}
-  .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
+  /* SPRITE IN DER KACHEL (30.08., Chris: "bei den health Bars unten noch jeweils das
+     sprite vom spieler sichtbar"). Der Canvas kommt aus figur() (s. kaderFigur in
+     battle-mode.engine.js), also aus demselben Ebenen-Baukasten wie die Arena — hier nur
+     auf Kachelgroesse heruntergerechnet. image-rendering:pixelated wie ueberall sonst,
+     sonst matscht die Verkleinerung die Pixelfiguren weich. */
+  .oly-battle-arena.oly-battle-arena .kk .kkkopf{display:flex;align-items:center;gap:5px;min-width:0}
+  .oly-battle-arena.oly-battle-arena .kk .kkfigur{width:19px;height:24px;flex:none;image-rendering:pixelated}
+  .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}
+  /* FOKUS-DOPPELN. --fokus ist das CSS-Gegenstueck zu FOKUS_FARBE in battle-mode.engine.js
+     (Ring und Pfeil auf der Leinwand) — beide muessen denselben Ton tragen, damit die
+     Kachel in der Kaderleiste und die Markierung auf dem Feld als EIN Zustand lesbar
+     sind. Bewusst ein fester Wert statt einer Themenfarbe: er darf mit keiner der beiden
+     Teamfarben (--home/--away) verwechselbar sein. */
+  .oly-battle-arena.oly-battle-arena{--fokus:#ffb02e}
+  .oly-battle-arena.oly-battle-arena .kk.waehlbar{cursor:pointer}
+  .oly-battle-arena.oly-battle-arena .kk.waehlbar:hover{border-color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .kk.fokus{border-color:var(--fokus);box-shadow:0 0 0 2px color-mix(in srgb,var(--fokus) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.fokus b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile{display:flex;gap:10px;align-items:center;justify-content:flex-end;
+    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
+    background:var(--fokus);margin-right:5px;vertical-align:-1px}
   /* Endstand */
   .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
     gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}

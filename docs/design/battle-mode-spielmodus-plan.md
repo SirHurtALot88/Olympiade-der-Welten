@@ -444,36 +444,59 @@ Siehe Abschnitt 4 — 9 PRs, jede hält `main` deploybar.
 
 ## 5. Offene Fragen — Chris-Entscheidung nötig
 
-### 5.1 Punktemodell für Arena-Ergebnisse (die wichtigste offene Frage dieses Plans)
-Zwei echte, unvereinbare Optionen, keine „technisch überlegene" ohne Produktentscheidung:
-- **(A) Synthetischer Rang → bestehende `getRankToPointsValue()`-Tabelle** (Empfehlung dieses
-  Plans, Abschnitt 3.3c): keine neue Punkte-Ökonomie, automatisch kommensurabel mit der zweiten
-  Disziplin desselben Spieltags, aber „Rang" ist für ein 1-gegen-1-Duell ein Konstrukt, keine
-  intuitive Sport-Metapher.
-- **(B) Klassisches Sieg=2/Unentschieden=1/Niederlage=0** (Chris' eigene, früher geäußerte
-  Präferenz, `docs/BATTLE_ARENA_UEBERGABE.md` Abschnitt F): intuitiv, aber eine **zweite,
-  unabhängig zu kalibrierende Punkteskala** neben der PPS-Disziplin desselben Spieltags — wie viel
-  „wert" ist ein Basketball-Sieg im Vergleich zu Rang 3 in Schach am selben Spieltag? Braucht echte
-  Abstimmungsarbeit, nicht nur Code.
+### 5.1 Punktemodell für Arena-Ergebnisse — ENTSCHIEDEN (30.08.)
+**Chris: (B), Sieg=2/Unentschieden=1/Niederlage=0. „Das ist gesetzt."**
+
+Auflösung des Kommensurabilitäts-Einwands oben: die bestehende `getRankToPointsValue()`-Tabelle
+ist **ausschließlich für den Management Mode**. Battle Mode bekommt eine eigene, davon entkoppelte
+Team-Punkteskala (2/1/0) — es muss NICHT gegen die PPS-Tabelle derselben Disziplin am selben
+Spieltag kalibriert werden, weil beide Modi getrennte Punkte-Ökonomien sind. Wer PR5 baut: Battle-
+Mode-Standings brauchen eine eigene Aggregation, nicht `getRankToPointsValue()`.
+
+**Zusatzentscheidung (über die ursprüngliche Frage hinaus): individuelle Spieler-Punkte (PPs) in
+Battle Mode.** Chris will PPs im Battle Mode vollständig von den Team-Punkten entkoppeln — sie
+sollen nur noch die Leistung einzelner Spieler messen (Stars bekommen mehr, schwächere Spieler
+weniger), abgeleitet z. B. aus dem Impact Rating der Arena-Simulation, und zwar **skaliert relativ
+zur gesamten Liga, nicht nur zum eigenen Team**. Bewusst noch nicht umgesetzt: das braucht echte
+Liga-Kontextdaten (Referenzwerte über alle Spieler der Liga), die im isolierten Mockup
+(`public/mockups/battle-mode.engine.js`) nicht existieren — sinnvoll erst mit der echten
+Resolve-Pipeline (Fund 7/8 unten), wenn Spielerdaten tatsächlich durch ein Liga-Save laufen. Bis
+dahin bleibt die im Mockup gezeigte Impact/Eignung-Spalte (PR #683) ein reiner Vorschau-Wert, kein
+echtes PPs-Modell.
 
 ### 5.2 Wo endet Phase 1 wirklich — nur Basketball, für immer, oder als Blaupause?
 Bestätigung erbeten: Abschnitt 3.2, Option (a) als *Phase-1-Grenze*, mit Football/Hockey/Tennis
 als expliziter, unterschriebener Ausblick (nicht Teil dieses Plans) — richtig verstanden?
 
-### 5.3 Was passiert mit einem Arena-Duell bei fehlender/unvollständiger Aufstellung?
-Die PPS-Pipeline kennt `ResolvePreviewStatus` wie `"incomplete_lineups"`/`"missing_lineups"` als
-regulären, abgefangenen Fall. Für ein Arena-Duell mit zu wenigen tauglichen Basketball-Spielern
-(z. B. Verletzungen) braucht es dieselbe Sorte Fallback — automatischer Rückfall auf PPS-Formel für
-diesen einen Spieltag/dieses eine Team, oder harte Blockade („Spieltag kann nicht simuliert
-werden")? Nicht recherchierbar, reine Design-Entscheidung.
+### 5.3 Was passiert mit einem Arena-Duell bei fehlender/unvollständiger Aufstellung? — ENTSCHIEDEN (30.08.)
+**Chris: (B) Unterzahl antreten lassen.** „Wenn ein Team weniger Spieler hat, kann es dennoch
+antreten, hat dann halt ein Handicap." Fortführung der bestehenden Grundsatzentscheidung aus
+`legacy-matchday-partial-lineup-rule.ts` (Verletzungen dürfen ein Lineup nie blockieren, kein
+Ersatz erfinden) — kein PPS-Rückfall, keine neue Notaufstellungs-Logik. Technisch weiterhin offen:
+kann die Arena-Engine ungleiche Seiten (z. B. 6 gegen 4)? Aktuell ist die Feldgröße fix — das muss
+in PR5/6 mitgebaut werden.
 
-### 5.4 Server-Ressourcen für den warmen Playwright-Prozess
-Der Hetzner-Server (`CLAUDE.md`) trägt heute die App-Instanz; ein dauerhaft offener Chromium-
-Prozess samt geladener Arena-Seite ist zusätzlicher RAM-/CPU-Verbrauch **rund um die Uhr**, nicht
-nur während eines Resolve-Laufs. Ist das auf der aktuellen Hetzner-Instanz akzeptabel, oder soll der
-Browser stattdessen **on-demand** gestartet und nach jedem Matchday-Resolve wieder beendet werden
-(einfacher, aber jeder Spieltag zahlt dann die vollen Start-/Ladekosten erneut)? Nur Chris/Betrieb
-kann das gegen die reale Serverauslastung abwägen — hier nicht messbar.
+### 5.4 Server-Ressourcen für den warmen Playwright-Prozess — Fable-Empfehlung: (B), gegen Chris' Bauchgefühl
+Vorfrage zuerst geklärt: Chromium ist aktuell NICHT im Produktions-Image (`node:22-bookworm-slim`,
+schlank, ohne libnss3 & Co. — ~400 MB zusätzlich nötig). Chris tendierte zu **dauerhaft warmgehalten
+(A)**, hat aber selbst um eine zweite Meinung gebeten („davon habe ich keine Ahnung"). Fable hält A
+für diesen Server klar falsch:
+- Der Resolve läuft automatisch, niemand wartet live davor — ob er 5 oder 20 Sekunden braucht, ist
+  irrelevant. Ein dauerhaft idler Chromium kostet 200-400 MB RAM rund um die Uhr auf einem Server,
+  der bereits App + SQLite + Crons trägt, UND ist selbst das instabilste Stück Software dort
+  (Memory-Leaks, Zombie-Prozesse) — braucht eigene Health-Checks/Neustart-Logik, die niemand
+  betreiben will.
+- (C) ist am schlechtesten: Komplexität von A (Scheduling/Lifecycle) plus Startkosten von B, sobald
+  ein Resolve außerhalb des Zeitfensters fällt.
+- **Empfehlung: (B) on-demand** — Browser pro Spieltag (nicht pro Match!) einmal starten, alle
+  Duelle abarbeiten, danach hart beenden (`try/finally` + Timeout). „Prozess existiert nicht" ist der
+  robusteste Ruhezustand.
+- **Mittelfristig besser als alle drei:** `battle-mode.engine.js` ist reines JS — vom DOM entkoppelt
+  liefe die Tick-Simulation direkt in Node, kein Chromium, kein Playwright in Produktion nötig. Das
+  wäre der eigentliche Fix; (B) ist die richtige Brücke bis dahin.
+
+Noch nicht final von Chris bestätigt — Fables Gegenargument ist deutlich, sollte ihm so vorgelegt
+werden, bevor A gebaut wird.
 
 ### 5.5 Sichtbarkeit des `battleArena`-Tabs nach Aktivierung (PR 9)
 Soll der Tab in Manager-Mode-Saves nach Fertigstellung ganz verschwinden (er ist dort weiterhin nur
