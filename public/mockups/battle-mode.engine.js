@@ -986,6 +986,33 @@
       const im=bHol(key,null); if(!im||!im.width)return;
       try{ctx.drawImage(im,0,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
     };
+    // WAFFE IN DER HAND, AUCH WENN GERADE NICHT ZUGESCHLAGEN WIRD.
+    //
+    // Chris' Fund (25.08.): "In der Arena haben die Chars ihre Waffen etc nicht." Stimmt,
+    // und der Grund steckt in den Blaettern: schwertbg_/schwertfg_ und bogen sind
+    // LPC-Blaetter fuer GENAU EINE Bewegung (slash bzw. shoot) — ein Schwert-LAUFblatt
+    // gibt es im Baukasten nicht. Gezeichnet wurden sie deshalb nur waehrend des eigenen
+    // Angriffs-Frames, und der dauert 0,2 s von mehreren Sekunden Wartezeit: praktisch
+    // die ganze Zeit stand jeder unbewaffnet da.
+    //
+    // Ohne neues Blatt loesbar, weil figur() genau das seit jeher tut: ausserhalb des
+    // Angriffs das ERSTE Bild der Angriffsfolge als HALTEPOSE zeichnen — dieselbe Zelle,
+    // mit der die stehende Kaderfigur bewaffnet ist. Die Waffe sitzt dann in der Hand,
+    // statt zu fehlen.
+    //
+    // PLATZHALTER, klar benannt: die Waffe schwingt zwischen zwei Schlaegen NICHT mit dem
+    // Laufzyklus mit, weil es dafuer kein Bild gibt. Ein echtes Laufblatt (oder ein
+    // Schwert-auf-dem-Ruecken-Blatt) waere die richtige Loesung; bis dahin ist eine
+    // ruhige Waffe naeher am Kartenbild als gar keine.
+    const zeichneWaffe=(key,zell,ox,oy,eigenerZyklus)=>{
+      const im=sprite(key,null); if(!im||!im.width)return;
+      const bild=eigenerZyklus?f:0;
+      const sp=zell===64?r*64:r*zell;
+      try{ctx.drawImage(im,bild*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);}catch(e){}
+    };
+    // Gefuehrte Waffe nur, solange er steht: wer am Boden liegt, haelt sie nicht mehr —
+    // und das hurt-Blatt kennt ohnehin keine Waffenhaltung.
+    const fuehrtWaffe=!feldspiel&&!u.down;
     if(b.fluegel)zeichneFluegel("z_fluegel_bg");
     // Katzenschwanz (25.08., LPC-fremdes Fell-Blatt aus dem Baukasten, vom Fable-Fund nie
     // eingebettet): eigene Fell-Faerbung im Blatt selbst, deshalb ton=null statt b.haut —
@@ -994,7 +1021,7 @@
     // beide bleiben in der bestehenden if(b.schwanz)-Pruefung wahr (JS-Truthiness).
     if(b.schwanz==="katze")zeichne("katzenschwanzbg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
-    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
+    if(fuehrtWaffe&&b.waffe==="schwert")zeichneWaffe("schwertbg_slash",128,-32,-32,ani==="slash");
     // Weiblicher Koerper (24.08., README "Weibliche Körper sind da"): eigenstaendiges
     // Blatt aus derselben LPC-Quelle, byte-identische Zellmasse — Drop-in-Ersatz fuer
     // "body_*", unabhaengig vom Kopf/der Rasse (die Tierkoepfe passen laut LPC-
@@ -1044,16 +1071,16 @@
     if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
     if(b.schwanz==="katze")zeichne("katzenschwanzfg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
-    if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
+    if(bogen&&!u.down)zeichneWaffe("bogen_shoot",64,0,0,ani==="shoot");
     // Feuerwaffe bleibt in der Hand, solange der Kaempfer steht (Chris' Vorbild: ein Soldat
-    // legt seine Waffe nicht ab) — anders als Schwert/Bogen, die nur waehrend ihres eigenen
-    // Angriffs-Frames erscheinen, weil ihre Blaetter genau darauf zugeschnitten sind.
+    // legt seine Waffe nicht ab). Sie hat als einzige ein eigenes 9-Bilder-Blatt und laeuft
+    // deshalb ueber zeichneWaffenbild statt ueber die Haltepose von zeichneWaffe.
     if(feuerwaffe&&!u.down)zeichneWaffenbild(b.waffe+"_walk");
     // Muendungsfeuer: optionaler Zusatz-Layer, nur waehrend der Schusspose sichtbar und nur
     // auf den letzten Frames des Waffen-Zyklus (angenaeherter Abzugsmoment — das Blatt selbst
     // traegt keine Frame-genaue Blitz-Markierung, s. quellen.json).
     if(feuerwaffe&&ani==="shoot"&&!u.down&&waffenF>=WAFFEN_N-3)zeichneWaffenbild("muendungsfeuer_walk");
-    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
+    if(fuehrtWaffe&&b.waffe==="schwert")zeichneWaffe("schwertfg_slash",128,-32,-32,ani==="slash");
     if(b.fluegel)zeichneFluegel("z_fluegel_fg");
   }
 
@@ -5442,17 +5469,40 @@
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
   const tipBox=document.createElement("div");tipBox.className="tipbox";tipBox.hidden=true;
-  document.body.appendChild(tipBox);
+  // Chris' Fund (25.08.): "die tooltips im end screen ... funktionieren nicht". Ursache war
+  // nicht der Endstand, sondern DIESE Zeile — sie hing an document.body. Seit der
+  // Kapselung (Phase 2) steht aber JEDE Stilregel unter `.oly-battle-arena ...`, und auch
+  // die Farb-Tokens (--surface/--home/--ink/--shadow) sind nur DORT definiert. Auf dem
+  // body traf also keine Regel und kein Token: der Kasten wurde als nackter Fliesstext
+  // ohne Hintergrund, ohne Rahmen und ohne position:absolute unten an die Seite gehaengt
+  // (nachgemessen: position "static", Hintergrund transparent, y=1677 statt am Zeiger).
+  // Kein einziger Tooltip des Entwurfs war sichtbar — nicht nur die beiden im Endstand.
+  // Jetzt haengt er IN der Wurzel, damit Regeln und Tokens greifen.
+  const tipWurzel=document.querySelector(".oly-battle-arena")||document.body;
+  tipWurzel.appendChild(tipBox);
   function tipOn(node,titel,text){
     const show=(ev)=>{
       tipBox.textContent="";
       const h=document.createElement("b");h.textContent=titel;tipBox.appendChild(h);
       const pgf=document.createElement("p");pgf.textContent=text;tipBox.appendChild(pgf);
       tipBox.hidden=false;
+      // NULLPUNKT MESSEN STATT RATEN. Wogegen ein position:absolute rechnet, haengt
+      // daran, welcher Vorfahr einen Bezugsrahmen aufspannt — und das ist hier nicht
+      // vorhersagbar: die Wurzel traegt container-type fuer die Container-Queries, im
+      // Spiel sitzt sie zusaetzlich in einem fremden Layout. Nachgemessen wich der
+      // Kasten eingebettet um genau die Hoehe der Shell-Kopfzeile ab. Also erst auf
+      // 0/0 setzen, nachsehen, WO im Fenster das gelandet ist, und von dort aus rechnen.
+      tipBox.style.left="0px"; tipBox.style.top="0px";
+      const null0=tipBox.getBoundingClientRect();
       const r=node.getBoundingClientRect();
-      const top=r.top+window.scrollY-8;
-      tipBox.style.left=Math.min(window.innerWidth-330,r.left+window.scrollX)+"px";
-      tipBox.style.top=Math.max(8,top-tipBox.offsetHeight)+"px";
+      const breite=null0.width, hoehe=null0.height;
+      // Waagerecht am Feld ausrichten, aber im Fenster halten.
+      const xZiel=Math.max(6,Math.min(window.innerWidth-breite-6,r.left));
+      // Ueber dem Feld, solange er dort ins Fenster passt — sonst darunter. Frueher
+      // wurde er stattdessen an den oberen Rand geklemmt und verdeckte das Feld selbst.
+      const yZiel=(r.top-hoehe-8>=6)?r.top-hoehe-8:r.bottom+8;
+      tipBox.style.left=(xZiel-null0.left)+"px";
+      tipBox.style.top=(yZiel-null0.top)+"px";
     };
     node.addEventListener("mouseenter",show);
     node.addEventListener("focus",show);
@@ -5507,26 +5557,66 @@
         }
         return;
       }
-      // Rueckfall auf den einfachen Bauplan, solange ein Spieler keine Ebenenliste hat.
+      // RUECKFALL AUF DEN EINFACHEN BAUPLAN (BAU), solange ein Spieler keine Ebenenliste
+      // hat. Das ist der Normalfall, nicht die Ausnahme: B_FIGUR kennt genau die dreizehn
+      // Spieler der beiden Beispielkader — jeder Spieler aus einem ECHTEN Kader landet
+      // hier. Chris' Fund (25.08.): "die coolen neuen profile die wir bei basketball
+      // erarbeitet haben für die einsatzliste fehlen auch noch." Genau das war der Grund:
+      // die animierte Ansicht (zeichneSprite) hat in den Basketball-Runden Haar, Bart,
+      // Krone, Fluegel, weibliche Koerper, mitgefaerbte Beine und die Feuerwaffen bekommen
+      // — dieser Rueckfall nicht. Er zeichnete Koerper, Kopf, Ruestung, Helm, Kapuze,
+      // Hoerner, Katzenteile und, als einzige Waffe, den Bogen. Ein Spieler mit Krone und
+      // Schwert stand in der Einsatzliste kahl und unbewaffnet da, waehrend derselbe
+      // Spieler in der Arena beides trug. "EIN Charakter" heisst das nicht.
+      //
+      // Ab hier dieselbe Ebenenfolge wie zeichneSprite, nur auf einem festen Bild
+      // (Spalte 0) und einer festen Blickrichtung.
       const b=BAU[p.n]||BAU_STD, r=3;
-      const setz=(key,ton)=>{const im=sprite(key,ton);if(!im||!im.width)return;
-        try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
+      // zell/ox/oy wie in zeichneSprite: die Waffenblaetter sind 128 breit und haengen um
+      // eine halbe Zelle ueber, alles andere sitzt in der 64er-Zelle.
+      const legeAb=(im,zell,ox,oy)=>{if(!im||!im.width)return;
+        try{x.drawImage(im,0,r*(zell||64),zell||64,zell||64,(ox||0)-AUSX,(oy||0)-AUSY,zell||64,zell||64);}catch(e){}};
+      const setz=(key,ton,zell,ox,oy)=>legeAb(sprite(key,ton),zell,ox,oy);
+      const setzR=(key,ton)=>legeAb(spriteRuest(key,ton),64,0,0);
+      const setzHaar=(key,ton)=>legeAb(spriteHaar(key,ton),64,0,0);
+      const setzFluegel=(key)=>legeAb(bHol(key,null),64,0,0);
+      // Kreaturen mit eigenem Vollbild (Golem/Kraken/Werwolf) haben ueberhaupt keine
+      // Ebenen — sie kamen hier bisher als generischer Mensch heraus.
+      if(b.vollbild){
+        const spec=VOLLBILD[b.vollbild], im=bHol(spec.key,null);
+        if(im&&im.width){
+          const reihe=spec.stendhal?STENDHAL_ROW[r]:r;
+          const dh=64, dw=spec.cw*(dh/spec.ch);
+          try{x.drawImage(im,0,reihe*spec.ch,spec.cw,spec.ch,32-dw/2-AUSX,-AUSY,dw,dh);}catch(e){}
+        }
+        return;
+      }
+      if(b.fluegel)setzFluegel("z_fluegel_bg");
       if(b.schwanz==="katze")setz("katzenschwanzbg_walk",null);
       else if(b.schwanz)setz("schwanzbg_walk",b.haut);
-      setz("body_walk",b.haut);
+      if(b.waffe==="schwert")setz("schwertbg_slash",null,128,-32,-32);
+      const koerperKey=(b.geschlecht==="w"?"bodyw_":"body_")+"walk";
+      if(b.ruest)legeAb(spriteBeine(koerperKey,b.haut,b.ruest,b.ruestTon),64,0,0);
+      else setz(koerperKey,b.haut);
       if(b.ohren==="katze")setz("katzenohrenbg_walk",null);
-      setz("k"+b.kopf+"_walk",b.haut);
+      setz((b.geschlecht==="w"&&b.kopf==="human"?"khumanw_":"k"+b.kopf+"_")+"walk",b.haut);
       if(b.ohren&&b.ohren!=="katze")setz("ohren_walk",b.haut);
       if(b.ohren==="katze")setz("katzenohrenfg_walk",null);
-      if(b.ruest){const im=spriteRuest(b.ruest+"_walk",b.ruestTon);
-        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}}}
+      if(b.ruest)setzR(b.ruest+"_walk",b.ruestTon);
+      if(b.haar)setzHaar(b.haar+"_walk",b.haarTon||"brown");
+      if(b.bart)setzHaar("bart_walk",b.haarTon||"brown");
+      if(b.helm)setzR("helm_walk",b.ruestTon);
+      // Hoerner NACH dem Helm, aus demselben Grund wie in zeichneSprite: ein voller
+      // Topfhelm ueberzeichnet sie sonst komplett.
       if(b.hoerner)setz("hoerner_walk",b.haut);
-      if(b.helm){const im=spriteRuest("helm_walk",b.ruestTon);
-        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}}}
+      if(b.krone)setz("krone_walk",null);
       if(b.kapuze)setz("kapuze_walk",null);
       if(b.schwanz==="katze")setz("katzenschwanzfg_walk",null);
       else if(b.schwanz)setz("schwanzfg_walk",b.haut);
       if(b.waffe==="bogen")setz("bogen_shoot",null);
+      if(FEUERWAFFEN.includes(b.waffe))setz(b.waffe+"_walk",null);
+      if(b.waffe==="schwert")setz("schwertfg_slash",null,128,-32,-32);
+      if(b.fluegel)setzFluegel("z_fluegel_fg");
     };
     mal(); setTimeout(mal,300); setTimeout(mal,1200);
     return c;
@@ -6362,7 +6452,8 @@
       ...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
       schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,
       durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-      st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}};
+      st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,
+          gegen:{},fuer:{},fuehrung:0}};
   }
 
   // Die Slots einer Reihe, in der Reihenfolge, in der sie definiert sind. Unsere Seite
@@ -6439,6 +6530,18 @@
     g[feld]+=wert;
   }
 
+  // Dasselbe fuer die EIGENE Seite: wem habe ich geholfen. Chris' Fund (25.08.):
+  // "genauso heal fehlt noch komplett dass man sieht wen man geheilt hat" — die Spalten H
+  // und S nannten bisher nur eine Gesamtsumme, und keine der drei Stellen, an denen
+  // geheilt oder geschildet wird, hat sich gemerkt, WER etwas abbekommen hat. Getrennt
+  // von `gegen`, weil das hier Mitspieler sind und nicht Gegner; eine gemeinsame Tabelle
+  // haette "gegen wen" und "fuer wen" in denselben Tooltip geworfen.
+  function fuerZaehler(u,name,feld,wert){
+    if(!u||!u.st||!(wert>0))return;
+    const g=u.st.fuer[name]||(u.st.fuer[name]={heal:0,schild:0});
+    g[feld]+=wert;
+  }
+
   function treffer(von,z,roh,sd){
     const d=Math.max(1,Math.round(roh*sd*(100/(100+z.VER))));
     // VERHINDERT: was seine Verteidigung von diesem Schlag weggenommen hat. Das ist keine
@@ -6447,14 +6550,19 @@
     // viel wert wie eine geheilte Lebenspunktezahl, und ein Tank steht endlich mit dem in
     // der Tabelle, wofuer er gebaut ist.
     z.st.tank+=roh*sd; z.st.verh+=roh*sd-d; von.st.dmg+=d;
-    gegenZaehler(von,z.n,"dmg",d); gegenZaehler(z,von.n,"erl",d);
+    // `erl` traegt den ROHSCHADEN, nicht den geminderten. Chris' Fund (25.08.): der
+    // Tooltip auf "ERL" soll zeigen, "wie es sich zusammensetzt" — die Spalte zeigt aber
+    // st.tank (roh*sd), waehrend hier bisher der geminderte Wert `d` gezaehlt wurde. Die
+    // Aufschluesselung summierte sich damit auf deutlich weniger als die Zahl darueber,
+    // und eine Zerlegung, die nicht auf ihre Summe kommt, erklaert nichts.
+    gegenZaehler(von,z.n,"dmg",d); gegenZaehler(z,von.n,"erl",roh*sd);
     // Wer wie viel an diesem Gegner gearbeitet hat — fuer die Aufteilung der Ausschaltung.
     (z.anteile||(z.anteile=new Map())).set(von,(z.anteile.get(von)||0)+d);
     let rest=d;
     if(z.schild>0){
       const weg=Math.min(z.schild,rest);
       z.schild-=weg; rest-=weg;
-      if(z.schildVon&&z.schildVon!==z)z.schildVon.st.schild+=weg;
+      if(z.schildVon&&z.schildVon!==z){z.schildVon.st.schild+=weg;fuerZaehler(z.schildVon,z.n,"schild",weg);}
       schwebe({x:z.x,y:z.y-42,txt:"Schild −"+weg,life:.7,heil:true});
     }
     z.hp=Math.max(0,z.hp-rest);
@@ -7035,6 +7143,7 @@
       if(e.art==="heilung"){
         for(const z of ziele){const h=Math.round(e.basis*angFaktor(u.ANG)*(e.mult||1));
           const echt=Math.min(h,z.max-z.hp); z.hp=Math.min(z.max,z.hp+h); u.st.heal+=echt;
+          fuerZaehler(u,z.n,"heal",echt);
           schwebe({x:z.x,y:z.y-26,txt:"+"+h,life:.95,heil:true});
           feed(u.side,u.n+" heilt "+z.n+" · "+h);}
         continue;
@@ -7527,6 +7636,7 @@
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
+          fuerZaehler(u,ziel.n,"heal",echt);
           schwebe({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,heil:true});
           feed(u.side,u.n+" heilt "+ziel.n+" · "+heal);
           continue;
@@ -7619,6 +7729,11 @@
   // nach dem Schadensanteil geteilt — die Zahl in der KO-Spalte bleibt der letzte Schlag,
   // weil der sich zaehlen laesst, aber die LEISTUNG rechnet mit dem Anteil.
   function verteileKo(z,letzter){
+    // Das Publikum reagiert auf das einzige Ereignis, das der Kampf wirklich hat: eine
+    // Ausschaltung. Leise (0,3), weil es je Kampf mehrfach kommt. Hier oben, weil beide
+    // Wege (Nahkampf und Pfeil) durch diese Funktion laufen — und VOR den frueheren
+    // Rueckspruengen unten, die nur die Punkteverteilung abkuerzen.
+    jubel(0.3);
     const anteile=z.anteile;
     if(!anteile||!anteile.size){letzter.st.koAnteil+=1;return;}
     let summe=0; for(const w of anteile.values())summe+=w;
@@ -7879,6 +7994,10 @@
   const bkPegel=(basis)=>bkMuted?0:basis*bkVolume/0.6; // /0.6, weil 0.6 die alte Default-Basislautstaerke war
   const bkSfxPool={};
   function bkSfx(name,vol){
+    // In der Messreihe kein Ton — dieselbe Regel wie fuer Schwebeschrift und Kampflog
+    // (`stumm`). Eine Serie rechnet Dutzende Kaempfe in Sekunden durch; ohne die Sperre
+    // feuert jeder davon seine Effekte in den Pool.
+    if(stumm)return;
     try{
       let pool=bkSfxPool[name];
       if(!pool){pool=bkSfxPool[name]=[0,1,2].map(()=>{const a=new Audio("/sound/basketball/"+name);a.preload="auto";return a;});}
@@ -7906,6 +8025,31 @@
   }
   function bkLoopPause(){ if(bkLoop.publikum)bkLoop.publikum.pause(); }
   function bkLoopStop(){ bkLoopPause(); if(bkLoop.publikum)bkLoop.publikum.currentTime=0; }
+
+  // TON AUSSERHALB VON BASKETBALL — Chris' Fund (25.08., aus der Arena heraus gemeldet):
+  // "Sound in der Battle Arena funktioniert gar nicht bei mir."
+  //
+  // NACHGEMESSEN, und er hat recht, nur anders als es klingt: kaputt ist nichts. Der Ton
+  // wurde in den Basketball-Runden gebaut und ist bis heute AUSSCHLIESSLICH dort
+  // verdrahtet — jeder bkSfx-Aufruf haengt an `feldspielDisc==="basketball"`, und die
+  // Publikums-Schleife startete nur bei `disc==="basketball"`. Der Entwurf startet aber
+  // auf TDM. Wer die Arena oeffnet und auf "Kampf starten" drueckt, hoert deshalb genau
+  // nichts, waehrend Ton-Knopf und Lautstaerkeregler daneben stehen und etwas anderes
+  // versprechen.
+  //
+  // WAS HIER BEHOBEN WIRD: die beiden disziplinNEUTRALEN Klaenge gelten ab jetzt ueberall
+  // — das Hallen-Grundrauschen ("Audience", Alexandr Zhelanov) und der Jubel ("Strong
+  // cheering", Gregor Quendel), siehe public/sound/basketball/quellen.json. Beide
+  // beschreiben ein Publikum, nicht einen Ball; in einer Kampfarena sitzt eines genauso
+  // wie in einer Halle.
+  //
+  // WAS OFFEN BLEIBT, und zwar bewusst: es gibt KEINE Kampf-Effekte. Schwerthieb,
+  // Pfeilschuss, Treffer, Schild — dafuer liegt keine einzige Datei im Repo
+  // (public/sound/ enthaelt nur den Basketball-Satz). Die zu erfinden waere ein eigener
+  // Beschaffungs- und Verdrahtungsschritt, kein Fehlerfix, und ein Ballaufprall als
+  // Schwerthieb waere gelogen. Bis dahin klingt die Arena nach Publikum und Jubel und
+  // nicht nach Metall — hoerbar unfertig, aber nicht mehr stumm.
+  const jubel=(pegel)=>bkSfx("publikum_jubel.mp3",pegel);
 
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
@@ -9089,6 +9233,8 @@
   function finish(){
     if(done)return;done=true;running=false;
     document.getElementById("play").textContent="Vorbei";
+    // Schlussjubel und Ruhe danach — dasselbe Paar wie Buzzer + bkLoopStop im Feldspiel.
+    jubel(0.5); bkLoopStop();
     renderEndstand();
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
@@ -9396,24 +9542,29 @@
   function impZerlegung(u){
     const st=u.st, tode=st.tode||0, z=[];
     const p=(x)=>(x>=0?"+":"")+Math.round(x);
+    // Einrueckung mit GESCHUETZTEN Leerzeichen: der Kasten rendert den Text mit
+    // white-space:pre-line, und das behaelt zwar die Zeilenumbrueche, wirft fuehrende
+    // normale Leerzeichen aber weg — die Unterposten haetten sonst auf der Kante der
+    // Ueberschriften gestanden und die Gliederung waere verschwunden.
+    const ein="\u00a0\u00a0";
     const kampfD=IMP_G.schaden*impS(st.dmg,IMP_R.schaden);
     const kampfK=IMP_STUECK.ko*(st.ko||0), kampfB=IMP_STUECK.beihilfe*(st.beihilfe||0);
     z.push("KAMPF "+Math.round(kampfD+kampfK+kampfB));
-    z.push("  "+p(kampfD)+" Schaden ("+Math.round(st.dmg)+", Sättigung "+IMP_R.schaden+")");
-    z.push("  "+p(kampfK)+" Ausschaltungen ("+(st.ko||0)+" × "+IMP_STUECK.ko+")");
-    z.push("  "+p(kampfB)+" Beihilfen ("+(st.beihilfe||0)+" × "+IMP_STUECK.beihilfe+")");
+    z.push(ein+p(kampfD)+" Schaden ("+Math.round(st.dmg)+", Sättigung "+IMP_R.schaden+")");
+    z.push(ein+p(kampfK)+" Ausschaltungen ("+(st.ko||0)+" × "+IMP_STUECK.ko+")");
+    z.push(ein+p(kampfB)+" Beihilfen ("+(st.beihilfe||0)+" × "+IMP_STUECK.beihilfe+")");
     const nH=IMP_G.heilung*impS(st.heal,IMP_R.heilung);
     const nS=IMP_G.schild*impS(st.schild,IMP_R.schild);
     const nC=IMP_G.kontrolle*impS(st.cc,IMP_R.kontrolle);
     const nF=IMP_G.frontlinie*impS(st.tank,IMP_R.frontlinie)/(1+0.75*tode);
     z.push("NUTZEN "+Math.round(nH+nS+nC+nF));
-    z.push("  "+p(nH)+" Heilung ("+Math.round(st.heal)+", Sättigung "+IMP_R.heilung+")");
-    z.push("  "+p(nS)+" Schild ("+Math.round(st.schild)+", Sättigung "+IMP_R.schild+")");
-    z.push("  "+p(nC)+" Kontrolle ("+(Math.round(st.cc*10)/10)+" s, Sättigung "+IMP_R.kontrolle+")");
-    z.push("  "+p(nF)+" Frontlinie ("+Math.round(st.tank)+" erlitten, Verfall ×"+(1+0.75*tode).toFixed(2)+")");
+    z.push(ein+p(nH)+" Heilung ("+Math.round(st.heal)+", Sättigung "+IMP_R.heilung+")");
+    z.push(ein+p(nS)+" Schild ("+Math.round(st.schild)+", Sättigung "+IMP_R.schild+")");
+    z.push(ein+p(nC)+" Kontrolle ("+(Math.round(st.cc*10)/10)+" s, Sättigung "+IMP_R.kontrolle+")");
+    z.push(ein+p(nF)+" Frontlinie ("+Math.round(st.tank)+" erlitten, Verfall ×"+(1+0.75*tode).toFixed(2)+")");
     z.push("ÜBERLEBEN "+(tode===0?IMP_STUECK.ueberlebt:0));
     z.push("ABZÜGE −"+Math.round(IMP_STUECK.tod*tode+(st.ff||0)));
-    z.push("  −"+IMP_STUECK.tod*tode+" Tode ("+tode+" × "+IMP_STUECK.tod+")");
+    z.push(ein+"−"+IMP_STUECK.tod*tode+" Tode ("+tode+" × "+IMP_STUECK.tod+")");
     const roh=kampfD+kampfK+kampfB+nH+nS+nC+nF+(tode===0?IMP_STUECK.ueberlebt:0)-IMP_STUECK.tod*tode-(st.ff||0);
     if(roh>IMP_KAPPE.weich)z.push("Weicher Deckel: "+Math.round(roh)+" → "+Math.round(IMP_KAPPE.weich+(roh-IMP_KAPPE.weich)*IMP_KAPPE.weichRest));
     return z;
@@ -9458,10 +9609,27 @@
   }
 
   // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
-  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
-                  ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
-  // Welche Spalten sich nach Gegner aufschluesseln lassen.
-  const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl"};
+  // Dritter Eintrag ist der Klartext der Abkuerzung. Er stand nirgends — die Kopfzeile
+  // zeigte "K T B CC H S SCH ERL FF IMP" und sonst nichts, und wer "IMP" nicht schon
+  // kannte, konnte es aus der Tafel nicht erfahren.
+  const ESPALTEN=[["K","ko","Ausschaltungen"],["T","tode","Tode"],["B","beihilfe","Beihilfen"],
+                  ["CC","cc","Kontrolle (Sekunden Betäubung/Verlangsamung)"],
+                  ["H","heal","Geheilte Lebenspunkte (ohne Überheilung)"],
+                  ["S","schild","Schaden, den sein Schild für andere geschluckt hat"],
+                  ["SCH","dmg","Ausgeteilter Schaden (nach Minderung des Ziels)"],
+                  ["ERL","tank","Erlittener Schaden, roh — vor der eigenen Minderung"],
+                  ["FF","ff","Eigenbeschuss"]];
+  // Welche Spalten sich nach Gegner aufschluesseln lassen — Feld in st.gegen plus die
+  // Frage, die der Tooltip beantwortet ("gegen wen" austeilen, "von wem" einstecken).
+  const GEGENFELD={ko:["ko","gegen wen"],cc:["cc","gegen wen"],dmg:["dmg","gegen wen"],
+                   tank:["erl","von wem"]};
+  // Und welche nach MITSPIELERN — Heilung und Schild gehen an die eigene Seite, nicht
+  // gegen jemanden. Deshalb eine zweite Tabelle statt eines Eintrags in GEGENFELD.
+  const FUERFELD={heal:["heal","wen er geheilt hat"],schild:["schild","wen sein Schild gedeckt hat"]};
+  // Eine Aufschluesselung muss auf ihre Summe kommen, sonst erklaert sie nichts — die
+  // Zeile macht das nachpruefbar, statt es zu behaupten.
+  const zerlegungText=(liste)=>liste.map(([n,x])=>"\u00a0\u00a0"+n+": "+Math.round(x*10)/10).join("\n")
+    +"\n= "+Math.round(liste.reduce((a,[,x])=>a+x,0));
   function renderEndstand(){
     const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
     document.getElementById("esieger").textContent =
@@ -9472,28 +9640,37 @@
       box.appendChild(el("h5",null,VEREIN[seite].name));
       const t=el("table"), kopf=el("tr");
       kopf.appendChild(el("th",null,"Kämpfer"));
-      for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
-      kopf.appendChild(el("th",null,"IMP"));
+      for(const [lab,,klartext] of ESPALTEN){
+        const th=el("th",null,lab); th.title=klartext; kopf.appendChild(th);
+      }
+      const thImp=el("th",null,"IMP");
+      thImp.title="Impact — die eine Zahl über Kampf, Nutzen, Überleben und Abzüge. "
+        +"Zelle anfahren zeigt die Rechnung.";
+      kopf.appendChild(thImp);
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
       const reihen=U.filter(u=>u.side===seite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
       for(const {u,imp} of reihen){
         const tr=el("tr",u.down?"tot":null);
         tr.appendChild(el("td",null,u.n));
-        for(const [lab,f] of ESPALTEN){
+        for(const [,f,klartext] of ESPALTEN){
           const v=u.st[f];
           // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
           // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
           if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
           const z=el("td",null,String(Math.round(v||0)));
-          const gf=GEGENFELD[f];
-          if(gf&&v){
-            const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
+          z.title=klartext;
+          // Aufschluesselung: erst gegen die Gegner, sonst fuer die eigene Seite.
+          // Die eigene Seite ist Chris' Punkt — "heal fehlt noch komplett dass man sieht
+          // wen man geheilt hat".
+          const teil=GEGENFELD[f]?[u.st.gegen,GEGENFELD[f]]:FUERFELD[f]?[u.st.fuer,FUERFELD[f]]:null;
+          if(teil&&v){
+            const [quelle,[feld,frage]]=teil;
+            const liste=Object.entries(quelle||{}).map(([n,g])=>[n,g[feld]||0])
               .filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]);
             if(liste.length){
               z.tabIndex=0; z.classList.add("hovbar");
-              tipOn(z,lab+" von "+u.n+" — gegen wen",
-                liste.map(([n,x])=>n+": "+Math.round(x*10)/10).join("\n"));
+              tipOn(z,u.n+" · "+frage,klartext+"\n"+zerlegungText(liste));
             }
           }
           tr.appendChild(z);
@@ -9534,9 +9711,10 @@
     zeigeEinlauf(false);
     running=!running;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
-    // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
-    // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
-    if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
+    // Publikum in JEDER Disziplin, solange wirklich gespielt wird (vorher nur Basketball,
+    // s. Kommentarblock bei bkLoopStop) — echte Nutzergeste (dieser Klick) noetig, sonst
+    // blockt der Browser Audio.
+    if(running)bkLoopStart(); else bkLoopPause();
   });
   document.getElementById("reset").addEventListener("click",reset);
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
