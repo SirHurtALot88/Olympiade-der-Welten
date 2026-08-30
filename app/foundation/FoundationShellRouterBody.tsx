@@ -224,11 +224,6 @@ const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/F
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
 });
-const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
-  ssr: false,
-  loading: () => <FoundationPanelSkeleton label="Entwurf wird geladen…" />,
-});
-
 const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog/FoundationChangelogHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
@@ -3239,13 +3234,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}
           {activeView === "changelog" ? <FoundationChangelogHost /> : null}
-          {activeView === "battleArena" ? (
-            <FoundationBattleArenaHost
-              gameState={gameState}
-              activeManagerTeamId={activeManagerTeamId}
-              saveId={activeSaveId}
-            />
-          ) : null}
 
           {/* Der Debug-Block hing bis hierher nur an einer CSS-Klasse (`getViewClass` gibt
               lediglich `foundation-section-hidden` zurueck). Das hiess: der komplette

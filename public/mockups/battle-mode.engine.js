@@ -7725,6 +7725,10 @@
   const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
+    // ZIELANSAGE zurueck auf Anfang — VOR den Weichen nach unten, damit ein Wechsel der
+    // Disziplin (renderDbar ruft reset()) keine Ansage aus einem alten Kampf mitschleppt.
+    // Die beiden Zeilen sind fuer Feldspiel/Buehne/Bahn wirkungslos: dort fragt sie niemand.
+    KFOKUS=null; KFOKUS_CD=0;
     if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
@@ -8033,6 +8037,85 @@
   const alleLebenden=()=>U.filter(u=>!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
+  // ===================================================================================
+  // ZIELANSAGE / FOKUSFEUER — der eine Eingriff, den der Zuschauer im Kampf hat.
+  //
+  // Vorbild ist das Fokus-Doppeln im Basketball (PR #685): EIN markierter Gegner, EIN
+  // Zustand, und die Wirkung ist ein BIAS, keine Sperre. Was hier anders ist als dort:
+  //
+  //  1. DER PREIS EXISTIERT SCHON. Wer sich aus der Schlagweite eines Gegners loest, um
+  //     dem Ruf zu folgen, kassiert den TRENNSCHLAG (halber Schaden, s. dort in der
+  //     Bewegung). Daran musste keine Zeile geaendert werden — die Regel ist rein
+  //     geometrisch und greift von selbst, sobald jemand wegen der Ansage umschwenkt.
+  //     Eine Ansage ins Leere ist damit teuer, eine Ansage auf den, der ohnehin vorn
+  //     steht, billig. Genau die Entscheidung, die sie interessant macht.
+  //  2. KEIN KONTINGENT, SONDERN EINE SPERRE JE ANSAGE (Football Manager, Touchline
+  //     Shouts: rund alle zehn Spielminuten einer). Auf 90 Minuten sind das ~11 % der
+  //     Spieldauer; ein Kampf hier dauert rund 60 Sekunden, also 7 Sekunden Sperre.
+  //     Aufheben ist frei — sonst waere die Sperre eine Falle statt einer Kosten.
+  //  3. DIE ANSAGE WIRKT NICHT SOFORT. Sie aendert nur, was bei der NAECHSTEN Zielwahl
+  //     herauskommt (u.reev, 0,35 s bis 2,75 s je nach Bindung). Wer gerade im Durchbruch
+  //     ist, hoert sie ueberhaupt nicht — das ist die Bindung, die in der Aufstellung
+  //     eingestellt wird, und sie behaelt hier ihr Gewicht: eine unbeirrte Mannschaft
+  //     laesst sich langsamer umlenken als eine opportunistische.
+  //
+  // Die gegnerische KI kann das laengst (s. schlachtplan: "Kopf abschlagen"/"Heiler
+  // zuerst"/"Lohnendste zuerst" setzen zielP fuer die ganze Seite). Bis hierher gab es
+  // dafuer auf UNSERER Seite kein Gegenstueck waehrend des Kampfes — nur die Aufstellung
+  // vorher. Das ist der Hebel, den die Ansage nachreicht.
+  //
+  // NEBENBEDINGUNG wie bei #685: ohne gesetzte Ansage (KFOKUS===null) faellt kfZielFuer
+  // sofort auf null zurueck, chooseTarget nimmt exakt denselben Weg wie vorher, und es
+  // wird kein einziger rr()-Wurf zusaetzlich oder weniger verbraucht. Der Kampf ist ohne
+  // Klick bit-identisch zum Stand davor.
+  let KFOKUS=null;      // u.id des angesagten GEGNERISCHEN Kaempfers, oder null
+  let KFOKUS_CD=0;      // Restsperre bis zur naechsten Ansage, in Kampfsekunden
+  const KF_CD=7;        // Sperre je Ansage (s.o.: FM-Verhaeltnis auf 60 s Kampf gerechnet)
+  // WIE WEIT DER RUF TRAEGT — der eine Regler, der ueber "Bias" oder "Sperre" entscheidet.
+  //
+  // NACHGEMESSEN, nicht geschaetzt (zielansageLauf, s.u.: fuer JEDEN der sechs bzw. vier
+  // Gegner ein Kampf mit und einer ohne Ansage, gezaehlt wird, wie viele Eigene im Mittel
+  // GLEICHZEITIG auf ihm standen — das ist buchstaeblich die Zahl der zusammenlaufenden
+  // Linien auf dem Schirm). Mittel ueber alle Angesagten, Saat 1337:
+  //
+  //             ohne Ansage   Ruf 340   Ruf 520   Ruf unbegrenzt   (von je 6 bzw. 4)
+  //   TDM          1,48         3,74      4,42        5,40
+  //   Mini-DM      1,68         2,08      2,55        3,18
+  //   Fechten      1,38         2,61      3,45        5,08
+  //   Battlefield  1,29         2,60      2,77        2,80
+  //
+  // Unbegrenzt ist zu viel: bei 5,4 von 6 laeuft die GANZE Mannschaft mit, und Befehle,
+  // Bindung und Persoenlichkeit sind waehrend der Ansage bedeutungslos — das waere eine
+  // Sperre, keine Gewichtung. 340 ist zu wenig, vor allem in Mini-DM (1,68 auf 2,08 sieht
+  // man nicht). 520 verdoppelt bis verdreifacht die Zahl der Angreifer und laesst
+  // gleichzeitig rund ein Drittel der Mannschaft bei ihrer Arbeit — genau die Mischung,
+  // die man sehen UND als Entscheidung erleben kann.
+  //
+  // Endstand mit 520 UND der Flanken-Ausnahme unten in chooseTarget (die eine kostet ein
+  // wenig von dem, was das andere bringt — das ist der Preis dafuer, dass eine gesetzte
+  // Flanke eine Flanke bleibt):
+  //   TDM 1,48 -> 4,23 · Mini-DM 1,68 -> 2,55 · Fechten 1,38 -> 2,70 · Battlefield 1,29 -> 2,77
+  const KF_RUF=520;
+  // Greifradius fuer den Klick auf die Leinwand — grosszuegiger als die Figur selbst
+  // (KOERPER_X=58 halbiert waere 29), weil im Getuemmel niemand pixelgenau trifft.
+  const KF_GREIF=46;
+  const istKampf=(d)=>!istFeldspiel(d)&&!istBuehne(d)&&!istBahn(d);
+  // Der angesagte Gegner als Objekt — oder null, wenn keiner gesetzt ist bzw. er gefallen
+  // ist. EINE Stelle, an der aus der id eine Einheit wird; alles andere fragt hier nach.
+  function kfZiel(){
+    if(KFOKUS==null)return null;
+    const z=U.find(x=>x.id===KFOKUS);
+    return z&&!z.down?z:null;
+  }
+  // Gilt die Ansage fuer DIESEN Kaempfer? Nur fuer unsere Seite (die Ansage ist unsere),
+  // nur auf einen echten Gegner, und nur soweit der Ruf traegt.
+  function kfZielFuer(u){
+    if(KFOKUS==null||u.side!==0)return null;
+    const z=kfZiel();
+    if(!z||z.side===u.side)return null;
+    return dist(u,z)<=KF_RUF?z:null;
+  }
+
   function chooseTarget(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
@@ -8044,6 +8127,33 @@
     // DURCHBRUCH: wer entschlossen ist, laesst sich nicht umlenken. Er nimmt die Schlaege
     // der Abfangenden in Kauf und geht zu dem, den er gemeint hat.
     if(u.durch&&u.tgt&&!u.tgt.down)return u.tgt;
+
+    // ZIELANSAGE. Sie steht bewusst HINTER Rueckzug und Durchbruch — den beiden Faellen,
+    // in denen ein Kaempfer per Regel ueberhaupt nicht mehr zuhoert — und VOR allem
+    // anderen: vor dem Offensivzwang, vor den Stellungsbefehlen, vor der uebersteuerten
+    // Zielprioritaet und vor der Persoenlichkeit. Genau das macht sie zu einem BEFEHL und
+    // nicht zu einer weiteren Neigung, die sich mit fuenf anderen um den Vortritt streitet.
+    //
+    // WAS SIE TROTZDEM NICHT AUSHEBELT (und deshalb hier auch nicht steht):
+    //  - Wer in Schlagweite GESTELLT ist, wird gleich nach diesem Aufruf wieder auf seinen
+    //    Abfaenger zurueckgesetzt, sofern seine Bindung opportunistisch genug ist
+    //    (s. u.bindAn im Tick). Ein Ruf reisst niemanden aus einem laufenden Nahkampf.
+    //  - Wer sich loest, zahlt den Trennschlag (halber Schaden, s. Bewegung).
+    //  - Die Bewegungs-Klammern bleiben: "Ruecken decken" kommt nicht ueber die Mittellinie,
+    //    "hinter den Eigenen" nicht an der vordersten Einheit vorbei. Der Gerufene wird
+    //    angesagt, die Formation bleibt.
+    // Keine Wuerfe, kein Zufall — dieselbe deterministische Auswahl wie ringsherum.
+    //
+    // EINE AUSNAHME: der Flankierer, der noch UNTERWEGS ist. Sein Befehl IST der Umweg,
+    // und unten in der Bewegung haengt daran mehr als eine Zielwahl — sobald er ein Ziel
+    // hat, laeuft er dorthin statt an den Rand, und die Formationsleine, die fuer "flanke"
+    // ausdruecklich aufgehoben ist, greift wieder. Ein Ruf wuerde aus einer Flanke also
+    // stillschweigend eine Mitte machen, und zwar fuer den Rest des Kampfes. Angekommen
+    // (Freigabe erteilt und tief genug im gegnerischen Feld) hoert er wieder zu.
+    const flankeNochUnterwegs=u.ord==="flanke"&&
+      !(freigabe[u.side]&&(u.side===0?u.x>MID+180:u.x<MID-180));
+    const angesagt=flankeNochUnterwegs?null:kfZielFuer(u);
+    if(angesagt)return angesagt;
 
     // OFFENSIVZWANG: Stellungsbefehle sind aufgehoben. Wer hier landet, hat entweder zu
     // lange ohne Ziel dagestanden oder das Feld ist so leer, dass Position nichts mehr
@@ -8542,6 +8652,17 @@
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
+    // ZIELANSAGE: die Sperre laeuft in KAMPFZEIT, nicht in Echtzeit — sonst haette das
+    // Tempo (1x/2x/4x) heimlich Einfluss darauf, wie oft man eingreifen darf.
+    if(KFOKUS_CD>0)KFOKUS_CD=Math.max(0,KFOKUS_CD-dt);
+    // Faellt der Angesagte, endet die Ansage von selbst. Sie bleibt NICHT als toter
+    // Verweis stehen — sonst zeigte die Zeile unter der Kaderleiste weiter auf eine
+    // Leiche, und der naechste Klick haette gegen ein unsichtbares Ziel zu kaempfen.
+    if(KFOKUS!=null&&!kfZiel()){
+      const gefallen=U.find(x=>x.id===KFOKUS);
+      KFOKUS=null;
+      if(gefallen)feed(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
+    }
     const sd=t>50?1+(t-50)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
@@ -10508,21 +10629,52 @@
     if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
 
+    // ZIELLINIEN. Ein duenner Strich von jedem Kaempfer zu dem, den er gerade meint.
+    //
+    // BEFUND (Zielansage-Runde, 30.08.): diese Linien waren seit ihrer Einfuehrung
+    // praktisch unsichtbar, und zwar nicht selten, sondern NIE. Die Bedingung lautete
+    // `dist(u,tg)<=RANGE+6`, also 26 px — RANGE ist aber der Zuschlag AUF den Koerper,
+    // nicht die ganze Reichweite (s. reichweiten(): reach=KOERPER_X+RANGE=78). Gleichzeitig
+    // haelt die Entzerrung im Tick jedes Paar auf mindestens KOERPER_X=58 px in x ODER
+    // KOERPER_Y=70 px in y auseinander. Zwei Figuren koennen also gar nicht auf 26 px
+    // zusammenkommen — die Bedingung war unerfuellbar. Jetzt steht dort die Reichweite,
+    // die der Kaempfer wirklich hat: die Linie erscheint genau dann, wenn er sein Ziel
+    // auch erreichen kann (Fernkaempfer entsprechend weiter, was ihre Schussachse zeigt).
+    //
+    // DIE ANGESAGTE LINIE ist dieselbe Linie in der Fokusfarbe, kraeftiger, gestrichelt
+    // und wandernd — und sie wird OHNE Reichweiten-Bedingung gezogen, ueber das ganze
+    // Feld. Das ist der eigentliche Beleg fuers Fokusfeuer: man sieht die Striche
+    // zusammenlaufen, sobald mehrere Kaempfer die Ansage uebernommen haben, und zwar schon
+    // waehrend sie noch unterwegs sind, nicht erst wenn sie ankommen.
+    const kfZ=kfZiel();
     for(const u of U){
       if(u.down)continue;
       const tg=u.tgt;
-      if(tg&&!tg.down&&dist(u,tg)<=RANGE+6){
+      if(!tg||tg.down)continue;
+      if(kfZ&&tg===kfZ&&u.side===0){
+        ctx.save();
+        ctx.strokeStyle=FOKUS_FARBE;ctx.globalAlpha=.7;ctx.lineWidth=2.5;
+        ctx.setLineDash([9,6]);ctx.lineDashOffset=-(t*40)%15;
+        ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();
+        ctx.restore();
+      } else if(dist(u,tg)<=u.reach+6){
         ctx.strokeStyle=u.side===0?css("--home"):css("--away");
         ctx.globalAlpha=.28;ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();ctx.globalAlpha=1;
       }
     }
+    let kfMarke=null;
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
       let x=u.x,y=u.y;
       if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
         const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
       if(u.dodge>0){const k=Math.sin((1-u.dodge/0.26)*Math.PI)*15;x+=(u.dx||0)*k;y+=(u.dy||0)*k;}
+      // ZIELANSAGE: nur die Position merken, GEZEICHNET wird sie nach der Schleife.
+      // Genau der Fehler, der beim Fokus-Doppeln schon einmal gemacht wurde (s. dort):
+      // hier gezeichnet laege der Ring unter den spaeter gemalten Figuren und der Pfeil
+      // ueber dem Kopf verschwaende hinter dem naechsten Sprite.
+      if(kfZ&&u===kfZ)kfMarke={x,y};
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
@@ -10577,6 +10729,34 @@
         u.heiler?css("--ok"):"#a9b6c6",8.5);
       ctx.globalAlpha=1;
     }
+    // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
+    // Fokus-Doppeln (s. dort, gleiche Farbe FOKUS_FARBE, gleicher gestrichelter Ring r=27
+    // mit wanderndem Strichmuster, gleicher wippender Pfeil ueber dem Kopf) — zwei
+    // verschiedene Markierungen fuer dieselbe Geste waeren nur zwei Dinge zum Lernen.
+    // Unterschied ist allein die Uhr: hier laeuft `t` (Kampfzeit) statt fsT.
+    // Dazu, was es im Basketball nicht gibt und hier gebraucht wird: ein ZAEHLER, wie
+    // viele der Eigenen die Ansage gerade wirklich uebernommen haben. Er beantwortet die
+    // Frage, die man beim Zuschauen sofort stellt ("hoert ueberhaupt jemand?"), ohne die
+    // Linien einzeln nachzuzaehlen.
+    if(kfMarke){
+      const {x,y}=kfMarke;
+      ctx.save();
+      ctx.strokeStyle=FOKUS_FARBE;ctx.lineWidth=2.5;ctx.globalAlpha=0.95;
+      ctx.setLineDash([7,5]);ctx.lineDashOffset=-(t*22)%12;
+      ctx.beginPath();ctx.arc(x,y,27,0,6.3);ctx.stroke();
+      ctx.setLineDash([]);
+      const pf=y-46-Math.sin(t*4)*2.5; // leichtes Wippen, damit der Pfeil auffaellt
+      ctx.fillStyle=FOKUS_FARBE;
+      ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineWidth=2;ctx.lineJoin="round";
+      ctx.beginPath();ctx.moveTo(x,pf+11);ctx.lineTo(x-7,pf);ctx.lineTo(x+7,pf);ctx.closePath();
+      ctx.stroke();ctx.fill();
+      const folgen=U.filter(a=>!a.down&&a.side===0&&a.tgt===kfZ).length;
+      ctx.font="700 11px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
+      ctx.strokeText("▼ "+folgen,x,y-58);
+      ctx.fillStyle=FOKUS_FARBE;ctx.fillText("▼ "+folgen,x,y-58);
+      ctx.restore();
+    }
     // Pfeile
     for(const pf of pfeile){
       if(pf.verzug>0)continue;
@@ -10590,6 +10770,17 @@
     zeichneEffekte(1/60);
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
+      // `ansage` ist der Ruf im Moment der Zielansage — eigene Groesse und die Fokusfarbe,
+      // damit er sich von Schaden (--crit), Heilung (--ok) und Skill-Namen (--home)
+      // unterscheidet. Zusaetzlich mit dunklem Rand, weil er ueber einer Figur steht und
+      // nicht ueber leerem Boden.
+      if(f.ansage){
+        ctx.font="800 22px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+        ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(f.txt,f.x,f.y);
+        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+        continue;
+      }
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.font=(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
@@ -11363,6 +11554,143 @@
     if(zu)zu.addEventListener("click",()=>{ bahnWahl=null; renderKader(); });
   }
 
+  // ===================================================================================
+  // ZIELANSAGE — die Bedienseite (Kampf-Disziplinen: TDM, Mini-DM, Fechten, Battlefield).
+  //
+  // Bewusst dieselben zwei Auswahlwege wie beim Fokus-Doppeln: auf der Leinwand anklicken
+  // ist das, was man will, und die Kaderleiste ist der Weg, der auch dann trifft, wenn
+  // zehn Figuren durcheinanderlaufen. Beide fuehren durch EINE Funktion
+  // (ansageUmschalten), es gibt also einen Zustand und eine Regel.
+  //
+  // WARUM NICHT DIESELBEN FUNKTIONEN WIE #685, sondern eigene daneben: der Zustand ist ein
+  // anderer (KFOKUS/U statt fsLive/FSTEAM), das Kostenmodell ist ein anderes (Sperre je
+  // Ansage statt frei), und die Auswahlregel ist eine andere (der Ruf hat Reichweite).
+  // Eine gemeinsame Funktion muesste all das ueber Flags hereinreichen und waere fuer
+  // beide Seiten schwerer zu lesen als zwei kurze, ehrliche Fassungen. Was sich WIRKLICH
+  // teilen laesst, ist die Klick-Geometrie — die steht deshalb unten in leinwandTreffer()
+  // und wird von hier benutzt. Die Basketball-Fassung bleibt trotzdem unangetastet: sie
+  // ist frisch vermessen (s. #685), und ein Umbau haette diese Abnahme wieder aufgemacht.
+  const ansageMoeglich=()=>istKampf(disc)&&U.length>0;
+  // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
+  // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
+  // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
+  // (u.x/u.y), nicht die um Ausfallschritt/Ausweichen verschobene Zeichenposition — die
+  // Bodenposition ist die, die auch Schatten und Team-Ring markieren.
+  function leinwandTreffer(leinwand,ev,pool,radius){
+    const r=leinwand.getBoundingClientRect();
+    if(!r.width||!r.height)return null;
+    const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+    const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+    let treffer=null,minD=radius;
+    for(const g of pool){
+      const d=Math.hypot(g.x-mx,g.y-my);
+      if(d<minD){ minD=d; treffer=g; }
+    }
+    return treffer;
+  }
+  // Ein Klick auf den bereits Angesagten hebt die Ansage auf, ein Klick auf einen anderen
+  // ersetzt sie — ein Zustand, kein Stapel. AUFHEBEN IST FREI und loest keine Sperre aus:
+  // sonst waere die Sperre eine Falle ("einmal falsch geklickt, sieben Sekunden bestraft")
+  // statt der Kosten einer Entscheidung. Nur die Seite 1 (Gegner) ist waehlbar.
+  function ansageUmschalten(id){
+    if(!ansageMoeglich())return;
+    const z=U.find(x=>x.id===id&&x.side===1&&!x.down);
+    if(!z)return;
+    if(KFOKUS===id){
+      KFOKUS=null;
+      feed(0,"Zielansage aufgehoben.");
+      renderKader();
+      return;
+    }
+    if(KFOKUS_CD>0){
+      // Abgelehnt, aber nicht stumm: die Uhr in der Zeile zeigt die Restzeit ohnehin, hier
+      // kommt der Grund noch einmal AN DER STELLE, an die geklickt wurde. Nur waehrend der
+      // Kampf laeuft — steht er, verfallen Schwebetexte nicht und blieben stehen.
+      if(running)schwebe({x:z.x,y:z.y-58,txt:"noch "+Math.ceil(KFOKUS_CD)+" s",life:1.1,crit:true});
+      renderKader();
+      return;
+    }
+    KFOKUS=id; KFOKUS_CD=KF_CD;
+    // DER RUF. Derselbe Baustein wie "STEAL!"/"BLOCK!" im Basketball (schwebe), nur mit
+    // eigener Farbe und Groesse — der Moment des Markierens ist der einzige, in dem die
+    // Ansage ein Ereignis ist; danach ist sie ein Zustand (Ring, Linien, Zeile).
+    schwebe({x:z.x,y:z.y-58,txt:"FOKUSFEUER!",life:1.7,ansage:true});
+    feed(0,"Zielansage: alles auf "+z.n+"!",true);
+    renderKader();
+  }
+  // Die Zeile unter der Kaderleiste. Sagt in Worten, was Ring und Linien auf der Leinwand
+  // zeigen — und traegt die Sperruhr, weil der Preis der Ansage dort hingehoert, wo man
+  // die naechste ausloest.
+  // Die beiden Bedienelemente, die nur der Zielansage gehoeren, wieder wegraeumen. Wird
+  // auch aus dem Basketball-Zweig von renderKader gerufen (s. dort).
+  function ansageZeileVerstecken(){
+    const weg=document.getElementById("ansageweg"); if(weg)weg.hidden=true;
+    const uhr=document.getElementById("ansageuhr"); if(uhr)uhr.hidden=true;
+  }
+  function renderAnsageZeile(){
+    const zeile=document.getElementById("fokuszeile");
+    if(!zeile)return;
+    const wegBk=document.getElementById("fokusweg");
+    const weg=document.getElementById("ansageweg");
+    const uhr=document.getElementById("ansageuhr");
+    if(!ansageMoeglich()){
+      zeile.hidden=true;
+      ansageZeileVerstecken();
+      return;
+    }
+    zeile.hidden=false;
+    if(wegBk)wegBk.hidden=true; // gehoert dem Basketball-Fokus, hier nie sichtbar
+    const z=kfZiel();
+    const txt=document.getElementById("fokustext");
+    if(!txt)return;
+    // Aus Textknoten zusammengesetzt statt innerHTML: der Name kommt aus dem Spielstand
+    // und darf nie als Markup ankommen.
+    txt.textContent="";
+    if(z){
+      const folgen=U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length;
+      txt.appendChild(el("i","fmarke"));
+      txt.appendChild(document.createTextNode("Zielansage auf "));
+      txt.appendChild(el("b",null,z.n));
+      txt.appendChild(document.createTextNode(" — "+folgen+" von "+live(0).length+
+        " folgen dem Ruf. Wer sich dafür aus einem Nahkampf löst, kassiert den Trennschlag."));
+    } else {
+      txt.appendChild(document.createTextNode(KFOKUS_CD>0
+        ? "Keine Ansage. Die nächste ist in "+Math.ceil(KFOKUS_CD)+" s wieder möglich."
+        : "Keine Ansage. Gegner auf dem Feld oder in der Kaderleiste anklicken — die Eigenen nehmen ihn dann bevorzugt aufs Korn."));
+    }
+    if(weg)weg.hidden=!z;
+    if(uhr){
+      uhr.hidden=KFOKUS_CD<=0;
+      // --p ist der noch gesperrte Anteil in Prozent: der Ring schrumpft, waehrend die
+      // Sperre ablaeuft, und ist genau dann leer, wenn wieder angesagt werden darf.
+      uhr.style.setProperty("--p",String(Math.round(KFOKUS_CD/KF_CD*100)));
+      const zahl=document.getElementById("ansageuhrzahl");
+      if(zahl)zahl.textContent=String(Math.ceil(KFOKUS_CD));
+    }
+  }
+  function verdrahteZielansage(){
+    // 1) Kaderleiste, delegiert an den stabilen Container — und aus demselben Grund
+    //    mousedown statt click wie beim Fokus-Doppeln: renderKader baut die Kacheln je
+    //    Bild neu, ein click faende zwischen Druecken und Loslassen nur noch den Container.
+    const box=document.getElementById("kaderR");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-ansageid]"):null;
+      if(k){ ev.preventDefault(); ansageUmschalten(Number(k.dataset.ansageid)); }
+    });
+    // 2) Direkt auf der Leinwand.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!ansageMoeglich())return;
+      const treffer=leinwandTreffer(leinwand,ev,U.filter(u=>u.side===1&&!u.down),KF_GREIF);
+      if(treffer)ansageUmschalten(treffer.id);
+    });
+    const weg=document.getElementById("ansageweg");
+    if(weg)weg.addEventListener("click",()=>{
+      if(!ansageMoeglich()||KFOKUS==null)return;
+      KFOKUS=null; feed(0,"Zielansage aufgehoben."); renderKader();
+    });
+  }
+
   // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
   // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
   // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
@@ -11434,14 +11762,32 @@
         // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
         // spiegelverkehrt — hier ist die EIGENE Seite waehlbar, denn einem gegnerischen
         // Laeufer sagt man nichts an. Wer im Ziel oder ausgeschieden ist, faellt raus.
+        // Eigene Klasse .rennplan-ansage statt .ansage: der Kampf (Zielansage) vergibt
+        // .ansage schon fuer seine eigene Markierung, und beide Zustaende teilen sich
+        // dieselbe .kk-Basis ueber alle Disziplinen hinweg.
         if(rennplanMoeglich()&&seite===0&&u.id!=null&&u.fertig==null){
           k.dataset.planid=String(u.id);
           k.classList.add("waehlbar");
           const gewaehlt=bahnWahl===u.id;
-          if(gewaehlt)k.classList.add("ansage");
+          if(gewaehlt)k.classList.add("rennplan-ansage");
           const plan=((BA().plaene||{})[u.plan]||{}).label||"—";
           k.title=u.n+" — Rennplan "+plan+(gewaehlt?" (klicken schließt die Ansage)"
                                                    :" · anklicken, um ihn zu wechseln");
+        }
+        // ZIELANSAGE, dieselbe Rolle fuer die Kampf-Disziplinen: die Kacheln stehen still,
+        // waehrend die Figuren laufen. `u` ist hier die Einheit selbst (der Kampf-Zweig
+        // oben reicht U durch, nicht eine Kopie), `u.id` also die echte Einheiten-Id.
+        // Getrenntes data-Attribut und getrennte Klassen, damit sich die beiden Mechaniken
+        // niemals gegenseitig auslesen koennen.
+        else if(ansageMoeglich()&&seite===1&&u.id!=null&&!u.down){
+          k.dataset.ansageid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=KFOKUS===u.id;
+          if(gewaehlt)k.classList.add("ansage");
+          else if(KFOKUS_CD>0)k.classList.add("gesperrt");
+          k.title=u.n+(gewaehlt?" — angesagt (klicken hebt die Ansage auf)"
+                      :KFOKUS_CD>0?" — Ansage gesperrt, noch "+Math.ceil(KFOKUS_CD)+" s"
+                      :" — anklicken: die Eigenen nehmen ihn bevorzugt aufs Korn");
         }
         box.appendChild(k);
       }
@@ -11458,7 +11804,18 @@
       : istFeldspiel(disc)
       ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
-    renderFokusZeile();
+    // EINE Zeile unter der Kaderleiste, zwei Mechaniken: Fokus-Doppeln im Basketball,
+    // Zielansage im Kampf. Sie schliessen sich gegenseitig aus (eine Disziplin ist immer
+    // nur das eine), deshalb schreibt hier immer genau eine der beiden Fassungen — und die
+    // andere raeumt vorher ihre eigenen Bedienelemente weg. Ohne das bliebe nach einem
+    // Wechsel von TDM zu Basketball der Knopf "Ansage aufheben" stehen: renderFokusZeile
+    // kennt ihn nicht und wuerde ihn nie ausblenden.
+    if(istKampf(disc))renderAnsageZeile();
+    else { ansageZeileVerstecken(); renderFokusZeile(); }
+    // Die Rennplan-Zeile ist eine EIGENE Zeile (#rennplanzeile), keine dritte Fassung der
+    // obigen — sie teilt sich kein DOM-Element mit Fokuszeile/Ansagezeile und braucht daher
+    // keine Absprache mit ihnen. renderRennplanZeile() blendet sich selbst aus, wenn die
+    // Disziplin keine Bahn ist (s. rennplanMoeglich), ein unbedingter Aufruf ist also sicher.
     renderRennplanZeile();
   }
 
@@ -11551,6 +11908,7 @@
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
   verdrahteRennplanAnsage();
+  verdrahteZielansage();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
@@ -11651,6 +12009,67 @@
   }
 
   const serie=(n,zwang)=>serieVon("tdm",n,zwang);
+
+  // ZIELANSAGE, ABNAHME. Dasselbe Muster wie spieleBasketball(saat,fokusName) beim
+  // Fokus-Doppeln: EIN Kampf headless durchgespielt, wahlweise mit einer vor dem ersten
+  // Tick gesetzten Ansage — dieselbe eine Zustandsvariable, die auch der Klick setzt, nur
+  // ohne Bedienung. Ohne `ansageName` bleibt KFOKUS null, und der Durchlauf ist Tick fuer
+  // Tick der von vorher; genau das ist die Determinismus-Kontrolle.
+  //
+  // Gemessen wird in ZIELFRAMES: fuer jeden Tick und jeden lebenden eigenen Kaempfer, auf
+  // wen er in diesem Moment zielt. Das ist die Groesse, die auch das Auge sieht (eine
+  // Ziellinie je Kaempfer je Bild) — nicht Schaden, der noch von Wuerfen und Ruestung
+  // abhaengt. Dazu je Gegner, wie viele Eigene GLEICHZEITIG auf ihm standen (Mittel und
+  // Hoechstwert): das ist buchstaeblich die Zahl der zusammenlaufenden Linien und damit
+  // das Abnahmekriterium fuer "man sieht das Fokusfeuer". Und eine Signatur des ganzen
+  // Verlaufs, damit sich Bit-Gleichheit ohne Ansage nachweisen laesst statt behaupten.
+  function zielansageLauf(saat,ansageName,d){
+    const alt={disc,U,pfeile,t,done,seed,freigabe};
+    if(d)disc=d;
+    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    build(saat||1337);
+    if(ansageName){
+      const z=U.find(x=>x.side===1&&x.n===ansageName);
+      if(z){ KFOKUS=z.id; KFOKUS_CD=KF_CD; }
+    }
+    const zielFrames=new Map();      // Name -> Summe der Zielframes
+    const gleichzeitig=new Map();    // Name -> {summe, lebtFrames, max}
+    let frames=0, g=0;
+    // Eine billige, aber scharfe Signatur des Verlaufs: gerundete Positionen und Leben
+    // aller Kaempfer, alle 30 Ticks. Zwei Laeufe mit derselben Signatur sind derselbe Kampf.
+    const signatur=[];
+    while(!done&&g<120){
+      stepSimStumm(1/60); g+=1/60; frames++;
+      const jetzt=new Map();
+      for(const u of U){
+        if(u.down||u.side!==0||!u.tgt)continue;
+        zielFrames.set(u.tgt.n,(zielFrames.get(u.tgt.n)||0)+1);
+        jetzt.set(u.tgt.n,(jetzt.get(u.tgt.n)||0)+1);
+      }
+      for(const f of U){
+        if(f.side!==1||f.down)continue;
+        const a=gleichzeitig.get(f.n)||(gleichzeitig.set(f.n,{summe:0,lebtFrames:0,max:0}),gleichzeitig.get(f.n));
+        const n=jetzt.get(f.n)||0;
+        a.summe+=n; a.lebtFrames++; if(n>a.max)a.max=n;
+      }
+      if(frames%30===0)signatur.push(U.map(u=>
+        Math.round(u.x)+","+Math.round(u.y)+","+Math.round(u.hp)).join("|"));
+    }
+    const gezielt=[...zielFrames.entries()].sort((a,b)=>b[1]-a[1]);
+    const gesamt=gezielt.reduce((a,[,v])=>a+v,0)||1;
+    const erg={saat:saat||1337, disziplin:disc, ansage:ansageName||null,
+      dauer:+t.toFixed(2), frames,
+      lebendLinks:live(0).length, lebendRechts:live(1).length,
+      zielAnteil:Object.fromEntries(gezielt.map(([n,v])=>[n,Math.round(v/gesamt*100)])),
+      zielFrames:Object.fromEntries(gezielt),
+      // Angreifer je Gegner, solange er lebte: Mittel und Hoechstwert.
+      angreifer:Object.fromEntries([...gleichzeitig.entries()].map(([n,a])=>
+        [n,{mittel:+(a.summe/Math.max(1,a.lebtFrames)).toFixed(2),max:a.max}])),
+      signatur:signatur.join(";")};
+    disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    return erg;
+  }
 
   // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
   // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
@@ -11930,6 +12349,12 @@
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    zielansageLauf,
+    // Zielansage, read-only: WER gerade angesagt ist und wie lange noch gesperrt ist
+    // (Name statt roher id, damit sich ein Klick in der UI von aussen abnehmen laesst).
+    kampfAnsage:()=>{ const z=kfZiel();
+      return {ziel:z?{id:z.id,n:z.n,seite:z.side}:null, sperre:+KFOKUS_CD.toFixed(2),
+        folgen:z?U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length:0}; },
     namenVon:(dId)=>{const M=MOTOREN[dId]; if(!M)return []; const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337); const namen=M.namen(); M.zurueck(g); return namen;},
     // AUFGABE-1-ABNAHME: reine Diagnose (kein Gameplay-Zugriff) — die Sub-Skill-Werte
     // (u.AUFBAU/SCHUSS_NAH/SCHUSS_FERN/...) einer frisch gebauten Feldspiel-Aufstellung,
