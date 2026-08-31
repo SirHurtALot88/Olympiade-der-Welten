@@ -766,11 +766,27 @@ export default function LegacyResolveLabClient({
                       <div className="stack">
                         <h3>
                           {side.label} · {side.preview?.disciplineId ?? "—"}
+                          {side.preview?.resolutionSource === "arena" ? (
+                            <span
+                              className="battle-mode-arena-result-badge"
+                              title={`Arena-Match-Seed: ${side.preview.arenaMatchSeed ?? "—"}`}
+                              data-testid="battle-mode-arena-result-badge"
+                              data-arena-match-seed={side.preview.arenaMatchSeed ?? ""}
+                            >
+                              {" "}
+                              🏟️ Arena-Ergebnis
+                            </span>
+                          ) : null}
                         </h3>
                         <p className="muted">
                           Status {getResolveStatusLabel(side.preview?.status ?? "blocked")} · Rang {side.preview?.rank ?? "—"} · Spieler{" "}
                           {side.entries.length}/{side.preview?.entries.length ?? 0}
                         </p>
+                        {side.preview?.resolutionSource === "arena" ? (
+                          <p className="muted" data-testid="battle-mode-arena-match-seed-line">
+                            Arena-Match-Seed: {side.preview.arenaMatchSeed ?? "—"}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="legacy-resolve-side-kpis">

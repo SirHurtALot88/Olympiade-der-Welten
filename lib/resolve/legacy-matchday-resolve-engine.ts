@@ -16,7 +16,9 @@ import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/resolve/battle-mode-arena-team-points";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   DisciplineHighlightCandidate,
@@ -328,8 +330,18 @@ export function buildLegacyMatchdayResolvePreview(
   const resolveOptions: LegacyResolvePreviewOptions = {
     modifierMode: options?.modifierMode ?? "legacy_selected_traits",
     captainMode: options?.captainMode ?? "selected_captain",
+    arenaTeamPointsByTeamId: options?.arenaTeamPointsByTeamId ?? null,
   };
   const base = contexts[0];
+  /**
+   * SICHERHEITSRAHMEN Battle Mode PR7: die uebergebene Arena-Punkte-Map wird NUR angewendet, wenn
+   * (a) der Save Battle Mode ist UND (b) es sich um die Basketball-Disziplin handelt. Jede andere
+   * Kombination (Manager Mode, jede andere Disziplin, auch in einem Battle-Mode-Save) ignoriert
+   * `resolveOptions.arenaTeamPointsByTeamId` vollstaendig, selbst wenn sie gesetzt ist — keine
+   * Verhaltensaenderung dort. Ohne `gameState` (aeltere/Test-Contexts ohne dieses Feld) bleibt es
+   * defensiv beim bisherigen PPS-Pfad.
+   */
+  const isBattleModeArenaEligible = Boolean(base.gameState && isBattleModeSave(base.gameState));
   const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
     saveId: base.saveId,
     seasonId: base.seasonId,
@@ -695,21 +707,35 @@ export function buildLegacyMatchdayResolvePreview(
         })),
       }));
     const { results: teamResultsAfterPowers, factorByTeamId: teamPowerDebuffFactorByTeamId } = applyTeamPowerDebuffs(rawTeamResults);
+    // Battle Mode PR7 (Plan Abschnitt 3.3c/5.1): NUR fuer Battle-Mode-Basketball ersetzt ein
+    // Arena-Ergebnis (Sieg=2/Unentschieden=1/Niederlage=0, s. battle-mode-arena-team-points.ts)
+    // die PPS-Rang-Formel — jede andere Disziplin/jeder andere Modus bleibt exakt beim Bisherigen.
+    const arenaOverridesForThisDiscipline =
+      isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
+        ? resolveOptions.arenaTeamPointsByTeamId ?? null
+        : null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
       (result) => result.teamId,
       base.gameState,
-    ).map<DisciplineTeamResolvePreview>(({ item, rank }) => ({
-      ...item,
-      rank,
-      teamPoints: getRankToPointsValue(
-        bucket.find((entry) => entry.context.team.id === item.teamId && entry.side === item.disciplineSide)?.score.requiredPlayers ??
-          item.entries.length,
+    ).map<DisciplineTeamResolvePreview>(({ item, rank }) => {
+      const arenaOverride = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      return {
+        ...item,
         rank,
-      ),
-      pointSource: "rank_to_points_final_score_share",
-    }));
+        teamPoints: arenaOverride
+          ? arenaOverride.teamPoints
+          : getRankToPointsValue(
+              bucket.find((entry) => entry.context.team.id === item.teamId && entry.side === item.disciplineSide)?.score
+                .requiredPlayers ?? item.entries.length,
+              rank,
+            ),
+        pointSource: arenaOverride ? "battle_mode_arena_win_draw_loss" : "rank_to_points_final_score_share",
+        resolutionSource: arenaOverride ? "arena" : "pps",
+        arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
+      };
+    });
 
     const rawPlayerEntries = bucket.flatMap(({ context, score, side }) => {
       // Propagate the team-power debuff (applied to the team score in
@@ -737,8 +763,14 @@ export function buildLegacyMatchdayResolvePreview(
       });
 
       if (rankedTeam) {
-        rankedTeam.pointSource = distributedPoints.pointSource;
-        rankedTeam.teamPoints = distributedPoints.teamPoints;
+        // Battle Mode PR7: fuer ein Arena-Ergebnis bleibt `teamPoints`/`pointSource` beim 2/1/0-Wert
+        // von oben — `distributeRankPointsToPlayers()` liefert hier trotzdem noch die individuellen
+        // `pointsAwarded` je Spieler (Abschnitt 5.1: individuelle PPs bleiben bewusst auf dem
+        // bisherigen, PPS-rang-basierten Pfad), nur der TEAM-Wert darf nicht ueberschrieben werden.
+        if (rankedTeam.resolutionSource !== "arena") {
+          rankedTeam.pointSource = distributedPoints.pointSource;
+          rankedTeam.teamPoints = distributedPoints.teamPoints;
+        }
         rankedTeam.warnings = Array.from(new Set([...rankedTeam.warnings, ...distributedPoints.warnings]));
         // PP nach playerId zuordnen, NICHT nach Index: distributedPoints.entries
         // folgt der score-absteigenden `rankedWithinTeam`-Reihenfolge, während

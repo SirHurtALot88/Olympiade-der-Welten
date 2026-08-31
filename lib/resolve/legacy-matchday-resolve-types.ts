@@ -104,6 +104,21 @@ export type DisciplineTeamResolvePreview = {
   rank: number;
   teamPoints: number | null;
   pointSource: string;
+  /**
+   * Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.4): woher `teamPoints`
+   * stammt — `"pps"` (Standard, jede Manager-Mode-Disziplin und jede Nicht-Basketball-Disziplin in
+   * Battle Mode) oder `"arena"` (Battle-Mode-Basketball, `teamPoints` kommt aus einem echten
+   * Arena-Duell, s. lib/resolve/battle-mode-arena-team-points.ts). Fehlt das Feld (aeltere
+   * Preview-Objekte), gilt der Default `"pps"` — kein Verhalten aendert sich dadurch.
+   */
+  resolutionSource?: "pps" | "arena";
+  /**
+   * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
+   * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau
+   * dieses Arena-Duell reproduzieren liesse. Die "Versionierung", die Chris fuer PR7 wollte — keine
+   * Replay-Funktion, nur eine sichtbare, nachvollziehbare Kennung je Ergebnis.
+   */
+  arenaMatchSeed?: string | null;
   warnings: string[];
   missingLineup: boolean;
   missingPlayers: number;
