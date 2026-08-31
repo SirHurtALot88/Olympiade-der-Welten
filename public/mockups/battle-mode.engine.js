@@ -12470,6 +12470,37 @@
       M.zurueck(g);
       return out;
     },
+    // BATTLE-MODE PR5 — „EIN SPIEL, EIN ERGEBNIS" (Plan, Abschnitt 3.3a). Bisher gab es fuer
+    // Feldspiel-Disziplinen keinen sauberen einzelnen Aufruf, der einmal simuliert und ein
+    // Endergebnis zurueckgibt — nur Diagnose-Werkzeuge (diagPositionen, feldspielSubskills)
+    // und die Serien-Messung (boxscoreSerie). Additiv, gleiches Sichern/Zurueck-Muster wie
+    // namenVon()/feldspielSubskills() direkt darueber: MOTOREN[fd] snapshotten, mit dem
+    // uebergebenen Seed neu aufbauen, still simulieren (M.lauf() = MOTORENs eigenes stilles
+    // stepFeldspiel()-Budget, kein Rendering), Boxscore lesen, Zustand zurueckspielen.
+    //
+    // PUNKTESTAND JE SEITE: der Boxscore-Wert (M.wert(), „Punkte zaehlen voll, Rebounds/
+    // Steals/Blocks etwas weniger, Ballverlust zieht ab") ist eine abgeleitete Kennzahl je
+    // SPIELER, kein Punktestand je TEAM-SEITE. Den Punktestand traegt bereits eine eigene,
+    // bisher nicht nach aussen gegebene Variable: `fsPunkte` (oben deklariert, Z. ~3426;
+    // stepFeldspiel() zaehlt dort bei jedem Korb fuer die jeweilige `side` mit, s. z.B.
+    // `fsPunkte[amBall]+=pkt` / `fsPunkte[schuetze.side]+=1`). Sie wird von M.sichern()/
+    // M.zurueck() schon mitgefuehrt (Snapshot-Sicherheit gegen Verschmutzung), aber von
+    // keinem MOTOREN[fd].wert() bisher gelesen. Hier wird sie nur GELESEN und in ein neues
+    // Feld `seiten` kopiert — dieselbe Zaehlung, kein Eingriff in stepFeldspiel()/die
+    // Trefferchancen-Zonen selbst.
+    spieleFeldspiel:(fd,saat)=>{
+      if(typeof FELDSPIEL_ART==="undefined"||!FELDSPIEL_ART[fd])return null;
+      const M=MOTOREN[fd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const seiten=[fsPunkte[0],fsPunkte[1]];
+      M.zurueck(g);
+      return {disziplin:fd, seiten, boxscore};
+    },
     renderProbe:(name,ani,feldspiel,dir,lunge)=>{
       const c=document.createElement("canvas"); c.width=64; c.height=64;
       const ctx=c.getContext("2d");
