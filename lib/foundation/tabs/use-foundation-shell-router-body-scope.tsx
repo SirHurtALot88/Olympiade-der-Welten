@@ -10056,6 +10056,52 @@ export function useFoundationShellRouterBodyScope({
     };
   }, [activeSaveId, foundationSaveMode, leagueSetupStatus, loadSave, readMeta.source, setGameState]);
 
+  // Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.4): derselbe
+  // Hintergrundlauf-/Polling-Vertrag wie der Liga-Draft direkt oberhalb, nur fuer
+  // `seasonState.arenaMatchdayResolveStatus` (Basketball-Arena-Duelle eines Battle-Mode-
+  // Spieltags, ~6-16+ Sekunden Playwright-Chromium-Laufzeit). Absichtlich EIN eigener Poller statt
+  // den obigen umzubauen — beide Felder koennen unabhaengig voneinander "in_progress" sein, und der
+  // Liga-Draft-Poller uebernimmt bei "fertig" den KOMPLETTEN Spielstand (s. Kommentar oben), was
+  // fuer den Arena-Fall zu frueh waere, solange der Arena-Lauf noch laeuft.
+  const arenaMatchdayResolveStatus = gameState.seasonState.arenaMatchdayResolveStatus ?? null;
+  useEffect(() => {
+    if (
+      readMeta.source !== "sqlite" ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      arenaMatchdayResolveStatus !== "in_progress"
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const pollArenaMatchdayResolveStatus = async () => {
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (cancelled || !nextGameState) return;
+      const nextStatus = nextGameState.seasonState.arenaMatchdayResolveStatus;
+      if (nextStatus === "in_progress") {
+        setGameState((current) =>
+          current.seasonState.arenaMatchdayResolveStatus === nextStatus
+            ? current
+            : { ...current, seasonState: { ...current.seasonState, arenaMatchdayResolveStatus: nextStatus } },
+        );
+        return;
+      }
+      // Fertig ("ready"/"failed"): jetzt wirklich den kompletten, gerade gebuchten Spieltag
+      // uebernehmen (Standings, Player-Progression, ...), nicht nur das Statusfeld.
+      setGameState(nextGameState);
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollArenaMatchdayResolveStatus();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSaveId, arenaMatchdayResolveStatus, foundationSaveMode, loadSave, readMeta.source, setGameState]);
+
   // CHUNKED league-setup completion. The server's fresh-S1 whole-league draft is a single long (~40s)
   // detached task; a server-side time limit on long background tasks can cut it short, so the league is
   // flagged "ready" while many teams are still empty (the "Draft nach ~11 Teams abgebrochen" symptom).
@@ -12743,6 +12789,7 @@ export function useFoundationShellRouterBodyScope({
     isViewingArchivedSeason,
     leaguePlayerHeatPools,
     leagueSetupStatus,
+    arenaMatchdayResolveStatus,
     leagueSetupRetryBusy,
     leagueSetupRetryError,
     retryLeagueSetup,
