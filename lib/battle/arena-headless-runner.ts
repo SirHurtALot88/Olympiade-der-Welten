@@ -134,7 +134,16 @@ type VorbereitetesFixture = {
 
 function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
   const kandidat = executablePathOverride ?? STANDARD_CHROMIUM_EXECUTABLE_PATH;
-  return existsSync(kandidat) ? { headless: true, executablePath: kandidat } : { headless: true };
+  if (existsSync(kandidat)) {
+    return { headless: true, executablePath: kandidat };
+  }
+  // Ohne festen Pfad (z.B. auf dem CI-Runner) loest Playwright den Standard-"chromium"-
+  // Browsertyp im Headless-Betrieb seit v1.49 auf die separat installierte "Chromium Headless
+  // Shell" auf, nicht auf das normale Chromium-Binary. Der CI-Workflow installiert per
+  // `npx playwright install chromium` aber nur Letzteres -- ohne `channel: "chromium"` bricht
+  // der Launch hier mit "Executable doesn't exist at .../chromium_headless_shell-.../..." ab,
+  // obwohl Chromium selbst vorhanden ist. `channel: "chromium"` erzwingt das normale Binary.
+  return { headless: true, channel: "chromium" as const };
 }
 
 /**
