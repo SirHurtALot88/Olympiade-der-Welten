@@ -1,4 +1,7 @@
 import { execSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -20,10 +23,28 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
  * Laeuft gegen echten Chromium (wie scripts/miss-arena-spielefeldspiel.mjs), deshalb ein
  * grosszuegigeres Timeout als der Vitest-Standard (Browser-Start + Sprite-Decodierung je
  * Fixture-Batch).
+ *
+ * `full-test-suite` in der CI faehrt `npm test` bewusst OHNE Chromium (siehe Kommentar dort:
+ * "die Suite ist reines Node") — dieser eine Test braucht als einziger in der ganzen Suite
+ * einen echten Browser und wuerde dort mit "Executable doesn't exist" abbrechen. Deshalb
+ * `describe.skipIf`: laeuft lokal/im Sandbox-Container (fester Pfad vorhanden) und ueberall
+ * sonst, wo `playwright install chromium` schon lief, aber nicht in `full-test-suite`.
  */
 
 const CHROMIUM_PFAD = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const LAUF_TIMEOUT_MS = 90_000;
+
+function chromiumVerfuegbar(): boolean {
+  if (existsSync(CHROMIUM_PFAD)) return true;
+  const cache = join(homedir(), ".cache", "ms-playwright");
+  try {
+    return readdirSync(cache).some((eintrag) => eintrag.startsWith("chromium"));
+  } catch {
+    return false;
+  }
+}
+
+const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 
 function zaehleChromiumKindprozesse(): number {
   try {
@@ -121,7 +142,7 @@ function pruefeErgebnisForm(ergebnis: ArenaFixtureResult, homeTeamId: string, aw
   expect(ergebnis.boxscore.length).toBeGreaterThan(0);
 }
 
-describe("runArenaFixtures", () => {
+describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
   it(
     "liefert bei gleichem Seed ein bitgenau identisches Ergebnis",
     async () => {
