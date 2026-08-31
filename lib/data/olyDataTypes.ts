@@ -3308,6 +3308,15 @@ export type SeasonState = {
    * instead of pretending the fill fully succeeded, so an under-filled team is never silently shipped.
    */
   leagueSetupWarnings?: LeagueSetupTeamWarning[];
+  /**
+   * Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.4/5.1): der
+   * Basketball-Anteil eines Spieltags-Apply in einem Battle-Mode-Save laeuft ueber echte
+   * Arena-Duelle (Playwright-Chromium, ~6-16s je Liga) — derselbe Hintergrundlauf-/Polling-Vertrag
+   * wie `leagueSetupStatus` oben, nur fuer `lib/season/arena-matchday-resolve-service.ts`.
+   * "in_progress" waehrend des Laufs, "ready"/"failed" danach, absent = kein Arena-Lauf anhaengig
+   * (Manager Mode, Nicht-Basketball-Spieltag, oder noch nie ausgeloest).
+   */
+  arenaMatchdayResolveStatus?: "in_progress" | "ready" | "failed";
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;

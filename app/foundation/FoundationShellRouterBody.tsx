@@ -422,6 +422,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   isViewingArchivedSeason,
   leaguePlayerHeatPools,
   leagueSetupStatus,
+  arenaMatchdayResolveStatus,
   leagueSetupRetryBusy,
   leagueSetupRetryError,
   retryLeagueSetup,
@@ -899,6 +900,31 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           >
             {leagueSetupRetryBusy ? "Wird erneut versucht …" : "Erneut versuchen"}
           </button>
+        </div>
+      ) : null}
+      {arenaMatchdayResolveStatus === "in_progress" ? (
+        <div
+          className="foundation-persistence-banner transfer-callout is-info"
+          role="status"
+          aria-live="polite"
+          data-testid="foundation-arena-matchday-resolve-banner"
+          data-arena-matchday-resolve-status="in_progress"
+        >
+          <strong>Arena-Spieltag wird simuliert …</strong>
+          <span>
+            Die Basketball-Duelle dieses Spieltags laufen gerade in der Arena. Das dauert ein paar
+            Sekunden bis unter einer Minute — wir aktualisieren automatisch, sobald das Ergebnis steht.
+          </span>
+        </div>
+      ) : arenaMatchdayResolveStatus === "failed" ? (
+        <div
+          className="foundation-persistence-banner transfer-callout is-warning"
+          role="alert"
+          data-testid="foundation-arena-matchday-resolve-banner"
+          data-arena-matchday-resolve-status="failed"
+        >
+          <strong>Arena-Spieltag fehlgeschlagen</strong>
+          <span>Die Basketball-Arena-Duelle konnten nicht simuliert werden. Bitte den Spieltag erneut simulieren.</span>
         </div>
       ) : null}
       <FoundationShell

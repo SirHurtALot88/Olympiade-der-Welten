@@ -532,4 +532,13 @@ export type LegacyLineupValidationOptions = {
 export type LegacyResolvePreviewOptions = {
   modifierMode?: LegacyResolveMutatorMode;
   captainMode?: "selected_captain" | "legacy_strongest_selected" | "missing_source";
+  /**
+   * Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.3c/5.1): fertig
+   * gerechnete Arena-Team-Punkte (2/1/0, s. lib/resolve/battle-mode-arena-team-points.ts), keyed
+   * nach Team-ID. `buildLegacyMatchdayResolvePreview` wendet einen Eintrag NUR an, wenn
+   * `isBattleModeSave(gameState) && disciplineId === "basketball"` — jede andere Kombination
+   * (Manager Mode, jede andere Disziplin) ignoriert diese Map vollstaendig, auch wenn sie gesetzt
+   * ist. `undefined`/leer aendert nichts am bisherigen PPS-Pfad.
+   */
+  arenaTeamPointsByTeamId?: ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }> | null;
 };
