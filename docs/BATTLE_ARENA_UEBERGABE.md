@@ -1,7 +1,9 @@
 # Battle Arena — Übergabe an die nächste Sitzung
 
-Stand: 23.08.2026, Branch `claude/ui-ux-upgrades-dat4ys`, PR
-[#651](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/651).
+Stand: 31.08.2026, Branch `claude/battle-arena-handoff-update-894yxz`. Ursprünglich
+23.08.2026 angelegt (PR [#651](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/651)),
+seither laufend fortgeschrieben — neuester Abschnitt ganz unten vor „Verlässliche
+Einstiegspunkte": **Update 31.08.2026: Battle-Mode-Produktivierung**.
 
 Diese Datei existiert aus einem Grund: **der Netzzugang öffnet sich erst in einer neuen
 Sitzung.** Chris hat die Netzwerk-Policy der Umgebung auf alle Domains gestellt, aber ein
@@ -1314,6 +1316,95 @@ Faktoren (Ist-Dauer ÷ 60, siehe `ZEIT_DEHNUNG` in `battle-mode.html`):
 
 Fehlt eine Disziplin in der Liste (Bühne, Feldspiel), bleibt sie automatisch unangetastet
 — `ZEIT_DEHNUNG[disc]||1` fällt auf Faktor 1 zurück.
+
+---
+
+## Update 31.08.2026: Battle-Mode-Produktivierung
+
+Seit der letzten Fortschreibung dieser Übergabe (#694, Kampf-Arena-Maßstab) ist eine
+andere Baustelle angelaufen: `docs/design/battle-mode-spielmodus-plan.md` ist der
+Fahrplan, aus dem reinen Mockup (diese Datei, `battle-mode.html`, liest/schreibt keinen
+Spielstand) einen echten **zweiten Spielmodus** zu machen, in dem Arena-Kämpfe echte
+Liga-Ergebnisse bestimmen. Neun PRs, additiv, jeder für sich hält `main` deploybar.
+
+**Stand:** PR 1–4 (Bugfix, `gameMode`-Datenmodell, Verdrahtung, Moduswahl-UI) waren schon
+vor dieser Sitzung auf `main`. Diese Sitzung hat PR 5 und PR 6 gemergt:
+
+- **PR 5** (#695): `window.__arena.spieleFeldspiel(fd, saat)` — der fehlende Engine-Hook,
+  der einen Feldspiel-Kampf einmal simuliert (kein Rendering) und `{disziplin, seiten,
+  boxscore}` zurückgibt. `seiten` ist der Punktestand je Team-Seite, aus der bisher nicht
+  nach außen gegebenen `fsPunkte`-Variable gelesen — dieselbe Zählung, die `stepFeldspiel()`
+  längst führt, kein neuer Zähler.
+- **PR 6** (#697): `lib/battle/arena-headless-runner.ts` — macht `spieleFeldspiel()`
+  serverseitig aufrufbar, über echten Chromium via Playwright (die Engine ist untrennbar
+  an DOM/Canvas gekoppelt). Führt die Roster-Zuführung über den bestehenden,
+  **unveränderten** `arena-kader-adapter.ts` aus, batcht mehrere Fixtures in einem
+  `page.evaluate()`, schließt den Browser danach hart in `finally`.
+
+**Architekturentscheidung PR 6, bewusst offen kommuniziert:** der ursprüngliche Plan
+(Abschnitt 3.4) schlug einen dauerhaft warmgehaltenen Browser-Singleton vor. Chris tendierte
+selbst dazu, wollte aber eine zweite Meinung — Fables Gegen-Empfehlung (Abschnitt 5.4) für
+**on-demand** (Browser pro Aufruf starten, danach hart schließen) ist umgesetzt: der
+Matchday-Resolve läuft ohnehin im Hintergrund, niemand wartet live davor, und ein dauerhaft
+idler Chromium kostet 200–400 MB RAM rund um die Uhr auf einem Server, der schon App +
+SQLite + Crons trägt, ohne eigene Health-Checks stabil zu bleiben. **Das ist eine
+Empfehlung, keine von Chris final abgenommene Entscheidung** — der Umstieg auf „dauerhaft
+warm" wäre später eine reine Lifecycle-Änderung, kein struktureller Umbau.
+
+**Ein echter Bug, beim Bau von PR 6 gefunden, in PR 5 verursacht:** `spieleFeldspiel()`s
+Seed geht direkt in eine lineare Kongruenzformel, die eine Zahl braucht. Ein Text-Seed —
+genau das Format, das der Plan selbst für die Produktivierung vorschlägt,
+`${saveId}:${seasonId}:${matchdayId}:arena:...` — kollabiert über `NaN>>>0` zu einer
+festen `0`. Jeder Text-Seed hätte also dasselbe Ergebnis geliefert, unbemerkt, weil PR 5s
+eigene Determinismus-Tests nur mit numerischen Seeds (424242, 99) liefen. PR 6 umgeht das
+am Aufrufer mit einem deterministischen FNV-1a-Hash (String → uint32), **der eigentliche
+Bug sitzt aber weiterhin in `battle-mode.engine.js` selbst** und wartet auf einen Fix an
+der Quelle, falls je ein anderer Aufrufer direkt einen Text-Seed an `spieleFeldspiel()`
+durchreicht, ohne über den Runner zu gehen.
+
+**Als Nächstes: PR 7**, auf Chris' ausdrücklichen Wunsch mit zwei Abweichungen vom
+ursprünglichen Plan — der sah PR 7 als reinen Hintergrund-Adapter vor, „hinter
+Feature-Flag, noch nicht am Spieltag-simulieren-Knopf" (das kam laut Plan erst mit PR 8).
+Stattdessen: ein echter „Spieltag simulieren"-Klick soll in einem Battle-Mode-Save mit
+Basketball sofort durch die Arena laufen, und jedes daraus entstandene Ergebnis soll
+sichtbar als „Arena-Ergebnis" markiert sein, mit dem Seed als nachvollziehbarer Kennung
+je Ergebnis — die vom Plan selbst vorgesehenen Felder `resolutionSource: "arena"` und
+`arenaMatchSeed` (Abschnitt 2.4) müssen dafür in der UI ankommen, nicht nur in den Daten
+stehen.
+
+### Zwei Bugfixes aus derselben Sitzung, unabhängig vom Battle-Mode-Plan
+
+**Endscreen-Tooltips ERL/IMP** (#696): Chris meldete am 25.08., die Tooltips im Endscreen
+für „Schaden Erlitten" und „Impact" zeigten nichts. Ein früherer Lauf (PR #675) fand „kein
+Bug im Quelltext" — reine Quelltext-Lektüre, keine Laufzeit-Reproduktion. Diesmal im
+Browser nachgestellt: Daten und Verdrahtung waren korrekt, aber `tipBox` hing per
+`document.body.appendChild()` an `document.body`, während sämtliches CSS unter
+`.oly-battle-arena .tipbox` steht — ein Kind von `document.body` ist dort nie ein
+Nachfahre von `.oly-battle-arena`, also nie sichtbar gestylt. **Dieselbe Fehlerfamilie wie
+der `FARBWURZEL`-Fix vom 30.08.** (Canvas-Farben lasen von `document.body` statt vom
+echten Arena-Root). Fix: `tipBox` hängt jetzt an `document.querySelector(".oly-battle-arena")
+||document.body`. Dabei zusätzlich gefunden und mitbehoben: `battle-mode.html` fehlte
+`<meta charset="utf-8">`, was zu echter Zeichen-Korruption der deutschen Tooltip-Texte
+(Umlaute, ×, −) führte, wenn die Seite ohne expliziten Charset-Header geöffnet wird.
+
+**Kaderleisten-Profile in Kampf/Bahn**: Chris' Meldung vom 25.08. (Sprite-Portraits fehlen
+in der Einsatzliste außerhalb Basketball) war bereits gelöst, **fünf Tage bevor er sie
+meldete** — als Nebeneffekt von #686. `renderKader()` ist eine einzige gemeinsame Funktion
+für alle vier Chassis, der `kaderFigur(u.n)`-Aufruf steht dort unbedingt, ohne
+Basketball-Sonderfall. Verifiziert per Playwright-Screenshot (Fechten 12, Spurt 8,
+Basketball 12 Sprite-Portraits, identisches Layout). Kein Code geändert.
+
+### Mini-DM mit dem korrigierten Maßstab aus #694 nachgemessen
+
+`node scripts/messe-arena-einfluss.mjs mini-dm 12` (Achtung: Bindestrich, nicht
+Unterstrich) gegen den aktuellen `main`-Stand: **28,8 Pp**. Über dem 15-Pp-Ziel, aber klar
+besser als TDM. Die sechs gewichteten Attribute (stamina, dexterity, torment, health,
+power, will) lesen alle einen Anteil, Intelligence/Awareness/Determination/Speed/
+Charisma/Spirit korrekt bei 0 % — passend zur Mini-DM-Matrix, die keins davon gewichtet.
+TDM, Fechten und Battlefield selbst sind seit #694 nicht erneut mit `einflussVon()`
+nachgemessen (#694 hat nur den Maßstab repariert, nicht neu durchgemessen) — offener
+nächster Schritt, falls jemand vor PR 8 (dem eigentlichen Go-Live für Basketball) auch die
+übrigen Kampf-Disziplinen production-ready sehen will.
 
 ---
 
