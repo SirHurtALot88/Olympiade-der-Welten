@@ -365,19 +365,16 @@ Formel-Form plausibel skaliert.
 Diese Fragen sind ausdrücklich **echte Design-Entscheidungen**, die nicht aus bestehenden Fakten
 folgen — anders als der Rest dieses Dokuments, das sich auf Nachgemessenes/Nachgelesenes stützt.
 
-1. **`DISCIPLINE_MAX` — der einzige verbleibende Zahlenwert.** Zwei nachgemessene Anker aus
-   Abschnitt 1.2: der Rang-1-Durchschnitt (≈3,3, playerCount-unabhängig) und das Doppelte davon
-   (≈6,6, entspricht zufällig dem Rang-1-Gesamtwert der 2-Spieler-Tabellenreihe). Soll `DISCIPLINE_MAX`
-   fix sein (eine Zahl, unabhängig von `playerCount`), oder — konsistent mit der Beobachtung aus
-   1.2, dass die bestehende Tabelle bereits playerCount-proportional ist — selbst leicht mit dem
-   an diesem Spieltag gewürfelten `playerCount` skalieren?
-2. **Gemeinsamer Referenz-Pool über beide Ligen, oder getrennt je Liga?** Abschnitt 4.3 empfiehlt
-   „gemeinsam" (mehr Stichprobe, individuelle Bewertung ist kein Tabellen-Wettbewerb), aber das
-   bedeutet: dieselbe Impact-Leistung kann in Liga A und Liga B **unterschiedlich** viele PPs
-   bringen, je nachdem, wie stark die jeweils andere Liga an diesem Spieltag performt hat — ist das
-   gewünscht, oder soll PPs strikt ligen-intern bewertet werden (konsistent mit dem
-   Liga-Split-Prinzip „getrennte Wettbewerbsräume"), mit der in 4.3 beschriebenen
-   Auflösungs-Einbuße bei `playerCount = 2`?
+1. **`DISCIPLINE_MAX` — ENTSCHIEDEN (31.08.): fest**, nicht mit `playerCount` skaliert. Der
+   konkrete Zahlenwert selbst ist damit noch nicht gesetzt — Kandidaten aus Abschnitt 1.2 sind
+   ≈3,3 (Rang-1-Durchschnitt, nachgemessen) oder ≈6,6 (das Doppelte, trifft Chris' eigenes Beispiel
+   am nächsten). Rückfrage an Chris folgt separat, welcher konkrete Wert gilt.
+2. **Referenz-Pool — ENTSCHIEDEN (31.08.): gemeinsam über beide Ligen**, nicht getrennt. Chris
+   ergänzend: „wir könnten später noch die PPs in Liga 2 zur Not runter skalieren mit einem
+   Faktor" — als möglicher **späterer** Ausbau festgehalten (z. B. ein Liga-2-Abwertungsfaktor,
+   falls sich in der Praxis zeigt, dass eine schwächere zweite Liga sonst zu leicht an PPs kommt),
+   **nicht** Teil der ersten Umsetzung. Bewusst nicht weiter spezifiziert, bis ein echter Bedarf
+   danach sichtbar wird — kein Wert dafür in dieser Phase erfinden.
 3. **Reine Basketball-Teilnehmer als Pool, oder auch nominierte, aber nicht eingesetzte Spieler?**
    Da `playerCount` pro Spieltag fix ist und laut `legacy-matchday-partial-lineup-rule.ts`-Prinzip
    (Abschnitt 5.3 von `battle-mode-spielmodus-plan.md`, „Unterzahl antreten lassen") auch
