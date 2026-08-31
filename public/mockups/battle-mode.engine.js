@@ -6777,8 +6777,27 @@
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
+  //
+  // GEMELDET (Chris, 25.08.): „die tooltips im end screen von Schaden Erlitten und IMP
+  // funktionieren nicht man soll sehen wie es sich zusammen setzt". Im Browser nachgestellt
+  // (Playwright, TDM bis zum Endscreen durchgespielt, echter Maus-Hover): die Zelle bekommt
+  // beim Hover korrekt Titel UND Aufschluesselung (tipOn/impZerlegung liefern nicht-leeren
+  // Text) — der Bug liegt nicht in den Daten, sondern in der Platzierung der Box selbst.
+  // `tipBox` haengte bisher an `document.body`, alle Regeln in battle-mode.css stehen aber
+  // unter `.oly-battle-arena .tipbox` (dieselbe Kapselung wie ueberall in dieser Datei, s.
+  // FARBWURZEL-Befund weiter unten). Ein body-Kind ist dort NIE ein Nachfahre — weder
+  // standalone (das Skript haengt hinter, nicht in, .oly-battle-arena) noch eingebettet
+  // (FoundationBattleArenaHost.tsx haengt das Skript als GESCHWISTER von .oly-battle-arena
+  // ein, nicht als Kind). Die Box blieb dadurch vollstaendig unstyled: position:static statt
+  // absolute, kein Hintergrund, keine Farbe — sie landete unsichtbar ganz unten im
+  // Seitenfluss, weit ausserhalb des Bildschirms, waehrend die gesetzten inline-Koordinaten
+  // (style.top/left) ohne position:absolute wirkungslos blieben. Nachgemessen: exakt dieselbe
+  // Ursache traf schon den Canvas-Farb-Bug (s. FARBWURZEL unten) — derselbe Fix hier: den
+  // naechsten `.oly-battle-arena`-Vorfahren suchen, `document.body` bleibt der Rueckfall,
+  // falls die Klasse einmal fehlt (dann verhaelt es sich wie bisher, nichts wird schlechter).
+  const TIPWURZEL=document.querySelector(".oly-battle-arena")||document.body;
   const tipBox=document.createElement("div");tipBox.className="tipbox";tipBox.hidden=true;
-  document.body.appendChild(tipBox);
+  TIPWURZEL.appendChild(tipBox);
   function tipOn(node,titel,text){
     const show=(ev)=>{
       tipBox.textContent="";
