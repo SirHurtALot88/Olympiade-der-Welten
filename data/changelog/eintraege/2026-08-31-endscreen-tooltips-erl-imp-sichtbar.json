@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-31",
+  "seite": "Spieltag · Battle Arena",
+  "text": "Die Tooltips „Schaden Erlitten“ (ERL) und „IMP“ im Endscreen der Battle Arena zeigen jetzt beim Darüberfahren die Aufschlüsselung — vorher hing die Tooltip-Box unsichtbar außerhalb des Bildschirms, weil sie außerhalb ihres eigenen Stylesheets im DOM landete.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

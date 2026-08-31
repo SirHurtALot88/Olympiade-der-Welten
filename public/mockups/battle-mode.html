@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Battle Mode Taktikbrett</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,9 +118,27 @@
            Worten, was der orange Ring auf dem Feld zeigt: wen die eigene Hilfsverteidigung
            gerade bevorzugt doppelt. Steht direkt unter der Kaderleiste, weil dort die
            Namen liegen, ueber die man auswaehlt. -->
+      <!-- ZIELANSAGE (nur Kampf-Disziplinen). Dieselbe Zeile, dieselbe Signalfarbe, andere
+           Mechanik: links die Sperruhr (ein schrumpfender Ring mit Restsekunden — sie ist
+           der Preis der Ansage und muss deshalb sichtbar sein, nicht nur spuerbar), rechts
+           der eigene Aufheben-Knopf. Der Basketball-Knopf daneben bleibt unberuehrt; beide
+           blenden sich gegenseitig aus, je nachdem welche Disziplin laeuft. -->
       <div class="fokuszeile" id="fokuszeile" hidden>
+        <span class="ansageuhr" id="ansageuhr" hidden title="Sperre bis zur nächsten Zielansage"><b id="ansageuhrzahl"></b></span>
         <span id="fokustext"></span>
         <button class="btn g" id="fokusweg" type="button">Fokus aufheben</button>
+        <button class="btn g" id="ansageweg" type="button" hidden>Ansage aufheben</button>
+      </div>
+      <!-- RENNPLAN-ANSAGE (nur die fuenf Bahn-Disziplinen). Das Gegenstueck zur
+           Fokuszeile darueber: dort markiert man einen Gegner, hier sagt man einem
+           EIGENEN Laeufer mitten im Rennen einen anderen Plan an. Steht aus demselben
+           Grund direkt unter der Kaderleiste — dort liegen die Namen, ueber die man
+           auswaehlt. Die Knopfreihe fuellt die Engine aus BAHN_ART, weil jede Bahn
+           ihre eigenen drei Plaene mit eigenen Namen hat. -->
+      <div class="rennplanzeile" id="rennplanzeile" hidden>
+        <span id="rennplantext"></span>
+        <span class="rpknoepfe" id="rennplanknoepfe"></span>
+        <button class="btn g" id="rennplanzu" type="button" hidden>Schließen</button>
       </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
