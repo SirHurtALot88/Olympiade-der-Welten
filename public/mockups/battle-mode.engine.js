@@ -3779,7 +3779,7 @@
     fastbreak:    {AUFBAU:2,  SCHUSS_NAH:2, ZWEITCHANCE:-2}
   };
   function bauFeldspiel(saat){
-    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
@@ -6488,7 +6488,7 @@
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
 
   function bauBuehne(saat){
-    seed=saat||1337; buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     floats.length=0;
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
@@ -7674,6 +7674,29 @@
   const FARBWURZEL=cv.closest(".oly-battle-arena")||document.body;
   const css=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  // SAAT-NORMALISIERUNG (Bug, gefunden beim Bau von Battle-Mode-PR6, 30./31.08.): alle vier
+  // `seed=saat||1337`-Stellen (bauFeldspiel/bauBuehne/build/bauSpurt) erwarten eine Zahl.
+  // Uebergibt man stattdessen einen Text-Seed -- genau das Format, das der Battle-Mode-Plan
+  // selbst fuer den Produktivbetrieb vorschlaegt, "${saveId}:${seasonId}:...:${matchdayId}" --
+  // landet der String unveraendert in `seed`, weil `saat||1337` einen truthy String einfach
+  // durchreicht. rr() rechnet dann `seed*1664525`: `Number(nicht-numerischer-String)` ist NaN,
+  // und `NaN>>>0` ist 0. JEDER Text-Seed kollabierte damit auf denselben Lauf ab Seed 0 --
+  // unbemerkt, weil die Determinismus-Abnahme in PR5 nur mit Zahlen-Seeds (424242, 99) lief.
+  // PR6 hat das nur am eigenen Aufrufer umgangen (eigener FNV-1a-Hash vor jedem Aufruf) --
+  // das hier ist der Fix an der Quelle, fuer JEDEN Aufrufer von bau(saat)/build(saat), nicht
+  // nur den einen. Verhalten fuer Zahlen/undefined/leeren String bleibt exakt wie vorher
+  // (`saat||1337`) -- Achtung, das gilt NICHT fuer numerische Strings ("424242"): die kamen
+  // vorher unveraendert durch `saat*1664525` (JS koerziert numerische Strings klaglos), laufen
+  // jetzt aber durch den Hash-Pfad und liefern damit einen ANDEREN Lauf als vor diesem Fix.
+  // Nur echte, nicht-leere Text-Seeds waren vom Kollaps-Bug betroffen und sind das Ziel hier.
+  function normalisiereSaat(saat){
+    if(typeof saat==="string"&&saat.length){
+      let h=2166136261;
+      for(let i=0;i<saat.length;i++){h^=saat.charCodeAt(i);h=Math.imul(h,16777619);}
+      return h>>>0;
+    }
+    return saat||1337;
+  }
 
   function homeFor(side,row,i,n){
     const cols=[side===0?MID-140:MID+140,side===0?MID-300:MID+300,side===0?MID-460:MID+460];
@@ -7800,7 +7823,7 @@
     if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
-    seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     let id=0;
 
@@ -10090,7 +10113,7 @@
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
-    seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     cam={zoom:1,cx:0.5}; bahnWahl=null;
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen

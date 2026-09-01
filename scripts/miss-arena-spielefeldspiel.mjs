@@ -92,6 +92,30 @@ try {
   const subskills = await seiteImBrowser.evaluate(() => window.__arena.feldspielSubskills("basketball"));
   pruefe(Array.isArray(subskills) && subskills.length > 0, "feldspielSubskills(\"basketball\") funktioniert weiterhin");
 
+  console.log("\n6) Text-Seed-Bug (gefunden beim Bau von PR 6, 30./31.08.): kollabiert NICHT mehr auf einen festen Lauf");
+  // Genau das Format, das der Battle-Mode-Plan fuer den Produktivbetrieb vorschlaegt:
+  // "${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}". Vor dem Fix
+  // landete jeder nicht-leere String unveraendert in `seed`, `seed*1664525` wurde dadurch
+  // NaN und `NaN>>>0` kollabierte auf 0 -- JEDER Text-Seed lief also wie Seed 0.
+  // Vor dem Fix waere hier jeder beliebige nicht-leere Text-Seed nach dem ERSTEN rr()-Aufruf
+  // auf denselben internen Zustand (0) gefallen und ab da fuer JEDEN Text-Seed identisch
+  // weitergelaufen -- der bestmoegliche Nachweis ist deshalb nicht ein Vergleich gegen einen
+  // bestimmten Zahlen-Seed (0 faellt wegen `saat||1337` ohnehin auf 1337 zurueck, reproduziert
+  // den Bug also gar nicht), sondern: zwei VERSCHIEDENE Text-Seeds muessen sich unterscheiden.
+  const [textA1, textA2, textB] = await seiteImBrowser.evaluate(() => [
+    window.__arena.spieleFeldspiel("basketball", "save-1:season-1:matchday-3:arena:V-W:A-A"),
+    window.__arena.spieleFeldspiel("basketball", "save-1:season-1:matchday-3:arena:V-W:A-A"),
+    window.__arena.spieleFeldspiel("basketball", "save-1:season-1:matchday-3:arena:M-M:D-P"),
+  ]);
+  pruefe(
+    JSON.stringify(textA1.seiten) === JSON.stringify(textA2.seiten) && JSON.stringify(textA1.boxscore) === JSON.stringify(textA2.boxscore),
+    "derselbe Text-Seed zweimal liefert dasselbe Ergebnis (Determinismus gilt auch fuer Strings)",
+  );
+  pruefe(
+    JSON.stringify(textA1.seiten) !== JSON.stringify(textB.seiten) || JSON.stringify(textA1.boxscore) !== JSON.stringify(textB.boxscore),
+    `zwei VERSCHIEDENE Text-Seeds liefern verschiedene Ergebnisse (${JSON.stringify(textA1.seiten)} vs. ${JSON.stringify(textB.seiten)}) -- kein Kollaps auf einen einzigen Lauf mehr`,
+  );
+
   if (seitenfehler.length) {
     console.error("\nSeitenfehler:\n  " + seitenfehler.join("\n  "));
     fehlgeschlagen = true;
