@@ -180,6 +180,80 @@ export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 16);
 export const BASE_MATCHDAY_RECOVERY = envNumber("OLY_FATIGUE_RECOVERY", 28);
 
 /**
+ * DIE ERHOLUNG ZERFÄLLT IN ZWEI TEILE — und der erste gilt künftig auch für den, der spielt.
+ *
+ * BEFUND (Designplan `docs/design/fatigue-saisonlaenge-plan.md`, Abschnitt B.2): Wer nie rotiert
+ * wird, bekommt HEUTE an keinem einzigen Spieltag Erholung — die Recovery-Schleife in
+ * `applyFatigueAndInjuryAfterMatchday` überspringt Einsatz-Spieler komplett. Fatigue ist für ihn
+ * ein reiner Aufwärts-Ratchet: `min(100, 16·n)`, die Kappungsgrenze fällt nach sieben Spieltagen.
+ * Bei zehn Spieltagen verbringt er die letzten drei (30 %) durchgehend im höchsten Risikoband,
+ * ohne dass er daran etwas ändern könnte — genau das, was Chris als „2. Saisonhälfte =
+ * Verletzungswelle" meldet. Es ist kein Fehler, sondern die Rechnung: SPIELEN GIBT NIE ERHOLUNG,
+ * NUR BANKZEIT TUT DAS.
+ *
+ * DIE ZERLEGUNG: der heutige Bank-Wert bleibt, was er ist, wird aber benannt statt gerechnet —
+ *
+ *   BASE_MATCHDAY_RECOVERY (28)
+ *     = MATCHDAY_ACTIVE_RECOVERY      (11, gilt künftig für ALLE, auch für Einsatz-Spieler)
+ *     + MATCHDAY_BENCH_BONUS_RECOVERY (17, nur für Bank/verletzt — der Rotations-Aufschlag)
+ *
+ * Für Bank und Verletzte ist das bit-identisch zu heute (11 + 17 = 28); dort ändert sich NICHTS.
+ * Neu ist allein, dass `MATCHDAY_ACTIVE_RECOVERY` auch dem gutgeschrieben wird, der aufläuft,
+ * bevor seine Last angerechnet wird:
+ *
+ *   Einsatz schonen   12   − 11  =  +1   netto je Spieltag
+ *   Einsatz normal    16   − 11  =  +5
+ *   Einsatz pushen    22,4 − 11  = +11,4
+ *   Bank / verletzt        −28        (unverändert)
+ *
+ * Der Dauerstarter erreicht die Kappungsgrenze damit nach 20 statt nach 7 Spieltagen, ein
+ * Dauer-Pusher nach 9 — die Bänder werden über die Saison durchlaufen statt in ihrem ersten Drittel
+ * verbraucht. Rotation SENKT die Fatigue weiterhin (Bank bleibt 5,6× stärker als der Normal-Load
+ * netto), statt sie nur langsamer steigen zu lassen.
+ *
+ * WARUM DER BANK-BONUS ABGELEITET IST statt eingetippt: `BASE_MATCHDAY_RECOVERY` hängt an
+ * `OLY_FATIGUE_RECOVERY`. Stünde hier eine feste 17, würde jede ENV-Verstellung der Basis die
+ * Summe auseinanderlaufen lassen und die Bank-Erholung still verändern. So bleibt
+ * `aktiv + bank-bonus === BASE_MATCHDAY_RECOVERY` per Konstruktion, egal wie getunt wird.
+ *
+ * ZWEI ÄHNLICHE ENV-NAMEN, ZWEI VERSCHIEDENE DINGE:
+ *   OLY_FATIGUE_ACTIVE_RECOVERY        — der SCHALTER (an/aus), siehe unten. Default AUS.
+ *   OLY_FATIGUE_ACTIVE_RECOVERY_VALUE  — die ZAHL (11), zum Nachtunen ohne Code-Änderung.
+ */
+export const MATCHDAY_ACTIVE_RECOVERY = Math.min(
+  BASE_MATCHDAY_RECOVERY,
+  envNumber("OLY_FATIGUE_ACTIVE_RECOVERY_VALUE", 11),
+);
+
+/** Der Rotations-Aufschlag: was ein Bank-/Verletzten-Spieltag ÜBER die aktive Erholung hinaus gibt. */
+export const MATCHDAY_BENCH_BONUS_RECOVERY = round(BASE_MATCHDAY_RECOVERY - MATCHDAY_ACTIVE_RECOVERY);
+
+function envFlag(name: string) {
+  const raw = process.env[name];
+  if (typeof raw !== "string") return false;
+  const value = raw.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "on" || value === "yes";
+}
+
+/**
+ * DER SCHALTER — Default AUS, und das ist Absicht.
+ *
+ * Solange `OLY_FATIGUE_ACTIVE_RECOVERY` nicht gesetzt ist, verhält sich das Spiel exakt wie vorher:
+ * Einsatz-Spieler bekommen keine Erholung, jede bestehende Saison rechnet unverändert weiter. Die
+ * Umstellung des Defaults ist ein eigener Schritt (PR3 im Designplan), NACHDEM der
+ * Verletzungs-Korridor für das neue Modell neu vermessen wurde (PR2) — die heutige Kalibrierung
+ * „150-200 Verletzungen je Saison" ist wörtlich für die Ratchet-Formel oben gemessen und gilt für
+ * das neue Modell nicht mehr.
+ *
+ * Bewusst eine FUNKTION statt einer Modul-Konstante: sie liest die Umgebung bei jedem Aufruf, damit
+ * ein Test (und ein Mess-Skript) beide Welten in EINEM Lauf gegeneinanderstellen kann, ohne das
+ * Modul neu laden zu müssen.
+ */
+export function isFatigueActiveRecoveryEnabled() {
+  return envFlag("OLY_FATIGUE_ACTIVE_RECOVERY");
+}
+
+/**
  * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
  * matchday fatigue load, not just the match score. Conserve saves ~25 % load (a real reason to
  * rotate down when leverage is low); push costs 40 % more (a deliberate, sparing gamble that
@@ -337,11 +411,34 @@ function getPlayerMatchdayFatigueLoad(
   );
 }
 
+/**
+ * DIE EINE NETTO-RECHNUNG EINES EINSATZES: Last minus aktiver Erholung.
+ *
+ * Drei Stellen buchen den Spieltag eines Einsatz-Spielers — die Roll-Map (`fatigueBeforeRoll`),
+ * der Apply (`matchFatigueNachEinsatz`) und die Replay-Rücknahme (`restorePreMatchdayAvailability`,
+ * die den Delta invertiert). Alle drei MÜSSEN dieselbe Zahl sehen; deshalb steht sie hier einmal.
+ *
+ * Bei ausgeschaltetem Schalter ist der Kredit exakt 0 und diese Funktion gibt die unveränderte
+ * Last zurück — kein zweites Runden, kein Gleitkomma-Rest, byte-identisch zu vorher.
+ */
+function getPlayerMatchdayFatigueDelta(input: {
+  gameState: GameState;
+  player: Player;
+  teamId: string;
+  intensity: MatchdayIntensityStage;
+}) {
+  const load = getPlayerMatchdayFatigueLoad(input.player, input.intensity);
+  const credit = getPlayerActiveRecoveryCredit(input.gameState, input.teamId, input.player.trainingMode);
+  return credit === 0 ? load : round(load - credit);
+}
+
 export type MatchdayInjuryRiskProjection = {
-  /** Fatigue, bei der der Wurf tatsaechlich stattfaende: aktuelle Fatigue + Spieltags-Last. */
+  /** Fatigue, bei der der Wurf tatsaechlich stattfaende: aktuelle Fatigue + Netto-Delta des Einsatzes. */
   fatigueBeforeRoll: number;
   /** Spieltags-Last, die VOR dem Wurf aufgeschlagen wird (trait- und intensitaetsskaliert). */
   matchdayLoad: number;
+  /** Aktive Erholung, die im selben Zug gutgeschrieben wird (0, solange der Schalter aus ist). */
+  activeRecovery: number;
   riskPercent: number;
   bandLabel: InjuryRiskBand["label"];
 };
@@ -367,14 +464,26 @@ export function projectMatchdayInjuryRisk(input: {
   player: Pick<Player, "traitsPositive" | "traitsNegative">;
   currentFatigue: number | null | undefined;
   intensity?: MatchdayIntensityStage;
+  /**
+   * Die aktive Erholung dieses Spielers (aus `calculatePlayerRecovery(...).activeRecovery`), damit
+   * die ANZEIGE dieselbe Netto-Rechnung zeigt wie der Wurf. Ohne Angabe: 0 — das ist zugleich der
+   * Wert bei ausgeschaltetem Schalter, die Anzeige bleibt also unverändert, solange nichts
+   * eingeschaltet ist. Wer den Wert übergibt, muss ihn über `getPlayerActiveRecoveryCredit` holen,
+   * damit Anzeige und Buchhaltung nie auseinanderdriften.
+   */
+  activeRecovery?: number;
 }): MatchdayInjuryRiskProjection {
   const matchdayLoad = getPlayerMatchdayFatigueLoad(input.player, input.intensity ?? "normal");
+  const activeRecovery = Math.max(0, input.activeRecovery ?? 0);
   // Gleiche Rechnung wie im Roll-Loop: getPlayerCurrentFatigue klemmt die aktuelle Fatigue,
   // danach klemmt die Summe erneut — beides hier gespiegelt, damit Randfaelle (>100) identisch fallen.
-  const fatigueBeforeRoll = clampFatigue(clampFatigue(input.currentFatigue) + matchdayLoad);
+  const fatigueBeforeRoll = clampFatigue(
+    clampFatigue(input.currentFatigue) + (activeRecovery === 0 ? matchdayLoad : round(matchdayLoad - activeRecovery)),
+  );
   return {
     fatigueBeforeRoll,
     matchdayLoad,
+    activeRecovery,
     riskPercent: getInjuryRiskPercent(fatigueBeforeRoll),
     bandLabel: getInjuryRiskBand(fatigueBeforeRoll).label,
   };
@@ -539,12 +648,39 @@ export const INJURY_RECOVERY_FACTOR = 1.0;
 /** Fuer die Anzeige: „Regeneration 100%" statt einer eingetippten Prozentzahl. */
 export const INJURY_RECOVERY_PCT = Math.round(INJURY_RECOVERY_FACTOR * 100);
 
+/**
+ * Zerlegt eine fertig modifizierte Gesamt-Erholung in ihre zwei Bestandteile.
+ *
+ * DIE GEBÄUDE WIRKEN AUF BEIDE TEILE, nicht nur auf den Bank-Anteil (Designplan B.4,
+ * „Facility-Interaktion"): der Reha-Aufschlag wird ANTEILIG mitgeteilt, statt zweimal voll
+ * addiert zu werden. Das ist die einzige Zerlegung, die zugleich
+ *
+ *   (a) die Bank-Erholung bit-identisch lässt — `aktiv + bankBonus === gesamt`, also weiterhin
+ *       genau `(28 + Reha-Aufschlag) × Trainingsmodus`, und
+ *   (b) Reha-Investment für JEDEN Spieler wertvoller macht, nicht nur für den, der aussetzt:
+ *       Stufe 5 (Aufschlag 24) hebt die aktive Erholung von 11 auf 11/28 × 52 = 20,4.
+ *
+ * Ein zweimal VOLL aufgeschlagener Bonus (11+24 und 17+24) würde die Bank-Erholung still auf
+ * 28 + 2×24 anheben und damit genau den gebäudelosen Verletzungs-Korridor reißen, den der
+ * Aufschlag laut `facility-effects.ts` bewusst unangetastet lässt.
+ */
+function splitRecovery(totalRecovery: number) {
+  const activeShare =
+    BASE_MATCHDAY_RECOVERY > 0 ? MATCHDAY_ACTIVE_RECOVERY / BASE_MATCHDAY_RECOVERY : 0;
+  const activeRecovery = round(totalRecovery * activeShare, 2);
+  return {
+    activeRecovery,
+    benchBonusRecovery: round(totalRecovery - activeRecovery, 2),
+  };
+}
+
 export function calculateTeamRecovery(gameState: GameState, teamId: string) {
   const facilities = getTeamFacilityState(gameState, teamId);
   const normalRecovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, facilities).after;
   return {
     normalRecovery,
     injuryRecovery: round(normalRecovery * INJURY_RECOVERY_FACTOR, 2),
+    ...splitRecovery(normalRecovery),
   };
 }
 
@@ -559,10 +695,34 @@ export function calculatePlayerRecovery(
     teamNormalRecovery: teamRecovery.normalRecovery,
     normalRecovery: modeRecovery.after,
     injuryRecovery: round(modeRecovery.after * INJURY_RECOVERY_FACTOR, 2),
+    // Der Trainingsmodus multipliziert die GESAMTE Erholung; die Zerlegung folgt ihm anteilig,
+    // damit „schonend trainieren" auch dem hilft, der spielt — und die Summe die Bank-Erholung
+    // weiterhin exakt trifft.
+    ...splitRecovery(modeRecovery.after),
     trainingMode: trainingMode ?? "mittel",
     trainingRecoveryModifierPct: modeRecovery.modifierPct,
     trainingRecoveryLabel: modeRecovery.label,
   };
+}
+
+/**
+ * Wieviel Erholung wird einem EINSATZ-Spieler an diesem Spieltag wirklich gutgeschrieben?
+ *
+ * Die EINE Stelle, an der der Schalter über die Buchhaltung entscheidet — Roll-Map, Apply, die
+ * Replay-Rücknahme UND die Anzeige in der Einsatzliste müssen denselben Wert sehen, sonst driften
+ * Wurf, Konto, Idempotenz und Anzeige auseinander. Schalter aus: exakt 0, und die Erholung wird
+ * gar nicht erst nachgeschlagen (ein Gebäude-Lookup je Spieler und Spieltag, der nichts zu sagen
+ * hätte).
+ */
+export function getPlayerActiveRecoveryCredit(
+  gameState: GameState,
+  teamId: string,
+  trainingMode: PlayerTrainingMode | null | undefined,
+) {
+  if (!isFatigueActiveRecoveryEnabled()) {
+    return 0;
+  }
+  return calculatePlayerRecovery(gameState, teamId, trainingMode).activeRecovery;
 }
 
 export function getPlayerAvailabilityView(
@@ -868,7 +1028,8 @@ export function buildMatchdayInjuryRollMap(input: {
     /**
      * ZWEI ZAHLEN, WEIL SIE ZWEI DINGE SIND — und genau hier trennt sich der Weg.
      *
-     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Last, ohne
+     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Netto-Delta des
+     * Einsatzes (Last minus aktiver Erholung, siehe `getPlayerMatchdayFatigueDelta`), ohne
      * Trainingsschicht. Er wird nach dem Wurf in `playerAvailabilityState` UND in
      * `player.fatigue` zurueckgeschrieben, und die Trainingsschicht legt sich anschliessend
      * wieder darauf. Traege er sie schon, kaeme sie doppelt — der in
@@ -878,7 +1039,10 @@ export function buildMatchdayInjuryRollMap(input: {
      * „Gesamt, ueberall" — Trainingslast soll auf das Verletzungsrisiko wirken, nicht nur
      * angezeigt werden. Der Wurf misst deshalb dagegen.
      */
-    const matchFatigueNachEinsatz = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    const matchFatigueNachEinsatz = clampFatigue(
+      getPlayerCurrentFatigue(gameState, player, use.teamId) +
+        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, intensity: use.intensity }),
+    );
     const risikoFatigue = clampFatigue(
       matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
     );
@@ -1131,9 +1295,18 @@ function restorePreMatchdayAvailability(input: {
     const useKey = `${entry.teamId}::${entry.playerId}`;
     const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
-      // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet -> zurücknehmen.
+      // Einsatz-Spieler: erster Apply hat den NETTO-Delta gerechnet (Last, intensitätsskaliert,
+      // abzüglich der aktiven Erholung) -> denselben Delta zurücknehmen. Über
+      // `getPlayerMatchdayFatigueDelta` ist das per Konstruktion dieselbe Zahl, auch wenn der
+      // Schalter zwischendurch umgelegt würde.
       const intensity = usedIntensityByKey.get(useKey) ?? "normal";
-      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player, intensity)) };
+      return {
+        ...entry,
+        fatigue: clampFatigue(
+          entry.fatigue -
+            getPlayerMatchdayFatigueDelta({ gameState, player, teamId: entry.teamId, intensity }),
+        ),
+      };
     }
     if (pendingLaterSideKeys.has(useKey) && !view.isUnavailable) {
       // Startet erst auf der offenen Seite: unangetastet stehen gelassen, also auch nichts
@@ -1241,6 +1414,10 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       input.matchdayId,
       { matchdayBookkeeping: true },
     );
+    // Einsatz-Spieler werden hier weiterhin übersprungen — ihre Erholung ist nicht die volle
+    // Bank-Erholung, sondern der aktive Anteil, und der wird unten im Einsatz-Loop VERRECHNET
+    // (`getPlayerMatchdayFatigueDelta`), nicht hier als eigener Abzug gebucht. Zwei Buchungen für
+    // denselben Spieltag würden dem Wurf und dem Konto verschiedene Zahlen geben.
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
     if (pendingLaterSideKeys.has(usedKey) && !view.isUnavailable) {
       deferredPlayerIds.add(roster.playerId);
@@ -1285,7 +1462,8 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     /**
      * ZWEI ZAHLEN, WEIL SIE ZWEI DINGE SIND — und genau hier trennt sich der Weg.
      *
-     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Last, ohne
+     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Netto-Delta des
+     * Einsatzes (Last minus aktiver Erholung, siehe `getPlayerMatchdayFatigueDelta`), ohne
      * Trainingsschicht. Er wird nach dem Wurf in `playerAvailabilityState` UND in
      * `player.fatigue` zurueckgeschrieben, und die Trainingsschicht legt sich anschliessend
      * wieder darauf. Traege er sie schon, kaeme sie doppelt — der in
@@ -1295,7 +1473,10 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
      * „Gesamt, ueberall" — Trainingslast soll auf das Verletzungsrisiko wirken, nicht nur
      * angezeigt werden. Der Wurf misst deshalb dagegen.
      */
-    const matchFatigueNachEinsatz = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    const matchFatigueNachEinsatz = clampFatigue(
+      getPlayerCurrentFatigue(gameState, player, use.teamId) +
+        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, intensity: use.intensity }),
+    );
     const risikoFatigue = clampFatigue(
       matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
     );

@@ -27,7 +27,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  BASE_MATCHDAY_RECOVERY,
   INTENSITY_FATIGUE_MULT,
+  MATCHDAY_ACTIVE_RECOVERY,
   MATCHDAY_FATIGUE_LOAD,
   projectMatchdayInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
@@ -95,6 +97,52 @@ describe("Die Last reicht jetzt bis in die Risikozone", () => {
       fatigue = projectMatchdayInjuryRisk({ player: NEUTRAL, currentFatigue: fatigue, intensity: "normal" }).fatigueBeforeRoll;
     }
     expect(projectMatchdayInjuryRisk({ player: NEUTRAL, currentFatigue: fatigue, intensity: "normal" }).riskPercent).toBeGreaterThan(3);
+  });
+});
+
+/**
+ * NETTO STATT BRUTTO — was ein Spieltag den Spieler WIRKLICH kostet, sobald die aktive Erholung
+ * eingeschaltet ist (Designplan B.4/B.5).
+ *
+ * Bisher hielt diese Datei nur die BRUTTO-Last fest. Mit `MATCHDAY_ACTIVE_RECOVERY` ist die für den
+ * Spieler erlebte Größe aber die Differenz: Last minus der Erholung, die er auch beim Spielen
+ * bekommt. Genau daran hängt Chris' Anforderung „von Anfang an spürbar, aber nicht schon zur
+ * Halbzeit erzwungen verletzt" — deshalb steht die Reihenfolge der drei Stufen jetzt auch netto
+ * unter Aufsicht.
+ *
+ * Absolute Zahlen stehen bewusst nicht hier (die dürfen sich beim Nachtunen ändern), sondern in
+ * `tests/fatigue-aktive-erholung.test.ts` an der Tabelle aus B.4.
+ */
+describe("Netto pro Spieltag je Stufe — sobald die aktive Erholung greift", () => {
+  const netto = (stufe: "conserve" | "normal" | "push") =>
+    MATCHDAY_FATIGUE_LOAD * INTENSITY_FATIGUE_MULT[stufe] - MATCHDAY_ACTIVE_RECOVERY;
+
+  it("die Rangfolge bleibt auch netto erhalten: schonen < normal < pushen", () => {
+    expect(netto("conserve")).toBeLessThan(netto("normal"));
+    expect(netto("normal")).toBeLessThan(netto("push"));
+  });
+
+  it("JEDE Stufe kostet netto noch etwas — Spielen bleibt spürbar, auch Schonen", () => {
+    // Chris' erste Anforderung: „von Anfang an spürbar". Fiele eine Stufe auf 0 oder darunter,
+    // wäre Dauereinsatz auf ihr gratis, und die Erschöpfung hätte keinen Zahn mehr.
+    for (const stufe of ["conserve", "normal", "push"] as const) {
+      expect(netto(stufe)).toBeGreaterThan(0);
+    }
+  });
+
+  it("die Bank bleibt das stärkste Werkzeug — Rotation SENKT die Fatigue, statt sie zu bremsen", () => {
+    // Chris' dritte Anforderung: „Rotation lohnt sich spürbar". Ein Bank-Spieltag muss deutlich
+    // mehr abbauen, als ein normaler Einsatz netto aufbaut.
+    expect(BASE_MATCHDAY_RECOVERY).toBeGreaterThan(netto("normal") * 4);
+  });
+
+  it("die Kappungsgrenze wird über eine ganze Saison gestreckt, nicht in ihrem ersten Drittel erreicht", () => {
+    // DAS war der Befund: brutto steht ein Dauerstarter nach ⌈100/16⌉ = 7 Spieltagen an der
+    // 100er-Kappung — bei 10 Spieltagen die letzten drei durchgehend im Maximalrisiko-Band.
+    const bruttoSpieltage = Math.ceil(100 / MATCHDAY_FATIGUE_LOAD);
+    const nettoSpieltage = Math.ceil(100 / netto("normal"));
+    expect(bruttoSpieltage).toBeLessThanOrEqual(7);
+    expect(nettoSpieltage).toBeGreaterThanOrEqual(bruttoSpieltage * 2);
   });
 });
 
