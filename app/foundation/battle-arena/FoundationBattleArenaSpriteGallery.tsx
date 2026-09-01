@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import spielerListe from "@/data/generated/battle-arena-sprite-gallery.json";
+import spriteFitBewertung from "@/data/generated/sprite-fit-bewertung.json";
 
 /**
  * SPRITE-VS-KARTENBILD-GALERIE — Chris' Wunsch nach dem Sichtcheck-Auftrag: eine
@@ -16,20 +17,52 @@ import spielerListe from "@/data/generated/battle-arena-sprite-gallery.json";
  * unnoetig langsam fuer ein Bild, das sich nur aendert, wenn jemand den Baukasten-Eintrag
  * anfasst. public/sprites/preview/<slug>.png wird per Skript aus genau demselben
  * renderProbe() erzeugt, das auch die Opus-Sichtcheck-Agents genutzt haben.
+ *
+ * Sterne-Bewertung (Chris, 01.09.: "zeig in dem unteren Bereich hier bitte dann auch die
+ * Sternezuweisung, die das Model bekommen hat, dann kann ich da auch drüber schauen"):
+ * s. docs/design/sprite-fit-bewertungssystem.md für die 1-5-Sterne-Rubrik. Die Bewertung
+ * ist eine separate Momentaufnahme (data/generated/sprite-fit-bewertung.json), kein Live-
+ * Vergleich — sie muss neu erzeugt werden, wenn sich ein Rezept ändert.
  */
 
 type GalerieEintrag = { name: string; slug: string };
+type FitBewertung = {
+  name: string;
+  slug: string;
+  sterne: 1 | 2 | 3 | 4 | 5;
+  begruendung: string;
+  fehlendesDetail: string | null;
+};
 
 const EINTRAEGE = spielerListe as GalerieEintrag[];
+const BEWERTUNG_NACH_SLUG = new Map(
+  (spriteFitBewertung as FitBewertung[]).map((b) => [b.slug, b]),
+);
+
+function SterneAnzeige({ sterne }: { sterne: number }) {
+  return (
+    <span aria-label={`${sterne} von 5 Sternen`} style={{ letterSpacing: 1 }}>
+      {"★".repeat(sterne)}
+      <span style={{ opacity: 0.3 }}>{"★".repeat(5 - sterne)}</span>
+    </span>
+  );
+}
 
 export default function FoundationBattleArenaSpriteGallery() {
   const [suche, setSuche] = useState("");
+  const [nurUnter, setNurUnter] = useState<number | null>(null);
 
   const gefiltert = useMemo(() => {
     const q = suche.trim().toLowerCase();
-    if (!q) return EINTRAEGE;
-    return EINTRAEGE.filter((e) => e.name.toLowerCase().includes(q));
-  }, [suche]);
+    return EINTRAEGE.filter((e) => {
+      if (q && !e.name.toLowerCase().includes(q)) return false;
+      if (nurUnter !== null) {
+        const b = BEWERTUNG_NACH_SLUG.get(e.slug);
+        if (!b || b.sterne > nurUnter) return false;
+      }
+      return true;
+    });
+  }, [suche, nurUnter]);
 
   return (
     <section className="panel" aria-label="Sprite-vs-Kartenbild-Galerie" style={{ marginTop: 16 }}>
@@ -42,22 +75,43 @@ export default function FoundationBattleArenaSpriteGallery() {
             falsche Haarfarbe — sag einfach den Namen.
           </p>
         </div>
-        <input
-          type="text"
-          value={suche}
-          onChange={(e) => setSuche(e.target.value)}
-          placeholder="Name suchen…"
-          aria-label="Spieler suchen"
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid var(--nl-line)",
-            background: "transparent",
-            color: "inherit",
-            minWidth: 200,
-            fontSize: 14,
-          }}
-        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={nurUnter ?? ""}
+            onChange={(e) => setNurUnter(e.target.value === "" ? null : Number(e.target.value))}
+            aria-label="Nach Sterne-Bewertung filtern"
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--nl-line)",
+              background: "transparent",
+              color: "inherit",
+              fontSize: 14,
+            }}
+          >
+            <option value="">Alle Bewertungen</option>
+            <option value={1}>nur ★ (1 Stern)</option>
+            <option value={2}>★★ oder schlechter</option>
+            <option value={3}>★★★ oder schlechter</option>
+            <option value={4}>★★★★ oder schlechter</option>
+          </select>
+          <input
+            type="text"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            placeholder="Name suchen…"
+            aria-label="Spieler suchen"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--nl-line)",
+              background: "transparent",
+              color: "inherit",
+              minWidth: 200,
+              fontSize: 14,
+            }}
+          />
+        </div>
       </header>
 
       {gefiltert.length === 0 ? (
@@ -70,7 +124,9 @@ export default function FoundationBattleArenaSpriteGallery() {
             gap: 10,
           }}
         >
-          {gefiltert.map((e) => (
+          {gefiltert.map((e) => {
+            const bewertung = BEWERTUNG_NACH_SLUG.get(e.slug);
+            return (
             <figure
               key={e.slug}
               style={{
@@ -126,8 +182,24 @@ export default function FoundationBattleArenaSpriteGallery() {
               >
                 {e.name}
               </figcaption>
+              {bewertung ? (
+                <div
+                  title={
+                    bewertung.begruendung +
+                    (bewertung.fehlendesDetail ? ` — fehlt für 5★: ${bewertung.fehlendesDetail}` : "")
+                  }
+                  style={{ fontSize: 13, textAlign: "center", cursor: "help" }}
+                >
+                  <SterneAnzeige sterne={bewertung.sterne} />
+                </div>
+              ) : (
+                <div className="muted" style={{ fontSize: 11 }}>
+                  unbewertet
+                </div>
+              )}
             </figure>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
