@@ -5705,7 +5705,12 @@
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
-          logZug(gewinner.side,"rebound",{spieler:gewinner});
+          // `offensiv` rein additiv fuer die Abnahme (s. basketballProbe): das reale
+          // Verhaeltnis Defensiv- zu Offensiv-Rebound (~74:26, NBA-Liga-Mittel und im
+          // NBA2K-Reverse-Engineering bestaetigt) ist eine Eigenschaft des SPIELS, nicht
+          // der Teamstaerke — es muss unabhaengig davon stimmen, wer die Rebounds holt.
+          // Ohne dieses Feld liess sich die Quote aus dem Protokoll nicht ablesen.
+          logZug(gewinner.side,"rebound",{spieler:gewinner,offensiv:eigen});
           fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
           fsLive.reboundKampf=null;
           if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
@@ -12682,6 +12687,110 @@
         deckerAbstandMismatch:mit(deck.schwach), deckerAbstandEbenbuertig:mit(deck.stark),
         mannVerlorenJeSpiel:+(verlorenEreignisse/spiele).toFixed(1),
         anteilMannVerloren:deckTicks?+(verlorenTicks/deckTicks*100).toFixed(1):0};
+    },
+    // RANGTREUE-SONDE (NBA2K-Modell-Runde, 01.09., s. docs/design/battle-mode-nba2k-modell-plan.md).
+    // Read-only wie diagDynamik/spieleBasketball daneben — spielt n Basketballspiele headless
+    // durch und gibt je Spiel je Spieler genau die Groessen zurueck, die die neue Abnahme
+    // braucht:
+    //   * eig            — die Eignung des Spielers (basisWert+Slot+Form), der SOLL-Rang
+    //   * wert           — dieselbe Impact-Formel wie MOTOREN.basketball.wert(), der IST-Rang
+    //   * Boxscore       — Punkte/Rebounds/Assists/Steals/Bloecke/Verluste/FG
+    //   * fgOffen/fgEng  — Feldwuerfe getrennt nach Deckerabstand im Abwurfmoment
+    //                      (>=BEDRAENGT_RADIUS = offen), fuer die zwei Rollenproben
+    //   * decker         — WER ihn ueber das Spiel hinweg tatsaechlich gedeckt hat (der
+    //                      Verteidiger mit den meisten Deckungs-Ticks, waehrend seine Seite
+    //                      angriff) samt Anteil — die Manndeckung wird live nachgezogen
+    //                      (zuordneDeckung), ein Endstand-Schnappschuss waere irrefuehrend
+    //   * ballwechsel    — wie oft fsLive.amBall in einem Spiel kippte (die "Ballbesitze"-
+    //                      Zahl, an der Eingriff (d) haengt)
+    // `jeSeite` setzt die Feldgroesse fuer die Dauer der Messung um (2v2/4v4/6v6, s.
+    // resolveDisciplinePlayerCount in lib/resolve/rank-to-points.ts — playerCount ist im
+    // echten Spiel NICHT fix) und wird danach zurueckgesetzt.
+    basketballProbe:(opt)=>{
+      const o=opt||{};
+      const n=o.n||10, dauer=o.dauer||(SPIELDAUER_BASKETBALL+5), saat0=o.saat0!=null?o.saat0:1337;
+      const schritt=o.schritt||7919;
+      const art=FELDSPIEL_ART.basketball, altJeSeite=art.jeSeite;
+      const M=MOTOREN.basketball, gesichert=M.sichern();
+      if(o.jeSeite)art.jeSeite=o.jeSeite;
+      M.vorher();
+      const spiele=[];
+      try{
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          feldspielDisc="basketball"; bauFeldspiel(saat0+i*schritt);
+          const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
+          let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
+          while(!done&&fsT<dauer&&guard<20000){
+            stepFeldspiel(1/60); guard++;
+            if(!fsLive)continue;
+            if(fsLive.amBall!==letzteSeite){ ballwechsel++; letzteSeite=fsLive.amBall; }
+            for(const team of FSTEAM)for(const u of team){
+              if(!u.deckt||u.side===fsLive.amBall)continue;
+              const k=u.deckt.id+"|"+u.id;
+              deckTicks.set(k,(deckTicks.get(k)||0)+1);
+            }
+          }
+          // Wurfprotokoll auswerten: offen vs. bedraengt im Abwurfmoment.
+          //
+          // NACH DISTANZSTUFE GETRENNT, nicht nur offen/eng: ein offener Wurf ist
+          // ueberwiegend ein Distanzwurf (GEO_BONUS.fern 0,075), ein bedraengter
+          // ueberwiegend einer am Ring (GEO_BONUS.dunk 0,70). Ohne die Trennung misst
+          // "offen minus bedraengt" die Wurfdistanz und nicht die Deckung — und liest
+          // dann sogar das falsche Vorzeichen (nachgemessen, s. Bericht). Dieselbe
+          // Vorsicht, die der bestehende Bedraengnis-Kommentar in entscheideBallaktion
+          // als "tier-isoliert" beschreibt.
+          const fg=new Map();
+          const leer=()=>({offenV:0,offenT:0,engV:0,engT:0});
+          const holeFg=(id)=>{ if(!fg.has(id))fg.set(id,{gesamt:leer(),
+            tier:{dunk:leer(),nah:leer(),mit:leer(),fern:leer()}});
+            return fg.get(id); };
+          // REBOUND-GRUNDVERTEILUNG (Chris, 01.09.): Defensiv- gegen Offensiv-Rebound.
+          // Zweite, voellig eigene Achse neben "wer holt ihn" — s. Plan §2.
+          let rebOff=0, rebDef=0;
+          for(const e of fsZuege){
+            if(e.art==="rebound"){ if(e.offensiv)rebOff++; else rebDef++; }
+            if(e.art!=="treffer"&&e.art!=="fehlwurf")continue;
+            if(e.freiwurf)continue;
+            const z=holeFg(e.spieler.id);
+            const d=e.deckerAbstandBeiWurf;
+            const offen=(d==null||d>=BEDRAENGT_RADIUS);
+            const ziele=[z.gesamt]; if(e.tier&&z.tier[e.tier])ziele.push(z.tier[e.tier]);
+            for(const t of ziele){
+              if(offen){ t.offenV++; if(e.art==="treffer")t.offenT++; }
+              else { t.engV++; if(e.art==="treffer")t.engT++; }
+            }
+          }
+          const alle=[...FSTEAM[0],...FSTEAM[1]];
+          const spieler=alle.map(u=>{
+            let bester=null,bestN=0,summe=0;
+            for(const v of FSTEAM[1-u.side]){
+              const c=deckTicks.get(u.id+"|"+v.id)||0;
+              summe+=c; if(c>bestN){ bestN=c; bester=v; }
+            }
+            const z=fg.get(u.id)||{gesamt:{offenV:0,offenT:0,engV:0,engT:0},
+              tier:{dunk:{offenV:0,offenT:0,engV:0,engT:0},nah:{offenV:0,offenT:0,engV:0,engT:0},
+                    mit:{offenV:0,offenT:0,engV:0,engT:0},fern:{offenV:0,offenT:0,engV:0,engT:0}}};
+            return {n:u.n, side:u.side, eig:+u.eig.toFixed(2),
+              wert:+(u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8).toFixed(2),
+              punkte:u.punkte, rebounds:u.rebounds, assists:u.assists, steals:u.steals,
+              bloecke:u.bloecke, verluste:u.verluste, fouls:u.fouls,
+              fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
+              fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
+              fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
+              decker:bester?bester.n:null, deckerAbwehr:bester?bester.ABWEHR:null,
+              deckerAnteil:summe?+(bestN/summe).toFixed(2):null,
+              AUFBAU:u.AUFBAU, ABSCHLUSS:u.ABSCHLUSS, TECHNIK:u.TECHNIK, ZWEITCHANCE:u.ZWEITCHANCE,
+              ABWEHR:u.ABWEHR, TEAMGEIST:u.TEAMGEIST, SCHUSS_NAH:u.SCHUSS_NAH,
+              SCHUSS_FERN:u.SCHUSS_FERN, LAUFTEMPO:u.LAUFTEMPO};
+          });
+          spiele.push({saat:saat0+i*schritt, seiten:[fsPunkte[0],fsPunkte[1]], ballwechsel,
+            rebOff, rebDef, spieler});
+        }
+      } finally {
+        art.jeSeite=altJeSeite; M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      return {jeSeite:o.jeSeite||altJeSeite, spiele};
     },
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
