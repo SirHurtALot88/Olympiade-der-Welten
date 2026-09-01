@@ -70,5 +70,24 @@
     "urheber": "diamonddmgirl",
     "lizenz": "CC-BY 4.0",
     "url": "https://opengameart.org/content/24x32-supernatural-creatures"
+  },
+  "_hinweis_vigil_seraph": "Nachtrag 01.09. (Chris' Grundsatz-Ansage 'wir wollen nie mehr das mit den besten Naeherungswerten haben ... 2 Richtungen ist nicht perfekt, aber besser als nichts', s. docs/design/sprite-fit-bewertungssystem.md Abschnitt 'Assets werden nie exklusiv reserviert'): taube_walk.png und singvogel_walk.png fuer Vigil (Ueberwachungskamera-Taube) bzw. Seraph-11 (mechanischer Reiher/Storch, als Chris' Weisskopfseeadler-Korrektur). Beide als vollbild:-Eintrag verdrahtet (s. VOLLBILD-Tabelle in battle-mode.engine.js), nicht ueber den Kopf/Ruestung-Baukasten — der kennt bis heute keinen einzigen Vogelkopf.",
+  "taube_walk.png": {
+    "original": "PNG/32x32/pigeon-NESW.png aus pigeon-1.1.zip",
+    "paket": "Pigeon (Blue Bird Rework)",
+    "blatt": "96x128 = 3 Spalten x 4 Reihen zu 32x32, ECHTES 4-Richtungs-Blatt (keine Notloesung noetig) — Reihenfolge laut Paket-README 'N/E/S/W fuer Stendhal', per Sichtcheck bestaetigt (Reihe 0 Ruecken/N, 1 Seite-Ost/E, 2 Front/S, 3 Seite-West/W). Deckt sich exakt mit der bestehenden STENDHAL_ROW-Konvention (stendhal:true), keine eigene rowMap noetig.",
+    "urheber": "Jordan Irwin (AntumDeluge), reworked von Onno Timmerman (Enquest)'s 'Bird blue flying' (CC0)",
+    "lizenz": "CC-BY 3.0 / CC-BY 4.0 / OGA-BY 3.0 (Attribution an Enquest erbeten, aber laut README nicht verpflichtend)",
+    "url": "https://opengameart.org/content/pigeon-blue-bird-rework",
+    "verwendung": "Vigil (Portrait: fotorealistische Taube mit Ueberwachungskamera als Kopf) — vollbild:\"taube\". Die Kamera selbst ist keine Sprite-Ebene (es gibt kein Kamera-Blatt im Repo), sondern prozedural gezeichnet (zeichneKameraKopf in battle-mode.engine.js, b.kamera:true)."
+  },
+  "singvogel_walk.png": {
+    "original": "bird_1_brown.png",
+    "paket": "[LPC] Birds",
+    "blatt": "96x256 = 3 Spalten x 8 Reihen zu 32x32. Reihen 0-3 sind der FLUG-Zyklus (ungenutzt), Reihen 4-7 der Boden-/Stehzyklus (per Sichtcheck: 4 Seite-rechts, 5 Ruecken/hinten, 6 Front/vorn, 7 Seite-links) — deshalb eigene rowMap statt stendhal:true/false.",
+    "urheber": "bluecarrot16 (inspiriert von Refuzzles CC0-'winter-birds' fuer die Cardinal-Farben, hier nicht relevant)",
+    "lizenz": "CC-BY 3.0 / CC-BY 4.0 / CC-BY-SA 3.0 / CC-BY-SA 4.0 / GPL 2.0 / GPL 3.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-birds",
+    "verwendung": "Seraph-11 (Portrait: dunkle mechanische Reiher-/Storch-Kreatur, langer Hals/Schnabel/Beine) — vollbild:\"singvogel\", vollbildFarbe dunkel eingefaerbt. NAEHERUNG, kein Treffer: von den 15 Voegeln in [LPC] Birds hat KEINER einen Reiher-/Kranich-Koerper (alle drei Basistypen sind kompakte Kleinvoegel); 'bird_1' (hier: die neutrale braune Variante statt einer benannten Art wie bluejay/cardinal) hat von den dreien den spitzesten Schnabel und die am staerksten laenglich gezogene Silhouette — die naechstliegende der 15, nicht die zuvor vorgemerkte bird_2_eagle (s. public/sprites/arena/quellen.json, dort Chris' Begruendung, warum ein Adler-Koerper nicht passt)."
   }
 }

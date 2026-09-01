@@ -94,3 +94,41 @@ Bei jedem gefundenen Widerspruch dieser Art: einen Remark/Kommentar im Code UND 
 Bewertung betroffen ist) einen Hinweis im `begruendung`-Feld der Sprite-Fit-Bewertung hinterlassen,
 der explizit sagt "Bild und Tags widersprechen sich" — nicht stillschweigend nach eigenem
 Ermessen zwischen beiden vermitteln.
+## Grundsatz: Assets werden nie exklusiv reserviert (Chris, 01.09.)
+
+Anlass war Vigil (Taube mit Überwachungskamera als Kopf): "[LPC] Birds" enthält keine Taube, und
+die drei gefundenen Ein-Richtungs-Tauben-Sprites auf itch.io hatten jeweils nur über verlinkte
+Zusatzseiten prüfbare Lizenzen. Ein früherer Agent hatte deshalb recherchiert, aber nichts
+eingebaut — "kein perfektes Asset gefunden" blieb als Endergebnis stehen. Chris' Reaktion:
+
+> "Entweder machst du den dann halt in 2 Richtungen oder den ähnlichsten der 15 Vögel nehmen,
+> Spieler reservieren ja keine Assets nur für sich alleine! [...] wir wollen nie mehr das mit
+> den besten Näherungswerten haben [...] 2 Richtungen ist nicht perfekt, aber besser als nichts,
+> wenn es dafür wenigstens eine Taube ist [...] so sollst du das dann bei allen auch immer
+> handhaben."
+
+Zwei Regeln folgen daraus, ab sofort für JEDEN Sprite-Fix-Auftrag verbindlich:
+
+1. **Keine Asset-Exklusivität.** Dieselbe Bild-/Sprite-Quelle darf für beliebig viele Charaktere
+   verwendet werden. Dass ein Blatt schon einem anderen Charakter zugeordnet ist, ist KEIN Grund,
+   es für einen weiteren Charakter zu verwerfen — solange es die bessere Annäherung ist als das,
+   was der Charakter aktuell hat. (Konkret bereits so gehandhabt: `bird_1_brown` einerseits für
+   Seraph-11 als Reiher-Näherung, dasselbe `[LPC] Birds`-Paket andererseits schon für die Deko in
+   `public/sprites/arena/vogel_adler.png` — eine Quelle, mehrere Verwendungen, ohne Konflikt.)
+
+2. **Eine unvollständige Näherung schlägt immer keinen Fix.** Eine Richtung statt vier (gespiegelt
+   für die zweite Seite, grobe Notlösung für die restlichen zwei), die ähnlichste von mehreren
+   verfügbaren Arten statt eines exakten Treffers, ein Körpertyp, der nur die Silhouette trifft
+   und nicht die spezifischen Details — all das wird eingebaut und im Code dokumentiert, nicht
+   liegengelassen. "Kein perfektes Asset gefunden, also nichts eingebaut" ist ab sofort **keine
+   akzeptable Endmeldung mehr** für einen Sprite-Fix-Auftrag. Die Dokumentationspflicht bleibt
+   unverändert bestehen (Kommentar im Code, `quellen.json`-Eintrag, ggf. Hinweis im
+   `begruendung`-Feld der Sprite-Fit-Bewertung) — dokumentiert wird die Lücke, nicht vertuscht,
+   aber sie blockiert den Fix nicht mehr.
+
+Beispiel für Regel 2, direkt aus demselben Auftrag: Seraph-11 (mechanischer Reiher/Storch) trifft
+keiner der 15 Vögel in `[LPC] Birds` körperlich — alle 15 sind kompakte Kleinvögel ohne langen
+Hals oder lange Beine. Eingebaut wurde trotzdem die ähnlichste der 15 (`bird_1`, die schlankste
+und spitzschnäbligste der drei Grund-Körpertypen), mit dokumentierter Begründung im BAU-Kommentar
+und in `public/sprites/vogel/quellen.json` — nicht der vorher vorgemerkte, aber körperlich
+unpassende Weißkopfseeadler, und nicht "gar kein Vogel".
