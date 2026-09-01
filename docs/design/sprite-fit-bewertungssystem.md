@@ -79,3 +79,18 @@ Für jeden Charakter aus `data/generated/battle-arena-sprite-gallery.json` wird 
 
 Die vollständige Auswertung der ersten Bewertungsrunde (Verteilung, Triage-Listen für 1-Stern-
 und 4-Stern-Fälle) steht in [`sprite-fit-ergebnisse.md`](./sprite-fit-ergebnisse.md).
+
+## Grundsatz: Bild schlägt Tags (Chris, 01.09.)
+
+Wenn Konzept-Portrait und die Daten-Tags eines Charakters (Rasse `r`, Unterklasse `sub`, o.ä.)
+sich widersprechen — wie bei Krolach, dessen Portrait einen Eis-/Kristall-Koloss zeigt, während
+sein Sprite über Jahre einem grünhäutigen Troll-Humanoid folgte, ohne dass das je auffiel —
+**gilt IMMER das Bild als Wahrheit für die Optik, nie die Tags.** Tags dürfen an das Bild
+angepasst werden (wie bei Krolachs Umstellung auf `Behemoth`/`Warrior`, passend zum jetzt
+korrekt gebauten Golem-Vollbild), aber niemals umgekehrt — das Sprite folgt nie den Tags gegen
+das Bild.
+
+Bei jedem gefundenen Widerspruch dieser Art: einen Remark/Kommentar im Code UND (falls die
+Bewertung betroffen ist) einen Hinweis im `begruendung`-Feld der Sprite-Fit-Bewertung hinterlassen,
+der explizit sagt "Bild und Tags widersprechen sich" — nicht stillschweigend nach eigenem
+Ermessen zwischen beiden vermitteln.
