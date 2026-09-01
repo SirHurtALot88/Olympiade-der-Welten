@@ -18,6 +18,7 @@ function mergeStats(
 ): PlayerAttributeSheetStats {
   return {
     height: current?.height ?? row.height ?? null,
+    heightIsEstimate: current?.heightIsEstimate ?? row.heightIsEstimate ?? null,
     power: current?.power ?? row.power ?? null,
     health: current?.health ?? row.health ?? null,
     stamina: current?.stamina ?? row.stamina ?? null,
