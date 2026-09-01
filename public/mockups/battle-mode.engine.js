@@ -13242,6 +13242,188 @@
     return {disziplin:dId, protokoll, wert, punkte, namen};
   }
 
+  // ABNAHME-SONDE FUER ALLE FELDSPIEL-DISZIPLINEN (Hockey-Plan PR 0, s.
+  // docs/design/hockey-rollout-plan.md Teil H.8). Bis hierher hiess sie basketballProbe
+  // und war auf Basketball verdrahtet — mit der Folge, dass sich fuer Hockey die halbe
+  // Abnahme (Rangtreue, Rollenproben) gar nicht fahren liess. Sie bleibt als Alias
+  // erhalten; die alten Aufrufer merken nichts.
+  //
+  // WAS EINE VORAB-DISZIPLIN NICHT LIEFERN KANN. Nur Basketball faehrt heute den
+  // Live-Motor (`feldspielDisc==="basketball"` in bauFeldspiel). Alle anderen Feldspiele
+  // rechnen ihr Ergebnis in bauFeldspiel vorab durch; dort gibt es kein fsLive, keine
+  // Manndeckung, kein `e.tier` und kein `e.deckerAbstandBeiWurf`. Die Sonde gibt fuer
+  // solche Disziplinen deshalb `live:false` und `fehlend:[...]` zurueck und laesst die
+  // betroffenen Felder auf null — sie darf NICHT still Nullen ausgeben, sonst liest eine
+  // Rangtreue-Auswertung "Deckerabstand 0" statt "gibt es hier nicht" (ausdrueckliche
+  // Auflage aus dem Plan, PR 0).
+  function feldspielProbe(dId,opt){
+      const id=dId||"basketball";
+      const art=FELDSPIEL_ART[id];
+      if(!art)throw new Error("feldspielProbe: \""+id+"\" ist keine Feldspiel-Disziplin. "
+        +"Vorhanden: "+Object.keys(FELDSPIEL_ART).join(", "));
+      const o=opt||{};
+      // SPIELDAUER JE DISZIPLIN. Basketball hat als einzige eine eigene Konstante (vier
+      // Viertel a 1:30); die Vorab-Disziplinen brauchen nur so viel Zeit, wie ihre
+      // vorberechneten Zuege zum Abspielen kosten — art.zuegeJeSeite*2 Zuege a
+      // art.zugDauer. +5 s Zugabe wie bisher, damit der Schlusspfiff sicher faellt.
+      const grunddauer=(id==="basketball")?SPIELDAUER_BASKETBALL
+        :Math.ceil(art.zuegeJeSeite*2*art.zugDauer);
+      const n=o.n||10, dauer=o.dauer||(grunddauer+5), saat0=o.saat0!=null?o.saat0:1337;
+      const schritt=o.schritt||7919;
+      // TICK-DECKEL DER SONDE (01.09. geraeumt, zweite Fundstelle derselben Runde wie in
+      // spieleBasketball unten): hier stand fest `guard<20000` — 20000 Ticks a 1/60 s,
+      // also 333 s Simulationszeit, waehrend `dauer` per Vorgabe SPIELDAUER_BASKETBALL+5
+      // = 365 s ist. Der Deckel griff damit VOR der Schranke, die er absichern sollte:
+      // nachgemessen (12 Spiele, jeSeite 6, guard/fsT/done instrumentiert) lief JEDES
+      // Spiel in den Deckel, `done` war 12 von 12 Mal false, und die Uhr stand bei 306,9
+      // bis 330,3 s von 360 s — 30 bis 53 s je Spiel fehlten, mitten im vierten Viertel
+      // abgeschnitten. Die Streuung kommt daher, dass angehaltene Uhr (Freiwurf-Stand-
+      // phasen, Viertelpausen) Ticks verbraucht, ohne `fsT` zu bewegen. Genau dafuer
+      // rechnet der Deckel jetzt eine Reserve ein — dieselbe Groesse und dieselbe
+      // Begruendung wie in MOTOREN[fd].lauf() (s. der Opus-Review-Fund dort): aus `dauer`
+      // abgeleitet statt als zweite Zahl gepflegt, damit beide nicht auseinanderlaufen,
+      // plus 60 s fuer die Standphasen. Er bleibt eine echte Notbremse gegen eine
+      // Endlosschleife, liegt aber jetzt OBERHALB der Spieldauer statt darunter.
+      const tickDeckel=Math.ceil((dauer+60)*60);
+      const altJeSeite=art.jeSeite;
+      // Die Sub-Skills kommen aus dem REZEPT der Disziplin, nicht aus einer festen Liste.
+      // Vorher standen Basketballs zehn hier ausgeschrieben; Hockey hat sieben, und der
+      // Plan schlaegt zwoelf vor. Dieselbe Quelle, aus der auch feldspielSubskills() liest.
+      const subskills=Object.keys(art.rezept||{});
+      // Nur Basketball faehrt den Live-Motor (bauFeldspiel, die eine Weiche dort).
+      const live=(id==="basketball");
+      const M=MOTOREN[id], gesichert=M.sichern();
+      if(o.jeSeite)art.jeSeite=o.jeSeite;
+      M.vorher();
+      const spiele=[];
+      try{
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          feldspielDisc=id; bauFeldspiel(saat0+i*schritt);
+          const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
+          let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
+          while(!done&&fsT<dauer&&guard<tickDeckel){
+            stepFeldspiel(1/60); guard++;
+            if(!fsLive)continue;
+            if(fsLive.amBall!==letzteSeite){ ballwechsel++; letzteSeite=fsLive.amBall; }
+            for(const team of FSTEAM)for(const u of team){
+              if(!u.deckt||u.side===fsLive.amBall)continue;
+              const k=u.deckt.id+"|"+u.id;
+              deckTicks.set(k,(deckTicks.get(k)||0)+1);
+            }
+          }
+          // Wurfprotokoll auswerten: offen vs. bedraengt im Abwurfmoment.
+          //
+          // NACH DISTANZSTUFE GETRENNT, nicht nur offen/eng: ein offener Wurf ist
+          // ueberwiegend ein Distanzwurf (GEO_BONUS.fern 0,075), ein bedraengter
+          // ueberwiegend einer am Ring (GEO_BONUS.dunk 0,70). Ohne die Trennung misst
+          // "offen minus bedraengt" die Wurfdistanz und nicht die Deckung — und liest
+          // dann sogar das falsche Vorzeichen (nachgemessen, s. Bericht). Dieselbe
+          // Vorsicht, die der bestehende Bedraengnis-Kommentar in entscheideBallaktion
+          // als "tier-isoliert" beschreibt.
+          //
+          // ABSTANDSBAENDER STATT EINER SCHWELLE (Hockey-Plan H.9, Auflage fuer diesen PR).
+          // Die binaere Einteilung oben misst die Deckungswirkung systematisch ZU KLEIN,
+          // und der Grund steht in der Wurfformel selbst: `bedraengnisGate` staffelt den
+          // Malus STUFENLOS ueber
+          //     max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.46
+          // — ein Verteidiger auf 29 px kostet also fast nichts, einer auf Tuchfuehlung
+          // fast den vollen Malus. Die Sonde warf beide in denselben Topf "bedraengt".
+          // Nachgemessen (miss-basketball-rangtreue.mjs gegen origin/main, n=60, jeSeite 6):
+          // binaer las der Vorteil eines offenen Wurfs +2,2 Pp, waehrend der
+          // Kalibrier-Kommentar der Wurfformel eine gemessene Spanne von -12,5 Pp ausweist
+          // (71,4 % offen gegen 58,9 % stark bedraengt). Kein Mechanikfehler — ein zu
+          // grobes Messinstrument.
+          // Die binaeren Felder (offenV/offenT/engV/engT) BLEIBEN unveraendert daneben
+          // stehen, damit alle bisher erhobenen Zahlen vergleichbar bleiben.
+          const BAENDER=[[0,10],[10,20],[20,30],[30,Infinity]];
+          const bandVon=(d)=>{ if(d==null)return null;
+            for(let b=0;b<BAENDER.length;b++)if(d>=BAENDER[b][0]&&d<BAENDER[b][1])return b;
+            return BAENDER.length-1; };
+          const fg=new Map();
+          const leer=()=>({offenV:0,offenT:0,engV:0,engT:0,
+            bandV:[0,0,0,0], bandT:[0,0,0,0]});
+          const holeFg=(id)=>{ if(!fg.has(id))fg.set(id,{gesamt:leer(),
+            tier:{dunk:leer(),nah:leer(),mit:leer(),fern:leer()}});
+            return fg.get(id); };
+          // REBOUND-GRUNDVERTEILUNG (Chris, 01.09.): Defensiv- gegen Offensiv-Rebound.
+          // Zweite, voellig eigene Achse neben "wer holt ihn" — s. Plan §2.
+          // Je SEITE getrennt, plus die Fehlwuerfe je Seite als Nenner: nur so laesst sich
+          // die Rebound-QUOTE (OREB%/DREB%) bilden. Die rohe Rebound-ZAHL taugt als
+          // Staerkemass nicht — ein starkes Angriffsteam wirft oefter, produziert also
+          // mehr gegnerische Defensiv-Rebounds und sieht in der Rohzahl schwaecher aus,
+          // als es ist (nachgemessen: Team-Korrelation auf der Rohzahl liest -0,48,
+          // obwohl die Spielerebene gleichzeitig +0,79 liest — ein reines Nenner-Artefakt).
+          let rebOff=0, rebDef=0;
+          const rebOffSeite=[0,0], rebDefSeite=[0,0], fehlSeite=[0,0];
+          for(const e of fsZuege){
+            if(e.art==="rebound"){
+              if(e.offensiv){ rebOff++; rebOffSeite[e.seite]++; }
+              else { rebDef++; rebDefSeite[e.seite]++; }
+            }
+            if((e.art==="fehlwurf"||e.art==="block")&&!e.freiwurf)fehlSeite[e.spieler.side]++;
+            if(e.art!=="treffer"&&e.art!=="fehlwurf")continue;
+            if(e.freiwurf)continue;
+            const z=holeFg(e.spieler.id);
+            const d=e.deckerAbstandBeiWurf;
+            const offen=(d==null||d>=BEDRAENGT_RADIUS);
+            const band=bandVon(d);
+            const ziele=[z.gesamt]; if(e.tier&&z.tier[e.tier])ziele.push(z.tier[e.tier]);
+            for(const t of ziele){
+              if(offen){ t.offenV++; if(e.art==="treffer")t.offenT++; }
+              else { t.engV++; if(e.art==="treffer")t.engT++; }
+              // Nur zaehlen, wenn ein Abstand UEBERHAUPT vorlag. Bei einer Vorab-
+              // Disziplin ist deckerAbstandBeiWurf nicht gesetzt — dann bleiben die
+              // Baender leer statt bei 0 zu stehen (s. Kopfkommentar der Funktion).
+              if(band!=null){ t.bandV[band]++; if(e.art==="treffer")t.bandT[band]++; }
+            }
+          }
+          const alle=[...FSTEAM[0],...FSTEAM[1]];
+          const spieler=alle.map(u=>{
+            let bester=null,bestN=0,summe=0;
+            for(const v of FSTEAM[1-u.side]){
+              const c=deckTicks.get(u.id+"|"+v.id)||0;
+              summe+=c; if(c>bestN){ bestN=c; bester=v; }
+            }
+            const z=fg.get(u.id)||{gesamt:leer(),
+              tier:{dunk:leer(),nah:leer(),mit:leer(),fern:leer()}};
+            const zeile={n:u.n, side:u.side, eig:+u.eig.toFixed(2),
+              wert:+(u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8).toFixed(2),
+              punkte:u.punkte, rebounds:u.rebounds, assists:u.assists, steals:u.steals,
+              bloecke:u.bloecke, verluste:u.verluste, fouls:u.fouls,
+              fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
+              fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
+              fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
+              // Neu (H.9): dieselben Wuerfe nach TATSAECHLICHEM Deckerabstand gebuendelt.
+              fgBandV:z.gesamt.bandV, fgBandT:z.gesamt.bandT,
+              // Manndeckung gibt es nur im Live-Motor. Bei einer Vorab-Disziplin bleiben
+              // diese drei ausdruecklich null — nicht 0, s. Kopfkommentar.
+              decker:bester?bester.n:null, deckerAbwehr:bester?(bester.ABWEHR!=null?bester.ABWEHR:null):null,
+              deckerAnteil:summe?+(bestN/summe).toFixed(2):null};
+            // Sub-Skills aus dem Rezept der Disziplin statt aus einer festen Liste
+            // (Basketball zehn, Hockey heute sieben, nach dem Plan zwoelf).
+            for(const k of subskills)zeile[k]=u[k];
+            return zeile;
+          });
+          spiele.push({saat:saat0+i*schritt, seiten:[fsPunkte[0],fsPunkte[1]], ballwechsel,
+            rebOff, rebDef, rebOffSeite, rebDefSeite, fehlSeite, spieler});
+        }
+      } finally {
+        art.jeSeite=altJeSeite; M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      // WAS DIESER LAUF NICHT LIEFERN KONNTE — ausdruecklich benannt statt still mit
+      // Nullen aufgefuellt (Plan-Auflage fuer PR 0). Wer die Sonde fuer eine Vorab-
+      // Disziplin faehrt, muss am Ergebnis SEHEN, dass die halbe Abnahme dort gar nicht
+      // laeuft, statt eine Rangtreue auf Nullspalten zu rechnen.
+      const fehlend=live?[]:[
+        "deckerAbstandBeiWurf (keine Manndeckung im Vorab-Pfad) -> fgOffen*/fgEng*/fgBand* bleiben leer",
+        "tier (keine Wurfdistanzstufen im Vorab-Pfad) -> fgTier bleibt leer",
+        "decker/deckerAbwehr/deckerAnteil (kein fsLive) -> null",
+        "ballwechsel (kein fsLive.amBall) -> 0"];
+      return {disziplin:id, live, fehlend, subskills,
+        jeSeite:o.jeSeite||altJeSeite, spiele};
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
     zielansageLauf,
     // Zielansage, read-only: WER gerade angesagt ist und wie lange noch gesperrt ist
@@ -13468,118 +13650,11 @@
     // `jeSeite` setzt die Feldgroesse fuer die Dauer der Messung um (2v2/4v4/6v6, s.
     // resolveDisciplinePlayerCount in lib/resolve/rank-to-points.ts — playerCount ist im
     // echten Spiel NICHT fix) und wird danach zurueckgesetzt.
-    basketballProbe:(opt)=>{
-      const o=opt||{};
-      const n=o.n||10, dauer=o.dauer||(SPIELDAUER_BASKETBALL+5), saat0=o.saat0!=null?o.saat0:1337;
-      const schritt=o.schritt||7919;
-      // TICK-DECKEL DER SONDE (01.09. geraeumt, zweite Fundstelle derselben Runde wie in
-      // spieleBasketball unten): hier stand fest `guard<20000` — 20000 Ticks a 1/60 s,
-      // also 333 s Simulationszeit, waehrend `dauer` per Vorgabe SPIELDAUER_BASKETBALL+5
-      // = 365 s ist. Der Deckel griff damit VOR der Schranke, die er absichern sollte:
-      // nachgemessen (12 Spiele, jeSeite 6, guard/fsT/done instrumentiert) lief JEDES
-      // Spiel in den Deckel, `done` war 12 von 12 Mal false, und die Uhr stand bei 306,9
-      // bis 330,3 s von 360 s — 30 bis 53 s je Spiel fehlten, mitten im vierten Viertel
-      // abgeschnitten. Die Streuung kommt daher, dass angehaltene Uhr (Freiwurf-Stand-
-      // phasen, Viertelpausen) Ticks verbraucht, ohne `fsT` zu bewegen. Genau dafuer
-      // rechnet der Deckel jetzt eine Reserve ein — dieselbe Groesse und dieselbe
-      // Begruendung wie in MOTOREN[fd].lauf() (s. der Opus-Review-Fund dort): aus `dauer`
-      // abgeleitet statt als zweite Zahl gepflegt, damit beide nicht auseinanderlaufen,
-      // plus 60 s fuer die Standphasen. Er bleibt eine echte Notbremse gegen eine
-      // Endlosschleife, liegt aber jetzt OBERHALB der Spieldauer statt darunter.
-      const tickDeckel=Math.ceil((dauer+60)*60);
-      const art=FELDSPIEL_ART.basketball, altJeSeite=art.jeSeite;
-      const M=MOTOREN.basketball, gesichert=M.sichern();
-      if(o.jeSeite)art.jeSeite=o.jeSeite;
-      M.vorher();
-      const spiele=[];
-      try{
-        for(let i=0;i<n;i++){
-          zieheFormkarten(20260823+i*104729);
-          feldspielDisc="basketball"; bauFeldspiel(saat0+i*schritt);
-          const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
-          let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
-          while(!done&&fsT<dauer&&guard<tickDeckel){
-            stepFeldspiel(1/60); guard++;
-            if(!fsLive)continue;
-            if(fsLive.amBall!==letzteSeite){ ballwechsel++; letzteSeite=fsLive.amBall; }
-            for(const team of FSTEAM)for(const u of team){
-              if(!u.deckt||u.side===fsLive.amBall)continue;
-              const k=u.deckt.id+"|"+u.id;
-              deckTicks.set(k,(deckTicks.get(k)||0)+1);
-            }
-          }
-          // Wurfprotokoll auswerten: offen vs. bedraengt im Abwurfmoment.
-          //
-          // NACH DISTANZSTUFE GETRENNT, nicht nur offen/eng: ein offener Wurf ist
-          // ueberwiegend ein Distanzwurf (GEO_BONUS.fern 0,075), ein bedraengter
-          // ueberwiegend einer am Ring (GEO_BONUS.dunk 0,70). Ohne die Trennung misst
-          // "offen minus bedraengt" die Wurfdistanz und nicht die Deckung — und liest
-          // dann sogar das falsche Vorzeichen (nachgemessen, s. Bericht). Dieselbe
-          // Vorsicht, die der bestehende Bedraengnis-Kommentar in entscheideBallaktion
-          // als "tier-isoliert" beschreibt.
-          const fg=new Map();
-          const leer=()=>({offenV:0,offenT:0,engV:0,engT:0});
-          const holeFg=(id)=>{ if(!fg.has(id))fg.set(id,{gesamt:leer(),
-            tier:{dunk:leer(),nah:leer(),mit:leer(),fern:leer()}});
-            return fg.get(id); };
-          // REBOUND-GRUNDVERTEILUNG (Chris, 01.09.): Defensiv- gegen Offensiv-Rebound.
-          // Zweite, voellig eigene Achse neben "wer holt ihn" — s. Plan §2.
-          // Je SEITE getrennt, plus die Fehlwuerfe je Seite als Nenner: nur so laesst sich
-          // die Rebound-QUOTE (OREB%/DREB%) bilden. Die rohe Rebound-ZAHL taugt als
-          // Staerkemass nicht — ein starkes Angriffsteam wirft oefter, produziert also
-          // mehr gegnerische Defensiv-Rebounds und sieht in der Rohzahl schwaecher aus,
-          // als es ist (nachgemessen: Team-Korrelation auf der Rohzahl liest -0,48,
-          // obwohl die Spielerebene gleichzeitig +0,79 liest — ein reines Nenner-Artefakt).
-          let rebOff=0, rebDef=0;
-          const rebOffSeite=[0,0], rebDefSeite=[0,0], fehlSeite=[0,0];
-          for(const e of fsZuege){
-            if(e.art==="rebound"){
-              if(e.offensiv){ rebOff++; rebOffSeite[e.seite]++; }
-              else { rebDef++; rebDefSeite[e.seite]++; }
-            }
-            if((e.art==="fehlwurf"||e.art==="block")&&!e.freiwurf)fehlSeite[e.spieler.side]++;
-            if(e.art!=="treffer"&&e.art!=="fehlwurf")continue;
-            if(e.freiwurf)continue;
-            const z=holeFg(e.spieler.id);
-            const d=e.deckerAbstandBeiWurf;
-            const offen=(d==null||d>=BEDRAENGT_RADIUS);
-            const ziele=[z.gesamt]; if(e.tier&&z.tier[e.tier])ziele.push(z.tier[e.tier]);
-            for(const t of ziele){
-              if(offen){ t.offenV++; if(e.art==="treffer")t.offenT++; }
-              else { t.engV++; if(e.art==="treffer")t.engT++; }
-            }
-          }
-          const alle=[...FSTEAM[0],...FSTEAM[1]];
-          const spieler=alle.map(u=>{
-            let bester=null,bestN=0,summe=0;
-            for(const v of FSTEAM[1-u.side]){
-              const c=deckTicks.get(u.id+"|"+v.id)||0;
-              summe+=c; if(c>bestN){ bestN=c; bester=v; }
-            }
-            const z=fg.get(u.id)||{gesamt:{offenV:0,offenT:0,engV:0,engT:0},
-              tier:{dunk:{offenV:0,offenT:0,engV:0,engT:0},nah:{offenV:0,offenT:0,engV:0,engT:0},
-                    mit:{offenV:0,offenT:0,engV:0,engT:0},fern:{offenV:0,offenT:0,engV:0,engT:0}}};
-            return {n:u.n, side:u.side, eig:+u.eig.toFixed(2),
-              wert:+(u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8).toFixed(2),
-              punkte:u.punkte, rebounds:u.rebounds, assists:u.assists, steals:u.steals,
-              bloecke:u.bloecke, verluste:u.verluste, fouls:u.fouls,
-              fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
-              fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
-              fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
-              decker:bester?bester.n:null, deckerAbwehr:bester?bester.ABWEHR:null,
-              deckerAnteil:summe?+(bestN/summe).toFixed(2):null,
-              AUFBAU:u.AUFBAU, ABSCHLUSS:u.ABSCHLUSS, TECHNIK:u.TECHNIK, ZWEITCHANCE:u.ZWEITCHANCE,
-              ABWEHR:u.ABWEHR, TEAMGEIST:u.TEAMGEIST, SCHUSS_NAH:u.SCHUSS_NAH,
-              SCHUSS_FERN:u.SCHUSS_FERN, LAUFTEMPO:u.LAUFTEMPO};
-          });
-          spiele.push({saat:saat0+i*schritt, seiten:[fsPunkte[0],fsPunkte[1]], ballwechsel,
-            rebOff, rebDef, rebOffSeite, rebDefSeite, fehlSeite, spieler});
-        }
-      } finally {
-        art.jeSeite=altJeSeite; M.zurueck(gesichert); zieheFormkarten(20260823);
-      }
-      return {jeSeite:o.jeSeite||altJeSeite, spiele};
-    },
+    // Generische Abnahme-Sonde fuer ALLE Feldspiel-Disziplinen (Hockey-Plan PR 0).
+    // basketballProbe bleibt als Alias erhalten, damit bestehende Aufrufer
+    // (scripts/miss-basketball-rangtreue.mjs) unveraendert weiterlaufen.
+    feldspielProbe,
+    basketballProbe:(opt)=>feldspielProbe("basketball",opt),
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
     // zieht, nicht nur die nackte Punktwolke — s. SEITEN-BALANCE-FIX-Kommentar bei SLOTS oben.
