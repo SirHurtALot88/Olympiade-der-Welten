@@ -464,9 +464,9 @@
  {
   "name": "Krolach",
   "slug": "krolach",
-  "sterne": 2,
-  "begruendung": "Nur eine vage 'Kreatur'-Kategorie bleibt übrig; das Sprite ist ein grünhäutiges Reptilwesen statt des massiven grau-türkisen Kristall-Titanen mit mehreren leuchtenden Edelsteinen aus dem Portrait - Farbe, Material und Skalierung stimmen alle nicht (Hinweis: weicht von Chris' Beschreibung als 'Standard-Construct-Look' ab, siehe Bericht).",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Nach dem Golem-Umbau (#713) jetzt ein blauer Kristall-Titan in der richtigen Farbfamilie und Silhouette statt des früheren grünen Reptilwesens.",
+  "fehlendesDetail": "Die mehreren leuchtenden, im Kristallkörper eingebetteten Edelstein-Lichter aus dem Portrait fehlen im Sprite komplett."
  },
  {
   "name": "Lady Mournvale",
@@ -765,8 +765,8 @@
  {
   "name": "Seraph-11",
   "slug": "seraph-11",
-  "sterne": 2,
-  "begruendung": "Eine kleine Metall-Maske am Gesicht deutet entfernt auf den Roboter-Vogel hin, aber der komplett vogeluntypische humanoide Körper, der fehlende Schnabel und das fehlende orange Brustlicht sorgen für keinen echten Bezug zum eigentlichen Kranich-Roboter.",
+  "sterne": 3,
+  "begruendung": "Nach dem Reiher-Umbau (01.09., rein prozedural aus Formen statt eines Sprites) stimmt die Grundform jetzt: langer Hals, lange dünne Beine, vogelartige Silhouette, leuchtender Energiekern am Kopf als Auge. Es bleibt aber eine grobe geometrische Näherung statt einer detaillierten Vogelgestalt: Farbe zu hell/blaugrau statt des fast schwarzen Portraits, keine Gefieder-/Federtextur, der Schnabel ist nur im Profil sichtbar.",
   "fehlendesDetail": null
  },
  {
@@ -789,6 +789,13 @@
   "sterne": 2,
   "begruendung": "Bronzefarbene Rüstung passt vom Ton her, aber der namensgebende riesige Schild - das absolut zentrale Element - fehlt komplett, ebenso der Kriegshammer und der Spitzhelm.",
   "fehlendesDetail": null
+ },
+ {
+  "name": "Shroomgator",
+  "slug": "shroomgator",
+  "sterne": 3,
+  "begruendung": "Krokodil mit mehreren Fliegenpilzen (Kappe+Stiel+Tupfen) auf dem Rücken verteilt trifft das Kernkonzept, aber es bleibt ein glatthäutiges Krokodil statt eines moosbewachsenen Alligators, die Pilzdichte ist deutlich geringer als im dicht bewachsenen Portrait, und sichtbare Zähne/Klauen fehlen.",
+  "fehlendesDetail": "Moos-Textur, Zahnreihe und dichtere Pilzverteilung fehlen."
  },
  {
   "name": "Sister Ilora",
@@ -947,9 +954,9 @@
  {
   "name": "Vigil",
   "slug": "vigil",
-  "sterne": 1,
-  "begruendung": "Die generische graue humanoide Figur hat keinerlei Bezug zur Überwachungskamera-Taube - keine Federn, kein Vogelkörper, keine Kamera am Kopf; das Portrait zeigt ein reales Tier mit Objekt-Fusion, für das der Humanoid-Baukasten strukturell nichts hergibt.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Echte Taube mit Überwachungskamera als Kopf jetzt getroffen (01.09.-Umbau, prozedurale Kamera-Requisite deckt den kompletten Kopf, echtes 4-Richtungs-Taubensprite): Federkörper, Beine, Kamera-Gehäuse mit Objektiv und roter Aufnahme-LED sind da, im Profil zeigt das Objektiv sogar seitlich in Laufrichtung statt frontal.",
+  "fehlendesDetail": "Der tropfende Flüssigkeitsfaden am Kamera-Gehäuse aus dem Portrait fehlt."
  },
  {
   "name": "Vorrak",
