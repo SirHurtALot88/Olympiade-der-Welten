@@ -350,6 +350,14 @@ export default function FoundationBattleArenaHost({
       for (const src of huelle.scriptSrcs) {
         const script = document.createElement("script");
         script.src = src;
+        // REIHENFOLGE ERZWINGEN. Die Huelle laedt seit dem Rezept-Umzug ZWEI Skripte:
+        // erst battle-mode.rezepte.js (setzt window.__ARENA_REZEPTE), dann den Motor,
+        // der die Rezepte beim Aufbau seiner Chassis-Tabellen liest. Per
+        // createElement erzeugte <script src> sind aber standardmaessig `async`, laufen
+        // also in ZUFAELLIGER Reihenfolge (wer zuerst geladen ist, laeuft zuerst) — ohne
+        // diese Zeile koennte der Motor vor den Daten starten und faende sie nicht.
+        // `async = false` stellt die Dokument-Reihenfolge wieder her.
+        script.async = false;
         container.appendChild(script);
       }
     })();
