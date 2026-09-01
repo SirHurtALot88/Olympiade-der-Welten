@@ -1108,3 +1108,54 @@ und dass die Aufstellung die Arena nicht erreicht (H.3).
 | **9** | Produktivierung — Orchestrator je Disziplin, Override-Map je Disziplin | ja |
 
 Sechs der dreizehn Schritte ändern kein Spielverhalten. `main` bleibt nach jedem deploybar.
+
+### H.9 PR 0 bekommt eine Auflage aus einer eigenen Messung: die Wurfqualitäts-Zahl ist zu grob
+
+Beim Nachmessen der Basketball-Abnahme gegen `origin/main` (`20efe4fb`, Werkzeug
+`scripts/miss-basketball-rangtreue.mjs`, Quelle in der Ausgabe genannt) ist eine Schwäche
+der Sonde selbst aufgefallen, die beim generischen Umbau mit repariert gehört.
+
+**Was gemessen wurde.** Die Spalte `S:dPp(tier)` (offen minus bedrängt, nach Distanzstufe
+isoliert) liest, je Distanzstufe:
+
+| Stufe | n=24 Spiele | n=60 Spiele |
+|---|---:|---:|
+| dunk | +11,0 (n=31) | +7,9 (n=86) |
+| nah | +3,3 (n=79) | +1,0 (n=217) |
+| mit | **−6,3** (n=59) | **−1,4** (n=137) |
+| fern | +12,1 (n=74) | +3,7 (n=172) |
+| **gesamt** | **+4,6** | **+2,2** |
+
+Die scheinbare Umkehrung in der Mitteldistanz (−6,3) ist **Rauschen** — sie schrumpft bei
+mehr als doppelter Stichprobe auf −1,4. Das ist kein Mechanikfehler und darf nicht als
+solcher behandelt werden.
+
+**Was dagegen ein echter Befund ist:** der Gesamtvorteil eines offenen Wurfs liest nur
+**+2,2 Pp**, während der Kalibrierungskommentar in der Wurfformel (`engine.js`, Absatz zu
+`bedraengnisGate`) eine gemessene Spanne von **−12,5 Pp** ausweist (71,4 % offen gegen
+58,9 % stark bedrängt).
+
+**Der Widerspruch ist eine Definitionsfrage, kein Mechanikfehler.** Die Formel staffelt den
+Malus **stufenlos** über `bedraengnisGate = max(0,(BEDRAENGT_RADIUS−deckerAbstand)/BEDRAENGT_RADIUS)*0.46`;
+die Sonde teilt aber **binär** bei `deckerAbstandBeiWurf >= BEDRAENGT_RADIUS` (30 px). Ein
+Wurf mit einem Verteidiger auf 29 px zählt dort genauso als „bedrängt" wie einer auf
+Tuchfühlung, obwohl die Formel dem ersten fast keinen Malus gibt. Die Sonde verwässert
+damit systematisch den Effekt, den die Mechanik tatsächlich erzeugt — sie misst die
+Deckungswirkung kleiner, als sie ist.
+
+**Auflage für PR 0:** beim generischen Umbau gibt die Sonde die Trefferquote nicht mehr nur
+gegen ein binäres „offen/bedrängt" aus, sondern gegen den tatsächlichen Deckerabstand in
+Bändern (Vorschlag: 0-10, 10-20, 20-30, ≥30 px, je Distanzstufe). Der binäre Wert bleibt
+als Spalte erhalten, damit die bisherigen Zahlen vergleichbar bleiben.
+
+Das ist keine Ausweitung von PR 0, sondern seine eigentliche Aufgabe: PR 0 macht die
+Abnahme-Sonde tauglich, und eine Sonde, die eine stufenlose Mechanik binär misst, ist für
+Hockey genauso untauglich wie für Basketball. Ohne diese Änderung würde Hockeys
+PARADE/SCHUSSBLOCK-Abnahme (D.2) denselben Fehler erben.
+
+**Für die Vollständigkeit, weil beide Zahlen im Umlauf sind:** die Rangtreue selbst liest
+gegen `origin/main` rho(ges) 0,826 / rho(Seite) 0,791 bei n=24 und 0,799 / 0,771 bei n=60 —
+die Stichprobengröße erklärt den Unterschied vollständig. Beide Läufe sind auf **durch den
+20000-Tick-Deckel abgeschnittenen** Spielen entstanden (12 von 12 Spielen erreichen den
+Schlusspfiff nicht, gemessen: 306,9-330,3 s von 360 s). Sie sind deshalb als Vorher-Stand
+zu lesen und nach der Deckel-Reparatur neu zu erheben.
