@@ -32,6 +32,18 @@ dieser Runde, sonst Konflikt in `battle-mode.engine.js`.
 > Ende; `spieleBasketball` behält den alten Deckel wortgleich, damit dieser reine
 > Struktur-Umbau kein Verhalten verschiebt. Den Deckel zu räumen verschiebt Messwerte
 > (Schlussviertel-FG%) und gehört in eine eigene Runde mit eigener Abnahme.
+>
+> **Nachtrag 01.09.: erledigt (PR #731).** Der Absatz darüber ist das Protokoll von
+> #726 und beschreibt nicht mehr den Ist-Stand. Die eigene Runde hat stattgefunden:
+> `spieleBasketball` lässt `opt.lauf` jetzt weg und nutzt `M.lauf()` (166 → **183**
+> Ereignisse bei Saat 1337, wie hier vorhergesagt). Dabei kam eine **zweite** Fundstelle
+> desselben Deckels dazu, die #726 nicht kannte: `basketballProbe`, also die Sonde hinter
+> der Rangtreue-Abnahme selbst — dort griff er in **12 von 12** Spielen, `done` wurde nie
+> erreicht, die Uhr stand bei 306,9–330,3 s von 360. Jede Rangtreue-Zahl vor #731 ist
+> damit an abgeschnittenen Spielen entstanden. Die Verschiebung ist gemessen und steht in
+> #731: rho(ges) 0,793 → 0,798 bei n=100 (die Rangtreue hält), Punkte/Spiel 77,8 → 86,8,
+> FGA 72,9 → 82,0 — rund 12 % mehr Volumen, weil das Schlussviertel jetzt mitgespielt wird.
+> Die dritte Fundstelle (`bahnLauf`) bleibt bewusst stehen, sie bindet nie.
 > Offen aus 1.2 bleiben Punkt 3 (Archetyp-Demo-Skript), Punkt 4 (Runbook) und Punkt 5
 > (Wertungstabellen-UI).
 
