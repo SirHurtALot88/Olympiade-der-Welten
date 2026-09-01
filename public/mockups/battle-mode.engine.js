@@ -593,12 +593,16 @@
     // Construct-Dings — einfaerben waere gut"): golem_walk.png selbst ist silbrig-blaugrau,
     // keine der Ruestungs-Rampen trifft. Generisches Flag, s. bHolEingefaerbt.
     "Lava Golem":         {vollbild:"golem",vollbildFarbe:"#7a1f1f",effekt:{typ:"feuer",pos:"koerper"},gluehenderRiss:true},
-    // effekt "frost"/"koerper" (25.08., Ausbau ueber Feuer hinaus, Bildbefund oben in
-    // subclass-archetypes.ts: "Steinerner Elementarkoloss aus Fels, Wasserfaellen und EIS,
-    // orange und blaue Kristalle im Rumpf eingelassen"): das Eis sitzt laut Bildbefund IM
-    // RUMPF, nicht am Kopf — deshalb "koerper" wie beim Lava-Vollbild, nur eben fuer einen
-    // normalen (nicht-vollbild) Sprite, s. zeichneSprite.
-    "Krolach":            {kopf:"troll",haut:"dark_green",ruest:"leder",hoerner:true,effekt:{typ:"frost",pos:"koerper"}},
+    // 01.09., Chris' Fund: Bildbefund (s. subclass-archetypes.ts) ist "Steinerner
+    // Elementarkoloss aus Fels, Wasserfaellen und EIS, orange und blaue Kristalle im Rumpf
+    // eingelassen" — der bisherige kopf:"troll"-Humanoid (grosse gruene Haut, Hoerner) traf
+    // das nie, obwohl der Kommentar hier die richtige Bildbeschreibung schon hatte. Chris:
+    // "dann muesstest du Krolach auf Construct Behemoth Warrior setzen" — analog zu
+    // Vorrak/Krag'Zul (beide vollbild:"golem" mit eigener Faerbung statt Metall/Lava) auf
+    // dasselbe Vollbild umgestellt, mit einer eisig-blaugrauen Faerbung statt Vorraks Eisen-
+    // grau oder Krag'Zuls Violett. effekt "frost"/"koerper" blieb (war schon korrekt fuer
+    // das Eis im Rumpf) — nur der Koerper darunter wechselt von Humanoid auf Golem.
+    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"}},
     "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel"},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
     // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
@@ -1991,7 +1995,7 @@
     // und solange es sie nicht gibt, tragen alle denselben Satz (siehe oben).
     {n:"Draco",c:"Warlord",skills:MATRIARCH,r:"Human",sub:["Knight","Destroyer","Scout"],tp:["Fair","Diligent","Loyal"],tn:["Renegade","Egomaniac"],d:{tdm:66.1,spurt:44.2},a:{power:81,health:84,stamina:37,intelligence:35,awareness:6,determination:64,speed:19,dexterity:43,charisma:89,will:72,spirit:40,torment:66}},
     {n:"Lava Golem",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Wayfarer","Behemoth"],tp:["FanFavorite","Healthy","FiredUp"],tn:["Vindictive","Scandalous"],d:{tdm:63.2,spurt:24.2},a:{power:98,health:99,stamina:29,intelligence:1,awareness:1,determination:21,speed:1,dexterity:2,charisma:94,will:35,spirit:2,torment:96}},
-    {n:"Krolach",c:"Templar",skills:MATRIARCH,r:"Construct",sub:["Guardian","Destroyer"],tp:["Loyal","Eloquent"],tn:["Vindictive"],d:{tdm:60.5,spurt:47.7},a:{power:86,health:88,stamina:22,intelligence:47,awareness:32,determination:82,speed:20,dexterity:3,charisma:33,will:94,spirit:45,torment:64}},
+    {n:"Krolach",c:"Templar",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Warrior"],tp:["Loyal","Eloquent"],tn:["Vindictive"],d:{tdm:60.5,spurt:47.7},a:{power:86,health:88,stamina:22,intelligence:47,awareness:32,determination:82,speed:20,dexterity:3,charisma:33,will:94,spirit:45,torment:64}},
     {n:"Johanna",c:"Templar",skills:MATRIARCH,r:"Human",sub:["Guardian","Knight"],tp:["Loyal","Motivated","Fearless"],tn:["FaintHearted","Obsessive"],d:{tdm:50.7,spurt:44.8},a:{power:56,health:81,stamina:51,intelligence:29,awareness:22,determination:64,speed:23,dexterity:32,charisma:44,will:86,spirit:68,torment:69}},
     {n:"King Arlen Morgolor",c:"Hero",skills:MATRIARCH,r:"Human",sub:["Warrior","Royalty"],tp:["Eloquent","Altruistic"],tn:[],d:{tdm:47.9,spurt:13.3},a:{power:40,health:70,stamina:26,intelligence:60,awareness:39,determination:54,speed:32,dexterity:33,charisma:95,will:1,spirit:96,torment:12}},
     {n:"Gram",c:"Warlord",skills:MATRIARCH,r:"Lizard",sub:["Guardian"],tp:["Loyal","Relaxed"],tn:["Lazy"],d:{tdm:45.8,spurt:23},a:{power:67,health:79,stamina:14,intelligence:12,awareness:18,determination:73,speed:3,dexterity:5,charisma:41,will:33,spirit:65,torment:58}},
