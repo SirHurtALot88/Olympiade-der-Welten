@@ -273,4 +273,10 @@
 </div>
 </div>
 
+<!-- Erst die Daten, dann der Motor: battle-mode.rezepte.js setzt window.__ARENA_REZEPTE
+     (die Attribut-Rezepte je Disziplin), battle-mode.engine.js liest sie beim Aufbau
+     seiner vier Chassis-Tabellen. Die Reihenfolge dieser zwei Zeilen ist die ganze
+     "Bauanleitung" — kein Bundler, kein Modulsystem. Fehlt die erste Datei, faellt der
+     Motor je Disziplin auf sein Inline-Rezept zurueck (s. rezeptAus() dort). -->
+<script src="battle-mode.rezepte.js"></script>
 <script src="battle-mode.engine.js"></script>

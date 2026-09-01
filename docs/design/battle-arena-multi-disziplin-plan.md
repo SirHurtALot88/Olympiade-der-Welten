@@ -11,6 +11,30 @@ strengeres Ziel (≤15 Pp, vier Archetypen). Dieser Plan fasst deshalb bewusst *
 Rezeptwerte** an und plant nur Struktur — Umsetzung der Struktur-Punkte erst nach Merge
 dieser Runde, sonst Konflikt in `battle-mode.engine.js`.
 
+> **Stand 01.09.: Abschnitt 1.2 Punkte 1 und 2 sind umgesetzt** (die Basketball-Runde
+> „NBA-2K-Modell", PR #710, ist gemergt, die Sperre oben also aufgehoben).
+> — **Punkt 1:** `public/mockups/battle-mode.rezepte.js` existiert, wird in
+> `battle-mode.html` **vor** dem Motor geladen und setzt `window.__ARENA_REZEPTE`.
+> Im Motor zieht `rezeptAus(dId, inline)` die vier Chassis-Tabellen einmal nach
+> (`rezepteNachziehen`, direkt hinter `BAHN_ART`): Daten-Datei gewinnt, sonst gilt das
+> Inline-Rezept, und „weder noch" wirft laut. Ausgelagert ist bisher **nur Basketball**
+> (mit seiner kompletten Kalibrier-Historie); die übrigen 19 laufen unverändert über den
+> Rückfall und ziehen einzeln nach. Keine Zahl geändert — `spieleBasketball(1337)` liefert
+> vorher wie nachher dasselbe Ereignisprotokoll, Zeichen für Zeichen.
+> — **Punkt 2:** `window.__arena.spiele(dId, saat)` gibt es, generisch über `MOTOREN[dId]`
+> (sichern/vorher/bau/lauf/wert/namen + zurück), Rückgabe
+> `{disziplin, protokoll, wert, punkte, namen}`. `spieleBasketball` ist jetzt ein Alias auf
+> denselben Ablauf. Dabei ist ein **Fund** aufgefallen, der bewusst NICHT mitrepariert
+> wurde: der historische Deckel `guard<20000` in `spieleBasketball` sind 333 s
+> Simulationszeit, ein Spiel dauert seit der Viertel-Umstellung aber 360 s — der Hook
+> schneidet also seit dieser Umstellung jedem Spiel die letzten ~27 s ab (166 statt 183
+> Ereignisse bei Saat 1337). `spiele()` nutzt den korrekten Motor-Deckel und spielt zu
+> Ende; `spieleBasketball` behält den alten Deckel wortgleich, damit dieser reine
+> Struktur-Umbau kein Verhalten verschiebt. Den Deckel zu räumen verschiebt Messwerte
+> (Schlussviertel-FG%) und gehört in eine eigene Runde mit eigener Abnahme.
+> Offen aus 1.2 bleiben Punkt 3 (Archetyp-Demo-Skript), Punkt 4 (Runbook) und Punkt 5
+> (Wertungstabellen-UI).
+
 ---
 
 ## 0. Befund vorab: mehr ist schon modular, als der Auftrag vermutet
