@@ -7433,8 +7433,44 @@
         if(b.kamera)zeichneKameraKopf(x,20,21,0.8);
         return;
       }
-      const setz=(key,ton)=>{const im=sprite(key,ton);if(!im||!im.width)return;
+      // Eine 64px-Ebene, Spalte 0 / Zeile r — die Grundmechanik, auf der alle folgenden
+      // Ebenen-Helfer aufsetzen (Gegenstueck zu male(im,64,0,0) in zeichneSprite).
+      const setzIm=(im)=>{if(!im||!im.width)return;
         try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
+      // Dasselbe mit frei waehlbarer Spalte — bislang brauchte das niemand, weil jede Ebene
+      // ihre Ruhepose in Spalte 0 hat. Der Bogen ist die eine Ausnahme (s. dort).
+      const setzIm2=(im,sp)=>{if(!im||!im.width)return;
+        try{x.drawImage(im,sp*64,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
+      const setz=(key,ton)=>setzIm(sprite(key,ton));
+      // Dieselbe 64px-Mechanik wie setz(), nur ueber die RUESTUNGS-Rampe (spriteRuest) statt
+      // der Hautrampe — Gegenstueck zu zeichneR() in zeichneSprite. Stand bislang zweimal
+      // ausgeschrieben (b.ruest, b.helm) und wird jetzt zusaetzlich von b.hose gebraucht.
+      const setzR=(key,ton)=>setzIm(spriteRuest(key,ton));
+      // Dasselbe ueber die HAAR-Rampe (spriteHaar) — Gegenstueck zu zeichneHaar() in
+      // zeichneSprite, fuer Haar/Bart/Krone. Chris' Fund am Kaderleisten-Screenshot ("Lulu,
+      // Inefinna, King Arlen Morgolor, Jorund stehen kahl da, und die Waffen fehlen noch!"):
+      // haar/bart/krone/hose standen in BAU laengst drin und wurden von der ANIMIERTEN
+      // Ansicht laengst gezeichnet — nur dieser Zeichenblock hier fragte sie nie ab. Genau
+      // umgekehrte Richtung desselben Fehlers wie bei b.fluegel weiter unten.
+      const setzHaar=(key,ton)=>setzIm(spriteHaar(key,ton));
+      // NAHKAMPFWAFFEN — Blaetter mit groesseren Zellen (128 bzw. 192 statt 64) und eigenem
+      // Versatz, exakt dieselben Zahlen wie male(im,zell,ox,oy) in zeichneSprite; nur die
+      // Spalte ist hier fest 0 statt des laufenden Animationsbilds f.
+      //
+      // WARUM SPALTE 0. Schwert/Axt/Stab/Zweihaender haben im Baukasten NUR ein Angriffs-
+      // blatt (s. quellen.json: sword/arming/attack_slash, blunt/waraxe/attack_slash,
+      // magic/gnarled/thrust, sword/longsword/attack_slash) — kein Steh-/Laufblatt, anders
+      // als der Bogen, der mit bogen_shoot eine fertige Pose mitbringt. Alle sechs Spalten
+      // der Zeile r=3 nebeneinandergestellt (Frame-Explorer, 01.09.): Spalte 0 zeigt bei
+      // allen vier Blaettern die Waffe ruhig in der Hand VOR dem Ausholen, ab Spalte 1
+      // laeuft der Schwung mit Bewegungsunschaerfe, ab Spalte 4 ist die Waffe teils ganz
+      // aus der Zelle heraus. Spalte 0 ist damit die einzige brauchbare Steh-Pose — und
+      // genau die, die die bis zum 01.09. bestehende B_FIGUR-Tabelle fuer dieselben
+      // Blaetter benutzt hat (sw_bg/sw_fg fuer Krolach/Johanna, axt_bg/fg fuer Draco,
+      // t_stab_bg/fg fuer Jorund/Ralazar, jeweils Spalte 0). Bewusster Kompromiss, keine
+      // perfekte Loesung: ein echtes Idle-Blatt fuer diese vier Waffen gibt es nicht.
+      const setzWaffe=(im,zell,ox,oy)=>{if(!im||!im.width)return;
+        try{x.drawImage(im,0,r*zell,zell,zell,ox-AUSX,oy-AUSY,zell,zell);}catch(e){}};
       // Fluegel (Chris' Fund: "im Mockup/in der Aufstellung sind Fluegel noch drin, aber im
       // Spiel fehlt es" — nachgemessen war es umgekehrt: zeichneSprite [die Live-Simulation]
       // zeichnet b.fluegel laengst ueber zeichneFluegel/z_fluegel_bg+fg, dieser Rueckfall
@@ -7448,26 +7484,85 @@
       // Rueckfall hier ist seither der EINZIGE Weg, wie figur() Fluegel zeichnet). bHol/
       // ton=null wie in zeichneFluegel oben, aus demselben Sprite-Bestand — kein zweites
       // Bild, dieselbe Datei wie in der Animation.
-      const setzFluegel=(key)=>{const im=bHol(key,null);if(!im||!im.width)return;
-        try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
-      if(b.fluegel)setzFluegel("z_fluegel_bg");
+      const setzFluegel=(key)=>setzIm(bHol(key,null));
+      // b.fluegel==="federn"/"fledermaus": ECHTE Fluegelblaetter statt des einen starren
+      // Fremdbilds z_fluegel — dieselbe Fallunterscheidung, die zeichneSprite laengst trifft
+      // (Elyon: weisse Federn; Dyrth: schwarze Fledermausfluegel). Ohne sie zeigte die Ikone
+      // beiden die blassen z_fluegel, die Arena die richtigen.
+      if(b.fluegel==="federn")setz("fluegel_federn_bg_walk",null);
+      else if(b.fluegel==="fledermaus")setz("fluegel_fledermaus_bg_walk",null);
+      else if(b.fluegel)setzFluegel("z_fluegel_bg");
       if(b.schwanz==="katze")setz("katzenschwanzbg_walk",null);
       else if(b.schwanz)setz("schwanzbg_walk",b.haut);
-      setz("body_walk",b.haut);
+      // Hintere Waffenhaelfte (hinter dem Koerper), Reihenfolge wie in zeichneSprite: bg vor
+      // dem Koerper, fg nach allen Koerperebenen. Schwert aus dem animierbaren SPRITES-Satz
+      // (sprite/schwertbg_slash), die drei anderen aus dem Baukasten-Bestand (bHol) — dieselbe
+      // Quellenaufteilung wie in zeichneSprite/zeichneB, kein zweites Bild.
+      if(b.waffe==="schwert")setzWaffe(sprite("schwertbg_slash",null),128,-32,-32);
+      else if(b.waffe==="axt")setzWaffe(bHol("axt_bg",null),192,-64,-64);
+      else if(b.waffe==="stab")setzWaffe(bHol("t_stab_bg",null),192,-64,-64);
+      else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_bg",null),192,-64,-64);
+      // KOERPER wie in zeichneSprite: b.koerper (Skelett/Zombie, eigene Farbgebung im Blatt)
+      // vor dem weiblichen Koerper vor dem Standardkoerper — und mit Ruestung ueber
+      // spriteBeine(), damit sich die BEINE in der Ruestungsfarbe mitfaerben. Ohne diese drei
+      // Faelle stand jede Frau mit maennlichem Rumpf und jeder Geruestete mit nackten,
+      // hautfarbenen Beinen in der Kaderleiste, waehrend die Arena beides laengst richtig
+      // zeigt (Chris' "nackter Koerper"-Befund am selben Screenshot).
+      const weiblich=b.geschlecht==="w";
+      const koerperKey=b.koerper?("koerper_"+b.koerper+"_walk"):((weiblich?"bodyw_":"body_")+"walk");
+      if(b.koerper)setz(koerperKey,null);
+      else if(b.ruest)setzIm(spriteBeine(koerperKey,b.haut,b.ruest,b.ruestTon));
+      else setz(koerperKey,b.haut);
+      // b.hose: echte Bein-/Hosenebene ueber dem Koerper, wie in zeichneSprite. Betrifft
+      // Inefinna, Xerathis und Catherine, die ohne sie mit nackten Beinen in der Kaderleiste
+      // standen, waehrend die Arena sie laengst bekleidet zeigt.
+      if(b.hose)setzR(b.hose+"_walk",b.ruestTon);
       if(b.ohren==="katze")setz("katzenohrenbg_walk",null);
-      setz("k"+b.kopf+"_walk",b.haut);
+      // Weiblicher Menschenkopf wie in zeichneSprite — nur "human" hat ueberhaupt ein
+      // eigenes weibliches Kopfblatt, die anderen Rassen fuehren ihre Frauenkoepfe als
+      // eigenen b.kopf-Wert (kwolf_frau/korc_frau/klizard_frau) und brauchen hier nichts.
+      setz((weiblich&&b.kopf==="human"?"khumanw_":"k"+b.kopf+"_")+"walk",b.haut);
       if(b.ohren&&b.ohren!=="katze")setz("ohren_walk",b.haut);
       if(b.ohren==="katze")setz("katzenohrenfg_walk",null);
-      if(b.ruest){const im=spriteRuest(b.ruest+"_walk",b.ruestTon);
-        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}}}
-      if(b.hoerner)setz("hoerner_walk",b.haut);
-      if(b.helm){const im=spriteRuest("helm_walk",b.ruestTon);
-        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}}}
+      if(b.ruest)setzR(b.ruest+"_walk",b.ruestTon);
+      if(b.haar)setzHaar(b.haar+"_walk",b.haarTon||"brown");
+      if(b.bart)setzHaar("bart_walk",b.haarTon||"brown");
+      // Helm VOR den Hoernern, Hoerner VOR der Krone — dieselbe Reihenfolge wie in
+      // zeichneSprite. Hier standen die Hoerner bislang unter dem Helm und waren bei einem
+      // vollen Topfhelm faktisch unsichtbar (derselbe Opus-Review-Fund vom 24.08., der in
+      // der animierten Ansicht laengst behoben ist — Draco, Bombblitzer, Steel Sinister).
+      if(b.helm)setzR("helm_walk",b.ruestTon);
+      if(b.hoerner==="gebogen")setz("hoerner_gebogen_walk",b.haut);
+      else if(b.hoerner)setz("hoerner_walk",b.haut);
+      if(b.krone)setz("krone_walk",null);
       if(b.kapuze)setz("kapuze_walk",null);
       if(b.schwanz==="katze")setz("katzenschwanzfg_walk",null);
       else if(b.schwanz)setz("schwanzfg_walk",b.haut);
-      if(b.waffe==="bogen")setz("bogen_shoot",null);
-      if(b.fluegel)setzFluegel("z_fluegel_fg");
+      // BOGEN — anders als alle anderen Waffen NICHT Spalte 0. bogen_shoot hat 13 Spalten,
+      // und der Schuss laeuft darin RUECKWAERTS zur Erwartung: Spalte 0 zeigt nur einen
+      // Splitter des Bogens (die Wurfarme sind fast ganz aus der Zelle heraus), Spalte 1 die
+      // gespannte Sehne als langen waagerechten Strich quer ueber die Brust — genau das, was
+      // Chris am Kader-Screenshot bei Cassandra und Elara sah. Erst ab Spalte 9 steht der
+      // Bogen vollstaendig und ruhig in der Zelle. Alle 13 Spalten der Zeile r=3 nebeneinander
+      // gestellt (Frame-Explorer, 01.09.): 0 Splitter, 1 waagerechter Strich, 2-4 halb
+      // gespannt mit schraeger Sehne, 5-8 Sehne noch schraeg angesetzt, 9-12 der ganze Bogen
+      // mit senkrechter Sehne. Spalte 10 gewaehlt (mittig im ruhigen Bereich, nicht am Rand
+      // eines Uebergangs). Das ist der Gegenpol zu den vier Nahkampfwaffen darunter, die
+      // gerade DESHALB Spalte 0 nehmen — dort liegt bei ihnen die Ruhepose.
+      if(b.waffe==="bogen")setzIm2(sprite("bogen_shoot",null),10);
+      // Vordere Waffenhaelfte (vor dem Koerper), Gegenstueck zum bg-Block oben.
+      else if(b.waffe==="schwert")setzWaffe(sprite("schwertfg_slash",null),128,-32,-32);
+      else if(b.waffe==="axt")setzWaffe(bHol("axt_fg",null),192,-64,-64);
+      else if(b.waffe==="stab")setzWaffe(bHol("t_stab_fg",null),192,-64,-64);
+      else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_fg",null),192,-64,-64);
+      // Feuerwaffe: in der Arena bleibt sie IMMER in der Hand, solange der Kaempfer steht
+      // (s. zeichneSprite, Chris' Vorbild "ein Soldat legt seine Waffe nicht ab") — in der
+      // Ikone fehlte sie ganz, Harbinger stand dort unbewaffnet. Erstes Bild des 9er-Zyklus
+      // statt des laufenden Frames, wie bei jeder anderen Ebene hier.
+      else if(FEUERWAFFEN.includes(b.waffe))setz(b.waffe+"_walk",null);
+      if(b.fluegel==="federn")setz("fluegel_federn_fg_walk",null);
+      else if(b.fluegel==="fledermaus")setz("fluegel_fledermaus_fg_walk",null);
+      else if(b.fluegel)setzFluegel("z_fluegel_fg");
     };
     mal(); setTimeout(mal,300); setTimeout(mal,1200);
     return c;
