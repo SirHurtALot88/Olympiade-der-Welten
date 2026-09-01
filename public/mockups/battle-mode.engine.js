@@ -436,130 +436,59 @@
   // Ruestung und Waffe — genau die Aufteilung, die spaeter aus der Datenbank kommen soll.
 
   // ===================================================================================
-  // EBENENLISTEN DER STEHENDEN FIGUR.
+  // EIN MODELL PRO SPIELER — B_FIGUR ERSATZLOS GESTRICHEN (Chris, 01.09.: "Sorge dafuer,
+  // dass die Vorschau der Charaktere ueberall gleich ist [...] jeder Spieler darf nur EIN
+  // aktuelles Modell haben").
   //
-  // King Arlen Morgolor und Draco stehen WORTGLEICH so hier, wie sie im Sprite-Baukasten
-  // gebaut wurden — nach ihren Portraits. Sie sind der Massstab; die uebrigen zehn sind
-  // nach derselben Regel zusammengesetzt: die RASSE gibt Kopf und Hautton, die
-  // UNTERKLASSEN geben die Ausruestung, und wo ein Spielerbild vorliegt (siehe
-  // lib/battle/subclass-archetypes.ts), gibt das Bild den Ausschlag.
+  // Hier stand bis zum 01.09. eine ZWEITE Ebenenliste je Charakter (B_FIGUR), nur fuer die
+  // STEHENDE Vorschau (Kader-Karte/Aufstellung/Diszi-Vorschau, alle ueber figur()/
+  // figurKlein()) — komplett unabhaengig von BAU/zeichneSprite, die die animierte Arena
+  // zeichnen. figur() las B_FIGUR IMMER zuerst und vollstaendig, mit einem BAU-Rueckfall nur
+  // fuer Spieler OHNE eigenen Eintrag. Vier Faelle waren so schon uebereinander gebaut
+  // gefunden und ersatzlos entfernt worden (Krag'Zul/Rhyx'Tal/Lava Golem/Tidesprinter, PR
+  // #706/#709) — Bildbefund und BAU waren fuer diese vier laengst weitergezogen, B_FIGUR
+  // zeigte noch den alten Stand.
   //
-  // Reihenfolge ist Zeichenreihenfolge: was hinten liegt, steht oben in der Liste.
-  // Format je Ebene: [Blatt, Zellbreite, Versatz X, Versatz Y, Faerbung]
-  // Faerbung "haut" nimmt den Hautton der Figur, sonst "kategorie:ton", sonst null.
-  const B_FIGUR={
-    // 25.08.: sw_bg/sw_fg gestrichen — Bildbefund "Haende leer an der Seite" schliesst eine
-    // gefuehrte Waffe aus (dieselbe Korrektur wie bei BAU["King Arlen Morgolor"] unten).
-    "King Arlen Morgolor":{haut:"light", ebenen:[
-      ["umhang_bg",64,0,0,"stoff:maroon"],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:gold"],["stiefel",64,0,0,"metall:gold"],
-      ["r_slash",64,0,0,"metall:gold"],["arme",64,0,0,"metall:gold"],
-      ["schulter",64,0,0,"metall:gold"],
-      ["haar_lang",64,0,0,"haar:gray"],["bart",64,0,0,"haar:gray"],
-      ["krone",64,0,0,null],
-      ["umhang_fg",64,0,0,"stoff:maroon"]]},
-    "Draco":{haut:"light", ebenen:[
-      ["schild_bg",64,0,0,"metall:iron"],["axt_bg",192,-64,-64,"metall:iron"],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:iron"],["stiefel",64,0,0,"metall:iron"],
-      ["r_slash",64,0,0,"metall:iron"],["arme",64,0,0,"metall:iron"],
-      ["schulter",64,0,0,"metall:iron"],
-      ["helm_horn",64,0,0,"metall:iron"],["visier_horn",64,0,0,"metall:iron"],
-      ["schild_fg",64,0,0,"metall:iron"],["axt_fg",192,-64,-64,"metall:iron"]]},
-
-    // Sprite-Galerie-Audit: Krag'Zul-Eintrag HIER entfernt (war kopf_troll+Stahlruestung,
-    // ein Troll-Humanoid statt des Kristallkoloss aus dem Bild). figur()/figurKlein() (die
-    // Kader-Vorschau UND das Aufstellungs-Board) lesen B_FIGUR IMMER zuerst und komplett
-    // unabhaengig von BAU (s. figur() unten, "if(bf){...return}") — solange dieser Eintrag
-    // hier stand, zeigte die Kader-Vorschau also einen ganz anderen Charakter als die
-    // animierte Battle-Arena-Ansicht (die BAU["Krag'Zul"] mit vollbild:"golem" liest), obwohl
-    // beide angeblich "EIN Charakter" sein sollen. Ohne Eintrag faellt figur() jetzt auf
-    // denselben b.vollbild-Zweig zurueck, den Terradon/Abysskraken/Brightpaw/Arachna & Co.
-    // schon benutzen (kein B_FIGUR-Eintrag fuer diese) — beide Ansichten zeigen jetzt densel-
-    // ben Golem. Per figurProbe vorher/nachher verglichen.
-
-    // RHYX'TAL STAND HIER FRUEHER als eigene GARGOYLE-Ebenenliste (Stein-Ton fur_grey,
-    // z_hoerner, z_fluegel_bg/fg vorn/hinten um den Koerper). Sprite-Konsistenz-Check
-    // (Chris' Fund, s. kaderFigur()/figur()-Header): das war ein VERALTETER Bauplan, von
-    // BEVOR BAU["Rhyx'Tal"] unten (kopf:"lizard",fluegel:true,hoerner:true) feststand, und
-    // figur() liest B_FIGUR VOR dem BAU-Rueckfall — die Kader-/Aufstellungskarte zeigte
-    // deshalb dauerhaft den alten Stand: Fluegel in der Frontalpose eng um den Koerper
-    // gefaltet, kaum als Fluegel zu erkennen, statt der Seitenpose/Faerbung, die
-    // zeichneSprite() (Live-Kampf) laengst ueber b.fluegel/zeichneFluegel zeigt. Ersatzlos
-    // gestrichen: derselbe BAU-Bauplan reicht jetzt fuer alle drei Ansichten (Kader-Karte,
-    // Aufstellung, Kampf) — EIN Charakter, ein Bild, wie gefordert.
-
-    // Bild: rothaarige ELFE mit LANGBOGEN und Koecher, gruener Umhang, leichte Ruestung.
-    "Cassandra":{haut:"light", ebenen:[
-      ["umhang_bg",64,0,0,"stoff:forest"],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],["stiefel",64,0,0,"metall:brass"],
-      ["haar_lang",64,0,0,"haar:redhead"],
-      ["umhang_fg",64,0,0,"stoff:forest"],
-      ["bogen",64,0,0,null],["pfeil",64,0,0,null]]},
-
-    // Bild: mechanischer VOGEL mit leuchtendem Kern. Einen Vogel haben wir nicht — bis
-    // dahin eine schmale Metallgestalt mit Fluegeln. Platzhalter, keine Abbildung.
-    "Seraph-11":{haut:"blue", ebenen:[
-      ["z_fluegel_bg",64,0,0,"metall:silver"],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["r_slash",64,0,0,"metall:silver"],["arme",64,0,0,"metall:silver"],
-      ["visier",64,0,0,"metall:silver"],
-      ["z_fluegel_fg",64,0,0,"metall:silver"]]},
-
-    "Krolach":{haut:"pale_green", ebenen:[
-      ["sw_bg",128,-32,-32,null],
-      ["k_slash",64,0,0,"haut"],["kopf_troll",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:iron"],["stiefel",64,0,0,"metall:iron"],
-      ["r_slash",64,0,0,"metall:iron"],["arme",64,0,0,"metall:iron"],
-      ["schulter",64,0,0,"metall:iron"],["helm",64,0,0,"metall:iron"],
-      ["sw_fg",128,-32,-32,null]]},
-    "Johanna":{haut:"light", ebenen:[
-      ["schild_bg",64,0,0,"metall:steel"],["sw_bg",128,-32,-32,null],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:steel"],["stiefel",64,0,0,"metall:steel"],
-      ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
-      ["haar_lang",64,0,0,"haar:blonde"],
-      ["schild_fg",64,0,0,"metall:steel"],["sw_fg",128,-32,-32,null]]},
-    // Sprite-Galerie-Audit: Lava-Golem-Eintrag HIER entfernt (war kopf_frankenstein+Messing-
-    // ruestung — ein aelterer, laengst verworfener Konzeptstand, sogar noch vor der "orc"-
-    // Kopf-Naeherung, die BAU["Lava Golem"] laut eigenem Kommentar spaeter selbst ablehnte).
-    // Gleicher Fall wie Krag'Zul direkt oben: figur() liest B_FIGUR IMMER zuerst und komplett
-    // unabhaengig von BAU, die Kader-Vorschau zeigte also einen banalen Messing-Ritter statt
-    // des Feuer-/Lavakolosses, den die animierte Ansicht laengst zeigt (vollbild:"golem").
-    // Ohne Eintrag faellt figur() auf denselben b.vollbild-Zweig zurueck wie bei Terradon
-    // direkt daneben. Per figurProbe vorher/nachher verglichen.
-    "Greenkraut":{haut:"green", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_orc",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],["binde",64,0,0,"stoff:walnut"],
-      ["haar_dread",64,0,0,"haar:green"]]},
-    // Sprite-Galerie-Audit: Tidesprinter-Eintrag HIER entfernt (war kopf_lizard+Messing-
-    // Stiefel — dieselbe menschlich-lizard-Naeherung, die BAU["Tidesprinter"] laut eigenem
-    // Kommentar explizit durch vollbild:"froschmensch" ersetzt hat, weil das Bild einen
-    // Wassermann/Meeresdaemon zeigt, keinen Echsenkrieger). Gleicher Fall wie Krag'Zul/Lava
-    // Golem oben: die Kader-Vorschau zeigte weiterhin die alte Lizard-Naeherung statt des
-    // Frogmen-Vollbilds. Ohne Eintrag faellt figur() auf denselben b.vollbild-Zweig zurueck.
-    // Per figurProbe vorher/nachher verglichen.
-    // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab, Feuer im Schnee.
-    // Keine Ruestung, keine Klinge — ein Weiser, kein Kaempfer. Passt zu seinen Werten:
-    // Charisma 85, Spirit 76, Wille 72, Entschlossenheit 81, dagegen Power 10.
-    "Jorund":{haut:"light", ebenen:[
-      ["t_stab_bg",192,-64,-64,null],
-      ["umhang_bg",64,0,0,"stoff:walnut"],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],
-      ["stiefel",64,0,0,"metall:bronze"],
-      ["haar_lang",64,0,0,"haar:gray"],["bart",64,0,0,"haar:gray"],
-      ["umhang_fg",64,0,0,"stoff:walnut"],
-      ["t_stab_fg",192,-64,-64,null]]},
-    "Ralazar the Balanced":{haut:"light", ebenen:[
-      ["t_stab_bg",192,-64,-64,null],
-      ["k_slash",64,0,0,"haut"],["g_slash",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],
-      ["haar_mop",64,0,0,"haar:chestnut"],["bart",64,0,0,"haar:chestnut"],
-      ["t_stab_fg",192,-64,-64,null]]}
-  };
+  // Vollstaendiger Abgleich aller verbliebenen neun Eintraege gegen die jeweilige BAU-Zeile
+  // (per figurProbe/renderProbe nebeneinandergestellt) zeigte: dasselbe Muster, nur nicht
+  // immer so grob. Klar widerspruechlich/veraltet:
+  //   - Seraph-11: B_FIGUR zeigte eine schlanke SILBERNE Metallgestalt mit Fluegeln (alter
+  //     Platzhalter-Kommentar: "mechanischer Vogel, den haben wir nicht"). BAU zeigt laengst
+  //     eine ALIEN-Kopf-Kreatur mit grauem Fell, Lederruestung und Kapuze — ein komplett
+  //     anderes Wesen.
+  //   - Krolach: B_FIGUR zeigte einen vollstaendig helmierten Ritter in Stahl/Eisen-Platte.
+  //     BAU zeigte zu diesem Zeitpunkt einen dunkelgruenen TROLL in LEDER mit Hoernern und
+  //     Frost-Effekt — seitdem (#713) auf vollbild:"golem" umgestellt (Bildbefund: Eis-/
+  //     Kristallkoloss), damit war auch DIESER BAU-Stand schon kein Troll-Humanoid mehr.
+  //     So oder so: keine der beiden Ebenenlisten deckte sich mit der jeweils anderen.
+  //   - Ralazar the Balanced: B_FIGUR zeigte einen HELLHAEUTIGen Mystiker mit Stab und
+  //     kastanienbraunem Haar. BAU zeigt OLIVHAEUTIGE Plattenruestung mit dunkelbraunem Haar
+  //     — anderer Hautton, andere Ruestungsklasse, andere Haarfarbe.
+  //   - Greenkraut: B_FIGUR zeigte sichtbares gruenes Dreadlock-Haar ohne Kopfbedeckung.
+  //     BAU setzt kapuze:true — die Live-Arena zeigt ihn behaubt, die Karte unbehaubt.
+  //   - Johanna: B_FIGUR faerbte die Ruestung ueber die B_METALL-Palette "steel" (hell,
+  //     silbrig). BAU traegt ruestTon:"dunkel" (naeher an Schwarz) — zwei sichtbar
+  //     unterschiedliche Ruestungstoene fuer dieselbe Figur.
+  //
+  // Nicht wirklich neue Information, nur anders erzeugt (also keine "Ausnahme", die B_FIGUR
+  // gerechtfertigt haette): King Arlen Morgolor, Draco, Cassandra und Jorund stimmten in
+  // Rasse/Hautton/Ruestungsfarbe/Waffe/Haar bereits mit ihrer BAU-Zeile ueberein — B_FIGUR
+  // fuegte dort nur Zierrat hinzu, den die animierte Ansicht ohnehin nie zeigt (Umhang,
+  // Schild): schild_bg/fg und umhang_bg/fg werden ausserhalb von B_FIGUR an KEINER Stelle
+  // von zeichneSprite gezeichnet (nachgemessen per Grep) — die Arena kannte diese Zierebenen
+  // also so oder so nie, mit oder ohne B_FIGUR blieb die Karte in genau diesem Detail reicher
+  // als der Kampf. Auch fuer diese vier war B_FIGUR also keine zweite, eigenstaendige
+  // Wahrheit ueber das Aussehen, nur eine hoehere Detailstufe desselben Bauplans.
+  //
+  // ENTSCHEIDUNG: die GESAMTE Tabelle ist gestrichen, nicht nur die widerspruechlichen
+  // Eintraege — fuer alle 13 je in B_FIGUR gefuehrten Charaktere (die neun oben plus die vier
+  // schon vorher entfernten) existiert eine vollstaendige BAU-Zeile mit echtem kopf/haut-
+  // Bauplan (kein einziger war ausschliesslich ueber B_FIGUR sichtbar). Es gibt also keinen
+  // Fall, in dem B_FIGUR die einzige Quelle fuer ein Standbild waere. Damit gibt es
+  // strukturell keine zweite Tabelle mehr, aus der figur() lesen koennte — jeder Spieler hat
+  // jetzt GENAU EINEN Bauplan (BAU), den Kader-Karte, Aufstellung, Diszi-Vorschau UND die
+  // animierte Arena gleichermassen lesen. Diese Garantie haelt tests/battle-arena-ein-modell-
+  // ueberall.test.ts fest.
 
   const BAU={
     // Vigilante Wranglers. Rasse gibt Kopf, Hautton und Aufsaetze, die Klasse gibt
@@ -7328,7 +7257,10 @@
   }
 
   // Die Figur daneben: ein stehendes Bild aus demselben Baukasten, mit dem die Arena
-  // zeichnet. Keine zweite Darstellung, dieselben Ebenen.
+  // zeichnet. Keine zweite Darstellung, dieselben Ebenen — und seit dem 01.09. (Chris'
+  // "EIN Modell"-Vorgabe, s. Kommentar vor BAU oben) auch keine zweite TABELLE mehr, aus
+  // der hier gelesen werden koennte: nur noch BAU/BAU_STD, derselbe Bauplan, den
+  // zeichneSprite() fuer die animierte Arena liest.
   function figur(p){
     // AUSSCHNITT STATT VOLLBILD. Eine LPC-Zelle ist 64 x 64, die Figur steht aber nur in
     // ihrer Mitte: rundherum liegt leerer Rand, und bei 44 x 52 wurde ausgerechnet der
@@ -7346,22 +7278,8 @@
     c.style.width=Math.round(40*figurFaktor)+"px";
     c.style.height=Math.round(50*figurFaktor)+"px";
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
-    const bf=B_FIGUR[p.n];
     const mal=()=>{
       x.clearRect(0,0,40,50);
-      if(bf){
-        // AUS DEM VOLLEN BAUKASTEN. Erstes Bild der Slash-Folge, Blickrichtung 2 (zum
-        // Betrachter) — genau die Pose, in der der Sprite-Entwurf sie zeigt. Hier
-        // funktionieren Krone, Doppelaxt, Schulterstuecke und Umhang, weil nur EIN Bild
-        // gebraucht wird; in der Animation fehlen ihnen die Laufblaetter.
-        for(const [key,zell,ox,oy,spec] of bf.ebenen){
-          const im=bHol(key, spec==="haut"?bf.haut:spec);
-          if(!im||!im.width)continue;
-          try{x.drawImage(im,0,2*zell,zell,zell,ox-AUSX,oy-AUSY,zell,zell);}catch(e){}
-        }
-        return;
-      }
-      // Rueckfall auf den einfachen Bauplan, solange ein Spieler keine Ebenenliste hat.
       const b=BAU[p.n]||BAU_STD, r=3;
       // VOLLBILD-Kreaturen (Golem/Kraken/Werwolf/Spinne/Roboter) haben keinen kopf/body-
       // Bauplan — vorher fiel so ein Spieler hier durch und stand als nackter Koerper OHNE
@@ -7384,13 +7302,15 @@
       // Spiel fehlt es" — nachgemessen war es umgekehrt: zeichneSprite [die Live-Simulation]
       // zeichnet b.fluegel laengst ueber zeichneFluegel/z_fluegel_bg+fg, dieser Rueckfall
       // [Kader-Vorschau UND Aufstellungs-Board, beide rufen figur()/figurKlein() fuer jeden
-      // Spieler ohne eigene B_FIGUR-Ebenenliste auf] fragte b.fluegel nie ab — betraf jeden
-      // gefluegelten Charakter OHNE B_FIGUR-Eintrag (Othrama, Enforcer, Elyon, Whispra,
-      // Harbinger, Hellvoice, Sunny, Xylaris, Cadrael, Raven, Nimri, Yuko, Mushu, Lumen
-      // Serene, Brobot, Sanctrix, Dyrth, Leviathan, Butterfly — Rhyx'Tal/Seraph-11 haben
-      // eine eigene B_FIGUR-Ebenenliste mit fest eingebauten z_fluegel-Ebenen und waren
-      // deshalb nie betroffen). bHol/ton=null wie in zeichneFluegel oben, aus demselben
-      // B_FIGUR-Bestand — kein zweites Bild, dieselbe Datei wie in der Animation.
+      // Spieler auf] fragte b.fluegel damals nie ab — betraf jeden gefluegelten Charakter
+      // OHNE B_FIGUR-Eintrag (Othrama, Enforcer, Elyon, Whispra, Harbinger, Hellvoice, Sunny,
+      // Xylaris, Cadrael, Raven, Nimri, Yuko, Mushu, Lumen Serene, Brobot, Sanctrix, Dyrth,
+      // Leviathan, Butterfly — Rhyx'Tal/Seraph-11 hatten damals noch eine eigene B_FIGUR-
+      // Ebenenliste mit fest eingebauten z_fluegel-Ebenen und waren deshalb nie betroffen;
+      // B_FIGUR selbst ist seit 01.09. ganz gestrichen, s. Kommentar vor BAU oben — dieser
+      // Rueckfall hier ist seither der EINZIGE Weg, wie figur() Fluegel zeichnet). bHol/
+      // ton=null wie in zeichneFluegel oben, aus demselben Sprite-Bestand — kein zweites
+      // Bild, dieselbe Datei wie in der Animation.
       const setzFluegel=(key)=>{const im=bHol(key,null);if(!im||!im.width)return;
         try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
       if(b.fluegel)setzFluegel("z_fluegel_bg");
@@ -12305,8 +12225,9 @@
   // der Ballbereich beschriftet ist, muss die Zuordnung Figur->Person woanders stehen.
   //
   // KEINE ZWEITE ZEICHENROUTINE. Es ist figur() — dieselbe Funktion, mit der Kaderliste
-  // und Aufstellungs-Board zeichnen, und damit derselbe Ebenen-Baukasten (B_FIGUR bzw. der
-  // BAU/VOLLBILD-Rueckfall), aus dem auch zeichneSprite() auf dem Feld schoepft. Ein
+  // und Aufstellungs-Board zeichnen, und damit derselbe Bauplan (BAU/VOLLBILD-Rueckfall,
+  // s. Kommentar vor BAU: seit 01.09. die einzige Tabelle), aus dem auch zeichneSprite()
+  // auf dem Feld schoepft. Ein
   // <img> mit fertigem Pfad geht nicht: die Figuren sind aus bis zu einem Dutzend
   // eingefaerbter Ebenen zusammengesetzt, es gibt gar keine einzelne Datei je Spieler.
   //
