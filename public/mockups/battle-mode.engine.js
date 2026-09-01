@@ -13118,12 +13118,13 @@
   // aggregieren waere eine erfundene Wertung, und erfundene Werte gibt es hier nicht
   // (docs/BATTLE_ARENA_UEBERGABE.md).
   //
-  // `opt.fokusName`, `opt.zustandBehalten` und `opt.lauf` existieren nur, damit
-  // spieleBasketball() ein echter Alias auf diese eine Funktion sein kann statt eine
-  // zweite Kopie des Ablaufs: `fokusName` setzt das Doppel-Ziel wie bisher,
-  // `zustandBehalten` laesst den Zustand nach dem Lauf stehen (genau das hat
-  // spieleBasketball immer getan), `lauf` ersetzt M.lauf() durch die historische
-  // Schleife dieses einen Aufrufs (s. dort, warum). Neue Aufrufer brauchen keine davon.
+  // `opt.fokusName` und `opt.zustandBehalten` existieren nur, damit spieleBasketball()
+  // ein echter Alias auf diese eine Funktion sein kann statt eine zweite Kopie des
+  // Ablaufs: `fokusName` setzt das Doppel-Ziel wie bisher, `zustandBehalten` laesst den
+  // Zustand nach dem Lauf stehen (genau das hat spieleBasketball immer getan). Neue
+  // Aufrufer brauchen keine davon. (Ein drittes `opt.lauf` gab es bis zum 01.09. — es
+  // ersetzte M.lauf() durch die historische Schleife von spieleBasketball mit ihrem
+  // veralteten 20000-Tick-Deckel und ist mit diesem weggefallen, s. dort.)
   function spieleDisziplin(dId,saat,opt){
     const M=MOTOREN[dId];
     if(!M)throw new Error("spiele: \""+dId+"\" hat keinen angemeldeten Motor (bekannt: "
@@ -13135,7 +13136,7 @@
     // Fokus-Doppeln, nur im Basketball-Live-Chassis vorhanden (fsLive), s. der Kommentar
     // bei spieleBasketball unten.
     if(o.fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===o.fokusName); if(z)fsLive.fokusZiel=z.id; }
-    if(o.lauf)o.lauf(); else M.lauf();
+    M.lauf();
     const wert=M.wert(), namen=M.namen();
     const protokoll=istFeldspiel(dId)?fsZuege
       :istBahn(dId)?rennFertig
@@ -13515,20 +13516,21 @@
     // alte Aufruf. Auf den Spielverlauf hat das nachweislich keinen Einfluss — das
     // Protokoll bei Saat 1337 ist byte-identisch zum Stand davor.)
     //
-    // WARUM DIESER EINE AUFRUF SEINE ALTE SCHLEIFE MITBRINGT statt M.lauf() zu nehmen —
-    // ein Fund, kein Feature: der Deckel `guard<20000` sind 20000 Ticks a 1/60 s, also
-    // 333 s Simulationszeit. Ein Spiel dauert seit der Viertel-Umstellung auf 4 x 1:30
-    // aber SPIELDAUER_BASKETBALL = 360 s (s. dort). Der Deckel greift damit VOR dem
-    // Schlusspfiff und schneidet jedem headless gespielten Spiel die letzten ~27 s ab —
-    // bei Saat 1337 sind das 166 statt 183 Ereignisse. MOTOREN[fd].lauf() hat den
-    // Deckel laengst richtig (Spieldauer + 60 s Reserve, s. der Opus-Review-Fund dort);
-    // spiele() bekommt also das ganze Spiel. Hier bleibt die alte Schleife wortgleich
-    // stehen, weil dieser Umbau ein reiner STRUKTUR-Umbau ist: das Ereignisprotokoll
-    // von spieleBasketball(1337) ist vorher wie nachher byte-identisch. Den Deckel zu
-    // reparieren verschiebt Messwerte (FG% des Schlussviertels, Ausdauer-Ende) und
-    // gehoert deshalb in eine eigene Runde mit eigener Abnahme.
-    spieleBasketball:(saat,fokusName)=>spieleDisziplin("basketball",saat,{fokusName,zustandBehalten:true,
-      lauf:()=>{let guard=0; while(!done&&fsT<SPIELDAUER_BASKETBALL+5&&guard<20000){ stepFeldspiel(1/60); guard++; }}}).protokoll,
+    // VERALTETER TICK-DECKEL GERAEUMT (01.09., die eigene Runde, die der Umbau-Kommentar
+    // hier angekuendigt hatte): dieser Aufruf brachte seine historische Laufschleife als
+    // `opt.lauf` mit — `while(!done && fsT<SPIELDAUER_BASKETBALL+5 && guard<20000)`. Der
+    // Deckel `guard<20000` sind 20000 Ticks a 1/60 s, also 333 s Simulationszeit; ein
+    // Spiel dauert seit der Viertel-Umstellung auf 4 x 1:30 aber SPIELDAUER_BASKETBALL
+    // = 360 s (s. dort). Der Deckel griff damit VOR dem Schlusspfiff und schnitt jedem
+    // headless gespielten Spiel die letzten ~27 s ab — bei Saat 1337 waren das 166 statt
+    // 183 Ereignisse. Beim Umbau auf spieleDisziplin() blieb er bewusst wortgleich
+    // stehen, damit jener Umbau ein reiner Struktur-Umbau blieb; jetzt faellt er weg und
+    // dieser Hook nimmt wie alle anderen Aufrufer M.lauf(). Kein Endlosschleifen-Risiko:
+    // MOTOREN[fd].lauf() hat eine eigene Obergrenze (Budget SPIELDAUER_BASKETBALL + 60 s
+    // Reserve fuer die Freiwurf-Standphasen, s. der Opus-Review-Fund dort), also
+    // hoechstens 25200 Ticks statt der 20000 hier — nur eben oberhalb der Spieldauer
+    // statt darunter.
+    spieleBasketball:(saat,fokusName)=>spieleDisziplin("basketball",saat,{fokusName,zustandBehalten:true}).protokoll,
     // DERSELBE LAUF FUER JEDE DISZIPLIN: window.__arena.spiele(dId, saat) liefert
     // {disziplin, protokoll, wert, punkte, namen} — s. spieleDisziplin() oben, dort steht
     // auch, was "Protokoll" je Chassis heisst und warum "punkte" nur im Feldspiel
