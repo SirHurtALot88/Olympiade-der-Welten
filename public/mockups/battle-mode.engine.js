@@ -1253,6 +1253,23 @@
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
 
+  // GROESSEN-SKALIERUNG (01.09., Chris: "die Groessen scheinen sich noch nicht
+  // auszuwirken, Lava Golem muesste ja groesser sein als die anderen Spieler"). Quelle ist
+  // data/generated/oly-player-groesse.json (Skala 1-10, ueber den Adapter/die SQUAD/OPP-
+  // Objekte als p.groesse durchgereicht, s. arena-kader-adapter.ts::zuArenaSpieler und
+  // die Uebernahme in u.groesse bei jedem Einheiten-Bau, z.B. bauFeldspiel::bauSpieler).
+  // Linearer Faktor 0,8 (Groesse 1) .. 1,3 (Groesse 10) auf dh/dw UND den Boden-Anker
+  // (y-46 etc.) — reine ZEICHEN-Groesse, ruehrt an keiner Position/Trefferbox der
+  // Simulation (u.x/u.y bleiben unangetastet, nur x/y-Uebergaben an ctx.drawImage/die
+  // Partikel-/Riss-Routinen skalieren mit). Fehlender/ungueltiger Wert (null, Rask z.B.,
+  // oder gar kein groesse-Feld bei den paar Diagnose-Aufrufen wie renderProbe) faellt auf
+  // 1.0 zurueck — nicht auf die formal bei Skala 5 errechenete 1,022, sondern exakt 1.0,
+  // "normalgross", wie Chris es fuer den Default vorgegeben hat.
+  function groesseFaktor(g){
+    if(typeof g!=="number"||!Number.isFinite(g))return 1;
+    return 0.8+(g-1)/9*0.5;
+  }
+
   // Welche Animation zu welchem Zustand gehoert — und wie viele Bilder sie hat.
   const ANIBILDER={walk:9,slash:6,shoot:13,hurt:6};
 
@@ -1382,6 +1399,11 @@
   const FEUERWAFFEN=["pistole","schrotflinte","sturmgewehr"];
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
+    // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
+    // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
+    // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
+    // Zahl statt einer zweiten.
+    const Z=groesseFaktor(u.groesse);
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -1529,16 +1551,22 @@
     // Bildbefund direkt: "geborstene Magmahaut und gluehende Risse"). Eigenes Flag
     // b.gluehenderRiss, UNABHAENGIG von b.effekt kombinierbar (beide zusammen bei Lava
     // Golem: der Riss zeichnet die geborstene Haut, die Glut daneben das "brennt noch").
-    // Dieselbe Bauart wie zeichnePartikelEffekt: reine Funktion aus t/u.id, kein Array,
+    // Dieselbe Bauart wie zeichnePartikelEffekt: reine Funktion aus u.id, kein Array,
     // kein Neuaufbau. Statt Partikeln ein gezackter Pfad (Zickzack-Linie plus ein kurzer
     // Seitenast), der wie ein Sprung in der Haut wirkt. Glow ohne shadowBlur (teuer, s.
     // Kommentar oben "ohne Schatten-/Blur-Filter"): stattdessen dreimal nachgezeichnet,
-    // von breit/blass nach schmal/hell, macht denselben weichen Schein guenstiger. Puls
-    // in Alpha UND Linienbreite ueber Math.sin(t*...), Phase ueber u.id versetzt wie beim
-    // Glut-Flackern, damit mehrere gleichzeitig gerisste Kaempfer nicht synchron pulsieren.
+    // von breit/blass nach schmal/hell, macht denselben weichen Schein guenstiger.
+    // BEWUSST OHNE Zeit-Puls (Chris, live in der Arena, 01.09.: "der Riss taucht nur ab
+    // und zu auf, muesste aber permanent sein — Lava Golem hat einen PERMANENTEN Riss,
+    // kein Lade-/Auflade-Effekt"). Die erste Fassung modulierte Alpha/Breite ueber
+    // Math.sin(t*...) — im Standbild (renderProbe, fester t) sah das aus wie ein
+    // gleichmaessiges Gluehen, LIVE (t laeuft) wurde daraus ein Pulsieren, das den Riss
+    // zeitweise fast unsichtbar machte. Jetzt feste Werte statt puls-Multiplikator — ein
+    // Merkmal der Optik, keine Animation. Zickzack-Form bleibt aus u.id/i abgeleitet
+    // (deterministisch je Figur, kein Zeitbezug), macht mehrere gerissene Kaempfer optisch
+    // unterschiedlich, ohne dass sich einer davon bewegt/pulsiert.
     const RISS_GLUT=["#ff5b1a","#ffb238","#fff4c2"]; // aussen->innen: dunkler Kern, warmer Schein, heller Kamm
     const zeichneRiss=(cx,topY,bottomY,breite)=>{
-      const puls=0.55+0.45*Math.sin(t*2.4+u.id*1.9);
       const segs=5, spanne=bottomY-topY, pfad=[];
       for(let i=0;i<=segs;i++){
         const py=topY+spanne*(i/segs);
@@ -1558,11 +1586,13 @@
         ctx.stroke();
       };
       // Weicher Schein zuerst (breit, blass), dann der helle Kamm obenauf (schmal, hell).
-      zeichnePfad(pfad,6.5,RISS_GLUT[0],puls*0.16);
-      zeichnePfad(pfad,3.5,RISS_GLUT[1],puls*0.32);
-      zeichnePfad(pfad,1.3+puls*0.5,RISS_GLUT[2],puls*0.85);
-      zeichnePfad([astStart,astEnde],3,RISS_GLUT[0],puls*0.14);
-      zeichnePfad([astStart,astEnde],1.1,RISS_GLUT[1],puls*0.6);
+      // Feste Alpha-/Dicke-Werte statt puls*X (s. Kommentar oben) — permanent sichtbar,
+      // keine Zeit-Modulation mehr.
+      zeichnePfad(pfad,6.5,RISS_GLUT[0],0.16);
+      zeichnePfad(pfad,3.5,RISS_GLUT[1],0.32);
+      zeichnePfad(pfad,1.8,RISS_GLUT[2],0.85);
+      zeichnePfad([astStart,astEnde],3,RISS_GLUT[0],0.14);
+      zeichnePfad([astStart,astEnde],1.1,RISS_GLUT[1],0.6);
       ctx.globalAlpha=1;
     };
     if(b.vollbild){
@@ -1575,11 +1605,17 @@
         const vf=(u.lunge>0&&!u.down)
           ? Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn))
           : (u.down?vn-1:Math.floor((t*7+u.id)%vn));
-        const dh=64, dw=spec.cw*(dh/spec.ch);
-        try{ctx.drawImage(im,vf*spec.cw,row*spec.ch,spec.cw,spec.ch,x-dw/2,y-46,dw,dh);}catch(e){}
+        // dh/dw UND der Boden-Anker (y-46) skalieren mit Z (s. groesseFaktor oben) — sonst
+        // waechst nur die Breite/Hoehe des Bilds, aber die Fuesse rutschen relativ zum
+        // Schatten weg (schwebt bei Z<1, versinkt bei Z>1).
+        const dh=64*Z, dw=spec.cw*(dh/spec.ch);
+        try{ctx.drawImage(im,vf*spec.cw,row*spec.ch,spec.cw,spec.ch,x-dw/2,y-46*Z,dw,dh);}catch(e){}
       }
-      if(b.effekt&&b.effekt.pos==="koerper"&&!u.down)zeichnePartikelEffekt(x,y-44,y+16,9,b.effekt.typ);
-      if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-42,y-4,11);
+      if(b.effekt&&b.effekt.pos==="koerper"&&!u.down)zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
+      // Riss mittig auf der Brust (y-26..y-2, dieselbe Spanne wie im normalen Zeichenpfad
+      // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
+      // war das "verschoben", das Chris live sah), skaliert mit Z wie alles andere hier.
+      if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,11*Z);
       return;
     }
     // geist:true (25.08., Rassen-Recherche: "Erna Wellenlaut" — Bild beschreibt sie SELBST,
@@ -1610,8 +1646,12 @@
       : (u.down?n-1:Math.floor((t*7+u.id)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
-    // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte.
-    const r=blickAus(u), Z=1;
+    // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte. Z ist seit
+    // Chris' Groessen-Sheet (01.09.) kein fester Wert mehr, sondern groesseFaktor(u.groesse)
+    // (oben am Funktionsanfang berechnet) — 0,8 bis 1,3 je nach Spieler statt 1 fuer alle,
+    // deutlich innerhalb des Bereichs, der beim alten Pauschal-Versuch (Z=2 fuer JEDEN)
+    // zum Ineinanderstehen fuehrte.
+    const r=blickAus(u);
     // Feuerwaffen-Frame: eigene 9er-Zaehlung (s. Kommentar oben bei FEUERWAFFEN), unabhaengig
     // von f/n der aktuellen Animation.
     const WAFFEN_N=9;
@@ -1769,7 +1809,8 @@
     // gab es urspruenglich nur im vollbild-Zweig oben (Lava Golem/Terradon) — hier fuer
     // normale Sprites nachgezogen (Krolach: Eis "im Rumpf eingelassen"; Krag'Zul: Energie
     // "in Brust und Rissen"; Nocture: formlose Schattengestalt ohne einzelnen Kopf-Fokus),
-    // dieselben Koordinaten wie beim Vollbild-Zweig (Z ist hier immer 1, s. Kommentar oben).
+    // dieselben Koordinaten wie beim Vollbild-Zweig (Z war hier frueher immer 1 — seit
+    // Chris' Groessen-Sheet ist es groesseFaktor(u.groesse), s. Kommentar am Funktionsanfang).
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
         // streuung/hoehe sind optionale Ueberschreibungen im BAU-Eintrag (s. Gram:
@@ -1777,16 +1818,16 @@
         // der Default-Werte 6/[56,34]).
         const streuung=b.effekt.streuung!=null?b.effekt.streuung:6;
         const hoehe=b.effekt.hoehe||[56,34];
-        zeichnePartikelEffekt(x,y-hoehe[0]*Z,y-hoehe[1]*Z,streuung,b.effekt.typ);
+        zeichnePartikelEffekt(x,y-hoehe[0]*Z,y-hoehe[1]*Z,streuung*Z,b.effekt.typ);
       }
-      else if(b.effekt.pos==="koerper")zeichnePartikelEffekt(x,y-44,y+16,9,b.effekt.typ);
+      else if(b.effekt.pos==="koerper")zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
     }
     // Riss ueber der fertigen Ruestung/Haut, aus demselben Grund wie b.effekt zuletzt
     // gezeichnet wird (s. Kommentar oben): sonst verdeckt Ruestung/Helm/Haar ihn wieder.
     // Bewusst auf Brust/Rumpf begrenzt (y-26..y-2 statt bis in den Kopf) — der Kopf hat
     // schon sein eigenes feuereffekt-Glimmen (b.effekt.pos==="kopf"), der Riss gehoert auf
     // den Panzer/Torso (Bildbefund "geschuppte Magmahaut"), nicht mitten durchs Gesicht.
-    if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,7);
+    if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,7*Z);
     if(b.geist)ctx.globalAlpha=1;
   }
 
@@ -2039,17 +2080,17 @@
     // drin; wer im Spiel weg ist, ist hier weg.
     // Die KITS sind weiterhin Platzhalter — es gibt noch keine echten Klassensaetze,
     // und solange es sie nicht gibt, tragen alle denselben Satz (siehe oben).
-    {n:"Draco",c:"Warlord",skills:MATRIARCH,r:"Human",sub:["Knight","Destroyer","Scout"],tp:["Fair","Diligent","Loyal"],tn:["Renegade","Egomaniac"],d:{tdm:66.1,spurt:44.2},a:{power:81,health:84,stamina:37,intelligence:35,awareness:6,determination:64,speed:19,dexterity:43,charisma:89,will:72,spirit:40,torment:66}},
-    {n:"Lava Golem",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Wayfarer","Behemoth"],tp:["FanFavorite","Healthy","FiredUp"],tn:["Vindictive","Scandalous"],d:{tdm:63.2,spurt:24.2},a:{power:98,health:99,stamina:29,intelligence:1,awareness:1,determination:21,speed:1,dexterity:2,charisma:94,will:35,spirit:2,torment:96}},
-    {n:"Krolach",c:"Templar",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Warrior"],tp:["Loyal","Eloquent"],tn:["Vindictive"],d:{tdm:60.5,spurt:47.7},a:{power:86,health:88,stamina:22,intelligence:47,awareness:32,determination:82,speed:20,dexterity:3,charisma:33,will:94,spirit:45,torment:64}},
-    {n:"Johanna",c:"Templar",skills:MATRIARCH,r:"Human",sub:["Guardian","Knight"],tp:["Loyal","Motivated","Fearless"],tn:["FaintHearted","Obsessive"],d:{tdm:50.7,spurt:44.8},a:{power:56,health:81,stamina:51,intelligence:29,awareness:22,determination:64,speed:23,dexterity:32,charisma:44,will:86,spirit:68,torment:69}},
-    {n:"King Arlen Morgolor",c:"Hero",skills:MATRIARCH,r:"Human",sub:["Warrior","Royalty"],tp:["Eloquent","Altruistic"],tn:[],d:{tdm:47.9,spurt:13.3},a:{power:40,health:70,stamina:26,intelligence:60,awareness:39,determination:54,speed:32,dexterity:33,charisma:95,will:1,spirit:96,torment:12}},
-    {n:"Gram",c:"Warlord",skills:MATRIARCH,r:"Lizard",sub:["Guardian"],tp:["Loyal","Relaxed"],tn:["Lazy"],d:{tdm:45.8,spurt:23},a:{power:67,health:79,stamina:14,intelligence:12,awareness:18,determination:73,speed:3,dexterity:5,charisma:41,will:33,spirit:65,torment:58}},
-    {n:"Rhyx'Tal",c:"Badass",skills:MATRIARCH,r:"Alien",sub:["Isolated","Controller","Guardian"],tp:["Caring","Loyal"],tn:["FaintHearted","Timid","Lazy"],d:{tdm:45.2,spurt:17.9},a:{power:58,health:62,stamina:48,intelligence:24,awareness:41,determination:52,speed:33,dexterity:29,charisma:38,will:1,spirit:81,torment:18}},
-    {n:"Xelara",c:"Bard",skills:MATRIARCH,r:"Alien",sub:["Ambassador","Guardian"],tp:["Eloquent","Altruistic","Caring"],tn:["Lazy","FaintHearted"],d:{tdm:33.2,spurt:24.5},a:{power:22,health:15,stamina:39,intelligence:68,awareness:69,determination:64,speed:31,dexterity:28,charisma:87,will:68,spirit:85,torment:14}},
-    {n:"Jorund",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Vigilante","Royalty","Guardian"],tp:["Eloquent","Loyal"],tn:["FaintHearted"],d:{tdm:27.2,spurt:26.8},a:{power:10,health:25,stamina:29,intelligence:64,awareness:51,determination:81,speed:29,dexterity:34,charisma:85,will:72,spirit:76,torment:24}},
-    {n:"Inefinna",c:"Mage",skills:MATRIARCH,r:"Divine",sub:["Ambassador","Vigilante"],tp:["Loyal","Disciplined"],tn:["Feisty","FaintHearted"],d:{tdm:12.7,spurt:13.1},a:{power:2,health:2,stamina:4,intelligence:84,awareness:64,determination:49,speed:42,dexterity:10,charisma:49,will:70,spirit:89,torment:3}},
-    {n:"Lulu",c:"Bard",skills:MATRIARCH,r:"Elf",sub:["Druid","Healer"],tp:["Loyal","Caring"],tn:["FaintHearted"],d:{tdm:10.1,spurt:8},a:{power:3,health:5,stamina:11,intelligence:86,awareness:52,determination:2,speed:71,dexterity:36,charisma:36,will:7,spirit:88,torment:3}}
+    {n:"Draco",c:"Warlord",skills:MATRIARCH,r:"Human",sub:["Knight","Destroyer","Scout"],tp:["Fair","Diligent","Loyal"],tn:["Renegade","Egomaniac"],d:{tdm:66.1,spurt:44.2},a:{power:81,health:84,stamina:37,intelligence:35,awareness:6,determination:64,speed:19,dexterity:43,charisma:89,will:72,spirit:40,torment:66},groesse:6},
+    {n:"Lava Golem",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Wayfarer","Behemoth"],tp:["FanFavorite","Healthy","FiredUp"],tn:["Vindictive","Scandalous"],d:{tdm:63.2,spurt:24.2},a:{power:98,health:99,stamina:29,intelligence:1,awareness:1,determination:21,speed:1,dexterity:2,charisma:94,will:35,spirit:2,torment:96},groesse:8},
+    {n:"Krolach",c:"Templar",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Warrior"],tp:["Loyal","Eloquent"],tn:["Vindictive"],d:{tdm:60.5,spurt:47.7},a:{power:86,health:88,stamina:22,intelligence:47,awareness:32,determination:82,speed:20,dexterity:3,charisma:33,will:94,spirit:45,torment:64},groesse:7},
+    {n:"Johanna",c:"Templar",skills:MATRIARCH,r:"Human",sub:["Guardian","Knight"],tp:["Loyal","Motivated","Fearless"],tn:["FaintHearted","Obsessive"],d:{tdm:50.7,spurt:44.8},a:{power:56,health:81,stamina:51,intelligence:29,awareness:22,determination:64,speed:23,dexterity:32,charisma:44,will:86,spirit:68,torment:69},groesse:5},
+    {n:"King Arlen Morgolor",c:"Hero",skills:MATRIARCH,r:"Human",sub:["Warrior","Royalty"],tp:["Eloquent","Altruistic"],tn:[],d:{tdm:47.9,spurt:13.3},a:{power:40,health:70,stamina:26,intelligence:60,awareness:39,determination:54,speed:32,dexterity:33,charisma:95,will:1,spirit:96,torment:12},groesse:5},
+    {n:"Gram",c:"Warlord",skills:MATRIARCH,r:"Lizard",sub:["Guardian"],tp:["Loyal","Relaxed"],tn:["Lazy"],d:{tdm:45.8,spurt:23},a:{power:67,health:79,stamina:14,intelligence:12,awareness:18,determination:73,speed:3,dexterity:5,charisma:41,will:33,spirit:65,torment:58},groesse:6},
+    {n:"Rhyx'Tal",c:"Badass",skills:MATRIARCH,r:"Alien",sub:["Isolated","Controller","Guardian"],tp:["Caring","Loyal"],tn:["FaintHearted","Timid","Lazy"],d:{tdm:45.2,spurt:17.9},a:{power:58,health:62,stamina:48,intelligence:24,awareness:41,determination:52,speed:33,dexterity:29,charisma:38,will:1,spirit:81,torment:18},groesse:8},
+    {n:"Xelara",c:"Bard",skills:MATRIARCH,r:"Alien",sub:["Ambassador","Guardian"],tp:["Eloquent","Altruistic","Caring"],tn:["Lazy","FaintHearted"],d:{tdm:33.2,spurt:24.5},a:{power:22,health:15,stamina:39,intelligence:68,awareness:69,determination:64,speed:31,dexterity:28,charisma:87,will:68,spirit:85,torment:14},groesse:5},
+    {n:"Jorund",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Vigilante","Royalty","Guardian"],tp:["Eloquent","Loyal"],tn:["FaintHearted"],d:{tdm:27.2,spurt:26.8},a:{power:10,health:25,stamina:29,intelligence:64,awareness:51,determination:81,speed:29,dexterity:34,charisma:85,will:72,spirit:76,torment:24},groesse:5},
+    {n:"Inefinna",c:"Mage",skills:MATRIARCH,r:"Divine",sub:["Ambassador","Vigilante"],tp:["Loyal","Disciplined"],tn:["Feisty","FaintHearted"],d:{tdm:12.7,spurt:13.1},a:{power:2,health:2,stamina:4,intelligence:84,awareness:64,determination:49,speed:42,dexterity:10,charisma:49,will:70,spirit:89,torment:3},groesse:5},
+    {n:"Lulu",c:"Bard",skills:MATRIARCH,r:"Elf",sub:["Druid","Healer"],tp:["Loyal","Caring"],tn:["FaintHearted"],d:{tdm:10.1,spurt:8},a:{power:3,health:5,stamina:11,intelligence:86,awareness:52,determination:2,speed:71,dexterity:36,charisma:36,will:7,spirit:88,torment:3},groesse:5}
   ];
   // DER GEGNER: ARMAGEDDON AFTERMATH, ebenfalls eins zu eins aus dem Spielstand. Die
   // sechs mit dem hoechsten TDM-Wert des Kaders, in den Reihen, die ihre beste
@@ -2058,12 +2099,12 @@
   // Team-TDM der besten Sechs samt Slot-Aufschlag: 308,7 gegen unsere 361,4 —
   // das deckt sich mit der Tabelle (V-W Platz 9, A-A Platz 22 von 32).
   let OPP=[
-    {n:"Greenkraut",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],row:0,d:{tdm:60.6,spurt:19.9},a:{power:94,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
-    {n:"Krag'Zul",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Guardian","Mage"],tp:["Healthy","Loyal"],tn:["Timid"],row:0,d:{tdm:62.7,spurt:25.2},a:{power:79,health:92,stamina:75,intelligence:31,awareness:20,determination:55,speed:21,dexterity:18,charisma:10,will:50,spirit:52,torment:9}},
-    {n:"Tidesprinter",c:"Berserker",skills:MATRIARCH,r:"Aqua",sub:["Trickster","Warrior"],tp:["Ambitious","Flexible","FiredUp"],tn:["Gambler","Cheater"],row:1,d:{tdm:47.2,spurt:88.3},a:{power:80,health:51,stamina:80,intelligence:35,awareness:63,determination:77,speed:89,dexterity:75,charisma:23,will:39,spirit:5,torment:78}},
-    {n:"Seraph-11",c:"Bard",skills:MATRIARCH,r:"Construct",sub:["Healer","Servant","Guardian"],tp:["Disciplined","Healthy","Loyal"],tn:["Timid"],row:1,d:{tdm:33.8,spurt:31.4},a:{power:19,health:52,stamina:58,intelligence:76,awareness:72,determination:63,speed:28,dexterity:69,charisma:24,will:55,spirit:62,torment:7}},
-    {n:"Ralazar the Balanced",c:"Mage",skills:MATRIARCH,r:"Human",sub:["Warrior","Mage"],tp:["Flexible","Fair","Altruistic"],tn:["Timid"],row:2,d:{tdm:37,spurt:43},a:{power:43,health:61,stamina:9,intelligence:84,awareness:67,determination:65,speed:45,dexterity:36,charisma:54,will:82,spirit:35,torment:34}},
-    {n:"Cassandra",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Hunter","Jungle"],tp:["Motivated","Loyal","Caring"],tn:[],row:2,d:{tdm:32.4,spurt:32.7},a:{power:25,health:37,stamina:47,intelligence:66,awareness:59,determination:27,speed:72,dexterity:81,charisma:38,will:37,spirit:89,torment:13}}
+    {n:"Greenkraut",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],row:0,d:{tdm:60.6,spurt:19.9},a:{power:94,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12},groesse:7},
+    {n:"Krag'Zul",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Guardian","Mage"],tp:["Healthy","Loyal"],tn:["Timid"],row:0,d:{tdm:62.7,spurt:25.2},a:{power:79,health:92,stamina:75,intelligence:31,awareness:20,determination:55,speed:21,dexterity:18,charisma:10,will:50,spirit:52,torment:9},groesse:9},
+    {n:"Tidesprinter",c:"Berserker",skills:MATRIARCH,r:"Aqua",sub:["Trickster","Warrior"],tp:["Ambitious","Flexible","FiredUp"],tn:["Gambler","Cheater"],row:1,d:{tdm:47.2,spurt:88.3},a:{power:80,health:51,stamina:80,intelligence:35,awareness:63,determination:77,speed:89,dexterity:75,charisma:23,will:39,spirit:5,torment:78},groesse:6},
+    {n:"Seraph-11",c:"Bard",skills:MATRIARCH,r:"Construct",sub:["Healer","Servant","Guardian"],tp:["Disciplined","Healthy","Loyal"],tn:["Timid"],row:1,d:{tdm:33.8,spurt:31.4},a:{power:19,health:52,stamina:58,intelligence:76,awareness:72,determination:63,speed:28,dexterity:69,charisma:24,will:55,spirit:62,torment:7},groesse:6},
+    {n:"Ralazar the Balanced",c:"Mage",skills:MATRIARCH,r:"Human",sub:["Warrior","Mage"],tp:["Flexible","Fair","Altruistic"],tn:["Timid"],row:2,d:{tdm:37,spurt:43},a:{power:43,health:61,stamina:9,intelligence:84,awareness:67,determination:65,speed:45,dexterity:36,charisma:54,will:82,spirit:35,torment:34},groesse:5},
+    {n:"Cassandra",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Hunter","Jungle"],tp:["Motivated","Loyal","Caring"],tn:[],row:2,d:{tdm:32.4,spurt:32.7},a:{power:25,health:37,stamina:47,intelligence:66,awareness:59,determination:27,speed:72,dexterity:81,charisma:38,will:37,spirit:89,torment:13},groesse:5}
   ];
 
   // ===================================================================================
@@ -4057,6 +4098,10 @@
       // p.d.tdm ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken.
       const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        // groesse (Skala 1-10, s. groesseFaktor): reine ZEICHEN-Angabe fuer zeichneSprite,
+        // faehrt in KEINE hier oben schon berechnete Zahl ein (eig/R2 stehen VOR dieser
+        // Zeile fest) — kann also nichts an TDM/Formkarte/Slot-Rechnung aendern.
+        groesse:p.groesse??null,
         eig:basisWert+engP+breitP,...R2,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
@@ -6854,6 +6899,7 @@
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        groesse:p.groesse??null,
         eig:(p.d[buehneDisc]||0)+engP+breitP,...R2,
         runden:[], summe:0, aktuell:-1};
       // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
@@ -7204,6 +7250,14 @@
     const AUSX=12, AUSY=13;
     const c=document.createElement("canvas");
     c.width=40;c.height=50;c.className="figur";
+    // Groessen-Skalierung wie in zeichneSprite (s. groesseFaktor oben) — die interne
+    // Aufloesung (40x50, der LPC-Ausschnitt) bleibt unangetastet, nur die CSS-Anzeigegroesse
+    // waechst/schrumpft. figurKlein() ueberschreibt das gleich wieder mit ihrer eigenen,
+    // ebenfalls faktor-skalierten Groesse (s. dort) — hier gesetzt, damit auch die direkten
+    // figur()-Aufrufer (Detailkarte, kaderFigur()) mitskalieren.
+    const figurFaktor=groesseFaktor(p.groesse);
+    c.style.width=Math.round(40*figurFaktor)+"px";
+    c.style.height=Math.round(50*figurFaktor)+"px";
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
     const bf=B_FIGUR[p.n];
     const mal=()=>{
@@ -7276,11 +7330,17 @@
   }
 
   // Dieselbe Figur, nur klein — fuer Kaderliste und Aufstellung.
+  // `gr` ist die CSS-Pixelgroesse des Icons (bestehender Parameter, unabhaengig von
+  // Chris' Groessen-Sheet) — die BAU-Groesse kommt aus p.groesse, NICHT aus gr, s.
+  // groesseFaktor oben. Beide zusammen: gr ist der Rahmen (wie gross das Icon im Layout
+  // sein darf), p.groesse skaliert INNERHALB dieses Rahmens, damit z.B. Lava Golem auch
+  // in der Kaderliste sichtbar groesser wirkt als ein normalgrosser Spieler.
   function figurKlein(p,gr){
     const c=figur(p);
     c.className="figurklein";
-    c.style.width=(gr||40)+"px";
-    c.style.height=Math.round((gr||40)*50/40)+"px";
+    const basis=gr||40, faktor=groesseFaktor(p.groesse);
+    c.style.width=Math.round(basis*faktor)+"px";
+    c.style.height=Math.round(basis*faktor*50/40)+"px";
     return c;
   }
 
@@ -8145,6 +8205,9 @@
     const h=homeFor(side,row,i,n);
     const fern=p.fern===true;
     return {id,n:p.n,side,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId||null,
+      // groesse (s. groesseFaktor/bauFeldspiel::bauSpieler): reine Zeichen-Angabe, rein
+      // additiv nach allen Kampfwerten oben berechnet.
+      groesse:p.groesse??null,
       ord:ordung||"mitlinie",zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
       hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
       dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -8203,7 +8266,26 @@
     // vier genommen und neu auf die Reihen verteilt, statt zwei Reihen leer zu lassen.
     const gegner=OPP.slice(0,n);
     const oByRow={0:[],1:[],2:[]};
-    gegner.forEach((o,i)=>oByRow[n===OPP.length?o.row:Math.min(2,Math.floor(i*3/n))].push(o));
+    // Wertung-Bug (01.09., Chris live in der Arena: Score/Feed liefen, die Wertungstabelle
+    // blieb aber komplett leer — kein Standbild-Fund wie Bug 1/2, sondern ein Absturz VOR dem
+    // ersten Frame). Root Cause: o.row ist ein reiner STANDALONE-Mockup-Wert (die
+    // handkuratierten OPP-Eintraege ganz oben in dieser Datei) — echte Spielstaende laufen
+    // ueber arena-kader-adapter.ts::zuArenaSpieler, dessen ArenaSpieler-Typ gar kein `row`
+    // Feld kennt. Sobald ein echter Gegnerkader GENAU so viele attributvollstaendige Spieler
+    // stellt wie die Disziplin braucht (n===OPP.length — der Normalfall, kein Sonderfall),
+    // griff dieser Zweig ungeprueft auf o.row zu: oByRow[undefined].push(o) wirft
+    // "Cannot read properties of undefined (reading 'push')". Der Fehler flog uncaught aus
+    // build() -> reset() -> der EINMALIGEN Zeile ganz unten in dieser Datei
+    // ("renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop)") — das
+    // requestAnimationFrame(loop) DANACH in derselben Anweisung lief dadurch nie an. Der Motor
+    // stand von Anfang an vollstaendig still: kein Frame, kein window.__arena, keine einzige
+    // Wertungszeile — der Play-Klick blieb wirkungslos (sein eigener Klick-Handler war zwar
+    // laengst registriert und schaltete "running" brav um, aber ohne laufende Schleife las das
+    // nie jemand). Fix: o.row nur nehmen, wenn es wirklich eine gueltige Reihe (0/1/2) ist,
+    // sonst dieselbe Verteilungsformel wie im n!==OPP.length-Fall — echte Kader fallen jetzt
+    // automatisch auf die berechnete Verteilung zurueck, statt den ganzen Motor zu reissen.
+    const gueltigeReihe=(o)=>typeof o.row==="number"&&oByRow[o.row]!==undefined;
+    gegner.forEach((o,i)=>oByRow[n===OPP.length&&gueltigeReihe(o)?o.row:Math.min(2,Math.floor(i*3/n))].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
         const reihenSlots=slotsDerReihe(row,d);
@@ -10492,6 +10574,7 @@
       const P=BA().plaene, JS=BA().planJeSlot;
       const planId=(sl&&JS[sl])||Object.keys(P)[1]||Object.keys(P)[0];
       const L={id:id++,n:p.n,seite,bahn,...w,
+        groesse:p.groesse??null,
         // ZWEI KOPPLUNGEN, BEIDE VERTRETBAR — aber sie sind verschieden, und das sollte
         // niemand fuer ein Versehen halten. In der Arena setzt aufEignung() die MENGE der
         // Kampfwerte auf die Eignung; die Rezepte geben nur die Form. Auf der Bahn geben
@@ -12148,7 +12231,11 @@
   const KADER_FIGUREN=new Map();
   function kaderFigur(name){
     let c=KADER_FIGUREN.get(name);
-    if(!c){ c=figur({n:name}); c.className="kkfigur"; KADER_FIGUREN.set(name,c); }
+    // SPIELER_NACH_NAME statt eines bloss {n:name}-Behelfs (Fund beim Groessen-Einbau,
+    // 01.09.): sonst fehlt hier p.groesse und der Sprite in der Kaderleiste bliebe immer
+    // bei Faktor 1, waehrend derselbe Spieler auf dem Feld/in der Kaderliste (figurKlein
+    // via renderKader/renderList) schon skaliert ist.
+    if(!c){ c=figur(SPIELER_NACH_NAME[name]||{n:name}); c.className="kkfigur"; KADER_FIGUREN.set(name,c); }
     return c;
   }
 

@@ -1,4 +1,5 @@
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
+import { getPlayerGroesse } from "@/lib/data/playerSizeData";
 
 /**
  * Bruecke zwischen dem echten Datenmodell und dem Motor in public/mockups/battle-mode.html.
@@ -24,6 +25,13 @@ export type ArenaSpieler = {
   tp: string[];
   tn: string[];
   d: Record<string, number>;
+  /**
+   * Sprite-Groesse (Skala 1-10, s. lib/data/playerSizeData.ts), rein fuer die ZEICHNUNG
+   * im Motor (dort groesseFaktor auf u.groesse) — beeinflusst keine Attribute/Formel oben.
+   * null, wenn Chris' Sheet fuer diesen Namen keinen Wert traegt; der Motor faellt dann auf
+   * den Default-Faktor 1.0 zurueck.
+   */
+  groesse: number | null;
   a: {
     power: number;
     health: number;
@@ -91,6 +99,7 @@ function zuArenaSpieler(player: Player & { attributeSheetStats: NonNullable<Play
     tp: [...player.traitsPositive],
     tn: [...player.traitsNegative],
     d: { ...player.disciplineRatings },
+    groesse: getPlayerGroesse(player.name),
     a: {
       power: sheet.power ?? 0,
       health: sheet.health ?? 0,
