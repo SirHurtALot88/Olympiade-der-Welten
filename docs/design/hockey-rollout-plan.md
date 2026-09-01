@@ -17,6 +17,13 @@ Stil/Struktur an `docs/design/fatigue-saisonlaenge-plan.md` angelehnt. Vorgänge
 (mit Datei:Zeile) oder eine reale Sport-Referenz (mit Quelle). Was ich nicht geprüft habe,
 steht als „nicht geprüft" da.** Was ich nicht prüfen konnte, steht gesammelt in Teil G.
 
+> **Zuerst Teil H lesen.** Fable hat den Plan gegen den Code geprüft
+> (`hockey-rollout-plan-review-fable.md`, Urteil *tragfähig mit Auflagen*) und drei Stellen
+> gefunden, an denen er sich zu leicht gemacht hat: PR 9 ist kein Einzeiler, die Pp-Zahl
+> misst eine Basketball-Buchhaltung mit, und die Torwart-Empfehlung übersieht eine bessere
+> Option. Teil G und die Teile A–F stehen als Recherche-Stand; **bei Widerspruch gilt
+> Teil H**, dort steht auch die überarbeitete PR-Reihenfolge (H.8).
+
 ---
 
 ## 0. Wichtige Funde vorab
@@ -955,3 +962,149 @@ Ehrlich und vollständig:
 - [StatMuse — Average number of blocked shots per game, team average](https://www.statmuse.com/nhl/ask/average-number-of-blocked-shots-per-game-team-average-nhl-this-season)
 - [ESPN — What are NHL overtime rules?](https://www.espn.com/nhl/story/_/id/39345002/what-nhl-rules)
 - [Hockey-Reference — NHL League Averages](https://www.hockey-reference.com/leagues/stats.html) (Übersichtsseite; die Detailtabelle war beim Abruf nicht erreichbar, HTTP 403)
+
+---
+
+## Teil H — Nach dem Fable-Review: was sich am Plan ändert
+
+Fable hat den Plan am 01.09. gegen den Code geprüft (`hockey-rollout-plan-review-fable.md`,
+Urteil **tragfähig mit Auflagen**) und dabei alle sieben Kernzahlen selbst reproduziert —
+Pp 51,0 / 48,1 / 44,5, Football 57,9, Tore 6,63 bei 66,6 % und 18,8 % Unentschieden, das
+Kandidatenrezept mit 14,2, und die sieben Sondierungsgewichte. Auch die Zeilenangaben
+halten. Was **nicht** hält, sind drei Stellen, an denen der Plan sich zu leicht gemacht
+hat. Sie sind hier eingearbeitet; die Abschnitte oben bleiben als Recherche-Stand stehen,
+dieser Teil hat bei Widerspruch Vorrang.
+
+### H.1 PR 9 ist kein Einzeiler (Befund 1)
+
+`ARENA_RESOLVED_DISCIPLINE_IDS` um `"hockey"` zu erweitern reicht nicht — es würde **falsche
+Punkte vergeben**. `runBattleModeArenaMatchday` ruft den Runner hart mit `"basketball"` auf
+(`lib/resolve/battle-mode-arena-team-points.ts:177`), ein Test pinnt das
+(`tests/battle-mode-arena-team-points.test.ts:133`), und die Override-Map wird je Spieltag
+gebaut, aber in `legacy-matchday-resolve-engine.ts:713-716` je Disziplin angewandt. Ein
+Spieltag hat zwei Disziplinen — die Hockey-Seite bekäme das Basketball-Ergebnis als
+Team-Punkte gutgeschrieben.
+
+**Neue Fassung von PR 9:** der Orchestrator wird je Disziplin aufgerufen, die Override-Map
+je Disziplin geschlüsselt, `determineBasketballContexts` umbenannt und generisch gemacht.
+Abnahme ist ein Test, der einen Spieltag mit Basketball **und** Hockey auflöst und
+nachweist, dass jede Seite ihr eigenes Ergebnis bekommt. Das ist kein Nachtrag, sondern die
+eigentliche Arbeit dieses PRs.
+
+### H.2 Die Pp-Zahl misst eine Basketball-Buchhaltung mit (Befund 2)
+
+`MOTOREN[fd].wert` ist für **alle** Feldspiele dieselbe Impact-Formel (`engine.js:12943`):
+Tor 1,0, Steal und Block je 1,5, Rebound 1,2. Im Eishockey ist ein Check damit anderthalbmal
+so viel wert wie ein Tor. ABWEHRs gemessene 36 % sind also zu einem erheblichen Teil eine
+**Gutschriftsregel**, keine Mechanik — und der Plan hat `wert` nirgends genannt.
+
+Zwei Folgen:
+
+1. **Die Budget-Tabelle B.3 hat einen zweiten, bisher unbenannten Hebel.** Die Soll-Massen
+   dort sind nur einlösbar, wenn die Impact-Formel dazu passt.
+2. **Die „zwei getrennten Achsen" (Pp und Realismus) sind nicht so sauber getrennt wie
+   D.1/D.3 behaupten.** Belegt ist die Trennung nur in Richtung Rezept → Tore (das
+   Kandidatenrezept ändert 6,63 → 6,76). In Richtung Mechanik → Pp sind sie über
+   Ereignishäufigkeit und `wert` gekoppelt — Basketballs eigene Historie zeigt das:
+   31,8 → 22,8 → 53,7 Pp allein durch die FG%-Kalibrierung (`rezepte.js:39-41`).
+
+**Auflage:** die Hockey-Impact-Formel wird als eigene, sichtbar begründete Entscheidung je
+Disziplin in `MOTOREN[fd].wert` gesetzt — **vor** jeder Sondierung und vor jedem Rezept. Ein
+Tor muss im Eishockey mehr wert sein als ein Check; wie viel mehr, ist eine Setzung und wird
+als solche gekennzeichnet (F.7).
+
+### H.3 Der Torwart: eine dritte Option, die besser ist als B (Befund 3)
+
+Das Kadergrößen-Argument hält im Code — sogar stärker als beschrieben: der Katalogwert 5
+wird von der Saison **nie** benutzt, der Rückfall würfelt 2..6 und weicht der 5 ausdrücklich
+aus. Aber Fable hat drei Dinge aufgedeckt, die B.4 falsch gewichtet:
+
+- **Die Arena ignoriert die Saison-Kadergröße heute vollständig — und auch die
+  Aufstellung.** Der Runner reicht nur den Gesamtkader durch, `place` bleibt leer,
+  `bauFeldspiel` nimmt die sechs besten nach Disziplinwert (`engine.js:4017-4019`). Der Plan
+  hat also eine **vertagte** Änderung (F.5) benutzt, um Option D **jetzt** auszuschließen.
+  Das geht nicht beides.
+- **Option C funktioniert über den Produktivpfad gar nicht**, solange keine Aufstellung die
+  Arena erreicht. „Der Manager entscheidet, wer ins Tor geht" scheitert nicht an einer
+  siebten Slot-Rolle, sondern daran, dass der Runner keine Slots kennt. Das gilt für
+  Basketballs Slot-Rollen heute genauso — ein eigener Befund, den der Plan hätte haben
+  müssen.
+- **Option B läuft in genau die Falle, vor der B.2 warnt.** PARADE führt dexterity wie
+  SCHUSS_NAH; der beste Torhüter ist damit voraussichtlich auch der beste Slot-Finisher,
+  und B schließt ihn nicht aus den Angriffslosen aus. Im Boxscore führt dann der „Torhüter"
+  die Torschützenliste an — Basketballs „Verteidiger war bester Scorer", nur mit anderem
+  Etikett.
+
+**Die übersehene Option E: Torwart als Nicht-Spieler-Akteur nach dem
+Schiedsrichter-Muster.** `fsSchiri` ist ausdrücklich „kein 13. Spieler, eigenes Objekt mit
+x/y" (`engine.js:5291`). Ein `fsTorwart` je Seite mit fester Position im Tor, gespeist aus
+dem Team-PARADE-Wert als *Zahl* statt als *Person*: sichtbar im Bild, **keine**
+Ausschlusslogik in `spielmacherLos`/`offensterMitspieler`/`zuordneDeckung`, **keine**
+Slot-Rolle, funktionsfähig bei jeder Kadergröße von 2 bis 6. Kosten: ein Sprite, eine
+Position, ein Term in der Erfolgsformel — ungefähr B plus Optik, deutlich unter D.
+
+**Damit lautet F.1 neu:** die Wahl steht zwischen **B** (billig, unsichtbar — die Fangquote
+ist eine Zahl im Boxscore) und **E** (wenig teurer, sichtbar — es steht eine Figur im Tor).
+E löst zusätzlich das dexterity-Problem, weil der Torwart kein Feldspieler mehr ist. Meine
+Empfehlung ist jetzt **E**. C bleibt vertagt, bis die Aufstellung die Arena überhaupt
+erreicht; D bleibt draußen.
+
+### H.4 PR 3 wird geteilt, PR −1 kommt vorne dazu (Befunde 5, 8)
+
+Die Live-Engine ist ~2.000 Zeilen, und es sind **20** Vergleiche gegen `"basketball"`, nicht
+14 (`disc===` mitgezählt). PR 3 wird in drei einzeln abnehmbare Schritte geteilt:
+
+- **3a** Umbenennen und Konfiguration heben — Basketball bit-identisch.
+- **3b** Hockey hinter der Weiche live schalten.
+- **3c** Sondierungslauf.
+
+Die Grenze zwischen PR 2 und PR 3a wird an `BASKETBALL_POS_MOD` festgemacht: die
+Zeit-/Perioden-Konstanten gehören in PR 2, `BASKETBALL_POS_MOD` und alles
+Sub-Skill-Bezogene in PR 3a. Bisher stand es in beiden Beschreibungen.
+
+Neu vorne: **PR −1 — `scripts/messe-arena-einfluss.mjs:44` den absoluten Pfad relativ
+auflösen.** Eine Zeile. Sie steht vorne, weil PR 0 bis 4 alle mit diesem Werkzeug
+abgenommen werden und es in einem Worktree heute still die falsche Datei misst.
+
+### H.5 Das Zonenmodell gehört INNERHALB von PR 4 nach vorn (Befund 6)
+
+Die Erfolgskurve mit Maximum im Slot ist eine Formänderung, keine Umparametrisierung — sie
+verschiebt die Sondierungsgewichte. Ein Rezept, das gegen die Gewichte *davor* gebaut ist,
+ist danach wertlos; das ist dasselbe Argument, mit dem der Plan das Kandidatenrezept zu
+Recht zurückhält. **Reihenfolge innerhalb von PR 4:** Zonenmodell + Erfolgsformel +
+Impact-Formel (H.2) → Sondierung → Rezept. Nicht alles gleichzeitig.
+
+### H.6 Die Pp-Abnahme wird auf ein fahrbares Maß gesetzt (Befund 4)
+
+D.1 verlangt Pp bei n=48 **und** n=96 auf der Live-Engine. `einflussVon` spielt 13 × 12 × n
+volle Spiele; bei n=96 und 240 Simulationssekunden sind das ~15.000 Spiele à 240 s — Teil
+G.1 räumt selbst ein, dass schon Basketball live bei n=48 das Zeitbudget gesprengt hat.
+**Die Abnahme von PR 4 ist n=48**; n=96 ist eine Bestätigung, die separat und ohne
+Zeitdruck läuft. Wer mehr will, muss vorher ein billigeres Messverfahren bauen — das wäre
+ein eigener Auftrag, kein Nebenprodukt von PR 4.
+
+### H.7 Was Teil G zusätzlich fehlte
+
+Drei Dinge, die nicht als „nicht geprüft" dastanden, sondern gar nicht als Größe erkannt
+waren: die Impact-Formel `wert` (H.2), der auf Basketball verdrahtete Produktivpfad (H.1),
+und dass die Aufstellung die Arena nicht erreicht (H.3).
+
+### H.8 Die überarbeitete PR-Reihenfolge
+
+| PR | Was | Ändert Spielverhalten? |
+|---|---|---|
+| **−1** | `messe-arena-einfluss.mjs` Pfad relativ auflösen | nein |
+| **0** | `feldspielProbe(dId, opt)` + `miss-feldspiel-rangtreue.mjs` | nein |
+| **1** | Hockey-Rezept nach `battle-mode.rezepte.js` | nein |
+| **2** | Zeit-/Perioden-Konstanten in die `FELDSPIEL_ART`-Zeile | nein (Basketball bit-identisch) |
+| **3a** | Live-Engine umbenennen, Sub-Skill-Konfiguration heben | nein (Basketball bit-identisch) |
+| **3b** | Hockey hinter der Weiche live schalten | **ja** — Hockey läuft live, noch falsch kalibriert |
+| **3c** | Sondierungslauf Hockey live | nein (Messung) |
+| **4** | Impact-Formel → Zonenmodell → Erfolgsformel → Sondierung → Rezept | **ja** |
+| **5** | Rangtreue und Archetypen | ja |
+| **6** | Bully-Standphase und Drittelpause | ja |
+| **7** | Die Eisfläche zeichnen | nein (nur Optik) |
+| **8** | Strafzeit und Überzahlspiel | ja |
+| **9** | Produktivierung — Orchestrator je Disziplin, Override-Map je Disziplin | ja |
+
+Sechs der dreizehn Schritte ändern kein Spielverhalten. `main` bleibt nach jedem deploybar.
