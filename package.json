@@ -134,7 +134,8 @@
     "bugs:tabelle": "tsx scripts/bug-reports-table.ts",
     "changelog:bauen": "tsx scripts/changelog-build.ts",
     "saves:export": "tsx scripts/save-export.ts",
-    "saves:import": "tsx scripts/save-import.ts"
+    "saves:import": "tsx scripts/save-import.ts",
+    "sprites:erzeuge-vorschauen": "node scripts/erzeuge-sprite-vorschauen.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

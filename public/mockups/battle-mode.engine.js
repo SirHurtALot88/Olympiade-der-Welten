@@ -468,12 +468,16 @@
       ["helm_horn",64,0,0,"metall:iron"],["visier_horn",64,0,0,"metall:iron"],
       ["schild_fg",64,0,0,"metall:iron"],["axt_fg",192,-64,-64,"metall:iron"]]},
 
-    // Bild: Koloss aus Kristallschollen, violette Energie, UNBEWAFFNET.
-    "Krag'Zul":{haut:"blue", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_troll",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:steel"],["stiefel",64,0,0,"metall:steel"],
-      ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
-      ["schulter",64,0,0,"metall:steel"],["z_hoerner",64,0,0,"haut"]]},
+    // Sprite-Galerie-Audit: Krag'Zul-Eintrag HIER entfernt (war kopf_troll+Stahlruestung,
+    // ein Troll-Humanoid statt des Kristallkoloss aus dem Bild). figur()/figurKlein() (die
+    // Kader-Vorschau UND das Aufstellungs-Board) lesen B_FIGUR IMMER zuerst und komplett
+    // unabhaengig von BAU (s. figur() unten, "if(bf){...return}") — solange dieser Eintrag
+    // hier stand, zeigte die Kader-Vorschau also einen ganz anderen Charakter als die
+    // animierte Battle-Arena-Ansicht (die BAU["Krag'Zul"] mit vollbild:"golem" liest), obwohl
+    // beide angeblich "EIN Charakter" sein sollen. Ohne Eintrag faellt figur() jetzt auf
+    // denselben b.vollbild-Zweig zurueck, den Terradon/Abysskraken/Brightpaw/Arachna & Co.
+    // schon benutzen (kein B_FIGUR-Eintrag fuer diese) — beide Ansichten zeigen jetzt densel-
+    // ben Golem. Per figurProbe vorher/nachher verglichen.
 
     // Bild: massiges Steinwesen mit ECHSENKOPF, gluehende Augen, UNBEWAFFNET.
     //
@@ -534,20 +538,25 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["haar_lang",64,0,0,"haar:blonde"],
       ["schild_fg",64,0,0,"metall:steel"],["sw_fg",128,-32,-32,null]]},
-    "Lava Golem":{haut:"olive", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_frankenstein",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:brass"],["arme",64,0,0,"metall:brass"],
-      ["r_slash",64,0,0,"metall:brass"],["schulter",64,0,0,"metall:brass"]]},
+    // Sprite-Galerie-Audit: Lava-Golem-Eintrag HIER entfernt (war kopf_frankenstein+Messing-
+    // ruestung — ein aelterer, laengst verworfener Konzeptstand, sogar noch vor der "orc"-
+    // Kopf-Naeherung, die BAU["Lava Golem"] laut eigenem Kommentar spaeter selbst ablehnte).
+    // Gleicher Fall wie Krag'Zul direkt oben: figur() liest B_FIGUR IMMER zuerst und komplett
+    // unabhaengig von BAU, die Kader-Vorschau zeigte also einen banalen Messing-Ritter statt
+    // des Feuer-/Lavakolosses, den die animierte Ansicht laengst zeigt (vollbild:"golem").
+    // Ohne Eintrag faellt figur() auf denselben b.vollbild-Zweig zurueck wie bei Terradon
+    // direkt daneben. Per figurProbe vorher/nachher verglichen.
     "Greenkraut":{haut:"green", ebenen:[
       ["k_slash",64,0,0,"haut"],["kopf_orc",64,0,0,"haut"],
       ["leder_slash",64,0,0,null],["binde",64,0,0,"stoff:walnut"],
       ["haar_dread",64,0,0,"haar:green"]]},
-    "Tidesprinter":{haut:"blue", ebenen:[
-      ["sw_bg",128,-32,-32,null],
-      ["s_schwanz_bg",64,0,0,"haut"],
-      ["k_slash",64,0,0,"haut"],["kopf_lizard",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],["stiefel",64,0,0,"metall:brass"],
-      ["s_schwanz_fg",64,0,0,"haut"],["sw_fg",128,-32,-32,null]]},
+    // Sprite-Galerie-Audit: Tidesprinter-Eintrag HIER entfernt (war kopf_lizard+Messing-
+    // Stiefel — dieselbe menschlich-lizard-Naeherung, die BAU["Tidesprinter"] laut eigenem
+    // Kommentar explizit durch vollbild:"froschmensch" ersetzt hat, weil das Bild einen
+    // Wassermann/Meeresdaemon zeigt, keinen Echsenkrieger). Gleicher Fall wie Krag'Zul/Lava
+    // Golem oben: die Kader-Vorschau zeigte weiterhin die alte Lizard-Naeherung statt des
+    // Frogmen-Vollbilds. Ohne Eintrag faellt figur() auf denselben b.vollbild-Zweig zurueck.
+    // Per figurProbe vorher/nachher verglichen.
     // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab, Feuer im Schnee.
     // Keine Ruestung, keine Klinge — ein Weiser, kein Kaempfer. Passt zu seinen Werten:
     // Charisma 85, Spirit 76, Wille 72, Entschlossenheit 81, dagegen Power 10.
@@ -674,7 +683,13 @@
     // effekt "void"/"koerper" (25.08., Ausbau ueber Feuer hinaus, Bildbefund: "violette
     // ENERGIE in Brust und Rissen") — dieselbe wabernde Rauch-/Energie-Optik wie bei
     // Nocture, aber in Lila statt Rot, weil das Bild hier ausdruecklich violett zeigt.
-    "Krag'Zul":           {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true,ruestTon:"dunkel",effekt:{typ:"void",pos:"koerper"}},
+    // Sprite-Galerie-Audit: Bildbefund "Riesiger Koloss aus Kristallschollen" beschreibt
+    // denselben blockigen Steinkoloss-Umriss wie golem_walk.png (das Blatt hat sogar einen
+    // spitzen Kammansatz am Kopf, der sich als Kristallzacke liest) — naeher dran als ein
+    // Alien-Kopf auf einem Platten-Torso. effekt "void" (das violette Lila aus dem eigenen
+    // Bildbefund, s. EFFEKT_ARTEN) bleibt unveraendert, nur der Koerper wechselt; per
+    // renderProbe vorher/nachher verglichen.
+    "Krag'Zul":           {vollbild:"golem",vollbildFarbe:"#6a5a8a",effekt:{typ:"void",pos:"koerper"}},
     // Bild (subclass-archetypes.ts): "Blauhaeutiger Wassermann/Meeresdaemon mit Dreizack,
     // schreiend, Schuppenschwanz, tost aus einem Strudel." public/sprites/fisch/
     // froschmensch.png (Stendhal Frogmen, 144x256 = 3x4 zu 48x64) ist genau fuer die
@@ -928,7 +943,20 @@
     // Bild: dunkler Kriegsgolem mit Schulterkanonen, geballte Metallfaeuste OHNE Handwaffe —
     // waffe:"bogen" war ein Fehlgriff (25.08. korrigiert; der Bildbefund-Text schliesst eine
     // gefuehrte Waffe ausdruecklich aus).
-    "Vorrak":             {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
+    // Sprite-Galerie-Audit: der eigene Bildbefund sagt woertlich "Kriegsgolem", der Bauplan
+    // war aber nur kopf:"orc"+plate — derselbe Fehler, den Lava Golem/Terradon schon hatten,
+    // bevor sie auf vollbild:"golem" umgestellt wurden (s. dort). golem_walk.png (dieselbe
+    // Silhouette: blockiger Koloss mit spitzem Helmkamm) trifft die Panzerform sichtbar
+    // naeher als ein Orc-Torso in Platte, per renderProbe vorher/nachher verglichen.
+    // vollbildFarbe dunkles Eisengrau statt der bisherigen Silber/Blaugrau-Grundfarbe des
+    // Blattes ("dunkler" Golem laut Bild); effekt "voidRot" (rot-orange wabernde Energie,
+    // s. EFFEKT_ARTEN) fuer den "gluehend roten Energiekern und rote Augen" aus dem
+    // Bildbefund — dieselbe Mechanik, die Nocture fuer ihre rotgluehende Energie nutzt.
+    // Farbwert bewusst ein MITTLERES Grau, kein fast-Schwarz: bHolEingefaerbt() multipliziert
+    // nur (destination-in/multiply, s. dort), ein zu dunkler Wert ertraenkt die Schattierung
+    // des Blatts komplett in einer Silhouette (per renderProbe nachgemessen, #3a3a40 lief
+    // sichtbar zu dunkel).
+    "Vorrak":             {vollbild:"golem",vollbildFarbe:"#6b6f78",effekt:{typ:"voidRot",pos:"koerper"}},
     // Bild (25.08., Katzenohren/-schwanz-Fund): eine ECHTE getigerte Katze mit Eimer auf
     // dem Kopf — das feline Motiv im Kartenbild ist eindeutiger als bei jedem anderen
     // Eintrag hier. ohren/schwanz jetzt "katze" statt der Echsen-Variante (s. zeichneSprite).
