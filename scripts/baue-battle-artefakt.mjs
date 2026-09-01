@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Setzt aus der duennen Huelle (public/mockups/battle-mode.html) und ihren zwei
-// ausgelagerten Dateien (battle-mode.css, battle-mode.engine.js) wieder EINE
+// Setzt aus der duennen Huelle (public/mockups/battle-mode.html) und ihren drei
+// ausgelagerten Dateien (battle-mode.css, battle-mode.rezepte.js, battle-mode.engine.js)
+// wieder EINE
 // selbststaendige HTML-Datei zusammen — fuer die Claude-Artefakt-Veroeffentlichung,
 // die (anders als die laufende App) keine externen <link>/<script src>-Verweise
 // laden darf.
@@ -20,6 +21,10 @@ const mockupsDir = resolve(hier, "..", "public", "mockups");
 const shell = readFileSync(resolve(mockupsDir, "battle-mode.html"), "utf8");
 const css = readFileSync(resolve(mockupsDir, "battle-mode.css"), "utf8");
 const js = readFileSync(resolve(mockupsDir, "battle-mode.engine.js"), "utf8");
+// Die Rezept-Daten muessen VOR dem Motor im Artefakt stehen, sonst faellt der Motor auf
+// seine Inline-Rezepte zurueck (s. rezeptAus() in battle-mode.engine.js) — beim heutigen
+// Stand haette Basketball dann gar keins mehr.
+const rezepte = readFileSync(resolve(mockupsDir, "battle-mode.rezepte.js"), "utf8");
 
 // Das Google-Fonts-<link> bleibt stehen (Artefakte duerfen dorthin verlinken, s.
 // Publish-Regeln) — nur der lokale Stylesheet-Verweis wird durch den Inhalt selbst
@@ -30,13 +35,21 @@ let ausgabe = shell
     () => `<style>\n${css}</style>`,
   )
   .replace(
+    /<script src="battle-mode\.rezepte\.js"><\/script>/,
+    () => `<script>\n${rezepte}</script>`,
+  )
+  .replace(
     /<script src="battle-mode\.engine\.js"><\/script>/,
     () => `<script>\n${js}</script>`,
   );
 
-if (ausgabe.includes('href="battle-mode.css"') || ausgabe.includes('src="battle-mode.engine.js"')) {
+if (
+  ausgabe.includes('href="battle-mode.css"') ||
+  ausgabe.includes('src="battle-mode.engine.js"') ||
+  ausgabe.includes('src="battle-mode.rezepte.js"')
+) {
   throw new Error(
-    "battle-mode.html hat sich strukturell geaendert — die <link>/<script>-Ersetzung hat nicht beide Stellen getroffen. Skript pruefen, bevor ein Artefakt draus wird.",
+    "battle-mode.html hat sich strukturell geaendert — die <link>/<script>-Ersetzung hat nicht alle drei Stellen getroffen. Skript pruefen, bevor ein Artefakt draus wird.",
   );
 }
 
