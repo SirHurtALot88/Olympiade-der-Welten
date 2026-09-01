@@ -168,15 +168,16 @@ describe("Battle Arena · ein Charakter, ein Modell (Chris, 01.09.)", () => {
 
   it("BAU traegt fuer alle 13 ehemaligen B_FIGUR-Charaktere weiterhin eine echte Zeile", () => {
     const bauQuelle = schneideObjektLiteral("BAU");
-    const bau = ladeObjektLiteral<Record<string, { kopf?: string; vollbild?: string }>>(bauQuelle);
+    const bau = ladeObjektLiteral<Record<string, { kopf?: string; vollbild?: string; reiherMech?: boolean }>>(bauQuelle);
 
     for (const name of EHEMALIGE_B_FIGUR_NAMEN) {
       const eintrag = bau[name];
       expect(eintrag, `BAU["${name}"] fehlt — B_FIGUR waere fuer diesen Charakter die einzige Quelle gewesen`).toBeDefined();
-      // Ein echter Bauplan ist entweder ein VOLLBILD-Eintrag (Kreaturen ohne kopf/body) oder
-      // traegt einen echten Kopftyp — beides schliesst den stillen BAU_STD-Nachfall aus, der
+      // Ein echter Bauplan ist ein VOLLBILD-Eintrag (Kreaturen ohne kopf/body), ein echter
+      // Kopftyp, oder eine prozedurale Sonderroutine wie b.reiherMech (Seraph-11, s.
+      // zeichneReiherMech) — alle drei schliessen den stillen BAU_STD-Nachfall aus, der
       // (unbemerkt) exakt denselben Effekt haette wie ein fehlender Eintrag.
-      expect(Boolean(eintrag!.kopf || eintrag!.vollbild), `BAU["${name}"] hat weder kopf noch vollbild`).toBe(true);
+      expect(Boolean(eintrag!.kopf || eintrag!.vollbild || eintrag!.reiherMech), `BAU["${name}"] hat weder kopf noch vollbild noch reiherMech`).toBe(true);
     }
   });
 

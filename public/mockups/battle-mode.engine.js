@@ -197,22 +197,30 @@
   // sowohl aus zeichneSprite (Arena, s.dort) als auch aus figur() (Kader-/Board-Vorschau,
   // s.dort) — EIN Charakter, ein Bild, wie beim Rest des Baukastens. s = Skalierung (1 in
   // der Arena bei einem 64px-Sprite, kleiner in der 40x50-Kader-Ikone).
-  function zeichneKameraKopf(cctx,cx,cy,s){
-    const w=13*s,h=9*s;
+  // Nachgebessert (01.09., Chris' Fund: "Vigil müsste die Kamera STATT dem Gesicht sein" —
+  // die erste Fassung SASS auf dem Kopf wie ein Hut, klein genug, dass Auge und Schnabel
+  // der Taube darunter weiter sichtbar blieben). Groesse/Position jetzt aus dem echten
+  // Kopf-Umriss von pigeon-NESW.png ausgemessen (Pixel-Scan je Zeile, nicht geschaetzt):
+  // Kopfball liegt in allen vier Ansichten zwischen nativ y=7 und y=19 (Ruecken enger,
+  // Front/Profil mit Schnabel/Kinn bis y~19), das Gehaeuse deckt diese Spanne jetzt
+  // komplett ab statt nur ihre obere Haelfte. breite/hoehe erlauben abweichende Masse fuer
+  // die Profilpose (dort steht der Schnabel seitlich ueber den Kopfball hinaus).
+  function zeichneKameraKopf(cctx,cx,cy,s,breite,hoehe){
+    const w=(breite||16)*s,h=(hoehe||18)*s;
     cctx.fillStyle="#26262a";
     cctx.fillRect(cx-w/2,cy-h/2,w,h);
     cctx.fillStyle="#45454c";
-    cctx.fillRect(cx-w/2,cy-h/2,w,Math.max(1,2*s));
+    cctx.fillRect(cx-w/2,cy-h/2,w,Math.max(1,2.4*s));
     cctx.fillStyle="#0d0f13";
-    cctx.beginPath();cctx.arc(cx,cy+1*s,3.4*s,0,Math.PI*2);cctx.fill();
+    cctx.beginPath();cctx.arc(cx,cy+1.5*s,4.2*s,0,Math.PI*2);cctx.fill();
     cctx.fillStyle="#5b6b78";
-    cctx.beginPath();cctx.arc(cx-1*s,cy,1*s,0,Math.PI*2);cctx.fill();
+    cctx.beginPath();cctx.arc(cx-1.3*s,cy+0.3*s,1.3*s,0,Math.PI*2);cctx.fill();
     cctx.fillStyle="#c8241e";
-    cctx.beginPath();cctx.arc(cx+w/2-1.6*s,cy-h/2+1.6*s,Math.max(0.6,1*s),0,Math.PI*2);cctx.fill();
-    cctx.strokeStyle="#232f23";cctx.lineWidth=Math.max(1,0.8*s);
-    cctx.beginPath();cctx.moveTo(cx-3*s,cy+h/2);cctx.lineTo(cx-3*s,cy+h/2+3*s);cctx.stroke();
+    cctx.beginPath();cctx.arc(cx+w/2-1.8*s,cy-h/2+1.8*s,Math.max(0.7,1.1*s),0,Math.PI*2);cctx.fill();
+    cctx.strokeStyle="#232f23";cctx.lineWidth=Math.max(1,0.9*s);
+    cctx.beginPath();cctx.moveTo(cx-w/2+2*s,cy+h/2);cctx.lineTo(cx-w/2+2*s,cy+h/2+3.2*s);cctx.stroke();
     cctx.fillStyle="#2c3a2c";
-    cctx.beginPath();cctx.arc(cx-3*s,cy+h/2+3.4*s,Math.max(0.7,1*s),0,Math.PI*2);cctx.fill();
+    cctx.beginPath();cctx.arc(cx-w/2+2*s,cy+h/2+3.6*s,Math.max(0.8,1.1*s),0,Math.PI*2);cctx.fill();
   }
 
   // WELCHE RAMPE STEHT IM BLATT? Nachgemessen, nicht angenommen.
@@ -646,22 +654,22 @@
     // ja auch kein Weisskopfseeadler, schau dir sein Bild mal genauer an" — ein vorheriger
     // Agent hatte vogel_adler.png (Weisskopfseeadler aus [LPC] Birds) vorgemerkt, das trifft
     // die KOERPERFORM nicht (kurzer Hals, Hakenschnabel, Sitzhaltung statt schlank/langhalsig).
-    // Jetzt vollbild:"singvogel" (s. VOLLBILD-Kommentar dort: keiner der 15 LPC-Birds-Voegel
-    // hat einen Reiher-Koerper, "bird_1" ist die schlankste/spitzschnaebligste Annaeherung der
-    // 15 — dokumentierte Naeherung, kein Platzhalter). vollbildFarbe dunkles Metallgrau wie
-    // bei Vorrak; b.gluehenderKern:true fuer den leuchtenden Brust-Energiekern (zeichneKern,
-    // punktueller Gluehlayer nach dem Vorbild von Lava Golems gluehenderRiss statt eines
-    // flaechigen b.effekt-Partikelfelds — das Bild zeigt EINEN Punkt, keine verteilte Aura).
-    // Per renderProbe geprueft: bHolEingefaerbt() faerbt per Multiply, das haelt den
-    // urspruenglichen Hell-Dunkel-VERLAUF des Bildes und damit auch dessen Farbton-Verhaeltnis
-    // (Original ist sattes Rotbraun) — das Ergebnis liest sich eher dunkel-erdig als rein
-    // metallisch-grau, selbst mit einem neutralen Grauton. Dasselbe Verfahren wie bei Vorrak/
-    // Krag'Zul/Krolach, dort faellt es weniger auf, weil deren Quellblatt (golem_walk.png)
-    // schon naeher an Grau liegt. Immer noch klar dunkler/unheilvoller als das vorherige
-    // Alien-Rezept und naeher am Bild — kein Grund, deswegen auf das Vogel-Vollbild zu
-    // verzichten, aber ein ehrlicher Vermerk statt eines stillschweigend hingenommenen
-    // Farbunterschieds zum Portrait.
-    "Seraph-11":          {vollbild:"singvogel",vollbildFarbe:"#3f4550",gluehenderKern:true},
+    // Ein zweiter Anlauf setzte vollbild:"singvogel" (LPC-Birds "bird_1", die schlankste der
+    // 15 verfuegbaren) — Chris' Fund danach: "das ist jetzt nur noch ein Licht (der Gluehkern/
+    // das Auge), braucht aber noch den Body". Recherche (WebSearch/WebFetch, opengameart.org
+    // + itch.io, 01.09.) nach einem echten Reiher-/Kranich-Sprite ergab: KEIN frei
+    // lizenziertes 2D-Sprite trifft Silhouette (Langhals/Langbein) UND Mehrrichtungs-
+    // Gehzyklus zugleich. "Prehistoric Bird" (OGA, CC0) trifft die Form, hat aber nur 3
+    // Frames einer Ansicht; "Cranepack" (itch.io) trifft Form UND Animation perfekt, ist
+    // aber kostenpflichtig mit eigener Nicht-Standard-Lizenz (kein CC0/CC-BY-Aequivalent) —
+    // faellt damit nach unserer eigenen Lizenzvorgabe raus. Deshalb JETZT: kein Sprite,
+    // sondern ein rein PROZEDURAL aus Formen gebauter Koerper (zeichneReiherMech, b.reiherMech:
+    // true statt b.vollbild — dasselbe Prinzip wie Vigils Kamera-Kopf zeichneKameraKopf).
+    // Bei einer SCI-FI-Kreatur ist eine klare geometrische Silhouette ohnehin naeher an
+    // "mechanisch" als ein nachgezeichnetes Federkleid. b.gluehenderKern:true bleibt (der
+    // Energiekern/das Auge), sitzt jetzt aber AM KOPF des gezeichneten Koerpers statt an
+    // einem geschaetzten Fixpunkt (zeichneReiherMech gibt die Kopfposition zurueck).
+    "Seraph-11":          {reiherMech:true,gluehenderKern:true},
     // Kastanienbraunes Haar und Bart wie im Portrait, keine Kapuze (derselbe Behelf wie
     // bei Jorund, jetzt behoben).
     "Ralazar the Balanced":{kopf:"human",haut:"olive",ruest:"plate",haar:"haar_mop",bart:true,haarTon:"dark_brown",ruestTon:"dunkel"},
@@ -1384,27 +1392,11 @@
     // Sichtcheck bestaetigt (Zeile 0 Ruecken/hinten, 1 Seite rechts/Ost, 2 Front/Sueden,
     // 3 Seite links/West) — deckt sich exakt mit STENDHAL_ROW/stendhal:true.
     taube: {key:"vogel_taube_walk", cw:32, ch:32, cols:3, stendhal:true},
-    // Seraph-11 (Chris' Korrektur: "Seraph ist ja auch kein Weisskopfseeadler" — das Portrait
-    // zeigt eine SCHLANKE, LANGHALSIGE mechanische Reiher-/Storch-Kreatur, kein Adler mit
-    // kurzem Hals/Hakenschnabel/Sitzhaltung). Alle 15 Voegel aus "[LPC] Birds" (bluecarrot16,
-    // opengameart.org/content/lpc-birds, CC-BY 3.0 u.a., s. quellen.json) durchgesehen: KEINER
-    // der drei Koerpertypen hat einen Reiher-/Kranich-Koerper (langer Hals, lange Beine) —
-    // alle sind kompakte, rundliche Kleinvoegel. Von den dreien hat "bird_1" (hier: die
-    // braune Farbvariante, neutral ohne Art-Anmutung wie "bluejay"/"cardinal") den
-    // spitzesten Schnabel und die am staerksten laenglich gezogene Silhouette (duennerer
-    // Hals-Ansatz, ausgepraegtere Schwanzfeder-Spitze als bird_2/eagle's rundlicher, kurz-
-    // halsiger Umriss) — DIE naechstliegende Annaeherung der 15, per Chris' Grundsatz
-    // ("nie wieder kein perfektes Asset gefunden, also nichts eingebaut") trotzdem eingebaut,
-    // nicht liegengelassen. bird_2/eagle bewusst NICHT genommen: dessen Silhouette ist exakt
-    // die kurzhalsige Sitzhaltung, die Chris am Weisskopfseeadler-Ersatz zurueckgewiesen hat.
-    // 96x256 = 3 Spalten x 8 Reihen zu 32px: Reihen 0-3 sind der FLUG-Zyklus (ungenutzt),
-    // Reihen 4-7 der Boden-/Stehzyklus, per Sichtcheck gemessen — Reihe 4 Seite rechts, 5
-    // Ruecken/hinten, 6 Front/vorn, 7 Seite links. rowMap bildet blickAus() (0 hinten,1
-    // links,2 vorn,3 rechts) direkt auf diese vier Zeilen ab, dasselbe Prinzip wie bei
-    // mech_transformer_walk.png/treant.png oben. Dunkel/metallisch eingefaerbt ueber
-    // vollbildFarbe (wie Vorrak/Krag'Zul/Krolach), der leuchtende Brustkern kommt separat
-    // ueber b.gluehenderKern (s. zeichneKern in zeichneSprite).
-    singvogel: {key:"vogel_singvogel_walk", cw:32, ch:32, cols:3, rows:8, rowMap:[5,7,6,4]},
+    // Seraph-11 nutzt seit 01.09. KEIN vollbild-Sprite mehr (b.reiherMech:true, prozedural
+    // in zeichneSprite via zeichneReiherMech statt eines VOLLBILD-Eintrags hier — s.
+    // Kommentar bei BAU["Seraph-11"] fuer die Sprite-Suche, die zu dieser Entscheidung
+    // fuehrte). Der fruehere Eintrag "singvogel" (LPC-Birds bird_1, nur eine dokumentierte
+    // Naeherung ohne Reiher-Koerperform) ist damit ersatzlos entfallen.
     // Nachverdrahtet (01.09., Shroomgator-Auftrag): Shroomgator ("pilzbewachsener
     // Alligator", Bildbefund public/portraits/shroomgator.jpg — vier Beine, langer
     // Schwanz, breite Zahn-Schnauze, komplett bewachsen mit Moos und roten
@@ -1625,18 +1617,19 @@
           ctx.globalAlpha=alpha;ctx.strokeStyle=farben[i];ctx.lineWidth=1.6-i*0.35;
           ctx.beginPath();ctx.ellipse(cx,ringY,ringR,ringR*0.32,0,0,Math.PI*2);ctx.stroke();
         }else if(modus==="pilzhuete"){
-          // Shroomgator: kleine rote Fliegenpilz-Huete, FEST nahe topY sitzend statt
-          // aufzusteigen/zu schweben/zu funkeln wie die Elementeffekte — Pilze bewegen
-          // sich nicht, nur ein leichtes Idle-Wippen (Analogie zum Ganges des Kaempfers).
-          // Positionen ueber i gleichmaessig entlang der Breite verteilt (streuung*2 statt
-          // eines einzelnen Punkts), Hoehe nahe topY (bei b.effekt.pos:"koerper" ist topY
-          // y-44, also nahe der Kopf-/Ruecken-Oberkante des Vollbild-Sprites — fuer ein
-          // niedriges Quadruped die plausibelste Naeherung an "auf dem Ruecken", ohne dass
-          // die Vollbild-Mechanik einen echten Ruecken-Ankerpunkt kennt).
+          // Shroomgator: kleine rote Fliegenpilz-Huete, FEST sitzend statt aufzusteigen/zu
+          // schweben/zu funkeln wie die Elementeffekte — Pilze bewegen sich nicht, nur ein
+          // leichtes Idle-Wippen (Analogie zum Ganges des Kaempfers). Ueber i in EINEM
+          // deterministischen Pseudo-Zufallsraster in X UND Y ueber die ganze uebergebene
+          // Flaeche verteilt (Chris' Korrektur 01.09.: "die Pilze auf ihm verteilt" — vorher
+          // lagen alle fuenf in EINER Zeile nahe topY, das deckte nur ein schmales Band ab
+          // statt der ganzen Ruecken-/Koerperflaeche). Aus u.id+i statt Math.random(), sonst
+          // "wandern" die Pilze jeden Frame neu.
+          const zx=Math.sin(u.id*7.3+i*12.9)*0.5+0.5, zy=Math.sin(u.id*4.1+i*9.7+3.3)*0.5+0.5;
           const phase=t*0.8+u.id*1.3+i*3.1;
-          const wippel=Math.sin(phase)*0.6;
-          const px=cx+(i-(n-1)/2)*streuung*0.85;
-          const py=topY+spanne*0.34+wippel;
+          const wippel=Math.sin(phase)*0.5;
+          const px=cx+(zx-0.5)*streuung*2;
+          const py=topY+spanne*(0.15+zy*0.65)+wippel;
           ctx.globalAlpha=0.92;ctx.fillStyle=farben[i];
           ctx.beginPath();ctx.arc(px,py,2.1,0,Math.PI*2);ctx.fill();
           // Weisser Punkt obendrauf — der Fliegenpilz-Tupfen aus dem Portrait.
@@ -1715,6 +1708,69 @@
       ctx.beginPath();ctx.arc(cx,cy,radius*0.55,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=1;
     };
+    // Seraph-11: mechanischer Reiher-/Kranich-KOERPER, rein prozedural aus Formen gebaut
+    // (01.09., Chris' Fund: "das ist jetzt nur noch ein Licht [der Gluehkern], braucht aber
+    // noch den Body — du wolltest doch einen Kranich oder Reiher finden dafuer"). Recherche
+    // (WebSearch/WebFetch, opengameart.org + itch.io) ergab: KEIN frei lizenziertes 2D-Sprite
+    // trifft Silhouette (langer Hals/lange Beine) UND Mehrrichtungs-Gehzyklus zugleich —
+    // "Prehistoric Bird" (OGA, CC0) trifft die Form, hat aber nur 3 Frames einer Ansicht;
+    // "Cranepack" (itch.io) trifft beides perfekt, ist aber kostenpflichtig mit eigener
+    // Nicht-Standard-Lizenz (kein CC0/CC-BY-Aequivalent) — faellt nach unserer eigenen
+    // Lizenzvorgabe raus. Deshalb wie Vigils Kamera-Kopf (zeichneKameraKopf): kein Sprite,
+    // sondern reine Formen — bei einer Sci-Fi-Kreatur ohnehin naeher an "mechanisch" als
+    // ein nachgezeichnetes Federkleid. b.reiherMech:true statt b.vollbild. Gibt die
+    // Kopfposition zurueck, damit b.gluehenderKern (der Energiekern/das Auge) direkt am
+    // Kopf andockt statt an einem geschaetzten Fixpunkt.
+    const zeichneReiherMech=(cx,cy,s,r0)=>{
+      const dunkel="#202327", mittel="#3f4550", hell="#5b6470";
+      const blick=r0===3?1:r0===1?-1:0; // Schnabelrichtung: rechts/links, Front+Ruecken mittig
+      const phase=t*3+u.id*1.7;
+      const schritt=(u.down?0:Math.sin(phase))*3*s;
+      // Beine: zwei duenne Staken mit Fuss, leichter Schrittversatz — dasselbe Prinzip wie
+      // jeder andere Lauf-Zyklus hier (Sinus aus t/u.id, kein Sprite-Frame).
+      ctx.strokeStyle=dunkel; ctx.lineWidth=1.6*s; ctx.lineCap="round";
+      for(const bseite of [-1,1]){
+        const bx=cx+bseite*3*s, byTop=cy+5*s, versatz=bseite*schritt*0.5, byBot=cy+19*s;
+        ctx.beginPath();ctx.moveTo(bx,byTop);ctx.lineTo(bx+versatz,byBot);ctx.stroke();
+        ctx.fillStyle=dunkel;
+        ctx.beginPath();ctx.ellipse(bx+versatz+bseite*1.6*s,byBot,2*s,1*s,0,0,Math.PI*2);ctx.fill();
+      }
+      // Rumpf: liegendes Oval mit hellerem Ruecken-Glanzlicht.
+      ctx.fillStyle=mittel;
+      ctx.beginPath();ctx.ellipse(cx,cy+1*s,9*s,6*s,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=hell;
+      ctx.beginPath();ctx.ellipse(cx-1.5*s,cy-1.5*s,6*s,3.2*s,0,0,Math.PI*2);ctx.fill();
+      // Hals: S-Kurve aus dem Rumpf, in Blickrichtung geneigt (Front/Ruecken fast senkrecht).
+      const halsX0=cx+blick*2*s, halsY0=cy-3*s;
+      const halsXm=cx+blick*7*s, halsYm=cy-11*s;
+      const kopfX=cx+blick*8*s, kopfY=cy-17*s;
+      ctx.strokeStyle=mittel; ctx.lineWidth=3*s; ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(halsX0,halsY0);ctx.quadraticCurveTo(halsXm,halsYm,kopfX,kopfY);ctx.stroke();
+      // Kopf plus langer spitzer Schnabel (im Profil zur Seite, in Front-/Ruecken-Ansicht
+      // kurz nach unten) — derselbe spitzschnaeblige Reiher-Umriss aus dem Portrait, jetzt
+      // nachgezeichnet statt uebernommen (s. Kommentar oben).
+      ctx.fillStyle=mittel;
+      ctx.beginPath();ctx.ellipse(kopfX,kopfY,2.6*s,2.2*s,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=dunkel;
+      ctx.beginPath();
+      if(blick!==0){
+        ctx.moveTo(kopfX+blick*2*s,kopfY-0.9*s);
+        ctx.lineTo(kopfX+blick*8.5*s,kopfY);
+        ctx.lineTo(kopfX+blick*2*s,kopfY+0.9*s);
+      }else{
+        ctx.moveTo(kopfX-1*s,kopfY+1.8*s);
+        ctx.lineTo(kopfX,kopfY+5.5*s);
+        ctx.lineTo(kopfX+1*s,kopfY+1.8*s);
+      }
+      ctx.closePath();ctx.fill();
+      return {kopfX,kopfY};
+    };
+    if(b.reiherMech){
+      const r0=blickAus(u);
+      const kopf=zeichneReiherMech(x,y,Z,r0);
+      if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
+      return;
+    }
     if(b.vollbild){
       const spec=VOLLBILD[b.vollbild];
       const im=bHolEingefaerbt(spec.key,b.vollbildFarbe);
@@ -1731,7 +1787,23 @@
         const dh=64*Z, dw=spec.cw*(dh/spec.ch);
         try{ctx.drawImage(im,vf*spec.cw,row*spec.ch,spec.cw,spec.ch,x-dw/2,y-46*Z,dw,dh);}catch(e){}
       }
-      if(b.effekt&&b.effekt.pos==="koerper"&&!u.down)zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
+      // Chris' Fund (01.09.): die Shroomgator-Pilze schwebten komplett UEBER dem Krokodil,
+      // gar nicht auf ihm — die generische Spanne y-44*Z..y+16*Z ist auf eine AUFRECHTE
+      // 64px-Figur zugeschnitten (Kopf oben, Fuesse unten). Ein liegendes Quadruped fuellt
+      // diesen Rahmen ganz anders (per Pixel-Scan an krokodil.png ausgemessen, nicht
+      // geschaetzt, s. quellen.json): Drauf-/Rueckansicht (r0 0/2, Kopf zeigt zur Kamera
+      // bzw. weg) ist SCHLANK UND HOCH (Koerperpixel fast ueber die volle Bildhoehe), die
+      // Seitenansicht (r0 1/3) ist ein schmales, fast bildbreites horizontales Band knapp
+      // ueber der Mitte. Eigene Grenzen je Blickrichtung statt der Humanoid-Spanne.
+      if(b.effekt&&b.effekt.pos==="koerper"&&!u.down){
+        if(b.vollbild==="krokodil"){
+          const seite=r0===1||r0===3;
+          const kTop=(seite?-15:-43)*Z, kBot=(seite?9:15)*Z, kStreu=(seite?20:9)*Z;
+          zeichnePartikelEffekt(x,y+kTop,y+kBot,kStreu,b.effekt.typ);
+        }else{
+          zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
+        }
+      }
       // Riss mittig auf der Brust (y-26..y-2, dieselbe Spanne wie im normalen Zeichenpfad
       // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
       // war das "verschoben", das Chris live sah), skaliert mit Z wie alles andere hier.
@@ -1740,17 +1812,27 @@
       // wie beim Riss-Bereich direkt darueber, nur als Punkt statt Pfad. Mit Z skaliert wie
       // alles andere hier (s. groesseFaktor oben).
       if(b.gluehenderKern&&!u.down)zeichneKern(x,y-24*Z,6*Z);
-      // Kamera-Requisite (Vigil) sitzt hier ueber dem Kopf: Kopf-Oberkante beim 32x32-
-      // Taubenblatt (skaliert auf dh=64) liegt bei ca. y-31 (per Sichtcheck an
-      // pigeon-NESW.png bestimmt, s. quellen.json), das Gehaeuse ueberlappt die Kopf-
-      // Oberkante deshalb bei y-27. In den Seitenposen (links/rechts) sitzt der Taubenkopf
-      // nicht mittig, sondern deutlich zur jeweiligen Blickseite hin (Kopf/Schnabel ragen
-      // weit aus der Silhouette) — ohne Versatz schwebte die Kamera dort sichtbar ueber dem
-      // Ruecken statt dem Kopf (renderProbe-Fund). kameraVersatz schiebt sie in Blickrichtung.
-      // Mit Z skaliert wie alles andere hier.
+      // Kamera-Requisite (Vigil) ERSETZT den Kopf, sitzt nicht mehr NUR obendrauf (Chris'
+      // Korrektur 01.09.: "Vigil müsste die Kamera statt dem Gesicht sein" — die erste
+      // Fassung liess Auge/Schnabel der Taube unter der Kamera weiter sichtbar). Position
+      // UND Groesse jetzt aus dem Kopf-Umriss von pigeon-NESW.png ausgemessen (Pixel-Scan
+      // je Zeile, s. quellen.json): der Kopfball liegt nativ zwischen y=7 und y=19 in allen
+      // vier Ansichten (Ruecken schmaler/hoeher oben, Front/Profil mit Kinn/Schnabel bis
+      // y=19) — Bildmitte des Baukastens ist y-46, ein Sprite-Pixel entspricht 2 Bildschirm-
+      // Pixeln (dh=64/ch=32), macht Mitte (7+19)/2*2-46=-20, deshalb y-20*Z statt der alten
+      // y-27*Z (die nur die OBERE Haelfte des Kopfs traf). In den Profilposen steht der
+      // Schnabel seitlich ueber den Kopfball hinaus — im GEHZYKLUS (nicht nur im
+      // Stehbild) bis nativ x=30 rechts bzw. x=2 links (col0/col2 der Laufanimation
+      // strecken den Schnabel weiter vor als das Stehbild col1, per Sichtcheck an einer
+      // renderProbe-Serie nachgemessen, sonst blieb die Schnabelspitze im Lauf sichtbar).
+      // kameraVersatz zentriert die Kamera auf Kopf+Schnabel GEMEINSAM ueber den ganzen
+      // Zyklus (Mitte bei nativ x=24,5 bzw. x=7,5, macht +-17 Bildschirm-Pixel Versatz),
+      // breite=22 deckt beide zugleich ab (die schmalere Front-/Ruecken-Breite von 16
+      // reicht dort, wo kein Schnabel absteht). Alles mit Z skaliert wie der Rest hier.
       if(b.kamera&&!u.down){
-        const kameraVersatz=(r0===1?-10:r0===3?10:0)*Z;
-        zeichneKameraKopf(ctx,x+kameraVersatz,y-27*Z,Z);
+        const seite=r0===1||r0===3;
+        const kameraVersatz=(r0===1?-17:r0===3?17:0)*Z;
+        zeichneKameraKopf(ctx,x+kameraVersatz,y-20*Z,Z,seite?22:16,18);
       }      return;
     }
     // geist:true (25.08., Rassen-Recherche: "Erna Wellenlaut" — Bild beschreibt sie SELBST,
@@ -3827,19 +3909,19 @@
   // andere in dieser Runde bleibt dann bestehen; es kostet nur rho 0,785 -> 0,718).
   // Die Richtung entspricht Chris' eigener, zweimal nachjustierter Vorgabe
   // (25.08.: 45->90; 29.08.: nochmal laenger) — die Groesse braucht seine Zustimmung.
-  const SPIELDAUER_BASKETBALL=180;
-  // VIERTEL-STRUKTUR (Chris' Folgeauftrag nach der Spieldauer-Verlaengerung, 01.09.):
+  // VIERTEL-STRUKTUR (Chris' Folgeauftrag nach der Spieldauer-Verlaengerung, 01.09.,
+  // korrigiert 01.09.: "hatten wir nicht gesagt ein Viertel dauert 1:30 Minute?"):
   // echtes Basketball laeuft in 4 Vierteln, nicht in 2 Halbzeiten oder einem durchgehenden
   // Block — s. docs/BATTLE_ARENA_UEBERGABE.md, "keine erfundene Struktur, wo ein reales
-  // Vorbild existiert". Chris hatte zwischen 2x3min und 4x1,5min gefragt; die Wahl fuer 4
-  // Viertel (nicht die Groesse selbst) ist eine bewusste Entscheidung dieser Runde.
-  // REINE STRUKTURIERUNG der bestehenden 180s, KEIN neues Zeitbudget: vier gleich lange
-  // Segmente derselben Gesamt-Spielzeit, dieselbe Zahl an Possessions/Feldwuerfen wie
-  // zuvor. Eine Aenderung an SPIELDAUER_BASKETBALL allein passt die Viertellaenge
-  // automatisch mit an (SPIELDAUER_BASKETBALL/VIERTEL_ANZAHL_BASKETBALL bleibt die
-  // Definition, keine zweite, unabhaengige Zahl).
+  // Vorbild existiert". Chris hatte zwischen 2x3min und 4x1,5min gewaehlt — 4x1,5min, NICHT
+  // 4 Viertel aus dem BESTEHENDEN 180s-Budget herausgeschnitten (das war der Fehler dieser
+  // Runde: SPIELDAUER_BASKETBALL blieb bei 180, macht 4x45s statt 4x90s). Jetzt richtig:
+  // die Spieldauer selbst ist das Produkt aus Viertelzahl und Viertellaenge, keine zweite,
+  // unabhaengige Zahl — 4 Viertel zu je 90s macht 360s Gesamt-Spielzeit (bei
+  // ZEIT_DEHNUNG.basketball=2 also ~12 Minuten Zuschauzeit statt vorher ~6).
   const VIERTEL_ANZAHL_BASKETBALL=4;
-  const VIERTEL_DAUER_BASKETBALL=SPIELDAUER_BASKETBALL/VIERTEL_ANZAHL_BASKETBALL; // 45s bei 180s Gesamt
+  const VIERTEL_DAUER_BASKETBALL=90;
+  const SPIELDAUER_BASKETBALL=VIERTEL_ANZAHL_BASKETBALL*VIERTEL_DAUER_BASKETBALL; // 360s (4x1:30)
   // Sichtbare Unterbrechung zwischen den Vierteln — bewusst KEINE eigene Standphase mit
   // Formation/Animation wie beim Freiwurf (FW_*): die Uhr steht ohnehin schon (s.
   // stepBasketballLive), hier reicht ein kurzer, im Feed lesbarer Break, waehrend die
@@ -7583,6 +7665,38 @@
       // Kopf in der Kaderliste (betraf Lava Golem, Terradon, Abysskraken, Brightpaw).
       // Jetzt: erstes Bild der Frontansicht aus demselben Blatt, das die Arena zeichnet,
       // auf Fusshoehe skaliert wie in zeichneSprite (dh=64 -> hier Kastenhoehe 50).
+      // Seraph-11 (b.reiherMech statt b.vollbild, s. zeichneSprite/zeichneReiherMech fuer
+      // die Herleitung): statische Front-Ansicht derselben prozeduralen Formen, kleiner
+      // Massstab fuer die 40x50-Ikone, ohne Lauf-/Puls-Animation (dieselbe Vereinfachung
+      // wie bei jeder anderen statischen Kader-Kachel hier — nur EIN Bild pro Charakter,
+      // keine zweite Zeichenroutine, nur andere Groesse/kein Zeitfaktor).
+      if(b.reiherMech){
+        const s=0.85, cx=20, cy=30, kopfX=cx, kopfY=cy-17*s;
+        x.strokeStyle="#202327"; x.lineWidth=1.4*s; x.lineCap="round";
+        for(const bseite of [-1,1]){
+          const bx=cx+bseite*3*s;
+          x.beginPath();x.moveTo(bx,cy+5*s);x.lineTo(bx,cy+19*s);x.stroke();
+          x.fillStyle="#202327";
+          x.beginPath();x.ellipse(bx+bseite*1.6*s,cy+19*s,2*s,1*s,0,0,Math.PI*2);x.fill();
+        }
+        x.fillStyle="#3f4550";
+        x.beginPath();x.ellipse(cx,cy+1*s,9*s,6*s,0,0,Math.PI*2);x.fill();
+        x.fillStyle="#5b6470";
+        x.beginPath();x.ellipse(cx-1.5*s,cy-1.5*s,6*s,3.2*s,0,0,Math.PI*2);x.fill();
+        x.strokeStyle="#3f4550"; x.lineWidth=3*s;
+        x.beginPath();x.moveTo(cx,cy-3*s);x.quadraticCurveTo(cx,cy-11*s,kopfX,kopfY);x.stroke();
+        x.fillStyle="#3f4550";
+        x.beginPath();x.ellipse(kopfX,kopfY,2.6*s,2.2*s,0,0,Math.PI*2);x.fill();
+        x.fillStyle="#202327";
+        x.beginPath();
+        x.moveTo(kopfX-1*s,kopfY+1.8*s);x.lineTo(kopfX,kopfY+5.5*s);x.lineTo(kopfX+1*s,kopfY+1.8*s);
+        x.closePath();x.fill();
+        if(b.gluehenderKern){
+          x.fillStyle="#ffb238";
+          x.beginPath();x.arc(kopfX,kopfY,1.6*s,0,Math.PI*2);x.fill();
+        }
+        return;
+      }
       if(b.vollbild){
         const spec=VOLLBILD[b.vollbild];
         const im=bHolEingefaerbt(spec.key,b.vollbildFarbe);
@@ -7594,9 +7708,12 @@
         // Kamera-Requisite (Vigil) auch hier, sonst zeigt nur die Arena die Kamera und die
         // Kader-/Board-Karte einen "nackten" Vogel — dieselbe Anforderung wie bei jeder
         // anderen Requisite (Krone/Helm), EIN Charakter in allen Ansichten. Position/Skala
-        // an die kleinere 40x50-Ikone angepasst (s. zeichneKameraKopf-Aufruf in
-        // zeichneSprite fuer die Herleitung der Kopf-Position).
-        if(b.kamera)zeichneKameraKopf(x,20,16,0.6);
+        // an die kleinere 40x50-Ikone angepasst, mit derselben Korrektur wie in zeichneSprite
+        // (Kamera deckt den ganzen Kopf, nicht nur seine obere Haelfte): Kopf-Mitte bei
+        // dh=50 (Skalierung 50/32=1,5625 statt 64/32=2 in der Arena) liegt bei nativ y=13,5
+        // -> Bildschirm-y=21, s auf 0,8 angehoben (~50/64, derselbe Groessen-Sprung wie die
+        // Ikone selbst gegenueber der Arena), damit Gehaeuse/Objektiv proportional mitwachsen.
+        if(b.kamera)zeichneKameraKopf(x,20,21,0.8);
         return;
       }
       const setz=(key,ton)=>{const im=sprite(key,ton);if(!im||!im.width)return;
