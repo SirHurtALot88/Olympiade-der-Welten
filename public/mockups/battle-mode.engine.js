@@ -3602,6 +3602,25 @@
   // Die Richtung entspricht Chris' eigener, zweimal nachjustierter Vorgabe
   // (25.08.: 45->90; 29.08.: nochmal laenger) — die Groesse braucht seine Zustimmung.
   const SPIELDAUER_BASKETBALL=180;
+  // VIERTEL-STRUKTUR (Chris' Folgeauftrag nach der Spieldauer-Verlaengerung, 01.09.):
+  // echtes Basketball laeuft in 4 Vierteln, nicht in 2 Halbzeiten oder einem durchgehenden
+  // Block — s. docs/BATTLE_ARENA_UEBERGABE.md, "keine erfundene Struktur, wo ein reales
+  // Vorbild existiert". Chris hatte zwischen 2x3min und 4x1,5min gefragt; die Wahl fuer 4
+  // Viertel (nicht die Groesse selbst) ist eine bewusste Entscheidung dieser Runde.
+  // REINE STRUKTURIERUNG der bestehenden 180s, KEIN neues Zeitbudget: vier gleich lange
+  // Segmente derselben Gesamt-Spielzeit, dieselbe Zahl an Possessions/Feldwuerfen wie
+  // zuvor. Eine Aenderung an SPIELDAUER_BASKETBALL allein passt die Viertellaenge
+  // automatisch mit an (SPIELDAUER_BASKETBALL/VIERTEL_ANZAHL_BASKETBALL bleibt die
+  // Definition, keine zweite, unabhaengige Zahl).
+  const VIERTEL_ANZAHL_BASKETBALL=4;
+  const VIERTEL_DAUER_BASKETBALL=SPIELDAUER_BASKETBALL/VIERTEL_ANZAHL_BASKETBALL; // 45s bei 180s Gesamt
+  // Sichtbare Unterbrechung zwischen den Vierteln — bewusst KEINE eigene Standphase mit
+  // Formation/Animation wie beim Freiwurf (FW_*): die Uhr steht ohnehin schon (s.
+  // stepBasketballLive), hier reicht ein kurzer, im Feed lesbarer Break, waehrend die
+  // Spieler sanft auslaufen (bewegeSpielerLive, dasselbe Muster wie nach Spielende).
+  // PLATZHALTER-Dauer wie ueberall in diesem Entwurf, in Simulationssekunden (s.
+  // PFIFF_DAUER-Kommentar oben: real beim Zuschauen ~doppelt so lang, ZEIT_DEHNUNG.basketball=2).
+  const VIERTELPAUSE_DAUER_BASKETBALL=1.0;
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   // Die Geduld-Abbauzeit, bis hierher ein Literal 4 mitten in `schwelle`. Nur benannt,
   // NICHT geaendert — durchgemessen (s. Eingriff (d) unten) bindet sie gar nicht: 1,0 s
@@ -4241,8 +4260,34 @@
   // des Sortierschluessels, und dieselbe Attributanhebung kippt nur noch halb so oft einen
   // Rang — beide Wurfwerte rutschen unter die Rauschschwelle der Messung statt sich den
   // Kanal zu teilen.
-  function zuordneSlots(seite){
-    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.SCHUSS_NAH-a.SCHUSS_NAH);
+  // OFFENSIVDRUCK-ROTATION (Auftrag 2, Viertelpausen-Runde, 01.09., Chris woertlich:
+  // "...oder so dass man in Kauf nimmt, dass der Spieler zwar ein paar Statpunkte
+  // verliert, aber in einer offensiveren oder defensiveren Position Platz nimmt").
+  //
+  // TRAINER-REGEL, keine Zufallsvariation: ein Team im Rueckstand sortiert seine Slots
+  // nicht mehr rein nach SCHUSS_NAH (korbnaechster Slot zuerst), sondern nach einer
+  // Mischung aus SCHUSS_NAH und SCHUSS_FERN. Realer Anker (keine erfundene Regel): im
+  // NBA-Analytics-Befund werfen zurueckliegende Teams nachweislich ueberdurchschnittlich
+  // mehr aus der Distanz, um schneller aufzuholen ("trailing teams shoot more threes") —
+  // exakt die Art Coaching-Anpassung, die Chris beschrieben hat, keine erfundene.
+  //
+  // Der Effekt: ein reiner Distanzschuetze kann dadurch den vordersten (korbnahen) Slot
+  // vor einem Korbspieler bekommen, obwohl er dort mechanisch (GEO_BONUS.dunk) schlechter
+  // trifft als auf seinem eigentlichen Fernwurf-Slot — GENAU der Tausch "ein paar
+  // Statpunkte gegen eine offensivere Rolle". Gewichtung 0,7/0,3 statt 1,0/0 ist eine
+  // MASSVOLLE Verschiebung, keine Umkehr der Sortierung (ein reiner Nahspieler bleibt bei
+  // realistischen Werten meist vorn) — PLATZHALTER, gemessen gegen die Rangtreue-Sonde
+  // (miss-basketball-rangtreue.mjs), nicht frei erfunden: 0,5/0,5 druecke ρ zu stark,
+  // 0,7/0,3 haelt sie im Rahmen (s. Bericht).
+  //
+  // `offensivDruck` bleibt bei allen BESTEHENDEN Aufrufstellen (Possession-Wechsel)
+  // undefined/false — die Basissortierung ist damit zeichenweise die von vorher. Nur die
+  // drei Viertelpausen (s. starteViertelpause) rufen mit einem gesetzten Wert.
+  function zuordneSlots(seite,offensivDruck){
+    const slotSchluessel=offensivDruck
+      ? (u)=>u.SCHUSS_NAH*0.7+u.SCHUSS_FERN*0.3
+      : (u)=>u.SCHUSS_NAH;
+    const sortiert=[...FSTEAM[seite]].sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
     sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
     // sitzen aber immer beim Team, das den Ball gerade VERLOR. Ohne Raeumen lief ein
@@ -4292,8 +4337,11 @@
     // eigene Hilfsverteidigung bevorzugt doppeln soll (s. FOKUS_*-Konstanten oben und die
     // Hilfe-Logik in bewegeSpielerLive). null = niemand gewaehlt = exakt das Verhalten
     // von vorher; ein neues Spiel startet immer ohne Fokus.
+    // `viertel` ist das VIERTEL, DAS GERADE LAEUFT (1..VIERTEL_ANZAHL_BASKETBALL) — s.
+    // naechsterAngriff()/starteViertelpause() fuer die Grenzpruefung; `viertelpause` haelt
+    // die Pausen-eigenen Daten und ist ausserhalb der Phase immer null, exakt wie `freiwurf`.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null};
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null};
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
@@ -4381,10 +4429,68 @@
     zuordneDeckung(true);
   }
 
-  function naechsterAngriff(seite){
+  // VIERTEL-STRUKTUR (Auftrag 1, s. VIERTEL_ANZAHL_BASKETBALL-Kommentar oben): JEDER
+  // Aufrufer von naechsterAngriff() steht per Konstruktion an einem toten Ball — ein
+  // Korberfolg, ein Turnover oder ein Defensiv-Rebound sind in diesem Motor genau die
+  // Momente, in denen die naechste Possession beginnt. Das ist deshalb die EINE Stelle,
+  // an der die Viertelgrenze geprueft wird: kein zusaetzlicher Zeit-Beobachter, kein
+  // Mitten-im-Wurf-Abbruch (ein Ballflug laeuft in stepBasketballLive immer erst zu Ende,
+  // s. `if(flug){...}`-Zweig dort, bevor loeseFlugAuf ueberhaupt naechsterAngriff ruft).
+  // Ueberschreitet die Uhr die Grenze WAEHREND einer laufenden Possession (Schussuhr
+  // erzwingt spaetestens nach SCHUSSUHR_BASKETBALL Sekunden einen Abschluss), greift die
+  // Pause beim naechsten toten Ball danach — derselbe kurze Nachlauf, den auch ein reales
+  // Team am Viertelende in Kauf nimmt (Foul/Einwurf lassen die Uhr selten exakt bei 0:00
+  // toter Ball stehen).
+  //
+  // `ausViertelpause` kommt NUR von starteViertelpause()s eigenem Wiederanpfiff (unten):
+  // Slots/Deckung sind zu diesem Zeitpunkt schon frisch zugeteilt (samt Rotation), eine
+  // zweite zuordneSlots()-Runde hier wuerde die Rotation sofort wieder ueberschreiben.
+  function naechsterAngriff(seite,ausViertelpause){
+    if(!ausViertelpause&&fsLive.viertel<VIERTEL_ANZAHL_BASKETBALL
+       &&fsT>=fsLive.viertel*VIERTEL_DAUER_BASKETBALL){
+      starteViertelpause(seite);
+      return;
+    }
     fsLive.angriffSeit=0;
-    zuordneSlots(seite);
+    if(!ausViertelpause)zuordneSlots(seite);
     ballUebernehmen(spielmacherLos(FSTEAM[seite]));
+  }
+
+  // BETRETEN DER VIERTELPAUSE. `naechsteSeite` ist die Seite, die den naechsten Angriff
+  // eroeffnet haette, waere die Viertelgrenze nicht dazwischengekommen — genau die
+  // eroeffnet nach der Pause auch tatsaechlich (s. Wiederanpfiff im "viertelpause"-Zweig
+  // von stepBasketballLive).
+  function starteViertelpause(naechsteSeite){
+    const zuEnde=fsLive.viertel;
+    feed(0,"Ende "+zuEnde+". Viertel — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
+    fsLive.viertel=zuEnde+1;
+    // ROTATION (Auftrag 2): s. zuordneSlots()-Kommentar fuer die Regel selbst. Beide
+    // Seiten unabhaengig voneinander geprueft — bei Gleichstand bleibt es fuer beide bei
+    // der Basissortierung.
+    const liegtZurueck=(seite)=>fsPunkte[seite]<fsPunkte[1-seite];
+    zuordneSlots(0,liegtZurueck(0));
+    zuordneSlots(1,liegtZurueck(1));
+    // BEWUSST KEIN zuordneDeckung(true) hier, obwohl Chris' Formulierung beide Funktionen
+    // nennt: der Wiederanpfiff (naechsterAngriff(...,true) im "viertelpause"-Zweig von
+    // stepBasketballLive) laeuft ueber ballUebernehmen(), das zuordneDeckung(true) ohnehin
+    // IMMER voll aufruft — ein zweiter Aufruf hier waere nicht wirkungslos, sondern
+    // schaedlich: durchgemessen (miss-basketball-rangtreue.mjs, n=120, 6v6) zog eine
+    // VORGEZOGENE Extra-Zuteilung genau an diesen drei Zeitpunkten rho auf 0,722 (Ziel
+    // 0,740) und drehte die Rollenprobe V weit ueber ihr Ziel hinaus (FG −8,9 Pp, Punkte
+    // −41,1 %) — die Deckung ordnete sich dann fuer die Restdauer der Pause auf Positionen
+    // ein, die der gleich folgende echte Ballwechsel sofort wieder verwarf, und die
+    // Simulation reagiert auf diese Art vorgezogener Positionsaenderung empfindlich (die
+    // Folgeticks haengen an denselben Abstaenden). Ohne den Zweitaufruf (hier gemessen):
+    // rho 0,748-0,757, Rollenprobe V −7,3 bis −8,3 Pp FG / −30,2 bis −33,2 % Punkte — beides
+    // naeher an bzw. innerhalb von Chris' Zielen als der Ausgangsstand.
+    // Ballzustand hart geraeumt, wie beim Betreten der Freiwurf-Standphase
+    // (starteFreiwuerfe) — waehrend der Pause ist nichts "im Spiel".
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.ball.frei=null;
+    fsLive.reboundKampf=null; fsLive.fastbreak=null;
+    fsBall={sichtbar:false,x:0,y:0};
+    for(const team of FSTEAM)for(const u of team)u.hatBall=false;
+    fsLive.phase="viertelpause";
+    fsLive.viertelpause={t:0,dauer:VIERTELPAUSE_DAUER_BASKETBALL,naechsteSeite};
   }
 
   // WER DEN ANGRIFF EROEFFNET. Frueher ein lineares gewichtetesLos ueber AUFBAU — bei
@@ -4609,6 +4715,43 @@
     // kontestFaktor) — zwei Verteidiger sind mehr als ein staerkerer einer.
     const doppelMalus=gedoppelt?0.26:0; // PLATZHALTER, s. Bericht
     const bedraengnisMake=bedraengnisGate*kontestFaktor+doppelMalus;
+    //
+    // AUFTRAG 3, FG%-UNTERDRUECKUNG-RUNDE (01.09., docs/design/battle-mode-nba2k-modell-
+    // plan.md §10 "Was offen bleibt"): Punkt-Unterdrueckung gegen starke Decker erreicht ihr
+    // Ziel (Probe V, 6v6: -32,5 % im PR, -29 bis -33 % nachgemessen; Ziel <=-25 % ✅), die
+    // TREFFERQUOTE nur -4,1 Pp (Ziel <=-8 ❌). ZWEI weitere, GEZIELTE (nicht globale)
+    // Versuche hier, beide durchgemessen und wieder VERWORFEN — dieselbe Formel bleibt
+    // unveraendert stehen:
+    //   1. bedraengnisGate NUR fuer bedraengnisMake durch eine steilere, rein quadratische
+    //      Kurve ersetzt (kickOutChance/Volumen unangetastet): V:dFG -8,3->-2,8 Pp UND
+    //      V:dPunkte -33,2->-8,9 % (n=120) — beide Zahlen wurden SCHLECHTER. Grund: ein
+    //      Quadrat ist unterhalb von bedraengnisNaehe~0,7 SCHWAECHER als die alte lineare
+    //      Kurve, und genau dieser Bereich (spuerbar, aber nicht maximal bedraengt) stellt
+    //      die Mehrheit der Wuerfe, die den Kick-Out-Wuerfel ueberhaupt ueberleben
+    //      (kickOutChance saettigt erst nahe bedraengnisNaehe~0,9 bei 0,85) — ein reines
+    //      Quadrat schwaecht also gerade die groesste Gruppe.
+    //   2. Derselbe quadratische Term ADDITIV oben auf die alte lineare Kurve (schwaecht
+    //      keine Stelle gegenueber vorher, verstaerkt nur nahe Maximalbedraengnis): bei einer
+    //      spuerbaren Staerke (Koeffizient 0,5) sackte V:dPunkte trotzdem auf -14,3 % (n=150)
+    //      — bei einer vorsichtigen Staerke (0,15) blieb V:dPunkte bei -27,7 % (ok), aber
+    //      V:dFG lag mit -6,2 Pp im Rauschen der Referenz OHNE die Aenderung (-6,6 bis -8,3
+    //      Pp je nach Lauf, s. unten) — kein messbarer Zusatznutzen fuer das Risiko.
+    // BEFUND, DER BEIDE VERSUCHE ERKLAERT: jede Verstaerkung des Trefferchance-Malus fuer
+    // bedraengte Wuerfe kippt tendenziell die Punkt-Unterdrueckung nach unten, nicht nur bei
+    // KONTEST_K (PR-Bericht), sondern GENAUSO bei einem auf die Trefferchance beschraenkten,
+    // vom Kick-Out-Wuerfel entkoppelten Hebel — der Selektionsmechanismus, den der PR-
+    // Bericht beschreibt, sitzt also nicht (nur) in einer gemeinsamen bedraengnisGate-Kurve,
+    // sondern tiefer in der Kaskade (mehr Fehlwuerfe -> andere Rebounds/Possessions -> ein
+    // anderer rr()-Verlauf fuer den Rest des Spiels — dieselbe Empfindlichkeit, die auch die
+    // Viertelpausen-Messung oben zeigt). Kein Rueckschritt bei den erreichten -25 % also nur
+    // um einen weiteren, unsicheren Versuch auf die -8 Pp zu erzwingen.
+    //
+    // WAS TATSAECHLICH GEHOLFEN HAT, ALS NEBENEFFEKT: die Viertel-/Rotations-Runde (Auftrag
+    // 1+2 oben) hebt V:dFG organisch von -3,9 auf -6,2 bis -8,3 Pp (mehrere Laeufe,
+    // n=90-150) — ohne dass hier ueberhaupt etwas an der Trefferformel geaendert wurde. Der
+    // wahrscheinliche Kanal: die Slot-Rotation aendert Matchup-Zusammensetzung/-Dauer genug,
+    // dass die Probe-V-Buckets (nach `deckerAbwehr` ueber die ganze Spieldauer) sauberer
+    // trennen. Bericht/Einschaetzung s. Uebergabe-Text, Punkt 3.
     // War der letzte Ballwechsel ein Pass AN u, gilt der Abschluss noch als vom Passgeber
     // vorbereitet — solange er INNERHALB von ASSIST_FENSTER faellt (s. dort).
     //
@@ -5727,6 +5870,25 @@
             const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3)   // PLATZHALTER, gedeckelt
               *(1+(u.mismatchWucht||0)*MISMATCH_WUCHT_SAG);
             zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+            // SLOT-BEWEGUNGSCHARAKTERISTIK — VERSUCHT UND WIEDER VERWORFEN (Zusatzauftrag,
+            // 01.09., Chris woertlich: "eine Johanna eher den Weg zum Korb deckt als
+            // vielleicht ein 3er-Werfer"). Ein Zonen-Anker fuer Slot-0-Verteidiger (Ziel
+            // gekappt auf KORB_NAH_RADIUS+16 statt der vollen Position des gedeckten Manns,
+            // sobald der weiter als das aus dem eigenen Korb heraus steht) wurde gebaut und
+            // gegen miss-basketball-rangtreue.mjs (n=150, 6v6 UND 4v4) durchgemessen — bei
+            // DREI verschiedenen Staerken (Kappung der Zonen-Bindung bei 1,0/0,3/0,15):
+            // rho(6v6) blieb bei allen drei Staerken um 0,72 (Ziel >=0,740), rho(4v4) bei
+            // 0,743 (Ziel >=0,754) selbst bei der schwaechsten Staerke. Die Staerke aendert
+            // das Ergebnis kaum — das spricht fuer einen strukturellen statt einen reinen
+            // Kalibrierungs-Effekt: sobald ein Slot-0-Verteidiger seinem Mann ausserhalb der
+            // Zone nicht mehr voll folgt, sinkt dessen deckerAbstand-Wert in GENAU den
+            // Momenten, in denen dieser Mann den Ball bekommt und wirft, spuerbar seltener
+            // — und schwaecht damit den Rangtreue-Kanal (schlechtes SCHUSS_NAH heisst nicht
+            // automatisch schlechte Eignung insgesamt; ein Slot-0-Spieler mit hoher
+            // Gesamteignung, der ploetzlich schwaecher deckt, drueckt sein eigenes Ranking).
+            // Nicht eingebaut, weil das die harte Vorgabe verletzt, die diese ganze Runde
+            // traegt ("Rangtreue darf nicht unter das erreichte Niveau fallen") — s. Bericht
+            // fuer die volle Messreihe und die Empfehlung an Chris.
             // Solange das Sichtverlust-Fenster laeuft: das alte Bild statt der aktuellen
             // Position, und ohne jeden Tempo-Bonus. Steht NACH der Zielsetzung, damit es
             // sie ueberschreibt, aber VOR der Screen-Bremse, die weiterhin gewinnt.
@@ -5871,6 +6033,22 @@
       stepFreiwurfPhase(dt);
       bewegeSchiri(dt);
       bewegeSpielerLive(dt);
+      return;
+    }
+    // VIERTELPAUSE (Auftrag 1): dieselbe UHR-STEHT-Begruendung wie bei der Freiwurf-
+    // Standphase direkt darueber — fsT laeuft waehrend der Pause nicht weiter, sonst
+    // wuerde die Struktur selbst Spielzeit kosten, die Chris ausdruecklich NICHT will
+    // ("Gesamt-Spielzeit/-Possessions darf sich dadurch NICHT aendern"). Kein Pfiff-
+    // Schiedsrichterlauf noetig (kein Foulort), nur das sanfte Auslaufen der Spieler wie
+    // nach Spielende (`done`-Zweig oben) — hier zeitlich begrenzt statt endgueltig.
+    if(fsLive.phase==="viertelpause"){
+      fsLive.viertelpause.t+=dt;
+      bewegeSpielerLive(dt);
+      if(fsLive.viertelpause.t>=fsLive.viertelpause.dauer){
+        const naechsteSeite=fsLive.viertelpause.naechsteSeite;
+        fsLive.phase="laufend"; fsLive.viertelpause=null;
+        naechsterAngriff(naechsteSeite,true);
+      }
       return;
     }
     fsT+=dt;
