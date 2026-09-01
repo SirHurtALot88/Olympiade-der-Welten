@@ -1630,11 +1630,20 @@
           const wippel=Math.sin(phase)*0.5;
           const px=cx+(zx-0.5)*streuung*2;
           const py=topY+spanne*(0.15+zy*0.65)+wippel;
-          ctx.globalAlpha=0.92;ctx.fillStyle=farben[i];
-          ctx.beginPath();ctx.arc(px,py,2.1,0,Math.PI*2);ctx.fill();
-          // Weisser Punkt obendrauf — der Fliegenpilz-Tupfen aus dem Portrait.
-          ctx.globalAlpha=0.85;ctx.fillStyle="#ffffff";
-          ctx.beginPath();ctx.arc(px-0.7,py-0.7,0.6,0,Math.PI*2);ctx.fill();
+          // Chris' Fund (01.09.): "sehen aus wie rote Pocken, nicht wie Pilze" — ein
+          // einzelner gefuellter Kreis plus EIN weisser Punkt liest sich als Fleck, kein
+          // Pilz-Umriss. Jetzt ein echter Stiel (heller Stamm) plus eine breite, flache
+          // KAPPE obendrauf mit MEHREREN weissen Tupfen — dieselbe Silhouette wie ein
+          // klassischer Fliegenpilz (Amanita muscaria)/das Mario-Pilz-Icon, nicht nur ein
+          // eingefaerbter Punkt.
+          ctx.globalAlpha=0.95; ctx.fillStyle="#efe6d2";
+          ctx.fillRect(px-0.65,py,1.3,2.4);
+          ctx.globalAlpha=0.94; ctx.fillStyle=farben[i];
+          ctx.beginPath();ctx.ellipse(px,py,2.8,1.8,0,0,Math.PI*2);ctx.fill();
+          ctx.globalAlpha=0.9; ctx.fillStyle="#ffffff";
+          for(const [tx,ty] of [[-1.3,-0.3],[1.1,-0.5],[0,0.4],[1.6,0.4]]){
+            ctx.beginPath();ctx.arc(px+tx,py+ty,0.5,0,Math.PI*2);ctx.fill();
+          }
         }
       }
       ctx.globalAlpha=1;
