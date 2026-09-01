@@ -1,15 +1,5 @@
 # Sprite-Fit-Bewertungssystem
 
-> Redaktionsnotiz (01.09.): Dieses Dokument wurde ursprünglich auf Branch
-> `claude/sprite-fit-rating-system` angelegt (noch nicht nach `main` gemerged, als dieser
-> Commit hier entstand). Der Auftrag für diesen Commit ging davon aus, dass es auf `main`
-> bereits existiert — es lag stattdessen nur auf jenem Branch. Der folgende Text bis
-> einschließlich "Grundsatz: Bild schlägt Tags" ist deshalb unverändert von dort übernommen,
-> nicht neu verfasst; nur der letzte Abschnitt "Grundsatz: Assets werden nie exklusiv
-> reserviert" ist neu. Der Querverweis auf `sprite-fit-ergebnisse.md` unten zeigt auf eine
-> Datei, die ebenfalls nur auf jenem Branch liegt — sie löst sich auf, sobald beide Branches
-> zusammengeführt sind.
-
 Wie gut trifft das im Battle Mode gebaute Sprite-Rezept (`BAU`-Tabelle in
 `public/mockups/battle-mode.engine.js`, oder `vollbild:"..."` für eigenständige Illustrationen)
 das Konzept-Portrait (`public/portraits/<slug>.jpg`) desselben Charakters? Dieses Dokument legt
@@ -60,11 +50,6 @@ generische Standard-Humanoid ohne jede thematische Anpassung ist.
 *Anker:* Vigil (Taube mit Kamera-Objektiv) und ein Schiff-Charakter (Kreischende Kogge) — beides
 Konzepte, für die der Humanoid-Baukasten strukturell nichts hergibt.
 
-> Update 01.09.: Vigil ist mittlerweile behoben (`vollbild:"taube"` + prozedurale
-> Kamera-Requisite, s. `BAU["Vigil"]` in `battle-mode.engine.js`) und damit kein 1-Stern-Anker
-> mehr im aktuellen Stand — als Definitions-Anker für "strukturell unmöglich" bleibt das
-> Beispiel trotzdem gültig, es beschreibt den Zustand VOR dem Fix.
-
 ## Abgrenzung 4 vs. 3 vs. 2 (die schwierigen Übergänge)
 
 - **4 vs. 3**: Lässt sich der Rückstand in EINEM Satz als EIN nachrüstbares Element beschreiben
@@ -109,7 +94,6 @@ Bei jedem gefundenen Widerspruch dieser Art: einen Remark/Kommentar im Code UND 
 Bewertung betroffen ist) einen Hinweis im `begruendung`-Feld der Sprite-Fit-Bewertung hinterlassen,
 der explizit sagt "Bild und Tags widersprechen sich" — nicht stillschweigend nach eigenem
 Ermessen zwischen beiden vermitteln.
-
 ## Grundsatz: Assets werden nie exklusiv reserviert (Chris, 01.09.)
 
 Anlass war Vigil (Taube mit Überwachungskamera als Kopf): "[LPC] Birds" enthält keine Taube, und
