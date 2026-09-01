@@ -7437,6 +7437,10 @@
       // Ebenen-Helfer aufsetzen (Gegenstueck zu male(im,64,0,0) in zeichneSprite).
       const setzIm=(im)=>{if(!im||!im.width)return;
         try{x.drawImage(im,0,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
+      // Dasselbe mit frei waehlbarer Spalte — bislang brauchte das niemand, weil jede Ebene
+      // ihre Ruhepose in Spalte 0 hat. Der Bogen ist die eine Ausnahme (s. dort).
+      const setzIm2=(im,sp)=>{if(!im||!im.width)return;
+        try{x.drawImage(im,sp*64,r*64,64,64,-AUSX,-AUSY,64,64);}catch(e){}};
       const setz=(key,ton)=>setzIm(sprite(key,ton));
       // Dieselbe 64px-Mechanik wie setz(), nur ueber die RUESTUNGS-Rampe (spriteRuest) statt
       // der Hautrampe — Gegenstueck zu zeichneR() in zeichneSprite. Stand bislang zweimal
@@ -7534,7 +7538,18 @@
       if(b.kapuze)setz("kapuze_walk",null);
       if(b.schwanz==="katze")setz("katzenschwanzfg_walk",null);
       else if(b.schwanz)setz("schwanzfg_walk",b.haut);
-      if(b.waffe==="bogen")setz("bogen_shoot",null);
+      // BOGEN — anders als alle anderen Waffen NICHT Spalte 0. bogen_shoot hat 13 Spalten,
+      // und der Schuss laeuft darin RUECKWAERTS zur Erwartung: Spalte 0 zeigt nur einen
+      // Splitter des Bogens (die Wurfarme sind fast ganz aus der Zelle heraus), Spalte 1 die
+      // gespannte Sehne als langen waagerechten Strich quer ueber die Brust — genau das, was
+      // Chris am Kader-Screenshot bei Cassandra und Elara sah. Erst ab Spalte 9 steht der
+      // Bogen vollstaendig und ruhig in der Zelle. Alle 13 Spalten der Zeile r=3 nebeneinander
+      // gestellt (Frame-Explorer, 01.09.): 0 Splitter, 1 waagerechter Strich, 2-4 halb
+      // gespannt mit schraeger Sehne, 5-8 Sehne noch schraeg angesetzt, 9-12 der ganze Bogen
+      // mit senkrechter Sehne. Spalte 10 gewaehlt (mittig im ruhigen Bereich, nicht am Rand
+      // eines Uebergangs). Das ist der Gegenpol zu den vier Nahkampfwaffen darunter, die
+      // gerade DESHALB Spalte 0 nehmen — dort liegt bei ihnen die Ruhepose.
+      if(b.waffe==="bogen")setzIm2(sprite("bogen_shoot",null),10);
       // Vordere Waffenhaelfte (vor dem Koerper), Gegenstueck zum bg-Block oben.
       else if(b.waffe==="schwert")setzWaffe(sprite("schwertfg_slash",null),128,-32,-32);
       else if(b.waffe==="axt")setzWaffe(bHol("axt_fg",null),192,-64,-64);
