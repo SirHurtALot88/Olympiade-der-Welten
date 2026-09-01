@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# install-live-save-cron.sh — richtet die beiden Push-Crons auf dem Hetzner-Server ein.
+# install-live-save-cron.sh — richtet die Push-Crons UND die woechentliche Git-Bereinigung auf
+# dem Hetzner-Server ein.
 #
 #   1. Live-Spielstand alle 10 Minuten nach GitHub (Branch "live-save").
 #   2. Bug-Meldungen alle 15 Minuten nach GitHub (Branch "bug-reports").
+#   3. Git-Repo-Bereinigung woechentlich (git-repo-aufraeumen.sh) — die elternlosen Force-Push-
+#      Commits aus 1./2. haeufen sich sonst lokal als "dangling objects" an (ANLASS 01.09.: 6,8 GB
+#      reine Git-Historie bei nur ~200 MB Arbeitsbaum, s. git-repo-aufraeumen.sh).
 #
 # Danach ist auf GitHub IMMER dein aktueller Stand UND jede im Spiel gemeldete Sache — ohne dass du
 # je wieder etwas tippst. Claude liest beides von dort (siehe docs/BUGFIXING_AGENT.md).
@@ -18,7 +22,7 @@
 # Seitdem ruft `auto-deploy.sh` diese Datei bei jedem Deploy auf: neue Zeilen richten sich selbst ein.
 #
 # Idempotent: mehrfaches Ausfuehren legt keine Duplikate an. Der Auto-Deploy-Cron selbst bleibt
-# unangetastet — entfernt werden nur die beiden eigenen Zeilen, bevor sie neu geschrieben werden.
+# unangetastet — entfernt werden nur die drei eigenen Zeilen, bevor sie neu geschrieben werden.
 set -euo pipefail
 
 ENSURE_ONLY=0
@@ -29,12 +33,16 @@ SAVE_CRON="*/10 * * * * cd $REPO_DIR && bash deploy/hetzner/push-live-save.sh >>
 # Versetzt zur vollen Viertelstunde, damit die beiden Pushes nicht gleichzeitig auf denselben
 # Git-Zugang gehen. Meldungen sind selten — 15 Minuten sind reichlich schnell.
 BUGS_CRON="7,22,37,52 * * * * cd $REPO_DIR && bash deploy/hetzner/push-bug-reports.sh >> /var/log/oly-bug-reports.log 2>&1"
+# Sonntagnacht, abseits jeder Stosszeit. `git gc --prune=now` braucht selbst bei mehreren GB nur
+# Sekunden bis wenige Minuten — kein Grund, das haeufiger als woechentlich zu tun.
+GC_CRON="10 4 * * 0 cd $REPO_DIR && bash deploy/hetzner/git-repo-aufraeumen.sh >> /var/log/oly-git-gc.log 2>&1"
 
 BEFORE="$(crontab -l 2>/dev/null || true)"
 AFTER="$(
-  printf '%s\n' "$BEFORE" | grep -v -e 'push-live-save.sh' -e 'push-bug-reports.sh' | sed '/^$/d' || true
+  printf '%s\n' "$BEFORE" | grep -v -e 'push-live-save.sh' -e 'push-bug-reports.sh' -e 'git-repo-aufraeumen.sh' | sed '/^$/d' || true
   echo "$SAVE_CRON"
   echo "$BUGS_CRON"
+  echo "$GC_CRON"
 )"
 
 if [ "$BEFORE" = "$AFTER" ]; then
@@ -46,6 +54,7 @@ else
   echo "Crons eingerichtet:"
   echo "    Live-Save     → alle 10 Minuten nach GitHub (Branch 'live-save')"
   echo "    Bug-Meldungen → alle 15 Minuten nach GitHub (Branch 'bug-reports')"
+  echo "    Git-Bereinigung → sonntags 04:10 (git gc --prune=now)"
 fi
 
 if [ "$ENSURE_ONLY" = "1" ]; then
@@ -59,3 +68,6 @@ echo ""
 echo "Mache jetzt gleich den ersten Push ..."
 bash "$REPO_DIR/deploy/hetzner/push-live-save.sh"
 bash "$REPO_DIR/deploy/hetzner/push-bug-reports.sh"
+echo ""
+echo "Und einmal sofort aufraeumen, statt bis Sonntag zu warten ..."
+bash "$REPO_DIR/deploy/hetzner/git-repo-aufraeumen.sh"
