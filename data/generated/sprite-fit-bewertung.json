@@ -1,0 +1,1010 @@
+[
+ {
+  "name": "Abysskraken",
+  "slug": "abysskraken",
+  "sterne": 2,
+  "begruendung": "Der runde Tentakel-Klumpen mit einem Auge trifft die Grundform eines Kraken-Monsters lose, aber Farbe (Rot statt Türkis-Dunkel), die vielen roten Augen, Reißzähne und Klauen aus dem Portrait fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Aegirion",
+  "slug": "aegirion",
+  "sterne": 2,
+  "begruendung": "Die Sprite-Szene zeigt immerhin ein Schiff, aber ein generisches hölzernes Piratenschiff mit Totenkopf-Segeln statt des rostigen Industrie-Flugschiffs aus dem Portrait - falsches Material, falsche Epoche, falsche Farbgebung.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Aeon Flux",
+  "slug": "aeon-flux",
+  "sterne": 3,
+  "begruendung": "Menschliche Silhouette korrekt, aber generischer moderner Look statt futuristischer Rüstung; die violette Energieklinge und die dunkle Haarfarbe fehlen.",
+  "fehlendesDetail": "Futuristische Rüstung und violette Lichtklinge fehlen, Haarfarbe stimmt nicht"
+ },
+ {
+  "name": "Akali",
+  "slug": "akali",
+  "sterne": 3,
+  "begruendung": "Menschliche Kämpferin korrekt, aber generischer brauner Lederlook statt schwarzer Ninja-Rüstung; Gesichtsmaske und Zwillingsschwerter fehlen.",
+  "fehlendesDetail": "Gesichtsmaske, Zwillingsschwerter und schwarze Farbgebung fehlen"
+ },
+ {
+  "name": "Alarm",
+  "slug": "alarm",
+  "sterne": 4,
+  "begruendung": "Robotersilhouette mit rundem Kopf und rotem Scanner-Auge trifft den Kern des Konzepts gut.",
+  "fehlendesDetail": "Der ikonische runde 'ALARM'-Bildschirmkopf mit rotem Text-Display fehlt (Sprite hat nur einen schmalen roten Augenstreifen)."
+ },
+ {
+  "name": "Arachna",
+  "slug": "arachna",
+  "sterne": 2,
+  "begruendung": "Spinnenbeine als thematischer Bezug vorhanden, aber die entscheidende Halb-Mensch-Identität (Gesicht, Krone, Rüstung, menschlicher Oberkörper) fehlt - stattdessen ein reines Insekten-Konstrukt.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Aurora",
+  "slug": "aurora",
+  "sterne": 3,
+  "begruendung": "Dunkelhaarige Frau in dunkler Kleidung trifft die Grundsilhouette, aber blasse Vampir-Haut, Blutträne und der Kelch mit Blutwein fehlen komplett.",
+  "fehlendesDetail": "Kelch mit Blutwein, blasse Haut und Blutträne fehlen (mehrere Details)"
+ },
+ {
+  "name": "Babuschinka",
+  "slug": "babuschinka",
+  "sterne": 2,
+  "begruendung": "Menschliche Form korrekt, aber generischer junger Look statt der alten grauhaarigen Cyber-Hexe mit leuchtendem Tablet und Schaltkreis-Robe; identisches Sprite wie bei drei völlig anderen Charakteren wiederverwendet.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Bana",
+  "slug": "bana",
+  "sterne": 3,
+  "begruendung": "Trägt korrekt eine Kapuze wie im Foto, aber cremefarben statt leuchtend gelb und in generischer Fantasy-Weste/-Stiefeln statt Alltagskleidung mit Jeans.",
+  "fehlendesDetail": "Gelbe Kapuzenfarbe und moderne Streetwear (Jeans) statt Fantasy-Weste fehlen"
+ },
+ {
+  "name": "Bearington",
+  "slug": "bearington",
+  "sterne": 2,
+  "begruendung": "Vierbeinig-humanoide Kreatur trifft die Kategorie 'flauschiges Wesen' grob, aber falsche Spezies (Wolf/Fuchs statt Bär), falsche Farbe (grau/weiß statt rosa) und die blaue Fliege fehlen.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Bloater",
+  "slug": "bloater",
+  "sterne": 2,
+  "begruendung": "Die dünne humanoide Mumienform mit rötlichen Wundflecken hat noch einen Bezug zur verwesenden Zombie-Farbgebung, aber der riesige, leuchtend-orange aufgeblähte Bauch - das zentrale Merkmal - fehlt komplett, die Statur ist viel zu klein.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Bombblitzer",
+  "slug": "bombblitzer",
+  "sterne": 2,
+  "begruendung": "Muskulöser Monster-Humanoid als grobe Kategorie vorhanden, aber Football-Trikot, Ball, Stachelhelm und Totenschädel-Gesicht fehlen vollständig; wirkt wie ein generischer gehörnter Ork statt eines Football-Zombies.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Breeze",
+  "slug": "breeze",
+  "sterne": 2,
+  "begruendung": "Menschliche Form korrekt, aber generischer dunkelhaariger Look statt der brillentragenden Gelehrten mit goldener Robe, Zauberbuch und magischem Lichtwirbel.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Brightpaw",
+  "slug": "brightpaw",
+  "sterne": 2,
+  "begruendung": "Die Wolfsform passt als Spezies, aber die Farbe ist komplett falsch (dunkelbraun statt leuchtend weiß) und die magischen blauen Rune-Markierungen fehlen völlig.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Brobot",
+  "slug": "brobot",
+  "sterne": 2,
+  "begruendung": "Nur die Flügel sind eine echte strukturelle Gemeinsamkeit; Farbe (braun statt blau-violett), Fledermausflügel statt Insektenflügel und der komplette Tech-Rüstungslook fehlen - wirkt wie ein niedlicher Fledermaus-Imp statt eines sleeken Cyber-Insekten-Kriegers.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Brunhilde",
+  "slug": "brunhilde",
+  "sterne": 2,
+  "begruendung": "Menschliche Kriegerin-Kategorie korrekt, aber Kriegsaxt, Pelzumhang, Rüstung und Wolfsbegleiter aus dem winterlichen Wikinger-Konzept fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Burster",
+  "slug": "burster",
+  "sterne": 2,
+  "begruendung": "Monster-Humanoid-Kategorie grob vorhanden, aber es ist eine blasse Skelett-Optik statt der blutig-roten Muskelmonster-Textur mit riesigen Klingen-Krallen aus dem Portrait.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Butterfly",
+  "slug": "butterfly",
+  "sterne": 4,
+  "begruendung": "Drachen-Körperform, Flügel und Schwanz treffen die Kategorie sehr gut - dieselbe Statur und Proportion wie im Konzept.",
+  "fehlendesDetail": "Der Regenbogen-Farbverlauf auf den Flügeln fehlt (Sprite ist golden-schwarz statt mehrfarbig schillernd)."
+ },
+ {
+  "name": "Byrd",
+  "slug": "byrd",
+  "sterne": 1,
+  "begruendung": "Die generische Abenteurer-Vorlage hat keinerlei Bezug zum bizarren Zwiebelkopf-Wesen mit Schutzbrille, gelbem Cardigan und Kehrbesen-Requisiten - das Portrait zeigt ein anthropomorphes Objekt/Gemüse, für das der Baukasten strukturell nichts hergibt.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Byrnja",
+  "slug": "byrnja",
+  "sterne": 2,
+  "begruendung": "Die menschliche Grundform stimmt, und das helle Haar ist ein loser Treffer, aber das absolut namensgebende, bizarre Element - ein auf dem Kopf balancierter, aufgeschnittener Kuchen - fehlt komplett, ebenso die schwarze Kleidung.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Cadrael",
+  "slug": "cadrael",
+  "sterne": 4,
+  "begruendung": "Krone, ein Flügel und die goldene Rüstungsfarbe treffen die strahlende Engelsfigur gut.",
+  "fehlendesDetail": "Der leuchtende Stab (Zepter) fehlt."
+ },
+ {
+  "name": "Caldor",
+  "slug": "caldor",
+  "sterne": 2,
+  "begruendung": "Nur der goldgelbe Farbton erinnert entfernt an die bronzene Rüstung; die komplette Ausrüstungsszene (Plattenpanzer, Helm mit Federbusch, Löwen-Schild) fehlt - wirkt wie ein einfacher Dorfbewohner statt eines gerüsteten Kriegers.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Cassandra",
+  "slug": "cassandra",
+  "sterne": 3,
+  "begruendung": "Menschliche Kategorie und die rötliche Haarfarbe stimmen überraschend gut, aber Bogen, Köcher, Spitzohren und die grüne Lederrüstung der Elfen-Waldläuferin fehlen komplett.",
+  "fehlendesDetail": "Bogen, Köcher und grüne Lederrüstung fehlen"
+ },
+ {
+  "name": "Catherine",
+  "slug": "catherine",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und goldene Farbgebung passen zur Paladin-Kriegerin, aber Kriegshammer, Schild mit Vogel-Wappen und die massive Plattenrüstung fehlen.",
+  "fehlendesDetail": "Kriegshammer, Wappenschild und Plattenrüstung fehlen"
+ },
+ {
+  "name": "Ciacia",
+  "slug": "ciacia",
+  "sterne": 2,
+  "begruendung": "Nur eine vage 'Raubtier-Kreatur'-Silhouette bleibt übrig; die robotische Panther-Mechanik, Metalltextur und leuchtenden Kabel des Cyberpunk-Konzepts fehlen völlig - wirkt wie ein feuriges Fabelwesen statt eines Maschinen-Panthers.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Clara",
+  "slug": "clara",
+  "sterne": 3,
+  "begruendung": "Krone und helles Haar passen zur Eiskönigin-Idee, aber die komplett falsche goldene statt eisblau-weiße Farbgebung und die fehlende Magie-Kugel drücken es unter die Marke für eine einzelne behebbare Korrektur.",
+  "fehlendesDetail": "Farbe muss von Gold zu Eisblau-Weiß, dazu fehlt die leuchtende Magie-Kugel"
+ },
+ {
+  "name": "Crumbsage",
+  "slug": "crumbsage",
+  "sterne": 2,
+  "begruendung": "Nur die bräunliche Farbe erinnert entfernt an Keksteig; die namensgebende gestapelte Kekse-Textur, Schokostückchen und der schwebende Kristall des Cookie-Golems fehlen komplett - wirkt wie ein generisches braunes Monster.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Cyrn",
+  "slug": "cyrn",
+  "sterne": 2,
+  "begruendung": "Grüne Hautfarbe passt lose zum Wald-Wesen, aber Rinden-/Blatt-Textur, Schild, Speer und die leuchtende Kristallbrust des Treants fehlen - wirkt wie ein generischer grüner Goblin statt eines Baum-Wächters.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Dawnwhisper",
+  "slug": "dawnwhisper",
+  "sterne": 3,
+  "begruendung": "Hautton und goldene Kleidung passen zur Konzept-Farbgebung, aber die leuchtenden goldenen Augen, der Heiligenschein und die Lichtkugeln in den Händen fehlen komplett.",
+  "fehlendesDetail": "Leuchtende Augen, Heiligenschein und Lichtkugeln in den Händen fehlen"
+ },
+ {
+  "name": "Dr Ironmind",
+  "slug": "dr-ironmind",
+  "sterne": 2,
+  "begruendung": "Kopfbedeckung als grobe Analogie zum Kopftuch vorhanden, aber Alter, Farbe und das leuchtende blaue Gerät der Feldärztin fehlen komplett - identisches Sprite wie bei völlig anderen Charakteren (Babuschinka, Bana, Gralakar) wiederverwendet.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Draco",
+  "slug": "draco",
+  "sterne": 2,
+  "begruendung": "Armierte dunkle Silhouette passt vom Ton her, aber Dämonenhörner, Drachenkopf-Waffe und die stachelige schwarze Rüstung fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines Ritterhelms mit Drachen-Thematik.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Drop Dead",
+  "slug": "drop-dead",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und goldener Farbton passen, aber die auffällige teal-goldene Rüstung und die zwei leuchtenden Schwerter der Kriegerkönigin fehlen.",
+  "fehlendesDetail": "Teal-goldene Rüstung und die zwei leuchtenden Schwerter fehlen"
+ },
+ {
+  "name": "Dyrth",
+  "slug": "dyrth",
+  "sterne": 3,
+  "begruendung": "Hörner und Fledermausflügel treffen die Dämon-Kategorie, aber die pechschwarze Farbe, die weiß leuchtenden Augen und die gewaltige, bedrohliche Statur fehlen - wirkt wie ein kleiner brauner Imp statt eines Titanen-Dämons.",
+  "fehlendesDetail": "Schwarze Farbe, weiß leuchtende Augen und massive Statur fehlen"
+ },
+ {
+  "name": "Eike",
+  "slug": "eike",
+  "sterne": 3,
+  "begruendung": "Bärtiger Mann korrekt, aber Zauberstab, leuchtender Würfel-Orb und die blau-goldene Robe mit Pentagramm-Muster fehlen komplett.",
+  "fehlendesDetail": "Zauberstab, leuchtender Orb und blau-goldene Robe fehlen"
+ },
+ {
+  "name": "Elara",
+  "slug": "elara",
+  "sterne": 3,
+  "begruendung": "Silberfarbenes Haar passt gut zum Elfen-Waldläufer, aber Bogen, Köcher und die grüne Lederrüstung fehlen.",
+  "fehlendesDetail": "Bogen, Köcher und grüne Lederrüstung fehlen"
+ },
+ {
+  "name": "Eldara",
+  "slug": "eldara",
+  "sterne": 2,
+  "begruendung": "Die Grundhaltung ist noch bipedal-humanoid, aber die namensgebende Rinden-Textur, das dritte Auge, die Geweih-Krone und vor allem die zusätzlichen Baumstamm-Arme fehlen komplett - wirkt wie ein generisches Kind statt eines Natur-Elementars.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Elyon",
+  "slug": "elyon",
+  "sterne": 4,
+  "begruendung": "Heiligenschein, ein Flügel und dunkle Rüstungsfarbe treffen die Idee des gefallenen Engel-Ritters gut.",
+  "fehlendesDetail": "Der Kopf wirkt wie ein Roboter-Visier statt eines Ritterhelms, und Schwert/Schild fehlen."
+ },
+ {
+  "name": "Elyssa Nightclaw",
+  "slug": "elyssa-nightclaw",
+  "sterne": 4,
+  "begruendung": "Grüne Schuppenhaut, gelbe Augen, Kapuze und sogar ein sichtbarer Schwanz treffen die Echsen-Schurkin gut.",
+  "fehlendesDetail": "Das markante Echsen-Schnauzen-Gesicht fehlt (Kopf wirkt eher wie ein Goblin), und der Dolch fehlt."
+ },
+ {
+  "name": "Emphi",
+  "slug": "emphi",
+  "sterne": 3,
+  "begruendung": "Dunkles Haar und die dunkle Farbgebung passen zur Zauberin, aber die glühende Energie, der Dreizack/Stab und die elaborierte Rüstungsrobe fehlen.",
+  "fehlendesDetail": "Leuchtende Energie und Dreizack/Stab fehlen"
+ },
+ {
+  "name": "Enforcer",
+  "slug": "enforcer",
+  "sterne": 3,
+  "begruendung": "Heiligenschein und goldener Farbton treffen die Paladin-Idee, aber der Flügel ist blass-häutig statt golden-gefiedert, und Kriegshammer sowie die voll ausgeprägte Rüstung fehlen.",
+  "fehlendesDetail": "Golden gefiederter statt hautfarbener Flügel, dazu fehlen Kriegshammer und Rüstung"
+ },
+ {
+  "name": "Erna Wellenlaut",
+  "slug": "erna-wellenlaut",
+  "sterne": 2,
+  "begruendung": "Silbernes Haar passt, aber Flügel, Flöte und das durchscheinende fließende Kleid der Wasser-/Wind-Fee fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Falcon",
+  "slug": "falcon",
+  "sterne": 2,
+  "begruendung": "Anthro-Silhouette mit dunkler Kleidung passt zum Konzept, aber der Kopf ist ein Wolf/Kanide statt eines weißköpfigen Adlers - kein Schnabel, keine Federkrone, keine Schulterrüstung.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Galactus",
+  "slug": "galactus",
+  "sterne": 2,
+  "begruendung": "Nur eine vage außerirdisch-nichtmenschliche Kopfform bleibt als Bezug; die riesige Krabben-Kreatur mit schwarzem Panzer, glühend roten Augen und Lava-Klauen aus dem Portrait ist komplett verschwunden - wirkt wie ein normal großer grauer Alien.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Gralakar",
+  "slug": "gralakar",
+  "sterne": 1,
+  "begruendung": "Die generische fröhliche Abenteurer-Vorlage hat keinerlei Bezug zur bedrohlichen Sensenmann-Gestalt mit rot glühenden Augen und sichtbarem Rippenkäfig - identisches Sprite wie bei drei völlig anderen Charakteren (Babuschinka, Bana, Dr Ironmind) wiederverwendet.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Gram",
+  "slug": "gram",
+  "sterne": 3,
+  "begruendung": "Die reptilienartige Kopfform mit einem kleinen Leuchtpunkt passt zur Kategorie, aber die schwarz-lava-orange Farbgebung, der Flammenkamm und Axt/Rüstung fehlen - wirkt zu freundlich-braun für den Lava-Drachenkrieger.",
+  "fehlendesDetail": "Schwarz-Lava-Farbe, Flammenkamm und Axt fehlen"
+ },
+ {
+  "name": "Greenkraut",
+  "slug": "greenkraut",
+  "sterne": 2,
+  "begruendung": "Grüne Hautfarbe erinnert entfernt an die Natur-Kreatur, aber die Rinden-Textur, die auffällige orangene Trichterblüte an der Schulter und das sanfte Baumwesen-Auftreten fehlen komplett - wirkt wie ein generischer grüner Goblin.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Greybeard",
+  "slug": "greybeard",
+  "sterne": 4,
+  "begruendung": "Graues Haar, Bart und die Statur eines alten weisen Mannes treffen den Charakter gut.",
+  "fehlendesDetail": "Der Holzstab (Wanderstab) fehlt, und das Stammes-Tattoo am Arm ist nicht sichtbar."
+ },
+ {
+  "name": "Grieving Colossus",
+  "slug": "grieving-colossus",
+  "sterne": 2,
+  "begruendung": "Nur eine grobe 'großes Monster'-Silhouette bleibt übrig; die dunkle Obsidian-Farbe, die schweren Ketten und die Lava-Tränen aus Augen/Mund des trauernden Stein-Koloss fehlen komplett - wirkt wie ein generisches braunes Fellmonster.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Grizz",
+  "slug": "grizz",
+  "sterne": 2,
+  "begruendung": "Nur ein grüner Ärmel deutet entfernt auf den Ork hin; der Kopf ist ein generischer Roboter-Visier-Kopf statt eines grünhäutigen Orks mit Schutzbrille, es fehlen die blau leuchtenden Zahnräder.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Gronkslime",
+  "slug": "gronkslime",
+  "sterne": 3,
+  "begruendung": "Die grüne Farbe und aggressive Monster-Optik passen gut, aber die schleimig-tropfende Textur und der leuchtende Kern in der Brust fehlen - wirkt wie ein fester grüner Ork statt einer Schleim-Kreatur.",
+  "fehlendesDetail": "Tropfende Schleim-Textur und leuchtender Brustkern fehlen"
+ },
+ {
+  "name": "Harbinger",
+  "slug": "harbinger",
+  "sterne": 2,
+  "begruendung": "Ein Flügel und eine Pistole als Requisite passen thematisch zum bewaffneten Kämpfer, aber die schwarze bio-mechanische Rüstung, grün leuchtenden Augen und die bedrohliche Statur fehlen - wirkt wie ein kleiner brauner Fledermaus-Imp statt eines Alien-Söldners.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Hellvoice",
+  "slug": "hellvoice",
+  "sterne": 2,
+  "begruendung": "Dunkles Haar und ein Flügel als Ansatz vorhanden, aber die namensgebende rote Teufels-Haut, die Hörner und die leuchtende Laute fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Holzfaust",
+  "slug": "holzfaust",
+  "sterne": 4,
+  "begruendung": "Grüne Hautfarbe, sichtbare Hauer und dunkles Haar treffen die Ork-Schnitzer-Identität gut.",
+  "fehlendesDetail": "Die weiße Schürze und das Schnitzwerkzeug (Meißel/Hammer) fehlen."
+ },
+ {
+  "name": "Inefinna",
+  "slug": "inefinna",
+  "sterne": 4,
+  "begruendung": "Krone, goldene Rüstungsfarbe und helles Haar treffen die strahlende Königin gut.",
+  "fehlendesDetail": "Das Schwert und der wallende weiße Umhang fehlen."
+ },
+ {
+  "name": "Ironhoof",
+  "slug": "ironhoof",
+  "sterne": 2,
+  "begruendung": "Gehörnter Kopf als grobe Analogie zum Minotaurus vorhanden, aber der zentaurische Unterkörper, die Doppeläxte und die massive Statur fehlen komplett - der Kopf wirkt eher wie ein Reh als ein Stier.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Issyria",
+  "slug": "issyria",
+  "sterne": 3,
+  "begruendung": "Graues Haar und die dunkle Kleidung passen zur Weisen, aber die zwei glühenden Magie-Orbs, Spitzohren und das hohe Alter fehlen komplett.",
+  "fehlendesDetail": "Zwei leuchtende Magie-Orbs und Spitzohren fehlen"
+ },
+ {
+  "name": "Isuzu",
+  "slug": "isuzu",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und goldene Farbgebung passen zur Feuer-Göttin, aber Speer und der lodernde Feuer-Explosionseffekt fehlen.",
+  "fehlendesDetail": "Speer und Feuer-Explosionseffekt fehlen"
+ },
+ {
+  "name": "Jihanna",
+  "slug": "jihanna",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und lederbraune Farbgebung passen zur Kriegerin, aber Spitzohren und die zwei Klingen fehlen.",
+  "fehlendesDetail": "Spitzohren und zwei Klingen fehlen"
+ },
+ {
+  "name": "Johanna",
+  "slug": "johanna",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und dunkle Farbgebung passen grob zur Rüstung, aber Kriegshammer, Wappenschild und der Pelzbesatz fehlen alle.",
+  "fehlendesDetail": "Kriegshammer, Wappenschild und Pelzbesatz fehlen"
+ },
+ {
+  "name": "Jorund",
+  "slug": "jorund",
+  "sterne": 4,
+  "begruendung": "Graues Haar und Bart treffen den alten weisen Nordmann sehr gut.",
+  "fehlendesDetail": "Der Holzstab (Wanderstab) und der dicke Pelzumhang fehlen."
+ },
+ {
+  "name": "Kento",
+  "slug": "kento",
+  "sterne": 2,
+  "begruendung": "Dunkle Beinkleidung erinnert entfernt an den Ninja, aber keine Maske, keine Schwerter, keine durchgehend schwarze Kleidung - die Kapuze ist zudem hell statt schwarz.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "King Arlen Morgolor",
+  "slug": "king-arlen-morgolor",
+  "sterne": 5,
+  "begruendung": "Krone, weißer Bart und goldene Rüstungsfarbe treffen den alten goldgepanzerten König exakt - alle prägenden Merkmale des Portraits sind vorhanden.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Knochenrichter",
+  "slug": "knochenrichter",
+  "sterne": 4,
+  "begruendung": "Knochenweißer Schädel und dunkle Robe treffen die Skelett-Richter-Idee gut.",
+  "fehlendesDetail": "Die blau leuchtenden Augen und der Schädel-Stab fehlen."
+ },
+ {
+  "name": "Kora",
+  "slug": "kora",
+  "sterne": 3,
+  "begruendung": "Hörner, braunes Fell und Schwanz treffen die Beastfolk-Kategorie, aber das Gesicht wirkt eher wie ein Reh als ein Stier, und die Kriegskeule sowie die Lederrüstung fehlen.",
+  "fehlendesDetail": "Bullen-Gesicht statt Reh-Gesicht, dazu fehlen Kriegskeule und Lederrüstung"
+ },
+ {
+  "name": "Krag'Zul",
+  "slug": "krag-zul",
+  "sterne": 3,
+  "begruendung": "Dunkle Steinfarbe und die kegelförmige Kristallspitze am Kopf passen zum Kristall-Golem, aber die vielen scharfkantigen Kristallzacken am ganzen Körper und das durchgehende violette Glühen fehlen - wirkt eher wie ein generischer Stein-Golem.",
+  "fehlendesDetail": "Durchgehende Kristallzacken am ganzen Körper und mehr violettes Glühen fehlen"
+ },
+ {
+  "name": "Kreischende Kogge",
+  "slug": "kreischende-kogge",
+  "sterne": 3,
+  "begruendung": "Kategorie (Schiff) und das Totenkopf-Motiv auf den Segeln passen zum Geisterschiff-Konzept, aber das gruselige Glühen (giftgrüner Nebel, leuchtende Skelettaugen) und der morsche, zerfetzte Geisterschiff-Look fehlen - wirkt wie ein normales Piratenschiff statt eines Geisterschiffs.",
+  "fehlendesDetail": "Gruseliges grünes Glühen und zerfetzter Geisterschiff-Look fehlen"
+ },
+ {
+  "name": "Krolach",
+  "slug": "krolach",
+  "sterne": 2,
+  "begruendung": "Nur eine vage 'Kreatur'-Kategorie bleibt übrig; das Sprite ist ein grünhäutiges Reptilwesen statt des massiven grau-türkisen Kristall-Titanen mit mehreren leuchtenden Edelsteinen aus dem Portrait - Farbe, Material und Skalierung stimmen alle nicht (Hinweis: weicht von Chris' Beschreibung als 'Standard-Construct-Look' ab, siehe Bericht).",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Lady Mournvale",
+  "slug": "lady-mournvale",
+  "sterne": 2,
+  "begruendung": "Dunkle Kleidung passt zur viktorianischen Robe, aber das namensgebende leere, ringförmige Void-Gesicht - das komplett prägende Merkmal des Portraits - fehlt völlig; die Figur hat ein gewöhnliches Gesicht.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Lady Yueqin",
+  "slug": "lady-yueqin",
+  "sterne": 3,
+  "begruendung": "Silbernes Haar passt gut, aber die smaragdgrüne Robe, der Wanderstab und die schwimmenden Fische fehlen; wirkt jünger als im Portrait.",
+  "fehlendesDetail": "Grüne Robe, Wanderstab und Fisch-Motiv fehlen"
+ },
+ {
+  "name": "Lava Golem",
+  "slug": "lava-golem",
+  "sterne": 4,
+  "begruendung": "Dunkelrote Stein-mit-Lava-Textur und ein glühender Riss treffen die Konzept-Farbgebung gut.",
+  "fehlendesDetail": "Die namensgebenden Dämonenhörner fehlen, und es gibt nur einen glühenden Riss statt der vielen Lavaadern im ganzen Körper."
+ },
+ {
+  "name": "Leviathan",
+  "slug": "leviathan",
+  "sterne": 4,
+  "begruendung": "Die Drachen-Körperform, Flügel und Schwanz treffen die Kategorie sehr gut.",
+  "fehlendesDetail": "Die Farbe ist komplett falsch (feuriges Rot statt türkis-blaugrünem Wasserdrachen-Schuppenkleid) - eine Neueinfärbung würde auf 5 heben."
+ },
+ {
+  "name": "Lilly",
+  "slug": "lilly",
+  "sterne": 3,
+  "begruendung": "Braunes Haar und lederbraune Kleidung passen zur Söldnerin, aber die Augenklappe und das blutige Messer - die auffälligsten Merkmale - fehlen.",
+  "fehlendesDetail": "Augenklappe und blutiges Messer fehlen"
+ },
+ {
+  "name": "Lucky",
+  "slug": "lucky",
+  "sterne": 2,
+  "begruendung": "Menschliche männliche Grundform passt, aber die schwarze Lederjacke, die Wurfmesser-Bandoliere und die Münzen des Glücksspielers/Diebes fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Lulu",
+  "slug": "lulu",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und erdige Farbgebung passen zur Waldnymphe, aber Armreifen, das Blätter-Element und die schlanke barfüßige Silhouette fehlen.",
+  "fehlendesDetail": "Armreifen und Blätter-Requisite fehlen"
+ },
+ {
+  "name": "Lumen Serene",
+  "slug": "lumen-serene",
+  "sterne": 2,
+  "begruendung": "Ein Flügel als Andeutung des Engelswesens vorhanden, aber die Form (Fledermaus- statt Federflügel), Farbe (hautfarben statt strahlend weiß) und die friedliche, in sich gekehrte Pose fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Lynara",
+  "slug": "lynara",
+  "sterne": 3,
+  "begruendung": "Krone/Kopfschmuck und goldene Farbgebung passen zur Elfen-Gelehrten, aber Schriftrolle, Spitzohren und die zweifarbige Weiß-Gold-Robe fehlen.",
+  "fehlendesDetail": "Schriftrolle und Spitzohren fehlen"
+ },
+ {
+  "name": "Lys Puppenkopf",
+  "slug": "lys-puppenkopf",
+  "sterne": 2,
+  "begruendung": "Ein menschliches Mädchen als Basis ist vorhanden, aber der namensgebende, übergroße gruselige Puppenkopf mit tropfenden Augen - das komplett prägende Element des Portraits - fehlt vollständig.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Mavra",
+  "slug": "mavra",
+  "sterne": 4,
+  "begruendung": "Grüne Haut und schwarzes Haar treffen die Orc-Kriegerin sehr gut.",
+  "fehlendesDetail": "Die rote Lederkleidung (statt Braun) und die Kriegsaxt fehlen."
+ },
+ {
+  "name": "Medibull",
+  "slug": "medibull",
+  "sterne": 2,
+  "begruendung": "Gehörnter brauner Kopf als grobe Analogie zum Bullen-Sanitäter vorhanden, aber die Gesichtsform wirkt wie ein Reh statt eines Stiers, und die Sanitäter-Ausrüstung (Rotes-Kreuz-Armbinde, Verbandtasche, Stethoskop) fehlt komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Melody",
+  "slug": "melody",
+  "sterne": 3,
+  "begruendung": "Das markante pinke Haar passt hervorragend, aber die schwarze Kleidung, die Gitarre und die kleine Krone/Tiara fehlen alle - mehrere Details offen für nur eine 4.",
+  "fehlendesDetail": "Schwarze Kleidung, Gitarre und Tiara fehlen"
+ },
+ {
+  "name": "Mindtamer",
+  "slug": "mindtamer",
+  "sterne": 2,
+  "begruendung": "Der kugelige verkleidete Kopf erinnert entfernt an den Glaskolben mit sichtbarem Gehirn, aber es ist ein grauer Roboter-Helm statt einer durchsichtigen Kugel, und die Blitz-/Energie-Fäden fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Moonveil",
+  "slug": "moonveil",
+  "sterne": 3,
+  "begruendung": "Goldene Farbgebung passt zur Mondkönigin-Rüstung, aber Silberhaar, Mondsichel-Schmuck und der leuchtende Stab fehlen alle.",
+  "fehlendesDetail": "Silberhaar, Mondsichel-Schmuck und Stab fehlen"
+ },
+ {
+  "name": "Murky",
+  "slug": "murky",
+  "sterne": 3,
+  "begruendung": "Grüne Farbe passt gut zur Sumpf-Kreatur, aber die tropfend-schleimige Algen-Textur und der aufgelöste, wässrige Look fehlen - wirkt wie ein fester grüner Ork statt einer Schlamm-Kreatur.",
+  "fehlendesDetail": "Tropfende Algen-Textur und aufgelöster Look fehlen"
+ },
+ {
+  "name": "Mushu",
+  "slug": "mushu",
+  "sterne": 2,
+  "begruendung": "Flügel, Schwanz und die reptilienartige Form passen lose zum Greifen-Wesen, aber die Farbe (grau statt cremeweiß), die Fledermausflügel statt großer Federflügel und die imposante Statur fehlen.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Myrkos",
+  "slug": "myrkos",
+  "sterne": 2,
+  "begruendung": "Kapuze passt lose zur Wanderer-Silhouette, aber die namensgebende tentakelartige Kreatur auf dem Rücken und der postapokalyptische Gasmasken-Look fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Nachtschatten",
+  "slug": "nachtschatten",
+  "sterne": 3,
+  "begruendung": "Dunkles Haar und schwarze Kleidung passen zur nächtlichen Diebin, aber die Maske, Spitzohren und das spinnennetzartige Verzierungsmuster fehlen.",
+  "fehlendesDetail": "Maske, Spitzohren und Netzmuster fehlen"
+ },
+ {
+  "name": "Nahli-Ke",
+  "slug": "nahli-ke",
+  "sterne": 4,
+  "begruendung": "Graue Haut und der große kahle Alien-Kopf mit dunklen Augen treffen das 'Grey Alien'-Konzept sehr gut.",
+  "fehlendesDetail": "Nur die Kleidung (brauner Overall) ist zu erdig/rüstungsartig statt der nackten, schlanken Alien-Silhouette - sonst passt der Kopf ausgezeichnet."
+ },
+ {
+  "name": "Nelchael",
+  "slug": "nelchael",
+  "sterne": 2,
+  "begruendung": "Graues Haar passt, aber das ausgezehrte, skelettartige Gesicht der Untoten-Hexe fehlt komplett - das Sprite hat ein rundliches, junges Gesicht statt eines hageren Totenkopfs, und das Kräuterbündel fehlt.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Nhyra-Vel",
+  "slug": "nhyra-vel",
+  "sterne": 4,
+  "begruendung": "Die graue Alien-Kopfform und blaue Hautfarbe treffen das kosmische Wesen gut.",
+  "fehlendesDetail": "Das Sternenglühen/die Nebel-Textur auf der Haut fehlt (Sprite hat einfarbige Haut statt der funkelnden Sternenmuster)."
+ },
+ {
+  "name": "Nimri",
+  "slug": "nimri",
+  "sterne": 2,
+  "begruendung": "Die bläuliche Hautfarbe passt zur Wasserfee, aber die Fledermausflügel statt zarter Schmetterlingsflügel sowie kleine Hörner (die im Portrait gar nicht vorkommen) passen nicht.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Nocture",
+  "slug": "nocture",
+  "sterne": 3,
+  "begruendung": "Die gruselige Kapuzen-Gestalt mit spitzen Zähnen trifft die unheimliche Schatten-Wesen-Idee im Ton, aber Farbe (oliv-weiß statt rauchig-schwarz) und die rote Glut-Aura fehlen.",
+  "fehlendesDetail": "Rauchig-schwarze Farbe und rote Glut-Aura fehlen"
+ },
+ {
+  "name": "Node",
+  "slug": "node",
+  "sterne": 3,
+  "begruendung": "Die dunkle Roboter-Silhouette passt zur Kategorie, aber der Bildschirm-Kopf mit Störbild-Anzeige (statt eines Helm-Visiers) und die blauen Energie-Schweife fehlen.",
+  "fehlendesDetail": "Bildschirm-Kopf und blaue Energie-Schweife fehlen"
+ },
+ {
+  "name": "Omniclops",
+  "slug": "omniclops",
+  "sterne": 2,
+  "begruendung": "Gehörnter Kopf als grobe Analogie zum Dämon vorhanden, aber Farbe (hellbraun statt dunkles Rindenschwarz), die violett leuchtende Brust-Ader und die riesigen Krallen fehlen - wirkt wie ein generisches Rentier-Wesen.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Orakelpfropf",
+  "slug": "orakelpfropf",
+  "sterne": 1,
+  "begruendung": "Das realistische Foto einer Katze mit Eimer auf dem Kopf hat keinerlei Bezug zur generischen braunen Fantasie-Kreatur - komplett andere Gattung (echtes Tier statt Fabelwesen), keine Requisite (Eimer), kein realistischer Look.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Orichalcos",
+  "slug": "orichalcos",
+  "sterne": 2,
+  "begruendung": "Kapuze als grobe Analogie zur Vermummung vorhanden, aber die goldene Vogel-Maske, das blaue Robe mit rotem Schärpe und der leuchtende Runenkreis fehlen komplett - identisches Sprite wie bei Myrkos (völlig anderes Konzept) wiederverwendet.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Othrama",
+  "slug": "othrama",
+  "sterne": 2,
+  "begruendung": "Flügel als Ansatz vorhanden, aber schwarze Chitin-Farbe, grün leuchtende Augen, Fühler und die langen Insekten-Gliedmaßen fehlen - wirkt wie ein brauner Fledermaus-Imp statt eines Insekten-Dämons.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Phantomblade",
+  "slug": "phantomblade",
+  "sterne": 4,
+  "begruendung": "Silberhaar und schwarze Lederkleidung treffen die blinde Assassinin farblich sehr gut.",
+  "fehlendesDetail": "Die charakteristische Augenbinde und die Zwillingsdolche fehlen."
+ },
+ {
+  "name": "Pinkypie",
+  "slug": "pinkypie",
+  "sterne": 2,
+  "begruendung": "Menschliche Form korrekt, aber der spitze Hexenhut, das dunkelblaue Ornat und das Zauberbuch fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "PixiKat",
+  "slug": "pixikat",
+  "sterne": 2,
+  "begruendung": "Katzenohren und Schwanz als Andeutung vorhanden, aber die pinke Farbe, der namensgebende Retro-Bildschirm-Kopf und die Tastatur fehlen - die Farbe ist zudem komplett falsch (blau-grau statt pink).",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Puschelix",
+  "slug": "puschelix",
+  "sterne": 3,
+  "begruendung": "Die grüne Farbe passt zur Blätter-Kreatur, aber die flauschige Blatt-Textur, die vierbeinige Fuchs-Pose und die niedliche Fell-Optik fehlen - wirkt wie ein bipedales grünes Reptil statt eines flauschigen Pflanzenwesens.",
+  "fehlendesDetail": "Flauschige Blatt-Textur und vierbeinige Fuchs-Pose fehlen"
+ },
+ {
+  "name": "Ralazar the Balanced",
+  "slug": "ralazar-the-balanced",
+  "sterne": 2,
+  "begruendung": "Menschliche männliche Figur korrekt, aber die komplette Rüstung fehlt (nur ein einfaches Tanktop statt Plattenpanzer), und der buschige Vollbart im Sprite existiert im glattrasierten Portrait gar nicht.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Raven",
+  "slug": "raven",
+  "sterne": 2,
+  "begruendung": "Ein Flügel als grobe Analogie zum geflügelten Krieger vorhanden, aber der Kopf ist ein Kaniden-Schnabel statt eines Rabenkopfs, Farbe (braun statt schwarz) und Flügeltyp (Fledermaus statt Federn) passen nicht.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Reefstrike",
+  "slug": "reefstrike",
+  "sterne": 2,
+  "begruendung": "Die hellgraue Farbe erinnert entfernt an Haihaut, aber der Kopf ist eindeutig ein Kanide statt eines Hais, und die Mönchsrobe mit umwickelten Fäusten fehlt komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Rhyx'Tal",
+  "slug": "rhyx-tal",
+  "sterne": 2,
+  "begruendung": "Nur die graue Farbe erinnert entfernt an den Stein-Troll; die geflügelte Drachen-Form hat sonst keinen Bezug zum wuchtigen, flügellosen Höhlen-Golem mit rissiger Steinhaut und leuchtend orangen Augen - identisches Sprite wie bei Mushu (ein Greifenwesen) wiederverwendet.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Riley Le Rogue",
+  "slug": "riley-le-rogue",
+  "sterne": 3,
+  "begruendung": "Blondes Haar und goldbraune Farbgebung passen, aber die Plattenrüstung und das große Schwert der Kriegerin fehlen.",
+  "fehlendesDetail": "Plattenrüstung und großes Schwert fehlen"
+ },
+ {
+  "name": "Roddox Harthelm",
+  "slug": "roddox-harthelm",
+  "sterne": 2,
+  "begruendung": "Gehörnter brauner Kopf als grobe Analogie zum Minotaurus vorhanden, aber das Gesicht wirkt eher wie ein Reh als ein Stier, und der Holzknüppel sowie die Fell-Textur fehlen.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Rok Kyl",
+  "slug": "rok-kyl",
+  "sterne": 3,
+  "begruendung": "Die reptilienartige Kopfform und das gelbe Auge passen zur Kategorie, aber die vielen Hörner/Stacheln, die riesigen Fangzähne und die dunkle, bedrohliche Farbe fehlen - wirkt deutlich zu freundlich für den Horden-Boss.",
+  "fehlendesDetail": "Mehrere Hörner/Stacheln, große Fangzähne und dunklere Farbe fehlen"
+ },
+ {
+  "name": "Rootheart",
+  "slug": "rootheart",
+  "sterne": 2,
+  "begruendung": "Grüne Hautfarbe passt lose zum Wald-Riesen, aber Moos-Bart, Schild, Speer und die massive Baumgestalt-Textur fehlen - wirkt wie ein generischer grüner Goblin statt eines Ent-Riesen.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Sanctrix",
+  "slug": "sanctrix",
+  "sterne": 3,
+  "begruendung": "Das markante blaue Haar passt hervorragend, aber die weißen Federflügel (statt Fledermausflügel), die kybernetischen Rüstungsteile und die teal-goldene Robe fehlen alle.",
+  "fehlendesDetail": "Weiße Federflügel und kybernetische Rüstungsteile fehlen"
+ },
+ {
+  "name": "Seraph-11",
+  "slug": "seraph-11",
+  "sterne": 2,
+  "begruendung": "Eine kleine Metall-Maske am Gesicht deutet entfernt auf den Roboter-Vogel hin, aber der komplett vogeluntypische humanoide Körper, der fehlende Schnabel und das fehlende orange Brustlicht sorgen für keinen echten Bezug zum eigentlichen Kranich-Roboter.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Serena",
+  "slug": "serena",
+  "sterne": 4,
+  "begruendung": "Krone, silbergraues Haar und die graue Rüstungsfarbe treffen die Silber-Königin sehr gut.",
+  "fehlendesDetail": "Das erhobene Schwert fehlt."
+ },
+ {
+  "name": "Shadowsage",
+  "slug": "shadowsage",
+  "sterne": 2,
+  "begruendung": "Kapuze als grobe Analogie zur Nekromanten-Robe vorhanden, aber die violette Farbgebung, der leuchtende Stab und das skelettartige Gesicht fehlen komplett - wirkt wie ein normaler Abenteurer statt eines Lichs.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Shield",
+  "slug": "shield",
+  "sterne": 2,
+  "begruendung": "Bronzefarbene Rüstung passt vom Ton her, aber der namensgebende riesige Schild - das absolut zentrale Element - fehlt komplett, ebenso der Kriegshammer und der Spitzhelm.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Sister Ilora",
+  "slug": "sister-ilora",
+  "sterne": 2,
+  "begruendung": "Menschliche weibliche Figur korrekt, aber die leuchtenden Augen, die orangene Heilenergie in den Händen und die taktische Ausrüstung der Kampf-Priesterin fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Skittermind",
+  "slug": "skittermind",
+  "sterne": 4,
+  "begruendung": "Blaugraue Schuppenhaut, gelbe Augen und die reptilienartige Kopfform treffen die Kreatur sehr gut.",
+  "fehlendesDetail": "Die Waffen am Boden (charakteristischer Dietrich-Dieb-Aspekt) und eine kräftigere türkis-grüne statt graue Farbtönung fehlen für die volle 5."
+ },
+ {
+  "name": "Starbound",
+  "slug": "starbound",
+  "sterne": 2,
+  "begruendung": "Nur eine entfernte außerirdische Kopfform erinnert an ein nicht-menschliches Wesen, aber die namensgebende dunkle Kristallzacken-Form, das innere Glühen und die imposante Titanen-Statur fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Starflame",
+  "slug": "starflame",
+  "sterne": 3,
+  "begruendung": "Silbernes Haar passt gut zur kosmischen Elfen-Zauberin, aber die dunkle Robe mit Astrologie-Symbolen, Spitzohren und der Stab fehlen.",
+  "fehlendesDetail": "Dunkle Robe mit Symbolen und Stab fehlen"
+ },
+ {
+  "name": "Steel Sinister",
+  "slug": "steel-sinister",
+  "sterne": 2,
+  "begruendung": "Dunkle Rüstungsfarbe passt zum Ton, aber die geschwungenen Hörner am Helm und die leuchtende grüne Orb-Kugel in der Klauenhand fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines dämonischen Ritterhelms.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Sunny",
+  "slug": "sunny",
+  "sterne": 3,
+  "begruendung": "Blondes Haar passt zur Walküre, aber die weißen Federflügel (statt Fledermausflügel), die goldene Rüstung und die Streitaxt fehlen.",
+  "fehlendesDetail": "Weiße Federflügel, goldene Rüstung und Streitaxt fehlen"
+ },
+ {
+  "name": "Sweet Dreams",
+  "slug": "sweet-dreams",
+  "sterne": 4,
+  "begruendung": "Krone, dunkles Haar und goldene Farbgebung treffen die Blumenkönigin sehr gut.",
+  "fehlendesDetail": "Das Zepter/der Dreizack und der violette Farbakzent im Gewand fehlen."
+ },
+ {
+  "name": "Tartarus",
+  "slug": "tartarus",
+  "sterne": 2,
+  "begruendung": "Gehörnter Kopf als grobe Analogie zum Dämon-Zentauren vorhanden, aber die schwarze Farbe, der zentaurische Unterkörper und die Kriegsaxt fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Taryn",
+  "slug": "taryn",
+  "sterne": 3,
+  "begruendung": "Die dunkle untere Kleidung passt zur Assassinin, aber die helle statt dunkelgraue Kapuze, die Gesichtsmaske und die Dolche fehlen.",
+  "fehlendesDetail": "Dunklere Kapuze, Gesichtsmaske und Dolche fehlen"
+ },
+ {
+  "name": "Tavascron",
+  "slug": "tavascron",
+  "sterne": 1,
+  "begruendung": "Die Sprite-Form ist als unklarer grünlich-brauner Klumpen kaum als Figur erkennbar und hat keinerlei erkennbaren Bezug zum wuchtigen, blau leuchtenden Kampf-Mech des Portraits.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Terradon",
+  "slug": "terradon",
+  "sterne": 3,
+  "begruendung": "Die Steingolem-Form passt zur Kategorie, aber die hellgraue statt dunkelgraue/schwarze Farbe und vor allem die durchgehenden glühend-orangenen Lavaadern (nur ein kleiner Fleck am Fuß) fehlen für ein stimmigeres Bild.",
+  "fehlendesDetail": "Dunklere Farbe und durchgehende Lavaadern am ganzen Körper fehlen"
+ },
+ {
+  "name": "Threnox",
+  "slug": "threnox",
+  "sterne": 4,
+  "begruendung": "Die knochenweiße Skelett-Figur trifft die Kategorie der Geistergestalt sehr gut.",
+  "fehlendesDetail": "Die namensgebende Rippenkäfig-Harfe (das Instrument, das er spielt) fehlt komplett."
+ },
+ {
+  "name": "Tidesinger",
+  "slug": "tidesinger",
+  "sterne": 4,
+  "begruendung": "Die Krone und der angedeutete Schwanz/Flosse am unteren Körper treffen die Meerjungfrauen-Königin überraschend gut.",
+  "fehlendesDetail": "Die kräftige türkisblaue Schuppen-Farbe (statt Grau) und der Wasser-Magie-Wirbel in der Hand fehlen."
+ },
+ {
+  "name": "Tidesprinter",
+  "slug": "tidesprinter",
+  "sterne": 2,
+  "begruendung": "Die türkise Farbe passt sehr gut zum Wassermann, aber die Form (kleine kauernde Amphibie statt muskulösem Krieger), der Dreizack und die leuchtende Flossen-Frisur fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Timantha",
+  "slug": "timantha",
+  "sterne": 2,
+  "begruendung": "Die verkleidete Silhouette passt lose zur Astronautin, aber die dunkelgraue statt silberweiße Farbe und die blau leuchtenden Energie-Punkte am Anzug fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines Raumfahrer-Helms.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Treantos",
+  "slug": "treantos",
+  "sterne": 2,
+  "begruendung": "Grüne Hautfarbe passt lose zum Baum-Wächter, aber Rinden-Textur, die leuchtende grüne Kugel in der Hand und die gewaltige Baumriesen-Statur fehlen - wirkt wie ein generischer grüner Goblin.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Tropfina",
+  "slug": "tropfina",
+  "sterne": 2,
+  "begruendung": "Grüne Farbe passt entfernt, aber die namensgebende Blatt-Form, das Leuchten und die Wassertropfen fehlen - wirkt wie ein generischer grüner Humanoid statt eines zarten Pflanzengeists.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Tsubaki Cleaning",
+  "slug": "tsubaki-cleaning",
+  "sterne": 2,
+  "begruendung": "Braune Farbe passt entfernt zur Zweig-Kreatur, aber die großen niedlichen Augen, Zweig-Antennen und vor allem die Sprühflasche als charakteristisches Requisit fehlen - wirkt wie ein aggressives braunes Monster statt einer niedlichen Garten-Fee.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Umbra",
+  "slug": "umbra",
+  "sterne": 2,
+  "begruendung": "Kapuze als grobe Analogie zum Trenchcoat-Assassinen vorhanden, aber die helle statt schwarze Farbe, die Gasmaske mit rot leuchtenden Augen und die Pistole fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Vargan",
+  "slug": "vargan",
+  "sterne": 4,
+  "begruendung": "Die weiße Pelzkapuze und der Bart treffen den arktischen Krieger gut.",
+  "fehlendesDetail": "Der Speer fehlt (sonst passt die pelzige Kapuzen-Silhouette gut)."
+ },
+ {
+  "name": "Velkin",
+  "slug": "velkin",
+  "sterne": 2,
+  "begruendung": "Dunkles Haar passt, aber die zerrissene schwarze Robe, die blutigen Fangzähne und der wilde bedrohliche Ausdruck fehlen - wirkt wie ein gewöhnlicher Dorfbewohner statt eines wilden Vampirs.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Verla Compliance",
+  "slug": "verla-compliance",
+  "sterne": 3,
+  "begruendung": "Silbernes Haar und dunkle Kleidung passen zur Geister-Sekretärin, aber die Geist-Wirbel/Nebel-Effekte und das Dokument in der Hand fehlen.",
+  "fehlendesDetail": "Geist-Wirbel-Effekte und das Dokument fehlen"
+ },
+ {
+  "name": "Vigil",
+  "slug": "vigil",
+  "sterne": 1,
+  "begruendung": "Die generische graue humanoide Figur hat keinerlei Bezug zur Überwachungskamera-Taube - keine Federn, kein Vogelkörper, keine Kamera am Kopf; das Portrait zeigt ein reales Tier mit Objekt-Fusion, für das der Humanoid-Baukasten strukturell nichts hergibt.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Vorrak",
+  "slug": "vorrak",
+  "sterne": 2,
+  "begruendung": "Die wuchtige gepanzerte Silhouette passt in der Grobform, aber es ist eine raue Fels-/Kristall-Textur statt glatten dunklen Metalls, die rote Kern-Glut fehlt (nur ein schwacher violetter Punkt), und die Schulterkanone fehlt komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Whispra",
+  "slug": "whispra",
+  "sterne": 2,
+  "begruendung": "Kapuze als grobe Analogie vorhanden, aber die schwarze Rabenfarbe (statt cremeweiß), der Schnabel und die Totenkopf-Trophäen am Gürtel fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Wingless",
+  "slug": "wingless",
+  "sterne": 3,
+  "begruendung": "Silberhaar und dunkle Rüstung passen gut, aber das Zauberbuch, die leuchtende Energiekugel und der kleine Drache auf der Schulter fehlen.",
+  "fehlendesDetail": "Zauberbuch, Energiekugel und der kleine Drache fehlen"
+ },
+ {
+  "name": "Wu Tang",
+  "slug": "wu-tang",
+  "sterne": 3,
+  "begruendung": "Dunkles Haar und erdig-braune Farbgebung passen zur Natur-Göttin, aber die Geweih-Krone aus Ästen und die Wurzel-Kleid-Textur fehlen.",
+  "fehlendesDetail": "Geweih-Krone und Wurzel-Kleid-Textur fehlen"
+ },
+ {
+  "name": "Xelara",
+  "slug": "xelara",
+  "sterne": 4,
+  "begruendung": "Graue Alien-Haut, großer Kopf mit dunklen Augen und die dunkle Kleidung mit Gürtelschnalle treffen die Diplomatin hervorragend.",
+  "fehlendesDetail": "Der hohe, kantige Uniformkragen fehlt (Sprite hat einen einfachen runden Ausschnitt) - ein kleines Detail für die volle 5."
+ },
+ {
+  "name": "Xerathis",
+  "slug": "xerathis",
+  "sterne": 4,
+  "begruendung": "Graue Alien-Kopfform und dunkle Kleidung treffen das Konzept gut.",
+  "fehlendesDetail": "Die leuchtend türkisen Akzentlinien auf dem Anzug fehlen."
+ },
+ {
+  "name": "Xylaris",
+  "slug": "xylaris",
+  "sterne": 2,
+  "begruendung": "Nur das helle Haar erinnert entfernt an den Erzengel, aber Flügeltyp/-farbe (Fledermaus statt goldweißer Federn), die grün-goldene Robe und der leuchtende Stab mit Heiligenschein-Symbol fehlen komplett.",
+  "fehlendesDetail": null
+ },
+ {
+  "name": "Yuko",
+  "slug": "yuko",
+  "sterne": 3,
+  "begruendung": "Dunkles Haar und dunkle Kleidung passen zum Cyborg-Look, aber die blau leuchtenden Anzug-Akzente und die namensgebenden holografischen Schmetterlingsflügel fehlen.",
+  "fehlendesDetail": "Blaue Anzug-Akzente und holografische Schmetterlingsflügel fehlen"
+ }
+]
