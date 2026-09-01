@@ -7674,7 +7674,10 @@
   // PR6 hat das nur am eigenen Aufrufer umgangen (eigener FNV-1a-Hash vor jedem Aufruf) --
   // das hier ist der Fix an der Quelle, fuer JEDEN Aufrufer von bau(saat)/build(saat), nicht
   // nur den einen. Verhalten fuer Zahlen/undefined/leeren String bleibt exakt wie vorher
-  // (`saat||1337`) -- nur ein nicht-leerer String nimmt jetzt den Hash-Pfad statt durchzufallen.
+  // (`saat||1337`) -- Achtung, das gilt NICHT fuer numerische Strings ("424242"): die kamen
+  // vorher unveraendert durch `saat*1664525` (JS koerziert numerische Strings klaglos), laufen
+  // jetzt aber durch den Hash-Pfad und liefern damit einen ANDEREN Lauf als vor diesem Fix.
+  // Nur echte, nicht-leere Text-Seeds waren vom Kollaps-Bug betroffen und sind das Ziel hier.
   function normalisiereSaat(saat){
     if(typeof saat==="string"&&saat.length){
       let h=2166136261;
