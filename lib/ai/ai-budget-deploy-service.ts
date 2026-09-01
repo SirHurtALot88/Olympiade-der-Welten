@@ -187,8 +187,35 @@ export function teamNeedsTransferBudgetDeploy(gameState: GameState, teamId: stri
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const { playerOpt } = deriveRosterTargets(team, identity);
   const cashSalaryRatio = salary > 0 ? cash / salary : 0;
-  if (rosterCount < playerOpt && (cashSalaryRatio + 0.01 < 1.15 || cash < 45)) return false;
+  // Aufruesten ist ein eigenes Mandat und behaelt Vorrang vor dem Verhaeltnis-Riegel darunter.
+  // Es stand schon vorher direkt hinter ihm; hier steht es nur davor, damit der Riegel in seiner
+  // neuen Ausrichtung (siehe unten) das Mandat nicht erschlaegt.
   if (teamNeedsPostOptUpgradeDeploy(gameState, teamId, seasonId)) return true;
+  /**
+   * DER VERHAELTNIS-RIEGEL GILT FUER LUXUS, NICHT FUER DIE NOT.
+   *
+   * ENTSCHIEDEN VON CHRIS: „riegel umdrehen!"
+   *
+   * Vorher stand hier `rosterCount < playerOpt` — die Pruefung traf also GENAU die Teams, die zu
+   * wenig Spieler haben. Das war eine Falle, die sich selbst zuzog: duenner Kader heisst wenige,
+   * dafuer teure Spieler, heisst schlechtes Cash/Gehalt-Verhaeltnis, heisst kein Kaufbudget,
+   * heisst duenner Kader.
+   *
+   * An Chris' Spielstand gemessen: von 25 Teams unter OPT hatten nur 5 ueberhaupt Budget frei.
+   *
+   *     H-R   Kader  8 / Opt 12   Cash 64,4   Verhaeltnis 1,08   -> gesperrt
+   *     L-K   Kader 10 / Opt 14   Cash 52,7   Verhaeltnis 0,96   -> gesperrt
+   *     B-P   Kader  8 / Opt 11   Cash 40,5   Verhaeltnis 0,71   -> gesperrt
+   *
+   * H-R verfehlte die Schwelle um 0,07 — mit 64,4 Mio auf der Bank, vier Spielern unter Soll und
+   * sieben Uebermuedeten. Und die Schieflage war doppelt: ein Team AUF Opt mit demselben
+   * Verhaeltnis kam durch, weil die Bedingung es gar nicht ansah.
+   *
+   * Ab jetzt andersherum. Wer unter Opt steht, darf auffuellen — die Hoehe begrenzt weiterhin
+   * `spendable` (Cash minus Liquiditaetsreserve), also genau das Geld, das nach den Gehaeltern
+   * uebrig ist. Wer schon auf Opt ist, kauft Luxus, und dafuer muss die Kasse stimmen.
+   */
+  if (rosterCount >= playerOpt && (cashSalaryRatio + 0.01 < 1.15 || cash < 45)) return false;
   const optTarget = getTeamOptTarget(gameState, teamId);
   const teamMw = getTeamMarketValueSum(gameState, teamId);
   const cashToMw = teamMw > 0 ? cash / teamMw : 0;
