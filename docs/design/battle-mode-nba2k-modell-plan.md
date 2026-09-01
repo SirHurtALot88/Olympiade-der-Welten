@@ -767,6 +767,29 @@ nicht: ein starkes Angriffsteam wirft öfter, erzeugt damit mehr gegnerische
 Defensiv-Rebounds und sieht in der Rohzahl schwächer aus, als es ist. Deshalb Quoten und
 ein direkter Vergleich statt einer Korrelation.
 
+### Pp-Abweichung (Beobachtung, kein Veto)
+
+`messe-arena-einfluss.mjs basketball 48`, beide Stände: **32,1 → 36,5 Pp.** Der Anstieg
+sitzt fast vollständig in **speed** (15,1 → 19,2 % bei Matrixgewicht 10) und wird zur
+Hälfte von **stamina** aufgewogen, das von +5,9 auf +0,5 Pp Abweichung fällt. Die
+speed-Bewegung ist erklärbar: ein längeres Spiel bedeutet mehr Umschaltmomente, und
+Fastbreak/Ausbruch hängen an `LAUFTEMPO`. Sie kommt also aus (d) und geht mit derselben
+einen Zeile wieder weg.
+
+### Verifikation
+
+`npx tsc --noEmit` (die zwei Fehler liegen in `tests/`-Dateien, die diese Runde nicht
+anfasst — vorbestehend) · `npx vitest run`: **1018 Dateien, 7988 Tests, 0 Fehler** ·
+`npm run build` erfolgreich · `miss-arena-spielefeldspiel.mjs` **BESTANDEN** ·
+`miss-arena-feldspiel-spiegel.mjs`: identischer Kader gegen sich selbst 22/23/3,
+**Boxscore-Abweichung 0,0 %** — die Seiten-Symmetrie aus PR #704 hält.
+
+Sichtprüfung in der echten gerenderten Arena über
+`scripts/schiesse-basketball-vergleich.mjs` (bedient die UI wie ein Mensch, fotografiert
+beide Stände zu denselben Spielzeitpunkten). Im Endstand-Bild desselben Teams: vorher
+steht der stärkste Spieler auf Platz 2 und der schwächste des Feldes auf Platz 3 — nachher
+führt der Stärkste mit 11 Punkten und 5/7 aus dem Feld, und Lava Golem steht auf Platz 5.
+
 ### Was offen bleibt
 
 1. **2v2 (ρ 0,239).** Siehe §6 — bei zwei Spielern je Seite ist ρ die nackte
