@@ -40,6 +40,7 @@ export const FOUNDATION_VIEW_IDS = [
   "credits",
   "finances",
   "changelog",
+  "battleArena",
 ] as const;
 
 export type FoundationViewId = (typeof FOUNDATION_VIEW_IDS)[number];
