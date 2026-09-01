@@ -205,16 +205,34 @@
   // Front/Profil mit Schnabel/Kinn bis y~19), das Gehaeuse deckt diese Spanne jetzt
   // komplett ab statt nur ihre obere Haelfte. breite/hoehe erlauben abweichende Masse fuer
   // die Profilpose (dort steht der Schnabel seitlich ueber den Kopfball hinaus).
-  function zeichneKameraKopf(cctx,cx,cy,s,breite,hoehe){
+  // Zweite Nachbesserung (01.09., Chris' Fund: "müsste man bei Vigil die Kamera nicht
+  // seitlich sehen statt von vorne?" — das rund aufgemalte Objektiv sass bisher IMMER
+  // mittig und blickte immer den Betrachter an, auch wenn die Taube seitlich lief; wirkte
+  // wie ein Objektiv, das sich staendig zum Betrachter dreht). blick (optional, +1 rechts/
+  // -1 links/0 Front-Ruecken) schaltet fuer die Profilposen auf einen SEITLICH
+  // VORSTEHENDEN Objektiv-Tubus an der Vorderkante (in Blickrichtung) um, statt des
+  // mittigen Rund-Objektivs — dieselbe Kamera, von der Seite gesehen zeigt sie ihr
+  // Objektiv seitlich herausragend, nicht frontal zum Betrachter gedreht.
+  function zeichneKameraKopf(cctx,cx,cy,s,breite,hoehe,blick){
     const w=(breite||16)*s,h=(hoehe||18)*s;
     cctx.fillStyle="#26262a";
     cctx.fillRect(cx-w/2,cy-h/2,w,h);
     cctx.fillStyle="#45454c";
     cctx.fillRect(cx-w/2,cy-h/2,w,Math.max(1,2.4*s));
-    cctx.fillStyle="#0d0f13";
-    cctx.beginPath();cctx.arc(cx,cy+1.5*s,4.2*s,0,Math.PI*2);cctx.fill();
-    cctx.fillStyle="#5b6b78";
-    cctx.beginPath();cctx.arc(cx-1.3*s,cy+0.3*s,1.3*s,0,Math.PI*2);cctx.fill();
+    if(blick){
+      const tubusL=4.6*s, tubusR=3.1*s, kanteX=cx+blick*(w/2);
+      cctx.fillStyle="#1a1a1e";
+      cctx.fillRect(blick>0?kanteX:kanteX-tubusL,cy-tubusR*0.7,tubusL,tubusR*1.4);
+      cctx.fillStyle="#0d0f13";
+      cctx.beginPath();cctx.arc(kanteX+blick*tubusL,cy,tubusR*0.62,0,Math.PI*2);cctx.fill();
+      cctx.fillStyle="#5b6b78";
+      cctx.beginPath();cctx.arc(kanteX+blick*tubusL-blick*0.7*s,cy-0.5*s,0.9*s,0,Math.PI*2);cctx.fill();
+    }else{
+      cctx.fillStyle="#0d0f13";
+      cctx.beginPath();cctx.arc(cx,cy+1.5*s,4.2*s,0,Math.PI*2);cctx.fill();
+      cctx.fillStyle="#5b6b78";
+      cctx.beginPath();cctx.arc(cx-1.3*s,cy+0.3*s,1.3*s,0,Math.PI*2);cctx.fill();
+    }
     cctx.fillStyle="#c8241e";
     cctx.beginPath();cctx.arc(cx+w/2-1.8*s,cy-h/2+1.8*s,Math.max(0.7,1.1*s),0,Math.PI*2);cctx.fill();
     cctx.strokeStyle="#232f23";cctx.lineWidth=Math.max(1,0.9*s);
@@ -1840,8 +1858,9 @@
       // reicht dort, wo kein Schnabel absteht). Alles mit Z skaliert wie der Rest hier.
       if(b.kamera&&!u.down){
         const seite=r0===1||r0===3;
-        const kameraVersatz=(r0===1?-17:r0===3?17:0)*Z;
-        zeichneKameraKopf(ctx,x+kameraVersatz,y-20*Z,Z,seite?22:16,18);
+        const blick=r0===1?-1:r0===3?1:0;
+        const kameraVersatz=blick*17*Z;
+        zeichneKameraKopf(ctx,x+kameraVersatz,y-20*Z,Z,seite?22:16,18,blick);
       }      return;
     }
     // geist:true (25.08., Rassen-Recherche: "Erna Wellenlaut" — Bild beschreibt sie SELBST,

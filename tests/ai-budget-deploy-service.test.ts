@@ -154,7 +154,17 @@ describe("ai budget deploy service", () => {
     expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-2")).toBe(true);
   });
 
-  it("does not run deploy pass while below opt with modest cash", () => {
+  /**
+   * FRUEHER STAND HIER DAS GEGENTEIL — und zwar mit Absicht: „does not run deploy pass while below
+   * opt with modest cash". Der Verhaeltnis-Riegel traf genau die Teams unter Opt.
+   *
+   * ENTSCHIEDEN VON CHRIS: „riegel umdrehen!" Wer Spieler braucht, darf kaufen; die Hoehe begrenzt
+   * `spendable` (Cash minus Liquiditaetsreserve), hier 7,99 Mio von 30 Cash.
+   *
+   * Der Gegenfall — ein Team AUF Opt, das am Riegel scheitert — steht in
+   * `tests/kaufbudget-riegel-gilt-fuer-luxus.test.ts`.
+   */
+  it("runs deploy pass while below opt even with modest cash", () => {
     const gameState = {
       season: { id: "season-2" },
       teams: [{ teamId: "T-1", shortCode: "T1", cash: 30, name: "Team" }],
@@ -184,6 +194,7 @@ describe("ai budget deploy service", () => {
       transferHistory: [],
     } as unknown as GameState;
 
-    expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-2")).toBe(false);
+    expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-2")).toBe(true);
   });
+
 });
