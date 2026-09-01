@@ -3790,15 +3790,26 @@
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     let id=0;
-    const bauSpieler=(p,seite,istGegner,idx)=>{
-      const sl=istGegner?null:slotFuer(p,idx);
+    // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
+    // Kaempfen, weil unsere Einheiten Slot, Form und Stufe bekamen, der Gegner nur seinen
+    // Disziplinwert — s. docs/BATTLE_ARENA_UEBERGABE.md Fehler #1). Im Kampf (baueEinheit)
+    // und auf der Bahn (bauSpurt) laengst behoben; hier im Feldspiel stand derselbe Fehler
+    // noch: `istGegner` schaltete Slot-Aufschlag, Positions-Modifier UND Intensitaet fuer
+    // die Gegnerseite komplett ab. Nachgemessen per Spiegeltest (identischer Kader gegen
+    // sich selbst, scripts/miss-arena-feldspiel-spiegel.mjs): der Bug erzeugt keinen dramatischen
+    // Sieganteil-Ausschlag (die Wirkung ist fit-abhaengig, nicht einseitig), aber er baut
+    // die zwei Seiten nachweisbar durch verschiedene Formeln — der Gegner bekam nie den
+    // Aufgabe-3-Positions-Modifier (BASKETBALL_POS_MOD), egal welchen Slot er stellte.
+    // Jetzt genau derselbe Aufruf fuer beide Seiten, kein `istGegner`-Sonderfall mehr.
+    const bauSpieler=(p,seite,idx)=>{
+      const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       // Positions-Modifier (Aufgabe 3, s. BASKETBALL_POS_MOD oben) — nur fuer Basketball
-      // und nur, wenn ein Slot gesetzt ist (Gegner haben nie einen Slot, s. `sl` oben).
+      // und nur, wenn ein Slot gesetzt ist (jede Seite bekommt einen, s. `sl` oben).
       if(feldspielDisc==="basketball"&&sl&&BASKETBALL_POS_MOD[sl]){
         const mod=BASKETBALL_POS_MOD[sl];
         for(const k in mod)if(R2[k]!=null)R2[k]=Math.max(1,Math.min(99,R2[k]+mod[k]));
@@ -3814,7 +3825,7 @@
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
-    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
+    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,i)), gegner.map((o,i)=>bauSpieler(o,1,i))];
     FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
       const p=fsIdlePos(side,i,team.length); u.x=p.x; u.y=p.y;
     }));
