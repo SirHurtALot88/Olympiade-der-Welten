@@ -23,6 +23,8 @@
 // Minuten. Fuer TDM also klein anfangen.
 // ===================================================================================
 import { chromium } from "playwright";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
 
 const disziplin = process.argv[2] || "spurt";
 // WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
@@ -41,8 +43,20 @@ const VORGABE = { staffel: 144 };
 const laeufe = Number(process.argv[3] || VORGABE[disziplin] || 48);
 // Dritter Aufrufwert: ein anderer Entwurf. Nuetzlich, um eine lange TDM-Messung gegen
 // eine eingefrorene Kopie laufen zu lassen, waehrend am Original weitergearbeitet wird.
-const pfad = process.argv[4] || "/home/user/Olympiade-der-Welten/public/mockups/battle-mode.html";
-const datei = "file://" + pfad;
+//
+// OHNE diesen Aufrufwert wird das Mockup RELATIV ZU DIESEM SKRIPT aufgeloest, nicht mehr
+// ueber ein absolutes Literal auf den Haupt-Checkout. Das Literal war ein stiller Fehler,
+// den ein Opus-Review am Hockey-Plan gefunden hat (01.09.): in einem Worktree — und jede
+// Agenten-Runde arbeitet in einem — mass das Skript ohne vierten Aufrufwert klaglos die
+// Datei des HAUPT-Checkouts statt der eigenen. Es schlug dabei nicht fehl, es mass nur das
+// Falsche, und zwar genau dann, wenn man eine Aenderung abnehmen wollte. Die Abnahme der
+// naechsten Hockey-Schritte haengt an diesem Werkzeug, deshalb steht die Reparatur vor
+// ihnen (Plan Teil H.4, "PR -1"). pathToFileURL statt "file://"+pfad, damit Leerzeichen
+// und Sonderzeichen im Pfad korrekt kodiert werden.
+const pfad = process.argv[4]
+  ? resolve(process.argv[4])
+  : resolve(dirname(fileURLToPath(import.meta.url)), "..", "public", "mockups", "battle-mode.html");
+const datei = pathToFileURL(pfad).href;
 
 const browser = await chromium.launch({
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
@@ -64,6 +78,10 @@ const start = Date.now();
 const e = await seite.evaluate(([d, n]) => window.__arena.einflussVon(d, n), [disziplin, laeufe]);
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
 
+// Der gemessene Pfad gehoert in die Ausgabe, nicht nur in den Aufruf: wer eine Zahl aus
+// diesem Skript in einen Plan oder PR schreibt, muss belegen koennen, WELCHE Datei sie
+// erzeugt hat. Genau das fehlte, als das Skript still den Haupt-Checkout mass (s. oben).
+console.log(`Gemessene Datei: ${pfad}`);
 console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`);
 console.log(`Abweichung zur Matrix: ${e.abweichungPp} Pp\n`);
 console.log("Attribut          Anteil   Matrix   Differenz");
