@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import {
   LegacyMatchdayResultApplyService,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
+import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -60,6 +62,44 @@ export async function POST(request: Request) {
       },
       { status: writeAuth.status },
     );
+  }
+
+  // Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.4): ein echter
+  // "Spieltag simulieren"-Klick, der Basketball-Arena-Duelle braucht, dauert 6-16+ Sekunden
+  // (Playwright-Chromium) — zu lang fuer diesen Request. `kickoffArenaMatchdayApply()` prueft
+  // SELBST, ob dieser Spieltag ueberhaupt betroffen ist (Battle Mode UND Basketball an diesem
+  // Spieltag); ist er es nicht (Manager Mode, jede andere Disziplin, ein reiner Dry-Run-Preview),
+  // liefert es `{ applicable: false }` und der bisherige synchrone Pfad laeuft unveraendert weiter.
+  if (execute && source === "sqlite") {
+    const kickoff = kickoffArenaMatchdayApply({
+      persistence: createPersistenceService(),
+      saveId,
+      seasonId,
+      matchdayId,
+      forceReplace: body.forceReplace ?? false,
+      allowIncompleteOverride: body.allowIncompleteOverride ?? false,
+      logPrefix: "[legacy-matchday-apply]",
+    });
+    if (kickoff.applicable) {
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        action: "matchday_apply",
+        eventType: "matchday_applied",
+        affectedViews: ["home", "season", "matchday", "arena", "standings"],
+        dryRun: false,
+        success: false,
+      });
+      return NextResponse.json({
+        success: true,
+        source,
+        dryRun: false,
+        applied: false,
+        arenaMatchdayResolveStatus: "in_progress",
+        previewStatus: null,
+        summary: null,
+        warnings: writeAuth.warnings,
+      });
+    }
   }
 
   const service = new LegacyMatchdayResultApplyService();

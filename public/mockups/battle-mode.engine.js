@@ -475,32 +475,16 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["schulter",64,0,0,"metall:steel"],["z_hoerner",64,0,0,"haut"]]},
 
-    // Bild: massiges Steinwesen mit ECHSENKOPF, gluehende Augen, UNBEWAFFNET.
-    //
-    // GARGOYLE. Chris: "gibts fuer rhyx thal nicht ein gargoyle sprite oder sowas?" —
-    // "ja bau den gargoyle". Einen Gargoyle-KOPF hat der LPC-Satz nicht; die zwanzig
-    // Koepfe sind Alien bis Zombie, kein Steinwaechter darunter. Zusammensetzen laesst er
-    // sich trotzdem, ohne ein einziges neues Blatt:
-    //
-    //   Stein   `fur_grey` statt `dark_green`. Der Ton lag schon in der Palette, und er
-    //           trifft das Portrait BESSER als Gruen — dort steht "massiges STEINwesen".
-    //   Hoerner `z_hoerner`, dasselbe Blatt, das Krag'Zul traegt.
-    //   Fluegel `z_fluegel_bg` und `_fg`, dieselben, die Seraph-11 traegt — hinten hinter
-    //           den Koerper, vorne darueber, damit sie ihn umschliessen.
-    //
-    // EHRLICH BLEIBEN: Fluegel stehen NICHT im Portrait. Stein und Echsenkopf schon,
-    // Hoerner sind eine Auslegung von "massig". Die Fluegel sind Chris' ausdrueckliche
-    // Ansage, nicht meine Lesart des Bildes — deshalb steht das hier und nicht nur im
-    // Commit. Wer spaeter das Portrait als Massstab nimmt, soll wissen, wo es abweicht.
-    "Rhyx'Tal":{haut:"fur_grey", ebenen:[
-      ["z_fluegel_bg",64,0,0,"haut"],
-      ["s_schwanz_bg",64,0,0,"haut"],
-      ["k_slash",64,0,0,"haut"],["kopf_lizard",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:iron"],["arme",64,0,0,"metall:iron"],
-      ["schulter",64,0,0,"metall:iron"],
-      ["z_hoerner",64,0,0,"haut"],
-      ["s_schwanz_fg",64,0,0,"haut"],
-      ["z_fluegel_fg",64,0,0,"haut"]]},
+    // RHYX'TAL STAND HIER FRUEHER als eigene GARGOYLE-Ebenenliste (Stein-Ton fur_grey,
+    // z_hoerner, z_fluegel_bg/fg vorn/hinten um den Koerper). Sprite-Konsistenz-Check
+    // (Chris' Fund, s. kaderFigur()/figur()-Header): das war ein VERALTETER Bauplan, von
+    // BEVOR BAU["Rhyx'Tal"] unten (kopf:"lizard",fluegel:true,hoerner:true) feststand, und
+    // figur() liest B_FIGUR VOR dem BAU-Rueckfall — die Kader-/Aufstellungskarte zeigte
+    // deshalb dauerhaft den alten Stand: Fluegel in der Frontalpose eng um den Koerper
+    // gefaltet, kaum als Fluegel zu erkennen, statt der Seitenpose/Faerbung, die
+    // zeichneSprite() (Live-Kampf) laengst ueber b.fluegel/zeichneFluegel zeigt. Ersatzlos
+    // gestrichen: derselbe BAU-Bauplan reicht jetzt fuer alle drei Ansichten (Kader-Karte,
+    // Aufstellung, Kampf) — EIN Charakter, ein Bild, wie gefordert.
 
     // Bild: rothaarige ELFE mit LANGBOGEN und Koecher, gruener Umhang, leichte Ruestung.
     "Cassandra":{haut:"light", ebenen:[
@@ -534,20 +518,21 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["haar_lang",64,0,0,"haar:blonde"],
       ["schild_fg",64,0,0,"metall:steel"],["sw_fg",128,-32,-32,null]]},
-    "Lava Golem":{haut:"olive", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_frankenstein",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:brass"],["arme",64,0,0,"metall:brass"],
-      ["r_slash",64,0,0,"metall:brass"],["schulter",64,0,0,"metall:brass"]]},
+    // LAVA GOLEM STAND HIER FRUEHER als eigene Ebenenliste (kopf_frankenstein, olive Haut,
+    // Messing-Ruestung) — derselbe veraltete Bauplan wie bei Rhyx'Tal oben, aus der Zeit
+    // VOR dem echten Vollbild (24./25.08., s. BAU["Lava Golem"] unten: vollbild:"golem",
+    // vollbildFarbe, gluehenderRiss). figur() liest B_FIGUR zuerst, die Kader-/Aufstellungs-
+    // karte zeigte deshalb dauerhaft einen generischen Ruestungs-Skin statt der rot/
+    // schwarzen Lavariss-Optik, die zeichneSprite() (Live-Kampf) laengst zeigt. Ersatzlos
+    // gestrichen, aus demselben Grund wie bei Rhyx'Tal.
     "Greenkraut":{haut:"green", ebenen:[
       ["k_slash",64,0,0,"haut"],["kopf_orc",64,0,0,"haut"],
       ["leder_slash",64,0,0,null],["binde",64,0,0,"stoff:walnut"],
       ["haar_dread",64,0,0,"haar:green"]]},
-    "Tidesprinter":{haut:"blue", ebenen:[
-      ["sw_bg",128,-32,-32,null],
-      ["s_schwanz_bg",64,0,0,"haut"],
-      ["k_slash",64,0,0,"haut"],["kopf_lizard",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],["stiefel",64,0,0,"metall:brass"],
-      ["s_schwanz_fg",64,0,0,"haut"],["sw_fg",128,-32,-32,null]]},
+    // TIDESPRINTER STAND HIER FRUEHER als eigene Ebenenliste (Echsenkopf, blaue Haut,
+    // Messing-Stiefel, Schwert) — derselbe veraltete Bauplan wie bei Lava Golem/Rhyx'Tal,
+    // aus der Zeit VOR dem Froschmensch-Vollbild (s. BAU["Tidesprinter"] unten:
+    // vollbild:"froschmensch"). Ersatzlos gestrichen, aus demselben Grund.
     // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab, Feuer im Schnee.
     // Keine Ruestung, keine Klinge — ein Weiser, kein Kaempfer. Passt zu seinen Werten:
     // Charisma 85, Spirit 76, Wille 72, Entschlossenheit 81, dagegen Power 10.
@@ -2796,6 +2781,33 @@
   // Wer hier eine Disziplin eintraegt, bekommt sie fertig: Aufstellung aus den erzeugten
   // Slots, Motor fuer die Abnahmemessung, Reiter in der Oberflaeche.
   const ARENA_ART={
+    // MATRIX: power 28, health 20, stamina 14, spirit 12, charisma 10, determination 6,
+    // intelligence 6, awareness 2, torment 2.
+    //
+    // REZEPT ABSICHTLICH UNVERAENDERT GELASSEN — nachgemessen, nicht vergessen. Mit dem
+    // korrigierten Massstab (s. MOTOREN unten, "Anteil am Gesamtbeitrag") liest dieses
+    // Rezept bei n=12 54,2 Pp; das ist der grosse Sprung dieser Runde, denn derselbe
+    // Kampf las mit dem alten, kurzgeschlossenen Massstab ueber 150 Pp. Der Fehler lag
+    // im Massstab, nicht im Rezept.
+    //
+    // Vier neue TDM-Rezepte wurden gebaut und gemessen, um die restlichen 54 Pp
+    // wegzuarbeiten: ein voller Neubau (168 Pp — schlechter), eine gezielte Korrektur
+    // der groessten Luecken aus der Messung (83 Pp — schlechter), und zwei ANG/VER-Sorten,
+    // die sich nur in Nuancen unterschieden (114,5 und 58,9 Pp bei n=6 — ein Ausschlag,
+    // der allein aus der Stichprobe kommen konnte). Bei doppeltem n bestaetigte sich genau
+    // das: die bessere der beiden ANG/VER-Sorten lag bei n=12 bei 57,9 Pp — innerhalb der
+    // Streuung von REC.power (54,2 Pp), nicht darunter. Jeder Umbauversuch war also
+    // entweder schlechter oder ununterscheidbar vom Nichtstun.
+    //
+    // Der wahrscheinliche Grund steht schon bei Fechten und Battlefield unten: TMP und
+    // AUS liegen ausserhalb der Eignungs-Normierung und haben Effekte erster Ordnung auf
+    // den Kampf selbst, nicht nur auf die Gewichtung — und REC.power traegt in TMP/AUS
+    // ausgerechnet die Attribute, die den Kampf am Laufen halten (speed/dexterity fuers
+    // Tempo, stamina fuers Durchhalten), waehrend ANG/VER durch aufEignung() proportional
+    // zur Eignung skalieren und daher wenig Spielraum fuer Feintuning lassen. TDM bleibt
+    // damit die einzige der drei Zieldisziplinen ueber 15 Pp — offener Befund fuer eine
+    // naechste Runde, die vermutlich am Chassis (aufEignung/TMP-AUS-Normierung) ansetzen
+    // muesste statt an den Rezeptgewichten.
     tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
 
     "mini-dm":{
@@ -2837,9 +2849,20 @@
       // Gewicht 16. Jetzt tragen Torment (25) und Dexterity (20) auch dort.
       rezept:{ANG:{torment:42,dexterity:32,power:26},
               VER:{awareness:40,dexterity:34,health:26},
-              LP:{health:34,determination:34,awareness:32},
+              LP:{health:34,determination:36,awareness:30},
               TMP:{dexterity:38,speed:34,awareness:28},
-              AUS:{torment:36,awareness:32,dexterity:24,determination:8}}
+              // NACHGEZOGEN, dritte Runde — diesmal am korrigierten Massstab (s. MOTOREN,
+              // „Anteil am Gesamtbeitrag"). Damit las Fechten 16,6 Pp, und die beiden
+              // groessten Einzelposten sassen beide in der AUSDAUER: Torment 21,5 % bei
+              // Gewicht 25, Awareness 17,3 % bei 15. Also traegt Torment dort mehr,
+              // Awareness weniger — gemessen 16,6 -> 12,5 Pp (n=6), bestaetigt bei
+              // doppeltem n: 11,0 Pp (n=12). Damit unter dem Zielwert von 15 Pp.
+              //
+              // TEMPO BLEIBT, WIE ES WAR. TMP und AUS liegen ausserhalb der
+              // Eignungs-Normierung; wer daran dreht, verschiebt nicht das Gewicht,
+              // sondern den Kampf. Ein Neubau dieser Runde, der auch TMP anfasste, kam
+              // auf 20,4 statt 12,5 Pp. Deshalb nur die Ausdauer, und die nur wenig.
+              AUS:{torment:44,dexterity:24,awareness:22,determination:10}}
     },
 
     battlefield:{
@@ -3600,6 +3623,87 @@
   // draussen trifft niemanden und laesst den Fokus stehen, statt ihn versehentlich zu
   // loeschen.
   const FOKUS_GREIF_RADIUS=30;
+
+  // ===================================================================================
+  // BEWEGUNGS-DYNAMIK (Chris, 30.08., woertlich): "Momentan gibt's quasi immer nur eine
+  // Manndeckung und keine verschiedenen Bewegungen. Agile Spieler sollten zum Beispiel
+  // das nutzen koennen, dass sie schneller sind und dann schneller zum anderen Korb
+  // kommen, falls sie dann den Pass kriegen, um den Dunk zu machen. Und schlechte
+  // Verteidiger koennten sie vielleicht aus den Augen verlieren oder haben nicht die
+  // Power, um starke Angreifer zu verteidigen."
+  //
+  // Zwei Mechaniken, beide bewusst ALS AUFSATZ auf das Vorhandene gebaut, nicht als
+  // zweites System daneben:
+  //
+  //   1. AUSBRUCH — das Fastbreak-Fenster (startFastbreak, seit der Dynamik-Runde da)
+  //      bekommt einen benannten Spieler. Bisher sprinteten pauschal "die ersten beiden
+  //      im Array" mit (PLATZHALTER, reine Aufstellungsreihenfolge, s. bewegeSpielerLive),
+  //      und niemand lief ueberhaupt an den gegnerischen Korb — der Ballfuehrer trug den
+  //      Ball selbst hoch. Jetzt loest sich der SCHNELLSTE Spieler des Teams vom Feld,
+  //      laeuft direkt an den Ring, ist bevorzugtes Passziel und zieht mit dem Ball ohne
+  //      Aufbauspiel durch. Wer nicht schneller ist als der schnellste Gegner, bricht
+  //      auch nicht aus — der Vorsprung ist RELATIV, nicht absolut.
+  //
+  //   2. MISMATCH — die Manndeckung (zuordneDeckung) war bis hierher attributblind in
+  //      der ZUORDNUNG (naechster freier Angreifer) und kannte nur EINEN Attributkanal
+  //      (reevDeckung ueber ABWEHR). Jetzt traegt jeder Verteidiger zwei Abstaende zu
+  //      SEINEM Mann mit sich, und beide wirken ausschliesslich ueber Bewegung: Tempo-
+  //      Vorsprung, Laufziel, Abstand. Die Erfolgsformel-Zone (technikMake/technikGate/
+  //      GEO_BONUS/bedraengnisGate/bedraengnisMake/kontestFaktor/0,92-Deckel) ist
+  //      unangetastet — die schwaechere Kontest-Wirkung entsteht allein daraus, dass ein
+  //      ueberforderter Verteidiger WEITER WEG steht, gemessen von derselben dist(), die
+  //      entscheideBallaktion ohnehin schon liest.
+  //
+  // WELCHE ATTRIBUTE — aus den fertigen Basketball-Rezepten (s. rezept: oben), nicht
+  // geraten. Es gibt in dieser Disziplin genau EINEN Verteidigungswert, ABWEHR
+  // (torment 26 / speed 24 / awareness 20 / intelligence 12 / dexterity 10 / charisma 8);
+  // "Antizipation" und "Haerte im Zweikampf" stecken beide schon darin, ein zweiter,
+  // separat gebauter Verteidigungswert waere eine Doppelzaehlung derselben Attribute.
+  // Ihm gegenueber stehen zwei Angreiferwerte:
+  //   * "verliert ihn aus den Augen"  -> LAUFTEMPO (speed 52/stamina 32/dexterity 16)
+  //     zusammen mit AUFBAU (charisma 36/dexterity 26/intelligence 14/awareness 12/
+  //     speed 8/spirit 4) — Antritt plus Ballbehandlung, das, womit ein Angreifer sich
+  //     tatsaechlich loest.
+  //   * "nicht die Power, ihn zu verteidigen" -> SCHUSS_NAH (power 34/spirit 30/
+  //     stamina 16/awareness 12/dexterity 6/torment 2) — der einzige Rezeptwert der
+  //     Disziplin, den power anfuehrt, und zugleich genau der Spielertyp, gegen den
+  //     Koerperlichkeit am Ring zaehlt.
+  // Alle Zahlen unten sind PLATZHALTER.
+  const AUSBRUCH_VORSPRUNG_MIN=6;   // LAUFTEMPO-Vorsprung vor dem SCHNELLSTEN Gegner, ab dem ein Ausbruch ueberhaupt zur Debatte steht
+  const AUSBRUCH_CHANCE_BASIS=0.15; // Chance genau an der Schwelle
+  const AUSBRUCH_CHANCE_K=0.022;    // Zuwachs je weiterem Punkt Vorsprung
+  const AUSBRUCH_CHANCE_MAX=0.85;   // nie Gewissheit — ein Ausbruch bleibt eine Gelegenheit, kein Automatismus
+  const AUSBRUCH_FENSTER=3;         // Sekunden, dieselbe Dauer wie das Fastbreak-Fenster selbst (s. startFastbreak)
+  const AUSBRUCH_TEMPO_MUL=1.55;    // Lauftempo des Ausbrechers; der uebrige Fastbreak bleibt beim bekannten 1,3x
+  const AUSBRUCH_PASS_MUL=2;        // Passgewicht, solange sein Fenster laeuft — knapp unter dem bestehenden Roll-Bonus (3, s. offensterMitspieler), s. BALANCE unten
+  const AUSBRUCH_PASS_ABSCHLAG=0.55;// wie stark der Ausbrecher MIT Ball seine eigene Passbereitschaft drosselt (er zieht durch, statt aufzubauen)
+  const AUSBRUCH_SUCHT_PASS_MUL=0.2;// derselbe Gedanke eine Stufe frueher: er laesst eine Wurfgelegenheit im Ausbruch kaum noch fuer ein Zuspiel liegen
+  // BALANCE DIESER DREI ZAHLEN — durchgemessen, nicht gewaehlt (messe-arena-einfluss.mjs
+  // basketball 48, jeweils gegen den eingefrorenen Stand von origin/main mit 31,6 Pp):
+  //   PASS_MUL 3 / ABSCHLAG 0,25 / SUCHT_PASS 0 (= harte Sperre)   37,7 Pp
+  //   PASS_MUL 2 / ABSCHLAG 0,55 / SUCHT_PASS 0,2 (gewaehlt)       32,6 Pp
+  // Der Unterschied sitzt genau da, wo die Kommentare in dieser Datei ihn immer wieder
+  // verorten: in der Pass-LOTTERIE (offensterMitspieler) und in der Passbereitschaft, also
+  // darin, WER den Ball bekommt — nicht in einem Erfolgswert. Die schaerfere Fassung nahm
+  // dem Spielmacher-Kanal (AUFBAU/charisma) zu viel weg; die gewaehlte laesst den Ausbruch
+  // sichtbar (Fastbreak-Wuerfe und Dunks steigen weiterhin deutlich, s. Commit-Text) und
+  // liest speed mit 10,3 % bei Matrixvorgabe 10 — genauer als der Ausgangsstand mit 8,7 %.
+  // MISMATCH_SPANNE — der Attributabstand, ab dem ein Mismatch VOLL zaehlt. Erster
+  // Anlauf normierte auf 100 (also "0 bis maximal moeglicher Abstand"); nachgemessen war
+  // das praktisch wirkungslos: in einer echten Paarung liegen die Rezeptwerte zweier
+  // Spieler selten mehr als 10-25 Punkte auseinander, der Faktor blieb damit unter 0,25
+  // und der Mann wurde in 0,6 % der Ticks verloren — nicht sichtbar, also keine Mechanik.
+  // 40 Punkte Abstand sind ein GROSSER Unterschied (etwa der zwischen einem Spezialisten
+  // und einem Mitlaeufer) und stehen jetzt fuer die volle Wirkung; darueber wird gedeckelt.
+  const MISMATCH_SPANNE=40;
+  const VERLIEREN_CD=1.3;           // Sekunden Sperre gegen staendiges Neuwuerfeln, Muster wie hilfeCd
+  const VERLIEREN_FENSTER=0.6;      // so lange laeuft der Verteidiger noch zur LETZTEN gesehenen Position seines Mannes
+  const VERLIEREN_K=0.70;           // Chance je Gelegenheit, linear im Beweglichkeits-Abstand
+  const VERLIEREN_MAX=0.30;         // Deckel: auch der hoffnungslos unterlegene Verteidiger verliert ihn nicht bei jeder Gelegenheit
+  const MISMATCH_TEMPO_ABZUG=0.22;  // wie viel vom 1,15x-Deckungsvorsprung der Beweglichkeits-Abstand hoechstens frisst
+  const MISMATCH_TEMPO_MIN=0.95;    // Untergrenze: er faellt nicht hinter seinen Mann zurueck, er holt ihn nur nicht mehr ein
+  const MISMATCH_WUCHT_SAG=0.45;     // wie stark der Wucht-Abstand den ohnehin vorhandenen Rueckzug (`sag`) aufweitet
+
   // ASSIST-FENSTER (Playmaker-Runde, s. passChance/frischerPassVon unten): wie lange nach
   // einem Zuspiel ein Abschluss noch als vom Passgeber vorbereitet gilt. Vorher gab es gar
   // kein Zeitfenster, sondern ein ENTSCHEIDUNGS-Fenster von genau eins: `frischerPassVon`
@@ -3660,7 +3764,7 @@
     fastbreak:    {AUFBAU:2,  SCHUSS_NAH:2, ZWEITCHANCE:-2}
   };
   function bauFeldspiel(saat){
-    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
@@ -3671,15 +3775,26 @@
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     let id=0;
-    const bauSpieler=(p,seite,istGegner,idx)=>{
-      const sl=istGegner?null:slotFuer(p,idx);
+    // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
+    // Kaempfen, weil unsere Einheiten Slot, Form und Stufe bekamen, der Gegner nur seinen
+    // Disziplinwert — s. docs/BATTLE_ARENA_UEBERGABE.md Fehler #1). Im Kampf (baueEinheit)
+    // und auf der Bahn (bauSpurt) laengst behoben; hier im Feldspiel stand derselbe Fehler
+    // noch: `istGegner` schaltete Slot-Aufschlag, Positions-Modifier UND Intensitaet fuer
+    // die Gegnerseite komplett ab. Nachgemessen per Spiegeltest (identischer Kader gegen
+    // sich selbst, scripts/miss-arena-feldspiel-spiegel.mjs): der Bug erzeugt keinen dramatischen
+    // Sieganteil-Ausschlag (die Wirkung ist fit-abhaengig, nicht einseitig), aber er baut
+    // die zwei Seiten nachweisbar durch verschiedene Formeln — der Gegner bekam nie den
+    // Aufgabe-3-Positions-Modifier (BASKETBALL_POS_MOD), egal welchen Slot er stellte.
+    // Jetzt genau derselbe Aufruf fuer beide Seiten, kein `istGegner`-Sonderfall mehr.
+    const bauSpieler=(p,seite,idx)=>{
+      const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       // Positions-Modifier (Aufgabe 3, s. BASKETBALL_POS_MOD oben) — nur fuer Basketball
-      // und nur, wenn ein Slot gesetzt ist (Gegner haben nie einen Slot, s. `sl` oben).
+      // und nur, wenn ein Slot gesetzt ist (jede Seite bekommt einen, s. `sl` oben).
       if(feldspielDisc==="basketball"&&sl&&BASKETBALL_POS_MOD[sl]){
         const mod=BASKETBALL_POS_MOD[sl];
         for(const k in mod)if(R2[k]!=null)R2[k]=Math.max(1,Math.min(99,R2[k]+mod[k]));
@@ -3695,7 +3810,7 @@
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
-    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
+    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,i)), gegner.map((o,i)=>bauSpieler(o,1,i))];
     FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
       const p=fsIdlePos(side,i,team.length); u.x=p.x; u.y=p.y;
     }));
@@ -3933,7 +4048,15 @@
     // Verteidiger bis zu 1,5s weiter zu seinem alten Blockpunkt bzw. Richtung GEGNERischem
     // Korb (rollBis), statt seinen Mann zu decken (26 % aller Roll-Ticks liefen so,
     // gemessen). Jetzt beide Teams.
-    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null; }
+    // BEWEGUNGS-DYNAMIK: dieselbe Aufraeumung, aus demselben Grund. Ein Ausbruchsfenster
+    // gehoert zu GENAU EINER Umschaltsituation — ueberlebte es den Possession-Wechsel,
+    // liefe der Ausbrecher im naechsten, ganz gewoehnlichen Halbfeld-Angriff weiter stur
+    // auf den Ring zu (derselbe Fehler, den Opus-Review-Fund #11 fuer fsLive.fastbreak
+    // beschreibt). startFastbreak wird bewusst NACH zuordneSlots gerufen und setzt ein
+    // frisches Fenster, falls die Lage eines hergibt. Das Sichtverlust-Fenster faellt aus
+    // demselben Grund mit weg: die Zuteilung wird gleich ohnehin neu gemacht.
+    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null;
+      u.ausbruchBis=0; u.verlorenBis=0; u.letzteSicht=null; }
   }
 
   function initBasketballLive(art){
@@ -3946,7 +4069,13 @@
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
         wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
-        screenRuf:0,rangeSeit:null});
+        screenRuf:0,rangeSeit:null,
+        // BEWEGUNGS-DYNAMIK (s. Konstantenblock oben): Ausbruchsfenster des Angreifers,
+        // Mismatch-Abstaende und Sichtverlust-Fenster des Verteidigers. Alle vier sind
+        // im Ausgangszustand aus (0 bzw. null) — ohne einen gestarteten Fastbreak bzw.
+        // ohne eine Zuteilung mit Attributgefaelle wirkt keiner von ihnen.
+        ausbruchBis:0,mismatchTempo:0,mismatchWucht:0,
+        verlorenBis:0,sichtCd:0,letzteSicht:null});
     }
     zuordneSlots(0); zuordneSlots(1);
     // `phase` ist der EINE Zustand, der entscheidet, ob die freie Simulation laeuft
@@ -3995,7 +4124,24 @@
         let naechster=null,minD=Infinity;
         for(const a of frei){ const d=dist(v,a); if(d<minD){minD=d;naechster=a;} }
         if(naechster){ v.deckt=naechster; frei.splice(frei.indexOf(naechster),1); }
-        v.reevDeckung=0.5+(100-v.ABWEHR)/100*1.5; // PLATZHALTER, nach Fables Vorschlag (Awareness liest das Feld)
+        // MISMATCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben): zwei Abstaende zwischen
+        // dem EINEN Verteidigungswert der Disziplin (ABWEHR) und dem, was der zugeteilte
+        // Angreifer mitbringt — auf 0..1 normiert, bei Gleichstand oder Ueberlegenheit
+        // des Verteidigers exakt 0. Ein 0er-Mismatch schaltet unten JEDEN Effekt aus
+        // (kein veraendertes Tempo, kein veraenderter Abstand, kein rr()-Wurf), die
+        // Deckung eines ebenbuertigen Paares ist also zeichenweise die von vorher.
+        // Hier berechnet und nicht in bewegeSpielerLive: die Werte gehoeren zur
+        // ZUTEILUNG, nicht zum Tick, und aendern sich nur mit ihr.
+        if(v.deckt){
+          const spanne=(x)=>Math.max(0,Math.min(1,x/MISMATCH_SPANNE));
+          v.mismatchTempo=spanne((v.deckt.LAUFTEMPO+v.deckt.AUFBAU)/2-v.ABWEHR);
+          v.mismatchWucht=spanne(v.deckt.SCHUSS_NAH-v.ABWEHR);
+        } else { v.mismatchTempo=0; v.mismatchWucht=0; }
+        // PLATZHALTER, nach Fables Vorschlag (Awareness liest das Feld). Der Mismatch-
+        // Aufschlag steht bewusst HIER und nicht als weiterer Multiplikator im Tick: wer
+        // seinem Mann klar unterlegen ist, sortiert die Lage auch seltener neu — dieselbe
+        // Groessenordnung wie der ABWEHR-Term selbst (0,5-2,0s -> hoechstens ~+0,9s).
+        v.reevDeckung=(0.5+(100-v.ABWEHR)/100*1.5)*(1+(v.mismatchTempo||0)*0.6);
       }
     }
   }
@@ -4119,8 +4265,17 @@
     // exakt wie vor der Wurf-Distanz-Aufspaltung — die Distanz-Differenzierung sitzt
     // bereits dort, wo sie hin muss (technikMake in entscheideBallaktion), nicht hier.
     const qualitaet=(m)=>Math.max(0.01,0.16+m.TECHNIK*0.0050+m.TEAMGEIST*0.0060);
+    // AUSBRUCH (Chris: "falls sie dann den Pass kriegen"): derselbe Bonus und dieselbe
+    // Bauform wie beim Roll-Fenster daneben — ein Spieler, der gerade allein Richtung
+    // Korb davonlaeuft, ist die naheliegende Anspielstation, unabhaengig von seiner
+    // sonstigen Bewertung. Ohne diesen Faktor bleibt der Ausbruch reine Optik: der
+    // Ballfuehrer traegt den Ball selbst hoch und der Schnelle laeuft nebenher.
+    // Multiplikator statt Sonderfall, damit ein schlechter Abschlussspieler auch im
+    // Ausbruch nicht zum bevorzugten Ziel wird, sondern nur ein wahrscheinlicheres.
+    const ausbrecher=fsLive&&fsLive.fastbreak?fsLive.fastbreak.ausbrecher:null;
     return gewichtetesLosNach(mitspieler,m=>
-      m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
+      m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1)
+      *(m===ausbrecher&&fsT<(m.ausbruchBis||0)?AUSBRUCH_PASS_MUL:1));
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -4226,7 +4381,15 @@
     // Liga-Mittelwert bleibt, nur die Spanne oeffnet sich). Ein Spielmacher mit AUFBAU 83
     // laesst gut jede fuenfte Wurfgelegenheit liegen und sucht stattdessen den freien Mann.
     // Beim Zwangswurf (Schussuhr) gilt das nicht — dann wird geworfen.
-    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080));
+    //
+    // AUSBRUCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben): wer gerade allein im offenen
+    // Feld auf den Ring zulaeuft und den Ball bekommt, sucht NICHT den freien Mann — er
+    // zieht durch. Umgesetzt als Schwelle 0 statt als vorgezogenes `return`, damit der
+    // rr()-Wurf an genau derselben Stelle stehen bleibt: `rr()<0` ist immer falsch, die
+    // Anzahl der Wuerfe (und damit die Zufallsfolge fuer alles Nachfolgende) aendert sich
+    // durch diesen Zweig nicht. Dieselbe Vorsicht wie beim Fokus-Doppeln, s. dort.
+    const imAusbruch=fsT<(u.ausbruchBis||0);
+    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080))*(imAusbruch?AUSBRUCH_SUCHT_PASS_MUL:1);
 
     if(tier&&!suchtPass){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
@@ -4354,7 +4517,13 @@
       // ausserdem deutlich haeufiger wirklich ein Assist — der Tausch lohnt sich fuer den
       // Passgeber jetzt auch im Boxscore-Mass. Gemessen (s. Bericht): der intelligence-
       // Anteil bleibt positiv, die Abweichung faellt statt zu steigen.
-      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040));
+      // AUSBRUCH: derselbe Gedanke wie bei `suchtPass` oben, eine Stufe spaeter — auch
+      // wer den Wurf gerade nicht nimmt, spielt im Ausbruch nicht zurueck ins Aufbauspiel,
+      // sondern dribbelt weiter Richtung Ring (der naechste Tick findet ihn dann naeher am
+      // Korb, s. bewegeSpielerLive). Abschlag statt Sperre und wieder OHNE Verschiebung
+      // der rr()-Reihenfolge: der Wurf steht unveraendert da, nur sein Schwellwert sinkt.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040))
+        *(imAusbruch?AUSBRUCH_PASS_ABSCHLAG:1);
       if(rr()<passChance){
         // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
         // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen
@@ -4843,7 +5012,35 @@
   // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
   // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
   function startFastbreak(seite){
-    fsLive.fastbreak={seite, bis:fsT+3};
+    fsLive.fastbreak={seite, bis:fsT+3, ausbrecher:null};
+    // AUSBRUCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben). Der Fastbreak selbst gab es
+    // schon; was fehlte, war ein Grund, warum ein SCHNELLER Spieler davon mehr hat als
+    // ein langsamer. Genau das ist dieser Block: er sucht den schnellsten Mann des
+    // Teams, misst seinen Vorsprung nicht gegen den Ligadurchschnitt, sondern gegen den
+    // SCHNELLSTEN GEGNER — denn der ist es, der ihn einholen muesste — und laesst ihn
+    // mit einer daran haengenden Chance losziehen.
+    //
+    // Der Ballfuehrer selbst kann nicht ausbrechen: er hat den Ball schon (startFastbreak
+    // wird bewusst NACH ballUebernehmen gerufen, s. dort), fuer ihn gilt der bestehende
+    // 1,3x-Fastbreak-Bonus. Der Ausbrecher ist der Mann VOR dem Ball.
+    const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
+    const kandidaten=team.filter(u=>!u.hatBall);
+    if(!kandidaten.length||!gegner.length)return;
+    let schnellsterGegner=gegner[0].LAUFTEMPO;
+    for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
+    let bester=kandidaten[0];
+    for(const u of kandidaten)if(u.LAUFTEMPO>bester.LAUFTEMPO)bester=u;
+    const vorsprung=bester.LAUFTEMPO-schnellsterGegner;
+    // Kein Vorsprung, kein Ausbruch — und ausdruecklich auch KEIN rr()-Wurf: ein Team
+    // ohne schnellen Mann laeuft damit exakt die rr()-Folge von vorher.
+    if(vorsprung<AUSBRUCH_VORSPRUNG_MIN)return;
+    const chance=Math.min(AUSBRUCH_CHANCE_MAX,
+      AUSBRUCH_CHANCE_BASIS+(vorsprung-AUSBRUCH_VORSPRUNG_MIN)*AUSBRUCH_CHANCE_K);
+    if(rr()<chance){
+      fsLive.fastbreak.ausbrecher=bester;
+      bester.ausbruchBis=fsT+AUSBRUCH_FENSTER;
+      feed(seite,bester.n+" reißt aus — allein Richtung Korb.");
+    }
   }
 
   function loeseFlugAuf(flug,art){
@@ -5003,6 +5200,13 @@
     // naechste Gegner/das Ziel statt des Balls) durch denselben Term; hier bewusst nur fuer
     // Basketball verdrahtet.
     const ALLE_SPIELER=[...FSTEAM[0],...FSTEAM[1]];
+    // WER IM FASTBREAK MITSPRINTET. Hier stand bisher `team.indexOf(u)<2` — die zwei
+    // ERSTEN im Team-Array, also die Aufstellungsreihenfolge, im Kommentar selbst als
+    // PLATZHALTER markiert. Chris' Punkt ("agile Spieler sollten nutzen koennen, dass sie
+    // schneller sind") faellt genau in diese Luecke: es waren nie die Schnellen, die
+    // mitsprinteten. Jetzt die zwei mit dem hoechsten LAUFTEMPO (speed/stamina/dexterity,
+    // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
+    const SPRINTER=FSTEAM.map(t=>[...t].sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -5075,6 +5279,18 @@
         // als seine freilaufenden Mitspieler, aber schneller als die zurueckweichende
         // Verteidigung (deren Bonus gleichzeitig von 1,25× auf 1,0× sinkt, s. unten).
         if(imFastbreak&&fastbreak.seite===u.side){ tempoMul=1.3; dribbelFaktor=0.85; }
+        // AUSBRUCH MIT BALL (Chris: "um den Dunk zu machen"). Der Ausbrecher hat den Pass
+        // bekommen — jetzt gilt fuer die Dauer seines Fensters KEINE Wunschdistanz: er
+        // zieht bis unter den Ring durch, wo klassifiziereWurfdistanz "dunk" liest und
+        // GEO_BONUS.dunk (unveraendert) den Abschluss traegt. Das ist bewusst dieselbe
+        // Bauform wie die Wunschdistanz darueber — ein anderes LAUFZIEL, keine neue
+        // Wahrscheinlichkeit. Steht NACH dem Fastbreak-Zweig, damit es ihn ueberschreibt,
+        // und gilt auch dann noch, wenn das 3s-Fastbreak-Fenster mit dem Ballwechsel
+        // schon geloescht wurde (ballUebernehmen) — sein eigenes Fenster laeuft weiter.
+        if(fsT<(u.ausbruchBis||0)){
+          zx=korbX; zy=H/2;
+          tempoMul=Math.max(tempoMul,AUSBRUCH_TEMPO_MUL); dribbelFaktor=0.85;
+        }
       } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
@@ -5129,7 +5345,18 @@
           u.slotSeit=0;
         }
         zx=bx; zy=by;
-        if(imFastbreak&&fastbreak.seite===u.side&&team.indexOf(u)<2)tempoMul=1.3; // PLATZHALTER: die ersten beiden sprinten mit
+        if(imFastbreak&&fastbreak.seite===u.side){
+          if(fastbreak.ausbrecher===u&&fsT<(u.ausbruchBis||0)){
+            // AUSBRUCH OHNE BALL: er laeuft nicht in seinen Slot, sondern DURCH — an den
+            // gegnerischen Korb, mit einer kleinen Y-Ablage, damit er nicht exakt auf dem
+            // Ring parkt und die Separation ihn dort wieder wegdrueckt. Genau das war der
+            // fehlende Teil ("schneller zum anderen Korb kommen"): das Fastbreak-Fenster
+            // gab bisher nur Tempo, aber niemandem ein anderes ZIEL — alle liefen ihre
+            // Halbfeld-Slots an, nur schneller.
+            zx=korbX; zy=H/2+(u.id%2?26:-26);
+            tempoMul=AUSBRUCH_TEMPO_MUL;
+          } else if(SPRINTER[u.side].indexOf(u)>=0)tempoMul=1.3; // die zwei Schnellsten sprinten mit, s. SPRINTER oben
+        }
       } else if(u.deckt){
         if(imFastbreak&&fastbreak.seite!==u.side){
           // FASTBREAK-VERTEIDIGUNG: erst zurueck zum eigenen Korb sprinten, Manndeckung
@@ -5191,10 +5418,44 @@
             // 33 -> 97px gemessen, bedraengte Entscheidungen -77 %). Ein kleiner Vorsprung
             // (1,15×, PLATZHALTER) gibt "Deckung halten" ueberhaupt eine Chance, ohne sie
             // unbeatbar zu machen.
-            tempoMul=1.15;
+            // AUS DEN AUGEN VERLIEREN (Chris: "schlechte Verteidiger koennten sie
+            // vielleicht aus den Augen verlieren"). Muster 1:1 vom Hilfe-Wurf darueber
+            // uebernommen: eine Gelegenheit je VERLIEREN_CD, eine Chance daran, ein
+            // Fenster als Ergebnis. Gewuerfelt wird NUR, wenn ueberhaupt ein
+            // Beweglichkeits-Abstand besteht (mismatchTempo>0, s. zuordneDeckung) — ein
+            // ebenbuertiges oder ueberlegenes Paar wuerfelt nicht und laeuft damit die
+            // rr()-Folge von vorher. Der Verlust ist eine reine BEWEGUNG: der Verteidiger
+            // laeuft weiter dorthin, wo sein Mann WAR, verliert dabei seinen
+            // Tempo-Vorsprung und steht danach zu weit weg — die geringere Kontest-
+            // Wirkung entsteht allein ueber diesen Abstand (dist(), gelesen von
+            // entscheideBallaktion), nicht ueber einen Eingriff in die Erfolgsformel.
+            if((u.mismatchTempo||0)>0&&fsT>=(u.sichtCd||0)){
+              u.sichtCd=fsT+VERLIEREN_CD;
+              if(rr()<Math.min(VERLIEREN_MAX,u.mismatchTempo*VERLIEREN_K)){
+                u.verlorenBis=fsT+VERLIEREN_FENSTER;
+                u.letzteSicht={x:u.deckt.x,y:u.deckt.y};
+              }
+            }
+            // MISMATCH, Tempo: der 1,15x-Deckungsvorsprung ist das, was "Deckung halten"
+            // ueberhaupt moeglich macht (s. Opus-Review-Fund #3 im Kommentar oben). Wer
+            // seinem Mann in Antritt und Ballbehandlung deutlich unterlegen ist, verliert
+            // genau diesen Vorsprung: die einmal gerissene Luecke bleibt offen, statt
+            // sich Tick fuer Tick wieder zu schliessen.
+            tempoMul=Math.max(MISMATCH_TEMPO_MIN,1.15-(u.mismatchTempo||0)*MISMATCH_TEMPO_ABZUG);
             const zumEigenenKorb=eigenerKorbX-u.deckt.x;
-            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
+            // MISMATCH, Wucht: "hat nicht die Power, um starke Angreifer zu verteidigen"
+            // — er weicht zurueck. `sag` (der Zug Richtung eigenen Korb) gab es schon;
+            // gegen einen koerperlich ueberlegenen Angreifer faellt er groesser aus, der
+            // Verteidiger steht also weiter vom Ball weg und bedraengt schwaecher.
+            const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3)   // PLATZHALTER, gedeckelt
+              *(1+(u.mismatchWucht||0)*MISMATCH_WUCHT_SAG);
             zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+            // Solange das Sichtverlust-Fenster laeuft: das alte Bild statt der aktuellen
+            // Position, und ohne jeden Tempo-Bonus. Steht NACH der Zielsetzung, damit es
+            // sie ueberschreibt, aber VOR der Screen-Bremse, die weiterhin gewinnt.
+            if(fsT<(u.verlorenBis||0)&&u.letzteSicht){
+              zx=u.letzteSicht.x; zy=u.letzteSicht.y; tempoMul=1;
+            }
             const screener=FSTEAM[u.deckt.side].find(s=>s.screent&&s.screent.fuer===u.deckt&&fsT<s.screent.bis);
             if(screener&&dist(screener,{x:(u.x+u.deckt.x)/2,y:(u.y+u.deckt.y)/2})<26)tempoMul=0.35; // PLATZHALTER
           }
@@ -6212,7 +6473,7 @@
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
 
   function bauBuehne(saat){
-    seed=saat||1337; buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     floats.length=0;
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
@@ -6512,8 +6773,27 @@
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
+  //
+  // GEMELDET (Chris, 25.08.): „die tooltips im end screen von Schaden Erlitten und IMP
+  // funktionieren nicht man soll sehen wie es sich zusammen setzt". Im Browser nachgestellt
+  // (Playwright, TDM bis zum Endscreen durchgespielt, echter Maus-Hover): die Zelle bekommt
+  // beim Hover korrekt Titel UND Aufschluesselung (tipOn/impZerlegung liefern nicht-leeren
+  // Text) — der Bug liegt nicht in den Daten, sondern in der Platzierung der Box selbst.
+  // `tipBox` haengte bisher an `document.body`, alle Regeln in battle-mode.css stehen aber
+  // unter `.oly-battle-arena .tipbox` (dieselbe Kapselung wie ueberall in dieser Datei, s.
+  // FARBWURZEL-Befund weiter unten). Ein body-Kind ist dort NIE ein Nachfahre — weder
+  // standalone (das Skript haengt hinter, nicht in, .oly-battle-arena) noch eingebettet
+  // (FoundationBattleArenaHost.tsx haengt das Skript als GESCHWISTER von .oly-battle-arena
+  // ein, nicht als Kind). Die Box blieb dadurch vollstaendig unstyled: position:static statt
+  // absolute, kein Hintergrund, keine Farbe — sie landete unsichtbar ganz unten im
+  // Seitenfluss, weit ausserhalb des Bildschirms, waehrend die gesetzten inline-Koordinaten
+  // (style.top/left) ohne position:absolute wirkungslos blieben. Nachgemessen: exakt dieselbe
+  // Ursache traf schon den Canvas-Farb-Bug (s. FARBWURZEL unten) — derselbe Fix hier: den
+  // naechsten `.oly-battle-arena`-Vorfahren suchen, `document.body` bleibt der Rueckfall,
+  // falls die Klasse einmal fehlt (dann verhaelt es sich wie bisher, nichts wird schlechter).
+  const TIPWURZEL=document.querySelector(".oly-battle-arena")||document.body;
   const tipBox=document.createElement("div");tipBox.className="tipbox";tipBox.hidden=true;
-  document.body.appendChild(tipBox);
+  TIPWURZEL.appendChild(tipBox);
   function tipOn(node,titel,text){
     const show=(ev)=>{
       tipBox.textContent="";
@@ -7352,8 +7632,56 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
-  const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+  // FARB-TOKENS DER LEINWAND (Chris, 30.08.: "Spielernamen auf dem Feld in Teamfarbe").
+  //
+  // BEFUND, nachgemessen statt vermutet. Der Aufruf las bisher `document.body` — die
+  // Design-Tokens (--home/--away/--ink/--ok/--crit/--pitch, 21 Aufrufstellen) stehen aber
+  // auf `.oly-battle-arena`, also einem NACHFAHREN von body. Custom Properties vererben
+  // nach UNTEN, nicht nach oben: getComputedStyle(document.body).getPropertyValue("--home")
+  // liefert deshalb den leeren String — im Browser nachgeprueft, sowohl standalone als
+  // auch eingebettet (dort setzt der Host seine --nl-*-Tokens ebenfalls auf den Container,
+  // nicht auf body).
+  //
+  // WARUM DAS NIEMANDEM AUFFIEL: `ctx.fillStyle=""` ist im Canvas kein Fehler, sondern
+  // ein STILLER NO-OP — die zuletzt gesetzte Farbe bleibt einfach stehen (im Browser
+  // verifiziert: fillStyle "#ff0000", dann "" -> weiterhin "#ff0000"). Jede dieser 21
+  // Stellen zeichnete also in der Farbe, die zufaellig davor an der Reihe war. Auf dem
+  // Feld hiess das konkret: die Namenslabels trugen die Farbe des zuletzt gezeichneten
+  // Objekts statt ihrer Teamfarbe — im Screenshot stand die GAST-Spielerin Cassandra in
+  // Heim-Bernstein neben dem Gast-Mitspieler Krag'Zul in Cyan. Genau das hat Chris
+  // gesehen. Der Rest (Team-Ring, Bewegungs-Schweif, Bodenfarben, Highlight-Farben) hing
+  // an derselben kaputten Quelle.
+  //
+  // FIX an der Wurzel statt an der einen Aufrufstelle: der Container der Leinwand ist der
+  // Knoten, auf dem die Tokens tatsaechlich stehen. `closest` findet ihn standalone wie
+  // eingebettet; der body-Rueckfall haelt den Aufruf am Leben, falls die Klasse einmal
+  // fehlt (dann verhaelt es sich exakt wie bisher, es wird also nichts schlechter).
+  const FARBWURZEL=cv.closest(".oly-battle-arena")||document.body;
+  const css=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  // SAAT-NORMALISIERUNG (Bug, gefunden beim Bau von Battle-Mode-PR6, 30./31.08.): alle vier
+  // `seed=saat||1337`-Stellen (bauFeldspiel/bauBuehne/build/bauSpurt) erwarten eine Zahl.
+  // Uebergibt man stattdessen einen Text-Seed -- genau das Format, das der Battle-Mode-Plan
+  // selbst fuer den Produktivbetrieb vorschlaegt, "${saveId}:${seasonId}:...:${matchdayId}" --
+  // landet der String unveraendert in `seed`, weil `saat||1337` einen truthy String einfach
+  // durchreicht. rr() rechnet dann `seed*1664525`: `Number(nicht-numerischer-String)` ist NaN,
+  // und `NaN>>>0` ist 0. JEDER Text-Seed kollabierte damit auf denselben Lauf ab Seed 0 --
+  // unbemerkt, weil die Determinismus-Abnahme in PR5 nur mit Zahlen-Seeds (424242, 99) lief.
+  // PR6 hat das nur am eigenen Aufrufer umgangen (eigener FNV-1a-Hash vor jedem Aufruf) --
+  // das hier ist der Fix an der Quelle, fuer JEDEN Aufrufer von bau(saat)/build(saat), nicht
+  // nur den einen. Verhalten fuer Zahlen/undefined/leeren String bleibt exakt wie vorher
+  // (`saat||1337`) -- Achtung, das gilt NICHT fuer numerische Strings ("424242"): die kamen
+  // vorher unveraendert durch `saat*1664525` (JS koerziert numerische Strings klaglos), laufen
+  // jetzt aber durch den Hash-Pfad und liefern damit einen ANDEREN Lauf als vor diesem Fix.
+  // Nur echte, nicht-leere Text-Seeds waren vom Kollaps-Bug betroffen und sind das Ziel hier.
+  function normalisiereSaat(saat){
+    if(typeof saat==="string"&&saat.length){
+      let h=2166136261;
+      for(let i=0;i<saat.length;i++){h^=saat.charCodeAt(i);h=Math.imul(h,16777619);}
+      return h>>>0;
+    }
+    return saat||1337;
+  }
 
   function homeFor(side,row,i,n){
     const cols=[side===0?MID-140:MID+140,side===0?MID-300:MID+300,side===0?MID-460:MID+460];
@@ -7473,10 +7801,14 @@
   const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
+    // ZIELANSAGE zurueck auf Anfang — VOR den Weichen nach unten, damit ein Wechsel der
+    // Disziplin (renderDbar ruft reset()) keine Ansage aus einem alten Kampf mitschleppt.
+    // Die beiden Zeilen sind fuer Feldspiel/Buehne/Bahn wirkungslos: dort fragt sie niemand.
+    KFOKUS=null; KFOKUS_CD=0;
     if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
-    seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     let id=0;
 
@@ -7781,6 +8113,85 @@
   const alleLebenden=()=>U.filter(u=>!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
+  // ===================================================================================
+  // ZIELANSAGE / FOKUSFEUER — der eine Eingriff, den der Zuschauer im Kampf hat.
+  //
+  // Vorbild ist das Fokus-Doppeln im Basketball (PR #685): EIN markierter Gegner, EIN
+  // Zustand, und die Wirkung ist ein BIAS, keine Sperre. Was hier anders ist als dort:
+  //
+  //  1. DER PREIS EXISTIERT SCHON. Wer sich aus der Schlagweite eines Gegners loest, um
+  //     dem Ruf zu folgen, kassiert den TRENNSCHLAG (halber Schaden, s. dort in der
+  //     Bewegung). Daran musste keine Zeile geaendert werden — die Regel ist rein
+  //     geometrisch und greift von selbst, sobald jemand wegen der Ansage umschwenkt.
+  //     Eine Ansage ins Leere ist damit teuer, eine Ansage auf den, der ohnehin vorn
+  //     steht, billig. Genau die Entscheidung, die sie interessant macht.
+  //  2. KEIN KONTINGENT, SONDERN EINE SPERRE JE ANSAGE (Football Manager, Touchline
+  //     Shouts: rund alle zehn Spielminuten einer). Auf 90 Minuten sind das ~11 % der
+  //     Spieldauer; ein Kampf hier dauert rund 60 Sekunden, also 7 Sekunden Sperre.
+  //     Aufheben ist frei — sonst waere die Sperre eine Falle statt einer Kosten.
+  //  3. DIE ANSAGE WIRKT NICHT SOFORT. Sie aendert nur, was bei der NAECHSTEN Zielwahl
+  //     herauskommt (u.reev, 0,35 s bis 2,75 s je nach Bindung). Wer gerade im Durchbruch
+  //     ist, hoert sie ueberhaupt nicht — das ist die Bindung, die in der Aufstellung
+  //     eingestellt wird, und sie behaelt hier ihr Gewicht: eine unbeirrte Mannschaft
+  //     laesst sich langsamer umlenken als eine opportunistische.
+  //
+  // Die gegnerische KI kann das laengst (s. schlachtplan: "Kopf abschlagen"/"Heiler
+  // zuerst"/"Lohnendste zuerst" setzen zielP fuer die ganze Seite). Bis hierher gab es
+  // dafuer auf UNSERER Seite kein Gegenstueck waehrend des Kampfes — nur die Aufstellung
+  // vorher. Das ist der Hebel, den die Ansage nachreicht.
+  //
+  // NEBENBEDINGUNG wie bei #685: ohne gesetzte Ansage (KFOKUS===null) faellt kfZielFuer
+  // sofort auf null zurueck, chooseTarget nimmt exakt denselben Weg wie vorher, und es
+  // wird kein einziger rr()-Wurf zusaetzlich oder weniger verbraucht. Der Kampf ist ohne
+  // Klick bit-identisch zum Stand davor.
+  let KFOKUS=null;      // u.id des angesagten GEGNERISCHEN Kaempfers, oder null
+  let KFOKUS_CD=0;      // Restsperre bis zur naechsten Ansage, in Kampfsekunden
+  const KF_CD=7;        // Sperre je Ansage (s.o.: FM-Verhaeltnis auf 60 s Kampf gerechnet)
+  // WIE WEIT DER RUF TRAEGT — der eine Regler, der ueber "Bias" oder "Sperre" entscheidet.
+  //
+  // NACHGEMESSEN, nicht geschaetzt (zielansageLauf, s.u.: fuer JEDEN der sechs bzw. vier
+  // Gegner ein Kampf mit und einer ohne Ansage, gezaehlt wird, wie viele Eigene im Mittel
+  // GLEICHZEITIG auf ihm standen — das ist buchstaeblich die Zahl der zusammenlaufenden
+  // Linien auf dem Schirm). Mittel ueber alle Angesagten, Saat 1337:
+  //
+  //             ohne Ansage   Ruf 340   Ruf 520   Ruf unbegrenzt   (von je 6 bzw. 4)
+  //   TDM          1,48         3,74      4,42        5,40
+  //   Mini-DM      1,68         2,08      2,55        3,18
+  //   Fechten      1,38         2,61      3,45        5,08
+  //   Battlefield  1,29         2,60      2,77        2,80
+  //
+  // Unbegrenzt ist zu viel: bei 5,4 von 6 laeuft die GANZE Mannschaft mit, und Befehle,
+  // Bindung und Persoenlichkeit sind waehrend der Ansage bedeutungslos — das waere eine
+  // Sperre, keine Gewichtung. 340 ist zu wenig, vor allem in Mini-DM (1,68 auf 2,08 sieht
+  // man nicht). 520 verdoppelt bis verdreifacht die Zahl der Angreifer und laesst
+  // gleichzeitig rund ein Drittel der Mannschaft bei ihrer Arbeit — genau die Mischung,
+  // die man sehen UND als Entscheidung erleben kann.
+  //
+  // Endstand mit 520 UND der Flanken-Ausnahme unten in chooseTarget (die eine kostet ein
+  // wenig von dem, was das andere bringt — das ist der Preis dafuer, dass eine gesetzte
+  // Flanke eine Flanke bleibt):
+  //   TDM 1,48 -> 4,23 · Mini-DM 1,68 -> 2,55 · Fechten 1,38 -> 2,70 · Battlefield 1,29 -> 2,77
+  const KF_RUF=520;
+  // Greifradius fuer den Klick auf die Leinwand — grosszuegiger als die Figur selbst
+  // (KOERPER_X=58 halbiert waere 29), weil im Getuemmel niemand pixelgenau trifft.
+  const KF_GREIF=46;
+  const istKampf=(d)=>!istFeldspiel(d)&&!istBuehne(d)&&!istBahn(d);
+  // Der angesagte Gegner als Objekt — oder null, wenn keiner gesetzt ist bzw. er gefallen
+  // ist. EINE Stelle, an der aus der id eine Einheit wird; alles andere fragt hier nach.
+  function kfZiel(){
+    if(KFOKUS==null)return null;
+    const z=U.find(x=>x.id===KFOKUS);
+    return z&&!z.down?z:null;
+  }
+  // Gilt die Ansage fuer DIESEN Kaempfer? Nur fuer unsere Seite (die Ansage ist unsere),
+  // nur auf einen echten Gegner, und nur soweit der Ruf traegt.
+  function kfZielFuer(u){
+    if(KFOKUS==null||u.side!==0)return null;
+    const z=kfZiel();
+    if(!z||z.side===u.side)return null;
+    return dist(u,z)<=KF_RUF?z:null;
+  }
+
   function chooseTarget(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
@@ -7792,6 +8203,33 @@
     // DURCHBRUCH: wer entschlossen ist, laesst sich nicht umlenken. Er nimmt die Schlaege
     // der Abfangenden in Kauf und geht zu dem, den er gemeint hat.
     if(u.durch&&u.tgt&&!u.tgt.down)return u.tgt;
+
+    // ZIELANSAGE. Sie steht bewusst HINTER Rueckzug und Durchbruch — den beiden Faellen,
+    // in denen ein Kaempfer per Regel ueberhaupt nicht mehr zuhoert — und VOR allem
+    // anderen: vor dem Offensivzwang, vor den Stellungsbefehlen, vor der uebersteuerten
+    // Zielprioritaet und vor der Persoenlichkeit. Genau das macht sie zu einem BEFEHL und
+    // nicht zu einer weiteren Neigung, die sich mit fuenf anderen um den Vortritt streitet.
+    //
+    // WAS SIE TROTZDEM NICHT AUSHEBELT (und deshalb hier auch nicht steht):
+    //  - Wer in Schlagweite GESTELLT ist, wird gleich nach diesem Aufruf wieder auf seinen
+    //    Abfaenger zurueckgesetzt, sofern seine Bindung opportunistisch genug ist
+    //    (s. u.bindAn im Tick). Ein Ruf reisst niemanden aus einem laufenden Nahkampf.
+    //  - Wer sich loest, zahlt den Trennschlag (halber Schaden, s. Bewegung).
+    //  - Die Bewegungs-Klammern bleiben: "Ruecken decken" kommt nicht ueber die Mittellinie,
+    //    "hinter den Eigenen" nicht an der vordersten Einheit vorbei. Der Gerufene wird
+    //    angesagt, die Formation bleibt.
+    // Keine Wuerfe, kein Zufall — dieselbe deterministische Auswahl wie ringsherum.
+    //
+    // EINE AUSNAHME: der Flankierer, der noch UNTERWEGS ist. Sein Befehl IST der Umweg,
+    // und unten in der Bewegung haengt daran mehr als eine Zielwahl — sobald er ein Ziel
+    // hat, laeuft er dorthin statt an den Rand, und die Formationsleine, die fuer "flanke"
+    // ausdruecklich aufgehoben ist, greift wieder. Ein Ruf wuerde aus einer Flanke also
+    // stillschweigend eine Mitte machen, und zwar fuer den Rest des Kampfes. Angekommen
+    // (Freigabe erteilt und tief genug im gegnerischen Feld) hoert er wieder zu.
+    const flankeNochUnterwegs=u.ord==="flanke"&&
+      !(freigabe[u.side]&&(u.side===0?u.x>MID+180:u.x<MID-180));
+    const angesagt=flankeNochUnterwegs?null:kfZielFuer(u);
+    if(angesagt)return angesagt;
 
     // OFFENSIVZWANG: Stellungsbefehle sind aufgehoben. Wer hier landet, hat entweder zu
     // lange ohne Ziel dagestanden oder das Feld ist so leer, dass Position nichts mehr
@@ -8290,6 +8728,17 @@
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
+    // ZIELANSAGE: die Sperre laeuft in KAMPFZEIT, nicht in Echtzeit — sonst haette das
+    // Tempo (1x/2x/4x) heimlich Einfluss darauf, wie oft man eingreifen darf.
+    if(KFOKUS_CD>0)KFOKUS_CD=Math.max(0,KFOKUS_CD-dt);
+    // Faellt der Angesagte, endet die Ansage von selbst. Sie bleibt NICHT als toter
+    // Verweis stehen — sonst zeigte die Zeile unter der Kaderleiste weiter auf eine
+    // Leiche, und der naechste Klick haette gegen ein unsichtbares Ziel zu kaempfen.
+    if(KFOKUS!=null&&!kfZiel()){
+      const gefallen=U.find(x=>x.id===KFOKUS);
+      KFOKUS=null;
+      if(gefallen)feed(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
+    }
     const sd=t>50?1+(t-50)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
@@ -9603,6 +10052,10 @@
   const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
+  // ausgewaehlt ist (u.id) — oder null. Reine Anzeigegroesse: die Simulation liest sie
+  // nirgends, ein Rennen ohne Eingriff laeuft damit Tick fuer Tick wie vorher.
+  let bahnWahl=null;
 
   // ===================================================================================
   // KAMERA. Chris: "man kann ja auch raus zoomen oder rein zoomen und dann die ganze
@@ -9645,8 +10098,8 @@
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
-    seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
-    cam={zoom:1,cx:0.5};
+    seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    cam={zoom:1,cx:0.5}; bahnWahl=null;
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
     // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
@@ -9772,6 +10225,64 @@
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
   }
 
+  // ===================================================================================
+  // RENNPLAN-ANSAGE — der Plan eines eigenen Laeufers, MITTEN IM RENNEN gewechselt.
+  //
+  // Das Gegenstueck zum Fokus-Doppeln im Basketball (#685): auf der Bahn gibt es keine
+  // Verteidigung zu verschieben, aber es gibt die eine Entscheidung, die ein Rennen
+  // ausmacht — WANN gehe ich? Bisher stand sie vor dem Start fest (planJeSlot) und lief
+  // dann elf Sekunden lang von allein ab. Zuschauen heisst dabei: sehen, dass der Plan
+  // nicht aufgeht, und nichts tun koennen.
+  //
+  // WARUM DAS FAST NICHTS KOSTET. Der Plan ist keine Zustandsmaschine, sondern reine
+  // Zahlen: `tempo`, `sucht`, `ab`. tempoVon() (oben) und der Kraftverbrauch in
+  // stepSpurt lesen sie JEDEN TICK neu. Ein Wechsel ist damit eine Zuweisung — kein
+  // Nachrechnen, keine Umschaltphase, kein zweiter Codepfad neben dem, den die
+  // KI-Aufstellung ohnehin nimmt.
+  //
+  // DER EINE STOLPERSTEIN IST `ab`. Das ist der ANGRIFFSPUNKT: eine Position im
+  // Rennverlauf (0..1), ab der der Laeufer alles gibt (`planT = pos>=ab ? 1.0 : tempo`).
+  // Er ist eine SCHWELLE, kein Ereignis — deshalb muss man beim Wechsel zwei Faelle
+  // trennen, sonst wirkt der neue Plan rueckwaerts in die schon gelaufene Strecke:
+  //
+  //   1. Er ist noch NICHT angegangen (pos < ab). Dann gilt der neue Angriffspunkt
+  //      unveraendert. Liegt er bereits hinter ihm, geht er JETZT los — das ist eine
+  //      Entscheidung in diesem Moment, keine rueckwirkende: nachgezahlt wird nichts,
+  //      weil `zehr` und `planT` je Tick aus den AKTUELLEN Werten entstehen. Genau das
+  //      ist die Ansage "Schlusssprint, sofort".
+  //   2. Er ist schon angegangen (pos >= ab). Dann darf ein Plan mit spaeterem
+  //      Angriffspunkt den Antritt NICHT zurueckdrehen — man kann einen Sprint nicht
+  //      ungeschehen machen. Der Angriffspunkt wird deshalb auf hoechstens die aktuelle
+  //      Position geklemmt: der Laeufer bleibt vorn, uebernimmt aber `tempo`/`sucht` des
+  //      neuen Plans fuer alles Weitere (im Sprint heisst das: er sucht wieder Sog und
+  //      spart darin ein Drittel Reserve).
+  //
+  // KEIN KONTINGENT, KEINE ABKLINGZEIT. Der Preis steht schon in der Fiktion und ist
+  // vollstaendig simuliert: ein falscher Plan verbrennt Reserve (`reserve`, s.
+  // KRAFT_VON) und auf Takeshis Bahn zusaetzlich Nerven. Wer dreimal umdisponiert,
+  // laeuft dreimal ueber seiner Schwelle und ist vor dem Ziel leer. Ein zweites
+  // Kostenmodell obendrauf wuerde dieselbe Sache doppelt berechnen.
+  //
+  // GILT FUER ALLE FUENF BAHNEN. Jede fuehrt in BAHN_ART ihre eigenen drei Plaene, und
+  // alle drei Felder werden vom gemeinsamen Motor gelesen — Spurt und Staffel nutzen
+  // zusaetzlich `sucht` (Windschatten), Zeitfahren/Wand/Takeshi fuehren es mit 0. Die
+  // Staffel ist der einzige Sonderfall, und er ist harmlos: dort laeuft je Mannschaft
+  // nur einer (`u.aktiv`), die Wartenden stehen in ihrer Wechselzone. Eine Ansage an
+  // einen Wartenden ist trotzdem sinnvoll — sie stellt seinen Abschnitt ein, bevor er
+  // den Stab bekommt.
+  const ANSAGE_NACHLEUCHTEN=1.4;   // Sekunden Rennzeit, die die Marke am Kopf nachleuchtet
+  function planWechsel(u,planId){
+    const p=(BA().plaene||{})[planId];
+    if(!p||u.plan===planId)return false;
+    const schonAngegangen=u.pos>=u.ab;
+    u.plan=planId;
+    u.tempo=p.tempo; u.sucht=p.sucht; u.label=p.label; u.text=p.text;
+    u.ab=schonAngegangen?Math.min(p.ab,u.pos):p.ab;
+    u.ansagen=(u.ansagen||0)+1;
+    u.ansageBei=rennT;               // nur fuer die Anzeige, s. zeichneSpurt
+    return true;
+  }
+
   function stepSpurt(dt){
     if(done)return;
     rennT+=dt;
@@ -9845,7 +10356,7 @@
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
         feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
@@ -9880,7 +10391,7 @@
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
@@ -9918,12 +10429,12 @@
           if(BA().nervenKosten && u.nerven<=0){
             u.raus=true; u.fertig=90+rennFertig.length*0.001;
             rennFertig.push(u);
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
           }
-          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
+          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
       }
@@ -9954,10 +10465,10 @@
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true,_laeufer:o.id});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
             feed(o.seite,o.n+" steckt den Rempler weg.");
           }
         }
@@ -9982,10 +10493,10 @@
               *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
           } else {
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
           }
         }
@@ -10012,6 +10523,10 @@
 
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
+  // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
+  // Violett: es darf mit keiner Farbe verwechselbar sein, die auf der Bahn schon etwas
+  // bedeutet — Team-Orange/Cyan (Namen), Gruen/Orange/Rot (Reserve), Blau (Sog).
+  const ANSAGE_FARBE="#b98cff";
   function zeichneSpurt(){
     zeichneBoden();
     for(const u of LAEUFER){
@@ -10046,17 +10561,76 @@
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
+      //
+      // ER LIEST u.plan JEDES BILD NEU — deshalb braucht die Rennplan-Ansage hier gar
+      // nichts Eigenes, um zu wirken: in dem Bild, in dem planWechsel() zugewiesen hat,
+      // steht der neue Name ueber dem Kopf. Was dazukommt, ist nur die Aufmerksamkeit:
+      // fuer ANSAGE_NACHLEUCHTEN Sekunden steht er fett und in der Ansage-Farbe, damit
+      // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
       if(u.fertig==null){
-        ctx.font="400 8px 'IBM Plex Mono',monospace";
+        const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
+        ctx.font=(frisch?"700 9px":"400 8px")+" 'IBM Plex Mono',monospace";
         const pl=((BA().plaene)[u.plan]||{}).label||"";
-        const zus=u.leer?" · leer":(u.imSchatten?" · Sog":"");
+        const zus=frisch?" ◂ neu":(u.leer?" · leer":(u.imSchatten?" · Sog":""));
         ctx.strokeText(pl+zus,x,y-40);
-        ctx.fillStyle=u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9");
+        ctx.fillStyle=frisch?ANSAGE_FARBE:(u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9"));
         ctx.fillText(pl+zus,x,y-40);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
+    }
+    // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
+    // Im Pulk (die Kamera zoomt bis 3,4x heran) malen die spaeter gezeichneten Sprites
+    // sonst ueber die Marke des frueher gezeichneten Laeufers, und ausgerechnet im
+    // dichten Feld — dort, wo man sie braucht — ist sie dann weg.
+    //
+    // Sie liegt am BODEN, nicht ueber dem Kopf: dort stehen schon Name (y-30) und Plan
+    // (y-40), und die Bahnen liegen nur rund 30 px auseinander. Zwei Ringe statt eines
+    // dicken — der aeussere hebt sich vor der hellen Bahn ab, der innere vor dem
+    // dunklen Schatten darunter. Dazu ein kurzer Strich nach unten, damit die Marke
+    // auch dann noch zu finden ist, wenn zwei Figuren uebereinanderstehen.
+    const gewaehlt=bahnWahl==null?null:LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null);
+    if(gewaehlt){
+      const gx=camX(gewaehlt.pos), gy=bahnY(gewaehlt.bahnZ);
+      ctx.save();
+      ctx.strokeStyle=ANSAGE_FARBE;ctx.lineWidth=2;
+      ctx.beginPath();ctx.ellipse(gx,gy+16,18,7.5,0,0,6.283);ctx.stroke();
+      ctx.globalAlpha=0.65;ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.ellipse(gx,gy+16,12,5,0,0,6.283);ctx.stroke();
+      ctx.globalAlpha=1;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(gx,gy+24);ctx.lineTo(gx,gy+30);ctx.stroke();
+      ctx.restore();
+    }
+    // SCHWEBETEXTE. Sie fehlten auf der Bahn komplett: stepSpurt ruft schwebe() an acht
+    // Stellen ("stolpert", "getackelt", "eingebrochen", "Stab weiter", "ausgeschieden"
+    // ...), gezeichnet wurden sie aber nur im Kampf (draw), im Feldspiel und auf der
+    // Buehne — draw() springt fuer die Bahn vorher mit `return` hier herein. Die
+    // Ereignisse standen damit nur im Ticker, nie am Laeufer.
+    //
+    // Verankert am LAEUFER (_laeufer), nicht an den festen Koordinaten aus dem Moment
+    // des Ereignisses: die Bahnkamera zoomt und schwenkt (kameraUpdate), ein fester
+    // Punkt waere schon nach einem halben Sekundenbruchteil neben der Figur. Dieselbe
+    // Loesung wie im Feldspiel (_spieler dort). Ohne Anker bleibt x/y als Rueckfall.
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.ansage?ANSAGE_FARBE:f.crit?css("--crit"):css("--ink");
+      ctx.font=(f.ansage?"800 17px":f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      // SIE STEHEN NEBEN DEM KOPF, NICHT DARUEBER. Ueber dem Kopf ist die Spalte voll
+      // (Name y-30, Plan y-40) — und zwoelf Laeufer liegen bei enger Kamera nur rund
+      // 30 px auseinander, ein hoch gesetzter Text landet also im Namen des Laeufers
+      // ZWEI BAHNEN WEITER OBEN. Seitlich ist Platz: die Bahn ist breit, und in einer
+      // Spur laeuft nur einer. Die Ansage rechts, alles Uebrige links — so ueberdeckt
+      // der Ruf nie das Ereignis, das ihn ausgeloest haben koennte.
+      ctx.textAlign=f.ansage?"left":"right";
+      let fx=f.x, fy=f.y;
+      if(f._laeufer!=null){
+        const u=LAEUFER.find(x=>x.id===f._laeufer);
+        if(u){ fx=camX(u.pos)+(f.ansage?20:-20);
+               fy=bahnY(u.bahnZ)-22-((1-f.life)*14); }
+      }
+      ctx.fillText(f.txt,fx,fy);
+      ctx.globalAlpha=1;
     }
   }
 
@@ -10131,21 +10705,52 @@
     if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
 
+    // ZIELLINIEN. Ein duenner Strich von jedem Kaempfer zu dem, den er gerade meint.
+    //
+    // BEFUND (Zielansage-Runde, 30.08.): diese Linien waren seit ihrer Einfuehrung
+    // praktisch unsichtbar, und zwar nicht selten, sondern NIE. Die Bedingung lautete
+    // `dist(u,tg)<=RANGE+6`, also 26 px — RANGE ist aber der Zuschlag AUF den Koerper,
+    // nicht die ganze Reichweite (s. reichweiten(): reach=KOERPER_X+RANGE=78). Gleichzeitig
+    // haelt die Entzerrung im Tick jedes Paar auf mindestens KOERPER_X=58 px in x ODER
+    // KOERPER_Y=70 px in y auseinander. Zwei Figuren koennen also gar nicht auf 26 px
+    // zusammenkommen — die Bedingung war unerfuellbar. Jetzt steht dort die Reichweite,
+    // die der Kaempfer wirklich hat: die Linie erscheint genau dann, wenn er sein Ziel
+    // auch erreichen kann (Fernkaempfer entsprechend weiter, was ihre Schussachse zeigt).
+    //
+    // DIE ANGESAGTE LINIE ist dieselbe Linie in der Fokusfarbe, kraeftiger, gestrichelt
+    // und wandernd — und sie wird OHNE Reichweiten-Bedingung gezogen, ueber das ganze
+    // Feld. Das ist der eigentliche Beleg fuers Fokusfeuer: man sieht die Striche
+    // zusammenlaufen, sobald mehrere Kaempfer die Ansage uebernommen haben, und zwar schon
+    // waehrend sie noch unterwegs sind, nicht erst wenn sie ankommen.
+    const kfZ=kfZiel();
     for(const u of U){
       if(u.down)continue;
       const tg=u.tgt;
-      if(tg&&!tg.down&&dist(u,tg)<=RANGE+6){
+      if(!tg||tg.down)continue;
+      if(kfZ&&tg===kfZ&&u.side===0){
+        ctx.save();
+        ctx.strokeStyle=FOKUS_FARBE;ctx.globalAlpha=.7;ctx.lineWidth=2.5;
+        ctx.setLineDash([9,6]);ctx.lineDashOffset=-(t*40)%15;
+        ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();
+        ctx.restore();
+      } else if(dist(u,tg)<=u.reach+6){
         ctx.strokeStyle=u.side===0?css("--home"):css("--away");
         ctx.globalAlpha=.28;ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();ctx.globalAlpha=1;
       }
     }
+    let kfMarke=null;
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
       let x=u.x,y=u.y;
       if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
         const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
       if(u.dodge>0){const k=Math.sin((1-u.dodge/0.26)*Math.PI)*15;x+=(u.dx||0)*k;y+=(u.dy||0)*k;}
+      // ZIELANSAGE: nur die Position merken, GEZEICHNET wird sie nach der Schleife.
+      // Genau der Fehler, der beim Fokus-Doppeln schon einmal gemacht wurde (s. dort):
+      // hier gezeichnet laege der Ring unter den spaeter gemalten Figuren und der Pfeil
+      // ueber dem Kopf verschwaende hinter dem naechsten Sprite.
+      if(kfZ&&u===kfZ)kfMarke={x,y};
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
@@ -10200,6 +10805,34 @@
         u.heiler?css("--ok"):"#a9b6c6",8.5);
       ctx.globalAlpha=1;
     }
+    // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
+    // Fokus-Doppeln (s. dort, gleiche Farbe FOKUS_FARBE, gleicher gestrichelter Ring r=27
+    // mit wanderndem Strichmuster, gleicher wippender Pfeil ueber dem Kopf) — zwei
+    // verschiedene Markierungen fuer dieselbe Geste waeren nur zwei Dinge zum Lernen.
+    // Unterschied ist allein die Uhr: hier laeuft `t` (Kampfzeit) statt fsT.
+    // Dazu, was es im Basketball nicht gibt und hier gebraucht wird: ein ZAEHLER, wie
+    // viele der Eigenen die Ansage gerade wirklich uebernommen haben. Er beantwortet die
+    // Frage, die man beim Zuschauen sofort stellt ("hoert ueberhaupt jemand?"), ohne die
+    // Linien einzeln nachzuzaehlen.
+    if(kfMarke){
+      const {x,y}=kfMarke;
+      ctx.save();
+      ctx.strokeStyle=FOKUS_FARBE;ctx.lineWidth=2.5;ctx.globalAlpha=0.95;
+      ctx.setLineDash([7,5]);ctx.lineDashOffset=-(t*22)%12;
+      ctx.beginPath();ctx.arc(x,y,27,0,6.3);ctx.stroke();
+      ctx.setLineDash([]);
+      const pf=y-46-Math.sin(t*4)*2.5; // leichtes Wippen, damit der Pfeil auffaellt
+      ctx.fillStyle=FOKUS_FARBE;
+      ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineWidth=2;ctx.lineJoin="round";
+      ctx.beginPath();ctx.moveTo(x,pf+11);ctx.lineTo(x-7,pf);ctx.lineTo(x+7,pf);ctx.closePath();
+      ctx.stroke();ctx.fill();
+      const folgen=U.filter(a=>!a.down&&a.side===0&&a.tgt===kfZ).length;
+      ctx.font="700 11px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
+      ctx.strokeText("▼ "+folgen,x,y-58);
+      ctx.fillStyle=FOKUS_FARBE;ctx.fillText("▼ "+folgen,x,y-58);
+      ctx.restore();
+    }
     // Pfeile
     for(const pf of pfeile){
       if(pf.verzug>0)continue;
@@ -10213,6 +10846,17 @@
     zeichneEffekte(1/60);
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
+      // `ansage` ist der Ruf im Moment der Zielansage — eigene Groesse und die Fokusfarbe,
+      // damit er sich von Schaden (--crit), Heilung (--ok) und Skill-Namen (--home)
+      // unterscheidet. Zusaetzlich mit dunklem Rand, weil er ueber einer Figur steht und
+      // nicht ueber leerem Boden.
+      if(f.ansage){
+        ctx.font="800 22px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+        ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(f.txt,f.x,f.y);
+        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+        continue;
+      }
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.font=(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
@@ -10850,6 +11494,279 @@
     if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
   }
 
+  // ===================================================================================
+  // RENNPLAN-ANSAGE — die Bedienseite.
+  //
+  // Die Wirkung selbst steht bei planWechsel() (dort auch, warum `ab` beim Wechsel
+  // geklemmt wird und warum es kein zusaetzliches Kontingent gibt); hier steht nur, WIE
+  // man einen Laeufer waehlt und ihm einen Plan ansagt.
+  //
+  // ZWEI WEGE, dieselben zwei wie beim Fokus-Doppeln und aus demselben Grund: auf der
+  // Bahn anklicken ist das Naheliegende, aber die Figuren laufen — und die Kamera zoomt
+  // dabei auch noch (kameraUpdate). Die Kaderleiste steht still und traegt dieselben
+  // Namen. Beide fuehren durch rennplanWaehlen(), es gibt also einen Zustand und eine
+  // Regel. Die eigentliche Ansage laeuft danach ueber die Knopfreihe: drei Plaene je
+  // Bahn, sie heissen ueberall anders (Von vorn/Windschatten/Schlusssprint im Sprint,
+  // Gleichmass/Negativ-Split/Attacke im Zeitfahren ...), also werden sie aus BAHN_ART
+  // gelesen statt fest verdrahtet.
+  //
+  // NUR DIE EIGENE SEITE. Einem gegnerischen Laeufer etwas anzusagen ergibt keinen Sinn
+  // — das ist die genaue Umkehrung des Fokus-Doppelns, das nur Gegner zulaesst.
+  const BAHN_GREIF_RADIUS=30;
+  function rennplanMoeglich(){ return istBahn(disc)&&LAEUFER.length>0; }
+  // `fertig==null` gehoert in die Abfrage, nicht nur in den Klick: wer waehrend der
+  // offenen Ansage ins Ziel laeuft oder ausscheidet, ist nicht mehr ansprechbar — die
+  // Zeile faellt dann von selbst auf ihren Hinweistext zurueck, statt Knoepfe zu zeigen,
+  // die nichts mehr tun.
+  function rennplanLaeufer(){
+    if(bahnWahl==null)return null;
+    return LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null)||null;
+  }
+  // Ein Klick auf denselben Laeufer schliesst die Ansage, ein Klick auf einen anderen
+  // wechselt sie — ein Zustand, kein Stapel. Wer im Ziel oder ausgeschieden ist
+  // (fertig!=null), ist nicht mehr ansprechbar.
+  function rennplanWaehlen(id){
+    if(!rennplanMoeglich())return;
+    const u=LAEUFER.find(x=>x.id===id&&x.seite===0&&x.fertig==null);
+    if(!u)return;
+    bahnWahl=(bahnWahl===id)?null:id;
+    renderKader();
+  }
+  function rennplanAnsagen(planId){
+    const u=rennplanLaeufer();
+    if(!u||u.seite!==0||u.fertig!=null)return false;
+    if(!planWechsel(u,planId))return false;
+    const p=BA().plaene[planId];
+    // DER RUF IM MOMENT DES WECHSELS — das Gegenstueck zu "STEAL!"/"BLOCK!" im
+    // Basketball. Er haengt am Laeufer (_laeufer), nicht in der Bildmitte: bei zwoelf
+    // Laeufern muss man sehen, WER umgestellt hat, nicht nur DASS jemand. Wo genau er
+    // neben dem Kopf landet, entscheidet zeichneSpurt (s. dort) — hier steht nur, an
+    // wen er gehoert.
+    schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-56,txt:p.label.toUpperCase()+"!",
+             life:1.35,ansage:true,_laeufer:u.id});
+    feed(0,u.n+" bekommt "+p.label.toUpperCase()+" angesagt — bei "
+      +Math.round(u.pos*100)+" % der Strecke.");
+    renderKader();
+    return true;
+  }
+  // Die Knopfreihe wird NICHT je Bild neu gebaut. renderKader laeuft waehrend des Rennens
+  // sechzigmal je Sekunde durch (s. der Kommentar beim Fokus-Klick oben) — ein Knopf, der
+  // zwischen mousedown und mouseup ersetzt wird, verschluckt seinen Klick. Deshalb: eine
+  // Signatur aus allem, was die Zeile zeigt; aendert sie sich nicht, bleibt das DOM stehen.
+  let rennplanSig="";
+  function renderRennplanZeile(){
+    const zeile=document.getElementById("rennplanzeile");
+    if(!zeile)return;
+    if(!rennplanMoeglich()){ zeile.hidden=true; rennplanSig=""; return; }
+    zeile.hidden=false;
+    const u=rennplanLaeufer();
+    const sig=bahnDisc+"|"+(u?u.id+"|"+u.plan:"-");
+    if(sig===rennplanSig)return;
+    rennplanSig=sig;
+    const txt=document.getElementById("rennplantext");
+    const knoepfe=document.getElementById("rennplanknoepfe");
+    const zu=document.getElementById("rennplanzu");
+    if(!txt||!knoepfe)return;
+    // Aus Textknoten zusammengesetzt statt per innerHTML: die Namen kommen aus dem
+    // Spielstand und duerfen nie als Markup ankommen (dieselbe Regel wie bei der
+    // Fokuszeile daneben).
+    txt.textContent=""; knoepfe.textContent="";
+    if(!u){
+      txt.appendChild(document.createTextNode(
+        "Rennplan-Ansage — eigenen Läufer auf der Bahn oder in der Kaderleiste anklicken."));
+      if(zu)zu.hidden=true;
+      return;
+    }
+    const P=BA().plaene||{};
+    txt.appendChild(el("i","amarke"));
+    txt.appendChild(el("b",null,u.n));
+    txt.appendChild(document.createTextNode(" läuft "));
+    txt.appendChild(el("b",null,(P[u.plan]||{}).label||"—"));
+    txt.appendChild(document.createTextNode(" — ansagen:"));
+    for(const id of Object.keys(P)){
+      const b=el("button","rpknopf"+(id===u.plan?" an":""),P[id].label);
+      b.type="button";
+      b.dataset.plan=id;
+      b.setAttribute("aria-pressed",id===u.plan?"true":"false");
+      b.title=P[id].text||"";
+      knoepfe.appendChild(b);
+    }
+    if(zu)zu.hidden=false;
+  }
+  function verdrahteRennplanAnsage(){
+    // 1) Kaderleiste, linke (eigene) Seite. mousedown statt click aus genau dem Grund,
+    //    der beim Fokus-Doppeln ausfuehrlich steht: die Kacheln werden je Bild neu gebaut.
+    const box=document.getElementById("kaderL");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-planid]"):null;
+      if(k){ ev.preventDefault(); rennplanWaehlen(Number(k.dataset.planid)); }
+    });
+    // 2) Direkt auf der Bahn. Zurueckskalieren wie beim Fokus-Klick; getroffen wird die
+    //    ZEICHENposition (camX/bahnY, inklusive des Versatzes fuer schon Eingelaufene),
+    //    denn das ist die Figur, die der Nutzer unter dem Zeiger sieht.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!rennplanMoeglich())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      let treffer=null,minD=BAHN_GREIF_RADIUS;
+      for(const u of LAEUFER){
+        if(u.seite!==0||u.fertig!=null)continue;
+        const d=Math.hypot(camX(u.pos)-mx,bahnY(u.bahnZ)-my);
+        if(d<minD){ minD=d; treffer=u; }
+      }
+      if(treffer)rennplanWaehlen(treffer.id);
+    });
+    // 3) Die Knopfreihe. Auch hier delegiert und auf mousedown — die Reihe selbst steht
+    //    zwar still (s. rennplanSig), aber der Container ist der stabile Anker.
+    const knoepfe=document.getElementById("rennplanknoepfe");
+    if(knoepfe)knoepfe.addEventListener("mousedown",ev=>{
+      const b=ev.target.closest?ev.target.closest(".rpknopf[data-plan]"):null;
+      if(b){ ev.preventDefault(); rennplanAnsagen(b.dataset.plan); }
+    });
+    const zu=document.getElementById("rennplanzu");
+    if(zu)zu.addEventListener("click",()=>{ bahnWahl=null; renderKader(); });
+  }
+
+  // ===================================================================================
+  // ZIELANSAGE — die Bedienseite (Kampf-Disziplinen: TDM, Mini-DM, Fechten, Battlefield).
+  //
+  // Bewusst dieselben zwei Auswahlwege wie beim Fokus-Doppeln: auf der Leinwand anklicken
+  // ist das, was man will, und die Kaderleiste ist der Weg, der auch dann trifft, wenn
+  // zehn Figuren durcheinanderlaufen. Beide fuehren durch EINE Funktion
+  // (ansageUmschalten), es gibt also einen Zustand und eine Regel.
+  //
+  // WARUM NICHT DIESELBEN FUNKTIONEN WIE #685, sondern eigene daneben: der Zustand ist ein
+  // anderer (KFOKUS/U statt fsLive/FSTEAM), das Kostenmodell ist ein anderes (Sperre je
+  // Ansage statt frei), und die Auswahlregel ist eine andere (der Ruf hat Reichweite).
+  // Eine gemeinsame Funktion muesste all das ueber Flags hereinreichen und waere fuer
+  // beide Seiten schwerer zu lesen als zwei kurze, ehrliche Fassungen. Was sich WIRKLICH
+  // teilen laesst, ist die Klick-Geometrie — die steht deshalb unten in leinwandTreffer()
+  // und wird von hier benutzt. Die Basketball-Fassung bleibt trotzdem unangetastet: sie
+  // ist frisch vermessen (s. #685), und ein Umbau haette diese Abnahme wieder aufgemacht.
+  const ansageMoeglich=()=>istKampf(disc)&&U.length>0;
+  // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
+  // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
+  // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
+  // (u.x/u.y), nicht die um Ausfallschritt/Ausweichen verschobene Zeichenposition — die
+  // Bodenposition ist die, die auch Schatten und Team-Ring markieren.
+  function leinwandTreffer(leinwand,ev,pool,radius){
+    const r=leinwand.getBoundingClientRect();
+    if(!r.width||!r.height)return null;
+    const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+    const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+    let treffer=null,minD=radius;
+    for(const g of pool){
+      const d=Math.hypot(g.x-mx,g.y-my);
+      if(d<minD){ minD=d; treffer=g; }
+    }
+    return treffer;
+  }
+  // Ein Klick auf den bereits Angesagten hebt die Ansage auf, ein Klick auf einen anderen
+  // ersetzt sie — ein Zustand, kein Stapel. AUFHEBEN IST FREI und loest keine Sperre aus:
+  // sonst waere die Sperre eine Falle ("einmal falsch geklickt, sieben Sekunden bestraft")
+  // statt der Kosten einer Entscheidung. Nur die Seite 1 (Gegner) ist waehlbar.
+  function ansageUmschalten(id){
+    if(!ansageMoeglich())return;
+    const z=U.find(x=>x.id===id&&x.side===1&&!x.down);
+    if(!z)return;
+    if(KFOKUS===id){
+      KFOKUS=null;
+      feed(0,"Zielansage aufgehoben.");
+      renderKader();
+      return;
+    }
+    if(KFOKUS_CD>0){
+      // Abgelehnt, aber nicht stumm: die Uhr in der Zeile zeigt die Restzeit ohnehin, hier
+      // kommt der Grund noch einmal AN DER STELLE, an die geklickt wurde. Nur waehrend der
+      // Kampf laeuft — steht er, verfallen Schwebetexte nicht und blieben stehen.
+      if(running)schwebe({x:z.x,y:z.y-58,txt:"noch "+Math.ceil(KFOKUS_CD)+" s",life:1.1,crit:true});
+      renderKader();
+      return;
+    }
+    KFOKUS=id; KFOKUS_CD=KF_CD;
+    // DER RUF. Derselbe Baustein wie "STEAL!"/"BLOCK!" im Basketball (schwebe), nur mit
+    // eigener Farbe und Groesse — der Moment des Markierens ist der einzige, in dem die
+    // Ansage ein Ereignis ist; danach ist sie ein Zustand (Ring, Linien, Zeile).
+    schwebe({x:z.x,y:z.y-58,txt:"FOKUSFEUER!",life:1.7,ansage:true});
+    feed(0,"Zielansage: alles auf "+z.n+"!",true);
+    renderKader();
+  }
+  // Die Zeile unter der Kaderleiste. Sagt in Worten, was Ring und Linien auf der Leinwand
+  // zeigen — und traegt die Sperruhr, weil der Preis der Ansage dort hingehoert, wo man
+  // die naechste ausloest.
+  // Die beiden Bedienelemente, die nur der Zielansage gehoeren, wieder wegraeumen. Wird
+  // auch aus dem Basketball-Zweig von renderKader gerufen (s. dort).
+  function ansageZeileVerstecken(){
+    const weg=document.getElementById("ansageweg"); if(weg)weg.hidden=true;
+    const uhr=document.getElementById("ansageuhr"); if(uhr)uhr.hidden=true;
+  }
+  function renderAnsageZeile(){
+    const zeile=document.getElementById("fokuszeile");
+    if(!zeile)return;
+    const wegBk=document.getElementById("fokusweg");
+    const weg=document.getElementById("ansageweg");
+    const uhr=document.getElementById("ansageuhr");
+    if(!ansageMoeglich()){
+      zeile.hidden=true;
+      ansageZeileVerstecken();
+      return;
+    }
+    zeile.hidden=false;
+    if(wegBk)wegBk.hidden=true; // gehoert dem Basketball-Fokus, hier nie sichtbar
+    const z=kfZiel();
+    const txt=document.getElementById("fokustext");
+    if(!txt)return;
+    // Aus Textknoten zusammengesetzt statt innerHTML: der Name kommt aus dem Spielstand
+    // und darf nie als Markup ankommen.
+    txt.textContent="";
+    if(z){
+      const folgen=U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length;
+      txt.appendChild(el("i","fmarke"));
+      txt.appendChild(document.createTextNode("Zielansage auf "));
+      txt.appendChild(el("b",null,z.n));
+      txt.appendChild(document.createTextNode(" — "+folgen+" von "+live(0).length+
+        " folgen dem Ruf. Wer sich dafür aus einem Nahkampf löst, kassiert den Trennschlag."));
+    } else {
+      txt.appendChild(document.createTextNode(KFOKUS_CD>0
+        ? "Keine Ansage. Die nächste ist in "+Math.ceil(KFOKUS_CD)+" s wieder möglich."
+        : "Keine Ansage. Gegner auf dem Feld oder in der Kaderleiste anklicken — die Eigenen nehmen ihn dann bevorzugt aufs Korn."));
+    }
+    if(weg)weg.hidden=!z;
+    if(uhr){
+      uhr.hidden=KFOKUS_CD<=0;
+      // --p ist der noch gesperrte Anteil in Prozent: der Ring schrumpft, waehrend die
+      // Sperre ablaeuft, und ist genau dann leer, wenn wieder angesagt werden darf.
+      uhr.style.setProperty("--p",String(Math.round(KFOKUS_CD/KF_CD*100)));
+      const zahl=document.getElementById("ansageuhrzahl");
+      if(zahl)zahl.textContent=String(Math.ceil(KFOKUS_CD));
+    }
+  }
+  function verdrahteZielansage(){
+    // 1) Kaderleiste, delegiert an den stabilen Container — und aus demselben Grund
+    //    mousedown statt click wie beim Fokus-Doppeln: renderKader baut die Kacheln je
+    //    Bild neu, ein click faende zwischen Druecken und Loslassen nur noch den Container.
+    const box=document.getElementById("kaderR");
+    if(box)box.addEventListener("mousedown",ev=>{
+      const k=ev.target.closest?ev.target.closest(".kk[data-ansageid]"):null;
+      if(k){ ev.preventDefault(); ansageUmschalten(Number(k.dataset.ansageid)); }
+    });
+    // 2) Direkt auf der Leinwand.
+    const leinwand=document.getElementById("cv");
+    if(leinwand)leinwand.addEventListener("click",ev=>{
+      if(!ansageMoeglich())return;
+      const treffer=leinwandTreffer(leinwand,ev,U.filter(u=>u.side===1&&!u.down),KF_GREIF);
+      if(treffer)ansageUmschalten(treffer.id);
+    });
+    const weg=document.getElementById("ansageweg");
+    if(weg)weg.addEventListener("click",()=>{
+      if(!ansageMoeglich()||KFOKUS==null)return;
+      KFOKUS=null; feed(0,"Zielansage aufgehoben."); renderKader();
+    });
+  }
+
   // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
   // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
   // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
@@ -10881,7 +11798,11 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
-      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
+          // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
+          // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
+          // Identitaet wie die Figur auf der Bahn.
+          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
@@ -10914,6 +11835,36 @@
           k.title=u.n+(gewaehlt?" — wird gedoppelt (klicken hebt den Fokus auf)"
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
+        // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
+        // spiegelverkehrt — hier ist die EIGENE Seite waehlbar, denn einem gegnerischen
+        // Laeufer sagt man nichts an. Wer im Ziel oder ausgeschieden ist, faellt raus.
+        // Eigene Klasse .rennplan-ansage statt .ansage: der Kampf (Zielansage) vergibt
+        // .ansage schon fuer seine eigene Markierung, und beide Zustaende teilen sich
+        // dieselbe .kk-Basis ueber alle Disziplinen hinweg.
+        if(rennplanMoeglich()&&seite===0&&u.id!=null&&u.fertig==null){
+          k.dataset.planid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=bahnWahl===u.id;
+          if(gewaehlt)k.classList.add("rennplan-ansage");
+          const plan=((BA().plaene||{})[u.plan]||{}).label||"—";
+          k.title=u.n+" — Rennplan "+plan+(gewaehlt?" (klicken schließt die Ansage)"
+                                                   :" · anklicken, um ihn zu wechseln");
+        }
+        // ZIELANSAGE, dieselbe Rolle fuer die Kampf-Disziplinen: die Kacheln stehen still,
+        // waehrend die Figuren laufen. `u` ist hier die Einheit selbst (der Kampf-Zweig
+        // oben reicht U durch, nicht eine Kopie), `u.id` also die echte Einheiten-Id.
+        // Getrenntes data-Attribut und getrennte Klassen, damit sich die beiden Mechaniken
+        // niemals gegenseitig auslesen koennen.
+        else if(ansageMoeglich()&&seite===1&&u.id!=null&&!u.down){
+          k.dataset.ansageid=String(u.id);
+          k.classList.add("waehlbar");
+          const gewaehlt=KFOKUS===u.id;
+          if(gewaehlt)k.classList.add("ansage");
+          else if(KFOKUS_CD>0)k.classList.add("gesperrt");
+          k.title=u.n+(gewaehlt?" — angesagt (klicken hebt die Ansage auf)"
+                      :KFOKUS_CD>0?" — Ansage gesperrt, noch "+Math.ceil(KFOKUS_CD)+" s"
+                      :" — anklicken: die Eigenen nehmen ihn bevorzugt aufs Korn");
+        }
         box.appendChild(k);
       }
     }
@@ -10929,7 +11880,19 @@
       : istFeldspiel(disc)
       ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
-    renderFokusZeile();
+    // EINE Zeile unter der Kaderleiste, zwei Mechaniken: Fokus-Doppeln im Basketball,
+    // Zielansage im Kampf. Sie schliessen sich gegenseitig aus (eine Disziplin ist immer
+    // nur das eine), deshalb schreibt hier immer genau eine der beiden Fassungen — und die
+    // andere raeumt vorher ihre eigenen Bedienelemente weg. Ohne das bliebe nach einem
+    // Wechsel von TDM zu Basketball der Knopf "Ansage aufheben" stehen: renderFokusZeile
+    // kennt ihn nicht und wuerde ihn nie ausblenden.
+    if(istKampf(disc))renderAnsageZeile();
+    else { ansageZeileVerstecken(); renderFokusZeile(); }
+    // Die Rennplan-Zeile ist eine EIGENE Zeile (#rennplanzeile), keine dritte Fassung der
+    // obigen — sie teilt sich kein DOM-Element mit Fokuszeile/Ansagezeile und braucht daher
+    // keine Absprache mit ihnen. renderRennplanZeile() blendet sich selbst aus, wenn die
+    // Disziplin keine Bahn ist (s. rennplanMoeglich), ein unbedingter Aufruf ist also sicher.
+    renderRennplanZeile();
   }
 
   // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
@@ -11020,6 +11983,8 @@
   });
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
+  verdrahteRennplanAnsage();
+  verdrahteZielansage();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
@@ -11121,6 +12086,67 @@
 
   const serie=(n,zwang)=>serieVon("tdm",n,zwang);
 
+  // ZIELANSAGE, ABNAHME. Dasselbe Muster wie spieleBasketball(saat,fokusName) beim
+  // Fokus-Doppeln: EIN Kampf headless durchgespielt, wahlweise mit einer vor dem ersten
+  // Tick gesetzten Ansage — dieselbe eine Zustandsvariable, die auch der Klick setzt, nur
+  // ohne Bedienung. Ohne `ansageName` bleibt KFOKUS null, und der Durchlauf ist Tick fuer
+  // Tick der von vorher; genau das ist die Determinismus-Kontrolle.
+  //
+  // Gemessen wird in ZIELFRAMES: fuer jeden Tick und jeden lebenden eigenen Kaempfer, auf
+  // wen er in diesem Moment zielt. Das ist die Groesse, die auch das Auge sieht (eine
+  // Ziellinie je Kaempfer je Bild) — nicht Schaden, der noch von Wuerfen und Ruestung
+  // abhaengt. Dazu je Gegner, wie viele Eigene GLEICHZEITIG auf ihm standen (Mittel und
+  // Hoechstwert): das ist buchstaeblich die Zahl der zusammenlaufenden Linien und damit
+  // das Abnahmekriterium fuer "man sieht das Fokusfeuer". Und eine Signatur des ganzen
+  // Verlaufs, damit sich Bit-Gleichheit ohne Ansage nachweisen laesst statt behaupten.
+  function zielansageLauf(saat,ansageName,d){
+    const alt={disc,U,pfeile,t,done,seed,freigabe};
+    if(d)disc=d;
+    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    build(saat||1337);
+    if(ansageName){
+      const z=U.find(x=>x.side===1&&x.n===ansageName);
+      if(z){ KFOKUS=z.id; KFOKUS_CD=KF_CD; }
+    }
+    const zielFrames=new Map();      // Name -> Summe der Zielframes
+    const gleichzeitig=new Map();    // Name -> {summe, lebtFrames, max}
+    let frames=0, g=0;
+    // Eine billige, aber scharfe Signatur des Verlaufs: gerundete Positionen und Leben
+    // aller Kaempfer, alle 30 Ticks. Zwei Laeufe mit derselben Signatur sind derselbe Kampf.
+    const signatur=[];
+    while(!done&&g<120){
+      stepSimStumm(1/60); g+=1/60; frames++;
+      const jetzt=new Map();
+      for(const u of U){
+        if(u.down||u.side!==0||!u.tgt)continue;
+        zielFrames.set(u.tgt.n,(zielFrames.get(u.tgt.n)||0)+1);
+        jetzt.set(u.tgt.n,(jetzt.get(u.tgt.n)||0)+1);
+      }
+      for(const f of U){
+        if(f.side!==1||f.down)continue;
+        const a=gleichzeitig.get(f.n)||(gleichzeitig.set(f.n,{summe:0,lebtFrames:0,max:0}),gleichzeitig.get(f.n));
+        const n=jetzt.get(f.n)||0;
+        a.summe+=n; a.lebtFrames++; if(n>a.max)a.max=n;
+      }
+      if(frames%30===0)signatur.push(U.map(u=>
+        Math.round(u.x)+","+Math.round(u.y)+","+Math.round(u.hp)).join("|"));
+    }
+    const gezielt=[...zielFrames.entries()].sort((a,b)=>b[1]-a[1]);
+    const gesamt=gezielt.reduce((a,[,v])=>a+v,0)||1;
+    const erg={saat:saat||1337, disziplin:disc, ansage:ansageName||null,
+      dauer:+t.toFixed(2), frames,
+      lebendLinks:live(0).length, lebendRechts:live(1).length,
+      zielAnteil:Object.fromEntries(gezielt.map(([n,v])=>[n,Math.round(v/gesamt*100)])),
+      zielFrames:Object.fromEntries(gezielt),
+      // Angreifer je Gegner, solange er lebte: Mittel und Hoechstwert.
+      angreifer:Object.fromEntries([...gleichzeitig.entries()].map(([n,a])=>
+        [n,{mittel:+(a.summe/Math.max(1,a.lebtFrames)).toFixed(2),max:a.max}])),
+      signatur:signatur.join(";")};
+    disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    return erg;
+  }
+
   // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
   // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
   // wie lange er im Windschatten hing, wie oft er einbrach, stolperte und tackelte.
@@ -11146,9 +12172,67 @@
   // Beim Rennen ist das die negative Platzierung, im Kampf die Leistung. Was "besser"
   // heisst, ist die einzige Entscheidung, die je Disziplin faellt.
   const MOTOREN={};
-  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Was
-  // „besser" heisst, ist im Kampf die LEISTUNG: der Beitrag, gemessen an dem, was der
-  // Einsatzwert erwarten laesst. Eine Platzierung gibt es hier nicht.
+  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Eine
+  // Platzierung gibt es hier nicht; „besser" ist der ANTEIL AM GESAMTBEITRAG der Partie.
+  //
+  // ===================================================================================
+  // WARUM HIER NICHT MEHR leistungVon() STEHT — der Grund, warum die Kampf-Disziplinen
+  // ueber Monate zwischen 90 und 160 Pp festhingen, egal welches Rezept man schrieb.
+  //
+  // Bis hierher lieferte wert() die LEISTUNG: `beitrag / erwartet` mit
+  // `erwartet = eigenerEinsatzwert / Summe aller Einsatzwerte * Gesamtbeitrag`. Der
+  // Nenner ist also die EIGNUNG — und die Eignung ist nichts anderes als Attribut mal
+  // Matrixgewicht, aufsummiert (calculateRawDisciplineScore). Gleichzeitig sorgt
+  // aufEignung() dafuer, dass LP, ANG und VER GENAU PROPORTIONAL zur Eignung wachsen:
+  // „die Rezepte geben die FORM, die Eignung gibt die MENGE".
+  //
+  // Beides zusammen ist ein Kurzschluss. Die Messung hebt ein Attribut, die Eignung
+  // steigt um `plus x Gewicht / 100` (eigHebung), die Kampfkraft steigt proportional
+  // mit — und der Nenner steigt im selben Zug. Der Quotient bleibt stehen. Was die
+  // Messung dann noch sieht, ist nur der REST zweiter Ordnung: waechst der Beitrag ein
+  // bisschen schneller oder langsamer als linear. Dieser Rest hat kein Vorzeichen, das
+  // die Matrix kennt, und er ist klein gegen das Rauschen. Genau deshalb las jede
+  // Kampfmessung dasselbe Muster: ein, zwei Attribute mit zufaellig positivem Rest
+  // greifen ueber die Positiv-Normierung in einflussVon() den ganzen Anteil ab, alle
+  // anderen klemmen auf 0 % — und zwar bevorzugt die mit HOHEM Matrixgewicht, weil bei
+  // denen der Nenner am staerksten mitwaechst.
+  //
+  // Das erklaert rueckwirkend alle drei Ratlosigkeiten aus BATTLE_ARENA_UEBERGABE.md:
+  // dass „welches Attribut dominiert, dreimal umgesprungen" ist (es war jedesmal
+  // Rauschen), dass die TMP/AUS-Kappung die Zahl senkte, ohne den Kampf zu verbessern
+  // (sie entfernte den letzten Rest Signal, uebrig blieb reines Rauschen), und dass
+  // Mini-DM einmal 13,8 Pp las (ein Treffer der Streuung, kein Beweis).
+  //
+  // GEMESSEN, nicht argumentiert — Battlefield, n = 8, dieselbe Mechanik, dieselben
+  // Rezepte, nur ein anderes wert():
+  //
+  //   leistungVon (Beitrag / Eignungserwartung)   158,9 Pp
+  //   beitragVon  (absoluter Beitrag)              16,3 Pp
+  //   Anteil am Gesamtbeitrag                      12,0 Pp
+  //
+  // Der Anteil gewinnt gegen den absoluten Beitrag, weil er die Laenge der Partie
+  // herauskuerzt: wer staerker wird, beendet den Kampf frueher und teilt sich dann
+  // WENIGER Gesamtschaden — beim absoluten Beitrag zieht dieser Nebeneffekt gegen das
+  // Signal, beim Anteil nicht. Es ist dieselbe Wahl, die die Staffel schon einmal
+  // getroffen hat (Teamzeit statt Platzierung, s. unten): Was „besser" heisst, ist die
+  // einzige Entscheidung, die je Disziplin faellt — und im Kampf heisst es „wie viel
+  // von dem, was auf dem Platz passiert ist, geht auf sein Konto".
+  //
+  // leistungVon() bleibt unveraendert und bleibt die ANZEIGE im Endstand („liefert er,
+  // was sein Einsatzwert verspricht" — 100 % heisst wie erwartet). Als Anzeige ist die
+  // Normierung richtig; als Massstab dafuer, ob die Matrix eingeloest wird, ist sie es
+  // nicht, weil sie genau den Kanal herauskuerzt, den die Matrix beschreibt. Am Kampf
+  // selbst aendert diese Zeile NICHTS: `MOTOREN[d].wert()` wird im ganzen Entwurf nur an
+  // einer einzigen Stelle gelesen, naemlich in einflussVon(). Weder stepSim() noch
+  // renderWertung() noch serieVon() haengen daran — die zeigen weiter leistungVon().
+  //
+  // ENDSTAND DIESER RUNDE, bei n=12 nachgemessen (Chris' Auftrag: TDM/Battlefield/Fechten
+  // moeglichst unter 15 Pp):
+  //
+  //   Battlefield   12,0 Pp   — Rezept unangetastet, allein der Massstab hat es gebracht.
+  //   Fechten       11,0 Pp   — Massstab + kleine Ausdauer-Korrektur (s. dort).
+  //   TDM           54,2 Pp   — Massstab allein reicht nicht; Rezeptumbau half nicht (s.
+  //                             ARENA_ART.tdm oben). Bleibt offen fuer eine naechste Runde.
   for(const ad of Object.keys(ARENA_ART)){
     MOTOREN[ad]={
       sichern:()=>({disc,U,pfeile,t,done,seed,freigabe}),
@@ -11157,7 +12241,8 @@
       bau:(saat)=>{disc=ad; build(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
       namen:()=>U.map(u=>u.n),
-      wert:()=>{const feld=[...U],o={}; for(const u of feld)o[u.n]=leistungVon(u,feld)||0; return o;}
+      wert:()=>{const g=U.reduce((a,x)=>a+beitragVon(x),0)||1,o={};
+        for(const u of U)o[u.n]=beitragVon(u)/g*100; return o;}
     };
   }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
@@ -11168,7 +12253,13 @@
     MOTOREN[bd]={
       sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
-                    rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;},
+                    rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
+                    // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
+                    // Rennen: ihre _laeufer-Verweise zeigen auf die Laeufer des Durchgangs,
+                    // den es nicht mehr gibt — die ids gibt es im echten Rennen aber auch,
+                    // also klebten sie sonst am falschen Mann. Vorher fiel das nicht auf,
+                    // weil zeichneSpurt Schwebetexte gar nicht gezeichnet hat.
+                    floats.length=0;},
       vorher:()=>{disc=bd; bahnDisc=bd;},
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
@@ -11393,6 +12484,12 @@
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    zielansageLauf,
+    // Zielansage, read-only: WER gerade angesagt ist und wie lange noch gesperrt ist
+    // (Name statt roher id, damit sich ein Klick in der UI von aussen abnehmen laesst).
+    kampfAnsage:()=>{ const z=kfZiel();
+      return {ziel:z?{id:z.id,n:z.n,seite:z.side}:null, sperre:+KFOKUS_CD.toFixed(2),
+        folgen:z?U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length:0}; },
     namenVon:(dId)=>{const M=MOTOREN[dId]; if(!M)return []; const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337); const namen=M.namen(); M.zurueck(g); return namen;},
     // AUFGABE-1-ABNAHME: reine Diagnose (kein Gameplay-Zugriff) — die Sub-Skill-Werte
     // (u.AUFBAU/SCHUSS_NAH/SCHUSS_FERN/...) einer frisch gebauten Feldspiel-Aufstellung,
@@ -11410,6 +12507,37 @@
       });
       M.zurueck(g);
       return out;
+    },
+    // BATTLE-MODE PR5 — „EIN SPIEL, EIN ERGEBNIS" (Plan, Abschnitt 3.3a). Bisher gab es fuer
+    // Feldspiel-Disziplinen keinen sauberen einzelnen Aufruf, der einmal simuliert und ein
+    // Endergebnis zurueckgibt — nur Diagnose-Werkzeuge (diagPositionen, feldspielSubskills)
+    // und die Serien-Messung (boxscoreSerie). Additiv, gleiches Sichern/Zurueck-Muster wie
+    // namenVon()/feldspielSubskills() direkt darueber: MOTOREN[fd] snapshotten, mit dem
+    // uebergebenen Seed neu aufbauen, still simulieren (M.lauf() = MOTORENs eigenes stilles
+    // stepFeldspiel()-Budget, kein Rendering), Boxscore lesen, Zustand zurueckspielen.
+    //
+    // PUNKTESTAND JE SEITE: der Boxscore-Wert (M.wert(), „Punkte zaehlen voll, Rebounds/
+    // Steals/Blocks etwas weniger, Ballverlust zieht ab") ist eine abgeleitete Kennzahl je
+    // SPIELER, kein Punktestand je TEAM-SEITE. Den Punktestand traegt bereits eine eigene,
+    // bisher nicht nach aussen gegebene Variable: `fsPunkte` (oben deklariert, Z. ~3426;
+    // stepFeldspiel() zaehlt dort bei jedem Korb fuer die jeweilige `side` mit, s. z.B.
+    // `fsPunkte[amBall]+=pkt` / `fsPunkte[schuetze.side]+=1`). Sie wird von M.sichern()/
+    // M.zurueck() schon mitgefuehrt (Snapshot-Sicherheit gegen Verschmutzung), aber von
+    // keinem MOTOREN[fd].wert() bisher gelesen. Hier wird sie nur GELESEN und in ein neues
+    // Feld `seiten` kopiert — dieselbe Zaehlung, kein Eingriff in stepFeldspiel()/die
+    // Trefferchancen-Zonen selbst.
+    spieleFeldspiel:(fd,saat)=>{
+      if(typeof FELDSPIEL_ART==="undefined"||!FELDSPIEL_ART[fd])return null;
+      const M=MOTOREN[fd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const seiten=[fsPunkte[0],fsPunkte[1]];
+      M.zurueck(g);
+      return {disziplin:fd, seiten, boxscore};
     },
     renderProbe:(name,ani,feldspiel,dir,lunge)=>{
       const c=document.createElement("canvas"); c.width=64; c.height=64;
@@ -11496,6 +12624,73 @@
         anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
       return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
     },
+    // ABNAHME DER BEWEGUNGS-DYNAMIK (30.08., Chris' Frage sinngemaess: "kommt der
+    // Schnelle jetzt WIRKLICH frueher an, oder sieht es nur so aus?"). Spielt N Spiele
+    // headless durch (Muster von diagAbstaende/spieleBasketball daneben, read-only) und
+    // zaehlt genau die drei Dinge, an denen die neue Mechanik haengt:
+    //   * ausbrueche  — wie oft ueberhaupt ein Ausbruch gestartet wurde, und wie oft der
+    //                   Ausbrecher den Ball dann auch bekam,
+    //   * vorstoss    — der X-Vorsprung des Ausbrechers vor dem Ballfuehrer waehrend
+    //                   seines Fensters (in Feldbreiten-Prozent), also das, was Chris
+    //                   sieht: laeuft da wirklich einer vorweg?
+    //   * deckung     — mittlerer Deckerabstand, getrennt nach Mismatch-Staerke, plus
+    //                   der Anteil der Ticks, in denen ein Verteidiger seinen Mann
+    //                   gerade aus den Augen verloren hat.
+    diagDynamik:(saaten,bis)=>{
+      const n=saaten||8, dauer=bis||90;
+      let ausbrueche=0, mitBall=0, spiele=0;
+      let vorsprungSumme=0, vorsprungTicks=0;
+      const deck={schwach:{s:0,n:0},stark:{s:0,n:0}};
+      let verlorenTicks=0, deckTicks=0, verlorenEreignisse=0, mismatchSumme=0;
+      // Merkt je Spieler den zuletzt gesehenen Wert von verlorenBis — steigt er, ist das
+      // ein NEUER Sichtverlust (und nicht derselbe, der noch laeuft).
+      const zuletztVerloren=new Map();
+      for(let i=0;i<n;i++){
+        feldspielDisc="basketball"; bauFeldspiel(1337+i*7919); spiele++;
+        // EIN Ausbruch = ein Fenster, erkannt an `ausbruchBis` (nicht an der Person: der
+        // schnellste Spieler bricht ueber ein Spiel hinweg mehrfach aus, und `fastbreak`
+        // selbst wird bei jedem Ballwechsel geloescht).
+        let laeuft=null, laeuftBis=0, hatteBall=false, guard=0;
+        while(!done&&fsT<dauer&&guard<40000){
+          stepFeldspiel(1/60); guard++;
+          if(!fsLive)continue;
+          const a=fsLive.fastbreak?fsLive.fastbreak.ausbrecher:null;
+          if(a&&(a!==laeuft||a.ausbruchBis!==laeuftBis)){
+            ausbrueche++; laeuft=a; laeuftBis=a.ausbruchBis; hatteBall=false;
+          }
+          if(laeuft&&fsT<laeuftBis){
+            if(laeuft.hatBall&&!hatteBall){ mitBall++; hatteBall=true; }
+            const t=fsLive.ball.traeger;
+            if(t&&t!==laeuft){
+              // Vorsprung Richtung ANGRIFFSKORB, auf die Feldbreite normiert.
+              const richtung=laeuft.side===0?1:-1;
+              vorsprungSumme+=(laeuft.x-t.x)*richtung/W*100; vorsprungTicks++;
+            }
+          }
+          // Gezaehlt wird NUR, wer gerade wirklich verteidigt (sein Team hat den Ball
+          // nicht) — `deckt` traegt jeder der zwoelf Spieler dauerhaft, auch im eigenen
+          // Angriff, und ein Nenner ueber alle zwoelf halbierte jede Quote hier optisch.
+          for(const team of FSTEAM)for(const u of team){
+            if(!u.deckt||u.side===fsLive.amBall)continue;
+            deckTicks++;
+            mismatchSumme+=(u.mismatchTempo||0);
+            if(fsT<(u.verlorenBis||0))verlorenTicks++;
+            if((u.verlorenBis||0)>zuletztVerloren.get(u)){ verlorenEreignisse++; }
+            zuletztVerloren.set(u,u.verlorenBis||0);
+            const eimer=(u.mismatchTempo||0)>0.25?deck.schwach:deck.stark;
+            eimer.s+=dist(u,u.deckt); eimer.n++;
+          }
+        }
+      }
+      const mit=(z)=>z.n?+(z.s/z.n).toFixed(1):null;
+      return {spiele, ausbrueche, ausbruecheJeSpiel:+(ausbrueche/spiele).toFixed(2),
+        ausbrecherMitBall:mitBall,
+        vorsprungProzentFeld:vorsprungTicks?+(vorsprungSumme/vorsprungTicks).toFixed(1):null,
+        mismatchMittel:deckTicks?+(mismatchSumme/deckTicks).toFixed(2):0,
+        deckerAbstandMismatch:mit(deck.schwach), deckerAbstandEbenbuertig:mit(deck.stark),
+        mannVerlorenJeSpiel:+(verlorenEreignisse/spiele).toFixed(1),
+        anteilMannVerloren:deckTicks?+(verlorenTicks/deckTicks*100).toFixed(1):0};
+    },
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
     // zieht, nicht nur die nackte Punktwolke — s. SEITEN-BALANCE-FIX-Kommentar bei SLOTS oben.
@@ -11538,6 +12733,54 @@
       while(!done&&fsT<SPIELDAUER_BASKETBALL+5&&guard<20000){ stepFeldspiel(1/60); guard++; }
       return fsZuege;
     },
+    // ABNAHME DER RENNPLAN-ANSAGE. Spielt EIN Rennen einer beliebigen Bahn headless
+    // durch (feste 1/60-Ticks, kein Rendering — dasselbe Muster wie spieleBasketball
+    // darueber) und kann dabei Ansagen ausloesen: `ansagen` ist eine Liste
+    // {n, plan, bei}, also "wenn <n> die Streckenmarke <bei> (0..1) erreicht hat, sag
+    // ihm <plan> an". Ohne die Liste ist der Durchlauf zeichenweise der von vorher —
+    // genau das ist die Determinismus-Kontrolle: zweimal derselbe Aufruf, einmal mit und
+    // einmal ohne Liste, und ohne Liste muessen alle Zeiten identisch sein.
+    //
+    // Geht durch planWechsel(), also durch DIESELBE Funktion, die auch der Klick in der
+    // UI aufruft — es gibt keine zweite Wechsel-Logik fuer die Messung.
+    bahnLauf:(d,saat,ansagen)=>{
+      const bd=d||"spurt";
+      if(!BAHN_ART[bd])throw new Error("bahnLauf: \""+bd+"\" ist keine Bahn-Disziplin");
+      const M=MOTOREN[bd];
+      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+      const offen=(ansagen||[]).map(a=>({n:a.n,plan:a.plan,bei:a.bei||0,getan:false}));
+      let guard=0;
+      // stumm: die Messung soll den Ticker nicht vollschreiben und keine Schwebetexte
+      // hinterlassen — dieselbe Klammer wie stepSimStumm im Kampf.
+      stumm=true;
+      try{
+        while(!done&&rennT<90&&guard<20000){
+          for(const a of offen){
+            if(a.getan)continue;
+            const u=LAEUFER.find(x=>x.n===a.n&&x.seite===0&&x.fertig==null);
+            if(u&&u.pos>=a.bei)a.getan=planWechsel(u,a.plan);
+          }
+          stepSpurt(1/60); guard++;
+        }
+      } finally { stumm=false; }
+      const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
+        laeufer:[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99)).map((u,pl)=>({
+          platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
+          ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
+          zeit:u.fertig==null?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+          bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
+          reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+          sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
+          ansagen:u.ansagen||0}))};
+      M.zurueck(gesichert);
+      return erg;
+    },
+    // Read-only wie fsFokus daneben: wer gerade fuer eine Ansage ausgewaehlt ist und
+    // welchen Plan die eigenen Laeufer fahren — damit sich ein Klick in der UI von
+    // aussen (Playwright) abnehmen laesst, ohne in die Leinwand hineinzumessen.
+    bahnWahl:()=>{ const u=LAEUFER.find(x=>x.id===bahnWahl); return u?{id:u.id,n:u.n,plan:u.plan}:null; },
+    bahnPlaene:()=>LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,plan:u.plan,
+      ab:+u.ab.toFixed(4),pos:+u.pos.toFixed(4),ansagen:u.ansagen||0})),
     setDisc:(d)=>{ disc=d; reset(); },
     debugZiele:(an)=>{ FS_DEBUG_ZIELE=!!an; },
     // Nur fuer die Wurfmechanik-Abnahme (Fable, 25.08.): rohes Ereignisprotokoll der

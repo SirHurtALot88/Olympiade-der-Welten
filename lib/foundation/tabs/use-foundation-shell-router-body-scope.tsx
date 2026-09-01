@@ -237,6 +237,7 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
 import type {
+  GameMode,
   SeasonSnapshotRecord,
   SponsorNegotiationProfile,
   SponsorLeihgabeRecord,
@@ -1057,7 +1058,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -6330,6 +6331,21 @@ export function useFoundationShellRouterBodyScope({
     setNewGameSuccess(null);
   }
 
+  /**
+   * Moduswahl im Anlege-Assistenten (docs/design/battle-mode-spielmodus-plan.md, 3.1).
+   *
+   * Verwirft wie `applyNewGamePreset()` die vorhandene Vorschau: der Modus entscheidet, ob der
+   * neue Save mit Liga-Split (`leagueByTeamId`) angelegt wird, also beschreibt eine vor dem
+   * Wechsel geprüfte Vorschau danach ein anderes Spiel. Der `confirmToken` aus dieser Vorschau
+   * darf nicht in ein Anlegen mit dem neuen Modus durchrutschen.
+   */
+  function selectNewGameMode(mode: GameMode) {
+    setNewGameMode(mode);
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+  }
+
   function setNewGameSoloTeam(teamId: string) {
     setNewGameChrisTeamIds([teamId]);
     setNewGameFrankyTeamIds([]);
@@ -6399,6 +6415,9 @@ export function useFoundationShellRouterBodyScope({
         },
         body: JSON.stringify({
           presetId: newGamePresetId,
+          // Vorschau (dryRun) und Anlegen laufen durch DENSELBEN Aufruf — beide sehen damit
+          // garantiert denselben Modus (Plan 2.3), es gibt keinen zweiten Payload-Bauplatz.
+          gameMode: newGameMode,
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
           sandbox: newGameSandbox,
@@ -10037,6 +10056,52 @@ export function useFoundationShellRouterBodyScope({
     };
   }, [activeSaveId, foundationSaveMode, leagueSetupStatus, loadSave, readMeta.source, setGameState]);
 
+  // Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.4): derselbe
+  // Hintergrundlauf-/Polling-Vertrag wie der Liga-Draft direkt oberhalb, nur fuer
+  // `seasonState.arenaMatchdayResolveStatus` (Basketball-Arena-Duelle eines Battle-Mode-
+  // Spieltags, ~6-16+ Sekunden Playwright-Chromium-Laufzeit). Absichtlich EIN eigener Poller statt
+  // den obigen umzubauen — beide Felder koennen unabhaengig voneinander "in_progress" sein, und der
+  // Liga-Draft-Poller uebernimmt bei "fertig" den KOMPLETTEN Spielstand (s. Kommentar oben), was
+  // fuer den Arena-Fall zu frueh waere, solange der Arena-Lauf noch laeuft.
+  const arenaMatchdayResolveStatus = gameState.seasonState.arenaMatchdayResolveStatus ?? null;
+  useEffect(() => {
+    if (
+      readMeta.source !== "sqlite" ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      arenaMatchdayResolveStatus !== "in_progress"
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const pollArenaMatchdayResolveStatus = async () => {
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (cancelled || !nextGameState) return;
+      const nextStatus = nextGameState.seasonState.arenaMatchdayResolveStatus;
+      if (nextStatus === "in_progress") {
+        setGameState((current) =>
+          current.seasonState.arenaMatchdayResolveStatus === nextStatus
+            ? current
+            : { ...current, seasonState: { ...current.seasonState, arenaMatchdayResolveStatus: nextStatus } },
+        );
+        return;
+      }
+      // Fertig ("ready"/"failed"): jetzt wirklich den kompletten, gerade gebuchten Spieltag
+      // uebernehmen (Standings, Player-Progression, ...), nicht nur das Statusfeld.
+      setGameState(nextGameState);
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollArenaMatchdayResolveStatus();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSaveId, arenaMatchdayResolveStatus, foundationSaveMode, loadSave, readMeta.source, setGameState]);
+
   // CHUNKED league-setup completion. The server's fresh-S1 whole-league draft is a single long (~40s)
   // detached task; a server-side time limit on long background tasks can cut it short, so the league is
   // flagged "ready" while many teams are still empty (the "Draft nach ~11 Teams abgebrochen" symptom).
@@ -12724,6 +12789,7 @@ export function useFoundationShellRouterBodyScope({
     isViewingArchivedSeason,
     leaguePlayerHeatPools,
     leagueSetupStatus,
+    arenaMatchdayResolveStatus,
     leagueSetupRetryBusy,
     leagueSetupRetryError,
     retryLeagueSetup,
@@ -12768,6 +12834,7 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameMode,
     newGamePresetId,
     newGamePreview,
     newGameSandbox,
@@ -12908,6 +12975,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
     seasonV2TopPlayers,
+    selectNewGameMode,
     selectTeamSettingsTeam,
     selectedBoardConfidence,
     selectedEncyclopediaEntry,

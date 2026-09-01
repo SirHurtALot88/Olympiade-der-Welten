@@ -336,6 +336,16 @@
   .oly-battle-arena.oly-battle-arena .kk .kkkopf{display:flex;align-items:center;gap:5px;min-width:0}
   .oly-battle-arena.oly-battle-arena .kk .kkfigur{width:19px;height:24px;flex:none;image-rendering:pixelated}
   .oly-battle-arena.oly-battle-arena .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px}
+  /* NAMEN IN TEAMFARBE (Chris, 30.08.). Auf dem FELD war das schon so — zeichneFeldspiel
+     zieht seine Textfarbe seit jeher aus `c` (--home/--away), derselben Farbe wie
+     Team-Ring, Schatten und Bewegungs-Schweif. Die Kaderleiste war die eine Stelle, an
+     der ein Spielername neutral (--ink) stand: sie kam erst mit der Kaderleisten-Runde
+     dazu, als die Feldnamen auf den Ballbereich reduziert wurden (s. NAME_NAH_RADIUS).
+     Damit trug ausgerechnet die Liste, die die Zuordnung Figur->Person jetzt traegt, als
+     einzige keine Seitenkodierung. kaderL ist immer Heim, kaderR immer Gast (renderKader,
+     seite 0/1) — dieselbe Zuordnung wie bei .wteamlabel und .feed .h/.a weiter unten. */
+  .oly-battle-arena.oly-battle-arena #kaderL .kk b{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena #kaderR .kk b{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
@@ -358,6 +368,57 @@
   .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
   .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
     background:var(--fokus);margin-right:5px;vertical-align:-1px}
+  /* RENNPLAN-ANSAGE. --ansage ist das CSS-Gegenstueck zu ANSAGE_FARBE in
+     battle-mode.engine.js (Ring am Boden, Marke ueber dem Kopf, Ruf beim Wechsel) —
+     beide muessen denselben Ton tragen, damit Kachel und Bahn als EIN Zustand lesbar
+     sind. Bewusst nicht --fokus: die beiden Mechaniken sitzen in verschiedenen
+     Disziplinen, und wer sie nebeneinander sieht (in zwei Laeufen), soll sie nicht
+     fuer dieselbe halten. Und bewusst kein Ton, der auf der Bahn schon etwas bedeutet:
+     Team-Orange/Cyan, Reserve-Gruen/Orange/Rot, Sog-Blau sind alle vergeben.
+     Klasse bewusst .kk.rennplan-ansage statt .kk.ansage: der Kampf (PR #691) hat
+     .kk.ansage bereits fuer die Zielansage vergeben, und .kk ist die Kader-Kachel-
+     Basis ueber alle Disziplinen hinweg — derselbe Klassenname haette beide Zustaende
+     global ueberlagert. */
+  .oly-battle-arena.oly-battle-arena{--ansage:#b98cff}
+  .oly-battle-arena.oly-battle-arena .kk.rennplan-ansage{border-color:var(--ansage);
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--ansage) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.rennplan-ansage b{color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile b{color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile .amarke{display:inline-block;width:9px;height:9px;border-radius:50%;
+    background:var(--ansage);margin-right:5px;vertical-align:-1px}
+  .oly-battle-arena.oly-battle-arena .rpknoepfe{display:flex;gap:6px;flex-wrap:wrap}
+  .oly-battle-arena.oly-battle-arena .rpknopf{border:1px solid var(--line);background:var(--surface);
+    color:var(--muted);border-radius:5px;padding:3px 9px;cursor:pointer;
+    font:600 11px/1.3 var(--sans,inherit)}
+  .oly-battle-arena.oly-battle-arena .rpknopf:hover{color:var(--ink);border-color:var(--ansage)}
+  .oly-battle-arena.oly-battle-arena .rpknopf:focus-visible{outline:2px solid var(--ansage);outline-offset:1px}
+  /* Der laufende Plan ist markiert, aber NICHT gesperrt: ein Klick darauf ist folgenlos
+     (planWechsel steigt bei gleichem Plan aus), und ein disabled-Knopf traegt keinen
+     Titel — genau den will man hier aber lesen koennen. */
+  .oly-battle-arena.oly-battle-arena .rpknopf.an{color:var(--ansage);border-color:var(--ansage);
+    background:color-mix(in srgb,var(--ansage) 14%,transparent)}
+  .oly-battle-arena.oly-battle-arena .rennplanzeile .btn[hidden]{display:none}
+  /* ZIELANSAGE (Kampf). Erbt Farbe und Kachel-Zustaende vom Fokus-Doppeln darueber — es
+     ist dieselbe Geste, nur in einer anderen Disziplin, und zwei Signalfarben fuer dasselbe
+     waeren zwei Dinge zum Lernen. Eigen ist nur die SPERRUHR: ein Kreisausschnitt, der mit
+     der Restzeit schrumpft (--p von 100 auf 0, je Bild aus der Engine gesetzt) und die
+     Restsekunden in der Mitte traegt. Kein Timer in Textform daneben: der Ring sagt "noch
+     nicht", die Zahl sagt "wie lange", und beide stehen an dem Knopf, den sie sperren. */
+  .oly-battle-arena.oly-battle-arena .kk.ansage{border-color:var(--fokus);box-shadow:0 0 0 2px color-mix(in srgb,var(--fokus) 45%,transparent)}
+  .oly-battle-arena.oly-battle-arena .kk.ansage b{color:var(--fokus)}
+  .oly-battle-arena.oly-battle-arena .kk.gesperrt{cursor:not-allowed;opacity:.72}
+  .oly-battle-arena.oly-battle-arena .kk.gesperrt:hover{border-color:var(--line)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr{position:relative;flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+    margin-right:auto;
+    background:conic-gradient(var(--fokus) calc(var(--p,0) * 1%),color-mix(in srgb,var(--fokus) 16%,transparent) 0)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ansageuhr::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sunk)}
+  .oly-battle-arena.oly-battle-arena .ansageuhr b{position:absolute;inset:0;z-index:1;display:flex;align-items:center;
+    justify-content:center;font:700 9px/1 var(--mono,ui-monospace,monospace);color:var(--fokus)}
   /* Endstand */
   .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
     gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}

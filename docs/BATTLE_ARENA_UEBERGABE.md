@@ -1,7 +1,9 @@
 # Battle Arena — Übergabe an die nächste Sitzung
 
-Stand: 23.08.2026, Branch `claude/ui-ux-upgrades-dat4ys`, PR
-[#651](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/651).
+Stand: 31.08.2026, Branch `claude/battle-arena-handoff-update-894yxz`. Ursprünglich
+23.08.2026 angelegt (PR [#651](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/651)),
+seither laufend fortgeschrieben — neuester Abschnitt ganz unten vor „Verlässliche
+Einstiegspunkte": **Update 31.08.2026: Battle-Mode-Produktivierung**.
 
 Diese Datei existiert aus einem Grund: **der Netzzugang öffnet sich erst in einer neuen
 Sitzung.** Chris hat die Netzwerk-Policy der Umgebung auf alle Domains gestellt, aber ein
@@ -976,20 +978,42 @@ seit dieser Sitzung korrigiert. Eine testweise Kappung von `TMP`/`AUS` senkte di
 gemessene Abweichung deutlich, verschlechterte aber den ECHTEN Kampf (mehr Blowouts) und
 ist zurückgenommen — Details im Abschnitt „Das Ventil".
 
-**Zuletzt gemessen, NACH dem Merge mit #654 (Heiler-Fix), n = 6:**
+**Update, Auftrag „möglichst unter 15 Pp" (Chris): die Ursache gefunden, nicht mehr nur
+umschifft.** `leistungVon()` (Beitrag / Eignungserwartung) hatte einen mathematischen
+Kurzschluss: `aufEignung()` skaliert LP/ANG/VER proportional zur Eignung
+(Attribut×Matrixgewicht, summiert), und genau diese Eignung steht auch im Nenner der
+Leistungsformel. Hebt man ein Attribut an, wachsen Zähler und Nenner im selben Verhältnis
+mit — der Quotient bleibt stehen. Gemessen wurde nur noch Rauschen zweiter Ordnung, das
+zufällig auf ein, zwei Attribute traf und deren ganzen Anteil an sich zog, während die
+übrigen auf 0 % klemmten. **Das erklärt rückwirkend, warum „welches Attribut dominiert"
+dreimal umgesprungen ist** (s. unten — es war jedesmal Rauschen, kein echter
+Bedeutungswechsel), warum die TMP/AUS-Kappung die Zahl senkte, ohne den Kampf zu
+verbessern (sie entfernte den letzten Rest Signal, übrig blieb reines Rauschen), und
+warum Mini-DM einmal 13,8 Pp las (ein Treffer der Streuung, kein Beweis).
 
-TDM 160,1 Pp (Spirit 38,1 %, Intelligence 33,1 %, Torment 28,9 % dominieren; Power,
-Health, Stamina, Charisma bei exakt 0 % trotz Matrixgewichten 28/20/14/10). Mini-DM,
-Fechten und Battlefield sind seit dem Merge nicht neu mit `einflussVon()` gemessen — nur
-die Siegquote (Mini-DM 100 %, Fechten 100 %, Battlefield 88 %, je n = 8), die zusammen mit
-TDM zeigt: der Heiler-Fix hat die Kampfdynamik grundlegend verschoben, und **welches
-Attribut das Kampfergebnis dominiert, ist seitdem dreimal umgesprungen** (Speed/Dexterity
-vor dem Maßstab-Fix → weiterhin Speed/Dexterity nach dem Maßstab-Fix, aber schwächer →
-jetzt Spirit/Intelligence/Torment nach dem Heiler-Fix). Das ist kein Rauschen, sondern ein
-Hinweis, dass die Ursache tiefer liegt als eine einzelne Formel — vermutlich in
-`leistungVon()`/der Skill-Priorisierung, die bestimmt, wer wie oft trifft. Nicht mehr mit
-Vermutungen nachgejagt in dieser Sitzung; das ist die nächste echte Aufgabe an TDM,
-unabhängig vom Chassis-Ausbau.
+Fix: `MOTOREN[d].wert()` (nur von `einflussVon()` gelesen, also nur die Abnahmemessung —
+am Kampf selbst ändert sich nichts) misst jetzt den **Anteil am Gesamtbeitrag** der Partie
+statt der eignungsnormierten Leistung. `leistungVon()` bleibt unverändert die Anzeige im
+Endstand.
+
+**Gemessen bei n = 12, mit dem korrigierten Maßstab:**
+
+| Disziplin | Abweichung | Ziel <15 Pp erreicht? |
+|---|---|---|
+| Battlefield | **12,0 Pp** | ja — Rezept unangetastet, allein der Maßstab hat es gebracht |
+| Fechten | **11,0 Pp** | ja — Maßstab + kleine Ausdauer-Korrektur im Rezept |
+| TDM | **54,2 Pp** | nein |
+
+TDM bleibt offen. Vier neue Rezepte wurden gebaut und bei n = 6 bzw. n = 12 gemessen (ein
+voller Neubau, eine gezielte Korrektur der größten Lücken, zwei ANG/VER-Varianten) — keins
+schlug das unveränderte `REC.power`-Rezept messbar; bei doppeltem n lag die beste
+Alternative (57,9 Pp) innerhalb der Streuung des Unveränderten (54,2 Pp), nicht darunter.
+Der wahrscheinliche Grund: `REC.power` trägt in TMP/AUS ausgerechnet die Attribute
+(speed/dexterity/stamina), die den Kampf strukturell am Laufen halten, während ANG/VER
+durch `aufEignung()` proportional zur Eignung skalieren und dadurch wenig Spielraum für
+Feintuning lassen. Eine nächste Runde müsste vermutlich am Chassis ansetzen
+(`aufEignung()`/die TMP-AUS-Normierung selbst) statt an den Rezeptgewichten — Details im
+Code-Kommentar an `ARENA_ART.tdm`.
 
 ---
 
@@ -1292,6 +1316,95 @@ Faktoren (Ist-Dauer ÷ 60, siehe `ZEIT_DEHNUNG` in `battle-mode.html`):
 
 Fehlt eine Disziplin in der Liste (Bühne, Feldspiel), bleibt sie automatisch unangetastet
 — `ZEIT_DEHNUNG[disc]||1` fällt auf Faktor 1 zurück.
+
+---
+
+## Update 31.08.2026: Battle-Mode-Produktivierung
+
+Seit der letzten Fortschreibung dieser Übergabe (#694, Kampf-Arena-Maßstab) ist eine
+andere Baustelle angelaufen: `docs/design/battle-mode-spielmodus-plan.md` ist der
+Fahrplan, aus dem reinen Mockup (diese Datei, `battle-mode.html`, liest/schreibt keinen
+Spielstand) einen echten **zweiten Spielmodus** zu machen, in dem Arena-Kämpfe echte
+Liga-Ergebnisse bestimmen. Neun PRs, additiv, jeder für sich hält `main` deploybar.
+
+**Stand:** PR 1–4 (Bugfix, `gameMode`-Datenmodell, Verdrahtung, Moduswahl-UI) waren schon
+vor dieser Sitzung auf `main`. Diese Sitzung hat PR 5 und PR 6 gemergt:
+
+- **PR 5** (#695): `window.__arena.spieleFeldspiel(fd, saat)` — der fehlende Engine-Hook,
+  der einen Feldspiel-Kampf einmal simuliert (kein Rendering) und `{disziplin, seiten,
+  boxscore}` zurückgibt. `seiten` ist der Punktestand je Team-Seite, aus der bisher nicht
+  nach außen gegebenen `fsPunkte`-Variable gelesen — dieselbe Zählung, die `stepFeldspiel()`
+  längst führt, kein neuer Zähler.
+- **PR 6** (#697): `lib/battle/arena-headless-runner.ts` — macht `spieleFeldspiel()`
+  serverseitig aufrufbar, über echten Chromium via Playwright (die Engine ist untrennbar
+  an DOM/Canvas gekoppelt). Führt die Roster-Zuführung über den bestehenden,
+  **unveränderten** `arena-kader-adapter.ts` aus, batcht mehrere Fixtures in einem
+  `page.evaluate()`, schließt den Browser danach hart in `finally`.
+
+**Architekturentscheidung PR 6, bewusst offen kommuniziert:** der ursprüngliche Plan
+(Abschnitt 3.4) schlug einen dauerhaft warmgehaltenen Browser-Singleton vor. Chris tendierte
+selbst dazu, wollte aber eine zweite Meinung — Fables Gegen-Empfehlung (Abschnitt 5.4) für
+**on-demand** (Browser pro Aufruf starten, danach hart schließen) ist umgesetzt: der
+Matchday-Resolve läuft ohnehin im Hintergrund, niemand wartet live davor, und ein dauerhaft
+idler Chromium kostet 200–400 MB RAM rund um die Uhr auf einem Server, der schon App +
+SQLite + Crons trägt, ohne eigene Health-Checks stabil zu bleiben. **Das ist eine
+Empfehlung, keine von Chris final abgenommene Entscheidung** — der Umstieg auf „dauerhaft
+warm" wäre später eine reine Lifecycle-Änderung, kein struktureller Umbau.
+
+**Ein echter Bug, beim Bau von PR 6 gefunden, in PR 5 verursacht:** `spieleFeldspiel()`s
+Seed geht direkt in eine lineare Kongruenzformel, die eine Zahl braucht. Ein Text-Seed —
+genau das Format, das der Plan selbst für die Produktivierung vorschlägt,
+`${saveId}:${seasonId}:${matchdayId}:arena:...` — kollabiert über `NaN>>>0` zu einer
+festen `0`. Jeder Text-Seed hätte also dasselbe Ergebnis geliefert, unbemerkt, weil PR 5s
+eigene Determinismus-Tests nur mit numerischen Seeds (424242, 99) liefen. PR 6 umgeht das
+am Aufrufer mit einem deterministischen FNV-1a-Hash (String → uint32), **der eigentliche
+Bug sitzt aber weiterhin in `battle-mode.engine.js` selbst** und wartet auf einen Fix an
+der Quelle, falls je ein anderer Aufrufer direkt einen Text-Seed an `spieleFeldspiel()`
+durchreicht, ohne über den Runner zu gehen.
+
+**Als Nächstes: PR 7**, auf Chris' ausdrücklichen Wunsch mit zwei Abweichungen vom
+ursprünglichen Plan — der sah PR 7 als reinen Hintergrund-Adapter vor, „hinter
+Feature-Flag, noch nicht am Spieltag-simulieren-Knopf" (das kam laut Plan erst mit PR 8).
+Stattdessen: ein echter „Spieltag simulieren"-Klick soll in einem Battle-Mode-Save mit
+Basketball sofort durch die Arena laufen, und jedes daraus entstandene Ergebnis soll
+sichtbar als „Arena-Ergebnis" markiert sein, mit dem Seed als nachvollziehbarer Kennung
+je Ergebnis — die vom Plan selbst vorgesehenen Felder `resolutionSource: "arena"` und
+`arenaMatchSeed` (Abschnitt 2.4) müssen dafür in der UI ankommen, nicht nur in den Daten
+stehen.
+
+### Zwei Bugfixes aus derselben Sitzung, unabhängig vom Battle-Mode-Plan
+
+**Endscreen-Tooltips ERL/IMP** (#696): Chris meldete am 25.08., die Tooltips im Endscreen
+für „Schaden Erlitten" und „Impact" zeigten nichts. Ein früherer Lauf (PR #675) fand „kein
+Bug im Quelltext" — reine Quelltext-Lektüre, keine Laufzeit-Reproduktion. Diesmal im
+Browser nachgestellt: Daten und Verdrahtung waren korrekt, aber `tipBox` hing per
+`document.body.appendChild()` an `document.body`, während sämtliches CSS unter
+`.oly-battle-arena .tipbox` steht — ein Kind von `document.body` ist dort nie ein
+Nachfahre von `.oly-battle-arena`, also nie sichtbar gestylt. **Dieselbe Fehlerfamilie wie
+der `FARBWURZEL`-Fix vom 30.08.** (Canvas-Farben lasen von `document.body` statt vom
+echten Arena-Root). Fix: `tipBox` hängt jetzt an `document.querySelector(".oly-battle-arena")
+||document.body`. Dabei zusätzlich gefunden und mitbehoben: `battle-mode.html` fehlte
+`<meta charset="utf-8">`, was zu echter Zeichen-Korruption der deutschen Tooltip-Texte
+(Umlaute, ×, −) führte, wenn die Seite ohne expliziten Charset-Header geöffnet wird.
+
+**Kaderleisten-Profile in Kampf/Bahn**: Chris' Meldung vom 25.08. (Sprite-Portraits fehlen
+in der Einsatzliste außerhalb Basketball) war bereits gelöst, **fünf Tage bevor er sie
+meldete** — als Nebeneffekt von #686. `renderKader()` ist eine einzige gemeinsame Funktion
+für alle vier Chassis, der `kaderFigur(u.n)`-Aufruf steht dort unbedingt, ohne
+Basketball-Sonderfall. Verifiziert per Playwright-Screenshot (Fechten 12, Spurt 8,
+Basketball 12 Sprite-Portraits, identisches Layout). Kein Code geändert.
+
+### Mini-DM mit dem korrigierten Maßstab aus #694 nachgemessen
+
+`node scripts/messe-arena-einfluss.mjs mini-dm 12` (Achtung: Bindestrich, nicht
+Unterstrich) gegen den aktuellen `main`-Stand: **28,8 Pp**. Über dem 15-Pp-Ziel, aber klar
+besser als TDM. Die sechs gewichteten Attribute (stamina, dexterity, torment, health,
+power, will) lesen alle einen Anteil, Intelligence/Awareness/Determination/Speed/
+Charisma/Spirit korrekt bei 0 % — passend zur Mini-DM-Matrix, die keins davon gewichtet.
+TDM, Fechten und Battlefield selbst sind seit #694 nicht erneut mit `einflussVon()`
+nachgemessen (#694 hat nur den Maßstab repariert, nicht neu durchgemessen) — offener
+nächster Schritt, falls jemand vor PR 8 (dem eigentlichen Go-Live für Basketball) auch die
+übrigen Kampf-Disziplinen production-ready sehen will.
 
 ---
 

@@ -134,3 +134,12 @@ das Spiel selbst nimmt — keine zweite Kauflogik.
 `deploy/hetzner/auto-deploy.sh` pollt per Cron `main` und baut bei neuen Commits neu. Er zieht mit
 `--ff-only`; ein liegengebliebener lokaler Commit im Server-Repo blockiert ihn deshalb dauerhaft.
 Logs: `tail -f /var/log/oly-deploy.log`.
+
+Zweiter, ganz anderer Blockierer: volle Root-Platte, weil der Docker-Build mitten im Bauen
+abbricht (`no space left on device`). Am 01.09. steckten so 6,8 GB reiner Git-Historie in `.git`,
+bei nur ~200 MB Arbeitsbaum — verursacht durch `push-live-save.sh`/`push-bug-reports.sh`, die bei
+jedem Cron-Lauf bewusst einen elternlosen Commit bauen und per Force-Push schicken (haelt den
+Branch auf GitHub klein), der aber lokal sofort zum "dangling object" wird und nie von selbst
+verschwindet. `deploy/hetzner/git-repo-aufraeumen.sh` raeumt das per `git gc --prune=now` weg und
+laeuft seitdem woechentlich (sonntags 04:10) als dritter Cron neben den beiden Push-Crons, s.
+`install-live-save-cron.sh`.
