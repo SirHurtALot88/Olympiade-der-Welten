@@ -126,7 +126,23 @@ Weil das neue Modell die Kappungsgrenze über die GESAMTE Saison streckt statt i
 
 ## Teil D — Empfohlene PR-Reihenfolge (`main` bleibt jederzeit deploybar)
 
-1. **PR1 — Fatigue-Fundament**: `MATCHDAY_ACTIVE_RECOVERY`/`MATCHDAY_BENCH_BONUS_RECOVERY` einführen, Bank-Pfad bit-identisch halten, Einsatz-Pfad neu (hinter ENV-Flag `OLY_FATIGUE_ACTIVE_RECOVERY`, Default aus = heutiges Verhalten). Nur Unit-Tests, kein Verhaltenswechsel im Default.
+1. ~~**PR1 — Fatigue-Fundament**~~ — **ERLEDIGT (01.09.).** `MATCHDAY_ACTIVE_RECOVERY` (11) und
+   `MATCHDAY_BENCH_BONUS_RECOVERY` (17, abgeleitet als `BASE_MATCHDAY_RECOVERY − aktiv`, damit die
+   Summe auch bei ENV-Verstellung der Basis stimmt) stehen in `lib/fatigue/fatigue-injury-service.ts`.
+   Der Einsatz-Pfad rechnet netto (`getPlayerMatchdayFatigueDelta`) — in Roll-Map, Apply UND
+   Replay-Rücknahme aus EINER Funktion, Anzeige der Einsatzliste inbegriffen. Der Reha-Aufschlag
+   wird ANTEILIG auf beide Bestandteile geteilt (`splitRecovery`), statt zweimal voll addiert: die
+   Bank-Erholung bleibt damit exakt `(28 + Aufschlag) × Trainingsmodus` wie bisher, der aktive
+   Anteil wächst trotzdem mit dem Ausbau. Schalter `OLY_FATIGUE_ACTIVE_RECOVERY`, Default AUS —
+   bei ausgeschaltetem Schalter wird die Erholung für Einsatz-Spieler gar nicht erst nachgeschlagen,
+   das Verhalten ist bit-identisch. Tests: `tests/fatigue-aktive-erholung.test.ts` (neu, beide
+   Welten inkl. Replay-Idempotenz und Facility-Zerlegung) und die neue Netto-Gruppe in
+   `tests/fatigue-last-drei-stufen.test.ts`. Offen für PR2/PR3 (bewusst NICHT in PR1): der
+   Verletzungs-Korridor (`tests/injury-basisfall-korridor.test.ts` gilt weiter nur für den Default),
+   `scripts/export-injury-balance-audit.ts` (eigene Simulationsschleife, kennt die aktive Erholung
+   noch nicht), die KI-Projektion in `lib/ai/ai-player-training-load-service.ts` (rechnet
+   `+= MATCHDAY_FATIGUE_LOAD` brutto) und die Rückrechnung in
+   `lib/foundation/player-season-fatigue-stats.ts` (`fatigueBefore − MATCHDAY_FATIGUE_LOAD`).
 2. **PR2 — Korridor neu vermessen**: `scripts/export-injury-balance-audit.ts` um Season-Length-Parameter erweitern, Sweep für 10 UND 20 Spieltage mit/ohne aktiver Erholung, Ergebnis mit Chris abstimmen (E.1).
 3. **PR3 — Aktivierung für die bestehende 10-Spieltage-Saison**: Flag-Default umstellen. Eigenständig wertvoll, liefert Live-Feedback unabhängig von Teil A.
 4. **PR4 — Disziplin-Verdopplung**: `SEASON_DISCIPLINE_REPEAT_COUNT`, Zwei-Halbserien-Pairing, Mindestabstands-Reparatur — hinter Flag, nur unit-getestet, keine Spielwirkung.

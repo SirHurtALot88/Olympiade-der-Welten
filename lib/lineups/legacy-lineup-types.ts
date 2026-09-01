@@ -52,6 +52,12 @@ export type LegacyInjuryRiskProjectionRef = Record<
   {
     fatigueBeforeRoll: number;
     matchdayLoad: number;
+    /**
+     * Aktive Erholung, die im selben Zug gegengerechnet wird (0, solange
+     * `OLY_FATIGUE_ACTIVE_RECOVERY` aus ist). `fatigueBeforeRoll` traegt sie bereits — das Feld
+     * steht hier, damit eine Anzeige „Last 16, davon 11 erholt" aufmachen kann, ohne zu rechnen.
+     */
+    activeRecovery?: number;
     riskPercent: number;
     bandLabel: string;
   }

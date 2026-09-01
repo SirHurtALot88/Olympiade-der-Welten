@@ -33,7 +33,12 @@ import type {
 } from "@/lib/lineups/legacy-lineup-types";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { getFatiguePerformanceMultiplier } from "@/lib/fatigue/fatigue-calibration";
-import { getInjuryRiskBand, getPlayerAvailabilityView, projectMatchdayInjuryRisk } from "@/lib/fatigue/fatigue-injury-service";
+import {
+  getPlayerActiveRecoveryCredit,
+  getInjuryRiskBand,
+  getPlayerAvailabilityView,
+  projectMatchdayInjuryRisk,
+} from "@/lib/fatigue/fatigue-injury-service";
 import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
@@ -659,10 +664,21 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
     // Einsatz-Risiko je Intensitaet VORberechnen (alle drei Stufen), damit die Einsatzliste
     // beim Intensitaets-Umschalten nur nachschlaegt. Bewusst hier im Server-Kontextbau statt
     // im Client: so gelten dieselben ENV-Tunables (OLY_FATIGUE_*) wie beim echten Wurf.
+    //
+    // Die aktive Erholung geht MIT in die Projektion — sonst zeigte die Einsatzliste bei
+    // eingeschaltetem Schalter eine Last, die so nie gebucht wird (siehe
+    // `getPlayerMatchdayFatigueDelta`). `getPlayerActiveRecoveryCredit` liefert bei
+    // ausgeschaltetem Schalter exakt 0 (und schlaegt die Erholung gar nicht erst nach), die
+    // Anzeige bleibt also unveraendert, solange nichts eingeschaltet ist.
+    const activeRecovery = getPlayerActiveRecoveryCredit(
+      normalizedGameState,
+      params.teamId,
+      player.trainingMode,
+    );
     const injuryRiskProjection = Object.fromEntries(
       (["conserve", "normal", "push"] as const).map((intensity) => [
         intensity,
-        projectMatchdayInjuryRisk({ player, currentFatigue: fatigue ?? 0, intensity }),
+        projectMatchdayInjuryRisk({ player, currentFatigue: fatigue ?? 0, intensity, activeRecovery }),
       ]),
     ) as LegacyInjuryRiskProjectionRef;
     return {
