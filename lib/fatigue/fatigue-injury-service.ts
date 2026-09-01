@@ -418,6 +418,43 @@ export function countTeamInjuredPlayers(gameState: GameState, teamId: string) {
   ).length;
 }
 
+/**
+ * DIE TRAININGSSCHICHT — der Teil der Erschöpfung, der nicht vom Spieltag kommt.
+ *
+ * Sie wird je Saison in `player.seasonTrainingAccumulator` mitgeführt und beim Spieltags-Commit
+ * auf `player.fatigue` gelegt (`matchday-training-accumulator.ts`). Das KONTO
+ * (`playerAvailabilityState[].fatigue`) trägt sie bewusst NICHT: es wird je Spieltag
+ * fortgeschrieben (Last drauf, Erholung ab), und eine mitgeführte Trainingsschicht würde sich
+ * dabei aufsummieren — genau der Fehler, der in `matchday-training-accumulator.ts` beschrieben
+ * und gemessen ist (eine Schicht zuviel, 2,2 Punkte bei Modus „hart" auf zehn Spieltage).
+ */
+export function getPlayerTrainingFatigueShare(player: Player | null | undefined, seasonId: string): number {
+  const accumulator = player?.seasonTrainingAccumulator;
+  if (!accumulator || accumulator.seasonId !== seasonId) return 0;
+  const share = accumulator.accumulatedTrainingFatigue;
+  return typeof share === "number" && Number.isFinite(share) ? Math.max(0, share) : 0;
+}
+
+/**
+ * DIE EINE ERSCHÖPFUNGSZAHL: Match-Fatigue aus dem Konto PLUS die Trainingsschicht.
+ *
+ * ENTSCHIEDEN VON CHRIS, nachdem eine Messung zwei Quellen zutage förderte, die bei 328 Spielern
+ * um median 9,4 Punkte auseinanderlagen und bei 33 von ihnen die 65er-Marke unterschiedlich
+ * entschieden: „Gesamt, überall." Trainingslast soll wirklich wirken, nicht nur angezeigt werden.
+ *
+ * WARUM NICHT EINFACH `player.fatigue` — das ist rechnerisch dasselbe (an Chris' Spielstand bei
+ * 307 von 328 Spielern auf die Nachkommastelle), aber nur ZWISCHEN den Spieltagen. Während einer
+ * Buchung steht `player.fatigue` zeitweise auf reiner Match-Fatigue, weil die Trainingsschicht
+ * erst danach wieder aufgelegt wird. Aus Konto + Schicht gerechnet stimmt die Zahl zu jedem
+ * Zeitpunkt.
+ */
+export function getPlayerGesamtFatigue(gameState: GameState, player: Player, teamId: string): number {
+  return clampFatigue(
+    getPlayerCurrentFatigue(gameState, player, teamId) +
+      getPlayerTrainingFatigueShare(player, gameState.season.id),
+  );
+}
+
 function getPlayerCurrentFatigue(gameState: GameState, player: Player, teamId: string) {
   if (!isActiveRosterPlayer(gameState, player.id, teamId)) {
     return 0;
@@ -624,7 +661,22 @@ export function getPlayerAvailabilityView(
   return {
     playerId,
     teamId,
-    fatigue: clampFatigue(stored?.fatigue ?? player?.fatigue ?? 0),
+    /**
+     * DIE GESAMTZAHL — Konto plus Trainingsschicht (Chris: „Gesamt, überall").
+     *
+     * Alle Leser dieser Sicht fragen „wie erschöpft ist er", nicht „was steht im Konto". Vorher
+     * stand hier `stored?.fatigue ?? player?.fatigue` und damit die reine Match-Fatigue, sobald
+     * ein Konto-Eintrag existierte — also bei jedem Kaderspieler. Der Training-Reiter las
+     * derweil `player.fatigue` und zeigte die Gesamtzahl: zwei Bildschirme, zwei Zahlen für
+     * denselben Spieler.
+     *
+     * Die BUCHFÜHRUNG liest bewusst nicht hier, sondern `getPlayerCurrentFatigue` — sie muss auf
+     * dem Konto rechnen, sonst summiert sich die Trainingsschicht über die Spieltage auf.
+     */
+    fatigue: clampFatigue(
+      (stored?.fatigue ?? player?.fatigue ?? 0) +
+        (stored ? getPlayerTrainingFatigueShare(player, gameState.season.id) : 0),
+    ),
     injuryStatus: resolvedInjuryStatus,
     injuryUntilMatchday: stored?.injuryUntilMatchday,
     injuredAtSeasonId: stored?.injuredAtSeasonId,
@@ -813,7 +865,24 @@ export function buildMatchdayInjuryRollMap(input: {
     const player = gameState.players.find((entry) => entry.id === use.playerId);
     if (!player) continue;
 
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    /**
+     * ZWEI ZAHLEN, WEIL SIE ZWEI DINGE SIND — und genau hier trennt sich der Weg.
+     *
+     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Last, ohne
+     * Trainingsschicht. Er wird nach dem Wurf in `playerAvailabilityState` UND in
+     * `player.fatigue` zurueckgeschrieben, und die Trainingsschicht legt sich anschliessend
+     * wieder darauf. Traege er sie schon, kaeme sie doppelt — der in
+     * `matchday-training-accumulator.ts` beschriebene und gemessene Fehler.
+     *
+     * `risikoFatigue` ist, wie erschoepft der Spieler WIRKLICH in den Spieltag geht. Chris:
+     * „Gesamt, ueberall" — Trainingslast soll auf das Verletzungsrisiko wirken, nicht nur
+     * angezeigt werden. Der Wurf misst deshalb dagegen.
+     */
+    const matchFatigueNachEinsatz = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    const risikoFatigue = clampFatigue(
+      matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
+    );
+    const fatigueBeforeRoll = risikoFatigue;
     const allowInjury = !injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries;
     const roll = resolveMatchdayInjuryRoll({
       saveId: input.saveId,
@@ -1213,7 +1282,24 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     if (availabilityView.isUnavailable) continue;
 
     const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    /**
+     * ZWEI ZAHLEN, WEIL SIE ZWEI DINGE SIND — und genau hier trennt sich der Weg.
+     *
+     * `matchFatigueNachEinsatz` ist der KONTO-Stand nach diesem Spieltag: Konto + Last, ohne
+     * Trainingsschicht. Er wird nach dem Wurf in `playerAvailabilityState` UND in
+     * `player.fatigue` zurueckgeschrieben, und die Trainingsschicht legt sich anschliessend
+     * wieder darauf. Traege er sie schon, kaeme sie doppelt — der in
+     * `matchday-training-accumulator.ts` beschriebene und gemessene Fehler.
+     *
+     * `risikoFatigue` ist, wie erschoepft der Spieler WIRKLICH in den Spieltag geht. Chris:
+     * „Gesamt, ueberall" — Trainingslast soll auf das Verletzungsrisiko wirken, nicht nur
+     * angezeigt werden. Der Wurf misst deshalb dagegen.
+     */
+    const matchFatigueNachEinsatz = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
+    const risikoFatigue = clampFatigue(
+      matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
+    );
+    const fatigueBeforeRoll = risikoFatigue;
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({
@@ -1265,7 +1351,8 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     nextAvailability = updateAvailability(nextAvailability, {
       playerId: use.playerId,
       teamId: use.teamId,
-      fatigue: fatigueBeforeRoll,
+      // Das KONTO bekommt den reinen Match-Stand — siehe die Begruendung an `risikoFatigue`.
+      fatigue: matchFatigueNachEinsatz,
       injuryStatus: roll.result === "injured" ? "injured" : availabilityView.injuryStatus === "recovering" ? "recovering" : "healthy",
       injuryUntilMatchday: roll.result === "injured" ? nextMatchdayId ?? undefined : availabilityView.injuryUntilMatchday,
       injuredAtSeasonId: roll.result === "injured" ? input.seasonId : availabilityView.injuredAtSeasonId,
@@ -1273,7 +1360,9 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       injuryReason: roll.result === "injured" ? "fatigue_over_30_after_matchday_use" : availabilityView.injuryReason,
       injuryRiskLastRoll: roll,
     });
-    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueBeforeRoll };
+    // Ebenso `player.fatigue`: reine Match-Fatigue. Der Akkumulator legt die Trainingsschicht
+    // direkt danach wieder darauf.
+    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: matchFatigueNachEinsatz };
   }
 
   const injuryHighlights = newEvents
