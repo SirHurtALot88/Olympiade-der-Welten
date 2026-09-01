@@ -25,8 +25,9 @@ benennbares Merkmal fehlt oder ist falsch — eine punktuelle Korrektur (ein Lay
 eine Farbe) würde auf 5 Sterne heben. Der Unterschied zu 3 Sternen ist die Zahl der fehlenden
 Details: bei 4 Sternen lässt sich der Fix in einem Satz benennen, bei 3 Sternen sind es mehrere
 Baustellen oder eine grundsätzlich zu grobe Annäherung.
-*Anker:* Krolach — Standard-Construct-Look ohne die Kristallstacheln aus dem Portrait. Mit
-Stacheln wäre er eine 5, ohne bleibt er eine 4 — das fehlende Detail lässt sich exakt benennen.
+*Anker:* Krolach — nach dem Golem-Umbau (01.09.) ein blauer Kristall-Titan mit korrekter Form und
+Farbfamilie, aber ohne die mehreren leuchtenden Edelstein-Lichter aus dem Portrait. Mit den
+Lichtern wäre er eine 5, ohne bleibt er eine 4 — das fehlende Detail lässt sich exakt benennen.
 
 **★★★ (3) — Grobe Kategorie stimmt, spürbar generisch.**
 Die grobe Kategorie ist richtig (z.B. "irgendein Monster", "irgendein Ritter", "irgendeine
@@ -47,8 +48,10 @@ Das Portrait zeigt etwas fundamental außerhalb des aktuellen Baukastens — ein
 unbelebtes Objekt (Schiff, Maschine), ein rein mechanisches Wesen ohne Humanoid-Analogie — und
 das aktuelle Sprite hat keinen erkennbaren Zusammenhang dazu, meist weil es schlicht der
 generische Standard-Humanoid ohne jede thematische Anpassung ist.
-*Anker:* Vigil (Taube mit Kamera-Objektiv) und ein Schiff-Charakter (Kreischende Kogge) — beides
-Konzepte, für die der Humanoid-Baukasten strukturell nichts hergibt.
+*Anker:* Byrd (Zwiebelkopf-Wesen mit Cardigan) und Tavascron (blau leuchtender Kampf-Mech, als
+unklarer Klumpen dargestellt) — beides Konzepte, für die der Humanoid-Baukasten strukturell nichts
+hergibt. (Vigil war früher der Anker hier — nach dem prozeduralen Kamera-Kopf-Umbau am 01.09. ist
+er jetzt eine 4, s. Grundsatz unten: der Anker muss mit dem Sprite mitwandern.)
 
 ## Abgrenzung 4 vs. 3 vs. 2 (die schwierigen Übergänge)
 
@@ -131,4 +134,23 @@ keiner der 15 Vögel in `[LPC] Birds` körperlich — alle 15 sind kompakte Klei
 Hals oder lange Beine. Eingebaut wurde trotzdem die ähnlichste der 15 (`bird_1`, die schlankste
 und spitzschnäbligste der drei Grund-Körpertypen), mit dokumentierter Begründung im BAU-Kommentar
 und in `public/sprites/vogel/quellen.json` — nicht der vorher vorgemerkte, aber körperlich
-unpassende Weißkopfseeadler, und nicht "gar kein Vogel".
+unpassende Weißkopfseeadler, und nicht "gar kein Vogel". (Stand 01.09.: Seraph-11 wurde seitdem
+noch einmal umgebaut — kein Sprite mehr, sondern ein rein prozedural aus Formen gezeichneter
+Reiher-Körper, siehe Grundsatz unten. Das Beispiel bleibt als Beleg für Regel 2 gültig, auch wenn
+es nicht mehr Seraph-11s aktueller Stand ist.)
+
+## Grundsatz: Score folgt dem Sprite (Chris, 01.09.)
+
+Chris' Fund an der Sprite-Fit-Galerie: Vigil zeigte nach dem Kamera-Kopf-Umbau in der Live-Arena
+längst eine echte Taube mit Kamera, die Galerie zeigte daneben aber weiterhin die alte 1-Stern-
+Bewertung ("kein Vogel, kein Bezug") — der gespeicherte Wert war seit dem Fix nicht mehr wahr.
+
+**Regel, ab sofort verbindlich:** Wer ein `BAU`-Rezept oder einen `vollbild`/prozeduralen
+Zeichenweg für einen Charakter ändert, aktualisiert im SELBEN Schritt (selber Commit, nicht eine
+spätere Aufräumrunde) auch dessen Eintrag in `data/generated/sprite-fit-bewertung.json` —
+`sterne`, `begruendung`, `fehlendesDetail` neu vergeben, mit derselben Rubrik wie oben. Ein
+Sprite-Fix ist nicht fertig, solange die Galerie noch die alte Note zeigt.
+
+Das gilt auch rückwirkend für die Ankerbeispiele dieses Dokuments (s. oben, 4- und 1-Sterne-Anker
+wurden am 01.09. deshalb ausgetauscht bzw. korrigiert) — ein Anker, der auf einen inzwischen
+gefixten Charakter zeigt, ist genauso irreführend wie ein veralteter Datensatz.
