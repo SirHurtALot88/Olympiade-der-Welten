@@ -475,32 +475,16 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["schulter",64,0,0,"metall:steel"],["z_hoerner",64,0,0,"haut"]]},
 
-    // Bild: massiges Steinwesen mit ECHSENKOPF, gluehende Augen, UNBEWAFFNET.
-    //
-    // GARGOYLE. Chris: "gibts fuer rhyx thal nicht ein gargoyle sprite oder sowas?" —
-    // "ja bau den gargoyle". Einen Gargoyle-KOPF hat der LPC-Satz nicht; die zwanzig
-    // Koepfe sind Alien bis Zombie, kein Steinwaechter darunter. Zusammensetzen laesst er
-    // sich trotzdem, ohne ein einziges neues Blatt:
-    //
-    //   Stein   `fur_grey` statt `dark_green`. Der Ton lag schon in der Palette, und er
-    //           trifft das Portrait BESSER als Gruen — dort steht "massiges STEINwesen".
-    //   Hoerner `z_hoerner`, dasselbe Blatt, das Krag'Zul traegt.
-    //   Fluegel `z_fluegel_bg` und `_fg`, dieselben, die Seraph-11 traegt — hinten hinter
-    //           den Koerper, vorne darueber, damit sie ihn umschliessen.
-    //
-    // EHRLICH BLEIBEN: Fluegel stehen NICHT im Portrait. Stein und Echsenkopf schon,
-    // Hoerner sind eine Auslegung von "massig". Die Fluegel sind Chris' ausdrueckliche
-    // Ansage, nicht meine Lesart des Bildes — deshalb steht das hier und nicht nur im
-    // Commit. Wer spaeter das Portrait als Massstab nimmt, soll wissen, wo es abweicht.
-    "Rhyx'Tal":{haut:"fur_grey", ebenen:[
-      ["z_fluegel_bg",64,0,0,"haut"],
-      ["s_schwanz_bg",64,0,0,"haut"],
-      ["k_slash",64,0,0,"haut"],["kopf_lizard",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:iron"],["arme",64,0,0,"metall:iron"],
-      ["schulter",64,0,0,"metall:iron"],
-      ["z_hoerner",64,0,0,"haut"],
-      ["s_schwanz_fg",64,0,0,"haut"],
-      ["z_fluegel_fg",64,0,0,"haut"]]},
+    // RHYX'TAL STAND HIER FRUEHER als eigene GARGOYLE-Ebenenliste (Stein-Ton fur_grey,
+    // z_hoerner, z_fluegel_bg/fg vorn/hinten um den Koerper). Sprite-Konsistenz-Check
+    // (Chris' Fund, s. kaderFigur()/figur()-Header): das war ein VERALTETER Bauplan, von
+    // BEVOR BAU["Rhyx'Tal"] unten (kopf:"lizard",fluegel:true,hoerner:true) feststand, und
+    // figur() liest B_FIGUR VOR dem BAU-Rueckfall — die Kader-/Aufstellungskarte zeigte
+    // deshalb dauerhaft den alten Stand: Fluegel in der Frontalpose eng um den Koerper
+    // gefaltet, kaum als Fluegel zu erkennen, statt der Seitenpose/Faerbung, die
+    // zeichneSprite() (Live-Kampf) laengst ueber b.fluegel/zeichneFluegel zeigt. Ersatzlos
+    // gestrichen: derselbe BAU-Bauplan reicht jetzt fuer alle drei Ansichten (Kader-Karte,
+    // Aufstellung, Kampf) — EIN Charakter, ein Bild, wie gefordert.
 
     // Bild: rothaarige ELFE mit LANGBOGEN und Koecher, gruener Umhang, leichte Ruestung.
     "Cassandra":{haut:"light", ebenen:[
@@ -534,20 +518,21 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["haar_lang",64,0,0,"haar:blonde"],
       ["schild_fg",64,0,0,"metall:steel"],["sw_fg",128,-32,-32,null]]},
-    "Lava Golem":{haut:"olive", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_frankenstein",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:brass"],["arme",64,0,0,"metall:brass"],
-      ["r_slash",64,0,0,"metall:brass"],["schulter",64,0,0,"metall:brass"]]},
+    // LAVA GOLEM STAND HIER FRUEHER als eigene Ebenenliste (kopf_frankenstein, olive Haut,
+    // Messing-Ruestung) — derselbe veraltete Bauplan wie bei Rhyx'Tal oben, aus der Zeit
+    // VOR dem echten Vollbild (24./25.08., s. BAU["Lava Golem"] unten: vollbild:"golem",
+    // vollbildFarbe, gluehenderRiss). figur() liest B_FIGUR zuerst, die Kader-/Aufstellungs-
+    // karte zeigte deshalb dauerhaft einen generischen Ruestungs-Skin statt der rot/
+    // schwarzen Lavariss-Optik, die zeichneSprite() (Live-Kampf) laengst zeigt. Ersatzlos
+    // gestrichen, aus demselben Grund wie bei Rhyx'Tal.
     "Greenkraut":{haut:"green", ebenen:[
       ["k_slash",64,0,0,"haut"],["kopf_orc",64,0,0,"haut"],
       ["leder_slash",64,0,0,null],["binde",64,0,0,"stoff:walnut"],
       ["haar_dread",64,0,0,"haar:green"]]},
-    "Tidesprinter":{haut:"blue", ebenen:[
-      ["sw_bg",128,-32,-32,null],
-      ["s_schwanz_bg",64,0,0,"haut"],
-      ["k_slash",64,0,0,"haut"],["kopf_lizard",64,0,0,"haut"],
-      ["leder_slash",64,0,0,null],["stiefel",64,0,0,"metall:brass"],
-      ["s_schwanz_fg",64,0,0,"haut"],["sw_fg",128,-32,-32,null]]},
+    // TIDESPRINTER STAND HIER FRUEHER als eigene Ebenenliste (Echsenkopf, blaue Haut,
+    // Messing-Stiefel, Schwert) — derselbe veraltete Bauplan wie bei Lava Golem/Rhyx'Tal,
+    // aus der Zeit VOR dem Froschmensch-Vollbild (s. BAU["Tidesprinter"] unten:
+    // vollbild:"froschmensch"). Ersatzlos gestrichen, aus demselben Grund.
     // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab, Feuer im Schnee.
     // Keine Ruestung, keine Klinge — ein Weiser, kein Kaempfer. Passt zu seinen Werten:
     // Charisma 85, Spirit 76, Wille 72, Entschlossenheit 81, dagegen Power 10.
