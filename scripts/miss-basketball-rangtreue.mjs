@@ -202,13 +202,33 @@ function werteAus(daten) {
   const rebDefSumme = alleSpiele.reduce((s, g) => s + (g.rebDef || 0), 0);
   const rebGesamt = rebOffSumme + rebDefSumme;
 
-  const teamDiffZw = [], teamDiffReb = [];
+  // Team-Ebene ueber die QUOTE, nicht ueber die Rohzahl. Ein starkes Angriffsteam wirft
+  // oefter und produziert damit mehr gegnerische Defensiv-Rebounds — auf der Rohzahl sieht
+  // es dadurch schwaecher aus, als es ist. Gemessen wird deshalb
+  //   OREB% = eigene Offensiv-Rebounds / eigene Fehlwuerfe
+  //   DREB% = eigene Defensiv-Rebounds / gegnerische Fehlwuerfe
+  // und korreliert wird die ZWEITCHANCE-Differenz gegen die Differenz aus OREB%+DREB%.
+  // TEAM-EBENE: kein Korrelationsmass. Beide Kader sind ueber alle Laeufe FIX (SQUAD/OPP);
+  // die ZWEITCHANCE-Summe je Seite schwankt nur ueber die Formkarten, also kaum — eine
+  // Korrelation darauf misst Rauschen und sprang in der Messung wild zwischen -0,48 und
+  // +0,72. Statt dessen der direkte Vergleich: welche Seite bringt mehr ZWEITCHANCE aufs
+  // Feld, und holt genau die auch die hoehere Rebound-QUOTE? Die Quote statt der Rohzahl,
+  // weil ein starkes Angriffsteam oefter wirft und damit mehr gegnerische Defensiv-
+  // Rebounds erzeugt — die Rohzahl laesst es dadurch schwaecher aussehen, als es ist.
+  //   OREB% = eigene Offensiv-Rebounds / eigene Fehlwuerfe
+  //   DREB% = eigene Defensiv-Rebounds / gegnerische Fehlwuerfe
+  const zwSeite = [0, 0], quoteSeite = [0, 0], quoteN = [0, 0];
   const rhoRebSpieler = [];
   for (const s of alleSpiele) {
-    const t0 = s.spieler.filter((p) => p.side === 0), t1 = s.spieler.filter((p) => p.side === 1);
-    const sum = (t, k) => t.reduce((x, p) => x + p[k], 0);
-    teamDiffZw.push(sum(t0, "ZWEITCHANCE") - sum(t1, "ZWEITCHANCE"));
-    teamDiffReb.push(sum(t0, "rebounds") - sum(t1, "rebounds"));
+    const sum = (seite, k) => s.spieler.filter((p) => p.side === seite).reduce((x, p) => x + p[k], 0);
+    const fehl = s.fehlSeite, ro = s.rebOffSeite, rd = s.rebDefSeite;
+    for (const seite of [0, 1]) zwSeite[seite] += sum(seite, "ZWEITCHANCE") / alleSpiele.length;
+    if (fehl && ro && rd && fehl[0] > 0 && fehl[1] > 0) {
+      for (const seite of [0, 1]) {
+        quoteSeite[seite] += ro[seite] / fehl[seite] + rd[seite] / fehl[1 - seite];
+        quoteN[seite]++;
+      }
+    }
     const r = spearman(s.spieler.map((p) => p.rebounds), s.spieler.map((p) => p.ZWEITCHANCE));
     if (r != null) rhoRebSpieler.push(r);
   }
@@ -251,7 +271,9 @@ function werteAus(daten) {
     rebound: {
       offAnteil: rebGesamt ? rund((rebOffSumme / rebGesamt) * 100, 1) : null, // Ziel ~26 %
       jeSpiel: rund(rebGesamt / alleSpiele.length, 1),
-      teamRho: rund(pearson(teamDiffZw, teamDiffReb)), // Achse 2, Teamebene
+      zwTeam0: rund(zwSeite[0], 1), zwTeam1: rund(zwSeite[1], 1),
+      quoteTeam0: quoteN[0] ? rund(quoteSeite[0] / quoteN[0], 3) : null,
+      quoteTeam1: quoteN[1] ? rund(quoteSeite[1] / quoteN[1], 3) : null,
       spielerRho: rund(mittel(rhoRebSpieler)),         // Achse 2, Spielerebene
     },
     kontext: {
@@ -315,23 +337,68 @@ console.log(
 console.log("Usage% = Feldwurfanteil des eignungsstaerksten Spielers seiner Seite (Gleichverteilung: " +
   ergebnisse.map((e) => e.jeSeite + "->" + e.kontext.gleichverteilung + "%").join(", ") + ")");
 console.log("\nRebounds — zwei getrennte Achsen:");
-console.log("jeSeite  OFF-Anteil (Ziel ~26%)  Reb/Spiel  Achse2 Team-rho  Achse2 Spieler-rho");
+console.log("jeSeite  OFF-Anteil (Ziel ~26%)  Reb/Spiel  ZWEITCH T0/T1  Reb-Quote T0/T1  Spieler-rho");
 for (const e of ergebnisse) {
+  const r = e.rebound;
   console.log(
-    String(e.jeSeite).padStart(7) + String(e.rebound.offAnteil).padStart(23) +
-      String(e.rebound.jeSpiel).padStart(11) + String(e.rebound.teamRho).padStart(17) +
-      String(e.rebound.spielerRho).padStart(20),
+    String(e.jeSeite).padStart(7) + String(r.offAnteil).padStart(23) +
+      String(r.jeSpiel).padStart(11) +
+      `   ${r.zwTeam0}/${r.zwTeam1}`.padEnd(17) +
+      `${r.quoteTeam0}/${r.quoteTeam1}`.padEnd(17) +
+      String(r.spielerRho).padStart(11),
   );
 }
 console.log("  Achse 1 (OFF-Anteil) ist ein reales Spiel-Faktum, unabhaengig von Teamstaerke.\n" +
-  "  Achse 2 misst, ob das Rebound-Rating entscheidet, WER sie holt — Team-rho korreliert die\n" +
-  "  ZWEITCHANCE-Differenz beider Teams mit ihrer Rebound-Differenz (bei 2K waere sie ~0).");
+  "  Achse 2: die Seite mit der hoeheren ZWEITCHANCE-Summe muss auch die hoehere Rebound-Quote\n" +
+  "  haben (OREB%+DREB%). Bei 2K waeren beide Quoten per Konstruktion gleich.");
 
 for (const e of ergebnisse) {
   console.log(`\njeSeite ${e.jeSeite} — S je Distanzstufe: ` +
     Object.entries(e.probeS.tierJeStufe)
       .map(([t, z]) => (z ? `${t} ${z.offen}/${z.eng} (${z.dPp >= 0 ? "+" : ""}${z.dPp}, n=${z.n})` : `${t} —`))
       .join("  "));
+}
+
+// SPIELER-AGGREGAT ueber ALLE Spiele der groessten Feldgroesse. Das ist die Ansicht, in
+// der Chris' eigener Live-Befund nachpruefbar wird: Lava Golem (Eignung ~22, weil die
+// Basketball-Matrix intelligence/awareness/spirit/dexterity/speed bepreist und er dort
+// 1-2 hat — nur Charisma 94 haelt ihn ueberhaupt ueber null) bekam beim Zuschauen 2-3
+// eigene Wuerfe, traf 2/3 und landete mit Impact 8,0 auf Platz 2 SEINES TEAMS. Genau das
+// darf nach dem Umbau nicht mehr regelmaessig passieren: bei konzentrierter Usage soll er
+// kaum noch Baelle bekommen, wenn deutlich bessere Optionen im Team stehen.
+//
+// Ausgewiesen wird deshalb je Spieler: mittlere Wurfversuche, mittlerer Impact, mittlerer
+// Rang IM EIGENEN TEAM und der Anteil der Spiele, in denen er in seinem Team unter den
+// besten zwei landet.
+{
+  const satz = rohdaten[rohdaten.length - 1];
+  const je = new Map();
+  for (const g of satz.spiele) {
+    for (const seite of [0, 1]) {
+      const t = g.spieler.filter((p) => p.side === seite).sort((a, b) => b.wert - a.wert);
+      t.forEach((p, i) => {
+        if (!je.has(p.n)) je.set(p.n, { eig: 0, fga: 0, fgm: 0, wert: 0, pkt: 0, rang: 0, top2: 0, k: 0, side: p.side });
+        const z = je.get(p.n);
+        z.eig += p.eig; z.fga += p.fga; z.fgm += p.fgm; z.wert += p.wert; z.pkt += p.punkte;
+        z.rang += i + 1; z.top2 += i < 2 ? 1 : 0; z.k++;
+      });
+    }
+  }
+  console.log(`\nSpieler-Aggregat ueber ${satz.spiele.length} Spiele, jeSeite ${satz.jeSeite} (Rang = Impact-Rang im EIGENEN Team):`);
+  console.log("Spieler                 Seite    Eig   FGA/Sp  FG%    Pkt/Sp  Impact  Rang  Top2-Anteil");
+  const reihen = [...je].map(([name, z]) => ({ ...z, name })).sort((a, b) => b.eig / b.k - a.eig / a.k);
+  for (const r of reihen) {
+    console.log(
+      r.name.padEnd(24) + String(r.side).padStart(3) +
+        (r.eig / r.k).toFixed(1).padStart(8) +
+        (r.fga / r.k).toFixed(2).padStart(8) +
+        (r.fga ? ((r.fgm / r.fga) * 100).toFixed(1) : "—").padStart(7) +
+        (r.pkt / r.k).toFixed(1).padStart(9) +
+        (r.wert / r.k).toFixed(1).padStart(8) +
+        (r.rang / r.k).toFixed(2).padStart(7) +
+        ((r.top2 / r.k) * 100).toFixed(0).padStart(9) + " %",
+    );
+  }
 }
 
 // BEISPIELSPIEL: das erste Spiel der groessten gemessenen Feldgroesse, nach Eignung

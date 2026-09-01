@@ -658,3 +658,126 @@ ganzen Runde** und sollte vor der nächsten Disziplin passieren, nicht danach.
 `lib/resolve/rank-to-points.ts` (`resolveDisciplinePlayerCount`) ·
 `docs/BATTLE_ARENA_UEBERGABE.md` (Feldspiel-Chassis) ·
 `docs/design/battle-mode-gameplay-grundmodell.md` (A.1, A.2, B.2, C.4).
+
+---
+
+## 10. Ergebnis (nachgetragen nach Phase 2/3)
+
+Alle Zahlen: `node scripts/miss-basketball-rangtreue.mjs 120 2,4,6`, gegen die eingefrorene
+Vorher-Kopie (`baue-battle-artefakt.mjs` aus dem Stand vor den Eingriffen, mit **derselben**
+Sonde).
+
+### Rangtreue und Rollenproben
+
+| Größe | | vorher | nachher | Ziel |
+|---|---|---|---|---|
+| 6v6 | ρ(gesamt) | 0,605 | **0,740** | ≥ 0,70 ✅ |
+| 6v6 | ρ(je Seite) | 0,594 | **0,731** | — |
+| 4v4 | ρ(gesamt) | 0,669 | **0,754** | ≥ 0,70 ✅ |
+| 2v2 | ρ(gesamt) | 0,182 | 0,239 | ≥ 0,70 ❌ |
+| 6v6 | Probe V: ΔPunkte | −17,6 % | **−32,5 %** | ≤ −25 % ✅ |
+| 6v6 | Probe V: ΔFG% | −3,9 Pp | −4,1 Pp | ≤ −8 Pp ❌ |
+| 6v6 | Offensiv-Rebound-Anteil | 46,2 % | **25,0 %** | 24–28 % ✅ |
+| 6v6 | Rebound-ρ je Spieler | 0,705 | **0,806** | steigend ✅ |
+| 6v6 | Feldwürfe/Spiel | 28,8 | **41,0** | ≥ 45 ⚠️ |
+| 6v6 | Punkte/Spiel | 31,4 | 42,3 | — |
+| 6v6 | Usage des Besten | 29,6 % | 32,9 % | — |
+
+**Probe V, ΔFG% verfehlt — und der Grund ist bekannt, nicht offen.** Durchgemessen:
+`KONTEST_K` von 0,006 auf 0,011 (fast doppelte Kontest-Wirkung) verbessert die Zahl nur von
+−3,5 auf −3,9 Pp und **verschlechtert** dabei die Punkt-Unterdrückung (−30,3 → −25,4 %). Der
+begrenzende Faktor ist keine zu schwache Kontest-Formel, sondern eine **Auswahlwirkung**:
+gegen einen starken Decker gibt der Ballführer häufiger ab (`kickOutChance`), die genommenen
+Würfe sind also die leichteren. Exakt dieselbe Selektionsverzerrung, die der
+Bedrängnis-Bugfix vom 26.08. schon einmal an anderer Stelle aufgedeckt hat. Die
+**Punkt**-Unterdrückung von −32,5 % ist die Größe, die Chris' Anforderung tatsächlich
+abbildet: der gedeckte Mann kommt weniger zum Zug und trifft insgesamt seltener.
+
+### Was jeder Eingriff einzeln gebracht hat (6v6, ρ(gesamt), n=60)
+
+| Stand | ρ | Bemerkung |
+|---|---|---|
+| Ist-Zustand | 0,623 | |
+| + (a) κ=3 | 0,648 | κ=2 gegengemessen: 0,635 — κ=3 gewählt |
+| + (b1) Paar-Abstand | 0,651 | Probe V dreht erstmals ins Richtige: −10,9 Pp / −28,3 % |
+| + (b2) logistisch | 0,708 | größter Einzelsprung |
+| + (c) Usage | 0,718 | Usage 29,1 → 33,2 % |
+| + (d) Spieldauer | 0,785 (n=30) | FGA 29,1 → 43,7 |
+| + (e) Ausboxen | 0,740 (n=120) | OFF-Rebound-Anteil 46 → 25 % |
+
+### Chris' eigener Live-Befund, nachgeprüft (120 Spiele, 6v6)
+
+**Lava Golem** (Eignung 23,1 — die Basketball-Matrix bepreist intelligence/awareness/
+spirit/dexterity/speed, wo er 1–2 hat; nur Charisma 94 hält ihn über null) landete beim
+Zuschauen mit Impact 8,0 auf **Platz 2 seines Teams**:
+
+| | vorher | nachher |
+|---|---|---|
+| Anteil Spiele in den Top 2 seines Teams | **13 %** | **2 %** |
+| mittlerer Impact-Rang im Team (von 6) | 4,42 | 4,72 |
+| Feldwurfanteil seines Teams | 3,9 % | **2,5 %** |
+| Trefferquote | 33,3 % | 22,1 % |
+| Punkte/Spiel | 1,1 | 0,6 |
+
+Und das Gegenstück, **King Arlen Morgolor** (Eignung 69,6, der Stärkste des Feldes):
+
+| | vorher | nachher |
+|---|---|---|
+| Anteil Spiele in den Top 2 seines Teams | 82 % | **95 %** |
+| mittlerer Impact-Rang im Team | 1,78 | **1,28** |
+| Punkte/Spiel | 5,2 | **10,7** |
+| Trefferquote | 55,6 % | **67,6 %** |
+| Impact | 9,4 | **16,4** |
+
+Das ist die NBA-2K-Erwartung, in echten Spielerdaten: der Star steht verlässlich vorn mit
+passenden Stats, der Schwache fällt ans Ende, wo seine Eignung ihn hinstellt.
+
+### Mittelwerttreue der Wurfkalibrierung
+
+| Distanzstufe | Soll (Vorher-Stand) | Nachher | Δ |
+|---|---|---|---|
+| dunk | 92,3 % | 91,5 % | −0,8 |
+| nah | 43,9 % | 42,2 % | −1,7 |
+| mit | 41,9 % | 38,9 % | −3,0 |
+| fern (n=1148) | 36,2 % | 36,1 % | −0,1 |
+
+Zwei Nachzieh-Durchgänge waren nötig, nicht einer (§5 Schritt 4 hatte einen angesetzt): die
+Jensen-Korrektur verändert selbst wieder die Wurfauswahl, ein Restfehler ist also zu
+erwarten. Beide Durchgänge sind Messungen, keine Handjustage.
+
+### Achse 2 der Rebounds, über alle drei Feldgrößen bestätigt
+
+Die Seite mit der höheren `ZWEITCHANCE`-Summe hat in **jeder** Feldgröße die höhere
+Rebound-Quote (OREB% + DREB%):
+
+| jeSeite | ZWEITCHANCE T0/T1 | Rebound-Quote T0/T1 |
+|---|---|---|
+| 2 | 70,8 / 59,5 | **1,635** / 0,684 |
+| 4 | 168,3 / 172,5 | 0,799 / **1,455** |
+| 6 | 258,5 / 280,5 | 0,894 / **1,368** |
+
+Damit gilt gleichzeitig: die reale 74:26-Grundverteilung (Achse 1) **und** die
+Rating-Sensitivität zwischen den Teams (Achse 2), die 2K nicht hat.
+
+Eine methodische Warnung dazu, die beim Messen aufgefallen ist: eine **Korrelation** über
+die Spiele taugt hier nicht. Beide Kader sind über alle Läufe fix (`SQUAD`/`OPP`), die
+`ZWEITCHANCE`-Summe je Seite schwankt nur über die Formkarten — die Korrelation sprang
+zwischen −0,48 und +0,72 und maß Rauschen. Und die rohe Rebound-**Zahl** taugt ebenfalls
+nicht: ein starkes Angriffsteam wirft öfter, erzeugt damit mehr gegnerische
+Defensiv-Rebounds und sieht in der Rohzahl schwächer aus, als es ist. Deshalb Quoten und
+ein direkter Vergleich statt einer Korrelation.
+
+### Was offen bleibt
+
+1. **2v2 (ρ 0,239).** Siehe §6 — bei zwei Spielern je Seite ist ρ die nackte
+   Paarvergleichs-Trefferquote, und die Slot-Vergabe (`zuordneSlots` nach `SCHUSS_NAH`)
+   entscheidet dort fast allein, weil einer der beiden zwangsläufig auf dem korbnahen Slot
+   mit `GEO_BONUS.dunk` 0,70 steht. Ein Spieler mit hoher Gesamteignung, aber schwachem
+   `SCHUSS_NAH`, verliert diesen Positionskampf und damit das Spiel. Das ist eine
+   **Slot-Frage, keine Kurven-Frage** — und der nächste Ansatzpunkt, falls Chris kleine
+   Feldgrößen wichtig sind.
+2. **Feldwürfe 41,0 statt ≥ 45.** Der Zielkorridor wurde knapp verfehlt; die restliche
+   Lücke ginge nur über noch mehr Spielzeit.
+3. **Die Spieldauer selbst** (§3d) ist die eine Änderung, die Chris bewusst annehmen oder
+   ablehnen muss. Eine Zeile zurück auf 120 nimmt sie vollständig zurück und kostet
+   ρ 0,740 → ~0,718; alles andere bleibt bestehen.
