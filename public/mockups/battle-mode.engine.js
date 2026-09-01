@@ -13377,6 +13377,21 @@
       const o=opt||{};
       const n=o.n||10, dauer=o.dauer||(SPIELDAUER_BASKETBALL+5), saat0=o.saat0!=null?o.saat0:1337;
       const schritt=o.schritt||7919;
+      // TICK-DECKEL DER SONDE (01.09. geraeumt, zweite Fundstelle derselben Runde wie in
+      // spieleBasketball unten): hier stand fest `guard<20000` — 20000 Ticks a 1/60 s,
+      // also 333 s Simulationszeit, waehrend `dauer` per Vorgabe SPIELDAUER_BASKETBALL+5
+      // = 365 s ist. Der Deckel griff damit VOR der Schranke, die er absichern sollte:
+      // nachgemessen (12 Spiele, jeSeite 6, guard/fsT/done instrumentiert) lief JEDES
+      // Spiel in den Deckel, `done` war 12 von 12 Mal false, und die Uhr stand bei 306,9
+      // bis 330,3 s von 360 s — 30 bis 53 s je Spiel fehlten, mitten im vierten Viertel
+      // abgeschnitten. Die Streuung kommt daher, dass angehaltene Uhr (Freiwurf-Stand-
+      // phasen, Viertelpausen) Ticks verbraucht, ohne `fsT` zu bewegen. Genau dafuer
+      // rechnet der Deckel jetzt eine Reserve ein — dieselbe Groesse und dieselbe
+      // Begruendung wie in MOTOREN[fd].lauf() (s. der Opus-Review-Fund dort): aus `dauer`
+      // abgeleitet statt als zweite Zahl gepflegt, damit beide nicht auseinanderlaufen,
+      // plus 60 s fuer die Standphasen. Er bleibt eine echte Notbremse gegen eine
+      // Endlosschleife, liegt aber jetzt OBERHALB der Spieldauer statt darunter.
+      const tickDeckel=Math.ceil((dauer+60)*60);
       const art=FELDSPIEL_ART.basketball, altJeSeite=art.jeSeite;
       const M=MOTOREN.basketball, gesichert=M.sichern();
       if(o.jeSeite)art.jeSeite=o.jeSeite;
@@ -13388,7 +13403,7 @@
           feldspielDisc="basketball"; bauFeldspiel(saat0+i*schritt);
           const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
           let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
-          while(!done&&fsT<dauer&&guard<20000){
+          while(!done&&fsT<dauer&&guard<tickDeckel){
             stepFeldspiel(1/60); guard++;
             if(!fsLive)continue;
             if(fsLive.amBall!==letzteSeite){ ballwechsel++; letzteSeite=fsLive.amBall; }
