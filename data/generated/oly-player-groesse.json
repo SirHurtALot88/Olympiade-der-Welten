@@ -5444,6 +5444,10 @@
     "groesse": 5
   },
   {
+    "name": "Lakshmi Ekelmann",
+    "groesse": 5
+  },
+  {
     "name": "Lamayan",
     "groesse": 5
   },
@@ -9060,6 +9064,10 @@
     "groesse": 6
   },
   {
+    "name": "Sir Galahad",
+    "groesse": 5
+  },
+  {
     "name": "Sir Gawain",
     "groesse": 6
   },
@@ -10461,7 +10469,7 @@
   },
   {
     "name": "Undgutis Duschdas",
-    "groesse": null
+    "groesse": 5
   },
   {
     "name": "Undying",
@@ -10930,6 +10938,10 @@
   {
     "name": "Violetscale",
     "groesse": 6
+  },
+  {
+    "name": "VIP Wal",
+    "groesse": 7
   },
   {
     "name": "Viper",
