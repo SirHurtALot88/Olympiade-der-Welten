@@ -534,10 +534,19 @@
       ["r_slash",64,0,0,"metall:steel"],["arme",64,0,0,"metall:steel"],
       ["haar_lang",64,0,0,"haar:blonde"],
       ["schild_fg",64,0,0,"metall:steel"],["sw_fg",128,-32,-32,null]]},
-    "Lava Golem":{haut:"olive", ebenen:[
-      ["k_slash",64,0,0,"haut"],["kopf_frankenstein",64,0,0,"haut"],
-      ["beine",64,0,0,"metall:brass"],["arme",64,0,0,"metall:brass"],
-      ["r_slash",64,0,0,"metall:brass"],["schulter",64,0,0,"metall:brass"]]},
+    // KEIN B_FIGUR-Eintrag fuer Lava Golem (Bug, gefunden 01.09. am Aufstellungs-Screen,
+    // Chris-Screenshot: das Rollenkaertchen zeigte einen olivfarbenen "Frankenstein"-Kopf
+    // mit Messing-Ruestung statt des roten/schwarzen Golem-Vollbilds). Es gab hier frueher
+    // genau so einen Eintrag ({haut:"olive", ebenen:[...kopf_frankenstein...]}) -- eine
+    // handgebaute Ebenenliste aus der Zeit VOR der Vollbild-Umstellung (s. BAU["Lava
+    // Golem"]: vollbild:"golem", vollbildFarbe:"#7a1f1f", seit 25.08.). figur() (s. dort)
+    // prueft B_FIGUR ZUERST und kehrt bei einem Treffer sofort zurueck -- der Eintrag hier
+    // gewann deshalb IMMER gegen den vollbild-Zweig, egal wie gut der ausgearbeitet ist.
+    // Genau der Fall, den der Kommentar bei figur()/b.vollbild als "betraf Lava Golem,
+    // Terradon, Abysskraken, Brightpaw" beschreibt -- nur dass Lava Golem hier (anders als
+    // die anderen drei) eben DOCH einen B_FIGUR-Eintrag hatte und deshalb nie beim
+    // vollbild-Zweig ankam. Ohne den Eintrag faellt Lava Golem jetzt wie die anderen drei
+    // korrekt durch auf die vollbild-Behandlung.
     "Greenkraut":{haut:"green", ebenen:[
       ["k_slash",64,0,0,"haut"],["kopf_orc",64,0,0,"haut"],
       ["leder_slash",64,0,0,null],["binde",64,0,0,"stoff:walnut"],
