@@ -47,24 +47,38 @@ Eine Saison enthält je Disziplin nur eine Handvoll Spiele, im Eishockey zwei. E
 Rangtreue, die sich erst über zwanzig Spiele einstellt, ist für den Spieler deshalb nicht
 vorhanden. **Die Abnahmezahl ist rho in EINEM Spiel, Ziel über 0,80, angestrebt 0,85.**
 
-Das ist strenger, als es klingt, und es hat eine harte Grenze: die Test-Retest-
-Verlässlichkeit des Impacts. Sagt die Leistung eines Spielers in einem Spiel seine Leistung
-im nächsten nur mit 0,44 voraus, kann keine Korrelation mit einem festen Merkmal über
-`sqrt(0,44) = 0,67` steigen — egal wie gut das Rezept ist. Gemessen:
+Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
+vermutete, und der Unterschied entscheidet, wo man arbeitet.
 
-| | Basketball | Hockey (Stand 02.09.) |
+**Zwei Größen, nicht eine.** Eine Einzelspiel-Rangtreue zerfällt in ein Produkt:
+
+    rho(ein Spiel) = rho(Saison) x Wurzel(Verlaesslichkeit)
+
+Die **Verlässlichkeit** sagt, wie gut ein Spiel das nächste vorhersagt — sie hängt an der
+Ereigniszahl. Die **Validität** (rho über die Saison) sagt, ob die Mechanik überhaupt das
+belohnt, was die Eignung misst — sie hängt am Rezept und an den Kanälen. Nachgemessen für
+Hockey (24 Spiele, 10 Feldspieler): Verlässlichkeit 0,755, Validität 0,82, Produkt 0,71 —
+und gemessen kommt 0,719 heraus, die Formel trägt auf ±0,01.
+
+**Mehr Ereignisse helfen fast nie.** Bei Hockey mit verdoppelter Spielzeit stieg die
+Verlässlichkeit von 0,755 auf 0,85 — und rho blieb bei 0,719 / 0,721 / 0,723. Flach.
+Unser Hockeyspiel hat je Minute bereits die dreizehnfache NHL-Ereignisdichte. **Wer die
+Rangtreue heben will, arbeitet an der Validität, nicht an der Uhr.**
+
+**Was rho drückt, ist oft gar kein Fehler.** In Hockey steht der eignungsbeste Feldspieler
+in 79 % der Spiele auf Rang 1, in 94 % in den ersten zwei, nie auf dem letzten. Paare mit
+mindestens 15 Eignungspunkten Abstand werden zu 99 % richtig geordnet. Was rho nach unten
+zieht, sind Paare unter zwei Punkten Abstand — die kann kein Motor der Welt ordnen, und sie
+sollen es auch nicht. **Die ehrlichere Abnahme fragt deshalb nach dem Star und nach der
+Paartreue mit Abstand**, nicht nach einer nackten Rangkorrelation über alle Paare.
+
+| Größe | Hockey | Basketball |
 |---|---:|---:|
-| rho je Spiel | 0,836 | 0,706 |
-| Test-Retest des Impacts | 0,761 | 0,443 |
-| Deckel = Wurzel daraus | 0,87 | 0,67 |
-
-Der Unterschied ist die **Ereigniszahl je Spiel**: Basketball hat 82 Würfe und 87 Punkte,
-Hockey 26 Schussversuche und 6,6 Tore. Wer eine neue Disziplin baut, muss deshalb ZUERST
-fragen, wie viele wertende Ereignisse ein Spiel überhaupt hervorbringt — nicht zuletzt das
-Rezept. Zwei Hebel gibt es: mehr Ereignisse (Spielzeit, Tempo, Zweikampfrate) und ein
-Impact-Maß aus den verlässlichen Größen (im Eishockey sind Schüsse und gewonnene Zweikämpfe
-weit verlässlicher als Tore — derselbe Befund, aus dem in der NHL Corsi und Game Score
-entstanden sind).
+| rho je Spiel | 0,706 | 0,836 |
+| Verlässlichkeit des Impacts | 0,755 | 0,761 |
+| Validität (Saison) | 0,82 | — |
+| Star auf Rang 1 | 79 % | — |
+| Star in den ersten zwei | 94 % | — |
 
 Werkzeuge dafür: `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` für die Zahl selbst,
 `scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48`, wenn eine Rolle (Torwart) eine eigene

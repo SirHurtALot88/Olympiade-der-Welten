@@ -14575,8 +14575,14 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
-    renderProbe:(name,ani,feldspiel,dir,lunge)=>{
-      const c=document.createElement("canvas"); c.width=64; c.height=64;
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand)=>{
+      // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
+      // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
+      // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
+      // KLEIN und meldete eine Rangkorrelation von 0,67, wo in Wahrheit 1,00 stand. Der
+      // Ankerpunkt waechst mit, damit die Figur weiter auf demselben relativen Boden steht.
+      const gr=Math.max(64,Math.round(leinwand||64));
+      const c=document.createElement("canvas"); c.width=gr; c.height=gr;
       const ctx=c.getContext("2d");
       // dir (0-3, optional) erzwingt eine Blickrichtung ueber vx/vy statt sich auf den
       // ani==="walk"-Normalfall (immer "rechts") zu verlassen — noetig, um Vollbild- und
@@ -14587,7 +14593,14 @@
       // 0 hinten(vy<0), 1 links(vx<0), 2 vorn(vy>0), 3 rechts(vx>0), s. blickAus().
       const richtung=[[0,-5],[-5,0],[0,5],[5,0]];
       const [vx,vy]=dir!==undefined&&dir!==null?richtung[dir]:[ani==="walk"?5:0,0];
-      const u={n:name,x:32,y:46,vx,vy,id:0,
+      // GROESSE MITGEBEN. Sie fehlte hier, und damit zeichnete die Sonde JEDE Figur mit
+      // Faktor 1 — eine Groessenpruefung ueber renderProbe verglich also nur die
+      // Rohbilder der Blaetter und sagte ueber die eingestellte Groesse gar nichts.
+      // Gemessen fiel es auf, weil eine Figur der Groesse 5 hoeher gezeichnet wurde als
+      // eine der Groesse 8. Aus dem Kader gelesen, nicht als Aufrufwert: die Sonde soll
+      // zeigen, was das Spiel zeigt.
+      const kaderEintrag=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      const u={n:name,x:gr/2,y:gr*46/64,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
         lunge:lunge!==undefined&&lunge!==null?lunge:((ani==="slash"||ani==="shoot")?0.1:0),
         down:ani==="hurt",side:0,hop:0};
       zeichneSprite(ctx,u,32,46,!!feldspiel);

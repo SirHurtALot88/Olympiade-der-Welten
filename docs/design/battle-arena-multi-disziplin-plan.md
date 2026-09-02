@@ -165,36 +165,58 @@ eine Ordnung, die erst im Aggregat sichtbar wird, existiert für den Spieler nic
 **Neue Abnahmeschranke für jede Disziplin: rho über 0,80 in einem einzelnen Spiel,
 angestrebt 0,85.**
 
-### Warum das eine Struktur-, keine Rezeptfrage ist
+### Warum das eine Frage der Mechanik ist, nicht der Uhr
 
-Die Obergrenze jeder solchen Korrelation ist die Wurzel aus der Test-Retest-Verlässlichkeit
-des Impacts — wie gut die Leistung eines Spielers in einem Spiel seine Leistung im nächsten
-vorhersagt. Gemessen (Overseer, 02.09.):
+**Korrigiert am 02.09., nachdem der erste Anlauf sich verrechnet hatte.** Die erste Fassung
+dieses Abschnitts nannte einen Deckel von 0,67 und schloss daraus, Hockey sei je Einzelspiel
+nicht auf 0,80 zu bringen. Beides war falsch: der Deckel war ein Messartefakt (die
+Torwärter und die Formkarten steckten mit in der Rechnung), und der Schluss zeigte in die
+falsche Richtung.
 
-| | Basketball | Hockey vor der Balance-Runde | Hockey danach |
-|---|---:|---:|---:|
-| rho je Spiel | 0,836 | 0,439 | 0,706 |
-| Streuung von rho je Spiel | 0,06 | 0,23 | — |
-| Test-Retest des Impacts | 0,761 | 0,443 | — |
-| **Deckel = Wurzel daraus** | **0,87** | **0,67** | — |
-| davon erreicht | 96 % | 72 % | — |
+Eine Einzelspiel-Rangtreue zerfällt in ein Produkt zweier Größen:
 
-Basketball schöpft seinen Deckel fast aus; Hockeys Deckel liegt zu tief. Der Unterschied
-sind die Ereignisse je Spiel: 82 Feldwürfe und 87 Punkte gegen 26 Schussversuche und 6,6
-Tore. **Kein Rezept der Welt hebt eine Disziplin über ihren eigenen Deckel.**
+    rho(ein Spiel) = rho(Saison) x Wurzel(Verlaesslichkeit)
 
-### Was das für jede neue Disziplin heißt
+| Größe | was sie sagt | woran sie hängt |
+|---|---|---|
+| **Verlässlichkeit** | wie gut ein Spiel das nächste vorhersagt | Ereigniszahl je Spiel |
+| **Validität** = rho(Saison) | ob die Mechanik belohnt, was die Eignung misst | Rezept und Kanäle |
 
-1. **Ereignisdichte kommt vor Rezept.** Vor der ersten Sondierung steht die Frage, wie
-   viele WERTENDE Ereignisse ein Spiel hervorbringt. Zu wenige, und die Reihenfolge ist
-   Rauschen — ablesbar an der Streuung von rho je Spiel, nicht am Mittelwert.
-2. **Das Impact-Maß aus den verlässlichen Größen bauen.** Im Eishockey haben gewonnene
-   lose Pucks eine Test-Retest-Verlässlichkeit von 0,89, Schüsse 0,56, Tore nur 0,30. Genau
-   dieser Befund hat in der NHL zu Corsi, Fenwick und Game Score geführt: Schussbasierte
-   Größen tragen eine Einzelspiel-Aussage, Tore tragen sie nicht.
-3. **Rollen mit eigener Wertformel getrennt prüfen.** Der Hockey-Torwart hat die
-   Gesamtzahl allein um 0,10 bis 0,38 gedrückt, ohne dass am Rezept der Feldspieler etwas
-   falsch war. `scripts/miss-rangtreue-nach-rolle.mjs` trennt das.
+Nachgemessen für Hockey (24 Spiele, 10 Feldspieler, Einweg-ICC): Verlässlichkeit **0,755**,
+Validität **0,82**, Produkt 0,711 — gemessen 0,719. Die Formel trägt auf ±0,01, geprüft an
+drei Datensätzen.
+
+**Mehr Ereignisse helfen fast nie.** Mit verlängerten Dritteln (3x2:00 und 3x2:40) stieg
+die Verlässlichkeit auf 0,80 und 0,85 — und rho blieb bei **0,719 / 0,721 / 0,723**. Flach.
+Bezahlt hätte man mit 5,6 statt 3,2 Toren je Team (real 3,0) und doppelter Zuschauzeit.
+Unser Hockeyspiel hat je Minute ohnehin schon die dreizehnfache NHL-Ereignisdichte.
+
+**Wer die Rangtreue heben will, arbeitet an der Validität.** Für Hockey heißt das konkret:
+die gewonnenen losen Pucks tragen 40 % der Impact-Masse, sind mit einer Verlässlichkeit von
+0,94 die stabilste Größe im Spiel — und hängen an der AUFSTELLUNGSPOSITION statt an
+Attributen. Wer vorm Tor steht, holt sie. Das ist der Grund, warum die Validität bei 0,82
+klebt, und es ist Motorarbeit, keine Rezeptarbeit.
+
+### Was rho drückt, ist oft gar kein Fehler
+
+In Hockey steht der eignungsbeste Feldspieler in **79 %** der Spiele auf Rang 1, in **94 %**
+in den ersten zwei, in **0 %** auf dem letzten. Paare mit mindestens 15 Eignungspunkten
+Abstand werden zu **99 %** richtig geordnet. Was rho nach unten zieht, sind die 90 von 480
+Paaren mit weniger als zwei Punkten Abstand: dort liegt die Trefferquote bei 39 %, also beim
+Münzwurf — und das ist richtig so. Ein Motor, der auch die ordnet, ist einer, in dem der
+Ausgang aus der Aufstellung folgt statt aus dem Spiel.
+
+**Die ehrlichere Abnahme fragt deshalb nach dem Star und nach der Paartreue mit Abstand:**
+
+| Kriterium | Ziel | Hockey heute |
+|---|---:|---:|
+| Eignungsbester Feldspieler in den ersten zwei | ≥ 90 % | 94 % |
+| Paare ab 6 Eignungspunkten Abstand richtig | ≥ 90 % | 82 % |
+| Paare ab 15 Punkten richtig | ≥ 97 % | 99 % |
+| Rolle mit eigener Wertformel (Torwart) | getrennt geprüft | — |
+
+Die nackte Rangkorrelation bleibt als Kennzahl daneben stehen; sie ist nur nicht mehr die
+einzige, und sie ist nicht die, an der eine Disziplin scheitert.
 
 ### Werkzeuge
 
