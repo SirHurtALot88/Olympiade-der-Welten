@@ -361,21 +361,33 @@ zweimal entsteht.
 
 ## 6. Was Chris entscheiden muss
 
-**6.1 Drei oder vier Tore je Team?** Der Vorschlag ist **3,5** bei 26 Abschlüssen und 13,5 %
-Trefferquote. Real sind 3,0 (NHL) beziehungsweise 3,02 (DEL 2024/25). Vier sind die
-Obergrenze; darüber verbringt ein Drittelspiel rund 27 % seiner Zeit mit Bullys nach Toren
-und stockt sichtbar.
+**6.1 — ENTSCHIEDEN: 3,5 Tore je Team.** Chris am 02.09.: „3,5 tore ist gut". Damit steht der
+Abnahme-Korridor fest: **3,5 Tore je Team** bei **26 Abschlüssen** und **13,5 % Trefferquote**,
+Fangquote des Torwarts entsprechend **86,5 %**. Real sind 3,0 (NHL 2024-25) beziehungsweise
+3,02 (DEL 2024/25) — wir liegen also rund 17 % darüber, das ist Chris' „ein paar Tore mehr".
 
 **6.2 — beantwortet.** Chris hat entschieden: benannter Torwart-Slot ab drei Spielern, bei
 zwei Spielern keiner. Damit steht auch die Reihenfolge: das Rohr von der Aufstellung zur
 Arena (Schritt R) kommt zuerst, weil der Torwart ohne es nicht zuweisbar ist.
 
-**6.3 Drei Drittel zu wie lang?** Aus dem alten Plan unbeantwortet: Basketball läuft 4×1:30,
-mit Dehnung rund 12 Minuten Zuschauzeit. Vorschlag Hockey: 3×1:20, rund 8 Minuten. Diese
-Zahl bestimmt direkt, wie lange du zuschaust — und zusammen mit 6.1, wie dicht die Tore
-fallen.
+**6.3 — ENTSCHIEDEN: 3 Drittel zu 1:20.** Chris am 02.09.: „und 3 drittel zu 1:20 auch".
+Also **240 s Simulationszeit**, mit Zeitdehnung rund 8 Minuten Zuschauzeit — etwas kürzer als
+Basketballs 4×1:30 (360 s, ~12 min), weil im Eishockey weniger Ereignisse fallen und ein
+leeres Drittel schnell lang wirkt.
 
----
+**Damit ist die Tempo-Rechnung geschlossen und alle drei Zahlen hängen zusammen:**
+
+| | Wert | Woher |
+|---|---:|---|
+| Spielzeit | **240 s** (3 × 80 s) | Chris |
+| Abschlüsse je Team | **26** | Basketballs Ereignisdichte (41 FGA je 360 s) auf 240 s |
+| Trefferquote | **13,5 %** | so gewählt, dass 26 × 13,5 % = 3,5 trifft |
+| **Tore je Team** | **3,5** | Chris |
+
+Die 26 Abschlüsse sind **keine freie Wahl**, sondern das, was 240 s bei Basketballs Tempo
+hergeben — und sie liegen zufällig dicht an der NHL-Zahl von 28,3. Genau deshalb braucht es
+die Schussuhr mit Klär-Ereignis: ohne sie kann eine Mannschaft den Puck laufen lassen, die
+Abschlusszahl fällt, und die Trefferquote müsste zum Ausgleich unrealistisch hoch werden.
 
 ## 7. Was ich nicht geprüft habe
 
