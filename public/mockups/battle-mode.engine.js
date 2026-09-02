@@ -4110,6 +4110,18 @@
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
   // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
   function klassifiziereWurfdistanz(zumKorb,erzwingen){
+    // EISHOCKEY HAT EIGENE SCHUSSWEITEN, s. HK_RADIUS_* — Basketballs Staffel endet bei
+    // 170 px, die blaue Linie liegt bei 295. Ohne diese Weiche gibt jeder Verteidiger,
+    // der auf seinem Slot steht, `null` zurueck: kein Schuss, nie, ausser die Schussuhr
+    // zwingt ihn. Der Schuss von der blauen Linie — im echten Eishockey die zweithaeufigste
+    // Schussart — kam im Spiel damit ueberhaupt nicht vor.
+    if(istHockey()){
+      if(zumKorb<HK_RADIUS_ABSTAUBER)return "dunk";
+      if(zumKorb<HK_RADIUS_SLOT)return "nah";
+      if(zumKorb<HK_RADIUS_HOCHSLOT)return "mit";
+      if(erzwingen||zumKorb<HK_RADIUS_MAX)return "fern";
+      return null;
+    }
     if(zumKorb<DUNK_RADIUS)return "dunk";
     if(zumKorb<KORB_NAH_RADIUS)return "nah";
     if(zumKorb<DREIER_RADIUS)return "mit";
@@ -4781,7 +4793,13 @@
   // PLATZHALTER und gegen die Torzahl gemessen (scripts/miss-hockey-korridor.mjs), nicht
   // geraten — aber sie sitzt auf Basketballs Wurfformel, nicht auf einer eigenen. Die
   // eigene Erfolgsformel und das Zonenmodell kommen in Schritt 4 des Hockey-Plans.
-  const HK_TOR_SKALA=0.700;
+  // NACHGEZOGEN 0,700 -> 0,440, weil die Hockey-Schussweiten (HK_RADIUS_*) das
+  // Schussvolumen von 26,6 auf 38,2 Versuche je Team gehoben haben: mit dem alten Faktor
+  // fielen 5,58 Tore je Team statt 3,5. Gemessen, 24 Spiele je Lauf:
+  //   Faktor 0,700 -> 5,58 Tore, Fangquote 83,3 %
+  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %   (gewaehlt)
+  // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
+  const HK_TOR_SKALA=0.440;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -4815,6 +4833,76 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
+  // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
+  // bei 78 (Netfront), 165 (Half-Wall) und 295 px (Point, blaue Linie). Mit Basketballs
+  // Deckel bei 170 gab `klassifiziereWurfdistanz` fuer BEIDE Verteidiger `null` zurueck —
+  // sie konnten von ihrer eigenen Position aus nie schiessen, nur die Schussuhr brachte
+  // sie ueberhaupt zum Abschluss.
+  //
+  // DER MASSSTAB, an dem die vier Zahlen haengen: der Point-Slot bei 295 px IST die blaue
+  // Linie, real 19,5 m bzw. 64 Fuss von der Torlinie. Das sind 4,6 px je Fuss. Damit
+  // uebersetzen sich die realen Schusszonen (Quellen in
+  // docs/design/hockey-torwart-puck-tore-recherche-fable.md, Abschnitt xG-Faktoren, dort
+  // "Tore peak around 10 feet") eins zu eins:
+  //   Abstauber/Direktabnahme im Torraum   bis 12 Fuss   ->  58 px
+  //   Slot                                 bis 30 Fuss   -> 140 px
+  //   hoher Slot / Bullykreise             bis 47 Fuss   -> 215 px
+  //   blaue Linie                          bis 72 Fuss   -> 330 px
+  // Jeder der drei Feldslots liegt damit in einer eigenen Stufe: Netfront (78) schiesst
+  // "nah", Half-Wall (165) "mit", Point (295) "fern".
+  const HK_RADIUS_ABSTAUBER=58, HK_RADIUS_SLOT=140, HK_RADIUS_HOCHSLOT=215, HK_RADIUS_MAX=330;
+  // Wunschdistanz des Puckfuehrers (s. bewegeSpielerLive). Basketball faehrt hier
+  // DREIER_RADIUS+18 = 130,8 als weitesten Punkt; wer im Hockey den Puck bekam, fuhr
+  // deshalb IMMER bis auf 131 px an das Tor heran, auch der Verteidiger, der gerade an der
+  // blauen Linie stand. 295 ist genau der Point-Slot: ein reiner Distanzschuetze bleibt
+  // dort stehen, wo ihn die Aufstellung ohnehin hinstellt, statt seinen Posten zu verlassen.
+  const HK_WUNSCH_MAX=295;
+  // LOSER PUCK ALS WETTLAUF, NICHT ALS STANDPLATZ (Chris woertlich, 02.09.: "Das muss
+  // dann auf jeden fall angepasst und gefixt werden das kann nicht nur positionssache
+  // sein").
+  //
+  // ZUERST DER BEFUND, DER DIE VERMUTUNG WIDERLEGT — und er steht hier, weil sonst der
+  // naechste dieselbe Runde noch einmal dreht. Die Vermutung war: der Zweikampf um den
+  // losen Puck traegt rund 40 % der Impact-Masse und haengt daran, wer im Moment der
+  // Aufloesung schon in GREIF_REICHWEITE steht, also an der Aufstellung. Nachgemessen ist
+  // das FALSCH (scripts/miss-losen-puck-quelle.mjs, 40 Spiele je Lauf):
+  //
+  //   Bezug                                       ZWEITCHANCE   SCHUSS_NAH (= Slot)
+  //   alter Stand                                    r 0,943        r 0,626
+  //   Slot-Reihenfolge komplett UMGEDREHT             r 0,950        r 0,605
+  //
+  // Der zweite Lauf ist der entscheidende: dort bekommt der SCHLECHTESTE SCHUSS_NAH den
+  // Netfront-Slot und der beste die blaue Linie. Waere der lose Puck Positionssache,
+  // muesste die Rangliste kippen. Sie kippt nicht — Greenkraut faellt von 17,5 auf 15,0
+  // Pucks je Spiel, Draco (13,5 -> 13,6) und Lava Golem (13,0 -> 13,2) bewegen sich gar
+  // nicht, und kein einziger Rang tauscht. Der lose Puck haengt praktisch vollstaendig an
+  // ZWEITCHANCE.
+  //
+  // WAS WIRKLICH KLEMMT, ist damit eine Etage tiefer und gehoert ins Rezept, nicht in
+  // diese Mechanik: ZWEITCHANCE ist einer der vier ausdruecklich UNKALIBRIERTEN
+  // Platzhalter-Sub-Skills (s. battle-mode.rezepte.js, Hockey-Block), traegt aber allein
+  // rund 47 % der Impact-Masse. Lava Golem ist nach Eignung der achtbeste Hockeyspieler
+  // des Kaders und hat den HOECHSTEN ZWEITCHANCE-Wert — er landet dadurch auf Impact-Rang
+  // 3. Solange ein einzelner Sub-Skill fast die halbe Wertung traegt und die Eignung ihn
+  // nur mit einem Elftel gewichtet, KANN die Rangtreue nicht stimmen. Das ist Schritt 4
+  // des Hockey-Plans (eigenes Sub-Skill-Set), nicht diese Runde.
+  //
+  // WARUM DIE UMSTELLUNG TROTZDEM BLEIBT. Sie aendert die Zahl nicht (gemessen), aber sie
+  // raeumt drei Sachverhalte auf, die vorher schlicht falsch modelliert waren: der
+  // Kandidatenkreis ist jetzt, wer den Puck im Laufzeitfenster ERREICHEN kann statt wer
+  // zufaellig danebensteht, ein Gestuerzter laeuft nicht mehr mit, und der Torwart
+  // startet keinen Wettlauf quer ueber das Eis. Auf ihr setzen die Puck-Zweikaempfe auf.
+  //
+  // Die Laufzeit rechnet mit derselben Tempoformel wie die Bewegung selbst (s.
+  // bewegeSpielerLive: 230 px/s plus 0,70 je LAUFTEMPO-Punkt ueber 50), inklusive
+  // Taumel-Bremse nach einem Bodycheck. Wer frueher da ist, behaelt seinen Vorteil — er
+  // geht als exponentiell fallendes Gewicht ein, nicht als Ja/Nein.
+  //
+  // PUCK_LAUF_FENSTER ist bewusst laenger als die Ringphase (0,40-0,55s): auch wer erst
+  // kurz nach der Aufloesung ankaeme, ist im Gerangel noch ein Faktor. TAU unter dem
+  // Fenster haelt den Ankunftsvorteil scharf — bei 0,45s Laufweg bleiben 28 % Gewicht.
+  const PUCK_LAUF_FENSTER=0.70, PUCK_ANKUNFT_TAU=0.35;
   // Torwart-Bewertung, s. feldspielWert. Alle drei PLATZHALTER, gegen die Rangtreue
   // gemessen: HK_TW_REF ist die gemessene Fangquote unserer Liga, HK_TW_BASIS der
   // gemessene Mittelwert der Feldspieler-Impacts, HK_TW_GSAA_K die Spreizung je Tor
@@ -6619,7 +6707,7 @@
         // Wurfauswahl rechnen unveraendert weiter.
         const profil=u.SCHUSS_FERN-u.SCHUSS_NAH;
         const anteil=Math.max(0,Math.min(1,(profil+12)/26));
-        const wunsch=(DREIER_RADIUS+18)*anteil;
+        const wunsch=(istHockey()?HK_WUNSCH_MAX:DREIER_RADIUS+18)*anteil;
         const zumFeldB=u.side===0?-1:1;
         zy=H/2+(u.id%2?40:-40);
         // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
@@ -7087,7 +7175,31 @@
         if(!nah.length){ fsLive.reboundKampf=null; } // Ball wieder ausser jeder Reichweite gerollt
         else if(fsLive.reboundKampf.t>=fsLive.reboundKampf.dauer){
           const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
-          const kandidaten=jetzt.length?jetzt:nah;
+          let kandidaten=jetzt.length?jetzt:nah;
+          // WETTLAUF UM DEN LOSEN PUCK (Hockey), Begruendung bei PUCK_LAUF_FENSTER.
+          // `ankunft` bleibt ausserhalb von Hockey null, dann ist das Gewicht unten
+          // Zeichen fuer Zeichen das alte — Basketball darf sich hier nicht bewegen.
+          let ankunft=null;
+          if(istHockey()){
+            ankunft=new Map();
+            const erreichbar=[];
+            for(const u of [...FSTEAM[0],...FSTEAM[1]]){
+              const weg=Math.max(0,dist(u,f)-GREIF_REICHWEITE);
+              // DER TORWART LAEUFT DEM PUCK NICHT NACH. Er bleibt nach der alten Regel
+              // Kandidat, wenn der Puck ohnehin in seiner Reichweite liegt (der Fall
+              // "loser Puck im eigenen Torraum", s. offensterMitspieler) — aber er
+              // startet keinen Wettlauf quer ueber das Eis.
+              if(u.torwart){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
+              // Wer liegt, laeuft nicht: nach einem Bodycheck ist der Gestuerzte fuer
+              // HK_STURZ Sekunden raus und taumelt danach mit HK_TAUMEL_TEMPO weiter.
+              if(u.down)continue;
+              const tempo=(230+(u.LAUFTEMPO-50)*0.70)*(u.taumeltBis>fsT?HK_TAUMEL_TEMPO:1);
+              const t=weg/tempo;
+              if(t<=PUCK_LAUF_FENSTER){ ankunft.set(u,t); erreichbar.push(u); }
+            }
+            if(erreichbar.length)kandidaten=erreichbar;
+            else ankunft=null;
+          }
           // Fable-Fund (Animations-Runde, 25.08.): der Rebound-Kampf loeste bisher rein
           // per Los auf — im Gedraenge sah man niemanden nach dem Ball greifen, weder
           // Gewinner noch Verlierer. Alle Kandidaten bekommen denselben lunge-Puls wie
@@ -7131,7 +7243,8 @@
           // `f.vonSeite` ist die Seite, die geworfen hat; wer NICHT von dort kommt,
           // verteidigt und bekommt den Ausbox-Vorteil.
           const gewinner=gewichtetesLosNach(kandidaten,
-            k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT));
+            k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT)
+              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1));
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
