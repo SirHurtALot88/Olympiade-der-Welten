@@ -28,7 +28,7 @@ await seite.waitForFunction(() => window.__arena && window.__arena.feldspielProb
 
 const w = await seite.evaluate((n) => {
   const x = window.__arena.feldspielProbe("hockey", { n, jeSeite: 6 });
-  const summe = { tore: 0, schuesse: 0, saves: 0, gegentore: 0, checks: 0, ballwechsel: 0, verluste: 0 };
+  const summe = { tore: 0, schuesse: 0, saves: 0, gegentore: 0, checks: 0, ballwechsel: 0, verluste: 0, strafen: 0 };
   const staende = [];
   for (const s of x.spiele) {
     summe.tore += s.seiten[0] + s.seiten[1];
@@ -40,6 +40,7 @@ const w = await seite.evaluate((n) => {
       summe.gegentore += q.gegentore || 0;
       summe.checks += q.checks || 0;
       summe.verluste += q.verluste;
+      summe.strafen += (q.strafminuten || 0) / 2;
     }
   }
   return { summe, spiele: x.spiele.length, staende, live: x.live, fehlend: x.fehlend };
@@ -69,6 +70,7 @@ console.log(zeile("Fangquote des Torwarts", fangquote.toFixed(1), "86,5 % (NHL .
 console.log(zeile("Checks je Team", jeTeam(w.summe.checks).toFixed(1), "— (fuenf Feldspieler, nicht 18)", ""));
 console.log(zeile("Ballwechsel je Spiel", (w.summe.ballwechsel / n).toFixed(1), "— (Basketball: 102)", ""));
 console.log(zeile("Verluste je Team", jeTeam(w.summe.verluste).toFixed(1), "—", ""));
+console.log(zeile("Kleine Strafen je Team", jeTeam(w.summe.strafen).toFixed(1), "NHL 3 bis 4", ""));
 console.log(`\nErste Endstaende: ${w.staende.slice(0, 8).map((s) => s.join(":")).join("  ")}`);
 console.log(`Seitenfehler: ${seitenfehler.length ? seitenfehler.slice(0, 3).join(" | ") : "keine"}`);
 await browser.close();

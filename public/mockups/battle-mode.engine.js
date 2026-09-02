@@ -4537,6 +4537,10 @@
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
+        // Strafbank: `strafeBis` ist der Zeitpunkt (Spielzeit fsT), ab dem er wieder
+        // aufs Eis darf, `strafminuten` die Statistikspalte. Ausserhalb von Hockey
+        // bleiben beide 0 — `aufDemEis` liest dann immer true.
+        strafeBis:0, strafminuten:0,
         // Laufende Schusssequenz (s. HOCKEY_SCHUSS/hockeySchussPhase). null = kein Schuss.
         schussSeit:null, schussArt:null,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
@@ -4826,7 +4830,10 @@
       : (u)=>u.SCHUSS_NAH;
     // Der Torwart nimmt an der Angriffsformation nicht teil — er steht im Tor. Ohne diese
     // Zeile bekaeme er einen Feldslot und wuerde von bewegeSpielerLive dorthin gezogen.
-    const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
+    // `aufDemEis` neben `!u.torwart`: wer auf der Strafbank sitzt, bekommt keinen Slot.
+    // Dadurch faellt die Seite von selbst in die Unterzahl-Tabelle unten — es braucht
+    // keinen zweiten Weg fuer "Ueberzahl", der bestehende traegt ihn schon.
+    const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
     // UNTERZAHL BEKOMMT NICHT DIE BESTEN PLAETZE.
     //
     // Chris' Fund: „wenn ich 6x50er spieler einsetze haette ich 300 Punkte, selbst ein
@@ -4917,9 +4924,13 @@
   // Schussvolumen von 26,6 auf 38,2 Versuche je Team gehoben haben: mit dem alten Faktor
   // fielen 5,58 Tore je Team statt 3,5. Gemessen, 24 Spiele je Lauf:
   //   Faktor 0,700 -> 5,58 Tore, Fangquote 83,3 %
-  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %   (gewaehlt)
+  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %
+  // Nach der Puck-Jagd-Begrenzung (HK_AUF_PUCK) noch einmal nachgezogen: weniger Gedraenge
+  // vor dem Tor heisst mehr durchkommende Schuesse, damit stieg die Torzahl auf 3,77.
+  //   Faktor 0,410 -> 3,29 Tore   Faktor 0,440 -> 3,77 Tore
+  //   Faktor 0,425 -> 3,49 Tore (n=48)                  (gewaehlt)
   // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
-  const HK_TOR_SKALA=0.440;
+  const HK_TOR_SKALA=0.425;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -4978,6 +4989,105 @@
   // blauen Linie stand. 295 ist genau der Point-Slot: ein reiner Distanzschuetze bleibt
   // dort stehen, wo ihn die Aufstellung ohnehin hinstellt, statt seinen Posten zu verlassen.
   const HK_WUNSCH_MAX=295;
+  // ============================== STRAFEN ==============================
+  // Chris' Ansage (02.09.): "Es muss auch fouls geben und dann diese puck duelle usw wie
+  // in echt halt".
+  //
+  // DIE DAUER IST HERGELEITET, NICHT GESETZT. Eine kleine Strafe sind real 2 von 60
+  // Minuten, also ein Dreissigstel des Spiels. Unser Spiel dauert 240 s (3 Drittel a 80),
+  // ein Dreissigstel davon sind 8 s. Damit steht die Ueberzahl im selben Verhaeltnis zum
+  // Spiel wie in echt — eine laengere Strafe waere auf unserer Uhr eine Matchstrafe.
+  const HK_STRAFE_DAUER=8;
+  // WIE OFT GEPFIFFEN WIRD. Real bekommt ein Team rund 3 bis 4 kleine Strafen je Spiel.
+  // Gemessen fallen bei uns rund 10 Bodychecks je Team und Spiel (miss-hockey-korridor),
+  // also muss gut jeder dritte Check zu weit gehen. Gepfiffen wird bewusst am CHECK und
+  // nicht als eigener Wuerfel: eine Strafe entsteht dort, wo im echten Eishockey der
+  // Koerpereinsatz ueber das Erlaubte hinausgeht (Stockschlag, Beinstellen, Bandencheck),
+  // und haengt damit an derselben Aktion, die der Zuschauer ohnehin sieht.
+  const HK_FOUL_ANTEIL=0.38;
+  // Eine Mannschaft darf nie unter drei Feldspieler fallen — real ist bei drei Schluss,
+  // eine weitere Strafe laeuft erst an, wenn der erste zurueckkommt. Bei kleinen
+  // Besetzungen (Zweierspiel) greift dieselbe Schranke und verhindert eine leere Seite.
+  const HK_STRAFE_MIN_FELD=3;
+  // BANDENDUELL. `HK_BANDE_NAH` ist der Abstand zur Bande, ab dem ein loser Puck als
+  // Bandenpuck gilt — 46 px sind auf unserem Massstab (4,6 px je Fuss, s. HK_RADIUS_*)
+  // genau 10 Fuss, also die Breite, in der ein Spieler den Puck noch gegen die Bande
+  // druecken kann. Die Dauer ist bewusst mehr als das Doppelte eines gewoehnlichen
+  // Gerangels: ein Bandenzweikampf dauert real mehrere Sekunden, und genau darin liegt
+  // sein Wert fuers Spiel — er haelt die Kamera an einer Stelle fest, an der zwei Spieler
+  // gegeneinander arbeiten, statt den Puck in einer halben Sekunde weiterzuschieben.
+  const HK_BANDE_NAH=46, HK_BANDENDUELL_DAUER=1.3, HK_DUELL_TAUMEL=0.7;
+  // Wo die Strafbank steht: ueber der Bande (RINK().o = 44), links und rechts der
+  // Mittellinie, je Seite eine. Der Spieler faehrt sichtbar dorthin und wartet.
+  function strafbankZiel(u){
+    const k=RINK(), zwei=u.side===0?-1:1;
+    return {x:MID+zwei*72+(u.id%2?0:20), y:k.o-22};
+  }
+  // Steht er auf dem Eis? Die eine Frage, die alle Zuteilungen stellen muessen — genau
+  // wie `!u.torwart`. Ausserhalb von Hockey ist `strafeBis` immer 0 und die Antwort immer
+  // ja, ohne einen zusaetzlichen Wuerfel oder Zweig.
+  function aufDemEis(u){ return !(u.strafeBis>fsT); }
+  // SICHERHEITSNETZ GEGEN DEN EINGEFRORENEN PUCK. Wer einen freien Puck holt, entscheidet
+  // LAUF_ZUM_BALL_RADIUS (260 px): naeher dran, dann laeuft er hin. Liegt der Puck weiter
+  // weg als das von JEDEM Spieler, laeuft niemand — und das Spiel steht, bis die Uhr
+  // ablaeuft. Gemessen ist das kein theoretischer Fall: ein Anspielpunkt tief in der Zone
+  // liess in einem von drei Spielen die Ballwechsel von 87 auf 11 einbrechen, ohne dass
+  // eine Zeile Fehler geloggt wurde. Der jeweils naechste Feldspieler jeder Seite holt den
+  // Puck deshalb IMMER, egal wie weit er liegt. Bei jedem gewoehnlichen losen Puck ist
+  // dieser Spieler ohnehin schon innerhalb des Radius — die Regel aendert dort nichts.
+  //
+  // NUR HOCKEY, und das ist gemessen und nicht vorsichtshalber: mit der Regel fuer ALLE
+  // Feldspiele fiel Basketballs Rangtreue von 0,836/0,804 auf 0,825/0,800 und die Punkte
+  // je Spiel von 87,3 auf 87,8. Der Court ist klein genug, dass praktisch immer jemand
+  // innerhalb von 260 px steht — die seltenen Faelle, in denen nicht, sind dort ein Teil
+  // der eingemessenen Balance. Auf der viermal so langen Eisflaeche ist es ein Fehler.
+  // Basketball bekommt dieselbe Absicherung in seiner eigenen Runde, mit eigener Messung.
+  //
+  // Fuer Hockey ersetzt diese Liste den Radius ganz (s. HK_AUF_PUCK darunter), statt ihn
+  // nur zu ergaenzen: der Radius ist auf dem Eis kein sinnvolles Kriterium mehr.
+  function naechsteZumFreienPuck(seite,wieviele){
+    const f=fsLive&&fsLive.ball?fsLive.ball.frei:null;
+    if(!f)return [];
+    return FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+      .sort((a,b)=>dist(a,f)-dist(b,f)).slice(0,wieviele);
+  }
+  // WIE VIELE GEHEN AUF DEN PUCK. Im Bild war die Eisflaeche zur Haelfte leer, waehrend
+  // sich beide Mannschaften in einem Bullykreis stapelten — sechs Figuren uebereinander.
+  // Ursache: LAUF_ZUM_BALL_RADIUS schickt JEDEN Spieler innerhalb von 260 px auf einen
+  // freien Puck, und bei rund 70 losen Pucks je Spiel ist fast immer einer in Reichweite.
+  // Die Mannschaft verbringt damit mehr Zeit im Rudel als auf ihren Positionen.
+  //
+  // Im echten Eishockey holen ein bis zwei Spieler den Puck, der Rest haelt seine Position
+  // und bietet sich an — genau darauf beruht die Formation ueberhaupt. HK_AUF_PUCK=2 ist
+  // die kleinste Zahl, die einen echten Zweikampf zulaesst (einer allein waere ein
+  // Selbstbedienungsladen). Der jeweils naechste Spieler ist immer dabei, auch wenn der
+  // Puck weiter als LAUF_ZUM_BALL_RADIUS liegt — das ist zugleich das Sicherheitsnetz
+  // gegen den eingefrorenen Puck (s. unten).
+  const HK_AUF_PUCK=2;
+  // Offensivdruck-Rotation (s. zuordneSlots): war bisher ein lokaler Ausdruck im
+  // Possession-Wechsel. Strafe und Rueckkehr stellen ebenfalls neu auf und brauchen
+  // dieselbe Regel — eine Kopie waere die zweite Stelle, die beim naechsten Anfassen
+  // vergessen wird.
+  const liegtZurueck=(seite)=>fsPunkte[seite]<fsPunkte[1-seite];
+  const feldStaerke=(seite)=>FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)).length;
+  // Strafe verhaengen. Gibt true zurueck, wenn wirklich gepfiffen wurde.
+  function verhaengeStrafe(taeter,opfer,grund){
+    if(feldStaerke(taeter.side)<=HK_STRAFE_MIN_FELD)return false;
+    taeter.strafeBis=fsT+HK_STRAFE_DAUER;
+    taeter.strafminuten+=2; taeter.fouls++;
+    if(taeter.hatBall){ taeter.hatBall=false; fsLive.ball.traeger=null; }
+    taeter.deckt=null;
+    feed(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
+    schwebe({x:0,y:0,txt:"STRAFE!",life:1.2,crit:true,_def:true,_spieler:taeter.id});
+    logZug(opfer.side,"strafe",{verteidiger:taeter,spieler:opfer});
+    // Beide Seiten neu aufstellen: die bestrafte Seite hat einen Mann weniger (die
+    // Unterzahl-Tabelle in zuordneSlots greift dadurch von selbst), die andere einen
+    // Gegenspieler weniger zu decken.
+    // Mit liegtZurueck wie beim regulaeren Possession-Wechsel (s. dort), damit die
+    // Offensivdruck-Rotation durch eine Strafe nicht stillschweigend zurueckfaellt.
+    zuordneSlots(0,liegtZurueck(0)); zuordneSlots(1,liegtZurueck(1)); zuordneDeckung(true);
+    return true;
+  }
   // LOSER PUCK ALS WETTLAUF, NICHT ALS STANDPLATZ (Chris woertlich, 02.09.: "Das muss
   // dann auf jeden fall angepasst und gefixt werden das kann nicht nur positionssache
   // sein").
@@ -5101,7 +5211,12 @@
       //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
       //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
       return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
-            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2;
+            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2
+      // Genommene Strafen zaehlen negativ, wie im NHL Game Score (Luszczyszyn): wer sein
+      // Team in Unterzahl bringt, hat dem Team geschadet, auch wenn der Check sass. Klein
+      // gehalten (0,2 je Strafminute, also 0,4 je kleiner Strafe) — die eigentliche Strafe
+      // ist die Unterzahl auf dem Eis, nicht der Abzug im Boxscore.
+      -u.strafminuten*0.2;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
   }
@@ -5216,8 +5331,8 @@
       // Schuesse, stahl Pucks und verteilte 26 Bodychecks. Ein Torwart, der durchs Feld
       // checkt, ist kein Torwart. Er faellt auf BEIDEN Seiten der Zuteilung heraus: er
       // deckt niemanden, und niemand deckt ihn.
-      const verteidiger=FSTEAM[1-seite].filter(u=>!u.torwart),
-            angreifer=FSTEAM[seite].filter(u=>!u.torwart);
+      const verteidiger=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u)),
+            angreifer=FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u));
       // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
       // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
       // ohne diese Bereinigung griff sich ein neu bewertender Verteidiger regelmaessig
@@ -5354,7 +5469,6 @@
     // ROTATION (Auftrag 2): s. zuordneSlots()-Kommentar fuer die Regel selbst. Beide
     // Seiten unabhaengig voneinander geprueft — bei Gleichstand bleibt es fuer beide bei
     // der Basissortierung.
-    const liegtZurueck=(seite)=>fsPunkte[seite]<fsPunkte[1-seite];
     zuordneSlots(0,liegtZurueck(0));
     zuordneSlots(1,liegtZurueck(1));
     // BEWUSST KEIN zuordneDeckung(true) hier, obwohl Chris' Formulierung beide Funktionen
@@ -5389,7 +5503,7 @@
   function spielmacherLos(team){
     // Der Torwart eroeffnet keinen Angriff — er steht im Tor. Nur wenn er der einzige
     // Spieler waere, bekommt er den Puck (dann gibt es ohnehin keinen anderen).
-    const feld=team.filter(u=>!u.torwart);
+    const feld=team.filter(u=>!u.torwart&&aufDemEis(u));
     return gewichtetesLosNach(feld.length?feld:team,u=>losGewicht(u.AUFBAU));
   }
 
@@ -5439,7 +5553,7 @@
     // Mannschaft. Er bekommt den Puck jetzt nur noch so, wie ein Torwart ihn bekommt:
     // ueber einen Schuss, einen Abpraller oder einen losen Puck in seinem Torraum.
     if(istHockey()){
-      const feld=mitspieler.filter(m=>!m.torwart);
+      const feld=mitspieler.filter(m=>!m.torwart&&aufDemEis(m));
       // Nur ersetzen, wenn ueberhaupt ein Feldspieler uebrig bleibt: die Aufrufer geben
       // das Ergebnis ungeprueft an passeAb weiter, ein null liefe dort ins Leere. Bleibt
       // nur der Torwart, ist er tatsaechlich die letzte Anspielstation.
@@ -6403,6 +6517,29 @@
     if(istHockey()){
       const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-traeger.AUSDAUER)*0.0040));
       if(rr()<wucht){
+        // ZU HART: derselbe Check, nur ueber die Grenze. Gepfiffen wird VOR der Wirkung,
+        // weil im echten Eishockey die Pfeife das Spiel unterbricht — der Getroffene
+        // faellt dann nicht mehr in ein Gerangel um den losen Puck, sondern es gibt ein
+        // Bully in der Zone des bestraften Teams, und der Gefoulte bekommt die Scheibe.
+        if(rr()<HK_FOUL_ANTEIL&&verhaengeStrafe(decker,traeger,"Bandencheck")){
+          traeger.taumeltBis=fsT+HK_TAUMEL;
+          traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+          traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
+          // DIE UEBERZAHL BEGINNT MIT DEM PUCK. Ein Bully tief in der Zone war der erste
+          // Entwurf und ist gemessen falsch: der Anspielpunkt lag regelmaessig weiter als
+          // LAUF_ZUM_BALL_RADIUS (260 px) von jedem Spieler entfernt, niemand lief hin,
+          // und der Puck blieb liegen — in einem von drei Spielen brach die Zahl der
+          // Ballwechsel dadurch von 87 auf 11 ein. Real bekommt die bestrafte Seite den
+          // Puck ohnehin nicht: das Anspiel findet in ihrer Zone statt, und die Ueberzahl
+          // hat den Aufbau. Der Spielmacher der gefoulten Mannschaft nimmt ihn auf.
+          const anspiel=spielmacherLos(FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)).length
+            ?FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)):FSTEAM[traeger.side]);
+          fsLive.ball.frei=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
+          naechsterAngriff(traeger.side);
+          ballUebernehmen(anspiel);
+          fsLive.angriffSeit=0;
+          return;
+        }
         traeger.taumeltBis=fsT+HK_TAUMEL;
         traeger.down=true; traeger.downBis=fsT+HK_STURZ;
         decker.checks++;
@@ -6460,7 +6597,7 @@
     const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
     // Der Torwart bricht nicht aus. Gemessen lief er sonst 19 s je Spiel als "Ausbrecher"
     // Richtung gegnerisches Tor, bei drei gegen drei sogar 80 s.
-    const kandidaten=team.filter(u=>!u.hatBall&&!u.torwart);
+    const kandidaten=team.filter(u=>!u.hatBall&&!u.torwart&&aufDemEis(u));
     if(!kandidaten.length||!gegner.length)return;
     let schnellsterGegner=gegner[0].LAUFTEMPO;
     for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
@@ -6772,7 +6909,7 @@
     // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
     // Die zwei Schnellsten je Seite — ohne den Torwart. Sonst nimmt er einem Feldspieler
     // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
-    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!u.torwart).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
+    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -6857,7 +6994,9 @@
           zx=korbX; zy=H/2;
           tempoMul=Math.max(tempoMul,AUSBRUCH_TEMPO_MUL); dribbelFaktor=0.85;
         }
-      } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
+      } else if(fsLive.ball.frei&&(istHockey()
+                 ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
+                 : dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
         // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
@@ -7141,7 +7280,10 @@
       // und das ueberschreibt alles. Ein zusaetzlicher Zweig oben in der Kette haette
       // dieselbe Wirkung, aber jede spaetere Aenderung an der Kette muesste ihn
       // mitdenken. Ausserhalb von Hockey sind `torwart` und `taumeltBis` nie gesetzt.
-      if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
+      // STRAFBANK VOR ALLEM ANDEREN, aus demselben Grund wie der Torwart-Zweig: er hat
+      // genau ein Ziel, und das ueberschreibt jede Angriffs- oder Verteidigungslogik.
+      if(!aufDemEis(u)){ const z=strafbankZiel(u); zx=z.x; zy=z.y; tempoMul=1.3; }
+      else if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
       if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
       const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
@@ -7174,6 +7316,14 @@
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
       if(u.down&&fsT>=u.downBis)u.down=false;
+      // ZURUECK AUFS EIS. `strafeBis` wird auf 0 gesetzt statt nur ablaufen gelassen,
+      // damit der Wiedereintritt EIN Ereignis ist und nicht in jedem Tick neu erkannt
+      // wird — nur so laesst sich die Aufstellung genau einmal neu machen.
+      if(u.strafeBis&&fsT>=u.strafeBis){
+        u.strafeBis=0;
+        feed(u.side,u.n+" ist wieder auf dem Eis.");
+        zuordneSlots(u.side,liegtZurueck(u.side)); zuordneDeckung(true);
+      }
       if(u.schussSeit!=null){
         u.schussSeit+=dt;
         if(hockeySchussPhase(u.schussSeit,u.schussArt).abgeschlossen)u.schussSeit=null;
@@ -7287,8 +7437,20 @@
         // ZWEITCHANCE die Entscheidung tragen soll. 0,40s reicht einem schnellen Spieler aus
         // der zweiten Reihe, um in GREIF_REICHWEITE zu kommen — und bleibt kurz genug, dass
         // ein wirklich freier Ball weiter sofort aufgenommen aussieht.
-        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.40}; // PLATZHALTER
-        if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
+        // ZWEIKAMPF AN DER BANDE (Chris: "dann diese puck duelle usw wie in echt halt").
+        // Ein loser Puck mitten im Slot ist in einer halben Sekunde weg; einer, der an der
+        // Bande liegt, wird dort mit dem Koerper festgehalten, bis ihn einer freikaempft —
+        // das ist im echten Eishockey eine eigene, laengere Spielsituation und der Grund,
+        // warum in der Bande gerangelt wird und nicht im freien Eis. Gegner aus beiden
+        // Mannschaften muessen beteiligt sein: zwei Mitspieler nebeneinander sind kein
+        // Zweikampf, die sortieren das in derselben halben Sekunde wie sonst auch.
+        const k=RINK(), anBande=istHockey()&&
+          (f.x-k.l<HK_BANDE_NAH||k.r-f.x<HK_BANDE_NAH||f.y-k.o<HK_BANDE_NAH||k.u-f.y<HK_BANDE_NAH);
+        const beideSeiten=nah.some(u=>u.side===0)&&nah.some(u=>u.side===1);
+        const duell=anBande&&beideSeiten;
+        fsLive.reboundKampf={t:0,dauer:duell?HK_BANDENDUELL_DAUER:(nah.length>1?0.55:0.40),duell}; // PLATZHALTER
+        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kaempfen um den Puck!");
+        else if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
         fsLive.reboundKampf.t+=dt;
@@ -7309,6 +7471,7 @@
               // Kandidat, wenn der Puck ohnehin in seiner Reichweite liegt (der Fall
               // "loser Puck im eigenen Torraum", s. offensterMitspieler) — aber er
               // startet keinen Wettlauf quer ueber das Eis.
+              if(!aufDemEis(u))continue;   // von der Strafbank holt niemand einen Puck
               if(u.torwart){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
               // Wer liegt, laeuft nicht: nach einem Bodycheck ist der Gestuerzte fuer
               // HK_STURZ Sekunden raus und taumelt danach mit HK_TAUMEL_TEMPO weiter.
@@ -7326,6 +7489,11 @@
           // ein Steal-Versuch (s. versucheSteal, selbes Muster), ausgeloest im selben
           // Frame wie der Feed-Text/das Outcome direkt darunter.
           for(const k of kandidaten)k.lunge=0.4;
+          // Beim Bandenduell schiebt der Sieger den Gegner sichtbar weg. Kein neuer
+          // Zustand: derselbe `taumeltBis`, den auch der Bodycheck setzt, nur kurz — der
+          // Verlierer eines Bandenduells ist nicht am Boden, aber einen Moment aus dem
+          // Gleichgewicht und deshalb langsamer.
+          const duellVerloren=fsLive.reboundKampf.duell;
           // ZWEIKAMPF STATT LOSTOPF: gewichtetesLos() loste linear ueber den Rohwert — bei
           // realistischen Werten (etwa 73 gegen 60) sind das 55 zu 45, also praktisch ein
           // Muenzwurf zwischen einem sehr guten und einem mittelmaessigen Rebounder. Der
@@ -7366,6 +7534,8 @@
             k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT)
               *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1));
           gewinner.rebounds++;
+          if(duellVerloren)for(const k of kandidaten)
+            if(k!==gewinner&&k.side!==gewinner.side)k.taumeltBis=fsT+HK_DUELL_TAUMEL;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
           // `offensiv` rein additiv fuer die Abnahme (s. basketballProbe): das reale
@@ -14797,6 +14967,7 @@
               // Eishockey-eigene Spalten. Ausserhalb von Hockey bleiben sie 0 — der
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
+              strafminuten:u.strafminuten,
               fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
               fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
               fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
