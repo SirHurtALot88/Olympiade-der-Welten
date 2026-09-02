@@ -3322,7 +3322,21 @@
   function zieheFormkarten(saat){
     FORMKARTE={};
     let z=saat;
-    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return z%n;};
+    // HOHE BITS, NICHT NIEDRIGE (Fable-Fund, Arena-Recherche). `z%n` nimmt die
+    // UNTERSTEN Bits eines linearen Kongruenzgenerators — und deren Periode ist winzig:
+    // bei FORMWERTE.length=4 haben die untersten zwei Bits Periode 4. Nachgerechnet
+    // ergaben 24 verschiedene Saaten dadurch genau VIER verschiedene Kartensaetze, und
+    // 1000 Saaten auch. Jede Messung dieses Projekts, die ueber die Saat variiert — Pp,
+    // Rangtreue, Korridore —, lief damit auf vier Spielen, die sich sechsmal wiederholten,
+    // statt auf 24 verschiedenen.
+    //
+    // `(z>>>16)` nimmt die oberen Bits, die die volle Periode haben. Mit derselben
+    // Rechnung ergeben 24 Saaten jetzt 24 verschiedene Kartensaetze.
+    //
+    // DAS VERSCHIEBT ALLE EINGEMESSENEN ZAHLEN, und zwar zu Recht: die alten sind auf
+    // einer viel zu kleinen Stichprobe entstanden. Die Basketball-Schranke
+    // (0,836/0,804/87,3/101,8/82,3) gilt ab hier nicht mehr und wird neu gesetzt.
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
     for(const p of SQUAD)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
     for(const o of OPP)FORMKARTE[o.n]=FORMWERTE[r(FORMWERTE.length)];
   }
@@ -10291,7 +10305,17 @@
     const tr=traitTreffer(p);
     const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
     const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
-    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte+eigHebung(p,d);
+    // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
+    // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
+    // Battlefield fiel der Basiswert damit auf 0, und `eigWert` bestand nur aus Slot-,
+    // Trait- und Formzuschlag. Nachgemessen (Fable, Arena-Recherche) lagen Fechtens
+    // Eignungswerte zwischen -8,5 und +18,5; Johanna kaempfte mit 3 Lebenspunkten,
+    // Cassandra mit 1,5. Fechtens gemessene 0,769 waren deshalb keine Fecht-Rangtreue.
+    //
+    // Und hier faellt der Fehler schwerer als in den anderen drei Chassis: `eigWert` geht
+    // ueber aufEignung() direkt in die KAMPFWERTE ein, ist also nicht nur Anzeige.
+    const eigWert=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
@@ -15069,7 +15093,21 @@
       // Duell (Speed-Schach, I-Spy): "besser" ist der eigene Vorteil am Brett, nicht die
       // absolute Punktesumme — ein Brett kann man mit wenigen, aber besseren Zuegen
       // gewinnen. Sonst wie ueberall: die Summe der Durchgangspunkte.
-      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=BUEHNE_ART[bd].duell?(u.vorteil||0):u.summe; return o;}
+      // EIGENE PUNKTE, AUCH IM DUELL. Hier stand fuer Speed-Schach und I-Spy der
+      // VORTEIL, also die Differenz zum Gegner am selben Brett. Das drueckt die
+      // Rangtreue konstruktionsbedingt: wer an einem starken Brett alles richtig macht,
+      // steht trotzdem negativ da. Fable hat es an denselben Spielen gegengerechnet —
+      // rho(Eignung, Vorteil) 0,541 und 0,548, rho(Eignung, eigene Punkte) 0,948 und
+      // 0,782. Die Mechanik war nie das Problem, nur das Mass.
+      //
+      // Gewichtheben macht es schon richtig und begruendet es an Ort und Stelle: "ein
+      // Heber, der an einem starken Slot 380 kg hebt, hat 380 kg gehoben, auch wenn er
+      // verliert". Derselbe Satz gilt am Schachbrett.
+      //
+      // Der DUELLSTAND bleibt unangetastet — er entscheidet weiter das Spiel und steht
+      // weiter im Ticker. Geaendert ist nur, woran der Beitrag EINES Spielers gemessen
+      // wird.
+      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
     };
   }
   // JEDES FELDSPIEL MELDET SICH SELBST AN. "Besser" ist hier ein kleiner Box-Score:
