@@ -16020,13 +16020,18 @@
             bein:u.bein??null, etappe:u.etappenZeit??null}))
             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
             :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig}))
-            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig}));
+            // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
+            // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
+            // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
+            // dorthin stellt, wo sie etwas bewirken koennen.
+            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig,reihe:u.row}));
           spiele.push({saat:saat0+i*schritt,
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
               wert:Math.round((w[u.n]||0)*100)/100,
               ...(u.bein!=null?{bein:u.bein,
-                etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{})}))});
+                etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
+              ...(u.reihe!=null?{reihe:u.reihe}:{})}))});
         }
       } finally { M.zurueck(gesichert); zieheFormkarten(20260823); }
       return {disziplin:dId, chassis:istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
