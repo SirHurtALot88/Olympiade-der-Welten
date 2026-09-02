@@ -246,9 +246,14 @@
   // Sprite-Layer, sondern Formen aus Canvas-Befehlen, aus denselben zwei Gruenden — kein
   // CC0-Requisitenblatt trifft "duenner Schaft + abgewinkelte Kelle" in vier Blickrichtungen
   // UND vier Haltungen zugleich, und ein prozedural gezeichnetes Requisit bleibt scharfkantig
-  // ohne Weichzeichnung, wie es imageSmoothingEnabled=false verlangt. WIRD IN DIESEM PR NICHT
-  // VERDRAHTET — keine Figur bekommt hier einen Schlaeger in die Hand, das macht ein anderer
-  // Agent in einem eigenen Schritt (s. PR-Beschreibung).
+  // ohne Weichzeichnung, wie es imageSmoothingEnabled=false verlangt.
+  //
+  // NACHTRAG (02.09., Folgeauftrag "auch die Golems/Vollbild-Kreaturen brauchen einen"):
+  // ausser dem NORMALEN Zeichenpfad (Standardkoerper body_walk/bodyw_walk) verdrahtet jetzt
+  // auch der b.vollbild-Zweig und b.reiherMech (Seraph-11) sowie die Kader-Vorschau (figur())
+  // einen Schlaeger, s. VOLLBILD_SCHLAEGER unten und die drei Aufrufstellen in zeichneSprite/
+  // figur(). Chris' eigener Vorschlag fuer Kreaturen ohne Haende ("quer im Mund, quer im
+  // Schnabel") ist die neue Phase "quer" (s. HOCKEY_PHASEN).
   //
   // Winkel werden "von der Senkrechten" gemessen (0 = schnurgerade nach unten), nicht "von
   // der Waagerechten" — sin() liefert dann den seitlichen Versatz, cos() den nach unten. Der
@@ -272,7 +277,16 @@
     ausholen:{schaftA:-0.85,schaftL:27, kelleA:-1.9},
     // Durchzug: Schaft nach VORN (gleiches Vorzeichen wie blick) statt nach hinten, Kelle
     // fegt knapp ueber Eishoehe durch statt hoch in der Luft zu bleiben.
-    schuss:  {schaftA:0.68, schaftL:29, kelleA:1.75}
+    schuss:  {schaftA:0.68, schaftL:29, kelleA:1.75},
+    // NEU (02.09., "quer im Mund" fuer alle Kreaturen OHNE Haende — Kraken, Drachen, Spinne,
+    // Schiff, Vogel/Taube, Krokodil, Seraph-11): schaftA=PI/2 ist die echte Waagerechte
+    // (sin(PI/2)=1, cos(PI/2)=0 in der "ab der Senkrechten"-Konvention von oben), und zwar
+    // ABSICHTLICH UNABHAENGIG von "blick" (s. eff-Sonderfall in zeichneHockeyschlaeger) — ein
+    // quer im Maul haengender Gegenstand liegt gleich, ob die Kreatur nach links oder rechts
+    // blickt, anders als ein gegriffener Schlaeger. kelleA nur leicht dagegen verkantet (statt
+    // exakt gleicher Winkel), damit die Kelle als etwas dickerer, dunklerer Abschnitt neben
+    // dem Schaft erkennbar bleibt statt in einer einzigen geraden Linie zu verschwinden.
+    quer:    {schaftA:Math.PI/2, schaftL:22, kelleA:Math.PI/2+0.3}
   };
   // x/y IST DIE HAND — kommt von aussen (ein zweiter Agent misst sie am Sprite), diese
   // Funktion kennt die Hand selbst nicht und muss sie auch nicht kennen: Schaft und Kelle
@@ -295,32 +309,120 @@
     {x:43,y:45}  // rechts — die vordere Hand im Profil
   ];
   function zeichneHockeyschlaeger(ctx,x,y,s,richtung,phase){
+    // "quer" (s. HOCKEY_PHASEN-Kommentar): x/y ist hier NICHT das Griffende wie bei den drei
+    // gegriffenen Posen, sondern die MITTE des Schafts (Mund/Schnabel) — sonst haengt der
+    // Stock einseitig heraus statt symmetrisch quer zu liegen. Deshalb startet der Schaft
+    // einen halben schaftL VOR dem Ankerpunkt statt direkt an ihm.
+    const istQuer=phase==="quer";
     const blick=richtung===3?1:richtung===1?-1:0;
-    const seitlich=blick!==0;
-    const eff=blick||1; // Front/Ruecken: kein Blick zum Spiegeln da, feste Seite als Vorgabe.
+    const seitlich=blick!==0||istQuer;
+    // Front/Ruecken: kein Blick zum Spiegeln da, feste Seite als Vorgabe. "quer" ignoriert
+    // blick ganz bewusst (s. HOCKEY_PHASEN-Kommentar bei "quer") — eff bleibt fest 1.
+    const eff=istQuer?1:(blick||1);
     const p=HOCKEY_PHASEN[phase]||HOCKEY_PHASEN.halten;
     const schaftWinkel=p.schaftA*eff, kelleWinkel=p.kelleA*eff;
-    const ferseX=x+Math.sin(schaftWinkel)*p.schaftL*s, ferseY=y+Math.cos(schaftWinkel)*p.schaftL*s;
-    const kelleLaenge=(seitlich?9:4)*s; // Front/Ruecken: Schmalseite, deutlich kuerzer.
+    const startX=istQuer?x-Math.sin(schaftWinkel)*p.schaftL*s*0.5:x;
+    const startY=istQuer?y-Math.cos(schaftWinkel)*p.schaftL*s*0.5:y;
+    const ferseX=startX+Math.sin(schaftWinkel)*p.schaftL*s, ferseY=startY+Math.cos(schaftWinkel)*p.schaftL*s;
+    const kelleLaenge=(seitlich?9:4)*s; // Front/Ruecken (gegriffen): Schmalseite, kuerzer.
     const spitzeX=ferseX+Math.sin(kelleWinkel)*kelleLaenge, spitzeY=ferseY+Math.cos(kelleWinkel)*kelleLaenge;
     // Schaft: dunkles Holz, dazu eine duenne hellere Kante parallel versetzt fuer Rundung
     // im Pixel-Look ohne Weichzeichner-Verlauf (dieselbe Idee wie das helle Ruecken-Oval
     // bei zeichneReiherMech oder die helle Gehaeusekante bei zeichneKameraKopf).
     const senkrechtX=Math.cos(schaftWinkel)*0.6*s, senkrechtY=-Math.sin(schaftWinkel)*0.6*s;
     ctx.strokeStyle="#4a2f16"; ctx.lineWidth=Math.max(1,2.2*s); ctx.lineCap="round";
-    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ferseX,ferseY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(startX,startY);ctx.lineTo(ferseX,ferseY);ctx.stroke();
     ctx.strokeStyle="#6b4523"; ctx.lineWidth=Math.max(1,0.8*s);
-    ctx.beginPath();ctx.moveTo(x+senkrechtX,y+senkrechtY);ctx.lineTo(ferseX+senkrechtX,ferseY+senkrechtY);ctx.stroke();
-    // Griffband: heller Punkt genau an der Hand, wo der obere Handschuh den Schaft fasst.
+    ctx.beginPath();ctx.moveTo(startX+senkrechtX,startY+senkrechtY);ctx.lineTo(ferseX+senkrechtX,ferseY+senkrechtY);ctx.stroke();
+    // Griffband: heller Punkt genau am Ankerpunkt — bei "quer" die Mitte des Schafts
+    // (Mund/Schnabel), sonst die Hand, wo der obere Handschuh den Schaft fasst.
     ctx.fillStyle="#e8e2d0";
     ctx.beginPath();ctx.arc(x,y,Math.max(0.9,1.3*s),0,Math.PI*2);ctx.fill();
-    // Kelle: kurzer, dickerer dunkler Strich ab der Ferse. Im Profil fast waagerecht mit
-    // leicht angehobener Spitze (s. HOCKEY_PHASEN-Kommentar), in Front/Ruecken ein kurzer
-    // Stummel.
+    // Kelle: kurzer, dickerer dunkler Strich ab der Ferse. Im Profil (bzw. immer bei "quer")
+    // fast waagerecht mit leicht angehobener Spitze (s. HOCKEY_PHASEN-Kommentar), in Front/
+    // Ruecken (nur gegriffen) ein kurzer Stummel.
     ctx.strokeStyle="#161616"; ctx.lineWidth=Math.max(1,(seitlich?2.4:3.2)*s); ctx.lineCap="round";
     ctx.beginPath();ctx.moveTo(ferseX,ferseY);ctx.lineTo(spitzeX,spitzeY);ctx.stroke();
-    return {ferseX,ferseY,spitzeX,spitzeY};
+    return {startX,startY,ferseX,ferseY,spitzeX,spitzeY};
   }
+  // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
+  // blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts. Koordinaten sind Zell-Koordinaten
+  // (0..63) IM SELBEN 64x64-Rahmen, in dem renderProbe zeichnet — unabhaengig von der
+  // nativen Blattgroesse (cw/ch) jedes einzelnen Vollbild-Eintrags, weil der b.vollbild-
+  // Zweig IMMER auf dh=64*Z skaliert (s. Kommentar dort). Gemessen per Augenschein an
+  // hochskalierten renderProbe-PNGs mit 8px-Gitter, NICHT per automatischem Pixel-Scan wie
+  // bei body_walk (docs/design/sprite-handpunkte.md) — diese Blaetter sind zu klein/zu
+  // wenige Frames fuer einen verlaesslichen Silhouetten-Scan, und mehrere davon haben gar
+  // keine eigene Hand-/Maulkontur (s. Markdown fuer die einzelnen Faelle und die
+  // Beweisbilder): docs/design/vollbild-schlaeger-griffpunkte.md.
+  //
+  // modus:"gegriffen" nutzt dieselbe Schaft/Kelle-Mechanik wie der Standardkoerper (Hand
+  // haelt das Griffende). modus:"quer" nutzt die neue "quer"-Phase (Ankerpunkt = Mitte des
+  // Schafts, s. HOCKEY_PHASEN) fuer alles ohne Haende.
+  const VOLLBILD_SCHLAEGER={
+    // --- GEGRIFFEN --------------------------------------------------------------------
+    // golem: Faust klar als eigene Form am Blatt sichtbar (blockiger Arm, s. Beweisbild).
+    // Front/Ruecken nutzen dieselbe (rechte) Faust wie HOCKEY_HAND es beim Standardkoerper
+    // tut — beide Blattzeilen zeigen ohnehin symmetrisch zwei Fäuste, welche Seite man
+    // nimmt, ist gleichwertig.
+    golem:            {modus:"gegriffen", punkte:[{x:54,y:32},{x:22,y:33},{x:54,y:32},{x:42,y:33}]},
+    // froschmensch: KEINE eigene Handkontur am Blatt (kleiner geduckter Koerper, Arme eng
+    // am Rumpf wie beim Standardkoerper-Ruheframe, s. sprite-handpunkte.md) — Naeherung an
+    // der Rumpfseite auf Schulterhoehe, keine Messung.
+    froschmensch:     {modus:"gegriffen", punkte:[{x:48,y:38},{x:24,y:38},{x:48,y:38},{x:40,y:38}]},
+    // werwolf: Front zeigt eine klar abgesetzte haengende Pranke (gemessen). Profil zeigt
+    // stattdessen eine geduckte Vierbeiner-Laufpose ohne freie Pranke — dort Naeherung
+    // (gleiche Hoehe, etwas nach vorn verschoben), keine Messung.
+    werwolf:          {modus:"gegriffen", punkte:[{x:47,y:42},{x:20,y:40},{x:47,y:42},{x:44,y:40}]},
+    // roboter (Alarm): Front zeigt beide Faeuste angehoben auf Kopfhoehe (gemessen, eigene
+    // Pose dieses Blatts). Profil zeigt eine gesenkte Faust seitlich am Torso (gemessen).
+    roboter:          {modus:"gegriffen", punkte:[{x:56,y:8}, {x:44,y:36},{x:56,y:8}, {x:20,y:36}]},
+    // mech_gross (Robofighter): eine Seite hat eine Faust (gemessen), die andere eine
+    // eingebaute Kanone statt einer Hand — deshalb wie bei golem dieselbe (Faust-)Seite fuer
+    // Front/Ruecken. Profil: Greifpunkt am Gewehrschaft (gemessen, dort haelt die Figur
+    // ohnehin schon etwas Laengliches).
+    mech_gross:       {modus:"gegriffen", punkte:[{x:13,y:23},{x:28,y:24},{x:13,y:23},{x:36,y:24}]},
+    // mech_transformer (Tavascron): Front zeigt zwei Faeuste (gemessen). Profil zeigt eine
+    // ungewoehnliche, schwer lesbare Haltung (s. Beweisbild) — Greifpunkt dort eine
+    // vorsichtige Naeherung, keine praezise Messung.
+    mech_transformer: {modus:"gegriffen", punkte:[{x:50,y:14},{x:26,y:26},{x:50,y:14},{x:38,y:26}]},
+    // treant: Front zeigt eine hochgereckte Asthand mit Blattbuendel (gemessen). Profil
+    // zeigt keinen frei stehenden Ast — Naeherung (gleiche Hoehe, Richtung Bewegung
+    // verschoben), keine Messung.
+    treant:           {modus:"gegriffen", punkte:[{x:50,y:26},{x:22,y:26},{x:50,y:26},{x:40,y:33}]},
+    // --- QUER (kein Griff, Schaft liegt quer auf Maul-/Kopfhoehe) ----------------------
+    // geist (Nocture): trotz aufrechter Silhouette KEINE Arm-/Handkontur — eine reine
+    // schwebende Robe ohne Gliedmassen (s. Beweisbild). Genau der Fall, fuer den der
+    // Auftrag die Rueckfallregel vorsieht ("mittig, quer, auf Rumpfhoehe") — deshalb hier
+    // bei QUER statt bei GEGRIFFEN, auch wenn Chris' eigene Aufzaehlung "Geist" bei den
+    // gegriffenen Beispielen nennt.
+    geist:            {modus:"quer", punkte:[{x:32,y:26},{x:32,y:26},{x:32,y:26},{x:32,y:26}]},
+    // kraken: bauchiger Mantelkoerper, keine Tentakel-"Hand" — Ansatzpunkt der Tentakel am
+    // Mantel (sichtbar als Verengung/Augenpaar) ist ueber alle vier Richtungen fast gleich
+    // (gemessen, das Blatt ist in allen Richtungen fast dieselbe Kugel).
+    kraken:           {modus:"quer", punkte:[{x:32,y:45},{x:32,y:45},{x:32,y:45},{x:32,y:45}]},
+    // drache_gold/drache_hydra: Front/Ruecken zeigen die Kreatur von oben mit der
+    // Kopfspitze oben mittig (gemessen, beide Richtungen sehen auf diesem Blatt nahezu
+    // gleich aus). Profil zeigt Kopf/Maul klar an einem Ende (gemessen).
+    drache_gold:      {modus:"quer", punkte:[{x:30,y:12},{x:16,y:30},{x:30,y:12},{x:48,y:30}]},
+    drache_hydra:     {modus:"quer", punkte:[{x:30,y:12},{x:16,y:30},{x:30,y:12},{x:48,y:30}]},
+    // schiff_pirat: KEINE Anatomie ueberhaupt — ein einzelnes Standbild ohne Figur/Gesicht
+    // (rows:1, s. VOLLBILD-Eintrag). Reine Rueckfallregel (Mitte des Rumpfs), keine
+    // Messung moeglich, gilt deshalb fuer alle vier Richtungen gleich.
+    schiff_pirat:     {modus:"quer", punkte:[{x:32,y:42},{x:32,y:42},{x:32,y:42},{x:32,y:42}]},
+    // spinne: Kopf/Kieferpartie klar als eigene Form vom Hinterleib abgesetzt (gemessen,
+    // beide Richtungen deutlich).
+    spinne:           {modus:"quer", punkte:[{x:32,y:20},{x:16,y:20},{x:32,y:20},{x:48,y:20}]},
+    // krokodil: Front/Ruecken (Draufsicht) zeigen die Schnauzenspitze oben mittig
+    // (gemessen). Profil zeigt Kopf klar an einem Ende, ACHTUNG seitenverkehrt zur
+    // Blickrichtung (rechts-Blick zeigt den Kopf links im Bild und umgekehrt, s.
+    // Beweisbild-Markdown) — beide Werte trotzdem direkt am gerenderten Bild gemessen.
+    krokodil:         {modus:"quer", punkte:[{x:32,y:6}, {x:58,y:27},{x:32,y:6}, {x:10,y:27}]},
+    // taube (Vigil): dieselbe gemessene Kamera-Kopf-Position wie b.kamera (s. dort,
+    // "kameraVersatz"), nur auf Schnabelhoehe (etwas tiefer) statt Kameramitte — sonst
+    // liegt der Schlaeger mitten in der Kamera-Requisite statt darunter am Schnabel.
+    taube:            {modus:"quer", punkte:[{x:32,y:45},{x:24,y:45},{x:32,y:45},{x:40,y:45}]}
+  };
 
   // WELCHE RAMPE STEHT IM BLATT? Nachgemessen, nicht angenommen.
   //
@@ -1935,6 +2037,10 @@
     if(b.reiherMech){
       const r0=blickAus(u);
       const kopf=zeichneReiherMech(x,y,Z,r0);
+      // Schlaeger quer im Schnabel (02.09.) — die Kopfposition kommt direkt aus
+      // zeichneReiherMech() zurueck, ist also fuer JEDES Bild bereits die echte,
+      // gerade gezeichnete Position und keine separat gemessene/geschaetzte Zahl.
+      if(feldspiel&&istHockey()&&!u.down)zeichneHockeyschlaeger(ctx,kopf.kopfX,kopf.kopfY,Z,r0,"quer");
       if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
       return;
     }
@@ -1953,6 +2059,20 @@
         // Schatten weg (schwebt bei Z<1, versinkt bei Z>1).
         const dh=64*Z, dw=spec.cw*(dh/spec.ch);
         try{ctx.drawImage(im,vf*spec.cw,row*spec.ch,spec.cw,spec.ch,x-dw/2,y-46*Z,dw,dh);}catch(e){}
+      }
+      // HOCKEYSCHLAEGER (02.09., Folgeauftrag "auch die Golems brauchen einen"): dieselbe
+      // Umrechnung Zell-Koordinate->Bildschirm wie beim normalen Zeichenpfad weiter unten
+      // (x-32*Z+hp.x*Z / y-46*Z+hp.y*Z) — funktioniert unveraendert, weil der Vollbild-
+      // Rahmen IMMER auf dh=64*Z skaliert wird, unabhaengig von der nativen Blattgroesse
+      // (s. dw/dh oben). VOLLBILD_SCHLAEGER kennt nicht jeden b.vollbild-Schluessel (z.B.
+      // "roboter_braun" ist registriert, aber von keiner Kreatur benutzt) — dann greift gar
+      // nichts, statt mit einem falschen Punkt zu zeichnen.
+      const griff=VOLLBILD_SCHLAEGER[b.vollbild];
+      if(griff&&feldspiel&&istHockey()&&!u.down){
+        const gp=griff.punkte[r0];
+        const pose=griff.modus==="quer"?"quer"
+          :(u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten");
+        zeichneHockeyschlaeger(ctx,x-32*Z+gp.x*Z,y-46*Z+gp.y*Z,Z,r0,pose);
       }
       // Chris' Fund (01.09.): die Shroomgator-Pilze schwebten komplett UEBER dem Krokodil,
       // gar nicht auf ihm — die generische Spanne y-44*Z..y+16*Z ist auf eine AUFRECHTE
@@ -8654,6 +8774,10 @@
         x.beginPath();
         x.moveTo(kopfX-1*s,kopfY+1.8*s);x.lineTo(kopfX,kopfY+5.5*s);x.lineTo(kopfX+1*s,kopfY+1.8*s);
         x.closePath();x.fill();
+        // Schlaeger quer im Schnabel (02.09.), dieselbe Kopfposition wie oben in der
+        // Formel (kein zweiter Punkt zu pflegen) — nur im Eishockey, s. Kommentar beim
+        // b.vollbild-Zweig direkt darunter fuer die Begruendung des disc-Checks.
+        if(istFeldspiel(disc)&&istHockey())zeichneHockeyschlaeger(x,kopfX,kopfY,s,2,"quer");
         if(b.gluehenderKern){
           x.fillStyle="#ffb238";
           x.beginPath();x.arc(kopfX,kopfY,1.6*s,0,Math.PI*2);x.fill();
@@ -8667,6 +8791,29 @@
           const row=vollbildRow(spec,2);
           const dh=50, dw=spec.cw*(dh/spec.ch);
           try{x.drawImage(im,0,row*spec.ch,spec.cw,spec.ch,(40-dw)/2,0,dw,dh);}catch(e){}
+        }
+        // HOCKEYSCHLAEGER (02.09., zweite Fundstelle neben zeichneSprite): dieselben
+        // gemessenen Griffpunkte wie dort (VOLLBILD_SCHLAEGER), nur auf die kleinere
+        // 40x50-Ikone umgerechnet. Icon- und Arena-Rahmen unterscheiden sich NUR in dh
+        // (50 hier, 64 dort) — dw folgt in beiden Faellen aus cw*(dh/ch), das Verhaeltnis
+        // dw_icon/dw_arena ist deshalb IMMER 50/64, unabhaengig von der nativen
+        // Blattgroesse (cw/ch) des einzelnen Vollbild-Eintrags. Ein am 64x64-Arena-Rahmen
+        // gemessener Punkt (Mitte bei x=32, y=0..64) liegt auf der Ikone (Mitte bei x=20,
+        // y=0..50) deshalb bei (20+(gpX-32)*50/64, gpY*50/64) — ohne dass cw/ch hier
+        // einzeln bekannt sein muessten.
+        //
+        // NUR IM EISHOCKEY: istFeldspiel(disc)&&istHockey() ist derselbe Zustands-Check
+        // wie feldspiel&&istHockey() im normalen Zeichenpfad/zeichneSprite, nur dass
+        // figur() kein feldspiel-Flag als Parameter bekommt (anders als zeichneSprite) —
+        // hier steht stattdessen das globale `disc` zur Verfuegung (dieselbe Variable, mit
+        // der renderKader() weiter unten "istFeldspiel(disc)" schon prueft). Kaderliste
+        // und Aufstellungs-Board fuer jede andere Disziplin (Basketball etc.) bleiben
+        // dadurch unveraendert, wie vom Auftrag verlangt.
+        const griff=VOLLBILD_SCHLAEGER[b.vollbild];
+        if(griff&&istFeldspiel(disc)&&istHockey()){
+          const gp=griff.punkte[2]; // Ikone zeigt immer die "vorn"-Zeile, s. row=2 oben.
+          const F=50/64;
+          zeichneHockeyschlaeger(x,20+(gp.x-32)*F,gp.y*F,F,2,griff.modus==="quer"?"quer":"halten");
         }
         // Kamera-Requisite (Vigil) auch hier, sonst zeigt nur die Arena die Kamera und die
         // Kader-/Board-Karte einen "nackten" Vogel — dieselbe Anforderung wie bei jeder
