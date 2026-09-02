@@ -38,8 +38,16 @@ async function lauf(k) {
       for (const q of s.spieler.filter((z) => z.side === 0)) { fga += q.fga; fgm += q.fgm; to += q.verluste; }
     }
     const m = x.spiele.length;
+    // Streuung der Heimpunkte je Spiel, nicht nur ihr Mittel (Overseer-Auflage): bei rund
+    // 10 Punkten Standardabweichung je Spiel ist ein Abstand von vier Punkten aus 24
+    // Spielen nicht belastbar — ohne diese Spalte meldet das Skript irgendwann eine Beule,
+    // die nur Rauschen ist. Der Standardfehler des Mittels ist s/sqrt(n).
+    const heimJeSpiel = x.spiele.map((s) => s.seiten[0]);
+    const mittel = hp / m;
+    const varianz = heimJeSpiel.reduce((a, v) => a + (v - mittel) ** 2, 0) / Math.max(1, m - 1);
     return {
-      heim: +(hp / m).toFixed(1), gast: +(gp / m).toFixed(1),
+      heim: +mittel.toFixed(1), gast: +(gp / m).toFixed(1),
+      sd: +Math.sqrt(varianz).toFixed(1), sem: +(Math.sqrt(varianz) / Math.sqrt(m)).toFixed(1),
       fga: +(fga / m).toFixed(1), fgq: +((100 * fgm) / Math.max(1, fga)).toFixed(1),
       ballw: +(bw / m).toFixed(1), to: +(to / m).toFixed(1),
     };
@@ -49,16 +57,23 @@ async function lauf(k) {
 }
 
 console.log(`Unterzahl-Kurve — ${SPIELE} Spiele je Groesse, Quelle: ${SEITE}\n`);
-console.log("gesetzt   Heim   Gast  Differenz    FGA    FG%   Ballw.     TO");
-let vorher = null, beule = [];
+console.log("gesetzt   Heim  +/-SEM   Gast  Differenz    FGA    FG%   Ballw.     TO");
+let vorher = null, beule = [], unklar = [];
 for (const k of [6, 5, 4, 3, 2, 1]) {
   const r = await lauf(k);
-  if (vorher !== null && r.heim > vorher) beule.push(k);
-  vorher = r.heim;
+  if (vorher !== null && r.heim > vorher.heim) {
+    // Nur was ausserhalb der doppelten Standardfehler beider Messungen liegt, ist eine
+    // Beule; alles darunter heisst "nicht unterscheidbar", nicht "in Ordnung".
+    const schranke = 2 * Math.hypot(r.sem, vorher.sem);
+    (r.heim - vorher.heim > schranke ? beule : unklar).push(k);
+  }
+  vorher = r;
   const z = (v, b) => String(v).padStart(b);
-  console.log(`${z(k, 7)} ${z(r.heim, 6)} ${z(r.gast, 6)} ${z(+(r.heim - r.gast).toFixed(1), 10)} ${z(r.fga, 6)} ${z(r.fgq, 6)} ${z(r.ballw, 8)} ${z(r.to, 6)}`);
+  console.log(`${z(k, 7)} ${z(r.heim, 6)} ${z("+-" + r.sem, 7)} ${z(r.gast, 6)} ${z(+(r.heim - r.gast).toFixed(1), 10)} ${z(r.fga, 6)} ${z(r.fgq, 6)} ${z(r.ballw, 8)} ${z(r.to, 6)}`);
 }
 console.log(beule.length
-  ? `\nBEULE bei gesetzt=${beule.join(",")}: weniger Spieler, aber MEHR Punkte.`
-  : "\nMonoton: weniger Spieler heisst durchgehend weniger Punkte.");
+  ? `\nBEULE bei gesetzt=${beule.join(",")}: weniger Spieler, aber signifikant MEHR Punkte.`
+  : "\nMonoton: weniger Spieler heisst durchgehend nicht mehr Punkte.");
+if (unklar.length)
+  console.log(`Nicht unterscheidbar bei gesetzt=${unklar.join(",")}: hoeher als der Schritt davor, aber innerhalb der Streuung. Mehr Spiele fahren.`);
 await browser.close();

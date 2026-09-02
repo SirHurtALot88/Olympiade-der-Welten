@@ -4363,15 +4363,36 @@
     // zwei Spielern 51 % der Wuerfe in die Naehkategorien (dunk+nah) gegen 32 % bei
     // sechs — Unterzahl kaufte sich bessere Wurfpositionen.
     //
-    // Jetzt werden die vorhandenen Spieler ueber die GANZE Formation verteilt statt von
-    // vorne aufgefuellt. Bei voller Besetzung ist das zeichenweise das alte Verhalten
-    // (i-ter Spieler auf i-ten Platz); der Einzelspieler steht in der Mitte der
-    // Formation, nicht direkt unter dem Korb.
-    const anz=sortiert.length;
+    // Jetzt bekommt jede Unterzahl-Groesse eine EIGENE, symmetrische Auswahl aus der
+    // Formation statt der ersten k Plaetze.
+    //
+    // ERSTER ANLAUF WAR EINE FORMEL, und der Overseer hat sie zu Recht zerlegt:
+    // `Math.round(i*(SLOTS.length-1)/(anz-1))` verteilt zwar, aber nicht symmetrisch. Sie
+    // setzte einen Einzelspieler auf Slot 3 (rechter Fluegel auf Dreier-Distanz, nicht
+    // "die Mitte der Formation", wie der Kommentar hier behauptete) und drei Spieler auf
+    // 0/3/5 — zwei davon auf DERSELBEN Seite, die andere Haelfte des Feldes leer. Genau
+    // der Klumpen, vor dem der SLOTS-Kommentar oben warnt.
+    //
+    // Die Tabelle unten liest sich stattdessen direkt aus der Geometrie: 0 ist der Platz
+    // am Korb, 1 der zentrale Platz am Kreis, 2/3 sind ein spiegelbildliches Fluegelpaar,
+    // 4/5 das aeussere Eckenpaar. Jede Zeile ist entweder zentral oder ein vollstaendiges
+    // Paar — nur bei fuenf Spielern geht das nicht auf, weil sich sechs Plaetze nicht in
+    // fuenf symmetrische Teile zerlegen lassen; dort faellt eine Ecke weg.
+    //
+    // Mittlerer Radius je Zeile (voll: 130): 1 -> 130, 2 -> 150, 3 -> 143, 4 -> 122,
+    // 5 -> 127. Keine Groesse kauft sich damit die korbnahen Plaetze.
+    const UNTERZAHL_PLAETZE={1:[1], 2:[2,3], 3:[1,2,3], 4:[0,1,2,3], 5:[0,1,2,3,4]};
+    // GEGATET AUF DIE NOMINELLE FELDGROESSE, nicht auf SLOTS.length (Overseer-Fund):
+    // `jeSeite` ist nicht immer 6 — die Sonde faehrt ausdruecklich auch 2v2 und 4v4, und
+    // `feldspielProbe` ueberschreibt dafuer `art.jeSeite`. Gegen SLOTS.length geprueft
+    // haette ein VOLLES 4v4 als Unterzahl gegolten und andere Plaetze bekommen als bisher
+    // — nachgemessen wichen 4v4 und 2v2 dadurch von main ab, obwohl niemand in Unterzahl
+    // war. Gegen `jeSeite` geprueft ist jede vollstaendige Aufstellung unveraendert.
+    const anz=sortiert.length, soll=FB().jeSeite||SLOTS.length;
+    const plaetze=anz<soll?UNTERZAHL_PLAETZE[anz]:null;
     sortiert.forEach((u,i)=>{
-      u.slotIdx = anz>=SLOTS.length ? Math.min(SLOTS.length-1,i)
-                : anz===1 ? Math.floor(SLOTS.length/2)
-                : Math.round(i*(SLOTS.length-1)/(anz-1));
+      u.slotIdx = plaetze?plaetze[Math.min(plaetze.length-1,i)]
+                : Math.min(SLOTS.length-1,i);
       u.slotSeit=0;
     });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
