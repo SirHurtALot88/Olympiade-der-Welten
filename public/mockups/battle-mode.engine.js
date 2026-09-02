@@ -665,7 +665,7 @@
     // froschmensch.png (Stendhal Frogmen, 144x256 = 3x4 zu 48x64) ist genau fuer die
     // Aqua-Rasse beschafft (quellen.json) und wird als Vollbild naeher am Bild als die
     // menschlich-lizard-Naeherung.
-    "Tidesprinter":       {vollbild:"wasser_elementar",effekt:{typ:"frost",pos:"koerper"}},
+    "Tidesprinter":       {vollbild:"froschmensch"},
     // Bild: dunkle, MECHANISCHE Reiher-/Storch-Kreatur — langer duenner Hals, sehr langer
     // spitzer Schnabel, lange duenne Beine, metallisch-dunkles Gefieder, leuchtender oranger
     // Energiekern mittig im Brustkorb, unter Vollmond. Chris' Korrektur (01.09.): "Seraph ist
