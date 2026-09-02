@@ -719,6 +719,37 @@ export function resolveSlotRolesForDiscipline(
   }));
 }
 
+/**
+ * Die KURZE Rollenkennung fuer einen Aufstellungs-Slot — das, was die Arena versteht.
+ *
+ * Produktionsseitig heisst eine Rolle `hockey-6-powerforward` (s. `buildGeneratedSlotRoles`),
+ * im Arena-Motor heisst dieselbe Rolle kurz `powerforward`. Die Verkuerzung erfindet diese
+ * Funktion nicht: `scripts/generiere-arena-daten.ts` schneidet beim Erzeugen von
+ * `SLOTS_JE_DISC` exakt dasselbe Praefix `${disziplin}-${slotZahl}-` ab.
+ *
+ * WARUM UEBER DEN INDEX UND OHNE KADERGROESSE. Der lange Name traegt die Kadergroesse mit
+ * (`hockey-6-…` gegen `hockey-4-…`), die kurze Kennung nicht — die Themenliste ist
+ * dieselbe, nur unterschiedlich lang abgeschnitten. Ein `LineupDraftEntry` kennt seinen
+ * `slotIndex`, aber nicht die Kadergroesse des Spieltags; die haengt am
+ * `matchdayContract`, den nicht jeder Aufrufer zur Hand hat. Ueber den Index in die
+ * ungekuerzte Themenliste zu greifen liefert dieselbe Kennung, ohne diese Abhaengigkeit.
+ *
+ * Gibt `null` zurueck, wenn die Disziplin keine echte Rollenmatrix hat (dann greift
+ * anderswo die generische Rueckfall-Rolle) oder der Index daneben liegt.
+ */
+export function resolveSlotRoleShortId(
+  disciplineId: string | null | undefined,
+  disciplineName: string | null | undefined,
+  slotIndex: number,
+): string | null {
+  const officialDisciplineId = resolveOfficialDisciplineId(disciplineId, disciplineName);
+  if (!officialDisciplineId) return null;
+  const themes = DISCIPLINE_ROLE_THEMES[officialDisciplineId];
+  if (!themes) return null;
+  const theme = themes[slotIndex];
+  return theme ? theme.roleId : null;
+}
+
 export function calculateMatchdayProjectedPreview(input: {
   baseScore: number | null | undefined;
   role: MatchdaySlotRoleDefinition | null | undefined;

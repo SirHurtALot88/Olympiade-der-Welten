@@ -5,6 +5,10 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "playwright";
 
 import { buildArenaTeam, type ArenaSpieler } from "@/lib/foundation/battle-arena/arena-kader-adapter";
+import {
+  buildArenaAufstellungBeide,
+  type ArenaAufstellung,
+} from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 
 /**
@@ -130,6 +134,12 @@ type VorbereitetesFixture = {
   seed: number;
   heim: ArenaSpieler[];
   gast: ArenaSpieler[];
+  /**
+   * Die Aufstellung beider Seiten, Spielername -> {d, slot}. Leer, wenn fuer den Spieltag
+   * kein Entwurf vorliegt — dann faellt der Motor auf seine Reihum-Vergabe zurueck und
+   * verhaelt sich wie vor dieser Aenderung.
+   */
+  aufstellung: ArenaAufstellung;
 };
 
 function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
@@ -164,12 +174,20 @@ function bereiteFixturesVor(
   return fixtures.map((fixture) => {
     const heim = buildArenaTeam(gameState, fixture.homeTeamId, attributeSheetOverrides);
     const gast = buildArenaTeam(gameState, fixture.awayTeamId, attributeSheetOverrides);
+    // Die Aufstellung des Spieltags wird hier mit vorbereitet, aus demselben Grund wie die
+    // Kader: server-seitig, VOR dem Browser-Start. Ohne Entwurf bleibt sie leer.
+    const aufstellung = buildArenaAufstellungBeide(
+      gameState,
+      fixture.homeTeamId,
+      fixture.awayTeamId,
+      gameState.matchdayState?.matchdayId ?? null,
+    );
     if (heim.length === 0 && gast.length === 0) {
       throw new Error(
         `arena-headless-runner: weder ${fixture.homeTeamId} noch ${fixture.awayTeamId} stellen einen einsatzfaehigen Kader (fehlende Attribut-Boegen?).`,
       );
     }
-    return { ...fixture, seed: seedZuZahl(fixture.seed), heim, gast };
+    return { ...fixture, seed: seedZuZahl(fixture.seed), heim, gast, aufstellung };
   });
 }
 
@@ -186,7 +204,12 @@ function bereiteFixturesVor(
 async function simuliereFixturesImBrowser(payload: {
   // `seed` ist hier bereits eine Zahl -- die Normalisierung nicht-numerischer String-Seeds
   // (s. `seedZuZahl()`-Kommentar oben) passiert VOR dem Sprung in den Browser-Kontext.
-  fixtures: { heim: ArenaSpieler[]; gast: ArenaSpieler[]; seed: number }[];
+  fixtures: {
+    heim: ArenaSpieler[];
+    gast: ArenaSpieler[];
+    seed: number;
+    aufstellung: ArenaAufstellung;
+  }[];
   disziplin: string;
   timeoutMs: number;
 }): Promise<Array<{ disziplin: string; seiten: [number, number]; boxscore: ArenaFixtureBoxscoreEintrag[] } | null>> {
@@ -205,8 +228,16 @@ async function simuliereFixturesImBrowser(payload: {
     }
   };
 
-  const haengeMotorNeuEin = (kader: { heim: ArenaSpieler[]; gast: ArenaSpieler[] }) => {
-    fenster.__olyArenaKader = { heim: kader.heim, gast: kader.gast };
+  const haengeMotorNeuEin = (kader: {
+    heim: ArenaSpieler[];
+    gast: ArenaSpieler[];
+    aufstellung: ArenaAufstellung;
+  }) => {
+    fenster.__olyArenaKader = {
+      heim: kader.heim,
+      gast: kader.gast,
+      aufstellung: kader.aufstellung,
+    };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
     const script = document.createElement("script");
@@ -272,12 +303,21 @@ export async function runArenaFixtures(
     // liest diesen Kader dann beim allerersten Motor-Start, kein zusaetzliches Einhaengen noetig.
     await page.addInitScript((kader) => {
       (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
-    }, { heim: vorbereitet[0].heim, gast: vorbereitet[0].gast });
+    }, {
+      heim: vorbereitet[0].heim,
+      gast: vorbereitet[0].gast,
+      aufstellung: vorbereitet[0].aufstellung,
+    });
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
-      fixtures: vorbereitet.map(({ heim, gast, seed }) => ({ heim, gast, seed })),
+      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
+        heim,
+        gast,
+        seed,
+        aufstellung,
+      })),
       disziplin,
       timeoutMs,
     });

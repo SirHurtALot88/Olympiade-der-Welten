@@ -4007,11 +4007,50 @@
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
+    // WER GESETZT IST, SPIELT — auch wenn es weniger als n sind.
+    //
+    // Chris ausdruecklich: „pruefe dass man auch mit 3v6 antreten kann, das ist erlaubt
+    // aber natuerlich ist man dann deutlich schwaecher." Eine unvollstaendige Aufstellung
+    // ist also kein Versehen, das der Motor stillschweigend repariert, sondern eine
+    // Entscheidung des Managers mit einer Folge. Ein Auffuellen nach Disziplinwert wuerde
+    // ihm genau diese Entscheidung wegnehmen.
+    //
+    // Ein Zwischenstand dieses PRs hatte das falsch herum gebaut (auffuellen bis n), weil
+    // ein Review den 3-gegen-6-Fall als Bruchstelle gemeldet hatte. Er ist keine: der
+    // Motor traegt Unterzahl (nachgemessen, s. unten), sie ist nur teuer — und teuer sein
+    // soll sie.
+    //
+    // Ohne jede Aufstellung gilt weiterhin der Rueckfall: die besten n nach
+    // Disziplinwert.
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[feldspielDisc]||0)-(a.d[feldspielDisc]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
-    const gegner=OPP.slice(0,n);
-    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
-                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO — sonst macht dieses Rohr die beiden
+    // Seiten ungleich, und Ungleichheit zwischen Heim und Gast ist genau der Fehler, gegen
+    // den der Spiegeltest (scripts/miss-arena-feldspiel-spiegel.mjs) als Waechter steht.
+    // Ein Overseer-Review hat den Punkt gefunden: `place` enthaelt beide Aufstellungen,
+    // und slotFuer wirkt deshalb laengst auf beiden Seiten — aber die AUSWAHL, wer
+    // ueberhaupt antritt, las bisher nur die Heimseite aus der Aufstellung.
+    //
+    // Dieselbe Regel wie oben, Unterzahl eingeschlossen: wer gesetzt ist, spielt. Ohne
+    // Aufstellung Zeichen fuer Zeichen das alte `OPP.slice(0,n)`.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===feldspielDisc);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    // Eine Slot-Kennung, die der Motor nicht kennt, liefert stillschweigend Aufschlag 0.
+    // Das passiert real: vier Disziplinen fuehren im Motor nur vier Slots, ihre
+    // Themenliste im Spiel aber sechs — ein gespeicherter slotIndex 4 oder 5 zeigt dann
+    // ins Leere. Ein Hinweis auf der Konsole statt eines lautlosen Nullwerts, damit der
+    // naechste, der eine ausbleibende Wirkung sucht, ihn nicht erst messen muss.
+    const slotFuer=(p,i)=>{
+      const gesetzterSlot=(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot:null;
+      if(gesetzterSlot){
+        if(!SLOTVON[gesetzterSlot]&&typeof console!=="undefined"&&console.warn){
+          console.warn("[arena] Slot \""+gesetzterSlot+"\" ist in "+feldspielDisc
+            +" nicht angemeldet — "+p.n+" bekommt keinen Slot-Aufschlag.");
+        }
+        return gesetzterSlot;
+      }
+      return (slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
+    };
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
     // Kaempfen, weil unsere Einheiten Slot, Form und Stufe bekamen, der Gegner nur seinen
@@ -7283,6 +7322,47 @@
   [["Jorund","blockstart"],["Lulu","acceleration"],
    ["Xelara","topspeed"],["Gram","lanecontrol"]]
     .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=slotOrd(sl);});
+
+  // DIE ECHTE AUFSTELLUNG AUS DEM SPIEL — und sie kommt bewusst ERST HIER, nach der
+  // Beispiel-Tafel darueber.
+  //
+  // `place` ist die Tabelle „welcher Spieler steht in welchem Slot welcher Disziplin",
+  // Spielername -> {d, slot}. Gefuellt hat sie bisher AUSSCHLIESSLICH die
+  // Aufstellungstafel dieses Mockups (die beiden Listen darueber). Der Produktivpfad
+  // reichte nur Kader durch, nie eine Aufstellung — deshalb lief `slotFuer` in
+  // bauFeldspiel immer in den Reihum-Rueckfall, und Chris' Zuweisung („der Center gehoert
+  // unter den Korb") hatte auf das Spiel keinerlei Wirkung. Es fehlte das Rohr, nicht die
+  // Buchse.
+  //
+  // WARUM DIE REIHENFOLGE ZAEHLT — nachgemessen, nicht vermutet: eingespielt VOR den
+  // beiden Listen kam von sechs gesetzten Basketball-Spielern genau EINER an. `place[n]`
+  // ist eine Zuweisung, kein Zusammenfuegen; die Beispiel-Tafel ueberschrieb jeden
+  // Spieler, den sie selbst kennt. Uebrig blieb der einzige, der in keiner der beiden
+  // Beispiel-Listen steht.
+  //
+  // Die echte Aufstellung gewinnt also gegen die Beispiel-Aufstellung: sie kommt aus dem
+  // Spielstand, jene ist Anschauungsmaterial fuer den Standalone-Betrieb. Ein Spieler,
+  // den der Manager auf einen Feldspiel-Slot gesetzt hat, wird damit aus der
+  // Beispiel-Aufstellung herausgeloest — richtig so, er kann nicht in zwei Disziplinen
+  // gleichzeitig antreten.
+  //
+  // Fehlt die Aufstellung ganz — Standalone, Artefakt, alte Aufrufer, kein Entwurf
+  // gesetzt —, bleibt alles wie bisher. Das ist die Bedingung, unter der jede bestehende
+  // Messung gueltig bleibt.
+  //
+  // ZWEI WIRKUNGEN, und die zweite ist die groessere: `slotFuer` gibt dem Spieler seinen
+  // Slot-Aufschlag (+-8,5 ueber slotAufschlag), UND `inDisc()` waehlt aus, WER ueberhaupt
+  // antritt — mit gesetzter Aufstellung spielt, wen der Manager gesetzt hat, statt der
+  // besten n nach Disziplinwert.
+  if(echterKader&&echterKader.aufstellung&&typeof echterKader.aufstellung==="object"){
+    for(const n of Object.keys(echterKader.aufstellung)){
+      const e=echterKader.aufstellung[n];
+      if(e&&typeof e.d==="string"&&typeof e.slot==="string"){
+        place[n]={d:e.d,slot:e.slot};
+        order[n]=slotOrd(e.slot);
+      }
+    }
+  }
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
