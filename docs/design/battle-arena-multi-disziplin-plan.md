@@ -148,6 +148,87 @@ die Geschwister sie erben.
 
 ---
 
+## 1.3 Die Abnahmezahl gilt JE SPIEL, nicht je Saison
+
+**Nachgetragen am 02.09. auf Chris' Ansage** — und es verschiebt die Reihenfolge weiter
+unten, deshalb steht es vor ihr.
+
+Chris wörtlich: *„wichtig wäre auch dass es irgendwie möglich ist das umzusetzen innerhalb
+von einem spiel! Wir haben ja pro season dann nur 2x Hockey. das muss also auch für sich
+wenn es einmal dran kommt REALISTISCH ablaufen und >80% sein"*, und unmittelbar danach:
+*„und das gilt natürlich für alle diszis merke dir das schon mal für das gesamtprojekt"*.
+
+Bis hierher war die stillschweigende Annahme, dass sich eine Rangtreue über viele Spiele
+einstellen darf. Sie darf nicht. Je Disziplin fallen in einer Saison nur wenige Spiele an;
+eine Ordnung, die erst im Aggregat sichtbar wird, existiert für den Spieler nicht.
+
+**Neue Abnahmeschranke für jede Disziplin: rho über 0,80 in einem einzelnen Spiel,
+angestrebt 0,85.**
+
+### Warum das eine Frage der Mechanik ist, nicht der Uhr
+
+**Korrigiert am 02.09., nachdem der erste Anlauf sich verrechnet hatte.** Die erste Fassung
+dieses Abschnitts nannte einen Deckel von 0,67 und schloss daraus, Hockey sei je Einzelspiel
+nicht auf 0,80 zu bringen. Beides war falsch: der Deckel war ein Messartefakt (die
+Torwärter und die Formkarten steckten mit in der Rechnung), und der Schluss zeigte in die
+falsche Richtung.
+
+Eine Einzelspiel-Rangtreue zerfällt in ein Produkt zweier Größen:
+
+    rho(ein Spiel) = rho(Saison) x Wurzel(Verlaesslichkeit)
+
+| Größe | was sie sagt | woran sie hängt |
+|---|---|---|
+| **Verlässlichkeit** | wie gut ein Spiel das nächste vorhersagt | Ereigniszahl je Spiel |
+| **Validität** = rho(Saison) | ob die Mechanik belohnt, was die Eignung misst | Rezept und Kanäle |
+
+Nachgemessen für Hockey (24 Spiele, 10 Feldspieler, Einweg-ICC): Verlässlichkeit **0,755**,
+Validität **0,82**, Produkt 0,711 — gemessen 0,719. Die Formel trägt auf ±0,01, geprüft an
+drei Datensätzen.
+
+**Mehr Ereignisse helfen fast nie.** Mit verlängerten Dritteln (3x2:00 und 3x2:40) stieg
+die Verlässlichkeit auf 0,80 und 0,85 — und rho blieb bei **0,719 / 0,721 / 0,723**. Flach.
+Bezahlt hätte man mit 5,6 statt 3,2 Toren je Team (real 3,0) und doppelter Zuschauzeit.
+Unser Hockeyspiel hat je Minute ohnehin schon die dreizehnfache NHL-Ereignisdichte.
+
+**Wer die Rangtreue heben will, arbeitet an der Validität.** Für Hockey heißt das konkret:
+die gewonnenen losen Pucks tragen 40 % der Impact-Masse, sind mit einer Verlässlichkeit von
+0,94 die stabilste Größe im Spiel — und hängen an der AUFSTELLUNGSPOSITION statt an
+Attributen. Wer vorm Tor steht, holt sie. Das ist der Grund, warum die Validität bei 0,82
+klebt, und es ist Motorarbeit, keine Rezeptarbeit.
+
+### Was rho drückt, ist oft gar kein Fehler
+
+In Hockey steht der eignungsbeste Feldspieler in **79 %** der Spiele auf Rang 1, in **94 %**
+in den ersten zwei, in **0 %** auf dem letzten. Paare mit mindestens 15 Eignungspunkten
+Abstand werden zu **99 %** richtig geordnet. Was rho nach unten zieht, sind die 90 von 480
+Paaren mit weniger als zwei Punkten Abstand: dort liegt die Trefferquote bei 39 %, also beim
+Münzwurf — und das ist richtig so. Ein Motor, der auch die ordnet, ist einer, in dem der
+Ausgang aus der Aufstellung folgt statt aus dem Spiel.
+
+**Die ehrlichere Abnahme fragt deshalb nach dem Star und nach der Paartreue mit Abstand:**
+
+| Kriterium | Ziel | Hockey heute |
+|---|---:|---:|
+| Eignungsbester Feldspieler in den ersten zwei | ≥ 90 % | 94 % |
+| Paare ab 6 Eignungspunkten Abstand richtig | ≥ 90 % | 82 % |
+| Paare ab 15 Punkten richtig | ≥ 97 % | 99 % |
+| Rolle mit eigener Wertformel (Torwart) | getrennt geprüft | — |
+
+Die nackte Rangkorrelation bleibt als Kennzahl daneben stehen; sie ist nur nicht mehr die
+einzige, und sie ist nicht die, an der eine Disziplin scheitert.
+
+### Werkzeuge
+
+| Skript | Frage |
+|---|---|
+| `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` | die Abnahmezahl selbst |
+| `scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48` | welche Rolle sie drückt |
+| `scripts/sondiere-feldspiel-subskills.mjs <diszi> 24` | was ein Sub-Skill mechanisch wiegt |
+| `scripts/baue-feldspiel-rezept.mjs <diszi> <sondierung>` | das Rezept daraus rechnen |
+
+---
+
 ## 2. Reihenfolge für die 19 verbleibenden Disziplinen
 
 Empfehlung in vier Wellen; innerhalb einer Welle ist die Reihenfolge Geschmackssache
