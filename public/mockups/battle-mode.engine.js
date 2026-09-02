@@ -4760,7 +4760,16 @@
   // gemessen: HK_TW_REF ist die gemessene Fangquote unserer Liga, HK_TW_BASIS der
   // gemessene Mittelwert der Feldspieler-Impacts, HK_TW_GSAA_K die Spreizung je Tor
   // ueber oder unter dem Durchschnitt.
-  const HK_TW_REF=0.844, HK_TW_BASIS=3.8, HK_TW_GSAA_K=3.0;
+  // HK_TW_GSAA_K von 3,0 auf 2,0 (Overseer-Fund): GSAA streut je Spiel mit rund 1,8
+  // Toren. Mit Gewicht 3 streute der Torwart-Impact damit um 5,4, waehrend Feldspieler um
+  // 3,46 streuen — der Torwart wurde in der Einzelspiel-Rangfolge zum lautesten Posten.
+  // 3,46/1,8 = 1,9; 2,0 gleicht die Streuung an, ohne den Mittelwert zu verschieben.
+  // HK_TW_BASIS ist der GEMESSENE Mittelwert der Feldspieler-Impacts und muss nach JEDER
+  // Aenderung der Wertformel nachgezogen werden — sonst faellt der Torwart aus der
+  // Rangfolge, ohne dass sich an ihm etwas geaendert haette. Genau das ist beim Einbau von
+  // Steals und Schussvolumen passiert: die Feldspieler stiegen von 3,8 auf 8,5, der Torwart
+  // blieb bei 3,8 und rutschte von Rang 5 auf Rang 9.
+  const HK_TW_REF=0.844, HK_TW_BASIS=8.5, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
@@ -4809,7 +4818,23 @@
         const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
         return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists*2;
       }
-      return u.punkte*3+u.assists*2+u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.6;
+      // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
+      //
+      // (1) STEALS FEHLTEN GANZ. Ein Feldspieler erobert 2,5 Pucks je Spiel, und diese
+      //     Groesse korreliert mit der Eignung (0,67 ueber die Saison) — sie stand
+      //     trotzdem in keiner Zeile. Puck erobern ist im Eishockey eine Hauptaufgabe.
+      //
+      // (2) DER VERLUST-ABZUG BESTRAFTE DEN STAR. Bei 0,6 radierte er 46 % der
+      //     Bruttomasse eines Feldspielers wieder weg, und Verluste korrelieren POSITIV
+      //     mit der Eignung (+0,38): wer den Puck fuehrt, wird gecheckt. Der beste
+      //     Spieler wurde also dafuer bestraft, dass er ueberhaupt am Puck war. Auf 0,2
+      //     gesenkt — ein Verlust bleibt teuer, aber er kippt die Rangfolge nicht mehr.
+      //
+      // (3) SCHUSSVOLUMEN ZAEHLT. Corsi ist im Eishockey die gaengigste Einzelgroesse
+      //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
+      //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
+      return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
+            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
   }
@@ -5267,7 +5292,12 @@
     // nur den zugewiesenen `decker` — bei zwei oder mehr gilt der Ballfuehrer als
     // gedoppelt (der zweite kommt ueber die Hilfe-Bewegung in bewegeSpielerLive
     // zustande, die dafuer ihren eigenen Mann kurz freigibt).
-    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>dist(u,v)<BEDRAENGT_RADIUS);
+    // DER TORWART BEDRAENGT NIEMANDEN (Overseer-Fund). Er steht per Definition dort, wo
+    // die gefaehrlichsten Schuesse fallen — jeder Schuss aus dem Torraum zaehlte deshalb
+    // als "gedoppelt" und bekam den vollen doppelMalus von 0,26, obwohl gar kein zweiter
+    // Feldspieler in der Naehe war. Der Torwart ist die Huerde, die die Schussaufloesung
+    // ohnehin schon abbildet; ein zweites Mal als Bedraenger zaehlt er doppelt.
+    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!v.torwart&&dist(u,v)<BEDRAENGT_RADIUS);
     const gedoppelt=naheVerteidiger.length>=2;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
     // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
@@ -5651,7 +5681,7 @@
     // Fuer die Doppeln-Abnahme (s. Bericht): dieselbe naheVerteidiger-Zaehlung wie in
     // entscheideBallaktion, hier am Schuetzen im Abwurfmoment (kann bei Spielzuegen/
     // Alley-Oop von der Person abweichen, die die Aktion ausgeloest hat).
-    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
+    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!v.torwart&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
     // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
@@ -6012,7 +6042,12 @@
     // bei starkem Druck nicht am alten 0,32-Deckel verpufft — s. Aufrufstelle in
     // entscheideBallaktion. Default 0 fuer jeden normalen Pass (keine Verhaltensaenderung).
     let abgefangenVon=null, minD=Infinity, waechter=null;
+    // Auch hier faellt der Torwart heraus: er steht auf der Torlinie, und eine Passlinie,
+    // die dort vorbeifuehrt, ist keine, die er abfangen koennte, ohne sein Tor zu
+    // verlassen. Gemessen fing er regelmaessig Paesse ab, die quer durch die eigene Zone
+    // liefen.
     for(const v of FSTEAM[1-von.side]){
+      if(v.torwart)continue;
       const d=distZuLinie(v,von,nach);
       if(d<minD){minD=d;waechter=v;}
     }
