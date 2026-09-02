@@ -322,6 +322,11 @@ Formuliert so, dass keine Architektur-Vorkenntnis nötig ist; meine Empfehlung s
 
 ## 5. Kern-Dateien für den Einstieg
 
+- `docs/design/neue-disziplin-handbuch.md` — das Verfahrens-Handbuch (Chassis-Wahl,
+  Reihenfolge, Abnahmeschranken, Recherche-Fragen, Code-Stellen, Fallen, Checkliste),
+  destilliert aus den Basketball- und Hockey-Runden; Asset-Teil daneben in
+  `docs/design/neue-disziplin-assets.md`
+
 - `public/mockups/battle-mode.engine.js` — die vier `*_ART`-Tabellen (Z. 2799/5146/8398/2958),
   `MOTOREN`-Registry (~10074), `window.__arena` (~10315), Basketball-Live (`initBasketballLive` 3670,
   `bewegeSpielerLive` 4376, `stepBasketballLive` 4621)
