@@ -241,6 +241,87 @@
     cctx.beginPath();cctx.arc(cx-w/2+2*s,cy+h/2+3.6*s,Math.max(0.8,1.1*s),0,Math.PI*2);cctx.fill();
   }
 
+  // HOCKEYSCHLAEGER (02.09., Chris: "Hockeyschlaeger in die Haende der Figuren"). Reine
+  // Zeichenfunktion, dieselbe Idee wie zeichneKameraKopf/zeichneReiherMech oben: kein
+  // Sprite-Layer, sondern Formen aus Canvas-Befehlen, aus denselben zwei Gruenden — kein
+  // CC0-Requisitenblatt trifft "duenner Schaft + abgewinkelte Kelle" in vier Blickrichtungen
+  // UND vier Haltungen zugleich, und ein prozedural gezeichnetes Requisit bleibt scharfkantig
+  // ohne Weichzeichnung, wie es imageSmoothingEnabled=false verlangt. WIRD IN DIESEM PR NICHT
+  // VERDRAHTET — keine Figur bekommt hier einen Schlaeger in die Hand, das macht ein anderer
+  // Agent in einem eigenen Schritt (s. PR-Beschreibung).
+  //
+  // Winkel werden "von der Senkrechten" gemessen (0 = schnurgerade nach unten), nicht "von
+  // der Waagerechten" — sin() liefert dann den seitlichen Versatz, cos() den nach unten. Der
+  // Vorteil: ein Vorzeichenwechsel bei "blick" spiegelt Schaft UND Kelle in einem Rutsch
+  // richtig, weil sin() ungerade und cos() gerade ist (sin(blick*a)=blick*sin(a) faellt
+  // exakt auf die andere Seite, cos(blick*a)=cos(a) bleibt gleich hoch) — kein zweiter
+  // Formelsatz fuer die Spiegelseite noetig, wie schon bei zeichneReiherMechs Schnabel.
+  const HOCKEY_PHASEN={
+    // schaftA/kelleA: Winkel ab der Senkrechten (s.o.) bei Blick nach RECHTS (blick=+1) —
+    // Linksblick spiegelt sich daraus automatisch, Front/Ruecken (kein echter Blick
+    // vorhanden) nutzt dieselbe Tabelle mit einer festen Standardseite.
+    // schaftL: Laenge Hand->Kellenferse. Bei halten absichtlich so bemessen, dass die
+    // Kelle auf einer 64px-Figur (Fuesse auf y+18..19, s. Kommentar bei "Massstab 1" oben)
+    // mit einer realistisch gegriffenen Hand (~24-28 Einheiten ueber dem Eis) GENAU auf dem
+    // Eis aufsetzt statt in der Luft zu haengen — Chris' Vorgabe, "Schlaeger halten" statt
+    // "Stock halten".
+    halten:  {schaftA:0.16, schaftL:26, kelleA:1.62},
+    // Kelle deutlich vom Eis abgehoben (kelleA jenseits von PI/2 -> cos wird negativ,
+    // die Kelle wandert nach OBEN statt weiter nach unten) UND der Schaft weit zur Seite
+    // gezogen — ein Ausholschwung reisst die Kelle sichtbar hoch und nach hinten.
+    ausholen:{schaftA:-0.85,schaftL:27, kelleA:-1.9},
+    // Durchzug: Schaft nach VORN (gleiches Vorzeichen wie blick) statt nach hinten, Kelle
+    // fegt knapp ueber Eishoehe durch statt hoch in der Luft zu bleiben.
+    schuss:  {schaftA:0.68, schaftL:29, kelleA:1.75}
+  };
+  // x/y IST DIE HAND — kommt von aussen (ein zweiter Agent misst sie am Sprite), diese
+  // Funktion kennt die Hand selbst nicht und muss sie auch nicht kennen: Schaft und Kelle
+  // haengen als reine Vektorkette an genau diesem einen Punkt.
+  // richtung: 0 hinten, 1 links, 2 vorn, 3 rechts — dieselbe Zaehlung wie blickAus(). Im
+  // Profil (1/3) zeigt die Kelle seitlich vom Koerper weg; in Front/Ruecken (0/2) ist sie
+  // per Definition stark verkuerzt (man blickt fast die Schmalseite an) und bekommt deshalb
+  // einen kurzen Stummel statt der vollen Laenge — keine Vereinfachung, sondern dieselbe
+  // Perspektive, die auch ein echter Schlaeger von vorne zeigen wuerde.
+  // phase: "halten"/"ausholen"/"schuss" (s. HOCKEY_PHASEN); eine unbekannte Phase faellt
+  // auf "halten" zurueck, damit ein Tippfehler beim Aufrufer nie eine leere/kaputte Pose
+  // zeichnet.
+  // Ausgemessen am Sprite-Blatt, nicht geschaetzt: docs/design/sprite-handpunkte.md
+  // haelt Verfahren, Zahlen und Beweisbilder. Reihenfolge wie blickAus(): 0 hinten,
+  // 1 links, 2 vorn, 3 rechts.
+  const HOCKEY_HAND=[
+    {x:44,y:47}, // hinten — die rechte Hand, von hinten gesehen die rechte Bildhaelfte
+    {x:20,y:45}, // links  — die vordere Hand im Profil
+    {x:44,y:47}, // vorn
+    {x:43,y:45}  // rechts — die vordere Hand im Profil
+  ];
+  function zeichneHockeyschlaeger(ctx,x,y,s,richtung,phase){
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const seitlich=blick!==0;
+    const eff=blick||1; // Front/Ruecken: kein Blick zum Spiegeln da, feste Seite als Vorgabe.
+    const p=HOCKEY_PHASEN[phase]||HOCKEY_PHASEN.halten;
+    const schaftWinkel=p.schaftA*eff, kelleWinkel=p.kelleA*eff;
+    const ferseX=x+Math.sin(schaftWinkel)*p.schaftL*s, ferseY=y+Math.cos(schaftWinkel)*p.schaftL*s;
+    const kelleLaenge=(seitlich?9:4)*s; // Front/Ruecken: Schmalseite, deutlich kuerzer.
+    const spitzeX=ferseX+Math.sin(kelleWinkel)*kelleLaenge, spitzeY=ferseY+Math.cos(kelleWinkel)*kelleLaenge;
+    // Schaft: dunkles Holz, dazu eine duenne hellere Kante parallel versetzt fuer Rundung
+    // im Pixel-Look ohne Weichzeichner-Verlauf (dieselbe Idee wie das helle Ruecken-Oval
+    // bei zeichneReiherMech oder die helle Gehaeusekante bei zeichneKameraKopf).
+    const senkrechtX=Math.cos(schaftWinkel)*0.6*s, senkrechtY=-Math.sin(schaftWinkel)*0.6*s;
+    ctx.strokeStyle="#4a2f16"; ctx.lineWidth=Math.max(1,2.2*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ferseX,ferseY);ctx.stroke();
+    ctx.strokeStyle="#6b4523"; ctx.lineWidth=Math.max(1,0.8*s);
+    ctx.beginPath();ctx.moveTo(x+senkrechtX,y+senkrechtY);ctx.lineTo(ferseX+senkrechtX,ferseY+senkrechtY);ctx.stroke();
+    // Griffband: heller Punkt genau an der Hand, wo der obere Handschuh den Schaft fasst.
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.9,1.3*s),0,Math.PI*2);ctx.fill();
+    // Kelle: kurzer, dickerer dunkler Strich ab der Ferse. Im Profil fast waagerecht mit
+    // leicht angehobener Spitze (s. HOCKEY_PHASEN-Kommentar), in Front/Ruecken ein kurzer
+    // Stummel.
+    ctx.strokeStyle="#161616"; ctx.lineWidth=Math.max(1,(seitlich?2.4:3.2)*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(ferseX,ferseY);ctx.lineTo(spitzeX,spitzeY);ctx.stroke();
+    return {ferseX,ferseY,spitzeX,spitzeY};
+  }
+
   // WELCHE RAMPE STEHT IM BLATT? Nachgemessen, nicht angenommen.
   //
   // faerbe() suchte fest die HELLE Hautrampe und tauschte sie gegen die Zielrampe. Fuer
@@ -2056,6 +2137,27 @@
     // "in Brust und Rissen"; Nocture: formlose Schattengestalt ohne einzelnen Kopf-Fokus),
     // dieselben Koordinaten wie beim Vollbild-Zweig (Z war hier frueher immer 1 — seit
     // Chris' Groessen-Sheet ist es groesseFaktor(u.groesse), s. Kommentar am Funktionsanfang).
+    // HOCKEYSCHLAEGER. Er gehoert an die HAND, nicht an die Figurmitte — die Handpunkte
+    // sind am Sprite ausgemessen (docs/design/sprite-handpunkte.md, Blatt body_walk/
+    // bodyw_walk, Zellkoordinaten 0..63) und werden hier mit demselben Massstab
+    // umgerechnet, den male() oben benutzt: eine Zellkoordinate (cx,cy) liegt auf dem
+    // Bildschirm bei x-32*Z+cx*Z und y-46*Z+cy*Z.
+    //
+    // Nur im Profil (links/rechts) ist die Hand am Sprite ueberhaupt als eigene Kontur zu
+    // sehen; von vorn und hinten liegen beide Haende auf gleicher Hoehe. Die Tabelle
+    // nimmt jeweils die Hand, die dem Betrachter naeher ist.
+    if(feldspiel&&istHockey()&&!u.down){
+      const hp=HOCKEY_HAND[r]||HOCKEY_HAND[2];
+      // Welche Haltung: waehrend eines Schusses laeuft die Sequenz aus HOCKEY_SCHUSS,
+      // sonst haelt er den Schlaeger. `schussSeit` startet bewusst NICHT bei 0, sondern am
+      // Beginn des Durchzugs — der Puck ist im selben Bild schon unterwegs (wirf() setzt
+      // den Flug), ein Ausholen davor waere eine Bewegung, die zeitlich nach ihrer eigenen
+      // Wirkung kaeme. Das Vorholen ist damit noch nicht gebaut; es braucht eine
+      // Vorwegnahme im Motor (der Schuss muesste eine Sekunde vor seiner Aufloesung
+      // feststehen) und gehoert in eine eigene Runde.
+      const pose=u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten";
+      zeichneHockeyschlaeger(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,pose);
+    }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
         // streuung/hoehe sind optionale Ueberschreibungen im BAU-Eintrag (s. Gram:
@@ -3384,6 +3486,16 @@
       label:"Basketball", jeSeite:6, zuegeJeSeite:12, zugDauer:60/(12*2*2),
       punkteNah:2, punkteFern:3, fernAnteil:0.32,
       wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
+      // LIVE-BLOCK: die Kennzeichnung "diese Disziplin faehrt den Live-Motor" und alles,
+      // was der Motor an disziplinabhaengigen Zahlen braucht. Bis hierher stand das in
+      // Konstanten mit BASKETBALL im Namen (VIERTEL_ANZAHL_BASKETBALL und so fort) und
+      // in einer Handvoll `feldspielDisc==="basketball"`-Abfragen quer durch die Datei —
+      // solange es nur eine Live-Disziplin gab, war das ehrlich. Mit Hockey als zweiter
+      // ist es das nicht mehr: eine zweite Disziplin haette jede dieser Stellen einzeln
+      // anfassen muessen. Die Zahlen selbst sind unveraendert (4 x 90 s, Pause 1,0 s,
+      // Schussuhr 8 s), Basketball bleibt zeichenweise das alte Spiel.
+      live:{perioden:4, periodenDauer:90, periodenPause:1.0, schussuhr:8,
+            periodeWort:"Viertel"},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Plan 1.2 Punkt 1,
       // s. rezeptAus() weiter oben). Dort steht es zeichengleich weiter — mitsamt der
       // kompletten Kalibrier-Historie: Chris' Budget-Methode, die zurueckgerechneten
@@ -3456,6 +3568,16 @@
       label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
       punkteNah:1, punkteFern:1, fernAnteil:0,
       wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      // LIVE-BLOCK (Hockey-Plan 6.3, von Chris entschieden: "3 drittel zu 1:20").
+      // 3 x 80 s = 240 s Simulationszeit, mit ZEIT_DEHNUNG rund 8 Minuten Zuschauzeit —
+      // etwas kuerzer als Basketballs 360 s, weil im Eishockey weniger Ereignisse fallen
+      // und ein leeres Drittel schnell lang wirkt. Die Schussuhr ist KEINE echte
+      // Eishockeyregel; sie steht hier als Tempo-Garantie, damit eine Mannschaft den Puck
+      // nicht laufen lassen kann (dann faellt die Abschlusszahl und die Trefferquote
+      // muesste zum Ausgleich unrealistisch hoch werden, s. Plan 6.3). Sie loest kein
+      // Vergehen aus, sondern erzwingt einen Abschluss oder ein Klaeren.
+      live:{perioden:3, periodenDauer:80, periodenPause:1.0, schussuhr:8,
+            periodeWort:"Drittel"},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Hockey-Plan PR 1,
       // Fortsetzung von #726, s. rezeptAus() weiter oben). Dort steht es zeichengleich
       // weiter, mitsamt dem Nachzieh-Kommentar zu TEAMGEIST. Zweite ausgelagerte
@@ -3489,6 +3611,17 @@
   };
   let feldspielDisc="basketball";
   const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
+  // LIVE-KENNUNG. Eine Disziplin faehrt genau dann den Live-Motor, wenn sie einen
+  // `live`-Block in FELDSPIEL_ART hat — nicht mehr, weil ihr Name "basketball" ist.
+  // `LIVE()` liefert den Block der GERADE laufenden Disziplin, `liveVon(id)` den einer
+  // beliebigen (die Sonde und die Motoren-Registry brauchen das, bevor feldspielDisc
+  // gesetzt ist). Beide geben null zurueck, wenn die Disziplin vorab rechnet.
+  const LIVE=()=>FB().live||null;
+  const liveVon=(id)=>(FELDSPIEL_ART[id]&&FELDSPIEL_ART[id].live)||null;
+  // Gesamte Spielzeit einer Live-Disziplin: Perioden mal Periodendauer. Bewusst KEINE
+  // zweite, unabhaengig gepflegte Zahl (genau daran ist die Viertel-Umstellung schon
+  // einmal gescheitert, s. SPIELDAUER_BASKETBALL-Kommentar unten).
+  const spieldauerVon=(id)=>{const L=liveVon(id); return L?L.perioden*L.periodenDauer:null;};
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
@@ -3585,6 +3718,112 @@
   // sekunden, was bei laufendem Spiel ~3,6 echten Sekunden entspricht.
   const PFIFF_DAUER=1.8;            // Simulationssekunden, s. Kommentar oben
   const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
+
+  // ===================================================================================
+  // HOCKEY — SCHUSSABLAUF (Daten fuer einen Bewegungsablauf, KEIN Live-Motor). Hockey hat
+  // noch keine Live-Engine wie stepBasketballLive (die MOTOREN[hockey] weiter unten
+  // rechnet die Partie vorab durch, s. Kommentar dort) — das hier ist Vorarbeit fuer den
+  // Moment, in dem eine entsteht: WANN welche Haltung gilt, nicht WIE sie gezeichnet
+  // wird (das macht der Schlaeger-Zeichenagent) oder WER wann schiesst (das der Live-
+  // Motor, spaetere Runde). Nach demselben Muster wie die Freiwurf-Sequenz oben (FW_*,
+  // freiwurfGeo/-Aufstellung, stepFreiwurfPhase): eine Zeitvariable je Phase, keine
+  // Bildnummern-Tabelle.
+  //
+  // ZWEI SCHUSSARTEN, nicht eine — begruendet aus demselben Rezept, das Hockey im Plan
+  // schon hat (docs/design/hockey-rollout-plan.md, Abschnitt B.2/B.3): SCHUSS_NAH
+  // (dexterity-gefuehrt, Ablenker/Nachschuss aus dem Slot) und SCHUSS_FERN (power-
+  // gefuehrt, Schusshaerte von der blauen Linie) sind dort bereits als zwei verschiedene
+  // Schuetzentypen angelegt. Ein einzelner Ablauf fuer beide waere fuer den einen zu lang
+  // und fuer den anderen zu kurz — Handgelenk- und Schlagschuss unterscheiden sich in der
+  // Technik, nicht nur in der Staerke. "handgelenk" bedient das SCHUSS_NAH-Profil, "schlag"
+  // das SCHUSS_FERN-Profil.
+  //
+  // ZEITEN, NICHT GERATEN:
+  //  - Schlagschuss ("schlag"): das lange Ausholen ist die Pointe der Bewegung UND ihr
+  //    bekannter Nachteil im echten Spiel. Wikipedia ("Slapshot"): "a player usually
+  //    cannot take a slapshot while under any significant pressure ... because they could
+  //    easily interfere during the windup". Ein NHL-Analytics-Zitat bei Yahoo Sports
+  //    ("The slap shot is dying", 2024) beziffert die Groessenordnung konkret: "A 90 MPH
+  //    shot from the point takes nearly half a second to get on net" — schon der Flug
+  //    allein liegt bei ~0,5s, das Ausholen davor kommt zeitlich VOR diesem Wert obendrauf.
+  //    Gesamtdauer hier: 0,82s (0,42 Ausholen + 0,14 Schuss + 0,26 Halten) — innerhalb der
+  //    von Chris vorgegebenen Groessenordnung "eine halbe bis eine Sekunde vom Ausholen
+  //    bis zum Treffen".
+  //  - Handgelenkschuss ("handgelenk"): keine harte Sekundenzahl in den erreichbaren
+  //    Quellen (Exploratorium "Science of Hockey: Wrist Shots & Contact Time"; die Wrist-
+  //    vs-Slap-Vergleichsstudien auf ResearchGate blieben hinter einer Bezahlschranke),
+  //    aber uebereinstimmend qualitativ: "minimal amount of setup", "much quicker release
+  //    than a slap shot" (Tim Turk Hockey; Cross Ice Hockey, "Slapshots vs. Wrist Shots").
+  //    Gesamtdauer hier: 0,42s, knapp halb so lang wie der Schlagschuss — Richtung UND
+  //    Verhaeltnis stuetzen sich auf diese Quellen, die exakte Sekundenzahl ist eine
+  //    kalibrierte Annahme (wie die PLATZHALTER bei FW_* oben: nachmessbar, sobald ein
+  //    Hockey-Live-Motor existiert, hier bewusst nicht vorgetaeuscht als Messwert).
+  //  - Die Drei-Phasen-Einteilung folgt der Fachliteratur, nur verdichtet: thesportjournal.
+  //    org ("Biomechanics of Ice Hockey Slap Shots") nennt "backswing, downswing, pre-
+  //    loading, loading, release, and follow through" — hier auf die drei fuers Spiel
+  //    sichtbaren/zeichenbaren Abschnitte zusammengefasst (ausholen=backswing, schuss=
+  //    downswing+release, halten=follow-through).
+  //
+  // WARUM SMOOTHSTEP STATT LINEARER INTERPOLATION JE PHASE: linear wechselt an jeder
+  // Phasengrenze schlagartig die Geschwindigkeit (bei "schlag" z.B. von "92 Grad in 0,42s
+  // rueckwaerts" auf "120 Grad in 0,14s vorwaerts", ohne Uebergang) — genau der Sprung/
+  // Knick, vor dem der Auftrag warnt. smoothstep(u)=u²(3-2u) hat an BEIDEN Enden jeder
+  // Phase Geschwindigkeit 0: die Kurve kommt an jeder Grenze zur Ruhe und beschleunigt neu
+  // — dieselbe kurze Pause, die ein echter Schlagschuss am Scheitelpunkt des Rueckschwungs
+  // ohnehin macht (Coaching-Fachbegriff: "pause at the top"). Sichtbar geprueft im
+  // Kurvenbild, s. scripts/hockey-schussablauf-kurve.py.
+  const HOCKEY_SCHUSS={
+    // Winkelangaben in Grad. schlaegerWinkel: 0 = Ruhehaltung (Schlaegerblatt unten vor
+    // dem Spieler, an der Kelle). Negativ = nach hinten/oben ausgeholt (Rueckschwung).
+    // Positiv = durchgezogen/ausgeschwungen, durch den Treffpunkt hindurch Richtung Ziel.
+    // koerperDrehung: 0 = Schulterachse zum Ziel. Negativ = weggedreht, Gewicht auf dem
+    // hinteren Bein (Ladephase). Positiv = durchgedreht, Gewichtsverlagerung im Durchzug.
+    handgelenk:{
+      ausholen:{dauer:0.12, schlaegerVon:-8,   schlaegerBis:-55,  koerperVon:0,   koerperBis:-12},
+      schuss:  {dauer:0.10, schlaegerVon:-55,  schlaegerBis:15,   koerperVon:-12, koerperBis:8},
+      halten:  {dauer:0.20, schlaegerVon:15,   schlaegerBis:40,   koerperVon:8,   koerperBis:18}
+    },
+    schlag:{
+      ausholen:{dauer:0.42, schlaegerVon:-8,   schlaegerBis:-100, koerperVon:0,   koerperBis:-25},
+      schuss:  {dauer:0.14, schlaegerVon:-100, schlaegerBis:20,   koerperVon:-25, koerperBis:15},
+      halten:  {dauer:0.26, schlaegerVon:20,   schlaegerBis:55,   koerperVon:15,  koerperBis:30}
+    }
+  };
+  // Ease-in-out ohne Bibliothek, s. Begruendung oben. Geklemmt auf [0,1], damit ein
+  // Aufrufer, der lokal leicht ausserhalb [0,1] uebergibt (Rundungsfehler), keinen Sprung
+  // ins Negative/Ueber-1 bekommt statt nur eines flachen Endstuecks.
+  function hockeySchussSmooth(u){ u=u<0?0:(u>1?1:u); return u*u*(3-2*u); }
+  // Reiner Zustandsrechner, s. Auftrag: t=Sekunden seit Schussbeginn, art="handgelenk"
+  // oder "schlag" (Default "schlag" — die von Chris vorgegebene Groessenordnung bezog
+  // sich konkret auf den Schlagschuss). Keine Seiteneffekte, kein Zugriff auf fsLive/
+  // u.lunge — der Aufrufer (spaeter der Hockey-Live-Motor) entscheidet, WANN ein Schuss
+  // beginnt und was mit den Werten passiert. Nach Ende von "halten" bleibt der Rueckgabe-
+  // wert eingefroren (fortschritt saettigt bei 1, abgeschlossen wird true) statt mit
+  // weiterlaufendem t unbegrenzt weiterzuschwingen — dieselbe Idee wie das gehaltene
+  // "nach"-Bild am Ende der Freiwurf-Sequenz (s. stepFreiwurfPhase oben).
+  function hockeySchussPhase(t, art){
+    const gewaehlteArt=HOCKEY_SCHUSS[art]?art:"schlag";
+    const def=HOCKEY_SCHUSS[gewaehlteArt];
+    const tt=Math.max(0, t||0);
+    const t1=def.ausholen.dauer, t2=t1+def.schuss.dauer;
+    const werte=(seg,lokal)=>{
+      const u=hockeySchussSmooth(lokal);
+      return {schlaegerWinkel:seg.schlaegerVon+(seg.schlaegerBis-seg.schlaegerVon)*u,
+        koerperDrehung:seg.koerperVon+(seg.koerperBis-seg.koerperVon)*u};
+    };
+    if(tt<t1){
+      const lokal=tt/t1;
+      return {phase:"ausholen", fortschritt:lokal, ...werte(def.ausholen,lokal), art:gewaehlteArt, abgeschlossen:false};
+    }
+    if(tt<t2){
+      const lokal=(tt-t1)/def.schuss.dauer;
+      return {phase:"schuss", fortschritt:lokal, ...werte(def.schuss,lokal), art:gewaehlteArt, abgeschlossen:false};
+    }
+    const lokal=Math.min(1,(tt-t2)/def.halten.dauer);
+    return {phase:"halten", fortschritt:lokal, ...werte(def.halten,lokal), art:gewaehlteArt, abgeschlossen:lokal>=1};
+  }
+  // ===================================================================================
+
   // ===================================================================================
   // EINGRIFF (d) DES NBA2K-MODELLS (docs/design/battle-mode-nba2k-modell-plan.md §3d).
   //
@@ -3978,7 +4217,17 @@
   // sichtbar an die Grundlinie, ohne Brett/Ring hinter dem Spielfeldrand zu zeichnen.
   // KORB_NAH_RADIUS/DREIER_RADIUS haengen relativ an korbX, nicht an einer absoluten
   // Position — die Verschiebung aendert nur die Optik, keine Distanz-Klassifizierung.
-  const korbXVon=(side)=>side===0?W*0.915:W*0.085;
+  // WO DAS ZIEL STEHT. Basketball haengt den Korb an die Grundlinie (W*0.915/0.085);
+  // im Eishockey steht das Tor bewusst weiter im Feld, weil HINTER dem Tor gespielt wird
+  // — das ist keine Kosmetik, sondern der Grund, warum ein Eishockeyfeld anders aussieht
+  // als ein Basketballfeld. Real liegt die Torlinie 3,7 m von der Bande, also rund 4,5 %
+  // der Feldlaenge; auf unserem Canvas sind das die 10 % unten, weil die Bande selbst
+  // schon bei 4,5 % sitzt. Alles andere (Schussdistanz, Ballflug, gezeichnete Torlinie)
+  // liest diese eine Funktion — getrennte Literale waren beim Basketballkorb schon
+  // einmal die Ursache dafuer, dass der Wurf das gezeichnete Ziel verfehlte.
+  const korbXVon=(side)=>feldspielDisc==="hockey"
+    ?(side===0?W*0.90:W*0.10)
+    :(side===0?W*0.915:W*0.085);
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -4089,7 +4338,18 @@
         // Zeile fest) — kann also nichts an TDM/Formkarte/Slot-Rechnung aendern.
         groesse:p.groesse??null,
         eig:basisWert+engP+breitP,...R2,
+        // `slotId` haelt fest, AUF WELCHEN Slot dieser Spieler gesetzt wurde — bisher
+        // wurde die Rolle nur zum Berechnen des Aufschlags gebraucht und danach
+        // weggeworfen. Der Torwart ist aber ein Slot, kein Attributwert: der Motor muss
+        // spaeter noch wissen, wer im Tor steht (s. bestimmeTorwaerter).
+        slotId:sl, torwart:false,
+        // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
+        // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
+        taumeltBis:0, downBis:0,
+        // Laufende Schusssequenz (s. HOCKEY_SCHUSS/hockeySchussPhase). null = kein Schuss.
+        schussSeit:null, schussArt:null,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
+        checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,i)), gegner.map((o,i)=>bauSpieler(o,1,i))];
@@ -4102,7 +4362,7 @@
     // Erster Schritt, nur diese eine Disziplin, siehe initBasketballLive/
     // stepBasketballLive). Football/Hockey/Tennis bleiben unten beim bewaehrten
     // Vorab-Durchlauf, bis sich das Muster bewaehrt hat.
-    if(feldspielDisc==="basketball"){ initBasketballLive(art); return; }
+    if(art.live){ initFeldspielLive(art); return; }
 
     // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
     // steht fest, bevor die Enthuellung beginnt.
@@ -4297,6 +4557,30 @@
     {radius:145, seitlich:1.45},
     {radius:145, seitlich:-1.45}
   ];
+  // EISHOCKEY HAT EINE ANDERE FORMATION, und zwar nicht als Geschmacksfrage: Basketballs
+  // Slots reichen bis 150 px vom Korb, weil ein Court so tief ist. Auf der Eisflaeche
+  // liegt die blaue Linie rund 300 px vor dem Tor und der Mittelkreis 500 px — mit
+  // Basketballs Radien steht die ganze Mannschaft im Torraum und der Rest des Feldes ist
+  // leer (im UI genau so gesehen, bevor diese Tabelle da war).
+  //
+  // Die fuenf Feldpositionen sind die echte Eishockey-Grundformation (Quellen in
+  // docs/design/hockey-torwart-puck-tore-recherche-fable.md, Abschnitt Formationen):
+  //   Netfront   der Mann vor dem Tor, faengt Abpraller ab und lenkt ab
+  //   Half-Wall  die beiden Fluegel an der Bande, links und rechts spiegelbildlich
+  //   Point      die beiden Verteidiger an der blauen Linie, Schuss von aussen
+  // Sortiert wird wie im Basketball nach SCHUSS_NAH — der beste Abschluss steht damit
+  // vor dem Tor, der schwaechste an der blauen Linie. Chris' Wunsch, den gesetzten Slot
+  // auf dem Feld wiederzuerkennen, ist damit fuer Hockey erfuellt; fuer Basketball ist
+  // das eine eigene Balance-Runde (Schritt F des Plans).
+  const SLOTS_HOCKEY=[
+    {radius:78,  seitlich:0},      // Netfront
+    {radius:165, seitlich:1.25},   // Half-Wall links
+    {radius:165, seitlich:-1.25},  // Half-Wall rechts
+    {radius:295, seitlich:0.62},   // Point links (blaue Linie)
+    {radius:295, seitlich:-0.62},  // Point rechts
+    {radius:215, seitlich:0}       // hoher Slot, nur bei voller Feldbesetzung ohne Torwart
+  ];
+  const FORMATION=()=>istHockey()?SLOTS_HOCKEY:SLOTS;
   // Rollenbasierte Slot-Vergabe: der staerkste SCHUSS_NAH-Wert zuerst auf den innersten
   // Slot, der Rest nach aussen — "wer aus der Zone trifft, steht in der Zone; wer das
   // nicht kann, zieht raus". Neu bei jedem Possession-Wechsel (naechsterAngriff), nicht
@@ -4349,7 +4633,9 @@
     const slotSchluessel=offensivDruck
       ? (u)=>u.SCHUSS_NAH*0.7+u.SCHUSS_FERN*0.3
       : (u)=>u.SCHUSS_NAH;
-    const sortiert=[...FSTEAM[seite]].sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
+    // Der Torwart nimmt an der Angriffsformation nicht teil — er steht im Tor. Ohne diese
+    // Zeile bekaeme er einen Feldslot und wuerde von bewegeSpielerLive dorthin gezogen.
+    const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
     // UNTERZAHL BEKOMMT NICHT DIE BESTEN PLAETZE.
     //
     // Chris' Fund: „wenn ich 6x50er spieler einsetze haette ich 300 Punkte, selbst ein
@@ -4357,42 +4643,52 @@
     // ein einzelner Spieler holte 54,1 Punkte, drei zusammen nur 20,3.
     //
     // Eine der beiden Ursachen sass hier. `slotIdx=i` vergibt die Plaetze der Reihe nach,
-    // und SLOTS ist nach Korbnaehe sortiert (Radius 60, 130, 150, 150, 145, 145). Eine
-    // Mannschaft mit zwei Spielern bekam also die zwei KORBNAECHSTEN Plaetze, waehrend
-    // eine volle Sechs vier Leute auf die Fluegel stellen muss. Nachgemessen fielen bei
-    // zwei Spielern 51 % der Wuerfe in die Naehkategorien (dunk+nah) gegen 32 % bei
-    // sechs — Unterzahl kaufte sich bessere Wurfpositionen.
+    // und beide Formationen sind nach Tornaehe sortiert (Basketball: Radius 60, 130, 150,
+    // 150, 145, 145). Eine Mannschaft mit zwei Spielern bekam also die zwei
+    // TORNAECHSTEN Plaetze, waehrend eine volle Besetzung Leute auf die Fluegel stellen
+    // muss. Nachgemessen fielen bei zwei Spielern 51 % der Wuerfe in die Naehkategorien
+    // (dunk+nah) gegen 32 % bei sechs — Unterzahl kaufte sich bessere Wurfpositionen.
     //
     // Jetzt bekommt jede Unterzahl-Groesse eine EIGENE, symmetrische Auswahl aus der
     // Formation statt der ersten k Plaetze.
     //
     // ERSTER ANLAUF WAR EINE FORMEL, und der Overseer hat sie zu Recht zerlegt:
-    // `Math.round(i*(SLOTS.length-1)/(anz-1))` verteilt zwar, aber nicht symmetrisch. Sie
-    // setzte einen Einzelspieler auf Slot 3 (rechter Fluegel auf Dreier-Distanz, nicht
-    // "die Mitte der Formation", wie der Kommentar hier behauptete) und drei Spieler auf
-    // 0/3/5 — zwei davon auf DERSELBEN Seite, die andere Haelfte des Feldes leer. Genau
-    // der Klumpen, vor dem der SLOTS-Kommentar oben warnt.
+    // `Math.round(i*(laenge-1)/(anz-1))` verteilt zwar, aber nicht symmetrisch. Sie setzte
+    // einen Einzelspieler auf Slot 3 (rechter Fluegel auf Dreier-Distanz, nicht "die Mitte
+    // der Formation", wie der Kommentar hier behauptete) und drei Spieler auf 0/3/5 —
+    // zwei davon auf DERSELBEN Seite, die andere Haelfte des Feldes leer. Genau der
+    // Klumpen, vor dem der SLOTS-Kommentar oben warnt.
     //
-    // Die Tabelle unten liest sich stattdessen direkt aus der Geometrie: 0 ist der Platz
-    // am Korb, 1 der zentrale Platz am Kreis, 2/3 sind ein spiegelbildliches Fluegelpaar,
-    // 4/5 das aeussere Eckenpaar. Jede Zeile ist entweder zentral oder ein vollstaendiges
-    // Paar — nur bei fuenf Spielern geht das nicht auf, weil sich sechs Plaetze nicht in
-    // fuenf symmetrische Teile zerlegen lassen; dort faellt eine Ecke weg.
+    // Die Tabellen unten lesen sich stattdessen direkt aus der Geometrie. Jede Zeile ist
+    // entweder ein zentraler Platz oder ein vollstaendiges spiegelbildliches Paar.
+    //   Basketball: 0 am Korb, 1 zentral am Kreis, 2/3 Fluegelpaar, 4/5 Eckenpaar. Nur bei
+    //     fuenf Spielern geht die Symmetrie nicht auf, weil sich sechs Plaetze nicht in
+    //     fuenf gleiche Teile zerlegen lassen; dort faellt eine Ecke weg.
+    //     Mittlerer Radius je Zeile (voll: 130): 1 -> 130, 2 -> 150, 3 -> 143, 4 -> 122,
+    //     5 -> 127.
+    //   Eishockey: 0 Netfront, 1/2 Half-Wall-Paar, 3/4 Point-Paar, 5 hoher Slot (zentral).
+    //     Mittlerer Radius je Zeile (voll, fuenf Feldspieler: 200): 1 -> 215, 2 -> 165,
+    //     3 -> 182, 4 -> 230. Keine Groesse kauft sich damit die tornahen Plaetze.
+    const UNTERZAHL_PLAETZE=istHockey()
+      ? {1:[5], 2:[1,2], 3:[5,1,2], 4:[1,2,3,4]}
+      : {1:[1], 2:[2,3], 3:[1,2,3], 4:[0,1,2,3], 5:[0,1,2,3,4]};
+    // GEGATET AUF DIE NOMINELLE FELDGROESSE, nicht auf die Laenge der Formationstabelle
+    // (Overseer-Fund): `jeSeite` ist nicht immer 6 — die Sonde faehrt ausdruecklich auch
+    // 2v2 und 4v4, und `feldspielProbe` ueberschreibt dafuer `art.jeSeite`. Gegen die
+    // Tabellenlaenge geprueft haette ein VOLLES 4v4 als Unterzahl gegolten und andere
+    // Plaetze bekommen als bisher — nachgemessen wichen 4v4 und 2v2 dadurch von main ab,
+    // obwohl niemand in Unterzahl war.
     //
-    // Mittlerer Radius je Zeile (voll: 130): 1 -> 130, 2 -> 150, 3 -> 143, 4 -> 122,
-    // 5 -> 127. Keine Groesse kauft sich damit die korbnahen Plaetze.
-    const UNTERZAHL_PLAETZE={1:[1], 2:[2,3], 3:[1,2,3], 4:[0,1,2,3], 5:[0,1,2,3,4]};
-    // GEGATET AUF DIE NOMINELLE FELDGROESSE, nicht auf SLOTS.length (Overseer-Fund):
-    // `jeSeite` ist nicht immer 6 — die Sonde faehrt ausdruecklich auch 2v2 und 4v4, und
-    // `feldspielProbe` ueberschreibt dafuer `art.jeSeite`. Gegen SLOTS.length geprueft
-    // haette ein VOLLES 4v4 als Unterzahl gegolten und andere Plaetze bekommen als bisher
-    // — nachgemessen wichen 4v4 und 2v2 dadurch von main ab, obwohl niemand in Unterzahl
-    // war. Gegen `jeSeite` geprueft ist jede vollstaendige Aufstellung unveraendert.
-    const anz=sortiert.length, soll=FB().jeSeite||SLOTS.length;
-    const plaetze=anz<soll?UNTERZAHL_PLAETZE[anz]:null;
+    // Im Eishockey zaehlt der Torwart NICHT mit: bei sechs Aufgestellten stehen fuenf im
+    // Feld, und das IST die volle Besetzung. Ohne diesen Abzug haette jede vollstaendige
+    // Hockey-Mannschaft als Unterzahl gegolten.
+    const form=FORMATION();
+    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>u.torwart);
+    const soll=Math.max(1,(FB().jeSeite||form.length)-(torwartDa?1:0));
+    const plaetze=sortiert.length<soll?UNTERZAHL_PLAETZE[sortiert.length]:null;
     sortiert.forEach((u,i)=>{
       u.slotIdx = plaetze?plaetze[Math.min(plaetze.length-1,i)]
-                : Math.min(SLOTS.length-1,i);
+                : Math.min(form.length-1,i);
       u.slotSeit=0;
     });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
@@ -4411,7 +4707,126 @@
       u.ausbruchBis=0; u.verlorenBis=0; u.letzteSicht=null; }
   }
 
-  function initBasketballLive(art){
+  // ======================= EISHOCKEY: TORWART, PUCK, CHECK =======================
+  // Alles in diesem Block liest ausschliesslich `feldspielDisc==="hockey"` und ist fuer
+  // jede andere Disziplin wirkungslos — Basketball laeuft weiter durch dieselben
+  // Funktionen wie vorher, ohne einen zusaetzlichen rr()-Wurf.
+  //
+  // WIE VIELE TORE FALLEN SOLLEN. Chris hat 3,5 Tore je Team entschieden (real: NHL
+  // 2024-25 3,0, DEL 2024/25 3,02 — wir liegen rund 17 % darueber, das ist sein "ein paar
+  // Tore mehr"). Zusammen mit 240 s Spielzeit und Basketballs Ereignisdichte ergibt das
+  // rund 26 Abschluesse je Team und damit eine Trefferquote von 13,5 %; die Fangquote des
+  // Torwarts liegt entsprechend bei 86,5 % (NHL-Referenz: .900 bis .905).
+  //
+  // HK_TOR_SKALA rechnet Basketballs Trefferchance auf diese Quote herunter. Sie ist ein
+  // PLATZHALTER und gegen die Torzahl gemessen (scripts/miss-hockey-korridor.mjs), nicht
+  // geraten — aber sie sitzt auf Basketballs Wurfformel, nicht auf einer eigenen. Die
+  // eigene Erfolgsformel und das Zonenmodell kommen in Schritt 4 des Hockey-Plans.
+  const HK_TOR_SKALA=0.700;
+  // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
+  // ob der Schuetze trifft.
+  const HK_TOR_SKALA_LEER=0.62;
+  // Was passiert, wenn KEIN Tor faellt. Die drei Ausgaenge zusammen ergeben 1.
+  //   vorbei      der Puck verfehlt das Tor und laeuft an die Bande weiter
+  //   abpraller   der Torwart wehrt ab, der Puck liegt frei vor dem Tor
+  //   fest        der Torwart haelt fest, es gibt ein Bully
+  // Real prallen rund vier von zehn gehaltenen Schuessen zurueck; ein festgehaltener Puck
+  // unterbricht das Spiel und darf deshalb nicht die Mehrheit sein, sonst steht das Spiel
+  // mehr still, als es laeuft.
+  // Von 0,42 auf 0,70 korrigiert (Overseer-Fund): mein Kommentar behauptete "real prallen
+  // rund vier von zehn gehaltenen Schuessen zurueck", die Recherche sagt das Gegenteil —
+  // rund 29 % werden festgehalten, der Rest bleibt loser Puck. Mit dem falschen Wert fielen
+  // gemessen 31 Zonen-Bullys je Spiel, zusammen mit den Anspielen nach Toren also alle
+  // sechs Sekunden eines. Das Spiel stand oefter still, als es lief.
+  const HK_VORBEI=0.11, HK_ABPRALLER=0.70;
+  // SCHUSSBLOCK. Der Unterschied zwischen "Schussversuch" und "Schuss aufs Tor" ist im
+  // Eishockey kein Detail, sondern eine der haeufigsten Aktionen ueberhaupt: ein
+  // Verteidiger wirft sich in die Schussbahn. Ohne diese Stufe kamen alle 33 Versuche
+  // beim Torwart an und es fielen 5,2 Tore je Team statt 3,5 (nachgemessen). Mit ihr
+  // stimmt auch die Rechnung des Plans wieder: 33 Versuche minus Bloecke minus die am Tor
+  // vorbei ergeben die 26 Abschluesse, auf die die 13,5 % gerechnet sind.
+  const HK_BLOCK_BASIS=0.12, HK_BLOCK_K=0.0030;
+  // Der Torwart bewegt sich auf einem kurzen Bogen vor seiner Linie und folgt dem Puck in
+  // der Hoehe. HK_TW_TIEFE ist, wie weit er maximal herauskommt, HK_TW_SPANNE, wie weit er
+  // seitlich geht — beide bewusst klein: ein Torwart, der durchs Feld laeuft, sieht falsch
+  // aus, und ein Torwart, der auf der Linie klebt, auch.
+  const HK_TW_TIEFE=22, HK_TW_SPANNE=40;
+  // Bodycheck. `wucht` ist die Chance, dass der Koerpereinsatz sitzt — sie haengt an der
+  // ABWEHR des Checkenden gegen die AUSDAUER des Getroffenen (wer im Stand ist, faellt
+  // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
+  // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
+  const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+
+  const istHockey=()=>feldspielDisc==="hockey";
+  // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
+  //
+  // Bis hierher stand Basketballs Box-Score-Formel an ZWEI Stellen (MOTOREN[fd].wert und
+  // die Sonde) und galt fuer jedes Feldspiel. Fuer Hockey ist sie schlicht falsch: ein
+  // Check zaehlte darin 1,5, ein Tor 1,0 — ein Check war also anderthalb Tore wert. Jede
+  // Sondierung, jede Rangtreue-Messung und jede Punktevergabe haette das mitgeschleppt.
+  //
+  // Die Hockey-Gewichte sind PLATZHALTER aus der Overseer-Recherche (Abschnitt "Impact"),
+  // gegen die Groessenordnung gewaehlt, dass ein Torwart mit rund .870 in einem 3:3 etwa
+  // den Beitrag eines Zwei-Tore-Schuetzen hat. Kalibriert wird gegen die Rangtreue, und
+  // zwar VOR der naechsten Sondierung — sonst misst die Sondierung die Gewichte dieser
+  // Formel statt die der Mechanik.
+  function feldspielWert(u,dId){
+    if((dId||feldspielDisc)==="hockey"){
+      if(u.torwart)return u.saves*0.35-u.gegentore*1.5+u.punkte*3+u.assists*2;
+      return u.punkte*3+u.assists*2+u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.6;
+    }
+    return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
+  }
+  // Die Slot-Kennungen, unter denen der Torwart im Aufstellungsbildschirm laeuft. Mehrere,
+  // weil der Slot-Generator seine Kennung selbst vergibt und der Motor nicht davon
+  // abhaengen darf, welche davon gerade gilt (s. lib/lineups/matchday-slot-roles.ts).
+  // Greift keine, faellt bestimmeTorwaerter auf den besten PARADE-Wert zurueck.
+  const TORWART_SLOTS=new Set(["goaltender","goalie","torwart","netminder","keeper"]);
+  const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
+  // GENAU EINER JE SEITE, AB DREI SPIELERN. Chris woertlich: "einer der spieler soll
+  // natuerlich einen torwart slot haben und entsprechend im tor stehen! ausser im 2er
+  // spiel da gibts nur verteiger und angreifer". Bei zwei Spielern steht das Tor also
+  // wirklich leer — das ist die Regel, nicht ein ungeprueter Sonderfall.
+  function bestimmeTorwaerter(){
+    for(const team of FSTEAM){
+      for(const u of team)u.torwart=false;
+      if(team.length<3)continue;
+      let gewaehlt=team.find(u=>u.slotId&&TORWART_SLOTS.has(u.slotId));
+      if(!gewaehlt)for(const u of team)if(!gewaehlt||(u.PARADE||0)>(gewaehlt.PARADE||0))gewaehlt=u;
+      if(gewaehlt)gewaehlt.torwart=true;
+    }
+  }
+  // Wo der Torwart hin will: auf die Verbindungslinie zwischen Puck und Tormitte, kurz
+  // vor der Linie. Damit steht er immer im Schusswinkel, ohne dass irgendwo eine
+  // Winkelformel steht — die Geometrie macht das von selbst.
+  function torwartZiel(u){
+    const tor={x:korbXVon(1-u.side),y:H/2};
+    const puck=fsLive.ball.traeger||fsLive.ball.frei||(fsLive.ball.flug&&fsLive.ball.flug.nach)||tor;
+    const dx=puck.x-tor.x, dy=puck.y-tor.y, d=Math.hypot(dx,dy)||1;
+    return {x:tor.x+dx/d*HK_TW_TIEFE,
+            y:Math.max(H/2-HK_TW_SPANNE,Math.min(H/2+HK_TW_SPANNE,tor.y+dy/d*HK_TW_TIEFE*1.6))};
+  }
+  // BANDE: der Puck geht nicht ins Aus, er prallt ab. Ohne das wirkt das Spiel wie
+  // Hallenfussball ohne Waende — und ein Puck, der ueber die Bande verschwindet und
+  // woanders wieder auftaucht, waere genau der "Geist", den Chris ausgeschlossen hat.
+  function haltePuckImFeld(pos){
+    const k=RINK(), rand=14;
+    pos.x=Math.max(k.l+rand,Math.min(k.r-rand,pos.x));
+    pos.y=Math.max(k.o+rand,Math.min(k.u-rand,pos.y));
+    return pos;
+  }
+  // BULLY: kein eigener Standzustand, sondern ein FREIER PUCK auf dem Bullypunkt. Die
+  // bestehende Zweikampf-Mechanik um den losen Ball (reboundKampf) ist genau das, was ein
+  // Anspiel ist — beide Seiten laufen hin, wer ihn erwischt, hat ihn. Ein eigener
+  // Phasenzustand haette dieselbe Wirkung mit doppeltem Code.
+  function bully(x,y,vonSeite){
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
+    for(const team of FSTEAM)for(const u of team)u.hatBall=false;
+    fsLive.ball.frei=haltePuckImFeld({x,y,vonSeite});
+    fsLive.angriffSeit=0;
+  }
+
+  function initFeldspielLive(art){
     fsZuege=[]; fsZeiger=0;
     for(const team of FSTEAM)for(const u of team){
       // reevBall wird erst relevant, sobald jemand den Ball bekommt (ballUebernehmen/
@@ -4429,6 +4844,9 @@
         ausbruchBis:0,mismatchTempo:0,mismatchWucht:0,
         verlorenBis:0,sichtCd:0,letzteSicht:null});
     }
+    // Erst der Torwart, dann die Slots: zuordneSlots ueberspringt ihn (er steht im Tor,
+    // nicht in der Angriffsformation), und dafuer muss er schon feststehen.
+    if(istHockey())bestimmeTorwaerter();
     zuordneSlots(0); zuordneSlots(1);
     // `phase` ist der EINE Zustand, der entscheidet, ob die freie Simulation laeuft
     // ("laufend") oder eine Standsituation die Spieler in eine feste Formation stellt
@@ -4464,7 +4882,14 @@
       // solange keine Manndeckung zuteilen, sonst haelt sie ihre alten Maenner fest und
       // rennt ihnen hinterher statt zum eigenen Korb. Echte Ueberzahl statt Kosmetik.
       if(fsLive.fastbreak&&fsLive.fastbreak.seite===seite&&fsT<fsLive.fastbreak.bis)continue;
-      const verteidiger=FSTEAM[1-seite], angreifer=FSTEAM[seite];
+      // DER TORWART SPIELT KEIN FELD. Der Overseer hat nachgemessen, was passiert, wenn er
+      // in FSTEAM bleibt und nur an zwei Stellen gefiltert wird: er bekam in 100 % der
+      // Ticks einen Gegenspieler zugeteilt, wurde damit zum `blockKandidat`, warf sich in
+      // Schuesse, stahl Pucks und verteilte 26 Bodychecks. Ein Torwart, der durchs Feld
+      // checkt, ist kein Torwart. Er faellt auf BEIDEN Seiten der Zuteilung heraus: er
+      // deckt niemanden, und niemand deckt ihn.
+      const verteidiger=FSTEAM[1-seite].filter(u=>!u.torwart),
+            angreifer=FSTEAM[seite].filter(u=>!u.torwart);
       // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
       // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
       // ohne diese Bereinigung griff sich ein neu bewertender Verteidiger regelmaessig
@@ -4576,8 +5001,9 @@
   // Slots/Deckung sind zu diesem Zeitpunkt schon frisch zugeteilt (samt Rotation), eine
   // zweite zuordneSlots()-Runde hier wuerde die Rotation sofort wieder ueberschreiben.
   function naechsterAngriff(seite,ausViertelpause){
-    if(!ausViertelpause&&fsLive.viertel<VIERTEL_ANZAHL_BASKETBALL
-       &&fsT>=fsLive.viertel*VIERTEL_DAUER_BASKETBALL){
+    const L=LIVE()||{perioden:VIERTEL_ANZAHL_BASKETBALL,periodenDauer:VIERTEL_DAUER_BASKETBALL};
+    if(!ausViertelpause&&fsLive.viertel<L.perioden
+       &&fsT>=fsLive.viertel*L.periodenDauer){
       starteViertelpause(seite);
       return;
     }
@@ -4592,7 +5018,10 @@
   // von stepBasketballLive).
   function starteViertelpause(naechsteSeite){
     const zuEnde=fsLive.viertel;
-    feed(0,"Ende "+zuEnde+". Viertel — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
+    // "Viertel" stand hier fest, obwohl die Disziplin ihr eigenes Wort mitbringt — im
+    // Eishockey las der Feed "Ende 1. Viertel".
+    const periode=(LIVE()||{}).periodeWort||"Viertel";
+    feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
     fsLive.viertel=zuEnde+1;
     // ROTATION (Auftrag 2): s. zuordneSlots()-Kommentar fuer die Regel selbst. Beide
     // Seiten unabhaengig voneinander geprueft — bei Gleichstand bleibt es fuer beide bei
@@ -4620,7 +5049,7 @@
     fsBall={sichtbar:false,x:0,y:0};
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
     fsLive.phase="viertelpause";
-    fsLive.viertelpause={t:0,dauer:VIERTELPAUSE_DAUER_BASKETBALL,naechsteSeite};
+    fsLive.viertelpause={t:0,dauer:(LIVE()||{}).periodenPause||VIERTELPAUSE_DAUER_BASKETBALL,naechsteSeite};
   }
 
   // WER DEN ANGRIFF EROEFFNET. Frueher ein lineares gewichtetesLos ueber AUFBAU — bei
@@ -4630,7 +5059,10 @@
   // der Rest verteilt sich weiter. Ohne das gibt es kein Spielmacher-Profil im Boxscore —
   // ein hoher AUFBAU-Wert wirkt nur, wenn der Spieler den Ball auch in die Hand bekommt.
   function spielmacherLos(team){
-    return gewichtetesLosNach(team,u=>losGewicht(u.AUFBAU));
+    // Der Torwart eroeffnet keinen Angriff — er steht im Tor. Nur wenn er der einzige
+    // Spieler waere, bekommt er den Puck (dann gibt es ohnehin keinen anderen).
+    const feld=team.filter(u=>!u.torwart);
+    return gewichtetesLosNach(feld.length?feld:team,u=>losGewicht(u.AUFBAU));
   }
 
   function logZug(seite,art,extra){
@@ -4671,6 +5103,20 @@
     return liste[liste.length-1];
   }
   function offensterMitspieler(mitspieler,von){
+    // KEIN RUECKPASS ZUM TORWART. Er steht in der leeren eigenen Zone, sein Decker ist
+    // weit weg und die Passlinie frei — nach jedem Mass, das diese Funktion kennt, ist er
+    // der offenste Mann auf dem Eis. Nachgemessen gingen dadurch 282 von 1147 Paessen zu
+    // ihm (bei drei gegen drei 48 %), im Schnitt ueber 532 px, und 21 % seiner eigenen
+    // Rueckpaesse wurden abgefangen. Der Torwart war damit der Spielmacher der
+    // Mannschaft. Er bekommt den Puck jetzt nur noch so, wie ein Torwart ihn bekommt:
+    // ueber einen Schuss, einen Abpraller oder einen losen Puck in seinem Torraum.
+    if(istHockey()){
+      const feld=mitspieler.filter(m=>!m.torwart);
+      // Nur ersetzen, wenn ueberhaupt ein Feldspieler uebrig bleibt: die Aufrufer geben
+      // das Ergebnis ungeprueft an passeAb weiter, ein null liefe dort ins Leere. Bleibt
+      // nur der Torwart, ist er tatsaechlich die letzte Anspielstation.
+      if(feld.length)mitspieler=feld;
+    }
     // Ein Spieler im Roll-Fenster (gerade geblockt und zum Korb geschnitten) ist die
     // Belohnung fuers Screenen — sein Passgewicht verdreifacht sich fuer das Fenster
     // (Fables Vorschlag), unabhaengig von seiner sonstigen Offenheit.
@@ -4754,6 +5200,22 @@
   // Kampfs Zielwahl. `erzwingen` kommt von der Schussuhr: dann wird notfalls auch von
   // weit draussen ohne freien Wurf abgeschlossen, statt endlos zu dribbeln.
   function entscheideBallaktion(u,art,erzwingen){
+    // DER TORWART SCHIESST NIE. Er spielt den Puck heraus — an den offensten Mitspieler,
+    // oder, wenn keiner da ist, an die Bande (Klaeren). Ohne diese Sperre wuerde er die
+    // normale Abschluss-Entscheidung durchlaufen und irgendwann auf das GEGNERISCHE Tor
+    // schiessen, mitsamt Laufweg dorthin.
+    if(u.torwart){
+      const mitspieler=FSTEAM[u.side].filter(m=>m!==u);
+      const ziel=mitspieler.length?offensterMitspieler(mitspieler,u):null;
+      if(ziel){ passeAb(u,ziel); return; }
+      // Klaeren: der Puck fliegt an die Bande in der eigenen Haelfte und ist wieder frei.
+      const k=RINK();
+      fsLive.ball.traeger=null; u.hatBall=false; u.lunge=0.4;
+      feed(u.side,u.n+" klärt den Puck an die Bande.");
+      fsLive.ball.frei=haltePuckImFeld({x:u.x+(u.side===0?90:-90),
+        y:u.y<H/2?k.o+20:k.u-20, vonSeite:u.side});
+      return;
+    }
     const team=FSTEAM[u.side];
     const korbX=korbXVon(u.side);
     const zumKorb=dist(u,{x:korbX,y:H/2});
@@ -5164,11 +5626,40 @@
     // beim Abwurf (deterministisch), aufgeloest in loeseFlugAuf, exakt das Muster von
     // `treffer`/`abgefangenVon` im Rest der Engine.
     const foulBasis=(tier==="dunk"||tier==="nah")?0.16:tier==="mit"?0.10:0.05;
-    const foulChance=blockKandidat?Math.max(0.02,foulBasis-(blockKandidat.ABWEHR-50)*0.0016):0;
+    // EISHOCKEY KENNT KEINE FREIWUERFE. Der Foul-Zweig weiter unten fuehrt in
+    // starteFreiwuerfe und damit in eine Basketball-Standphase mit Korb, Linie und
+    // Aufstellung — im Eishockey waere das sinnlos. Strafzeit und Ueberzahlspiel sind
+    // eigene Mechanik und stehen im Plan hinten (Schritt 8).
+    const foulChance=(blockKandidat&&!istHockey())?Math.max(0.02,foulBasis-(blockKandidat.ABWEHR-50)*0.0016):0;
     const foul=blockKandidat?rr()<foulChance:false;
+    // EISHOCKEY: der Ausgang wird — wie `treffer` im Basketball — beim ABWURF gewuerfelt
+    // und erst bei Ankunft enthuellt. Dieselbe Ehrlichkeit: was zu sehen ist, steht schon
+    // fest, waehrend der Puck fliegt.
+    const hk=istHockey()?hockeySchussAusgang(schuetze,technik,blockKandidat):null;
+    if(hk){
+      // Handgelenkschuss aus der Naehe, Schlagschuss von der blauen Linie — dieselbe
+      // Unterscheidung, die auch das Rezept mit SCHUSS_NAH und SCHUSS_FERN trifft.
+      schuetze.schussArt=(tier==="fern"||tier==="mit")?"schlag":"handgelenk";
+      // Beginn beim Durchzug, nicht beim Ausholen (s. Kommentar in zeichneSprite).
+      schuetze.schussSeit=HOCKEY_SCHUSS[schuetze.schussArt].ausholen.dauer;
+    }
+    // DER GEBLOCKTE PUCK FLIEGT NICHT ERST INS TOR. Der Ausgang steht beim Abwurf fest,
+    // das Ziel des Fluges war aber weiterhin die Torlinie — man sah den Puck durch den
+    // Verteidiger hindurchfliegen und erst am Tor zurueckspringen (Overseer-Fund). Jetzt
+    // endet der Flug am Blocker, und die Flugdauer schrumpft im selben Verhaeltnis wie die
+    // Strecke, damit der Puck nicht plotzlich langsamer wird.
+    let flugNach={x:korbXVon(schuetze.side),y:H/2};
+    let flugDauer=zug?0.55:0.45;
+    if(hk&&hk.ausgang==="geblockt"&&hk.blocker){
+      const ganz=Math.hypot(flugNach.x-von.x,flugNach.y-von.y)||1;
+      const bis=Math.hypot(hk.blocker.x-von.x,hk.blocker.y-von.y);
+      flugNach={x:hk.blocker.x,y:hk.blocker.y};
+      flugDauer=Math.max(0.08,flugDauer*Math.min(1,bis/ganz));
+    }
     fsLive.ball.flug={
-      von:{x:von.x,y:von.y}, nach:{x:korbXVon(schuetze.side),y:H/2},
-      art:zug?"alley":"wurf", t:0, dauer:zug?0.55:0.45, // PLATZHALTER
+      hockey:hk,
+      von:{x:von.x,y:von.y}, nach:flugNach,
+      art:zug?"alley":"wurf", t:0, dauer:flugDauer, // PLATZHALTER
       treffer, tier, fern, punkte:fern?art.punkteFern:art.punkteNah, foul, zumKorbBeiWurf,
       deckerAbstandBeiWurf, deckerLauftempoBeiWurf, imFastbreakBeiWurf, gedoppeltBeiWurf,
       schuetze, passgeber, zug, ziel:schuetze, blockKandidat
@@ -5510,7 +6001,15 @@
     // AUFBAU 30 in 5,0 % — der Ballverlust zieht im Mass 0,8 ab und war vorher praktisch
     // skillunabhaengig.
     const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0016);
-    fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
+    // PASSDAUER NACH STRECKE, nur im Eishockey. Die feste Drittelsekunde traegt auf einem
+    // Basketballcourt, weil dort kein Pass weit ist. Auf der Eisflaeche misst der laengste
+    // gemessene Pass 992 px — in 0,3 s waeren das 3300 px/s, also ein Teleport, und genau
+    // die Sorte "Geist", die Chris ausgeschlossen hat. Der Puck laeuft jetzt mit einem
+    // festen Tempo (PLATZHALTER, an der gemessenen Streckenverteilung gewaehlt), gedeckelt
+    // nach unten wie nach oben. Basketball behaelt die 0,3 s unveraendert.
+    const strecke=Math.hypot(nach.x-von.x,nach.y-von.y);
+    const passDauer=istHockey()?Math.max(0.16,Math.min(0.75,strecke/1050)):0.3;
+    fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:passDauer,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
       abgefangenVon,eigenerFehler};
   }
@@ -5553,9 +6052,43 @@
     // dem Wuerfeln gesetzt, gilt also fuer beide Ausgaenge und faellt in dasselbe
     // Bildfenster wie Feed-Text/Outcome unten (win-Zweig) bzw. das stille Scheitern.
     decker.lunge=0.4;
+    // ============================ BODYCHECK ============================
+    // Chris' Ansage: "Tacklings etc soll es auch geben, stuerzende oder wankende Spieler
+    // die dann etwas langsamer sind fuer kurze Zeit". Im Eishockey ist der Koerpereinsatz
+    // eine EIGENE Aktion neben dem Stockcheck: er kann sitzen, ohne dass der Puck den
+    // Besitzer wechselt, und er wirkt danach weiter, weil der Getroffene erst wieder auf
+    // die Beine kommen muss. Deshalb steht er VOR dem Puck-Wuerfel und nicht in ihm.
+    //
+    // `wucht` liest die ABWEHR des Checkenden gegen die AUSDAUER des Getroffenen: wer
+    // stabil im Stand ist, faellt seltener. Die drei Zeiten (Sturz, Taumeln, Tempo) sind
+    // PLATZHALTER und im UI gegen den Bewegungseindruck geprueft, nicht gegen eine Zahl.
+    if(istHockey()){
+      const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-traeger.AUSDAUER)*0.0040));
+      if(rr()<wucht){
+        traeger.taumeltBis=fsT+HK_TAUMEL;
+        traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+        decker.checks++;
+        feed(decker.side,decker.n+" checkt "+traeger.n+" von den Kufen.");
+        schwebe({x:0,y:0,txt:"CHECK!",life:1.0,crit:true,_def:true,_spieler:decker.id});
+        logZug(decker.side,"check",{verteidiger:decker,spieler:traeger});
+        // WER LIEGT, FUEHRT KEINEN PUCK (Overseer-Fund). Bis hierher war der Check von der
+        // Puckfrage vollstaendig entkoppelt: in rund 84 % der Faelle lag der Getroffene am
+        // Eis UND behielt die Scheibe — gemessen 6,3 s je Spiel, in denen ein liegender
+        // Spieler mit halbem Tempo weiterdribbelte. Jetzt liegt der Puck neben ihm, und
+        // wer ihn holt, entscheidet dasselbe Gerangel wie bei jedem anderen losen Puck.
+        // Damit entstehen Ballverluste aus Checks von selbst, statt ueber einen zweiten,
+        // unabhaengigen Wuerfel.
+        traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
+        traeger.verluste++;
+        const winkel=rr()*Math.PI*2, streu=16+rr()*24;
+        fsLive.ball.frei=haltePuckImFeld({x:traeger.x+Math.cos(winkel)*streu,
+          y:traeger.y+Math.sin(winkel)*streu, vonSeite:traeger.side});
+        return;
+      }
+    }
     if(rr()<proVersuch){
       decker.steals++; traeger.verluste++;
-      feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
+      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+art.wortAbwehr+".");
       // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
       // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
       // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
@@ -5587,7 +6120,9 @@
     // wird bewusst NACH ballUebernehmen gerufen, s. dort), fuer ihn gilt der bestehende
     // 1,3x-Fastbreak-Bonus. Der Ausbrecher ist der Mann VOR dem Ball.
     const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
-    const kandidaten=team.filter(u=>!u.hatBall);
+    // Der Torwart bricht nicht aus. Gemessen lief er sonst 19 s je Spiel als "Ausbrecher"
+    // Richtung gegnerisches Tor, bei drei gegen drei sogar 80 s.
+    const kandidaten=team.filter(u=>!u.hatBall&&!u.torwart);
     if(!kandidaten.length||!gegner.length)return;
     let schnellsterGegner=gegner[0].LAUFTEMPO;
     for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
@@ -5602,8 +6137,120 @@
     if(rr()<chance){
       fsLive.fastbreak.ausbrecher=bester;
       bester.ausbruchBis=fsT+AUSBRUCH_FENSTER;
-      feed(seite,bester.n+" reißt aus — allein Richtung Korb.");
+      feed(seite,bester.n+" reißt aus — allein Richtung "+(istHockey()?"Tor":"Korb")+".");
     }
+  }
+
+  // VIER AUSGAENGE STATT ZWEI. Basketball kennt nur Treffer oder Fehlwurf; im Eishockey
+  // sind das vier voellig verschiedene Spielsituationen, und genau daran haengt, wie das
+  // Spiel aussieht:
+  //   tor         das Tor faellt, Anspiel am Mittelpunkt
+  //   abpraller   der Torwart wehrt ab, der Puck liegt frei VOR dem Tor — Nachschuss
+  //   fest        der Torwart haelt fest, Anspiel im Bullykreis der Zone
+  //   vorbei      der Puck verfehlt das Tor und laeuft an der Bande weiter
+  // Der Torwart ist damit keine zweite Trefferquote, sondern der Grund, warum sich das
+  // Spiel vor dem Tor staut.
+  // DREI HUERDEN NACHEINANDER, nicht eine gemischte Wahrscheinlichkeit: erst der
+  // Verteidiger in der Schussbahn, dann das Tor selbst, dann der Torwart. Jede Stufe ist
+  // eine eigene Spielsituation mit eigenem Ausgang — genau daran haengt, dass sich das
+  // Spiel vor dem Tor staut, statt dass Schuesse durchlaufen.
+  function hockeySchussAusgang(schuetze,technik,blockKandidat){
+    if(blockKandidat){
+      const pBlock=Math.max(0.05,Math.min(0.35,HK_BLOCK_BASIS+(blockKandidat.ABWEHR-50)*HK_BLOCK_K));
+      if(rr()<pBlock)return {ausgang:"geblockt",blocker:blockKandidat,torwart:null};
+    }
+    if(rr()<HK_VORBEI)return {ausgang:"vorbei",torwart:null};
+    const tw=torwartVon(1-schuetze.side);
+    // PARADE 20 -> Faktor 1,00 (kein Halt), PARADE 95 -> 0,55. Bewusst gemaessigt: der
+    // Torwart soll ein spuerbarer Unterschied sein, aber nicht die einzige Zahl, die
+    // ueber ein Spiel entscheidet.
+    const paradeFaktor=tw?1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060)):1;
+    const pTor=Math.max(0.01,Math.min(0.60,
+      technik*(tw?HK_TOR_SKALA:HK_TOR_SKALA_LEER)*paradeFaktor));
+    if(rr()<pTor)return {ausgang:"tor",torwart:tw};
+    if(!tw)return {ausgang:"vorbei",torwart:null};
+    return {ausgang:(rr()<HK_ABPRALLER)?"abpraller":"fest",torwart:tw};
+  }
+  function loeseHockeySchuss(flug,art){
+    const schuetze=flug.schuetze, hk=flug.hockey, tw=hk.torwart;
+    const torX=flug.nach.x, torY=flug.nach.y;
+    // Richtung "zurueck ins Feld" vom angegriffenen Tor aus gesehen.
+    const rein=torX>MID?-1:1;
+    if(hk.ausgang==="tor"){
+      schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
+      if(flug.passgeber)flug.passgeber.assists++;
+      if(tw)tw.gegentore++;
+      feed(schuetze.side,schuetze.n+" trifft"+(flug.passgeber?" nach Vorlage von "+flug.passgeber.n:"")+" — TOR!",true);
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:1,
+        tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
+        deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
+        imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
+      schwebe({x:0,y:0,txt:"TOR!",life:1.7,crit:true,_spieler:schuetze.id,_gross:true});
+      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      // Anspiel am Mittelpunkt. naechsterAngriff() zuerst, weil NUR dort die
+      // Drittelgrenze geprueft wird; faellt das Tor genau auf die Grenze, uebernimmt die
+      // Drittelpause, und dann darf hier kein Bully mehr dazwischenfunken.
+      naechsterAngriff(1-schuetze.side);
+      if(!fsLive.viertelpause)bully(MID,H/2,schuetze.side);
+      return;
+    }
+    if(hk.ausgang==="geblockt"){
+      const b=hk.blocker;
+      b.bloecke++; b.lunge=0.5;
+      feed(b.side,b.n+" wirft sich in den Schuss — geblockt.");
+      schwebe({x:0,y:0,txt:"BLOCK!",life:1.1,crit:true,_def:true,_spieler:b.id});
+      logZug(b.side,"block",{verteidiger:b,spieler:schuetze});
+      fsAktuell={spieler:null,verteidiger:b,passgeber:flug.passgeber,rebounder:null};
+      // Der geblockte Puck springt dort weg, wo der Flug geendet hat — also am Blocker
+      // (s. wirf: flugNach zeigt bei einem Block auf ihn), nicht an seiner inzwischen
+      // veraenderten Position.
+      const winkel=rr()*Math.PI*2, streu=20+rr()*40;
+      fsLive.ball.frei=haltePuckImFeld({x:flug.nach.x+Math.cos(winkel)*streu,
+        y:flug.nach.y+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      return;
+    }
+    if(hk.ausgang==="abpraller"){
+      tw.saves++;
+      feed(tw.side,tw.n+" pariert — "+art.wortRebound+" vor dem Tor!");
+      schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      tw.lunge=0.5;
+      fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
+      // Der Puck liegt frei vor dem Tor — daraus wird ueber die bestehende
+      // Zweikampf-Mechanik ein echter Nachschuss-Kampf, kein Ballbesitzwechsel per Dekret.
+      const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
+      fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
+        y:torY+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      return;
+    }
+    if(hk.ausgang==="fest"){
+      tw.saves++;
+      feed(tw.side,tw.n+" pariert und hält fest — Bully.");
+      schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      tw.lunge=0.5;
+      fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
+      // Bully im Zonenkreis: dieselbe Hoehe wie der Schuetze stand, damit das Anspiel dort
+      // stattfindet, wo gerade gespielt wurde, und nicht immer am selben Fleck.
+      const k=RINK();
+      naechsterAngriff(tw.side);
+      if(!fsLive.viertelpause)
+        bully(torX+rein*(k.r-k.l)*0.105, schuetze.y<H/2?H/2-(k.u-k.o)*0.28:H/2+(k.u-k.o)*0.28, schuetze.side);
+      return;
+    }
+    // vorbei: kein Save fuer den Torwart (der Puck war nie auf dem Tor), der Puck laeuft
+    // hinter dem Tor an der Bande weiter — die klassische Eishockey-Situation, aus der
+    // heraus wieder aufgebaut wird. Ein Schuss neben das Tor ist KEINE Parade und wird
+    // dem Torwart deshalb auch nicht gutgeschrieben — sonst laege seine Fangquote ueber
+    // dem, was er wirklich gehalten hat.
+    feed(schuetze.side,schuetze.n+" verfehlt das Tor — der Puck läuft an die Bande.");
+    logZug(schuetze.side,"fehlwurf",{spieler:schuetze,tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
+      deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
+      imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
+    fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
+    const hinterTor=torX-rein*26;
+    fsLive.ball.frei=haltePuckImFeld({x:hinterTor,
+      y:schuetze.y<H/2?torY-46:torY+46, vonSeite:schuetze.side});
   }
 
   function loeseFlugAuf(flug,art){
@@ -5611,7 +6258,7 @@
       if(flug.abgefangenVon){
         const f=flug.abgefangenVon;
         f.steals++; flug.passgeber.verluste++; f.lunge=0.4;
-        feed(f.side,f.n+" fängt den Pass ab — Steal.");
+        feed(f.side,f.n+" fängt den Pass ab — "+art.wortAbwehr+".");
         schwebe({x:0,y:0,txt:"STEAL!",life:1.1,crit:true,_def:true,_spieler:f.id});
         logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
@@ -5624,7 +6271,7 @@
       }
       if(flug.eigenerFehler){
         flug.passgeber.verluste++;
-        feed(flug.passgeber.side,flug.passgeber.n+" verliert den Ball — Fehlpass.");
+        feed(flug.passgeber.side,flug.passgeber.n+" verliert "+(istHockey()?"den Puck":"den Ball")+" — Fehlpass.");
         logZug(flug.passgeber.side,"turnover",{spieler:flug.passgeber});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.4);
         // Loser Ball statt sofortigem Ballwechsel — laeuft ueber dieselbe Rebound-Kampf-
@@ -5652,6 +6299,7 @@
       return;
     }
     const schuetze=flug.schuetze;
+    if(flug.hockey){ loeseHockeySchuss(flug,art); return; }
     const szDef=flug.zug?art.spielzuege[flug.zug]:null;
     if(flug.treffer){
       schuetze.punkte+=flug.punkte; fsPunkte[schuetze.side]+=flug.punkte;
@@ -5769,7 +6417,9 @@
     // schneller sind") faellt genau in diese Luecke: es waren nie die Schnellen, die
     // mitsprinteten. Jetzt die zwei mit dem hoechsten LAUFTEMPO (speed/stamina/dexterity,
     // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
-    const SPRINTER=FSTEAM.map(t=>[...t].sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
+    // Die zwei Schnellsten je Seite — ohne den Torwart. Sonst nimmt er einem Feldspieler
+    // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
+    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!u.torwart).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -5873,7 +6523,7 @@
         // Team-Index-Formation, PLUS Ausweichdruck vom Ballfuehrer PLUS gelegentliches
         // Freilaufen, wenn der eigene Decker zu eng klebt — sonst ist Offense ohne Ball
         // ein Standbild (Fables Fund).
-        const slot=SLOTS[u.slotIdx??0];
+        const slot=FORMATION()[u.slotIdx??0]||FORMATION()[0];
         const zumFeld=u.side===0?-1:1;
         // Opus-Review-Fund #7: `radius` als reiner X-Versatz benutzt, tatsaechlicher
         // Korbabstand war hypot(radius*94,seitlich*90) — bei den alten Werten 171-246px,
@@ -6133,6 +6783,13 @@
       // Bewegungs-Schweif (s.u.) traegt deshalb bewusst einen ZWEITEN, situationsunab-
       // haengigen LAUFTEMPO-Faktor, nicht nur die Momentangeschwindigkeit — das macht das
       // ATTRIBUT selbst sichtbar, nicht nur den gerade aktiven Bonus/Malus.
+      // TORWART UND TAUMELN. Bewusst hier, ganz am Ende der Zielfindung: der Torwart hat
+      // KEIN Laufziel aus der Angriffs-/Verteidigungslogik darueber, er hat genau eins,
+      // und das ueberschreibt alles. Ein zusaetzlicher Zweig oben in der Kette haette
+      // dieselbe Wirkung, aber jede spaetere Aenderung an der Kette muesste ihn
+      // mitdenken. Ausserhalb von Hockey sind `torwart` und `taumeltBis` nie gesetzt.
+      if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
+      if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
       const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
@@ -6149,7 +6806,7 @@
     }
   }
 
-  function stepBasketballLive(dt){
+  function stepFeldspielLive(dt){
     // Fable-Playtest (25.08.): nach Spielende stand alles bewegungslos still — der fruehe
     // Return liess bewegeSpielerLive() nie wieder laufen. Anders als die anderen
     // Feldspiel-Disziplinen (die ueber fsLerpPositionen() in feste Formationsslots
@@ -6157,6 +6814,18 @@
     // ueber bewegeSpielerLive() aus fsLive — genau die Funktion weiterlaufen zu lassen
     // (ohne entscheideBallaktion/versucheSteal, die neue Ballwechsel ausloesen wuerden)
     // laesst die Spieler sanft in ihre letzte Ziel-Position auslaufen statt einzufrieren.
+    // ZUERST DIE KOERPERZUSTAENDE, DANN DIE FRUEHEN RETURNS (Overseer-Fund): der Abbau von
+    // `down` und `taumeltBis` stand hinter dem done-Return und hinter der Drittelpause —
+    // ein Spieler, der im letzten Bild gecheckt wurde, blieb danach liegen (gemessen: 1 von
+    // 12 Spielen endete so, 3 von 6 mit noch laufendem Taumeln). Diese beiden Zeilen sind
+    // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
+    for(const team of FSTEAM)for(const u of team){
+      if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.schussSeit!=null){
+        u.schussSeit+=dt;
+        if(hockeySchussPhase(u.schussSeit,u.schussArt).abgeschlossen)u.schussSeit=null;
+      }
+    }
     if(done){bewegeSpielerLive(dt);return;}
     // STANDPHASE: die freie Simulation ist ausgesetzt — kein entscheideBallaktion, kein
     // Steal, keine Manndeckung, kein Rebound-Kampf; die Spieler laufen ausschliesslich auf
@@ -6195,7 +6864,7 @@
       return;
     }
     fsT+=dt;
-    if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
+    if(fsT>=(spieldauerVon(feldspielDisc)||SPIELDAUER_BASKETBALL)){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
       // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
       // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
       // returnt vorher), das erneute Setzen aenderte also nie etwas.
@@ -6218,6 +6887,9 @@
       if(u.reevBall>0)u.reevBall-=dt;
       if(u.stealCd>0)u.stealCd-=dt;
       if(u.screenRuf>0)u.screenRuf-=dt;
+      // Ein gecheckter Spieler liegt kurz und taumelt danach noch. `down` treibt in
+      // zeichneSprite die "hurt"-Pose (dasselbe Feld, das der Kampf schon benutzt) —
+      // nichts Neues zu zeichnen, nur ein Zustand mehr, der es setzt.
       // Opus-Review-Fund #9 (erster Teil): `screent` hielt eine harte Referenz auf den
       // Ballfuehrer zum Zeitpunkt des Rufs — passt der den Ball im selben Zyklus ab (kann
       // er), blockte der Screener 1,2s weiter fuer jemanden ohne Ball, und die
@@ -6238,7 +6910,7 @@
       fsBall={sichtbar:true,
         x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
         y:flug.von.y+(flug.nach.y-flug.von.y)*phase
-          -Math.sin(phase*Math.PI)*(flug.art==="alley"?90:flug.art==="wurf"?36:0)};
+          -Math.sin(phase*Math.PI)*(istHockey()?0:flug.art==="alley"?90:flug.art==="wurf"?36:0)};
       if(flug.art==="alley"&&phase>0.66)flug.ziel.hop=Math.sin(((phase-0.66)/0.34)*Math.PI)*28;
       if(phase>=1){ loeseFlugAuf(flug,art); fsLive.ball.flug=null; }
     } else if(fsLive.ball.frei){
@@ -6354,10 +7026,14 @@
         fsLive.ball.dribbelT=neuT;
         const halbPeriode=BK_DRIBBEL_PERIODE/2;
         const altIdx=Math.floor(altT/halbPeriode), neuIdx=Math.floor(neuT/halbPeriode);
-        if(neuIdx!==altIdx&&(neuIdx%2)===1)bkSfx("ballaufprall.mp3",0.32);
+        // Das Aufprallgeraeusch gehoert zum Prellen eines Balls. Der Puck prellt nicht,
+        // und das Geraeusch lief hier ungeschuetzt auch bei jedem Hockey-Ballbesitz.
+        if(neuIdx!==altIdx&&(neuIdx%2)===1&&feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.32);
         const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
-        const dribbelDip=Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
-        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip,traegerId:traeger.id};
+        // Der Puck prellt nicht — er gleitet am Schlaeger. Basketballs Dribbel-Huepfen
+        // waere hier sofort als falsche Sportart zu erkennen.
+        const dribbelDip=istHockey()?0:Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+(istHockey()?26:18)+dribbelDip,traegerId:traeger.id};
         // ALLE Decker des Ballfuehrers duerfen es versuchen, nicht nur der erste.
         //
         // Hier stand `find(v=>v.deckt===traeger)` — genau EIN Verteidiger, egal wie viele
@@ -6377,7 +7053,7 @@
         const deckerAlle=FSTEAM[1-traeger.side].filter(v=>v.deckt===traeger);
         const decker=deckerAlle[0]||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
-        const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
+        const erzwingen=fsLive.angriffSeit>((LIVE()||{}).schussuhr||SCHUSSUHR_BASKETBALL);
         if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
         for(const v of deckerAlle){
           if(fsLive.ball.traeger!==traeger)break;
@@ -6480,7 +7156,7 @@
   }
 
   function stepFeldspiel(dt){
-    if(feldspielDisc==="basketball")return stepBasketballLive(dt);
+    if(LIVE())return stepFeldspielLive(dt);
     if(done){fsLerpPositionen(dt);return;}
     fsT+=dt;
     for(const team of FSTEAM)for(const u of team)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
@@ -6568,9 +7244,134 @@
   // anderen drei Feldspiel-Disziplinen (Football, Hockey, Tennis) teilen sich vorerst
   // den neutralen Platz von vorher; eigene Feldmarkierungen fuer die sind ein eigener
   // Auftrag, keiner, den diese Aenderung nebenbei mitloest.
+  // ============================ DIE EISFLAECHE ============================
+  // Alle Masse sind aus dem echten Eishockeyfeld (NHL 200x85 Fuss) auf den Canvas
+  // uebertragen und nicht freihaendig gewaehlt — das Seitenverhaeltnis 200:85 = 2,35
+  // liegt dicht an unseren 1240:470 = 2,64, die Flaeche passt also fast massstabsgetreu.
+  // Umgerechnet auf die Spielflaeche zwischen den Banden:
+  //   Torlinie      3,7 m von der Bande      -> RINK_TORLINIE_EIN
+  //   blaue Linie   17,3 m von der Torlinie   -> BLAU_ABSTAND
+  //   Bullykreis    r = 4,5 m                 -> BULLY_RADIUS
+  //   Torraum       r = 1,8 m, halbrund       -> TORRAUM_RADIUS
+  // Die vier Zonen-Bullypunkte liegen real 6,1 m von der Torlinie und 6,7 m aus der
+  // Mitte; genau diese Verhaeltnisse stehen unten.
+  //
+  // Die Bande ist KEINE Zierde: sie haelt den Puck im Feld (haltePuckImFeld). Was sie
+  // heute NICHT tut, ist abprallen — ein freier Puck ist ein ruhender Punkt, kein Koerper
+  // mit Geschwindigkeit; die Klemme greift deshalb nur in den seltenen Faellen, in denen
+  // ein Abpraller rechnerisch hinter der Bande laenden wuerde (gemessen 0 bis 1 mal je
+  // sechs bis zwoelf Spiele). Ein echter Abprall braucht einen bewegten Puck und gehoert
+  // in dieselbe Runde wie die Puckgeschwindigkeit. Der Rahmen wird trotzdem koerperhaft
+  // gezeichnet, weil das Feld ohne ihn wie Hallenfussball ohne Waende wirkt.
+  const RINK=()=>({
+    l:W*0.045, r:W*0.955, o:44, u:H-44,
+    ecke:64
+  });
+  function eisRundweg(k,ein){
+    const l=k.l+ein, r=k.r-ein, o=k.o+ein, u=k.u-ein, e=Math.max(4,k.ecke-ein);
+    ctx.beginPath();
+    ctx.moveTo(l+e,o); ctx.lineTo(r-e,o); ctx.quadraticCurveTo(r,o,r,o+e);
+    ctx.lineTo(r,u-e); ctx.quadraticCurveTo(r,u,r-e,u);
+    ctx.lineTo(l+e,u); ctx.quadraticCurveTo(l,u,l,u-e);
+    ctx.lineTo(l,o+e); ctx.quadraticCurveTo(l,o,l+e,o);
+    ctx.closePath();
+  }
+  function eisflaeche(){
+    const k=RINK();
+    // Eis. Ein kalter Verlauf statt einer flachen Flaeche — sonst liest sich die Mitte
+    // wie Papier und das Feld verliert jede Tiefe.
+    const eis=ctx.createLinearGradient(0,k.o,0,k.u);
+    eis.addColorStop(0,"#dce9f2"); eis.addColorStop(0.5,"#eef5fa"); eis.addColorStop(1,"#d3e2ee");
+    eisRundweg(k,0); ctx.fillStyle=eis; ctx.fill();
+    // Bande: aussen der Rahmen, innen die gelbe Kickleiste am Boden — dieselbe Ordnung
+    // wie in echt (Plexiglas oben, gelbe Leiste unten).
+    ctx.lineWidth=7; ctx.strokeStyle="#f2f4f7"; eisRundweg(k,0); ctx.stroke();
+    ctx.lineWidth=2; ctx.strokeStyle="rgba(214,172,54,.85)"; eisRundweg(k,4); ctx.stroke();
+    const mitte=(k.o+k.u)/2, breite=k.r-k.l;
+    // Die Torlinie IST die x-Position des Tors — nicht eine zweite, daneben gepflegte Zahl.
+    const torlinie=(links)=>korbXVon(links?1:0);
+    // Die blaue Linie liegt real 17,3 m von der Torlinie bei 3,7 m Abstand zur Bande,
+    // also rund 0,3 der Feldlaenge von der Torlinie aus zur Mitte hin.
+    const blau=(links)=>links?torlinie(true)+breite*0.27:torlinie(false)-breite*0.27;
+    ctx.save();
+    eisRundweg(k,3.5); ctx.clip();
+    // Rote Mittellinie, breit — sie ist im Eishockey die auffaelligste Linie.
+    ctx.strokeStyle="rgba(198,42,48,.85)"; ctx.lineWidth=8;
+    ctx.beginPath(); ctx.moveTo(MID,k.o); ctx.lineTo(MID,k.u); ctx.stroke();
+    // Zwei blaue Linien.
+    ctx.strokeStyle="rgba(38,86,182,.8)"; ctx.lineWidth=8;
+    for(const links of [true,false]){
+      const x=blau(links);
+      ctx.beginPath(); ctx.moveTo(x,k.o); ctx.lineTo(x,k.u); ctx.stroke();
+    }
+    // Torlinien, duenn und rot.
+    ctx.strokeStyle="rgba(198,42,48,.8)"; ctx.lineWidth=2.5;
+    for(const links of [true,false]){
+      const x=torlinie(links);
+      ctx.beginPath(); ctx.moveTo(x,k.o); ctx.lineTo(x,k.u); ctx.stroke();
+    }
+    ctx.restore();
+    // Mittelkreis mit Bullypunkt.
+    ctx.strokeStyle="rgba(38,86,182,.65)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(MID,mitte,52,0,6.3); ctx.stroke();
+    ctx.fillStyle="rgba(38,86,182,.75)";
+    ctx.beginPath(); ctx.arc(MID,mitte,4.5,0,6.3); ctx.fill();
+    // Vier Zonen-Bullykreise, rot.
+    ctx.strokeStyle="rgba(198,42,48,.55)"; ctx.lineWidth=2;
+    for(const links of [true,false])for(const oben of [true,false]){
+      const bx=links?torlinie(true)+breite*0.105:torlinie(false)-breite*0.105;
+      const by=oben?mitte-(k.u-k.o)*0.28:mitte+(k.u-k.o)*0.28;
+      ctx.beginPath(); ctx.arc(bx,by,52,0,6.3); ctx.stroke();
+      ctx.fillStyle="rgba(198,42,48,.7)";
+      ctx.beginPath(); ctx.arc(bx,by,4.5,0,6.3); ctx.fill();
+    }
+    // Torraum und Tor. korbXVon() ist dieselbe Referenz, auf die auch der Schuss zielt —
+    // getrennte Literale hier waeren genau der Fehler, der beim Basketballkorb schon
+    // einmal dazu gefuehrt hat, dass der Wurf das gezeichnete Ziel verfehlte.
+    for(const seite of [0,1]){
+      const tx=korbXVon(seite), links=tx<MID;
+      // Halbrunder blauer Torraum, oeffnet ins Feld.
+      ctx.fillStyle="rgba(96,158,214,.35)";
+      ctx.beginPath();
+      ctx.arc(tx,mitte,34,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:1.5*Math.PI);
+      ctx.lineTo(tx,mitte+(links?-34:34));
+      ctx.closePath(); ctx.fill();
+      zeichneTor(tx,mitte,links);
+    }
+  }
+  // Das Tor in Draufsicht: zwei rote Pfosten, die Querlatte zur Bande hin, dazwischen das
+  // Netz. TOR_HALBHOEHE ist die halbe Torbreite in Canvas-Pixeln und heute eine reine
+  // ZEICHEN-Angabe: die Schussaufloesung wuerfelt ihren Ausgang und liest keine Geometrie
+  // des Tors. Sobald sie das tut (Winkelmodell, Plan-Schritt 4), ist das hier die eine
+  // Zahl, die beide benutzen.
+  const TOR_HALBHOEHE=26;
+  const TOR_TIEFE=17;
+  function zeichneTor(tx,my,links){
+    const hinten=links?tx-TOR_TIEFE:tx+TOR_TIEFE;
+    ctx.save();
+    // Netz
+    ctx.fillStyle="rgba(250,250,252,.55)";
+    ctx.fillRect(Math.min(tx,hinten),my-TOR_HALBHOEHE,TOR_TIEFE,TOR_HALBHOEHE*2);
+    ctx.strokeStyle="rgba(120,132,148,.55)"; ctx.lineWidth=1;
+    for(let i=1;i<4;i++){
+      const y=my-TOR_HALBHOEHE+i*(TOR_HALBHOEHE*2/4);
+      ctx.beginPath(); ctx.moveTo(Math.min(tx,hinten),y); ctx.lineTo(Math.min(tx,hinten)+TOR_TIEFE,y); ctx.stroke();
+    }
+    // Pfosten und Querlatte
+    ctx.strokeStyle="#c62a30"; ctx.lineWidth=3.5; ctx.lineCap="round";
+    ctx.beginPath();
+    ctx.moveTo(tx,my-TOR_HALBHOEHE); ctx.lineTo(hinten,my-TOR_HALBHOEHE);
+    ctx.lineTo(hinten,my+TOR_HALBHOEHE); ctx.lineTo(tx,my+TOR_HALBHOEHE);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function bodenFeldspiel(){
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#1c2e1e");g.addColorStop(1,"#152418");
+    // Ausserhalb der Spielflaeche: Rasenton fuer die Feldsportarten, kalte Halle fuer
+    // das Eis. Ein gruener Rand um eine Eisflaeche liest sich sofort falsch.
+    if(feldspielDisc==="hockey"){ g.addColorStop(0,"#141c26"); g.addColorStop(1,"#0d141c"); }
+    else { g.addColorStop(0,"#1c2e1e"); g.addColorStop(1,"#152418"); }
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     if(feldspielDisc==="football"){
       // Ein echtes Football-Feld: zwei Endzonen, Yard-Linien alle 10 %, Mittellinie
@@ -6594,6 +7395,7 @@
       ctx.beginPath();ctx.moveTo(W/2,50);ctx.lineTo(W/2,H-50);ctx.stroke();
       return;
     }
+    if(feldspielDisc==="hockey"){ eisflaeche(); return; }
     if(feldspielDisc!=="basketball"){
       ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
       ctx.strokeRect(60,H*0.10,W-120,H*0.80);
@@ -6854,7 +7656,7 @@
         // wenn er sich ueberhaupt bewegt, einen laengeren/kraeftigeren Schweif als ein
         // langsamer in derselben Situation, auch wenn beide gerade z.B. im selben
         // Fastbreak-Bonus stecken.
-        if(feldspielDisc==="basketball"){
+        if(LIVE()){
           const tempoJetzt=Math.hypot(u.vx||0,u.vy||0);
           const sichtbarkeitsFaktor=0.55+u.LAUFTEMPO*0.011; // LAUFTEMPO 0->0.55, 50->1.1, 100->1.65
           if(tempoJetzt>2){
@@ -6944,7 +7746,20 @@
         if(h){ bvx=h._zvx||0; bvy=h._zvy||0; }
       }
       const bx=fsBall.x+bvx, by=fsBall.y+bvy;
-      if(bkDa("ball")){
+      if(istHockey()){
+        // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
+        // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
+        // geprellt wird. Ein Puck liegt auf dem Eis. Die leichte Ellipse (breiter als
+        // hoch) ist die Draufsicht der Scheibe, der helle Bogen oben ihre Kante.
+        ctx.save();
+        ctx.fillStyle="rgba(10,16,24,.28)";
+        ctx.beginPath();ctx.ellipse(bx,by-3,7.5,3,0,0,6.3);ctx.fill();
+        ctx.fillStyle="#15181d";
+        ctx.beginPath();ctx.ellipse(bx,by-6,6.5,3.4,0,0,6.3);ctx.fill();
+        ctx.strokeStyle="rgba(200,214,230,.55)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.ellipse(bx,by-7,6.5,3.4,0,Math.PI,2*Math.PI);ctx.stroke();
+        ctx.restore();
+      } else if(bkDa("ball")){
         ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
       } else {
         ctx.fillStyle="#e8823a";
@@ -11789,7 +12604,12 @@
     // aendert an der INNEREN Balance nichts, nur an der Erzaehlgeschwindigkeit. Faktor 2
     // heisst doppelt so viele echte Sekunden fuer dieselbe Spielsekunde — Bewegung wirkt
     // halb so schnell, ohne dass sich verschiebt, wer zuerst am Ball/Rebound/Slot ist.
-    basketball:2
+    basketball:2,
+    // Hockey bekommt denselben Faktor aus demselben Grund (Chris' Fund zur Hektik auf dem
+    // Court): 240 s Simulationszeit werden damit zu rund 8 Minuten Zuschauzeit. Eishockey
+    // ist im Original schneller als Basketball, aber die Lesbarkeit auf einem 1240x470
+    // grossen Feld haengt an der Zeichenflaeche, nicht am Vorbild.
+    hockey:2
   };
   const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
 
@@ -12277,7 +13097,7 @@
   // gar nichts zu beeinflussen. Verallgemeinert wird, wenn die zweite Live-Disziplin
   // kommt (s. docs/design/battle-arena-multi-disziplin-plan.md), nicht vorher.
   function fokusAuswahlMoeglich(){
-    return feldspielDisc==="basketball"&&istFeldspiel(disc)&&!!fsLive;
+    return !!LIVE()&&istFeldspiel(disc)&&!!fsLive;
   }
   function fokusSpieler(){
     if(!fsLive||fsLive.fokusZiel==null)return null;
@@ -13204,11 +14024,14 @@
       // abgeleitet statt als zweite Zahl gepflegt, damit beide nicht auseinanderlaufen
       // koennen; die 60 s Reserve decken den schlimmsten plausiblen Fall (mehrere
       // Freiwurf-Sequenzen a ~8 s) unveraendert ab.
-      lauf:()=>{const budget=SPIELDAUER_BASKETBALL+60;
+      // Je Disziplin abgeleitet, nicht mehr fest aus Basketballs Konstante: Hockey faehrt
+      // 240 s, Basketball 360 s, die Vorab-Disziplinen so lange wie ihre Zuege dauern.
+      // Die 60 s Reserve fuer Standphasen bleiben unveraendert.
+      lauf:()=>{const budget=(spieldauerVon(fd)||SPIELDAUER_BASKETBALL)+60;
                 let g=0; while(!done&&g<budget){ stepFeldspiel(1/60); g+=1/60; }},
       namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
       wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
-        o[u.n]=u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
+        o[u.n]=feldspielWert(u,fd); return o;}
     };
   }
 
@@ -13439,7 +14262,7 @@
       // Viertel a 1:30); die Vorab-Disziplinen brauchen nur so viel Zeit, wie ihre
       // vorberechneten Zuege zum Abspielen kosten — art.zuegeJeSeite*2 Zuege a
       // art.zugDauer. +5 s Zugabe wie bisher, damit der Schlusspfiff sicher faellt.
-      const grunddauer=(id==="basketball")?SPIELDAUER_BASKETBALL
+      const grunddauer=art.live?spieldauerVon(id)
         :Math.ceil(art.zuegeJeSeite*2*art.zugDauer);
       const n=o.n||10, dauer=o.dauer||(grunddauer+5), saat0=o.saat0!=null?o.saat0:1337;
       const schritt=o.schritt||7919;
@@ -13464,7 +14287,7 @@
       // Plan schlaegt zwoelf vor. Dieselbe Quelle, aus der auch feldspielSubskills() liest.
       const subskills=Object.keys(art.rezept||{});
       // Nur Basketball faehrt den Live-Motor (bauFeldspiel, die eine Weiche dort).
-      const live=(id==="basketball");
+      const live=!!art.live;
       const M=MOTOREN[id], gesichert=M.sichern();
       if(o.jeSeite)art.jeSeite=o.jeSeite;
       M.vorher();
@@ -13561,9 +14384,12 @@
             const z=fg.get(u.id)||{gesamt:leer(),
               tier:{dunk:leer(),nah:leer(),mit:leer(),fern:leer()}};
             const zeile={n:u.n, side:u.side, eig:+u.eig.toFixed(2),
-              wert:+(u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8).toFixed(2),
+              wert:+feldspielWert(u,id).toFixed(2),
               punkte:u.punkte, rebounds:u.rebounds, assists:u.assists, steals:u.steals,
               bloecke:u.bloecke, verluste:u.verluste, fouls:u.fouls,
+              // Eishockey-eigene Spalten. Ausserhalb von Hockey bleiben sie 0 — der
+              // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
+              torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
               fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
               fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
@@ -13653,6 +14479,14 @@
       M.zurueck(g);
       return {disziplin:fd, seiten, boxscore};
     },
+    // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
+    // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
+    // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster
+    // Schritt: der Schlaeger-Zeichenagent). Selbes Prinzip wie renderProbe/figurProbe
+    // direkt darunter, nur ohne Canvas — es gibt ja noch nichts zu zeichnen. Unter dem
+    // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
+    // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
+    hockeySchussPhase,
     renderProbe:(name,ani,feldspiel,dir,lunge)=>{
       const c=document.createElement("canvas"); c.width=64; c.height=64;
       const ctx=c.getContext("2d");
@@ -13681,6 +14515,20 @@
       const c=figur({n:name});
       setTimeout(()=>res(c.toDataURL()),1500);
     }),
+    // Debug-Zugriff auf zeichneHockeyschlaeger (02.09.) — noch NICHT verdrahtet (s.
+    // Kommentar an der Funktion), deshalb ohne eigenen Sprite: reicht die Zeichenfunktion
+    // roh nach draussen, damit ein zweiter Agent (Playwright, ohne UI) sie ohne Squad-/
+    // Kampfaufbau aufrufen kann, um Handpositionen daran zu pruefen — dasselbe Prinzip wie
+    // renderProbe/figurProbe daneben, nur fuer ein einzelnes Requisit statt eine ganze Figur.
+    // groesse (optional, Default 96): auf 64 gesetzt deckt sich der Leinwand-Nullpunkt mit
+    // dem von renderProbe (das ebenfalls eine 64x64-Leinwand zeichnet) — so lassen sich
+    // beide PNGs deckungsgleich uebereinanderlegen, ohne Versatz auszurechnen.
+    hockeyschlaegerProbe:(x,y,s,richtung,phase,groesse)=>{
+      const c=document.createElement("canvas"); c.width=groesse||96; c.height=groesse||96;
+      const cctx=c.getContext("2d"); cctx.imageSmoothingEnabled=false;
+      const punkte=zeichneHockeyschlaeger(cctx,x??48,y??70,s??1,richtung??2,phase??"halten");
+      return {dataUrl:c.toDataURL(), punkte};
+    },
     renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
     diagPositionen:(saat)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);

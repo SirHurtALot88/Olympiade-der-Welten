@@ -423,6 +423,28 @@ window.__ARENA_REZEPTE = {
     // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
     // nicht Entschlossenheit.
     TEAMGEIST:   {spirit:60,torment:40},
-    AUSDAUER:    {stamina:50,health:30,will:20}
+    AUSDAUER:    {stamina:50,health:30,will:20},
+    // ================= AB HIER: PLATZHALTER FUER DEN LIVE-MOTOR =================
+    // Diese vier Sub-Skills sind NICHT kalibriert. Sie stehen hier, weil der Live-Motor
+    // sie liest — ohne sie laeuft Hockey live gar nicht: `zuordneSlots` sortiert nach
+    // SCHUSS_NAH, `bewegeSpielerLive` rechnet mit LAUFTEMPO, die Wurfformel mit
+    // SCHUSS_NAH/SCHUSS_FERN. Ohne diese Felder sind alle vier undefined, jede daraus
+    // gerechnete Position wird NaN, und das Spiel steht bei 0:0 mit null Ballwechseln
+    // (genau so gemessen, bevor sie hier standen).
+    //
+    // Die Gewichte sind aus der Hockey-Matrix (power 18, health 18, speed 12, spirit 12,
+    // stamina 10, torment 10, awareness 8, determination 4, dexterity 4, will 4) plausibel
+    // abgeleitet, aber NICHT gegen eine Sondierung gemessen. Die Kalibrierung ist Schritt 4
+    // des Hockey-Plans und kommt NACH der Live-Migration — in dieser Reihenfolge, weil
+    // Gewichte, die gegen die Vorab-Mechanik gemessen werden, nach der Migration wertlos
+    // sind (derselbe Befund, der oben schon ein besseres Kandidatenrezept verworfen hat).
+    //
+    // SCHUSS_NAH ist die Direktabnahme vor dem Tor, SCHUSS_FERN der Schuss von der blauen
+    // Linie, LAUFTEMPO das Schlittschuhtempo. PARADE ist der einzige wirklich neue: er
+    // gehoert dem Torwart und wird ausserhalb des Tors nie gelesen.
+    SCHUSS_NAH:  {power:40,dexterity:25,awareness:20,spirit:15},
+    SCHUSS_FERN: {power:45,awareness:30,dexterity:25},
+    LAUFTEMPO:   {speed:55,stamina:30,power:15},
+    PARADE:      {awareness:40,dexterity:30,determination:15,will:15}
   }
 };
