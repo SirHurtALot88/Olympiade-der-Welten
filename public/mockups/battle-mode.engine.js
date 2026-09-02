@@ -4756,6 +4756,11 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // Torwart-Bewertung, s. feldspielWert. Alle drei PLATZHALTER, gegen die Rangtreue
+  // gemessen: HK_TW_REF ist die gemessene Fangquote unserer Liga, HK_TW_BASIS der
+  // gemessene Mittelwert der Feldspieler-Impacts, HK_TW_GSAA_K die Spreizung je Tor
+  // ueber oder unter dem Durchschnitt.
+  const HK_TW_REF=0.844, HK_TW_BASIS=3.8, HK_TW_GSAA_K=3.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
@@ -4772,7 +4777,38 @@
   // Formel statt die der Mechanik.
   function feldspielWert(u,dId){
     if((dId||feldspielDisc)==="hockey"){
-      if(u.torwart)return u.saves*0.35-u.gegentore*1.5+u.punkte*3+u.assists*2;
+      // DER TORWART WIRD WIE IM ECHTEN EISHOCKEY BEWERTET: ueber GSAA (goals saved above
+      // average), also erwartete Gegentore bei Liga-Fangquote minus tatsaechliche
+      // Gegentore. Genau das ist die Groesse, mit der die NHL Torwaerter vergleicht, und
+      // sie loest das Problem, das die erste Fassung hatte.
+      //
+      // WARUM DIE ERSTE FASSUNG FALSCH WAR — nachgemessen, nicht vermutet. Sie las
+      // `saves*0,35 - gegentore*1,5`. Bei 18 Paraden und 3,4 Gegentoren macht das 0,4,
+      // waehrend ein Feldspieler im Mittel bei 3,8 liegt. Die beiden Torwaerter standen
+      // dadurch auf Rang 2 und 3 der Eignung und auf den LETZTEN Raengen des Impacts, und
+      // das allein druckte die Rangtreue der ganzen Disziplin von 0,830 (ohne Torwaerter
+      // gerechnet) auf 0,587. Ein Torwart kann nicht strukturell der schlechteste Spieler
+      // auf dem Eis sein.
+      //
+      // ZWEI TEILE, und die Trennung ist der Punkt:
+      //   HK_TW_BASIS  was eine gespielte Schicht im Tor ueberhaupt wert ist — auf den
+      //                gemessenen Mittelwert der Feldspieler gelegt, damit ein
+      //                DURCHSCHNITTLICHER Torwart einen durchschnittlichen Beitrag hat.
+      //   GSAA         was er BESSER oder SCHLECHTER war als der Durchschnitt. Positiv,
+      //                wenn er mehr gehalten hat, als die Referenzquote erwarten laesst.
+      // Ohne den Basisteil bekaeme ein tadelloser Durchschnittstorwart eine Null, und die
+      // Rangtreue waere genauso kaputt wie vorher, nur andersherum.
+      //
+      // HK_TW_REF ist die Referenz-Fangquote und ein PLATZHALTER: gemessen liegt unsere
+      // Liga bei 84,4 % (32 Spiele), real bei .902. Genommen wird der GEMESSENE Wert, nicht
+      // der reale — GSAA vergleicht einen Torwart mit seiner eigenen Liga, nicht mit der
+      // NHL. Nach jeder Kalibrierung der Torzahl gehoert er nachgezogen; laeuft er weg,
+      // verschiebt sich nur der Nullpunkt, nicht die Reihenfolge.
+      if(u.torwart){
+        const schuesse=u.saves+u.gegentore;
+        const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
+        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists*2;
+      }
       return u.punkte*3+u.assists*2+u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.6;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;

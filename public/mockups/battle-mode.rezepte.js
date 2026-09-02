@@ -445,6 +445,15 @@ window.__ARENA_REZEPTE = {
     SCHUSS_NAH:  {power:40,dexterity:25,awareness:20,spirit:15},
     SCHUSS_FERN: {power:45,awareness:30,dexterity:25},
     LAUFTEMPO:   {speed:55,stamina:30,power:15},
-    PARADE:      {awareness:40,dexterity:30,determination:15,will:15}
+    // PARADE FUEHRT HEALTH, nicht Awareness — nachgezogen, weil der Slot es so ausweist.
+    // Der Torwart-Slot (SLOTS_JE_DISC.hockey, aus dem Generator) traegt gross:"health",
+    // klein:"awareness" und hebt im Profil health auf 26. Im Aufstellungsbildschirm steht
+    // damit "haelt den Kasten sauber ueber Health und Awareness" — und der Wert, der die
+    // Paraden wirklich entscheidet, las health mit NULL. Ein Spieler, den der Slot
+    // ausdruecklich fuer diese Position empfiehlt, wurde davon kein besserer Torwart.
+    // Health ist ausserdem mit 18 das schwerste Attribut der Hockey-Matrix; ueber
+    // awareness (8) und will/determination (je 4) laesst sich ein Torwart, der zur
+    // Disziplin passt, gar nicht bauen.
+    PARADE:      {health:45,awareness:30,dexterity:15,will:10}
   }
 };
