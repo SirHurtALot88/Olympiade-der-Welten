@@ -11728,7 +11728,22 @@
   // die ich sonst Zeile fuer Zeile abgeschrieben habe. Charisma wirkt weiterhin im Kampf
   // (ueber formMitFuehrung auf den Zusammenhalt der Linie) — es wird nur nicht mehr als
   // Leistung verbucht.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
+  // ERLITTENER SCHADEN ZAEHLT NICHT MEHR MIT (`tank*0.15` gestrichen), und das ist genau
+  // das, was der Absatz darueber schon sagt: "'ich wurde beschossen' fuer sich genommen
+  // ist noch keine Leistung". Er stand trotzdem im Ausdruck.
+  //
+  // Nachgemessen (Fable, Arena-Recherche) vergab die Formel 44 % des Gesamtbeitrags fuers
+  // GETROFFENWERDEN — `verh` 33 %, `tank` 11 %. Der Verliererseite, die in 24 von 24
+  // Spielen komplett faellt, wurde derselbe Anteil gutgeschrieben wie den Siegern (8,2
+  // gegen 8,4). Und die Zielwahl ist Geometrie, nicht Bedrohung: 264 von 288
+  // Kaempfer-Spielen zielen auf den NAECHSTEN. Wer beschossen wird, haengt damit an
+  // seiner Reihe, nicht an seiner Eignung — die Korrelation zwischen Eignung und
+  // "Angreifer je Lebenssekunde" liegt bei -0,02.
+  //
+  // `verh` BLEIBT. Es ist die Differenz zwischen dem, was ankam, und dem, was ohne seine
+  // Verteidigung angekommen waere, entsteht also aus SEINEM Attributwert — anders als
+  // `tank`, das reine Aussetzung ist.
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.koAnteil*140;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
