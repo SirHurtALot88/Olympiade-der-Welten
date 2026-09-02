@@ -3127,7 +3127,31 @@
     breaker:{reihe:1,ord:"verfolgen",pos:2},   skirmisher:{reihe:1,ord:"flanke",pos:3},
     shotcaller:{reihe:2,ord:"mitlinie",pos:4}, rallypoint:{reihe:2,ord:"mitlinie",pos:5},
     blockstart:{reihe:0,ord:"mitlinie",pos:0}, acceleration:{reihe:0,ord:"mitlinie",pos:1},
-    topspeed:{reihe:1,ord:"verfolgen",pos:2},  lanecontrol:{reihe:1,ord:"flanke",pos:3}
+    topspeed:{reihe:1,ord:"verfolgen",pos:2},  lanecontrol:{reihe:1,ord:"flanke",pos:3},
+    // BATTLEFIELD — nachgetragen, weil die Ersatzregel die Aufstellung VERKEHRT HERUM
+    // aufbaute. Ohne Eintrag hier faellt `slotReihe` auf floor(Listenplatz/2) zurueck, und
+    // die Battlefield-Liste steht in der Reihenfolge commander, spotter, siegecore,
+    // moraleanchor. Damit stand der Commander ("fuehrt grosse Situationen ueber Charisma
+    // und Intelligence") in der VORDERSTEN Linie und der Siege Core ("drueckt Fronten mit
+    // Power und Torment") dahinter — nach den eigenen Slot-Texten genau falsch herum.
+    //
+    // Nachgemessen (12 Spiele je Disziplin, nach der Eignungsreparatur) war Battlefield
+    // die einzige Arena-Disziplin, in der die Eignung MIT der Reihennummer steigt:
+    //
+    //   Disziplin      r(Eignung, Reihe)   r(Reihe, Wert)
+    //   battlefield          +0,252            -0,310
+    //   mini-dm              -0,542            -0,386
+    //   tdm                  -0,454            -0,049
+    //
+    // Bei mini-dm und tdm stehen die Besten vorn (negatives Vorzeichen), bei Battlefield
+    // hinten — und die hintere Reihe bewirkt gemessen weniger (-0,310). Battlefield ist
+    // zugleich die schwaechste der vier (rho 0,469). Das passt zusammen: wer hinten steht,
+    // wird von der Zielwahl "naechster" kaum gefunden und kommt nicht zum Zug.
+    //
+    // Die Reihen folgen jetzt den Slot-Texten, und `pos` folgt den Reihen: der beste
+    // Spieler bekommt den vordersten Slot, wie im TDM (vanguard pos 0, reihe 0).
+    siegecore:{reihe:0,ord:"mitlinie",pos:0},   moraleanchor:{reihe:0,ord:"mitlinie",pos:1},
+    spotter:{reihe:1,ord:"flanke",pos:2},       commander:{reihe:2,ord:"mitlinie",pos:3}
   };
   const SLOT_STELLE=(()=>{const o={};for(const d in SLOTS_JE_DISC)SLOTS_JE_DISC[d].forEach((s2,i)=>{o[s2.id]=i;});return o;})();
   const slotReihe=(id)=>SLOT_ZUSATZ[id]?SLOT_ZUSATZ[id].reihe:Math.min(2,Math.floor((SLOT_STELLE[id]||0)/2));
