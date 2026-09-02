@@ -8344,8 +8344,16 @@
       // der Grenzversuch gelingt nicht allein durch Kraft, das Publikum traegt den Lifter
       // durch die letzten Kilo. Drei Versuche, ein verpatzter zaehlt NICHTS (failAbzug 0)
       // — echtes Gewichtheben kennt keine Teilpunkte fuer eine gerissene Hantel.
-      label:"Gewichtheben", jeSeite:6, rundenN:3, rundenDauer:1.65,
-      failAbzug:0, failWort:"Fehlversuch", erfolgWort:"sauber durchgestemmt",
+      // HEBEN-MOTOR (Gewichtheben-Plan, Schritt S1). `heben:true` ist die eine Weiche:
+      // die sechs anderen Buehnen-Disziplinen laufen Zeichen fuer Zeichen weiter durch den
+      // Durchgangs-Rechner, Gewichtheben durch baueHebenDuelle().
+      //
+      // rundenN ist jetzt 6 statt 3 — drei Versuche Reissen plus drei Versuche Stossen,
+      // der reale Wettkampf. rundenDauer 1,55 s ergibt 12 Duell-Versuche a 1,55 s mal
+      // sechs Duelle, also rund 112 s: laenger als die 60 s der anderen Buehnen, kuerzer
+      // als Hockeys 240 s, und langsam genug, dass man eine Hantel sieht.
+      label:"Gewichtheben", jeSeite:6, rundenN:6, rundenDauer:1.55, heben:true,
+      failAbzug:0, failWort:"ungueltig", erfolgWort:"gueltig",
       // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
       // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
       // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
@@ -8353,14 +8361,25 @@
       // hergibt (15,7 % statt 6). Jetzt hat Charisma auch einen Platz in einer
       // erfolgsentscheidenden Rolle (NERVEN, TECHNIK) — passend zur Erzaehlung: das
       // Publikum traegt nicht nur mit, es hilft durch den Grenzversuch.
+      // EIGENES SUB-SKILL-SET (Plan Teil 5). Die sieben Buehnen-Rollen sind fuer
+      // AUFTRITTE gemacht — Durchgang, Jury, Publikum. Gewichtheben ist kein Auftritt,
+      // sondern eine Versuchs-Zustandsmaschine: Ansage, Gelingen, Steigerung, Erholung
+      // zwischen Reissen und Stossen. Fuenf Sub-Skills, jeder traegt genau einen Teil.
+      //
+      // CHARISMA SITZT ZWEIMAL, UND BEIDE MALE AUSGANGSWIRKSAM — genau die Lektion aus der
+      // alten Fassung, die oben im Kommentar steht: im flachen PUBLIKUM-Zuschlag las
+      // Charisma (Matrixgewicht 23) weit unter seinem Gewicht, Dexterity (6) ueber der
+      // Erfolgschance weit darueber. NERVEN und ANSAGE entscheiden jetzt beide mit ueber
+      // den Ausgang. STAMINA hat mit ERHOLUNG sein einziges Zuhause — klein, wie die
+      // Matrix (2) es will: sechs Versuche sind kein Ausdauersport.
+      //
+      // Alle Zahlen PLATZHALTER bis zur Sondierung (Schritte S3/S4 des Plans).
       rezept:{
-        GRUNDLAGE:    {power:55,health:25,determination:20},
-        SPITZENMOMENT:{power:50,will:30,determination:20},
-        TECHNIK:      {dexterity:30,charisma:25,health:25,determination:20},
-        PUBLIKUM:     {charisma:70,will:30},
-        NERVEN:       {charisma:35,will:35,determination:20,health:10},
-        AUSDAUER:     {stamina:40,health:35,determination:25},
-        WAGNIS:       {power:45,charisma:30,speed:25}
+        LAST:     {power:60,health:25,determination:15},
+        TECHNIK:  {dexterity:35,speed:30,determination:20,power:15},
+        NERVEN:   {charisma:35,will:35,determination:20,health:10},
+        ANSAGE:   {charisma:45,power:30,speed:25},
+        ERHOLUNG: {stamina:40,health:35,will:25}
       }
     },
 
@@ -8507,12 +8526,31 @@
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         groesse:p.groesse??null,
-        eig:(p.d[buehneDisc]||0)+engP+breitP,...R2,
+        // DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen (Chris' Fund vom
+        // 25.08., s. bauSpieler und aufschluesselung): `p.d` haelt nur "tdm" und "spurt"
+        // vorberechnet. Fuer JEDE Buehnen-Disziplin fiel der Basiswert deshalb auf 0
+        // zurueck, und `eig` bestand nur noch aus den kleinen Slot- und Formzuschlaegen —
+        // nachgemessen Werte zwischen -4,6 und +8,0 statt eines echten Fertigkeitswerts.
+        // Damit war die Rangtreue aller sieben Buehnen-Disziplinen gar nicht messbar: die
+        // Sonde haette Zufallszahlen gegen Kilogramm korreliert.
+        //
+        // gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der p.d.tdm
+        // ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken,
+        // Zeichen fuer Zeichen wie im Feldspiel. Das VERHALTEN der sechs anderen
+        // Buehnen-Disziplinen aendert sich dadurch nicht: ihre Durchgangspunkte rechnen
+        // aus den Sub-Skills (R2), nicht aus `eig`.
+        eig:(p.d[buehneDisc]!=null?p.d[buehneDisc]:gewichtet(p.a,BASIS_JE_DISC[buehneDisc]||{}))
+            +engP+breitP,...R2,
         runden:[], summe:0, aktuell:-1};
       // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
       // die Logik einfach — kein "wer ist als naechstes dran" ueber mehrere Frames — und
       // ist ehrlich: die Formkarte und der Disziplinwert stehen fest, bevor der Auftritt
       // beginnt, genau wie beim Kampf.
+      // GEWICHTHEBEN GEHT HIER NICHT DURCH. Sein Ergebnis entsteht paarweise (der Heber
+      // reagiert auf den Stand seines Duells) und laesst sich deshalb nicht je Teilnehmer
+      // fuer sich ausrechnen — baueHebenDuelle() macht das unten, nachdem beide Seiten
+      // stehen. Fuer die sechs anderen Buehnen-Disziplinen aendert sich hier nichts.
+      if(art.heben){ TEILNEHMER.push(L); return; }
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
@@ -8540,6 +8578,7 @@
     // Jury-Punkten: was die eine Seite pro Durchgang gewinnt, verliert die andere — die
     // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
+    if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
     if(art.duell){
       for(let i=0;i<n;i++){
         const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
@@ -8568,6 +8607,194 @@
     }
   }
 
+  // ================== GEWICHTHEBEN: DER HEBER-RUNDENRECHNER ==================
+  // Gewichtheben-Plan Teil 4 bis 6, Schritt S1. Alle Zahlen PLATZHALTER, gegen den
+  // Korridor in 6.1 zu messen (Schritt S3).
+  //
+  // WARUM DAS EIN EIGENER RECHNER IST UND KEIN SIEBTER DURCHGANG. Bei jeder anderen
+  // Buehnen-Disziplin steht das Ergebnis eines Teilnehmers fuer sich fest, bevor der
+  // Auftritt beginnt. Beim Gewichtheben nicht: der dritte Versuch haengt davon ab, ob der
+  // Heber gerade hinten liegt. Genau das macht aus zwei Auftritten ein Duell — und es
+  // laesst sich nur rechnen, wenn beide Heber im selben Durchlauf stehen.
+  //
+  // WAS AUS DEM ECHTEN SPORT UEBERNOMMEN IST (Quellen im Plan, Teil 2):
+  //   * Zwei Uebungen, je drei Versuche. Zweikampf = bestes Reissen plus bestes Stossen.
+  //   * Die Last steigt nie. Nach einem Fehlversuch wird dieselbe Last wiederholt.
+  //   * Drei ungueltige Versuche in EINER Uebung sind die Nullwertung: der ganze
+  //     Zweikampf ist 0. Das ist die Haerte, die diesen Sport ausmacht.
+  //   * Gelingensquoten je Versuchsnummer (Sci Rep 2024, IWF-WM 2011-2023):
+  //     Reissen 85,9 / 78,9 / 58,7 %, Stossen 89,3 / 74,4 / 51,4 %.
+  //   * Reissen traegt rund 45 % des Zweikampfs.
+  //   * Gleichstand: es gewinnt, wer die Last mit WENIGER Versuchen erreicht hat (die
+  //     IWF-Regel seit 2017). Erst danach die Reihenfolge.
+  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.514]};
+  const HEBEN_ANTEIL_REISSEN=0.455;
+  // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
+  // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
+  // (ein Hobbyheber). Bewusst breiter als jede reale Klasse, weil unser Kader beides
+  // enthaelt: Lava Golem und Lulu stehen in derselben Liga.
+  const HEBEN_KG_BASIS=100, HEBEN_KG_PRO_LAST=3.8;
+  // DIE SLOT-ROLLE IST DIE VERSUCHSSTRATEGIE. Die sechs Rollen des Gewichtheben-Slots
+  // beschreiben schon Strategien, ohne dass es je jemand so gebaut hat: der Power Opener
+  // setzt solide an, der Pressure Lift geht aggressiv, der Final Attempt hebt sich das
+  // Wagnis fuer den dritten Versuch auf. Reale Referenz fuer die Spruenge: 5 kg bzw.
+  // 2 bis 5 kg (USAW) bei Lasten um 150 bis 200 kg, also rund 3 % und 1,5 bis 3 %. Unsere
+  // sind etwas groesser, damit sechs Rollen sichtbar verschieden heben.
+  const HEBEN_ROLLEN=[
+    {rolle:"Power Opener",   eroeffnung:0.92, sprung1:0.04, sprung2:0.03},
+    {rolle:"Safe Lift",      eroeffnung:0.94, sprung1:0.03, sprung2:0.02},
+    {rolle:"Pressure Lift",  eroeffnung:0.89, sprung1:0.06, sprung2:0.05},
+    {rolle:"Technical Lift", eroeffnung:0.91, sprung1:0.05, sprung2:0.04},
+    {rolle:"Grip Anchor",    eroeffnung:0.92, sprung1:0.04, sprung2:0.04},
+    {rolle:"Final Attempt",  eroeffnung:0.90, sprung1:0.04, sprung2:0.06}
+  ];
+  // Wie stark die Sub-Skills die Kurve biegen. Alle PLATZHALTER.
+  const HEBEN_TECHNIK_K=0.0020;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
+  const HEBEN_NERVEN_K=0.0030;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
+  const HEBEN_ANSAGE_EROEFFNUNG=0.00035; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
+  const HEBEN_ANSAGE_SPRUNG=0.006;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
+  const HEBEN_ERHOLUNG_K=0.0012;  // je Punkt ERHOLUNG ueber 50 auf das Stossen-Maximum
+  const HEBEN_WAGNIS_K=6.0;       // Malus je Anteil, den die Ansage ueber dem Tagesmax liegt
+  const HEBEN_WIEDERHOLUNG=0.06;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // GROESSE IST KEIN ATTRIBUT — sie steht in keiner Matrix, und einflussVon hebt sie
+  // nicht. Wuerde sie die Kilogramm im ERGEBNIS verschieben, waere sie ein verstecktes
+  // neuntes Gewicht, das keine Messung sieht. Sie verschiebt deshalb nur die ANZEIGE:
+  // gerechnet wird Sinclair-normiert, angezeigt wird durch den Koeffizienten der
+  // Koerpergewichts-Klasse geteilt. Groesse 1..10 auf 55..175,5 kg gelegt (geometrisch,
+  // damit die Mitte nicht auf 115 kg faellt), Koeffizienten der Fassung 2017-2020.
+  const HEBEN_SINCLAIR=[1.552,1.406,1.305,1.220,1.145,1.093,1.050,1.024,1.008,1.000];
+  const sinclairAnzeige=(kg,groesse)=>{
+    const g=Math.max(1,Math.min(10,Math.round(groesse||5)));
+    return Math.round(kg/HEBEN_SINCLAIR[g-1]);
+  };
+
+  function baueHebenDuelle(art,mine,gegner){
+    const n=Math.min(mine.length,gegner.length);
+    const paar=[];
+    for(let i=0;i<n;i++){
+      const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
+      const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+      if(!a||!b)continue;
+      // PAARUNG UEBER DEN SLOT, nicht ueber die Punktzahl: mein Power Opener gegen ihren
+      // Power Opener. Beide Seiten bekommen ihre Rollen in derselben Listenreihenfolge
+      // (slotsVon), der Index ist damit die Rolle. Ein bewusst schwach besetzter Slot ist
+      // dadurch ein Zug und kein Unfall.
+      const plan=HEBEN_ROLLEN[i%HEBEN_ROLLEN.length];
+      a.rolle=plan.rolle; b.rolle=plan.rolle; a.duellNr=i; b.duellNr=i;
+      a.gegnerN=b.n; b.gegnerN=a.n;
+      paar.push([a,b,plan]);
+    }
+    for(const [a,b,plan] of paar){
+      for(const u of [a,b]){
+        u.runden=[]; u.summe=0; u.aktuell=-1;
+        u.tagesmax=HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST;
+        u.maxReissen=u.tagesmax*HEBEN_ANTEIL_REISSEN;
+        // Wer schlecht erholt, hat im Stossen weniger uebrig. 0,94 bei ERHOLUNG 50.
+        u.maxStossen=u.tagesmax*(1-HEBEN_ANTEIL_REISSEN)
+                     *(0.94+(u.ERHOLUNG-50)*HEBEN_ERHOLUNG_K);
+        u.besteReissen=0; u.besteStossen=0; u.versucheBis=0; u.nullwertung=false;
+      }
+      hebeUebung(a,b,plan,"reissen");
+      hebeUebung(a,b,plan,"stossen");
+      for(const u of [a,b]){
+        u.nullwertung=(u.besteReissen<=0||u.besteStossen<=0);
+        u.zweikampf=u.nullwertung?0:Math.round(u.besteReissen+u.besteStossen);
+        // `summe` ist die Zahl, die MOTOREN[...].wert() liest — also die Rangtreue misst.
+        // Bewusst die EIGENEN Kilogramm und nicht die Differenz zum Gegner: ein Heber, der
+        // an einem starken Slot 380 kg hebt, hat 380 kg gehoben, auch wenn er verliert.
+        // Der Gegnerbezug steckt im Duellstand, nicht im Spielerwert.
+        u.summe=u.zweikampf;
+        u.anzeigeKg=sinclairAnzeige(u.zweikampf,u.groesse);
+      }
+      // DUELLENTSCHEID. Gleicher Zweikampf: es gewinnt, wer weniger Versuche gebraucht hat
+      // (IWF seit 2017). Auch gleich: die Reihenfolge, also A. Ein halber Punkt ist damit
+      // praktisch ausgeschlossen — anders als bei Speed-Schach gibt es hier kein Remis.
+      let sieger=null;
+      if(a.zweikampf!==b.zweikampf)sieger=a.zweikampf>b.zweikampf?a:b;
+      else if(a.zweikampf>0)sieger=a.versucheBis<=b.versucheBis?a:b;
+      a.duellGewonnen=sieger===a; b.duellGewonnen=sieger===b;
+      a.vorteil=a.zweikampf-b.zweikampf; b.vorteil=-a.vorteil;
+    }
+    // WARTESCHLANGE: Duell fuer Duell, zwei auf der Buehne (Chris' Bild). Innerhalb einer
+    // Uebung hebt, wer die leichtere Last angesagt hat — die reale Regel, und sie macht
+    // das Bild ehrlich: der Schwaechere eroeffnet, der Staerkere wartet.
+    buehneQueue=[];
+    for(const [a,b] of paar){
+      for(let v=0;v<art.rundenN;v++){
+        const ra=a.runden[v], rb=b.runden[v];
+        const zuerst=(ra&&rb&&rb.kg<ra.kg)?[b,a]:[a,b];
+        for(const u of zuerst)if(u.runden[v])buehneQueue.push(u);
+      }
+    }
+  }
+
+  // Eine Uebung (Reissen oder Stossen) fuer ein Duellpaar, Versuch fuer Versuch im
+  // Wechsel. Beide Heber im selben Durchlauf, weil der dritte Versuch auf den Stand des
+  // Gegners reagiert.
+  function hebeUebung(a,b,plan,uebung){
+    const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
+    const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
+    const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
+    const ansage={};
+    for(const u of [a,b]){
+      const anteil=plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG;
+      ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
+      u.letzteLast=0;
+    }
+    for(let v=0;v<3;v++){
+      for(const u of [a,b]){
+        const gegner=u===a?b:a;
+        let kg=ansage[u.id];
+        // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
+        // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
+        // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
+        // Wechselspiel. Ob er es schafft, entscheiden LAST (wie weit ueber seinem Maximum
+        // die Ansage liegt) und NERVEN.
+        // ...aber nur, wenn es ueberhaupt in Reichweite ist. Ohne den Deckel sprang ein
+        // Heber, der gegen einen viel staerkeren Gegner antrat, weit ueber sein
+        // Tagesmaximum und riss fast sicher — gemessen fiel die Gelingensquote im dritten
+        // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
+        // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
+        // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
+        if(v===2&&beste(gegner)>beste(u)){
+          const ziel=Math.round(beste(gegner))+1;
+          if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
+        }
+        // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
+        kg=Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
+        const ueber=Math.max(0,kg/Math.max(1,max(u))-1);
+        const p=Math.max(0.05,Math.min(0.97,
+          HEBEN_BASIS[uebung][v]
+          +(u.TECHNIK-50)*HEBEN_TECHNIK_K
+          +(v===2?(u.NERVEN-50)*HEBEN_NERVEN_K:0)
+          // WIEDERHOLUNG IST LEICHTER ALS EINE NEUE ANSAGE. Die Quoten aus der Studie
+          // gelten fuer den PLANMAESSIGEN Versuchsaufbau; ein wiederholtes Gewicht ist
+          // dagegen eine Last, die der Heber schon einmal angegriffen hat und die unter
+          // seinem urspruenglichen Plan liegt. Ohne diesen Zuschlag lagen die
+          // Nullwertungen bei 4,4 % (Ziel hoechstens 3): wer einmal riss, riss meist
+          // wieder, weil dieselbe Zahl mit derselben Wahrscheinlichkeit gewuerfelt wurde.
+          +(kg<=u.letzteLast?HEBEN_WIEDERHOLUNG:0)
+          -ueber*HEBEN_WAGNIS_K));
+        u.letzteLast=kg;
+        const gueltig=rr()<p;
+        if(gueltig){
+          setzeBeste(u,kg);
+          u.versucheBis+=v+1;
+          // Naechste Ansage: geplanter Sprung, groesser bei hoher ANSAGE.
+          const sprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          ansage[u.id]=Math.max(kg+1,Math.round(kg*(1+sprung)));
+        } else {
+          // Fehlversuch: dieselbe Last noch einmal, wie im echten Wettkampf.
+          ansage[u.id]=kg;
+        }
+        u.runden.push({kg, gueltig, uebung, versuch:v+1,
+          punkte:gueltig?kg:0,
+          ereignis:(uebung==="reissen"?"Reissen":"Stossen")+", "+(v+1)+". Versuch, "+kg+" kg — "
+                   +(gueltig?"gueltig":"ungueltig")});
+      }
+    }
+  }
+
   function stepBuehne(dt){
     if(done)return;
     buehneT+=dt;
@@ -8577,12 +8804,30 @@
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
-      u.summe+=r.punkte;
+      // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
+      // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
+      // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
+      // der dreimal dasselbe leichte Gewicht hebt.
+      if(!BB().heben)u.summe+=r.punkte;
       u.lunge=0.5;
-      schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
+      if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
+        crit:r.gueltig&&r.versuch===3,_def:!r.gueltig,_teilnehmer:u.id});
+      else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
       // DUELL: statt "X Punkte" die laufende Vorteils-Anzeige — dieselbe Zahl, die auch
       // fuer wert() zaehlt, damit Anzeige und Messung nie auseinanderlaufen.
-      if(BB().duell&&u.verlauf){
+      if(BB().heben){
+        // Der Ticker liest sich wie ein Wettkampf: "Reissen, 2. Versuch, 152 kg —
+        // gueltig". Die angezeigten Kilogramm sind die groessennormierten (s.
+        // sinclairAnzeige) — ein Zwerg hebt weniger Kilo und trotzdem relativ genauso
+        // viel. Entschieden wird auf den normierten, angezeigt auf den echten.
+        const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
+        feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
+          +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")
+          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".");
+        if(u.aktuell+1>=BB().rundenN)
+          feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
+            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".");
+      } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v+" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").");
@@ -8601,7 +8846,9 @@
     // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
     // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd)sd.textContent=BB().duell
+    if(sd)sd.textContent=BB().heben
+      ? "Reißen und Stoßen, je drei Versuche — Duell um Duell"
+      : BB().duell
       ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
@@ -8618,7 +8865,14 @@
     document.getElementById("aliveR").textContent=String(fertig(1));
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
     // rohe Punktesumme — genau wie beim Schach-Mannschaftskampf, den es nachbildet.
-    if(BB().duell){
+    if(BB().heben){
+      // Der Punktestand zaehlt GEWONNENE DUELLE, wie Chris es wollte — bei sechs Slots
+      // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
+      // Gesamt-Kilogramm beider Mannschaften (der Tiebreak aus Plan 3.5), damit die
+      // Tabelle nicht an jedem dritten Spieltag ein Remis bekommt.
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.duellGewonnen).length;
+      document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
+    } else if(BB().duell){
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.vorteil>0).length;
       document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
     } else {
@@ -14806,7 +15060,17 @@
     const wert=M.wert(), namen=M.namen();
     const protokoll=istFeldspiel(dId)?fsZuege
       :istBahn(dId)?rennFertig
-      :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,summe:u.summe,runden:u.runden}))
+      :istBuehne(dId)?TEILNEHMER.map(u=>BUEHNE_ART[dId]&&BUEHNE_ART[dId].heben
+        // Gewichtheben braucht mehr im Protokoll, weil die Abnahme mehr fragt: die
+        // Eignung (fuer die Rangtreue), die Rolle (fuer die Archetypen), den Zweikampf
+        // und die Nullwertung (fuer den Korridor). Die anderen sechs Buehnen behalten
+        // ihre vier Felder unveraendert — nachgeprueft, das Protokoll ist bei den Saaten
+        // 1337, 4242 und 99991 zeichengleich.
+        ?({n:u.n,seite:u.side,summe:u.summe,runden:u.runden,eig:u.eig,rolle:u.rolle,
+           zweikampf:u.zweikampf,nullwertung:u.nullwertung,duellGewonnen:u.duellGewonnen,
+           anzeigeKg:u.anzeigeKg,groesse:u.groesse,duellNr:u.duellNr,
+           LAST:u.LAST,TECHNIK:u.TECHNIK,NERVEN:u.NERVEN,ANSAGE:u.ANSAGE,ERHOLUNG:u.ERHOLUNG})
+        :({n:u.n,seite:u.side,summe:u.summe,runden:u.runden}))
       :null;
     const punkte=istFeldspiel(dId)?[fsPunkte[0],fsPunkte[1]]:null;
     if(!o.zustandBehalten)M.zurueck(gesichert);
