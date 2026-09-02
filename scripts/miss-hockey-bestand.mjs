@@ -25,11 +25,19 @@
 //                          mitgefahren, damit ein Lauf alles auf einmal liefert.
 //
 // WAS ES BEWUSST NICHT MISST: Rangtreue (Spearman-rho), Rebound-Achsen, offen/bedraengt.
-// Dafuer gibt es fuer Hockey heute keinen Zugang — window.__arena.basketballProbe
-// (engine.js:13375) ist hart auf MOTOREN.basketball/FELDSPIEL_ART.basketball verdrahtet
-// und liest ausserdem Felder, die NUR die Live-Engine schreibt (fsLive.amBall, u.deckt,
-// e.tier, e.deckerAbstandBeiWurf, e.offensiv). Der Vorab-Durchlauf erzeugt keines davon.
-// Das ist ein Befund, kein Versaeumnis dieses Skripts — s. Plan, Teil D.
+//
+// STAND DIESES KOMMENTARS BEI DER BESTANDSAUFNAHME: dafuer gab es fuer Hockey keinen
+// Zugang — window.__arena.basketballProbe war hart auf MOTOREN.basketball/
+// FELDSPIEL_ART.basketball verdrahtet. Das war ein Befund, kein Versaeumnis dieses
+// Skripts, und es wurde im Plan zu PR 0 gemacht (Teil D bzw. H.8).
+//
+// INZWISCHEN ERLEDIGT: die Sonde heisst window.__arena.feldspielProbe(dId, opt) und
+// laeuft fuer jede Feldspiel-Disziplin; die Rangtreue fuer Hockey holt man mit
+//     node scripts/miss-feldspiel-rangtreue.mjs hockey 24 6
+// Was der Vorab-Durchlauf nach wie vor NICHT erzeugt (fsLive.amBall, u.deckt, e.tier,
+// e.deckerAbstandBeiWurf), meldet die Sonde jetzt als `fehlend`-Liste, statt Nullen
+// auszugeben, die wie Messwerte aussehen. Die beiden Rollenproben V und S bleiben
+// deshalb bis zur Live-Migration (PR 3b) leer — die Rangtreue selbst nicht.
 //
 // Aufruf (aus dem Repo-Wurzelverzeichnis):
 //   node scripts/miss-hockey-bestand.mjs [disziplin] [laeufe] [pfad-zur-html]
