@@ -4722,7 +4722,7 @@
   // PLATZHALTER und gegen die Torzahl gemessen (scripts/miss-hockey-korridor.mjs), nicht
   // geraten — aber sie sitzt auf Basketballs Wurfformel, nicht auf einer eigenen. Die
   // eigene Erfolgsformel und das Zonenmodell kommen in Schritt 4 des Hockey-Plans.
-  const HK_TOR_SKALA=0.465;
+  const HK_TOR_SKALA=0.700;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
