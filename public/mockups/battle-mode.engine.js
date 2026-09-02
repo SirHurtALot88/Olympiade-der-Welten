@@ -4057,6 +4057,7 @@
     if(erzwingen||zumKorb<FERN_RADIUS_MAX)return "fern";
     return null; // ausserhalb jeder Reichweite fuer einen ungezwungenen Wurf
   }
+  const STEAL_TRAUBE=0.06;         // Abzug auf die Ballsicherheit je Decker ueber den ersten hinaus (nur in Unterzahl wirksam)
   const STEAL_REICHWEITE=45;        // wie nah ein Decker sein muss, um es auf einen Steal ankommen zu lassen
   const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
@@ -4635,8 +4636,61 @@
     // Der Torwart nimmt an der Angriffsformation nicht teil — er steht im Tor. Ohne diese
     // Zeile bekaeme er einen Feldslot und wuerde von bewegeSpielerLive dorthin gezogen.
     const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
+    // UNTERZAHL BEKOMMT NICHT DIE BESTEN PLAETZE.
+    //
+    // Chris' Fund: „wenn ich 6x50er spieler einsetze haette ich 300 Punkte, selbst ein
+    // 80er star alleine hat doch dann absolut keine Chance!" Gemessen war es umgekehrt —
+    // ein einzelner Spieler holte 54,1 Punkte, drei zusammen nur 20,3.
+    //
+    // Eine der beiden Ursachen sass hier. `slotIdx=i` vergibt die Plaetze der Reihe nach,
+    // und beide Formationen sind nach Tornaehe sortiert (Basketball: Radius 60, 130, 150,
+    // 150, 145, 145). Eine Mannschaft mit zwei Spielern bekam also die zwei
+    // TORNAECHSTEN Plaetze, waehrend eine volle Besetzung Leute auf die Fluegel stellen
+    // muss. Nachgemessen fielen bei zwei Spielern 51 % der Wuerfe in die Naehkategorien
+    // (dunk+nah) gegen 32 % bei sechs — Unterzahl kaufte sich bessere Wurfpositionen.
+    //
+    // Jetzt bekommt jede Unterzahl-Groesse eine EIGENE, symmetrische Auswahl aus der
+    // Formation statt der ersten k Plaetze.
+    //
+    // ERSTER ANLAUF WAR EINE FORMEL, und der Overseer hat sie zu Recht zerlegt:
+    // `Math.round(i*(laenge-1)/(anz-1))` verteilt zwar, aber nicht symmetrisch. Sie setzte
+    // einen Einzelspieler auf Slot 3 (rechter Fluegel auf Dreier-Distanz, nicht "die Mitte
+    // der Formation", wie der Kommentar hier behauptete) und drei Spieler auf 0/3/5 —
+    // zwei davon auf DERSELBEN Seite, die andere Haelfte des Feldes leer. Genau der
+    // Klumpen, vor dem der SLOTS-Kommentar oben warnt.
+    //
+    // Die Tabellen unten lesen sich stattdessen direkt aus der Geometrie. Jede Zeile ist
+    // entweder ein zentraler Platz oder ein vollstaendiges spiegelbildliches Paar.
+    //   Basketball: 0 am Korb, 1 zentral am Kreis, 2/3 Fluegelpaar, 4/5 Eckenpaar. Nur bei
+    //     fuenf Spielern geht die Symmetrie nicht auf, weil sich sechs Plaetze nicht in
+    //     fuenf gleiche Teile zerlegen lassen; dort faellt eine Ecke weg.
+    //     Mittlerer Radius je Zeile (voll: 130): 1 -> 130, 2 -> 150, 3 -> 143, 4 -> 122,
+    //     5 -> 127.
+    //   Eishockey: 0 Netfront, 1/2 Half-Wall-Paar, 3/4 Point-Paar, 5 hoher Slot (zentral).
+    //     Mittlerer Radius je Zeile (voll, fuenf Feldspieler: 200): 1 -> 215, 2 -> 165,
+    //     3 -> 182, 4 -> 230. Keine Groesse kauft sich damit die tornahen Plaetze.
+    const UNTERZAHL_PLAETZE=istHockey()
+      ? {1:[5], 2:[1,2], 3:[5,1,2], 4:[1,2,3,4]}
+      : {1:[1], 2:[2,3], 3:[1,2,3], 4:[0,1,2,3], 5:[0,1,2,3,4]};
+    // GEGATET AUF DIE NOMINELLE FELDGROESSE, nicht auf die Laenge der Formationstabelle
+    // (Overseer-Fund): `jeSeite` ist nicht immer 6 — die Sonde faehrt ausdruecklich auch
+    // 2v2 und 4v4, und `feldspielProbe` ueberschreibt dafuer `art.jeSeite`. Gegen die
+    // Tabellenlaenge geprueft haette ein VOLLES 4v4 als Unterzahl gegolten und andere
+    // Plaetze bekommen als bisher — nachgemessen wichen 4v4 und 2v2 dadurch von main ab,
+    // obwohl niemand in Unterzahl war.
+    //
+    // Im Eishockey zaehlt der Torwart NICHT mit: bei sechs Aufgestellten stehen fuenf im
+    // Feld, und das IST die volle Besetzung. Ohne diesen Abzug haette jede vollstaendige
+    // Hockey-Mannschaft als Unterzahl gegolten.
     const form=FORMATION();
-    sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(form.length-1,i); u.slotSeit=0; });
+    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>u.torwart);
+    const soll=Math.max(1,(FB().jeSeite||form.length)-(torwartDa?1:0));
+    const plaetze=sortiert.length<soll?UNTERZAHL_PLAETZE[sortiert.length]:null;
+    sortiert.forEach((u,i)=>{
+      u.slotIdx = plaetze?plaetze[Math.min(plaetze.length-1,i)]
+                : Math.min(form.length-1,i);
+      u.slotSeit=0;
+    });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
     // sitzen aber immer beim Team, das den Ball gerade VERLOR. Ohne Raeumen lief ein
     // Verteidiger bis zu 1,5s weiter zu seinem alten Blockpunkt bzw. Richtung GEGNERischem
@@ -4850,6 +4904,30 @@
         let naechster=null,minD=Infinity;
         for(const a of frei){ const d=dist(v,a); if(d<minD){minD=d;naechster=a;} }
         if(naechster){ v.deckt=naechster; frei.splice(frei.indexOf(naechster),1); }
+        // UEBERZAHL DECKT DOPPELT, statt danebenzustehen.
+        //
+        // Die zweite Ursache von Chris' Fund. Ist `frei` leer, blieb ein Verteidiger
+        // bisher ohne Mann — bei sechs gegen zwei standen also VIER Verteidiger
+        // unbeschaeftigt herum, waehrend die zwei Angreifer frei warfen. Genau deshalb
+        // holte ein Einzelspieler mehr Punkte als drei.
+        //
+        // Jetzt nimmt ein ueberzaehliger Verteidiger den naechstgelegenen Angreifer,
+        // obwohl der schon gedeckt ist. Ein eigener Doppel-Mechanismus ist dafuer nicht
+        // noetig: `gedoppelt` in entscheideBallaktion zaehlt die Verteidiger im
+        // BEDRAENGT_RADIUS, nicht die Zuteilung — wer zugeteilt ist, laeuft hin
+        // (bewegeSpielerLive folgt `u.deckt`) und wird dort automatisch als zweiter
+        // Decker gezaehlt, mit dem bestehenden doppelMalus.
+        //
+        // AUSDRUECKLICH NUR BEI ECHTER UEBERZAHL. Ohne diese Bedingung wuerde die Regel
+        // auch bei voller Besetzung greifen: `frei` kann dort leer sein, wenn andere
+        // Verteidiger ihren Mann behalten (voll=false), und ein neu bewertender
+        // Verteidiger wuerde dann grundlos doppeln. Mit der Bedingung ist das Verhalten
+        // bei gleicher Spielerzahl zeichenweise das alte.
+        else if(verteidiger.length>angreifer.length&&angreifer.length>0){
+          let ziel=null,zd=Infinity;
+          for(const a of angreifer){ const d=dist(v,a); if(d<zd){zd=d;ziel=a;} }
+          v.deckt=ziel;
+        }
         // MISMATCH (s. Konstantenblock BEWEGUNGS-DYNAMIK oben): zwei Abstaende zwischen
         // dem EINEN Verteidigungswert der Disziplin (ABWEHR) und dem, was der zugeteilte
         // Angreifer mitbringt — auf 0..1 normiert, bei Gleichstand oder Ueberlegenheit
@@ -5950,8 +6028,21 @@
     // damit mehr Versuche bekommt. Die Zahl der Gelegenheiten haengt an der Aufstellung, die
     // Chance je Gelegenheit an ABWEHR; wenn ein Verteidiger sich gegen die Aufstellung
     // durchsetzen soll, muss der zweite Hebel schwerer wiegen.
+    // TRAUBE: wie viele Gegner diesen Ballfuehrer decken. Bei gleicher Spielerzahl ist das
+    // immer genau einer (nachgemessen ueber 60.000 Ticks: 1,00) — der Abzug unten ist dann
+    // exakt 0 und die Formel zeichenweise die alte. In Unterzahl steht die Zahl hoeher.
+    const traube=FSTEAM[1-traeger.side].filter(v=>v.deckt===traeger).length;
+    // Die Ballsicherheit las bisher NUR die Paarung Ballfuehrer/Decker — wie viele Gegner
+    // am Mann kleben, ging nicht ein. Sechs Verteidiger erzeugten zwar sechsmal so viele
+    // Versuche, aber jeder einzelne war so aussichtslos wie gegen einen. Gemessen: ein
+    // allein angetretener Spieler bekam 379 Steal-Versuche je Spiel und verlor den Ball
+    // trotzdem nur 9,4-mal, weil `basis` bei seinen Werten am Deckel 0,94 klebte (Chance
+    // je Versuch 2,0 %). Er warf deshalb 31-mal — mehr als eine Zweierbesetzung (19,7) —
+    // und kam damit auf mehr Punkte als sie. Jeder Decker ueber den ersten hinaus senkt
+    // die Ballsicherheit jetzt um STEAL_TRAUBE.
     const basis=Math.min(0.94,Math.max(0.20,
-      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0050+traeger.TEAMGEIST*0.0060));
+      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0050+traeger.TEAMGEIST*0.0060
+      -(traube-1)*STEAL_TRAUBE));
     const proVersuch=1-Math.pow(basis,1/3);
     decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
     // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
@@ -6943,12 +7034,30 @@
         // waere hier sofort als falsche Sportart zu erkennen.
         const dribbelDip=istHockey()?0:Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
         fsBall={sichtbar:true,x:traeger.x,y:traeger.y+(istHockey()?26:18)+dribbelDip,traegerId:traeger.id};
-        const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
+        // ALLE Decker des Ballfuehrers duerfen es versuchen, nicht nur der erste.
+        //
+        // Hier stand `find(v=>v.deckt===traeger)` — genau EIN Verteidiger, egal wie viele
+        // den Mann tatsaechlich decken. Bei gleicher Spielerzahl ist das dasselbe (jeder
+        // Angreifer hat genau einen Decker), in Ueberzahl aber nicht: seit die
+        // ueberzaehligen Verteidiger zugeteilt werden (s. zuordneDeckung), stehen bei
+        // sechs gegen einen alle sechs am Ballfuehrer — und trotzdem versuchte nur einer
+        // einen Steal. Gemessen fielen die Ballverluste eines Einzelspielers dadurch auf
+        // 1,1 je Spiel gegen 20,8 bei voller Besetzung: wer allein antritt, kann nicht
+        // angespielt und deshalb auch nicht abgefangen werden, und der einzige verbliebene
+        // Verlustweg war lahmgelegt.
+        //
+        // `decker` bleibt fuer die ANZEIGE der erste (fsAktuell zeigt einen Gegenspieler,
+        // nicht sechs); der Steal-Versuch laeuft jetzt ueber alle, jeder mit eigener
+        // Abklingzeit und eigener Reichweitenpruefung. Bei gleicher Spielerzahl ist das
+        // zeichenweise das alte Verhalten.
+        const deckerAlle=FSTEAM[1-traeger.side].filter(v=>v.deckt===traeger);
+        const decker=deckerAlle[0]||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>((LIVE()||{}).schussuhr||SCHUSSUHR_BASKETBALL);
         if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
-        if(fsLive.ball.traeger===traeger&&decker&&decker.stealCd<=0&&dist(decker,traeger)<STEAL_REICHWEITE){
-          versucheSteal(decker,traeger,art);
+        for(const v of deckerAlle){
+          if(fsLive.ball.traeger!==traeger)break;
+          if(v.stealCd<=0&&dist(v,traeger)<STEAL_REICHWEITE)versucheSteal(v,traeger,art);
         }
       }
     }
