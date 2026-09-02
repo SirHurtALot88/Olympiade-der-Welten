@@ -3705,7 +3705,26 @@
     football:{
       // MATRIX: spirit 25, torment 16, health 14, awareness 11, will 10,
       // determination 8, power 6, stamina 6, charisma 4.
-      label:"Football", jeSeite:6, zuegeJeSeite:8, zugDauer:60/(8*2*2),
+      // EREIGNISDICHTE ANGEHOBEN, 8 auf 24 Zuege je Seite. Mit acht kamen auf zwoelf
+      // Spieler ganze 16 Ereignisse je Spiel, also gut EINES je Spieler — und an einem
+      // Ereignis je Spieler laesst sich nichts messen. Nachgemessen war der ganze
+      // Boxscore flach: 0 bis 0,4 Fumble-Recoveries, 0,1 bis 0,9 Vorlagen, und der
+      // Spieler mit der NIEDRIGSTEN Eignung (46) erzielte die meisten Punkte. Die
+      // Rangtreue lag bei rho 0,183 — praktisch Rauschen. Real hat ein Footballspiel rund
+      // 130 Spielzuege; 48 sind immer noch eine starke Abstraktion, aber messbar.
+      //
+      // zugDauer steht jetzt fest bei 1,25 s statt an der Zugzahl zu haengen (die alte
+      // Formel 60/(n*2*2) hielt das Spiel stur bei 30 s und haette 48 Zuege zu einem
+      // halbsekuendigen Stakkato gemacht, das niemand mitlesen kann). Das Spiel dauert
+      // damit 60 s.
+      //
+      // DAS IST NICHT DIE LOESUNG, NUR DIE HAELFTE DAVON. Mit der Dichte stieg rho auf
+      // 0,254 je Spiel und 0,559 ueber die Saison. Die Saisonzahl ist der Deckel, und sie
+      // sagt: die VORAB-Mechanik belohnt nicht, was die Eignung misst. Football gehoert
+      // wie Hockey auf den Live-Motor (FELDSPIEL_ART[...].live) — ein Rezept, das gegen
+      // die Vorab-Mechanik eingemessen wird, ist nach der Migration wertlos. Genau dieser
+      // Befund steht schon einmal im Hockey-Block von battle-mode.rezepte.js.
+      label:"Football", jeSeite:6, zuegeJeSeite:24, zugDauer:1.25,
       punkteNah:6, punkteFern:3, fernAnteil:0.30,
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
       rezept:{
