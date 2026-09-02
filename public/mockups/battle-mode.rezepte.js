@@ -386,5 +386,43 @@ window.__ARENA_REZEPTE = {
     // Live-Engine nichts mehr auszahlt (s. dortiger Kommentar) — es las in mehreren
     // Fassungen 0,1-0,3 % bei Vorgabe 6. Mit 32 liest es 9,6 %.
     LAUFTEMPO:   {speed:52,stamina:32,dexterity:16}
+  },
+  // ===============================================================================
+  // HOCKEY — zweite ausgelagerte Disziplin (Hockey-Plan PR 1, Teil H.8).
+  //
+  // Zeichengleich aus FELDSPIEL_ART.hockey uebernommen, KEINE Zahl geaendert. Abnahme
+  // war das Ereignisprotokoll von window.__arena.spiele("hockey", saat) fuer die Saaten
+  // 1337, 4242 und 99991 — vorher wie nachher byte-identisch, dasselbe Verfahren, mit
+  // dem #726 den Basketball-Umzug belegt hat.
+  //
+  // WAS MAN BEIM NAECHSTEN ANFASSEN WISSEN MUSS. Hockey faehrt heute NICHT den
+  // Live-Motor, sondern den Vorab-Pfad: bauFeldspiel rechnet das Ergebnis in einer
+  // Schleife durch, es gibt keine Manndeckung, keine Zonen und keine Standphasen. Die
+  // sieben Sub-Skills unten sind deshalb Basketballs alte Sieben, nicht hockeyeigene.
+  // Gemessen (scripts/miss-hockey-bestand.mjs) tragen sie mechanisch sehr ungleich:
+  // ABWEHR 33,5 % gegen ZWEITCHANCE 1,4 %, und stamina hat mit AUSDAUER als einziger
+  // Heimat 1,6 % verfuegbar bei Matrixvorgabe 10. Die Pp-Abweichung liegt bei 48,1
+  // (n=48), die Rangtreue bei rho 0,493 (n=24, jeSeite 6, seit PR #732 messbar).
+  //
+  // AN DIESEN ZAHLEN JETZT ZU DREHEN LOHNT NICHT — und das ist ein Befund, keine
+  // Bequemlichkeit: ein Kandidatenrezept, das 48,1 auf 14,2 Pp druecken wuerde, ist
+  // gemessen und BEWUSST NICHT eingebaut, weil seine Gewichte fuer die Vorab-Mechanik
+  // gelten und nach der Live-Migration (Plan H.8, PR 3b) wertlos waeren. Reihenfolge
+  // schlaegt Rezeptqualitaet. Das eigene Sub-Skill-Set kommt in PR 4, zusammen mit
+  // Zonenmodell, Erfolgsformel und Impact-Formel — in genau dieser Reihenfolge, weil
+  // jede davon die Sondierungsgewichte verschiebt (Plan H.5).
+  // ===============================================================================
+  hockey:{
+    AUFBAU:      {awareness:35,speed:35,power:30},
+    ABSCHLUSS:   {power:40,torment:30,dexterity:30},
+    TECHNIK:     {dexterity:40,awareness:35,determination:25},
+    ZWEITCHANCE: {power:40,health:35,torment:25},
+    ABWEHR:      {health:40,power:35,speed:25},
+    // Nachgezogen: Determination hat in der Hockey-Matrix nur Gewicht 4, sass aber
+    // mit 45 in Teamgeist (individuell, starker Koeffizient) und las 24,8 %. Ersetzt
+    // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
+    // nicht Entschlossenheit.
+    TEAMGEIST:   {spirit:60,torment:40},
+    AUSDAUER:    {stamina:50,health:30,will:20}
   }
 };

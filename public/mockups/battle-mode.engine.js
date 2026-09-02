@@ -3456,19 +3456,12 @@
       label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
       punkteNah:1, punkteFern:1, fernAnteil:0,
       wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
-      rezept:{
-        AUFBAU:      {awareness:35,speed:35,power:30},
-        ABSCHLUSS:   {power:40,torment:30,dexterity:30},
-        TECHNIK:     {dexterity:40,awareness:35,determination:25},
-        ZWEITCHANCE: {power:40,health:35,torment:25},
-        ABWEHR:      {health:40,power:35,speed:25},
-        // Nachgezogen: Determination hat in der Hockey-Matrix nur Gewicht 4, sass aber
-        // mit 45 in Teamgeist (individuell, starker Koeffizient) und las 24,8 %. Ersetzt
-        // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
-        // nicht Entschlossenheit.
-        TEAMGEIST:   {spirit:60,torment:40},
-        AUSDAUER:    {stamina:50,health:30,will:20}
-      }
+      // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Hockey-Plan PR 1,
+      // Fortsetzung von #726, s. rezeptAus() weiter oben). Dort steht es zeichengleich
+      // weiter, mitsamt dem Nachzieh-Kommentar zu TEAMGEIST. Zweite ausgelagerte
+      // Disziplin nach Basketball und deshalb wie diese ohne eigenes `rezept:`-Feld;
+      // die uebrigen 18 fuehren ihres weiter hier und werden Stueck fuer Stueck
+      // nachgezogen.
     },
     tennis:{
       // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
