@@ -241,6 +241,78 @@
     cctx.beginPath();cctx.arc(cx-w/2+2*s,cy+h/2+3.6*s,Math.max(0.8,1.1*s),0,Math.PI*2);cctx.fill();
   }
 
+  // HOCKEYSCHLAEGER (02.09., Chris: "Hockeyschlaeger in die Haende der Figuren"). Reine
+  // Zeichenfunktion, dieselbe Idee wie zeichneKameraKopf/zeichneReiherMech oben: kein
+  // Sprite-Layer, sondern Formen aus Canvas-Befehlen, aus denselben zwei Gruenden — kein
+  // CC0-Requisitenblatt trifft "duenner Schaft + abgewinkelte Kelle" in vier Blickrichtungen
+  // UND vier Haltungen zugleich, und ein prozedural gezeichnetes Requisit bleibt scharfkantig
+  // ohne Weichzeichnung, wie es imageSmoothingEnabled=false verlangt. WIRD IN DIESEM PR NICHT
+  // VERDRAHTET — keine Figur bekommt hier einen Schlaeger in die Hand, das macht ein anderer
+  // Agent in einem eigenen Schritt (s. PR-Beschreibung).
+  //
+  // Winkel werden "von der Senkrechten" gemessen (0 = schnurgerade nach unten), nicht "von
+  // der Waagerechten" — sin() liefert dann den seitlichen Versatz, cos() den nach unten. Der
+  // Vorteil: ein Vorzeichenwechsel bei "blick" spiegelt Schaft UND Kelle in einem Rutsch
+  // richtig, weil sin() ungerade und cos() gerade ist (sin(blick*a)=blick*sin(a) faellt
+  // exakt auf die andere Seite, cos(blick*a)=cos(a) bleibt gleich hoch) — kein zweiter
+  // Formelsatz fuer die Spiegelseite noetig, wie schon bei zeichneReiherMechs Schnabel.
+  const HOCKEY_PHASEN={
+    // schaftA/kelleA: Winkel ab der Senkrechten (s.o.) bei Blick nach RECHTS (blick=+1) —
+    // Linksblick spiegelt sich daraus automatisch, Front/Ruecken (kein echter Blick
+    // vorhanden) nutzt dieselbe Tabelle mit einer festen Standardseite.
+    // schaftL: Laenge Hand->Kellenferse. Bei halten absichtlich so bemessen, dass die
+    // Kelle auf einer 64px-Figur (Fuesse auf y+18..19, s. Kommentar bei "Massstab 1" oben)
+    // mit einer realistisch gegriffenen Hand (~24-28 Einheiten ueber dem Eis) GENAU auf dem
+    // Eis aufsetzt statt in der Luft zu haengen — Chris' Vorgabe, "Schlaeger halten" statt
+    // "Stock halten".
+    halten:  {schaftA:0.16, schaftL:26, kelleA:1.62},
+    // Kelle deutlich vom Eis abgehoben (kelleA jenseits von PI/2 -> cos wird negativ,
+    // die Kelle wandert nach OBEN statt weiter nach unten) UND der Schaft weit zur Seite
+    // gezogen — ein Ausholschwung reisst die Kelle sichtbar hoch und nach hinten.
+    ausholen:{schaftA:-0.85,schaftL:27, kelleA:-1.9},
+    // Durchzug: Schaft nach VORN (gleiches Vorzeichen wie blick) statt nach hinten, Kelle
+    // fegt knapp ueber Eishoehe durch statt hoch in der Luft zu bleiben.
+    schuss:  {schaftA:0.68, schaftL:29, kelleA:1.75}
+  };
+  // x/y IST DIE HAND — kommt von aussen (ein zweiter Agent misst sie am Sprite), diese
+  // Funktion kennt die Hand selbst nicht und muss sie auch nicht kennen: Schaft und Kelle
+  // haengen als reine Vektorkette an genau diesem einen Punkt.
+  // richtung: 0 hinten, 1 links, 2 vorn, 3 rechts — dieselbe Zaehlung wie blickAus(). Im
+  // Profil (1/3) zeigt die Kelle seitlich vom Koerper weg; in Front/Ruecken (0/2) ist sie
+  // per Definition stark verkuerzt (man blickt fast die Schmalseite an) und bekommt deshalb
+  // einen kurzen Stummel statt der vollen Laenge — keine Vereinfachung, sondern dieselbe
+  // Perspektive, die auch ein echter Schlaeger von vorne zeigen wuerde.
+  // phase: "halten"/"ausholen"/"schuss" (s. HOCKEY_PHASEN); eine unbekannte Phase faellt
+  // auf "halten" zurueck, damit ein Tippfehler beim Aufrufer nie eine leere/kaputte Pose
+  // zeichnet.
+  function zeichneHockeyschlaeger(ctx,x,y,s,richtung,phase){
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const seitlich=blick!==0;
+    const eff=blick||1; // Front/Ruecken: kein Blick zum Spiegeln da, feste Seite als Vorgabe.
+    const p=HOCKEY_PHASEN[phase]||HOCKEY_PHASEN.halten;
+    const schaftWinkel=p.schaftA*eff, kelleWinkel=p.kelleA*eff;
+    const ferseX=x+Math.sin(schaftWinkel)*p.schaftL*s, ferseY=y+Math.cos(schaftWinkel)*p.schaftL*s;
+    const kelleLaenge=(seitlich?9:4)*s; // Front/Ruecken: Schmalseite, deutlich kuerzer.
+    const spitzeX=ferseX+Math.sin(kelleWinkel)*kelleLaenge, spitzeY=ferseY+Math.cos(kelleWinkel)*kelleLaenge;
+    // Schaft: dunkles Holz, dazu eine duenne hellere Kante parallel versetzt fuer Rundung
+    // im Pixel-Look ohne Weichzeichner-Verlauf (dieselbe Idee wie das helle Ruecken-Oval
+    // bei zeichneReiherMech oder die helle Gehaeusekante bei zeichneKameraKopf).
+    const senkrechtX=Math.cos(schaftWinkel)*0.6*s, senkrechtY=-Math.sin(schaftWinkel)*0.6*s;
+    ctx.strokeStyle="#4a2f16"; ctx.lineWidth=Math.max(1,2.2*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ferseX,ferseY);ctx.stroke();
+    ctx.strokeStyle="#6b4523"; ctx.lineWidth=Math.max(1,0.8*s);
+    ctx.beginPath();ctx.moveTo(x+senkrechtX,y+senkrechtY);ctx.lineTo(ferseX+senkrechtX,ferseY+senkrechtY);ctx.stroke();
+    // Griffband: heller Punkt genau an der Hand, wo der obere Handschuh den Schaft fasst.
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.9,1.3*s),0,Math.PI*2);ctx.fill();
+    // Kelle: kurzer, dickerer dunkler Strich ab der Ferse. Im Profil fast waagerecht mit
+    // leicht angehobener Spitze (s. HOCKEY_PHASEN-Kommentar), in Front/Ruecken ein kurzer
+    // Stummel.
+    ctx.strokeStyle="#161616"; ctx.lineWidth=Math.max(1,(seitlich?2.4:3.2)*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(ferseX,ferseY);ctx.lineTo(spitzeX,spitzeY);ctx.stroke();
+    return {ferseX,ferseY,spitzeX,spitzeY};
+  }
+
   // WELCHE RAMPE STEHT IM BLATT? Nachgemessen, nicht angenommen.
   //
   // faerbe() suchte fest die HELLE Hautrampe und tauschte sie gegen die Zielrampe. Fuer
@@ -14094,6 +14166,20 @@
       const c=figur({n:name});
       setTimeout(()=>res(c.toDataURL()),1500);
     }),
+    // Debug-Zugriff auf zeichneHockeyschlaeger (02.09.) — noch NICHT verdrahtet (s.
+    // Kommentar an der Funktion), deshalb ohne eigenen Sprite: reicht die Zeichenfunktion
+    // roh nach draussen, damit ein zweiter Agent (Playwright, ohne UI) sie ohne Squad-/
+    // Kampfaufbau aufrufen kann, um Handpositionen daran zu pruefen — dasselbe Prinzip wie
+    // renderProbe/figurProbe daneben, nur fuer ein einzelnes Requisit statt eine ganze Figur.
+    // groesse (optional, Default 96): auf 64 gesetzt deckt sich der Leinwand-Nullpunkt mit
+    // dem von renderProbe (das ebenfalls eine 64x64-Leinwand zeichnet) — so lassen sich
+    // beide PNGs deckungsgleich uebereinanderlegen, ohne Versatz auszurechnen.
+    hockeyschlaegerProbe:(x,y,s,richtung,phase,groesse)=>{
+      const c=document.createElement("canvas"); c.width=groesse||96; c.height=groesse||96;
+      const cctx=c.getContext("2d"); cctx.imageSmoothingEnabled=false;
+      const punkte=zeichneHockeyschlaeger(cctx,x??48,y??70,s??1,richtung??2,phase??"halten");
+      return {dataUrl:c.toDataURL(), punkte};
+    },
     renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
     diagPositionen:(saat)=>{
       feldspielDisc="basketball"; bauFeldspiel(saat||1337);
