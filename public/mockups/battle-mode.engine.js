@@ -12474,7 +12474,21 @@
       // in einer Staffel raeumt niemand den Gegner von der Bahn.
       label:"Staffel", jeSeite:6, staffel:true, bahnenFest:2,
       hindernisse:[], hindernisWort:"Wechsel", boden:"#8a4a32",
-      schatten:true, tackle:false, grundTempo:92, tempoSpanne:0.90,
+      // WINDSCHATTEN AUS (vorher an). Zwei Gruende, der zweite gemessen.
+      //
+      // ERSTENS ist er hier unrealistisch: eine Staffel laeuft in ZUGETEILTEN Bahnen,
+      // jede Mannschaft auf ihrer eigenen. Zwischen zwei Laeufern auf getrennten Bahnen
+      // gibt es keinen Sog — das ist der Unterschied zu einem Massenstart.
+      //
+      // ZWEITENS war er ein Rauschsender. Solange `vordermann` auch WARTENDE Laeufer als
+      // Sogquelle zaehlte (Fable-Fund, jetzt behoben), hingen die Beine zwei bis fuenf 35
+      // bis 40 % ihrer Zeit hinter einem Stehenden — ein Vorteil, der an der
+      // Abschnittsnummer hing und nicht am Koennen. Ohne diesen Fehler blieb nur noch der
+      // Sog hinter dem GEGNER, und der faellt nur der zurueckliegenden Mannschaft zu.
+      // Nachgemessen fiel die Validitaet dadurch von 0,762 auf 0,601: ein
+      // situationsabhaengiger Vorteil, den das Koennen nicht steuert, ist genau das, was
+      // eine Rangtreue frisst.
+      schatten:false, tackle:false, grundTempo:92, tempoSpanne:0.90,
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
       kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
       rezept:{
@@ -12720,7 +12734,7 @@
         // EIGENEN Abschnitt, `wechselKonto` die Bilanz aus allen Uebergaben, an denen er
         // beteiligt war (abgebend wie annehmend). Ausserhalb der Staffel bleiben beide
         // null und werden nie gelesen.
-        etappenZeit:null, wechselKonto:0, wechselN:0};
+        etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
@@ -12750,6 +12764,17 @@
     let best=null, bestD=9;
     for(const o of LAEUFER){
       if(o===u||o.fertig!=null)continue;
+      // WER STEHT, SPENDET KEINEN WINDSCHATTEN (Fable-Fund, Bahn-Recherche). Diese
+      // Pruefung fehlte, und in der Staffel richtet das echten Schaden an: die wartenden
+      // Laeufer stehen sichtbar in ihrer Wechselzone auf der Strecke, und `vordermann`
+      // hat sie als Sogquelle gezaehlt. Nachgemessen hingen die Beine zwei bis fuenf 35
+      // bis 40 % ihrer Zeit im Sog eines STEHENDEN Mannes, Bein sechs (vor dem niemand
+      // mehr wartet) exakt 0 % — der Windschatten war also gar kein Rennelement, sondern
+      // eine Praemie darauf, welchen Abschnitt man zugeteilt bekam. Laeufer auf Bein
+      // fuenf wechselten sogar die Bahn, um an dem Stehenden vorbeizukommen.
+      //
+      // Ausserhalb der Staffel ist `aktiv` nie gesetzt und die Zeile wirkungslos.
+      if(BA().staffel&&o.aktiv===false)continue;
       const d=o.pos-u.pos;
       if(d<=0.004||d>SCHATTEN_ABSTAND)continue;
       if(Math.abs(o.bahnZ-u.bahnZ)>1.05)continue;
@@ -13134,7 +13159,7 @@
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
-        u.etappenZeit=rennT-(u.startT||0);
+        u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
         if(naechster){
           naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
           // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
@@ -13171,6 +13196,19 @@
           // Der Verlust ist physisch: der Annehmende steht so lange im Weg wie er dauert.
           // Damit schlaegt er auf die Teamzeit durch, entscheidet also wirklich Rennen.
           naechster.stolper=verlust;
+          // ...und er wird aus der ETAPPENZEIT des Annehmenden herausgerechnet.
+          //
+          // Sonst zahlt er zweimal: einmal ueber die laengere Etappe, einmal ueber das
+          // Konto. Schlimmer noch, es verzerrt die Abschnitte gegeneinander — der
+          // STARTLAEUFER bekommt gar keine Uebergabe und ist damit systematisch schnell,
+          // ohne besser zu sein. Nachgemessen (40 Rennen) lief Bein 1 im Schnitt 1,92 s
+          // bei einer mittleren Eignung von 41,5, waehrend Bein 5 bei Eignung 51,9 auf
+          // 2,11 s kam: die Etappenzeit mass den ABSCHNITT und erst danach den Laeufer.
+          //
+          // Der Faktor 0,65: waehrend `stolper` laeuft, kommt der Laeufer nicht zum
+          // Stehen, sondern auf 35 % Tempo (s. tempoVon) — verloren geht also rund
+          // zwei Drittel der Stolperdauer.
+          naechster.wechselVerlust+=verlust*0.65;
           // ...und er wird BEIDEN angeschrieben, je zur Haelfte, in Sekunden. Ohne dieses
           // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
           // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
@@ -13195,7 +13233,7 @@
         if(BA().staffel){
           // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
           // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
-          u.etappenZeit=rennT-(u.startT||0);
+          u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
           feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
@@ -15901,14 +15939,22 @@
           M.bau(saat0+i*schritt);
           M.lauf();
           const w=M.wert();
-          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig}))
+          // Bei der Bahn kommen zwei Diagnosespalten mit, weil sie dort — und nur dort —
+          // eine eigene Frage beantworten: `bein` sagt, welchen Abschnitt einer gelaufen
+          // ist, `etappenZeit`, wie lange er dafuer gebraucht hat. Erst damit laesst sich
+          // pruefen, ob eine Staffel den Abschnitt misst oder den Laeufer. Ausserhalb der
+          // Staffel bleiben beide null.
+          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig,
+            bein:u.bein??null, etappe:u.etappenZeit??null}))
             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
             :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig}))
             :U.map(u=>({n:u.n,seite:u.side,eig:u.eig}));
           spiele.push({saat:saat0+i*schritt,
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
-              wert:Math.round((w[u.n]||0)*100)/100}))});
+              wert:Math.round((w[u.n]||0)*100)/100,
+              ...(u.bein!=null?{bein:u.bein,
+                etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{})}))});
         }
       } finally { M.zurueck(gesichert); zieheFormkarten(20260823); }
       return {disziplin:dId, chassis:istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
