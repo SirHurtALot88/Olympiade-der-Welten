@@ -11743,7 +11743,26 @@
   // `verh` BLEIBT. Es ist die Differenz zwischen dem, was ankam, und dem, was ohne seine
   // Verteidigung angekommen waere, entsteht also aus SEINEM Attributwert — anders als
   // `tank`, das reine Aussetzung ist.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.koAnteil*140;
+  // VERHINDERTER SCHADEN MIT 0,4 STATT VOLL — gemessen, nicht gewaehlt. Er entsteht zwar
+  // aus dem eigenen Verteidigungswert, waechst aber zugleich mit der AUSSETZUNG: wer oft
+  // beschossen wird, verhindert viel, unabhaengig davon, wie gut er ist. Und beschossen
+  // wird, wer zufaellig am naechsten steht (s. oben).
+  //
+  // Drei Gewichte durchgemessen, je 24 Spiele:
+  //
+  //   Gewicht        1,0     0,4     0,0
+  //   mini-dm       0,383   0,658   0,750
+  //   battlefield   0,041   0,469   0,473
+  //   tdm           0,518   0,506   0,457
+  //   fechten       0,537   0,495   0,407
+  //   Summe         1,479   2,128   2,087
+  //
+  // Die Aufteilung ist kein Zufall: mini-dm und battlefield spielen vier gegen vier, tdm
+  // und fechten sechs gegen sechs. In kleinen Teams ist die Aussetzung sehr ungleich
+  // verteilt, dort ist der Posten fast nur Rauschen; in grossen gleicht sie sich aus und
+  // er traegt echten Tank-Wert. Ein Entweder-oder waere fuer die eine oder die andere
+  // Haelfte falsch — 0,4 ist das Optimum ueber alle vier.
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh*0.4+u.st.koAnteil*140;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
