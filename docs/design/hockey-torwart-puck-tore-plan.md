@@ -18,6 +18,17 @@ Auftrag von Chris, wörtlich:
 **Jede Zahl hier ist entweder selbst gemessen, aus dem Code zitiert oder eine reale
 Sport-Referenz mit Quelle.** Was nicht geprüft ist, steht als „nicht geprüft" da.
 
+> **Dieser Plan ist nach dem Overseer-Review korrigiert.** Fable hat als Sparringspartner
+> (Chris' Wunsch) unabhängig recherchiert — `hockey-torwart-puck-tore-recherche-fable.md`,
+> 964 Zeilen — und mir an drei Stellen mit Zahlen widersprochen. Alle drei sind hier
+> eingearbeitet; was ursprünglich dastand, ist in **Teil 8** protokolliert, damit die
+> Korrektur nachvollziehbar bleibt:
+> 1. Die **Bauform des Torwarts** war falsch bewertet, in beide Richtungen (Teil 3.2).
+> 2. Die **Reihenfolge** hätte eine Sondierung gegen eine Mechanik gemessen, die danach
+>    ersetzt wird (Teil 5).
+> 3. Der **Slot-Generator** fehlte in diesem Plan ganz — und er macht Chris' „sehr
+>    defensiven" Torwart-Slot heute unmöglich (neuer Teil 3.4).
+
 ---
 
 ## 0. Die drei Ansagen, übersetzt
@@ -117,16 +128,25 @@ nicht endlos". Daraus:
 
 | Größe | Ziel | Begründung |
 |---|---:|---|
-| **Tore je Team und Spiel** | **3,5 – 4,5** | Real 3,0. „Ein paar mehr" heißt +20 bis +50 %, nicht +120 % |
-| **Abschlüsse je Team** | **26 – 32** | Real 28,3 — hier ist die Realität selbst das Ziel, weil mehr Schüsse das Zuschauen besser machen |
-| **Trefferquote** | **13 – 16 %** | Real 9–12,6 %. Leicht darüber, damit die 4 Tore ohne unrealistische Schussflut zustande kommen |
+| **Tore je Team und Spiel** | **3,5** (Korridor 3 – 4) | Real NHL ~3,0, DEL 2024/25 3,02. „Ein paar mehr" heißt +17 %, nicht +50 % |
+| **Abschlüsse je Team** | **24 – 28** | Real 28,3 — die Realität selbst ist das Ziel, weil mehr Schüsse das Zuschauen besser machen |
+| **Trefferquote** | **13 – 16 %** | Real 9–12,6 %. Leicht darüber, damit die Tore ohne unrealistische Schussflut zustande kommen |
 | **Fangquote des Torwarts** | **84 – 87 %** | Gegenstück zur Trefferquote (real ~90 %) |
 
-Rechenprobe: 29 Abschlüsse × 14 % = **4,1 Tore**. Beide Eingangsgrößen liegen dicht an der
-Realität, das Ergebnis liegt bewusst darüber.
+Rechenprobe: 26 Abschlüsse × 13,5 % = **3,5 Tore**. Beide Eingangsgrößen liegen dicht an der
+Realität, das Ergebnis liegt bewusst leicht darüber.
 
-**Die Zahl, die Chris gehört:** ob 4 Tore je Team richtig sind oder ob er 5 will. Alles
-darüber kippt in die Torflut zurück, alles darunter macht ein 8-Minuten-Spiel ereignisarm.
+**Die Obergrenze 4,5 aus dem ersten Entwurf war zu hoch** — der Overseer hat vorgerechnet,
+dass ein Drittelspiel bei so vielen Toren rund 27 % seiner Zeit in Standphasen verbringt
+(nach jedem Tor ein Bully). Das Spiel würde stocken. Vier Tore je Team sind die Grenze, und
+fünf sollten Chris gar nicht erst angeboten werden.
+
+**Die Zahl, an der alles hängt, ist aber nicht die Quote, sondern das TEMPO.** Basketball
+erzeugt gemessen 41 Feldwürfe je Team in 360 s. Dieselbe Ereignisdichte auf 240 s Hockey
+ergibt **rund 27 Abschlüsse** — exakt die NHL-Zahl. Das Tempo kommt also von selbst, **wenn
+es garantiert wird**: es braucht eine Schussuhr mit Klär-Ereignis als Gegenstück, sonst
+kann ein Team den Puck beliebig lange laufen lassen. Der ursprüngliche Hockey-Plan hatte
+die Schussuhr für Hockey gestrichen; sie muss zurück.
 
 ---
 
@@ -153,31 +173,54 @@ Bei zwei Spielern schießt man aufs **leere Tor** — das ist im echten Eishocke
 Situation und braucht keine Erfindung. Die Trefferquote muss dort eigens kalibriert werden,
 sonst fallen zweistellige Ergebnisse.
 
-### 3.2 Was ein echter Torwart im Motor anfassen muss
+### 3.2 Die Bauform — hier lag ich falsch, in beide Richtungen
 
-Vollständig aufgelistet, damit der Aufwand nicht unterschätzt wird:
+Ich hatte einen Torwart **als sechsten Feldspieler mit Ausschluss-Flag** empfohlen und den
+Aufwand auf „sechs Stellen" geschätzt. Der Overseer hat nachgezählt: zwischen
+`initBasketballLive` (`:4330`) und dem Ende von `stepFeldspiel` (`:6440`) stehen **23**
+Zugriffe der Form `FSTEAM[...]`, **10** Ganzteam-Schleifen und **8** Mitspieler-Filter.
+Jeder davon ist eine Stelle, an der ein Torwart im Team falsch behandelt würde — er würde
+Angriffe eröffnen, angespielt werden, einen Angriffs-Slot am **gegnerischen** Tor bekommen,
+decken und gedeckt werden, schießen, Pässe abfangen, stehlen, Ausbrecher werden und um freie
+Bälle rangeln. Meine Schätzung war um den Faktor vier zu niedrig.
 
-| Stelle | Was zu tun ist |
-|---|---|
-| `zuordneSlots` (`:4308`) | Sortiert heute **alle** Spieler nach Schusswert in Positionen. Torwart muss raus und eine feste Position am eigenen Tor bekommen |
-| `spielmacherLos` (`:4524`) | Gewichtet nach AUFBAU — Torwart darf den Angriff nicht einleiten |
-| `offensterMitspieler` (`:4565`) | Torwart darf kein Passziel im Angriffsdrittel sein |
-| `gewichtetesLos(team,"ABSCHLUSS")` | Torwart darf nicht schießen |
-| `zuordneDeckung` (`:4377`) | Torwart deckt keinen Mann und wird nicht gedeckt |
-| `bewegeSpielerLive` (`:5624`) | Eigene Bewegungslogik: in der Torlinie bleiben, dem Puck folgen |
-| Erfolgsformel | Neuer Term `paradeChance(schütze, torwart)` als Gegenstück zum Schuss |
-| Boxscore | Spalten Paraden / Gegentore / Fangquote |
-| `SLOTS_JE_DISC.hockey` | Siebte Rolle `goaltender` |
-| `matchday-slot-roles.ts:169-176` | Dieselbe Rolle produktionsseitig — **berührt laufende Spielstände** |
-| `bodenFeldspiel` | Zwei Tore und zwei Torräume zeichnen |
+Gleichzeitig hatte ich die Alternative mit einem falschen Argument verworfen: „kein
+Kaderspieler, kein Name, nicht wählbar". Das stimmt für den Schiedsrichter, aber nicht für
+die Bauform. Ein Objekt **außerhalb** von `FSTEAM` kann die **Identität eines Kaderspielers
+tragen** — Name, Sprite, eigene Boxscore-Zahlen, und wählbar über den Aufstellungs-Slot.
 
-**Der billigere Zwischenweg, den ich nicht empfehle, aber benennen will:** ein `fsTorwart`
-nach dem `fsSchiri`-Muster — ein eigenes Objekt statt eines Spielers. Er wäre sichtbar im
-Tor und bräuchte **keine** der sechs Ausschlussstellen oben. Der Preis ist, dass er kein
-Kaderspieler ist: er hat keinen Namen aus dem Team, keine Statistik in der Wertung und der
-Manager kann ihn nicht wählen. Chris sagt „**einer der spieler** soll einen torwart slot
-haben" — das schließt diese Variante aus. Sie steht hier nur, damit die Entscheidung
-bewusst getroffen ist.
+**Empfohlen ist damit Variante E′: der Torwart ist eine Person, aber kein Feldspieler.**
+
+```
+fsTorwart = [ {p, n, side, x, y, zielX, zielY, PARADE,
+               saves, gegentore, festgehalten, abpraller, lunge, reaktT}, {…} ]
+```
+
+- **Wer:** `bauFeldspiel` liest `place[p.n].slot === "goaltender"` aus der Aufstellung;
+  Rückfall ist der beste PARADE-Wert im Kader. Er wird **aus dem Kader herausgenommen,
+  bevor `FSTEAM` gebaut wird** — `FSTEAM` hat dann `jeSeite − 1` Feldspieler, und **keine
+  einzige Feldspieler-Funktion muss angefasst werden**.
+- **Wo:** auf der Torlinie plus Torraum-Tiefe, quadratisch dem Puck folgend
+  (`zielY = H/2 + clamp(puck.y − H/2)·k`, `zielX` fest). Dieselbe Bauform wie
+  `schiriRuhePos` (`:5279`).
+- **Sichtbar:** `zeichneSprite` zeichnet jede Figur nach ihrem Namen — der Torwart bekommt
+  sein eigenes Charakter-Sprite, und die vorhandene `lunge`-Pose trägt die Parade-Geste.
+  **Kein neues Bild-Asset nötig.**
+- **Messbar:** `MOTOREN[fd].namen()` und `wert()` (`:13029`) müssen `fsTorwart` mitnehmen,
+  sonst ist er für die Pp-Messung und die Rangtreue unsichtbar.
+- **Beim Zweierspiel** ist das schlicht `fsTorwart[side] = null`. Bei einem Flag-Torwart im
+  Team wäre Chris' Zweierregel ein zweiter Codepfad an jeder der 20 Stellen.
+
+Angefasst werden bei E′: `bauFeldspiel` (Auswahl und Herausnahme), ein neues
+`bewegeTorwart`/`zeichneTorwart`, die Schussauflösung, `wert`/`namen`, die Wertungstabelle
+und `sichern`/`zurueck` — ein weiteres Feld wie `fsSchiri`.
+
+### 3.2b Was trotzdem am Feldspieler-Code zu tun ist
+
+Nichts. Genau das ist der Gewinn: der Schiedsrichter-Kommentar (`:3500-3506`) verlangt
+ausdrücklich, dass ein Nicht-Spieler „in keiner der Spieler-Schleifen auftauchen" darf. Ein
+`if(u.torwart) continue;` an zwanzig Stellen wäre die Bauform, vor der dieser Kommentar
+warnt.
 
 ### 3.3 Der PARADE-Sub-Skill
 
@@ -191,6 +234,54 @@ Attributmischung bleibt trotzdem besser ohne Überschneidung:
 `PARADE: {awareness, will, determination, dexterity, health}` — Stellungsspiel und
 Nervenstärke vor Handgeschwindigkeit. Die genauen Gewichte fallen erst nach der Sondierung
 auf dem Live-Motor (Reihenfolge s. Hockey-Plan H.5).
+
+---
+
+### 3.4 Der Slot-Generator — Chris' Bedingung ist Systemgesetz, und sie beißt
+
+Chris verlangt einen „sehr defensiv ausgerichteten" Torwart-Slot, dessen Profil **zusammen
+mit den anderen wieder die Disziplinmatrix ergibt**. Nachgemessen: das gilt heute exakt.
+
+| Disziplin | Slots | Abweichung des Slot-Mittels zur Matrix |
+|---|---:|---:|
+| Hockey | 6 | **0,1 Pp** |
+| Basketball | 6 | **0,1 Pp** |
+| Tennis | 6 | **0,1 Pp** |
+
+Das ist keine Näherung, sondern per Konstruktion so: `buildSlotWeightProfiles`
+(`lib/lineups/matchday-slot-roles.ts:421-454`) baut für alle Themen außer dem letzten ein
+Delta und gibt dem **letzten Thema `−Σ` aller anderen** — es ist der Ausgleichsslot, der
+die Matrix wiederherstellt.
+
+**Vier Folgen, alle am Code geprüft:**
+
+1. **Der Generator trägt sieben Themen ohne Umbau** — die Rechnung ist längenunabhängig.
+   Aber `buildGeneratedSlotRoles` klemmt auf `slice(0, slotCount)` mit `slotCount` auf 0..6:
+   bei sechs Spielern wird ein siebtes Thema **nie** ausgegeben. Der Torwart muss also
+   **innerhalb** der Sechs sitzen, nicht daneben.
+2. **Die Position in der Liste entscheidet über Chris' Degradationsregel.** `slice(0,n)`
+   liefert bei drei Spielern die ersten drei Themen. Damit der Torwart bei 3 bis 6
+   erscheint und bei 2 fehlt, muss er **an dritter Stelle** stehen. Preis: bei drei
+   Spielern fällt dann ein Thema heraus, das es heute gibt.
+3. **Bei drei Spielern wäre der Torwart der Ausgleichsslot** — sein Profil wäre `−Σ` der
+   beiden anderen, also ein Zufallsprofil statt des entworfenen. Es braucht eine
+   Generator-Regel: Ausgleichsslot ist das letzte **Nicht-Torwart**-Thema.
+4. **„Sehr defensiv" ist heute nicht ausdrückbar.** Der Fokus-Deckel `min(base·0,45, 7)`
+   erlaubt für ein Attribut mit Matrixgewicht 4 (determination, dexterity, will) nur
+   **+1,8**, für awareness +3,6. Das stärkste erreichbare Torwart-Profil landet bei
+   `health ≈ 23,5, awareness ≈ 11,5` — praktisch identisch mit dem bestehenden „Defensive
+   Wall" (`health 23,4, spirit 15,4`). **Chris bekäme einen zweiten Verteidiger, keinen
+   Torwart.**
+
+**Vorschlag:** Torwart-Thema an dritter Stelle, mit eigenem, höherem Fokus-Deckel (bis 12
+Punkte auf zwei von determination/will/awareness/health, damit ein Profil bei health ~25,
+awareness ~14, will ~8 entsteht), und der Ausgleich **verteilt auf die fünf Feldrollen**
+statt auf eine allein.
+
+**Das berührt Produktionsdaten und damit laufende Spielstände.** Chris sieht die geänderten
+Schlüsselattribute seiner sechs bestehenden Hockey-Slots im Aufstellungsbildschirm. Die
+neuen Profile gehören ihm deshalb **vorher als Tabelle gezeigt**, nicht nachher erklärt.
+Eigener PR, der keinen Motor anfasst.
 
 ---
 
@@ -220,51 +311,64 @@ Bande wirkt das Spiel wie Hallenfußball ohne Wände.
 
 ## 5. Reihenfolge
 
-Die Nummerierung schließt an `hockey-rollout-plan.md` Teil H.8 an. **PR −1 bis PR 1 sind
-erledigt** (#729, #732, #734).
+**Auch hier hatte der Overseer recht.** Mein erster Entwurf hätte Hockey erst live geschaltet
+(mit Basketballs Formeln), dann sondiert, und erst danach Tor, Torwart, Bande und
+Impact-Formel gebaut. Damit hätte die Sondierung die Gewichte einer Mechanik gemessen, die
+unmittelbar danach ersetzt wird — **exakt der Fehler, den ich im vorigen Review selbst als
+Auflage übernommen hatte** (Impact-Formel vor jeder Sondierung, Zonenmodell vor dem Rezept).
 
-| PR | Was | Ändert Spielverhalten? |
+Die korrigierte Fassung fasst alles Strukturelle in **einen** Schritt mit Platzhalter-Zahlen
+zusammen und misst erst danach.
+
+| Schritt | Was | Ändert Spielverhalten? |
 |---|---|---|
-| **2** | Zeit- und Perioden-Konstanten in die `FELDSPIEL_ART`-Zeile; Hockey bekommt 3 Drittel | nein (Basketball bit-identisch) |
+| **R** | **Das Rohr**: Aufstellung → Arena, `place` durchreichen. Erste sichtbare Wirkung der Aufstellung überhaupt | nur Slot-Aufschläge |
+| **G** | **Slot-Generator**: Torwart-Thema an dritter Stelle, eigener Deckel, verteilter Ausgleich; neue Hockey-Profile Chris **vorher** zeigen | Produktionsdaten |
+| **2** | Zeit- und Periodenkonstanten in die `FELDSPIEL_ART`-Zeile | nein |
 | **3a** | Live-Engine umbenennen, Sub-Skill-Konfiguration heben | nein (Basketball bit-identisch) |
-| **3b** | **Hockey live schalten** — der Puck wird ein Objekt | **ja**, erstmals |
-| **3c** | Sondierungslauf: welcher Sub-Skill trägt live wie viel | nein (Messung) |
-| **4a** | **Eisfläche mit zwei Toren, Torräumen, blauen Linien, Bullypunkten** | nein (Optik), aber Voraussetzung für 4b |
-| **4b** | **Torwart als echte Sonderrolle** + PARADE + Degradationsregel + Boxscore-Spalten | **ja** |
-| **4c** | **Bande**: der Puck prallt ab statt ins Aus zu gehen | **ja** |
-| **4d** | Impact-Formel je Disziplin, dann Zonenmodell, dann Erfolgsformel, dann Rezept | **ja** |
-| **5** | Rangtreue und Archetypen (inkl. Torwart-Archetyp) | ja |
-| **6** | Bully-Standphase und Drittelpause | ja |
-| **9** | Produktivierung — Orchestrator je Disziplin | ja |
+| **3b′** | **Hockey live, komplett**: Torwart-Objekt (E′), Tor, Schussauflösung mit vier Ausgängen, Zonentabelle, Bande, Bully-Phase, Klär-Ereignis, Impact-Formel je Disziplin, Boxscore-Spalten — **mit Platzhalter-Zahlen** | **ja**, erstmals |
+| **3c** | Sondierung — jetzt gegen die richtige Struktur | nein (Messung) |
+| **4** | Sub-Skills, Rezept, Kalibrierung gegen den Korridor aus 2.1 | ja |
+| **5** | Rangtreue und Archetypen, inklusive Torwart-Archetyp | ja |
+| **6** | Drittelpause, Eisflächen-Politur | ja |
+| **F** | **Formation je Rolle für Basketball** — Chris' „Center unterm Korb", eigene Balance-Runde | **ja**, Basketball |
+| **8** | Strafzeit und Überzahlspiel | ja |
+| **9** | Produktivierung: Orchestrator je Disziplin | ja |
 
-Gegenüber dem alten Plan neu: **4a vor 4b** (ohne gezeichnetes Tor keine Torwartposition),
-**4c** als eigener Schritt, und der Torwart wandert von „eigene Entscheidung danach" in die
-Kernrunde. Das Überzahlspiel (alt PR 8) bleibt hinten.
+**Warum R und G ganz vorn stehen:** der Torwart *ist* ein Aufstellungs-Slot. Ohne das Rohr
+kommt Chris' Zuweisung nie an, und ohne den Generator-Umbau gibt es das Torwart-Thema
+nicht. Beide sind klein, beide sind für sich abnehmbar, und beide nützen Basketball
+genauso.
+
+**Warum F erst hinten steht, obwohl es Chris' zweiter Wunsch ist:** die Formation ändert
+Wurfdistanzen und Deckerabstände und damit **alle** Zahlen der Rollenproben. Das ist eine
+Balance-Runde mit eigener Abnahme, und sie darf den Hockey-Weg nicht blockieren. Die
+**Datenform** für Positionen je Rolle wird aber schon in 3b′ mitgebaut, damit sie nicht
+zweimal entsteht.
 
 ### 5.1 Abnahme je Schritt
 
-- **3b:** Hockey läuft drei Drittel durch, der Puck hat zu jedem Zeitpunkt genau einen
-  Zustand (Träger, Flug oder frei), Basketball bit-identisch.
-- **4b:** Bei jeder Kadergröße 2..6 startet das Spiel; bei 3..6 steht genau ein Torwart je
-  Seite in der Torlinie und schießt nie; bei 2 gibt es keinen.
-- **4d:** Tore je Team 3,5–4,5 · Abschlüsse 26–32 · Trefferquote 13–16 % · Fangquote
-  84–87 % — und die Pp-Abnahme aus dem Hockey-Plan D.1 bei n=48.
-- **5:** Rangtreue rho ≥ 0,74 (heute 0,493, gemessen mit
-  `scripts/miss-feldspiel-rangtreue.mjs hockey 24 6`).
-
----
+- **R:** eine Aufstellung, die Chris setzt, verändert nachweisbar den Slot-Aufschlag eines
+  Spielers; ohne Aufstellung bleibt alles bit-identisch.
+- **G:** das Mittel aller Slot-Profile trifft die Disziplinmatrix weiter auf ≤0,2 Pp.
+- **3b′:** `feldspielProbe("hockey")` liefert **keine** `fehlend`-Liste mehr; der Puck hat
+  zu jedem Zeitpunkt genau einen Zustand; bei jeder Kadergröße 2..6 startet das Spiel; bei
+  3..6 steht genau ein Torwart je Seite auf der Torlinie und schießt nie; Basketball
+  bit-identisch.
+- **4:** Tore je Team 3–4 · Abschlüsse 24–28 · Trefferquote 13–16 % · Fangquote 84–87 % ·
+  Pp-Abnahme bei n=48.
+- **5:** Rangtreue rho ≥ 0,74 (heute 0,493).
 
 ## 6. Was Chris entscheiden muss
 
-**6.1 Vier oder fünf Tore je Team?** Der Vorschlag ist ein Korridor von 3,5 bis 4,5 bei rund
-29 Abschlüssen. Real sind 3,0. Fünf wären das Doppelte der Realität — machbar, aber dann
-sollte es eine bewusste Entscheidung sein und keine Nebenwirkung.
+**6.1 Drei oder vier Tore je Team?** Der Vorschlag ist **3,5** bei 26 Abschlüssen und 13,5 %
+Trefferquote. Real sind 3,0 (NHL) beziehungsweise 3,02 (DEL 2024/25). Vier sind die
+Obergrenze; darüber verbringt ein Drittelspiel rund 27 % seiner Zeit mit Bullys nach Toren
+und stockt sichtbar.
 
-**6.2 Wer bestimmt den Torwart?** Heute erreicht **keine** Aufstellung die Arena, für keine
-Disziplin. Der Plan baut den Motor so, dass er den Torwart selbst bestimmt (bester
-PARADE-Wert) — sichtbar im Tor, mit Namen und Statistik. Dass **du** ihn aussuchst, ist ein
-eigener, größerer Auftrag, der Basketballs Slot-Rollen genauso betrifft. Soll der jetzt
-mit dazu, oder reicht dir zunächst, dass ein echter Spieler aus deinem Kader im Tor steht?
+**6.2 — beantwortet.** Chris hat entschieden: benannter Torwart-Slot ab drei Spielern, bei
+zwei Spielern keiner. Damit steht auch die Reihenfolge: das Rohr von der Aufstellung zur
+Arena (Schritt R) kommt zuerst, weil der Torwart ohne es nicht zuweisbar ist.
 
 **6.3 Drei Drittel zu wie lang?** Aus dem alten Plan unbeantwortet: Basketball läuft 4×1:30,
 mit Dehnung rund 12 Minuten Zuschauzeit. Vorschlag Hockey: 3×1:20, rund 8 Minuten. Diese
@@ -286,3 +390,30 @@ fallen.
 - Wie viel Rechenzeit ein Live-Hockeyspiel kostet und ob die Pp-Messung bei n=48 dann noch
   in ein Zeitbudget passt — bei Basketball hat genau das schon einmal geklemmt.
 - Keine Zeile Code geändert. Dieser Plan ist Recherche.
+
+---
+
+## 8. Protokoll: was der Overseer korrigiert hat
+
+Fable lief als Sparringspartner auf Chris' Wunsch und hat **unabhängig** recherchiert,
+bevor er diesen Plan gelesen hat. Was hier ursprünglich stand und warum es falsch war:
+
+| Stelle | Erster Entwurf | Korrigiert zu | Beleg |
+|---|---|---|---|
+| **3.2 Bauform** | Torwart als sechster Feldspieler mit Ausschluss-Flag, „sechs Stellen" | **E′**: Person außerhalb von `FSTEAM`, mit Kaderidentität | 23 `FSTEAM[…]`-Zugriffe, 10 Ganzteam-Schleifen, 8 Mitspieler-Filter — gezählt, nicht geschätzt |
+| **3.2 Alternative** | Schiri-Muster verworfen: „kein Kaderspieler, kein Name, nicht wählbar" | Falsche Alternative — das Objekt kann alle drei tragen | `zeichneSprite` zeichnet nach Namen; `lunge`-Pose existiert |
+| **3.4** | fehlte ganz | Der Slot-Generator macht „sehr defensiv" heute unmöglich | Fokus-Deckel `min(base·0,45, 7)` erlaubt für 4er-Attribute nur +1,8 |
+| **5 Reihenfolge** | 3b live → 3c sondieren → 4a–4d Struktur | **3b′**: alles Strukturelle zuerst, dann messen | sonst misst die Sondierung eine Mechanik, die danach ersetzt wird |
+| **2.1 Korridor** | 3,5 – 4,5 Tore, „oder fünf?" | **3,5** (Korridor 3 – 4), fünf nicht anbieten | bei 4,5 Toren ~27 % Standphasen |
+| **2.1 Tempo** | fehlte | Die Torzahl hängt an einer **Tempo-Garantie**, nicht an der Quote | Basketball: 41 FGA je Team je 360 s → ~27 Abschlüsse auf 240 s |
+| **Zonenmodell** | „Maximum im Slot" | **monoton in der Distanz plus eigene Winkel-Achse** | die offenen xG-Modelle sagen: Distanz und Winkel sind die zwei stärksten Merkmale |
+| **3.1 Zweierspiel** | „leeres Tor braucht keine Erfindung" | braucht kleineres Tor und eigene Kalibrierung | sonst ~11 Tore je Team |
+
+**Was der Overseer bestätigt hat:** die Degradationsregel, dass Hockeys `jeSeite: 6` exakt
+5 Feldspieler plus Torwart trifft, die Slot-Invariante (0,10 Pp), und dass EAs NHL
+proprietär ist, während die offenen xG-Modelle die brauchbare Quelle sind — fünf von sechs
+Repos erreichbar, eines GPL-3.0, vier ohne Lizenz. **Daraus dürfen nur Zahlen übernommen
+werden, kein Code**, und die Quelle gehört in den Kommentar.
+
+Die vollständige Recherche mit allen Belegen steht in
+`docs/design/hockey-torwart-puck-tore-recherche-fable.md`.
