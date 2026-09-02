@@ -4804,9 +4804,13 @@
   // Schussvolumen von 26,6 auf 38,2 Versuche je Team gehoben haben: mit dem alten Faktor
   // fielen 5,58 Tore je Team statt 3,5. Gemessen, 24 Spiele je Lauf:
   //   Faktor 0,700 -> 5,58 Tore, Fangquote 83,3 %
-  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %   (gewaehlt)
+  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %
+  // Nach der Puck-Jagd-Begrenzung (HK_AUF_PUCK) noch einmal nachgezogen: weniger Gedraenge
+  // vor dem Tor heisst mehr durchkommende Schuesse, damit stieg die Torzahl auf 3,77.
+  //   Faktor 0,410 -> 3,29 Tore   Faktor 0,440 -> 3,77 Tore
+  //   Faktor 0,425 -> 3,49 Tore (n=48)                  (gewaehlt)
   // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
-  const HK_TOR_SKALA=0.440;
+  const HK_TOR_SKALA=0.425;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -4918,16 +4922,28 @@
   // innerhalb von 260 px steht — die seltenen Faelle, in denen nicht, sind dort ein Teil
   // der eingemessenen Balance. Auf der viermal so langen Eisflaeche ist es ein Fehler.
   // Basketball bekommt dieselbe Absicherung in seiner eigenen Runde, mit eigener Messung.
-  function naechsterZumFreienPuck(seite){
+  //
+  // Fuer Hockey ersetzt diese Liste den Radius ganz (s. HK_AUF_PUCK darunter), statt ihn
+  // nur zu ergaenzen: der Radius ist auf dem Eis kein sinnvolles Kriterium mehr.
+  function naechsteZumFreienPuck(seite,wieviele){
     const f=fsLive&&fsLive.ball?fsLive.ball.frei:null;
-    if(!f)return null;
-    let bester=null,minD=Infinity;
-    for(const u of FSTEAM[seite]){
-      if(u.torwart||!aufDemEis(u)||u.down)continue;
-      const d=dist(u,f); if(d<minD){ minD=d; bester=u; }
-    }
-    return bester;
+    if(!f)return [];
+    return FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+      .sort((a,b)=>dist(a,f)-dist(b,f)).slice(0,wieviele);
   }
+  // WIE VIELE GEHEN AUF DEN PUCK. Im Bild war die Eisflaeche zur Haelfte leer, waehrend
+  // sich beide Mannschaften in einem Bullykreis stapelten — sechs Figuren uebereinander.
+  // Ursache: LAUF_ZUM_BALL_RADIUS schickt JEDEN Spieler innerhalb von 260 px auf einen
+  // freien Puck, und bei rund 70 losen Pucks je Spiel ist fast immer einer in Reichweite.
+  // Die Mannschaft verbringt damit mehr Zeit im Rudel als auf ihren Positionen.
+  //
+  // Im echten Eishockey holen ein bis zwei Spieler den Puck, der Rest haelt seine Position
+  // und bietet sich an — genau darauf beruht die Formation ueberhaupt. HK_AUF_PUCK=2 ist
+  // die kleinste Zahl, die einen echten Zweikampf zulaesst (einer allein waere ein
+  // Selbstbedienungsladen). Der jeweils naechste Spieler ist immer dabei, auch wenn der
+  // Puck weiter als LAUF_ZUM_BALL_RADIUS liegt — das ist zugleich das Sicherheitsnetz
+  // gegen den eingefrorenen Puck (s. unten).
+  const HK_AUF_PUCK=2;
   // Offensivdruck-Rotation (s. zuordneSlots): war bisher ein lokaler Ausdruck im
   // Possession-Wechsel. Strafe und Rueckkehr stellen ebenfalls neu auf und brauchen
   // dieselbe Regel — eine Kopie waere die zweite Stelle, die beim naechsten Anfassen
@@ -6858,8 +6874,9 @@
           zx=korbX; zy=H/2;
           tempoMul=Math.max(tempoMul,AUSBRUCH_TEMPO_MUL); dribbelFaktor=0.85;
         }
-      } else if(fsLive.ball.frei&&(dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS
-                 ||(istHockey()&&u===naechsterZumFreienPuck(u.side)))){
+      } else if(fsLive.ball.frei&&(istHockey()
+                 ? naechsteZumFreienPuck(u.side,HK_AUF_PUCK).includes(u)
+                 : dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS)){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
         // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
