@@ -169,6 +169,13 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
   hockey: [
     roleTheme("powerforward", "Power Forward", "Geht dahin, wo es weh tut.", ["power", "health"], "stamina", "high", ["tank", "charger"]),
     roleTheme("defensivewall", "Defensive Wall", "Schliesst Raeume über Health und Spirit.", ["health", "spirit"], "speed", "medium", ["tank"]),
+    // Dritte Stelle ist Absicht, nicht Zufall: `buildGeneratedSlotRoles` klemmt auf
+    // `slice(0, slotCount)`, und Chris' Regel verlangt den Torwart bei 3..6 Spielern, aber
+    // NICHT bei 2 ("da gibts nur Verteidiger und Angreifer"). An Position 3 trifft slice(0,2)
+    // ihn nie, slice(0,3..6) immer — s. Plan Abschnitt 3.4, Punkt 2. Sein Profil entsteht in
+    // `buildGoaltenderDelta` (eigener, groesserer Fokus-Deckel als jede Feldrolle) und wird in
+    // `buildSlotWeightProfilesWithGoaltender` gegen die Feldrollen ausgeglichen.
+    roleTheme("goaltender", "Goaltender", "Steht im Tor und haelt den Kasten sauber über Health und Awareness.", ["health", "awareness"], "dexterity", "low", ["tank", "overseer"]),
     roleTheme("playmaker", "Playmaker", "Verbindet Linien über Power und Awareness.", ["awareness", "power"], "health", "medium", ["tactician"]),
     roleTheme("transition", "Transition Runner", "Dreht Tempo über Speed und Stamina.", ["speed", "stamina"], "power", "high", ["sprinter"]),
     roleTheme("slotfinisher", "Slot Finisher", "Schliesst Chancen über Power und Torment.", ["power", "torment"], "health", "medium", ["berserker"]),
@@ -418,6 +425,127 @@ function resolveSafeDeltaScale(
   return clampNumber(scale * 0.98, 0, 1);
 }
 
+function roundedProfilesFromDeltas(
+  baseWeights: MatchdaySlotRoleWeightProfile,
+  deltas: MatchdaySlotRoleWeightProfile[],
+) {
+  return deltas.map((delta) =>
+    Object.fromEntries(
+      getPositiveAttributes(baseWeights).map((attribute) => [
+        attribute,
+        roundWeight(Math.max((baseWeights[attribute] ?? 0) + (delta[attribute] ?? 0), 0)),
+      ]),
+    ) as MatchdaySlotRoleWeightProfile,
+  );
+}
+
+const GOALTENDER_ROLE_ID = "goaltender";
+
+// Der Torwart braucht einen viel groesseren Fokus-Deckel als jede Feldrolle (Plan 3.4): sein
+// staerkstes erreichbares Profil ueber den normalen Deckel `min(base*0.45, 7)` landete bei
+// health~23,5/awareness~11,5 — praktisch identisch mit der bestehenden "Defensive Wall". Hier
+// bekommt er bis zu 12 Punkte auf zwei Fokus-Attribute, OHNE intern etwas davon abzugeben (das
+// wuerde ihn wieder auf Feldrollen-Niveau zurueckziehen). Der Ausgleich, den die Diszi-Invariante
+// verlangt, wird stattdessen ANSCHLIESSEND ueber alle Feldrollen verteilt (Variante C, s. Plan
+// Punkt 4) statt — wie der Standard-Generator es fuer alle anderen Themen tut — einer einzigen
+// "letzten" Rolle aufgebuerdet zu werden (gemessen: das zerstoert die Rolle, die es trifft).
+const GOALTENDER_PRIMARY_FOCUS_DELTA = 8;
+const GOALTENDER_SECONDARY_FOCUS_DELTA = 4;
+
+function buildGoaltenderDelta(theme: SlotRoleTheme, baseWeights: MatchdaySlotRoleWeightProfile): MatchdaySlotRoleWeightProfile {
+  const deltas: MatchdaySlotRoleWeightProfile = {};
+  const focusAttributes = resolveThemeFocus(theme, baseWeights).slice(0, 2);
+  focusAttributes.forEach((attribute, index) => {
+    addDelta(deltas, attribute, index === 0 ? GOALTENDER_PRIMARY_FOCUS_DELTA : GOALTENDER_SECONDARY_FOCUS_DELTA);
+  });
+  return deltas;
+}
+
+/**
+ * Verteilt `amount` (den Torwart-Fokusaufschlag auf EIN Attribut) als Abzug auf mehrere
+ * Feldrollen-Deltas — kapazitaetsgewichtet und iterativ wie `distributeNegativeDelta`, nur
+ * ueber SLOTS statt ueber Attribute innerhalb eines Slots. Gibt zurueck, was mangels Kapazitaet
+ * nicht untergebracht werden konnte; der Aufrufer muss den Rest dann dem Torwart selbst wieder
+ * abziehen, sonst bricht die Spaltensumme (und damit die Invariante).
+ */
+function distributeAmountAcrossThemeDeltas(
+  themeDeltas: MatchdaySlotRoleWeightProfile[],
+  baseWeights: MatchdaySlotRoleWeightProfile,
+  attribute: PlayerGeneratorAttributeKey,
+  amount: number,
+) {
+  let remaining = amount;
+  for (let attempt = 0; attempt < 4 && remaining > 0.001; attempt += 1) {
+    const capacities = themeDeltas.map((delta) => Math.max((baseWeights[attribute] ?? 0) + (delta[attribute] ?? 0) - 0.75, 0));
+    const totalCapacity = capacities.reduce((sum, capacity) => sum + capacity, 0);
+    if (totalCapacity <= 0) {
+      break;
+    }
+
+    let spent = 0;
+    themeDeltas.forEach((delta, index) => {
+      const capacity = capacities[index];
+      if (capacity <= 0) {
+        return;
+      }
+      const take = Math.min((remaining * capacity) / totalCapacity, capacity);
+      addDelta(delta, attribute, -take);
+      spent += take;
+    });
+    remaining = Math.max(remaining - spent, 0);
+  }
+  return remaining;
+}
+
+/**
+ * Slot-Profile fuer eine Themenliste, die einen Torwart enthaelt. Anders als der
+ * Standard-Zweig unten (eine einzige "letzte" Rolle traegt `-Σ` aller anderen) tragen hier ALLE
+ * Feldrollen gemeinsam den Ausgleich fuer den Torwart-Fokusaufschlag — das ist Variante C aus
+ * Plan 3.4 Punkt 4. Die Spaltensumme je Attribut bleibt trotzdem exakt 0: was der Torwart an
+ * einem Attribut bekommt, wird 1:1 von den Feldrollen desselben Attributs abgezogen.
+ */
+function buildSlotWeightProfilesWithGoaltender(
+  baseWeights: MatchdaySlotRoleWeightProfile,
+  selectedThemes: SlotRoleTheme[],
+  goaltenderIndex: number,
+) {
+  const fieldIndices = selectedThemes.map((_, index) => index).filter((index) => index !== goaltenderIndex);
+  const goaltenderDelta = buildGoaltenderDelta(selectedThemes[goaltenderIndex]!, baseWeights);
+  const fieldDeltas = fieldIndices.map((index) => buildInitialDelta(selectedThemes[index]!, baseWeights));
+
+  // WICHTIG: nicht nur den Torwart-Fokusaufschlag ausgleichen, sondern die SPALTENSUMME je
+  // Attribut ueber Torwart + alle Feldrollen. Jede Feldrolle traegt naemlich schon von sich aus
+  // (ueber `buildInitialDelta`) einen eigenen, nur INNERHALB ihrer selbst ausgeglichenen Delta —
+  // ueber mehrere Feldrollen hinweg addiert sich das je Attribut nicht von selbst zu 0 (das war
+  // bisher die Aufgabe der "letzten" Rolle). Ohne diesen Schritt bliebe der Torwart-Ausgleich
+  // unvollstaendig und die Invariante bricht.
+  for (const attribute of getPositiveAttributes(baseWeights)) {
+    const total = (goaltenderDelta[attribute] ?? 0) + fieldDeltas.reduce((sum, delta) => sum + (delta[attribute] ?? 0), 0);
+    if (Math.abs(total) <= 0.001) {
+      continue;
+    }
+    if (total > 0) {
+      const leftover = distributeAmountAcrossThemeDeltas(fieldDeltas, baseWeights, attribute, total);
+      if (leftover > 0.001) {
+        // Feldrollen konnten nicht alles tragen (Kapazitaetsgrenze) — der Rest schrumpft den
+        // Torwart-Fokus selbst, damit die Spaltensumme trotzdem exakt 0 bleibt.
+        addDelta(goaltenderDelta, attribute, -leftover);
+      }
+    } else {
+      // Feldrollen draenieren dieses Attribut in Summe schon unter die Basis (unabhaengig vom
+      // Torwart) — gleichmaessig auffuellen statt kapazitaetsgewichtet abzuziehen.
+      const share = -total / fieldDeltas.length;
+      fieldDeltas.forEach((delta) => addDelta(delta, attribute, share));
+    }
+  }
+
+  const deltasInOrder = selectedThemes.map((_, index) =>
+    index === goaltenderIndex ? goaltenderDelta : fieldDeltas[fieldIndices.indexOf(index)]!,
+  );
+
+  return roundedProfilesFromDeltas(baseWeights, deltasInOrder);
+}
+
 function buildSlotWeightProfiles(
   disciplineId: OfficialDisciplineWeightId,
   selectedThemes: SlotRoleTheme[],
@@ -425,6 +553,11 @@ function buildSlotWeightProfiles(
   const baseWeights = getBaseWeightProfile(disciplineId);
   if (selectedThemes.length <= 1) {
     return [baseWeights];
+  }
+
+  const goaltenderIndex = selectedThemes.findIndex((theme) => theme.roleId === GOALTENDER_ROLE_ID);
+  if (goaltenderIndex !== -1) {
+    return buildSlotWeightProfilesWithGoaltender(baseWeights, selectedThemes, goaltenderIndex);
   }
 
   const editableSlotDeltas = selectedThemes.slice(0, -1).map((theme) => buildInitialDelta(theme, baseWeights));
@@ -441,16 +574,8 @@ function buildSlotWeightProfiles(
       -scaledDeltas.reduce((sum, delta) => sum + (delta[attribute] ?? 0), 0),
     ]),
   ) as MatchdaySlotRoleWeightProfile;
-  const allDeltas = [...scaledDeltas, finalDelta];
 
-  return allDeltas.map((delta) =>
-    Object.fromEntries(
-      getPositiveAttributes(baseWeights).map((attribute) => [
-        attribute,
-        roundWeight(Math.max((baseWeights[attribute] ?? 0) + (delta[attribute] ?? 0), 0)),
-      ]),
-    ) as MatchdaySlotRoleWeightProfile,
-  );
+  return roundedProfilesFromDeltas(baseWeights, [...scaledDeltas, finalDelta]);
 }
 
 function resolveKeyAttributes(
