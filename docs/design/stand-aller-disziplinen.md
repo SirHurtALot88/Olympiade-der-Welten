@@ -1,0 +1,142 @@
+# Der Stand aller zwanzig Disziplinen
+
+Stand 02.09.2026. Gemessen mit `scripts/miss-alle-disziplinen.mjs 24`, also 24 Spiele je
+Disziplin, auf der **korrigierten Messbasis** (s. Abschnitt „Warum die alten Zahlen nicht
+mehr gelten").
+
+Chris' Frage war: *„welche sind quasi spielreif?"* — und dann, praeziser: *„dass die diszis
+INSGESAMT soweit fertig werden also was gameplay angeht, visuals, bewegungen, scoring usw"*.
+Dieses Dokument beantwortet beides, getrennt nach vier Achsen.
+
+---
+
+## 1. Rangtreue — die Abnahmezahl
+
+Die Schranke steht in CLAUDE.md und gilt fuer alle: **rho ueber 0,80 in EINEM Spiel**. Pro
+Saison kommt jede Disziplin nur ein paar Mal dran; eine Rangtreue, die sich erst ueber zwanzig
+Spiele einstellt, ist fuer den Spieler nicht vorhanden.
+
+Die zweite Spalte (rho ueber die Saison) sagt daneben, ob die Mechanik ueberhaupt das Richtige
+belohnt. Der Zusammenhang ist gemessen und traegt auf ±0,01:
+
+    rho(ein Spiel) = rho(Saison) x Wurzel(Verlaesslichkeit)
+
+| Disziplin | Chassis | rho je Spiel | rho Saison | |
+|---|---|---:|---:|---|
+| Speed-Schach | Buehne | 0,950 | 0,986 | bestanden |
+| Wettessen | Buehne | 0,921 | 0,979 | bestanden |
+| Time-Trial | Bahn | 0,902 | 0,998 | bestanden |
+| Eiskunstlauf | Buehne | 0,892 | 0,958 | bestanden |
+| Breaking | Buehne | 0,891 | 0,993 | bestanden |
+| Climbing | Bahn | 0,846 | 0,900 | bestanden |
+| Takeshi's Castle | Bahn | 0,842 | 0,958 | bestanden |
+| Basketball | Feldspiel | 0,786 | 0,881 | knapp |
+| Showcase | Buehne | 0,784 | 0,825 | knapp |
+| I-Spy | Buehne | 0,776 | 0,776 | knapp |
+| Staffel | Bahn | 0,757 | 0,818 | knapp |
+| Spurt | Bahn | 0,745 | 0,762 | knapp |
+| Gewichtheben | Buehne | 0,745 | 0,839 | knapp |
+| Hockey | Feldspiel | 0,670 | 0,874 | durchgefallen |
+| Mini-DM | Arena | 0,658 | 0,786 | durchgefallen |
+| Tennis | Feldspiel | 0,605 | 0,762 | durchgefallen |
+| TDM | Arena | 0,506 | 0,587 | durchgefallen |
+| Fechten | Arena | 0,495 | 0,559 | durchgefallen |
+| Battlefield | Arena | 0,469 | 0,500 | durchgefallen |
+| Football | Feldspiel | 0,307 | 0,776 | durchgefallen |
+
+**Sieben bestehen, sechs sind knapp, sieben fallen durch.**
+
+### Was die zwei Spalten zusammen sagen
+
+Wo die Saisonzahl hoch und die Einzelspielzahl niedrig ist, belohnt die Mechanik das Richtige,
+aber zu laut — das ist ein **Verlaesslichkeitsproblem**, und es loest sich ueber Ereignisdichte,
+nicht ueber Rezepte. Football (0,307 gegen 0,776) und Hockey (0,670 gegen 0,874) stehen genau
+so da.
+
+Wo beide Zahlen niedrig sind, belohnt die Mechanik das Falsche — ein **Validitaetsproblem**.
+Die ganze Arena steht so da (0,50 bis 0,59 in der Saison).
+
+---
+
+## 2. Warum die alten Zahlen nicht mehr gelten
+
+`zieheFormkarten` nahm `z % n` von einem linearen Kongruenzgenerator, also die UNTERSTEN Bits.
+Deren Periode ist bei vier Formwerten genau vier. Nachgerechnet ergaben **24 verschiedene
+Saaten genau VIER verschiedene Kartensaetze**, 1000 Saaten ebenfalls vier.
+
+Jede Rangtreue, jede Pp-Zahl und jeder Korridor dieses Projekts lief damit auf vier Spielen,
+die sich sechsmal wiederholten. Seit dem Umstieg auf die oberen Bits sind es 24 aus 24.
+
+**Die Basketball-Schranke lautet ab hier `0,786 / 0,881`** (Einzelspiel / Saison, n=24). Die
+alten `0,836 / 0,804 / 87,3 / 101,8 / 82,3` sind auf einer Stichprobe von vier entstanden und
+gelten nicht mehr.
+
+---
+
+## 3. Dieselbe Luecke, vier Mal
+
+`p.d` haelt genau ZWEI Disziplinwerte vorberechnet: `tdm` und `spurt`. Alle vier Chassis lasen
+die Eignung als `p.d[disziplin] || 0` — fuer die uebrigen achtzehn Disziplinen fiel der
+Basiswert damit auf 0, und `eig` bestand nur aus Slot-, Trait- und Formzuschlag.
+
+| Chassis | Funktion | behoben |
+|---|---|---|
+| Feldspiel | `bauFeldspiel` | 25.08. (Chris' Fund) |
+| Buehne | `bauBuehne` | 02.09. |
+| Bahn | `bauSpurt` | 02.09. |
+| Arena | `baueEinheit` | 02.09. |
+
+In der Arena wiegt sie am schwersten, weil `eigWert` dort ueber `aufEignung()` direkt in die
+KAMPFWERTE geht und nicht nur in die Anzeige. Fechtens fruehere 0,769 waren deshalb ein
+Zirkelschluss: die Messung verglich eine Zahl mit sich selbst.
+
+---
+
+## 4. Die anderen drei Achsen
+
+### Visuals
+
+Es gibt **vier Bilder fuer zwanzig Disziplinen**, eines je Chassis: `bodenFeldspiel`,
+`bodenBuehne`, `bodenArena`, `bodenSpurt`. Eigene Arenen haben genau zwei Disziplinen —
+Basketball (Court) und Eishockey (Eisflaeche mit Linien, Torraeumen, Toren). Die uebrigen
+achtzehn teilen sich das Bild ihres Chassis, mit kleinen Abweichungen wie Bodenfarbe
+(`BA().boden`), Hindernissen und Steigung.
+
+### Bewegungen
+
+Die Sprites koennen laufen, angreifen, stuerzen, taumeln und den Schlaeger fuehren. Ausser im
+Eishockey (Bodycheck, Torwartbogen, Schussphasen, Bandenzweikampf) gibt es keine
+disziplineigenen Bewegungen.
+
+### Scoring und Produktion
+
+Im echten Spielstand wird bislang **nur Basketball** ueber die Arena ausgespielt
+(`ARENA_RESOLVED_DISCIPLINE_IDS`). Die anderen neunzehn laufen ausschliesslich im Mockup.
+
+---
+
+## 5. Was als naechstes den groessten Hebel hat
+
+1. **Die Arena** — vier Disziplinen, alle unter 0,70, und die Ursache ist benannt: die Zielwahl
+   ist Geometrie, nicht Bedrohung (264 von 288 Kaempfern zielen auf den Naechsten). Die Zahl der
+   Gelegenheiten korreliert mit der Eignung nur zu 0,05 bis 0,25, der Schaden JE Gelegenheit
+   dagegen zu 0,42 bis 0,47. Der Motor kann den Staerkeren unterscheiden — er laesst ihn nur
+   nicht oefter ran.
+2. **Football und Tennis auf den Live-Motor.** Beide rechnen ihr Ergebnis vorab durch, ohne
+   Manndeckung, Zonen und Positionen. Footballs Saisonzahl (0,776) gegen die Einzelspielzahl
+   (0,307) sagt genau das: zu wenige Ereignisse, um einen Spieler zu erkennen.
+3. **Hockey.** Validitaet 0,874, Einzelspiel 0,670 — auch hier fehlt Verlaesslichkeit, nicht
+   Richtigkeit.
+4. **Die sechs Knappen** brauchen je eine Rezeptrunde nach Chris' Budget-Methode
+   (`scripts/baue-feldspiel-rezept.mjs`), keine Mechanikaenderung.
+
+---
+
+## 6. Das Werkzeug
+
+`window.__arena.disziplinProbe(dId, {n})` baut, laesst laufen und sammelt `wert()` und `eig` je
+Teilnehmer ein — fuer alle vier Chassis ueber dieselbe `MOTOREN`-Schnittstelle. Vorher gab es
+eine Sonde nur fuers Feldspiel, also fuer vier der zwanzig Disziplinen; ueber die anderen
+sechzehn liess sich gar nichts sagen.
+
+    node scripts/miss-alle-disziplinen.mjs [spiele] [disziplin ...]
