@@ -1477,6 +1477,65 @@
     return 0.8+(g-1)/9*0.5;
   }
 
+  // ============== WARUM DER FAKTOR ALLEIN NICHT REICHT ==============
+  //
+  // Chris: "skalier bitte die groessen ich will schon sehen dass ein lava golem groesser
+  // ist als ein tidesprinter oder so". Nachgemessen war er es nicht immer — und der Grund
+  // liegt nicht im Faktor, sondern in den Blaettern.
+  //
+  // Die Sprite-Blaetter sind unterschiedlich hoch GEZEICHNET: eine 64er-Zelle ist bei der
+  // einen Figur bis oben gefuellt (Krone, Hoerner, Haar, Fluegel), bei der naechsten bleibt
+  // ein Drittel Luft. Gemessen ueber den Kader reichen die Inhaltshoehen von 46 bis 62 px,
+  // also Verhaeltnis 1,34. Der Groessenfaktor spannt ueber die tatsaechlich vergebenen
+  // Groessen (5 bis 8) nur 1,02 bis 1,19, also 1,16 — WENIGER als die Blattstreuung. Das
+  // Blatt gewinnt, und dann steht eine Figur der Groesse 5 hoeher auf dem Eis als eine der
+  // Groesse 7.
+  //
+  // DIE HOEHENKORREKTUR macht die Blattstreuung weg, statt den Faktor aufzublasen. Sie
+  // misst einmal je Figur, wie hoch ihr Blatt WIRKLICH zeichnet, und skaliert auf eine
+  // gemeinsame Bezugshoehe. Danach ist die Bildschirmhoehe proportional zum Faktor — und
+  // damit zur eingestellten Groesse, so wie Chris' Groessen-Sheet es meint.
+  //
+  // GEMESSEN STATT TABELLIERT. Eine generierte Tabelle waere die zweite Kopie derselben
+  // Wahrheit, und genau daran ist in diesem Projekt schon einmal etwas auseinandergelaufen
+  // (die Slot-Profile im Motor gegen die in matchday-slot-roles.ts). Die Messung laeuft
+  // deshalb einmal je Figur beim ersten Zeichnen und liegt danach im Zwischenspeicher: ein
+  // 64x64-Offscreen-Bild, ein Alpha-Durchlauf, zwoelf Mal je Spiel.
+  //
+  // GEDECKELT auf HOEHEN_KORR_MIN..MAX: eine Figur, deren Blatt extrem flach oder extrem
+  // hoch zeichnet, soll nicht bis zur Unkenntlichkeit gestaucht oder gestreckt werden. Wer
+  // an den Deckel stoesst, behaelt einen Rest Blattcharakter — das ist ehrlicher, als ein
+  // Kraken-Blatt auf Menschenhoehe zu quetschen.
+  const HOEHEN_BEZUG=52;        // PLATZHALTER: Median der gemessenen Blatthoehen im Kader
+  const HOEHEN_KORR_MIN=0.80, HOEHEN_KORR_MAX=1.25;
+  const hoehenKorrSpeicher=new Map();
+  function hoehenKorrektur(u){
+    if(!u||!u.n)return 1;
+    if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
+    let korr=1;
+    try{
+      // DOPPELT SO GROSSE MESSLEINWAND wie die Zelle. Bei 64x64 klebt ein hohes Blatt
+      // (Krone, Hoerner, Fluegel) oben an der Kante und wird zu KLEIN gemessen — und
+      // ausgerechnet die Figuren, die die Korrektur am noetigsten haben, bekaemen dann
+      // keine. Nachgemessen betraf das vier von elf Figuren im Kader.
+      const MESS=128, ankerY=MESS*46/64;
+      const c=document.createElement("canvas"); c.width=MESS; c.height=MESS;
+      const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+      // Messfigur ohne Groesse: so misst der Durchlauf das BLATT, nicht das Ergebnis.
+      zeichneSprite(cx,{n:u.n,x:MESS/2,y:ankerY,vx:5,vy:0,id:0,lunge:0,down:false,side:0,hop:0},MESS/2,ankerY,false);
+      const px=cx.getImageData(0,0,MESS,MESS).data;
+      let oben=null,unten=null;
+      for(let y=0;y<MESS;y++)for(let x=0;x<MESS;x++)
+        if(px[(y*MESS+x)*4+3]>16){ if(oben==null)oben=y; unten=y; break; }
+      const hoehe=(oben==null)?0:unten-oben+1;
+      // Steht die Figur trotz der grossen Leinwand an der Kante, ist die Zahl eine
+      // Untergrenze — dann lieber gar nicht korrigieren als falsch.
+      if(hoehe>8&&oben>0&&unten<MESS-1)korr=Math.max(HOEHEN_KORR_MIN,Math.min(HOEHEN_KORR_MAX,HOEHEN_BEZUG/hoehe));
+    }catch(e){ korr=1; }
+    hoehenKorrSpeicher.set(u.n,korr);
+    return korr;
+  }
+
   // Welche Animation zu welchem Zustand gehoert — und wie viele Bilder sie hat.
   const ANIBILDER={walk:9,slash:6,shoot:13,hurt:6};
 
@@ -1670,7 +1729,7 @@
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
     // Zahl statt einer zweiten.
-    const Z=groesseFaktor(u.groesse);
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -4171,6 +4230,18 @@
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
   // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
   function klassifiziereWurfdistanz(zumKorb,erzwingen){
+    // EISHOCKEY HAT EIGENE SCHUSSWEITEN, s. HK_RADIUS_* — Basketballs Staffel endet bei
+    // 170 px, die blaue Linie liegt bei 295. Ohne diese Weiche gibt jeder Verteidiger,
+    // der auf seinem Slot steht, `null` zurueck: kein Schuss, nie, ausser die Schussuhr
+    // zwingt ihn. Der Schuss von der blauen Linie — im echten Eishockey die zweithaeufigste
+    // Schussart — kam im Spiel damit ueberhaupt nicht vor.
+    if(istHockey()){
+      if(zumKorb<HK_RADIUS_ABSTAUBER)return "dunk";
+      if(zumKorb<HK_RADIUS_SLOT)return "nah";
+      if(zumKorb<HK_RADIUS_HOCHSLOT)return "mit";
+      if(erzwingen||zumKorb<HK_RADIUS_MAX)return "fern";
+      return null;
+    }
     if(zumKorb<DUNK_RADIUS)return "dunk";
     if(zumKorb<KORB_NAH_RADIUS)return "nah";
     if(zumKorb<DREIER_RADIUS)return "mit";
@@ -4842,7 +4913,13 @@
   // PLATZHALTER und gegen die Torzahl gemessen (scripts/miss-hockey-korridor.mjs), nicht
   // geraten — aber sie sitzt auf Basketballs Wurfformel, nicht auf einer eigenen. Die
   // eigene Erfolgsformel und das Zonenmodell kommen in Schritt 4 des Hockey-Plans.
-  const HK_TOR_SKALA=0.700;
+  // NACHGEZOGEN 0,700 -> 0,440, weil die Hockey-Schussweiten (HK_RADIUS_*) das
+  // Schussvolumen von 26,6 auf 38,2 Versuche je Team gehoben haben: mit dem alten Faktor
+  // fielen 5,58 Tore je Team statt 3,5. Gemessen, 24 Spiele je Lauf:
+  //   Faktor 0,700 -> 5,58 Tore, Fangquote 83,3 %
+  //   Faktor 0,440 -> 3,54 Tore, Fangquote 89,4 %   (gewaehlt)
+  // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
+  const HK_TOR_SKALA=0.440;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -4876,6 +4953,90 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
+  // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
+  // bei 78 (Netfront), 165 (Half-Wall) und 295 px (Point, blaue Linie). Mit Basketballs
+  // Deckel bei 170 gab `klassifiziereWurfdistanz` fuer BEIDE Verteidiger `null` zurueck —
+  // sie konnten von ihrer eigenen Position aus nie schiessen, nur die Schussuhr brachte
+  // sie ueberhaupt zum Abschluss.
+  //
+  // DER MASSSTAB, an dem die vier Zahlen haengen: der Point-Slot bei 295 px IST die blaue
+  // Linie, real 19,5 m bzw. 64 Fuss von der Torlinie. Das sind 4,6 px je Fuss. Damit
+  // uebersetzen sich die realen Schusszonen (Quellen in
+  // docs/design/hockey-torwart-puck-tore-recherche-fable.md, Abschnitt xG-Faktoren, dort
+  // "Tore peak around 10 feet") eins zu eins:
+  //   Abstauber/Direktabnahme im Torraum   bis 12 Fuss   ->  58 px
+  //   Slot                                 bis 30 Fuss   -> 140 px
+  //   hoher Slot / Bullykreise             bis 47 Fuss   -> 215 px
+  //   blaue Linie                          bis 72 Fuss   -> 330 px
+  // Jeder der drei Feldslots liegt damit in einer eigenen Stufe: Netfront (78) schiesst
+  // "nah", Half-Wall (165) "mit", Point (295) "fern".
+  const HK_RADIUS_ABSTAUBER=58, HK_RADIUS_SLOT=140, HK_RADIUS_HOCHSLOT=215, HK_RADIUS_MAX=330;
+  // Wunschdistanz des Puckfuehrers (s. bewegeSpielerLive). Basketball faehrt hier
+  // DREIER_RADIUS+18 = 130,8 als weitesten Punkt; wer im Hockey den Puck bekam, fuhr
+  // deshalb IMMER bis auf 131 px an das Tor heran, auch der Verteidiger, der gerade an der
+  // blauen Linie stand. 295 ist genau der Point-Slot: ein reiner Distanzschuetze bleibt
+  // dort stehen, wo ihn die Aufstellung ohnehin hinstellt, statt seinen Posten zu verlassen.
+  const HK_WUNSCH_MAX=295;
+  // LOSER PUCK ALS WETTLAUF, NICHT ALS STANDPLATZ (Chris woertlich, 02.09.: "Das muss
+  // dann auf jeden fall angepasst und gefixt werden das kann nicht nur positionssache
+  // sein").
+  //
+  // ZUERST DER BEFUND, DER DIE VERMUTUNG WIDERLEGT — und er steht hier, weil sonst der
+  // naechste dieselbe Runde noch einmal dreht. Die Vermutung war: der Zweikampf um den
+  // losen Puck traegt rund 40 % der Impact-Masse und haengt daran, wer im Moment der
+  // Aufloesung schon in GREIF_REICHWEITE steht, also an der Aufstellung. Nachgemessen ist
+  // das FALSCH (scripts/miss-losen-puck-quelle.mjs, 40 Spiele je Lauf):
+  //
+  //   Bezug                                       ZWEITCHANCE   SCHUSS_NAH (= Slot)
+  //   alter Stand                                    r 0,943        r 0,626
+  //   Slot-Reihenfolge komplett UMGEDREHT             r 0,950        r 0,605
+  //
+  // Der zweite Lauf ist der entscheidende: dort bekommt der SCHLECHTESTE SCHUSS_NAH den
+  // Netfront-Slot und der beste die blaue Linie. Waere der lose Puck Positionssache,
+  // muesste die Rangliste kippen. Sie kippt nicht — Greenkraut faellt von 17,5 auf 15,0
+  // Pucks je Spiel, Draco (13,5 -> 13,6) und Lava Golem (13,0 -> 13,2) bewegen sich gar
+  // nicht, und kein einziger Rang tauscht. Der lose Puck haengt praktisch vollstaendig an
+  // ZWEITCHANCE.
+  //
+  // WAS WIRKLICH KLEMMT, ist damit eine Etage tiefer und gehoert ins Rezept, nicht in
+  // diese Mechanik: ZWEITCHANCE ist einer der vier ausdruecklich UNKALIBRIERTEN
+  // Platzhalter-Sub-Skills (s. battle-mode.rezepte.js, Hockey-Block), traegt aber allein
+  // rund 47 % der Impact-Masse. Lava Golem ist nach Eignung der achtbeste Hockeyspieler
+  // des Kaders und hat den HOECHSTEN ZWEITCHANCE-Wert — er landet dadurch auf Impact-Rang
+  // 3. Solange ein einzelner Sub-Skill fast die halbe Wertung traegt und die Eignung ihn
+  // nur mit einem Elftel gewichtet, KANN die Rangtreue nicht stimmen. Das ist Schritt 4
+  // des Hockey-Plans (eigenes Sub-Skill-Set), nicht diese Runde.
+  //
+  // WARUM DIE UMSTELLUNG TROTZDEM BLEIBT. Sie aendert die Zahl nicht (gemessen), aber sie
+  // raeumt drei Sachverhalte auf, die vorher schlicht falsch modelliert waren: der
+  // Kandidatenkreis ist jetzt, wer den Puck im Laufzeitfenster ERREICHEN kann statt wer
+  // zufaellig danebensteht, ein Gestuerzter laeuft nicht mehr mit, und der Torwart
+  // startet keinen Wettlauf quer ueber das Eis. Auf ihr setzen die Puck-Zweikaempfe auf.
+  //
+  // Die Laufzeit rechnet mit derselben Tempoformel wie die Bewegung selbst (s.
+  // bewegeSpielerLive: 230 px/s plus 0,70 je LAUFTEMPO-Punkt ueber 50), inklusive
+  // Taumel-Bremse nach einem Bodycheck. Wer frueher da ist, behaelt seinen Vorteil — er
+  // geht als exponentiell fallendes Gewicht ein, nicht als Ja/Nein.
+  //
+  // PUCK_LAUF_FENSTER ist bewusst laenger als die Ringphase (0,40-0,55s): auch wer erst
+  // kurz nach der Aufloesung ankaeme, ist im Gerangel noch ein Faktor. TAU unter dem
+  // Fenster haelt den Ankunftsvorteil scharf — bei 0,45s Laufweg bleiben 28 % Gewicht.
+  const PUCK_LAUF_FENSTER=0.70, PUCK_ANKUNFT_TAU=0.35;
+  // Torwart-Bewertung, s. feldspielWert. Alle drei PLATZHALTER, gegen die Rangtreue
+  // gemessen: HK_TW_REF ist die gemessene Fangquote unserer Liga, HK_TW_BASIS der
+  // gemessene Mittelwert der Feldspieler-Impacts, HK_TW_GSAA_K die Spreizung je Tor
+  // ueber oder unter dem Durchschnitt.
+  // HK_TW_GSAA_K von 3,0 auf 2,0 (Overseer-Fund): GSAA streut je Spiel mit rund 1,8
+  // Toren. Mit Gewicht 3 streute der Torwart-Impact damit um 5,4, waehrend Feldspieler um
+  // 3,46 streuen — der Torwart wurde in der Einzelspiel-Rangfolge zum lautesten Posten.
+  // 3,46/1,8 = 1,9; 2,0 gleicht die Streuung an, ohne den Mittelwert zu verschieben.
+  // HK_TW_BASIS ist der GEMESSENE Mittelwert der Feldspieler-Impacts und muss nach JEDER
+  // Aenderung der Wertformel nachgezogen werden — sonst faellt der Torwart aus der
+  // Rangfolge, ohne dass sich an ihm etwas geaendert haette. Genau das ist beim Einbau von
+  // Steals und Schussvolumen passiert: die Feldspieler stiegen von 3,8 auf 8,5, der Torwart
+  // blieb bei 3,8 und rutschte von Rang 5 auf Rang 9.
+  const HK_TW_REF=0.844, HK_TW_BASIS=8.5, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
@@ -4892,8 +5053,55 @@
   // Formel statt die der Mechanik.
   function feldspielWert(u,dId){
     if((dId||feldspielDisc)==="hockey"){
-      if(u.torwart)return u.saves*0.35-u.gegentore*1.5+u.punkte*3+u.assists*2;
-      return u.punkte*3+u.assists*2+u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.6;
+      // DER TORWART WIRD WIE IM ECHTEN EISHOCKEY BEWERTET: ueber GSAA (goals saved above
+      // average), also erwartete Gegentore bei Liga-Fangquote minus tatsaechliche
+      // Gegentore. Genau das ist die Groesse, mit der die NHL Torwaerter vergleicht, und
+      // sie loest das Problem, das die erste Fassung hatte.
+      //
+      // WARUM DIE ERSTE FASSUNG FALSCH WAR — nachgemessen, nicht vermutet. Sie las
+      // `saves*0,35 - gegentore*1,5`. Bei 18 Paraden und 3,4 Gegentoren macht das 0,4,
+      // waehrend ein Feldspieler im Mittel bei 3,8 liegt. Die beiden Torwaerter standen
+      // dadurch auf Rang 2 und 3 der Eignung und auf den LETZTEN Raengen des Impacts, und
+      // das allein druckte die Rangtreue der ganzen Disziplin von 0,830 (ohne Torwaerter
+      // gerechnet) auf 0,587. Ein Torwart kann nicht strukturell der schlechteste Spieler
+      // auf dem Eis sein.
+      //
+      // ZWEI TEILE, und die Trennung ist der Punkt:
+      //   HK_TW_BASIS  was eine gespielte Schicht im Tor ueberhaupt wert ist — auf den
+      //                gemessenen Mittelwert der Feldspieler gelegt, damit ein
+      //                DURCHSCHNITTLICHER Torwart einen durchschnittlichen Beitrag hat.
+      //   GSAA         was er BESSER oder SCHLECHTER war als der Durchschnitt. Positiv,
+      //                wenn er mehr gehalten hat, als die Referenzquote erwarten laesst.
+      // Ohne den Basisteil bekaeme ein tadelloser Durchschnittstorwart eine Null, und die
+      // Rangtreue waere genauso kaputt wie vorher, nur andersherum.
+      //
+      // HK_TW_REF ist die Referenz-Fangquote und ein PLATZHALTER: gemessen liegt unsere
+      // Liga bei 84,4 % (32 Spiele), real bei .902. Genommen wird der GEMESSENE Wert, nicht
+      // der reale — GSAA vergleicht einen Torwart mit seiner eigenen Liga, nicht mit der
+      // NHL. Nach jeder Kalibrierung der Torzahl gehoert er nachgezogen; laeuft er weg,
+      // verschiebt sich nur der Nullpunkt, nicht die Reihenfolge.
+      if(u.torwart){
+        const schuesse=u.saves+u.gegentore;
+        const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
+        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists*2;
+      }
+      // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
+      //
+      // (1) STEALS FEHLTEN GANZ. Ein Feldspieler erobert 2,5 Pucks je Spiel, und diese
+      //     Groesse korreliert mit der Eignung (0,67 ueber die Saison) — sie stand
+      //     trotzdem in keiner Zeile. Puck erobern ist im Eishockey eine Hauptaufgabe.
+      //
+      // (2) DER VERLUST-ABZUG BESTRAFTE DEN STAR. Bei 0,6 radierte er 46 % der
+      //     Bruttomasse eines Feldspielers wieder weg, und Verluste korrelieren POSITIV
+      //     mit der Eignung (+0,38): wer den Puck fuehrt, wird gecheckt. Der beste
+      //     Spieler wurde also dafuer bestraft, dass er ueberhaupt am Puck war. Auf 0,2
+      //     gesenkt — ein Verlust bleibt teuer, aber er kippt die Rangfolge nicht mehr.
+      //
+      // (3) SCHUSSVOLUMEN ZAEHLT. Corsi ist im Eishockey die gaengigste Einzelgroesse
+      //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
+      //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
+      return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
+            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
   }
@@ -5351,7 +5559,12 @@
     // nur den zugewiesenen `decker` — bei zwei oder mehr gilt der Ballfuehrer als
     // gedoppelt (der zweite kommt ueber die Hilfe-Bewegung in bewegeSpielerLive
     // zustande, die dafuer ihren eigenen Mann kurz freigibt).
-    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>dist(u,v)<BEDRAENGT_RADIUS);
+    // DER TORWART BEDRAENGT NIEMANDEN (Overseer-Fund). Er steht per Definition dort, wo
+    // die gefaehrlichsten Schuesse fallen — jeder Schuss aus dem Torraum zaehlte deshalb
+    // als "gedoppelt" und bekam den vollen doppelMalus von 0,26, obwohl gar kein zweiter
+    // Feldspieler in der Naehe war. Der Torwart ist die Huerde, die die Schussaufloesung
+    // ohnehin schon abbildet; ein zweites Mal als Bedraenger zaehlt er doppelt.
+    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!v.torwart&&dist(u,v)<BEDRAENGT_RADIUS);
     const gedoppelt=naheVerteidiger.length>=2;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
     // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
@@ -5735,7 +5948,7 @@
     // Fuer die Doppeln-Abnahme (s. Bericht): dieselbe naheVerteidiger-Zaehlung wie in
     // entscheideBallaktion, hier am Schuetzen im Abwurfmoment (kann bei Spielzuegen/
     // Alley-Oop von der Person abweichen, die die Aktion ausgeloest hat).
-    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
+    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!v.torwart&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
     // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
@@ -6096,7 +6309,12 @@
     // bei starkem Druck nicht am alten 0,32-Deckel verpufft — s. Aufrufstelle in
     // entscheideBallaktion. Default 0 fuer jeden normalen Pass (keine Verhaltensaenderung).
     let abgefangenVon=null, minD=Infinity, waechter=null;
+    // Auch hier faellt der Torwart heraus: er steht auf der Torlinie, und eine Passlinie,
+    // die dort vorbeifuehrt, ist keine, die er abfangen koennte, ohne sein Tor zu
+    // verlassen. Gemessen fing er regelmaessig Paesse ab, die quer durch die eigene Zone
+    // liefen.
     for(const v of FSTEAM[1-von.side]){
+      if(v.torwart)continue;
       const d=distZuLinie(v,von,nach);
       if(d<minD){minD=d;waechter=v;}
     }
@@ -6293,6 +6511,21 @@
   }
   function loeseHockeySchuss(flug,art){
     const schuetze=flug.schuetze, hk=flug.hockey, tw=hk.torwart;
+    // DIE ABNAHME MUSS DIESE SCHUESSE SEHEN. Ein gehaltener, abgeprallter oder geblockter
+    // Schuss war GENOMMEN und ist NICHT reingegangen — fuer jede Trefferquoten-Statistik
+    // also ein Fehlwurf. Er wird aber als "block" protokolliert, und die Zaehlung in der
+    // Sonde liest nur "treffer" und "fehlwurf". Der Overseer hat nachgemessen, was das
+    // anrichtet: von 51 Schuessen je Spiel sah die Sonde 12,4 — alle Tore plus nur die
+    // am Tor vorbei — und meldete daraufhin eine Trefferquote von 55 % je Distanzstufe.
+    // Die Stufen- und Bandtabellen waren fuer Hockey damit unbrauchbar.
+    //
+    // `wurf:true` markiert diese Ereignisse als genommenen Wurf; die Zaehlung nimmt sie
+    // dann mit auf. Basketballs Block-Ereignisse tragen die Marke nicht und bleiben
+    // aussen vor, dort ist ein Block auch wirklich kein genommener Wurf desselben Typs.
+    const wurfDaten={wurf:true, tier:flug.tier, zumKorbBeiWurf:flug.zumKorbBeiWurf,
+      deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,
+      deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
+      imFastbreakBeiWurf:flug.imFastbreakBeiWurf, gedoppeltBeiWurf:flug.gedoppeltBeiWurf};
     const torX=flug.nach.x, torY=flug.nach.y;
     // Richtung "zurueck ins Feld" vom angegriffenen Tor aus gesehen.
     const rein=torX>MID?-1:1;
@@ -6319,7 +6552,7 @@
       b.bloecke++; b.lunge=0.5;
       feed(b.side,b.n+" wirft sich in den Schuss — geblockt.");
       schwebe({x:0,y:0,txt:"BLOCK!",life:1.1,crit:true,_def:true,_spieler:b.id});
-      logZug(b.side,"block",{verteidiger:b,spieler:schuetze});
+      logZug(b.side,"block",{verteidiger:b,spieler:schuetze,...wurfDaten});
       fsAktuell={spieler:null,verteidiger:b,passgeber:flug.passgeber,rebounder:null};
       // Der geblockte Puck springt dort weg, wo der Flug geendet hat — also am Blocker
       // (s. wirf: flugNach zeigt bei einem Block auf ihn), nicht an seiner inzwischen
@@ -6333,7 +6566,7 @@
       tw.saves++;
       feed(tw.side,tw.n+" pariert — "+art.wortRebound+" vor dem Tor!");
       schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
-      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
       // Der Puck liegt frei vor dem Tor — daraus wird ueber die bestehende
@@ -6347,7 +6580,7 @@
       tw.saves++;
       feed(tw.side,tw.n+" pariert und hält fest — Bully.");
       schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
-      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
       // Bully im Zonenkreis: dieselbe Hoehe wie der Schuetze stand, damit das Anspiel dort
@@ -6594,7 +6827,7 @@
         // Wurfauswahl rechnen unveraendert weiter.
         const profil=u.SCHUSS_FERN-u.SCHUSS_NAH;
         const anteil=Math.max(0,Math.min(1,(profil+12)/26));
-        const wunsch=(DREIER_RADIUS+18)*anteil;
+        const wunsch=(istHockey()?HK_WUNSCH_MAX:DREIER_RADIUS+18)*anteil;
         const zumFeldB=u.side===0?-1:1;
         zy=H/2+(u.id%2?40:-40);
         // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
@@ -7062,7 +7295,31 @@
         if(!nah.length){ fsLive.reboundKampf=null; } // Ball wieder ausser jeder Reichweite gerollt
         else if(fsLive.reboundKampf.t>=fsLive.reboundKampf.dauer){
           const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
-          const kandidaten=jetzt.length?jetzt:nah;
+          let kandidaten=jetzt.length?jetzt:nah;
+          // WETTLAUF UM DEN LOSEN PUCK (Hockey), Begruendung bei PUCK_LAUF_FENSTER.
+          // `ankunft` bleibt ausserhalb von Hockey null, dann ist das Gewicht unten
+          // Zeichen fuer Zeichen das alte — Basketball darf sich hier nicht bewegen.
+          let ankunft=null;
+          if(istHockey()){
+            ankunft=new Map();
+            const erreichbar=[];
+            for(const u of [...FSTEAM[0],...FSTEAM[1]]){
+              const weg=Math.max(0,dist(u,f)-GREIF_REICHWEITE);
+              // DER TORWART LAEUFT DEM PUCK NICHT NACH. Er bleibt nach der alten Regel
+              // Kandidat, wenn der Puck ohnehin in seiner Reichweite liegt (der Fall
+              // "loser Puck im eigenen Torraum", s. offensterMitspieler) — aber er
+              // startet keinen Wettlauf quer ueber das Eis.
+              if(u.torwart){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
+              // Wer liegt, laeuft nicht: nach einem Bodycheck ist der Gestuerzte fuer
+              // HK_STURZ Sekunden raus und taumelt danach mit HK_TAUMEL_TEMPO weiter.
+              if(u.down)continue;
+              const tempo=(230+(u.LAUFTEMPO-50)*0.70)*(u.taumeltBis>fsT?HK_TAUMEL_TEMPO:1);
+              const t=weg/tempo;
+              if(t<=PUCK_LAUF_FENSTER){ ankunft.set(u,t); erreichbar.push(u); }
+            }
+            if(erreichbar.length)kandidaten=erreichbar;
+            else ankunft=null;
+          }
           // Fable-Fund (Animations-Runde, 25.08.): der Rebound-Kampf loeste bisher rein
           // per Los auf — im Gedraenge sah man niemanden nach dem Ball greifen, weder
           // Gewinner noch Verlierer. Alle Kandidaten bekommen denselben lunge-Puls wie
@@ -7106,7 +7363,8 @@
           // `f.vonSeite` ist die Seite, die geworfen hat; wer NICHT von dort kommt,
           // verteidigt und bekommt den Ausbox-Vorteil.
           const gewinner=gewichtetesLosNach(kandidaten,
-            k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT));
+            k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT)
+              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1));
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
@@ -14769,7 +15027,9 @@
               else { rebDef++; rebDefSeite[e.seite]++; }
             }
             if((e.art==="fehlwurf"||e.art==="block")&&!e.freiwurf)fehlSeite[e.spieler.side]++;
-            if(e.art!=="treffer"&&e.art!=="fehlwurf")continue;
+            // `e.wurf` holt die gehaltenen/geblockten Hockey-Schuesse mit herein (s.
+            // loeseHockeySchuss); ohne sie zaehlt die Sonde nur ein Viertel der Schuesse.
+            if(e.art!=="treffer"&&e.art!=="fehlwurf"&&!e.wurf)continue;
             if(e.freiwurf)continue;
             const z=holeFg(e.spieler.id);
             const d=e.deckerAbstandBeiWurf;
@@ -14898,8 +15158,14 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
-    renderProbe:(name,ani,feldspiel,dir,lunge)=>{
-      const c=document.createElement("canvas"); c.width=64; c.height=64;
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand)=>{
+      // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
+      // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
+      // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
+      // KLEIN und meldete eine Rangkorrelation von 0,67, wo in Wahrheit 1,00 stand. Der
+      // Ankerpunkt waechst mit, damit die Figur weiter auf demselben relativen Boden steht.
+      const gr=Math.max(64,Math.round(leinwand||64));
+      const c=document.createElement("canvas"); c.width=gr; c.height=gr;
       const ctx=c.getContext("2d");
       // dir (0-3, optional) erzwingt eine Blickrichtung ueber vx/vy statt sich auf den
       // ani==="walk"-Normalfall (immer "rechts") zu verlassen — noetig, um Vollbild- und
@@ -14910,7 +15176,14 @@
       // 0 hinten(vy<0), 1 links(vx<0), 2 vorn(vy>0), 3 rechts(vx>0), s. blickAus().
       const richtung=[[0,-5],[-5,0],[0,5],[5,0]];
       const [vx,vy]=dir!==undefined&&dir!==null?richtung[dir]:[ani==="walk"?5:0,0];
-      const u={n:name,x:32,y:46,vx,vy,id:0,
+      // GROESSE MITGEBEN. Sie fehlte hier, und damit zeichnete die Sonde JEDE Figur mit
+      // Faktor 1 — eine Groessenpruefung ueber renderProbe verglich also nur die
+      // Rohbilder der Blaetter und sagte ueber die eingestellte Groesse gar nichts.
+      // Gemessen fiel es auf, weil eine Figur der Groesse 5 hoeher gezeichnet wurde als
+      // eine der Groesse 8. Aus dem Kader gelesen, nicht als Aufrufwert: die Sonde soll
+      // zeigen, was das Spiel zeigt.
+      const kaderEintrag=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      const u={n:name,x:gr/2,y:gr*46/64,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
         lunge:lunge!==undefined&&lunge!==null?lunge:((ani==="slash"||ani==="shoot")?0.1:0),
         down:ani==="hurt",side:0,hop:0};
       zeichneSprite(ctx,u,32,46,!!feldspiel);

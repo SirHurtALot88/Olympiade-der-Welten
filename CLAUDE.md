@@ -35,6 +35,55 @@ die Domain müsste in der Netzwerk-Policy der Claude-Code-Umgebung freigeschalte
 die behandelt `#` interaktiv nicht als Kommentar — eine Zeile wie `befehl   # erklaerung` scheitert
 mit `command not found: #`. Erklärungen gehören in den Fließtext, nicht in die Befehlszeile.
 
+## Die Abnahme jeder Disziplin: ein Spiel, nicht eine Saison
+
+**Gilt für alle zwanzig Disziplinen, nicht nur für Hockey.** Chris am 02.09., wörtlich:
+„wichtig wäre auch dass es irgendwie möglich ist das umzusetzen innerhalb von einem spiel!
+Wir haben ja pro season dann nur 2x Hockey. das muss also auch für sich wenn es einmal dran
+kommt REALISTISCH ablaufen und >80% sein" — und danach: „und das gilt natürlich für alle
+diszis merke dir das schon mal für das gesamtprojekt".
+
+Eine Saison enthält je Disziplin nur eine Handvoll Spiele, im Eishockey zwei. Eine
+Rangtreue, die sich erst über zwanzig Spiele einstellt, ist für den Spieler deshalb nicht
+vorhanden. **Die Abnahmezahl ist rho in EINEM Spiel, Ziel über 0,80, angestrebt 0,85.**
+
+Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
+vermutete, und der Unterschied entscheidet, wo man arbeitet.
+
+**Zwei Größen, nicht eine.** Eine Einzelspiel-Rangtreue zerfällt in ein Produkt:
+
+    rho(ein Spiel) = rho(Saison) x Wurzel(Verlaesslichkeit)
+
+Die **Verlässlichkeit** sagt, wie gut ein Spiel das nächste vorhersagt — sie hängt an der
+Ereigniszahl. Die **Validität** (rho über die Saison) sagt, ob die Mechanik überhaupt das
+belohnt, was die Eignung misst — sie hängt am Rezept und an den Kanälen. Nachgemessen für
+Hockey (24 Spiele, 10 Feldspieler): Verlässlichkeit 0,755, Validität 0,82, Produkt 0,71 —
+und gemessen kommt 0,719 heraus, die Formel trägt auf ±0,01.
+
+**Mehr Ereignisse helfen fast nie.** Bei Hockey mit verdoppelter Spielzeit stieg die
+Verlässlichkeit von 0,755 auf 0,85 — und rho blieb bei 0,719 / 0,721 / 0,723. Flach.
+Unser Hockeyspiel hat je Minute bereits die dreizehnfache NHL-Ereignisdichte. **Wer die
+Rangtreue heben will, arbeitet an der Validität, nicht an der Uhr.**
+
+**Was rho drückt, ist oft gar kein Fehler.** In Hockey steht der eignungsbeste Feldspieler
+in 79 % der Spiele auf Rang 1, in 94 % in den ersten zwei, nie auf dem letzten. Paare mit
+mindestens 15 Eignungspunkten Abstand werden zu 99 % richtig geordnet. Was rho nach unten
+zieht, sind Paare unter zwei Punkten Abstand — die kann kein Motor der Welt ordnen, und sie
+sollen es auch nicht. **Die ehrlichere Abnahme fragt deshalb nach dem Star und nach der
+Paartreue mit Abstand**, nicht nach einer nackten Rangkorrelation über alle Paare.
+
+| Größe | Hockey | Basketball |
+|---|---:|---:|
+| rho je Spiel | 0,706 | 0,836 |
+| Verlässlichkeit des Impacts | 0,755 | 0,761 |
+| Validität (Saison) | 0,82 | — |
+| Star auf Rang 1 | 79 % | — |
+| Star in den ersten zwei | 94 % | — |
+
+Werkzeuge dafür: `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` für die Zahl selbst,
+`scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48`, wenn eine Rolle (Torwart) eine eigene
+Wertformel hat und die Gesamtzahl allein nicht sagt, wo es klemmt.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
