@@ -3585,6 +3585,112 @@
   // sekunden, was bei laufendem Spiel ~3,6 echten Sekunden entspricht.
   const PFIFF_DAUER=1.8;            // Simulationssekunden, s. Kommentar oben
   const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
+
+  // ===================================================================================
+  // HOCKEY — SCHUSSABLAUF (Daten fuer einen Bewegungsablauf, KEIN Live-Motor). Hockey hat
+  // noch keine Live-Engine wie stepBasketballLive (die MOTOREN[hockey] weiter unten
+  // rechnet die Partie vorab durch, s. Kommentar dort) — das hier ist Vorarbeit fuer den
+  // Moment, in dem eine entsteht: WANN welche Haltung gilt, nicht WIE sie gezeichnet
+  // wird (das macht der Schlaeger-Zeichenagent) oder WER wann schiesst (das der Live-
+  // Motor, spaetere Runde). Nach demselben Muster wie die Freiwurf-Sequenz oben (FW_*,
+  // freiwurfGeo/-Aufstellung, stepFreiwurfPhase): eine Zeitvariable je Phase, keine
+  // Bildnummern-Tabelle.
+  //
+  // ZWEI SCHUSSARTEN, nicht eine — begruendet aus demselben Rezept, das Hockey im Plan
+  // schon hat (docs/design/hockey-rollout-plan.md, Abschnitt B.2/B.3): SCHUSS_NAH
+  // (dexterity-gefuehrt, Ablenker/Nachschuss aus dem Slot) und SCHUSS_FERN (power-
+  // gefuehrt, Schusshaerte von der blauen Linie) sind dort bereits als zwei verschiedene
+  // Schuetzentypen angelegt. Ein einzelner Ablauf fuer beide waere fuer den einen zu lang
+  // und fuer den anderen zu kurz — Handgelenk- und Schlagschuss unterscheiden sich in der
+  // Technik, nicht nur in der Staerke. "handgelenk" bedient das SCHUSS_NAH-Profil, "schlag"
+  // das SCHUSS_FERN-Profil.
+  //
+  // ZEITEN, NICHT GERATEN:
+  //  - Schlagschuss ("schlag"): das lange Ausholen ist die Pointe der Bewegung UND ihr
+  //    bekannter Nachteil im echten Spiel. Wikipedia ("Slapshot"): "a player usually
+  //    cannot take a slapshot while under any significant pressure ... because they could
+  //    easily interfere during the windup". Ein NHL-Analytics-Zitat bei Yahoo Sports
+  //    ("The slap shot is dying", 2024) beziffert die Groessenordnung konkret: "A 90 MPH
+  //    shot from the point takes nearly half a second to get on net" — schon der Flug
+  //    allein liegt bei ~0,5s, das Ausholen davor kommt zeitlich VOR diesem Wert obendrauf.
+  //    Gesamtdauer hier: 0,82s (0,42 Ausholen + 0,14 Schuss + 0,26 Halten) — innerhalb der
+  //    von Chris vorgegebenen Groessenordnung "eine halbe bis eine Sekunde vom Ausholen
+  //    bis zum Treffen".
+  //  - Handgelenkschuss ("handgelenk"): keine harte Sekundenzahl in den erreichbaren
+  //    Quellen (Exploratorium "Science of Hockey: Wrist Shots & Contact Time"; die Wrist-
+  //    vs-Slap-Vergleichsstudien auf ResearchGate blieben hinter einer Bezahlschranke),
+  //    aber uebereinstimmend qualitativ: "minimal amount of setup", "much quicker release
+  //    than a slap shot" (Tim Turk Hockey; Cross Ice Hockey, "Slapshots vs. Wrist Shots").
+  //    Gesamtdauer hier: 0,42s, knapp halb so lang wie der Schlagschuss — Richtung UND
+  //    Verhaeltnis stuetzen sich auf diese Quellen, die exakte Sekundenzahl ist eine
+  //    kalibrierte Annahme (wie die PLATZHALTER bei FW_* oben: nachmessbar, sobald ein
+  //    Hockey-Live-Motor existiert, hier bewusst nicht vorgetaeuscht als Messwert).
+  //  - Die Drei-Phasen-Einteilung folgt der Fachliteratur, nur verdichtet: thesportjournal.
+  //    org ("Biomechanics of Ice Hockey Slap Shots") nennt "backswing, downswing, pre-
+  //    loading, loading, release, and follow through" — hier auf die drei fuers Spiel
+  //    sichtbaren/zeichenbaren Abschnitte zusammengefasst (ausholen=backswing, schuss=
+  //    downswing+release, halten=follow-through).
+  //
+  // WARUM SMOOTHSTEP STATT LINEARER INTERPOLATION JE PHASE: linear wechselt an jeder
+  // Phasengrenze schlagartig die Geschwindigkeit (bei "schlag" z.B. von "92 Grad in 0,42s
+  // rueckwaerts" auf "120 Grad in 0,14s vorwaerts", ohne Uebergang) — genau der Sprung/
+  // Knick, vor dem der Auftrag warnt. smoothstep(u)=u²(3-2u) hat an BEIDEN Enden jeder
+  // Phase Geschwindigkeit 0: die Kurve kommt an jeder Grenze zur Ruhe und beschleunigt neu
+  // — dieselbe kurze Pause, die ein echter Schlagschuss am Scheitelpunkt des Rueckschwungs
+  // ohnehin macht (Coaching-Fachbegriff: "pause at the top"). Sichtbar geprueft im
+  // Kurvenbild, s. scripts/hockey-schussablauf-kurve.py.
+  const HOCKEY_SCHUSS={
+    // Winkelangaben in Grad. schlaegerWinkel: 0 = Ruhehaltung (Schlaegerblatt unten vor
+    // dem Spieler, an der Kelle). Negativ = nach hinten/oben ausgeholt (Rueckschwung).
+    // Positiv = durchgezogen/ausgeschwungen, durch den Treffpunkt hindurch Richtung Ziel.
+    // koerperDrehung: 0 = Schulterachse zum Ziel. Negativ = weggedreht, Gewicht auf dem
+    // hinteren Bein (Ladephase). Positiv = durchgedreht, Gewichtsverlagerung im Durchzug.
+    handgelenk:{
+      ausholen:{dauer:0.12, schlaegerVon:-8,   schlaegerBis:-55,  koerperVon:0,   koerperBis:-12},
+      schuss:  {dauer:0.10, schlaegerVon:-55,  schlaegerBis:15,   koerperVon:-12, koerperBis:8},
+      halten:  {dauer:0.20, schlaegerVon:15,   schlaegerBis:40,   koerperVon:8,   koerperBis:18}
+    },
+    schlag:{
+      ausholen:{dauer:0.42, schlaegerVon:-8,   schlaegerBis:-100, koerperVon:0,   koerperBis:-25},
+      schuss:  {dauer:0.14, schlaegerVon:-100, schlaegerBis:20,   koerperVon:-25, koerperBis:15},
+      halten:  {dauer:0.26, schlaegerVon:20,   schlaegerBis:55,   koerperVon:15,  koerperBis:30}
+    }
+  };
+  // Ease-in-out ohne Bibliothek, s. Begruendung oben. Geklemmt auf [0,1], damit ein
+  // Aufrufer, der lokal leicht ausserhalb [0,1] uebergibt (Rundungsfehler), keinen Sprung
+  // ins Negative/Ueber-1 bekommt statt nur eines flachen Endstuecks.
+  function hockeySchussSmooth(u){ u=u<0?0:(u>1?1:u); return u*u*(3-2*u); }
+  // Reiner Zustandsrechner, s. Auftrag: t=Sekunden seit Schussbeginn, art="handgelenk"
+  // oder "schlag" (Default "schlag" — die von Chris vorgegebene Groessenordnung bezog
+  // sich konkret auf den Schlagschuss). Keine Seiteneffekte, kein Zugriff auf fsLive/
+  // u.lunge — der Aufrufer (spaeter der Hockey-Live-Motor) entscheidet, WANN ein Schuss
+  // beginnt und was mit den Werten passiert. Nach Ende von "halten" bleibt der Rueckgabe-
+  // wert eingefroren (fortschritt saettigt bei 1, abgeschlossen wird true) statt mit
+  // weiterlaufendem t unbegrenzt weiterzuschwingen — dieselbe Idee wie das gehaltene
+  // "nach"-Bild am Ende der Freiwurf-Sequenz (s. stepFreiwurfPhase oben).
+  function hockeySchussPhase(t, art){
+    const gewaehlteArt=HOCKEY_SCHUSS[art]?art:"schlag";
+    const def=HOCKEY_SCHUSS[gewaehlteArt];
+    const tt=Math.max(0, t||0);
+    const t1=def.ausholen.dauer, t2=t1+def.schuss.dauer;
+    const werte=(seg,lokal)=>{
+      const u=hockeySchussSmooth(lokal);
+      return {schlaegerWinkel:seg.schlaegerVon+(seg.schlaegerBis-seg.schlaegerVon)*u,
+        koerperDrehung:seg.koerperVon+(seg.koerperBis-seg.koerperVon)*u};
+    };
+    if(tt<t1){
+      const lokal=tt/t1;
+      return {phase:"ausholen", fortschritt:lokal, ...werte(def.ausholen,lokal), art:gewaehlteArt, abgeschlossen:false};
+    }
+    if(tt<t2){
+      const lokal=(tt-t1)/def.schuss.dauer;
+      return {phase:"schuss", fortschritt:lokal, ...werte(def.schuss,lokal), art:gewaehlteArt, abgeschlossen:false};
+    }
+    const lokal=Math.min(1,(tt-t2)/def.halten.dauer);
+    return {phase:"halten", fortschritt:lokal, ...werte(def.halten,lokal), art:gewaehlteArt, abgeschlossen:lokal>=1};
+  }
+  // ===================================================================================
+
   // ===================================================================================
   // EINGRIFF (d) DES NBA2K-MODELLS (docs/design/battle-mode-nba2k-modell-plan.md §3d).
   //
@@ -13473,6 +13579,14 @@
       M.zurueck(g);
       return {disziplin:fd, seiten, boxscore};
     },
+    // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
+    // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
+    // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster
+    // Schritt: der Schlaeger-Zeichenagent). Selbes Prinzip wie renderProbe/figurProbe
+    // direkt darunter, nur ohne Canvas — es gibt ja noch nichts zu zeichnen. Unter dem
+    // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
+    // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
+    hockeySchussPhase,
     renderProbe:(name,ani,feldspiel,dir,lunge)=>{
       const c=document.createElement("canvas"); c.width=64; c.height=64;
       const ctx=c.getContext("2d");
