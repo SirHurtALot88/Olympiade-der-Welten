@@ -132,6 +132,35 @@ Im echten Spielstand wird bislang **nur Basketball** ueber die Arena ausgespielt
 
 ---
 
+## 5a. Die Arena im Einzelnen — was gepruef ist und was noch offen
+
+Aus Fables Bericht (`arena-duell-recherche-fable.md`), Stand nach der Wertformel-Runde:
+
+| Befund | Stand |
+|---|---|
+| Wertformel vergab 44 % fuer Getroffenwerden | **behoben** — `tank` gestrichen, `verh` auf 0,4 gesetzt, beides durchgemessen |
+| Eignung war Slot plus Formkarte plus Trait | **behoben** — vierte Fundstelle derselben Luecke |
+| Zielwahl ist Geometrie statt Bedrohung | offen |
+| Battlefield stellt die Eignungsbesten nach hinten (rho -0,49) | **nachzumessen** — Fables Zahl entstand VOR der Eignungsreparatur und kann ein Artefakt davon sein |
+
+### Die eine Entscheidung, die Chris gehoert
+
+Der direkteste Weg, dem Staerkeren mehr Gelegenheiten zu geben, waere die **Schlagfrequenz**:
+sie ist heute fuer alle identisch (`cdKuerzung` gibt konstant 0 zurueck, `abkling` teilt nur
+durch die Ermuedung). Ein schneller, geschickter Kaempfer schlaegt also exakt so oft zu wie ein
+langsamer, und genau deshalb korreliert die Zahl der Gelegenheiten nicht mit der Eignung
+(gemessen 0,05 bis 0,25), waehrend der Schaden JE Gelegenheit es sehr wohl tut (0,42 bis 0,47).
+
+Das ist aber KEINE Luecke, sondern eine getroffene Entscheidung: der Tooltip sagt woertlich
+„TMP … px/s Marschtempo · beschleunigt den Angriff nicht". Sie umzudrehen ist ein Eingriff in
+das Kampfgefuehl und gehoert Chris, nicht mir.
+
+Die Alternative ohne diesen Eingriff ist Fables K1: Zielwahl nach Bedrohung statt nach Naehe,
+mit Hysterese, damit niemand im Kreis laeuft. Dann bekommt der Starke nicht mehr Schlaege, aber
+die Schlaege der anderen konzentrieren sich sinnvoller.
+
+---
+
 ## 6. Das Werkzeug
 
 `window.__arena.disziplinProbe(dId, {n})` baut, laesst laufen und sammelt `wert()` und `eig` je
