@@ -8,6 +8,7 @@ import {
   listeArenaTeams,
 } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -326,6 +327,17 @@ export default function FoundationBattleArenaHost({
       (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = {
         heim: heimKader,
         gast: gastKader,
+        // DIE AUFSTELLUNG, die der Manager gesetzt hat — bis hierher reichte der
+        // Umschlag nur Kader durch. Der Motor fragt sie in `slotFuer` (bauFeldspiel)
+        // laengst ab und fiel mangels Daten immer auf Reihum zurueck; Chris' Zuweisung
+        // hatte deshalb auf das Spiel keine Wirkung. Fehlt der Spieltag oder der
+        // Aufstellungsentwurf, kommt ein leeres Objekt und alles bleibt wie bisher.
+        aufstellung: buildArenaAufstellungBeide(
+          gameState,
+          heimTeamId,
+          gastTeamId,
+          gameState.matchdayState?.matchdayId ?? null,
+        ),
         // kurz/platz/punkte/spieltag sind reine ANZEIGE-Daten fuer den Motor (Einlauf-
         // Tafel, Anzeigetafel, Kopfzeilen): shortCode bestimmt dort auch das Wappen
         // unter /team-logos/<kurz>.jpg, Platz und Punkte kommen aus denselben

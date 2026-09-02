@@ -7284,6 +7284,47 @@
    ["Xelara","topspeed"],["Gram","lanecontrol"]]
     .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=slotOrd(sl);});
 
+  // DIE ECHTE AUFSTELLUNG AUS DEM SPIEL — und sie kommt bewusst ERST HIER, nach der
+  // Beispiel-Tafel darueber.
+  //
+  // `place` ist die Tabelle „welcher Spieler steht in welchem Slot welcher Disziplin",
+  // Spielername -> {d, slot}. Gefuellt hat sie bisher AUSSCHLIESSLICH die
+  // Aufstellungstafel dieses Mockups (die beiden Listen darueber). Der Produktivpfad
+  // reichte nur Kader durch, nie eine Aufstellung — deshalb lief `slotFuer` in
+  // bauFeldspiel immer in den Reihum-Rueckfall, und Chris' Zuweisung („der Center gehoert
+  // unter den Korb") hatte auf das Spiel keinerlei Wirkung. Es fehlte das Rohr, nicht die
+  // Buchse.
+  //
+  // WARUM DIE REIHENFOLGE ZAEHLT — nachgemessen, nicht vermutet: eingespielt VOR den
+  // beiden Listen kam von sechs gesetzten Basketball-Spielern genau EINER an. `place[n]`
+  // ist eine Zuweisung, kein Zusammenfuegen; die Beispiel-Tafel ueberschrieb jeden
+  // Spieler, den sie selbst kennt. Uebrig blieb der einzige, der in keiner der beiden
+  // Beispiel-Listen steht.
+  //
+  // Die echte Aufstellung gewinnt also gegen die Beispiel-Aufstellung: sie kommt aus dem
+  // Spielstand, jene ist Anschauungsmaterial fuer den Standalone-Betrieb. Ein Spieler,
+  // den der Manager auf einen Feldspiel-Slot gesetzt hat, wird damit aus der
+  // Beispiel-Aufstellung herausgeloest — richtig so, er kann nicht in zwei Disziplinen
+  // gleichzeitig antreten.
+  //
+  // Fehlt die Aufstellung ganz — Standalone, Artefakt, alte Aufrufer, kein Entwurf
+  // gesetzt —, bleibt alles wie bisher. Das ist die Bedingung, unter der jede bestehende
+  // Messung gueltig bleibt.
+  //
+  // ZWEI WIRKUNGEN, und die zweite ist die groessere: `slotFuer` gibt dem Spieler seinen
+  // Slot-Aufschlag (+-8,5 ueber slotAufschlag), UND `inDisc()` waehlt aus, WER ueberhaupt
+  // antritt — mit gesetzter Aufstellung spielt, wen der Manager gesetzt hat, statt der
+  // besten n nach Disziplinwert.
+  if(echterKader&&echterKader.aufstellung&&typeof echterKader.aufstellung==="object"){
+    for(const n of Object.keys(echterKader.aufstellung)){
+      const e=echterKader.aufstellung[n];
+      if(e&&typeof e.d==="string"&&typeof e.slot==="string"){
+        place[n]={d:e.d,slot:e.slot};
+        order[n]=slotOrd(e.slot);
+      }
+    }
+  }
+
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
   //
