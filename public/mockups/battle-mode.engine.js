@@ -5165,7 +5165,12 @@
   // Rangfolge, ohne dass sich an ihm etwas geaendert haette. Genau das ist beim Einbau von
   // Steals und Schussvolumen passiert: die Feldspieler stiegen von 3,8 auf 8,5, der Torwart
   // blieb bei 3,8 und rutschte von Rang 5 auf Rang 9.
-  const HK_TW_REF=0.844, HK_TW_BASIS=8.5, HK_TW_GSAA_K=2.0;
+  // HK_TW_BASIS nachgezogen 8,5 -> 7,0: das Gewicht der gewonnenen Pucks ist von 0,5
+  // auf 0,2 gefallen (s. feldspielWert), und damit der gemessene Mittelwert der
+  // Feldspieler-Impacts von 9,40 auf 6,98. Genau das verlangt der Kommentar unten —
+  // wer die Wertformel anfasst, muss diese Zahl nachrechnen, sonst faellt der Torwart
+  // aus der Rangfolge, ohne dass sich an ihm etwas geaendert haette.
+  const HK_TW_REF=0.844, HK_TW_BASIS=7.0, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
@@ -5230,7 +5235,25 @@
       //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
       //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
       return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
-            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2
+            // GEWICHT DER GEWONNENEN PUCKS: 0,5 -> 0,2, und zwar an der realen Formel
+      // ausgerichtet statt geschaetzt. Der NHL Game Score (Luszczyszyn 2016) kennt einen
+      // Posten "loser Puck gewonnen" UEBERHAUPT NICHT — er zaehlt Tore (0,75), Vorlagen
+      // (0,7 und 0,55), Schuesse aufs Tor (0,075), Bloecke (0,05) und Strafen. Unsere 0,5
+      // je Puck waren eine Erfindung, und eine grosse: nachgemessen trugen die Pucks
+      // damit 35,8 % der gesamten Impact-Masse, mehr als Tore (17,9 %) und Schuesse
+      // (22,9 %) zusammen genommen fast erreichen.
+      //
+      // Das ist die Ursache hinter dem Sondierungsbefund. Zwei Sondierungslaeufe mit
+      // verschiedener Attributzuordnung (24 Spiele je Lauf) lasen fuer ZWEITCHANCE 42,9 %
+      // und 48,6 % mechanisches Gewicht — der mit Abstand groesste Posten, und der
+      // einzige, in dem sich beide Laeufe einig waren. Ein einzelner Sub-Skill, der die
+      // halbe Wertung traegt, kann mit einer Eignung, die ihn mit einem Elftel gewichtet,
+      // nicht zusammenpassen.
+      //
+      // Einen Puck zu erobern IST wertvoll, deshalb bleibt der Posten stehen. Aber mit
+      // 0,2 wiegt er jetzt ungefaehr wie ein Block und nicht mehr wie zwei Drittel eines
+      // Tores.
+      +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.2-u.verluste*0.2
       // Genommene Strafen zaehlen negativ, wie im NHL Game Score (Luszczyszyn): wer sein
       // Team in Unterzahl bringt, hat dem Team geschadet, auch wenn der Check sass. Klein
       // gehalten (0,2 je Strafminute, also 0,4 je kleiner Strafe) — die eigentliche Strafe
