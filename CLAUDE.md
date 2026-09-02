@@ -35,6 +35,41 @@ die Domain müsste in der Netzwerk-Policy der Claude-Code-Umgebung freigeschalte
 die behandelt `#` interaktiv nicht als Kommentar — eine Zeile wie `befehl   # erklaerung` scheitert
 mit `command not found: #`. Erklärungen gehören in den Fließtext, nicht in die Befehlszeile.
 
+## Die Abnahme jeder Disziplin: ein Spiel, nicht eine Saison
+
+**Gilt für alle zwanzig Disziplinen, nicht nur für Hockey.** Chris am 02.09., wörtlich:
+„wichtig wäre auch dass es irgendwie möglich ist das umzusetzen innerhalb von einem spiel!
+Wir haben ja pro season dann nur 2x Hockey. das muss also auch für sich wenn es einmal dran
+kommt REALISTISCH ablaufen und >80% sein" — und danach: „und das gilt natürlich für alle
+diszis merke dir das schon mal für das gesamtprojekt".
+
+Eine Saison enthält je Disziplin nur eine Handvoll Spiele, im Eishockey zwei. Eine
+Rangtreue, die sich erst über zwanzig Spiele einstellt, ist für den Spieler deshalb nicht
+vorhanden. **Die Abnahmezahl ist rho in EINEM Spiel, Ziel über 0,80, angestrebt 0,85.**
+
+Das ist strenger, als es klingt, und es hat eine harte Grenze: die Test-Retest-
+Verlässlichkeit des Impacts. Sagt die Leistung eines Spielers in einem Spiel seine Leistung
+im nächsten nur mit 0,44 voraus, kann keine Korrelation mit einem festen Merkmal über
+`sqrt(0,44) = 0,67` steigen — egal wie gut das Rezept ist. Gemessen:
+
+| | Basketball | Hockey (Stand 02.09.) |
+|---|---:|---:|
+| rho je Spiel | 0,836 | 0,706 |
+| Test-Retest des Impacts | 0,761 | 0,443 |
+| Deckel = Wurzel daraus | 0,87 | 0,67 |
+
+Der Unterschied ist die **Ereigniszahl je Spiel**: Basketball hat 82 Würfe und 87 Punkte,
+Hockey 26 Schussversuche und 6,6 Tore. Wer eine neue Disziplin baut, muss deshalb ZUERST
+fragen, wie viele wertende Ereignisse ein Spiel überhaupt hervorbringt — nicht zuletzt das
+Rezept. Zwei Hebel gibt es: mehr Ereignisse (Spielzeit, Tempo, Zweikampfrate) und ein
+Impact-Maß aus den verlässlichen Größen (im Eishockey sind Schüsse und gewonnene Zweikämpfe
+weit verlässlicher als Tore — derselbe Befund, aus dem in der NHL Corsi und Game Score
+entstanden sind).
+
+Werkzeuge dafür: `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` für die Zahl selbst,
+`scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48`, wenn eine Rolle (Torwart) eine eigene
+Wertformel hat und die Gesamtzahl allein nicht sagt, wo es klemmt.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch

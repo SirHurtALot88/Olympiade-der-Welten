@@ -148,6 +148,65 @@ die Geschwister sie erben.
 
 ---
 
+## 1.3 Die Abnahmezahl gilt JE SPIEL, nicht je Saison
+
+**Nachgetragen am 02.09. auf Chris' Ansage** — und es verschiebt die Reihenfolge weiter
+unten, deshalb steht es vor ihr.
+
+Chris wörtlich: *„wichtig wäre auch dass es irgendwie möglich ist das umzusetzen innerhalb
+von einem spiel! Wir haben ja pro season dann nur 2x Hockey. das muss also auch für sich
+wenn es einmal dran kommt REALISTISCH ablaufen und >80% sein"*, und unmittelbar danach:
+*„und das gilt natürlich für alle diszis merke dir das schon mal für das gesamtprojekt"*.
+
+Bis hierher war die stillschweigende Annahme, dass sich eine Rangtreue über viele Spiele
+einstellen darf. Sie darf nicht. Je Disziplin fallen in einer Saison nur wenige Spiele an;
+eine Ordnung, die erst im Aggregat sichtbar wird, existiert für den Spieler nicht.
+
+**Neue Abnahmeschranke für jede Disziplin: rho über 0,80 in einem einzelnen Spiel,
+angestrebt 0,85.**
+
+### Warum das eine Struktur-, keine Rezeptfrage ist
+
+Die Obergrenze jeder solchen Korrelation ist die Wurzel aus der Test-Retest-Verlässlichkeit
+des Impacts — wie gut die Leistung eines Spielers in einem Spiel seine Leistung im nächsten
+vorhersagt. Gemessen (Overseer, 02.09.):
+
+| | Basketball | Hockey vor der Balance-Runde | Hockey danach |
+|---|---:|---:|---:|
+| rho je Spiel | 0,836 | 0,439 | 0,706 |
+| Streuung von rho je Spiel | 0,06 | 0,23 | — |
+| Test-Retest des Impacts | 0,761 | 0,443 | — |
+| **Deckel = Wurzel daraus** | **0,87** | **0,67** | — |
+| davon erreicht | 96 % | 72 % | — |
+
+Basketball schöpft seinen Deckel fast aus; Hockeys Deckel liegt zu tief. Der Unterschied
+sind die Ereignisse je Spiel: 82 Feldwürfe und 87 Punkte gegen 26 Schussversuche und 6,6
+Tore. **Kein Rezept der Welt hebt eine Disziplin über ihren eigenen Deckel.**
+
+### Was das für jede neue Disziplin heißt
+
+1. **Ereignisdichte kommt vor Rezept.** Vor der ersten Sondierung steht die Frage, wie
+   viele WERTENDE Ereignisse ein Spiel hervorbringt. Zu wenige, und die Reihenfolge ist
+   Rauschen — ablesbar an der Streuung von rho je Spiel, nicht am Mittelwert.
+2. **Das Impact-Maß aus den verlässlichen Größen bauen.** Im Eishockey haben gewonnene
+   lose Pucks eine Test-Retest-Verlässlichkeit von 0,89, Schüsse 0,56, Tore nur 0,30. Genau
+   dieser Befund hat in der NHL zu Corsi, Fenwick und Game Score geführt: Schussbasierte
+   Größen tragen eine Einzelspiel-Aussage, Tore tragen sie nicht.
+3. **Rollen mit eigener Wertformel getrennt prüfen.** Der Hockey-Torwart hat die
+   Gesamtzahl allein um 0,10 bis 0,38 gedrückt, ohne dass am Rezept der Feldspieler etwas
+   falsch war. `scripts/miss-rangtreue-nach-rolle.mjs` trennt das.
+
+### Werkzeuge
+
+| Skript | Frage |
+|---|---|
+| `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` | die Abnahmezahl selbst |
+| `scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48` | welche Rolle sie drückt |
+| `scripts/sondiere-feldspiel-subskills.mjs <diszi> 24` | was ein Sub-Skill mechanisch wiegt |
+| `scripts/baue-feldspiel-rezept.mjs <diszi> <sondierung>` | das Rezept daraus rechnen |
+
+---
+
 ## 2. Reihenfolge für die 19 verbleibenden Disziplinen
 
 Empfehlung in vier Wellen; innerhalb einer Welle ist die Reihenfolge Geschmackssache
