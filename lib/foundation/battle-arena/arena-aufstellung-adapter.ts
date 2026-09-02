@@ -54,13 +54,27 @@ export function buildArenaAufstellung(
   if (!entwurf || entwurf.entries.length === 0) return {};
 
   const nameVon = new Map(gameState.players.map((player) => [player.id, player.name]));
+  // `activePlayerId` ist die Id der KADER-ZEILE, nicht die des Spielers.
+  //
+  // Das ist die Falle, in die ein erster Entwurf dieser Datei voll hineingelaufen ist: er
+  // las `activePlayerId ?? playerId` und schlug damit eine Kader-Eintrags-Id
+  // (`season-loop-roster-7`) in der Spieler-Tabelle nach. Am echten Spielstand gemessen
+  // kamen dadurch NULL von 480 Eintraegen an — alle 64 Aufstellungen blieben leer, und
+  // zwar lautlos: der Motor faellt bei leerem `place` auf sein Reihum zurueck und sieht
+  // voellig gesund aus. Aufgefallen ist es erst, weil ein Review gegen einen echten Export
+  // gemessen hat statt gegen den Beispielkader des Mockups, wo `activePlayerId` null ist.
+  //
+  // Die Semantik ist im Rest des Codes eindeutig (`legacy-lineup-lab.ts:97`,
+  // `ai-legacy-lineup-engine.ts:587`): `activePlayerId` zeigt auf die Roster-Zeile
+  // DESSELBEN Spielers, es ist kein „Eingewechselter". Der Umweg ueber `rosters` ist
+  // deshalb kein Zusatz, sondern die einzige richtige Aufloesung.
+  const spielerZuKaderzeile = new Map(gameState.rosters.map((zeile) => [zeile.id, zeile.playerId]));
   const aufstellung: ArenaAufstellung = {};
 
   for (const eintrag of entwurf.entries) {
-    // `activePlayerId` gewinnt: er traegt den tatsaechlich eingewechselten Spieler,
-    // `playerId` den urspruenglich gesetzten. Wer auf dem Feld steht, gehoert auf den
-    // Slot — nicht, wer dafuer vorgesehen war.
-    const spielerId = eintrag.activePlayerId ?? eintrag.playerId;
+    const spielerId = eintrag.activePlayerId
+      ? spielerZuKaderzeile.get(eintrag.activePlayerId) ?? eintrag.playerId
+      : eintrag.playerId;
     const name = nameVon.get(spielerId);
     if (!name) continue;
 
@@ -75,8 +89,20 @@ export function buildArenaAufstellung(
 /**
  * Beide Seiten zusammen, so wie der Umschlag sie transportiert. Heim und Gast landen in
  * EINEM Objekt, weil der Motor `place` als eine einzige Tabelle ueber Spielernamen fuehrt
- * — dieselbe Bauform, die die Aufstellungstafel des Mockups schon benutzt. Namen sind
- * ueber beide Kader eindeutig, weil ein Spieler nur in einem Team steht.
+ * — dieselbe Bauform, die die Aufstellungstafel des Mockups schon benutzt.
+ *
+ * NAMENSGLEICHHEIT IST MOEGLICH, nur selten. Ein frueherer Kommentar hier behauptete,
+ * Namen seien ueber beide Kader eindeutig, „weil ein Spieler nur in einem Team steht" —
+ * das begruendet das Falsche: die Frage ist nicht, ob derselbe Spieler zweimal antritt,
+ * sondern ob ZWEI Spieler denselben Namen tragen. Der Namensgenerator baut aus 280
+ * Kombinationen ohne Eindeutigkeitspruefung (`buildGeneratedName`); entdoppelt wird nur
+ * die Id. Im echten Export war kein Doppel, aber ab einigen Dutzend generierten Spielern
+ * wird eines wahrscheinlich.
+ *
+ * Deshalb: HEIM GEWINNT, ausdruecklich statt zufaellig. Bei einer Kollision behaelt der
+ * Heim-Eintrag seinen Slot, der Gast faellt fuer diesen einen Spieler auf Reihum zurueck.
+ * Ein blosses Zusammenfuegen haette dem Gast den Vorrang gegeben (Spread-Reihenfolge) und
+ * dem Heimteam still seine Aufstellung genommen.
  */
 export function buildArenaAufstellungBeide(
   gameState: GameState,
@@ -84,8 +110,7 @@ export function buildArenaAufstellungBeide(
   gastTeamId: string,
   matchdayId: string | null | undefined,
 ): ArenaAufstellung {
-  return {
-    ...buildArenaAufstellung(gameState, heimTeamId, matchdayId),
-    ...buildArenaAufstellung(gameState, gastTeamId, matchdayId),
-  };
+  const heim = buildArenaAufstellung(gameState, heimTeamId, matchdayId);
+  const gast = buildArenaAufstellung(gameState, gastTeamId, matchdayId);
+  return { ...gast, ...heim };
 }

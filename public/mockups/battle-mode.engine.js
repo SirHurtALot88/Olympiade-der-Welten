@@ -4007,11 +4007,61 @@
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
-    const ersatz=[...SQUAD].sort((a,b)=>(b.d[feldspielDisc]||0)-(a.d[feldspielDisc]||0)).slice(0,n);
-    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
-    const gegner=OPP.slice(0,n);
-    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
-                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    const nachWert=[...SQUAD].sort((a,b)=>(b.d[feldspielDisc]||0)-(a.d[feldspielDisc]||0));
+    // UNVOLLSTAENDIGE AUFSTELLUNG FUELLT AUF, statt mit zu wenigen anzutreten.
+    //
+    // Bis hierher hiess es `(gesetzt.length?gesetzt:ersatz).slice(0,n)`: sobald AUCH NUR
+    // EIN Spieler gesetzt war, galt ausschliesslich die gesetzte Liste. Solange die
+    // Aufstellung die Arena gar nicht erreichte, war das folgenlos — `gesetzt` war
+    // entweder leer oder vollstaendig (die Beispiel-Tafel des Mockups setzt immer alle).
+    // Mit dem Rohr aus dem Spielstand ist ein TEILWEISE gefuellter Entwurf aber ein
+    // realer Fall, und nachgemessen trat das Heimteam dann mit drei gegen sechs Spieler
+    // an (29:60) — ohne Fehlermeldung, weil `slice(0,n)` eine kuerzere Liste klaglos
+    // durchreicht.
+    //
+    // Jetzt: die Gesetzten zuerst, in ihrer Reihenfolge, dann nach Disziplinwert
+    // auffuellen, bis n erreicht ist. Wer gesetzt ist, spielt; wer fehlt, wird durch den
+    // Besten ersetzt, der noch frei ist.
+    const gefuellt=[...gesetzt];
+    for(const p of nachWert){
+      if(gefuellt.length>=n)break;
+      if(!gefuellt.includes(p))gefuellt.push(p);
+    }
+    const mine=gefuellt.slice(0,n);
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO — sonst macht dieses Rohr die beiden
+    // Seiten ungleich, und Ungleichheit zwischen Heim und Gast ist genau der Fehler, gegen
+    // den der Spiegeltest (scripts/miss-arena-feldspiel-spiegel.mjs) als Waechter steht.
+    // Ein Overseer-Review hat den Punkt gefunden: `place` enthaelt beide Aufstellungen,
+    // und slotFuer wirkt deshalb laengst auf beiden Seiten — aber die AUSWAHL, wer
+    // ueberhaupt antritt, las bisher nur die Heimseite aus der Aufstellung. Das Heimteam
+    // bekaeme seine gesetzten Spieler, der Gast nicht.
+    //
+    // Dieselbe Regel wie oben: die Gesetzten zuerst, dann in der bestehenden Reihenfolge
+    // des Gastkaders auffuellen. Ohne Aufstellung ist das Zeichen fuer Zeichen das alte
+    // `OPP.slice(0,n)` — deshalb wird hier NICHT vorsortiert.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===feldspielDisc);
+    const gastGefuellt=[...gastGesetzt];
+    for(const p of OPP){
+      if(gastGefuellt.length>=n)break;
+      if(!gastGefuellt.includes(p))gastGefuellt.push(p);
+    }
+    const gegner=gastGefuellt.slice(0,n);
+    // Eine Slot-Kennung, die der Motor nicht kennt, liefert stillschweigend Aufschlag 0.
+    // Das passiert real: vier Disziplinen fuehren im Motor nur vier Slots, ihre
+    // Themenliste im Spiel aber sechs — ein gespeicherter slotIndex 4 oder 5 zeigt dann
+    // ins Leere. Ein Hinweis auf der Konsole statt eines lautlosen Nullwerts, damit der
+    // naechste, der eine ausbleibende Wirkung sucht, ihn nicht erst messen muss.
+    const slotFuer=(p,i)=>{
+      const gesetzterSlot=(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot:null;
+      if(gesetzterSlot){
+        if(!SLOTVON[gesetzterSlot]&&typeof console!=="undefined"&&console.warn){
+          console.warn("[arena] Slot \""+gesetzterSlot+"\" ist in "+feldspielDisc
+            +" nicht angemeldet — "+p.n+" bekommt keinen Slot-Aufschlag.");
+        }
+        return gesetzterSlot;
+      }
+      return (slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
+    };
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
     // Kaempfen, weil unsere Einheiten Slot, Form und Stufe bekamen, der Gegner nur seinen
