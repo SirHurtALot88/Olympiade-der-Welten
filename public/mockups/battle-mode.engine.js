@@ -1375,6 +1375,65 @@
     return 0.8+(g-1)/9*0.5;
   }
 
+  // ============== WARUM DER FAKTOR ALLEIN NICHT REICHT ==============
+  //
+  // Chris: "skalier bitte die groessen ich will schon sehen dass ein lava golem groesser
+  // ist als ein tidesprinter oder so". Nachgemessen war er es nicht immer — und der Grund
+  // liegt nicht im Faktor, sondern in den Blaettern.
+  //
+  // Die Sprite-Blaetter sind unterschiedlich hoch GEZEICHNET: eine 64er-Zelle ist bei der
+  // einen Figur bis oben gefuellt (Krone, Hoerner, Haar, Fluegel), bei der naechsten bleibt
+  // ein Drittel Luft. Gemessen ueber den Kader reichen die Inhaltshoehen von 46 bis 62 px,
+  // also Verhaeltnis 1,34. Der Groessenfaktor spannt ueber die tatsaechlich vergebenen
+  // Groessen (5 bis 8) nur 1,02 bis 1,19, also 1,16 — WENIGER als die Blattstreuung. Das
+  // Blatt gewinnt, und dann steht eine Figur der Groesse 5 hoeher auf dem Eis als eine der
+  // Groesse 7.
+  //
+  // DIE HOEHENKORREKTUR macht die Blattstreuung weg, statt den Faktor aufzublasen. Sie
+  // misst einmal je Figur, wie hoch ihr Blatt WIRKLICH zeichnet, und skaliert auf eine
+  // gemeinsame Bezugshoehe. Danach ist die Bildschirmhoehe proportional zum Faktor — und
+  // damit zur eingestellten Groesse, so wie Chris' Groessen-Sheet es meint.
+  //
+  // GEMESSEN STATT TABELLIERT. Eine generierte Tabelle waere die zweite Kopie derselben
+  // Wahrheit, und genau daran ist in diesem Projekt schon einmal etwas auseinandergelaufen
+  // (die Slot-Profile im Motor gegen die in matchday-slot-roles.ts). Die Messung laeuft
+  // deshalb einmal je Figur beim ersten Zeichnen und liegt danach im Zwischenspeicher: ein
+  // 64x64-Offscreen-Bild, ein Alpha-Durchlauf, zwoelf Mal je Spiel.
+  //
+  // GEDECKELT auf HOEHEN_KORR_MIN..MAX: eine Figur, deren Blatt extrem flach oder extrem
+  // hoch zeichnet, soll nicht bis zur Unkenntlichkeit gestaucht oder gestreckt werden. Wer
+  // an den Deckel stoesst, behaelt einen Rest Blattcharakter — das ist ehrlicher, als ein
+  // Kraken-Blatt auf Menschenhoehe zu quetschen.
+  const HOEHEN_BEZUG=52;        // PLATZHALTER: Median der gemessenen Blatthoehen im Kader
+  const HOEHEN_KORR_MIN=0.80, HOEHEN_KORR_MAX=1.25;
+  const hoehenKorrSpeicher=new Map();
+  function hoehenKorrektur(u){
+    if(!u||!u.n)return 1;
+    if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
+    let korr=1;
+    try{
+      // DOPPELT SO GROSSE MESSLEINWAND wie die Zelle. Bei 64x64 klebt ein hohes Blatt
+      // (Krone, Hoerner, Fluegel) oben an der Kante und wird zu KLEIN gemessen — und
+      // ausgerechnet die Figuren, die die Korrektur am noetigsten haben, bekaemen dann
+      // keine. Nachgemessen betraf das vier von elf Figuren im Kader.
+      const MESS=128, ankerY=MESS*46/64;
+      const c=document.createElement("canvas"); c.width=MESS; c.height=MESS;
+      const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+      // Messfigur ohne Groesse: so misst der Durchlauf das BLATT, nicht das Ergebnis.
+      zeichneSprite(cx,{n:u.n,x:MESS/2,y:ankerY,vx:5,vy:0,id:0,lunge:0,down:false,side:0,hop:0},MESS/2,ankerY,false);
+      const px=cx.getImageData(0,0,MESS,MESS).data;
+      let oben=null,unten=null;
+      for(let y=0;y<MESS;y++)for(let x=0;x<MESS;x++)
+        if(px[(y*MESS+x)*4+3]>16){ if(oben==null)oben=y; unten=y; break; }
+      const hoehe=(oben==null)?0:unten-oben+1;
+      // Steht die Figur trotz der grossen Leinwand an der Kante, ist die Zahl eine
+      // Untergrenze — dann lieber gar nicht korrigieren als falsch.
+      if(hoehe>8&&oben>0&&unten<MESS-1)korr=Math.max(HOEHEN_KORR_MIN,Math.min(HOEHEN_KORR_MAX,HOEHEN_BEZUG/hoehe));
+    }catch(e){ korr=1; }
+    hoehenKorrSpeicher.set(u.n,korr);
+    return korr;
+  }
+
   // Welche Animation zu welchem Zustand gehoert — und wie viele Bilder sie hat.
   const ANIBILDER={walk:9,slash:6,shoot:13,hurt:6};
 
@@ -1568,7 +1627,7 @@
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
     // Zahl statt einer zweiten.
-    const Z=groesseFaktor(u.groesse);
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
