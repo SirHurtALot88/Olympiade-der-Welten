@@ -12650,13 +12650,35 @@
         // NICHT der Disziplinrang, sondern nur die Attribute, aus denen er entsteht. Zwei
         // Laeufer mit gleichen Attributen laufen gleich schnell, auch wenn der eine im
         // Spurt auf Rang 6 und der andere auf Rang 20 steht.
-        eig:(p.d[d]||0)+engP+breitP+eigHebung(p,d),
+        // DIESELBE LUECKE WIE IM FELDSPIEL UND AUF DER BUEHNE, hier nie geschlossen —
+        // und auf der Bahn hat sie am meisten angerichtet. `p.d` haelt genau ZWEI
+        // Disziplinwerte vorberechnet: "tdm" und "spurt". Fuer die anderen drei Bahnen
+        // (Staffel, Zeitfahren, Klettern) und fuer Takeshi fiel der Basiswert damit auf
+        // 0 zurueck, und `eig` bestand nur noch aus Slot- und Formzuschlaegen.
+        //
+        // NACHGEMESSEN, nicht vermutet: in der Staffel lagen die Eignungswerte zwischen
+        // -8,4 und +11,8 statt zwischen 40 und 70. Die Rangtreue mass damit den
+        // Formkarten-Zufall gegen die Rennzeit und las rho -0,038 — statistisch null.
+        // Und es erklaert, warum ausgerechnet Spurt als einzige Bahn bestand: es ist die
+        // einzige, deren Disziplinwert vorberechnet vorliegt.
+        //
+        // gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der p.d.tdm
+        // ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken,
+        // Zeichen fuer Zeichen wie in bauFeldspiel und bauBuehne. Das VERHALTEN der
+        // Rennen aendert sich dadurch nicht: die Laufwerte kommen aus dem Rezept (R2),
+        // nicht aus `eig`.
+        eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
         pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
         plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
         bahnZ:bahn, wechselCd:0, wechsel:0,
         reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
-        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null};
+        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null,
+        // STAFFEL, WAS EINEN EINZELNEN MESSBAR MACHT. `etappenZeit` ist die Zeit fuer den
+        // EIGENEN Abschnitt, `wechselKonto` die Bilanz aus allen Uebergaben, an denen er
+        // beteiligt war (abgebend wie annehmend). Ausserhalb der Staffel bleiben beide
+        // null und werden nie gelesen.
+        etappenZeit:null, wechselKonto:0, wechselN:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
@@ -12694,6 +12716,72 @@
     return best;
   }
 
+  // ============================ DIE KURVE ============================
+  // Chris' Auftrag woertlich: "dann support stats bei der staffel zb in
+  // kurvengeschwindigkeit oder staffelstab uebergabe ueberleiten damit es nicht nur der
+  // reine speed ist".
+  //
+  // WARUM DAS DIE STAFFEL BRAUCHT. Bis hierher war WENDIGKEIT in der Staffel praktisch
+  // arbeitslos: zwei Bahnen, keine freie Spur, keine Huerden. Sie wirkte an genau EINER
+  // Stelle — beim Aufraeumen nach einer verpatzten Uebergabe, also nur dann, wenn schon
+  // etwas schiefgegangen war. Ein Wert, der nur im Schadensfall zaehlt, ist im Boxscore
+  // unsichtbar.
+  //
+  // Jetzt hat jeder Abschnitt eine Kurve, und wer sie traegt, verliert dort weniger
+  // Tempo. Das ist keine erfundene Regel: eine 4x400-Staffel laeuft ueberwiegend in der
+  // Kurve, und der Unterschied zwischen einem guten und einem schlechten Kurvenlaeufer
+  // ist eine der wenigen Groessen, die im Staffellauf ueberhaupt neben der reinen
+  // Schnelligkeit steht.
+  //
+  // KURVE_ANTEIL sagt, welcher Teil eines Abschnitts Kurve ist; die Zahlen darunter, wie
+  // viel Tempo sie kostet und wie viel davon Bahnarbeit zurueckholt. Alle drei sind
+  // PLATZHALTER, bis die Bahn-Recherche eigene Zahlen liefert — sie stehen hier als
+  // Struktur, nicht als eingemessene Groesse.
+  // UEBERGABE. Der Zeitverlust im Wechsel, stufenlos aus dem Koennen beider Beteiligten.
+  // Real trennt einen guten von einem mittelmaessigen Wechsel ungefaehr eine Zehntel-
+  // sekunde; ein echter Patzer kostet ein Vielfaches davon. Alle fuenf Zahlen sind
+  // PLATZHALTER, bis die Bahn-Recherche eigene liefert.
+  const WECHSEL_MAX=0.42;          // Verlust bei Koennen 0
+  const WECHSEL_K=0.0036;          // wieviel je Punkt Koennen zurueckkommt
+  const WECHSEL_MIN=0.04;          // schneller als das geht kein Wechsel
+  const WECHSEL_PATZER=0.22;       // Grundchance auf einen echten Patzer
+  const WECHSEL_PATZER_K=0.0020;   // wieviel Koennen sie senkt
+  const WECHSEL_PATZER_KOSTEN=0.9; // was ein Patzer obendrauf kostet
+  const WECHSEL_ROBUST_K=0.0012;   // wieviel Verlaesslichkeit die Patzerchance senkt
+  const SPITZE_ZUG=0.0038;         // wieviel WUCHT die Fuehrungsarbeit verbilligt (Staffel)
+  const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
+  const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
+  const KURVE_WENDIG=0.0016;      // wieviel davon je Punkt WENDIGKEIT zurueckkommt
+  // Liegt dieser Laeufer gerade in der Kurve seines Abschnitts? Ausserhalb der Staffel
+  // gibt es keine Abschnitte — dort ist der Faktor immer 1 und die Zeile wirkungslos.
+  // WIE WEIT IST ER AUF SEINER EIGENEN STRECKE? Ausserhalb der Staffel ist das die
+  // Rennposition selbst. In der Staffel laeuft jeder nur seinen Abschnitt — und zwar von
+  // vorn: der Schlusslaeufer uebernimmt frisch, er hat nicht fuenf Sechstel Rennen in den
+  // Beinen.
+  //
+  // DAS WAR DER ZWEITE STAFFEL-FEHLER, und er sass tiefer als der erste. Ermuedung
+  // (`mued`, ab pos>0,45) und Angriffspunkt (`planT`, ab pos>=u.ab) lasen die GLOBALE
+  // Rennposition. Der Startlaeufer lief damit seinen Abschnitt immer im Bereich 0,00 bis
+  // 0,17 — also nie ermuedet und nie im Angriff — und der Schlusslaeufer immer im
+  // Bereich 0,83 bis 1,00, also mit voller Ermuedungsstrafe. Die Etappenzeit hing damit
+  // vor allem daran, WELCHEN Abschnitt jemand lief, und erst danach daran, WER er ist.
+  // Ein Weltklasse-Schlusslaeufer sah aus wie ein mittelmaessiger Startlaeufer.
+  const laufAnteil=(u)=>{
+    if(!BA().staffel||u.beinVon==null)return u.pos;
+    const laenge=(u.beinBis-u.beinVon)||1;
+    return Math.max(0,Math.min(1,(u.pos-u.beinVon)/laenge));
+  };
+  function kurvenFaktor(u){
+    if(!BA().staffel||u.beinVon==null)return 1;
+    const imBein=laufAnteil(u);
+    // Die Kurve liegt in der MITTE des Abschnitts: Anlauf gerade, Kurve, Zielgerade —
+    // dieselbe Reihenfolge wie auf einer echten Rundbahn.
+    const rand=(1-KURVE_ANTEIL)/2;
+    if(imBein<rand||imBein>1-rand)return 1;
+    const verlust=KURVE_KOSTEN*Math.max(0,1-u.WENDIGKEIT*KURVE_WENDIG/KURVE_KOSTEN);
+    return 1-Math.max(0,Math.min(KURVE_KOSTEN,verlust));
+  }
+
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
@@ -12706,13 +12794,14 @@
     const phase=Math.min(1,(rennT-(u.startT||0))/3.2);
     const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
     // Der Plan: bis zum Angriffspunkt laeuft er verhalten, danach alles.
-    const planT=u.pos>=u.ab?1.0:u.tempo;
+    const planT=laufAnteil(u)>=u.ab?1.0:u.tempo;
     // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
     // ERMUEDUNG. Der Beiwert entscheidet, wie stark das Stehvermoegen die zweite
     // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
     // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
     // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
-    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(u.pos-0.45)*100):1;
+    const anteil=laufAnteil(u);
+    const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -12731,7 +12820,8 @@
     const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
-    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
+    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1);
   }
 
   // ===================================================================================
@@ -12855,8 +12945,20 @@
       // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
       // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
-      const ueber=Math.max(0.4,(u.pos>=u.ab?1.0:u.tempo));
+      const ueber=Math.max(0.4,(laufAnteil(u)>=u.ab?1.0:u.tempo));
       let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      // ZUG AN DER SPITZE (nur Staffel). WUCHT heisst dort ausdruecklich "Zug an der
+      // Spitze" (s. BAHN_ART.staffel.lang) — hatte aber keinen einzigen Kanal: WUCHT ist
+      // ueberall sonst der Rempler, und in der Staffel wird nicht gerempelt
+      // (tackle:false). Damit lagen Spirit (Matrixgewicht 16) und Charisma (10) in einem
+      // Sub-Skill, der mechanisch NICHTS tat — zusammen ein Viertel der Matrix, das die
+      // Rangtreue nie erreichen konnte. Genau solche toten Kanaele deckeln die
+      // Validitaet, nicht die Zuverlaessigkeit.
+      //
+      // Jetzt kostet Fuehrungsarbeit den, der sie leistet — aber wer Zug hat, zahlt
+      // weniger dafuer. Das ist dieselbe Idee wie der Windschatten, nur von der anderen
+      // Seite, und es ist die Rolle, die der Text ohnehin beschreibt.
+      if(BA().staffel&&!u.imSchatten)zehr*=Math.max(0.72,1.10-u.WUCHT*SPITZE_ZUG);
       // STEIGUNG. Eine Wand ist unten leichter als oben. Der Verbrauch waechst mit der
       // Hoehe — deshalb entscheidet beim Klettern der Haushalt, nicht der Antritt.
       if(BA().steigung)zehr*=1+BA().steigung*u.pos;
@@ -12990,23 +13092,57 @@
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
+        u.etappenZeit=rennT-(u.startT||0);
         if(naechster){
           naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
-          const gut=Math.min(0.96,(BA().wechselBasis??0.34)
-            + ((u.TECHNIK+naechster.TECHNIK)/2)*(BA().wechselSpanne??0.0062));
-          if(rr()>gut){
-            // Bahnarbeit hilft, den Anschluss wiederzufinden. Ohne diesen Kanal war
-            // WENDIGKEIT in der Staffel voellig unbeschaeftigt: zwei Bahnen, keine freie
-            // Spur, keine Hindernisse — Awareness und Dexterity lasen 0 %.
-            naechster.stolper=(BA().wechselStrafe??1.30)
-              *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+          // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
+          // Vorher war der Wechsel ein Ja/Nein: mit Wahrscheinlichkeit `gut` sauber, sonst
+          // eine feste Strafe. Das ist aus zwei Gruenden schlecht.
+          //
+          // ERSTENS MISST ES NICHTS. Jeder Laeufer ist an hoechstens zwei Uebergaben
+          // beteiligt, der Start- und der Schlusslaeufer sogar nur an einer. Ein Muenzwurf
+          // mit ein bis zwei Wuerfen je Spieler ist als Mass unbrauchbar — die Streuung
+          // erschlaegt das Koennen. Nachgemessen blieb die Rangtreue der Staffel damit bei
+          // rho 0,31 je Spiel, obwohl sie ueber die Saison schon 0,67 erreichte: die
+          // Mechanik belohnte das Richtige, aber viel zu laut.
+          //
+          // ZWEITENS IST ES UNREALISTISCH. Eine Stabuebergabe gelingt nicht oder
+          // misslingt — sie ist schneller oder langsamer. Der Unterschied zwischen einem
+          // guten und einem mittelmaessigen Wechsel sind Zehntel, nicht ein Totalausfall.
+          //
+          // Jetzt: der Zeitverlust faellt STUFENLOS aus dem Schnitt beider
+          // TECHNIK-Werte — beide sind daran beteiligt, wie schon vorher. Der echte
+          // Patzer bleibt als seltener Ausreisser erhalten, sonst faellt das Drama weg,
+          // das eine Staffel ausmacht.
+          const koennen=(u.TECHNIK+naechster.TECHNIK)/2;
+          let verlust=Math.max(WECHSEL_MIN,WECHSEL_MAX-koennen*WECHSEL_K);
+          // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
+          // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
+          // gerempelt wird hier nicht. Jetzt senkt es die Chance auf den echten Patzer —
+          // genau das, was "verlaesslich" heisst. Gerechnet wird mit dem Schnitt beider
+          // Beteiligten, wie beim Koennen auch.
+          const verlaesslich=(u.ROBUST+naechster.ROBUST)/2;
+          const patzer=rr()<Math.max(0.01,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
+                                          -verlaesslich*WECHSEL_ROBUST_K);
+          if(patzer)verlust+=WECHSEL_PATZER_KOSTEN
+            *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+          // Der Verlust ist physisch: der Annehmende steht so lange im Weg wie er dauert.
+          // Damit schlaegt er auf die Teamzeit durch, entscheidet also wirklich Rennen.
+          naechster.stolper=verlust;
+          // ...und er wird BEIDEN angeschrieben, je zur Haelfte, in Sekunden. Ohne dieses
+          // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
+          // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
+          // allein dafuer.
+          u.wechselKonto-=verlust/2; naechster.wechselKonto-=verlust/2;
+          u.wechselN++; naechster.wechselN++;
+          if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+verlust.toFixed(2)+" s verloren.");
           } else {
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
+            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+verlust.toFixed(2)+" s im Wechsel.");
           }
         }
         continue;
@@ -13017,6 +13153,7 @@
         if(BA().staffel){
           // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
           // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
+          u.etappenZeit=rennT-(u.startT||0);
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
           feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
@@ -14797,8 +14934,38 @@
       // getackelt wird in einer Staffel nicht.
       wert:()=>{
         if(BAHN_ART[bd].staffel){
+          // NACHGEZOGEN, WEIL ES NACHWEISLICH NICHTS GEMESSEN HAT. Hier stand die
+          // TEAMZEIT: `-(u.fertig)`, und `fertig` ist fuer alle sechs einer Mannschaft
+          // dieselbe Zahl. Damit hatte jeder Laeufer eines Teams exakt denselben Wert,
+          // und die Rangfolge innerhalb einer Mannschaft war gar nicht vorhanden. Die
+          // Rangtreue der Staffel lag gemessen bei rho -0,038 — statistisch null. Ein
+          // schneller Laeufer war von einem langsamen nicht zu unterscheiden.
+          //
+          // Der Kommentar an dieser Stelle begruendete die Teamzeit damit, dass eine
+          // verpatzte Uebergabe "die Mannschaft" Zeit kostet und nicht den Einzelnen.
+          // Das stimmt fuer die WERTUNG DES RENNENS und ist dort unveraendert: gewonnen
+          // hat, wer zuerst im Ziel ist. Es stimmt aber nicht fuer die Frage, was EIN
+          // Laeufer beigetragen hat — und genau die misst `wert()`.
+          //
+          // Jetzt zwei Groessen, die es beide nur in einer Staffel gibt:
+          //   ETAPPENZEIT    die Zeit fuer den eigenen Abschnitt. Alle sechs Abschnitte
+          //                  sind gleich lang, die Zeiten also direkt vergleichbar.
+          //   WECHSELKONTO   die Bilanz der Uebergaben, an denen er beteiligt war —
+          //                  abgebend wie annehmend, je +1 sauber und -1 verpatzt.
+          //                  Ohne diesen Posten stuende der Abgebende nach seinem eigenen
+          //                  Patzer sauber da (seine Etappenzeit ist ja vorbei) und der
+          //                  Annehmende buesste allein dafuer.
+          //
+          // WECHSEL_GEWICHT ist PLATZHALTER: 0,35 s je Uebergabe entspricht ungefaehr der
+          // Zeitstrafe, die ein verpatzter Wechsel im Motor tatsaechlich kostet
+          // (wechselStrafe 1,55 auf das Tempo, ueber rund eine halbe Sekunde) — damit
+          // wiegt ein Patzer im Wert etwa so schwer wie auf der Bahn.
+          // `wechselKonto` steht bereits in SEKUNDEN (s. die Uebergabe in stepSpurt), es
+          // wird also einfach addiert — kein Gewicht, das man einstellen koennte und das
+          // dann jemand einstellt.
           const o={};
-          for(const u of LAEUFER)o[u.n]=-(u.fertig??60);
+          for(const u of LAEUFER)
+            o[u.n]=-(u.etappenZeit??(u.fertig??60))+u.wechselKonto;
           return o;
         }
         const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
