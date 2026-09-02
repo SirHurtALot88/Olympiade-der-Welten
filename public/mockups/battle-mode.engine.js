@@ -15666,6 +15666,45 @@
         stufe:fsLive.freiwurf.stufe,undEins:fsLive.freiwurf.undEins}:null,
       schiri:fsSchiri?{x:Math.round(fsSchiri.x),y:Math.round(fsSchiri.y),pfiffT:+fsSchiri.pfiffT.toFixed(2)}:null}:null,
     fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
+    // ============ DIE EINE SONDE FUER ALLE ZWANZIG DISZIPLINEN ============
+    // Bis hierher hatte nur das Feldspiel eine (feldspielProbe). Fuer Buehne, Bahn und
+    // Arena gab es gar keine — und damit fuer 16 der 20 Disziplinen KEINE Moeglichkeit,
+    // die Rangtreue zu messen. "Spielreif" war fuer sie eine Meinung, keine Zahl.
+    //
+    // Sie ist bewusst duenn: bauen, laufen lassen, `wert()` und `eig` je Teilnehmer
+    // einsammeln, mehr nicht. Genau diese vier Dinge kann JEDER der vier Motoren, und
+    // genau sie braucht eine Rangtreue. Alles Disziplineigene (Boxscore, Wurfprotokoll,
+    // Kilogramm) bleibt Sache der jeweiligen Spezialsonde.
+    //
+    // Die Teilnehmerliste kommt aus derselben Fallunterscheidung, die auch die
+    // Aufstellungsanzeige benutzt (s. renderKader) — nicht aus einer zweiten Tabelle, die
+    // beim naechsten neuen Chassis vergessen wuerde.
+    disziplinProbe:(dId,opt)=>{
+      const M=MOTOREN[dId];
+      if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      const spiele=[];
+      try{
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          M.bau(saat0+i*schritt);
+          M.lauf();
+          const w=M.wert();
+          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig}))
+            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig}));
+          spiele.push({saat:saat0+i*schritt,
+            teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
+              eig:Math.round((u.eig||0)*100)/100,
+              wert:Math.round((w[u.n]||0)*100)/100}))});
+        }
+      } finally { M.zurueck(gesichert); zieheFormkarten(20260823); }
+      return {disziplin:dId, chassis:istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
+        :istFeldspiel(dId)?"feldspiel":"arena", spiele};
+    },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
