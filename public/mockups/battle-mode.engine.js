@@ -285,6 +285,15 @@
   // phase: "halten"/"ausholen"/"schuss" (s. HOCKEY_PHASEN); eine unbekannte Phase faellt
   // auf "halten" zurueck, damit ein Tippfehler beim Aufrufer nie eine leere/kaputte Pose
   // zeichnet.
+  // Ausgemessen am Sprite-Blatt, nicht geschaetzt: docs/design/sprite-handpunkte.md
+  // haelt Verfahren, Zahlen und Beweisbilder. Reihenfolge wie blickAus(): 0 hinten,
+  // 1 links, 2 vorn, 3 rechts.
+  const HOCKEY_HAND=[
+    {x:44,y:47}, // hinten — die rechte Hand, von hinten gesehen die rechte Bildhaelfte
+    {x:20,y:45}, // links  — die vordere Hand im Profil
+    {x:44,y:47}, // vorn
+    {x:43,y:45}  // rechts — die vordere Hand im Profil
+  ];
   function zeichneHockeyschlaeger(ctx,x,y,s,richtung,phase){
     const blick=richtung===3?1:richtung===1?-1:0;
     const seitlich=blick!==0;
@@ -2128,6 +2137,27 @@
     // "in Brust und Rissen"; Nocture: formlose Schattengestalt ohne einzelnen Kopf-Fokus),
     // dieselben Koordinaten wie beim Vollbild-Zweig (Z war hier frueher immer 1 — seit
     // Chris' Groessen-Sheet ist es groesseFaktor(u.groesse), s. Kommentar am Funktionsanfang).
+    // HOCKEYSCHLAEGER. Er gehoert an die HAND, nicht an die Figurmitte — die Handpunkte
+    // sind am Sprite ausgemessen (docs/design/sprite-handpunkte.md, Blatt body_walk/
+    // bodyw_walk, Zellkoordinaten 0..63) und werden hier mit demselben Massstab
+    // umgerechnet, den male() oben benutzt: eine Zellkoordinate (cx,cy) liegt auf dem
+    // Bildschirm bei x-32*Z+cx*Z und y-46*Z+cy*Z.
+    //
+    // Nur im Profil (links/rechts) ist die Hand am Sprite ueberhaupt als eigene Kontur zu
+    // sehen; von vorn und hinten liegen beide Haende auf gleicher Hoehe. Die Tabelle
+    // nimmt jeweils die Hand, die dem Betrachter naeher ist.
+    if(feldspiel&&istHockey()&&!u.down){
+      const hp=HOCKEY_HAND[r]||HOCKEY_HAND[2];
+      // Welche Haltung: waehrend eines Schusses laeuft die Sequenz aus HOCKEY_SCHUSS,
+      // sonst haelt er den Schlaeger. `schussSeit` startet bewusst NICHT bei 0, sondern am
+      // Beginn des Durchzugs — der Puck ist im selben Bild schon unterwegs (wirf() setzt
+      // den Flug), ein Ausholen davor waere eine Bewegung, die zeitlich nach ihrer eigenen
+      // Wirkung kaeme. Das Vorholen ist damit noch nicht gebaut; es braucht eine
+      // Vorwegnahme im Motor (der Schuss muesste eine Sekunde vor seiner Aufloesung
+      // feststehen) und gehoert in eine eigene Runde.
+      const pose=u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten";
+      zeichneHockeyschlaeger(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,pose);
+    }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
         // streuung/hoehe sind optionale Ueberschreibungen im BAU-Eintrag (s. Gram:
@@ -4315,6 +4345,8 @@
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
+        // Laufende Schusssequenz (s. HOCKEY_SCHUSS/hockeySchussPhase). null = kein Schuss.
+        schussSeit:null, schussArt:null,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
@@ -5497,6 +5529,13 @@
     // und erst bei Ankunft enthuellt. Dieselbe Ehrlichkeit: was zu sehen ist, steht schon
     // fest, waehrend der Puck fliegt.
     const hk=istHockey()?hockeySchussAusgang(schuetze,technik,blockKandidat):null;
+    if(hk){
+      // Handgelenkschuss aus der Naehe, Schlagschuss von der blauen Linie — dieselbe
+      // Unterscheidung, die auch das Rezept mit SCHUSS_NAH und SCHUSS_FERN trifft.
+      schuetze.schussArt=(tier==="fern"||tier==="mit")?"schlag":"handgelenk";
+      // Beginn beim Durchzug, nicht beim Ausholen (s. Kommentar in zeichneSprite).
+      schuetze.schussSeit=HOCKEY_SCHUSS[schuetze.schussArt].ausholen.dauer;
+    }
     fsLive.ball.flug={
       hockey:hk,
       von:{x:von.x,y:von.y}, nach:{x:korbXVon(schuetze.side),y:H/2},
@@ -6680,6 +6719,10 @@
       // zeichneSprite die "hurt"-Pose (dasselbe Feld, das der Kampf schon benutzt) —
       // nichts Neues zu zeichnen, nur ein Zustand mehr, der es setzt.
       if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.schussSeit!=null){
+        u.schussSeit+=dt;
+        if(hockeySchussPhase(u.schussSeit,u.schussArt).abgeschlossen)u.schussSeit=null;
+      }
       // Opus-Review-Fund #9 (erster Teil): `screent` hielt eine harte Referenz auf den
       // Ballfuehrer zum Zeitpunkt des Rufs — passt der den Ball im selben Zyklus ab (kann
       // er), blockte der Screener 1,2s weiter fuer jemanden ohne Ball, und die
