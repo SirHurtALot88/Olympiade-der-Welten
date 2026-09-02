@@ -6244,6 +6244,21 @@
   }
   function loeseHockeySchuss(flug,art){
     const schuetze=flug.schuetze, hk=flug.hockey, tw=hk.torwart;
+    // DIE ABNAHME MUSS DIESE SCHUESSE SEHEN. Ein gehaltener, abgeprallter oder geblockter
+    // Schuss war GENOMMEN und ist NICHT reingegangen — fuer jede Trefferquoten-Statistik
+    // also ein Fehlwurf. Er wird aber als "block" protokolliert, und die Zaehlung in der
+    // Sonde liest nur "treffer" und "fehlwurf". Der Overseer hat nachgemessen, was das
+    // anrichtet: von 51 Schuessen je Spiel sah die Sonde 12,4 — alle Tore plus nur die
+    // am Tor vorbei — und meldete daraufhin eine Trefferquote von 55 % je Distanzstufe.
+    // Die Stufen- und Bandtabellen waren fuer Hockey damit unbrauchbar.
+    //
+    // `wurf:true` markiert diese Ereignisse als genommenen Wurf; die Zaehlung nimmt sie
+    // dann mit auf. Basketballs Block-Ereignisse tragen die Marke nicht und bleiben
+    // aussen vor, dort ist ein Block auch wirklich kein genommener Wurf desselben Typs.
+    const wurfDaten={wurf:true, tier:flug.tier, zumKorbBeiWurf:flug.zumKorbBeiWurf,
+      deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,
+      deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
+      imFastbreakBeiWurf:flug.imFastbreakBeiWurf, gedoppeltBeiWurf:flug.gedoppeltBeiWurf};
     const torX=flug.nach.x, torY=flug.nach.y;
     // Richtung "zurueck ins Feld" vom angegriffenen Tor aus gesehen.
     const rein=torX>MID?-1:1;
@@ -6270,7 +6285,7 @@
       b.bloecke++; b.lunge=0.5;
       feed(b.side,b.n+" wirft sich in den Schuss — geblockt.");
       schwebe({x:0,y:0,txt:"BLOCK!",life:1.1,crit:true,_def:true,_spieler:b.id});
-      logZug(b.side,"block",{verteidiger:b,spieler:schuetze});
+      logZug(b.side,"block",{verteidiger:b,spieler:schuetze,...wurfDaten});
       fsAktuell={spieler:null,verteidiger:b,passgeber:flug.passgeber,rebounder:null};
       // Der geblockte Puck springt dort weg, wo der Flug geendet hat — also am Blocker
       // (s. wirf: flugNach zeigt bei einem Block auf ihn), nicht an seiner inzwischen
@@ -6284,7 +6299,7 @@
       tw.saves++;
       feed(tw.side,tw.n+" pariert — "+art.wortRebound+" vor dem Tor!");
       schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
-      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
       // Der Puck liegt frei vor dem Tor — daraus wird ueber die bestehende
@@ -6298,7 +6313,7 @@
       tw.saves++;
       feed(tw.side,tw.n+" pariert und hält fest — Bully.");
       schwebe({x:0,y:0,txt:art.wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:tw.id});
-      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze});
+      logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
       // Bully im Zonenkreis: dieselbe Hoehe wie der Schuetze stand, damit das Anspiel dort
@@ -14429,7 +14444,9 @@
               else { rebDef++; rebDefSeite[e.seite]++; }
             }
             if((e.art==="fehlwurf"||e.art==="block")&&!e.freiwurf)fehlSeite[e.spieler.side]++;
-            if(e.art!=="treffer"&&e.art!=="fehlwurf")continue;
+            // `e.wurf` holt die gehaltenen/geblockten Hockey-Schuesse mit herein (s.
+            // loeseHockeySchuss); ohne sie zaehlt die Sonde nur ein Viertel der Schuesse.
+            if(e.art!=="treffer"&&e.art!=="fehlwurf"&&!e.wurf)continue;
             if(e.freiwurf)continue;
             const z=holeFg(e.spieler.id);
             const d=e.deckerAbstandBeiWurf;
