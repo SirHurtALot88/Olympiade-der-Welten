@@ -256,4 +256,69 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): `boxscore[].playerId`/`.side` sind die
+   * Bruecke, ueber die `battle-mode-arena-team-points.ts` einen Boxscore-Namen wieder auf einen
+   * echten Spieler zurueckfuehrt.
+   */
+  it(
+    "ordnet jedem Boxscore-Eintrag playerId und side eindeutig zu, wenn die Namen im Duell eindeutig sind",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "boxscore-an-pps-zuordnung" }],
+        "basketball",
+      );
+
+      expect(ergebnis.boxscore.length).toBeGreaterThan(0);
+      for (const eintrag of ergebnis.boxscore) {
+        expect(eintrag.playerId).not.toBeNull();
+        expect(eintrag.side).not.toBeNull();
+        // playerId muss auf den bekannten Praefix des Kaders (Heim-* bzw. Gast-*) zurueckfuehren --
+        // der Beweis, dass wirklich zurueckgefuehrt und nicht nur irgendein String durchgereicht wurde.
+        expect(eintrag.playerId).toMatch(eintrag.side === "home" ? /^Heim-/ : /^Gast-/);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  it(
+    "faellt fuer eine Namens-Kollision innerhalb eines Duells auf playerId=null/side=null zurueck, statt zu raten",
+    async () => {
+      // Beide Kader tragen DENSELBEN Namenspool (identischer Praefix) -- der Motor selbst fuehrt
+      // Boxscore-Werte nur nach Namen (s. arena-headless-runner.ts-Kommentar), diese Kollision
+      // entsteht also GENAU dort, wo sie im echten Spiel ebenfalls entstehen wuerde.
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Kollision" },
+        { teamId: "team-gast", prefix: "Kollision" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "boxscore-an-pps-kollision" }],
+        "basketball",
+      );
+
+      const nameHaeufigkeit = new Map<string, number>();
+      for (const eintrag of ergebnis.boxscore) {
+        nameHaeufigkeit.set(eintrag.name, (nameHaeufigkeit.get(eintrag.name) ?? 0) + 1);
+      }
+      const kollidierendeEintraege = ergebnis.boxscore.filter((eintrag) => (nameHaeufigkeit.get(eintrag.name) ?? 0) > 1);
+
+      // Identische Kader auf beiden Seiten -> dieselbe Auswahllogik waehlt praktisch immer
+      // dieselben Namen fuer beide Seiten -- mindestens eine Kollision ist so gut wie sicher.
+      expect(kollidierendeEintraege.length).toBeGreaterThan(0);
+      for (const eintrag of kollidierendeEintraege) {
+        expect(eintrag.playerId).toBeNull();
+        expect(eintrag.side).toBeNull();
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
 });

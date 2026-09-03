@@ -103,6 +103,20 @@ export type ArenaFixtureInput = {
 export type ArenaFixtureBoxscoreEintrag = {
   name: string;
   wert: number;
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): die echte Spieler-ID, sofern `name`
+   * eindeutig einem Kadermitglied aus HEIM ODER GAST dieses Duells zugeordnet werden konnte.
+   * `null` bei Namens-Kollision (zwei Spieler desselben Duells mit identischem Namen — der Motor
+   * selbst fuehrt Boxscore-Werte NUR nach Namen, s. `battle-mode.engine.js`
+   * `wert:()=>{...o[u.n]=...}`, ein kollidierender Name ueberschreibt dort bereits den Wert des
+   * anderen Spielers) oder wenn der Name in keinem der beiden geladenen Kader auftaucht. Ein
+   * Aufrufer, der `playerId` fuer eine Zuordnung braucht, MUSS mit `null` umgehen, statt zu raten
+   * (s. `battle-mode-arena-team-points.ts`, das bei `null` fuer das GANZE Duell auf den
+   * PPS-Pfad zurueckfaellt).
+   */
+  playerId: string | null;
+  /** Welche Seite `playerId` gehoert — nur gesetzt, wenn `playerId` gesetzt ist. */
+  side: "home" | "away" | null;
 };
 
 export type ArenaFixtureResult = {
@@ -112,6 +126,32 @@ export type ArenaFixtureResult = {
   seiten: [number, number];
   boxscore: ArenaFixtureBoxscoreEintrag[];
 };
+
+/**
+ * Ordnet jeden Boxscore-Namen genau einem Spieler zu — NUR, wenn der Name in GENAU EINEM der
+ * beiden geladenen Kader (HEIM+GAST zusammen) genau einmal vorkommt. Zwei Spieler mit
+ * identischem Namen im selben Duell (theoretisch moeglich, s. `player-generator-service.ts`,
+ * das keine Eindeutigkeit erzwingt; nachgemessen an einem echten `live-save`-Abbild kam das nicht
+ * vor, s. docs/design/boxscore-an-pps.md) werden ABSICHTLICH auf `null` abgebildet, statt zu
+ * raten, wer von beiden gemeint ist.
+ */
+function baueEindeutigeNamenZuordnung(
+  heim: ArenaSpieler[],
+  gast: ArenaSpieler[],
+): Map<string, { playerId: string; side: "home" | "away" }> {
+  const vorkommen = new Map<string, number>();
+  for (const spieler of [...heim, ...gast]) {
+    vorkommen.set(spieler.n, (vorkommen.get(spieler.n) ?? 0) + 1);
+  }
+  const zuordnung = new Map<string, { playerId: string; side: "home" | "away" }>();
+  for (const spieler of heim) {
+    if (vorkommen.get(spieler.n) === 1) zuordnung.set(spieler.n, { playerId: spieler.id, side: "home" });
+  }
+  for (const spieler of gast) {
+    if (vorkommen.get(spieler.n) === 1) zuordnung.set(spieler.n, { playerId: spieler.id, side: "away" });
+  }
+  return zuordnung;
+}
 
 export type RunArenaFixturesOptions = {
   /**
@@ -192,6 +232,14 @@ function bereiteFixturesVor(
 }
 
 /**
+ * Genau das Format, das `window.__arena.spieleFeldspiel()` im Browser roh liefert — OHNE
+ * `playerId`/`side` (s. `ArenaFixtureBoxscoreEintrag`): der Motor selbst kennt nur Namen, die
+ * Node-seitige Zuordnung auf echte Spieler-IDs passiert ERST NACH dem `page.evaluate()`-Aufruf
+ * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten).
+ */
+type RoherBrowserBoxscoreEintrag = { name: string; wert: number };
+
+/**
  * Laeuft im Browser-Kontext (per `page.evaluate()` serialisiert) — darf deshalb nur auf seine
  * Argumente und Browser-globale (`window`, `document`) zugreifen, keine Closures aus Node.
  *
@@ -212,9 +260,9 @@ async function simuliereFixturesImBrowser(payload: {
   }[];
   disziplin: string;
   timeoutMs: number;
-}): Promise<Array<{ disziplin: string; seiten: [number, number]; boxscore: ArenaFixtureBoxscoreEintrag[] } | null>> {
+}): Promise<Array<{ disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null>> {
   const fenster = window as unknown as {
-    __arena?: { spieleFeldspiel: (fd: string, saat: number) => { disziplin: string; seiten: [number, number]; boxscore: ArenaFixtureBoxscoreEintrag[] } | null };
+    __arena?: { spieleFeldspiel: (fd: string, saat: number) => { disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null };
     __olyArenaKader?: unknown;
   };
 
@@ -248,7 +296,7 @@ async function simuliereFixturesImBrowser(payload: {
 
   await wartenAufMotor(payload.timeoutMs);
 
-  const ergebnisse: Array<{ disziplin: string; seiten: [number, number]; boxscore: ArenaFixtureBoxscoreEintrag[] } | null> = [];
+  const ergebnisse: Array<{ disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null> = [];
   for (let i = 0; i < payload.fixtures.length; i += 1) {
     const fixture = payload.fixtures[i];
     if (i > 0) {
@@ -328,11 +376,24 @@ export async function runArenaFixtures(
           `arena-headless-runner: spieleFeldspiel("${disziplin}", ...) lieferte null fuer Fixture ${index} (${vorbereitet[index].homeTeamId} vs. ${vorbereitet[index].awayTeamId}) — unbekannte Disziplin?`,
         );
       }
+      // Namenszuordnung PRO FIXTURE (nicht global): derselbe Name in zwei VERSCHIEDENEN
+      // Fixtures desselben Batches ist unproblematisch (jedes Duell hat sein eigenes Kader-Paar),
+      // nur eine Kollision INNERHALB dieses einen Duells zaehlt.
+      const zuordnung = baueEindeutigeNamenZuordnung(vorbereitet[index].heim, vorbereitet[index].gast);
+      const boxscore: ArenaFixtureBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => {
+        const treffer = zuordnung.get(eintrag.name);
+        return {
+          name: eintrag.name,
+          wert: eintrag.wert,
+          playerId: treffer?.playerId ?? null,
+          side: treffer?.side ?? null,
+        };
+      });
       return {
         homeTeamId: vorbereitet[index].homeTeamId,
         awayTeamId: vorbereitet[index].awayTeamId,
         seiten: ergebnis.seiten,
-        boxscore: ergebnis.boxscore,
+        boxscore,
       };
     });
   } finally {
