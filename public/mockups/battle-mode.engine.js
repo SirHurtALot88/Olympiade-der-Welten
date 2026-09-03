@@ -4454,18 +4454,22 @@
   // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
   const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
   const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
-  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,085/0,915) —
+  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,076/0,924) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
   //
-  // KORB-ABSTAND ZUR GRUNDLINIE (Chris' Fund, 29.08.): mit 0,115/0,885 haengte der Korb
-  // 0,055*W (~68px) hinter der Grundlinie (grundX bei 0,06/0,94) — fast am Freiwurf-
-  // kreis, optisch als wuerde der Korb mitten im Feld schweben statt an der Wand.
-  // Realer Abstand Brett-zu-Grundlinie ist klein; 0,025*W (~31px) haengt den Ring
-  // sichtbar an die Grundlinie, ohne Brett/Ring hinter dem Spielfeldrand zu zeichnen.
+  // KORB-ABSTAND ZUR GRUNDLINIE (Chris' Fund, 29.08., nachgemessen von Fable 03.09.): mit
+  // 0,115/0,885 haengte der Korb 0,055*W (~68px) hinter der Grundlinie (grundX bei
+  // 0,06/0,94) — fast am Freiwurfkreis. Die erste Korrektur (0,915/0,085) blieb noch
+  // 0,025*W (~31px) zurueck; Fables Pixelmessung am echten Sprite (nicht nur der
+  // Ring-Mitte, sondern der gezeichneten Brett-Ruecckante) zeigte dort weiterhin eine
+  // 11px-Luecke zum Spielfeldrand UND keinen verbindenden Staender — der Korb wirkte,
+  // als schwebe er frei im Feld statt an einer Wand zu haengen. 0,016*W (~21px, also
+  // nochmal 11px naeher) schliesst die Luecke; der Staender unten (bodenFeldspiel)
+  // schliesst den Rest optisch.
   // KORB_NAH_RADIUS/DREIER_RADIUS haengen relativ an korbX, nicht an einer absoluten
   // Position — die Verschiebung aendert nur die Optik, keine Distanz-Klassifizierung.
-  // WO DAS ZIEL STEHT. Basketball haengt den Korb an die Grundlinie (W*0.915/0.085);
+  // WO DAS ZIEL STEHT. Basketball haengt den Korb an die Grundlinie (W*0.924/0.076);
   // im Eishockey steht das Tor bewusst weiter im Feld, weil HINTER dem Tor gespielt wird
   // — das ist keine Kosmetik, sondern der Grund, warum ein Eishockeyfeld anders aussieht
   // als ein Basketballfeld. Real liegt die Torlinie 3,7 m von der Bande, also rund 4,5 %
@@ -4475,7 +4479,15 @@
   // einmal die Ursache dafuer, dass der Wurf das gezeichnete Ziel verfehlte.
   const korbXVon=(side)=>feldspielDisc==="hockey"
     ?(side===0?W*0.90:W*0.10)
-    :(side===0?W*0.915:W*0.085);
+    :(side===0?W*0.924:W*0.076);
+  // HANDPUNKTE FUER DEN GETRAGENEN BALL (Chris, 03.09.: "die Spieler den tragen mit den
+  // Animationen"). Reine Uebernahme der Messung aus docs/design/sprite-handpunkte.md
+  // (Profil-Laufbilder, Spalten 0-8 = ANIBILDER.walk, Zellen-Pixel mit Fusspunkt bei
+  // (32,46)) — nur die "vordere Hand" (in Bewegungsrichtung), das reicht fuer einen
+  // einhaendig getragenen Ball. Spalten ohne eigene Handkontur (0-2, 7-8) tragen dort
+  // schon die im Dokument empfohlene Interpolation, keine eigene Messung.
+  const BK_HAND_LINKS=[[24,46],[24,46],[24,46],[25,36],[22,45],[20,45],[23,45],[24,44],[24,44]];
+  const BK_HAND_RECHTS=[[40,46],[40,46],[40,46],[38,36],[41,45],[43,45],[40,45],[40,44],[40,44]];
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -7660,7 +7672,16 @@
         const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
         // Der Puck prellt nicht — er gleitet am Schlaeger. Basketballs Dribbel-Huepfen
         // waere hier sofort als falsche Sportart zu erkennen.
-        const dribbelDip=istHockey()?0:Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
+        //
+        // KURVENFORM (Fables Fund, 03.09., Pixelmessung der Bewegung): ein reiner
+        // sin(phi*pi)-Bogen hat seinen "Knick" (harten Richtungswechsel) GENAU in der
+        // Mitte (phi=0,5) und laeuft an den Endpunkten (phi=0/1) glatt aus — bei einem
+        // Ball ist es umgekehrt. Am Boden (Bodenkontakt, phi=0,5) prallt er hart und
+        // wechselt die Richtung schlagartig; an der Hand (phi=0/1, Abwurf/Fang) ist die
+        // Bewegung weich, wie am Scheitel eines Wurfbogens. 1-|cos(phi*pi)| hat genau
+        // diese Form: glatter Scheitel (Ableitung 0) bei phi=0/1, harter Knick bei
+        // phi=0,5 — Boden und Hand tauschen die Rollen gegenueber dem alten sin-Bogen.
+        const dribbelDip=istHockey()?0:(1-Math.abs(Math.cos(dribbelPhase*Math.PI)))*BK_DRIBBEL_AMPLITUDE;
         fsBall={sichtbar:true,x:traeger.x,y:traeger.y+(istHockey()?26:18)+dribbelDip,traegerId:traeger.id};
         // ALLE Decker des Ballfuehrers duerfen es versuchen, nicht nur der erste.
         //
@@ -8063,10 +8084,17 @@
       // (nicht mehr eigene Literale hier) — sonst laeuft die Zeichnung wieder aus dem
       // Ruder, sobald korbXVon() an anderer Stelle nachjustiert wird.
       const grundX=links?W*0.06:W*0.94, korbX=korbXVon(links?1:0);
-      // Zone (die Zahnstocher-Box unterm Korb)
-      ctx.strokeRect(links?grundX:grundX-H*0.16,H/2-H*0.08,H*0.16,H*0.16);
-      // Freiwurflinie mit Halbkreis
-      ctx.beginPath();ctx.arc(links?grundX+H*0.16:grundX-H*0.16,H/2,H*0.09,0,6.3);ctx.stroke();
+      // Zone (die Zahnstocher-Box unterm Korb). Fables Fund (03.09.): die Box haengte
+      // Tiefe UND Breite an H (der kurzen Seitenlinien-Achse) — H*0.16 ~75px, deutlich
+      // kleiner als eine echte NBA-Zone. Die Zone reicht real 19 ft von der Grundlinie
+      // (Feldlaenge 94 ft) und ist 16 ft breit (Feldbreite 50 ft); hier ist W die lange
+      // Achse (Spielfeldlaenge, Spielflaeche W*0.88 breit gemalt, s. fillRect oben) und
+      // H die kurze (Feldbreite) — die TIEFE gehoert deshalb an W, nicht an H.
+      const zoneTiefe=W*0.88*(19/94), zoneBreite=H*(16/50);
+      ctx.strokeRect(links?grundX:grundX-zoneTiefe,H/2-zoneBreite/2,zoneTiefe,zoneBreite);
+      // Freiwurflinie mit Halbkreis — Radius bleibt an H (Feldbreite), nur der Abstand
+      // von der Grundlinie folgt jetzt derselben echten Zonentiefe wie die Box oben.
+      ctx.beginPath();ctx.arc(links?grundX+zoneTiefe:grundX-zoneTiefe,H/2,H*0.09,0,6.3);ctx.stroke();
       // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
       ctx.beginPath();
       ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
@@ -8087,6 +8115,16 @@
         ctx.rotate(links?-Math.PI/2:Math.PI/2);
         ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
         ctx.restore();
+        // Staender zur Grundlinie (Fables Fund, 03.09.: das Sprite haengt frei im Feld,
+        // ohne sichtbare Verbindung zur Wand — real steht die Korbanlage auf einem
+        // Pfosten/Ausleger, der zur Grund-/Aussenlinie zurueckreicht). Reicht bis knapp
+        // an den gezeichneten Ring heran (halbe Sprite-Breite), damit er nicht ueber den
+        // Ring hinaus ins Feld ragt.
+        ctx.strokeStyle="rgba(210,210,215,.6)";ctx.lineWidth=5;
+        ctx.beginPath();
+        ctx.moveTo(grundX,H/2);
+        ctx.lineTo(links?korbX-22:korbX+22,H/2);
+        ctx.stroke();
       } else {
         // Rueckfall: Ring plus kurzer Brett-Strich, wie vor der Asset-Runde.
         ctx.fillStyle="rgba(255,140,60,.9)";
@@ -8368,12 +8406,25 @@
       // Damit der Ball nicht neben der entzerrt gezeichneten Hand schwebt, bekommt er
       // denselben Zeichen-Versatz. Ein FLIEGENDER Ball (Pass/Wurf) traegt keine traegerId
       // und bleibt unveraendert auf seiner interpolierten Bahn.
-      let bvx=0, bvy=0;
+      let bvx=0, bvy=0, handOffX=0, traeger=null;
       if(fsBall.traegerId!=null){
-        const h=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
-        if(h){ bvx=h._zvx||0; bvy=h._zvy||0; }
+        traeger=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
+        if(traeger){
+          bvx=traeger._zvx||0; bvy=traeger._zvy||0;
+          // Ball IN der Hand statt vor der Bauchmitte (Chris, 03.09.: "die Spieler den
+          // tragen"): seitlicher Versatz aus den gemessenen Handpunkten (BK_HAND_*, s.
+          // dort). Nur Basketball — der Puck liegt am Schlaeger, kein Handpunkt noetig,
+          // und die Freiwurf-Formation traegt denselben traegerId-Pfad mit, was hier
+          // gewollt ist (der Schuetze haelt den Ball dort genauso in der Hand).
+          if(feldspielDisc==="basketball"){
+            const rBlick=blickAus(traeger);
+            const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
+            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
+            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger));
+          }
+        }
       }
-      const bx=fsBall.x+bvx, by=fsBall.y+bvy;
+      const bx=fsBall.x+bvx+handOffX, by=fsBall.y+bvy;
       if(istHockey()){
         // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
         // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
@@ -8387,13 +8438,28 @@
         ctx.strokeStyle="rgba(200,214,230,.55)";ctx.lineWidth=1;
         ctx.beginPath();ctx.ellipse(bx,by-7,6.5,3.4,0,Math.PI,2*Math.PI);ctx.stroke();
         ctx.restore();
-      } else if(bkDa("ball")){
-        ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
       } else {
-        ctx.fillStyle="#e8823a";
-        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
-        ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+        // Bodenschatten fuer den getragenen/gedribbelten Ball (Fables Fund, 03.09.: kein
+        // Schatten heisst der Ball wirkt, als schwebe er frei — der Spielerschatten oben
+        // hat genau dasselbe Problem nicht, weil er fest am Boden klebt). Groesse/
+        // Deckkraft folgen dem Dribbel-Takt ueber dieselbe dip-Groesse, die auch die
+        // Hoehe treibt (fsBall.y=traeger.y+18+dip, s. BK_DRIBBEL_* oben): am Boden
+        // (naehe=1) dunkler/breiter, an der Hand (naehe=0) kaum sichtbar.
+        if(traeger){
+          const naehe=Math.max(0,Math.min(1,(fsBall.y-traeger.y-18)/BK_DRIBBEL_AMPLITUDE));
+          ctx.fillStyle="rgba(0,0,0,"+(0.12+naehe*0.28)+")";
+          ctx.beginPath();
+          ctx.ellipse(bx,traeger.y+bvy+19,6+naehe*4,2.5+naehe*1.5,0,0,6.3);
+          ctx.fill();
+        }
+        if(bkDa("ball")){
+          ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
+        } else {
+          ctx.fillStyle="#e8823a";
+          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
+          ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
+          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+        }
       }
     }
     for(const f of floats){
