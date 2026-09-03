@@ -9005,10 +9005,13 @@
   const istBuehne=(d)=>!!BUEHNE_ART[d];
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
+  // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
+  let letzterHebenZug=null;
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
-    floats.length=0;
+    floats.length=0; letzterHebenZug=null;
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
@@ -9331,6 +9334,7 @@
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
+      if(BB().heben)letzterHebenZug={u,r};
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
@@ -9434,6 +9438,11 @@
   function zeichneBuehne(){
     bodenBuehne();
     const art=BB();
+    // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
+    // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
+    // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
+    // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
+    if(art.heben){ zeichneHeben(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
@@ -9500,6 +9509,119 @@
       }
       ctx.globalAlpha=1;
     }
+  }
+
+  // ================== GEWICHTHEBEN: EIGENES BUEHNENBILD (Plan S2) ==================
+  // Zwei Heber mittig, eine Hantel mit der angesagten Last, gueltig/ungueltig als Geste,
+  // Duellstand gross, Gesamtlast klein, die wartenden Paare klein am Rand — genau die
+  // Liste aus Plan Abschnitt 7. Kein neues Sprite-Rendering: zeichneSprite() von den
+  // Auftritts-Disziplinen wird nur GROESSER und MITTIGER platziert.
+  function bestBisher(u,uebung){
+    let m=0;
+    for(let i=0;i<=u.aktuell;i++){const r=u.runden[i];
+      if(r&&r.uebung===uebung&&r.gueltig)m=Math.max(m,r.kg);}
+    return m;
+  }
+  function zeichneHeben(art){
+    if(!TEILNEHMER.length)return;
+    const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
+    // Aktives Duell: das des zuletzt enthuellten Zugs. Vor dem allerersten Zug (noch
+    // nichts in letzterHebenZug) ist es das erste Duell — dieselbe Regel, mit der die
+    // Warteschlange startet.
+    const aktivNr=letzterHebenZug?(letzterHebenZug.u.duellNr??0):0;
+    const a=TEILNEHMER.find(u=>u.side===0&&u.duellNr===aktivNr);
+    const b=TEILNEHMER.find(u=>u.side===1&&u.duellNr===aktivNr);
+    if(!a||!b)return;
+
+    // GROSSE DUELLSTAND-ZEILE — dieselbe Zahl wie im DOM-Score (#score), hier zusaetzlich
+    // auf der Buehne selbst, weil das Auge beim Gewichtheben auf dem Podest bleibt, nicht
+    // am Seitenrand des HUDs.
+    const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=art.rundenN&&u.duellGewonnen).length;
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="700 30px 'Barlow Condensed',sans-serif";
+    ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+    const standTxt=duelle(0)+" : "+duelle(1);
+    ctx.strokeText(standTxt,W/2,H*0.10);
+    ctx.fillStyle="#f2e9d8";ctx.fillText(standTxt,W/2,H*0.10);
+    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
+
+    // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
+    // Chris beschrieben hat ("immer 2 gleichzeitig").
+    const y=H*0.46;
+    [[a,W*0.30,"--home"],[b,W*0.70,"--away"]].forEach(([u,x,farbVar])=>{
+      const c=css(farbVar);
+      ctx.globalAlpha=u.lunge>0?1:0.94;
+      ctx.fillStyle=c;ctx.globalAlpha=0.22;
+      ctx.beginPath();ctx.ellipse(x,y+26,22,8,0,0,6.3);ctx.fill();
+      ctx.globalAlpha=1;
+      zeichneSprite(ctx,u,x,y);
+      const schrift=(txt,dy,farbe,groesse,gewicht)=>{
+        ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+      };
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
+      // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
+      // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
+      const zwSoFar=bestBisher(u,"reissen")+bestBisher(u,"stossen");
+      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
+    });
+
+    // DIE HANTEL — Balken mit zwei Scheibenpaaren, keine neue Sprite-Pipeline, nur
+    // Primitiven. Traegt die zuletzt angesagte/gehobene Last als grosse Zahl.
+    const bx=W/2,by=y+2;
+    ctx.strokeStyle="#5a5568";ctx.lineWidth=5;
+    ctx.beginPath();ctx.moveTo(bx-46,by);ctx.lineTo(bx+46,by);ctx.stroke();
+    ctx.fillStyle="#3a3648";
+    for(const dx of [-46,-38,38,46])
+      {ctx.beginPath();ctx.ellipse(bx+dx,by,Math.abs(dx)===46?11:8,Math.abs(dx)===46?11:8,0,0,6.3);ctx.fill();}
+
+    const zug=letzterHebenZug;
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    if(zug){
+      const gueltig=zug.r.gueltig;
+      const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
+      ctx.font="700 22px 'Barlow Condensed',sans-serif";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
+      ctx.strokeText(zeigeKg+" kg",bx,by-34);
+      ctx.fillStyle=gueltig?css("--ok"):css("--crit");
+      ctx.fillText(zeigeKg+" kg",bx,by-34);
+      // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
+      // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";
+      ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,by+34);
+      ctx.font="400 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,by+48);
+    } else {
+      ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.fillText("Erste Ansage folgt …",bx,by-10);
+    }
+
+    // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
+    // mit Ergebnis sobald entschieden. Das ist das "was noch kommt/kam"-Gedaechtnis, das
+    // beim Reihenbild der anderen Buehnen die zwoelf sichtbaren Figuren selbst leisten.
+    const paare=[];
+    for(let d=0;d<gesamtDuelle;d++){
+      if(d===aktivNr)continue;
+      const pa=TEILNEHMER.find(u=>u.side===0&&u.duellNr===d), pb=TEILNEHMER.find(u=>u.side===1&&u.duellNr===d);
+      if(!pa||!pb)continue;
+      const fertig=pa.aktuell+1>=art.rundenN;
+      const status=!fertig&&pa.aktuell<0?"wartet":!fertig?"läuft":(pa.duellGewonnen?"1:0 für "+pa.n.split(" ")[0]:"1:0 für "+pb.n.split(" ")[0]);
+      paare.push({d,pa,pb,fertig,status});
+    }
+    paare.sort((x,y)=>x.d-y.d);
+    ctx.textAlign="center";
+    const ry=H*0.90, spanne=W-120;
+    paare.forEach((p,i)=>{
+      const rx=60+spanne*(paare.length>1?i/(paare.length-1):0.5);
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=p.fertig?"#8a93a3":"#c7ccd6";
+      ctx.fillText((p.d+1)+". "+p.pa.n.split(" ")[0]+" – "+p.pb.n.split(" ")[0],rx,ry);
+      ctx.font="400 8px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=p.fertig?css(p.pa.duellGewonnen?"--home":"--away"):"#5f6675";
+      ctx.fillText(p.status,rx,ry+11);
+    });
   }
 
   function stats(p,dId){const rec=rezeptVon(dId),o={};
