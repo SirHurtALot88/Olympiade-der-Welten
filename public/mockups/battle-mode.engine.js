@@ -2772,7 +2772,7 @@
     "takeshis-castle":{label:"Takeshi",cat:"chaos",size:6},
     staffel:{label:"Staffel",cat:"speed",size:6},
     "mini-dm":{label:"Mini-DM",cat:"power",size:4},
-    fechten:{label:"Fechten",cat:"power",size:6},
+    fechten:{label:"Fechten",cat:"buehne",size:6},
     battlefield:{label:"Battlefield",cat:"power",size:4},
     gewichtheben:{label:"Gewichtheben",cat:"buehne",size:6},
     showcase:{label:"Showcase",cat:"buehne",size:6},
@@ -2782,7 +2782,7 @@
     basketball:{label:"Basketball",cat:"feldspiel",size:6},
     football:{label:"Football",cat:"feldspiel",size:6},
     hockey:{label:"Hockey",cat:"feldspiel",size:6},
-    tennis:{label:"Tennis",cat:"feldspiel",size:6},
+    tennis:{label:"Tennis",cat:"buehne",size:6},
     "speed-schach":{label:"Speed-Schach",cat:"buehne",size:6},
     "i-spy":{label:"I-Spy",cat:"buehne",size:6}};
   // ===================================================================================
@@ -3548,40 +3548,17 @@
               AUS:{stamina:48,will:32,health:20}}
     },
 
-    fechten:{
-      // MATRIX: torment 25, dexterity 20, speed 16, awareness 15, power 10,
-      // determination 6, health 4, intelligence 4.
-      //
-      // Die einzige Kampfdisziplin, in der Speed ueberhaupt ein Gewicht hat (16) — und
-      // die einzige, in der Health fast keins hat (4). Ein Fechter faellt nicht um, weil
-      // er duenn ist, sondern weil er zu spaet kommt. Deshalb traegt Health hier kaum
-      // Lebenspunkte; die tragen Entschlossenheit und Aufmerksamkeit, also das, was einen
-      // im Gefecht haelt.
-      //
-      // Torment mit 25 ist der hoechste Wert: die Klinge sucht die Bloesse.
-      label:"Fechten", jeSeite:6,
-      // NACHGEZOGEN aus demselben Grund wie Battlefield: TMP und AUS liegen ausserhalb
-      // der Eignungs-Normierung, also bekommt jedes Attribut dort einen Bonus erster
-      // Ordnung. Entschlossenheit stand mit 40 in der Ausdauer und mit 36 in den
-      // Lebenspunkten, obwohl die Matrix ihr nur 6 gibt; Speed mit 46 im Tempo bei
-      // Gewicht 16. Jetzt tragen Torment (25) und Dexterity (20) auch dort.
-      rezept:{ANG:{torment:42,dexterity:32,power:26},
-              VER:{awareness:40,dexterity:34,health:26},
-              LP:{health:34,determination:36,awareness:30},
-              TMP:{dexterity:38,speed:34,awareness:28},
-              // NACHGEZOGEN, dritte Runde — diesmal am korrigierten Massstab (s. MOTOREN,
-              // „Anteil am Gesamtbeitrag"). Damit las Fechten 16,6 Pp, und die beiden
-              // groessten Einzelposten sassen beide in der AUSDAUER: Torment 21,5 % bei
-              // Gewicht 25, Awareness 17,3 % bei 15. Also traegt Torment dort mehr,
-              // Awareness weniger — gemessen 16,6 -> 12,5 Pp (n=6), bestaetigt bei
-              // doppeltem n: 11,0 Pp (n=12). Damit unter dem Zielwert von 15 Pp.
-              //
-              // TEMPO BLEIBT, WIE ES WAR. TMP und AUS liegen ausserhalb der
-              // Eignungs-Normierung; wer daran dreht, verschiebt nicht das Gewicht,
-              // sondern den Kampf. Ein Neubau dieser Runde, der auch TMP anfasste, kam
-              // auf 20,4 statt 12,5 Pp. Deshalb nur die Ausdauer, und die nur wenig.
-              AUS:{torment:44,dexterity:24,awareness:22,determination:10}}
-    },
+    // FECHTEN AUSGEZOGEN, CHASSIS-WECHSEL AUF DIE BUeHNE (03.09., Recherche
+    // docs/design/tennis-fechten-rollout-plan.md). Fechten ist real ein 1-gegen-1-
+    // Gefecht, keine Fuenf-gegen-fuenf-Auseinandersetzung wie TDM/Mini-DM/Battlefield —
+    // der Eintrag steht jetzt in BUEHNE_ART.fechten, mit einem ersten Sieben-Rollen-
+    // Rezept aus derselben MATRIX (torment 25, dexterity 20, speed 16, awareness 15,
+    // power 10, determination 6, health 4, intelligence 4). Entfernt statt nur
+    // ergaenzt, damit istArena("fechten") nicht weiter true zurueckgibt und irgendwo
+    // (Aufstellung, Rezept-Tools) falsch verzweigt — dieselbe Registrierungs-Warnung wie
+    // bei Tennis, hier unkritischer, weil die BUEHNE_ART-Schleife ohnehin NACH der
+    // ARENA_ART-Schleife registriert (s. MOTOREN unten), ein doppelter Eintrag also
+    // schon vorher zugunsten der Buehne aufgeloest worden waere.
 
     battlefield:{
       // MATRIX: charisma 20, intelligence 16, spirit 16, torment 12, power 10,
@@ -3886,30 +3863,14 @@
         korrektur:{dunk:-1.351, nah:0.353, mit:-1.057, fern:-1.879}, // GEMESSEN, s. Bericht
         skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0050}]
       }
-    },
-    tennis:{
-      // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
-      // determination 6, speed 6, charisma 4. Kein echtes "Team" — die sechs tragen
-      // abwechselnd den Ballwechsel aus, wie eine Setzliste, dieselbe Struktur wie
-      // ueberall sonst.
-      label:"Tennis", jeSeite:6, zuegeJeSeite:16, zugDauer:60/(16*2*2),
-      punkteNah:1, punkteFern:1, fernAnteil:0,
-      wortAbwehr:"Return", wortBlock:"Ass", wortRebound:"Vorteil",
-      // NACHGEZOGEN: erste Messung stand bei 105,7 Pp. Dexterity (Matrixgewicht 12) sass
-      // in DREI Rollen (Abschluss, Technik, Abwehr) und las 28,2 %. Intelligence, der
-      // hoechste Matrixwert (22), sass nur in zwei Rollen und las 6,7 %. Jetzt traegt
-      // Intelligence auch Abwehr und Aufbau fuehrend, Dexterity nur noch dort, wo ein
-      // schneller Schlag wirklich zaehlt (Abschluss).
-      rezept:{
-        AUFBAU:      {intelligence:40,awareness:35,spirit:25},
-        ABSCHLUSS:   {dexterity:35,intelligence:35,speed:30},
-        TECHNIK:     {intelligence:50,awareness:35,determination:15},
-        ZWEITCHANCE: {stamina:40,determination:35,awareness:25},
-        ABWEHR:      {intelligence:35,awareness:35,dexterity:30},
-        TEAMGEIST:   {spirit:55,charisma:45},
-        AUSDAUER:    {stamina:50,determination:30,spirit:20}
-      }
     }
+    // TENNIS AUSGEZOGEN, CHASSIS-WECHSEL AUF DIE BUeHNE (03.09., Recherche
+    // docs/design/tennis-fechten-rollout-plan.md). Der Eintrag steht jetzt in
+    // BUEHNE_ART.tennis, Rezept 1:1 uebernommen. WICHTIG, wie die Recherche (E.1)
+    // ausdruecklich warnt: die MOTOREN-Registrierung unten laeuft ARENA_ART -> BAHN_ART
+    // -> BUEHNE_ART -> FELDSPIEL_ART, in dieser Reihenfolge, spaetere Schleifen
+    // ueberschreiben fruehere. Ein "tennis" in BEIDEN Tabellen haette hier weiter
+    // gewonnen — der alte Eintrag MUSSTE raus, nicht nur der neue rein.
   };
   let feldspielDisc="basketball";
   const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
@@ -8997,6 +8958,69 @@
         NERVEN:       {will:35,spirit:30,speed:20,determination:15},
         AUSDAUER:     {spirit:40,will:35,health:25},
         WAGNIS:       {torment:45,speed:30,dexterity:25}
+      }
+    },
+
+    tennis:{
+      // CHASSIS-WECHSEL vom Feldspiel (Recherche
+      // docs/design/tennis-fechten-rollout-plan.md, Abschnitt A.3/E.1). Tennis' Duell
+      // ist real ein alternierendes Einzelformat (Aufschlag wechselt nach jedem Spiel,
+      // kein gleichzeitig bewegtes Fuenf-gegen-fuenf) — strukturell naeher an Speed-
+      // Schachs Brett-fuer-Brett-Duell als am Ballbesitz-Feldspiel, das Basketball/
+      // Football/Hockey teilen. Duell wie Speed-Schach: unabhaengig gewuerfelt, dann
+      // Vorteil gebildet (kein interaktiver Ballwechsel-Rechner, s. Recherche A.5).
+      //
+      // REZEPT 1:1 AUS FELDSPIEL_ART.tennis UEBERNOMMEN, nur auf die sieben
+      // Buehnen-Rollennamen umbenannt — KEINE Gewichtsaenderung. Genau der Test aus der
+      // Recherche (Scratchpad, nie committet): rho je Spiel 0,605 -> 0,919 (Saison
+      // 0,762 -> 0,958), robust bei jeSeite 6/4/2 (0,919/0,860/0,833). Der Sprung kommt
+      // aus zwei bereits vorhandenen Buehnen-Eigenschaften, nicht aus dem Rezept selbst:
+      // wert() liest hier die eigene Punktsumme statt der Vorteils-Differenz (s. Kommentar
+      // bei MOTOREN weiter unten), und die Buehnen-Punkteformel ist glatt und monoton aus
+      // denselben Sub-Skills gebaut, aus denen auch die Eignung selbst entsteht.
+      //
+      // AUFBAU->GRUNDLAGE, ABSCHLUSS->SPITZENMOMENT, ZWEITCHANCE->NERVEN,
+      // ABWEHR->WAGNIS, TEAMGEIST->PUBLIKUM — nur die Namen sind neu.
+      label:"Tennis", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      failAbzug:0.55, failWort:"vergibt den Punkt", erfolgWort:"gewinnt den Ballwechsel",
+      rezept:{
+        GRUNDLAGE:    {intelligence:40,awareness:35,spirit:25},
+        SPITZENMOMENT:{dexterity:35,intelligence:35,speed:30},
+        TECHNIK:      {intelligence:50,awareness:35,determination:15},
+        NERVEN:       {stamina:40,determination:35,awareness:25},
+        WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
+        PUBLIKUM:     {spirit:55,charisma:45},
+        AUSDAUER:     {stamina:50,determination:30,spirit:20}
+      }
+    },
+
+    fechten:{
+      // CHASSIS-WECHSEL von der Arena (Recherche
+      // docs/design/tennis-fechten-rollout-plan.md, Abschnitt A.4/E.2). Fechten ist real
+      // ein 1-gegen-1-Gefecht, keine Fuenf-gegen-fuenf-Auseinandersetzung — die Arena
+      // passte strukturell nie. Waffenart: Degen (kein "wer hatte zuerst die Aktion"-
+      // Vorfahrtsregel wie bei Floret/Saebel noetig, s. Recherche C.2) — passt darum
+      // beiseitig unabhaengig, "naiv" wie Speed-Schach: kein interaktiver Paar-Rechner
+      // (der waere ein Ausbau von baueHebenDuelle, s. Recherche E.2 Phase 2, fuer das
+      // Spielgefuehl, nicht fuer die Abnahmezahl).
+      //
+      // ERSTER, AUSDRUeCKLICH NICHT FINALER Sieben-Rollen-Entwurf aus Fechtens realer
+      // Arena-Matrix (torment 25, dexterity 20, speed 16, awareness 15, power 10,
+      // determination 6, health 4, intelligence 4) — kein Charisma, Torment am
+      // staerksten vertreten (vier Rollen), genau wie die Matrix es vorgibt. Genau der
+      // Test aus der Recherche (Scratchpad, nie committet): rho je Spiel 0,495 -> 0,894
+      // (Saison 0,559 -> 0,958), robust bei jeSeite 6/4/2 (0,894/0,880/0,908). Noch keine
+      // Sinkhorn-Kalibrierrunde (Recherche F.2) — Startpunkt, kein fertiges Ergebnis.
+      label:"Fechten", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
+      rezept:{
+        GRUNDLAGE:    {torment:45,dexterity:30,awareness:25},
+        SPITZENMOMENT:{dexterity:40,speed:35,torment:25},
+        TECHNIK:      {torment:40,dexterity:35,awareness:25},
+        NERVEN:       {determination:40,awareness:35,health:25},
+        PUBLIKUM:     {intelligence:50,health:50},
+        AUSDAUER:     {speed:40,power:35,health:25},
+        WAGNIS:       {speed:45,torment:30,power:25}
       }
     }
   };
@@ -15020,7 +15044,9 @@
   }
 
   // ===================================================================================
-  // ZIELANSAGE — die Bedienseite (Kampf-Disziplinen: TDM, Mini-DM, Fechten, Battlefield).
+  // ZIELANSAGE — die Bedienseite (Kampf-Disziplinen: TDM, Mini-DM, Battlefield — Fechten
+  // seit dem Buehnen-Chassis-Wechsel nicht mehr, istKampf() schliesst es jetzt generisch
+  // aus, s. BUEHNE_ART.fechten).
   //
   // Bewusst dieselben zwei Auswahlwege wie beim Fokus-Doppeln: auf der Leinwand anklicken
   // ist das, was man will, und die Kaderleiste ist der Weg, der auch dann trifft, wenn
