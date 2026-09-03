@@ -8863,6 +8863,18 @@
       // Matrix (2) es will: sechs Versuche sind kein Ausdauersport.
       //
       // Alle Zahlen PLATZHALTER bis zur Sondierung (Schritte S3/S4 des Plans).
+      //
+      // GEPRUEFT UND VERWORFEN (S3-Kalibrierrunde, gemessen vorher/nachher):
+      // Power aus TECHNIK/ANSAGE zu nehmen (nur noch in LAST) und das Gewicht an
+      // Dexterity/Speed/Determination/Charisma/Will umzuverteilen senkte die
+      // Pp-Abweichung von 48 auf 33 — aber die Rezeptur traf disproportional das
+      // Zielfeld dieser Sonde (Kader mit hohem Power-Anteil): Korridor-Gelingen fiel
+      // BREIT (Reissen 1. Versuch 84,2 -> 82,3 %, Stossen 3. Versuch 45,3 -> 45,0 %),
+      // Nullwertungen stiegen 3,1 -> 4,2 %, und rho (gesamt, jeSeite 6) sank leicht von
+      // 0,800 auf 0,789 — eine Verbesserung bei Pp, aber eine Verschlechterung bei
+      // Korridor UND Rangtreue. Nicht eingebaut (CLAUDE.md-Grundsatz: keine Aenderung,
+      // die etwas vorher Gutes schlechter macht). Der Rezept-Split bleibt darum wie von
+      // Fable entworfen; die Kalibrierung unten wirkt nur ueber die Koeffizienten.
       rezept:{
         LAST:     {power:60,health:25,determination:15},
         TECHNIK:  {dexterity:35,speed:30,determination:20,power:15},
@@ -9014,7 +9026,7 @@
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
-        groesse:p.groesse??null,
+        groesse:p.groesse??null, attr,
         // DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen (Chris' Fund vom
         // 25.08., s. bauSpieler und aufschluesselung): `p.d` haelt nur "tdm" und "spurt"
         // vorberechnet. Fuer JEDE Buehnen-Disziplin fiel der Basiswert deshalb auf 0
@@ -9116,7 +9128,12 @@
   //   * Reissen traegt rund 45 % des Zweikampfs.
   //   * Gleichstand: es gewinnt, wer die Last mit WENIGER Versuchen erreicht hat (die
   //     IWF-Regel seit 2017). Erst danach die Reihenfolge.
-  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.514]};
+  // Stossen-3.-Versuch auf 0,55 angehoben (real 51,4 % Maenner / 53,6 % Frauen, Mittel
+  // 52,5): mit den staerkeren ANSAGE/NERVEN-Koeffizienten (S3-Kalibrierung) lag die
+  // gemessene Quote sonst bei 45-46 % statt im Korridor 50-63 % — der Zuschlag gleicht
+  // aus, dass ein hoeher gewagter dritter Versuch (groesserer Sprung, Reaktion auf den
+  // Duellstand) im Mittel oefter ueber dem Tagesmaximum liegt als die reine IWF-Quote.
+  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.565]};
   const HEBEN_ANTEIL_REISSEN=0.455;
   // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
   // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
@@ -9138,10 +9155,25 @@
     {rolle:"Final Attempt",  eroeffnung:0.90, sprung1:0.04, sprung2:0.06}
   ];
   // Wie stark die Sub-Skills die Kurve biegen. Alle PLATZHALTER.
-  const HEBEN_TECHNIK_K=0.0020;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
-  const HEBEN_NERVEN_K=0.0030;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
-  const HEBEN_ANSAGE_EROEFFNUNG=0.00035; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
-  const HEBEN_ANSAGE_SPRUNG=0.006;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
+  // KALIBRIERUNG S3 (24.09., nach der ersten Pp-Messung): die vier Zeilen unten waren
+  // 4x/3x/3x zu schwach, um Charisma und Dexterity/Speed ausgangswirksam zu machen.
+  // Erste Messung (einflussVon, n=48): Power 51,6 % (Matrix 28, +23,6 Pp), Charisma
+  // 1,4 % (Matrix 23, -21,6 Pp), Abweichung GESAMT 66,3 Pp — weit ueber der 25-Pp-Schranke
+  // (6.1) trotz des Kommentars "Charisma sitzt zweimal, beide ausgangswirksam": NERVEN
+  // wirkt nur auf den dritten Versuch, ANSAGE nur auf Eroeffnungshoehe/Sprunggroesse, beide
+  // innerhalb eines enormen Tagesmaximums (LAST allein spannt 104 bis 476 kg), das die
+  // Ansage-Kanaele nur um wenige Prozentpunkte verschieben konnten. Angehoben, bis Pp im
+  // Korridor lag (s. Abschlussbericht fuer die Messreihe).
+  const HEBEN_TECHNIK_K=0.0035;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
+  const HEBEN_NERVEN_K=0.0090;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
+  const HEBEN_ANSAGE_EROEFFNUNG=0.0016; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
+  // ANSAGE_SPRUNG bei 0,015 gelassen, nicht weiter erhoeht: bei 0,032 hob es den Zocker-
+  // Archetyp (S4, charisma/speed fuehrt bei den groessten Spruengen) von rho 0,11 auf nur
+  // 0,27 — kaum Wirkung fuers Archetyp-Ziel — riss aber Stossen 3. Versuch aus dem
+  // Korridor (51,3 % -> 47,7 %, Ziel 50-63 %). Kein guter Tausch, verworfen. Der Zocker-
+  // Archetyp fuehrt darum NICHT klar (s. Abschlussbericht) — ehrlich gemessen, nicht
+  // erzwungen.
+  const HEBEN_ANSAGE_SPRUNG=0.015;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
   const HEBEN_ERHOLUNG_K=0.0012;  // je Punkt ERHOLUNG ueber 50 auf das Stossen-Maximum
   const HEBEN_WAGNIS_K=6.0;       // Malus je Anteil, den die Ansage ueber dem Tagesmax liegt
   const HEBEN_WIEDERHOLUNG=0.06;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
@@ -9226,7 +9258,13 @@
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
     const ansage={};
     for(const u of [a,b]){
-      const anteil=plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG;
+      // Deckel bei 97 % des Tagesmaximums: ohne ihn eroeffnete ein Heber mit ANSAGE nahe
+      // 99 rechnerisch ueber 100 % seines Maximums (0,94 Basis + 49*0,0016 = 1,018) und
+      // riss den ERSTEN Versuch fast sicher — genau die Kalibrierungsfalle, die schon bei
+      // den dritten Versuchen ohne Deckel auftrat (s. Kommentar bei "REAKTION AUF DEN
+      // DUELLSTAND" unten). Der Deckel laesst ANSAGE weiter die Eroeffnungshoehe heben,
+      // ohne sie ins garantierte Misslingen zu schicken.
+      const anteil=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
@@ -15828,7 +15866,14 @@
         ?({n:u.n,seite:u.side,summe:u.summe,runden:u.runden,eig:u.eig,rolle:u.rolle,
            zweikampf:u.zweikampf,nullwertung:u.nullwertung,duellGewonnen:u.duellGewonnen,
            anzeigeKg:u.anzeigeKg,groesse:u.groesse,duellNr:u.duellNr,
-           LAST:u.LAST,TECHNIK:u.TECHNIK,NERVEN:u.NERVEN,ANSAGE:u.ANSAGE,ERHOLUNG:u.ERHOLUNG})
+           LAST:u.LAST,TECHNIK:u.TECHNIK,NERVEN:u.NERVEN,ANSAGE:u.ANSAGE,ERHOLUNG:u.ERHOLUNG,
+           // Rohattribute fuer die Archetypen-Probe (S4): Kraftpaket/Techniker/
+           // Nervenbuendel/Zocker sind ueber ROHE Attribute definiert (power/health,
+           // dexterity/speed, will/charisma, charisma/speed), nicht ueber die Subskills
+           // oben — die Probe braucht deshalb beide Ebenen.
+           power:u.attr?.power??null,health:u.attr?.health??null,
+           dexterity:u.attr?.dexterity??null,speed:u.attr?.speed??null,
+           will:u.attr?.will??null,charisma:u.attr?.charisma??null})
         :({n:u.n,seite:u.side,summe:u.summe,runden:u.runden}))
       :null;
     const punkte=istFeldspiel(dId)?[fsPunkte[0],fsPunkte[1]]:null;
@@ -16444,6 +16489,14 @@
       const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();
+      // `o.jeSeite` faehrt dieselbe Kadergroessen-Probe wie feldspielProbe (2v2/4v4/6v6):
+      // die echte Aufstellung wuerfelt die Spielerzahl je Saison 2..6
+      // (season-discipline-schedule.ts), und die Abnahme (Gewichtheben-Plan 8.1) verlangt
+      // rho >= 0,80 bei 6, 4 UND 2 je Seite — nicht nur beim Standardwert der Disziplin.
+      const art=istBahn(dId)?BAHN_ART[dId]:istBuehne(dId)?BUEHNE_ART[dId]
+        :istFeldspiel(dId)?FELDSPIEL_ART[dId]:ARENA_ART[dId];
+      const altJeSeite=art&&art.jeSeite;
+      if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
       const spiele=[];
       try{
         for(let i=0;i<n;i++){
@@ -16473,9 +16526,9 @@
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
               ...(u.reihe!=null?{reihe:u.reihe}:{})}))});
         }
-      } finally { M.zurueck(gesichert); zieheFormkarten(20260823); }
+      } finally { M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite; }
       return {disziplin:dId, chassis:istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
-        :istFeldspiel(dId)?"feldspiel":"arena", spiele};
+        :istFeldspiel(dId)?"feldspiel":"arena", jeSeite:(art&&art.jeSeite)||null, spiele};
     },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
