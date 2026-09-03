@@ -2782,7 +2782,7 @@
     basketball:{label:"Basketball",cat:"feldspiel",size:6},
     football:{label:"Football",cat:"feldspiel",size:6},
     hockey:{label:"Hockey",cat:"feldspiel",size:6},
-    tennis:{label:"Tennis",cat:"feldspiel",size:6},
+    tennis:{label:"Tennis",cat:"buehne",size:6},
     "speed-schach":{label:"Speed-Schach",cat:"buehne",size:6},
     "i-spy":{label:"I-Spy",cat:"buehne",size:6}};
   // ===================================================================================
@@ -3886,30 +3886,14 @@
         korrektur:{dunk:-1.351, nah:0.353, mit:-1.057, fern:-1.879}, // GEMESSEN, s. Bericht
         skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0050}]
       }
-    },
-    tennis:{
-      // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
-      // determination 6, speed 6, charisma 4. Kein echtes "Team" — die sechs tragen
-      // abwechselnd den Ballwechsel aus, wie eine Setzliste, dieselbe Struktur wie
-      // ueberall sonst.
-      label:"Tennis", jeSeite:6, zuegeJeSeite:16, zugDauer:60/(16*2*2),
-      punkteNah:1, punkteFern:1, fernAnteil:0,
-      wortAbwehr:"Return", wortBlock:"Ass", wortRebound:"Vorteil",
-      // NACHGEZOGEN: erste Messung stand bei 105,7 Pp. Dexterity (Matrixgewicht 12) sass
-      // in DREI Rollen (Abschluss, Technik, Abwehr) und las 28,2 %. Intelligence, der
-      // hoechste Matrixwert (22), sass nur in zwei Rollen und las 6,7 %. Jetzt traegt
-      // Intelligence auch Abwehr und Aufbau fuehrend, Dexterity nur noch dort, wo ein
-      // schneller Schlag wirklich zaehlt (Abschluss).
-      rezept:{
-        AUFBAU:      {intelligence:40,awareness:35,spirit:25},
-        ABSCHLUSS:   {dexterity:35,intelligence:35,speed:30},
-        TECHNIK:     {intelligence:50,awareness:35,determination:15},
-        ZWEITCHANCE: {stamina:40,determination:35,awareness:25},
-        ABWEHR:      {intelligence:35,awareness:35,dexterity:30},
-        TEAMGEIST:   {spirit:55,charisma:45},
-        AUSDAUER:    {stamina:50,determination:30,spirit:20}
-      }
     }
+    // TENNIS AUSGEZOGEN, CHASSIS-WECHSEL AUF DIE BUeHNE (03.09., Recherche
+    // docs/design/tennis-fechten-rollout-plan.md). Der Eintrag steht jetzt in
+    // BUEHNE_ART.tennis, Rezept 1:1 uebernommen. WICHTIG, wie die Recherche (E.1)
+    // ausdruecklich warnt: die MOTOREN-Registrierung unten laeuft ARENA_ART -> BAHN_ART
+    // -> BUEHNE_ART -> FELDSPIEL_ART, in dieser Reihenfolge, spaetere Schleifen
+    // ueberschreiben fruehere. Ein "tennis" in BEIDEN Tabellen haette hier weiter
+    // gewonnen — der alte Eintrag MUSSTE raus, nicht nur der neue rein.
   };
   let feldspielDisc="basketball";
   const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
@@ -8997,6 +8981,39 @@
         NERVEN:       {will:35,spirit:30,speed:20,determination:15},
         AUSDAUER:     {spirit:40,will:35,health:25},
         WAGNIS:       {torment:45,speed:30,dexterity:25}
+      }
+    },
+
+    tennis:{
+      // CHASSIS-WECHSEL vom Feldspiel (Recherche
+      // docs/design/tennis-fechten-rollout-plan.md, Abschnitt A.3/E.1). Tennis' Duell
+      // ist real ein alternierendes Einzelformat (Aufschlag wechselt nach jedem Spiel,
+      // kein gleichzeitig bewegtes Fuenf-gegen-fuenf) — strukturell naeher an Speed-
+      // Schachs Brett-fuer-Brett-Duell als am Ballbesitz-Feldspiel, das Basketball/
+      // Football/Hockey teilen. Duell wie Speed-Schach: unabhaengig gewuerfelt, dann
+      // Vorteil gebildet (kein interaktiver Ballwechsel-Rechner, s. Recherche A.5).
+      //
+      // REZEPT 1:1 AUS FELDSPIEL_ART.tennis UEBERNOMMEN, nur auf die sieben
+      // Buehnen-Rollennamen umbenannt — KEINE Gewichtsaenderung. Genau der Test aus der
+      // Recherche (Scratchpad, nie committet): rho je Spiel 0,605 -> 0,919 (Saison
+      // 0,762 -> 0,958), robust bei jeSeite 6/4/2 (0,919/0,860/0,833). Der Sprung kommt
+      // aus zwei bereits vorhandenen Buehnen-Eigenschaften, nicht aus dem Rezept selbst:
+      // wert() liest hier die eigene Punktsumme statt der Vorteils-Differenz (s. Kommentar
+      // bei MOTOREN weiter unten), und die Buehnen-Punkteformel ist glatt und monoton aus
+      // denselben Sub-Skills gebaut, aus denen auch die Eignung selbst entsteht.
+      //
+      // AUFBAU->GRUNDLAGE, ABSCHLUSS->SPITZENMOMENT, ZWEITCHANCE->NERVEN,
+      // ABWEHR->WAGNIS, TEAMGEIST->PUBLIKUM — nur die Namen sind neu.
+      label:"Tennis", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      failAbzug:0.55, failWort:"vergibt den Punkt", erfolgWort:"gewinnt den Ballwechsel",
+      rezept:{
+        GRUNDLAGE:    {intelligence:40,awareness:35,spirit:25},
+        SPITZENMOMENT:{dexterity:35,intelligence:35,speed:30},
+        TECHNIK:      {intelligence:50,awareness:35,determination:15},
+        NERVEN:       {stamina:40,determination:35,awareness:25},
+        WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
+        PUBLIKUM:     {spirit:55,charisma:45},
+        AUSDAUER:     {stamina:50,determination:30,spirit:20}
       }
     }
   };
