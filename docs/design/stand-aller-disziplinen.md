@@ -45,8 +45,13 @@ belohnt. Der Zusammenhang ist gemessen und traegt auf ±0,01:
 | Football | Feldspiel | 0,307 | 0,776 | durchgefallen |
 
 **Sieben bestehen, sechs sind knapp, sieben fallen durch.** (Gewichtheben stand vor der
-S3/S4-Kalibrierrunde vom 03.09. bei 0,745/0,839 — die neue Zeile ist gemessen NACH dieser
-Runde, s. `docs/design/gewichtheben-buehnenbild-fortschritt.md`.)
+S3/S4-Kalibrierrunde vom 03.09. bei 0,745/0,839 — die Zeile oben ist die alte
+Einzelkader-Zahl NACH dieser Runde (0,792/0,909), s.
+`docs/design/gewichtheben-buehnenbild-fortschritt.md`. Eine weitere Runde am selben Tag hat
+den Charisma-Kanal mechanisch verstaerkt und **kaderfest** nachgemessen — 0,595 → 0,720 bei
+jeSeite 6, immer noch unter der 0,80-Schranke; s. `docs/design/gewichtheben-gameplay-fertig.md`
+fuer alle Zahlen inklusive jeSeite 4/2. Die kaderfeste Zahl ist NICHT mit der Einzelkader-Zahl
+oben vergleichbar — s. Abschnitt zur Messgrundlage.)
 
 ### Was die zwei Spalten zusammen sagen
 
@@ -185,7 +190,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Spurt | 50 % | 0,745 | Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
 | Staffel | 45 % | 0,757 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · von rho -0,04 auf 0,76 gehoben |
 | Speed-Schach | 45 % | 0,950 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · Bild vom Chassis |
-| Gewichtheben | 55 % | 0,792 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild (zwei Heber mittig, Hantel, Duellstand) · Korridor kalibriert, Pp gegen die Matrix noch ueber der Schranke (48 statt <=25) · nicht im echten Spielstand |
+| Gewichtheben | 60 % | 0,720 (kaderfest, Median) | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild (zwei Heber mittig, Hantel, Duellstand) · Korridor kalibriert, Charisma/ANSAGE jetzt mit echtem Hebel auf Sprunggroesse UND Wagnis, Pp 48→26, alle vier Archetypen fuehren (Zocker 0,11→0,28) · rho weiterhin unter 0,80 (0,595→0,720 bei jeSeite 6, kaderfest gemessen) · nicht im echten Spielstand, s. `docs/design/gewichtheben-gameplay-fertig.md` |
 | Wettessen | 40 % | 0,921 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Eiskunstlauf | 40 % | 0,892 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Breaking | 40 % | 0,891 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
