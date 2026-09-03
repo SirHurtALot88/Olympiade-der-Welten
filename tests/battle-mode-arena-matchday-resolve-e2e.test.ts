@@ -285,23 +285,22 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
 
   /**
    * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md), End-zu-End-Nachweis Auftragspunkt 5: ein
-   * ECHTER Arena-Lauf (kein gemocktes `runArenaFixturesImpl`) liefert einen Boxscore, dieser
-   * Boxscore laeuft durch `runBattleModeArenaMatchday()` in eine Team-Override MIT
-   * `playerImpactByPlayerId`, und `buildLegacyMatchdayResolvePreview()` verteilt daraus jetzt die
-   * individuellen `pointsAwarded` -- nachweislich NACH ECHTEM BOXSCORE-IMPACT, nicht nach der
-   * alten PPS-Formel.
+   * ECHTER Arena-Lauf (kein gemocktes `runArenaFixturesImpl`) liefert einen Boxscore,
+   * `runBattleModeArenaMatchday()` rechnet daraus `individualBoxscorePpsByPlayerId` (Perzentilrang
+   * gegen den Referenz-Pool, s. battle-mode-arena-team-points.ts), und
+   * `buildLegacyMatchdayResolvePreview()` setzt daraus die individuellen `pointsAwarded` --
+   * nachweislich NACH ECHTEM BOXSCORE-IMPACT, nicht nach der alten PPS-Formel.
    *
    * Nur EINE Liga-Stufe (liga1), um den Chromium-Aufwand auf einen einzigen Batch/ein Duell zu
    * begrenzen -- der Team-Punkte-Nachweis oben deckt bereits beide Ligen ab.
    *
    * DIE ECHTE HERAUSFORDERUNG: `context.entries[].playerId` (das Lineup) und der reale
-   * Arena-Boxscore (`playerImpactByPlayerId`, keyed nach echter `Player.id`) muessen auf
-   * DIESELBEN Spieler zeigen, damit `arenaImpactCoversWholeSide` in der Resolve-Engine ueberhaupt
-   * greifen kann. Statt zu raten, WELCHE 6 von 10 Kader-Spielern der Motor als Starter waehlt
-   * (ohne gesetzte Aufstellung faellt er auf seine eigene "Reihum-Vergabe" zurueck, s.
+   * Arena-Boxscore (`individualBoxscorePpsByPlayerId`, keyed nach echter `Player.id`) muessen auf
+   * DIESELBEN Spieler zeigen. Statt zu raten, WELCHE 6 von 10 Kader-Spielern der Motor als Starter
+   * waehlt (ohne gesetzte Aufstellung faellt er auf seine eigene "Reihum-Vergabe" zurueck, s.
    * arena-headless-runner.ts), liest dieser Test die tatsaechlich gefelderten Spieler aus dem
-   * ECHTEN Ergebnis ab und baut den Lineup-Context DANACH -- kein Rate-Risiko, keine Kopplung an
-   * Motor-interne Auswahllogik.
+   * ECHTEN Ergebnis ab (per Namenspraefix, da die Map liga-uebergreifend flach ist) und baut den
+   * Lineup-Context DANACH -- kein Rate-Risiko, keine Kopplung an Motor-interne Auswahllogik.
    */
   it(
     "ein echter Arena-Boxscore treibt jetzt die individuellen Spieler-PPs -- nachweislich entkoppelt von der alten PPS-Formel",
@@ -327,31 +326,31 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
         },
       } as unknown as GameState;
 
-      const { overridesByTeamId, warnings } = await runBattleModeArenaMatchday({
+      const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
         gameState,
         saveId: "save-1",
         seasonId: "season-1",
         matchdayId: "matchday-1",
       });
       expect(warnings).toHaveLength(0);
+      expect(individualBoxscorePpsByPlayerId.size).toBeGreaterThan(1);
 
-      const heimOverride = overridesByTeamId.get("liga1-a");
-      expect(heimOverride?.boxscoreRank).not.toBeNull();
-      expect(heimOverride?.playerImpactByPlayerId).not.toBeNull();
+      // Die tatsaechlich gefelderten liga1-a-Spieler, sortiert nach ECHTER Boxscore-PPs-Zahl
+      // AUFSTEIGEND -- der schwaechste zuerst. Zuordnung ueber den Namenspraefix ("Liga1A-"), da
+      // `individualBoxscorePpsByPlayerId` liga-uebergreifend flach ist (Referenz-Pool-Entscheidung,
+      // s. battle-mode-arena-team-points.ts).
+      const heimSpielerAufsteigend = [...individualBoxscorePpsByPlayerId.entries()]
+        .filter(([playerId]) => playerId.startsWith("Liga1A-"))
+        .sort(([, a], [, b]) => a - b);
+      expect(heimSpielerAufsteigend.length).toBeGreaterThan(1);
 
-      // Die tatsaechlich gefelderten liga1-a-Spieler, sortiert nach ECHTEM Boxscore-Impact
-      // AUFSTEIGEND -- der schwaechste zuerst.
-      const gefelderteSpielerNachImpactAufsteigend = [...heimOverride!.playerImpactByPlayerId!.entries()].sort(
-        ([, a], [, b]) => a - b,
-      );
-      expect(gefelderteSpielerNachImpactAufsteigend.length).toBeGreaterThan(1);
-
-      // PPS-Score ABSICHTLICH GEGENLAEUFIG zum echten Boxscore-Impact vergeben: der Spieler mit dem
-      // SCHWAECHSTEN echten Impact bekommt den HOECHSTEN erfundenen PPS-Score, und umgekehrt --
-      // damit jede Uebereinstimmung zwischen `pointsAwarded`-Reihenfolge und Impact-Reihenfolge nur
-      // aus dem Boxscore stammen kann, nicht aus einem zufaelligen Gleichlauf mit der PPS-Zahl.
-      const d1Scores = gefelderteSpielerNachImpactAufsteigend.map((_, index) => (index + 1) * 10);
-      const heimEntries = gefelderteSpielerNachImpactAufsteigend.map(([playerId], index) => ({
+      // PPS-Score ABSICHTLICH GEGENLAEUFIG zur echten Boxscore-PPs-Zahl vergeben: der Spieler mit
+      // dem SCHWAECHSTEN echten Boxscore-Impact bekommt den HOECHSTEN erfundenen PPS-Score, und
+      // umgekehrt -- damit jede Uebereinstimmung zwischen `pointsAwarded`-Reihenfolge und
+      // Impact-Reihenfolge nur aus dem Boxscore stammen kann, nicht aus einem zufaelligen
+      // Gleichlauf mit der alten PPS-Zahl.
+      const d1Scores = heimSpielerAufsteigend.map((_, index) => (index + 1) * 10);
+      const heimEntries = heimSpielerAufsteigend.map(([playerId], index) => ({
         disciplineId: "basketball",
         disciplineSide: "d1" as const,
         slotIndex: index,
@@ -359,8 +358,7 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
         activePlayerId: `active-${playerId}`,
       }));
 
-      const gastOverride = overridesByTeamId.get("liga1-b");
-      const gastSpieler = [...(gastOverride!.playerImpactByPlayerId?.entries() ?? [])];
+      const gastSpieler = [...individualBoxscorePpsByPlayerId.entries()].filter(([playerId]) => playerId.startsWith("Liga1B-"));
       const gastEntries = gastSpieler.map(([playerId], index) => ({
         disciplineId: "basketball",
         disciplineSide: "d1" as const,
@@ -420,20 +418,25 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
 
       const preview = buildLegacyMatchdayResolvePreview([heimContext, gastContext], {
         arenaTeamPointsByTeamId: overridesByTeamId,
+        arenaIndividualBoxscorePpsByPlayerId: individualBoxscorePpsByPlayerId,
       });
 
       const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
       const heim = basketball?.teamResults.find((team) => team.teamId === "liga1-a");
       expect(heim).toBeDefined();
 
-      // DER NACHWEIS: jeder gefelderte Spieler ist als "aus dem Boxscore-Impact bedient" markiert
-      // ...
-      for (const entry of heim!.entries) {
+      // DER NACHWEIS: jeder gefelderte Spieler ist als "aus dem Boxscore-Impact bedient" markiert,
+      // und `pointsAwarded` entspricht EXAKT der berechneten Boxscore-PPs-Zahl -- nicht nur
+      // "correlates with", sondern bitgenau derselbe Wert.
+      for (const [playerId, erwartetePps] of heimSpielerAufsteigend) {
+        const entry = heim!.entries.find((eintrag) => eintrag.playerId === playerId)!;
         expect(entry.arenaBoxscoreImpactApplied).toBe(true);
+        expect(entry.pointsAwarded).toBe(erwartetePps);
       }
-      // ... und die pointsAwarded-Reihenfolge folgt dem ECHTEN Boxscore-Impact (aufsteigend), NICHT
-      // dem erfundenen, gegenlaeufigen PPS-Score.
-      const pointsInImpactReihenfolge = gefelderteSpielerNachImpactAufsteigend.map(
+
+      // ... und die pointsAwarded-Reihenfolge folgt damit dem ECHTEN Boxscore-Impact (aufsteigend),
+      // NICHT dem erfundenen, gegenlaeufigen PPS-Score.
+      const pointsInImpactReihenfolge = heimSpielerAufsteigend.map(
         ([playerId]) => heim!.entries.find((entry) => entry.playerId === playerId)!.pointsAwarded!,
       );
       for (let i = 1; i < pointsInImpactReihenfolge.length; i += 1) {

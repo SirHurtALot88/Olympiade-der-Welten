@@ -546,28 +546,17 @@ export type LegacyResolvePreviewOptions = {
    * (Manager Mode, jede andere Disziplin) ignoriert diese Map vollstaendig, auch wenn sie gesetzt
    * ist. `undefined`/leer aendert nichts am bisherigen PPS-Pfad.
    */
-  arenaTeamPointsByTeamId?: ReadonlyMap<
-    string,
-    {
-      teamPoints: number;
-      arenaMatchSeed: string;
-      /**
-       * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): der Rang DIESES Teams unter allen
-       * Teams DERSELBEN Liga-Stufe an diesem Spieltag, sortiert nach Summe der
-       * Boxscore-Impact-Werte seiner gefeldeten Spieler — s.
-       * lib/resolve/battle-mode-arena-team-points.ts. Optional, damit aeltere Aufrufer (Tests,
-       * die nur `{teamPoints, arenaMatchSeed}` liefern) unveraendert funktionieren: fehlt es
-       * oder ist es null, bleiben INDIVIDUELLE Spieler-PPs auf dem bisherigen PPS-Rang-Pfad —
-       * nur die TEAM-Punkte (oben) bleiben dann weiterhin auf 2/1/0.
-       */
-      boxscoreRank?: number | null;
-      /**
-       * Boxscore-Impact-Wert je Spieler DIESES Teams (playerId -> Wert). Nur gesetzt, wenn JEDER
-       * gefelderte Spieler eindeutig zugeordnet werden konnte (s. arena-headless-runner.ts) —
-       * sonst faellt `buildLegacyMatchdayResolvePreview` fuer die GESAMTE Seite auf den
-       * PPS-Pfad zurueck, statt fuer einzelne Spieler zu raten.
-       */
-      playerImpactByPlayerId?: ReadonlyMap<string, number> | null;
-    }
-  > | null;
+  arenaTeamPointsByTeamId?: ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }> | null;
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7): individuelle Spieler-PPs
+   * (playerId -> PPs), berechnet nach dem in `battle-mode-pps-modell-plan.md` Abschnitt 5
+   * vorgeschlagenen Modell (Perzentilrang des Arena-Boxscore-Impacts gegen BEIDE Liga-Stufen
+   * desselben Spieltags, linear auf `BASKETBALL_INDIVIDUAL_PPS_MAX` abgebildet — s.
+   * lib/resolve/battle-mode-arena-team-points.ts). `buildLegacyMatchdayResolvePreview` setzt
+   * `pointsAwarded` fuer einen Spieler NUR aus dieser Map, wenn (a) `isBattleModeSave(gameState)
+   * && disciplineId === "basketball"` UND (b) die Map einen Eintrag fuer genau diesen Spieler
+   * enthaelt — jeder andere Spieler (auch derselben Seite/desselben Teams) bleibt unveraendert
+   * beim bisherigen PPS-Pfad. `undefined`/leer/fehlender Eintrag aendert nichts.
+   */
+  arenaIndividualBoxscorePpsByPlayerId?: ReadonlyMap<string, number> | null;
 };
