@@ -4550,6 +4550,10 @@
     // Themenliste im Spiel aber sechs — ein gespeicherter slotIndex 4 oder 5 zeigt dann
     // ins Leere. Ein Hinweis auf der Konsole statt eines lautlosen Nullwerts, damit der
     // naechste, der eine ausbleibende Wirkung sucht, ihn nicht erst messen muss.
+    // `slotGesetzt` unterscheidet eine ECHTE Manager-Entscheidung (Aufstellungsbildschirm,
+    // `place[p.n]`) vom reinen Rundlauf-Ruecfall unten (`i % slotListe.length`) — ohne
+    // diese Unterscheidung sah `bestimmeTorwaerter` (dort) beide Faelle gleich aus und
+    // hielt den Ruecfall-Slot faelschlich fuer eine Wahl (Fund: hockey-archetypen-probe.md).
     const slotFuer=(p,i)=>{
       const gesetzterSlot=(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot:null;
       if(gesetzterSlot){
@@ -4557,9 +4561,9 @@
           console.warn("[arena] Slot \""+gesetzterSlot+"\" ist in "+feldspielDisc
             +" nicht angemeldet — "+p.n+" bekommt keinen Slot-Aufschlag.");
         }
-        return gesetzterSlot;
+        return {sl:gesetzterSlot,gesetzt:true};
       }
-      return (slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
+      return {sl:(slotListe[i%Math.max(1,slotListe.length)]||{}).id||null,gesetzt:false};
     };
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
@@ -4574,7 +4578,7 @@
     // Aufgabe-3-Positions-Modifier (BASKETBALL_POS_MOD), egal welchen Slot er stellte.
     // Jetzt genau derselbe Aufruf fuer beide Seiten, kein `istGegner`-Sonderfall mehr.
     const bauSpieler=(p,seite,idx)=>{
-      const sl=slotFuer(p,idx);
+      const {sl,gesetzt:slotGesetzt}=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
       const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
@@ -4602,7 +4606,7 @@
         // wurde die Rolle nur zum Berechnen des Aufschlags gebraucht und danach
         // weggeworfen. Der Torwart ist aber ein Slot, kein Attributwert: der Motor muss
         // spaeter noch wissen, wer im Tor steht (s. bestimmeTorwaerter).
-        slotId:sl, torwart:false,
+        slotId:sl, slotGesetzt, torwart:false,
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
@@ -5315,18 +5319,28 @@
   // Die Slot-Kennungen, unter denen der Torwart im Aufstellungsbildschirm laeuft. Mehrere,
   // weil der Slot-Generator seine Kennung selbst vergibt und der Motor nicht davon
   // abhaengen darf, welche davon gerade gilt (s. lib/lineups/matchday-slot-roles.ts).
-  // Greift keine, faellt bestimmeTorwaerter auf den besten PARADE-Wert zurueck.
+  // Greift keine ECHTE Aufstellung, faellt bestimmeTorwaerter auf den besten PARADE-Wert
+  // zurueck.
   const TORWART_SLOTS=new Set(["goaltender","goalie","torwart","netminder","keeper"]);
   const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
   // GENAU EINER JE SEITE, AB DREI SPIELERN. Chris woertlich: "einer der spieler soll
   // natuerlich einen torwart slot haben und entsprechend im tor stehen! ausser im 2er
   // spiel da gibts nur verteiger und angreifer". Bei zwei Spielern steht das Tor also
   // wirklich leer — das ist die Regel, nicht ein ungeprueter Sonderfall.
+  //
+  // BUG (hockey-archetypen-probe.md, Abschnitt 4): ohne gesetzte Aufstellung vergibt
+  // `slotFuer` (s. bauFeldspiel) den Torwart-Slot per Rundlauf ueber die Kaderreihenfolge
+  // — bei Hockeys Slotliste liegt "goaltender" zufaellig an Index 2, der DRITTE Spieler im
+  // Array wird also automatisch "Torwart", VOELLIG unabhaengig von PARADE. Diese Zeile
+  // griff bisher auch fuer den Rundlauf-Slot, weil `u.slotId` in beiden Faellen gleich
+  // aussah. Jetzt zaehlt nur eine ECHTE Manager-Zuweisung (`u.slotGesetzt`, aus
+  // `place[]`) — der automatische Ruecfall faellt immer auf die PARADE-Auswahl darunter
+  // durch, wie es der Kommentar hier schon immer versprach.
   function bestimmeTorwaerter(){
     for(const team of FSTEAM){
       for(const u of team)u.torwart=false;
       if(team.length<3)continue;
-      let gewaehlt=team.find(u=>u.slotId&&TORWART_SLOTS.has(u.slotId));
+      let gewaehlt=team.find(u=>u.slotGesetzt&&u.slotId&&TORWART_SLOTS.has(u.slotId));
       if(!gewaehlt)for(const u of team)if(!gewaehlt||(u.PARADE||0)>(gewaehlt.PARADE||0))gewaehlt=u;
       if(gewaehlt)gewaehlt.torwart=true;
     }
