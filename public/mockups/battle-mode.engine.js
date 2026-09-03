@@ -3720,57 +3720,135 @@
     football:{
       // MATRIX: spirit 25, torment 16, health 14, awareness 11, will 10,
       // determination 8, power 6, stamina 6, charisma 4.
-      // EREIGNISDICHTE ANGEHOBEN, 8 auf 24 Zuege je Seite. Mit acht kamen auf zwoelf
-      // Spieler ganze 16 Ereignisse je Spiel, also gut EINES je Spieler — und an einem
-      // Ereignis je Spieler laesst sich nichts messen. Nachgemessen war der ganze
-      // Boxscore flach: 0 bis 0,4 Fumble-Recoveries, 0,1 bis 0,9 Vorlagen, und der
-      // Spieler mit der NIEDRIGSTEN Eignung (46) erzielte die meisten Punkte. Die
-      // Rangtreue lag bei rho 0,183 — praktisch Rauschen. Real hat ein Footballspiel rund
-      // 130 Spielzuege; 48 sind immer noch eine starke Abstraktion, aber messbar.
       //
-      // zugDauer steht jetzt fest bei 1,25 s statt an der Zugzahl zu haengen (die alte
-      // Formel 60/(n*2*2) hielt das Spiel stur bei 30 s und haette 48 Zuege zu einem
-      // halbsekuendigen Stakkato gemacht, das niemand mitlesen kann). Das Spiel dauert
-      // damit 60 s.
+      // GESCHICHTE DES VORAB-PFADS (fuer die Nachwelt, jetzt abgeloest): 8 auf 24 Zuege je
+      // Seite angehoben (16 -> 48 Ereignisse/Spiel), rho blieb bei 0,254 je Spiel / 0,559
+      // Saison haengen — die Saisonzahl war der Deckel: die VORAB-Mechanik (48 unabhaengige
+      // Zwei-Personen-Duelle ohne Downs, ohne Line of Scrimmage, ohne Serie, die enden
+      // kann) belohnte nicht, was die Eignung misst. Football-Rollout-Plan (docs/design/
+      // football-rollout-plan.md), frisch kaderfest nachgemessen vor dieser Runde: rho
+      // 0,345 je Spiel / 0,699 Saison (schlechteste Disziplin von allen zwanzig).
       //
-      // DAS IST NICHT DIE LOESUNG, NUR DIE HAELFTE DAVON. Mit der Dichte stieg rho auf
-      // 0,254 je Spiel und 0,559 ueber die Saison. Die Saisonzahl ist der Deckel, und sie
-      // sagt: die VORAB-Mechanik belohnt nicht, was die Eignung misst. Football gehoert
-      // wie Hockey auf den Live-Motor (FELDSPIEL_ART[...].live) — ein Rezept, das gegen
-      // die Vorab-Mechanik eingemessen wird, ist nach der Migration wertlos. Genau dieser
-      // Befund steht schon einmal im Hockey-Block von battle-mode.rezepte.js.
+      // LIVE-MOTOR-MIGRATION (diese Runde, analog zu Hockeys Migration). Football bekommt
+      // KEIN Schussuhr-Aequivalent im Basketball/Hockey-Sinn (eine Uhr, die einen
+      // EINZELNEN Abschluss erzwingt) — die reale Entsprechung ist der Play Clock, der
+      // einen SNAP erzwingt, s. `downs` unten. `schussuhr` traegt trotzdem denselben
+      // Feldnamen wie bei Basketball/Hockey (generischer LIVE()-Block, s. Kommentar dort),
+      // nur gelesen von football-eigenem Code (stepSnapPhase), nicht von
+      // entscheideBallaktion. `perioden`/`periodenDauer` sind ECHTE NFL-Viertel (4x15min
+      // real, hier wie ueberall zeitgerafft) — 4x70s haelt die Gesamt-Spielzeit nah an
+      // Basketballs 360s, bei geschaetzt 12-16 Spielzuegen je Viertel (Snap-Formation +
+      // Ergebnis-Anzeige brauchen je Zug laenger als ein einzelner Freiwurf).
+      live:{perioden:4, periodenDauer:70, periodenPause:1.0, schussuhr:6, periodeWort:"Viertel",
+        // DOWN/DISTANCE-KONZEPT statt einer reinen Schussuhr (Football-Plan Abschnitt B.2
+        // Punkt 2, zengm `GameSim.football` als Formel-Referenz, Abschnitt A.2/A.3 dort).
+        // PLATZHALTER, an der realen NFL-Regel orientiert, keine Kalibrierung dahinter.
+        downs:{max:4, distanz:10, feldLaenge:100, startSpot:75,
+          // fgReichweite: Yards bis zum GEGNERISCHEN Ziel, ab denen ein Field Goal in
+          // Betracht kommt (Kick-Distanz waere spot+17, s. loeseVierterVersuch) —
+          // real reicht das bis ~55-58 Yard Kickdistanz, also ~38-41 Yard Spielstand.
+          fgReichweite:38, puntNetto:40, xpQuote:0.95}},
+      // VESTIGIAL, wie bei Basketball/Hockey (s. dortiger Kommentar bei zuegeJeSeite):
+      // der Live-Motor liest diese vier Felder nirgends, nur die Infotext-/Laufzeit-
+      // Schaetzung (engine.js ~10586/16031) noch. Unveraendert aus dem Vorab-Pfad stehen
+      // gelassen, keine neue Bedeutung.
       label:"Football", jeSeite:6, zuegeJeSeite:24, zugDauer:1.25,
       punkteNah:6, punkteFern:3, fernAnteil:0.30,
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
+      // KURVE: Footballs EIGENE Erfolgskurve (Struktur wie Hockeys, s. dortiger
+      // KURVE-Kommentar) — AUSDRUECKLICH KEIN KURVE_BASKETBALL-Erbe, das war Hockeys
+      // eigener Anfangsfehler (docs/design/hockey-eigene-erfolgskurve.md) und soll sich
+      // hier nicht wiederholen.
+      //
+      // Anders als bei Basketball/Hockey sind die vier Tiers hier KEINE Distanz-zum-Ziel-
+      // Ringe (ein Football-"Wurf" hat kein festes Ziel wie ein Korb oder ein Tor),
+      // sondern PASS-TIEFEN: dunk=Checkdown/Screen hinter der Line of Scrimmage,
+      // nah=kurzer Pass, mit=mittlerer Pass, fern=Deep Ball. loeseFootballPass() waehlt
+      // die Tiefe aus Down/Distance (waehleFootballTier(), s. football-eigener Block
+      // unten) und ruft dann dieselben drei generischen Funktionen
+      // (lageBasisFuer/skillTeilFuer/steilerMake) wie jede andere Feldspiel-Disziplin.
+      // Laufspielzuege (loeseFootballLauf()) nutzen diese Kurve NICHT — ein Laufzug ist
+      // real eine kontinuierliche Yards-Verteilung um einen Mittelwert (zengm `truncGauss`,
+      // Football-Plan Abschnitt A.3/B.4), keine Treffer/Fehltreffer-Wahrscheinlichkeit,
+      // und bekommt deshalb eine eigene, kleinere Formel statt eines zweiten Kurve-Blocks.
+      //
+      // ALLE ZAHLEN HIER SIND PLATZHALTER — Football hat noch keinen einzigen Live-Lauf
+      // hinter sich, gegen den man fitten koennte (derselbe Stand, in dem Hockeys erste
+      // Kurve war, bevor scripts/miss-hockey-* sie eingemessen haben). `radien` bleibt aus
+      // Struktur-Konsistenz stehen, hat fuer Football aber KEINE geometrische Bedeutung
+      // (klassifiziereWurfdistanz() wird von Football nicht aufgerufen, s. dort).
+      kurve:{
+        base:-0.05,
+        geoBonus:{dunk:0.34, nah:0.14, mit:0.0, fern:-0.18},
+        radien:{dunk:0, nah:0, mit:0, fern:0}, // ohne Bedeutung, s. Kommentar oben
+        skillMittel:0.30,
+        steil:14,
+        korrektur:{dunk:0, nah:0, mit:0, fern:0},
+        skillTerme:[{feld:"PASSGENAUIGKEIT",koeff:0.0060},{feld:"TEAMGEIST",koeff:0.0020}]
+      },
+      // SUB-SKILLS (Football-Plan Abschnitt D, Diskussionsvorschlag dort UMGESETZT statt
+      // erneut entschieden): sieben Rollen wie Basketball/Hockey/Tennis, aber football-
+      // eigen benannt statt der generischen AUFBAU/ABSCHLUSS/TECHNIK/ZWEITCHANCE/ABWEHR-
+      // Erbschaft aus der Basketball-Ableitung. Kein FIELD-GOAL-GENAUIGKEIT-Eintrag (der
+      // Plan selbst haelt fest: kein Kicker-Slot bei sechs Feldspielern, FGs laufen ueber
+      // eine feste Distanzformel ohne Spielerattribut, s. loeseVierterVersuch).
+      //
+      // TURNOVER-ANFAELLIGKEIT DES PLANS -> hier BALLSICHERHEIT (Vorzeichen gedreht): jeder
+      // andere Sub-Skill im ganzen Motor ist "hoeher = besser", und jedes generische
+      // Werkzeug (Sinkhorn-Ausgleich in scripts/baue-feldspiel-rezept.mjs, die
+      // Eignungs-Korrelation selbst) geht stillschweigend davon aus. Ein einzelner
+      // "hoeher = schlechter"-Sub-Skill waere eine Falle fuer die naechste Rezept-Runde,
+      // die dieser Auftrag nicht legen soll. BALLSICHERHEIT ist dieselbe Groesse, nur
+      // positiv gedreht (real zengms `bsc`, Football-Plan Abschnitt A.4).
+      //
+      // PLATZHALTER-GEWICHTE, NICHT SINKHORN-AUSGEGLICHEN (das ist Rezept-Feinkalibrierung,
+      // ausdruecklich NICHT Teil dieser Migrations-Runde, s. Abschlussbericht). Alle neun
+      // Matrix-Attribute kommen mindestens einmal vor.
+      //
+      // LAUFTEMPO NICHT VERGESSEN (Fund waehrend der Visualpruefung, Chris' Zusatzauftrag
+      // 03.09.: alle zwoelf Spieler standen wie eingefroren da). `bewegeSpielerLive` liest
+      // `u.LAUFTEMPO` FUER JEDE Feldspiel-Disziplin (tempoPx-Formel, engine.js Kommentar
+      // "Laufen mit LAUFTEMPO als Basis") — es ist kein Basketball-eigenes Feld, sondern
+      // ein ACHTER, disziplinuebergreifend erwarteter Rezept-Key neben den sieben
+      // "fachlichen" Rollen (s. battle-mode.rezepte.js, Basketball/Hockey fuehren ihn
+      // beide). Ohne ihn ist `u.LAUFTEMPO` `undefined`, `tempoPx` wird `NaN`, und JEDE
+      // Positionsaktualisierung ab dem ersten Zielwechsel (`u.x+=NaN`) friert oder
+      // zerstoert die Spielerposition dauerhaft — genau das lag hinter dem eingefrorenen
+      // Spielfeld. Gewichte 1:1 von Basketball/Hockey uebernommen (`speed:52,stamina:32,
+      // dexterity:16`), nicht neu erfunden: Lauftempo ist eine physische, keine football-
+      // spezifische Eigenschaft.
       rezept:{
-        AUFBAU:      {awareness:40,determination:30,will:30},
-        ABSCHLUSS:   {power:40,torment:30,health:30},
-        TECHNIK:     {awareness:40,determination:35,torment:25},
-        ZWEITCHANCE: {health:40,power:35,torment:25},
-        ABWEHR:      {torment:45,awareness:30,health:25},
-        // Nachgezogen: Will sass in Aufbau UND Teamgeist (jetzt individuell, mit
-        // starkem Koeffizienten in zwei Erfolgsformeln) und las 31,6 % bei Matrixgewicht
-        // 10. Teamgeist traegt jetzt Health mit statt Will — Health (14) war bislang kaum
-        // vertreten.
-        TEAMGEIST:   {spirit:65,health:35},
-        AUSDAUER:    {stamina:40,health:35,spirit:25}
+        PASSGENAUIGKEIT: {awareness:45,determination:30,will:25},
+        LAUFKRAFT:       {power:45,health:30,spirit:25},
+        PASSSCHUTZ:      {health:40,determination:35,awareness:25},
+        ABWEHR_PASS:     {torment:55,awareness:45},
+        ABWEHR_LAUF:     {torment:40,power:35,health:25},
+        BALLSICHERHEIT:  {will:55,health:45},
+        TEAMGEIST:       {spirit:55,charisma:20,health:25},
+        AUSDAUER:        {stamina:40,health:35,spirit:25},
+        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
-      // Football-Konzepten, aber bewusst auf die zwei bestehenden Choreografie-Primitive
-      // gemappt statt auf ein drittes eigenes zu erfinden. PLATZHALTER, wie bei Basketball.
+      // Football-Konzepten. Auf die neuen Sub-Skill-Namen nachgezogen, damit hier keine
+      // toten Feld-Referenzen (pg.AUFBAU etc.) stehen bleiben; loeseFootballPass()/-Lauf()
+      // rufen diesen Mechanismus (art.spielzuege) in dieser Runde NICHT auf — Football
+      // loest Spielzuege ueber eine eigene Zustandsmaschine auf (stepSnapPhase), nicht
+      // ueber die basketball-/hockey-eigene entscheideBallaktion-Pass-Veredelung, an die
+      // dieses Feld urspruenglich gerichtet war. Bleibt dokumentiert als naechster Anschluss
+      // (s. Abschlussbericht), keine tote Idee.
       spielzuege:{
         screen:{
-          label:"Screen Pass", rolle:"ABSCHLUSS", choreo:"flachpass-lauf", jubel:"gross",
+          label:"Screen Pass", rolle:"PASSSCHUTZ", choreo:"flachpass-lauf", jubel:"gross",
           neigung:(pg,bf)=>Math.min(0.20,Math.max(0.02,
-            0.05+(pg.AUFBAU-50)*0.0018+(bf.ABSCHLUSS-50)*0.0018)),
-          abschluss:(pg,bf)=>Math.min(0.88,0.12+bf.ABSCHLUSS*0.0040+pg.AUFBAU*0.0020),
+            0.05+(pg.PASSGENAUIGKEIT-50)*0.0018+(bf.PASSSCHUTZ-50)*0.0018)),
+          abschluss:(pg,bf)=>Math.min(0.88,0.12+bf.PASSSCHUTZ*0.0040+pg.PASSGENAUIGKEIT*0.0020),
           text:(pg,bf)=>pg.n+" legt kurz ab — "+bf.n+" schlängelt sich durch"
         },
         deepball:{
-          label:"Deep Ball", rolle:"ZWEITCHANCE", choreo:"weitpass-lauf", jubel:"riesig",
+          label:"Deep Ball", rolle:"LAUFKRAFT", choreo:"weitpass-lauf", jubel:"riesig",
           neigung:(pg,bf)=>Math.min(0.16,Math.max(0.02,
-            0.04+(pg.TECHNIK-50)*0.0015+(bf.ZWEITCHANCE-50)*0.0015)),
-          abschluss:(pg,bf)=>Math.min(0.80,0.07+bf.ZWEITCHANCE*0.0035+pg.TECHNIK*0.0020),
+            0.04+(pg.PASSGENAUIGKEIT-50)*0.0015+(bf.LAUFKRAFT-50)*0.0015)),
+          abschluss:(pg,bf)=>Math.min(0.80,0.07+bf.LAUFKRAFT*0.0035+pg.PASSGENAUIGKEIT*0.0020),
           text:(pg,bf)=>pg.n+" bringt den langen Ball — "+bf.n+" gewinnt den Zweikampf"
         }
       }
@@ -4713,7 +4791,11 @@
         // 0,55), `assists` bleibt die Summe fuer Boxscore/Anzeige unveraendert.
         assists1:0,assists2:0,
         checks:0,saves:0,gegentore:0,
-        fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
+        fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,
+        // NUR FOOTBALL: Yards nach Quelle getrennt (feldspielWert unten), wie eine reale
+        // Box-Score-Zeile. Ausserhalb von Football immer 0 und ungelesen.
+        passYards:0,laufYards:0,fangYards:0,
+        x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,i)), gegner.map((o,i)=>bauSpieler(o,1,i))];
     FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
@@ -4946,7 +5028,21 @@
     {radius:295, seitlich:-0.62},  // Point rechts
     {radius:215, seitlich:0}       // hoher Slot, nur bei voller Feldbesetzung ohne Torwart
   ];
-  const FORMATION=()=>istHockey()?SLOTS_HOCKEY:SLOTS;
+  // FOOTBALL: nur der Rueckfall fuer bewegeSpielerLive's generische "Angriff ohne Ball"-
+  // Ruheformation (radius/seitlich-Modell wie Basketball/Hockey) — waehrend eines echten
+  // Snaps ueberschreibt starteSnap()/stehtStill (s. bewegeSpielerLive) diese Positionen
+  // mit den echten Formationstabellen SLOTS_FOOTBALL_OFF/_DEF weiter unten; diese Tabelle
+  // hier greift nur zwischen zwei Spielen bzw. beim allerersten Aufbau, bevor der erste
+  // Snap steht.
+  const SLOTS_FOOTBALL=[
+    {radius:40,  seitlich:0},
+    {radius:120, seitlich:0},
+    {radius:70,  seitlich:1.2},
+    {radius:70,  seitlich:-1.2},
+    {radius:150, seitlich:1.9},
+    {radius:150, seitlich:-1.9}
+  ];
+  const FORMATION=()=>istHockey()?SLOTS_HOCKEY:istFootball()?SLOTS_FOOTBALL:SLOTS;
   // Rollenbasierte Slot-Vergabe: der staerkste SCHUSS_NAH-Wert zuerst auf den innersten
   // Slot, der Rest nach aussen — "wer aus der Zone trifft, steht in der Zone; wer das
   // nicht kann, zieht raus". Neu bei jedem Possession-Wechsel (naechsterAngriff), nicht
@@ -5359,6 +5455,7 @@
   const HK_TW_REF=0.907, HK_TW_BASIS=7.16, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
+  const istFootball=()=>feldspielDisc==="football";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
   // Bis hierher stand Basketballs Box-Score-Formel an ZWEI Stellen (MOTOREN[fd].wert und
@@ -5372,6 +5469,17 @@
   // zwar VOR der naechsten Sondierung — sonst misst die Sondierung die Gewichte dieser
   // Formel statt die der Mechanik.
   function feldspielWert(u,dId){
+    if((dId||feldspielDisc)==="football"){
+      // ANGELEHNT AN STANDARD-FANTASY-FOOTBALL-SCORING (reale, breit zitierte Konvention,
+      // nicht erfunden): ~1 Punkt je 10 Yards Lauf/Fang, ~1 Punkt je 25 Yards Pass, 6 je
+      // Touchdown, Turnover-Abzuege. PLATZHALTER-Gewichte fuer Sack/Interception/Fumble-
+      // Recovery (Fantasy-Standardscoring kennt dafuer nur die IDP-Variante, die nicht
+      // jede Liga spielt) — ohne die generische Fallback-Formel (unten) waeren Yards, die
+      // in Football die wichtigste kontinuierliche Faehigkeits-Anzeige sind, komplett
+      // unsichtbar fuer die Rangtreue-Messung.
+      return u.punkte*1.0 + (u.passYards||0)/25 + (u.laufYards||0)/10 + (u.fangYards||0)/10
+        + u.assists*0.3 + u.bloecke*1.0 + u.steals*2.0 + u.rebounds*1.0 - u.verluste*2.0;
+    }
     if((dId||feldspielDisc)==="hockey"){
       // DER TORWART WIRD WIE IM ECHTEN EISHOCKEY BEWERTET: ueber GSAA (goals saved above
       // average), also erwartete Gegentore bei Liga-Fangquote minus tatsaechliche
@@ -5540,6 +5648,417 @@
     fsLive.angriffSeit=0;
   }
 
+  // ======================= FOOTBALL: DOWNS, FORMATIONEN, SNAP =======================
+  // Football laeuft NICHT durch entscheideBallaktion (Basketball/Hockeys kontinuierliche
+  // Dribbel-/Passentscheidung je Tick) — ein Football-Spielzug ist strukturell etwas
+  // anderes: eine Formation, EIN Snap, EIN Ergebnis, dann entweder der naechste Snap oder
+  // ein Possession-Wechsel (Football-Plan Abschnitt A.2/B.4, zengm `GameSim.football` als
+  // Formel-Referenz, keine Codeuebernahme, s. docs/design/football-rollout-plan.md).
+  // Football ERBT trotzdem die generische Infrastruktur: `initFeldspielLive`/
+  // `zuordneSlots`/`naechsterAngriff`/`starteViertelpause`/die `fsLive.phase`-Naht sind
+  // alle unveraendert dieselben Funktionen wie bei Basketball/Hockey — nur der Inhalt
+  // EINER neuen Phase ("snap") und die Possession-Uebergaben sind football-eigen.
+  //
+  // ALLE ZAHLEN/WAHRSCHEINLICHKEITEN HIER SIND PLATZHALTER, wie bei jeder ersten
+  // Live-Runde (s. Hockeys erste Kurve vor der Messung). Kalibrierung ist ausdruecklich
+  // NICHT Teil dieser Migrations-Runde (s. Abschlussbericht).
+
+  // FELDGEOMETRIE. `bodenFeldspiel()`s Football-Zweig zeichnet das Feld bereits
+  // (Endzonen bei W*0.04-0.13 und W*0.87-0.96, Spielfeld W*0.13-0.87 in zehn Yard-
+  // Segmenten, Seitenlinien bei y=50/H-50, s. engine.js dort) — FIELD() erhebt genau
+  // diese Zeichen-Konstanten zur mechanischen Wahrheit, dieselbe korbXVon()-Lehre wie
+  // beim Basketballkorb (EINE Referenz fuer Zeichnung UND Mechanik statt zweier
+  // auseinanderlaufender Zahlen, s. Kommentar dort).
+  function FIELD(){
+    return {l:W*0.04, r:W*0.96, o:50, u:H-50, spielfeldL:W*0.13, spielfeldR:W*0.87};
+  }
+  // Line-of-Scrimmage-X aus dem Feldstand (`spot` = Yards bis zum GEGNERISCHEN Ziel der
+  // angreifenden Seite, 0=Touchdown, 100=eigene Torlinie) — Seite 0 greift nach rechts an
+  // (wie korbXVon Seite 0 = rechter Korb), Seite 1 nach links.
+  function fkLosX(side,spot){
+    const F=FIELD(), frac=Math.max(0,Math.min(1,(100-spot)/100));
+    return side===0 ? F.spielfeldL+frac*(F.spielfeldR-F.spielfeldL)
+                    : F.spielfeldR-frac*(F.spielfeldR-F.spielfeldL);
+  }
+  // Haelt eine Formationsposition im gezeichneten Feld — dieselbe Idee wie
+  // haltePuckImFeld(), nur mit den Football-Feldmassen statt der Eisflaeche.
+  function fkClamp(x,y){
+    const F=FIELD();
+    return {x:Math.max(F.l+16,Math.min(F.r-16,x)), y:Math.max(F.o+20,Math.min(F.u-20,y))};
+  }
+
+  // FORMATIONEN — Chris' Zusatzauftrag (03.09.): sichtbar UNTERSCHIEDLICHE Aufstellungen
+  // statt generischer Bewegung, mit realen NFL-Formationen als Vorbild (WebSearch,
+  // Quellen im Abschlussbericht: en.wikipedia.org/wiki/Shotgun_formation, .../4–3_defense,
+  // .../3–4_defense, .../Nickel_defense; throwdeeppublishing.com Formations-Glossar).
+  // Elf reale Positionen auf sechs Slots (Football-Plan Abschnitt A.3/B.3, offene Frage
+  // dort): jede Formation ist EINE {tiefe,breite}-Tabelle mit sechs Eintraegen, `tiefe`
+  // positiv = auf der EIGENEN Seite der Line of Scrimmage (Offense: dahinter,
+  // Defense: davor — s. starteSnap fuer die Vorzeichen-Anwendung je Seite), `breite` =
+  // seitlicher Versatz von der Feldmitte.
+  //
+  // OFFENSE „eng" (I-Formation-artig): QB unter Center, ein Running Back dahinter
+  // gestapelt (die namensgebende „I"), ein Tight End eng an der Line, zwei WRs nur
+  // maessig gespreizt — kompakt und laufbetont, genau das reale Bild einer I-Formation.
+  // OFFENSE „weit" (Shotgun/Spread-artig): QB 5-7 Yards zurueckversetzt (Shotgun laut
+  // Wikipedia-Quelle oben), Receiver ueber die volle Feldbreite gespreizt — die reale
+  // Spread-Offense-Idee, den Gegner horizontal zu dehnen.
+  // TIEFEN-SKALA (Visualpruefung, Chris' Zusatzauftrag 03.09.): erste Fassung hatte den
+  // naechsten Offensiv- und den naechsten Defensiv-Spieler nur 10-16px auseinander (die
+  // beiden juengeren Skalen ueberlappten praktisch an der Line) — im Screenshot sah das
+  // Feld aus wie EIN Klumpen aus zwoelf Figuren, keine zwei Formationen. Jetzt haelt der
+  // naechste O-Mann mindestens 24px, der naechste D-Mann mindestens 30px Abstand zur Line
+  // — nah genug, um wirklich "an der Line" zu wirken (real stehen sich Center und Nose
+  // Tackle nur ~1m gegenueber), aber mit sichtbarer Luecke dazwischen.
+  const SLOTS_FOOTBALL_OFF={
+    eng:[ {tiefe:24,breite:0}, {tiefe:80,breite:0}, {tiefe:20,breite:-70},
+          {tiefe:14,breite:150}, {tiefe:14,breite:-150}, {tiefe:12,breite:26} ],
+    weit:[ {tiefe:130,breite:16}, {tiefe:100,breite:-46}, {tiefe:14,breite:200},
+           {tiefe:14,breite:-200}, {tiefe:18,breite:88}, {tiefe:12,breite:0} ]
+  };
+  // DEFENSE „basis" (4-3-artig): vier „Linemen" dicht an der Line, zwei Linebacker
+  // mittlerer Tiefe — kompakt, gegen den Lauf gestellt (Quelle: en.wikipedia.org/
+  // wiki/4–3_defense, vier Down Lineman + drei Linebacker im Original).
+  // DEFENSE „nickel" (Nickel-artig): nur zwei „Linemen" vorn, dafuer zwei Defensive Backs
+  // WEIT UND TIEF — genau das Nickel-Kennzeichen (Quelle: en.wikipedia.org/wiki/
+  // Nickel_defense, ein fuenfter Defensive Back ersetzt einen Linebacker gegen Passzuege).
+  const SLOTS_FOOTBALL_DEF={
+    basis:[ {tiefe:30,breite:-105}, {tiefe:30,breite:-35}, {tiefe:30,breite:35},
+            {tiefe:30,breite:105}, {tiefe:90,breite:-40}, {tiefe:90,breite:40} ],
+    nickel:[ {tiefe:26,breite:-55}, {tiefe:26,breite:55}, {tiefe:80,breite:-15},
+             {tiefe:80,breite:15}, {tiefe:170,breite:-190}, {tiefe:170,breite:190} ]
+  };
+  // Trainer-Tendenz statt freier Wuerfel: kurze Distanz -> kompakte/laufbetonte
+  // Formation, lange Distanz -> gespreizte/passbetonte Formation. Die Verteidigung
+  // reagiert auf Down/Distance, nicht auf den bereits gewuerfelten Spielzug (real weiss
+  // die Verteidigung den Play Call vorher auch nicht).
+  const waehleFormationOffense=(down,toGo)=>toGo<=3?"eng":"weit";
+  const waehleFormationDefense=(down,toGo)=>toGo<=6?"basis":"nickel";
+
+  // SPIELZUG-AUSWAHL. Fuenf sichtbar unterschiedliche Zuege (Football-Plan-Vorschlag,
+  // "lauf" plus die vier Pass-Tiefen dunk/nah/mit/fern aus der eigenen kurve, s.
+  // FELDSPIEL_ART.football.kurve-Kommentar) — Verteilung grob an der realen NFL-Down-
+  // /Distance-Tendenz orientiert (Football-Plan A.1: ~46 % Lauf/54 % Pass insgesamt,
+  // stark distanzabhaengig), PLATZHALTER-Schwellen.
+  function waehlePlayCall(down,toGo){
+    if(toGo<=2){ return rr()<0.60?"lauf":"screen"; }
+    if(toGo<=6){ const r=rr(); return r<0.40?"lauf":r<0.75?"kurz":"mittel"; }
+    if(toGo<=11){ const r=rr(); return r<0.22?"lauf":r<0.55?"mittel":"tief"; }
+    const r=rr(); return r<0.15?"lauf":r<0.35?"mittel":"tief";
+  }
+  // VIERTER VERSUCH: Field Goal in Reichweite, sonst bei kurzer Distanz (und nicht zu
+  // nah an der eigenen Torlinie) ein Go-For-It-Versuch, sonst Punt. PLATZHALTER-Schwellen,
+  // an der modernen NFL-Analytics-Tendenz zu mehr 4th-Down-Versuchen orientiert, aber
+  // nicht aus einer Quelle nachgerechnet (Football-Plan nennt keine eigene Zahl dafuer).
+  function waehleVierterVersuch(spot,toGo){
+    const d=FB().live.downs;
+    if(spot<=d.fgReichweite)return "fg";
+    if(toGo<=1&&spot<85)return "go";
+    return "punt";
+  }
+
+  // ROLLENWAHL JE ZUG — DYNAMISCH, NICHT FEST. Erstversuch war ein EINMAL je Spiel
+  // gezogener Depth Chart (fester QB/RB/PassRusher/RunStopper, wie ein echtes Football-
+  // Team ihn haette) — gemessen SCHLECHTER (rho 0,167/0,280 gegen 0,277/0,413 mit
+  // dynamischer Wahl, node scripts/miss-alle-disziplinen.mjs 24 football, s. Bericht):
+  // ABWEHR_PASS/ABWEHR_LAUF sind beide aus torment/power/health gemischt (s. rezept oben)
+  // und kueren deshalb oft DIESELBE Person zu passRusher UND runStopper, PASSGENAUIGKEIT/
+  // LAUFKRAFT ebenso oft dieselbe Person zu QB UND RB — auf sechs Spieler bleiben so real
+  // nur zwei bis drei je Seite je ueberhaupt eine Ballberuehrung, der Rest steht bei EXAKT
+  // Null, nicht nur bei Rauschen. `gewichtetesLos` streut dagegen JEDEN Snap neu, gewichtet
+  // nach Faehigkeit — schlechter fuer die Football-Erzaehlung ("derselbe Star wirft nicht
+  // jeden Pass"), aber besser fuer die Rangtreue, weil alle sechs Spieler eine von Null
+  // verschiedene Chance behalten. Bei Fumble-Recovery/Receiver war das ohnehin schon so.
+  function resolveLauf(off,def){
+    const rusher=gewichtetesLos(off,"LAUFKRAFT");
+    const abwehr=gewichtetesLos(def,"ABWEHR_LAUF");
+    // FUMBLE zuerst — Ballsicherheit des Traegers gegen die Tackling-Staerke der Abwehr
+    // (zengm `probFumble`-Struktur als Vorbild, Football-Plan A.2/A.3).
+    const pFumble=Math.max(0.006,Math.min(0.05,0.014+(abwehr.ABWEHR_LAUF-rusher.BALLSICHERHEIT)*0.00035));
+    if(rr()<pFumble)return {typ:"fumble",spieler:rusher,yards:Math.round(rr()*3)};
+    const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
+    const meanYds=Math.max(-3,Math.min(11,3.6+diff*0.055));
+    const yards=Math.round(meanYds+(rr()-0.5)*9);
+    return {typ:"lauf",spieler:rusher,yards};
+  }
+  // PASSTIEFE aus Down/Distance (nur fuer "kurz"/"mittel" ohne festen Spielzug-Namen —
+  // "screen" und "tief" legen ihre Tiefe schon selbst fest, s. resolvePass).
+  function waehleFootballTier(down,toGo){
+    if(toGo<=3)return rr()<0.6?"dunk":"nah";
+    if(toGo<=7)return rr()<0.55?"nah":"mit";
+    if(toGo<=12)return rr()<0.5?"mit":"fern";
+    return rr()<0.7?"fern":"mit";
+  }
+  const FK_TIER_YARDS={dunk:[0,5],nah:[3,10],mit:[7,18],fern:[14,34]};
+  // PASSSPIELZUG: zweistufig wie real (erst Sack-Chance, DANACH erst Completion/
+  // Interception, Football-Plan A.2/A.3 — genau das fehlte dem Vorab-Pfad komplett).
+  // Nutzt die generische lageBasisFuer/skillTeilFuer/steilerMake-Kette mit Footballs
+  // EIGENEM kurve-Block (FB().kurve, s. FELDSPIEL_ART.football) — dieselben drei
+  // Funktionen, die Basketball/Hockey fuer ihre Wurf-/Schusserfolgsquote nutzen.
+  function resolvePass(off,def,down,toGo,spielTyp){
+    const passer=gewichtetesLos(off,"PASSGENAUIGKEIT");
+    const rusher=gewichtetesLos(def,"ABWEHR_PASS");
+    const pSack=Math.max(0.02,Math.min(0.20,0.05+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
+    if(rr()<pSack)return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
+    const tier=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
+    // DEGENERIERTE UNTERZAHL (die Sonde faehrt ausdruecklich auch 1v1/2v2, s. Hockey-
+    // Kommentare oben): bleibt nach Abzug des Passers niemand mehr fuer den Zielspieler
+    // uebrig, faengt er notgedrungen selbst — gewichtetesLos() auf ein leeres Array gibt
+    // sonst `undefined` zurueck (Array-Index -1) und liess die Sonde abstuerzen.
+    const restOff=off.filter(u=>u!==passer);
+    const receiver=restOff.length?gewichtetesLos(restOff,"LAUFKRAFT"):passer;
+    const chance=steilerMake(lageBasisFuer(tier),skillTeilFuer(passer,tier),tier);
+    const pInt=Math.max(0.015,Math.min(0.16,0.03+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0012
+      +(tier==="fern"?0.03:tier==="mit"?0.012:0)));
+    if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
+    if(rr()<chance){
+      const [lo,hi]=FK_TIER_YARDS[tier];
+      const yac=Math.max(0,(receiver.LAUFKRAFT-50)*0.06);
+      return {typ:"komplett",spieler:passer,receiver,yards:Math.round(lo+rr()*(hi-lo)+yac),tier};
+    }
+    return {typ:"incomplete",spieler:passer,receiver,tier};
+  }
+  // FIELD GOAL: Stufentabelle nach Distanz statt eines linearen Fits — reales Vorbild
+  // zengm `probFieldGoal` (Football-Plan A.3, aus echten NFL-Kicking-Daten abgeleitete
+  // Stufen), hier als geglaettete Formel statt einer Yard-fuer-Yard-Tabelle. KEIN
+  // Kicker-Sub-Skill (Football-Plan D: "heute kein Kicker-Slot bei sechs Feldspielern") —
+  // die Distanz allein entscheidet, PLATZHALTER wie alles hier.
+  function resolveFieldgoal(spot){
+    const kickDistanz=spot+17;
+    const chance=Math.max(0.05,Math.min(0.99,0.99-(kickDistanz-20)*0.012));
+    return {typ:"fg",erfolg:rr()<chance,distanz:kickDistanz};
+  }
+  function resolvePunt(spot,netto){ return {typ:"punt",spot,yards:netto}; }
+  function loeseFootballZug(spielTyp,fb){
+    const off=FSTEAM[fb.side], def=FSTEAM[1-fb.side];
+    if(spielTyp==="fg")return resolveFieldgoal(fb.spot);
+    if(spielTyp==="punt")return resolvePunt(fb.spot,fb.puntNetto);
+    if(spielTyp==="lauf")return resolveLauf(off,def);
+    return resolvePass(off,def,fb.down,fb.toGo,spielTyp);
+  }
+
+  // VISUALISIERUNG DES ZUGS. Fuenf sichtbar unterschiedliche Ball-Bahnen statt einer
+  // generischen Bewegung (Chris' Zusatzauftrag) — niedriger Lauf mit leichtem Schlenker,
+  // ein SEHR flacher/kurzer Screen-Bogen, ansteigend hohe/lange Bogen fuer kurz/mittel/
+  // tief (derselbe Parabel-Mechanismus wie Basketballs Freiwurf-Flug, nur mit anderer
+  // Amplitude je Tiefe), ein kurzes Zurueckzucken beim Sack, ein hoher Kick-Bogen fuer
+  // Field Goal/Punt. `s.ergebnis` steht schon fest (gewuerfelt beim Snap-Ende), hier wird
+  // nur ENTHUELLT — dasselbe Muster wie Basketballs Freiwurf (treffer steht vor dem Flug).
+  const FK_ZUG_DAUER={lauf:0.9,screen:0.8,kurz:0.9,mittel:1.1,tief:1.6,fg:1.3,punt:1.5};
+  function animiereFootballZug(s,phase){
+    const fb=fsLive.football, erg=s.ergebnis;
+    if(!fb){ return; } // Serie kann waehrend "nach" schon durch eine neue ersetzt sein
+    if(s.spielTyp==="fg"||s.spielTyp==="punt"){
+      const zielSpot=s.spielTyp==="fg"?Math.max(0,fb.spot-17):Math.max(1,fb.spot-fb.puntNetto);
+      const zielX=fkLosX(fb.side,zielSpot);
+      const hoch=Math.sin(phase*Math.PI)*(s.spielTyp==="fg"?46:60);
+      fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:H/2-hoch,traegerId:null};
+      return;
+    }
+    if(erg.typ==="sack"){
+      fsBall={sichtbar:true,x:s.losX-s.zumFeld*12*Math.min(1,phase*2),y:H/2,traegerId:erg.spieler.id};
+      return;
+    }
+    const zielSpot=Math.max(0,Math.min(100,fb.spot-(erg.yards||0)));
+    const zielX=fkLosX(fb.side,zielSpot);
+    if(s.spielTyp==="lauf"){
+      fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,
+        y:H/2+Math.sin(phase*Math.PI*3)*12,traegerId:erg.spieler.id};
+      return;
+    }
+    // Pass: parabolischer Flug, Amplitude waechst mit der Tiefe (screen sehr flach, tief
+    // hoch und lang) — beim Sack schon oben behandelt, bleibt hier immer ein echter Wurf.
+    const flugHoch=s.spielTyp==="tief"?70:s.spielTyp==="mittel"?46:s.spielTyp==="kurz"?30:16;
+    const startY=H/2+(s.spielTyp==="screen"?-26:0); // Screen: erst leicht zurueck zum Receiver hinter der Line
+    fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:startY-Math.sin(phase*Math.PI)*flugHoch,
+      traegerId:(phase>=0.96&&erg.typ==="komplett")?erg.receiver.id:null};
+  }
+
+  // ANWENDUNG DES ERGEBNISSES — hier erst mutiert Punktestand/Down/Distance/Spot, am
+  // Ende der Zug-Animation (dasselbe "gewuerfelt frueh, angewendet spaet"-Muster wie
+  // Basketballs Freiwurf). `fkNaechsterSpot` traegt einen Feldstand ueber einen
+  // Possession-Wechsel hinweg zu beginneFootballSerie() (s. dort) — ein Modul-State statt
+  // eines neuen naechsterAngriff()-Parameters, weil naechsterAngriff() generisch fuer alle
+  // vier Feldspiel-Disziplinen bleiben soll.
+  let fkNaechsterSpot=null;
+  function footballDownWeiter(fb,yards,traeger){
+    const neuerSpot=Math.max(0,Math.min(100,fb.spot-yards));
+    if(neuerSpot<=0){
+      if(traeger)traeger.punkte+=6;
+      fsPunkte[fb.side]+=6;
+      feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true);
+      schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
+      logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
+      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feed(fb.side,"Extra-Punkt ist gut."); }
+      fsLive.football=null; naechsterAngriff(1-fb.side);
+      return;
+    }
+    const neuesToGo=fb.toGo-yards;
+    if(neuesToGo<=0){
+      feed(fb.side,"Erster Versuch!");
+      fb.down=1; fb.spot=neuerSpot; fb.toGo=Math.min(10,neuerSpot);
+      return;
+    }
+    fb.spot=neuerSpot; fb.toGo=Math.min(neuesToGo,neuerSpot); fb.down++;
+    if(fb.down>fb.max){
+      feed(fb.side,"Turnover on Downs.");
+      fkNaechsterSpot=100-neuerSpot; fsLive.football=null; naechsterAngriff(1-fb.side);
+    }
+  }
+  function vollziehFootballErgebnis(erg,fb){
+    const off=FSTEAM[fb.side], def=FSTEAM[1-fb.side];
+    if(erg.typ==="fg"){
+      if(erg.erfolg){
+        fsPunkte[fb.side]+=3;
+        feed(fb.side,"Field Goal von "+Math.round(erg.distanz)+" Yards ist gut — drei Punkte!",true);
+        schwebe({x:0,y:0,txt:"FIELD GOAL!",life:1.4,crit:true,_gross:true});
+        // KEIN Kicker-Slot (Football-Plan D) — logZug() BRAUCHT trotzdem einen echten
+        // Spieler (die Boxscore-Sonde liest e.spieler.id ungeprueft, s.
+        // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
+        // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
+        logZug(fb.side,"treffer",{spieler:gewichtetesLos(off,"PASSGENAUIGKEIT"),punkte:3});
+        fsLive.football=null; naechsterAngriff(1-fb.side);
+      } else {
+        feed(fb.side,"Field-Goal-Versuch von "+Math.round(erg.distanz)+" Yards verfehlt.");
+        fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
+      }
+      return;
+    }
+    if(erg.typ==="punt"){
+      feed(fb.side,"Punt — Ballwechsel.");
+      fkNaechsterSpot=100-Math.max(1,fb.spot-erg.yards);
+      fsLive.football=null; naechsterAngriff(1-fb.side);
+      return;
+    }
+    if(erg.typ==="sack"){
+      erg.spieler.passYards+=erg.yards; erg.verteidiger.bloecke++;
+      feed(erg.verteidiger.side,erg.verteidiger.n+" sackt "+erg.spieler.n+" — "+FB().wortBlock+"!",true);
+      schwebe({x:0,y:0,txt:FB().wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:erg.verteidiger.id});
+      logZug(erg.verteidiger.side,"block",{verteidiger:erg.verteidiger,spieler:erg.spieler});
+      footballDownWeiter(fb,erg.yards);
+      return;
+    }
+    if(erg.typ==="fumble"){
+      erg.spieler.laufYards+=erg.yards; erg.spieler.verluste++;
+      const gewinntDef=rr()<0.58; // real ~55-60% aller Fumbles landen bei der Defense
+      const recover=gewinntDef?gewichtetesLos(def,"ABWEHR_LAUF"):gewichtetesLos(off,"BALLSICHERHEIT");
+      recover.rebounds++;
+      feed(recover.side,erg.spieler.n+" verliert den Ball — "+recover.n+" mit der "+FB().wortRebound+"!",true);
+      schwebe({x:0,y:0,txt:"FUMBLE!",life:1.2,crit:true,_spieler:erg.spieler.id});
+      logZug(recover.side,"steal",{verteidiger:recover,spieler:erg.spieler});
+      if(!gewinntDef){ footballDownWeiter(fb,erg.yards); return; }
+      fkNaechsterSpot=100-Math.max(0,fb.spot-erg.yards); fsLive.football=null; naechsterAngriff(1-fb.side);
+      return;
+    }
+    if(erg.typ==="interception"){
+      erg.spieler.verluste++; erg.verteidiger.steals++;
+      feed(erg.verteidiger.side,erg.verteidiger.n+" fängt den Pass ab — Interception!",true);
+      schwebe({x:0,y:0,txt:"INTERCEPTION!",life:1.3,crit:true,_def:true,_spieler:erg.verteidiger.id});
+      logZug(erg.verteidiger.side,"steal",{verteidiger:erg.verteidiger,spieler:erg.spieler});
+      fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
+      return;
+    }
+    if(erg.typ==="incomplete"){
+      feed(fb.side,erg.spieler.n+" wirft — "+erg.receiver.n+" kann nicht fangen. Unvollständig.");
+      footballDownWeiter(fb,0);
+      return;
+    }
+    if(erg.typ==="komplett"){
+      erg.spieler.passYards+=erg.yards; erg.spieler.assists++; erg.receiver.fangYards+=erg.yards;
+      feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
+      footballDownWeiter(fb,erg.yards,erg.receiver);
+      return;
+    }
+    if(erg.typ==="lauf"){
+      erg.spieler.laufYards+=erg.yards;
+      feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
+      footballDownWeiter(fb,erg.yards,erg.spieler);
+    }
+  }
+
+  // BETRETEN DER SNAP-STANDPHASE (Football-Plan B.2 Punkt 3, analog zu Basketballs
+  // Freiwurf-Formation und Hockeys Bully, s. Kommentar bei fsLive.phase in
+  // initFeldspielLive). Waehlt Spielzug UND — Chris' Zusatzauftrag — je EINE sichtbar
+  // unterschiedliche Offense-/Defense-Formation, stellt beide Seiten an der Line of
+  // Scrimmage auf. Anders als Basketballs Freiwurf laeuft die Spieluhr waeter (fsT+=dt
+  // bleibt in stepFeldspielLive aktiv, s. dort) — ein Play Clock ist Teil der echten
+  // Spielzeit, keine separate Pause.
+  function starteSnap(){
+    const fb=fsLive.football;
+    const vierter=fb.down===fb.max?waehleVierterVersuch(fb.spot,fb.toGo):null;
+    const spielTyp=vierter&&vierter!=="go"?vierter:waehlePlayCall(fb.down,fb.toGo);
+    const formOff=waehleFormationOffense(fb.down,fb.toGo);
+    const formDef=(spielTyp==="fg"||spielTyp==="punt")?"basis":waehleFormationDefense(fb.down,fb.toGo);
+    const losX=fkLosX(fb.side,fb.spot), zumFeld=fb.side===0?1:-1;
+    const offTab=(spielTyp==="fg"||spielTyp==="punt")?SLOTS_FOOTBALL_OFF.weit:SLOTS_FOOTBALL_OFF[formOff];
+    const defTab=SLOTS_FOOTBALL_DEF[formDef];
+    const plaetze={};
+    FSTEAM[fb.side].forEach((u,i)=>{
+      const s=offTab[i%offTab.length];
+      plaetze[u.id]=fkClamp(losX-zumFeld*s.tiefe,H/2+s.breite);
+    });
+    FSTEAM[1-fb.side].forEach((u,i)=>{
+      const s=defTab[i%defTab.length];
+      plaetze[u.id]=fkClamp(losX+zumFeld*s.tiefe,H/2+s.breite);
+    });
+    fsLive.phase="snap";
+    fsLive.snap={stufe:"formation",t:0,spielTyp,formOff,formDef,losX,zumFeld,plaetze,ergebnis:null};
+    // DIREKT AN DEN PLATZ, NICHT HINLAUFEN LASSEN. Chris' Zusatzauftrag (Visualpruefung
+    // 03.09.): mit dem normalen bewegeSpielerLive-Lauftempo (~230px/s) erreichte niemand
+    // die neue Formation, BEVOR der naechste Snap (alle ~2,4-3,2s) schon wieder eine ganz
+    // andere Line of Scrimmage vorgab — die Line of Scrimmage kann von Zug zu Zug um
+    // hunderte Pixel wandern (ein Fluss ueber mehrere Downs, kein lokaler Freiwurf-
+    // Wiederanlauf wie bei Basketball). Ergebnis: ein Spielfeld-weiter Klumpen aus zwoelf
+    // Spielern, die alle demselben wandernden Ziel hinterherlaufen, nie eine erkennbare
+    // Formation. Football spielt real auch keinen Sprint quer ueber das Feld zwischen zwei
+    // Downs — die Formation STEHT, sobald der Snap beginnt. `stehtStill` (s.
+    // bewegeSpielerLive) haelt sie danach nur noch dort fest.
+    for(const team of FSTEAM)for(const u of team){
+      const p=plaetze[u.id];
+      if(p){ u.x=p.x; u.y=p.y; u.vx=0; u.vy=0; }
+      u.hatBall=false;
+    }
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.ball.frei=null;
+    fsBall={sichtbar:true,x:losX,y:H/2,traegerId:null};
+    fsAktuell=null;
+  }
+  const FK_SNAP_FORMATION=0.9, FK_SNAP_NACH=0.6;
+  function stepSnapPhase(dt){
+    const s=fsLive.snap, fb=fsLive.football;
+    s.t+=dt;
+    if(s.stufe==="formation"){
+      fsBall={sichtbar:true,x:s.losX,y:H/2,traegerId:null};
+      if(s.t>=FK_SNAP_FORMATION){ s.ergebnis=loeseFootballZug(s.spielTyp,fb); s.stufe="zug"; s.t=0; }
+      return;
+    }
+    if(s.stufe==="zug"){
+      const dauer=FK_ZUG_DAUER[s.spielTyp]||1.0;
+      const phase=Math.min(1,s.t/dauer);
+      animiereFootballZug(s,phase);
+      if(phase>=1){ vollziehFootballErgebnis(s.ergebnis,fb); s.stufe="nach"; s.t=0; }
+      return;
+    }
+    if(s.t<FK_SNAP_NACH)return;
+    // Serie kann inzwischen vorbei sein (Touchdown/Turnover -> naechsterAngriff hat schon
+    // entweder eine neue Serie gestartet — dann laeuft fsLive.snap bereits frisch, dieser
+    // Aufruf hier laueft ins Leere, s. `s` oben als lokale Kopie — oder die Viertelpause
+    // uebernommen, dann ist fsLive.phase nicht mehr "snap" und stepFeldspielLive ruft
+    // diese Funktion naechsten Tick gar nicht mehr auf).
+    if(fsLive.phase==="snap"&&fsLive.snap===s)starteSnap();
+  }
+  // SERIENSTART. `fkNaechsterSpot` (falls gesetzt, s. vollziehFootballErgebnis) gilt fuer
+  // GENAU eine Serie und wird sofort verbraucht — ein Kickoff nach einem Score faehrt
+  // immer auf den Standard-Touchback-Spot (startSpot), kein Rueckgabespiel modelliert
+  // (PLATZHALTER, wie der Rest dieser Runde).
+  function beginneFootballSerie(seite){
+    const d=FB().live.downs;
+    ballUebernehmen(spielmacherLos(FSTEAM[seite]));
+    const spot=fkNaechsterSpot!=null?Math.max(1,Math.min(99,fkNaechsterSpot)):d.startSpot;
+    fkNaechsterSpot=null;
+    fsLive.football={side:seite,down:1,toGo:Math.min(d.distanz,spot),max:d.max,spot,puntNetto:d.puntNetto};
+    starteSnap();
+  }
+
   function initFeldspielLive(art){
     fsZuege=[]; fsZeiger=0;
     for(const team of FSTEAM)for(const u of team){
@@ -5583,9 +6102,16 @@
       fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null,
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
-      beruehrungKette:[], beruehrungSeite:null};
+      beruehrungKette:[], beruehrungSeite:null,
+      // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
+      // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
+      football:null, snap:null};
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
+    // FOOTBALL STARTET NICHT UEBER ballUebernehmen()/spielmacherLos() — ein Empfangsteam
+    // wird per Muenzwurf bestimmt, und beginneFootballSerie() setzt Down/Distance/Spot
+    // sowie den ersten Snap selbst auf (s. dort). Basketball/Hockey/Tennis unveraendert.
+    if(istFootball()){ beginneFootballSerie(rr()<0.5?0:1); return; }
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
   }
 
@@ -5742,6 +6268,10 @@
     }
     fsLive.angriffSeit=0;
     if(!ausViertelpause)zuordneSlots(seite);
+    // FOOTBALL HAT KEINEN KONTINUIERLICHEN BALLBESITZ: jeder Wechsel ist eine neue Serie
+    // mit eigenem Down/Distance/Feldstand (beginneFootballSerie ruft ballUebernehmen()
+    // selbst mit auf und startet direkt den ersten Snap der neuen Serie).
+    if(istFootball()){ beginneFootballSerie(seite); return; }
     ballUebernehmen(spielmacherLos(FSTEAM[seite]));
   }
 
@@ -7333,13 +7863,21 @@
       // weiter unten, deshalb steht das Flag hier oben und nicht im Zweig selbst.
       let fokusHelfer=false;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
-      const stehtStill=fsLive.phase==="freiwurf";
+      // "snap" (Football) ist dieselbe Standphase-Idee wie "freiwurf" (Basketball) —
+      // s. Kommentar bei fsLive.phase in initFeldspielLive ("eine Phase, eine
+      // Aufstellungsfunktion, ein Schritt-Handler"). Football bleibt fuer die GESAMTE
+      // Snap-bis-Ergebnis-Dauer in dieser Standphase (kein Dribbeln/Freilaufen zwischen
+      // Formation und Spielzug-Ausgang, s. stepSnapPhase) — nur der Ball bewegt sich
+      // (animiereFootballZug), die elf ausserhalb des Balls stehen fest in Formation,
+      // genau wie ein Freiwurfschuetzen-Umfeld bei Basketball. Wirkungslos fuer
+      // Basketball/Hockey/Tennis, die "snap" nie setzen.
+      const stehtStill=fsLive.phase==="freiwurf"||fsLive.phase==="snap";
       if(stehtStill){
         // STANDPHASE: EIN Ziel, sonst nichts — kein Dribbeln, keine Deckung, kein
         // Freilaufen, kein Zug zum freien Ball. Der Zweig steht bewusst GANZ oben in der
         // Kette, damit keiner der spaeteren Zweige ihn ueberschreiben kann; alle uebrigen
         // Zweige bleiben Zeichen fuer Zeichen unveraendert.
-        const p=fsLive.freiwurf.plaetze[u.id];
+        const p=fsLive.phase==="snap"?(fsLive.snap&&fsLive.snap.plaetze[u.id]):fsLive.freiwurf.plaetze[u.id];
         if(p){ zx=p.x; zy=p.y; }
       } else if(u.hatBall){
         // WUNSCHDISTANZ statt "immer zum Korb" (Archetypen-Runde). Bisher stand hier
@@ -7778,6 +8316,16 @@
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
         +fsPunkte[0]+":"+fsPunkte[1]+".",true);
       return; }
+    // FOOTBALL: eigene Zustandsmaschine statt der Basketball/Hockey-Dribbel-/Pass-
+    // Entscheidungskette darunter (entscheideBallaktion & Co. — strukturell auf
+    // kontinuierlichen Ballbesitz zugeschnitten, s. Kommentar am FOOTBALL-Block oben).
+    // Die Spieluhr (fsT) und die Spielende-Erkennung direkt darueber gelten unveraendert
+    // fuer Football mit — nur der Rest von stepFeldspielLive wird uebersprungen.
+    if(istFootball()){
+      bewegeSpielerLive(dt);
+      if(fsLive.phase==="snap")stepSnapPhase(dt);
+      return;
+    }
     const art=FB();
     fsLive.angriffSeit+=dt;
     for(const team of FSTEAM)for(const u of team){
@@ -16643,8 +17191,11 @@
       freiwurf:fsLive.freiwurf?{schuetze:fsLive.freiwurf.schuetze.n,seite:fsLive.freiwurf.schuetze.side,
         anzahl:fsLive.freiwurf.anzahl,idx:fsLive.freiwurf.idx,gemacht:fsLive.freiwurf.gemacht,
         stufe:fsLive.freiwurf.stufe,undEins:fsLive.freiwurf.undEins}:null,
+      snap:fsLive.snap?{stufe:fsLive.snap.stufe,spielTyp:fsLive.snap.spielTyp,t:fsLive.snap.t,
+        losX:fsLive.snap.losX,plaetze:fsLive.snap.plaetze}:null,
+      football:fsLive.football?{down:fsLive.football.down,toGo:fsLive.football.toGo,spot:fsLive.football.spot,side:fsLive.football.side}:null,
       schiri:fsSchiri?{x:Math.round(fsSchiri.x),y:Math.round(fsSchiri.y),pfiffT:+fsSchiri.pfiffT.toFixed(2)}:null}:null,
-    fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
+    fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,id:u.id,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
     // ============ DIE EINE SONDE FUER ALLE ZWANZIG DISZIPLINEN ============
     // Bis hierher hatte nur das Feldspiel eine (feldspielProbe). Fuer Buehne, Bahn und
     // Arena gab es gar keine — und damit fuer 16 der 20 Disziplinen KEINE Moeglichkeit,
