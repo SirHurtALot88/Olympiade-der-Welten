@@ -53,7 +53,13 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const roheArgs = process.argv.slice(2);
 const EINZELKADER = roheArgs.includes("--einzelkader");
-const rest = roheArgs.filter((a) => a !== "--einzelkader");
+// --je-seite=N: faehrt die kaderfeste Messung mit einer anderen Kadergroesse je Seite
+// (2/4/6 ...), zusaetzlich zur Kader-FAMILIE (fuenf Team-Paarungen). Additiv, ohne diesen
+// Schalter unveraendertes Verhalten — noetig fuer die Gewichtheben-Abnahme "rho >= 0,80 bei
+// 6, 4 UND 2 je Seite" (Plan 8.1), jetzt mit Median+Spannweite statt Einzelkader.
+const jeSeiteArg = roheArgs.find((a) => a.startsWith("--je-seite="));
+const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && !a.startsWith("--je-seite="));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -85,7 +91,10 @@ try {
 
   zeilen = [];
   for (const d of alleDisz) {
-    zeilen.push(await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie }));
+    zeilen.push(await disziplinMessen(seite, d, {
+      n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie,
+      ...(JE_SEITE ? { jeSeite: JE_SEITE } : {}),
+    }));
   }
 } finally {
   await browser.close();
