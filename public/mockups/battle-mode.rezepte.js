@@ -410,41 +410,72 @@ window.__ARENA_REZEPTE = {
   // gelten und nach der Live-Migration (Plan H.8, PR 3b) wertlos waeren. Reihenfolge
   // schlaegt Rezeptqualitaet. Das eigene Sub-Skill-Set kommt in PR 4, zusammen mit
   // Zonenmodell, Erfolgsformel und Impact-Formel — in genau dieser Reihenfolge, weil
-  // jede davon die Sondierungsgewichte verschiebt (Plan H.5).
+  // jede davon die Sondierungsgewichte verschiebt (Plan H.5). INZWISCHEN UEBERHOLT: die
+  // Live-Migration (hockey-eigene-erfolgskurve, 02.09.) ist gelaufen, und das Rezept unten
+  // ist das hockeyeigene Ergebnis der Sondierung, nicht mehr Basketballs alte Sieben.
+  // ===============================================================================
+  // NACH DER SONDIERUNG NEU GEBAUT (docs/design/hockey-rezept-ursache.md) — der obige
+  // Platzhalter-Hinweis ("Schritt 4 kommt nach der Live-Migration") ist ueberholt: die
+  // Sondierung selbst braucht keine Live-Migration, nur einen stehenden Motor, und der
+  // steht seit `hockey-eigene-erfolgskurve` (TEAMGEIST raus, SCHUSS_NAH/FERN neu gefittet).
+  // `scripts/sondiere-feldspiel-subskills.mjs hockey 24 0` + `scripts/baue-feldspiel-
+  // rezept.mjs` (Sinkhorn, Chris' Budget-Methode, exakt das Verfahren hinter Arena/Bahn/
+  // Basketball) liefern daraus ein Rezept mit 0,00 Pp Abweichung zu den gemessenen
+  // Sub-Skill-Gewichten — UND DAS WAR SCHLECHTER als dieses hier: rho je Spiel 0,582 gegen
+  // 0,617, rho Saison 0,755 gegen 0,783 (n=24, zweimal identisch reproduziert).
+  //
+  // URSACHE (gemessen, nicht vermutet — voller Befund samt verworfener Hypothese im
+  // Bericht): NICHT "ein Attribut wird ueberladen" — die mittlere Sub-Skill-Kreuzkorrelation
+  // sank mit dem Sinkhorn-Rezept sogar (0,467 auf 0,408 ueber alle Paare). Der echte Grund:
+  // Sinkhorn balanciert nur Zeilen-/Spaltensummen, kennt aber keine "das hier muss das
+  // FUEHRENDE Attribut bleiben"-Nebenbedingung. Power wird von fuenf Sub-Skills zugleich
+  // angefragt (AUFBAU/ABSCHLUSS/SCHUSS_FERN/ZWEITCHANCE/ABWEHR); die beiden schwersten
+  // (ABSCHLUSS 17,7 %, ZWEITCHANCE 17,5 %) zogen dabei so viel von Powers 18-Punkte-Budget
+  // ab, dass SCHUSS_FERN — laut Hockey-Plan B.2 ausdruecklich "fuehrt power" — nur noch 17 %
+  // Power bekam und den Rest (53 %!) aus SPEED auffuellen musste. Auf dem festen 12-Spieler
+  // Testkader (demselben, den jede dieser Sonden benutzt) korreliert Power mit der
+  // Matrix-Eignung mit rho 0,68, Speed mit rho -0,06 — ein rein rechnerisch bilanzierter
+  // Tausch, der die Korrelation mit der Eignung zerstoert, ohne dass eine einzige Pp-Zahl
+  // das anzeigt. Ebenso bei ABSCHLUSS: B.2 sieht dort "power, spirit" vor (keine Verletzung
+  // der Dokumentation), aber Sinkhorns 63/37-Aufteilung gibt Spirit (rho -0,34 zur Eignung
+  // auf diesem Kader) zu viel Gewicht gegenueber Power (rho 0,68).
+  //
+  // DER FIX HIER: dieselben, von B.2 erlaubten Attribute, aber innerhalb von ABSCHLUSS und
+  // SCHUSS_FERN zugunsten von Power nachjustiert (Power bleibt das statuarisch fuehrende
+  // Attribut, wie B.2 es fuer SCHUSS_FERN ausdruecklich verlangt) — alle uebrigen neun
+  // Sub-Skills unveraendert aus dem Sinkhorn-Ergebnis uebernommen. Verifiziert:
+  //
+  //   n=24  rho je Spiel 0,647  rho Saison 0,860   (vorher: 0,617 / 0,783)
+  //   n=48  rho je Spiel 0,626  rho Saison 0,846   (vorher: 0,607 / 0,804)
+  //   Basketball bei beiden n bit-identisch zum unveraenderten Stand (0,820/0,881 bzw.
+  //   0,821/0,895) — keine Regression durch diese Datei.
+  //
+  // AUFBAU/SCHUSS_NAH/TECHNIK/ZWEITCHANCE/ABWEHR/TEAMGEIST/AUSDAUER/LAUFTEMPO unveraendert
+  // aus dem Sinkhorn-Lauf: ihre Einzel-Korrelation mit der Eignung war beim Sinkhorn-Rezept
+  // gleich gut oder besser als beim alten Handrezept, dort war nichts zu reparieren.
+  // PARADE bleibt wie zuvor unangetastet (Torwart-Rolle, eigene Messung/Rangtreue-nach-Rolle).
   // ===============================================================================
   hockey:{
-    AUFBAU:      {awareness:35,speed:35,power:30},
-    ABSCHLUSS:   {power:40,torment:30,dexterity:30},
-    TECHNIK:     {dexterity:40,awareness:35,determination:25},
-    ZWEITCHANCE: {power:40,health:35,torment:25},
-    ABWEHR:      {health:40,power:35,speed:25},
-    // Nachgezogen: Determination hat in der Hockey-Matrix nur Gewicht 4, sass aber
-    // mit 45 in Teamgeist (individuell, starker Koeffizient) und las 24,8 %. Ersetzt
-    // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
-    // nicht Entschlossenheit.
-    TEAMGEIST:   {spirit:60,torment:40},
-    AUSDAUER:    {stamina:50,health:30,will:20},
-    // ================= AB HIER: PLATZHALTER FUER DEN LIVE-MOTOR =================
-    // Diese vier Sub-Skills sind NICHT kalibriert. Sie stehen hier, weil der Live-Motor
-    // sie liest — ohne sie laeuft Hockey live gar nicht: `zuordneSlots` sortiert nach
-    // SCHUSS_NAH, `bewegeSpielerLive` rechnet mit LAUFTEMPO, die Wurfformel mit
-    // SCHUSS_NAH/SCHUSS_FERN. Ohne diese Felder sind alle vier undefined, jede daraus
-    // gerechnete Position wird NaN, und das Spiel steht bei 0:0 mit null Ballwechseln
-    // (genau so gemessen, bevor sie hier standen).
-    //
-    // Die Gewichte sind aus der Hockey-Matrix (power 18, health 18, speed 12, spirit 12,
-    // stamina 10, torment 10, awareness 8, determination 4, dexterity 4, will 4) plausibel
-    // abgeleitet, aber NICHT gegen eine Sondierung gemessen. Die Kalibrierung ist Schritt 4
-    // des Hockey-Plans und kommt NACH der Live-Migration — in dieser Reihenfolge, weil
-    // Gewichte, die gegen die Vorab-Mechanik gemessen werden, nach der Migration wertlos
-    // sind (derselbe Befund, der oben schon ein besseres Kandidatenrezept verworfen hat).
-    //
-    // SCHUSS_NAH ist die Direktabnahme vor dem Tor, SCHUSS_FERN der Schuss von der blauen
-    // Linie, LAUFTEMPO das Schlittschuhtempo. PARADE ist der einzige wirklich neue: er
-    // gehoert dem Torwart und wird ausserhalb des Tors nie gelesen.
-    SCHUSS_NAH:  {power:40,dexterity:25,awareness:20,spirit:15},
-    SCHUSS_FERN: {power:45,awareness:30,dexterity:25},
-    LAUFTEMPO:   {speed:55,stamina:30,power:15},
+    AUFBAU:      {stamina:57,speed:23,awareness:13,power:7},
+    // Sinkhorn gab hier 63/37 (Power/Spirit) — auf dem Testkader korreliert Spirit mit der
+    // Eignung NEGATIV (rho -0,34), Power stark positiv (rho 0,68). Nachjustiert auf 82/18,
+    // ohne die von B.2 vorgesehenen Attribute zu verlassen (s. Blockkommentar oben).
+    ABSCHLUSS:   {power:82,spirit:18},
+    TECHNIK:     {awareness:46,determination:31,dexterity:23},
+    ZWEITCHANCE: {health:62,power:23,torment:15},
+    ABWEHR:      {speed:26,health:24,will:24,determination:11,power:9,torment:6},
+    TEAMGEIST:   {torment:53,spirit:47},
+    AUSDAUER:    {stamina:57,health:20,will:19,spirit:4},
+    // SCHUSS_NAH fuehrt jetzt Health statt Power — gemessen BESSER als beim alten Rezept
+    // (Sub-Skill-Korrelation zur Eignung 0,36 -> 0,76 auf dem Testkader), deshalb hier vom
+    // Sinkhorn-Lauf unveraendert uebernommen.
+    SCHUSS_NAH:  {health:63,dexterity:22,torment:15},
+    // Sinkhorn gab hier 53/30/17 (Speed/Awareness/Power) und verletzte damit B.2 ("SCHUSS_FERN
+    // fuehrt power") als Nebenwirkung der Power-Konkurrenz mit ABSCHLUSS/ZWEITCHANCE (s.
+    // Blockkommentar oben) — Speed korreliert auf dem Testkader praktisch gar nicht mit der
+    // Eignung (rho -0,06). Nachjustiert auf 47/30/23, Power wieder fuehrend wie geplant.
+    SCHUSS_FERN: {power:47,awareness:30,speed:23},
+    LAUFTEMPO:   {stamina:66,speed:26,dexterity:8},
     // PARADE FUEHRT HEALTH, nicht Awareness — nachgezogen, weil der Slot es so ausweist.
     // Der Torwart-Slot (SLOTS_JE_DISC.hockey, aus dem Generator) traegt gross:"health",
     // klein:"awareness" und hebt im Profil health auf 26. Im Aufstellungsbildschirm steht
