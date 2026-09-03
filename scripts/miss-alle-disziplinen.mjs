@@ -10,20 +10,58 @@
 // (die Validitaet: belohnt die Mechanik ueberhaupt das Richtige?) und einmal je EINZELNEM
 // Spiel (die Zahl, die zaehlt — pro Saison kommt jede Disziplin nur ein paar Mal dran).
 //
+// KADERFEST SEIT 03.09.2026 (docs/design/messgrundlage-kaderfest.md, Ausloeser
+// docs/design/projekt-ueberwachung-opus.md Abschnitt 1.3): dieses Skript mass bis dahin
+// IMMER denselben 17-Spieler-Testkader in derselben Paarung (den hartkodierten SQUAD/OPP in
+// battle-mode.engine.js). Das wirkte wie eine einzelne Zahl, war aber eine EINZIGE Ziehung
+// aus einer Verteilung — Opus hat nachgewiesen, dass allein der Kaderwechsel bei gleicher
+// Mechanik rho um bis zu 0,73 (TDM) bewegt. Seit hier misst dieses Skript ueber eine
+// KADER-FAMILIE (mehrere feste, unterschiedliche Team-Paarungen desselben Spielstands) und
+// gibt MEDIAN und SPANNWEITE statt einer einzelnen Zahl aus — das ist die Zahl, an der sich
+// erkennen laesst, ob eine kuenftige Rezeptaenderung real etwas bewegt hat oder innerhalb des
+// Kaderrauschens verschwindet.
+//
+// Kader-Quelle, in Prioritaet:
+//   1. data/generated/kaderfamilie-live-save.json — fuenf ECHTE Team-Paarungen aus dem
+//      aktuellen live-save-Abbild (s. scripts/ziehe-kader-familie.ts). Bevorzugt: echte
+//      Attributverteilungen einer echten Liga statt einer erfundenen Mischung.
+//   2. Fehlt die Datei (z.B. frischer Checkout ohne live-save-Zugriff), faellt das Skript auf
+//      SYNTHETISCHE Kader zurueck: dieselben 17 Spieler aus dem hartkodierten SQUAD/OPP,
+//      deterministisch in vier weitere 8-gegen-8-Aufteilungen gemischt (genau die Methode aus
+//      dem Opus-Anhang). Das ist ausdruecklich ein KOMPROMISS fuer den Fall ohne
+//      Save-Zugriff, keine Verbesserung gegenueber Quelle 1 — die Tabelle sagt, welche Quelle
+//      gerade lief.
+//
 //   node scripts/miss-alle-disziplinen.mjs [spiele] [disziplin ...]
+//   node scripts/miss-alle-disziplinen.mjs [spiele] [disziplin ...] --einzelkader
 //
 // Ohne Disziplinliste laufen alle zwanzig. Das dauert; mit einer Liste misst man gezielt.
+// `--einzelkader` schaltet auf das alte Verhalten zurueck (ein einziger Kader, eine Zahl je
+// Disziplin) — fuer einen schnellen Einzelcheck, NICHT fuer eine Abnahme- oder CI-Zahl.
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
-const SPIELE = Number(process.argv[2] || 24);
-const NUR = process.argv.slice(3);
+const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE
+  || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+
+const roheArgs = process.argv.slice(2);
+const EINZELKADER = roheArgs.includes("--einzelkader");
+const rest = roheArgs.filter((a) => a !== "--einzelkader");
+const SPIELE = Number(rest[0] || 24);
+const NUR = rest.slice(1);
+
+let kaderQuelle, kaderFamilie;
+if (!EINZELKADER) {
+  const geladen = ladeKaderFamilieAusDatei(KADERFAMILIE_PFAD);
+  if (geladen) { kaderFamilie = geladen.familie; kaderQuelle = geladen.quelle; }
+}
 
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
 const seite = await browser.newPage();
@@ -32,68 +70,38 @@ seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(SEITE, { waitUntil: "networkidle" });
 await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
 
-const alle = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
+if (!EINZELKADER && !kaderFamilie) {
+  const gebaut = await baueSynthetischeKaderFamilie(seite);
+  kaderFamilie = gebaut.familie;
+  kaderQuelle = gebaut.quelle + " (Kopfkommentar dieses Skripts erklaert, wann das greift)";
+}
 
-// Spearman ueber Paare {eig, wert}. Bindungen bekommen den Durchschnittsrang, sonst
-// verzerren gleiche Werte (bei Bahn-Platzierungen keine Seltenheit) das Ergebnis.
-const rho = (paare) => {
-  const n = paare.length;
-  if (n < 3) return NaN;
-  const rang = (key) => {
-    const s = paare.map((p, i) => ({ i, v: p[key] })).sort((a, b) => b.v - a.v);
-    const r = new Array(n);
-    let k = 0;
-    while (k < n) {
-      let j = k;
-      while (j + 1 < n && s[j + 1].v === s[k].v) j++;
-      const mittel = (k + j) / 2 + 1;
-      for (let m = k; m <= j; m++) r[s[m].i] = mittel;
-      k = j + 1;
-    }
-    return r;
-  };
-  const a = rang("eig"), b = rang("wert");
-  const ma = a.reduce((x, y) => x + y, 0) / n, mb = b.reduce((x, y) => x + y, 0) / n;
-  let sab = 0, sa = 0, sb = 0;
-  for (let i = 0; i < n; i++) {
-    const da = a[i] - ma, db = b[i] - mb;
-    sab += da * db; sa += da * da; sb += db * db;
-  }
-  return sab / Math.sqrt(sa * sb || 1);
-};
+const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
 
 const zeilen = [];
-for (const d of alle) {
-  let x;
-  try {
-    x = await seite.evaluate(([d, n]) => window.__arena.disziplinProbe(d, { n }), [d, SPIELE]);
-  } catch (e) { zeilen.push({ d, fehler: String(e).slice(0, 60) }); continue; }
-  if (x.fehler || !x.spiele.length) { zeilen.push({ d, fehler: x.fehler || "keine Spiele" }); continue; }
-
-  // rho JE SPIEL, dann gemittelt — das ist die Abnahmezahl (CLAUDE.md: rho in EINEM Spiel).
-  const jeSpiel = x.spiele.map((s) => rho(s.teilnehmer)).filter((v) => !Number.isNaN(v));
-  // rho ueber die Saison: je Teilnehmer erst mitteln, dann einmal ordnen.
-  const agg = new Map();
-  for (const s of x.spiele) for (const t of s.teilnehmer) {
-    const a = agg.get(t.n) || { n: t.n, eig: 0, wert: 0, k: 0 };
-    a.eig += t.eig; a.wert += t.wert; a.k++; agg.set(t.n, a);
-  }
-  const saison = rho([...agg.values()].map((a) => ({ eig: a.eig / a.k, wert: a.wert / a.k })));
-  zeilen.push({ d, chassis: x.chassis,
-    spiel: jeSpiel.reduce((a, b) => a + b, 0) / Math.max(1, jeSpiel.length),
-    saison, teilnehmer: agg.size });
+for (const d of alleDisz) {
+  zeilen.push(await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie }));
 }
 await browser.close();
 
-console.log(`Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin\n`);
-console.log("Disziplin           Chassis     Teiln.  rho je Spiel  rho Saison   Abnahme");
-for (const z of zeilen.sort((a, b) => (b.spiel || -9) - (a.spiel || -9))) {
+const titel = EINZELKADER
+  ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
+  : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
+console.log(titel + "\n");
+console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
+for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }
-  const ok = z.spiel >= 0.80 ? "bestanden" : z.spiel >= 0.70 ? "knapp" : "durchgefallen";
+  const ok = z.spielMed >= 0.80 ? "bestanden" : z.spielMed >= 0.70 ? "knapp" : "durchgefallen";
   console.log(z.d.padEnd(20) + (z.chassis || "").padEnd(12)
     + String(z.teilnehmer).padStart(5)
-    + z.spiel.toFixed(3).padStart(14) + z.saison.toFixed(3).padStart(12)
+    + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
+    + z.saisonMed.toFixed(3).padStart(21) + z.saisonSpan.toFixed(3).padStart(12)
     + "   " + ok);
 }
-console.log("\nSchranke: rho je Spiel ueber 0,80 (CLAUDE.md, gilt fuer alle Disziplinen).");
+console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) ueber 0,80 (CLAUDE.md, gilt fuer alle Disziplinen).");
+if (!EINZELKADER) {
+  console.log("Spannweite = Kaderrauschen bei UNVERAENDERTER Mechanik — eine Rezeptaenderung, die kleiner");
+  console.log("bewegt als die Spannweite einer Disziplin, ist von Null nicht unterscheidbar (s.");
+  console.log("docs/design/messgrundlage-kaderfest.md).");
+}
 console.log("Seitenfehler: " + (fehler.length ? fehler.slice(0, 3).join(" | ") : "keine"));

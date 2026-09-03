@@ -16605,6 +16605,20 @@
     // Die Teilnehmerliste kommt aus derselben Fallunterscheidung, die auch die
     // Aufstellungsanzeige benutzt (s. renderKader) — nicht aus einer zweiten Tabelle, die
     // beim naechsten neuen Chassis vergessen wuerde.
+    // `kaderSetzen` tauscht SQUAD/OPP zur Laufzeit aus — derselbe Weg, den auch das Laden von
+    // `window.__olyArenaKader` benutzt (s. "BRUECKE ZUR ECHTEN APP" oben, `mitKit`), nur ohne
+    // Seiten-Reload. Existiert seit dem Kaderfamilien-Befund der Projektueberwachung
+    // (docs/design/projekt-ueberwachung-opus.md, Abschnitt 1.3): `disziplinProbe` mass bis
+    // dahin IMMER denselben 17-Spieler-Testkader in derselben Paarung, weil es keinen Weg gab,
+    // SQUAD/OPP nach dem Laden auszutauschen (s. Kommentar in
+    // lib/battle/arena-headless-runner.ts:48, der das fuer echte Fixtures per Re-Einhaengen des
+    // ganzen Skripts loest — hier reicht der billigere Weg, weil kein neuer `<script>`-Tag noetig
+    // ist). Rein additiv, veraendert kein bestehendes Verhalten.
+    kaderSetzen:(kader)=>{
+      if(kader&&Array.isArray(kader.heim)&&kader.heim.length)SQUAD=mitKit(kader.heim);
+      if(kader&&Array.isArray(kader.gast)&&kader.gast.length)OPP=mitKit(kader.gast);
+      return {heim:SQUAD.length,gast:OPP.length};
+    },
     disziplinProbe:(dId,opt)=>{
       const M=MOTOREN[dId];
       if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
@@ -16619,8 +16633,16 @@
         :istFeldspiel(dId)?FELDSPIEL_ART[dId]:ARENA_ART[dId];
       const altJeSeite=art&&art.jeSeite;
       if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
-      const spiele=[];
-      try{
+      // NEU (Kaderfamilie, Projektueberwachung Abschnitt 1.3/3.1 A): `o.kaderFamilie` ist
+      // optional. Ohne sie laeuft GENAU der Code, der hier schon immer stand — ein einziges
+      // SQUAD/OPP, eine `spiele`-Liste, dieselbe Rueckgabeform wie vorher. Mit ihr wird die
+      // Spieleschleife fuer JEDE Aufteilung einmal gefahren (eigene `spiele`-Liste je
+      // Aufteilung), SQUAD/OPP dazwischen ueber `kaderSetzen` getauscht, und am Ende exakt der
+      // Kader wiederhergestellt, der vor dem Aufruf geladen war.
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:null;
+      const kaderVorher={SQUAD,OPP};
+      const einSpieldurchlauf=()=>{
+        const spiele=[];
         for(let i=0;i<n;i++){
           zieheFormkarten(20260823+i*104729);
           M.bau(saat0+i*schritt);
@@ -16648,11 +16670,30 @@
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
               ...(u.reihe!=null?{reihe:u.reihe}:{})}))});
         }
-      } finally { M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite; }
-      return {disziplin:dId, chassis:istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
-        :istFeldspiel(dId)?"feldspiel":"arena", jeSeite:(art&&art.jeSeite)||null, spiele};
+        return spiele;
+      };
+      let ergebnis;
+      try{
+        if(familie){
+          ergebnis=familie.map(v=>{
+            if(v&&Array.isArray(v.heim)&&v.heim.length)SQUAD=mitKit(v.heim);
+            if(v&&Array.isArray(v.gast)&&v.gast.length)OPP=mitKit(v.gast);
+            return {label:(v&&v.label)||null, spiele:einSpieldurchlauf()};
+          });
+        } else {
+          ergebnis=einSpieldurchlauf();
+        }
+      } finally {
+        M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
+        if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;}
+      }
+      const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
+        :istFeldspiel(dId)?"feldspiel":"arena";
+      return familie
+        ? {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, varianten:ergebnis}
+        : {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, spiele:ergebnis};
     },
-    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
