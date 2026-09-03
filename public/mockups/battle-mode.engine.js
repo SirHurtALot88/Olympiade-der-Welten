@@ -4277,11 +4277,75 @@
   const MAKE_KORREKTUR={dunk:0.491, nah:-0.473, mit:-0.624, fern:-0.474}; // GEMESSEN
   const logistisch=(z)=>1/(1+Math.exp(-z));
   const logitVon=(p)=>Math.log(p/(1-p));
+
+  // ===================================================================================
+  // KURVE-STRUKTUR — Chris, woertlich: "ja jede diszi braucht eine eigene success kurve!"
+  //
+  // Bis hierher war die komplette Erfolgsformel (BASE -0,02, GEO_BONUS, SKILL_MITTEL,
+  // STEIL_MAKE, MAKE_KORREKTUR, UND welche Sub-Skills ueberhaupt in den Skill-Term
+  // eingehen) in genau dieser Funktion hartcodiert und wurde von JEDER Feldspiel-
+  // Disziplin mit `live`-Block unveraendert geerbt — obwohl sie ausschliesslich gegen
+  // 1074 echte NBA-Feldwuerfe kalibriert ist (s. Kommentare oben, b1/b2). Hockey lief
+  // bis zu dieser Runde durch exakt dieselbe Kurve wie Basketball (dokumentiert als
+  // offener Punkt seit battle-mode.rezepte.js:437-440 und Design-Frage C1 in
+  // docs/design/hockey-mechanik-angleichen.md).
+  //
+  // `kurve` macht die Erfolgsformel zu DATEN je Disziplin (FELDSPIEL_ART[d].kurve) statt
+  // zu einem zweiten Funktionsklon: `steilerMake`/`skillTeilFuer`/`lageBasisFuer` lesen
+  // `FB().kurve || KURVE_BASKETBALL`. Eine Disziplin OHNE eigenen `kurve`-Block faehrt
+  // damit unveraendert die Basketball-Kurve weiter — der heutige, unangetastete Stand.
+  // Nichts bewegt sich fuer sie, das ist die Rueckfall-Garantie, nicht ein Nebeneffekt.
+  //
+  // FELDER:
+  //   base        BASE der Erfolgsformel (Basketball: -0,02)
+  //   geoBonus    {dunk,nah,mit,fern} — Distanzstufen-Bonus/Malus auf `lage`
+  //   radien      {dunk,nah,mit,fern} — nur Dokumentation/Sonden-Konsistenz: die
+  //               tatsaechliche Stufen-Zuordnung bleibt in klassifiziereWurfdistanz()
+  //               (dort haengt sie an istHockey(), nicht an FB().kurve), radien hier
+  //               MUSS mit den dortigen Konstanten uebereinstimmen.
+  //   skillMittel MESSWERT (gewichtetes Mittel der eigenen skillTerme ueber den echten
+  //               Kader) — NIEMALS handgesetzt, s. Hockey-Block unten fuer die Herleitung.
+  //   steil       STEIL_MAKE-Aequivalent, gegen die reale Trefferquote der Disziplin
+  //               gefittet (Basketball p~0,44, Hockey p~0,09 — sehr unterschiedliche
+  //               Ableitung STEIL*p*(1-p), s. Kommentar oben bei (b2)).
+  //   korrektur   {dunk,nah,mit,fern} — MAKE_KORREKTUR-Aequivalent, ZULETZT gefittet,
+  //               NACHDEM steil/skillMittel stehen (Fehler vom 26.08. laut Motor-
+  //               kommentar: zweimal fitten, wenn die Reihenfolge nicht stimmt).
+  //   skillTerme  [{feld,koeff},...] — welche Sub-Skills mit welchem Koeffizienten in
+  //               den Skill-Term eingehen. "SCHUSS_TIER" ist ein Sonderfeld-Name (kein
+  //               echtes u.-Attribut): skillTeilFuer() ersetzt ihn durch
+  //               schussSkillFuer(u,tier), also SCHUSS_NAH bei dunk/nah, sonst
+  //               SCHUSS_FERN — jeder andere feld-Name liest u[feld] direkt.
+  const KURVE_BASKETBALL={
+    base:-0.02,
+    geoBonus:GEO_BONUS,
+    radien:{dunk:DUNK_RADIUS, nah:KORB_NAH_RADIUS, mit:DREIER_RADIUS, fern:FERN_RADIUS_MAX},
+    skillMittel:SKILL_MITTEL,
+    steil:STEIL_MAKE,
+    korrektur:MAKE_KORREKTUR,
+    skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0022},{feld:"TEAMGEIST",koeff:0.0030}]
+  };
+  // Skill-Term aus der Kurve der GERADE LAUFENDEN Disziplin (Daten, kein Code je
+  // Disziplin) — s. KURVE_BASKETBALL-Kommentar oben fuer die Feldbedeutung.
+  const skillTeilFuer=(u,tier)=>{
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    let s=0;
+    for(const t of kurve.skillTerme)
+      s+=(t.feld==="SCHUSS_TIER"?schussSkillFuer(u,tier):(u[t.feld]||0))*t.koeff;
+    return s;
+  };
+  // BASE+GEO_BONUS der GERADE LAUFENDEN Disziplin, ohne Bedraengnis/Fastbreak/Passqualitaet
+  // (die bleiben situativ am Aufrufort, s. entscheideBallaktion).
+  const lageBasisFuer=(tier)=>{
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    return kurve.base+(kurve.geoBonus[tier]||0);
+  };
   const steilerMake=(lage,skillTeil,tier)=>{
-    const mitte=Math.max(MAKE_MIN,Math.min(MAKE_MAX,lage+SKILL_MITTEL));
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    const mitte=Math.max(MAKE_MIN,Math.min(MAKE_MAX,lage+kurve.skillMittel));
     return Math.max(MAKE_MIN,Math.min(MAKE_MAX,
-      logistisch(logitVon(mitte)+STEIL_MAKE*(skillTeil-SKILL_MITTEL)
-                 +(MAKE_KORREKTUR[tier]||0))));
+      logistisch(logitVon(mitte)+kurve.steil*(skillTeil-kurve.skillMittel)
+                 +((kurve.korrektur&&kurve.korrektur[tier])||0))));
   };
   // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
@@ -6095,8 +6159,10 @@
       // nur ohne den harten 0,92-Deckel, den jetzt die Logistik uebernimmt. Aufgesteilt
       // wird um den GEMESSENEN Tier-Mittelwert herum, damit der Ligadurchschnitt exakt
       // dort bleibt, wo die Kalibrierung ihn hingestellt hat.
-      const skillTeil=schussSkillFuer(u,tier)*0.0022+u.TEAMGEIST*0.0030;
-      const lage=-0.02+GEO_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0)
+      // KURVE-STRUKTUR: skillTeil/lage kommen jetzt aus FB().kurve (Basketball unveraendert
+      // ueber den KURVE_BASKETBALL-Rueckfall, s. Kommentar bei KURVE_BASKETBALL oben).
+      const skillTeil=skillTeilFuer(u,tier);
+      const lage=lageBasisFuer(tier)-bedraengnisMake+(imFastbreak?0.12:0)
         +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0);
       const technikMake=steilerMake(lage,skillTeil,tier);
       // EINGRIFF (d), zweiter Teil: die bisher als Literal "4" eingebettete Abbauzeit ist
@@ -6161,9 +6227,9 @@
       // die einzige Stelle ohne Aufsteilung, haetten Schussuhr-Wuerfe eine andere
       // Skill-Kopplung als alle anderen — genau die Art Inkonsistenz, die Opus-Review-
       // Fund #4 an dieser Stelle schon einmal aufgedeckt hat.
-      const technik=steilerMake(-0.02+GEO_BONUS[tierErz]-bedraengnisMake
+      const technik=steilerMake(lageBasisFuer(tierErz)-bedraengnisMake
         +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0),
-        schussSkillFuer(u,tierErz)*0.0022+u.TEAMGEIST*0.0030,tierErz);
+        skillTeilFuer(u,tierErz),tierErz);
       wirf(u,u,art,tierErz,technik,moeglicherAssist,null,(bedraengnisMake>0||gedoppelt)?decker:null);
       return;
     }
