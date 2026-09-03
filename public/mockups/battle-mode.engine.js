@@ -3820,6 +3820,72 @@
       // Disziplin nach Basketball und deshalb wie diese ohne eigenes `rezept:`-Feld;
       // die uebrigen 18 fuehren ihres weiter hier und werden Stueck fuer Stueck
       // nachgezogen.
+      //
+      // KURVE: Hockeys EIGENE Erfolgskurve (Opus-Konsultation, docs/design/
+      // hockey-eigene-erfolgskurve.md) statt des KURVE_BASKETBALL-Rueckfalls.
+      //
+      // skillTerme OHNE TEAMGEIST. TEAMGEIST blieb bislang in der Skill-Formel, weil sie
+      // 1:1 von Basketball geerbt war — bei Basketball-Mittelwerten traegt TEAMGEIST dort
+      // 57% des Skill-Terms, der eigentliche Schuss-Skill nur 43%, und macht denselben
+      // Spieler zugleich (ueber offensterMitspieler/qualitaet()) zum bevorzugten
+      // Passempfaenger statt zum Passgeber — der eigentliche TEAMGEIST-Inversions-Kanal
+      // (rho -0,86 bis -0,90 zu Assists, s. Bericht). Chris hat NICHT "Linienspiel"
+      // beauftragt (das war eine Erfindung einer frueheren Planungsrunde, s. Bericht) —
+      // TEAMGEIST wird ERSATZLOS gestrichen, nicht durch einen neuen Sub-Skill ersetzt.
+      // TEAMGEIST bleibt unangetastet in qualitaet()/offensterMitspieler und in
+      // hockeyPassQualBonus (Chemie als attraktives Anspielziel) — nur aus DIESEM
+      // Skill-Term verschwindet es.
+      //
+      // Koeffizient 0,0022->0,0050 (Richtung des Auftrags, NEU GEFITTET nicht blind
+      // uebernommen, s. Bericht Abschnitt "steil/koeff"): mit dem TEAMGEIST-Term weg
+      // MUSS der verbleibende schussSkillFuer-Koeffizient staerker wirken, sonst schrumpft
+      // der gesamte Skill-Term auf weniger als die Haelfte seiner alten Groesse und die
+      // Kurve wird insgesamt flacher, nicht praeziser.
+      //
+      // skillMittel ist GEMESSEN (scripts/miss-hockey-skillmittel.mjs 24 0.0050), NICHT
+      // gesetzt: mit Schussversuchen gewichteter Mittelwert von schussSkillFuer ueber den
+      // echten Kader (57,79) mal 0,0050 = 0,2889. Herleitung/Rohzahlen im Bericht.
+      //
+      // steil=20 ist GEFITTET, nicht die geschaetzte Mitte 18-22 blind uebernommen:
+      // durchprobiert 14/16/18/20/22/24 (korrektur=0, Vorlauf-Fit) gegen
+      // scripts/miss-hockey-archetypen.mjs (Sniper-Terzil-Spreizung SCHUSS_NAH/FERN) und
+      // scripts/miss-hockey-korridor.mjs (Torzahl-/Fangquote-Drift). Die Terzil-Trennung
+      // wird in diesem Fenster mit steigendem steil eher staerker (24 trennt SCHUSS_FERN
+      // sogar noch schaerfer als 20), aber die Messreihe bei n=32 ist deutlich verrauscht
+      // (SCHUSS_NAH-rho sprang nicht monoton: 0,358/0,515/0,480/0,697/0,564 fuer
+      // 14/18/20/22/24) — kein klares Optimum, nur ein Trend. 20 gewaehlt als solider
+      // Punkt innerhalb der urspruenglichen Schaetzung, der nach dem korrektur-Fit (s.
+      // unten) den Torkorridor OHNE jede HK_TOR_SKALA/HK_TW_*-Nachziehung haelt (s.
+      // Bericht) — ein hoeherer Wert (22/24) waere ebenfalls vertretbar und eine
+      // legitime Option fuer eine kuenftige, straffere Runde.
+      //
+      // korrektur je Tier ZULETZT gefittet, NACHDEM skillMittel/steil standen (Fehler vom
+      // 26.08. laut Motorkommentar bei steilerMake: zweimal fitten, wenn die Reihenfolge
+      // nicht stimmt) — Zielwerte aus echten NHL-Torwahrscheinlichkeiten nach Distanz
+      // (docs/design/hockey-torwart-puck-tore-recherche-fable.md, Abschnitt 8.4: ~19-21%
+      // Torraum-Rand, ~14-16% Slot, ~7-10% hoher Slot/Bullykreis, ~3,5-5% Point/blaue
+      // Linie), logit(Soll)-logit(Ist) wie bei Basketballs MAKE_KORREKTUR (scripts/
+      // miss-hockey-tier-quote.mjs). DREI statt Basketballs zwei Durchgaenge noetig (die
+      // Korrektur selbst verschiebt wieder leicht die getroffene Quote je Tier) — alle drei
+      // Rohzahlen im Bericht. `dunk` bleibt die unsicherste Stufe (nur ~2 % aller
+      // Schussversuche, 30-90 Beobachtungen je Lauf, entsprechend verrauscht).
+      //
+      // base/geoBonus/radien UNVERAENDERT von Basketball uebernommen — dieser Auftrag
+      // fittet ausdruecklich nur skillTerme/skillMittel/steil/korrektur (s. Opus-
+      // Konsultation Punkt 4), nicht die geometrische Bonus-Tabelle. radien hier NUR
+      // Dokumentation (muss mit HK_RADIUS_ABSTAUBER/SLOT/HOCHSLOT/MAX weiter unten
+      // uebereinstimmen, die die eigentliche Stufen-Zuordnung in
+      // klassifiziereWurfdistanz() treffen) — HK_RADIUS_* selbst sind hier wegen TDZ noch
+      // nicht deklariert (sie stehen erst nach der Live-Motor-Sektion), deshalb Literale.
+      kurve:{
+        base:-0.02,
+        geoBonus:{dunk:0.70, nah:0.20, mit:0.09, fern:0.075},
+        radien:{dunk:58, nah:140, mit:215, fern:330}, // = HK_RADIUS_ABSTAUBER/SLOT/HOCHSLOT/MAX
+        skillMittel:0.2889,   // GEMESSEN (24 Spiele, miss-hockey-skillmittel.mjs)
+        steil:20,             // GEFITTET (16/18/20/22/24 durchgemessen, s. Bericht)
+        korrektur:{dunk:-1.351, nah:0.353, mit:-1.057, fern:-1.879}, // GEMESSEN, s. Bericht
+        skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0050}]
+      }
     },
     tennis:{
       // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
