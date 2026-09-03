@@ -109,12 +109,14 @@ export async function baueSynthetischeKaderFamilie(seite) {
  * Einzelkader-Weg) und fasst sie zu Median/Spannweite zusammen. `seite` ist eine
  * Playwright-Page mit bereits geladenem `window.__arena`.
  */
-export async function disziplinMessen(seite, d, { n, kaderFamilie }) {
+export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite }) {
   let x;
   try {
     x = await seite.evaluate(
-      ([d, n, familie]) => window.__arena.disziplinProbe(d, familie ? { n, kaderFamilie: familie } : { n }),
-      [d, n, kaderFamilie || null],
+      ([d, n, familie, js]) => window.__arena.disziplinProbe(d, {
+        n, ...(familie ? { kaderFamilie: familie } : {}), ...(js ? { jeSeite: js } : {}),
+      }),
+      [d, n, kaderFamilie || null, jeSeite || null],
     );
   } catch (e) {
     return { d, fehler: String(e).slice(0, 60) };

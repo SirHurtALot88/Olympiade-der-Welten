@@ -8838,9 +8838,9 @@
       // Fable entworfen; die Kalibrierung unten wirkt nur ueber die Koeffizienten.
       rezept:{
         LAST:     {power:60,health:25,determination:15},
-        TECHNIK:  {dexterity:35,speed:30,determination:20,power:15},
+        TECHNIK:  {dexterity:45,speed:30,determination:20,power:5},
         NERVEN:   {charisma:35,will:35,determination:20,health:10},
-        ANSAGE:   {charisma:45,power:30,speed:25},
+        ANSAGE:   {charisma:60,power:15,speed:25},
         ERHOLUNG: {stamina:40,health:35,will:25}
       }
     },
@@ -9160,7 +9160,7 @@
   // gemessene Quote sonst bei 45-46 % statt im Korridor 50-63 % — der Zuschlag gleicht
   // aus, dass ein hoeher gewagter dritter Versuch (groesserer Sprung, Reaktion auf den
   // Duellstand) im Mittel oefter ueber dem Tagesmaximum liegt als die reine IWF-Quote.
-  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.565]};
+  const HEBEN_BASIS={reissen:[0.885,0.789,0.587], stossen:[0.908,0.758,0.565]};
   const HEBEN_ANTEIL_REISSEN=0.455;
   // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
   // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
@@ -9192,18 +9192,41 @@
   // Ansage-Kanaele nur um wenige Prozentpunkte verschieben konnten. Angehoben, bis Pp im
   // Korridor lag (s. Abschlussbericht fuer die Messreihe).
   const HEBEN_TECHNIK_K=0.0035;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
-  const HEBEN_NERVEN_K=0.0090;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
+  // NERVEN-KORREKTUR (Gameplay-Runde, 03.09.): frueher wirkte NERVEN nur auf den DRITTEN
+  // Versuch (HEBEN_NERVEN_K=0,0090 auf 1 von 6 Ereignissen je Heber) — ein einzelner
+  // Hebel, der schon am Wettkampfformat selbst kaum Angriffsflaeche hatte. Jetzt wirkt ein
+  // kleinerer Grundbetrag auf JEDEN Versuch (Nerven zaehlen nicht nur beim letzten Zug)
+  // und ein groesserer Zuschlag zusaetzlich auf den dritten — dieselbe Gesamthoehe am
+  // dritten Versuch (0,004+0,006=0,010, vorher 0,009), aber sechsmal so viele Ereignisse,
+  // an denen NERVEN ueberhaupt etwas bewegen kann.
+  const HEBEN_NERVEN_K=0.0040;        // je Punkt NERVEN ueber 50, auf JEDEN Versuch
+  const HEBEN_NERVEN_K_DRITT=0.0060;  // zusaetzlich je Punkt NERVEN ueber 50, nur auf den dritten
   const HEBEN_ANSAGE_EROEFFNUNG=0.0016; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
-  // ANSAGE_SPRUNG bei 0,015 gelassen, nicht weiter erhoeht: bei 0,032 hob es den Zocker-
-  // Archetyp (S4, charisma/speed fuehrt bei den groessten Spruengen) von rho 0,11 auf nur
-  // 0,27 — kaum Wirkung fuers Archetyp-Ziel — riss aber Stossen 3. Versuch aus dem
-  // Korridor (51,3 % -> 47,7 %, Ziel 50-63 %). Kein guter Tausch, verworfen. Der Zocker-
-  // Archetyp fuehrt darum NICHT klar (s. Abschlussbericht) — ehrlich gemessen, nicht
-  // erzwungen.
-  const HEBEN_ANSAGE_SPRUNG=0.015;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
+  // ANSAGE_SPRUNG: von 0,015 auf 0,024 angehoben. Beim ersten Anlauf (Buehnenbild-Runde)
+  // riss eine Anhebung allein (auf 0,032) den Korridor, weil ein hoeher gewagter Sprung
+  // OHNE Gegenmassnahme das Risiko (WAGNIS) unveraendert liess — ein Zocker, der mehr
+  // wagt, wurde nur haeufiger bestraft, nie mehr belohnt. HEBEN_WAGNIS_ANSAGE_FLEX unten
+  // ist die Gegenmassnahme: dieselbe ANSAGE, die groessere Spruenge ansagt, macht den
+  // Heber auch abgeklaerter GEGENUEBER dem eigenen Risiko (Buehnenerfahrung, nicht nur
+  // Kuehnheit) — reale Referenz: Selbstwirksamkeit/mentale Staerke veraendert nachweislich
+  // die tatsaechliche Wettkampfleistung, nicht nur die Bereitschaft, ein Gewicht
+  // anzusagen (Bandura, Self-Efficacy; "Clutch"-Literatur im Spitzensport).
+  const HEBEN_ANSAGE_SPRUNG=0.032;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
   const HEBEN_ERHOLUNG_K=0.0012;  // je Punkt ERHOLUNG ueber 50 auf das Stossen-Maximum
   const HEBEN_WAGNIS_K=6.0;       // Malus je Anteil, den die Ansage ueber dem Tagesmax liegt
-  const HEBEN_WIEDERHOLUNG=0.06;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // WAGNIS-FLEX: der fuer die Risikoformel (nicht fuer Tagesmax/Sinclair-Anzeige!) genutzte
+  // Massstab ist nicht das nackte Tagesmaximum, sondern ein um ANSAGE gedehnter Massstab.
+  // Ein Heber mit ANSAGE 99 behandelt eine Ansage bei 105 % seines echten Maximums wie
+  // ein Heber mit ANSAGE 50 eine Ansage bei rund 90 % behandeln wuerde — er UEBERSCHAETZT
+  // sein Risiko nicht so schnell. Ein Heber mit ANSAGE 1 tut das Gegenteil: fuer ihn wirkt
+  // schon eine Last knapp am eigenen Maximum wie ein Wagnis. Das ist der zweite, groessere
+  // Charisma-Hebel neben der Sprunggroesse (Plan Teil 5: "Charisma sitzt zweimal, beide
+  // ausgangswirksam") — vorher blieb der zweite Platz (ANSAGE) auf die Eroeffnungshoehe
+  // und die Sprunggroesse beschraenkt, beide nur Verschiebungen von wenigen Prozentpunkten
+  // INNERHALB des riesigen LAST-Spielraums; jetzt greift er auch in die Erfolgschance
+  // selbst, nicht nur in die Ansage.
+  const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
+  const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
   // GROESSE IST KEIN ATTRIBUT — sie steht in keiner Matrix, und einflussVon hebt sie
   // nicht. Wuerde sie die Kilogramm im ERGEBNIS verschieben, waere sie ein verstecktes
   // neuntes Gewicht, das keine Messung sieht. Sie verschiebt deshalb nur die ANZEIGE:
@@ -9316,11 +9339,15 @@
         }
         // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
         kg=Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
-        const ueber=Math.max(0,kg/Math.max(1,max(u))-1);
+        // Risiko-Massstab statt nacktem Tagesmax: s. HEBEN_WAGNIS_ANSAGE_FLEX oben. Nur
+        // fuer die Erfolgschance gedehnt — Tagesmax/Sinclair-Anzeige bleiben unangetastet.
+        const risikoMax=Math.max(1,max(u)*(1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
+        const ueber=Math.max(0,kg/risikoMax-1);
         const p=Math.max(0.05,Math.min(0.97,
           HEBEN_BASIS[uebung][v]
           +(u.TECHNIK-50)*HEBEN_TECHNIK_K
-          +(v===2?(u.NERVEN-50)*HEBEN_NERVEN_K:0)
+          +(u.NERVEN-50)*HEBEN_NERVEN_K
+          +(v===2?(u.NERVEN-50)*HEBEN_NERVEN_K_DRITT:0)
           // WIEDERHOLUNG IST LEICHTER ALS EINE NEUE ANSAGE. Die Quoten aus der Studie
           // gelten fuer den PLANMAESSIGEN Versuchsaufbau; ein wiederholtes Gewicht ist
           // dagegen eine Last, die der Heber schon einmal angegriffen hat und die unter
