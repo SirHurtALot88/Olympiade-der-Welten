@@ -1,0 +1,5937 @@
+{
+ "hinweis": "Fuenf echte Team-Paarungen aus dem live-save-Abbild, gezogen ueber buildArenaTeam() (dieselbe Bruecke wie der echte Arena-Host). Format je Spieler identisch zu SQUAD/OPP in battle-mode.engine.js: {n,c,r,sub,tp,tn,d,groesse,a}. Neu ziehen mit scripts/ziehe-kader-familie.ts, wenn sich der Spielstand deutlich veraendert hat (neue Saison, große Transferfenster) — die Zahlen in docs/design/messgrundlage-kaderfest.md beziehen sich auf DIESEN Stand.",
+ "quelle": {
+  "saveId": "new-game-1787123325719-swnjlk",
+  "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+  "gezogenAm": "2026-09-03T11:40:56.959Z"
+ },
+ "varianten": [
+  {
+   "label": "vigilante-armageddon",
+   "heimName": "Vigilante Wranglers",
+   "gastName": "Armageddon Aftermath",
+   "heim": [
+    {
+     "n": "Draco",
+     "c": "Warlord",
+     "r": "Human",
+     "sub": [
+      "Knight",
+      "Destroyer",
+      "Scout"
+     ],
+     "tp": [
+      "Fair",
+      "Diligent",
+      "Loyal"
+     ],
+     "tn": [
+      "Renegade",
+      "Egomaniac"
+     ],
+     "d": {
+      "tdm": 66.1,
+      "mini-dm": 61.2,
+      "battlefield": 52.9,
+      "gewichtheben": 79.7,
+      "climbing": 39.4,
+      "staffel": 25,
+      "time-trial": 21.1,
+      "spurt": 44.2,
+      "tennis": 21.4,
+      "hockey": 46.5,
+      "showcase": 59.3,
+      "speed-schach": 26,
+      "takeshis-castle": 48.9,
+      "breaking": 66.8,
+      "wettessen": 55.3,
+      "basketball": 27.8,
+      "football": 52.4,
+      "eiskunstlauf": 40.5,
+      "fechten": 37.1,
+      "i-spy": 43.4
+     },
+     "groesse": 6,
+     "a": {
+      "power": 81,
+      "health": 84,
+      "stamina": 37,
+      "intelligence": 35,
+      "awareness": 6,
+      "determination": 64,
+      "speed": 19,
+      "dexterity": 43,
+      "charisma": 89,
+      "will": 72,
+      "spirit": 40,
+      "torment": 66
+     }
+    },
+    {
+     "n": "Lava Golem",
+     "c": "Warlord",
+     "r": "Construct",
+     "sub": [
+      "Wayfarer",
+      "Behemoth"
+     ],
+     "tp": [
+      "FanFavorite",
+      "Healthy",
+      "FiredUp"
+     ],
+     "tn": [
+      "Vindictive",
+      "Scandalous"
+     ],
+     "d": {
+      "tdm": 63.2,
+      "mini-dm": 65.6,
+      "battlefield": 42.9,
+      "gewichtheben": 73.8,
+      "climbing": 15.1,
+      "staffel": 7.7,
+      "time-trial": 7.1,
+      "spurt": 24.2,
+      "tennis": 7,
+      "hockey": 42.4,
+      "showcase": 34.4,
+      "speed-schach": 8.7,
+      "takeshis-castle": 23.7,
+      "breaking": 56.3,
+      "wettessen": 36.4,
+      "basketball": 11,
+      "football": 35.9,
+      "eiskunstlauf": 19.6,
+      "fechten": 26.6,
+      "i-spy": 16.3
+     },
+     "groesse": 8,
+     "a": {
+      "power": 98,
+      "health": 99,
+      "stamina": 29,
+      "intelligence": 1,
+      "awareness": 1,
+      "determination": 21,
+      "speed": 1,
+      "dexterity": 2,
+      "charisma": 94,
+      "will": 35,
+      "spirit": 2,
+      "torment": 96
+     }
+    },
+    {
+     "n": "Krolach",
+     "c": "Templar",
+     "r": "Construct",
+     "sub": [
+      "Guardian",
+      "Destroyer"
+     ],
+     "tp": [
+      "Loyal",
+      "Eloquent"
+     ],
+     "tn": [
+      "Vindictive"
+     ],
+     "d": {
+      "tdm": 60.5,
+      "mini-dm": 57.4,
+      "battlefield": 44.3,
+      "gewichtheben": 61,
+      "climbing": 36.2,
+      "staffel": 19.4,
+      "time-trial": 14,
+      "spurt": 47.7,
+      "tennis": 22.6,
+      "hockey": 52.4,
+      "showcase": 40,
+      "speed-schach": 39.5,
+      "takeshis-castle": 49.5,
+      "breaking": 78.2,
+      "wettessen": 68,
+      "basketball": 24.9,
+      "football": 64.2,
+      "eiskunstlauf": 23.3,
+      "fechten": 33.4,
+      "i-spy": 43.2
+     },
+     "groesse": 7,
+     "a": {
+      "power": 86,
+      "health": 88,
+      "stamina": 22,
+      "intelligence": 47,
+      "awareness": 32,
+      "determination": 82,
+      "speed": 20,
+      "dexterity": 3,
+      "charisma": 33,
+      "will": 94,
+      "spirit": 45,
+      "torment": 64
+     }
+    },
+    {
+     "n": "Johanna",
+     "c": "Templar",
+     "r": "Human",
+     "sub": [
+      "Guardian",
+      "Knight"
+     ],
+     "tp": [
+      "Loyal",
+      "Motivated",
+      "Fearless"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 50.7,
+      "mini-dm": 60,
+      "battlefield": 43.8,
+      "gewichtheben": 47.8,
+      "climbing": 42.8,
+      "staffel": 33.6,
+      "time-trial": 20.9,
+      "spurt": 44.8,
+      "tennis": 25.6,
+      "hockey": 49.6,
+      "showcase": 41.9,
+      "speed-schach": 26.7,
+      "takeshis-castle": 46.4,
+      "breaking": 71,
+      "wettessen": 65.3,
+      "basketball": 30.4,
+      "football": 70.2,
+      "eiskunstlauf": 29.3,
+      "fechten": 34.6,
+      "i-spy": 44.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 56,
+      "health": 81,
+      "stamina": 51,
+      "intelligence": 29,
+      "awareness": 22,
+      "determination": 64,
+      "speed": 23,
+      "dexterity": 32,
+      "charisma": 44,
+      "will": 86,
+      "spirit": 68,
+      "torment": 69
+     }
+    },
+    {
+     "n": "King Arlen Morgolor",
+     "c": "Hero",
+     "r": "Human",
+     "sub": [
+      "Warrior",
+      "Royalty"
+     ],
+     "tp": [
+      "Eloquent",
+      "Altruistic"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 47.9,
+      "mini-dm": 21.9,
+      "battlefield": 66,
+      "gewichtheben": 46.3,
+      "climbing": 19.9,
+      "staffel": 38.8,
+      "time-trial": 24.7,
+      "spurt": 13.3,
+      "tennis": 44.3,
+      "hockey": 34.3,
+      "showcase": 72,
+      "speed-schach": 32.2,
+      "takeshis-castle": 26.1,
+      "breaking": 18.1,
+      "wettessen": 22.7,
+      "basketball": 53.7,
+      "football": 45.1,
+      "eiskunstlauf": 61.9,
+      "fechten": 19.4,
+      "i-spy": 35.4
+     },
+     "groesse": 5,
+     "a": {
+      "power": 39.6,
+      "health": 70.1,
+      "stamina": 25.8,
+      "intelligence": 60.1,
+      "awareness": 38.8,
+      "determination": 53.5,
+      "speed": 32,
+      "dexterity": 32.9,
+      "charisma": 95.4,
+      "will": 1,
+      "spirit": 96,
+      "torment": 12.2
+     }
+    },
+    {
+     "n": "Gram",
+     "c": "Warlord",
+     "r": "Lizard",
+     "sub": [
+      "Guardian"
+     ],
+     "tp": [
+      "Loyal",
+      "Relaxed"
+     ],
+     "tn": [
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 45.8,
+      "mini-dm": 40.2,
+      "battlefield": 35.5,
+      "gewichtheben": 44,
+      "climbing": 18.1,
+      "staffel": 10.4,
+      "time-trial": 7.2,
+      "spurt": 23,
+      "tennis": 14.8,
+      "hockey": 38.5,
+      "showcase": 34.1,
+      "speed-schach": 14.6,
+      "takeshis-castle": 23.6,
+      "breaking": 43.1,
+      "wettessen": 34.2,
+      "basketball": 18.5,
+      "football": 47.9,
+      "eiskunstlauf": 22,
+      "fechten": 19.8,
+      "i-spy": 20.5
+     },
+     "groesse": 6,
+     "a": {
+      "power": 67,
+      "health": 79,
+      "stamina": 14,
+      "intelligence": 12,
+      "awareness": 18,
+      "determination": 73,
+      "speed": 3,
+      "dexterity": 5,
+      "charisma": 41,
+      "will": 33,
+      "spirit": 65,
+      "torment": 58
+     }
+    },
+    {
+     "n": "Rhyx'Tal",
+     "c": "Badass",
+     "r": "Alien",
+     "sub": [
+      "Isolated",
+      "Controller",
+      "Guardian"
+     ],
+     "tp": [
+      "Caring",
+      "Loyal"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Timid",
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 45.2,
+      "mini-dm": 26,
+      "battlefield": 34.6,
+      "gewichtheben": 37.5,
+      "climbing": 26.4,
+      "staffel": 28.6,
+      "time-trial": 22.6,
+      "spurt": 17.9,
+      "tennis": 32,
+      "hockey": 40.3,
+      "showcase": 38.5,
+      "speed-schach": 19.2,
+      "takeshis-castle": 16.1,
+      "breaking": 19.4,
+      "wettessen": 23.2,
+      "basketball": 33.4,
+      "football": 41,
+      "eiskunstlauf": 32.8,
+      "fechten": 20.6,
+      "i-spy": 17.4
+     },
+     "groesse": 8,
+     "a": {
+      "power": 58,
+      "health": 62,
+      "stamina": 48,
+      "intelligence": 24,
+      "awareness": 41,
+      "determination": 52,
+      "speed": 33,
+      "dexterity": 29,
+      "charisma": 38,
+      "will": 1,
+      "spirit": 81,
+      "torment": 18
+     }
+    },
+    {
+     "n": "Xelara",
+     "c": "Bard",
+     "r": "Alien",
+     "sub": [
+      "Ambassador",
+      "Guardian"
+     ],
+     "tp": [
+      "Eloquent",
+      "Altruistic",
+      "Caring"
+     ],
+     "tn": [
+      "Lazy",
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 33.2,
+      "mini-dm": 19.2,
+      "battlefield": 55,
+      "gewichtheben": 36.1,
+      "climbing": 25.5,
+      "staffel": 47.7,
+      "time-trial": 30.3,
+      "spurt": 24.5,
+      "tennis": 58.3,
+      "hockey": 24.2,
+      "showcase": 59.4,
+      "speed-schach": 55.6,
+      "takeshis-castle": 51.5,
+      "breaking": 25.9,
+      "wettessen": 35.3,
+      "basketball": 57.7,
+      "football": 45.1,
+      "eiskunstlauf": 62.9,
+      "fechten": 19.9,
+      "i-spy": 48
+     },
+     "groesse": 5,
+     "a": {
+      "power": 21.7,
+      "health": 14.6,
+      "stamina": 38.7,
+      "intelligence": 68.1,
+      "awareness": 69,
+      "determination": 64.3,
+      "speed": 30.7,
+      "dexterity": 28.3,
+      "charisma": 87.3,
+      "will": 67.9,
+      "spirit": 85.1,
+      "torment": 13.9
+     }
+    },
+    {
+     "n": "Jorund",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Vigilante",
+      "Royalty",
+      "Guardian"
+     ],
+     "tp": [
+      "Eloquent",
+      "Loyal"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 27.2,
+      "mini-dm": 21.2,
+      "battlefield": 47.6,
+      "gewichtheben": 36.4,
+      "climbing": 25.2,
+      "staffel": 42.5,
+      "time-trial": 25.2,
+      "spurt": 26.8,
+      "tennis": 45.9,
+      "hockey": 20.5,
+      "showcase": 58,
+      "speed-schach": 50,
+      "takeshis-castle": 57.1,
+      "breaking": 33.4,
+      "wettessen": 41.8,
+      "basketball": 44.6,
+      "football": 44,
+      "eiskunstlauf": 56.6,
+      "fechten": 21.2,
+      "i-spy": 50
+     },
+     "groesse": 5,
+     "a": {
+      "power": 9.8,
+      "health": 25,
+      "stamina": 28.8,
+      "intelligence": 64,
+      "awareness": 51,
+      "determination": 80.8,
+      "speed": 28.7,
+      "dexterity": 34.1,
+      "charisma": 85.3,
+      "will": 72,
+      "spirit": 76,
+      "torment": 23.6
+     }
+    },
+    {
+     "n": "Inefinna",
+     "c": "Mage",
+     "r": "Divine",
+     "sub": [
+      "Ambassador",
+      "Vigilante"
+     ],
+     "tp": [
+      "Loyal",
+      "Disciplined"
+     ],
+     "tn": [
+      "Feisty",
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 12.7,
+      "mini-dm": 8.2,
+      "battlefield": 37.7,
+      "gewichtheben": 12.9,
+      "climbing": 10.3,
+      "staffel": 34.5,
+      "time-trial": 23.8,
+      "spurt": 13.1,
+      "tennis": 47.1,
+      "hockey": 10.6,
+      "showcase": 39.6,
+      "speed-schach": 53.6,
+      "takeshis-castle": 38,
+      "breaking": 17.6,
+      "wettessen": 20.8,
+      "basketball": 44.7,
+      "football": 27.7,
+      "eiskunstlauf": 43.4,
+      "fechten": 10.9,
+      "i-spy": 43.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 2,
+      "health": 2,
+      "stamina": 4,
+      "intelligence": 84,
+      "awareness": 64,
+      "determination": 49,
+      "speed": 42,
+      "dexterity": 10,
+      "charisma": 49,
+      "will": 70,
+      "spirit": 89,
+      "torment": 3
+     }
+    },
+    {
+     "n": "Lulu",
+     "c": "Bard",
+     "r": "Elf",
+     "sub": [
+      "Druid",
+      "Healer"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 10.1,
+      "mini-dm": 7.1,
+      "battlefield": 26.6,
+      "gewichtheben": 7.6,
+      "climbing": 7.7,
+      "staffel": 35,
+      "time-trial": 40.7,
+      "spurt": 8,
+      "tennis": 47.5,
+      "hockey": 10.9,
+      "showcase": 31.1,
+      "speed-schach": 38.1,
+      "takeshis-castle": 10.9,
+      "breaking": 7,
+      "wettessen": 7.4,
+      "basketball": 47.7,
+      "football": 10.6,
+      "eiskunstlauf": 43,
+      "fechten": 18.3,
+      "i-spy": 27
+     },
+     "groesse": 5,
+     "a": {
+      "power": 3.2,
+      "health": 5,
+      "stamina": 10.9,
+      "intelligence": 86,
+      "awareness": 52,
+      "determination": 2.2,
+      "speed": 71.1,
+      "dexterity": 36.4,
+      "charisma": 35.5,
+      "will": 6.8,
+      "spirit": 88,
+      "torment": 2.5
+     }
+    }
+   ],
+   "gast": [
+    {
+     "n": "Krag'Zul",
+     "c": "Tank",
+     "r": "Construct",
+     "sub": [
+      "Behemoth",
+      "Guardian",
+      "Mage"
+     ],
+     "tp": [
+      "Healthy",
+      "Loyal"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 62.7,
+      "mini-dm": 44,
+      "battlefield": 24.2,
+      "gewichtheben": 44.3,
+      "climbing": 45,
+      "staffel": 24,
+      "time-trial": 19.6,
+      "spurt": 25.2,
+      "tennis": 24,
+      "hockey": 46,
+      "showcase": 24.4,
+      "speed-schach": 19.9,
+      "takeshis-castle": 24.3,
+      "breaking": 43.8,
+      "wettessen": 54,
+      "basketball": 19.3,
+      "football": 41.1,
+      "eiskunstlauf": 18,
+      "fechten": 13.8,
+      "i-spy": 13.1
+     },
+     "groesse": 9,
+     "a": {
+      "power": 79,
+      "health": 92,
+      "stamina": 74.6,
+      "intelligence": 30.8,
+      "awareness": 19.8,
+      "determination": 55.4,
+      "speed": 20.8,
+      "dexterity": 17.9,
+      "charisma": 10.2,
+      "will": 50.2,
+      "spirit": 52,
+      "torment": 8.9
+     }
+    },
+    {
+     "n": "Greenkraut",
+     "c": "Warlord",
+     "r": "Construct",
+     "sub": [
+      "Behemoth",
+      "Pet Master",
+      "Druid"
+     ],
+     "tp": [
+      "Healthy",
+      "Flexible"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 60.6,
+      "mini-dm": 41.8,
+      "battlefield": 24.1,
+      "gewichtheben": 43.7,
+      "climbing": 39.7,
+      "staffel": 23.1,
+      "time-trial": 24,
+      "spurt": 19.9,
+      "tennis": 22.4,
+      "hockey": 46.8,
+      "showcase": 21.4,
+      "speed-schach": 16,
+      "takeshis-castle": 12.1,
+      "breaking": 31.8,
+      "wettessen": 34.5,
+      "basketball": 22.5,
+      "football": 29,
+      "eiskunstlauf": 18.8,
+      "fechten": 19.5,
+      "i-spy": 8.8
+     },
+     "groesse": 7,
+     "a": {
+      "power": 94,
+      "health": 83.1,
+      "stamina": 66.6,
+      "intelligence": 21.7,
+      "awareness": 38.7,
+      "determination": 27.9,
+      "speed": 32.1,
+      "dexterity": 19.3,
+      "charisma": 13.8,
+      "will": 20.9,
+      "spirit": 45.8,
+      "torment": 11.9
+     }
+    },
+    {
+     "n": "Tidesprinter",
+     "c": "Berserker",
+     "r": "Aqua",
+     "sub": [
+      "Trickster",
+      "Warrior"
+     ],
+     "tp": [
+      "Ambitious",
+      "Flexible",
+      "FiredUp"
+     ],
+     "tn": [
+      "Gambler",
+      "Cheater"
+     ],
+     "d": {
+      "tdm": 47.2,
+      "mini-dm": 64.2,
+      "battlefield": 33.6,
+      "gewichtheben": 51.7,
+      "climbing": 87.9,
+      "staffel": 54.5,
+      "time-trial": 75.5,
+      "spurt": 88.3,
+      "tennis": 41.3,
+      "hockey": 67.5,
+      "showcase": 38.7,
+      "speed-schach": 44.2,
+      "takeshis-castle": 45.2,
+      "breaking": 53.8,
+      "wettessen": 48,
+      "basketball": 38.5,
+      "football": 40.8,
+      "eiskunstlauf": 36.1,
+      "fechten": 88.3,
+      "i-spy": 42.1
+     },
+     "groesse": 6,
+     "a": {
+      "power": 80.2,
+      "health": 51.4,
+      "stamina": 79.6,
+      "intelligence": 34.8,
+      "awareness": 63.1,
+      "determination": 77,
+      "speed": 88.6,
+      "dexterity": 74.7,
+      "charisma": 22.7,
+      "will": 39.2,
+      "spirit": 4.6,
+      "torment": 77.8
+     }
+    },
+    {
+     "n": "Ralazar the Balanced",
+     "c": "Mage",
+     "r": "Human",
+     "sub": [
+      "Warrior",
+      "Mage"
+     ],
+     "tp": [
+      "Flexible",
+      "Fair",
+      "Altruistic"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 37,
+      "mini-dm": 34,
+      "battlefield": 44.9,
+      "gewichtheben": 44,
+      "climbing": 28.8,
+      "staffel": 32.5,
+      "time-trial": 37.7,
+      "spurt": 43,
+      "tennis": 42.6,
+      "hockey": 33.6,
+      "showcase": 43.5,
+      "speed-schach": 68.3,
+      "takeshis-castle": 57,
+      "breaking": 45.3,
+      "wettessen": 45.4,
+      "basketball": 41,
+      "football": 41.2,
+      "eiskunstlauf": 42.7,
+      "fechten": 39.1,
+      "i-spy": 49.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 42.8,
+      "health": 60.7,
+      "stamina": 8.7,
+      "intelligence": 83.6,
+      "awareness": 67.3,
+      "determination": 64.5,
+      "speed": 44.6,
+      "dexterity": 35.7,
+      "charisma": 54,
+      "will": 81.9,
+      "spirit": 34.8,
+      "torment": 33.9
+     }
+    },
+    {
+     "n": "Seraph-11",
+     "c": "Bard",
+     "r": "Construct",
+     "sub": [
+      "Healer",
+      "Servant",
+      "Guardian"
+     ],
+     "tp": [
+      "Disciplined",
+      "Healthy",
+      "Loyal"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 33.8,
+      "mini-dm": 28,
+      "battlefield": 35.6,
+      "gewichtheben": 25.3,
+      "climbing": 44.5,
+      "staffel": 42.3,
+      "time-trial": 46.2,
+      "spurt": 31.4,
+      "tennis": 64.6,
+      "hockey": 30.7,
+      "showcase": 35,
+      "speed-schach": 55,
+      "takeshis-castle": 43,
+      "breaking": 32,
+      "wettessen": 44.9,
+      "basketball": 43.8,
+      "football": 40.2,
+      "eiskunstlauf": 42.9,
+      "fechten": 29.6,
+      "i-spy": 40.7
+     },
+     "groesse": 6,
+     "a": {
+      "power": 19,
+      "health": 52,
+      "stamina": 57.9,
+      "intelligence": 76.2,
+      "awareness": 72.2,
+      "determination": 63,
+      "speed": 27.6,
+      "dexterity": 68.6,
+      "charisma": 24.1,
+      "will": 54.9,
+      "spirit": 61.9,
+      "torment": 6.8
+     }
+    },
+    {
+     "n": "Cassandra",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Hunter",
+      "Jungle"
+     ],
+     "tp": [
+      "Motivated",
+      "Loyal",
+      "Caring"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 32.4,
+      "mini-dm": 25.3,
+      "battlefield": 40.7,
+      "gewichtheben": 25.3,
+      "climbing": 38.5,
+      "staffel": 62.3,
+      "time-trial": 60.6,
+      "spurt": 32.7,
+      "tennis": 68,
+      "hockey": 37.2,
+      "showcase": 43.9,
+      "speed-schach": 44.4,
+      "takeshis-castle": 29.5,
+      "breaking": 19.6,
+      "wettessen": 25,
+      "basketball": 64.1,
+      "football": 39.8,
+      "eiskunstlauf": 55.6,
+      "fechten": 40.9,
+      "i-spy": 43.5
+     },
+     "groesse": 5,
+     "a": {
+      "power": 25,
+      "health": 36.5,
+      "stamina": 46.8,
+      "intelligence": 65.8,
+      "awareness": 59.4,
+      "determination": 27.2,
+      "speed": 71.8,
+      "dexterity": 80.6,
+      "charisma": 37.9,
+      "will": 36.7,
+      "spirit": 89,
+      "torment": 13.4
+     }
+    },
+    {
+     "n": "Aeon Flux",
+     "c": "Sprinter",
+     "r": "Elf",
+     "sub": [
+      "Agent",
+      "Spec Ops",
+      "Augmented"
+     ],
+     "tp": [
+      "Motivated",
+      "FiredUp"
+     ],
+     "tn": [
+      "Devious",
+      "Mercenary",
+      "Paranoid"
+     ],
+     "d": {
+      "tdm": 28.5,
+      "mini-dm": 40.5,
+      "battlefield": 25,
+      "gewichtheben": 24.1,
+      "climbing": 42.4,
+      "staffel": 44.6,
+      "time-trial": 71,
+      "spurt": 43.1,
+      "tennis": 43,
+      "hockey": 43.1,
+      "showcase": 25,
+      "speed-schach": 33.2,
+      "takeshis-castle": 18.9,
+      "breaking": 24.5,
+      "wettessen": 19.6,
+      "basketball": 42.6,
+      "football": 23.5,
+      "eiskunstlauf": 35.8,
+      "fechten": 64.3,
+      "i-spy": 31.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 43,
+      "health": 44,
+      "stamina": 56,
+      "intelligence": 50,
+      "awareness": 60,
+      "determination": 20,
+      "speed": 90,
+      "dexterity": 80,
+      "charisma": 10,
+      "will": 1,
+      "spirit": 35,
+      "torment": 64
+     }
+    },
+    {
+     "n": "Elara",
+     "c": "Rogue",
+     "r": "Elf",
+     "sub": [
+      "Hunter"
+     ],
+     "tp": [
+      "Diligent",
+      "Loyal"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 16.3,
+      "mini-dm": 19,
+      "battlefield": 16.4,
+      "gewichtheben": 24.8,
+      "climbing": 34.9,
+      "staffel": 41.8,
+      "time-trial": 64.3,
+      "spurt": 35.6,
+      "tennis": 42.6,
+      "hockey": 23.3,
+      "showcase": 27.2,
+      "speed-schach": 44.6,
+      "takeshis-castle": 25,
+      "breaking": 12.7,
+      "wettessen": 13.8,
+      "basketball": 33.2,
+      "football": 7.8,
+      "eiskunstlauf": 44.4,
+      "fechten": 45.9,
+      "i-spy": 24.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 24.4,
+      "health": 29.5,
+      "stamina": 26.2,
+      "intelligence": 49.2,
+      "awareness": 80.4,
+      "determination": 39.7,
+      "speed": 81.9,
+      "dexterity": 93.8,
+      "charisma": 34.5,
+      "will": 15.9,
+      "spirit": 11.6,
+      "torment": 10.2
+     }
+    },
+    {
+     "n": "Mindtamer",
+     "c": "Mage",
+     "r": "Alien",
+     "sub": [
+      "Warlock",
+      "Ambassador"
+     ],
+     "tp": [
+      "Eloquent",
+      "Caring"
+     ],
+     "tn": [
+      "Manipulative",
+      "Timid"
+     ],
+     "d": {
+      "tdm": 9.5,
+      "mini-dm": 8.2,
+      "battlefield": 25.1,
+      "gewichtheben": 8.2,
+      "climbing": 11.4,
+      "staffel": 18.7,
+      "time-trial": 17.7,
+      "spurt": 13.2,
+      "tennis": 47.6,
+      "hockey": 8.3,
+      "showcase": 24.7,
+      "speed-schach": 62.1,
+      "takeshis-castle": 41,
+      "breaking": 20.6,
+      "wettessen": 27.5,
+      "basketball": 33.6,
+      "football": 29.7,
+      "eiskunstlauf": 29.1,
+      "fechten": 9.8,
+      "i-spy": 40.3
+     },
+     "groesse": 6,
+     "a": {
+      "power": 1,
+      "health": 1,
+      "stamina": 1,
+      "intelligence": 90.1,
+      "awareness": 76.5,
+      "determination": 84.7,
+      "speed": 4.7,
+      "dexterity": 11.8,
+      "charisma": 6.7,
+      "will": 75.8,
+      "spirit": 81,
+      "torment": 2.2
+     }
+    },
+    {
+     "n": "Byrnja",
+     "c": "Overseer",
+     "r": "Construct",
+     "sub": [
+      "Servant",
+      "Apparition"
+     ],
+     "tp": [],
+     "tn": [
+      "FaintHearted",
+      "Manipulative",
+      "ColdBlooded"
+     ],
+     "d": {
+      "tdm": 7.7,
+      "mini-dm": 9.1,
+      "battlefield": 7.2,
+      "gewichtheben": 7,
+      "climbing": 7.1,
+      "staffel": 7.6,
+      "time-trial": 8.5,
+      "spurt": 7.1,
+      "tennis": 12.2,
+      "hockey": 7.1,
+      "showcase": 7.7,
+      "speed-schach": 11,
+      "takeshis-castle": 7.2,
+      "breaking": 7.8,
+      "wettessen": 7.7,
+      "basketball": 9.1,
+      "football": 7,
+      "eiskunstlauf": 14.5,
+      "fechten": 7.6,
+      "i-spy": 7.6
+     },
+     "groesse": 5,
+     "a": {
+      "power": 9.2,
+      "health": 18.2,
+      "stamina": 22.1,
+      "intelligence": 28.6,
+      "awareness": 24.8,
+      "determination": 11.4,
+      "speed": 16.6,
+      "dexterity": 18.6,
+      "charisma": 21.2,
+      "will": 8,
+      "spirit": 27.9,
+      "torment": 15
+     }
+    }
+   ]
+  },
+  {
+   "label": "coldsteel-direlegion",
+   "heimName": "Cold Steel",
+   "gastName": "Dire Legion",
+   "heim": [
+    {
+     "n": "Midas",
+     "c": "Hero",
+     "r": "Demon",
+     "sub": [
+      "Royalty",
+      "Knight",
+      "Undead"
+     ],
+     "tp": [
+      "FanFavorite",
+      "Fair",
+      "Ambitious"
+     ],
+     "tn": [
+      "Lazy",
+      "Cheater"
+     ],
+     "d": {
+      "tdm": 62.3,
+      "mini-dm": 44.5,
+      "battlefield": 56.3,
+      "gewichtheben": 62.7,
+      "climbing": 42.1,
+      "staffel": 43.5,
+      "time-trial": 18.1,
+      "spurt": 33.6,
+      "tennis": 30,
+      "hockey": 44,
+      "showcase": 60.1,
+      "speed-schach": 26.6,
+      "takeshis-castle": 48.6,
+      "breaking": 50.6,
+      "wettessen": 57.3,
+      "basketball": 40.4,
+      "football": 64.9,
+      "eiskunstlauf": 43.8,
+      "fechten": 19.3,
+      "i-spy": 41.4
+     },
+     "groesse": 6,
+     "a": {
+      "power": 59.9,
+      "health": 63.1,
+      "stamina": 65.2,
+      "intelligence": 24.8,
+      "awareness": 24.7,
+      "determination": 61.2,
+      "speed": 17.8,
+      "dexterity": 18.6,
+      "charisma": 94.3,
+      "will": 81,
+      "spirit": 79,
+      "torment": 37
+     }
+    },
+    {
+     "n": "Ser Camelot",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Knight"
+     ],
+     "tp": [
+      "Motivated",
+      "Loyal",
+      "Fair"
+     ],
+     "tn": [
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 61.9,
+      "mini-dm": 44.3,
+      "battlefield": 67.4,
+      "gewichtheben": 64.1,
+      "climbing": 43.8,
+      "staffel": 45.1,
+      "time-trial": 34.4,
+      "spurt": 45.3,
+      "tennis": 47.3,
+      "hockey": 48.2,
+      "showcase": 74.2,
+      "speed-schach": 46.5,
+      "takeshis-castle": 61.1,
+      "breaking": 52.3,
+      "wettessen": 55.2,
+      "basketball": 54.4,
+      "football": 71.9,
+      "eiskunstlauf": 56.8,
+      "fechten": 39.1,
+      "i-spy": 62.4
+     },
+     "groesse": 6,
+     "a": {
+      "power": 60,
+      "health": 71,
+      "stamina": 34.9,
+      "intelligence": 59.1,
+      "awareness": 38,
+      "determination": 81.2,
+      "speed": 27.9,
+      "dexterity": 55.1,
+      "charisma": 74,
+      "will": 73.2,
+      "spirit": 86.7,
+      "torment": 38.1
+     }
+    },
+    {
+     "n": "Catherine",
+     "c": "Hero",
+     "r": "Human",
+     "sub": [
+      "Knight",
+      "Cleric"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring",
+      "Fair"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 55.8,
+      "mini-dm": 40.5,
+      "battlefield": 47.8,
+      "gewichtheben": 62.2,
+      "climbing": 47.2,
+      "staffel": 44.9,
+      "time-trial": 36.7,
+      "spurt": 40.9,
+      "tennis": 42.1,
+      "hockey": 43.8,
+      "showcase": 59.5,
+      "speed-schach": 43.2,
+      "takeshis-castle": 47.8,
+      "breaking": 42.9,
+      "wettessen": 48.2,
+      "basketball": 42.4,
+      "football": 45.4,
+      "eiskunstlauf": 47.6,
+      "fechten": 28,
+      "i-spy": 40.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 57.6,
+      "health": 73,
+      "stamina": 53,
+      "intelligence": 48.7,
+      "awareness": 44.8,
+      "determination": 72,
+      "speed": 40,
+      "dexterity": 46.3,
+      "charisma": 78.6,
+      "will": 57.7,
+      "spirit": 55.2,
+      "torment": 13.6
+     }
+    },
+    {
+     "n": "Reefstrike",
+     "c": "Berserker",
+     "r": "Aqua",
+     "sub": [
+      "Warrior",
+      "Monk",
+      "Guardian"
+     ],
+     "tp": [
+      "Fair",
+      "FanFavorite",
+      "Flexible"
+     ],
+     "tn": [
+      "Egomaniac"
+     ],
+     "d": {
+      "tdm": 50.4,
+      "mini-dm": 57.3,
+      "battlefield": 42,
+      "gewichtheben": 48.7,
+      "climbing": 63.3,
+      "staffel": 45.7,
+      "time-trial": 61,
+      "spurt": 59.1,
+      "tennis": 40.6,
+      "hockey": 62.8,
+      "showcase": 42.7,
+      "speed-schach": 33.2,
+      "takeshis-castle": 33.6,
+      "breaking": 43.5,
+      "wettessen": 42.1,
+      "basketball": 41.6,
+      "football": 42.4,
+      "eiskunstlauf": 41.1,
+      "fechten": 71.7,
+      "i-spy": 37
+     },
+     "groesse": 6,
+     "a": {
+      "power": 69.7,
+      "health": 71.2,
+      "stamina": 71.7,
+      "intelligence": 35.5,
+      "awareness": 50.8,
+      "determination": 58.6,
+      "speed": 72,
+      "dexterity": 75.8,
+      "charisma": 38.7,
+      "will": 8.7,
+      "spirit": 25.8,
+      "torment": 75.1
+     }
+    },
+    {
+     "n": "Sir Percival",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Knight",
+      "Cleric",
+      "Servant"
+     ],
+     "tp": [
+      "Loyal",
+      "Altruistic"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 44.3,
+      "mini-dm": 33.3,
+      "battlefield": 44.9,
+      "gewichtheben": 47.6,
+      "climbing": 53,
+      "staffel": 66.3,
+      "time-trial": 44.5,
+      "spurt": 44.2,
+      "tennis": 51.5,
+      "hockey": 42.4,
+      "showcase": 64.1,
+      "speed-schach": 44.6,
+      "takeshis-castle": 48.7,
+      "breaking": 37.4,
+      "wettessen": 44.5,
+      "basketball": 50.4,
+      "football": 47.9,
+      "eiskunstlauf": 61.4,
+      "fechten": 35.5,
+      "i-spy": 44.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 40.9,
+      "health": 42.8,
+      "stamina": 58.9,
+      "intelligence": 41.6,
+      "awareness": 46.7,
+      "determination": 79.2,
+      "speed": 57.9,
+      "dexterity": 65.9,
+      "charisma": 69.3,
+      "will": 58.6,
+      "spirit": 79.8,
+      "torment": 13.5
+     }
+    },
+    {
+     "n": "Knochenrichter",
+     "c": "Templar",
+     "r": "Human",
+     "sub": [
+      "Undead",
+      "Cleric",
+      "Ambassador"
+     ],
+     "tp": [
+      "Fair"
+     ],
+     "tn": [
+      "Cruel"
+     ],
+     "d": {
+      "tdm": 42.8,
+      "mini-dm": 57.4,
+      "battlefield": 34.7,
+      "gewichtheben": 45.4,
+      "climbing": 44.4,
+      "staffel": 20.2,
+      "time-trial": 24.2,
+      "spurt": 48.6,
+      "tennis": 24.1,
+      "hockey": 41.2,
+      "showcase": 26.4,
+      "speed-schach": 41.8,
+      "takeshis-castle": 56.1,
+      "breaking": 73.5,
+      "wettessen": 69.3,
+      "basketball": 19.2,
+      "football": 44.1,
+      "eiskunstlauf": 22.4,
+      "fechten": 41.2,
+      "i-spy": 40.4
+     },
+     "groesse": 7,
+     "a": {
+      "power": 59,
+      "health": 64.3,
+      "stamina": 53.1,
+      "intelligence": 43.7,
+      "awareness": 46.7,
+      "determination": 81.5,
+      "speed": 18.6,
+      "dexterity": 20.6,
+      "charisma": 36,
+      "will": 88,
+      "spirit": 5.6,
+      "torment": 77.2
+     }
+    },
+    {
+     "n": "Zeynorr Driftblade",
+     "c": "Charger",
+     "r": "Alien",
+     "sub": [
+      "Wayfarer",
+      "Warrior",
+      "Agent"
+     ],
+     "tp": [
+      "Cool",
+      "Flexible",
+      "FiredUp"
+     ],
+     "tn": [
+      "Renegade",
+      "Scandalous"
+     ],
+     "d": {
+      "tdm": 42.1,
+      "mini-dm": 44.9,
+      "battlefield": 31.2,
+      "gewichtheben": 41.4,
+      "climbing": 62.5,
+      "staffel": 61.3,
+      "time-trial": 89.4,
+      "spurt": 57,
+      "tennis": 48.7,
+      "hockey": 52,
+      "showcase": 34.4,
+      "speed-schach": 44.7,
+      "takeshis-castle": 34.7,
+      "breaking": 39.3,
+      "wettessen": 40.4,
+      "basketball": 46.5,
+      "football": 29.2,
+      "eiskunstlauf": 42.5,
+      "fechten": 64.1,
+      "i-spy": 40.2
+     },
+     "groesse": 5,
+     "a": {
+      "power": 61.5,
+      "health": 48.6,
+      "stamina": 70.5,
+      "intelligence": 53.9,
+      "awareness": 66.3,
+      "determination": 30.1,
+      "speed": 91,
+      "dexterity": 87.6,
+      "charisma": 21.7,
+      "will": 40.6,
+      "spirit": 31.1,
+      "torment": 41.8
+     }
+    },
+    {
+     "n": "Bladewalker",
+     "c": "Rogue",
+     "r": "Construct",
+     "sub": [
+      "Bot",
+      "Assassin",
+      "Ninja"
+     ],
+     "tp": [
+      "Flexible"
+     ],
+     "tn": [
+      "Devious",
+      "ColdBlooded"
+     ],
+     "d": {
+      "tdm": 34.9,
+      "mini-dm": 44.1,
+      "battlefield": 33.4,
+      "gewichtheben": 41.5,
+      "climbing": 55.3,
+      "staffel": 47.6,
+      "time-trial": 82,
+      "spurt": 65.8,
+      "tennis": 47.6,
+      "hockey": 44.8,
+      "showcase": 38.1,
+      "speed-schach": 54.9,
+      "takeshis-castle": 42.8,
+      "breaking": 41.9,
+      "wettessen": 39.5,
+      "basketball": 43.8,
+      "football": 25.9,
+      "eiskunstlauf": 43.2,
+      "fechten": 76,
+      "i-spy": 45.4
+     },
+     "groesse": 6,
+     "a": {
+      "power": 54.1,
+      "health": 44.5,
+      "stamina": 48,
+      "intelligence": 64,
+      "awareness": 70,
+      "determination": 55.1,
+      "speed": 85.4,
+      "dexterity": 90.8,
+      "charisma": 24.6,
+      "will": 37.8,
+      "spirit": 14.5,
+      "torment": 59.8
+     }
+    },
+    {
+     "n": "Caldor",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Knight"
+     ],
+     "tp": [
+      "Ambitious",
+      "Loyal"
+     ],
+     "tn": [
+      "Timid",
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 34.2,
+      "mini-dm": 23.2,
+      "battlefield": 55.5,
+      "gewichtheben": 37,
+      "climbing": 28,
+      "staffel": 44.8,
+      "time-trial": 26.2,
+      "spurt": 30.5,
+      "tennis": 49.3,
+      "hockey": 25.1,
+      "showcase": 65.1,
+      "speed-schach": 47.3,
+      "takeshis-castle": 52.6,
+      "breaking": 32.8,
+      "wettessen": 40.4,
+      "basketball": 51.2,
+      "football": 49.5,
+      "eiskunstlauf": 56.5,
+      "fechten": 24.7,
+      "i-spy": 56.1
+     },
+     "groesse": 4,
+     "a": {
+      "power": 20.7,
+      "health": 13.8,
+      "stamina": 40.7,
+      "intelligence": 63.9,
+      "awareness": 45.1,
+      "determination": 90.7,
+      "speed": 31.6,
+      "dexterity": 28.4,
+      "charisma": 80.2,
+      "will": 56,
+      "spirit": 90.7,
+      "torment": 36.7
+     }
+    },
+    {
+     "n": "Lucky",
+     "c": "Bard",
+     "r": "Dwarf",
+     "sub": [
+      "Warrior",
+      "Trickster"
+     ],
+     "tp": [
+      "Motivated",
+      "Fair"
+     ],
+     "tn": [
+      "Gambler",
+      "Cheater",
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 26.9,
+      "mini-dm": 26.3,
+      "battlefield": 42.3,
+      "gewichtheben": 34.8,
+      "climbing": 37,
+      "staffel": 52.2,
+      "time-trial": 59.4,
+      "spurt": 42.2,
+      "tennis": 55.1,
+      "hockey": 32.4,
+      "showcase": 48.2,
+      "speed-schach": 49.3,
+      "takeshis-castle": 42,
+      "breaking": 25.1,
+      "wettessen": 25.6,
+      "basketball": 53.7,
+      "football": 30.9,
+      "eiskunstlauf": 62.4,
+      "fechten": 46.5,
+      "i-spy": 47.9
+     },
+     "groesse": 3,
+     "a": {
+      "power": 24.1,
+      "health": 34.4,
+      "stamina": 29.8,
+      "intelligence": 67.1,
+      "awareness": 57.4,
+      "determination": 49.5,
+      "speed": 73.1,
+      "dexterity": 84.9,
+      "charisma": 59.6,
+      "will": 37.8,
+      "spirit": 57.7,
+      "torment": 32.5
+     }
+    },
+    {
+     "n": "Suzuna",
+     "c": "Mage",
+     "r": "Human",
+     "sub": [
+      "Mage"
+     ],
+     "tp": [
+      "Resourceful",
+      "Disciplined"
+     ],
+     "tn": [
+      "Feisty",
+      "Diva",
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 18.8,
+      "mini-dm": 16.7,
+      "battlefield": 34.7,
+      "gewichtheben": 24.3,
+      "climbing": 18.4,
+      "staffel": 32.6,
+      "time-trial": 40.5,
+      "spurt": 30.2,
+      "tennis": 44.5,
+      "hockey": 18.9,
+      "showcase": 35.9,
+      "speed-schach": 63.4,
+      "takeshis-castle": 41.5,
+      "breaking": 24.2,
+      "wettessen": 21.2,
+      "basketball": 42.7,
+      "football": 20.2,
+      "eiskunstlauf": 42.2,
+      "fechten": 33.6,
+      "i-spy": 43.4
+     },
+     "groesse": 5,
+     "a": {
+      "power": 33.5,
+      "health": 6.6,
+      "stamina": 2.8,
+      "intelligence": 83.9,
+      "awareness": 78.4,
+      "determination": 50.2,
+      "speed": 56.9,
+      "dexterity": 32.8,
+      "charisma": 41.1,
+      "will": 62.3,
+      "spirit": 43.9,
+      "torment": 25
+     }
+    }
+   ],
+   "gast": [
+    {
+     "n": "Hargorin Todbringer",
+     "c": "Warlord",
+     "r": "Human",
+     "sub": [
+      "Behemoth",
+      "Warrior",
+      "Isolated"
+     ],
+     "tp": [
+      "Healthy",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid",
+      "Paranoid"
+     ],
+     "d": {
+      "tdm": 65,
+      "mini-dm": 51.4,
+      "battlefield": 44.6,
+      "gewichtheben": 46.1,
+      "climbing": 37.9,
+      "staffel": 21.3,
+      "time-trial": 24.4,
+      "spurt": 26,
+      "tennis": 25.3,
+      "hockey": 47.8,
+      "showcase": 40,
+      "speed-schach": 17.5,
+      "takeshis-castle": 22,
+      "breaking": 42.7,
+      "wettessen": 40.9,
+      "basketball": 29.9,
+      "football": 47,
+      "eiskunstlauf": 25.4,
+      "fechten": 34.9,
+      "i-spy": 24.7
+     },
+     "groesse": 8,
+     "a": {
+      "power": 79,
+      "health": 76.4,
+      "stamina": 71.5,
+      "intelligence": 33.8,
+      "awareness": 17.6,
+      "determination": 49.1,
+      "speed": 14.6,
+      "dexterity": 32.8,
+      "charisma": 43.9,
+      "will": 6.1,
+      "spirit": 55.7,
+      "torment": 71.7
+     }
+    },
+    {
+     "n": "Genta",
+     "c": "Tank",
+     "r": "Human",
+     "sub": [
+      "Guardian"
+     ],
+     "tp": [
+      "Healthy"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 63.8,
+      "mini-dm": 43.2,
+      "battlefield": 28.7,
+      "gewichtheben": 55.2,
+      "climbing": 44.5,
+      "staffel": 25,
+      "time-trial": 21.1,
+      "spurt": 27.2,
+      "tennis": 23.7,
+      "hockey": 44.6,
+      "showcase": 33.6,
+      "speed-schach": 22,
+      "takeshis-castle": 26.1,
+      "breaking": 42.4,
+      "wettessen": 45.6,
+      "basketball": 21.8,
+      "football": 37.9,
+      "eiskunstlauf": 24.6,
+      "fechten": 19.3,
+      "i-spy": 14.1
+     },
+     "groesse": 4,
+     "a": {
+      "power": 87,
+      "health": 81,
+      "stamina": 66.5,
+      "intelligence": 20.8,
+      "awareness": 32.5,
+      "determination": 58.2,
+      "speed": 21.7,
+      "dexterity": 25.8,
+      "charisma": 40.8,
+      "will": 45,
+      "spirit": 40.8,
+      "torment": 11.8
+     }
+    },
+    {
+     "n": "Die Liebenden",
+     "c": "Tank",
+     "r": "Human",
+     "sub": [
+      "Angel",
+      "Isolated"
+     ],
+     "tp": [
+      "Caring",
+      "Loyal",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 47.2,
+      "mini-dm": 42,
+      "battlefield": 43.8,
+      "gewichtheben": 37.6,
+      "climbing": 36,
+      "staffel": 48.2,
+      "time-trial": 9.3,
+      "spurt": 9.4,
+      "tennis": 30.7,
+      "hockey": 37.9,
+      "showcase": 34,
+      "speed-schach": 19.4,
+      "takeshis-castle": 40,
+      "breaking": 44.8,
+      "wettessen": 70.1,
+      "basketball": 33,
+      "football": 67.6,
+      "eiskunstlauf": 39.7,
+      "fechten": 7.1,
+      "i-spy": 24.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 1,
+      "health": 99,
+      "stamina": 99,
+      "intelligence": 9.8,
+      "awareness": 39.8,
+      "determination": 1.4,
+      "speed": 1,
+      "dexterity": 1,
+      "charisma": 89.9,
+      "will": 99,
+      "spirit": 97.9,
+      "torment": 2
+     }
+    },
+    {
+     "n": "Angrod",
+     "c": "Badass",
+     "r": "Human",
+     "sub": [
+      "Rebel",
+      "Swashbuckler",
+      "Vigilante"
+     ],
+     "tp": [],
+     "tn": [
+      "Mercenary",
+      "ColdBlooded"
+     ],
+     "d": {
+      "tdm": 46.9,
+      "mini-dm": 48.1,
+      "battlefield": 61.6,
+      "gewichtheben": 54.2,
+      "climbing": 46.8,
+      "staffel": 64,
+      "time-trial": 54.3,
+      "spurt": 58.9,
+      "tennis": 50,
+      "hockey": 55.6,
+      "showcase": 63.5,
+      "speed-schach": 43.7,
+      "takeshis-castle": 47.6,
+      "breaking": 45.4,
+      "wettessen": 39.6,
+      "basketball": 67.3,
+      "football": 63.1,
+      "eiskunstlauf": 68.8,
+      "fechten": 67.5,
+      "i-spy": 61.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 63,
+      "health": 42,
+      "stamina": 47,
+      "intelligence": 34,
+      "awareness": 68,
+      "determination": 45,
+      "speed": 57,
+      "dexterity": 85,
+      "charisma": 76,
+      "will": 54,
+      "spirit": 69,
+      "torment": 71
+     }
+    },
+    {
+     "n": "Drop Dead",
+     "c": "Sprinter",
+     "r": "Human",
+     "sub": [
+      "Assassin",
+      "Isolated"
+     ],
+     "tp": [
+      "Diligent"
+     ],
+     "tn": [
+      "Mercenary",
+      "Vindictive",
+      "Timid"
+     ],
+     "d": {
+      "tdm": 35.1,
+      "mini-dm": 32.7,
+      "battlefield": 34.8,
+      "gewichtheben": 26.2,
+      "climbing": 42.7,
+      "staffel": 47.6,
+      "time-trial": 62.5,
+      "spurt": 42.1,
+      "tennis": 55.7,
+      "hockey": 41.9,
+      "showcase": 40,
+      "speed-schach": 42.4,
+      "takeshis-castle": 25.5,
+      "breaking": 24.6,
+      "wettessen": 24.1,
+      "basketball": 51.7,
+      "football": 34.4,
+      "eiskunstlauf": 43,
+      "fechten": 48.1,
+      "i-spy": 41.4
+     },
+     "groesse": 5,
+     "a": {
+      "power": 53.1,
+      "health": 24.5,
+      "stamina": 50.9,
+      "intelligence": 61.8,
+      "awareness": 57.4,
+      "determination": 45.1,
+      "speed": 71,
+      "dexterity": 77.6,
+      "charisma": 15.6,
+      "will": 20.8,
+      "spirit": 67.8,
+      "torment": 40.2
+     }
+    },
+    {
+     "n": "Timantha",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Mage"
+     ],
+     "tp": [
+      "Eloquent",
+      "Diligent"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 33.9,
+      "mini-dm": 17.8,
+      "battlefield": 45.9,
+      "gewichtheben": 26.6,
+      "climbing": 37.7,
+      "staffel": 47.5,
+      "time-trial": 43.2,
+      "spurt": 18.8,
+      "tennis": 63.8,
+      "hockey": 24.4,
+      "showcase": 47.2,
+      "speed-schach": 49.9,
+      "takeshis-castle": 41.5,
+      "breaking": 18.2,
+      "wettessen": 38.4,
+      "basketball": 48,
+      "football": 26.7,
+      "eiskunstlauf": 49.9,
+      "fechten": 19.1,
+      "i-spy": 40.6
+     },
+     "groesse": 5,
+     "a": {
+      "power": 3.3,
+      "health": 41.9,
+      "stamina": 66.1,
+      "intelligence": 88.3,
+      "awareness": 57.2,
+      "determination": 63,
+      "speed": 49.8,
+      "dexterity": 30.9,
+      "charisma": 71.2,
+      "will": 23.9,
+      "spirit": 64,
+      "torment": 1.9
+     }
+    },
+    {
+     "n": "Glockenfresser",
+     "c": "Tank",
+     "r": "Human",
+     "sub": [
+      "Apparition",
+      "Guardian",
+      "Cleric"
+     ],
+     "tp": [
+      "Diligent",
+      "Loyal"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Timid"
+     ],
+     "d": {
+      "tdm": 33.8,
+      "mini-dm": 38.4,
+      "battlefield": 8.9,
+      "gewichtheben": 23.3,
+      "climbing": 24.2,
+      "staffel": 9,
+      "time-trial": 10.3,
+      "spurt": 11,
+      "tennis": 11.8,
+      "hockey": 25.6,
+      "showcase": 7.3,
+      "speed-schach": 11.9,
+      "takeshis-castle": 11.3,
+      "breaking": 33.7,
+      "wettessen": 35.3,
+      "basketball": 8.4,
+      "football": 14.9,
+      "eiskunstlauf": 9,
+      "fechten": 11.2,
+      "i-spy": 7.7
+     },
+     "groesse": 8,
+     "a": {
+      "power": 54.1,
+      "health": 73,
+      "stamina": 62.4,
+      "intelligence": 13.8,
+      "awareness": 41.7,
+      "determination": 18.6,
+      "speed": 6.5,
+      "dexterity": 5.5,
+      "charisma": 4,
+      "will": 39.1,
+      "spirit": 11,
+      "torment": 31
+     }
+    },
+    {
+     "n": "Serena",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Trickster",
+      "Warrior",
+      "Swashbuckler"
+     ],
+     "tp": [
+      "Diligent",
+      "Motivated",
+      "FiredUp"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 33.7,
+      "mini-dm": 24.7,
+      "battlefield": 47,
+      "gewichtheben": 33.6,
+      "climbing": 18.3,
+      "staffel": 47.8,
+      "time-trial": 47.1,
+      "spurt": 24.4,
+      "tennis": 47.2,
+      "hockey": 36.3,
+      "showcase": 48.4,
+      "speed-schach": 32.3,
+      "takeshis-castle": 19.3,
+      "breaking": 13.6,
+      "wettessen": 8.6,
+      "basketball": 66.3,
+      "football": 36,
+      "eiskunstlauf": 66.8,
+      "fechten": 44.6,
+      "i-spy": 40.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 39.5,
+      "health": 39.5,
+      "stamina": 15,
+      "intelligence": 48.8,
+      "awareness": 61.2,
+      "determination": 1,
+      "speed": 71.2,
+      "dexterity": 76.3,
+      "charisma": 71.8,
+      "will": 3.8,
+      "spirit": 85.2,
+      "torment": 39
+     }
+    },
+    {
+     "n": "Elum Kaa",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Druid",
+      "Wayfarer",
+      "Servant"
+     ],
+     "tp": [
+      "Caring",
+      "Relaxed"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 26.8,
+      "mini-dm": 15.4,
+      "battlefield": 33.5,
+      "gewichtheben": 22.4,
+      "climbing": 9.3,
+      "staffel": 24.8,
+      "time-trial": 22.9,
+      "spurt": 7.5,
+      "tennis": 32.1,
+      "hockey": 16.1,
+      "showcase": 41,
+      "speed-schach": 19.6,
+      "takeshis-castle": 13.2,
+      "breaking": 10.1,
+      "wettessen": 11.8,
+      "basketball": 37.5,
+      "football": 18.8,
+      "eiskunstlauf": 41.4,
+      "fechten": 8.8,
+      "i-spy": 22.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 22.4,
+      "health": 37,
+      "stamina": 31.8,
+      "intelligence": 56.8,
+      "awareness": 9.9,
+      "determination": 6,
+      "speed": 28.8,
+      "dexterity": 43.4,
+      "charisma": 66.5,
+      "will": 15.7,
+      "spirit": 88,
+      "torment": 5.9
+     }
+    },
+    {
+     "n": "Lumen Serene",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Angel",
+      "Isolated",
+      "Cleric"
+     ],
+     "tp": [
+      "Caring",
+      "Eloquent"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 20.3,
+      "mini-dm": 11.4,
+      "battlefield": 42.7,
+      "gewichtheben": 24.9,
+      "climbing": 15,
+      "staffel": 43.2,
+      "time-trial": 25.6,
+      "spurt": 15.1,
+      "tennis": 46.2,
+      "hockey": 13.8,
+      "showcase": 48.6,
+      "speed-schach": 42.1,
+      "takeshis-castle": 36.9,
+      "breaking": 15.1,
+      "wettessen": 17.4,
+      "basketball": 47.6,
+      "football": 34.3,
+      "eiskunstlauf": 63.6,
+      "fechten": 18.4,
+      "i-spy": 41
+     },
+     "groesse": 5,
+     "a": {
+      "power": 8.5,
+      "health": 3.7,
+      "stamina": 18.8,
+      "intelligence": 48.4,
+      "awareness": 61.4,
+      "determination": 44.6,
+      "speed": 30.9,
+      "dexterity": 48.6,
+      "charisma": 85,
+      "will": 53,
+      "spirit": 92.9,
+      "torment": 7.7
+     }
+    },
+    {
+     "n": "Etwas M",
+     "c": "Mage",
+     "r": "Human",
+     "sub": [
+      "Strategist",
+      "Controller",
+      "Drainer"
+     ],
+     "tp": [
+      "Eloquent",
+      "Disciplined"
+     ],
+     "tn": [
+      "Egomaniac",
+      "Manipulative",
+      "Paranoid"
+     ],
+     "d": {
+      "tdm": 11.8,
+      "mini-dm": 24.5,
+      "battlefield": 11.9,
+      "gewichtheben": 13.4,
+      "climbing": 11.8,
+      "staffel": 9.4,
+      "time-trial": 17.1,
+      "spurt": 12.8,
+      "tennis": 18.1,
+      "hockey": 10,
+      "showcase": 12.1,
+      "speed-schach": 24.2,
+      "takeshis-castle": 20.4,
+      "breaking": 25.3,
+      "wettessen": 24.1,
+      "basketball": 12.9,
+      "football": 8.5,
+      "eiskunstlauf": 18.5,
+      "fechten": 18.2,
+      "i-spy": 18.2
+     },
+     "groesse": 5,
+     "a": {
+      "power": 17.4,
+      "health": 31.6,
+      "stamina": 28.6,
+      "intelligence": 48.2,
+      "awareness": 27.7,
+      "determination": 33.4,
+      "speed": 21.2,
+      "dexterity": 23.6,
+      "charisma": 27.1,
+      "will": 43.6,
+      "spirit": 13.7,
+      "torment": 47.5
+     }
+    }
+   ]
+  },
+  {
+   "label": "goldengladiators-silversoldiers",
+   "heimName": "Golden Gladiators",
+   "gastName": "Silver Soldiers",
+   "heim": [
+    {
+     "n": "Valara",
+     "c": "Hero",
+     "r": "Demon",
+     "sub": [
+      "Warrior",
+      "Guardian"
+     ],
+     "tp": [
+      "Altruistic",
+      "Caring"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 73.5,
+      "mini-dm": 42.4,
+      "battlefield": 65.4,
+      "gewichtheben": 67.2,
+      "climbing": 48.7,
+      "staffel": 54,
+      "time-trial": 39.2,
+      "spurt": 40.3,
+      "tennis": 47.3,
+      "hockey": 54.3,
+      "showcase": 71.7,
+      "speed-schach": 43.5,
+      "takeshis-castle": 47.8,
+      "breaking": 44,
+      "wettessen": 57.1,
+      "basketball": 53.2,
+      "football": 60.1,
+      "eiskunstlauf": 50.7,
+      "fechten": 25.7,
+      "i-spy": 45.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 61.2,
+      "health": 85.2,
+      "stamina": 62.2,
+      "intelligence": 63.2,
+      "awareness": 32.8,
+      "determination": 68.4,
+      "speed": 47.8,
+      "dexterity": 34,
+      "charisma": 80.1,
+      "will": 53.7,
+      "spirit": 79.8,
+      "torment": 13.7
+     }
+    },
+    {
+     "n": "Arabelle Stormtide",
+     "c": "Hero",
+     "r": "Human",
+     "sub": [
+      "Guardian",
+      "Lord",
+      "Knight"
+     ],
+     "tp": [
+      "Motivated",
+      "FanFavorite",
+      "Loyal"
+     ],
+     "tn": [
+      "Feisty",
+      "Diva"
+     ],
+     "d": {
+      "tdm": 61.5,
+      "mini-dm": 40.7,
+      "battlefield": 61.1,
+      "gewichtheben": 59.1,
+      "climbing": 44.7,
+      "staffel": 53.2,
+      "time-trial": 38.1,
+      "spurt": 38.5,
+      "tennis": 45.4,
+      "hockey": 47.6,
+      "showcase": 67.3,
+      "speed-schach": 40.2,
+      "takeshis-castle": 43.7,
+      "breaking": 40.7,
+      "wettessen": 43.8,
+      "basketball": 53.3,
+      "football": 57.6,
+      "eiskunstlauf": 56.1,
+      "fechten": 33.3,
+      "i-spy": 43.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 59.3,
+      "health": 65.2,
+      "stamina": 57.8,
+      "intelligence": 44.1,
+      "awareness": 46.1,
+      "determination": 61.5,
+      "speed": 45,
+      "dexterity": 43,
+      "charisma": 83,
+      "will": 42.9,
+      "spirit": 80.2,
+      "torment": 26.7
+     }
+    },
+    {
+     "n": "Petra Brezelstein",
+     "c": "Tank",
+     "r": "Construct",
+     "sub": [
+      "Guardian",
+      "Behemoth",
+      "Knight"
+     ],
+     "tp": [
+      "Loyal",
+      "FiredUp"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 60.6,
+      "mini-dm": 58.7,
+      "battlefield": 26.8,
+      "gewichtheben": 48.4,
+      "climbing": 53.1,
+      "staffel": 19.4,
+      "time-trial": 22.1,
+      "spurt": 43,
+      "tennis": 23.2,
+      "hockey": 48.1,
+      "showcase": 24.8,
+      "speed-schach": 26.2,
+      "takeshis-castle": 40.8,
+      "breaking": 64.1,
+      "wettessen": 70.9,
+      "basketball": 18.3,
+      "football": 44.8,
+      "eiskunstlauf": 17.4,
+      "fechten": 27.6,
+      "i-spy": 23.4
+     },
+     "groesse": 6,
+     "a": {
+      "power": 81,
+      "health": 89,
+      "stamina": 71.4,
+      "intelligence": 34.9,
+      "awareness": 31.6,
+      "determination": 82.3,
+      "speed": 13.4,
+      "dexterity": 20.5,
+      "charisma": 12.2,
+      "will": 64.3,
+      "spirit": 23.8,
+      "torment": 46
+     }
+    },
+    {
+     "n": "Terradon",
+     "c": "Warlord",
+     "r": "Construct",
+     "sub": [
+      "Guardian"
+     ],
+     "tp": [
+      "Loyal",
+      "Healthy"
+     ],
+     "tn": [
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 54,
+      "mini-dm": 59.8,
+      "battlefield": 22.2,
+      "gewichtheben": 58.9,
+      "climbing": 45.7,
+      "staffel": 27.4,
+      "time-trial": 24.3,
+      "spurt": 54.1,
+      "tennis": 11.9,
+      "hockey": 60.4,
+      "showcase": 25.6,
+      "speed-schach": 24,
+      "takeshis-castle": 34.6,
+      "breaking": 68.3,
+      "wettessen": 62.2,
+      "basketball": 14.9,
+      "football": 38,
+      "eiskunstlauf": 15.2,
+      "fechten": 34.6,
+      "i-spy": 24.5
+     },
+     "groesse": 8,
+     "a": {
+      "power": 86.2,
+      "health": 98.1,
+      "stamina": 47.7,
+      "intelligence": 23.9,
+      "awareness": 1,
+      "determination": 56.7,
+      "speed": 82.4,
+      "dexterity": 2.5,
+      "charisma": 21.3,
+      "will": 75.4,
+      "spirit": 13.9,
+      "torment": 55
+     }
+    },
+    {
+     "n": "Elyon",
+     "c": "Templar",
+     "r": "Divine",
+     "sub": [
+      "Angel",
+      "Knight",
+      "Vigilante"
+     ],
+     "tp": [
+      "Altruistic",
+      "Caring"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 48.5,
+      "mini-dm": 44.2,
+      "battlefield": 43.9,
+      "gewichtheben": 47.5,
+      "climbing": 39,
+      "staffel": 27,
+      "time-trial": 18.9,
+      "spurt": 43.8,
+      "tennis": 32.8,
+      "hockey": 45.2,
+      "showcase": 43.1,
+      "speed-schach": 41.1,
+      "takeshis-castle": 47.8,
+      "breaking": 61.2,
+      "wettessen": 59.6,
+      "basketball": 33.3,
+      "football": 67.5,
+      "eiskunstlauf": 29.8,
+      "fechten": 28.5,
+      "i-spy": 44.5
+     },
+     "groesse": 5,
+     "a": {
+      "power": 65,
+      "health": 70.1,
+      "stamina": 28.1,
+      "intelligence": 45.8,
+      "awareness": 37.9,
+      "determination": 88,
+      "speed": 18.5,
+      "dexterity": 21.6,
+      "charisma": 31.1,
+      "will": 86,
+      "spirit": 75.1,
+      "torment": 46.1
+     }
+    },
+    {
+     "n": "Gary the Keeper",
+     "c": "Hero",
+     "r": "Human",
+     "sub": [
+      "Knight",
+      "Guardian"
+     ],
+     "tp": [
+      "Motivated"
+     ],
+     "tn": [
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 46.2,
+      "mini-dm": 35.3,
+      "battlefield": 43.8,
+      "gewichtheben": 40.3,
+      "climbing": 23.1,
+      "staffel": 33.8,
+      "time-trial": 24,
+      "spurt": 14.8,
+      "tennis": 32.4,
+      "hockey": 37.4,
+      "showcase": 43.1,
+      "speed-schach": 22.6,
+      "takeshis-castle": 24.6,
+      "breaking": 33.1,
+      "wettessen": 38.6,
+      "basketball": 41,
+      "football": 43.8,
+      "eiskunstlauf": 36.5,
+      "fechten": 13.6,
+      "i-spy": 30.7
+     },
+     "groesse": 5,
+     "a": {
+      "power": 45,
+      "health": 69.1,
+      "stamina": 52.8,
+      "intelligence": 53.8,
+      "awareness": 6.9,
+      "determination": 14.8,
+      "speed": 31.7,
+      "dexterity": 28.4,
+      "charisma": 60.8,
+      "will": 47.6,
+      "spirit": 90,
+      "torment": 24
+     }
+    },
+    {
+     "n": "Grizz",
+     "c": "Charger",
+     "r": "Goblin",
+     "sub": [
+      "Knight",
+      "Guardian"
+     ],
+     "tp": [
+      "Caring",
+      "Motivated"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 45.7,
+      "mini-dm": 53.9,
+      "battlefield": 35.5,
+      "gewichtheben": 44,
+      "climbing": 61,
+      "staffel": 44.3,
+      "time-trial": 49.4,
+      "spurt": 53.1,
+      "tennis": 35.9,
+      "hockey": 49.2,
+      "showcase": 37.9,
+      "speed-schach": 39.8,
+      "takeshis-castle": 42.6,
+      "breaking": 49.2,
+      "wettessen": 57.4,
+      "basketball": 33.6,
+      "football": 40.1,
+      "eiskunstlauf": 30.4,
+      "fechten": 46.4,
+      "i-spy": 42.1
+     },
+     "groesse": 4,
+     "a": {
+      "power": 52.7,
+      "health": 70.2,
+      "stamina": 79.1,
+      "intelligence": 57.5,
+      "awareness": 22.8,
+      "determination": 59.6,
+      "speed": 72.8,
+      "dexterity": 52.1,
+      "charisma": 30.6,
+      "will": 48.8,
+      "spirit": 27.6,
+      "torment": 61.3
+     }
+    },
+    {
+     "n": "Skull Knight",
+     "c": "Hero",
+     "r": "Demon",
+     "sub": [
+      "Guardian",
+      "Apparition"
+     ],
+     "tp": [
+      "Flexible",
+      "Motivated"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 44.4,
+      "mini-dm": 32.9,
+      "battlefield": 42.6,
+      "gewichtheben": 43.6,
+      "climbing": 19.2,
+      "staffel": 23.1,
+      "time-trial": 23.8,
+      "spurt": 29.7,
+      "tennis": 30.3,
+      "hockey": 41.2,
+      "showcase": 43.2,
+      "speed-schach": 32.1,
+      "takeshis-castle": 25.5,
+      "breaking": 35.3,
+      "wettessen": 25.5,
+      "basketball": 37.9,
+      "football": 44.1,
+      "eiskunstlauf": 33.7,
+      "fechten": 32.6,
+      "i-spy": 34.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 73.5,
+      "health": 61.3,
+      "stamina": 1,
+      "intelligence": 53.8,
+      "awareness": 36.1,
+      "determination": 55.4,
+      "speed": 36.8,
+      "dexterity": 32.4,
+      "charisma": 34.9,
+      "will": 37.9,
+      "spirit": 73.9,
+      "torment": 39.1
+     }
+    },
+    {
+     "n": "Erna Wellenlaut",
+     "c": "Bard",
+     "r": "Aqua",
+     "sub": [
+      "Angel",
+      "Controller"
+     ],
+     "tp": [
+      "Disciplined",
+      "Eloquent",
+      "Caring"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 42.1,
+      "mini-dm": 32,
+      "battlefield": 52.2,
+      "gewichtheben": 40.1,
+      "climbing": 46.5,
+      "staffel": 63.1,
+      "time-trial": 43.2,
+      "spurt": 35.1,
+      "tennis": 75.2,
+      "hockey": 36.7,
+      "showcase": 53.7,
+      "speed-schach": 62.4,
+      "takeshis-castle": 62.4,
+      "breaking": 41.8,
+      "wettessen": 55.5,
+      "basketball": 62.4,
+      "football": 60.9,
+      "eiskunstlauf": 63,
+      "fechten": 25.3,
+      "i-spy": 55.7
+     },
+     "groesse": 6,
+     "a": {
+      "power": 16.4,
+      "health": 47.8,
+      "stamina": 62.1,
+      "intelligence": 68.3,
+      "awareness": 71.3,
+      "determination": 63.7,
+      "speed": 27.6,
+      "dexterity": 57.4,
+      "charisma": 64.8,
+      "will": 86.2,
+      "spirit": 92.2,
+      "torment": 5.6
+     }
+    },
+    {
+     "n": "Jara",
+     "c": "Templar",
+     "r": "Human",
+     "sub": [
+      "Guardian",
+      "Knight"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 38.1,
+      "mini-dm": 33.7,
+      "battlefield": 22.8,
+      "gewichtheben": 41.9,
+      "climbing": 39.9,
+      "staffel": 25.1,
+      "time-trial": 24.9,
+      "spurt": 27.8,
+      "tennis": 24.9,
+      "hockey": 27.7,
+      "showcase": 28.1,
+      "speed-schach": 30.3,
+      "takeshis-castle": 35,
+      "breaking": 39,
+      "wettessen": 43.5,
+      "basketball": 19.9,
+      "football": 24.2,
+      "eiskunstlauf": 26.1,
+      "fechten": 20.8,
+      "i-spy": 19.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 47.4,
+      "health": 58.5,
+      "stamina": 50,
+      "intelligence": 33.8,
+      "awareness": 39.7,
+      "determination": 60.7,
+      "speed": 29.3,
+      "dexterity": 39.3,
+      "charisma": 42.6,
+      "will": 60.1,
+      "spirit": 27.7,
+      "torment": 14.3
+     }
+    },
+    {
+     "n": "Nimri",
+     "c": "Sprinter",
+     "r": "Construct",
+     "sub": [
+      "Swashbuckler",
+      "Angel",
+      "Jungle"
+     ],
+     "tp": [
+      "Flexible",
+      "Altruistic"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 19.9,
+      "mini-dm": 25.9,
+      "battlefield": 13.8,
+      "gewichtheben": 24.7,
+      "climbing": 55.1,
+      "staffel": 57.7,
+      "time-trial": 69.4,
+      "spurt": 44.2,
+      "tennis": 44.2,
+      "hockey": 30.1,
+      "showcase": 25.4,
+      "speed-schach": 44.7,
+      "takeshis-castle": 34,
+      "breaking": 22.9,
+      "wettessen": 33.3,
+      "basketball": 33,
+      "football": 12.5,
+      "eiskunstlauf": 42.4,
+      "fechten": 44.7,
+      "i-spy": 24.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 13.6,
+      "health": 38.7,
+      "stamina": 63,
+      "intelligence": 37.8,
+      "awareness": 75.3,
+      "determination": 50.1,
+      "speed": 91,
+      "dexterity": 86,
+      "charisma": 24.9,
+      "will": 38.6,
+      "spirit": 19.1,
+      "torment": 10.9
+     }
+    },
+    {
+     "n": "Sweet Dreams",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Guardian",
+      "Apparition"
+     ],
+     "tp": [
+      "Fair",
+      "Eloquent",
+      "Altruistic"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 16.7,
+      "mini-dm": 8.5,
+      "battlefield": 45.2,
+      "gewichtheben": 20,
+      "climbing": 11,
+      "staffel": 43.7,
+      "time-trial": 31.9,
+      "spurt": 16.9,
+      "tennis": 58.8,
+      "hockey": 11.3,
+      "showcase": 47.9,
+      "speed-schach": 65.9,
+      "takeshis-castle": 44.1,
+      "breaking": 17.4,
+      "wettessen": 20.1,
+      "basketball": 59.4,
+      "football": 30,
+      "eiskunstlauf": 60.6,
+      "fechten": 16.1,
+      "i-spy": 52.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 1.5,
+      "health": 1,
+      "stamina": 1,
+      "intelligence": 93,
+      "awareness": 65.4,
+      "determination": 42.8,
+      "speed": 50.8,
+      "dexterity": 25,
+      "charisma": 74.6,
+      "will": 73.3,
+      "spirit": 90.3,
+      "torment": 1
+     }
+    }
+   ],
+   "gast": [
+    {
+     "n": "Vorrak",
+     "c": "Tank",
+     "r": "Construct",
+     "sub": [
+      "Guardian",
+      "Destroyer",
+      "Behemoth"
+     ],
+     "tp": [
+      "Loyal",
+      "Diligent"
+     ],
+     "tn": [
+      "Renegade",
+      "ColdBlooded",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 71.1,
+      "mini-dm": 73.5,
+      "battlefield": 43.4,
+      "gewichtheben": 57.6,
+      "climbing": 54.7,
+      "staffel": 23.4,
+      "time-trial": 19.1,
+      "spurt": 47.5,
+      "tennis": 24.9,
+      "hockey": 61.7,
+      "showcase": 32.5,
+      "speed-schach": 31.3,
+      "takeshis-castle": 47.6,
+      "breaking": 81.4,
+      "wettessen": 86.1,
+      "basketball": 24.1,
+      "football": 68.3,
+      "eiskunstlauf": 19.8,
+      "fechten": 35.5,
+      "i-spy": 34.6
+     },
+     "groesse": 9,
+     "a": {
+      "power": 79.2,
+      "health": 98.7,
+      "stamina": 70.5,
+      "intelligence": 34.9,
+      "awareness": 38.5,
+      "determination": 87.3,
+      "speed": 5.3,
+      "dexterity": 11.4,
+      "charisma": 26.4,
+      "will": 74.2,
+      "spirit": 36.1,
+      "torment": 70.6
+     }
+    },
+    {
+     "n": "Brontar",
+     "c": "Tank",
+     "r": "Construct",
+     "sub": [
+      "Behemoth",
+      "Guardian",
+      "Beast"
+     ],
+     "tp": [
+      "Loyal",
+      "Healthy"
+     ],
+     "tn": [
+      "ColdBlooded",
+      "Lazy",
+      "Diva"
+     ],
+     "d": {
+      "tdm": 69,
+      "mini-dm": 57.8,
+      "battlefield": 34.8,
+      "gewichtheben": 60.6,
+      "climbing": 61.2,
+      "staffel": 26.9,
+      "time-trial": 28.5,
+      "spurt": 51.8,
+      "tennis": 25.8,
+      "hockey": 63.4,
+      "showcase": 33.4,
+      "speed-schach": 36.3,
+      "takeshis-castle": 43.5,
+      "breaking": 64.8,
+      "wettessen": 71.1,
+      "basketball": 24.4,
+      "football": 48.3,
+      "eiskunstlauf": 21.1,
+      "fechten": 38.3,
+      "i-spy": 27.3
+     },
+     "groesse": 8,
+     "a": {
+      "power": 90.1,
+      "health": 95.2,
+      "stamina": 60.6,
+      "intelligence": 41.7,
+      "awareness": 37.6,
+      "determination": 89.6,
+      "speed": 39.5,
+      "dexterity": 21.6,
+      "charisma": 13.9,
+      "will": 63.1,
+      "spirit": 29.9,
+      "torment": 40.9
+     }
+    },
+    {
+     "n": "Grieving Colossus",
+     "c": "Warlord",
+     "r": "Construct",
+     "sub": [
+      "Behemoth",
+      "Guardian",
+      "Isolated"
+     ],
+     "tp": [
+      "Fair"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Lazy",
+      "Timid"
+     ],
+     "d": {
+      "tdm": 58,
+      "mini-dm": 64,
+      "battlefield": 18.7,
+      "gewichtheben": 43.8,
+      "climbing": 42.5,
+      "staffel": 11.6,
+      "time-trial": 11.7,
+      "spurt": 31.5,
+      "tennis": 9.2,
+      "hockey": 48.1,
+      "showcase": 15.1,
+      "speed-schach": 9,
+      "takeshis-castle": 18.1,
+      "breaking": 53.8,
+      "wettessen": 48.9,
+      "basketball": 9.5,
+      "football": 40.6,
+      "eiskunstlauf": 8.9,
+      "fechten": 25,
+      "i-spy": 10.7
+     },
+     "groesse": 10,
+     "a": {
+      "power": 84.2,
+      "health": 95,
+      "stamina": 79.3,
+      "intelligence": 1,
+      "awareness": 1,
+      "determination": 52.7,
+      "speed": 17.4,
+      "dexterity": 8.6,
+      "charisma": 7.2,
+      "will": 31.2,
+      "spirit": 24,
+      "torment": 70.8
+     }
+    },
+    {
+     "n": "Tavascron",
+     "c": "Berserker",
+     "r": "Construct",
+     "sub": [
+      "Bot",
+      "Warrior",
+      "Behemoth"
+     ],
+     "tp": [
+      "Loyal"
+     ],
+     "tn": [
+      "ColdBlooded"
+     ],
+     "d": {
+      "tdm": 48.9,
+      "mini-dm": 67.2,
+      "battlefield": 39.8,
+      "gewichtheben": 44.8,
+      "climbing": 42.7,
+      "staffel": 31.7,
+      "time-trial": 44.8,
+      "spurt": 52.2,
+      "tennis": 32.1,
+      "hockey": 65.9,
+      "showcase": 26.5,
+      "speed-schach": 27.8,
+      "takeshis-castle": 25.9,
+      "breaking": 51.7,
+      "wettessen": 40,
+      "basketball": 38,
+      "football": 48.1,
+      "eiskunstlauf": 26.7,
+      "fechten": 67.5,
+      "i-spy": 36.2
+     },
+     "groesse": 7,
+     "a": {
+      "power": 91.7,
+      "health": 73.8,
+      "stamina": 40.6,
+      "intelligence": 33.9,
+      "awareness": 60.8,
+      "determination": 23.5,
+      "speed": 48.4,
+      "dexterity": 67.5,
+      "charisma": 11.6,
+      "will": 43.5,
+      "spirit": 37.8,
+      "torment": 83.5
+     }
+    },
+    {
+     "n": "Crucible Warden",
+     "c": "Tank",
+     "r": "Construct",
+     "sub": [
+      "Warrior",
+      "Guardian",
+      "Behemoth"
+     ],
+     "tp": [
+      "Cool"
+     ],
+     "tn": [
+      "Timid",
+      "Mercenary"
+     ],
+     "d": {
+      "tdm": 47,
+      "mini-dm": 52.3,
+      "battlefield": 24.3,
+      "gewichtheben": 42.6,
+      "climbing": 50.6,
+      "staffel": 19.4,
+      "time-trial": 15.4,
+      "spurt": 42.2,
+      "tennis": 23.2,
+      "hockey": 45.5,
+      "showcase": 18.1,
+      "speed-schach": 26.1,
+      "takeshis-castle": 41.3,
+      "breaking": 63.1,
+      "wettessen": 70.4,
+      "basketball": 14.2,
+      "football": 52.6,
+      "eiskunstlauf": 16.7,
+      "fechten": 28,
+      "i-spy": 19
+     },
+     "groesse": 8,
+     "a": {
+      "power": 58,
+      "health": 93,
+      "stamina": 66.3,
+      "intelligence": 10.7,
+      "awareness": 66.7,
+      "determination": 90,
+      "speed": 1,
+      "dexterity": 14.5,
+      "charisma": 6.1,
+      "will": 66.5,
+      "spirit": 24.9,
+      "torment": 49.1
+     }
+    },
+    {
+     "n": "Bearington",
+     "c": "Hero",
+     "r": "Construct",
+     "sub": [
+      "Guardian",
+      "Trickster",
+      "Maniac"
+     ],
+     "tp": [
+      "Caring",
+      "FanFavorite"
+     ],
+     "tn": [
+      "Feisty",
+      "Devious"
+     ],
+     "d": {
+      "tdm": 42,
+      "mini-dm": 41.3,
+      "battlefield": 59.4,
+      "gewichtheben": 48.2,
+      "climbing": 20.6,
+      "staffel": 25.2,
+      "time-trial": 20,
+      "spurt": 37.5,
+      "tennis": 32.5,
+      "hockey": 33.2,
+      "showcase": 61.6,
+      "speed-schach": 40.1,
+      "takeshis-castle": 48.3,
+      "breaking": 46.6,
+      "wettessen": 41,
+      "basketball": 41.1,
+      "football": 56.6,
+      "eiskunstlauf": 47.9,
+      "fechten": 39.7,
+      "i-spy": 55.5
+     },
+     "groesse": 3,
+     "a": {
+      "power": 40.4,
+      "health": 58.4,
+      "stamina": 6.2,
+      "intelligence": 47.9,
+      "awareness": 35.1,
+      "determination": 69.4,
+      "speed": 12,
+      "dexterity": 49,
+      "charisma": 89,
+      "will": 61,
+      "spirit": 65.8,
+      "torment": 70
+     }
+    },
+    {
+     "n": "Snow Eagle",
+     "c": "Sprinter",
+     "r": "Construct",
+     "sub": [
+      "Bot"
+     ],
+     "tp": [
+      "Cool"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 34.5,
+      "mini-dm": 28,
+      "battlefield": 24.5,
+      "gewichtheben": 24,
+      "climbing": 34,
+      "staffel": 44.1,
+      "time-trial": 43.2,
+      "spurt": 25.7,
+      "tennis": 40.7,
+      "hockey": 41.1,
+      "showcase": 24.7,
+      "speed-schach": 26,
+      "takeshis-castle": 18,
+      "breaking": 21.9,
+      "wettessen": 25,
+      "basketball": 40,
+      "football": 31,
+      "eiskunstlauf": 30.9,
+      "fechten": 32.3,
+      "i-spy": 23.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 39.2,
+      "health": 56.9,
+      "stamina": 53.6,
+      "intelligence": 41.6,
+      "awareness": 53.9,
+      "determination": 19.4,
+      "speed": 73.4,
+      "dexterity": 43.3,
+      "charisma": 12.5,
+      "will": 24.7,
+      "spirit": 67.7,
+      "torment": 20.2
+     }
+    },
+    {
+     "n": "Wheatley",
+     "c": "Sprinter",
+     "r": "Construct",
+     "sub": [
+      "Wayfarer",
+      "Bot"
+     ],
+     "tp": [
+      "Resourceful"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 33.4,
+      "mini-dm": 20.6,
+      "battlefield": 44.4,
+      "gewichtheben": 23.2,
+      "climbing": 40.1,
+      "staffel": 81.6,
+      "time-trial": 74.1,
+      "spurt": 22.7,
+      "tennis": 86.1,
+      "hockey": 40.6,
+      "showcase": 44.5,
+      "speed-schach": 43.4,
+      "takeshis-castle": 22.2,
+      "breaking": 9.6,
+      "wettessen": 18.7,
+      "basketball": 78.6,
+      "football": 37.3,
+      "eiskunstlauf": 73.2,
+      "fechten": 40.6,
+      "i-spy": 37.7
+     },
+     "groesse": 2,
+     "a": {
+      "power": 1.4,
+      "health": 59.8,
+      "stamina": 59.8,
+      "intelligence": 64,
+      "awareness": 82.3,
+      "determination": 1.9,
+      "speed": 90.5,
+      "dexterity": 77.1,
+      "charisma": 57.1,
+      "will": 1,
+      "spirit": 92,
+      "torment": 1
+     }
+    },
+    {
+     "n": "Brobot",
+     "c": "Sprinter",
+     "r": "Construct",
+     "sub": [
+      "Ninja",
+      "Bot",
+      "Spec Ops"
+     ],
+     "tp": [],
+     "tn": [],
+     "d": {
+      "tdm": 26.9,
+      "mini-dm": 37.4,
+      "battlefield": 18.8,
+      "gewichtheben": 24.4,
+      "climbing": 44.7,
+      "staffel": 53.8,
+      "time-trial": 62.5,
+      "spurt": 41.1,
+      "tennis": 42.4,
+      "hockey": 40.4,
+      "showcase": 25.3,
+      "speed-schach": 33.2,
+      "takeshis-castle": 24.8,
+      "breaking": 27.6,
+      "wettessen": 33.4,
+      "basketball": 40.3,
+      "football": 24.5,
+      "eiskunstlauf": 37.2,
+      "fechten": 43.1,
+      "i-spy": 28.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 30.9,
+      "health": 46,
+      "stamina": 65.2,
+      "intelligence": 42.9,
+      "awareness": 42.6,
+      "determination": 14.2,
+      "speed": 83.5,
+      "dexterity": 85,
+      "charisma": 14.8,
+      "will": 47.7,
+      "spirit": 52,
+      "torment": 26
+     }
+    },
+    {
+     "n": "Hollow",
+     "c": "Bard",
+     "r": "Construct",
+     "sub": [
+      "Trickster",
+      "Lord"
+     ],
+     "tp": [
+      "Eloquent",
+      "Ambitious"
+     ],
+     "tn": [
+      "Mercenary",
+      "Devious",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 26.3,
+      "mini-dm": 24.2,
+      "battlefield": 60.9,
+      "gewichtheben": 37.5,
+      "climbing": 17.1,
+      "staffel": 34.3,
+      "time-trial": 22,
+      "spurt": 29.6,
+      "tennis": 43.6,
+      "hockey": 19.6,
+      "showcase": 70.5,
+      "speed-schach": 48.6,
+      "takeshis-castle": 59.8,
+      "breaking": 40.1,
+      "wettessen": 37.5,
+      "basketball": 47.6,
+      "football": 49.3,
+      "eiskunstlauf": 59.2,
+      "fechten": 25.5,
+      "i-spy": 72.8
+     },
+     "groesse": 6,
+     "a": {
+      "power": 11.6,
+      "health": 18.8,
+      "stamina": 6.8,
+      "intelligence": 76.2,
+      "awareness": 28.7,
+      "determination": 84.7,
+      "speed": 24.8,
+      "dexterity": 33.5,
+      "charisma": 91,
+      "will": 70.7,
+      "spirit": 88.3,
+      "torment": 53.7
+     }
+    },
+    {
+     "n": "Italo-Delta",
+     "c": "Overseer",
+     "r": "Construct",
+     "sub": [
+      "Trickster",
+      "Servant",
+      "Bot"
+     ],
+     "tp": [
+      "Loyal",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 25.3,
+      "mini-dm": 25,
+      "battlefield": 18.8,
+      "gewichtheben": 24.8,
+      "climbing": 26,
+      "staffel": 22.7,
+      "time-trial": 33.9,
+      "spurt": 22.4,
+      "tennis": 32.5,
+      "hockey": 22.1,
+      "showcase": 22.8,
+      "speed-schach": 37.8,
+      "takeshis-castle": 25.8,
+      "breaking": 24.9,
+      "wettessen": 30.6,
+      "basketball": 24.5,
+      "football": 13.2,
+      "eiskunstlauf": 25.7,
+      "fechten": 23.4,
+      "i-spy": 20.6
+     },
+     "groesse": 5,
+     "a": {
+      "power": 37,
+      "health": 41.8,
+      "stamina": 40,
+      "intelligence": 58.2,
+      "awareness": 51.6,
+      "determination": 44.1,
+      "speed": 32.9,
+      "dexterity": 48.1,
+      "charisma": 22.9,
+      "will": 46.9,
+      "spirit": 29,
+      "torment": 10.8
+     }
+    },
+    {
+     "n": "PixiKat",
+     "c": "Sprinter",
+     "r": "Construct",
+     "sub": [
+      "Ninja",
+      "Bot",
+      "Trickster"
+     ],
+     "tp": [
+      "Cool",
+      "FiredUp"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 24.9,
+      "mini-dm": 25,
+      "battlefield": 34.7,
+      "gewichtheben": 25.1,
+      "climbing": 43.2,
+      "staffel": 59,
+      "time-trial": 71.6,
+      "spurt": 42.7,
+      "tennis": 65.2,
+      "hockey": 34.6,
+      "showcase": 39,
+      "speed-schach": 62.6,
+      "takeshis-castle": 39.3,
+      "breaking": 23.4,
+      "wettessen": 29,
+      "basketball": 51.3,
+      "football": 25.1,
+      "eiskunstlauf": 47.9,
+      "fechten": 47.1,
+      "i-spy": 43.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 16.3,
+      "health": 41.6,
+      "stamina": 41.6,
+      "intelligence": 77.2,
+      "awareness": 82.3,
+      "determination": 45.3,
+      "speed": 91.2,
+      "dexterity": 68.5,
+      "charisma": 32.9,
+      "will": 33.5,
+      "spirit": 44.6,
+      "torment": 22.9
+     }
+    }
+   ]
+  },
+  {
+   "label": "mortalsin-natureswrath",
+   "heimName": "Mortal Sin",
+   "gastName": "Natures Wrath",
+   "heim": [
+    {
+     "n": "Matcha",
+     "c": "Bard",
+     "r": "Elf",
+     "sub": [
+      "Druid",
+      "Healer",
+      "Shaman"
+     ],
+     "tp": [
+      "Caring",
+      "Healthy",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid",
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 42.7,
+      "mini-dm": 26.1,
+      "battlefield": 60.9,
+      "gewichtheben": 36.2,
+      "climbing": 27.8,
+      "staffel": 44.3,
+      "time-trial": 26,
+      "spurt": 16.6,
+      "tennis": 57.9,
+      "hockey": 28.6,
+      "showcase": 49.5,
+      "speed-schach": 46,
+      "takeshis-castle": 45.8,
+      "breaking": 33.3,
+      "wettessen": 46.7,
+      "basketball": 52.2,
+      "football": 55,
+      "eiskunstlauf": 54.4,
+      "fechten": 13.2,
+      "i-spy": 44.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 6.9,
+      "health": 68,
+      "stamina": 53.8,
+      "intelligence": 74.3,
+      "awareness": 59.2,
+      "determination": 46.1,
+      "speed": 13.5,
+      "dexterity": 27.6,
+      "charisma": 83.2,
+      "will": 62,
+      "spirit": 91,
+      "torment": 8.5
+     }
+    },
+    {
+     "n": "Issyria",
+     "c": "Bard",
+     "r": "Elf",
+     "sub": [
+      "Mage",
+      "Jungle"
+     ],
+     "tp": [
+      "Cool",
+      "Motivated"
+     ],
+     "tn": [
+      "Gambler"
+     ],
+     "d": {
+      "tdm": 39.3,
+      "mini-dm": 20.8,
+      "battlefield": 49.1,
+      "gewichtheben": 41.1,
+      "climbing": 26.9,
+      "staffel": 44.9,
+      "time-trial": 35.8,
+      "spurt": 24.1,
+      "tennis": 49.8,
+      "hockey": 25.9,
+      "showcase": 62.9,
+      "speed-schach": 47,
+      "takeshis-castle": 43.8,
+      "breaking": 24.6,
+      "wettessen": 37.7,
+      "basketball": 48.7,
+      "football": 41.1,
+      "eiskunstlauf": 59.9,
+      "fechten": 20.4,
+      "i-spy": 45.2
+     },
+     "groesse": 5,
+     "a": {
+      "power": 15.7,
+      "health": 52.9,
+      "stamina": 32.9,
+      "intelligence": 77.1,
+      "awareness": 40.1,
+      "determination": 64.6,
+      "speed": 46.7,
+      "dexterity": 42.2,
+      "charisma": 81.5,
+      "will": 43.1,
+      "spirit": 80.6,
+      "torment": 5.6
+     }
+    },
+    {
+     "n": "Abyssalfin",
+     "c": "Sprinter",
+     "r": "Aqua",
+     "sub": [],
+     "tp": [
+      "Flexible"
+     ],
+     "tn": [
+      "ColdBlooded"
+     ],
+     "d": {
+      "tdm": 38.8,
+      "mini-dm": 38.5,
+      "battlefield": 32.5,
+      "gewichtheben": 42.2,
+      "climbing": 53,
+      "staffel": 61.1,
+      "time-trial": 63,
+      "spurt": 47.7,
+      "tennis": 44.8,
+      "hockey": 43.8,
+      "showcase": 42.5,
+      "speed-schach": 43.3,
+      "takeshis-castle": 39.3,
+      "breaking": 33.3,
+      "wettessen": 38.8,
+      "basketball": 43.8,
+      "football": 31.8,
+      "eiskunstlauf": 45.7,
+      "fechten": 47.7,
+      "i-spy": 37.7
+     },
+     "groesse": 5,
+     "a": {
+      "power": 41.9,
+      "health": 50.8,
+      "stamina": 58.5,
+      "intelligence": 42.8,
+      "awareness": 58.7,
+      "determination": 47.3,
+      "speed": 86.8,
+      "dexterity": 77.1,
+      "charisma": 43.9,
+      "will": 40.5,
+      "spirit": 41.3,
+      "torment": 29.8
+     }
+    },
+    {
+     "n": "Vexon",
+     "c": "Overseer",
+     "r": "Human",
+     "sub": [
+      "Guardian",
+      "Spec Ops",
+      "Augmented"
+     ],
+     "tp": [
+      "FanFavorite",
+      "Cool"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 38.8,
+      "mini-dm": 33.7,
+      "battlefield": 60,
+      "gewichtheben": 44.5,
+      "climbing": 43.4,
+      "staffel": 54,
+      "time-trial": 57.6,
+      "spurt": 45.7,
+      "tennis": 65.3,
+      "hockey": 38.9,
+      "showcase": 61.8,
+      "speed-schach": 68.5,
+      "takeshis-castle": 55.2,
+      "breaking": 34.3,
+      "wettessen": 35.4,
+      "basketball": 62.2,
+      "football": 42.8,
+      "eiskunstlauf": 73,
+      "fechten": 55.1,
+      "i-spy": 59.3
+     },
+     "groesse": 6,
+     "a": {
+      "power": 32,
+      "health": 40,
+      "stamina": 38,
+      "intelligence": 71,
+      "awareness": 87,
+      "determination": 66,
+      "speed": 59,
+      "dexterity": 69,
+      "charisma": 83,
+      "will": 37,
+      "spirit": 42,
+      "torment": 49
+     }
+    },
+    {
+     "n": "Sunny",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Ambassador",
+      "Angel"
+     ],
+     "tp": [
+      "Caring",
+      "Resourceful",
+      "Loyal"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 35.6,
+      "mini-dm": 19.3,
+      "battlefield": 51.6,
+      "gewichtheben": 41.6,
+      "climbing": 26.3,
+      "staffel": 73.4,
+      "time-trial": 52.3,
+      "spurt": 32.6,
+      "tennis": 68,
+      "hockey": 36.7,
+      "showcase": 68.3,
+      "speed-schach": 49.9,
+      "takeshis-castle": 38.9,
+      "breaking": 18.4,
+      "wettessen": 20.8,
+      "basketball": 77.6,
+      "football": 42.2,
+      "eiskunstlauf": 85,
+      "fechten": 36.7,
+      "i-spy": 49.1
+     },
+     "groesse": 4,
+     "a": {
+      "power": 27.7,
+      "health": 40.6,
+      "stamina": 18.6,
+      "intelligence": 68.3,
+      "awareness": 62.3,
+      "determination": 28.9,
+      "speed": 87,
+      "dexterity": 65.5,
+      "charisma": 80.6,
+      "will": 42.7,
+      "spirit": 96.6,
+      "torment": 1
+     }
+    },
+    {
+     "n": "Velza",
+     "c": "Bard",
+     "r": "Demon",
+     "sub": [
+      "Cleric",
+      "Mage"
+     ],
+     "tp": [
+      "Caring"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 33.4,
+      "mini-dm": 22.8,
+      "battlefield": 49.6,
+      "gewichtheben": 34.9,
+      "climbing": 24,
+      "staffel": 43.7,
+      "time-trial": 25.3,
+      "spurt": 19.5,
+      "tennis": 48.6,
+      "hockey": 24,
+      "showcase": 57.6,
+      "speed-schach": 46.9,
+      "takeshis-castle": 48.6,
+      "breaking": 32.7,
+      "wettessen": 43.1,
+      "basketball": 47.9,
+      "football": 47.5,
+      "eiskunstlauf": 60.3,
+      "fechten": 13.5,
+      "i-spy": 49.3
+     },
+     "groesse": 4,
+     "a": {
+      "power": 3.8,
+      "health": 47.9,
+      "stamina": 29.7,
+      "intelligence": 71.2,
+      "awareness": 41.9,
+      "determination": 51.4,
+      "speed": 21.7,
+      "dexterity": 43.1,
+      "charisma": 85.9,
+      "will": 79.9,
+      "spirit": 95.6,
+      "torment": 5.8
+     }
+    },
+    {
+     "n": "Iska",
+     "c": "Sprinter",
+     "r": "Aqua",
+     "sub": [
+      "Augmented",
+      "Apparition"
+     ],
+     "tp": [
+      "Caring",
+      "Flexible"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 32.4,
+      "mini-dm": 28.1,
+      "battlefield": 40.1,
+      "gewichtheben": 23.3,
+      "climbing": 46.2,
+      "staffel": 72.8,
+      "time-trial": 57,
+      "spurt": 28,
+      "tennis": 61.8,
+      "hockey": 38.7,
+      "showcase": 34.8,
+      "speed-schach": 42.7,
+      "takeshis-castle": 32.2,
+      "breaking": 22.8,
+      "wettessen": 36.7,
+      "basketball": 53.5,
+      "football": 37.8,
+      "eiskunstlauf": 46.9,
+      "fechten": 35.3,
+      "i-spy": 34.5
+     },
+     "groesse": 4,
+     "a": {
+      "power": 6.7,
+      "health": 46,
+      "stamina": 87.5,
+      "intelligence": 52.8,
+      "awareness": 77.1,
+      "determination": 20,
+      "speed": 77,
+      "dexterity": 49,
+      "charisma": 49.9,
+      "will": 32.8,
+      "spirit": 64.1,
+      "torment": 21.8
+     }
+    },
+    {
+     "n": "Hartmut",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Servant",
+      "Trickster"
+     ],
+     "tp": [
+      "Loyal",
+      "Diligent"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 25.4,
+      "mini-dm": 24.4,
+      "battlefield": 24.1,
+      "gewichtheben": 26.2,
+      "climbing": 25.1,
+      "staffel": 24.9,
+      "time-trial": 20.4,
+      "spurt": 20,
+      "tennis": 28.2,
+      "hockey": 19.9,
+      "showcase": 28.2,
+      "speed-schach": 31.8,
+      "takeshis-castle": 32.9,
+      "breaking": 26.7,
+      "wettessen": 33.9,
+      "basketball": 24.4,
+      "football": 25.5,
+      "eiskunstlauf": 32.9,
+      "fechten": 18.1,
+      "i-spy": 22.7
+     },
+     "groesse": 5,
+     "a": {
+      "power": 24.2,
+      "health": 41.7,
+      "stamina": 37.1,
+      "intelligence": 33,
+      "awareness": 51.8,
+      "determination": 59.6,
+      "speed": 17.4,
+      "dexterity": 40.3,
+      "charisma": 45.3,
+      "will": 56,
+      "spirit": 49.7,
+      "torment": 13.4
+     }
+    },
+    {
+     "n": "Sylvara",
+     "c": "Bard",
+     "r": "Elf",
+     "sub": [
+      "Druid",
+      "Healer"
+     ],
+     "tp": [
+      "Sexy",
+      "Eloquent",
+      "FanFavorite"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 25.1,
+      "mini-dm": 22.1,
+      "battlefield": 46.9,
+      "gewichtheben": 25.5,
+      "climbing": 21.8,
+      "staffel": 48.5,
+      "time-trial": 40.3,
+      "spurt": 18.2,
+      "tennis": 47.9,
+      "hockey": 19.9,
+      "showcase": 51.5,
+      "speed-schach": 38.5,
+      "takeshis-castle": 36.1,
+      "breaking": 19,
+      "wettessen": 22.9,
+      "basketball": 56.2,
+      "football": 36.3,
+      "eiskunstlauf": 65.4,
+      "fechten": 24.6,
+      "i-spy": 44.4
+     },
+     "groesse": 5,
+     "a": {
+      "power": 4.7,
+      "health": 14.5,
+      "stamina": 50.9,
+      "intelligence": 56.8,
+      "awareness": 44.6,
+      "determination": 22.1,
+      "speed": 40.8,
+      "dexterity": 57.9,
+      "charisma": 93.9,
+      "will": 43.4,
+      "spirit": 86.1,
+      "torment": 30.3
+     }
+    },
+    {
+     "n": "Barkwing",
+     "c": "Sprinter",
+     "r": "Dragon",
+     "sub": [
+      "Jungle"
+     ],
+     "tp": [
+      "Caring",
+      "Altruistic",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 23,
+      "mini-dm": 15.4,
+      "battlefield": 24.7,
+      "gewichtheben": 21.7,
+      "climbing": 25,
+      "staffel": 44.6,
+      "time-trial": 45.6,
+      "spurt": 24.4,
+      "tennis": 44.4,
+      "hockey": 25.7,
+      "showcase": 40.9,
+      "speed-schach": 36.7,
+      "takeshis-castle": 20.4,
+      "breaking": 11,
+      "wettessen": 17.6,
+      "basketball": 42.4,
+      "football": 20.6,
+      "eiskunstlauf": 46.5,
+      "fechten": 32.5,
+      "i-spy": 27.9
+     },
+     "groesse": 2,
+     "a": {
+      "power": 2,
+      "health": 59.9,
+      "stamina": 16.8,
+      "intelligence": 54.8,
+      "awareness": 44,
+      "determination": 44.2,
+      "speed": 81.3,
+      "dexterity": 77,
+      "charisma": 34.9,
+      "will": 7.7,
+      "spirit": 73.9,
+      "torment": 1.2
+     }
+    },
+    {
+     "n": "Xil'Vera",
+     "c": "Rogue",
+     "r": "Alien",
+     "sub": [
+      "Wraith",
+      "Beast"
+     ],
+     "tp": [
+      "Flexible"
+     ],
+     "tn": [
+      "ColdBlooded",
+      "Renegade",
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 18.7,
+      "mini-dm": 36.5,
+      "battlefield": 19.2,
+      "gewichtheben": 21,
+      "climbing": 44.7,
+      "staffel": 45.8,
+      "time-trial": 77.1,
+      "spurt": 50.2,
+      "tennis": 43.3,
+      "hockey": 34.5,
+      "showcase": 24.3,
+      "speed-schach": 44.5,
+      "takeshis-castle": 31.6,
+      "breaking": 27.8,
+      "wettessen": 25.1,
+      "basketball": 37,
+      "football": 18,
+      "eiskunstlauf": 40.4,
+      "fechten": 70.7,
+      "i-spy": 37.1
+     },
+     "groesse": 6,
+     "a": {
+      "power": 23.3,
+      "health": 32.6,
+      "stamina": 46.9,
+      "intelligence": 49,
+      "awareness": 74.9,
+      "determination": 39.2,
+      "speed": 90.4,
+      "dexterity": 92.7,
+      "charisma": 13.8,
+      "will": 27.6,
+      "spirit": 12.4,
+      "torment": 61
+     }
+    },
+    {
+     "n": "Orichalcos",
+     "c": "Mage",
+     "r": "Demon",
+     "sub": [
+      "Warlock"
+     ],
+     "tp": [
+      "Motivated",
+      "Resourceful"
+     ],
+     "tn": [
+      "Devious",
+      "Cheater"
+     ],
+     "d": {
+      "tdm": 10.6,
+      "mini-dm": 13.9,
+      "battlefield": 33.7,
+      "gewichtheben": 19.8,
+      "climbing": 18.3,
+      "staffel": 29.1,
+      "time-trial": 35,
+      "spurt": 25.8,
+      "tennis": 42.1,
+      "hockey": 11.5,
+      "showcase": 33.7,
+      "speed-schach": 63.8,
+      "takeshis-castle": 44.1,
+      "breaking": 23.3,
+      "wettessen": 24.4,
+      "basketball": 34.9,
+      "football": 15.1,
+      "eiskunstlauf": 42.2,
+      "fechten": 29.1,
+      "i-spy": 42.6
+     },
+     "groesse": 5,
+     "a": {
+      "power": 4.8,
+      "health": 10.8,
+      "stamina": 11.8,
+      "intelligence": 82.6,
+      "awareness": 79.1,
+      "determination": 59,
+      "speed": 55.9,
+      "dexterity": 20.9,
+      "charisma": 58.9,
+      "will": 55.3,
+      "spirit": 23.8,
+      "torment": 33.9
+     }
+    },
+    {
+     "n": "Hisihida",
+     "c": "Bard",
+     "r": "Animal",
+     "sub": [
+      "Druid"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring",
+      "Resourceful"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 9.8,
+      "mini-dm": 8,
+      "battlefield": 28.2,
+      "gewichtheben": 14.1,
+      "climbing": 18.3,
+      "staffel": 47.3,
+      "time-trial": 42.1,
+      "spurt": 25.5,
+      "tennis": 55.2,
+      "hockey": 15.5,
+      "showcase": 40.8,
+      "speed-schach": 62.7,
+      "takeshis-castle": 37.3,
+      "breaking": 13.7,
+      "wettessen": 18,
+      "basketball": 47.7,
+      "football": 24.1,
+      "eiskunstlauf": 47.6,
+      "fechten": 25.2,
+      "i-spy": 44.1
+     },
+     "groesse": 2,
+     "a": {
+      "power": 1,
+      "health": 1.7,
+      "stamina": 1,
+      "intelligence": 77.7,
+      "awareness": 73.5,
+      "determination": 55.8,
+      "speed": 79.9,
+      "dexterity": 36.6,
+      "charisma": 38,
+      "will": 57.3,
+      "spirit": 78.9,
+      "torment": 1
+     }
+    }
+   ],
+   "gast": [
+    {
+     "n": "Buttercup",
+     "c": "Charger",
+     "r": "Animal",
+     "sub": [
+      "Guardian",
+      "Beast"
+     ],
+     "tp": [
+      "Loyal",
+      "Relaxed"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 57.3,
+      "mini-dm": 43.8,
+      "battlefield": 28.8,
+      "gewichtheben": 47.3,
+      "climbing": 48.7,
+      "staffel": 46.1,
+      "time-trial": 41.3,
+      "spurt": 46.3,
+      "tennis": 26.6,
+      "hockey": 64.5,
+      "showcase": 42.6,
+      "speed-schach": 20,
+      "takeshis-castle": 21.8,
+      "breaking": 40.1,
+      "wettessen": 39.2,
+      "basketball": 34.4,
+      "football": 44,
+      "eiskunstlauf": 27.3,
+      "fechten": 42.8,
+      "i-spy": 25.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 81.1,
+      "health": 70,
+      "stamina": 60.3,
+      "intelligence": 20.6,
+      "awareness": 7.6,
+      "determination": 65.7,
+      "speed": 88.9,
+      "dexterity": 41.9,
+      "charisma": 17.7,
+      "will": 15.7,
+      "spirit": 70.7,
+      "torment": 43.6
+     }
+    },
+    {
+     "n": "Grimflora",
+     "c": "Berserker",
+     "r": "Plant",
+     "sub": [
+      "Jungle",
+      "Destroyer"
+     ],
+     "tp": [
+      "Healthy"
+     ],
+     "tn": [
+      "Scandalous",
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 43.8,
+      "mini-dm": 60.9,
+      "battlefield": 25.7,
+      "gewichtheben": 34,
+      "climbing": 23.5,
+      "staffel": 9.9,
+      "time-trial": 16.4,
+      "spurt": 27.9,
+      "tennis": 14.2,
+      "hockey": 45.3,
+      "showcase": 8.8,
+      "speed-schach": 16.9,
+      "takeshis-castle": 17.5,
+      "breaking": 49.6,
+      "wettessen": 38.1,
+      "basketball": 16.4,
+      "football": 42,
+      "eiskunstlauf": 11.9,
+      "fechten": 42,
+      "i-spy": 16.7
+     },
+     "groesse": 7,
+     "a": {
+      "power": 78,
+      "health": 88,
+      "stamina": 43,
+      "intelligence": 17.8,
+      "awareness": 60.8,
+      "determination": 9.8,
+      "speed": 14.6,
+      "dexterity": 7.7,
+      "charisma": 9.1,
+      "will": 37,
+      "spirit": 11.8,
+      "torment": 95.1
+     }
+    },
+    {
+     "n": "Faith",
+     "c": "Bard",
+     "r": "Divine",
+     "sub": [
+      "Monk",
+      "Cleric"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring",
+      "Altruistic"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 40.9,
+      "mini-dm": 24.2,
+      "battlefield": 59.2,
+      "gewichtheben": 43.8,
+      "climbing": 36.1,
+      "staffel": 47.8,
+      "time-trial": 32.2,
+      "spurt": 29.1,
+      "tennis": 63.3,
+      "hockey": 24.6,
+      "showcase": 70.3,
+      "speed-schach": 68.6,
+      "takeshis-castle": 72.9,
+      "breaking": 40.1,
+      "wettessen": 47.6,
+      "basketball": 58.5,
+      "football": 47.7,
+      "eiskunstlauf": 63.5,
+      "fechten": 16.7,
+      "i-spy": 60.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 33.7,
+      "health": 11.8,
+      "stamina": 46.8,
+      "intelligence": 82,
+      "awareness": 52.1,
+      "determination": 80.6,
+      "speed": 17.8,
+      "dexterity": 35.8,
+      "charisma": 88.4,
+      "will": 97.5,
+      "spirit": 87,
+      "torment": 1.9
+     }
+    },
+    {
+     "n": "Marin Solis",
+     "c": "Sprinter",
+     "r": "Aqua",
+     "sub": [
+      "Isolated"
+     ],
+     "tp": [
+      "Loyal",
+      "Caring"
+     ],
+     "tn": [
+      "Timid"
+     ],
+     "d": {
+      "tdm": 38.3,
+      "mini-dm": 33.1,
+      "battlefield": 27,
+      "gewichtheben": 41.1,
+      "climbing": 56.5,
+      "staffel": 72.3,
+      "time-trial": 48.9,
+      "spurt": 53.4,
+      "tennis": 45.6,
+      "hockey": 46.4,
+      "showcase": 40.4,
+      "speed-schach": 47.1,
+      "takeshis-castle": 43.2,
+      "breaking": 39.4,
+      "wettessen": 44.1,
+      "basketball": 43.6,
+      "football": 43.3,
+      "eiskunstlauf": 43.5,
+      "fechten": 42.9,
+      "i-spy": 38
+     },
+     "groesse": 5,
+     "a": {
+      "power": 40.6,
+      "health": 52.8,
+      "stamina": 49.4,
+      "intelligence": 33.6,
+      "awareness": 72.2,
+      "determination": 64.1,
+      "speed": 95,
+      "dexterity": 51.2,
+      "charisma": 27.8,
+      "will": 67,
+      "spirit": 60,
+      "torment": 11.8
+     }
+    },
+    {
+     "n": "Falcon",
+     "c": "Sprinter",
+     "r": "Animal",
+     "sub": [],
+     "tp": [
+      "Motivated",
+      "FiredUp",
+      "Resourceful"
+     ],
+     "tn": [
+      "Mercenary"
+     ],
+     "d": {
+      "tdm": 24.6,
+      "mini-dm": 24.5,
+      "battlefield": 24.1,
+      "gewichtheben": 24.4,
+      "climbing": 47.7,
+      "staffel": 67.8,
+      "time-trial": 77.9,
+      "spurt": 36.8,
+      "tennis": 55.5,
+      "hockey": 32.7,
+      "showcase": 34,
+      "speed-schach": 43.8,
+      "takeshis-castle": 26.4,
+      "breaking": 15.5,
+      "wettessen": 24.9,
+      "basketball": 44.8,
+      "football": 15.1,
+      "eiskunstlauf": 47.7,
+      "fechten": 43.2,
+      "i-spy": 26.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 12.2,
+      "health": 38.9,
+      "stamina": 69.1,
+      "intelligence": 52.1,
+      "awareness": 70,
+      "determination": 30.4,
+      "speed": 96.2,
+      "dexterity": 83.8,
+      "charisma": 38.9,
+      "will": 19.4,
+      "spirit": 40.5,
+      "torment": 6.9
+     }
+    },
+    {
+     "n": "Frayja Accounting",
+     "c": "Mage",
+     "r": "Animal",
+     "sub": [
+      "Servant",
+      "Trickster",
+      "Isolated"
+     ],
+     "tp": [
+      "Disciplined",
+      "Fair"
+     ],
+     "tn": [
+      "Diva"
+     ],
+     "d": {
+      "tdm": 22.6,
+      "mini-dm": 32.1,
+      "battlefield": 31.8,
+      "gewichtheben": 24.2,
+      "climbing": 41.9,
+      "staffel": 40.3,
+      "time-trial": 48.1,
+      "spurt": 44.5,
+      "tennis": 50.6,
+      "hockey": 25.9,
+      "showcase": 30.3,
+      "speed-schach": 71.5,
+      "takeshis-castle": 52,
+      "breaking": 42.1,
+      "wettessen": 44.8,
+      "basketball": 40.5,
+      "football": 29.9,
+      "eiskunstlauf": 40,
+      "fechten": 43.7,
+      "i-spy": 48.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 16.6,
+      "health": 31.8,
+      "stamina": 38.8,
+      "intelligence": 85.1,
+      "awareness": 73.4,
+      "determination": 68.4,
+      "speed": 51.6,
+      "dexterity": 57.8,
+      "charisma": 21.7,
+      "will": 73,
+      "spirit": 30.8,
+      "torment": 42.2
+     }
+    },
+    {
+     "n": "Madora",
+     "c": "Sprinter",
+     "r": "Human",
+     "sub": [
+      "Trickster"
+     ],
+     "tp": [
+      "Cool",
+      "Caring"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 21.2,
+      "mini-dm": 19.4,
+      "battlefield": 15.9,
+      "gewichtheben": 10.4,
+      "climbing": 34.7,
+      "staffel": 58,
+      "time-trial": 49.5,
+      "spurt": 20.2,
+      "tennis": 44.1,
+      "hockey": 28,
+      "showcase": 23.6,
+      "speed-schach": 26,
+      "takeshis-castle": 14.9,
+      "breaking": 11.6,
+      "wettessen": 22,
+      "basketball": 41.4,
+      "football": 19,
+      "eiskunstlauf": 36.2,
+      "fechten": 24.8,
+      "i-spy": 21.8
+     },
+     "groesse": 5,
+     "a": {
+      "power": 1,
+      "health": 43.7,
+      "stamina": 66.9,
+      "intelligence": 45.8,
+      "awareness": 42.4,
+      "determination": 10.1,
+      "speed": 94,
+      "dexterity": 57.5,
+      "charisma": 12.9,
+      "will": 20.6,
+      "spirit": 76,
+      "torment": 1
+     }
+    },
+    {
+     "n": "Tidesinger",
+     "c": "Sprinter",
+     "r": "Aqua",
+     "sub": [
+      "Ambassador"
+     ],
+     "tp": [],
+     "tn": [
+      "Timid",
+      "FaintHearted",
+      "Renegade"
+     ],
+     "d": {
+      "tdm": 20.5,
+      "mini-dm": 21.3,
+      "battlefield": 24.8,
+      "gewichtheben": 11.6,
+      "climbing": 39.8,
+      "staffel": 52.5,
+      "time-trial": 42,
+      "spurt": 25.4,
+      "tennis": 48,
+      "hockey": 25,
+      "showcase": 25.1,
+      "speed-schach": 42,
+      "takeshis-castle": 32.3,
+      "breaking": 22.8,
+      "wettessen": 34.2,
+      "basketball": 42.3,
+      "football": 34.4,
+      "eiskunstlauf": 36.9,
+      "fechten": 24.6,
+      "i-spy": 32.1
+     },
+     "groesse": 5,
+     "a": {
+      "power": 3.3,
+      "health": 14.7,
+      "stamina": 72.3,
+      "intelligence": 48.8,
+      "awareness": 69.5,
+      "determination": 46.3,
+      "speed": 59.4,
+      "dexterity": 31.6,
+      "charisma": 22.8,
+      "will": 51.8,
+      "spirit": 73.3,
+      "torment": 20.7
+     }
+    },
+    {
+     "n": "Xylaris",
+     "c": "Overseer",
+     "r": "Divine",
+     "sub": [
+      "Angel",
+      "Wayfarer",
+      "Druid"
+     ],
+     "tp": [
+      "Altruistic",
+      "Caring",
+      "Healthy"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Timid"
+     ],
+     "d": {
+      "tdm": 18.6,
+      "mini-dm": 18.9,
+      "battlefield": 33.3,
+      "gewichtheben": 10.5,
+      "climbing": 28.7,
+      "staffel": 47.5,
+      "time-trial": 58.7,
+      "spurt": 28.2,
+      "tennis": 70.4,
+      "hockey": 25.5,
+      "showcase": 29,
+      "speed-schach": 55,
+      "takeshis-castle": 27,
+      "breaking": 16.6,
+      "wettessen": 19.8,
+      "basketball": 54.8,
+      "football": 26,
+      "eiskunstlauf": 44,
+      "fechten": 43.3,
+      "i-spy": 42.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 6.4,
+      "health": 18.8,
+      "stamina": 40.8,
+      "intelligence": 81.3,
+      "awareness": 88,
+      "determination": 39.9,
+      "speed": 71,
+      "dexterity": 58,
+      "charisma": 16.2,
+      "will": 21.8,
+      "spirit": 65.1,
+      "torment": 31.9
+     }
+    },
+    {
+     "n": "Sir Ruckus",
+     "c": "Sprinter",
+     "r": "Animal",
+     "sub": [
+      "Knight"
+     ],
+     "tp": [
+      "Diligent",
+      "Caring",
+      "Loyal"
+     ],
+     "tn": [
+      "FaintHearted"
+     ],
+     "d": {
+      "tdm": 18.5,
+      "mini-dm": 18,
+      "battlefield": 10.9,
+      "gewichtheben": 11.9,
+      "climbing": 19.4,
+      "staffel": 41.8,
+      "time-trial": 37.5,
+      "spurt": 21.5,
+      "tennis": 32.1,
+      "hockey": 32.9,
+      "showcase": 18.1,
+      "speed-schach": 19.5,
+      "takeshis-castle": 8,
+      "breaking": 9.7,
+      "wettessen": 8.2,
+      "basketball": 31.9,
+      "football": 24.9,
+      "eiskunstlauf": 33.8,
+      "fechten": 37.5,
+      "i-spy": 12.7
+     },
+     "groesse": 3,
+     "a": {
+      "power": 17.2,
+      "health": 57.6,
+      "stamina": 11.9,
+      "intelligence": 1,
+      "awareness": 76.2,
+      "determination": 13.2,
+      "speed": 80.3,
+      "dexterity": 64.6,
+      "charisma": 1.6,
+      "will": 1,
+      "spirit": 76.8,
+      "torment": 15.6
+     }
+    },
+    {
+     "n": "Webweaver",
+     "c": "Overseer",
+     "r": "Construct",
+     "sub": [
+      "Beast",
+      "Warlock"
+     ],
+     "tp": [
+      "Ambitious"
+     ],
+     "tn": [
+      "Manipulative",
+      "Devious"
+     ],
+     "d": {
+      "tdm": 17.2,
+      "mini-dm": 23.9,
+      "battlefield": 33.1,
+      "gewichtheben": 20.6,
+      "climbing": 40,
+      "staffel": 46.6,
+      "time-trial": 58,
+      "spurt": 42,
+      "tennis": 54.6,
+      "hockey": 24,
+      "showcase": 30.5,
+      "speed-schach": 79.9,
+      "takeshis-castle": 47.9,
+      "breaking": 28,
+      "wettessen": 40,
+      "basketball": 42.7,
+      "football": 17.8,
+      "eiskunstlauf": 42.8,
+      "fechten": 43.1,
+      "i-spy": 46.2
+     },
+     "groesse": 7,
+     "a": {
+      "power": 4.2,
+      "health": 22.9,
+      "stamina": 44,
+      "intelligence": 93,
+      "awareness": 89.2,
+      "determination": 53.3,
+      "speed": 83.2,
+      "dexterity": 35.3,
+      "charisma": 42.6,
+      "will": 58.3,
+      "spirit": 11.9,
+      "torment": 35.1
+     }
+    },
+    {
+     "n": "Raven",
+     "c": "Rogue",
+     "r": "Animal",
+     "sub": [
+      "Beast"
+     ],
+     "tp": [
+      "Relaxed"
+     ],
+     "tn": [
+      "Mercenary",
+      "Paranoid"
+     ],
+     "d": {
+      "tdm": 15.7,
+      "mini-dm": 24.4,
+      "battlefield": 23.6,
+      "gewichtheben": 24.1,
+      "climbing": 40.9,
+      "staffel": 47,
+      "time-trial": 71.1,
+      "spurt": 48,
+      "tennis": 45.1,
+      "hockey": 28.3,
+      "showcase": 34.1,
+      "speed-schach": 45.7,
+      "takeshis-castle": 27.7,
+      "breaking": 18,
+      "wettessen": 12.1,
+      "basketball": 42.2,
+      "football": 14.8,
+      "eiskunstlauf": 46.7,
+      "fechten": 73.9,
+      "i-spy": 35.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 26.2,
+      "health": 11.7,
+      "stamina": 25.9,
+      "intelligence": 40.8,
+      "awareness": 87,
+      "determination": 62.3,
+      "speed": 96,
+      "dexterity": 91,
+      "charisma": 29.6,
+      "will": 1.8,
+      "spirit": 21.6,
+      "torment": 55.8
+     }
+    },
+    {
+     "n": "Whispra",
+     "c": "Sprinter",
+     "r": "Animal",
+     "sub": [
+      "Ninja",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Flexible"
+     ],
+     "tn": [
+      "Mercenary",
+      "Scandalous"
+     ],
+     "d": {
+      "tdm": 14,
+      "mini-dm": 19.9,
+      "battlefield": 15.4,
+      "gewichtheben": 8.4,
+      "climbing": 42.9,
+      "staffel": 55.5,
+      "time-trial": 67.8,
+      "spurt": 24.5,
+      "tennis": 52.6,
+      "hockey": 23.8,
+      "showcase": 20.3,
+      "speed-schach": 34.5,
+      "takeshis-castle": 18.7,
+      "breaking": 10.3,
+      "wettessen": 18.5,
+      "basketball": 42.1,
+      "football": 10.6,
+      "eiskunstlauf": 40.1,
+      "fechten": 38.2,
+      "i-spy": 24
+     },
+     "groesse": 3,
+     "a": {
+      "power": 1.5,
+      "health": 5.7,
+      "stamina": 88,
+      "intelligence": 50.9,
+      "awareness": 64.3,
+      "determination": 21,
+      "speed": 81.6,
+      "dexterity": 74,
+      "charisma": 14.9,
+      "will": 8.7,
+      "spirit": 49,
+      "torment": 20.7
+     }
+    },
+    {
+     "n": "Zhyrra",
+     "c": "Bard",
+     "r": "Elf",
+     "sub": [
+      "Apparition",
+      "Druid"
+     ],
+     "tp": [
+      "Caring",
+      "Relaxed"
+     ],
+     "tn": [
+      "Timid",
+      "FaintHearted",
+      "Mercenary"
+     ],
+     "d": {
+      "tdm": 12.3,
+      "mini-dm": 11.3,
+      "battlefield": 20.8,
+      "gewichtheben": 14.8,
+      "climbing": 12.3,
+      "staffel": 24.7,
+      "time-trial": 16.5,
+      "spurt": 9.8,
+      "tennis": 31.5,
+      "hockey": 9.4,
+      "showcase": 25.7,
+      "speed-schach": 32.6,
+      "takeshis-castle": 25.9,
+      "breaking": 17.6,
+      "wettessen": 19.6,
+      "basketball": 25.7,
+      "football": 20,
+      "eiskunstlauf": 35.9,
+      "fechten": 9.5,
+      "i-spy": 22.6
+     },
+     "groesse": 3,
+     "a": {
+      "power": 5.7,
+      "health": 13.7,
+      "stamina": 20.7,
+      "intelligence": 38,
+      "awareness": 57.9,
+      "determination": 42.2,
+      "speed": 17.7,
+      "dexterity": 30.9,
+      "charisma": 49,
+      "will": 60.9,
+      "spirit": 67.1,
+      "torment": 2.7
+     }
+    }
+   ]
+  },
+  {
+   "label": "piratecrew-raginglunatics",
+   "heimName": "Pirate Crew",
+   "gastName": "Raging Lunatics",
+   "heim": [
+    {
+     "n": "Broxingar",
+     "c": "Warlord",
+     "r": "Orc",
+     "sub": [
+      "Warrior",
+      "Swashbuckler"
+     ],
+     "tp": [
+      "Cool",
+      "Eloquent",
+      "Diligent"
+     ],
+     "tn": [
+      "Mercenary",
+      "Cheater"
+     ],
+     "d": {
+      "tdm": 46.8,
+      "mini-dm": 49.3,
+      "battlefield": 13.5,
+      "gewichtheben": 34.8,
+      "climbing": 24.1,
+      "staffel": 9.1,
+      "time-trial": 8.9,
+      "spurt": 13.7,
+      "tennis": 8.2,
+      "hockey": 40.9,
+      "showcase": 8.5,
+      "speed-schach": 7.6,
+      "takeshis-castle": 8.9,
+      "breaking": 43,
+      "wettessen": 39.6,
+      "basketball": 9.1,
+      "football": 24.3,
+      "eiskunstlauf": 7.9,
+      "fechten": 14,
+      "i-spy": 7.9
+     },
+     "groesse": 6,
+     "a": {
+      "power": 82.3,
+      "health": 88,
+      "stamina": 69.1,
+      "intelligence": 6.7,
+      "awareness": 1,
+      "determination": 1.3,
+      "speed": 13.4,
+      "dexterity": 4.6,
+      "charisma": 10.3,
+      "will": 35.9,
+      "spirit": 25.6,
+      "torment": 52.3
+     }
+    },
+    {
+     "n": "Maru",
+     "c": "Sprinter",
+     "r": "Human",
+     "sub": [
+      "Monk",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Healthy",
+      "FiredUp"
+     ],
+     "tn": [
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 37.2,
+      "mini-dm": 41.4,
+      "battlefield": 24.4,
+      "gewichtheben": 42,
+      "climbing": 64.9,
+      "staffel": 61,
+      "time-trial": 59,
+      "spurt": 53.9,
+      "tennis": 42.3,
+      "hockey": 43.7,
+      "showcase": 38.8,
+      "speed-schach": 41.7,
+      "takeshis-castle": 42,
+      "breaking": 40.4,
+      "wettessen": 44,
+      "basketball": 37.7,
+      "football": 32.9,
+      "eiskunstlauf": 42.6,
+      "fechten": 46.3,
+      "i-spy": 33.6
+     },
+     "groesse": 5,
+     "a": {
+      "power": 42.1,
+      "health": 47.6,
+      "stamina": 68.7,
+      "intelligence": 28.8,
+      "awareness": 52.4,
+      "determination": 61.3,
+      "speed": 80.4,
+      "dexterity": 81.8,
+      "charisma": 32.6,
+      "will": 54.5,
+      "spirit": 39.3,
+      "torment": 26.8
+     }
+    },
+    {
+     "n": "Swiftfoot",
+     "c": "Sprinter",
+     "r": "Human",
+     "sub": [
+      "Wayfarer"
+     ],
+     "tp": [
+      "Flexible",
+      "FiredUp"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 32.2,
+      "mini-dm": 25,
+      "battlefield": 30.4,
+      "gewichtheben": 33.5,
+      "climbing": 47.4,
+      "staffel": 63.6,
+      "time-trial": 60,
+      "spurt": 40.6,
+      "tennis": 49.2,
+      "hockey": 32.9,
+      "showcase": 45.8,
+      "speed-schach": 43.3,
+      "takeshis-castle": 36.7,
+      "breaking": 21.2,
+      "wettessen": 32.7,
+      "basketball": 46.2,
+      "football": 24.4,
+      "eiskunstlauf": 48,
+      "fechten": 37.3,
+      "i-spy": 39.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 28.4,
+      "health": 24.8,
+      "stamina": 65.4,
+      "intelligence": 56.8,
+      "awareness": 36.5,
+      "determination": 58.2,
+      "speed": 84.7,
+      "dexterity": 73.8,
+      "charisma": 48.7,
+      "will": 35.8,
+      "spirit": 62.1,
+      "torment": 9.8
+     }
+    },
+    {
+     "n": "Taryn",
+     "c": "Sprinter",
+     "r": "Human",
+     "sub": [
+      "Assassin",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Flexible",
+      "Ambitious"
+     ],
+     "tn": [
+      "Devious",
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 29.3,
+      "mini-dm": 34.5,
+      "battlefield": 34,
+      "gewichtheben": 34.3,
+      "climbing": 47.6,
+      "staffel": 53.9,
+      "time-trial": 71.8,
+      "spurt": 47.3,
+      "tennis": 48.8,
+      "hockey": 39.5,
+      "showcase": 39.1,
+      "speed-schach": 53.3,
+      "takeshis-castle": 41.7,
+      "breaking": 30.2,
+      "wettessen": 34.4,
+      "basketball": 44.4,
+      "football": 24,
+      "eiskunstlauf": 45.1,
+      "fechten": 54.1,
+      "i-spy": 42.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 33.3,
+      "health": 40.6,
+      "stamina": 54.7,
+      "intelligence": 64.9,
+      "awareness": 73.1,
+      "determination": 46.5,
+      "speed": 87.3,
+      "dexterity": 72.2,
+      "charisma": 41.9,
+      "will": 35.7,
+      "spirit": 22.4,
+      "torment": 39.8
+     }
+    },
+    {
+     "n": "Yukine",
+     "c": "Tactician",
+     "r": "Human",
+     "sub": [
+      "Pirate",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Diligent"
+     ],
+     "tn": [
+      "Timid",
+      "Mercenary"
+     ],
+     "d": {
+      "tdm": 29.3,
+      "mini-dm": 21,
+      "battlefield": 44.8,
+      "gewichtheben": 27.3,
+      "climbing": 13,
+      "staffel": 25.3,
+      "time-trial": 27.9,
+      "spurt": 21.2,
+      "tennis": 43.9,
+      "hockey": 24.8,
+      "showcase": 43.3,
+      "speed-schach": 43,
+      "takeshis-castle": 28,
+      "breaking": 21.7,
+      "wettessen": 15.6,
+      "basketball": 46.7,
+      "football": 38.7,
+      "eiskunstlauf": 43.9,
+      "fechten": 32.5,
+      "i-spy": 42
+     },
+     "groesse": 5,
+     "a": {
+      "power": 49,
+      "health": 19,
+      "stamina": 3,
+      "intelligence": 69,
+      "awareness": 66,
+      "determination": 44,
+      "speed": 27,
+      "dexterity": 41,
+      "charisma": 49,
+      "will": 36,
+      "spirit": 77,
+      "torment": 37
+     }
+    },
+    {
+     "n": "Wavepiercer",
+     "c": "Rogue",
+     "r": "Aqua",
+     "sub": [
+      "Assassin",
+      "Swashbuckler",
+      "Trickster"
+     ],
+     "tp": [
+      "Flexible"
+     ],
+     "tn": [
+      "Vindictive",
+      "Cheater",
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 25.1,
+      "mini-dm": 33.3,
+      "battlefield": 25.4,
+      "gewichtheben": 27.1,
+      "climbing": 43.2,
+      "staffel": 47.5,
+      "time-trial": 72.2,
+      "spurt": 47.8,
+      "tennis": 46.3,
+      "hockey": 38.8,
+      "showcase": 34.2,
+      "speed-schach": 45,
+      "takeshis-castle": 31.4,
+      "breaking": 25.6,
+      "wettessen": 23.4,
+      "basketball": 44,
+      "football": 22.6,
+      "eiskunstlauf": 43.4,
+      "fechten": 62.6,
+      "i-spy": 41.2
+     },
+     "groesse": 2,
+     "a": {
+      "power": 43.4,
+      "health": 26.6,
+      "stamina": 38.1,
+      "intelligence": 55.8,
+      "awareness": 65.3,
+      "determination": 43.4,
+      "speed": 87.7,
+      "dexterity": 90,
+      "charisma": 20.5,
+      "will": 28.8,
+      "spirit": 35.6,
+      "torment": 46.8
+     }
+    },
+    {
+     "n": "Yuko",
+     "c": "Bard",
+     "r": "Human",
+     "sub": [
+      "Wayfarer",
+      "Mage"
+     ],
+     "tp": [
+      "Flexible",
+      "Motivated",
+      "Resourceful"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 20.9,
+      "mini-dm": 10.3,
+      "battlefield": 46.2,
+      "gewichtheben": 20.3,
+      "climbing": 18.4,
+      "staffel": 44,
+      "time-trial": 32.1,
+      "spurt": 16.4,
+      "tennis": 66.1,
+      "hockey": 13.9,
+      "showcase": 47.9,
+      "speed-schach": 60.2,
+      "takeshis-castle": 44,
+      "breaking": 17.9,
+      "wettessen": 24.5,
+      "basketball": 58.7,
+      "football": 38.9,
+      "eiskunstlauf": 61.2,
+      "fechten": 17.1,
+      "i-spy": 47.5
+     },
+     "groesse": 5,
+     "a": {
+      "power": 1,
+      "health": 4.7,
+      "stamina": 22.8,
+      "intelligence": 82.4,
+      "awareness": 72.4,
+      "determination": 57.7,
+      "speed": 32,
+      "dexterity": 33.5,
+      "charisma": 71.1,
+      "will": 59.2,
+      "spirit": 93.9,
+      "torment": 2.8
+     }
+    },
+    {
+     "n": "Belandria",
+     "c": "Mage",
+     "r": "Elf",
+     "sub": [
+      "Scout",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Ambitious",
+      "Loyal"
+     ],
+     "tn": [
+      "FaintHearted",
+      "Diva",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 16.2,
+      "mini-dm": 15.8,
+      "battlefield": 24.4,
+      "gewichtheben": 26.8,
+      "climbing": 24.7,
+      "staffel": 30.3,
+      "time-trial": 25.9,
+      "spurt": 28,
+      "tennis": 34.1,
+      "hockey": 10.8,
+      "showcase": 42.5,
+      "speed-schach": 47.7,
+      "takeshis-castle": 48.5,
+      "breaking": 27.4,
+      "wettessen": 38.5,
+      "basketball": 25.8,
+      "football": 18.2,
+      "eiskunstlauf": 42.2,
+      "fechten": 18.4,
+      "i-spy": 40.2
+     },
+     "groesse": 5,
+     "a": {
+      "power": 6.7,
+      "health": 14.8,
+      "stamina": 18.8,
+      "intelligence": 61.4,
+      "awareness": 34.4,
+      "determination": 86.1,
+      "speed": 40.5,
+      "dexterity": 45.8,
+      "charisma": 60.1,
+      "will": 79.9,
+      "spirit": 42.9,
+      "torment": 7.3
+     }
+    }
+   ],
+   "gast": [
+    {
+     "n": "Umbrafond",
+     "c": "Berserker",
+     "r": "Plant",
+     "sub": [
+      "Guardian",
+      "Druid",
+      "Jungle"
+     ],
+     "tp": [
+      "Healthy",
+      "Loyal"
+     ],
+     "tn": [
+      "Timid",
+      "Lazy"
+     ],
+     "d": {
+      "tdm": 62.6,
+      "mini-dm": 73.4,
+      "battlefield": 43.1,
+      "gewichtheben": 60.1,
+      "climbing": 73.1,
+      "staffel": 47,
+      "time-trial": 48.9,
+      "spurt": 83.1,
+      "tennis": 40.7,
+      "hockey": 85,
+      "showcase": 40.7,
+      "speed-schach": 43.9,
+      "takeshis-castle": 47.7,
+      "breaking": 71.6,
+      "wettessen": 61.6,
+      "basketball": 41.5,
+      "football": 63.4,
+      "eiskunstlauf": 33.8,
+      "fechten": 73.3,
+      "i-spy": 45.7
+     },
+     "groesse": 9,
+     "a": {
+      "power": 88.3,
+      "health": 79.2,
+      "stamina": 58,
+      "intelligence": 34.5,
+      "awareness": 65.7,
+      "determination": 73.8,
+      "speed": 64.9,
+      "dexterity": 57.7,
+      "charisma": 18.5,
+      "will": 62.9,
+      "spirit": 34,
+      "torment": 76.4
+     }
+    },
+    {
+     "n": "Radditz",
+     "c": "Charger",
+     "r": "Animal",
+     "sub": [
+      "Beast",
+      "Monk"
+     ],
+     "tp": [
+      "Fair",
+      "Cool",
+      "FiredUp"
+     ],
+     "tn": [
+      "Renegade"
+     ],
+     "d": {
+      "tdm": 57.4,
+      "mini-dm": 45.5,
+      "battlefield": 49,
+      "gewichtheben": 61.3,
+      "climbing": 67.2,
+      "staffel": 66,
+      "time-trial": 68.2,
+      "spurt": 57.6,
+      "tennis": 49.3,
+      "hockey": 62,
+      "showcase": 58.6,
+      "speed-schach": 44.8,
+      "takeshis-castle": 43.9,
+      "breaking": 41.7,
+      "wettessen": 43.4,
+      "basketball": 54.6,
+      "football": 44,
+      "eiskunstlauf": 57.1,
+      "fechten": 60.1,
+      "i-spy": 44
+     },
+     "groesse": 5,
+     "a": {
+      "power": 65.8,
+      "health": 69.3,
+      "stamina": 67,
+      "intelligence": 49.6,
+      "awareness": 59.7,
+      "determination": 58.5,
+      "speed": 82.5,
+      "dexterity": 74,
+      "charisma": 65.7,
+      "will": 25.6,
+      "spirit": 40.9,
+      "torment": 42.9
+     }
+    },
+    {
+     "n": "Cyrn",
+     "c": "Tank",
+     "r": "Plant",
+     "sub": [
+      "Jungle",
+      "Guardian",
+      "Druid"
+     ],
+     "tp": [
+      "Loyal",
+      "Diligent",
+      "Healthy"
+     ],
+     "tn": [],
+     "d": {
+      "tdm": 47.8,
+      "mini-dm": 43.3,
+      "battlefield": 34.1,
+      "gewichtheben": 40.2,
+      "climbing": 46.8,
+      "staffel": 29.6,
+      "time-trial": 24.4,
+      "spurt": 30.6,
+      "tennis": 36.9,
+      "hockey": 43.3,
+      "showcase": 26.5,
+      "speed-schach": 34,
+      "takeshis-castle": 40.4,
+      "breaking": 46.9,
+      "wettessen": 63.7,
+      "basketball": 26.3,
+      "football": 49.8,
+      "eiskunstlauf": 24.8,
+      "fechten": 19.9,
+      "i-spy": 25.3
+     },
+     "groesse": 5,
+     "a": {
+      "power": 46.1,
+      "health": 84.9,
+      "stamina": 72.8,
+      "intelligence": 44,
+      "awareness": 51.6,
+      "determination": 68.3,
+      "speed": 11.5,
+      "dexterity": 23.6,
+      "charisma": 20.1,
+      "will": 63.9,
+      "spirit": 57.9,
+      "torment": 21.9
+     }
+    },
+    {
+     "n": "Nytharos",
+     "c": "Berserker",
+     "r": "Animal",
+     "sub": [
+      "Beast",
+      "Jungle"
+     ],
+     "tp": [
+      "FiredUp"
+     ],
+     "tn": [
+      "Vindictive",
+      "Scandalous",
+      "Renegade"
+     ],
+     "d": {
+      "tdm": 38.3,
+      "mini-dm": 57.4,
+      "battlefield": 25.6,
+      "gewichtheben": 35.5,
+      "climbing": 62.6,
+      "staffel": 48.6,
+      "time-trial": 72.8,
+      "spurt": 73.9,
+      "tennis": 41.4,
+      "hockey": 54.7,
+      "showcase": 24.7,
+      "speed-schach": 39.2,
+      "takeshis-castle": 33.7,
+      "breaking": 44.9,
+      "wettessen": 33.4,
+      "basketball": 41.7,
+      "football": 37.8,
+      "eiskunstlauf": 31.8,
+      "fechten": 94.1,
+      "i-spy": 38.4
+     },
+     "groesse": 7,
+     "a": {
+      "power": 83.8,
+      "health": 9,
+      "stamina": 78,
+      "intelligence": 23.8,
+      "awareness": 79.1,
+      "determination": 41.7,
+      "speed": 78.5,
+      "dexterity": 77.7,
+      "charisma": 5.5,
+      "will": 41.8,
+      "spirit": 18.6,
+      "torment": 93.3
+     }
+    },
+    {
+     "n": "Salvador Mare",
+     "c": "Mage",
+     "r": "Animal",
+     "sub": [
+      "Beast",
+      "Strategist",
+      "Engineer"
+     ],
+     "tp": [
+      "Resourceful",
+      "Disciplined"
+     ],
+     "tn": [
+      "Paranoid",
+      "Lazy",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 34.8,
+      "mini-dm": 35.7,
+      "battlefield": 33.9,
+      "gewichtheben": 37,
+      "climbing": 42.6,
+      "staffel": 24.6,
+      "time-trial": 42.6,
+      "spurt": 37.5,
+      "tennis": 43.9,
+      "hockey": 26,
+      "showcase": 32.2,
+      "speed-schach": 62.2,
+      "takeshis-castle": 49.8,
+      "breaking": 43.4,
+      "wettessen": 51.1,
+      "basketball": 30.2,
+      "football": 25.2,
+      "eiskunstlauf": 33,
+      "fechten": 32.3,
+      "i-spy": 40.8
+     },
+     "groesse": 6,
+     "a": {
+      "power": 40.7,
+      "health": 51.9,
+      "stamina": 45.9,
+      "intelligence": 88.5,
+      "awareness": 63,
+      "determination": 70.1,
+      "speed": 18.5,
+      "dexterity": 53.7,
+      "charisma": 31.3,
+      "will": 73.1,
+      "spirit": 17.6,
+      "torment": 22.1
+     }
+    },
+    {
+     "n": "Umbramantis",
+     "c": "Rogue",
+     "r": "Animal",
+     "sub": [
+      "Beast",
+      "Assassin",
+      "Wraith"
+     ],
+     "tp": [],
+     "tn": [
+      "ColdBlooded",
+      "Vindictive",
+      "Scandalous"
+     ],
+     "d": {
+      "tdm": 26.9,
+      "mini-dm": 44.4,
+      "battlefield": 18.1,
+      "gewichtheben": 32.7,
+      "climbing": 41.3,
+      "staffel": 40.2,
+      "time-trial": 60.1,
+      "spurt": 59.2,
+      "tennis": 26.7,
+      "hockey": 46,
+      "showcase": 19.6,
+      "speed-schach": 29.1,
+      "takeshis-castle": 20.6,
+      "breaking": 36.9,
+      "wettessen": 19.1,
+      "basketball": 30,
+      "football": 22.9,
+      "eiskunstlauf": 27.3,
+      "fechten": 78.2,
+      "i-spy": 25.9
+     },
+     "groesse": 6,
+     "a": {
+      "power": 71,
+      "health": 41,
+      "stamina": 29,
+      "intelligence": 21,
+      "awareness": 68,
+      "determination": 23,
+      "speed": 94,
+      "dexterity": 82,
+      "charisma": 1,
+      "will": 28,
+      "spirit": 14,
+      "torment": 76
+     }
+    },
+    {
+     "n": "Cogfina Skyforge",
+     "c": "Sprinter",
+     "r": "Animal",
+     "sub": [
+      "Succubus",
+      "Trickster",
+      "Wayfarer"
+     ],
+     "tp": [
+      "Ambitious",
+      "Altruistic"
+     ],
+     "tn": [
+      "Scandalous",
+      "Feisty"
+     ],
+     "d": {
+      "tdm": 24.2,
+      "mini-dm": 24.6,
+      "battlefield": 32.9,
+      "gewichtheben": 23.6,
+      "climbing": 41.6,
+      "staffel": 47.5,
+      "time-trial": 65.3,
+      "spurt": 38,
+      "tennis": 62.1,
+      "hockey": 26.8,
+      "showcase": 37.9,
+      "speed-schach": 59,
+      "takeshis-castle": 38.6,
+      "breaking": 21.6,
+      "wettessen": 29.7,
+      "basketball": 46.2,
+      "football": 22.2,
+      "eiskunstlauf": 46.5,
+      "fechten": 44,
+      "i-spy": 42.9
+     },
+     "groesse": 5,
+     "a": {
+      "power": 10.5,
+      "health": 38.7,
+      "stamina": 44.2,
+      "intelligence": 81.1,
+      "awareness": 72.1,
+      "determination": 50,
+      "speed": 72.2,
+      "dexterity": 76,
+      "charisma": 34.1,
+      "will": 30.7,
+      "spirit": 42,
+      "torment": 22.9
+     }
+    },
+    {
+     "n": "Don Micelio Valens",
+     "c": "Mage",
+     "r": "Animal",
+     "sub": [
+      "Lord",
+      "Trickster",
+      "Ambassador"
+     ],
+     "tp": [
+      "Eloquent",
+      "Loyal"
+     ],
+     "tn": [
+      "Manipulative",
+      "Mercenary",
+      "Obsessive"
+     ],
+     "d": {
+      "tdm": 19.9,
+      "mini-dm": 28.8,
+      "battlefield": 47.6,
+      "gewichtheben": 30.1,
+      "climbing": 32.9,
+      "staffel": 44.3,
+      "time-trial": 43,
+      "spurt": 43.2,
+      "tennis": 52.8,
+      "hockey": 20,
+      "showcase": 48.5,
+      "speed-schach": 69.8,
+      "takeshis-castle": 71.9,
+      "breaking": 42.4,
+      "wettessen": 42.9,
+      "basketball": 46.9,
+      "football": 42.2,
+      "eiskunstlauf": 60.8,
+      "fechten": 43.5,
+      "i-spy": 71.3
+     },
+     "groesse": 1,
+     "a": {
+      "power": 1.5,
+      "health": 7.7,
+      "stamina": 35.8,
+      "intelligence": 72.6,
+      "awareness": 68.1,
+      "determination": 75,
+      "speed": 36.5,
+      "dexterity": 58.7,
+      "charisma": 81.3,
+      "will": 78.7,
+      "spirit": 45.9,
+      "torment": 63
+     }
+    }
+   ]
+  }
+ ]
+}

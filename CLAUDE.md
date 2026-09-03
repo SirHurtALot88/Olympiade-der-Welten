@@ -74,15 +74,34 @@ Paartreue mit Abstand**, nicht nach einer nackten Rangkorrelation über alle Paa
 
 | Größe | Hockey | Basketball |
 |---|---:|---:|
-| rho je Spiel | 0,706 | 0,836 |
-| Verlässlichkeit des Impacts | 0,755 | 0,761 |
-| Validität (Saison) | 0,82 | — |
+| rho je Spiel | 0,670 | 0,786 |
+| Validität (Saison) | 0,874 | 0,881 |
 | Star auf Rang 1 | 79 % | — |
 | Star in den ersten zwei | 94 % | — |
 
-Werkzeuge dafür: `scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` für die Zahl selbst,
+**Achtung, alle älteren Zahlen in diesem Repo sind auf einer Stichprobe von VIER entstanden.**
+`zieheFormkarten` nahm `z % n` von einem linearen Kongruenzgenerator, also die untersten Bits;
+deren Periode ist bei vier Formwerten genau vier. Nachgerechnet ergaben 24 verschiedene Saaten
+**vier** verschiedene Kartensätze, 1000 Saaten ebenfalls vier. Seit dem Umstieg auf die oberen
+Bits (02.09.) sind es 24 aus 24. Die alte Basketball-Schranke `0,836 / 0,804 / 87,3 / 101,8 /
+82,3` gilt deshalb nicht mehr; die neue steht in der Tabelle oben.
+
+**Dieselbe Eignungslücke saß in ALLEN VIER Chassis** und ist überall behoben: `p.d` hält nur
+`tdm` und `spurt` vorberechnet, alle vier Baufunktionen lasen `p.d[disziplin] || 0`, und für die
+übrigen achtzehn Disziplinen bestand `eig` damit nur aus Slot-, Trait- und Formzuschlag. In der
+Arena wog es am schwersten, weil `eigWert` dort über `aufEignung()` direkt in die Kampfwerte
+geht. Fundstellen: `bauFeldspiel` (25.08.), `bauBuehne`, `bauSpurt`, `baueEinheit` (alle 02.09.).
+
+Werkzeuge dafür: **`scripts/miss-alle-disziplinen.mjs [spiele] [disziplin ...]`** für alle
+zwanzig auf einmal — die einzige Sonde, die alle vier Chassis kennt. Daneben
+`scripts/miss-feldspiel-rangtreue.mjs <diszi> 24 6` für den Feldspiel-Boxscore und
 `scripts/miss-rangtreue-nach-rolle.mjs <diszi> 48`, wenn eine Rolle (Torwart) eine eigene
-Wertformel hat und die Gesamtzahl allein nicht sagt, wo es klemmt.
+Wertformel hat. Der vollständige Stand aller zwanzig steht in
+`docs/design/stand-aller-disziplinen.md`.
+
+**Die zwei Spalten lesen.** Ist die Saisonzahl hoch und die Einzelspielzahl niedrig, belohnt die
+Mechanik das Richtige, aber zu laut — dann fehlen EREIGNISSE, nicht Rezepte. Sind beide niedrig,
+belohnt die Mechanik das Falsche. Das entscheidet, ob man an der Uhr oder am Rezept arbeitet.
 
 ## An die Spielstände kommen
 

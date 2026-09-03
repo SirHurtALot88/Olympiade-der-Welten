@@ -226,6 +226,143 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
     );
   });
 
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): sobald `arenaIndividualBoxscorePpsByPlayerId`
+   * einen Eintrag fuer einen Spieler traegt, kommen seine individuellen PPs jetzt tatsaechlich aus
+   * dem Arena-Boxscore-Impact -- nicht mehr aus der alten PPS-Rang-Formel. Der Beweis ist eine
+   * ABSICHTLICH UMGEKEHRTE Reihenfolge: der PPS-staerkere Spieler bekommt eine NIEDRIGERE
+   * Boxscore-PPs-Zahl als sein PPS-schwaecherer Teamkollege.
+   */
+  it("Basketball: individuelle PPs kommen aus arenaIndividualBoxscorePpsByPlayerId, sobald ein Eintrag vorliegt", () => {
+    const gameState = buildBattleModeGameState();
+    const contexts = [
+      createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40], gameState }),
+      createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35], gameState }),
+    ];
+
+    const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
+    const withArenaBoxscore = buildLegacyMatchdayResolvePreview(contexts, {
+      arenaTeamPointsByTeamId: new Map([
+        ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+        ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+      ]),
+      // A-A-d1-0 hatte den HOEHEREN PPS-Score (10 vs. 5) -- hier ABSICHTLICH die NIEDRIGERE
+      // Boxscore-PPs-Zahl, damit ein Effekt eindeutig auf den Boxscore zurueckzufuehren ist.
+      arenaIndividualBoxscorePpsByPlayerId: new Map([
+        ["A-A-d1-0", 0.5],
+        ["A-A-d1-1", 5.9],
+      ]),
+    });
+
+    const alphaWithout = withoutArena.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === "basketball")
+      ?.teamResults.find((team) => team.teamId === "A-A");
+    const alphaWith = withArenaBoxscore.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === "basketball")
+      ?.teamResults.find((team) => team.teamId === "A-A");
+
+    const entryWithout = (playerId: string) => alphaWithout?.entries.find((entry) => entry.playerId === playerId);
+    const entryWith = (playerId: string) => alphaWith?.entries.find((entry) => entry.playerId === playerId);
+
+    // ALTE FORMEL (ohne Arena-Boxscore): der PPS-staerkere Spieler (Score 10) bekommt MEHR Punkte.
+    expect(entryWithout("A-A-d1-0")!.pointsAwarded!).toBeGreaterThan(entryWithout("A-A-d1-1")!.pointsAwarded!);
+
+    // NEUE FORMEL: GENAU UMGEKEHRT -- d1-1 hat die hoehere Boxscore-PPs-Zahl (5,9 statt 0,5) und
+    // bekommt jetzt MEHR Punkte, exakt den gelieferten Wert, obwohl er den niedrigeren PPS-Score
+    // hatte. Nur der Boxscore erklaert diese Umkehr, kein Zufall bei gleicher Reihenfolge.
+    expect(entryWith("A-A-d1-0")!.pointsAwarded).toBe(0.5);
+    expect(entryWith("A-A-d1-1")!.pointsAwarded).toBe(5.9);
+
+    // Die Markierung bestaetigt explizit, woran es lag.
+    expect(entryWith("A-A-d1-0")!.arenaBoxscoreImpactApplied).toBe(true);
+    expect(entryWith("A-A-d1-1")!.arenaBoxscoreImpactApplied).toBe(true);
+    expect(entryWithout("A-A-d1-0")!.arenaBoxscoreImpactApplied ?? false).toBe(false);
+
+    // Team-Punkte (2/0) bleiben unveraendert vom 2/1/0-Modell -- der Boxscore setzt nur die
+    // INDIVIDUELLEN PPs, nicht das Team-Ergebnis.
+    expect(alphaWith?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+  });
+
+  it("Basketball: ein Spieler OHNE eigenen Eintrag in arenaIndividualBoxscorePpsByPlayerId faellt fuer SICH ALLEIN auf PPS zurueck", () => {
+    const gameState = buildBattleModeGameState();
+    const contexts = [
+      createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40], gameState }),
+      createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35], gameState }),
+    ];
+
+    const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
+    const withPartialImpact = buildLegacyMatchdayResolvePreview(contexts, {
+      arenaTeamPointsByTeamId: new Map([
+        ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+        ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+      ]),
+      // NUR A-A-d1-0 hat einen Boxscore-Eintrag -- A-A-d1-1 fehlt (z.B. Namens-Kollision im
+      // Boxscore desselben Duells). Anders als bei den Team-Punkten ist das hier PRO SPIELER
+      // unabhaengig: d1-1 faellt fuer SICH ALLEIN auf den PPS-Pfad zurueck, d1-0 bekommt trotzdem
+      // seine echte Boxscore-Zahl.
+      arenaIndividualBoxscorePpsByPlayerId: new Map([["A-A-d1-0", 3.3]]),
+    });
+
+    const alphaWithout = withoutArena.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === "basketball")
+      ?.teamResults.find((team) => team.teamId === "A-A");
+    const alphaWith = withPartialImpact.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === "basketball")
+      ?.teamResults.find((team) => team.teamId === "A-A");
+
+    const entryWithout = (playerId: string) => alphaWithout?.entries.find((entry) => entry.playerId === playerId);
+    const entryWith = (playerId: string) => alphaWith?.entries.find((entry) => entry.playerId === playerId);
+
+    expect(entryWith("A-A-d1-0")!.pointsAwarded).toBe(3.3);
+    expect(entryWith("A-A-d1-0")!.arenaBoxscoreImpactApplied).toBe(true);
+    // d1-1 (kein eigener Eintrag) bleibt EXAKT beim alten PPS-Wert -- unbeeinflusst davon, dass
+    // sein Teamkollege jetzt aus dem Boxscore bedient wird.
+    expect(entryWith("A-A-d1-1")!.pointsAwarded).toBe(entryWithout("A-A-d1-1")!.pointsAwarded);
+    expect(entryWith("A-A-d1-1")!.arenaBoxscoreImpactApplied ?? false).toBe(false);
+    // Das TEAM-Ergebnis (2/1/0) bleibt in jedem Fall beim Arena-Ausgang.
+    expect(alphaWith?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+  });
+
+  /**
+   * REGRESSIONSTEST (Auftrag Punkt 4): fuer JEDE Disziplin ausser Basketball darf sich an der
+   * PP-Vergabe NICHTS aendern -- selbst wenn `arenaIndividualBoxscorePpsByPlayerId` fuer denselben
+   * SPIELER (unter seiner D2-playerId) ebenfalls einen Eintrag traegt; die Sperre
+   * `ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)` muss sie fuer jede andere Disziplin trotzdem
+   * vollstaendig ignorieren, s. Kommentar an `isBattleModeArenaEligible`/
+   * `arenaIndividualPpsForThisDiscipline`.
+   */
+  it("Fechten (D2) bleibt byte-identisch, selbst wenn arenaIndividualBoxscorePpsByPlayerId einen Eintrag fuer dieselbe playerId traegt", () => {
+    const gameState = buildBattleModeGameState();
+    const contexts = [
+      createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40, 30] }),
+      createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35, 20] }),
+    ].map((context) => ({ ...context, gameState }));
+
+    const arenaTeamPointsByTeamId = new Map([
+      ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+      ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+    ]);
+    // "A-A-d2-0" existiert nur auf der Fechten-Seite (D2) -- traegt hier trotzdem probeweise einen
+    // Boxscore-Eintrag, um zu beweisen, dass die Disziplin-Sperre wirklich greift, nicht nur die
+    // ID zufaellig nirgends vorkommt.
+    const arenaIndividualBoxscorePpsByPlayerId = new Map([
+      ["A-A-d1-0", 0.5],
+      ["A-A-d1-1", 5.9],
+      ["A-A-d2-0", 6.6],
+    ]);
+
+    const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
+    const withArena = buildLegacyMatchdayResolvePreview(contexts, {
+      arenaTeamPointsByTeamId,
+      arenaIndividualBoxscorePpsByPlayerId,
+    });
+
+    const fechtenWithout = withoutArena.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
+    const fechtenWith = withArena.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
+
+    expect(fechtenWith).toEqual(fechtenWithout);
+  });
+
   it("ignoriert die Arena-Punkte-Map vollstaendig in einem Manager-Mode-Save (Sicherheitsrahmen)", () => {
     const gameState = buildManagerModeGameState();
     const arenaTeamPointsByTeamId = new Map([

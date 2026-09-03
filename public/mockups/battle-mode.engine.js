@@ -3127,7 +3127,31 @@
     breaker:{reihe:1,ord:"verfolgen",pos:2},   skirmisher:{reihe:1,ord:"flanke",pos:3},
     shotcaller:{reihe:2,ord:"mitlinie",pos:4}, rallypoint:{reihe:2,ord:"mitlinie",pos:5},
     blockstart:{reihe:0,ord:"mitlinie",pos:0}, acceleration:{reihe:0,ord:"mitlinie",pos:1},
-    topspeed:{reihe:1,ord:"verfolgen",pos:2},  lanecontrol:{reihe:1,ord:"flanke",pos:3}
+    topspeed:{reihe:1,ord:"verfolgen",pos:2},  lanecontrol:{reihe:1,ord:"flanke",pos:3},
+    // BATTLEFIELD — nachgetragen, weil die Ersatzregel die Aufstellung VERKEHRT HERUM
+    // aufbaute. Ohne Eintrag hier faellt `slotReihe` auf floor(Listenplatz/2) zurueck, und
+    // die Battlefield-Liste steht in der Reihenfolge commander, spotter, siegecore,
+    // moraleanchor. Damit stand der Commander ("fuehrt grosse Situationen ueber Charisma
+    // und Intelligence") in der VORDERSTEN Linie und der Siege Core ("drueckt Fronten mit
+    // Power und Torment") dahinter — nach den eigenen Slot-Texten genau falsch herum.
+    //
+    // Nachgemessen (12 Spiele je Disziplin, nach der Eignungsreparatur) war Battlefield
+    // die einzige Arena-Disziplin, in der die Eignung MIT der Reihennummer steigt:
+    //
+    //   Disziplin      r(Eignung, Reihe)   r(Reihe, Wert)
+    //   battlefield          +0,252            -0,310
+    //   mini-dm              -0,542            -0,386
+    //   tdm                  -0,454            -0,049
+    //
+    // Bei mini-dm und tdm stehen die Besten vorn (negatives Vorzeichen), bei Battlefield
+    // hinten — und die hintere Reihe bewirkt gemessen weniger (-0,310). Battlefield ist
+    // zugleich die schwaechste der vier (rho 0,469). Das passt zusammen: wer hinten steht,
+    // wird von der Zielwahl "naechster" kaum gefunden und kommt nicht zum Zug.
+    //
+    // Die Reihen folgen jetzt den Slot-Texten, und `pos` folgt den Reihen: der beste
+    // Spieler bekommt den vordersten Slot, wie im TDM (vanguard pos 0, reihe 0).
+    siegecore:{reihe:0,ord:"mitlinie",pos:0},   moraleanchor:{reihe:0,ord:"mitlinie",pos:1},
+    spotter:{reihe:1,ord:"flanke",pos:2},       commander:{reihe:2,ord:"mitlinie",pos:3}
   };
   const SLOT_STELLE=(()=>{const o={};for(const d in SLOTS_JE_DISC)SLOTS_JE_DISC[d].forEach((s2,i)=>{o[s2.id]=i;});return o;})();
   const slotReihe=(id)=>SLOT_ZUSATZ[id]?SLOT_ZUSATZ[id].reihe:Math.min(2,Math.floor((SLOT_STELLE[id]||0)/2));
@@ -3322,7 +3346,21 @@
   function zieheFormkarten(saat){
     FORMKARTE={};
     let z=saat;
-    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return z%n;};
+    // HOHE BITS, NICHT NIEDRIGE (Fable-Fund, Arena-Recherche). `z%n` nimmt die
+    // UNTERSTEN Bits eines linearen Kongruenzgenerators — und deren Periode ist winzig:
+    // bei FORMWERTE.length=4 haben die untersten zwei Bits Periode 4. Nachgerechnet
+    // ergaben 24 verschiedene Saaten dadurch genau VIER verschiedene Kartensaetze, und
+    // 1000 Saaten auch. Jede Messung dieses Projekts, die ueber die Saat variiert — Pp,
+    // Rangtreue, Korridore —, lief damit auf vier Spielen, die sich sechsmal wiederholten,
+    // statt auf 24 verschiedenen.
+    //
+    // `(z>>>16)` nimmt die oberen Bits, die die volle Periode haben. Mit derselben
+    // Rechnung ergeben 24 Saaten jetzt 24 verschiedene Kartensaetze.
+    //
+    // DAS VERSCHIEBT ALLE EINGEMESSENEN ZAHLEN, und zwar zu Recht: die alten sind auf
+    // einer viel zu kleinen Stichprobe entstanden. Die Basketball-Schranke
+    // (0,836/0,804/87,3/101,8/82,3) gilt ab hier nicht mehr und wird neu gesetzt.
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
     for(const p of SQUAD)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
     for(const o of OPP)FORMKARTE[o.n]=FORMWERTE[r(FORMWERTE.length)];
   }
@@ -3705,7 +3743,26 @@
     football:{
       // MATRIX: spirit 25, torment 16, health 14, awareness 11, will 10,
       // determination 8, power 6, stamina 6, charisma 4.
-      label:"Football", jeSeite:6, zuegeJeSeite:8, zugDauer:60/(8*2*2),
+      // EREIGNISDICHTE ANGEHOBEN, 8 auf 24 Zuege je Seite. Mit acht kamen auf zwoelf
+      // Spieler ganze 16 Ereignisse je Spiel, also gut EINES je Spieler — und an einem
+      // Ereignis je Spieler laesst sich nichts messen. Nachgemessen war der ganze
+      // Boxscore flach: 0 bis 0,4 Fumble-Recoveries, 0,1 bis 0,9 Vorlagen, und der
+      // Spieler mit der NIEDRIGSTEN Eignung (46) erzielte die meisten Punkte. Die
+      // Rangtreue lag bei rho 0,183 — praktisch Rauschen. Real hat ein Footballspiel rund
+      // 130 Spielzuege; 48 sind immer noch eine starke Abstraktion, aber messbar.
+      //
+      // zugDauer steht jetzt fest bei 1,25 s statt an der Zugzahl zu haengen (die alte
+      // Formel 60/(n*2*2) hielt das Spiel stur bei 30 s und haette 48 Zuege zu einem
+      // halbsekuendigen Stakkato gemacht, das niemand mitlesen kann). Das Spiel dauert
+      // damit 60 s.
+      //
+      // DAS IST NICHT DIE LOESUNG, NUR DIE HAELFTE DAVON. Mit der Dichte stieg rho auf
+      // 0,254 je Spiel und 0,559 ueber die Saison. Die Saisonzahl ist der Deckel, und sie
+      // sagt: die VORAB-Mechanik belohnt nicht, was die Eignung misst. Football gehoert
+      // wie Hockey auf den Live-Motor (FELDSPIEL_ART[...].live) — ein Rezept, das gegen
+      // die Vorab-Mechanik eingemessen wird, ist nach der Migration wertlos. Genau dieser
+      // Befund steht schon einmal im Hockey-Block von battle-mode.rezepte.js.
+      label:"Football", jeSeite:6, zuegeJeSeite:24, zugDauer:1.25,
       punkteNah:6, punkteFern:3, fernAnteil:0.30,
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
       rezept:{
@@ -3763,6 +3820,72 @@
       // Disziplin nach Basketball und deshalb wie diese ohne eigenes `rezept:`-Feld;
       // die uebrigen 18 fuehren ihres weiter hier und werden Stueck fuer Stueck
       // nachgezogen.
+      //
+      // KURVE: Hockeys EIGENE Erfolgskurve (Opus-Konsultation, docs/design/
+      // hockey-eigene-erfolgskurve.md) statt des KURVE_BASKETBALL-Rueckfalls.
+      //
+      // skillTerme OHNE TEAMGEIST. TEAMGEIST blieb bislang in der Skill-Formel, weil sie
+      // 1:1 von Basketball geerbt war — bei Basketball-Mittelwerten traegt TEAMGEIST dort
+      // 57% des Skill-Terms, der eigentliche Schuss-Skill nur 43%, und macht denselben
+      // Spieler zugleich (ueber offensterMitspieler/qualitaet()) zum bevorzugten
+      // Passempfaenger statt zum Passgeber — der eigentliche TEAMGEIST-Inversions-Kanal
+      // (rho -0,86 bis -0,90 zu Assists, s. Bericht). Chris hat NICHT "Linienspiel"
+      // beauftragt (das war eine Erfindung einer frueheren Planungsrunde, s. Bericht) —
+      // TEAMGEIST wird ERSATZLOS gestrichen, nicht durch einen neuen Sub-Skill ersetzt.
+      // TEAMGEIST bleibt unangetastet in qualitaet()/offensterMitspieler und in
+      // hockeyPassQualBonus (Chemie als attraktives Anspielziel) — nur aus DIESEM
+      // Skill-Term verschwindet es.
+      //
+      // Koeffizient 0,0022->0,0050 (Richtung des Auftrags, NEU GEFITTET nicht blind
+      // uebernommen, s. Bericht Abschnitt "steil/koeff"): mit dem TEAMGEIST-Term weg
+      // MUSS der verbleibende schussSkillFuer-Koeffizient staerker wirken, sonst schrumpft
+      // der gesamte Skill-Term auf weniger als die Haelfte seiner alten Groesse und die
+      // Kurve wird insgesamt flacher, nicht praeziser.
+      //
+      // skillMittel ist GEMESSEN (scripts/miss-hockey-skillmittel.mjs 24 0.0050), NICHT
+      // gesetzt: mit Schussversuchen gewichteter Mittelwert von schussSkillFuer ueber den
+      // echten Kader (57,79) mal 0,0050 = 0,2889. Herleitung/Rohzahlen im Bericht.
+      //
+      // steil=20 ist GEFITTET, nicht die geschaetzte Mitte 18-22 blind uebernommen:
+      // durchprobiert 14/18/20/22/24 (korrektur=0, Vorlauf-Fit) gegen
+      // scripts/miss-hockey-archetypen.mjs (Sniper-Terzil-Spreizung SCHUSS_NAH/FERN) und
+      // scripts/miss-hockey-korridor.mjs (Torzahl-/Fangquote-Drift). Die Terzil-Trennung
+      // wird in diesem Fenster mit steigendem steil eher staerker (24 trennt SCHUSS_FERN
+      // sogar noch schaerfer als 20), aber die Messreihe bei n=32 ist deutlich verrauscht
+      // (SCHUSS_NAH-rho sprang nicht monoton: 0,358/0,515/0,480/0,697/0,564 fuer
+      // 14/18/20/22/24) — kein klares Optimum, nur ein Trend. 20 gewaehlt als solider
+      // Punkt innerhalb der urspruenglichen Schaetzung, der nach dem korrektur-Fit (s.
+      // unten) den Torkorridor OHNE jede HK_TOR_SKALA/HK_TW_*-Nachziehung haelt (s.
+      // Bericht) — ein hoeherer Wert (22/24) waere ebenfalls vertretbar und eine
+      // legitime Option fuer eine kuenftige, straffere Runde.
+      //
+      // korrektur je Tier ZULETZT gefittet, NACHDEM skillMittel/steil standen (Fehler vom
+      // 26.08. laut Motorkommentar bei steilerMake: zweimal fitten, wenn die Reihenfolge
+      // nicht stimmt) — Zielwerte aus echten NHL-Torwahrscheinlichkeiten nach Distanz
+      // (docs/design/hockey-torwart-puck-tore-recherche-fable.md, Abschnitt 8.4: ~19-21%
+      // Torraum-Rand, ~14-16% Slot, ~7-10% hoher Slot/Bullykreis, ~3,5-5% Point/blaue
+      // Linie), logit(Soll)-logit(Ist) wie bei Basketballs MAKE_KORREKTUR (scripts/
+      // miss-hockey-tier-quote.mjs). DREI statt Basketballs zwei Durchgaenge noetig (die
+      // Korrektur selbst verschiebt wieder leicht die getroffene Quote je Tier) — alle drei
+      // Rohzahlen im Bericht. `dunk` bleibt die unsicherste Stufe (nur ~2 % aller
+      // Schussversuche, 30-90 Beobachtungen je Lauf, entsprechend verrauscht).
+      //
+      // base/geoBonus/radien UNVERAENDERT von Basketball uebernommen — dieser Auftrag
+      // fittet ausdruecklich nur skillTerme/skillMittel/steil/korrektur (s. Opus-
+      // Konsultation Punkt 4), nicht die geometrische Bonus-Tabelle. radien hier NUR
+      // Dokumentation (muss mit HK_RADIUS_ABSTAUBER/SLOT/HOCHSLOT/MAX weiter unten
+      // uebereinstimmen, die die eigentliche Stufen-Zuordnung in
+      // klassifiziereWurfdistanz() treffen) — HK_RADIUS_* selbst sind hier wegen TDZ noch
+      // nicht deklariert (sie stehen erst nach der Live-Motor-Sektion), deshalb Literale.
+      kurve:{
+        base:-0.02,
+        geoBonus:{dunk:0.70, nah:0.20, mit:0.09, fern:0.075},
+        radien:{dunk:58, nah:140, mit:215, fern:330}, // = HK_RADIUS_ABSTAUBER/SLOT/HOCHSLOT/MAX
+        skillMittel:0.2889,   // GEMESSEN (24 Spiele, miss-hockey-skillmittel.mjs)
+        steil:20,             // GEFITTET (16/18/20/22/24 durchgemessen, s. Bericht)
+        korrektur:{dunk:-1.351, nah:0.353, mit:-1.057, fern:-1.879}, // GEMESSEN, s. Bericht
+        skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0050}]
+      }
     },
     tennis:{
       // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
@@ -4220,11 +4343,75 @@
   const MAKE_KORREKTUR={dunk:0.491, nah:-0.473, mit:-0.624, fern:-0.474}; // GEMESSEN
   const logistisch=(z)=>1/(1+Math.exp(-z));
   const logitVon=(p)=>Math.log(p/(1-p));
+
+  // ===================================================================================
+  // KURVE-STRUKTUR — Chris, woertlich: "ja jede diszi braucht eine eigene success kurve!"
+  //
+  // Bis hierher war die komplette Erfolgsformel (BASE -0,02, GEO_BONUS, SKILL_MITTEL,
+  // STEIL_MAKE, MAKE_KORREKTUR, UND welche Sub-Skills ueberhaupt in den Skill-Term
+  // eingehen) in genau dieser Funktion hartcodiert und wurde von JEDER Feldspiel-
+  // Disziplin mit `live`-Block unveraendert geerbt — obwohl sie ausschliesslich gegen
+  // 1074 echte NBA-Feldwuerfe kalibriert ist (s. Kommentare oben, b1/b2). Hockey lief
+  // bis zu dieser Runde durch exakt dieselbe Kurve wie Basketball (dokumentiert als
+  // offener Punkt seit battle-mode.rezepte.js:437-440 und Design-Frage C1 in
+  // docs/design/hockey-mechanik-angleichen.md).
+  //
+  // `kurve` macht die Erfolgsformel zu DATEN je Disziplin (FELDSPIEL_ART[d].kurve) statt
+  // zu einem zweiten Funktionsklon: `steilerMake`/`skillTeilFuer`/`lageBasisFuer` lesen
+  // `FB().kurve || KURVE_BASKETBALL`. Eine Disziplin OHNE eigenen `kurve`-Block faehrt
+  // damit unveraendert die Basketball-Kurve weiter — der heutige, unangetastete Stand.
+  // Nichts bewegt sich fuer sie, das ist die Rueckfall-Garantie, nicht ein Nebeneffekt.
+  //
+  // FELDER:
+  //   base        BASE der Erfolgsformel (Basketball: -0,02)
+  //   geoBonus    {dunk,nah,mit,fern} — Distanzstufen-Bonus/Malus auf `lage`
+  //   radien      {dunk,nah,mit,fern} — nur Dokumentation/Sonden-Konsistenz: die
+  //               tatsaechliche Stufen-Zuordnung bleibt in klassifiziereWurfdistanz()
+  //               (dort haengt sie an istHockey(), nicht an FB().kurve), radien hier
+  //               MUSS mit den dortigen Konstanten uebereinstimmen.
+  //   skillMittel MESSWERT (gewichtetes Mittel der eigenen skillTerme ueber den echten
+  //               Kader) — NIEMALS handgesetzt, s. Hockey-Block unten fuer die Herleitung.
+  //   steil       STEIL_MAKE-Aequivalent, gegen die reale Trefferquote der Disziplin
+  //               gefittet (Basketball p~0,44, Hockey p~0,09 — sehr unterschiedliche
+  //               Ableitung STEIL*p*(1-p), s. Kommentar oben bei (b2)).
+  //   korrektur   {dunk,nah,mit,fern} — MAKE_KORREKTUR-Aequivalent, ZULETZT gefittet,
+  //               NACHDEM steil/skillMittel stehen (Fehler vom 26.08. laut Motor-
+  //               kommentar: zweimal fitten, wenn die Reihenfolge nicht stimmt).
+  //   skillTerme  [{feld,koeff},...] — welche Sub-Skills mit welchem Koeffizienten in
+  //               den Skill-Term eingehen. "SCHUSS_TIER" ist ein Sonderfeld-Name (kein
+  //               echtes u.-Attribut): skillTeilFuer() ersetzt ihn durch
+  //               schussSkillFuer(u,tier), also SCHUSS_NAH bei dunk/nah, sonst
+  //               SCHUSS_FERN — jeder andere feld-Name liest u[feld] direkt.
+  const KURVE_BASKETBALL={
+    base:-0.02,
+    geoBonus:GEO_BONUS,
+    radien:{dunk:DUNK_RADIUS, nah:KORB_NAH_RADIUS, mit:DREIER_RADIUS, fern:FERN_RADIUS_MAX},
+    skillMittel:SKILL_MITTEL,
+    steil:STEIL_MAKE,
+    korrektur:MAKE_KORREKTUR,
+    skillTerme:[{feld:"SCHUSS_TIER",koeff:0.0022},{feld:"TEAMGEIST",koeff:0.0030}]
+  };
+  // Skill-Term aus der Kurve der GERADE LAUFENDEN Disziplin (Daten, kein Code je
+  // Disziplin) — s. KURVE_BASKETBALL-Kommentar oben fuer die Feldbedeutung.
+  const skillTeilFuer=(u,tier)=>{
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    let s=0;
+    for(const t of kurve.skillTerme)
+      s+=(t.feld==="SCHUSS_TIER"?schussSkillFuer(u,tier):(u[t.feld]||0))*t.koeff;
+    return s;
+  };
+  // BASE+GEO_BONUS der GERADE LAUFENDEN Disziplin, ohne Bedraengnis/Fastbreak/Passqualitaet
+  // (die bleiben situativ am Aufrufort, s. entscheideBallaktion).
+  const lageBasisFuer=(tier)=>{
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    return kurve.base+(kurve.geoBonus[tier]||0);
+  };
   const steilerMake=(lage,skillTeil,tier)=>{
-    const mitte=Math.max(MAKE_MIN,Math.min(MAKE_MAX,lage+SKILL_MITTEL));
+    const kurve=FB().kurve||KURVE_BASKETBALL;
+    const mitte=Math.max(MAKE_MIN,Math.min(MAKE_MAX,lage+kurve.skillMittel));
     return Math.max(MAKE_MIN,Math.min(MAKE_MAX,
-      logistisch(logitVon(mitte)+STEIL_MAKE*(skillTeil-SKILL_MITTEL)
-                 +(MAKE_KORREKTUR[tier]||0))));
+      logistisch(logitVon(mitte)+kurve.steil*(skillTeil-kurve.skillMittel)
+                 +((kurve.korrektur&&kurve.korrektur[tier])||0))));
   };
   // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
@@ -4397,18 +4584,22 @@
   // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
   const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
   const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
-  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,085/0,915) —
+  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,076/0,924) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
   //
-  // KORB-ABSTAND ZUR GRUNDLINIE (Chris' Fund, 29.08.): mit 0,115/0,885 haengte der Korb
-  // 0,055*W (~68px) hinter der Grundlinie (grundX bei 0,06/0,94) — fast am Freiwurf-
-  // kreis, optisch als wuerde der Korb mitten im Feld schweben statt an der Wand.
-  // Realer Abstand Brett-zu-Grundlinie ist klein; 0,025*W (~31px) haengt den Ring
-  // sichtbar an die Grundlinie, ohne Brett/Ring hinter dem Spielfeldrand zu zeichnen.
+  // KORB-ABSTAND ZUR GRUNDLINIE (Chris' Fund, 29.08., nachgemessen von Fable 03.09.): mit
+  // 0,115/0,885 haengte der Korb 0,055*W (~68px) hinter der Grundlinie (grundX bei
+  // 0,06/0,94) — fast am Freiwurfkreis. Die erste Korrektur (0,915/0,085) blieb noch
+  // 0,025*W (~31px) zurueck; Fables Pixelmessung am echten Sprite (nicht nur der
+  // Ring-Mitte, sondern der gezeichneten Brett-Ruecckante) zeigte dort weiterhin eine
+  // 11px-Luecke zum Spielfeldrand UND keinen verbindenden Staender — der Korb wirkte,
+  // als schwebe er frei im Feld statt an einer Wand zu haengen. 0,016*W (~21px, also
+  // nochmal 11px naeher) schliesst die Luecke; der Staender unten (bodenFeldspiel)
+  // schliesst den Rest optisch.
   // KORB_NAH_RADIUS/DREIER_RADIUS haengen relativ an korbX, nicht an einer absoluten
   // Position — die Verschiebung aendert nur die Optik, keine Distanz-Klassifizierung.
-  // WO DAS ZIEL STEHT. Basketball haengt den Korb an die Grundlinie (W*0.915/0.085);
+  // WO DAS ZIEL STEHT. Basketball haengt den Korb an die Grundlinie (W*0.924/0.076);
   // im Eishockey steht das Tor bewusst weiter im Feld, weil HINTER dem Tor gespielt wird
   // — das ist keine Kosmetik, sondern der Grund, warum ein Eishockeyfeld anders aussieht
   // als ein Basketballfeld. Real liegt die Torlinie 3,7 m von der Bande, also rund 4,5 %
@@ -4418,7 +4609,15 @@
   // einmal die Ursache dafuer, dass der Wurf das gezeichnete Ziel verfehlte.
   const korbXVon=(side)=>feldspielDisc==="hockey"
     ?(side===0?W*0.90:W*0.10)
-    :(side===0?W*0.915:W*0.085);
+    :(side===0?W*0.924:W*0.076);
+  // HANDPUNKTE FUER DEN GETRAGENEN BALL (Chris, 03.09.: "die Spieler den tragen mit den
+  // Animationen"). Reine Uebernahme der Messung aus docs/design/sprite-handpunkte.md
+  // (Profil-Laufbilder, Spalten 0-8 = ANIBILDER.walk, Zellen-Pixel mit Fusspunkt bei
+  // (32,46)) — nur die "vordere Hand" (in Bewegungsrichtung), das reicht fuer einen
+  // einhaendig getragenen Ball. Spalten ohne eigene Handkontur (0-2, 7-8) tragen dort
+  // schon die im Dokument empfohlene Interpolation, keine eigene Messung.
+  const BK_HAND_LINKS=[[24,46],[24,46],[24,46],[25,36],[22,45],[20,45],[23,45],[24,44],[24,44]];
+  const BK_HAND_RECHTS=[[40,46],[40,46],[40,46],[38,36],[41,45],[43,45],[40,45],[40,44],[40,44]];
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -4481,6 +4680,10 @@
     // Themenliste im Spiel aber sechs — ein gespeicherter slotIndex 4 oder 5 zeigt dann
     // ins Leere. Ein Hinweis auf der Konsole statt eines lautlosen Nullwerts, damit der
     // naechste, der eine ausbleibende Wirkung sucht, ihn nicht erst messen muss.
+    // `slotGesetzt` unterscheidet eine ECHTE Manager-Entscheidung (Aufstellungsbildschirm,
+    // `place[p.n]`) vom reinen Rundlauf-Ruecfall unten (`i % slotListe.length`) — ohne
+    // diese Unterscheidung sah `bestimmeTorwaerter` (dort) beide Faelle gleich aus und
+    // hielt den Ruecfall-Slot faelschlich fuer eine Wahl (Fund: hockey-archetypen-probe.md).
     const slotFuer=(p,i)=>{
       const gesetzterSlot=(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot:null;
       if(gesetzterSlot){
@@ -4488,9 +4691,9 @@
           console.warn("[arena] Slot \""+gesetzterSlot+"\" ist in "+feldspielDisc
             +" nicht angemeldet — "+p.n+" bekommt keinen Slot-Aufschlag.");
         }
-        return gesetzterSlot;
+        return {sl:gesetzterSlot,gesetzt:true};
       }
-      return (slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
+      return {sl:(slotListe[i%Math.max(1,slotListe.length)]||{}).id||null,gesetzt:false};
     };
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN (Chris' Fund, urspruenglich im TDM: 0:6 in 24 von 24
@@ -4505,7 +4708,7 @@
     // Aufgabe-3-Positions-Modifier (BASKETBALL_POS_MOD), egal welchen Slot er stellte.
     // Jetzt genau derselbe Aufruf fuer beide Seiten, kein `istGegner`-Sonderfall mehr.
     const bauSpieler=(p,seite,idx)=>{
-      const sl=slotFuer(p,idx);
+      const {sl,gesetzt:slotGesetzt}=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
       const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
@@ -4533,7 +4736,7 @@
         // wurde die Rolle nur zum Berechnen des Aufschlags gebraucht und danach
         // weggeworfen. Der Torwart ist aber ein Slot, kein Attributwert: der Motor muss
         // spaeter noch wissen, wer im Tor steht (s. bestimmeTorwaerter).
-        slotId:sl, torwart:false,
+        slotId:sl, slotGesetzt, torwart:false,
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
@@ -4544,6 +4747,10 @@
         // Laufende Schusssequenz (s. HOCKEY_SCHUSS/hockeySchussPhase). null = kein Schuss.
         schussSeit:null, schussArt:null,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
+        // Nur Hockey: A1/A2 getrennt gezaehlt (s. loeseHockeySchuss/feldspielWert) — der
+        // NHL Game Score gewichtet eine erste Vorlage hoeher als eine zweite (0,7 gegen
+        // 0,55), `assists` bleibt die Summe fuer Boxscore/Anzeige unveraendert.
+        assists1:0,assists2:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
@@ -4670,6 +4877,9 @@
       if(e.art==="treffer"){
         team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++;
+        // Zweite Vorlage (nur Hockey, s. loeseHockeySchuss/merkeBeruehrung) — sonst
+        // zeigt die Live-Enthuellung eine Vorlage weniger als am Ende im Boxscore steht.
+        if(e.zweitpassgeber)s(e.zweitpassgeber).assists++;
         // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als FG 3/6 im Boxscore"): ein Freiwurf
         // (e.freiwurf, s. verbucheFreiwurf) ist kein Feldwurf-Versuch, zaehlt hier also
         // NICHT mit — real-basketball-konform (FT% und FG% sind getrennte Statistiken).
@@ -4930,7 +5140,15 @@
   //   Faktor 0,410 -> 3,29 Tore   Faktor 0,440 -> 3,77 Tore
   //   Faktor 0,425 -> 3,49 Tore (n=48)                  (gewaehlt)
   // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
-  const HK_TOR_SKALA=0.425;
+  //
+  // NACHGEZOGEN 0,425 -> 0,46 (Mechanik-Angleichungs-Runde, Schritt 6 des Impact-
+  // Verteilung-Berichts): die Passqualitaets-Kette (5.1) und vor allem der Abpraller in
+  // die Ecke (5.2, weniger leichte Nachschuesse aus dem Slot) drueckten die Torzahl auf
+  // 3,23 je Team und die Fangquote auf 91,4 % (miss-hockey-korridor.mjs, 24 Spiele) —
+  // schwieriger abzuschliessen heisst nicht automatisch weniger Tore SOLLEN fallen, Chris'
+  // Zielkorridor (3,5, s. oben) bleibt unveraendert. 0,425*3,5/3,23 = 0,46, gemessen
+  // bestaetigt (s. hockey-mechanik-angleichen.md).
+  const HK_TOR_SKALA=0.46;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -4947,6 +5165,22 @@
   // gemessen 31 Zonen-Bullys je Spiel, zusammen mit den Anspielen nach Toren also alle
   // sechs Sekunden eines. Das Spiel stand oefter still, als es lief.
   const HK_VORBEI=0.11, HK_ABPRALLER=0.70;
+  // WOHIN DER ABPRALLER GEHT (hockey-impact-verteilung-recherche-fable.md, Abschnitt 5.2):
+  // bisher landete JEDER Abpraller frontal 18-52px vor dem Tor — real gehen Abpraller
+  // ueberwiegend in die Ecke/hinter das Tor, nur ein kleiner Teil bleibt im gefaehrlichen
+  // Slot (5,7 % der nicht festgehaltenen Paraden erzeugen real einen Nachschuss binnen 2s,
+  // bei uns vorher rund 30 % — das Fuenffache). Ohne diese Staffelung war "Puck gewinnen,
+  // aus 58px schiessen, Torwart laesst abprallen, Puck liegt wieder da" eine Schleife, die
+  // derselbe Spieler allein durchlaufen konnte. HK_ABPRALLER_SLOT_BASIS sinkt mit PARADE
+  // (ein guter Torwart lenkt gezielter weg vom Slot), HK_ABPRALLER_SLOT_MIN haelt eine
+  // Mindestchance, weil auch der beste Torwart nicht jeden Abpraller kontrolliert.
+  const HK_ABPRALLER_SLOT_BASIS=0.25, HK_ABPRALLER_SLOT_MIN=0.08, HK_ABPRALLER_SLOT_K=0.0025;
+  // BULLY-DUELL (s. bully()): Steilheit der Logistik ueber die TECHNIK-Differenz der
+  // beiden Center. Bei einer Differenz von 20 Punkten (73 gegen 53, wie im ZWEITCHANCE-
+  // Zweikampf-Kommentar an anderer Stelle) gewinnt der bessere zu rund 67 %, bei 40 Punkten
+  // zu rund 80 % — spuerbar, aber kein Automatismus, wie es sich fuer ein Duell mit
+  // Schiedsrichter-Einwurf gehoert.
+  const HK_BULLY_K=0.035;
   // SCHUSSBLOCK. Der Unterschied zwischen "Schussversuch" und "Schuss aufs Tor" ist im
   // Eishockey kein Detail, sondern eine der haeufigsten Aktionen ueberhaupt: ein
   // Verteidiger wirft sich in die Schussbahn. Ohne diese Stufe kamen alle 33 Versuche
@@ -5146,7 +5380,22 @@
   // Rangfolge, ohne dass sich an ihm etwas geaendert haette. Genau das ist beim Einbau von
   // Steals und Schussvolumen passiert: die Feldspieler stiegen von 3,8 auf 8,5, der Torwart
   // blieb bei 3,8 und rutschte von Rang 5 auf Rang 9.
-  const HK_TW_REF=0.844, HK_TW_BASIS=8.5, HK_TW_GSAA_K=2.0;
+  // HK_TW_BASIS nachgezogen 8,5 -> 7,0: das Gewicht der gewonnenen Pucks ist von 0,5
+  // auf 0,2 gefallen (s. feldspielWert), und damit der gemessene Mittelwert der
+  // Feldspieler-Impacts von 9,40 auf 6,98. Genau das verlangt der Kommentar unten —
+  // wer die Wertformel anfasst, muss diese Zahl nachrechnen, sonst faellt der Torwart
+  // aus der Rangfolge, ohne dass sich an ihm etwas geaendert haette.
+  //
+  // BEIDE NACHGEZOGEN (Mechanik-Angleichungs-Runde, Schritt 6): checks*0,4 ist raus,
+  // Vorlagen sind jetzt A1/A2-gewichtet (assists1*2+assists2*1.5 statt assists*2) und die
+  // Fangquote ist durch die Passqualitaets-Kette/den Abpraller-in-die-Ecke von 84,4 % auf
+  // 90,7 % gestiegen (miss-hockey-korridor.mjs, 24 Spiele, nach der HK_TOR_SKALA-
+  // Nachziehung). HK_TW_REF MUSS dieser eigenen Liga folgen — sonst sieht JEDER Torwart
+  // im Schnitt besser aus als er ist (GSAA misst gegen einen zu niedrigen Massstab), genau
+  // das hob den gemessenen Torwart-Mittelwert auf 11,77 gegen 7,16 bei den Feldspielern.
+  // Mit REF=0,907 pendelt sich GSAA im Mittel wieder um 0 ein; HK_TW_BASIS auf den neu
+  // gemessenen Feldspieler-Mittelwert gezogen.
+  const HK_TW_REF=0.907, HK_TW_BASIS=7.16, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
@@ -5193,7 +5442,9 @@
       if(u.torwart){
         const schuesse=u.saves+u.gegentore;
         const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
-        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists*2;
+        // A1/A2 getrennt gewichtet wie beim Feldspieler unten (s. dort) — ein Torwart
+        // bekommt in der Praxis fast nie eine Vorlage, die Formel bleibt trotzdem konsistent.
+        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists1*2+u.assists2*1.5;
       }
       // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
       //
@@ -5210,8 +5461,37 @@
       // (3) SCHUSSVOLUMEN ZAEHLT. Corsi ist im Eishockey die gaengigste Einzelgroesse
       //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
       //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
-      return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
-            +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.5-u.verluste*0.2
+      // A1/A2 GETRENNT GEWICHTET (Impact-Verteilung-Recherche 5.4, wie NHL Game Score
+      // 0,7/0,55): eine erste Vorlage zaehlt mehr als eine zweite. `assists` (Summe) bleibt
+      // fuer Boxscore/Anzeige unveraendert, hier zaehlen assists1/assists2 getrennt.
+      return u.punkte*3+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
+            // GEWICHT DER GEWONNENEN PUCKS: 0,5 -> 0,2, und zwar an der realen Formel
+      // ausgerichtet statt geschaetzt. Der NHL Game Score (Luszczyszyn 2016) kennt einen
+      // Posten "loser Puck gewonnen" UEBERHAUPT NICHT — er zaehlt Tore (0,75), Vorlagen
+      // (0,7 und 0,55), Schuesse aufs Tor (0,075), Bloecke (0,05) und Strafen. Unsere 0,5
+      // je Puck waren eine Erfindung, und eine grosse: nachgemessen trugen die Pucks
+      // damit 35,8 % der gesamten Impact-Masse, mehr als Tore (17,9 %) und Schuesse
+      // (22,9 %) zusammen genommen fast erreichen.
+      //
+      // Das ist die Ursache hinter dem Sondierungsbefund. Zwei Sondierungslaeufe mit
+      // verschiedener Attributzuordnung (24 Spiele je Lauf) lasen fuer ZWEITCHANCE 42,9 %
+      // und 48,6 % mechanisches Gewicht — der mit Abstand groesste Posten, und der
+      // einzige, in dem sich beide Laeufe einig waren. Ein einzelner Sub-Skill, der die
+      // halbe Wertung traegt, kann mit einer Eignung, die ihn mit einem Elftel gewichtet,
+      // nicht zusammenpassen.
+      //
+      // Einen Puck zu erobern IST wertvoll, deshalb bleibt der Posten stehen. Aber mit
+      // 0,2 wiegt er jetzt ungefaehr wie ein Block und nicht mehr wie zwei Drittel eines
+      // Tores.
+      //
+      // CHECKS GESTRICHEN (Impact-Verteilung-Recherche 5.5/5.6, mit realer Deckung): der
+      // NHL Game Score kennt keinen Posten fuer Hits, und Hit-Differenzen korrelieren mit
+      // Tordifferenzen NEGATIV (Hockey Graphs 2015) — wer viel checkt, hat meist selten den
+      // Puck. `checks*0,4` war eine Erfindung ohne reale Entsprechung, die nur deshalb mit
+      // der Eignung korrelierte (0,855), weil `wucht` (s. versucheSteal) ABWEHR gegen
+      // AUSDAUER liest, also dieselbe Matrix wie ABWEHR selbst. Ein Check wirkt jetzt nur
+      // noch als Taumeln des Getroffenen (taumeltBis), nicht mehr als Punkt fuer den Checker.
+      +u.bloecke*0.5+u.rebounds*0.2-u.verluste*0.2
       // Genommene Strafen zaehlen negativ, wie im NHL Game Score (Luszczyszyn): wer sein
       // Team in Unterzahl bringt, hat dem Team geschadet, auch wenn der Check sass. Klein
       // gehalten (0,2 je Strafminute, also 0,4 je kleiner Strafe) — die eigentliche Strafe
@@ -5223,18 +5503,28 @@
   // Die Slot-Kennungen, unter denen der Torwart im Aufstellungsbildschirm laeuft. Mehrere,
   // weil der Slot-Generator seine Kennung selbst vergibt und der Motor nicht davon
   // abhaengen darf, welche davon gerade gilt (s. lib/lineups/matchday-slot-roles.ts).
-  // Greift keine, faellt bestimmeTorwaerter auf den besten PARADE-Wert zurueck.
+  // Greift keine ECHTE Aufstellung, faellt bestimmeTorwaerter auf den besten PARADE-Wert
+  // zurueck.
   const TORWART_SLOTS=new Set(["goaltender","goalie","torwart","netminder","keeper"]);
   const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
   // GENAU EINER JE SEITE, AB DREI SPIELERN. Chris woertlich: "einer der spieler soll
   // natuerlich einen torwart slot haben und entsprechend im tor stehen! ausser im 2er
   // spiel da gibts nur verteiger und angreifer". Bei zwei Spielern steht das Tor also
   // wirklich leer — das ist die Regel, nicht ein ungeprueter Sonderfall.
+  //
+  // BUG (hockey-archetypen-probe.md, Abschnitt 4): ohne gesetzte Aufstellung vergibt
+  // `slotFuer` (s. bauFeldspiel) den Torwart-Slot per Rundlauf ueber die Kaderreihenfolge
+  // — bei Hockeys Slotliste liegt "goaltender" zufaellig an Index 2, der DRITTE Spieler im
+  // Array wird also automatisch "Torwart", VOELLIG unabhaengig von PARADE. Diese Zeile
+  // griff bisher auch fuer den Rundlauf-Slot, weil `u.slotId` in beiden Faellen gleich
+  // aussah. Jetzt zaehlt nur eine ECHTE Manager-Zuweisung (`u.slotGesetzt`, aus
+  // `place[]`) — der automatische Ruecfall faellt immer auf die PARADE-Auswahl darunter
+  // durch, wie es der Kommentar hier schon immer versprach.
   function bestimmeTorwaerter(){
     for(const team of FSTEAM){
       for(const u of team)u.torwart=false;
       if(team.length<3)continue;
-      let gewaehlt=team.find(u=>u.slotId&&TORWART_SLOTS.has(u.slotId));
+      let gewaehlt=team.find(u=>u.slotGesetzt&&u.slotId&&TORWART_SLOTS.has(u.slotId));
       if(!gewaehlt)for(const u of team)if(!gewaehlt||(u.PARADE||0)>(gewaehlt.PARADE||0))gewaehlt=u;
       if(gewaehlt)gewaehlt.torwart=true;
     }
@@ -5258,13 +5548,33 @@
     pos.y=Math.max(k.o+rand,Math.min(k.u-rand,pos.y));
     return pos;
   }
-  // BULLY: kein eigener Standzustand, sondern ein FREIER PUCK auf dem Bullypunkt. Die
-  // bestehende Zweikampf-Mechanik um den losen Ball (reboundKampf) ist genau das, was ein
-  // Anspiel ist — beide Seiten laufen hin, wer ihn erwischt, hat ihn. Ein eigener
-  // Phasenzustand haette dieselbe Wirkung mit doppeltem Code.
+  // BULLY ALS FAEHIGKEITSDUELL (Impact-Verteilung-Recherche 5.5): frueher legte bully() nur
+  // einen freien Puck auf den Punkt, den danach dieselbe ZWEITCHANCE-Wettlaufmechanik wie
+  // jeder andere lose Puck entschied (reboundKampf) — rund 30 Bullys je Spiel liefen damit
+  // in dieselbe Masse wie Abpraller. Real ist ein Faceoff-Gewinn im NHL Game Score mit 0,01
+  // bewusst FAST wertlos (kein eigener Wertformel-Posten hier, s. feldspielWert), aber er
+  // ist ein echtes Fähigkeitsduell zwischen den beiden Centern — nicht ein Wettlauf, den
+  // LAUFTEMPO/ZWEITCHANCE entscheiden. TECHNIK steht stellvertretend fuer Stockarbeit im
+  // Kreis (dieselbe Sub-Skill-Wahl wie beim Schuss-Gate, s. entscheideBallaktion).
   function bully(x,y,vonSeite){
     fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
+    if(istHockey()){
+      const naechster=(seite)=>FSTEAM[seite]
+        .filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+        .sort((a,b)=>dist(a,{x,y})-dist(b,{x,y}))[0]||null;
+      const c0=naechster(0), c1=naechster(1);
+      if(c0&&c1){
+        const chance=1/(1+Math.exp(-(c0.TECHNIK-c1.TECHNIK)*HK_BULLY_K));
+        const gewinner=rr()<chance?c0:c1;
+        gewinner.x=x; gewinner.y=y;
+        feed(gewinner.side,gewinner.n+" gewinnt den Bully.");
+        logZug(gewinner.side,"bully",{spieler:gewinner});
+        fsLive.angriffSeit=0;
+        ballUebernehmen(gewinner);
+        return;
+      }
+    }
     fsLive.ball.frei=haltePuckImFeld({x,y,vonSeite});
     fsLive.angriffSeit=0;
   }
@@ -5278,7 +5588,8 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        wobbleY:0,frischerPassVon:null,frischerPassBis:0,frischerPassGeometrie:null,frischerPassAbwehr:50,
+        slotIdx:0,slotSeit:0,screent:null,rollBis:0,
         screenRuf:0,rangeSeit:null,
         // BEWEGUNGS-DYNAMIK (s. Konstantenblock oben): Ausbruchsfenster des Angreifers,
         // Mismatch-Abstaende und Sichtverlust-Fenster des Verteidigers. Alle vier sind
@@ -5308,7 +5619,10 @@
     // naechsterAngriff()/starteViertelpause() fuer die Grenzpruefung; `viertelpause` haelt
     // die Pausen-eigenen Daten und ist ausserhalb der Phase immer null, exakt wie `freiwurf`.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null};
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null,
+      // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
+      // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
+      beruehrungKette:[], beruehrungSeite:null};
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
@@ -5393,9 +5707,24 @@
     }
   }
 
+  // VORLAGEN AUS DER BERUEHRUNGSKETTE (nur Hockey, Impact-Verteilung-Recherche 5.4): statt
+  // eines einzelnen Zeitfensters (ASSIST_FENSTER, weiterhin fuer die Passqualitaets-Kette
+  // in Kraft, s. hockeyPassQualBonus) haelt die Kette die letzten BIS ZU DREI Ballbesitzer
+  // DERSELBEN Seite fest — verliert die Seite den Puck, beginnt die Kette bei null, ein
+  // Turnover darf keine Vorlage "von vorhin" ueberleben. Aufeinanderfolgende Beruehrungen
+  // DESSELBEN Spielers (Dribbeln, mehrere Ticks am Puck) zaehlen nur einmal.
+  function merkeBeruehrung(u){
+    if(!istHockey())return;
+    if(fsLive.beruehrungSeite!==u.side){fsLive.beruehrungKette=[];fsLive.beruehrungSeite=u.side;}
+    const kette=fsLive.beruehrungKette;
+    if(kette[kette.length-1]!==u)kette.push(u);
+    if(kette.length>3)kette.shift();
+  }
+
   function ballUebernehmen(u){
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    merkeBeruehrung(u);
     // Kein Assist-Fenster: hierher kommt man ueber Rebound, Steal, Anwurf oder neuen
     // Angriff — nie ueber ein Zuspiel (das laeuft ueber loeseFlugAuf, s. dort).
     u.frischerPassVon=null;
@@ -5632,6 +5961,19 @@
     };
     const abwehrTeiler=(m)=>Math.max(USAGE_TEILER_MIN,Math.min(USAGE_TEILER_MAX,
       1/(1+(deckerAbwehrVon(m)-ABWEHR_MITTEL)*USAGE_ABWEHR_K)));
+    // HOCKEY-SCHUETZENBONUS VERSUCHT UND WIEDER VERWORFEN (Impact-Verteilung-Recherche 5.3,
+    // zweiter Teil; s. hockey-mechanik-angleichen.md): ein Multiplikator ueber
+    // schussSkillFuer(m,tier) sollte den Passgeber zum besseren Schuetzen im jeweiligen
+    // Tier lenken. Durchgemessen (miss-hockey-archetypen.mjs 48) drehte er stattdessen die
+    // Sniper-Probe um: SCHUSS_NAH-Nahdistanz-rho von +0,30 auf −0,25, Terzil-dPp von +4,8
+    // auf −4,4 Pp. Wahrscheinlicher Kanal: der bevorzugt angespielte gute Schuetze bekommt
+    // dadurch MEHR, aber im Mittel schlechtere/bedraengtere Gelegenheiten (die Verteidigung
+    // kann sich auf ihn einstellen), was seinen Vorteil in der Trefferquote mehr als
+    // aufwiegt — dieselbe Selektionsverzerrung, vor der die Kommentare bei `passChance`/
+    // `kickOutChance` an anderer Stelle schon warnen. Nicht eingebaut; die Schwellen-
+    // Aenderung unten (schwelle) bleibt stehen, hat gemessen aber ohnehin keine Wirkung,
+    // weil technikGate bei normalen Werten weit ueber jeder erreichbaren Schwelle liegt
+    // (derselbe Befund wie im Rollout-Plan zu TECHNIK in Basketball).
     return gewichtetesLosNach(mitspieler,m=>
       losGewicht(m.ABSCHLUSS,USAGE_KAPPA)*Math.pow(qualitaet(m),2)
       *offenheitFuerPass(von,m)*abwehrTeiler(m)*(m.rollBis>fsT?3:1)
@@ -5883,16 +6225,27 @@
       // nur ohne den harten 0,92-Deckel, den jetzt die Logistik uebernimmt. Aufgesteilt
       // wird um den GEMESSENEN Tier-Mittelwert herum, damit der Ligadurchschnitt exakt
       // dort bleibt, wo die Kalibrierung ihn hingestellt hat.
-      const skillTeil=schussSkillFuer(u,tier)*0.0022+u.TEAMGEIST*0.0030;
-      const lage=-0.02+GEO_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0);
+      // KURVE-STRUKTUR: skillTeil/lage kommen jetzt aus FB().kurve (Basketball unveraendert
+      // ueber den KURVE_BASKETBALL-Rueckfall, s. Kommentar bei KURVE_BASKETBALL oben).
+      const skillTeil=skillTeilFuer(u,tier);
+      const lage=lageBasisFuer(tier)-bedraengnisMake+(imFastbreak?0.12:0)
+        +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0);
       const technikMake=steilerMake(lage,skillTeil,tier);
       // EINGRIFF (d), zweiter Teil: die bisher als Literal "4" eingebettete Abbauzeit ist
       // jetzt eine benannte Konstante und kuerzer. Sie ist die zweite Bremse neben der
       // Schussuhr — wer in Reichweite steht, wartete bisher bis zu vier Sekunden auf eine
       // bessere Gelegenheit, was bei 120 s Spielzeit einen erheblichen Teil jedes
       // Angriffs verbraucht.
+      // HOCKEY: Schussanteil als Faehigkeit, nicht nur als Standplatz (Impact-Verteilung-
+      // Recherche 5.3). Ohne diesen Term entscheidet fast ausschliesslich die Aufstellung
+      // (wer im Slot steht, bekommt die meisten Pucks), WER schiesst — die Schuss-Schwelle
+      // selbst kannte SCHUSS_NAH/SCHUSS_FERN nicht. Ein starker Schuetze im eigenen Tier
+      // zieht jetzt frueher ab, ein schwacher wartet laenger (faellt eher in die
+      // Pass-Logik durch, s. offensterMitspieler) — real nimmt der beste NHL-Schuetze rund
+      // 14 % der Teamschuesse, bei uns vor dieser Aenderung 56 % beim Netfront-Spieler.
       const schwelle=erzwingen?-1:Math.max(0.05,
-        0.42-((fsT-u.rangeSeit)/SCHWELLE_ABBAU)*0.30-(u.ABSCHLUSS-50)*0.0010);
+        0.42-((fsT-u.rangeSeit)/SCHWELLE_ABBAU)*0.30-(u.ABSCHLUSS-50)*0.0010
+        -(istHockey()?(schussSkillFuer(u,tier)-50)*0.0016:0));
       // KICK-OUT-WUERFEL: VOR dem Quality-Gate und bewusst UNABHAENGIG von TECHNIK/
       // TEAMGEIST des Schuetzen — ob ein bedraengter/gedoppelter Ballfuehrer abgibt,
       // haengt an der Bedraengnis selbst, nicht am eigenen Skill (genau das war vorher
@@ -5940,8 +6293,9 @@
       // die einzige Stelle ohne Aufsteilung, haetten Schussuhr-Wuerfe eine andere
       // Skill-Kopplung als alle anderen — genau die Art Inkonsistenz, die Opus-Review-
       // Fund #4 an dieser Stelle schon einmal aufgedeckt hat.
-      const technik=steilerMake(-0.02+GEO_BONUS[tierErz]-bedraengnisMake,
-        schussSkillFuer(u,tierErz)*0.0022+u.TEAMGEIST*0.0030,tierErz);
+      const technik=steilerMake(lageBasisFuer(tierErz)-bedraengnisMake
+        +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0),
+        skillTeilFuer(u,tierErz),tierErz);
       wirf(u,u,art,tierErz,technik,moeglicherAssist,null,(bedraengnisMake>0||gedoppelt)?decker:null);
       return;
     }
@@ -6407,6 +6761,50 @@
   }
   const PASSLINIE_RADIUS=55; // PLATZHALTER: wie nah ein Verteidiger an der Passlinie stehen muss
 
+  // PASSQUALITAETS-KETTE (nur Hockey — hockey-impact-verteilung-recherche-fable.md,
+  // Abschnitt 5.1/7.1). Bisher aenderte ein Pass NIE die Torwahrscheinlichkeit des darauf
+  // folgenden Schusses (nachgemessen: 6,9 % Trefferquote nach Pass gegen 8,4 % ohne —
+  // der Pass senkte die Chance leicht, statt sie zu heben). Real trifft ein Schuss nach
+  // einem Royal-Road-Pass (quer durch den Slot, Vorzeichenwechsel der y-Seite bezogen auf
+  // die Tormitte) zu 15,5 % gegen 6,7 % nach einem Pass von hinter der Torlinie (Passing
+  // Project, zitiert ueber NHL.com/Kraken). `klassifiziereHockeyPassGeometrie` trifft
+  // genau diese Unterscheidung anhand der Ursprungs-/Zielposition des Passes.
+  function klassifiziereHockeyPassGeometrie(seite,von,nach){
+    const torX=korbXVon(seite);
+    // Royal Road: die Seite bezogen auf die Tormitte (H/2) wechselt, UND der Puck landet
+    // dabei in der Angriffszone (nah genug am Tor, sonst ist es ein Zonenpass, kein
+    // Slot-Zuspiel).
+    const vzVon=Math.sign(von.y-H/2), vzNach=Math.sign(nach.y-H/2);
+    if(vzVon!==0&&vzNach!==0&&vzVon!==vzNach&&Math.abs(nach.x-torX)<HK_RADIUS_HOCHSLOT)return "slot";
+    // Hinter dem Tor: der Pass startet auf der bandenseitigen Seite der Torlinie.
+    if(seite===0?von.x>torX:von.x<torX)return "hinterTor";
+    return "sonst";
+  }
+  // GROESSENORDNUNG BEWUSST KLEIN GEHALTEN (Nachmessung, s. hockey-mechanik-angleichen.md):
+  // eine erste Fassung mit 0,14/0,06/0,02 (vor AUFBAU-Skalierung bis zu 0,23) drueckte
+  // `mitte` in `steilerMake` bei Nahdistanz-Schuessen (dort ist GEO_BONUS.nah bereits 0,20)
+  // regelmaessig gegen den MAKE_MAX-Deckel — genau die Saettigungsfalle, vor der der
+  // Motorkommentar beim verworfenen Assist-Bonus (oben, `:5931` im urspruenglichen Bericht)
+  // schon einmal warnt: nahe am Deckel wirkt der SKILL-Term (STEIL_MAKE*(skillTeil-...))
+  // kaum noch, weil sigma dort saettigt. Nachgemessen (miss-hockey-archetypen.mjs 48):
+  // SCHUSS_NAH-Sniper-Probe kippte dadurch von rho +0,30 auf −0,22, die Verteidiger-Probe
+  // von dTore% −3,8 % auf +5,8 % — beides die falsche Richtung. Auf ein Drittel gesenkt
+  // (0,05/0,025/0,01) und die Multiplikator-Spannen enger gefasst.
+  const HK_PASSQUAL_SLOT=0.05, HK_PASSQUAL_HINTERTOR=0.025, HK_PASSQUAL_SONST=0.01;
+  // Additiver Term auf `lage` in technikMake (s. entscheideBallaktion) — skaliert mit
+  // AUFBAU des Passgebers (ein Zuspiel eines Spielmachers "kommt in den Lauf"), gedaempft
+  // von der ABWEHR des naechsten Verteidigers an der Passlinie (`flug.passLinienAbwehr`,
+  // s. passeAb). Faengt der Verteidiger den Pass nicht ab, steht er trotzdem oft genug im
+  // Weg, dass die Anspielposition nicht die volle Qualitaet traegt.
+  function hockeyPassQualBonus(schuetze,passgeber){
+    if(!passgeber)return 0;
+    const g=schuetze.frischerPassGeometrie;
+    const basis=g==="slot"?HK_PASSQUAL_SLOT:g==="hinterTor"?HK_PASSQUAL_HINTERTOR:HK_PASSQUAL_SONST;
+    const aufbauSkala=Math.max(0.7,Math.min(1.3,0.85+(passgeber.AUFBAU-50)*0.0060));
+    const abwehrDaempfung=Math.max(0.6,Math.min(1.05,1.05-((schuetze.frischerPassAbwehr||50)-50)*0.0040));
+    return basis*aufbauSkala*abwehrDaempfung;
+  }
+
   function passeAb(von,nach,druckBonus=0){
     von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
     // Assist-Fenster schliessen: wer weitergibt, hat nicht abgeschlossen — der Assist
@@ -6463,6 +6861,10 @@
     const passDauer=istHockey()?Math.max(0.16,Math.min(0.75,strecke/1050)):0.3;
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:passDauer,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
+      // Fuer die Passqualitaets-Kette (s. hockeyPassQualBonus): welcher Verteidiger stand
+      // der Passlinie am naechsten, egal ob er den Pass abgefangen hat oder nicht — ein
+      // Verteidiger, der knapp daneben steht, daempft die Qualitaet trotzdem.
+      passLinienAbwehr:waechter?waechter.ABWEHR:50,
       abgefangenVon,eigenerFehler};
   }
 
@@ -6668,15 +7070,28 @@
     const rein=torX>MID?-1:1;
     if(hk.ausgang==="tor"){
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
-      if(flug.passgeber)flug.passgeber.assists++;
+      // VORLAGEN AUS DER BERUEHRUNGSKETTE (Impact-Verteilung-Recherche 5.4, statt des
+      // reinen ASSIST_FENSTER-Zeitfensters): A1 ist der Ballbesitzer unmittelbar vor dem
+      // Schuetzen in derselben ununterbrochenen Kette (s. merkeBeruehrung), A2 der davor —
+      // beide nur, wenn sie nicht der Schuetze selbst sind (Dribbeln zaehlt nicht als
+      // eigene Beruehrung, s. dort). `assists` bleibt die Summe fuer Boxscore/Anzeige,
+      // assists1/assists2 tragen die A1/A2-Gewichtung in feldspielWert (NHL Game Score:
+      // 0,7 gegen 0,55 — bei uns vorher 17 % der Tore mit ueberhaupt einer Vorlage gegen
+      // real 77,8 % mit ZWEI).
+      const kette=fsLive.beruehrungKette;
+      const idx=kette.lastIndexOf(schuetze);
+      const a1=idx>0?kette[idx-1]:null;
+      const a2=idx>1?kette[idx-2]:null;
+      if(a1){a1.assists++; a1.assists1++;}
+      if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
-      feed(schuetze.side,schuetze.n+" trifft"+(flug.passgeber?" nach Vorlage von "+flug.passgeber.n:"")+" — TOR!",true);
-      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:1,
+      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true);
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
         imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
       schwebe({x:0,y:0,txt:"TOR!",life:1.7,crit:true,_spieler:schuetze.id,_gross:true});
-      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:a1,rebounder:null};
       // Anspiel am Mittelpunkt. naechsterAngriff() zuerst, weil NUR dort die
       // Drittelgrenze geprueft wird; faellt das Tor genau auf die Grenze, uebernimmt die
       // Drittelpause, und dann darf hier kein Bully mehr dazwischenfunken.
@@ -6706,11 +7121,22 @@
       logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
-      // Der Puck liegt frei vor dem Tor — daraus wird ueber die bestehende
-      // Zweikampf-Mechanik ein echter Nachschuss-Kampf, kein Ballbesitzwechsel per Dekret.
-      const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
-      fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
-        y:torY+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      // Der Puck liegt frei vor dem Tor ODER in der Ecke — daraus wird ueber die
+      // bestehende Zweikampf-Mechanik ein echter Nachschuss-Kampf, kein Ballbesitzwechsel
+      // per Dekret. Nur der SLOT-Zweig ist der bisherige, frontale Abpraller; die Mehrheit
+      // geht jetzt seitlich Richtung Bande/hinter das Tor (s. HK_ABPRALLER_SLOT_*).
+      const slotChance=Math.max(HK_ABPRALLER_SLOT_MIN,
+        HK_ABPRALLER_SLOT_BASIS-(tw.PARADE-50)*HK_ABPRALLER_SLOT_K);
+      if(rr()<slotChance){
+        const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
+        fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
+          y:torY+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      } else {
+        const k=RINK(), seiteY=rr()<0.5?-1:1;
+        const streuX=30+rr()*40, streuY=(k.u-k.o)*0.28+rr()*(k.u-k.o)*0.14;
+        fsLive.ball.frei=haltePuckImFeld({x:torX+rein*streuX,
+          y:H/2+seiteY*streuY, vonSeite:schuetze.side});
+      }
       return;
     }
     if(hk.ausgang==="fest"){
@@ -6772,6 +7198,7 @@
         return;
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
+      merkeBeruehrung(flug.ziel);
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // Merkt sich den Passgeber fuer ASSIST_FENSTER Sekunden (s. dort und
       // entscheideBallaktion) — sonst gibt es beim normalen Pass nie einen Assist, weil
@@ -6783,6 +7210,14 @@
       // ASSIST_FENSTER, nur kuerzer, wenn der Passgeber keiner ist.
       const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(flug.passgeber.AUFBAU-50)*0.0060));
       flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.frischerPassBis=fsT+ASSIST_FENSTER*fensterFaktor;
+      // PASSQUALITAETS-KETTE (nur Hockey, s. hockeyPassQualBonus): Geometrie am
+      // Ankunftsort festhalten, nicht am Abwurfort — das ist die Position, die auch fuer
+      // "quer durch den Slot" zaehlt.
+      if(istHockey()){
+        flug.ziel.frischerPassGeometrie=klassifiziereHockeyPassGeometrie(
+          flug.ziel.side,flug.von,{x:flug.ziel.x,y:flug.ziel.y});
+        flug.ziel.frischerPassAbwehr=flug.passLinienAbwehr;
+      }
       flug.ziel.lunge=0.2;
       feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
       fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
@@ -7580,7 +8015,16 @@
         const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
         // Der Puck prellt nicht — er gleitet am Schlaeger. Basketballs Dribbel-Huepfen
         // waere hier sofort als falsche Sportart zu erkennen.
-        const dribbelDip=istHockey()?0:Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
+        //
+        // KURVENFORM (Fables Fund, 03.09., Pixelmessung der Bewegung): ein reiner
+        // sin(phi*pi)-Bogen hat seinen "Knick" (harten Richtungswechsel) GENAU in der
+        // Mitte (phi=0,5) und laeuft an den Endpunkten (phi=0/1) glatt aus — bei einem
+        // Ball ist es umgekehrt. Am Boden (Bodenkontakt, phi=0,5) prallt er hart und
+        // wechselt die Richtung schlagartig; an der Hand (phi=0/1, Abwurf/Fang) ist die
+        // Bewegung weich, wie am Scheitel eines Wurfbogens. 1-|cos(phi*pi)| hat genau
+        // diese Form: glatter Scheitel (Ableitung 0) bei phi=0/1, harter Knick bei
+        // phi=0,5 — Boden und Hand tauschen die Rollen gegenueber dem alten sin-Bogen.
+        const dribbelDip=istHockey()?0:(1-Math.abs(Math.cos(dribbelPhase*Math.PI)))*BK_DRIBBEL_AMPLITUDE;
         fsBall={sichtbar:true,x:traeger.x,y:traeger.y+(istHockey()?26:18)+dribbelDip,traegerId:traeger.id};
         // ALLE Decker des Ballfuehrers duerfen es versuchen, nicht nur der erste.
         //
@@ -7983,10 +8427,17 @@
       // (nicht mehr eigene Literale hier) — sonst laeuft die Zeichnung wieder aus dem
       // Ruder, sobald korbXVon() an anderer Stelle nachjustiert wird.
       const grundX=links?W*0.06:W*0.94, korbX=korbXVon(links?1:0);
-      // Zone (die Zahnstocher-Box unterm Korb)
-      ctx.strokeRect(links?grundX:grundX-H*0.16,H/2-H*0.08,H*0.16,H*0.16);
-      // Freiwurflinie mit Halbkreis
-      ctx.beginPath();ctx.arc(links?grundX+H*0.16:grundX-H*0.16,H/2,H*0.09,0,6.3);ctx.stroke();
+      // Zone (die Zahnstocher-Box unterm Korb). Fables Fund (03.09.): die Box haengte
+      // Tiefe UND Breite an H (der kurzen Seitenlinien-Achse) — H*0.16 ~75px, deutlich
+      // kleiner als eine echte NBA-Zone. Die Zone reicht real 19 ft von der Grundlinie
+      // (Feldlaenge 94 ft) und ist 16 ft breit (Feldbreite 50 ft); hier ist W die lange
+      // Achse (Spielfeldlaenge, Spielflaeche W*0.88 breit gemalt, s. fillRect oben) und
+      // H die kurze (Feldbreite) — die TIEFE gehoert deshalb an W, nicht an H.
+      const zoneTiefe=W*0.88*(19/94), zoneBreite=H*(16/50);
+      ctx.strokeRect(links?grundX:grundX-zoneTiefe,H/2-zoneBreite/2,zoneTiefe,zoneBreite);
+      // Freiwurflinie mit Halbkreis — Radius bleibt an H (Feldbreite), nur der Abstand
+      // von der Grundlinie folgt jetzt derselben echten Zonentiefe wie die Box oben.
+      ctx.beginPath();ctx.arc(links?grundX+zoneTiefe:grundX-zoneTiefe,H/2,H*0.09,0,6.3);ctx.stroke();
       // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
       ctx.beginPath();
       ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
@@ -8007,6 +8458,16 @@
         ctx.rotate(links?-Math.PI/2:Math.PI/2);
         ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
         ctx.restore();
+        // Staender zur Grundlinie (Fables Fund, 03.09.: das Sprite haengt frei im Feld,
+        // ohne sichtbare Verbindung zur Wand — real steht die Korbanlage auf einem
+        // Pfosten/Ausleger, der zur Grund-/Aussenlinie zurueckreicht). Reicht bis knapp
+        // an den gezeichneten Ring heran (halbe Sprite-Breite), damit er nicht ueber den
+        // Ring hinaus ins Feld ragt.
+        ctx.strokeStyle="rgba(210,210,215,.6)";ctx.lineWidth=5;
+        ctx.beginPath();
+        ctx.moveTo(grundX,H/2);
+        ctx.lineTo(links?korbX-22:korbX+22,H/2);
+        ctx.stroke();
       } else {
         // Rueckfall: Ring plus kurzer Brett-Strich, wie vor der Asset-Runde.
         ctx.fillStyle="rgba(255,140,60,.9)";
@@ -8288,12 +8749,25 @@
       // Damit der Ball nicht neben der entzerrt gezeichneten Hand schwebt, bekommt er
       // denselben Zeichen-Versatz. Ein FLIEGENDER Ball (Pass/Wurf) traegt keine traegerId
       // und bleibt unveraendert auf seiner interpolierten Bahn.
-      let bvx=0, bvy=0;
+      let bvx=0, bvy=0, handOffX=0, traeger=null;
       if(fsBall.traegerId!=null){
-        const h=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
-        if(h){ bvx=h._zvx||0; bvy=h._zvy||0; }
+        traeger=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
+        if(traeger){
+          bvx=traeger._zvx||0; bvy=traeger._zvy||0;
+          // Ball IN der Hand statt vor der Bauchmitte (Chris, 03.09.: "die Spieler den
+          // tragen"): seitlicher Versatz aus den gemessenen Handpunkten (BK_HAND_*, s.
+          // dort). Nur Basketball — der Puck liegt am Schlaeger, kein Handpunkt noetig,
+          // und die Freiwurf-Formation traegt denselben traegerId-Pfad mit, was hier
+          // gewollt ist (der Schuetze haelt den Ball dort genauso in der Hand).
+          if(feldspielDisc==="basketball"){
+            const rBlick=blickAus(traeger);
+            const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
+            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
+            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger));
+          }
+        }
       }
-      const bx=fsBall.x+bvx, by=fsBall.y+bvy;
+      const bx=fsBall.x+bvx+handOffX, by=fsBall.y+bvy;
       if(istHockey()){
         // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
         // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
@@ -8307,13 +8781,28 @@
         ctx.strokeStyle="rgba(200,214,230,.55)";ctx.lineWidth=1;
         ctx.beginPath();ctx.ellipse(bx,by-7,6.5,3.4,0,Math.PI,2*Math.PI);ctx.stroke();
         ctx.restore();
-      } else if(bkDa("ball")){
-        ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
       } else {
-        ctx.fillStyle="#e8823a";
-        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
-        ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+        // Bodenschatten fuer den getragenen/gedribbelten Ball (Fables Fund, 03.09.: kein
+        // Schatten heisst der Ball wirkt, als schwebe er frei — der Spielerschatten oben
+        // hat genau dasselbe Problem nicht, weil er fest am Boden klebt). Groesse/
+        // Deckkraft folgen dem Dribbel-Takt ueber dieselbe dip-Groesse, die auch die
+        // Hoehe treibt (fsBall.y=traeger.y+18+dip, s. BK_DRIBBEL_* oben): am Boden
+        // (naehe=1) dunkler/breiter, an der Hand (naehe=0) kaum sichtbar.
+        if(traeger){
+          const naehe=Math.max(0,Math.min(1,(fsBall.y-traeger.y-18)/BK_DRIBBEL_AMPLITUDE));
+          ctx.fillStyle="rgba(0,0,0,"+(0.12+naehe*0.28)+")";
+          ctx.beginPath();
+          ctx.ellipse(bx,traeger.y+bvy+19,6+naehe*4,2.5+naehe*1.5,0,0,6.3);
+          ctx.fill();
+        }
+        if(bkDa("ball")){
+          ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
+        } else {
+          ctx.fillStyle="#e8823a";
+          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
+          ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
+          ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
+        }
       }
     }
     for(const f of floats){
@@ -8374,6 +8863,18 @@
       // Matrix (2) es will: sechs Versuche sind kein Ausdauersport.
       //
       // Alle Zahlen PLATZHALTER bis zur Sondierung (Schritte S3/S4 des Plans).
+      //
+      // GEPRUEFT UND VERWORFEN (S3-Kalibrierrunde, gemessen vorher/nachher):
+      // Power aus TECHNIK/ANSAGE zu nehmen (nur noch in LAST) und das Gewicht an
+      // Dexterity/Speed/Determination/Charisma/Will umzuverteilen senkte die
+      // Pp-Abweichung von 48 auf 33 — aber die Rezeptur traf disproportional das
+      // Zielfeld dieser Sonde (Kader mit hohem Power-Anteil): Korridor-Gelingen fiel
+      // BREIT (Reissen 1. Versuch 84,2 -> 82,3 %, Stossen 3. Versuch 45,3 -> 45,0 %),
+      // Nullwertungen stiegen 3,1 -> 4,2 %, und rho (gesamt, jeSeite 6) sank leicht von
+      // 0,800 auf 0,789 — eine Verbesserung bei Pp, aber eine Verschlechterung bei
+      // Korridor UND Rangtreue. Nicht eingebaut (CLAUDE.md-Grundsatz: keine Aenderung,
+      // die etwas vorher Gutes schlechter macht). Der Rezept-Split bleibt darum wie von
+      // Fable entworfen; die Kalibrierung unten wirkt nur ueber die Koeffizienten.
       rezept:{
         LAST:     {power:60,health:25,determination:15},
         TECHNIK:  {dexterity:35,speed:30,determination:20,power:15},
@@ -8504,10 +9005,13 @@
   const istBuehne=(d)=>!!BUEHNE_ART[d];
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
+  // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
+  let letzterHebenZug=null;
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
-    floats.length=0;
+    floats.length=0; letzterHebenZug=null;
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
@@ -8525,7 +9029,7 @@
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
-        groesse:p.groesse??null,
+        groesse:p.groesse??null, attr,
         // DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen (Chris' Fund vom
         // 25.08., s. bauSpieler und aufschluesselung): `p.d` haelt nur "tdm" und "spurt"
         // vorberechnet. Fuer JEDE Buehnen-Disziplin fiel der Basiswert deshalb auf 0
@@ -8627,7 +9131,12 @@
   //   * Reissen traegt rund 45 % des Zweikampfs.
   //   * Gleichstand: es gewinnt, wer die Last mit WENIGER Versuchen erreicht hat (die
   //     IWF-Regel seit 2017). Erst danach die Reihenfolge.
-  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.514]};
+  // Stossen-3.-Versuch auf 0,55 angehoben (real 51,4 % Maenner / 53,6 % Frauen, Mittel
+  // 52,5): mit den staerkeren ANSAGE/NERVEN-Koeffizienten (S3-Kalibrierung) lag die
+  // gemessene Quote sonst bei 45-46 % statt im Korridor 50-63 % — der Zuschlag gleicht
+  // aus, dass ein hoeher gewagter dritter Versuch (groesserer Sprung, Reaktion auf den
+  // Duellstand) im Mittel oefter ueber dem Tagesmaximum liegt als die reine IWF-Quote.
+  const HEBEN_BASIS={reissen:[0.859,0.789,0.587], stossen:[0.893,0.744,0.565]};
   const HEBEN_ANTEIL_REISSEN=0.455;
   // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
   // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
@@ -8649,10 +9158,25 @@
     {rolle:"Final Attempt",  eroeffnung:0.90, sprung1:0.04, sprung2:0.06}
   ];
   // Wie stark die Sub-Skills die Kurve biegen. Alle PLATZHALTER.
-  const HEBEN_TECHNIK_K=0.0020;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
-  const HEBEN_NERVEN_K=0.0030;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
-  const HEBEN_ANSAGE_EROEFFNUNG=0.00035; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
-  const HEBEN_ANSAGE_SPRUNG=0.006;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
+  // KALIBRIERUNG S3 (24.09., nach der ersten Pp-Messung): die vier Zeilen unten waren
+  // 4x/3x/3x zu schwach, um Charisma und Dexterity/Speed ausgangswirksam zu machen.
+  // Erste Messung (einflussVon, n=48): Power 51,6 % (Matrix 28, +23,6 Pp), Charisma
+  // 1,4 % (Matrix 23, -21,6 Pp), Abweichung GESAMT 66,3 Pp — weit ueber der 25-Pp-Schranke
+  // (6.1) trotz des Kommentars "Charisma sitzt zweimal, beide ausgangswirksam": NERVEN
+  // wirkt nur auf den dritten Versuch, ANSAGE nur auf Eroeffnungshoehe/Sprunggroesse, beide
+  // innerhalb eines enormen Tagesmaximums (LAST allein spannt 104 bis 476 kg), das die
+  // Ansage-Kanaele nur um wenige Prozentpunkte verschieben konnten. Angehoben, bis Pp im
+  // Korridor lag (s. Abschlussbericht fuer die Messreihe).
+  const HEBEN_TECHNIK_K=0.0035;   // je Punkt TECHNIK ueber 50 auf jede Gelingchance
+  const HEBEN_NERVEN_K=0.0090;    // je Punkt NERVEN ueber 50, nur auf den dritten Versuch
+  const HEBEN_ANSAGE_EROEFFNUNG=0.0016; // je Punkt ANSAGE ueber 50 auf die Eroeffnungshoehe
+  // ANSAGE_SPRUNG bei 0,015 gelassen, nicht weiter erhoeht: bei 0,032 hob es den Zocker-
+  // Archetyp (S4, charisma/speed fuehrt bei den groessten Spruengen) von rho 0,11 auf nur
+  // 0,27 — kaum Wirkung fuers Archetyp-Ziel — riss aber Stossen 3. Versuch aus dem
+  // Korridor (51,3 % -> 47,7 %, Ziel 50-63 %). Kein guter Tausch, verworfen. Der Zocker-
+  // Archetyp fuehrt darum NICHT klar (s. Abschlussbericht) — ehrlich gemessen, nicht
+  // erzwungen.
+  const HEBEN_ANSAGE_SPRUNG=0.015;       // je Punkt ANSAGE ueber 50 auf die Sprunggroesse
   const HEBEN_ERHOLUNG_K=0.0012;  // je Punkt ERHOLUNG ueber 50 auf das Stossen-Maximum
   const HEBEN_WAGNIS_K=6.0;       // Malus je Anteil, den die Ansage ueber dem Tagesmax liegt
   const HEBEN_WIEDERHOLUNG=0.06;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
@@ -8737,7 +9261,13 @@
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
     const ansage={};
     for(const u of [a,b]){
-      const anteil=plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG;
+      // Deckel bei 97 % des Tagesmaximums: ohne ihn eroeffnete ein Heber mit ANSAGE nahe
+      // 99 rechnerisch ueber 100 % seines Maximums (0,94 Basis + 49*0,0016 = 1,018) und
+      // riss den ERSTEN Versuch fast sicher — genau die Kalibrierungsfalle, die schon bei
+      // den dritten Versuchen ohne Deckel auftrat (s. Kommentar bei "REAKTION AUF DEN
+      // DUELLSTAND" unten). Der Deckel laesst ANSAGE weiter die Eroeffnungshoehe heben,
+      // ohne sie ins garantierte Misslingen zu schicken.
+      const anteil=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
@@ -8804,6 +9334,7 @@
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
+      if(BB().heben)letzterHebenZug={u,r};
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
@@ -8907,6 +9438,11 @@
   function zeichneBuehne(){
     bodenBuehne();
     const art=BB();
+    // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
+    // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
+    // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
+    // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
+    if(art.heben){ zeichneHeben(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
@@ -8973,6 +9509,119 @@
       }
       ctx.globalAlpha=1;
     }
+  }
+
+  // ================== GEWICHTHEBEN: EIGENES BUEHNENBILD (Plan S2) ==================
+  // Zwei Heber mittig, eine Hantel mit der angesagten Last, gueltig/ungueltig als Geste,
+  // Duellstand gross, Gesamtlast klein, die wartenden Paare klein am Rand — genau die
+  // Liste aus Plan Abschnitt 7. Kein neues Sprite-Rendering: zeichneSprite() von den
+  // Auftritts-Disziplinen wird nur GROESSER und MITTIGER platziert.
+  function bestBisher(u,uebung){
+    let m=0;
+    for(let i=0;i<=u.aktuell;i++){const r=u.runden[i];
+      if(r&&r.uebung===uebung&&r.gueltig)m=Math.max(m,r.kg);}
+    return m;
+  }
+  function zeichneHeben(art){
+    if(!TEILNEHMER.length)return;
+    const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
+    // Aktives Duell: das des zuletzt enthuellten Zugs. Vor dem allerersten Zug (noch
+    // nichts in letzterHebenZug) ist es das erste Duell — dieselbe Regel, mit der die
+    // Warteschlange startet.
+    const aktivNr=letzterHebenZug?(letzterHebenZug.u.duellNr??0):0;
+    const a=TEILNEHMER.find(u=>u.side===0&&u.duellNr===aktivNr);
+    const b=TEILNEHMER.find(u=>u.side===1&&u.duellNr===aktivNr);
+    if(!a||!b)return;
+
+    // GROSSE DUELLSTAND-ZEILE — dieselbe Zahl wie im DOM-Score (#score), hier zusaetzlich
+    // auf der Buehne selbst, weil das Auge beim Gewichtheben auf dem Podest bleibt, nicht
+    // am Seitenrand des HUDs.
+    const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=art.rundenN&&u.duellGewonnen).length;
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="700 30px 'Barlow Condensed',sans-serif";
+    ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+    const standTxt=duelle(0)+" : "+duelle(1);
+    ctx.strokeText(standTxt,W/2,H*0.10);
+    ctx.fillStyle="#f2e9d8";ctx.fillText(standTxt,W/2,H*0.10);
+    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
+
+    // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
+    // Chris beschrieben hat ("immer 2 gleichzeitig").
+    const y=H*0.46;
+    [[a,W*0.30,"--home"],[b,W*0.70,"--away"]].forEach(([u,x,farbVar])=>{
+      const c=css(farbVar);
+      ctx.globalAlpha=u.lunge>0?1:0.94;
+      ctx.fillStyle=c;ctx.globalAlpha=0.22;
+      ctx.beginPath();ctx.ellipse(x,y+26,22,8,0,0,6.3);ctx.fill();
+      ctx.globalAlpha=1;
+      zeichneSprite(ctx,u,x,y);
+      const schrift=(txt,dy,farbe,groesse,gewicht)=>{
+        ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+      };
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
+      // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
+      // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
+      const zwSoFar=bestBisher(u,"reissen")+bestBisher(u,"stossen");
+      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
+    });
+
+    // DIE HANTEL — Balken mit zwei Scheibenpaaren, keine neue Sprite-Pipeline, nur
+    // Primitiven. Traegt die zuletzt angesagte/gehobene Last als grosse Zahl.
+    const bx=W/2,by=y+2;
+    ctx.strokeStyle="#5a5568";ctx.lineWidth=5;
+    ctx.beginPath();ctx.moveTo(bx-46,by);ctx.lineTo(bx+46,by);ctx.stroke();
+    ctx.fillStyle="#3a3648";
+    for(const dx of [-46,-38,38,46])
+      {ctx.beginPath();ctx.ellipse(bx+dx,by,Math.abs(dx)===46?11:8,Math.abs(dx)===46?11:8,0,0,6.3);ctx.fill();}
+
+    const zug=letzterHebenZug;
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    if(zug){
+      const gueltig=zug.r.gueltig;
+      const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
+      ctx.font="700 22px 'Barlow Condensed',sans-serif";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
+      ctx.strokeText(zeigeKg+" kg",bx,by-34);
+      ctx.fillStyle=gueltig?css("--ok"):css("--crit");
+      ctx.fillText(zeigeKg+" kg",bx,by-34);
+      // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
+      // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";
+      ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,by+34);
+      ctx.font="400 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,by+48);
+    } else {
+      ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.fillText("Erste Ansage folgt …",bx,by-10);
+    }
+
+    // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
+    // mit Ergebnis sobald entschieden. Das ist das "was noch kommt/kam"-Gedaechtnis, das
+    // beim Reihenbild der anderen Buehnen die zwoelf sichtbaren Figuren selbst leisten.
+    const paare=[];
+    for(let d=0;d<gesamtDuelle;d++){
+      if(d===aktivNr)continue;
+      const pa=TEILNEHMER.find(u=>u.side===0&&u.duellNr===d), pb=TEILNEHMER.find(u=>u.side===1&&u.duellNr===d);
+      if(!pa||!pb)continue;
+      const fertig=pa.aktuell+1>=art.rundenN;
+      const status=!fertig&&pa.aktuell<0?"wartet":!fertig?"läuft":(pa.duellGewonnen?"1:0 für "+pa.n.split(" ")[0]:"1:0 für "+pb.n.split(" ")[0]);
+      paare.push({d,pa,pb,fertig,status});
+    }
+    paare.sort((x,y)=>x.d-y.d);
+    ctx.textAlign="center";
+    const ry=H*0.90, spanne=W-120;
+    paare.forEach((p,i)=>{
+      const rx=60+spanne*(paare.length>1?i/(paare.length-1):0.5);
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=p.fertig?"#8a93a3":"#c7ccd6";
+      ctx.fillText((p.d+1)+". "+p.pa.n.split(" ")[0]+" – "+p.pb.n.split(" ")[0],rx,ry);
+      ctx.font="400 8px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=p.fertig?css(p.pa.duellGewonnen?"--home":"--away"):"#5f6675";
+      ctx.fillText(p.status,rx,ry+11);
+    });
   }
 
   function stats(p,dId){const rec=rezeptVon(dId),o={};
@@ -9496,7 +10145,14 @@
         if(b){const v=el("div","slotvorschlag");
           v.appendChild(el("span","vlabel",drin.length?"Besser wäre":"Bester Freier"));
           v.appendChild(el("b",null,b.p.n));
-          const abs=(b.p.d[disc]||0)+b.m;
+          // Dieselbe Eignungsluecke wie in bauFeldspiel/bauBuehne/bauSpurt/baueEinheit
+          // (CLAUDE.md: "p.d haelt nur tdm und spurt vorberechnet"), fuenfte Fundstelle
+          // (Opus-Projektueberwachung, 03.09.): `p.d[disc]||0` ist fuer die anderen 18
+          // Disziplinen immer 0, die angezeigte "absolute" Eignung war also nur der kleine
+          // Slot-Modifikator (b.m, Spanne +/-8,5) statt einer echten ~0-99-Eignung — der
+          // Vorschlag "Bester Freier"/"Besser waere" zeigte eine fast bedeutungslose Zahl.
+          // Gleicher Rueckfall wie ueberall sonst: gewichtet(p.a, BASIS_JE_DISC[...]).
+          const abs=(b.p.d[disc]!=null?b.p.d[disc]:gewichtet(b.p.a,BASIS_JE_DISC[disc]||{}))+b.m;
           v.appendChild(el("s",null,abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
           v.addEventListener("click",()=>{
             const raus=here.find(x=>place[x.n].slot===rw.id);
@@ -10249,7 +10905,17 @@
     const tr=traitTreffer(p);
     const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
     const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
-    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte+eigHebung(p,d);
+    // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
+    // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
+    // Battlefield fiel der Basiswert damit auf 0, und `eigWert` bestand nur aus Slot-,
+    // Trait- und Formzuschlag. Nachgemessen (Fable, Arena-Recherche) lagen Fechtens
+    // Eignungswerte zwischen -8,5 und +18,5; Johanna kaempfte mit 3 Lebenspunkten,
+    // Cassandra mit 1,5. Fechtens gemessene 0,769 waren deshalb keine Fecht-Rangtreue.
+    //
+    // Und hier faellt der Fehler schwerer als in den anderen drei Chassis: `eigWert` geht
+    // ueber aufEignung() direkt in die KAMPFWERTE ein, ist also nicht nur Anzeige.
+    const eigWert=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
@@ -11662,7 +12328,41 @@
   // die ich sonst Zeile fuer Zeile abgeschrieben habe. Charisma wirkt weiterhin im Kampf
   // (ueber formMitFuehrung auf den Zusammenhalt der Linie) — es wird nur nicht mehr als
   // Leistung verbucht.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
+  // ERLITTENER SCHADEN ZAEHLT NICHT MEHR MIT (`tank*0.15` gestrichen), und das ist genau
+  // das, was der Absatz darueber schon sagt: "'ich wurde beschossen' fuer sich genommen
+  // ist noch keine Leistung". Er stand trotzdem im Ausdruck.
+  //
+  // Nachgemessen (Fable, Arena-Recherche) vergab die Formel 44 % des Gesamtbeitrags fuers
+  // GETROFFENWERDEN — `verh` 33 %, `tank` 11 %. Der Verliererseite, die in 24 von 24
+  // Spielen komplett faellt, wurde derselbe Anteil gutgeschrieben wie den Siegern (8,2
+  // gegen 8,4). Und die Zielwahl ist Geometrie, nicht Bedrohung: 264 von 288
+  // Kaempfer-Spielen zielen auf den NAECHSTEN. Wer beschossen wird, haengt damit an
+  // seiner Reihe, nicht an seiner Eignung — die Korrelation zwischen Eignung und
+  // "Angreifer je Lebenssekunde" liegt bei -0,02.
+  //
+  // `verh` BLEIBT. Es ist die Differenz zwischen dem, was ankam, und dem, was ohne seine
+  // Verteidigung angekommen waere, entsteht also aus SEINEM Attributwert — anders als
+  // `tank`, das reine Aussetzung ist.
+  // VERHINDERTER SCHADEN MIT 0,4 STATT VOLL — gemessen, nicht gewaehlt. Er entsteht zwar
+  // aus dem eigenen Verteidigungswert, waechst aber zugleich mit der AUSSETZUNG: wer oft
+  // beschossen wird, verhindert viel, unabhaengig davon, wie gut er ist. Und beschossen
+  // wird, wer zufaellig am naechsten steht (s. oben).
+  //
+  // Drei Gewichte durchgemessen, je 24 Spiele:
+  //
+  //   Gewicht        1,0     0,4     0,0
+  //   mini-dm       0,383   0,658   0,750
+  //   battlefield   0,041   0,469   0,473
+  //   tdm           0,518   0,506   0,457
+  //   fechten       0,537   0,495   0,407
+  //   Summe         1,479   2,128   2,087
+  //
+  // Die Aufteilung ist kein Zufall: mini-dm und battlefield spielen vier gegen vier, tdm
+  // und fechten sechs gegen sechs. In kleinen Teams ist die Aussetzung sehr ungleich
+  // verteilt, dort ist der Posten fast nur Rauschen; in grossen gleicht sie sich aus und
+  // er traegt echten Tank-Wert. Ein Entweder-oder waere fuer die eine oder die andere
+  // Haelfte falsch — 0,4 ist das Optimum ueber alle vier.
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh*0.4+u.st.koAnteil*140;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
@@ -12432,7 +13132,21 @@
       // in einer Staffel raeumt niemand den Gegner von der Bahn.
       label:"Staffel", jeSeite:6, staffel:true, bahnenFest:2,
       hindernisse:[], hindernisWort:"Wechsel", boden:"#8a4a32",
-      schatten:true, tackle:false, grundTempo:92, tempoSpanne:0.90,
+      // WINDSCHATTEN AUS (vorher an). Zwei Gruende, der zweite gemessen.
+      //
+      // ERSTENS ist er hier unrealistisch: eine Staffel laeuft in ZUGETEILTEN Bahnen,
+      // jede Mannschaft auf ihrer eigenen. Zwischen zwei Laeufern auf getrennten Bahnen
+      // gibt es keinen Sog — das ist der Unterschied zu einem Massenstart.
+      //
+      // ZWEITENS war er ein Rauschsender. Solange `vordermann` auch WARTENDE Laeufer als
+      // Sogquelle zaehlte (Fable-Fund, jetzt behoben), hingen die Beine zwei bis fuenf 35
+      // bis 40 % ihrer Zeit hinter einem Stehenden — ein Vorteil, der an der
+      // Abschnittsnummer hing und nicht am Koennen. Ohne diesen Fehler blieb nur noch der
+      // Sog hinter dem GEGNER, und der faellt nur der zurueckliegenden Mannschaft zu.
+      // Nachgemessen fiel die Validitaet dadurch von 0,762 auf 0,601: ein
+      // situationsabhaengiger Vorteil, den das Koennen nicht steuert, ist genau das, was
+      // eine Rangtreue frisst.
+      schatten:false, tackle:false, grundTempo:92, tempoSpanne:0.90,
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
       kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
       rezept:{
@@ -12650,13 +13364,35 @@
         // NICHT der Disziplinrang, sondern nur die Attribute, aus denen er entsteht. Zwei
         // Laeufer mit gleichen Attributen laufen gleich schnell, auch wenn der eine im
         // Spurt auf Rang 6 und der andere auf Rang 20 steht.
-        eig:(p.d[d]||0)+engP+breitP+eigHebung(p,d),
+        // DIESELBE LUECKE WIE IM FELDSPIEL UND AUF DER BUEHNE, hier nie geschlossen —
+        // und auf der Bahn hat sie am meisten angerichtet. `p.d` haelt genau ZWEI
+        // Disziplinwerte vorberechnet: "tdm" und "spurt". Fuer die anderen drei Bahnen
+        // (Staffel, Zeitfahren, Klettern) und fuer Takeshi fiel der Basiswert damit auf
+        // 0 zurueck, und `eig` bestand nur noch aus Slot- und Formzuschlaegen.
+        //
+        // NACHGEMESSEN, nicht vermutet: in der Staffel lagen die Eignungswerte zwischen
+        // -8,4 und +11,8 statt zwischen 40 und 70. Die Rangtreue mass damit den
+        // Formkarten-Zufall gegen die Rennzeit und las rho -0,038 — statistisch null.
+        // Und es erklaert, warum ausgerechnet Spurt als einzige Bahn bestand: es ist die
+        // einzige, deren Disziplinwert vorberechnet vorliegt.
+        //
+        // gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der p.d.tdm
+        // ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken,
+        // Zeichen fuer Zeichen wie in bauFeldspiel und bauBuehne. Das VERHALTEN der
+        // Rennen aendert sich dadurch nicht: die Laufwerte kommen aus dem Rezept (R2),
+        // nicht aus `eig`.
+        eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
         pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
         plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
         bahnZ:bahn, wechselCd:0, wechsel:0,
         reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
-        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null};
+        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null,
+        // STAFFEL, WAS EINEN EINZELNEN MESSBAR MACHT. `etappenZeit` ist die Zeit fuer den
+        // EIGENEN Abschnitt, `wechselKonto` die Bilanz aus allen Uebergaben, an denen er
+        // beteiligt war (abgebend wie annehmend). Ausserhalb der Staffel bleiben beide
+        // null und werden nie gelesen.
+        etappenZeit:null, wechselKonto:0, wechselN:0, wechselVerlust:0};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
       L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
       // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
@@ -12686,12 +13422,89 @@
     let best=null, bestD=9;
     for(const o of LAEUFER){
       if(o===u||o.fertig!=null)continue;
+      // WER STEHT, SPENDET KEINEN WINDSCHATTEN (Fable-Fund, Bahn-Recherche). Diese
+      // Pruefung fehlte, und in der Staffel richtet das echten Schaden an: die wartenden
+      // Laeufer stehen sichtbar in ihrer Wechselzone auf der Strecke, und `vordermann`
+      // hat sie als Sogquelle gezaehlt. Nachgemessen hingen die Beine zwei bis fuenf 35
+      // bis 40 % ihrer Zeit im Sog eines STEHENDEN Mannes, Bein sechs (vor dem niemand
+      // mehr wartet) exakt 0 % — der Windschatten war also gar kein Rennelement, sondern
+      // eine Praemie darauf, welchen Abschnitt man zugeteilt bekam. Laeufer auf Bein
+      // fuenf wechselten sogar die Bahn, um an dem Stehenden vorbeizukommen.
+      //
+      // Ausserhalb der Staffel ist `aktiv` nie gesetzt und die Zeile wirkungslos.
+      if(BA().staffel&&o.aktiv===false)continue;
       const d=o.pos-u.pos;
       if(d<=0.004||d>SCHATTEN_ABSTAND)continue;
       if(Math.abs(o.bahnZ-u.bahnZ)>1.05)continue;
       if(d<bestD){bestD=d;best=o;}
     }
     return best;
+  }
+
+  // ============================ DIE KURVE ============================
+  // Chris' Auftrag woertlich: "dann support stats bei der staffel zb in
+  // kurvengeschwindigkeit oder staffelstab uebergabe ueberleiten damit es nicht nur der
+  // reine speed ist".
+  //
+  // WARUM DAS DIE STAFFEL BRAUCHT. Bis hierher war WENDIGKEIT in der Staffel praktisch
+  // arbeitslos: zwei Bahnen, keine freie Spur, keine Huerden. Sie wirkte an genau EINER
+  // Stelle — beim Aufraeumen nach einer verpatzten Uebergabe, also nur dann, wenn schon
+  // etwas schiefgegangen war. Ein Wert, der nur im Schadensfall zaehlt, ist im Boxscore
+  // unsichtbar.
+  //
+  // Jetzt hat jeder Abschnitt eine Kurve, und wer sie traegt, verliert dort weniger
+  // Tempo. Das ist keine erfundene Regel: eine 4x400-Staffel laeuft ueberwiegend in der
+  // Kurve, und der Unterschied zwischen einem guten und einem schlechten Kurvenlaeufer
+  // ist eine der wenigen Groessen, die im Staffellauf ueberhaupt neben der reinen
+  // Schnelligkeit steht.
+  //
+  // KURVE_ANTEIL sagt, welcher Teil eines Abschnitts Kurve ist; die Zahlen darunter, wie
+  // viel Tempo sie kostet und wie viel davon Bahnarbeit zurueckholt. Alle drei sind
+  // PLATZHALTER, bis die Bahn-Recherche eigene Zahlen liefert — sie stehen hier als
+  // Struktur, nicht als eingemessene Groesse.
+  // UEBERGABE. Der Zeitverlust im Wechsel, stufenlos aus dem Koennen beider Beteiligten.
+  // Real trennt einen guten von einem mittelmaessigen Wechsel ungefaehr eine Zehntel-
+  // sekunde; ein echter Patzer kostet ein Vielfaches davon. Alle fuenf Zahlen sind
+  // PLATZHALTER, bis die Bahn-Recherche eigene liefert.
+  const WECHSEL_MAX=0.42;          // Verlust bei Koennen 0
+  const WECHSEL_K=0.0036;          // wieviel je Punkt Koennen zurueckkommt
+  const WECHSEL_MIN=0.04;          // schneller als das geht kein Wechsel
+  const WECHSEL_PATZER=0.22;       // Grundchance auf einen echten Patzer
+  const WECHSEL_PATZER_K=0.0020;   // wieviel Koennen sie senkt
+  const WECHSEL_PATZER_KOSTEN=0.9; // was ein Patzer obendrauf kostet
+  const WECHSEL_ROBUST_K=0.0012;   // wieviel Verlaesslichkeit die Patzerchance senkt
+  const SPITZE_ZUG=0.0038;         // wieviel WUCHT die Fuehrungsarbeit verbilligt (Staffel)
+  const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
+  const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
+  const KURVE_WENDIG=0.0016;      // wieviel davon je Punkt WENDIGKEIT zurueckkommt
+  // Liegt dieser Laeufer gerade in der Kurve seines Abschnitts? Ausserhalb der Staffel
+  // gibt es keine Abschnitte — dort ist der Faktor immer 1 und die Zeile wirkungslos.
+  // WIE WEIT IST ER AUF SEINER EIGENEN STRECKE? Ausserhalb der Staffel ist das die
+  // Rennposition selbst. In der Staffel laeuft jeder nur seinen Abschnitt — und zwar von
+  // vorn: der Schlusslaeufer uebernimmt frisch, er hat nicht fuenf Sechstel Rennen in den
+  // Beinen.
+  //
+  // DAS WAR DER ZWEITE STAFFEL-FEHLER, und er sass tiefer als der erste. Ermuedung
+  // (`mued`, ab pos>0,45) und Angriffspunkt (`planT`, ab pos>=u.ab) lasen die GLOBALE
+  // Rennposition. Der Startlaeufer lief damit seinen Abschnitt immer im Bereich 0,00 bis
+  // 0,17 — also nie ermuedet und nie im Angriff — und der Schlusslaeufer immer im
+  // Bereich 0,83 bis 1,00, also mit voller Ermuedungsstrafe. Die Etappenzeit hing damit
+  // vor allem daran, WELCHEN Abschnitt jemand lief, und erst danach daran, WER er ist.
+  // Ein Weltklasse-Schlusslaeufer sah aus wie ein mittelmaessiger Startlaeufer.
+  const laufAnteil=(u)=>{
+    if(!BA().staffel||u.beinVon==null)return u.pos;
+    const laenge=(u.beinBis-u.beinVon)||1;
+    return Math.max(0,Math.min(1,(u.pos-u.beinVon)/laenge));
+  };
+  function kurvenFaktor(u){
+    if(!BA().staffel||u.beinVon==null)return 1;
+    const imBein=laufAnteil(u);
+    // Die Kurve liegt in der MITTE des Abschnitts: Anlauf gerade, Kurve, Zielgerade —
+    // dieselbe Reihenfolge wie auf einer echten Rundbahn.
+    const rand=(1-KURVE_ANTEIL)/2;
+    if(imBein<rand||imBein>1-rand)return 1;
+    const verlust=KURVE_KOSTEN*Math.max(0,1-u.WENDIGKEIT*KURVE_WENDIG/KURVE_KOSTEN);
+    return 1-Math.max(0,Math.min(KURVE_KOSTEN,verlust));
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -12706,13 +13519,14 @@
     const phase=Math.min(1,(rennT-(u.startT||0))/3.2);
     const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
     // Der Plan: bis zum Angriffspunkt laeuft er verhalten, danach alles.
-    const planT=u.pos>=u.ab?1.0:u.tempo;
+    const planT=laufAnteil(u)>=u.ab?1.0:u.tempo;
     // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
     // ERMUEDUNG. Der Beiwert entscheidet, wie stark das Stehvermoegen die zweite
     // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
     // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
     // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
-    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(u.pos-0.45)*100):1;
+    const anteil=laufAnteil(u);
+    const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -12731,7 +13545,8 @@
     const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
-    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
+    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1);
   }
 
   // ===================================================================================
@@ -12855,8 +13670,20 @@
       // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
       // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
-      const ueber=Math.max(0.4,(u.pos>=u.ab?1.0:u.tempo));
+      const ueber=Math.max(0.4,(laufAnteil(u)>=u.ab?1.0:u.tempo));
       let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      // ZUG AN DER SPITZE (nur Staffel). WUCHT heisst dort ausdruecklich "Zug an der
+      // Spitze" (s. BAHN_ART.staffel.lang) — hatte aber keinen einzigen Kanal: WUCHT ist
+      // ueberall sonst der Rempler, und in der Staffel wird nicht gerempelt
+      // (tackle:false). Damit lagen Spirit (Matrixgewicht 16) und Charisma (10) in einem
+      // Sub-Skill, der mechanisch NICHTS tat — zusammen ein Viertel der Matrix, das die
+      // Rangtreue nie erreichen konnte. Genau solche toten Kanaele deckeln die
+      // Validitaet, nicht die Zuverlaessigkeit.
+      //
+      // Jetzt kostet Fuehrungsarbeit den, der sie leistet — aber wer Zug hat, zahlt
+      // weniger dafuer. Das ist dieselbe Idee wie der Windschatten, nur von der anderen
+      // Seite, und es ist die Rolle, die der Text ohnehin beschreibt.
+      if(BA().staffel&&!u.imSchatten)zehr*=Math.max(0.72,1.10-u.WUCHT*SPITZE_ZUG);
       // STEIGUNG. Eine Wand ist unten leichter als oben. Der Verbrauch waechst mit der
       // Hoehe — deshalb entscheidet beim Klettern der Haushalt, nicht der Antritt.
       if(BA().steigung)zehr*=1+BA().steigung*u.pos;
@@ -12990,23 +13817,70 @@
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
+        u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
         if(naechster){
           naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
-          const gut=Math.min(0.96,(BA().wechselBasis??0.34)
-            + ((u.TECHNIK+naechster.TECHNIK)/2)*(BA().wechselSpanne??0.0062));
-          if(rr()>gut){
-            // Bahnarbeit hilft, den Anschluss wiederzufinden. Ohne diesen Kanal war
-            // WENDIGKEIT in der Staffel voellig unbeschaeftigt: zwei Bahnen, keine freie
-            // Spur, keine Hindernisse — Awareness und Dexterity lasen 0 %.
-            naechster.stolper=(BA().wechselStrafe??1.30)
-              *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+          // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
+          // Vorher war der Wechsel ein Ja/Nein: mit Wahrscheinlichkeit `gut` sauber, sonst
+          // eine feste Strafe. Das ist aus zwei Gruenden schlecht.
+          //
+          // ERSTENS MISST ES NICHTS. Jeder Laeufer ist an hoechstens zwei Uebergaben
+          // beteiligt, der Start- und der Schlusslaeufer sogar nur an einer. Ein Muenzwurf
+          // mit ein bis zwei Wuerfen je Spieler ist als Mass unbrauchbar — die Streuung
+          // erschlaegt das Koennen. Nachgemessen blieb die Rangtreue der Staffel damit bei
+          // rho 0,31 je Spiel, obwohl sie ueber die Saison schon 0,67 erreichte: die
+          // Mechanik belohnte das Richtige, aber viel zu laut.
+          //
+          // ZWEITENS IST ES UNREALISTISCH. Eine Stabuebergabe gelingt nicht oder
+          // misslingt — sie ist schneller oder langsamer. Der Unterschied zwischen einem
+          // guten und einem mittelmaessigen Wechsel sind Zehntel, nicht ein Totalausfall.
+          //
+          // Jetzt: der Zeitverlust faellt STUFENLOS aus dem Schnitt beider
+          // TECHNIK-Werte — beide sind daran beteiligt, wie schon vorher. Der echte
+          // Patzer bleibt als seltener Ausreisser erhalten, sonst faellt das Drama weg,
+          // das eine Staffel ausmacht.
+          const koennen=(u.TECHNIK+naechster.TECHNIK)/2;
+          let verlust=Math.max(WECHSEL_MIN,WECHSEL_MAX-koennen*WECHSEL_K);
+          // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
+          // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
+          // gerempelt wird hier nicht. Jetzt senkt es die Chance auf den echten Patzer —
+          // genau das, was "verlaesslich" heisst. Gerechnet wird mit dem Schnitt beider
+          // Beteiligten, wie beim Koennen auch.
+          const verlaesslich=(u.ROBUST+naechster.ROBUST)/2;
+          const patzer=rr()<Math.max(0.01,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
+                                          -verlaesslich*WECHSEL_ROBUST_K);
+          if(patzer)verlust+=WECHSEL_PATZER_KOSTEN
+            *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+          // Der Verlust ist physisch: der Annehmende steht so lange im Weg wie er dauert.
+          // Damit schlaegt er auf die Teamzeit durch, entscheidet also wirklich Rennen.
+          naechster.stolper=verlust;
+          // ...und er wird aus der ETAPPENZEIT des Annehmenden herausgerechnet.
+          //
+          // Sonst zahlt er zweimal: einmal ueber die laengere Etappe, einmal ueber das
+          // Konto. Schlimmer noch, es verzerrt die Abschnitte gegeneinander — der
+          // STARTLAEUFER bekommt gar keine Uebergabe und ist damit systematisch schnell,
+          // ohne besser zu sein. Nachgemessen (40 Rennen) lief Bein 1 im Schnitt 1,92 s
+          // bei einer mittleren Eignung von 41,5, waehrend Bein 5 bei Eignung 51,9 auf
+          // 2,11 s kam: die Etappenzeit mass den ABSCHNITT und erst danach den Laeufer.
+          //
+          // Der Faktor 0,65: waehrend `stolper` laeuft, kommt der Laeufer nicht zum
+          // Stehen, sondern auf 35 % Tempo (s. tempoVon) — verloren geht also rund
+          // zwei Drittel der Stolperdauer.
+          naechster.wechselVerlust+=verlust*0.65;
+          // ...und er wird BEIDEN angeschrieben, je zur Haelfte, in Sekunden. Ohne dieses
+          // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
+          // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
+          // allein dafuer.
+          u.wechselKonto-=verlust/2; naechster.wechselKonto-=verlust/2;
+          u.wechselN++; naechster.wechselN++;
+          if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+verlust.toFixed(2)+" s verloren.");
           } else {
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
+            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+verlust.toFixed(2)+" s im Wechsel.");
           }
         }
         continue;
@@ -13017,6 +13891,7 @@
         if(BA().staffel){
           // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
           // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
+          u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
           feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
@@ -14797,8 +15672,38 @@
       // getackelt wird in einer Staffel nicht.
       wert:()=>{
         if(BAHN_ART[bd].staffel){
+          // NACHGEZOGEN, WEIL ES NACHWEISLICH NICHTS GEMESSEN HAT. Hier stand die
+          // TEAMZEIT: `-(u.fertig)`, und `fertig` ist fuer alle sechs einer Mannschaft
+          // dieselbe Zahl. Damit hatte jeder Laeufer eines Teams exakt denselben Wert,
+          // und die Rangfolge innerhalb einer Mannschaft war gar nicht vorhanden. Die
+          // Rangtreue der Staffel lag gemessen bei rho -0,038 — statistisch null. Ein
+          // schneller Laeufer war von einem langsamen nicht zu unterscheiden.
+          //
+          // Der Kommentar an dieser Stelle begruendete die Teamzeit damit, dass eine
+          // verpatzte Uebergabe "die Mannschaft" Zeit kostet und nicht den Einzelnen.
+          // Das stimmt fuer die WERTUNG DES RENNENS und ist dort unveraendert: gewonnen
+          // hat, wer zuerst im Ziel ist. Es stimmt aber nicht fuer die Frage, was EIN
+          // Laeufer beigetragen hat — und genau die misst `wert()`.
+          //
+          // Jetzt zwei Groessen, die es beide nur in einer Staffel gibt:
+          //   ETAPPENZEIT    die Zeit fuer den eigenen Abschnitt. Alle sechs Abschnitte
+          //                  sind gleich lang, die Zeiten also direkt vergleichbar.
+          //   WECHSELKONTO   die Bilanz der Uebergaben, an denen er beteiligt war —
+          //                  abgebend wie annehmend, je +1 sauber und -1 verpatzt.
+          //                  Ohne diesen Posten stuende der Abgebende nach seinem eigenen
+          //                  Patzer sauber da (seine Etappenzeit ist ja vorbei) und der
+          //                  Annehmende buesste allein dafuer.
+          //
+          // WECHSEL_GEWICHT ist PLATZHALTER: 0,35 s je Uebergabe entspricht ungefaehr der
+          // Zeitstrafe, die ein verpatzter Wechsel im Motor tatsaechlich kostet
+          // (wechselStrafe 1,55 auf das Tempo, ueber rund eine halbe Sekunde) — damit
+          // wiegt ein Patzer im Wert etwa so schwer wie auf der Bahn.
+          // `wechselKonto` steht bereits in SEKUNDEN (s. die Uebergabe in stepSpurt), es
+          // wird also einfach addiert — kein Gewicht, das man einstellen koennte und das
+          // dann jemand einstellt.
           const o={};
-          for(const u of LAEUFER)o[u.n]=-(u.fertig??60);
+          for(const u of LAEUFER)
+            o[u.n]=-(u.etappenZeit??(u.fertig??60))+u.wechselKonto;
           return o;
         }
         const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
@@ -14822,7 +15727,21 @@
       // Duell (Speed-Schach, I-Spy): "besser" ist der eigene Vorteil am Brett, nicht die
       // absolute Punktesumme — ein Brett kann man mit wenigen, aber besseren Zuegen
       // gewinnen. Sonst wie ueberall: die Summe der Durchgangspunkte.
-      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=BUEHNE_ART[bd].duell?(u.vorteil||0):u.summe; return o;}
+      // EIGENE PUNKTE, AUCH IM DUELL. Hier stand fuer Speed-Schach und I-Spy der
+      // VORTEIL, also die Differenz zum Gegner am selben Brett. Das drueckt die
+      // Rangtreue konstruktionsbedingt: wer an einem starken Brett alles richtig macht,
+      // steht trotzdem negativ da. Fable hat es an denselben Spielen gegengerechnet —
+      // rho(Eignung, Vorteil) 0,541 und 0,548, rho(Eignung, eigene Punkte) 0,948 und
+      // 0,782. Die Mechanik war nie das Problem, nur das Mass.
+      //
+      // Gewichtheben macht es schon richtig und begruendet es an Ort und Stelle: "ein
+      // Heber, der an einem starken Slot 380 kg hebt, hat 380 kg gehoben, auch wenn er
+      // verliert". Derselbe Satz gilt am Schachbrett.
+      //
+      // Der DUELLSTAND bleibt unangetastet — er entscheidet weiter das Spiel und steht
+      // weiter im Ticker. Geaendert ist nur, woran der Beitrag EINES Spielers gemessen
+      // wird.
+      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
     };
   }
   // JEDES FELDSPIEL MELDET SICH SELBST AN. "Besser" ist hier ein kleiner Box-Score:
@@ -15069,7 +15988,14 @@
         ?({n:u.n,seite:u.side,summe:u.summe,runden:u.runden,eig:u.eig,rolle:u.rolle,
            zweikampf:u.zweikampf,nullwertung:u.nullwertung,duellGewonnen:u.duellGewonnen,
            anzeigeKg:u.anzeigeKg,groesse:u.groesse,duellNr:u.duellNr,
-           LAST:u.LAST,TECHNIK:u.TECHNIK,NERVEN:u.NERVEN,ANSAGE:u.ANSAGE,ERHOLUNG:u.ERHOLUNG})
+           LAST:u.LAST,TECHNIK:u.TECHNIK,NERVEN:u.NERVEN,ANSAGE:u.ANSAGE,ERHOLUNG:u.ERHOLUNG,
+           // Rohattribute fuer die Archetypen-Probe (S4): Kraftpaket/Techniker/
+           // Nervenbuendel/Zocker sind ueber ROHE Attribute definiert (power/health,
+           // dexterity/speed, will/charisma, charisma/speed), nicht ueber die Subskills
+           // oben — die Probe braucht deshalb beide Ebenen.
+           power:u.attr?.power??null,health:u.attr?.health??null,
+           dexterity:u.attr?.dexterity??null,speed:u.attr?.speed??null,
+           will:u.attr?.will??null,charisma:u.attr?.charisma??null})
         :({n:u.n,seite:u.side,summe:u.summe,runden:u.runden}))
       :null;
     const punkte=istFeldspiel(dId)?[fsPunkte[0],fsPunkte[1]]:null;
@@ -15666,7 +16592,108 @@
         stufe:fsLive.freiwurf.stufe,undEins:fsLive.freiwurf.undEins}:null,
       schiri:fsSchiri?{x:Math.round(fsSchiri.x),y:Math.round(fsSchiri.y),pfiffT:+fsSchiri.pfiffT.toFixed(2)}:null}:null,
     fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
-    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+    // ============ DIE EINE SONDE FUER ALLE ZWANZIG DISZIPLINEN ============
+    // Bis hierher hatte nur das Feldspiel eine (feldspielProbe). Fuer Buehne, Bahn und
+    // Arena gab es gar keine — und damit fuer 16 der 20 Disziplinen KEINE Moeglichkeit,
+    // die Rangtreue zu messen. "Spielreif" war fuer sie eine Meinung, keine Zahl.
+    //
+    // Sie ist bewusst duenn: bauen, laufen lassen, `wert()` und `eig` je Teilnehmer
+    // einsammeln, mehr nicht. Genau diese vier Dinge kann JEDER der vier Motoren, und
+    // genau sie braucht eine Rangtreue. Alles Disziplineigene (Boxscore, Wurfprotokoll,
+    // Kilogramm) bleibt Sache der jeweiligen Spezialsonde.
+    //
+    // Die Teilnehmerliste kommt aus derselben Fallunterscheidung, die auch die
+    // Aufstellungsanzeige benutzt (s. renderKader) — nicht aus einer zweiten Tabelle, die
+    // beim naechsten neuen Chassis vergessen wuerde.
+    // `kaderSetzen` tauscht SQUAD/OPP zur Laufzeit aus — derselbe Weg, den auch das Laden von
+    // `window.__olyArenaKader` benutzt (s. "BRUECKE ZUR ECHTEN APP" oben, `mitKit`), nur ohne
+    // Seiten-Reload. Existiert seit dem Kaderfamilien-Befund der Projektueberwachung
+    // (docs/design/projekt-ueberwachung-opus.md, Abschnitt 1.3): `disziplinProbe` mass bis
+    // dahin IMMER denselben 17-Spieler-Testkader in derselben Paarung, weil es keinen Weg gab,
+    // SQUAD/OPP nach dem Laden auszutauschen (s. Kommentar in
+    // lib/battle/arena-headless-runner.ts:48, der das fuer echte Fixtures per Re-Einhaengen des
+    // ganzen Skripts loest — hier reicht der billigere Weg, weil kein neuer `<script>`-Tag noetig
+    // ist). Rein additiv, veraendert kein bestehendes Verhalten.
+    kaderSetzen:(kader)=>{
+      if(kader&&Array.isArray(kader.heim)&&kader.heim.length)SQUAD=mitKit(kader.heim);
+      if(kader&&Array.isArray(kader.gast)&&kader.gast.length)OPP=mitKit(kader.gast);
+      return {heim:SQUAD.length,gast:OPP.length};
+    },
+    disziplinProbe:(dId,opt)=>{
+      const M=MOTOREN[dId];
+      if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      // `o.jeSeite` faehrt dieselbe Kadergroessen-Probe wie feldspielProbe (2v2/4v4/6v6):
+      // die echte Aufstellung wuerfelt die Spielerzahl je Saison 2..6
+      // (season-discipline-schedule.ts), und die Abnahme (Gewichtheben-Plan 8.1) verlangt
+      // rho >= 0,80 bei 6, 4 UND 2 je Seite — nicht nur beim Standardwert der Disziplin.
+      const art=istBahn(dId)?BAHN_ART[dId]:istBuehne(dId)?BUEHNE_ART[dId]
+        :istFeldspiel(dId)?FELDSPIEL_ART[dId]:ARENA_ART[dId];
+      const altJeSeite=art&&art.jeSeite;
+      if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
+      // NEU (Kaderfamilie, Projektueberwachung Abschnitt 1.3/3.1 A): `o.kaderFamilie` ist
+      // optional. Ohne sie laeuft GENAU der Code, der hier schon immer stand — ein einziges
+      // SQUAD/OPP, eine `spiele`-Liste, dieselbe Rueckgabeform wie vorher. Mit ihr wird die
+      // Spieleschleife fuer JEDE Aufteilung einmal gefahren (eigene `spiele`-Liste je
+      // Aufteilung), SQUAD/OPP dazwischen ueber `kaderSetzen` getauscht, und am Ende exakt der
+      // Kader wiederhergestellt, der vor dem Aufruf geladen war.
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:null;
+      const kaderVorher={SQUAD,OPP};
+      const einSpieldurchlauf=()=>{
+        const spiele=[];
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          M.bau(saat0+i*schritt);
+          M.lauf();
+          const w=M.wert();
+          // Bei der Bahn kommen zwei Diagnosespalten mit, weil sie dort — und nur dort —
+          // eine eigene Frage beantworten: `bein` sagt, welchen Abschnitt einer gelaufen
+          // ist, `etappenZeit`, wie lange er dafuer gebraucht hat. Erst damit laesst sich
+          // pruefen, ob eine Staffel den Abschnitt misst oder den Laeufer. Ausserhalb der
+          // Staffel bleiben beide null.
+          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig,
+            bein:u.bein??null, etappe:u.etappenZeit??null}))
+            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
+            // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
+            // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
+            // dorthin stellt, wo sie etwas bewirken koennen.
+            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig,reihe:u.row}));
+          spiele.push({saat:saat0+i*schritt,
+            teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
+              eig:Math.round((u.eig||0)*100)/100,
+              wert:Math.round((w[u.n]||0)*100)/100,
+              ...(u.bein!=null?{bein:u.bein,
+                etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
+              ...(u.reihe!=null?{reihe:u.reihe}:{})}))});
+        }
+        return spiele;
+      };
+      let ergebnis;
+      try{
+        if(familie){
+          ergebnis=familie.map(v=>{
+            if(v&&Array.isArray(v.heim)&&v.heim.length)SQUAD=mitKit(v.heim);
+            if(v&&Array.isArray(v.gast)&&v.gast.length)OPP=mitKit(v.gast);
+            return {label:(v&&v.label)||null, spiele:einSpieldurchlauf()};
+          });
+        } else {
+          ergebnis=einSpieldurchlauf();
+        }
+      } finally {
+        M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
+        if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;}
+      }
+      const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
+        :istFeldspiel(dId)?"feldspiel":"arena";
+      return familie
+        ? {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, varianten:ergebnis}
+        : {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, spiele:ergebnis};
+    },
+    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 

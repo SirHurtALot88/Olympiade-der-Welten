@@ -102,7 +102,7 @@ async function fuehreArenaMatchdayApplyAus(input: {
       return;
     }
 
-    const { overridesByTeamId, warnings } = await runBattleModeArenaMatchday({
+    const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
       gameState: current.gameState,
       saveId,
       seasonId,
@@ -144,6 +144,9 @@ async function fuehreArenaMatchdayApplyAus(input: {
     // gebucht wird statt eines veralteten, ohne Arena-Overrides berechneten Snapshots.
     const preview = buildLegacyMatchdayResolvePreview(contexts, {
       arenaTeamPointsByTeamId: overridesByTeamId,
+      // BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): individuelle Spieler-PPs aus dem echten
+      // Arena-Boxscore, s. lib/resolve/battle-mode-arena-team-points.ts.
+      arenaIndividualBoxscorePpsByPlayerId: individualBoxscorePpsByPlayerId,
     });
 
     const service = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);

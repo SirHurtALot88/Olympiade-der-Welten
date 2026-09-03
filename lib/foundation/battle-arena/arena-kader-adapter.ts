@@ -19,6 +19,15 @@ import { getPlayerGroesse } from "@/lib/data/playerSizeData";
 
 export type ArenaSpieler = {
   n: string;
+  /**
+   * Echte Spieler-ID (`Player.id`), NUR fuer die Bruecke selbst (BOXSCORE-AN-PPS,
+   * docs/design/boxscore-an-pps.md) — der Motor liest dieses Feld nirgends, es faehrt als reines
+   * Passthrough durch `window.__olyArenaKader`/`spieleFeldspiel()` mit, damit
+   * `arena-headless-runner.ts` einen Boxscore-Eintrag (dort nur nach Name gefuehrt, s.
+   * `battle-mode.engine.js`, `wert()`/`namen()`) wieder auf einen konkreten Spieler zurueckfuehren
+   * kann, ohne den Motor selbst anzufassen ("Motor bleibt unangetastet", s. Kommentar oben).
+   */
+  id: string;
   c: string;
   r: string;
   sub: string[];
@@ -93,6 +102,7 @@ function zuArenaSpieler(player: Player & { attributeSheetStats: NonNullable<Play
   const sheet = player.attributeSheetStats;
   return {
     n: player.name,
+    id: player.id,
     c: player.className,
     r: player.race,
     sub: [...player.subclasses],
