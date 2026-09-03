@@ -161,6 +161,43 @@ die Schlaege der anderen konzentrieren sich sinnvoller.
 
 ---
 
+## 5b. Wie weit ist jede Disziplin? — die Prozentzahlen
+
+Die Prozentzahlen sind meine Einschaetzung, keine Messung. Gewichtet ueber vier Achsen:
+**Rangtreue 40 %** (die einzige gemessene), **eigene Mechanik 25 %**, **Bild und Bewegung
+20 %**, **im echten Spielstand 15 %**. „Eigene Mechanik" heisst: hat die Disziplin Regeln, die
+ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
+
+| Disziplin | fertig | rho | Was steht |
+|---|---:|---:|---|
+| Basketball | 90 % | 0,786 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · **einzige Disziplin im echten Spielstand** |
+| Hockey | 70 % | 0,670 | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Schussweiten aus dem realen Massstab |
+| Time-Trial | 55 % | 0,902 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |
+| Climbing | 50 % | 0,846 | Steigung und Kraftbudget statt Antritt · Rangtreue bestanden · Bild vom Chassis |
+| Takeshi's Castle | 50 % | 0,842 | Hindernisse und Nerven · Rangtreue bestanden · Bild vom Chassis |
+| Spurt | 50 % | 0,745 | Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
+| Staffel | 45 % | 0,757 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · von rho -0,04 auf 0,76 gehoben |
+| Gewichtheben | 45 % | 0,745 | Reissen und Stossen mit je drei Versuchen, Duelle je Slot, Nullwertung · Buehnenbild fehlt noch |
+| Speed-Schach | 45 % | 0,950 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · Bild vom Chassis |
+| Wettessen | 40 % | 0,921 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
+| Eiskunstlauf | 40 % | 0,892 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
+| Breaking | 40 % | 0,891 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
+| I-Spy | 40 % | 0,776 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |
+| Showcase | 35 % | 0,784 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
+| Mini-DM | 30 % | 0,658 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert |
+| TDM | 30 % | 0,506 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie |
+| Fechten | 25 % | 0,495 | Gemeinsamer Arena-Motor · gehoert laut Recherche als Paar-Duell auf die Buehne |
+| Battlefield | 25 % | 0,470 | Aufstellung repariert (Siege Core stand hinten) · Validitaet von 0,50 auf 0,71 |
+| Tennis | 25 % | 0,605 | Vorab-Pfad ohne Zonen und Deckung · eigene Zuege und Rezept |
+| Football | 20 % | 0,307 | Vorab-Pfad · Ereignisdichte verdreifacht · gehoert auf den Live-Motor |
+
+**Kein Durchschnitt ueber alles**, weil die Achsen ungleich schwer wiegen: die neunzehn
+Disziplinen ausserhalb von Basketball koennen zusammen keine 15 % erreichen, solange sie nicht
+im Spielstand laufen, und die achtzehn ohne eigenes Bild keine 20 %. Wer die Zahlen heben will,
+hebt sie am billigsten ueber diese beiden Achsen, nicht ueber Rezepte.
+
+---
+
 ## 6. Das Werkzeug
 
 `window.__arena.disziplinProbe(dId, {n})` baut, laesst laufen und sammelt `wert()` und `eig` je
