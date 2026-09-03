@@ -5010,7 +5010,15 @@
   //   Faktor 0,410 -> 3,29 Tore   Faktor 0,440 -> 3,77 Tore
   //   Faktor 0,425 -> 3,49 Tore (n=48)                  (gewaehlt)
   // Die Fangquote laeuft dabei sogar auf die NHL-Referenz zu (.902) statt von ihr weg.
-  const HK_TOR_SKALA=0.425;
+  //
+  // NACHGEZOGEN 0,425 -> 0,46 (Mechanik-Angleichungs-Runde, Schritt 6 des Impact-
+  // Verteilung-Berichts): die Passqualitaets-Kette (5.1) und vor allem der Abpraller in
+  // die Ecke (5.2, weniger leichte Nachschuesse aus dem Slot) drueckten die Torzahl auf
+  // 3,23 je Team und die Fangquote auf 91,4 % (miss-hockey-korridor.mjs, 24 Spiele) —
+  // schwieriger abzuschliessen heisst nicht automatisch weniger Tore SOLLEN fallen, Chris'
+  // Zielkorridor (3,5, s. oben) bleibt unveraendert. 0,425*3,5/3,23 = 0,46, gemessen
+  // bestaetigt (s. hockey-mechanik-angleichen.md).
+  const HK_TOR_SKALA=0.46;
   // Ohne Torwart (Zweierspiel, Chris' Ausnahme) ist das Tor leer — dann zaehlt nur noch,
   // ob der Schuetze trifft.
   const HK_TOR_SKALA_LEER=0.62;
@@ -5247,7 +5255,17 @@
   // Feldspieler-Impacts von 9,40 auf 6,98. Genau das verlangt der Kommentar unten —
   // wer die Wertformel anfasst, muss diese Zahl nachrechnen, sonst faellt der Torwart
   // aus der Rangfolge, ohne dass sich an ihm etwas geaendert haette.
-  const HK_TW_REF=0.844, HK_TW_BASIS=7.0, HK_TW_GSAA_K=2.0;
+  //
+  // BEIDE NACHGEZOGEN (Mechanik-Angleichungs-Runde, Schritt 6): checks*0,4 ist raus,
+  // Vorlagen sind jetzt A1/A2-gewichtet (assists1*2+assists2*1.5 statt assists*2) und die
+  // Fangquote ist durch die Passqualitaets-Kette/den Abpraller-in-die-Ecke von 84,4 % auf
+  // 90,7 % gestiegen (miss-hockey-korridor.mjs, 24 Spiele, nach der HK_TOR_SKALA-
+  // Nachziehung). HK_TW_REF MUSS dieser eigenen Liga folgen — sonst sieht JEDER Torwart
+  // im Schnitt besser aus als er ist (GSAA misst gegen einen zu niedrigen Massstab), genau
+  // das hob den gemessenen Torwart-Mittelwert auf 11,77 gegen 7,16 bei den Feldspielern.
+  // Mit REF=0,907 pendelt sich GSAA im Mittel wieder um 0 ein; HK_TW_BASIS auf den neu
+  // gemessenen Feldspieler-Mittelwert gezogen.
+  const HK_TW_REF=0.907, HK_TW_BASIS=7.16, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
