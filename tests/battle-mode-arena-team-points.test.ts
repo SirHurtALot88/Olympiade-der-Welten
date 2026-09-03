@@ -5,11 +5,14 @@ import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 import {
   ARENA_TEAM_POINTS,
   BASKETBALL_INDIVIDUAL_PPS_MAX,
+  BASKETBALL_PPS_ANTEIL_MITTE,
   arenaTeamPointsForFixture,
   buildArenaMatchSeed,
   computeArenaTeamPointsFromFixtureResults,
   computeIndividualBoxscorePpsFromFixtureResults,
   findLeagueFixturesForMatchday,
+  ppsAusBasketballImpact,
+  resolveBasketballPpsReferenz,
   runBattleModeArenaMatchday,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 
@@ -102,105 +105,201 @@ describe("computeArenaTeamPointsFromFixtureResults", () => {
 });
 
 /**
- * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): individuelle Spieler-PPs nach dem in
- * battle-mode-pps-modell-plan.md Abschnitt 5 vorgeschlagenen Modell -- Perzentilrang gegen den
- * Referenz-Pool, linear auf BASKETBALL_INDIVIDUAL_PPS_MAX abgebildet.
+ * DIE IMPACT-KURVE (docs/design/pps-skalierung-opus.md Abschnitt 4.1,
+ * docs/design/pps-skalierung-umsetzung.md): reine Funktionspruefung mit einer HANDGEBAUTEN
+ * Referenz (unabhaengig von den echten, gezogenen Werten in
+ * data/generated/basketball-pps-referenz.json) -- bleibt gueltig, auch wenn die Referenz spaeter
+ * neu gezogen wird.
  */
-describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS)", () => {
+describe("ppsAusBasketballImpact (Impact-Kurve)", () => {
+  const referenz = { iMittel: 10, iKrass: 100 };
+
+  it("ein Impact von 0 bekommt 0 PPs", () => {
+    expect(ppsAusBasketballImpact(0, referenz)).toBe(0);
+  });
+
+  it("ein negativer Impact bekommt 0 PPs, nie negative (Bodenregel wie in distributeByValues())", () => {
+    expect(ppsAusBasketballImpact(-5, referenz)).toBe(0);
+  });
+
+  it("Impact == iMittel trifft GENAU den Mitte-Anker: MAX * BASKETBALL_PPS_ANTEIL_MITTE", () => {
+    expect(ppsAusBasketballImpact(referenz.iMittel, referenz)).toBeCloseTo(
+      BASKETBALL_INDIVIDUAL_PPS_MAX * BASKETBALL_PPS_ANTEIL_MITTE,
+      2,
+    );
+  });
+
+  it("Impact == iKrass trifft GENAU den Krass-Anker: die volle Hoechstpunktzahl MAX", () => {
+    expect(ppsAusBasketballImpact(referenz.iKrass, referenz)).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 5);
+  });
+
+  it("ein Impact weit ueber iKrass bleibt bei MAX gedeckelt (Deckel, keine Asymptote/Extrapolation)", () => {
+    expect(ppsAusBasketballImpact(referenz.iKrass * 5, referenz)).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 5);
+  });
+
+  it("ist streng monoton steigend zwischen 0 und iKrass", () => {
+    const werte = [1, 5, 10, 25, 50, 75, 100].map((impact) => ppsAusBasketballImpact(impact, referenz));
+    for (let i = 1; i < werte.length; i += 1) {
+      expect(werte[i]).toBeGreaterThan(werte[i - 1]!);
+    }
+  });
+
+  it("ein schwacher Spieltag (alle Werte auf/unter iMittel) vergibt NIRGENDS mehr als die Haelfte der Hoechstpunktzahl", () => {
+    // Genau Chris' Beschwerde am alten Perzentil-Modell: ein durchweg mittelmaessiger/schwacher
+    // Satz an Werten soll NICHT trotzdem nahe an MAX liegen.
+    for (const impact of [1, 3, 5, 8, referenz.iMittel]) {
+      // +0.01 Toleranz fuer `roundPps()`s Rundung auf zwei Nachkommastellen (5,5*0,25 = 1,375
+      // rundet auf 1,38).
+      expect(ppsAusBasketballImpact(impact, referenz)).toBeLessThanOrEqual(
+        BASKETBALL_INDIVIDUAL_PPS_MAX * BASKETBALL_PPS_ANTEIL_MITTE + 0.01,
+      );
+    }
+  });
+
+  it("eine entartete Referenz (iKrass <= iMittel) liefert 0 statt NaN/Infinity", () => {
+    expect(ppsAusBasketballImpact(50, { iMittel: 100, iKrass: 50 })).toBe(0);
+    expect(ppsAusBasketballImpact(50, { iMittel: 0, iKrass: 0 })).toBe(0);
+  });
+});
+
+describe("resolveBasketballPpsReferenz (Feldgroessen-Weiche)", () => {
+  it("liefert fuer eine bekannte Feldgroesse (2..6) genau diese zurueck", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      expect(resolveBasketballPpsReferenz(n).feldgroesseGenutzt).toBe(n);
+    }
+  });
+
+  it("faellt fuer playerCount=null auf Basketballs Katalog-Standardwert 6 zurueck", () => {
+    expect(resolveBasketballPpsReferenz(null).feldgroesseGenutzt).toBe(6);
+  });
+
+  it("faellt fuer eine zu kleine Feldgroesse (< 2) auf die kleinste gezogene zurueck, statt zu werfen", () => {
+    expect(resolveBasketballPpsReferenz(1).feldgroesseGenutzt).toBe(2);
+  });
+
+  it("faellt fuer eine zu grosse Feldgroesse (> 6) auf die groesste gezogene zurueck, statt zu werfen", () => {
+    expect(resolveBasketballPpsReferenz(9).feldgroesseGenutzt).toBe(6);
+  });
+
+  it("verschiedene Feldgroessen tragen unterschiedliche Referenzwerte (Opus-Dokument Abschnitt 7: der Rohwert skaliert massiv mit der Feldgroesse)", () => {
+    const klein = resolveBasketballPpsReferenz(2).referenz;
+    const gross = resolveBasketballPpsReferenz(6).referenz;
+    expect(klein.iMittel).not.toBeCloseTo(gross.iMittel, 5);
+    expect(klein.iKrass).not.toBeCloseTo(gross.iKrass, 5);
+  });
+});
+
+/**
+ * BOXSCORE-AN-PPS, V2 (docs/design/boxscore-an-pps.md, docs/design/pps-skalierung-opus.md,
+ * docs/design/pps-skalierung-umsetzung.md): individuelle Spieler-PPs ueber die Impact-Kurve gegen
+ * eine feste, je Feldgroesse gezogene Referenz -- NICHT mehr ueber ein Perzentil gegen den
+ * Spieltags-Pool (V1, entfernt). Nutzt die ECHTE, gezogene Referenz aus
+ * data/generated/basketball-pps-referenz.json (ueber `computeIndividualBoxscorePpsFromFixtureResults`
+ * selbst geladen) -- die Tests unten pruefen deshalb RELATIVE Eigenschaften und mit
+ * `resolveBasketballPpsReferenz()` selbst abgeleitete Werte, keine an die aktuelle Ziehung
+ * gebundenen Festwerte, damit ein Neuziehen der Referenz (Opus-Dokument Abschnitt 8.3) diese
+ * Tests nicht bricht.
+ */
+describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS, V2 Impact-Kurve)", () => {
   function eintrag(name: string, wert: number, playerId: string | null, side: "home" | "away" | null) {
     return { name, wert, playerId, side };
   }
 
-  it("der Spieler mit dem hoechsten Impact im Pool bekommt mehr PPs als jeder andere im selben Pool", () => {
+  it("ein hoeherer Impact bekommt bei gleicher Feldgroesse nie weniger PPs als ein niedrigerer", () => {
     const fixtureResults: ArenaFixtureResult[] = [
       {
         homeTeamId: "team-a",
         awayTeamId: "team-b",
         seiten: [10, 5],
-        boxscore: [eintrag("Top", 20, "p-top", "home"), eintrag("Rest", 5, "p-rest", "away")],
+        boxscore: [eintrag("Top", 40, "p-top", "home"), eintrag("Rest", 5, "p-rest", "away")],
       },
     ];
 
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults);
-    // Perzentil = Anteil STRIKT kleinerer Werte im Pool (dasselbe Prinzip wie percentileOf() in
-    // lib/scouting/player-axis-star-rating.ts): bei 2 Werten hat der groessere GENAU EINEN
-    // kleineren Wert vor sich -> 1/2 = 50 %, der kleinere 0 kleinere Werte -> 0 %.
-    expect(pps.get("p-top")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.5, 5);
-    expect(pps.get("p-rest")).toBe(0);
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6);
     expect(pps.get("p-top")!).toBeGreaterThan(pps.get("p-rest")!);
   });
 
-  it("der Spieler mit dem niedrigsten Impact im Pool bekommt 0 PPs (Perzentil 0, nie negativ)", () => {
+  it("ein negativer Impact bekommt 0 PPs, nie negative", () => {
     const fixtureResults: ArenaFixtureResult[] = [
       {
         homeTeamId: "team-a",
         awayTeamId: "team-b",
         seiten: [10, 5],
-        boxscore: [
-          eintrag("Top", 20, "p-top", "home"),
-          // Negativer Boxscore-Impact ist real moeglich (Plan Abschnitt 3) -- fuehrt zu 0 PPs,
-          // nie zu negativen PPs (Plan Abschnitt 5, "Bodenregel").
-          eintrag("Schwach", -3, "p-schwach", "away"),
-        ],
+        boxscore: [eintrag("Top", 20, "p-top", "home"), eintrag("Schwach", -3, "p-schwach", "away")],
       },
     ];
 
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults);
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6);
     expect(pps.get("p-schwach")).toBe(0);
   });
 
-  it("ein Durchschnittsspieler in der Mitte des Pools bekommt ungefaehr die Haelfte von BASKETBALL_INDIVIDUAL_PPS_MAX", () => {
+  it("KEIN Spieltags-Pool mehr: derselbe rohe Impact ergibt UNABHAENGIG davon, wie stark der Rest des Spieltags war, dieselben PPs (Chris' Kernbeschwerde am V1-Modell)", () => {
+    const schwacherSpieltag: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [1, 0],
+        boxscore: [eintrag("X", 33.5, "p-x", "home"), eintrag("Y", 1, "p-y", "away")],
+      },
+    ];
+    const starkerSpieltag: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [1, 0],
+        // Y hat hier einen VIEL hoeheren Impact (67.4 statt 1) -- unter dem alten Perzentil-Modell
+        // haette das X's PPs gesenkt, obwohl X selbst genau gleich gut war.
+        boxscore: [eintrag("X", 33.5, "p-x", "home"), eintrag("Y", 67.4, "p-y", "away")],
+      },
+    ];
+
+    const ppsSchwach = computeIndividualBoxscorePpsFromFixtureResults(schwacherSpieltag, 6).get("p-x")!;
+    const ppsStark = computeIndividualBoxscorePpsFromFixtureResults(starkerSpieltag, 6).get("p-x")!;
+    expect(ppsSchwach).toBeCloseTo(ppsStark, 5);
+  });
+
+  it("dieselbe Rohleistung wird bei unterschiedlicher Feldgroesse unterschiedlich bewertet (kein gemeinsamer Massstab ueber alle Feldgroessen)", () => {
+    const fixtureResultsMit = (wert: number): ArenaFixtureResult[] => [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [eintrag("X", wert, "p-x", "home")] },
+    ];
+    // Ein Rohwert von 20 ist bei 2v2 (hoeherer iMittel/iKrass, s. Opus-Dokument Abschnitt 7)
+    // relativ schwaecher als bei 6v6 -- die Feldgroesse muss also den Ausschlag geben, nicht nur
+    // der nackte Rohwert.
+    const ppsBei2 = computeIndividualBoxscorePpsFromFixtureResults(fixtureResultsMit(20), 2).get("p-x")!;
+    const ppsBei6 = computeIndividualBoxscorePpsFromFixtureResults(fixtureResultsMit(20), 6).get("p-x")!;
+    expect(ppsBei2).not.toBeCloseTo(ppsBei6, 5);
+  });
+
+  it("ein wirklich krasser Ausreisser (Impact >= iKrass dieser Feldgroesse) erreicht nahe die volle Punktzahl", () => {
+    const { referenz } = resolveBasketballPpsReferenz(6);
+    const fixtureResults: ArenaFixtureResult[] = [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [eintrag("Krass", referenz.iKrass * 1.2, "p-krass", "home")] },
+    ];
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6);
+    expect(pps.get("p-krass")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 5);
+  });
+
+  it("ein schwacher Spieltag (alle Werte klar unter iMittel dieser Feldgroesse) vergibt in KEINEM Duell die volle Punktzahl", () => {
+    const { referenz } = resolveBasketballPpsReferenz(6);
     const fixtureResults: ArenaFixtureResult[] = [
       {
-        homeTeamId: "team-a",
-        awayTeamId: "team-b",
-        seiten: [10, 5],
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [1, 0],
         boxscore: [
-          eintrag("Schlecht", 0, "p-1", "home"),
-          eintrag("Mittel", 10, "p-2", "home"),
-          eintrag("Gut", 20, "p-3", "away"),
-          eintrag("SehrGut", 30, "p-4", "away"),
+          eintrag("S1", referenz.iMittel * 0.3, "p-1", "home"),
+          eintrag("S2", referenz.iMittel * 0.6, "p-2", "home"),
+          eintrag("S3", referenz.iMittel * 0.9, "p-3", "away"),
         ],
       },
     ];
-
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults);
-    // Aufsteigend sortiert [0,10,20,30] -- "Mittel" (10) hat GENAU EINEN kleineren Wert vor sich
-    // (Perzentil = 1/4 = 25%), "Gut" (20) hat zwei kleinere davor (50%).
-    expect(pps.get("p-2")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.25, 5);
-    expect(pps.get("p-3")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.5, 5);
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6);
+    for (const wert of pps.values()) {
+      expect(wert).toBeLessThan(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.95);
+    }
   });
 
-  it("beide Liga-Stufen EINES Spieltags bilden GEMEINSAM einen Pool (Plan Abschnitt 7, Frage 2: 'gemeinsam ueber beide Ligen')", () => {
-    // liga2 hat insgesamt schwaechere Werte -- ohne gemeinsamen Pool waere der liga2-Topspieler
-    // trotzdem bei PPS_MAX (bestes Perzentil SEINER eigenen Liga). Mit gemeinsamem Pool nicht mehr.
-    const fixtureResults: ArenaFixtureResult[] = [
-      {
-        homeTeamId: "liga1-a",
-        awayTeamId: "liga1-b",
-        seiten: [10, 5],
-        boxscore: [eintrag("Liga1Top", 100, "p-liga1-top", "home"), eintrag("Liga1Rest", 50, "p-liga1-rest", "away")],
-      },
-      {
-        homeTeamId: "liga2-a",
-        awayTeamId: "liga2-b",
-        seiten: [10, 5],
-        boxscore: [eintrag("Liga2Top", 5, "p-liga2-top", "home"), eintrag("Liga2Rest", 1, "p-liga2-rest", "away")],
-      },
-    ];
-
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults);
-    // Gemeinsamer, aufsteigend sortierter Pool: [1, 5, 50, 100].
-    // Liga2Top (5) hat nur EINEN kleineren Wert vor sich (1) -> Perzentil 25 % -- WAERE der Pool
-    // pro Liga getrennt, haette er (bester seiner eigenen Liga) das hoechste Perzentil bekommen.
-    expect(pps.get("p-liga2-top")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.25, 5);
-    // Liga1Top (100) hat drei kleinere Werte vor sich (1, 5, 50) -> Perzentil 75 %, das hoechste
-    // in diesem Pool.
-    expect(pps.get("p-liga1-top")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.75, 5);
-    expect(pps.get("p-liga1-top")!).toBeGreaterThan(pps.get("p-liga2-top")!);
-  });
-
-  it("ein Boxscore-Eintrag ohne eindeutige playerId (Namens-Kollision) bekommt KEINE PPs und verzerrt auch nicht den Pool anderer Spieler", () => {
+  it("ein Boxscore-Eintrag ohne eindeutige playerId (Namens-Kollision) bekommt keinen Eintrag im Ergebnis", () => {
     const fixtureResults: ArenaFixtureResult[] = [
       {
         homeTeamId: "team-a",
@@ -208,28 +307,35 @@ describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS)", () 
         seiten: [10, 5],
         boxscore: [
           eintrag("Top", 20, "p-top", "home"),
-          eintrag("Unklar", 1000, null, null), // riesiger Wert, aber nicht zuordenbar
+          eintrag("Unklar", 1000, null, null),
           eintrag("Rest", 5, "p-rest", "away"),
         ],
       },
     ];
 
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults);
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6);
     expect(pps.size).toBe(2);
-    // Der Pool besteht NUR aus [5, 20] -- waere der unzuordenbare Wert (1000) mit reingerutscht,
-    // haette "Top" (20) ein KLEINERES Perzentil bekommen (2 von 3 statt 1 von 2 kleiner).
-    expect(pps.get("p-top")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.5, 5);
+    expect(pps.has("p-top")).toBe(true);
+    expect(pps.has("p-rest")).toBe(true);
   });
 
-  it("ein leerer Pool (kein einziges Duell mit zuordenbarem Boxscore) liefert eine leere Map, keinen Fehler", () => {
-    const pps = computeIndividualBoxscorePpsFromFixtureResults([]);
+  it("ein leeres Ergebnis (kein einziges Duell mit zuordenbarem Boxscore) liefert eine leere Map, keinen Fehler", () => {
+    const pps = computeIndividualBoxscorePpsFromFixtureResults([], 6);
     expect(pps.size).toBe(0);
+  });
+
+  it("playerCount=null wirft nicht, sondern faellt auf eine gueltige Referenz zurueck", () => {
+    const fixtureResults: ArenaFixtureResult[] = [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [eintrag("X", 20, "p-x", "home")] },
+    ];
+    expect(() => computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, null)).not.toThrow();
   });
 });
 
 describe("runBattleModeArenaMatchday liefert individualBoxscorePpsByPlayerId liga-uebergreifend (gemockter Runner)", () => {
-  it("fasst die Boxscores BEIDER Liga-Stufen EINES Spieltags zu einem gemeinsamen Pool zusammen", async () => {
-    const gameState = {
+  it("V2: liga2-Spieler bekommen dieselben PPs, UNABHAENGIG davon, was liga1 desselben Spieltags leistet (kein gemeinsamer Pool mehr noetig)", async () => {
+    const gameStateBeideLigen = {
+      disciplines: [{ id: "basketball", playerCount: 6 }],
       seasonState: {
         schedule: buildFixtureSchedule([
           { id: "f-liga1", homeTeamId: "liga1-a", awayTeamId: "liga1-b", matchdayId: "matchday-1", leagueTier: "liga1" },
@@ -237,47 +343,64 @@ describe("runBattleModeArenaMatchday liefert individualBoxscorePpsByPlayerId lig
         ]),
       },
     } as unknown as GameState;
+    const gameStateNurLiga2 = {
+      ...gameStateBeideLigen,
+      seasonState: {
+        schedule: buildFixtureSchedule([
+          { id: "f-liga2", homeTeamId: "liga2-a", awayTeamId: "liga2-b", matchdayId: "matchday-1", leagueTier: "liga2" },
+        ]),
+      },
+    } as unknown as GameState;
 
-    const runArenaFixturesImpl = vi.fn(async (_gameState, fixtures) =>
-      fixtures.map((fixture: { homeTeamId: string; awayTeamId: string }) => {
-        const istLiga1 = fixture.homeTeamId === "liga1-a";
-        return {
-          homeTeamId: fixture.homeTeamId,
-          awayTeamId: fixture.awayTeamId,
-          seiten: [10, 5] as [number, number],
-          boxscore: istLiga1
-            ? [
-                { name: "Liga1Heim", wert: 100, playerId: "p-liga1-heim", side: "home" as const },
-                { name: "Liga1Gast", wert: 50, playerId: "p-liga1-gast", side: "away" as const },
-              ]
-            : [
-                { name: "Liga2Heim", wert: 5, playerId: "p-liga2-heim", side: "home" as const },
-                { name: "Liga2Gast", wert: 1, playerId: "p-liga2-gast", side: "away" as const },
-              ],
-        };
-      }),
-    );
+    const buildRunnerImpl = () =>
+      vi.fn(async (_gameState, fixtures) =>
+        fixtures.map((fixture: { homeTeamId: string; awayTeamId: string }) => {
+          const istLiga1 = fixture.homeTeamId === "liga1-a";
+          return {
+            homeTeamId: fixture.homeTeamId,
+            awayTeamId: fixture.awayTeamId,
+            seiten: [10, 5] as [number, number],
+            boxscore: istLiga1
+              ? [
+                  { name: "Liga1Heim", wert: 100, playerId: "p-liga1-heim", side: "home" as const },
+                  { name: "Liga1Gast", wert: 50, playerId: "p-liga1-gast", side: "away" as const },
+                ]
+              : [
+                  { name: "Liga2Heim", wert: 5, playerId: "p-liga2-heim", side: "home" as const },
+                  { name: "Liga2Gast", wert: 1, playerId: "p-liga2-gast", side: "away" as const },
+                ],
+          };
+        }),
+      );
 
-    const { individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
-      gameState,
+    const { individualBoxscorePpsByPlayerId: mitLiga1, warnings: warnungenMit } = await runBattleModeArenaMatchday({
+      gameState: gameStateBeideLigen,
       saveId: "save-1",
       seasonId: "season-1",
       matchdayId: "matchday-1",
-      runArenaFixturesImpl: runArenaFixturesImpl as never,
+      runArenaFixturesImpl: buildRunnerImpl() as never,
+    });
+    const { individualBoxscorePpsByPlayerId: ohneLiga1, warnings: warnungenOhne } = await runBattleModeArenaMatchday({
+      gameState: gameStateNurLiga2,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      runArenaFixturesImpl: buildRunnerImpl() as never,
     });
 
-    expect(warnings).toHaveLength(0);
-    expect(individualBoxscorePpsByPlayerId.size).toBe(4);
-    // Gemeinsamer, aufsteigend sortierter Pool ueber BEIDE Liga-Stufen: [1, 5, 50, 100].
-    // Bester Wert insgesamt (100, liga1-heim) hat drei kleinere Werte vor sich -> 75 %.
-    expect(individualBoxscorePpsByPlayerId.get("p-liga1-heim")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.75, 5);
-    // Der beste liga2-Spieler (5) hat nur EINEN kleineren Wert vor sich (1) -> 25 % --
-    // waere der Pool pro Liga getrennt, haette er (bester seiner Liga) das hoechste Perzentil
-    // seiner eigenen, schwaecheren Liga bekommen.
-    expect(individualBoxscorePpsByPlayerId.get("p-liga2-heim")).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX * 0.25, 5);
-    expect(individualBoxscorePpsByPlayerId.get("p-liga1-heim")!).toBeGreaterThan(
-      individualBoxscorePpsByPlayerId.get("p-liga2-heim")!,
-    );
+    expect(warnungenMit).toHaveLength(0);
+    expect(warnungenOhne).toHaveLength(0);
+    expect(mitLiga1.size).toBe(4);
+    expect(ohneLiga1.size).toBe(2);
+    // DER KERN DER V2-AENDERUNG: liga2Heim/liga2Gast bekommen exakt dieselben PPs, ob liga1
+    // an diesem Spieltag krass stark war (Impact 100/50) oder gar nicht mitlief -- unter dem
+    // alten Perzentil-Modell (V1) haette der starke liga1-Pool liga2Heims Perzentil GESENKT.
+    expect(mitLiga1.get("p-liga2-heim")).toBeCloseTo(ohneLiga1.get("p-liga2-heim")!, 5);
+    expect(mitLiga1.get("p-liga2-gast")).toBeCloseTo(ohneLiga1.get("p-liga2-gast")!, 5);
+    // Reihenfolge nach Rohwert bleibt trotzdem erhalten (die Kurve ist monoton).
+    expect(mitLiga1.get("p-liga1-heim")!).toBeGreaterThan(mitLiga1.get("p-liga1-gast")!);
+    expect(mitLiga1.get("p-liga1-gast")!).toBeGreaterThan(mitLiga1.get("p-liga2-heim")!);
+    expect(mitLiga1.get("p-liga2-heim")!).toBeGreaterThan(mitLiga1.get("p-liga2-gast")!);
   });
 });
 
@@ -302,6 +425,7 @@ describe("findLeagueFixturesForMatchday", () => {
 describe("runBattleModeArenaMatchday (gemockter Runner, kein Browser)", () => {
   function buildGameState(): GameState {
     return {
+      disciplines: [{ id: "basketball", playerCount: 6 }],
       seasonState: {
         schedule: buildFixtureSchedule([
           { id: "f-liga1", homeTeamId: "liga1-a", awayTeamId: "liga1-b", matchdayId: "matchday-1", leagueTier: "liga1" },
@@ -362,6 +486,7 @@ describe("runBattleModeArenaMatchday (gemockter Runner, kein Browser)", () => {
 
   it("eine Liga ohne Fixtures an diesem Spieltag wird uebersprungen, ohne den Lauf zu blockieren", async () => {
     const gameState = {
+      disciplines: [{ id: "basketball", playerCount: 6 }],
       seasonState: {
         schedule: buildFixtureSchedule([
           { id: "f-liga1", homeTeamId: "liga1-a", awayTeamId: "liga1-b", matchdayId: "matchday-1", leagueTier: "liga1" },
