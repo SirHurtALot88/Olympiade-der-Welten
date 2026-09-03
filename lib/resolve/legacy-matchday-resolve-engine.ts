@@ -752,12 +752,33 @@ export function buildLegacyMatchdayResolvePreview(
         rankInTeam: rank,
       }));
       const rankedTeam = teamResultsRanked.find((entry) => entry.teamId === context.team.id && entry.disciplineSide === side);
+
+      /**
+       * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): fuer Battle-Mode-Basketball ersetzt der
+       * echte Arena-Boxscore-Impact JETZT die alte PPS-Rang-Formel bei der VERTEILUNG des
+       * Punkte-Pools an einzelne Spieler — s. den ausfuehrlichen Entscheidungs-Kommentar am Kopf
+       * von battle-mode-arena-team-points.ts. Voraussetzung: `boxscoreRank` UND eine vollstaendige
+       * `playerImpactByPlayerId` (JEDER Spieler dieser Seite hat einen Eintrag) liegen vor — sonst
+       * bleibt die GESAMTE Seite beim bisherigen PPS-Pfad (kein team-interner Mix aus zwei
+       * unterschiedlichen Wertskalen).
+       */
+      const arenaOverride = arenaOverridesForThisDiscipline?.get(context.team.id) ?? null;
+      const arenaImpactByPlayerId =
+        arenaOverride?.boxscoreRank != null && arenaOverride.playerImpactByPlayerId != null
+          ? arenaOverride.playerImpactByPlayerId
+          : null;
+      const arenaImpactCoversWholeSide =
+        arenaImpactByPlayerId != null &&
+        rankedWithinTeam.every(({ entry }) => arenaImpactByPlayerId.has(entry.playerId));
+
       const distributedPoints = distributeRankPointsToPlayers({
         playerCount: score.requiredPlayers ?? rankedWithinTeam.length,
-        rank: rankedTeam?.rank ?? null,
+        rank: arenaImpactCoversWholeSide ? arenaOverride!.boxscoreRank ?? null : rankedTeam?.rank ?? null,
         entries: rankedWithinTeam.map(({ entry }) => ({
           baseValue: entry.baseDisciplineScore ?? entry.score ?? 0,
-          finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
+          finalPlayerScore: arenaImpactCoversWholeSide
+            ? arenaImpactByPlayerId!.get(entry.playerId)!
+            : scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
           scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         })),
       });
@@ -783,6 +804,7 @@ export function buildLegacyMatchdayResolvePreview(
         rankedTeam.entries = rankedTeam.entries.map((entry) => ({
           ...entry,
           pointsAwarded: pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
+          arenaBoxscoreImpactApplied: arenaImpactCoversWholeSide,
         }));
       }
 
@@ -810,6 +832,9 @@ export function buildLegacyMatchdayResolvePreview(
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         pointsAwarded: distributedPoints.entries[index]?.points ?? null,
         pointSource: distributedPoints.pointSource,
+        // BOXSCORE-AN-PPS: nur informativ (Debug/Anzeige) -- `pointsAwarded` oben ist die einzige
+        // Stelle, an der der Boxscore-Impact tatsaechlich Punkte vergibt.
+        arenaBoxscoreImpactApplied: arenaImpactCoversWholeSide,
         rankInTeam,
         rankInDiscipline: 0,
         isTop10: false,

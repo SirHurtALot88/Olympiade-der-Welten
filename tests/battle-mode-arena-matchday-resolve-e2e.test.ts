@@ -282,4 +282,167 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md), End-zu-End-Nachweis Auftragspunkt 5: ein
+   * ECHTER Arena-Lauf (kein gemocktes `runArenaFixturesImpl`) liefert einen Boxscore, dieser
+   * Boxscore laeuft durch `runBattleModeArenaMatchday()` in eine Team-Override MIT
+   * `playerImpactByPlayerId`, und `buildLegacyMatchdayResolvePreview()` verteilt daraus jetzt die
+   * individuellen `pointsAwarded` -- nachweislich NACH ECHTEM BOXSCORE-IMPACT, nicht nach der
+   * alten PPS-Formel.
+   *
+   * Nur EINE Liga-Stufe (liga1), um den Chromium-Aufwand auf einen einzigen Batch/ein Duell zu
+   * begrenzen -- der Team-Punkte-Nachweis oben deckt bereits beide Ligen ab.
+   *
+   * DIE ECHTE HERAUSFORDERUNG: `context.entries[].playerId` (das Lineup) und der reale
+   * Arena-Boxscore (`playerImpactByPlayerId`, keyed nach echter `Player.id`) muessen auf
+   * DIESELBEN Spieler zeigen, damit `arenaImpactCoversWholeSide` in der Resolve-Engine ueberhaupt
+   * greifen kann. Statt zu raten, WELCHE 6 von 10 Kader-Spielern der Motor als Starter waehlt
+   * (ohne gesetzte Aufstellung faellt er auf seine eigene "Reihum-Vergabe" zurueck, s.
+   * arena-headless-runner.ts), liest dieser Test die tatsaechlich gefelderten Spieler aus dem
+   * ECHTEN Ergebnis ab und baut den Lineup-Context DANACH -- kein Rate-Risiko, keine Kopplung an
+   * Motor-interne Auswahllogik.
+   */
+  it(
+    "ein echter Arena-Boxscore treibt jetzt die individuellen Spieler-PPs -- nachweislich entkoppelt von der alten PPS-Formel",
+    async () => {
+      const gameStateVoll = baueBattleModeGameState();
+      // Nur liga1 behalten -- liga2 wuerde einen zweiten, fuer diesen Nachweis unnoetigen
+      // Chromium-Batch ausloesen.
+      const gameState: GameState = {
+        ...gameStateVoll,
+        teams: gameStateVoll.teams.filter((team) => team.teamId.startsWith("liga1-")),
+        players: gameStateVoll.players.filter((player) => player.id.startsWith("Liga1")),
+        rosters: gameStateVoll.rosters.filter((entry) => entry.teamId.startsWith("liga1-")),
+        // Anders als die synthetischen `liga1-a-d1-*`-IDs im ersten Test dieser Datei sind die hier
+        // verwendeten Spieler-IDs ECHTE Roster-Mitglieder (s. Kommentar oben) -- dadurch findet
+        // `buildPlayerMoralePerformanceMap()` einen echten `rosterEntry` und fragt anschliessend
+        // `gameState.teamIdentities` ab, das die schlanke `baueBattleModeGameState()` gar nicht
+        // erst mitfuehrt.
+        teamIdentities: [],
+        matchdayState: { matchdayId: "matchday-1" },
+        seasonState: {
+          ...gameStateVoll.seasonState,
+          schedule: gameStateVoll.seasonState.schedule.filter((fixture) => fixture.leagueTier === "liga1"),
+        },
+      } as unknown as GameState;
+
+      const { overridesByTeamId, warnings } = await runBattleModeArenaMatchday({
+        gameState,
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+      });
+      expect(warnings).toHaveLength(0);
+
+      const heimOverride = overridesByTeamId.get("liga1-a");
+      expect(heimOverride?.boxscoreRank).not.toBeNull();
+      expect(heimOverride?.playerImpactByPlayerId).not.toBeNull();
+
+      // Die tatsaechlich gefelderten liga1-a-Spieler, sortiert nach ECHTEM Boxscore-Impact
+      // AUFSTEIGEND -- der schwaechste zuerst.
+      const gefelderteSpielerNachImpactAufsteigend = [...heimOverride!.playerImpactByPlayerId!.entries()].sort(
+        ([, a], [, b]) => a - b,
+      );
+      expect(gefelderteSpielerNachImpactAufsteigend.length).toBeGreaterThan(1);
+
+      // PPS-Score ABSICHTLICH GEGENLAEUFIG zum echten Boxscore-Impact vergeben: der Spieler mit dem
+      // SCHWAECHSTEN echten Impact bekommt den HOECHSTEN erfundenen PPS-Score, und umgekehrt --
+      // damit jede Uebereinstimmung zwischen `pointsAwarded`-Reihenfolge und Impact-Reihenfolge nur
+      // aus dem Boxscore stammen kann, nicht aus einem zufaelligen Gleichlauf mit der PPS-Zahl.
+      const d1Scores = gefelderteSpielerNachImpactAufsteigend.map((_, index) => (index + 1) * 10);
+      const heimEntries = gefelderteSpielerNachImpactAufsteigend.map(([playerId], index) => ({
+        disciplineId: "basketball",
+        disciplineSide: "d1" as const,
+        slotIndex: index,
+        playerId,
+        activePlayerId: `active-${playerId}`,
+      }));
+
+      const gastOverride = overridesByTeamId.get("liga1-b");
+      const gastSpieler = [...(gastOverride!.playerImpactByPlayerId?.entries() ?? [])];
+      const gastEntries = gastSpieler.map(([playerId], index) => ({
+        disciplineId: "basketball",
+        disciplineSide: "d1" as const,
+        slotIndex: index,
+        playerId,
+        activePlayerId: `active-${playerId}`,
+      }));
+
+      const heimContext = createContext({
+        teamId: "liga1-a",
+        teamName: "Liga1A",
+        d1Scores,
+        d2Scores: [40, 39],
+        gameState,
+      });
+      heimContext.entries = [...heimEntries, ...heimContext.entries.filter((entry) => entry.disciplineSide === "d2")];
+      heimContext.disciplineScores = [
+        ...heimEntries.map((entry, index) => ({ playerId: entry.playerId, disciplineId: "basketball", score: d1Scores[index] })),
+        ...heimContext.disciplineScores.filter((entry) => entry.disciplineId !== "basketball"),
+      ];
+      heimContext.activePlayers = heimContext.entries.map((entry) => ({
+        id: entry.activePlayerId ?? `missing-${entry.playerId}`,
+        saveId: "save-1",
+        seasonId: "season-1",
+        teamId: "liga1-a",
+        playerId: entry.playerId,
+      }));
+      heimContext.disciplinePlayerCounts = { ...heimContext.disciplinePlayerCounts, basketball: heimEntries.length };
+      // `scoreLegacyLineupDisciplineSide()` liest die Slot-Belegung aus `existingDraft.entries`,
+      // NICHT aus `context.entries` (das nur fuer Namen/Metadaten dient) -- ohne dieses Update
+      // wuerde die Wertung weiterhin die alten, synthetischen `${teamId}-d1-${index}`-IDs sehen.
+      heimContext.existingDraft = {
+        ...heimContext.existingDraft!,
+        entries: heimContext.entries,
+      };
+
+      const gastContext = createContext({
+        teamId: "liga1-b",
+        teamName: "Liga1B",
+        d1Scores: gastSpieler.map((_, index) => 100 - index),
+        d2Scores: [35, 34],
+        gameState,
+      });
+      gastContext.entries = [...gastEntries, ...gastContext.entries.filter((entry) => entry.disciplineSide === "d2")];
+      gastContext.activePlayers = gastContext.entries.map((entry) => ({
+        id: entry.activePlayerId ?? `missing-${entry.playerId}`,
+        saveId: "save-1",
+        seasonId: "season-1",
+        teamId: "liga1-b",
+        playerId: entry.playerId,
+      }));
+      gastContext.disciplinePlayerCounts = { ...gastContext.disciplinePlayerCounts, basketball: gastEntries.length };
+      gastContext.existingDraft = {
+        ...gastContext.existingDraft!,
+        entries: gastContext.entries,
+      };
+
+      const preview = buildLegacyMatchdayResolvePreview([heimContext, gastContext], {
+        arenaTeamPointsByTeamId: overridesByTeamId,
+      });
+
+      const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
+      const heim = basketball?.teamResults.find((team) => team.teamId === "liga1-a");
+      expect(heim).toBeDefined();
+
+      // DER NACHWEIS: jeder gefelderte Spieler ist als "aus dem Boxscore-Impact bedient" markiert
+      // ...
+      for (const entry of heim!.entries) {
+        expect(entry.arenaBoxscoreImpactApplied).toBe(true);
+      }
+      // ... und die pointsAwarded-Reihenfolge folgt dem ECHTEN Boxscore-Impact (aufsteigend), NICHT
+      // dem erfundenen, gegenlaeufigen PPS-Score.
+      const pointsInImpactReihenfolge = gefelderteSpielerNachImpactAufsteigend.map(
+        ([playerId]) => heim!.entries.find((entry) => entry.playerId === playerId)!.pointsAwarded!,
+      );
+      for (let i = 1; i < pointsInImpactReihenfolge.length; i += 1) {
+        expect(pointsInImpactReihenfolge[i]).toBeGreaterThanOrEqual(pointsInImpactReihenfolge[i - 1]);
+      }
+      // Nicht-monoton waere das Ergebnis gewesen, haette stattdessen der (gegenlaeufige) PPS-Score
+      // entschieden -- dann waere die Reihenfolge hier FALLEND, nicht steigend.
+      expect(pointsInImpactReihenfolge[pointsInImpactReihenfolge.length - 1]).toBeGreaterThan(pointsInImpactReihenfolge[0]);
+    },
+    LAUF_TIMEOUT_MS,
+  );
 });

@@ -49,6 +49,14 @@ export type PlayerPerformancePreview = {
   scoreContribution: number;
   pointsAwarded: number | null;
   pointSource: string;
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): true NUR fuer Battle-Mode-Basketball, wenn
+   * `pointsAwarded` oben tatsaechlich aus dem echten Arena-Boxscore-Impact kam statt aus der alten
+   * PPS-Rang-Formel — s. lib/resolve/battle-mode-arena-team-points.ts. Rein informativ (Debug/
+   * Anzeige); fehlt es (aeltere Preview-Objekte), gilt der Default "false" — kein
+   * Verhaltensunterschied.
+   */
+  arenaBoxscoreImpactApplied?: boolean;
   rankInTeam: number;
   rankInDiscipline: number;
   isTop10: boolean;
@@ -147,6 +155,12 @@ export type DisciplineTeamResolvePreview = {
     teamPowerShare?: number | null;
     finalPlayerScore: number | null;
     pointsAwarded?: number | null;
+    /**
+     * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): true NUR fuer Battle-Mode-Basketball, wenn
+     * `pointsAwarded` oben aus dem echten Arena-Boxscore-Impact kam statt aus der alten PPS-Rang-
+     * Formel. Rein informativ; fehlt es (aeltere Preview-Objekte), gilt der Default "false".
+     */
+    arenaBoxscoreImpactApplied?: boolean;
     isCaptain: boolean;
     warnings: string[];
   }>;

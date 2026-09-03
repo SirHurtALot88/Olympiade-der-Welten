@@ -546,5 +546,28 @@ export type LegacyResolvePreviewOptions = {
    * (Manager Mode, jede andere Disziplin) ignoriert diese Map vollstaendig, auch wenn sie gesetzt
    * ist. `undefined`/leer aendert nichts am bisherigen PPS-Pfad.
    */
-  arenaTeamPointsByTeamId?: ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }> | null;
+  arenaTeamPointsByTeamId?: ReadonlyMap<
+    string,
+    {
+      teamPoints: number;
+      arenaMatchSeed: string;
+      /**
+       * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): der Rang DIESES Teams unter allen
+       * Teams DERSELBEN Liga-Stufe an diesem Spieltag, sortiert nach Summe der
+       * Boxscore-Impact-Werte seiner gefeldeten Spieler — s.
+       * lib/resolve/battle-mode-arena-team-points.ts. Optional, damit aeltere Aufrufer (Tests,
+       * die nur `{teamPoints, arenaMatchSeed}` liefern) unveraendert funktionieren: fehlt es
+       * oder ist es null, bleiben INDIVIDUELLE Spieler-PPs auf dem bisherigen PPS-Rang-Pfad —
+       * nur die TEAM-Punkte (oben) bleiben dann weiterhin auf 2/1/0.
+       */
+      boxscoreRank?: number | null;
+      /**
+       * Boxscore-Impact-Wert je Spieler DIESES Teams (playerId -> Wert). Nur gesetzt, wenn JEDER
+       * gefelderte Spieler eindeutig zugeordnet werden konnte (s. arena-headless-runner.ts) —
+       * sonst faellt `buildLegacyMatchdayResolvePreview` fuer die GESAMTE Seite auf den
+       * PPS-Pfad zurueck, statt fuer einzelne Spieler zu raten.
+       */
+      playerImpactByPlayerId?: ReadonlyMap<string, number> | null;
+    }
+  > | null;
 };
