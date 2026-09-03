@@ -9985,7 +9985,14 @@
         if(b){const v=el("div","slotvorschlag");
           v.appendChild(el("span","vlabel",drin.length?"Besser wäre":"Bester Freier"));
           v.appendChild(el("b",null,b.p.n));
-          const abs=(b.p.d[disc]||0)+b.m;
+          // Dieselbe Eignungsluecke wie in bauFeldspiel/bauBuehne/bauSpurt/baueEinheit
+          // (CLAUDE.md: "p.d haelt nur tdm und spurt vorberechnet"), fuenfte Fundstelle
+          // (Opus-Projektueberwachung, 03.09.): `p.d[disc]||0` ist fuer die anderen 18
+          // Disziplinen immer 0, die angezeigte "absolute" Eignung war also nur der kleine
+          // Slot-Modifikator (b.m, Spanne +/-8,5) statt einer echten ~0-99-Eignung — der
+          // Vorschlag "Bester Freier"/"Besser waere" zeigte eine fast bedeutungslose Zahl.
+          // Gleicher Rueckfall wie ueberall sonst: gewichtet(p.a, BASIS_JE_DISC[...]).
+          const abs=(b.p.d[disc]!=null?b.p.d[disc]:gewichtet(b.p.a,BASIS_JE_DISC[disc]||{}))+b.m;
           v.appendChild(el("s",null,abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
           v.addEventListener("click",()=>{
             const raus=here.find(x=>place[x.n].slot===rw.id);
