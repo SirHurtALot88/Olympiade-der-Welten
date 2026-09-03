@@ -30,12 +30,12 @@ belohnt. Der Zusammenhang ist gemessen und traegt auf ±0,01:
 | Breaking | Buehne | 0,891 | 0,993 | bestanden |
 | Climbing | Bahn | 0,846 | 0,900 | bestanden |
 | Takeshi's Castle | Bahn | 0,842 | 0,958 | bestanden |
+| Gewichtheben | Buehne | 0,792 | 0,909 | knapp |
 | Basketball | Feldspiel | 0,786 | 0,881 | knapp |
 | Showcase | Buehne | 0,784 | 0,825 | knapp |
 | I-Spy | Buehne | 0,776 | 0,776 | knapp |
 | Staffel | Bahn | 0,757 | 0,818 | knapp |
 | Spurt | Bahn | 0,745 | 0,762 | knapp |
-| Gewichtheben | Buehne | 0,745 | 0,839 | knapp |
 | Hockey | Feldspiel | 0,670 | 0,874 | durchgefallen |
 | Mini-DM | Arena | 0,658 | 0,786 | durchgefallen |
 | Tennis | Feldspiel | 0,605 | 0,762 | durchgefallen |
@@ -44,7 +44,9 @@ belohnt. Der Zusammenhang ist gemessen und traegt auf ±0,01:
 | Battlefield | Arena | 0,469 | 0,500 | durchgefallen |
 | Football | Feldspiel | 0,307 | 0,776 | durchgefallen |
 
-**Sieben bestehen, sechs sind knapp, sieben fallen durch.**
+**Sieben bestehen, sechs sind knapp, sieben fallen durch.** (Gewichtheben stand vor der
+S3/S4-Kalibrierrunde vom 03.09. bei 0,745/0,839 — die neue Zeile ist gemessen NACH dieser
+Runde, s. `docs/design/gewichtheben-buehnenbild-fortschritt.md`.)
 
 ### Was die zwei Spalten zusammen sagen
 
@@ -182,8 +184,8 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Takeshi's Castle | 50 % | 0,842 | Hindernisse und Nerven · Rangtreue bestanden · Bild vom Chassis |
 | Spurt | 50 % | 0,745 | Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
 | Staffel | 45 % | 0,757 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · von rho -0,04 auf 0,76 gehoben |
-| Gewichtheben | 45 % | 0,745 | Reissen und Stossen mit je drei Versuchen, Duelle je Slot, Nullwertung · Buehnenbild fehlt noch |
 | Speed-Schach | 45 % | 0,950 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · Bild vom Chassis |
+| Gewichtheben | 55 % | 0,792 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild (zwei Heber mittig, Hantel, Duellstand) · Korridor kalibriert, Pp gegen die Matrix noch ueber der Schranke (48 statt <=25) · nicht im echten Spielstand |
 | Wettessen | 40 % | 0,921 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Eiskunstlauf | 40 % | 0,892 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Breaking | 40 % | 0,891 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
