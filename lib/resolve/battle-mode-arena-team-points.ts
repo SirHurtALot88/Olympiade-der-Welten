@@ -11,13 +11,43 @@
  * die Punktevergabe selbst (Punktdifferenz bleibt fuer Tie-Breaking/Anzeige nutzbar, s.
  * `ArenaTeamPointsOverride.seitenDiff`).
  *
- * INDIVIDUELLE SPIELER-PPs BLEIBEN UNANGETASTET (Abschnitt 5.1, Zusatzentscheidung): Chris will sie
- * langfristig von den Team-Punkten entkoppeln und liga-relativ aus dem Impact Rating der
- * Arena-Simulation skalieren — aber der Plan selbst haelt fest, dass das "bewusst noch nicht
- * umgesetzt" ist (fehlende Liga-Kontextdaten). Diese Datei liefert deshalb NUR die TEAM-Punkte;
- * `legacy-matchday-resolve-engine.ts` laesst die bestehende `distributeRankPointsToPlayers()`-
- * Verteilung der individuellen PPs fuer Battle-Mode-Basketball unveraendert (auf Basis des alten,
- * PPS-rang-basierten Team-Totals) — GENAU wie fuer jede andere Disziplin auch.
+ * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7): die individuellen Spieler-PPs
+ * sind SEIT DIESER AENDERUNG nicht mehr laenger "bewusst noch nicht umgesetzt". Der urspruengliche
+ * Blockierer im Plan ("fehlende Liga-Kontextdaten... sinnvoll erst mit der echten Resolve-Pipeline,
+ * wenn Spielerdaten tatsaechlich durch ein Liga-Save laufen", Abschnitt 5.1) ist inzwischen aufgeloest:
+ * `runBattleModeArenaMatchday()` laeuft laengst gegen die echte Resolve-Pipeline (PR7/8 sind gebaut)
+ * und bekommt hier, PRO LIGA-STUFE, alle 8 Fixtures/96 gefelderten Spieler EINES Spieltags auf einmal
+ * zurueck — genau der Liga-Kontext, der frueher fehlte.
+ *
+ * WAS "LIGA-RELATIV SKALIERT AUS DEM IMPACT RATING" HIER KONKRET HEISST (Chris' Vorgabe war absichtlich
+ * vage — "z.B." —, diese Entscheidung ist deshalb explizit dokumentiert, nicht versteckt):
+ *   1. TEAM-EBENE: `boxscoreRank` ist der Rang DIESES Teams unter allen Teams DERSELBEN Liga-Stufe an
+ *      diesem Spieltag, sortiert nach der SUMME der Boxscore-Impact-Werte (`ArenaFixtureBoxscoreEintrag
+ *      .wert`) seiner gefeldeten Spieler -- Shared-Ties wie ueberall sonst im Resolve. Das ist die
+ *      "liga-relative" Komponente: ein Team mit starker Arena-Leistung bekommt einen besseren Rang
+ *      als ein anderes Team mit schwacher Arena-Leistung, UNABHAENGIG vom Sieg/Niederlage-Ausgang
+ *      (der beim 2/1/0-Modell oben bleibt, s. Kommentar dort).
+ *   2. INDIVIDUAL-EBENE: `legacy-matchday-resolve-engine.ts` speist `boxscoreRank` GENAU DORT in
+ *      `getRankToPointsValue()` ein, wo bisher der PPS-Rang stand (dieselbe Tabelle, keine neue
+ *      Punkte-Oekonomie) und verteilt den resultierenden Team-Pool NICHT mehr nach PPS-Anteil,
+ *      sondern nach dem Anteil, den jeder Spieler an der Boxscore-Impact-SUMME seines Teams hat.
+ *      Stars (hoher Impact) bekommen dadurch mehr vom Pool, schwache Spieler weniger -- UND der Pool
+ *      selbst faellt groesser aus, wenn das Team insgesamt gegen die Liga stark spielte.
+ *   3. WARUM NICHT EIN GLOBALER Rang ueber alle ~96 Spieler einer Liga-Stufe direkt in
+ *      `getRankToPointsValue()`: die Tabelle (`references/sheets/rank-to-points.json`) deckt nur
+ *      Raenge 1..32 ab (Team-Groesse der ganzen Liga), nicht die Groessenordnung einer vollen
+ *      Spieler-Population -- ein direkter Spieler-Rang liefe ab Rang 33 ins Leere (`null`, keine
+ *      Punkte). Der Team-Rang-plus-Anteils-Ansatz oben bleibt darum innerhalb der bestehenden
+ *      Tabellendomaene.
+ *   4. SICHERHEITSNETZ: `boxscoreRank`/`playerImpactByPlayerId` werden NUR gesetzt, wenn JEDER
+ *      Boxscore-Name des betroffenen Duells eindeutig einem Spieler zugeordnet werden konnte (s.
+ *      `arena-headless-runner.ts`, `baueEindeutigeNamenZuordnung()`). Fehlt auch nur ein Spieler
+ *      (Namens-Kollision, Runner-Fehler), bleibt das GESAMTE Team beim alten PPS-Pfad -- kein
+ *      Team bekommt eine teilweise aus Boxscore, teilweise aus PPS gemischte Verteilung.
+ *
+ * Diese Datei liefert weiterhin ausschliesslich TEAM-seitige Vorverarbeitung (Team-Punkte 2/1/0 UND
+ * die neuen Boxscore-Rang-/Impact-Felder); die tatsaechliche Anwendung auf einzelne Spieler-PPs
+ * passiert erst in `legacy-matchday-resolve-engine.ts`.
  */
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
@@ -47,7 +77,43 @@ export type ArenaTeamPointsOverride = {
   /** Punktestand [dieses Team, Gegner] — fuer Anzeige/Tie-Breaking, NICHT fuer die Punktevergabe selbst. */
   seiten: [number, number];
   outcome: "win" | "draw" | "loss";
+  /**
+   * BOXSCORE-AN-PPS: Rang dieses Teams unter allen Teams DERSELBEN Liga-Stufe an diesem
+   * Spieltag, nach Summe der Boxscore-Impact-Werte seiner gefeldeten Spieler (s. Dateikopf-
+   * Kommentar). `null`, wenn fuer dieses Team keine vollstaendig zugeordneten Boxscore-Daten
+   * vorliegen (Namens-Kollision, fehlender Boxscore) — der Aufrufer faellt dann fuer die
+   * individuellen PPs dieses Teams auf den PPS-Pfad zurueck, waehrend `teamPoints` oben
+   * unveraendert beim 2/1/0-Ergebnis bleibt.
+   */
+  boxscoreRank: number | null;
+  /**
+   * Boxscore-Impact-Wert je Spieler DIESES Teams (playerId -> `ArenaFixtureBoxscoreEintrag.wert`).
+   * Nur gesetzt (und nur dann vollstaendig), wenn boxscoreRank ebenfalls gesetzt ist.
+   */
+  playerImpactByPlayerId: ReadonlyMap<string, number> | null;
 };
+
+/**
+ * Shared-Ties-Rang absteigend nach `wertVon(item)` — dieselbe Regel wie im uebrigen Resolve
+ * (`legacy-matchday-resolve-engine.ts`, `rankDescendingSharedTies`), hier lokal noch einmal
+ * ausgeschrieben, um dieses Modul frei von einem Import aus dem Resolve-Engine zu halten (dieses
+ * Modul wird selbst VON dort importiert — ein Ruecksprung waere ein Zirkel).
+ */
+function rangAbsteigendMitGleichstand<T>(items: T[], wertVon: (item: T) => number): Map<T, number> {
+  const sortiert = [...items].sort((a, b) => wertVon(b) - wertVon(a));
+  const rangByItem = new Map<T, number>();
+  let vorherigerWert: number | null = null;
+  let geteilterRang = 0;
+  sortiert.forEach((item, index) => {
+    const wert = wertVon(item);
+    if (vorherigerWert === null || wert !== vorherigerWert) {
+      geteilterRang = index + 1;
+      vorherigerWert = wert;
+    }
+    rangByItem.set(item, geteilterRang);
+  });
+  return rangByItem;
+}
 
 /**
  * Deterministischer Seed pro Duell — exakt das im Plan (Abschnitt 3.3c) vorgeschlagene Format.
@@ -76,15 +142,48 @@ export function arenaTeamPointsForFixture(seiten: readonly [number, number]): [n
 }
 
 /**
+ * Boxscore-Impact-Werte GENAU EINER Team-Seite eines Duells, nur aus Eintraegen, die eindeutig
+ * zugeordnet werden konnten (s. `ArenaFixtureBoxscoreEintrag.playerId`). `vollstaendig` ist false,
+ * sobald irgendein Eintrag im Duell ueberhaupt nicht zugeordnet werden konnte (Namens-Kollision) —
+ * dann ist unklar, ob der fehlende Spieler zu DIESER oder der gegnerischen Seite gehoert haette,
+ * und BEIDE Seiten dieses Duells gelten als unvollstaendig (s. Aufrufer).
+ */
+function sammleImpactJeSeite(
+  boxscore: ArenaFixtureResult["boxscore"],
+  seite: "home" | "away",
+): { impactByPlayerId: Map<string, number>; vollstaendig: boolean } {
+  const impactByPlayerId = new Map<string, number>();
+  let vollstaendig = true;
+  for (const eintrag of boxscore) {
+    if (eintrag.playerId === null) {
+      vollstaendig = false;
+      continue;
+    }
+    if (eintrag.side !== seite) continue;
+    impactByPlayerId.set(eintrag.playerId, eintrag.wert);
+  }
+  return { impactByPlayerId, vollstaendig };
+}
+
+/**
  * Baut aus bereits gelaufenen Arena-Fixture-Ergebnissen (s. `runArenaFixtures()`) die Team-Punkte-
  * Overrides je teamId. Rein, synchron, ohne Playwright/Browser — dafuer in den meisten Tests
  * gedacht (s. Testing-Lektion PR6: Chromium ist in `full-test-suite` nicht installiert).
+ *
+ * BOXSCORE-AN-PPS: `fixtureResults` sollte hier bereits ALLE Fixtures EINER Liga-Stufe EINES
+ * Spieltags enthalten (so wie `runBattleModeArenaMatchday()` es aufruft) — `boxscoreRank` rankt
+ * NUR unter den hier uebergebenen Teams. Weniger Fixtures (z. B. ein einzelnes, isoliertes Duell
+ * in einem Test) ergeben einen technisch gueltigen, aber kleineren Rangraum — fuer die Team-Punkte
+ * (2/1/0) macht das keinen Unterschied, sie sind schon pro Duell unabhaengig.
  */
 export function computeArenaTeamPointsFromFixtureResults(
   fixtureResults: readonly ArenaFixtureResult[],
   seedByFixtureKey: ReadonlyMap<string, string>,
 ): Map<string, ArenaTeamPointsOverride> {
   const overridesByTeamId = new Map<string, ArenaTeamPointsOverride>();
+  const impactByPlayerIdByTeamId = new Map<string, Map<string, number>>();
+  const impactSummeByTeamId = new Map<string, number>();
+
   for (const result of fixtureResults) {
     const [heimPunkte, gastPunkte] = arenaTeamPointsForFixture(result.seiten);
     const seed = seedByFixtureKey.get(`${result.homeTeamId}::${result.awayTeamId}`) ?? "";
@@ -98,6 +197,8 @@ export function computeArenaTeamPointsFromFixtureResults(
       opponentTeamId: result.awayTeamId,
       seiten: result.seiten,
       outcome: heimOutcome,
+      boxscoreRank: null,
+      playerImpactByPlayerId: null,
     });
     overridesByTeamId.set(result.awayTeamId, {
       teamPoints: gastPunkte,
@@ -105,8 +206,43 @@ export function computeArenaTeamPointsFromFixtureResults(
       opponentTeamId: result.homeTeamId,
       seiten: [result.seiten[1], result.seiten[0]],
       outcome: gastOutcome,
+      boxscoreRank: null,
+      playerImpactByPlayerId: null,
     });
+
+    // Ein leerer Boxscore heisst "keine Daten", nicht "jeder Spieler hatte Impact 0" — z.B. der
+    // synchrone `[]`-Platzhalter aelterer Tests, die Boxscore-Zuordnung bewusst nicht pruefen.
+    // Beide Seiten gelten dann als unvollstaendig, exakt wie bei einer Namens-Kollision.
+    const hatBoxscore = result.boxscore.length > 0;
+    const heimImpact = hatBoxscore
+      ? sammleImpactJeSeite(result.boxscore, "home")
+      : { impactByPlayerId: new Map<string, number>(), vollstaendig: false };
+    const gastImpact = hatBoxscore
+      ? sammleImpactJeSeite(result.boxscore, "away")
+      : { impactByPlayerId: new Map<string, number>(), vollstaendig: false };
+    if (heimImpact.vollstaendig && gastImpact.vollstaendig) {
+      impactByPlayerIdByTeamId.set(result.homeTeamId, heimImpact.impactByPlayerId);
+      impactByPlayerIdByTeamId.set(result.awayTeamId, gastImpact.impactByPlayerId);
+      impactSummeByTeamId.set(result.homeTeamId, [...heimImpact.impactByPlayerId.values()].reduce((a, b) => a + b, 0));
+      impactSummeByTeamId.set(result.awayTeamId, [...gastImpact.impactByPlayerId.values()].reduce((a, b) => a + b, 0));
+    }
+    // Unvollstaendig (Namens-Kollision o.ae.): weder impactByPlayerIdByTeamId noch
+    // impactSummeByTeamId bekommen einen Eintrag fuer eines der beiden Teams — sie bleiben unten
+    // bei boxscoreRank/playerImpactByPlayerId=null, der Aufrufer faellt fuer BEIDE Seiten dieses
+    // einen Duells auf den PPS-Pfad zurueck (andere Duelle derselben Liga-Stufe sind davon nicht
+    // betroffen).
   }
+
+  const boxscoreRangByTeamId = rangAbsteigendMitGleichstand(
+    [...impactSummeByTeamId.keys()],
+    (teamId) => impactSummeByTeamId.get(teamId) ?? 0,
+  );
+  for (const [teamId, override] of overridesByTeamId) {
+    const playerImpactByPlayerId = impactByPlayerIdByTeamId.get(teamId) ?? null;
+    const boxscoreRank = playerImpactByPlayerId ? boxscoreRangByTeamId.get(teamId) ?? null : null;
+    overridesByTeamId.set(teamId, { ...override, boxscoreRank, playerImpactByPlayerId });
+  }
+
   return overridesByTeamId;
 }
 

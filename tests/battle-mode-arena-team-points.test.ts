@@ -65,12 +65,17 @@ describe("computeArenaTeamPointsFromFixtureResults", () => {
 
     const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
 
+    // boxscore:[] -> keine Boxscore-Daten fuer dieses Duell -> boxscoreRank/playerImpactByPlayerId
+    // bleiben null (s. Kommentar an computeArenaTeamPointsFromFixtureResults) -- die Team-Punkte
+    // (2/1/0) selbst haengen nie am Boxscore.
     expect(overrides.get("team-a")).toEqual({
       teamPoints: ARENA_TEAM_POINTS.win,
       arenaMatchSeed: "seed-a-b",
       opponentTeamId: "team-b",
       seiten: [80, 70],
       outcome: "win",
+      boxscoreRank: null,
+      playerImpactByPlayerId: null,
     });
     expect(overrides.get("team-b")).toEqual({
       teamPoints: ARENA_TEAM_POINTS.loss,
@@ -78,6 +83,8 @@ describe("computeArenaTeamPointsFromFixtureResults", () => {
       opponentTeamId: "team-a",
       seiten: [70, 80],
       outcome: "loss",
+      boxscoreRank: null,
+      playerImpactByPlayerId: null,
     });
   });
 
@@ -95,6 +102,120 @@ describe("computeArenaTeamPointsFromFixtureResults", () => {
     expect(overrides.get("team-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
     expect(overrides.get("team-c")?.teamPoints).toBe(ARENA_TEAM_POINTS.draw);
     expect(overrides.get("team-d")?.teamPoints).toBe(ARENA_TEAM_POINTS.draw);
+  });
+
+  /**
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): der Rang und die Impact-Map, aus denen
+   * `legacy-matchday-resolve-engine.ts` spaeter individuelle Spieler-PPs verteilt.
+   */
+  describe("boxscoreRank / playerImpactByPlayerId (BOXSCORE-AN-PPS)", () => {
+    function eintrag(name: string, wert: number, playerId: string, side: "home" | "away") {
+      return { name, wert, playerId, side };
+    }
+
+    it("rankt Teams EINER Liga-Stufe absteigend nach Summe des Boxscore-Impacts, unabhaengig vom Sieg/Niederlage-Ausgang", () => {
+      const seedByFixtureKey = new Map([
+        ["team-a::team-b", "seed-1"],
+        ["team-c::team-d", "seed-2"],
+      ]);
+      const fixtureResults: ArenaFixtureResult[] = [
+        // team-a GEWINNT (2/1/0-Punkte), hat aber den SCHWAECHEREN Boxscore-Impact (30) als team-b (70).
+        {
+          homeTeamId: "team-a",
+          awayTeamId: "team-b",
+          seiten: [80, 70],
+          boxscore: [eintrag("A1", 30, "p-a1", "home"), eintrag("B1", 70, "p-b1", "away")],
+        },
+        {
+          homeTeamId: "team-c",
+          awayTeamId: "team-d",
+          seiten: [50, 40],
+          boxscore: [eintrag("C1", 10, "p-c1", "home"), eintrag("D1", 5, "p-d1", "away")],
+        },
+      ];
+
+      const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+
+      // Sieg/Niederlage bleibt beim 2/1/0-Modell, unveraendert vom Boxscore.
+      expect(overrides.get("team-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+      expect(overrides.get("team-b")?.teamPoints).toBe(ARENA_TEAM_POINTS.loss);
+
+      // Boxscore-Rang dagegen: absteigend nach Impact-Summe UEBER ALLE VIER Teams dieses Batches
+      // (b=70 > a=30 > c=10 > d=5) -- team-b (verlor das Spiel!) steht trotzdem auf Rang 1.
+      expect(overrides.get("team-b")?.boxscoreRank).toBe(1);
+      expect(overrides.get("team-a")?.boxscoreRank).toBe(2);
+      expect(overrides.get("team-c")?.boxscoreRank).toBe(3);
+      expect(overrides.get("team-d")?.boxscoreRank).toBe(4);
+
+      expect(overrides.get("team-a")?.playerImpactByPlayerId).toEqual(new Map([["p-a1", 30]]));
+      expect(overrides.get("team-b")?.playerImpactByPlayerId).toEqual(new Map([["p-b1", 70]]));
+    });
+
+    it("shared ties: zwei Teams mit exakt gleicher Impact-Summe teilen sich den besseren Rang", () => {
+      const seedByFixtureKey = new Map([["team-a::team-b", "seed-1"]]);
+      const fixtureResults: ArenaFixtureResult[] = [
+        {
+          homeTeamId: "team-a",
+          awayTeamId: "team-b",
+          seiten: [10, 10],
+          boxscore: [eintrag("A1", 40, "p-a1", "home"), eintrag("B1", 40, "p-b1", "away")],
+        },
+      ];
+
+      const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+      expect(overrides.get("team-a")?.boxscoreRank).toBe(1);
+      expect(overrides.get("team-b")?.boxscoreRank).toBe(1);
+    });
+
+    it("faellt fuer BEIDE Seiten eines Duells auf null zurueck, wenn ein Boxscore-Name nicht eindeutig zugeordnet werden konnte", () => {
+      const seedByFixtureKey = new Map([["team-a::team-b", "seed-1"]]);
+      const fixtureResults: ArenaFixtureResult[] = [
+        {
+          homeTeamId: "team-a",
+          awayTeamId: "team-b",
+          seiten: [80, 70],
+          boxscore: [
+            eintrag("A1", 30, "p-a1", "home"),
+            // Zweiter Heim-Spieler konnte nicht eindeutig zugeordnet werden (z.B. Namens-Kollision).
+            { name: "A2", wert: 20, playerId: null, side: null },
+            eintrag("B1", 70, "p-b1", "away"),
+          ],
+        },
+      ];
+
+      const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+      // Team-Punkte (2/1/0) bleiben unberuehrt -- die haengen nie am Boxscore.
+      expect(overrides.get("team-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+      expect(overrides.get("team-b")?.teamPoints).toBe(ARENA_TEAM_POINTS.loss);
+      // Aber BEIDE Seiten dieses Duells fallen auf den PPS-Pfad zurueck -- nicht nur die Seite mit
+      // dem unklaren Namen, weil unklar ist, zu welcher Seite der fehlende Spieler gehoert haette.
+      expect(overrides.get("team-a")?.boxscoreRank).toBeNull();
+      expect(overrides.get("team-a")?.playerImpactByPlayerId).toBeNull();
+      expect(overrides.get("team-b")?.boxscoreRank).toBeNull();
+      expect(overrides.get("team-b")?.playerImpactByPlayerId).toBeNull();
+    });
+
+    it("ein Duell ohne Boxscore-Daten (leeres Array) bleibt auf null, andere Duelle desselben Batches sind davon nicht betroffen", () => {
+      const seedByFixtureKey = new Map([
+        ["team-a::team-b", "seed-1"],
+        ["team-c::team-d", "seed-2"],
+      ]);
+      const fixtureResults: ArenaFixtureResult[] = [
+        { homeTeamId: "team-a", awayTeamId: "team-b", seiten: [80, 70], boxscore: [] },
+        {
+          homeTeamId: "team-c",
+          awayTeamId: "team-d",
+          seiten: [50, 40],
+          boxscore: [eintrag("C1", 10, "p-c1", "home"), eintrag("D1", 5, "p-d1", "away")],
+        },
+      ];
+
+      const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+      expect(overrides.get("team-a")?.boxscoreRank).toBeNull();
+      expect(overrides.get("team-b")?.boxscoreRank).toBeNull();
+      expect(overrides.get("team-c")?.boxscoreRank).toBe(1);
+      expect(overrides.get("team-d")?.boxscoreRank).toBe(2);
+    });
   });
 });
 
