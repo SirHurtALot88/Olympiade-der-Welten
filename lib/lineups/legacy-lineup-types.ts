@@ -548,11 +548,12 @@ export type LegacyResolvePreviewOptions = {
    */
   arenaTeamPointsByTeamId?: ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }> | null;
   /**
-   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7): individuelle Spieler-PPs
-   * (playerId -> PPs), berechnet nach dem in `battle-mode-pps-modell-plan.md` Abschnitt 5
-   * vorgeschlagenen Modell (Perzentilrang des Arena-Boxscore-Impacts gegen BEIDE Liga-Stufen
-   * desselben Spieltags, linear auf `BASKETBALL_INDIVIDUAL_PPS_MAX` abgebildet — s.
-   * lib/resolve/battle-mode-arena-team-points.ts). `buildLegacyMatchdayResolvePreview` setzt
+   * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7) — SEIT
+   * docs/design/pps-skalierung-umsetzung.md auf V2 umgestellt: individuelle Spieler-PPs
+   * (playerId -> PPs), berechnet ueber eine Impact-Kurve gegen eine feste, je Feldgroesse
+   * gezogene Referenz (nicht mehr ein Perzentilrang gegen den Spieltags-Pool — s.
+   * lib/resolve/battle-mode-arena-team-points.ts, `computeIndividualBoxscorePpsFromFixtureResults()`
+   * und `BASKETBALL_INDIVIDUAL_PPS_MAX`/`BASKETBALL_PPS_ANTEIL_MITTE`). `buildLegacyMatchdayResolvePreview` setzt
    * `pointsAwarded` fuer einen Spieler NUR aus dieser Map, wenn (a) `isBattleModeSave(gameState)
    * && disciplineId === "basketball"` UND (b) die Map einen Eintrag fuer genau diesen Spieler
    * enthaelt — jeder andere Spieler (auch derselben Seite/desselben Teams) bleibt unveraendert

@@ -1,0 +1,16 @@
+{
+ "disziplin": "basketball",
+ "hinweis": "PLATZHALTER -- wird von scripts/ziehe-basketball-pps-referenz.ts ueberschrieben. Werte hier sind NICHT aus echten Liga-Kadern gezogen (s. quelle.mechanismus), nur eine Uebergangsstuetze aus docs/design/pps-skalierung-opus.md Abschnitt 1.2/7 (Demokader-Messung), damit lib/resolve/battle-mode-arena-team-points.ts waehrend der Entwicklung eine gueltige Datei importieren kann.",
+ "gezogenAm": "1970-01-01T00:00:00.000Z",
+ "motorSha1": "PLATZHALTER",
+ "repoCommit": "PLATZHALTER",
+ "quelle": { "mechanismus": "PLATZHALTER -- noch nicht gezogen" },
+ "fixturesJeFeldgroesse": 0,
+ "feldgroessen": {
+  "2": { "n": 2, "iMittel": 33.5, "iKrass": 121.5, "quantile": {} },
+  "3": { "n": 3, "iMittel": 22.0, "iKrass": 98.0, "quantile": {} },
+  "4": { "n": 4, "iMittel": 15.0, "iKrass": 75.5, "quantile": {} },
+  "5": { "n": 5, "iMittel": 13.0, "iKrass": 65.0, "quantile": {} },
+  "6": { "n": 6, "iMittel": 11.1, "iKrass": 56.9, "quantile": {} }
+ }
+}
