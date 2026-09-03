@@ -9268,7 +9268,12 @@
           // dort). Nur Basketball — der Puck liegt am Schlaeger, kein Handpunkt noetig,
           // und die Freiwurf-Formation traegt denselben traegerId-Pfad mit, was hier
           // gewollt ist (der Schuetze haelt den Ball dort genauso in der Hand).
-          if(feldspielDisc==="basketball"){
+          // NUR Basketball/Football — derselbe gemessene Handpunkt (docs/design/
+          // sprite-handpunkte.md) traegt beide: ein getragener Football liegt wie ein
+          // Basketball in der vorderen Hand, kein football-eigenes Messblatt noetig
+          // (Chris' Auftrag Punkt 6: "denselben Handpunkt-Mechanismus... fuer einen
+          // getragenen Football"). Der Puck liegt am Schlaeger, kein Handpunkt noetig.
+          if(feldspielDisc==="basketball"||feldspielDisc==="football"){
             const rBlick=blickAus(traeger);
             const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
             const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
@@ -9277,7 +9282,30 @@
         }
       }
       const bx=fsBall.x+bvx+handOffX, by=fsBall.y+bvy;
-      if(istHockey()){
+      if(istFootball()){
+        // DER FOOTBALL. Kein Dribbeln (anders als Basketball) — fester Schlagschatten am
+        // Fuss des Traegers statt der Dribbel-Amplitude, sonst dieselbe getragen/
+        // geflogen-Unterscheidung ueber traegerId wie beim Basketball.
+        ctx.save();
+        if(traeger){
+          ctx.fillStyle="rgba(0,0,0,.22)";
+          ctx.beginPath();ctx.ellipse(bx,traeger.y+bvy+19,6,2.5,0,0,6.3);ctx.fill();
+        }
+        if(fkDa("ball_football")){
+          ctx.save();ctx.translate(bx,by-26);
+          // Laengsachse in Bewegungsrichtung drehen (Kenneys Sprite ist 14x16, die
+          // Naehte laufen laengs) — ohne Drehung laege der Ball immer "quer".
+          ctx.rotate(Math.atan2((traeger&&traeger._zvy)||0,(traeger&&traeger._zvx)||1));
+          ctx.drawImage(fkBild.ball_football,-7,-8,14,16);
+          ctx.restore();
+        } else {
+          ctx.fillStyle="#7a4a26";
+          ctx.beginPath();ctx.ellipse(bx,by-26,8,5,0,0,6.3);ctx.fill();
+          ctx.strokeStyle="rgba(250,250,250,.85)";ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(bx-4,by-26);ctx.lineTo(bx+4,by-26);ctx.stroke();
+        }
+        ctx.restore();
+      } else if(istHockey()){
         // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
         // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
         // geprellt wird. Ein Puck liegt auf dem Eis. Die leichte Ellipse (breiter als
@@ -13260,6 +13288,17 @@
   const bkMust=n=>{ if(!bkDa(n))return null;
     if(!bkMuster[n])bkMuster[n]=ctx.createPattern(bkBild[n],"repeat");
     return bkMuster[n]; };
+
+  // Football-Assets (docs/design/football-assets.md, Kenney Sports Pack, CC0 — dieselbe
+  // Datei-statt-base64-Idee wie A_TEILE/BK_TEILE oben). Nur `ball_football` wird diese
+  // Runde tatsaechlich gezeichnet (getragener/geworfener Ball, s. fsBall-Rendering
+  // weiter unten); die drei Helm-Blickwinkel sind geladen und liegen bereit fuer eine
+  // kuenftige Overlay-Zeichenfunktion (analog zu zeichneHockeyschlaeger), aber in dieser
+  // Runde noch ungenutzt — s. Abschlussbericht.
+  const FK_TEILE=["ball_football","helmet_white1","helmet_white2","helmet_white3"];
+  const fkBild={};
+  for(const n of FK_TEILE){const im=new Image();im.src="/sprites/football/"+n+".png";fkBild[n]=im;}
+  const fkDa=n=>{const im=fkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
 
   // Basketball-Sound (Fables Recherche, 24.08.): lag als Datei bereit, aber die ganze
   // Datei hatte bisher KEINERLEI Audio-Infrastruktur (kein <audio>, kein Audio(), kein
