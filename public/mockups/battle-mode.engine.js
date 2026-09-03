@@ -3847,7 +3847,7 @@
       // echten Kader (57,79) mal 0,0050 = 0,2889. Herleitung/Rohzahlen im Bericht.
       //
       // steil=20 ist GEFITTET, nicht die geschaetzte Mitte 18-22 blind uebernommen:
-      // durchprobiert 14/16/18/20/22/24 (korrektur=0, Vorlauf-Fit) gegen
+      // durchprobiert 14/18/20/22/24 (korrektur=0, Vorlauf-Fit) gegen
       // scripts/miss-hockey-archetypen.mjs (Sniper-Terzil-Spreizung SCHUSS_NAH/FERN) und
       // scripts/miss-hockey-korridor.mjs (Torzahl-/Fangquote-Drift). Die Terzil-Trennung
       // wird in diesem Fenster mit steigendem steil eher staerker (24 trennt SCHUSS_FERN
