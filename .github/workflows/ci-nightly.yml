@@ -30,3 +30,38 @@ jobs:
       - name: Stop dev server
         if: always()
         run: kill "$(cat .dev-server.pid)" 2>/dev/null || true
+
+  # DIE RHO-SCHRANKE (docs/design/messgrundlage-kaderfest.md, Ausloeser
+  # docs/design/projekt-ueberwachung-opus.md Abschnitt 3.1 B): 1008 Testdateien und keine
+  # einzige, die die Abnahmezahl des Projekts prueft (rho zwischen Eignung und Spielergebnis,
+  # s. CLAUDE.md). Drei ehrliche Hockey-Berichte ergaben zusammen eine unehrliche Bilanz
+  # (0,670 -> 0,612 -> 0,617 -> 0,647), weil jeder sich nur gegen den letzten Zwischenstand
+  # verglich, nie gegen den Tagesanfang. Dieser Job ist die fehlende Instanz.
+  #
+  # BRAUCHT WEDER DEV-SERVER NOCH SQLITE: `disziplinProbe` laeuft gegen die statische
+  # public/mockups/battle-mode.html per file://, komplett unabhaengig vom App-Server — nur
+  # Chromium fuer Playwright, genau wie im Job oben.
+  #
+  # EIGENER JOB statt Schritt im PFLICHT-Check `ci.yml`: alle zwanzig Disziplinen mit je
+  # fuenf Kader-Varianten (n=24) kosten rund 11 Minuten (nachgemessen,
+  # scripts/baue-rangtreue-basislinie.mjs) — zu teuer, um jeden Pull Request zu blockieren,
+  # aber billig genug fuer diesen Job, der ohnehin nur auf Zuruf laeuft.
+  #
+  # NUR MANUELL, wie der Job oben (s. Kommentar im `on:`-Block): dieser Workflow hat keinen
+  # automatischen Zeitplan mehr, weil der VOLLE Saisondurchlauf ihn unzuverlaessig machte —
+  # das betraf einen anderen Job, nicht diesen hier. Ob dieser Job einen eigenen, kuerzeren
+  # automatischen Rhythmus bekommt (er ist deutlich billiger und stabiler als der
+  # Saisondurchlauf), ist eine offene Entscheidung fuer Chris, keine, die hier vorweggenommen
+  # wird.
+  rangtreue-schranke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run ci:rangtreue-schranke

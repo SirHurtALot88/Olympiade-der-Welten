@@ -57,6 +57,7 @@
     "ci:quittungen": "tsx scripts/pruefe-quittungen.ts --nur-repo",
     "ci:persistenz-suiten": "tsx scripts/fahre-persistenz-suiten.ts",
     "ci:ensure-gameplay-smoke-save": "tsx scripts/ensure-ci-gameplay-smoke-save.ts",
+    "ci:rangtreue-schranke": "node scripts/pruefe-rangtreue-schranke.mjs",
     "db:check-foundation-projection": "tsx scripts/check-foundation-projection.ts",
     "db:compare-foundation-sources": "tsx scripts/compare-foundation-sources.ts",
     "lineup:check-context": "tsx scripts/check-legacy-lineup-context.ts",
