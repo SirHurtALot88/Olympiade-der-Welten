@@ -4617,6 +4617,10 @@
         // Laufende Schusssequenz (s. HOCKEY_SCHUSS/hockeySchussPhase). null = kein Schuss.
         schussSeit:null, schussArt:null,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
+        // Nur Hockey: A1/A2 getrennt gezaehlt (s. loeseHockeySchuss/feldspielWert) — der
+        // NHL Game Score gewichtet eine erste Vorlage hoeher als eine zweite (0,7 gegen
+        // 0,55), `assists` bleibt die Summe fuer Boxscore/Anzeige unveraendert.
+        assists1:0,assists2:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
@@ -4743,6 +4747,9 @@
       if(e.art==="treffer"){
         team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++;
+        // Zweite Vorlage (nur Hockey, s. loeseHockeySchuss/merkeBeruehrung) — sonst
+        // zeigt die Live-Enthuellung eine Vorlage weniger als am Ende im Boxscore steht.
+        if(e.zweitpassgeber)s(e.zweitpassgeber).assists++;
         // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als FG 3/6 im Boxscore"): ein Freiwurf
         // (e.freiwurf, s. verbucheFreiwurf) ist kein Feldwurf-Versuch, zaehlt hier also
         // NICHT mit — real-basketball-konform (FT% und FG% sind getrennte Statistiken).
@@ -5020,6 +5027,22 @@
   // gemessen 31 Zonen-Bullys je Spiel, zusammen mit den Anspielen nach Toren also alle
   // sechs Sekunden eines. Das Spiel stand oefter still, als es lief.
   const HK_VORBEI=0.11, HK_ABPRALLER=0.70;
+  // WOHIN DER ABPRALLER GEHT (hockey-impact-verteilung-recherche-fable.md, Abschnitt 5.2):
+  // bisher landete JEDER Abpraller frontal 18-52px vor dem Tor — real gehen Abpraller
+  // ueberwiegend in die Ecke/hinter das Tor, nur ein kleiner Teil bleibt im gefaehrlichen
+  // Slot (5,7 % der nicht festgehaltenen Paraden erzeugen real einen Nachschuss binnen 2s,
+  // bei uns vorher rund 30 % — das Fuenffache). Ohne diese Staffelung war "Puck gewinnen,
+  // aus 58px schiessen, Torwart laesst abprallen, Puck liegt wieder da" eine Schleife, die
+  // derselbe Spieler allein durchlaufen konnte. HK_ABPRALLER_SLOT_BASIS sinkt mit PARADE
+  // (ein guter Torwart lenkt gezielter weg vom Slot), HK_ABPRALLER_SLOT_MIN haelt eine
+  // Mindestchance, weil auch der beste Torwart nicht jeden Abpraller kontrolliert.
+  const HK_ABPRALLER_SLOT_BASIS=0.25, HK_ABPRALLER_SLOT_MIN=0.08, HK_ABPRALLER_SLOT_K=0.0025;
+  // BULLY-DUELL (s. bully()): Steilheit der Logistik ueber die TECHNIK-Differenz der
+  // beiden Center. Bei einer Differenz von 20 Punkten (73 gegen 53, wie im ZWEITCHANCE-
+  // Zweikampf-Kommentar an anderer Stelle) gewinnt der bessere zu rund 67 %, bei 40 Punkten
+  // zu rund 80 % — spuerbar, aber kein Automatismus, wie es sich fuer ein Duell mit
+  // Schiedsrichter-Einwurf gehoert.
+  const HK_BULLY_K=0.035;
   // SCHUSSBLOCK. Der Unterschied zwischen "Schussversuch" und "Schuss aufs Tor" ist im
   // Eishockey kein Detail, sondern eine der haeufigsten Aktionen ueberhaupt: ein
   // Verteidiger wirft sich in die Schussbahn. Ohne diese Stufe kamen alle 33 Versuche
@@ -5271,7 +5294,9 @@
       if(u.torwart){
         const schuesse=u.saves+u.gegentore;
         const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
-        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists*2;
+        // A1/A2 getrennt gewichtet wie beim Feldspieler unten (s. dort) — ein Torwart
+        // bekommt in der Praxis fast nie eine Vorlage, die Formel bleibt trotzdem konsistent.
+        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists1*2+u.assists2*1.5;
       }
       // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
       //
@@ -5288,7 +5313,10 @@
       // (3) SCHUSSVOLUMEN ZAEHLT. Corsi ist im Eishockey die gaengigste Einzelgroesse
       //     ueberhaupt: wer schiesst, erzeugt Druck, auch wenn der Puck nicht reingeht.
       //     Klein gewichtet, damit sie die Tore nicht ueberstimmt.
-      return u.punkte*3+u.assists*2+u.steals*0.5+u.feldwuerfe*0.3
+      // A1/A2 GETRENNT GEWICHTET (Impact-Verteilung-Recherche 5.4, wie NHL Game Score
+      // 0,7/0,55): eine erste Vorlage zaehlt mehr als eine zweite. `assists` (Summe) bleibt
+      // fuer Boxscore/Anzeige unveraendert, hier zaehlen assists1/assists2 getrennt.
+      return u.punkte*3+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
             // GEWICHT DER GEWONNENEN PUCKS: 0,5 -> 0,2, und zwar an der realen Formel
       // ausgerichtet statt geschaetzt. Der NHL Game Score (Luszczyszyn 2016) kennt einen
       // Posten "loser Puck gewonnen" UEBERHAUPT NICHT — er zaehlt Tore (0,75), Vorlagen
@@ -5307,7 +5335,15 @@
       // Einen Puck zu erobern IST wertvoll, deshalb bleibt der Posten stehen. Aber mit
       // 0,2 wiegt er jetzt ungefaehr wie ein Block und nicht mehr wie zwei Drittel eines
       // Tores.
-      +u.checks*0.4+u.bloecke*0.5+u.rebounds*0.2-u.verluste*0.2
+      //
+      // CHECKS GESTRICHEN (Impact-Verteilung-Recherche 5.5/5.6, mit realer Deckung): der
+      // NHL Game Score kennt keinen Posten fuer Hits, und Hit-Differenzen korrelieren mit
+      // Tordifferenzen NEGATIV (Hockey Graphs 2015) — wer viel checkt, hat meist selten den
+      // Puck. `checks*0,4` war eine Erfindung ohne reale Entsprechung, die nur deshalb mit
+      // der Eignung korrelierte (0,855), weil `wucht` (s. versucheSteal) ABWEHR gegen
+      // AUSDAUER liest, also dieselbe Matrix wie ABWEHR selbst. Ein Check wirkt jetzt nur
+      // noch als Taumeln des Getroffenen (taumeltBis), nicht mehr als Punkt fuer den Checker.
+      +u.bloecke*0.5+u.rebounds*0.2-u.verluste*0.2
       // Genommene Strafen zaehlen negativ, wie im NHL Game Score (Luszczyszyn): wer sein
       // Team in Unterzahl bringt, hat dem Team geschadet, auch wenn der Check sass. Klein
       // gehalten (0,2 je Strafminute, also 0,4 je kleiner Strafe) — die eigentliche Strafe
@@ -5364,13 +5400,33 @@
     pos.y=Math.max(k.o+rand,Math.min(k.u-rand,pos.y));
     return pos;
   }
-  // BULLY: kein eigener Standzustand, sondern ein FREIER PUCK auf dem Bullypunkt. Die
-  // bestehende Zweikampf-Mechanik um den losen Ball (reboundKampf) ist genau das, was ein
-  // Anspiel ist — beide Seiten laufen hin, wer ihn erwischt, hat ihn. Ein eigener
-  // Phasenzustand haette dieselbe Wirkung mit doppeltem Code.
+  // BULLY ALS FAEHIGKEITSDUELL (Impact-Verteilung-Recherche 5.5): frueher legte bully() nur
+  // einen freien Puck auf den Punkt, den danach dieselbe ZWEITCHANCE-Wettlaufmechanik wie
+  // jeder andere lose Puck entschied (reboundKampf) — rund 30 Bullys je Spiel liefen damit
+  // in dieselbe Masse wie Abpraller. Real ist ein Faceoff-Gewinn im NHL Game Score mit 0,01
+  // bewusst FAST wertlos (kein eigener Wertformel-Posten hier, s. feldspielWert), aber er
+  // ist ein echtes Fähigkeitsduell zwischen den beiden Centern — nicht ein Wettlauf, den
+  // LAUFTEMPO/ZWEITCHANCE entscheiden. TECHNIK steht stellvertretend fuer Stockarbeit im
+  // Kreis (dieselbe Sub-Skill-Wahl wie beim Schuss-Gate, s. entscheideBallaktion).
   function bully(x,y,vonSeite){
     fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
+    if(istHockey()){
+      const naechster=(seite)=>FSTEAM[seite]
+        .filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+        .sort((a,b)=>dist(a,{x,y})-dist(b,{x,y}))[0]||null;
+      const c0=naechster(0), c1=naechster(1);
+      if(c0&&c1){
+        const chance=1/(1+Math.exp(-(c0.TECHNIK-c1.TECHNIK)*HK_BULLY_K));
+        const gewinner=rr()<chance?c0:c1;
+        gewinner.x=x; gewinner.y=y;
+        feed(gewinner.side,gewinner.n+" gewinnt den Bully.");
+        logZug(gewinner.side,"bully",{spieler:gewinner});
+        fsLive.angriffSeit=0;
+        ballUebernehmen(gewinner);
+        return;
+      }
+    }
     fsLive.ball.frei=haltePuckImFeld({x,y,vonSeite});
     fsLive.angriffSeit=0;
   }
@@ -5384,7 +5440,8 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        wobbleY:0,frischerPassVon:null,frischerPassBis:0,frischerPassGeometrie:null,frischerPassAbwehr:50,
+        slotIdx:0,slotSeit:0,screent:null,rollBis:0,
         screenRuf:0,rangeSeit:null,
         // BEWEGUNGS-DYNAMIK (s. Konstantenblock oben): Ausbruchsfenster des Angreifers,
         // Mismatch-Abstaende und Sichtverlust-Fenster des Verteidigers. Alle vier sind
@@ -5414,7 +5471,10 @@
     // naechsterAngriff()/starteViertelpause() fuer die Grenzpruefung; `viertelpause` haelt
     // die Pausen-eigenen Daten und ist ausserhalb der Phase immer null, exakt wie `freiwurf`.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null};
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null,
+      // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
+      // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
+      beruehrungKette:[], beruehrungSeite:null};
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
@@ -5499,9 +5559,24 @@
     }
   }
 
+  // VORLAGEN AUS DER BERUEHRUNGSKETTE (nur Hockey, Impact-Verteilung-Recherche 5.4): statt
+  // eines einzelnen Zeitfensters (ASSIST_FENSTER, weiterhin fuer die Passqualitaets-Kette
+  // in Kraft, s. hockeyPassQualBonus) haelt die Kette die letzten BIS ZU DREI Ballbesitzer
+  // DERSELBEN Seite fest — verliert die Seite den Puck, beginnt die Kette bei null, ein
+  // Turnover darf keine Vorlage "von vorhin" ueberleben. Aufeinanderfolgende Beruehrungen
+  // DESSELBEN Spielers (Dribbeln, mehrere Ticks am Puck) zaehlen nur einmal.
+  function merkeBeruehrung(u){
+    if(!istHockey())return;
+    if(fsLive.beruehrungSeite!==u.side){fsLive.beruehrungKette=[];fsLive.beruehrungSeite=u.side;}
+    const kette=fsLive.beruehrungKette;
+    if(kette[kette.length-1]!==u)kette.push(u);
+    if(kette.length>3)kette.shift();
+  }
+
   function ballUebernehmen(u){
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    merkeBeruehrung(u);
     // Kein Assist-Fenster: hierher kommt man ueber Rebound, Steal, Anwurf oder neuen
     // Angriff — nie ueber ein Zuspiel (das laeuft ueber loeseFlugAuf, s. dort).
     u.frischerPassVon=null;
@@ -5738,6 +5813,19 @@
     };
     const abwehrTeiler=(m)=>Math.max(USAGE_TEILER_MIN,Math.min(USAGE_TEILER_MAX,
       1/(1+(deckerAbwehrVon(m)-ABWEHR_MITTEL)*USAGE_ABWEHR_K)));
+    // HOCKEY-SCHUETZENBONUS VERSUCHT UND WIEDER VERWORFEN (Impact-Verteilung-Recherche 5.3,
+    // zweiter Teil; s. hockey-mechanik-angleichen.md): ein Multiplikator ueber
+    // schussSkillFuer(m,tier) sollte den Passgeber zum besseren Schuetzen im jeweiligen
+    // Tier lenken. Durchgemessen (miss-hockey-archetypen.mjs 48) drehte er stattdessen die
+    // Sniper-Probe um: SCHUSS_NAH-Nahdistanz-rho von +0,30 auf −0,25, Terzil-dPp von +4,8
+    // auf −4,4 Pp. Wahrscheinlicher Kanal: der bevorzugt angespielte gute Schuetze bekommt
+    // dadurch MEHR, aber im Mittel schlechtere/bedraengtere Gelegenheiten (die Verteidigung
+    // kann sich auf ihn einstellen), was seinen Vorteil in der Trefferquote mehr als
+    // aufwiegt — dieselbe Selektionsverzerrung, vor der die Kommentare bei `passChance`/
+    // `kickOutChance` an anderer Stelle schon warnen. Nicht eingebaut; die Schwellen-
+    // Aenderung unten (schwelle) bleibt stehen, hat gemessen aber ohnehin keine Wirkung,
+    // weil technikGate bei normalen Werten weit ueber jeder erreichbaren Schwelle liegt
+    // (derselbe Befund wie im Rollout-Plan zu TECHNIK in Basketball).
     return gewichtetesLosNach(mitspieler,m=>
       losGewicht(m.ABSCHLUSS,USAGE_KAPPA)*Math.pow(qualitaet(m),2)
       *offenheitFuerPass(von,m)*abwehrTeiler(m)*(m.rollBis>fsT?3:1)
@@ -5990,15 +6078,24 @@
       // wird um den GEMESSENEN Tier-Mittelwert herum, damit der Ligadurchschnitt exakt
       // dort bleibt, wo die Kalibrierung ihn hingestellt hat.
       const skillTeil=schussSkillFuer(u,tier)*0.0022+u.TEAMGEIST*0.0030;
-      const lage=-0.02+GEO_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0);
+      const lage=-0.02+GEO_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0)
+        +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0);
       const technikMake=steilerMake(lage,skillTeil,tier);
       // EINGRIFF (d), zweiter Teil: die bisher als Literal "4" eingebettete Abbauzeit ist
       // jetzt eine benannte Konstante und kuerzer. Sie ist die zweite Bremse neben der
       // Schussuhr — wer in Reichweite steht, wartete bisher bis zu vier Sekunden auf eine
       // bessere Gelegenheit, was bei 120 s Spielzeit einen erheblichen Teil jedes
       // Angriffs verbraucht.
+      // HOCKEY: Schussanteil als Faehigkeit, nicht nur als Standplatz (Impact-Verteilung-
+      // Recherche 5.3). Ohne diesen Term entscheidet fast ausschliesslich die Aufstellung
+      // (wer im Slot steht, bekommt die meisten Pucks), WER schiesst — die Schuss-Schwelle
+      // selbst kannte SCHUSS_NAH/SCHUSS_FERN nicht. Ein starker Schuetze im eigenen Tier
+      // zieht jetzt frueher ab, ein schwacher wartet laenger (faellt eher in die
+      // Pass-Logik durch, s. offensterMitspieler) — real nimmt der beste NHL-Schuetze rund
+      // 14 % der Teamschuesse, bei uns vor dieser Aenderung 56 % beim Netfront-Spieler.
       const schwelle=erzwingen?-1:Math.max(0.05,
-        0.42-((fsT-u.rangeSeit)/SCHWELLE_ABBAU)*0.30-(u.ABSCHLUSS-50)*0.0010);
+        0.42-((fsT-u.rangeSeit)/SCHWELLE_ABBAU)*0.30-(u.ABSCHLUSS-50)*0.0010
+        -(istHockey()?(schussSkillFuer(u,tier)-50)*0.0016:0));
       // KICK-OUT-WUERFEL: VOR dem Quality-Gate und bewusst UNABHAENGIG von TECHNIK/
       // TEAMGEIST des Schuetzen — ob ein bedraengter/gedoppelter Ballfuehrer abgibt,
       // haengt an der Bedraengnis selbst, nicht am eigenen Skill (genau das war vorher
@@ -6046,7 +6143,8 @@
       // die einzige Stelle ohne Aufsteilung, haetten Schussuhr-Wuerfe eine andere
       // Skill-Kopplung als alle anderen — genau die Art Inkonsistenz, die Opus-Review-
       // Fund #4 an dieser Stelle schon einmal aufgedeckt hat.
-      const technik=steilerMake(-0.02+GEO_BONUS[tierErz]-bedraengnisMake,
+      const technik=steilerMake(-0.02+GEO_BONUS[tierErz]-bedraengnisMake
+        +(istHockey()?hockeyPassQualBonus(u,moeglicherAssist):0),
         schussSkillFuer(u,tierErz)*0.0022+u.TEAMGEIST*0.0030,tierErz);
       wirf(u,u,art,tierErz,technik,moeglicherAssist,null,(bedraengnisMake>0||gedoppelt)?decker:null);
       return;
@@ -6513,6 +6611,50 @@
   }
   const PASSLINIE_RADIUS=55; // PLATZHALTER: wie nah ein Verteidiger an der Passlinie stehen muss
 
+  // PASSQUALITAETS-KETTE (nur Hockey — hockey-impact-verteilung-recherche-fable.md,
+  // Abschnitt 5.1/7.1). Bisher aenderte ein Pass NIE die Torwahrscheinlichkeit des darauf
+  // folgenden Schusses (nachgemessen: 6,9 % Trefferquote nach Pass gegen 8,4 % ohne —
+  // der Pass senkte die Chance leicht, statt sie zu heben). Real trifft ein Schuss nach
+  // einem Royal-Road-Pass (quer durch den Slot, Vorzeichenwechsel der y-Seite bezogen auf
+  // die Tormitte) zu 15,5 % gegen 6,7 % nach einem Pass von hinter der Torlinie (Passing
+  // Project, zitiert ueber NHL.com/Kraken). `klassifiziereHockeyPassGeometrie` trifft
+  // genau diese Unterscheidung anhand der Ursprungs-/Zielposition des Passes.
+  function klassifiziereHockeyPassGeometrie(seite,von,nach){
+    const torX=korbXVon(seite);
+    // Royal Road: die Seite bezogen auf die Tormitte (H/2) wechselt, UND der Puck landet
+    // dabei in der Angriffszone (nah genug am Tor, sonst ist es ein Zonenpass, kein
+    // Slot-Zuspiel).
+    const vzVon=Math.sign(von.y-H/2), vzNach=Math.sign(nach.y-H/2);
+    if(vzVon!==0&&vzNach!==0&&vzVon!==vzNach&&Math.abs(nach.x-torX)<HK_RADIUS_HOCHSLOT)return "slot";
+    // Hinter dem Tor: der Pass startet auf der bandenseitigen Seite der Torlinie.
+    if(seite===0?von.x>torX:von.x<torX)return "hinterTor";
+    return "sonst";
+  }
+  // GROESSENORDNUNG BEWUSST KLEIN GEHALTEN (Nachmessung, s. hockey-mechanik-angleichen.md):
+  // eine erste Fassung mit 0,14/0,06/0,02 (vor AUFBAU-Skalierung bis zu 0,23) drueckte
+  // `mitte` in `steilerMake` bei Nahdistanz-Schuessen (dort ist GEO_BONUS.nah bereits 0,20)
+  // regelmaessig gegen den MAKE_MAX-Deckel — genau die Saettigungsfalle, vor der der
+  // Motorkommentar beim verworfenen Assist-Bonus (oben, `:5931` im urspruenglichen Bericht)
+  // schon einmal warnt: nahe am Deckel wirkt der SKILL-Term (STEIL_MAKE*(skillTeil-...))
+  // kaum noch, weil sigma dort saettigt. Nachgemessen (miss-hockey-archetypen.mjs 48):
+  // SCHUSS_NAH-Sniper-Probe kippte dadurch von rho +0,30 auf −0,22, die Verteidiger-Probe
+  // von dTore% −3,8 % auf +5,8 % — beides die falsche Richtung. Auf ein Drittel gesenkt
+  // (0,05/0,025/0,01) und die Multiplikator-Spannen enger gefasst.
+  const HK_PASSQUAL_SLOT=0.05, HK_PASSQUAL_HINTERTOR=0.025, HK_PASSQUAL_SONST=0.01;
+  // Additiver Term auf `lage` in technikMake (s. entscheideBallaktion) — skaliert mit
+  // AUFBAU des Passgebers (ein Zuspiel eines Spielmachers "kommt in den Lauf"), gedaempft
+  // von der ABWEHR des naechsten Verteidigers an der Passlinie (`flug.passLinienAbwehr`,
+  // s. passeAb). Faengt der Verteidiger den Pass nicht ab, steht er trotzdem oft genug im
+  // Weg, dass die Anspielposition nicht die volle Qualitaet traegt.
+  function hockeyPassQualBonus(schuetze,passgeber){
+    if(!passgeber)return 0;
+    const g=schuetze.frischerPassGeometrie;
+    const basis=g==="slot"?HK_PASSQUAL_SLOT:g==="hinterTor"?HK_PASSQUAL_HINTERTOR:HK_PASSQUAL_SONST;
+    const aufbauSkala=Math.max(0.7,Math.min(1.3,0.85+(passgeber.AUFBAU-50)*0.0060));
+    const abwehrDaempfung=Math.max(0.6,Math.min(1.05,1.05-((schuetze.frischerPassAbwehr||50)-50)*0.0040));
+    return basis*aufbauSkala*abwehrDaempfung;
+  }
+
   function passeAb(von,nach,druckBonus=0){
     von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
     // Assist-Fenster schliessen: wer weitergibt, hat nicht abgeschlossen — der Assist
@@ -6569,6 +6711,10 @@
     const passDauer=istHockey()?Math.max(0.16,Math.min(0.75,strecke/1050)):0.3;
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:passDauer,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
+      // Fuer die Passqualitaets-Kette (s. hockeyPassQualBonus): welcher Verteidiger stand
+      // der Passlinie am naechsten, egal ob er den Pass abgefangen hat oder nicht — ein
+      // Verteidiger, der knapp daneben steht, daempft die Qualitaet trotzdem.
+      passLinienAbwehr:waechter?waechter.ABWEHR:50,
       abgefangenVon,eigenerFehler};
   }
 
@@ -6774,15 +6920,28 @@
     const rein=torX>MID?-1:1;
     if(hk.ausgang==="tor"){
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
-      if(flug.passgeber)flug.passgeber.assists++;
+      // VORLAGEN AUS DER BERUEHRUNGSKETTE (Impact-Verteilung-Recherche 5.4, statt des
+      // reinen ASSIST_FENSTER-Zeitfensters): A1 ist der Ballbesitzer unmittelbar vor dem
+      // Schuetzen in derselben ununterbrochenen Kette (s. merkeBeruehrung), A2 der davor —
+      // beide nur, wenn sie nicht der Schuetze selbst sind (Dribbeln zaehlt nicht als
+      // eigene Beruehrung, s. dort). `assists` bleibt die Summe fuer Boxscore/Anzeige,
+      // assists1/assists2 tragen die A1/A2-Gewichtung in feldspielWert (NHL Game Score:
+      // 0,7 gegen 0,55 — bei uns vorher 17 % der Tore mit ueberhaupt einer Vorlage gegen
+      // real 77,8 % mit ZWEI).
+      const kette=fsLive.beruehrungKette;
+      const idx=kette.lastIndexOf(schuetze);
+      const a1=idx>0?kette[idx-1]:null;
+      const a2=idx>1?kette[idx-2]:null;
+      if(a1){a1.assists++; a1.assists1++;}
+      if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
-      feed(schuetze.side,schuetze.n+" trifft"+(flug.passgeber?" nach Vorlage von "+flug.passgeber.n:"")+" — TOR!",true);
-      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:1,
+      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true);
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
         imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
       schwebe({x:0,y:0,txt:"TOR!",life:1.7,crit:true,_spieler:schuetze.id,_gross:true});
-      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:a1,rebounder:null};
       // Anspiel am Mittelpunkt. naechsterAngriff() zuerst, weil NUR dort die
       // Drittelgrenze geprueft wird; faellt das Tor genau auf die Grenze, uebernimmt die
       // Drittelpause, und dann darf hier kein Bully mehr dazwischenfunken.
@@ -6812,11 +6971,22 @@
       logZug(tw.side,"block",{verteidiger:tw,spieler:schuetze,...wurfDaten});
       tw.lunge=0.5;
       fsAktuell={spieler:null,verteidiger:tw,passgeber:flug.passgeber,rebounder:null};
-      // Der Puck liegt frei vor dem Tor — daraus wird ueber die bestehende
-      // Zweikampf-Mechanik ein echter Nachschuss-Kampf, kein Ballbesitzwechsel per Dekret.
-      const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
-      fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
-        y:torY+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      // Der Puck liegt frei vor dem Tor ODER in der Ecke — daraus wird ueber die
+      // bestehende Zweikampf-Mechanik ein echter Nachschuss-Kampf, kein Ballbesitzwechsel
+      // per Dekret. Nur der SLOT-Zweig ist der bisherige, frontale Abpraller; die Mehrheit
+      // geht jetzt seitlich Richtung Bande/hinter das Tor (s. HK_ABPRALLER_SLOT_*).
+      const slotChance=Math.max(HK_ABPRALLER_SLOT_MIN,
+        HK_ABPRALLER_SLOT_BASIS-(tw.PARADE-50)*HK_ABPRALLER_SLOT_K);
+      if(rr()<slotChance){
+        const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
+        fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
+          y:torY+Math.sin(winkel)*streu, vonSeite:schuetze.side});
+      } else {
+        const k=RINK(), seiteY=rr()<0.5?-1:1;
+        const streuX=30+rr()*40, streuY=(k.u-k.o)*0.28+rr()*(k.u-k.o)*0.14;
+        fsLive.ball.frei=haltePuckImFeld({x:torX+rein*streuX,
+          y:H/2+seiteY*streuY, vonSeite:schuetze.side});
+      }
       return;
     }
     if(hk.ausgang==="fest"){
@@ -6878,6 +7048,7 @@
         return;
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
+      merkeBeruehrung(flug.ziel);
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // Merkt sich den Passgeber fuer ASSIST_FENSTER Sekunden (s. dort und
       // entscheideBallaktion) — sonst gibt es beim normalen Pass nie einen Assist, weil
@@ -6889,6 +7060,14 @@
       // ASSIST_FENSTER, nur kuerzer, wenn der Passgeber keiner ist.
       const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(flug.passgeber.AUFBAU-50)*0.0060));
       flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.frischerPassBis=fsT+ASSIST_FENSTER*fensterFaktor;
+      // PASSQUALITAETS-KETTE (nur Hockey, s. hockeyPassQualBonus): Geometrie am
+      // Ankunftsort festhalten, nicht am Abwurfort — das ist die Position, die auch fuer
+      // "quer durch den Slot" zaehlt.
+      if(istHockey()){
+        flug.ziel.frischerPassGeometrie=klassifiziereHockeyPassGeometrie(
+          flug.ziel.side,flug.von,{x:flug.ziel.x,y:flug.ziel.y});
+        flug.ziel.frischerPassAbwehr=flug.passLinienAbwehr;
+      }
       flug.ziel.lunge=0.2;
       feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
       fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
