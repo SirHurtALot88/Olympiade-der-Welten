@@ -125,8 +125,13 @@ Im echten Spielstand wird bislang **nur Basketball** ueber die Arena ausgespielt
 2. **Football und Tennis auf den Live-Motor.** Beide rechnen ihr Ergebnis vorab durch, ohne
    Manndeckung, Zonen und Positionen. Footballs Saisonzahl (0,776) gegen die Einzelspielzahl
    (0,307) sagt genau das: zu wenige Ereignisse, um einen Spieler zu erkennen.
-3. **Hockey.** Validitaet 0,874, Einzelspiel 0,670 — auch hier fehlt Verlaesslichkeit, nicht
-   Richtigkeit.
+3. **Hockey.** Validitaet 0,874, Einzelspiel 0,670 — **KORRIGIERT** (widersprach CLAUDE.md und
+   der eigenen Messung): hier fehlt RICHTIGKEIT, nicht Verlaesslichkeit. Bei doppelter
+   Spielzeit stieg die Verlaesslichkeit von 0,755 auf 0,85, rho blieb bei 0,719/0,721/0,723
+   flach (CLAUDE.md). Gewonnene Pucks haben Retest 0,997 — verlaesslicher wird nichts im
+   ganzen Boxscore — aber Tore haengen an der Eignung nur mit rho 0,27, Vorlagen mit 0,09
+   (`hockey-impact-verteilung-recherche-fable.md`, Abschnitt 0.1/4.4). Die Mechanik belohnt
+   stabil das Falsche: wer im Netfront-Slot steht, nicht wer die Eignung dafuer hat.
 4. **Die sechs Knappen** brauchen je eine Rezeptrunde nach Chris' Budget-Methode
    (`scripts/baue-feldspiel-rezept.mjs`), keine Mechanikaenderung.
 
