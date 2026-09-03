@@ -99,12 +99,12 @@ describe.skipIf(!chromiumVerfuegbar())("basketball-pps-referenz: Drift-Waechter"
                 feldspielProbe: (
                   dId: string,
                   opt: { n: number },
-                ) => { spiele: Array<{ teilnehmer: Array<{ wert: number }> }> };
+                ) => { spiele: Array<{ spieler: Array<{ wert: number }> }> };
               };
             }
           ).__arena;
           const ergebnis = arena.feldspielProbe("basketball", { n: 24 });
-          return ergebnis.spiele.flatMap((spiel) => spiel.teilnehmer.map((teilnehmer) => teilnehmer.wert));
+          return ergebnis.spiele.flatMap((spiel) => spiel.spieler.map((spieler) => spieler.wert));
         });
 
         expect(werte.length).toBeGreaterThan(100);

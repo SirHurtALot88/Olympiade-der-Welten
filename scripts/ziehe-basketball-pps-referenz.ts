@@ -188,7 +188,25 @@ async function zieheFeldgroesse(gameState: GameState, saveId: string, n: number)
     `  n=${n}: ${fixtureInputs.length} Fixtures ueber ${runden} Runden, ${spielbareTeams.length} Teams -- das dauert...`,
   );
   const t0 = Date.now();
-  const ergebnisse = await runArenaFixtures(gameStateFuerLauf, fixtureInputs, "basketball");
+  // IN BATCHES, NICHT ALLE 300+ IN EINEM runArenaFixtures()-AUFRUF: nachgemessen (PPS-
+  // Skalierung, 03.09.) waechst der Speicher EINER Browser-Seite ueber viele sequenzielle
+  // `haengeMotorNeuEin()`-Neueinhaengungen hinweg unbegrenzt (2,7+ GB nach ~150 Fixtures, bei
+  // fuenf parallelen Feldgroessen reichte das, den Host auf unter 1 GB freien Speicher zu
+  // druecken UND die Simulation durch GC-Druck drastisch zu verlangsamen). `runArenaFixtures()`
+  // startet und schliesst PRO AUFRUF einen frischen Browser (s. dessen Kopfkommentar) -- in
+  // Batches von je `BATCH_GROESSE` Fixtures aufgerufen bleibt der Speicher pro Browser klein,
+  // auf Kosten von ein paar zusaetzlichen Browser-Starts (Sekunden, nicht Minuten).
+  const BATCH_GROESSE = 20;
+  const ergebnisse: Awaited<ReturnType<typeof runArenaFixtures>> = [];
+  for (let start = 0; start < fixtureInputs.length; start += BATCH_GROESSE) {
+    const batch = fixtureInputs.slice(start, start + BATCH_GROESSE);
+    const batchErgebnisse = await runArenaFixtures(gameStateFuerLauf, batch, "basketball");
+    ergebnisse.push(...batchErgebnisse);
+    console.log(
+      `  n=${n}: ${ergebnisse.length}/${fixtureInputs.length} Fixtures fertig ` +
+        `(${((Date.now() - t0) / 1000).toFixed(0)} s bisher)`,
+    );
+  }
   const dauerS = ((Date.now() - t0) / 1000).toFixed(0);
   console.log(`  n=${n}: fertig nach ${dauerS} s (${(Number(dauerS) / fixtureInputs.length).toFixed(2)} s/Fixture).`);
 
@@ -259,13 +277,13 @@ async function zieheDemoKaderMedianAllerFeldgroessen(): Promise<Map<number, numb
           window as unknown as {
             __arena: {
               feldspielProbe: (dId: string, opt: { n: number; jeSeite: number }) => {
-                spiele: Array<{ teilnehmer: Array<{ wert: number }> }>;
+                spiele: Array<{ spieler: Array<{ wert: number }> }>;
               };
             };
           }
         ).__arena;
         const lauf = arena.feldspielProbe("basketball", { n: 24, jeSeite });
-        return lauf.spiele.flatMap((spiel) => spiel.teilnehmer.map((teilnehmer) => teilnehmer.wert));
+        return lauf.spiele.flatMap((spiel) => spiel.spieler.map((spieler) => spieler.wert));
       }, n);
       werte.sort((a, b) => a - b);
       ergebnis.set(n, Math.round(median(werte) * 100) / 100);
