@@ -16977,8 +16977,11 @@
     // plus dem Versatz aus zeichenVersatzSchritt, s. dort) — genau die Trennung, um die es
     // beim Stacking geht: die Spiellogik darf ihre Abstaende behalten, das Bild nicht.
     // Read-only wie diagDetail/diagPositionen daneben.
-    diagAbstaende:(saat,bis)=>{
-      feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+    // Optionaler dritter Parameter (Football-Review, 03.09.): welche Feldspiel-Disziplin
+    // gebaut wird, Vorgabe weiter "basketball" — dieselbe Anti-Stacking-Messung liest sich
+    // damit auch fuer Football/Hockey ab, ohne den Aufruf fuer Basketball zu aendern.
+    diagAbstaende:(saat,bis,dId)=>{
+      feldspielDisc=dId||"basketball"; bauFeldspiel(saat||1337);
       const stufen=[12,18,24,30];
       const leer=()=>({min:1e9,frames:0,unter:stufen.map(()=>0),summeMin:0});
       const sim=leer(), zei=leer(), fw=leer();
