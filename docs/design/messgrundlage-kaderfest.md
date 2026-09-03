@@ -271,18 +271,21 @@ Getestet mit `basketball` (Basislinie: 0,757/0,102, Schranke 0,05). Testweise
 entkoppelt Trefferquote von Skill) und die Schranke gegen eine Test-Basislinie laufen lassen:
 
 ```
-Disziplin            Basislinie      Jetzt  Aenderung   Schranke   Status
-basketball                0.757      0.628    -0.129      0.050   GEFALLEN
+Disziplin            Basislinie      Jetzt   Aenderung   Schranke   Status
+basketball                0.757      0.628      -0.129      0.050   GEFALLEN
 
 FEHLGESCHLAGEN: mindestens eine Disziplin ist um mehr als ihre Schranke gefallen ...
 ```
 
 Exit-Code 1, wie erwartet. Änderung danach vollständig zurückgenommen (`git diff` auf
-`battle-mode.engine.js` leer) — **nicht** im finalen Commit enthalten. Ein zweiter Lauf ohne
-die Testveränderung, direkt gegen die echte, eingecheckte Basislinie (alle 20 Disziplinen),
-bestätigt außerdem die Determinismus-Annahme aus Abschnitt 3: die Nachmessung reproduziert
-jede der zwanzig Basislinien-Zahlen exakt (Status „ok" auf ganzer Linie), obwohl Browser und
-Prozess zwischen den beiden Läufen neu gestartet wurden.
+`battle-mode.engine.js` leer) — **nicht** im finalen Commit enthalten.
+
+Ein zweiter, unabhängiger Lauf ohne die Testveränderung, direkt gegen die echte, eingecheckte
+Basislinie und alle 20 Disziplinen (neuer Browser- und Node-Prozess, 11m39s), bestätigt
+außerdem die Determinismus-Annahme aus Abschnitt 3: die Nachmessung reproduziert **jede** der
+zwanzig Basislinien-Zahlen bit-identisch (Status „ok" auf ganzer Linie, Änderung exakt ±0,000
+in jeder Zeile) — Exit-Code 0, „Bestanden: keine Disziplin ist um mehr als ihre Schranke
+gefallen."
 
 ---
 
@@ -360,6 +363,12 @@ Disziplinen nutzen, deren Rangfolge heute am wenigsten stabil ist.
 - `--einzelkader`-Pfad manuell gegen den alten Code verglichen (Basketball 0,780 vs. vorher
   0,786/0,820 — im Rahmen der ohnehin bekannten Lauf-zu-Lauf-Schwankung bei kleinem n).
 - Determinismus: zwei unabhängige Prozess-/Browser-Starts liefern für alle 20 Disziplinen
-  bit-identische Mediane und Spannweiten.
+  bit-identische Mediane und Spannweiten (s. Abschnitt 3, „Nachweis: die Schranke schlägt
+  tatsächlich an").
 - CI-Schranke schlägt nachweislich an (Basketball testweise verschlechtert, Exit-Code 1,
-  Änderung vollständig zurückgenommen) und besteht nachweislich, wenn nichts kaputt ist.
+  Änderung vollständig zurückgenommen) und besteht nachweislich, wenn nichts kaputt ist
+  (Exit-Code 0 gegen die echte Basislinie, alle 20 Disziplinen).
+- Alle drei Skripte schließen den Browser jetzt in einem `finally`-Block — ein Absturz mitten
+  in der Messung (beobachtet: ein Lauf während starker Systemlast durch einen parallelen
+  Prozess brach beim Seitenaufbau ab) hinterließ vorher Zombie-Chromium-Prozesse, die Speicher
+  und Festplatte belegten, statt sich selbst aufzuräumen.

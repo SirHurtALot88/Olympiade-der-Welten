@@ -45,35 +45,40 @@ let kaderFamilie, kaderQuelle;
 const geladen = ladeKaderFamilieAusDatei(KADERFAMILIE_PFAD);
 if (geladen) { kaderFamilie = geladen.familie; kaderQuelle = geladen.quelle; }
 
+// try/finally: ein abgestuerzter Browser darf keinen Chromium-Prozess hinterlassen (s.
+// derselbe Kommentar in miss-alle-disziplinen.mjs).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-const seite = await browser.newPage();
-await seite.goto(SEITE, { waitUntil: "networkidle" });
-await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
-
-if (!kaderFamilie) {
-  const gebaut = await baueSynthetischeKaderFamilie(seite);
-  kaderFamilie = gebaut.familie;
-  kaderQuelle = gebaut.quelle;
-}
-
-const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
-
 const disziplinen = {};
-for (const d of alleDisz) {
-  const z = await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie });
-  if (z.fehler) { console.log(`${d.padEnd(20)} — ${z.fehler}`); continue; }
-  const schranke = Math.round(Math.max(SCHRANKE_BODEN, SCHRANKE_ANTEIL * z.spielSpan) * 1000) / 1000;
-  disziplinen[d] = {
-    chassis: z.chassis,
-    spielMedian: Math.round(z.spielMed * 1000) / 1000,
-    spielSpannweite: Math.round(z.spielSpan * 1000) / 1000,
-    saisonMedian: Math.round(z.saisonMed * 1000) / 1000,
-    saisonSpannweite: Math.round(z.saisonSpan * 1000) / 1000,
-    schranke,
-  };
-  console.log(`${d.padEnd(20)} spielMedian=${disziplinen[d].spielMedian.toFixed(3)}  spannweite=${disziplinen[d].spielSpannweite.toFixed(3)}  schranke=${schranke.toFixed(3)}`);
+try {
+  const seite = await browser.newPage();
+  await seite.goto(SEITE, { waitUntil: "networkidle" });
+  await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+
+  if (!kaderFamilie) {
+    const gebaut = await baueSynthetischeKaderFamilie(seite);
+    kaderFamilie = gebaut.familie;
+    kaderQuelle = gebaut.quelle;
+  }
+
+  const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
+
+  for (const d of alleDisz) {
+    const z = await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie });
+    if (z.fehler) { console.log(`${d.padEnd(20)} — ${z.fehler}`); continue; }
+    const schranke = Math.round(Math.max(SCHRANKE_BODEN, SCHRANKE_ANTEIL * z.spielSpan) * 1000) / 1000;
+    disziplinen[d] = {
+      chassis: z.chassis,
+      spielMedian: Math.round(z.spielMed * 1000) / 1000,
+      spielSpannweite: Math.round(z.spielSpan * 1000) / 1000,
+      saisonMedian: Math.round(z.saisonMed * 1000) / 1000,
+      saisonSpannweite: Math.round(z.saisonSpan * 1000) / 1000,
+      schranke,
+    };
+    console.log(`${d.padEnd(20)} spielMedian=${disziplinen[d].spielMedian.toFixed(3)}  spannweite=${disziplinen[d].spielSpannweite.toFixed(3)}  schranke=${schranke.toFixed(3)}`);
+  }
+} finally {
+  await browser.close();
 }
-await browser.close();
 
 const basislinie = {
   hinweis:

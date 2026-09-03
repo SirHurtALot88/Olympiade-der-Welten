@@ -39,44 +39,53 @@ let kaderFamilie;
 const geladen = ladeKaderFamilieAusDatei(KADERFAMILIE_PFAD);
 if (geladen) kaderFamilie = geladen.familie;
 
+// try/finally: ein abgestuerzter Browser darf keinen Chromium-Prozess hinterlassen (s.
+// derselbe Kommentar in miss-alle-disziplinen.mjs).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-const seite = await browser.newPage();
-await seite.goto(SEITE, { waitUntil: "networkidle" });
-await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
-
-if (!kaderFamilie) {
-  console.log("Achtung: keine live-save-Kaderfamilie gefunden, messe mit dem synthetischen Ausweichkader.");
-  const gebaut = await baueSynthetischeKaderFamilie(seite);
-  kaderFamilie = gebaut.familie;
-}
-
 let rot = false;
 const zeilen = [];
-for (const d of disziplinIds) {
-  const basis = basislinie.disziplinen[d];
-  const z = await disziplinMessen(seite, d, { n: basislinie.spiele, kaderFamilie });
-  if (z.fehler) {
-    zeilen.push({ d, fehler: z.fehler });
-    rot = true;
-    continue;
+try {
+  const seite = await browser.newPage();
+  await seite.goto(SEITE, { waitUntil: "networkidle" });
+  await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+
+  if (!kaderFamilie) {
+    console.log("Achtung: keine live-save-Kaderfamilie gefunden, messe mit dem synthetischen Ausweichkader.");
+    const gebaut = await baueSynthetischeKaderFamilie(seite);
+    kaderFamilie = gebaut.familie;
   }
-  const rueckgang = basis.spielMedian - z.spielMed; // positiv = gefallen, negativ = gestiegen
-  const gefallen = rueckgang > basis.schranke;
-  if (gefallen) rot = true;
-  zeilen.push({ d, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen });
+
+  for (const d of disziplinIds) {
+    const basis = basislinie.disziplinen[d];
+    const z = await disziplinMessen(seite, d, { n: basislinie.spiele, kaderFamilie });
+    if (z.fehler) {
+      zeilen.push({ d, fehler: z.fehler });
+      rot = true;
+      continue;
+    }
+    const rueckgang = basis.spielMedian - z.spielMed; // positiv = gefallen, negativ = gestiegen
+    const gefallen = rueckgang > basis.schranke;
+    if (gefallen) rot = true;
+    zeilen.push({ d, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen });
+  }
+} finally {
+  await browser.close();
 }
-await browser.close();
 
 console.log(`Rho-Schranke — Basislinie vom ${basislinie.gemessenAm}, ${basislinie.spiele} Spiele je Kader-Variante\n`);
-console.log("Disziplin            Basislinie      Jetzt  Aenderung   Schranke   Status");
+console.log("Disziplin            Basislinie      Jetzt   Aenderung   Schranke   Status");
 for (const z of zeilen) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }
   const status = z.gefallen ? "GEFALLEN" : "ok";
-  const aenderung = -z.rueckgang + 0; // "+0" normalisiert eine negative Null in der Anzeige
+  // Auf drei Nachkommastellen runden VOR dem Vorzeichen-Check, sonst zeigt Floating-Point-
+  // Rauschen unterhalb der Anzeigegenauigkeit ein irrefuehrendes "-0.000".
+  const aenderungGerundet = Math.round(-z.rueckgang * 1000) / 1000 + 0;
+  const vorzeichen = aenderungGerundet > 0 ? "+" : aenderungGerundet < 0 ? "-" : "±";
+  const aenderungText = vorzeichen + Math.abs(aenderungGerundet).toFixed(3);
   console.log(z.d.padEnd(20)
     + z.basis.toFixed(3).padStart(11)
     + z.jetzt.toFixed(3).padStart(11)
-    + (aenderung >= 0 ? "+" : "") + aenderung.toFixed(3).padStart(10)
+    + aenderungText.padStart(12)
     + z.schranke.toFixed(3).padStart(11) + "   " + status);
 }
 

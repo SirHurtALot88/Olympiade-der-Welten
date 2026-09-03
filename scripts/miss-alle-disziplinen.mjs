@@ -63,26 +63,33 @@ if (!EINZELKADER) {
   if (geladen) { kaderFamilie = geladen.familie; kaderQuelle = geladen.quelle; }
 }
 
+// try/finally: ein abgestuerzter Browser (page.goto/evaluate wirft) darf keinen Chromium-
+// Prozess hinterlassen — sonst sammeln sich Zombie-Prozesse an, die dem naechsten Lauf den
+// Speicher/die Festplatte wegnehmen (selbst beobachtet: ein abgebrochener Lauf ohne diesen
+// Block liess fuenf Chromium-Kindprozesse zurueck).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-const seite = await browser.newPage();
-const fehler = [];
-seite.on("pageerror", (e) => fehler.push(String(e)));
-await seite.goto(SEITE, { waitUntil: "networkidle" });
-await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+let zeilen, fehler = [];
+try {
+  const seite = await browser.newPage();
+  seite.on("pageerror", (e) => fehler.push(String(e)));
+  await seite.goto(SEITE, { waitUntil: "networkidle" });
+  await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
 
-if (!EINZELKADER && !kaderFamilie) {
-  const gebaut = await baueSynthetischeKaderFamilie(seite);
-  kaderFamilie = gebaut.familie;
-  kaderQuelle = gebaut.quelle + " (Kopfkommentar dieses Skripts erklaert, wann das greift)";
+  if (!EINZELKADER && !kaderFamilie) {
+    const gebaut = await baueSynthetischeKaderFamilie(seite);
+    kaderFamilie = gebaut.familie;
+    kaderQuelle = gebaut.quelle + " (Kopfkommentar dieses Skripts erklaert, wann das greift)";
+  }
+
+  const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
+
+  zeilen = [];
+  for (const d of alleDisz) {
+    zeilen.push(await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie }));
+  }
+} finally {
+  await browser.close();
 }
-
-const alleDisz = NUR.length ? NUR : await seite.evaluate(() => window.__arena.motoren());
-
-const zeilen = [];
-for (const d of alleDisz) {
-  zeilen.push(await disziplinMessen(seite, d, { n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie }));
-}
-await browser.close();
 
 const titel = EINZELKADER
   ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
