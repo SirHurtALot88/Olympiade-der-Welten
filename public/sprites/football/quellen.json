@@ -1,0 +1,35 @@
+{
+  "_hinweis": "Football: Ball und Helm (drei Blickwinkel). Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Beschafft am 03.09. ueber OpenGameArt (opengameart.org/content/sports-pack-350), unveraendert aus dem Original-ZIP entnommen (kein eigener Schnitt/keine Skalierung noetig, PNGs liegen in Originalgroesse vor). Dieselbe Quelle liefert bereits public/sprites/basketball/korb_topdown.png u.a. (s. dort), gefunden und vorverifiziert in docs/design/football-rollout-plan.md Abschnitt C.",
+  "ball_football.png": {
+    "paket": "Sports pack (350+)",
+    "blatt": "PNG/Equipment/ball_football.png, unveraendert, 14x16",
+    "urheber": "Kenney (kenney.nl)",
+    "lizenz": "CC0",
+    "url": "https://opengameart.org/content/sports-pack-350",
+    "verwendung": "Football-Ball-Sprite; braun mit zwei weissen Schnuersenkel-Streifen, korrekt oval. Deutlich kleiner als Basketballs ball.png (32x32) oder korb_topdown.png (64x64) — beim Einbau verlustfrei per Nearest-Neighbor auf 32x32 oder 64x64 hochskalieren, kein neuer Download noetig."
+  },
+  "helmet_white1.png": {
+    "paket": "Sports pack (350+)",
+    "blatt": "PNG/Equipment/helmet_white1.png, unveraendert, 19x19",
+    "urheber": "Kenney (kenney.nl)",
+    "lizenz": "CC0",
+    "url": "https://opengameart.org/content/sports-pack-350",
+    "verwendung": "Football-Helm, ein Blickwinkel von drei. Weiss mit blauem Gesichtsschutz-/Seitenstreifen. Welcher der drei Winkel zu welcher blickAus()-Richtung passt, ist noch nicht zugeordnet (Namen selbst tragen keine Blickwinkel-Angabe) — das ist Teil der spaeteren Verdrahtung, nicht dieser Beschaffungsrunde."
+  },
+  "helmet_white2.png": {
+    "paket": "Sports pack (350+)",
+    "blatt": "PNG/Equipment/helmet_white2.png, unveraendert, 21x19",
+    "urheber": "Kenney (kenney.nl)",
+    "lizenz": "CC0",
+    "url": "https://opengameart.org/content/sports-pack-350",
+    "verwendung": "Football-Helm, zweiter Blickwinkel. Siehe helmet_white1.png."
+  },
+  "helmet_white3.png": {
+    "paket": "Sports pack (350+)",
+    "blatt": "PNG/Equipment/helmet_white3.png, unveraendert, 26x22",
+    "urheber": "Kenney (kenney.nl)",
+    "lizenz": "CC0",
+    "url": "https://opengameart.org/content/sports-pack-350",
+    "verwendung": "Football-Helm, dritter Blickwinkel. Siehe helmet_white1.png."
+  }
+}
