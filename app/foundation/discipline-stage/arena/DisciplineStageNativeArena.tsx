@@ -1477,9 +1477,59 @@ function HoverTeamCardPortal({
   );
 }
 
+// ---- Perioden-Pause (Viertel/Drittel/Halbzeit) --------------------------------------------
+// Chris, 04.09.: „pausen zu irgendwelchen vierteln gabs auch nicht, das muss hier und in
+// anderen diszis auch möglich sein wo es viertel drittel oder halbzeiten gibt!"
+//
+// Es gibt in diesem Spiel NIRGENDS echte Spielabschnitte als eigene Daten — auch bei
+// Basketball/Hockey/Football ist eine „Etappe" (siehe `slots`/`SLOT_VOCAB` in
+// `DisciplineStageArena.tsx`) ein Spieler-Slot der Aufstellung, keine Spielminute. Diese
+// Tabelle bildet die vom echten Vorbild her erwarteten Perioden deshalb NÄHERUNGSWEISE über
+// die vorhandenen Etappen ab (`periodBoundaryRounds` verteilt sie so gleichmäßig wie möglich)
+// — bewusst NUR für Disziplinen mit einem echten sportlichen Vorbild dafür. Alle anderen
+// (Lauf, Wettessen, Schach, Gewichtheben, …) bekommen gar keine Perioden-Kontrolle, genau wie
+// verlangt („wo es das gibt").
+const PERIOD_CONFIG: Record<string, { count: number; noun: string }> = {
+  basketball: { count: 4, noun: "Viertel" },
+  hockey: { count: 3, noun: "Drittel" },
+  football: { count: 4, noun: "Viertel" },
+};
+
+/**
+ * Auf welche Etappen-Zahlen (1-basiert, nur die INNEREN Grenzen — nie 0, nie `slotCount`
+ * selbst) die Perioden-Enden fallen, so gleichmäßig wie möglich über `slotCount` Etappen
+ * verteilt. `slotCount` muss nicht durch `periodCount` teilbar sein (6 Etappen / 4 Viertel bei
+ * Basketball sind der Regelfall) — dann sind einzelne Perioden eine Etappe länger als andere.
+ */
+function periodBoundaryRounds(slotCount: number, periodCount: number): number[] {
+  if (slotCount <= 0 || periodCount <= 1) return [];
+  const bounds: number[] = [];
+  for (let k = 1; k < periodCount; k += 1) {
+    const b = Math.round((k / periodCount) * slotCount);
+    if (b > 0 && b < slotCount && bounds[bounds.length - 1] !== b) bounds.push(b);
+  }
+  return bounds;
+}
+
+/** In welcher Periode (1-basiert, gedeckelt auf `periodCount`) die naechste bzw. gerade
+ * laufende Etappe liegt — `round` = Anzahl bereits enthuellter Etappen (0 = noch keine). */
+function currentPeriodForRound(round: number, boundaries: number[], periodCount: number): number {
+  let p = 1;
+  for (const b of boundaries) if (round >= b) p += 1;
+  return Math.min(p, periodCount);
+}
+
 export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
+  // Perioden-Pause: nur fuer Disziplinen mit einem konfigurierten Vorbild (s.o.), nie erzwungen
+  // — Standard ist AUS, damit sich am heutigen Immer-Durchlaufen nichts aendert, wer es nicht
+  // will bemerkt gar nichts davon.
+  const periodConfig = disciplineId ? PERIOD_CONFIG[disciplineId] : undefined;
+  const periodBoundaries = useMemo(
+    () => (periodConfig ? periodBoundaryRounds(slotCount, periodConfig.count) : []),
+    [periodConfig, slotCount],
+  );
   const prim = primitive;
   const geo = PRIM_GEO[prim];
   const W = geo.w;
@@ -1548,6 +1598,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [busy, setBusy] = useState(false);
   const [ended, setEnded] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Perioden-Pause (Feature, s.o.): rein lokale Anzeige-Praeferenz, ueberlebt bewusst weder
+  // „↻ Neu" noch Quick-Sim NICHT extra — sie ist ja unabhaengig vom Simulationszustand (wie die
+  // Lautstaerke), ein Remount (Disziplinwechsel) setzt sie ohnehin frisch auf false.
+  const [pauseAtPeriods, setPauseAtPeriods] = useState(false);
   // Start-Gate: die Disziplin läuft NICHT von allein los — erst der erste ▶-Etappe-Klick
   // (oder Quick-Sim) startet sie; danach läuft sie automatisch durch (bis Pause/Ende).
   // Bei Remount (Disziplin/Modus/Seed → neuer key) ist started wieder false → wartet.
@@ -1680,6 +1734,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const resumeCascade = useCallback(() => {
     pauseRef.current = false;
   }, []);
+
+  /**
+   * Gemeinsamer Pause-Setzer fuer Leertaste UND die Perioden-Pause weiter unten — beide
+   * muessen dieselben zwei Dinge tun (lokal pausieren + bei Bedarf den Raum informieren), nur
+   * die Leertaste TOGGLED, die Perioden-Pause SETZT (will nie ausversehen entpausen). Meldet
+   * `onHostPauseToggle` nur, wenn sich der Zustand wirklich aendert — sonst wuerde ein zweiter
+   * Aufruf mit demselben Zielwert den Raum ungewollt wieder ENTpausieren (der Raum kennt nur
+   * ein Toggle, kein Set).
+   */
+  const setManualPause = useCallback(
+    (next: boolean) => {
+      if (manualPauseRef.current === next) return;
+      manualPauseRef.current = next;
+      setPaused(next);
+      if (roomSync?.active && roomSync.isHost) {
+        roomSync.onHostPauseToggle?.();
+      }
+    },
+    [roomSync],
+  );
 
   // Token-Hovercard: eigener Schließ-Timer (unabhängig von der Reveal-Cascade),
   // damit die Karte beim Rüberfahren nicht flackert.
@@ -1839,19 +1913,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (document.querySelector("[role='dialog']")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      manualPauseRef.current = !manualPauseRef.current;
-      setPaused(manualPauseRef.current);
       // Pause als Raum-Zustand (Stufe 3.6): NUR der Host meldet seine Pause an den Raum — der
       // Guest hat gar keine eigene Pause-Autoritaet (`resolveArenaEffectivePause` in
       // `arena-timeline.ts`), sein Leertaste-Druck bleibt rein kosmetisch fuer die eigene
-      // Ansicht. `onHostPauseToggle` ist optional/no-op, solange der Aufrufer sie nicht befuellt.
-      if (roomSync?.active && roomSync.isHost) {
-        roomSync.onHostPauseToggle?.();
-      }
+      // Ansicht. `setManualPause` uebernimmt das Melden (`onHostPauseToggle`, optional/no-op,
+      // solange der Aufrufer sie nicht befuellt).
+      setManualPause(!manualPauseRef.current);
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [done, roomSync]);
+  }, [done, setManualPause]);
 
   // ---- Feld-Geometrie ----
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -2799,6 +2870,18 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         rt.forEach((t) => t.rankHistory.push(t.trueRank)); // Rang-Verlauf je Etappe
         const nextRound = r + 1;
         setRound(nextRound);
+        /**
+         * PERIODEN-PAUSE (Feature 2, Chris 04.09.): an einer Viertel-/Drittel-Grenze anhalten,
+         * statt ungebremst bis zum Ende durchzulaufen — NUR wenn der Betrachter das
+         * eingeschaltet hat (`pauseAtPeriods`), NUR fuer Disziplinen mit einem echten
+         * Perioden-Vorbild (`periodConfig`), NIE an der ALLERLETZTEN Etappe (das ist das
+         * reguläre Ende, kein Perioden-Wechsel — dort laeuft ohnehin `showPodium`). Ein Gast im
+         * Raum pausiert sich nie selbst (`roomSync.followsHost`): er hat keine eigene
+         * Pause-Autoritaet und folgt ohnehin nur dem Host, genau wie beim Leertaste-Druck.
+         */
+        if (periodConfig && pauseAtPeriods && !roomSync?.followsHost && periodBoundaries.includes(nextRound)) {
+          setManualPause(true);
+        }
         later(() => {
           busyRef.current = false;
           setBusy(false);
@@ -2891,7 +2974,32 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       later(doOne, delay);
     };
     doOne();
-  }, [round, slotCount, audio, tokenPos, addPop, addFrags, pushTicker, pushRoundHeader, showSpotlight, fireFlash, doShake, glow, roundSummary, showPodium, later, slots, popBanner, barbellInfo, barbellOrder]);
+  }, [
+    round,
+    slotCount,
+    audio,
+    tokenPos,
+    addPop,
+    addFrags,
+    pushTicker,
+    pushRoundHeader,
+    showSpotlight,
+    fireFlash,
+    doShake,
+    glow,
+    roundSummary,
+    showPodium,
+    later,
+    slots,
+    popBanner,
+    barbellInfo,
+    barbellOrder,
+    periodConfig,
+    pauseAtPeriods,
+    periodBoundaries,
+    setManualPause,
+    roomSync?.followsHost,
+  ]);
 
   // Auto-Continue (ALLE Disziplinen): die Disziplin läuft ab Start von selbst durch —
   // Etappe für Etappe im TRACK_ROUND_MS-Takt, ohne Klick — bis der Endstand steht.
@@ -3181,7 +3289,24 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   }, [round, roomSync]);
 
   const quickSim = useCallback(() => {
-    if (busyRef.current) return; // Busy-Guard: keine Doppel-Auslösung während einer Cascade.
+    /**
+     * KEIN busyRef-FRÜHAUSSTIEG MEHR (Chris, 04.09.: „wir brauchen noch nen quick sim button
+     * um das ergebnis zu simulieren").
+     *
+     * Der Knopf existierte technisch schon — er tat nur meistens nichts. `busyRef` ist genau
+     * dann `true`, wenn die Reveal-Kaskade GERADE LÄUFT (die gesamte Dauer einer Etappe,
+     * ~TRACK_ROUND_MS), und wird nur in der kurzen Lücke ZWISCHEN zwei Etappen kurz `false`.
+     * Ein Klick waehrend der (weitaus haeufigeren) laufenden Kaskade — der Moment, in dem
+     * jemand ueberhaupt auf die Idee kommt, die Animation ueberspringen zu wollen — landete
+     * also auf `return` und blieb wirkungslos, ohne jede Rueckmeldung. Dieselbe Falle traf eine
+     * laufende PAUSE mitten in einer Etappe (Leertaste/Hover): `busyRef` bleibt waehrend einer
+     * Pause unveraendert `true` (die Kaskade haelt nur an, sie endet nicht) — Quick-Sim aus der
+     * Pause heraus war also der zweite tote Pfad.
+     *
+     * `clearTimers()` darunter reisst jede laufende Kaskade (die `later()`-Timer-Kette von
+     * `advance()`/`doOne`) sofort ab, danach baut dieser Block den Endstand ohnehin komplett
+     * neu und deterministisch auf — ein Doppel-Fortschritt ist ausgeschlossen.
+     */
     clearTimers();
     // Frischer Aufbau: NICHT auf bestehende Scores addieren (sonst Doppel-Zählung
     // nach manuellen Etappen oder erneutem Quick-Sim → z.B. 420 statt 210). (B2)
@@ -3221,6 +3346,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setHandoffTs(0);
     setPhotoFinish(false);
     setStageCrown(null);
+    // Jede laufende Pause (Leertaste/Hover ODER eine Perioden-Pause, Feature „Viertel/
+    // Drittel/Halbzeit" weiter unten) ist nach einem Quick-Sim gegenstandslos — sonst stuende
+    // die Buehne auf „✔ Disziplin gewertet" UND zeigte weiterhin den „⏸ Pausiert"-Chip.
+    pauseRef.current = false;
+    manualPauseRef.current = false;
+    setPaused(false);
     force();
     later(showPodium, 200);
     // Quick-Sim als Raum-Aktion (Stufe 3.6): der Guest muss denselben Sprung ans Ende sehen —
@@ -3792,13 +3923,47 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         alreadyScored
                         ? `▶ Nachspielen · Etappe 1 / ${slotCount}`
                         : `▶ Start · Etappe 1 / ${slotCount}`
-                      : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+                      : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}${
+                          periodConfig ? ` · ${currentPeriodForRound(round, periodBoundaries, periodConfig.count)}. ${periodConfig.noun}` : ""
+                        }`}
               </button>
             );
           })()}
           <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
+          {/* Perioden-Pause (Feature 2, Chris 04.09.): nur sichtbar, wenn diese Disziplin ein
+              echtes Perioden-Vorbild hat (`PERIOD_CONFIG`) — Lauf/Wettessen/Schach usw. zeigen
+              gar keine Kontrolle, genau wie verlangt („wo es das gibt"). Fuer einen Gast ohne
+              eigene Steuerungs-Hoheit ist der Schalter wirkungslos (`advance()` pausiert einen
+              folgenden Gast nie selbst) — deshalb dieselbe Sperre wie bei Quick-Sim/Reset. */}
+          {periodConfig ? (
+            <label
+              title={`Hält die Enthüllung automatisch nach jedem ${periodConfig.noun} an, statt bis zum Ende durchzulaufen — mit Leertaste geht es dann weiter.`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "9px 12px",
+                fontWeight: 700,
+                fontSize: 13,
+                border: "1px solid var(--nl-line)",
+                borderRadius: 10,
+                cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer",
+                opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1,
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={pauseAtPeriods}
+                disabled={Boolean(roomSync?.active && !roomSync.canControl)}
+                onChange={(e) => setPauseAtPeriods(e.target.checked)}
+                style={{ accentColor: "var(--nl-accent)", cursor: "inherit" }}
+              />
+              {`Nach jedem ${periodConfig.noun} pausieren`}
+            </label>
+          ) : null}
           {/* B2: Die Buehne wusste laengst, dass die Seite gewertet ist (`activeSideScoredInSave`)
               — gesagt hat sie es nicht. Ein Durchlauf bleibt folgenlos, weil
               `commitFinishedDiscipline` eine gebuchte Seite nicht erneut bucht; ohne diesen Satz
@@ -3833,7 +3998,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               JEDEN lokalen Tastendruck des Gasts sofort wieder ueberschreibt). */}
           {paused ? (
             <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>
-              {roomSync?.followsHost ? "⏸ Host hat pausiert" : "⏸ Pausiert · Leertaste"}
+              {roomSync?.followsHost ? "⏸ Host hat pausiert"
+                : /* Perioden-Pause: `round` steht in diesem Fall EXAKT auf der Grenze, an der
+                     `advance()` selbst pausiert hat (s.o.) — kein zusätzlicher State nötig,
+                     nur das eine, was gerade zu Ende ging, statt der generischen Meldung. */
+                  periodConfig && periodBoundaries.includes(round)
+                  ? `⏸ Ende ${currentPeriodForRound(round, periodBoundaries, periodConfig.count) - 1}. ${periodConfig.noun} · Leertaste zum Weiterspielen`
+                  : "⏸ Pausiert · Leertaste"}
             </span>
           ) : null}
           {/* Feld-Legende nur noch als dezentes ⓘ-Hover (früher permanente „Manual"-Zeile je
