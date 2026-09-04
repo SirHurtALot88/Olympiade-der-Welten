@@ -10000,6 +10000,21 @@
   // selbst, nicht nur in die Ansage.
   const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
   const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
+  // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
+  // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
+  // (docs/design/gewichtheben-zufriedenstellend.md, kaderfest, jeSeite 6/4/2): bei 0 haengt
+  // `tagesmax` (Zweikampf-Ceiling, Sinclair-Anzeige) ausschliesslich an LAST, Konfidenz
+  // wirkt nur auf die Erfolgschance (WAGNIS_ANSAGE_FLEX oben); rho blieb dort bei 0,720.
+  // Bei 0,0045 (derselbe Koeffizient wie WAGNIS_ANSAGE_FLEX — Konfidenz haengt genauso
+  // stark an der Obergrenze wie am Risiko-Massstab) steigt rho auf 0,887 (jeSeite 6, ebenso
+  // deutlich bei 4 und 2), Pp faellt von 23,1 auf 17,3 (Charisma liest fast exakt am
+  // Matrixgewicht 23: 23,4 %), und der Korridor haelt bei beiden Werten. Das ist die erste
+  // Aenderung ueberhaupt, die diese Disziplin ueber die 0,80-Schranke traegt — deshalb
+  // gewaehlt, obwohl die konservativere Lesart (Obergrenze rein physisch) die a-priori
+  // vorsichtigere gewesen waere. Ein-Zeilen-Umkehr, falls Chris die physische Obergrenze
+  // lieber unangetastet von Charisma haette: Wert auf 0 setzen.
+  const HEBEN_TAGESMAX_ANSAGE_K=0.0045;
   // GROESSE IST KEIN ATTRIBUT — sie steht in keiner Matrix, und einflussVon hebt sie
   // nicht. Wuerde sie die Kilogramm im ERGEBNIS verschieben, waere sie ein verstecktes
   // neuntes Gewicht, das keine Messung sieht. Sie verschiebt deshalb nur die ANZEIGE:
@@ -10031,7 +10046,7 @@
     for(const [a,b,plan] of paar){
       for(const u of [a,b]){
         u.runden=[]; u.summe=0; u.aktuell=-1;
-        u.tagesmax=HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST;
+        u.tagesmax=(HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST)*(1+(u.ANSAGE-50)*HEBEN_TAGESMAX_ANSAGE_K);
         u.maxReissen=u.tagesmax*HEBEN_ANTEIL_REISSEN;
         // Wer schlecht erholt, hat im Stossen weniger uebrig. 0,94 bei ERHOLUNG 50.
         u.maxStossen=u.tagesmax*(1-HEBEN_ANTEIL_REISSEN)
