@@ -5265,6 +5265,10 @@
         // Tor kam (K3, hockey-naechster-hebel-recherche-fable.md 3.3). Ausserhalb von
         // Hockey immer 0 und ungelesen (feldspielWert liest u.xg nur im Hockey-Zweig).
         xg:0,
+        // NUR BASKETBALL: aufsummierte Trefferwahrscheinlichkeit (technik) jedes Feldkorb-
+        // versuchs (K3-Analog, s. wirf()/feldspielWert). Ausserhalb von Basketball immer 0
+        // und ungelesen.
+        xp:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,
         // NUR FOOTBALL: Yards nach Quelle getrennt (feldspielWert unten), wie eine reale
@@ -6073,6 +6077,26 @@
       // gehalten (0,2 je Strafminute, also 0,4 je kleiner Strafe) — die eigentliche Strafe
       // ist die Unterzahl auf dem Eis, nicht der Abzug im Boxscore.
       -u.strafminuten*0.2;
+    }
+    if((dId||feldspielDisc)==="basketball"){
+      // FELDKORB-PUNKTE HALB ALS xP GEBUCHT (K3-Analog zu Hockeys `punkte*1.5+xg*1.5`
+      // oben, docs/design/basketball-k3.md): Basketball hat exakt dasselbe Vor-K3-Muster
+      // wie Hockey — Saisonzahl hoch (0,923), Einzelspiel niedrig (0,757), also eine
+      // Mechanik, die das Richtige belohnt, aber zu laut. Der Motor kennt die
+      // Trefferwahrscheinlichkeit jedes Feldkorbversuchs bereits (`technik` in wirf(),
+      // s. dortiger Kommentar) — sie wurde bisher nach dem Wurf verworfen.
+      //
+      // NUR Feldkoerbe, NICHT Freiwuerfe: `u.punkte` mischt beide (verbucheFreiwurf
+      // schreibt in dasselbe Feld). `fgPunkte` zieht die tatsaechlichen Freiwurftreffer
+      // wieder heraus, `ftPunkte` bleibt unveraendert binaer gebucht — genau wie Hockey-K3
+      // nur Torschuesse anfasste und keine andere Interaktion (s. dortiger Bericht).
+      // `punkte*0,5+xp*0,5` haelt den Erwartungswert eines Feldkorbversuchs gleich (ein
+      // Wurf mit technik 0,5 auf einen Dreier, der reingeht, zaehlt 1,5+0,75=2,25 statt
+      // vorher 3 — der Unterschied ist die gesenkte Streuung, keine Restwertung nach
+      // unten), Freiwuerfe zaehlen unveraendert 1:1.
+      const ftPunkte=u.freiwurfTreffer||0, fgPunkte=u.punkte-ftPunkte;
+      return fgPunkte*0.5+(u.xp||0)*0.5+ftPunkte
+            +u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
   }
@@ -7558,6 +7582,16 @@
     schuetze.feldwuerfe++;
     const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
     const fern=tier==="fern";
+    // NUR BASKETBALL, K3-Analog zu Hockeys xg (s. dortiger Kommentar bei loeseHockeySchuss):
+    // `technik` ist hier bereits die volle Trefferwahrscheinlichkeit des Feldkorbversuchs,
+    // GEWUERFELT (s. `treffer` oben), aber noch VOR der Aufloesung verworfen — genau die
+    // Stelle, an der Hockey pTor auf xg bucht. Aufsummiert wird bei JEDEM Feldkorbversuch
+    // (Treffer oder Fehlwurf, s. Kopfkommentar "FG-ZAEHLUNG" oben), mit dem Punktwert des
+    // versuchten Wurfs (2 oder 3) — kein neuer rr()-Aufruf, keine Verschiebung bestehender.
+    // Ausserhalb von Basketball bleibt u.xp bei 0 und ungelesen (feldspielWert liest u.xp
+    // nur im Basketball-Zweig).
+    if(feldspielDisc==="basketball")
+      schuetze.xp=(schuetze.xp||0)+technik*(fern?art.punkteFern:art.punkteNah);
     // Nur fuer die Wurfmechanik-Abnahme (s. fsZuege()-Debughook): die tatsaechliche
     // Distanz zum Korb IM Abwurfmoment, damit sich die Tier-Klassifizierung nachtraeglich
     // gegen die echte Geometrie pruefen laesst, ohne die Spiellogik selbst zu beeinflussen.
@@ -17546,6 +17580,9 @@
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               strafminuten:u.strafminuten, xg:+((u.xg||0).toFixed(3)),
+              // NUR BASKETBALL (K3-Analog zu xg oben): aufsummierte Feldkorb-Trefferwahr-
+              // scheinlichkeit, s. wirf()/feldspielWert. Ausserhalb von Basketball immer 0.
+              xp:+((u.xp||0).toFixed(3)),
               // Football-eigene Spalten (Rezept-Feinkalibrierung), dasselbe Muster: an
               // jeder Einheit vorhanden, ausserhalb von Football immer 0.
               passYards:u.passYards, laufYards:u.laufYards, fangYards:u.fangYards,
