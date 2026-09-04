@@ -65,9 +65,10 @@ export async function POST(request: Request) {
   }
 
   // Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.4), seit der
-  // Gewichtheben-Produktivierung (S6, docs/design/gewichtheben-produktivierung.md)
-  // disziplinuebergreifend: ein echter "Spieltag simulieren"-Klick, der Arena-Duelle braucht
-  // (Basketball oder Gewichtheben), dauert 6-16+ Sekunden (Playwright-Chromium) — zu lang fuer
+  // Gewichtheben- (S6, docs/design/gewichtheben-produktivierung.md) und der Hockey-
+  // Produktivierung (docs/design/hockey-produktivierung.md) disziplinuebergreifend: ein echter
+  // "Spieltag simulieren"-Klick, der Arena-Duelle braucht (Basketball, Gewichtheben oder
+  // Hockey), dauert 6-16+ Sekunden (Playwright-Chromium) — zu lang fuer
   // diesen Request. `kickoffArenaMatchdayApply()` prueft SELBST, ob dieser Spieltag ueberhaupt
   // betroffen ist (Battle Mode UND eine arena-aufgeloeste Disziplin an diesem Spieltag); ist er
   // es nicht (Manager Mode, jede andere Disziplin, ein reiner Dry-Run-Preview), liefert es

@@ -136,6 +136,20 @@ export type ArenaFixtureBoxscoreEintrag = {
   playerId: string | null;
   /** Welche Seite `playerId` gehoert — nur gesetzt, wenn `playerId` gesetzt ist. */
   side: "home" | "away" | null;
+  /**
+   * TORWART-KENNZEICHNUNG (Hockey-Produktivierung, docs/design/hockey-produktivierung.md):
+   * direktes Passthrough von `window.__arena.spieleFeldspiel()`s `torwart`-Feld (s.
+   * battle-mode.engine.js), das seinerseits nur fuer Hockey je `true` wird
+   * (`bestimmeTorwaerter()` setzt `u.torwart` ausserhalb von Hockey nie). Fuer jede andere
+   * Feldspiel-Disziplin (Basketball, Football, ...) bleibt dieses Feld `false` -- unveraendertes
+   * Verhalten dort. Grund: Hockeys Torwart hat eine strukturell andere Wertverteilung als seine
+   * Feldspieler (gemessen, s. scripts/ziehe-hockey-pps-referenz.ts), `battle-mode-arena-team-
+   * points.ts` braucht dieses Feld, um beide Rollen getrennt gegen ihre je eigene PPS-Referenz zu
+   * normieren. Optional (statt `boolean`), damit bestehende Test-Fixtures ohne dieses Feld
+   * (Basketball/Gewichtheben, vor dieser Aenderung geschrieben) unveraendert kompilieren --
+   * `undefined` bedeutet dasselbe wie `false` fuer jeden Aufrufer, der dieses Feld liest.
+   */
+  torwart?: boolean;
 };
 
 export type ArenaFixtureResult = {
@@ -279,9 +293,10 @@ function bereiteFixturesVor(
  * Genau das Format, das `window.__arena.spieleFeldspiel()` im Browser roh liefert — OHNE
  * `playerId`/`side` (s. `ArenaFixtureBoxscoreEintrag`): der Motor selbst kennt nur Namen, die
  * Node-seitige Zuordnung auf echte Spieler-IDs passiert ERST NACH dem `page.evaluate()`-Aufruf
- * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten).
+ * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten). `torwart` fehlt im rohen Objekt ganz,
+ * wenn `false` (s. battle-mode.engine.js, `spieleFeldspiel()`) -- deshalb optional hier.
  */
-type RoherBrowserBoxscoreEintrag = { name: string; wert: number };
+type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean };
 type RoherBrowserFixtureErgebnis = {
   disziplin: string;
   seiten: [number, number];
@@ -478,6 +493,7 @@ export async function runArenaFixtures(
           wert: eintrag.wert,
           playerId: treffer?.playerId ?? null,
           side: treffer?.side ?? null,
+          torwart: !!eintrag.torwart,
         };
       });
       return {

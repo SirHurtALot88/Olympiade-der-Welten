@@ -66,8 +66,9 @@ export type ArenaMatchdayApplyKickoffResult =
  * Welche arena-aufgeloeste Disziplin (falls ueberhaupt eine) an diesem Spieltag D1 oder D2 ist —
  * geprueft ueber dieselben geladenen Contexts, die der Lauf ohnehin braucht. Reine Mengen-
  * Zugehoerigkeit zu `ARENA_RESOLVED_DISCIPLINE_IDS`, KEIN Disziplins-Literal-Vergleich — eine
- * kuenftige Arena-Disziplin (Hockey ist als naechstes geplant) braucht hier keine Code-Aenderung,
- * nur einen Eintrag in dieser Menge.
+ * kuenftige Arena-Disziplin (Hockey war die dritte, s. docs/design/hockey-produktivierung.md --
+ * dieser Code-Pfad brauchte dafuer tatsaechlich KEINE Aenderung) braucht hier keine
+ * Code-Aenderung, nur einen Eintrag in dieser Menge.
  *
  * `arenaDisciplineId` ist `null`, wenn keine arena-aufgeloeste Disziplin gespielt wird.
  * `mehrdeutig` ist `true`, wenn D1 UND D2 BEIDE arena-aufgeloest sind (s. Dateikopf-Kommentar,

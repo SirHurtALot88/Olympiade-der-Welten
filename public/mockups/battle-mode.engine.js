@@ -17628,6 +17628,17 @@
     // keinem MOTOREN[fd].wert() bisher gelesen. Hier wird sie nur GELESEN und in ein neues
     // Feld `seiten` kopiert — dieselbe Zaehlung, kein Eingriff in stepFeldspiel()/die
     // Trefferchancen-Zonen selbst.
+    //
+    // `torwart` (Hockey-Produktivierung, docs/design/hockey-produktivierung.md): dieselbe
+    // Kennzeichnung, die `feldspielProbe()` (weiter unten, Fable-Recherche 3.1/1.1) schon lange
+    // fuer die Feldspieler-only-Rangtreue mitgibt — NUR angehaengt, wenn `true`
+    // (`...(u.torwart?{torwart:true}:{})`), damit jede Feldspiel-Disziplin ausser Hockey
+    // (`u.torwart` dort immer `false`, s. `bestimmeTorwaerter()`) einen BYTE-IDENTISCHEN
+    // Boxscore-Eintrag wie vor dieser Aenderung bekommt. Grund: Hockeys Torwart hat eine
+    // STRUKTURELL ANDERE Wertverteilung als seine Feldspieler (gemessen, s.
+    // scripts/ziehe-hockey-pps-referenz.ts Rollen-Diagnose) — ohne dieses Feld koennte
+    // `computeIndividualBoxscorePpsFromFixtureResults()` (lib/resolve/battle-mode-arena-team-
+    // points.ts) die beiden Rollen nicht getrennt gegen ihre je eigene Referenz normieren.
     spieleFeldspiel:(fd,saat)=>{
       if(typeof FELDSPIEL_ART==="undefined"||!FELDSPIEL_ART[fd])return null;
       const M=MOTOREN[fd]; if(!M)return null;
@@ -17636,7 +17647,8 @@
       M.lauf();
       const wert=M.wert();
       const namen=M.namen();
-      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const torwartNamen=new Set([...FSTEAM[0],...FSTEAM[1]].filter(u=>u.torwart).map(u=>u.n));
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0,...(torwartNamen.has(n)?{torwart:true}:{})}));
       const seiten=[fsPunkte[0],fsPunkte[1]];
       M.zurueck(g);
       return {disziplin:fd, seiten, boxscore};
