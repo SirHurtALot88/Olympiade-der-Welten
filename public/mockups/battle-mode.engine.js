@@ -815,7 +815,7 @@
     "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"},energiekern:true},
     // schild:true (04.09., s. Kommentar bei Draco oben fuer die volle Begruendung/den
     // Fund) — dieselbe Ergaenzung, Chris wollte beide.
-    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel",schild:true},
+    "Johanna":            {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel",schild:true},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
     // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
     // Sprite-Blaettern nicht; die fehlt und gehoert auf die Liste.
@@ -968,7 +968,7 @@
     // Bild: weiblicher Cyborg, schwarze Techruestung, spitze Antennenohren, pinke
     // Energieklinge. Keine Techruestung im Baukasten: "plate" in "dunkel" vertritt sie,
     // die Energieklinge vertritt das Schwert.
-    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"dark_brown"},
+    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"dark_brown"},
     // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
     // schwebende Faeden mit erhobenen Haenden.
     "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder",geschlecht:"w"},
@@ -1144,7 +1144,7 @@
     // bislang ganz ohne Waffe. 25.08.: waffe:"schwert" als naechstliegende Klingen-Ebene ergaenzt
     // (Naeherung — eine Dolch-Ebene existiert im Baukasten nicht).
     "Jihanna":            {kopf:"human",haut:"light",ruest:"leder",ruestTon:"bronze",ohren:true,haar:"haar_lang",haarTon:"platinum",geschlecht:"w",waffe:"schwert"},
-    "Serena":             {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",haar:"haar_lang",haarTon:"white",geschlecht:"w",krone:true},
+    "Serena":             {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",waffe:"schwert",haar:"haar_lang",haarTon:"white",geschlecht:"w",krone:true},
     // effekt "voidRot"/"koerper" (25.08., Ausbau ueber Feuer hinaus, Bildbefund oben in
     // subclass-archetypes.ts: "Formlose, rauchig-klauenartige Schattengestalt mit
     // ROTGLUEHENDER Energie im Inneren") — wabernder Rauch statt Kopf-Glut, weil die
@@ -1190,7 +1190,7 @@
     // im Gesicht, haelt einen Kelch mit rotem Wein/Blut in der Hand" — Unterklassen Vampire
     // UND Undead. kopf:"vampire" (Fangzaehne-Kopf, s. Velkin) war hier nicht gesetzt —
     // jetzt nachgeholt statt der menschlichen Naeherung.
-    "Aurora":             {kopf:"vampire",haut:"light",ruest:"leder",ruestTon:"dunkel",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
+    "Aurora":             {kopf:"vampire",haut:"light",ruest:"leder_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     // effekt "heilig"/"kopf" (26.08., Ausbau ueber die vier Grundtypen hinaus, Bildbefund
     // oben: "Gefluegelter Ritter ... mit Heiligenschein" — s. EFFEKT_ARTEN/Inefinna).
     // Bild: "Gefluegelter Ritter in schwarz-goldener Plattenruestung mit Heiligenschein,
@@ -1221,17 +1221,17 @@
     // dem Kopf — das feline Motiv im Kartenbild ist eindeutiger als bei jedem anderen
     // Eintrag hier. ohren/schwanz jetzt "katze" statt der Echsen-Variante (s. zeichneSprite).
     "Orakelpfropf":       {kopf:"wolf",haut:"fur_brown",geschlecht:"w",ohren:"katze",schwanz:"katze"},
-    "Lilly":              {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",waffe:"schwert",geschlecht:"w"},
+    "Lilly":              {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",waffe:"schwert",geschlecht:"w"},
     // Bild: "haelt einen kleinen Wurfdolch" — bewaffnete Klingenkaempferin, bislang ganz ohne
     // Waffe. 25.08.: waffe:"schwert" als naechstliegende Klingen-Ebene ergaenzt (Naeherung,
     // gleiches Muster wie bei Lilly/Jihanna — eine Dolch-Ebene existiert im Baukasten nicht).
-    "Elyssa Nightclaw":   {kopf:"lizard",haut:"dark_green",ruest:"leder",kapuze:true,geschlecht:"w",schwanz:true,waffe:"schwert"},
+    "Elyssa Nightclaw":   {kopf:"lizard",haut:"dark_green",ruest:"leder_frau",kapuze:true,geschlecht:"w",schwanz:true,waffe:"schwert"},
     // Bild: dunkle Zauberin in schwarzer Ruestung, haelt einen langen Stab mit blauem
     // Blitz-/Energieschein in der rechten Hand, linke Hand wirkt zusaetzlich Magie.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
-    "Emphi":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",haar:"haar_lang",haarTon:"raven",geschlecht:"w",waffe:"stab"},
-    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"raven",ruestTon:"dunkel"},
+    "Emphi":              {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"raven",geschlecht:"w",waffe:"stab"},
+    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"raven",ruestTon:"dunkel"},
     // 26.08., NEU: koerper:"zombie" ergaenzt (koerper_zombie_*, s. quellen.json) — derselbe
     // Menschenkoerper-Fehler unter dem verifizierten Zombie-Kopf wie bei Bloater/Burster.
     // haut gestrichen: das Blatt traegt seine eigene Verwesungsfarbe. haar/haarTon (bereits
@@ -1251,9 +1251,9 @@
     // Zombie-Koerper-Sprite ist der androgyne Verwesungs-Torso der Stand der Technik. Kein
     // eigener Bildbefund fuer eine Waffe (nicht in subclass-archetypes.ts, className
     // "Tactician" ist kein Nahkampf-Indiz) — bleibt unbewaffnet.
-    "Nelchael":           {kopf:"zombie",koerper:"zombie",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
-    "Akali":              {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
-    "Nahli-Ke":           {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w"},
+    "Nelchael":           {kopf:"zombie",koerper:"zombie",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
+    "Akali":              {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
+    "Nahli-Ke":           {kopf:"alien",haut:"lavender",ruest:"leder_frau",geschlecht:"w"},
     // Bild (public/portraits/gralakar.jpg): ein schwebender Sensenmann/Wraith aus zerfetzten
     // schwarzen Stoffbahnen, ROT GLUEHENDE Augen, sichtbarer rot glimmender Rippenkaefig,
     // skelettartige Klauenhaende, Friedhof im Hintergrund — kein Bezug zur froehlichen
@@ -1266,7 +1266,7 @@
     // rot-gluehenden Augen/den Rippenkaefig-Schein — dieselbe Farbfamilie wie im Bild, ohne
     // eine weitere neue Palette anzulegen (04.09., Sprite-Cluster-Runde 1).
     "Gralakar":           {kopf:"skeleton",koerper:"skelett",geist:true,effekt:{typ:"voidRot",pos:"koerper"}},
-    "Lady Yueqin":        {kopf:"human",haut:"light",ohren:true,ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
+    "Lady Yueqin":        {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Falcon":             {kopf:"wolf",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
     // Bild: fotorealistische TAUBE mit einer kaputten/verwitterten Ueberwachungskamera ALS
     // KOPF (schwarzes Kameragehaeuse, tropft Fluessigkeit). Der bisherige Bauplan (grauer
@@ -1280,11 +1280,11 @@
     // Stab mit Mondsichel-Verzierung in der rechten Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
-    "Moonveil":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",geschlecht:"w",waffe:"stab"},
+    "Moonveil":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",geschlecht:"w",waffe:"stab"},
     "Riley Le Rogue":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
     // Portrait: dunkle Lederriemen, Beutel und Trophaeen um Torso/Huefte — bislang komplett
     // ohne `ruest` (Bildbefund, Fable-Runde 25.08.), Beine liefen nackt/hautfarben.
-    "Whispra":            {kopf:"human",haut:"black",kapuze:true,fluegel:true,geschlecht:"w",ruest:"leder",ruestTon:"dunkel"},
+    "Whispra":            {kopf:"human",haut:"black",kapuze:true,fluegel:true,geschlecht:"w",ruest:"leder_frau",ruestTon:"dunkel"},
     // Bild (25.08.): mooshaftes Waldwesen mit ausgepraegten spitzen Ohren und einem grossen
     // buschigen Farnschwanz — die Silhouette ist eindeutig katzenartig (Ohren+Schwanz), nur
     // aus Laub statt Fell. ohren/schwanz "katze" statt der Echsen-Variante.
@@ -1301,13 +1301,13 @@
     // gemeinsamen Kapuzen-Bauplan ueberhaupt passt (bereits ★★★, s. sprite-fit-bewertung.json)
     // — bewusst UNVERAENDERT gelassen, die drei anderen wurden stattdessen auf eigene Rezepte
     // umgestellt (04.09., Sprite-Cluster-Runde 1).
-    "Bana":               {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
+    "Bana":               {kopf:"human",haut:"light",kapuze:true,ruest:"leder_frau",geschlecht:"w"},
     // Portrait: um die Huefte gewickeltes Tuch mit Seil (Bildbefund, Fable-Runde 25.08.) —
     // "leder" ist der naechstliegende Ersatz im Baukasten (kein Stoff/Robe-Blatt vorhanden,
     // derselbe Rueckgriff wie bei anderen Roben-Charakteren in dieser Tabelle). Bislang ganz
     // ohne `ruest`, Beine liefen nackt/hautfarben.
     "Reefstrike":         {kopf:"wolf",haut:"blue",ruest:"leder"},
-    "Taryn":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",geschlecht:"w",ruestTon:"dunkel"},
+    "Taryn":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder_frau",waffe:"schwert",geschlecht:"w",ruestTon:"dunkel"},
     "Cyrn":               {kopf:"orc",haut:"green",waffe:"schwert",ruest:"leder"},
     // Chris' Fund: ein Tauren-Kopf ("kopf_minotaur_walk.png") lag im Baukasten, war nur
     // nie eingebettet — jetzt nachgeholt statt der Ork-mit-Hoernern-Naeherung.
@@ -1319,10 +1319,10 @@
     // stimmt (anders als Ironhoof, ein Zentaur, s. dortiger Kommentar). Bewusst UNVERAENDERT
     // gelassen, nur Ironhoof bekam ein eigenes Rezept (04.09., Sprite-Cluster-Runde 1).
     "Medibull":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
-    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
+    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Phantomblade":       {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",waffe:"schwert",haar:"haar_mop",haarTon:"white",geschlecht:"w"},
-    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
-    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"sandy",geschlecht:"w",waffe:"schwert"},
+    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
+    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"sandy",geschlecht:"w",waffe:"schwert"},
     // 26.08., NEU: kopf:"skeleton" sass bislang auf dem normalen Menschenkoerper, dazu
     // haut:"olive" — ein Skelett hat keinen Hautton, den olive faerbte da nichts sinnvoll um.
     // Jetzt koerper:"skelett" (koerper_skelett_*, s. quellen.json) fuer einen durchgehenden
@@ -1372,7 +1372,7 @@
     // Sigill/Halo-Kopf in der rechten Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
-    "Xylaris":            {kopf:"human",haut:"light",haar:"haar_lang",haarTon:"white",fluegel:true,ruest:"leder",geschlecht:"w",waffe:"stab"},
+    "Xylaris":            {kopf:"human",haut:"light",haar:"haar_lang",haarTon:"white",fluegel:true,ruest:"leder_frau",geschlecht:"w",waffe:"stab"},
     "Grizz":              {kopf:"orc",haut:"green",ohren:true,helm:true,ruest:"plate",ruestTon:"bronze"},
     // Chris' Fund: ein Skelett-Kopf ("kopf_skeleton_walk.png") lag im Baukasten, war nur
     // nie eingebettet — reines Skelett-Motiv (spielt Knochenharfe), jetzt echt statt der
@@ -1396,7 +1396,7 @@
     // Threnox/Burster (Tank/Charger, kein Klassen-Praezedenzfall, deshalb dort unbewaffnet
     // gelassen, s.u.).
     "Knochenrichter":     {kopf:"skeleton",koerper:"skelett",ruest:"leder",ruestTon:"dunkel",waffe:"schwert"},
-    "Kora":               {kopf:"minotaur",haut:"brown",schwanz:true,ruest:"leder",waffe:"schwert",geschlecht:"w"},
+    "Kora":               {kopf:"minotaur",haut:"brown",schwanz:true,ruest:"leder_frau",waffe:"schwert",geschlecht:"w"},
     "Grieving Colossus":  {kopf:"orc",haut:"black"},
     "Tartarus":           {kopf:"minotaur",haut:"black",ruest:"plate",ruestTon:"dunkel",waffe:"schwert"},
     // Bild: riesige Baumkreatur (viel groesser als jeder Humanoid im Baukasten), am Arm ein
@@ -1453,18 +1453,18 @@
     //   dritten neuen Positions-Slots).
     "Bloater":            {kopf:"zombie",koerper:"zombie",skala:1.35,leuchtenderBauch:true,
                            effekt:{typ:"gift",pos:"kopf"}},
-    "Dawnwhisper":        {kopf:"human",haut:"olive",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
+    "Dawnwhisper":        {kopf:"human",haut:"olive",ruest:"leder_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     "Caldor":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"chestnut",waffe:"schwert"},
     "Skittermind":        {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true},
     "Shield":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",helm:true,waffe:"schwert"},
     "Umbra":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",ruestTon:"dunkel",waffe:"bogen"},
-    "Sister Ilora":       {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
+    "Sister Ilora":       {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
     // Bild: Zauberer mit Pentagramm-Amulett, haelt einen leuchtenden Kristall in der einen
     // und einen knorrigen Holzstab mit Schaedel-Totem in der anderen Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
     "Eike":               {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"dark_brown",waffe:"stab"},
-    "Lynara":             {kopf:"human",haut:"light",ohren:true,ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",krone:true,geschlecht:"w"},
+    "Lynara":             {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",krone:true,geschlecht:"w"},
     // Bild: gefluegelte goldene Lichtgestalt, haelt einen langen Stab/Zepter mit
     // leuchtender Kugel in der rechten Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
@@ -1486,7 +1486,7 @@
     // gemeinsamem Kapuzen-Grundbauplan sichtbar auseinanderlaufen. kapuze:true bleibt (deckt
     // das Kopftuch am ehesten), effekt:{typ:"frost",pos:"kopf"} wie bei Babuschinka als
     // Naeherung an das leuchtend blaue Geraet (04.09., Sprite-Cluster-Runde 1).
-    "Dr Ironmind":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",ruestTon:"bronze",geschlecht:"w",effekt:{typ:"frost",pos:"kopf"}},
+    "Dr Ironmind":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder_frau",ruestTon:"bronze",geschlecht:"w",effekt:{typ:"frost",pos:"kopf"}},
     // Bild-Fund (04.09., Sprite-Cluster-Runde 1): public/portraits/mushu.jpg zeigt ein
     // cremeweisses, geschupptes, greifenartiges Wesen mit grossen BRAUNEN FEDERFLUEGELN
     // (kein Fledermaus-Haeutchen), langem Schwanz, hellblauen Augen — KEINE Hoerner. War
@@ -1525,7 +1525,7 @@
     // deutlich sichtbarer als im Portrait, wo Haar/Fluegel/Pose das kaschieren. "leder" als
     // naechstliegender Ersatz, wie schon bei Inefinna/Lulu/Starflame/Byrnja fuer aehnlich
     // unbewaffnete, ruestungslose Bildbefunde gehandhabt.
-    "Lumen Serene":       {kopf:"human",haut:"light",ruest:"leder",fluegel:true,haar:"haar_mop",haarTon:"dark_brown",geschlecht:"w"},
+    "Lumen Serene":       {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:true,haar:"haar_mop",haarTon:"dark_brown",geschlecht:"w"},
     "Tidesinger":         {kopf:"human",haut:"blue",ruest:"plate",krone:true,haar:"haar_lang",haarTon:"white",schwanz:true,geschlecht:"w",ruestTon:"dunkel"},
     // Bild (25.08.): rosa Katzenwesen mit deutlich sichtbaren Katzenohren und dichtem Fell
     // von Kopf bis Fuss — ohren war hier schon true (Elfen-Ohr-Naeherung), jetzt "katze"
@@ -1537,10 +1537,10 @@
     "Velkin":             {kopf:"vampire",haut:"light",ohren:true,ruest:"leder",haar:"haar_mop",haarTon:"black"},
     "Brobot":             {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",hoerner:true,fluegel:true},
     "Crumbsage":          {kopf:"orc",haut:"brown"},
-    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
+    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
     "Steel Sinister":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:true},
     "Isuzu":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
-    "Eldara":             {kopf:"human",haut:"light",hoerner:true,geschlecht:"w",ruest:"leder"},
+    "Eldara":             {kopf:"human",haut:"light",hoerner:true,geschlecht:"w",ruest:"leder_frau"},
     // Bild: "mehrere Wurfmesser quer ueber der Brust gegürtet" — kein Schwertkampf, keine
     // geführte Klinge (Bildbefund). 25.08.: waffe:"schwert" gestrichen statt durch eine
     // falsche Waffe ersetzt — eine Wurfklingen-Ebene existiert im Baukasten nicht.
@@ -1557,13 +1557,13 @@
     // Golem"): Terradon teilt sich das Vollbild-Blatt mit Lava Golem, hatte den Glut-
     // Effekt aber nie bekommen, obwohl der Bildbefund identisch ist.
     "Terradon":           {vollbild:"golem",effekt:{typ:"feuer",pos:"koerper"}},
-    "Byrd":               {kopf:"human",haut:"brown",geschlecht:"w",kapuze:true,ruest:"leder"},
+    "Byrd":               {kopf:"human",haut:"brown",geschlecht:"w",kapuze:true,ruest:"leder_frau"},
     // effekt "frost"/"kopf" (25.08., Ausbau ueber Feuer hinaus, Bildbefund oben in
     // subclass-archetypes.ts: "Eiskoenigin ... haelt eine leuchtend blaue Eiskugel in der
     // erhobenen Hand, Frostkristalle und Eiswaende im Hintergrund"): der Baukasten kennt
     // keine gehaltene Eiskugel, deshalb "kopf" als naechstliegende Naeherung fuer eine
     // umgebende Frost-Aura statt der konkreten Handgeste.
-    "Clara":              {kopf:"human",haut:"light",krone:true,haar:"haar_lang",haarTon:"white",geschlecht:"w",ruest:"leder",ruestTon:"gold",effekt:{typ:"frost",pos:"kopf"}},
+    "Clara":              {kopf:"human",haut:"light",krone:true,haar:"haar_lang",haarTon:"white",geschlecht:"w",ruest:"leder_frau",ruestTon:"gold",effekt:{typ:"frost",pos:"kopf"}},
     // Bild: "Spinnenhybride mit menschlichem Oberkoerper, acht lange gepanzerte Spinnenbeine
     // als Unterleib" (subclass-archetypes.ts) — Chris' ausdruecklicher Wunsch, dass Arachna
     // "wirklich Spinnenbeine bekommt". public/sprites/insekt/spinnenwesen_walk.png (Arachne,
@@ -1606,8 +1606,8 @@
     // "goldene ARKANE Lichtschlieren wirbeln um sie" — das Bild nennt den Effekttyp fast
     // woertlich beim Namen; "koerper" statt "kopf", weil die Schlieren laut Bild um die
     // ganze Figur wirbeln, nicht nur um den Kopf).
-    "Breeze":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w",effekt:{typ:"arkan",pos:"koerper"}},
-    "Wu Tang":            {kopf:"human",haut:"amber",haar:"haar_lang",haarTon:"black",geschlecht:"w",hoerner:true,ruest:"leder"},
+    "Breeze":             {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w",effekt:{typ:"arkan",pos:"koerper"}},
+    "Wu Tang":            {kopf:"human",haut:"amber",haar:"haar_lang",haarTon:"black",geschlecht:"w",hoerner:true,ruest:"leder_frau"},
     // Bild (subclass-archetypes.ts): "Riesige schwarze Daemonengestalt mit Hoernern, weit
     // ausgebreiteten Fluegeln und leuchtend weissen Augen, umklammert schuetzend ein kleines
     // Kind, mehrere Pfeile stecken in Koerper und Fluegeln." 26.08., NEU: fluegel:"fledermaus"
