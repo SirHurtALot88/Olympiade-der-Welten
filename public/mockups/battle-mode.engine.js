@@ -828,21 +828,26 @@
     // sichtbar AUF dem Kopf statt darueber zu schweben): hoehe [38,28] statt [56,34],
     // streuung 2 statt 6.
     "Gram":               {kopf:"lizard",haut:"black",ruest:"plate",schwanz:true,waffe:"schwert",ruestTon:"bronze",effekt:{typ:"feuer",pos:"kopf",streuung:2,hoehe:[38,28]},gluehenderRiss:true},
-    // Bild-schlaegt-Tags-Fund (04.09., Sprite-Cluster-Runde 1): der Kommentar HIER hatte die
-    // richtige Diagnose schon stehen ("massiges Steinwesen ... kauert in einer Hoehle,
-    // gluehende Augen, unbewaffnet"), aber darunter stand ein voellig anderes Rezept
-    // (gefluegelter/geschwaenzter/gehoernter Echsen-Humanoid) — byte-identisch mit Mushu (s.
-    // sprite-fit-ergebnisse.md, "neun Gruppen teilen sich byte-identische Sprites"). Das
-    // eigentliche Bild (public/portraits/rhyx-tal.jpg): ein wuchtiger, kauernder, GRAUSCHWARZER
-    // Hoehlen-Koloss mit rissiger Steinhaut und zwei leuchtend ORANGEN Augen — kein Fluegel,
-    // kein Schwanz, keine Hoerner im Bild. Das ist exakt vollbild:"golem" (dieselbe Kreatur-
-    // klasse wie Lava Golem/Krolach/Vorrak/Krag'Zul), nicht der lizard-Baukasten.
-    // vollbildFarbe dunkles Basalt-Grau statt der warmen/farbigen Toene der Golem-Geschwister.
-    // energiekern:true (s. Kommentar bei Krolach oben) liefert die zwei KONSTANT leuchtenden
-    // Augenpunkte (Palette rot-orange, s. zeichneAugen) — der mitgelieferte Brustkern ist im
-    // Bild nicht dokumentiert, aber unauffaellig und nicht im Widerspruch dazu (einzige
-    // Moeglichkeit, die Augen ohne eigene neue Zeichenroutine zu bekommen).
-    "Rhyx'Tal":           {vollbild:"golem",vollbildFarbe:"#46433d",energiekern:true},
+    // GARGOYLE, WIEDERHERGESTELLT (04.09., nach einer fehlgeleiteten Korrektur). Chris,
+    // urspruenglich: "gibts fuer rhyx thal nicht ein gargoyle sprite oder sowas?" — "ja bau
+    // den gargoyle". Das Portrait (public/portraits/rhyx-tal.jpg) zeigt zwar einen kauernden,
+    // graubraunen Hoehlen-Koloss ohne sichtbare Fluegel — aber Chris wollte AUSDRUECKLICH den
+    // Gargoyle-Look, nicht die woertliche Portraet-Lesart, und das steht so schon im aeltesten
+    // Kommentar zu diesem Eintrag ("EHRLICH BLEIBEN: Fluegel stehen NICHT im Portrait ...
+    // Chris' ausdrueckliche Ansage, nicht meine Lesart des Bildes").
+    //
+    // Die Sprite-Cluster-Runde 1 (04.09.) fand diesen Eintrag byte-identisch mit Mushu (beide
+    // gefluegelt/geschwaenzt/gehoernt) und hat ihn — OHNE diese Historie zu kennen, nur aus
+    // dem Portrait heraus — auf vollbild:"golem" umgebaut. Chris hat den Tausch sofort und zu
+    // Recht bemaengelt: "der hatte doch diesen gargoyle look der genau gepasst hat". Zurueck
+    // auf den Gargoyle-Bauplan, unveraendert gegenueber dem letzten Stand vor der Korrektur.
+    //
+    // LEHRE FUER KUENFTIGE SPRITE-RUNDEN: bevor ein "Bild schlaegt Tags"-Fund einen
+    // BESTEHENDEN Eintrag umbaut, in der Git-Historie pruefen, ob ein aelterer Kommentar eine
+    // bewusste, von Chris angeordnete Abweichung vom Portrait dokumentiert (grep nach dem
+    // Charakternamen im vollen `git log -p`) — eine "byte-identische Dopplung" ist nicht
+    // automatisch ein Fehler, wenn beide Charaktere denselben angeforderten Look tragen sollen.
+    "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey",fluegel:true,schwanz:true,hoerner:true},
     // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
     // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
     "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w",ruestTon:"dunkel"},
