@@ -9,6 +9,8 @@ import {
   BASKETBALL_PPS_ANTEIL_MITTE,
   GEWICHTHEBEN_INDIVIDUAL_PPS_MAX,
   GEWICHTHEBEN_PPS_ANTEIL_MITTE,
+  HOCKEY_INDIVIDUAL_PPS_MAX,
+  HOCKEY_PPS_ANTEIL_MITTE,
   arenaTeamPointsForFixture,
   arenaTeamPointsForFixtureMitTiebreak,
   buildArenaMatchSeed,
@@ -18,10 +20,12 @@ import {
   ppsAusArenaImpact,
   ppsAusBasketballImpact,
   ppsAusGewichthebenImpact,
+  ppsAusHockeyImpact,
   resolveArenaFieldSizeForMatchday,
   resolveArenaPpsReferenz,
   resolveBasketballPpsReferenz,
   resolveGewichthebenPpsReferenz,
+  resolveHockeyPpsReferenz,
   runBattleModeArenaMatchday,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 
@@ -57,9 +61,10 @@ describe("arenaTeamPointsForFixture", () => {
 });
 
 describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
-  it("enthaelt Basketball und Gewichtheben (Gewichtheben-Produktivierung S6)", () => {
+  it("enthaelt Basketball, Gewichtheben und Hockey (Hockey-Produktivierung)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("basketball")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
   });
 
   /**
@@ -287,6 +292,11 @@ describe("ppsAusArenaImpact (generischer Kern) / ppsAusGewichthebenImpact", () =
       ppsAusArenaImpact(37, basketballReferenz, BASKETBALL_INDIVIDUAL_PPS_MAX, BASKETBALL_PPS_ANTEIL_MITTE),
     );
   });
+
+  it("ppsAusHockeyImpact trifft bei iMittel/iKrass exakt Hockeys eigene Anker (Hockey-Produktivierung)", () => {
+    expect(ppsAusHockeyImpact(referenz.iMittel, referenz)).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX * HOCKEY_PPS_ANTEIL_MITTE, 2);
+    expect(ppsAusHockeyImpact(referenz.iKrass, referenz)).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX, 5);
+  });
 });
 
 describe("resolveArenaPpsReferenz / resolveGewichthebenPpsReferenz (disziplinuebergreifend)", () => {
@@ -308,6 +318,37 @@ describe("resolveArenaPpsReferenz / resolveGewichthebenPpsReferenz (disziplinueb
   it("eine unbekannte disciplineId faellt defensiv auf Basketballs Konfiguration zurueck, statt zu werfen", () => {
     expect(() => resolveArenaPpsReferenz("keine-disziplin-die-es-gibt", 6)).not.toThrow();
     expect(resolveArenaPpsReferenz("keine-disziplin-die-es-gibt", 6)).toEqual(resolveArenaPpsReferenz("basketball", 6));
+  });
+
+  it("resolveHockeyPpsReferenz delegiert an resolveArenaPpsReferenz('hockey', ...) mit Rolle 'feld' als Default", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      expect(resolveHockeyPpsReferenz(n)).toEqual(resolveArenaPpsReferenz("hockey", n, "feld"));
+    }
+  });
+});
+
+/**
+ * TORWART-EIGENE REFERENZ (Hockey-Produktivierung, docs/design/hockey-produktivierung.md):
+ * EMPIRISCH als noetig befunden, s. Kommentar an `ArenaImpactKonfig.referenzFeldgroessenTorwart`
+ * -- Feldspieler- und Torwart-Median liegen je Feldgroesse unterschiedlich weit auseinander und
+ * wechseln sogar die Richtung.
+ */
+describe("resolveArenaPpsReferenz mit rolle-Parameter (Hockey-Produktivierung)", () => {
+  it("Hockeys Feld- und Torwart-Referenz sind bei derselben Feldgroesse UNTERSCHIEDLICH (n=6)", () => {
+    const feld = resolveArenaPpsReferenz("hockey", 6, "feld").referenz;
+    const torwart = resolveArenaPpsReferenz("hockey", 6, "torwart").referenz;
+    expect(torwart.iMittel).not.toBeCloseTo(feld.iMittel, 0);
+  });
+
+  it("Basketball/Gewichtheben (keine eigene Torwart-Rolle) fallen fuer rolle:'torwart' defensiv auf die Feldspieler-Referenz zurueck, statt zu werfen", () => {
+    expect(() => resolveArenaPpsReferenz("basketball", 6, "torwart")).not.toThrow();
+    expect(resolveArenaPpsReferenz("basketball", 6, "torwart")).toEqual(resolveArenaPpsReferenz("basketball", 6, "feld"));
+    expect(() => resolveArenaPpsReferenz("gewichtheben", 6, "torwart")).not.toThrow();
+    expect(resolveArenaPpsReferenz("gewichtheben", 6, "torwart")).toEqual(resolveArenaPpsReferenz("gewichtheben", 6, "feld"));
+  });
+
+  it("resolveHockeyPpsReferenz(n, 'torwart') delegiert korrekt", () => {
+    expect(resolveHockeyPpsReferenz(6, "torwart")).toEqual(resolveArenaPpsReferenz("hockey", 6, "torwart"));
   });
 });
 
@@ -335,6 +376,20 @@ describe("resolveBasketballPpsReferenz (Feldgroessen-Weiche)", () => {
     const gross = resolveBasketballPpsReferenz(6).referenz;
     expect(klein.iMittel).not.toBeCloseTo(gross.iMittel, 5);
     expect(klein.iKrass).not.toBeCloseTo(gross.iKrass, 5);
+  });
+});
+
+/**
+ * HOCKEYS EIGENER KATALOG-STANDARDWERT (Hockey-Produktivierung): ANDERS ALS Basketball/
+ * Gewichtheben (beide `Discipline.playerCount` 6) ist Hockeys eigener Katalogwert 5
+ * (`lib/data/dataAdapter.ts`) -- nachgesehen, nicht von den beiden Vorlagen kopiert. Dieser Test
+ * waere BEIDE Male gruen geblieben, wenn `katalogStandardgroesse` faelschlich bei 6 (Basketballs/
+ * Gewichthebens Wert) geblieben waere, WEIL n=6 selbst eine gueltige gezogene Feldgroesse ist --
+ * er belegt trotzdem den korrekten, disziplineigenen Fallback-Wert.
+ */
+describe("resolveHockeyPpsReferenz (Feldgroessen-Weiche, eigener Katalogwert)", () => {
+  it("faellt fuer playerCount=null auf Hockeys EIGENEN Katalog-Standardwert 5 zurueck, nicht auf Basketballs/Gewichthebens 6", () => {
+    expect(resolveHockeyPpsReferenz(null).feldgroesseGenutzt).toBe(5);
   });
 });
 
@@ -399,8 +454,14 @@ describe("resolveArenaPpsReferenz ueberspringt entartete Eintraege (kein exakter
  * Tests nicht bricht.
  */
 describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS, V2 Impact-Kurve)", () => {
-  function eintrag(name: string, wert: number, playerId: string | null, side: "home" | "away" | null) {
-    return { name, wert, playerId, side };
+  function eintrag(
+    name: string,
+    wert: number,
+    playerId: string | null,
+    side: "home" | "away" | null,
+    torwart?: boolean,
+  ) {
+    return { name, wert, playerId, side, torwart };
   }
 
   it("ein hoeherer Impact bekommt bei gleicher Feldgroesse nie weniger PPs als ein niedrigerer", () => {
@@ -548,6 +609,65 @@ describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS, V2 Im
     expect(ppsGewichtheben).toBeCloseTo(GEWICHTHEBEN_INDIVIDUAL_PPS_MAX * GEWICHTHEBEN_PPS_ANTEIL_MITTE, 1);
     expect(ppsBasketballDefault).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 1);
     expect(ppsGewichtheben).not.toBeCloseTo(ppsBasketballDefault, 0);
+  });
+
+  /**
+   * TORWART-EIGENE REFERENZ (Hockey-Produktivierung): `eintrag.torwart` steuert, GEGEN WELCHE
+   * Referenz ein Boxscore-Eintrag normiert wird -- derselbe Rohwert bewertet sich als Torwart
+   * anders als als Feldspieler, weil Hockeys Torwart-Median von Basketballs/Gewichthebens
+   * Feldspieler-Median UNABHAENGIG gezogen ist (s. `ArenaImpactKonfig.
+   * referenzFeldgroessenTorwart`-Kommentar).
+   */
+  it("disciplineId='hockey': eintrag.torwart=true normiert gegen Hockeys Torwart-Referenz, nicht die Feldspieler-Referenz", () => {
+    const { referenz: torwartReferenz } = resolveHockeyPpsReferenz(6, "torwart");
+    const { referenz: feldReferenz } = resolveHockeyPpsReferenz(6, "feld");
+    // Am Torwart-iMittel gemessen: als Torwart trifft dieser Rohwert exakt den Mitte-Anker,
+    // als (faelschlich) Feldspieler bewertet nicht (die beiden Referenzen unterscheiden sich,
+    // s. voriger describe-Block).
+    const fixtureResults: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [3, 2],
+        boxscore: [
+          eintrag("Waechter", torwartReferenz.iMittel, "p-torwart", "home", true),
+          eintrag("Stuermer", feldReferenz.iMittel, "p-feld", "home", false),
+        ],
+      },
+    ];
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6, "hockey");
+    expect(pps.get("p-torwart")).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX * HOCKEY_PPS_ANTEIL_MITTE, 1);
+    expect(pps.get("p-feld")).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX * HOCKEY_PPS_ANTEIL_MITTE, 1);
+    // Derselbe Rohwert (Torwarts iMittel) UNTER DER FELDSPIELER-REFERENZ bewertet -- zeigt, dass
+    // die beiden tatsaechlich verschiedene Referenzen benutzen, wenn iMittel selbst unterschiedlich ist.
+    if (Math.abs(torwartReferenz.iMittel - feldReferenz.iMittel) > 0.5) {
+      const ppsFaelschlichAlsFeld = ppsAusArenaImpact(
+        torwartReferenz.iMittel,
+        feldReferenz,
+        HOCKEY_INDIVIDUAL_PPS_MAX,
+        HOCKEY_PPS_ANTEIL_MITTE,
+      );
+      expect(pps.get("p-torwart")).not.toBeCloseTo(ppsFaelschlichAlsFeld, 1);
+    }
+  });
+
+  it("disciplineId='basketball'/'gewichtheben': eintrag.torwart wird ignoriert (keine eigene Torwart-Rolle, unveraendertes Verhalten)", () => {
+    const { referenz } = resolveArenaPpsReferenz("basketball", 6);
+    const fixtureResults: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [80, 70],
+        boxscore: [eintrag("Spieler", referenz.iMittel, "p-1", "home", true)],
+      },
+    ];
+    const ppsMitTorwartFlag = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6, "basketball").get("p-1")!;
+    const ppsOhneTorwartFlag = computeIndividualBoxscorePpsFromFixtureResults(
+      [{ ...fixtureResults[0]!, boxscore: [eintrag("Spieler", referenz.iMittel, "p-1", "home", false)] }],
+      6,
+      "basketball",
+    ).get("p-1")!;
+    expect(ppsMitTorwartFlag).toBeCloseTo(ppsOhneTorwartFlag, 5);
   });
 
   it("ohne disciplineId (Default) bleibt exakt Basketballs Verhalten -- Testkompatibilitaet", () => {

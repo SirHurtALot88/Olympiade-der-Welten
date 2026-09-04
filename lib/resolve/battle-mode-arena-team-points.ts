@@ -80,7 +80,7 @@
  * durch einen `disciplineId`-Parameter ersetzt, den der Aufrufer explizit reicht -- s.
  * `arena-matchday-resolve-service.ts`, `determineArenaDisciplineContexts()`, die ihn ueber
  * `ARENA_RESOLVED_DISCIPLINE_IDS`-Mengen-Zugehoerigkeit (nicht per Disziplins-Literal) ermittelt.
- * Das macht jede WEITERE Arena-Disziplin (Hockey ist als naechstes geplant) zu einer reinen
+ * Das macht jede WEITERE Arena-Disziplin (Hockey war die naechste, s. unten) zu einer reinen
  * Konfigurationsaenderung (Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS` plus eigene
  * PPS-Referenz/Kurvenkonstanten, s. `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` unten) statt eines
  * zweiten Sonderfalls neben Basketball.
@@ -90,6 +90,24 @@
  * sind jetzt je Disziplin parametrisiert statt fest verdrahtet. `ppsAusBasketballImpact()`
  * bleibt als benannter Wrapper mit Basketballs Konstanten exportiert (Testkompatibilitaet,
  * unveraendertes Verhalten).
+ *
+ * HOCKEY-PRODUKTIVIERUNG (docs/design/hockey-produktivierung.md, 04.09.): dritte Arena-
+ * aufgeloeste Disziplin, GENAU DIE reine Konfigurationsaenderung, die der Kommentar oben
+ * vorhersagt -- kein neuer Chassis-Dispatch (Hockey nutzt wie Basketball das bestehende
+ * Feldspiel-Chassis, `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` bleibt unveraendert), keine neue
+ * Verzweigung in `ppsAusArenaImpact()`. NUR EINE STRUKTURELLE ERGAENZUNG war noetig, und sie
+ * ist ausdruecklich additiv: Hockeys Torwart hat eine EIGENE Wertformel (HK_TW_BASIS/HK_TW_REF,
+ * battle-mode.engine.js) mit einer strukturell anderen Wertverteilung als seine Feldspieler --
+ * EMPIRISCH GEMESSEN (nicht angenommen), dass eine gemeinsame Referenz den Torwart, je nach
+ * Feldgroesse, systematisch UNTER- ODER UEBERBEZAHLT haette. `ArenaImpactKonfig` traegt deshalb
+ * eine optionale ZWEITE Referenz (`referenzFeldgroessenTorwart`), `resolveArenaPpsReferenz()`
+ * einen `rolle`-Parameter ("feld" | "torwart", Default "feld") und `ArenaFixtureBoxscoreEintrag`
+ * (arena-headless-runner.ts) ein `torwart`-Feld, direktes Passthrough von `window.__arena.
+ * spieleFeldspiel()`s eigenem `torwart`-Flag (battle-mode.engine.js). Fuer Basketball/
+ * Gewichtheben (keine Torwart-Rolle, `torwart` an jedem Eintrag `false`/`undefined`) ist das
+ * BYTE-IDENTISCHES Verhalten -- `referenzFeldgroessenTorwart` bleibt dort `undefined`,
+ * `resolveArenaPpsReferenz(..., "torwart")` faellt defensiv auf die normale Referenz zurueck,
+ * ein Fall, der fuer diese beiden Disziplinen nie eintritt.
  *
  * DER GESAMT-KG-TIEBREAK (Fable-Empfehlung 9.1, docs/design/gewichtheben-gameplay-fertig.md
  * Abschnitt 4): ein Duellgleichstand (z.B. 3:3 der sechs Gewichtheben-Duelle) wird NICHT mehr
@@ -109,6 +127,7 @@ import {
 } from "@/lib/battle/arena-headless-runner";
 import basketballPpsReferenzJson from "@/data/generated/basketball-pps-referenz.json";
 import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-referenz.json";
+import hockeyPpsReferenzJson from "@/data/generated/hockey-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -119,7 +138,7 @@ import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-refer
  * falls sie ein anderes Chassis als Feldspiel/Buehnen-Heben braucht, Motor-Anbindung in
  * `arena-headless-runner.ts`.
  */
-export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball", "gewichtheben"]);
+export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball", "gewichtheben", "hockey"]);
 
 /**
  * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` (arena-headless-
@@ -217,6 +236,23 @@ export const GEWICHTHEBEN_INDIVIDUAL_PPS_MAX = 5.5;
 export const GEWICHTHEBEN_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER HOCKEY (Hockey-Produktivierung, docs/design/
+ * hockey-produktivierung.md). Dieselbe Impact-Kurve wie Basketball/Gewichtheben
+ * (`ppsAusArenaImpact()`), eigene Regler aus demselben Grund wie bei Gewichtheben: Hockeys
+ * roher Boxscore-Wert (`feldspielWert(u,"hockey")`, battle-mode.engine.js -- TORWART UND
+ * FELDSPIELER GEMEINSAM, s. `hockey-pps-referenz.json`s `hinweis`) liegt auf einer eigenen
+ * Skala, die vom Kader-/Attributniveau der Liga abhaengt, genau wie Basketballs Impact-Score
+ * und Gewichthebens Zweikampf-kg.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben
+ * Grund wie bei Gewichtheben (s. dortiger Kommentar): Chris' Rahmen "max 5-6" und die 04.09.-
+ * Kurvenform-Messung gelten disziplinuebergreifend. EIGENE Konstanten statt Alias, damit eine
+ * spaetere hockey-spezifische Kalibrierung Basketball/Gewichtheben nicht beruehrt.
+ */
+export const HOCKEY_INDIVIDUAL_PPS_MAX = 5.5;
+export const HOCKEY_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -228,14 +264,32 @@ export const GEWICHTHEBEN_PPS_ANTEIL_MITTE = 0.25;
  * Fixture-Zahl) steht in der jeweiligen Datei selbst, s. dortiger `hinweis`.
  */
 export type ArenaPpsReferenzFeldgroesse = { iMittel: number; iKrass: number };
+type ArenaPpsReferenzFeldgroessenRecord = Record<string, { n: number; iMittel: number; iKrass: number }>;
 type ArenaPpsReferenzJson = {
-  feldgroessen: Record<string, { n: number; iMittel: number; iKrass: number }>;
+  feldgroessen: ArenaPpsReferenzFeldgroessenRecord;
+  /**
+   * TORWART-EIGENE REFERENZ (Hockey-Produktivierung, docs/design/hockey-produktivierung.md):
+   * NUR fuer Disziplinen mit einer eigenen Torwart-Rolle (aktuell nur Hockey) -- fehlt in
+   * Basketballs/Gewichthebens JSON komplett, `ladeReferenzFeldgroessenTorwart()` liefert dann
+   * `undefined`.
+   */
+  feldgroessenTorwart?: ArenaPpsReferenzFeldgroessenRecord;
 };
 
+function ladeReferenzFeldgroessenRecord(
+  record: ArenaPpsReferenzFeldgroessenRecord,
+): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> {
+  return new Map(Object.values(record).map((werte) => [werte.n, { iMittel: werte.iMittel, iKrass: werte.iKrass }]));
+}
+
 function ladeReferenzFeldgroessen(json: ArenaPpsReferenzJson): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> {
-  return new Map(
-    Object.values(json.feldgroessen).map((werte) => [werte.n, { iMittel: werte.iMittel, iKrass: werte.iKrass }]),
-  );
+  return ladeReferenzFeldgroessenRecord(json.feldgroessen);
+}
+
+function ladeReferenzFeldgroessenTorwart(
+  json: ArenaPpsReferenzJson,
+): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> | undefined {
+  return json.feldgroessenTorwart ? ladeReferenzFeldgroessenRecord(json.feldgroessenTorwart) : undefined;
 }
 
 const BASKETBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
@@ -244,18 +298,45 @@ const BASKETBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 const GEWICHTHEBEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   gewichthebenPpsReferenzJson as ArenaPpsReferenzJson,
 );
+const HOCKEY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(hockeyPpsReferenzJson as ArenaPpsReferenzJson);
+/**
+ * HOCKEYS TORWART-REFERENZ (Hockey-Produktivierung): EMPIRISCH ALS NOETIG BEFUNDEN, nicht aus
+ * dem Bauch entschieden -- s. docs/design/hockey-produktivierung.md, Abschnitt zur Torwart-
+ * Referenz-Entscheidung. Gemessen (scripts/ziehe-hockey-pps-referenz.ts Rollen-Diagnose, 04.09.):
+ * bei kleiner Feldgroesse (n=3) liegt der Feldspieler-Median weit UEBER dem Torwart-Median
+ * (22,4 gegen 8,4 -- eine gemeinsame Referenz haette den Torwart systematisch unterbezahlt),
+ * bei n=6 ist es GENAU UMGEKEHRT (Feld 6,84 gegen Torwart 10,22 --
+ * eine gemeinsame Referenz haette JEDEN durchschnittlichen Torwart ueberdurchschnittlich
+ * aussehen lassen, exakt die Art systematischer Verzerrung, die die ganze Impact-Kurve
+ * (Boxscore-an-PPS V2) eigentlich vermeiden soll). Der Grund: Hockeys Torwart-Wertformel
+ * (HK_TW_BASIS/HK_TW_REF, battle-mode.engine.js) ist auf den FELDSPIELER-MITTELWERT bei EINER
+ * bestimmten Feldgroesse kalibriert, nicht auf jede -- bei wenigen Feldspielern teilen sich diese
+ * denselben "Kuchen" an Punkten/Assists auf weniger Koepfe (hoeherer Medianwert je Spieler), der
+ * Torwart-Anteil bleibt aber unabhaengig von der Feldspieleranzahl ungefaehr gleich.
+ */
+const HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART = ladeReferenzFeldgroessenTorwart(
+  hockeyPpsReferenzJson as ArenaPpsReferenzJson,
+);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
  * Referenzverteilung und welche zwei Kurvenregler (`max`/`anteilMitte`) ihre individuellen PPs
  * bestimmen, plus der Katalog-Standardgroesse, auf die `resolveArenaPpsReferenz()` faellt, wenn
  * fuer einen Spieltag ueberhaupt keine Feldgroesse ermittelbar war. EINE neue Arena-Disziplin
- * (Hockey ist als naechstes geplant) braucht NUR einen weiteren Eintrag hier plus ihre eigene
- * gezogene Referenz-JSON — keine neue Verzweigung in `ppsAusArenaImpact()` oder
- * `computeIndividualBoxscorePpsFromFixtureResults()`.
+ * (Hockey war die dritte) braucht NUR einen weiteren Eintrag hier plus ihre eigene gezogene
+ * Referenz-JSON — keine neue Verzweigung in `ppsAusArenaImpact()` oder
+ * `computeIndividualBoxscorePpsFromFixtureResults()`. Eine Disziplin mit einer EIGENEN Rolle
+ * (Hockeys Torwart) braucht zusaetzlich `referenzFeldgroessenTorwart`, s. dort.
  */
 type ArenaImpactKonfig = {
   referenzFeldgroessen: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
+  /**
+   * TORWART-EIGENE REFERENZ (Hockey-Produktivierung) -- `undefined` fuer jede Disziplin ohne
+   * eigene Torwart-Rolle (Basketball, Gewichtheben): `resolveArenaPpsReferenz()` faellt dann
+   * fuer `rolle:"torwart"` defensiv auf `referenzFeldgroessen` zurueck (s. dort), was fuer diese
+   * Disziplinen ohnehin nie angefragt wird (kein Boxscore-Eintrag traegt dort je `torwart:true`).
+   */
+  referenzFeldgroessenTorwart?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
   max: number;
   anteilMitte: number;
   katalogStandardgroesse: number;
@@ -278,6 +359,24 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       max: GEWICHTHEBEN_INDIVIDUAL_PPS_MAX,
       anteilMitte: GEWICHTHEBEN_PPS_ANTEIL_MITTE,
       katalogStandardgroesse: 6,
+    },
+  ],
+  [
+    "hockey",
+    {
+      referenzFeldgroessen: HOCKEY_PPS_REFERENZ_FELDGROESSEN,
+      referenzFeldgroessenTorwart: HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART,
+      max: HOCKEY_INDIVIDUAL_PPS_MAX,
+      anteilMitte: HOCKEY_PPS_ANTEIL_MITTE,
+      // ANDERS ALS BASKETBALL/GEWICHTHEBEN: Hockeys `Discipline.playerCount` (dataAdapter.ts)
+      // ist 5, nicht 6 -- nachgesehen, nicht von den beiden Vorlagen kopiert. Nur der Katalog-
+      // Fallback, wenn ueberhaupt kein Spielplan-Eintrag ermittelbar war (seltener Pfad, s.
+      // `resolveArenaFieldSizeForMatchday()`); die tatsaechlich GEWUERFELTE Feldgroesse einer
+      // Saison liegt fuer JEDE der zwanzig Disziplinen gleichverteilt zwischen 2 und 6
+      // (`buildSeasonPlayerCountByDiscipline()`, season-discipline-schedule.ts -- jede der vier
+      // Fuenfer-Kategorien bekommt eine Permutation von [2,3,4,5,6] zugeteilt), dieser Wert ist
+      // also fuer keine der drei Arena-Disziplinen der "typische" Fall.
+      katalogStandardgroesse: 5,
     },
   ],
 ]);
@@ -318,22 +417,28 @@ function loeseArenaImpactKonfigAuf(disciplineId: string): ArenaImpactKonfig {
 export function resolveArenaPpsReferenz(
   disciplineId: string,
   playerCount: number | null,
+  rolle: "feld" | "torwart" = "feld",
 ): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
   const konfig = loeseArenaImpactKonfigAuf(disciplineId);
+  // TORWART-EIGENE REFERENZ (Hockey-Produktivierung, s. `ArenaImpactKonfig.
+  // referenzFeldgroessenTorwart`-Kommentar): faellt fuer eine Disziplin ohne eigene
+  // Torwart-Referenz (Basketball, Gewichtheben) defensiv auf die Feldspieler-Referenz zurueck.
+  const referenzFeldgroessen =
+    (rolle === "torwart" ? konfig.referenzFeldgroessenTorwart : undefined) ?? konfig.referenzFeldgroessen;
   const istGueltig = (referenz: ArenaPpsReferenzFeldgroesse) => referenz.iMittel > 0 && referenz.iKrass > referenz.iMittel;
-  const verfuegbareGroessen = [...konfig.referenzFeldgroessen.entries()]
+  const verfuegbareGroessen = [...referenzFeldgroessen.entries()]
     .filter(([, referenz]) => istGueltig(referenz))
     .map(([n]) => n)
     .sort((a, b) => a - b);
   if (verfuegbareGroessen.length === 0) {
     throw new Error(
-      `battle-mode-arena-team-points: keine gueltige gezogene PPS-Referenz fuer "${disciplineId}" gefunden — ` +
-        "scripts/ziehe-basketball-pps-referenz.ts bzw. scripts/ziehe-gewichtheben-pps-referenz.ts (neu) ausfuehren.",
+      `battle-mode-arena-team-points: keine gueltige gezogene PPS-Referenz fuer "${disciplineId}" (Rolle "${rolle}") gefunden — ` +
+        "scripts/ziehe-basketball-pps-referenz.ts bzw. scripts/ziehe-gewichtheben-pps-referenz.ts/scripts/ziehe-hockey-pps-referenz.ts (neu) ausfuehren.",
     );
   }
   const gerundet = playerCount != null && Number.isFinite(playerCount) ? Math.round(playerCount) : null;
-  if (gerundet != null && konfig.referenzFeldgroessen.has(gerundet) && istGueltig(konfig.referenzFeldgroessen.get(gerundet)!)) {
-    return { referenz: konfig.referenzFeldgroessen.get(gerundet)!, feldgroesseGenutzt: gerundet };
+  if (gerundet != null && referenzFeldgroessen.has(gerundet) && istGueltig(referenzFeldgroessen.get(gerundet)!)) {
+    return { referenz: referenzFeldgroessen.get(gerundet)!, feldgroesseGenutzt: gerundet };
   }
   // Der Katalog-Standardwert (`Discipline.playerCount`) als Ziel, wenn ueberhaupt keine
   // Feldgroesse ermittelbar war -- dieselbe Zahl, auf die auch der bestehende PPS-Pfad
@@ -343,7 +448,7 @@ export function resolveArenaPpsReferenz(
   for (const kandidat of verfuegbareGroessen) {
     if (Math.abs(kandidat - ziel) < Math.abs(naechste - ziel)) naechste = kandidat;
   }
-  return { referenz: konfig.referenzFeldgroessen.get(naechste)!, feldgroesseGenutzt: naechste };
+  return { referenz: referenzFeldgroessen.get(naechste)!, feldgroesseGenutzt: naechste };
 }
 
 /**
@@ -361,6 +466,14 @@ export function resolveGewichthebenPpsReferenz(
   playerCount: number | null,
 ): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
   return resolveArenaPpsReferenz("gewichtheben", playerCount);
+}
+
+/** Hockey-Analogon zu `resolveBasketballPpsReferenz()`, s. dort. */
+export function resolveHockeyPpsReferenz(
+  playerCount: number | null,
+  rolle: "feld" | "torwart" = "feld",
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  return resolveArenaPpsReferenz("hockey", playerCount, rolle);
 }
 
 const LEAGUE_TIERS: readonly LeagueTier[] = ["liga1", "liga2"];
@@ -527,6 +640,11 @@ export function ppsAusGewichthebenImpact(impact: number, referenz: ArenaPpsRefer
   return ppsAusArenaImpact(impact, referenz, GEWICHTHEBEN_INDIVIDUAL_PPS_MAX, GEWICHTHEBEN_PPS_ANTEIL_MITTE);
 }
 
+/** Hockey-Analogon zu `ppsAusBasketballImpact()`, s. dort. */
+export function ppsAusHockeyImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
+  return ppsAusArenaImpact(impact, referenz, HOCKEY_INDIVIDUAL_PPS_MAX, HOCKEY_PPS_ANTEIL_MITTE);
+}
+
 /**
  * BOXSCORE-AN-PPS, KERNFUNKTION — V2 (docs/design/pps-skalierung-opus.md,
  * docs/design/pps-skalierung-umsetzung.md): aus ALLEN Boxscore-Ergebnissen EINES Spieltags
@@ -557,13 +675,23 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   playerCount: number | null,
   disciplineId: string = "basketball",
 ): Map<string, number> {
-  const { referenz } = resolveArenaPpsReferenz(disciplineId, playerCount);
+  const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
+  // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
+  // ueberhaupt braucht (s. Schleife unten) -- `resolveArenaPpsReferenz()` faellt fuer Basketball/
+  // Gewichtheben ohnehin auf `feldReferenz` zurueck, ein zweiter Aufruf hier waere fuer die beiden
+  // schlicht verschwendet, nicht falsch.
+  let torwartReferenz: ArenaPpsReferenzFeldgroesse | null = null;
   const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const ppsByPlayerId = new Map<string, number>();
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {
       if (eintrag.playerId === null) continue;
-      ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, referenz, konfig.max, konfig.anteilMitte));
+      if (eintrag.torwart) {
+        torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz;
+        ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, torwartReferenz, konfig.max, konfig.anteilMitte));
+      } else {
+        ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, feldReferenz, konfig.max, konfig.anteilMitte));
+      }
     }
   }
   return ppsByPlayerId;
