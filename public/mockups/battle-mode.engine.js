@@ -3778,10 +3778,22 @@
       // Struktur-Konsistenz stehen, hat fuer Football aber KEINE geometrische Bedeutung
       // (klassifiziereWurfdistanz() wird von Football nicht aufgerufen, s. dort).
       kurve:{
-        base:-0.05,
+        base:0.20,
         geoBonus:{dunk:0.34, nah:0.14, mit:0.0, fern:-0.18},
         radien:{dunk:0, nah:0, mit:0, fern:0}, // ohne Bedeutung, s. Kommentar oben
-        skillMittel:0.30,
+        // skillMittel GEMESSEN (nicht mehr geraten): window.__arena.feldspielSubskills(
+        // "football") auf dem 12-Spieler-Testkader (dasselbe Kader, das jede Sondierung/
+        // jeder Korridor-Lauf benutzt, s. docs/design/hockey-rezept-ursache.md fuer den
+        // Praezedenzfall) liefert PASSGENAUIGKEIT-Mittel 58,3, TEAMGEIST-Mittel 48,2 ->
+        // 58,3*0,0060 + 48,2*0,0020 = 0,446. Der alte Platzhalter 0,30 war zu niedrig und
+        // gab jedem Spieler mit durchschnittlichem Skill einen unbeabsichtigten
+        // Bonus-Logit von +14*(0,446-0,30)=+2,0 obendrauf — kein Effekt der Eignung,
+        // sondern ein Messfehler in der Kurve selbst.
+        skillMittel:0.446,
+        // steil/korrektur GEGEN DEN NFL-KORRIDOR GEFITTET (docs/design/football-rezept-
+        // kalibrierung.md, scripts/miss-football-korridor.mjs): Completion-Quote 65,3 %,
+        // Yards/Attempt 7,1 (NFL 2024, football-rollout-plan.md A.1) — dieselbe
+        // Fit-Reihenfolge wie ueberall (steil/skillMittel ZUERST, korrektur ZULETZT).
         steil:14,
         korrektur:{dunk:0, nah:0, mit:0, fern:0},
         skillTerme:[{feld:"PASSGENAUIGKEIT",koeff:0.0060},{feld:"TEAMGEIST",koeff:0.0020}]
@@ -3801,9 +3813,10 @@
       // die dieser Auftrag nicht legen soll. BALLSICHERHEIT ist dieselbe Groesse, nur
       // positiv gedreht (real zengms `bsc`, Football-Plan Abschnitt A.4).
       //
-      // PLATZHALTER-GEWICHTE, NICHT SINKHORN-AUSGEGLICHEN (das ist Rezept-Feinkalibrierung,
-      // ausdruecklich NICHT Teil dieser Migrations-Runde, s. Abschlussbericht). Alle neun
-      // Matrix-Attribute kommen mindestens einmal vor.
+      // SINKHORN-AUSGEGLICHEN SEIT DER REZEPT-FEINKALIBRIERUNG (s. weiter unten) — zur
+      // Migrationszeit waren diese Gewichte noch reine Platzhalter, alle neun Matrix-
+      // Attribute kamen nur "mindestens einmal vor". Was daraus wurde, steht direkt beim
+      // `rezept:`-Feld unten.
       //
       // LAUFTEMPO NICHT VERGESSEN (Fund waehrend der Visualpruefung, Chris' Zusatzauftrag
       // 03.09.: alle zwoelf Spieler standen wie eingefroren da). `bewegeSpielerLive` liest
@@ -3817,15 +3830,90 @@
       // Spielfeld. Gewichte 1:1 von Basketball/Hockey uebernommen (`speed:52,stamina:32,
       // dexterity:16`), nicht neu erfunden: Lauftempo ist eine physische, keine football-
       // spezifische Eigenschaft.
+      // REZEPT-NEUBAU (Rezept-Feinkalibrierung, Football-Kalibrierung-Runde, s.
+      // docs/design/football-rezept-kalibrierung.md) NACH CHRIS' BUDGET-METHODE
+      // (Sondierung + Sinkhorn, dasselbe Verfahren wie Hockey/Basketball/Arena/Bahn):
+      // scripts/sondiere-feldspiel-subskills.mjs football 24 misst das mechanische
+      // Gewicht jedes Sub-Skills im MOTOR (orthogonales Testrezept, ein Attribut je
+      // Sub-Skill), scripts/baue-feldspiel-rezept.mjs football verteilt die neun
+      // Football-Matrixattribute per Sinkhorn so auf die acht "fachlichen" Sub-Skills,
+      // dass Zeile (Attributbudget) UND Spalte (gemessenes mechanisches Gewicht)
+      // gleichzeitig aufgehen.
+      //
+      // AWARENESS BEWUSST NIE ALS TRAEGER GEWAEHLT (docs/design/football-rezept-
+      // kalibrierung.md Abschnitt 2, dieselbe Falle wie Hockeys Speed/Spirit-Fund,
+      // hockey-rezept-ursache.md): auf der echten Kaderfamilie (110 Spieler,
+      // data/generated/kaderfamilie-live-save.json) korreliert awareness NEGATIV mit
+      // der Football-Eignung (rho -0,34) — trotz drittschwerstem Matrixgewicht (11).
+      // health/determination/will/power/charisma/spirit liegen alle deutlich positiv
+      // (0,36 bis 0,54) und tragen die acht Sub-Skills stattdessen. Der Football-Plan
+      // (Teil D) nennt awareness als EINEN moeglichen Traeger unter mehreren — die
+      // Auswahl AUS den erlaubten Kandidaten ist Sache dieser Kalibrierung, keine
+      // Abweichung von der Doku.
+      //
+      // PASSSCHUTZ/ABWEHR_LAUF lesen in der Sondierung 0 % mechanisches Gewicht (der
+      // Bericht ordnet das als echten Motorbefund ein, nicht als Rezeptfehler: ihr
+      // einziger Kanal zum EIGENEN feldspielWert() ist indirekt ueber eine zweite
+      // gewichtete Verlosung) — MINDEST-Bodensatz 1 % wie ueberall sonst in
+      // baue-feldspiel-rezept.mjs, damit kein Sub-Skill auf null Budget faellt.
+      // LAUFTEMPO bleibt UNVERAENDERT (Bug-Fix vom 03.09., s. Motorkommentar oben):
+      // physische Bewegungsgeschwindigkeit, kein fachlicher Sub-Skill, kein
+      // Football-Matrixgewicht auf speed/dexterity — nicht Teil dieser Kalibrierung.
+      // VERSUCHTE, WIEDER VERWORFENE ZWEITE FASSUNG (dokumentiert, damit die naechste
+      // Runde denselben Weg nicht noch einmal geht — docs/design/football-rezept-
+      // kalibrierung.md Abschnitt 4): eine Sub-Skill-Korrelation gegen die echte Football-
+      // Eignung, GEMESSEN auf allen 110 Spielern der Kaderfamilie GEPOOLT (data/generated/
+      // kaderfamilie-live-save.json), steigt deutlich, wenn ein Sub-Skill aus drei bis
+      // fuenf gut korrelierenden Attributen gemischt wird statt aus ein bis zwei (ABWEHR_
+      // PASS allein torment: rho 0,27 gepoolt; health+will+spirit+torment gemischt: rho
+      // 0,92 gepoolt). Trotzdem mit genau diesen Mischungen bestueckt kaderfest GEMESSEN
+      // (node scripts/miss-alle-disziplinen.mjs 24 football): rho je Spiel 0,342 (Spann-
+      // weite 0,410), SCHLECHTER als die Fassung unten. Die gepoolte Korrelation ueber
+      // fuenf verschiedene Kader-Paarungen hinweg ist offenbar kein verlaesslicher Proxy
+      // fuer die Rangtreue INNERHALB einer einzelnen 6-gegen-6-Paarung — sie sagt, wie gut
+      // ein Attribut-Mix die EignungsFORMEL nachbildet, nicht, wie gut er zwoelf konkrete
+      // Spieler eines Spiels der Groesse nach ordnet. Nicht eingebaut.
+      //
+      // DIESE FASSUNG (Sinkhorn + EIN gezielter Nachschlag, derselbe Kaderfest-Massstab):
+      // scripts/sondiere-feldspiel-subskills.mjs football 24 misst das mechanische
+      // Gewicht jedes Sub-Skills im MOTOR, scripts/baue-feldspiel-rezept.mjs football
+      // verteilt die neun Football-Matrixattribute per Sinkhorn auf die acht "fachlichen"
+      // Sub-Skills (Zeile=Attributbudget, Spalte=mechanisches Gewicht). AWARENESS bleibt
+      // bewusst nie Traeger (Kaderfamilie-Korrelation -0,34, s. Kopfkommentar oben) — die
+      // dieselbe Falle wie Hockeys Speed/Spirit-Fund (hockey-rezept-ursache.md). EIN
+      // Nachschlag ueber die reine Sinkhorn-Ausgabe hinaus, GEMESSEN verbessert (0,407->
+      // 0,431 je Spiel): ABWEHR_PASS bekam von Sinkhorn 100 % torment (Blindfleck-Falle,
+      // s. hockey-rezept-ursache.md Abschnitt 2 — torment ist mit rho 0,27 das schwaechste
+      // der neun Matrixattribute), auf power/torment 70/30 verschoben (power korreliert
+      // mit 0,42 fast doppelt so gut).
+      // DRITTER DURCHGANG VERSUCHT UND VERWORFEN (docs/design/football-rezept-
+      // kalibrierung.md Abschnitt 5): TEAMGEIST wurde zum Receiver-Los (s. resolvePass-
+      // Kommentar), sein mechanisches Gewicht sprang in der Sondierung von 5,2 % auf
+      // 44,5 % — bei weitem der schwerste Sub-Skill. Ein KOMPLETT NEUER Sinkhorn-Lauf
+      // gegen diese Sondierung ergab {spirit:52,torment:37,charisma:11} fuer TEAMGEIST und
+      // verschob auch alle anderen sieben Sub-Skills. GEMESSEN SCHLECHTER (rho je Spiel
+      // 0,431->0,407, Spannweite 0,200->0,333; rho Saison 0,608->0,622 bei Spannweite
+      // 0,266->0,608 — die riesige Saison-Spannweite zeigt eine kaderabhaengig instabile
+      // Mechanik). Verworfen zugunsten des GEZIELTEN Einzel-Nachschlags unten: nur
+      // TEAMGEIST angepasst, die uebrigen sieben Sub-Skills beim vorherigen, bereits
+      // gemessenen Stand belassen.
+      //
+      // TEAMGEIST-MISCHUNG GEGENGEPRUEFT, NICHT GEAENDERT: vier Varianten kaderfest
+      // durchgemessen (charisma:82/torment:18 — die Ausgangsfassung dieses Sub-Skills seit
+      // der Live-Migration —, charisma:100, charisma:70/spirit:30, charisma:60/torment:20/
+      // spirit:20). Die urspruengliche 82/18-Mischung blieb bei rho je Spiel klar vorn
+      // (0,460 gegen 0,431/0,453/0,343) und bleibt deshalb unveraendert stehen — der
+      // eigentliche Hebel war die Zielrolle (TEAMGEIST als Receiver-Los), nicht die
+      // Attributmischung dahinter.
       rezept:{
-        PASSGENAUIGKEIT: {awareness:45,determination:30,will:25},
-        LAUFKRAFT:       {power:45,health:30,spirit:25},
-        PASSSCHUTZ:      {health:40,determination:35,awareness:25},
-        ABWEHR_PASS:     {torment:55,awareness:45},
-        ABWEHR_LAUF:     {torment:40,power:35,health:25},
-        BALLSICHERHEIT:  {will:55,health:45},
-        TEAMGEIST:       {spirit:55,charisma:20,health:25},
-        AUSDAUER:        {stamina:40,health:35,spirit:25},
+        PASSGENAUIGKEIT: {will:54,determination:46},
+        LAUFKRAFT:       {spirit:56,health:30,power:14},
+        PASSSCHUTZ:      {health:41,will:32,determination:27},
+        ABWEHR_PASS:     {power:70,torment:30},
+        ABWEHR_LAUF:     {torment:100},
+        BALLSICHERHEIT:  {health:57,will:43},
+        TEAMGEIST:       {charisma:82,torment:18},
+        AUSDAUER:        {stamina:100},
         LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
@@ -3966,6 +4054,16 @@
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
+  // NUR FOOTBALL — SPIEL-WEITER KORRIDOR-MITSCHNITT (Rezept-Feinkalibrierung, s.
+  // docs/design/football-rezept-kalibrierung.md und scripts/miss-football-korridor.mjs).
+  // Weder Yards/Completions/Sacks NOCH Field-Goals lassen sich vollstaendig aus den
+  // ohnehin generischen Feldspieler-Zaehlern (passYards/verluste/bloecke/steals/rebounds)
+  // zurueckrechnen — "Passversuch" existiert als Ereignis gar nicht (ein "incomplete"
+  // erhoeht heute KEINEN Zaehler), und ein Field Goal hat keinen echten Spieler, der es
+  // tragen koennte (Football-Plan D: kein Kicker-Slot). Ein zweites, rein additives
+  // Mitschnitt-Objekt statt neuer Spieler-Felder fuer Werte ohne Spielerbezug — bei jedem
+  // bauFeldspiel() zurueckgesetzt, ausserhalb von Football nie gelesen.
+  let fsFbLog=null;
   let fsAktuell=null, fsBall={sichtbar:false,x:0,y:0};
   // Nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive) — Ballzustand und
   // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
@@ -4683,6 +4781,8 @@
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
+    fsFbLog=feldspielDisc==="football"?{passAtt:0,passComp:0,passInt:0,sacks:0,rushAtt:0,
+      fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -5740,11 +5840,19 @@
   // FELDSPIEL_ART.football.kurve-Kommentar) — Verteilung grob an der realen NFL-Down-
   // /Distance-Tendenz orientiert (Football-Plan A.1: ~46 % Lauf/54 % Pass insgesamt,
   // stark distanzabhaengig), PLATZHALTER-Schwellen.
+  // NACHJUSTIERT (Rezept-Feinkalibrierung, docs/design/football-rezept-kalibrierung.md):
+  // die alte Verteilung rief bei Standard-Down (das haeufigste toGo-Fenster, jeder Drive
+  // beginnt bei toGo=10) nur 22 % Lauf auf — gemessen (scripts/miss-football-korridor.mjs)
+  // kamen so 12-13 Laufversuche gegen 33-35 Passversuche je Team heraus, gegen das reale
+  // NFL-Verhaeltnis 27,0/29,9 (Football-Plan A.1, ~47,5 % Lauf). Zusaetzlich rief "tief"
+  // (die "fern"-Kurve-Tier, mittlere Yards-Spanne 9-20 statt eines realen Deep-Ball-
+  // Long-Shots) zu oft — reale Passtiefe im Mittel liegt bei ~7-8 Air Yards, nicht bei
+  // jedem dritten Snap ein Bombenversuch.
   function waehlePlayCall(down,toGo){
-    if(toGo<=2){ return rr()<0.60?"lauf":"screen"; }
-    if(toGo<=6){ const r=rr(); return r<0.40?"lauf":r<0.75?"kurz":"mittel"; }
-    if(toGo<=11){ const r=rr(); return r<0.22?"lauf":r<0.55?"mittel":"tief"; }
-    const r=rr(); return r<0.15?"lauf":r<0.35?"mittel":"tief";
+    if(toGo<=2){ return rr()<0.68?"lauf":"screen"; }
+    if(toGo<=6){ const r=rr(); return r<0.55?"lauf":r<0.85?"kurz":"mittel"; }
+    if(toGo<=11){ const r=rr(); return r<0.46?"lauf":r<0.82?"mittel":"tief"; }
+    const r=rr(); return r<0.28?"lauf":r<0.64?"mittel":"tief";
   }
   // VIERTER VERSUCH: Field Goal in Reichweite, sonst bei kurzer Distanz (und nicht zu
   // nah an der eigenen Torlinie) ein Go-For-It-Versuch, sonst Punt. PLATZHALTER-Schwellen,
@@ -5774,7 +5882,14 @@
     const abwehr=gewichtetesLos(def,"ABWEHR_LAUF");
     // FUMBLE zuerst — Ballsicherheit des Traegers gegen die Tackling-Staerke der Abwehr
     // (zengm `probFumble`-Struktur als Vorbild, Football-Plan A.2/A.3).
-    const pFumble=Math.max(0.006,Math.min(0.05,0.014+(abwehr.ABWEHR_LAUF-rusher.BALLSICHERHEIT)*0.00035));
+    // BASIS 0,032 STATT 0,014 (Korridor-Fit): unser Motor kennt Fumbles nur aus Laufzuegen
+    // (resolvePass() erzeugt nie typ "fumble") — anders als in der realen NFL, wo auch
+    // Sacks/Receptions welche produzieren. Um trotzdem die reale Gesamtquote zu treffen
+    // (Ziel ~0,5 verlorene Fumbles je Team/Spiel, aus 271 verlorenen Fumbles / 272 Spielen
+    // 2024 hergeleitet, WebSearch dieser Runde, mit ~58 % Recovery-Anteil bei der Defense
+    // macht das ~0,86 Fumbles GESAMT je Team) muss die Rate je Laufversuch hoeher liegen
+    // als eine reale Pro-Snap-Fumble-Quote, weil sie den fehlenden zweiten Kanal mittraegt.
+    const pFumble=Math.max(0.01,Math.min(0.08,0.032+(abwehr.ABWEHR_LAUF-rusher.BALLSICHERHEIT)*0.00035));
     if(rr()<pFumble)return {typ:"fumble",spieler:rusher,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
     const meanYds=Math.max(-3,Math.min(11,3.6+diff*0.055));
@@ -5789,7 +5904,11 @@
     if(toGo<=12)return rr()<0.5?"mit":"fern";
     return rr()<0.7?"fern":"mit";
   }
-  const FK_TIER_YARDS={dunk:[0,5],nah:[3,10],mit:[7,18],fern:[14,34]};
+  // ENGER GEFASST (Korridor-Fit gegen 7,1 Yards/Attempt, NFL 2024, Football-Plan A.1) —
+  // die alten Spannen (bis fern:[14,34], Mitte 24 Yards) trieben Yards/Attempt auf 11-13
+  // trotz einer schon realistischen Completion-Quote, weil "fern" ueber waehlePlayCall
+  // ("tief") zu oft gerufen wurde UND selbst im Erfolgsfall zu lang ausfiel.
+  const FK_TIER_YARDS={dunk:[0,4], nah:[2,7], mit:[5,12], fern:[9,20]};
   // PASSSPIELZUG: zweistufig wie real (erst Sack-Chance, DANACH erst Completion/
   // Interception, Football-Plan A.2/A.3 — genau das fehlte dem Vorab-Pfad komplett).
   // Nutzt die generische lageBasisFuer/skillTeilFuer/steilerMake-Kette mit Footballs
@@ -5798,7 +5917,10 @@
   function resolvePass(off,def,down,toGo,spielTyp){
     const passer=gewichtetesLos(off,"PASSGENAUIGKEIT");
     const rusher=gewichtetesLos(def,"ABWEHR_PASS");
-    const pSack=Math.max(0.02,Math.min(0.20,0.05+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
+    // BASIS 0,07 (Korridor-Fit): 2,42 Sacks / (29,9 Passversuche + 2,42 Sacks) = 7,5 %
+    // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
+    // nur 4,6-5,1 %.
+    const pSack=Math.max(0.02,Math.min(0.20,0.07+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
     if(rr()<pSack)return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
     const tier=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
     // DEGENERIERTE UNTERZAHL (die Sonde faehrt ausdruecklich auch 1v1/2v2, s. Hockey-
@@ -5806,10 +5928,26 @@
     // uebrig, faengt er notgedrungen selbst — gewichtetesLos() auf ein leeres Array gibt
     // sonst `undefined` zurueck (Array-Index -1) und liess die Sonde abstuerzen.
     const restOff=off.filter(u=>u!==passer);
-    const receiver=restOff.length?gewichtetesLos(restOff,"LAUFKRAFT"):passer;
+    // RECEIVER UEBER TEAMGEIST STATT LAUFKRAFT (Rezept-Feinkalibrierung, docs/design/
+    // football-rezept-kalibrierung.md Abschnitt 5): LAUFKRAFT entschied bis hierher SOWOHL
+    // den Rusher (resolveLauf) ALS AUCH den Receiver jedes kompletten Passes — auf sechs
+    // Feldspielern vereinnahmten dieselben ein bis zwei laufstarken Spieler dadurch fast
+    // den GESAMTEN Offensiv-Ertrag (Sack-/Fumble-Yards ausgenommen), unabhaengig davon, ob
+    // ihre reale Eignung ueberhaupt darauf beruht. Kaderfest GEMESSEN (node scripts/
+    // miss-alle-disziplinen.mjs 24 football): TEAMGEIST als Receiver-Los schlaegt
+    // LAUFKRAFT klar (rho je Spiel 0,431->0,460, rho Saison 0,608->0,692, Saison-
+    // Spannweite 0,266->0,196) — von den durchprobierten Alternativen (BALLSICHERHEIT,
+    // PASSSCHUTZ, AUSDAUER) das einzig bessere. TEAMGEIST hatte davor kaum mechanisches
+    // Gewicht (Sondierung: 5,2 %) und keine zweite Ballberuehrungs-Rolle — jetzt eine
+    // DRITTE, von Passer UND Rusher unabhaengige Kreditvergabe-Achse.
+    const receiver=restOff.length?gewichtetesLos(restOff,"TEAMGEIST"):passer;
     const chance=steilerMake(lageBasisFuer(tier),skillTeilFuer(passer,tier),tier);
-    const pInt=Math.max(0.015,Math.min(0.16,0.03+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0012
-      +(tier==="fern"?0.03:tier==="mit"?0.012:0)));
+    // BASIS/ZUSCHLAEGE GESENKT (Korridor-Fit): Ziel ~2,1-2,4 % je Passversuch, hergeleitet
+    // aus 658 Turnovern minus ~0,5 verlorenen Fumbles je Team (271 Fumbles verloren / 272
+    // Spiele 2024, WebSearch) ueber 544 Team-Spiele bei 29,9 Passversuchen/Team — die alte
+    // Fassung (Basis 0,03, +0,03 fern) mass 5-5,6 %, mehr als doppelt so hoch.
+    const pInt=Math.max(0.008,Math.min(0.10,0.014+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
+      +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
     if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
     if(rr()<chance){
       const [lo,hi]=FK_TIER_YARDS[tier];
@@ -5823,9 +5961,19 @@
   // Stufen), hier als geglaettete Formel statt einer Yard-fuer-Yard-Tabelle. KEIN
   // Kicker-Sub-Skill (Football-Plan D: "heute kein Kicker-Slot bei sechs Feldspielern") —
   // die Distanz allein entscheidet, PLATZHALTER wie alles hier.
+  // STUFENTABELLE GEGEN ECHTE NFL-2024-QUOTEN (WebSearch dieser Runde, nicht mehr die
+  // aeltere zengm-Tabelle aus dem Rollout-Plan A.3 — moderne Kicker treffen deutlich
+  // besser): 40-49 Yards 76,9 %, 50+ Yards 71,7 % (2024-Saison), Gesamtquote ueber alle
+  // Distanzen ~85 %. Unter 40 Yards gibt es keine oeffentlich zitierte Einzelzahl aus
+  // dieser Suche — dort mit der allgemein bekannten, seit Jahren stabilen NFL-Grössenordnung
+  // (>95 % innerhalb 30 Yards) aufgefuellt, klar so gekennzeichnet.
   function resolveFieldgoal(spot){
     const kickDistanz=spot+17;
-    const chance=Math.max(0.05,Math.min(0.99,0.99-(kickDistanz-20)*0.012));
+    let chance;
+    if(kickDistanz<30)chance=0.97;
+    else if(kickDistanz<40)chance=0.93;
+    else if(kickDistanz<50)chance=0.769;
+    else chance=0.717;
     return {typ:"fg",erfolg:rr()<chance,distanz:kickDistanz};
   }
   function resolvePunt(spot,netto){ return {typ:"punt",spot,yards:netto}; }
@@ -5890,6 +6038,7 @@
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
       if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feed(fb.side,"Extra-Punkt ist gut."); }
+      if(fsFbLog)fsFbLog.tds++;
       fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
     }
@@ -5917,21 +6066,25 @@
         // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
         // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
         logZug(fb.side,"treffer",{spieler:gewichtetesLos(off,"PASSGENAUIGKEIT"),punkte:3});
+        if(fsFbLog){ fsFbLog.fgAtt++; fsFbLog.fgMade++; }
         fsLive.football=null; naechsterAngriff(1-fb.side);
       } else {
         feed(fb.side,"Field-Goal-Versuch von "+Math.round(erg.distanz)+" Yards verfehlt.");
+        if(fsFbLog)fsFbLog.fgAtt++;
         fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
       }
       return;
     }
     if(erg.typ==="punt"){
       feed(fb.side,"Punt — Ballwechsel.");
+      if(fsFbLog)fsFbLog.punts++;
       fkNaechsterSpot=100-Math.max(1,fb.spot-erg.yards);
       fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
     }
     if(erg.typ==="sack"){
       erg.spieler.passYards+=erg.yards; erg.verteidiger.bloecke++;
+      if(fsFbLog)fsFbLog.sacks++;
       feed(erg.verteidiger.side,erg.verteidiger.n+" sackt "+erg.spieler.n+" — "+FB().wortBlock+"!",true);
       schwebe({x:0,y:0,txt:FB().wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"block",{verteidiger:erg.verteidiger,spieler:erg.spieler});
@@ -5940,18 +6093,33 @@
     }
     if(erg.typ==="fumble"){
       erg.spieler.laufYards+=erg.yards; erg.spieler.verluste++;
+      // Fumbles entstehen im Motor heute ausschliesslich aus resolveLauf() (resolvePass()
+      // kennt "fumble" als typ nicht) — zaehlt deshalb immer zugleich als Laufversuch.
+      if(fsFbLog){ fsFbLog.fumbles++; fsFbLog.rushAtt++; }
       const gewinntDef=rr()<0.58; // real ~55-60% aller Fumbles landen bei der Defense
+      if(fsFbLog&&gewinntDef)fsFbLog.fumblesLost++;
       const recover=gewinntDef?gewichtetesLos(def,"ABWEHR_LAUF"):gewichtetesLos(off,"BALLSICHERHEIT");
       recover.rebounds++;
       feed(recover.side,erg.spieler.n+" verliert den Ball — "+recover.n+" mit der "+FB().wortRebound+"!",true);
       schwebe({x:0,y:0,txt:"FUMBLE!",life:1.2,crit:true,_spieler:erg.spieler.id});
       logZug(recover.side,"steal",{verteidiger:recover,spieler:erg.spieler});
-      if(!gewinntDef){ footballDownWeiter(fb,erg.yards); return; }
+      // BUG GEFUNDEN UND BEHOBEN (Rezept-Feinkalibrierung, docs/design/football-rezept-
+      // kalibrierung.md): kein `traeger` uebergeben, wenn die OFFENSE ihren eigenen
+      // Fumble selbst zurueckholt. Erreichte `erg.yards` dabei zufaellig genau den Rest
+      // bis zur Torlinie (spot-yards<=0), loeste footballDownWeiter() die TOUCHDOWN-
+      // Verzweigung MIT `traeger===undefined` aus — logZug() schrieb ein "treffer"-
+      // Ereignis ganz ohne e.spieler, und jede Sonde, die e.spieler.id liest (u.a.
+      // scripts/miss-feldspiel-rangtreue.mjs, feldspielProbe), stuerzte darauf ab. Beim
+      // ersten Kalibrierungslauf mit angehobenem `steil` bei n=24 reproduzierbar
+      // getroffen. Der Recoverer IST ab diesem Moment real der Ballfuehrer — genau der,
+      // den footballDownWeiter fuer Punktegutschrift und Feed-Text braucht.
+      if(!gewinntDef){ footballDownWeiter(fb,erg.yards,recover); return; }
       fkNaechsterSpot=100-Math.max(0,fb.spot-erg.yards); fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
     }
     if(erg.typ==="interception"){
       erg.spieler.verluste++; erg.verteidiger.steals++;
+      if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passInt++; }
       feed(erg.verteidiger.side,erg.verteidiger.n+" fängt den Pass ab — Interception!",true);
       schwebe({x:0,y:0,txt:"INTERCEPTION!",life:1.3,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"steal",{verteidiger:erg.verteidiger,spieler:erg.spieler});
@@ -5959,18 +6127,21 @@
       return;
     }
     if(erg.typ==="incomplete"){
+      if(fsFbLog)fsFbLog.passAtt++;
       feed(fb.side,erg.spieler.n+" wirft — "+erg.receiver.n+" kann nicht fangen. Unvollständig.");
       footballDownWeiter(fb,0);
       return;
     }
     if(erg.typ==="komplett"){
       erg.spieler.passYards+=erg.yards; erg.spieler.assists++; erg.receiver.fangYards+=erg.yards;
+      if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.receiver);
       return;
     }
     if(erg.typ==="lauf"){
       erg.spieler.laufYards+=erg.yards;
+      if(fsFbLog)fsFbLog.rushAtt++;
       feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.spieler);
     }
@@ -16798,6 +16969,9 @@
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               strafminuten:u.strafminuten,
+              // Football-eigene Spalten (Rezept-Feinkalibrierung), dasselbe Muster: an
+              // jeder Einheit vorhanden, ausserhalb von Football immer 0.
+              passYards:u.passYards, laufYards:u.laufYards, fangYards:u.fangYards,
               fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
               fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
               fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
@@ -16813,7 +16987,10 @@
             return zeile;
           });
           spiele.push({saat:saat0+i*schritt, seiten:[fsPunkte[0],fsPunkte[1]], ballwechsel,
-            rebOff, rebDef, rebOffSeite, rebDefSeite, fehlSeite, spieler});
+            rebOff, rebDef, rebOffSeite, rebDefSeite, fehlSeite, spieler,
+            // NUR FOOTBALL, s. fsFbLog-Kopfkommentar — ausserhalb von Football null, nicht
+            // mit Nullen aufgefuellt (dieselbe Ehrlichkeitsregel wie `fehlend` oben).
+            football:fsFbLog?{...fsFbLog}:null});
         }
       } finally {
         art.jeSeite=altJeSeite; M.zurueck(gesichert); zieheFormkarten(20260823);

@@ -30,6 +30,8 @@ const SONDIERUNG = process.argv[3];
 const MATRIX = {
   hockey: { power: 18, health: 18, speed: 12, spirit: 12, stamina: 10, torment: 10,
             awareness: 8, determination: 4, dexterity: 4, will: 4 },
+  football: { spirit: 25, torment: 16, health: 14, awareness: 11, will: 10,
+              determination: 8, power: 6, stamina: 6, charisma: 4 },
 };
 
 // WO EIN ATTRIBUT UEBERHAUPT HINGEHOEREN DARF. Aus der Sub-Skill-Tabelle des
@@ -50,6 +52,35 @@ const ERLAUBT = {
     AUSDAUER:    ["stamina", "health", "will", "spirit"],
     LAUFTEMPO:   ["speed", "stamina", "dexterity"],
     PARADE:      ["awareness", "will", "determination", "health", "dexterity"],
+  },
+  // FOOTBALL — Kandidaten aus dem Football-Plan (docs/design/football-rollout-plan.md,
+  // Teil D), aber NICHT wortgleich uebernommen: "awareness" faellt ueberall dort heraus,
+  // wo der Plan es als Kandidat nennt (PASSGENAUIGKEIT/PASSSCHUTZ/ABWEHR_PASS). Grund,
+  // GEMESSEN an der echten Kaderfamilie (data/generated/kaderfamilie-live-save.json, 110
+  // Spieler, Spearman-rho je Attribut gegen `p.d.football`, s. docs/design/football-
+  // rezept-kalibrierung.md Abschnitt 4.2 fuer die volle Tabelle und das Skript-Fragment):
+  // awareness korreliert auf diesem Kader NEGATIV mit der Football-Eignung (rho -0,34) —
+  // trotz drittschwerstem
+  // Matrixgewicht (11). health/determination/will/power/charisma/spirit liegen alle
+  // deutlich positiv (0,36 bis 0,54), genau dieselbe Falle wie Hockeys Speed/Spirit
+  // (docs/design/hockey-rezept-ursache.md Abschnitt 2) — nur schon VOR dem ersten
+  // Sinkhorn-Lauf vermieden statt hinterher nachjustiert. "dexterity"/"speed"/
+  // "intelligence" stehen gar nicht erst zur Wahl: keins der drei traegt Matrixgewicht in
+  // BASIS_JE_DISC.football (spirit/torment/health/awareness/will/determination/power/
+  // stamina/charisma), Sinkhorn kann sie ohnehin nicht speisen. LAUFTEMPO fehlt hier
+  // bewusst (wie PARADE torwartspezifisch bei Hockey, nur umgekehrt): es ist keine
+  // fachliche Rolle, sondern das disziplinuebergreifend erwartete Bewegungstempo
+  // (battle-mode.rezepte.js-Konvention 1:1 mit Basketball/Hockey), speed/dexterity
+  // tragen dafuer ohnehin kein Football-Matrixgewicht — bleibt unangetastet.
+  football: {
+    PASSGENAUIGKEIT: ["determination", "will"],
+    LAUFKRAFT:       ["power", "health", "spirit"],
+    PASSSCHUTZ:      ["health", "determination", "will"],
+    ABWEHR_PASS:     ["torment", "power"],
+    ABWEHR_LAUF:     ["torment", "power", "health"],
+    BALLSICHERHEIT:  ["health", "will"],
+    TEAMGEIST:       ["spirit", "charisma", "torment"],
+    AUSDAUER:        ["stamina", "health", "will"],
   },
 };
 
