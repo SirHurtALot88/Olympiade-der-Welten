@@ -88,6 +88,49 @@ Das ist kein Loch im Download, sondern der LPC-Standard: getragene Platten, Umh�
 Waffen werden nur zu `walk` und den Angriffen geführt. Draco kann mit Doppelaxt stehen und
 gehen, nicht rennen. Wer das ändern will, muss zeichnen — oder im Sprint `walk` fahren.
 
+### Weiblich geschnittene Lederrüstung (04.09.)
+
+Chris' Frage "haben wir wirklich keine weiblichen Körper für zb Lulu oder Inefinna oder
+Cassandra? die müssen eigentlich mal anders aussehen" führte auf einen Befund, der die
+Frage anders beantwortet, als sie gestellt war: **der weibliche Körper (`kw_*`/`gw_*`) war
+längst da** und lief bei allen drei Charakteren bereits mit. Per `renderProbe("Lulu")`
+gegen `renderProbe("Jorund")` verglichen (echte 64×64-Kampfgröße, keine gezoomte Ansicht)
+zeigte sich das eigentliche Problem: `ruest:"leder"` ist ein reines **Brustharnisch-Blatt
+in männlichem Schnitt** — eine gerade, kastenförmige Silhouette ohne Taille, die den ganzen
+sichtbaren Oberkörper überdeckt. Der weibliche Körper darunter wird dadurch unsichtbar;
+Lulu, Cassandra und jede andere Trägerin von `ruest:"leder"` sahen deshalb bis auf Frisur
+und Kopf identisch zu einem männlichen Lederkämpfer aus.
+
+Inefinna hatte dasselbe Problem schon einmal, für die Platten-Rüstung — und war am 26.08.
+bereits auf `plate_frau`/`beine_frau` umgestellt (Damenschnitt-Blätter aus demselben
+LPC-Checkout). Für Leder gab es diesen Schnitt im Baukasten bisher nicht. Nachgesehen im
+lokalen LPC-Checkout: **der Damenschnitt existiert**, unter
+`torso/armour/leather/female/` — byte-genau dieselben Blattmaße wie das männliche Vorbild,
+Farbrampe ausgezählt aus `female/walk.png` und mit dem männlichen `leder`-Ramp identisch
+(#2B1C1D, #704325, #75502D, #4B2B13, #9A6F37, #C4B59F — reiner Silhouetten-Recolor, keine
+neue Palette). Vier Bewegungen (`slash`/`walk`/`shoot`/`hurt`, dieselben vier, die auch
+`leder`/`plate_frau` führen) sind jetzt als `leder_frau` verdrahtet und ersetzen `ruest:
+"leder"` bei **Lulu und Cassandra** — sichtprüfungsbestätigt (renderProbe vorher/nachher,
+echte Pixelgröße) eine deutlich taillierte statt kastenförmige Silhouette.
+
+**Was bewusst offen bleibt.** `ruest:"leder"` mit `geschlecht:"w"` steht noch bei **41**
+weiteren Charakteren im Bauplan — ausgezählt, nicht geschätzt (Xelara, Byrnja, Elara,
+Mindtamer, Mavra, Starflame, Babuschinka, Melody, Pinkypie, Jihanna, Drop Dead,
+Nachtschatten, Erna Wellenlaut, Xerathis, Aurora, Lilly, Elyssa Nightclaw, Lady Mournvale,
+Nelchael, Akali, Nahli-Ke, Lady Yueqin, Whispra, Bana, Taryn, Lys Puppenkopf, Verla
+Compliance, Brunhilde, Xylaris, Kora, Dawnwhisper, Sister Ilora, Lynara, Dr Ironmind, Lumen
+Serene, Sanctrix, Eldara, Byrd, Clara, Breeze, Wu Tang). Dieselbe Lücke besteht bei
+`ruest:"plate"` für **17** weitere Trägerinnen (Johanna, Aeon Flux, Serena, Emphi, Moonveil,
+Riley Le Rogue, Phantomblade, Sweet Dreams, Issyria, Wingless, Sunny, Ciacia, Cadrael, Yuko,
+Timantha, Tidesinger, Isuzu — `plate_frau` existiert bereits, ist dort aber nicht
+eingetragen). Beide Ebenen sind jetzt technisch vorhanden; das Verdrahten wurde hier NICHT
+pauschal für alle 58 betroffenen Namen gemacht, weil die Verifikationsregel dieses Projekts
+genau das verbietet — eine visuelle Änderung gilt erst als bestätigt, wenn sie per
+`renderProbe` in echter Pixelgröße einzeln angesehen wurde, nicht als Serienumstellung ohne
+Sichtprüfung. Ein Folgeauftrag, der jeden der 58 Namen einzeln durchsieht (manche tragen
+zusätzliche Ebenen wie `hose`/`kapuze`, die mit umgestellt werden müssten), ist der
+nächste, saubere Schritt.
+
 ## Umfärben
 
 Jede Ebene liegt **einmal** vor und wird zur Laufzeit umgefärbt: sechs Farben werden
