@@ -7549,7 +7549,18 @@ export function useFoundationShellRouterBodyScope({
         target?.isContentEditable ||
         target?.closest("[contenteditable='true']");
       const modalOpen = Boolean(document.querySelector(".foundation-drilldown-page, .player-drawer-backdrop, [role='dialog']"));
-      const activeViewHandlesOwnSpace = activeView === "lineup" || activeView === "lineupV2" || activeView === "matchdayArena";
+      // `battleArena` haengt keinen eigenen Leertaste-Handler ein (der Kampf-Entwurf in
+      // battle-mode.engine.js kennt keinen globalen Pause-Key) — ohne diesen Eintrag faellt
+      // JEDER Leertaste-Druck auf dieser Ansicht ungebremst zu `triggerGlobalNext()` durch, auch
+      // waehrend ein Kampf laeuft. GEMELDET VON CHRIS (04.09.): „man muss das spiel mit leertaste
+      // pausieren koennen ohne dass der season flow weitergeht" — nachgemessen per Playwright
+      // gegen den echten Dev-Server: Leertaste auf `battleArena` navigierte tatsaechlich weg
+      // (View wechselte zu `seasonV2`, dem naechsten Season-Flow-Schritt), obwohl auf dem Schirm
+      // eine laufende Diszi-artige Ansicht zu sehen war. `matchdayArena` (die ECHTE, gewertete
+      // Arena) blockiert das schon lange richtig — dieselbe Ausnahme muss auch fuer den Battle-
+      // Arena-Entwurf gelten, sonst bleibt genau diese eine Ansicht die Luecke.
+      const activeViewHandlesOwnSpace =
+        activeView === "lineup" || activeView === "lineupV2" || activeView === "matchdayArena" || activeView === "battleArena";
       if (isTextTarget || modalOpen || activeViewHandlesOwnSpace || globalNextDisabled) return;
       event.preventDefault();
       void triggerGlobalNext();
