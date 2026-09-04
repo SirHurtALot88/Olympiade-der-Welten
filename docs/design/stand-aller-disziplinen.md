@@ -53,7 +53,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,618 | 0,247 | 0,748 | 0,126 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,719 | 0,182 | 0,818 | 0,259 | knapp |
 | Battlefield | Arena | 0,325 | 0,662 | 0,619 | 1,000 | durchgefallen |
-| **Football** | Feldspiel | **0,305** | 0,321 | 0,448 | 0,448 | durchgefallen |
+| **Football** | Feldspiel | **0,468** | 0,383 | 0,671 | 0,420 | durchgefallen |
 | Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
 | TDM | Arena | 0,113 | 0,387 | 0,070 | 0,441 | durchgefallen |
 
@@ -100,14 +100,21 @@ Nicht jede Bewegung gegenueber der 02.09.-Fassung ist eine echte Aenderung an de
 | Tennis | Feldspiel | 0,505 / 0,853 | **Buehne** | **0,814 / 0,839** | `tennis-fechten-buehne-umsetzung.md` |
 | Fechten | Arena | 0,153 / 0,378 | **Buehne** | **0,840 / 0,874** | `tennis-fechten-buehne-umsetzung.md` |
 | Gewichtheben | Buehne | 0,720 / 0,860 | Buehne | **0,887 / 0,944** | `gewichtheben-zufriedenstellend.md` |
-| Football | Feldspiel (Vorab-Pfad) | 0,345 / 0,699 | Feldspiel (**Live-Motor**) | **0,305 / 0,448** | `football-live-migration.md` |
+| Football | Feldspiel (Vorab-Pfad) | 0,345 / 0,699 | Feldspiel (**Live-Motor**) | **0,468 / 0,671** | `football-review-bugfixes.md` |
 
 Tennis und Fechten sind der groesste Sprung, den dieses Dokument je in einer Runde gesehen
 hat: beide wechselten das Chassis komplett (nicht nur ein Rezept) und sprangen von
 „durchgefallen, mit deutlichem Abstand" auf „bestanden, mit komfortablem Puffer". Football
-ist das Gegenteil: ein strukturell notwendiger Schritt (echter Live-Motor mit Downs, Line of
-Scrimmage, Formationen statt 48 kontextloser Duelle), dessen Kopfzahl trotzdem **gesunken**
-ist, weil das neue Rezept noch aus reinen Platzhaltern besteht (s. Abschnitt 5).
+ist ein anderer Fall: ein strukturell notwendiger Schritt (echter Live-Motor mit Downs, Line
+of Scrimmage, Formationen statt 48 kontextloser Duelle) liess die Kopfzahl beim Umstieg
+zunaechst **sinken** (0,345 → 0,305), weil das neue Rezept beim Start reine, ungemessene
+Platzhalter trug. Das ist inzwischen **nicht mehr der Stand**: eine eigene Rezeptkalibrierung
+gegen echte NFL-2024-Quoten (`football-rezept-kalibrierung.md`, 04.09.) hat das Rezept
+gemessen und gefittet und die Kopfzahl auf 0,460 gehoben; eine anschliessende Down-Verdrahtung
+in vier bis dahin toten Entscheidungsfunktionen (`football-review-bugfixes.md`, ebenfalls
+04.09.) hat sie zuletzt auf **0,468** bewegt — eine Bewegung innerhalb der eigenen
+Kader-Spannweite, also von Null nicht unterscheidbar (s. Abschnitt 2). Football bleibt klar
+unter der 0,80-Schranke (s. Abschnitt 5), ist aber kein Platzhalter-Rezept mehr.
 
 **Alle uebrigen sechzehn Zeilen bewegten sich ausschliesslich, weil die Messmethode selbst sich
 geaendert hat** — an ihrem Motor-Code wurde nichts angefasst. Die 02.09.-Fassung mass jede
@@ -133,8 +140,11 @@ aber zu laut — ein **Verlaesslichkeitsproblem**, das sich ueber Ereignisdichte
 ueber Rezepte. Hockey (Feldspieler: 0,719 gegen 0,818; alle 12: 0,618 gegen 0,748, s. Abschnitt
 1a) und Battlefield (0,325 gegen 0,619) stehen so da.
 Football faellt dagegen aus diesem Muster heraus: **beide** Zahlen sind kaderfest gemessen
-niedrig (0,305/0,448) — nach der Live-Migration sieht das eher nach einem ungemessenen,
-schlecht kalibrierten Rezept aus als nach reinem Verlaesslichkeitsrauschen (s. Abschnitt 5).
+niedrig (0,468/0,671) — das ist nach der eigenen Rezeptkalibrierung UND der Down-Verdrahtung
+(Abschnitt 5) gemessen, nicht mehr der ungemessene Platzhalter-Stand direkt nach der
+Live-Migration, und sieht damit
+eher nach einer echten Validitaetslücke (Rezept/Matrix) aus als nach reinem
+Verlaesslichkeitsrauschen.
 
 Wo beide Zahlen niedrig sind, belohnt die Mechanik das Falsche — ein **Validitaetsproblem**. Die
 verbleibenden drei Arena-Disziplinen (TDM, Mini-DM, Battlefield) stehen so da, unveraendert seit
@@ -280,15 +290,26 @@ bleibt bzw. neu hinzukommt:
    `u.zielP==="bedrohung"` (existiert bereits als Spieler-Option, ist aber nicht KI-Standard)
    mit Hysterese als Standardverhalten. **Reine Recherche, kein Commit an der Engine** — der
    naechste Schritt ist Umsetzung, keine weitere Recherche.
-2. **Football braucht eine echte Rezeptkalibrierung, keine weitere Strukturaenderung.** Der
-   Live-Motor selbst (Downs, Formationen, eigene Kurve) ist der richtige Unterbau — aber alle
-   acht Sub-Skill-Gewichte und alle Wahrscheinlichkeitskonstanten sind ungemessene Platzhalter,
-   und die Kopfzahl bewegte sich deshalb kaderfest RUECKWAERTS (0,345 → 0,305). Naechster
-   Schritt laut eigenem Bericht: ein Football-Analogon zu `scripts/miss-hockey-skillmittel.mjs`
-   bauen und `skillMittel`/`steil`/`korrektur` gegen reale NFL-Quoten fitten (Completion-Quote
-   65,3 %, Yards/Attempt 7,1 — beide bereits recherchiert). Zwei offene Kandidaten fuer die
-   Ursache, keiner davon bisher durchgemessen: zu duenne Ereignisdichte pro Spieler trotz Downs,
-   oder eine ungetestete MATRIX-zu-Sub-Skill-Abbildung.
+2. **Football: die Rezeptkalibrierung ist inzwischen gelaufen — der naechste Hebel ist die
+   MATRIX, nicht ein weiterer Rezeptanlauf.** Der Live-Motor selbst (Downs, Formationen,
+   eigene Kurve) war beim Umstieg der richtige Unterbau, aber alle acht Sub-Skill-Gewichte
+   und alle Wahrscheinlichkeitskonstanten waren zunaechst ungemessene Platzhalter, und die
+   Kopfzahl bewegte sich deshalb kaderfest zunaechst RUECKWAERTS (0,345 → 0,305). Das ist
+   **erledigt**: `football-rezept-kalibrierung.md` (04.09.) hat `skillMittel`/`steil`/
+   `korrektur` gegen reale NFL-2024-Quoten gefittet (Completion-Quote 65,3 %, Yards/Attempt
+   7,1) und den Football-Korridor (`scripts/miss-football-korridor.mjs`) gebaut; die
+   Kopfzahl stand seither bei 0,460 (`football-zufriedenstellend.md` bestaetigt sie per
+   Sicht-QA erneut). Eine anschliessende Down-Verdrahtung in vier bis dahin toten
+   Entscheidungsfunktionen (`waehlePlayCall`/`waehleFormationOffense`/
+   `waehleFormationDefense`/`waehleFootballTier`, `football-review-bugfixes.md`, ebenfalls
+   04.09.) hat sie auf **0,468** bewegt — eine Bewegung innerhalb der eigenen
+   Kader-Spannweite (0,258→0,383), also von Null nicht unterscheidbar, aber mechanisch
+   real (3rd & 8 spielt sich jetzt sichtbar anders als 1st & 10). Ein weiteres
+   Rezept-Grinding hat laut der Kalibrierungsrunde **abnehmenden Grenzertrag** — der von
+   ihr selbst benannte naechste Kandidat ist die Football-MATRIX (`BASIS_JE_DISC.football`:
+   spirit 25, torment 16 dominieren, power steht mit Gewicht 6 an neunter Stelle in einer
+   Kollisionssportart), nicht eine dritte Rezeptrunde — s.
+   `football-gewichtheben-opus-review.md` Abschnitt B.6.
 3. **Hockey: der billige Hebel ist gezogen, der teure (Zoneneintritt) hat sich zweimal nicht
    nachweisbar gehalten — ein dritter struktureller Anlauf ist nicht mehr das naechste
    Sinnvolle.** Nach drei Kalibrierrunden (Torwart-Fix, sieben-Schritt-Liste, eigene
@@ -393,7 +414,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Staffel | 40 % | 0,681 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze |
 | I-Spy | 35 % | 0,692 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |
 | Spurt | 45 % | 0,652 | Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
-| **Football** | **28 %** | **0,305** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung, aber **Rezept vollstaendig ungemessene Platzhalter** und die Kopfzahl bewegte sich dadurch RUECKWAERTS (0,345→0,305) · nicht im echten Spielstand |
+| **Football** | **28 %** | **0,468** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460) und mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468, Bewegung innerhalb der Kader-Spannweite) · naechster Hebel ist die MATRIX, nicht das Rezept (Abschnitt 5) · nicht im echten Spielstand |
 | Mini-DM | 30 % | 0,269 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt |
 | TDM | 30 % | 0,113 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
 | Battlefield | 30 % | 0,325 | Aufstellung repariert und nachgemessen (Siege Core stand hinten, jetzt Saison-Validitaet 0,619) · Zielwahl-Redesign recherchiert, nicht umgesetzt |
