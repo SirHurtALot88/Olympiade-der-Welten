@@ -251,3 +251,104 @@ auch der Ball-Handoffset) — kein Verhaltensunterschied für einen bestehenden 
 - `data/generated/sprite-fit-bewertung.json` — Bloater-Eintrag aktualisiert (2 → 4 Sterne).
 - `docs/design/bloater-modell-verbessert.md` — dieser Bericht.
 - `docs/design/bloater-vorher-nachher.png`, `docs/design/bloater-arena-live.png` — Screenshot-Belege.
+
+## Korrektur 04.09. — die 4-Sterne-Bewertung oben war falsch
+
+**Was schiefging.** Die Verifikation oben (Abschnitt "Verifikation") stützte sich auf einen
+gezoomten, handverlesenen Vorher/Nachher-Screenshot (`bloater-vorher-nachher.png`) und einen
+Live-Arena-Screenshot — beide vergrößert/ausgewählt, keiner davon die tatsächliche 64×64-PNG bei
+tatsächlicher Pixelgröße, wie sie `scripts/erzeuge-sprite-vorschauen.mjs` erzeugt und wie sie in
+der Bewertungs-Galerie erscheint. Chris hat das echte Ergebnis gesehen und zu Recht widersprochen:
+
+> „bloater passt irgendwie nicht, das müsste ja sein bauch sein und keine ahnung was das ist was
+> du daraus gemacht hast du hast es wohl selbst nicht gesichtet wenn du 4 stars dafür gibst"
+
+Nachgeprüft mit **exakt der Pose, die die echte Galerie-PNG erzeugt**
+(`window.__arena.renderProbe("Bloater")`, keine weiteren Argumente) bei echten 64×64 Pixeln, ohne
+Zoom: die drei alpha-transparenten, überlappenden Glutkreise der ersten Fassung (Alpha 0,30/0,68/
+0,92) verschwammen bei dieser Größe zu einem unscharfen orangen Fleck ohne erkennbare Kante — genau
+das, was Chris beschrieb. Die Lehre daraus (jetzt auch im Auftrag für künftige Sprite-Korrekturen
+festgehalten): **an der echten Galerie-Pose und echten Pixelgröße verifizieren, nicht an einem
+gezoomten oder handverlesenen Screenshot.**
+
+### Was diesmal geändert wurde
+
+`zeichneLeuchtenderBauch(ctx,cx,cy,radius)` umgebaut, drei Änderungen:
+
+1. **Fleisch-Sockel zuerst**: eine breite, flache Ellipse in dunklem, fauligem Grünton
+   (`BAUCH_SOCKEL="#3d4a2e"`, dunkler als die Zombie-Haut, damit sie sich davon absetzt) UNTER dem
+   Glutkreis, seitlich UND unten über die dünne Körpersilhouette hinausragend — die Wölbung ist
+   damit schon als Körperform da, bevor überhaupt Farbe draufkommt, statt nur ein Kreis obendrauf
+   zu sein.
+2. **Glut nahezu deckend statt alpha-verlaufend**: drei konzentrische Kreise mit festem, hohem
+   Alpha (0,95–1) statt 0,30/0,68/0,92 — bei 64px liest sich das als klar abgegrenzte Kugel statt
+   als Lichtschein. Ein dünner, fast schwarzer Konturring (`BAUCH_RISS="#2a0d04"`, deckend) um den
+   ganzen Kreis setzt ihn zusätzlich sichtbar vom Körper ab, wie ein echtes Körperteil statt ein
+   aufgeklebter Sticker.
+3. **Kleiner heller Glanzfleck** oben links (klassischer Kugel-Trick) für den Volumen-Eindruck, die
+   vier Risslinien aus der ersten Fassung blieben unverändert (funktionierten schon vorher).
+
+Radius/Position (`y-9*Z`, Radius `11*Z`) unverändert gelassen — das Problem war die Zeichnung
+selbst (Transparenz/Kontur), nicht die Platzierung; eine Neupositionierung hätte das eigentliche
+Problem nicht behoben.
+
+### Verifikation — diesmal an der echten Galerie-Pose, echte Pixelgröße, alle vier Richtungen
+
+`window.__arena.renderProbe("Bloater")` (ohne Argumente, der tatsächliche Aufruf aus
+`scripts/erzeuge-sprite-vorschauen.mjs`) UND `renderProbe("Bloater", undefined, false, dir)` für
+`dir` 0–3 (alle vier Blickrichtungen) ausgeführt, jede resultierende 64×64-PNG mit dem Read-Tool
+bei tatsächlicher Pixelgröße betrachtet — kein Zoom, keine Auswahl-Momentaufnahme. In allen vier
+Richtungen dasselbe Bild: ein klar abgegrenzter, kugelrunder, gerissener Glutkreis mit dunklem
+Rand, keine Vermischung mehr mit dem Körper.
+
+![Vorher/Nachher, oben in echten 64×64 Pixeln ohne jede Skalierung, unten zur Lesbarkeit 6x mit
+nearest-neighbor vergrößert (reine Pixelverdopplung, nicht die Grundlage der Bewertung)](./bloater-korrektur-04-09-vergleich.png)
+
+Die obere Zeile ist die tatsächliche Bewertungsgrundlage: 64×64 Pixel, kein Zoom. Die untere Zeile
+dient ausschließlich der Lesbarkeit in diesem Dokument (nearest-neighbor, keine Interpolation, die
+neue Kante glättet oder erfindet) — die Sterne-Bewertung unten stützt sich auf die obere Zeile.
+
+Zusätzlich `window.__arena.figurProbe("Bloater")` (Kader-Karte, 40×50) geprüft — derselbe klar
+abgegrenzte Bauch, kein Sonderfall nur für die Arena-Pose.
+
+### Syntax und Regression, erneut
+
+```
+node --check public/mockups/battle-mode.engine.js
+```
+→ OK.
+
+```
+node scripts/miss-alle-disziplinen.mjs 24
+```
+→ bit-identisch zum Stand vor dieser Korrektur (Vorher/Nachher-Läufe verglichen, reines
+Rendering, keine Simulationszahl bewegt sich) — s. Commit-Historie für den vollständigen
+Diff-Beleg.
+
+### Sprite-Fit-Bewertung: 4 → 3 Sterne, nicht wieder 4
+
+`data/generated/sprite-fit-bewertung.json` wurde auf **3 Sterne** korrigiert — bewusst
+zurückhaltender als die vorige (falsche) 4, nachdem sich diese als nicht haltbar erwiesen hat.
+Ehrliche Bilanz nach demselben Bild, das jetzt tatsächlich geprüft wurde:
+
+- **Behoben**: der Bauch liest sich jetzt bei echter Pixelgröße tatsächlich als runder, klar
+  abgegrenzter Körperteil statt als verwaschener Lichtschein/Fleck — der von Chris benannte
+  Kernfehler dieser Runde.
+- **Weiterhin offen** (Grund für 3, nicht 4 Sterne):
+  1. Der Bauch ist rund und klar, aber nicht **riesig** im Sinn des Portraits — dort dominiert er
+     über die halbe Körperhöhe und reicht bis zu den Knien; hier bleibt er ein Kreis von rund
+     halber Körperbreite auf der Rumpfmitte.
+  2. Körper/Gliedmaßen bleiben weiterhin die schlanke Standard-Zombie-Silhouette (dünne
+     Arme/Schultern statt wuchtig) — der neue Fleisch-Sockel deckt nur die unmittelbare
+     Bauchzone ab, kein durchgehend fleischigerer Körpertyp.
+
+## Geänderte/neue Dateien (Korrektur 04.09.)
+
+- `public/mockups/battle-mode.engine.js` — `zeichneLeuchtenderBauch` umgebaut (Fleisch-Sockel,
+  deckende statt alpha-verlaufende Glutkreise, Konturring, Glanzfleck); `BAU["Bloater"]`
+  unverändert (nur die Zeichenfunktion selbst geändert).
+- `data/generated/sprite-fit-bewertung.json` — Bloater-Eintrag korrigiert (4 → 3 Sterne, neue
+  Begründung).
+- `docs/design/bloater-modell-verbessert.md` — dieser Abschnitt.
+- `docs/design/bloater-korrektur-04-09-vergleich.png` — Vorher/Nachher, echte Pixelgröße oben,
+  6x-Vergrößerung nur zur Lesbarkeit unten.
