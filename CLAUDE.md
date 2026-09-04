@@ -66,7 +66,8 @@ Unser Hockeyspiel hat je Minute bereits die dreizehnfache NHL-Ereignisdichte. **
 Rangtreue heben will, arbeitet an der Validität, nicht an der Uhr.**
 
 **Was rho drückt, ist oft gar kein Fehler.** In Hockey steht der eignungsbeste Feldspieler
-in 79 % der Spiele auf Rang 1, in 94 % in den ersten zwei, nie auf dem letzten. Paare mit
+in 58 % der Spiele auf Rang 1, in 78 % in den ersten zwei, nie auf dem letzten (kaderfest
+gemessen, nicht Einzelkader — `docs/design/hockey-opus-review-nhl.md` Abschnitt 5.3). Paare mit
 mindestens 15 Eignungspunkten Abstand werden zu 99 % richtig geordnet. Was rho nach unten
 zieht, sind Paare unter zwei Punkten Abstand — die kann kein Motor der Welt ordnen, und sie
 sollen es auch nicht. **Die ehrlichere Abnahme fragt deshalb nach dem Star und nach der
@@ -76,8 +77,8 @@ Paartreue mit Abstand**, nicht nach einer nackten Rangkorrelation über alle Paa
 |---|---:|---:|
 | rho je Spiel | 0,670 | 0,786 |
 | Validität (Saison) | 0,874 | 0,881 |
-| Star auf Rang 1 | 79 % | — |
-| Star in den ersten zwei | 94 % | — |
+| Star auf Rang 1 (kaderfest) | 58 % | — |
+| Star in den ersten zwei (kaderfest) | 78 % | — |
 
 **Achtung, alle älteren Zahlen in diesem Repo sind auf einer Stichprobe von VIER entstanden.**
 `zieheFormkarten` nahm `z % n` von einem linearen Kongruenzgenerator, also die untersten Bits;

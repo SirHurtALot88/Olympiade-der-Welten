@@ -6,9 +6,26 @@ on:
   # bleibt erhalten und kann bei Bedarf jederzeit manuell über „Run workflow" (workflow_dispatch) gestartet
   # werden — er läuft nur nicht mehr automatisch um Mitternacht.
   workflow_dispatch:
+  # PUSH NACH MAIN HINZUGEFÜGT (04.09., Merge-Hygiene-Runde) — NUR für `rangtreue-schranke` unten,
+  # nicht für `full-season-playthrough`: der bleibt über das `if:` am Job selbst weiterhin
+  # ausschließlich manuell (Grund s. Kommentar oben, gilt unverändert). `rangtreue-schranke` ist
+  # der einzige Job im gesamten CI, der die 0,80-Rangtreue-Schranke gegen
+  # `data/generated/rangtreue-basislinie.json` prüft (docs/design/messgrundlage-kaderfest.md), und
+  # er lief seit seiner Einführung noch KEIN einziges Mal automatisch — nur auf Zuruf per
+  # `workflow_dispatch`. Er ist deterministisch (bit-identische Reproduktion nachgewiesen, s.
+  # `docs/design/naechste-schritte-fable-04-09.md` Abschnitt 2.7 Punkt 2) und kostet gemessen
+  # ~11 Minuten (`scripts/baue-rangtreue-basislinie.mjs`) — das lief bislang als Grund, ihn aus dem
+  # PFLICHT-Check `ci.yml` herauszuhalten (s. Kommentar am Job unten), ist aber kein Grund, ihn
+  # NIRGENDS automatisch zu fahren: 11 Minuten LAUFEN PARALLEL zu den Jobs in `ci.yml` (eigener
+  # Workflow, eigener Runner) und verlängern die Wartezeit auf einen grünen Merge nicht spürbar.
+  push:
+    branches: [main]
 
 jobs:
   full-season-playthrough:
+    # NUR MANUELL, unveraendert seit der Nightly-Abschaltung oben — der neue `push`-Trigger gilt
+    # workflowweit, soll aber ausschliesslich `rangtreue-schranke` automatisch anstossen.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -45,14 +62,15 @@ jobs:
   # EIGENER JOB statt Schritt im PFLICHT-Check `ci.yml`: alle zwanzig Disziplinen mit je
   # fuenf Kader-Varianten (n=24) kosten rund 11 Minuten (nachgemessen,
   # scripts/baue-rangtreue-basislinie.mjs) — zu teuer, um jeden Pull Request zu blockieren,
-  # aber billig genug fuer diesen Job, der ohnehin nur auf Zuruf laeuft.
+  # aber billig genug fuer diesen Job, der parallel zu `ci.yml` laeuft, ohne dessen Laufzeit zu
+  # verlaengern.
   #
-  # NUR MANUELL, wie der Job oben (s. Kommentar im `on:`-Block): dieser Workflow hat keinen
-  # automatischen Zeitplan mehr, weil der VOLLE Saisondurchlauf ihn unzuverlaessig machte —
-  # das betraf einen anderen Job, nicht diesen hier. Ob dieser Job einen eigenen, kuerzeren
-  # automatischen Rhythmus bekommt (er ist deutlich billiger und stabiler als der
-  # Saisondurchlauf), ist eine offene Entscheidung fuer Chris, keine, die hier vorweggenommen
-  # wird.
+  # SEIT 04.09. AUCH AUF `push` NACH `main` (s. `on:`-Block oben), nicht mehr nur manuell. Vorher
+  # war dieser Job — die EINZIGE Pruefung im ganzen CI gegen die 0,80-Rangtreue-Schranke — nur per
+  # `workflow_dispatch` erreichbar und lief seit seiner Einfuehrung nie automatisch; jeder Merge
+  # nach `main` konnte die Schranke unbemerkt reissen. `full-season-playthrough` bleibt ueber sein
+  # eigenes `if:` unveraendert NUR manuell (der Grund von vorher gilt weiter: der volle
+  # Saisondurchlauf macht Nightly unzuverlaessig, nicht dieser Job hier).
   rangtreue-schranke:
     runs-on: ubuntu-latest
     timeout-minutes: 30

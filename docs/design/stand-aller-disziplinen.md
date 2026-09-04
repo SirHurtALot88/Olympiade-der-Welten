@@ -222,9 +222,16 @@ bleibt als historischer Befund stehen; es gibt keine offene fuenfte Fundstelle.
 
 Es gibt weiterhin **vier Bilder fuer zwanzig Disziplinen**, eines je Chassis: `bodenFeldspiel`,
 `bodenBuehne`, `bodenArena`, `bodenSpurt`. Eigene Arenen haben weiterhin genau zwei Disziplinen
-— Basketball (Court) und Eishockey (Eisflaeche mit Linien, Torraeumen, Toren). Die uebrigen
-achtzehn teilen sich das Bild ihres Chassis, mit kleinen Abweichungen wie Bodenfarbe
-(`BA().boden`), Hindernissen und Steigung.
+— Basketball (Court) und Eishockey (Eisflaeche mit Linien, Torraeumen, Toren). Von den
+uebrigen achtzehn teilen sich siebzehn das Bild ihres Chassis, mit kleinen Abweichungen wie
+Bodenfarbe (`BA().boden`), Hindernissen und Steigung. **Gewichtheben ist die Ausnahme:**
+`zeichneBuehne()` verzweigt fuer `heben:true` in eine eigene `zeichneHeben()`
+(`public/mockups/battle-mode.engine.js:10629/10716`) — statt der zwoelf Teilnehmer in zwei
+Reihen, die alle anderen Buehnen-Disziplinen zeigen, rendert sie nur das aktive Duell (zwei
+Heber mittig, Hantel mit Last, Duellstand gross, wartende Paare klein am Rand). Das ist die
+"eigenes Buehnenbild"-Zeile in Abschnitt 5b: kein eigenes Chassis wie bei Basketball/Eishockey
+(der Boden bleibt `bodenBuehne`), aber eine eigene, nicht geteilte Szene innerhalb des
+Buehnen-Chassis (Bericht: `gewichtheben-buehnenbild-fortschritt.md` Abschnitt S2).
 
 **Neu seit dem 03.09.: Tennis und Fechten haben das geteilte Bild gewechselt, nicht nur das
 Rezept.** Tennis zeigte vorher das Feldspiel-Bild, Fechten das Arena-Bild (Sandgrund,
@@ -250,6 +257,15 @@ Field-Goal/Punt) mit je eigener Ballflugbahn. Nach eigenem Bericht funktioniert 
 ist aber noch nicht fein poliert (Formationen standen beim ersten Sichttest zu dicht). Die
 uebrigen siebzehn Disziplinen — inklusive der frisch migrierten Tennis/Fechten — haben weiterhin
 keine eigenen Bewegungen ueber das generische Chassis-Repertoire hinaus.
+
+**Bekannte, benannte Luecke (triagiert, nicht gebaut):** Fuer die Arena existiert **keinerlei
+Audio-Infrastruktur** ausserhalb Basketballs — der sichtbare Ton-Regler steuert ausschliesslich
+`bkVolume`/`bkMuted`, `public/sound/` enthaelt nur einen `basketball/`-Ordner, und die
+Basketball-Rollenprofile (`lib/lineups/matchday-slot-roles.ts`) sind nicht an das eigene
+Slot-/Rollensystem der Arena (`SLOTVON`, `renderKader`) angebunden, obwohl beide dieselben
+Rollen-IDs kennen. Beides sind Chris' letzte zwei In-Game-Meldungen ueberhaupt (25.08.),
+beide betreffen die Arena; beide sind laut Triage Feature-Luecken, kein Ein-Zeilen-Fix
+(`data/bug-reports/triage/bug-2026-08-25T13-50-21-597Z-rtyqa9.md`).
 
 ### Scoring und Produktion
 
