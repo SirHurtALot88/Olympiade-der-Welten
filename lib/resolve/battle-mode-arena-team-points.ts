@@ -102,6 +102,7 @@ import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import {
   runArenaFixtures,
+  ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
   type RunArenaFixturesOptions,
@@ -119,6 +120,32 @@ import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-refer
  * `arena-headless-runner.ts`.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball", "gewichtheben"]);
+
+/**
+ * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` (arena-headless-
+ * runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei UNABHAENGIG GEPFLEGTE Mengen,
+ * die trotzdem eine Teilmengen-Beziehung einhalten MUESSEN: jede Buehnen-Heben-Chassis-Disziplin
+ * ist zwangslaeufig auch arena-aufgeloest (das Chassis ist nur fuer eine Disziplin relevant, die
+ * ueberhaupt arena-simuliert wird). Ohne diese Pruefung wuerde eine kuenftige Disziplin, die nur
+ * in EINER der beiden Mengen landet (Copy-Paste-Fehler beim Hinzufuegen), STILL auf den falschen
+ * Chassis-Dispatch fallen: fehlt sie in `ARENA_RESOLVED_DISCIPLINE_IDS`, wird sie nie arena-
+ * aufgeloest (der Fehler bliebe unbemerkt, bis jemand fragt, warum die Disziplin nicht ankommt);
+ * fehlt sie umgekehrt (waere hier nicht der Fall, aber symmetrisch denkbar bei einem dritten
+ * Chassis) in `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`, wuerde `runArenaFixtures()` faelschlich
+ * `spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts aufrufen und mit der (jetzt korrigierten,
+ * s. `arena-headless-runner.ts`) Fehlermeldung "lieferte null" scheitern -- verwirrend statt klar.
+ * Wirft SOFORT beim Modul-Laden (Fail-Fast), nicht erst beim ersten betroffenen Spieltag-Resolve.
+ */
+for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
+  if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)) {
+    throw new Error(
+      `battle-mode-arena-team-points: "${buehneHebenId}" steht in ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS ` +
+        "(arena-headless-runner.ts), aber NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- jede Buehnen-Heben-" +
+        "Chassis-Disziplin muss auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch still " +
+        "auf den falschen Pfad.",
+    );
+  }
+}
 
 /** Chris' Vorgabe vom 30.08., "das ist gesetzt" — s. Plan Abschnitt 5.1. */
 export const ARENA_TEAM_POINTS = {
@@ -256,6 +283,19 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
 ]);
 
 /**
+ * Loest die Impact-Kurven-Konfiguration EINER Disziplin auf — mit Basketballs Konfiguration als
+ * Fallback fuer eine unbekannte `disciplineId` (sollte bei einem Eintrag in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` ohne passenden `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag nie
+ * vorkommen). EINZIGE Stelle, die diesen Fallback kennt (Review-Fund PR #776: vorher wortgleich
+ * doppelt an zwei Stellen — `resolveArenaPpsReferenz()` und
+ * `computeIndividualBoxscorePpsFromFixtureResults()` — dupliziert, mit dem Risiko, dass eine
+ * kuenftige Aenderung der Fallback-Regel eine der beiden Stellen vergisst).
+ */
+function loeseArenaImpactKonfigAuf(disciplineId: string): ArenaImpactKonfig {
+  return ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get(disciplineId) ?? ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get("basketball")!;
+}
+
+/**
  * Loest die Referenzwerte EINER Disziplin fuer eine (moeglicherweise unbekannte oder fehlende)
  * Feldgroesse auf — faellt auf die naechstgelegene GEZOGENE Feldgroesse zurueck, statt einen
  * Fehler zu werfen. Das deckt sowohl "playerCount fuer diesen Spieltag nicht ermittelbar"
@@ -279,7 +319,7 @@ export function resolveArenaPpsReferenz(
   disciplineId: string,
   playerCount: number | null,
 ): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
-  const konfig = ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get(disciplineId) ?? ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get("basketball")!;
+  const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const istGueltig = (referenz: ArenaPpsReferenzFeldgroesse) => referenz.iMittel > 0 && referenz.iKrass > referenz.iMittel;
   const verfuegbareGroessen = [...konfig.referenzFeldgroessen.entries()]
     .filter(([, referenz]) => istGueltig(referenz))
@@ -518,7 +558,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   disciplineId: string = "basketball",
 ): Map<string, number> {
   const { referenz } = resolveArenaPpsReferenz(disciplineId, playerCount);
-  const konfig = ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get(disciplineId) ?? ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get("basketball")!;
+  const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const ppsByPlayerId = new Map<string, number>();
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {

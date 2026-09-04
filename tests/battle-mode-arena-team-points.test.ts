@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
+import { ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS, type ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 import {
   ARENA_RESOLVED_DISCIPLINE_IDS,
   ARENA_TEAM_POINTS,
@@ -60,6 +60,21 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   it("enthaelt Basketball und Gewichtheben (Gewichtheben-Produktivierung S6)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("basketball")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
+  });
+
+  /**
+   * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
+   * (arena-headless-runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei unabhaengig
+   * gepflegte Mengen -- jede Buehnen-Heben-Chassis-Disziplin MUSS auch arena-aufgeloest sein,
+   * sonst faellt der Chassis-Dispatch in `runArenaFixtures()` still auf den falschen Pfad
+   * (`spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts). Das Modul selbst wirft dafuer
+   * bereits beim Laden (s. Kommentar dort) -- dieser Test macht die Erwartung zusaetzlich
+   * explizit und dokumentiert sie an einer fuer beide Mengen sichtbaren Stelle.
+   */
+  it("jede Buehnen-Heben-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
+    for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
+      expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)).toBe(true);
+    }
   });
 });
 

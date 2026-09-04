@@ -454,10 +454,17 @@ export async function runArenaFixtures(
       timeoutMs,
     });
 
+    // Review-Fund (PR #776): die Fehlermeldung unten muss die TATSAECHLICH aufgerufene
+    // Browser-Funktion nennen -- vor der Chassis-Weiche stand hier "spieleFeldspiel"
+    // hartkodiert, obwohl derselbe Codepfad seit der Gewichtheben-Produktivierung auch
+    // "spieleBuehneHeben" aufruft. Ein Fehler im Buehnen-Pfad haette damit faelschlich auf die
+    // falsche Funktion gezeigt und beim Debuggen eines echten Produktionsfehlers in die Irre
+    // gefuehrt.
+    const aufgerufeneFunktion = chassis === "buehneHeben" ? "spieleBuehneHeben" : "spieleFeldspiel";
     return rohErgebnisse.map((ergebnis, index) => {
       if (!ergebnis) {
         throw new Error(
-          `arena-headless-runner: spieleFeldspiel("${disziplin}", ...) lieferte null fuer Fixture ${index} (${vorbereitet[index].homeTeamId} vs. ${vorbereitet[index].awayTeamId}) — unbekannte Disziplin?`,
+          `arena-headless-runner: ${aufgerufeneFunktion}("${disziplin}", ...) lieferte null fuer Fixture ${index} (${vorbereitet[index].homeTeamId} vs. ${vorbereitet[index].awayTeamId}) — unbekannte Disziplin?`,
         );
       }
       // Namenszuordnung PRO FIXTURE (nicht global): derselbe Name in zwei VERSCHIEDENEN

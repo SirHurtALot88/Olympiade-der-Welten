@@ -399,6 +399,50 @@ Gezielt vorher geprüft:
 - `tests/battle-mode-arena-team-points.test.ts`, `tests/arena-headless-runner.test.ts` — neue
   Tests, s. Abschnitt 6. Kein bestehender Test verändert.
 
+## 7a. Nachgereicht: drei Code-Review-Funde (vor dem Merge behoben)
+
+Der Koordinator hat PR #776 gründlich gegengelesen (Produktionscode-Sorgfalt) — keine
+Korrektheitsfehler, keine Basketball-Regression, aber drei kleine Robustheits-/
+Wartbarkeitsfunde, alle synchron behoben, bevor gemergt wird:
+
+1. **Irreführende Fehlermeldung im Chassis-Dispatch** (`arena-headless-runner.ts`): die
+   `null`-Ergebnis-Fehlermeldung nannte immer `"spieleFeldspiel"`, auch wenn der Buehnen-Pfad
+   (`spieleBuehneHeben`) den `null` geliefert hatte — ein Fehler im Gewichtheben-Pfad hätte beim
+   Debuggen auf die falsche Funktion gezeigt. Behoben: die Meldung nennt jetzt die tatsächlich
+   aufgerufene Funktion (`aufgerufeneFunktion`, aus derselben `chassis`-Variable abgeleitet, die
+   auch den Dispatch selbst steuert).
+2. **Duplizierter Fallback-Lookup** (`battle-mode-arena-team-points.ts`): der Ausdruck
+   `ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get(disciplineId) ?? ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get
+   ("basketball")!` stand wortgleich zweimal (`resolveArenaPpsReferenz()` und
+   `computeIndividualBoxscorePpsFromFixtureResults()`). In eine gemeinsame Hilfsfunktion
+   `loeseArenaImpactKonfigAuf()` gezogen — eine künftige Änderung der Fallback-Regel kann jetzt
+   keine der beiden Stellen mehr vergessen.
+3. **Fehlende Querprüfung zwischen zwei unabhängig gepflegten Mengen**:
+   `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` (arena-headless-runner.ts) und
+   `ARENA_RESOLVED_DISCIPLINE_IDS` (battle-mode-arena-team-points.ts) stehen in einer
+   Teilmengen-Beziehung (jede Buehnen-Heben-Disziplin muss auch arena-aufgelöst sein), die nie
+   geprüft wurde — eine künftige Disziplin, die nur in einer der beiden landet, wäre still auf
+   den falschen Chassis-Dispatch gefallen. Behoben mit einer Fail-Fast-Prüfung beim Modul-Laden
+   von `battle-mode-arena-team-points.ts` (wirft sofort mit einer klaren Meldung, statt erst beim
+   ersten betroffenen Spieltag-Resolve stumm falsch zu laufen) PLUS einem expliziten Test
+   (`tests/battle-mode-arena-team-points.test.ts`, „jede Buehnen-Heben-Chassis-Disziplin ist auch
+   arena-aufgeloest").
+
+Alle drei Änderungen sind für Basketball wirkungslos (bestätigt): `tests/battle-mode-arena-team-
+points.test.ts` und `tests/arena-headless-runner.test.ts` liefen erneut vollständig grün (63 bzw.
+7 Tests), danach die volle Suite (`npm test`) noch einmal komplett: **8092/8093 Einzeltests
+grün** — dieselbe eine Umgebungs-Ausnahme wie in Abschnitt 6 (Zombie-Prozess-Zähler, diesmal in
+die andere Richtung ausgeschlagen: „expected 20 to be 10" statt vorher „expected 0 to be 10" —
+zwei GEGENSÄTZLICHE Ausschläge in zwei Läufen belegen zusätzlich, dass es Rauschen ist, kein
+gerichteter Leak durch diese Änderung; isoliert erneut zweimal sauber bestanden).
+
+**Nebenbefund während dieser Runde, dokumentiert statt verschwiegen**: der geteilte Container
+hatte zwischenzeitlich ein leeres `node_modules` (vermutlich durch eine der vielen parallelen
+Agenten-Worktree-Sessions auf demselben Host, der Datenträger stand bei 95–98 % Belegung) — ein
+schlichtes `npm ci` (nicht `npm install`, das hätte `package-lock.json` unnötig verändert)
+stellte es wieder her, ohne dass `package-lock.json`/`package.json` in diesem PR angerührt
+wurden.
+
 ## 8. Offene Architekturfragen für Chris
 
 1. **`barbell.tsx`/`buildBarbellInfo` mit literalen kg statt PPS-Remap** (s. 5.1) — will Chris
