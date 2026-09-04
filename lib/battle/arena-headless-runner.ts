@@ -82,6 +82,25 @@ const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
  * scripts/miss-arena-spielefeldspiel.mjs, PR 5s eigener Abnahme) bleibt unveraendert
  * durchgereicht.
  */
+/**
+ * BUEHNEN-DUELL-CHASSIS (Gewichtheben-Produktivierung, S6, docs/design/
+ * gewichtheben-produktivierung.md): `window.__arena.spieleFeldspiel()` kennt nur
+ * `FELDSPIEL_ART`-Disziplinen (Ballbesitz-Feldspiel, aktuell Basketball) -- es liefert fuer jede
+ * andere Disziplin bereits heute `null`, nie einen falschen Wert, weil es `FELDSPIEL_ART[fd]`
+ * selbst prueft. Gewichtheben laeuft ueber ein STRUKTURELL ANDERES Chassis (Buehnen-Duelle je
+ * Slot, s. `baueHebenDuelle()` in battle-mode.engine.js) und braucht deshalb den eigenen
+ * Einstiegspunkt `spieleBuehneHeben()`.
+ *
+ * NUR DIESE MENGE ENTSCHEIDET, WELCHE BROWSER-FUNKTION AUFGERUFEN WIRD -- keine
+ * If/Else-Kette auf einzelne Disziplins-IDs. Eine kuenftige Disziplin mit demselben
+ * Buehnen-Duell-Chassis (keine ist aktuell geplant) braucht hier nur einen weiteren Eintrag,
+ * keine neue Verzweigung. Bewusst GETRENNT von `ARENA_RESOLVED_DISCIPLINE_IDS`
+ * (battle-mode-arena-team-points.ts): jene Menge sagt "wird ueberhaupt arena-aufgeloest", diese
+ * hier sagt "mit welchem Chassis" -- zwei unabhaengige Fragen (eine dritte Feldspiel-Disziplin
+ * koennte arena-aufgeloest werden, ohne dieses Chassis zu brauchen, und umgekehrt).
+ */
+export const ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["gewichtheben"]);
+
 function seedZuZahl(seed: string | number): number {
   if (typeof seed === "number" && Number.isFinite(seed)) return seed;
   const text = String(seed);
@@ -122,9 +141,16 @@ export type ArenaFixtureBoxscoreEintrag = {
 export type ArenaFixtureResult = {
   homeTeamId: string;
   awayTeamId: string;
-  /** Punktestand [heim, gast] — direkt aus `spieleFeldspiel()`s `seiten`-Feld. */
+  /** Punktestand [heim, gast] — direkt aus `spieleFeldspiel()`/`spieleBuehneHeben()`s `seiten`-Feld. */
   seiten: [number, number];
   boxscore: ArenaFixtureBoxscoreEintrag[];
+  /**
+   * NUR fuer das Buehnen-Duell-Chassis gesetzt (s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`): die
+   * kumulierte Zweikampf-Kilogrammsumme je Seite [heim, gast] -- Grundlage fuer den Gesamt-kg-
+   * Tiebreak bei einem Duellgleichstand (Fable-Empfehlung 9.1, battle-mode-arena-team-points.ts).
+   * `undefined` fuer jedes Feldspiel-Chassis (Basketball) — unveraendertes Verhalten dort.
+   */
+  gesamtKg?: [number, number];
 };
 
 /**
@@ -256,6 +282,12 @@ function bereiteFixturesVor(
  * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten).
  */
 type RoherBrowserBoxscoreEintrag = { name: string; wert: number };
+type RoherBrowserFixtureErgebnis = {
+  disziplin: string;
+  seiten: [number, number];
+  boxscore: RoherBrowserBoxscoreEintrag[];
+  gesamtKg?: [number, number];
+};
 
 /**
  * Laeuft im Browser-Kontext (per `page.evaluate()` serialisiert) — darf deshalb nur auf seine
@@ -277,10 +309,16 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
   }[];
   disziplin: string;
+  // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
+  // oben. NUR diese Weiche entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
+  chassis: "feldspiel" | "buehneHeben";
   timeoutMs: number;
-}): Promise<Array<{ disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null>> {
+}): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
-    __arena?: { spieleFeldspiel: (fd: string, saat: number) => { disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null };
+    __arena?: {
+      spieleFeldspiel: (fd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBuehneHeben: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+    };
     __olyArenaKader?: unknown;
   };
 
@@ -314,7 +352,7 @@ async function simuliereFixturesImBrowser(payload: {
 
   await wartenAufMotor(payload.timeoutMs);
 
-  const ergebnisse: Array<{ disziplin: string; seiten: [number, number]; boxscore: RoherBrowserBoxscoreEintrag[] } | null> = [];
+  const ergebnisse: Array<RoherBrowserFixtureErgebnis | null> = [];
   for (let i = 0; i < payload.fixtures.length; i += 1) {
     const fixture = payload.fixtures[i];
     if (i > 0) {
@@ -324,7 +362,11 @@ async function simuliereFixturesImBrowser(payload: {
     if (!fenster.__arena) {
       throw new Error(`arena-headless-runner: window.__arena fehlt bei Fixture ${i}.`);
     }
-    ergebnisse.push(fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed));
+    ergebnisse.push(
+      payload.chassis === "buehneHeben"
+        ? fenster.__arena.spieleBuehneHeben(payload.disziplin, fixture.seed)
+        : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
+    );
   }
   return ergebnisse;
 }
@@ -397,6 +439,9 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
+    const chassis: "feldspiel" | "buehneHeben" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(disziplin)
+      ? "buehneHeben"
+      : "feldspiel";
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
       fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
         heim,
@@ -405,6 +450,7 @@ export async function runArenaFixtures(
         aufstellung,
       })),
       disziplin,
+      chassis,
       timeoutMs,
     });
 
@@ -432,6 +478,7 @@ export async function runArenaFixtures(
         awayTeamId: vorbereitet[index].awayTeamId,
         seiten: ergebnis.seiten,
         boxscore,
+        ...(ergebnis.gesamtKg ? { gesamtKg: ergebnis.gesamtKg } : {}),
       };
     });
   } finally {

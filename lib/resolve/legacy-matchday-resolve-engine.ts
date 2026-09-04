@@ -708,14 +708,19 @@ export function buildLegacyMatchdayResolvePreview(
         })),
       }));
     const { results: teamResultsAfterPowers, factorByTeamId: teamPowerDebuffFactorByTeamId } = applyTeamPowerDebuffs(rawTeamResults);
-    // Battle Mode PR7 (Plan Abschnitt 3.3c/5.1): NUR fuer Battle-Mode-Basketball ersetzt ein
+    // Battle Mode PR7 (Plan Abschnitt 3.3c/5.1), seit der Gewichtheben-Produktivierung (S6,
+    // docs/design/gewichtheben-produktivierung.md) DISZIPLINUEBERGREIFEND statt Basketball-fest:
+    // NUR fuer eine arena-aufgeloeste Disziplin (Mengen-Zugehoerigkeit zu
+    // `ARENA_RESOLVED_DISCIPLINE_IDS` — aktuell Basketball und Gewichtheben) ersetzt ein
     // Arena-Ergebnis (Sieg=2/Unentschieden=1/Niederlage=0, s. battle-mode-arena-team-points.ts)
     // die PPS-Rang-Formel — jede andere Disziplin/jeder andere Modus bleibt exakt beim Bisherigen.
+    // Diese Stelle selbst brauchte fuer die Erweiterung KEINE Code-Aenderung — sie pruefte schon
+    // vor der Gewichtheben-Produktivierung Mengen-Zugehoerigkeit, nicht `disciplineId === "basketball"`.
     const arenaOverridesForThisDiscipline =
       isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
         ? resolveOptions.arenaTeamPointsByTeamId ?? null
         : null;
-    // BOXSCORE-AN-PPS: dieselbe Sperre wie oben (nur Battle-Mode-Basketball) — s.
+    // BOXSCORE-AN-PPS: dieselbe Sperre wie oben (jede arena-aufgeloeste Disziplin) — s.
     // docs/design/boxscore-an-pps.md.
     const arenaIndividualPpsForThisDiscipline =
       isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)

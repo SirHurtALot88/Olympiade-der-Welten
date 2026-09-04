@@ -17493,6 +17493,52 @@
       M.zurueck(g);
       return {disziplin:fd, seiten, boxscore};
     },
+    // GEWICHTHEBEN-PRODUKTIVIERUNG (S6, docs/design/gewichtheben-produktivierung.md): dasselbe
+    // "ein Spiel, ein Ergebnis"-Muster wie spieleFeldspiel() direkt darueber, aber fuer die
+    // BUEHNEN-DUELL-STRUKTUR des Hebens (baueHebenDuelle) statt des Ballbesitz-Feldspiels.
+    //
+    // WARUM EIN EIGENER EINSTIEGSPUNKT UND NICHT spieleFeldspiel() SELBST ERWEITERT:
+    // spieleFeldspiel() prueft `FELDSPIEL_ART[fd]` (fuer Gewichtheben, eine BUEHNE_ART-Disziplin,
+    // immer `undefined` -- daher liefert es fuer "gewichtheben" schon heute `null`, nie einen
+    // falschen Wert) und liest den Punktestand aus `fsPunkte[0]/fsPunkte[1]` -- Feldspiel-
+    // internem Zustand, den BUEHNE_ART-Disziplinen nie fuellen. Ein Umbau von spieleFeldspiel()
+    // haette Basketballs bereits produktiven, getesteten Pfad angefasst (Regressionsrisiko) fuer
+    // eine Struktur, die strukturell nichts mit Feldspiel teilt. Dieser Einstiegspunkt beruehrt
+    // spieleFeldspiel() NICHT -- jede Zeile dort bleibt exakt wie sie war.
+    //
+    // GENERISCH UEBER `art.heben`, NICHT AUF "gewichtheben" HARDCODIERT: jede kuenftige
+    // BUEHNE_ART-Disziplin mit `heben:true` (aktuell nur Gewichtheben) laeuft hier automatisch
+    // mit, ohne eine zweite Kopie dieser Funktion.
+    //
+    // PUNKTESTAND JE SEITE: GEWONNENE DUELLE (0..jeSeite), exakt dieselbe Zaehlung wie
+    // updateHudBuehne()s BB().heben-Zweig -- NICHT die Kilogrammsumme (die waere ein
+    // Feldspiel-Punktestand-Analogon, aber IWF-Gewichtheben zaehlt gewonnene Zweikaempfe, s.
+    // Motoren-Kommentar bei BUEHNE_ART.gewichtheben und den Team-kg-Tiebreak fuer den Fall eines
+    // Duellgleichstands in battle-mode-arena-team-points.ts).
+    //
+    // `gesamtKg`: die kumulierte Zweikampf-Kilogrammsumme JE SEITE -- Grundlage fuer den
+    // Gesamt-kg-Tiebreak bei einem Duellgleichstand (Fable-Empfehlung 9.1,
+    // docs/design/gewichtheben-gameplay-fertig.md Abschnitt 4). Bewusst hier im Motor gebildet,
+    // nicht in Node aus dem Boxscore nachgerechnet: TEILNEHMER traegt bereits `u.side` und
+    // `u.summe` (= Zweikampf-kg, s. baueHebenDuelle) direkt aus derselben Simulation, ohne einen
+    // zweiten, potenziell abweichenden Rechenweg ueber Node-seitigen Namensabgleich aufzubauen
+    // (die Namenszuordnung in arena-headless-runner.ts dient einem anderen Zweck -- playerId je
+    // Boxscore-Eintrag, nicht Team-Summen).
+    spieleBuehneHeben:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].heben)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen).length;
+      const seiten=[duelle(0),duelle(1)];
+      const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore, gesamtKg};
+    },
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
     // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster
