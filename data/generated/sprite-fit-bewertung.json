@@ -51,9 +51,9 @@
  {
   "name": "Babuschinka",
   "slug": "babuschinka",
-  "sterne": 2,
-  "begruendung": "Menschliche Form korrekt, aber generischer junger Look statt der alten grauhaarigen Cyber-Hexe mit leuchtendem Tablet und Schaltkreis-Robe; identisches Sprite wie bei drei völlig anderen Charakteren wiederverwendet.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Graues, offen getragenes Haar und dunkel getoente Robe treffen die Kategorie \"alte Hexe\" jetzt eigenstaendig (vorher byte-identisches Sprite wie Bana/Dr Ironmind/Gralakar, kapuzenbedeckt statt offenhaarig); ein blaeulicher Schein nahe dem Kopf steht als Naeherung fuer die leuchtende Zauberhand/das Tablet. Die Schaltkreis-Musterung der Robe, die schwebenden Geldscheine und die geklauten Finger fehlen weiterhin.",
+  "fehlendesDetail": "Schaltkreis-Robenmuster, schwebende Geldscheine und die gluehende Klauenhand fehlen (mehrere Details, kein Einzel-Fix)."
  },
  {
   "name": "Bana",
@@ -114,9 +114,9 @@
  {
   "name": "Burster",
   "slug": "burster",
-  "sterne": 2,
-  "begruendung": "Monster-Humanoid-Kategorie grob vorhanden, aber es ist eine blasse Skelett-Optik statt der blutig-roten Muskelmonster-Textur mit riesigen Klingen-Krallen aus dem Portrait.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Rohe, zombiehafte Koerperfarbe statt reinweissem Skelett und ein rot gluehender Riss ueber der Brust treffen die \"blutig-rote Muskelmonster\"-Beschreibung deutlich besser als der vorherige, mit Threnox byte-identische Skelett-Bauplan. Die riesigen klingenartigen Knochenkrallen an beiden Armen und eine durchgehend blutrote statt nur teilweise gluehende Faerbung fehlen.",
+  "fehlendesDetail": "Klingenartige Knochenkrallen und eine durchgehend blutrote Faerbung fehlen (mehrere Details)."
  },
  {
   "name": "Butterfly",
@@ -205,9 +205,9 @@
  {
   "name": "Dr Ironmind",
   "slug": "dr-ironmind",
-  "sterne": 2,
-  "begruendung": "Kopfbedeckung als grobe Analogie zum Kopftuch vorhanden, aber Alter, Farbe und das leuchtende blaue Gerät der Feldärztin fehlen komplett - identisches Sprite wie bei völlig anderen Charakteren (Babuschinka, Bana, Gralakar) wiederverwendet.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Kapuze und braeunlich (bronze) getoente Robe treffen die Feldaerztin-Silhouette jetzt eigenstaendig (vorher byte-identisches Sprite wie Babuschinka/Bana/Gralakar); der blaeuliche Schein am Kopf steht als Naeherung fuer das leuchtende medizinische Geraet. Alter, das konkrete Symbol auf dem Geraet und die blutig verbundene Patientin/Zeltszene fehlen.",
+  "fehlendesDetail": "Alter, Geraete-Symbole und die Verbands-/Patientenszene fehlen (mehrere Details)."
  },
  {
   "name": "Draco",
@@ -303,9 +303,9 @@
  {
   "name": "Gralakar",
   "slug": "gralakar",
-  "sterne": 1,
-  "begruendung": "Die generische fröhliche Abenteurer-Vorlage hat keinerlei Bezug zur bedrohlichen Sensenmann-Gestalt mit rot glühenden Augen und sichtbarem Rippenkäfig - identisches Sprite wie bei drei völlig anderen Charakteren (Babuschinka, Bana, Dr Ironmind) wiederverwendet.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Skelett-Koerper plus halbtransparente Erscheinung (geist) und rote wabernde Energie treffen die Grundidee des schwebenden Wraiths mit rot gluehenden Augen deutlich besser als der vorherige, mit Babuschinka/Bana/Dr Ironmind identische Kapuzen-Frauen-Bauplan (vorher 1 Stern, Bild und Sprite hatten keinerlei Bezug). Die wallende, zerfetzte Robe, die ausgestreckte Klauenhand und die Friedhofsstimmung fehlen weiterhin.",
+  "fehlendesDetail": "Zerfetzte Robe/Tendrils, ausgestreckte Klauenhand und der sichtbare Rippenkaefig-Schein fehlen (mehrere Details)."
  },
  {
   "name": "Gram",
@@ -380,9 +380,9 @@
  {
   "name": "Ironhoof",
   "slug": "ironhoof",
-  "sterne": 2,
-  "begruendung": "Gehörnter Kopf als grobe Analogie zum Minotaurus vorhanden, aber der zentaurische Unterkörper, die Doppeläxte und die massive Statur fehlen komplett - der Kopf wirkt eher wie ein Reh als ein Stier.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Gebogene Widderhoerner, Streitaxt und ein Schweif treffen jetzt mehrere sichtbare Details des Zentauren-Kriegers aus dem Bild (vorher byte-identisch mit Medibull, nur ein Kopf-Tausch ohne diese Details, s. sprite-fit-ergebnisse.md). Der namensgebende Pferde-Unterkoerper bleibt strukturell unerreichbar (kein Zentauren-Koerper im Baukasten) — das Sprite bleibt zweibeinig statt vierbeinig.",
+  "fehlendesDetail": "Der Pferde-Unterkoerper (Zentaur) fehlt strukturell; nur die Oberkoerper-Details (Hoerner, Axt, Schweif) sind nachgeruestet."
  },
  {
   "name": "Issyria",
@@ -583,9 +583,9 @@
  {
   "name": "Mushu",
   "slug": "mushu",
-  "sterne": 2,
-  "begruendung": "Flügel, Schwanz und die reptilienartige Form passen lose zum Greifen-Wesen, aber die Farbe (grau statt cremeweiß), die Fledermausflügel statt großer Federflügel und die imposante Statur fehlen.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Federfluegel statt Fledermausfluegel und ein helleres Hautton statt Grau treffen zwei der in der letzten Bewertung ausdruecklich genannten Fehlstellen (vorher byte-identisch mit Rhyx'Tal, einem voellig andersartigen Hoehlen-Golem, s. sprite-fit-ergebnisse.md). Die Statur bleibt zweibeinig-humanoid statt eines echten Vierbeiners, die hellblaue Augenfarbe und eine reinweisse statt hautfarbene Faerbung fehlen weiterhin.",
+  "fehlendesDetail": "Vierbeinige Statur, blaue Augenfarbe und reinweisse (statt hautfarbene) Faerbung fehlen (mehrere Details)."
  },
  {
   "name": "Myrkos",
@@ -723,9 +723,9 @@
  {
   "name": "Rhyx'Tal",
   "slug": "rhyx-tal",
-  "sterne": 2,
-  "begruendung": "Nur die graue Farbe erinnert entfernt an den Stein-Troll; die geflügelte Drachen-Form hat sonst keinen Bezug zum wuchtigen, flügellosen Höhlen-Golem mit rissiger Steinhaut und leuchtend orangen Augen - identisches Sprite wie bei Mushu (ein Greifenwesen) wiederverwendet.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "vollbild:\"golem\" mit dunkler Basalt-Toenung und energiekern (rot-orange leuchtende Augen) trifft den \"wuchtigen, kauernden Hoehlen-Koloss mit rissiger Steinhaut und leuchtend orangen Augen\" aus dem Bild sehr gut — dieselbe Kreaturklasse wie Lava Golem/Krolach/Vorrak, statt des vorher mit Mushu byte-identischen gefluegelten Echsen-Sprites (vorher 2 Sterne, s. sprite-fit-ergebnisse.md).",
+  "fehlendesDetail": "Die zerklueftete, zahnreiche Kopfform/Schnauze aus dem Bild fehlt (der generische Golem-Kopf ist glatt/blockig)."
  },
  {
   "name": "Riley Le Rogue",
