@@ -12057,15 +12057,18 @@
     const box=document.getElementById("profStats");box.textContent="";
     // NACHGEPRUEFT gegen die Simulation — zum zweiten Mal, und zum zweiten Mal stimmte es
     // nicht. Diese Zeilen sind der Ort, an dem die Erklaerung der Mechanik hinterherhinkt:
-    // sie standen noch auf Leben mal 12 (heute 4, siehe LEBEN_JE_LP) und auf einer
-    // Tempo-Verkuerzung der Abklingzeit von bis zu 30 % (heute null, siehe cdKuerzung).
-    // Ein Spieler las hier 1,09 s Abklingzeit fuer Slash, waehrend die Arena mit 0,3 s
-    // rechnete. Wer eine Zahl anzeigt, die der Kampf nicht fuehrt, erklaert nichts — er
-    // luegt praezise.
+    // sie standen noch auf Leben mal 12 (heute 4, siehe LEBEN_JE_LP). Ein Spieler las hier
+    // 1,09 s Abklingzeit fuer Slash, waehrend die Arena mit 0,3 s rechnete. Wer eine Zahl
+    // anzeigt, die der Kampf nicht fuehrt, erklaert nichts — er luegt praezise.
+    //
+    // Seit 04.09. (Chris' Umkehr, siehe cdKuerzung in baueEinheit()) kuerzt Tempo die
+    // Abklingzeit wieder — dieselbe gedeckelte Kurve hier dupliziert, weil cdKuerzung
+    // lokal in baueEinheit() lebt und aus diesem Anzeige-Code heraus nicht sichtbar ist.
+    const cdKuerzungAnzeige=Math.round(30*s.TMP/(s.TMP+120));
     const ex={LP:"hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus",
       ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
-      TMP:Math.round(KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)+" px/s Marschtempo · beschleunigt den Angriff nicht",
+      TMP:Math.round(KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)+" px/s Marschtempo · kürzt Abklingzeiten um "+cdKuerzungAnzeige+" %",
       AUS:"verliert ab Sekunde 35 "+((100-s.AUS)*0.11).toFixed(2)+" % je Sekunde"};
     renderLevelUp(p);
     for(const k of KEYS){
@@ -12480,23 +12483,30 @@
     if(k.includes("shoot"))return REGEN.archer;
     return REGEN.neutral;
   };
-  // TEMPO BESCHLEUNIGT DEN ANGRIFF NICHT MEHR.
+  // TEMPO BESCHLEUNIGT DEN ANGRIFF WIEDER — Chris' bewusste Umkehr, 04.09., woertlich:
+  // "mach die schlagfrequenz vom tempo abhaengig".
   //
-  // Bis hierher kuerzte Tempo jede Abklingzeit um bis zu 30 %. Chris: "schau, dass Tempo
-  // nicht den Angriff beschleunigt — du musst die Mechaniken wirklich von Eslabong
-  // uebernehmen, sonst funktioniert es nicht." Und die Klassenkarten geben ihm recht:
-  // dort steht an JEDEM Skill eine feste Abklingzeit (Magic Heal 1s CD, Holy Light 11s CD,
-  // Medium Dash 4s CD). Keine davon haengt am Tempo des Traegers.
+  // Bis heute stand hier cdKuerzung=(u)=>0, mit der Begruendung: die Klassenkarten des
+  // Vorbilds zeigen an JEDEM Skill eine feste Abklingzeit (Magic Heal 1s CD, Holy Light
+  // 11s CD, Medium Dash 4s CD), keine haengt am Tempo des Traegers — und weil die
+  // Abklingzeit im Nenner steht, multipliziert sich jede Tempo-Kuerzung direkt auf den
+  // Schaden je Sekunde, waehrend die TDM-Matrix Tempo mit Gewicht NULL bepreist. Diese
+  // Begruendung GALT BIS HEUTE. Chris hat sie mit der Anweisung oben ausdruecklich
+  // aufgehoben — das ist keine offene Frage mehr, sondern eine getroffene Entscheidung,
+  // die hier dokumentiert und nicht wiederholt in Frage gestellt wird.
   //
-  // Das war auch kein kleiner Nebeneffekt: die Abklingzeit steht im Nenner, also
-  // multipliziert sie sich direkt auf den Schaden je Sekunde. Ein Spieler mit Tempo 80
-  // schlug damit 18 % oefter zu als einer mit Tempo 20 — bezahlt hat er dafuer nichts,
-  // denn die TDM-Matrix bepreist Tempo mit Gewicht NULL.
+  // Was bleibt: die Matrix-Warnung von oben ist weiterhin wahr und unveraendert scharf.
+  // Ein schnellerer Kaempfer bekommt durch diese Aenderung wieder mehr Gelegenheiten,
+  // ohne dass die TDM-Eignungsformel dafuer bezahlt. Ob das die Rangtreue hebt (mehr
+  // Ereignisse haengen jetzt an einem Attribut) oder sie verzerrt (die Mechanik belohnt
+  // etwas, das die Matrix nicht bepreist, und driftet von ihr weg), ist gemessen, nicht
+  // angenommen — s. docs/design/arena-tempo-schlagfrequenz.md.
   //
-  // Tempo bleibt, wofuer es da ist: Laufgeschwindigkeit. Wer schnell ist, ist zuerst da
-  // und kommt schneller wieder heraus — er schlaegt nur nicht haeufiger zu.
-  const cdKuerzung=(u)=>0;
-  const abkling=(u,sk_cd,fat)=>sk_cd/Math.max(.5,fat);
+  // Formel: unveraendert die Kurve aus Commit 9290fbf4 (git log -S "cdKuerzung"), die
+  // schon vor der Abschaltung hier stand und im Kommentar oben (Zeile ~12460, nie
+  // geloescht) weiter die richtige Groessenordnung nannte.
+  const cdKuerzung=(u)=>0.30*u.TMP/(u.TMP+120);
+  const abkling=(u,sk_cd,fat)=>sk_cd*(1-cdKuerzung(u))/Math.max(.5,fat);
   // Der schwere Schlag kostet zusaetzlich seine Haltezeit — die steht am Skill.
   const abklingSchwer=(u,sk,fat)=>abkling(u,sk.cd+sk.halten,fat);
   // Schaden: Basisschaden des Skills mal Angriffswert. Bei ANG 100 traegt der Skill seinen
@@ -12885,8 +12895,10 @@
   // Skill, also hat jedes Kit einen Eintrag mehr.
   const kitVon=(alt)=>!alt?null:(alt===ARCHER?ARCHER2:alt===MATRIARCH?MATRIARCH2:alt===FIGHTER?FIGHTER2:alt);
 
-  // Ebenfalls ohne Tempo (siehe cdKuerzung): der Grundtakt ist der Takt des
-  // Grundschlags, und der steht am Kit, nicht an den Beinen.
+  // Feste Vergleichsbasis, absichtlich OHNE das echte Tempo der Einheit (TMP 40 ist ein
+  // fixer Messwert, kein Attribut-Lookup): dies ist nur der Nenner fuer die MESS-Kennzahl
+  // "Skill bereit, aber ungenutzt", nicht die tatsaechliche Abklingzeit — die läuft ueber
+  // abkling()/cdKuerzung() und traegt seit 04.09. wieder Tempo, s. dort.
   const grundtaktVon=(u)=>1/(0.5+40/120);
 
   // REICHWEITE AB KOERPER. Die Zahl aus dem Kit ist der Arm, nicht der Abstand der
