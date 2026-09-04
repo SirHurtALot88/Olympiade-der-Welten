@@ -56,6 +56,22 @@ export function auswerten(spieleListe) {
   };
 }
 
+// Gibt `true` zurueck, wenn IRGENDEIN Teilnehmer in der Spieleliste als Torwart markiert
+// ist (Fable-Recherche 1.1/3.1: Hockeys Torwart-Wert ist eine andere Formel als die der
+// Feldspieler und schwankt je Spiel binomial staerker, als der reale Faehigkeitsunterschied
+// zwischen bestem und schlechtestem Torwart ausmacht — die 0,80-Schranke soll ihn deshalb
+// NICHT mitordnen). Fuer jede andere Disziplin ist `torwart` nie gesetzt, die Funktion
+// liefert also `false` und die aufrufende Seite laesst die Feldspieler-Spalte einfach weg.
+export function hatTorwart(spieleListe) {
+  return spieleListe.some((s) => s.teilnehmer.some((t) => t.torwart === true));
+}
+
+// Dieselbe `spiele`-Liste OHNE die als Torwart markierten Teilnehmer — fuer `auswerten()`,
+// wenn nur die Feldspieler geordnet werden sollen.
+export function ohneTorwart(spieleListe) {
+  return spieleListe.map((s) => ({ ...s, teilnehmer: s.teilnehmer.filter((t) => !t.torwart) }));
+}
+
 export function median(werte) {
   const s = [...werte].sort((a, b) => a - b);
   const n = s.length, m = n >> 1;
@@ -105,6 +121,25 @@ export async function baueSynthetischeKaderFamilie(seite) {
 }
 
 /**
+ * Feldspieler-only-Zusatz (Fable-Recherche 1.1/3.1): nur ausgefuellt, wenn IRGENDEINER der
+ * Spieldurchlaeufe einen als Torwart markierten Teilnehmer enthaelt (heute nur Hockey) —
+ * fuer jede andere Disziplin liefert das ein leeres Objekt, und `disziplinMessen` gibt
+ * exakt dieselben Felder zurueck wie vorher. `gruppen` ist die Liste der Spieldurchlaeufe,
+ * je Kader-Variante einer (oder ein einzelner Eintrag ohne Kaderfamilie).
+ */
+function feldOnlyZusatz(gruppen) {
+  if (!gruppen.some((g) => hatTorwart(g.spiele))) return {};
+  const ausw = gruppen.map((g) => ({ label: g.label, ...auswerten(ohneTorwart(g.spiele)) }))
+    .filter((v) => !Number.isNaN(v.spiel));
+  if (!ausw.length) return {};
+  return {
+    spielMedFeld: median(ausw.map((v) => v.spiel)), spielSpanFeld: spannweite(ausw.map((v) => v.spiel)),
+    saisonMedFeld: median(ausw.map((v) => v.saison)), saisonSpanFeld: spannweite(ausw.map((v) => v.saison)),
+    teilnehmerFeld: Math.round(ausw.reduce((a, v) => a + v.teilnehmer, 0) / ausw.length),
+  };
+}
+
+/**
  * Misst EINE Disziplin ueber die gegebene Kader-Familie (oder ohne Familie den bisherigen
  * Einzelkader-Weg) und fasst sie zu Median/Spannweite zusammen. `seite` ist eine
  * Playwright-Page mit bereits geladenem `window.__arena`.
@@ -133,9 +168,13 @@ export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite }) {
       saisonMed: median(ausw.map((v) => v.saison)), saisonSpan: spannweite(ausw.map((v) => v.saison)),
       teilnehmer: Math.round(ausw.reduce((a, v) => a + v.teilnehmer, 0) / ausw.length),
       varianten: ausw,
+      ...feldOnlyZusatz(x.varianten),
     };
   }
   if (!x.spiele.length) return { d, fehler: "keine Spiele" };
   const e = auswerten(x.spiele);
-  return { d, chassis: x.chassis, spielMed: e.spiel, spielSpan: 0, saisonMed: e.saison, saisonSpan: 0, teilnehmer: e.teilnehmer };
+  return {
+    d, chassis: x.chassis, spielMed: e.spiel, spielSpan: 0, saisonMed: e.saison, saisonSpan: 0, teilnehmer: e.teilnehmer,
+    ...feldOnlyZusatz([{ label: null, spiele: x.spiele }]),
+  };
 }

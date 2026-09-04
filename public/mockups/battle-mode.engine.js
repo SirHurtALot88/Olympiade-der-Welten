@@ -4890,6 +4890,10 @@
         // NHL Game Score gewichtet eine erste Vorlage hoeher als eine zweite (0,7 gegen
         // 0,55), `assists` bleibt die Summe fuer Boxscore/Anzeige unveraendert.
         assists1:0,assists2:0,
+        // NUR HOCKEY: aufsummierte Torwahrscheinlichkeit (pTor) jedes Schusses, der aufs
+        // Tor kam (K3, hockey-naechster-hebel-recherche-fable.md 3.3). Ausserhalb von
+        // Hockey immer 0 und ungelesen (feldspielWert liest u.xg nur im Hockey-Zweig).
+        xg:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,
         // NUR FOOTBALL: Yards nach Quelle getrennt (feldspielWert unten), wie eine reale
@@ -5633,7 +5637,20 @@
       // A1/A2 GETRENNT GEWICHTET (Impact-Verteilung-Recherche 5.4, wie NHL Game Score
       // 0,7/0,55): eine erste Vorlage zaehlt mehr als eine zweite. `assists` (Summe) bleibt
       // fuer Boxscore/Anzeige unveraendert, hier zaehlen assists1/assists2 getrennt.
-      return u.punkte*3+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
+      //
+      // TORE HALB ALS xG GEBUCHT (K3, hockey-naechster-hebel-recherche-fable.md 3.3,
+      // gemessen und uebernommen): vorher `u.punkte*3`. Ein Tor ist bei ~9% Torquote
+      // Poisson-Rauschen (1,04 +/- 1,67 je Spieler und Spiel) — ein Spieler mit vielen
+      // guten Chancen, aber einmal Schusspech, sah in EINEM Spiel wie ein schwacher
+      // Spieler aus. `u.xg` (Summe der pTor jedes Schusses, der aufs Tor kam, s.
+      // hockeySchussAusgang/loeseHockeySchuss) ist die kalibrierte TORWAHRSCHEINLICHKEIT
+      // desselben Schusses — im Erwartungswert identisch zu einem Tor, aber ohne den
+      // Muenzwurf. `punkte*1.5+xg*1.5` haelt den Erwartungswert einer Torchance gleich
+      // (ein Schuss mit pTor 0,5, der reingeht, zaehlt 1,5+0,75=2,25 statt vorher 3 — der
+      // Unterschied ist die tatsaechlich gesenkte Streuung, nicht eine Restwertung nach
+      // unten) und senkt gemessen die Spiel-zu-Spiel-Verlaesslichkeit der Feldspieler von
+      // 0,661 auf 0,710 (miss-alle-disziplinen.mjs, kaderfest, n=24, Kader-Familie).
+      return u.punkte*1.5+u.xg*1.5+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
             // GEWICHT DER GEWONNENEN PUCKS: 0,5 -> 0,2, und zwar an der realen Formel
       // ausgerichtet statt geschaetzt. Der NHL Game Score (Luszczyszyn 2016) kennt einen
       // Posten "loser Puck gewonnen" UEBERHAUPT NICHT — er zaehlt Tore (0,75), Vorlagen
@@ -7694,11 +7711,16 @@
   // eine eigene Spielsituation mit eigenem Ausgang — genau daran haengt, dass sich das
   // Spiel vor dem Tor staut, statt dass Schuesse durchlaufen.
   function hockeySchussAusgang(schuetze,technik,blockKandidat){
+    // `pTor` faehrt seit K3 (Fable-Recherche 3.3) auf JEDEM Rueckgabewert mit — 0 fuer
+    // "geblockt"/den fruehen "vorbei"-Wurf (der Schuss kam nie aufs Tor, hat also keine
+    // TORWAHRSCHEINLICHKEIT im Sinne dieser Formel), sonst die unten berechnete Zahl.
+    // KEIN neuer rr()-Aufruf und KEINE Verschiebung der bestehenden — die drei Wuerfe
+    // (Block, Vorbei, Tor/Abpraller-vs-Fest) stehen exakt an derselben Stelle wie vorher.
     if(blockKandidat){
       const pBlock=Math.max(0.05,Math.min(0.35,HK_BLOCK_BASIS+(blockKandidat.ABWEHR-50)*HK_BLOCK_K));
-      if(rr()<pBlock)return {ausgang:"geblockt",blocker:blockKandidat,torwart:null};
+      if(rr()<pBlock)return {ausgang:"geblockt",blocker:blockKandidat,torwart:null,pTor:0};
     }
-    if(rr()<HK_VORBEI)return {ausgang:"vorbei",torwart:null};
+    if(rr()<HK_VORBEI)return {ausgang:"vorbei",torwart:null,pTor:0};
     const tw=torwartVon(1-schuetze.side);
     // PARADE 20 -> Faktor 1,00 (kein Halt), PARADE 95 -> 0,55. Bewusst gemaessigt: der
     // Torwart soll ein spuerbarer Unterschied sein, aber nicht die einzige Zahl, die
@@ -7706,12 +7728,16 @@
     const paradeFaktor=tw?1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060)):1;
     const pTor=Math.max(0.01,Math.min(0.60,
       technik*(tw?HK_TOR_SKALA:HK_TOR_SKALA_LEER)*paradeFaktor));
-    if(rr()<pTor)return {ausgang:"tor",torwart:tw};
-    if(!tw)return {ausgang:"vorbei",torwart:null};
-    return {ausgang:(rr()<HK_ABPRALLER)?"abpraller":"fest",torwart:tw};
+    if(rr()<pTor)return {ausgang:"tor",torwart:tw,pTor};
+    if(!tw)return {ausgang:"vorbei",torwart:null,pTor};
+    return {ausgang:(rr()<HK_ABPRALLER)?"abpraller":"fest",torwart:tw,pTor};
   }
   function loeseHockeySchuss(flug,art){
     const schuetze=flug.schuetze, hk=flug.hockey, tw=hk.torwart;
+    // K3 (Fable-Recherche 3.3): jeder Schuss bucht seine Torwahrscheinlichkeit auf xg,
+    // egal ob er am Ende reingeht — 0 bei "geblockt"/"vorbei" (s. hockeySchussAusgang).
+    // feldspielWert liest u.xg nur im Hockey-Zweig, ausserhalb von Hockey bleibt es 0.
+    schuetze.xg=(schuetze.xg||0)+(hk.pTor||0);
     // DIE ABNAHME MUSS DIESE SCHUESSE SEHEN. Ein gehaltener, abgeprallter oder geblockter
     // Schuss war GENOMMEN und ist NICHT reingegangen — fuer jede Trefferquoten-Statistik
     // also ein Fehlwurf. Er wird aber als "block" protokolliert, und die Zaehlung in der
@@ -9974,6 +10000,16 @@
   // selbst, nicht nur in die Ansage.
   const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
   const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
+  // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
+  // Selbstvertrauen auch in die physische Obergrenze?"). Auf 0 gehalten: `tagesmax`
+  // (Zweikampf-Ceiling, Sinclair-Anzeige) haengt ausschliesslich an LAST (power/health/
+  // determination) — Konfidenz/ANSAGE wirkt nur auf die ERFOLGSCHANCE innerhalb dieses
+  // Fensters (HEBEN_WAGNIS_ANSAGE_FLEX oben) und auf Eroeffnungshoehe/Sprunggroesse, nie
+  // auf das Fenster selbst. Gemessen ist auch die Alternative (Wert > 0, macht ANSAGE zum
+  // zweiten Kanal FUER die Obergrenze) — s. docs/design/gewichtheben-zufriedenstellend.md
+  // fuer beide Zahlen und die Begruendung, warum 0 blieb. Ein-Zeilen-Umkehr: Wert setzen.
+  const HEBEN_TAGESMAX_ANSAGE_K=0.0045;
   // GROESSE IST KEIN ATTRIBUT — sie steht in keiner Matrix, und einflussVon hebt sie
   // nicht. Wuerde sie die Kilogramm im ERGEBNIS verschieben, waere sie ein verstecktes
   // neuntes Gewicht, das keine Messung sieht. Sie verschiebt deshalb nur die ANZEIGE:
@@ -10005,7 +10041,7 @@
     for(const [a,b,plan] of paar){
       for(const u of [a,b]){
         u.runden=[]; u.summe=0; u.aktuell=-1;
-        u.tagesmax=HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST;
+        u.tagesmax=(HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST)*(1+(u.ANSAGE-50)*HEBEN_TAGESMAX_ANSAGE_K);
         u.maxReissen=u.tagesmax*HEBEN_ANTEIL_REISSEN;
         // Wer schlecht erholt, hat im Stossen weniger uebrig. 0,94 bei ERHOLUNG 50.
         u.maxStossen=u.tagesmax*(1-HEBEN_ANTEIL_REISSEN)
@@ -16968,7 +17004,7 @@
               // Eishockey-eigene Spalten. Ausserhalb von Hockey bleiben sie 0 — der
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
-              strafminuten:u.strafminuten,
+              strafminuten:u.strafminuten, xg:+((u.xg||0).toFixed(3)),
               // Football-eigene Spalten (Rezept-Feinkalibrierung), dasselbe Muster: an
               // jeder Einheit vorhanden, ausserhalb von Football immer 0.
               passYards:u.passYards, laufYards:u.laufYards, fangYards:u.fangYards,
@@ -17479,7 +17515,10 @@
           const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig,
             bein:u.bein??null, etappe:u.etappenZeit??null}))
             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
-            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
+            // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
+            // und macht die Teilnehmerliste dort ununterscheidbar von vorher.
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig,torwart:!!u.torwart}))
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
@@ -17491,7 +17530,8 @@
               wert:Math.round((w[u.n]||0)*100)/100,
               ...(u.bein!=null?{bein:u.bein,
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
-              ...(u.reihe!=null?{reihe:u.reihe}:{})}))});
+              ...(u.reihe!=null?{reihe:u.reihe}:{}),
+              ...(u.torwart?{torwart:true}:{})}))});
         }
         return spiele;
       };

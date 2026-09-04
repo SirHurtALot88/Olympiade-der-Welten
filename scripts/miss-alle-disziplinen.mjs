@@ -113,6 +113,19 @@ for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) 
     + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
     + z.saisonMed.toFixed(3).padStart(21) + z.saisonSpan.toFixed(3).padStart(12)
     + "   " + ok);
+  // FELDSPIELER-ONLY (Fable-Recherche 1.1/3.1): nur ausgefuellt, wenn die Disziplin eine
+  // Rolle mit eigener, andersartiger Wertformel kennt (heute nur Hockeys Torwart) — die
+  // Zwoelfer-Zahl oben bleibt die, gegen die pruefe-rangtreue-schranke.mjs misst (das reale
+  // Spiel FELDET den Torwart mit), diese Zeile ist die ehrlichere Frage "belohnt die
+  // Feldspieler-Mechanik das Richtige?", s. docs/design/stand-aller-disziplinen.md.
+  if (z.spielMedFeld != null) {
+    const okFeld = z.spielMedFeld >= 0.80 ? "bestanden" : z.spielMedFeld >= 0.70 ? "knapp" : "durchgefallen";
+    console.log("  davon nur Feldspieler".padEnd(32)
+      + String(z.teilnehmerFeld).padStart(5)
+      + z.spielMedFeld.toFixed(3).padStart(23) + z.spielSpanFeld.toFixed(3).padStart(12)
+      + z.saisonMedFeld.toFixed(3).padStart(21) + z.saisonSpanFeld.toFixed(3).padStart(12)
+      + "   " + okFeld);
+  }
 }
 console.log("\nSchranke: rho je Spiel (Median ueber die Kader-Familie) ueber 0,80 (CLAUDE.md, gilt fuer alle Disziplinen).");
 if (!EINZELKADER) {
