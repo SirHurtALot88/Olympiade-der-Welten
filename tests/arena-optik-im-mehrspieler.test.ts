@@ -373,8 +373,15 @@ describe("Arena-Optik im Mehrspieler — Punkt 5, umgedreht: ein Getrennter fael
 
 describe("Arena-Optik im Mehrspieler — Punkt 6: der Pausen-Chip luegt den Gast an", () => {
   it("zeigt dem Gast NICHT 'Leertaste', weil seine Leertaste wirkungslos ist", () => {
-    const chip = NATIVE.slice(NATIVE.indexOf("{paused ? (\n            <span"), NATIVE.indexOf("{paused ? (\n            <span") + 400);
-    expect(chip).toContain('roomSync?.followsHost ? "⏸ Host hat pausiert" : "⏸ Pausiert · Leertaste"');
+    const chip = NATIVE.slice(NATIVE.indexOf("{paused ? (\n            <span"), NATIVE.indexOf("{paused ? (\n            <span") + 1100);
+    // Seit der Perioden-Pause (04.09.) ist der Nicht-Host-Zweig kein einzelner String mehr
+    // (er unterscheidet zusaetzlich "Ende N. Viertel" von der generischen Meldung) — die
+    // eigentliche Zusicherung bleibt aber dieselbe: der followsHost-Zweig nennt "Leertaste"
+    // NIE (sie waere fuer den Gast wirkungslos), waehrend jeder Nicht-Host-Zweig sie nennt.
+    expect(chip).toContain('roomSync?.followsHost ? "⏸ Host hat pausiert"');
+    expect(chip).not.toContain('"⏸ Host hat pausiert · Leertaste');
+    expect(chip).toContain("Leertaste zum Weiterspielen");
+    expect(chip).toContain('"⏸ Pausiert · Leertaste"');
   });
 });
 
