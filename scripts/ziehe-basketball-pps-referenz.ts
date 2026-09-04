@@ -79,7 +79,12 @@ const FELDGROESSEN = [2, 3, 4, 5, 6] as const;
 // (32 Teams) = 304 -- knapp darueber, nicht viel mehr, weil jede Fixture bei playerCount 6 real
 // ueber eine halbe Minute Simulationszeit braucht (nachgemessen: ~6,5 s/Fixture inkl.
 // Skript-Neueinhaengung, s. arena-headless-runner.ts).
-const FIXTURES_ZIEL = 300;
+// `--fixtures=<n>` UEBERSCHREIBT DEN STANDARD (300), NUR FUER DIESEN LAUF: eingefuehrt fuer die
+// Basketball-K3-Runde (docs/design/basketball-k3.md), weil die Umgebung dort ausschliesslich
+// synchrone, blockierende Einzelaufrufe mit hartem Zeitlimit erlaubte (kein Hintergrundprozess
+// ueberlebt zwischen Nachrichten) und 5x300 Fixtures unter geteilter CPU mit anderen Agenten
+// nicht in ein solches Fenster passten. Ohne das Flag unveraendert 300, wie bisher.
+let FIXTURES_ZIEL = 300;
 const PAARUNGEN_JE_RUNDE = 16; // 32 Teams / 2
 
 function mulberry32(seed: number) {
@@ -343,6 +348,8 @@ async function main() {
   const args = process.argv.slice(2);
   const feldgroesseArg = args.find((a) => a.startsWith("--feldgroesse="));
   const mergeModus = args.includes("--merge");
+  const fixturesArg = args.find((a) => a.startsWith("--fixtures="));
+  if (fixturesArg) FIXTURES_ZIEL = Number(fixturesArg.split("=")[1]);
 
   if (mergeModus) {
     const ergebnisseNachGroesse = new Map<number, FeldgroessenErgebnis>();
