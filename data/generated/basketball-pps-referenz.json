@@ -1,0 +1,120 @@
+{
+ "disziplin": "basketball",
+ "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) je Feldgroesse, gezogen aus echten Liga-Kadern (buildArenaTeam(), s. scripts/ziehe-basketball-pps-referenz.ts) ueber runArenaFixtures() -- NICHT aus dem Demokader des Mockups. Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. Neu ziehen nach jeder Aenderung, die den rohen Boxscore-Impact verschiebt (feldspielWert()-Gewichte, Spieldauer/VIERTEL_*, Basketball-Rezept, Kadergenerierung/Attributniveau der Liga) -- s. docs/design/pps-skalierung-opus.md Abschnitt 8.3. `demoKaderMedianFuerDriftpruefung` je Feldgroesse ist ein SEPARATER Wert, NUR fuer tests/basketball-pps-referenz-drift.test.ts -- gemessen am eingebauten Demokader des Mockups (feldspielProbe), NICHT an echten Liga-Kadern, damit der Drift-Waechter dieselbe Population misst, die er spaeter erneut abfragt (sonst waere jede Abweichung zwischen Demokader und Liga-Feld ein Fehlalarm).",
+ "gezogenAm": "2026-09-03T20:11:00.178Z",
+ "motorSha1": "01cb2ce543c150d56261e899f1155491f0af7a62",
+ "repoCommit": "d4430b81794fca6120711abccc8ee158336476e6",
+ "quelle": {
+  "saveId": "new-game-1787123325719-swnjlk",
+  "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+  "mechanismus": "runArenaFixtures gegen echte Liga-Kader (buildArenaTeam)"
+ },
+ "fixturesJeFeldgroesse": 300,
+ "feldgroessen": {
+  "2": {
+   "n": 2,
+   "fixtures": 304,
+   "spielerwerte": 1216,
+   "iMittel": 52.5,
+   "iKrass": 101.01,
+   "quantile": {
+    "p1": 17.89,
+    "p5": 26.58,
+    "p10": 31.6,
+    "p25": 40.98,
+    "p50": 52.5,
+    "p75": 63.7,
+    "p90": 74.6,
+    "p95": 81.82,
+    "p99": 95.07,
+    "p99_5": 101.01,
+    "p99_9": 107.16
+   },
+   "demoKaderMedianFuerDriftpruefung": 33.3
+  },
+  "3": {
+   "n": 3,
+   "fixtures": 304,
+   "spielerwerte": 1824,
+   "iMittel": 34,
+   "iKrass": 77.22,
+   "quantile": {
+    "p1": 5.77,
+    "p5": 13.3,
+    "p10": 17.3,
+    "p25": 25.1,
+    "p50": 34,
+    "p75": 44.43,
+    "p90": 54.37,
+    "p95": 60.98,
+    "p99": 73.11,
+    "p99_5": 77.22,
+    "p99_9": 82.3
+   },
+   "demoKaderMedianFuerDriftpruefung": 18.2
+  },
+  "4": {
+   "n": 4,
+   "fixtures": 304,
+   "spielerwerte": 2432,
+   "iMittel": 24.9,
+   "iKrass": 65.68,
+   "quantile": {
+    "p1": 4.2,
+    "p5": 8.56,
+    "p10": 11.7,
+    "p25": 17.3,
+    "p50": 24.9,
+    "p75": 34,
+    "p90": 43.5,
+    "p95": 48.9,
+    "p99": 61.54,
+    "p99_5": 65.68,
+    "p99_9": 69.81
+   },
+   "demoKaderMedianFuerDriftpruefung": 14.95
+  },
+  "5": {
+   "n": 5,
+   "fixtures": 304,
+   "spielerwerte": 3040,
+   "iMittel": 19.1,
+   "iKrass": 54.5,
+   "quantile": {
+    "p1": 1.44,
+    "p5": 5.1,
+    "p10": 7.6,
+    "p25": 12.5,
+    "p50": 19.1,
+    "p75": 27,
+    "p90": 35.8,
+    "p95": 41,
+    "p99": 52.5,
+    "p99_5": 54.5,
+    "p99_9": 61.26
+   },
+   "demoKaderMedianFuerDriftpruefung": 13.5
+  },
+  "6": {
+   "n": 6,
+   "fixtures": 304,
+   "spielerwerte": 3648,
+   "iMittel": 15.4,
+   "iKrass": 52.65,
+   "quantile": {
+    "p1": 0,
+    "p5": 2.7,
+    "p10": 4.47,
+    "p25": 8.9,
+    "p50": 15.4,
+    "p75": 22.9,
+    "p90": 31.53,
+    "p95": 36.93,
+    "p99": 47.75,
+    "p99_5": 52.65,
+    "p99_9": 56.61
+   },
+   "demoKaderMedianFuerDriftpruefung": 10.8
+  }
+ }
+}

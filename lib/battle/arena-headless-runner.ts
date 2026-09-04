@@ -182,10 +182,28 @@ type VorbereitetesFixture = {
   aufstellung: ArenaAufstellung;
 };
 
+/**
+ * NETZWERK-ABRIEGELUNG (PPS-Skalierung, 03.09., gefunden beim Bau von
+ * scripts/ziehe-basketball-pps-referenz.ts): diese Datei simuliert rein rechnerisch (Canvas/DOM
+ * nur als Motor-Abhaengigkeit, s. Kopfkommentar), sie braucht KEIN einziges echtes
+ * Netzwerk-Request. Chromium selbst versucht trotzdem welche (Google-Hintergrunddienste beim
+ * Start, plus `battle-mode.html`s Google-Fonts-Stylesheet) -- in einer Umgebung mit
+ * Proxy-Allowlist (s. CLAUDE.md, "Agenten kommen an den Server NICHT heran") liest Chromium
+ * `HTTPS_PROXY` aus der Prozessumgebung und haengt an jedem dieser Requests, bis der jeweilige
+ * Chromium-interne Timeout greift -- nachgemessen: ein einzelner `runArenaFixtures()`-Aufruf
+ * blieb dadurch wiederholt weit ueber 100 s haengen, obwohl die eigentliche Simulation
+ * (20 Fixtures) in Sekunden fertig ist. `--proxy-server=direct://` ignoriert die Umgebungs-
+ * `HTTPS_PROXY` (kein Warten auf einen Tunnel, der fuer diese Hosts ohnehin abgelehnt wuerde),
+ * `--host-resolver-rules=MAP * 0.0.0.0` laesst jeden Hostnamen sofort auf eine tote Adresse
+ * aufloesen (sofortiges ECONNREFUSED statt DNS-/Tunnel-Wartezeit). `file://`-Navigation
+ * (die einzige, die dieser Runner macht) ist von beidem unberuehrt.
+ */
+const ARENA_NETZWERK_ABRIEGELUNG_ARGS = ["--proxy-server=direct://", "--host-resolver-rules=MAP * 0.0.0.0"];
+
 function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
   const kandidat = executablePathOverride ?? STANDARD_CHROMIUM_EXECUTABLE_PATH;
   if (existsSync(kandidat)) {
-    return { headless: true, executablePath: kandidat };
+    return { headless: true, executablePath: kandidat, args: ARENA_NETZWERK_ABRIEGELUNG_ARGS };
   }
   // Ohne festen Pfad (z.B. auf dem CI-Runner) loest Playwright den Standard-"chromium"-
   // Browsertyp im Headless-Betrieb seit v1.49 auf die separat installierte "Chromium Headless
@@ -193,7 +211,7 @@ function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
   // `npx playwright install chromium` aber nur Letzteres -- ohne `channel: "chromium"` bricht
   // der Launch hier mit "Executable doesn't exist at .../chromium_headless_shell-.../..." ab,
   // obwohl Chromium selbst vorhanden ist. `channel: "chromium"` erzwingt das normale Binary.
-  return { headless: true, channel: "chromium" as const };
+  return { headless: true, channel: "chromium" as const, args: ARENA_NETZWERK_ABRIEGELUNG_ARGS };
 }
 
 /**
@@ -346,6 +364,26 @@ export async function runArenaFixtures(
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
   try {
     const page: Page = await browser.newPage();
+    // TSX/ESBUILD-KOMPATIBILITAET (PPS-Skalierung, 03.09., gefunden beim Bau von
+    // scripts/ziehe-basketball-pps-referenz.ts): `tsx` -- der Loader, mit dem JEDES Skript in
+    // scripts/ per `npx tsx` laeuft -- transformiert JEDE Datei mit esbuilds `keepNames:true`
+    // (fest verdrahtet in tsx selbst, nicht abschaltbar). Das schreibt eine benannte
+    // Funktion/Arrow-Const zu `x = /* @__PURE__ */ __name(x, "x")` um -- AUCH innerhalb von
+    // `simuliereFixturesImBrowser` unten, deren eigene Hilfsfunktionen (`wartenAufMotor`,
+    // `haengeMotorNeuEin`) genau solche benannten Consts sind. `page.evaluate()` uebertraegt die
+    // Funktion aber nur als TEXT (`.toString()`) in den Browser -- der `__name`-Aufruf reist mit,
+    // die Helper-Definition selbst nicht. Ergebnis: JEDER tsx-getriebene Aufruf von
+    // `runArenaFixtures()` schlug mit "ReferenceError: __name is not defined" fehl, bevor auch
+    // nur ein Fixture simuliert wurde. Ueber Next.js/Webpack (Produktivpfad) und Vitest (die
+    // gesamte bestehende Testsuite) trat das nie auf, weil beide anders buendeln -- weshalb es
+    // bislang unbemerkt blieb: keine bestehende Datei ruft diese Funktion ueber `tsx` auf. Ein
+    // Identitaets-Shim ist ueberall harmlos, auch dort, wo `__name` nie aufgerufen wird.
+    await page.addInitScript(() => {
+      const fenster = window as unknown as { __name?: (fn: unknown, name?: string) => unknown };
+      if (typeof fenster.__name !== "function") {
+        fenster.__name = (fn) => fn;
+      }
+    });
     // Erstes Fixture VOR der Navigation setzen (Plan Abschnitt 3.3b) — der normale
     // Seitenaufbau (battle-mode.html haengt battle-mode.engine.js selbst per <script src> ein)
     // liest diesen Kader dann beim allerersten Motor-Start, kein zusaetzliches Einhaengen noetig.
