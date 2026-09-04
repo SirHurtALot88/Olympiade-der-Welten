@@ -828,15 +828,21 @@
     // sichtbar AUF dem Kopf statt darueber zu schweben): hoehe [38,28] statt [56,34],
     // streuung 2 statt 6.
     "Gram":               {kopf:"lizard",haut:"black",ruest:"plate",schwanz:true,waffe:"schwert",ruestTon:"bronze",effekt:{typ:"feuer",pos:"kopf",streuung:2,hoehe:[38,28]},gluehenderRiss:true},
-    // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
-    // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
-    // Chris' Fund (25.08.): Fluegel fehlten in der animierten Ansicht, obwohl die
-    // Vorschau (B_FIGUR oben, Zeile ~1069) sie laengst zeigt — der Kommentar hier
-    // kuendigte das schon an ("Fluegel jetzt auch in der animierten Ansicht"), das
-    // eigentliche Flag fehlte aber im Objekt. Vorschau hat auch Schwanz und Hoerner
-    // (s_schwanz_bg/fg, z_hoerner) — beim Nachziehen gleich mit uebernommen, damit
-    // beide Ansichten dieselbe Figur zeigen.
-    "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey",fluegel:true,schwanz:true,hoerner:true},
+    // Bild-schlaegt-Tags-Fund (04.09., Sprite-Cluster-Runde 1): der Kommentar HIER hatte die
+    // richtige Diagnose schon stehen ("massiges Steinwesen ... kauert in einer Hoehle,
+    // gluehende Augen, unbewaffnet"), aber darunter stand ein voellig anderes Rezept
+    // (gefluegelter/geschwaenzter/gehoernter Echsen-Humanoid) — byte-identisch mit Mushu (s.
+    // sprite-fit-ergebnisse.md, "neun Gruppen teilen sich byte-identische Sprites"). Das
+    // eigentliche Bild (public/portraits/rhyx-tal.jpg): ein wuchtiger, kauernder, GRAUSCHWARZER
+    // Hoehlen-Koloss mit rissiger Steinhaut und zwei leuchtend ORANGEN Augen — kein Fluegel,
+    // kein Schwanz, keine Hoerner im Bild. Das ist exakt vollbild:"golem" (dieselbe Kreatur-
+    // klasse wie Lava Golem/Krolach/Vorrak/Krag'Zul), nicht der lizard-Baukasten.
+    // vollbildFarbe dunkles Basalt-Grau statt der warmen/farbigen Toene der Golem-Geschwister.
+    // energiekern:true (s. Kommentar bei Krolach oben) liefert die zwei KONSTANT leuchtenden
+    // Augenpunkte (Palette rot-orange, s. zeichneAugen) — der mitgelieferte Brustkern ist im
+    // Bild nicht dokumentiert, aber unauffaellig und nicht im Widerspruch dazu (einzige
+    // Moeglichkeit, die Augen ohne eigene neue Zeichenroutine zu bekommen).
+    "Rhyx'Tal":           {vollbild:"golem",vollbildFarbe:"#46433d",energiekern:true},
     // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
     // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
     "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w",ruestTon:"dunkel"},
@@ -1054,11 +1060,34 @@
     // "leder" (Bildbefund, Fable-Runde 25.08.: bislang komplett ohne `ruest`, Beine liefen
     // deshalb hautfarben/nackt statt in dem Leder, das das Bild zeigt).
     "Roddox Harthelm":    {kopf:"minotaur",haut:"brown",ruest:"leder"},
-    // Bild: riesiges bruellendes Reptilwesen mit gehoerntem Kamm, Zaehnen und Klauen,
-    // unbewaffnet.
-    "Ironhoof":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
-    // Bild: alte Hexe mit leuchtend blauen Augen, dunkler bestickter Robe.
-    "Babuschinka":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
+    // Bild-schlaegt-Tags-Fund (04.09., Sprite-Cluster-Runde 1): der Kommentar hier ("riesiges
+    // bruellendes Reptilwesen mit gehoerntem Kamm") passt zu KEINEM der beiden Bilder, die je
+    // unter diesem Namen liefen — public/portraits/ironhoof.jpg zeigt tatsaechlich einen
+    // ZENTAUREN-Krieger: menschlicher Oberkoerper mit stark GEBOGENEN Widderhoernern und
+    // Streitaxt, Pferde-Unterkoerper samt Schweif. War bislang byte-identisch mit Medibull
+    // (s. sprite-fit-ergebnisse.md), obwohl beide Bilder nichts miteinander zu tun haben:
+    // Medibull ist zweibeinig (Sanitaeter-Stier), Ironhoof ein Zentaur.
+    // Der Pferde-Unterkoerper selbst ist im Baukasten strukturell nicht baubar (kein
+    // Zentauren-Koerper, s. auch Fables Notiz zum "gehoernten Minotaurus/Zentaur"-Cluster in
+    // naechste-schritte-fable-04-09.md) — bleibt zweibeiniger Minotaurus. Aber hoerner:"gebogen"
+    // (statt true) trifft die auffaellig GEBOGENEN Widderhoerner aus dem Bild exakt (s.
+    // Dyrth-Kommentar bei hoerner:"gebogen" oben), dazu waffe:"axt" (die Streitaxt) und
+    // schwanz:true als schwache Annaeherung an den Pferdeschweif — bessere Naeherung an die
+    // sichtbaren Details, auch wenn die Grundsilhouette (zweibeinig statt vierbeinig) falsch
+    // bleibt.
+    "Ironhoof":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder",ruestTon:"bronze",hoerner:"gebogen",waffe:"axt",schwanz:true},
+    // Bild: alte Hexe mit leuchtend blauen Augen, dunkler bestickter Robe. War bislang
+    // byte-identisch mit Bana/Dr Ironmind/Gralakar (s. sprite-fit-ergebnisse.md, "neun Gruppen
+    // teilen sich byte-identische Sprites") — derselbe generische Kapuzen-Bauplan, obwohl das
+    // Bild (public/portraits/babuschinka.jpg) keine Kapuze zeigt, sondern offenes wildes
+    // grau-weisses Haar, dazu eine leuchtend blaue Zauberhand/ein leuchtendes Tablet und
+    // schwebende Geldscheine (letztere zwei ohne Requisiten-Aequivalent im Baukasten, s.
+    // Bewertung). kapuze entfernt, haar_lang/gray statt dessen (04.09., Sprite-Cluster-Runde 1).
+    // effekt:{typ:"frost",pos:"kopf"} (Wiederverwendung der hellblau/weissen Frost-Palette, s.
+    // EFFEKT_ARTEN oben, "Assets werden nie exklusiv reserviert") als beste verfuegbare
+    // Naeherung an den blauen Zauber-/Technik-Schein — keine Aussage ueber Eis/Kaelte,
+    // sondern reine Farbwiederverwendung, wie bei "gift"/"voidRot" schon ueblich.
+    "Babuschinka":        {kopf:"human",haut:"light",geschlecht:"w",haar:"haar_lang",haarTon:"gray",ruest:"leder",ruestTon:"dunkel",effekt:{typ:"frost",pos:"kopf"}},
     // Bild: gehoerntes reptilienartiges Monster, unbewaffnet — bereits als Widerspruch
     // vorgelegt (BILDBEFUNDE, weder Servant- noch Monk-Motiv im Bild).
     "Rok Kyl":            {kopf:"lizard",haut:"brown",hoerner:true},
@@ -1198,7 +1227,18 @@
     "Nelchael":           {kopf:"zombie",koerper:"zombie",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Akali":              {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
     "Nahli-Ke":           {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w"},
-    "Gralakar":           {kopf:"human",haut:"light",kapuze:true,geschlecht:"w",ruest:"leder"},
+    // Bild (public/portraits/gralakar.jpg): ein schwebender Sensenmann/Wraith aus zerfetzten
+    // schwarzen Stoffbahnen, ROT GLUEHENDE Augen, sichtbarer rot glimmender Rippenkaefig,
+    // skelettartige Klauenhaende, Friedhof im Hintergrund — kein Bezug zur froehlichen
+    // Abenteurerin, mit der er bislang byte-identisch war (Babuschinka/Bana/Dr Ironmind, s.
+    // sprite-fit-ergebnisse.md), war entsprechend der ★-Anker fuer 1 Stern. Jetzt derselbe
+    // Skelett-Baustein wie Burster/Threnox (kopf:"skeleton",koerper:"skelett") statt des
+    // Menschen-mit-Kapuze-Bauplans, dazu geist:true (Alpha-Absenkung, s. Kommentar bei Erna
+    // Wellenlaut oben) fuer die schwebend-durchscheinende Erscheinung UND effekt:{typ:"voidRot",
+    // pos:"koerper"} (rote wabernde Energie, bislang nur bei Nocture/Vorrak) fuer die
+    // rot-gluehenden Augen/den Rippenkaefig-Schein — dieselbe Farbfamilie wie im Bild, ohne
+    // eine weitere neue Palette anzulegen (04.09., Sprite-Cluster-Runde 1).
+    "Gralakar":           {kopf:"skeleton",koerper:"skelett",geist:true,effekt:{typ:"voidRot",pos:"koerper"}},
     "Lady Yueqin":        {kopf:"human",haut:"light",ohren:true,ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Falcon":             {kopf:"wolf",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
     // Bild: fotorealistische TAUBE mit einer kaputten/verwitterten Ueberwachungskamera ALS
@@ -1229,6 +1269,11 @@
     // (derselbe Kompromiss wie bei Draco/Mavras Axt). 24.08.: "pistole" statt "schwert",
     // die Pistole ist die groessere/zentralere Waffe im Bild.
     "Harbinger":          {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",fluegel:true,waffe:"pistole"},
+    // War byte-identisch mit Babuschinka/Dr Ironmind/Gralakar (s. sprite-fit-ergebnisse.md);
+    // von den vieren ist Bana die einzige, deren Bild (gelbe Kapuzen-Streetwear) zum
+    // gemeinsamen Kapuzen-Bauplan ueberhaupt passt (bereits ★★★, s. sprite-fit-bewertung.json)
+    // — bewusst UNVERAENDERT gelassen, die drei anderen wurden stattdessen auf eigene Rezepte
+    // umgestellt (04.09., Sprite-Cluster-Runde 1).
     "Bana":               {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
     // Portrait: um die Huefte gewickeltes Tuch mit Seil (Bildbefund, Fable-Runde 25.08.) —
     // "leder" ist der naechstliegende Ersatz im Baukasten (kein Stoff/Robe-Blatt vorhanden,
@@ -1242,6 +1287,10 @@
     // Portrait: gruene Cargo-Hose, Gurt, Sanitaeter-Ausruestung (Bildbefund, Fable-Runde
     // 25.08.) — "leder" ist die naechstliegende Stoff-/Materialrampe im Baukasten (kein
     // Gruenton verfuegbar). Bislang ganz ohne `ruest`, Beine liefen nackt/hautfarben.
+    // War byte-identisch mit Ironhoof (s. sprite-fit-ergebnisse.md, "gehoernter Kopf"-Cluster)
+    // — Medibull ist der zweibeinige Stier-Sanitaeter, fuer den dieser Bauplan strukturell
+    // stimmt (anders als Ironhoof, ein Zentaur, s. dortiger Kommentar). Bewusst UNVERAENDERT
+    // gelassen, nur Ironhoof bekam ein eigenes Rezept (04.09., Sprite-Cluster-Runde 1).
     "Medibull":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
     "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Phantomblade":       {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",waffe:"schwert",haar:"haar_mop",haarTon:"white",geschlecht:"w"},
@@ -1255,8 +1304,20 @@
     // "Charger" waere fuer sich ein Nahkampf-Indiz (s. Knochenrichter/Vargan/Tartarus/Cyrn),
     // aber die Subclass "Beast" zieht in die Gegenrichtung — ein Bestien-Nahkaempfer kaempft
     // typischerweise mit Klauen/Biss statt einer gefuehrten Waffe, nicht mit Schwert/Axt. Bei
-    // diesem Widerspruch ohne Bild lieber unbewaffnet als raten.
-    "Burster":            {kopf:"skeleton",koerper:"skelett"},
+    // diesem Widerspruch ohne Bild lieber unbewaffnet als raten. Bleibt bewusst unbewaffnet:
+    // die "Klauen" unten sind Koerperteil, keine gefuehrte Waffe.
+    // Bild-Fund (04.09., Sprite-Cluster-Runde 1): public/portraits/burster.jpg zeigt einen
+    // haeutungslosen, blutig-roten Muskelkoloss mit Totenschaedel-Gesicht UND riesigen
+    // klingenartigen Knochenkrallen an beiden Armen — der bisherige Skelett-Bauplan
+    // (koerper:"skelett", knochenweiss) war byte-identisch mit Threnox (s.
+    // sprite-fit-ergebnisse.md), passt aber nur zu Threnox' Geistergestalt, nicht zu Bursters
+    // rohem Fleisch/Blut-Look. Koerper jetzt "zombie" statt "skelett" (verwesende/rohe statt
+    // blankgeknocherte Optik, naeher an "blutig-rot" als reines Bein-Weiss), dazu
+    // gluehenderRiss:true fuer die aufgerissene, adrig-rote Wund-/Muskeltextur und skala:1.15
+    // fuer die hulkartige, geduckt-aggressive Statur aus dem Bild. Die riesigen Klingenkrallen
+    // selbst bleiben unbebaut (kein Requisiten-Layer im Baukasten dafuer) — dokumentierte
+    // Luecke, kein Blocker (Grundsatz "eine unvollstaendige Naeherung schlaegt keinen Fix").
+    "Burster":            {kopf:"zombie",koerper:"zombie",skala:1.15,gluehenderRiss:true},
     // 26.08., NEU: kein eigener Bildbefund fuer diese Karte, aber ein eindeutiger
     // Rassen-Fund (s. public/sprites/baukasten/quellen.json, "kopf_wolf_frau"): der Baukasten
     // hatte fuer die Rasse Animal/Wolf bislang NUR den maennlichen Kopf — jede weibliche
@@ -1389,8 +1450,29 @@
     "Galactus":           {kopf:"lizard",haut:"fur_grey",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
     "Yuko":               {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",fluegel:true,haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Shadowsage":         {kopf:"human",haut:"fur_grey",kapuze:true,ruest:"leder"},
-    "Dr Ironmind":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
-    "Mushu":              {kopf:"lizard",haut:"fur_grey",hoerner:true,fluegel:true,schwanz:true},
+    // Bild (public/portraits/dr-ironmind.jpg): alte Feldaerztin in braunem Kopftuch/Umhang in
+    // einem Kriegszelt, versorgt einen blutig verbundenen Patienten, haelt ein leuchtend
+    // BLAUES medizinisches Geraet mit Symbolen. War bislang byte-identisch mit
+    // Babuschinka/Bana/Gralakar (s. sprite-fit-ergebnisse.md). ruestTon jetzt "bronze" statt
+    // "dunkel" (braunlich-warm statt schwarz-grau, naeher an den verwitterten braunen Roben)
+    // — der einzige Unterschied zu Babuschinka ausser der Kapuze selbst, damit beide trotz
+    // gemeinsamem Kapuzen-Grundbauplan sichtbar auseinanderlaufen. kapuze:true bleibt (deckt
+    // das Kopftuch am ehesten), effekt:{typ:"frost",pos:"kopf"} wie bei Babuschinka als
+    // Naeherung an das leuchtend blaue Geraet (04.09., Sprite-Cluster-Runde 1).
+    "Dr Ironmind":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",ruestTon:"bronze",geschlecht:"w",effekt:{typ:"frost",pos:"kopf"}},
+    // Bild-Fund (04.09., Sprite-Cluster-Runde 1): public/portraits/mushu.jpg zeigt ein
+    // cremeweisses, geschupptes, greifenartiges Wesen mit grossen BRAUNEN FEDERFLUEGELN
+    // (kein Fledermaus-Haeutchen), langem Schwanz, hellblauen Augen — KEINE Hoerner. War
+    // bislang byte-identisch mit Rhyx'Tal (s. sprite-fit-ergebnisse.md), einem voellig
+    // andersartigen Hoehlen-Golem (jetzt eigenes vollbild:"golem"-Rezept, s. dort). hoerner
+    // gestrichen (kein Hoernerbefund im Bild), fluegel:"federn" statt des generischen
+    // Fluegel-Blatts (Bildbefund "Federflügel" traegt exakt diese Variante, s. Dyrth/Elyon-
+    // Kommentare bei fluegel), haut "light" statt "fur_grey" (naeher an cremeweiss als an
+    // Grau — s. HAUT-Tabelle oben, kein reines Weiss verfuegbar), skala:1.15 fuer die
+    // "imposante Statur" aus der Bewertung. Bleibt ein zweibeiniger lizard-Kopf-Bauplan statt
+    // eines echten Vierbeiners — der Baukasten kennt keinen Greifen-/Vierbeiner-Koerper mit
+    // dieser Fluegelform (dokumentierte Luecke).
+    "Mushu":              {kopf:"lizard",haut:"light",fluegel:"federn",schwanz:true,skala:1.15},
     // KORREKTUR (Chris' Fund, 26.08.: "Bombblitzer ist ein Ork!"): Save-Daten bestaetigen
     // race:"Orc" — der Skelett-Kopf+Koerper (kopf:"skeleton",koerper:"skelett") war schlicht
     // falsch, nicht nur unvollstaendig, und loeschte die Orc-Identitaet komplett. Save traegt
