@@ -1295,7 +1295,43 @@
     // "Bloater" (aufgeblaehter Zombie) und die Subclass "Behemoth" beschreiben eine
     // schwerfaellige, aufgedunsene Masse, keinen Klingenkaempfer — className "Warlord" ist
     // zwar kraftbetont, aber kein verlaesslicher Waffen-Indiz gegen dieses Bild.
-    "Bloater":            {kopf:"zombie",koerper:"zombie"},
+    //
+    // 04.09., Sprite-Fit-Nacharbeit (data/generated/sprite-fit-bewertung.json, 2/5 Sterne,
+    // Begruendung woertlich: "Die duenne humanoide Mumienform mit roetlichen Wundflecken hat
+    // noch einen Bezug zur verwesenden Zombie-Farbgebung, aber der riesige, leuchtend-orange
+    // aufgeblaehte Bauch — das zentrale Merkmal — fehlt komplett, die Statur ist viel zu
+    // klein"). Chris' ausdruecklicher Auftrag war ein einzelner Beispiel-Durchlauf, um zu
+    // sehen, wie weit sich ein 2-Sterne-Eintrag verbessern laesst.
+    //
+    // RECHERCHE VOR DER BEHELFSLOESUNG (docs/design/bloater-modell-verbessert.md hat die
+    // Details): weder public/sprites/** noch das lokal geklonte Universal-LPC-Spritesheet-
+    // Character-Generator-Repo (~/liberatedpixelcup/universal-lpc-spritesheet-character-
+    // generator, sheet_definitions/body/body.json) kennen einen "fett/dick/obese/ogre"-
+    // Koerpertyp — nur male/muscular/female/pregnant/teen/child, und body_zombie.json
+    // speziell nur male/female/teen, keine Groessenvariante. b.vollbild:"golem" (der einzige
+    // "massige Koloss" im Baukasten, s. Lava Golem/Krolach oben) wurde per renderProbe-
+    // Bildvergleich geprueft und verworfen: er liest sich als blockig-gepanzerter
+    // Stein-/Metall-Construct, nicht als aufgedunsene verwesende Masse — er haette genau die
+    // "Bezug zur Zombie-Faerbung", die der Bewertungstext dem jetzigen Modell noch zugesteht,
+    // gegen eine falsche Materialitaet eingetauscht. Kein echtes Asset trifft das Bild besser
+    // als der bisherige Zombie-Koerper — deshalb zwei neue, generische BAU-Flags (Muster
+    // fuer spaetere 1-2-Sterne-Korrekturen, s. Bericht):
+    //   skala:1.35 (NEU, s. bauSkala oben) — reiner Groessen-Multiplikator UNABHAENGIG von
+    //   u.groesse/der Kader-Datei, weil renderProbe ohne echten Kader (genau der Pfad, der
+    //   die bewerteten PNGs erzeugt) sonst auf Faktor 1 zurueckfaellt. Kombiniert mit der
+    //   ohnehin schon greifenden hoehenKorrektur (misst 04.09. real ~1,106 fuer den duenn
+    //   gezeichneten Zombie-Koerper) ergibt das eine gegenueber einem normalen Menschen
+    //   deutlich, aber nicht absurd groessere Statur (~1,49x insgesamt).
+    //   leuchtenderBauch:true (NEU, s. zeichneLeuchtenderBauch oben) — EIN grosser,
+    //   permanent leuchtender orange-roter Kreis mit vier Rissadern ueber der unteren
+    //   Koerpermitte, bewusst breiter als die duenne Zombie-Silhouette selbst, fuer genau
+    //   das "zentrale, unuebersehbare Merkmal" aus dem Bildbefund.
+    //   effekt:{typ:"gift",pos:"kopf"} (NEU, s. EFFEKT_ARTEN.gift oben) — Nice-to-have fuer
+    //   den gruenen Giftrauch im Portrait, ausdruecklich NICHT der Hauptbefund laut Auftrag;
+    //   `pos:"kopf"` reicht (wabernder gruener Rauch ueber Kopf/Schultern statt eines
+    //   dritten neuen Positions-Slots).
+    "Bloater":            {kopf:"zombie",koerper:"zombie",skala:1.35,leuchtenderBauch:true,
+                           effekt:{typ:"gift",pos:"kopf"}},
     "Dawnwhisper":        {kopf:"human",haut:"olive",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     "Caldor":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"chestnut",waffe:"schwert"},
     "Skittermind":        {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true},
@@ -1536,6 +1572,78 @@
     return korr;
   }
 
+  // BAU-SKALA (04.09., Bloater-Sichtcheck: data/generated/sprite-fit-bewertung.json, 2/5
+  // Sterne, Begruendung woertlich "die Statur ist viel zu klein"). groesseFaktor(u.groesse)
+  // oben skaliert nach der SPIELER-Groesse aus data/generated/oly-player-groesse.json
+  // (0,8..1,3, ueber den Adapter durchgereicht) — eine reale Kader-Eigenschaft, kein Hebel,
+  // den ein einzelner BAU-Eintrag hier ueberschreiben duerfte oder in der freistehenden
+  // Vorschau (renderProbe ohne window.__olyArenaKader, s. scripts/erzeuge-sprite-vorschauen.mjs)
+  // ueberhaupt zu fassen bekommt: "Bloater" steht nicht im lokalen Notfall-SQUAD/OPP-Array
+  // weiter unten, kaderEintrag bleibt dort also undefined und der Faktor faellt auf 1 zurueck
+  // — GENAU der Pfad, ueber den sprite-fit-bewertung.json (das die 144 PNGs aus
+  // public/sprites/preview/ bewertet) das Sprite rendert. Ohne einen zweiten, vom
+  // Kader-Datensatz unabhaengigen Hebel bliebe Bloater dort exakt so klein wie bisher, egal
+  // was am Datensatz gepflegt wird.
+  // b.skala (NEU, generischer Multiplikator, Default 1 fuer jeden bestehenden BAU-Eintrag,
+  // der ihn nicht setzt) ist deshalb ein zweiter, rein optischer Faktor AUF b-Ebene, genau
+  // wie b.vollbildFarbe/b.effekt/b.gluehenderRiss — unabhaengig von u.groesse, multipliziert
+  // aber mit demselben Z nach demselben Prinzip (reine Zeichen-Groesse, ruehrt an keiner
+  // Trefferbox/Position der Simulation). Recherche VOR dieser Entscheidung (s. Bericht
+  // docs/design/bloater-modell-verbessert.md): weder im Repo (public/sprites/**) noch im
+  // Universal-LPC-Spritesheet-Character-Generator (sheet_definitions/body/body.json) gibt es
+  // einen eigenen "fett/dick/obese/ogre"-Koerpertyp — nur male/muscular/female/pregnant/teen/
+  // child, und die Zombie-Variante (body_zombie.json) kennt nur male/female/teen, keine
+  // Groessenvariante. Ein genereller Skalierungshebel je BAU-Eintrag ist damit die einzige
+  // Moeglichkeit, eine Figur GEZIELT groesser zu machen, ohne ihr Blatt zu tauschen.
+  function bauSkala(b){ return (b&&typeof b.skala==="number"&&b.skala>0)?b.skala:1; }
+
+  // LEUCHTENDER BAUCH (04.09., derselbe Bildbefund oben: "der riesige, leuchtend-orange
+  // aufgeblaehte Bauch — das zentrale Merkmal — fehlt komplett"). Das bestehende
+  // b.effekt/zeichnePartikelEffekt-System (s. EFFEKT_ARTEN unten, in zeichneSprite
+  // verschachtelt) zeichnet wandernde/wabernde PARTIKEL ueber eine ganze Zone — kein fest
+  // positionierter, grosser, EINZELNER Kreis an einer bestimmten Koerperstelle. Fuer einen
+  // "riesigen leuchtend-orangen Bauch" (Portrait: kugelrund, rissige lavaartig gluehende
+  // Oberflaeche) reicht das nicht.
+  //
+  // EIGENSTAENDIGE FUNKTION AUF MODULEBENE statt in zeichneSprite verschachtelt (anders als
+  // zeichneRiss/zeichneKern dort): figur() — die Kader-Karte/das Aufstellungs-Board, eigene
+  // 40x50-Ikone, eigene Skalierung — braucht dieselbe Optik, nur kleiner, und figur() ist
+  // eine eigene Funktion neben zeichneSprite, keine Verschachtelung darin. Genau das Muster,
+  // das figur() fuer jede andere Ebene ohnehin schon faehrt (z.B. b.gluehenderKern im
+  // reiherMech-Zweig dort: eigene, kleinere Zeichnung statt eines gemeinsamen Grossformats).
+  //
+  // BEWUSST OHNE ZEIT-PULS — dieselbe Lehre wie bei b.gluehenderRiss (Kommentar dort, Chris
+  // live in der Arena 01.09.: "der Riss taucht nur ab und zu auf, muesste aber permanent
+  // sein"): ein Bauch, der zwischendurch verblasst, waere derselbe Fehler. Feste Alpha-Werte,
+  // von aussen (blass/breit) nach innen (hell/schmal) wie beim Riss-Glow, macht denselben
+  // weichen Schein ohne shadowBlur (teuer). Palette identisch zu EFFEKT_ARTEN.feuer/
+  // RISS_GLUT uebernommen (Chris' Auftrag: "nicht fuer jeden Effekttyp eine komplette
+  // Kopie") statt einer dritten Orange-Tabelle fuer denselben Ton.
+  //
+  // Vier kurze Risslinien vom Rand Richtung Mitte (deterministisch aus festen Winkeln, kein
+  // Math.random() — dieselbe Figur soll bei jedem Neuzeichnen gleich aussehen) fuer die
+  // "rissige, lavaartig gluehende Oberflaeche" aus dem Bildbefund, dunkler als der Glutkern
+  // selbst (schwarzbraun statt einer vierten Orange-Stufe — sonst liesen sich Riss und Glut
+  // optisch nicht mehr auseinanderhalten).
+  const BAUCH_GLUT=["#ff8c1a","#ffcf40","#ff4d1a"], BAUCH_RISS="#3a1206";
+  function zeichneLeuchtenderBauch(ctx,cx,cy,radius){
+    ctx.globalAlpha=0.30;ctx.fillStyle=BAUCH_GLUT[0];
+    ctx.beginPath();ctx.arc(cx,cy,radius*1.22,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.68;ctx.fillStyle=BAUCH_GLUT[2];
+    ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.92;ctx.fillStyle=BAUCH_GLUT[1];
+    ctx.beginPath();ctx.arc(cx,cy,radius*0.66,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.7;ctx.strokeStyle=BAUCH_RISS;ctx.lineWidth=Math.max(1,radius*0.09);
+    ctx.lineCap="round";
+    for(let i=0;i<4;i++){
+      const winkel=i*1.571+0.4; // 4 Speichen im rechten Winkel, plus fester Offset gegen Symmetrie
+      const x1=cx+Math.cos(winkel)*radius*0.88, y1=cy+Math.sin(winkel)*radius*0.88;
+      const x2=cx+Math.cos(winkel+0.5)*radius*0.22, y2=cy+Math.sin(winkel+0.5)*radius*0.22;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
   // Welche Animation zu welchem Zustand gehoert — und wie viele Bilder sie hat.
   const ANIBILDER={walk:9,slash:6,shoot:13,hurt:6};
 
@@ -1728,8 +1836,10 @@
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
-    // Zahl statt einer zweiten.
-    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+    // Zahl statt einer zweiten. bauSkala(b) (04.09., s. Kommentar dort) haengt zusaetzlich
+    // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
+    // Ersatzes fuer u.groesse.
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -1793,6 +1903,12 @@
       // damit auf dem breiten Krokodil-Ruecken mehr als nur drei Huete sitzen (Portrait
       // zeigt deutlich mehr als drei).
       pilz:{farben:["#b71c1c","#c62828","#d32f2f","#e53935","#ef5350"],modus:"pilzhuete"},
+      // Giftgas (04.09., Bloater-Bildbefund: "gruen-giftiger Rauch/Nebel, der vom Koerper
+      // aufsteigt" — Nice-to-have laut Auftrag, NICHT der Hauptbefund, deshalb bewusst nur
+      // eine neue Farbtabelle statt einer eigenen Bewegungsformel: "wabernd" (Void-Modus,
+      // s. oben) passt schon fast — traeger, wolkiger Rauch statt aufsteigender Flammen-
+      // Tupfen (Feuer) oder treibender Kristalle (Frost) — nur in Gruen statt Lila/Rot.
+      gift:{farben:["#2e7d32","#66bb6a","#1b3a1e"],modus:"wabernd"},
     };
     // Eine Zeichenfunktion fuer alle Arten — nur die Bewegungsformel (modus) unterscheidet
     // sich je Art, keine Kopie der ganzen Funktion pro Element (Chris' Auftrag: "nicht fuer
@@ -2095,6 +2211,10 @@
       // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
       // war das "verschoben", das Chris live sah), skaliert mit Z wie alles andere hier.
       if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,11*Z);
+      // b.leuchtenderBauch (04.09., noch von keiner Vollbild-Kreatur genutzt, aber dieselbe
+      // Koordinatenlogik wie im normalen Zeichenpfad unten — fuer einen spaeteren
+      // aufgedunsenen Vollbild-Koerper mitverdrahtet statt es dort nachzuruesten).
+      if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
       // Brustkern etwas oberhalb der Mitte des 64px-Vollbild-Rahmens — dieselbe Hoehenlogik
       // wie beim Riss-Bereich direkt darueber, nur als Punkt statt Pfad. Mit Z skaliert wie
       // alles andere hier (s. groesseFaktor oben).
@@ -2354,6 +2474,13 @@
     // schon sein eigenes feuereffekt-Glimmen (b.effekt.pos==="kopf"), der Riss gehoert auf
     // den Panzer/Torso (Bildbefund "geschuppte Magmahaut"), nicht mitten durchs Gesicht.
     if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,7*Z);
+    // b.leuchtenderBauch (04.09., s. Kommentar bei zeichneLeuchtenderBauch oben): tiefer als
+    // der Riss-Bereich (y-26..y-2, "Brust/Rumpf") sitzt der BAUCH direkt darueber der Beine —
+    // Mittelpunkt y-9*Z, Radius 11*Z (per renderProbe-Vorher/Nachher-Screenshot gegen
+    // public/portraits/bloater.jpg abgeglichen: deutlich groesser als jeder Partikel-Effekt,
+    // ragt bewusst seitlich über die duenne Zombie-Silhouette hinaus — genau das "zentrale,
+    // unuebersehbare Merkmal" aus dem Bildbefund, nicht nur ein Farbtupfer auf dem Koerper).
+    if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
     if(b.geist)ctx.globalAlpha=1;
   }
 
@@ -9487,7 +9614,12 @@
             const rBlick=blickAus(traeger);
             const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
             const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
-            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger));
+            // bauSkala(b) (04.09., s. Kommentar bei zeichneSprite/bauSkala oben) fehlte hier
+            // urspruenglich — ohne sie wuerde ein Ball bei einem Traeger mit eigenem
+            // Skala-Flag leicht neben der (dann groesseren) Hand schweben. Heute inert fuer
+            // jeden bestehenden Charakter (Default 1), aber korrekt fuer den Fall, dass
+            // b.skala spaeter auch bei einem Basketball-/Football-Spieler zum Einsatz kommt.
+            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger)*bauSkala(BAU[traeger.n]||BAU_STD));
           }
         }
       }
@@ -10660,8 +10792,10 @@
     // Aufloesung (40x50, der LPC-Ausschnitt) bleibt unangetastet, nur die CSS-Anzeigegroesse
     // waechst/schrumpft. figurKlein() ueberschreibt das gleich wieder mit ihrer eigenen,
     // ebenfalls faktor-skalierten Groesse (s. dort) — hier gesetzt, damit auch die direkten
-    // figur()-Aufrufer (Detailkarte, kaderFigur()) mitskalieren.
-    const figurFaktor=groesseFaktor(p.groesse);
+    // figur()-Aufrufer (Detailkarte, kaderFigur()) mitskalieren. bauSkala(b) (04.09., s.
+    // Kommentar bei zeichneSprite/bauSkala oben) multipliziert genauso mit rein wie dort —
+    // die Kader-Karte soll denselben Bauplan zeigen wie die Arena, Groesse eingeschlossen.
+    const figurFaktor=groesseFaktor(p.groesse)*bauSkala(BAU[p.n]||BAU_STD);
     c.style.width=Math.round(40*figurFaktor)+"px";
     c.style.height=Math.round(50*figurFaktor)+"px";
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
@@ -10881,6 +11015,18 @@
       if(b.fluegel==="federn")setz("fluegel_federn_fg_walk",null);
       else if(b.fluegel==="fledermaus")setz("fluegel_fledermaus_fg_walk",null);
       else if(b.fluegel)setzFluegel("z_fluegel_fg");
+      // b.leuchtenderBauch auch auf der Kader-Karte (04.09.), nicht nur in der Arena — diese
+      // Funktion zeichnet sonst weder b.effekt noch b.gluehenderRiss (beide gab es bislang
+      // nur in zeichneSprite), aber Chris wollte den Bauch ausdruecklich "in der Kader-
+      // Karte/Vorschau" sehen, nicht nur live. zeichneLeuchtenderBauch ist deshalb auf
+      // Modulebene definiert (s. Kommentar dort) statt in zeichneSprite verschachtelt — sonst
+      // waere sie von hier aus gar nicht aufrufbar gewesen. Koordinaten UMGERECHNET auf den
+      // 40x50-Ausschnitt (AUSX/AUSY=12/13, s. oben): derselbe Punkt, den zeichneSprite bei
+      // (x,y-9*Z) mit Radius 11*Z trifft, liegt hier bei cx=32-12=20, cy=37-13=24 mit Radius
+      // 11 — figur() zeichnet intern immer bei Z=1 (die BAU-/Groessen-Skalierung laeuft erst
+      // hinterher ueber c.style.width/height, s. figurFaktor oben), deshalb ohne weiteren
+      // Faktor auf den Radius.
+      if(b.leuchtenderBauch)zeichneLeuchtenderBauch(x,20,24,11);
     };
     mal(); setTimeout(mal,300); setTimeout(mal,1200);
     return c;
@@ -10895,7 +11041,7 @@
   function figurKlein(p,gr){
     const c=figur(p);
     c.className="figurklein";
-    const basis=gr||40, faktor=groesseFaktor(p.groesse);
+    const basis=gr||40, faktor=groesseFaktor(p.groesse)*bauSkala(BAU[p.n]||BAU_STD);
     c.style.width=Math.round(basis*faktor)+"px";
     c.style.height=Math.round(basis*faktor*50/40)+"px";
     return c;
