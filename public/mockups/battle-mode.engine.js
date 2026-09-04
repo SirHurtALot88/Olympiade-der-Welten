@@ -6007,7 +6007,20 @@
       fsBall={sichtbar:true,x:s.losX-s.zumFeld*12*Math.min(1,phase*2),y:H/2,traegerId:erg.spieler.id};
       return;
     }
-    const zielSpot=Math.max(0,Math.min(100,fb.spot-(erg.yards||0)));
+    // SICHTBARE WURFWEITE AUCH BEI UNVOLLSTAENDIG/INTERCEPTION (Fund dieser Runde,
+    // docs/design/football-zufriedenstellend.md, Playwright-Sichtpruefung nach der
+    // Rezept-Kalibrierung): `erg.yards` ist bei "incomplete"/"interception" undefined
+    // (kein realer Raumgewinn — vollziehFootballErgebnis oben liest bei beiden Typen
+    // NIE erg.yards, diese Zeile hier wirkt also NUR auf die Animation, nicht auf
+    // Down/Distance/Punktestand). Ohne Fallback flog der Ball dadurch bei JEDEM
+    // unvollstaendigen oder abgefangenen Pass nur bis zur Line of Scrimmage und wieder
+    // zurueck, UNABHAENGIG von der angesagten Tiefe (dunk/nah/mit/fern) — ein als "tief"
+    // angesagter, dann unvollstaendiger Pass sah optisch nicht anders aus als gar kein
+    // Wurf. Fallback: die Tier-Mitte aus FK_TIER_YARDS, damit ein unvollstaendiger
+    // tiefer Pass auch sichtbar tief fliegt, bevor er zu Boden faellt bzw. abgefangen wird.
+    const sichtYards=erg.yards!=null?erg.yards
+      :(erg.tier&&FK_TIER_YARDS[erg.tier]?(FK_TIER_YARDS[erg.tier][0]+FK_TIER_YARDS[erg.tier][1])/2:0);
+    const zielSpot=Math.max(0,Math.min(100,fb.spot-sichtYards));
     const zielX=fkLosX(fb.side,zielSpot);
     if(s.spielTyp==="lauf"){
       fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,
