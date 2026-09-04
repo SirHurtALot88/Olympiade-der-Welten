@@ -20,8 +20,9 @@ wurde, mit welchen Zahlen, und wie/wann nachgezogen werden muss.
    `γ = ln(a_mitte) / ln(I_mittel / I_krass)`. `I_mittel`/`I_krass` kommen — **je Feldgröße
    getrennt** — aus `data/generated/basketball-pps-referenz.json`.
 3. **Zwei benannte, kommentierte Konstanten, keine tief vergrabene Zahl**: `BASKETBALL_INDIVIDUAL_PPS_MAX
-   = 5,5` (vorher 6,6; Mitte von Chris' Rahmen „5-6") und `BASKETBALL_PPS_ANTEIL_MITTE = 0,25`
-   (Opus' schärfer trennende Variante — Chris kann beide mit einer Zeile ändern).
+   = 5,5` (vorher 6,6; Mitte von Chris' Rahmen „5-6") und `BASKETBALL_PPS_ANTEIL_MITTE = 0,25`.
+   Letztere war die einzige offene Zahl dieser Runde und ist seit dem 04.09. **an echten Duellen
+   gemessen entschieden**, nicht mehr Geschmackssache — s. Abschnitt 9.
 4. **Die Referenz ist produktionsnah gezogen**, nicht aus dem kleinen Mockup-Demokader: über
    `scripts/ziehe-basketball-pps-referenz.ts` gegen echte Liga-Kader aus dem `live-save`-Abbild,
    `[FIXTURES]` Fixtures je Feldgröße, über `runArenaFixtures()` — derselbe Weg, den der echte
@@ -247,3 +248,178 @@ Fünftel der Zeit.
 | `scripts/ziehe-basketball-pps-referenz.ts` | **neu** — zieht die Referenz gegen echte Liga-Kader |
 | `tests/battle-mode-arena-team-points.test.ts` | V1-Perzentil-Tests durch V2-Kurven-Tests ersetzt |
 | `tests/basketball-pps-referenz-drift.test.ts` | **neu** — der Drift-Wächter |
+| `scripts/miss-basketball-pps-anteil-mitte.ts` | **neu** (04.09.) — misst `a_mitte`-Kandidaten an echten Duellen, s. Abschnitt 9 |
+
+---
+
+## 9. `BASKETBALL_PPS_ANTEIL_MITTE`: entschieden bei 0,25, gemessen statt geraten (04.09.)
+
+Diese Konstante war der **einzige** offene Punkt dieser Runde: 0,25 (ausgeliefert, Opus'
+Empfehlung) gegen 0,45 (Chris' älteres Beispiel). Chris hat die Entscheidung ausdrücklich
+zurückgegeben — „trifft bei Basketball eine gemessene Entscheidung oder frag fable" —, also ist sie
+hier gemessen worden, nicht abgewogen.
+
+**Ergebnis: 0,25 bleibt.** Der ausgelieferte Wert ist bestätigt, keine Codeänderung nötig.
+
+### 9.1 Wie gemessen wurde
+
+`scripts/miss-basketball-pps-anteil-mitte.ts` (neu) zieht echte Duelle über denselben Weg wie das
+Referenz-Ziehskript — `buildArenaTeam()` gegen echte Liga-Kader aus dem `live-save`-Abbild,
+`runArenaFixtures()` als Motorpfad — und wertet die **rohen Duell-Boxscores** gegen mehrere
+`a_mitte`-Kandidaten aus. Entscheidend: die Simulation läuft **einmal**, alle Kandidaten sehen
+danach **exakt dieselben Duelle** (`--roh=<pfad>` + `--nur-auswertung`), nicht je eine eigene
+Ziehung.
+
+| | |
+|---|---|
+| Quell-Save | `new-game-1787123325719-swnjlk` (`live-save`, gespiegelt 2026-09-04 05:10, Spiegel geprüft) |
+| Duelle | 352 (160 bei 6v6, 96 bei 4v4, 96 bei 2v2) |
+| Spielerwerte | 3.072 |
+| Gemessen am | 2026-09-04 |
+
+**Nebenbefund, unbestellt, aber wichtig: die eingefrorene Referenz ist unabhängig bestätigt.** Diese
+Ziehung ist eine komplett eigene Stichprobe (andere Saaten, andere Paarungen) und reproduziert die
+Referenzwerte aus Abschnitt 4.1 fast exakt:
+
+| Feldgröße | iMittel (eingefroren) | Median (neue Stichprobe) | iKrass (eingefroren) | p99,5 (neue Stichprobe) |
+|---:|---:|---:|---:|---:|
+| 2 | 52,5 | 52,9 | 101,01 | 101,9 |
+| 4 | 24,9 | 25,1 | 65,68 | 65,1 |
+| 6 | 15,4 | 15,6 | 52,65 | 52,1 |
+
+### 9.2 Der wichtigste Fund: Chris' wörtliche Beschwerde hängt gar nicht an `a_mitte`
+
+Chris' Satz war „es soll nicht in jedem team duell immer ein spieler volle punktzahl bekommen".
+Gemessen, Anteil der Duelle, in denen **mindestens ein Spieler die volle Punktzahl 5,50 bekommt**:
+
+| Feldgröße | a_mitte 0,20 | **0,25** | 0,35 | 0,45 |
+|---:|---:|---:|---:|---:|
+| 2v2 | 3,1 % | **3,1 %** | 3,1 % | 3,1 % |
+| 4v4 | 4,2 % | **4,2 %** | 4,2 % | 4,2 % |
+| 6v6 | 5,6 % | **5,6 %** | 5,6 % | 5,6 % |
+
+**Identisch, in jeder Zeile.** Das ist kein Messrauschen, sondern eine Eigenschaft der Formel: die
+volle Punktzahl fällt genau dann, wenn `I ≥ I_krass` — und diese Bedingung enthält `gamma`
+überhaupt nicht. Wie oft ein Duell die Höchstnote sieht, entscheidet **allein `I_krass`** (das
+99,5.-Perzentil, s. Opus-Dokument offene Frage 2), nicht `a_mitte`.
+
+Damit ist die Beschwerde bereits durch das ausgelieferte Modell beantwortet — **einmal in rund
+achtzehn 6v6-Duellen** statt wie unter V1 in praktisch jedem. Und die Frage nach `a_mitte`
+reduziert sich auf die **zweite Hälfte** von Chris' neuerer Aussage: die Trennschärfe zwischen
+„krass" und „mittelmäßig".
+
+### 9.3 Wo `a_mitte` wirklich beißt
+
+Alle Zahlen 6v6 (160 Duelle), die Vollständige über alle drei Feldgrößen im Skript-Ausdruck:
+
+| Größe | a_mitte 0,20 | **0,25 (ausgeliefert)** | 0,35 | 0,45 |
+|---|---:|---:|---:|---:|
+| gamma (6v6) | 1,309 | **1,128** | 0,854 | 0,650 |
+| Duelle mit **≥ 90 % von MAX** | 8,1 % | **9,4 %** | 11,9 % | 15,6 % |
+| Duelle mit ≥ 95 % von MAX | 7,5 % | **7,5 %** | 8,1 % | 8,1 % |
+| mittelmäßiger Auftritt (Median-Impact) | 1,12 | **1,40** | 1,95 | 2,50 |
+| schwacher Auftritt (p10-Impact) | 0,21 | **0,33** | 0,66 | 1,10 |
+| Duellbester p10 / Median / p90 | 2,46 / 3,38 / 4,79 | **2,75 / 3,63 / 4,89** | 3,26 / 4,00 / 5,03 | 3,69 / 4,33 / 5,14 |
+| **Spreizung der Duellbesten (p10..p90)** | 2,33 | **2,14** | 1,77 | **1,45** |
+| Team-Ausschüttung (Median, Summe je Team) | 7,9 | **9,3** | 12,2 | 15,1 |
+
+Drei Dinge stehen darin, und alle drei zeigen in dieselbe Richtung:
+
+1. **Beinahe-Höchstnoten.** 0,45 vergibt in **15,6 %** der 6v6-Duelle mindestens 90 % der
+   Höchstnote, 0,25 in **9,4 %** — zwei Drittel mehr. Der Deckel selbst fällt gleich oft (9.2),
+   aber 0,45 drückt das Feld darunter spürbar näher an ihn heran. Das ist genau die Richtung, aus
+   der Chris' Beschwerde kam.
+2. **Trennschärfe.** Der Abstand zwischen einem schwachen und einem starken Duellbesten beträgt bei
+   0,25 **2,14 PPs**, bei 0,45 nur **1,45**. Und der Abstand mittelmäßig → typischer Duellbester:
+   1,40 gegen 3,63 (Faktor 2,6) bei 0,25, 2,50 gegen 4,33 (Faktor 1,7) bei 0,45. Chris' neuere
+   Aussage betont ausdrücklich, „was ein krasser impact ist und was mittelmäßig" — 0,25 trennt das
+   messbar deutlicher.
+3. **Ausschüttungsniveau — das Argument, das gar keine Geschmacksfrage ist.** Diese PPs ersetzen
+   `pointsAwarded` auf dem PPS-Pfad (`legacy-matchday-resolve-engine.ts` Z. 798/829), die Team-Summe
+   ist also direkt mit `rank-to-points` vergleichbar (`references/sheets/rank-to-points.json`,
+   playerCount 6: Rang 1 = 19,9, Rang 4 = 16,1, Rang 8 = 11,8, Rang 11 = 9,1, Rang 16 = 5,6):
+
+   | a_mitte | Team-Summe (Median) | entspricht PPS-Rang |
+   |---|---:|---|
+   | **0,25** | **9,3** | **10-11 (unteres Mittelfeld)** |
+   | 0,35 | 12,2 | 7-8 (Mitte) |
+   | 0,45 | 15,1 | 4-5 (oberes Mittelfeld) |
+
+   `MAX` wurde in dieser Runde von 6,6 auf 5,5 gesenkt, **weil** das Modell sonst jedem Team im
+   Mittel Meisterniveau zahlt (Abschnitt 2 / Opus-Dokument Abschnitt 6). `a_mitte = 0,45` macht
+   64 % dieser Senkung wieder rückgängig und schiebt eine Durchschnittsmannschaft zurück in Richtung
+   Meisterausschüttung. Das ist kein Geschmack, das ist derselbe Fehler auf einem anderen Regler.
+
+### 9.4 Und Chris' älteres Beispiel? Es spricht nicht für 0,45.
+
+Die Begründung für 0,45 lautete: Chris nannte einmal „ein mittlerer Spieler ca. 2,5" — und
+`2,5 / 5,5 ≈ 0,45`. Diese Rechnung setzt still voraus, dass ein Topspieler die **vollen 5,5**
+bekommt. Chris' Satz sagt aber etwas anderes (`docs/design/battle-mode-pps-modell-plan.md`
+Abschnitt 0, wörtlich):
+
+> „… bis zu sechs oder fünf PPs pro Disziplin bekommen — ein **Topspieler z. B. fünf**, ein
+> **mittlerer Spieler ca. 2,5**, ein **schlechter Spieler 0,5**. Als Beispiel."
+
+Das ist eine Aussage über **Verhältnisse zu dem, was ein Topspieler tatsächlich bekommt**
+(Mitte/Bester = 0,50, Schwach/Bester = 0,10) — und ein typischer Duellbester bekommt gemessen
+3,63 (0,25) bzw. 4,33 (0,45), nicht 5,5. So gemessen:
+
+| Feldgröße | Verhältnis | Chris' Beispiel | **0,25** | 0,35 | 0,45 |
+|---:|---|---:|---:|---:|---:|
+| 6v6 | Mitte / Duellbester | 0,50 | **0,39** | 0,49 | 0,58 |
+| 6v6 | Schwach / Duellbester | 0,10 | **0,09** | 0,16 | 0,25 |
+| 4v4 | Mitte / Duellbester | 0,50 | **0,44** | 0,53 | 0,62 |
+| 4v4 | Schwach / Duellbester | 0,10 | **0,15** | 0,24 | 0,34 |
+| 2v2 | Mitte / Duellbester | 0,50 | **0,51** | 0,61 | 0,68 |
+| 2v2 | Schwach / Duellbester | 0,10 | **0,19** | 0,29 | 0,39 |
+
+**0,25 liegt bei 2v2 und 4v4 auf beiden Verhältnissen näher an Chris' Beispiel als 0,45, bei 6v6
+auf dem unteren.** Auf dem „schlechter Spieler"-Ende trifft 0,25 die 0,10 bei 6v6 fast exakt (0,09),
+während 0,45 mit 0,25 das Zweieinhalbfache ausschüttet. Der ältere Satz ist also **kein** Argument
+für 0,45, sobald man ihn misst statt ihn auf den Deckel zu normieren. Nur wer „2,5" absolut liest,
+landet bei 0,45 — und dann bekommt der schlechte Spieler 1,10 statt 0,5.
+
+### 9.5 Warum nicht 0,35 als Kompromiss
+
+0,35 wurde mitgemessen und trifft bei 6v6 das Mitte/Bester-Verhältnis (0,49) und setzt die
+Team-Ausschüttung genau auf PPS-Rang 8 (12,2 gegen 11,8). Trotzdem nicht gewählt:
+
+- Es kostet Trennschärfe (Spreizung 1,77 statt 2,14) und vergibt in 11,9 % statt 9,4 % der Duelle
+  mindestens 90 % der Höchstnote — beides in die Richtung, aus der die Beschwerde kam.
+- Chris hat weder 0,35 genannt noch eine mittlere Ausschüttung auf Rang 8 verlangt. Eine Zahl zu
+  wählen, weil sie „in der Mitte liegt", ist genau das freihändige Setzen, das die Projektregel
+  „keine erfundenen Werte" untersagt. 0,25 hat eine benannte Herleitung (Opus-Dokument
+  Abschnitt 6) und wird von den Messungen oben getragen.
+
+### 9.6 Rangtreue: strukturell unberührt, trotzdem nachgemessen
+
+Die Kurve ist eine **streng monoton steigende** Abbildung desselben Rohwerts — die Reihenfolge der
+Spieler kann sich mit `a_mitte` gar nicht ändern. Nachgemessen an allen 13.824 Spielerpaaren der
+352 gezogenen Duelle: **0 Paare drehen zwischen 0,25 und 0,45 die Reihenfolge**, 9 Paare (0,065 %)
+unterscheiden sich ausschließlich darin, ob `roundPps()`s zwei Nachkommastellen sie zu einem
+Gleichstand zusammenziehen.
+
+Zusätzlich die reguläre Sonde, `node scripts/miss-alle-disziplinen.mjs 24 basketball` auf diesem
+Branch:
+
+| | rho je Spiel (Median) | Spannweite | rho Saison (Median) | Abnahme |
+|---|---:|---:|---:|---|
+| Basislinie (`data/generated/rangtreue-basislinie.json`) | 0,757 | 0,102 | 0,923 | knapp |
+| dieser Branch | **0,757** | 0,102 | **0,923** | knapp |
+
+Unverändert auf die dritte Stelle — wie erwartet, denn `a_mitte` sitzt hinter dem Motor, nicht in
+ihm.
+
+### 9.7 Wie das nachzurechnen ist
+
+```sh
+git fetch origin live-save
+git show origin/live-save:data/online-saves/hetzner-live.sqlite.gz > /tmp/abbild.gz
+gunzip -c /tmp/abbild.gz > /tmp/abbild.sqlite
+OLY_APP_SQLITE_PATH=/tmp/abbild.sqlite npx tsx scripts/miss-basketball-pps-anteil-mitte.ts --feldgroessen=6 --fixtures=160 --roh=/tmp/duelle-6.json
+npx tsx scripts/miss-basketball-pps-anteil-mitte.ts --nur-auswertung --roh=/tmp/duelle-6.json
+```
+
+Der erste Aufruf simuliert (bei 6v6 rund 15 Minuten für 160 Duelle), der zweite rechnet die Tabelle
+aus den gespeicherten Rohdaten in Sekunden neu — auch für weitere Kandidaten, indem man `KANDIDATEN`
+im Skriptkopf ergänzt.

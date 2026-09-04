@@ -106,16 +106,31 @@ export const ARENA_TEAM_POINTS = {
 export const BASKETBALL_INDIVIDUAL_PPS_MAX = 5.5;
 
 /**
- * ANTEIL DER HOECHSTPUNKTZAHL FUER EINEN „MITTELMAESSIGEN" AUFTRITT (Opus-Dokument Abschnitt 6,
- * zweite Tabelle) — der zweite und letzte freie Regler der Impact-Kurve, `a_mitte` in deren
- * Formel. Chris' AELTERES Beispiel („mittlerer Spieler ca. 2,5 von damals 10") entspraeche eher
- * 0,45, aber seine NEUERE, praezisere Aussage betont ausdruecklich die Trennschaerfe an der
- * Spitze („müsste man dann wissen was ein krasser impact ist und was mittelmäßig") — bei 0,45
- * liegen ein schwacher und ein herausragender Duellbester nur 1,19 PPs auseinander, bei 0,25 sind
- * es 1,90 (Opus-Dokument Abschnitt 6, Tabelle „a_mitte"). Deshalb hier die schaerfer trennende,
- * seltener volle Punktzahl vergebende Variante gewaehlt — ausdruecklich eine Geschmacksfrage, in
- * einem Satz aenderbar: „soll ein durchschnittlicher Auftritt ein Viertel der Hoechstnote wert
- * sein (1,4 von 5,5) oder knapp die Haelfte (2,4 von 5,5)?"
+ * ANTEIL DER HOECHSTPUNKTZAHL FUER EINEN „MITTELMAESSIGEN" AUFTRITT — der zweite und letzte
+ * Regler der Impact-Kurve, `a_mitte` in deren Formel.
+ *
+ * ENTSCHIEDEN AN 352 ECHTEN DUELLEN (04.09., docs/design/pps-skalierung-umsetzung.md Abschnitt 9,
+ * Sonde: scripts/miss-basketball-pps-anteil-mitte.ts) — vorher stand hier eine Geschmacksfrage
+ * zwischen 0,25 und 0,45. Die drei Zahlen, die sie beendet haben:
+ *
+ *  1. Chris' woertliche Beschwerde („nicht in jedem team duell immer ein spieler volle punktzahl")
+ *     haengt NICHT an dieser Konstante: die volle Punktzahl faellt genau dann, wenn `I >= I_krass`,
+ *     und diese Bedingung enthaelt `gamma` nicht. Gemessen deshalb IDENTISCHE 5,6 % (6v6) der
+ *     Duelle mit voller Punktzahl bei 0,20 / 0,25 / 0,35 / 0,45. Die Deckelquote regelt allein
+ *     `I_krass` (p99,5 der Referenz).
+ *  2. Was diese Konstante regelt, ist die Naehe DARUNTER und die Trennschaerfe: 0,45 vergibt in
+ *     15,6 % der 6v6-Duelle mindestens 90 % der Hoechstnote, 0,25 nur in 9,4 %; die Spreizung der
+ *     Duellbesten (p10..p90) betraegt 2,14 PPs bei 0,25 gegen 1,45 bei 0,45. Chris' NEUERE,
+ *     praezisere Aussage betont genau diese Trennschaerfe.
+ *  3. Kein Geschmack, sondern dieselbe Inflation auf einem anderen Regler: die Team-Summe dieser
+ *     PPs ist direkt mit `rank-to-points` vergleichbar (sie ersetzt `pointsAwarded`, s.
+ *     legacy-matchday-resolve-engine.ts). Median bei 6v6: 9,3 unter 0,25 (PPS-Rang 10-11, unteres
+ *     Mittelfeld) gegen 15,1 unter 0,45 (Rang 4-5). `MAX` wurde in derselben Runde 6,6 -> 5,5
+ *     gesenkt, WEIL das Modell sonst jedem Team Meisterniveau zahlt; 0,45 nimmt 64 % davon zurueck.
+ *
+ * Chris' AELTERES Beispiel („ein Topspieler z.B. fuenf, ein mittlerer Spieler ca. 2,5, ein
+ * schlechter Spieler 0,5") spricht ebenfalls nicht fuer 0,45, sobald man es als VERHAELTNIS zum
+ * tatsaechlichen Duellbesten misst statt es auf den Deckel zu normieren — s. Abschnitt 9.4.
  */
 export const BASKETBALL_PPS_ANTEIL_MITTE = 0.25;
 
