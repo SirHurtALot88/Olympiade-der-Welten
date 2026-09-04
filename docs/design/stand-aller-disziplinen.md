@@ -50,14 +50,45 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | I-Spy | Buehne | 0,692 | 0,384 | 0,727 | 0,441 | durchgefallen |
 | Staffel | Bahn | 0,681 | 0,398 | 0,706 | 0,650 | durchgefallen |
 | Spurt | Bahn | 0,652 | 0,559 | 0,690 | 0,643 | durchgefallen |
-| Hockey | Feldspiel | 0,589 | 0,292 | 0,748 | 0,105 | durchgefallen |
+| Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,618 | 0,247 | 0,748 | 0,126 | durchgefallen |
+| ↳ Hockey, nur Feldspieler | Feldspiel | 0,719 | 0,182 | 0,818 | 0,259 | knapp |
 | Battlefield | Arena | 0,325 | 0,662 | 0,619 | 1,000 | durchgefallen |
 | **Football** | Feldspiel | **0,305** | 0,321 | 0,448 | 0,448 | durchgefallen |
 | Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
 | TDM | Arena | 0,113 | 0,387 | 0,070 | 0,441 | durchgefallen |
 
-**Sieben bestehen, vier sind knapp, neun fallen durch.** (Bucketing: bestanden ab 0,80, knapp
-ab 0,70, sonst durchgefallen — `scripts/miss-alle-disziplinen.mjs`.)
+**Sieben bestehen, vier sind knapp, neun fallen durch** (die Zwoelferzahlen der zwanzig echten
+Disziplinen; Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst durchgefallen —
+`scripts/miss-alle-disziplinen.mjs`). Die eingerueckte Hockey-Zeile ist kein einundzwanzigster
+Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden Torhueter (s. Abschnitt
+1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die ehrlichere Frage fuer „belohnt Hockeys
+Mechanik das Richtige".
+
+### 1a. Hockey: zwei Zahlen, nicht eine — und welche Frage jede beantwortet
+
+Seit dieser Runde (`docs/design/hockey-zufriedenstellend.md`,
+`docs/design/hockey-naechster-hebel-recherche-fable.md` Abschnitt 1.1) misst
+`scripts/miss-alle-disziplinen.mjs` Hockey automatisch zweimal: einmal ueber alle zwoelf
+Gefeldeten (die Zeile, gegen die auch `scripts/pruefe-rangtreue-schranke.mjs` als CI-Gate
+misst — **bewusst nicht umgestellt**, weil ein echtes Chris-Spiel tatsaechlich zwei Torhueter
+mitfeldet und die Schranke genau DAS Spiel absichern soll), und einmal ohne die beiden
+Torhueter. `feldspielProbe`/`disziplinProbe` markieren dafuer jeden Torwart (`torwart:true`);
+`scripts/lib/rangtreue-messung.mjs` erkennt das automatisch und liefert die zweite Zeile nur,
+wenn eine Disziplin ueberhaupt eine Torwart-Rolle hat (heute nur Hockey).
+
+**Warum zwei Zahlen ehrlicher sind als eine.** Ein Torwart-Wert schwankt in EINEM Spiel um
+±3,4 Tore rein binomial (40 Schuesse bei ~9 % Torquote) — mehr, als der ganze reale
+Faehigkeitsunterschied zwischen dem besten und dem schlechtesten gefeldeten Torwart ausmacht
+(1,35 Tore). Seine Eignung ist zudem die Feldspieler-Matrix (power/health), nicht sein
+PARADE-Wert (Korrelation nur 0,46) — zwei Zeilen in einer Zwoelfer-Rangliste, die strukturell
+Rauschen statt Faehigkeit tragen. Die Zwoelferzahl ist deshalb die **richtige Zahl fuers
+CI-Gate** (sie misst das reale Spiel, Torwarte inklusive), aber die **falsche Zahl fuer die
+Frage „funktioniert die Feldspieler-Mechanik"** — dafuer ist die Feldspieler-Zahl gemeint, und
+sie ist es, die im Fazit dieses Dokuments (Abschnitt 5, Punkt 3) und im eigenen Bericht
+zaehlt. `scripts/miss-rangtreue-nach-rolle.mjs` bleibt daneben fuer die Frage bestehen, WIE
+gut die Torwart-Wertformel selbst ist (PARADE gegen GSAA ueber die Saison, gemessen 0,39 —
+ehrlich schwach, aber ein eigener Befund mit eigener Sonde, kein Grund, ihn in die
+Feldspieler-Rangtreue mit hineinzurechnen).
 
 ### Was hier wirklich Code ist und was nur die neue Messmethode zeigt
 
@@ -99,7 +130,8 @@ Befund ueber die Mechanik, sondern Kaderrauschen, das wie ein Befund aussah.
 
 Wo die Saisonzahl hoch und die Einzelspielzahl niedrig ist, belohnt die Mechanik das Richtige,
 aber zu laut — ein **Verlaesslichkeitsproblem**, das sich ueber Ereignisdichte loest, nicht
-ueber Rezepte. Hockey (0,589 gegen 0,748) und Battlefield (0,325 gegen 0,619) stehen so da.
+ueber Rezepte. Hockey (Feldspieler: 0,719 gegen 0,818; alle 12: 0,618 gegen 0,748, s. Abschnitt
+1a) und Battlefield (0,325 gegen 0,619) stehen so da.
 Football faellt dagegen aus diesem Muster heraus: **beide** Zahlen sind kaderfest gemessen
 niedrig (0,305/0,448) — nach der Live-Migration sieht das eher nach einem ungemessenen,
 schlecht kalibrierten Rezept aus als nach reinem Verlaesslichkeitsrauschen (s. Abschnitt 5).
@@ -257,18 +289,32 @@ bleibt bzw. neu hinzukommt:
    65,3 %, Yards/Attempt 7,1 — beide bereits recherchiert). Zwei offene Kandidaten fuer die
    Ursache, keiner davon bisher durchgemessen: zu duenne Ereignisdichte pro Spieler trotz Downs,
    oder eine ungetestete MATRIX-zu-Sub-Skill-Abbildung.
-3. **Hockey braucht eine neue Mechanik, keine weitere Rezeptrunde.** Nach drei
-   Kalibrierrunden (Torwart-Fix, sieben-Schritt-Liste, eigene Erfolgskurve, Sinkhorn-Fix:
-   netto 0,617→0,647 einzelkader) wurde ein vierter Anlauf ausdruecklich **verworfen**
-   (`docs/design/hockey-ueber-080-versuch2.md`): die getestete Variante lag bei 0,595 kaderfest
-   gegen die Baseline 0,589 — innerhalb der eigenen Kader-Spannweite (0,292), also nicht
-   nachweisbar besser. Hockeys Saison-Validitaet ist mit 0,748 (kaderfest) ordentlich; CLAUDE.md
-   dokumentiert bereits, dass mehr Ereignisdichte hier NICHT hilft (rho blieb bei verdoppelter
-   Spielzeit flach). Der eigene Bericht zieht den ehrlichen Schluss: eine weitere
-   Rezept-Feinjustierung stoesst an eine Decke, die nur eine echte Mechanikaenderung
-   durchbricht — z. B. einer der noch unimplementierten Schritte aus
-   `hockey-impact-verteilung-recherche-fable.md`, kein weiterer Sinkhorn-Anlauf auf denselben
-   Sub-Skills.
+3. **Hockey: der billige Hebel ist gezogen, der teure (Zoneneintritt) hat sich zweimal nicht
+   nachweisbar gehalten — ein dritter struktureller Anlauf ist nicht mehr das naechste
+   Sinnvolle.** Nach drei Kalibrierrunden (Torwart-Fix, sieben-Schritt-Liste, eigene
+   Erfolgskurve, Sinkhorn-Fix: netto 0,617→0,647 einzelkader) wurde ein vierter Rezeptanlauf
+   verworfen (`hockey-ueber-080-versuch2.md`), und ein struktureller Anlauf — Zoneneintritt als
+   Zweikampf, der bei n=24 gewinnend aussah — kippte bei n=96 im Vorzeichen (RNG-Kaskade eines
+   40-50x je Spiel gewuerfelten Ereignisses dominiert die Messung, `hockey-zoneneintritt-
+   umsetzung.md`) und wurde deshalb ebenfalls **nicht committed**. Was diese Runde stattdessen
+   umgesetzt hat, gemessen und gehalten (`hockey-zufriedenstellend.md`):
+   - **Die Feldspieler-only-Messung ist jetzt Standard** (Abschnitt 1a) — Hockeys ehrlichere
+     Zahl ist **0,719** Feldspieler (0,818 Saison), nicht 0,618 ueber alle zwoelf.
+   - **K3 (Tore halb als xG buchen)**, aus derselben Recherche (Abschnitt 3.3 dort): jeder
+     Schuss aufs Tor bucht seine kalibrierte Torwahrscheinlichkeit auf `u.xg`, `feldspielWert`
+     zahlt `punkte·1,5+xg·1,5` statt `punkte·3`. KEIN neuer `rr()`-Aufruf, KEINE Verschiebung
+     bestehender Wuerfe — reine Bilanzierung eines bereits berechneten Werts, deshalb ohne das
+     RNG-Kaskade-Risiko, an dem der Zoneneintritt scheiterte. Gemessen (kaderfest, n=24 und
+     n=48, dieselbe Kader-Familie): Feldspieler-rho je Spiel **0,651→0,719** (n=24) bzw.
+     **0,666→0,714** (n=48) — eine Bewegung, die groesser ist als die eigene Kader-Spannweite
+     (0,182–0,197), also nach der Projekt-eigenen Faustregel real. Torkorridor, Endstaende und
+     Basketball bit-identisch (reine Wertformel-Aenderung, kein Mechanikeingriff).
+   Hockey steht damit bei **0,719 Feldspieler-rho, „knapp"** statt 0,80 — echt besser als vor
+   dieser Runde, aber nicht am Ziel. CLAUDE.md dokumentiert bereits, dass mehr Ereignisdichte
+   hier kaum hilft; der naechste strukturelle Hebel bliebe der Zoneneintritt oder der
+   Netfront-Schirm aus derselben Recherche, aber beide brauchen — anders als K3 — entweder eine
+   deutlich groessere Stichprobe (n≥150) oder einen Bauweg ohne neuen `rr()`-Wurf im
+   Tick-Loop, um an dieser Projektgroesse ueberhaupt sauber messbar zu sein.
 4. **Gewichtheben wartet auf eine Architekturentscheidung von Chris, nicht auf mehr
    Kalibrierung.** Die Gameplay-Runde vom 03.09. (`gewichtheben-gameplay-fertig.md`) ist eine
    echte, gemessene Verbesserung — Zocker-Archetyp fuehrt jetzt, Pp-Abweichung fast halbiert
@@ -332,7 +378,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Disziplin | fertig | rho | Was steht |
 |---|---:|---:|---|
 | Basketball | 92 % | 0,757 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (Perzentilmodell, PR #755 fuer eine absolute Impact-Kurve offen) |
-| Hockey | 68 % | 0,589 | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · drei Kalibrierrunden ausgereizt, ein vierter Rezeptversuch ausdruecklich verworfen (nicht nachweisbar besser) — der Rest der Luecke braucht laut eigenem Bericht eine neue Mechanik, kein weiteres Rezept |
+| Hockey | 71 % | 0,719 (Feldspieler) / 0,618 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 |
 | **Fechten** | **48 %** | **0,840** | **Neu auf der Buehne** (vorher Arena, rho 0,153) · Rangtreue klar bestanden mit komfortablem Puffer · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
 | **Tennis** | **48 %** | **0,814** | **Neu auf der Buehne** (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert · nicht im echten Spielstand |
 | Time-Trial | 55 % | 0,867 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |
