@@ -10000,16 +10000,6 @@
   // selbst, nicht nur in die Ansage.
   const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
   const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
-  // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
-  // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
-  // Selbstvertrauen auch in die physische Obergrenze?"). Auf 0 gehalten: `tagesmax`
-  // (Zweikampf-Ceiling, Sinclair-Anzeige) haengt ausschliesslich an LAST (power/health/
-  // determination) — Konfidenz/ANSAGE wirkt nur auf die ERFOLGSCHANCE innerhalb dieses
-  // Fensters (HEBEN_WAGNIS_ANSAGE_FLEX oben) und auf Eroeffnungshoehe/Sprunggroesse, nie
-  // auf das Fenster selbst. Gemessen ist auch die Alternative (Wert > 0, macht ANSAGE zum
-  // zweiten Kanal FUER die Obergrenze) — s. docs/design/gewichtheben-zufriedenstellend.md
-  // fuer beide Zahlen und die Begruendung, warum 0 blieb. Ein-Zeilen-Umkehr: Wert setzen.
-  const HEBEN_TAGESMAX_ANSAGE_K=0.0045;
   // GROESSE IST KEIN ATTRIBUT — sie steht in keiner Matrix, und einflussVon hebt sie
   // nicht. Wuerde sie die Kilogramm im ERGEBNIS verschieben, waere sie ein verstecktes
   // neuntes Gewicht, das keine Messung sieht. Sie verschiebt deshalb nur die ANZEIGE:
@@ -10041,7 +10031,7 @@
     for(const [a,b,plan] of paar){
       for(const u of [a,b]){
         u.runden=[]; u.summe=0; u.aktuell=-1;
-        u.tagesmax=(HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST)*(1+(u.ANSAGE-50)*HEBEN_TAGESMAX_ANSAGE_K);
+        u.tagesmax=HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST;
         u.maxReissen=u.tagesmax*HEBEN_ANTEIL_REISSEN;
         // Wer schlecht erholt, hat im Stossen weniger uebrig. 0,94 bei ERHOLUNG 50.
         u.maxStossen=u.tagesmax*(1-HEBEN_ANTEIL_REISSEN)
