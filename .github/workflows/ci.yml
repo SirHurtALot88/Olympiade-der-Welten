@@ -30,7 +30,16 @@ concurrency:
 jobs:
   test-and-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # ZEITGRENZE AUF 40 MINUTEN — nachgemessen, nicht geraten (04.09., mehrere unabhaengige Laeufe
+    # auf main und offenen PRs). Bei 30 Minuten lag der Job praktisch immer knapp DARUNTER statt
+    # weit darunter: 26:50, 28:53, 29:25 (34s Puffer) waren alles GRUENE Laeufe, und zwei weitere
+    # (Runs 33613424667, 33833633766) ueberschritten die 30 Minuten und endeten `cancelled` —
+    # beide waehrend `app:smoke-multiplayer-e2e`, dem letzten Schritt. Der war nur das Opfer, nicht
+    # die Ursache: `app:smoke-gameplay` allein kostet durchgehend 15:43-16:02, und `npm ci` schwankt
+    # je nach Runner zwischen 2:00 und 7:01 — beide Schwankungen zusammen fressen den alten Deckel
+    # fast immer auf, ohne dass irgendetwas kaputt ist. 40 Minuten geben rund 8-13 Minuten Puffer
+    # ueber dem schlechtesten beobachteten Fall (siehe PR-Beschreibung fuer die volle Messreihe).
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - name: Set CI SQLite path
@@ -118,7 +127,12 @@ jobs:
       - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
       - run: npm run ci:ensure-gameplay-smoke-save
       - run: npm run perf:resolve-preview
-      - run: npm run app:smoke-gameplay
+      # EIGENE ZEITGRENZE, damit ein haengender Smoke MIT NAMEN abbricht statt sich lautlos den
+      # Rest des 40-Minuten-Jobbudgets zu nehmen (Begruendung fuer `timeout-minutes: 40` s. oben).
+      # 20 Minuten geben ~4-5 Minuten Puffer ueber dem gemessenen Normalfall von 15:43-16:02.
+      - name: Browser smoke - Gameplay
+        run: npm run app:smoke-gameplay
+        timeout-minutes: 20
       # Coop-Smoke (Ebene 3 aus docs/design/coop-absicherung.md). Bis hierher lief KEIN einziger
       # Coop-Pfad in CI: der 2-Browser-E2E darunter ist auskommentiert, und dieser Smoke existierte
       # zwar, war aber nirgends verdrahtet. Jede Coop-Regression waere also nur im Spiel
@@ -130,8 +144,11 @@ jobs:
       # Besitz-Isolation haelt.
       #
       # `--no-start`, weil der Produktionsserver oben schon laeuft — ohne das startet der Smoke
-      # einen zweiten (dev-)Server auf demselben Port.
-      - run: npm run app:smoke-coop-sync -- --no-start
+      # einen zweiten (dev-)Server auf demselben Port. Zeitgrenze 5 Minuten, grosszuegig ueber den
+      # gemessenen ~6 Sekunden — reiner Haenger-Fangnetz wie bei den beiden anderen Browser-Smokes.
+      - name: Browser smoke - Coop-Sync
+        run: npm run app:smoke-coop-sync -- --no-start
+        timeout-minutes: 5
       # ZWEI-BROWSER-E2E (Stufe 4.1, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md) — seit 11.07.2026 draussen,
       # jetzt zurueck im Tor. Er ist die EINZIGE Pruefung hier, die zwei echte Playwright-Browser
       # (Chris + Franky) gegen denselben Room-Socket fuehrt und dabei den kompletten Reveal-Pfad im
@@ -186,7 +203,16 @@ jobs:
       # den Test aber LOKAL mehrfach fahren will, muss die `rooms`-Tabelle zwischendurch leeren —
       # oder besser: der Test sollte seinen Raum am Ende ueber `closeRoom` (Stufe 0.4) schliessen.
       # Das waere die saubere Loesung und ist noch nicht gebaut.
-      - run: npm run app:smoke-multiplayer-e2e -- --no-start
+      #
+      # Zeitgrenze 10 Minuten: der Schritt selbst braucht in CI gemessen 2:18-3:03 (der obige
+      # ~3:50-Wert ist der isolierte Lokallauf inkl. Kader-Aufbau), der `room_state_timeout`-Fall
+      # oben kostet zusaetzliche Zeit ohne den Job zu haengen. Puffer bewusst grosszuegig, weil
+      # genau dieser Schritt zweimal den alten 30-Minuten-Jobdeckel gerissen hat (s. Begruendung
+      # fuer `timeout-minutes: 40` oben) — er war dort nur das Opfer der Vorschritte, soll aber ab
+      # jetzt SELBST erkennbar sein, falls er es doch einmal ist.
+      - name: Browser smoke - Multiplayer-E2E
+        run: npm run app:smoke-multiplayer-e2e -- --no-start
+        timeout-minutes: 10
       - name: Stop dev server
         if: always()
         run: kill "$(cat .dev-server.pid)" 2>/dev/null || true

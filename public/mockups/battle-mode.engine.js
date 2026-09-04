@@ -717,6 +717,13 @@
   // als der Kampf. Auch fuer diese vier war B_FIGUR also keine zweite, eigenstaendige
   // Wahrheit ueber das Aussehen, nur eine hoehere Detailstufe desselben Bauplans.
   //
+  // NACHTRAG (04.09.): "schild_bg/fg ... an KEINER Stelle gezeichnet" oben beschreibt den
+  // Stand VOR diesem Datum. Chris wollte den Schild trotzdem sichtbar ("das gehört für mich
+  // zu den waffen dazu") — seitdem gibt es b.schild (Draco/Johanna, s. dort) und eine echte
+  // Zeichenstelle in zeichneSprite/figur() (s. zeichneSchild/setzIm-Aufrufe weiter unten).
+  // Kein Widerspruch zur ENTSCHEIDUNG unten: die Ebene wurde in BAU nachgezogen statt eine
+  // zweite Tabelle zurueckzuholen — dieselbe Bauart wie jede andere Ergaenzung hier.
+  //
   // ENTSCHEIDUNG: die GESAMTE Tabelle ist gestrichen, nicht nur die widerspruechlichen
   // Eintraege — fuer alle 13 je in B_FIGUR gefuehrten Charaktere (die neun oben plus die vier
   // schon vorher entfernten) existiert eine vollstaendige BAU-Zeile mit echtem kopf/haut-
@@ -735,7 +742,15 @@
     // 25.08.: Axt jetzt eine echte Ebene (axt_bg/fg, s. zeichneB) statt Schwert-Behelf —
     // B_FIGUR zeigte die Axt fuer Draco laengst, nur die animierte Ansicht vertrat sie
     // bislang mit dem Schwert.
-    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel"},
+    // 04.09.: Schild ergaenzt (Chris: "in der preview fehlt draco und johanna der schild
+    // das gehört für mich zu den waffen dazu"). schild_bg/fg lagen laengst fertig als Base64
+    // in B_SPRITES (nachgemessen: byte-identisch zu public/sprites/baukasten/schild_bg.png/
+    // schild_fg.png, s. Kommentar bei zeichneSchild), waren aber nirgends verdrahtet — der
+    // Kommentar bei zeichneSprite (weiter unten, "schild_bg/fg werden ausserhalb von B_FIGUR
+    // an KEINER Stelle gezeichnet") beschrieb genau diese Luecke. Rein kosmetisches
+    // Zusatzflag wie hoerner/helm, unabhaengig davon, ob eine zweihaendig gefuehrte Axt einen
+    // Schild eigentlich ausschliessen wuerde — Chris will ihn trotzdem an beiden Figuren.
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel",schild:true},
     // Bild: gehoernter, unbewaffneter Feuer-/Lavakoloss mit geborstener Magmahaut, kaempft
     // mit blossen Faeusten. Frueher "orc" als Kopf-Naeherung (der animierbare Baukasten kennt
     // keinen Lavakoloss-Kopf) — 24.08. ECHTES Vollbild nachgezogen: public/sprites/monster/
@@ -767,8 +782,26 @@
     // dasselbe Vollbild umgestellt, mit einer eisig-blaugrauen Faerbung statt Vorraks Eisen-
     // grau oder Krag'Zuls Violett. effekt "frost"/"koerper" blieb (war schon korrekt fuer
     // das Eis im Rumpf) — nur der Koerper darunter wechselt von Humanoid auf Golem.
-    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"}},
-    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel"},
+    // energiekern:true (04.09., Chris: "krolach waere geil wenn wir da so in der mitte einen
+    // energiekern haetten (so wie iron man) und leuchtende augen in rot"). ERST GEPRUEFT, ob
+    // b.effekt das schon trifft (per renderProbe an Vorrak, der laut eigenem BAU-Kommentar
+    // weiter unten "gluehend roten Energiekern und rote Augen" schon ueber effekt:"voidRot"
+    // abdecken sollte): tut es nicht — zeichnePartikelEffekt() streut Wisps ueber die GANZE
+    // Silhouette (modus "wabernd" kreist sogar sichtbar WEIT ausserhalb des Koerperumrisses,
+    // s. Screenshot im PR), nie ein fester Kreis in der Mitte, nie zwei Punkte an den Augen —
+    // eine grobe Annaeherung, keine woertliche Umsetzung von Chris' sehr konkretem Bild.
+    // Deshalb ein EIGENER, zweiter Flag statt effekt zu missbrauchen oder zu ersetzen —
+    // dieselbe Bauart wie b.gluehenderRiss beim Lava Golem (zweite, eigenstaendige Ergaenzung
+    // ZUSAETZLICH zum bestehenden effekt-Slot, s. Kommentar dort): Krolachs "frost"-Identitaet
+    // (sein etablierter Eis-/Kristall-Look, von Chris nicht in Frage gestellt) bleibt
+    // unangetastet, energiekern kommt nur oben drauf. Zeichnet einen pulsierenden Kern
+    // (zeichneKern, dieselbe Funktion/Palette wie bei Seraph-11 — kein zweites Rezept) MITTIG
+    // auf dem Rumpf plus zwei KONSTANT leuchtende rote Punkte am Kopf (zeichneAugen, neu,
+    // s. dort fuer die Begruendung "konstant statt gepulst"), s. zeichneSprite/figur().
+    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"},energiekern:true},
+    // schild:true (04.09., s. Kommentar bei Draco oben fuer die volle Begruendung/den
+    // Fund) — dieselbe Ergaenzung, Chris wollte beide.
+    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel",schild:true},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
     // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
     // Sprite-Blaettern nicht; die fehlt und gehoert auf die Liste.
@@ -1295,7 +1328,43 @@
     // "Bloater" (aufgeblaehter Zombie) und die Subclass "Behemoth" beschreiben eine
     // schwerfaellige, aufgedunsene Masse, keinen Klingenkaempfer — className "Warlord" ist
     // zwar kraftbetont, aber kein verlaesslicher Waffen-Indiz gegen dieses Bild.
-    "Bloater":            {kopf:"zombie",koerper:"zombie"},
+    //
+    // 04.09., Sprite-Fit-Nacharbeit (data/generated/sprite-fit-bewertung.json, 2/5 Sterne,
+    // Begruendung woertlich: "Die duenne humanoide Mumienform mit roetlichen Wundflecken hat
+    // noch einen Bezug zur verwesenden Zombie-Farbgebung, aber der riesige, leuchtend-orange
+    // aufgeblaehte Bauch — das zentrale Merkmal — fehlt komplett, die Statur ist viel zu
+    // klein"). Chris' ausdruecklicher Auftrag war ein einzelner Beispiel-Durchlauf, um zu
+    // sehen, wie weit sich ein 2-Sterne-Eintrag verbessern laesst.
+    //
+    // RECHERCHE VOR DER BEHELFSLOESUNG (docs/design/bloater-modell-verbessert.md hat die
+    // Details): weder public/sprites/** noch das lokal geklonte Universal-LPC-Spritesheet-
+    // Character-Generator-Repo (~/liberatedpixelcup/universal-lpc-spritesheet-character-
+    // generator, sheet_definitions/body/body.json) kennen einen "fett/dick/obese/ogre"-
+    // Koerpertyp — nur male/muscular/female/pregnant/teen/child, und body_zombie.json
+    // speziell nur male/female/teen, keine Groessenvariante. b.vollbild:"golem" (der einzige
+    // "massige Koloss" im Baukasten, s. Lava Golem/Krolach oben) wurde per renderProbe-
+    // Bildvergleich geprueft und verworfen: er liest sich als blockig-gepanzerter
+    // Stein-/Metall-Construct, nicht als aufgedunsene verwesende Masse — er haette genau die
+    // "Bezug zur Zombie-Faerbung", die der Bewertungstext dem jetzigen Modell noch zugesteht,
+    // gegen eine falsche Materialitaet eingetauscht. Kein echtes Asset trifft das Bild besser
+    // als der bisherige Zombie-Koerper — deshalb zwei neue, generische BAU-Flags (Muster
+    // fuer spaetere 1-2-Sterne-Korrekturen, s. Bericht):
+    //   skala:1.35 (NEU, s. bauSkala oben) — reiner Groessen-Multiplikator UNABHAENGIG von
+    //   u.groesse/der Kader-Datei, weil renderProbe ohne echten Kader (genau der Pfad, der
+    //   die bewerteten PNGs erzeugt) sonst auf Faktor 1 zurueckfaellt. Kombiniert mit der
+    //   ohnehin schon greifenden hoehenKorrektur (misst 04.09. real ~1,106 fuer den duenn
+    //   gezeichneten Zombie-Koerper) ergibt das eine gegenueber einem normalen Menschen
+    //   deutlich, aber nicht absurd groessere Statur (~1,49x insgesamt).
+    //   leuchtenderBauch:true (NEU, s. zeichneLeuchtenderBauch oben) — EIN grosser,
+    //   permanent leuchtender orange-roter Kreis mit vier Rissadern ueber der unteren
+    //   Koerpermitte, bewusst breiter als die duenne Zombie-Silhouette selbst, fuer genau
+    //   das "zentrale, unuebersehbare Merkmal" aus dem Bildbefund.
+    //   effekt:{typ:"gift",pos:"kopf"} (NEU, s. EFFEKT_ARTEN.gift oben) — Nice-to-have fuer
+    //   den gruenen Giftrauch im Portrait, ausdruecklich NICHT der Hauptbefund laut Auftrag;
+    //   `pos:"kopf"` reicht (wabernder gruener Rauch ueber Kopf/Schultern statt eines
+    //   dritten neuen Positions-Slots).
+    "Bloater":            {kopf:"zombie",koerper:"zombie",skala:1.35,leuchtenderBauch:true,
+                           effekt:{typ:"gift",pos:"kopf"}},
     "Dawnwhisper":        {kopf:"human",haut:"olive",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     "Caldor":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"chestnut",waffe:"schwert"},
     "Skittermind":        {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true},
@@ -1536,6 +1605,78 @@
     return korr;
   }
 
+  // BAU-SKALA (04.09., Bloater-Sichtcheck: data/generated/sprite-fit-bewertung.json, 2/5
+  // Sterne, Begruendung woertlich "die Statur ist viel zu klein"). groesseFaktor(u.groesse)
+  // oben skaliert nach der SPIELER-Groesse aus data/generated/oly-player-groesse.json
+  // (0,8..1,3, ueber den Adapter durchgereicht) — eine reale Kader-Eigenschaft, kein Hebel,
+  // den ein einzelner BAU-Eintrag hier ueberschreiben duerfte oder in der freistehenden
+  // Vorschau (renderProbe ohne window.__olyArenaKader, s. scripts/erzeuge-sprite-vorschauen.mjs)
+  // ueberhaupt zu fassen bekommt: "Bloater" steht nicht im lokalen Notfall-SQUAD/OPP-Array
+  // weiter unten, kaderEintrag bleibt dort also undefined und der Faktor faellt auf 1 zurueck
+  // — GENAU der Pfad, ueber den sprite-fit-bewertung.json (das die 144 PNGs aus
+  // public/sprites/preview/ bewertet) das Sprite rendert. Ohne einen zweiten, vom
+  // Kader-Datensatz unabhaengigen Hebel bliebe Bloater dort exakt so klein wie bisher, egal
+  // was am Datensatz gepflegt wird.
+  // b.skala (NEU, generischer Multiplikator, Default 1 fuer jeden bestehenden BAU-Eintrag,
+  // der ihn nicht setzt) ist deshalb ein zweiter, rein optischer Faktor AUF b-Ebene, genau
+  // wie b.vollbildFarbe/b.effekt/b.gluehenderRiss — unabhaengig von u.groesse, multipliziert
+  // aber mit demselben Z nach demselben Prinzip (reine Zeichen-Groesse, ruehrt an keiner
+  // Trefferbox/Position der Simulation). Recherche VOR dieser Entscheidung (s. Bericht
+  // docs/design/bloater-modell-verbessert.md): weder im Repo (public/sprites/**) noch im
+  // Universal-LPC-Spritesheet-Character-Generator (sheet_definitions/body/body.json) gibt es
+  // einen eigenen "fett/dick/obese/ogre"-Koerpertyp — nur male/muscular/female/pregnant/teen/
+  // child, und die Zombie-Variante (body_zombie.json) kennt nur male/female/teen, keine
+  // Groessenvariante. Ein genereller Skalierungshebel je BAU-Eintrag ist damit die einzige
+  // Moeglichkeit, eine Figur GEZIELT groesser zu machen, ohne ihr Blatt zu tauschen.
+  function bauSkala(b){ return (b&&typeof b.skala==="number"&&b.skala>0)?b.skala:1; }
+
+  // LEUCHTENDER BAUCH (04.09., derselbe Bildbefund oben: "der riesige, leuchtend-orange
+  // aufgeblaehte Bauch — das zentrale Merkmal — fehlt komplett"). Das bestehende
+  // b.effekt/zeichnePartikelEffekt-System (s. EFFEKT_ARTEN unten, in zeichneSprite
+  // verschachtelt) zeichnet wandernde/wabernde PARTIKEL ueber eine ganze Zone — kein fest
+  // positionierter, grosser, EINZELNER Kreis an einer bestimmten Koerperstelle. Fuer einen
+  // "riesigen leuchtend-orangen Bauch" (Portrait: kugelrund, rissige lavaartig gluehende
+  // Oberflaeche) reicht das nicht.
+  //
+  // EIGENSTAENDIGE FUNKTION AUF MODULEBENE statt in zeichneSprite verschachtelt (anders als
+  // zeichneRiss/zeichneKern dort): figur() — die Kader-Karte/das Aufstellungs-Board, eigene
+  // 40x50-Ikone, eigene Skalierung — braucht dieselbe Optik, nur kleiner, und figur() ist
+  // eine eigene Funktion neben zeichneSprite, keine Verschachtelung darin. Genau das Muster,
+  // das figur() fuer jede andere Ebene ohnehin schon faehrt (z.B. b.gluehenderKern im
+  // reiherMech-Zweig dort: eigene, kleinere Zeichnung statt eines gemeinsamen Grossformats).
+  //
+  // BEWUSST OHNE ZEIT-PULS — dieselbe Lehre wie bei b.gluehenderRiss (Kommentar dort, Chris
+  // live in der Arena 01.09.: "der Riss taucht nur ab und zu auf, muesste aber permanent
+  // sein"): ein Bauch, der zwischendurch verblasst, waere derselbe Fehler. Feste Alpha-Werte,
+  // von aussen (blass/breit) nach innen (hell/schmal) wie beim Riss-Glow, macht denselben
+  // weichen Schein ohne shadowBlur (teuer). Palette identisch zu EFFEKT_ARTEN.feuer/
+  // RISS_GLUT uebernommen (Chris' Auftrag: "nicht fuer jeden Effekttyp eine komplette
+  // Kopie") statt einer dritten Orange-Tabelle fuer denselben Ton.
+  //
+  // Vier kurze Risslinien vom Rand Richtung Mitte (deterministisch aus festen Winkeln, kein
+  // Math.random() — dieselbe Figur soll bei jedem Neuzeichnen gleich aussehen) fuer die
+  // "rissige, lavaartig gluehende Oberflaeche" aus dem Bildbefund, dunkler als der Glutkern
+  // selbst (schwarzbraun statt einer vierten Orange-Stufe — sonst liesen sich Riss und Glut
+  // optisch nicht mehr auseinanderhalten).
+  const BAUCH_GLUT=["#ff8c1a","#ffcf40","#ff4d1a"], BAUCH_RISS="#3a1206";
+  function zeichneLeuchtenderBauch(ctx,cx,cy,radius){
+    ctx.globalAlpha=0.30;ctx.fillStyle=BAUCH_GLUT[0];
+    ctx.beginPath();ctx.arc(cx,cy,radius*1.22,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.68;ctx.fillStyle=BAUCH_GLUT[2];
+    ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.92;ctx.fillStyle=BAUCH_GLUT[1];
+    ctx.beginPath();ctx.arc(cx,cy,radius*0.66,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.7;ctx.strokeStyle=BAUCH_RISS;ctx.lineWidth=Math.max(1,radius*0.09);
+    ctx.lineCap="round";
+    for(let i=0;i<4;i++){
+      const winkel=i*1.571+0.4; // 4 Speichen im rechten Winkel, plus fester Offset gegen Symmetrie
+      const x1=cx+Math.cos(winkel)*radius*0.88, y1=cy+Math.sin(winkel)*radius*0.88;
+      const x2=cx+Math.cos(winkel+0.5)*radius*0.22, y2=cy+Math.sin(winkel+0.5)*radius*0.22;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
   // Welche Animation zu welchem Zustand gehoert — und wie viele Bilder sie hat.
   const ANIBILDER={walk:9,slash:6,shoot:13,hurt:6};
 
@@ -1728,8 +1869,10 @@
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
-    // Zahl statt einer zweiten.
-    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+    // Zahl statt einer zweiten. bauSkala(b) (04.09., s. Kommentar dort) haengt zusaetzlich
+    // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
+    // Ersatzes fuer u.groesse.
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -1793,6 +1936,12 @@
       // damit auf dem breiten Krokodil-Ruecken mehr als nur drei Huete sitzen (Portrait
       // zeigt deutlich mehr als drei).
       pilz:{farben:["#b71c1c","#c62828","#d32f2f","#e53935","#ef5350"],modus:"pilzhuete"},
+      // Giftgas (04.09., Bloater-Bildbefund: "gruen-giftiger Rauch/Nebel, der vom Koerper
+      // aufsteigt" — Nice-to-have laut Auftrag, NICHT der Hauptbefund, deshalb bewusst nur
+      // eine neue Farbtabelle statt einer eigenen Bewegungsformel: "wabernd" (Void-Modus,
+      // s. oben) passt schon fast — traeger, wolkiger Rauch statt aufsteigender Flammen-
+      // Tupfen (Feuer) oder treibender Kristalle (Frost) — nur in Gruen statt Lila/Rot.
+      gift:{farben:["#2e7d32","#66bb6a","#1b3a1e"],modus:"wabernd"},
     };
     // Eine Zeichenfunktion fuer alle Arten — nur die Bewegungsformel (modus) unterscheidet
     // sich je Art, keine Kopie der ganzen Funktion pro Element (Chris' Auftrag: "nicht fuer
@@ -1977,6 +2126,32 @@
       ctx.beginPath();ctx.arc(cx,cy,radius*0.55,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=1;
     };
+    // Leuchtende Augen (04.09., Krolach: "leuchtende augen in rot" — s. b.energiekern-
+    // Kommentar bei BAU/Krolach fuer die volle Herleitung, inkl. warum b.effekt/voidRot das
+    // nicht trifft). Zwei feste Punkte statt eines ueber die Silhouette verteilten Feldes —
+    // dieselbe Kritik wie bei zeichneKern oben ("nicht ueber den Koerper verteilt"), nur fuer
+    // ZWEI Punkte statt einem.
+    // ABSICHTLICH OHNE Puls (anders als zeichneKern direkt darueber): derselbe Fund wie bei
+    // b.gluehenderRiss (s. Kommentar dort, "der Riss taucht nur ab und zu auf, muesste aber
+    // PERMANENT sein") — ein zeitgepulster Dauerzustand liest sich live wie ein Auf-/Abladen,
+    // nicht wie ein staendiges Merkmal einer Kreatur. Leuchtende Augen sollen die ganze Zeit
+    // leuchten, nicht im Sekundentakt an-/abschwellen. Feste Alpha-Werte statt puls*X, sonst
+    // wie zeichneKern gebaut: drei konzentrische Kreise je Auge, aussen breit/blass (weicher
+    // Schein) nach innen schmal/hell (heller Kern) — RGB-Rot/Orange/Warmweiss statt der drei
+    // Feuer-Toene, damit die Augen sich sichtbar von einem etwaigen Feuer-b.effekt absetzen.
+    const zeichneAugen=(cx,cy,abstand,radius)=>{
+      const farben=["#ff2a1a","#ff7a4a","#fff0da"];
+      for(const seite of [-1,1]){
+        const ex=cx+seite*abstand;
+        ctx.globalAlpha=0.35;ctx.fillStyle=farben[0];
+        ctx.beginPath();ctx.arc(ex,cy,radius*1.8,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=0.75;ctx.fillStyle=farben[1];
+        ctx.beginPath();ctx.arc(ex,cy,radius*1.05,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;ctx.fillStyle=farben[2];
+        ctx.beginPath();ctx.arc(ex,cy,radius*0.5,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    };
     // Seraph-11: mechanischer Reiher-/Kranich-KOERPER, rein prozedural aus Formen gebaut
     // (01.09., Chris' Fund: "das ist jetzt nur noch ein Licht [der Gluehkern], braucht aber
     // noch den Body — du wolltest doch einen Kranich oder Reiher finden dafuer"). Recherche
@@ -2095,10 +2270,28 @@
       // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
       // war das "verschoben", das Chris live sah), skaliert mit Z wie alles andere hier.
       if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,11*Z);
+      // b.leuchtenderBauch (04.09., noch von keiner Vollbild-Kreatur genutzt, aber dieselbe
+      // Koordinatenlogik wie im normalen Zeichenpfad unten — fuer einen spaeteren
+      // aufgedunsenen Vollbild-Koerper mitverdrahtet statt es dort nachzuruesten).
+      if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
       // Brustkern etwas oberhalb der Mitte des 64px-Vollbild-Rahmens — dieselbe Hoehenlogik
       // wie beim Riss-Bereich direkt darueber, nur als Punkt statt Pfad. Mit Z skaliert wie
       // alles andere hier (s. groesseFaktor oben).
       if(b.gluehenderKern&&!u.down)zeichneKern(x,y-24*Z,6*Z);
+      // Krolach: Energiekern + Augen (04.09., s. BAU/Krolach-Kommentar fuer die Herleitung).
+      // Kern an DERSELBEN Stelle wie b.gluehenderKern direkt darueber (y-24*Z, Rumpfmitte
+      // des 64px-Vollbild-Rahmens — golem_walk.png ist fuer Lava Golem/Vorrak/Krag'Zul/
+      // Krolach dasselbe Blatt, dieselbe Koordinate trifft bei allen dieselbe Koerperstelle).
+      // Augen bei y-36*Z: per Pixel-Scan an golem_walk.png Reihe "vorn" ausgemessen (nicht
+      // geschaetzt) — der spitze Kopfansatz sitzt nativ zwischen y=0 (Spitze) und y~13 (wo
+      // die Schultern beginnen), y-36*Z liegt bei nativ y=10 (46-36), also im unteren, etwas
+      // breiteren Teil des Kopfansatzes statt an der duennen Spitze (dort waeren zwei Punkte
+      // im Abstand von 3*Z nicht mehr nebeneinander sichtbar). +-3*Z Abstand haelt beide
+      // Punkte innerhalb der dort ~14px breiten Kopfsilhouette.
+      if(b.energiekern&&!u.down){
+        zeichneKern(x,y-24*Z,6*Z);
+        zeichneAugen(x,y-36*Z,3*Z,1.4*Z);
+      }
       // Kamera-Requisite (Vigil) ERSETZT den Kopf, sitzt nicht mehr NUR obendrauf (Chris'
       // Korrektur 01.09.: "Vigil müsste die Kamera statt dem Gesicht sein" — die erste
       // Fassung liess Auge/Schnabel der Taube unter der Kamera weiter sichtbar). Position
@@ -2215,6 +2408,39 @@
       const im=bHol(key,null); if(!im||!im.width)return;
       try{ctx.drawImage(im,0,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
     };
+    // SCHILD (04.09., Chris: "in der preview fehlt draco und johanna der schild das gehört
+    // für mich zu den waffen dazu"). schild_bg/fg (b_schild_bg/b_schild_fg in B_SPRITES,
+    // s. quellen bei "schild" oben im Datei-Header) sind KEIN 192px-Nahkampfwaffenblatt wie
+    // axt/stab/zweihaender (deren Zellen sind quadratisch zur Blatthoehe/4, hier 256/4=64,
+    // nicht 192 — 256 ist durch 192 nicht mal ganzzahlig teilbar, s. index.json), sondern ein
+    // normales 64px-Blatt mit 6 Spalten x 4 Zeilen, ausgemessen per Pixel-Scan (nicht
+    // geschaetzt): schild_bg traegt nur in Zeile 0 (hinten) Pixel — ein kleiner Riemen/die
+    // Schildrueckseite, die von hinten zwischen den Armen hervorlugt, in den Zeilen 1-3
+    // (links/vorn/rechts) ist die BG-Zelle leer. schild_fg traegt in ALLEN vier Zeilen Pixel:
+    // in Zeile 0 nur einen duennen Streifen (der Riemen von oben ueber die Schulter), in
+    // 1-3 den vollen Rundschild sichtbar vor dem Koerper (x/y-Ausdehnung ~30-55 von 64,
+    // Ruestungs-/Waffenhoehe). Exakt das erwartete Zwei-Ebenen-Muster (bg = was der Koerper
+    // verdeckt, fg = was er nicht verdeckt) — bg VOR, fg NACH dem Koerper zeichnen, wie bei
+    // jeder anderen bg/fg-Waffe hier.
+    // Alle 6 Spalten sehen bei einem Pixel-Vergleich praktisch identisch aus (kein
+    // Angriffsschwung wie bei axt/stab/zweihaender, s. deren "6 Spalten Sechserraster"-
+    // Kommentar weiter unten) — deshalb FESTE Spalte 0 statt der laufenden Animationsspalte
+    // f: ueber zeichneB()/male() liefe f aus ANIBILDER (9 fuer walk, 13 fuer shoot, ...) und
+    // wuerde regelmaessig ueber die 6 vorhandenen Spalten hinauslaufen (Lesefehler ausserhalb
+    // des Blatts). Eigene, kleine Zeichenfunktion wie zeichneFluegel direkt darueber statt
+    // zeichneB() aus genau diesem Grund.
+    // JEDE Animation statt nur "slash" (anders als axt/stab/zweihaender): ein Schild wird am
+    // Unterarm getragen und macht keinen Angriffsschwung mit wie eine gefuehrte Waffe — er
+    // sitzt durchgehend am Arm, ob die Figur laeuft, schiesst oder getroffen wird. Deshalb
+    // auch NICHT auf !feldspiel begrenzt (anders als die vier echten Nahkampfwaffen, die
+    // Chris fuer Feldspiel-Disziplinen ausdruecklich verboten hat, s. Kommentar bei `bogen`
+    // weiter unten) — ein am Arm sitzendes Ruestungsstueck ist eher mit Helm/Ruestung
+    // vergleichbar (die ebenfalls nie feldspiel-gesperrt sind) als mit einer geschwungenen
+    // Waffe.
+    const zeichneSchild=(key)=>{
+      const im=bHol(key,null); if(!im||!im.width)return;
+      try{ctx.drawImage(im,0,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
+    };
     // b.fluegel==="federn"/"fledermaus" (26.08., Rassen-/Subclass-Luecken-Recherche): echte
     // ANIMIERTE Fluegel (4 Phasen wie jede andere Zubehoer-Ebene) statt des einen starren
     // Fremdbilds z_fluegel. "federn" (weiss, Angel/Divine) fuer Elyon; "fledermaus" (schwarz,
@@ -2233,6 +2459,7 @@
     if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
     if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
     if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
+    if(b.schild)zeichneSchild("schild_bg");
     // Weiblicher Koerper (24.08., README "Weibliche Körper sind da"): eigenstaendiges
     // Blatt aus derselben LPC-Quelle, byte-identische Zellmasse — Drop-in-Ersatz fuer
     // "body_*", unabhaengig vom Kopf/der Rasse (die Tierkoepfe passen laut LPC-
@@ -2321,6 +2548,7 @@
     if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
     if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
     if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
+    if(b.schild)zeichneSchild("schild_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
     else if(b.fluegel==="fledermaus")zeichne("fluegel_fledermaus_fg_"+ani,64,0,0,null);
     else if(b.fluegel)zeichneFluegel("z_fluegel_fg");
@@ -2369,6 +2597,13 @@
     // schon sein eigenes feuereffekt-Glimmen (b.effekt.pos==="kopf"), der Riss gehoert auf
     // den Panzer/Torso (Bildbefund "geschuppte Magmahaut"), nicht mitten durchs Gesicht.
     if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,7*Z);
+    // b.leuchtenderBauch (04.09., s. Kommentar bei zeichneLeuchtenderBauch oben): tiefer als
+    // der Riss-Bereich (y-26..y-2, "Brust/Rumpf") sitzt der BAUCH direkt darueber der Beine —
+    // Mittelpunkt y-9*Z, Radius 11*Z (per renderProbe-Vorher/Nachher-Screenshot gegen
+    // public/portraits/bloater.jpg abgeglichen: deutlich groesser als jeder Partikel-Effekt,
+    // ragt bewusst seitlich über die duenne Zombie-Silhouette hinaus — genau das "zentrale,
+    // unuebersehbare Merkmal" aus dem Bildbefund, nicht nur ein Farbtupfer auf dem Koerper).
+    if(b.leuchtenderBauch&&!u.down)zeichneLeuchtenderBauch(ctx,x,y-9*Z,11*Z);
     if(b.geist)ctx.globalAlpha=1;
   }
 
@@ -5571,7 +5806,26 @@
   // das hob den gemessenen Torwart-Mittelwert auf 11,77 gegen 7,16 bei den Feldspielern.
   // Mit REF=0,907 pendelt sich GSAA im Mittel wieder um 0 ein; HK_TW_BASIS auf den neu
   // gemessenen Feldspieler-Mittelwert gezogen.
-  const HK_TW_REF=0.907, HK_TW_BASIS=7.16, HK_TW_GSAA_K=2.0;
+  //
+  // BEIDE ERNEUT NACHGEZOGEN (Opus-Review docs/design/hockey-opus-review-nhl.md Abschnitt 2,
+  // 04.09.): seit der letzten Nachziehung oben sind mehrere Runden durch die Wertformel
+  // gelaufen (u.a. K3 — Tore halb als xG gebucht, s. feldspielWert unten — und die
+  // Passqualitaets-/Abpraller-Kette), ohne dass HK_TW_REF/HK_TW_BASIS mitgezogen wurden —
+  // genau der Fehlerzustand, vor dem der Kommentar oben warnt. Frisch gemessen
+  // (scripts/miss-hockey-torwart-konstanten.mjs, 24 Spiele je Kader):
+  //   Einzelkader (SQUAD/OPP):      BASIS 7,85   REF 0,891
+  //   Kader-Familie (5 echte Paarungen aus data/generated/kaderfamilie-live-save.json,
+  //   die fuer die CI-Schranke massgebliche Zahl, gepoolt ueber alle 1200 Feldspieler-
+  //   Zeilen bzw. 8426/1245 saves/gegentore): BASIS 9,13   REF 0,871
+  // HK_TW_BASIS auf den gepoolten Kader-Familie-Mittelwert gezogen, HK_TW_REF auf die
+  // gepoolte Kader-Familie-Fangquote. HK_TW_GSAA_K unveraendert gelassen (das Review hat ihn
+  // nicht als Problem benannt und die Streuungsrechnung des Kommentars oben haengt nicht an
+  // REF/BASIS). Wirkung gemessen (miss-alle-disziplinen.mjs, kaderfest, n=24): Hockey alle 12
+  // Teilnehmer rho je Spiel 0,618 [0,247] -> 0,669 [0,181], Feldspieler-only BIT-IDENTISCH
+  // (0,719 [0,182]) — die gesamte Bewegung sitzt nachweislich in den zwei Torwart-Zeilen,
+  // kein neuer rr()-Wurf. Basketball/Football/Gewichtheben ebenfalls bit-identisch
+  // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
+  const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   const istFootball=()=>feldspielDisc==="football";
@@ -5864,8 +6118,23 @@
   // Formation, lange Distanz -> gespreizte/passbetonte Formation. Die Verteidigung
   // reagiert auf Down/Distance, nicht auf den bereits gewuerfelten Spielzug (real weiss
   // die Verteidigung den Play Call vorher auch nicht).
-  const waehleFormationOffense=(down,toGo)=>toGo<=3?"eng":"weit";
-  const waehleFormationDefense=(down,toGo)=>toGo<=6?"basis":"nickel";
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2/B.5, docs/design/football-gewichtheben-opus-
+  // review.md — down kam bis hierhin als Parameter an, wurde aber nie gelesen). Quelle
+  // fuer die Schwelle: Gridiron Deep Dive/Sharp Football Stats (in
+  // football-gewichtheben-opus-review.md B.4.1 zitiert) — Under-Center/"eng" wird 2024
+  // NUR noch bei <=1 Yard bzw. an der Goalline bevorzugt, nicht generell bei kurzer
+  // Distanz. Auf 1./2. Down bleibt die engere reale Schwelle (<=1) massgeblich; auf
+  // 3./4. Down ("Money Down", muss die Distanz wirklich schaffen) bleibt zusaetzlich das
+  // bisherige, bewusst grosszuegigere <=3-Fenster fuer ein sichtbares Kurzyardage-Paket
+  // erhalten — dort zaehlt echte NFL-Praxis (Quarterback-Sneak/"Tush Push"-artige Bündel-
+  // Formationen bei 3rd/4th & kurz, s. B.4.1) mehr als ein reiner Distanzwert.
+  const waehleFormationOffense=(down,toGo)=>(toGo<=1||(down>=3&&toGo<=3))?"eng":"weit";
+  // Nickel ist 2024 die De-facto-Basisformation (~65-67 % aller Defensiv-Snaps, CBS
+  // Sports/Acme Packing Company, in B.4.1 zitiert) — Verteidigungen wechseln aber gezielt
+  // NOCH frueher in den fuenften Verteidiger, sobald der Down selbst die Passwahrschein-
+  // lichkeit hebt ("Money Down"): auf 3./4. Down reicht schon toGo>=4 fuer "nickel", auf
+  // 1./2. Down bleibt die alte, groessere Schwelle toGo>6.
+  const waehleFormationDefense=(down,toGo)=>((down>=3&&toGo>=4)||toGo>6)?"nickel":"basis";
 
   // SPIELZUG-AUSWAHL. Fuenf sichtbar unterschiedliche Zuege (Football-Plan-Vorschlag,
   // "lauf" plus die vier Pass-Tiefen dunk/nah/mit/fern aus der eigenen kurve, s.
@@ -5880,11 +6149,49 @@
   // (die "fern"-Kurve-Tier, mittlere Yards-Spanne 9-20 statt eines realen Deep-Ball-
   // Long-Shots) zu oft — reale Passtiefe im Mittel liegt bei ~7-8 Air Yards, nicht bei
   // jedem dritten Snap ein Bombenversuch.
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2, docs/design/football-gewichtheben-opus-
+  // review.md): bis hierhin bestimmte ausschliesslich `toGo` den Laufanteil, `down` kam
+  // als Parameter an und wurde nie gelesen — 3rd & 8 spielte sich identisch zu 1st & 10.
+  // Real ist der Down der staerkste Praediktor der Spielzugwahl (echte NFL-2024/-Analytics-
+  // Quoten, s. football-gewichtheben-opus-review.md B.4.1/B.5 fuer die Fundstellen):
+  //   - 1st & 10 (WebSearch dieser Runde, NFL.com "First-down success is the key to
+  //     third-down conversions"): 53 % Lauf / 47 % Pass — das ist genau die Basislinie,
+  //     die die vorige Rezept-Feinkalibrierung schon fuer die toGo-Fenster gefittet hat
+  //     (unten als "fruehLauf" unveraendert stehen gelassen).
+  //   - 3rd/4th & lang (>=15 Yards, thespax.com "Analyzing NFL Third Down Play-Calling"):
+  //     83 % Pass / 17 % Lauf — auf 1st/2nd Down bei derselben Distanz bleibt es dagegen
+  //     bei den alten 28 % Lauf (Draw/Clock-Situationen sind dort noch nicht "Money Down").
+  //   - 3rd/4th & kurz (<=2 Yards): deutlich laufbetonter als die Basislinie (Fox Sports/
+  //     PFF 2024: Ravens 77,6 %, Chargers hoeher, Commanders 88 % auf 3rd/4th-&-1-Laeufen,
+  //     Eagles 76,7 % Erfolgsquote auf denselben — Quarterback-Sneak/"Tush Push"-artige
+  //     Kurzyardage-Laeufe sind auf Money Downs die erwartbare Wahl, nicht die Ausnahme).
+  //   - Die mittleren toGo-Fenster (3-6 und 7-11) haben keine eigene zitierte Einzelzahl;
+  //     dort wird zwischen der 1st/2nd- und der 3rd/4th-Extremzahl linear interpoliert,
+  //     klar als Interpolation gekennzeichnet, keine erfundene Konstante.
+  // Umsetzung: der Laufanteil verschiebt sich mit Down und Distanz, die INNERE Aufteilung
+  // der Pass-Tiefen (kurz:mittel bzw. mittel:tief) bleibt exakt die bereits kalibrierte
+  // Rezept-Feinkalibrierung (Verhaeltnis 2:1 bzw. 1:1) — nur der Lauf/Pass-Schnitt selbst
+  // reagiert neu auf `down`, damit der bereits gemessene Korridor (Yards/Attempt,
+  // Completion-Quote) nicht durch eine zweite, unabhaengige Aenderung mitverschoben wird.
   function waehlePlayCall(down,toGo){
-    if(toGo<=2){ return rr()<0.68?"lauf":"screen"; }
-    if(toGo<=6){ const r=rr(); return r<0.55?"lauf":r<0.85?"kurz":"mittel"; }
-    if(toGo<=11){ const r=rr(); return r<0.46?"lauf":r<0.82?"mittel":"tief"; }
-    const r=rr(); return r<0.28?"lauf":r<0.64?"mittel":"tief";
+    const spaet=down>=3; // "Money Down": muss die Distanz wirklich schaffen
+    if(toGo<=2){
+      const pLauf=spaet?0.80:0.68; // 3rd/4th&kurz real deutlich laufbetonter (s.o.)
+      return rr()<pLauf?"lauf":"screen";
+    }
+    if(toGo<=6){
+      const pLauf=spaet?0.38:0.55, r=rr(); // interpoliert zwischen den beiden Ankern
+      if(r<pLauf)return "lauf";
+      return (r-pLauf)<(1-pLauf)*(2/3)?"kurz":"mittel";
+    }
+    if(toGo<=11){
+      const pLauf=spaet?0.22:0.46, r=rr(); // interpoliert zwischen den beiden Ankern
+      if(r<pLauf)return "lauf";
+      return (r-pLauf)<(1-pLauf)*(2/3)?"mittel":"tief";
+    }
+    const pLauf=spaet?0.17:0.28, r=rr(); // 3rd/4th&lang: 17 % Lauf, thespax.com
+    if(r<pLauf)return "lauf";
+    return (r-pLauf)<(1-pLauf)*0.5?"mittel":"tief";
   }
   // VIERTER VERSUCH: Field Goal in Reichweite, sonst bei kurzer Distanz (und nicht zu
   // nah an der eigenen Torlinie) ein Go-For-It-Versuch, sonst Punt. PLATZHALTER-Schwellen,
@@ -5930,11 +6237,21 @@
   }
   // PASSTIEFE aus Down/Distance (nur fuer "kurz"/"mittel" ohne festen Spielzug-Namen —
   // "screen" und "tief" legen ihre Tiefe schon selbst fest, s. resolvePass).
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2, docs/design/football-gewichtheben-opus-
+  // review.md): auf 3./4. Down muss der Quarterback an bzw. ueber die Distanzmarke
+  // werfen, um ueberhaupt zu konvertieren ("distance to sticks", real gut belegtes
+  // Play-Calling-Muster, s. Chris' Auftrag: "3rd/4th & long -> ... tiefere Routen") —
+  // auf 1./2. Down ist ein kurzer Check-Down dagegen folgenlos, die alte, flachere
+  // Verteilung bleibt dort unveraendert stehen. Jede Distanzstufe ruft auf 3./4. Down
+  // die naechsttiefere Tier-Stufe deutlich haeufiger auf; die Verschiebung ist an keiner
+  // Einzelquelle festgemacht (anders als der Lauf/Pass-Schnitt in waehlePlayCall), daher
+  // bewusst moderat.
   function waehleFootballTier(down,toGo){
-    if(toGo<=3)return rr()<0.6?"dunk":"nah";
-    if(toGo<=7)return rr()<0.55?"nah":"mit";
-    if(toGo<=12)return rr()<0.5?"mit":"fern";
-    return rr()<0.7?"fern":"mit";
+    const spaet=down>=3;
+    if(toGo<=3)return rr()<(spaet?0.45:0.6)?"dunk":"nah";
+    if(toGo<=7)return rr()<(spaet?0.35:0.55)?"nah":"mit";
+    if(toGo<=12)return rr()<(spaet?0.30:0.5)?"mit":"fern";
+    return rr()<(spaet?0.85:0.7)?"fern":"mit";
   }
   // ENGER GEFASST (Korridor-Fit gegen 7,1 Yards/Attempt, NFL 2024, Football-Plan A.1) —
   // die alten Spannen (bis fern:[14,34], Mitte 24 Yards) trieben Yards/Attempt auf 11-13
@@ -6029,7 +6346,18 @@
     const fb=fsLive.football, erg=s.ergebnis;
     if(!fb){ return; } // Serie kann waehrend "nach" schon durch eine neue ersetzt sein
     if(s.spielTyp==="fg"||s.spielTyp==="punt"){
-      const zielSpot=s.spielTyp==="fg"?Math.max(0,fb.spot-17):Math.max(1,fb.spot-fb.puntNetto);
+      // FIELD-GOAL-ZIEL IST DIE TORLINIE, NICHT SPOT-17 (Fund aus dem Opus-Review,
+      // docs/design/football-gewichtheben-opus-review.md C.1, dieselbe Fehlerklasse wie
+      // der Pass-Fix in 60bad611): `spot` ist bereits "Yards bis zum GEGNERISCHEN Ziel"
+      // (fkLosX-Kommentar, engine.js:5793) — 0 IST die Torlinie. Die alten 17 (Endzone +
+      // Snap/Halter-Abstand) waren die BERECHNUNG der Kickdistanz in resolveFieldgoal()
+      // (`spot+17`), keine zweite Distanz, die hier nochmal abgezogen werden muesste. Der
+      // Ball flog dadurch bei jedem Field Goal 17 Yards VOR der Torlinie liegen (bei einem
+      // typischen 47-Yard-Versuch aus spot=30 also bis spot=13 statt spot=0) — unabhaengig
+      // vom Ausgang. resolveFieldgoal() traegt Erfolg/Distanz separat in `erg`;
+      // vollziehFootballErgebnis() liest bei typ:"fg" weder zielSpot noch erg.yards, also
+      // ist dies reine Sichtkorrektur ohne Wirkung auf Punktestand/Down/Distance.
+      const zielSpot=s.spielTyp==="fg"?0:Math.max(1,fb.spot-fb.puntNetto);
       const zielX=fkLosX(fb.side,zielSpot);
       const hoch=Math.sin(phase*Math.PI)*(s.spielTyp==="fg"?46:60);
       fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:H/2-hoch,traegerId:null};
@@ -9502,7 +9830,12 @@
             const rBlick=blickAus(traeger);
             const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
             const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
-            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger));
+            // bauSkala(b) (04.09., s. Kommentar bei zeichneSprite/bauSkala oben) fehlte hier
+            // urspruenglich — ohne sie wuerde ein Ball bei einem Traeger mit eigenem
+            // Skala-Flag leicht neben der (dann groesseren) Hand schweben. Heute inert fuer
+            // jeden bestehenden Charakter (Default 1), aber korrekt fuer den Fall, dass
+            // b.skala spaeter auch bei einem Basketball-/Football-Spieler zum Einsatz kommt.
+            handOffX=(hp[0]-32)*(groesseFaktor(traeger.groesse)*hoehenKorrektur(traeger)*bauSkala(BAU[traeger.n]||BAU_STD));
           }
         }
       }
@@ -9963,10 +10296,16 @@
   // Duellstand) im Mittel oefter ueber dem Tagesmaximum liegt als die reine IWF-Quote.
   const HEBEN_BASIS={reissen:[0.885,0.789,0.587], stossen:[0.908,0.758,0.565]};
   const HEBEN_ANTEIL_REISSEN=0.455;
-  // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
-  // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
-  // (ein Hobbyheber). Bewusst breiter als jede reale Klasse, weil unser Kader beides
-  // enthaelt: Lava Golem und Lulu stehen in derselben Liga.
+  // T_max = 100 + 3,8 x LAST Sinclair-kg, VOR dem ANSAGE-Faktor aus Variante B (s.
+  // HEBEN_TAGESMAX_ANSAGE_K unten). Kontrolle an den Raendern (nur ueber LAST, ANSAGE=50
+  // neutral): LAST 100 -> 480 (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse
+  // 55-kg-Klasse: 294), LAST 10 -> 138 (ein Hobbyheber). Bewusst breiter als jede reale
+  // Klasse, weil unser Kader beides enthaelt: Lava Golem und Lulu stehen in derselben Liga.
+  // VERALTET-HINWEIS (Opus-Review C.3, docs/design/football-gewichtheben-opus-review.md):
+  // seit Variante B multipliziert der ANSAGE-Faktor noch obendrauf, rechnerisch bis LAST
+  // 100 x ANSAGE 99 -> 586 — ueber Talakhadzes Weltrekord. Praktisch tritt das nicht ein:
+  // der staerkste Heber des echten live-save-Kaders (110 Spieler) landet bei 471 kg, weil
+  // hohe LAST- und hohe ANSAGE-Werte im Kader nicht zusammenfallen (r(ANSAGE,LAST)=-0,093).
   const HEBEN_KG_BASIS=100, HEBEN_KG_PRO_LAST=3.8;
   // DIE SLOT-ROLLE IST DIE VERSUCHSSTRATEGIE. Die sechs Rollen des Gewichtheben-Slots
   // beschreiben schon Strategien, ohne dass es je jemand so gebaut hat: der Power Opener
@@ -10675,8 +11014,10 @@
     // Aufloesung (40x50, der LPC-Ausschnitt) bleibt unangetastet, nur die CSS-Anzeigegroesse
     // waechst/schrumpft. figurKlein() ueberschreibt das gleich wieder mit ihrer eigenen,
     // ebenfalls faktor-skalierten Groesse (s. dort) — hier gesetzt, damit auch die direkten
-    // figur()-Aufrufer (Detailkarte, kaderFigur()) mitskalieren.
-    const figurFaktor=groesseFaktor(p.groesse);
+    // figur()-Aufrufer (Detailkarte, kaderFigur()) mitskalieren. bauSkala(b) (04.09., s.
+    // Kommentar bei zeichneSprite/bauSkala oben) multipliziert genauso mit rein wie dort —
+    // die Kader-Karte soll denselben Bauplan zeigen wie die Arena, Groesse eingeschlossen.
+    const figurFaktor=groesseFaktor(p.groesse)*bauSkala(BAU[p.n]||BAU_STD);
     c.style.width=Math.round(40*figurFaktor)+"px";
     c.style.height=Math.round(50*figurFaktor)+"px";
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
@@ -10754,6 +11095,22 @@
           const gp=griff.punkte[2]; // Ikone zeigt immer die "vorn"-Zeile, s. row=2 oben.
           const F=50/64;
           zeichneHockeyschlaeger(x,20+(gp.x-32)*F,gp.y*F,F,2,griff.modus==="quer"?"quer":"halten");
+        }
+        // Krolach: Energiekern + Augen auch in der Kader-/Board-Ikone (04.09., EIN Modell
+        // ueberall, s. Kommentar bei zeichneKern/zeichneAugen in zeichneSprite fuer die volle
+        // Herleitung/Position). Kein Puls hier — figur() hat kein laufendes `t` wie die Arena,
+        // derselbe Kompromiss wie beim b.reiherMech-Zweig oben (dort ist b.gluehenderKern
+        // ebenfalls ein fester Punkt statt einer Animation). Dieselben Referenzkoordinaten wie
+        // dort (Rumpfmitte bei nativ y=22, Augen bei y=10, Abstand 3), auf die 40x50-Ikone
+        // umgerechnet mit demselben F=50/64 wie beim Hockeyschlaeger-Griffpunkt oben.
+        if(b.energiekern){
+          const F=50/64;
+          x.fillStyle="#ffcf40";
+          x.beginPath();x.arc(20,22*F,4*F,0,Math.PI*2);x.fill();
+          x.fillStyle="#ff2a1a";
+          for(const seite of [-1,1]){
+            x.beginPath();x.arc(20+seite*3*F,10*F,1.1*F,0,Math.PI*2);x.fill();
+          }
         }
         // Kamera-Requisite (Vigil) auch hier, sonst zeigt nur die Arena die Kamera und die
         // Kader-/Board-Karte einen "nackten" Vogel — dieselbe Anforderung wie bei jeder
@@ -10835,6 +11192,11 @@
       else if(b.waffe==="axt")setzWaffe(bHol("axt_bg",null),192,-64,-64);
       else if(b.waffe==="stab")setzWaffe(bHol("t_stab_bg",null),192,-64,-64);
       else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_bg",null),192,-64,-64);
+      // Schild (04.09., s. Kommentar bei zeichneSchild in zeichneSprite fuer die volle
+      // Begruendung/den Fund): schild_bg/fg sind ein normales 64px-Blatt (feste Spalte 0,
+      // Zeile r) wie jede andere Zubehoerebene hier — setzIm() leistet bereits GENAU das
+      // (drawImage(im,0,r*64,...)), keine eigene setzSchild()-Funktion noetig.
+      if(b.schild)setzIm(bHol("schild_bg",null));
       // KOERPER wie in zeichneSprite: b.koerper (Skelett/Zombie, eigene Farbgebung im Blatt)
       // vor dem weiblichen Koerper vor dem Standardkoerper — und mit Ruestung ueber
       // spriteBeine(), damit sich die BEINE in der Ruestungsfarbe mitfaerben. Ohne diese drei
@@ -10888,6 +11250,7 @@
       else if(b.waffe==="axt")setzWaffe(bHol("axt_fg",null),192,-64,-64);
       else if(b.waffe==="stab")setzWaffe(bHol("t_stab_fg",null),192,-64,-64);
       else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_fg",null),192,-64,-64);
+      if(b.schild)setzIm(bHol("schild_fg",null));
       // Feuerwaffe: in der Arena bleibt sie IMMER in der Hand, solange der Kaempfer steht
       // (s. zeichneSprite, Chris' Vorbild "ein Soldat legt seine Waffe nicht ab") — in der
       // Ikone fehlte sie ganz, Harbinger stand dort unbewaffnet. Erstes Bild des 9er-Zyklus
@@ -10896,6 +11259,18 @@
       if(b.fluegel==="federn")setz("fluegel_federn_fg_walk",null);
       else if(b.fluegel==="fledermaus")setz("fluegel_fledermaus_fg_walk",null);
       else if(b.fluegel)setzFluegel("z_fluegel_fg");
+      // b.leuchtenderBauch auch auf der Kader-Karte (04.09.), nicht nur in der Arena — diese
+      // Funktion zeichnet sonst weder b.effekt noch b.gluehenderRiss (beide gab es bislang
+      // nur in zeichneSprite), aber Chris wollte den Bauch ausdruecklich "in der Kader-
+      // Karte/Vorschau" sehen, nicht nur live. zeichneLeuchtenderBauch ist deshalb auf
+      // Modulebene definiert (s. Kommentar dort) statt in zeichneSprite verschachtelt — sonst
+      // waere sie von hier aus gar nicht aufrufbar gewesen. Koordinaten UMGERECHNET auf den
+      // 40x50-Ausschnitt (AUSX/AUSY=12/13, s. oben): derselbe Punkt, den zeichneSprite bei
+      // (x,y-9*Z) mit Radius 11*Z trifft, liegt hier bei cx=32-12=20, cy=37-13=24 mit Radius
+      // 11 — figur() zeichnet intern immer bei Z=1 (die BAU-/Groessen-Skalierung laeuft erst
+      // hinterher ueber c.style.width/height, s. figurFaktor oben), deshalb ohne weiteren
+      // Faktor auf den Radius.
+      if(b.leuchtenderBauch)zeichneLeuchtenderBauch(x,20,24,11);
     };
     mal(); setTimeout(mal,300); setTimeout(mal,1200);
     return c;
@@ -10910,7 +11285,7 @@
   function figurKlein(p,gr){
     const c=figur(p);
     c.className="figurklein";
-    const basis=gr||40, faktor=groesseFaktor(p.groesse);
+    const basis=gr||40, faktor=groesseFaktor(p.groesse)*bauSkala(BAU[p.n]||BAU_STD);
     c.style.width=Math.round(basis*faktor)+"px";
     c.style.height=Math.round(basis*faktor*50/40)+"px";
     return c;
