@@ -723,9 +723,9 @@
  {
   "name": "Rhyx'Tal",
   "slug": "rhyx-tal",
-  "sterne": 4,
-  "begruendung": "vollbild:\"golem\" mit dunkler Basalt-Toenung und energiekern (rot-orange leuchtende Augen) trifft den \"wuchtigen, kauernden Hoehlen-Koloss mit rissiger Steinhaut und leuchtend orangen Augen\" aus dem Bild sehr gut — dieselbe Kreaturklasse wie Lava Golem/Krolach/Vorrak, statt des vorher mit Mushu byte-identischen gefluegelten Echsen-Sprites (vorher 2 Sterne, s. sprite-fit-ergebnisse.md).",
-  "fehlendesDetail": "Die zerklueftete, zahnreiche Kopfform/Schnauze aus dem Bild fehlt (der generische Golem-Kopf ist glatt/blockig)."
+  "sterne": 3,
+  "begruendung": "Korrektur 04.09.: die Sprite-Cluster-Runde 1 hatte dies auf vollbild:\"golem\" umgebaut (naeher am reinen Portrait, ein kauernder Hoehlen-Koloss ohne Fluegel) und dabei eine aeltere, explizite Ansage von Chris uebersehen: \"gibts fuer rhyx thal nicht ein gargoyle sprite oder sowas?\" — \"ja bau den gargoyle\". Chris hat den Golem-Tausch prompt und zu Recht abgelehnt (\"der hatte doch diesen gargoyle look der genau gepasst hat\") — zurueckgesetzt auf den Gargoyle-Bauplan (gehoernter, gefluegelter, geschwaenzter Echsen-Humanoid in Steingrau). Bewertet nach Chris' eigenem Massstab (Gargoyle-Treue), nicht nach woertlicher Portraet-Deckung, die hier ausdruecklich NICHT das Ziel ist.",
+  "fehlendesDetail": "Kein echter Gargoyle-Kopf im Baukasten vorhanden (Echsenkopf vertritt ihn); die zackige Steinhaut-Textur aus einem klassischen Gargoyle-Motiv fehlt."
  },
  {
   "name": "Riley Le Rogue",
