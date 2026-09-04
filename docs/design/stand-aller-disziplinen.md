@@ -36,6 +36,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Disziplin | Chassis | rho je Spiel (Median) | Spannweite | rho Saison (Median) | Spannweite | Abnahme |
 |---|---|---:|---:|---:|---:|---|
 | Speed-Schach | Buehne | 0,889 | 0,060 | 0,979 | 0,021 | bestanden |
+| **Gewichtheben** | **Buehne** | **0,887** | 0,224 | 0,944 | 0,261 | **bestanden** |
 | Showcase | Buehne | 0,880 | 0,140 | 0,944 | 0,063 | bestanden |
 | Time-Trial | Bahn | 0,867 | 0,050 | 0,909 | 0,056 | bestanden |
 | Wettessen | Buehne | 0,844 | 0,233 | 0,916 | 0,126 | bestanden |
@@ -45,7 +46,6 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Climbing | Bahn | 0,790 | 0,192 | 0,851 | 0,308 | knapp |
 | Basketball | Feldspiel | 0,757 | 0,102 | 0,923 | 0,231 | knapp |
 | Eiskunstlauf | Buehne | 0,757 | 0,125 | 0,958 | 0,091 | knapp |
-| Gewichtheben | Buehne | 0,720 | 0,223 | 0,860 | 0,245 | knapp |
 | Takeshi's Castle | Bahn | 0,697 | 0,170 | 0,839 | 0,196 | durchgefallen |
 | I-Spy | Buehne | 0,692 | 0,384 | 0,727 | 0,441 | durchgefallen |
 | Staffel | Bahn | 0,681 | 0,398 | 0,706 | 0,650 | durchgefallen |
@@ -56,7 +56,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
 | TDM | Arena | 0,113 | 0,387 | 0,070 | 0,441 | durchgefallen |
 
-**Sieben bestehen, vier sind knapp, neun fallen durch.** (Bucketing: bestanden ab 0,80, knapp
+**Acht bestehen, drei sind knapp, neun fallen durch.** (Bucketing: bestanden ab 0,80, knapp
 ab 0,70, sonst durchgefallen — `scripts/miss-alle-disziplinen.mjs`.)
 
 ### Was hier wirklich Code ist und was nur die neue Messmethode zeigt
@@ -68,7 +68,7 @@ Nicht jede Bewegung gegenueber der 02.09.-Fassung ist eine echte Aenderung an de
 |---|---|---:|---|---:|---|
 | Tennis | Feldspiel | 0,505 / 0,853 | **Buehne** | **0,814 / 0,839** | `tennis-fechten-buehne-umsetzung.md` |
 | Fechten | Arena | 0,153 / 0,378 | **Buehne** | **0,840 / 0,874** | `tennis-fechten-buehne-umsetzung.md` |
-| Gewichtheben | Buehne | 0,595 / 0,636 | Buehne | **0,720 / 0,860** | `gewichtheben-gameplay-fertig.md` |
+| Gewichtheben | Buehne | 0,720 / 0,860 | Buehne | **0,887 / 0,944** | `gewichtheben-zufriedenstellend.md` |
 | Football | Feldspiel (Vorab-Pfad) | 0,345 / 0,699 | Feldspiel (**Live-Motor**) | **0,305 / 0,448** | `football-live-migration.md` |
 
 Tennis und Fechten sind der groesste Sprung, den dieses Dokument je in einer Runde gesehen
@@ -336,7 +336,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | **Fechten** | **48 %** | **0,840** | **Neu auf der Buehne** (vorher Arena, rho 0,153) · Rangtreue klar bestanden mit komfortablem Puffer · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
 | **Tennis** | **48 %** | **0,814** | **Neu auf der Buehne** (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert · nicht im echten Spielstand |
 | Time-Trial | 55 % | 0,867 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |
-| Gewichtheben | 62 % | 0,720 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · **Gameplay-Runde 03.09.: Zocker-Archetyp repariert, Pp-Abweichung fast halbiert, rho +0,125** · offene Architekturfrage an Chris (soll Charisma auch die physische Hebe-Obergrenze beruehren?) · nicht im echten Spielstand |
+| **Gewichtheben** | **70 %** | **0,887** | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · **Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten** · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · nicht im echten Spielstand |
 | Climbing | 48 % | 0,790 | Steigung und Kraftbudget statt Antritt · kaderfest knapp unter der Schranke (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,889 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · Bild vom Chassis |
 | Wettessen | 40 % | 0,844 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
