@@ -5849,8 +5849,23 @@
   // Formation, lange Distanz -> gespreizte/passbetonte Formation. Die Verteidigung
   // reagiert auf Down/Distance, nicht auf den bereits gewuerfelten Spielzug (real weiss
   // die Verteidigung den Play Call vorher auch nicht).
-  const waehleFormationOffense=(down,toGo)=>toGo<=3?"eng":"weit";
-  const waehleFormationDefense=(down,toGo)=>toGo<=6?"basis":"nickel";
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2/B.5, docs/design/football-gewichtheben-opus-
+  // review.md — down kam bis hierhin als Parameter an, wurde aber nie gelesen). Quelle
+  // fuer die Schwelle: Gridiron Deep Dive/Sharp Football Stats (in
+  // football-gewichtheben-opus-review.md B.4.1 zitiert) — Under-Center/"eng" wird 2024
+  // NUR noch bei <=1 Yard bzw. an der Goalline bevorzugt, nicht generell bei kurzer
+  // Distanz. Auf 1./2. Down bleibt die engere reale Schwelle (<=1) massgeblich; auf
+  // 3./4. Down ("Money Down", muss die Distanz wirklich schaffen) bleibt zusaetzlich das
+  // bisherige, bewusst grosszuegigere <=3-Fenster fuer ein sichtbares Kurzyardage-Paket
+  // erhalten — dort zaehlt echte NFL-Praxis (Quarterback-Sneak/"Tush Push"-artige Bündel-
+  // Formationen bei 3rd/4th & kurz, s. B.4.1) mehr als ein reiner Distanzwert.
+  const waehleFormationOffense=(down,toGo)=>(toGo<=1||(down>=3&&toGo<=3))?"eng":"weit";
+  // Nickel ist 2024 die De-facto-Basisformation (~65-67 % aller Defensiv-Snaps, CBS
+  // Sports/Acme Packing Company, in B.4.1 zitiert) — Verteidigungen wechseln aber gezielt
+  // NOCH frueher in den fuenften Verteidiger, sobald der Down selbst die Passwahrschein-
+  // lichkeit hebt ("Money Down"): auf 3./4. Down reicht schon toGo>=4 fuer "nickel", auf
+  // 1./2. Down bleibt die alte, groessere Schwelle toGo>6.
+  const waehleFormationDefense=(down,toGo)=>((down>=3&&toGo>=4)||toGo>6)?"nickel":"basis";
 
   // SPIELZUG-AUSWAHL. Fuenf sichtbar unterschiedliche Zuege (Football-Plan-Vorschlag,
   // "lauf" plus die vier Pass-Tiefen dunk/nah/mit/fern aus der eigenen kurve, s.
@@ -5865,11 +5880,49 @@
   // (die "fern"-Kurve-Tier, mittlere Yards-Spanne 9-20 statt eines realen Deep-Ball-
   // Long-Shots) zu oft — reale Passtiefe im Mittel liegt bei ~7-8 Air Yards, nicht bei
   // jedem dritten Snap ein Bombenversuch.
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2, docs/design/football-gewichtheben-opus-
+  // review.md): bis hierhin bestimmte ausschliesslich `toGo` den Laufanteil, `down` kam
+  // als Parameter an und wurde nie gelesen — 3rd & 8 spielte sich identisch zu 1st & 10.
+  // Real ist der Down der staerkste Praediktor der Spielzugwahl (echte NFL-2024/-Analytics-
+  // Quoten, s. football-gewichtheben-opus-review.md B.4.1/B.5 fuer die Fundstellen):
+  //   - 1st & 10 (WebSearch dieser Runde, NFL.com "First-down success is the key to
+  //     third-down conversions"): 53 % Lauf / 47 % Pass — das ist genau die Basislinie,
+  //     die die vorige Rezept-Feinkalibrierung schon fuer die toGo-Fenster gefittet hat
+  //     (unten als "fruehLauf" unveraendert stehen gelassen).
+  //   - 3rd/4th & lang (>=15 Yards, thespax.com "Analyzing NFL Third Down Play-Calling"):
+  //     83 % Pass / 17 % Lauf — auf 1st/2nd Down bei derselben Distanz bleibt es dagegen
+  //     bei den alten 28 % Lauf (Draw/Clock-Situationen sind dort noch nicht "Money Down").
+  //   - 3rd/4th & kurz (<=2 Yards): deutlich laufbetonter als die Basislinie (Fox Sports/
+  //     PFF 2024: Ravens 77,6 %, Chargers hoeher, Commanders 88 % auf 3rd/4th-&-1-Laeufen,
+  //     Eagles 76,7 % Erfolgsquote auf denselben — Quarterback-Sneak/"Tush Push"-artige
+  //     Kurzyardage-Laeufe sind auf Money Downs die erwartbare Wahl, nicht die Ausnahme).
+  //   - Die mittleren toGo-Fenster (3-6 und 7-11) haben keine eigene zitierte Einzelzahl;
+  //     dort wird zwischen der 1st/2nd- und der 3rd/4th-Extremzahl linear interpoliert,
+  //     klar als Interpolation gekennzeichnet, keine erfundene Konstante.
+  // Umsetzung: der Laufanteil verschiebt sich mit Down und Distanz, die INNERE Aufteilung
+  // der Pass-Tiefen (kurz:mittel bzw. mittel:tief) bleibt exakt die bereits kalibrierte
+  // Rezept-Feinkalibrierung (Verhaeltnis 2:1 bzw. 1:1) — nur der Lauf/Pass-Schnitt selbst
+  // reagiert neu auf `down`, damit der bereits gemessene Korridor (Yards/Attempt,
+  // Completion-Quote) nicht durch eine zweite, unabhaengige Aenderung mitverschoben wird.
   function waehlePlayCall(down,toGo){
-    if(toGo<=2){ return rr()<0.68?"lauf":"screen"; }
-    if(toGo<=6){ const r=rr(); return r<0.55?"lauf":r<0.85?"kurz":"mittel"; }
-    if(toGo<=11){ const r=rr(); return r<0.46?"lauf":r<0.82?"mittel":"tief"; }
-    const r=rr(); return r<0.28?"lauf":r<0.64?"mittel":"tief";
+    const spaet=down>=3; // "Money Down": muss die Distanz wirklich schaffen
+    if(toGo<=2){
+      const pLauf=spaet?0.80:0.68; // 3rd/4th&kurz real deutlich laufbetonter (s.o.)
+      return rr()<pLauf?"lauf":"screen";
+    }
+    if(toGo<=6){
+      const pLauf=spaet?0.38:0.55, r=rr(); // interpoliert zwischen den beiden Ankern
+      if(r<pLauf)return "lauf";
+      return (r-pLauf)<(1-pLauf)*(2/3)?"kurz":"mittel";
+    }
+    if(toGo<=11){
+      const pLauf=spaet?0.22:0.46, r=rr(); // interpoliert zwischen den beiden Ankern
+      if(r<pLauf)return "lauf";
+      return (r-pLauf)<(1-pLauf)*(2/3)?"mittel":"tief";
+    }
+    const pLauf=spaet?0.17:0.28, r=rr(); // 3rd/4th&lang: 17 % Lauf, thespax.com
+    if(r<pLauf)return "lauf";
+    return (r-pLauf)<(1-pLauf)*0.5?"mittel":"tief";
   }
   // VIERTER VERSUCH: Field Goal in Reichweite, sonst bei kurzer Distanz (und nicht zu
   // nah an der eigenen Torlinie) ein Go-For-It-Versuch, sonst Punt. PLATZHALTER-Schwellen,
@@ -5915,11 +5968,21 @@
   }
   // PASSTIEFE aus Down/Distance (nur fuer "kurz"/"mittel" ohne festen Spielzug-Namen —
   // "screen" und "tief" legen ihre Tiefe schon selbst fest, s. resolvePass).
+  // DOWN JETZT VERDRAHTET (Opus-Review C.2, docs/design/football-gewichtheben-opus-
+  // review.md): auf 3./4. Down muss der Quarterback an bzw. ueber die Distanzmarke
+  // werfen, um ueberhaupt zu konvertieren ("distance to sticks", real gut belegtes
+  // Play-Calling-Muster, s. Chris' Auftrag: "3rd/4th & long -> ... tiefere Routen") —
+  // auf 1./2. Down ist ein kurzer Check-Down dagegen folgenlos, die alte, flachere
+  // Verteilung bleibt dort unveraendert stehen. Jede Distanzstufe ruft auf 3./4. Down
+  // die naechsttiefere Tier-Stufe deutlich haeufiger auf; die Verschiebung ist an keiner
+  // Einzelquelle festgemacht (anders als der Lauf/Pass-Schnitt in waehlePlayCall), daher
+  // bewusst moderat.
   function waehleFootballTier(down,toGo){
-    if(toGo<=3)return rr()<0.6?"dunk":"nah";
-    if(toGo<=7)return rr()<0.55?"nah":"mit";
-    if(toGo<=12)return rr()<0.5?"mit":"fern";
-    return rr()<0.7?"fern":"mit";
+    const spaet=down>=3;
+    if(toGo<=3)return rr()<(spaet?0.45:0.6)?"dunk":"nah";
+    if(toGo<=7)return rr()<(spaet?0.35:0.55)?"nah":"mit";
+    if(toGo<=12)return rr()<(spaet?0.30:0.5)?"mit":"fern";
+    return rr()<(spaet?0.85:0.7)?"fern":"mit";
   }
   // ENGER GEFASST (Korridor-Fit gegen 7,1 Yards/Attempt, NFL 2024, Football-Plan A.1) —
   // die alten Spannen (bis fern:[14,34], Mitte 24 Yards) trieben Yards/Attempt auf 11-13
@@ -6014,7 +6077,18 @@
     const fb=fsLive.football, erg=s.ergebnis;
     if(!fb){ return; } // Serie kann waehrend "nach" schon durch eine neue ersetzt sein
     if(s.spielTyp==="fg"||s.spielTyp==="punt"){
-      const zielSpot=s.spielTyp==="fg"?Math.max(0,fb.spot-17):Math.max(1,fb.spot-fb.puntNetto);
+      // FIELD-GOAL-ZIEL IST DIE TORLINIE, NICHT SPOT-17 (Fund aus dem Opus-Review,
+      // docs/design/football-gewichtheben-opus-review.md C.1, dieselbe Fehlerklasse wie
+      // der Pass-Fix in 60bad611): `spot` ist bereits "Yards bis zum GEGNERISCHEN Ziel"
+      // (fkLosX-Kommentar, engine.js:5793) — 0 IST die Torlinie. Die alten 17 (Endzone +
+      // Snap/Halter-Abstand) waren die BERECHNUNG der Kickdistanz in resolveFieldgoal()
+      // (`spot+17`), keine zweite Distanz, die hier nochmal abgezogen werden muesste. Der
+      // Ball flog dadurch bei jedem Field Goal 17 Yards VOR der Torlinie liegen (bei einem
+      // typischen 47-Yard-Versuch aus spot=30 also bis spot=13 statt spot=0) — unabhaengig
+      // vom Ausgang. resolveFieldgoal() traegt Erfolg/Distanz separat in `erg`;
+      // vollziehFootballErgebnis() liest bei typ:"fg" weder zielSpot noch erg.yards, also
+      // ist dies reine Sichtkorrektur ohne Wirkung auf Punktestand/Down/Distance.
+      const zielSpot=s.spielTyp==="fg"?0:Math.max(1,fb.spot-fb.puntNetto);
       const zielX=fkLosX(fb.side,zielSpot);
       const hoch=Math.sin(phase*Math.PI)*(s.spielTyp==="fg"?46:60);
       fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:H/2-hoch,traegerId:null};
@@ -9948,10 +10022,16 @@
   // Duellstand) im Mittel oefter ueber dem Tagesmaximum liegt als die reine IWF-Quote.
   const HEBEN_BASIS={reissen:[0.885,0.789,0.587], stossen:[0.908,0.758,0.565]};
   const HEBEN_ANTEIL_REISSEN=0.455;
-  // T_max = 100 + 3,8 x LAST Sinclair-kg. Kontrolle an den Raendern: LAST 100 -> 480
-  // (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse 55-kg-Klasse: 294), LAST 10 -> 138
-  // (ein Hobbyheber). Bewusst breiter als jede reale Klasse, weil unser Kader beides
-  // enthaelt: Lava Golem und Lulu stehen in derselben Liga.
+  // T_max = 100 + 3,8 x LAST Sinclair-kg, VOR dem ANSAGE-Faktor aus Variante B (s.
+  // HEBEN_TAGESMAX_ANSAGE_K unten). Kontrolle an den Raendern (nur ueber LAST, ANSAGE=50
+  // neutral): LAST 100 -> 480 (Talakhadze hebt 492), LAST 50 -> 290 (Weltklasse
+  // 55-kg-Klasse: 294), LAST 10 -> 138 (ein Hobbyheber). Bewusst breiter als jede reale
+  // Klasse, weil unser Kader beides enthaelt: Lava Golem und Lulu stehen in derselben Liga.
+  // VERALTET-HINWEIS (Opus-Review C.3, docs/design/football-gewichtheben-opus-review.md):
+  // seit Variante B multipliziert der ANSAGE-Faktor noch obendrauf, rechnerisch bis LAST
+  // 100 x ANSAGE 99 -> 586 — ueber Talakhadzes Weltrekord. Praktisch tritt das nicht ein:
+  // der staerkste Heber des echten live-save-Kaders (110 Spieler) landet bei 471 kg, weil
+  // hohe LAST- und hohe ANSAGE-Werte im Kader nicht zusammenfallen (r(ANSAGE,LAST)=-0,093).
   const HEBEN_KG_BASIS=100, HEBEN_KG_PRO_LAST=3.8;
   // DIE SLOT-ROLLE IST DIE VERSUCHSSTRATEGIE. Die sechs Rollen des Gewichtheben-Slots
   // beschreiben schon Strategien, ohne dass es je jemand so gebaut hat: der Power Opener
