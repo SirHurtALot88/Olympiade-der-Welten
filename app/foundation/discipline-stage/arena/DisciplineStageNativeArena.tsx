@@ -3998,8 +3998,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               JEDEN lokalen Tastendruck des Gasts sofort wieder ueberschreibt). */}
           {paused ? (
             <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>
-              {roomSync?.followsHost
-                ? "⏸ Host hat pausiert"
+              {roomSync?.followsHost ? "⏸ Host hat pausiert"
                 : /* Perioden-Pause: `round` steht in diesem Fall EXAKT auf der Grenze, an der
                      `advance()` selbst pausiert hat (s.o.) — kein zusätzlicher State nötig,
                      nur das eine, was gerade zu Ende ging, statt der generischen Meldung. */
