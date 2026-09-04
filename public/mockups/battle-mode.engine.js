@@ -717,6 +717,13 @@
   // als der Kampf. Auch fuer diese vier war B_FIGUR also keine zweite, eigenstaendige
   // Wahrheit ueber das Aussehen, nur eine hoehere Detailstufe desselben Bauplans.
   //
+  // NACHTRAG (04.09.): "schild_bg/fg ... an KEINER Stelle gezeichnet" oben beschreibt den
+  // Stand VOR diesem Datum. Chris wollte den Schild trotzdem sichtbar ("das gehört für mich
+  // zu den waffen dazu") — seitdem gibt es b.schild (Draco/Johanna, s. dort) und eine echte
+  // Zeichenstelle in zeichneSprite/figur() (s. zeichneSchild/setzIm-Aufrufe weiter unten).
+  // Kein Widerspruch zur ENTSCHEIDUNG unten: die Ebene wurde in BAU nachgezogen statt eine
+  // zweite Tabelle zurueckzuholen — dieselbe Bauart wie jede andere Ergaenzung hier.
+  //
   // ENTSCHEIDUNG: die GESAMTE Tabelle ist gestrichen, nicht nur die widerspruechlichen
   // Eintraege — fuer alle 13 je in B_FIGUR gefuehrten Charaktere (die neun oben plus die vier
   // schon vorher entfernten) existiert eine vollstaendige BAU-Zeile mit echtem kopf/haut-
@@ -735,7 +742,15 @@
     // 25.08.: Axt jetzt eine echte Ebene (axt_bg/fg, s. zeichneB) statt Schwert-Behelf —
     // B_FIGUR zeigte die Axt fuer Draco laengst, nur die animierte Ansicht vertrat sie
     // bislang mit dem Schwert.
-    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel"},
+    // 04.09.: Schild ergaenzt (Chris: "in der preview fehlt draco und johanna der schild
+    // das gehört für mich zu den waffen dazu"). schild_bg/fg lagen laengst fertig als Base64
+    // in B_SPRITES (nachgemessen: byte-identisch zu public/sprites/baukasten/schild_bg.png/
+    // schild_fg.png, s. Kommentar bei zeichneSchild), waren aber nirgends verdrahtet — der
+    // Kommentar bei zeichneSprite (weiter unten, "schild_bg/fg werden ausserhalb von B_FIGUR
+    // an KEINER Stelle gezeichnet") beschrieb genau diese Luecke. Rein kosmetisches
+    // Zusatzflag wie hoerner/helm, unabhaengig davon, ob eine zweihaendig gefuehrte Axt einen
+    // Schild eigentlich ausschliessen wuerde — Chris will ihn trotzdem an beiden Figuren.
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel",schild:true},
     // Bild: gehoernter, unbewaffneter Feuer-/Lavakoloss mit geborstener Magmahaut, kaempft
     // mit blossen Faeusten. Frueher "orc" als Kopf-Naeherung (der animierbare Baukasten kennt
     // keinen Lavakoloss-Kopf) — 24.08. ECHTES Vollbild nachgezogen: public/sprites/monster/
@@ -767,8 +782,26 @@
     // dasselbe Vollbild umgestellt, mit einer eisig-blaugrauen Faerbung statt Vorraks Eisen-
     // grau oder Krag'Zuls Violett. effekt "frost"/"koerper" blieb (war schon korrekt fuer
     // das Eis im Rumpf) — nur der Koerper darunter wechselt von Humanoid auf Golem.
-    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"}},
-    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel"},
+    // energiekern:true (04.09., Chris: "krolach waere geil wenn wir da so in der mitte einen
+    // energiekern haetten (so wie iron man) und leuchtende augen in rot"). ERST GEPRUEFT, ob
+    // b.effekt das schon trifft (per renderProbe an Vorrak, der laut eigenem BAU-Kommentar
+    // weiter unten "gluehend roten Energiekern und rote Augen" schon ueber effekt:"voidRot"
+    // abdecken sollte): tut es nicht — zeichnePartikelEffekt() streut Wisps ueber die GANZE
+    // Silhouette (modus "wabernd" kreist sogar sichtbar WEIT ausserhalb des Koerperumrisses,
+    // s. Screenshot im PR), nie ein fester Kreis in der Mitte, nie zwei Punkte an den Augen —
+    // eine grobe Annaeherung, keine woertliche Umsetzung von Chris' sehr konkretem Bild.
+    // Deshalb ein EIGENER, zweiter Flag statt effekt zu missbrauchen oder zu ersetzen —
+    // dieselbe Bauart wie b.gluehenderRiss beim Lava Golem (zweite, eigenstaendige Ergaenzung
+    // ZUSAETZLICH zum bestehenden effekt-Slot, s. Kommentar dort): Krolachs "frost"-Identitaet
+    // (sein etablierter Eis-/Kristall-Look, von Chris nicht in Frage gestellt) bleibt
+    // unangetastet, energiekern kommt nur oben drauf. Zeichnet einen pulsierenden Kern
+    // (zeichneKern, dieselbe Funktion/Palette wie bei Seraph-11 — kein zweites Rezept) MITTIG
+    // auf dem Rumpf plus zwei KONSTANT leuchtende rote Punkte am Kopf (zeichneAugen, neu,
+    // s. dort fuer die Begruendung "konstant statt gepulst"), s. zeichneSprite/figur().
+    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"},energiekern:true},
+    // schild:true (04.09., s. Kommentar bei Draco oben fuer die volle Begruendung/den
+    // Fund) — dieselbe Ergaenzung, Chris wollte beide.
+    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel",schild:true},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
     // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
     // Sprite-Blaettern nicht; die fehlt und gehoert auf die Liste.
@@ -2093,6 +2126,32 @@
       ctx.beginPath();ctx.arc(cx,cy,radius*0.55,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=1;
     };
+    // Leuchtende Augen (04.09., Krolach: "leuchtende augen in rot" — s. b.energiekern-
+    // Kommentar bei BAU/Krolach fuer die volle Herleitung, inkl. warum b.effekt/voidRot das
+    // nicht trifft). Zwei feste Punkte statt eines ueber die Silhouette verteilten Feldes —
+    // dieselbe Kritik wie bei zeichneKern oben ("nicht ueber den Koerper verteilt"), nur fuer
+    // ZWEI Punkte statt einem.
+    // ABSICHTLICH OHNE Puls (anders als zeichneKern direkt darueber): derselbe Fund wie bei
+    // b.gluehenderRiss (s. Kommentar dort, "der Riss taucht nur ab und zu auf, muesste aber
+    // PERMANENT sein") — ein zeitgepulster Dauerzustand liest sich live wie ein Auf-/Abladen,
+    // nicht wie ein staendiges Merkmal einer Kreatur. Leuchtende Augen sollen die ganze Zeit
+    // leuchten, nicht im Sekundentakt an-/abschwellen. Feste Alpha-Werte statt puls*X, sonst
+    // wie zeichneKern gebaut: drei konzentrische Kreise je Auge, aussen breit/blass (weicher
+    // Schein) nach innen schmal/hell (heller Kern) — RGB-Rot/Orange/Warmweiss statt der drei
+    // Feuer-Toene, damit die Augen sich sichtbar von einem etwaigen Feuer-b.effekt absetzen.
+    const zeichneAugen=(cx,cy,abstand,radius)=>{
+      const farben=["#ff2a1a","#ff7a4a","#fff0da"];
+      for(const seite of [-1,1]){
+        const ex=cx+seite*abstand;
+        ctx.globalAlpha=0.35;ctx.fillStyle=farben[0];
+        ctx.beginPath();ctx.arc(ex,cy,radius*1.8,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=0.75;ctx.fillStyle=farben[1];
+        ctx.beginPath();ctx.arc(ex,cy,radius*1.05,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;ctx.fillStyle=farben[2];
+        ctx.beginPath();ctx.arc(ex,cy,radius*0.5,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    };
     // Seraph-11: mechanischer Reiher-/Kranich-KOERPER, rein prozedural aus Formen gebaut
     // (01.09., Chris' Fund: "das ist jetzt nur noch ein Licht [der Gluehkern], braucht aber
     // noch den Body — du wolltest doch einen Kranich oder Reiher finden dafuer"). Recherche
@@ -2219,6 +2278,20 @@
       // wie beim Riss-Bereich direkt darueber, nur als Punkt statt Pfad. Mit Z skaliert wie
       // alles andere hier (s. groesseFaktor oben).
       if(b.gluehenderKern&&!u.down)zeichneKern(x,y-24*Z,6*Z);
+      // Krolach: Energiekern + Augen (04.09., s. BAU/Krolach-Kommentar fuer die Herleitung).
+      // Kern an DERSELBEN Stelle wie b.gluehenderKern direkt darueber (y-24*Z, Rumpfmitte
+      // des 64px-Vollbild-Rahmens — golem_walk.png ist fuer Lava Golem/Vorrak/Krag'Zul/
+      // Krolach dasselbe Blatt, dieselbe Koordinate trifft bei allen dieselbe Koerperstelle).
+      // Augen bei y-36*Z: per Pixel-Scan an golem_walk.png Reihe "vorn" ausgemessen (nicht
+      // geschaetzt) — der spitze Kopfansatz sitzt nativ zwischen y=0 (Spitze) und y~13 (wo
+      // die Schultern beginnen), y-36*Z liegt bei nativ y=10 (46-36), also im unteren, etwas
+      // breiteren Teil des Kopfansatzes statt an der duennen Spitze (dort waeren zwei Punkte
+      // im Abstand von 3*Z nicht mehr nebeneinander sichtbar). +-3*Z Abstand haelt beide
+      // Punkte innerhalb der dort ~14px breiten Kopfsilhouette.
+      if(b.energiekern&&!u.down){
+        zeichneKern(x,y-24*Z,6*Z);
+        zeichneAugen(x,y-36*Z,3*Z,1.4*Z);
+      }
       // Kamera-Requisite (Vigil) ERSETZT den Kopf, sitzt nicht mehr NUR obendrauf (Chris'
       // Korrektur 01.09.: "Vigil müsste die Kamera statt dem Gesicht sein" — die erste
       // Fassung liess Auge/Schnabel der Taube unter der Kamera weiter sichtbar). Position
@@ -2320,6 +2393,39 @@
       const im=bHol(key,null); if(!im||!im.width)return;
       try{ctx.drawImage(im,0,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
     };
+    // SCHILD (04.09., Chris: "in der preview fehlt draco und johanna der schild das gehört
+    // für mich zu den waffen dazu"). schild_bg/fg (b_schild_bg/b_schild_fg in B_SPRITES,
+    // s. quellen bei "schild" oben im Datei-Header) sind KEIN 192px-Nahkampfwaffenblatt wie
+    // axt/stab/zweihaender (deren Zellen sind quadratisch zur Blatthoehe/4, hier 256/4=64,
+    // nicht 192 — 256 ist durch 192 nicht mal ganzzahlig teilbar, s. index.json), sondern ein
+    // normales 64px-Blatt mit 6 Spalten x 4 Zeilen, ausgemessen per Pixel-Scan (nicht
+    // geschaetzt): schild_bg traegt nur in Zeile 0 (hinten) Pixel — ein kleiner Riemen/die
+    // Schildrueckseite, die von hinten zwischen den Armen hervorlugt, in den Zeilen 1-3
+    // (links/vorn/rechts) ist die BG-Zelle leer. schild_fg traegt in ALLEN vier Zeilen Pixel:
+    // in Zeile 0 nur einen duennen Streifen (der Riemen von oben ueber die Schulter), in
+    // 1-3 den vollen Rundschild sichtbar vor dem Koerper (x/y-Ausdehnung ~30-55 von 64,
+    // Ruestungs-/Waffenhoehe). Exakt das erwartete Zwei-Ebenen-Muster (bg = was der Koerper
+    // verdeckt, fg = was er nicht verdeckt) — bg VOR, fg NACH dem Koerper zeichnen, wie bei
+    // jeder anderen bg/fg-Waffe hier.
+    // Alle 6 Spalten sehen bei einem Pixel-Vergleich praktisch identisch aus (kein
+    // Angriffsschwung wie bei axt/stab/zweihaender, s. deren "6 Spalten Sechserraster"-
+    // Kommentar weiter unten) — deshalb FESTE Spalte 0 statt der laufenden Animationsspalte
+    // f: ueber zeichneB()/male() liefe f aus ANIBILDER (9 fuer walk, 13 fuer shoot, ...) und
+    // wuerde regelmaessig ueber die 6 vorhandenen Spalten hinauslaufen (Lesefehler ausserhalb
+    // des Blatts). Eigene, kleine Zeichenfunktion wie zeichneFluegel direkt darueber statt
+    // zeichneB() aus genau diesem Grund.
+    // JEDE Animation statt nur "slash" (anders als axt/stab/zweihaender): ein Schild wird am
+    // Unterarm getragen und macht keinen Angriffsschwung mit wie eine gefuehrte Waffe — er
+    // sitzt durchgehend am Arm, ob die Figur laeuft, schiesst oder getroffen wird. Deshalb
+    // auch NICHT auf !feldspiel begrenzt (anders als die vier echten Nahkampfwaffen, die
+    // Chris fuer Feldspiel-Disziplinen ausdruecklich verboten hat, s. Kommentar bei `bogen`
+    // weiter unten) — ein am Arm sitzendes Ruestungsstueck ist eher mit Helm/Ruestung
+    // vergleichbar (die ebenfalls nie feldspiel-gesperrt sind) als mit einer geschwungenen
+    // Waffe.
+    const zeichneSchild=(key)=>{
+      const im=bHol(key,null); if(!im||!im.width)return;
+      try{ctx.drawImage(im,0,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
+    };
     // b.fluegel==="federn"/"fledermaus" (26.08., Rassen-/Subclass-Luecken-Recherche): echte
     // ANIMIERTE Fluegel (4 Phasen wie jede andere Zubehoer-Ebene) statt des einen starren
     // Fremdbilds z_fluegel. "federn" (weiss, Angel/Divine) fuer Elyon; "fledermaus" (schwarz,
@@ -2338,6 +2444,7 @@
     if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
     if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
     if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
+    if(b.schild)zeichneSchild("schild_bg");
     // Weiblicher Koerper (24.08., README "Weibliche Körper sind da"): eigenstaendiges
     // Blatt aus derselben LPC-Quelle, byte-identische Zellmasse — Drop-in-Ersatz fuer
     // "body_*", unabhaengig vom Kopf/der Rasse (die Tierkoepfe passen laut LPC-
@@ -2426,6 +2533,7 @@
     if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
     if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
     if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
+    if(b.schild)zeichneSchild("schild_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
     else if(b.fluegel==="fledermaus")zeichne("fluegel_fledermaus_fg_"+ani,64,0,0,null);
     else if(b.fluegel)zeichneFluegel("z_fluegel_fg");
@@ -10973,6 +11081,22 @@
           const F=50/64;
           zeichneHockeyschlaeger(x,20+(gp.x-32)*F,gp.y*F,F,2,griff.modus==="quer"?"quer":"halten");
         }
+        // Krolach: Energiekern + Augen auch in der Kader-/Board-Ikone (04.09., EIN Modell
+        // ueberall, s. Kommentar bei zeichneKern/zeichneAugen in zeichneSprite fuer die volle
+        // Herleitung/Position). Kein Puls hier — figur() hat kein laufendes `t` wie die Arena,
+        // derselbe Kompromiss wie beim b.reiherMech-Zweig oben (dort ist b.gluehenderKern
+        // ebenfalls ein fester Punkt statt einer Animation). Dieselben Referenzkoordinaten wie
+        // dort (Rumpfmitte bei nativ y=22, Augen bei y=10, Abstand 3), auf die 40x50-Ikone
+        // umgerechnet mit demselben F=50/64 wie beim Hockeyschlaeger-Griffpunkt oben.
+        if(b.energiekern){
+          const F=50/64;
+          x.fillStyle="#ffcf40";
+          x.beginPath();x.arc(20,22*F,4*F,0,Math.PI*2);x.fill();
+          x.fillStyle="#ff2a1a";
+          for(const seite of [-1,1]){
+            x.beginPath();x.arc(20+seite*3*F,10*F,1.1*F,0,Math.PI*2);x.fill();
+          }
+        }
         // Kamera-Requisite (Vigil) auch hier, sonst zeigt nur die Arena die Kamera und die
         // Kader-/Board-Karte einen "nackten" Vogel — dieselbe Anforderung wie bei jeder
         // anderen Requisite (Krone/Helm), EIN Charakter in allen Ansichten. Position/Skala
@@ -11053,6 +11177,11 @@
       else if(b.waffe==="axt")setzWaffe(bHol("axt_bg",null),192,-64,-64);
       else if(b.waffe==="stab")setzWaffe(bHol("t_stab_bg",null),192,-64,-64);
       else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_bg",null),192,-64,-64);
+      // Schild (04.09., s. Kommentar bei zeichneSchild in zeichneSprite fuer die volle
+      // Begruendung/den Fund): schild_bg/fg sind ein normales 64px-Blatt (feste Spalte 0,
+      // Zeile r) wie jede andere Zubehoerebene hier — setzIm() leistet bereits GENAU das
+      // (drawImage(im,0,r*64,...)), keine eigene setzSchild()-Funktion noetig.
+      if(b.schild)setzIm(bHol("schild_bg",null));
       // KOERPER wie in zeichneSprite: b.koerper (Skelett/Zombie, eigene Farbgebung im Blatt)
       // vor dem weiblichen Koerper vor dem Standardkoerper — und mit Ruestung ueber
       // spriteBeine(), damit sich die BEINE in der Ruestungsfarbe mitfaerben. Ohne diese drei
@@ -11106,6 +11235,7 @@
       else if(b.waffe==="axt")setzWaffe(bHol("axt_fg",null),192,-64,-64);
       else if(b.waffe==="stab")setzWaffe(bHol("t_stab_fg",null),192,-64,-64);
       else if(b.waffe==="zweihaender")setzWaffe(bHol("zweihaender_fg",null),192,-64,-64);
+      if(b.schild)setzIm(bHol("schild_fg",null));
       // Feuerwaffe: in der Arena bleibt sie IMMER in der Hand, solange der Kaempfer steht
       // (s. zeichneSprite, Chris' Vorbild "ein Soldat legt seine Waffe nicht ab") — in der
       // Ikone fehlte sie ganz, Harbinger stand dort unbewaffnet. Erstes Bild des 9er-Zyklus
