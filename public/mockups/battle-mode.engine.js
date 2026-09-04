@@ -864,7 +864,7 @@
     "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey",fluegel:true,schwanz:true,hoerner:true},
     // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
     // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
-    "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w",ruestTon:"dunkel"},
+    "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder_frau",geschlecht:"w",ruestTon:"dunkel"},
     // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab — keine Kapuze
     // (die stand hier nur als Behelf, solange Haar nicht animiert werden konnte).
     // 25.08.: waffe:"stab" ergaenzt (t_stab_bg/fg, s. zeichneB) — der Holzstab aus dem
@@ -961,17 +961,17 @@
     // Bild: blasses Maedchen, schwarzes Kleid, kein Kampfmotiv — kein Kopftyp und keine
     // Kleidung im Baukasten trifft die surreale Tortenboden-Szene; "leder" bleibt als
     // naechstliegender Ersatz fuer das Kleid stehen (wie bei Inefinnas Robe).
-    "Byrnja":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_mop",haarTon:"white"},
+    "Byrnja":             {kopf:"human",haut:"light",ruest:"leder_frau",geschlecht:"w",haar:"haar_mop",haarTon:"white"},
     // Bild: Elfe mit Langbogen, Koecher, gruenem Umhang, leichter Ruestung — deckungsgleich
     // mit Cassandras Bauplan (Bogen, keine Armbrust).
-    "Elara":              {kopf:"human",haut:"light",ohren:true,ruest:"leder",waffe:"bogen",geschlecht:"w",haar:"haar_lang",haarTon:"white"},
+    "Elara":              {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",waffe:"bogen",geschlecht:"w",haar:"haar_lang",haarTon:"white"},
     // Bild: weiblicher Cyborg, schwarze Techruestung, spitze Antennenohren, pinke
     // Energieklinge. Keine Techruestung im Baukasten: "plate" in "dunkel" vertritt sie,
     // die Energieklinge vertritt das Schwert.
     "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"dark_brown"},
     // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
     // schwebende Faeden mit erhobenen Haenden.
-    "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder",geschlecht:"w"},
+    "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder_frau",geschlecht:"w"},
     // Bild: kleines freundliches Wesen aus Rinde und Moos, keine Waffe, keine Ruestung —
     // bloss der Hautton uebernimmt das Gruen.
     "Tsubaki Cleaning":   {kopf:"orc",haut:"green",hoerner:true},
@@ -999,7 +999,7 @@
     // schon bei Draco.
     // 26.08., NEU: dieselbe Rassen-Luecke wie bei Bearington, nur fuer Orc statt Wolf
     // (kopf_orc_frau, s. quellen.json) — weiblicher Orkkopf statt des bisherigen maennlichen.
-    "Mavra":              {kopf:"orc_frau",haut:"green",ruest:"leder",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
+    "Mavra":              {kopf:"orc_frau",haut:"green",ruest:"leder_frau",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
     // Bild: Sumpfmonster aus Moos und Faeulnis, unbewaffnet.
     "Murky":              {kopf:"orc",haut:"dark_green"},
     // Bild: gewaltiger oestlicher Drache mit goldener Maehne, an Ketten gelegt. Kein
@@ -1034,7 +1034,7 @@
     // in zeichneSprite).
     // 25.08.: waffe:"stab" ergaenzt (t_stab_bg/fg, s. zeichneB) — der Kristallstab aus dem
     // Bild war bislang nirgends verdrahtet, weder in B_FIGUR noch in der animierten Ansicht.
-    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"white",effekt:{typ:"arkan",pos:"kopf"},waffe:"stab"},
+    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"white",effekt:{typ:"arkan",pos:"kopf"},waffe:"stab"},
     // Bild: kolossales kristallines Sternenwesen, wirbelnde Energieringe — dieselbe Wahl
     // wie Krag'Zul (auch ein Kristallkoloss): "alien"/"lavender"/"plate" plus Hoerner fuer
     // die Zacken.
@@ -1114,7 +1114,7 @@
     // EFFEKT_ARTEN oben, "Assets werden nie exklusiv reserviert") als beste verfuegbare
     // Naeherung an den blauen Zauber-/Technik-Schein — keine Aussage ueber Eis/Kaelte,
     // sondern reine Farbwiederverwendung, wie bei "gift"/"voidRot" schon ueblich.
-    "Babuschinka":        {kopf:"human",haut:"light",geschlecht:"w",haar:"haar_lang",haarTon:"gray",ruest:"leder",ruestTon:"dunkel",effekt:{typ:"frost",pos:"kopf"}},
+    "Babuschinka":        {kopf:"human",haut:"light",geschlecht:"w",haar:"haar_lang",haarTon:"gray",ruest:"leder_frau",ruestTon:"dunkel",effekt:{typ:"frost",pos:"kopf"}},
     // Bild: gehoerntes reptilienartiges Monster, unbewaffnet — bereits als Widerspruch
     // vorgelegt (BILDBEFUNDE, weder Servant- noch Monk-Motiv im Bild).
     "Rok Kyl":            {kopf:"lizard",haut:"brown",hoerner:true},
@@ -1132,18 +1132,18 @@
     "Enforcer":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",waffe:"schwert",fluegel:true,kapuze:true,effekt:{typ:"heilig",pos:"kopf",streuung:9}},
     // Bild: Frau mit rosa Haar, schwarzer Spitzenrobe, spielt Gitarre — keine Waffe, keine
     // Kapuze. "leder" vertritt die Robe.
-    "Melody":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"pink"},
+    "Melody":             {kopf:"human",haut:"light",ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"pink"},
 
     // ===================================================================================
     // BATCH 5 (80 neue Eintraege) — zehn parallele Agenten, je 10 Spieler aus der
     // aktiven Liga, jeder per Playwright tatsaechlich ueber zeichneSprite() gerendert und
     // gegen das Kartenfoto verifiziert (nicht nur ueber figur()/die Kader-Vorschau).
     // ===================================================================================
-    "Pinkypie":           {kopf:"human",haut:"light",ruest:"leder",ohren:true,haar:"haar_lang",haarTon:"chestnut",geschlecht:"w"},
+    "Pinkypie":           {kopf:"human",haut:"light",ruest:"leder_frau",ohren:true,haar:"haar_lang",haarTon:"chestnut",geschlecht:"w"},
     // Bild: "haelt zwei blutverschmierte Dolche im Rueckhandgriff" — bewaffnete Klingenkaempferin,
     // bislang ganz ohne Waffe. 25.08.: waffe:"schwert" als naechstliegende Klingen-Ebene ergaenzt
     // (Naeherung — eine Dolch-Ebene existiert im Baukasten nicht).
-    "Jihanna":            {kopf:"human",haut:"light",ruest:"leder",ruestTon:"bronze",ohren:true,haar:"haar_lang",haarTon:"platinum",geschlecht:"w",waffe:"schwert"},
+    "Jihanna":            {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"bronze",ohren:true,haar:"haar_lang",haarTon:"platinum",geschlecht:"w",waffe:"schwert"},
     "Serena":             {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",haar:"haar_lang",haarTon:"white",geschlecht:"w",krone:true},
     // effekt "voidRot"/"koerper" (25.08., Ausbau ueber Feuer hinaus, Bildbefund oben in
     // subclass-archetypes.ts: "Formlose, rauchig-klauenartige Schattengestalt mit
@@ -1161,14 +1161,14 @@
     // effekt bleibt (Void-Effekt-Runde, selber Tag): passt weiterhin zur rotgluehenden
     // Energie im Bild, jetzt zusaetzlich zum Vollbild statt zum Baukasten-Kopf.
     "Nocture":            {vollbild:"geist",effekt:{typ:"voidRot",pos:"koerper"}},
-    "Drop Dead":          {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",geschlecht:"w",waffe:"schwert"},
-    "Nachtschatten":      {kopf:"human",haut:"light",ruest:"leder",ruestTon:"dunkel",ohren:true,haar:"haar_lang",haarTon:"black",geschlecht:"w"},
+    "Drop Dead":          {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",geschlecht:"w",waffe:"schwert"},
+    "Nachtschatten":      {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"dunkel",ohren:true,haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     // Bild (subclass-archetypes.ts): "Gefluegelte, DURCHSCHEINENDE Fee spielt eine
     // Silberfloete, sanftes Licht, keine Ruestung, keine Waffe." Sie selbst — nicht nur ihre
     // Fluegel — wird als durchscheinend beschrieben, und es gibt kein eigenes Feen-Vollbild
     // im Repo. geist:true (s. zeichneSprite) macht sie ueber ctx.globalAlpha halbtransparent,
     // naeher am Bild als eine blickdichte Kaempferin.
-    "Erna Wellenlaut":    {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w",geist:true},
+    "Erna Wellenlaut":    {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w",geist:true},
     // Bild (subclass-archetypes.ts): "Grauhaeutige Alien-Agentin in SCHWARZEM TECH-ANZUG mit
     // leuchtenden Energieadern, Taktikguertel mit Ausruestung, futuristischer
     // Raumschiffkorridor." ruest:"plate" war eine Ritterruestung fuer eine Agentin im Anzug —
@@ -1180,7 +1180,7 @@
     // ausdruecklich Fernwaffen ("keine Armbrust") und Ruestungswaffen ("keine Heilgeste")
     // aus und erwaehnt nirgends eine gefuehrte Klinge — nur Taktikguertel/Ausruestung einer
     // verdeckt operierenden Agentin. Eine Waffe zu raten waere hier ein Griff ins Leere.
-    "Xerathis":           {kopf:"alien",haut:"fur_grey",ruest:"leder",ruestTon:"dunkel",hose:"anzug_hose_frau",geschlecht:"w"},
+    "Xerathis":           {kopf:"alien",haut:"fur_grey",ruest:"leder_frau",ruestTon:"dunkel",hose:"anzug_hose_frau",geschlecht:"w"},
     // Bild: "Riesiger Kampfroboter mit rot leuchtendem Sirenenkopf und der Aufschrift ALARM"
     // (subclass-archetypes.ts). Bisher eine graue Orkin in Platte — jetzt der Mech aus
     // public/sprites/monster/roboter_walk.png (Skorpio SciFi Pack, laut quellen.json
