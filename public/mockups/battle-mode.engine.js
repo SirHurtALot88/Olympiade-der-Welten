@@ -1729,33 +1729,67 @@
   //
   // BEWUSST OHNE ZEIT-PULS — dieselbe Lehre wie bei b.gluehenderRiss (Kommentar dort, Chris
   // live in der Arena 01.09.: "der Riss taucht nur ab und zu auf, muesste aber permanent
-  // sein"): ein Bauch, der zwischendurch verblasst, waere derselbe Fehler. Feste Alpha-Werte,
-  // von aussen (blass/breit) nach innen (hell/schmal) wie beim Riss-Glow, macht denselben
-  // weichen Schein ohne shadowBlur (teuer). Palette identisch zu EFFEKT_ARTEN.feuer/
-  // RISS_GLUT uebernommen (Chris' Auftrag: "nicht fuer jeden Effekttyp eine komplette
-  // Kopie") statt einer dritten Orange-Tabelle fuer denselben Ton.
+  // sein"): ein Bauch, der zwischendurch verblasst, waere derselbe Fehler. Feste Alpha-Werte
+  // statt eines Zeitpulses.
   //
-  // Vier kurze Risslinien vom Rand Richtung Mitte (deterministisch aus festen Winkeln, kein
-  // Math.random() — dieselbe Figur soll bei jedem Neuzeichnen gleich aussehen) fuer die
-  // "rissige, lavaartig gluehende Oberflaeche" aus dem Bildbefund, dunkler als der Glutkern
-  // selbst (schwarzbraun statt einer vierten Orange-Stufe — sonst liesen sich Riss und Glut
-  // optisch nicht mehr auseinanderhalten).
-  const BAUCH_GLUT=["#ff8c1a","#ffcf40","#ff4d1a"], BAUCH_RISS="#3a1206";
+  // KORREKTUR 04.09. (zweiter Durchlauf, s. docs/design/bloater-modell-verbessert.md
+  // Abschnitt "Korrektur 04.09."): die erste Fassung wurde nur an einem gezoomten
+  // Vorher/Nachher-Screenshot abgenommen, nicht an der echten Galerie-Groesse (64px,
+  // renderProbe("Bloater") ohne Argumente). Bei tatsaechlicher Pixelgroesse verschwammen
+  // drei halbtransparente, ueberlappende Kreise (0.30/0.68/0.92 Alpha) zu einem unscharfen
+  // Fleck ohne erkennbare Kante — Chris zu Recht: "keine ahnung was das ist was du daraus
+  // gemacht hast". Zwei Aenderungen dagegen, beide an renderProbe("Bloater") in allen vier
+  // Blickrichtungen bei echten 64px geprueft (kein Zoom):
+  //   1. FLEISCH-SOCKEL zuerst: eine breite, flache Ellipse in dunklem, fauligem Gruenton
+  //      (dunkler als die Zombie-Haut, damit sie sich davon absetzt) UNTER dem Glutkreis,
+  //      seitlich ueber die duenne Koerpersilhouette hinausragend — die Woelbung ist damit
+  //      schon als Koerperform da, bevor ueberhaupt Farbe draufkommt (Auftrag Punkt 2,
+  //      zweiter Gedankenstrich: "eine einfache ovale Unterlage ... UNTER dem Glut-Kreis").
+  //   2. GLUT NAHEZU DECKEND statt alpha-verlaufend: drei konzentrische Kreise mit fixem,
+  //      hohem Alpha (0.95 aussen bis 1 innen) statt 0.30/0.68/0.92 — bei 64px liest sich
+  //      das als klar abgegrenzte Kugel statt als Lichtschein. Ein duenner, fast schwarzer
+  //      Konturring (BAUCH_RISS, deckend) UM den ganzen Kreis setzt ihn zusaetzlich sichtbar
+  //      vom Koerper ab, wie ein echtes Koerperteil und nicht wie ein aufgeklebter Sticker.
+  //   Dazu ein kleiner heller Glanzfleck oben links (klassischer Kugel-Trick: ein Lichtpunkt
+  //      verrät Woelbung schneller als jeder Farbverlauf) und die vier Risslinien aus der
+  //      ersten Fassung unveraendert (funktionierten schon vorher, s. Vorher/Nachher-PNGs).
+  // Palette identisch zu EFFEKT_ARTEN.feuer/RISS_GLUT uebernommen (Chris' Auftrag: "nicht
+  // fuer jeden Effekttyp eine komplette Kopie") statt einer dritten Orange-Tabelle fuer
+  // denselben Ton.
+  const BAUCH_GLUT=["#ff8c1a","#ffcf40","#ff4d1a"], BAUCH_RISS="#2a0d04", BAUCH_SOCKEL="#3d4a2e";
   function zeichneLeuchtenderBauch(ctx,cx,cy,radius){
-    ctx.globalAlpha=0.30;ctx.fillStyle=BAUCH_GLUT[0];
-    ctx.beginPath();ctx.arc(cx,cy,radius*1.22,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=0.68;ctx.fillStyle=BAUCH_GLUT[2];
-    ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=0.92;ctx.fillStyle=BAUCH_GLUT[1];
-    ctx.beginPath();ctx.arc(cx,cy,radius*0.66,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=0.7;ctx.strokeStyle=BAUCH_RISS;ctx.lineWidth=Math.max(1,radius*0.09);
+    // 1) Fleisch-Sockel: breiter/flacher als der Glutkreis und tiefer angesetzt (cy+radius*0.22),
+    // damit er seitlich UND unten sichtbar uebersteht statt vom Glutkreis komplett verdeckt zu
+    // werden — genau die "Woelbung der Koerpersilhouette", die der vorigen Fassung fehlte.
+    ctx.globalAlpha=1;ctx.fillStyle=BAUCH_SOCKEL;
+    ctx.beginPath();ctx.ellipse(cx,cy+radius*0.22,radius*1.38,radius*1.08,0,0,Math.PI*2);ctx.fill();
+    // 2) Dunkler Konturring, deckend, damit sich der Glutkreis als eigenstaendige Form vom
+    // Sockel/Koerper absetzt statt nahtlos ineinanderzulaufen.
+    ctx.fillStyle=BAUCH_RISS;
+    ctx.beginPath();ctx.arc(cx,cy,radius*1.04,0,Math.PI*2);ctx.fill();
+    // 3) Glutkugel: drei konzentrische, fast deckende Kreise (kein Verlauf mehr) fuer eine
+    // klare, kugelrunde Kante bei 64px statt eines verwaschenen Farbtupfers.
+    ctx.globalAlpha=0.95;ctx.fillStyle=BAUCH_GLUT[2];
+    ctx.beginPath();ctx.arc(cx,cy,radius*0.94,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;ctx.fillStyle=BAUCH_GLUT[0];
+    ctx.beginPath();ctx.arc(cx,cy,radius*0.68,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=BAUCH_GLUT[1];
+    ctx.beginPath();ctx.arc(cx,cy,radius*0.38,0,Math.PI*2);ctx.fill();
+    // 4) Vier kurze Risslinien vom Rand Richtung Mitte (deterministisch aus festen Winkeln,
+    // kein Math.random() — dieselbe Figur soll bei jedem Neuzeichnen gleich aussehen) fuer
+    // die "rissige, lavaartig gluehende Oberflaeche" aus dem Bildbefund.
+    ctx.globalAlpha=0.85;ctx.strokeStyle=BAUCH_RISS;ctx.lineWidth=Math.max(1,radius*0.1);
     ctx.lineCap="round";
     for(let i=0;i<4;i++){
       const winkel=i*1.571+0.4; // 4 Speichen im rechten Winkel, plus fester Offset gegen Symmetrie
-      const x1=cx+Math.cos(winkel)*radius*0.88, y1=cy+Math.sin(winkel)*radius*0.88;
-      const x2=cx+Math.cos(winkel+0.5)*radius*0.22, y2=cy+Math.sin(winkel+0.5)*radius*0.22;
+      const x1=cx+Math.cos(winkel)*radius*0.9, y1=cy+Math.sin(winkel)*radius*0.9;
+      const x2=cx+Math.cos(winkel+0.5)*radius*0.2, y2=cy+Math.sin(winkel+0.5)*radius*0.2;
       ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
     }
+    // 5) Kleiner heller Glanzfleck oben links — der klassische Kugel-Trick, verraet die
+    // Woelbung schneller als jeder Farbverlauf, gerade bei so wenigen Pixeln.
+    ctx.globalAlpha=0.5;ctx.fillStyle="#fff3c4";
+    ctx.beginPath();ctx.ellipse(cx-radius*0.34,cy-radius*0.4,radius*0.22,radius*0.13,-0.5,0,Math.PI*2);ctx.fill();
     ctx.globalAlpha=1;
   }
 
