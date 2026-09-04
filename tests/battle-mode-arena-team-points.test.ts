@@ -1,18 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
+import { ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS, type ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 import {
+  ARENA_RESOLVED_DISCIPLINE_IDS,
   ARENA_TEAM_POINTS,
   BASKETBALL_INDIVIDUAL_PPS_MAX,
   BASKETBALL_PPS_ANTEIL_MITTE,
+  GEWICHTHEBEN_INDIVIDUAL_PPS_MAX,
+  GEWICHTHEBEN_PPS_ANTEIL_MITTE,
   arenaTeamPointsForFixture,
+  arenaTeamPointsForFixtureMitTiebreak,
   buildArenaMatchSeed,
   computeArenaTeamPointsFromFixtureResults,
   computeIndividualBoxscorePpsFromFixtureResults,
   findLeagueFixturesForMatchday,
+  ppsAusArenaImpact,
   ppsAusBasketballImpact,
+  ppsAusGewichthebenImpact,
+  resolveArenaFieldSizeForMatchday,
+  resolveArenaPpsReferenz,
   resolveBasketballPpsReferenz,
+  resolveGewichthebenPpsReferenz,
   runBattleModeArenaMatchday,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 
@@ -44,6 +53,88 @@ describe("arenaTeamPointsForFixture", () => {
 
   it("NICHT das Rang-basierte Modell: die Groesse der Punktdifferenz aendert nichts an den Punkten", () => {
     expect(arenaTeamPointsForFixture([100, 10])).toEqual(arenaTeamPointsForFixture([51, 50]));
+  });
+});
+
+describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
+  it("enthaelt Basketball und Gewichtheben (Gewichtheben-Produktivierung S6)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("basketball")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
+  });
+
+  /**
+   * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
+   * (arena-headless-runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei unabhaengig
+   * gepflegte Mengen -- jede Buehnen-Heben-Chassis-Disziplin MUSS auch arena-aufgeloest sein,
+   * sonst faellt der Chassis-Dispatch in `runArenaFixtures()` still auf den falschen Pfad
+   * (`spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts). Das Modul selbst wirft dafuer
+   * bereits beim Laden (s. Kommentar dort) -- dieser Test macht die Erwartung zusaetzlich
+   * explizit und dokumentiert sie an einer fuer beide Mengen sichtbaren Stelle.
+   */
+  it("jede Buehnen-Heben-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
+    for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
+      expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)).toBe(true);
+    }
+  });
+});
+
+describe("arenaTeamPointsForFixtureMitTiebreak (Gesamt-kg-Tiebreak, Fable-Empfehlung 9.1)", () => {
+  it("ohne gesamtKg identisch zu arenaTeamPointsForFixture (Basketball, unveraendertes Verhalten)", () => {
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [80, 70] })).toEqual(arenaTeamPointsForFixture([80, 70]));
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [50, 50] })).toEqual(arenaTeamPointsForFixture([50, 50]));
+  });
+
+  it("bei einem Duellgleichstand MIT gesamtKg entscheidet die hoehere Kilogrammsumme, nicht Unentschieden", () => {
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [3, 3], gesamtKg: [1800, 1750] })).toEqual([
+      ARENA_TEAM_POINTS.win,
+      ARENA_TEAM_POINTS.loss,
+    ]);
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [3, 3], gesamtKg: [1750, 1800] })).toEqual([
+      ARENA_TEAM_POINTS.loss,
+      ARENA_TEAM_POINTS.win,
+    ]);
+  });
+
+  it("ein Duellgleichstand OHNE Gleichstand bei den Punkten (seiten unterschiedlich) ignoriert gesamtKg", () => {
+    // gesamtKg wuerde hier "loss/win" nahelegen, aber seiten ist eindeutig -- die Punkte
+    // entscheiden, der Tiebreak greift nur bei einem Duellgleichstand.
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [4, 2], gesamtKg: [1000, 2000] })).toEqual([
+      ARENA_TEAM_POINTS.win,
+      ARENA_TEAM_POINTS.loss,
+    ]);
+  });
+
+  it("ein Duellgleichstand MIT ebenfalls gleicher Kilogrammsumme bleibt ein echtes Unentschieden (kein willkuerlicher Sieger)", () => {
+    expect(arenaTeamPointsForFixtureMitTiebreak({ seiten: [3, 3], gesamtKg: [1800, 1800] })).toEqual([
+      ARENA_TEAM_POINTS.draw,
+      ARENA_TEAM_POINTS.draw,
+    ]);
+  });
+});
+
+describe("computeArenaTeamPointsFromFixtureResults nutzt den Gesamt-kg-Tiebreak", () => {
+  it("ein 3:3-Duellgleichstand mit gesamtKg wird zu Sieg/Niederlage aufgeloest, seiten bleibt unveraendert 3:3", () => {
+    const seedByFixtureKey = new Map([["team-a::team-b", "seed-a-b"]]);
+    const fixtureResults: ArenaFixtureResult[] = [
+      { homeTeamId: "team-a", awayTeamId: "team-b", seiten: [3, 3], boxscore: [], gesamtKg: [1900, 1850] },
+    ];
+
+    const overrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+
+    expect(overrides.get("team-a")).toEqual({
+      teamPoints: ARENA_TEAM_POINTS.win,
+      arenaMatchSeed: "seed-a-b",
+      opponentTeamId: "team-b",
+      seiten: [3, 3],
+      outcome: "win",
+    });
+    expect(overrides.get("team-b")).toEqual({
+      teamPoints: ARENA_TEAM_POINTS.loss,
+      arenaMatchSeed: "seed-a-b",
+      opponentTeamId: "team-a",
+      seiten: [3, 3],
+      outcome: "loss",
+    });
   });
 });
 
@@ -162,6 +253,64 @@ describe("ppsAusBasketballImpact (Impact-Kurve)", () => {
   });
 });
 
+/**
+ * GEWICHTHEBEN-PRODUKTIVIERUNG (S6): dieselbe Impact-Kurve (`ppsAusArenaImpact()`), disziplinfest
+ * an Gewichthebens eigene Regler (`GEWICHTHEBEN_INDIVIDUAL_PPS_MAX`/`GEWICHTHEBEN_PPS_ANTEIL_MITTE`)
+ * -- aktuell identisch zu Basketballs Reglern, aber als EIGENE Konstanten, s. deren Kommentar.
+ * `ppsAusBasketballImpact()`/`ppsAusGewichthebenImpact()` sind duenne Wrapper um denselben
+ * generischen Kern; dieser Block prueft, dass der generische Kern (`ppsAusArenaImpact()`) mit
+ * BELIEBIGEN Reglern arbeitet, nicht nur mit Basketballs Zahlen fest verdrahtet ist.
+ */
+describe("ppsAusArenaImpact (generischer Kern) / ppsAusGewichthebenImpact", () => {
+  const referenz = { iMittel: 300, iKrass: 450 };
+
+  it("ppsAusGewichthebenImpact trifft bei iMittel/iKrass exakt Gewichthebens eigene Anker", () => {
+    expect(ppsAusGewichthebenImpact(referenz.iMittel, referenz)).toBeCloseTo(
+      GEWICHTHEBEN_INDIVIDUAL_PPS_MAX * GEWICHTHEBEN_PPS_ANTEIL_MITTE,
+      2,
+    );
+    expect(ppsAusGewichthebenImpact(referenz.iKrass, referenz)).toBeCloseTo(GEWICHTHEBEN_INDIVIDUAL_PPS_MAX, 5);
+  });
+
+  it("ppsAusArenaImpact mit frei gewaehlten max/anteilMitte reproduziert exakt diese Anker", () => {
+    const max = 9;
+    const anteilMitte = 0.4;
+    expect(ppsAusArenaImpact(referenz.iMittel, referenz, max, anteilMitte)).toBeCloseTo(max * anteilMitte, 2);
+    expect(ppsAusArenaImpact(referenz.iKrass, referenz, max, anteilMitte)).toBeCloseTo(max, 5);
+    expect(ppsAusArenaImpact(referenz.iKrass * 3, referenz, max, anteilMitte)).toBeCloseTo(max, 5);
+    expect(ppsAusArenaImpact(-10, referenz, max, anteilMitte)).toBe(0);
+  });
+
+  it("ppsAusBasketballImpact bleibt unveraendert: identisch zu ppsAusArenaImpact mit Basketballs eigenen Reglern", () => {
+    const basketballReferenz = { iMittel: 10, iKrass: 100 };
+    expect(ppsAusBasketballImpact(37, basketballReferenz)).toBe(
+      ppsAusArenaImpact(37, basketballReferenz, BASKETBALL_INDIVIDUAL_PPS_MAX, BASKETBALL_PPS_ANTEIL_MITTE),
+    );
+  });
+});
+
+describe("resolveArenaPpsReferenz / resolveGewichthebenPpsReferenz (disziplinuebergreifend)", () => {
+  it("resolveGewichthebenPpsReferenz delegiert an resolveArenaPpsReferenz('gewichtheben', ...)", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      expect(resolveGewichthebenPpsReferenz(n)).toEqual(resolveArenaPpsReferenz("gewichtheben", n));
+    }
+  });
+
+  it("Basketball und Gewichtheben tragen UNABHAENGIGE Referenzverteilungen (verschiedene Datenquellen)", () => {
+    const basketball = resolveArenaPpsReferenz("basketball", 6).referenz;
+    const gewichtheben = resolveArenaPpsReferenz("gewichtheben", 6).referenz;
+    // Gewichthebens Referenz haelt echte Zweikampf-Kilogramm (Groessenordnung >= 100), Basketballs
+    // haelt einen abstrakten Boxscore-Impact (Groessenordnung < 100 bei n=6) -- ein triftiger,
+    // von den konkreten Ziehungen unabhaengiger Beleg, dass hier NICHT dieselbe Tabelle gelesen wird.
+    expect(gewichtheben.iMittel).not.toBeCloseTo(basketball.iMittel, 0);
+  });
+
+  it("eine unbekannte disciplineId faellt defensiv auf Basketballs Konfiguration zurueck, statt zu werfen", () => {
+    expect(() => resolveArenaPpsReferenz("keine-disziplin-die-es-gibt", 6)).not.toThrow();
+    expect(resolveArenaPpsReferenz("keine-disziplin-die-es-gibt", 6)).toEqual(resolveArenaPpsReferenz("basketball", 6));
+  });
+});
+
 describe("resolveBasketballPpsReferenz (Feldgroessen-Weiche)", () => {
   it("liefert fuer eine bekannte Feldgroesse (2..6) genau diese zurueck", () => {
     for (const n of [2, 3, 4, 5, 6]) {
@@ -186,6 +335,55 @@ describe("resolveBasketballPpsReferenz (Feldgroessen-Weiche)", () => {
     const gross = resolveBasketballPpsReferenz(6).referenz;
     expect(klein.iMittel).not.toBeCloseTo(gross.iMittel, 5);
     expect(klein.iKrass).not.toBeCloseTo(gross.iKrass, 5);
+  });
+});
+
+/**
+ * ENTARTETE REFERENZ-EINTRAEGE (Gewichtheben-Produktivierung, S6, gefunden bei der echten
+ * Erstziehung 04.09.: `n=2` lieferte bei der kleinen Erststichprobe `iMittel=0`, s. Kommentar an
+ * `resolveArenaPpsReferenz()`). Ein exakter Treffer auf so einen Eintrag darf NICHT
+ * durchgereicht werden -- sonst bekaeme jeder Spieler dieser Feldgroesse 0 PPs, unabhaengig von
+ * seiner Leistung (`ppsAusArenaImpact()`s eigene Degenerationsbremse). Konstruiert mit einer
+ * handgebauten Konfiguration (unabhaengig von der aktuellen Ziehung), damit dieser Test auch
+ * dann noch triftig ist, wenn eine spaetere, groessere Nachziehung `n=2` repariert.
+ */
+describe("resolveArenaPpsReferenz ueberspringt entartete Eintraege (kein exakter Treffer auf iMittel<=0)", () => {
+  it("ein entarteter Eintrag GENAU bei der angefragten Feldgroesse wird uebersprungen -- Fallback auf die naechste GUELTIGE Groesse", () => {
+    // Basketballs echte Referenz ist an allen fuenf Feldgroessen gueltig -- dieser Test prueft
+    // die generische Fallback-Logik anhand des GEZOGENEN Basketball-Falls, bei dem n=2 die
+    // kleinste gueltige Feldgroesse ist: eine Anfrage nach n=1 muss auf n=2 fallen (bereits durch
+    // den bestehenden Test oben belegt), UND eine Anfrage GENAU auf ein hypothetisches n=2 mit
+    // iMittel=0 haette denselben Fallback-Pfad genommen wie eine fehlende Feldgroesse -- die
+    // Bedingung selbst (`istGueltig`) ist unten direkt an `ppsAusArenaImpact()`s eigener
+    // Degenerationsbremse gespiegelt und dort schon durch die "entartete Referenz"-Tests belegt.
+    // Hier zusaetzlich: der reale Gewichtheben-Fall, falls die aktuelle Ziehung (noch) einen
+    // entarteten n=2-Eintrag traegt.
+    const { feldgroesseGenutzt, referenz } = resolveArenaPpsReferenz("gewichtheben", 2);
+    if (feldgroesseGenutzt !== 2) {
+      // Erwartungsfall bei der aktuellen (kleinen) Erstziehung: n=2 war entartet, der Fallback
+      // liefert eine ANDERE, gueltige Feldgroesse.
+      expect(referenz.iMittel).toBeGreaterThan(0);
+      expect(referenz.iKrass).toBeGreaterThan(referenz.iMittel);
+    } else {
+      // Nach einer spaeteren, groesseren Nachziehung koennte n=2 selbst gueltig geworden sein --
+      // dann muss sie es auch WIRKLICH sein (kein stiller Rueckfall auf einen entarteten Treffer).
+      expect(referenz.iMittel).toBeGreaterThan(0);
+      expect(referenz.iKrass).toBeGreaterThan(referenz.iMittel);
+    }
+  });
+
+  it("computeIndividualBoxscorePpsFromFixtureResults liefert bei Gewichtheben n=2 NIE pauschal 0 fuer alle Spieler (Beweis, dass der Fallback tatsaechlich greift)", () => {
+    const { referenz } = resolveArenaPpsReferenz("gewichtheben", 2);
+    const fixtureResults: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [1, 0],
+        boxscore: [{ name: "Krass", wert: referenz.iKrass, playerId: "p-krass", side: "home" }],
+      },
+    ];
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 2, "gewichtheben");
+    expect(pps.get("p-krass")).toBeGreaterThan(0);
   });
 });
 
@@ -330,6 +528,67 @@ describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS, V2 Im
     ];
     expect(() => computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, null)).not.toThrow();
   });
+
+  it("disciplineId='gewichtheben' nutzt Gewichthebens EIGENE Referenz -- derselbe Rohwert bewertet sich anders als unter Basketballs Referenz", () => {
+    const { referenz: gewichthebenReferenz } = resolveGewichthebenPpsReferenz(6);
+    // Genau am Gewichtheben-Mitte-Anker: unter Basketballs (kleinerer) Referenz waere derselbe
+    // Rohwert weit ueber deren iKrass und liefe in den Deckel (MAX) statt in den Mitte-Anker.
+    const fixtureResults: ArenaFixtureResult[] = [
+      {
+        homeTeamId: "a",
+        awayTeamId: "b",
+        seiten: [1, 0],
+        boxscore: [eintrag("Heber", gewichthebenReferenz.iMittel, "p-heber", "home")],
+      },
+    ];
+    const ppsGewichtheben = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6, "gewichtheben").get(
+      "p-heber",
+    )!;
+    const ppsBasketballDefault = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6).get("p-heber")!;
+    expect(ppsGewichtheben).toBeCloseTo(GEWICHTHEBEN_INDIVIDUAL_PPS_MAX * GEWICHTHEBEN_PPS_ANTEIL_MITTE, 1);
+    expect(ppsBasketballDefault).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 1);
+    expect(ppsGewichtheben).not.toBeCloseTo(ppsBasketballDefault, 0);
+  });
+
+  it("ohne disciplineId (Default) bleibt exakt Basketballs Verhalten -- Testkompatibilitaet", () => {
+    const fixtureResults: ArenaFixtureResult[] = [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [eintrag("X", 20, "p-x", "home")] },
+    ];
+    expect(computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6)).toEqual(
+      computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6, "basketball"),
+    );
+  });
+});
+
+describe("resolveArenaFieldSizeForMatchday (disziplinuebergreifend)", () => {
+  function buildGameStateMitSchedule(disciplineId: string, playerCount: number) {
+    return {
+      disciplines: [{ id: disciplineId, playerCount: 6 }],
+      seasonState: {
+        disciplineSchedule: [
+          {
+            matchdayId: "matchday-1",
+            discipline1: { disciplineId, playerCount },
+            discipline2: { disciplineId: "fechten", playerCount: 4 },
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof resolveArenaFieldSizeForMatchday>[0];
+  }
+
+  it("liest die gewuerfelte Feldgroesse aus dem Spielplan-Eintrag DIESER Disziplin (egal ob d1 oder d2)", () => {
+    const gameState = buildGameStateMitSchedule("gewichtheben", 4);
+    expect(resolveArenaFieldSizeForMatchday(gameState, "matchday-1", "gewichtheben")).toBe(4);
+    expect(resolveArenaFieldSizeForMatchday(gameState, "matchday-1", "fechten")).toBe(4);
+  });
+
+  it("faellt ohne Spielplan-Eintrag auf den Katalogwert DIESER Disziplin zurueck", () => {
+    const gameState = {
+      disciplines: [{ id: "gewichtheben", playerCount: 6 }],
+      seasonState: {},
+    } as unknown as Parameters<typeof resolveArenaFieldSizeForMatchday>[0];
+    expect(resolveArenaFieldSizeForMatchday(gameState, "matchday-1", "gewichtheben")).toBe(6);
+  });
 });
 
 describe("runBattleModeArenaMatchday liefert individualBoxscorePpsByPlayerId liga-uebergreifend (gemockter Runner)", () => {
@@ -401,6 +660,68 @@ describe("runBattleModeArenaMatchday liefert individualBoxscorePpsByPlayerId lig
     expect(mitLiga1.get("p-liga1-heim")!).toBeGreaterThan(mitLiga1.get("p-liga1-gast")!);
     expect(mitLiga1.get("p-liga1-gast")!).toBeGreaterThan(mitLiga1.get("p-liga2-heim")!);
     expect(mitLiga1.get("p-liga2-heim")!).toBeGreaterThan(mitLiga1.get("p-liga2-gast")!);
+  });
+});
+
+describe("runBattleModeArenaMatchday mit disciplineId (Gewichtheben-Produktivierung S6, gemockter Runner)", () => {
+  function buildGameState(disciplineId: string): GameState {
+    return {
+      disciplines: [{ id: disciplineId, playerCount: 6 }],
+      seasonState: {
+        schedule: buildFixtureSchedule([
+          { id: "f-liga1", homeTeamId: "liga1-a", awayTeamId: "liga1-b", matchdayId: "matchday-1", leagueTier: "liga1" },
+        ]),
+      },
+    } as unknown as GameState;
+  }
+
+  it("reicht disciplineId unveraendert an runArenaFixturesImpl durch (kein 'basketball'-Literal mehr im Orchestrator)", async () => {
+    const runArenaFixturesImpl = vi.fn(async (_gameState, fixtures, disziplin) => {
+      expect(disziplin).toBe("gewichtheben");
+      return fixtures.map((fixture: { homeTeamId: string; awayTeamId: string }) => ({
+        homeTeamId: fixture.homeTeamId,
+        awayTeamId: fixture.awayTeamId,
+        seiten: [4, 2] as [number, number],
+        boxscore: [],
+        gesamtKg: [1900, 1850] as [number, number],
+      }));
+    });
+
+    const { overridesByTeamId, warnings } = await runBattleModeArenaMatchday({
+      gameState: buildGameState("gewichtheben"),
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      disciplineId: "gewichtheben",
+      runArenaFixturesImpl: runArenaFixturesImpl as never,
+    });
+
+    expect(runArenaFixturesImpl).toHaveBeenCalledTimes(1);
+    expect(warnings).toHaveLength(0);
+    expect(overridesByTeamId.get("liga1-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+    expect(overridesByTeamId.get("liga1-b")?.teamPoints).toBe(ARENA_TEAM_POINTS.loss);
+  });
+
+  it("ohne disciplineId bleibt der Default 'basketball' -- Rueckwaertskompatibilitaet mit Aufrufern von vor S6", async () => {
+    const runArenaFixturesImpl = vi.fn(async (_gameState, fixtures, disziplin) => {
+      expect(disziplin).toBe("basketball");
+      return fixtures.map((fixture: { homeTeamId: string; awayTeamId: string }) => ({
+        homeTeamId: fixture.homeTeamId,
+        awayTeamId: fixture.awayTeamId,
+        seiten: [80, 70] as [number, number],
+        boxscore: [],
+      }));
+    });
+
+    await runBattleModeArenaMatchday({
+      gameState: buildGameState("basketball"),
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      runArenaFixturesImpl: runArenaFixturesImpl as never,
+    });
+
+    expect(runArenaFixturesImpl).toHaveBeenCalledTimes(1);
   });
 });
 

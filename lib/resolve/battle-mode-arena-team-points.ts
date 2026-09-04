@@ -72,19 +72,80 @@
  * INDIVIDUELLE PPs SIND WEITERHIN ECHT ENTKOPPELT VON DEN TEAM-PUNKTEN (Plan Abschnitt 0/1.1):
  * die Summe der Spieler-PPs eines Teams MUSS nicht mehr `teamPoints` ergeben. Das ist gewollt,
  * nicht vergessen.
+ *
+ * GEWICHTHEBEN-PRODUKTIVIERUNG (S6, docs/design/gewichtheben-produktivierung.md, 04.09.):
+ * Gewichtheben ist die zweite Arena-aufgeloeste Disziplin. Die drei bis dahin auf den String
+ * "basketball" HARDCODIERTEN Stellen in `runBattleModeArenaMatchday()` (der Aufruf von
+ * `runArenaFixtures()`, die Feldgroessen-Aufloesung und die individuelle-PPs-Berechnung) sind
+ * durch einen `disciplineId`-Parameter ersetzt, den der Aufrufer explizit reicht -- s.
+ * `arena-matchday-resolve-service.ts`, `determineArenaDisciplineContexts()`, die ihn ueber
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`-Mengen-Zugehoerigkeit (nicht per Disziplins-Literal) ermittelt.
+ * Das macht jede WEITERE Arena-Disziplin (Hockey ist als naechstes geplant) zu einer reinen
+ * Konfigurationsaenderung (Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS` plus eigene
+ * PPS-Referenz/Kurvenkonstanten, s. `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` unten) statt eines
+ * zweiten Sonderfalls neben Basketball.
+ *
+ * Die Impact-Kurve selbst (`ppsAusArenaImpact()`, umbenannt aus `ppsAusBasketballImpact()`,
+ * s. dort) ist UNVERAENDERT dieselbe Formel -- nur `MAX`/`ANTEIL_MITTE`/die Referenzverteilung
+ * sind jetzt je Disziplin parametrisiert statt fest verdrahtet. `ppsAusBasketballImpact()`
+ * bleibt als benannter Wrapper mit Basketballs Konstanten exportiert (Testkompatibilitaet,
+ * unveraendertes Verhalten).
+ *
+ * DER GESAMT-KG-TIEBREAK (Fable-Empfehlung 9.1, docs/design/gewichtheben-gameplay-fertig.md
+ * Abschnitt 4): ein Duellgleichstand (z.B. 3:3 der sechs Gewichtheben-Duelle) wird NICHT mehr
+ * automatisch zum Unentschieden -- `arenaTeamPointsForFixtureMitTiebreak()` vergleicht dann die
+ * kumulierte Zweikampf-Kilogrammsumme beider Seiten (`ArenaFixtureResult.gesamtKg`, geliefert
+ * von `spieleBuehneHeben()` im Motor). Fuer jede Disziplin OHNE `gesamtKg` (Basketball) bleibt
+ * ein Punktegleichstand ein echtes Unentschieden -- unveraendertes Basketball-Verhalten.
  */
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import {
   runArenaFixtures,
+  ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
   type RunArenaFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import basketballPpsReferenzJson from "@/data/generated/basketball-pps-referenz.json";
+import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-referenz.json";
 
-/** Die einzige Disziplin, die in Phase 1 einen Arena-Pfad hat (Plan Abschnitt 3.2, Option a). */
-export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball"]);
+/**
+ * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
+ * Produktivierung erweitert). JEDER Code-Pfad, der wissen muss "wird dieser Spieltag arena-
+ * aufgeloest", prueft Mitgliedschaft in DIESER Menge -- nie einen Disziplins-Literal-Vergleich
+ * (`=== "basketball"` o.ae.) direkt. Ein Eintrag hier reicht NICHT allein: eine neue Disziplin
+ * braucht zusaetzlich einen Eintrag in `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` (individuelle PPs) und,
+ * falls sie ein anderes Chassis als Feldspiel/Buehnen-Heben braucht, Motor-Anbindung in
+ * `arena-headless-runner.ts`.
+ */
+export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball", "gewichtheben"]);
+
+/**
+ * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` (arena-headless-
+ * runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei UNABHAENGIG GEPFLEGTE Mengen,
+ * die trotzdem eine Teilmengen-Beziehung einhalten MUESSEN: jede Buehnen-Heben-Chassis-Disziplin
+ * ist zwangslaeufig auch arena-aufgeloest (das Chassis ist nur fuer eine Disziplin relevant, die
+ * ueberhaupt arena-simuliert wird). Ohne diese Pruefung wuerde eine kuenftige Disziplin, die nur
+ * in EINER der beiden Mengen landet (Copy-Paste-Fehler beim Hinzufuegen), STILL auf den falschen
+ * Chassis-Dispatch fallen: fehlt sie in `ARENA_RESOLVED_DISCIPLINE_IDS`, wird sie nie arena-
+ * aufgeloest (der Fehler bliebe unbemerkt, bis jemand fragt, warum die Disziplin nicht ankommt);
+ * fehlt sie umgekehrt (waere hier nicht der Fall, aber symmetrisch denkbar bei einem dritten
+ * Chassis) in `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`, wuerde `runArenaFixtures()` faelschlich
+ * `spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts aufrufen und mit der (jetzt korrigierten,
+ * s. `arena-headless-runner.ts`) Fehlermeldung "lieferte null" scheitern -- verwirrend statt klar.
+ * Wirft SOFORT beim Modul-Laden (Fail-Fast), nicht erst beim ersten betroffenen Spieltag-Resolve.
+ */
+for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
+  if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)) {
+    throw new Error(
+      `battle-mode-arena-team-points: "${buehneHebenId}" steht in ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS ` +
+        "(arena-headless-runner.ts), aber NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- jede Buehnen-Heben-" +
+        "Chassis-Disziplin muss auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch still " +
+        "auf den falschen Pfad.",
+    );
+  }
+}
 
 /** Chris' Vorgabe vom 30.08., "das ist gesetzt" — s. Plan Abschnitt 5.1. */
 export const ARENA_TEAM_POINTS = {
@@ -135,57 +196,171 @@ export const BASKETBALL_INDIVIDUAL_PPS_MAX = 5.5;
 export const BASKETBALL_PPS_ANTEIL_MITTE = 0.25;
 
 /**
- * BASKETBALL-PPS-REFERENZ (Opus-Dokument Abschnitt 7/8): `iMittel` (Median) und `iKrass`
- * (99,5.-Perzentil) des rohen Boxscore-Impacts, JE FELDGROESSE (`playerCount` 2..6) getrennt
- * gezogen — der Rohwert skaliert massiv mit der Feldgroesse (Median 33,5 bei 2v2 gegen 11,1 bei
- * 6v6, Opus-Dokument Abschnitt 7), eine gemeinsame Kurve fuer alle Feldgroessen wuerde Chris'
- * Problem bei kleiner Besetzung ueber einen anderen Mechanismus reproduzieren. Gezogen von
- * `scripts/ziehe-basketball-pps-referenz.ts` gegen ECHTE Liga-Kader aus dem `live-save`-Abbild
- * (nicht den Demokader des Mockups) — Provenienz (Motor-SHA1, Repo-Commit, Ziehdatum,
- * Fixture-Zahl) steht in der Datei selbst, s. dortiger `hinweis`.
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER GEWICHTHEBEN (Gewichtheben-Produktivierung, S6, 04.09.).
+ * Dieselbe Impact-Kurve wie Basketball (`ppsAusArenaImpact()`), aber mit eigenen Reglern:
+ * Gewichtheben MISST bereits eine reale, unbeschraenkte physikalische Groesse (Zweikampf-kg,
+ * s. `ArenaFixtureBoxscoreEintrag.wert` fuer diese Disziplin -- `MOTOREN.gewichtheben.wert()`
+ * liefert `u.summe`, den echten gehobenen Zweikampf, keinen abstrakten "Impact"-Score wie
+ * Basketballs Boxscore). Die Kurve braucht dieselben zwei Anker trotzdem, weil die absolute
+ * Kilogrammzahl je Kadergeneration/Liga-Niveau driftet (genau der Grund, aus dem Basketballs
+ * `iMittel`/`iKrass` je Feldgroesse getrennt gezogen sind) — ein fester kg-Schwellwert waere
+ * genauso wenig kaderrobust wie ein fester Impact-Schwellwert bei Basketball.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN (Chris' Rahmen "max
+ * 5-6" gilt disziplinuebergreifend, s. `BASKETBALL_INDIVIDUAL_PPS_MAX`-Kommentar; die 04.09.-
+ * Messung von `BASKETBALL_PPS_ANTEIL_MITTE` an 352 Duellen ist eine Aussage ueber die Kurvenform
+ * selbst, nicht ueber Basketball-spezifische Zahlen) — EXPLIZIT ALS EIGENE KONSTANTEN, nicht als
+ * Alias, damit eine spaetere Gewichtheben-spezifische Kalibrierung (z.B. nach echten Spieldaten)
+ * Basketball nicht beruehrt.
  */
-type BasketballPpsReferenzFeldgroesse = { iMittel: number; iKrass: number };
-type BasketballPpsReferenzJson = {
+export const GEWICHTHEBEN_INDIVIDUAL_PPS_MAX = 5.5;
+export const GEWICHTHEBEN_PPS_ANTEIL_MITTE = 0.25;
+
+/**
+ * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
+ * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
+ * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
+ * fuer Gewichtheben ist die Feldgroesse zwar katalogfest 6, aber Unterzahl-Duelle, s.
+ * `baueHebenDuelle()`, koennen trotzdem eine kleinere tatsaechlich gefelderte Groesse ergeben).
+ * Gezogen von `scripts/ziehe-basketball-pps-referenz.ts` bzw.
+ * `scripts/ziehe-gewichtheben-pps-referenz.ts` gegen ECHTE Liga-Kader aus dem `live-save`-Abbild
+ * (nicht den Demokader des Mockups) — Provenienz (Motor-SHA1, Repo-Commit, Ziehdatum,
+ * Fixture-Zahl) steht in der jeweiligen Datei selbst, s. dortiger `hinweis`.
+ */
+export type ArenaPpsReferenzFeldgroesse = { iMittel: number; iKrass: number };
+type ArenaPpsReferenzJson = {
   feldgroessen: Record<string, { n: number; iMittel: number; iKrass: number }>;
 };
 
-const BASKETBALL_PPS_REFERENZ_FELDGROESSEN: ReadonlyMap<number, BasketballPpsReferenzFeldgroesse> = new Map(
-  Object.values((basketballPpsReferenzJson as BasketballPpsReferenzJson).feldgroessen).map((werte) => [
-    werte.n,
-    { iMittel: werte.iMittel, iKrass: werte.iKrass },
-  ]),
+function ladeReferenzFeldgroessen(json: ArenaPpsReferenzJson): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> {
+  return new Map(
+    Object.values(json.feldgroessen).map((werte) => [werte.n, { iMittel: werte.iMittel, iKrass: werte.iKrass }]),
+  );
+}
+
+const BASKETBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  basketballPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const GEWICHTHEBEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  gewichthebenPpsReferenzJson as ArenaPpsReferenzJson,
 );
 
 /**
- * Loest die Referenzwerte fuer eine (moeglicherweise unbekannte oder fehlende) Feldgroesse auf --
- * faellt auf die naechstgelegene GEZOGENE Feldgroesse zurueck, statt einen Fehler zu werfen. Das
- * deckt sowohl "playerCount fuer diesen Spieltag nicht ermittelbar" (`null`) als auch eine
- * Feldgroesse ausserhalb der gezogenen Spanne (z. B. 1 oder 7, sollte am echten Spielplan nicht
- * vorkommen, s. `resolveBasketballFieldSizeForMatchday()`) mit demselben, robusten Pfad ab.
+ * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
+ * Referenzverteilung und welche zwei Kurvenregler (`max`/`anteilMitte`) ihre individuellen PPs
+ * bestimmen, plus der Katalog-Standardgroesse, auf die `resolveArenaPpsReferenz()` faellt, wenn
+ * fuer einen Spieltag ueberhaupt keine Feldgroesse ermittelbar war. EINE neue Arena-Disziplin
+ * (Hockey ist als naechstes geplant) braucht NUR einen weiteren Eintrag hier plus ihre eigene
+ * gezogene Referenz-JSON — keine neue Verzweigung in `ppsAusArenaImpact()` oder
+ * `computeIndividualBoxscorePpsFromFixtureResults()`.
  */
-export function resolveBasketballPpsReferenz(
+type ArenaImpactKonfig = {
+  referenzFeldgroessen: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
+  max: number;
+  anteilMitte: number;
+  katalogStandardgroesse: number;
+};
+
+const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> = new Map([
+  [
+    "basketball",
+    {
+      referenzFeldgroessen: BASKETBALL_PPS_REFERENZ_FELDGROESSEN,
+      max: BASKETBALL_INDIVIDUAL_PPS_MAX,
+      anteilMitte: BASKETBALL_PPS_ANTEIL_MITTE,
+      katalogStandardgroesse: 6,
+    },
+  ],
+  [
+    "gewichtheben",
+    {
+      referenzFeldgroessen: GEWICHTHEBEN_PPS_REFERENZ_FELDGROESSEN,
+      max: GEWICHTHEBEN_INDIVIDUAL_PPS_MAX,
+      anteilMitte: GEWICHTHEBEN_PPS_ANTEIL_MITTE,
+      katalogStandardgroesse: 6,
+    },
+  ],
+]);
+
+/**
+ * Loest die Impact-Kurven-Konfiguration EINER Disziplin auf — mit Basketballs Konfiguration als
+ * Fallback fuer eine unbekannte `disciplineId` (sollte bei einem Eintrag in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` ohne passenden `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag nie
+ * vorkommen). EINZIGE Stelle, die diesen Fallback kennt (Review-Fund PR #776: vorher wortgleich
+ * doppelt an zwei Stellen — `resolveArenaPpsReferenz()` und
+ * `computeIndividualBoxscorePpsFromFixtureResults()` — dupliziert, mit dem Risiko, dass eine
+ * kuenftige Aenderung der Fallback-Regel eine der beiden Stellen vergisst).
+ */
+function loeseArenaImpactKonfigAuf(disciplineId: string): ArenaImpactKonfig {
+  return ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get(disciplineId) ?? ARENA_IMPACT_KONFIG_JE_DISZIPLIN.get("basketball")!;
+}
+
+/**
+ * Loest die Referenzwerte EINER Disziplin fuer eine (moeglicherweise unbekannte oder fehlende)
+ * Feldgroesse auf — faellt auf die naechstgelegene GEZOGENE Feldgroesse zurueck, statt einen
+ * Fehler zu werfen. Das deckt sowohl "playerCount fuer diesen Spieltag nicht ermittelbar"
+ * (`null`) als auch eine Feldgroesse ausserhalb der gezogenen Spanne mit demselben, robusten Pfad
+ * ab. Eine unbekannte `disciplineId` (sollte bei einem Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS`
+ * ohne passenden `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag nie vorkommen) faellt defensiv auf
+ * Basketballs Konfiguration zurueck statt zu werfen.
+ *
+ * ENTARTETE EINTRAEGE WERDEN UEBERSPRUNGEN (Gewichtheben-Produktivierung, S6, gefunden bei der
+ * echten Erstziehung 04.09.): eine KLEINE Stichprobe kann fuer eine seltene Feldgroesse (hier:
+ * `n=2`, ein extremer Unterzahl-Fall) einen Median von 0 liefern (Nullwertungsquote in dieser
+ * Stichprobe zufällig ueber 50 %, s. docs/design/gewichtheben-produktivierung.md). Ein exakter
+ * Treffer auf so einen Eintrag wuerde `ppsAusArenaImpact()`s eigene Degenerationsbremse
+ * (`iMittel > 0`) auslösen und JEDEM Spieler dieser Feldgroesse 0 PPs geben, unabhaengig von
+ * seiner tatsaechlichen Leistung — schlimmer als ein Fallback auf die naechste GUELTIGE
+ * Feldgroesse, die immer noch naeher an der Wahrheit liegt als eine pauschale Null. Deshalb
+ * zaehlt ein Eintrag hier nur als „verfuegbar", wenn `iMittel > 0` UND `iKrass > iMittel` gilt —
+ * exakt dieselbe Gueltigkeitsbedingung wie in `ppsAusArenaImpact()` selbst.
+ */
+export function resolveArenaPpsReferenz(
+  disciplineId: string,
   playerCount: number | null,
-): { referenz: BasketballPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
-  const verfuegbareGroessen = [...BASKETBALL_PPS_REFERENZ_FELDGROESSEN.keys()].sort((a, b) => a - b);
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  const konfig = loeseArenaImpactKonfigAuf(disciplineId);
+  const istGueltig = (referenz: ArenaPpsReferenzFeldgroesse) => referenz.iMittel > 0 && referenz.iKrass > referenz.iMittel;
+  const verfuegbareGroessen = [...konfig.referenzFeldgroessen.entries()]
+    .filter(([, referenz]) => istGueltig(referenz))
+    .map(([n]) => n)
+    .sort((a, b) => a - b);
   if (verfuegbareGroessen.length === 0) {
     throw new Error(
-      "battle-mode-arena-team-points: data/generated/basketball-pps-referenz.json enthaelt keine Feldgroessen — " +
-        "scripts/ziehe-basketball-pps-referenz.ts ausfuehren.",
+      `battle-mode-arena-team-points: keine gueltige gezogene PPS-Referenz fuer "${disciplineId}" gefunden — ` +
+        "scripts/ziehe-basketball-pps-referenz.ts bzw. scripts/ziehe-gewichtheben-pps-referenz.ts (neu) ausfuehren.",
     );
   }
   const gerundet = playerCount != null && Number.isFinite(playerCount) ? Math.round(playerCount) : null;
-  if (gerundet != null && BASKETBALL_PPS_REFERENZ_FELDGROESSEN.has(gerundet)) {
-    return { referenz: BASKETBALL_PPS_REFERENZ_FELDGROESSEN.get(gerundet)!, feldgroesseGenutzt: gerundet };
+  if (gerundet != null && konfig.referenzFeldgroessen.has(gerundet) && istGueltig(konfig.referenzFeldgroessen.get(gerundet)!)) {
+    return { referenz: konfig.referenzFeldgroessen.get(gerundet)!, feldgroesseGenutzt: gerundet };
   }
-  // Basketballs Katalog-Standardwert (`Discipline.playerCount`) als Ziel, wenn ueberhaupt keine
+  // Der Katalog-Standardwert (`Discipline.playerCount`) als Ziel, wenn ueberhaupt keine
   // Feldgroesse ermittelbar war -- dieselbe Zahl, auf die auch der bestehende PPS-Pfad
   // (`resolveDisciplinePlayerCount()`) ohne Spielplan-Eintrag zurueckfaellt.
-  const ziel = gerundet ?? 6;
+  const ziel = gerundet ?? konfig.katalogStandardgroesse;
   let naechste = verfuegbareGroessen[0]!;
   for (const kandidat of verfuegbareGroessen) {
     if (Math.abs(kandidat - ziel) < Math.abs(naechste - ziel)) naechste = kandidat;
   }
-  return { referenz: BASKETBALL_PPS_REFERENZ_FELDGROESSEN.get(naechste)!, feldgroesseGenutzt: naechste };
+  return { referenz: konfig.referenzFeldgroessen.get(naechste)!, feldgroesseGenutzt: naechste };
+}
+
+/**
+ * BASKETBALL-WRAPPER, unveraendertes Verhalten (Testkompatibilitaet PR7/Boxscore-an-PPS):
+ * `resolveArenaPpsReferenz("basketball", playerCount)`.
+ */
+export function resolveBasketballPpsReferenz(
+  playerCount: number | null,
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  return resolveArenaPpsReferenz("basketball", playerCount);
+}
+
+/** Gewichtheben-Analogon zu `resolveBasketballPpsReferenz()`, s. dort. */
+export function resolveGewichthebenPpsReferenz(
+  playerCount: number | null,
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  return resolveArenaPpsReferenz("gewichtheben", playerCount);
 }
 
 const LEAGUE_TIERS: readonly LeagueTier[] = ["liga1", "liga2"];
@@ -226,9 +401,42 @@ export function arenaTeamPointsForFixture(seiten: readonly [number, number]): [n
 }
 
 /**
+ * GESAMT-KG-TIEBREAK (Fable-Empfehlung 9.1, docs/design/gewichtheben-gameplay-fertig.md
+ * Abschnitt 4, umgesetzt in der Gewichtheben-Produktivierung S6): bei einem Duellgleichstand
+ * (z.B. 3:3 der sechs Gewichtheben-Zweikaempfe) entscheidet NICHT mehr automatisch ein
+ * Unentschieden, sondern die kumulierte Zweikampf-Kilogrammsumme beider Seiten
+ * (`ArenaFixtureResult.gesamtKg`, geliefert von `spieleBuehneHeben()` im Motor).
+ *
+ * NUR RELEVANT, WENN `gesamtKg` GESETZT IST — also ausschliesslich fuer das Buehnen-Duell-
+ * Chassis (aktuell Gewichtheben, s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` in
+ * `arena-headless-runner.ts`). Fuer jede andere Disziplin (Basketball: `gesamtKg` `undefined`)
+ * delegiert diese Funktion unveraendert an `arenaTeamPointsForFixture()` — ein Punktegleichstand
+ * bleibt dort ein echtes Unentschieden, exakt wie vor dieser Aenderung.
+ *
+ * Ein exakter Gleichstand AUCH bei der Kilogrammsumme ist mit echten kg-Werten praktisch
+ * ausgeschlossen (Sinclair-normierte Fliesskommazahlen aus sechs unabhaengigen Zweikaempfen je
+ * Seite), bleibt defensiv aber ein echtes Unentschieden statt eine willkuerliche Seite zu waehlen.
+ */
+export function arenaTeamPointsForFixtureMitTiebreak(
+  result: Pick<ArenaFixtureResult, "seiten" | "gesamtKg">,
+): [number, number] {
+  const [heim, gast] = result.seiten;
+  if (heim !== gast || !result.gesamtKg) {
+    return arenaTeamPointsForFixture(result.seiten);
+  }
+  const [heimKg, gastKg] = result.gesamtKg;
+  if (heimKg === gastKg) return [ARENA_TEAM_POINTS.draw, ARENA_TEAM_POINTS.draw];
+  return heimKg > gastKg ? [ARENA_TEAM_POINTS.win, ARENA_TEAM_POINTS.loss] : [ARENA_TEAM_POINTS.loss, ARENA_TEAM_POINTS.win];
+}
+
+/**
  * Baut aus bereits gelaufenen Arena-Fixture-Ergebnissen (s. `runArenaFixtures()`) die Team-Punkte-
  * Overrides je teamId. Rein, synchron, ohne Playwright/Browser — dafuer in den meisten Tests
  * gedacht (s. Testing-Lektion PR6: Chromium ist in `full-test-suite` nicht installiert).
+ *
+ * NUTZT `arenaTeamPointsForFixtureMitTiebreak()`, NICHT `arenaTeamPointsForFixture()` direkt (s.
+ * dort) — fuer Basketball (kein `gesamtKg`) identisches Verhalten wie vor der Gewichtheben-
+ * Produktivierung.
  */
 export function computeArenaTeamPointsFromFixtureResults(
   fixtureResults: readonly ArenaFixtureResult[],
@@ -236,10 +444,10 @@ export function computeArenaTeamPointsFromFixtureResults(
 ): Map<string, ArenaTeamPointsOverride> {
   const overridesByTeamId = new Map<string, ArenaTeamPointsOverride>();
   for (const result of fixtureResults) {
-    const [heimPunkte, gastPunkte] = arenaTeamPointsForFixture(result.seiten);
+    const [heimPunkte, gastPunkte] = arenaTeamPointsForFixtureMitTiebreak(result);
     const seed = seedByFixtureKey.get(`${result.homeTeamId}::${result.awayTeamId}`) ?? "";
     const heimOutcome: ArenaTeamPointsOverride["outcome"] =
-      result.seiten[0] === result.seiten[1] ? "draw" : result.seiten[0] > result.seiten[1] ? "win" : "loss";
+      heimPunkte === gastPunkte ? "draw" : heimPunkte > gastPunkte ? "win" : "loss";
     const gastOutcome: ArenaTeamPointsOverride["outcome"] =
       heimOutcome === "draw" ? "draw" : heimOutcome === "win" ? "loss" : "win";
     overridesByTeamId.set(result.homeTeamId, {
@@ -287,16 +495,36 @@ function roundPps(value: number): number {
  * gibt 0 PPs, nie negative.
  *
  * Eine entartete Referenz (`iKrass <= iMittel`, koennte nur bei einer kaputten/leeren Ziehung
- * vorkommen, s. `resolveBasketballPpsReferenz()`) liefert 0 statt NaN/Infinity durchzureichen —
+ * vorkommen, s. `resolveArenaPpsReferenz()`) liefert 0 statt NaN/Infinity durchzureichen —
  * defensiv, sollte an einer echten gezogenen Referenz nie greifen.
+ *
+ * GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `max`/`anteilMitte` sind jetzt
+ * Parameter statt fest verdrahteter Basketball-Konstanten — die Formel selbst ist UNVERAENDERT.
+ * `ppsAusBasketballImpact()`/`ppsAusGewichthebenImpact()` darunter sind duenne, disziplinfeste
+ * Wrapper (Testkompatibilitaet, unveraendertes Basketball-Verhalten).
  */
-export function ppsAusBasketballImpact(impact: number, referenz: BasketballPpsReferenzFeldgroesse): number {
+export function ppsAusArenaImpact(
+  impact: number,
+  referenz: ArenaPpsReferenzFeldgroesse,
+  max: number,
+  anteilMitte: number,
+): number {
   const { iMittel, iKrass } = referenz;
   if (!(iKrass > 0) || !(iMittel > 0) || iMittel >= iKrass) return 0;
-  const gamma = Math.log(BASKETBALL_PPS_ANTEIL_MITTE) / Math.log(iMittel / iKrass);
+  const gamma = Math.log(anteilMitte) / Math.log(iMittel / iKrass);
   const basis = Math.max(0, impact) / iKrass;
   const anteil = basis <= 0 ? 0 : Math.min(1, Math.pow(basis, gamma));
-  return roundPps(BASKETBALL_INDIVIDUAL_PPS_MAX * anteil);
+  return roundPps(max * anteil);
+}
+
+/** BASKETBALL-WRAPPER, unveraendertes Verhalten: `ppsAusArenaImpact()` mit Basketballs Reglern. */
+export function ppsAusBasketballImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
+  return ppsAusArenaImpact(impact, referenz, BASKETBALL_INDIVIDUAL_PPS_MAX, BASKETBALL_PPS_ANTEIL_MITTE);
+}
+
+/** Gewichtheben-Analogon zu `ppsAusBasketballImpact()`, s. dort. */
+export function ppsAusGewichthebenImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
+  return ppsAusArenaImpact(impact, referenz, GEWICHTHEBEN_INDIVIDUAL_PPS_MAX, GEWICHTHEBEN_PPS_ANTEIL_MITTE);
 }
 
 /**
@@ -308,10 +536,10 @@ export function ppsAusBasketballImpact(impact: number, referenz: BasketballPpsRe
  * ohne Playwright — nimmt bereits gelaufene `ArenaFixtureResult`s entgegen, genau wie
  * `computeArenaTeamPointsFromFixtureResults()` daneben.
  *
- * `playerCount` ist die fuer DIESEN Spieltag gewuerfelte Basketball-Feldgroesse (s.
- * `resolveBasketballFieldSizeForMatchday()` unten) — `null`, wenn sie nicht ermittelbar war;
- * `resolveBasketballPpsReferenz()` faellt dafuer robust auf die naechstgelegene gezogene
- * Feldgroesse zurueck, wirft also nie.
+ * `playerCount` ist die fuer DIESEN Spieltag gewuerfelte Feldgroesse dieser Disziplin (s.
+ * `resolveArenaFieldSizeForMatchday()` unten) — `null`, wenn sie nicht ermittelbar war;
+ * `resolveArenaPpsReferenz()` faellt dafuer robust auf die naechstgelegene gezogene Feldgroesse
+ * zurueck, wirft also nie.
  *
  * NUR Boxscore-Eintraege mit eindeutig zugeordneter `playerId` (s. `arena-headless-runner.ts`)
  * bekommen einen Eintrag im Ergebnis — ein Spieler, dessen Name in seinem Duell nicht eindeutig
@@ -320,48 +548,65 @@ export function ppsAusBasketballImpact(impact: number, referenz: BasketballPpsRe
  * Teams beruehrt. Anders als beim V1-Perzentil braucht diese Funktion keinen Pool mehr — jeder
  * Spieler haengt nur noch von seinem eigenen Boxscore-Wert und der Feldgroesse ab, nicht mehr vom
  * Rest des Spieltags.
+ *
+ * `disciplineId` (Gewichtheben-Produktivierung, S6) waehlt Referenz UND Kurvenregler — Default
+ * `"basketball"` fuer Rueckwaertskompatibilitaet mit Aufrufern von vor dieser Aenderung.
  */
 export function computeIndividualBoxscorePpsFromFixtureResults(
   fixtureResults: readonly ArenaFixtureResult[],
   playerCount: number | null,
+  disciplineId: string = "basketball",
 ): Map<string, number> {
-  const { referenz } = resolveBasketballPpsReferenz(playerCount);
+  const { referenz } = resolveArenaPpsReferenz(disciplineId, playerCount);
+  const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const ppsByPlayerId = new Map<string, number>();
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {
       if (eintrag.playerId === null) continue;
-      ppsByPlayerId.set(eintrag.playerId, ppsAusBasketballImpact(eintrag.wert, referenz));
+      ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, referenz, konfig.max, konfig.anteilMitte));
     }
   }
   return ppsByPlayerId;
 }
 
 /**
- * Die fuer DIESEN Spieltag gewuerfelte Basketball-Feldgroesse (`playerCount` 2..6), fuer die
- * Impact-Kurven-Referenz — ANDERS als `resolveDisciplinePlayerCount()` (`rank-to-points.ts`)
- * OHNE vorher wissen zu muessen, ob Basketball an diesem Spieltag `d1` oder `d2` ist: geprueft
- * werden BEIDE Slots des Spielplan-Eintrags, der erste mit `disciplineId === "basketball"`
- * gewinnt. `resolveDisciplinePlayerCount()` selbst waere hier riskant gewesen — bei falsch
- * geratener Seite faellt es NICHT auf den jeweils anderen Slot zurueck, sondern direkt auf den
- * Katalogwert, und wuerde damit einen echten, vom Katalog abweichenden Spielplan-Wert (nachgemessen
- * real vorkommend, s. `Discipline.playerCount`-Kommentar in `olyDataTypes.ts`) stillschweigend
+ * Die fuer DIESEN Spieltag gewuerfelte Feldgroesse EINER Disziplin (`playerCount` 2..6), fuer die
+ * Impact-Kurven-Referenz — ANDERS als `resolveDisciplinePlayerCount()` (`rank-to-points.ts`) OHNE
+ * vorher wissen zu muessen, ob diese Disziplin an diesem Spieltag `d1` oder `d2` ist: geprueft
+ * werden BEIDE Slots des Spielplan-Eintrags, der erste mit passender `disciplineId` gewinnt.
+ * `resolveDisciplinePlayerCount()` selbst waere hier riskant gewesen — bei falsch geratener Seite
+ * faellt es NICHT auf den jeweils anderen Slot zurueck, sondern direkt auf den Katalogwert, und
+ * wuerde damit einen echten, vom Katalog abweichenden Spielplan-Wert (nachgemessen real
+ * vorkommend, s. `Discipline.playerCount`-Kommentar in `olyDataTypes.ts`) stillschweigend
  * ignorieren.
+ *
+ * GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6) — `resolveBasketballFieldSizeForMatchday()`
+ * darunter bleibt als unveraenderter Wrapper erhalten.
  */
-export function resolveBasketballFieldSizeForMatchday(
+export function resolveArenaFieldSizeForMatchday(
   gameState: Pick<GameState, "disciplines" | "seasonState">,
   matchdayId: string | null,
+  disciplineId: string,
 ): number | null {
   const scheduleRow = (gameState.seasonState.disciplineSchedule ?? []).find((entry) => entry.matchdayId === matchdayId);
   const slot = [scheduleRow?.discipline1, scheduleRow?.discipline2].find(
-    (kandidat) => kandidat?.disciplineId === "basketball",
+    (kandidat) => kandidat?.disciplineId === disciplineId,
   );
   if (slot && typeof slot.playerCount === "number" && Number.isFinite(slot.playerCount)) {
     return slot.playerCount;
   }
-  const discipline = gameState.disciplines.find((entry) => entry.id === "basketball");
+  const discipline = gameState.disciplines.find((entry) => entry.id === disciplineId);
   return typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
     ? discipline.playerCount
     : null;
+}
+
+/** BASKETBALL-WRAPPER, unveraendertes Verhalten: `resolveArenaFieldSizeForMatchday()` fuer "basketball". */
+export function resolveBasketballFieldSizeForMatchday(
+  gameState: Pick<GameState, "disciplines" | "seasonState">,
+  matchdayId: string | null,
+): number | null {
+  return resolveArenaFieldSizeForMatchday(gameState, matchdayId, "basketball");
 }
 
 export type RunBattleModeArenaMatchdayInput = {
@@ -369,6 +614,16 @@ export type RunBattleModeArenaMatchdayInput = {
   saveId: string;
   seasonId: string;
   matchdayId: string;
+  /**
+   * Welche arena-aufgeloeste Disziplin (Mitglied von `ARENA_RESOLVED_DISCIPLINE_IDS`) dieser Lauf
+   * simuliert. Weggelassen -> `"basketball"` — NUR Rueckwaertskompatibilitaet mit Aufrufern/Tests
+   * von vor der Gewichtheben-Produktivierung (PR7, als es nur Basketball gab), KEIN Sonderfall
+   * fuer eine zweite Disziplin. Der produktive Aufrufer (`arena-matchday-resolve-service.ts`,
+   * `determineArenaDisciplineContexts()`) ermittelt diesen Wert seit dieser Aenderung SELBST ueber
+   * `ARENA_RESOLVED_DISCIPLINE_IDS`-Mengen-Zugehoerigkeit der an diesem Spieltag gespielten
+   * d1/d2-Disziplinen und reicht ihn IMMER explizit durch.
+   */
+  disciplineId?: string;
   /** Injektionspunkt fuer Tests — Default ist der echte, Playwright-gestuetzte Runner. */
   runArenaFixturesImpl?: typeof runArenaFixtures;
   runArenaFixturesOptions?: RunArenaFixturesOptions;
@@ -402,6 +657,7 @@ export async function runBattleModeArenaMatchday(
   input: RunBattleModeArenaMatchdayInput,
 ): Promise<RunBattleModeArenaMatchdayResult> {
   const { gameState, saveId, seasonId, matchdayId } = input;
+  const disciplineId = input.disciplineId ?? "basketball";
   const runImpl = input.runArenaFixturesImpl ?? runArenaFixtures;
   const overridesByTeamId = new Map<string, ArenaTeamPointsOverride>();
   const alleFixtureErgebnisse: ArenaFixtureResult[] = [];
@@ -428,7 +684,7 @@ export async function runBattleModeArenaMatchday(
 
     let fixtureResults: ArenaFixtureResult[];
     try {
-      fixtureResults = await runImpl(gameState, fixtureInputs, "basketball", input.runArenaFixturesOptions);
+      fixtureResults = await runImpl(gameState, fixtureInputs, disciplineId, input.runArenaFixturesOptions);
     } catch (error) {
       warnings.push(
         `arena_matchday_league_failed:${tier}:${error instanceof Error ? error.message : String(error)}`,
@@ -454,17 +710,18 @@ export async function runBattleModeArenaMatchday(
   // BOXSCORE-AN-PPS (V2, Impact-Kurve): EINMAL ueber alle bereits gelaufenen Liga-Stufen dieses
   // Spieltags, nicht pro Liga getrennt — die Referenz ist ohnehin je Feldgroesse fest, nicht vom
   // Spieltag abhaengig, aber EINE gemeinsame Sammlung bleibt einfacher als zwei getrennte Laeufe
-  // derselben Funktion. `resolveBasketballFieldSizeForMatchday()` kann `null` liefern (kein
+  // derselben Funktion. `resolveArenaFieldSizeForMatchday()` kann `null` liefern (kein
   // Spielplan-Eintrag/kein Katalogwert, sollte an einem echten Spielstand nicht vorkommen --
-  // Basketball fuehrt immer einen Katalog-Standardwert, s. `Discipline.playerCount`) —
+  // jede Arena-Disziplin fuehrt immer einen Katalog-Standardwert, s. `Discipline.playerCount`) —
   // `computeIndividualBoxscorePpsFromFixtureResults()` faellt dafuer selbst robust auf die
-  // naechstgelegene gezogene Feldgroesse zurueck (s. `resolveBasketballPpsReferenz()`), deshalb
-  // hier bewusst KEINE eigene Warnung: anders als ein fehlendes Fixture-Ergebnis ist das kein
-  // Zeichen eines echten Problems.
-  const fieldSizeGewuerfelt = resolveBasketballFieldSizeForMatchday(gameState, matchdayId);
+  // naechstgelegene gezogene Feldgroesse zurueck (s. `resolveArenaPpsReferenz()`), deshalb hier
+  // bewusst KEINE eigene Warnung: anders als ein fehlendes Fixture-Ergebnis ist das kein Zeichen
+  // eines echten Problems.
+  const fieldSizeGewuerfelt = resolveArenaFieldSizeForMatchday(gameState, matchdayId, disciplineId);
   const individualBoxscorePpsByPlayerId = computeIndividualBoxscorePpsFromFixtureResults(
     alleFixtureErgebnisse,
     fieldSizeGewuerfelt,
+    disciplineId,
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

@@ -321,4 +321,51 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * GEWICHTHEBEN-PRODUKTIVIERUNG (S6, docs/design/gewichtheben-produktivierung.md): das
+   * Buehnen-Duell-Chassis (`spieleBuehneHeben()` im Motor, `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
+   * im Runner) laeuft ueber einen ANDEREN Browser-Einstiegspunkt als Basketballs
+   * `spieleFeldspiel()` — dieser Test deckt genau die Weiche ab, nicht die Heben-Mechanik selbst
+   * (die hat ihre eigenen Sonden im Mockup, s. scripts/miss-gewichtheben-korridor.mjs).
+   */
+  it(
+    "simuliert Gewichtheben ueber das Buehnen-Duell-Chassis: Duellstand 0..jeSeite plus echte Zweikampf-kg-Summe je Seite",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "gewichtheben-chassis-abnahme" }],
+        "gewichtheben",
+      );
+
+      pruefeErgebnisForm(ergebnis, "team-heim", "team-gast");
+      // Duellstand: gewonnene Zweikaempfe je Seite, hoechstens jeSeite (6) — NICHT die
+      // Kilogrammsumme (die traegt `gesamtKg`, s. unten).
+      for (const seite of ergebnis.seiten) {
+        expect(seite).toBeGreaterThanOrEqual(0);
+        expect(seite).toBeLessThanOrEqual(6);
+      }
+      // `gesamtKg` ist NUR fuer das Buehnen-Duell-Chassis gesetzt (Basketball: `undefined`, s.
+      // Test oben) — Grundlage fuer den Gesamt-kg-Tiebreak bei einem Duellgleichstand.
+      expect(ergebnis.gesamtKg).toBeDefined();
+      expect(ergebnis.gesamtKg).toHaveLength(2);
+      for (const kg of ergebnis.gesamtKg!) {
+        // Realistische Groessenordnung: ein einzelner Zweikampf liegt zwischen roughly 100 und
+        // 600 kg (s. HEBEN_KG_BASIS/HEBEN_KG_PRO_LAST-Kommentar im Motor), sechs je Seite also
+        // deutlich ueber 0 — ein `undefined`/`NaN`-Rechenfehler waere hier sofort sichtbar.
+        expect(kg).toBeGreaterThan(0);
+      }
+      // Boxscore-Werte sind hier ECHTE Zweikampf-Kilogramm (MOTOREN.gewichtheben.wert() = u.summe),
+      // kein abstrakter Impact-Score wie bei Basketball — dieselbe Groessenordnung wie `gesamtKg`.
+      for (const eintrag of ergebnis.boxscore) {
+        expect(eintrag.wert).toBeGreaterThanOrEqual(0);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
 });
