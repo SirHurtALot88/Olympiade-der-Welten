@@ -2360,9 +2360,24 @@
       const im=sprBild[key]; if(!im||!im.width)return;
       try{ctx.drawImage(im,waffenF*64,r*64,64,64,x-32*Z,y-46*Z,64*Z,64*Z);}catch(e){}
     };
+    // Opus-Review-Fund (PR #770, "Nebenfund", jetzt behoben): male() nahm die Zeilenzahl
+    // eines Blattes bisher als GEGEBEN an (immer 4, eine je Blickrichtung) und griff mit
+    // r*zell ins Bild, egal wie hoch es wirklich ist. Die "_hurt"-Blaetter (body_hurt,
+    // khumanw_hurt und ausnahmslos alle weiteren *_hurt-Ebenen — Sondierung aller ueber 400
+    // Sprite-Blaetter im Repo ergab GENAU die 51 *_hurt-Dateien mit nur einer 64px-Zeile,
+    // sonst keine einzige Abweichung) liegen nur mit EINER Zeile vor — der niedergeschlagene
+    // Kaempfer braucht ja keine Blickrichtung mehr. Fuer r>0 (alles ausser "hinten") las
+    // drawImage() damit ausserhalb des Bilds, kam leer/transparent zurueck, und die Figur
+    // verschwand sichtbar, sobald sie "hurt" war. Behoben wie beim schiff_pirat-Praezedenzfall
+    // (VOLLBILD, rows:1 oben): Zeilenzahl aus der tatsaechlichen Bildhoehe ablesen (im.height
+    // durch die Zellhoehe) statt sie als 4 anzunehmen, und den Blickrichtungsindex per Modulo
+    // auf diese echte Zeilenzahl begrenzen. Bei 4 echten Zeilen (alle anderen Zustaende)
+    // aendert sich dadurch nichts (r%4===r fuer r in 0..3) — nur einzeilige Blaetter wie
+    // *_hurt zeichnen jetzt aus ihrer einzigen Zeile, gleich welche Blickrichtung gefragt ist.
     const male=(im,zell,ox,oy)=>{
       if(!im||!im.width)return;
-      const sp=zell===64?r*64:r*zell;
+      const reihen=Math.max(1,Math.round((im.height||zell*4)/zell));
+      const sp=(r%reihen)*zell;
       try{ctx.drawImage(im,f*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);}catch(e){}
     };
     const zeichne=(key,zell,ox,oy,ton)=>male(sprite(key,ton),zell,ox,oy);
