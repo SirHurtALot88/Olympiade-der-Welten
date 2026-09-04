@@ -49,9 +49,9 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Takeshi's Castle | Bahn | 0,697 | 0,170 | 0,839 | 0,196 | durchgefallen |
 | I-Spy | Buehne | 0,692 | 0,384 | 0,727 | 0,441 | durchgefallen |
 | Staffel | Bahn | 0,681 | 0,398 | 0,706 | 0,650 | durchgefallen |
-| Spurt | Bahn | 0,652 | 0,559 | 0,690 | 0,643 | durchgefallen |
-| Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,618 | 0,247 | 0,748 | 0,126 | durchgefallen |
+| Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,669 | 0,181 | 0,832 | 0,259 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,719 | 0,182 | 0,818 | 0,259 | knapp |
+| Spurt | Bahn | 0,652 | 0,559 | 0,690 | 0,643 | durchgefallen |
 | Battlefield | Arena | 0,325 | 0,662 | 0,619 | 1,000 | durchgefallen |
 | **Football** | Feldspiel | **0,305** | 0,321 | 0,448 | 0,448 | durchgefallen |
 | Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
@@ -130,7 +130,7 @@ Befund ueber die Mechanik, sondern Kaderrauschen, das wie ein Befund aussah.
 
 Wo die Saisonzahl hoch und die Einzelspielzahl niedrig ist, belohnt die Mechanik das Richtige,
 aber zu laut — ein **Verlaesslichkeitsproblem**, das sich ueber Ereignisdichte loest, nicht
-ueber Rezepte. Hockey (Feldspieler: 0,719 gegen 0,818; alle 12: 0,618 gegen 0,748, s. Abschnitt
+ueber Rezepte. Hockey (Feldspieler: 0,719 gegen 0,818; alle 12: 0,669 gegen 0,832, s. Abschnitt
 1a) und Battlefield (0,325 gegen 0,619) stehen so da.
 Football faellt dagegen aus diesem Muster heraus: **beide** Zahlen sind kaderfest gemessen
 niedrig (0,305/0,448) — nach der Live-Migration sieht das eher nach einem ungemessenen,
@@ -309,6 +309,15 @@ bleibt bzw. neu hinzukommt:
      **0,666→0,714** (n=48) — eine Bewegung, die groesser ist als die eigene Kader-Spannweite
      (0,182–0,197), also nach der Projekt-eigenen Faustregel real. Torkorridor, Endstaende und
      Basketball bit-identisch (reine Wertformel-Aenderung, kein Mechanikeingriff).
+   - **HK_TW_BASIS/HK_TW_REF nachgezogen** (Opus-Review `hockey-opus-review-nhl.md` Abschnitt 2,
+     04.09., `hockey-torwart-konstanten-nachgezogen.md`): die beiden Torwart-Kalibrierungs-
+     konstanten waren seit K3 und der Passqualitaets-/Abpraller-Kette nicht mehr nachgezogen
+     worden — jeder Torwart startete dadurch 4,84 Wertpunkte unter dem Feldspieler-Schnitt,
+     rein arithmetisch. Frisch gezogen (Kader-Familie, n=24): `HK_TW_BASIS` 7,16→**9,13**,
+     `HK_TW_REF` 0,907→**0,871**. Wirkung ausschliesslich auf die alle-12-Zahl: **0,618→0,669**
+     (Saison 0,748→0,832); die Feldspieler-only-Zahl bleibt **bit-identisch** (0,719/0,182) —
+     der Isolationsnachweis, dass die Bewegung vollstaendig in den zwei Torwart-Zeilen sitzt.
+     Basketball/Football/Gewichtheben ebenfalls bit-identisch gegengeprueft.
    Hockey steht damit bei **0,719 Feldspieler-rho, „knapp"** statt 0,80 — echt besser als vor
    dieser Runde, aber nicht am Ziel. CLAUDE.md dokumentiert bereits, dass mehr Ereignisdichte
    hier kaum hilft; der naechste strukturelle Hebel bliebe der Zoneneintritt oder der
@@ -378,7 +387,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Disziplin | fertig | rho | Was steht |
 |---|---:|---:|---|
 | Basketball | 92 % | 0,757 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (Perzentilmodell, PR #755 fuer eine absolute Impact-Kurve offen) |
-| Hockey | 71 % | 0,719 (Feldspieler) / 0,618 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 |
+| Hockey | 71 % | 0,719 (Feldspieler) / 0,669 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 |
 | **Fechten** | **48 %** | **0,840** | **Neu auf der Buehne** (vorher Arena, rho 0,153) · Rangtreue klar bestanden mit komfortablem Puffer · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
 | **Tennis** | **48 %** | **0,814** | **Neu auf der Buehne** (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert · nicht im echten Spielstand |
 | Time-Trial | 55 % | 0,867 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |

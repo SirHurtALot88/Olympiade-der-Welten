@@ -5556,7 +5556,26 @@
   // das hob den gemessenen Torwart-Mittelwert auf 11,77 gegen 7,16 bei den Feldspielern.
   // Mit REF=0,907 pendelt sich GSAA im Mittel wieder um 0 ein; HK_TW_BASIS auf den neu
   // gemessenen Feldspieler-Mittelwert gezogen.
-  const HK_TW_REF=0.907, HK_TW_BASIS=7.16, HK_TW_GSAA_K=2.0;
+  //
+  // BEIDE ERNEUT NACHGEZOGEN (Opus-Review docs/design/hockey-opus-review-nhl.md Abschnitt 2,
+  // 04.09.): seit der letzten Nachziehung oben sind mehrere Runden durch die Wertformel
+  // gelaufen (u.a. K3 — Tore halb als xG gebucht, s. feldspielWert unten — und die
+  // Passqualitaets-/Abpraller-Kette), ohne dass HK_TW_REF/HK_TW_BASIS mitgezogen wurden —
+  // genau der Fehlerzustand, vor dem der Kommentar oben warnt. Frisch gemessen
+  // (scripts/miss-hockey-torwart-konstanten.mjs, 24 Spiele je Kader):
+  //   Einzelkader (SQUAD/OPP):      BASIS 7,85   REF 0,891
+  //   Kader-Familie (5 echte Paarungen aus data/generated/kaderfamilie-live-save.json,
+  //   die fuer die CI-Schranke massgebliche Zahl, gepoolt ueber alle 1200 Feldspieler-
+  //   Zeilen bzw. 8426/1245 saves/gegentore): BASIS 9,13   REF 0,871
+  // HK_TW_BASIS auf den gepoolten Kader-Familie-Mittelwert gezogen, HK_TW_REF auf die
+  // gepoolte Kader-Familie-Fangquote. HK_TW_GSAA_K unveraendert gelassen (das Review hat ihn
+  // nicht als Problem benannt und die Streuungsrechnung des Kommentars oben haengt nicht an
+  // REF/BASIS). Wirkung gemessen (miss-alle-disziplinen.mjs, kaderfest, n=24): Hockey alle 12
+  // Teilnehmer rho je Spiel 0,618 [0,247] -> 0,669 [0,181], Feldspieler-only BIT-IDENTISCH
+  // (0,719 [0,182]) — die gesamte Bewegung sitzt nachweislich in den zwei Torwart-Zeilen,
+  // kein neuer rr()-Wurf. Basketball/Football/Gewichtheben ebenfalls bit-identisch
+  // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
+  const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
   const istHockey=()=>feldspielDisc==="hockey";
   const istFootball=()=>feldspielDisc==="football";
