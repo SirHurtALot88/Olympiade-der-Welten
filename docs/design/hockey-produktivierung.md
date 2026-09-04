@@ -240,17 +240,26 @@ Messrunde in dieser Änderung.
 
 ## 5. Regressionsnachweis
 
-`npm test` (vollständige Suite, nicht nur battle-mode/arena-Testdateien) — Ergebnis wird nach dem
-vollständigen Lauf hier nachgetragen. Gezielt vorher geprüft:
+`npm test` (vollständige Suite, nicht nur battle-mode/arena-Testdateien): **1024/1024
+Testdateien, 8101/8101 Einzeltests grün** (23 übersprungen, umgebungsbedingt — Chromium-
+Verfügbarkeit u. Ä., unverändert zu vorher). Der Lauf brauchte in dieser Session rund 21 Minuten
+statt der üblichen wenigen Minuten — reines Umgebungsrauschen: sehr hohe gemeinsame Rechenlast
+im geteilten Container (viele parallele Agenten-Sessions, Load Average zeitweise >12 auf 4
+Kernen), nachgemessen an `/proc/loadavg` und an neu erscheinenden Worker-Prozess-IDs während des
+Laufs — keine einzige Regression. Kein bestehender Test (Basketball, Gewichtheben oder jede
+andere Disziplin) verändert oder rot geworden.
 
-- `tests/battle-mode-arena-team-points.test.ts`: **alle bisherigen 63 Tests** (56 vor dieser
-  Änderung, `ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")` noch `false`) **unverändert bestanden**,
-  plus 7 neue Tests: `ppsAusHockeyImpact`, `resolveHockeyPpsReferenz` (Default-Rolle „feld"),
+Gezielt vorher (schneller, isoliert) geprüft:
+
+- `tests/battle-mode-arena-team-points.test.ts`: **64/64 Tests grün** (56 vor dieser Änderung,
+  `ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")` noch `false`, unverändert bestanden), plus 8 neue
+  Tests: `ppsAusHockeyImpact`, `resolveHockeyPpsReferenz` (Default-Rolle „feld"),
   `resolveArenaPpsReferenz` mit `rolle`-Parameter (Hockeys Feld-/Torwart-Referenz unterscheiden
   sich; Basketball/Gewichtheben fallen für `rolle:"torwart"` defensiv auf die Feldspieler-
   Referenz zurück, statt zu werfen), `computeIndividualBoxscorePpsFromFixtureResults` mit
   `eintrag.torwart` (Hockey normiert je nach Flag gegen die richtige Referenz; Basketball/
-  Gewichtheben ignorieren das Feld vollständig — unverändertes Verhalten).
+  Gewichtheben ignorieren das Feld vollständig — unverändertes Verhalten), Hockeys eigener
+  Katalog-Standardwert 5 (nicht Basketballs/Gewichthebens 6, s. Abschnitt 1.3/Fund).
 - `tests/battle-mode-arena-resolve-engine.test.ts`, `tests/arena-headless-runner.test.ts`
   (echter Chromium-Lauf): alle 15 Tests unverändert bestanden.
 - `tests/gewichtheben-kg-folgt-dem-score.test.ts`: unverändert bestanden (Isolationsnachweis für
