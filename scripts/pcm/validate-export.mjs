@@ -109,6 +109,7 @@ const idCyclist = readColumnValues(cyclistTable, 'IDcyclist').values;
 const fkTeam = readColumnValues(cyclistTable, 'fkIDteam').values;
 const firstnames = readColumnValues(cyclistTable, 'gene_sz_firstname').values;
 const lastnames = readColumnValues(cyclistTable, 'gene_sz_lastname').values;
+const willRetire = readColumnValues(cyclistTable, 'gene_b_will_retire').values;
 const CURRENT_SEASON_YEAR = 2026;
 
 let characOutOfRange = 0, limitInvalid = 0, ageLimitViolation = 0, potentielInvalid = 0, tourClassicInvalid = 0;
@@ -179,15 +180,21 @@ const contractFkCyclist = readColumnValues(contractTable, 'fkIDcyclist').values;
 const contractFkTeam = readColumnValues(contractTable, 'fkIDteam').values;
 const contractYearEnd = readColumnValues(contractTable, 'iYearEnd').values;
 const cyclistIdToRow = new Map(idCyclist.map((id, i) => [id, i]));
-let contractMismatch = 0, yearEndInvalid = 0;
+let contractMismatch = 0, yearEndInvalid = 0, retireYearEndInvalid = 0;
 for (let i = 0; i < contractRowCount; i++) {
   const cyclistRow = cyclistIdToRow.get(contractFkCyclist[i]);
   if (cyclistRow == null) continue;
   if (contractFkTeam[i] !== fkTeam[cyclistRow]) contractMismatch++;
   if (contractYearEnd[i] < 2026 || contractYearEnd[i] > 2029) yearEndInvalid++;
+  // PCMs eigener DatabaseChecker lehnt die ganze Mod ab, wenn ein Fahrer mit
+  // gene_b_will_retire=1 einen Vertrag hat, der ueber die aktuelle Saison hinausreicht
+  // (Log: "the cyclist will retire at the end of the year, the contract cannot stop
+  // after that date" -- am 05.09. an Chris' echtem PCM-Log nachgewiesen).
+  if (willRetire[cyclistRow] && contractYearEnd[i] > CURRENT_SEASON_YEAR) retireYearEndInvalid++;
 }
 if (contractMismatch > 0) fail(`${contractMismatch} Vertraege mit fkIDteam != Fahrer.fkIDteam`); else console.log(`OK: alle ${contractRowCount} Vertraege konsistent zu fkIDteam`);
 if (yearEndInvalid > 0) fail(`${yearEndInvalid} Vertraege mit iYearEnd ausserhalb 2026..2029`); else console.log('OK: iYearEnd in 2026..2029');
+if (retireYearEndInvalid > 0) fail(`${retireYearEndInvalid} Vertraege mit iYearEnd nach dem Ruhestandsjahr des Fahrers (PCMs DatabaseChecker lehnt das ab)`); else console.log('OK: keine Vertraege ueber das Ruhestandsjahr hinaus');
 
 // Gehaelter (Phase 4) -- erfundene, aber konsistente Skala, s. export-pcm-mod.mjs
 // Kopfkommentar. Kein echter Referenzwert existiert, deshalb nur ein weicher Sanity-Check:

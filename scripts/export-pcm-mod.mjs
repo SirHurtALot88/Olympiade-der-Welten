@@ -571,6 +571,16 @@ async function main() {
   console.log(`${riderPatchTrace.length} Fahrer-Zeilen gepatcht.`);
 
   // ---- Vertraege patchen: nur iYearEnd fuer gerosterte Oly-Spieler -------------------
+  // FUND 05.09. (Chris' PCM-Log, DatabaseChecker.cpp): "Wrong year: the cyclist will
+  // retire at the end of the year, the contract cannot stop after that date" -- 4
+  // Vertraege liessen das Spiel die ganze Mod als "FAILED to validate" ablehnen (0
+  // Errors/Critical laut Log, aber schon 4 Warnings reichen dem Launcher zum Abbruch).
+  // Ursache: wir haben iYearEnd unabhaengig vom Slot gesetzt, obwohl `gene_b_will_retire`
+  // (bewusst unangetastet, s. plan.md 1.3) fuer manche Slots bereits "retiert Ende dieser
+  // Saison" markiert -- das Original haelt iYearEnd dafuer konsequent auf 2026, unser
+  // Contract-Length-Wert (bis zu 2029) widersprach dem. Deshalb jetzt: Slots, die laut
+  // Original-Flag in den Ruhestand gehen, NIE anfassen (Top-up-Fahrer-Regel greift jetzt
+  // auch fuer gerosterte Spieler auf einem Ruhestands-Slot).
   const contractRowsByCyclist = new Map();
   {
     const { rowCount } = getTableMeta(contractTable);
@@ -578,9 +588,15 @@ async function main() {
     for (let i = 0; i < rowCount; i++) contractRowsByCyclist.set(fkCyclist[i], i);
   }
   const idCyclistValues = readColumnValues(cyclistTable, 'IDcyclist').values;
+  const willRetireValues = readColumnValues(cyclistTable, 'gene_b_will_retire').values;
   let contractsPatched = 0;
+  let contractsSkippedRetiring = 0;
   for (const p of population) {
     if (!p.roster) continue;
+    if (willRetireValues[p.rowIndex]) {
+      contractsSkippedRetiring++;
+      continue;
+    }
     const cyclistId = idCyclistValues[p.rowIndex];
     const contractRow = contractRowsByCyclist.get(cyclistId);
     if (contractRow == null) continue;
@@ -588,7 +604,7 @@ async function main() {
     setIntegerCell(contractTable, 'iYearEnd', contractRow, yearEnd);
     contractsPatched++;
   }
-  console.log(`${contractsPatched} Vertraege (iYearEnd) angepasst.`);
+  console.log(`${contractsPatched} Vertraege (iYearEnd) angepasst, ${contractsSkippedRetiring} auf Ruhestands-Slots unangetastet gelassen.`);
 
   // ---- Phase 2: restliche Kader-Auffuellung in Continental/U23 ----------------------
   // Chris (05.09., dritte Runde): "ich moechte dass du alle ca 3k spieler einfuegst!". Phase
