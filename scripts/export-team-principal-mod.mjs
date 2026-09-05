@@ -654,11 +654,15 @@ function organicFirstActiveSeason(oly, rank, fieldSize) {
 
 // Chris (05.09.): die echten Asset-Dateien der Mod heissen "VornameNachname.png" --
 // OHNE Leerzeichen (Beispiele aus seinem Portrait-Ordner: "CallumViera.png",
-// "ChristianCostoya.jpg", "JacobMicallef.png", "SonnyHayes.png"). Einwortnamen liefen
-// deshalb schon vorher richtig, mehrteilige Namen mit Leerzeichen nicht. Gilt hier fuer
-// Logos wie Portraits gleichermassen, mangels Gegenbeispiel fuer Team-Logos.
+// "ChristianCostoya.jpg", "JacobMicallef.png", "SonnyHayes.png"). Erst nur Leerzeichen
+// entfernt behoben (z.B. "Aeon Flux" -> "AeonFlux" funktioniert seitdem im Spiel) --
+// zwei weitere Faelle blieben aber kaputt: "A'Kalya" (Apostroph) und "Abu-T"
+// (Bindestrich) laden im Roster Editor kein Portrait. Die Mod entfernt beim Abgleich
+// offenbar JEDES Nicht-Buchstaben/Zahl-Zeichen, nicht nur Leerraum -- deshalb jetzt
+// alles ausser Buchstaben/Ziffern raus (Unicode-bewusst, damit z.B. Umlaute erhalten
+// bleiben). Gilt fuer Logos wie Portraits gleichermassen.
 function assetFilename(name) {
-  return name.replace(/\s+/g, '');
+  return name.replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 async function exportLogos(allTeams, outDir) {
