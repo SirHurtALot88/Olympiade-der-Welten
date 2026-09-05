@@ -165,17 +165,52 @@ function hslStringToRgb(hslStr) {
   return [r0, g0, b0].map((v) => Math.round((v + m2) * 255));
 }
 
+// WCAG-Kontrastformel: relative Luminanz je Farbe, daraus ein Kontrastverhaeltnis.
+function relativeLuminance([r, g, b]) {
+  const chan = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+}
+function contrastRatio(rgbA, rgbB) {
+  const a = relativeLuminance(rgbA);
+  const b = relativeLuminance(rgbB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+// lib/foundation/team-colors.ts ist fuer einen diagonal geteilten RUNDEN TOKEN kuratiert
+// (s. Kopfkommentar dort), nicht fuer Fahrer-/Team-Namen als Text auf vollflaechigem
+// Farb-Hintergrund -- genau das macht die Mod-Oberflaeche aber mit color_rgb/
+// secondary_color_rgb (Chris' Screenshot 05.09.: mehrere Teams unlesbar, "gruen auf
+// gruen"). Einige Codes haben in team-colors.ts ueberhaupt keine secondary-Farbe (vorher
+// fiel das hier stumpf auf color_rgb selbst zurueck -- garantiert unlesbar), andere haben
+// eine secondary mit zu aehnlicher Helligkeit. Deshalb: echte Oly-Sekundaerfarbe nur
+// uebernehmen, wenn sie tatsaechlich genug Kontrast zur Primaerfarbe hat, sonst schwarz
+// oder weiss nehmen -- je nachdem, was staerker kontrastiert.
+const MIN_TEXT_CONTRAST = 3.0;
+function ensureReadableSecondary(primary, candidateSecondary) {
+  if (candidateSecondary && contrastRatio(primary, candidateSecondary) >= MIN_TEXT_CONTRAST) {
+    return candidateSecondary;
+  }
+  const white = [255, 255, 255];
+  const black = [17, 17, 17];
+  return contrastRatio(primary, white) >= contrastRatio(primary, black) ? white : black;
+}
+
 function resolveTeamColors(colorMap, shortCode) {
   const entry = colorMap[shortCode];
+  let primary;
+  let secondaryCandidate = null;
   if (!entry) {
     // Deterministischer Fallback, analog zur fallbackColor()-Funktion in team-colors.ts.
     const hue = Math.round((hashString(shortCode) * 137.508) % 360);
-    return { primary: hslStringToRgb(`hsl(${hue} 58% 55%)`), secondary: null };
+    primary = hslStringToRgb(`hsl(${hue} 58% 55%)`);
+  } else {
+    primary = hslStringToRgb(entry.primary);
+    secondaryCandidate = entry.secondary ? hslStringToRgb(entry.secondary) : null;
   }
-  return {
-    primary: hslStringToRgb(entry.primary),
-    secondary: entry.secondary ? hslStringToRgb(entry.secondary) : null,
-  };
+  return { primary, secondary: ensureReadableSecondary(primary, secondaryCandidate) };
 }
 
 // ---- Chassis-Referenzkurve aus der ECHTEN 2026er-Mod-Datenbank -------------------------
@@ -262,33 +297,56 @@ function interpolateChassis(curve, percentile) {
 }
 
 // ---- Trait-/Persoenlichkeits-Lookup: Olys Fantasy-Traits -> feste Mod-Vokabeln. -------
-// Vokabular an der echten 2026er-Referenz geprueft (322 Fahrer): racing traits
-// bottlejob/cautious/clean_air_merchant/crash_happy/hotlapper/mechanic/nervous/
-// overtake_artist/pay_driver/rainmaster/tyre_abuser/tyre_whisperer; personality-Vokabular
-// deckt sich fast 1:1 mit unseren drei Achsen unten. Unvollstaendig by design -- alles
-// ausserhalb dieser Liste faellt auf einen neutralen Default.
+// KORRIGIERT 05.09. (Chris: "traits usw hast du bei den Spielern aber nicht gut
+// uebersetzt"): die vorherige Tabelle war aus geratenen Trait-Woertern gebaut (z.B.
+// "brave", "charismatic", "calm", "reckless", "arrogant", "volatile") -- keins davon
+// kommt in Olys echten Daten vor. Nachgemessen ueber alle 328 gerosterten Charaktere im
+// Save gibt es GENAU 18 positive und 18 negative Traits (siehe Query unten); die Tabelle
+// deckt jetzt alle 36 ab, deshalb faellt praktisch niemand mehr auf den Achsen-Default
+// zurueck (vorher landeten die meisten Spieler bei racing=mechanic/cautious und
+// personality=loyal/ambitious/company_man, weil ihre echten Traits nie trafen).
+//
+//   node -e "... traitsPositive/traitsNegative-Verteilung ueber alle Rosters ..."
+//   Positiv: Motivated Fair Loyal Healthy Caring FanFavorite Relaxed Sexy Ambitious
+//            Eloquent Diligent Altruistic Disciplined FiredUp Flexible Resourceful Cool
+//            Fearless
+//   Negativ: Gambler Cheater Feisty Lazy Timid Manipulative Renegade Egomaniac Diva
+//            Paranoid ColdBlooded FaintHearted Obsessive Scandalous Mercenary Vindictive
+//            Devious Cruel
 const RACING_TRAIT_POSITIVE = {
-  motivated: 'hotlapper', fair: 'mechanic', disciplined: 'mechanic', calm: 'tyre_whisperer',
-  brave: 'overtake_artist', charismatic: 'clean_air_merchant', loyal: 'mechanic', clutch: 'rainmaster',
-  focused: 'tyre_whisperer', resilient: 'rainmaster',
+  motivated: 'hotlapper', firedup: 'hotlapper', ambitious: 'hotlapper',
+  fair: 'mechanic', loyal: 'mechanic', disciplined: 'mechanic', diligent: 'mechanic', resourceful: 'mechanic', altruistic: 'mechanic',
+  cool: 'rainmaster', relaxed: 'tyre_whisperer', healthy: 'tyre_whisperer', caring: 'tyre_whisperer', flexible: 'tyre_whisperer',
+  fearless: 'overtake_artist',
 };
 const RACING_TRAIT_NEGATIVE = {
-  gambler: 'crash_happy', cheater: 'bottlejob', feisty: 'nervous', reckless: 'crash_happy',
-  arrogant: 'tyre_abuser', fragile: 'nervous', greedy: 'bottlejob', lazy: 'cautious',
-  volatile: 'nervous', unstable: 'crash_happy',
+  gambler: 'crash_happy', feisty: 'crash_happy', renegade: 'crash_happy', egomaniac: 'tyre_abuser', vindictive: 'tyre_abuser', cruel: 'tyre_abuser', coldblooded: 'tyre_abuser',
+  cheater: 'bottlejob', devious: 'bottlejob', manipulative: 'bottlejob', mercenary: 'bottlejob', diva: 'pay_driver', scandalous: 'pay_driver',
+  timid: 'nervous', paranoid: 'nervous', fainthearted: 'nervous', obsessive: 'nervous',
+  lazy: 'cautious',
 };
 const PERSONALITY_LOYALTY = {
-  motivated: 'ambitious', fair: 'loyal', loyal: 'loyal', disciplined: 'loyal',
-  gambler: 'short_termist', cheater: 'short_termist', greedy: 'short_termist',
+  loyal: 'loyal', fair: 'loyal', altruistic: 'loyal', caring: 'loyal',
+  mercenary: 'short_termist', renegade: 'short_termist', gambler: 'short_termist', coldblooded: 'short_termist',
+  timid: 'security_seeker', paranoid: 'security_seeker', lazy: 'security_seeker',
 };
 const PERSONALITY_MOTIVATION = {
-  motivated: 'ambitious', fair: 'team_player', disciplined: 'team_player', calm: 'team_player',
-  charismatic: 'prestigious', gambler: 'mercenary', cheater: 'mercenary', greedy: 'mercenary',
+  ambitious: 'ambitious', motivated: 'ambitious', firedup: 'ambitious',
+  flexible: 'team_player', diligent: 'team_player',
+  altruistic: 'mentor', caring: 'mentor',
+  mercenary: 'mercenary', cheater: 'mercenary', manipulative: 'mercenary',
+  fanfavorite: 'prestigious', sexy: 'prestigious', eloquent: 'prestigious', diva: 'prestigious',
 };
 const PERSONALITY_FLAVOUR = {
-  motivated: 'glory_hunter', fair: 'quiet_professional', charismatic: 'media_darling',
-  cheater: 'prima_donna', feisty: 'fragile_ego', gambler: 'hot_streaker',
-  disciplined: 'quiet_professional', calm: 'quiet_professional',
+  loyal: 'company_man', disciplined: 'company_man',
+  relaxed: 'quiet_professional', cool: 'quiet_professional',
+  fearless: 'glory_hunter', egomaniac: 'glory_hunter',
+  firedup: 'hot_streaker',
+  vindictive: 'fragile_ego', feisty: 'fragile_ego',
+  resourceful: 'comeback_artist', renegade: 'comeback_artist',
+  fanfavorite: 'media_darling', eloquent: 'media_darling', scandalous: 'media_darling',
+  sexy: 'prima_donna', diva: 'prima_donna', devious: 'prima_donna',
+  obsessive: 'impatient',
 };
 
 function pickTrait(traitsPositive, traitsNegative, table, fallback) {
@@ -305,15 +363,17 @@ function pickTrait(traitsPositive, traitsNegative, table, fallback) {
 
 // Wie pickTrait, aber verhindert, dass zwei Achsen auf denselben Tag landen, wenn beide
 // Lookup-Tabellen fuer denselben Oly-Trait denselben Wert vorschlagen. Faellt dafuer auf
-// die uebrige feste Vokabel-Liste der Achse zurueck.
-function pickDistinctTrait(traitsPositive, traitsNegative, table, axisVocabulary, used) {
+// die uebrige feste Vokabel-Liste der Achse zurueck -- ueber einen Hash der Spieler-ID
+// gestreut statt immer beim ersten freien Eintrag zu landen (sonst kaeme jeder Spieler
+// ohne Tabellentreffer auf dieselbe Achse "Loyal/Ambitious/Company Man").
+function pickDistinctTrait(playerId, traitsPositive, traitsNegative, table, axisVocabulary, used) {
   const preferred = pickTrait(traitsPositive, traitsNegative, table, null);
   if (preferred && !used.has(preferred)) {
     used.add(preferred);
     return preferred;
   }
-  const free = axisVocabulary.find((v) => !used.has(v));
-  const pick = free || axisVocabulary[0];
+  const free = axisVocabulary.filter((v) => !used.has(v));
+  const pick = free.length > 0 ? free[hashString(playerId) % free.length] : axisVocabulary[0];
   used.add(pick);
   return pick;
 }
@@ -374,13 +434,54 @@ function makeScaler(values, lo, hi) {
   return (raw) => clamp(Math.round(lo + mapper(raw) * (hi - lo)), lo, hi);
 }
 
+function rawOverall(r) {
+  return r.cornering + r.braking + r.consistency + r.smoothness + r.control;
+}
+
+// "Largest Remainder"-Verfahren: verteilt eine ganzzahlige Zielsumme (0-100) auf 5 Slots
+// proportional zu deren Rohanteilen, jeder Slot geklemmt auf 1-20, Summe trifft exakt das
+// Ziel. Wird gebraucht, weil eine einfache Rundung pro Slot fuer sich (Math.round) die
+// Zielsumme um ein paar Punkte verfehlt.
+function distributeIntegerTotal(rawShares, target) {
+  const total = rawShares.reduce((a, b) => a + b, 0) || 1;
+  const exact = rawShares.map((r) => (r / total) * target);
+  const floors = exact.map((v) => clamp(Math.floor(v), 1, 20));
+  let remainder = target - floors.reduce((a, b) => a + b, 0);
+  const order = exact.map((v, i) => ({ i, frac: v - Math.floor(v) }));
+  if (remainder > 0) {
+    order.sort((a, b) => b.frac - a.frac);
+    for (const { i } of order) {
+      if (remainder <= 0) break;
+      if (floors[i] < 20) {
+        floors[i]++;
+        remainder--;
+      }
+    }
+  } else if (remainder < 0) {
+    order.sort((a, b) => a.frac - b.frac);
+    for (const { i } of order) {
+      if (remainder >= 0) break;
+      if (floors[i] > 1) {
+        floors[i]--;
+        remainder++;
+      }
+    }
+  }
+  return floors;
+}
+
 function buildScalers(rawList) {
   return {
-    cornering: makeScaler(rawList.map((r) => r.cornering), 1, 20),
-    braking: makeScaler(rawList.map((r) => r.braking), 1, 20),
-    consistency: makeScaler(rawList.map((r) => r.consistency), 1, 20),
-    smoothness: makeScaler(rawList.map((r) => r.smoothness), 1, 20),
-    control: makeScaler(rawList.map((r) => r.control), 1, 20),
+    // KORRIGIERT 05.09. (Chris: "hast es nicht geschafft, Fahrer in die 90er zu
+    // uebersetzen, unten waere ok"): vorher wurden cornering/braking/consistency/
+    // smoothness/control JEDER FUER SICH perzentiliert -- damit muesste ein Fahrer
+    // gleichzeitig Top-Perzentil in allen 5 unabhaengigen Kategorien sein, um nahe an
+    // 100 zu kommen; das kam faktisch nie vor (bestes Ergebnis im Save: 83). Jetzt wird
+    // erst die ROHSUMME der 5 Skills perzentiliert (garantiert, dass der staerkste
+    // Fahrer der Population nahe 100 landet), und diese Zielsumme dann per
+    // "Largest Remainder"-Verfahren proportional zu seinem eigenen Rohprofil auf die 5
+    // Einzelskills verteilt -- die Form (wo er stark/schwach ist) bleibt erhalten.
+    overall: makeScaler(rawList.map((r) => rawOverall(r)), 5, 100),
     balance: makeScaler(rawList.map((r) => r.balance), 1, 100),
     traction: makeScaler(rawList.map((r) => r.traction), 1, 100),
     talent: makeScaler(rawList.map((r) => r.talentRaw), 1, 99),
@@ -392,11 +493,11 @@ function buildScalers(rawList) {
 // "Free Agent") + minimaler Vertrag fuer Free Agents, kein "number", kein "career_stage",
 // Reserve-Fahrer bekommen zusaetzlich ein Top-Level "role": "reserve".
 function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) {
-  const cornering = scalers.cornering(raw.cornering);
-  const braking = scalers.braking(raw.braking);
-  const consistency = scalers.consistency(raw.consistency);
-  const smoothness = scalers.smoothness(raw.smoothness);
-  const control = scalers.control(raw.control);
+  const targetOverall = scalers.overall(rawOverall(raw));
+  const [cornering, braking, consistency, smoothness, control] = distributeIntegerTotal(
+    [raw.cornering, raw.braking, raw.consistency, raw.smoothness, raw.control],
+    targetOverall
+  );
   const talent = scalers.talent(raw.talentRaw);
   const balance_preference = scalers.balance(raw.balance);
   const traction_preference = scalers.traction(raw.traction);
@@ -404,9 +505,9 @@ function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) 
   const racingTraitPos = pickTrait(player.traitsPositive, player.traitsNegative, RACING_TRAIT_POSITIVE, 'mechanic');
   const racingTraitNeg = pickTrait(player.traitsNegative, player.traitsPositive, RACING_TRAIT_NEGATIVE, 'cautious');
   const usedPersonalityTags = new Set();
-  const loyalty = pickDistinctTrait(player.traitsPositive, player.traitsNegative, PERSONALITY_LOYALTY, LOYALTY_VOCAB, usedPersonalityTags);
-  const motivation = pickDistinctTrait(player.traitsPositive, player.traitsNegative, PERSONALITY_MOTIVATION, MOTIVATION_VOCAB, usedPersonalityTags);
-  const flavour = pickDistinctTrait(player.traitsPositive, player.traitsNegative, PERSONALITY_FLAVOUR, FLAVOUR_VOCAB, usedPersonalityTags);
+  const loyalty = pickDistinctTrait(player.id, player.traitsPositive, player.traitsNegative, PERSONALITY_LOYALTY, LOYALTY_VOCAB, usedPersonalityTags);
+  const motivation = pickDistinctTrait(player.id, player.traitsPositive, player.traitsNegative, PERSONALITY_MOTIVATION, MOTIVATION_VOCAB, usedPersonalityTags);
+  const flavour = pickDistinctTrait(player.id, player.traitsPositive, player.traitsNegative, PERSONALITY_FLAVOUR, FLAVOUR_VOCAB, usedPersonalityTags);
 
   const entry = {
     name: player.name,
@@ -473,7 +574,7 @@ function buildTeamCore(oly, percentile, curve, colors) {
   return {
     name: oly.team.name,
     color_rgb: colors.primary,
-    secondary_color_rgb: colors.secondary || colors.primary,
+    secondary_color_rgb: colors.secondary,
     heritage_prestige: prestige.heritage,
     form_prestige: prestige.form,
     prestige_base: prestige.base,
@@ -551,13 +652,22 @@ function organicFirstActiveSeason(oly, rank, fieldSize) {
   return clamp(Math.round(2 + Math.pow(p, 2) * 30) + jitter, 1, 89);
 }
 
+// Chris (05.09.): die echten Asset-Dateien der Mod heissen "VornameNachname.png" --
+// OHNE Leerzeichen (Beispiele aus seinem Portrait-Ordner: "CallumViera.png",
+// "ChristianCostoya.jpg", "JacobMicallef.png", "SonnyHayes.png"). Einwortnamen liefen
+// deshalb schon vorher richtig, mehrteilige Namen mit Leerzeichen nicht. Gilt hier fuer
+// Logos wie Portraits gleichermassen, mangels Gegenbeispiel fuer Team-Logos.
+function assetFilename(name) {
+  return name.replace(/\s+/g, '');
+}
+
 async function exportLogos(allTeams, outDir) {
   const logosDir = path.join(outDir, 'logos');
   mkdirSync(logosDir, { recursive: true });
   const results = [];
   for (const oly of allTeams) {
     const src = path.join(TEAM_LOGOS_DIR, `${oly.team.shortCode}.jpg`);
-    const dest = path.join(logosDir, `${oly.team.name}.png`);
+    const dest = path.join(logosDir, `${assetFilename(oly.team.name)}.png`);
     try {
       await sharp(src).png({ quality: 80, palette: true }).toFile(dest);
       results.push({ team: oly.team.name, logo: dest, ok: true });
@@ -584,10 +694,11 @@ async function exportPortraits(entries, outDir) {
       missing++;
       continue;
     }
-    let filename = `${e.player.name}.png`;
+    const baseName = assetFilename(e.player.name);
+    let filename = `${baseName}.png`;
     let suffix = 2;
     while (usedNames.has(filename)) {
-      filename = `${e.player.name} (${suffix}).png`;
+      filename = `${baseName}(${suffix}).png`;
       suffix++;
     }
     try {
