@@ -15,6 +15,14 @@ gar nicht angefangen, weil OpenGameArt nicht erreichbar war" stand.
 | `baum_1..4.png` | die Baumreihe ueber der Bahn |
 | `fackel.png` | die sechs Fackeln der Arena, 9 Bilder zu 32x64 |
 | `vogel_adler.png` | vorgesehen fuer Seraph-11, **noch nicht verbaut** |
+| `hind_huerde.png` | Spurt, Station 1 (Huerde) — Balkenzaun |
+| `hind_balken.png` | Spurt, Station 2 (Balken ueber Wasser) — Planke, ueber `hind_wasser_l/r` gelegt |
+| `hind_wand.png` | Spurt, Station 3 (Palisade) |
+| `hind_seil.png` | Spurt, Station 4 (Seil zum Hangeln) |
+| `hind_wasser_l.png`, `hind_wasser_r.png` | Spurt, Stationen 2 und 5 (Wassergraben), linkes/rechtes Ufer |
+| `hind_mauer.png` | Spurt, Station 6 (Bruchsteinmauer) |
+| `hind_heu.png` | Spurt, Station 7 (Strohballen) |
+| `hind_feuer.png` | Spurt, Feuersprung hinter der Ziellinie (Deko, 5 Bilder zu 32x32) |
 
 `quellen.json` nennt zu jeder Datei Paket, Blatt, Schnittstelle, Urheber und Lizenz.
 `HERKUNFT/` traegt die Urheberketten der drei Pakete im Wortlaut der Originale — bei

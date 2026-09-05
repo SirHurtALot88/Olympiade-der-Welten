@@ -14205,7 +14205,10 @@
   // HTML. Die Sprite-Blaetter der Kaempfer liegen weiter eingebettet — die brauchen
   // Farbtausch je Pixel und muessen deshalb ohnehin durch die Leinwand.
   const A_TEILE=["boden_sand","boden_stein","boden_erde","mauer_ziegel","rasen",
-    "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel"];
+    "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel",
+    // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
+    "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
+    "hind_mauer","hind_heu","hind_feuer"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -14441,16 +14444,26 @@
     const BN=BAHNEN_N();
     for(let i=0;i<=BN;i++){const y=oben+(unten-oben)*i/BN;
       ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    // Hindernisse genau dort, wo die Simulation sie prueft — in der Form, die die
-    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff. Ihre Bildschirmposition kommt
-    // jetzt aus camX(): gezoomt und im Rennverlauf verschoben wie das Feld selbst.
-    const wort=BA().hindernisWort;
-    for(const h of HUERDEN_N()){
+    // Hindernisse genau dort, wo die Simulation sie prueft — als Kachel je Station, wenn die
+    // Disziplin Bilder fuehrt (Spurt, U3), sonst in der Form, die die Disziplin kennt: Huerde,
+    // Kurvenmarkierung, Griff. Unterkante auf bahnY(b)+16, der Fusslinie der Laeufer
+    // (Schatten-Ellipse in zeichneSpurt bei y+16).
+    const wort=BA().hindernisWort, bilder=BA().hindernisBilder||null;
+    HUERDEN_N().forEach((h,i)=>{
       const x=camX(h);
-      if(x<-20||x>W+20)continue;         // ausserhalb des Bildausschnitts — nicht zeichnen
+      if(x<-60||x>W+60)return;           // ausserhalb des Bildausschnitts — nicht zeichnen
+      const key=bilder&&bilder[i]?"hind_"+bilder[i]:null;
+      const wasser=(key==="hind_wasser"||key==="hind_balken")&&aDa("hind_wasser_l")&&aDa("hind_wasser_r");
+      const kachel=key&&key!=="hind_wasser"&&aDa(key)?aBild[key]:null;
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
-        if(wort==="Griff"){
+        if(wasser){
+          const l=aBild.hind_wasser_l, r=aBild.hind_wasser_r, yo=Math.round(y-15);
+          ctx.drawImage(l,Math.round(x-32),yo); ctx.drawImage(r,Math.round(x),yo);
+          if(key==="hind_balken"&&kachel)ctx.drawImage(kachel,Math.round(x-kachel.naturalWidth/2),Math.round(y-2-kachel.naturalHeight));
+        } else if(kachel){
+          ctx.drawImage(kachel,Math.round(x-kachel.naturalWidth/2),Math.round(y+3-kachel.naturalHeight));
+        } else if(wort==="Griff"){
           ctx.fillStyle="#cfa46b";
           ctx.beginPath();ctx.arc(x,y-7,5,0,6.283);ctx.fill();
           ctx.fillStyle="#8d6a3f";ctx.fillRect(x-1,y-7,2,7);
@@ -14462,7 +14475,7 @@
           ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10);
         }
       }
-    }
+    });
     // Start und Ziel — ebenfalls unter der Kamera, damit sie beim Auszoomen wieder
     // ins Bild kommen, statt an einer festen Pixelstelle zu kleben.
     const xStart=camX(0), xZiel=camX(1);
@@ -14474,6 +14487,15 @@
       ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
       ctx.setLineDash([]);
+    }
+    // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
+    // Bilder ueber rennT. Kein Zeitpreis — die Mechanik bekommt kein achtes Ereignis.
+    if(BA().feuerZiel&&aDa("hind_feuer")&&xZiel>-40&&xZiel<W+40){
+      const f=aBild.hind_feuer, fr=Math.floor(rennT*8)%5;
+      for(let b=0;b<BAHNEN_N();b++){
+        const y=bahnY(b)+16;
+        ctx.drawImage(f,fr*32,0,32,32,Math.round(xZiel-42),Math.round(y-30),32,32);
+      }
     }
     // Zoomstufe als kleiner, fester HUD-Hinweis — nur wenn die Kamera ueberhaupt
     // herangezoomt hat, sonst waere er staendig sichtbares Rauschen.
@@ -14548,6 +14570,11 @@
   const BAHN_ART={
     spurt:{
       label:"Spurt", jeSeite:4, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
+      // BILD JE STATION (U3). Parallel zu `hindernisse` und `hindernisTypen`: Index i ist
+      // dieselbe Station. "wasser" zeichnet zwei Uferkacheln, "balken" dieselben zwei plus die
+      // Planke darueber. Fehlt eine Kachel, faellt genau diese Station auf die alten Pfosten
+      // zurueck (bodenSpurt). Andere Bahnen fuehren keine Liste und bleiben bit-identisch.
+      hindernisBilder:["huerde","balken","wand","seil","wasser","mauer","heu"], feuerZiel:true,
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
       technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
@@ -14561,7 +14588,14 @@
       // der neue Hindernis-Kanal nicht im alten Ermuedungs- und Rempler-Rauschen untergeht.
       // Kaderfest (n=24) gemessen: rho/Spiel 0,652 -> 0,857, Spannweite 0,559 -> 0,286,
       // Saison 0,690 -> 0,905, Dexterity-Einfluss 3,5 % -> 16,7 %.
-      muedGrad:0.00014, hindernisTypen:["TECHNIK","WUCHT","WENDIGKEIT"], huerdePreis:1.00,
+      // PAKET B (Fable-Recherche 05.09.2026, docs/design/spurt-offene-fragen-plus-optik-plan-05-09.md,
+      // Anhang B): feste Stationsfolge Huerde/Balken/Palisade/Seil/Graben/Mauer/Stroh statt
+      // Dreierzyklus (T,Wd,W,W,Wd,W,T — der Wassergraben ist WENDIGKEIT, nicht WUCHT), dazu
+      // wuchtPreisFaktor fuer die drei Kraft-Stationen. Kaderfest (n=24): rho/Spiel 0,857 ->
+      // 0,871, Spannweite 0,286 -> 0,236, Saison 0,905 -> 0,905, Einfluss-Abweichung zur
+      // Matrix 38,9 -> 16,7 Pp. Bei playerCount 2 (das reale jeSeite im Spiel): 0,700 -> 0,825.
+      muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.00,
+      wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       rezept:{
         // NACHGEZOGEN AN DIE SPURT-MATRIX. Gemessen: Speed trug 47,6 % dazu bei, ob
@@ -15297,6 +15331,7 @@
       if(BA().steigung)zehr*=1+BA().steigung*u.pos;
       if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
+      if(u.huerde>0)zehr*=0.4;             // Stopp am Hindernis: ein Fuenftel bis die Haelfte, nicht Volllast
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
         u.leer=true;
@@ -15337,7 +15372,7 @@
           if(A.hindernisTypen){
             const hTyp=A.hindernisTypen[HUERDEN_N().indexOf(h)%A.hindernisTypen.length];
             const hSkill=u[hTyp]||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(1-0.8*hSkill/100));
+            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
           }
           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
           if(rr()<=technik)continue;                       // sauber drueber
@@ -15405,9 +15440,12 @@
       // Schwelle und darueber fast wirkungslos. Damit kaufte mehr Torment so gut wie
       // nichts, und gemessen trug es 2,2 % bei einem Matrixgewicht von 14. Jetzt kauft
       // Wucht auch Gelegenheiten, nicht nur Durchschlagskraft.
-      if(BA().tackle && u.tackleCd<=0 && u.WUCHT>(BA().tackleAb??45)
+      // SPERRE IM HINDERNIS (Paket B): wer im Hindernis-Stopp steht, rempelt nicht und wird
+      // nicht gerempelt — sonst ist der Stopp an der Wand Freiwild, und der Zeitpreis, der
+      // Dexterity tragen soll, wird zur Torment-Praemie.
+      if(BA().tackle && u.tackleCd<=0 && !(u.huerde>0) && u.WUCHT>(BA().tackleAb??45)
          && rr()<willTackeln*dt*(BA().tackleRate??1.6)){
-        const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null
+        const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null&&!(o.huerde>0)
           && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
