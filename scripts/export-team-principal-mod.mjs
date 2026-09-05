@@ -281,18 +281,36 @@ function interpolateChassis(curve, percentile) {
     for (const k of Object.keys(a[key])) out[k] = blendNum2(a[key][k], b[key][k], frac);
     return out;
   };
+  const braking = blendNum('braking');
+  const acceleration = blendNum('acceleration');
+  const team_pace = blendNum('team_pace');
+  const tyre_management = blendNum('tyre_management');
+  const chassis_reliability = blendNum('chassis_reliability');
+  const chassis_starting_potential = blendObj('chassis_starting_potential');
+
+  // Die reale 2026er-Referenz hat selbst zwei Faelle, in denen "Potential" unter dem
+  // aktuellen Wert liegt (Ferrari tyre_management, Alpine team_pace -- vermutlich als
+  // Story-Beat "im Abstieg begriffenes Team" gedacht). Fuer frisch gestartete Oly-Teams
+  // ergibt eine Entwicklungsdecke UNTER dem Ist-Wert keinen Sinn und wirkt wie ein Bug --
+  // deshalb hier hart abgesichert: Potential ist nie niedriger als der aktuelle Wert.
+  chassis_starting_potential.braking = Math.max(chassis_starting_potential.braking, braking);
+  chassis_starting_potential.acceleration = Math.max(chassis_starting_potential.acceleration, acceleration);
+  chassis_starting_potential.team_pace = Math.max(chassis_starting_potential.team_pace, team_pace);
+  chassis_starting_potential.tyre_management = Math.max(chassis_starting_potential.tyre_management, tyre_management);
+  chassis_starting_potential.chassis_reliability = Math.max(chassis_starting_potential.chassis_reliability, chassis_reliability);
+
   return {
     ...nearer,
     car_mass_kg: blendNum('car_mass_kg'),
-    braking: blendNum('braking'),
-    acceleration: blendNum('acceleration'),
-    team_pace: blendNum('team_pace'),
+    braking,
+    acceleration,
+    team_pace,
     attr: blendObj('attr'),
-    tyre_management: blendNum('tyre_management'),
+    tyre_management,
     dirty_air_sensitivity: blendNum('dirty_air_sensitivity'),
-    chassis_reliability: blendNum('chassis_reliability'),
+    chassis_reliability,
     aero_efficiency: blendNum('aero_efficiency'),
-    chassis_starting_potential: blendObj('chassis_starting_potential'),
+    chassis_starting_potential,
   };
 }
 
@@ -403,10 +421,8 @@ function computeRawMetrics(player) {
 
   const rating = Number(player.rating) || 1;
   const potential = Number(player.potential) || rating;
-  const overallRaw = cornering + braking + consistency + smoothness + control;
-  const talentRaw = overallRaw * (potential / rating);
 
-  return { cornering, braking, consistency, smoothness, control, balance, traction, talentRaw, rating, potential };
+  return { cornering, braking, consistency, smoothness, control, balance, traction, rating, potential };
 }
 
 // ---- Perzentil-Skalierung: jede Roh-Groesse wird gegen ihre eigene Verteilung ueber die
@@ -484,8 +500,15 @@ function buildScalers(rawList) {
     overall: makeScaler(rawList.map((r) => rawOverall(r)), 5, 100),
     balance: makeScaler(rawList.map((r) => r.balance), 1, 100),
     traction: makeScaler(rawList.map((r) => r.traction), 1, 100),
-    talent: makeScaler(rawList.map((r) => r.talentRaw), 1, 99),
   };
+}
+
+// talent haengt an targetOverall (derselbe percentilierte Wert wie die 5 Einzelskills),
+// gestreckt per Olys eigenem Potential/Rating-Verhaeltnis -- niemals darunter. Eigene
+// Funktion, damit main() beim Sortieren main/reserve/Free-Agent dieselbe Zahl sieht wie
+// spaeter im driversJson-Eintrag (sonst koennte die Rang-Reihenfolge auseinanderlaufen).
+function computeTalent(raw, targetOverall) {
+  return clamp(Math.round(targetOverall * (raw.potential / raw.rating)), targetOverall, 99);
 }
 
 // roleInfo: {contractLength, salary, role: 'main'|'reserve', status} oder null fuer einen
@@ -498,7 +521,13 @@ function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) 
     [raw.cornering, raw.braking, raw.consistency, raw.smoothness, raw.control],
     targetOverall
   );
-  const talent = scalers.talent(raw.talentRaw);
+  // KORRIGIERT 05.09. (Chris: "schau nach anderen unlogischen Werten"): talent kam vorher
+  // aus einer EIGENEN, unabhaengigen Perzentil-Skalierung -- dadurch lag talent bei 220
+  // von 328 Fahrern (67%!) UNTER der aktuellen Skill-Summe. Ein Fahrer, dessen Ceiling
+  // niedriger ist als das, was er jetzt schon zeigt, ergibt keinen Sinn. talent haengt
+  // jetzt direkt an targetOverall (derselbe Wert, der schon die 5 Skills bestimmt) und
+  // wird per Olys eigenem Potential/Rating-Verhaeltnis nur noch nach OBEN gestreckt.
+  const talent = computeTalent(raw, targetOverall);
   const balance_preference = scalers.balance(raw.balance);
   const traction_preference = scalers.traction(raw.traction);
 
@@ -554,12 +583,16 @@ function computeTeamPrestige(identity) {
   return { heritage, form, base };
 }
 
-function sameLevelHeadquarters(identity) {
+// engineContractType: engine_plant war bisher IMMER 0 -- widersprach sich mit einem
+// "works"-Motorvertrag (dann baut das Team seinen Motor ja selbst, das braucht eine
+// Motorenfabrik). Reale Referenz: Werksteams fuehren engine_plant 1-5, Kunden-/Partner-
+// Teams durchgaengig 0.
+function sameLevelHeadquarters(identity, engineContractType) {
   const level = clamp(Math.round((identity.finances / 10) * 6), 0, 6);
   return {
     hospitality_pr_center: level,
     wind_tunnel: level,
-    engine_plant: 0,
+    engine_plant: engineContractType === 'works' ? clamp(Math.round(level * 0.8), 1, 6) : 0,
     test_track: clamp(Math.round((identity.ambition / 10) * 6), 0, 6),
     driver_centre: level,
     factory: level,
@@ -592,7 +625,7 @@ function buildTeamCore(oly, percentile, curve, colors) {
     // vorbeizulaufen.
     budget_m: oly.team.budget,
     starting_balance_m: Math.round(oly.team.budget * clamp(0.3 + (oly.identity.finances / 10) * 1.1, 0.3, 1.4) * 10) / 10,
-    headquarters: sameLevelHeadquarters(oly.identity),
+    headquarters: sameLevelHeadquarters(oly.identity, template.engine_contract_type),
     negotiation_points: 0,
     performance_scale: 'rating_100',
     car_mass_kg: template.car_mass_kg,
@@ -796,21 +829,33 @@ async function main() {
     const colors = resolveTeamColors(colorMap, oly.team.shortCode);
     teamsJson.push(buildF1Team(oly, rank, f1Teams.length, chassisCurve, colors));
 
+    const talentOf = (e) => computeTalent(e.raw, scalers.overall(rawOverall(e.raw)));
     const roster = allEntries
       .filter((e) => e.teamId === oly.team.teamId)
-      .sort((a, b) => scalers.talent(b.raw.talentRaw) - scalers.talent(a.raw.talentRaw));
+      .sort((a, b) => talentOf(b) - talentOf(a));
 
     const carSlots = roster.slice(0, 2);
     const reserveSlots = roster.slice(2, 3);
 
+    // KORRIGIERT 05.09. (Chris: "schau nach anderen unlogischen Werten"): das Gehalt kam
+    // bisher 1:1 aus Olys eigenem salaryDemand -- das folgt Olys ALTEM rating, nicht
+    // unserer neuen Talent-Rangfolge. Bei 9 von 16 Teams verdiente dadurch der Reservist
+    // mehr als ein Stammfahrer. Jetzt werden die drei Original-Gehaelter der Gruppe nur
+    // umsortiert (keine neuen Zahlen erfunden), sodass sie zur Talent-Rangfolge passen.
+    const group = [...carSlots, ...reserveSlots];
+    const sortedSalaries = group.map((s) => s.player.salaryDemand || 1).sort((a, b) => b - a);
+    group.forEach((slot, i) => {
+      slot.rankedSalary = sortedSalaries[i];
+    });
+
     carSlots.forEach((slot, i) => {
       assignedPlayerIds.add(slot.player.id);
-      const gap = carSlots.length > 1 ? Math.abs(scalers.talent(carSlots[0].raw.talentRaw) - scalers.talent(carSlots[1].raw.talentRaw)) : 0;
+      const gap = carSlots.length > 1 ? Math.abs(talentOf(carSlots[0]) - talentOf(carSlots[1])) : 0;
       const status = gap < 3 ? 'equal' : i === 0 ? 'first' : 'second';
       driversJson.push(
         mapPlayerToDriver(slot.player, slot.raw, scalers, oly.team.name, {
           contractLength: slot.roster.contractLength || 1,
-          salary: slot.player.salaryDemand || 1,
+          salary: slot.rankedSalary,
           role: 'main',
           status,
         })
@@ -821,7 +866,7 @@ async function main() {
       driversJson.push(
         mapPlayerToDriver(slot.player, slot.raw, scalers, oly.team.name, {
           contractLength: slot.roster.contractLength || 1,
-          salary: slot.player.salaryDemand || 1,
+          salary: slot.rankedSalary,
           role: 'reserve',
           status: 'equal',
         })

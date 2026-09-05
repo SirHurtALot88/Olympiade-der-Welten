@@ -1,6 +1,6 @@
 {
 	"saveId": "new-game-1787123325719-swnjlk",
-	"generatedAt": "2026-09-05T09:35:02.437Z",
+	"generatedAt": "2026-09-05T09:43:52.353Z",
 	"teams": [
 		{
 			"teamId": "M-M",
@@ -207,18 +207,18 @@
 			"race": "Alien"
 		},
 		{
-			"playerId": "player-0739-bladewalker",
-			"sourceRating": 46.86,
-			"sourcePotential": 50.86,
-			"className": "Rogue",
-			"race": "Construct"
-		},
-		{
 			"playerId": "player-2035-zeynorr-driftblade",
 			"sourceRating": 46.5,
 			"sourcePotential": 50.5,
 			"className": "Charger",
 			"race": "Alien"
+		},
+		{
+			"playerId": "player-0739-bladewalker",
+			"sourceRating": 46.86,
+			"sourcePotential": 50.86,
+			"className": "Rogue",
+			"race": "Construct"
 		},
 		{
 			"playerId": "player-0770-lucky",
@@ -228,18 +228,18 @@
 			"race": "Dwarf"
 		},
 		{
-			"playerId": "player-2262-nimri",
-			"sourceRating": 33.72,
-			"sourcePotential": 37.72,
-			"className": "Sprinter",
-			"race": "Construct"
-		},
-		{
 			"playerId": "player-2937-erna-wellenlaut",
 			"sourceRating": 47.98,
 			"sourcePotential": 51.98,
 			"className": "Bard",
 			"race": "Aqua"
+		},
+		{
+			"playerId": "player-2262-nimri",
+			"sourceRating": 33.72,
+			"sourcePotential": 37.72,
+			"className": "Sprinter",
+			"race": "Construct"
 		},
 		{
 			"playerId": "player-1685-valara",
@@ -298,18 +298,18 @@
 			"race": "Animal"
 		},
 		{
-			"playerId": "player-2920-salvador-mare",
-			"sourceRating": 36.87,
-			"sourcePotential": 40.87,
-			"className": "Mage",
-			"race": "Animal"
-		},
-		{
 			"playerId": "player-0522-radditz",
 			"sourceRating": 53.86,
 			"sourcePotential": 57.86,
 			"className": "Charger",
 			"race": "Animal"
+		},
+		{
+			"playerId": "player-0007-umbrafond",
+			"sourceRating": 58.28,
+			"sourcePotential": 62.28,
+			"className": "Berserker",
+			"race": "Plant"
 		},
 		{
 			"playerId": "player-2473-vexel",
@@ -319,18 +319,18 @@
 			"race": "Construct"
 		},
 		{
-			"playerId": "player-1791-soulsinger",
-			"sourceRating": 42.11,
-			"sourcePotential": 46.11,
-			"className": "Bard",
-			"race": "Elf"
-		},
-		{
 			"playerId": "player-0875-vargan",
 			"sourceRating": 46.62,
 			"sourcePotential": 50.62,
 			"className": "Charger",
 			"race": "Human"
+		},
+		{
+			"playerId": "player-1791-soulsinger",
+			"sourceRating": 42.11,
+			"sourcePotential": 46.11,
+			"className": "Bard",
+			"race": "Elf"
 		},
 		{
 			"playerId": "player-2541-malagor",
@@ -424,6 +424,13 @@
 			"race": "Animal"
 		},
 		{
+			"playerId": "player-2367-marin-solis",
+			"sourceRating": 43.88,
+			"sourcePotential": 47.88,
+			"className": "Sprinter",
+			"race": "Aqua"
+		},
+		{
 			"playerId": "player-2340-frayja-accounting",
 			"sourceRating": 37.9,
 			"sourcePotential": 41.9,
@@ -431,11 +438,11 @@
 			"race": "Animal"
 		},
 		{
-			"playerId": "player-0583-raven",
-			"sourceRating": 35.8,
-			"sourcePotential": 39.8,
-			"className": "Rogue",
-			"race": "Animal"
+			"playerId": "player-2689-lady-yueqin",
+			"sourceRating": 46.39,
+			"sourcePotential": 50.39,
+			"className": "Mage",
+			"race": "Elf"
 		},
 		{
 			"playerId": "player-2952-eldara",
@@ -443,13 +450,6 @@
 			"sourcePotential": 39.15,
 			"className": "Mage",
 			"race": "Construct"
-		},
-		{
-			"playerId": "player-2689-lady-yueqin",
-			"sourceRating": 46.39,
-			"sourcePotential": 50.39,
-			"className": "Mage",
-			"race": "Elf"
 		},
 		{
 			"playerId": "player-2281-yurei",
@@ -480,18 +480,18 @@
 			"race": "Alien"
 		},
 		{
-			"playerId": "player-0528-ashanti",
-			"sourceRating": 40.34,
-			"sourcePotential": 44.34,
-			"className": "Sprinter",
-			"race": "Elf"
-		},
-		{
 			"playerId": "player-0625-ciacia",
 			"sourceRating": 31.22,
 			"sourcePotential": 35.22,
 			"className": "Sprinter",
 			"race": "Construct"
+		},
+		{
+			"playerId": "player-0528-ashanti",
+			"sourceRating": 40.34,
+			"sourcePotential": 44.34,
+			"className": "Sprinter",
+			"race": "Elf"
 		},
 		{
 			"playerId": "player-1005-corsair",
@@ -1383,11 +1383,11 @@
 			"race": "Divine"
 		},
 		{
-			"playerId": "player-2367-marin-solis",
-			"sourceRating": 43.88,
-			"sourcePotential": 47.88,
-			"className": "Sprinter",
-			"race": "Aqua"
+			"playerId": "player-0583-raven",
+			"sourceRating": 35.8,
+			"sourcePotential": 39.8,
+			"className": "Rogue",
+			"race": "Animal"
 		},
 		{
 			"playerId": "player-0077-buttercup",
@@ -1621,11 +1621,11 @@
 			"race": "Animal"
 		},
 		{
-			"playerId": "player-0007-umbrafond",
-			"sourceRating": 58.28,
-			"sourcePotential": 62.28,
-			"className": "Berserker",
-			"race": "Plant"
+			"playerId": "player-2920-salvador-mare",
+			"sourceRating": 36.87,
+			"sourcePotential": 40.87,
+			"className": "Mage",
+			"race": "Animal"
 		},
 		{
 			"playerId": "player-0549-nytharos",

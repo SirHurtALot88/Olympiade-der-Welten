@@ -19,7 +19,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 5,
 			"driver_centre": 3,
 			"factory": 3,
@@ -48,7 +48,7 @@
 			"med": 58,
 			"high": 60,
 			"straight": 54,
-			"tyre_management": 53,
+			"tyre_management": 54,
 			"chassis_reliability": 69,
 			"dirty_air_sensitivity": 62.333,
 			"acceleration": 58,
@@ -116,7 +116,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 6,
 			"driver_centre": 2,
 			"factory": 2,
@@ -213,7 +213,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 5,
 			"wind_tunnel": 5,
-			"engine_plant": 0,
+			"engine_plant": 4,
 			"test_track": 4,
 			"driver_centre": 5,
 			"factory": 5,
@@ -408,7 +408,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 5,
 			"driver_centre": 2,
 			"factory": 2,
@@ -505,7 +505,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 2,
 			"driver_centre": 2,
 			"factory": 2,
@@ -602,7 +602,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 1,
 			"wind_tunnel": 1,
-			"engine_plant": 0,
+			"engine_plant": 1,
 			"test_track": 5,
 			"driver_centre": 1,
 			"factory": 1,
@@ -626,7 +626,7 @@
 		"chassis_reliability": 45,
 		"aero_efficiency": 1.065,
 		"chassis_starting_potential": {
-			"team_pace": 42,
+			"team_pace": 49,
 			"slow": 41,
 			"med": 47,
 			"high": 46,
@@ -728,7 +728,7 @@
 		"chassis_reliability": 41.666666666666664,
 		"aero_efficiency": 1.0883333333333334,
 		"chassis_starting_potential": {
-			"team_pace": 46.66666666666667,
+			"team_pace": 49,
 			"slow": 48.333333333333336,
 			"med": 45.666666666666664,
 			"high": 46,
@@ -910,7 +910,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
-			"engine_plant": 0,
+			"engine_plant": 3,
 			"test_track": 3,
 			"driver_centre": 4,
 			"factory": 4,
@@ -1497,7 +1497,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 3,
 			"driver_centre": 2,
 			"factory": 2,
@@ -1595,7 +1595,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
-			"engine_plant": 0,
+			"engine_plant": 3,
 			"test_track": 2,
 			"driver_centre": 4,
 			"factory": 4,
@@ -1624,7 +1624,7 @@
 			"med": 58,
 			"high": 60,
 			"straight": 54,
-			"tyre_management": 53,
+			"tyre_management": 54,
 			"chassis_reliability": 69,
 			"dirty_air_sensitivity": 62.333,
 			"acceleration": 58,
@@ -1693,7 +1693,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 4,
 			"driver_centre": 3,
 			"factory": 3,
@@ -1791,7 +1791,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
-			"engine_plant": 0,
+			"engine_plant": 2,
 			"test_track": 4,
 			"driver_centre": 3,
 			"factory": 3,
@@ -1988,7 +1988,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
-			"engine_plant": 0,
+			"engine_plant": 3,
 			"test_track": 4,
 			"driver_centre": 4,
 			"factory": 4,
@@ -2086,7 +2086,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
-			"engine_plant": 0,
+			"engine_plant": 3,
 			"test_track": 5,
 			"driver_centre": 4,
 			"factory": 4,
@@ -2184,7 +2184,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 6,
 			"wind_tunnel": 6,
-			"engine_plant": 0,
+			"engine_plant": 5,
 			"test_track": 3,
 			"driver_centre": 6,
 			"factory": 6,
@@ -2208,7 +2208,7 @@
 		"chassis_reliability": 45,
 		"aero_efficiency": 1.065,
 		"chassis_starting_potential": {
-			"team_pace": 42,
+			"team_pace": 49,
 			"slow": 41,
 			"med": 47,
 			"high": 46,
@@ -2311,7 +2311,7 @@
 		"chassis_reliability": 41.666666666666664,
 		"aero_efficiency": 1.0883333333333334,
 		"chassis_starting_potential": {
-			"team_pace": 46.66666666666667,
+			"team_pace": 49,
 			"slow": 48.333333333333336,
 			"med": 45.666666666666664,
 			"high": 46,
@@ -2495,7 +2495,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 6,
 			"wind_tunnel": 6,
-			"engine_plant": 0,
+			"engine_plant": 5,
 			"test_track": 2,
 			"driver_centre": 6,
 			"factory": 6,
@@ -3088,7 +3088,7 @@
 		"headquarters": {
 			"hospitality_pr_center": 1,
 			"wind_tunnel": 1,
-			"engine_plant": 0,
+			"engine_plant": 1,
 			"test_track": 5,
 			"driver_centre": 1,
 			"factory": 1,

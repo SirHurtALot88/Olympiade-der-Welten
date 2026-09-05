@@ -17,7 +17,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 98,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -30,8 +30,8 @@
 		],
 		"nationality": "international",
 		"contract": {
-			"status": "first",
-			"priority": "first",
+			"status": "equal",
+			"priority": "equal",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 52,
 			"salary_m": 17.04,
@@ -57,7 +57,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 87,
+		"talent": 98,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -70,11 +70,11 @@
 		],
 		"nationality": "international",
 		"contract": {
-			"status": "second",
-			"priority": "second",
+			"status": "equal",
+			"priority": "equal",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 104,
-			"salary_m": 8.07,
+			"salary_m": 8.55,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -97,7 +97,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 84,
+		"talent": 94,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -114,7 +114,7 @@
 			"priority": "equal",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 52,
-			"salary_m": 8.55,
+			"salary_m": 8.07,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -155,7 +155,7 @@
 			"priority": "equal",
 			"team": "Zero Heroes",
 			"length_weeks": 52,
-			"salary_m": 7.72,
+			"salary_m": 13.13,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -195,7 +195,7 @@
 			"priority": "equal",
 			"team": "Zero Heroes",
 			"length_weeks": 52,
-			"salary_m": 13.13,
+			"salary_m": 7.72,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -218,7 +218,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 77,
+		"talent": 85,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -242,46 +242,6 @@
 		"role": "reserve"
 	},
 	{
-		"name": "Bladewalker",
-		"team": "Cold Steel",
-		"cornering": 20,
-		"braking": 20,
-		"consistency": 13,
-		"smoothness": 20,
-		"control": 19,
-		"balance_preference": 88,
-		"traction_preference": 83,
-		"age": 29,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 97,
-		"traits": [
-			"tyre_whisperer",
-			"bottlejob"
-		],
-		"personality": "team_player",
-		"personalities": [
-			"short_termist",
-			"team_player",
-			"prima_donna"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "equal",
-			"priority": "equal",
-			"team": "Cold Steel",
-			"length_weeks": 104,
-			"salary_m": 8.49,
-			"start_week": 1,
-			"role": "main"
-		}
-	},
-	{
 		"name": "Zeynorr Driftblade",
 		"team": "Cold Steel",
 		"cornering": 20,
@@ -299,7 +259,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 95,
+		"talent": 99,
 		"traits": [
 			"rainmaster",
 			"crash_happy"
@@ -322,6 +282,46 @@
 		}
 	},
 	{
+		"name": "Bladewalker",
+		"team": "Cold Steel",
+		"cornering": 20,
+		"braking": 20,
+		"consistency": 13,
+		"smoothness": 20,
+		"control": 19,
+		"balance_preference": 88,
+		"traction_preference": 83,
+		"age": 29,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"tyre_whisperer",
+			"bottlejob"
+		],
+		"personality": "team_player",
+		"personalities": [
+			"short_termist",
+			"team_player",
+			"prima_donna"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Cold Steel",
+			"length_weeks": 104,
+			"salary_m": 8.49,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
 		"name": "Lucky",
 		"team": "Cold Steel",
 		"cornering": 20,
@@ -339,7 +339,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 80,
+		"talent": 91,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -363,46 +363,6 @@
 		"role": "reserve"
 	},
 	{
-		"name": "Nimri",
-		"team": "Golden Gladiators",
-		"cornering": 20,
-		"braking": 20,
-		"consistency": 19,
-		"smoothness": 20,
-		"control": 14,
-		"balance_preference": 82,
-		"traction_preference": 52,
-		"age": 23,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 97,
-		"traits": [
-			"tyre_whisperer",
-			"nervous"
-		],
-		"personality": "team_player",
-		"personalities": [
-			"loyal",
-			"team_player",
-			"fragile_ego"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "first",
-			"priority": "first",
-			"team": "Golden Gladiators",
-			"length_weeks": 52,
-			"salary_m": 4.47,
-			"start_week": 1,
-			"role": "main"
-		}
-	},
-	{
 		"name": "Erna Wellenlaut",
 		"team": "Golden Gladiators",
 		"cornering": 20,
@@ -420,7 +380,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 91,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -433,11 +393,51 @@
 		],
 		"nationality": "international",
 		"contract": {
-			"status": "second",
-			"priority": "second",
+			"status": "equal",
+			"priority": "equal",
 			"team": "Golden Gladiators",
 			"length_weeks": 208,
 			"salary_m": 8.61,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
+		"name": "Nimri",
+		"team": "Golden Gladiators",
+		"cornering": 20,
+		"braking": 20,
+		"consistency": 19,
+		"smoothness": 20,
+		"control": 14,
+		"balance_preference": 82,
+		"traction_preference": 52,
+		"age": 23,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"tyre_whisperer",
+			"nervous"
+		],
+		"personality": "team_player",
+		"personalities": [
+			"loyal",
+			"team_player",
+			"fragile_ego"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Golden Gladiators",
+			"length_weeks": 52,
+			"salary_m": 8.3,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -460,7 +460,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 53,
+		"talent": 66,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -477,7 +477,7 @@
 			"priority": "equal",
 			"team": "Golden Gladiators",
 			"length_weeks": 104,
-			"salary_m": 8.3,
+			"salary_m": 4.47,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -501,7 +501,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 94,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -518,7 +518,7 @@
 			"priority": "equal",
 			"team": "Last Ride",
 			"length_weeks": 52,
-			"salary_m": 10.13,
+			"salary_m": 13.56,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -541,7 +541,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 92,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -581,7 +581,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 83,
+		"talent": 95,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -598,7 +598,7 @@
 			"priority": "equal",
 			"team": "Last Ride",
 			"length_weeks": 104,
-			"salary_m": 13.56,
+			"salary_m": 10.13,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -622,7 +622,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 98,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -662,7 +662,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 84,
+		"talent": 93,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -702,7 +702,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 73,
+		"talent": 81,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -743,7 +743,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 93,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"pay_driver"
@@ -760,47 +760,7 @@
 			"priority": "equal",
 			"team": "Raging Lunatics",
 			"length_weeks": 156,
-			"salary_m": 5.41,
-			"start_week": 1,
-			"role": "main"
-		}
-	},
-	{
-		"name": "Salvador Mare",
-		"team": "Raging Lunatics",
-		"cornering": 18,
-		"braking": 20,
-		"consistency": 20,
-		"smoothness": 20,
-		"control": 12,
-		"balance_preference": 50,
-		"traction_preference": 59,
-		"age": 29,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 92,
-		"traits": [
-			"mechanic",
-			"nervous"
-		],
-		"personality": "mercenary",
-		"personalities": [
-			"security_seeker",
-			"mercenary",
-			"comeback_artist"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "equal",
-			"priority": "equal",
-			"team": "Raging Lunatics",
-			"length_weeks": 156,
-			"salary_m": 5.79,
+			"salary_m": 10.53,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -823,7 +783,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 90,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -841,6 +801,46 @@
 			"team": "Raging Lunatics",
 			"length_weeks": 104,
 			"salary_m": 10.3,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
+		"name": "Umbrafond",
+		"team": "Raging Lunatics",
+		"cornering": 19,
+		"braking": 20,
+		"consistency": 16,
+		"smoothness": 15,
+		"control": 20,
+		"balance_preference": 44,
+		"traction_preference": 84,
+		"age": 25,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"tyre_whisperer",
+			"nervous"
+		],
+		"personality": "mentor",
+		"personalities": [
+			"loyal",
+			"mentor",
+			"company_man"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Raging Lunatics",
+			"length_weeks": 208,
+			"salary_m": 5.41,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -864,7 +864,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 97,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -881,47 +881,7 @@
 			"priority": "first",
 			"team": "Wrecking Legionnaires",
 			"length_weeks": 104,
-			"salary_m": 6.16,
-			"start_week": 1,
-			"role": "main"
-		}
-	},
-	{
-		"name": "Soulsinger",
-		"team": "Wrecking Legionnaires",
-		"cornering": 16,
-		"braking": 18,
-		"consistency": 16,
-		"smoothness": 16,
-		"control": 3,
-		"balance_preference": 62,
-		"traction_preference": 15,
-		"age": 21,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 67,
-		"traits": [
-			"mechanic",
-			"bottlejob"
-		],
-		"personality": "prestigious",
-		"personalities": [
-			"short_termist",
-			"prestigious",
-			"prima_donna"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "second",
-			"priority": "second",
-			"team": "Wrecking Legionnaires",
-			"length_weeks": 52,
-			"salary_m": 8.85,
+			"salary_m": 9.74,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -944,7 +904,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 66,
+		"talent": 76,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -957,11 +917,51 @@
 		],
 		"nationality": "international",
 		"contract": {
+			"status": "second",
+			"priority": "second",
+			"team": "Wrecking Legionnaires",
+			"length_weeks": 104,
+			"salary_m": 8.85,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
+		"name": "Soulsinger",
+		"team": "Wrecking Legionnaires",
+		"cornering": 16,
+		"braking": 18,
+		"consistency": 16,
+		"smoothness": 16,
+		"control": 3,
+		"balance_preference": 62,
+		"traction_preference": 15,
+		"age": 21,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 76,
+		"traits": [
+			"mechanic",
+			"bottlejob"
+		],
+		"personality": "prestigious",
+		"personalities": [
+			"short_termist",
+			"prestigious",
+			"prima_donna"
+		],
+		"nationality": "international",
+		"contract": {
 			"status": "equal",
 			"priority": "equal",
 			"team": "Wrecking Legionnaires",
-			"length_weeks": 104,
-			"salary_m": 9.74,
+			"length_weeks": 52,
+			"salary_m": 6.16,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -985,7 +985,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 95,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -1025,7 +1025,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 62,
+		"talent": 69,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -1065,7 +1065,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 53,
+		"talent": 64,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -1106,7 +1106,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 94,
+		"talent": 99,
 		"traits": [
 			"rainmaster",
 			"crash_happy"
@@ -1123,7 +1123,7 @@
 			"priority": "first",
 			"team": "Silver Soldiers",
 			"length_weeks": 52,
-			"salary_m": 6.94,
+			"salary_m": 7.45,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1146,7 +1146,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 79,
+		"talent": 90,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -1163,7 +1163,7 @@
 			"priority": "second",
 			"team": "Silver Soldiers",
 			"length_weeks": 104,
-			"salary_m": 7.45,
+			"salary_m": 6.94,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1186,7 +1186,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 67,
+		"talent": 74,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -1227,7 +1227,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 95,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -1244,7 +1244,7 @@
 			"priority": "first",
 			"team": "Black Panthers",
 			"length_weeks": 156,
-			"salary_m": 6.19,
+			"salary_m": 11.14,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1267,7 +1267,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 85,
+		"talent": 95,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -1307,7 +1307,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 76,
+		"talent": 88,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -1324,7 +1324,7 @@
 			"priority": "equal",
 			"team": "Black Panthers",
 			"length_weeks": 52,
-			"salary_m": 11.14,
+			"salary_m": 6.19,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -1348,7 +1348,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 98,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -1388,7 +1388,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 80,
+		"talent": 92,
 		"traits": [
 			"rainmaster",
 			"bottlejob"
@@ -1428,7 +1428,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 80,
+		"talent": 91,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -1469,7 +1469,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 91,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -1492,6 +1492,46 @@
 		}
 	},
 	{
+		"name": "Marin Solis",
+		"team": "Natures Wrath",
+		"cornering": 19,
+		"braking": 20,
+		"consistency": 20,
+		"smoothness": 13,
+		"control": 19,
+		"balance_preference": 43,
+		"traction_preference": 25,
+		"age": 28,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personality": "mentor",
+		"personalities": [
+			"loyal",
+			"mentor",
+			"company_man"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Natures Wrath",
+			"length_weeks": 104,
+			"salary_m": 6.31,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
 		"name": "Frayja Accounting",
 		"team": "Natures Wrath",
 		"cornering": 20,
@@ -1509,7 +1549,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 90,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"pay_driver"
@@ -1526,91 +1566,11 @@
 			"priority": "equal",
 			"team": "Natures Wrath",
 			"length_weeks": 52,
-			"salary_m": 6.31,
-			"start_week": 1,
-			"role": "main"
-		}
-	},
-	{
-		"name": "Raven",
-		"team": "Natures Wrath",
-		"cornering": 20,
-		"braking": 20,
-		"consistency": 7,
-		"smoothness": 20,
-		"control": 13,
-		"balance_preference": 90,
-		"traction_preference": 79,
-		"age": 42,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 89,
-		"traits": [
-			"tyre_whisperer",
-			"bottlejob"
-		],
-		"personality": "mercenary",
-		"personalities": [
-			"short_termist",
-			"mercenary",
-			"quiet_professional"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "equal",
-			"priority": "equal",
-			"team": "Natures Wrath",
-			"length_weeks": 52,
-			"salary_m": 5.84,
+			"salary_m": 5.65,
 			"start_week": 1,
 			"role": "reserve"
 		},
 		"role": "reserve"
-	},
-	{
-		"name": "Eldara",
-		"team": "Death Peaches",
-		"cornering": 20,
-		"braking": 20,
-		"consistency": 20,
-		"smoothness": 20,
-		"control": 8,
-		"balance_preference": 35,
-		"traction_preference": 25,
-		"age": 35,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 93,
-		"traits": [
-			"mechanic",
-			"tyre_abuser"
-		],
-		"personality": "team_player",
-		"personalities": [
-			"loyal",
-			"team_player",
-			"company_man"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "first",
-			"priority": "first",
-			"team": "Death Peaches",
-			"length_weeks": 156,
-			"salary_m": 6.04,
-			"start_week": 1,
-			"role": "main"
-		}
 	},
 	{
 		"name": "Lady Yueqin",
@@ -1630,7 +1590,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 90,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -1643,11 +1603,51 @@
 		],
 		"nationality": "international",
 		"contract": {
-			"status": "second",
-			"priority": "second",
+			"status": "equal",
+			"priority": "equal",
 			"team": "Death Peaches",
 			"length_weeks": 104,
 			"salary_m": 7.76,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
+		"name": "Eldara",
+		"team": "Death Peaches",
+		"cornering": 20,
+		"braking": 20,
+		"consistency": 20,
+		"smoothness": 20,
+		"control": 8,
+		"balance_preference": 35,
+		"traction_preference": 25,
+		"age": 35,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"mechanic",
+			"tyre_abuser"
+		],
+		"personality": "team_player",
+		"personalities": [
+			"loyal",
+			"team_player",
+			"company_man"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Death Peaches",
+			"length_weeks": 156,
+			"salary_m": 6.4,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1670,7 +1670,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 85,
+		"talent": 93,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -1687,7 +1687,7 @@
 			"priority": "equal",
 			"team": "Death Peaches",
 			"length_weeks": 52,
-			"salary_m": 6.4,
+			"salary_m": 6.04,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -1711,7 +1711,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 86,
+		"talent": 98,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -1751,7 +1751,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 78,
+		"talent": 85,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -1768,7 +1768,7 @@
 			"priority": "second",
 			"team": "Wicked Wizards",
 			"length_weeks": 104,
-			"salary_m": 6.91,
+			"salary_m": 7.25,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1791,7 +1791,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 73,
+		"talent": 83,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -1808,51 +1808,11 @@
 			"priority": "equal",
 			"team": "Wicked Wizards",
 			"length_weeks": 104,
-			"salary_m": 7.25,
+			"salary_m": 6.91,
 			"start_week": 1,
 			"role": "reserve"
 		},
 		"role": "reserve"
-	},
-	{
-		"name": "Ashanti",
-		"team": "Vicious & Delicious",
-		"cornering": 20,
-		"braking": 17,
-		"consistency": 17,
-		"smoothness": 20,
-		"control": 14,
-		"balance_preference": 83,
-		"traction_preference": 4,
-		"age": 21,
-		"history": {
-			"seasons": 0,
-			"championships": 0,
-			"wins": 0,
-			"podiums": 0,
-			"poles": 0
-		},
-		"talent": 96,
-		"traits": [
-			"mechanic",
-			"cautious"
-		],
-		"personality": "prestigious",
-		"personalities": [
-			"security_seeker",
-			"prestigious",
-			"prima_donna"
-		],
-		"nationality": "international",
-		"contract": {
-			"status": "first",
-			"priority": "first",
-			"team": "Vicious & Delicious",
-			"length_weeks": 52,
-			"salary_m": 8.12,
-			"start_week": 1,
-			"role": "main"
-		}
 	},
 	{
 		"name": "Ciacia",
@@ -1872,7 +1832,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 93,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -1885,11 +1845,51 @@
 		],
 		"nationality": "international",
 		"contract": {
-			"status": "second",
-			"priority": "second",
+			"status": "equal",
+			"priority": "equal",
 			"team": "Vicious & Delicious",
 			"length_weeks": 104,
-			"salary_m": 5.15,
+			"salary_m": 9.56,
+			"start_week": 1,
+			"role": "main"
+		}
+	},
+	{
+		"name": "Ashanti",
+		"team": "Vicious & Delicious",
+		"cornering": 20,
+		"braking": 17,
+		"consistency": 17,
+		"smoothness": 20,
+		"control": 14,
+		"balance_preference": 83,
+		"traction_preference": 4,
+		"age": 21,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 99,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personality": "prestigious",
+		"personalities": [
+			"security_seeker",
+			"prestigious",
+			"prima_donna"
+		],
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal",
+			"team": "Vicious & Delicious",
+			"length_weeks": 52,
+			"salary_m": 8.12,
 			"start_week": 1,
 			"role": "main"
 		}
@@ -1912,7 +1912,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 88,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -1929,7 +1929,7 @@
 			"priority": "equal",
 			"team": "Vicious & Delicious",
 			"length_weeks": 52,
-			"salary_m": 9.56,
+			"salary_m": 5.15,
 			"start_week": 1,
 			"role": "reserve"
 		},
@@ -1953,7 +1953,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 95,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -1988,7 +1988,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 75,
+		"talent": 84,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2023,7 +2023,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 5,
+		"talent": 9,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2058,7 +2058,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 96,
+		"talent": 99,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2093,7 +2093,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 58,
+		"talent": 67,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -2128,7 +2128,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 51,
+		"talent": 54,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -2163,7 +2163,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 26,
+		"talent": 34,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2198,7 +2198,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 94,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -2233,7 +2233,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 24,
+		"talent": 30,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2268,7 +2268,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 78,
+		"talent": 88,
 		"traits": [
 			"hotlapper",
 			"cautious"
@@ -2303,7 +2303,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 11,
+		"talent": 16,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2338,7 +2338,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 60,
+		"talent": 69,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -2373,7 +2373,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 72,
+		"talent": 79,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2443,7 +2443,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 71,
+		"talent": 75,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2478,7 +2478,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 10,
+		"talent": 14,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2513,7 +2513,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 87,
+		"talent": 99,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -2548,7 +2548,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 5,
+		"talent": 11,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -2583,7 +2583,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 50,
+		"talent": 61,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2618,7 +2618,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 38,
+		"talent": 45,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2653,7 +2653,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 21,
+		"talent": 29,
 		"traits": [
 			"hotlapper",
 			"pay_driver"
@@ -2688,7 +2688,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 28,
+		"talent": 36,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -2723,7 +2723,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 35,
+		"talent": 52,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -2758,7 +2758,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 27,
+		"talent": 32,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -2793,7 +2793,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 74,
+		"talent": 86,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2828,7 +2828,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 86,
+		"talent": 87,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -2863,7 +2863,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 44,
+		"talent": 41,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -2898,7 +2898,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 13,
+		"talent": 18,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -2933,7 +2933,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 31,
+		"talent": 39,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -2968,7 +2968,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 10,
+		"talent": 20,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -3003,7 +3003,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 34,
+		"talent": 42,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -3038,7 +3038,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 49,
+		"talent": 55,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -3073,7 +3073,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 15,
+		"talent": 21,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -3108,7 +3108,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 34,
+		"talent": 42,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3143,7 +3143,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 42,
+		"talent": 50,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3178,7 +3178,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 65,
+		"talent": 74,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -3213,7 +3213,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 68,
+		"talent": 78,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -3248,7 +3248,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 36,
+		"talent": 47,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -3283,7 +3283,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 29,
+		"talent": 37,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -3318,7 +3318,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 77,
+		"talent": 89,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3353,7 +3353,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 18,
+		"talent": 27,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -3388,7 +3388,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 63,
+		"talent": 76,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -3423,7 +3423,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 59,
+		"talent": 66,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -3458,7 +3458,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 40,
+		"talent": 47,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3493,7 +3493,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 75,
+		"talent": 84,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -3528,7 +3528,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 32,
+		"talent": 36,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3563,7 +3563,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 53,
+		"talent": 60,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3598,7 +3598,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 7,
+		"talent": 14,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -3633,7 +3633,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 79,
+		"talent": 92,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -3668,7 +3668,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 12,
+		"talent": 16,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3703,7 +3703,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 11,
+		"talent": 15,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -3738,7 +3738,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 9,
+		"talent": 19,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3773,7 +3773,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 32,
+		"talent": 40,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -3808,7 +3808,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 14,
+		"talent": 21,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3843,7 +3843,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 59,
+		"talent": 66,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3878,7 +3878,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 84,
+		"talent": 91,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3913,7 +3913,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 68,
+		"talent": 78,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -3948,7 +3948,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 30,
+		"talent": 40,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -3983,7 +3983,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 14,
+		"talent": 20,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -4018,7 +4018,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 17,
+		"talent": 25,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4053,7 +4053,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 29,
+		"talent": 36,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -4088,7 +4088,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 74,
+		"talent": 85,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -4123,7 +4123,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 15,
+		"talent": 22,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4158,7 +4158,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 37,
+		"talent": 51,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4193,7 +4193,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 39,
+		"talent": 45,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4228,7 +4228,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 48,
+		"talent": 60,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -4263,7 +4263,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 11,
+		"talent": 19,
 		"traits": [
 			"hotlapper",
 			"cautious"
@@ -4298,7 +4298,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 38,
+		"talent": 48,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4333,7 +4333,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 44,
+		"talent": 49,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -4368,7 +4368,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 50,
+		"talent": 63,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -4403,7 +4403,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 26,
+		"talent": 33,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -4438,7 +4438,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 20,
+		"talent": 28,
 		"traits": [
 			"hotlapper",
 			"pay_driver"
@@ -4473,7 +4473,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 36,
+		"talent": 45,
 		"traits": [
 			"rainmaster",
 			"bottlejob"
@@ -4508,7 +4508,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 8,
+		"talent": 15,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -4543,7 +4543,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 33,
+		"talent": 47,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -4578,7 +4578,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 52,
+		"talent": 64,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -4613,7 +4613,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 30,
+		"talent": 42,
 		"traits": [
 			"rainmaster",
 			"tyre_abuser"
@@ -4648,7 +4648,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 3,
+		"talent": 9,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -4683,7 +4683,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 25,
+		"talent": 33,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -4718,7 +4718,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 59,
+		"talent": 69,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -4753,7 +4753,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 9,
+		"talent": 19,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -4788,7 +4788,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 37,
+		"talent": 47,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -4823,7 +4823,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 21,
+		"talent": 27,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -4858,7 +4858,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 87,
+		"talent": 96,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -4893,7 +4893,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 57,
+		"talent": 65,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -4928,7 +4928,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 16,
+		"talent": 23,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -4963,7 +4963,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 34,
+		"talent": 36,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -4998,7 +4998,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 68,
+		"talent": 75,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -5033,7 +5033,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 70,
+		"talent": 77,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5068,7 +5068,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 20,
+		"talent": 28,
 		"traits": [
 			"hotlapper",
 			"pay_driver"
@@ -5103,7 +5103,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 73,
+		"talent": 86,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -5138,7 +5138,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 3,
+		"talent": 10,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -5173,7 +5173,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 43,
+		"talent": 44,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -5208,7 +5208,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 57,
+		"talent": 66,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5243,7 +5243,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 68,
+		"talent": 78,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5278,7 +5278,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 9,
+		"talent": 18,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5313,7 +5313,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 6,
+		"talent": 13,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -5348,7 +5348,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 64,
+		"talent": 79,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -5383,7 +5383,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 2,
+		"talent": 8,
 		"traits": [
 			"mechanic",
 			"pay_driver"
@@ -5418,7 +5418,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 54,
+		"talent": 66,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -5453,7 +5453,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 45,
+		"talent": 55,
 		"traits": [
 			"rainmaster",
 			"crash_happy"
@@ -5488,7 +5488,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 46,
+		"talent": 53,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -5523,7 +5523,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 70,
+		"talent": 80,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -5558,7 +5558,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 86,
+		"talent": 95,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -5593,7 +5593,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 41,
+		"talent": 51,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5628,7 +5628,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 56,
+		"talent": 64,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -5663,7 +5663,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 62,
+		"talent": 70,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5698,7 +5698,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 56,
+		"talent": 62,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5733,7 +5733,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 25,
+		"talent": 31,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -5768,7 +5768,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 41,
+		"talent": 38,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -5803,7 +5803,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 92,
+		"talent": 99,
 		"traits": [
 			"rainmaster",
 			"cautious"
@@ -5838,7 +5838,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 44,
+		"talent": 54,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -5873,7 +5873,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 89,
+		"talent": 98,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -5908,7 +5908,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 55,
+		"talent": 61,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -5943,7 +5943,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 58,
+		"talent": 64,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -5978,7 +5978,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 60,
+		"talent": 64,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -6013,7 +6013,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 17,
+		"talent": 19,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -6048,7 +6048,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 69,
+		"talent": 73,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -6083,7 +6083,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 6,
+		"talent": 13,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -6118,7 +6118,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 76,
+		"talent": 86,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6153,7 +6153,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 1,
+		"talent": 7,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -6188,7 +6188,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 66,
+		"talent": 75,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -6223,7 +6223,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 4,
+		"talent": 9,
 		"traits": [
 			"mechanic",
 			"pay_driver"
@@ -6258,7 +6258,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 62,
+		"talent": 66,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -6293,7 +6293,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 45,
+		"talent": 53,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6328,7 +6328,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 78,
+		"talent": 82,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6346,16 +6346,16 @@
 		}
 	},
 	{
-		"name": "Marin Solis",
+		"name": "Raven",
 		"team": null,
-		"cornering": 19,
+		"cornering": 20,
 		"braking": 20,
-		"consistency": 20,
-		"smoothness": 13,
-		"control": 19,
-		"balance_preference": 43,
-		"traction_preference": 25,
-		"age": 28,
+		"consistency": 7,
+		"smoothness": 20,
+		"control": 13,
+		"balance_preference": 90,
+		"traction_preference": 79,
+		"age": 42,
 		"history": {
 			"seasons": 0,
 			"championships": 0,
@@ -6363,16 +6363,16 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 89,
+		"talent": 98,
 		"traits": [
-			"mechanic",
-			"nervous"
+			"tyre_whisperer",
+			"bottlejob"
 		],
-		"personality": "mentor",
+		"personality": "mercenary",
 		"personalities": [
-			"loyal",
-			"mentor",
-			"company_man"
+			"short_termist",
+			"mercenary",
+			"quiet_professional"
 		],
 		"nationality": "international",
 		"contract": {
@@ -6398,7 +6398,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 23,
+		"talent": 32,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6433,7 +6433,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 39,
+		"talent": 40,
 		"traits": [
 			"rainmaster",
 			"cautious"
@@ -6468,7 +6468,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 83,
+		"talent": 92,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -6503,7 +6503,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 44,
+		"talent": 39,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6538,7 +6538,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 65,
+		"talent": 75,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -6573,7 +6573,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 26,
+		"talent": 28,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -6608,7 +6608,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 11,
+		"talent": 18,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -6643,7 +6643,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 92,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -6678,7 +6678,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 50,
+		"talent": 58,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -6713,7 +6713,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 89,
+		"talent": 97,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -6748,7 +6748,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 38,
+		"talent": 42,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -6783,7 +6783,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 88,
+		"talent": 98,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -6818,7 +6818,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 69,
+		"talent": 74,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -6853,7 +6853,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 2,
+		"talent": 8,
 		"traits": [
 			"rainmaster",
 			"bottlejob"
@@ -6888,7 +6888,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 47,
+		"talent": 54,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -6923,7 +6923,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 64,
+		"talent": 71,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -6993,7 +6993,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 53,
+		"talent": 61,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -7028,7 +7028,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 69,
+		"talent": 77,
 		"traits": [
 			"rainmaster",
 			"pay_driver"
@@ -7063,7 +7063,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 41,
+		"talent": 55,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -7098,7 +7098,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 2,
+		"talent": 8,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -7133,7 +7133,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 24,
+		"talent": 27,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7168,7 +7168,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 96,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -7203,7 +7203,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 81,
+		"talent": 92,
 		"traits": [
 			"rainmaster",
 			"nervous"
@@ -7238,7 +7238,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 61,
+		"talent": 70,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -7273,7 +7273,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 23,
+		"talent": 28,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -7308,7 +7308,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 31,
+		"talent": 43,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7343,7 +7343,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 15,
+		"talent": 18,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -7378,7 +7378,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 47,
+		"talent": 57,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -7413,7 +7413,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 58,
+		"talent": 70,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -7448,7 +7448,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 74,
+		"talent": 82,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7483,7 +7483,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 51,
+		"talent": 59,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -7518,7 +7518,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 67,
+		"talent": 74,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -7536,16 +7536,16 @@
 		}
 	},
 	{
-		"name": "Umbrafond",
+		"name": "Salvador Mare",
 		"team": null,
-		"cornering": 19,
+		"cornering": 18,
 		"braking": 20,
-		"consistency": 16,
-		"smoothness": 15,
-		"control": 20,
-		"balance_preference": 44,
-		"traction_preference": 84,
-		"age": 25,
+		"consistency": 20,
+		"smoothness": 20,
+		"control": 12,
+		"balance_preference": 50,
+		"traction_preference": 59,
+		"age": 29,
 		"history": {
 			"seasons": 0,
 			"championships": 0,
@@ -7553,16 +7553,16 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 88,
+		"talent": 99,
 		"traits": [
-			"tyre_whisperer",
+			"mechanic",
 			"nervous"
 		],
-		"personality": "mentor",
+		"personality": "mercenary",
 		"personalities": [
-			"loyal",
-			"mentor",
-			"company_man"
+			"security_seeker",
+			"mercenary",
+			"comeback_artist"
 		],
 		"nationality": "international",
 		"contract": {
@@ -7588,7 +7588,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 83,
+		"talent": 93,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -7623,7 +7623,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 61,
+		"talent": 72,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -7658,7 +7658,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 8,
+		"talent": 16,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -7693,7 +7693,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 54,
+		"talent": 65,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7728,7 +7728,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 77,
+		"talent": 86,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -7763,7 +7763,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 20,
+		"talent": 24,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7798,7 +7798,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 35,
+		"talent": 42,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -7833,7 +7833,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 40,
+		"talent": 46,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -7868,7 +7868,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 23,
+		"talent": 30,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -7903,7 +7903,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 82,
+		"talent": 90,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -7938,7 +7938,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 98,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -7973,7 +7973,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 65,
+		"talent": 78,
 		"traits": [
 			"overtake_artist",
 			"pay_driver"
@@ -8008,7 +8008,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 81,
+		"talent": 92,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -8043,7 +8043,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 64,
+		"talent": 71,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -8078,7 +8078,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 7,
+		"talent": 10,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -8113,7 +8113,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 35,
+		"talent": 39,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -8148,7 +8148,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 2,
+		"talent": 7,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8183,7 +8183,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 72,
+		"talent": 76,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -8218,7 +8218,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 57,
+		"talent": 69,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -8253,7 +8253,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 32,
+		"talent": 43,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -8288,7 +8288,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 23,
+		"talent": 32,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -8323,7 +8323,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 5,
+		"talent": 12,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -8358,7 +8358,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 18,
+		"talent": 26,
 		"traits": [
 			"hotlapper",
 			"bottlejob"
@@ -8393,7 +8393,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 55,
+		"talent": 66,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -8428,7 +8428,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 42,
+		"talent": 43,
 		"traits": [
 			"rainmaster",
 			"nervous"
@@ -8463,7 +8463,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 47,
+		"talent": 56,
 		"traits": [
 			"rainmaster",
 			"nervous"
@@ -8498,7 +8498,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 55,
+		"talent": 60,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -8533,7 +8533,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 63,
+		"talent": 68,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -8568,7 +8568,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 82,
+		"talent": 92,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8603,7 +8603,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 71,
+		"talent": 78,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -8638,7 +8638,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 61,
+		"talent": 69,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8673,7 +8673,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 19,
+		"talent": 25,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8708,7 +8708,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 33,
+		"talent": 45,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -8743,7 +8743,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 33,
+		"talent": 39,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -8778,7 +8778,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 20,
+		"talent": 29,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -8813,7 +8813,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 59,
+		"talent": 64,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8848,7 +8848,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 71,
+		"talent": 84,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8883,7 +8883,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 16,
+		"talent": 22,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -8918,7 +8918,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 45,
+		"talent": 56,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -8953,7 +8953,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 65,
+		"talent": 72,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -8988,7 +8988,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 13,
+		"talent": 22,
 		"traits": [
 			"overtake_artist",
 			"pay_driver"
@@ -9023,7 +9023,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 12,
+		"talent": 17,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -9058,7 +9058,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 38,
+		"talent": 50,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -9093,7 +9093,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 6,
+		"talent": 12,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -9128,7 +9128,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 51,
+		"talent": 57,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -9163,7 +9163,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 42,
+		"talent": 54,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -9198,7 +9198,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 91,
+		"talent": 99,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -9233,7 +9233,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 16,
+		"talent": 20,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -9268,7 +9268,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 43,
+		"talent": 49,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -9303,7 +9303,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 82,
+		"talent": 91,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -9338,7 +9338,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 26,
+		"talent": 34,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -9373,7 +9373,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 48,
+		"talent": 58,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -9408,7 +9408,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 62,
+		"talent": 72,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -9443,7 +9443,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 79,
+		"talent": 88,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -9478,7 +9478,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 47,
+		"talent": 55,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -9513,7 +9513,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 12,
+		"talent": 20,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -9548,7 +9548,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 77,
+		"talent": 88,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -9583,7 +9583,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 14,
+		"talent": 21,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -9618,7 +9618,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 48,
+		"talent": 49,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -9653,7 +9653,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 4,
+		"talent": 10,
 		"traits": [
 			"mechanic",
 			"pay_driver"
@@ -9688,7 +9688,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 85,
+		"talent": 90,
 		"traits": [
 			"rainmaster",
 			"cautious"
@@ -9723,7 +9723,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 14,
+		"talent": 17,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -9758,7 +9758,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 81,
+		"talent": 89,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -9793,7 +9793,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 46,
+		"talent": 57,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -9828,7 +9828,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 56,
+		"talent": 65,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -9863,7 +9863,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 39,
+		"talent": 43,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -9898,7 +9898,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 1,
+		"talent": 6,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -9933,7 +9933,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 72,
+		"talent": 76,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -9968,7 +9968,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 10,
+		"talent": 17,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -10003,7 +10003,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 50,
+		"talent": 56,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -10038,7 +10038,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 30,
+		"talent": 35,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10073,7 +10073,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 86,
+		"talent": 94,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -10108,7 +10108,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 76,
+		"talent": 83,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10143,7 +10143,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 80,
+		"talent": 92,
 		"traits": [
 			"hotlapper",
 			"nervous"
@@ -10178,7 +10178,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 70,
+		"talent": 81,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -10213,7 +10213,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 4,
+		"talent": 10,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -10248,7 +10248,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 7,
+		"talent": 11,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -10283,7 +10283,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 83,
+		"talent": 85,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -10318,7 +10318,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 13,
+		"talent": 21,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -10353,7 +10353,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 54,
+		"talent": 65,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -10388,7 +10388,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 75,
+		"talent": 84,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10423,7 +10423,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 8,
+		"talent": 16,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -10458,7 +10458,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 35,
+		"talent": 43,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -10493,7 +10493,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 74,
+		"talent": 86,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -10528,7 +10528,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 24,
+		"talent": 32,
 		"traits": [
 			"rainmaster",
 			"cautious"
@@ -10563,7 +10563,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 21,
+		"talent": 27,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -10598,7 +10598,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 52,
+		"talent": 59,
 		"traits": [
 			"hotlapper",
 			"crash_happy"
@@ -10633,7 +10633,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 22,
+		"talent": 29,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -10668,7 +10668,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 41,
+		"talent": 51,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10703,7 +10703,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 49,
+		"talent": 58,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -10738,7 +10738,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 27,
+		"talent": 31,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -10773,7 +10773,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 19,
+		"talent": 26,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -10808,7 +10808,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 22,
+		"talent": 31,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10843,7 +10843,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 5,
+		"talent": 11,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -10878,7 +10878,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 8,
+		"talent": 11,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -10913,7 +10913,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 25,
+		"talent": 34,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -10948,7 +10948,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 19,
+		"talent": 25,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -10983,7 +10983,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 22,
+		"talent": 29,
 		"traits": [
 			"mechanic",
 			"cautious"
@@ -11018,7 +11018,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 3,
+		"talent": 9,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -11053,7 +11053,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 49,
+		"talent": 61,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -11088,7 +11088,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 43,
+		"talent": 50,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -11123,7 +11123,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 56,
+		"talent": 70,
 		"traits": [
 			"mechanic",
 			"pay_driver"
@@ -11158,7 +11158,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 17,
+		"talent": 25,
 		"traits": [
 			"tyre_whisperer",
 			"tyre_abuser"
@@ -11193,7 +11193,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 29,
+		"talent": 40,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -11228,7 +11228,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 17,
+		"talent": 24,
 		"traits": [
 			"rainmaster",
 			"bottlejob"
@@ -11263,7 +11263,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 60,
+		"talent": 73,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -11298,7 +11298,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 71,
+		"talent": 80,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -11333,7 +11333,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 40,
+		"talent": 49,
 		"traits": [
 			"rainmaster",
 			"tyre_abuser"
@@ -11368,7 +11368,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 66,
+		"talent": 75,
 		"traits": [
 			"tyre_whisperer",
 			"crash_happy"
@@ -11403,7 +11403,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 32,
+		"talent": 40,
 		"traits": [
 			"mechanic",
 			"crash_happy"
@@ -11438,7 +11438,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 52,
+		"talent": 61,
 		"traits": [
 			"mechanic",
 			"nervous"
@@ -11473,7 +11473,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 46,
+		"talent": 51,
 		"traits": [
 			"tyre_whisperer",
 			"cautious"
@@ -11508,7 +11508,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 29,
+		"talent": 36,
 		"traits": [
 			"hotlapper",
 			"tyre_abuser"
@@ -11543,7 +11543,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 63,
+		"talent": 73,
 		"traits": [
 			"tyre_whisperer",
 			"pay_driver"
@@ -11578,7 +11578,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 28,
+		"talent": 34,
 		"traits": [
 			"mechanic",
 			"tyre_abuser"
@@ -11613,7 +11613,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 36,
+		"talent": 46,
 		"traits": [
 			"mechanic",
 			"bottlejob"
@@ -11648,7 +11648,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 31,
+		"talent": 35,
 		"traits": [
 			"tyre_whisperer",
 			"nervous"
@@ -11683,7 +11683,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 27,
+		"talent": 39,
 		"traits": [
 			"tyre_whisperer",
 			"bottlejob"
@@ -11718,7 +11718,7 @@
 			"podiums": 0,
 			"poles": 0
 		},
-		"talent": 37,
+		"talent": 52,
 		"traits": [
 			"mechanic",
 			"nervous"
