@@ -1,6 +1,6 @@
 {
 	"saveId": "new-game-1787123325719-swnjlk",
-	"generatedAt": "2026-09-05T07:12:28.047Z",
+	"generatedAt": "2026-09-05T07:17:58.413Z",
 	"teams": [
 		{
 			"teamId": "M-M",
@@ -80,6 +80,86 @@
 		{
 			"teamId": "V-D",
 			"budget": 250,
+			"chassisTemplateBorrowedFrom": "Minardi"
+		},
+		{
+			"teamId": "M-S",
+			"budget": 245,
+			"chassisTemplateBorrowedFrom": "McLaren"
+		},
+		{
+			"teamId": "D-L",
+			"budget": 195,
+			"chassisTemplateBorrowedFrom": "Ferrari"
+		},
+		{
+			"teamId": "U-A",
+			"budget": 190,
+			"chassisTemplateBorrowedFrom": "Porsche"
+		},
+		{
+			"teamId": "V-W",
+			"budget": 180,
+			"chassisTemplateBorrowedFrom": "Jordan"
+		},
+		{
+			"teamId": "L-K",
+			"budget": 225,
+			"chassisTemplateBorrowedFrom": "Toyota"
+		},
+		{
+			"teamId": "S-C",
+			"budget": 205,
+			"chassisTemplateBorrowedFrom": "Stewart"
+		},
+		{
+			"teamId": "P-C",
+			"budget": 200,
+			"chassisTemplateBorrowedFrom": "Lotus"
+		},
+		{
+			"teamId": "T-C",
+			"budget": 210,
+			"chassisTemplateBorrowedFrom": "Winfield Williams"
+		},
+		{
+			"teamId": "V-V",
+			"budget": 235,
+			"chassisTemplateBorrowedFrom": "Winfield Williams"
+		},
+		{
+			"teamId": "C-C",
+			"budget": 215,
+			"chassisTemplateBorrowedFrom": "Benetton"
+		},
+		{
+			"teamId": "R-R",
+			"budget": 170,
+			"chassisTemplateBorrowedFrom": "Prost"
+		},
+		{
+			"teamId": "T-T",
+			"budget": 260,
+			"chassisTemplateBorrowedFrom": "Super Aguri"
+		},
+		{
+			"teamId": "R-C",
+			"budget": 220,
+			"chassisTemplateBorrowedFrom": "British American Racing"
+		},
+		{
+			"teamId": "T-G",
+			"budget": 230,
+			"chassisTemplateBorrowedFrom": "Sauber"
+		},
+		{
+			"teamId": "B-B",
+			"budget": 185,
+			"chassisTemplateBorrowedFrom": "Repsol Arrows"
+		},
+		{
+			"teamId": "A-A",
+			"budget": 175,
 			"chassisTemplateBorrowedFrom": "Minardi"
 		}
 	],

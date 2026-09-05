@@ -4,10 +4,13 @@
 // Chris will seine Olympiade-Teams/Charaktere in der 1999er-Mod von "Team Principal"
 // spielen. Entscheidung mit Chris (05.09.): 16 von ihm benannte Oly-Teams ersetzen das
 // reale 1999er-Grid komplett und bilden das F1-Feld, in GENAU der Staerke-Reihenfolge, die
-// er vorgegeben hat (Index 0 = staerkstes Team). Die uebrigen 16 Oly-Teams liefern keine
-// Teams (Junior-Teams steigen in dieser Mod nicht als Team auf, s. unten), aber ALLE ihre
-// Spieler kommen als Free Agents mit rein -- Chris wollte zum Testen die komplette
-// Save-Besetzung sehen, nicht nur 48 vorbelegte Cockpits.
+// er vorgegeben hat (Index 0 = staerkstes Team). ALLE 32 Oly-Teams landen in teams.json --
+// die uebrigen 16 als "active: false" mit first_active_season (koennen laut Chris spaeter
+// dazustossen, genau das Muster, das die Mod selbst fuer Porsche/Toyota/Lotus/Super Aguri im
+// echten 1999er-Feld nutzt). Sie haben noch keinen eigenen Kader (Junior-Teams steigen in
+// dieser Mod nicht als Team auf, s. unten) -- ALLE ihre Spieler kommen trotzdem als Free
+// Agents mit rein, Chris wollte zum Testen die komplette Save-Besetzung sehen, nicht nur 48
+// vorbelegte Cockpits.
 //
 // Woher die Zahlen kommen:
 //
@@ -459,15 +462,68 @@ function buildF1Team(oly, rank, fieldSize, colors) {
   };
 }
 
-async function exportLogos(f1Teams, outDir) {
+// Die uebrigen 16 Oly-Teams (Chris, 05.09.: "moechte dass du die restlichen 16 Teams auch
+// einbaust, allerdings sind die dann inactive... aber koennen spaeter dazu stossen"). Genau
+// das Muster, das die Mod selbst fuer Porsche/Toyota/Lotus/Super Aguri im echten 1999er-Feld
+// nutzt: active:false + first_active_season, budget_m statt starting_balance_m, kein
+// previous_constructor_position/difficulty, tyre_contract ohne start/expires_season (noch
+// kein laufender Reifenvertrag). Chris hat fuer diese 16 keine Reihenfolge vorgegeben, daher
+// hier die einzige Stelle, an der wieder Olys eigene Prestige-Formel ueber die Chassis-Staerke
+// entscheidet -- unter sich selbst gerankt, nicht gegen die F1-Teams.
+function buildInactiveTeam(oly, rank, fieldSize, colors, firstActiveSeason) {
+  const percentile = fieldSize > 1 ? rank / (fieldSize - 1) : 0;
+  const template = interpolateChassis(percentile);
+  const prestige = computeTeamPrestige(oly.identity);
+  return {
+    name: oly.team.name,
+    active: false,
+    first_active_season: firstActiveSeason,
+    color_rgb: colors.primary,
+    secondary_color_rgb: colors.secondary || colors.primary,
+    heritage_prestige: prestige.heritage,
+    form_prestige: prestige.form,
+    prestige_base: prestige.base,
+    // Olys "budget"-Feld liegt ueber alle 32 Teams zwischen 170 und 325 -- praktisch
+    // dieselbe Groessenordnung wie die budget_m-Werte der echten inaktiven Zukunftsteams
+    // (Porsche 350, Toyota 400, Lotus 200, Super Aguri 140). Deshalb unskaliert uebernommen,
+    // anders als starting_balance_m oben (das ist Olys "cash", die laufende Kriegskasse
+    // eines bereits aktiven Teams -- ein anderer Wert mit anderer Bedeutung).
+    budget_m: oly.team.budget,
+    headquarters: sameLevelHeadquarters(oly.identity),
+    performance_scale: 'rating_100',
+    car_mass_kg: template.car_mass_kg,
+    braking: template.braking,
+    acceleration: template.acceleration,
+    team_pace: template.team_pace,
+    attr: template.attr,
+    tyre_management: template.tyre_management,
+    dirty_air_sensitivity: template.dirty_air_sensitivity,
+    chassis_reliability: template.chassis_reliability,
+    aero_efficiency: template.aero_efficiency,
+    chassis_starting_potential: template.chassis_starting_potential,
+    tyre_contract: { supplier: template.tyre_contract.supplier, type: template.tyre_contract.type },
+    engine: template.engine,
+    engine_supplier: template.engine_supplier,
+    engine_contract_type: template.engine_contract_type,
+    engine_contract_seasons: template.engine_contract_seasons,
+    engine_contract_bonus: template.engine_contract_bonus,
+    driver_aids: template.driver_aids,
+    driver_focus: template.driver_focus,
+    history: { seasons: 0, championships: 0, wins: 0, podiums: 0, poles: 0 },
+    nationality: 'international',
+    _oly: { teamId: oly.team.teamId, budget: oly.team.budget, chassisTemplateBorrowedFrom: template.name },
+  };
+}
+
+async function exportLogos(allTeams, outDir) {
   const logosDir = path.join(outDir, 'logos');
   mkdirSync(logosDir, { recursive: true });
   const results = [];
-  for (const oly of f1Teams) {
+  for (const oly of allTeams) {
     const src = path.join(TEAM_LOGOS_DIR, `${oly.team.shortCode}.jpg`);
     const dest = path.join(logosDir, `${oly.team.name}.png`);
     try {
-      await sharp(src).png().toFile(dest);
+      await sharp(src).png({ quality: 80, palette: true }).toFile(dest);
       results.push({ team: oly.team.name, logo: dest, ok: true });
     } catch (err) {
       results.push({ team: oly.team.name, logo: null, ok: false, error: String(err.message || err) });
@@ -502,7 +558,7 @@ async function exportPortraits(entries, outDir) {
       suffix++;
     }
     try {
-      await sharp(src).png().toFile(path.join(dir, filename));
+      await sharp(src).png({ quality: 80, palette: true }).toFile(path.join(dir, filename));
       usedNames.add(filename);
       ok++;
     } catch {
@@ -552,8 +608,16 @@ async function main() {
   const f1Teams = F1_TEAM_NAMES.map((name) => teamsByName.get(name)).filter(Boolean);
 
   console.log(`Formula 1 (${f1Teams.length} Teams, in Chris' vorgegebener Staerke-Reihenfolge): ${f1Teams.map((t) => t.team.name).join(', ')}`);
-  const nonF1 = teams.filter((t) => !F1_TEAM_NAMES.includes(t.team.name));
-  console.log(`Kein eigenes Team, Spieler werden Free Agents (${nonF1.length}): ${nonF1.map((t) => t.team.name).join(', ')}`);
+  // Chris (05.09.): die restlichen 16 Teams auch einbauen, aber als "active: false" --
+  // koennen laut Mod-Konvention (first_active_season, s. Porsche/Toyota/Lotus/Super Aguri
+  // im echten 1999er-Feld) spaeter dazustossen. Untereinander nach Olys eigener Prestige
+  // gerankt (Chris hat fuer diese 16 keine Reihenfolge vorgegeben), gestaffelt ab Saison 3,
+  // zwei neue Teams pro Saison -- die staerksten zuerst.
+  const inactiveTeams = teams
+    .filter((t) => !F1_TEAM_NAMES.includes(t.team.name))
+    .map((t) => ({ ...t, prestige: computeTeamPrestige(t.identity) }))
+    .sort((a, b) => b.prestige.base - a.prestige.base);
+  console.log(`Inaktiv, koennen spaeter dazustossen (${inactiveTeams.length}): ${inactiveTeams.map((t) => t.team.name).join(', ')}`);
 
   // Chris will ALLE im Save eingesetzten (gerosterten) Charaktere sehen, nicht nur 48
   // vorbelegte Cockpits -- also erst der GESAMTE Pool ueber alle 32 Teams, danach je Team
@@ -614,6 +678,14 @@ async function main() {
     });
   });
 
+  inactiveTeams.forEach((oly, rank) => {
+    const colors = resolveTeamColors(colorMap, oly.team.shortCode);
+    const firstActiveSeason = 3 + Math.floor(rank / 2);
+    teamsJson.push(buildInactiveTeam(oly, rank, inactiveTeams.length, colors, firstActiveSeason));
+    // Kein Kader: ein inaktives Team hat noch keine Fahrer unter Vertrag (wie im Vorbild
+    // Porsche/Toyota/Lotus/Super Aguri). Die Spieler dieser Teams bleiben Free Agents.
+  });
+
   for (const entry of allEntries) {
     if (assignedPlayerIds.has(entry.player.id)) continue;
     driversJson.push(mapPlayerToDriver(entry.player, entry.raw, scalers, 'Free Agent', null));
@@ -622,7 +694,7 @@ async function main() {
   const talents = driversJson.map((d) => d.talent).sort((a, b) => a - b);
   console.log(`Talent-Spanne: ${talents[0]} - ${talents[talents.length - 1]} (Median ${talents[Math.floor(talents.length / 2)]})`);
 
-  const logoResults = await exportLogos(f1Teams, outDir);
+  const logoResults = await exportLogos([...f1Teams, ...inactiveTeams], outDir);
   const failedLogos = logoResults.filter((r) => !r.ok);
   if (failedLogos.length > 0) {
     console.warn(`WARNUNG: Logo-Konvertierung fehlgeschlagen fuer: ${failedLogos.map((r) => `${r.team} (${r.error})`).join(', ')}`);
@@ -645,7 +717,7 @@ async function main() {
 
   console.log(`\n${teamsJson.length} Teams -> ${path.join(outDir, 'teams.json')}`);
   console.log(`${driversJson.length} Fahrer (main+reserve+free_agent) -> ${path.join(outDir, 'drivers.json')}`);
-  console.log(`${logoResults.filter((r) => r.ok).length}/${f1Teams.length} Logos -> ${path.join(outDir, 'logos')}/*.png (Car-PNG-Slot bleibt leer, kein Oly-Aequivalent)`);
+  console.log(`${logoResults.filter((r) => r.ok).length}/${f1Teams.length + inactiveTeams.length} Logos -> ${path.join(outDir, 'logos')}/*.png (Car-PNG-Slot bleibt leer, kein Oly-Aequivalent)`);
   console.log(`${portraitResults.ok}/${portraitResults.total} Fahrer-Portraits -> ${path.join(outDir, 'portraits')}/*.png (${portraitResults.missing} ohne Bild in ${PLAYER_PORTRAITS_DIR})`);
 }
 
