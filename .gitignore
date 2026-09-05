@@ -23,6 +23,13 @@ outputs/
 reports/
 backups/
 
+# scripts/export-team-principal-mod.mjs erzeugt Team-Logo-/Fahrer-Portrait-PNGs neben
+# teams.json/drivers.json -- die JSONs bleiben versioniert, aber hunderte Bilddateien
+# (~130 MB) gehoeren nicht ins Git (s. CLAUDE.md "Deploy": genau dieses Bloat-Problem
+# hat den Server schon einmal per vollem Root-Volume lahmgelegt).
+data/generated/team-principal-mod/logos/
+data/generated/team-principal-mod/portraits/
+
 # local databases / saves
 *.sqlite
 *.sqlite3
