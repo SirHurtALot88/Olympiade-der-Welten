@@ -14603,12 +14603,18 @@
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Abschnittstempo",TECHNIK:"Wechsel",
             WENDIGKEIT:"Bahnarbeit",STEHEN:"Stehvermögen",WUCHT:"Zug an der Spitze",
             ROBUST:"Verlässlichkeit"},
+      // K2 (staffel-modellierung-recherche-05-09.md, Teil 3.2): die Plaene bestraften
+      // Beine 1/2/4/5 mit 4,6-6,1% weniger Tempo, ohne dass es je etwas zu sparen gab
+      // (Restreserve am Beinende median 88%, s. Bericht Teil 1.2) — ein reiner Bein-Bias
+      // durch `planJeSlot`. Alle drei Plaene laufen jetzt mit vollem Tempo; `sucht`/`ab`
+      // bleiben unveraendert (Windschatten/Rempler-Verhalten, hier ohnehin ohne Tackle).
+      // Gemessen zusammen mit K1: Spannweite 0,212 -> 0,140, Validitaet 0,888 -> 0,944.
       plaene:{
-        halten:  {label:"Halten",     tempo:0.94, sucht:0.75, ab:0.72,
+        halten:  {label:"Halten",     tempo:1.00, sucht:0.75, ab:0.72,
                   text:"Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt."},
         angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.60,
                   text:"Geht seinen Abschnitt von vorn an und legt vor."},
-        schluss: {label:"Schlussmann",tempo:0.90, sucht:0.85, ab:0.55,
+        schluss: {label:"Schlussmann",tempo:1.00, sucht:0.85, ab:0.55,
                   text:"Hängt sich an und wirft alles auf das letzte Stück."}
       },
       planJeSlot:{startrunner:"angehen", tempolink:"halten", batontech:"halten",
@@ -14791,6 +14797,18 @@
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,d,true),d);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,d,false),d);
       const w=spurtWerte(p,attr);
+      // STAFFEL: MENGE AUS DER EIGNUNG, FORM AUS DEM REZEPT (wie aufEignung in der Arena).
+      // Uebertragen aus docs/design/staffel-modellierung-recherche-05-09.md, Teil 3.1 (K1):
+      // gemessen an Kopien kaderfest 0,681 -> 0,858 (rho je Spiel), NUR fuer die Staffel
+      // gegated (art.staffel) — Spurt/Zeitfahren behalten ihre alte Kopplung "Rezept gibt
+      // Form UND Menge, Eignung nur Anzeige" unveraendert, das ist eine offene Frage an
+      // Chris (Bericht Teil 6, Frage 1), nicht Teil dieser Aenderung.
+      if(art.staffel){
+        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d);
+        const m=0.73*w.ANTRITT+0.27*w.ENDTEMPO;      // die effektive Tempoformel eines 1,7-s-Beins
+        const f=m>0?eigW/m:1;
+        for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
+      }
       const P=BA().plaene, JS=BA().planJeSlot;
       const planId=(sl&&JS[sl])||Object.keys(P)[1]||Object.keys(P)[0];
       const L={id:id++,n:p.n,seite,bahn,...w,
@@ -14911,7 +14929,11 @@
   const WECHSEL_MAX=0.42;          // Verlust bei Koennen 0
   const WECHSEL_K=0.0036;          // wieviel je Punkt Koennen zurueckkommt
   const WECHSEL_MIN=0.04;          // schneller als das geht kein Wechsel
-  const WECHSEL_PATZER=0.22;       // Grundchance auf einen echten Patzer
+  // K3 (staffel-modellierung-recherche-05-09.md, Teil 3.3): halbiert. 0,22 traf real
+  // ~9% der Wechsel als Patzer; real fallen ~21% der Teams je Rennen aus (~4,5-4,6% je
+  // Wechsel bei fuenf Wechseln) — 0,11 liegt in dieser Groessenordnung. Gemessen (E2b+PATZ):
+  // rho je Spiel 0,906, kostet nichts an anderer Stelle.
+  const WECHSEL_PATZER=0.11;       // Grundchance auf einen echten Patzer
   const WECHSEL_PATZER_K=0.0020;   // wieviel Koennen sie senkt
   const WECHSEL_PATZER_KOSTEN=0.9; // was ein Patzer obendrauf kostet
   const WECHSEL_ROBUST_K=0.0012;   // wieviel Verlaesslichkeit die Patzerchance senkt
