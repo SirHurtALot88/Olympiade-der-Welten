@@ -2,12 +2,20 @@
  * Exportiert alle Spieler eines Saves als CSV fuer den FM-Bulk-Import (z.B. via "FM26 Generator").
  * Uebersetzt die 12 Oly-Attribute (1-99) auf die FM-Skala (1-20) und weist jedem Spieler
  * eine Feldposition zu (Heuristik aus coreStats + attributeSheetStats, da es in Oly keine
- * echten Positionen gibt). Alter und Nationalitaet sind synthetisch (siehe CLAUDE.md-Notiz
- * an den Nutzer: Oly hat weder Geburtsdatum noch Nation).
+ * echten Positionen gibt).
+ *
+ * CA/PA (1-200, FM-Skala) kommen aus Olys eigenem Rating bzw. dem echten Potenzial-Modell
+ * (resolvePlayerPotentialScoreFromGameState -> gameState.playerPotential[].hiddenPotentialScore,
+ * NICHT das veraltete player.potential-Feld, siehe Kommentar an olyDataTypes.ts:1079). PA wird auf
+ * mindestens CA geklemmt (FM erlaubt CA nie > PA). Alter ist synthetisch (Oly kennt kein
+ * Geburtsdatum), aber an die CA/PA-Luecke gekoppelt: viel Potenzial-Puffer -> jung, kaum Puffer
+ * -> nah an 30. Deckel bei 30, damit niemand nach der ersten Saison in Rente geht. Nationalitaet
+ * ist ein reiner Platzhalter (Oly kennt keine Nation).
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-fm.ts --save-id <id> --out <pfad.csv>
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { writeFileSync } from "fs";
 
 function arg(flag: string): string | null {
@@ -22,6 +30,12 @@ function scale20(v: number | null | undefined): number {
 function avg(...vals: Array<number | null | undefined>): number {
   const nums = vals.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 50;
+}
+
+// Oly-Skala (0-99, teils leicht drueber) -> FM CA/PA-Skala (1-200)
+function scale200(v: number | null | undefined): number {
+  const x = typeof v === "number" && Number.isFinite(v) ? v : 50;
+  return Math.min(195, Math.max(5, Math.round((x / 99) * 190) + 5));
 }
 
 // einfacher deterministischer Zufall pro Spieler-ID, damit Alter/Nation bei erneutem Lauf stabil bleiben
@@ -95,7 +109,8 @@ function main() {
     "player_id", "name", "oly_team_code", "oly_team_name",
     "race", "class_name", "gender", "assigned_position",
     "synthetic_age", "synthetic_nationality",
-    "oly_rating", "oly_market_value",
+    "oly_rating", "oly_potential", "oly_market_value",
+    "fm_CA", "fm_PA",
     "raw_power", "raw_health", "raw_stamina", "raw_intelligence", "raw_awareness",
     "raw_determination", "raw_speed", "raw_dexterity", "raw_charisma", "raw_will",
     "raw_spirit", "raw_torment",
@@ -122,8 +137,20 @@ function main() {
     };
 
     const frac = seededFraction(p.id);
-    const age = 17 + Math.round(frac * 17); // 17-34
     const nation = NATION_POOL[Math.floor(frac * NATION_POOL.length)];
+
+    const ratingScore = p.rating ?? 50;
+    const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
+    const ca = scale200(ratingScore);
+    const pa = Math.max(ca, scale200(potentialScore));
+
+    // Luecke zwischen Potenzial und aktuellem Rating (0-99er Skala) -> Alter: viel Luft nach oben (junger
+    // Spieler), kaum Luft (schon nah am eigenen Limit, aelter). Deckel 30, damit niemand nach einer Saison
+    // in Rente geht (Chris' Vorgabe).
+    const gap = Math.max(0, Math.min(30, potentialScore - ratingScore));
+    const baseAge = 30 - (gap / 30) * 13; // gap=0 -> 30, gap>=30 -> 17
+    const jitter = (frac - 0.5) * 4; // +/-2 Jahre
+    const age = Math.min(30, Math.max(17, Math.round(baseAge + jitter)));
 
     const teamSize = roster ? rosterCountByTeam.get(roster.teamId) ?? 1 : 1;
     const rank = roster ? rankIndex.get(p.id) ?? 0 : 0;
@@ -133,7 +160,8 @@ function main() {
       p.id, p.name, team?.shortCode ?? "", team?.name ?? "",
       p.race, p.className, p.gender, position,
       age, nation,
-      Math.round((p.rating ?? 0) * 10) / 10, Math.round((p.marketValue ?? 0) * 10) / 10,
+      Math.round(ratingScore * 10) / 10, Math.round(potentialScore * 10) / 10, Math.round((p.marketValue ?? 0) * 10) / 10,
+      ca, pa,
       raw.power, raw.health, raw.stamina, raw.intelligence, raw.awareness,
       raw.determination, raw.speed, raw.dexterity, raw.charisma, raw.will,
       raw.spirit, raw.torment,
