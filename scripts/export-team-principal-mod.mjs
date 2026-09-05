@@ -1,27 +1,39 @@
 // ===================================================================================
-// OLY -> "Team Principal" (99er-Mod) Exporteur.
+// OLY -> "Team Principal" (2026er-Mod) Exporteur.
 //
-// Chris will seine Olympiade-Teams/Charaktere in der 1999er-Mod von "Team Principal"
-// spielen. Entscheidung mit Chris (05.09.): 16 von ihm benannte Oly-Teams ersetzen das
-// reale 1999er-Grid komplett und bilden das F1-Feld, in GENAU der Staerke-Reihenfolge, die
-// er vorgegeben hat (Index 0 = staerkstes Team). ALLE 32 Oly-Teams landen in teams.json --
-// die uebrigen 16 als "active: false" mit first_active_season (koennen laut Chris spaeter
-// dazustossen, genau das Muster, das die Mod selbst fuer Porsche/Toyota/Lotus/Super Aguri im
-// echten 1999er-Feld nutzt). Sie haben noch keinen eigenen Kader (Junior-Teams steigen in
-// dieser Mod nicht als Team auf, s. unten) -- ALLE ihre Spieler kommen trotzdem als Free
-// Agents mit rein, Chris wollte zum Testen die komplette Save-Besetzung sehen, nicht nur 48
-// vorbelegte Cockpits.
+// KORREKTUR 05.09.: Wir nutzen fuer die Olympiade die **2026er-Mod** von "Team Principal",
+// NICHT die 1999er (die frueheren Versionen dieses Skripts liehen sich Chassis-Physik von
+// den 1999er-Basisteams -- das war falsch). Referenzdaten liegen jetzt unter
+// references/team-principal-mod/2026-*.json (von Chris hochgeladene Mod-Exporte: alle 77
+// Teams -- 11 aktive reale 2026er-Konstrukteure + 66 noch inaktive -- und 322 Fahrer, zur
+// Kontrolle des tatsaechlichen Schemas, s. unten).
+//
+// Entscheidung mit Chris (05.09.): 16 von ihm benannte Oly-Teams ersetzen das reale 2026er-
+// Grid komplett und bilden das F1-Feld, in GENAU der Staerke-Reihenfolge, die er vorgegeben
+// hat (Index 0 = staerkstes Team). Die uebrigen 16 Oly-Teams landen als "active: false" in
+// teams.json (koennen spaeter dazustossen -- exakt das Muster, das die reale 2026er-
+// Referenz selbst fuer ihre 66 inaktiven Teams nutzt: active:false + first_active_season).
+//
+// ORGANISCH, NICHT VOLLGESPAMMT (Chris, 05.09.: "es soll sich organisch entwickeln und
+// nicht fix dazu kommen, manche Teams haben vielleicht Probleme, hoeren auf oder werden
+// aufgekauft"): first_active_season wird NICHT als sauberer Kalender (2 Teams pro Saison)
+// vergeben, sondern gestreut -- staerkere inaktive Teams eher frueh moeglich, schwaechere
+// erst sehr spaet, ein paar sogar praktisch nie (Saison 90+). Das spiegelt die reale
+// 2026er-Referenz: deren first_active_season-Werte liegen wild verteilt zwischen 1 und 100
+// (u.a. mehrere bewusste 98/99/100 fuer "praktisch nie ohne manuelles Eingreifen"), keine
+// gleichmaessige Kadenz. Ob so ein Team dann WIRKLICH kommt (Pleite eines aktiven Teams,
+// Aufkauf etc.) entscheidet ohnehin die Mod-Simulation selbst, nicht diese Datei -- wir
+// setzen nur, ab wann es ueberhaupt in Frage kaeme.
 //
 // Woher die Zahlen kommen:
 //
 //   Fahrer-Skill/Talent: gewichtete Kombination aus ALLEN 12 Oly-Attributen (0-99), dann
-//   PERZENTIL-skaliert -- nicht linear /99*20. Grund: die gewichteten Rohwerte erreichen in
-//   diesem Save selten die Naehe von 99 (siehe erster Entwurf: talent blieb durchgaengig
-//   unter 80). Ein Perzentil-Ranking innerhalb der tatsaechlich exportierten Population
-//   garantiert echte Sternfahrer (~90er) UND echte Hinterbaenkler (<10), unabhaengig davon,
-//   wie gestaucht die Roh-Attribute sind -- das ist dieselbe Idee wie die rho-Abnahme, mit
-//   der dieses Projekt seine Disziplinen misst (s. CLAUDE.md): nicht der Rohwert zaehlt,
-//   sondern die Position in der Verteilung.
+//   PERZENTIL-skaliert -- nicht linear /99*20 (die gewichteten Rohwerte kommen selten in
+//   die Naehe von 99). Ein Perzentil-Ranking innerhalb der tatsaechlich exportierten
+//   Population garantiert echte Sternfahrer (~90er) UND echte Hinterbaenkler (<10),
+//   unabhaengig davon, wie gestaucht die Roh-Attribute sind -- dieselbe Idee wie die
+//   rho-Abnahme, mit der dieses Projekt seine Disziplinen misst (s. CLAUDE.md): nicht der
+//   Rohwert zaehlt, sondern die Position in der Verteilung.
 //
 //     cornering    = 0.5*dexterity + 0.5*awareness
 //     braking      = 0.5*awareness + 0.5*determination
@@ -32,37 +44,47 @@
 //     traction_preference (roh) = 0.6*torment + 0.4*(99-spirit)
 //     talent (roh) = (Summe der 5 Skill-Rohwerte) * (potential/rating) -- nutzt Olys
 //                    eigenes Potenzial/Rating-Verhaeltnis als Wachstums-Headroom
-//   Jede der acht Roh-Groessen wird EINZELN ueber die komplette exportierte Fahrer-Population
-//   perzentil-skaliert (cornering/braking/consistency/smoothness/control -> 1-20,
-//   balance/traction -> 1-100, talent -> 1-99). Alle 12 Attribute fliessen mit ein --
 //   "speed" taucht bewusst nur EINMAL auf (in control), damit nicht nur schnelle Spieler
-//   ueberall vorne liegen.
+//   ueberall vorne liegen -- alle 12 Attribute fliessen ein, keins dominiert.
 //
 //   Team-Prestige      = aus den Oly-Team-Ratings (ambition/boardConfidence -> heritage,
 //                        harmony/cooperation -> form), unabhaengig von der Grid-Reihenfolge.
-//   starting_balance_m = Olys eigenes cash-Feld (Save-Wirtschaft, keine Umrechnung).
-//   Farben             = ECHTE Oly-Team-Farben aus lib/foundation/team-colors.ts (HSL ->
-//                        RGB konvertiert) -- keine geliehenen 1999er-Farben mehr.
-//   Team-Logo          = ECHTE Oly-Logos aus public/team-logos/<shortCode>.jpg, als PNG
-//                        neben teams.json/drivers.json abgelegt (die Mod importiert Bilder
-//                        nicht ueber die JSON-Dateien, sondern ueber den Roster-Editor "Team
-//                        Logo"-Upload-Slot -- s. Notiz am Ende von main()). Fuer den "Car
-//                        PNG"-Slot (2:1, Wagen-Lackierung) gibt es kein Oly-Aequivalent.
-//   Chassis-Physik     = KEIN Oly-Aequivalent vorhanden. Deshalb geliehen: die 16 F1-Teams
-//                        werden -- in der von Chris vorgegebenen Reihenfolge, NICHT nach
-//                        Oly-Prestige neu sortiert -- per Perzentil auf eine nach team_pace
-//                        sortierte Physik-Kurve aus 15 echten 1999er-Team-Templates gemappt.
-//                        Nur Chassis-Zahlen/Reifen-/Motor-Deal kommen von dort, Farbe/Name/
-//                        Prestige/Budget/Historie sind komplett Oly.
+//   budget_m           = Olys eigenes budget-Feld (liegt ueber alle 32 Teams zwischen 170
+//                        und 325 -- praktisch dieselbe Groessenordnung wie die realen
+//                        2026er budget_m-Werte, 60-490).
+//   starting_balance_m = Olys eigenes cash-Feld (laufende Kriegskasse, anderer Wert als
+//                        budget_m -- die 2026er-Referenz fuehrt fuer JEDES Team, aktiv wie
+//                        inaktiv, beide Felder gleichzeitig und unterschiedlich).
+//   Farben/Logo        = ECHTE Oly-Farben (lib/foundation/team-colors.ts, HSL->RGB) und
+//                        -Logos (public/team-logos/<shortCode>.jpg, als PNG exportiert).
+//   Chassis-Physik     = KEIN Oly-Aequivalent vorhanden. Deshalb geliehen: alle 32 Oly-
+//                        Teams werden -- F1-Teams in Chris' vorgegebener Reihenfolge, die
+//                        16 inaktiven untereinander nach Olys eigener Prestige -- per
+//                        Perzentil auf eine nach team_pace sortierte Physik-Kurve aus ALLEN
+//                        77 echten 2026er-Team-Templates (aktiv + inaktiv, s. Referenzdatei)
+//                        gemappt. Nur Chassis-Zahlen/Reifen-/Motor-Vertrag kommen von dort,
+//                        Farbe/Name/Prestige/Budget/Historie sind komplett Oly.
+//
+// Fahrer-Schema an der echten 2026er-Referenz kalibriert (322 Fahrer geprueft):
+//   - Freie Agenten haben "team": null (NICHT den String "Free Agent" wie in der 1999er-
+//     Mod) und einen minimalen Vertrag {status, priority}.
+//   - Kein "number"-Feld (in 322 echten Eintraegen genau EINMAL vorhanden -- faktisch
+//     unbenutzt, hier komplett weggelassen).
+//   - Kein "career_stage"-Feld (existiert im 2026er-Schema nicht, das war 1999er-spezifisch).
+//   - "personality" (Einzahl, IMMER vorhanden) zusaetzlich zu "personalities" (Mehrzahl,
+//     in ~65% der echten Eintraege vorhanden) -- wir liefern beides.
+//   - Reserve-Fahrer bekommen zusaetzlich zu contract.role ein Top-Level "role": "reserve"
+//     (Hauptfahrer nicht -- genau das Muster der echten Daten).
 //
 // Das ist ein Entwurf -- KEINE endgueltige Balance-Aussage. Alle Annahmen (age-Heuristik,
-// nationality="international", Trait-Lookup, Free-Agent-Schema unten) sind markiert und
-// sollen von Chris im Spiel gegengeprueft werden, bevor final importiert wird.
+// nationality="international", Trait-Lookup, first_active_season-Streuung) sind markiert
+// und sollen von Chris im Spiel gegengeprueft werden, bevor final importiert wird.
 //
-// Junior-Teams steigen in dieser Mod nicht als Team in die F1 auf (nachgeprueft in der
-// Mod-Datenbank: "Driver Development [config.json]" kennt nur individuelle Wachstums-
-// Multiplikatoren je Serie fuer FAHRER, keine Team-Beforderung) -- deshalb keine
-// Access-Series-Aufteilung mehr, sondern direkt 16 Oly-Teams als komplettes F1-Feld.
+// Junior-Teams steigen in dieser Mod nicht als Team in die F1 auf (nachgeprueft an der
+// 1999er-Datenbank: "Driver Development [config.json]" kennt nur individuelle Wachstums-
+// Multiplikatoren je Serie fuer FAHRER, keine Team-Beforderung; die 2026er-Referenz kennt
+// gar keine Junior-Serien-Struktur, nur active/inactive-Teams) -- deshalb keine
+// Access-Series-Aufteilung, sondern direkt Oly-Teams als F1-Feld plus inaktive Kandidaten.
 //
 //   node scripts/export-team-principal-mod.mjs [--save <saveId>] [--out <dir>]
 //
@@ -79,6 +101,7 @@ const SQLITE_PATH = process.env.OLY_APP_SQLITE_PATH || 'data/persistence/oly-app
 const TEAM_COLORS_TS_PATH = 'lib/foundation/team-colors.ts';
 const TEAM_LOGOS_DIR = 'public/team-logos';
 const PLAYER_PORTRAITS_DIR = 'public/portraits';
+const CHASSIS_REFERENCE_PATH = 'references/team-principal-mod/2026-teams-reference.json';
 
 function parseArgs(argv) {
   const out = { save: null, outDir: 'data/generated/team-principal-mod' };
@@ -93,7 +116,13 @@ function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
 }
 
-// ---- Echte Oly-Team-Farben statt geliehener 1999er-Farben -----------------------------
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// ---- Echte Oly-Team-Farben statt geliehener Mod-Farben -----------------------------
 // Liest lib/foundation/team-colors.ts direkt (statt die Farben hier zu duplizieren), damit
 // Aenderungen an TEAM_COLOR automatisch uebernommen werden. Kein TS-Compiler noetig -- wir
 // brauchen nur das Objektliteral, keine Typen.
@@ -140,9 +169,7 @@ function resolveTeamColors(colorMap, shortCode) {
   const entry = colorMap[shortCode];
   if (!entry) {
     // Deterministischer Fallback, analog zur fallbackColor()-Funktion in team-colors.ts.
-    let h = 0;
-    for (let i = 0; i < shortCode.length; i++) h = (h * 31 + shortCode.charCodeAt(i)) & 0xffff;
-    const hue = Math.round((h * 137.508) % 360);
+    const hue = Math.round((hashString(shortCode) * 137.508) % 360);
     return { primary: hslStringToRgb(`hsl(${hue} 58% 55%)`), secondary: null };
   }
   return {
@@ -151,30 +178,48 @@ function resolveTeamColors(colorMap, shortCode) {
   };
 }
 
-// ---- Referenz-Physik von 15 echten 1999er-Team-Templates (11 Basisteams + 4 spaeter
-// aktive Werksteams aus derselben Mod-Datenbank), nur die Felder ohne Oly-Aequivalent.
-// Wird nach team_pace absteigend sortiert, damit die Reihenfolge unten keine Rolle spielt.
-const REFERENCE_CHASSIS_CURVE = [
-  { name: 'McLaren', car_mass_kg: 645.0, braking: 53.0, acceleration: 52.0, team_pace: 54.0, attr: { slow: 52.5, med: 52.0, high: 52.5, straight: 54.0 }, tyre_management: 55.0, dirty_air_sensitivity: 55.4, chassis_reliability: 65.5, aero_efficiency: 1.05, chassis_starting_potential: { braking: 56.0, acceleration: 55.0, team_pace: 67.0, slow: 65.5, med: 65.0, high: 65.5, straight: 69.0, tyre_management: 58.0, dirty_air_sensitivity: 58.4, chassis_reliability: 75.5 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Mercedes', engine_supplier: 'Mercedes', engine_contract_type: 'partner', engine_contract_seasons: 3, engine_contract_bonus: 'bonus2', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Ferrari', car_mass_kg: 643.0, braking: 57.0, acceleration: 53.0, team_pace: 50.0, attr: { slow: 52.4, med: 50.3, high: 50.4, straight: 49.8 }, tyre_management: 55.0, dirty_air_sensitivity: 55.4, chassis_reliability: 68.4, aero_efficiency: 1.025, chassis_starting_potential: { braking: 60.0, acceleration: 56.0, team_pace: 63.0, slow: 67.4, med: 63.3, high: 63.4, straight: 62.8, tyre_management: 58.0, dirty_air_sensitivity: 58.4, chassis_reliability: 78.4 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Ferrari', engine_contract_type: 'works', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Winfield Williams', car_mass_kg: 649.0, braking: 50.0, acceleration: 50.0, team_pace: 39.3, attr: { slow: 44.1, med: 43.6, high: 44.2, straight: 47.1 }, tyre_management: 50.0, dirty_air_sensitivity: 51.9, chassis_reliability: 64.1, aero_efficiency: 1.010, chassis_starting_potential: { braking: 55.0, acceleration: 55.0, team_pace: 54.3, slow: 59.1, med: 58.6, high: 59.2, straight: 64.1, tyre_management: 55.0, dirty_air_sensitivity: 56.9, chassis_reliability: 74.1 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Supertec', engine_supplier: 'Mecachrome', engine_contract_type: 'customer', engine_contract_seasons: 1, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Jordan', car_mass_kg: 646.0, braking: 51.0, acceleration: 52.0, team_pace: 44.7, attr: { slow: 47.9, med: 46.4, high: 47.2, straight: 49.7 }, tyre_management: 50.0, dirty_air_sensitivity: 54.7, chassis_reliability: 65.5, aero_efficiency: 1.035, chassis_starting_potential: { braking: 56.0, acceleration: 57.0, team_pace: 59.7, slow: 62.9, med: 61.4, high: 62.2, straight: 66.7, tyre_management: 55.0, dirty_air_sensitivity: 59.7, chassis_reliability: 75.5 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Mugen Honda', engine_supplier: 'Mugen Honda', engine_contract_type: 'partner', engine_contract_seasons: 2, engine_contract_bonus: 'bonus2', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Benetton', car_mass_kg: 645.0, braking: 49.0, acceleration: 50.0, team_pace: 39.3, attr: { slow: 48.6, med: 44.9, high: 40.2, straight: 45.6 }, tyre_management: 50.0, dirty_air_sensitivity: 55.4, chassis_reliability: 68.4, aero_efficiency: 1.015, chassis_starting_potential: { braking: 54.0, acceleration: 55.0, team_pace: 54.3, slow: 65.6, med: 59.9, high: 55.2, straight: 60.6, tyre_management: 55.0, dirty_air_sensitivity: 60.4, chassis_reliability: 78.4 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Supertec', engine_supplier: 'Mecachrome', engine_contract_type: 'customer', engine_contract_seasons: 3, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Sauber', car_mass_kg: 644.0, braking: 49.0, acceleration: 49.0, team_pace: 36.0, attr: { slow: 44.8, med: 43.0, high: 41.0, straight: 43.2 }, tyre_management: 47.5, dirty_air_sensitivity: 51.9, chassis_reliability: 55.4, aero_efficiency: 1.020, chassis_starting_potential: { braking: 54.0, acceleration: 54.0, team_pace: 51.0, slow: 61.8, med: 58.0, high: 56.0, straight: 58.2, tyre_management: 52.5, dirty_air_sensitivity: 56.9, chassis_reliability: 65.4 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Ferrari', engine_supplier: 'Ferrari', engine_contract_type: 'customer', engine_contract_seasons: 2, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Repsol Arrows', car_mass_kg: 650.0, braking: 47.0, acceleration: 47.0, team_pace: 24.8, attr: { slow: 36.9, med: 36.3, high: 35.5, straight: 38.3 }, tyre_management: 45.0, dirty_air_sensitivity: 48.3, chassis_reliability: 44.3, aero_efficiency: 1.000, chassis_starting_potential: { braking: 52.0, acceleration: 52.0, team_pace: 39.8, slow: 51.9, med: 51.3, high: 50.5, straight: 55.3, tyre_management: 50.0, dirty_air_sensitivity: 53.3, chassis_reliability: 54.3 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Hart', engine_supplier: 'Hart', engine_contract_type: 'customer', engine_contract_seasons: 1, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Stewart', car_mass_kg: 646.0, braking: 50.0, acceleration: 51.0, team_pace: 41.8, attr: { slow: 47.2, med: 46.4, high: 44.3, straight: 46.8 }, tyre_management: 47.5, dirty_air_sensitivity: 56.8, chassis_reliability: 62.6, aero_efficiency: 1.010, chassis_starting_potential: { braking: 55.0, acceleration: 56.0, team_pace: 56.8, slow: 64.2, med: 61.4, high: 59.3, straight: 61.8, tyre_management: 52.5, dirty_air_sensitivity: 61.8, chassis_reliability: 72.6 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Ford Cosworth', engine_supplier: 'Ford', engine_contract_type: 'partner', engine_contract_seasons: 3, engine_contract_bonus: 'bonus2', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Prost', car_mass_kg: 647.0, braking: 49.0, acceleration: 49.0, team_pace: 38.1, attr: { slow: 44.7, med: 43.3, high: 42.0, straight: 46.5 }, tyre_management: 47.5, dirty_air_sensitivity: 54.0, chassis_reliability: 56.1, aero_efficiency: 0.950, chassis_starting_potential: { braking: 54.0, acceleration: 54.0, team_pace: 53.1, slow: 59.7, med: 58.3, high: 57.0, straight: 63.5, tyre_management: 52.5, dirty_air_sensitivity: 59.0, chassis_reliability: 66.1 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Peugeot', engine_supplier: 'Peugeot', engine_contract_type: 'partner', engine_contract_seasons: 2, engine_contract_bonus: 'bonus2', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Minardi', car_mass_kg: 652.0, braking: 45.0, acceleration: 45.0, team_pace: 22.8, attr: { slow: 35.7, med: 33.2, high: 33.3, straight: 40.4 }, tyre_management: 45.0, dirty_air_sensitivity: 49.8, chassis_reliability: 47.4, aero_efficiency: 0.950, chassis_starting_potential: { braking: 52.0, acceleration: 51.0, team_pace: 37.8, slow: 50.7, med: 48.2, high: 48.3, straight: 57.4, tyre_management: 50.0, dirty_air_sensitivity: 54.8, chassis_reliability: 57.4 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Ford Cosworth', engine_supplier: 'Ford', engine_contract_type: 'customer', engine_contract_seasons: 2, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'British American Racing', car_mass_kg: 646.0, braking: 49.0, acceleration: 50.0, team_pace: 37.1, attr: { slow: 45.7, med: 42.3, high: 41.8, straight: 44.6 }, tyre_management: 40.0, dirty_air_sensitivity: 55.4, chassis_reliability: 35.0, aero_efficiency: 1.020, chassis_starting_potential: { braking: 54.0, acceleration: 55.0, team_pace: 52.1, slow: 62.7, med: 57.3, high: 56.8, straight: 59.6, tyre_management: 45.0, dirty_air_sensitivity: 60.4, chassis_reliability: 46.8 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer', start_season: 1, expires_season: 2 }, engine: 'Supertec', engine_supplier: 'Mecachrome', engine_contract_type: 'customer', engine_contract_seasons: 1, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Porsche', car_mass_kg: 645.0, braking: 50.0, acceleration: 50.0, team_pace: 45.0, attr: { slow: 49.0, med: 49.0, high: 49.0, straight: 49.0 }, tyre_management: 45.0, dirty_air_sensitivity: 51.9, chassis_reliability: 60.9, aero_efficiency: 1.025, chassis_starting_potential: { braking: 55.0, acceleration: 50.0, team_pace: 60.0, slow: 60.0, med: 60.0, high: 60.0, straight: 60.0, tyre_management: 50.0, dirty_air_sensitivity: 56.9, chassis_reliability: 70.9 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer' }, engine: 'Porsche', engine_contract_type: 'works', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Toyota', car_mass_kg: 645.0, braking: 50.0, acceleration: 50.0, team_pace: 42.5, attr: { slow: 48.0, med: 48.0, high: 48.0, straight: 48.0 }, tyre_management: 40.0, dirty_air_sensitivity: 51.9, chassis_reliability: 64.1, aero_efficiency: 1.015, chassis_starting_potential: { braking: 55.0, acceleration: 55.0, team_pace: 57.5, slow: 59.0, med: 59.0, high: 59.0, straight: 59.0, tyre_management: 45.0, dirty_air_sensitivity: 56.9, chassis_reliability: 74.1 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer' }, engine: 'Toyota', engine_contract_type: 'works', driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Lotus', car_mass_kg: 650.0, braking: 50.0, acceleration: 50.0, team_pace: 40.0, attr: { slow: 47.0, med: 47.0, high: 47.0, straight: 47.0 }, tyre_management: 40.0, dirty_air_sensitivity: 51.9, chassis_reliability: 59.3, aero_efficiency: 1.025, chassis_starting_potential: { braking: 55.0, acceleration: 55.0, team_pace: 55.0, slow: 58.0, med: 58.0, high: 58.0, straight: 58.0, tyre_management: 45.0, dirty_air_sensitivity: 56.9, chassis_reliability: 69.3 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer' }, engine: 'Ford Cosworth', engine_supplier: 'Ford', engine_contract_type: 'customer', engine_contract_seasons: 1, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-  { name: 'Super Aguri', car_mass_kg: 650.0, braking: 50.0, acceleration: 50.0, team_pace: 37.5, attr: { slow: 46.0, med: 46.0, high: 46.0, straight: 46.0 }, tyre_management: 40.0, dirty_air_sensitivity: 51.9, chassis_reliability: 59.3, aero_efficiency: 0.95, chassis_starting_potential: { braking: 55.0, acceleration: 55.0, team_pace: 52.5, slow: 57.0, med: 57.0, high: 57.0, straight: 57.0, tyre_management: 45.0, dirty_air_sensitivity: 56.9, chassis_reliability: 69.3 }, tyre_contract: { supplier: 'Bridgestone', type: 'customer' }, engine: 'Honda', engine_supplier: 'Honda', engine_contract_type: 'customer', engine_contract_seasons: 2, driver_aids: { active_suspension: 0, active_aero: 0, traction_control: 0, abs: 0, advanced_tpms: 0 }, driver_focus: { cornering: 20, braking: 20, consistency: 20, smoothness: 20, control: 20 } },
-].sort((a, b) => b.team_pace - a.team_pace);
+// ---- Chassis-Referenzkurve aus der ECHTEN 2026er-Mod-Datenbank -------------------------
+// Alle 77 Team-Templates (11 aktive reale Konstrukteure + 66 inaktive Kandidaten), nur die
+// Felder ohne Oly-Aequivalent. "active" in dieser Referenzdatei hat NICHTS mit unserer
+// eigenen Oly->F1-Zuordnung zu tun. NUR die 11 echten AKTIVEN Konstrukteure -- die 66
+// inaktiven Kandidaten der Referenz mischen erkennbare Spass-/Easter-Egg-Eintraege unter
+// echte Automarken (u.a. "Brawn GP" mit team_pace 100 als Anspielung auf die reale
+// 2009er-Dominanz, "Dinoco" ist eine reine Pixar-"Cars"-Referenz) -- als Physik-Stichprobe
+// wuerden die unser staerkstes Oly-Team unrealistisch ueberdrehen (Perzentil 0 haette sonst
+// woertlich Brawn-GP-Werte bekommen).
+function loadChassisReferenceCurve() {
+  const raw = JSON.parse(readFileSync(CHASSIS_REFERENCE_PATH, 'utf8'));
+  return raw
+    .filter((t) => t.active === true)
+    .map((t) => ({
+      name: t.name,
+      car_mass_kg: t.car_mass_kg,
+      braking: t.braking,
+      acceleration: t.acceleration,
+      team_pace: t.team_pace,
+      attr: t.attr,
+      tyre_management: t.tyre_management,
+      dirty_air_sensitivity: t.dirty_air_sensitivity,
+      chassis_reliability: t.chassis_reliability,
+      aero_efficiency: t.aero_efficiency,
+      chassis_starting_potential: t.chassis_starting_potential,
+      tyre_contract: t.tyre_contract,
+      engine: t.engine,
+      engine_supplier: t.engine_supplier,
+      engine_contract_type: t.engine_contract_type,
+      engine_contract: t.engine_contract,
+      engine_contract_seasons: t.engine_contract_seasons,
+      engine_units_per_season: t.engine_units_per_season,
+      engine_contract_bonus: t.engine_contract_bonus,
+      driver_aids: t.driver_aids,
+      driver_focus: t.driver_focus,
+    }))
+    .filter((t) => typeof t.team_pace === 'number')
+    .sort((a, b) => b.team_pace - a.team_pace);
+}
 
-// Chris' vorgegebene Reihenfolge (05.09., ueberarbeitet): Index 0 ist das staerkste Team,
-// letzter Index das schwaechste. Das steuert NUR die geliehene Chassis-Physik-Kurve, nicht
-// Prestige/Budget (die bleiben Oly-eigen).
+// Chris' vorgegebene Reihenfolge (05.09.): Index 0 ist das staerkste Team, letzter Index
+// das schwaechste. Steuert NUR die geliehene Chassis-Physik-Kurve, nicht Prestige/Budget.
 const F1_TEAM_NAMES = [
   'Mayhem Mavericks', 'Zero Heroes', 'Cold Steel', 'Golden Gladiators', 'Last Ride',
   'Project Suicide', 'Raging Lunatics', 'Wrecking Legionnaires', 'Hell Raisers',
@@ -184,9 +229,9 @@ const F1_TEAM_NAMES = [
 
 // Interpoliert an Perzentil p (0 = staerkstes Team, 1 = schwaechstes) linear zwischen den
 // beiden naechstliegenden Punkten der Referenzkurve. Numerische Felder werden geblendet,
-// alles andere (Motor-/Reifendeal, Name) kommt vom naeher liegenden Referenzpunkt.
-function interpolateChassis(percentile) {
-  const curve = REFERENCE_CHASSIS_CURVE;
+// alles andere (Motor-/Reifendeal, Name) kommt vom naeher liegenden Referenzpunkt -- ein
+// "halber" Motorvertrag ergibt ja keinen Sinn.
+function interpolateChassis(curve, percentile) {
   const pos = clamp(percentile, 0, 1) * (curve.length - 1);
   const i0 = Math.floor(pos);
   const i1 = Math.min(i0 + 1, curve.length - 1);
@@ -217,11 +262,14 @@ function interpolateChassis(percentile) {
 }
 
 // ---- Trait-/Persoenlichkeits-Lookup: Olys Fantasy-Traits -> feste Mod-Vokabeln. -------
-// Unvollstaendig by design -- alles ausserhalb dieser Liste faellt auf einen neutralen
-// Default. Ein erster Vorschlag zum Gegenlesen, keine Wahrheit.
+// Vokabular an der echten 2026er-Referenz geprueft (322 Fahrer): racing traits
+// bottlejob/cautious/clean_air_merchant/crash_happy/hotlapper/mechanic/nervous/
+// overtake_artist/pay_driver/rainmaster/tyre_abuser/tyre_whisperer; personality-Vokabular
+// deckt sich fast 1:1 mit unseren drei Achsen unten. Unvollstaendig by design -- alles
+// ausserhalb dieser Liste faellt auf einen neutralen Default.
 const RACING_TRAIT_POSITIVE = {
   motivated: 'hotlapper', fair: 'mechanic', disciplined: 'mechanic', calm: 'tyre_whisperer',
-  brave: 'hotlapper', charismatic: 'clean_air_merchant', loyal: 'mechanic', clutch: 'rainmaster',
+  brave: 'overtake_artist', charismatic: 'clean_air_merchant', loyal: 'mechanic', clutch: 'rainmaster',
   focused: 'tyre_whisperer', resilient: 'rainmaster',
 };
 const RACING_TRAIT_NEGATIVE = {
@@ -276,9 +324,7 @@ const FLAVOUR_VOCAB = ['company_man', 'quiet_professional', 'glory_hunter', 'hot
 
 // Deterministischer, aber inhaltlich beliebiger Platzhalter: Oly fuehrt kein Alter.
 function hashAge(playerId) {
-  let h = 0;
-  for (let i = 0; i < playerId.length; i++) h = (h * 31 + playerId.charCodeAt(i)) >>> 0;
-  return 19 + (h % 24);
+  return 19 + (hashString(playerId) % 24);
 }
 
 // ---- Rohwerte aus ALLEN 12 Attributen -- bewusst so verteilt, dass jedes Attribut in
@@ -304,10 +350,9 @@ function computeRawMetrics(player) {
 }
 
 // ---- Perzentil-Skalierung: jede Roh-Groesse wird gegen ihre eigene Verteilung ueber die
-// GESAMTE exportierte Fahrer-Population gerankt, nicht linear /99 umgerechnet. So bleibt die
-// volle Ziel-Bandbreite (1-20 bzw. 1-99) auch dann ausgenutzt, wenn die gewichteten
-// Roh-Werte selbst nie in die Naehe von 99 kommen -- exakt Chris' Wunsch nach echten
-// 90er-Stars UND echten <10-Nieten.
+// GESAMTE exportierte Fahrer-Population gerankt, nicht linear /99 umgerechnet -- damit
+// bleibt die volle Ziel-Bandbreite (1-20 bzw. 1-99) ausgenutzt, auch wenn die gewichteten
+// Roh-Werte selbst nie in die Naehe von 99 kommen.
 function buildPercentileMapper(values) {
   const sorted = [...values].sort((x, y) => x - y);
   const n = sorted.length;
@@ -342,11 +387,10 @@ function buildScalers(rawList) {
   };
 }
 
-// roleInfo: {number, contractLength, salary, role: 'main'|'reserve', status} oder null fuer
-// einen Free Agent (Spieler aus einem der 16 nicht uebersetzten Oly-Teams, oder ueberzaehlig
-// im Kader eines F1-Teams). Free-Agent-Schema ist ein Best-Guess (die Mod-Datenbank zeigt
-// z.B. "Jos Verstappen ... Free Agent" ohne Startnummer/Vertrag in der Drivers-Skills-
-// Tabelle, aber keine vollstaendige Feldliste) -- im Spiel gegenpruefen.
+// roleInfo: {contractLength, salary, role: 'main'|'reserve', status} oder null fuer einen
+// Free Agent. Schema an der echten 2026er-Referenz kalibriert: team:null (nicht der String
+// "Free Agent") + minimaler Vertrag fuer Free Agents, kein "number", kein "career_stage",
+// Reserve-Fahrer bekommen zusaetzlich ein Top-Level "role": "reserve".
 function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) {
   const cornering = scalers.cornering(raw.cornering);
   const braking = scalers.braking(raw.braking);
@@ -366,7 +410,7 @@ function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) 
 
   const entry = {
     name: player.name,
-    team: teamNameForContract,
+    team: teamNameForContract, // null fuer Free Agents
     cornering,
     braking,
     consistency,
@@ -378,23 +422,25 @@ function mapPlayerToDriver(player, raw, scalers, teamNameForContract, roleInfo) 
     history: { seasons: 0, championships: 0, wins: 0, podiums: 0, poles: 0 },
     talent,
     traits: [racingTraitPos, racingTraitNeg],
+    personality: motivation,
     personalities: [loyalty, motivation, flavour],
-    career_stage: !roleInfo ? 'free_agent' : roleInfo.role === 'reserve' ? 'reserve_driver' : 'racer',
     nationality: 'international',
     _oly: { playerId: player.id, sourceRating: raw.rating, sourcePotential: raw.potential, className: player.className, race: player.race },
   };
 
   if (roleInfo) {
-    entry.number = roleInfo.number;
     entry.contract = {
+      status: roleInfo.status,
+      priority: roleInfo.status,
       team: teamNameForContract,
       length_weeks: roleInfo.contractLength * 52,
       salary_m: roleInfo.salary,
       start_week: 1,
       role: roleInfo.role,
-      status: roleInfo.status,
-      priority: roleInfo.status,
     };
+    if (roleInfo.role === 'reserve') entry.role = 'reserve';
+  } else {
+    entry.contract = { status: 'equal', priority: 'equal' };
   }
 
   return entry;
@@ -421,20 +467,24 @@ function sameLevelHeadquarters(identity) {
   };
 }
 
-function buildF1Team(oly, rank, fieldSize, colors) {
-  const percentile = fieldSize > 1 ? rank / (fieldSize - 1) : 0;
-  const template = interpolateChassis(percentile);
+function buildTeamCore(oly, percentile, curve, colors) {
+  const template = interpolateChassis(curve, percentile);
   const prestige = computeTeamPrestige(oly.identity);
   return {
     name: oly.team.name,
-    active: true,
     color_rgb: colors.primary,
     secondary_color_rgb: colors.secondary || colors.primary,
     heritage_prestige: prestige.heritage,
     form_prestige: prestige.form,
     prestige_base: prestige.base,
+    // Beide Felder, wie in der echten 2026er-Referenz fuer JEDES Team (aktiv wie
+    // inaktiv): budget_m (Olys "budget", Groessenordnung 170-325 ueber alle 32 Teams,
+    // passt fast 1:1 zur realen Spanne 60-490) und starting_balance_m (Olys "cash", die
+    // laufende Kriegskasse -- ein anderer Wert mit anderer Bedeutung).
+    budget_m: oly.team.budget,
     starting_balance_m: Math.round(oly.team.cash * 10) / 10,
     headquarters: sameLevelHeadquarters(oly.identity),
+    negotiation_points: 0,
     performance_scale: 'rating_100',
     car_mass_kg: template.car_mass_kg,
     braking: template.braking,
@@ -450,69 +500,55 @@ function buildF1Team(oly, rank, fieldSize, colors) {
     engine: template.engine,
     engine_supplier: template.engine_supplier,
     engine_contract_type: template.engine_contract_type,
-    engine_contract_seasons: template.engine_contract_seasons,
-    engine_contract_bonus: template.engine_contract_bonus,
+    engine_contract: template.engine_contract,
+    ...(template.engine_contract_seasons != null ? { engine_contract_seasons: template.engine_contract_seasons } : {}),
+    ...(template.engine_units_per_season != null ? { engine_units_per_season: template.engine_units_per_season } : {}),
+    ...(template.engine_contract_bonus != null ? { engine_contract_bonus: template.engine_contract_bonus } : {}),
     driver_aids: template.driver_aids,
     driver_focus: template.driver_focus,
     history: { seasons: 0, championships: 0, wins: 0, podiums: 0, poles: 0 },
     difficulty: percentile < 0.25 ? 'easy' : percentile < 0.65 ? 'medium' : 'hard',
     nationality: 'international',
-    previous_constructor_position: rank + 1,
     _oly: { teamId: oly.team.teamId, budget: oly.team.budget, chassisTemplateBorrowedFrom: template.name },
   };
 }
 
-// Die uebrigen 16 Oly-Teams (Chris, 05.09.: "moechte dass du die restlichen 16 Teams auch
-// einbaust, allerdings sind die dann inactive... aber koennen spaeter dazu stossen"). Genau
-// das Muster, das die Mod selbst fuer Porsche/Toyota/Lotus/Super Aguri im echten 1999er-Feld
-// nutzt: active:false + first_active_season, budget_m statt starting_balance_m, kein
-// previous_constructor_position/difficulty, tyre_contract ohne start/expires_season (noch
-// kein laufender Reifenvertrag). Chris hat fuer diese 16 keine Reihenfolge vorgegeben, daher
-// hier die einzige Stelle, an der wieder Olys eigene Prestige-Formel ueber die Chassis-Staerke
-// entscheidet -- unter sich selbst gerankt, nicht gegen die F1-Teams.
-function buildInactiveTeam(oly, rank, fieldSize, colors, firstActiveSeason) {
+function buildF1Team(oly, rank, fieldSize, curve, colors) {
   const percentile = fieldSize > 1 ? rank / (fieldSize - 1) : 0;
-  const template = interpolateChassis(percentile);
-  const prestige = computeTeamPrestige(oly.identity);
   return {
-    name: oly.team.name,
+    ...buildTeamCore(oly, percentile, curve, colors),
+    active: true,
+    previous_constructor_position: rank + 1,
+  };
+}
+
+// Die uebrigen 16 Oly-Teams (Chris, 05.09.: alle 32 sollen rein, aber die 16 nicht
+// ausgewaehlten als inaktiv -- koennen spaeter organisch dazustossen). Chris hat fuer diese
+// 16 keine Reihenfolge vorgegeben, daher hier die einzige Stelle, an der wieder Olys eigene
+// Prestige-Formel ueber die Chassis-Staerke entscheidet -- unter sich selbst gerankt.
+function buildInactiveTeam(oly, rank, fieldSize, curve, colors, firstActiveSeason) {
+  const percentile = fieldSize > 1 ? rank / (fieldSize - 1) : 0;
+  return {
+    ...buildTeamCore(oly, percentile, curve, colors),
     active: false,
     first_active_season: firstActiveSeason,
-    color_rgb: colors.primary,
-    secondary_color_rgb: colors.secondary || colors.primary,
-    heritage_prestige: prestige.heritage,
-    form_prestige: prestige.form,
-    prestige_base: prestige.base,
-    // Olys "budget"-Feld liegt ueber alle 32 Teams zwischen 170 und 325 -- praktisch
-    // dieselbe Groessenordnung wie die budget_m-Werte der echten inaktiven Zukunftsteams
-    // (Porsche 350, Toyota 400, Lotus 200, Super Aguri 140). Deshalb unskaliert uebernommen,
-    // anders als starting_balance_m oben (das ist Olys "cash", die laufende Kriegskasse
-    // eines bereits aktiven Teams -- ein anderer Wert mit anderer Bedeutung).
-    budget_m: oly.team.budget,
-    headquarters: sameLevelHeadquarters(oly.identity),
-    performance_scale: 'rating_100',
-    car_mass_kg: template.car_mass_kg,
-    braking: template.braking,
-    acceleration: template.acceleration,
-    team_pace: template.team_pace,
-    attr: template.attr,
-    tyre_management: template.tyre_management,
-    dirty_air_sensitivity: template.dirty_air_sensitivity,
-    chassis_reliability: template.chassis_reliability,
-    aero_efficiency: template.aero_efficiency,
-    chassis_starting_potential: template.chassis_starting_potential,
-    tyre_contract: { supplier: template.tyre_contract.supplier, type: template.tyre_contract.type },
-    engine: template.engine,
-    engine_supplier: template.engine_supplier,
-    engine_contract_type: template.engine_contract_type,
-    engine_contract_seasons: template.engine_contract_seasons,
-    engine_contract_bonus: template.engine_contract_bonus,
-    driver_aids: template.driver_aids,
-    driver_focus: template.driver_focus,
-    history: { seasons: 0, championships: 0, wins: 0, podiums: 0, poles: 0 },
-    nationality: 'international',
-    _oly: { teamId: oly.team.teamId, budget: oly.team.budget, chassisTemplateBorrowedFrom: template.name },
+    previous_constructor_position: null,
   };
+}
+
+// "Organisch, nicht vollgespammt": keine gleichmaessige Kadenz, sondern eine Streuung, die
+// der echten 2026er-Referenz nachempfunden ist (deren first_active_season-Werte liegen
+// wild zwischen 1 und 100). Staerkere inaktive Teams koennen frueher kommen, schwaechere
+// erst sehr spaet; die drei schwaechsten landen bewusst bei "praktisch nie" (Saison 90+,
+// wie die 98/99/100-Eintraege im Original) -- ob sie tatsaechlich je kommen, entscheidet
+// ohnehin die Mod-Simulation selbst (Pleite/Aufkauf eines aktiven Teams o.ae.), nicht wir.
+function organicFirstActiveSeason(oly, rank, fieldSize) {
+  if (rank >= fieldSize - 3) {
+    return 90 + (hashString(oly.team.teamId) % 10);
+  }
+  const p = fieldSize > 1 ? rank / (fieldSize - 1) : 0;
+  const jitter = (hashString(oly.team.teamId) % 5) - 2;
+  return clamp(Math.round(2 + Math.pow(p, 2) * 30) + jitter, 1, 89);
 }
 
 async function exportLogos(allTeams, outDir) {
@@ -534,9 +570,6 @@ async function exportLogos(allTeams, outDir) {
 
 // Oly-Portraits liegen unter public/portraits/<slug>.jpg, wobei <slug> der Teil der
 // playerId nach "player-<nummer>-" ist (z.B. "player-1413-ser-camelot" -> "ser-camelot").
-// Bekannt: die Mod-Oberflaeche hat dafuer bislang nur den "Team Logo"/"Car PNG"-Upload je
-// Team gezeigt (s. Chris' Screenshot) -- ob und wo "Drivers" ein Portrait-Upload-Feld hat,
-// ist ungeprueft. Die PNGs werden trotzdem vorbereitet, damit sie bereitliegen.
 async function exportPortraits(entries, outDir) {
   const dir = path.join(outDir, 'portraits');
   mkdirSync(dir, { recursive: true });
@@ -608,18 +641,13 @@ async function main() {
   const f1Teams = F1_TEAM_NAMES.map((name) => teamsByName.get(name)).filter(Boolean);
 
   console.log(`Formula 1 (${f1Teams.length} Teams, in Chris' vorgegebener Staerke-Reihenfolge): ${f1Teams.map((t) => t.team.name).join(', ')}`);
-  // Chris (05.09.): die restlichen 16 Teams auch einbauen, aber als "active: false" --
-  // koennen laut Mod-Konvention (first_active_season, s. Porsche/Toyota/Lotus/Super Aguri
-  // im echten 1999er-Feld) spaeter dazustossen. Untereinander nach Olys eigener Prestige
-  // gerankt (Chris hat fuer diese 16 keine Reihenfolge vorgegeben), gestaffelt ab Saison 3,
-  // zwei neue Teams pro Saison -- die staerksten zuerst.
   const inactiveTeams = teams
     .filter((t) => !F1_TEAM_NAMES.includes(t.team.name))
     .map((t) => ({ ...t, prestige: computeTeamPrestige(t.identity) }))
     .sort((a, b) => b.prestige.base - a.prestige.base);
-  console.log(`Inaktiv, koennen spaeter dazustossen (${inactiveTeams.length}): ${inactiveTeams.map((t) => t.team.name).join(', ')}`);
+  console.log(`Inaktiv, koennen organisch spaeter dazustossen (${inactiveTeams.length}): ${inactiveTeams.map((t) => t.team.name).join(', ')}`);
 
-  // Chris will ALLE im Save eingesetzten (gerosterten) Charaktere sehen, nicht nur 48
+  // Chris will ALLE im Save eingesetzten (gerosterten) Charaktere sehen, nicht nur
   // vorbelegte Cockpits -- also erst der GESAMTE Pool ueber alle 32 Teams, danach je Team
   // die Zuordnung main/reserve/Free-Agent.
   const allEntries = [];
@@ -633,6 +661,8 @@ async function main() {
   console.log(`Spieler-Population fuer Perzentil-Skalierung: ${allEntries.length}`);
 
   const scalers = buildScalers(allEntries.map((e) => e.raw));
+  const chassisCurve = loadChassisReferenceCurve();
+  console.log(`Chassis-Referenzkurve: ${chassisCurve.length} echte 2026er-Team-Templates (team_pace ${chassisCurve[chassisCurve.length - 1].team_pace}-${chassisCurve[0].team_pace})`);
 
   const colorMap = loadTeamColorMap();
   const teamsJson = [];
@@ -641,7 +671,7 @@ async function main() {
 
   f1Teams.forEach((oly, rank) => {
     const colors = resolveTeamColors(colorMap, oly.team.shortCode);
-    teamsJson.push(buildF1Team(oly, rank, f1Teams.length, colors));
+    teamsJson.push(buildF1Team(oly, rank, f1Teams.length, chassisCurve, colors));
 
     const roster = allEntries
       .filter((e) => e.teamId === oly.team.teamId)
@@ -656,7 +686,6 @@ async function main() {
       const status = gap < 3 ? 'equal' : i === 0 ? 'first' : 'second';
       driversJson.push(
         mapPlayerToDriver(slot.player, slot.raw, scalers, oly.team.name, {
-          number: rank * 2 + i + 1,
           contractLength: slot.roster.contractLength || 1,
           salary: slot.player.salaryDemand || 1,
           role: 'main',
@@ -668,7 +697,6 @@ async function main() {
       assignedPlayerIds.add(slot.player.id);
       driversJson.push(
         mapPlayerToDriver(slot.player, slot.raw, scalers, oly.team.name, {
-          number: null,
           contractLength: slot.roster.contractLength || 1,
           salary: slot.player.salaryDemand || 1,
           role: 'reserve',
@@ -680,19 +708,21 @@ async function main() {
 
   inactiveTeams.forEach((oly, rank) => {
     const colors = resolveTeamColors(colorMap, oly.team.shortCode);
-    const firstActiveSeason = 3 + Math.floor(rank / 2);
-    teamsJson.push(buildInactiveTeam(oly, rank, inactiveTeams.length, colors, firstActiveSeason));
-    // Kein Kader: ein inaktives Team hat noch keine Fahrer unter Vertrag (wie im Vorbild
-    // Porsche/Toyota/Lotus/Super Aguri). Die Spieler dieser Teams bleiben Free Agents.
+    const firstActiveSeason = organicFirstActiveSeason(oly, rank, inactiveTeams.length);
+    teamsJson.push(buildInactiveTeam(oly, rank, inactiveTeams.length, chassisCurve, colors, firstActiveSeason));
+    // Kein Kader: ein inaktives Team hat noch keine Fahrer unter Vertrag. Die Spieler
+    // dieser Teams bleiben Free Agents.
   });
 
   for (const entry of allEntries) {
     if (assignedPlayerIds.has(entry.player.id)) continue;
-    driversJson.push(mapPlayerToDriver(entry.player, entry.raw, scalers, 'Free Agent', null));
+    driversJson.push(mapPlayerToDriver(entry.player, entry.raw, scalers, null, null));
   }
 
   const talents = driversJson.map((d) => d.talent).sort((a, b) => a - b);
   console.log(`Talent-Spanne: ${talents[0]} - ${talents[talents.length - 1]} (Median ${talents[Math.floor(talents.length / 2)]})`);
+  const seasons = teamsJson.filter((t) => !t.active).map((t) => t.first_active_season).sort((a, b) => a - b);
+  console.log(`first_active_season der 16 inaktiven Teams: ${seasons.join(', ')}`);
 
   const logoResults = await exportLogos([...f1Teams, ...inactiveTeams], outDir);
   const failedLogos = logoResults.filter((r) => !r.ok);

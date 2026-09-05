@@ -1,166 +1,166 @@
 {
 	"saveId": "new-game-1787123325719-swnjlk",
-	"generatedAt": "2026-09-05T07:17:58.413Z",
+	"generatedAt": "2026-09-05T07:34:32.869Z",
 	"teams": [
 		{
 			"teamId": "M-M",
 			"budget": 325,
-			"chassisTemplateBorrowedFrom": "McLaren"
+			"chassisTemplateBorrowedFrom": "Scuderia Ferrari"
 		},
 		{
 			"teamId": "Z-H",
 			"budget": 320,
-			"chassisTemplateBorrowedFrom": "Ferrari"
+			"chassisTemplateBorrowedFrom": "Mercedes-AMG"
 		},
 		{
 			"teamId": "C-S",
 			"budget": 315,
-			"chassisTemplateBorrowedFrom": "Porsche"
+			"chassisTemplateBorrowedFrom": "Mercedes-AMG"
 		},
 		{
 			"teamId": "G-G",
 			"budget": 310,
-			"chassisTemplateBorrowedFrom": "Jordan"
+			"chassisTemplateBorrowedFrom": "McLaren Racing"
 		},
 		{
 			"teamId": "L-R",
 			"budget": 305,
-			"chassisTemplateBorrowedFrom": "Toyota"
+			"chassisTemplateBorrowedFrom": "Red Bull Racing"
 		},
 		{
 			"teamId": "P-S",
 			"budget": 300,
-			"chassisTemplateBorrowedFrom": "Stewart"
+			"chassisTemplateBorrowedFrom": "Red Bull Racing"
 		},
 		{
 			"teamId": "R-L",
 			"budget": 295,
-			"chassisTemplateBorrowedFrom": "Lotus"
+			"chassisTemplateBorrowedFrom": "Alpine"
 		},
 		{
 			"teamId": "W-L",
 			"budget": 290,
-			"chassisTemplateBorrowedFrom": "Winfield Williams"
+			"chassisTemplateBorrowedFrom": "Racing Bulls"
 		},
 		{
 			"teamId": "H-R",
 			"budget": 285,
-			"chassisTemplateBorrowedFrom": "Winfield Williams"
+			"chassisTemplateBorrowedFrom": "Racing Bulls"
 		},
 		{
 			"teamId": "S-S",
 			"budget": 280,
-			"chassisTemplateBorrowedFrom": "Benetton"
+			"chassisTemplateBorrowedFrom": "Audi"
 		},
 		{
 			"teamId": "B-P",
 			"budget": 275,
-			"chassisTemplateBorrowedFrom": "Prost"
+			"chassisTemplateBorrowedFrom": "Haas"
 		},
 		{
 			"teamId": "N-N",
 			"budget": 270,
-			"chassisTemplateBorrowedFrom": "Super Aguri"
+			"chassisTemplateBorrowedFrom": "Haas"
 		},
 		{
 			"teamId": "N-W",
 			"budget": 265,
-			"chassisTemplateBorrowedFrom": "British American Racing"
+			"chassisTemplateBorrowedFrom": "Williams Racing"
 		},
 		{
 			"teamId": "D-P",
 			"budget": 240,
-			"chassisTemplateBorrowedFrom": "Sauber"
+			"chassisTemplateBorrowedFrom": "Aston Martin"
 		},
 		{
 			"teamId": "W-W",
 			"budget": 255,
-			"chassisTemplateBorrowedFrom": "Repsol Arrows"
+			"chassisTemplateBorrowedFrom": "Aston Martin"
 		},
 		{
 			"teamId": "V-D",
 			"budget": 250,
-			"chassisTemplateBorrowedFrom": "Minardi"
+			"chassisTemplateBorrowedFrom": "Cadillac"
 		},
 		{
 			"teamId": "M-S",
 			"budget": 245,
-			"chassisTemplateBorrowedFrom": "McLaren"
+			"chassisTemplateBorrowedFrom": "Scuderia Ferrari"
 		},
 		{
 			"teamId": "D-L",
 			"budget": 195,
-			"chassisTemplateBorrowedFrom": "Ferrari"
+			"chassisTemplateBorrowedFrom": "Mercedes-AMG"
 		},
 		{
 			"teamId": "U-A",
 			"budget": 190,
-			"chassisTemplateBorrowedFrom": "Porsche"
+			"chassisTemplateBorrowedFrom": "Mercedes-AMG"
 		},
 		{
 			"teamId": "V-W",
 			"budget": 180,
-			"chassisTemplateBorrowedFrom": "Jordan"
+			"chassisTemplateBorrowedFrom": "McLaren Racing"
 		},
 		{
 			"teamId": "L-K",
 			"budget": 225,
-			"chassisTemplateBorrowedFrom": "Toyota"
+			"chassisTemplateBorrowedFrom": "Red Bull Racing"
 		},
 		{
 			"teamId": "S-C",
 			"budget": 205,
-			"chassisTemplateBorrowedFrom": "Stewart"
+			"chassisTemplateBorrowedFrom": "Red Bull Racing"
 		},
 		{
 			"teamId": "P-C",
 			"budget": 200,
-			"chassisTemplateBorrowedFrom": "Lotus"
+			"chassisTemplateBorrowedFrom": "Alpine"
 		},
 		{
 			"teamId": "T-C",
 			"budget": 210,
-			"chassisTemplateBorrowedFrom": "Winfield Williams"
+			"chassisTemplateBorrowedFrom": "Racing Bulls"
 		},
 		{
 			"teamId": "V-V",
 			"budget": 235,
-			"chassisTemplateBorrowedFrom": "Winfield Williams"
+			"chassisTemplateBorrowedFrom": "Racing Bulls"
 		},
 		{
 			"teamId": "C-C",
 			"budget": 215,
-			"chassisTemplateBorrowedFrom": "Benetton"
+			"chassisTemplateBorrowedFrom": "Audi"
 		},
 		{
 			"teamId": "R-R",
 			"budget": 170,
-			"chassisTemplateBorrowedFrom": "Prost"
+			"chassisTemplateBorrowedFrom": "Haas"
 		},
 		{
 			"teamId": "T-T",
 			"budget": 260,
-			"chassisTemplateBorrowedFrom": "Super Aguri"
+			"chassisTemplateBorrowedFrom": "Haas"
 		},
 		{
 			"teamId": "R-C",
 			"budget": 220,
-			"chassisTemplateBorrowedFrom": "British American Racing"
+			"chassisTemplateBorrowedFrom": "Williams Racing"
 		},
 		{
 			"teamId": "T-G",
 			"budget": 230,
-			"chassisTemplateBorrowedFrom": "Sauber"
+			"chassisTemplateBorrowedFrom": "Aston Martin"
 		},
 		{
 			"teamId": "B-B",
 			"budget": 185,
-			"chassisTemplateBorrowedFrom": "Repsol Arrows"
+			"chassisTemplateBorrowedFrom": "Aston Martin"
 		},
 		{
 			"teamId": "A-A",
 			"budget": 175,
-			"chassisTemplateBorrowedFrom": "Minardi"
+			"chassisTemplateBorrowedFrom": "Cadillac"
 		}
 	],
 	"drivers": [

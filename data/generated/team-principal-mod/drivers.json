@@ -22,22 +22,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 1,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 52,
 			"salary_m": 17.04,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -63,22 +62,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 2,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 104,
 			"salary_m": 8.07,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -104,23 +102,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Mayhem Mavericks",
 			"length_weeks": 52,
 			"salary_m": 8.55,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Vaelynn",
@@ -145,22 +143,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 3,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Zero Heroes",
 			"length_weeks": 52,
 			"salary_m": 7.72,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -186,22 +183,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 4,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Zero Heroes",
 			"length_weeks": 52,
 			"salary_m": 13.13,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -227,23 +223,23 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Zero Heroes",
 			"length_weeks": 52,
 			"salary_m": 6.04,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Bladewalker",
@@ -268,22 +264,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 5,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Cold Steel",
 			"length_weeks": 104,
 			"salary_m": 8.49,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -309,22 +304,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 6,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Cold Steel",
 			"length_weeks": 156,
 			"salary_m": 8.72,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -350,23 +344,23 @@
 			"hotlapper",
 			"crash_happy"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Cold Steel",
 			"length_weeks": 156,
 			"salary_m": 7.48,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Nimri",
@@ -391,22 +385,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 7,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Golden Gladiators",
 			"length_weeks": 52,
 			"salary_m": 4.47,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -432,22 +425,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 8,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Golden Gladiators",
 			"length_weeks": 208,
 			"salary_m": 8.61,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -473,23 +465,23 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Golden Gladiators",
 			"length_weeks": 104,
 			"salary_m": 8.3,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Verla Compliance",
@@ -514,22 +506,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 9,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Last Ride",
 			"length_weeks": 52,
 			"salary_m": 10.13,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -555,22 +546,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 10,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Last Ride",
 			"length_weeks": 52,
 			"salary_m": 11.57,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -596,23 +586,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Last Ride",
 			"length_weeks": 104,
 			"salary_m": 13.56,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Darkblade",
@@ -637,22 +627,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 11,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Project Suicide",
 			"length_weeks": 52,
 			"salary_m": 13.54,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -678,22 +667,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 12,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Project Suicide",
 			"length_weeks": 156,
 			"salary_m": 7.44,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -719,23 +707,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Project Suicide",
 			"length_weeks": 104,
 			"salary_m": 6.12,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Cogfina Skyforge",
@@ -760,22 +748,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 13,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Raging Lunatics",
 			"length_weeks": 156,
 			"salary_m": 5.41,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -801,22 +788,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 14,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Raging Lunatics",
 			"length_weeks": 156,
 			"salary_m": 5.79,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -842,23 +828,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Raging Lunatics",
 			"length_weeks": 104,
 			"salary_m": 10.3,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Vexel",
@@ -883,22 +869,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 15,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Wrecking Legionnaires",
 			"length_weeks": 104,
 			"salary_m": 6.16,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -924,22 +909,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 16,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Wrecking Legionnaires",
 			"length_weeks": 52,
 			"salary_m": 8.85,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -965,23 +949,23 @@
 			"hotlapper",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Wrecking Legionnaires",
 			"length_weeks": 104,
 			"salary_m": 9.74,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Malagor",
@@ -1006,22 +990,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 17,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Hell Raisers",
 			"length_weeks": 208,
 			"salary_m": 17.84,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1047,22 +1030,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 18,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Hell Raisers",
 			"length_weeks": 104,
 			"salary_m": 5.7,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1088,23 +1070,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Hell Raisers",
 			"length_weeks": 52,
 			"salary_m": 5.5,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "PixiKat",
@@ -1129,22 +1111,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 19,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Silver Soldiers",
 			"length_weeks": 52,
 			"salary_m": 6.94,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1170,22 +1151,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 20,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Silver Soldiers",
 			"length_weeks": 104,
 			"salary_m": 7.45,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1211,23 +1191,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Silver Soldiers",
 			"length_weeks": 104,
 			"salary_m": 4.99,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Node",
@@ -1252,22 +1232,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 21,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Black Panthers",
 			"length_weeks": 156,
 			"salary_m": 6.19,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1293,22 +1272,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 22,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Black Panthers",
 			"length_weeks": 52,
 			"salary_m": 6.75,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1334,23 +1312,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Black Panthers",
 			"length_weeks": 52,
 			"salary_m": 11.14,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Jolia Noireclair",
@@ -1375,22 +1353,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 23,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Nunchuck Ninjas",
 			"length_weeks": 52,
 			"salary_m": 12.52,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1416,22 +1393,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 24,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Nunchuck Ninjas",
 			"length_weeks": 52,
 			"salary_m": 8.67,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1457,23 +1433,23 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Nunchuck Ninjas",
 			"length_weeks": 52,
 			"salary_m": 6.65,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Falcon",
@@ -1498,22 +1474,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 25,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Natures Wrath",
 			"length_weeks": 52,
 			"salary_m": 6.52,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -1539,22 +1514,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 26,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Natures Wrath",
 			"length_weeks": 52,
 			"salary_m": 6.31,
 			"start_week": 1,
-			"role": "main",
-			"status": "equal",
-			"priority": "equal"
+			"role": "main"
 		}
 	},
 	{
@@ -1580,23 +1554,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Natures Wrath",
 			"length_weeks": 52,
 			"salary_m": 5.84,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Eldara",
@@ -1621,22 +1595,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 27,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Death Peaches",
 			"length_weeks": 156,
 			"salary_m": 6.04,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1662,22 +1635,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 28,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Death Peaches",
 			"length_weeks": 104,
 			"salary_m": 7.76,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1703,23 +1675,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Death Peaches",
 			"length_weeks": 52,
 			"salary_m": 6.4,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Weaver of Time",
@@ -1744,22 +1716,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 29,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Wicked Wizards",
 			"length_weeks": 104,
 			"salary_m": 9.62,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1785,22 +1756,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 30,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Wicked Wizards",
 			"length_weeks": 104,
 			"salary_m": 6.91,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1826,23 +1796,23 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Wicked Wizards",
 			"length_weeks": 104,
 			"salary_m": 7.25,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Ashanti",
@@ -1867,22 +1837,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 31,
 		"contract": {
+			"status": "first",
+			"priority": "first",
 			"team": "Vicious & Delicious",
 			"length_weeks": 52,
 			"salary_m": 8.12,
 			"start_week": 1,
-			"role": "main",
-			"status": "first",
-			"priority": "first"
+			"role": "main"
 		}
 	},
 	{
@@ -1908,22 +1877,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "racer",
 		"nationality": "international",
-		"number": 32,
 		"contract": {
+			"status": "second",
+			"priority": "second",
 			"team": "Vicious & Delicious",
 			"length_weeks": 104,
 			"salary_m": 5.15,
 			"start_week": 1,
-			"role": "main",
-			"status": "second",
-			"priority": "second"
+			"role": "main"
 		}
 	},
 	{
@@ -1949,27 +1917,27 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "reserve_driver",
 		"nationality": "international",
-		"number": null,
 		"contract": {
+			"status": "equal",
+			"priority": "equal",
 			"team": "Vicious & Delicious",
 			"length_weeks": 52,
 			"salary_m": 9.56,
 			"start_week": 1,
-			"role": "reserve",
-			"status": "equal",
-			"priority": "equal"
-		}
+			"role": "reserve"
+		},
+		"role": "reserve"
 	},
 	{
 		"name": "Seraph-11",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 17,
 		"consistency": 18,
@@ -1990,17 +1958,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Ralazar the Balanced",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 16,
 		"consistency": 12,
@@ -2021,17 +1993,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Byrnja",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 2,
 		"consistency": 4,
@@ -2052,17 +2028,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Elara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 14,
 		"consistency": 6,
@@ -2083,17 +2063,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Aeon Flux",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 5,
 		"consistency": 2,
@@ -2114,17 +2098,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Mindtamer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 20,
 		"consistency": 15,
@@ -2145,17 +2133,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Krag'Zul",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 5,
 		"consistency": 18,
@@ -2176,17 +2168,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tidesprinter",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 18,
 		"consistency": 8,
@@ -2207,17 +2203,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Greenkraut",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 4,
 		"consistency": 12,
@@ -2238,17 +2238,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Cassandra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 7,
 		"consistency": 12,
@@ -2269,17 +2273,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Byrd",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 4,
 		"consistency": 13,
@@ -2300,17 +2308,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Arachna",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 17,
 		"consistency": 3,
@@ -2331,17 +2343,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tsubaki Cleaning",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 9,
 		"consistency": 18,
@@ -2362,17 +2378,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Othrama",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 2,
 		"consistency": 11,
@@ -2393,17 +2413,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Butterfly",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 15,
 		"consistency": 12,
@@ -2424,17 +2448,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Myrkos",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 4,
 		"consistency": 4,
@@ -2455,17 +2483,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Mavra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 14,
 		"consistency": 19,
@@ -2486,17 +2518,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Murky",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 2,
 		"consistency": 17,
@@ -2517,17 +2553,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Leviathan",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 7,
 		"consistency": 12,
@@ -2548,17 +2588,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Aegirion",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 11,
 		"consistency": 18,
@@ -2579,17 +2623,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Starbound",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 8,
 		"consistency": 14,
@@ -2610,17 +2658,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Brightpaw",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 5,
 		"consistency": 16,
@@ -2641,17 +2693,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Abysskraken",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 10,
 		"consistency": 11,
@@ -2672,17 +2728,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Kreischende Kogge",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 8,
 		"consistency": 3,
@@ -2703,17 +2763,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Xerathis",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 7,
 		"consistency": 18,
@@ -2734,17 +2798,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Alarm",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 20,
 		"consistency": 14,
@@ -2765,17 +2833,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Aurora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 18,
 		"consistency": 12,
@@ -2796,17 +2868,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tropfina",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 9,
 		"consistency": 15,
@@ -2827,17 +2903,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Roddox Harthelm",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 5,
 		"consistency": 11,
@@ -2858,17 +2938,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Ironhoof",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 4,
 		"consistency": 6,
@@ -2889,17 +2973,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Babuschinka",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 11,
 		"consistency": 14,
@@ -2920,17 +3008,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rok Kyl",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 5,
 		"consistency": 1,
@@ -2951,17 +3043,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"loyal",
 			"mercenary",
 			"prima_donna"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Omniclops",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 2,
 		"consistency": 11,
@@ -2982,17 +3078,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Enforcer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 9,
 		"consistency": 19,
@@ -3013,17 +3113,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Melody",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 4,
 		"consistency": 10,
@@ -3044,17 +3148,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Catherine",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 13,
 		"consistency": 17,
@@ -3075,17 +3183,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Reefstrike",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 11,
 		"consistency": 3,
@@ -3106,17 +3218,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Knochenrichter",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 15,
 		"consistency": 13,
@@ -3137,17 +3253,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Caldor",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 17,
 		"consistency": 11,
@@ -3168,17 +3288,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sir Percival",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 15,
 		"consistency": 18,
@@ -3199,17 +3323,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Midas",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 6,
 		"consistency": 19,
@@ -3230,17 +3358,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Ser Camelot",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 13,
 		"consistency": 14,
@@ -3261,17 +3393,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Suzuna",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 16,
 		"consistency": 9,
@@ -3292,17 +3428,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Serena",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 3,
 		"consistency": 2,
@@ -3323,17 +3463,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Drop Dead",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 10,
 		"consistency": 6,
@@ -3354,17 +3498,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lumen Serene",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 11,
 		"consistency": 12,
@@ -3385,17 +3533,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Timantha",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 14,
 		"consistency": 14,
@@ -3416,17 +3568,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Elum Kaa",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 1,
 		"consistency": 7,
@@ -3447,17 +3603,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Angrod",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 12,
 		"consistency": 7,
@@ -3478,17 +3638,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Glockenfresser",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 3,
 		"consistency": 12,
@@ -3509,17 +3673,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Etwas M",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 3,
 		"consistency": 6,
@@ -3540,17 +3708,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Die Liebenden",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 2,
 		"consistency": 20,
@@ -3571,17 +3743,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Genta",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 7,
 		"consistency": 17,
@@ -3602,17 +3778,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hargorin Todbringer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 4,
 		"consistency": 3,
@@ -3633,17 +3813,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Jihanna",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 3,
 		"consistency": 8,
@@ -3664,17 +3848,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nahli-Ke",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 13,
 		"consistency": 15,
@@ -3695,17 +3883,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lyselith",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 16,
 		"consistency": 5,
@@ -3726,17 +3918,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Cerenna Garstochter",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 10,
 		"consistency": 20,
@@ -3757,17 +3953,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Belinda",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 7,
 		"consistency": 3,
@@ -3788,17 +3988,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Floodspirit",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 5,
 		"consistency": 18,
@@ -3819,17 +4023,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Pestilence",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 13,
 		"consistency": 20,
@@ -3850,17 +4058,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Katniss",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 18,
 		"consistency": 9,
@@ -3881,17 +4093,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Terradon",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 3,
 		"consistency": 13,
@@ -3912,17 +4128,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Elyon",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 15,
 		"consistency": 14,
@@ -3943,17 +4163,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sweet Dreams",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 11,
 		"consistency": 14,
@@ -3974,17 +4198,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grizz",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 6,
 		"consistency": 12,
@@ -4005,17 +4233,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Gary the Keeper",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 2,
 		"consistency": 13,
@@ -4036,17 +4268,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Petra Brezelstein",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 13,
 		"consistency": 16,
@@ -4067,17 +4303,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Jara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 9,
 		"consistency": 17,
@@ -4098,17 +4338,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Arabelle Stormtide",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 11,
 		"consistency": 13,
@@ -4129,17 +4373,21 @@
 			"hotlapper",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Skull Knight",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 8,
 		"consistency": 3,
@@ -4160,17 +4408,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nocture",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 5,
 		"consistency": 2,
@@ -4191,17 +4443,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hellvoice",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 9,
 		"consistency": 7,
@@ -4222,17 +4478,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Venom",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 2,
 		"consistency": 4,
@@ -4253,17 +4513,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Small Red Machine",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 10,
 		"consistency": 7,
@@ -4284,17 +4548,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Voryne Darkclaw",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 8,
 		"consistency": 9,
@@ -4315,17 +4583,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lady Mournvale",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 11,
 		"consistency": 14,
@@ -4346,17 +4618,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nelchael",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 4,
 		"consistency": 7,
@@ -4377,17 +4653,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Gralakar",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 11,
 		"consistency": 10,
@@ -4408,17 +4688,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lord Amaranth",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 15,
 		"consistency": 18,
@@ -4439,17 +4723,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Blorgh",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 8,
 		"consistency": 8,
@@ -4470,17 +4758,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Eternia",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 5,
 		"consistency": 13,
@@ -4501,17 +4793,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Krosis",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 8,
 		"consistency": 16,
@@ -4532,17 +4828,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nefruet Pixelwick",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 10,
 		"consistency": 11,
@@ -4563,17 +4863,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nekira",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 7,
 		"consistency": 3,
@@ -4594,17 +4898,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nezhet",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 8,
 		"consistency": 10,
@@ -4625,17 +4933,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Steel Sinister",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 17,
 		"consistency": 13,
@@ -4656,17 +4968,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tartarus",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 6,
 		"consistency": 7,
@@ -4687,17 +5003,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sister Ilora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 18,
 		"consistency": 19,
@@ -4718,17 +5038,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Bombblitzer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 7,
 		"consistency": 3,
@@ -4749,17 +5073,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nefar Safety",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 19,
 		"consistency": 14,
@@ -4780,17 +5108,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tremble",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 1,
 		"consistency": 13,
@@ -4811,17 +5143,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Knisterl",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 7,
 		"consistency": 3,
@@ -4842,17 +5178,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shadowwing",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 5,
 		"consistency": 3,
@@ -4873,17 +5213,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tollim KS",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 12,
 		"consistency": 7,
@@ -4904,17 +5248,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Minion Master",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 3,
 		"consistency": 5,
@@ -4935,17 +5283,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rustfire Golem",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 1,
 		"consistency": 7,
@@ -4966,17 +5318,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Steel Sentinel",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 19,
 		"consistency": 17,
@@ -4997,17 +5353,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Devastator",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 1,
 		"consistency": 1,
@@ -5028,17 +5388,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Chain",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 7,
 		"consistency": 3,
@@ -5059,17 +5423,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Issyria",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 10,
 		"consistency": 12,
@@ -5090,17 +5458,21 @@
 			"hotlapper",
 			"crash_happy"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Orichalcos",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 17,
 		"consistency": 8,
@@ -5121,17 +5493,21 @@
 			"hotlapper",
 			"bottlejob"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sunny",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 8,
 		"consistency": 10,
@@ -5152,17 +5528,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Abyssalfin",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 11,
 		"consistency": 12,
@@ -5183,17 +5563,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Velza",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 8,
 		"consistency": 18,
@@ -5214,17 +5598,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hisihida",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 16,
 		"consistency": 11,
@@ -5245,17 +5633,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Iska",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 9,
 		"consistency": 16,
@@ -5276,17 +5668,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Barkwing",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 7,
 		"consistency": 5,
@@ -5307,17 +5703,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sylvara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 4,
 		"consistency": 11,
@@ -5338,17 +5738,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hartmut",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 12,
 		"consistency": 14,
@@ -5369,17 +5773,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Vexon",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 19,
 		"consistency": 6,
@@ -5400,17 +5808,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Matcha",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 10,
 		"consistency": 18,
@@ -5431,17 +5843,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Xil'Vera",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 13,
 		"consistency": 4,
@@ -5462,17 +5878,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Breeze",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 15,
 		"consistency": 13,
@@ -5493,17 +5913,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lilly",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 6,
 		"consistency": 1,
@@ -5524,17 +5948,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Vigil",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 16,
 		"consistency": 2,
@@ -5555,17 +5983,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Bana",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 4,
 		"consistency": 9,
@@ -5586,17 +6018,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Wingless",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 16,
 		"consistency": 15,
@@ -5617,17 +6053,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Furomar",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 1,
 		"consistency": 1,
@@ -5648,17 +6088,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Zephyra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 14,
 		"consistency": 8,
@@ -5679,17 +6123,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Kloeschen",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 2,
 		"consistency": 5,
@@ -5710,17 +6158,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shadowsong",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 6,
 		"consistency": 9,
@@ -5741,17 +6193,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grossmutter Igid",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 5,
 		"consistency": 10,
@@ -5772,17 +6228,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Whispra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 6,
 		"consistency": 11,
@@ -5803,17 +6263,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tidesinger",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 13,
 		"consistency": 17,
@@ -5834,17 +6298,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Xylaris",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 15,
 		"consistency": 6,
@@ -5865,17 +6333,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Marin Solis",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 17,
 		"consistency": 18,
@@ -5896,17 +6368,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Buttercup",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 5,
 		"consistency": 6,
@@ -5927,17 +6403,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Madora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 3,
 		"consistency": 14,
@@ -5958,17 +6438,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Webweaver",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 18,
 		"consistency": 12,
@@ -5989,17 +6473,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sir Ruckus",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 7,
 		"consistency": 3,
@@ -6020,17 +6508,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Faith",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 16,
 		"consistency": 20,
@@ -6051,17 +6543,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Zhyrra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 9,
 		"consistency": 15,
@@ -6082,17 +6578,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grimflora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 4,
 		"consistency": 2,
@@ -6113,17 +6613,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Taryn",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 14,
 		"consistency": 9,
@@ -6144,17 +6648,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Yuko",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 16,
 		"consistency": 15,
@@ -6175,17 +6683,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Wavepiercer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 11,
 		"consistency": 5,
@@ -6206,17 +6718,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"prima_donna"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Yukine",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 11,
 		"consistency": 4,
@@ -6237,17 +6753,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Maru",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 12,
 		"consistency": 17,
@@ -6268,17 +6788,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Swiftfoot",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 8,
 		"consistency": 15,
@@ -6299,17 +6823,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Broxingar",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 1,
 		"consistency": 9,
@@ -6330,17 +6858,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"prima_donna"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Belandria",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 14,
 		"consistency": 17,
@@ -6361,17 +6893,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Clara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 16,
 		"consistency": 13,
@@ -6392,17 +6928,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Orakelpfropf",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 9,
 		"consistency": 5,
@@ -6423,17 +6963,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Skittermind",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 6,
 		"consistency": 1,
@@ -6454,17 +6998,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Talahon",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 19,
 		"consistency": 14,
@@ -6485,17 +7033,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Varric Frankenstein",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 17,
 		"consistency": 7,
@@ -6516,17 +7068,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nula",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 2,
 		"consistency": 4,
@@ -6547,17 +7103,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Pinkypie",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 9,
 		"consistency": 7,
@@ -6578,17 +7138,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nachtschatten",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 15,
 		"consistency": 13,
@@ -6609,17 +7173,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Moonveil",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 18,
 		"consistency": 17,
@@ -6640,17 +7208,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Velkin",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 20,
 		"consistency": 4,
@@ -6671,17 +7243,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Isuzu",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 9,
 		"consistency": 7,
@@ -6702,17 +7278,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Treantos",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 11,
 		"consistency": 18,
@@ -6733,17 +7313,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Fyrn",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 5,
 		"consistency": 8,
@@ -6764,17 +7348,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Titania",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 14,
 		"consistency": 10,
@@ -6795,17 +7383,21 @@
 			"hotlapper",
 			"crash_happy"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hippo",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 18,
 		"consistency": 9,
@@ -6826,17 +7418,21 @@
 			"hotlapper",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Diana",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 14,
 		"consistency": 4,
@@ -6857,17 +7453,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Cyrn",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 14,
 		"consistency": 19,
@@ -6888,17 +7488,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Umbramantis",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 7,
 		"consistency": 2,
@@ -6919,17 +7523,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Umbrafond",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 18,
 		"consistency": 9,
@@ -6950,17 +7558,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nytharos",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 14,
 		"consistency": 6,
@@ -6981,17 +7593,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Don Micelio Valens",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 18,
 		"consistency": 11,
@@ -7012,17 +7628,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Wu Tang",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 4,
 		"consistency": 20,
@@ -7043,17 +7663,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Mora Schleck",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 17,
 		"consistency": 19,
@@ -7074,17 +7698,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Kyori",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 6,
 		"consistency": 3,
@@ -7105,17 +7733,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Vero",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 3,
 		"consistency": 16,
@@ -7136,17 +7768,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nemenlirea",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 3,
 		"consistency": 6,
@@ -7167,17 +7803,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Therella",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 3,
 		"consistency": 5,
@@ -7198,17 +7838,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Chyros",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 3,
 		"consistency": 5,
@@ -7229,17 +7873,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nemo",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 12,
 		"consistency": 13,
@@ -7260,17 +7908,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lys Puppenkopf",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 19,
 		"consistency": 16,
@@ -7291,17 +7943,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Galactus",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 19,
 		"consistency": 17,
@@ -7322,17 +7978,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Varkon Darkheed",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 17,
 		"consistency": 14,
@@ -7353,17 +8013,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Asher Caligo",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 10,
 		"consistency": 18,
@@ -7384,17 +8048,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Myrth",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 3,
 		"consistency": 4,
@@ -7415,17 +8083,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Biteback",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 15,
 		"consistency": 2,
@@ -7446,17 +8118,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Scavenger",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 1,
 		"consistency": 6,
@@ -7477,17 +8153,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Horst Schlurff",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 17,
 		"consistency": 19,
@@ -7508,17 +8188,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Tavascron",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 6,
 		"consistency": 4,
@@ -7539,17 +8223,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Vorrak",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 15,
 		"consistency": 15,
@@ -7570,17 +8258,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Bearington",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 10,
 		"consistency": 4,
@@ -7601,17 +8293,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grieving Colossus",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 3,
 		"consistency": 8,
@@ -7632,17 +8328,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hollow",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 12,
 		"consistency": 7,
@@ -7663,17 +8363,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Brontar",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 15,
 		"consistency": 15,
@@ -7694,17 +8398,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Snow Eagle",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 5,
 		"consistency": 10,
@@ -7725,17 +8433,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Crucible Warden",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 19,
 		"consistency": 15,
@@ -7756,17 +8468,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Italo-Delta",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 8,
 		"consistency": 13,
@@ -7787,17 +8503,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sanctrix",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 9,
 		"consistency": 16,
@@ -7818,17 +8538,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Dawnwhisper",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 17,
 		"consistency": 16,
@@ -7849,17 +8573,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Cadrael",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 5,
 		"consistency": 13,
@@ -7880,17 +8608,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Dr Ironmind",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 17,
 		"consistency": 19,
@@ -7911,17 +8643,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hegrun",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 12,
 		"consistency": 8,
@@ -7942,17 +8678,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Johnny Smoke",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 10,
 		"consistency": 16,
@@ -7973,17 +8713,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Bronzebrow",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 13,
 		"consistency": 16,
@@ -8004,17 +8748,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Quarris",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 4,
 		"consistency": 18,
@@ -8035,17 +8783,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Becky",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 19,
 		"braking": 3,
 		"consistency": 3,
@@ -8066,17 +8818,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Medibull",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 19,
 		"consistency": 16,
@@ -8097,17 +8853,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Gronkslime",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 4,
 		"consistency": 11,
@@ -8128,17 +8888,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Kora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 9,
 		"consistency": 17,
@@ -8159,17 +8923,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Mushu",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 4,
 		"consistency": 8,
@@ -8190,17 +8958,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"prima_donna"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hulk",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 2,
 		"consistency": 16,
@@ -8221,17 +8993,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Abu-T",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 5,
 		"consistency": 10,
@@ -8252,17 +9028,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Stormfang",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 6,
 		"consistency": 19,
@@ -8283,17 +9063,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Whaam",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 4,
 		"consistency": 6,
@@ -8314,17 +9098,21 @@
 			"mechanic",
 			"bottlejob"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"prima_donna"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Mictone",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 6,
 		"consistency": 5,
@@ -8345,17 +9133,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Moonscourge",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 6,
 		"consistency": 7,
@@ -8376,17 +9168,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Knoedelsohn",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 13,
 		"consistency": 16,
@@ -8407,17 +9203,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Riley Le Rogue",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 2,
 		"consistency": 3,
@@ -8438,17 +9238,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Puschelix",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 9,
 		"consistency": 14,
@@ -8469,17 +9273,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Kento",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 13,
 		"consistency": 4,
@@ -8500,17 +9308,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shield",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 8,
 		"consistency": 15,
@@ -8531,17 +9343,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Eike",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 18,
 		"consistency": 11,
@@ -8562,17 +9378,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lynara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 14,
 		"consistency": 15,
@@ -8593,17 +9413,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shadowforge",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 8,
 		"consistency": 10,
@@ -8624,17 +9448,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Waechterbot",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 8,
 		"consistency": 9,
@@ -8655,17 +9483,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lord Gildnor",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 6,
 		"consistency": 7,
@@ -8686,17 +9518,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Elea Cinnamora",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 12,
 		"consistency": 19,
@@ -8717,17 +9553,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Pandemonium",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 5,
 		"consistency": 1,
@@ -8748,17 +9588,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Delamare",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 3,
 		"consistency": 10,
@@ -8779,17 +9623,21 @@
 			"hotlapper",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Teravolt",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 2,
 		"consistency": 6,
@@ -8810,17 +9658,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Deadface",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 18,
 		"braking": 16,
 		"consistency": 2,
@@ -8841,17 +9693,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Emphi",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 3,
 		"consistency": 9,
@@ -8872,17 +9728,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Akali",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 16,
 		"consistency": 2,
@@ -8903,17 +9763,21 @@
 			"hotlapper",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rootheart",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 12,
 		"consistency": 19,
@@ -8934,17 +9798,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Phantomblade",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 10,
 		"consistency": 2,
@@ -8965,17 +9833,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nhyra-Vel",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 6,
 		"consistency": 7,
@@ -8996,17 +9868,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rex",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 1,
 		"consistency": 3,
@@ -9027,17 +9903,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Impulse",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 14,
 		"braking": 5,
 		"consistency": 10,
@@ -9058,17 +9938,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Terratron",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 4,
 		"consistency": 10,
@@ -9089,17 +9973,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Yinen",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 8,
 		"consistency": 3,
@@ -9120,17 +10008,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Untaught Scribe",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 19,
 		"consistency": 9,
@@ -9151,17 +10043,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Cyra",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 7,
 		"consistency": 8,
@@ -9182,17 +10078,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Hyperion",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 16,
 		"braking": 14,
 		"consistency": 6,
@@ -9213,17 +10113,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nyrell Winterfang",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 20,
 		"braking": 11,
 		"consistency": 5,
@@ -9244,17 +10148,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Floralis",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 10,
 		"consistency": 18,
@@ -9275,17 +10183,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Nebrauk",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 1,
 		"consistency": 2,
@@ -9306,17 +10218,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grumpp",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 2,
 		"consistency": 17,
@@ -9337,17 +10253,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sloth",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 17,
 		"braking": 18,
 		"consistency": 5,
@@ -9368,17 +10288,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Liluth",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 2,
 		"consistency": 2,
@@ -9399,17 +10323,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Brunhilde",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 7,
 		"consistency": 6,
@@ -9430,17 +10358,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Holzfaust",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 14,
 		"consistency": 19,
@@ -9461,17 +10393,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Wahiru",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 2,
 		"consistency": 4,
@@ -9492,17 +10428,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Skenhylde",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 5,
 		"consistency": 10,
@@ -9523,17 +10463,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Freyla",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 19,
 		"consistency": 11,
@@ -9554,17 +10498,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Harold",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 10,
 		"consistency": 11,
@@ -9585,17 +10533,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rhazgul Icebound",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 12,
 		"consistency": 12,
@@ -9616,17 +10568,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Frostseer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 9,
 		"consistency": 12,
@@ -9647,17 +10603,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Draco",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 4,
 		"consistency": 10,
@@ -9678,17 +10638,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Jorund",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 8,
 		"braking": 16,
 		"consistency": 15,
@@ -9709,17 +10673,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Xelara",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 17,
 		"consistency": 17,
@@ -9740,17 +10708,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Inefinna",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 12,
 		"consistency": 14,
@@ -9771,17 +10743,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rhyx'Tal",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 8,
 		"consistency": 5,
@@ -9802,17 +10778,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Johanna",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 7,
 		"consistency": 14,
@@ -9833,17 +10813,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Gram",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 7,
 		"consistency": 3,
@@ -9864,17 +10848,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lava Golem",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 1,
 		"braking": 2,
 		"consistency": 2,
@@ -9895,17 +10883,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Krolach",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 3,
 		"braking": 13,
 		"consistency": 12,
@@ -9926,17 +10918,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lulu",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 9,
 		"braking": 3,
 		"consistency": 4,
@@ -9957,17 +10953,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "King Arlen Morgolor",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 8,
 		"consistency": 4,
@@ -9988,17 +10988,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Bloater",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 2,
 		"braking": 6,
 		"consistency": 1,
@@ -10019,17 +11023,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Iron Warlord",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 12,
 		"consistency": 8,
@@ -10050,17 +11058,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Houndmaster Riaje",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 15,
 		"consistency": 2,
@@ -10081,17 +11093,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Rubio Stone",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 13,
 		"consistency": 18,
@@ -10112,17 +11128,21 @@
 			"mechanic",
 			"nervous"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"fragile_ego"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Avatar of Slaughter",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 13,
 		"consistency": 8,
@@ -10143,17 +11163,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sunken Crown",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 4,
 		"braking": 5,
 		"consistency": 19,
@@ -10174,17 +11198,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Sterling",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 2,
 		"consistency": 5,
@@ -10205,17 +11233,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Dyrth",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 16,
 		"consistency": 20,
@@ -10236,17 +11268,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Crumbsage",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 12,
 		"braking": 14,
 		"consistency": 16,
@@ -10267,17 +11303,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Threnox",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 14,
 		"consistency": 5,
@@ -10298,17 +11338,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shadowsage",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 13,
 		"braking": 11,
 		"consistency": 15,
@@ -10329,17 +11373,21 @@
 			"mechanic",
 			"crash_happy"
 		],
+		"personality": "mercenary",
 		"personalities": [
 			"short_termist",
 			"mercenary",
 			"hot_streaker"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Gravemind Atoll",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 6,
 		"braking": 18,
 		"consistency": 9,
@@ -10360,17 +11408,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Prinz Faelyn",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 19,
 		"consistency": 6,
@@ -10391,17 +11443,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Marzipella",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 12,
 		"consistency": 5,
@@ -10422,17 +11478,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Voidseer",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 13,
 		"consistency": 2,
@@ -10453,17 +11513,21 @@
 			"hotlapper",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"ambitious",
 			"team_player",
 			"glory_hunter"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Harbinger",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 15,
 		"braking": 13,
 		"consistency": 1,
@@ -10484,17 +11548,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Burster",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 11,
 		"consistency": 2,
@@ -10515,17 +11583,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Shroud",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 10,
 		"braking": 12,
 		"consistency": 7,
@@ -10546,17 +11618,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "team_player",
 		"personalities": [
 			"loyal",
 			"team_player",
 			"quiet_professional"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Haldor",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 11,
 		"braking": 13,
 		"consistency": 16,
@@ -10577,17 +11653,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Grok'Na",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 5,
 		"braking": 16,
 		"consistency": 5,
@@ -10608,17 +11688,21 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	},
 	{
 		"name": "Lizard",
-		"team": "Free Agent",
+		"team": null,
 		"cornering": 7,
 		"braking": 8,
 		"consistency": 17,
@@ -10639,12 +11723,16 @@
 			"mechanic",
 			"cautious"
 		],
+		"personality": "ambitious",
 		"personalities": [
 			"loyal",
 			"ambitious",
 			"company_man"
 		],
-		"career_stage": "free_agent",
-		"nationality": "international"
+		"nationality": "international",
+		"contract": {
+			"status": "equal",
+			"priority": "equal"
+		}
 	}
 ]
