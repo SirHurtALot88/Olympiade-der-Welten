@@ -131,6 +131,54 @@ Sichtprüfung. Ein Folgeauftrag, der jeden der 58 Namen einzeln durchsieht (manc
 zusätzliche Ebenen wie `hose`/`kapuze`, die mit umgestellt werden müssten), ist der
 nächste, saubere Schritt.
 
+### Football-Ausrüstung für LPC-Körper (05.09.)
+
+Chris' Bericht "Football-Spieler sehen aus wie umlackierte Arena-Kämpfer" führte zurück auf
+die `football-matrix-und-assets-recherche-05-09.md`: nur der Ball war football-spezifisch
+verdrahtet, drei geladene Kenney-Helme wurden nirgends gezeichnet, und eine Namenssuche
+(`*football*`, `*jersey*`, `*pauldron*`) hatte im LPC-Fundus nichts gefunden — obwohl er
+unter anderen Namen die passenden Formen längst enthält. Fünf neue Ebenen, byte-identisch
+aus demselben LPC-Checkout wie `leder_frau`/`plate_frau`:
+
+| Ebene | LPC-Quelle | Bedeutet |
+|---|---|---|
+| `fb_helm` | `hat/helmet/bascinet_round/adult/` | runde Helmschale (kein Nasal/Kamm) |
+| `fb_maske` | `hat/visor/grated/adult/` | Gittervisier — unser `visier` ist Slit, kein Gitter |
+| `fb_schulter` (+`_frau`) | `shoulders/mantal/{male,thin}/` | breite, gepolsterte Schulterkappen |
+| `fb_trikot` (+`_frau`) | `torso/clothes/sleeveless/sleeveless2/{male,female}/` | ärmelloses Trikot |
+| `fb_hose` (+`_frau`) | `legs/leggings/{male,thin}/` | enge Beinschutz-Hose |
+
+Nur `walk`/`shoot`/`hurt` nachgezogen, nicht der volle Satz: `istFootball()` greift
+ausschließlich im Feldspiel, und dort fragt `zeichneSprite()` für Feldspiel-Akteure
+nachweislich nie `slash`/`idle`/`run` an (Waffen und damit Nahkampf-Posen sind im Feldspiel
+gesperrt) — ein zusätzliches Blatt wäre totes Gewicht gewesen.
+
+Verdrahtet ist das als **Disziplin-Override beim Zeichnen** (`zeichneSprite`, Flag
+`footballGear = feldspiel && istFootball()`), nicht als Änderung an den 124 Baueinträgen
+selbst: derselbe Charakter trägt in jeder anderen Disziplin/der Arena weiterhin sein
+eigenes `ruest`/`helm`. Für die Dauer eines Football-Feldspiels ersetzt das Override
+`ruest`→`fb_trikot`, `hose`→`fb_hose`, `helm`→`fb_helm`+`fb_maske`, ergänzt `fb_schulter`
+und schaltet Krone/Hörner/Bart/Kapuze/Schild ab (ein Bascinet mit Gittervisier verträgt
+sich mit keinem davon — beim Sichtcheck trug Johanna sonst weiterhin ihren Ritterschild
+unterm Trikot).
+
+`fb_helm`/`fb_maske` treffen pixelgenau die bestehende `RUEST_RAMPE`/"plate"-Palette und
+laufen deshalb automatisch über die vorhandene `spriteRuest()`/`RUEST_TON`-Erkennung, ohne
+neuen Code. `fb_trikot`/`fb_schulter`/`fb_hose` teilen sich eine eigene Stofframpe (neuer
+`RUEST_QUELLEN`-Eintrag `football_stoff`, ausgezählt aus `fb_trikot_walk.png`). Das Trikot
+wird in **Teamfarbe** eingefärbt (Chris' Auftrag: die Stofffarben sollen nach Team
+umschaltbar sein) — nicht über eine der drei festen `RUEST_TON`-Tabellen, sondern über eine
+zur Laufzeit aus `--home`/`--away` erzeugte sechsstufige Rampe (`footballTeamRampe()`,
+`hexZuHsl`/`hslZuRgb`), mit denselben Lightness-Stufen, die `gold`/`bronze`/`dunkel` schon
+benutzen. Schulterpolster und Hose bleiben in natürlicher Stofffarbe (`ruestTon`, falls
+gesetzt) — das Team-Signal soll am Trikot sitzen, nicht an jeder Ebene gleichzeitig.
+
+**Grenze, wie in der Recherche benannt**: das hilft nur den LPC-körperbasierten Charakteren
+(`kopf`-Bauplan, kein `vollbild`) — rund 45 von 110 Kaderfamilien-Spielern. Die 65
+Vollbild-Kreaturen (Drachen, Golems, Reiher-Mechs …) brauchen eine eigene
+Kopfpunkt-Vermessung (`docs/design/football-zufriedenstellend.md` Abschnitt 5) und bleiben
+unangetastet — bewusst eine spätere Runde.
+
 ## Umfärben
 
 Jede Ebene liegt **einmal** vor und wird zur Laufzeit umgefärbt: sechs Farben werden

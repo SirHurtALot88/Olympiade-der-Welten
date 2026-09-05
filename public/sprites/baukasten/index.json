@@ -698,5 +698,173 @@
     "bytes": 519,
     "hoehe": 256,
     "richtungen": 4
+  },
+  "fb_helm_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 4088,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_helm_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 4506,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_helm_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1791,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_maske_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 956,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_maske_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1038,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_maske_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 717,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_schulter_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 3089,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_schulter_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 7994,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_schulter_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1040,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_schulter_frau_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 2847,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_schulter_frau_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 8050,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_schulter_frau_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1130,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_trikot_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 5309,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_trikot_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 5743,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_trikot_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1301,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_trikot_frau_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1903,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_trikot_frau_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 2004,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_trikot_frau_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 537,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_hose_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 5493,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_hose_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1484,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_hose_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 737,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "fb_hose_frau_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 2000,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_hose_frau_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1231,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fb_hose_frau_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 669,
+    "hoehe": 64,
+    "richtungen": 1
   }
 }
