@@ -16,10 +16,13 @@
 // zentriert waere.
 //
 //   node scripts/pcm/export-photos.mjs --trace <pfad-zu-oly-pcm-mapping-trace.json> [--out <dir>]
-//     [--format png|jpeg] [--quality 85]
-// --format jpeg ist NUR eine Not-Option fuer die Dateiuebertragung an Chris (PNG bei 256x256
-// x ~2984 Dateien wird als Zip zu gross fuer die Chat-Uebertragung) -- welches Format PCM
-// tatsaechlich erwartet, ist wie bei den Logos nicht verifiziert, deshalb bleibt PNG Default.
+//     [--size 256] [--palette]
+// Chris' erster Testlauf (05.09.): Datenbank + Restart korrekt, Teamname/Trikot laden, Foto
+// bleibt graue Silhouette -- die erste Lieferung war als JPEG exportiert (nur wegen der
+// Chat-Uebertragungsgrenze, s. Git-Historie), .jpg wird von PCMs ProCyclistPhoto-Ordner
+// offenbar NICHT akzeptiert. --palette erzeugt eine ECHTE PNG-Datei (8-Bit indiziert statt
+// 24-Bit) -- kleiner (~4x) ohne das Format zu wechseln, damit auch die volle ~2984er-Lieferung
+// unter das Uebertragungslimit passt.
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -28,12 +31,12 @@ const PORTRAITS_DIR = 'public/portraits';
 const EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
 function parseArgs(argv) {
-  const out = { trace: null, outDir: 'data/generated/pcm-mod/photos', format: 'png', quality: 85 };
+  const out = { trace: null, outDir: 'data/generated/pcm-mod/photos', size: 256, palette: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--trace') out.trace = argv[++i];
     else if (argv[i] === '--out') out.outDir = argv[++i];
-    else if (argv[i] === '--format') out.format = argv[++i];
-    else if (argv[i] === '--quality') out.quality = Number(argv[++i]);
+    else if (argv[i] === '--size') out.size = Number(argv[++i]);
+    else if (argv[i] === '--palette') out.palette = true;
   }
   if (!out.trace) throw new Error('Pflichtargument fehlt: --trace <pfad-zu-oly-pcm-mapping-trace.json>');
   return out;
@@ -72,9 +75,12 @@ async function main() {
       continue;
     }
     try {
-      await sharp(src).resize(256, 256, { fit: 'cover' }).toFormat(args.format, args.format === 'jpeg' ? { quality: args.quality } : {}).toFile(path.join(args.outDir, `${slug}.${args.format === 'jpeg' ? 'jpg' : args.format}`));
+      await sharp(src)
+        .resize(args.size, args.size, { fit: 'cover' })
+        .png(args.palette ? { palette: true, quality: 80, effort: 8 } : {})
+        .toFile(path.join(args.outDir, `${slug}.png`));
       ok++;
-      manifest.push({ olyPlayerName: rider.olyPlayerName, slug, photo: `${slug}.${args.format === 'jpeg' ? 'jpg' : args.format}` });
+      manifest.push({ olyPlayerName: rider.olyPlayerName, slug, photo: `${slug}.png` });
     } catch (e) {
       missing++;
       console.warn(`WARNUNG: ${rider.olyPlayerName} (${src}): ${e.message}`);
@@ -82,7 +88,7 @@ async function main() {
   }
 
   writeFileSync(path.join(args.outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log(`${ok} Spielerportraits exportiert (256x256 ${args.format.toUpperCase()}), ${missing} fehlgeschlagen/fehlend.`);
+  console.log(`${ok} Spielerportraits exportiert (${args.size}x${args.size} PNG${args.palette ? ', indiziert' : ''}), ${missing} fehlgeschlagen/fehlend.`);
   console.log(`Ausgabe: ${args.outDir}/`);
 }
 
