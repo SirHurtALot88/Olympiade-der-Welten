@@ -245,6 +245,21 @@ export function fidelityFromTraits(player) {
   return 0;
 }
 
+// ---- Gehaltsvorstellung aus Oly-Traits (Chris, 05.09., fuenfte Runde: "ob sie im
+// Verhaeltnis etwas mehr oder weniger wollen") -- selbstbezogene/geldgetriebene Traits
+// wollen mehr, teamorientierte/bescheidene weniger. Beide Listen sind echte Vokabel aus
+// Olys 36-Wort-Trait-Set (s. export-team-principal-mod.mjs Kopfkommentar).
+const WAGE_DEMAND_HIGH = new Set(['Mercenary', 'Gambler', 'Renegade', 'Egomaniac', 'Diva', 'Vindictive', 'Scandalous']);
+const WAGE_DEMAND_LOW = new Set(['Loyal', 'Fair', 'Altruistic', 'Caring', 'Disciplined', 'Relaxed']);
+
+export function wageDemandMultiplier(player) {
+  const pos = player.traitsPositive || [];
+  const neg = player.traitsNegative || [];
+  if (neg.some((t) => WAGE_DEMAND_HIGH.has(t))) return 1.25;
+  if (pos.some((t) => WAGE_DEMAND_LOW.has(t))) return 0.85;
+  return 1;
+}
+
 // ---- 2. Team-Zuordnung ----------------------------------------------------------------
 
 // Chris' F1-Reihenfolge (staerkstes zuerst), s. export-team-principal-mod.mjs F1_TEAM_NAMES.

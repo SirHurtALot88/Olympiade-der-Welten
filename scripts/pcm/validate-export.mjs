@@ -189,6 +189,19 @@ for (let i = 0; i < contractRowCount; i++) {
 if (contractMismatch > 0) fail(`${contractMismatch} Vertraege mit fkIDteam != Fahrer.fkIDteam`); else console.log(`OK: alle ${contractRowCount} Vertraege konsistent zu fkIDteam`);
 if (yearEndInvalid > 0) fail(`${yearEndInvalid} Vertraege mit iYearEnd ausserhalb 2026..2029`); else console.log('OK: iYearEnd in 2026..2029');
 
+// Gehaelter (Phase 4) -- erfundene, aber konsistente Skala, s. export-pcm-mod.mjs
+// Kopfkommentar. Kein echter Referenzwert existiert, deshalb nur ein weicher Sanity-Check:
+// niemand mehr auf 0 (das war vorher ausnahmslos der Fall), keine negativen Werte.
+const contractWage = readColumnValues(contractTable, 'finan_i_period_wage').values;
+const zeroWages = contractWage.filter((w) => w === 0).length;
+const negativeWages = contractWage.filter((w) => w < 0).length;
+if (negativeWages > 0) fail(`${negativeWages} Vertraege mit negativem Gehalt`);
+if (zeroWages > 0) warn(`${zeroWages} Vertraege noch auf Gehalt 0 (Phase 4 evtl. nicht gelaufen?)`);
+else {
+  const sorted = [...contractWage].sort((a, b) => a - b);
+  console.log(`OK: alle ${contractRowCount} Gehaelter > 0 (Median ${sorted[Math.floor(sorted.length / 2)]}, Max ${sorted[sorted.length - 1]})`);
+}
+
 // Kompressions-Header
 if (neu.header.uncompressedSize !== neu.buffer.length) fail('Header uncompressedSize stimmt nicht');
 else console.log('OK: Kompressions-Header konsistent');

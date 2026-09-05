@@ -20,14 +20,25 @@
 // signierbar im Spiel, statt sofort in einem Team zu stecken. Kader-Auffuellung (WT/PT UND
 // Continental/U23) zieht nur noch aus dem Rest.
 //
-// Gehaelter: `finan_i_period_wage` ist in der ECHTEN WorldDB fuer alle 4202 Vertraege 0 --
-// PCM leitet Gehaelter offenbar erst zur Laufzeit her (Karrierestart), nicht aus der
-// gespeicherten .cdb. Wir fassen dieses Feld deshalb bewusst nicht an (bleibt 0, wie im
-// Original), es gibt nichts zu balancieren.
+// Fuenfte Runde (05.09.): "kannst du die gehaelter denn irgendwie vorgeben? ... auf Basis
+// der urspruenglichen gehaelter und den Staerken der Fahrer ... alle auf 0 ist kacke".
+// `finan_i_period_wage` ist in der ECHTEN WorldDB fuer ALLE 4202 Vertraege 0 -- nachgeprueft
+// auch in Nachbartabellen (DYN_finance, DYN_contract_cyclist_offer, DYN_brand_contract:
+// value_i_budget ueberall 0) -- es gibt buchstaeblich KEINEN echten Referenzwert in der
+// Datei, an dem sich eine Skala kalibrieren liesse; PCM generiert Gehaelter offenbar rein
+// zur Laufzeit. Phase 4 unten setzt deshalb eine bewusst ERFUNDENE, aber konsistente Skala:
+// realistische oeffentlich bekannte Radsport-Gehaltsspannen (nicht aus Oly/PCM selbst) je
+// Divisions-Tier, log-verteilt nach Perzentil-Rang aus Niveau+Potenzial (dieselbe
+// "echte Population statt Formel"-Lehre wie beim Rest des Skripts), plus ein
+// Persoenlichkeits-Faktor (+/-) fuer unsere eigenen Charaktere aus ihren Oly-Traits. Die
+// ABSOLUTE Groessenordnung (Waehrung? Periode = Jahr/Monat/Woche?) ist Annahme, kein
+// Messwert -- Chris muss im Spiel gegenpruefen, `--wage-scale`/`--wage-period` skalieren
+// alles gemeinsam nach, ohne die Formel neu zu bauen.
 //
 //   node scripts/export-pcm-mod.mjs --cdb <pfad-zur-OfficialRelease.cdb> [--out <dir>]
 //     [--save <saveId>] [--order f1|budget] [--fill free-agents|keep-real]
-//     [--transfer-reserve 0.2] [--firstname-fallback ""] [--teams-only] [--validate-only]
+//     [--transfer-reserve 0.2] [--wage-period annual|monthly|weekly] [--wage-scale 1]
+//     [--firstname-fallback ""] [--teams-only] [--validate-only]
 //
 // Save-Quelle: OLY_APP_SQLITE_PATH (Default data/persistence/oly-app.sqlite).
 // ===================================================================================
@@ -60,6 +71,7 @@ import {
   classicIndexRaw,
   splitName,
   fidelityFromTraits,
+  wageDemandMultiplier,
   rankOlyTeams,
   matchSlotOrder,
   draftTopUps,
@@ -85,6 +97,19 @@ const VICTORY_COUNTER_COLUMNS = [
 // Basis-Headroom), damit juenger/mehr-Potenzial tendenziell hoehere Sternezahlen bekommt.
 const baseHeadroomByAge = (age) => (age >= 28 ? 0 : age <= 21 ? 5 : age <= 24 ? 3 : 1);
 
+// Jaehrliche Gehaltsspannen je Divisions-Tier (min = schwaechster Fahrer der Division,
+// max = Superstar) -- oeffentlich bekannte reale Radsport-Groessenordnungen, NICHT aus
+// Oly oder PCM hergeleitet (s. Kopfkommentar). Log-Interpolation zwischen min/max nach
+// Perzentil-Rang, damit wenige Stars ueberproportional viel verdienen (wie im echten
+// Sport), nicht linear gestaffelt.
+const WAGE_TIER_BY_DIVISION = {
+  10: { min: 60_000, max: 5_500_000 }, // WorldTour
+  11: { min: 25_000, max: 180_000 }, // ProTeams
+  12: { min: 8_000, max: 40_000 }, // Continental
+  20: { min: 5_000, max: 20_000 }, // U23
+};
+const WAGE_PERIOD_DIVISOR = { annual: 1, monthly: 12, weekly: 52 };
+
 function parseArgs(argv) {
   const out = {
     cdb: null,
@@ -96,6 +121,8 @@ function parseArgs(argv) {
     firstnameFallback: '',
     teamsOnly: false,
     validateOnly: false,
+    wagePeriod: 'annual',
+    wageScale: 1,
   };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--cdb') out.cdb = argv[++i];
@@ -107,6 +134,8 @@ function parseArgs(argv) {
     else if (argv[i] === '--firstname-fallback') out.firstnameFallback = argv[++i];
     else if (argv[i] === '--teams-only') out.teamsOnly = true;
     else if (argv[i] === '--validate-only') out.validateOnly = true;
+    else if (argv[i] === '--wage-period') out.wagePeriod = argv[++i];
+    else if (argv[i] === '--wage-scale') out.wageScale = Number(argv[++i]);
   }
   if (!out.cdb) throw new Error('Pflichtargument fehlt: --cdb <pfad-zur-OfficialRelease.cdb>');
   return out;
@@ -613,10 +642,72 @@ async function main() {
   const totalPatched = riderPatchTrace.length + riderPatchTrace2.length + riderPatchTrace3.length;
   console.log(`\nInsgesamt eingesetzte Oly-Charaktere: ${totalPatched} von ${oly.rosters.length + oly.freePlayers.length} (${oly.rosters.length} gerostert + ${oly.freePlayers.length} frei, davon ${riderPatchTrace3.length} im Transfermarkt statt im Kader).`);
 
+  // ---- Phase 4: Gehaelter -------------------------------------------------------------
+  // Chris (05.09., fuenfte Runde): "kannst du die gehaelter denn irgendwie vorgeben? auf
+  // Basis der urspruenglichen gehaelter und den Staerken der Fahrer ... alle auf 0 ist
+  // kacke". Betrifft ALLE 4202 Vertraege (auch die, deren Fahrerzeile real geblieben ist --
+  // die haben ja auch charac_i_*/potentiel-Werte, nur eben keine Oly-Traits). Rang nach
+  // Niveau+Potenzial INNERHALB der jeweiligen Division, log-Skala zwischen Tier-Minimum und
+  // -Maximum (s. WAGE_TIER_BY_DIVISION-Kommentar), Persoenlichkeits-Faktor nur wo wir
+  // Oly-Traits kennen (unsere eigenen gepatchten Zeilen aus Phase 1+2).
+  const olyPlayerByRow = new Map();
+  for (const p of [...population, ...phase2Population]) olyPlayerByRow.set(p.rowIndex, p.player);
+
+  const characColsFinal = {};
+  for (const d of DISCIPLINES) characColsFinal[d] = readColumnValues(cyclistTable, `charac_i_${d}`).values;
+  const potentielFinal = readColumnValues(cyclistTable, 'value_f_potentiel').values;
+  const cyclistIdToRow = new Map(idCyclistValues.map((id, i) => [id, i]));
+  const teamDivisionById = new Map();
+  {
+    const { rowCount } = getTableMeta(teamTable);
+    const ids = readColumnValues(teamTable, 'IDteam').values;
+    const divs = readColumnValues(teamTable, 'fkIDdivision').values;
+    for (let i = 0; i < rowCount; i++) teamDivisionById.set(ids[i], divs[i]);
+  }
+
+  function levelOfRow(rowIndex) {
+    const vals = DISCIPLINES.map((d) => characColsFinal[d][rowIndex]);
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+
+  const { rowCount: contractRowCountAll } = getTableMeta(contractTable);
+  const contractFkCyclistAll = readColumnValues(contractTable, 'fkIDcyclist').values;
+  const contractFkTeamAll = readColumnValues(contractTable, 'fkIDteam').values;
+
+  const rowsByDivision = new Map();
+  for (let i = 0; i < contractRowCountAll; i++) {
+    const cyclistRow = cyclistIdToRow.get(contractFkCyclistAll[i]);
+    if (cyclistRow == null) continue;
+    const division = teamDivisionById.get(contractFkTeamAll[i]);
+    if (!WAGE_TIER_BY_DIVISION[division]) continue;
+    const score = levelOfRow(cyclistRow) + potentielFinal[cyclistRow] * 3;
+    if (!rowsByDivision.has(division)) rowsByDivision.set(division, []);
+    rowsByDivision.get(division).push({ contractRow: i, cyclistRow, score });
+  }
+
+  const periodDivisor = WAGE_PERIOD_DIVISOR[args.wagePeriod] ?? 1;
+  let wagesSet = 0;
+  for (const [division, rows] of rowsByDivision) {
+    const tier = WAGE_TIER_BY_DIVISION[division];
+    const sorted = [...rows].sort((a, b) => a.score - b.score);
+    const n = sorted.length;
+    sorted.forEach((r, rank) => {
+      const percentile = n <= 1 ? 0.5 : rank / (n - 1);
+      const base = tier.min * (tier.max / tier.min) ** percentile;
+      const olyPlayer = olyPlayerByRow.get(r.cyclistRow);
+      const demandFactor = olyPlayer ? wageDemandMultiplier(olyPlayer) : 1;
+      const wage = Math.round((base * demandFactor * args.wageScale) / periodDivisor / 100) * 100;
+      setIntegerCell(contractTable, 'finan_i_period_wage', r.contractRow, wage);
+      wagesSet++;
+    });
+  }
+  console.log(`\nPhase 4: ${wagesSet} Gehaelter gesetzt (Tier-Perzentil x Potenzial, Periode=${args.wagePeriod}, Skala=${args.wageScale}).`);
+
   finalizeAndWrite(tree, args, {
     teams: teamPatchTrace,
     riders: [...riderPatchTrace, ...riderPatchTrace2, ...riderPatchTrace3],
     contractsPatched,
+    wagesSet,
   });
 }
 
