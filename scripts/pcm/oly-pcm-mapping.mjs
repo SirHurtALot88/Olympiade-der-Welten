@@ -192,6 +192,36 @@ export function enforceMountainSprintTradeoff(charac, raw) {
 // druecken mehrere Rohwerte gleichzeitig, vergroessern also die Eigen-Streuung -- das
 // Budget, das die Disziplin mit sozialem Abzug verliert, taucht als groesserer Ausschlag bei
 // den unterstuetzten Disziplinen wieder auf (naeher an 85), statt gleichmaessig zu verwaschen.
+// UEBERARBEITET 05.09., achte Runde: Chris ("ZF PRL KSP ZAEH sind vom peak her deutlich
+// schwaecher als die anderen stats! kannst du da noch etwas anziehen am oberen ende dass wir
+// ueberall aehnlich viele leute >82 und >77 haben") -- die geliehene FORM oben ist row-relativ
+// zum jeweiligen Template, und in der echten 919-Zeilen-Population ist timetrial/prologue/
+// cobble/resistance nur SELTEN die persoenliche Staerke eines Fahrers (Templates mit
+// row-relativem z>1.0: cobble 48, prologue 23, resistance 97 -- gegen 200-270 bei hill/
+// acceleration/medium_mountain). Das schlaegt 1:1 auf unsere generierten Peaks durch,
+// unabhaengig vom Matching. Das ist real begruendet (echte Renn-Datenbank), aber Chris will
+// hier bewusst NICHT Realismus, sondern Spielbalance -- deshalb ein expliziter Boost nur auf
+// die POSITIVE Haelfte der Form (die niedrige Seite/Streuung bleibt unangetastet).
+//
+// Kalibriert wurde NICHT gegen eine isolierte Simulation, sondern gegen den echten
+// Vier-Phasen-Export (scripts/export-pcm-mod.mjs), weil Phase 2 (Continental/U23, ~53% der
+// 2984 Zeilen) gegen ein deutlich niedrigeres Referenzniveau skaliert -- eine Kalibrierung
+// gegen die volle Population allein ohne diese Zweiteilung ueberschaetzt den Effekt eines
+// Gains massiv (Faktor ~2x zu hohe Trefferzahlen bei gleichem Gain). Trial-and-Error mit
+// echten Exportlaeufen (>=82-Zahl je Disziplin, Ziel: im Rahmen von mountain/sprint/plain/
+// baroudeur landen, deren >=82 zwischen 3 und 12 liegt): prologue 0->7, cobble 1->7,
+// resistance 1->5 (>=82, Original vs. mit Boost). timetrial lag mit 3 von Anfang an im
+// selben Rahmen und bekommt deshalb keinen Boost -- Chris' Verdacht traf nur auf 3 der 4
+// genannten Disziplinen tatsaechlich zu. Die Reaktion auf den Gain ist stark nichtlinear
+// (kleine Aenderungen kippen ganze Bloecke gleichzeitig ueber 82, weil die reale WT/PT-
+// Population selbst schon flach ist, s.o.) -- deshalb keine Formel, sondern die konkret
+// getesteten Werte.
+const PEAK_BOOST = {
+  prologue: 1.45,
+  cobble: 2.3,
+  resistance: 1.65,
+};
+
 export function buildShapeMatchedProfiler(templates, rawList, targetWithinSdMedian) {
   function ownSpread(raw) {
     const vals = DISCIPLINES.map((d) => raw[d]);
@@ -213,7 +243,8 @@ export function buildShapeMatchedProfiler(templates, rawList, targetWithinSdMedi
 
       let charac = {};
       for (const d of DISCIPLINES) {
-        const shape = (template.charac[d] - tMean) / tSd; // Richtung, Einheitsstreuung
+        let shape = (template.charac[d] - tMean) / tSd; // Richtung, Einheitsstreuung
+        if (shape > 0 && PEAK_BOOST[d]) shape *= PEAK_BOOST[d];
         charac[d] = clamp(Math.round(targetMean + targetWithinSdMedian * specializationFactor * shape), PCM_MIN, PCM_MAX);
       }
       charac = enforceMountainSprintTradeoff(charac, raw);
