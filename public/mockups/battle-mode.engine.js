@@ -4278,6 +4278,8 @@
       // gelassen, keine neue Bedeutung.
       label:"Football", jeSeite:6, zuegeJeSeite:24, zugDauer:1.25,
       punkteNah:6, punkteFern:3, fernAnteil:0.30,
+      // PROTOTYP-SCHALTER (s. bauSpieler): Football-eigene Spiel-Eignung aus p.a.
+      spielEignung:{gewichte:{power:22,health:18,speed:14,torment:12,determination:10,awareness:8,stamina:6,dexterity:4,spirit:3,will:3}},
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
       // KURVE: Footballs EIGENE Erfolgskurve (Struktur wie Hockeys, s. dortiger
       // KURVE-Kommentar) — AUSDRUECKLICH KEIN KURVE_BASKETBALL-Erbe, das war Hockeys
@@ -4430,15 +4432,15 @@
       // eigentliche Hebel war die Zielrolle (TEAMGEIST als Receiver-Los), nicht die
       // Attributmischung dahinter.
       rezept:{
-        PASSGENAUIGKEIT: {will:54,determination:46},
-        LAUFKRAFT:       {spirit:56,health:30,power:14},
-        PASSSCHUTZ:      {health:41,will:32,determination:27},
-        ABWEHR_PASS:     {power:70,torment:30},
+        PASSGENAUIGKEIT: {determination:71,dexterity:29},
+        LAUFKRAFT:       {power:41,health:33,speed:26},
+        PASSSCHUTZ:      {power:40,health:40,awareness:20},   // Hand: O-Line = Anker, nicht Wahrnehmung (Sinkhorn: awareness 100)
+        ABWEHR_PASS:     {speed:40,awareness:30,torment:30},   // Hand: CB/S = Speed + Lesen (Sinkhorn: torment 100)
         ABWEHR_LAUF:     {torment:100},
-        BALLSICHERHEIT:  {health:57,will:43},
-        TEAMGEIST:       {charisma:82,torment:18},
-        AUSDAUER:        {stamina:100},
-        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}
+        BALLSICHERHEIT:  {determination:71,dexterity:29},
+        TEAMGEIST:       {power:41,health:33,speed:26},        // Receiver-Los: der grosse Receiver (PR #796, Lauf E gegen H)
+        AUSDAUER:        {stamina:67,will:33},
+        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}    // unveraendert, disziplinuebergreifend
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
       // Football-Konzepten. Auf die neuen Sub-Skill-Namen nachgezogen, damit hier keine
@@ -5388,7 +5390,9 @@
       // noch aus den kleinen Slot-/Form-Zuschlaegen (typisch -5 bis +10 statt eines echten
       // Fertigkeitswerts). gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der
       // p.d.tdm ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken.
-      const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
+      const spielE=FB().spielEignung;
+      const produktionsWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
+      const basisWert=spielE?gewichtet(p.a,spielE.gewichte):produktionsWert;
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         // groesse (Skala 1-10, s. groesseFaktor): reine ZEICHEN-Angabe fuer zeichneSprite,
         // faehrt in KEINE hier oben schon berechnete Zahl ein (eig/R2 stehen VOR dieser
