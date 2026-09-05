@@ -14787,10 +14787,18 @@
       label:"Takeshi's Castle", jeSeite:6,
       hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
       hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
-      grundTempo:92, tempoSpanne:0.70,
+      hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT"], huerdePreis:0.80,
+      // Falle lesen (Honeycomb Maze) · Aufstehen/Balance (Skipping Stones) · Durchbrettern (Knock Knock) ·
+      // Wille (Bridge Ball) · Falle lesen · Nehmerqualitaet (Final Fall) · Durchbrettern — zweimal durch, 14 Fallen.
+      // Skill 20 friert 0,67 s je Falle ein, Skill 80 nur 0,29 s. Kein Motor: stepSpurt/tempoVon lesen
+      // beide Felder bereits (PR #794, fuer Spurt gebaut). Uebernommen aus
+      // docs/design/staffel-offene-fragen-plus-takeshis-castle-05-09.md, Teil 3.3, Schritt 1 (T2b).
+      grundTempo:92, tempoSpanne:0.70, mengeAusEignung:true,
       technikBasis:0.26, technikSpanne:0.0060, wuchtBasis:0.10, wuchtSpanne:0.0060,
       wuchtKraft:14, wuchtZeit:0.20, stolperGrund:0.80, stolperSpanne:0.95, stolperKraft:9,
-      wendigErholt:0.0030, kraftBasis:300, kraftSpanne:2.8, nervenKosten:34, nervenRegen:0.05,
+      // Budgets an das Eignungs-Niveau angepasst (Kader-Mittel 42 statt Rezept-Mittel 53) — sonst
+      // verdoppelt die Kopplung (mengeAusEignung) die Ausscheidequote, s. Bericht Teil 2.4/3.3 (T1f).
+      wendigErholt:0.0030, kraftBasis:334, kraftSpanne:2.8, nervenKosten:27, nervenRegen:0.05,
       rezept:{
         ANTRITT:    {will:40,determination:32,speed:28},
         ENDTEMPO:   {will:38,determination:33,stamina:29},
@@ -14949,6 +14957,21 @@
       if(art.staffel){
         const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d);
         const m=0.73*w.ANTRITT+0.27*w.ENDTEMPO;      // die effektive Tempoformel eines 1,7-s-Beins
+        const f=m>0?eigW/m:1;
+        for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
+      }
+      // TAKESHI: MENGE AUS DER EIGNUNG, MIT DEM MITTEL DER SIEBEN — eigenes Gate
+      // `mengeAusEignung`, NICHT `art.staffel` (das bleibt allein der Staffel und ihrer
+      // Tempoformel vorbehalten, damit diese Aenderung Staffel/Spurt/Zeitfahren/Klettern
+      // bit-identisch laesst). Anders als bei der Staffel ist bei Takeshi die Falle so
+      // entscheidend wie das Tempo (T1b mit dem Tempo-Mix verzerrte die anderen fuenf
+      // Sub-Skills, rho 0,608 statt 0,689) — deshalb hier das Mittel aller sieben
+      // Sub-Skills statt des Tempo-Mixes. Uebertragen aus
+      // docs/design/staffel-offene-fragen-plus-takeshis-castle-05-09.md, Teil 3.3, Schritt 2
+      // (T1a), zusammen mit den nachgezogenen Budgets (T1f) im BAHN_ART-Block.
+      if(art.mengeAusEignung){
+        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d);
+        const ks=Object.keys(w); const m=ks.reduce((s,k)=>s+w[k],0)/ks.length;   // Mittel der sieben, nicht der Tempo-Mix
         const f=m>0?eigW/m:1;
         for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
       }
@@ -15382,7 +15405,13 @@
             u.nerven-=BA().nervenKosten*Math.max(0.45,1-u.ROBUST*0.0045);
           }
           if(BA().nervenKosten && u.nerven<=0){
-            u.raus=true; u.fertig=90+rennFertig.length*0.001;
+            // AUSSCHEIDE-ORDNUNG NACH STRECKE, NICHT NACH REIHENFOLGE. Vorher platzierte
+            // "90+rennFertig.length*0.001" den ZUERST Ausgeschiedenen am besten — verkehrt
+            // herum: real gilt, wer laenger durchhaelt, hat mehr geleistet (Sasuke, ANW,
+            // Takeshi ordnen alle nach erreichter Stufe). Jetzt nach `u.pos` (0..1 Strecke):
+            // je weiter gekommen, desto naeher an den Finishern (< 90). Bericht Teil 2.2 (b) /
+            // 3.3, Patch T0.
+            u.raus=true; u.fertig=90+(1-u.pos)*10;
             rennFertig.push(u);
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
