@@ -12,9 +12,22 @@
 // Chris' Vorgabe (05.09.): oberste 18 Oly-Teams (nach Budget) -> WorldTour, Rest in die
 // ProTeams; PCMs harte Obergrenze ist 85 (nicht 99 wie bei Team Principal).
 //
+// Vierte Runde (05.09.): "es waere gut wenn die teams nur meine Fahrer in den teams haetten
+// und dann noch schwaechere zum auffuellen, nicht direkt so krass starke, die kann man dann
+// in der kommenden Transferperiode holen" -- die staerksten freien Oly-Charaktere (Standard
+// 20 %, s. RESERVE_FOR_TRANSFERS_FRACTION) werden deshalb NICHT als Kader-Auffuellung
+// verwendet, sondern landen im echten PCM-Freien-Markt (Division 4) -- sichtbar und
+// signierbar im Spiel, statt sofort in einem Team zu stecken. Kader-Auffuellung (WT/PT UND
+// Continental/U23) zieht nur noch aus dem Rest.
+//
+// Gehaelter: `finan_i_period_wage` ist in der ECHTEN WorldDB fuer alle 4202 Vertraege 0 --
+// PCM leitet Gehaelter offenbar erst zur Laufzeit her (Karrierestart), nicht aus der
+// gespeicherten .cdb. Wir fassen dieses Feld deshalb bewusst nicht an (bleibt 0, wie im
+// Original), es gibt nichts zu balancieren.
+//
 //   node scripts/export-pcm-mod.mjs --cdb <pfad-zur-OfficialRelease.cdb> [--out <dir>]
 //     [--save <saveId>] [--order f1|budget] [--fill free-agents|keep-real]
-//     [--firstname-fallback ""] [--teams-only] [--validate-only]
+//     [--transfer-reserve 0.2] [--firstname-fallback ""] [--teams-only] [--validate-only]
 //
 // Save-Quelle: OLY_APP_SQLITE_PATH (Default data/persistence/oly-app.sqlite).
 // ===================================================================================
@@ -67,6 +80,10 @@ const VICTORY_COUNTER_COLUMNS = [
   'gene_i_nb_total_victory', 'gene_i_nb_tdf', 'gene_i_nb_giro', 'gene_i_nb_vuelta',
   'gene_i_nb_sanremo', 'gene_i_nb_flandres', 'gene_i_nb_roubaix', 'gene_i_nb_liege', 'gene_i_nb_lombardia',
 ];
+// Grob: kein Fahrer <= 27 waechst um mehr als 5 Punkte pro Alterstufe (plan.md 1.3) --
+// dieselbe Naeherung dient hier zusaetzlich als potentiel-Rangschluessel (levelTarget +
+// Basis-Headroom), damit juenger/mehr-Potenzial tendenziell hoehere Sternezahlen bekommt.
+const baseHeadroomByAge = (age) => (age >= 28 ? 0 : age <= 21 ? 5 : age <= 24 ? 3 : 1);
 
 function parseArgs(argv) {
   const out = {
@@ -75,6 +92,7 @@ function parseArgs(argv) {
     save: null,
     order: 'f1',
     fill: 'free-agents',
+    transferReserve: 0.2,
     firstnameFallback: '',
     teamsOnly: false,
     validateOnly: false,
@@ -85,6 +103,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--save') out.save = argv[++i];
     else if (argv[i] === '--order') out.order = argv[++i];
     else if (argv[i] === '--fill') out.fill = argv[++i];
+    else if (argv[i] === '--transfer-reserve') out.transferReserve = Number(argv[++i]);
     else if (argv[i] === '--firstname-fallback') out.firstnameFallback = argv[++i];
     else if (argv[i] === '--teams-only') out.teamsOnly = true;
     else if (argv[i] === '--validate-only') out.validateOnly = true;
@@ -179,6 +198,8 @@ function loadOlySave(saveArg) {
   const allPlayers = allPlayerRows.map((r) => JSON.parse(r.payload_json).player);
   const playersById = new Map(allPlayers.map((p) => [p.id, p]));
   const rosteredPlayerIds = new Set(rosters.map((r) => r.playerId));
+  // Absteigend nach rating -- staerkste zuerst, s. Aufteilung in transferMarketPlayers /
+  // fillerPlayers weiter unten in main().
   const freePlayers = allPlayers.filter((p) => !rosteredPlayerIds.has(p.id)).sort((a, b) => b.rating - a.rating);
 
   return { db, teams, identityByTeam, rosters, rostersByTeam, playersById, freePlayers };
@@ -203,6 +224,118 @@ function makeStringColumnEditor(tableChunk, columnName) {
       setColumnStrings(tableChunk, columnName, arr);
     },
   };
+}
+
+// ---- Gemeinsame Patch-Logik fuer eine Fahrer-Population (Phase 1/2/3) ----------------
+// population: [{ rowIndex, age, olyTeamId, olyTeamName, division, player, roster, raw,
+// levelRaw }]. reference: Rueckgabe von collectReferenceStats(). Gibt den Trace-Eintrag je
+// gepatchter Zeile zurueck.
+function patchRiderPopulation(cyclistTable, population, reference, args, label) {
+  if (population.length === 0) return [];
+
+  const levelTargets = buildLevelTargets(population, reference.levelValues);
+  const profileScaler = buildProfileScaler(population.map((p) => p.raw), reference.withinSdMedian);
+  console.log(`  ${label}: Profil-Skalierung kalibriert: k=${profileScaler.k.toFixed(3)}`);
+
+  const characByRow = new Map();
+  population.forEach((p, i) => characByRow.set(p.rowIndex, profileScaler.apply(p.raw, levelTargets[i])));
+
+  // potentiel: Rang nach grober peakLevel-Naeherung (Level + alterabhaengiges
+  // Basis-Headroom, ohne den zirkulaeren potentiel-Term -- plan.md 1.3).
+  const potentielValues = multisetAssign(
+    population,
+    (p) => levelTargets[population.indexOf(p)] + baseHeadroomByAge(p.age),
+    reference.potentielValues,
+  );
+  const potentielByRow = new Map();
+  population.forEach((p, i) => potentielByRow.set(p.rowIndex, potentielValues[i]));
+
+  // tour/classic: Rang nach dem jeweiligen Rohindex aus den fertigen charac-Werten.
+  const tourValues = multisetAssign(population, (p) => tourIndexRaw(characByRow.get(p.rowIndex)), reference.tourValues);
+  const classicValues = multisetAssign(population, (p) => classicIndexRaw(characByRow.get(p.rowIndex)), reference.classicValues);
+
+  const editors = {
+    firstname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstname'),
+    lastname: makeStringColumnEditor(cyclistTable, 'gene_sz_lastname'),
+    firstlastname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstlastname'),
+    photo: makeStringColumnEditor(cyclistTable, 'gene_sz_photo'),
+    soundname: makeStringColumnEditor(cyclistTable, 'gene_sz_soundname'),
+    constant: makeStringColumnEditor(cyclistTable, 'CONSTANT'),
+  };
+
+  const trace = [];
+  population.forEach((p, i) => {
+    const charac = characByRow.get(p.rowIndex);
+    const potentiel = potentielByRow.get(p.rowIndex);
+    const limits = limitsFor(charac, p.age, potentiel);
+    const tour = tourValues[i];
+    const classic = classicValues[i];
+    const names = splitName(p.player.name, args.firstnameFallback);
+    const fidelity = fidelityFromTraits(p.player);
+    const slug = playerSlug(p.player);
+
+    for (const d of DISCIPLINES) {
+      setIntegerCell(cyclistTable, `charac_i_${d}`, p.rowIndex, charac[d]);
+      setIntegerCell(cyclistTable, `limit_i_${d}`, p.rowIndex, limits[d]);
+    }
+    setFloatCell(cyclistTable, 'value_f_potentiel', p.rowIndex, potentiel);
+    setIntegerCell(cyclistTable, 'charac_i_tour', p.rowIndex, tour);
+    setIntegerCell(cyclistTable, 'charac_i_classic', p.rowIndex, classic);
+    setIntegerCell(cyclistTable, 'iContract_fidelity', p.rowIndex, fidelity);
+    setIntegerCell(cyclistTable, 'gene_i_champion_bit', p.rowIndex, 0);
+    for (const col of VICTORY_COUNTER_COLUMNS) setIntegerCell(cyclistTable, col, p.rowIndex, 0);
+
+    editors.firstname.set(p.rowIndex, names.firstname);
+    editors.lastname.set(p.rowIndex, names.lastname);
+    editors.firstlastname.set(p.rowIndex, names.firstlastname);
+    editors.photo.set(p.rowIndex, slug);
+    editors.soundname.set(p.rowIndex, '');
+    editors.constant.set(p.rowIndex, '');
+
+    trace.push({
+      rowIndex: p.rowIndex,
+      olyPlayerId: p.player.id,
+      olyPlayerName: p.player.name,
+      olyTeamId: p.olyTeamId,
+      olyTeamName: p.olyTeamName,
+      division: p.division,
+      rostered: p.roster != null,
+      age: p.age,
+      charac,
+      limits,
+      potentiel,
+      tour,
+      classic,
+      fidelity,
+    });
+  });
+  for (const editor of Object.values(editors)) editor.flush();
+  return trace;
+}
+
+// Baut die Populationseintraege (raw/levelRaw vorab berechnet) fuer eine Liste von
+// {rowIndex, birthYear}-Slots und eine Liste von Oly-Charakteren -- gemeinsame Vorstufe fuer
+// Phase 1 (je Oly-Team) und Phase 2/3 (je reales Team bzw. Free-Pool).
+function buildPopulationForSlots(slotRows, playerEntries, extra) {
+  const withLevel = playerEntries.map((e) => {
+    const { raw, levelRaw } = computeRaw(e.player);
+    return { ...e, raw, levelRaw };
+  });
+  const assigned = assignSlotsWithinTeam(slotRows, withLevel, CURRENT_SEASON_YEAR);
+  const out = [];
+  for (const a of assigned) {
+    if (!a.player) continue; // mehr Slots als Spieler -- Rest bleibt real.
+    out.push({
+      rowIndex: a.rowIndex,
+      age: a.age,
+      player: a.player.player,
+      roster: a.player.roster,
+      raw: a.player.raw,
+      levelRaw: a.player.levelRaw,
+      ...extra,
+    });
+  }
+  return out;
 }
 
 // ---- Hauptprogramm ------------------------------------------------------------------
@@ -231,6 +364,7 @@ async function main() {
   const ptSlotsOrdered = ptOrderIdx.map((i) => ptTeamRows[i]);
 
   const rowIndicesByTeam = cyclistRowIndicesByTeam(tree);
+  const birthdatesAll = readColumnValues(cyclistTable, 'gene_i_birthdate').values;
 
   const referenceStats = collectReferenceStats(
     cyclistTable,
@@ -255,6 +389,17 @@ async function main() {
   if (worldTour.length !== wtSlotsOrdered.length || proTeams.length !== ptSlotsOrdered.length) {
     throw new Error(`Slotanzahl passt nicht: WT ${worldTour.length}/${wtSlotsOrdered.length}, PT ${proTeams.length}/${ptSlotsOrdered.length}`);
   }
+
+  // Chris (05.09., vierte Runde): Kader sollen "nur meine Fahrer + schwaechere zum
+  // Auffuellen" enthalten, "nicht direkt so krass starke" -- die stellt er sich lieber fuer
+  // die kommende Transferperiode vor. Die staerksten `transferReserve` (Default 20 %) der
+  // freien Charaktere werden deshalb komplett aus jeder Kader-Auffuellung herausgehalten
+  // (weder WT/PT-Top-ups noch Continental/U23) und landen stattdessen unten in Phase 3 im
+  // echten PCM-Freien-Markt.
+  const reserveCount = clamp(Math.round(oly.freePlayers.length * args.transferReserve), 0, oly.freePlayers.length);
+  const transferMarketPlayers = oly.freePlayers.slice(0, reserveCount);
+  const fillerPlayers = oly.freePlayers.slice(reserveCount);
+  console.log(`\nFreie Oly-Charaktere: ${oly.freePlayers.length} gesamt, davon ${transferMarketPlayers.length} fuer den Transfermarkt reserviert (Anteil ${args.transferReserve}), ${fillerPlayers.length} als Kader-Auffuellung verfuegbar.`);
 
   const assignments = [
     ...worldTour.map((olyTeam, i) => ({ olyTeam, slot: wtSlotsOrdered[i], division: 'WT' })),
@@ -303,7 +448,7 @@ async function main() {
     return;
   }
 
-  // ---- Fahrer-Population bauen -------------------------------------------------------
+  // ---- Phase 1: WorldTour/ProTeams -- gerosterte Oly-Spieler + schwaechere Top-ups ---
   const teamsInStrengthOrder = [...worldTour, ...proTeams];
   const slotCountByOlyTeam = new Map();
   for (const { olyTeam, slot } of assignments) {
@@ -326,14 +471,13 @@ async function main() {
 
   let draftedByTeam = new Map(teamsInStrengthOrder.map((t) => [t.teamId, []]));
   if (args.fill === 'free-agents') {
-    draftedByTeam = draftTopUps(teamsInStrengthOrder, oly.freePlayers, topUpNeedByTeam);
+    draftedByTeam = draftTopUps(teamsInStrengthOrder, fillerPlayers, topUpNeedByTeam);
   }
 
   const totalTopUps = [...topUpNeedByTeam.values()].reduce((a, b) => a + b, 0);
   console.log(`Kader-Auffuellung: ${totalTopUps} Top-up-Slots ueber ${teamsInStrengthOrder.length} Teams (Modus: ${args.fill}).`);
 
-  // ---- Rohwerte/Level fuer JEDEN Kandidaten (gerostert + Top-up) vorab berechnen -----
-  const population = []; // { rowIndex, olyTeamId, division, player, roster, raw, levelRaw }
+  const population = [];
   for (const { olyTeam, slot, division } of assignments) {
     const rosterEntries = rosteredByOlyTeam.get(olyTeam.teamId);
     const topUps = draftedByTeam.get(olyTeam.teamId) || [];
@@ -345,33 +489,8 @@ async function main() {
     if (teamPlayers.length !== slotRowIndices.length) {
       console.warn(`  WARNUNG: ${olyTeam.name}: ${teamPlayers.length} Spieler != ${slotRowIndices.length} Slots -- werde auffuellen/kappen.`);
     }
-
-    const birthdates = readColumnValues(cyclistTable, 'gene_i_birthdate').values;
-    const slotRows = slotRowIndices.map((rowIndex) => ({
-      rowIndex,
-      birthYear: Math.floor(birthdates[rowIndex] / 10000),
-    }));
-
-    const withLevel = teamPlayers.map((e) => {
-      const { raw, levelRaw } = computeRaw(e.player);
-      return { ...e, raw, levelRaw };
-    });
-
-    const assigned = assignSlotsWithinTeam(slotRows, withLevel, CURRENT_SEASON_YEAR);
-    for (const a of assigned) {
-      if (!a.player) continue; // mehr Slots als Spieler (sollte laut plan.md nicht vorkommen)
-      population.push({
-        rowIndex: a.rowIndex,
-        age: a.age,
-        olyTeamId: olyTeam.teamId,
-        olyTeamName: olyTeam.name,
-        division,
-        player: a.player.player,
-        roster: a.player.roster,
-        raw: a.player.raw,
-        levelRaw: a.player.levelRaw,
-      });
-    }
+    const slotRows = slotRowIndices.map((rowIndex) => ({ rowIndex, birthYear: Math.floor(birthdatesAll[rowIndex] / 10000) }));
+    population.push(...buildPopulationForSlots(slotRows, teamPlayers, { olyTeamId: olyTeam.teamId, olyTeamName: olyTeam.name, division }));
   }
   console.log(`Fahrer-Population (Slots, die gepatcht werden): ${population.length}`);
 
@@ -388,77 +507,7 @@ async function main() {
     console.log(`  Ankerpruefung ${ourKey} vs. ${olyKey}: corr=${corr.toFixed(3)}`);
   }
 
-  // ---- Skalierung kalibrieren ---------------------------------------------------------
-  const levelTargets = buildLevelTargets(population, referenceStats.levelValues);
-  const profileScaler = buildProfileScaler(population.map((p) => p.raw), referenceStats.withinSdMedian);
-  console.log(`Profil-Skalierung kalibriert: k=${profileScaler.k.toFixed(3)}`);
-
-  const characByRow = new Map();
-  population.forEach((p, i) => {
-    characByRow.set(p.rowIndex, profileScaler.apply(p.raw, levelTargets[i]));
-  });
-
-  // potentiel: Rang nach grober peakLevel-Naeherung (Level + alterabhaengiges Basis-Headroom,
-  // ohne den zirkulaeren potentiel-Term -- plan.md 1.3).
-  const baseHeadroomByAge = (age) => (age >= 28 ? 0 : age <= 21 ? 5 : age <= 24 ? 3 : 1);
-  const potentielValues = multisetAssign(
-    population,
-    (p) => levelTargets[population.indexOf(p)] + baseHeadroomByAge(p.age),
-    referenceStats.potentielValues,
-  );
-  const potentielByRow = new Map();
-  population.forEach((p, i) => potentielByRow.set(p.rowIndex, potentielValues[i]));
-
-  // tour/classic: Rang nach dem jeweiligen Rohindex aus den fertigen charac-Werten.
-  const tourValues = multisetAssign(population, (p) => tourIndexRaw(characByRow.get(p.rowIndex)), referenceStats.tourValues);
-  const classicValues = multisetAssign(population, (p) => classicIndexRaw(characByRow.get(p.rowIndex)), referenceStats.classicValues);
-
-  // ---- Fahrer patchen ------------------------------------------------------------------
-  const riderEditors = {
-    firstname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstname'),
-    lastname: makeStringColumnEditor(cyclistTable, 'gene_sz_lastname'),
-    firstlastname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstlastname'),
-    photo: makeStringColumnEditor(cyclistTable, 'gene_sz_photo'),
-    soundname: makeStringColumnEditor(cyclistTable, 'gene_sz_soundname'),
-    constant: makeStringColumnEditor(cyclistTable, 'CONSTANT'),
-  };
-
-  const riderPatchTrace = [];
-  population.forEach((p, i) => {
-    const charac = characByRow.get(p.rowIndex);
-    const potentiel = potentielByRow.get(p.rowIndex);
-    const limits = limitsFor(charac, p.age, potentiel);
-    const tour = tourValues[i];
-    const classic = classicValues[i];
-    const names = splitName(p.player.name, args.firstnameFallback);
-    const fidelity = fidelityFromTraits(p.player);
-    const slug = playerSlug(p.player);
-
-    for (const d of DISCIPLINES) {
-      setIntegerCell(cyclistTable, `charac_i_${d}`, p.rowIndex, charac[d]);
-      setIntegerCell(cyclistTable, `limit_i_${d}`, p.rowIndex, limits[d]);
-    }
-    setFloatCell(cyclistTable, 'value_f_potentiel', p.rowIndex, potentiel);
-    setIntegerCell(cyclistTable, 'charac_i_tour', p.rowIndex, tour);
-    setIntegerCell(cyclistTable, 'charac_i_classic', p.rowIndex, classic);
-    setIntegerCell(cyclistTable, 'iContract_fidelity', p.rowIndex, fidelity);
-    setIntegerCell(cyclistTable, 'gene_i_champion_bit', p.rowIndex, 0);
-    for (const col of VICTORY_COUNTER_COLUMNS) setIntegerCell(cyclistTable, col, p.rowIndex, 0);
-
-    riderEditors.firstname.set(p.rowIndex, names.firstname);
-    riderEditors.lastname.set(p.rowIndex, names.lastname);
-    riderEditors.firstlastname.set(p.rowIndex, names.firstlastname);
-    riderEditors.photo.set(p.rowIndex, slug);
-    riderEditors.soundname.set(p.rowIndex, '');
-    riderEditors.constant.set(p.rowIndex, '');
-
-    riderPatchTrace.push({
-      rowIndex: p.rowIndex, olyPlayerId: p.player.id, olyPlayerName: p.player.name,
-      olyTeamId: p.olyTeamId, olyTeamName: p.olyTeamName, division: p.division,
-      rostered: p.roster != null, age: p.age, charac, limits, potentiel, tour, classic, fidelity,
-    });
-  });
-  for (const editor of Object.values(riderEditors)) editor.flush();
+  const riderPatchTrace = patchRiderPopulation(cyclistTable, population, referenceStats, args, 'Phase 1');
   console.log(`${riderPatchTrace.length} Fahrer-Zeilen gepatcht.`);
 
   // ---- Vertraege patchen: nur iYearEnd fuer gerosterte Oly-Spieler -------------------
@@ -481,20 +530,18 @@ async function main() {
   }
   console.log(`${contractsPatched} Vertraege (iYearEnd) angepasst.`);
 
-  // ---- Phase 2: alle verbleibenden freien Oly-Charaktere einsetzen ------------------
-  // Chris (05.09., dritte Runde): "ich moechte dass du alle ca 3k spieler einfuegst! die
-  // echten spieler kannst du raus nehmen dann kommen die spieler auch gut unter". Phase 1
-  // platziert nur 878 Zeilen (328 gerostert + Top-ups). Die uebrigen freien Oly-Charaktere
-  // (2656 - bereits verbrauchte Top-ups) werden jetzt in Continental- (Division 12) und
-  // U23-Zeilen (Division 20) eingesetzt -- 3286 Zeilen insgesamt, mehr als genug fuer den
-  // Rest (plan.md 6.10 hatte das schon als unkritisch eingeschaetzt). Staerkste
-  // Continental/U23-Teams zuerst (top8avg aus den eigenen echten charac_i_*-Werten, keine
-  // Handliste noetig -- anders als bei WT/PT gibt es hier keine bekannten Markennamen).
+  // ---- Phase 2: restliche Kader-Auffuellung in Continental/U23 ----------------------
+  // Chris (05.09., dritte Runde): "ich moechte dass du alle ca 3k spieler einfuegst!". Phase
+  // 1 platziert nur 878 Zeilen (328 gerostert + Top-ups). Die uebrigen freien Oly-Charaktere
+  // (aus `fillerPlayers`, die staerksten 20 % sind fuer Phase 3 reserviert) werden jetzt in
+  // Continental- (Division 12) und U23-Zeilen (Division 20) eingesetzt -- 3286 Zeilen
+  // insgesamt. Staerkste Continental/U23-Teams zuerst (top8avg aus den eigenen echten
+  // charac_i_*-Werten, keine Handliste noetig -- anders als bei WT/PT gibt es hier keine
+  // bekannten Markennamen).
   const contiTeamRows = realTeamRowsByDivision(tree, 12).map((t) => ({ ...t, division: 'CONTI' }));
   const u23TeamRows = realTeamRowsByDivision(tree, 20).map((t) => ({ ...t, division: 'U23' }));
   console.log(`\nPhase 2: ${contiTeamRows.length} Continental-Teams, ${u23TeamRows.length} U23-Teams.`);
 
-  const birthdatesAll = readColumnValues(cyclistTable, 'gene_i_birthdate').values;
   const characColsCache = {};
   for (const d of DISCIPLINES) characColsCache[d] = readColumnValues(cyclistTable, `charac_i_${d}`).values;
 
@@ -514,114 +561,61 @@ async function main() {
   const phase2Reference = collectReferenceStats(cyclistTable, rowIndicesByTeam, phase2Teams.map((t) => t.IDteam));
   console.log(`Phase-2-Referenzpopulation: ${phase2Reference.rowCount} Fahrer, Innerhalb-SD-Median=${phase2Reference.withinSdMedian.toFixed(2)}`);
 
-  const usedFreeIds = new Set(population.filter((p) => !p.roster).map((p) => p.player.id));
-  const remainingFree = oly.freePlayers.filter((p) => !usedFreeIds.has(p.id));
-  console.log(`Verbleibende freie Oly-Charaktere fuer Phase 2: ${remainingFree.length}`);
+  const usedFillerIds = new Set(population.filter((p) => !p.roster).map((p) => p.player.id));
+  const remainingFiller = fillerPlayers.filter((p) => !usedFillerIds.has(p.id));
+  console.log(`Verbleibende Auffuell-Charaktere fuer Phase 2: ${remainingFiller.length}`);
 
   const phase2Population = [];
   let cursor = 0;
   for (const team of phase2Teams) {
-    if (cursor >= remainingFree.length) break;
-    const take = Math.min(team.rows.length, remainingFree.length - cursor);
+    if (cursor >= remainingFiller.length) break;
+    const take = Math.min(team.rows.length, remainingFiller.length - cursor);
     if (take <= 0) continue;
-    const teamPlayers = remainingFree.slice(cursor, cursor + take).map((p) => ({ player: p, roster: null }));
+    const teamPlayers = remainingFiller.slice(cursor, cursor + take).map((p) => ({ player: p, roster: null }));
     cursor += take;
 
     const slotRows = team.rows.map((rowIndex) => ({ rowIndex, birthYear: Math.floor(birthdatesAll[rowIndex] / 10000) }));
-    const withLevel = teamPlayers.map((e) => {
-      const { raw, levelRaw } = computeRaw(e.player);
-      return { ...e, raw, levelRaw };
-    });
-    // assignSlotsWithinTeam bekommt ALLE Zeilen des Teams, aber nur `take` Spieler -- die
-    // Funktion sortiert die Zeilen selbst nach Prime-Alter und vergibt die Spieler an die
-    // besten `take` Slots; der Rest bleibt (player: undefined, unten uebersprungen) real.
-    const assigned = assignSlotsWithinTeam(slotRows, withLevel, CURRENT_SEASON_YEAR);
-    for (const a of assigned) {
-      if (!a.player) continue;
-      phase2Population.push({
-        rowIndex: a.rowIndex,
-        age: a.age,
-        olyTeamId: null,
-        olyTeamName: null,
-        division: team.division,
-        player: a.player.player,
-        roster: null,
-        raw: a.player.raw,
-        levelRaw: a.player.levelRaw,
-      });
-    }
+    phase2Population.push(...buildPopulationForSlots(slotRows, teamPlayers, { olyTeamId: null, olyTeamName: null, division: team.division }));
   }
   console.log(`Phase-2-Population (Slots, die zusaetzlich gepatcht werden): ${phase2Population.length}`);
 
-  const levelTargets2 = buildLevelTargets(phase2Population, phase2Reference.levelValues);
-  const profileScaler2 = buildProfileScaler(phase2Population.map((p) => p.raw), phase2Reference.withinSdMedian);
-  console.log(`Phase-2-Profil-Skalierung kalibriert: k=${profileScaler2.k.toFixed(3)}`);
-
-  const characByRow2 = new Map();
-  phase2Population.forEach((p, i) => characByRow2.set(p.rowIndex, profileScaler2.apply(p.raw, levelTargets2[i])));
-
-  const potentielValues2 = multisetAssign(
-    phase2Population,
-    (p) => levelTargets2[phase2Population.indexOf(p)] + baseHeadroomByAge(p.age),
-    phase2Reference.potentielValues,
-  );
-  const potentielByRow2 = new Map();
-  phase2Population.forEach((p, i) => potentielByRow2.set(p.rowIndex, potentielValues2[i]));
-
-  const tourValues2 = multisetAssign(phase2Population, (p) => tourIndexRaw(characByRow2.get(p.rowIndex)), phase2Reference.tourValues);
-  const classicValues2 = multisetAssign(phase2Population, (p) => classicIndexRaw(characByRow2.get(p.rowIndex)), phase2Reference.classicValues);
-
-  const riderEditors2 = {
-    firstname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstname'),
-    lastname: makeStringColumnEditor(cyclistTable, 'gene_sz_lastname'),
-    firstlastname: makeStringColumnEditor(cyclistTable, 'gene_sz_firstlastname'),
-    photo: makeStringColumnEditor(cyclistTable, 'gene_sz_photo'),
-    soundname: makeStringColumnEditor(cyclistTable, 'gene_sz_soundname'),
-    constant: makeStringColumnEditor(cyclistTable, 'CONSTANT'),
-  };
-
-  const riderPatchTrace2 = [];
-  phase2Population.forEach((p, i) => {
-    const charac = characByRow2.get(p.rowIndex);
-    const potentiel = potentielByRow2.get(p.rowIndex);
-    const limits = limitsFor(charac, p.age, potentiel);
-    const tour = tourValues2[i];
-    const classic = classicValues2[i];
-    const names = splitName(p.player.name, args.firstnameFallback);
-    const fidelity = fidelityFromTraits(p.player);
-    const slug = playerSlug(p.player);
-
-    for (const d of DISCIPLINES) {
-      setIntegerCell(cyclistTable, `charac_i_${d}`, p.rowIndex, charac[d]);
-      setIntegerCell(cyclistTable, `limit_i_${d}`, p.rowIndex, limits[d]);
-    }
-    setFloatCell(cyclistTable, 'value_f_potentiel', p.rowIndex, potentiel);
-    setIntegerCell(cyclistTable, 'charac_i_tour', p.rowIndex, tour);
-    setIntegerCell(cyclistTable, 'charac_i_classic', p.rowIndex, classic);
-    setIntegerCell(cyclistTable, 'iContract_fidelity', p.rowIndex, fidelity);
-    setIntegerCell(cyclistTable, 'gene_i_champion_bit', p.rowIndex, 0);
-    for (const col of VICTORY_COUNTER_COLUMNS) setIntegerCell(cyclistTable, col, p.rowIndex, 0);
-
-    riderEditors2.firstname.set(p.rowIndex, names.firstname);
-    riderEditors2.lastname.set(p.rowIndex, names.lastname);
-    riderEditors2.firstlastname.set(p.rowIndex, names.firstlastname);
-    riderEditors2.photo.set(p.rowIndex, slug);
-    riderEditors2.soundname.set(p.rowIndex, '');
-    riderEditors2.constant.set(p.rowIndex, '');
-
-    riderPatchTrace2.push({
-      rowIndex: p.rowIndex, olyPlayerId: p.player.id, olyPlayerName: p.player.name,
-      olyTeamId: null, olyTeamName: null, division: p.division,
-      rostered: false, age: p.age, charac, limits, potentiel, tour, classic, fidelity,
-    });
-  });
-  for (const editor of Object.values(riderEditors2)) editor.flush();
+  const riderPatchTrace2 = patchRiderPopulation(cyclistTable, phase2Population, phase2Reference, args, 'Phase 2');
   console.log(`${riderPatchTrace2.length} zusaetzliche Fahrer-Zeilen gepatcht (Phase 2).`);
-  console.log(`Insgesamt eingesetzte Oly-Charaktere: ${riderPatchTrace.length + riderPatchTrace2.length} von ${oly.rosters.length + oly.freePlayers.length} (${oly.rosters.length} gerostert + ${oly.freePlayers.length} frei).`);
+
+  // ---- Phase 3: staerkste freie Oly-Charaktere in den echten PCM-Freien-Markt --------
+  // Chris (05.09., vierte Runde): diese Charaktere sollen NICHT in einem Kader landen,
+  // sondern als Signings fuer die kommende Transferperiode sichtbar bleiben -- Division 4
+  // ist Chris' eigener "Free"-Pseudo-Team (plan.md 0.3: "Fahrer ohne Team haengen am
+  // Pseudo-Team ... Division 4 'Free'"). Referenz bewusst dieselbe wie Phase 1 (WT+PT) --
+  // diese Charaktere sollen wie plausible Verstaerkungen fuer ein Topteam aussehen.
+  const freeTeamRows = realTeamRowsByDivision(tree, 4);
+  let riderPatchTrace3 = [];
+  if (freeTeamRows.length === 0) {
+    console.warn('\nWARNUNG: kein Team in Division 4 (Free-Pool) gefunden -- Phase 3 uebersprungen, Transfermarkt-Charaktere bleiben unplatziert.');
+  } else {
+    const freeTeam = freeTeamRows[0];
+    const freeTeamRowIdx = rowIndicesByTeam.get(freeTeam.IDteam) || [];
+    console.log(`\nPhase 3: Free-Pool-Team "${freeTeam.name}" hat ${freeTeamRowIdx.length} Zeilen, ${transferMarketPlayers.length} Oly-Charaktere fuer den Transfermarkt reserviert.`);
+    if (transferMarketPlayers.length > freeTeamRowIdx.length) {
+      console.warn(`  WARNUNG: mehr Transfermarkt-Charaktere (${transferMarketPlayers.length}) als freie Zeilen (${freeTeamRowIdx.length}) -- ueberschuessige bleiben unplatziert.`);
+    }
+    const slotRows3 = freeTeamRowIdx.map((rowIndex) => ({ rowIndex, birthYear: Math.floor(birthdatesAll[rowIndex] / 10000) }));
+    const phase3Population = buildPopulationForSlots(
+      slotRows3,
+      transferMarketPlayers.map((p) => ({ player: p, roster: null })),
+      { olyTeamId: null, olyTeamName: null, division: 'FREE' },
+    );
+    console.log(`Phase-3-Population: ${phase3Population.length}`);
+    riderPatchTrace3 = patchRiderPopulation(cyclistTable, phase3Population, referenceStats, args, 'Phase 3');
+    console.log(`${riderPatchTrace3.length} Fahrer-Zeilen im Freien Markt gepatcht (Phase 3).`);
+  }
+
+  const totalPatched = riderPatchTrace.length + riderPatchTrace2.length + riderPatchTrace3.length;
+  console.log(`\nInsgesamt eingesetzte Oly-Charaktere: ${totalPatched} von ${oly.rosters.length + oly.freePlayers.length} (${oly.rosters.length} gerostert + ${oly.freePlayers.length} frei, davon ${riderPatchTrace3.length} im Transfermarkt statt im Kader).`);
 
   finalizeAndWrite(tree, args, {
     teams: teamPatchTrace,
-    riders: [...riderPatchTrace, ...riderPatchTrace2],
+    riders: [...riderPatchTrace, ...riderPatchTrace2, ...riderPatchTrace3],
     contractsPatched,
   });
 }
