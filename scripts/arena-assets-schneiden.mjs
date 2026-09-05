@@ -40,11 +40,23 @@ const SCHNITTE = [
   ['baum_2',       'nadelbaum', 288, 162,  32,  60, false],
   ['baum_3',       'nadelbaum', 321, 163,  30,  59, false],
   ['baum_4',       'nadelbaum', 353, 170,  30,  42, false],
+  // Hindernis-Stationen der Spurt-Bahn (docs/design/spurt-offene-fragen-plus-optik-plan-05-09.md, 4.2).
+  // Koordinaten aus den TSX-Wangsets der Pakete, am 4x-Ausschnitt gegengeprueft.
+  ['hind_huerde',   'zaun',     64, 160,  32,  32, false],
+  ['hind_balken',   'zaun',     80, 768,  64,  32, false],
+  ['hind_wand',     'zaun',    256, 448,  32,  64, false],
+  ['hind_seil',     'zaun',    384,  64,  64,  32, false],
+  ['hind_wasser_l', 'terrain',  96, 544,  32,  32, false],
+  ['hind_wasser_r', 'terrain', 160, 544,  32,  32, false],
+  ['hind_mauer',    'zaun',    192, 352,  40,  32, false],
+  ['hind_heu',      'deko',      0, 736,  64,  32, false],
+  ['hind_feuer',    'deko',    256,1536, 160,  32, false],
 ];
 
 const BLATT = {
   terrain:   'lpc-terrains/terrain-v7.png',
   zaun:      'decoration_medieval/fence_medieval.png',
+  deko:      'decoration_medieval/decorations-medieval.png',
   nadelbaum: 'lpc-conifers/conifers.png',
 };
 
