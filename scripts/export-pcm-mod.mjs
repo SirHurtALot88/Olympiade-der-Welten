@@ -285,18 +285,20 @@ function patchRiderPopulation(cyclistTable, population, reference, templates, ar
   if (population.length === 0) return [];
 
   const levelTargets = buildLevelTargets(population, reference.levelValues);
-  const profiler = buildShapeMatchedProfiler(templates);
+  const profiler = buildShapeMatchedProfiler(templates, population.map((p) => p.raw), reference.withinSdMedian);
 
   const characByRow = new Map();
   const compByRow = new Map();
   let similaritySum = 0;
+  let specSum = 0;
   population.forEach((p, i) => {
-    const { charac, matchedName, similarity } = profiler.apply(p.raw, levelTargets[i]);
+    const { charac, matchedName, similarity, specializationFactor } = profiler.apply(p.raw, levelTargets[i]);
     characByRow.set(p.rowIndex, charac);
-    compByRow.set(p.rowIndex, { matchedName, similarity });
+    compByRow.set(p.rowIndex, { matchedName, similarity, specializationFactor });
     similaritySum += similarity;
+    specSum += specializationFactor;
   });
-  console.log(`  ${label}: Form-Zuordnung gegen ${templates.length} echte Fahrerprofile, mittlere Aehnlichkeit=${(similaritySum / population.length).toFixed(3)}`);
+  console.log(`  ${label}: Form-Zuordnung gegen ${templates.length} echte Fahrerprofile, mittlere Aehnlichkeit=${(similaritySum / population.length).toFixed(3)}, mittlerer Spezialisierungsfaktor=${(specSum / population.length).toFixed(2)}`);
 
   // potentiel: Rang nach grober peakLevel-Naeherung (Level + alterabhaengiges
   // Basis-Headroom, ohne den zirkulaeren potentiel-Term -- plan.md 1.3).
@@ -368,6 +370,7 @@ function patchRiderPopulation(cyclistTable, population, reference, templates, ar
       fidelity,
       realRiderComp: comp.matchedName,
       compSimilarity: Math.round(comp.similarity * 1000) / 1000,
+      specializationFactor: Math.round(comp.specializationFactor * 100) / 100,
     });
   });
   for (const editor of Object.values(editors)) editor.flush();

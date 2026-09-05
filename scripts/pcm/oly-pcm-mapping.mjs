@@ -176,18 +176,48 @@ export function enforceMountainSprintTradeoff(charac, raw) {
   return out;
 }
 
-export function buildShapeMatchedProfiler(templates) {
+// UEBERARBEITET 05.09., siebte Runde: Chris ("hoffe dass du auch wirklich starke
+// Spezialisten drin hast und nicht nur Allrounder ... social als support oder teils mental
+// soll dann nicht nur was drauf schlagen sondern zieht ja auch Punkte ab, weil es dann den
+// Schnitt deutlich schlechter macht, und das wird dann auf die Punkte bis 85 verteilt").
+// Die reine Form-Zuordnung oben leiht IMMER die Streuung des gefundenen echten Fahrers --
+// und echte WT/PT-Fahrer sind selbst schon eher flach (Median-Innerhalb-SD nur 3.64 von 35
+// moeglichen Punkten). Ein Oly-Charakter mit hart einseitigen Attributen (z.B. Speed/Power
+// exzellent, aber charisma/spirit/torment mies -- die in praktisch jeder Disziplin als
+// kleiner Abzugsposten mitzaehlen, s. DISCIPLINE_WEIGHTS) hat in seinen ROHWERTEN oft eine
+// VIEL groessere Eigen-Streuung als der beste Formtreffer -- lieh man bisher trotzdem dessen
+// (kleinere) Streuung, wurden echte Spezialisten unnoetig geglaettet. Jetzt wird die
+// geliehene FORM (Richtung, auf Einheitsstreuung normiert) mit der EIGENEN Streuung des
+// Charakters skaliert, relativ zum Populations-Median: schwache soziale/mentale Attribute
+// druecken mehrere Rohwerte gleichzeitig, vergroessern also die Eigen-Streuung -- das
+// Budget, das die Disziplin mit sozialem Abzug verliert, taucht als groesserer Ausschlag bei
+// den unterstuetzten Disziplinen wieder auf (naeher an 85), statt gleichmaessig zu verwaschen.
+export function buildShapeMatchedProfiler(templates, rawList, targetWithinSdMedian) {
+  function ownSpread(raw) {
+    const vals = DISCIPLINES.map((d) => raw[d]);
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+    return Math.sqrt(variance);
+  }
+  const spreads = rawList.map(ownSpread).sort((a, b) => a - b);
+  const spreadMedian = spreads[Math.floor(spreads.length / 2)] || 1;
+
   return {
     apply(raw, targetMean) {
       const { template, similarity } = matchShapeTemplate(raw, templates);
-      const vals = DISCIPLINES.map((d) => template.charac[d]);
-      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const tVals = DISCIPLINES.map((d) => template.charac[d]);
+      const tMean = tVals.reduce((a, b) => a + b, 0) / tVals.length;
+      const tSd = Math.sqrt(DISCIPLINES.reduce((s, d) => s + (template.charac[d] - tMean) ** 2, 0) / DISCIPLINES.length) || 1;
+
+      const specializationFactor = spreadMedian > 0 ? ownSpread(raw) / spreadMedian : 1;
+
       let charac = {};
       for (const d of DISCIPLINES) {
-        charac[d] = clamp(Math.round(targetMean + (template.charac[d] - mean)), PCM_MIN, PCM_MAX);
+        const shape = (template.charac[d] - tMean) / tSd; // Richtung, Einheitsstreuung
+        charac[d] = clamp(Math.round(targetMean + targetWithinSdMedian * specializationFactor * shape), PCM_MIN, PCM_MAX);
       }
       charac = enforceMountainSprintTradeoff(charac, raw);
-      return { charac, matchedName: template.name, similarity };
+      return { charac, matchedName: template.name, similarity, specializationFactor };
     },
   };
 }
