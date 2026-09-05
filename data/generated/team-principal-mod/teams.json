@@ -15,7 +15,7 @@
 		"form_prestige": 31,
 		"prestige_base": 46,
 		"budget_m": 325,
-		"starting_balance_m": 7.1,
+		"starting_balance_m": 280.9,
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
@@ -112,7 +112,7 @@
 		"form_prestige": 20,
 		"prestige_base": 44,
 		"budget_m": 320,
-		"starting_balance_m": 0.6,
+		"starting_balance_m": 186.8,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -209,7 +209,7 @@
 		"form_prestige": 90,
 		"prestige_base": 88,
 		"budget_m": 315,
-		"starting_balance_m": 37.1,
+		"starting_balance_m": 382.8,
 		"headquarters": {
 			"hospitality_pr_center": 5,
 			"wind_tunnel": 5,
@@ -306,7 +306,7 @@
 		"form_prestige": 88,
 		"prestige_base": 82,
 		"budget_m": 310,
-		"starting_balance_m": 52.1,
+		"starting_balance_m": 321.8,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -404,7 +404,7 @@
 		"form_prestige": 39,
 		"prestige_base": 54,
 		"budget_m": 305,
-		"starting_balance_m": 26.7,
+		"starting_balance_m": 192.5,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -501,7 +501,7 @@
 		"form_prestige": 56,
 		"prestige_base": 48,
 		"budget_m": 300,
-		"starting_balance_m": 34.6,
+		"starting_balance_m": 219.7,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -598,7 +598,7 @@
 		"form_prestige": 45,
 		"prestige_base": 56,
 		"budget_m": 295,
-		"starting_balance_m": 86.7,
+		"starting_balance_m": 158.3,
 		"headquarters": {
 			"hospitality_pr_center": 1,
 			"wind_tunnel": 1,
@@ -700,7 +700,7 @@
 		"form_prestige": 81,
 		"prestige_base": 67,
 		"budget_m": 290,
-		"starting_balance_m": 33.4,
+		"starting_balance_m": 406,
 		"headquarters": {
 			"hospitality_pr_center": 6,
 			"wind_tunnel": 6,
@@ -803,7 +803,7 @@
 		"form_prestige": 34,
 		"prestige_base": 55,
 		"budget_m": 285,
-		"starting_balance_m": 64.4,
+		"starting_balance_m": 151.3,
 		"headquarters": {
 			"hospitality_pr_center": 1,
 			"wind_tunnel": 1,
@@ -906,7 +906,7 @@
 		"form_prestige": 79,
 		"prestige_base": 71,
 		"budget_m": 280,
-		"starting_balance_m": 27.6,
+		"starting_balance_m": 312.8,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -1003,7 +1003,7 @@
 		"form_prestige": 51,
 		"prestige_base": 64,
 		"budget_m": 275,
-		"starting_balance_m": 40.5,
+		"starting_balance_m": 251.6,
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
@@ -1101,7 +1101,7 @@
 		"form_prestige": 62,
 		"prestige_base": 54,
 		"budget_m": 270,
-		"starting_balance_m": 23.1,
+		"starting_balance_m": 178.1,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -1199,7 +1199,7 @@
 		"form_prestige": 70,
 		"prestige_base": 66,
 		"budget_m": 265,
-		"starting_balance_m": 40.9,
+		"starting_balance_m": 200.2,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -1297,7 +1297,7 @@
 		"form_prestige": 88,
 		"prestige_base": 75,
 		"budget_m": 240,
-		"starting_balance_m": 19.3,
+		"starting_balance_m": 152.5,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -1395,7 +1395,7 @@
 		"form_prestige": 64,
 		"prestige_base": 68,
 		"budget_m": 255,
-		"starting_balance_m": 3.3,
+		"starting_balance_m": 284.1,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -1493,7 +1493,7 @@
 		"form_prestige": 57,
 		"prestige_base": 63,
 		"budget_m": 250,
-		"starting_balance_m": 27.7,
+		"starting_balance_m": 180.6,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -1591,7 +1591,7 @@
 		"form_prestige": 95,
 		"prestige_base": 81,
 		"budget_m": 245,
-		"starting_balance_m": 1.9,
+		"starting_balance_m": 256.5,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -1689,7 +1689,7 @@
 		"form_prestige": 77,
 		"prestige_base": 79,
 		"budget_m": 195,
-		"starting_balance_m": 27.2,
+		"starting_balance_m": 164.5,
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
@@ -1787,7 +1787,7 @@
 		"form_prestige": 71,
 		"prestige_base": 73,
 		"budget_m": 190,
-		"starting_balance_m": 24.6,
+		"starting_balance_m": 145.8,
 		"headquarters": {
 			"hospitality_pr_center": 3,
 			"wind_tunnel": 3,
@@ -1885,7 +1885,7 @@
 		"form_prestige": 75,
 		"prestige_base": 73,
 		"budget_m": 180,
-		"starting_balance_m": 4.2,
+		"starting_balance_m": 115.6,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -1984,7 +1984,7 @@
 		"form_prestige": 81,
 		"prestige_base": 69,
 		"budget_m": 225,
-		"starting_balance_m": 52.7,
+		"starting_balance_m": 250.2,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -2082,7 +2082,7 @@
 		"form_prestige": 59,
 		"prestige_base": 69,
 		"budget_m": 205,
-		"starting_balance_m": 29,
+		"starting_balance_m": 196.8,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -2180,7 +2180,7 @@
 		"form_prestige": 73,
 		"prestige_base": 65,
 		"budget_m": 200,
-		"starting_balance_m": 36.5,
+		"starting_balance_m": 265.7,
 		"headquarters": {
 			"hospitality_pr_center": 6,
 			"wind_tunnel": 6,
@@ -2283,7 +2283,7 @@
 		"form_prestige": 87,
 		"prestige_base": 63,
 		"budget_m": 210,
-		"starting_balance_m": 51.1,
+		"starting_balance_m": 252.9,
 		"headquarters": {
 			"hospitality_pr_center": 5,
 			"wind_tunnel": 5,
@@ -2387,7 +2387,7 @@
 		"form_prestige": 39,
 		"prestige_base": 60,
 		"budget_m": 235,
-		"starting_balance_m": 50.5,
+		"starting_balance_m": 135.9,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -2491,7 +2491,7 @@
 		"form_prestige": 83,
 		"prestige_base": 59,
 		"budget_m": 215,
-		"starting_balance_m": 50.3,
+		"starting_balance_m": 294.4,
 		"headquarters": {
 			"hospitality_pr_center": 6,
 			"wind_tunnel": 6,
@@ -2589,7 +2589,7 @@
 		"form_prestige": 63,
 		"prestige_base": 54,
 		"budget_m": 170,
-		"starting_balance_m": 47.5,
+		"starting_balance_m": 188.3,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -2688,7 +2688,7 @@
 		"form_prestige": 69,
 		"prestige_base": 54,
 		"budget_m": 260,
-		"starting_balance_m": 3.5,
+		"starting_balance_m": 304.5,
 		"headquarters": {
 			"hospitality_pr_center": 5,
 			"wind_tunnel": 5,
@@ -2787,7 +2787,7 @@
 		"form_prestige": 46,
 		"prestige_base": 50,
 		"budget_m": 220,
-		"starting_balance_m": 56.1,
+		"starting_balance_m": 230.6,
 		"headquarters": {
 			"hospitality_pr_center": 4,
 			"wind_tunnel": 4,
@@ -2886,7 +2886,7 @@
 		"form_prestige": 40,
 		"prestige_base": 47,
 		"budget_m": 230,
-		"starting_balance_m": 7,
+		"starting_balance_m": 135.8,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -2985,7 +2985,7 @@
 		"form_prestige": 27,
 		"prestige_base": 40,
 		"budget_m": 185,
-		"starting_balance_m": 41.1,
+		"starting_balance_m": 130.4,
 		"headquarters": {
 			"hospitality_pr_center": 2,
 			"wind_tunnel": 2,
@@ -3084,7 +3084,7 @@
 		"form_prestige": 22,
 		"prestige_base": 38,
 		"budget_m": 175,
-		"starting_balance_m": 31.5,
+		"starting_balance_m": 86.8,
 		"headquarters": {
 			"hospitality_pr_center": 1,
 			"wind_tunnel": 1,

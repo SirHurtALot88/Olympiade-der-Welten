@@ -578,12 +578,20 @@ function buildTeamCore(oly, percentile, curve, colors) {
     heritage_prestige: prestige.heritage,
     form_prestige: prestige.form,
     prestige_base: prestige.base,
-    // Beide Felder, wie in der echten 2026er-Referenz fuer JEDES Team (aktiv wie
-    // inaktiv): budget_m (Olys "budget", Groessenordnung 170-325 ueber alle 32 Teams,
-    // passt fast 1:1 zur realen Spanne 60-490) und starting_balance_m (Olys "cash", die
-    // laufende Kriegskasse -- ein anderer Wert mit anderer Bedeutung).
+    // KORRIGIERT 05.09. (Chris: "muessen cash und budget nicht irgendwie zusammenhaengen
+    // damit das sauber laeuft?"): stimmt, taten sie nicht. starting_balance_m kam vorher
+    // direkt aus Olys "cash"-Feld -- das liegt aber auf einer komplett unabhaengigen
+    // Skala zu "budget" (Verhaeltnis ueber alle 32 Teams: 0.002 bis 0.29, z.B. Mayhem
+    // Mavericks budget_m 325 / cash 7.1 = 0.022). Die echte 2026er-Referenz haelt dieses
+    // Verhaeltnis dagegen konsequent zwischen 0.32 und 1.44 (Aston Martin sogar >1). Jetzt
+    // wird starting_balance_m als Anteil von budget_m berechnet, gesteuert von Olys
+    // eigener "finances"-Bewertung des Teams (1.78-10 im Save) -- ein finanziell gut
+    // gefuehrtes Team startet mit einem groesseren Anteil seines Budgets als fluessige
+    // Kasse, ein schlecht gefuehrtes mit weniger. Ergebnis liegt damit in derselben
+    // Groessenordnung wie das reale Vorbild (~0.5-1.4), statt am Original voellig
+    // vorbeizulaufen.
     budget_m: oly.team.budget,
-    starting_balance_m: Math.round(oly.team.cash * 10) / 10,
+    starting_balance_m: Math.round(oly.team.budget * clamp(0.3 + (oly.identity.finances / 10) * 1.1, 0.3, 1.4) * 10) / 10,
     headquarters: sameLevelHeadquarters(oly.identity),
     negotiation_points: 0,
     performance_scale: 'rating_100',
