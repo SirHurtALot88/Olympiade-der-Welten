@@ -1,0 +1,444 @@
+// Fachlogik fuer Oly -> Pro Cycling Manager 2026 (rein, keine I/O ausser dem kleinen
+// Farbladen-Helfer unten). Alle Zahlen/Formeln sind aus plan.md (Fable-Plan, 05.09.2026)
+// uebernommen -- s. dort fuer die empirische Herleitung. Nichts hier rundet auf 99; PCMs
+// harte Obergrenze ist 85.
+
+import { readFileSync } from 'node:fs';
+
+export const PCM_MIN = 50;
+export const PCM_MAX = 85;
+
+export function clamp(v, lo, hi) {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+export function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// ---- 1.1 Rohformeln (12 Oly-Attribute -> 14 PCM-Disziplinen) ------------------------
+export const DISCIPLINE_WEIGHTS = {
+  mountain: { stamina: 26, determination: 16, speed: 12, dexterity: 12, health: 10, power: 8, awareness: 8, will: 8 },
+  timetrial: { dexterity: 25, speed: 22, intelligence: 18, stamina: 15, awareness: 12, power: 5, torment: 3 },
+  sprint: { speed: 18, determination: 15, will: 14, torment: 14, dexterity: 12, power: 10, awareness: 7, health: 6, stamina: 4 },
+  hill: { power: 20, determination: 18, speed: 16, stamina: 14, will: 12, torment: 10, awareness: 10 },
+  plain: { stamina: 25, power: 20, speed: 15, health: 15, awareness: 10, will: 10, intelligence: 5 },
+  prologue: { speed: 28, power: 20, dexterity: 18, intelligence: 12, torment: 12, awareness: 10 },
+  acceleration: { power: 30, speed: 25, torment: 15, determination: 12, dexterity: 10, health: 8 },
+  endurance: { stamina: 35, health: 25, will: 15, determination: 10, spirit: 10, intelligence: 5 },
+  resistance: { stamina: 25, will: 22, health: 18, determination: 15, spirit: 10, torment: 10 },
+  recuperation: { health: 32, spirit: 26, stamina: 18, will: 12, intelligence: 12 },
+  cobble: { health: 22, power: 20, dexterity: 18, will: 15, stamina: 10, awareness: 10, determination: 5 },
+  downhilling: { dexterity: 30, awareness: 22, torment: 14, speed: 12, intelligence: 12, spirit: 10 },
+  baroudeur: { will: 22, determination: 20, stamina: 18, torment: 14, charisma: 12, spirit: 8, awareness: 6 },
+  // medium_mountain wird nicht direkt gewichtet, s. computeRaw() -- real corr hill/medium_mountain 0.92.
+};
+
+export const DISCIPLINES = [...Object.keys(DISCIPLINE_WEIGHTS), 'medium_mountain'];
+
+function weightedRaw(attrs, weights) {
+  let sum = 0;
+  let wsum = 0;
+  for (const [attr, w] of Object.entries(weights)) {
+    sum += (Number(attrs[attr]) || 0) * w;
+    wsum += w;
+  }
+  return sum / wsum;
+}
+
+// { d: raw je Disziplin (0..99-Skala, wie Olys Attribute), levelRaw: Mittel ueber alle 14 }
+export function computeRaw(player) {
+  const attrs = player.attributeSheetStats || {};
+  const raw = {};
+  for (const [disc, weights] of Object.entries(DISCIPLINE_WEIGHTS)) {
+    raw[disc] = weightedRaw(attrs, weights);
+  }
+  raw.medium_mountain = 0.5 * raw.mountain + 0.5 * raw.hill;
+  const levelRaw = DISCIPLINES.reduce((s, d) => s + raw[d], 0) / DISCIPLINES.length;
+  return { raw, levelRaw };
+}
+
+// Ankerpruefung (plan.md 1.1): unsere mountain/timetrial/sprint-Rohformeln sollen stark mit
+// Olys eigenen offiziellen climbing/time-trial/spurt-Werten korrelieren.
+export function pearsonCorrelation(xs, ys) {
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx;
+    const dy = ys[i] - my;
+    num += dx * dy;
+    dx2 += dx * dx;
+    dy2 += dy * dy;
+  }
+  const denom = Math.sqrt(dx2 * dy2);
+  return denom === 0 ? 0 : num / denom;
+}
+
+// ---- 1.2 "Level + Profil"-Skalierung gegen die echte Zielpopulation -----------------
+
+// Ordnet jedem Eintrag (nach levelRaw sortiert, Tie-Break Hash) den Wert an derselben
+// relativen Position in `referenceValues` (aufsteigend sortiert) zu -- Multiset-Zuweisung,
+// keine Formel. `referenceValues` = die echten mittleren charac-Werte der 919 zu
+// ersetzenden PCM-Zeilen.
+export function buildLevelTargets(entries, referenceValues) {
+  const refSorted = [...referenceValues].sort((a, b) => a - b);
+  const order = entries
+    .map((e, i) => ({ i, levelRaw: e.levelRaw, tie: hashString(String(e.id ?? i)) }))
+    .sort((a, b) => a.levelRaw - b.levelRaw || a.tie - b.tie);
+  const targets = new Array(entries.length);
+  const n = entries.length;
+  order.forEach((o, rank) => {
+    const refIdx = n <= 1 ? 0 : Math.round((rank / (n - 1)) * (refSorted.length - 1));
+    targets[o.i] = refSorted[refIdx];
+  });
+  return targets;
+}
+
+// z-standardisiert jede Disziplin ueber die Population, berechnet die charakterspezifische
+// Abweichung vom eigenen Mittel (dev), und kalibriert k so, dass der Median der
+// Innerhalb-Fahrer-Standardabweichung `targetWithinSdMedian` trifft (plan.md 1.2 Schritt 2).
+export function buildProfileScaler(rawList, targetWithinSdMedian) {
+  const discMeans = {};
+  const discStds = {};
+  for (const d of DISCIPLINES) {
+    const vals = rawList.map((r) => r[d]);
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+    discMeans[d] = mean;
+    discStds[d] = Math.sqrt(variance) || 1;
+  }
+
+  function devFor(raw) {
+    const z = {};
+    for (const d of DISCIPLINES) z[d] = (raw[d] - discMeans[d]) / discStds[d];
+    const zMean = DISCIPLINES.reduce((s, d) => s + z[d], 0) / DISCIPLINES.length;
+    const dev = {};
+    for (const d of DISCIPLINES) dev[d] = z[d] - zMean;
+    return dev;
+  }
+
+  function withinSd(dev) {
+    const vals = DISCIPLINES.map((d) => dev[d]);
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length; // ~0
+    const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
+    return Math.sqrt(variance);
+  }
+
+  // k so waehlen, dass Median(withinSd(k*dev)) == targetWithinSdMedian. withinSd ist linear
+  // in k (k>0), also reicht ein einziges Verhaeltnis aus dem unskalierten Median.
+  const devs = rawList.map(devFor);
+  const unscaledSds = devs.map(withinSd).sort((a, b) => a - b);
+  const unscaledMedian = unscaledSds[Math.floor(unscaledSds.length / 2)] || 1;
+  const k = unscaledMedian > 0 ? targetWithinSdMedian / unscaledMedian : 1;
+
+  return {
+    k,
+    apply(raw, targetMean) {
+      const dev = devFor(raw);
+      const charac = {};
+      for (const d of DISCIPLINES) {
+        charac[d] = clamp(Math.round(targetMean + k * dev[d]), PCM_MIN, PCM_MAX);
+      }
+      return charac;
+    },
+  };
+}
+
+// ---- Multiset-Zuweisung fuer diskrete Felder (potentiel, tour, classic) ------------
+
+// Weist jedem Eintrag (sortiert nach `rankKey`, aufsteigend) den Wert an derselben
+// relativen Position in der sortierten Referenzliste zu -- garantiert exakt dieselbe
+// Verteilung wie das Original.
+export function multisetAssign(entries, rankKeyFn, referenceValues) {
+  const refSorted = [...referenceValues].sort((a, b) => a - b);
+  const order = entries
+    .map((e, i) => ({ i, key: rankKeyFn(e), tie: hashString(String(e.id ?? i)) }))
+    .sort((a, b) => a.key - b.key || a.tie - b.tie);
+  const out = new Array(entries.length);
+  const n = entries.length;
+  order.forEach((o, rank) => {
+    const refIdx = n <= 1 ? 0 : Math.round((rank / (n - 1)) * (refSorted.length - 1));
+    out[o.i] = refSorted[refIdx];
+  });
+  return out;
+}
+
+// ---- 1.3 Abgeleitete Fahrerfelder ---------------------------------------------------
+
+// headroom(age, potentiel): Wachstumsspielraum fuer Fahrer <= 27 (plan.md 1.3).
+export function headroom(age, potentiel) {
+  if (age >= 28) return 0;
+  const base = age <= 21 ? 5 : age <= 24 ? 3 : 1;
+  return Math.max(0, base + Math.round(0.5 * (potentiel - 3)));
+}
+
+// limitsFor(charac, age, potentiel) -> { [discipline]: limit } (0 wenn age>=28).
+export function limitsFor(charac, age, potentiel) {
+  const limits = {};
+  const hr = headroom(age, potentiel);
+  for (const d of DISCIPLINES) {
+    limits[d] = age >= 28 ? 0 : clamp(charac[d] + hr, charac[d], PCM_MAX);
+  }
+  return limits;
+}
+
+// charac_i_tour / charac_i_classic: Mittel bestimmter Disziplinen, per Multiset gegen die
+// echte 1..5-Verteilung zugewiesen (an der Aufrufstelle, hier nur die Indexformel).
+export function tourIndexRaw(charac) {
+  return (charac.mountain + charac.recuperation + charac.resistance + charac.timetrial) / 4;
+}
+export function classicIndexRaw(charac) {
+  return (charac.cobble + charac.hill + charac.baroudeur + charac.plain) / 4;
+}
+
+// ---- 1.4 Namen -----------------------------------------------------------------------
+
+export function splitName(fullName, firstnameFallback = '') {
+  const trimmed = (fullName || '').trim();
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) {
+    const lastname = parts[0] || firstnameFallback || '-';
+    return { firstname: firstnameFallback, lastname, firstlastname: lastname };
+  }
+  const firstname = parts[0];
+  const lastname = parts.slice(1).join(' ');
+  const initial = firstname.slice(0, 1).toUpperCase();
+  return { firstname, lastname, firstlastname: `${lastname} ${initial}.` };
+}
+
+// ---- Loyalitaet aus Oly-Traits (plan.md 1.3) ------------------------------------------
+const FIDELITY_HIGH = new Set(['Loyal']);
+const FIDELITY_MID = new Set(['Fair', 'Altruistic', 'Caring', 'Disciplined']);
+const FIDELITY_LOW = new Set(['Mercenary', 'Renegade', 'Gambler']);
+
+export function fidelityFromTraits(player) {
+  const pos = player.traitsPositive || [];
+  const neg = player.traitsNegative || [];
+  if (pos.some((t) => FIDELITY_HIGH.has(t))) return 5;
+  if (neg.some((t) => FIDELITY_LOW.has(t))) return 0;
+  if (pos.some((t) => FIDELITY_MID.has(t))) return 3;
+  return 0;
+}
+
+// ---- 2. Team-Zuordnung ----------------------------------------------------------------
+
+// Chris' F1-Reihenfolge (staerkstes zuerst), s. export-team-principal-mod.mjs F1_TEAM_NAMES.
+export const F1_TEAM_NAMES = [
+  'Mayhem Mavericks', 'Zero Heroes', 'Cold Steel', 'Golden Gladiators', 'Last Ride',
+  'Project Suicide', 'Raging Lunatics', 'Wrecking Legionnaires', 'Hell Raisers',
+  'Silver Soldiers', 'Black Panthers', 'Nunchuck Ninjas', 'Natures Wrath', 'Death Peaches',
+  'Wicked Wizards', 'Vicious & Delicious',
+];
+// plan.md 2.1: die Menge "Top 18 nach Budget" ist identisch mit "F1-16 + Terrible Teachers +
+// Mortal Sin"; Default-Reihenfolge haengt die beiden hinten an.
+export const WORLD_TOUR_ORDER_OVERRIDE = [...F1_TEAM_NAMES, 'Terrible Teachers', 'Mortal Sin'];
+
+export function computeTeamPrestige(identity) {
+  const heritage = clamp(Math.round(((identity.ambition / 10) * 0.5 + (identity.boardConfidence / 9) * 0.5) * 100), 10, 95);
+  const form = clamp(Math.round(((identity.harmony / 10) * 0.5 + (identity.cooperation / 9.73) * 0.5) * 100), 10, 95);
+  return { heritage, form, base: Math.round((heritage + form) / 2) };
+}
+
+// teams: [{teamId, name, budget}], identities: Map(teamId -> identity). orderMode:
+// 'f1' (Default, WORLD_TOUR_ORDER_OVERRIDE) oder 'budget' (reine Budget-Reihenfolge).
+export function rankOlyTeams(teams, identities, orderMode = 'f1') {
+  const sorted = [...teams].sort((a, b) => b.budget - a.budget);
+  const top18 = sorted.slice(0, 18);
+  const rest = sorted.slice(18);
+
+  let worldTour;
+  if (orderMode === 'f1') {
+    const byName = new Map(top18.map((t) => [t.name, t]));
+    worldTour = WORLD_TOUR_ORDER_OVERRIDE.map((name) => byName.get(name)).filter(Boolean);
+    if (worldTour.length !== 18) {
+      throw new Error(
+        `WORLD_TOUR_ORDER_OVERRIDE (${WORLD_TOUR_ORDER_OVERRIDE.length} Namen) trifft nicht auf die Top-18-Teams nach Budget zu (${worldTour.length} gefunden) -- Team umbenannt/Budget veraendert?`,
+      );
+    }
+  } else {
+    worldTour = top18;
+  }
+
+  const proTeams = [...rest].sort((a, b) => b.budget - a.budget).slice(0, 14);
+  return { worldTour, proTeams };
+}
+
+// Real-Staerke der Slots (Mittel der 8 besten "max charac"), absteigend -- plan.md 0.3.
+export const WT_SLOT_STRENGTH_ORDER = [
+  'Lidl-Trek', 'UAE', 'Visma', 'Red Bull', 'INEOS', 'Bahrain', 'Quick-Step', 'Jayco',
+  'Decathlon', 'Lotto', 'EF', 'Uno-X', 'NSN', 'Alpecin', 'Movistar', 'Astana',
+  'Groupama', 'Picnic',
+];
+export const PT_SLOT_STRENGTH_ORDER = [
+  'Tudor', 'Polti', 'Pinarello', 'TotalEnergies', 'Cofidis', 'Unibet', 'Bardiani',
+  'Caja Rural', 'Flanders', 'Kern Pharma', 'NIPPO', 'MBH', 'Burgos', 'Euskaltel',
+];
+
+// slotTeamsByName: Map(kurzer Markenname -> Team-Chunk-Zeilenindex), aus dem echten PCM-
+// Team-Namen aufgeloest (Substring-Match, da die echten Namen laenger/anders geschrieben
+// sind, z.B. "Lidl - Trek"). rankKey(name) -> Zeilenindex.
+export function matchSlotOrder(strengthOrder, realTeamNames) {
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return strengthOrder.map((brand) => {
+    const target = norm(brand);
+    const idx = realTeamNames.findIndex((n) => norm(n).includes(target));
+    if (idx === -1) throw new Error(`Slot-Marke "${brand}" nicht unter den echten PCM-Teamnamen gefunden`);
+    return idx;
+  });
+}
+
+// ---- 3.2 Snake-Draft fuer Top-up-Fahrer ------------------------------------------------
+
+// teamsInOrder: Array von Team-Objekten in Oly-Staerkereihenfolge (staerkstes zuerst).
+// freePlayers: Array, absteigend nach rating vorsortiert erwartet.
+// slotCounts: Map(teamId -> Anzahl benoetigter Top-ups).
+// Gibt Map(teamId -> Array von Top-up-Spielern) zurueck.
+export function draftTopUps(teamsInOrder, freePlayers, slotCounts) {
+  const drafted = new Map(teamsInOrder.map((t) => [t.teamId, []]));
+  let cursor = 0;
+  let forward = true;
+  let remaining = teamsInOrder.filter((t) => (slotCounts.get(t.teamId) || 0) > drafted.get(t.teamId).length);
+  while (remaining.length > 0 && cursor < freePlayers.length) {
+    const order = forward ? teamsInOrder : [...teamsInOrder].reverse();
+    for (const team of order) {
+      const need = slotCounts.get(team.teamId) || 0;
+      if (drafted.get(team.teamId).length >= need) continue;
+      if (cursor >= freePlayers.length) break;
+      drafted.get(team.teamId).push(freePlayers[cursor]);
+      cursor++;
+    }
+    forward = !forward;
+    remaining = teamsInOrder.filter((t) => (slotCounts.get(t.teamId) || 0) > drafted.get(t.teamId).length);
+  }
+  return drafted;
+}
+
+// ---- 3.3 Slot-Zuordnung innerhalb eines Teams (Prime-Alter-Regel) ---------------------
+
+// slotRows: [{rowIndex, birthYear}] eines Teams (aus der echten PCM-Zeile). players:
+// [{..., levelRaw}] in beliebiger Reihenfolge, bereits (gerostert zuerst, dann Top-ups)
+// konkateniert. Gibt Array [{rowIndex, player}] zurueck, laengengleich zu slotRows.
+export function assignSlotsWithinTeam(slotRows, players, currentSeasonYear) {
+  function primeClass(age) {
+    if (age >= 24 && age <= 30) return 0;
+    if ((age >= 22 && age <= 23) || (age >= 31 && age <= 32)) return 1;
+    return 2;
+  }
+  const slots = slotRows.map((s) => ({ ...s, age: currentSeasonYear - s.birthYear }));
+  slots.sort((a, b) => primeClass(a.age) - primeClass(b.age) || a.age - b.age);
+  const sortedPlayers = [...players].sort((a, b) => (b.levelRaw ?? 0) - (a.levelRaw ?? 0));
+  return slots.map((slot, i) => ({ rowIndex: slot.rowIndex, age: slot.age, player: sortedPlayers[i] }));
+}
+
+// ---- Team-Abkuerzung -------------------------------------------------------------------
+
+// ---- Teamfarben (dupliziert aus export-team-principal-mod.mjs -- dort nicht exportiert,
+// und dieses Skript soll die bereits gepruefte TP-Datei nicht anfassen) --------------------
+
+export function loadTeamColorMap(teamColorsTsPath) {
+  const src = readFileSync(teamColorsTsPath, 'utf8');
+  const marker = 'export const TEAM_COLOR: Record<string, TeamColor> = ';
+  const start = src.indexOf(marker);
+  if (start === -1) throw new Error(`TEAM_COLOR nicht gefunden in ${teamColorsTsPath}`);
+  const objStart = src.indexOf('{', start);
+  let depth = 0;
+  let i = objStart;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        i++;
+        break;
+      }
+    }
+  }
+  const objText = src.slice(objStart, i);
+  return new Function(`return (${objText});`)();
+}
+
+export function hslStringToRgb(hslStr) {
+  const m = /hsl\(\s*(-?[\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)/.exec(hslStr || '');
+  if (!m) return [128, 128, 128];
+  const h = ((Number(m[1]) % 360) + 360) % 360;
+  const s = Number(m[2]) / 100;
+  const l = Number(m[3]) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m2 = l - c / 2;
+  const [r0, g0, b0] =
+    h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [r0, g0, b0].map((v) => Math.round((v + m2) * 255));
+}
+
+export function rgbToHex([r, g, b]) {
+  return [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+}
+
+function relativeLuminance([r, g, b]) {
+  const chan = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+}
+export function contrastRatio(rgbA, rgbB) {
+  const a = relativeLuminance(rgbA);
+  const b = relativeLuminance(rgbB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+const MIN_TEXT_CONTRAST = 3.0;
+export function ensureReadableSecondary(primary, candidateSecondary) {
+  if (candidateSecondary && contrastRatio(primary, candidateSecondary) >= MIN_TEXT_CONTRAST) {
+    return candidateSecondary;
+  }
+  const white = [255, 255, 255];
+  const black = [17, 17, 17];
+  return contrastRatio(primary, white) >= contrastRatio(primary, black) ? white : black;
+}
+
+export function resolveTeamColors(colorMap, shortCode) {
+  const entry = colorMap[shortCode];
+  let primary;
+  let secondaryCandidate = null;
+  if (!entry) {
+    const hue = Math.round((hashString(shortCode) * 137.508) % 360);
+    primary = hslStringToRgb(`hsl(${hue} 58% 55%)`);
+  } else {
+    primary = hslStringToRgb(entry.primary);
+    secondaryCandidate = entry.secondary ? hslStringToRgb(entry.secondary) : null;
+  }
+  return { primary, secondary: ensureReadableSecondary(primary, secondaryCandidate) };
+}
+
+export function teamAbbreviation(name, used) {
+  const letters = name.toUpperCase().replace(/[^A-Z]/g, '');
+  const candidates = [];
+  if (letters.length >= 3) {
+    candidates.push(letters.slice(0, 3));
+    // Konsonanten-Fallback: Anfangsbuchstaben der Woerter, dann Konsonanten auffuellen.
+    const words = name.toUpperCase().split(/\s+/).filter(Boolean);
+    const initials = words.map((w) => w[0]).join('').replace(/[^A-Z]/g, '');
+    if (initials.length >= 2) candidates.push((initials + letters).slice(0, 3));
+    for (let i = 1; i < letters.length - 1; i++) {
+      candidates.push((letters[0] + letters.slice(i)).slice(0, 3));
+    }
+  }
+  candidates.push(letters.padEnd(3, 'X').slice(0, 3));
+  for (const c of candidates) {
+    if (c.length === 3 && !used.has(c)) return c;
+  }
+  // Letzter Ausweg: Zahl anhaengen bis eindeutig.
+  let n = 0;
+  let fallback;
+  do {
+    fallback = (letters.slice(0, 2) || 'XX') + String(n % 10);
+    n++;
+  } while (used.has(fallback));
+  return fallback;
+}
