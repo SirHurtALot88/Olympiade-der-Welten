@@ -375,14 +375,17 @@ async function main() {
   }
   console.log(`Fahrer-Population (Slots, die gepatcht werden): ${population.length}`);
 
-  // ---- Ankerpruefung: unsere mountain/timetrial/sprint-Rohformeln vs. Olys eigene
-  // offizielle climbing/time-trial/spurt-disciplineRatings (plan.md 1.1).
+  // ---- Ankerpruefung (informativ): unsere mountain/timetrial/sprint-Rohformeln vs. Olys
+  // eigene offizielle climbing/time-trial/spurt-disciplineRatings. Chris hat mountain/sprint
+  // am 05.09. bewusst von Olys climbing-Formel weggeholt (power- statt stamina-gefuehrt,
+  // s. DISCIPLINE_WEIGHTS-Kommentar) -- niedrige Korrelation bei mountain ist seitdem
+  // ERWARTET, kein Fehler. timetrial blieb naeher am Original, dient hier noch als
+  // Tippfehler-Absicherung.
   for (const [ourKey, olyKey] of [['mountain', 'climbing'], ['timetrial', 'time-trial'], ['sprint', 'spurt']]) {
     const xs = population.map((p) => p.raw[ourKey]);
     const ys = population.map((p) => Number(p.player.disciplineRatings?.[olyKey] ?? 0));
     const corr = pearsonCorrelation(xs, ys);
-    const flag = corr >= 0.95 ? 'ok' : 'WARNUNG < 0.95';
-    console.log(`  Ankerpruefung ${ourKey} vs. ${olyKey}: corr=${corr.toFixed(3)} (${flag})`);
+    console.log(`  Ankerpruefung ${ourKey} vs. ${olyKey}: corr=${corr.toFixed(3)}`);
   }
 
   // ---- Skalierung kalibrieren ---------------------------------------------------------
