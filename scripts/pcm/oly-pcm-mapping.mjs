@@ -19,43 +19,42 @@ export function hashString(s) {
 }
 
 // ---- 1.1 Rohformeln (12 Oly-Attribute -> 14 PCM-Disziplinen) ------------------------
-// UEBERARBEITET 05.09. (Chris, per Chat): "Berge fuer die power Leute", "speed viel fuer
-// Sprinter und Ebene", und "moeglichst soll alles anteilig gleichwertig sein" -- drei
-// konkrete Vorgaben (mountain->power, sprint->speed, plain->speed jeweils klar dominant)
-// plus ein weicher Fairness-Wunsch ueber die GESAMTE Tabelle. Die erste Fassung folgte fuer
-// mountain/timetrial/sprint Olys eigenen offiziellen climbing/time-trial/spurt-Gewichten
-// (lib/player-generator/official-discipline-weights.ts) -- das war fuer climbing
-// stamina-dominant, nicht power-dominant, und widersprach damit Chris' Vorgabe direkt.
-// Die Tabelle unten ist deshalb eine bewusste Abweichung vom Anker: mountain/sprint/plain
-// folgen jetzt Chris' Vorgabe, nicht mehr Olys climbing-Formel (die Ankerpruefung in
-// export-pcm-mod.mjs bleibt informativ bestehen, faellt fuer diese drei aber niedriger aus).
+// UEBERARBEITET 05.09., zweite Runde (Chris, per Chat): "mach es so dass alle 12 attribute
+// ihren sinn haben, social sind dann eher supportive stats und spielen ein wenig ueberall
+// mit rein". Oly selbst kennt eine 4-Achsen-Einteilung der 12 Attribute (POW/SPE/MEN/SOC,
+// s. lib/ai/ai-needs-engine.ts `mapAttributeToAxis` und docs/PLAYER_GENERATOR_PLAN.md):
+// SOC = charisma + spirit + torment. Die erste ueberarbeitete Fassung (per IPF auf gleiche
+// Spaltensummen getrimmt) hatte genau das Gegenteil produziert -- weil charisma/spirit/
+// torment nur in wenigen Zeilen auftauchten, musste der Ausgleich sie DORT ueberproportional
+// aufblasen, sodass torment/charisma in einzelnen Zeilen sogar zur groessten Kraft wurden
+// (z.B. torment=24 in acceleration, noch vor power). Das ist die Umkehrung von "social =
+// Support": ein einzelnes SOC-Attribut wurde zum Haupttreiber EINER Disziplin, statt in
+// ALLEN ein bisschen mitzuzaehlen.
 //
-// Fairness-Ausgleich: mit den drei Vorgaben allein waere z.B. "charisma" nur in EINER
-// Disziplin (baroudeur) vertreten und "stamina" in zehn -- am Ende haette ein Attribut fast
-// nichts beizutragen, ein anderes fast alles. Erzeugt mit einem kleinen IPF-Ausgleich
-// (Iterative Proportional Fitting, gedaempft und frueh gestoppt, damit mountain/sprint/plain
-// eindeutig bei power/speed bleiben statt von selteneren Attributen ueberstrahlt zu werden --
-// s. scripts/pcm/balance-discipline-weights.mjs fuer das reproduzierbare Skript): jede Zeile
-// summiert weiter exakt zu 100, und die Spaltensummen (wie viel jedes der 12 Attribute ueber
-// alle 13 Zeilen insgesamt zaehlt) liegen jetzt bei 91-131 statt vorher 12-190 -- kein
-// Attribut ist mehr praktisch bedeutungslos, aber mountain/sprint/plain bleiben klar power-
-// bzw. speed-gefuehrt.
+// Die Tabelle unten ist deshalb ein Handentwurf statt eines Ausgleichsalgorithmus (Quelle/
+// Pruefung: scripts/pcm/design-discipline-weights.mjs), der zwei Invarianten direkt
+// durchsetzt: (1) jedes der 9 physischen/mentalen Attribute (power/health/determination/
+// stamina/speed/dexterity/awareness/intelligence/will) fuehrt oder co-fuehrt mindestens eine
+// Disziplin klar erkennbar; (2) charisma/spirit/torment tauchen in JEDER der 13 Zeilen mit
+// spuerbarem Gewicht auf (4-22, nie nur Alibi-1), sind aber in KEINER Zeile die groesste
+// Kraft. Chris' fruehere Einzelvorgaben bleiben erhalten: mountain/hill/acceleration klar
+// power-gefuehrt, sprint/plain/prologue klar speed-gefuehrt.
 export const DISCIPLINE_WEIGHTS = {
-  mountain: { power: 26, determination: 20, stamina: 15, awareness: 8, will: 7, health: 6, charisma: 6, spirit: 5, intelligence: 4, dexterity: 3 },
-  timetrial: { dexterity: 32, intelligence: 22, awareness: 18, speed: 9, stamina: 6, charisma: 5, spirit: 4, torment: 3, power: 1 },
-  sprint: { speed: 25, determination: 19, torment: 19, power: 10, awareness: 7, dexterity: 6, charisma: 6, intelligence: 4, spirit: 4 },
-  hill: { power: 27, determination: 21, speed: 11, torment: 10, awareness: 8, will: 7, charisma: 7, spirit: 5, intelligence: 4 },
-  plain: { speed: 33, stamina: 18, power: 13, awareness: 9, health: 8, charisma: 8, spirit: 6, intelligence: 5 },
-  prologue: { speed: 32, dexterity: 18, intelligence: 14, power: 12, torment: 11, charisma: 8, spirit: 5 },
-  acceleration: { power: 30, torment: 24, speed: 13, determination: 11, charisma: 8, spirit: 6, intelligence: 5, dexterity: 3 },
-  endurance: { stamina: 40, will: 16, health: 14, spirit: 14, charisma: 7, intelligence: 5, determination: 4 },
-  resistance: { will: 39, stamina: 16, health: 14, determination: 10, charisma: 7, intelligence: 5, spirit: 5, torment: 4 },
-  recuperation: { health: 37, spirit: 32, intelligence: 13, stamina: 8, charisma: 7, will: 3 },
-  cobble: { health: 38, dexterity: 18, power: 12, will: 8, charisma: 7, intelligence: 5, spirit: 5, determination: 4, stamina: 3 },
-  downhilling: { awareness: 35, dexterity: 29, torment: 15, intelligence: 9, charisma: 5, speed: 4, spirit: 3 },
-  baroudeur: { will: 31, determination: 17, torment: 17, charisma: 15, stamina: 6, awareness: 6, intelligence: 4, spirit: 4 },
+  mountain: { power: 30, stamina: 18, determination: 13, torment: 7, health: 6, spirit: 6, will: 5, awareness: 5, charisma: 4, dexterity: 3, intelligence: 3 },
+  timetrial: { dexterity: 26, intelligence: 21, awareness: 14, speed: 10, stamina: 6, torment: 6, spirit: 5, charisma: 4, power: 2, determination: 2, health: 2, will: 2 },
+  sprint: { speed: 30, power: 16, determination: 14, torment: 12, dexterity: 7, spirit: 5, awareness: 4, charisma: 4, health: 4, will: 2, intelligence: 2 },
+  hill: { power: 29, determination: 17, speed: 13, torment: 7, will: 6, awareness: 5, spirit: 5, charisma: 4, health: 4, stamina: 4, dexterity: 3, intelligence: 3 },
+  plain: { speed: 29, stamina: 15, power: 14, awareness: 8, torment: 7, health: 5, spirit: 5, intelligence: 4, charisma: 4, determination: 4, dexterity: 3, will: 2 },
+  prologue: { speed: 30, dexterity: 15, power: 13, torment: 10, intelligence: 8, charisma: 5, spirit: 5, awareness: 4, determination: 4, health: 4, stamina: 2 },
+  acceleration: { power: 30, speed: 17, torment: 12, determination: 10, dexterity: 5, spirit: 5, charisma: 4, health: 4, stamina: 4, awareness: 3, intelligence: 3, will: 3 },
+  endurance: { stamina: 28, health: 15, will: 13, spirit: 12, determination: 6, torment: 6, intelligence: 5, charisma: 4, dexterity: 4, power: 3, speed: 2, awareness: 2 },
+  resistance: { will: 27, stamina: 15, health: 13, spirit: 13, determination: 7, torment: 6, intelligence: 4, charisma: 4, power: 3, awareness: 3, dexterity: 3, speed: 2 },
+  recuperation: { health: 27, spirit: 22, stamina: 10, intelligence: 10, will: 6, torment: 6, determination: 4, charisma: 4, power: 3, dexterity: 3, awareness: 3, speed: 2 },
+  cobble: { health: 26, power: 15, dexterity: 14, torment: 10, will: 6, awareness: 6, spirit: 5, determination: 4, charisma: 4, stamina: 4, speed: 3, intelligence: 3 },
+  downhilling: { dexterity: 25, awareness: 22, torment: 14, speed: 9, intelligence: 6, spirit: 5, charisma: 4, determination: 3, power: 3, health: 3, will: 3, stamina: 3 },
+  baroudeur: { determination: 24, will: 15, torment: 13, charisma: 12, stamina: 10, spirit: 8, intelligence: 5, power: 3, health: 3, awareness: 3, dexterity: 2, speed: 2 },
   // medium_mountain wird nicht direkt gewichtet, s. computeRaw() -- Mittel aus mountain+hill,
-  // beide jetzt power-gefuehrt, also bleibt auch medium_mountain ein Power-Terrain.
+  // beide power-gefuehrt mit demselben SOC-Sockel, also bleibt medium_mountain konsistent.
 };
 
 export const DISCIPLINES = [...Object.keys(DISCIPLINE_WEIGHTS), 'medium_mountain'];
