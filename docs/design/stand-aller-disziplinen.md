@@ -1,5 +1,10 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Nachtrag 05.09.:** Basketballs Zeile (Abschnitt 1) und der Produktions-Abschnitt (Abschnitt 4,
+„Scoring und Produktion") sind auf den Stand nach K3 und der Hockey-Produktivierung
+nachgezogen — der Rest dieses Dokuments (Stand 03.09.) gilt unveraendert weiter, da keine
+andere Disziplin seither an ihrer Mechanik etwas geaendert hat.
+
 Stand 03.09.2026 (zweite grosse Revision; vorherige Fassung 02.09.2026). Gemessen mit
 `node scripts/miss-alle-disziplinen.mjs 24` — 24 Spiele je Kader-Variante, **kaderfest** ueber
 fuenf echte Team-Paarungen aus dem live-save-Abbild (s.
@@ -44,7 +49,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Tennis** | **Buehne** | **0,814** | 0,176 | 0,839 | 0,294 | **bestanden** |
 | Breaking | Buehne | 0,801 | 0,114 | 0,874 | 0,119 | bestanden |
 | Climbing | Bahn | 0,790 | 0,192 | 0,851 | 0,308 | knapp |
-| Basketball | Feldspiel | 0,757 | 0,102 | 0,923 | 0,231 | knapp |
+| Basketball | Feldspiel | 0,772 | 0,088 | 0,923 | 0,231 | knapp |
 | Eiskunstlauf | Buehne | 0,757 | 0,125 | 0,958 | 0,091 | knapp |
 | Takeshi's Castle | Bahn | 0,697 | 0,170 | 0,839 | 0,196 | durchgefallen |
 | I-Spy | Buehne | 0,692 | 0,384 | 0,727 | 0,441 | durchgefallen |
@@ -269,23 +274,36 @@ beide betreffen die Arena; beide sind laut Triage Feature-Luecken, kein Ein-Zeil
 
 ### Scoring und Produktion
 
-Im echten Spielstand wird weiterhin **nur Basketball** ueber die Arena ausgespielt
-(`ARENA_RESOLVED_DISCIPLINE_IDS`). Neu seit der letzten Fassung: Basketballs individuelle PPs
-kommen jetzt aus dem echten Arena-Boxscore-Impact (ein Perzentilrang gegen den Liga-Pool,
-linear auf einen Hoechstwert abgebildet), nicht mehr aus der alten PPS-Rang-Formel — vorher
-wurde der Boxscore, den der Motor Zug fuer Zug berechnete, fuer die individuelle Punktzahl
-schlicht verworfen (`docs/design/boxscore-an-pps.md`). Ein Anschluss-PR (#755, offen, **noch
-nicht gemerged** zum Zeitpunkt dieses Berichts) ersetzt das Perzentilmodell durch eine absolute
-Impact-Kurve, weil Chris zurecht bemaengelte, dass ein Perzentilrang fast immer denselben
-Spieler auf die volle Punktzahl hebt, unabhaengig davon, ob sein Rohwert an diesem Tag gut oder
-nur mittelmaessig war (`docs/design/pps-skalierung-opus.md`/`-umsetzung.md` auf dem PR-Branch).
+**Stand 04./05.09., dritte Revision dieses Abschnitts:** drei Disziplinen laufen inzwischen
+ueber die Arena (`ARENA_RESOLVED_DISCIPLINE_IDS = {"basketball", "gewichtheben", "hockey"}`),
+jede mit echter Boxscore-an-PPs-Berechnung (Impact-Kurve, `battle-mode-arena-team-points.ts`)
+statt der alten PPS-Rang-Formel:
 
-Die anderen neunzehn — einschliesslich Tennis, Fechten und Football trotz ihrer grossen
-Mechanik-Runden — laufen weiterhin ausschliesslich im Mockup. Fuer Tennis/Fechten ist das
-explizit dokumentiert (`tennis-fechten-buehne-umsetzung.md` Abschnitt 4): der Chassis-Wechsel
-aendert nichts an dem, was Chris heute im echten Spiel sieht, weil beide dort weiterhin ueber
-den alten PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`) abgerechnet werden. Eine
-Live-Motor-Befoerderung wie bei Basketball waere ein eigener, spaeterer Auftrag.
+- **Basketball** — seit laenger produktiviert, seither zwei weitere Runden: PR #755
+  (Perzentilrang → absolute Impact-Kurve) und **K3** (04.09., `basketball-k3.md`): Feldkorb-
+  Punkte werden jetzt zur Haelfte als `technik`-Erwartungswert statt als binaeres Treffer/Fehl
+  gebucht (dasselbe Muster wie Hockeys K3, s.u.) — rho je Spiel **0,757 → 0,772** (n=24),
+  Saisonzahl unveraendert (0,923), wie von einer erwartungswertneutralen Formel vorhergesagt.
+- **Gewichtheben** — produktiviert (`gewichtheben-produktivierung.md`, S6): eigene
+  Buehnen-Duell-Referenz, `barbell.tsx` bewusst noch kosmetisch belassen (keine Blockade fuer
+  den Live-Betrieb).
+- **Hockey** — NEU seit dieser Fassung produktiviert (`hockey-produktivierung.md`, PR #780):
+  kein neues Chassis noetig (nutzt wie Basketball das Feldspiel-Chassis), aber eine **eigene
+  Torwart-Referenz** war empirisch noetig — Feldspieler- und Torwart-Median liegen je
+  Feldgroesse unterschiedlich weit auseinander und wechseln sogar die Richtung (n=3: Feld weit
+  ueber Torwart; n=6: Feld unter Torwart). Chris hat Hockeys Rangtreue (0,669 alle 12 / 0,719
+  nur Feldspieler, s. Abschnitt 1a) fuer den Live-Betrieb ausdruecklich akzeptiert — kein
+  weiterer Rangtreue-Anlauf vorgesehen (Aufgabe #20 entsprechend geschlossen).
+
+**Die anderen siebzehn** — einschliesslich Tennis, Fechten und Football trotz ihrer grossen
+Mechanik-Runden — laufen weiterhin ausschliesslich im Mockup, abgerechnet ueber den alten
+PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`). Neun davon (Speed-Schach, Showcase,
+Time-Trial, Wettessen, Fechten, Tennis, Breaking, Climbing, Eiskunstlauf) haben die
+Rangtreue-Schranke bereits bestanden oder liegen knapp darunter — bei ihnen fehlt NUR die
+Produktivierung (Konfigurationseintrag + eigene PPS-Referenz ziehen), keine eigene Optik oder
+Bewegung: Hockeys Beispiel zeigt, dass beides unabhaengig voneinander geht (Hockeys Eisflaeche
+brauchte fuer die Live-Schaltung keine einzige Aenderung). Eine Live-Motor-Befoerderung wie bei
+Basketball/Hockey waere fuer sie trotzdem ein eigener, noch nicht angefasster Auftrag.
 
 ---
 
