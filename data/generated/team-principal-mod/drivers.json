@@ -1,0 +1,1970 @@
+[
+	{
+		"name": "Ser Camelot",
+		"team": "Cold Steel",
+		"cornering": 8,
+		"braking": 9,
+		"consistency": 12,
+		"smoothness": 12,
+		"control": 13,
+		"balance_preference": 56,
+		"traction_preference": 38,
+		"age": 21,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 58,
+		"traits": [
+			"hotlapper",
+			"cautious"
+		],
+		"personalities": [
+			"ambitious",
+			"team_player",
+			"glory_hunter"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 1,
+		"contract": {
+			"team": "Cold Steel",
+			"length_weeks": 208,
+			"salary_m": 9.31,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Reefstrike",
+		"team": "Cold Steel",
+		"cornering": 15,
+		"braking": 12,
+		"consistency": 6,
+		"smoothness": 10,
+		"control": 13,
+		"balance_preference": 77,
+		"traction_preference": 76,
+		"age": 35,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 61,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 2,
+		"contract": {
+			"team": "Cold Steel",
+			"length_weeks": 104,
+			"salary_m": 8.62,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Sir Percival",
+		"team": "Cold Steel",
+		"cornering": 12,
+		"braking": 11,
+		"consistency": 13,
+		"smoothness": 10,
+		"control": 13,
+		"balance_preference": 67,
+		"traction_preference": 14,
+		"age": 31,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 64,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Cold Steel",
+			"length_weeks": 156,
+			"salary_m": 6.61,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Valara",
+		"team": "Golden Gladiators",
+		"cornering": 9,
+		"braking": 7,
+		"consistency": 13,
+		"smoothness": 10,
+		"control": 13,
+		"balance_preference": 34,
+		"traction_preference": 14,
+		"age": 41,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 56,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 3,
+		"contract": {
+			"team": "Golden Gladiators",
+			"length_weeks": 104,
+			"salary_m": 8.3,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Arabelle Stormtide",
+		"team": "Golden Gladiators",
+		"cornering": 9,
+		"braking": 9,
+		"consistency": 11,
+		"smoothness": 9,
+		"control": 12,
+		"balance_preference": 43,
+		"traction_preference": 27,
+		"age": 28,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 54,
+		"traits": [
+			"hotlapper",
+			"nervous"
+		],
+		"personalities": [
+			"ambitious",
+			"team_player",
+			"glory_hunter"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 4,
+		"contract": {
+			"team": "Golden Gladiators",
+			"length_weeks": 52,
+			"salary_m": 8.81,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Erna Wellenlaut",
+		"team": "Golden Gladiators",
+		"cornering": 8,
+		"braking": 13,
+		"consistency": 16,
+		"smoothness": 13,
+		"control": 10,
+		"balance_preference": 58,
+		"traction_preference": 6,
+		"age": 21,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 65,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Golden Gladiators",
+			"length_weeks": 208,
+			"salary_m": 8.61,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Lyselith",
+		"team": "Death Peaches",
+		"cornering": 10,
+		"braking": 11,
+		"consistency": 7,
+		"smoothness": 12,
+		"control": 13,
+		"balance_preference": 52,
+		"traction_preference": 40,
+		"age": 33,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 57,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 5,
+		"contract": {
+			"team": "Death Peaches",
+			"length_weeks": 156,
+			"salary_m": 7.06,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Lady Yueqin",
+		"team": "Death Peaches",
+		"cornering": 4,
+		"braking": 12,
+		"consistency": 14,
+		"smoothness": 13,
+		"control": 11,
+		"balance_preference": 27,
+		"traction_preference": 18,
+		"age": 39,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 59,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 6,
+		"contract": {
+			"team": "Death Peaches",
+			"length_weeks": 104,
+			"salary_m": 7.76,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Katniss",
+		"team": "Death Peaches",
+		"cornering": 12,
+		"braking": 14,
+		"consistency": 9,
+		"smoothness": 15,
+		"control": 11,
+		"balance_preference": 65,
+		"traction_preference": 22,
+		"age": 32,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 66,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Death Peaches",
+			"length_weeks": 104,
+			"salary_m": 8.25,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Vorrak",
+		"team": "Silver Soldiers",
+		"cornering": 2,
+		"braking": 6,
+		"consistency": 13,
+		"smoothness": 5,
+		"control": 13,
+		"balance_preference": 12,
+		"traction_preference": 71,
+		"age": 24,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 42,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 7,
+		"contract": {
+			"team": "Silver Soldiers",
+			"length_weeks": 208,
+			"salary_m": 9.09,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Brontar",
+		"team": "Silver Soldiers",
+		"cornering": 7,
+		"braking": 6,
+		"consistency": 12,
+		"smoothness": 7,
+		"control": 15,
+		"balance_preference": 22,
+		"traction_preference": 41,
+		"age": 28,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 51,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 8,
+		"contract": {
+			"team": "Silver Soldiers",
+			"length_weeks": 104,
+			"salary_m": 7.25,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Tavascron",
+		"team": "Silver Soldiers",
+		"cornering": 11,
+		"braking": 13,
+		"consistency": 7,
+		"smoothness": 10,
+		"control": 8,
+		"balance_preference": 68,
+		"traction_preference": 84,
+		"age": 30,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 54,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Silver Soldiers",
+			"length_weeks": 104,
+			"salary_m": 7.52,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Weaver of Time",
+		"team": "Wicked Wizards",
+		"cornering": 2,
+		"braking": 12,
+		"consistency": 18,
+		"smoothness": 13,
+		"control": 9,
+		"balance_preference": 14,
+		"traction_preference": 5,
+		"age": 29,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 59,
+		"traits": [
+			"mechanic",
+			"bottlejob"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 9,
+		"contract": {
+			"team": "Wicked Wizards",
+			"length_weeks": 104,
+			"salary_m": 9.62,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Dyrth",
+		"team": "Wicked Wizards",
+		"cornering": 4,
+		"braking": 8,
+		"consistency": 16,
+		"smoothness": 6,
+		"control": 13,
+		"balance_preference": 22,
+		"traction_preference": 12,
+		"age": 19,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 51,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 10,
+		"contract": {
+			"team": "Wicked Wizards",
+			"length_weeks": 156,
+			"salary_m": 7.31,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Shadowsage",
+		"team": "Wicked Wizards",
+		"cornering": 11,
+		"braking": 12,
+		"consistency": 12,
+		"smoothness": 15,
+		"control": 9,
+		"balance_preference": 59,
+		"traction_preference": 41,
+		"age": 24,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 64,
+		"traits": [
+			"mechanic",
+			"crash_happy"
+		],
+		"personalities": [
+			"short_termist",
+			"mercenary",
+			"hot_streaker"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Wicked Wizards",
+			"length_weeks": 208,
+			"salary_m": 8.79,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Rubio Stone",
+		"team": "Wrecking Legionnaires",
+		"cornering": 6,
+		"braking": 7,
+		"consistency": 13,
+		"smoothness": 7,
+		"control": 13,
+		"balance_preference": 26,
+		"traction_preference": 33,
+		"age": 33,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 49,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 11,
+		"contract": {
+			"team": "Wrecking Legionnaires",
+			"length_weeks": 52,
+			"salary_m": 10.81,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Sunken Crown",
+		"team": "Wrecking Legionnaires",
+		"cornering": 1,
+		"braking": 6,
+		"consistency": 14,
+		"smoothness": 8,
+		"control": 8,
+		"balance_preference": 11,
+		"traction_preference": 38,
+		"age": 32,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 40,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 12,
+		"contract": {
+			"team": "Wrecking Legionnaires",
+			"length_weeks": 52,
+			"salary_m": 9.72,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Iron Warlord",
+		"team": "Wrecking Legionnaires",
+		"cornering": 11,
+		"braking": 8,
+		"consistency": 10,
+		"smoothness": 7,
+		"control": 14,
+		"balance_preference": 38,
+		"traction_preference": 73,
+		"age": 20,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 54,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Wrecking Legionnaires",
+			"length_weeks": 52,
+			"salary_m": 8.18,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Faith",
+		"team": "Natures Wrath",
+		"cornering": 5,
+		"braking": 9,
+		"consistency": 17,
+		"smoothness": 13,
+		"control": 10,
+		"balance_preference": 36,
+		"traction_preference": 2,
+		"age": 29,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 59,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 13,
+		"contract": {
+			"team": "Natures Wrath",
+			"length_weeks": 52,
+			"salary_m": 7.81,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Marin Solis",
+		"team": "Natures Wrath",
+		"cornering": 16,
+		"braking": 13,
+		"consistency": 13,
+		"smoothness": 8,
+		"control": 14,
+		"balance_preference": 52,
+		"traction_preference": 12,
+		"age": 28,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 70,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 14,
+		"contract": {
+			"team": "Natures Wrath",
+			"length_weeks": 104,
+			"salary_m": 5.65,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Buttercup",
+		"team": "Natures Wrath",
+		"cornering": 14,
+		"braking": 4,
+		"consistency": 7,
+		"smoothness": 6,
+		"control": 15,
+		"balance_preference": 42,
+		"traction_preference": 44,
+		"age": 40,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 51,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Natures Wrath",
+			"length_weeks": 104,
+			"salary_m": 4.15,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Abysskraken",
+		"team": "Black Panthers",
+		"cornering": 9,
+		"braking": 7,
+		"consistency": 11,
+		"smoothness": 5,
+		"control": 14,
+		"balance_preference": 35,
+		"traction_preference": 70,
+		"age": 36,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 50,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 15,
+		"contract": {
+			"team": "Black Panthers",
+			"length_weeks": 52,
+			"salary_m": 9.65,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Greybeard",
+		"team": "Black Panthers",
+		"cornering": 7,
+		"braking": 10,
+		"consistency": 14,
+		"smoothness": 10,
+		"control": 13,
+		"balance_preference": 40,
+		"traction_preference": 7,
+		"age": 23,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 58,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 16,
+		"contract": {
+			"team": "Black Panthers",
+			"length_weeks": 52,
+			"salary_m": 6.75,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Starflame",
+		"team": "Black Panthers",
+		"cornering": 8,
+		"braking": 15,
+		"consistency": 12,
+		"smoothness": 13,
+		"control": 10,
+		"balance_preference": 41,
+		"traction_preference": 42,
+		"age": 42,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 63,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Black Panthers",
+			"length_weeks": 52,
+			"salary_m": 11.14,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Corsair",
+		"team": "Vicious & Delicious",
+		"cornering": 8,
+		"braking": 13,
+		"consistency": 11,
+		"smoothness": 15,
+		"control": 13,
+		"balance_preference": 44,
+		"traction_preference": 42,
+		"age": 19,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 65,
+		"traits": [
+			"mechanic",
+			"crash_happy"
+		],
+		"personalities": [
+			"short_termist",
+			"mercenary",
+			"hot_streaker"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 17,
+		"contract": {
+			"team": "Vicious & Delicious",
+			"length_weeks": 52,
+			"salary_m": 9.56,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Floralis",
+		"team": "Vicious & Delicious",
+		"cornering": 11,
+		"braking": 8,
+		"consistency": 14,
+		"smoothness": 8,
+		"control": 14,
+		"balance_preference": 67,
+		"traction_preference": 46,
+		"age": 25,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 60,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 18,
+		"contract": {
+			"team": "Vicious & Delicious",
+			"length_weeks": 52,
+			"salary_m": 8.77,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Nyrell Winterfang",
+		"team": "Vicious & Delicious",
+		"cornering": 18,
+		"braking": 17,
+		"consistency": 7,
+		"smoothness": 12,
+		"control": 9,
+		"balance_preference": 88,
+		"traction_preference": 62,
+		"age": 33,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 69,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Vicious & Delicious",
+			"length_weeks": 52,
+			"salary_m": 8.23,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Umbrafond",
+		"team": "Raging Lunatics",
+		"cornering": 13,
+		"braking": 13,
+		"consistency": 11,
+		"smoothness": 9,
+		"control": 15,
+		"balance_preference": 58,
+		"traction_preference": 77,
+		"age": 25,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 65,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 19,
+		"contract": {
+			"team": "Raging Lunatics",
+			"length_weeks": 208,
+			"salary_m": 10.53,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Radditz",
+		"team": "Raging Lunatics",
+		"cornering": 16,
+		"braking": 13,
+		"consistency": 9,
+		"smoothness": 12,
+		"control": 14,
+		"balance_preference": 75,
+		"traction_preference": 43,
+		"age": 31,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 69,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 20,
+		"contract": {
+			"team": "Raging Lunatics",
+			"length_weeks": 104,
+			"salary_m": 10.3,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Nytharos",
+		"team": "Raging Lunatics",
+		"cornering": 16,
+		"braking": 16,
+		"consistency": 9,
+		"smoothness": 9,
+		"control": 9,
+		"balance_preference": 78,
+		"traction_preference": 94,
+		"age": 22,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 64,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Raging Lunatics",
+			"length_weeks": 104,
+			"salary_m": 10.11,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Malagor",
+		"team": "Hell Raisers",
+		"cornering": 12,
+		"braking": 11,
+		"consistency": 13,
+		"smoothness": 13,
+		"control": 16,
+		"balance_preference": 38,
+		"traction_preference": 98,
+		"age": 19,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 69,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 21,
+		"contract": {
+			"team": "Hell Raisers",
+			"length_weeks": 208,
+			"salary_m": 17.84,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Voryne Darkclaw",
+		"team": "Hell Raisers",
+		"cornering": 13,
+		"braking": 9,
+		"consistency": 11,
+		"smoothness": 9,
+		"control": 12,
+		"balance_preference": 53,
+		"traction_preference": 85,
+		"age": 25,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 58,
+		"traits": [
+			"mechanic",
+			"nervous"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"fragile_ego"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 22,
+		"contract": {
+			"team": "Hell Raisers",
+			"length_weeks": 52,
+			"salary_m": 11.32,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Small Red Machine",
+		"team": "Hell Raisers",
+		"cornering": 7,
+		"braking": 9,
+		"consistency": 9,
+		"smoothness": 13,
+		"control": 10,
+		"balance_preference": 29,
+		"traction_preference": 68,
+		"age": 37,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 52,
+		"traits": [
+			"hotlapper",
+			"cautious"
+		],
+		"personalities": [
+			"ambitious",
+			"team_player",
+			"glory_hunter"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Hell Raisers",
+			"length_weeks": 104,
+			"salary_m": 8.83,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Lucien Valecroft",
+		"team": "Last Ride",
+		"cornering": 11,
+		"braking": 14,
+		"consistency": 10,
+		"smoothness": 14,
+		"control": 12,
+		"balance_preference": 62,
+		"traction_preference": 80,
+		"age": 41,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 65,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 23,
+		"contract": {
+			"team": "Last Ride",
+			"length_weeks": 104,
+			"salary_m": 13.56,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Umbra",
+		"team": "Last Ride",
+		"cornering": 15,
+		"braking": 14,
+		"consistency": 6,
+		"smoothness": 14,
+		"control": 14,
+		"balance_preference": 82,
+		"traction_preference": 92,
+		"age": 41,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 68,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 24,
+		"contract": {
+			"team": "Last Ride",
+			"length_weeks": 52,
+			"salary_m": 11.57,
+			"start_week": 1,
+			"role": "main",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Verla Compliance",
+		"team": "Last Ride",
+		"cornering": 13,
+		"braking": 13,
+		"consistency": 14,
+		"smoothness": 14,
+		"control": 15,
+		"balance_preference": 55,
+		"traction_preference": 45,
+		"age": 40,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 74,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Last Ride",
+			"length_weeks": 52,
+			"salary_m": 10.13,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Jolia Noireclair",
+		"team": "Nunchuck Ninjas",
+		"cornering": 18,
+		"braking": 16,
+		"consistency": 10,
+		"smoothness": 14,
+		"control": 14,
+		"balance_preference": 92,
+		"traction_preference": 69,
+		"age": 30,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 77,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 25,
+		"contract": {
+			"team": "Nunchuck Ninjas",
+			"length_weeks": 52,
+			"salary_m": 12.52,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Shadowsong",
+		"team": "Nunchuck Ninjas",
+		"cornering": 15,
+		"braking": 10,
+		"consistency": 9,
+		"smoothness": 14,
+		"control": 12,
+		"balance_preference": 80,
+		"traction_preference": 40,
+		"age": 31,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 65,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 26,
+		"contract": {
+			"team": "Nunchuck Ninjas",
+			"length_weeks": 52,
+			"salary_m": 6.99,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Veza-Null",
+		"team": "Nunchuck Ninjas",
+		"cornering": 9,
+		"braking": 15,
+		"consistency": 7,
+		"smoothness": 15,
+		"control": 11,
+		"balance_preference": 59,
+		"traction_preference": 72,
+		"age": 40,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 62,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Nunchuck Ninjas",
+			"length_weeks": 52,
+			"salary_m": 8.67,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Darkblade",
+		"team": "Project Suicide",
+		"cornering": 18,
+		"braking": 16,
+		"consistency": 9,
+		"smoothness": 14,
+		"control": 14,
+		"balance_preference": 86,
+		"traction_preference": 87,
+		"age": 32,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 76,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 27,
+		"contract": {
+			"team": "Project Suicide",
+			"length_weeks": 52,
+			"salary_m": 13.54,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Varric Frankenstein",
+		"team": "Project Suicide",
+		"cornering": 4,
+		"braking": 7,
+		"consistency": 8,
+		"smoothness": 7,
+		"control": 15,
+		"balance_preference": 14,
+		"traction_preference": 73,
+		"age": 34,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 44,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 28,
+		"contract": {
+			"team": "Project Suicide",
+			"length_weeks": 208,
+			"salary_m": 9.71,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Prinzessin Valeria",
+		"team": "Project Suicide",
+		"cornering": 9,
+		"braking": 12,
+		"consistency": 13,
+		"smoothness": 14,
+		"control": 10,
+		"balance_preference": 56,
+		"traction_preference": 5,
+		"age": 34,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 64,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Project Suicide",
+			"length_weeks": 104,
+			"salary_m": 6.12,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Kelektros",
+		"team": "Mayhem Mavericks",
+		"cornering": 17,
+		"braking": 13,
+		"consistency": 12,
+		"smoothness": 12,
+		"control": 17,
+		"balance_preference": 65,
+		"traction_preference": 74,
+		"age": 20,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 75,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 29,
+		"contract": {
+			"team": "Mayhem Mavericks",
+			"length_weeks": 52,
+			"salary_m": 17.04,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Steel Sentinel",
+		"team": "Mayhem Mavericks",
+		"cornering": 4,
+		"braking": 11,
+		"consistency": 14,
+		"smoothness": 5,
+		"control": 13,
+		"balance_preference": 24,
+		"traction_preference": 47,
+		"age": 36,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 50,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 30,
+		"contract": {
+			"team": "Mayhem Mavericks",
+			"length_weeks": 52,
+			"salary_m": 13.74,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Elyssa Nightclaw",
+		"team": "Mayhem Mavericks",
+		"cornering": 16,
+		"braking": 14,
+		"consistency": 10,
+		"smoothness": 13,
+		"control": 12,
+		"balance_preference": 73,
+		"traction_preference": 34,
+		"age": 29,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 71,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Mayhem Mavericks",
+			"length_weeks": 104,
+			"salary_m": 8.07,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	},
+	{
+		"name": "Watcher",
+		"team": "Zero Heroes",
+		"cornering": 15,
+		"braking": 15,
+		"consistency": 10,
+		"smoothness": 14,
+		"control": 16,
+		"balance_preference": 76,
+		"traction_preference": 47,
+		"age": 25,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 74,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"team_player",
+			"quiet_professional"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 31,
+		"contract": {
+			"team": "Zero Heroes",
+			"length_weeks": 52,
+			"salary_m": 13.13,
+			"start_week": 1,
+			"role": "main",
+			"status": "first",
+			"priority": "first"
+		}
+	},
+	{
+		"name": "Grok'Na",
+		"team": "Zero Heroes",
+		"cornering": 6,
+		"braking": 7,
+		"consistency": 8,
+		"smoothness": 4,
+		"control": 14,
+		"balance_preference": 2,
+		"traction_preference": 71,
+		"age": 28,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 42,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "racer",
+		"nationality": "international",
+		"number": 32,
+		"contract": {
+			"team": "Zero Heroes",
+			"length_weeks": 52,
+			"salary_m": 9.82,
+			"start_week": 1,
+			"role": "main",
+			"status": "second",
+			"priority": "second"
+		}
+	},
+	{
+		"name": "Lizard",
+		"team": "Zero Heroes",
+		"cornering": 6,
+		"braking": 8,
+		"consistency": 14,
+		"smoothness": 8,
+		"control": 10,
+		"balance_preference": 40,
+		"traction_preference": 66,
+		"age": 39,
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"talent": 50,
+		"traits": [
+			"mechanic",
+			"cautious"
+		],
+		"personalities": [
+			"loyal",
+			"ambitious",
+			"company_man"
+		],
+		"career_stage": "reserve_driver",
+		"nationality": "international",
+		"number": null,
+		"contract": {
+			"team": "Zero Heroes",
+			"length_weeks": 52,
+			"salary_m": 9.42,
+			"start_week": 1,
+			"role": "reserve",
+			"status": "equal",
+			"priority": "equal"
+		}
+	}
+]

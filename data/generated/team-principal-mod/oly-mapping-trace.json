@@ -1,0 +1,424 @@
+{
+	"saveId": "new-game-1787123325719-swnjlk",
+	"generatedAt": "2026-09-05T06:57:36.928Z",
+	"teams": [
+		{
+			"teamId": "C-S",
+			"budget": 315,
+			"chassisTemplateBorrowedFrom": "McLaren"
+		},
+		{
+			"teamId": "G-G",
+			"budget": 310,
+			"chassisTemplateBorrowedFrom": "Ferrari"
+		},
+		{
+			"teamId": "D-P",
+			"budget": 240,
+			"chassisTemplateBorrowedFrom": "Porsche"
+		},
+		{
+			"teamId": "S-S",
+			"budget": 280,
+			"chassisTemplateBorrowedFrom": "Jordan"
+		},
+		{
+			"teamId": "W-W",
+			"budget": 255,
+			"chassisTemplateBorrowedFrom": "Toyota"
+		},
+		{
+			"teamId": "W-L",
+			"budget": 290,
+			"chassisTemplateBorrowedFrom": "Stewart"
+		},
+		{
+			"teamId": "N-W",
+			"budget": 265,
+			"chassisTemplateBorrowedFrom": "Lotus"
+		},
+		{
+			"teamId": "B-P",
+			"budget": 275,
+			"chassisTemplateBorrowedFrom": "Winfield Williams"
+		},
+		{
+			"teamId": "V-D",
+			"budget": 250,
+			"chassisTemplateBorrowedFrom": "Winfield Williams"
+		},
+		{
+			"teamId": "R-L",
+			"budget": 295,
+			"chassisTemplateBorrowedFrom": "Benetton"
+		},
+		{
+			"teamId": "H-R",
+			"budget": 285,
+			"chassisTemplateBorrowedFrom": "Prost"
+		},
+		{
+			"teamId": "L-R",
+			"budget": 305,
+			"chassisTemplateBorrowedFrom": "Super Aguri"
+		},
+		{
+			"teamId": "N-N",
+			"budget": 270,
+			"chassisTemplateBorrowedFrom": "British American Racing"
+		},
+		{
+			"teamId": "P-S",
+			"budget": 300,
+			"chassisTemplateBorrowedFrom": "Sauber"
+		},
+		{
+			"teamId": "M-M",
+			"budget": 325,
+			"chassisTemplateBorrowedFrom": "Repsol Arrows"
+		},
+		{
+			"teamId": "Z-H",
+			"budget": 320,
+			"chassisTemplateBorrowedFrom": "Minardi"
+		}
+	],
+	"drivers": [
+		{
+			"playerId": "player-1413-ser-camelot",
+			"sourceRating": 53.48,
+			"sourcePotential": 57.48,
+			"className": "Bard",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-0890-reefstrike",
+			"sourceRating": 48.39,
+			"sourcePotential": 52.39,
+			"className": "Berserker",
+			"race": "Aqua"
+		},
+		{
+			"playerId": "player-2545-sir-percival",
+			"sourceRating": 47.51,
+			"sourcePotential": 51.51,
+			"className": "Bard",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-1685-valara",
+			"sourceRating": 50.99,
+			"sourcePotential": 54.99,
+			"className": "Hero",
+			"race": "Demon"
+		},
+		{
+			"playerId": "player-2031-arabelle-stormtide",
+			"sourceRating": 48.24,
+			"sourcePotential": 52.24,
+			"className": "Hero",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-2937-erna-wellenlaut",
+			"sourceRating": 47.98,
+			"sourcePotential": 51.98,
+			"className": "Bard",
+			"race": "Aqua"
+		},
+		{
+			"playerId": "player-1697-lyselith",
+			"sourceRating": 48.41,
+			"sourcePotential": 52.41,
+			"className": "Hero",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-2689-lady-yueqin",
+			"sourceRating": 46.39,
+			"sourcePotential": 50.39,
+			"className": "Mage",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-1545-katniss",
+			"sourceRating": 44.96,
+			"sourcePotential": 48.96,
+			"className": "Bard",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-0359-vorrak",
+			"sourceRating": 47.41,
+			"sourcePotential": 51.41,
+			"className": "Tank",
+			"race": "Construct"
+		},
+		{
+			"playerId": "player-2471-brontar",
+			"sourceRating": 46.21,
+			"sourcePotential": 50.21,
+			"className": "Tank",
+			"race": "Construct"
+		},
+		{
+			"playerId": "player-0047-tavascron",
+			"sourceRating": 43.31,
+			"sourcePotential": 47.31,
+			"className": "Berserker",
+			"race": "Construct"
+		},
+		{
+			"playerId": "player-0995-weaver-of-time",
+			"sourceRating": 47.23,
+			"sourcePotential": 51.23,
+			"className": "Mage",
+			"race": "Divine"
+		},
+		{
+			"playerId": "player-2901-dyrth",
+			"sourceRating": 46.08,
+			"sourcePotential": 50.08,
+			"className": "Tank",
+			"race": "Voidborn"
+		},
+		{
+			"playerId": "player-1548-shadowsage",
+			"sourceRating": 44.89,
+			"sourcePotential": 48.89,
+			"className": "Bard",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-2408-rubio-stone",
+			"sourceRating": 54.29,
+			"sourcePotential": 58.29,
+			"className": "Warlord",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-0185-sunken-crown",
+			"sourceRating": 52.63,
+			"sourcePotential": 56.63,
+			"className": "Tank",
+			"race": "Aqua"
+		},
+		{
+			"playerId": "player-2178-iron-warlord",
+			"sourceRating": 46.78,
+			"sourcePotential": 50.78,
+			"className": "Berserker",
+			"race": "Construct"
+		},
+		{
+			"playerId": "player-1002-faith",
+			"sourceRating": 45.98,
+			"sourcePotential": 49.98,
+			"className": "Bard",
+			"race": "Divine"
+		},
+		{
+			"playerId": "player-2367-marin-solis",
+			"sourceRating": 43.88,
+			"sourcePotential": 47.88,
+			"className": "Sprinter",
+			"race": "Aqua"
+		},
+		{
+			"playerId": "player-0077-buttercup",
+			"sourceRating": 40.41,
+			"sourcePotential": 44.41,
+			"className": "Charger",
+			"race": "Animal"
+		},
+		{
+			"playerId": "player-1760-abysskraken",
+			"sourceRating": 52.46,
+			"sourcePotential": 56.46,
+			"className": "Berserker",
+			"race": "Aqua"
+		},
+		{
+			"playerId": "player-0389-greybeard",
+			"sourceRating": 48.18,
+			"sourcePotential": 52.18,
+			"className": "Tank",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-1000-starflame",
+			"sourceRating": 47.63,
+			"sourcePotential": 51.63,
+			"className": "Mage",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-1005-corsair",
+			"sourceRating": 49.14,
+			"sourcePotential": 53.14,
+			"className": "Mage",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-0023-floralis",
+			"sourceRating": 48.53,
+			"sourcePotential": 52.53,
+			"className": "Berserker",
+			"race": "Plant"
+		},
+		{
+			"playerId": "player-0546-nyrell-winterfang",
+			"sourceRating": 44.04,
+			"sourcePotential": 48.04,
+			"className": "Sprinter",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-0007-umbrafond",
+			"sourceRating": 58.28,
+			"sourcePotential": 62.28,
+			"className": "Berserker",
+			"race": "Plant"
+		},
+		{
+			"playerId": "player-0522-radditz",
+			"sourceRating": 53.86,
+			"sourcePotential": 57.86,
+			"className": "Charger",
+			"race": "Animal"
+		},
+		{
+			"playerId": "player-0549-nytharos",
+			"sourceRating": 45.26,
+			"sourcePotential": 49.26,
+			"className": "Berserker",
+			"race": "Animal"
+		},
+		{
+			"playerId": "player-2541-malagor",
+			"sourceRating": 69.47,
+			"sourcePotential": 73.47,
+			"className": "Berserker",
+			"race": "Demon"
+		},
+		{
+			"playerId": "player-0873-voryne-darkclaw",
+			"sourceRating": 51.91,
+			"sourcePotential": 55.91,
+			"className": "Berserker",
+			"race": "Demon"
+		},
+		{
+			"playerId": "player-1780-small-red-machine",
+			"sourceRating": 48.97,
+			"sourcePotential": 52.97,
+			"className": "Tactician",
+			"race": "Demon"
+		},
+		{
+			"playerId": "player-2846-lucien-valecroft",
+			"sourceRating": 55.54,
+			"sourcePotential": 59.54,
+			"className": "Overseer",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-0718-umbra",
+			"sourceRating": 53.25,
+			"sourcePotential": 57.25,
+			"className": "Rogue",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-2350-verla-compliance",
+			"sourceRating": 51.92,
+			"sourcePotential": 55.92,
+			"className": "Mage",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-2529-jolia-noireclair",
+			"sourceRating": 56.47,
+			"sourcePotential": 60.47,
+			"className": "Rogue",
+			"race": "Lizard"
+		},
+		{
+			"playerId": "player-0769-shadowsong",
+			"sourceRating": 46.83,
+			"sourcePotential": 50.83,
+			"className": "Bard",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-2181-veza-null",
+			"sourceRating": 46.74,
+			"sourcePotential": 50.74,
+			"className": "Overseer",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-2383-darkblade",
+			"sourceRating": 60.33,
+			"sourcePotential": 64.33,
+			"className": "Berserker",
+			"race": "Voidborn"
+		},
+		{
+			"playerId": "player-2705-varric-frankenstein",
+			"sourceRating": 56.9,
+			"sourcePotential": 60.9,
+			"className": "Tank",
+			"race": "Human"
+		},
+		{
+			"playerId": "player-1564-prinzessin-valeria",
+			"sourceRating": 40.9,
+			"sourcePotential": 44.9,
+			"className": "Bard",
+			"race": "Elf"
+		},
+		{
+			"playerId": "player-2307-kelektros",
+			"sourceRating": 67.88,
+			"sourcePotential": 71.88,
+			"className": "Berserker",
+			"race": "Dragon"
+		},
+		{
+			"playerId": "player-1645-steel-sentinel",
+			"sourceRating": 62.22,
+			"sourcePotential": 66.22,
+			"className": "Hero",
+			"race": "Construct"
+		},
+		{
+			"playerId": "player-0734-elyssa-nightclaw",
+			"sourceRating": 47.25,
+			"sourcePotential": 51.25,
+			"className": "Rogue",
+			"race": "Lizard"
+		},
+		{
+			"playerId": "player-1730-watcher",
+			"sourceRating": 67.32,
+			"sourcePotential": 71.32,
+			"className": "Bard",
+			"race": "Lizard"
+		},
+		{
+			"playerId": "player-0188-grok-na",
+			"sourceRating": 55.23,
+			"sourcePotential": 59.23,
+			"className": "Warlord",
+			"race": "Animal"
+		},
+		{
+			"playerId": "player-0377-lizard",
+			"sourceRating": 50.57,
+			"sourcePotential": 54.57,
+			"className": "Tank",
+			"race": "Lizard"
+		}
+	]
+}
