@@ -5,6 +5,12 @@
 nachgezogen — der Rest dieses Dokuments (Stand 03.09.) gilt unveraendert weiter, da keine
 andere Disziplin seither an ihrer Mechanik etwas geaendert hat.
 
+**Zweiter Nachtrag 05.09.:** Spurts Zeile (Abschnitt 1 und 4) ist auf den Stand nach der
+Umsetzung von `docs/design/spurt-modellierung-recherche-05-09.md` (Prototyp P6) nachgezogen —
+Spurt ist jetzt ein Hindernislauf mit Zeitpreis je Hindernis statt eines Ermuedungssprints mit
+Huerden als Dekoration, rho 0,652 → 0,857 (kaderfest, n=24). `node scripts/miss-alle-disziplinen.mjs
+24` bestaetigt alle uebrigen 19 Zeilen bit-identisch zum Stand davor.
+
 Stand 03.09.2026 (zweite grosse Revision; vorherige Fassung 02.09.2026). Gemessen mit
 `node scripts/miss-alle-disziplinen.mjs 24` — 24 Spiele je Kader-Variante, **kaderfest** ueber
 fuenf echte Team-Paarungen aus dem live-save-Abbild (s.
@@ -44,6 +50,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Gewichtheben** | **Buehne** | **0,887** | 0,224 | 0,944 | 0,261 | **bestanden** |
 | Showcase | Buehne | 0,880 | 0,140 | 0,944 | 0,063 | bestanden |
 | Time-Trial | Bahn | 0,867 | 0,050 | 0,909 | 0,056 | bestanden |
+| **Spurt** | **Bahn** | **0,857** | 0,286 | 0,905 | 0,357 | **bestanden** |
 | Wettessen | Buehne | 0,844 | 0,233 | 0,916 | 0,126 | bestanden |
 | **Fechten** | **Buehne** | **0,840** | 0,230 | 0,874 | 0,252 | **bestanden** |
 | **Tennis** | **Buehne** | **0,814** | 0,176 | 0,839 | 0,294 | **bestanden** |
@@ -56,13 +63,13 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Staffel | Bahn | 0,681 | 0,398 | 0,706 | 0,650 | durchgefallen |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,669 | 0,181 | 0,832 | 0,259 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,719 | 0,182 | 0,818 | 0,259 | knapp |
-| Spurt | Bahn | 0,652 | 0,559 | 0,690 | 0,643 | durchgefallen |
 | Battlefield | Arena | 0,325 | 0,662 | 0,619 | 1,000 | durchgefallen |
 | **Football** | Feldspiel | **0,468** | 0,383 | 0,671 | 0,420 | durchgefallen |
 | Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
 | TDM | Arena | 0,113 | 0,387 | 0,070 | 0,441 | durchgefallen |
 
-**Acht bestehen, drei sind knapp, neun fallen durch** (die Zwoelferzahlen der zwanzig echten
+**Neun bestehen, drei sind knapp, acht fallen durch** (Stand nach der Spurt-Umsetzung vom 05.09.,
+zuvor acht/drei/neun; die Zwoelferzahlen der zwanzig echten
 Disziplinen; Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst durchgefallen —
 `scripts/miss-alle-disziplinen.mjs`). Die eingerueckte Hockey-Zeile ist kein einundzwanzigster
 Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden Torhueter (s. Abschnitt
@@ -456,7 +463,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Takeshi's Castle | 45 % | 0,697 | Hindernisse und Nerven · kaderfest durchgefallen (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
 | Staffel | 40 % | 0,681 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze |
 | I-Spy | 35 % | 0,692 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |
-| Spurt | 45 % | 0,652 | Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
+| **Spurt** | **45 %** | **0,857** | **Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,857, Dexterity-Einfluss 3,5 % → 16,7 %** · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
 | **Football** | **28 %** | **0,468** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460) und mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468, Bewegung innerhalb der Kader-Spannweite) · naechster Hebel ist die MATRIX, nicht das Rezept (Abschnitt 5) · nicht im echten Spielstand |
 | Mini-DM | 30 % | 0,269 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt |
 | TDM | 30 % | 0,113 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |

@@ -14418,8 +14418,20 @@
     spurt:{
       label:"Spurt", jeSeite:4, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
-      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65, muedGrad:0.00028,
-      wendigErholt:0.0035, tackleAb:36, tackleRate:2.4, tackleKosten:0,
+      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
+      // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
+      // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
+      // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
+      // Torment, Power — 36 % der Matrix) mechanisch fast tot waren: eine genommene Huerde
+      // kostete nichts, ein Sturz ging im breiten Tempo-Rauschen unter. `hindernisTypen` und
+      // `huerdePreis` geben jedem Hindernis einen STETIGEN Zeitpreis (s. stepSpurt/tempoVon),
+      // dessen Dauer der zugehoerige Sub-Skill bestimmt — Skill 20 friert 0,84 s ein, Skill 80
+      // nur 0,36 s. muedGrad halbiert und der Rempler gedaempft (tackleAb/tackleRate), damit
+      // der neue Hindernis-Kanal nicht im alten Ermuedungs- und Rempler-Rauschen untergeht.
+      // Kaderfest (n=24) gemessen: rho/Spiel 0,652 -> 0,857, Spannweite 0,559 -> 0,286,
+      // Saison 0,690 -> 0,905, Dexterity-Einfluss 3,5 % -> 16,7 %.
+      muedGrad:0.00014, hindernisTypen:["TECHNIK","WUCHT","WENDIGKEIT"], huerdePreis:1.00,
+      wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       rezept:{
         // NACHGEZOGEN AN DIE SPURT-MATRIX. Gemessen: Speed trug 47,6 % dazu bei, ob
         // jemand Plaetze gutmacht — die Matrix bepreist ihn mit 18. Der Grund lag hier:
@@ -15010,7 +15022,7 @@
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
-           *kurvenFaktor(u)*(u.kraft>0?0.82:1);
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1);
   }
 
   // ===================================================================================
@@ -15081,6 +15093,7 @@
       // Wechselzone — sie verbrauchen keine Kraft und bewegen sich nicht.
       if(BA().staffel && !u.aktiv)continue;
       if(u.stolper>0)u.stolper-=dt;
+      if(u.huerde>0)u.huerde-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
       if(u.kraft>0)u.kraft-=dt;
       if(u.wechselCd>0)u.wechselCd-=dt;
@@ -15184,6 +15197,17 @@
           // Gemessen hat das Zeitfahren Intelligence mit 3,5 % gefuehrt, wo die Matrix 18
           // sagt. Der Grund war genau das: die Kurve war zu leicht.
           const A=BA();
+          // HINDERNIS-ZEITPREIS (P6, Fable-Recherche 05.09.2026): JEDES Hindernis kostet
+          // einen vollen Stopp, dessen Dauer der zum Hindernis-Typ gehoerige Sub-Skill
+          // bestimmt — nicht erst beim Misslingen. Real kostet auch die genommene Huerde
+          // Zeit (0,2 s bei Elite-Sprintern); bei uns kostete ein Gelingen bisher nichts,
+          // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
+          // `hindernisTypen` nicht und bleiben bit-identisch.
+          if(A.hindernisTypen){
+            const hTyp=A.hindernisTypen[HUERDEN_N().indexOf(h)%A.hindernisTypen.length];
+            const hSkill=u[hTyp]||0;
+            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(1-0.8*hSkill/100));
+          }
           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
           if(rr()<=technik)continue;                       // sauber drueber
           const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+u.WUCHT*(A.wuchtSpanne??0.0090));
