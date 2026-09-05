@@ -119,52 +119,75 @@ export function buildLevelTargets(entries, referenceValues) {
   return targets;
 }
 
-// z-standardisiert jede Disziplin ueber die Population, berechnet die charakterspezifische
-// Abweichung vom eigenen Mittel (dev), und kalibriert k so, dass der Median der
-// Innerhalb-Fahrer-Standardabweichung `targetWithinSdMedian` trifft (plan.md 1.2 Schritt 2).
-export function buildProfileScaler(rawList, targetWithinSdMedian) {
-  const discMeans = {};
-  const discStds = {};
-  for (const d of DISCIPLINES) {
-    const vals = rawList.map((r) => r[d]);
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
-    discMeans[d] = mean;
-    discStds[d] = Math.sqrt(variance) || 1;
+// UEBERARBEITET 05.09., sechste Runde: Chris fand einen "Superman" (Kelektros: sprint UND
+// mountain beide nahe 85) -- die vorherige unabhaengige Z-Skalierung pro Disziplin ignoriert
+// jede Kopplung zwischen Disziplinen komplett. In der echten Population (WT+PT, 919 Zeilen)
+// kommt sprint>=80 UND mountain>=80 aber NULL mal vor (corr sprint/mountain = -0.51 --
+// Sprinter und Kletterer sind gegensaetzliche Koerpertypen). Statt jede Disziplin unabhaengig
+// zu skalieren, wird deshalb pro Charakter der STAT-AEHNLICHSTE echte Fahrer gesucht (Pearson-
+// Korrelation der 14 Rohwerte gegen dessen 14 charac_i_*-Werte -- skalen-/lageinvariant,
+// vergleicht also die FORM des Profils, nicht das Niveau) und dessen echte Abweichung vom
+// eigenen Mittel uebernommen. Jede in der Realitaet vorkommende Kombination ist damit erlaubt,
+// jede nicht vorkommende automatisch ausgeschlossen (sie waere nie der best passende Fund).
+// Als Nebeneffekt bekommt man den "closest real rider comp" geschenkt, den Chris explizit
+// sehen wollte.
+export function matchShapeTemplate(raw, templates) {
+  let best = null;
+  let bestScore = -Infinity;
+  const xs = DISCIPLINES.map((d) => raw[d]);
+  for (const t of templates) {
+    const ys = DISCIPLINES.map((d) => t.charac[d]);
+    const score = pearsonCorrelation(xs, ys);
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
   }
+  return { template: best, similarity: bestScore };
+}
 
-  function devFor(raw) {
-    const z = {};
-    for (const d of DISCIPLINES) z[d] = (raw[d] - discMeans[d]) / discStds[d];
-    const zMean = DISCIPLINES.reduce((s, d) => s + z[d], 0) / DISCIPLINES.length;
-    const dev = {};
-    for (const d of DISCIPLINES) dev[d] = z[d] - zMean;
-    return dev;
+// Ein geliehenes Profil kann trotzdem noch "Supermann"-Kombinationen zeigen: ein
+// Oly-Charakter mit gleichzeitig sehr hohen Roh-Werten in mehreren Disziplinen (z.B. power
+// UND speed UND determination alle nahe Maximum) destabilisiert die Form-Suche selbst -- der
+// best passende echte Fahrer ist dann oft ein "flacher" Generalist ohne ausgepraegtes Profil
+// (kleine Abweichungen ueberall), dessen Muster auf einem hohen Zielmittel trotzdem ueberall
+// hohe Werte ergibt. mountain/sprint ist die einzige STARK gegenlaeufige Achse unter den 14
+// Disziplinen (corr=-0.51 an den 919 echten WT+PT-Zeilen, alle anderen Paare nicht-negativ,
+// s. scripts/pcm/analyze-correlations in der Session-Historie) -- deshalb eine direkte,
+// aus genau dieser echten Population per linearer Regression kalibrierte Nachkorrektur:
+// die schwaechere der beiden Spezialisierungen (laut Rohwerten, nicht laut Zielwert) wird auf
+// das reale Band (Regressionswert +1 SD) gedeckelt, die staerkere bleibt unangetastet.
+const MOUNTAIN_SPRINT_REGRESSION = {
+  sprintGivenMountain: { a: 92.71, b: -0.366, sd: 3.79 },
+  mountainGivenSprint: { a: 115.92, b: -0.713, sd: 5.30 },
+};
+
+export function enforceMountainSprintTradeoff(charac, raw) {
+  const out = { ...charac };
+  if (raw.mountain >= raw.sprint) {
+    const { a, b, sd } = MOUNTAIN_SPRINT_REGRESSION.sprintGivenMountain;
+    const cap = Math.round(a + b * out.mountain + sd);
+    if (out.sprint > cap) out.sprint = Math.max(PCM_MIN, cap);
+  } else {
+    const { a, b, sd } = MOUNTAIN_SPRINT_REGRESSION.mountainGivenSprint;
+    const cap = Math.round(a + b * out.sprint + sd);
+    if (out.mountain > cap) out.mountain = Math.max(PCM_MIN, cap);
   }
+  return out;
+}
 
-  function withinSd(dev) {
-    const vals = DISCIPLINES.map((d) => dev[d]);
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length; // ~0
-    const variance = vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length;
-    return Math.sqrt(variance);
-  }
-
-  // k so waehlen, dass Median(withinSd(k*dev)) == targetWithinSdMedian. withinSd ist linear
-  // in k (k>0), also reicht ein einziges Verhaeltnis aus dem unskalierten Median.
-  const devs = rawList.map(devFor);
-  const unscaledSds = devs.map(withinSd).sort((a, b) => a - b);
-  const unscaledMedian = unscaledSds[Math.floor(unscaledSds.length / 2)] || 1;
-  const k = unscaledMedian > 0 ? targetWithinSdMedian / unscaledMedian : 1;
-
+export function buildShapeMatchedProfiler(templates) {
   return {
-    k,
     apply(raw, targetMean) {
-      const dev = devFor(raw);
-      const charac = {};
+      const { template, similarity } = matchShapeTemplate(raw, templates);
+      const vals = DISCIPLINES.map((d) => template.charac[d]);
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      let charac = {};
       for (const d of DISCIPLINES) {
-        charac[d] = clamp(Math.round(targetMean + k * dev[d]), PCM_MIN, PCM_MAX);
+        charac[d] = clamp(Math.round(targetMean + (template.charac[d] - mean)), PCM_MIN, PCM_MAX);
       }
-      return charac;
+      charac = enforceMountainSprintTradeoff(charac, raw);
+      return { charac, matchedName: template.name, similarity };
     },
   };
 }

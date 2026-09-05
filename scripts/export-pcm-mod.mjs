@@ -64,7 +64,7 @@ import {
   computeRaw,
   pearsonCorrelation,
   buildLevelTargets,
-  buildProfileScaler,
+  buildShapeMatchedProfiler,
   multisetAssign,
   limitsFor,
   tourIndexRaw,
@@ -203,6 +203,25 @@ function collectReferenceStats(cyclistTable, rowIndicesByTeam, teamIds) {
   return { levelValues, withinSdMedian, potentielValues, tourValues, classicValues, rowCount: rowIndices.length };
 }
 
+// Echte Fahrerprofile (Name + alle 14 charac_i_*-Werte) fuer die Form-Zuordnung (s.
+// oly-pcm-mapping.mjs matchShapeTemplate) -- MUSS vor jeder Aenderung an der Tabelle gelesen
+// werden, sonst liest man die eigenen, bereits gepatchten Werte statt der echten.
+function collectReferenceProfiles(cyclistTable, rowIndicesByTeam, teamIds) {
+  const columns = {};
+  for (const d of DISCIPLINES) columns[d] = readColumnValues(cyclistTable, `charac_i_${d}`).values;
+  const names = readColumnValues(cyclistTable, 'gene_sz_firstlastname').values;
+
+  const profiles = [];
+  for (const id of teamIds) {
+    for (const idx of rowIndicesByTeam.get(id) || []) {
+      const charac = {};
+      for (const d of DISCIPLINES) charac[d] = columns[d][idx];
+      profiles.push({ name: names[idx], charac });
+    }
+  }
+  return profiles;
+}
+
 // ---- Oly-Save laden (Muster aus export-team-principal-mod.mjs) ---------------------
 
 function loadOlySave(saveArg) {
@@ -257,17 +276,27 @@ function makeStringColumnEditor(tableChunk, columnName) {
 
 // ---- Gemeinsame Patch-Logik fuer eine Fahrer-Population (Phase 1/2/3) ----------------
 // population: [{ rowIndex, age, olyTeamId, olyTeamName, division, player, roster, raw,
-// levelRaw }]. reference: Rueckgabe von collectReferenceStats(). Gibt den Trace-Eintrag je
+// levelRaw }]. reference: Rueckgabe von collectReferenceStats(). templates: Rueckgabe von
+// collectReferenceProfiles() (echte Fahrerprofile fuer die Form-Zuordnung, s.
+// oly-pcm-mapping.mjs matchShapeTemplate -- IMMER dieselbe grosse WT+PT-Bibliothek, auch fuer
+// Phase 2/3, weil Profil-FORM unabhaengig vom Liga-Niveau ist). Gibt den Trace-Eintrag je
 // gepatchter Zeile zurueck.
-function patchRiderPopulation(cyclistTable, population, reference, args, label) {
+function patchRiderPopulation(cyclistTable, population, reference, templates, args, label) {
   if (population.length === 0) return [];
 
   const levelTargets = buildLevelTargets(population, reference.levelValues);
-  const profileScaler = buildProfileScaler(population.map((p) => p.raw), reference.withinSdMedian);
-  console.log(`  ${label}: Profil-Skalierung kalibriert: k=${profileScaler.k.toFixed(3)}`);
+  const profiler = buildShapeMatchedProfiler(templates);
 
   const characByRow = new Map();
-  population.forEach((p, i) => characByRow.set(p.rowIndex, profileScaler.apply(p.raw, levelTargets[i])));
+  const compByRow = new Map();
+  let similaritySum = 0;
+  population.forEach((p, i) => {
+    const { charac, matchedName, similarity } = profiler.apply(p.raw, levelTargets[i]);
+    characByRow.set(p.rowIndex, charac);
+    compByRow.set(p.rowIndex, { matchedName, similarity });
+    similaritySum += similarity;
+  });
+  console.log(`  ${label}: Form-Zuordnung gegen ${templates.length} echte Fahrerprofile, mittlere Aehnlichkeit=${(similaritySum / population.length).toFixed(3)}`);
 
   // potentiel: Rang nach grober peakLevel-Naeherung (Level + alterabhaengiges
   // Basis-Headroom, ohne den zirkulaeren potentiel-Term -- plan.md 1.3).
@@ -321,6 +350,7 @@ function patchRiderPopulation(cyclistTable, population, reference, args, label) 
     editors.soundname.set(p.rowIndex, '');
     editors.constant.set(p.rowIndex, '');
 
+    const comp = compByRow.get(p.rowIndex);
     trace.push({
       rowIndex: p.rowIndex,
       olyPlayerId: p.player.id,
@@ -336,6 +366,8 @@ function patchRiderPopulation(cyclistTable, population, reference, args, label) 
       tour,
       classic,
       fidelity,
+      realRiderComp: comp.matchedName,
+      compSimilarity: Math.round(comp.similarity * 1000) / 1000,
     });
   });
   for (const editor of Object.values(editors)) editor.flush();
@@ -395,12 +427,11 @@ async function main() {
   const rowIndicesByTeam = cyclistRowIndicesByTeam(tree);
   const birthdatesAll = readColumnValues(cyclistTable, 'gene_i_birthdate').values;
 
-  const referenceStats = collectReferenceStats(
-    cyclistTable,
-    rowIndicesByTeam,
-    [...wtTeamRows.map((t) => t.IDteam), ...ptTeamRows.map((t) => t.IDteam)],
-  );
+  const referenceTeamIds = [...wtTeamRows.map((t) => t.IDteam), ...ptTeamRows.map((t) => t.IDteam)];
+  const referenceStats = collectReferenceStats(cyclistTable, rowIndicesByTeam, referenceTeamIds);
   console.log(`Referenzpopulation (alle 18 WT + 16 PT Zeilen): ${referenceStats.rowCount} Fahrer, Innerhalb-SD-Median=${referenceStats.withinSdMedian.toFixed(2)}`);
+  // MUSS hier (vor jeder Aenderung) gelesen werden -- s. collectReferenceProfiles-Kommentar.
+  const shapeTemplates = collectReferenceProfiles(cyclistTable, rowIndicesByTeam, referenceTeamIds);
 
   if (args.validateOnly) {
     console.log('\n--validate-only: nur Format- und Referenzpruefung, keine Aenderung.');
@@ -536,7 +567,7 @@ async function main() {
     console.log(`  Ankerpruefung ${ourKey} vs. ${olyKey}: corr=${corr.toFixed(3)}`);
   }
 
-  const riderPatchTrace = patchRiderPopulation(cyclistTable, population, referenceStats, args, 'Phase 1');
+  const riderPatchTrace = patchRiderPopulation(cyclistTable, population, referenceStats, shapeTemplates, args, 'Phase 1');
   console.log(`${riderPatchTrace.length} Fahrer-Zeilen gepatcht.`);
 
   // ---- Vertraege patchen: nur iYearEnd fuer gerosterte Oly-Spieler -------------------
@@ -608,7 +639,7 @@ async function main() {
   }
   console.log(`Phase-2-Population (Slots, die zusaetzlich gepatcht werden): ${phase2Population.length}`);
 
-  const riderPatchTrace2 = patchRiderPopulation(cyclistTable, phase2Population, phase2Reference, args, 'Phase 2');
+  const riderPatchTrace2 = patchRiderPopulation(cyclistTable, phase2Population, phase2Reference, shapeTemplates, args, 'Phase 2');
   console.log(`${riderPatchTrace2.length} zusaetzliche Fahrer-Zeilen gepatcht (Phase 2).`);
 
   // ---- Phase 3: staerkste freie Oly-Charaktere in den echten PCM-Freien-Markt --------
@@ -635,7 +666,7 @@ async function main() {
       { olyTeamId: null, olyTeamName: null, division: 'FREE' },
     );
     console.log(`Phase-3-Population: ${phase3Population.length}`);
-    riderPatchTrace3 = patchRiderPopulation(cyclistTable, phase3Population, referenceStats, args, 'Phase 3');
+    riderPatchTrace3 = patchRiderPopulation(cyclistTable, phase3Population, referenceStats, shapeTemplates, args, 'Phase 3');
     console.log(`${riderPatchTrace3.length} Fahrer-Zeilen im Freien Markt gepatcht (Phase 3).`);
   }
 
