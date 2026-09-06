@@ -85,17 +85,32 @@
  *                        im Ruhestand ist, haengt vom echten Alterungsverlauf im
  *                        jeweiligen Save ab, nicht von diesem Skript.
  *
+ * WICHTIG (Chris 06.09., 7. Ruecksprache, nach echtem Test): Basketball GMs Draft-
+ * Scouting-Screen zeigt ALLE tid:-2-Spieler in EINER flachen Liste, unabhaengig von
+ * draft.year (kein Verstecken kuenftiger Jahrgaenge), und rechnet "Age" gegen die
+ * AKTUELLE Saison -- Prospects mit einem Geburtsjahr in der Zukunft zeigen deshalb
+ * negative Alter. Ein einzelnes Liga-File kann also KEINE mehreren Jahrzehnte an
+ * Draft-Jahrgaengen vorausplanen; das ist auch nicht der von Basketball GM selbst
+ * vorgesehene Weg. Der dokumentierte Weg (basketball-gm.com/manual/customization/
+ * draft-class/): "Players > Draft > Draft Scouting > Customize", EIN separates
+ * Draft-Class-File PRO JAHR hochladen, wenn dieses Jahr ansteht. Mit --draft-classes
+ * schreibt dieses Skript deshalb N einzelne Dateien (eine je Jahr, normales Alter
+ * 19-23, kein Duplikat in derselben Datei) statt alles in ein Liga-File zu packen --
+ * s. --draft-class-files-dir unten. Wiederkehrende Charaktere (naechster Rotations-
+ * Zyklus) heissen dann "Name Jr.", "Name III" usw. statt exakt gleich.
+ *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
- *   [--free-agents-only | --draft-classes N [--picks-per-year P] [--empty-rosters]
- *     [--initial-free-agents M] [--first-year-picks F]]
+ *   [--free-agents-only | --draft-classes N --draft-class-files-dir <ordner>
+ *     [--picks-per-year P] [--empty-rosters] [--initial-free-agents M]
+ *     [--first-year-picks F]]
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import { getTeamColor } from "@/lib/foundation/team-colors";
 import { berechneStaturModifikator, ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
-import { writeFileSync } from "fs";
+import { writeFileSync, mkdirSync } from "fs";
 
 const BASE_URL = "https://olympiade.duckdns.org";
 
@@ -260,12 +275,26 @@ function main() {
   // picksPerYear. Bleibt als Flag verfuegbar, falls Chris das Verhalten je nach
   // Testergebnis doch wieder anders haben will.
   const firstYearPicks = Number(arg("--first-year-picks") ?? String(picksPerYear));
+  // Chris 06.09. (7. Ruecksprache), nach echtem Test: Basketball GMs Draft-Scouting-
+  // Screen zeigt ALLE tid:-2-Spieler in EINER flachen Liste, unabhaengig von
+  // draft.year -- kein Verstecken kuenftiger Jahrgaenge. Ausserdem rechnet die
+  // "Age"-Spalte gegen die AKTUELLE Saison, also negative Alter fuer alles mit einem
+  // Geburtsjahr in der Zukunft. Ein einzelnes Liga-File kann also KEINE 150 Jahre
+  // Draft-Jahrgaenge vorausplanen. Der von Basketball GM selbst dokumentierte Weg
+  // (basketball-gm.com/manual/customization/draft-class/): "Players > Draft > Draft
+  // Scouting > Customize", EIN separates kleines Draft-Class-File PRO JAHR hochladen.
+  // --draft-class-files-dir schreibt deshalb N einzelne Dateien (eine je Jahr) in
+  // dieses Verzeichnis, statt alles in die Haupt-Liga-Datei zu packen.
+  const draftClassFilesDir = arg("--draft-class-files-dir");
   if (!saveId) throw new Error("--save-id required");
   if (freeAgentsOnly && totalDraftYears) {
     throw new Error("--free-agents-only und --draft-classes schliessen sich aus -- getrennte Laeufe/Dateien.");
   }
   if (emptyRosters && !totalDraftYears) {
     throw new Error("--empty-rosters braucht --draft-classes -- ohne Draft-System nimm stattdessen --free-agents-only.");
+  }
+  if (totalDraftYears && !draftClassFilesDir) {
+    throw new Error("--draft-classes braucht --draft-class-files-dir <ordner> -- ein einzelnes Liga-File kann Draft-Jahrgaenge nicht vorausplanen (s. Docstring).");
   }
 
   const persistence = createPersistenceService();
@@ -451,8 +480,16 @@ function main() {
     const avg = keys.reduce((sum, k) => sum + full[k], 0) / keys.length;
     return Math.round(clamp(avg * 1.15, 75, 99));
   }
+  // Chris: "beim 2. Mal heisst Lyssara dann Lyssara Jr." -- Generationen-Suffix nach
+  // Auftritts-Index (0 = Original, 1 = Jr., 2+ = roemische Ziffer), damit Wiederkehr
+  // klar als "naechste Generation" erkennbar ist statt als exakter Namens-Duplikat.
+  const GENERATION_SUFFIXES = ["", " Jr.", " III", " IV", " V", " VI", " VII", " VIII", " IX", " X"];
+  function generationSuffix(occurrenceIndex: number): string {
+    return GENERATION_SUFFIXES[occurrenceIndex] ?? ` Gen. ${occurrenceIndex + 1}`;
+  }
 
   const bbgmPlayers: Record<string, unknown>[] = [];
+  const draftClassFilesByYear = new Map<number, Record<string, unknown>[]>();
 
   for (const p of players) {
     const a = p.attributeSheetStats ?? {};
@@ -479,10 +516,10 @@ function main() {
     const makeRecord = (args: {
       tid: number; bornYear: number; draftYear: number; ratingsSeason: number;
       contract: { amount: number; exp: number } | null;
-      ratingsOverride?: typeof ratings; pot?: number;
+      ratingsOverride?: typeof ratings; pot?: number; lastName?: string;
     }) => ({
       firstName: "",
-      lastName: p.name,
+      lastName: args.lastName ?? p.name,
       tid: args.tid,
       born: { year: args.bornYear, loc: "" },
       weight,
@@ -581,10 +618,14 @@ function main() {
     const ratingsOverride = highPotential ? dampenForProspect(ratings) : undefined;
     const pot = highPotential ? highPotentialValue(ratings) : undefined;
 
-    for (const draftYear of draftYears) {
+    // NICHT in die Haupt-Liga-Datei (bbgmPlayers) -- s. Docstring/Kommentar oben bei
+    // --draft-class-files-dir: jeder Jahrgang wird als EIGENE kleine Datei geschrieben,
+    // die Chris einzeln ueber "Players > Draft > Draft Scouting > Customize" hochlaedt,
+    // wenn dieses Jahr im Save tatsaechlich ansteht.
+    draftYears.forEach((draftYear, occurrenceIndex) => {
       const rookieAge = 19 + Math.floor(seededFraction(`${p.id}|rookieage|${draftYear}`) * 5);
       const bornYear = draftYear - rookieAge;
-      bbgmPlayers.push(makeRecord({
+      const record = makeRecord({
         tid: -2,
         bornYear,
         draftYear,
@@ -592,8 +633,12 @@ function main() {
         contract: null,
         ratingsOverride,
         pot,
-      }));
-    }
+        lastName: `${p.name}${generationSuffix(occurrenceIndex)}`,
+      });
+      const list = draftClassFilesByYear.get(draftYear) ?? [];
+      list.push(record);
+      draftClassFilesByYear.set(draftYear, list);
+    });
   }
 
   const league = {
@@ -603,8 +648,18 @@ function main() {
   };
 
   writeFileSync(out, JSON.stringify(league, null, 1), "utf-8");
-  const cycleInfo = totalDraftYears ? `, Draft-Zykluslaenge: ${draftCycleLengthYears} Jahre` : "";
-  console.log(`Geschrieben: ${out} (${bbgmTeams.length} Teams, ${bbgmPlayers.length} Spieler-Eintraege${cycleInfo})`);
+  console.log(`Geschrieben: ${out} (${bbgmTeams.length} Teams, ${bbgmPlayers.length} sofort aktive Spieler)`);
+
+  if (draftClassFilesDir) {
+    mkdirSync(draftClassFilesDir, { recursive: true });
+    let written = 0;
+    for (const [year, list] of [...draftClassFilesByYear.entries()].sort((a, b) => a[0] - b[0])) {
+      const classFile = { version: 37, startingSeason: year, players: list };
+      writeFileSync(`${draftClassFilesDir}/draft-class-${year}.json`, JSON.stringify(classFile, null, 1), "utf-8");
+      written++;
+    }
+    console.log(`Geschrieben: ${written} Draft-Klassen-Dateien in ${draftClassFilesDir} (Zykluslaenge: ${draftCycleLengthYears} Jahre)`);
+  }
 }
 
 main();
