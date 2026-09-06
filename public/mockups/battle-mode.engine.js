@@ -10372,7 +10372,11 @@
       // Teilnehmer i gegen Gegner i, wie ein Schach-Mannschaftskampf mit mehreren
       // Brettern. Dieselbe Punkteformel wie ueberall — nur die Auswertung ist jetzt
       // relativ (Vorteil = eigene Punkte minus die des Gegners je Zug), nicht absolut.
-      label:"Speed-Schach", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      // EIGENES BUEHNENBILD (Fable-Plan 05.09., Teil A, nach dem art.heben-Muster):
+      // schach:true schaltet zeichneBuehne() auf zeichneSchach() um — Fokus-Brett samt
+      // Figuren statt der Reihen-Darstellung. Rein zeichnerisch: rezept/vorteil/duell
+      // bleiben unveraendert, das Brett zeigt nur eine plausible Zugfolge dazu.
+      label:"Speed-Schach", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true, schach:true,
       failAbzug:0.55, failWort:"verliert Zeit am Zug", erfolgWort:"findet den starken Zug",
       rezept:{
         GRUNDLAGE:    {intelligence:45,awareness:35,determination:20},
@@ -10478,10 +10482,15 @@
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // S-Schach (Buehnenbild Speed-Schach): welches Brett gerade im Fokus steht.
+  // schachPin!=null haelt es fest (Klick auf ein Mini-Brett/den Kadernamen) und
+  // schaltet die Regie-Automatik ab; schachMiniRects sind die zuletzt gezeichneten
+  // Mini-Brett-Rechtecke, fuer den Klick-Trefftest (s. verdrahteSchachPin).
+  let schachFokus=0, schachPin=null, schachMiniRects=[];
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
-    floats.length=0; letzterHebenZug=null;
+    floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[];
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
@@ -10961,6 +10970,7 @@
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
     // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
     if(art.heben){ zeichneHeben(art); return; }
+    if(art.schach){ zeichneSchach(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
@@ -11140,6 +11150,239 @@
       ctx.fillStyle=p.fertig?css(p.pa.duellGewonnen?"--home":"--away"):"#5f6675";
       ctx.fillText(p.status,rx,ry+11);
     });
+  }
+
+  // ================== SPEED-SCHACH: EIGENES BUEHNENBILD (Fable-Plan 05.09., Teil A) ==================
+  // Ein Fokus-Brett gross in der Mitte, beide Spieler daneben, zwei Schachuhren, ein
+  // Bewertungsbalken (lichess-Art), der letzte Zug mit Pfeil und Annotation (!/?!), eine
+  // Zugliste, und die uebrigen fuenf Bretter klein am unteren Rand — dasselbe Muster wie
+  // zeichneHeben (Abschnitt A.1 des Plans: "aktives Duell" wird "Fokus-Brett", "Hantel"
+  // wird "Brett mit Figuren", "wartende Paare" werden "die anderen fuenf Bretter").
+  //
+  // WAS ECHT IST UND WAS KULISSE: Punkte und Vorteil (a.verlauf/a.vorteil) kommen
+  // unveraendert aus dem Durchgangs-Rechner oben (baueDuell/stepBuehne) — hier wird
+  // NICHTS davon gelesen ausser zur ANZEIGE. Die Stellung ist eine von sechs echten
+  // Eroeffnungen (SCHACH_PARTIEN), Brett i spielt Partie i; sie zeigt nur, WO gerade
+  // gezogen wird, nicht WARUM ein Zug stark oder schwach ist. Die Annotation (!/?!) und
+  // die Uhr sind dagegen WAHR: sie lesen das Ereignis des zuletzt enthuellten Zuges
+  // (r.ereignis === art.erfolgWort) direkt aus derselben Simulation.
+  const SCHACH_PARTIEN=[
+    {name:"Opera-Partie (Morphy 1858)", z:"e2e4 e7e5 g1f3 d7d6 d2d4 c8g4 d4e5 g4f3 d1f3 d6e5 f1c4 g8f6 f3b3 d8e7 b1c3 c7c6 c1g5 b7b5 c3b5 c6b5"},
+    {name:"Unsterbliche Partie (Anderssen 1851)", z:"e2e4 e7e5 f2f4 e5f4 f1c4 d8h4 e1f1 b7b5 c4b5 g8f6 g1f3 h4h6 d2d3 f6h5 f3h4 h6g5 h4f5 c7c6 g2g4 h5f6"},
+    {name:"Immergrüne Partie (Anderssen 1852)", z:"e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 b2b4 c5b4 c2c3 b4a5 d2d4 e5d4 e1g1 d4d3 d1b3 d8f6 e4e5 f6g6 f1e1 g8e7"},
+    {name:"Damengambit, Orthodox", z:"d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1g5 f8e7 e2e3 e8g8 g1f3 b8d7 a1c1 c7c6 f1d3 d5c4 d3c4 f6d5 g5e7 d8e7"},
+    {name:"Sizilianisch, Najdorf", z:"e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 c1e3 e7e5 d4b3 c8e6 f2f3 f8e7 d1d2 e8g8 e1c1 b8d7"},
+    {name:"Spanisch, geschlossen", z:"e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 f1e1 b7b5 a4b3 d7d6 c2c3 e8g8 h2h3 c6a5 b3c2 c7c5"}
+  ].map(P=>({...P, zuege:P.z.split(" ")}));
+  // schachStellung() liest Halbzuege in Koordinatennotation (z.B. "e2e4"): Start-/
+  // Zielfeld, keine Zugart noetig (Schlag/Rochade folgen aus der Stellung selbst). Alle
+  // sechs Partien vorab durchgespielt und auf "Zugfeld besetzt, Farbe am Zug" geprueft
+  // (Plan A.4) — hier nur noch angewendet, kein Motor, kein Risiko.
+  const SCHACH_IDX={p:0,r:1,n:2,b:3,q:4,k:5};
+  function schachGrund(){
+    const B=[]; const r="rnbqkbnr";
+    for(let y=0;y<8;y++){B.push([]);for(let x=0;x<8;x++){
+      let p=null; if(y===0)p="b"+r[x]; if(y===1)p="bp"; if(y===6)p="wp"; if(y===7)p="w"+r[x];
+      B[y].push(p);
+    }}
+    return B;
+  }
+  function schachStellung(partie,halbzuege){
+    const B=schachGrund(); let letzter=null;
+    const f=(c)=>c.charCodeAt(0)-97, r=(c)=>8-Number(c);
+    for(let i=0;i<Math.min(halbzuege,partie.zuege.length);i++){
+      const z=partie.zuege[i];
+      const x0=f(z[0]),y0=r(z[1]),x1=f(z[2]),y1=r(z[3]); const p=B[y0][x0]; if(!p)continue;
+      const schlag=!!B[y1][x1]; B[y1][x1]=p; B[y0][x0]=null;
+      // Rochade als Koenigszug ueber zwei Felder — der Turm folgt aus derselben Zeile.
+      if(p[1]==="k"&&Math.abs(x1-x0)===2){
+        if(x1===6){B[y0][5]=B[y0][7];B[y0][7]=null;} else {B[y0][3]=B[y0][0];B[y0][0]=null;}
+      }
+      letzter={x0,y0,x1,y1,p,schlag,z,nr:i};
+    }
+    return {B,letzter};
+  }
+  // Zeichnet EIN Brett (Fokus oder Mini) an (bx,by) mit Feldgroesse q. `gross` schaltet
+  // Figuren-Sprites und den Zug-Pfeil zu — auf 6-px-Mini-Feldern traegt ohnehin keine
+  // 48er-Figur, dort bleiben es Kreise (derselbe Rueckfall wie ohne geladenes Blatt).
+  function zeichneSchachBrett(bx,by,q,B,letzter,gross){
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+      ctx.fillStyle=((x+y)%2===0)?"#e9dcc3":"#7a5236"; ctx.fillRect(bx+x*q,by+y*q,q,q);
+      if(letzter&&((x===letzter.x0&&y===letzter.y0)||(x===letzter.x1&&y===letzter.y1))){
+        ctx.fillStyle="rgba(255,214,90,.55)"; ctx.fillRect(bx+x*q,by+y*q,q,q);
+      }
+    }
+    ctx.strokeStyle="#2b2016"; ctx.lineWidth=gross?3:1; ctx.strokeRect(bx-1,by-1,8*q+2,8*q+2);
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+      const p=B[y][x]; if(!p)continue;
+      const blatt=p[0]==="w"?"schach_weiss":"schach_schwarz";
+      if(gross&&sbDa(blatt)){
+        ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(sbBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,bx+x*q,by+y*q-q*0.15,q,q);
+        ctx.imageSmoothingEnabled=true;
+      } else {
+        ctx.fillStyle=p[0]==="w"?"#fff6e6":"#26221f";
+        ctx.beginPath(); ctx.arc(bx+x*q+q/2,by+y*q+q/2,q*0.32,0,6.283); ctx.fill();
+        ctx.strokeStyle=p[0]==="w"?"#6b5a45":"#000"; ctx.lineWidth=0.7; ctx.stroke();
+      }
+    }
+    if(letzter&&gross){
+      // Pfeil vom Start- zum Zielfeld — nur am Fokus-Brett, die Minis bleiben ruhig.
+      const ax=bx+letzter.x0*q+q/2, ay=by+letzter.y0*q+q/2, zx=bx+letzter.x1*q+q/2, zy=by+letzter.y1*q+q/2;
+      ctx.save(); ctx.strokeStyle="rgba(40,120,60,.85)"; ctx.fillStyle="rgba(40,120,60,.85)";
+      ctx.lineWidth=4; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(zx,zy); ctx.stroke();
+      const w=Math.atan2(zy-ay,zx-ax);
+      ctx.beginPath(); ctx.moveTo(zx,zy);
+      ctx.lineTo(zx-10*Math.cos(w-0.5),zy-10*Math.sin(w-0.5));
+      ctx.lineTo(zx-10*Math.cos(w+0.5),zy-10*Math.sin(w+0.5));
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+  // Ist ein Klick auf ein Mini-Brett / einen Kadernamen gerade sinnvoll? Nur bei
+  // laufendem Speed-Schach — dieselbe Torwaechter-Idee wie fokusAuswahlMoeglich/
+  // rennplanMoeglich daneben.
+  function schachKlickMoeglich(){ return istBuehne(disc)&&!!BB().schach; }
+  // Klick pinnt/loest ein Brett fest — EIN Zustand (schachPin), kein Stapel: derselbe
+  // Klick auf dasselbe Brett loest wieder, ein Klick auf ein anderes wechselt.
+  function schachPinUmschalten(i){
+    if(!schachKlickMoeglich())return;
+    schachPin=(schachPin===i)?null:i;
+  }
+  function zeichneSchach(art){
+    if(!TEILNEHMER.length)return;
+    const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
+    const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const fertig=(u)=>u.aktuell+1>=art.rundenN;
+    const gueltigesBrett=(b)=>{const [x,y]=paar(b); return !!x&&!!y;};
+
+    // REGIE. Ein Klick auf ein Mini-Brett pinnt es fest und schaltet die Automatik ab
+    // (schachPinUmschalten, ueber den #cv-Klick-Handler); geloest oder auf ein
+    // ungueltiges/fertiges Brett gezeigt, uebernimmt die Automatik wieder: alle 3 s
+    // springt der Fokus auf das Brett mit dem engsten laufenden Vorteil — kein Sprung
+    // je Enthuellung, kein Flackern. Sind alle Bretter fertig, zeigt der Fokus das
+    // Brett des eigenen (Seite 0) besten Spielers (hoechste u.summe) — das Ergebnis,
+    // das man am Ende ansehen will.
+    const alleFertig=Array.from({length:bretter},(_,b)=>b).every(b=>{
+      const [x,y]=paar(b); return !x||!y||(fertig(x)&&fertig(y));
+    });
+    if(schachPin!=null&&gueltigesBrett(schachPin)){
+      schachFokus=schachPin;
+    } else if(alleFertig){
+      let best=schachFokus,bs=-Infinity;
+      for(let b=0;b<bretter;b++){const [x]=paar(b); if(!x)continue; if(x.summe>bs){bs=x.summe;best=b;}}
+      schachFokus=best;
+    } else if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
+      let best=schachFokus,bv=Infinity;
+      for(let b=0;b<bretter;b++){
+        const [a]=paar(b); if(!a)continue;
+        const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
+        if(v<bv){bv=v;best=b;}
+      }
+      schachFokus=best;
+    }
+    const fb=schachFokus, [a,b]=paar(fb); if(!a||!b)return;
+    const partie=SCHACH_PARTIEN[fb%SCHACH_PARTIEN.length];
+    const halb=(a.aktuell+1)+(b.aktuell+1);
+    const {B,letzter}=schachStellung(partie,halb);
+
+    // DUELLSTAND gross wie beim Heben: gewonnene Bretter je Seite.
+    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&(s===0?x.vorteil>0:y.vorteil>0))n++;}return n;};
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="700 30px 'Barlow Condensed',sans-serif"; ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+    const st=gew(0)+" : "+gew(1); ctx.strokeText(st,W/2,H*0.075); ctx.fillStyle="#f2e9d8"; ctx.fillText(st,W/2,H*0.075);
+    ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+    ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name,W/2,H*0.125);
+
+    // TISCH + BRETT — zwei braune Rechtecke und zwei Beine, wie die Hantel beim Heben:
+    // keine neue Sprite-Pipeline, nur Primitiven.
+    const q=24, bw=8*q, bx=W/2-bw/2, by=H*0.225;
+    ctx.fillStyle="#3b2a1c"; ctx.fillRect(bx-26,by-14,bw+52,bw+30);
+    ctx.fillStyle="#5a3f2a"; ctx.fillRect(bx-22,by-10,bw+44,bw+22);
+    ctx.fillStyle="#2a1d13"; ctx.fillRect(bx-20,by+bw+16,10,22); ctx.fillRect(bx+bw+10,by+bw+16,10,22);
+    zeichneSchachBrett(bx,by,q,B,letzter,true);
+
+    // ANNOTATION am Zielfeld: ! bei starkem Zug, ?! bei Zeitverlust — das Ereignis des
+    // zuletzt enthuellten Zuges dieses Bretts, dieselbe Information, die sonst nur im
+    // Feed steht.
+    const letzterZieher=(halb%2===1)?a:b; const rr_=letzterZieher.runden[letzterZieher.aktuell];
+    if(letzter&&rr_){
+      const gut=rr_.ereignis===art.erfolgWort; ctx.font="800 16px 'Barlow Condensed',sans-serif";
+      ctx.fillStyle=gut?css("--ok"):css("--crit"); ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=3;
+      const tx=bx+letzter.x1*q+q-2, ty=by+letzter.y1*q+4;
+      ctx.strokeText(gut?"!":"?!",tx,ty); ctx.fillText(gut?"!":"?!",tx,ty);
+    }
+
+    // BEWERTUNGSBALKEN links vom Brett (lichess-Art): Weiss-Anteil aus dem laufenden
+    // Vorteil — exakt die Zahl, die im Reihenbild als "+X Vorteil" unter der Figur steht.
+    const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
+    const anteil=0.5+0.5*Math.max(-1,Math.min(1,v/maxV));
+    ctx.fillStyle="#1a1a1a"; ctx.fillRect(bx-42,by,12,bw); ctx.fillStyle="#f4f0e8"; ctx.fillRect(bx-42,by+bw*(1-anteil),12,bw*anteil);
+    ctx.strokeStyle="#000"; ctx.lineWidth=1; ctx.strokeRect(bx-42,by,12,bw);
+    ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
+
+    // SCHACHUHREN ueber dem Brett: 3:00 Blitz, ein starker Zug kostet 8 s, ein
+    // verpatzter 20 s — wer am Zug ist, hat die helle Uhr.
+    const uhr=(u)=>{let t=180;for(let i=0;i<=u.aktuell;i++){const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20);} return Math.max(0,t);};
+    const mmss=(t)=>Math.floor(t/60)+":"+String(Math.floor(t)%60).padStart(2,"0");
+    const amZug=(halb%2===0)?a:b;
+    [[a,bx+bw*0.25],[b,bx+bw*0.75]].forEach(([u,x])=>{
+      const dran=u===amZug;
+      ctx.fillStyle=dran?"#f2e9d8":"#2a2233"; ctx.fillRect(x-34,by-38,68,22);
+      ctx.strokeStyle="#000"; ctx.strokeRect(x-34,by-38,68,22);
+      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3"; ctx.fillText(mmss(uhr(u)),x,by-27);
+    });
+
+    // DIE ZWEI SPIELER am Tisch (Sitz-Animation ist bewusst nicht Teil dieser Runde —
+    // Chris/Fable-Entscheidung, s. Plan A.3/A.6 Schritt 5; blickAus() laesst sie ueber
+    // ihre Seite ohnehin schon einander zugewandt stehen: Seite 0 blickt rechts, Seite 1
+    // links, genau zueinander).
+    const py=by+bw*0.55;
+    [[a,bx-110,"--home","Weiß"],[b,bx+bw+110,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
+      const c=css(farbVar); ctx.fillStyle=c; ctx.globalAlpha=0.22; ctx.beginPath();ctx.ellipse(x,py+26,22,8,0,0,6.3);ctx.fill(); ctx.globalAlpha=1;
+      zeichneSprite(ctx,u,x,py);
+      const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5);
+    });
+
+    // ZUGLISTE rechts vom Brett — die letzten acht Halbzuege.
+    ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+    const von=Math.max(0,halb-8);
+    for(let i=von;i<halb;i++){
+      const z=partie.zuege[i]; const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
+      const gut=r&&r.ereignis===art.erfolgWort; ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
+      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+(gut?" !":" ?!"),bx+bw+34,by+10+(i-von)*13);
+    }
+    ctx.textAlign="center";
+
+    // DIE ANDEREN BRETTER klein am unteren Rand — Kreise auf 48x48 px mit zwei
+    // Textzeilen, wie die wartenden Paare beim Heben. Klick pinnt (schachPinUmschalten
+    // ueber den #cv-Handler); die Rechtecke werden hier fuer den Trefftest gemerkt.
+    schachMiniRects=[];
+    const klein=[]; for(let i=0;i<bretter;i++){ if(i===fb)continue; klein.push(i); }
+    const kq=6, kw=8*kq, ry=H*0.80, spanne=W-160;
+    klein.forEach((i,k)=>{
+      const [pa,pb]=paar(i); if(!pa||!pb)return;
+      const rx=80+spanne*(klein.length>1?k/(klein.length-1):0.5);
+      schachMiniRects.push({i,rx,ry,halbW:Math.max(kw/2,26),halbH:kw/2+22});
+      const P=SCHACH_PARTIEN[i%SCHACH_PARTIEN.length]; const h=(pa.aktuell+1)+(pb.aktuell+1); const {B:KB,letzter:kl}=schachStellung(P,h);
+      zeichneSchachBrett(rx-kw/2,ry-kw/2,kq,KB,kl,false);
+      if(i===schachPin){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=2; ctx.strokeRect(rx-kw/2-3,ry-kw/2-3,kw+6,kw+6); }
+      const kv=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.fillText("Brett "+(i+1)+" · "+pa.n.split(" ")[0]+" – "+pb.n.split(" ")[0],rx,ry+kw/2+10);
+      ctx.fillStyle=kv>0?css("--ok"):(kv<0?css("--crit"):"#8a93a3"); ctx.fillText((kv>0?"+":"")+kv+" · Zug "+(Math.max(pa.aktuell,pb.aktuell)+1)+"/"+art.rundenN,rx,ry+kw/2+21);
+      const bwk=kw, halb2=Math.min(bwk/2,(bwk/2)*Math.abs(kv)/maxV); ctx.fillStyle=css("--line"); ctx.fillRect(rx-bwk/2,ry+kw/2+26,bwk,3);
+      ctx.fillStyle=kv>=0?css("--ok"):css("--crit"); ctx.fillRect(kv>=0?rx:rx-halb2,ry+kw/2+26,halb2,3);
+    });
+
+    // SCHWEBETEXTE nur fuer das Fokus-Brett, am jeweiligen Spieler.
+    for(const f of floats){
+      if(f._teilnehmer!==a.id&&f._teilnehmer!==b.id)continue;
+      ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.crit?css("--ok"):css("--ink"); ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      const x=f._teilnehmer===a.id?bx-110:bx+bw+110; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
+    }
   }
 
   function stats(p,dId){const rec=rezeptVon(dId),o={};
@@ -14220,6 +14463,16 @@
     if(!aMuster[n])aMuster[n]=ctx.createPattern(aBild[n],"repeat");
     return aMuster[n]; };
 
+  // Speed-Schach-Buehnenbild: dieselbe Datei-statt-base64-Idee, eigener Ordner
+  // (public/sprites/buehne/, quellen.json dort — Fable-Plan 05.09., Teil A.2). Brett
+  // und Tisch sind Canvas-Primitiven, nur die Figuren sind ein Blatt. Laedt es nicht,
+  // zeichnet zeichneSchachBrett() helle/dunkle Kreise statt Figuren (derselbe
+  // Rueckfall-Grundsatz wie bei jeder A_TEILE/BK_TEILE-Kachel).
+  const SB_TEILE=["schach_weiss","schach_schwarz"];
+  const sbBild={};
+  for(const n of SB_TEILE){const im=new Image();im.src="/sprites/buehne/"+n+".png";sbBild[n]=im;}
+  const sbDa=n=>{const im=sbBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
@@ -16710,6 +16963,31 @@
   }
 
   // ===================================================================================
+  // SPEED-SCHACH: MINI-BRETT ANKLICKEN PINNT DEN FOKUS (Fable-Plan 05.09., A.5 Regel 2).
+  //
+  // Nur EIN Weg hier, nicht zwei wie beim Fokus-Doppeln/der Rennplan-Ansage: die sechs
+  // Bretter laufen alle gleichzeitig auf der Leinwand, es gibt keine "Kaderleiste
+  // steht still, das Feld laeuft"-Asymmetrie, die einen zweiten Weg noetig machte.
+  // schachMiniRects wird in zeichneSchach() jedes Bild neu geschrieben (Rechtecke der
+  // gerade gezeichneten Mini-Bretter); ein Klick darauf pinnt/loest ueber
+  // schachPinUmschalten. Das Fokus-Brett selbst nimmt keinen Klick an — ein Klick
+  // DARAUF haette ohnehin nichts zu pinnen (es ist schon im Fokus).
+  function verdrahteSchachPin(){
+    const leinwand=document.getElementById("cv");
+    if(!leinwand)return;
+    leinwand.addEventListener("click",ev=>{
+      if(!schachKlickMoeglich())return;
+      const r=leinwand.getBoundingClientRect();
+      if(!r.width||!r.height)return;
+      const mx=(ev.clientX-r.left)*(leinwand.width/r.width);
+      const my=(ev.clientY-r.top)*(leinwand.height/r.height);
+      for(const k of schachMiniRects){
+        if(Math.abs(mx-k.rx)<=k.halbW&&Math.abs(my-k.ry)<=k.halbH){ schachPinUmschalten(k.i); return; }
+      }
+    });
+  }
+
+  // ===================================================================================
   // ZIELANSAGE — die Bedienseite (Kampf-Disziplinen: TDM, Mini-DM, Battlefield — Fechten
   // seit dem Buehnen-Chassis-Wechsel nicht mehr, istKampf() schliesst es jetzt generisch
   // aus, s. BUEHNE_ART.fechten).
@@ -17070,6 +17348,7 @@
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
   verdrahteRennplanAnsage();
+  verdrahteSchachPin();
   verdrahteZielansage();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
