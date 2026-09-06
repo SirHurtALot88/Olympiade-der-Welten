@@ -311,8 +311,15 @@ function main() {
       tid: i,
       cid,
       did,
-      region: "",
-      name: t.name,
+      // Basketball GMs eigener Quellcode (TeamColumn in src/ui/views/Standings.tsx):
+      // die volle Standings-Seite zeigt "region + name", das kompakte Dashboard-Widget
+      // zeigt NUR region. Mit region:"" (Oly kennt keine Staedte) blieb das Widget
+      // deshalb komplett leer, obwohl die volle Tabelle noch den name-Teil zeigte.
+      // Fix: den vollen Namen in region packen, name leer lassen -- beide Stellen
+      // zeigen dann "Stronghold Crusaders" (in der "region+name"-Variante mit
+      // harmlosem Leerzeichen dahinter).
+      region: t.name,
+      name: "",
       abbrev: t.shortCode.replace(/-/g, "").toUpperCase().slice(0, 3),
       pop: Math.round(clamp(avgRating / 8, 0.5, 8) * 10) / 10,
       imgURL: logoRel ? `${BASE_URL}${logoRel}` : undefined,
