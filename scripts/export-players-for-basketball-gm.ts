@@ -29,31 +29,45 @@
  * Varianten zum A/B/C-Test (Chris' Wunsch 06.09.):
  *   (Standard)          echte Kader + Rest Free Agent (s. oben).
  *   --free-agents-only  ALLE Free Agent, kein Team hat einen Kader.
- *   --draft-classes N [--picks-per-year P]
- *                        Echte Kader bleiben. ALLE nicht gerosterten Spieler (Chris
- *                        06.09., 3. Ruecksprache: "wir haben ja 3k Spieler", nicht nur
- *                        eine Auswahl von 1600) werden zu Draft-Prospects (tid -2,
- *                        BGMs "undrafted"-Konvention) statt Free Agent, verteilt auf
- *                        wiederkehrende Zyklen von je ceil(Poolgroesse/P) Jahren
- *                        (Default P=64, also 2 Runden fuer 32 Teams -- bei ~2650
- *                        Nicht-Roster-Spielern eine Zykluslaenge von ~42 Jahren). Zyklus
- *                        1 verteilt die komplette Gruppe zufaellig auf diese Jahre
- *                        (Jahrgang der Startsaison ist Jahr 1, es gibt also sofort einen
- *                        ECHTEN Draft statt einer Free-Agency-Flut); danach beginnt
- *                        Zyklus 2 mit einer KOMPLETT NEUEN, unabhaengigen Zufalls-
- *                        verteilung derselben Gruppe (nicht dieselbe Jahrgangs-
- *                        Zuordnung wie Zyklus 1), usw., bis die mit N gewuenschte
- *                        Gesamtjahreszahl erreicht ist -- "150 Jahre durchrotieren mit
- *                        immer neueren Junior-Versionen". Ist N kleiner als eine
- *                        Zykluslaenge, bekommen die dann nicht verplanten Spieler einen
- *                        sofortigen Free-Agent-Eintrag statt spurlos zu verschwinden.
- *                        Oberes Staerke-Drittel (Charakter-Eigenschaft, gilt in jedem
- *                        Zyklus gleich) bekommt "mittleres bis starkes CA, aber hohes
- *                        PO": gedaempfte Anfangs-Ratings (~55% des vollen Niveaus) +
- *                        explizit hohes `pot` (75-99) -- Basketball GMs Alterungs-
- *                        Engine zieht die echten Ratings ueber die Karriere Richtung
- *                        `pot` hoch, die Charaktere werden also spuerbar besser statt
- *                        schon fertig zu sein. Alle anderen behalten ihr volles Niveau
+ *   --draft-classes N [--picks-per-year P] [--empty-rosters] [--initial-free-agents M]
+ *                        [--first-year-picks F]
+ *                        Standardmaessig bleiben echte Kader bestehen und nur die nicht
+ *                        gerosterten Spieler werden zu Draft-Prospects. ALLE davon
+ *                        (Chris 06.09., 3. Ruecksprache: "wir haben ja 3k Spieler",
+ *                        nicht nur eine Auswahl von 1600) bekommen tid -2 (BGMs
+ *                        "undrafted"-Konvention), verteilt auf wiederkehrende Zyklen
+ *                        von je ceil(Poolgroesse/P) Jahren (Default P=70 -- NICHT 64:
+ *                        Basketball GM fuellt jeden Jahrgang unter 70 Spielern mit
+ *                        ZUFAELLIG GENERIERTEN Nicht-Oly-Fuellspielern auf, 70 ist die
+ *                        kleinste Groesse ohne das). Jahr 1 (Startsaison) ist ein
+ *                        einmaliger Expansion-Draft der Groesse firstYearPicks (Default
+ *                        = P, oder bei --empty-rosters automatisch 384 = 32 Teams * 12,
+ *                        "muessten genug sein um die Teams zuverlaessig zu fuellen").
+ *                        Danach rotiert der Rest weiter: Zyklus 1 verteilt die restliche
+ *                        Gruppe zufaellig auf so viele Jahre wie noetig; jeder weitere
+ *                        Zyklus ist eine KOMPLETT NEUE, unabhaengige Zufallsverteilung
+ *                        derselben Gruppe (nicht dieselbe Jahrgangs-Zuordnung wie zuvor),
+ *                        bis die mit N gewuenschte Gesamtjahreszahl erreicht ist -- "150
+ *                        Jahre durchrotieren mit immer neueren Junior-Versionen". Reicht
+ *                        N nicht fuer einen vollen Zyklus, bekommen die dann nicht
+ *                        verplanten Spieler einen sofortigen Free-Agent-Eintrag statt
+ *                        spurlos zu verschwinden.
+ *                        --empty-rosters: Chris 06.09. (4. Ruecksprache) -- "die Roster
+ *                        muessten leer sein, die Teams sollen dann draften". Schaltet
+ *                        die Kader-Uebernahme komplett ab, auch die bisher gerosterten
+ *                        328 gehen ins Draft-/Free-Agent-System. Kein Team startet mit
+ *                        einem vorgefertigten Kader. Braucht --draft-classes.
+ *                        --initial-free-agents M (Default 100 bei --draft-classes, 0
+ *                        sonst): reserviert M Spieler quer durch alle Staerke-Brackets
+ *                        (stark bis schwach) als sofortige Free Agents VOR dem Draft-
+ *                        Zyklus -- Chris: "ein paar Spieler sollten schon am Anfang als
+ *                        Free Agents verfuegbar sein, stark bis schwach, so 100".
+ *                        Oberes Staerke-Drittel des Drafts (Charakter-Eigenschaft, gilt
+ *                        in jedem Zyklus gleich) bekommt "mittleres bis starkes CA, aber
+ *                        hohes PO": gedaempfte Anfangs-Ratings (~55% des vollen
+ *                        Niveaus) + explizit hohes `pot` (75-99) -- Basketball GMs
+ *                        Alterungs-Engine zieht die echten Ratings ueber die Karriere
+ *                        Richtung `pot` hoch. Alle anderen behalten ihr volles Niveau
  *                        und ein normales, von Basketball GM selbst berechnetes `pot`.
  *                        Alter/Geburtsjahr/Ratings-Saison eines Prospect-Auftritts
  *                        beziehen sich auf DESSEN Draft-Jahr (19-23 zum eigenen Draft),
@@ -61,11 +75,16 @@
  *                        unterschrieben). Reine Terminplanung: ob ein Charakter zum
  *                        Zeitpunkt seines naechsten Zyklus im Spiel tatsaechlich schon
  *                        im Ruhestand ist, haengt vom echten Alterungsverlauf im
- *                        jeweiligen Save ab, nicht von diesem Skript.
+ *                        jeweiligen Save ab, nicht von diesem Skript. UNGEKLAERT (nicht
+ *                        in der offiziellen Doku gefunden): ob ein brandneues
+ *                        --empty-rosters-League-File direkt in den Draft startet oder
+ *                        ob Basketball GM technisch erst eine (dann kaderlose) Saison
+ *                        erwartet -- das muss Chris einmal ausprobieren.
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
- *   [--free-agents-only | --draft-classes N [--picks-per-year P]]
+ *   [--free-agents-only | --draft-classes N [--picks-per-year P] [--empty-rosters]
+ *     [--initial-free-agents M] [--first-year-picks F]]
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
@@ -212,10 +231,30 @@ function main() {
   const freeAgentsOnly = process.argv.includes("--free-agents-only");
   const draftClassesArg = arg("--draft-classes");
   const totalDraftYears = draftClassesArg ? Number(draftClassesArg) : null;
-  const picksPerYear = Number(arg("--picks-per-year") ?? "64");
+  // Default 70 statt 64: Basketball GM fuellt jeden Jahrgang unter 70 Spielern mit
+  // ZUFAELLIG GENERIERTEN (Nicht-Oly!) Fuellspielern auf ("Custom Draft Classes"-Doku).
+  // 70 ist die kleinste Groesse, bei der garantiert NUR unsere eigenen Charaktere drin
+  // sind.
+  const picksPerYear = Number(arg("--picks-per-year") ?? "70");
+  // Chris (06.09., 4. Ruecksprache): "die roster muessten leer sein, die teams sollen
+  // dann draften" -- alle Spieler (auch die bisher auf echten Oly-Kadern) werden Teil
+  // des Draft-/Free-Agent-Systems, kein Team startet mit einem vorgefertigten Kader.
+  const emptyRosters = process.argv.includes("--empty-rosters");
+  // "ein paar Spieler sollten schon am Anfang als Free Agents verfuegbar sein, stark
+  // bis schwach, so 100" -- Reserve aus dem Pool, VOR dem Draft-Zyklus, nicht Teil davon.
+  const initialFreeAgents = Number(arg("--initial-free-agents") ?? (totalDraftYears ? "100" : "0"));
+  // "muessten genug sein um die Teams zuverlaessig zu fuellen mit dem Draft" -- die
+  // erste Jahrgangs-Ladung (Jahr 1 von Zyklus 1) ist bei leeren Kadern viel groesser als
+  // die normalen Folgejahrgaenge, quasi ein Expansion-Draft: genug fuer ~12 Spieler pro
+  // Team (32*12=384), damit alle 32 Teams sofort einen spielbaren Kader haben statt erst
+  // nach Jahren picksPerYear/32-weise aufzufuellen.
+  const firstYearPicks = Number(arg("--first-year-picks") ?? (emptyRosters ? "384" : String(picksPerYear)));
   if (!saveId) throw new Error("--save-id required");
   if (freeAgentsOnly && totalDraftYears) {
     throw new Error("--free-agents-only und --draft-classes schliessen sich aus -- getrennte Laeufe/Dateien.");
+  }
+  if (emptyRosters && !totalDraftYears) {
+    throw new Error("--empty-rosters braucht --draft-classes -- ohne Draft-System nimm stattdessen --free-agents-only.");
   }
 
   const persistence = createPersistenceService();
@@ -316,33 +355,66 @@ function main() {
   // Charakter taucht also in jedem Zyklus als frischer 19-23-jaehriger Rookie auf.
   const prospectDraftYearsByPlayerId = new Map<string, number[]>();
   const prospectPercentileByPlayerId = new Map<string, number>();
+  const initialFreeAgentIds = new Set<string>();
   let draftCycleLengthYears = 0;
   if (totalDraftYears) {
-    const nonRostered = players.filter((p) => !(freeAgentsOnly ? null : rosterByPlayerId.get(p.id)));
-    const sortedAscending = [...nonRostered].sort((a, b) => (a.rating ?? 50) - (b.rating ?? 50));
+    // emptyRosters: ALLE Spieler gehen ins Draft-/Free-Agent-System, auch die sonst auf
+    // einem echten Oly-Kader stehenden -- kein Team startet mit einem vorgefertigten
+    // Kader. Sonst wie gehabt: nur die Nicht-Roster-Spieler.
+    const pool = players.filter((p) => emptyRosters || !(freeAgentsOnly ? null : rosterByPlayerId.get(p.id)));
+    const sortedAscending = [...pool].sort((a, b) => (a.rating ?? 50) - (b.rating ?? 50));
     sortedAscending.forEach((p, i) =>
       prospectPercentileByPlayerId.set(p.id, sortedAscending.length > 1 ? i / (sortedAscending.length - 1) : 0));
 
-    draftCycleLengthYears = Math.max(1, Math.ceil(nonRostered.length / picksPerYear));
-    const numCycles = Math.ceil(totalDraftYears / draftCycleLengthYears);
+    // Reserve ~initialFreeAgents Spieler QUER durch alle Staerke-Brackets (systematisch
+    // gesampelt wie die Draft-Auswahl vorher) als sofortige Free Agents -- Chris: "ein
+    // paar Spieler sollten schon am Anfang als Free Agents verfuegbar sein, stark bis
+    // schwach". Diese nehmen NICHT am Draft-Zyklus teil.
+    const reserveCount = Math.min(initialFreeAgents, sortedAscending.length);
+    if (reserveCount > 0) {
+      const step = sortedAscending.length / reserveCount;
+      for (let i = 0; i < reserveCount; i++) {
+        initialFreeAgentIds.add(sortedAscending[Math.min(sortedAscending.length - 1, Math.floor(i * step))].id);
+      }
+    }
+    const draftPool = pool.filter((p) => !initialFreeAgentIds.has(p.id));
+
+    // Jahr 1 (Startsaison) ist ein EINMALIGER Expansion-Draft (firstYearPicks,
+    // eigener Zufalls-Shuffle, nicht Teil der wiederkehrenden Zyklen) -- bei leeren
+    // Kadern deutlich groesser als picksPerYear, damit alle 32 Teams sofort einen
+    // spielbaren Kader haben ("muessten genug sein um die Teams zuverlaessig zu
+    // fuellen"). Der Rest der Gruppe rotiert danach normal weiter, ab Jahr 2.
+    const expansionShuffled = [...draftPool].sort(
+      (a, b) => seededFraction(`${a.id}|expansion`) - seededFraction(`${b.id}|expansion`),
+    );
+    const expansionCount = Math.min(firstYearPicks, expansionShuffled.length);
+    const expansionIds = new Set(expansionShuffled.slice(0, expansionCount).map((p) => p.id));
+    for (const p of expansionShuffled.slice(0, expansionCount)) {
+      prospectDraftYearsByPlayerId.set(p.id, [startingSeason]);
+    }
+
+    const remainingPool = draftPool.filter((p) => !expansionIds.has(p.id));
+    draftCycleLengthYears = Math.max(1, Math.ceil(remainingPool.length / picksPerYear));
+    const remainingYears = Math.max(0, totalDraftYears - 1);
+    const numCycles = Math.ceil(remainingYears / draftCycleLengthYears);
 
     for (let cycle = 0; cycle < numCycles; cycle++) {
-      const shuffled = [...nonRostered].sort(
+      const shuffled = [...remainingPool].sort(
         (a, b) => seededFraction(`${a.id}|shuffleyear|${cycle}`) - seededFraction(`${b.id}|shuffleyear|${cycle}`),
       );
       shuffled.forEach((p, i) => {
-        const absoluteYearIndex = cycle * draftCycleLengthYears + Math.floor(i / picksPerYear);
+        const absoluteYearIndex = 1 + cycle * draftCycleLengthYears + Math.floor(i / picksPerYear);
         if (absoluteYearIndex >= totalDraftYears) return; // ueber den gewuenschten Zeitraum hinaus abschneiden
         const list = prospectDraftYearsByPlayerId.get(p.id) ?? [];
         list.push(startingSeason + absoluteYearIndex);
         prospectDraftYearsByPlayerId.set(p.id, list);
       });
     }
-    // Randfall (nur bei sehr kurzem --draft-classes < Zykluslaenge moeglich): Spieler,
+    // Randfall (nur bei sehr kurzem --draft-classes < 1+Zykluslaenge moeglich): Spieler,
     // die in keinem Zyklus einen Platz innerhalb des gewuenschten Zeitraums bekommen
     // haben, sollen trotzdem nicht spurlos verschwinden -- ein sofortiger Free Agent
     // statt eines nie auftauchenden Charakters.
-    for (const p of nonRostered) {
+    for (const p of draftPool) {
       if (!prospectDraftYearsByPlayerId.has(p.id)) prospectDraftYearsByPlayerId.set(p.id, []);
     }
   }
@@ -417,8 +489,29 @@ function main() {
     // Echte Oly-Kader als Startaufstellung uebernehmen statt alle als Free Agent zu
     // dumpen: eine KI, die 31 Kader aus 2984 Free Agents zusammenkaufen muss, tut das
     // schlecht (nachgemessen: Team-Ratings von +97 bis -130, praktisch nur das
-    // handgepickte eigene Team konkurrenzfaehig).
-    const roster = freeAgentsOnly ? null : rosterByPlayerId.get(p.id);
+    // handgepickte eigene Team konkurrenzfaehig). --empty-rosters schaltet das ab: dann
+    // startet KEIN Team mit einem vorgefertigten Kader, alles laeuft ueber Draft/Free
+    // Agency.
+    const roster = freeAgentsOnly || emptyRosters ? null : rosterByPlayerId.get(p.id);
+    if (initialFreeAgentIds.has(p.id)) {
+      // Reservierter sofortiger Free Agent (stark bis schwach quer durch den Pool) --
+      // nimmt nicht am Draft-Zyklus teil, sonst wie ein normaler aktiver Charakter.
+      const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
+      const gap = clamp(potentialScore - ratingScore, 0, 30);
+      const baseAge = 26 - (gap / 30) * 9;
+      const frac = seededFraction(p.id);
+      const age = Math.round(clamp(baseAge + (frac - 0.5) * 4, 17, 26));
+      const bornYear = startingSeason - age;
+      const amount = Math.round(clamp((ratingScore / 99) * 24500 + 500, 500, 25000));
+      bbgmPlayers.push(makeRecord({
+        tid: -1,
+        bornYear,
+        draftYear: Math.min(startingSeason, bornYear + 19),
+        ratingsSeason: startingSeason,
+        contract: { amount, exp: startingSeason + 2 },
+      }));
+      continue;
+    }
     // Liste der Draft-Jahre, in denen dieser Charakter ueber alle Zyklen hinweg
     // auftaucht (leer = kein Platz im gewuenschten Zeitraum gefunden -> Fallback unten).
     const draftYears = roster || !totalDraftYears ? null : prospectDraftYearsByPlayerId.get(p.id) ?? null;
