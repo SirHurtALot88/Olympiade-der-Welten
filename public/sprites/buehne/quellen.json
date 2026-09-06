@@ -1,0 +1,23 @@
+{
+  "_hinweis": "Speed-Schach-Buehnenbild: nur die Figuren sind ein Asset, Brett und Tisch sind Canvas-Primitiven (zwei Farben im Schachmuster, s. docs/design/takeshi-schach-optik-gameplay-plan-05-09.md A.2). Beschafft am 06.09. ueber OpenGameArt (CC0), Schnitt mit sharp per scripts/buehne-schach-assets-schneiden.mjs, Koordinaten aus dem Alphakanal gelesen (nicht geschaetzt).",
+  "schach_weiss.png": {
+    "paket": "Chess pieces pixel art (Catacomb Chess)",
+    "blatt": "chess_clean.png, 628x360, Pixel-Umrisse auf grauem Grund (169,156,152)",
+    "schnitt": "sechs Spalten x=246-288/297-339/348-390/401-443/454-496/507-549 (Bauer/Turm/Springer/Laeufer/Dame/Koenig), zwei Zeilen y=15-75/78-140 (zwei Zeichnungsvarianten des Blatts), Hintergrund per Toleranz 20 transparent, je Zelle auf 48x48 unten buendig zentriert -> 288x96. Zeile 0 wird von zeichneSchachBrett() gezeichnet, Zeile 1 ist mitgeschnitten, aber ungenutzt.",
+    "urheber": "woodsmoke",
+    "lizenz": "CC0",
+    "namensnennung": "Vom Einsteller erbeten (obwohl CC0 sie nicht verlangt): \"woodsmoke\", alternativ \"Chess pieces from Catacomb Chess\".",
+    "url": "https://opengameart.org/content/chess-pieces-pixel-art",
+    "verwendung": "Fokus- und Mini-Bretter in BUEHNE_ART[\"speed-schach\"] (zeichneSchach); Rueckfall ohne die Datei: helle/dunkle Kreise, wie jede andere Kachel in bodenSpurt einzeln geprueft"
+  },
+  "schach_schwarz.png": {
+    "paket": "Chess pieces pixel art (Catacomb Chess)",
+    "blatt": "dieselbe Quelldatei wie schach_weiss.png, im selben Schnitt-Skript umgefaerbt",
+    "schnitt": "wie schach_weiss.png, danach alle Pixel mit R>150 und G>140 (die Cremefuellung) auf (62,58,54) gesetzt; Umriss/Schattierung bleiben unveraendert",
+    "urheber": "woodsmoke",
+    "lizenz": "CC0",
+    "namensnennung": "Vom Einsteller erbeten (obwohl CC0 sie nicht verlangt): \"woodsmoke\", alternativ \"Chess pieces from Catacomb Chess\".",
+    "url": "https://opengameart.org/content/chess-pieces-pixel-art",
+    "verwendung": "wie schach_weiss.png, fuer die schwarzen Figuren (kein zweiter Download noetig, reine Umfaerbung im Schnitt-Skript)"
+  }
+}
