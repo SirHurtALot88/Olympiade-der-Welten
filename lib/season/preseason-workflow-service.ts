@@ -13,6 +13,8 @@ import {
   type SeasonEndProgressionBatchResult,
 } from "@/lib/progression/season-end-progression-batch";
 import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
+import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
@@ -584,6 +586,40 @@ function buildNextSeasonGameState(
     scheduleRerollCount > 0 ? `season_schedule_rerolled:${scheduleRerollCount}` : null,
     scheduleSameAsPrevious ? "season_schedule_same_as_previous_after_reroll_warning" : null,
   ].filter((entry): entry is string => Boolean(entry));
+  /**
+   * LIGA-SPIELPLAN AB SAISON 2 FUER BATTLE-MODE-SAVES (Folgefund zu F3,
+   * docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.2).
+   *
+   * `leagueByTeamId` wird bei DIESEM Uebergang nirgends neu zugeordnet -- es gibt (Stand heute)
+   * noch keine Auf-/Abstiegs-Logik im Repo (`RELEGATION_COUNT` in league-split.ts ist definiert,
+   * aber von keinem Produktionscode gelesen); das Feld traegt unten im Spread
+   * `...save.gameState.seasonState` unveraendert in `nextSeasonState.leagueByTeamId` fort. Der
+   * Circle-Generator liest deshalb bewusst noch von `save.gameState` (der ALTEN Saison) -- das ist
+   * exakt dieselbe Zuordnung, die gleich unveraendert in die neue Saison uebernommen wird, nur
+   * bevor sie durch den Spread hindurchgereicht ist. Sobald eine Auf-/Abstiegs-PR
+   * `leagueByTeamId` hier tatsaechlich neu berechnet, muss dieser Block auf die NEUE Zuordnung
+   * umgestellt werden, nicht mehr auf `save.gameState`.
+   *
+   * Ohne aktiven Split (Manager-Mode-/Legacy-Saves, `isLeagueSplitActive` liefert `false`) bleibt
+   * exakt der alte Dummy-Spielplan (`buildSeasonFixtures` unten, Rest-Klassen-Paarung ohne
+   * Liga-Tier) im Einsatz -- bit-identisch zum Verhalten vor dieser Aenderung. Das ist die
+   * Regressionsgrenze, die dieser Umbau nicht anfassen darf.
+   */
+  const leagueSplitActive = isLeagueSplitActive(save.gameState);
+  const nextSeasonFixtureSchedule = leagueSplitActive
+    ? buildSeasonFixtureSchedule({
+        saveId: save.saveId,
+        seasonId: nextSeasonId,
+        matchdayIds,
+        leagueTeamIds: {
+          liga1: getLeagueTeamIds(save.gameState, "liga1"),
+          liga2: getLeagueTeamIds(save.gameState, "liga2"),
+        } satisfies Record<LeagueTier, string[]>,
+      })
+    : null;
+  if (nextSeasonFixtureSchedule) {
+    scheduleWarnings.push(...nextSeasonFixtureSchedule.warnings);
+  }
   const nextFormCards = transferPipelineFast
     ? []
     : buildGeneratedFormCardRecordsForSeason(
@@ -604,11 +640,17 @@ function buildNextSeasonGameState(
   const nextSeasonState: SeasonState = {
     ...save.gameState.seasonState,
     seasonId: nextSeasonId,
-    schedule: buildSeasonFixtures({
-      seasonId: nextSeasonId,
-      matchdayIds,
-      teamIds: save.gameState.teams.map((team) => team.teamId),
-    }),
+    // Battle-Mode-Saves mit aktivem Liga-Split bekommen ab Saison 2 den echten Circle-Spielplan
+    // (leagueTier je Fixture, Gegner ueber Runden verteilt) statt der alten Dummy-Paarung --
+    // Manager-Mode-/Legacy-Saves ohne `leagueByTeamId` bleiben unveraendert bei `buildSeasonFixtures`.
+    schedule:
+      leagueSplitActive && nextSeasonFixtureSchedule
+        ? nextSeasonFixtureSchedule.fixtures
+        : buildSeasonFixtures({
+            seasonId: nextSeasonId,
+            matchdayIds,
+            teamIds: save.gameState.teams.map((team) => team.teamId),
+          }),
     disciplineSchedule: schedulePlan.entries,
     seasonEconomyFactors: economyFactors.nextWindow,
     standings: buildZeroStandings(save.gameState),
