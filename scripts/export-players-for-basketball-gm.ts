@@ -33,27 +33,38 @@
  *                        Echte Kader bleiben. Von den NICHT gerosterten Spielern werden
  *                        bis zu P*N (Default P=64, also 2 Runden fuer 32 Teams) zu
  *                        Draft-Prospects (tid -2, BGMs "undrafted"-Konvention) statt
- *                        Free Agent -- nach Oly-Rating aufsteigend sortiert und in
- *                        Bloecke zu je P zerlegt: Block 1 = Jahrgang der Startsaison (es
- *                        gibt also sofort einen ECHTEN Draft statt einer Free-Agency-
- *                        Flut), Block N = letzter Jahrgang. Weil aufsteigend sortiert,
- *                        landen die staerksten der ausgewaehlten Gruppe im LETZTEN
- *                        Jahrgang -- "die krassesten Spieler kommen erst spaeter als
- *                        Rookies" (Chris 06.09.). Wer nicht in die Top P*N faellt,
- *                        bleibt sofortiger Free Agent. Alter/Geburtsjahr/Ratings-Saison
- *                        eines Prospects beziehen sich auf SEIN Draft-Jahr (19-23 zum
- *                        eigenen Draft), nicht auf die Export-Startsaison; kein Contract
- *                        (noch nicht unterschrieben).
- *                        --rotations R (Default 1): dieselbe ausgewaehlte Gruppe taucht
- *                        ein zweites/drittes/... Mal auf, jeweils N Jahre nach dem
- *                        vorherigen Zyklus (Name/Bild/Ratings identisch, neues
- *                        Geburtsjahr) -- Chris' "volle Rotation": nachdem die
- *                        Originalbesetzung durchgealtert ist, kommt exakt dieselbe
- *                        Besetzung als frischer Nachwuchs-Jahrgang zurueck statt neu
- *                        generierter Spieler. Reine Terminplanung: ob ein Charakter zum
- *                        Zeitpunkt seines naechsten Zyklus im Spiel tatsaechlich schon
- *                        im Ruhestand ist, haengt vom echten Alterungsverlauf im
- *                        jeweiligen Save ab, nicht von diesem Skript.
+ *                        Free Agent. Auswahl: SYSTEMATISCH ueber die gesamte nach
+ *                        Oly-Rating sortierte Liste gesampelt (jeder ~n-te Spieler,
+ *                        nicht nur die Spitze) -- Chris (06.09., 2. Ruecksprache):
+ *                        "1600 aus ALLEN Brackets nehmen, gute sowie schlechte". Die
+ *                        Jahrgangs-Zuteilung ist danach per Spieler-ID-Hash GEMISCHT
+ *                        (nicht nach Staerke sortiert), jeder Jahrgang ist also ein
+ *                        normaler Mix aus schwach/mittel/stark; Jahrgang der
+ *                        Startsaison gibt es sofort einen ECHTEN Draft statt einer
+ *                        Free-Agency-Flut. Wer nicht in die Auswahl faellt, bleibt
+ *                        sofortiger Free Agent.
+ *                        Oberes Staerke-Drittel der Auswahl (unabhaengig vom Jahrgang)
+ *                        bekommt "mittleres bis starkes CA, aber hohes PO": gedaempfte
+ *                        Anfangs-Ratings (~55% des vollen Niveaus) + explizit hohes
+ *                        `pot` (75-99) -- Basketball GMs Alterungs-Engine zieht die
+ *                        echten Ratings ueber die Karriere Richtung `pot` hoch, die
+ *                        Charaktere werden also spuerbar besser statt schon fertig zu
+ *                        sein (Chris 06.09.). Alle anderen behalten ihr volles Niveau
+ *                        und ein normales, von Basketball GM selbst berechnetes `pot`.
+ *                        Alter/Geburtsjahr/Ratings-Saison eines Prospects beziehen sich
+ *                        auf SEIN Draft-Jahr (19-23 zum eigenen Draft), nicht auf die
+ *                        Export-Startsaison; kein Contract (noch nicht unterschrieben).
+ *                        --rotations R (Default 1): dieselbe ausgewaehlte Gruppe (inkl.
+ *                        High-Potential-Einstufung) taucht ein zweites/drittes/... Mal
+ *                        auf, jeweils N Jahre nach dem vorherigen Zyklus (Name/Bild/
+ *                        Ratings identisch, neues Geburtsjahr) -- Chris' "volle
+ *                        Rotation": nachdem die Originalbesetzung durchgealtert ist,
+ *                        kommt exakt dieselbe Besetzung als frischer Nachwuchs-Jahrgang
+ *                        zurueck statt neu generierter Spieler. Reine Terminplanung: ob
+ *                        ein Charakter zum Zeitpunkt seines naechsten Zyklus im Spiel
+ *                        tatsaechlich schon im Ruhestand ist, haengt vom echten
+ *                        Alterungsverlauf im jeweiligen Save ab, nicht von diesem
+ *                        Skript.
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
@@ -286,18 +297,46 @@ function main() {
 
   // --draft-classes N: statt alle Nicht-Roster-Spieler sofort als Free Agent zu
   // exportieren, werden bis zu picksPerYear*N von ihnen zu Draft-Prospects (tid -2).
-  // Sortiert nach Oly-Rating AUFSTEIGEND und in Jahrgangs-Bloecke zerlegt -- Chris'
-  // Wunsch (06.09.): "die krassesten Spieler sollen als Rookies mit high potential
-  // erst spaeter dazustossen", also landen die staerksten der ausgewaehlten Gruppe im
-  // LETZTEN Jahrgang, nicht zufaellig verteilt. Wer nicht in die Top picksPerYear*N
-  // faellt, bleibt sofortiger Free Agent (die schwaecheren, fuer Tag-1-Signings).
+  // Chris' korrigierte Vorgabe (06.09., 2. Ruecksprache): "1600 aus ALLEN Brackets
+  // nehmen, gute sowie schlechte" -- also NICHT nur die Spitze abschneiden, sondern
+  // systematisch ueber die GESAMTE nach Oly-Rating sortierte Liste sampeln (jeder
+  // ~n-te Spieler), damit die Auswahl den vollen Staerke-Bereich abbildet. Die
+  // Jahrgangs-Zuteilung wird danach separat GEMISCHT (per Spieler-ID-Hash), nicht
+  // nach Staerke sortiert -- jeder Jahrgang ist also wieder ein normaler Mix aus
+  // schwach/mittel/stark statt "Jahr 1 nur Fuellspieler, Jahr 25 nur Stars".
+  // Das obere Staerke-Drittel der Auswahl (unabhaengig vom Jahrgang) bekommt
+  // stattdessen die "High-Potential-Rookie"-Behandlung, s. HIGH_POTENTIAL_PERCENTILE
+  // unten: gedaempftes Anfangs-Rating, aber explizit hohes `pot`.
   const prospectChunkByPlayerId = new Map<string, number>();
+  const prospectPercentileByPlayerId = new Map<string, number>();
   if (draftClassYears) {
     const nonRostered = players.filter((p) => !(freeAgentsOnly ? null : rosterByPlayerId.get(p.id)));
     const sortedAscending = [...nonRostered].sort((a, b) => (a.rating ?? 50) - (b.rating ?? 50));
     const totalSlots = Math.min(picksPerYear * draftClassYears, sortedAscending.length);
-    const selected = sortedAscending.slice(sortedAscending.length - totalSlots);
-    selected.forEach((p, i) => prospectChunkByPlayerId.set(p.id, Math.floor(i / picksPerYear)));
+    const step = sortedAscending.length / totalSlots;
+    const selected = Array.from({ length: totalSlots }, (_, i) =>
+      sortedAscending[Math.min(sortedAscending.length - 1, Math.floor(i * step))]);
+    selected.forEach((p, i) => prospectPercentileByPlayerId.set(p.id, totalSlots > 1 ? i / (totalSlots - 1) : 0));
+
+    const shuffled = [...selected].sort(
+      (a, b) => seededFraction(`${a.id}|shuffleyear`) - seededFraction(`${b.id}|shuffleyear`),
+    );
+    shuffled.forEach((p, i) => prospectChunkByPlayerId.set(p.id, Math.floor(i / picksPerYear)));
+  }
+  const HIGH_POTENTIAL_PERCENTILE = 0.7; // oberes Drittel der Auswahl
+  const HIGH_POTENTIAL_DAMP = 0.55; // wie viel vom vollen Niveau schon sichtbar ist
+  function dampenForProspect(full: ReturnType<typeof toBbgmRatings>): ReturnType<typeof toBbgmRatings> {
+    const damped = { ...full };
+    for (const key of Object.keys(damped) as (keyof typeof damped)[]) {
+      if (key === "hgt") continue; // physische Groesse "waechst" nicht rein
+      damped[key] = Math.round(50 + (full[key] - 50) * HIGH_POTENTIAL_DAMP);
+    }
+    return damped;
+  }
+  function highPotentialValue(full: ReturnType<typeof toBbgmRatings>): number {
+    const keys = (Object.keys(full) as (keyof typeof full)[]).filter((k) => k !== "hgt");
+    const avg = keys.reduce((sum, k) => sum + full[k], 0) / keys.length;
+    return Math.round(clamp(avg * 1.15, 75, 99));
   }
 
   const bbgmPlayers: Record<string, unknown>[] = [];
@@ -327,6 +366,7 @@ function main() {
     const makeRecord = (args: {
       tid: number; bornYear: number; draftYear: number; ratingsSeason: number;
       contract: { amount: number; exp: number } | null;
+      ratingsOverride?: typeof ratings; pot?: number;
     }) => ({
       firstName: "",
       lastName: p.name,
@@ -342,7 +382,13 @@ function main() {
       // an echten NBA-Daten trainiertem Modell (siehe zengm.com/blog/2021/03/
       // new-position-formula) -- das ist naeher an "wie im Base-Game" als jede eigene
       // Heuristik hier, und bringt Mehrfachpositionen gratis mit.
-      ratings: [{ season: args.ratingsSeason, fuzz: 0, skills: [], ...ratings }],
+      // `pot` bewusst NUR fuer High-Potential-Prospects gesetzt (s.u.) -- fuer alle
+      // anderen berechnet Basketball GM es wie ovr selbst aus den 15 Ratings + Alter.
+      ratings: [{
+        season: args.ratingsSeason, fuzz: 0, skills: [],
+        ...(args.ratingsOverride ?? ratings),
+        ...(args.pot != null ? { pot: args.pot } : {}),
+      }],
     });
 
     // Echte Oly-Kader als Startaufstellung uebernehmen statt alle als Free Agent zu
@@ -383,8 +429,22 @@ function main() {
     // nicht unterschrieben). Alter/Geburtsjahr/Ratings-Saison beziehen sich auf das
     // JEWEILIGE Draft-Jahr, nicht auf die Export-Startsaison -- ein Rookie ist zum
     // eigenen Draft 19-23, unabhaengig davon, in welchem Jahrgang/welcher Rotation.
-    // --rotations R (>1): derselbe Charakter (Name/Bild/Werte identisch) taucht ein
-    // zweites/drittes/... Mal auf, R*draftClassYears Jahre nach dem ersten Zyklus --
+    //
+    // Oberes Staerke-Drittel der Auswahl (percentile, s.o.) bekommt "mittleres bis
+    // starkes CA, aber hohes PO" (Chris 06.09.): gedaempfte Anfangs-Ratings (nur ~55%
+    // des vollen Niveaus sichtbar -- Basketball GM zeigt also einen soliden, aber noch
+    // nicht ausgereiften Rookie), dafuer ein explizit hohes `pot` (75-99, aus dem
+    // VOLLEN Niveau berechnet). Basketball GMs eigene Alterungs-Engine zieht die
+    // tatsaechlichen Ratings ueber die folgenden Saisons Richtung `pot` hoch -- so
+    // kommen sie "ueber die Jahre immer mehr als coole neue Rookies" rein, statt schon
+    // am Draft-Tag fertig zu sein. Alle anderen behalten ihr volles, unveraendertes
+    // Niveau und ein normales, von Basketball GM selbst berechnetes `pot`.
+    const highPotential = (prospectPercentileByPlayerId.get(p.id) ?? 0) >= HIGH_POTENTIAL_PERCENTILE;
+    const ratingsOverride = highPotential ? dampenForProspect(ratings) : undefined;
+    const pot = highPotential ? highPotentialValue(ratings) : undefined;
+
+    // --rotations R (>1): derselbe Charakter (Name/Bild/volles Niveau identisch) taucht
+    // ein zweites/drittes/... Mal auf, R*draftClassYears Jahre nach dem ersten Zyklus --
     // Chris' "volle Rotation": nachdem die Originalbesetzung durchgealtert/im
     // Ruhestand ist, kommt exakt dieselbe Besetzung als frische Nachwuchs-Jahrgaenge
     // zurueck, nicht neu generiert.
@@ -398,6 +458,8 @@ function main() {
         draftYear,
         ratingsSeason: draftYear,
         contract: null,
+        ratingsOverride,
+        pot,
       }));
     }
   }
