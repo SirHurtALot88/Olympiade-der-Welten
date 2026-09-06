@@ -1,0 +1,175 @@
+diff --git a/public/mockups/battle-mode.engine.js b/public/mockups/battle-mode.engine.js
+index b2abbece..b7105020 100644
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -15133,6 +15133,11 @@
+   // bleiben bit-identisch), also faellt HUERDEN_TYP() dort immer auf hindernisTypen[i%n]
+   // zurueck — genau die Formel, die vorher an der einen Lesestelle in stepSpurt stand.
+   let bahnFallenTypen=null, bahnKursName=null;
++  // PROTOTYP CHAOS (Fable 06.09.): Chaos-Faktor des gewaehlten Kurses (kurse[].chaos),
++  // multipliziert tackleRate und Gedraenge-Preis. null ausserhalb Takeshi -> Faktor 1.
++  let bahnKursChaos=null;
++  // Welche Fallen in diesem Rennen schon eine Gedraenge-Zeile im Ticker hatten (nur Anzeige).
++  let bahnGedraengeGemeldet=new Set();
+   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
+   let LAEUFER=[], rennFertig=[], rennT=0;
+   // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
+@@ -15187,12 +15192,12 @@
+     // zieheFormkarten seit dessen Fix (obere Bits, `(s0>>>8)/16777216`) — die untersten
+     // Bits eines LCG mit gerader Modulusbasis haben eine kurze Periode und waeren fuer
+     // eine Kursauswahl aus drei Werten genauso ungeeignet wie sie es fuer Formkarten war.
+-    bahnFallenTypen=null; bahnKursName=null;
++    bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
+     if(BA().kurse&&BA().kurse.length){
+       let s0=(Number(seed)>>>0)||1;
+       const rnd=()=>{s0=(Math.imul(s0,1664525)+1013904223)>>>0; return (s0>>>8)/16777216;};
+       const kurs=BA().kurse[Math.floor(rnd()*BA().kurse.length)];
+-      bahnFallenTypen=kurs.typen; bahnKursName=kurs.name;
++      bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
+     }
+     bahnEndeGemeldet=false;
+     cam={zoom:1,cx:0.5}; bahnWahl=null;
+@@ -15636,13 +15641,45 @@
+           if(A.hindernisTypen){
+             const hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
+             const hSkill=u[hTyp]||0;
+-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
++            // OUTSMART, Saeule "Hindernis lesen" (Chris 06.09.): `lesenBonus` laesst TECHNIK
++            // (Intelligence 36, Awareness 30) an JEDER Falle einen Anteil des Stopps
++            // sparen, nicht nur an den TECHNIK-Fallen — wer die Falle liest, findet den
++            // schnelleren Weg hindurch. Ohne das Feld (Spurt) Faktor 1, bit-identisch.
++            const lesen=A.lesenBonus?(1-A.lesenBonus*(u.TECHNIK||0)/100):1;
++            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100)*lesen);
+             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
+             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
+             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
+             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
+             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
+-            u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
++            u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100)*lesen,aus:'sauber'});
++            // PROTOTYP GEDRAENGE (Fable 06.09.): stehen beim Erreichen der Falle noch andere
++            // Laeufer (beide Seiten) im Umkreis `radius`, kostet jeder ueber `frei` hinaus
++            // `preis` Sekunden zusaetzlichen Stopp — wer Wucht (Durchbrettern) hat, schiebt
++            // sich durch und zahlt weniger. Kein rr()-Aufruf: Bahnen ohne `gedraenge`
++            // bleiben bit-identisch.
++            if(A.gedraenge){
++              const G=A.gedraenge;
++              const andere=LAEUFER.filter(o=>o!==u&&o.fertig==null&&Math.abs(o.pos-h)<=(G.radius??0.025)).length;
++              const extra=Math.max(0,andere-(G.frei??1));
++              if(extra>0){
++                // OUTSMART (Chris 06.09.: "gegner ... outsmarten"): mit `lesen:true` findet
++                // der Kluge die Luecke im Pulk — es zaehlt das Bessere aus Durchbrettern
++                // (WUCHT) und Falle lesen (TECHNIK, dort sitzen Intelligence und Awareness).
++                const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
++                const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
++                u.huerde+=preis; u.gedraengt=(u.gedraengt||0)+1; u.gedraengeZeit=(u.gedraengeZeit||0)+preis;
++                u.fallen[u.fallen.length-1].gedraenge=extra;
++                // Schwebetext je Laeufer, Ticker EINMAL je Falle und Pulk (ab `melden`
++                // Mitlaeufern) — je Laeufer gemeldet waren es 39 Zeilen in einem Rennen.
++                schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
++                const hi=HUERDEN_N().indexOf(h);
++                if(extra>=(G.melden??1) && !bahnGedraengeGemeldet.has(hi)){
++                  bahnGedraengeGemeldet.add(hi);
++                  feed(u.seite,"Gedränge an "+A.hindernisWort+" "+(hi+1)+" — "+(andere+1)+" Mann an einer Stelle, "+u.n+" mittendrin.");
++                }
++              }
++            }
+           }
+           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
+           if(rr()<=technik)continue;                       // sauber drueber
+@@ -15721,10 +15758,21 @@
+       // SPERRE IM HINDERNIS (Paket B): wer im Hindernis-Stopp steht, rempelt nicht und wird
+       // nicht gerempelt — sonst ist der Stopp an der Wand Freiwild, und der Zeitpreis, der
+       // Dexterity tragen soll, wird zur Torment-Praemie.
+-      if(BA().tackle && u.tackleCd<=0 && !(u.huerde>0) && u.WUCHT>(BA().tackleAb??45)
+-         && rr()<willTackeln*dt*(BA().tackleRate??1.6)){
+-        const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null&&!(o.huerde>0)
+-          && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
++      // PROTOTYP CHAOS (Fable 06.09.): `tackleFenster` erlaubt den Rempler nur in den
++      // letzten `tackleFenster` Streckenanteilen VOR einer Falle (Gedraenge am Hindernis,
++      // nicht Rempelei auf freier Strecke); `tackleAlleSeiten` macht auch die eigene Seite
++      // zum Opfer (jeder gegen jeden); `tackleNerven` laesst einen Rempler Nerven kosten
++      // (Anteil von nervenKosten). Fuer Spurt (kein Fenster, kein Chaos-Kurs) ist die
++      // Bedingung Zeichen fuer Zeichen die alte, rr() wird in denselben Faellen gerufen.
++      const TA=BA();
++      let tackleOk=TA.tackle && u.tackleCd<=0 && !(u.huerde>0) && u.WUCHT>(TA.tackleAb??45);
++      if(tackleOk && TA.tackleFenster){
++        const naechste=HUERDEN_N().find(h=>h>u.pos);
++        tackleOk=naechste!=null && (naechste-u.pos)<=TA.tackleFenster;
++      }
++      if(tackleOk && rr()<willTackeln*dt*(TA.tackleRate??1.6)*(bahnKursChaos||1)){
++        const opfer=LAEUFER.filter(o=>o!==u&&(TA.tackleAlleSeiten||o.seite!==u.seite)&&o.fertig==null&&!(o.huerde>0)
++          && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035);
+         if(opfer.length){
+           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
+           // Der Rempler kostet den Remplenden weniger, als er den Getroffenen kostet —
+@@ -15732,16 +15780,37 @@
+           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
+           // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
+           // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
+-          u.tackleCd=1.8; u.kraft=BA().tackleKosten??0.26; u.tackles++;
++          u.tackleCd=TA.tackleCd??1.8; u.kraft=BA().tackleKosten??0.26; u.tackles++;
++          // OUTSMART, Saeule "Gegner lesen" (Chris 06.09.): mit `tackleAusweichen` darf das
++          // Opfer den Rempler kommen sehen und ihn ins Leere laufen lassen — Chance aus
++          // TECHNIK (Intelligence/Awareness). Der Taeter zahlt Abklingzeit und Kraft
++          // trotzdem. Eigener rr()-Aufruf NUR hinter dem Feld: Spurt bleibt bit-identisch.
++          // Zwei Formen: `{basis,spanne}` linear in TECHNIK, oder `{duell:f}` als Duell
++          // f x TECHNIK_opfer / (TECHNIK_opfer + WUCHT_taeter) — dieselbe Form wie `stark`.
++          const ausw=TA.tackleAusweichen?(TA.tackleAusweichen.duell!=null
++              ?TA.tackleAusweichen.duell*(o.TECHNIK||0)/((o.TECHNIK||0)+u.WUCHT||1)
++              :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
++          if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
++            o.ausgewichen=(o.ausgewichen||0)+1;
++            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"weicht aus",life:.9,crit:false,_laeufer:o.id});
++            feed(o.seite,o.n+" sieht "+u.n+" kommen und lässt ihn ins Leere laufen.");
++          } else {
+           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
+           if(rr()<stark){
+             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
+-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true,_laeufer:o.id});
+-            feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
++            if(TA.tackleNerven&&TA.nervenKosten&&o.nervenMax){
++              o.nerven-=TA.nervenKosten*TA.tackleNerven*Math.max(0.45,1-o.ROBUST*0.0045);
++              if(o.nerven<=0){ o.raus=true; o.fertig=90+(1-o.pos)*10; rennFertig.push(o);
++                schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:o.id});
++                feed(o.seite,o.n+" scheidet aus — von "+u.n+" umgerannt, Nerven am Ende bei "+Math.round(o.pos*100)+" % der Strecke."); }
++            }
++            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"gerammt",life:1,crit:true,_laeufer:o.id});
++            feed(u.seite,u.n+" rammt "+o.n+(TA.tackleFenster?" vor der "+TA.hindernisWort+" um.":" von der Bahn."));
+           } else {
+             schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
+             feed(o.seite,o.n+" steckt den Rempler weg.");
+           }
++          }
+         }
+       }
+ 
+@@ -18730,6 +18799,9 @@
+       if(kader&&Array.isArray(kader.gast)&&kader.gast.length)OPP=mitKit(kader.gast);
+       return {heim:SQUAD.length,gast:OPP.length};
+     },
++    // PROTOTYP-HAKEN (Fable 06.09., nur Messung): Felder einer Bahn zur Laufzeit setzen.
++    bahnArtSetzen:(d,felder)=>{ if(!BAHN_ART[d])return null; for(const k in felder){ if(felder[k]===undefined)delete BAHN_ART[d][k]; else BAHN_ART[d][k]=felder[k]; } return Object.keys(BAHN_ART[d]); },
++    bahnArtLesen:(d)=>JSON.parse(JSON.stringify(BAHN_ART[d]||null)),
+     disziplinProbe:(dId,opt)=>{
+       const M=MOTOREN[dId];
+       if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
+@@ -18765,7 +18837,9 @@
+           // pruefen, ob eine Staffel den Abschnitt misst oder den Laeufer. Ausserhalb der
+           // Staffel bleiben beide null.
+           const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig,
+-            bein:u.bein??null, etappe:u.etappenZeit??null}))
++            bein:u.bein??null, etappe:u.etappenZeit??null,
++            diag:{tackles:u.tackles,getackelt:u.getackelt,ausgewichen:u.ausgewichen||0,gedraengt:u.gedraengt||0,gedraengeZeit:u.gedraengeZeit||0,TECHNIK:u.TECHNIK,
++                  gestolpert:u.gestolpert,raus:!!u.raus,fertig:u.fertig,WUCHT:u.WUCHT,ROBUST:u.ROBUST,pers:u.pers,kurs:bahnKursName}}))
+             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+             // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
+             // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
+@@ -18782,6 +18856,7 @@
+               wert:Math.round((w[u.n]||0)*100)/100,
+               ...(u.bein!=null?{bein:u.bein,
+                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
++              ...(u.diag?{diag:u.diag}:{}),
+               ...(u.reihe!=null?{reihe:u.reihe}:{}),
+               ...(u.torwart?{torwart:true}:{})}))});
+         }
