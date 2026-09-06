@@ -314,10 +314,10 @@ beide betreffen die Arena; beide sind laut Triage Feature-Luecken, kein Ein-Zeil
 
 ### Scoring und Produktion
 
-**Stand 04./05.09., dritte Revision dieses Abschnitts:** drei Disziplinen laufen inzwischen
-ueber die Arena (`ARENA_RESOLVED_DISCIPLINE_IDS = {"basketball", "gewichtheben", "hockey"}`),
-jede mit echter Boxscore-an-PPs-Berechnung (Impact-Kurve, `battle-mode-arena-team-points.ts`)
-statt der alten PPS-Rang-Formel:
+**Stand 06.09., vierte Revision dieses Abschnitts:** fuenf Disziplinen laufen inzwischen ueber
+die Arena (`ARENA_RESOLVED_DISCIPLINE_IDS = {"basketball", "gewichtheben", "hockey",
+"speed-schach", "showcase"}`), jede mit echter Boxscore-an-PPs-Berechnung (Impact-Kurve,
+`battle-mode-arena-team-points.ts`) statt der alten PPS-Rang-Formel:
 
 - **Basketball** — seit laenger produktiviert, seither zwei weitere Runden: PR #755
   (Perzentilrang → absolute Impact-Kurve) und **K3** (04.09., `basketball-k3.md`): Feldkorb-
@@ -327,23 +327,46 @@ statt der alten PPS-Rang-Formel:
 - **Gewichtheben** — produktiviert (`gewichtheben-produktivierung.md`, S6): eigene
   Buehnen-Duell-Referenz, `barbell.tsx` bewusst noch kosmetisch belassen (keine Blockade fuer
   den Live-Betrieb).
-- **Hockey** — NEU seit dieser Fassung produktiviert (`hockey-produktivierung.md`, PR #780):
-  kein neues Chassis noetig (nutzt wie Basketball das Feldspiel-Chassis), aber eine **eigene
-  Torwart-Referenz** war empirisch noetig — Feldspieler- und Torwart-Median liegen je
-  Feldgroesse unterschiedlich weit auseinander und wechseln sogar die Richtung (n=3: Feld weit
-  ueber Torwart; n=6: Feld unter Torwart). Chris hat Hockeys Rangtreue (0,669 alle 12 / 0,719
-  nur Feldspieler, s. Abschnitt 1a) fuer den Live-Betrieb ausdruecklich akzeptiert — kein
-  weiterer Rangtreue-Anlauf vorgesehen (Aufgabe #20 entsprechend geschlossen).
+- **Hockey** — produktiviert (`hockey-produktivierung.md`, PR #780): kein neues Chassis noetig
+  (nutzt wie Basketball das Feldspiel-Chassis), aber eine **eigene Torwart-Referenz** war
+  empirisch noetig — Feldspieler- und Torwart-Median liegen je Feldgroesse unterschiedlich weit
+  auseinander und wechseln sogar die Richtung (n=3: Feld weit ueber Torwart; n=6: Feld unter
+  Torwart). Chris hat Hockeys Rangtreue (0,669 alle 12 / 0,719 nur Feldspieler, s. Abschnitt 1a)
+  fuer den Live-Betrieb ausdruecklich akzeptiert — kein weiterer Rangtreue-Anlauf vorgesehen
+  (Aufgabe #20 entsprechend geschlossen).
+- **Speed-Schach und Showcase** — NEU seit dieser Fassung produktiviert
+  (`speed-schach-showcase-produktivierung.md`, Produktivierungswelle 1, 06.09.): zwei NEUE
+  Buehnen-Chassis-Dispatch-Funktionen (`spieleBuehneDuell()` fuer Speed-Schachs `art.duell`,
+  `spieleBuehneAuftritt()` fuer Showcases `art`-ohne-`heben`/`duell`), da bisher nur das
+  Buehnen-Heben-Chassis (Gewichtheben) ans Arena-Resolve angebunden war. Beim Bau ein
+  vorbestehender Motor-Fehler gefunden und behoben: die `art.duell`-Paarung in `bauBuehne()`
+  zaehlte Bretter ueber die feste Motor-Konstante `art.jeSeite` statt ueber die tatsaechliche
+  Teilnehmerzahl — bei weniger als sechs gesetzten Spielern (z.B. bei einer gewuerfelten
+  Feldgroesse < 6) griff das ins Leere (`mine[i]` `undefined`). Nie zuvor aufgefallen, weil
+  Speed-Schach/I-Spy vor dieser Welle nie ausserhalb einer manuell voll besetzten Aufstellung
+  simuliert wurden.
 
-**Die anderen siebzehn** — einschliesslich Tennis, Fechten und Football trotz ihrer grossen
+**Die anderen fuenfzehn** — einschliesslich Tennis, Fechten und Football trotz ihrer grossen
 Mechanik-Runden — laufen weiterhin ausschliesslich im Mockup, abgerechnet ueber den alten
-PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`). Neun davon (Speed-Schach, Showcase,
-Time-Trial, Wettessen, Fechten, Tennis, Breaking, Climbing, Eiskunstlauf) haben die
-Rangtreue-Schranke bereits bestanden oder liegen knapp darunter — bei ihnen fehlt NUR die
-Produktivierung (Konfigurationseintrag + eigene PPS-Referenz ziehen), keine eigene Optik oder
-Bewegung: Hockeys Beispiel zeigt, dass beides unabhaengig voneinander geht (Hockeys Eisflaeche
-brauchte fuer die Live-Schaltung keine einzige Aenderung). Eine Live-Motor-Befoerderung wie bei
-Basketball/Hockey waere fuer sie trotzdem ein eigener, noch nicht angefasster Auftrag.
+PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`). Acht davon (Time-Trial, Wettessen,
+Fechten, Tennis, Breaking, Climbing, Eiskunstlauf, Takeshi's Castle) haben die Rangtreue-Schranke
+bereits bestanden oder liegen knapp darunter — bei ihnen fehlt nur die Produktivierung (Konfigurations-
+eintrag + eigene PPS-Referenz ziehen, ggf. mit einem neuen Buehnen-/Bahn-Chassis-Dispatch wie in
+dieser Welle), keine eigene Optik oder Bewegung. **Staffel bestand die Schranke ebenfalls
+(0,915), ist aber BEWUSST NICHT dabei**: `bahnTeamstand()` liefert fuer Staffel `gewertet:false`
+— das Spiel selbst hat dort noch keine Wertung (die Live-HUD-Meldung sagt woertlich "fuer diese
+Disziplin gibt es noch keine Wertung"). Ein Arena-Team-Ergebnis auf dieser Grundlage waere keine
+Konfigurationsaenderung mehr, sondern eine neue Wertungsmechanik — das gehoert zu "Wertungstabelle
+Welle 2", nicht zur Produktivierung. Eine Live-Motor-Befoerderung wie bei Basketball/Hockey waere
+fuer die verbleibenden Disziplinen trotzdem ein eigener, noch nicht angefasster Auftrag.
+
+**Unveraendert: kein aktiver Save nutzt Battle Mode.** Alle sieben Saves im aktuellen
+`live-save`-Abbild (gepruft 06.09., derselbe Befund wie bei Hockey/Gewichtheben) haben
+`scenarioMeta.gameMode` nicht gesetzt (`isBattleModeSave()` faellt auf `"manager"` zurueck) —
+die gesamte Arena-Produktivierung, alle fuenf Disziplinen zusammen, wirkt sich auf KEINEN von
+Chris' aktuellen Spielstaenden aus. `gameMode` wird bei Save-Anlage entschieden und aendert sich
+nie wieder (s. `lib/season/game-mode.ts`); erst ein NEUER Save mit Battle-Mode-Wahl wuerde diese
+Mechanik ueberhaupt scharf schalten.
 
 ---
 
@@ -498,11 +521,11 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Time-Trial | 55 % | 0,867 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |
 | Gewichtheben | 70 % | 0,887 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Climbing | 48 % | 0,790 | Steigung und Kraftbudget statt Antritt · kaderfest knapp unter der Schranke (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
-| Speed-Schach | 45 % | 0,889 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) |
+| Speed-Schach | 45 % | 0,889 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | Wettessen | 40 % | 0,844 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Eiskunstlauf | 38 % | 0,757 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest knapp unter der Schranke (vorher bestanden) |
 | Breaking | 38 % | 0,801 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
-| Showcase | 40 % | 0,880 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) |
+| Showcase | 40 % | 0,880 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,886** | **Kaderfest bestanden (vorher als 0,697/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · nicht im echten Spielstand |
 | **Staffel** | **48 %** | **0,915** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |
 | I-Spy | 35 % | 0,692 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |

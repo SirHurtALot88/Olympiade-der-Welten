@@ -101,6 +101,25 @@ const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
  */
 export const ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["gewichtheben"]);
 
+/**
+ * PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
+ * zweite Buehnen-Chassis-Menge, GENAU DASSELBE Muster wie `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
+ * direkt darueber -- nur fuer `BUEHNE_ART[d].duell` statt `.heben` (`window.__arena.
+ * spieleBuehneDuell()`, battle-mode.engine.js). Speed-Schach ist der erste Eintrag; I-Spy
+ * (ebenfalls `duell:true` im Motor) ist NICHT enthalten -- kein Auftrag dafuer in dieser
+ * Welle, s. PM-Briefing 06.09. Abschnitt 4 (nur Speed-Schach/Staffel/Showcase bestanden UND
+ * beauftragt).
+ */
+export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["speed-schach"]);
+
+/**
+ * DRITTE BUeHNEN-CHASSIS-MENGE (Produktivierungswelle 1): fuer die sechs "Auftritt"-Buehnen
+ * (`BUEHNE_ART[d]` ohne `.heben` UND ohne `.duell`) -- Showcase ist der erste Eintrag.
+ * `window.__arena.spieleBuehneAuftritt()` liest denselben summenbasierten Seitenstand, den
+ * `updateHudBuehne()`s eigener Nicht-Heben-Nicht-Duell-Zweig bereits live anzeigt.
+ */
+export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["showcase"]);
+
 function seedZuZahl(seed: string | number): number {
   if (typeof seed === "number" && Number.isFinite(seed)) return seed;
   const text = String(seed);
@@ -325,14 +344,17 @@ async function simuliereFixturesImBrowser(payload: {
   }[];
   disziplin: string;
   // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
-  // oben. NUR diese Weiche entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
-  chassis: "feldspiel" | "buehneHeben";
+  // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` oben. NUR
+  // diese Weiche entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
+  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt";
   timeoutMs: number;
 }): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
     __arena?: {
       spieleFeldspiel: (fd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneHeben: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBuehneDuell: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBuehneAuftritt: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
     };
     __olyArenaKader?: unknown;
   };
@@ -380,6 +402,10 @@ async function simuliereFixturesImBrowser(payload: {
     ergebnisse.push(
       payload.chassis === "buehneHeben"
         ? fenster.__arena.spieleBuehneHeben(payload.disziplin, fixture.seed)
+        : payload.chassis === "buehneDuell"
+        ? fenster.__arena.spieleBuehneDuell(payload.disziplin, fixture.seed)
+        : payload.chassis === "buehneAuftritt"
+        ? fenster.__arena.spieleBuehneAuftritt(payload.disziplin, fixture.seed)
         : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
     );
   }
@@ -454,8 +480,14 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(disziplin)
+    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
+      disziplin,
+    )
       ? "buehneHeben"
+      : ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has(disziplin)
+      ? "buehneDuell"
+      : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
+      ? "buehneAuftritt"
       : "feldspiel";
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
       fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
@@ -475,7 +507,14 @@ export async function runArenaFixtures(
     // "spieleBuehneHeben" aufruft. Ein Fehler im Buehnen-Pfad haette damit faelschlich auf die
     // falsche Funktion gezeigt und beim Debuggen eines echten Produktionsfehlers in die Irre
     // gefuehrt.
-    const aufgerufeneFunktion = chassis === "buehneHeben" ? "spieleBuehneHeben" : "spieleFeldspiel";
+    const aufgerufeneFunktion =
+      chassis === "buehneHeben"
+        ? "spieleBuehneHeben"
+        : chassis === "buehneDuell"
+        ? "spieleBuehneDuell"
+        : chassis === "buehneAuftritt"
+        ? "spieleBuehneAuftritt"
+        : "spieleFeldspiel";
     return rohErgebnisse.map((ergebnis, index) => {
       if (!ergebnis) {
         throw new Error(
