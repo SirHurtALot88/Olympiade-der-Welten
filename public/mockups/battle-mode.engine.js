@@ -4281,6 +4281,10 @@
       // PROTOTYP-SCHALTER (s. bauSpieler): Football-eigene Spiel-Eignung aus p.a.
       spielEignung:{gewichte:{power:22,health:18,speed:14,torment:12,determination:10,awareness:8,stamina:6,dexterity:4,spirit:3,will:3}},
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
+      // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
+      // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht),
+      // s. WERTUNG_FOOTBALL() weiter unten bei den anderen WERTUNG_*-Bauern.
+      wertungTabelle:(basis,art)=>WERTUNG_FOOTBALL(art),
       // KURVE: Footballs EIGENE Erfolgskurve (Struktur wie Hockeys, s. dortiger
       // KURVE-Kommentar) — AUSDRUECKLICH KEIN KURVE_BASKETBALL-Erbe, das war Hockeys
       // eigener Anfangsfehler (docs/design/hockey-eigene-erfolgskurve.md) und soll sich
@@ -4473,6 +4477,11 @@
       label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
       punkteNah:1, punkteFern:1, fernAnteil:0,
       wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
+      // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht,
+      // und der Torwart hat keine eigene Zeile), s. WERTUNG_HOCKEY() weiter unten bei den
+      // anderen WERTUNG_*-Bauern.
+      wertungTabelle:(basis,art)=>WERTUNG_HOCKEY(art),
       // LIVE-BLOCK (Hockey-Plan 6.3, von Chris entschieden: "3 drittel zu 1:20").
       // 3 x 80 s = 240 s Simulationszeit, mit ZEIT_DEHNUNG rund 8 Minuten Zuschauzeit —
       // etwas kuerzer als Basketballs 360 s, weil im Eishockey weniger Ereignisse fallen
@@ -14423,10 +14432,16 @@
         {id:"eig", kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
       fuss:"„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet. „Eignung\" ist dieser Einsatzwert selbst."
     }),
-    // FELDSPIEL: dieselbe Zeilenquelle wie vorher (fsBisher() — sonst waeren die an der
-    // Einheit vorberechneten Objektfelder bei Football/Hockey/Tennis ein Spoiler, s.
-    // dortiger Kommentar), dieselben zehn Spalten wie vorher (unveraendert — Welle 2 des
-    // Plans macht Hockey/Football ehrlich, hier bewusst nicht angefasst).
+    // FELDSPIEL (Basketball-Default; Hockey/Football ersetzen dies komplett ueber ihre
+    // eigene `wertungTabelle`, s. WERTUNG_HOCKEY/WERTUNG_FOOTBALL weiter unten — Welle 2
+    // des Plans). Zeilenquelle bleibt fsBisher() — spoilerfrei, s. dortiger Kommentar —,
+    // dieselben zehn Spalten wie vorher, EINE Aenderung: „Imp" ruft jetzt feldspielWert()
+    // (Welle-2-Fund: die Spalte war bislang bei ALLEN drei Feldspielen die feste
+    // Basketball-Formel, nicht MOTOREN[disc].wert() — genau die Formel, die die Sonde und
+    // die Rangtreue-Messung laengst benutzen. Fuer Basketball selbst aendert das den Wert
+    // NICHT auf der Nachkommastelle: feldspielWert()s Basketball-Zweig IST diese Formel,
+    // nur mit punkte/xp halbiert gebucht (K3) statt der reinen Punktzahl — s. dortiger
+    // Kommentar. Reiner Anzeige-Fund, MOTOREN[disc].wert() selbst ist unveraendert.).
     feldspiel:(art)=>({
       namen:"Spieler",
       zeilen:()=>{
@@ -14445,11 +14460,11 @@
         {id:"fg",  kopf:"FG",  titel:"Treffer/Versuche aus dem Feld",
           wert:z=>z.st.feldwuerfe?z.st.feldwuerfeTreffer+"/"+z.st.feldwuerfe:null},
         {id:"fgp", kopf:"FG%", wert:z=>z.st.feldwuerfe?Math.round(z.st.feldwuerfeTreffer/z.st.feldwuerfe*100):null, fmt:v=>v+"%"},
-        {id:"imp", kopf:"Imp", titel:"Kompositwert aus Punkten/Rebounds/Steals+Blocks/Ballverlusten",
-          wert:z=>{const st=z.st,imp=st.punkte+st.assists+st.rebounds*1.2+(st.steals+st.bloecke)*1.5-st.verluste*0.8; return imp?imp:null;},
+        {id:"imp", kopf:"Imp", titel:"Kompositwert — exakt der Wert aus MOTOREN[disc].wert() (feldspielWert), nicht mehr eine feste Kopie der Basketball-Formel",
+          wert:z=>{const v=feldspielWert(z.u); return v?v:null;},
           fmt:v=>v.toFixed(1)},
         {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" gewichtet Punkte/Rebounds/Steals+Blocks/Ballverluste zu einem Kompositwert. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
+      fuss:"„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
     }),
     buehne:(art)=>art.heben?WERTUNG_HEBEN(art):art.duell?WERTUNG_DUELL(art):WERTUNG_AUFTRITT(art),
     bahn:(art)=>art.staffel?WERTUNG_STAFFEL(art):WERTUNG_RENNEN(art)
@@ -15482,6 +15497,76 @@
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
       fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich)."};
   }
+
+  // WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5, PM-Briefing
+  // 06.09. Abschnitt 2a): Hockey unter Basketball-Woertern war Chris' konkreter Fund —
+  // Reb=Abpraller, Blk=Blocks UND Torwart-Paraden GLEICHZEITIG (beide fsZuege-Ereignis
+  // "block", s. loeseHockeySchuss/fsBisher), Strafminuten/Checks nirgends sichtbar, kein
+  // eigenes Torwart-Feld. Liest NICHT mehr ueber fsBisher()/das Ereignisprotokoll (das
+  // kennt weder "check" noch "strafe" noch Torwart-Felder, s. dortiger Kommentar), sondern
+  // DIREKT an der Einheit — spoilerfrei, weil Hockey seit der Live-Migration ohnehin den
+  // Live-Motor faehrt (Plan Abschnitt 1.4: "die Einheitenfelder sind kein Spoiler mehr").
+  // Skater- und Torwart-Spalten stehen NEBENEINANDER in derselben Tabelle (eine Zeile pro
+  // Spieler, ein fester Spaltensatz je Tabelle — anders kann der generische Renderer keine
+  // Spalten je Zeile umschalten): ein Skater zeigt bei Par/GT/Fg% "—", der Torwart bei
+  // Sch/Sch%/Puck/Blk/Chk/Abpr/Str "—" (die Felder bleiben bei ihm ohnehin auf 0, s.
+  // Einheiten-Grundfelder Z. ~5416/5429).
+  function WERTUNG_HOCKEY(art){
+    const zeilen=()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,
+      u,torwart:!!u.torwart,imp:feldspielWert(u,"hockey")}));
+    return {namen:"Spieler", zeilen, sortierung:(a,b)=>b.imp-a.imp,
+      spalten:[
+        {id:"tore", kopf:"Tore", top:true, wert:z=>z.u.punkte||null},
+        {id:"ass",  kopf:"Ass",  titel:"Vorlagen (erste und zweite zusammen)", wert:z=>z.u.assists||null},
+        {id:"sch",  kopf:"Sch",  titel:"Schüsse aufs Tor", wert:z=>z.u.feldwuerfe||null},
+        {id:"schp", kopf:"Sch%", titel:"Anteil der Schüsse, die reingingen",
+          wert:z=>z.u.feldwuerfe?Math.round(z.u.feldwuerfeTreffer/z.u.feldwuerfe*100):null, fmt:v=>v+"%"},
+        {id:"puck", kopf:"Puck", titel:"eroberte lose Pucks (Steals)", wert:z=>z.u.steals||null},
+        {id:"blk",  kopf:"Blk",  titel:"geblockte gegnerische Schüsse (nicht die Torwart-Paraden — die stehen unter Par)",
+          wert:z=>z.torwart?null:z.u.bloecke||null},
+        {id:"chk",  kopf:"Chk",  titel:"Bodychecks", wert:z=>z.torwart?null:z.u.checks||null},
+        {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
+        {id:"str",  kopf:"Str",  titel:"Strafminuten", wert:z=>z.torwart?null:z.u.strafminuten||null},
+        {id:"par",  kopf:"Par",  titel:"Paraden (nur Torwart)", wert:z=>z.torwart?(z.u.saves||null):null},
+        {id:"gt",   kopf:"GT",   titel:"Gegentore (nur Torwart)", wert:z=>z.torwart?(z.u.gegentore||null):null},
+        {id:"fgp",  kopf:"Fg%",  titel:"Fangquote — Paraden / (Paraden + Gegentore), nur Torwart",
+          wert:z=>z.torwart&&(z.u.saves+z.u.gegentore)?Math.round(z.u.saves/(z.u.saves+z.u.gegentore)*100):null, fmt:v=>v+"%"},
+        {id:"imp",  kopf:"Imp",  titel:"Kompositwert — exakt der Wert aus MOTOREN.hockey.wert() (feldspielWert), beim Torwart über GSAA",
+          wert:z=>z.imp||null, fmt:v=>v.toFixed(1)},
+        {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"„Blk\" zählt nur echte Schussblocks von Feldspielern, nicht die Torwart-Paraden — die stehen unter „Par\". „Abpr\" ist ein gewonnener loser Puck nach einem Abpraller, „Puck\" ein direkt erobert. Der Torwart zeigt statt der Feldspieler-Spalten „Par\"/„GT\"/„Fg%\" — seine Fangquote gegen die eigene Liga. „Imp\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt."};
+  }
+
+  // WELLE 2, Footballs zweiter Fund: nach 76 Spielsekunden war die Tabelle bis auf den
+  // Touchdown-Scorer leer, weil `fsBisher()`/der generische Feldspiel-Default weder Yards
+  // noch Sacks noch Interceptions/Fumble-Recoveries kennt — die liegen alle NUR direkt an
+  // der Einheit (`passYards/laufYards/fangYards/bloecke/steals/verluste`, s.
+  // vollziehFootballErgebnis). „Kompl\" ist football-eigen dasselbe Feld `assists`, das bei
+  // Hockey/Basketball Vorlagen zaehlt — hier zaehlt es Completions (s. Z. 6811).
+  // KEIN eigener Tackle-Zaehler: anders als der ausformulierte Wunsch nach „Tkl" hat der
+  // Motor keine einzige Play-Auswertung, die einem Verteidiger einen Tackle fuer sich
+  // gutschreibt (resolveLauf/resolvePass kennen nur sack/fumble/interception/komplett/
+  // incomplete/lauf als Ergebnistypen) — "Int/Rec" (das Feld `steals`) ist die einzige
+  // echte Verteidiger-Zahl, die der Motor fuehrt, s. PR-Beschreibung.
+  function WERTUNG_FOOTBALL(art){
+    const zeilen=()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,
+      u,imp:feldspielWert(u,"football")}));
+    return {namen:"Spieler", zeilen, sortierung:(a,b)=>b.imp-a.imp,
+      spalten:[
+        {id:"pkt",   kopf:"Pkt",   top:true, titel:"Touchdown-Punkte (6 je TD)", wert:z=>z.u.punkte||null},
+        {id:"passy", kopf:"PassY", titel:"Passyards (Sack-Yards eingerechnet)", wert:z=>z.u.passYards||null},
+        {id:"laufy", kopf:"LaufY", titel:"Laufyards", wert:z=>z.u.laufYards||null},
+        {id:"fangy", kopf:"FangY", titel:"Fangyards", wert:z=>z.u.fangYards||null},
+        {id:"kompl", kopf:"Kompl", titel:"angekommene Pässe (Completions)", wert:z=>z.u.assists||null},
+        {id:"sack",  kopf:"Sack",  titel:"Sacks (als Verteidiger)", wert:z=>z.u.bloecke||null},
+        {id:"intr",  kopf:"Int/Rec", titel:"Interceptions + Fumble-Recoveries (als Verteidiger)", wert:z=>z.u.steals||null},
+        {id:"to",    kopf:"TO",    titel:"eigene Turnover — Fumbles verloren oder Interception geworfen", wert:z=>z.u.verluste||null},
+        {id:"imp",   kopf:"Imp",   titel:"Kompositwert — exakt der Wert aus MOTOREN.football.wert() (feldspielWert, Fantasy-Scoring)",
+          wert:z=>z.imp||null, fmt:v=>v.toFixed(1)},
+        {id:"eig",   kopf:"Eig",   wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"„PassY\" enthält die verlorenen Yards eines Sacks. „Kompl\" zählt angekommene Pässe. „Int/Rec\" ist die einzige Verteidiger-Zahl, die der Motor führt (Tackles werden nicht gezählt) — Sacks stehen eigens unter „Sack\". „Imp\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt."};
+  }
+
   // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
   // ausgewaehlt ist (u.id) — oder null. Reine Anzeigegroesse: die Simulation liest sie
   // nirgends, ein Rennen ohne Eingriff laeuft damit Tick fuer Tick wie vorher.
@@ -16519,7 +16604,11 @@
     // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
     // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
     const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
-    d.appendChild(el("span","tk","0:"+String(Math.floor(anzeigeT)).padStart(2,"0")));
+    // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
+    // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
+    // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
+    // Umrechnung wie dort, nur hier fuer den Ticker-Zeitstempel.
+    d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
     d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
     f.appendChild(d);
     while(f.children.length>140)f.removeChild(f.firstChild);
@@ -17706,6 +17795,16 @@
     draw();renderKader();
     document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
+    // WELLE-2-FUND (time-trial-einzelzeitfahren-wertung-plan-05-09.md Abschnitt 1.5):
+    // "Plan der KI" (#arenaplan) zeigte im Time-Trial den TDM-Text weiter an. Ursache war
+    // nicht die istBahn-Fallunterscheidung in renderOpp() selbst (die baut fuer Bahn schon
+    // die Rennplaene korrekt auf) — reset() rief renderOpp() bisher NIE auf. Der
+    // Disziplin-Wechselknopf in der UI (Z. ~12342) ruft es zusaetzlich selbst noch einmal
+    // auf und blieb deshalb unauffaellig; window.__arena.setDisc() (die Sonden/Skripte
+    // benutzen) ruft NUR reset() — #arenaplan fror auf dem allerersten Stand (TDM) ein.
+    // Hier statt an jeder Aufrufstelle einzeln: reset() ist der eine Ort, den jeder
+    // Disziplinwechsel garantiert durchlaeuft.
+    renderOpp();
   }
 
   document.getElementById("play").addEventListener("click",()=>{
