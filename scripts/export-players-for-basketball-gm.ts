@@ -28,6 +28,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import { getTeamColor } from "@/lib/foundation/team-colors";
+import { berechneStaturModifikator, ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import { writeFileSync } from "fs";
 
 const BASE_URL = "https://olympiade.duckdns.org";
@@ -41,9 +42,19 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
-// Oly-Skala (1-99) -> Basketball-GM-Skala (0-100, Mittelwert ~50)
+// Oly-Skala (1-99) -> Basketball-GM-Skala (0-100, Mittelwert ~50).
+// Jede Wertung ist ein gewichteter Mix aus mehreren Attributen -- Mitteln drueckt
+// Extremwerte automatisch Richtung Mittelwert (nachgemessen: `diq`, 5 Attribute
+// gemischt, kam vorher nur auf 12-85 statt 0-100). STAR_STRETCH zieht das nach dem
+// Mitteln wieder auseinander, damit ein Charakter, der in EINEM Attribut wirklich
+// herausragt, auch als Star ankommt statt vom Durchschnitt der anderen verwaschen
+// zu werden. Einzelner Wert zum Nachjustieren, falls die Ovr-Spitze im Spiel immer
+// noch zu flach/zu voll wirkt.
+const STAR_STRETCH = 1.45;
 function scale100(v: number): number {
-  return Math.round(clamp((v / 99) * 100, 0, 100));
+  const raw = clamp((v / 99) * 100, 0, 100);
+  const stretched = 50 + (raw - 50) * STAR_STRETCH;
+  return Math.round(clamp(stretched, 0, 100));
 }
 
 function blend(...weighted: Array<[number, number]>): number {
@@ -96,14 +107,21 @@ function hexLuminance(hex: string): number {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
 
-const TALL_RACE_HINTS = ["golem", "riese", "troll", "oger", "ogre", "gigant", "titan"];
-const SHORT_RACE_HINTS = ["zwerg", "goblin", "kobold", "gnom", "halbling", "hobbit"];
+// Oly hat eine ECHTE Groesse (1-10, lib/player-generator/provisional-height.ts) --
+// Rasse+Subklasse+Statur-Heuristik, dieselbe Skala, die schon anderswo im Spiel
+// fuer Tall/Giant/Colossus/Titan-Einstufungen benutzt wird. Chris' Kalibrierung
+// (06.09.): Groesse 5 = durchschnittlicher Basketballer, Groesse 10 = 2,30 m.
+// Linear durch beide Punkte, dann in Basketball GMs Rating-Skala umgerechnet
+// (hgt-Rating = (Zoll-66)*3.70, so dokumentiert Basketball GM selbst).
+const HOEHE_CM_BEI_5 = 198; // ca. NBA-Durchschnitt
+const HOEHE_CM_BEI_10 = 230;
+const HOEHE_CM_PRO_STUFE = (HOEHE_CM_BEI_10 - HOEHE_CM_BEI_5) / 5;
 
-function raceHeightBonus(race: string | null | undefined): number {
-  const r = (race ?? "").toLowerCase();
-  if (TALL_RACE_HINTS.some((k) => r.includes(k))) return 18;
-  if (SHORT_RACE_HINTS.some((k) => r.includes(k))) return -18;
-  return 0;
+function groesseZuBbgmHoehe(groesse1bis10: number): { ratingHgt: number; zollGerundet: number } {
+  const cm = HOEHE_CM_BEI_5 + (groesse1bis10 - 5) * HOEHE_CM_PRO_STUFE;
+  const zoll = cm / 2.54;
+  const ratingHgt = clamp(Math.round((zoll - 66) * 3.7), 0, 100);
+  return { ratingHgt, zollGerundet: Math.round(clamp(zoll, 60, 96)) };
 }
 
 type RawAttrs = {
@@ -120,13 +138,9 @@ type RawAttrs = {
 // praktisch jeder teamorientierten Wertung (ins, tp, oiq, diq, drb, pss, reb), damit
 // ein hoher Teamgeist spuerbar in fast jede Aktion einzahlt statt nur beim Dribbling,
 // und niemand allein durch Ego-Werte (power/dexterity) zum Ball-Hog wird.
-function toBbgmRatings(raw: RawAttrs, race: string | null | undefined) {
-  const hgt = clamp(
-    scale100(blend([raw.power, 0.65], [raw.health, 0.25], [raw.stamina, 0.10])) + raceHeightBonus(race),
-    0, 100,
-  );
+function toBbgmRatings(raw: RawAttrs, ratingHgt: number) {
   return {
-    hgt,
+    hgt: ratingHgt,
     stre: scale100(blend([raw.power, 0.75], [raw.health, 0.15], [raw.determination, 0.10])),
     spd: scale100(blend([raw.speed, 0.75], [raw.dexterity, 0.15], [raw.stamina, 0.10])),
     jmp: scale100(blend([raw.power, 0.4], [raw.speed, 0.4], [raw.determination, 0.2])),
@@ -144,14 +158,21 @@ function toBbgmRatings(raw: RawAttrs, race: string | null | undefined) {
   };
 }
 
+// Nach RELATIVER Balance Speed/Dexterity vs. Power einordnen, nicht nach starrer
+// Power-Schwelle -- eine feste "power>=60 -> PF"-Schwelle liess frueher fast jeden
+// kraeftigen Charakter als PF landen, egal wie schnell/geschickt er dazu war (genau
+// das Problem hinter den PF-lastigen Top-Ovr-Listen). `diff` ist Speed/Dexterity
+// minus Power: stark positiv -> PG (reiner Ballhandler), stark negativ -> C (reine
+// Wucht), dazwischen abgestuft.
 function assignPos(raw: RawAttrs): string {
   const size = raw.power;
   const skill = blend([raw.speed, 1], [raw.dexterity, 1]);
-  if (size >= 75 && skill < 55) return "C";
-  if (size >= 60) return "PF";
-  if (skill >= 75) return "PG";
-  if (skill >= 60) return "SG";
-  return "SF";
+  const diff = skill - size;
+  if (diff >= 20) return "PG";
+  if (diff >= 7) return "SG";
+  if (diff >= -7) return "SF";
+  if (diff >= -20) return "PF";
+  return "C";
 }
 
 function main() {
@@ -217,6 +238,24 @@ function main() {
   let players = gs.players;
   if (limit) players = players.slice(0, limit);
 
+  // Statur-Modifikator fuer die echte Groessen-Ableitung braucht Rassen-Mittel/-Streuung
+  // von (power+health)/2 -- ueber ALLE Spieler des Saves berechnet (nicht nur --limit),
+  // damit der Modifikator bei einem Testlauf mit --limit nicht verzerrt wird.
+  const staturByRace = new Map<string, number[]>();
+  for (const p of gs.players) {
+    const a = p.attributeSheetStats ?? {};
+    const statur = ((a.power ?? 50) + (a.health ?? 50)) / 2;
+    const list = staturByRace.get(p.race) ?? [];
+    list.push(statur);
+    staturByRace.set(p.race, list);
+  }
+  const raceStatById = new Map<string, { mean: number; stdev: number }>();
+  for (const [race, list] of staturByRace.entries()) {
+    const mean = list.reduce((a, b) => a + b, 0) / list.length;
+    const variance = list.reduce((a, b) => a + (b - mean) ** 2, 0) / list.length;
+    raceStatById.set(race, { mean, stdev: Math.sqrt(variance) });
+  }
+
   const bbgmPlayers = players.map((p) => {
     const a = p.attributeSheetStats ?? {};
     const raw: RawAttrs = {
@@ -225,20 +264,29 @@ function main() {
       determination: a.determination ?? 50, speed: a.speed ?? 50, dexterity: a.dexterity ?? 50,
       charisma: a.charisma ?? 50, will: a.will ?? 50, spirit: a.spirit ?? 50, torment: a.torment ?? 50,
     };
-    const ratings = toBbgmRatings(raw, p.race);
+
+    const statur = (raw.power + raw.health) / 2;
+    const raceStat = raceStatById.get(p.race) ?? { mean: statur, stdev: 0 };
+    const staturModifikator = berechneStaturModifikator(statur, raceStat.mean, raceStat.stdev);
+    const groesse = ermittleSpielerHoehe(a.height ?? null, p.race, p.subclasses ?? [], staturModifikator);
+    const { ratingHgt, zollGerundet } = groesseZuBbgmHoehe(groesse);
+
+    const ratings = toBbgmRatings(raw, ratingHgt);
     const pos = assignPos(raw);
 
     const ratingScore = p.rating ?? 50;
     const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
     const gap = clamp(potentialScore - ratingScore, 0, 30);
-    const baseAge = 30 - (gap / 30) * 13;
+    // Juenger als beim FM-Export (dort Deckel 30): Chris will hier mehr Spielzeit pro
+    // Charakter herausholen, bevor Alterung/Ruhestand im Karriere-Modus greifen.
+    const baseAge = 26 - (gap / 30) * 9;
     const frac = seededFraction(p.id);
     const jitter = (frac - 0.5) * 4;
-    const age = Math.round(clamp(baseAge + jitter, 17, 30));
+    const age = Math.round(clamp(baseAge + jitter, 17, 26));
     const bornYear = startingSeason - age;
 
     const weight = Math.round(150 + (raw.power / 99) * 130);
-    const heightInches = Math.round(clamp(ratings.hgt / 3.7 + 66, 60, 90));
+    const heightInches = zollGerundet;
 
     const amount = Math.round(clamp((ratingScore / 99) * 24500 + 500, 500, 25000));
 
