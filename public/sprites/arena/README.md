@@ -28,6 +28,10 @@ gar nicht angefangen, weil OpenGameArt nicht erreichbar war" stand.
 | `deko_rad.png` | Takeshi's Castle, Falle High Rollers |
 | `boden_eis.png` | Takeshi's Castle, Falle Slip Way |
 | `deko_banner.png`, `deko_pranger.png`, `deko_stock.png`, `deko_holz.png` | Takeshi's Castle, Burg-Deko (Banner ueber der Bahn, Pranger/Fussblock/Holzstapel am Ziel) |
+| `boden_wiese.png`, `boden_wald.png` | Takeshi's Castle, Route durch Midoriyama: Grundflaeche und Waldhuellen |
+| `boden_pfad.png`, `boden_kies.png`, `boden_pflaster.png` | Takeshi's Castle, Route: Untergrund der Zonen Sammelplatz/Hang, Holzbauten, Burghof |
+| `boden_schlamm.png`, `boden_see.png`, `boden_sumpf.png` | Takeshi's Castle, Route: Seeufer, See, Tuempel |
+| `boden_hang.png` | Takeshi's Castle, Route: trockenes Gras am Hang |
 
 `quellen.json` nennt zu jeder Datei Paket, Blatt, Schnittstelle, Urheber und Lizenz.
 `HERKUNFT/` traegt die Urheberketten der drei Pakete im Wortlaut der Originale — bei

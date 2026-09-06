@@ -73,6 +73,22 @@ const SCHNITTE = [
   ['deko_stock',         'deko', 128,1474,  64,  38, false],
   ['deko_holz',          'deko', 352, 640,  64,  64, false],
   ['falle_fass',         'deko',  64, 704,  32,  64, false],
+  // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
+  // Abschnitt 5): neun Untergruende fuer die fuenf Gelaende-Zonen. Alle aus demselben
+  // Terrain-Blatt, das oben schon geladen wird — kein neuer Download, kein neuer Credit.
+  // Jeder Terrain-Block in terrain-v7.png ist 96x224 (3 Spalten x 7 Reihen): Reihen 0-1
+  // Innenecken, 2-4 der 3x3-Uebergangssatz (Mitte = die "tile"-Koordinate der TSX-Datei),
+  // Reihen 5-6 volle Kacheln ohne Rand. Alle neun Schnitte sind Reihe-5-Kacheln
+  // (y = tile-y + 64) — dieselbe Reihe, aus der `boden_erde` (Dirt_Brown) stammt.
+  ['boden_wiese',     'terrain',  32, 384,  32,  32, false],   // Grass
+  ['boden_wald',      'terrain', 224, 384,  32,  32, false],   // Grass_Dark
+  ['boden_pfad',      'terrain',  32, 160,  32,  32, false],   // Dirt_Tan
+  ['boden_kies',      'terrain', 800, 384,  32,  32, false],   // Gravel_1
+  ['boden_schlamm',   'terrain', 896, 160,  32,  32, false],   // Mud_Brown
+  ['boden_see',       'terrain', 128, 608,  32,  32, false],   // Water
+  ['boden_sumpf',     'terrain',  32, 608,  32,  32, false],   // Water_Shallows_Dirt
+  ['boden_hang',      'terrain', 320, 384,  32,  32, false],   // Grass_Dead
+  ['boden_pflaster',  'terrain', 704, 832,  32,  32, false],   // Stone_Tan
 ];
 
 const BLATT = {

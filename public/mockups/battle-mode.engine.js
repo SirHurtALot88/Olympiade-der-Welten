@@ -14685,7 +14685,11 @@
     // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
     "falle_tuer","falle_strickleiter","falle_spitzen","falle_walze","falle_fass",
     "burg_mauer","burg_turm","burg_tor","deko_rad","boden_eis","deko_banner",
-    "deko_pranger","deko_stock","deko_holz"];
+    "deko_pranger","deko_stock","deko_holz",
+    // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
+    // Abschnitt 5): die Untergruende der fuenf Gelaende-Zonen und ihrer Umgebungen.
+    "boden_wiese","boden_wald","boden_pfad","boden_kies","boden_schlamm","boden_see",
+    "boden_sumpf","boden_hang","boden_pflaster"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -14906,7 +14910,189 @@
   // Spurt: Rasen, Bahnen, Huerden, Baumreihe. Bahnen und Huerden kommen aus DENSELBEN
   // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
   // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
+  // ============ TAKESHI'S CASTLE: DIE ROUTE DURCH MIDORIYAMA ============
+  // Kein Bahn-Rechteck, keine waagerechten Spuren: eine Karte des Gelaendes, EINE
+  // gewundene Route darauf, die zehn Fallen-Bilder aus der Burgpunkte-Runde an ihren
+  // Wegpunkten, die Burg am Routenende. Alles unter der Weltkamera (translate/scale),
+  // damit die Burg beim Heranzoomen wirklich naeher kommt und die Kachelmuster mitwachsen.
+  // Nur das HUD (Burgpunkte, Kursname, Zoom) liegt im Bildschirmraum.
+  // Entwurf und Quellen: docs/design/takeshi-schlammroute-plan-06-09.md, Abschnitt 3/4.
+  function bodenTakeshiRoute(){
+    const R=routeTabelle(), z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
+    ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
+    const Z=BA().zonen||[{bis:1,boden:"pfad",um:"wiese"}];
+    const zoneBei=(s)=>Z.find(q=>s<=q.bis)||Z[Z.length-1];
+    const zoneVon=(q)=>{const i=Z.indexOf(q); return i?Z[i-1].bis:0;};
+    const teilPfad=(s0,s1)=>{ ctx.beginPath(); const n=Math.max(2,Math.ceil((s1-s0)*160));
+      for(let k=0;k<=n;k++){const r=routeXY(s0+(s1-s0)*k/n); k?ctx.lineTo(r.x,r.y):ctx.moveTo(r.x,r.y);} };
+    const M=(n,f)=>aMust(n)||f;               // Kachelmuster, sonst die Farbfassung
+    // HUELLE ALS POLYGON ENTLANG DER ROUTE, nicht als Ellipse um ihre Bounding-Box (der
+    // Prototyp hatte die Ellipse; fuer See und Hof stimmte sie, fuer Wald und Hang wirkte
+    // sie an den Raendern rund und losgeloest). Jetzt: die Routenpunkte des Abschnitts,
+    // einmal um `rand` nach der einen Normalen versetzt und auf dem Rueckweg nach der
+    // anderen — die Flaeche schmiegt sich an den Weg.
+    const huellePfad=(um,rand)=>{
+      const links=[], rechts=[]; let da=false;
+      for(const q of Z){ if(q.um!==um)continue; const a=zoneVon(q); da=true;
+        for(let k=0;k<=28;k++){const p=routeXY(a+(q.bis-a)*k/28);
+          links.push({x:p.x+p.nx*rand,y:p.y+p.ny*rand}); rechts.push({x:p.x-p.nx*rand,y:p.y-p.ny*rand});} }
+      if(!da)return null;
+      ctx.beginPath(); ctx.moveTo(links[0].x,links[0].y);
+      for(const p of links)ctx.lineTo(p.x,p.y);
+      for(let i=rechts.length-1;i>=0;i--)ctx.lineTo(rechts[i].x,rechts[i].y);
+      ctx.closePath(); return true;
+    };
+    // Fuer See und Burghof bleibt die Ellipse richtig — ein See ist rund, ein Hof auch.
+    const huelleEll=(um,rand)=>{ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,da=false;
+      for(const q of Z){ if(q.um!==um)continue; const a=zoneVon(q);
+        for(let k=0;k<=24;k++){const p=routeXY(a+(q.bis-a)*k/24); da=true;
+          x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);} }
+      return da?{cx:(x0+x1)/2,cy:(y0+y1)/2,rx:(x1-x0)/2+rand,ry:(y1-y0)/2+rand}:null; };
+    const ell=(h,fill,dx,dy,f)=>{ if(!h)return; ctx.fillStyle=fill; ctx.beginPath();
+      ctx.ellipse(h.cx+(dx||0),h.cy+(dy||0),h.rx*(f||1),h.ry*(f||1),0,0,6.283); ctx.fill(); };
+    const inEll=(h,x,y,f)=>h&&Math.hypot((x-h.cx)/(h.rx*(f||1)),(y-h.cy)/(h.ry*(f||1)))<1;
+
+    // 1. GRUNDFLAECHE: Wiese. Midoriyama heisst "Gruener Berg" — offenes, huegeliges
+    //    Gelaende, kein Studio-Parcours. Grosszuegig ueber den Weltausschnitt hinaus, weil
+    //    die Kamera bei Zoom 1 die ganze Karte zeigt und an den Raendern nichts fehlen darf.
+    ctx.fillStyle=M("boden_wiese","#2f6b2a"); ctx.fillRect(-W,-H,3*W,3*H);
+    // 2. UMGEBUNGEN je Zone. Wald um die Holzbauten und an den Kartenraendern, trockener
+    //    Hang unter dem Anstieg zur Burg, der See mit Schlammufer, Pflaster im Burghof.
+    if(huellePfad("waelle",92)){ ctx.fillStyle=M("boden_wald","#1f3a2a"); ctx.fill(); }
+    ctx.fillStyle=M("boden_wald","#1f3a2a");
+    ctx.beginPath(); ctx.ellipse(W*0.28,-H*0.02,W*0.5,H*0.32,0,0,6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W*0.15,H*1.02,W*0.30,H*0.22,0,0,6.283); ctx.fill();
+    if(huellePfad("huegel",84)){ ctx.fillStyle=M("boden_hang","#7a5a2a"); ctx.fill(); }
+    const hHang=huelleEll("huegel",80);
+    const e=routeXY(1), hHof={cx:e.x,cy:e.y+44,rx:320,ry:125}; ell(hHof,M("boden_pflaster","#a08050"));
+    const hSee=huelleEll("see",56);
+    if(hSee){ hSee.cy+=14; hSee.ry=Math.min(hSee.ry,hSee.cy-(e.y+18));   // nie bis unter die Burgmauer
+      ell(hSee,M("boden_schlamm","#5a3b22"),0,0,1.14); ell(hSee,M("boden_see","#2d6d8a"));
+      ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
+      for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath();
+        ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();} }
+    for(const [fx,fy,rx,ry] of (BA().tuempel||[])){ const x=fx*W,y=fy*H;
+      ctx.fillStyle="#3a2816"; ctx.beginPath(); ctx.ellipse(x,y,rx+7,ry+6,0,0,6.283); ctx.fill();
+      ctx.fillStyle=M("boden_sumpf","#3d6b78"); ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,6.283); ctx.fill(); }
+    // 3. DIE ROUTE, Abschnitt fuer Abschnitt mit dem Untergrund ihrer Zone. Erst ein
+    //    dunkler Saum ueber die ganze Laenge, dann je Zone der Belag als dicker Strich.
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    teilPfad(0,1); ctx.strokeStyle="#241a0f"; ctx.lineWidth=breite+8; ctx.stroke();
+    for(const q of Z){ const a=Math.max(0,zoneVon(q)-0.012), b=Math.min(1,q.bis+0.012);
+      if(q.boden==="planken"){
+        // DER STEG UEBER DEN SEE. Prozedural statt Kachel: Holzton, Querbretter alle 9 px,
+        // Pfosten alle 44 px. Das Terrain-Blatt hat keine kachelbare Bretterflaeche, und
+        // eine gedrehte Kachel sieht auf einer Kurve schlechter aus als gezeichnete Bretter.
+        teilPfad(a,b); ctx.strokeStyle="#7d5c34"; ctx.lineWidth=breite-8; ctx.stroke();
+        ctx.strokeStyle="rgba(40,24,10,.55)"; ctx.lineWidth=2; const n=Math.ceil((b-a)*R.len/9);
+        for(let k=0;k<=n;k++){const r=routeXY(a+(b-a)*k/n); ctx.beginPath();
+          ctx.moveTo(r.x-r.nx*(breite/2-5),r.y-r.ny*(breite/2-5));
+          ctx.lineTo(r.x+r.nx*(breite/2-5),r.y+r.ny*(breite/2-5)); ctx.stroke();}
+        ctx.fillStyle="#3e2a14"; const m=Math.ceil((b-a)*R.len/44);
+        for(let k=0;k<=m;k++){const r=routeXY(a+(b-a)*k/m);
+          for(const sg of [-1,1])ctx.fillRect(Math.round(r.x+sg*r.nx*(breite/2-3))-2,Math.round(r.y+sg*r.ny*(breite/2-3))-9,4,11);} }
+      else { const bild={pfad:"boden_pfad",kies:"boden_kies",schlamm:"boden_schlamm",pflaster:"boden_pflaster"}[q.boden]||"boden_pfad";
+        teilPfad(a,b); ctx.strokeStyle=M(bild,"#8a6a3a"); ctx.lineWidth=breite; ctx.stroke(); } }
+    // Schlamm an Ein- und Ausstieg des Sees; Pfuetzen auf Pfad und Kies (nicht auf Steg
+    // oder Pflaster). Saatfest ueber bodenSaat — der Boden soll nicht bei jedem Bild tanzen.
+    for(const q of Z){ if(q.um!=="see")continue;
+      for(const s of [zoneVon(q),q.bis]){ teilPfad(Math.max(0,s-0.035),Math.min(1,s+0.03));
+        ctx.strokeStyle=M("boden_schlamm","#5a3b22"); ctx.lineWidth=breite+2; ctx.stroke(); } }
+    for(let i=0;i<40;i++){ const s=bodenSaat(i+500), q=zoneBei(s);
+      if(q.boden==="planken"||q.boden==="pflaster")continue;
+      const r=routeXY(s), qq=(bodenSaat(i+540)-0.5)*(breite-18);
+      ctx.fillStyle="rgba(90,130,170,"+(0.16+bodenSaat(i+560)*0.22)+")"; ctx.beginPath();
+      ctx.ellipse(r.x+r.nx*qq,r.y+r.ny*qq,4+bodenSaat(i+580)*7,2+bodenSaat(i+620)*3,0,0,6.283); ctx.fill(); }
+    // 4. BAUTEN UND FELS: Palisadenzaun beiderseits der Holzbauten-Zone, Felsbrocken am Hang.
+    if(aDa("zaun_holz")){ const zn=aBild.zaun_holz;
+      for(const q of Z){ if(q.um!=="waelle")continue; const a=zoneVon(q), n=Math.ceil((q.bis-a)*R.len/30);
+        for(let k=0;k<=n;k++){const r=routeXY(a+(q.bis-a)*k/n);
+          for(const sg of [-1,1])ctx.drawImage(zn,Math.round(r.x+sg*r.nx*(breite/2+12)-16),Math.round(r.y+sg*r.ny*(breite/2+12)-26));} } }
+    { const st=aMust("boden_stein");
+      for(const q of Z){ if(q.um!=="huegel")continue; const a=zoneVon(q);
+        for(let i=0;i<16;i++){ const r=routeXY(a+bodenSaat(i+1000)*(q.bis-a));
+          const sg=bodenSaat(i+1050)>0.5?1:-1, d=breite/2+14+bodenSaat(i+1100)*46;
+          const x=r.x+r.nx*sg*d, y=r.y+r.ny*sg*d, rr=5+bodenSaat(i+1150)*7;
+          if(inEll(hSee,x,y,1.1)||inEll(hHof,x,y))continue;
+          ctx.save(); ctx.beginPath(); ctx.ellipse(x,y,rr,rr*0.7,0,0,6.283); ctx.clip();
+          ctx.fillStyle=st||"#9a9486"; ctx.fillRect(x-rr,y-rr,2*rr,2*rr); ctx.restore();
+          ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath();
+          ctx.ellipse(x,y,rr,rr*0.7,0,0,6.283); ctx.stroke(); } } }
+    // 5. BAEUME: nur auf Wiese und Wald, nie auf Route, See, Hof, Burgzone oder Tuempel —
+    //    Fuss UND Krone werden geprueft, sonst haengt eine Krone ueber dem Weg.
+    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
+    const nahe=(x,y)=>{ let m=1e9; for(let i=0;i<R.pts.length;i+=2){const d=Math.hypot(R.pts[i].x-x,R.pts[i].y-y); if(d<m)m=d;} return m; };
+    const wald_=[];
+    for(let i=0;i<130;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
+      if(nahe(x,y)<breite*0.5+22||nahe(x,y-30)<breite*0.5+22)continue;
+      if(x>W*0.42&&y<H*0.36)continue;                                   // Platz fuer die Burg
+      if(inEll(hSee,x,y,1.2)||inEll(hSee,x,y-30,1.2)||inEll(hHof,x,y,1.05)||inEll(hHof,x,y-30,1.05))continue;
+      if((BA().tuempel||[]).some(([fx,fy,rx,ry])=>Math.hypot((x-fx*W)/(rx+12),(y-fy*H)/(ry+12))<1
+        ||Math.hypot((x-fx*W)/(rx+12),(y-30-fy*H)/(ry+12))<1))continue;
+      if(inEll(hHang,x,y,1.0)&&bodenSaat(i+800)<0.7)continue;           // am Hang nur wenige
+      wald_.push({x,y,i}); }
+    wald_.sort((a,b)=>a.y-b.y);
+    // 6. DAS TOR am Sammelplatz: zwei Palisadenstuecke, Startlinie quer zur Route.
+    { const r=routeXY(0);
+      if(aDa("hind_wand"))for(const sg of [-1,1])ctx.drawImage(aBild.hind_wand,Math.round(r.x+sg*r.nx*(breite/2+10)-16),Math.round(r.y+sg*r.ny*(breite/2+10)-58));
+      ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=3; ctx.beginPath();
+      ctx.moveTo(r.x-r.nx*breite/2,r.y-r.ny*breite/2); ctx.lineTo(r.x+r.nx*breite/2,r.y+r.ny*breite/2); ctx.stroke(); }
+    // 7. DIE BURG am Routenende: Torhaus auf dem Endpunkt, Mauer und Tuerme links und
+    //    rechts, Banner, Ruestkammer-Deko der Emperor's Guards. Alles Welt, nicht Fries.
+    const bx=Math.round(e.x), by=Math.round(e.y);
+    if(aDa("burg_mauer")&&aDa("burg_turm")&&aDa("burg_tor")){
+      const mw=aBild.burg_mauer, tw=aBild.burg_turm, tor=aBild.burg_tor, top=by-140;
+      for(const k of [0,1]){ ctx.drawImage(mw,bx-48-160*(k+1),top+86); ctx.drawImage(mw,bx+48+160*k,top+86); }
+      ctx.drawImage(tw,bx-48-320-30,top-8); ctx.drawImage(tw,bx+48+320-40,top-8);
+      ctx.drawImage(tor,bx-48,top);
+      if(aDa("deko_banner")){const bn=aBild.deko_banner; for(const x of [bx-150,bx+150])ctx.drawImage(bn,0,0,96,80,x-48,top+20,96,80);}
+      for(const [n,dx,dy] of [["deko_pranger",-150,-6],["deko_stock",-96,6],["deko_holz",70,-2],["falle_fass",130,-24]]){
+        if(aDa(n))ctx.drawImage(aBild[n],bx+dx,by+dy); }
+      const zl=routeXY(0.985); ctx.setLineDash([6,6]); ctx.lineWidth=3; ctx.strokeStyle="#fff";
+      ctx.beginPath(); ctx.moveTo(zl.x-zl.nx*breite/2,zl.y-zl.ny*breite/2);
+      ctx.lineTo(zl.x+zl.nx*breite/2,zl.y+zl.ny*breite/2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // 8. DIE FALLEN an den Wegpunkten: DIESELBEN zehn Bilder wie in der Burgpunkte-Runde,
+    //    nur einmal je Station statt einmal je Spur, und in Weltkoordinaten — sie wachsen
+    //    also mit der Kamera. Dazu ein Wegpunkt-Pfahl mit so vielen Sternen, wie die Falle
+    //    Burgpunkte wert ist: damit liest sich die Karte als Kurs ("da vorne kommt eine
+    //    Drei-Sterne-Falle") statt als Bahn mit Saeulen.
+    HUERDEN_N().forEach((h,i)=>{ const r=routeXY(h);
+      zeichneFalleTakeshi(i,r.x,r.y+12,i%3);
+      const st=(BA().fallenStufe||{})[HUERDEN_TYP(i)]||1;
+      const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
+      ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);
+      ctx.fillStyle="#e8d8a8"; ctx.beginPath(); ctx.moveTo(px-2,py-18); ctx.lineTo(px+12,py-14); ctx.lineTo(px-2,py-9); ctx.closePath(); ctx.fill();
+      ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
+      ctx.fillText("★".repeat(st),px-2,py-20);
+    });
+    // Baeume zuletzt (ueber Route und Fallen), nach y sortiert wie eine Tiefenreihe.
+    for(const b of wald_){ if(!baeume.length)break; const im=aBild[baeume[b.i%baeume.length]];
+      ctx.drawImage(im,Math.round(b.x-im.naturalWidth/2),Math.round(b.y-im.naturalHeight)); }
+    ctx.restore();
+    // 9. HUD im BILDSCHIRMRAUM: Burgpunkte, Kursname, Legende, Zoomstufe. Dieselben
+    //    Groessen wie auf der alten Bahn, nur auf einem Band statt ueber der Zinnenmauer.
+    // Das Band liegt UNTEN, nicht oben wie auf der geraden Bahn: die Burg steht auf der
+    // Karte oben rechts, und ein Band ueber dem oberen Rand haette genau ihr Tor verdeckt.
+    const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
+    ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
+    ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'Barlow Condensed',sans-serif";
+    ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+    const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1);
+    ctx.strokeText(bpTxt,W/2,H-35); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,H-35);
+    ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.lineWidth=3;
+    const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
+      +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
+    ctx.strokeText(leg,W/2,H-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,H-16);
+    ctx.textBaseline="alphabetic";
+    if(cam.zoom>1.08){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+      ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,16); }
+  }
+
   function bodenSpurt(){
+    // TAKESHI LAEUFT UEBER DIE KARTE, nicht ueber das Bahn-Rechteck. Eine Weiche fuer
+    // Boden UND Laeufer (istRoute()), damit beide nie auseinanderlaufen koennen.
+    if(istRoute())return bodenTakeshiRoute();
     // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
     // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
@@ -15432,7 +15618,46 @@
       //      Eine Falle, die fast immer gelingt, waere Dekoration.
       label:"Takeshi's Castle", jeSeite:6,
       hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
-      hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
+      hindernisWort:"Falle", boden:"#4a5f3a", schatten:false,
+      // CHAOS AM HINDERNIS UND OUTSMART (Chris 06.09.: "takeshis castle soll halt so
+      // chaotisch sein wo die leute sich tackeln rammen dann hindernisse kommen, jeder
+      // versucht 'zu ueberleben'" + "faende es halt cool wenn man gegner dort auch
+      // outsmarten kann ... weil takeshi ja als blaue diszi sicher auch int awareness
+      // etc braucht"). Rezept aus docs/design/takeshi-chaos-tackle-plan-06-09.md,
+      // Abschnitt 8.1 (Variante P10), kaderfest gemessen.
+      //
+      //   tackleFenster  Rempler nur in den letzten 5 % vor einer Falle — das Gedraenge
+      //                  am Engpass, nicht Rempelei auf freier Strecke (Sendung, s. 2.)
+      //   tackleAb 30    statt Spurts 50: WUCHT heisst hier "Durchbrettern" (Charisma 38,
+      //                  Entschlossenheit 32, Torment 30) und liegt nach mengeAusEignung
+      //                  im Median bei 43 — mit 50 duerften sieben von zehn nie rempeln.
+      //   tackleRate 2.0 weil das Fenster die Gelegenheit auf ~0,45 s je Falle begrenzt.
+      //                  Ergibt gemessen 13,3 Rempler und 5,4 Treffer je Rennen.
+      //   tackleAusweichen  das Opfer sieht den Rempler kommen (TECHNIK gegen WUCHT).
+      //   gedraenge      ab zwei Mann im Umkreis +-2,5 % der Strecke kostet jeder weitere
+      //                  bis zu 0,12 s Stopp; `lesen` laesst dabei das Bessere aus WUCHT
+      //                  und TECHNIK zaehlen (der Kluge findet die Luecke).
+      //
+      // Kaderfest (miss-alle-disziplinen.mjs 24, fuenf Paarungen): der Plan misst 0,860
+      // (Saat 1337) und 0,872 (Saat 4242) gegen Basis 0,866 / 0,826, Star auf Rang 1 in
+      // 84 % der Rennen gegen 73 %. Die Chaos-Kanaele belohnen WUCHT und ROBUST, und
+      // beide korrelieren mit der Eignung zu 0,85 bzw. 0,88 — Rempler sind hier kein
+      // Rauschen, sondern ein weiterer Kanal derselben Groesse.
+      //
+      // BEWUSST NICHT GESETZT, weil gemessen schaedlich (Abschnitt 3.3):
+      //   tackleNerven  Rempler kosten Nerven und koennen ausscheiden lassen — Saison
+      //                 0,937 -> 0,902. Ein Ausscheiden durch fremde Hand misst nicht die
+      //                 eigene Eignung. Deshalb ist der Zweig auch nicht im Motor.
+      //   lesenBonus    TECHNIK spart Stopp an JEDER Falle — 0,847 / 0,831. TECHNIK
+      //                 korreliert nur 0,60 mit der Eignung; wer ihn auf vierzehn Fallen
+      //                 legt, gewichtet ihn ueber die Matrix (Int 11 + Aw 8) hinaus.
+      //   tackleAlleSeiten/tackleSpur  "jeder gegen jeden" (Chris 06.09.: nur gegen die
+      //                 gegnerische Seite), kurse[].chaos  Intensitaet je Kurs (erst nach
+      //                 der ersten Sichtung) — beide Felder liest der Motor, wenn sie da
+      //                 sind; hier stehen sie absichtlich nicht.
+      tackle:true, tackleAb:30, tackleRate:2.0, tackleKosten:0, tackleFenster:0.05,
+      tackleAusweichen:{duell:0.35},
+      gedraenge:{radius:0.025, frei:1, preis:0.12, lesen:true, melden:2},
       hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT"], huerdePreis:0.80,
       // ZEHN FALLEN-BILDER AUF VIERZEHN STATIONEN (Teil B.3 des Plans): ein Bild je
       // Sub-Skill UND Durchgang (i<7 / i>=7), kein neuer Download — beide Schnitte aus
@@ -15441,6 +15666,42 @@
       // zeichneFalleTakeshi frei; `fallenStufe` ist die Schwierigkeit je Sub-Skill fuer
       // die Burgpunkte (1-3 Sterne, s. burgpunkte() und MOTOREN["takeshis-castle"].wert).
       takeshi:true,
+      // DIE ROUTE DURCH MIDORIYAMA (Chris 06.09.: "eine fortlaufende route ... bis zum
+      // schloss"; docs/design/takeshi-schlammroute-plan-06-09.md). Zwoelf Wegpunkte in
+      // Bruchteilen von W/H, also aufloesungsunabhaengig; dazwischen eine Catmull-Rom-
+      // Kurve (s. routeTabelle/routeXY). Start unten links, Anstieg zur Mitte, Abstieg
+      // ueber den See nach unten rechts, dann der Hang hinauf zur Burg oben rechts.
+      // Entwurfsregeln: Leserichtung von unten links nach oben rechts, mindestens zwei
+      // Richtungswechsel in y (nie drei Stationen auf einer Linie), kein Abschnitt kreuzt
+      // einen anderen (bei Zoom 3,4x waere ein Kreuzungspunkt ein zweiter Pulk im Bild),
+      // und die letzten 15 % laufen AUF die Burg zu — der letzte Wegpunkt IST das Tor.
+      // Die Bogenlaenge ist etwa 1,9 x W: die Route ist fast doppelt so lang wie die alte
+      // Bahn, das Feld zieht sich sichtbarer auseinander.
+      // Der letzte Wegpunkt liegt bei 0,36 H und nicht — wie im Entwurf — bei 0,31 H:
+      // das Torhaus ist 150 px hoch und steht MIT DEM FUSS auf dem Routenende, sein Dach
+      // waere bei 0,31 H auf einer 470 px hohen Leinwand ueber dem oberen Weltrand, und
+      // die Kamera kann dorthin nicht blicken (sie ist auf [0,W]x[0,H] geklemmt). Im
+      // Prototyp lief die Burgmauer deshalb am oberen Bildrand entlang, ohne sichtbares Tor.
+      route:[[0.04,0.80],[0.13,0.86],[0.25,0.72],[0.32,0.50],[0.43,0.36],[0.55,0.44],
+             [0.61,0.66],[0.71,0.82],[0.80,0.76],[0.87,0.60],[0.84,0.47],[0.79,0.36]],
+      routeBreite:56,
+      // FUENF GELAENDE-ZONEN wie auf dem Studiogelaende der Sendung (Chris 06.09.: "das
+      // soll nicht alles Schlamm sein"). `boden` ist der Untergrund DER ROUTE in diesem
+      // Abschnitt, `um` die Umgebung, die als Huelle um die Routenpunkte gelegt wird;
+      // `bis` sind Bogenlaengen-Bruchteile, dieselbe Groesse wie `hindernisse[]`.
+      //   Sammelplatz mit Tor (Wiese, Trampelpfad — General Tanis Aufmarsch)
+      //   Holzbauten auf Kies (Knock Knock, Devil's House, Border Wall — Palisaden)
+      //   der See mit Steg und Schlammufern (Dragon God's Pond, Gibraltar Strait)
+      //   der Hang (Erdpfad, Felsen, trockenes Gras — Avalanche, Zweites Fort)
+      //   Burghof (Kopfsteinpflaster — der Show-Down mit den Karts)
+      // Schlamm gibt es damit an drei Stellen — Seeufer, Ein-/Ausstieg des Stegs und in
+      // der Grube der Falle `schlamm` —, also dort, wo er in Midoriyama war.
+      zonen:[{bis:0.12,boden:"pfad",    um:"wiese"},
+             {bis:0.36,boden:"kies",    um:"waelle"},
+             {bis:0.60,boden:"planken", um:"see"},
+             {bis:0.86,boden:"pfad",    um:"huegel"},
+             {bis:1.00,boden:"pflaster",um:"hof"}],
+      tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
       // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
@@ -15491,9 +15752,13 @@
                   ironwill:"stetig", chaosdodge:"wild", finalwall:"stetig"},
       // WERTUNGSTABELLE (Plan Abschnitt 4.3): schiebt eine "Nerv"-Spalte vor die
       // Kraftreserve — Nervenkostuem ist hier die zweite Ressource neben der Reserve,
-      // und bei 0 scheidet der Laeufer aus (s. Ausscheiden-Logik oben). Alles andere
-      // kommt unveraendert aus dem Rennen-Default (WERTUNG_RENNEN): schatten/tackle sind
-      // hier beide aus, also keine Sog/Rempl-Spalten.
+      // und bei 0 scheidet der Laeufer aus (s. Ausscheiden-Logik oben). Dazu seit dem
+      // Chaos-Rezept zwei Spalten hinter "Rempl" (die der Rennen-Default wegen
+      // `tackle:true` jetzt selbst mitbringt): "Ausw" — wie oft der Laeufer einen
+      // Rempler kommen sah und ihn ins Leere laufen liess, und "Gedr" — an wie vielen
+      // Fallen er im Pulk stand und wie viel Zeit ihn das gekostet hat. Ohne die zwei
+      // waere die Outsmart-Saeule im Boxscore unsichtbar. `schatten` bleibt aus, also
+      // keine Sog-Spalte.
       // Feld heisst `wertungTabelle` (nicht `wertung`, Review-Fund 06.09.): `wertung` auf
       // BAHN_ART ist bereits aus #807 der String-Wertungsmodus fuer bahnTeamstand/bahnLauf
       // ("rang" oder Fallback "zieleinlauf") — eine Funktion hier haette das kollidieren
@@ -15505,8 +15770,14 @@
           ?[{id:"nerv",kopf:"Nerv",titel:"Nervenkostüm — bei 0 scheidet er aus",
               wert:z=>z.u.nervenMax?Math.round(z.u.nerven/z.u.nervenMax*100):null, fmt:v=>v+"%",
               farbe:v=>v<30?"var(--crit)":null}, s]
+          :s.id==="rempl"
+          ?[s,
+            {id:"ausw",kopf:"Ausw",titel:"Rempler kommen gesehen und ins Leere laufen lassen",
+              wert:z=>z.u.ausgewichen||null},
+            {id:"gedr",kopf:"Gedr",titel:"Fallen, an denen er im Pulk stand",
+              wert:z=>z.u.gedraengt||null, fmt:v=>v+"×"}]
           :[s]),
-        fuss:"Vierzehn Fallen. „Sauber\" ist ohne Sturz und ohne Gewalt genommen, „Durch\" mit Gewalt durchgebrettert, „Sturz\" gerissen. Jeder Sturz kostet Nerven; sind sie leer, ist er raus („Stand\"). „Weit\" ist die erreichte Strecke, „Zeit\" nur für die, die ankommen."})
+        fuss:"Vierzehn Fallen. „Sauber\" ist ohne Sturz und ohne Gewalt genommen, „Durch\" mit Gewalt durchgebrettert, „Sturz\" gerissen. Jeder Sturz kostet Nerven; sind sie leer, ist er raus („Stand\"). „Rempl\" ist ausgeteilt/eingesteckt vor einer Falle, „Ausw\" ein Rempler, den er kommen sah, „Gedr\" die Fallen, an denen er im Pulk stand. „Weit\" ist die erreichte Strecke, „Zeit\" nur für die, die ankommen."})
     }
   };
 
@@ -15564,6 +15835,17 @@
   // bleiben bit-identisch), also faellt HUERDEN_TYP() dort immer auf hindernisTypen[i%n]
   // zurueck — genau die Formel, die vorher an der einen Lesestelle in stepSpurt stand.
   let bahnFallenTypen=null, bahnKursName=null;
+  // CHAOS AM HINDERNIS (docs/design/takeshi-chaos-tackle-plan-06-09.md, Abschnitt 8.2,
+  // Schritt 1): Chaos-Faktor des gewaehlten Kurses (`kurse[].chaos`) — er multipliziert
+  // die Rempler-Rate und den Gedraenge-Preis. `null` ausserhalb von Takeshi und auch
+  // innerhalb, solange kein Kurs das Feld fuehrt; gelesen wird immer als
+  // `(bahnKursChaos||1)`, also Faktor 1. Chris' Entscheidung 06.09.: die Intensitaet je
+  // Kurs erst NACH der ersten Sichtung des Grund-Chaos einstellen — das Feld ist gebaut
+  // und gemessen (0,859-0,861), aber in BAHN_ART bewusst nicht gesetzt.
+  let bahnKursChaos=null;
+  // Welche Fallen in diesem Rennen schon eine Gedraenge-Zeile im Ticker hatten. Reine
+  // Anzeige-Buchhaltung, kein Simulationszustand.
+  let bahnGedraengeGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
 
@@ -15656,12 +15938,97 @@
   }
   // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
   const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
+
+  // ===================== DIE ROUTE DURCH MIDORIYAMA =====================
+  // Chris am 06.09.: "bei takeshi haette ich mir so eine fortlaufende route gewuenscht
+  // die nicht so arena maessig aussieht sondern so schlamm, dann irgendwelche hindernisse
+  // wo man drueber balancieren muss bis zum schloss" — und dazu: "das soll nicht alles
+  // Schlamm sein! ... forsche nach was Takeshi's Castle als Serie immer so geboten hat".
+  // Recherche und Entwurf: docs/design/takeshi-schlammroute-plan-06-09.md.
+  //
+  // DIE SIMULATION BLEIBT EINDIMENSIONAL. `u.pos` ist weiter 0..1, `u.bahnZ` weiter die
+  // Spur — es aendert sich einzig die ABBILDUNG auf den Bildschirm: statt `x = pos *
+  // Breite` liegt der Laeufer auf einer Catmull-Rom-Kurve durch die Wegpunkte in
+  // `BAHN_ART.route`, quer dazu versetzt nach seiner Spur. Deshalb ist die ganze Route
+  // rho-neutral, bevor man sie misst: kein Leser von camX/bahnY sitzt in stepSpurt.
+  //
+  // Die Tabelle wird je (W, H, route) einmal gebaut und nach Bogenlaenge parametrisiert,
+  // damit `s` gleichmaessig ueber die Strecke laeuft und nicht ueber den Kurvenparameter
+  // (sonst waeren die Laeufer in engen Kurven langsamer als auf den Geraden).
+  let routeCache=null;
+  function routeTabelle(){
+    const A=BA(); if(!A.route)return null;
+    if(routeCache&&routeCache.W===W&&routeCache.H===H&&routeCache.src===A.route)return routeCache;
+    const P=A.route.map(([fx,fy])=>({x:fx*W,y:fy*H}));
+    const at=(i)=>P[Math.max(0,Math.min(P.length-1,i))];
+    const pts=[];
+    for(let i=0;i<P.length-1;i++){
+      const p0=at(i-1),p1=at(i),p2=at(i+1),p3=at(i+2);
+      for(let k=0;k<24;k++){const t=k/24,t2=t*t,t3=t2*t;
+        pts.push({x:0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+                  y:0.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)});}
+    }
+    pts.push(P[P.length-1]);
+    const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
+    routeCache={W,H,src:A.route,pts,cum,len:cum[cum.length-1]}; return routeCache;
+  }
+  // s (Bogenlaenge 0..1) -> Weltpunkt, Tangente (tx,ty), Normale (nx,ny).
+  // Binaersuche in der Bogenlaengen-Tabelle, ~8 Schritte bei 265 Stuetzpunkten.
+  function routeXY(s){
+    const R=routeTabelle(); const d=Math.max(0,Math.min(1,s))*R.len;
+    let lo=0,hi=R.cum.length-1; while(hi-lo>1){const m=(lo+hi)>>1; if(R.cum[m]<=d)lo=m; else hi=m;}
+    const a=R.pts[lo], b=R.pts[hi], seg=(R.cum[hi]-R.cum[lo])||1, t=(d-R.cum[lo])/seg;
+    let tx=b.x-a.x, ty=b.y-a.y; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l;
+    return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, tx,ty, nx:-ty, ny:tx};
+  }
+  // EINE Weiche fuer den ganzen Zeichenpfad. Der Prototyp hatte hier zwei (bodenSpurt
+  // wich nur bei geladener Kachel aus, laeuferXY bei jedem `route`-Feld) — fehlte die
+  // Kachel, stuenden die Laeufer auf der Route und der Boden zeigte die alte Bahn.
+  // bodenTakeshiRoute hat fuer jede Kachel eine Farbfassung (M(name,farbe)) und braucht
+  // die Bahn als Rueckfall nicht.
+  const istRoute=()=>!!BA().route;
+  let camR={x:W/2,y:H/2};                       // Kameramitte in WELTkoordinaten (nur Route)
+  const weltZuSchirm=(wx,wy)=>({x:(wx-camR.x)*cam.zoom+W/2, y:(wy-camR.y)*cam.zoom+H/2});
+  // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
+  function laeuferXY(u){
+    const platz=rennFertig.indexOf(u);
+    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
+    const r=routeXY(u.pos), breite=BA().routeBreite||56;
+    // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
+    // Spurwechsel weich interpoliert) wird zum Versatz QUER zur Route. Die Spur-Mechanik
+    // selbst — Rempler nur bei |bahnZ-bahnZ'| <= 1,6, Wechsel weg von Blockierern —
+    // bleibt Wort fuer Wort dieselbe; man sieht den Wechsel nur als Schritt zur Seite auf
+    // dem Weg statt als Sprung in die Nachbarspur.
+    const q=((u.bahnZ+0.5)/BAHNEN_N()-0.5)*(breite-14);
+    const v=platz>=0?(14+platz*8):0;            // Eingelaufene: hinter dem Tor im Burghof
+    return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
+  }
   function kameraUpdate(dt){
     const aktiv=LAEUFER.filter(u=>u.fertig==null);
     const quelle=aktiv.length?aktiv:LAEUFER;
     if(!quelle.length)return;
     let minP=quelle[0].pos,maxP=quelle[0].pos;
     for(const u of quelle){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
+    if(istRoute()){
+      // ZWEIDIMENSIONALE KAMERA, gleiche Idee: ein Kasten um die Weltpunkte der noch
+      // Laufenden, 0,10 der Strecke voraus (die naechste Falle soll schon im Bild sein)
+      // und 0,04 zurueck. `cam.zoom` bleibt die Zahl, die das HUD zeigt; neu ist camR als
+      // Weltmitte. Bei Zoom 1 zeigt die Leinwand die ganze Karte. Weil die Burg jetzt
+      // Teil der Welt ist und nicht mehr Fries ueber der Bahn, kommt sie beim Heranzoomen
+      // wirklich naeher.
+      const breite=BA().routeBreite||56;
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      const nimm=(r)=>{x0=Math.min(x0,r.x);y0=Math.min(y0,r.y);x1=Math.max(x1,r.x);y1=Math.max(y1,r.y);};
+      for(const u of quelle)nimm(routeXY(u.pos));
+      nimm(routeXY(Math.min(1,maxP+0.10))); nimm(routeXY(Math.max(0,minP-0.04)));
+      const z0=cam.zoom||1, bw=(x1-x0)+breite+90/z0, bh=(y1-y0)+breite+130/z0;   // Namen ueber dem Kopf, Balken darunter
+      const zielZoom=Math.max(1,Math.min(3.4,Math.min(W/bw,H/bh)));
+      const hw=W/2/zielZoom, hh=H/2/zielZoom;
+      const cx=Math.max(hw,Math.min(W-hw,(x0+x1)/2)), cy=Math.max(hh,Math.min(H-hh,(y0+y1)/2));
+      const t=Math.min(1,dt*1.8);               // weich nachziehen, derselbe Faktor wie unten
+      cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
+      return;
+    }
     const zielCx=Math.max(0,Math.min(1,(minP+maxP)/2));
     // 0,10 Polster: das naechste Hindernis soll schon sichtbar sein, bevor es dran ist.
     const spanne=Math.max(0.05,(maxP-minP)+0.10);
@@ -15676,19 +16043,58 @@
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     // DREI BENANNTE KURSE JE SAAT (Takeshi's Castle, B.4 des Plans, Chris' Entscheidung
-    // 05.09.: fest verdrahtet, nicht hinter einem Debug-Flag). Derselbe LCG wie
-    // zieheFormkarten seit dessen Fix (obere Bits, `(s0>>>8)/16777216`) — die untersten
-    // Bits eines LCG mit gerader Modulusbasis haben eine kurze Periode und waeren fuer
-    // eine Kursauswahl aus drei Werten genauso ungeeignet wie sie es fuer Formkarten war.
-    bahnFallenTypen=null; bahnKursName=null;
+    // 05.09.: fest verdrahtet, nicht hinter einem Debug-Flag). Obere Bits des LCG
+    // (`(s0>>>8)/16777216`) wie zieheFormkarten seit dessen Fix — die untersten Bits
+    // eines LCG mit gerader Modulusbasis haben eine kurze Periode und waeren fuer eine
+    // Kursauswahl aus drei Werten genauso ungeeignet wie sie es fuer Formkarten war.
+    //
+    // ABER: ein EINZELNER LCG-Schritt auf der Saat ist eine affine Abbildung, und die
+    // mischt benachbarte ZAHLEN-Saaten nicht. Saat n und n+1 liegen danach nur
+    // 1664525/2^32 ~ 0,00039 auseinander; man braucht ~860 aufeinanderfolgende Saaten,
+    // um von einem Drittel des Wertebereichs ins naechste zu rutschen. Nachgerechnet
+    // ueber 300k fortlaufende Saaten: P(gleicher Kurs wie bei Saat n-1) = 0,9988 statt
+    // der erwarteten 0,3333 — dieselbe Fehlerklasse wie der zieheFormkarten-Bug
+    // (CLAUDE.md), nur eine Etage hoeher: dort zu kurze Periode der untersten Bits, hier
+    // zu geringe Durchmischung eines einzigen Schrittes.
+    //
+    // Heute faellt es nicht auf, weil der Produktivpfad TEXT-Saaten uebergibt
+    // ("${saveId}:${seasonId}:...:${matchdayId}"), die normalisiereSaat schon durch
+    // FNV-1a schickt. Es faellt in dem Moment auf, in dem irgendein Aufrufer eine
+    // FORTLAUFENDE Zahl als Saat nimmt (Debug, eine Sonde, ein kuenftiger Zaehler): dann
+    // zieht jedes Rennen denselben Kurs, und "drei Kurse" ist still wirkungslos.
+    //
+    // BEHOBEN, ohne die Auswahl von der Saat zu entkoppeln (sie bleibt deterministisch):
+    // dieselbe FNV-1a-Mischung wie normalisiereSaat (Offset 2166136261, Prime 16777619),
+    // hier ueber die vier Bytes der Zahl-Saat und zweimal angewandt, danach der bekannte
+    // LCG-Schritt. Warum zwei Runden UND der LCG-Schritt, gemessen ueber je 300k Saaten:
+    //   FNV allein (eine Runde, ohne LCG)  P(gleich) = 0,928  — Hochbits bleiben roh
+    //   FNV einmal + LCG-Schritt           P(gleich) = 0,322  — schon brauchbar
+    //   FNV zweimal + LCG-Schritt          P(gleich) = 0,3333 — Sollwert
+    // Zwei bis drei LCG-Schritte statt FNV waeren die andere naheliegende Variante, sind
+    // aber unzuverlaessig: gemessen 2 Schritte 0,728, 3 Schritte 0,054 (anti-korreliert),
+    // 4 Schritte 0,889 — die Gitterstruktur des LCG schwingt weiter, statt zu mischen.
+    // Gleichverteilung bleibt in beiden Faellen erhalten (0,3341/0,3331/0,3328 ueber
+    // 300k Saaten); Textsaaten aendern sich in der Qualitaet nicht (0,3345 vorher wie
+    // nachher). Nachrechnen: docs/design/takeshi-kursmischer-nachweis-06-09.mjs.
+    bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
     if(BA().kurse&&BA().kurse.length){
       let s0=(Number(seed)>>>0)||1;
+      for(let runde=0;runde<2;runde++){
+        let h=2166136261;
+        for(let i=0;i<4;i++){ h^=(s0>>>(i*8))&255; h=Math.imul(h,16777619); }
+        s0=(h>>>0)||1;
+      }
       const rnd=()=>{s0=(Math.imul(s0,1664525)+1013904223)>>>0; return (s0>>>8)/16777216;};
       const kurs=BA().kurse[Math.floor(rnd()*BA().kurse.length)];
-      bahnFallenTypen=kurs.typen; bahnKursName=kurs.name;
+      bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
     }
     bahnEndeGemeldet=false;
     cam={zoom:1,cx:0.5}; bahnWahl=null;
+    // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
+    // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
+    // beim Kurswechsel nicht auf der alten Kurve zeichnet.
+    routeCache=null;
+    if(BA().route){ const r0=routeXY(0); camR={x:r0.x,y:r0.y}; }
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
     // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
@@ -15782,6 +16188,9 @@
         bahnZ:bahn, wechselCd:0, wechsel:0,
         reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
         pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null,
+        // Chaos/Outsmart (Takeshi's Castle): ausgewichene Rempler, Gedraenge-Stopps und
+        // die dabei verlorene Zeit. Auf jeder anderen Bahn bleiben sie 0.
+        ausgewichen:0, gedraengt:0, gedraengeZeit:0,
         // STAFFEL, WAS EINEN EINZELNEN MESSBAR MACHT. `etappenZeit` ist die Zeit fuer den
         // EIGENEN Abschnitt, `wechselKonto` die Bilanz aus allen Uebergaben, an denen er
         // beteiligt war (abgebend wie annehmend). Ausserhalb der Staffel bleiben beide
@@ -16136,6 +16545,41 @@
             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
             u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
+            // GEDRAENGE AN DER FALLE (Chris 06.09.: "so chaotisch ... jeder versucht zu
+            // ueberleben"; docs/design/takeshi-chaos-tackle-plan-06-09.md, Abschnitt 3.1).
+            // Das ist der Knock-Knock-Modus der Sendung: alle stuermen gleichzeitig auf
+            // dieselbe Tuer, und wer mit vieren zugleich ankommt, braucht laenger. Beide
+            // Seiten zaehlen — der Pulk kennt keine Vereine.
+            //
+            // OUTSMART, Saeule "die Luecke im Pulk" (Chris 06.09.: "gegner ... outsmarten,
+            // weil takeshi ja als blaue diszi int awareness braucht"): mit `lesen:true`
+            // zaehlt das BESSERE aus WUCHT ("Durchbrettern") und TECHNIK ("Falle lesen",
+            // dort sitzen Intelligence 36 und Awareness 30). Der Bulle schiebt sich durch,
+            // der Kluge sieht die Luecke. Gemessen ist genau dieser Schalter der einzige
+            // im ganzen Versuch, der rho HEBT: 0,857 ohne, 0,878 mit (Abschnitt 3.2).
+            //
+            // KEIN rr()-Aufruf. Die Zufallsfolge jeder Bahn ohne `gedraenge` — Spurt,
+            // Staffel, Zeitfahren, Klettern — bleibt dadurch Zug fuer Zug dieselbe.
+            if(A.gedraenge){
+              const G=A.gedraenge;
+              const andere=LAEUFER.filter(o=>o!==u&&o.fertig==null&&Math.abs(o.pos-h)<=(G.radius??0.025)).length;
+              const extra=Math.max(0,andere-(G.frei??1));
+              if(extra>0){
+                const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
+                const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
+                u.huerde+=preis; u.gedraengt=(u.gedraengt||0)+1; u.gedraengeZeit=(u.gedraengeZeit||0)+preis;
+                u.fallen[u.fallen.length-1].gedraenge=extra;
+                schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
+                // Ticker EINMAL je Falle und Pulk (ab `melden` Mitlaeufern). Je Laeufer
+                // gemeldet waren es 39 Zeilen in einem Rennen — das haette die Fallen
+                // aus dem Ticker gedraengt, statt sie zu wuerzen.
+                const hi=HUERDEN_N().indexOf(h);
+                if(extra>=(G.melden??1) && !bahnGedraengeGemeldet.has(hi)){
+                  bahnGedraengeGemeldet.add(hi);
+                  feed(u.seite,"Gedränge an "+(A.hindernisWort||"Hürde")+" "+(hi+1)+" — "+(andere+1)+" Mann an einer Stelle, "+u.n+" mittendrin.");
+                }
+              }
+            }
           }
           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
           if(rr()<=technik)continue;                       // sauber drueber
@@ -16214,10 +16658,34 @@
       // SPERRE IM HINDERNIS (Paket B): wer im Hindernis-Stopp steht, rempelt nicht und wird
       // nicht gerempelt — sonst ist der Stopp an der Wand Freiwild, und der Zeitpreis, der
       // Dexterity tragen soll, wird zur Torment-Praemie.
-      if(BA().tackle && u.tackleCd<=0 && !(u.huerde>0) && u.WUCHT>(BA().tackleAb??45)
-         && rr()<willTackeln*dt*(BA().tackleRate??1.6)){
-        const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null&&!(o.huerde>0)
-          && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
+      // REMPLER NUR IM FENSTER VOR EINER FALLE (Takeshi's Castle, Chris 06.09.;
+      // docs/design/takeshi-chaos-tackle-plan-06-09.md, Abschnitt 2/3.1). Recherchiert:
+      // Kandidat-gegen-Kandidat-Kontakt war in der Sendung nie das Spiel auf freier
+      // Strecke — der Gegner war die Garde oder die Falle. Was es zwischen Kandidaten
+      // gab, war das Gedraenge am Engpass: alle stuermen zugleich auf die Tuer, den Steg,
+      // die Wand. `tackleFenster` nimmt das woertlich: gerempelt wird nur in den letzten
+      // 5 % Strecke VOR einer Falle.
+      //
+      // Fuer Spurt (kein `tackleFenster`, kein Chaos-Kurs) ist `tackleOk` Zeichen fuer
+      // Zeichen die alte Bedingung, `(bahnKursChaos||1)` ist 1, `tackleSpur??1.6` ist 1,6
+      // und `tackleCd??1.8` ist 1,8 — rr() wird in genau denselben Faellen und in
+      // derselben Reihenfolge gerufen wie vorher. Deshalb bleiben Spurt, Staffel,
+      // Zeitfahren und Klettern bit-identisch.
+      //
+      // `tackleAlleSeiten` (+ `tackleSpur`, sonst wirkungslos, weil eigene Laeufer zwei
+      // Spuren auseinander starten) macht "jeder gegen jeden" moeglich; gemessen tragfaehig
+      // (0,868/0,881), aber Chris' Entscheidung 06.09.: NUR gegen die gegnerische Seite —
+      // die Olympiade ist ein Vereinsspiel, und die Boxscore-Spalten sind seitenweise
+      // gedacht. Beide Felder bleiben im Motor, sind in BAHN_ART nicht gesetzt.
+      const TA=BA();
+      let tackleOk=TA.tackle && u.tackleCd<=0 && !(u.huerde>0) && u.WUCHT>(TA.tackleAb??45);
+      if(tackleOk && TA.tackleFenster){
+        const naechste=HUERDEN_N().find(hh=>hh>u.pos);
+        tackleOk=naechste!=null && (naechste-u.pos)<=TA.tackleFenster;
+      }
+      if(tackleOk && rr()<willTackeln*dt*(TA.tackleRate??1.6)*(bahnKursChaos||1)){
+        const opfer=LAEUFER.filter(o=>o!==u&&(TA.tackleAlleSeiten||o.seite!==u.seite)&&o.fertig==null&&!(o.huerde>0)
+          && Math.abs(o.bahnZ-u.bahnZ)<=(TA.tackleSpur??1.6) && Math.abs(o.pos-u.pos)<0.035);
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
           // Der Rempler kostet den Remplenden weniger, als er den Getroffenen kostet —
@@ -16225,15 +16693,36 @@
           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
           // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
           // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
-          u.tackleCd=1.8; u.kraft=BA().tackleKosten??0.26; u.tackles++;
-          const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
-          if(rr()<stark){
-            o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true,_laeufer:o.id});
-            feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
+          u.tackleCd=TA.tackleCd??1.8; u.kraft=TA.tackleKosten??0.26; u.tackles++;
+          // OUTSMART, Saeule "Gegner lesen" (Chris 06.09.: "faende es halt cool wenn man
+          // gegner dort auch outsmarten kann"). Bevor das Duell WUCHT gegen ROBUST faellt,
+          // darf das Opfer den Rempler KOMMEN SEHEN und ihn ins Leere laufen lassen:
+          // TECHNIK des Opfers gegen WUCHT des Taeters, dieselbe Duell-Form wie `stark`,
+          // mal 0,35 — bei gleichen Werten 17,5 %, ein Kluger gegen einen Schwachen bis
+          // 26 %. Der Taeter zahlt Abklingzeit und Kraft trotzdem, er ist ins Leere
+          // gelaufen. Eine LINEARE Fassung (`{basis,spanne}`, auch gebaut) kostete
+          // gemessen 0,017 rho; die Duell-Fassung liegt im Rauschen (Abschnitt 3.2/4.1,
+          // Variante P10 — Chris' Entscheidung 06.09.: einbauen).
+          // Eigener rr()-Aufruf NUR hinter dem Feld — ohne `tackleAusweichen` faellt kein
+          // zusaetzlicher Wurf an, Spurt bleibt bit-identisch.
+          const ausw=TA.tackleAusweichen?(TA.tackleAusweichen.duell!=null
+              ?TA.tackleAusweichen.duell*(o.TECHNIK||0)/((o.TECHNIK||0)+u.WUCHT||1)
+              :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
+          if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
+            o.ausgewichen=(o.ausgewichen||0)+1;
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"weicht aus",life:.9,crit:false,_laeufer:o.id});
+            feed(o.seite,o.n+" sieht "+u.n+" kommen und lässt ihn ins Leere laufen.");
           } else {
-            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
-            feed(o.seite,o.n+" steckt den Rempler weg.");
+            const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
+            if(rr()<stark){
+              o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
+              schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:TA.tackleFenster?"gerammt":"getackelt",life:1,crit:true,_laeufer:o.id});
+              feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
+                                                :" räumt "+o.n+" von der Bahn."));
+            } else {
+              schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
+              feed(o.seite,o.n+" steckt den Rempler weg.");
+            }
           }
         }
       }
@@ -16341,13 +16830,31 @@
   const ANSAGE_FARBE="#b98cff";
   function zeichneSpurt(){
     zeichneBoden();
-    for(const u of LAEUFER){
+    // AUF DER ROUTE nach Bildschirm-y sortiert zeichnen: wer weiter unten steht, ueberdeckt
+    // den, der weiter oben steht — dieselbe Tiefenstaffelung wie im Feldspiel. Auf der
+    // geraden Bahn gibt es nichts zu staffeln (jede Spur hat ihre eigene Zeile), dort
+    // bleibt die Reihenfolge unveraendert.
+    const reihe=istRoute()?[...LAEUFER].sort((a,b)=>laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
+    // Die Figur waechst mit der Kamera, damit sie auf einer bei 3,4x 190 px breiten Route
+    // nicht als 32-px-Sprite verloren geht. Bei Zoom 1 ist sie so gross wie bisher.
+    // Name, Plan und Sterne bleiben im Bildschirmraum, skalieren also NICHT mit.
+    const sk=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
+    for(const u of reihe){
       const platz=rennFertig.indexOf(u);
-      const x=camX(u.pos)+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
+      const {x,y}=laeuferXY(u);
       ctx.globalAlpha=0.25;ctx.fillStyle="#000";
-      ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
-      zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
+      ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
+      // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
+      // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
+      // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
+      // vier Richtungen und braucht dafuer nur vx/vy — hier die Tangente, auf 4 skaliert
+      // (die Schwelle |vy|>2 in blickAus verlangt einen Betrag ueber 2).
+      const tg=istRoute()&&u.stolper<=0?routeXY(u.pos):null;
+      ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
+      zeichneSprite(ctx,{n:u.n,id:u.id,
+        vx:u.stolper>0?0:(tg?tg.tx*4:4), vy:tg?tg.ty*4:0, side:u.seite,
         lunge:u.kraft>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+      ctx.restore();
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
       if(u.imSchatten&&u.fertig==null){
@@ -16398,7 +16905,12 @@
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
-      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+
+      // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
+      // Finisher waeren zwoelf Zeilen "Platz n · Zeit · ★" uebereinander auf dem Pflaster,
+      // und die Ziffern stehen ohnehin in der Wertungstabelle daneben. Auf der geraden
+      // Bahn (Spurt, Staffel, ...) bleibt die Zeile, dort stehen die Fertigen einzeln
+      // gestaffelt rechts neben der Ziellinie.
+      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+
         (BA().takeshi?" · ★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,""):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
@@ -16414,7 +16926,7 @@
     // auch dann noch zu finden ist, wenn zwei Figuren uebereinanderstehen.
     const gewaehlt=bahnWahl==null?null:LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null);
     if(gewaehlt){
-      const gx=camX(gewaehlt.pos), gy=bahnY(gewaehlt.bahnZ);
+      const {x:gx,y:gy}=laeuferXY(gewaehlt);
       ctx.save();
       ctx.strokeStyle=ANSAGE_FARBE;ctx.lineWidth=2;
       ctx.beginPath();ctx.ellipse(gx,gy+16,18,7.5,0,0,6.283);ctx.stroke();
@@ -16448,8 +16960,8 @@
       let fx=f.x, fy=f.y;
       if(f._laeufer!=null){
         const u=LAEUFER.find(x=>x.id===f._laeufer);
-        if(u){ fx=camX(u.pos)+(f.ansage?20:-20);
-               fy=bahnY(u.bahnZ)-22-((1-f.life)*14); }
+        if(u){ const p=laeuferXY(u); fx=p.x+(f.ansage?20:-20);
+               fy=p.y-22-((1-f.life)*14); }
       }
       ctx.fillText(f.txt,fx,fy);
       ctx.globalAlpha=1;
@@ -17441,7 +17953,7 @@
       let treffer=null,minD=BAHN_GREIF_RADIUS;
       for(const u of LAEUFER){
         if(u.seite!==0||u.fertig!=null)continue;
-        const d=Math.hypot(camX(u.pos)-mx,bahnY(u.bahnZ)-my);
+        const p=laeuferXY(u); const d=Math.hypot(p.x-mx,p.y-my);
         if(d<minD){ minD=d; treffer=u; }
       }
       if(treffer)rennplanWaehlen(treffer.id);
@@ -18456,10 +18968,15 @@
       const sortiert=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
       sortiert.forEach((u,platz)=>{
         const e=summe[u.n]||(summe[u.n]={n:u.n,seite:u.seite,plan:u.plan,eig:u.eig,
-          platz:0,zeit:0,schatten:0,leer:0,stolper:0,tackles:0,getackelt:0,wechsel:0});
+          platz:0,zeit:0,schatten:0,leer:0,stolper:0,tackles:0,getackelt:0,wechsel:0,
+          // CHAOS-DIAGNOSE (Takeshi's Castle): ausgewichene Rempler und Gedraenge-Stopps
+          // je Laeufer. Ausserhalb von Takeshi fuehrt keine Bahn die Felder, dort bleiben
+          // beide Spalten 0 — die Serie zaehlt nur mit, sie rechnet nichts.
+          ausgewichen:0,gedraengt:0,gedraengeZeit:0});
         e.platz+=platz+1; e.zeit+=u.fertig??90;
         e.schatten+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
         e.leer+=u.leer?1:0; e.stolper+=u.gestolpert; e.tackles+=u.tackles; e.getackelt+=u.getackelt;
+        e.ausgewichen+=u.ausgewichen||0; e.gedraengt+=u.gedraengt||0; e.gedraengeZeit+=u.gedraengeZeit||0;
         leerGesamt+=u.leer?1:0; schattenGesamt+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
       });
     }
@@ -18471,7 +18988,9 @@
       platz:+(e.platz/laeufe).toFixed(2), zeit:+(e.zeit/laeufe).toFixed(2),
       schatten:Math.round(e.schatten/laeufe*100), leerQuote:Math.round(e.leer/laeufe*100),
       stolper:+(e.stolper/laeufe).toFixed(2), tackles:+(e.tackles/laeufe).toFixed(2),
-      getackelt:+(e.getackelt/laeufe).toFixed(2)})).sort((a,b)=>a.platz-b.platz);
+      getackelt:+(e.getackelt/laeufe).toFixed(2),
+      ausgewichen:+(e.ausgewichen/laeufe).toFixed(2), gedraengt:+(e.gedraengt/laeufe).toFixed(2),
+      gedraengeZeit:+(e.gedraengeZeit/laeufe).toFixed(2)})).sort((a,b)=>a.platz-b.platz);
     const koepfe=Math.max(1,reihen.length);
     return {disziplin:d, laeufe, reihen,
       leerQuote:Math.round(leerGesamt/(laeufe*koepfe)*100),
