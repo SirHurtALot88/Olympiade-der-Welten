@@ -11053,10 +11053,17 @@
   // WERTUNGSTABELLE — BUEHNEN-DEFAULTS (Plan Abschnitt 3.4/4). Drei Chassis-Varianten,
   // weil sich das Bühnenbild in drei Familien teilt: Duell (Speed-Schach/I-Spy/Tennis/
   // Fechten, `duell:true`), Auftritt (Wettessen/Showcase/Eiskunstlauf/Breaking) und
-  // Gewichtheben (`heben:true`, eigener Rundenrechner). Alle drei lesen ausschliesslich
-  // `runden[0..aktuell]`/`verlauf[aktuell]`/`bestBisher()` — nie die vorberechneten
-  // Endgroessen (`vorteil`, `zweikampf`, `duellGewonnen`, `besteReissen/Stossen`), die
-  // erst mit dem letzten Durchgang enthuellt sein duerfen (Spoiler-Regel, Plan 1.4).
+  // Gewichtheben (`heben:true`, eigener Rundenrechner).
+  //
+  // SPOILER-REGEL (Plan 1.4), GENAU GESAGT. Jede laufende Spalte liest ausschliesslich
+  // `runden[0..aktuell]`/`verlauf[aktuell]`/`bestBisher()`. Die EINE Spalte "Stand" muss
+  // dagegen den Ausgang nennen — sie liest deshalb sehr wohl eine Endgroesse
+  // (`verlauf[rundenN-1]` bzw. `duellGewonnen`), aber NUR hinter `z.fertig`. Die Trennung
+  // haengt damit an dieser Klammer, nicht an der Datenquelle: wer hier eine Spalte
+  // ergaenzt, hat `z.u` vollstaendig in der Hand — `vorteil`, `zweikampf`, `duellGewonnen`
+  // und `besteReissen/Stossen` liegen alle offen — und muss den Spoiler selbst verhindern.
+  // `z.fertig` kommt aus paarFertig() (s. dort) und meint BEIDE Seiten der Paarung; eine
+  // Pruefung nur auf den eigenen `aktuell` verraet den Sieger einen Zug zu frueh.
   //
   // LEISTUNG WIE IM KAMPF: der Beitrag (hier: die eigene Punktsumme) gemessen gegen den
   // Anteil, den die Eignung am Feld erwarten laesst — dieselbe Idee wie leistungVon(),
@@ -11068,6 +11075,26 @@
     return erwartet>0?Math.round(u.summe/erwartet*100):null;
   }
 
+  // WANN IST EIN DUELL WIRKLICH ENTSCHIEDEN? Nicht, wenn DIESER Teilnehmer seinen letzten
+  // Zug/Versuch gezeigt hat, sondern erst, wenn BEIDE ihn gezeigt haben. Die Warteschlange
+  // enthuellt paarweise nacheinander (buehneQueue) — wer zuerst dran ist, waere sonst einen
+  // Zug vor dem Gegner "fertig", und weil beide Seiten denselben Ausgang haben, stuende der
+  // Sieger in der Tabelle, BEVOR der entscheidende letzte Zug/Versuch gelaufen ist.
+  // Nachgemessen (Opus-Review 06.09., vor dieser Klammer): Gewichtheben zeigte "Niederlage"
+  // bei 6 von 6 gezeigten Versuchen des einen, waehrend der andere erst 5 gezeigt hatte —
+  // damit war der Gewinner des Duells eine Hebung zu frueh verraten. Speed-Schach dasselbe
+  // einen Zug zu frueh. Das ist genau der Spoiler, den Plan 1.4 ausschliesst.
+  function duellPartner(u){
+    const schluessel=(x)=>x.duellNr!=null?"d"+x.duellNr:(x.brett!=null?"b"+x.brett:null);
+    const k=schluessel(u); if(k==null)return null;
+    return TEILNEHMER.find(x=>x!==u&&x.side!==u.side&&schluessel(x)===k)||null;
+  }
+  function paarFertig(u,art){
+    if(u.aktuell+1<art.rundenN)return false;
+    const g=duellPartner(u);
+    return !g||g.aktuell+1>=art.rundenN;
+  }
+
   // DUELL (Speed-Schach, I-Spy, Tennis, Fechten): Brett i ist mein Teilnehmer i gegen
   // Gegner i, wie ein Schach-Mannschaftskampf mit mehreren Brettern. SORTIERUNG NACH
   // BRETT, NICHT NACH PUNKTEN (Chris' Entscheidung, 06.09.): beide Team-Bloecke zeigen
@@ -11076,7 +11103,7 @@
     const w=art.wertung||{};
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,brett:u.brett??0,
-      r:bisher(u), fertig:u.aktuell+1>=art.rundenN}));
+      r:bisher(u), fertig:paarFertig(u,art)}));
     return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>a.brett-b.brett,
       spalten:[
         {id:"brett",kopf:w.duellWort||"Brett", titel:"gegen wen", wert:z=>(w.duellWort||"B").slice(0,1)+(z.brett+1)},
@@ -11133,7 +11160,7 @@
   function WERTUNG_HEBEN(art){
     const w=art.wertung||{};
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,
-      fertig:u.aktuell+1>=art.rundenN}));
+      fertig:paarFertig(u,art)}));
     return {namen:"Heber", zeilen, sortierung:(a,b)=>(a.u.duellNr??0)-(b.u.duellNr??0)||a.u.side-b.u.side,
       spalten:[
         {id:"duell",kopf:"Duell", titel:"Duell-Nummer, gegen wen", wert:z=>z.u.duellNr!=null?"D"+(z.u.duellNr+1):null},
