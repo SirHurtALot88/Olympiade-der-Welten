@@ -14150,13 +14150,20 @@
   // eigene `wertung` dazu, reicht ein weiterer Zweig HIER — updateHudBahn, renderKader und
   // das Endstand-Overlay (renderEndstandBahn) lesen alle denselben Rueckgabewert und
   // brauchen dafuer keine eigene Anpassung.
+  // `gewertet` sagt, ob hinter dem Stand eine ECHTE Wertung steht. Der Zieleinlauf-Zaehler
+  // ist keine: bei Takeshi zaehlt er Ausgeschiedene mit (rennFertig nimmt sie auf, s.
+  // nervenKosten-Zweig in stepSpurt), am Rennende steht darum IMMER 6:6 — genau der
+  // Anzeigefehler, den diese Aenderung fuer die drei Rang-Bahnen behebt. Wer daraus ein
+  // "Unentschieden" macht, behauptet ein Ergebnis, das der Motor nicht hergibt. Solange
+  // `gewertet` false ist, meldet das Rennen deshalb nur, DASS es zu Ende ist. Kommt fuer
+  // Takeshi/Staffel eine eigene `wertung` dazu, faellt das von selbst weg.
   function bahnTeamstand(){
     if(BA().wertung==="rang"){
       const w=bahnRangliste();
-      return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte};
+      return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
     }
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
-    return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null};
+    return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
   function updateHudBahn(){
@@ -14187,13 +14194,16 @@
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
     document.getElementById("klsuffix").textContent=
-      stand.suffix+(BA().wertung==="rang"&&!done?" · vorläufig":"");
+      stand.suffix+(stand.gewertet&&!done?" · vorläufig":"");
     document.getElementById("score").textContent=stand.seiten[0]+" : "+stand.seiten[1];
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
-      feed(0,(pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
-        +pL+":"+pR+" "+stand.suffix,true);
+      feed(0,stand.gewertet
+        ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+          +pL+":"+pR+" "+stand.suffix
+        : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
+          +" (fuer diese Disziplin gibt es noch keine Wertung)",true);
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
@@ -17123,9 +17133,10 @@
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
-    document.getElementById("esieger").textContent=
-      (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
-      +" — "+pL+" : "+pR+" "+stand.suffix;
+    document.getElementById("esieger").textContent=stand.gewertet
+      ? (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
+        +" — "+pL+" : "+pR+" "+stand.suffix
+      : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung";
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -17139,7 +17150,13 @@
         const tr=el("tr",u.raus?"tot":null);
         tr.appendChild(el("td",null,u.n));
         tr.appendChild(el("td",null,String(i+1)));
-        tr.appendChild(el("td",null,u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
+        // AUSGESCHIEDENE HABEN KEINE ZEIT. `u.fertig` traegt bei ihnen den Sortierschluessel
+        // 90+(1-pos)*10 aus dem nervenKosten-Zweig (s. stepSpurt), also 90..100 — in einem
+        // Rennen, das nach ~25 s vorbei ist. Als "93,7 s" gedruckt waere das eine erfundene
+        // Zahl, genau das, was die Punkte-Spalte hier bewusst vermeidet. Die Reihenfolge
+        // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
+        // Finisher, nur ANZEIGEN darf man ihn nicht.
+        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
         tr.appendChild(el("td",null,stand.punkte?String(stand.punkte.get(u.id)):"—"));
         tb.appendChild(tr);
       });
@@ -18425,13 +18442,27 @@
           stepSpurt(1/60); guard++;
         }
       } finally { stumm=false; }
-      const w=bahnRangliste();
+      // DIE SONDE MELDET, WAS DAS SPIEL WERTET — nicht, was bahnRangliste rechnen KANN.
+      // `seiten` kam vorher immer aus bahnRangliste, auch bei Staffel/Takeshi: die Sonde
+      // sagte dann `wertung:"zieleinlauf"` und lieferte im selben Objekt Rangpunkte
+      // (Staffel z.B. 21:57), waehrend die Anzeige 6:6 zeigte. Ein Test darauf haette den
+      // falschen Vertrag festgeschrieben. Jetzt kommen `seiten` und `punkte` aus
+      // bahnTeamstand — demselben Dispatch, den HUD, Kader und Overlay lesen; `punkte` ist
+      // null, wo es (noch) keine Punkte je Laeufer gibt. Die Reihenfolge/`platz` kommt aus
+      // bahnRangliste.reihe, damit die Sonde exakt die Plaetze des Overlays nennt statt
+      // einer zweiten, leicht abweichenden Sortierung (fertig??99 ordnete Unfertige nicht
+      // nach Strecke).
+      const w=bahnRangliste(), st=bahnTeamstand();
       const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
-        wertung:BAHN_ART[bd].wertung||"zieleinlauf", seiten:w.seiten,
-        laeufer:[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99)).map((u,pl)=>({
-          platz:pl+1, n:u.n, seite:u.seite, plan:u.plan, punkte:w.punkte.get(u.id),
+        wertung:BAHN_ART[bd].wertung||"zieleinlauf", seiten:st.seiten, gewertet:st.gewertet,
+        laeufer:w.reihe.map((u,pl)=>({
+          platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
+          punkte:st.punkte?st.punkte.get(u.id):null, rangpunkte:w.punkte.get(u.id),
+          raus:!!u.raus,
           ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
-          zeit:u.fertig==null?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+          // Ausgeschiedene: kein `zeit`. u.fertig traegt bei ihnen nur den Sortierschluessel
+          // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit.
+          zeit:(u.fertig==null||u.raus)?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
           bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
           reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
           sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
