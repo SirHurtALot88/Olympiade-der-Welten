@@ -17464,9 +17464,31 @@
   // Die Faktoren kommen aus der gemessenen Ist-Dauer (n=20) geteilt durch 60s. Fehlt eine
   // Disziplin in der Liste, bleibt sie unangetastet (Faktor 1 — das gilt automatisch fuer
   // Buehne und Feldspiel, die ihr Tempo schon anders steuern).
+  //
+  // SPURT-AUSNAHME (Chris' Fund 06.09.): "spurt sollte ca 3 minuten dauern damit man sich
+  // das auch in ruhe angucken kann und kleine unterschiede erkennt" — 60s Zuschauzeit war
+  // fuer Spurt zu knapp, um Laeufer nebeneinander zu vergleichen. Nachgemessen (Playwright,
+  // Standard-Saat 1337, Chris' Formel-Klick "Kampf starten"): mit dem alten Faktor 5,36
+  // dauerte ein Rennen real 86,6 s (1:26) bis zum Zieleinlauf — schon laenger als die
+  // angepeilten 60s (die Hindernislauf-Umstellung Anfang September hat die Rennen selbst
+  // laenger gemacht, ohne den Faktor nachzuziehen), aber weit unter den gewuenschten 180 s.
+  // Faktor linear hochskaliert (5,36 * 180/86,6 = 11,14 -> 183,6 s / 3:03 real
+  // nachgemessen, dieselbe Standard-Saat, Abweichung durch Frame-Rundung im rAF-Loop).
+  // Das betrifft NUR, wie viele echte Sekunden ein Simulationstick beim Zusehen kostet
+  // (stepSpurt bekommt weiterhin exakt dieselbe dt-Folge, nur kleiner dosiert) — nicht
+  // MOTOREN.spurt.wert()/rho-Messung, die stepSpurt fest mit 1/60 aufruft und NIE durch
+  // diese Schleife bzw. ZEIT_DEHNUNG laeuft (s. Kommentar unten), und nicht die angezeigte
+  // Zielzeit (u.fertig, z.B. "13,5 s" im Endstand): die bleibt rennT im Simulationsmassstab
+  // und wird nie mit zeitFaktor() multipliziert (nur die laufende Uhr #clock waehrend des
+  // Rennens rechnet rennT*zeitFaktor() zurueck auf echte Sekunden, s. updateHudBahn — das
+  // ist die Uhr, die der Zuschauer waehrend des Rennens live sieht, nicht die Endzeit-Spalte
+  // im Endstand-Overlay). Bit-identische Rangtreue nachgemessen: node
+  // scripts/miss-alle-disziplinen.mjs 24 spurt vor UND nach dieser Aenderung liefert
+  // 0,871 rho/Spiel, 0,905 rho Saison — unveraendert, wie fuer eine reine dt-Streckung
+  // erwartet.
   const ZEIT_DEHNUNG={
     tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
-    spurt:5.36, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
+    spurt:11.14, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
     // Chris' Fund (29.08.): die Bewegung auf dem Court wirkt zu hektisch, um ihr zu
     // folgen. tempoPx selbst anzufassen wuerde die Matrix-Balance neu aufrollen (s.
     // die ausfuehrliche Herleitung beim tempoPx-Koeffizienten, bewegeSpielerLive) — der
