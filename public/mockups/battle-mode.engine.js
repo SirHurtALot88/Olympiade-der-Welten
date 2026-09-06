@@ -9601,8 +9601,7 @@
     const maxPkt=Math.max(1,bisher[0],bisher[1]);
     document.getElementById("thpL").style.width=(bisher[0]/maxPkt*100)+"%";
     document.getElementById("thpR").style.width=(bisher[1]/maxPkt*100)+"%";
-    setWertungKopf(true);
-    renderWertungFeldspiel();
+    renderWertungTabelle();
     renderKader();
   }
 
@@ -10361,7 +10360,11 @@
         NERVEN:       {will:45,health:35,determination:20},
         AUSDAUER:     {stamina:50,health:30,will:20},
         WAGNIS:       {torment:50,stamina:30,intelligence:20}
-      }
+      },
+      // WERTUNGSTABELLE (Plan Abschnitt 4.2): nur die Woerter — Spalten kommen aus
+      // WERTUNG_AUFTRITT. "Pause" ist Chris' eigenes Wort fuer failWort.
+      wertung:{failKopf:"Pause",
+        fuss:"Jeder Durchgang bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (der Durchgang zählt dann nur 65 %). „Abfall\" vergleicht die späten Durchgänge mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
     "speed-schach":{
@@ -10382,7 +10385,12 @@
         NERVEN:       {will:45,determination:30,speed:25},
         AUSDAUER:     {will:40,determination:35,speed:25},
         WAGNIS:       {speed:45,dexterity:30,charisma:25}
-      }
+      },
+      // WERTUNGSTABELLE (Plan Abschnitt 4.1): nur die Woerter — Spalten kommen aus
+      // WERTUNG_DUELL. Sortierung nach Brett statt Punkten ist der Default (Chris'
+      // Entscheidung, 06.09.), gilt also automatisch mit.
+      wertung:{duellWort:"Brett", erfolgKopf:"Stark", failKopf:"Zeit−",
+        fuss:"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
     "i-spy":{
@@ -10933,6 +10941,7 @@
       return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    renderWertungTabelle();
     renderKader();
   }
 
@@ -11040,6 +11049,111 @@
       if(r&&r.uebung===uebung&&r.gueltig)m=Math.max(m,r.kg);}
     return m;
   }
+
+  // WERTUNGSTABELLE — BUEHNEN-DEFAULTS (Plan Abschnitt 3.4/4). Drei Chassis-Varianten,
+  // weil sich das Bühnenbild in drei Familien teilt: Duell (Speed-Schach/I-Spy/Tennis/
+  // Fechten, `duell:true`), Auftritt (Wettessen/Showcase/Eiskunstlauf/Breaking) und
+  // Gewichtheben (`heben:true`, eigener Rundenrechner). Alle drei lesen ausschliesslich
+  // `runden[0..aktuell]`/`verlauf[aktuell]`/`bestBisher()` — nie die vorberechneten
+  // Endgroessen (`vorteil`, `zweikampf`, `duellGewonnen`, `besteReissen/Stossen`), die
+  // erst mit dem letzten Durchgang enthuellt sein duerfen (Spoiler-Regel, Plan 1.4).
+  //
+  // LEISTUNG WIE IM KAMPF: der Beitrag (hier: die eigene Punktsumme) gemessen gegen den
+  // Anteil, den die Eignung am Feld erwarten laesst — dieselbe Idee wie leistungVon(),
+  // nur ueber TEILNEHMER statt U.
+  function leistungBuehne(u){
+    const gesamt=TEILNEHMER.reduce((a,x)=>a+x.summe,0), gesamtEig=TEILNEHMER.reduce((a,x)=>a+(x.eig||1),0);
+    if(gesamt<=0||gesamtEig<=0)return null;
+    const erwartet=(u.eig||1)/gesamtEig*gesamt;
+    return erwartet>0?Math.round(u.summe/erwartet*100):null;
+  }
+
+  // DUELL (Speed-Schach, I-Spy, Tennis, Fechten): Brett i ist mein Teilnehmer i gegen
+  // Gegner i, wie ein Schach-Mannschaftskampf mit mehreren Brettern. SORTIERUNG NACH
+  // BRETT, NICHT NACH PUNKTEN (Chris' Entscheidung, 06.09.): beide Team-Bloecke zeigen
+  // so dieselbe Paarung auf einer Zeile nebeneinander.
+  function WERTUNG_DUELL(art){
+    const w=art.wertung||{};
+    const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
+    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,brett:u.brett??0,
+      r:bisher(u), fertig:u.aktuell+1>=art.rundenN}));
+    return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>a.brett-b.brett,
+      spalten:[
+        {id:"brett",kopf:w.duellWort||"Brett", titel:"gegen wen", wert:z=>(w.duellWort||"B").slice(0,1)+(z.brett+1)},
+        {id:"zug",  kopf:"Zug",  titel:"gespielte Züge", wert:z=>z.r.length+"/"+art.rundenN},
+        {id:"pkt",  kopf:"Pkt",  top:true, titel:"eigene Punkte bisher", wert:z=>z.u.summe||null},
+        {id:"stark",kopf:w.erfolgKopf||"Stark", titel:art.erfolgWort, wert:z=>z.r.filter(r=>r.ereignis===art.erfolgWort).length||null},
+        {id:"fail", kopf:w.failKopf||"Fehl", titel:art.failWort, wert:z=>z.r.filter(r=>r.ereignis===art.failWort).length||null},
+        {id:"best", kopf:"Best", top:true, titel:"stärkster Zug bisher", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
+        {id:"vort", kopf:"Vort", titel:"laufender Vorteil gegen den Gegner in dieser Zeile",
+          wert:z=>z.r.length&&z.u.verlauf?z.u.verlauf[z.r.length-1]:0,
+          fmt:v=>(v>0?"+":"")+v, farbe:v=>v>0?"var(--ok)":v<0?"var(--crit)":null},
+        {id:"stand",kopf:"Stand", titel:"Brett entschieden (+ Sieg, = Remis, − Niederlage)",
+          wert:z=>!z.fertig?"…":(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"="),
+          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null},
+        {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
+          farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
+        {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:w.fuss||"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."};
+  }
+
+  // AUFTRITT (Wettessen, Showcase, Eiskunstlauf, Breaking): kein Duell, jeder Teilnehmer
+  // steht fuer sich; sortiert nach Gesamtpunkten wie bisher der Buehnenbalken.
+  function WERTUNG_AUFTRITT(art){
+    const w=art.wertung||{};
+    const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
+    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,r:bisher(u)}));
+    return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>b.u.summe-a.u.summe,
+      spalten:[
+        {id:"dg",   kopf:"Dg",   titel:"Durchgänge bisher", wert:z=>z.r.length+"/"+art.rundenN},
+        {id:"pkt",  kopf:"Pkt",  top:true, titel:"Punkte gesamt", wert:z=>z.u.summe||null},
+        {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.u.summe/z.r.length):null},
+        {id:"best", kopf:"Best", top:true, titel:"bester Durchgang", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
+        {id:"letzt",kopf:"Letzt", titel:"letzter Durchgang", wert:z=>z.r.length?z.r[z.r.length-1].punkte:null},
+        {id:"fail", kopf:w.failKopf||"Fehl", titel:art.failWort, wert:z=>z.r.filter(r=>r.ereignis===art.failWort).length||null},
+        {id:"serie",kopf:"Serie", titel:"Durchgänge ohne "+(w.failKopf||"Fehler")+" in Folge",
+          wert:z=>{let s=0; for(let i=z.r.length-1;i>=0;i--){ if(z.r[i].ereignis===art.failWort)break; s++; } return s||null;}},
+        {id:"abfall",kopf:"Abfall", titel:"späte gegen frühe Hälfte — wer hinten raus einbricht, steht im Minus",
+          wert:z=>{const n=z.r.length; if(n<4)return null; const halb=Math.floor(n/2);
+            const avg=(a)=>a.reduce((s,r)=>s+r.punkte,0)/a.length;
+            return Math.round(avg(z.r.slice(halb))-avg(z.r.slice(0,halb)));},
+          fmt:v=>(v>0?"+":"")+v, farbe:v=>v<0?"var(--crit)":v>0?"var(--ok)":null},
+        {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
+          farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
+        {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:w.fuss||""};
+  }
+
+  // GEWICHTHEBEN (`heben:true`): eigener Rundenrechner (baueHebenDuelle), eigene Felder
+  // (rolle/duellNr/besteReissen.../zweikampf/duellGewonnen — die vier letzten sind
+  // Endgroessen und daher SPOILER, s.o. — bestBisher() liest stattdessen nur die bisher
+  // enthuellten Versuche). Chris' Entscheidung (Rueckfrage, 06.09.): "Last" zeigt die
+  // zuletzt gehobene Last, NICHT die angesagte naechste (die im Motor ohnehin Teil der
+  // vorberechneten Runden ist).
+  function WERTUNG_HEBEN(art){
+    const w=art.wertung||{};
+    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,
+      fertig:u.aktuell+1>=art.rundenN}));
+    return {namen:"Heber", zeilen, sortierung:(a,b)=>(a.u.duellNr??0)-(b.u.duellNr??0)||a.u.side-b.u.side,
+      spalten:[
+        {id:"duell",kopf:"Duell", titel:"Duell-Nummer, gegen wen", wert:z=>z.u.duellNr!=null?"D"+(z.u.duellNr+1):null},
+        {id:"rolle",kopf:"Rolle", titel:"Versuchsstrategie", wert:z=>z.u.rolle||null},
+        {id:"reiss",kopf:"Reiß", top:true, titel:"bestes gültiges Reißen bisher",
+          wert:z=>{const kg=bestBisher(z.u,"reissen"); return kg?sinclairAnzeige(kg,z.u.groesse):null;}},
+        {id:"stoss",kopf:"Stoß", top:true, titel:"bestes gültiges Stoßen bisher",
+          wert:z=>{const kg=bestBisher(z.u,"stossen"); return kg?sinclairAnzeige(kg,z.u.groesse):null;}},
+        {id:"vers", kopf:"Vers", titel:"gültige Versuche von den bisher gezeigten",
+          wert:z=>{const bis=z.u.runden.slice(0,Math.max(0,z.u.aktuell+1)); return bis.length?bis.filter(r=>r.gueltig).length+"/"+bis.length:null;}},
+        {id:"zwei", kopf:"Zwei", top:true, titel:"Zweikampf bisher (Reißen + Stoßen)",
+          wert:z=>{const st=bestBisher(z.u,"stossen"); if(!st)return null; return sinclairAnzeige(bestBisher(z.u,"reissen")+st,z.u.groesse);}},
+        {id:"last", kopf:"Last", titel:"zuletzt gehobene Last (nicht die angesagte nächste)",
+          wert:z=>{const r=z.u.aktuell>=0?z.u.runden[z.u.aktuell]:null; return r&&r.gueltig?sinclairAnzeige(r.kg,z.u.groesse):null;}},
+        {id:"stand",kopf:"Stand", titel:"Duell entschieden?", wert:z=>!z.fertig?"…":(z.u.duellGewonnen?"Sieg":"Niederlage"),
+          farbe:v=>v==="Sieg"?"var(--ok)":v==="Niederlage"?"var(--crit)":null},
+        {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:w.fuss||"„Last\" ist die zuletzt gehobene Last (Sinclair-normiert), nicht die angesagte nächste. „Vers\" zählt gültige Versuche von den bisher gezeigten. „Stand\" wird erst am Ende des Duells entschieden."};
+  }
+
   function zeichneHeben(art){
     if(!TEILNEHMER.length)return;
     const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
@@ -13980,132 +14094,125 @@
     }
   }
 
-  function renderWertung(){
-    // ZWEI TABELLEN STATT EINER (Chris' Fund, 29.08., s. .wsplit in battle-mode.html):
-    // eigenes Team links (wbodyL), Gegner rechts (wbodyR) — jede Seite fuer sich nach
-    // Beitrag sortiert, statt einer gemeinsam gemischten Liste.
-    const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
-    if(!tbL||!tbR)return;
-    const maxD=Math.max(1,...U.map(u=>u.st.dmg)),maxH=Math.max(1,...U.map(u=>u.st.heal)),
-          maxT=Math.max(1,...U.map(u=>u.st.tank)),maxV=Math.max(1,...U.map(u=>u.st.verh));
-    tbL.textContent="";tbR.textContent="";
-    for(const seite of[0,1]){
-      const tb=seite===0?tbL:tbR;
-      const reihen=U.filter(u=>u.side===seite).sort((a,b)=>beitragVon(b)-beitragVon(a));
-      for(const u of reihen){
-        const tr=el("tr",(u.side===0?"eigen":"gegner")+(u.down?" raus":""));
-        tr.appendChild(el("td",null,u.n.length>10?u.n.slice(0,9)+"…":u.n));
-        const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(Math.round(v)):"—";return td;};
-        tr.appendChild(c(u.st.dmg,maxD));
-        tr.appendChild(c(u.st.heal,maxH));
-        tr.appendChild(c(u.st.verh,maxV));
-        tr.appendChild(c(u.st.tank,maxT));
-        tr.appendChild(c(u.st.ko,99));
-        const l=leistungVon(u,U);
-        const td=el("td","n");
-        if(l==null){td.textContent="—";}
-        else{td.textContent=l+" %";
-          td.style.color=l>=140?"var(--ok)":l<=60?"var(--crit)":"var(--muted)";
-          td.style.fontWeight=l>=140||l<=60?"600":"400";}
-        td.title="Beitrag gemessen an dem, was der Einsatzwert erwarten lässt";
-        tr.appendChild(td);
-        // Spalten 7/8 existieren nur fuers Feldspiel (FG%/Impact, s.
-        // renderWertungFeldspiel) — hier Platzhalter, damit Kopf- und Zeilen-
-        // Spaltenzahl uebereinstimmen. Spalte 9 (Eignung) gilt ueberall, s. dort.
-        tr.appendChild(el("td","n","–"));
-        tr.appendChild(el("td","n","–"));
-        tr.appendChild(el("td","n",u.eig?String(Math.round(u.eig)):"—"));
-        tb.appendChild(tr);
-      }
-    }
+  // ===================================================================================
+  // WERTUNGSTABELLE — EIN VERTRAG FUER ALLE VIER CHASSIS (05.09., Plan
+  // docs/design/wertungstabelle-je-disziplin-plan-05-09.md). Vorher gab es genau zwei
+  // Bau-Funktionen (renderWertung/renderWertungFeldspiel) und einen Booleschen Kopf-
+  // Schalter (setWertungKopf) — fuer Kampf und Feldspiel richtig, aber Buehne und Bahn
+  // konnten in diesem Schema gar nicht ankommen. Sie riefen die Tabelle nie, und weil
+  // build() fuer diese Chassis vor "U=[]" aussteigt, blieb die Tabelle beim
+  // Disziplinwechsel auf dem letzten Kampf-/Feldspiel-Stand eingefroren — Chris' drei
+  // Screenshots (Speed-Schach, Wettessen, Takeshi) zeigten so ein Standbild, keine
+  // falschen Spalten.
+  //
+  // EINE SPALTE: {id, kopf, titel?, wert:(z)=>Zahl|String|null, top?:true, fmt?:(v)=>String,
+  // farbe?:(v)=>css-Variable}. `wert` darf null liefern ("—" wird angezeigt), top:true
+  // markiert die Spalten, in denen der Bestwert je Tabelle (ueber BEIDE Seiten, wie
+  // bisher maxD/maxP) fett hervorgehoben wird.
+  // EINE ZEILE: ein Objekt {n, side, raus, eig, ...}; nur die Zeilenquelle des jeweiligen
+  // Chassis kennt die Spoiler-Regel ihrer Rohdaten (s. Plan Abschnitt 1.4) — die Buehne
+  // darf z.B. nur runden[0..aktuell]/verlauf[aktuell]/bestBisher() lesen, nie das
+  // vorberechnete Endergebnis (vorteil/zweikampf/duellGewonnen/besteReissen).
+  // EINE WERTUNG: {namen, spalten, zeilen(), sortierung, fuss}.
+  const WERTUNG_CHASSIS={
+    kampf:(art)=>({
+      namen:"Kämpfer",
+      zeilen:()=>U.map(u=>({n:u.n,side:u.side,raus:u.down,eig:u.eig,u})),
+      sortierung:(a,b)=>beitragVon(b.u)-beitragVon(a.u),
+      spalten:[
+        {id:"dmg", kopf:"Schd", top:true, wert:z=>z.u.st.dmg||null},
+        {id:"heal",kopf:"Heil", top:true, wert:z=>z.u.st.heal||null},
+        {id:"verh",kopf:"Verh", top:true, wert:z=>z.u.st.verh||null},
+        {id:"tank",kopf:"Tank", top:true, wert:z=>z.u.st.tank||null},
+        {id:"ko",  kopf:"KO",              wert:z=>z.u.st.ko||null},
+        {id:"leist",kopf:"Leist", wert:z=>leistungVon(z.u,U), fmt:v=>v+" %",
+          farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null,
+          titel:"Beitrag gemessen an dem, was der Einsatzwert erwarten lässt"},
+        {id:"eig", kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet. „Eignung\" ist dieser Einsatzwert selbst."
+    }),
+    // FELDSPIEL: dieselbe Zeilenquelle wie vorher (fsBisher() — sonst waeren die an der
+    // Einheit vorberechneten Objektfelder bei Football/Hockey/Tennis ein Spoiler, s.
+    // dortiger Kommentar), dieselben zehn Spalten wie vorher (unveraendert — Welle 2 des
+    // Plans macht Hockey/Football ehrlich, hier bewusst nicht angefasst).
+    feldspiel:(art)=>({
+      namen:"Spieler",
+      zeilen:()=>{
+        const bisher=fsBisher().spieler;
+        const s=(u)=>bisher.get(u.id)||{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0,feldwuerfe:0,feldwuerfeTreffer:0};
+        return [...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,st:s(u)}));
+      },
+      sortierung:(a,b)=>b.st.punkte-a.st.punkte||b.st.assists-a.st.assists,
+      spalten:[
+        {id:"pkt", kopf:"Pkt", top:true, wert:z=>z.st.punkte||null},
+        {id:"reb", kopf:"Reb", wert:z=>z.st.rebounds||null},
+        {id:"ast", kopf:"Ast", wert:z=>z.st.assists||null},
+        {id:"stl", kopf:"Stl", wert:z=>z.st.steals||null},
+        {id:"blk", kopf:"Blk", wert:z=>z.st.bloecke||null},
+        {id:"to",  kopf:"TO",  wert:z=>z.st.verluste||null},
+        {id:"fg",  kopf:"FG",  titel:"Treffer/Versuche aus dem Feld",
+          wert:z=>z.st.feldwuerfe?z.st.feldwuerfeTreffer+"/"+z.st.feldwuerfe:null},
+        {id:"fgp", kopf:"FG%", wert:z=>z.st.feldwuerfe?Math.round(z.st.feldwuerfeTreffer/z.st.feldwuerfe*100):null, fmt:v=>v+"%"},
+        {id:"imp", kopf:"Imp", titel:"Kompositwert aus Punkten/Rebounds/Steals+Blocks/Ballverlusten",
+          wert:z=>{const st=z.st,imp=st.punkte+st.assists+st.rebounds*1.2+(st.steals+st.bloecke)*1.5-st.verluste*0.8; return imp?imp:null;},
+          fmt:v=>v.toFixed(1)},
+        {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" gewichtet Punkte/Rebounds/Steals+Blocks/Ballverluste zu einem Kompositwert. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
+    }),
+    buehne:(art)=>art.heben?WERTUNG_HEBEN(art):art.duell?WERTUNG_DUELL(art):WERTUNG_AUFTRITT(art),
+    bahn:(art)=>art.staffel?WERTUNG_STAFFEL(art):WERTUNG_RENNEN(art)
+  };
+
+  // Mischt Chassis-Default und Disziplin-Eintrag (`ART.wertung`, analog zu rezept/kurve/
+  // lang/plaene). Ein Disziplin-Eintrag ERSETZT den Default (Objekt) oder WANDELT ihn AB
+  // (Funktion (basis,art)=>{...basis, spalten:[...]}), damit z.B. Takeshi nur eine Spalte
+  // einschieben muss, statt den ganzen Rennen-Default zu kopieren.
+  function wertungVon(d){
+    const art=ARENA_ART[d]||FELDSPIEL_ART[d]||BUEHNE_ART[d]||BAHN_ART[d]||{};
+    const chassis=istFeldspiel(d)?"feldspiel":istBuehne(d)?"buehne":istBahn(d)?"bahn":"kampf";
+    const basis=WERTUNG_CHASSIS[chassis](art);
+    const w=art.wertung;
+    return !w?basis:(typeof w==="function"?w(basis,art):{...basis,...w});
   }
 
-  // WERTUNG FUERS FELDSPIEL. Dieselbe Tabelle wie im Kampf, aber die dortigen Kampf-
-  // Spalten (Schaden/Heilung/Verhindert/Getankt/KO/Leistung) sagen im Feldspiel nichts
-  // aus — deshalb standen sie dort bisher immer auf "–", Chris' Fund. Die Felder
-  // punkte/rebounds/assists/steals/bloecke/verluste sitzen bereits an jeder Feldspiel-
-  // Einheit (bauSpieler) und werden von der Basketball-Live-Engine schon befuellt
-  // (wirf/versucheSteal/loeseFlugAuf) — es fehlte nur die Anzeige. Header-Beschriftung
-  // wird in setWertungKopf() passend zur Disziplin umgeschaltet.
-  // Spalten 0-8 wie zuvor, 9. Spalte (Eignung) neu und gilt fuer BEIDE Modi (Chris'
-  // Fund, 29.08.: der erwartete Einsatzwert soll direkt neben der tatsaechlichen
-  // Leistung stehen, nicht nur indirekt ueber die Leistungs-Prozentzahl). Feldspiel
-  // bekommt zusaetzlich FG% (7) und Impact (8, dieselbe Formel wie MOTOREN[disc].wert()
-  // in der Messreihe — ein Boxscore-Kompositwert, kein neu erfundener).
-  //
-  // Kurze Kopf-Woerter (Chris' Fund, 29.08.): zehn Spalten je Team-Block bei ~450px
-  // Breite (zwei Bloecke aus ~900-960px Gesamtbreite, s. .wsplit) lassen fuer jede nur
-  // ~45px — "Verhindert"/"Steals"/"Impact" sprengten das. Reale Boxscore-Kuerzel
-  // (PTS/REB/AST/STL/BLK/TO/FG%) sind ausserdem vertrauter als ausgeschriebene Woerter;
-  // die volle Bedeutung steht weiterhin in wfuss.
-  const WERTUNG_KOPF={
-    kampf:["Schd","Heil","Verh","Tank","KO","Leist","–","–","–","Eig"],
-    feldspiel:["Pkt","Reb","Ast","Stl","Blk","TO","FG","FG%","Imp","Eig"]};
-  function setWertungKopf(feldspiel){
-    const kopf=feldspiel?WERTUNG_KOPF.feldspiel:WERTUNG_KOPF.kampf;
-    for(let i=0;i<kopf.length;i++){
-      // Jede Kopfzeile existiert zweimal (eigenes Team/Gegner, s. .wsplit) — beide mit
-      // demselben Durchlauf beschriften, das "r"-Suffix ist die einzige Abweichung.
-      for(const suf of["","r"]){
-        const th=document.getElementById("wth"+i+suf); if(th)th.textContent=kopf[i];
-      }
-    }
-    // Opus-Review-Fund (30.08.): die Namensspalte selbst (wthN/wthNr) wurde nie
-    // umgeschrieben — hiess deshalb auch im Feldspiel immer "Kämpfer".
-    for(const suf of["","r"]){
-      const thN=document.getElementById("wthN"+suf); if(thN)thN.textContent=feldspiel?"Spieler":"Kämpfer";
-    }
-    const fuss=document.getElementById("wfuss");
-    if(fuss)fuss.textContent=feldspiel
-      ? "„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" gewichtet Punkte/Rebounds/Steals+Blocks/Ballverluste zu einem Kompositwert. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
-      : "„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet. „Eignung\" ist dieser Einsatzwert selbst.";
-  }
-  function renderWertungFeldspiel(){
-    // ZWEI TABELLEN STATT EINER, s. renderWertung() oben fuer dieselbe Begruendung.
+  // DER EINE RENDERER — ersetzt renderWertung()/renderWertungFeldspiel()/
+  // setWertungKopf()/WERTUNG_KOPF. Die Kopfzeile kommt jetzt aus der Spaltenliste statt
+  // aus zehn fest verdrahteten <th> mit "–"-Fuellern; die <th> bekommen weiterhin die
+  // Ids wthN/wth{i}(+r), damit nichts, was diese Ids liest (Sonden, andere Skripte),
+  // etwas umlernen muss.
+  let wertungKopfStand="";
+  function renderWertungTabelle(){
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
-    // Ueber fsBisher() statt direkt u.punkte/u.rebounds/... zu lesen — sonst waeren die
-    // Objektfelder (bei Football/Hockey/Tennis vorab durchgerechnet) ein Spoiler, derselbe
-    // Fehler, den fsBisher() fuer Score und Kader-Panel schon behebt. Fuer die Basketball-
-    // Live-Engine ist fsBisher() ein reiner Mitschnitt (fsZeiger==fsZuege.length), liefert
-    // also dieselben Werte wie ein Direktzugriff — kostet hier nichts.
-    const alle=[...FSTEAM[0],...FSTEAM[1]];
-    const bisher=fsBisher().spieler;
-    const s=(u)=>bisher.get(u.id)||{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0,feldwuerfe:0,feldwuerfeTreffer:0};
-    const maxP=Math.max(1,...alle.map(u=>s(u).punkte));
-    tbL.textContent="";tbR.textContent="";
-    for(const seite of[0,1]){
+    const w=wertungVon(disc);
+    const stand=disc+"|"+w.spalten.map(s=>s.id+s.kopf).join(",");
+    if(stand!==wertungKopfStand){
+      for(const suf of ["","r"]){
+        const tr=document.getElementById("wkopf"+(suf?"R":"L")); if(!tr)continue;
+        tr.textContent="";
+        const thN=el("th",null,w.namen); thN.id="wthN"+suf; tr.appendChild(thN);
+        w.spalten.forEach((s,i)=>{const th=el("th","n",s.kopf); th.id="wth"+i+suf; if(s.titel)th.title=s.titel; tr.appendChild(th);});
+      }
+      const fuss=document.getElementById("wfuss"); if(fuss)fuss.textContent=w.fuss||"";
+      wertungKopfStand=stand;
+    }
+    const zeilen=w.zeilen();
+    // Bestwert je Spalte ueber BEIDE Seiten (wie bisher maxD/maxP), nur fuer top:true.
+    const best={}; for(const s of w.spalten)if(s.top)best[s.id]=Math.max(0,...zeilen.map(z=>+s.wert(z)||0));
+    tbL.textContent=""; tbR.textContent="";
+    for(const seite of [0,1]){
       const tb=seite===0?tbL:tbR;
-      const reihen=alle.filter(u=>u.side===seite).sort((a,b)=>s(b).punkte-s(a).punkte||s(b).assists-s(a).assists);
-      for(const u of reihen){
-        const st=s(u);
-        const tr=el("tr",u.side===0?"eigen":"gegner");
-        tr.appendChild(el("td",null,u.n.length>10?u.n.slice(0,9)+"…":u.n));
-        const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(v):"—";return td;};
-        tr.appendChild(c(st.punkte,maxP));
-        tr.appendChild(c(st.rebounds,99));
-        tr.appendChild(c(st.assists,99));
-        tr.appendChild(c(st.steals,99));
-        tr.appendChild(c(st.bloecke,99));
-        tr.appendChild(c(st.verluste,99));
-        // FG-SPALTE (Chris' Fund): Feldwurf-Treffer/Versuche, nicht nur Punkte — "FG 3/6"
-        // liest sich sofort als Trefferquote, waehrend eine reine Prozentzahl bei kleinen
-        // Versuchszahlen (ein 1/1-Spiel = 100 %) irrefuehrend waere. "—" ohne jeden Versuch.
-        const fg=el("td","n");
-        fg.textContent=st.feldwuerfe?st.feldwuerfeTreffer+"/"+st.feldwuerfe:"—";
-        tr.appendChild(fg);
-        // FG%-SPALTE (Chris' Fund, 29.08.): dieselbe Quote als Prozentzahl neben der
-        // Treffer/Versuche-Spalte — beide zusammen sagen mehr als jede fuer sich.
-        const fgp=el("td","n");
-        fgp.textContent=st.feldwuerfe?Math.round(st.feldwuerfeTreffer/st.feldwuerfe*100)+"%":"—";
-        tr.appendChild(fgp);
-        // IMPACT-SPALTE (Chris' Fund, 29.08.): derselbe Boxscore-Kompositwert wie
-        // MOTOREN[disc].wert() in der Messreihe (s. dort) — keine zweite Formel.
-        const impact=st.punkte+st.assists*1.0+st.rebounds*1.2+(st.steals+st.bloecke)*1.5-st.verluste*0.8;
-        tr.appendChild(el("td","n",impact?impact.toFixed(1):"—"));
-        // EIGNUNG-SPALTE: der erwartete Einsatzwert dieser Disziplin (s. baueEinheit/
-        // eigWert) — direkter Vergleich zur tatsaechlichen Leistung oben.
-        tr.appendChild(el("td","n",u.eig?String(Math.round(u.eig)):"—"));
+      for(const z of zeilen.filter(z=>z.side===seite).sort(w.sortierung)){
+        const tr=el("tr",(seite===0?"eigen":"gegner")+(z.raus?" raus":""));
+        tr.appendChild(el("td",null,z.n.length>10?z.n.slice(0,9)+"…":z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td","n"+(s.top&&typeof v==="number"&&v>0&&v>=best[s.id]?" top":""));
+          td.textContent=v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
         tb.appendChild(tr);
       }
     }
@@ -14147,6 +14254,7 @@
       return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    renderWertungTabelle();
     renderKader();
   }
 
@@ -14180,8 +14288,7 @@
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
-    setWertungKopf(false);
-    renderWertung();
+    renderWertungTabelle();
     renderKader();
   }
 
@@ -14857,7 +14964,19 @@
                   text:"Rennt durch und hofft. Das Publikum liebt es. Drei Stürze und Schluss."}
       },
       planJeSlot:{gatecrash:"wild", balancerun:"vorsicht", trapreader:"vorsicht",
-                  ironwill:"stetig", chaosdodge:"wild", finalwall:"stetig"}
+                  ironwill:"stetig", chaosdodge:"wild", finalwall:"stetig"},
+      // WERTUNGSTABELLE (Plan Abschnitt 4.3): schiebt eine "Nerv"-Spalte vor die
+      // Kraftreserve — Nervenkostuem ist hier die zweite Ressource neben der Reserve,
+      // und bei 0 scheidet der Laeufer aus (s. Ausscheiden-Logik oben). Alles andere
+      // kommt unveraendert aus dem Rennen-Default (WERTUNG_RENNEN): schatten/tackle sind
+      // hier beide aus, also keine Sog/Rempl-Spalten.
+      wertung:(basis,art)=>({...basis,
+        spalten:basis.spalten.flatMap(s=>s.id==="res"
+          ?[{id:"nerv",kopf:"Nerv",titel:"Nervenkostüm — bei 0 scheidet er aus",
+              wert:z=>z.u.nervenMax?Math.round(z.u.nerven/z.u.nervenMax*100):null, fmt:v=>v+"%",
+              farbe:v=>v<30?"var(--crit)":null}, s]
+          :[s]),
+        fuss:"Vierzehn Fallen. „Sauber\" ist ohne Sturz und ohne Gewalt genommen, „Durch\" mit Gewalt durchgebrettert, „Sturz\" gerissen. Jeder Sturz kostet Nerven; sind sie leer, ist er raus („Stand\"). „Weit\" ist die erreichte Strecke, „Zeit\" nur für die, die ankommen."})
     }
   };
 
@@ -14911,6 +15030,68 @@
   const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
+
+  // WERTUNGSTABELLE — BAHN-DEFAULTS (Plan Abschnitt 3.4/4.3). Live-Motor, kein
+  // Spoiler-Problem (Abschnitt 1.4): alle Felder duerfen direkt gelesen werden. KEINE
+  // "Leist(ung)"-Spalte auf der Bahn (Chris' Entscheidung, 06.09.): Plaetze sind ein
+  // Nullsummenspiel, anders als im Kampf/auf der Buehne, wo ein additiver Beitrag
+  // existiert.
+  function WERTUNG_RENNEN(art){
+    const H=()=>HUERDEN_N(), hw=art.hindernisWort||"Hürde", wucht=(art.lang||{}).WUCHT||"Wucht";
+    const zeilen=()=>LAEUFER.map(u=>{
+      const erreicht=H().filter(h=>u.pos>=h).length;
+      return {n:u.n,side:u.seite,raus:!!u.raus,eig:u.eig,u,erreicht,
+        sauber:Math.max(0,erreicht-u.gestolpert-(u.durchbruch||0)),
+        platz:u.fertig!=null&&!u.raus?rennFertig.filter(x=>!x.raus).indexOf(u)+1:null};
+    });
+    const spalten=[
+      {id:"hind", kopf:hw.slice(0,4), titel:hw+"n erreicht", wert:z=>z.erreicht+"/"+H().length},
+      {id:"sauber",kopf:"Saub", titel:"sauber genommen", top:true, wert:z=>z.sauber||null},
+      {id:"durch", kopf:wucht.slice(0,5), titel:wucht, wert:z=>z.u.durchbruch||null},
+      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null},
+      ...(art.schatten?[{id:"sog",kopf:"Sog",titel:"Anteil im Windschatten",
+        wert:z=>Math.round(z.u.schattenS/Math.max(0.1,z.u.schattenS+z.u.spitzeS)*100),fmt:v=>v+"%"}]:[]),
+      ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
+        wert:z=>(z.u.tackles||z.u.getackelt)?z.u.tackles+"/"+z.u.getackelt:null}]:[]),
+      {id:"weit", kopf:"Weit", titel:"erreichte Strecke", top:true, wert:z=>Math.round(z.u.pos*100), fmt:v=>v+"%"},
+      {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+        farbe:v=>v==="leer"?"var(--crit)":null},
+      {id:"zeit", kopf:"Zeit", wert:z=>z.u.fertig!=null&&!z.u.raus?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+      {id:"stand",kopf:"Stand", wert:z=>z.u.raus?"raus":z.platz?"Ziel "+z.platz:"läuft",
+        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&v.startsWith("Ziel"))?"var(--ok)":null},
+      {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
+    return {namen:"Läufer", zeilen, spalten,
+      sortierung:(a,b)=>((a.u.fertig??99)-(b.u.fertig??99))||(b.u.pos-a.u.pos), fuss:""};
+  }
+
+  // STAFFEL (`staffel:true`): nur einer je Team laeuft gleichzeitig — die anderen fuenf
+  // Spalten der Rennen-Vorlage passen deshalb nicht (kein individuelles Hindernis-Feld,
+  // kein Windschatten-Anteil, der etwas ueber die STAFFEL aussagt). Eigene Spalten:
+  // welches Bein, wie stand die eigene Etappe, wie viele Wechsel, wie viel dabei
+  // verloren ging. `laufAnteil()` (oben) rechnet den Fortschritt im EIGENEN Abschnitt
+  // bereits fuer die Kamera vor — hier wiederverwendet statt zweimal gebaut.
+  function WERTUNG_STAFFEL(art){
+    const zeilen=()=>LAEUFER.map(u=>({n:u.n,side:u.seite,raus:false,eig:u.eig,u}));
+    return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
+      spalten:[
+        {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
+        {id:"etappe",kopf:"Etappe", titel:"Zeit für den eigenen Abschnitt",
+          wert:z=>z.u.etappenZeit!=null?+z.u.etappenZeit.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+        {id:"wechs",kopf:"Wechs", titel:"Übergaben, an denen beteiligt", wert:z=>z.u.wechselN||null},
+        {id:"verl", kopf:"Verl", titel:"bei Übergaben verlorene Zeit",
+          wert:z=>z.u.wechselKonto<0?Math.round(-z.u.wechselKonto*10)/10:null, fmt:v=>v.toFixed(1)+" s"},
+        {id:"patz", kopf:"Patz", titel:"gestürzt oder Übergabe verpatzt", wert:z=>z.u.gestolpert||null},
+        {id:"weit", kopf:"Weit", titel:"Fortschritt im eigenen Abschnitt", top:true,
+          wert:z=>Math.round(laufAnteil(z.u)*100), fmt:v=>v+"%"},
+        {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+          farbe:v=>v==="leer"?"var(--crit)":null},
+        {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
+          wert:z=>z.u.fertig!=null?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+        {id:"stand",kopf:"Stand", wert:z=>z.u.fertig!=null?"Ziel":z.u.durch?"übergeben":z.u.aktiv?"läuft":"wartet",
+          farbe:v=>v==="Ziel"?"var(--ok)":null},
+        {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich)."};
+  }
   // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
   // ausgewaehlt ist (u.id) — oder null. Reine Anzeigegroesse: die Simulation liest sie
   // nirgends, ein Rennen ohne Eingriff laeuft damit Tick fuer Tick wie vorher.

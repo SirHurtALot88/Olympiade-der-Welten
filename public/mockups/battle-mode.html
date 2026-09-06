@@ -155,21 +155,19 @@
           <!-- ZWEI BLOECKE STATT EINER GEMEINSAMEN TABELLE (Chris' Fund, 29.08.): bei
                zwoelf gemischt sortierten Zeilen musste man erst die Team-Farbe der
                ersten Spalte lesen, um "eigen" von "Gegner" zu trennen. Jetzt eigenes
-               Team links, Gegner rechts, jeweils fuer sich nach Beitrag sortiert — die
-               Kopf-IDs (wth*/wth*R) tragen denselben Wortlaut zweimal, damit
-               setWertungKopf() beide Tabellen mit einem Durchlauf beschriften kann. -->
+               Team links, Gegner rechts, jeweils fuer sich sortiert. Die Kopfzeile
+               (wkopfL/wkopfR) ist bewusst LEER im HTML: renderWertungTabelle() (Plan
+               05.09., wertungstabelle-je-disziplin-plan) baut sie aus der Spaltenliste
+               der jeweiligen Disziplin, die <th> behalten dabei die Ids wthN/wth{i}(+r)
+               fuer alles, was diese Ids liest. -->
           <div class="wsplit">
             <div class="wteam">
               <div class="wteamlabel">Eigenes Team</div>
-              <div class="tbl-wrap"><table class="wtbl"><thead><tr>
-                <th id="wthN">Kämpfer</th><th class="n" id="wth0">Schaden</th><th class="n" id="wth1">Heilung</th><th class="n" id="wth2">Verhindert</th><th class="n" id="wth3">Getankt</th><th class="n" id="wth4">KO</th><th class="n" id="wth5">Leistung</th><th class="n" id="wth6">–</th><th class="n" id="wth7">–</th><th class="n" id="wth8">–</th><th class="n" id="wth9">–</th>
-              </tr></thead><tbody id="wbodyL"></tbody></table></div>
+              <div class="tbl-wrap"><table class="wtbl"><thead><tr id="wkopfL"></tr></thead><tbody id="wbodyL"></tbody></table></div>
             </div>
             <div class="wteam">
               <div class="wteamlabel">Gegner</div>
-              <div class="tbl-wrap"><table class="wtbl"><thead><tr>
-                <th id="wthNr">Kämpfer</th><th class="n" id="wth0r">Schaden</th><th class="n" id="wth1r">Heilung</th><th class="n" id="wth2r">Verhindert</th><th class="n" id="wth3r">Getankt</th><th class="n" id="wth4r">KO</th><th class="n" id="wth5r">Leistung</th><th class="n" id="wth6r">–</th><th class="n" id="wth7r">–</th><th class="n" id="wth8r">–</th><th class="n" id="wth9r">–</th>
-              </tr></thead><tbody id="wbodyR"></tbody></table></div>
+              <div class="tbl-wrap"><table class="wtbl"><thead><tr id="wkopfR"></tr></thead><tbody id="wbodyR"></tbody></table></div>
             </div>
           </div>
           <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
