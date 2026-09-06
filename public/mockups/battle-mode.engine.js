@@ -10363,7 +10363,9 @@
       },
       // WERTUNGSTABELLE (Plan Abschnitt 4.2): nur die Woerter — Spalten kommen aus
       // WERTUNG_AUFTRITT. "Pause" ist Chris' eigenes Wort fuer failWort.
-      wertung:{failKopf:"Pause",
+      // Feld heisst `wertungTabelle` (nicht `wertung`), um mit PR #807s `BAHN_ART.*.wertung`
+      // (String-Wertungsmodus fuer bahnTeamstand) nicht zu kollidieren, s. Review 06.09.
+      wertungTabelle:{failKopf:"Pause",
         fuss:"Jeder Durchgang bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (der Durchgang zählt dann nur 65 %). „Abfall\" vergleicht die späten Durchgänge mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
@@ -10389,7 +10391,8 @@
       // WERTUNGSTABELLE (Plan Abschnitt 4.1): nur die Woerter — Spalten kommen aus
       // WERTUNG_DUELL. Sortierung nach Brett statt Punkten ist der Default (Chris'
       // Entscheidung, 06.09.), gilt also automatisch mit.
-      wertung:{duellWort:"Brett", erfolgKopf:"Stark", failKopf:"Zeit−",
+      // Feld heisst `wertungTabelle` (nicht `wertung`), s. Kommentar bei Wettessen oben.
+      wertungTabelle:{duellWort:"Brett", erfolgKopf:"Stark", failKopf:"Zeit−",
         fuss:"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
@@ -11100,7 +11103,7 @@
   // BRETT, NICHT NACH PUNKTEN (Chris' Entscheidung, 06.09.): beide Team-Bloecke zeigen
   // so dieselbe Paarung auf einer Zeile nebeneinander.
   function WERTUNG_DUELL(art){
-    const w=art.wertung||{};
+    const w=art.wertungTabelle||{};
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,brett:u.brett??0,
       r:bisher(u), fertig:paarFertig(u,art)}));
@@ -11127,7 +11130,7 @@
   // AUFTRITT (Wettessen, Showcase, Eiskunstlauf, Breaking): kein Duell, jeder Teilnehmer
   // steht fuer sich; sortiert nach Gesamtpunkten wie bisher der Buehnenbalken.
   function WERTUNG_AUFTRITT(art){
-    const w=art.wertung||{};
+    const w=art.wertungTabelle||{};
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,r:bisher(u)}));
     return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>b.u.summe-a.u.summe,
@@ -11158,7 +11161,7 @@
   // zuletzt gehobene Last, NICHT die angesagte naechste (die im Motor ohnehin Teil der
   // vorberechneten Runden ist).
   function WERTUNG_HEBEN(art){
-    const w=art.wertung||{};
+    const w=art.wertungTabelle||{};
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,
       fertig:paarFertig(u,art)}));
     return {namen:"Heber", zeilen, sortierung:(a,b)=>(a.u.duellNr??0)-(b.u.duellNr??0)||a.u.side-b.u.side,
@@ -14190,15 +14193,19 @@
     bahn:(art)=>art.staffel?WERTUNG_STAFFEL(art):WERTUNG_RENNEN(art)
   };
 
-  // Mischt Chassis-Default und Disziplin-Eintrag (`ART.wertung`, analog zu rezept/kurve/
-  // lang/plaene). Ein Disziplin-Eintrag ERSETZT den Default (Objekt) oder WANDELT ihn AB
-  // (Funktion (basis,art)=>{...basis, spalten:[...]}), damit z.B. Takeshi nur eine Spalte
-  // einschieben muss, statt den ganzen Rennen-Default zu kopieren.
+  // Mischt Chassis-Default und Disziplin-Eintrag (`ART.wertungTabelle`, analog zu
+  // rezept/kurve/lang/plaene). Ein Disziplin-Eintrag ERSETZT den Default (Objekt) oder
+  // WANDELT ihn AB (Funktion (basis,art)=>{...basis, spalten:[...]}), damit z.B. Takeshi
+  // nur eine Spalte einschieben muss, statt den ganzen Rennen-Default zu kopieren.
+  // HEISST BEWUSST NICHT `wertung` (Review-Fund 06.09.): BAHN_ART.*.wertung ist bereits
+  // aus #807 der STRING-Wertungsmodus fuer bahnTeamstand ("rang"/undefined->"zieleinlauf")
+  // — dieselbe Schluesselbezeichnung auf demselben Objekt-Typ, aber eine andere Bedeutung.
+  // Ein Funktions-Wert dort haette bahnTeamstand/bahnLauf verwirrt (s. dortige Kommentare).
   function wertungVon(d){
     const art=ARENA_ART[d]||FELDSPIEL_ART[d]||BUEHNE_ART[d]||BAHN_ART[d]||{};
     const chassis=istFeldspiel(d)?"feldspiel":istBuehne(d)?"buehne":istBahn(d)?"bahn":"kampf";
     const basis=WERTUNG_CHASSIS[chassis](art);
-    const w=art.wertung;
+    const w=art.wertungTabelle;
     return !w?basis:(typeof w==="function"?w(basis,art):{...basis,...w});
   }
 
@@ -15075,7 +15082,13 @@
       // und bei 0 scheidet der Laeufer aus (s. Ausscheiden-Logik oben). Alles andere
       // kommt unveraendert aus dem Rennen-Default (WERTUNG_RENNEN): schatten/tackle sind
       // hier beide aus, also keine Sog/Rempl-Spalten.
-      wertung:(basis,art)=>({...basis,
+      // Feld heisst `wertungTabelle` (nicht `wertung`, Review-Fund 06.09.): `wertung` auf
+      // BAHN_ART ist bereits aus #807 der String-Wertungsmodus fuer bahnTeamstand/bahnLauf
+      // ("rang" oder Fallback "zieleinlauf") — eine Funktion hier haette das kollidieren
+      // lassen (bahnTeamstand las eine Funktion statt "rang"/undefined, bahnLauf haette
+      // eine Funktion statt "zieleinlauf" gemeldet). Takeshi fuehrt bewusst KEINE eigene
+      // `wertung` (bleibt beim alten Zieleinlauf-Zaehler, s. bahnTeamstand-Kommentar).
+      wertungTabelle:(basis,art)=>({...basis,
         spalten:basis.spalten.flatMap(s=>s.id==="res"
           ?[{id:"nerv",kopf:"Nerv",titel:"Nervenkostüm — bei 0 scheidet er aus",
               wert:z=>z.u.nervenMax?Math.round(z.u.nerven/z.u.nervenMax*100):null, fmt:v=>v+"%",
