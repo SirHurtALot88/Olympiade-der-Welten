@@ -39,17 +39,13 @@
  *                        von je ceil(Poolgroesse/P) Jahren (Default P=70 -- NICHT 64:
  *                        Basketball GM fuellt jeden Jahrgang unter 70 Spielern mit
  *                        ZUFAELLIG GENERIERTEN Nicht-Oly-Fuellspielern auf, 70 ist die
- *                        kleinste Groesse ohne das). Jahr 1 (Startsaison) ist ein
- *                        einmaliger Expansion-Draft der Groesse firstYearPicks (Default
- *                        = P, oder bei --empty-rosters automatisch 384 = 32 Teams * 12,
- *                        "muessten genug sein um die Teams zuverlaessig zu fuellen").
- *                        Danach rotiert der Rest weiter: Zyklus 1 verteilt die restliche
- *                        Gruppe zufaellig auf so viele Jahre wie noetig; jeder weitere
- *                        Zyklus ist eine KOMPLETT NEUE, unabhaengige Zufallsverteilung
- *                        derselben Gruppe (nicht dieselbe Jahrgangs-Zuordnung wie zuvor),
- *                        bis die mit N gewuenschte Gesamtjahreszahl erreicht ist -- "150
- *                        Jahre durchrotieren mit immer neueren Junior-Versionen". Reicht
- *                        N nicht fuer einen vollen Zyklus, bekommen die dann nicht
+ *                        kleinste Groesse ohne das). Zyklus 1 verteilt die Gruppe
+ *                        zufaellig auf so viele Jahre wie noetig; jeder weitere Zyklus
+ *                        ist eine KOMPLETT NEUE, unabhaengige Zufallsverteilung derselben
+ *                        Gruppe (nicht dieselbe Jahrgangs-Zuordnung wie zuvor), bis die
+ *                        mit N gewuenschte Gesamtjahreszahl erreicht ist -- "150 Jahre
+ *                        durchrotieren mit immer neueren Junior-Versionen". Reicht N
+ *                        nicht fuer einen vollen Zyklus, bekommen die dann nicht
  *                        verplanten Spieler einen sofortigen Free-Agent-Eintrag statt
  *                        spurlos zu verschwinden.
  *                        --empty-rosters: Chris 06.09. (4. Ruecksprache) -- "die Roster
@@ -57,11 +53,23 @@
  *                        die Kader-Uebernahme komplett ab, auch die bisher gerosterten
  *                        328 gehen ins Draft-/Free-Agent-System. Kein Team startet mit
  *                        einem vorgefertigten Kader. Braucht --draft-classes.
- *                        --initial-free-agents M (Default 100 bei --draft-classes, 0
- *                        sonst): reserviert M Spieler quer durch alle Staerke-Brackets
- *                        (stark bis schwach) als sofortige Free Agents VOR dem Draft-
- *                        Zyklus -- Chris: "ein paar Spieler sollten schon am Anfang als
- *                        Free Agents verfuegbar sein, stark bis schwach, so 100".
+ *                        WICHTIG (Chris 06.09., 6. Ruecksprache, nach echtem Test):
+ *                        "draft gibts nicht am anfang" -- Basketball GM bietet direkt
+ *                        nach dem Erstellen einer Liga KEINEN Draft an (der existiert
+ *                        laut Phasenfolge Preseason->Season->Playoffs->Draft Lottery->
+ *                        Draft erst am Ende einer Saison). Ein Expansion-Draft in Jahr 1
+ *                        waere also toter Code -- deshalb gibt es firstYearPicks als
+ *                        Sondergroesse fuer Jahr 1 nicht mehr (Default = P wie jedes
+ *                        andere Jahr). Der einzig wirksame Hebel fuer sofort spielbare
+ *                        Kader ist ein GROSSER sofortiger Free-Agent-Pool.
+ *                        --initial-free-agents M reserviert M Spieler quer durch alle
+ *                        Staerke-Brackets (stark bis schwach) als sofortige Free Agents,
+ *                        VOR dem Draft-Zyklus, per Free Agency signierbar (nicht per
+ *                        Draft). Default 600 bei --empty-rosters (Chris: "500 oder so,
+ *                        besser 600, damit die Teams die Wahl haben wenn jedes 15
+ *                        Spieler picken soll" -- 32 Teams * 15 = 480 plus Puffer fuer
+ *                        echte Auswahl), sonst 100 (echte Kader bleiben ja bestehen und
+ *                        koennen sofort spielen, da reicht ein kleinerer Puffer).
  *                        Oberes Staerke-Drittel des Drafts (Charakter-Eigenschaft, gilt
  *                        in jedem Zyklus gleich) bekommt "mittleres bis starkes CA, aber
  *                        hohes PO": gedaempfte Anfangs-Ratings (~55% des vollen
@@ -75,11 +83,7 @@
  *                        unterschrieben). Reine Terminplanung: ob ein Charakter zum
  *                        Zeitpunkt seines naechsten Zyklus im Spiel tatsaechlich schon
  *                        im Ruhestand ist, haengt vom echten Alterungsverlauf im
- *                        jeweiligen Save ab, nicht von diesem Skript. UNGEKLAERT (nicht
- *                        in der offiziellen Doku gefunden): ob ein brandneues
- *                        --empty-rosters-League-File direkt in den Draft startet oder
- *                        ob Basketball GM technisch erst eine (dann kaderlose) Saison
- *                        erwartet -- das muss Chris einmal ausprobieren.
+ *                        jeweiligen Save ab, nicht von diesem Skript.
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
@@ -240,15 +244,22 @@ function main() {
   // dann draften" -- alle Spieler (auch die bisher auf echten Oly-Kadern) werden Teil
   // des Draft-/Free-Agent-Systems, kein Team startet mit einem vorgefertigten Kader.
   const emptyRosters = process.argv.includes("--empty-rosters");
-  // "ein paar Spieler sollten schon am Anfang als Free Agents verfuegbar sein, stark
-  // bis schwach, so 100" -- Reserve aus dem Pool, VOR dem Draft-Zyklus, nicht Teil davon.
-  const initialFreeAgents = Number(arg("--initial-free-agents") ?? (totalDraftYears ? "100" : "0"));
-  // "muessten genug sein um die Teams zuverlaessig zu fuellen mit dem Draft" -- die
-  // erste Jahrgangs-Ladung (Jahr 1 von Zyklus 1) ist bei leeren Kadern viel groesser als
-  // die normalen Folgejahrgaenge, quasi ein Expansion-Draft: genug fuer ~12 Spieler pro
-  // Team (32*12=384), damit alle 32 Teams sofort einen spielbaren Kader haben statt erst
-  // nach Jahren picksPerYear/32-weise aufzufuellen.
-  const firstYearPicks = Number(arg("--first-year-picks") ?? (emptyRosters ? "384" : String(picksPerYear)));
+  // Chris 06.09. (6. Ruecksprache): "draft gibts nicht am anfang" -- Basketball GM
+  // bietet direkt nach dem Erstellen einer Liga KEINEN Draft an (der existiert laut
+  // Doku erst am Ende einer Saison, s. Docstring-Warnung). Ein Expansion-Draft in Jahr
+  // 1 (tid -2) waere also toter Code -- die Teams koennen ihn am ersten Tag gar nicht
+  // durchfuehren. Einzig wirksamer Hebel fuer sofort spielbare Kader ist Free Agency:
+  // deshalb bei --empty-rosters ein viel groesserer sofortiger Free-Agent-Pool (Default
+  // 600, Chris: "500 oder so, besser 600, damit die Teams die Wahl haben wenn jedes 15
+  // Spieler picken soll" -- 32 Teams * 15 = 480, plus Puffer fuer echte Auswahl statt
+  // exakt genug). Ohne --empty-rosters (echte Kader bleiben bestehen, koennen sofort
+  // spielen) reicht der alte kleine Puffer von 100.
+  const initialFreeAgents = Number(arg("--initial-free-agents") ?? (emptyRosters ? "600" : totalDraftYears ? "100" : "0"));
+  // Jahr 1 des Draft-Zyklus braucht KEINE Sondergroesse mehr (s.o.) -- der erste
+  // erreichbare Draft laeuft wie jeder andere mit der normalen Jahrgangsgroesse
+  // picksPerYear. Bleibt als Flag verfuegbar, falls Chris das Verhalten je nach
+  // Testergebnis doch wieder anders haben will.
+  const firstYearPicks = Number(arg("--first-year-picks") ?? String(picksPerYear));
   if (!saveId) throw new Error("--save-id required");
   if (freeAgentsOnly && totalDraftYears) {
     throw new Error("--free-agents-only und --draft-classes schliessen sich aus -- getrennte Laeufe/Dateien.");
