@@ -245,7 +245,8 @@ function main() {
       born: { year: bornYear, loc: "" },
       weight,
       hgt: heightInches,
-      draft: { year: bornYear + 19, round: 0, pick: 0, tid: -1 },
+      // Darf nie in der Zukunft liegen -- das sind schon aktive Spieler, kein Nachwuchs-Draft.
+      draft: { year: Math.min(startingSeason, bornYear + 19), round: 0, pick: 0, tid: -1 },
       contract: { amount, exp: startingSeason + 2 },
       imgURL: portraitRel ? `${BASE_URL}${portraitRel}` : undefined,
       ratings: [
