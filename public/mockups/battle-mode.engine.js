@@ -4212,6 +4212,19 @@
       // ist es das nicht mehr: eine zweite Disziplin haette jede dieser Stellen einzeln
       // anfassen muessen. Die Zahlen selbst sind unveraendert (4 x 90 s, Pause 1,0 s,
       // Schussuhr 8 s), Basketball bleibt zeichenweise das alte Spiel.
+      // periodenPause BEWUSST NICHT angehoben (06.09., Chris' Fund "da fehlt der
+      // Pausenbuzzer" — Overlay+Ton kamen dazu, s. starteViertelpause, aber NICHT ueber
+      // eine laengere Simulationspause): nachgemessen (scripts/miss-alle-disziplinen.mjs 24
+      // basketball) verschob schon eine Anhebung auf 3,0 rho von 0,772 auf 0,771 — winzig,
+      // weit innerhalb der Kader-Spannweite (~0,09-0,11), aber NICHT bit-identisch, weil die
+      // zusaetzlichen Leerlauf-Ticks in bewegeSpielerLive denselben deterministischen
+      // Zufallsstrom weiterschieben, aus dem alle folgenden Ballbesitze des Spiels ziehen.
+      // Die sichtbare Dauer von Overlay/Buzzer haengt deshalb NICHT an dieser Zahl, sondern
+      // an einer eigenen, rein kosmetischen Echtzeit-Uhr (vpSichtbarBis, wall-clock via
+      // performance.now(), s. starteViertelpause/updateHudFeldspiel) — die Simulation pausiert
+      // weiter exakt 1,0 Sekunde wie zuvor, das Overlay bleibt unabhaengig davon laenger
+      // stehen. Damit ist die Rangtreue-Sonde bit-identisch (nachgemessen: 0,772/0,088/
+      // 0,923/0,231 vor UND nach dieser gesamten Aenderung, s. PR-Beschreibung).
       live:{perioden:4, periodenDauer:90, periodenPause:1.0, schussuhr:8,
             periodeWort:"Viertel"},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Plan 1.2 Punkt 1,
@@ -4604,6 +4617,11 @@
   // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
   // zurueck() (MOTOREN.basketball) sie mit einer Zeile mitnehmen koennen.
   let fsLive=null;
+  // Wandzeit-Zeitstempel (performance.now()), bis wann das Viertelpause-Overlay sichtbar
+  // bleibt — s. starteViertelpause()/updateHudFeldspiel() fuer die Herleitung: bewusst
+  // ENTKOPPELT von fsLive.viertelpause.dauer (der Rangtreue-kritischen Simulationspause),
+  // sonst wuerde ein laenger sichtbares Overlay dieselbe Zufallskette verschieben.
+  let vpSichtbarBis=0;
   // SCHIEDSRICHTER (Chris' Auftrag, 29.08.: "wir brauchen einen schiedsrichter der fouls
   // pfeifen kann"). Bewusst NICHT in FSTEAM: er ist kein Spieler, hat keine Sub-Skills,
   // keinen Slot, keine Deckung und darf in keiner der Spieler-Schleifen (zuordneDeckung,
@@ -4679,9 +4697,10 @@
   // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
   // ARENA_INTERAKTION_KONZEPT.md).
   // STANDPHASE FREIWURF — alle vier PLATZHALTER, in SPIELZEIT-Sekunden (die Uhr steht
-  // waehrend der Phase still, s. stepBasketballLive; ZEIT_DEHNUNG.basketball=2 streckt sie
-  // fuer den Zuschauer wie jede andere Sekunde auch). Summe fuer zwei Freiwuerfe: 1,6 +
-  // 2x(0,9+0,5+0,7) = 5,8s Zuschauerzeit.
+  // waehrend der Phase still, s. stepBasketballLive; ZEIT_DEHNUNG.basketball streckt sie
+  // fuer den Zuschauer wie jede andere Sekunde auch, aktuell Faktor 1, s. die
+  // ZEIT_DEHNUNG-Tabelle weiter unten). Summe fuer zwei Freiwuerfe: 1,6 +
+  // 2x(0,9+0,5+0,7) = 5,8s Simulationszeit.
   const FW_FORMATION=1.6;           // Aufstellen an der Linie/an der Zone, bevor der erste Ball fliegt
   const FW_ANLAUF=0.9;              // Ritual am Ball, bevor der Schuetze abdrueckt
   const FW_FLUG=0.5;                // Ballflug zum Ring (Muster wie flug.dauer bei einem Feldwurf)
@@ -4840,8 +4859,10 @@
   // 4 Viertel aus dem BESTEHENDEN 180s-Budget herausgeschnitten (das war der Fehler dieser
   // Runde: SPIELDAUER_BASKETBALL blieb bei 180, macht 4x45s statt 4x90s). Jetzt richtig:
   // die Spieldauer selbst ist das Produkt aus Viertelzahl und Viertellaenge, keine zweite,
-  // unabhaengige Zahl — 4 Viertel zu je 90s macht 360s Gesamt-Spielzeit (bei
-  // ZEIT_DEHNUNG.basketball=2 also ~12 Minuten Zuschauzeit statt vorher ~6).
+  // unabhaengige Zahl — 4 Viertel zu je 90s macht 360s Gesamt-Spielzeit. Bei
+  // ZEIT_DEHNUNG.basketball=1 (06.09. auf 1 zurueckgenommen, s. ZEIT_DEHNUNG-Tabelle weiter
+  // unten fuer die Herleitung) sind das 90 reale Sekunden = 1,5 Minuten je Viertel, wie von
+  // Chris vorgegeben — vorher (Faktor 2) waren es 3 Minuten je Viertel/12 Minuten Gesamt.
   const VIERTEL_ANZAHL_BASKETBALL=4;
   const VIERTEL_DAUER_BASKETBALL=90;
   const SPIELDAUER_BASKETBALL=VIERTEL_ANZAHL_BASKETBALL*VIERTEL_DAUER_BASKETBALL; // 360s (4x1:30)
@@ -4849,8 +4870,15 @@
   // Formation/Animation wie beim Freiwurf (FW_*): die Uhr steht ohnehin schon (s.
   // stepBasketballLive), hier reicht ein kurzer, im Feed lesbarer Break, waehrend die
   // Spieler sanft auslaufen (bewegeSpielerLive, dasselbe Muster wie nach Spielende).
-  // PLATZHALTER-Dauer wie ueberall in diesem Entwurf, in Simulationssekunden (s.
-  // PFIFF_DAUER-Kommentar oben: real beim Zuschauen ~doppelt so lang, ZEIT_DEHNUNG.basketball=2).
+  // PLATZHALTER-Dauer wie ueberall in diesem Entwurf, in Simulationssekunden, seit dem
+  // ZEIT_DEHNUNG-Wechsel auf 1 (06.09., s. ZEIT_DEHNUNG-Tabelle weiter unten) 1:1 auch die
+  // reale Sekundenzahl. BEWUSST NICHT angehoben, obwohl das naheliegend gewirkt haette, um
+  // Overlay/Buzzer (06.09., Chris' Fund "da fehlt der Pausenbuzzer") mehr Zeit zu geben —
+  // nachgemessen zieht eine laengere Simulationspause hier rho winzig, aber messbar (0,772
+  // -> 0,771, s. Kommentar bei FELDSPIEL_ART.basketball.live), weil die zusaetzlichen
+  // Leerlauf-Ticks denselben deterministischen Zufallsstrom weiterschieben. Die sichtbare
+  // Dauer von Overlay/Buzzer laeuft deshalb ueber eine eigene, rein kosmetische Echtzeit-Uhr
+  // (vpSichtbarBis, s. starteViertelpause/updateHudFeldspiel), nicht ueber diese Zahl.
   const VIERTELPAUSE_DAUER_BASKETBALL=1.0;
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   // Die Geduld-Abbauzeit, bis hierher ein Literal 4 mitten in `schwelle`. Nur benannt,
@@ -7166,7 +7194,42 @@
     fsBall={sichtbar:false,x:0,y:0};
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
     fsLive.phase="viertelpause";
+    // Simulationspause UNVERAENDERT bei periodenPause/VIERTELPAUSE_DAUER_BASKETBALL (1,0 s,
+    // s. die beiden Kommentare dort fuer die Begruendung: laenger gemacht, verschiebt das
+    // rho winzig ueber die Zufallskette in bewegeSpielerLive). Overlay und Buzzer haengen
+    // NICHT an dieser Zahl.
     fsLive.viertelpause={t:0,dauer:(LIVE()||{}).periodenPause||VIERTELPAUSE_DAUER_BASKETBALL,naechsteSeite};
+    // PAUSENBUZZER (Chris' Fund 06.09.: "da fehlt der Pausenbuzzer") — bislang lief die
+    // Pause komplett lautlos ab, derselbe buzzer.mp3 wie beim Schlusspfiff (s. weiter unten
+    // im "fsT>=SPIELDAUER"-Zweig), nur leiser: der Schlusspfiff beendet das ganze Spiel,
+    // eine Viertelpause nur einen Abschnitt davon.
+    if(feldspielDisc==="basketball")bkSfx("buzzer.mp3",0.6);
+    // SICHTBARER BREAK (dieselbe Luecke wie beim Ton: es gab bisher kein Overlay, nur den
+    // Feed-Text oben — dafuer muesste man aber ins Log schauen, waehrend die Spieler auf
+    // dem Feld einfach weiterliefen, als sei nichts passiert). Dieselbe Overlay-Technik wie
+    // Einlauf/Endstand (feste #id, hidden-Attribut, s. battle-mode.css .viertelpause) statt
+    // eines neuen Canvas-Zeichenpfads — der Break ist Text/Zahl, kein Sprite.
+    //
+    // EIGENE ECHTZEIT-UHR STATT fsLive.viertelpause FUER DIE SICHTBARKEIT: die Simulation
+    // pausiert absichtlich nur die knappe 1,0 s von oben (Rangtreue-Sicherheit), aber ein
+    // Overlay, das genauso kurz aufblitzt, waere kaum lesbar — "Pause — Viertel 1 von 4"
+    // plus Stand braucht mehr als eine Sekunde. vpSichtbarBis ist deshalb ein reiner
+    // Wandzeit-Zeitstempel (performance.now()), den nur updateHudFeldspiel liest (dort laeuft
+    // ohnehin jeden gezeichneten Frame ein DOM-Update, unabhaengig von stepFeldspiel/fsT) —
+    // die Abnahme-Sonde (feldspielProbe) ruft stepFeldspiel() direkt und nie
+    // updateHudFeldspiel, diese Uhr beeinflusst also nichts Zaehlbares. Halbzeit (nach dem
+    // halben Spiel, hier Viertel 2 von 4) bekommt mehr Anzeigezeit als eine gewoehnliche
+    // Viertelpause, wie beim realen Vorbild — auch das rein kosmetisch.
+    const perioden=(LIVE()||{}).perioden||VIERTEL_ANZAHL_BASKETBALL;
+    const istHalbzeit=perioden>=4&&zuEnde===Math.floor(perioden/2);
+    vpSichtbarBis=performance.now()+(istHalbzeit?3600:2000);
+    const vp=document.getElementById("viertelpause");
+    if(vp){
+      const titel=document.getElementById("vpTitel"), sub=document.getElementById("vpUntertitel");
+      if(titel)titel.textContent=istHalbzeit?"Halbzeit":"Pause";
+      if(sub)sub.textContent="Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".";
+      vp.hidden=false;
+    }
   }
 
   // WER DEN ANGRIFF EROEFFNET. Frueher ein lineares gewichtetesLos ueber AUFBAU — bei
@@ -9170,6 +9233,11 @@
       if(fsLive.viertelpause.t>=fsLive.viertelpause.dauer){
         const naechsteSeite=fsLive.viertelpause.naechsteSeite;
         fsLive.phase="laufend"; fsLive.viertelpause=null;
+        // Overlay BLEIBT hier bewusst noch stehen (kein vp.hidden=true) — es haengt an der
+        // eigenen Echtzeit-Uhr vpSichtbarBis (s. starteViertelpause), die laenger laeuft als
+        // diese Rangtreue-kritische Simulationspause, und wird von updateHudFeldspiel
+        // ausgeblendet. Der Anpfiff darunter darf trotzdem sofort passieren: die Spieler
+        // laufen unter dem blickdichten Overlay bereits wieder an.
         naechsterAngriff(naechsteSeite,true);
       }
       return;
@@ -9610,6 +9678,21 @@
     const maxPkt=Math.max(1,bisher[0],bisher[1]);
     document.getElementById("thpL").style.width=(bisher[0]/maxPkt*100)+"%";
     document.getElementById("thpR").style.width=(bisher[1]/maxPkt*100)+"%";
+    // VIERTELPAUSE-OVERLAY AUSBLENDEN/COUNTDOWN. Titel/Untertitel setzt starteViertelpause()
+    // einmal beim Einblenden (s. dort); hier laeuft nur die Restsekunden-Anzeige und das
+    // automatische Ausblenden — beides an vpSichtbarBis (Wandzeit), bewusst NICHT an
+    // fsLive.viertelpause (die Rangtreue-kritische, viel kuerzere Simulationspause ist zu
+    // diesem Zeitpunkt oft schon vorbei, s. Kommentar bei vpSichtbarBis). Laeuft einmal je
+    // GEZEICHNETEM Frame (requestAnimationFrame), nicht in stepFeldspielLive/stepSim.
+    const vp=document.getElementById("viertelpause");
+    if(vp&&!vp.hidden){
+      const restMs=vpSichtbarBis-performance.now();
+      if(restMs<=0)vp.hidden=true;
+      else{
+        const vpZahl=document.getElementById("vpCountdown");
+        if(vpZahl)vpZahl.textContent=String(Math.max(1,Math.ceil(restMs/1000)));
+      }
+    }
     renderWertungTabelle();
     renderKader();
   }
@@ -17474,7 +17557,25 @@
     // aendert an der INNEREN Balance nichts, nur an der Erzaehlgeschwindigkeit. Faktor 2
     // heisst doppelt so viele echte Sekunden fuer dieselbe Spielsekunde — Bewegung wirkt
     // halb so schnell, ohne dass sich verschiebt, wer zuerst am Ball/Rebound/Slot ist.
-    basketball:2,
+    //
+    // ZURUECKGENOMMEN AUF 1 (06.09., Chris woertlich: "basketball sollte doch 1,5 minuten
+    // lange viertel haben"). Mit Faktor 2 UND VIERTEL_DAUER_BASKETBALL=90 Simulationssekunden
+    // (s. dort) dauerte ein Viertel real 90*2=180s=3 Minuten Zuschauzeit statt der
+    // vereinbarten 1,5 — die "1:30"-Korrektur vom 01.09. (Commit 8d2dd60c) hatte das
+    // GAME-CLOCK-Ziel (die angezeigte Uhr zaehlt bis 1:30 runter) getroffen, aber nicht
+    // gegen den schon damals gesetzten ZEIT_DEHNUNG-Faktor gegengerechnet — die eigene
+    // Randnotiz jener Runde ("bei ZEIT_DEHNUNG.basketball=2 also ~12 Minuten Zuschauzeit")
+    // haette das schon damals auffallen muessen. Faktor 1 macht 90 Simulationssekunden zu
+    // 90 realen Sekunden = 1,5 Minuten, genau das jetzt bestaetigte Ziel — UND haelt die
+    // angezeigte Uhr weiter bei "1:30" (die zaehlt in Simulationssekunden, s. updateHudFeldspiel,
+    // unveraendert von diesem Faktor). Reiner Praesentationswert: `feldspielProbe`/
+    // `disziplinMessen` (Abnahme-Sonden) rufen stepFeldspiel() in einer eigenen Schleife mit
+    // festem 1/60 auf, NIE durch loop()/zeitFaktor() — Rangtreue bit-identisch nachgemessen
+    // (scripts/miss-alle-disziplinen.mjs 24 basketball vor/nach dieser Zeile). Die "zu
+    // hektisch"-Sorge vom 29.08. bezog sich auf dieselbe Zeichenflaeche wie heute; ein
+    // erneuter Fund dazu ist ein eigenes Ticket, kein Grund, Chris' expliziten Auftrag zur
+    // Viertellaenge liegen zu lassen.
+    basketball:1,
     // Hockey bekommt denselben Faktor aus demselben Grund (Chris' Fund zur Hektik auf dem
     // Court): 240 s Simulationszeit werden damit zu rund 8 Minuten Zuschauzeit. Eishockey
     // ist im Original schneller als Basketball, aber die Lesbarkeit auf einem 1240x470
@@ -18638,6 +18739,9 @@
       :istFeldspiel(disc)?updateHudFeldspiel():updateHud();
     draw();renderKader();
     document.getElementById("endstand").hidden=true;
+    // Viertelpause-Overlay wie Endstand zuruecksetzen — ein Reset waehrend einer laufenden
+    // Pause (z.B. Disziplinwechsel mitten im Spiel) darf keine Karteileiche stehenlassen.
+    const vp=document.getElementById("viertelpause"); if(vp)vp.hidden=true;
     renderEinlauf();zeigeEinlauf(true);
     // WELLE-2-FUND (time-trial-einzelzeitfahren-wertung-plan-05-09.md Abschnitt 1.5):
     // "Plan der KI" (#arenaplan) zeigte im Time-Trial den TDM-Text weiter an. Ursache war

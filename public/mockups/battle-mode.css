@@ -436,6 +436,18 @@
   .oly-battle-arena.oly-battle-arena .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
   .oly-battle-arena.oly-battle-arena .etafel td.leer{color:var(--faint)}
 
+  /* Viertelpause (nur Basketball) — dieselbe dunkle Vollflaeche wie .einlauf, aber
+     zentriert statt zweispaltig: eine Pause hat keine Aufstellung zu zeigen, nur einen
+     Grund und einen Countdown. */
+  .oly-battle-arena.oly-battle-arena .viertelpause{position:absolute;inset:0;background:rgba(16,20,26,.94);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+  .oly-battle-arena.oly-battle-arena .viertelpause[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .viertelpause b{font:700 clamp(20px,3.4vw,34px)/1.1 "Barlow Condensed",sans-serif;
+    text-transform:uppercase;letter-spacing:.06em;color:#eef3f9}
+  .oly-battle-arena.oly-battle-arena .viertelpause span{font:500 clamp(11px,1.5vw,15px)/1.4 system-ui,sans-serif;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .viertelpause em{font:700 clamp(28px,5vw,48px)/1 ui-monospace,monospace;
+    font-style:normal;color:var(--warn)}
+
   /* Einlauf vor dem Anpfiff */
   .oly-battle-arena.oly-battle-arena .arenaraum{position:relative}
   .oly-battle-arena.oly-battle-arena .einlauf{position:absolute;inset:0;background:rgba(16,20,26,.94);display:flex;
