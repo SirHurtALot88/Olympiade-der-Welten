@@ -14212,7 +14212,13 @@
     "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel",
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
-    "hind_mauer","hind_heu","hind_feuer"];
+    "hind_mauer","hind_heu","hind_feuer",
+    // Takeshi's Castle: zehn Fallen-Typen + Burg-Kulisse auf vierzehn Stationen, s.
+    // BAHN_ART["takeshis-castle"].fallenBild und zeichneFalleTakeshi() weiter unten
+    // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
+    "falle_tuer","falle_strickleiter","falle_spitzen","falle_walze","falle_fass",
+    "burg_mauer","burg_turm","burg_tor","deko_rad","boden_eis","deko_banner",
+    "deko_pranger","deko_stock","deko_holz"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -14365,6 +14371,61 @@
     }
   }
 
+  // ================== TAKESHI'S CASTLE: ZEHN FALLEN-BILDER ==================
+  // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B.3/B.6.) Typ und
+  // Durchgang bestimmen das Bild: Station i<7 zeigt die erste Fassung, i>=7 die zweite —
+  // mit dem gewaehlten Kurs (HUERDEN_TYP, s. bauSpurt) folgt das Bild dem TYP der Falle,
+  // nicht der Stationsnummer, also wechselt es mit dem Kurs.
+  function fallenTyp(i){ return HUERDEN_TYP(i); }
+  function fallenLook(i){ const A=BA(); const t=fallenTyp(i); const v=A.fallenBild[t]||["huerde"];
+    return v[Math.floor(i/A.hindernisTypen.length)%v.length]; }
+  // BURGPUNKTE (B.5 des Plans, Chris' Entscheidung 05.09.: sie SIND die Wertung fuer
+  // Takeshi's Castle, nicht nur Anzeige) — W4: je Falle Stufe x (1 - Stopp-Anteil),
+  // ein Sturz kostet die halbe Stufe, sauber/durchgebrochen zaehlen ohne Abzug voll bzw.
+  // schon ueber den kleineren Stopp-Anteil. Dieselbe Formel liest MOTOREN["takeshis-
+  // castle"].wert() (mit Zielbonus fuer Finisher) und die Anzeige hier (ohne Zielbonus,
+  // waehrend das Rennen noch laeuft — ein Laeufer, der noch nicht im Ziel ist, hat keinen
+  // Platz, den der Bonus lesen koennte).
+  function burgpunkte(u){ const St=BA().fallenStufe||{}; let p=0;
+    for(const f of (u.fallen||[])){ const st=St[f.typ]??1; p+=st*(1-f.stoppAnteil)-(f.aus==='sturz'?st*0.5:0); }
+    return p; }
+  function zeichneFalleTakeshi(i,x,y,b){
+    const look=fallenLook(i), t=rennT;
+    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
+    switch(look){
+      case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders
+        if(!aDa("burg_mauer"))break; const m=aBild.burg_mauer; const luecke=((b+i)%3);
+        const teile=[[x-30,0],[x-8,1],[x+14,2]]; for(const [tx,k] of teile){ if(k===luecke)continue; ctx.drawImage(m,k*40,8,36,56,Math.round(tx),Math.round(y-24),18,28);} break; }
+      case "steine": { // Skipping Stones: Wasser und drei Trittsteine
+        wasser(); const st=aMust("boden_stein"); for(const dx of [-18,0,18]){ ctx.save(); ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.clip(); ctx.fillStyle=st||"#9a9486"; ctx.fillRect(x+dx-8,y-10,16,12); ctx.restore(); ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.stroke(); } break; }
+      case "tuer": { // Knock Knock: Tueren — je Bahn eine aus Papier (hell) oder aus Holz
+        if(!aDa("falle_tuer"))break; ctx.drawImage(aBild.falle_tuer,Math.round(x-12),Math.round(y+3-48),24,48);
+        if((b+i)%2===0){ ctx.globalAlpha=0.38; ctx.fillStyle="#fff7e0"; ctx.fillRect(x-10,y+3-44,20,40); ctx.globalAlpha=1; } break; }
+      case "brueckenball": { // Bridge Ball: Planke ueber Wasser, ein Pendelball schwingt quer
+        wasser(); if(aDa("hind_balken"))ctx.drawImage(aBild.hind_balken,Math.round(x-32),Math.round(y-2-32));
+        const w=Math.sin(t*2.2+b*0.9)*0.7, px=x+Math.sin(w)*26, py=y-52+Math.cos(w)*26;
+        ctx.strokeStyle="#d9c9a0"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x,y-54); ctx.lineTo(px,py); ctx.stroke();
+        ctx.fillStyle="#c0504a"; ctx.beginPath(); ctx.arc(px,py,6,0,6.283); ctx.fill(); ctx.strokeStyle="#5a1f1c"; ctx.stroke(); break; }
+      case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur
+        const e=aMust("boden_eis"); ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
+        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();} break; }
+      case "raeder": { // High Rollers: ein rollendes Rad pendelt ueber die Spur
+        if(!aDa("deko_rad"))break; const ox=Math.sin(t*1.3+b*0.7)*18; ctx.save(); ctx.translate(x+ox,y-12); ctx.rotate(t*3+b); ctx.drawImage(aBild.deko_rad,-14,-14,28,28); ctx.restore();
+        ctx.globalAlpha=0.25; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(x+ox,y+2,12,4,0,0,6.283); ctx.fill(); ctx.globalAlpha=1; break; }
+      case "seilwand": { // Border Wall: Palisade mit Strickleiter
+        if(aDa("hind_wand"))ctx.drawImage(aBild.hind_wand,Math.round(x-16),Math.round(y+3-64));
+        if(aDa("falle_strickleiter")){ctx.globalAlpha=0.95; ctx.drawImage(aBild.falle_strickleiter,8,0,24,64,Math.round(x-8),Math.round(y+1-60),16,60); ctx.globalAlpha=1;} break; }
+      case "walzen": { // Roller Game: zwei Rollen, die auf und ab wippen
+        if(!aDa("falle_walze"))break; for(const k of [-13,13]){ const dy=Math.sin(t*4+b+k)*3; ctx.drawImage(aBild.falle_walze,Math.round(x+k-14),Math.round(y-18+dy),28,28);} break; }
+      case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen
+        const er=aMust("boden_erde"); ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+        ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();} break; }
+      case "spitzen": { // Final Fall: spanischer Reiter
+        if(!aDa("falle_spitzen"))break; ctx.drawImage(aBild.falle_spitzen,0,96,32,32,Math.round(x-16),Math.round(y+3-32),32,32); break; }
+      default: { ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3); ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10); }
+    }
+  }
+
   // Spurt: Rasen, Bahnen, Huerden, Baumreihe. Bahnen und Huerden kommen aus DENSELBEN
   // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
   // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
@@ -14401,16 +14462,31 @@
     // Bewusst NICHT unter der Kamera: die Baumreihe steht fest wie ein Tribuenendach,
     // waehrend die Bahn darunter zoomt. Der leichte Parallax-Effekt macht das
     // Heranzoomen im Bild spuerbar, ohne dass er eigens programmiert werden musste.
-    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
-    for(let i=0;i<(BA().baeume===false?0:26);i++){
-      const x=12+i*(W/25), yb=oben-24;
-      if(baeume.length){
-        const b=aBild[baeume[i%baeume.length]];
-        ctx.drawImage(b,Math.round(x-b.naturalWidth/2),Math.round(yb+14-b.naturalHeight));
-      } else {
-        ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
-        ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
-        ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
+    if(BA().takeshi&&aDa("burg_mauer")){
+      // TAKESHIS BURG statt Baumreihe (Teil B.3 des Plans): eine Zinnenmauer, zwei Tuerme,
+      // Banner — fest wie ein Tribuenendach, genau wie die Baumreihe, die sie ersetzt.
+      const m=aBild.burg_mauer; for(let x=-20;x<W;x+=m.naturalWidth)ctx.drawImage(m,x,Math.round(oben-58));
+      if(aDa("burg_turm")){ctx.drawImage(aBild.burg_turm,8,Math.round(oben-150+6));ctx.drawImage(aBild.burg_turm,W-104,Math.round(oben-150+6));}
+      if(aDa("deko_banner")){const bn=aBild.deko_banner; for(const x of [W*0.30,W*0.62]){ctx.drawImage(bn,0,0,96,80,Math.round(x-48),Math.round(oben-62),96,80);}}
+      // BURGPUNKTE-STAND beider Seiten auf der Mauer — die Summe der Sterne (burgpunkte()),
+      // nicht die Wertung selbst (die zaehlt zusaetzlich den Zielbonus fuer Finisher).
+      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
+      ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 22px 'Barlow Condensed',sans-serif";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+      ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.fillText((bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")+"je Falle 1–3 Sterne: sauber = alle, durchgebrochen = halbe, gestürzt = keine",W/2,oben-18);
+    } else {
+      const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
+      for(let i=0;i<(BA().baeume===false?0:26);i++){
+        const x=12+i*(W/25), yb=oben-24;
+        if(baeume.length){
+          const b=aBild[baeume[i%baeume.length]];
+          ctx.drawImage(b,Math.round(x-b.naturalWidth/2),Math.round(yb+14-b.naturalHeight));
+        } else {
+          ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
+          ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
+          ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
+        }
       }
     }
     // Laufbahn — Farbe je Bahn-Art. Eine Kletterwand ist kein Tartan, und ein
@@ -14461,6 +14537,7 @@
       const kachel=key&&key!=="hind_wasser"&&aDa(key)?aBild[key]:null;
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
+        if(BA().takeshi){ zeichneFalleTakeshi(i,x,y,b); continue; }
         if(wasser){
           const l=aBild.hind_wasser_l, r=aBild.hind_wasser_r, yo=Math.round(y-15);
           ctx.drawImage(l,Math.round(x-32),yo); ctx.drawImage(r,Math.round(x),yo);
@@ -14491,6 +14568,14 @@
       ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
       ctx.setLineDash([]);
+    }
+    if(BA().takeshi&&aDa("burg_tor")&&xZiel>-60&&xZiel<W+60){
+      // DAS BURGTOR am Ziel (Teil B.3) — unter der Kamera wie die Ziellinie selbst, und
+      // die Ruestkammer-Deko der Emperor's Guards davor (Pranger, Fussblock, Holzstapel, Fass).
+      ctx.drawImage(aBild.burg_tor,Math.round(xZiel-48),Math.round(oben-150+8));
+      for(const [n,dx,dy] of [["deko_pranger",-200,10],["deko_stock",-60,14],["deko_holz",60,4],["falle_fass",120,-6]]){
+        if(aDa(n))ctx.drawImage(aBild[n],Math.round(camX(0.25)+dx),Math.round(unten+dy));
+      }
     }
     // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
     // Bilder ueber rennT. Kein Zeitpreis — die Mechanik bekommt kein achtes Ereignis.
@@ -14826,6 +14911,29 @@
       hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
       hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
       hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT"], huerdePreis:0.80,
+      // ZEHN FALLEN-BILDER AUF VIERZEHN STATIONEN (Teil B.3 des Plans): ein Bild je
+      // Sub-Skill UND Durchgang (i<7 / i>=7), kein neuer Download — beide Schnitte aus
+      // den zwei Paketen, die schon in public/sprites/arena/ liegen (s. quellen.json).
+      // `takeshi:true` schaltet Burg-Kulisse und Fallen-Bilder in bodenSpurt/
+      // zeichneFalleTakeshi frei; `fallenStufe` ist die Schwierigkeit je Sub-Skill fuer
+      // die Burgpunkte (1-3 Sterne, s. burgpunkte() und MOTOREN["takeshis-castle"].wert).
+      takeshi:true,
+      fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
+      fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+      // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
+      // Saat gewaehlt — keine freie Ziehung). Jeder Kurs ist dieselbe Multimenge von
+      // vierzehn Fallen (2x jeder der sieben Typen) in anderer Reihenfolge, deshalb
+      // bewegt sich rho je Spiel gemessen nur innerhalb der Kader-Spannweite (Anhang A/B.4
+      // des Plans: Basis 0,886, S3 0,876 bei einer Spannweite von 0,073). "Nordhof" ist
+      // die heutige Folge zweimal — ohne Kurs-Auswahl waere sie ohnehin die einzige.
+      kurse:[
+        {name:"Nordhof", typen:["TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT",
+                                 "TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT"]},
+        {name:"Sumpfpfad", typen:["WENDIGKEIT","TECHNIK","STEHEN","WUCHT","ROBUST","TECHNIK","WUCHT",
+                                   "WENDIGKEIT","STEHEN","TECHNIK","WUCHT","ROBUST","TECHNIK","WUCHT"]},
+        {name:"Die Mauern", typen:["WUCHT","TECHNIK","WENDIGKEIT","ROBUST","TECHNIK","STEHEN","WUCHT",
+                                    "WUCHT","TECHNIK","WENDIGKEIT","STEHEN","ROBUST","TECHNIK","WUCHT"]}
+      ],
       // Falle lesen (Honeycomb Maze) · Aufstehen/Balance (Skipping Stones) · Durchbrettern (Knock Knock) ·
       // Wille (Bridge Ball) · Falle lesen · Nehmerqualitaet (Final Fall) · Durchbrettern — zweimal durch, 14 Fallen.
       // Skill 20 friert 0,67 s je Falle ein, Skill 80 nur 0,29 s. Kein Motor: stepSpurt/tempoVon lesen
@@ -14910,6 +15018,12 @@
   // Funktion stehen, damit der Motor unveraendert lesen kann.
   const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
   const HUERDEN_N=()=>BA().hindernisse;
+  // FALLENFOLGE JE RENN-SAAT (Takeshi's Castle, B.4/B.6 des Plans): `BAHN_ART.kurse`
+  // fuehrt nur Takeshi (Spurt/Staffel/Zeitfahren/Klettern haben kein `kurse`-Feld und
+  // bleiben bit-identisch), also faellt HUERDEN_TYP() dort immer auf hindernisTypen[i%n]
+  // zurueck — genau die Formel, die vorher an der einen Lesestelle in stepSpurt stand.
+  let bahnFallenTypen=null, bahnKursName=null;
+  const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
   // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
   // ausgewaehlt ist (u.id) — oder null. Reine Anzeigegroesse: die Simulation liest sie
@@ -14958,6 +15072,18 @@
 
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    // DREI BENANNTE KURSE JE SAAT (Takeshi's Castle, B.4 des Plans, Chris' Entscheidung
+    // 05.09.: fest verdrahtet, nicht hinter einem Debug-Flag). Derselbe LCG wie
+    // zieheFormkarten seit dessen Fix (obere Bits, `(s0>>>8)/16777216`) — die untersten
+    // Bits eines LCG mit gerader Modulusbasis haben eine kurze Periode und waeren fuer
+    // eine Kursauswahl aus drei Werten genauso ungeeignet wie sie es fuer Formkarten war.
+    bahnFallenTypen=null; bahnKursName=null;
+    if(BA().kurse&&BA().kurse.length){
+      let s0=(Number(seed)>>>0)||1;
+      const rnd=()=>{s0=(Math.imul(s0,1664525)+1013904223)>>>0; return (s0>>>8)/16777216;};
+      const kurs=BA().kurse[Math.floor(rnd()*BA().kurse.length)];
+      bahnFallenTypen=kurs.typen; bahnKursName=kurs.name;
+    }
     cam={zoom:1,cx:0.5}; bahnWahl=null;
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
@@ -15397,9 +15523,15 @@
           // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
           // `hindernisTypen` nicht und bleiben bit-identisch.
           if(A.hindernisTypen){
-            const hTyp=A.hindernisTypen[HUERDEN_N().indexOf(h)%A.hindernisTypen.length];
+            const hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
             const hSkill=u[hTyp]||0;
             u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
+            // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
+            // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
+            // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
+            // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
+            u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
           }
           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
           if(rr()<=technik)continue;                       // sauber drueber
@@ -15408,6 +15540,7 @@
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
+            if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
@@ -15426,6 +15559,7 @@
           if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
           if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
           u.gestolpert++;
+          if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
           // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
           //
           // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
@@ -15651,7 +15785,17 @@
         ctx.fillText(pl+zus,x,y-40);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
-      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
+      // BURGPUNKTE AM LAEUFER (Teil B.6 des Plans): laufend waehrend des Rennens neben
+      // der Figur, im Ziel zusammen mit Platz und Zeit — dieselbe Zahl, die jetzt auch
+      // MOTOREN["takeshis-castle"].wert() liest (s. dort).
+      if(BA().takeshi&&u.fertig==null){
+        const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
+        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
+      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+
+        (BA().takeshi?" · ★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,""):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
@@ -17396,6 +17540,30 @@
           const o={};
           for(const u of LAEUFER)
             o[u.n]=-(u.etappenZeit??(u.fertig??60))+u.wechselKonto;
+          return o;
+        }
+        // TAKESHI'S CASTLE: BURGPUNKTE SIND DIE WERTUNG, NICHT NUR ANZEIGE.
+        //
+        // Chris' Entscheidung (05.09., nach Rueckfrage): die Platzierung nach Zeit ist
+        // gemessen die beste Groesse fuer dieses Rennen (0,886 kaderfest je Spiel,
+        // docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Anhang B.5/B.7) — aber
+        // Chris will die Burgpunkte ("immer wenn Spieler es schaffen gibt's nen Punkt ...
+        // am Ende wird zusammengezaehlt") als die ECHTE Wertung, nicht nur als Anzeige
+        // neben ihr. Das ist W4 aus dem Plan: je Falle Stufe x (1 - Stopp-Anteil) — die
+        // stetige Zeit, die der Sub-Skill an der Falle spart —, ein Sturz kostet die
+        // halbe Stufe, und wer im Ziel ankommt, bekommt einen Zielbonus nach Platz.
+        // Gemessen kaderfest 0,881 je Spiel (bei 2/3/5 je Seite: 0,842/0,886/0,880) — unter
+        // der Platzierung, aber ueber der 0,80-Schranke bei jeder Kadergroesse, die der
+        // Saisonplan wuerfelt. `u.fallen` fuehrt jede Falle bereits mit (stepSpurt,
+        // rho-neutrales Protokoll), diese Formel liest nur.
+        if(BAHN_ART[bd].takeshi){
+          const reihe=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
+          const o={};
+          for(const u of LAEUFER){
+            let p=burgpunkte(u);
+            if(u.fertig!=null&&!u.raus)p+=(LAEUFER.length-reihe.indexOf(u))*0.5;
+            o[u.n]=p;
+          }
           return o;
         }
         const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))

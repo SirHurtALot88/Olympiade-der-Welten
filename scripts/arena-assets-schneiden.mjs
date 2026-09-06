@@ -51,6 +51,28 @@ const SCHNITTE = [
   ['hind_mauer',    'zaun',    192, 352,  40,  32, false],
   ['hind_heu',      'deko',      0, 736,  64,  32, false],
   ['hind_feuer',    'deko',    256,1536, 160,  32, false],
+  // Takeshi's Castle: zehn Fallen-Typen + Burg-Deko auf vierzehn Stationen (docs/design/
+  // takeshi-schach-optik-gameplay-plan-05-09.md, Teil B, Anhang B.3). Koordinaten am
+  // gleichen 8x-Raster-Verfahren nachgemessen wie oben (Anhang B), zwei Korrekturen
+  // gegenueber dem Plan-Dokument: `deko_pranger`/`deko_stock` sassen dort auf der
+  // Wagen-Kachel eine Spalte daneben (x=128 statt 64 bzw. x=256/y=1440 statt 128/1474),
+  // `burg_mauer` ist auf 160 statt 256 Breite gekuerzt (die restlichen 96 px sind
+  // Fackelhalter-Reste, keine Mauer — beim Kacheln quer ueber den Bildschirm sonst eine
+  // sichtbare Luecke).
+  ['falle_tuer',         'zaun', 128, 512,  32,  64, false],
+  ['falle_strickleiter', 'zaun', 384,  64,  64,  64, false],
+  ['falle_spitzen',      'zaun', 288, 224,  96, 128, false],
+  ['burg_mauer',         'zaun',   0, 672, 160,  64, false],
+  ['burg_turm',          'zaun', 384, 512,  96, 150, false],
+  ['burg_tor',           'zaun', 256, 512,  96, 150, false],
+  ['deko_rad',           'deko', 416,1440,  32,  32, false],
+  ['falle_walze',        'deko', 416, 672,  32,  32, false],
+  ['boden_eis',       'terrain', 640, 928,  32,  32, false],
+  ['deko_banner',        'deko',   0,1216, 192,  80, false],
+  ['deko_pranger',       'deko',  64,1408,  64,  88, false],
+  ['deko_stock',         'deko', 128,1474,  64,  38, false],
+  ['deko_holz',          'deko', 352, 640,  64,  64, false],
+  ['falle_fass',         'deko',  64, 704,  32,  64, false],
 ];
 
 const BLATT = {
