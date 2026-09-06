@@ -57,21 +57,25 @@ function shuffleSeeded<T>(items: T[], seed: string) {
   return next;
 }
 
-function clampPlayerCount(value: number) {
-  return Math.max(2, Math.min(6, Math.round(value)));
-}
-
+/**
+ * Kadergroesse je Seite fuer eine Disziplin -- GLEICHVERTEILT auf {2,3,4,5,6}, keine Sonderrolle
+ * fuer die konfigurierte Basisgroesse (Chris-Entscheidung, 06.09.).
+ *
+ * Vorher warf diese Funktion `rolled` gleichverteilt aus {2..6}, verschob den Treffer bei
+ * `rolled === base` aber zusaetzlich noch um +-1 -- mit dem Effekt, dass `base` fuer jede
+ * Basisgroesse in der Mitte des Bereichs (3, 4, 5) rechnerisch NIE herauskam: der direkte Treffer
+ * (1/5) wurde immer weggeschoben, und der Verschiebe-Schritt eines nicht-benachbarten Wurfs traf
+ * die Basis nie. Nur an den Raendern (Basis 2 oder 6) kam die Basis noch mit halbierter
+ * Wahrscheinlichkeit vor (Klammerung am Rand faengt die Verschiebung teilweise wieder ein). Diese
+ * Funktion ist im Produktionspfad seit dem Umstieg auf den kategorie-balancierten Zweig in
+ * `buildSeasonPlayerCountByDiscipline` (Kategorien mit genau fuenf Disziplinen -- alle vier
+ * Kategorien treffen das heute) bereits inaktiv; sie bleibt als Ersatzweg fuer den Fall, dass eine
+ * Kategorie irgendwann nicht mehr genau fuenf Disziplinen zaehlt, und muss deshalb dieselbe echte
+ * Gleichverteilung liefern wie der Hauptpfad.
+ */
 function buildSeasonPlayerCount(discipline: Discipline, seed: string) {
   const random = createSeededRandom(`${seed}:players:${discipline.id}`);
-  const rolled = 2 + Math.floor(random() * 5);
-  if (Number.isFinite(discipline.playerCount ?? NaN)) {
-    const base = clampPlayerCount(discipline.playerCount ?? rolled);
-    if (rolled === base) {
-      const direction = random() >= 0.5 ? 1 : -1;
-      return clampPlayerCount(base + direction);
-    }
-  }
-  return clampPlayerCount(rolled);
+  return 2 + Math.floor(random() * 5);
 }
 
 function buildSeasonPlayerCountByDiscipline(disciplines: Discipline[], seed: string) {

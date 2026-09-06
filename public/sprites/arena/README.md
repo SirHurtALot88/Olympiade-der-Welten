@@ -23,6 +23,15 @@ gar nicht angefangen, weil OpenGameArt nicht erreichbar war" stand.
 | `hind_mauer.png` | Spurt, Station 6 (Bruchsteinmauer) |
 | `hind_heu.png` | Spurt, Station 7 (Strohballen) |
 | `hind_feuer.png` | Spurt, Feuersprung hinter der Ziellinie (Deko, 5 Bilder zu 32x32) |
+| `falle_tuer.png`, `falle_strickleiter.png`, `falle_spitzen.png`, `falle_walze.png`, `falle_fass.png` | Takeshi's Castle, Fallen-Bilder (Knock Knock, Border Wall, Final Fall, Roller Game; `falle_fass` als Reserve) |
+| `burg_mauer.png`, `burg_turm.png`, `burg_tor.png` | Takeshi's Castle, Burg-Kulisse ueber der Bahn und Torhaus am Ziel; `burg_mauer` auch fuer die Honeycomb-Maze-Fallenstuecke |
+| `deko_rad.png` | Takeshi's Castle, Falle High Rollers |
+| `boden_eis.png` | Takeshi's Castle, Falle Slip Way |
+| `deko_banner.png`, `deko_pranger.png`, `deko_stock.png`, `deko_holz.png` | Takeshi's Castle, Burg-Deko (Banner ueber der Bahn, Pranger/Fussblock/Holzstapel am Ziel) |
+| `boden_wiese.png`, `boden_wald.png` | Takeshi's Castle, Route durch Midoriyama: Grundflaeche und Waldhuellen |
+| `boden_pfad.png`, `boden_kies.png`, `boden_pflaster.png` | Takeshi's Castle, Route: Untergrund der Zonen Sammelplatz/Hang, Holzbauten, Burghof |
+| `boden_schlamm.png`, `boden_see.png`, `boden_sumpf.png` | Takeshi's Castle, Route: Seeufer, See, Tuempel |
+| `boden_hang.png` | Takeshi's Castle, Route: trockenes Gras am Hang |
 
 `quellen.json` nennt zu jeder Datei Paket, Blatt, Schnittstelle, Urheber und Lizenz.
 `HERKUNFT/` traegt die Urheberketten der drei Pakete im Wortlaut der Originale — bei
@@ -33,7 +42,8 @@ CC-BY-SA ist das keine Hoeflichkeit, sondern die Bedingung.
 Die Sprite-Blaetter der Kaempfer liegen als base64 in `battle-mode.html`, weil sie zur
 Laufzeit Pixel fuer Pixel umgefaerbt werden. Diese hier nicht: sie werden nur gekachelt und
 gezeichnet. Als Datei bleiben sie dort nachweisbar, wo `quellen.json` sie belegt, und die
-HTML waechst nicht um jeden Kachelsatz. Zusammen sind es 56 KB.
+HTML waechst nicht um jeden Kachelsatz. Zusammen sind es rund 144 KB (56 KB vor den
+vierzehn Takeshi-Kacheln vom 06.09.2026).
 
 `battle-mode.html` laedt sie unter `/sprites/arena/…` und prueft **jede einzeln**: fehlt
 eine, faellt genau dieser Teil auf die gezeichnete Fassung von vorher zurueck. Eine

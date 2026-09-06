@@ -139,6 +139,51 @@ it("keeps every discipline area balanced across 2-6 slot sizes", () => {
   });
 });
 
+it("draws the fallback player count uniformly across 2-6, with no special role for the base size", () => {
+  // Nur EINE Kategorie mit drei Disziplinen -- die kategorie-balancierte Auslosung greift nur bei
+  // Kategorien mit genau fuenf Disziplinen (der Produktionsfall), sonst faellt sie auf
+  // `buildSeasonPlayerCount` zurueck. Diese drei Basisgroessen (3, 4, 5) liegen genau dort, wo der
+  // alte Verschiebe-Mechanismus die Basis nie herausgab.
+  const threeDisciplinePool: Discipline[] = [
+    { id: "pow-a", name: "Power A", category: "power", weight: 1, playerCount: 3 },
+    { id: "pow-b", name: "Power B", category: "power", weight: 1, playerCount: 4 },
+    { id: "pow-c", name: "Power C", category: "power", weight: 1, playerCount: 5 },
+  ];
+  const tally: Record<string, Record<number, number>> = {
+    "pow-a": { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+    "pow-b": { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+    "pow-c": { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  };
+  const seasons = 4000;
+
+  for (let index = 0; index < seasons; index += 1) {
+    const { entries } = buildSeasonSeededDisciplineSchedule({
+      saveId: "save-fallback-uniform",
+      seasonId: `season-fallback-${index}`,
+      disciplines: threeDisciplinePool,
+    });
+    for (const entry of entries) {
+      for (const slot of [entry.discipline1, entry.discipline2]) {
+        if (slot?.disciplineId && tally[slot.disciplineId] && slot.playerCount != null) {
+          tally[slot.disciplineId][slot.playerCount] += 1;
+        }
+      }
+    }
+  }
+
+  for (const counts of Object.values(tally)) {
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    expect(total).toBeGreaterThan(seasons * 0.9);
+    for (const value of [2, 3, 4, 5, 6] as const) {
+      const share = counts[value] / total;
+      // Erwartet 20% je Groesse; grosszuegiger Korridor gegen Stichprobenrauschen, aber eng genug,
+      // dass eine ausgeschlossene Basisgroesse (0%) zuverlaessig durchfaellt.
+      expect(share).toBeGreaterThan(0.15);
+      expect(share).toBeLessThan(0.25);
+    }
+  }
+});
+
 it("does not treat stale previous-season discipline schedules as active", () => {
   const stale = buildSeasonSeededDisciplineSchedule({
     saveId: "save-a",
