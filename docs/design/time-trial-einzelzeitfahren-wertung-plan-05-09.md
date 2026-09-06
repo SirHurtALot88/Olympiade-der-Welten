@@ -172,6 +172,9 @@ Die Staffel ist der eine Fall, in dem der Zähler *sinnvoll* etwas sagt (die Man
   mit Gewalt / gerissen, Reserve, Punkte, Eig) wäre die passende Tafel; `setWertungKopf()` kennt
   bislang nur `kampf` und `feldspiel`.
 - „Plan der KI" (`#arenaplan`) zeigt im Time-Trial den TDM-Text („Mauer schieben — Kein Ausreißer …").
+- Der Ticker-Zeitstempel (`feed()`, Zeile 15950) schreibt `"0:"+floor(sekunden)` ohne
+  Minutenumbruch — auf der Bahn stehen dort „0:66" und „0:99" (Bildschirmfoto in 4.3), während
+  die Kopfzeile korrekt „1:39" zeigt.
 
 ---
 
