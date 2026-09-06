@@ -10524,14 +10524,25 @@
     const gesetzt=inDisc(buehneDisc);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[buehneDisc]||0)-(a.d[buehneDisc]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
-    const gegner=OPP.slice(0,n);
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO WIE DIE HEIMSEITE — sonst macht dieses
+    // Rohr die beiden Seiten ungleich (Opus-Review auf PR #818, docs/BATTLE_ARENA_UEBERGABE.md
+    // Fehler #1, hier nie geschlossen): vorher immer `OPP.slice(0,n)`, unabhaengig von der
+    // tatsaechlich gesetzten Aufstellung. Zeichen fuer Zeichen wie bauFeldspiel.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===buehneDisc);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     let id=0;
-    const setz=(p,seite,istGegner,idx)=>{
-      const sl=istGegner?null:slotFuer(p,idx);
+    // BEIDE SEITEN GLEICH BAUEN — derselbe Fehler wie im Feldspiel vor seiner Korrektur:
+    // `istGegner` schaltete Slot-Aufschlag und Stufenwert fuer die Gastseite komplett ab.
+    // Spiegeltest (identischer Kader gegen sich selbst, 60 Spiele): Speed-Schach 40:4,
+    // Showcase 38:22, Gewichtheben 0:60 Heimsiege VORHER; 25:26, 30:30, 16:24 NACHHER.
+    // `place` enthaelt beide Aufstellungen, `slotFuer` wirkt also laengst auf beiden
+    // Seiten — kein `istGegner`-Sonderfall mehr noetig.
+    const setz=(p,seite,idx)=>{
+      const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -10579,8 +10590,8 @@
       }
       TEILNEHMER.push(L);
     };
-    mine.forEach((p,i)=>setz(p,0,false,i));
-    gegner.forEach((o,i)=>setz(o,1,true,i));
+    mine.forEach((p,i)=>setz(p,0,i));
+    gegner.forEach((o,i)=>setz(o,1,i));
 
     // DUELL-VARIANTE (Speed-Schach, I-Spy) — Fables Rat: kein eigener fuenfter Motor,
     // sondern Buehne mit zwei Aenderungen. Erstens Paarung statt Einzelauftritt: Brett i
@@ -19511,6 +19522,28 @@
       const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore, gesamtKg};
+    },
+    // DASSELBE MUSTER FUER DIE DUELL-BUEHNEN (Speed-Schach, I-Spy) — "ein Spiel, ein
+    // Ergebnis" wie spieleBuehneHeben direkt darueber, hier fuer die Brett-Paarung
+    // (art.duell) statt der Heber-Duelle. PUNKTESTAND JE SEITE: GEWONNENE BRETTER
+    // (vorteil>0), exakt dieselbe Zaehlung wie updateHudBuehne()s BB().duell-Zweig —
+    // nicht die rohe Punktesumme (die misst wert()/PPs, nicht das Spielergebnis; ein
+    // Brett kann mit wenigen, aber besseren Zuegen gewonnen werden). Bei Gleichstand
+    // (vorteil===0 an einem Brett, oder gleich viele gewonnene Bretter) bleibt es ein
+    // Remis — Speed-Schach kennt anders als Gewichtheben keinen erzwungenen Tiebreak.
+    spieleBuehneDuell:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].duell)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.vorteil>0).length;
+      const seiten=[bretter(0),bretter(1)];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
     },
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
