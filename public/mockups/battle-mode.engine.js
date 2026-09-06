@@ -15675,13 +15675,24 @@
       // Richtungswechsel in y (nie drei Stationen auf einer Linie), kein Abschnitt kreuzt
       // einen anderen (bei Zoom 3,4x waere ein Kreuzungspunkt ein zweiter Pulk im Bild),
       // und die letzten 15 % laufen AUF die Burg zu — der letzte Wegpunkt IST das Tor.
-      // Die Bogenlaenge ist etwa 1,9 x W: die Route ist fast doppelt so lang wie die alte
-      // Bahn, das Feld zieht sich sichtbarer auseinander.
-      // Der letzte Wegpunkt liegt bei 0,36 H und nicht — wie im Entwurf — bei 0,31 H:
-      // das Torhaus ist 150 px hoch und steht MIT DEM FUSS auf dem Routenende, sein Dach
-      // waere bei 0,31 H auf einer 470 px hohen Leinwand ueber dem oberen Weltrand, und
-      // die Kamera kann dorthin nicht blicken (sie ist auf [0,W]x[0,H] geklemmt). Im
-      // Prototyp lief die Burgmauer deshalb am oberen Bildrand entlang, ohne sichtbares Tor.
+      // Die Bogenlaenge ist 1390 px auf einer 1240x470-Leinwand, also 1,12 x W (Review
+      // 06.09. nachgerechnet — hier stand "etwa 1,9 x W" und "fast doppelt so lang wie die
+      // alte Bahn"; die alte Bahn misst camStrecke() = W-170 = 1070 px, die Route ist also
+      // 1,30 x so lang, nicht 1,9 x). Sie ist damit laenger als die gerade Bahn, aber nicht
+      // annaehernd doppelt — und weil `u.pos` weiter 0..1 laeuft, aendert die Laenge NUR
+      // die Pixel je Streckenanteil, nie die Rennzeit oder eine gemessene Zahl.
+      // ABWEICHUNG VOM ENTWURF, und zwar groesser als der Text daneben lange sagte
+      // (Review 06.09.): nicht nur der LETZTE Wegpunkt ist verschoben, sondern die ganze
+      // zweite Haelfte. Die Punkte 5-12 liegen um +0,02 H tiefer als in
+      // takeshi-schlammroute-plan-06-09.md, die letzten drei zusaetzlich weiter rechts
+      // und tiefer (0,86/0,56 -> 0,87/0,60 · 0,82/0,42 -> 0,84/0,47 · 0,77/0,31 ->
+      // 0,79/0,36). Acht der zwoelf Wegpunkte weichen ab, nicht einer.
+      // Der Grund ist derselbe fuer alle: das Torhaus ist 150 px hoch und steht MIT DEM
+      // FUSS auf dem Routenende. Bei 0,31 H auf einer 470 px hohen Leinwand liegt seine
+      // Oberkante bei Welt-y 5,7 — die Kamera ist auf [0,W]x[0,H] geklemmt und kann nicht
+      // hoeher blicken, im Prototyp lief die Burgmauer deshalb am oberen Bildrand entlang,
+      // ohne sichtbares Tor. Bei 0,36 H sind es 29 px Luft; die sieben Punkte davor sind
+      // mitgezogen, damit der Anstieg zur Burg seine Form behaelt statt zu knicken.
       route:[[0.04,0.80],[0.13,0.86],[0.25,0.72],[0.32,0.50],[0.43,0.36],[0.55,0.44],
              [0.61,0.66],[0.71,0.82],[0.80,0.76],[0.87,0.60],[0.84,0.47],[0.79,0.36]],
       routeBreite:56,
