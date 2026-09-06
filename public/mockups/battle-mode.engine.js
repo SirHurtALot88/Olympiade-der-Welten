@@ -14468,13 +14468,6 @@
       const m=aBild.burg_mauer; for(let x=-20;x<W;x+=m.naturalWidth)ctx.drawImage(m,x,Math.round(oben-58));
       if(aDa("burg_turm")){ctx.drawImage(aBild.burg_turm,8,Math.round(oben-150+6));ctx.drawImage(aBild.burg_turm,W-104,Math.round(oben-150+6));}
       if(aDa("deko_banner")){const bn=aBild.deko_banner; for(const x of [W*0.30,W*0.62]){ctx.drawImage(bn,0,0,96,80,Math.round(x-48),Math.round(oben-62),96,80);}}
-      // BURGPUNKTE-STAND beider Seiten auf der Mauer — die Summe der Sterne (burgpunkte()),
-      // nicht die Wertung selbst (die zaehlt zusaetzlich den Zielbonus fuer Finisher).
-      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
-      ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 22px 'Barlow Condensed',sans-serif";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-      const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
-      ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
-      ctx.fillText((bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")+"je Falle 1–3 Sterne: sauber = alle, durchgebrochen = halbe, gestürzt = keine",W/2,oben-18);
     } else {
       const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
       for(let i=0;i<(BA().baeume===false?0:26);i++){
@@ -14518,6 +14511,30 @@
         ctx.drawImage(z,x,Math.round(oben-z.naturalHeight+4));
         ctx.drawImage(z,x,Math.round(unten-4));
       }
+    }
+    // BURGPUNKTE-STAND beider Seiten ueber der Bahn — die Summe der Sterne (burgpunkte()),
+    // nicht die Wertung selbst (die zaehlt zusaetzlich den Zielbonus fuer Finisher).
+    //
+    // NACH dem Zaun gezeichnet, nicht im Burg-Block darueber: der obere Zaun laeuft von
+    // `oben-28` bis `oben+4` und hat die Legendenzeile bei `oben-18` vorher vollstaendig
+    // uebermalt — sie stand im Code, war im Bild aber nie zu sehen (nachgemessen am
+    // Screenshot, 1240x470: Zaunkachel 32 px hoch bei `oben-z.naturalHeight+4`).
+    if(BA().takeshi&&aDa("burg_mauer")){
+      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
+      ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      ctx.font="700 22px 'Barlow Condensed',sans-serif";
+      const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+      // WAS DIE STERNE SIND — und zwar die Formel, die wirklich laeuft (W4, s. burgpunkte()
+      // und MOTOREN["takeshis-castle"].wert): je Falle 1-3 Sterne nach Schwierigkeit, davon
+      // haelt der passende Sub-Skill einen Anteil; ein Sturz kostet die halbe Falle; wer ins
+      // Ziel kommt, bekommt einen Bonus nach Platz. Die vorherige Zeile ("sauber = alle,
+      // durchgebrochen = halbe, gestuerzt = keine") beschrieb W2b aus Anhang A des Plans —
+      // die Anzeige-Variante, die NICHT gebaut wurde: durchbrechen kostet in W4 gar nichts,
+      // und ein Sturz kann den Beitrag einer Falle negativ machen.
+      ctx.font="400 9px 'IBM Plex Mono',monospace";
+      const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
+        +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
+      ctx.lineWidth=3; ctx.strokeText(leg,W/2,oben-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,oben-16);
     }
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
@@ -14573,8 +14590,23 @@
       // DAS BURGTOR am Ziel (Teil B.3) — unter der Kamera wie die Ziellinie selbst, und
       // die Ruestkammer-Deko der Emperor's Guards davor (Pranger, Fussblock, Holzstapel, Fass).
       ctx.drawImage(aBild.burg_tor,Math.round(xZiel-48),Math.round(oben-150+8));
-      for(const [n,dx,dy] of [["deko_pranger",-200,10],["deko_stock",-60,14],["deko_holz",60,4],["falle_fass",120,-6]]){
-        if(aDa(n))ctx.drawImage(aBild[n],Math.round(camX(0.25)+dx),Math.round(unten+dy));
+      // AM ZIEL HEISST AM ZIEL. Hier stand `camX(0.25)+dx` — die Deko hing damit an der
+      // Position 0,25 der Strecke, waehrend der Block selbst nur laeuft, wenn das ZIEL im
+      // Bild ist. Sobald die Kamera aufs Ziel zoomt, liegt camX(0,25) weit links ausserhalb:
+      // nachgemessen (Canvas 1240x470, Rennen bei ~45 s) landeten die vier Kacheln bei
+      // x = -1164 / -1024 / -904 / -844, also samt und sonders neben dem Bild. Vier
+      // committete Schnitte, die nie jemand zu sehen bekam. Anker ist jetzt `xZiel`, wie
+      // beim Torhaus eine Zeile darueber.
+      //
+      // Und `unten+dy` setzte die OBERKANTE der Kachel auf die Rasenkante, sodass von einem
+      // 88 px hohen Pranger 18 px uebrig blieben. Die Kacheln stehen jetzt AUF der Rasenkante
+      // (Unterkante bei `unten+dy`), so wie die Laeufer auf ihrer Fusslinie stehen.
+      // Alle vier VOR dem Tor (negatives dx), so wie der Kommentar es beschreibt: das Ziel
+      // ist im Bild per Definition ganz rechts, alles mit positivem dx faellt hinten raus.
+      for(const [n,dx,dy] of [["deko_pranger",-260,22],["deko_stock",-186,22],["deko_holz",-112,22],["falle_fass",-40,22]]){
+        if(!aDa(n))continue;
+        const im=aBild[n];
+        ctx.drawImage(im,Math.round(xZiel+dx),Math.round(unten+dy-im.naturalHeight));
       }
     }
     // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
@@ -17552,9 +17584,13 @@
         // neben ihr. Das ist W4 aus dem Plan: je Falle Stufe x (1 - Stopp-Anteil) — die
         // stetige Zeit, die der Sub-Skill an der Falle spart —, ein Sturz kostet die
         // halbe Stufe, und wer im Ziel ankommt, bekommt einen Zielbonus nach Platz.
-        // Gemessen kaderfest 0,881 je Spiel (bei 2/3/5 je Seite: 0,842/0,886/0,880) — unter
-        // der Platzierung, aber ueber der 0,80-Schranke bei jeder Kadergroesse, die der
-        // Saisonplan wuerfelt. `u.fallen` fuehrt jede Falle bereits mit (stepSpurt,
+        // Gemessen kaderfest, und zwar in der Fassung, die hier WIRKLICH laeuft — W4
+        // ZUSAMMEN MIT den drei Kursen (S3+W4), nicht W4 allein: 0,866 je Spiel bei 6 je
+        // Seite (Spannweite 0,126, Saison 0,937), bei 2/3/5 je Seite 0,842/0,902/0,882.
+        // W4 ohne Kurse maesse 0,881 / 0,842 / 0,886 / 0,880 — diese Zahlen standen hier
+        // vorher und gehoeren zu einer Variante, die nicht ausgeliefert wird. Unter der
+        // reinen Platzierung (0,886), aber ueber der 0,80-Schranke bei jeder Kadergroesse,
+        // die der Saisonplan wuerfelt. `u.fallen` fuehrt jede Falle bereits mit (stepSpurt,
         // rho-neutrales Protokoll), diese Formel liest nur.
         if(BAHN_ART[bd].takeshi){
           const reihe=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
