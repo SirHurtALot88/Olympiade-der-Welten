@@ -10535,8 +10535,12 @@
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN — derselbe Fehler wie im Feldspiel vor seiner Korrektur:
     // `istGegner` schaltete Slot-Aufschlag und Stufenwert fuer die Gastseite komplett ab.
-    // Spiegeltest (identischer Kader gegen sich selbst, 60 Spiele): Speed-Schach 40:4,
-    // Showcase 38:22, Gewichtheben 0:60 Heimsiege VORHER; 25:26, 30:30, 16:24 NACHHER.
+    // Spiegeltest (identischer Kader gegen sich selbst, scripts/miss-arena-buehne-spiegel.mjs
+    // 120): VORHER war die GASTSEITE im Vorteil (Heim:Gast-Siege Showcase 36:84, Speed-Schach
+    // Rohwertabweichung -10,5 %) — nicht die Heimseite, wie eine fruehere Fassung dieses
+    // Kommentars faelschlich behauptete. NACHHER: Showcase 58:60, Speed-Schach +3,0 %. Gewichtheben
+    // bleibt wegen eines separaten, hier NICHT behobenen Fehlers in hebeUebung() (Reihenfolge im
+    // dritten Versuch, s. PR #825) leicht gastlastig.
     // `place` enthaelt beide Aufstellungen, `slotFuer` wirkt also laengst auf beiden
     // Seiten — kein `istGegner`-Sonderfall mehr noetig.
     const setz=(p,seite,idx)=>{

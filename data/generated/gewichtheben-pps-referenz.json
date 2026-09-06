@@ -1,9 +1,9 @@
 {
  "disziplin": "gewichtheben",
  "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) DES ECHTEN ZWEIKAMPFS IN KILOGRAMM (MOTOREN.gewichtheben.wert() = u.summe, s. baueHebenDuelle() in public/mockups/battle-mode.engine.js), JE FELDGROESSE getrennt gezogen -- gebaut von scripts/ziehe-gewichtheben-pps-referenz.ts gegen echte Liga-Kader (buildArenaTeam()) ueber runArenaFixtures()/spieleBuehneHeben(). Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. KLEINERE STICHPROBE ALS BASKETBALLS REFERENZ (60 statt 300+ Fixtures je Feldgroesse, s. Skript-Kopfkommentar) -- eine Zeitbudget-Entscheidung der Erstziehung (04.09.2026), keine methodische. Neu ziehen nach jeder Aenderung, die den rohen Zweikampf verschiebt (HEBEN_*-Konstanten, BUEHNE_ART.gewichtheben.rezept, Kadergenerierung/Attributniveau der Liga).",
- "gezogenAm": "2026-09-06T17:33:43.107Z",
- "motorSha1": "4d87bab9ddc44f6dd3338596262620ecc77824b0",
- "repoCommit": "04068529d6f9e6fabd9738809c45cf0939d00d36",
+ "gezogenAm": "2026-09-06T22:36:17.595Z",
+ "motorSha1": "6092d148793026957b4dd719083a4b7974083dcc",
+ "repoCommit": "8da171284d11e4b262743a1e733055ff6f51f82d",
  "quelle": {
   "saveId": "new-game-1787123325719-swnjlk",
   "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
