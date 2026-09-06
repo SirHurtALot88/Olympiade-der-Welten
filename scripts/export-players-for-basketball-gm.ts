@@ -20,14 +20,44 @@
  *
  * Kader: wer im Save auf einem Oly-Team-Roster steht, wird genau dorthin uebernommen
  * (tid = das jeweilige BGM-Team) -- alle anderen (der weitaus groessere Teil der 2984)
- * bleiben Free Agent (tid: -1). Erster Anlauf hatte ALLE als Free Agent exportiert
- * (analog zum FM-Export), aber eine KI, die 31 Kader aus dem Nichts zusammenkaufen
- * muss, tut das schlecht -- nachgemessen Team-Ratings von +97 bis -130, praktisch nur
- * das handgepickte eigene Team konkurrenzfaehig. Die echten Oly-Kader als Startpunkt
- * geben von Anfang an 32 einigermassen ausgeglichene Teams.
+ * bleiben standardmaessig Free Agent (tid: -1). Erster Anlauf hatte ALLE als Free Agent
+ * exportiert (analog zum FM-Export), aber eine KI, die 31 Kader aus dem Nichts
+ * zusammenkaufen muss, tut das schlecht -- nachgemessen Team-Ratings von +97 bis -130,
+ * praktisch nur das handgepickte eigene Team konkurrenzfaehig. Die echten Oly-Kader als
+ * Startpunkt geben von Anfang an 32 einigermassen ausgeglichene Teams.
+ *
+ * Varianten zum A/B/C-Test (Chris' Wunsch 06.09.):
+ *   (Standard)          echte Kader + Rest Free Agent (s. oben).
+ *   --free-agents-only  ALLE Free Agent, kein Team hat einen Kader.
+ *   --draft-classes N [--picks-per-year P] [--rotations R]
+ *                        Echte Kader bleiben. Von den NICHT gerosterten Spielern werden
+ *                        bis zu P*N (Default P=64, also 2 Runden fuer 32 Teams) zu
+ *                        Draft-Prospects (tid -2, BGMs "undrafted"-Konvention) statt
+ *                        Free Agent -- nach Oly-Rating aufsteigend sortiert und in
+ *                        Bloecke zu je P zerlegt: Block 1 = Jahrgang der Startsaison (es
+ *                        gibt also sofort einen ECHTEN Draft statt einer Free-Agency-
+ *                        Flut), Block N = letzter Jahrgang. Weil aufsteigend sortiert,
+ *                        landen die staerksten der ausgewaehlten Gruppe im LETZTEN
+ *                        Jahrgang -- "die krassesten Spieler kommen erst spaeter als
+ *                        Rookies" (Chris 06.09.). Wer nicht in die Top P*N faellt,
+ *                        bleibt sofortiger Free Agent. Alter/Geburtsjahr/Ratings-Saison
+ *                        eines Prospects beziehen sich auf SEIN Draft-Jahr (19-23 zum
+ *                        eigenen Draft), nicht auf die Export-Startsaison; kein Contract
+ *                        (noch nicht unterschrieben).
+ *                        --rotations R (Default 1): dieselbe ausgewaehlte Gruppe taucht
+ *                        ein zweites/drittes/... Mal auf, jeweils N Jahre nach dem
+ *                        vorherigen Zyklus (Name/Bild/Ratings identisch, neues
+ *                        Geburtsjahr) -- Chris' "volle Rotation": nachdem die
+ *                        Originalbesetzung durchgealtert ist, kommt exakt dieselbe
+ *                        Besetzung als frischer Nachwuchs-Jahrgang zurueck statt neu
+ *                        generierter Spieler. Reine Terminplanung: ob ein Charakter zum
+ *                        Zeitpunkt seines naechsten Zyklus im Spiel tatsaechlich schon
+ *                        im Ruhestand ist, haengt vom echten Alterungsverlauf im
+ *                        jeweiligen Save ab, nicht von diesem Skript.
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
+ *   [--free-agents-only | --draft-classes N]
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
@@ -172,7 +202,14 @@ function main() {
   // Chris will beides vergleichen: --free-agents-only erzwingt tid -1 fuer alle (wie
   // der allererste Anlauf), Standard uebernimmt die echten Oly-Kader (s. Docstring).
   const freeAgentsOnly = process.argv.includes("--free-agents-only");
+  const draftClassesArg = arg("--draft-classes");
+  const draftClassYears = draftClassesArg ? Number(draftClassesArg) : null;
+  const picksPerYear = Number(arg("--picks-per-year") ?? "64");
+  const rotations = Number(arg("--rotations") ?? "1");
   if (!saveId) throw new Error("--save-id required");
+  if (freeAgentsOnly && draftClassYears) {
+    throw new Error("--free-agents-only und --draft-classes schliessen sich aus -- getrennte Laeufe/Dateien.");
+  }
 
   const persistence = createPersistenceService();
   const save = persistence.getSaveById(saveId);
@@ -247,7 +284,25 @@ function main() {
     raceStatById.set(race, { mean, stdev: Math.sqrt(variance) });
   }
 
-  const bbgmPlayers = players.map((p) => {
+  // --draft-classes N: statt alle Nicht-Roster-Spieler sofort als Free Agent zu
+  // exportieren, werden bis zu picksPerYear*N von ihnen zu Draft-Prospects (tid -2).
+  // Sortiert nach Oly-Rating AUFSTEIGEND und in Jahrgangs-Bloecke zerlegt -- Chris'
+  // Wunsch (06.09.): "die krassesten Spieler sollen als Rookies mit high potential
+  // erst spaeter dazustossen", also landen die staerksten der ausgewaehlten Gruppe im
+  // LETZTEN Jahrgang, nicht zufaellig verteilt. Wer nicht in die Top picksPerYear*N
+  // faellt, bleibt sofortiger Free Agent (die schwaecheren, fuer Tag-1-Signings).
+  const prospectChunkByPlayerId = new Map<string, number>();
+  if (draftClassYears) {
+    const nonRostered = players.filter((p) => !(freeAgentsOnly ? null : rosterByPlayerId.get(p.id)));
+    const sortedAscending = [...nonRostered].sort((a, b) => (a.rating ?? 50) - (b.rating ?? 50));
+    const totalSlots = Math.min(picksPerYear * draftClassYears, sortedAscending.length);
+    const selected = sortedAscending.slice(sortedAscending.length - totalSlots);
+    selected.forEach((p, i) => prospectChunkByPlayerId.set(p.id, Math.floor(i / picksPerYear)));
+  }
+
+  const bbgmPlayers: Record<string, unknown>[] = [];
+
+  for (const p of players) {
     const a = p.attributeSheetStats ?? {};
     const raw: RawAttrs = {
       power: a.power ?? 50, health: a.health ?? 50, stamina: a.stamina ?? 50,
@@ -263,60 +318,89 @@ function main() {
     const { ratingHgt, zollGerundet } = groesseZuBbgmHoehe(groesse);
 
     const ratings = toBbgmRatings(raw, ratingHgt);
-
-    const ratingScore = p.rating ?? 50;
-    const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
-    const gap = clamp(potentialScore - ratingScore, 0, 30);
-    // Juenger als beim FM-Export (dort Deckel 30): Chris will hier mehr Spielzeit pro
-    // Charakter herausholen, bevor Alterung/Ruhestand im Karriere-Modus greifen.
-    const baseAge = 26 - (gap / 30) * 9;
-    const frac = seededFraction(p.id);
-    const jitter = (frac - 0.5) * 4;
-    const age = Math.round(clamp(baseAge + jitter, 17, 26));
-    const bornYear = startingSeason - age;
-
     const weight = Math.round(150 + (raw.power / 99) * 130);
     const heightInches = zollGerundet;
-
-    const amount = Math.round(clamp((ratingScore / 99) * 24500 + 500, 500, 25000));
-
     const portraitRel = getPlayerPortraitBrowserUrl(p.id, p.portraitUrl ?? null, p.portraitPath ?? null);
+    const imgURL = portraitRel ? `${BASE_URL}${portraitRel}` : undefined;
+    const ratingScore = p.rating ?? 50;
 
-    // Echte Oly-Kader als Startaufstellung uebernehmen statt alle als Free Agent zu
-    // dumpen: eine KI, die 31 Kader aus 2984 Free Agents zusammenkaufen muss, tut das
-    // schlecht (nachgemessen: Team-Ratings von +97 bis -130, praktisch nur das
-    // handgepickte eigene Team konkurrenzfaehig). Wer im aktuellen Save auf keinem
-    // Roster steht, bleibt regulaerer Free Agent (tid -1) -- das ist der groessere Teil
-    // des Bestands und bleibt fuer Transfers/Scouting verfuegbar.
-    const roster = freeAgentsOnly ? null : rosterByPlayerId.get(p.id);
-    const tid = roster ? tidByTeamId.get(roster.teamId) ?? -1 : -1;
-
-    return {
+    const makeRecord = (args: {
+      tid: number; bornYear: number; draftYear: number; ratingsSeason: number;
+      contract: { amount: number; exp: number } | null;
+    }) => ({
       firstName: "",
       lastName: p.name,
-      tid,
-      born: { year: bornYear, loc: "" },
+      tid: args.tid,
+      born: { year: args.bornYear, loc: "" },
       weight,
       hgt: heightInches,
-      // Darf nie in der Zukunft liegen -- das sind schon aktive Spieler, kein Nachwuchs-Draft.
-      draft: { year: Math.min(startingSeason, bornYear + 19), round: 0, pick: 0, tid: -1 },
-      contract: { amount, exp: startingSeason + 2 },
-      imgURL: portraitRel ? `${BASE_URL}${portraitRel}` : undefined,
+      draft: { year: args.draftYear, round: 0, pick: 0, tid: -1 },
+      ...(args.contract ? { contract: args.contract } : {}),
+      imgURL,
       // `pos` bewusst NICHT gesetzt: Basketball GM berechnet die Position (inkl.
       // Kombi-Positionen wie "G"/"F"/"GF"/"FC") selbst aus den 15 Ratings, per eigenem
       // an echten NBA-Daten trainiertem Modell (siehe zengm.com/blog/2021/03/
       // new-position-formula) -- das ist naeher an "wie im Base-Game" als jede eigene
       // Heuristik hier, und bringt Mehrfachpositionen gratis mit.
-      ratings: [
-        {
-          season: startingSeason,
-          fuzz: 0,
-          skills: [],
-          ...ratings,
-        },
-      ],
-    };
-  });
+      ratings: [{ season: args.ratingsSeason, fuzz: 0, skills: [], ...ratings }],
+    });
+
+    // Echte Oly-Kader als Startaufstellung uebernehmen statt alle als Free Agent zu
+    // dumpen: eine KI, die 31 Kader aus 2984 Free Agents zusammenkaufen muss, tut das
+    // schlecht (nachgemessen: Team-Ratings von +97 bis -130, praktisch nur das
+    // handgepickte eigene Team konkurrenzfaehig).
+    const roster = freeAgentsOnly ? null : rosterByPlayerId.get(p.id);
+    const chunk = roster ? null : prospectChunkByPlayerId.get(p.id) ?? null;
+
+    if (chunk == null) {
+      // Bereits aktiver Spieler (gerostert ODER sofortiger Free Agent): Alter ueber die
+      // Potenzial-Luecke wie gehabt, ein Contract-Eintrag, draft.year darf nie in der
+      // Zukunft liegen (das ist kein Nachwuchs-Draft, der Charakter spielt schon).
+      const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
+      const gap = clamp(potentialScore - ratingScore, 0, 30);
+      // Juenger als beim FM-Export (dort Deckel 30): Chris will hier mehr Spielzeit pro
+      // Charakter herausholen, bevor Alterung/Ruhestand im Karriere-Modus greifen.
+      const baseAge = 26 - (gap / 30) * 9;
+      const frac = seededFraction(p.id);
+      const jitter = (frac - 0.5) * 4;
+      const age = Math.round(clamp(baseAge + jitter, 17, 26));
+      const bornYear = startingSeason - age;
+      const amount = Math.round(clamp((ratingScore / 99) * 24500 + 500, 500, 25000));
+      const tid = roster ? tidByTeamId.get(roster.teamId) ?? -1 : -1;
+
+      bbgmPlayers.push(makeRecord({
+        tid,
+        bornYear,
+        draftYear: Math.min(startingSeason, bornYear + 19),
+        ratingsSeason: startingSeason,
+        contract: { amount, exp: startingSeason + 2 },
+      }));
+      continue;
+    }
+
+    // Draft-Prospect: noch nicht in der Liga, taucht erst im Draft des zugewiesenen
+    // Jahrgangs auf (tid -2 = "undrafted", BGMs eigene Konvention). Kein Contract (noch
+    // nicht unterschrieben). Alter/Geburtsjahr/Ratings-Saison beziehen sich auf das
+    // JEWEILIGE Draft-Jahr, nicht auf die Export-Startsaison -- ein Rookie ist zum
+    // eigenen Draft 19-23, unabhaengig davon, in welchem Jahrgang/welcher Rotation.
+    // --rotations R (>1): derselbe Charakter (Name/Bild/Werte identisch) taucht ein
+    // zweites/drittes/... Mal auf, R*draftClassYears Jahre nach dem ersten Zyklus --
+    // Chris' "volle Rotation": nachdem die Originalbesetzung durchgealtert/im
+    // Ruhestand ist, kommt exakt dieselbe Besetzung als frische Nachwuchs-Jahrgaenge
+    // zurueck, nicht neu generiert.
+    for (let cycle = 0; cycle < rotations; cycle++) {
+      const draftYear = startingSeason + chunk + cycle * draftClassYears;
+      const rookieAge = 19 + Math.floor(seededFraction(`${p.id}|rookieage|${cycle}`) * 5);
+      const bornYear = draftYear - rookieAge;
+      bbgmPlayers.push(makeRecord({
+        tid: -2,
+        bornYear,
+        draftYear,
+        ratingsSeason: draftYear,
+        contract: null,
+      }));
+    }
+  }
 
   const league = {
     startingSeason,
