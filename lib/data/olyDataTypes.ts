@@ -2429,6 +2429,14 @@ export type SeasonDisciplineScheduleSlot = {
   order: number | null;
   playerCount: number | null;
   category: DisciplineCategory;
+  /**
+   * Additiv, optional — welches der (bei Battle-Mode-Repeat) zwei Saison-Vorkommen dieser
+   * Disziplin dieser Slot ist. `undefined` fuer jeden Save vor Battle-Mode-20-Spieltage (W1,
+   * 06.09.) und fuer jeden Manager-Mode-Save (Repeat-Faktor 1) — dort gibt es nur EIN Vorkommen,
+   * das Feld bleibt faktisch 1/unbenutzt und die Ausgabe bit-identisch. Siehe
+   * `getSeasonDisciplineRepeatCount` in lib/season/season-discipline-schedule.ts.
+   */
+  occurrenceInSeason?: 1 | 2;
 };
 
 export type SeasonDisciplineScheduleEntry = {
