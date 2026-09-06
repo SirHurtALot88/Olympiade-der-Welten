@@ -169,6 +169,9 @@ function main() {
   const limitArg = arg("--limit");
   const limit = limitArg ? Number(limitArg) : null;
   const startingSeason = Number(arg("--starting-season") ?? "2026");
+  // Chris will beides vergleichen: --free-agents-only erzwingt tid -1 fuer alle (wie
+  // der allererste Anlauf), Standard uebernimmt die echten Oly-Kader (s. Docstring).
+  const freeAgentsOnly = process.argv.includes("--free-agents-only");
   if (!saveId) throw new Error("--save-id required");
 
   const persistence = createPersistenceService();
@@ -285,7 +288,7 @@ function main() {
     // handgepickte eigene Team konkurrenzfaehig). Wer im aktuellen Save auf keinem
     // Roster steht, bleibt regulaerer Free Agent (tid -1) -- das ist der groessere Teil
     // des Bestands und bleibt fuer Transfers/Scouting verfuegbar.
-    const roster = rosterByPlayerId.get(p.id);
+    const roster = freeAgentsOnly ? null : rosterByPlayerId.get(p.id);
     const tid = roster ? tidByTeamId.get(roster.teamId) ?? -1 : -1;
 
     return {
