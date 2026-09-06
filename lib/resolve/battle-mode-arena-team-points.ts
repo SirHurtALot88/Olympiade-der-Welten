@@ -467,6 +467,32 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
 ]);
 
 /**
+ * ZWEITE QUERPRUEFUNG, GEGENRICHTUNG (Review-Fund Produktivierungswelle 1): jede Disziplin in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` MUSS auch einen eigenen `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-
+ * Eintrag haben. Die Mengen-Pruefung oben deckt nur die Richtung "Chassis-Menge -> arena-
+ * aufgeloest" ab; die Gegenrichtung war ungeprueft, und ihr Ausfall ist der GEFAEHRLICHERE der
+ * beiden Faelle: `loeseArenaImpactKonfigAuf()` faellt fuer eine unbekannte Disziplin STILL auf
+ * Basketballs Konfiguration zurueck (bewusst defensiv, s. dort) — Basketballs Referenz liegt
+ * aber auf einer voellig anderen Rohwert-Skala (iKrass 51,5 bei Feldgroesse 6) als jede Buehnen-
+ * Disziplin (Showcase 575, Speed-Schach 1210). Ein Buehnen-Rohwert gegen Basketballs `iKrass`
+ * normiert reisst den `min(1, …)`-Deckel in `ppsAusArenaImpact()` fuer JEDEN Spieler: alle
+ * bekaemen kommentarlos die volle Hoechstpunktzahl, ohne Fehler, ohne Warnung, mitten in einer
+ * echten Saison. Deshalb hier derselbe Fail-Fast beim Modul-Laden wie oben, statt sich auf den
+ * Kommentar "sollte nie vorkommen" zu verlassen.
+ */
+for (const disziplinId of ARENA_RESOLVED_DISCIPLINE_IDS) {
+  if (!ARENA_IMPACT_KONFIG_JE_DISZIPLIN.has(disziplinId)) {
+    throw new Error(
+      `battle-mode-arena-team-points: "${disziplinId}" steht in ARENA_RESOLVED_DISCIPLINE_IDS, ` +
+        "aber NICHT in ARENA_IMPACT_KONFIG_JE_DISZIPLIN -- ohne eigenen Eintrag faellt " +
+        "loeseArenaImpactKonfigAuf() still auf Basketballs Referenz zurueck und vergibt auf einer " +
+        "fremden Rohwert-Skala jedem Spieler die volle Hoechstpunktzahl. Eigene PPS-Referenz " +
+        "ziehen (scripts/ziehe-<disziplin>-pps-referenz.ts) und hier eintragen.",
+    );
+  }
+}
+
+/**
  * Loest die Impact-Kurven-Konfiguration EINER Disziplin auf — mit Basketballs Konfiguration als
  * Fallback fuer eine unbekannte `disciplineId` (sollte bei einem Eintrag in
  * `ARENA_RESOLVED_DISCIPLINE_IDS` ohne passenden `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag nie

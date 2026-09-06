@@ -113,6 +113,30 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
       }
     }
   });
+
+  /**
+   * GEGENRICHTUNG (Review-Fund Produktivierungswelle 1): jede arena-aufgeloeste Disziplin
+   * braucht eine EIGENE gezogene PPS-Referenz. Ohne eigenen Eintrag faellt
+   * `loeseArenaImpactKonfigAuf()` still auf Basketballs Referenz zurueck -- und Basketballs
+   * Rohwert-Skala (iKrass ~51 bei Feldgroesse 6) liegt eine Groessenordnung unter jeder
+   * Buehnen-Skala (Showcase 575, Speed-Schach 1210), sodass JEDER Spieler kommentarlos die
+   * volle Hoechstpunktzahl bekaeme. Das Modul wirft dafuer beim Laden (s. Kommentar dort);
+   * dieser Test prueft dieselbe Zusage ueber die oeffentliche Schnittstelle
+   * (`resolveArenaPpsReferenz`), ohne den internen Map-Export zu brauchen.
+   */
+  it("jede arena-aufgeloeste Disziplin hat eine EIGENE PPS-Referenz, keinen stillen Basketball-Rueckfall", () => {
+    const basketball = resolveArenaPpsReferenz("basketball", 6).referenz;
+    for (const disziplinId of ARENA_RESOLVED_DISCIPLINE_IDS) {
+      const referenz = resolveArenaPpsReferenz(disziplinId, 6).referenz;
+      expect(referenz.iKrass).toBeGreaterThan(0);
+      expect(referenz.iKrass).toBeGreaterThan(referenz.iMittel);
+      if (disziplinId !== "basketball") {
+        // Ein stiller Rueckfall lieferte Basketballs Referenz Zahl fuer Zahl -- genau das
+        // schliesst dieser Vergleich aus.
+        expect(referenz).not.toEqual(basketball);
+      }
+    }
+  });
 });
 
 describe("arenaTeamPointsForFixtureMitTiebreak (Gesamt-kg-Tiebreak, Fable-Empfehlung 9.1)", () => {
