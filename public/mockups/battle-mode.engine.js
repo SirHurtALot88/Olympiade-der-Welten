@@ -6540,11 +6540,17 @@
     // macht das ~0,86 Fumbles GESAMT je Team) muss die Rate je Laufversuch hoeher liegen
     // als eine reale Pro-Snap-Fumble-Quote, weil sie den fehlenden zweiten Kanal mittraegt.
     const pFumble=Math.max(0.01,Math.min(0.08,0.032+(abwehr.ABWEHR_LAUF-rusher.BALLSICHERHEIT)*0.00035));
-    if(rr()<pFumble)return {typ:"fumble",spieler:rusher,yards:Math.round(rr()*3)};
+    // `verteidiger:abwehr` NEU (06.09., Bewegungs-/Kollisions-Runde): reine Zusatzangabe
+    // fuer die Zug-Animation (fkZugPosition, s.u. bei bewegeSpielerLive) — der schon fuer
+    // die Fumble-/Yards-Formel gezogene Gegenspieler wird jetzt auch als sichtbarer
+    // "Tackler" verwendet. `vollziehFootballErgebnis()` liest bei "lauf"/"fumble" weiterhin
+    // ausschliesslich `spieler`/`yards`, das neue Feld aendert an KEINER bestehenden
+    // Wahrscheinlichkeit/Yards-Formel etwas.
+    if(rr()<pFumble)return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
     const meanYds=Math.max(-3,Math.min(11,3.6+diff*0.055));
     const yards=Math.round(meanYds+(rr()-0.5)*9);
-    return {typ:"lauf",spieler:rusher,yards};
+    return {typ:"lauf",spieler:rusher,verteidiger:abwehr,yards};
   }
   // PASSTIEFE aus Down/Distance (nur fuer "kurz"/"mittel" ohne festen Spielzug-Namen —
   // "screen" und "tief" legen ihre Tiefe schon selbst fest, s. resolvePass).
@@ -6609,12 +6615,19 @@
     const pInt=Math.max(0.008,Math.min(0.10,0.014+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
       +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
     if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
+    // `verteidiger:rusher` NEU an "komplett"/"incomplete" (06.09., Bewegungs-Runde) —
+    // "interception" trug das Feld schon vorher (Zeile oben), nur die beiden haeufigeren
+    // Ausgaenge nicht. Reine Zusatzangabe fuer die Zug-Animation (fkZugPosition): der
+    // Coverage-Spieler bekommt jetzt einen sichtbaren Weg zum Receiver statt fuer den
+    // Zug unsichtbar zu bleiben. vollziehFootballErgebnis() liest bei "komplett"/
+    // "incomplete" weiterhin nur spieler/receiver/yards — keine Wirkung auf Punktestand,
+    // Down/Distance oder eine Wahrscheinlichkeit.
     if(rr()<chance){
       const [lo,hi]=FK_TIER_YARDS[tier];
       const yac=Math.max(0,(receiver.LAUFKRAFT-50)*0.06);
-      return {typ:"komplett",spieler:passer,receiver,yards:Math.round(lo+rr()*(hi-lo)+yac),tier};
+      return {typ:"komplett",spieler:passer,receiver,verteidiger:rusher,yards:Math.round(lo+rr()*(hi-lo)+yac),tier};
     }
-    return {typ:"incomplete",spieler:passer,receiver,tier};
+    return {typ:"incomplete",spieler:passer,receiver,verteidiger:rusher,tier};
   }
   // FIELD GOAL: Stufentabelle nach Distanz statt eines linearen Fits — reales Vorbild
   // zengm `probFieldGoal` (Football-Plan A.3, aus echten NFL-Kicking-Daten abgeleitete
@@ -6704,6 +6717,92 @@
     const startY=H/2+(s.spielTyp==="screen"?-26:0); // Screen: erst leicht zurueck zum Receiver hinter der Line
     fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:startY-Math.sin(phase*Math.PI)*flugHoch,
       traegerId:(phase>=0.96&&erg.typ==="komplett")?erg.receiver.id:null};
+  }
+
+  // BEWEGUNG DER SPIELER WAEHREND DES ZUGS (Chris, 06.09., woertlich: "football bewegt
+  // sich nicht dynamisch ... es wird nciht geblockt, keiner bewegt sich keiner veruscht
+  // zu tacklen ... dass sich bewegt wird wie bei basketball aiuch mit
+  // kollisionsabfragen"). Nachgemessen (Playwright-Screenshots ueber 35s realer Spielzeit,
+  // s. PR-Bericht): `bewegeSpielerLive`s `stehtStill`-Zweig (s.u.) hielt bislang ALLE
+  // zwoelf Spieler fuer die GESAMTE Snap-bis-Ergebnis-Dauer (Formation- UND Zug- UND
+  // Nachlauf-Teilphase) hart auf ihrer Formationsposition fest — nur der Ball bewegte
+  // sich (animiereFootballZug oben). Das war beim Migrations-Fix (football-live-
+  // migration.md Abschnitt 7) eine bewusste Entscheidung GEGEN den Klumpen-Bug (Spieler
+  // liefen quer ueber ein neues, weit entferntes Line-of-Scrimmage-Ziel und kamen nie an,
+  // bevor der naechste Snap schon wieder umzog) — sie hat aber jede Bewegung mitgenommen,
+  // nicht nur den einen problematischen Sprint zwischen zwei Downs.
+  //
+  // FIX: die Formationsposition bleibt in der "formation"-Teilphase (0,9s Standbild vor
+  // dem Snap) weiter hart — das verhindert weiterhin den Klumpen. Waehrend "zug" (die
+  // eigentliche Ausfuehrung) und "nach" (Ergebnis-Anzeige, haelt die "zug"-Endposition)
+  // bekommen die am jeweiligen Spielzug beteiligten Spieler jetzt ein echtes, sich
+  // bewegendes Ziel, das ueber DENSELBEN tempoPx-Schrittmechanismus wie Basketball
+  // (bewegeSpielerLive weiter unten, "TEMPO statt Lerp") angelaufen wird — keine zweite
+  // Bewegungs-Infrastruktur, exakt die, die Chris als Vorbild nennt.
+  //
+  // WER BEKOMMT EIN ZIEL: der Ballfuehrer/Passempfaenger laeuft zum selben sichtYards-/
+  // zielSpot-Fallback wie animiereFootballZug oben (Ball und Laeufer/Receiver kommen also
+  // sichtbar am selben Punkt an). Der fuer die Erfolgsformel gezogene Gegenspieler
+  // (`erg.verteidiger`, jetzt an resolveLauf/resolvePass zusaetzlich durchgereicht, s.
+  // dort) folgt ihm hinterher und erreicht ihn am Ende der Animation — der sichtbare
+  // Tackle-/Deckungs-Versuch. ALLE UEBRIGEN acht Spieler (die an diesem einen Zug nicht
+  // direkt beteiligten Linemen/Receiver/Defensive Backs) bekommen eine kleine,
+  // GEGENSEITIGE Bewegung aufeinander zu (fkEngageZiel, nach Formationsindex gepaart) —
+  // eine sichtbare Kollision/Blockade-Andeutung, ausdruecklich KEIN vollstaendiger
+  // Block-Assignment-Nachbau (der waere ein eigenes, deutlich groesseres Vorhaben, s.
+  // PR-Bericht). Rein optisch: keine dieser Funktionen wird von resolveLauf/resolvePass/
+  // vollziehFootballErgebnis GELESEN — Yards, Wahrscheinlichkeiten, Punktestand und damit
+  // die Rangtreue sind unveraendert (gemessen, s. PR-Bericht).
+  const FK_ENGAGE_ANTEIL=0.35, FK_ENGAGE_TEMPO=4;
+  // Gegenspieler nach FORMATIONS-INDEX gepaart (dieselbe Reihenfolge, mit der starteSnap
+  // Slots vergibt) — deterministisch, ohne eine zweite Zuteilung/einen zweiten rr()-Zug.
+  function fkGegenpart(u){
+    const fb=fsLive.football; if(!fb)return null;
+    const offTeam=FSTEAM[fb.side], defTeam=FSTEAM[1-fb.side];
+    const eigen=u.side===fb.side?offTeam:defTeam, gegner=u.side===fb.side?defTeam:offTeam;
+    const idx=eigen.indexOf(u);
+    if(idx<0||!gegner.length)return null;
+    return gegner[idx%gegner.length];
+  }
+  function fkEngageZiel(u,s,phase){
+    const p=s.plaetze[u.id]; if(!p)return null;
+    const gegner=fkGegenpart(u), po=gegner&&s.plaetze[gegner.id];
+    if(!po)return null;
+    const anteil=Math.min(1,phase*FK_ENGAGE_TEMPO)*FK_ENGAGE_ANTEIL;
+    return {x:p.x+(po.x-p.x)*anteil, y:p.y+(po.y-p.y)*anteil};
+  }
+  // Derselbe sichtYards-/zielSpot-Fallback wie animiereFootballZug (Duplikat statt
+  // Refaktor: animiereFootballZug ist bereits sichtgeprueft/gemessen, s. football-
+  // zufriedenstellend.md Abschnitt 4 — hier absichtlich unangetastet gelassen).
+  function fkZugZielX(fb,erg){
+    const sichtYards=erg.yards!=null?erg.yards
+      :(erg.tier&&FK_TIER_YARDS[erg.tier]?(FK_TIER_YARDS[erg.tier][0]+FK_TIER_YARDS[erg.tier][1])/2:0);
+    const zielSpot=Math.max(0,Math.min(100,fb.spot-sichtYards));
+    return fkLosX(fb.side,zielSpot);
+  }
+  function fkZugPosition(u,s,phase){
+    const fb=fsLive.football, erg=s.ergebnis;
+    if(!fb||!erg)return null;
+    const p=s.plaetze[u.id]; if(!p)return null;
+    if(s.spielTyp==="fg"||s.spielTyp==="punt")return fkEngageZiel(u,s,phase); // Schutzformation, kein Ballfuehrer
+    if(erg.typ==="sack"){
+      const zx=s.losX-s.zumFeld*12*Math.min(1,phase*2);
+      if(u===erg.spieler)return {x:zx,y:H/2};
+      if(erg.verteidiger&&u===erg.verteidiger)return {x:p.x+(zx-p.x)*phase,y:p.y+(H/2-p.y)*phase};
+      return fkEngageZiel(u,s,phase);
+    }
+    const zielX=fkZugZielX(fb,erg);
+    if(s.spielTyp==="lauf"){
+      const ziel={x:p.x+(zielX-p.x)*phase,y:H/2+Math.sin(phase*Math.PI*3)*12};
+      if(u===erg.spieler)return ziel;
+      if(erg.verteidiger&&u===erg.verteidiger)return {x:p.x+(ziel.x-p.x)*phase,y:p.y+(ziel.y-p.y)*phase};
+      return fkEngageZiel(u,s,phase);
+    }
+    // Pass (komplett/incomplete/interception): Ziel- UND Deckungsspieler laufen zur
+    // Landestelle (derselbe zielX-Fallback wie der Ball).
+    if(erg.receiver&&u===erg.receiver)return {x:p.x+(zielX-p.x)*phase,y:H/2};
+    if(erg.verteidiger&&u===erg.verteidiger)return {x:p.x+(zielX-p.x)*phase,y:p.y+(H/2-p.y)*phase};
+    return fkEngageZiel(u,s,phase);
   }
 
   // ANWENDUNG DES ERGEBNISSES — hier erst mutiert Punktestand/Down/Distance/Spot, am
@@ -8739,20 +8838,26 @@
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       // "snap" (Football) ist dieselbe Standphase-Idee wie "freiwurf" (Basketball) —
       // s. Kommentar bei fsLive.phase in initFeldspielLive ("eine Phase, eine
-      // Aufstellungsfunktion, ein Schritt-Handler"). Football bleibt fuer die GESAMTE
-      // Snap-bis-Ergebnis-Dauer in dieser Standphase (kein Dribbeln/Freilaufen zwischen
-      // Formation und Spielzug-Ausgang, s. stepSnapPhase) — nur der Ball bewegt sich
-      // (animiereFootballZug), die elf ausserhalb des Balls stehen fest in Formation,
-      // genau wie ein Freiwurfschuetzen-Umfeld bei Basketball. Wirkungslos fuer
-      // Basketball/Hockey/Tennis, die "snap" nie setzen.
+      // Aufstellungsfunktion, ein Schritt-Handler"). NUR NOCH die "formation"-Teilphase
+      // (0,9s Standbild direkt vor dem Snap) haelt alle zwoelf Spieler hart fest — das
+      // verhindert weiterhin den Klumpen-Bug (football-live-migration.md Abschnitt 7),
+      // ohne den JEDE Bewegung fuer die gesamte Zug-Dauer mitzunehmen (Chris' Fund,
+      // 06.09., s. fkZugPosition-Kommentar oben: "keiner bewegt sich, keiner versucht zu
+      // tackeln"). Waehrend "zug"/"nach" liefert fkZugPosition ein echtes, sich
+      // bewegendes Ziel fuer Ballfuehrer/Receiver/Verteidiger/Blocker-Paare; alle
+      // uebrigen Zweige darunter bleiben Zeichen fuer Zeichen unveraendert. Wirkungslos
+      // fuer Basketball/Hockey/Tennis, die "snap"/`fsLive.football` nie setzen.
       const stehtStill=fsLive.phase==="freiwurf"||fsLive.phase==="snap";
       if(stehtStill){
-        // STANDPHASE: EIN Ziel, sonst nichts — kein Dribbeln, keine Deckung, kein
-        // Freilaufen, kein Zug zum freien Ball. Der Zweig steht bewusst GANZ oben in der
-        // Kette, damit keiner der spaeteren Zweige ihn ueberschreiben kann; alle uebrigen
-        // Zweige bleiben Zeichen fuer Zeichen unveraendert.
-        const p=fsLive.phase==="snap"?(fsLive.snap&&fsLive.snap.plaetze[u.id]):fsLive.freiwurf.plaetze[u.id];
+        const snap=fsLive.phase==="snap"?fsLive.snap:null;
+        const p=snap?snap.plaetze[u.id]:fsLive.freiwurf.plaetze[u.id];
         if(p){ zx=p.x; zy=p.y; }
+        if(snap&&fsLive.football&&(snap.stufe==="zug"||snap.stufe==="nach")){
+          const dauer=FK_ZUG_DAUER[snap.spielTyp]||1.0;
+          const phase=snap.stufe==="nach"?1:Math.min(1,snap.t/dauer);
+          const ziel=fkZugPosition(u,snap,phase);
+          if(ziel){ zx=ziel.x; zy=ziel.y; }
+        }
       } else if(u.hatBall){
         // WUNSCHDISTANZ statt "immer zum Korb" (Archetypen-Runde). Bisher stand hier
         // `zx=korbX` fuer JEDEN Ballfuehrer: wer den Ball hatte, zog los Richtung Ring,
@@ -9767,6 +9872,23 @@
       }
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
       ctx.beginPath();ctx.moveTo(W/2,50);ctx.lineTo(W/2,H-50);ctx.stroke();
+      // YARD-ZAHLEN (Chris' Fund, 06.09.: "die yard linien und zahlen fehlen komplett" —
+      // die Linien standen schon, die ZAHLEN nie; hier genuin nachgebaut, kein Verdrahtungs-
+      // fehler). Reale NFL-Zaehlweise: von jeder Torlinie aufsteigend bis 50 (Mittellinie),
+      // dann wieder absteigend — an jeder der neun Zehn-Yard-Linien einmal nah an jeder
+      // Seitenlinie, spiegelbildlich fuer beide Blickrichtungen (kein Rotationsaufwand fuer
+      // eine reine Draufsicht noetig, beide Teams lesen dieselbe liegende Zahl).
+      ctx.save();
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillStyle="rgba(255,255,255,.45)";
+      for(let i=1;i<10;i++){
+        const x=W*0.13+W*0.74*(i/10);
+        const yardWert=i<=5?i*10:100-i*10; // 10,20,30,40,50,40,30,20,10
+        ctx.fillText(String(yardWert),x,50+18);
+        ctx.fillText(String(yardWert),x,H-50-18);
+      }
+      ctx.restore();
       return;
     }
     if(feldspielDisc==="hockey"){ eisflaeche(); return; }
