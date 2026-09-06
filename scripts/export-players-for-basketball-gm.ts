@@ -158,23 +158,6 @@ function toBbgmRatings(raw: RawAttrs, ratingHgt: number) {
   };
 }
 
-// Nach RELATIVER Balance Speed/Dexterity vs. Power einordnen, nicht nach starrer
-// Power-Schwelle -- eine feste "power>=60 -> PF"-Schwelle liess frueher fast jeden
-// kraeftigen Charakter als PF landen, egal wie schnell/geschickt er dazu war (genau
-// das Problem hinter den PF-lastigen Top-Ovr-Listen). `diff` ist Speed/Dexterity
-// minus Power: stark positiv -> PG (reiner Ballhandler), stark negativ -> C (reine
-// Wucht), dazwischen abgestuft.
-function assignPos(raw: RawAttrs): string {
-  const size = raw.power;
-  const skill = blend([raw.speed, 1], [raw.dexterity, 1]);
-  const diff = skill - size;
-  if (diff >= 20) return "PG";
-  if (diff >= 7) return "SG";
-  if (diff >= -7) return "SF";
-  if (diff >= -20) return "PF";
-  return "C";
-}
-
 function main() {
   const saveId = arg("--save-id");
   const out = arg("--out") ?? "basketball-gm-league.json";
@@ -272,7 +255,6 @@ function main() {
     const { ratingHgt, zollGerundet } = groesseZuBbgmHoehe(groesse);
 
     const ratings = toBbgmRatings(raw, ratingHgt);
-    const pos = assignPos(raw);
 
     const ratingScore = p.rating ?? 50;
     const potentialScore = resolvePlayerPotentialScoreFromGameState({ gameState: gs, playerId: p.id }) ?? ratingScore;
@@ -303,12 +285,16 @@ function main() {
       draft: { year: Math.min(startingSeason, bornYear + 19), round: 0, pick: 0, tid: -1 },
       contract: { amount, exp: startingSeason + 2 },
       imgURL: portraitRel ? `${BASE_URL}${portraitRel}` : undefined,
+      // `pos` bewusst NICHT gesetzt: Basketball GM berechnet die Position (inkl.
+      // Kombi-Positionen wie "G"/"F"/"GF"/"FC") selbst aus den 15 Ratings, per eigenem
+      // an echten NBA-Daten trainiertem Modell (siehe zengm.com/blog/2021/03/
+      // new-position-formula) -- das ist naeher an "wie im Base-Game" als jede eigene
+      // Heuristik hier, und bringt Mehrfachpositionen gratis mit.
       ratings: [
         {
           season: startingSeason,
           fuzz: 0,
           skills: [],
-          pos,
           ...ratings,
         },
       ],
