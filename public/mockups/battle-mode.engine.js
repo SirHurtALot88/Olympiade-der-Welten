@@ -14249,6 +14249,57 @@
   // beides gibt es im Rennen nicht. Vorher lief sie deshalb gar nicht, und ueber dem
   // Rennen stand dauerhaft "0 : 0" und "0:00". Hier stehen die Groessen, die ein Rennen
   // wirklich hat: verstrichene Zeit, wie viele im Ziel sind, und wie weit das Feld ist.
+
+  // RANGPUNKTE FUER DIE BAHN (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
+  // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND Climbing —
+  // Takeshi's Castle und Staffel bleiben aussen vor, s. BAHN_ART). Eine gemeinsame
+  // Rangliste ueber BEIDE Seiten: wer im Ziel ist, nach Zielzeit; wer noch unterwegs ist,
+  // dahinter nach Strecke (vorlaeufig — so zeigt der Stand waehrend des Rennens, wo es
+  // gerade steht, und konvergiert von selbst auf den Endstand). Platz 1 bekommt N Punkte
+  // (N = Laeufer im Rennen), der Letzte einen. Der Teamstand ist die Summe — dieselbe Idee
+  // wie die Platzziffern-Wertung im Crosslauf, nur so gedreht, dass wie ueberall sonst in
+  // der Arena die GROESSERE Zahl gewinnt.
+  // Liest nur u.fertig/u.pos/u.seite/u.id, schreibt nichts: reine Auswertung. Wird sowohl
+  // von der laufenden Anzeige als auch von der Sonde (bahnLauf) und dem Endstand-Overlay
+  // aufgerufen — es gibt keine zweite Kopie dieser Logik.
+  function bahnRangliste(){
+    const N=LAEUFER.length;
+    const reihe=[...LAEUFER].sort((a,b)=>{
+      const fa=a.fertig!=null, fb=b.fertig!=null;
+      if(fa&&fb)return a.fertig-b.fertig;
+      if(fa!==fb)return fa?-1:1;
+      return b.pos-a.pos;
+    });
+    const punkte=new Map(), seiten=[0,0];
+    reihe.forEach((u,i)=>{const p=N-i; punkte.set(u.id,p); seiten[u.seite]+=p;});
+    return {reihe,punkte,seiten};
+  }
+  let bahnEndeGemeldet=false;
+
+  // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
+  // liefern Rangpunkte (bahnRangliste). Staffel und Takeshi's Castle fuehren (noch) keine
+  // eigene `wertung` und bleiben beim alten Zieleinlauf-Zaehler — fuer die Staffel ist das
+  // vorlaeufig die einzige Antwort (eigener Auftrag, s. Abschnitt 5.5 im Plan), fuer
+  // Takeshi steht die Burgpunkte-Wertung in einem PARALLELEN Auftrag aus. Kommt dort eine
+  // eigene `wertung` dazu, reicht ein weiterer Zweig HIER — updateHudBahn, renderKader und
+  // das Endstand-Overlay (renderEndstandBahn) lesen alle denselben Rueckgabewert und
+  // brauchen dafuer keine eigene Anpassung.
+  // `gewertet` sagt, ob hinter dem Stand eine ECHTE Wertung steht. Der Zieleinlauf-Zaehler
+  // ist keine: bei Takeshi zaehlt er Ausgeschiedene mit (rennFertig nimmt sie auf, s.
+  // nervenKosten-Zweig in stepSpurt), am Rennende steht darum IMMER 6:6 — genau der
+  // Anzeigefehler, den diese Aenderung fuer die drei Rang-Bahnen behebt. Wer daraus ein
+  // "Unentschieden" macht, behauptet ein Ergebnis, das der Motor nicht hergibt. Solange
+  // `gewertet` false ist, meldet das Rennen deshalb nur, DASS es zu Ende ist. Kommt fuer
+  // Takeshi/Staffel eine eigene `wertung` dazu, faellt das von selbst weg.
+  function bahnTeamstand(){
+    if(BA().wertung==="rang"){
+      const w=bahnRangliste();
+      return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
+    }
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
+  }
+
   function updateHudBahn(){
     // Anzeige in ECHTEN Sekunden, nicht in Simulationssekunden: rennT selbst bleibt die
     // unangetastete physikalische Zeitbasis (Cooldowns, Ermuedung ...); was hier steht,
@@ -14270,12 +14321,25 @@
     // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
     // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
     // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
-    document.getElementById("klsuffix").textContent="im Ziel";
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
-    // Der Punktestand ist die Zahl der Laeufer im Ziel — die Reihenfolge entscheidet.
-    document.getElementById("score").textContent=imZiel(0)+" : "+imZiel(1);
+    // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
+    // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
+    const stand=bahnTeamstand();
+    document.getElementById("klsuffix").textContent=
+      stand.suffix+(stand.gewertet&&!done?" · vorläufig":"");
+    document.getElementById("score").textContent=stand.seiten[0]+" : "+stand.seiten[1];
+    if(done&&!bahnEndeGemeldet){
+      bahnEndeGemeldet=true;
+      const [pL,pR]=stand.seiten;
+      feed(0,stand.gewertet
+        ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+          +pL+":"+pR+" "+stand.suffix
+        : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
+          +" (fuer diese Disziplin gibt es noch keine Wertung)",true);
+      renderEndstandBahn();
+    }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
     const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
       return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
@@ -14735,6 +14799,9 @@
       muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.00,
       wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
+      // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
+      // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.
+      wertung:"rang",
       rezept:{
         // NACHGEZOGEN AN DIE SPURT-MATRIX. Gemessen: Speed trug 47,6 % dazu bei, ob
         // jemand Plaetze gutmacht — die Matrix bepreist ihn mit 18. Der Grund lag hier:
@@ -14796,6 +14863,14 @@
       kraftBasis:290, kraftSpanne:2.7,
       label:"Time-Trial", jeSeite:6, hindernisse:[0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90],
       hindernisWort:"Kurve", boden:"#3c3f45", schatten:false, tackle:false, grundTempo:96, tempoSpanne:0.82,
+      // WERTUNG NACH RANG (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
+      // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND
+      // Climbing): alle Laeufer beider Seiten in EINER Rangliste nach Zielzeit, Platz 1
+      // bekommt N Punkte (N = Laeufer im Rennen), der Letzte einen — Teamstand ist die
+      // Summe. Nur Anzeige und Auswertung (s. bahnRangliste/bahnTeamstand), keine Zeile
+      // der Rennmechanik haengt daran. Gleichstand bleibt Unentschieden — kein
+      // Zeitsumme-Tiebreak (Chris' Rueckfrage 06.09.).
+      wertung:"rang",
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
@@ -14846,6 +14921,9 @@
       label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
+      // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
+      // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.
+      wertung:"rang",
       rezept:{
         ANTRITT:    {power:38,dexterity:32,speed:30},
         ENDTEMPO:   {stamina:44,determination:31,speed:25},
@@ -15166,6 +15244,7 @@
 
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    bahnEndeGemeldet=false;
     cam={zoom:1,cx:0.5}; bahnWahl=null;
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
@@ -17164,7 +17243,7 @@
     }
     const m=document.getElementById("kmitte");
     if(m)m.textContent=istBahn(disc)
-      ? (rennFertig.filter(x=>x.seite===0).length+" : "+rennFertig.filter(x=>x.seite===1).length)
+      ? bahnTeamstand().seiten.join(" : ")
       : (istBuehne(disc)&&BB().duell)
       ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length+" : "+
          TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length)
@@ -17242,6 +17321,53 @@
         tr.appendChild(iz);
         tb.appendChild(tr);
       }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    document.getElementById("endstand").hidden=false;
+  }
+
+  // ENDSTAND-OVERLAY FUER DIE BAHN (Chris' Rueckfrage 06.09.). Dasselbe Overlay-Element
+  // wie im Kampf (#endstand/#esieger/#etafelL/#etafelR, s. renderEndstand darueber), aber
+  // mit bahn-eigenen Spalten: Laeufer, Platz, Zeit, Punkte statt Schaden/Heilung/KO.
+  //
+  // GENERISCH GEHALTEN, wie von Chris verlangt: Platz und Zeit kommen aus derselben
+  // Rangliste (bahnRangliste — sortiert nach u.fertig/u.pos) fuer ALLE FUENF Bahnen, auch
+  // Staffel und Takeshi's Castle, deren eigene Wertung (Burgpunkte fuer Takeshi) ein
+  // paralleler Auftrag ist und hier noch keine Zeile Code braucht. Die "Punkte"-Spalte
+  // liest bahnTeamstand().punkte und zeigt "–", wo es (noch) keine Punkte je Laeufer gibt,
+  // statt eine Zahl zu erfinden, die zur jeweiligen Wertung nicht passt. Kommt spaeter eine
+  // eigene Wertung dazu, reicht eine Erweiterung von bahnTeamstand() — diese Funktion hier
+  // muss dafuer nicht angefasst werden.
+  function renderEndstandBahn(){
+    const rang=bahnRangliste(), stand=bahnTeamstand();
+    const [pL,pR]=stand.seiten;
+    document.getElementById("esieger").textContent=stand.gewertet
+      ? (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
+        +" — "+pL+" : "+pR+" "+stand.suffix
+      : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung";
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      for(const lab of ["Läufer","Platz","Zeit","Punkte"])kopf.appendChild(el("th",null,lab));
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      rang.reihe.forEach((u,i)=>{
+        if(u.seite!==seite)return;
+        const tr=el("tr",u.raus?"tot":null);
+        tr.appendChild(el("td",null,u.n));
+        tr.appendChild(el("td",null,String(i+1)));
+        // AUSGESCHIEDENE HABEN KEINE ZEIT. `u.fertig` traegt bei ihnen den Sortierschluessel
+        // 90+(1-pos)*10 aus dem nervenKosten-Zweig (s. stepSpurt), also 90..100 — in einem
+        // Rennen, das nach ~25 s vorbei ist. Als "93,7 s" gedruckt waere das eine erfundene
+        // Zahl, genau das, was die Punkte-Spalte hier bewusst vermeidet. Die Reihenfolge
+        // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
+        // Finisher, nur ANZEIGEN darf man ihn nicht.
+        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
+        tr.appendChild(el("td",null,stand.punkte?String(stand.punkte.get(u.id)):"—"));
+        tb.appendChild(tr);
+      });
       t.appendChild(tb); box.appendChild(t);
     }
     document.getElementById("endstand").hidden=false;
@@ -18524,11 +18650,27 @@
           stepSpurt(1/60); guard++;
         }
       } finally { stumm=false; }
+      // DIE SONDE MELDET, WAS DAS SPIEL WERTET — nicht, was bahnRangliste rechnen KANN.
+      // `seiten` kam vorher immer aus bahnRangliste, auch bei Staffel/Takeshi: die Sonde
+      // sagte dann `wertung:"zieleinlauf"` und lieferte im selben Objekt Rangpunkte
+      // (Staffel z.B. 21:57), waehrend die Anzeige 6:6 zeigte. Ein Test darauf haette den
+      // falschen Vertrag festgeschrieben. Jetzt kommen `seiten` und `punkte` aus
+      // bahnTeamstand — demselben Dispatch, den HUD, Kader und Overlay lesen; `punkte` ist
+      // null, wo es (noch) keine Punkte je Laeufer gibt. Die Reihenfolge/`platz` kommt aus
+      // bahnRangliste.reihe, damit die Sonde exakt die Plaetze des Overlays nennt statt
+      // einer zweiten, leicht abweichenden Sortierung (fertig??99 ordnete Unfertige nicht
+      // nach Strecke).
+      const w=bahnRangliste(), st=bahnTeamstand();
       const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
-        laeufer:[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99)).map((u,pl)=>({
+        wertung:BAHN_ART[bd].wertung||"zieleinlauf", seiten:st.seiten, gewertet:st.gewertet,
+        laeufer:w.reihe.map((u,pl)=>({
           platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
+          punkte:st.punkte?st.punkte.get(u.id):null, rangpunkte:w.punkte.get(u.id),
+          raus:!!u.raus,
           ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
-          zeit:u.fertig==null?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+          // Ausgeschiedene: kein `zeit`. u.fertig traegt bei ihnen nur den Sortierschluessel
+          // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit.
+          zeit:(u.fertig==null||u.raus)?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
           bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
           reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
           sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
