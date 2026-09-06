@@ -1,0 +1,347 @@
+diff --git a/public/mockups/battle-mode.engine.js b/public/mockups/battle-mode.engine.js
+index ca0eb9e7..c3a666f1 100644
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -10372,7 +10372,7 @@
+       // Teilnehmer i gegen Gegner i, wie ein Schach-Mannschaftskampf mit mehreren
+       // Brettern. Dieselbe Punkteformel wie ueberall — nur die Auswertung ist jetzt
+       // relativ (Vorteil = eigene Punkte minus die des Gegners je Zug), nicht absolut.
+-      label:"Speed-Schach", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
++      label:"Speed-Schach", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true, schach:true,
+       failAbzug:0.55, failWort:"verliert Zeit am Zug", erfolgWort:"findet den starken Zug",
+       rezept:{
+         GRUNDLAGE:    {intelligence:45,awareness:35,determination:20},
+@@ -10961,6 +10961,7 @@
+     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
+     // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
+     if(art.heben){ zeichneHeben(art); return; }
++    if(art.schach){ zeichneSchach(art); return; }
+     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
+     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
+     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
+@@ -11142,6 +11143,133 @@
+     });
+   }
+ 
++
++  // ================== SPEED-SCHACH: EIGENES BUEHNENBILD (PROTOTYP, Fable-Plan 05.09.) ==================
++  // Ein Fokus-Brett gross in der Mitte, beide Spieler daneben, Schachuhr, Bewertungsbalken,
++  // letzter Zug markiert, die uebrigen fuenf Bretter klein am unteren Rand. Die Partien sind
++  // sechs echte Eroeffnungen (20 Halbzuege = rundenN x 2), rein kosmetisch: Punkte und
++  // Vorteil kommen unveraendert aus dem Durchgangs-Rechner, das Brett zeigt nur, WO gerade
++  // gezogen wird. Weiss = eigenes Team (in der Queue zieht Seite 0 zuerst).
++  const SCHACH_PARTIEN=[
++    {name:"Opera-Partie (Morphy 1858)", z:"e2e4 e7e5 g1f3 d7d6 d2d4 c8g4 d4e5 g4f3 d1f3 d6e5 f1c4 g8f6 f3b3 d8e7 b1c3 c7c6 c1g5 b7b5 c3b5 c6b5"},
++    {name:"Unsterbliche Partie (Anderssen 1851)", z:"e2e4 e7e5 f2f4 e5f4 f1c4 d8h4 e1f1 b7b5 c4b5 g8f6 g1f3 h4h6 d2d3 f6h5 f3h4 h6g5 h4f5 c7c6 g2g4 h5f6"},
++    {name:"Immergrüne Partie (Anderssen 1852)", z:"e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 b2b4 c5b4 c2c3 b4a5 d2d4 e5d4 e1g1 d4d3 d1b3 d8f6 e4e5 f6g6 f1e1 g8e7"},
++    {name:"Damengambit, Orthodox", z:"d2d4 d7d5 c2c4 e7e6 b1c3 g8f6 c1g5 f8e7 e2e3 e8g8 g1f3 b8d7 a1c1 c7c6 f1d3 d5c4 d3c4 f6d5 g5e7 d8e7"},
++    {name:"Sizilianisch, Najdorf", z:"e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6 c1e3 e7e5 d4b3 c8e6 f2f3 f8e7 d1d2 e8g8 e1c1 b8d7"},
++    {name:"Spanisch, geschlossen", z:"e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 f1e1 b7b5 a4b3 d7d6 c2c3 e8g8 h2h3 c6a5 b3c2 c7c5"}
++  ].map(P=>({...P, zuege:P.z.split(" ")}));
++  const SCHACH_IDX={p:0,r:1,n:2,b:3,q:4,k:5};
++  function schachGrund(){ const B=[]; const r="rnbqkbnr"; for(let y=0;y<8;y++){B.push([]);for(let x=0;x<8;x++){let p=null; if(y===0)p="b"+r[x]; if(y===1)p="bp"; if(y===6)p="wp"; if(y===7)p="w"+r[x]; B[y].push(p);}} return B; }
++  function schachStellung(partie,halbzuege){
++    const B=schachGrund(); let letzter=null;
++    const f=(c)=>c.charCodeAt(0)-97, r=(c)=>8-Number(c);
++    for(let i=0;i<Math.min(halbzuege,partie.zuege.length);i++){ const z=partie.zuege[i];
++      const x0=f(z[0]),y0=r(z[1]),x1=f(z[2]),y1=r(z[3]); const p=B[y0][x0]; if(!p)continue;
++      const schlag=!!B[y1][x1]; B[y1][x1]=p; B[y0][x0]=null;
++      if(p[1]==="k"&&Math.abs(x1-x0)===2){ if(x1===6){B[y0][5]=B[y0][7];B[y0][7]=null;} else {B[y0][3]=B[y0][0];B[y0][0]=null;} }
++      letzter={x0,y0,x1,y1,p,schlag,z,nr:i}; }
++    return {B,letzter};
++  }
++  let schachFokus=0;
++  function zeichneSchachBrett(bx,by,q,B,letzter,gross){
++    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
++      ctx.fillStyle=((x+y)%2===0)?"#e9dcc3":"#7a5236"; ctx.fillRect(bx+x*q,by+y*q,q,q);
++      if(letzter&&((x===letzter.x0&&y===letzter.y0)||(x===letzter.x1&&y===letzter.y1))){
++        ctx.fillStyle="rgba(255,214,90,.55)"; ctx.fillRect(bx+x*q,by+y*q,q,q); }
++    }
++    ctx.strokeStyle="#2b2016"; ctx.lineWidth=gross?3:1; ctx.strokeRect(bx-1,by-1,8*q+2,8*q+2);
++    for(let y=0;y<8;y++)for(let x=0;x<8;x++){ const p=B[y][x]; if(!p)continue;
++      const blatt=p[0]==="w"?"schach_weiss":"schach_schwarz";
++      if(gross&&aDa(blatt)){ ctx.imageSmoothingEnabled=false;
++        ctx.drawImage(aBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,bx+x*q+(q-q)/2,by+y*q-q*0.15,q,q); ctx.imageSmoothingEnabled=true; }
++      else { ctx.fillStyle=p[0]==="w"?"#fff6e6":"#26221f"; ctx.beginPath(); ctx.arc(bx+x*q+q/2,by+y*q+q/2,q*0.32,0,6.283); ctx.fill();
++        ctx.strokeStyle=p[0]==="w"?"#6b5a45":"#000"; ctx.lineWidth=0.7; ctx.stroke(); }
++    }
++    if(letzter&&gross){ // Pfeil vom Start- zum Zielfeld
++      const ax=bx+letzter.x0*q+q/2, ay=by+letzter.y0*q+q/2, zx=bx+letzter.x1*q+q/2, zy=by+letzter.y1*q+q/2;
++      ctx.save(); ctx.strokeStyle="rgba(40,120,60,.85)"; ctx.fillStyle="rgba(40,120,60,.85)"; ctx.lineWidth=4; ctx.lineCap="round";
++      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(zx,zy); ctx.stroke();
++      const w=Math.atan2(zy-ay,zx-ax); ctx.beginPath(); ctx.moveTo(zx,zy); ctx.lineTo(zx-10*Math.cos(w-0.5),zy-10*Math.sin(w-0.5)); ctx.lineTo(zx-10*Math.cos(w+0.5),zy-10*Math.sin(w+0.5)); ctx.closePath(); ctx.fill(); ctx.restore(); }
++  }
++  function zeichneSchach(art){
++    if(!TEILNEHMER.length)return;
++    const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
++    const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
++    // REGIE: alle 3 s springt der Fokus auf das engste noch laufende Brett (Klick pinnt spaeter).
++    if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
++      let best=schachFokus,bv=Infinity;
++      for(let b=0;b<bretter;b++){const [a]=paar(b); if(!a)continue; const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0; if(v<bv){bv=v;best=b;}}
++      schachFokus=best; }
++    const fb=schachFokus, [a,b]=paar(fb); if(!a||!b)return;
++    const partie=SCHACH_PARTIEN[fb%SCHACH_PARTIEN.length];
++    const halb=(a.aktuell+1)+(b.aktuell+1);
++    const {B,letzter}=schachStellung(partie,halb);
++    // DUELLSTAND gross wie beim Heben: gewonnene Bretter
++    const fertig=(u)=>u.aktuell+1>=art.rundenN;
++    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&(s===0?x.vorteil>0:y.vorteil>0))n++;}return n;};
++    ctx.textAlign="center";ctx.textBaseline="middle";
++    ctx.font="700 30px 'Barlow Condensed',sans-serif"; ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
++    const st=gew(0)+" : "+gew(1); ctx.strokeText(st,W/2,H*0.075); ctx.fillStyle="#f2e9d8"; ctx.fillText(st,W/2,H*0.075);
++    ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
++    ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name,W/2,H*0.125);
++    // TISCH + BRETT
++    const q=24, bw=8*q, bx=W/2-bw/2, by=H*0.225;
++    ctx.fillStyle="#3b2a1c"; ctx.fillRect(bx-26,by-14,bw+52,bw+30);
++    ctx.fillStyle="#5a3f2a"; ctx.fillRect(bx-22,by-10,bw+44,bw+22);
++    ctx.fillStyle="#2a1d13"; ctx.fillRect(bx-20,by+bw+16,10,22); ctx.fillRect(bx+bw+10,by+bw+16,10,22);
++    zeichneSchachBrett(bx,by,q,B,letzter,true);
++    // Annotation am Zielfeld: ! bei gutem Zug, ?! bei Zeitverlust (aus dem Ereignis des zuletzt enthuellten Zuges)
++    const letzterZieher=(halb%2===1)?a:b; const rr_=letzterZieher.runden[letzterZieher.aktuell];
++    if(letzter&&rr_){ const gut=rr_.ereignis===art.erfolgWort; ctx.font="800 16px 'Barlow Condensed',sans-serif";
++      ctx.fillStyle=gut?"#5FD08A":"#e0645a"; ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=3;
++      const tx=bx+letzter.x1*q+q-2, ty=by+letzter.y1*q+4; ctx.strokeText(gut?"!":"?!",tx,ty); ctx.fillText(gut?"!":"?!",tx,ty); }
++    // BEWERTUNGSBALKEN links vom Brett (lichess-Art): laufender Vorteil von Weiss
++    const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
++    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
++    const anteil=0.5+0.5*Math.max(-1,Math.min(1,v/maxV));
++    ctx.fillStyle="#1a1a1a"; ctx.fillRect(bx-42,by,12,bw); ctx.fillStyle="#f4f0e8"; ctx.fillRect(bx-42,by+bw*(1-anteil),12,bw*anteil);
++    ctx.strokeStyle="#000"; ctx.lineWidth=1; ctx.strokeRect(bx-42,by,12,bw);
++    ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?"#5FD08A":(v<0?"#e0645a":"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
++    // SCHACHUHREN ueber dem Brett: 3:00 Blitz, guter Zug 8 s, schlechter 20 s
++    const uhr=(u)=>{let t=180;for(let i=0;i<=u.aktuell;i++){const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20);} return Math.max(0,t);};
++    const mmss=(t)=>Math.floor(t/60)+":"+String(t%60).padStart(2,"0");
++    const amZug=(halb%2===0)?a:b;
++    [[a,bx+bw*0.25],[b,bx+bw*0.75]].forEach(([u,x])=>{ const dran=u===amZug;
++      ctx.fillStyle=dran?"#f2e9d8":"#2a2233"; ctx.fillRect(x-34,by-38,68,22);
++      ctx.strokeStyle="#000"; ctx.strokeRect(x-34,by-38,68,22);
++      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3"; ctx.fillText(mmss(uhr(u)),x,by-27); });
++    // DIE ZWEI SPIELER am Tisch, einander zugewandt (Sitz-Animation folgt in der Umsetzung)
++    const py=by+bw*0.55;
++    [[a,bx-110,1,"--home","Weiß"],[b,bx+bw+110,-1,"--away","Schwarz"]].forEach(([u,x,vx,farbVar,farbe])=>{
++      const c=css(farbVar); ctx.fillStyle=c; ctx.globalAlpha=0.22; ctx.beginPath();ctx.ellipse(x,py+26,22,8,0,0,6.3);ctx.fill(); ctx.globalAlpha=1;
++      zeichneSprite(ctx,{...u,vx:vx*4,vy:0},x,py);
++      const schrift=(txt,dy,f,g,w)=>{ctx.font=(w||"400")+" "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
++      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5); });
++    // ZUGLISTE rechts vom Brett
++    ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
++    const von=Math.max(0,halb-8);
++    for(let i=von;i<halb;i++){ const z=partie.zuege[i]; const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
++      const gut=r&&r.ereignis===art.erfolgWort; ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
++      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+(gut?" !":" ?!"),bx+bw+34,by+10+(i-von)*13); }
++    ctx.textAlign="center";
++    // DIE ANDEREN BRETTER klein am unteren Rand
++    const klein=[]; for(let i=0;i<bretter;i++){ if(i===fb)continue; klein.push(i); }
++    const kq=6, kw=8*kq, ry=H*0.80, spanne=W-160;
++    klein.forEach((i,k)=>{ const [pa,pb]=paar(i); if(!pa||!pb)return; const rx=80+spanne*(klein.length>1?k/(klein.length-1):0.5);
++      const P=SCHACH_PARTIEN[i%SCHACH_PARTIEN.length]; const h=(pa.aktuell+1)+(pb.aktuell+1); const {B:KB,letzter:kl}=schachStellung(P,h);
++      zeichneSchachBrett(rx-kw/2,ry-kw/2,kq,KB,kl,false);
++      const kv=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
++      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
++      ctx.fillText("Brett "+(i+1)+" · "+pa.n.split(" ")[0]+" – "+pb.n.split(" ")[0],rx,ry+kw/2+10);
++      ctx.fillStyle=kv>0?"#5FD08A":(kv<0?"#e0645a":"#8a93a3"); ctx.fillText((kv>0?"+":"")+kv+" · Zug "+(Math.max(pa.aktuell,pb.aktuell)+1)+"/"+art.rundenN,rx,ry+kw/2+21);
++      const bwk=kw, halb2=Math.min(bwk/2,(bwk/2)*Math.abs(kv)/maxV); ctx.fillStyle=css("--line"); ctx.fillRect(rx-bwk/2,ry+kw/2+26,bwk,3);
++      ctx.fillStyle=kv>=0?css("--ok"):css("--crit"); ctx.fillRect(kv>=0?rx:rx-halb2,ry+kw/2+26,halb2,3); });
++    // Schwebetexte nur fuer das Fokus-Brett, am jeweiligen Spieler
++    for(const f of floats){ if(f._teilnehmer!==a.id&&f._teilnehmer!==b.id)continue;
++      ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.crit?css("--ok"):css("--ink"); ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
++      const x=f._teilnehmer===a.id?bx-110:bx+bw+110; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1; }
++  }
++
+   function stats(p,dId){const rec=rezeptVon(dId),o={};
+     for(const k of KEYS)o[k]=mische(p,rec[k]);
+     o.MANA=mische(p,MANAREZEPT);
+@@ -14212,7 +14340,9 @@
+     "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel",
+     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
+     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
+-    "hind_mauer","hind_heu","hind_feuer"];
++    "hind_mauer","hind_heu","hind_feuer",
++    // PROTOTYP Takeshi/Schach (Fable-Plan 05.09.)
++    "falle_tuer","falle_strickleiter","falle_spitzen","burg_mauer","burg_turm","burg_tor","deko_rad","deko_pranger","deko_stock","boden_eis","deko_banner","falle_walze","falle_fass","deko_holz","schach_weiss","schach_schwarz"];
+   const aBild={}, aMuster={};
+   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
+   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+@@ -14368,6 +14498,49 @@
+   // Spurt: Rasen, Bahnen, Huerden, Baumreihe. Bahnen und Huerden kommen aus DENSELBEN
+   // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
+   // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
++  // ================== TAKESHI'S CASTLE: ZEHN FALLEN-BILDER (PROTOTYP, Fable-Plan 05.09.) ==================
++  // Typ + Durchgang bestimmen das Bild: i<7 erste Fassung, i>=7 zweite. Mit einer Fallenfolge je
++  // Renn-Saat (window.__SEQ_TYPEN, Messpatch) folgt das Bild dem Typ, nicht der Stationsnummer.
++  function fallenTyp(i){ const A=BA(); const T=window.__SEQ_TYPEN||A.hindernisTypen; return T[i%T.length]; }
++  function fallenLook(i){ const A=BA(); const t=fallenTyp(i); const v=A.fallenBild[t]||["huerde"]; return v[Math.floor(i/A.hindernisTypen.length)%v.length]; }
++  function burgpunkte(u){ const St=BA().fallenStufe||{}; let p=0; for(const f of (u.fallen||[])){const st=St[f.typ]??1; p+=f.aus==="sauber"?st:(f.aus==="durchbruch"?st/2:0);} return p; }
++  function zeichneFalleTakeshi(i,x,y,b){
++    const look=fallenLook(i), t=rennT;
++    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
++    switch(look){
++      case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders
++        if(!aDa("burg_mauer"))break; const m=aBild.burg_mauer; const luecke=((b+i)%3); 
++        const teile=[[x-30,0],[x-8,1],[x+14,2]]; for(const [tx,k] of teile){ if(k===luecke)continue; ctx.drawImage(m,k*40,8,36,56,Math.round(tx),Math.round(y-24),18,28);} break; }
++      case "steine": { // Skipping Stones: Wasser und drei Trittsteine
++        wasser(); const st=aMust("boden_stein"); for(const dx of [-18,0,18]){ ctx.save(); ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.clip(); ctx.fillStyle=st||"#9a9486"; ctx.fillRect(x+dx-8,y-10,16,12); ctx.restore(); ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.stroke(); } break; }
++      case "tuer": { // Knock Knock: Tueren — je Bahn eine aus Papier (hell) oder aus Holz
++        if(!aDa("falle_tuer"))break; ctx.drawImage(aBild.falle_tuer,Math.round(x-12),Math.round(y+3-48),24,48);
++        if((b+i)%2===0){ ctx.globalAlpha=0.38; ctx.fillStyle="#fff7e0"; ctx.fillRect(x-10,y+3-44,20,40); ctx.globalAlpha=1; } break; }
++      case "brueckenball": { // Bridge Ball: Planke ueber Wasser, ein Pendelball schwingt quer
++        wasser(); if(aDa("hind_balken"))ctx.drawImage(aBild.hind_balken,Math.round(x-32),Math.round(y-2-32));
++        const w=Math.sin(t*2.2+b*0.9)*0.7, px=x+Math.sin(w)*26, py=y-52+Math.cos(w)*26;
++        ctx.strokeStyle="#d9c9a0"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x,y-54); ctx.lineTo(px,py); ctx.stroke();
++        ctx.fillStyle="#c0504a"; ctx.beginPath(); ctx.arc(px,py,6,0,6.283); ctx.fill(); ctx.strokeStyle="#5a1f1c"; ctx.stroke(); break; }
++      case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur
++        const e=aMust("boden_eis"); ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
++        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();} break; }
++      case "raeder": { // High Rollers / Avalanche: ein rollendes Rad pendelt ueber die Spur
++        if(!aDa("deko_rad"))break; const ox=Math.sin(t*1.3+b*0.7)*18; ctx.save(); ctx.translate(x+ox,y-12); ctx.rotate(t*3+b); ctx.drawImage(aBild.deko_rad,-14,-14,28,28); ctx.restore();
++        ctx.globalAlpha=0.25; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(x+ox,y+2,12,4,0,0,6.283); ctx.fill(); ctx.globalAlpha=1; break; }
++      case "seilwand": { // Border Wall: Palisade mit Strickleiter
++        if(aDa("hind_wand"))ctx.drawImage(aBild.hind_wand,Math.round(x-16),Math.round(y+3-64));
++        if(aDa("falle_strickleiter")){ctx.globalAlpha=0.95; ctx.drawImage(aBild.falle_strickleiter,8,0,24,64,Math.round(x-8),Math.round(y+1-60),16,60); ctx.globalAlpha=1;} break; }
++      case "walzen": { // Roller Game: zwei Rollen, die auf und ab wippen
++        if(!aDa("falle_walze"))break; for(const k of [-13,13]){ const dy=Math.sin(t*4+b+k)*3; ctx.drawImage(aBild.falle_walze,Math.round(x+k-14),Math.round(y-18+dy),28,28);} break; }
++      case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen
++        const er=aMust("boden_erde"); ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
++        ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();} break; }
++      case "spitzen": { // Final Fall: spanischer Reiter
++        if(!aDa("falle_spitzen"))break; ctx.drawImage(aBild.falle_spitzen,0,96,32,32,Math.round(x-16),Math.round(y+3-32),32,32); break; }
++      default: { ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3); ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10); }
++    }
++  }
++
+   function bodenSpurt(){
+     // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
+     // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
+@@ -14402,7 +14575,18 @@
+     // waehrend die Bahn darunter zoomt. Der leichte Parallax-Effekt macht das
+     // Heranzoomen im Bild spuerbar, ohne dass er eigens programmiert werden musste.
+     const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
+-    for(let i=0;i<(BA().baeume===false?0:26);i++){
++    if(BA().takeshi&&aDa("burg_mauer")){
++      // BURGMAUER statt Baumreihe: Takeshis Burg steht ueber der Bahn, fest wie ein Tribuenendach.
++      const m=aBild.burg_mauer; for(let x=-20;x<W;x+=m.naturalWidth)ctx.drawImage(m,x,Math.round(oben-58));
++      if(aDa("burg_turm")){ctx.drawImage(aBild.burg_turm,8,Math.round(oben-150+6));ctx.drawImage(aBild.burg_turm,W-104,Math.round(oben-150+6));}
++      if(aDa("deko_banner")){const bn=aBild.deko_banner; for(const x of [W*0.30,W*0.62]){ctx.drawImage(bn,0,0,96,80,Math.round(x-48),Math.round(oben-62),96,80);}}
++      // BURGPUNKTE beider Seiten auf der Mauer
++      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
++      ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 22px 'Barlow Condensed',sans-serif";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
++      const t="Burgpunkte  "+bp(0)+" : "+bp(1); ctx.strokeText(t,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(t,W/2,oben-34);
++      ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6"; ctx.fillText("je Falle 1–3 Sterne: sauber = alle, durchgebrochen = halbe, gestürzt = keine",W/2,oben-18);
++    }
++    for(let i=0;i<(BA().baeume===false||BA().takeshi?0:26);i++){
+       const x=12+i*(W/25), yb=oben-24;
+       if(baeume.length){
+         const b=aBild[baeume[i%baeume.length]];
+@@ -14461,6 +14645,7 @@
+       const kachel=key&&key!=="hind_wasser"&&aDa(key)?aBild[key]:null;
+       for(let b=0;b<BAHNEN_N();b++){
+         const y=bahnY(b)+13;
++        if(BA().takeshi){ zeichneFalleTakeshi(i,x,y,b); continue; }
+         if(wasser){
+           const l=aBild.hind_wasser_l, r=aBild.hind_wasser_r, yo=Math.round(y-15);
+           ctx.drawImage(l,Math.round(x-32),yo); ctx.drawImage(r,Math.round(x),yo);
+@@ -14487,6 +14672,11 @@
+       ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
+       ctx.beginPath();ctx.moveTo(xStart,oben);ctx.lineTo(xStart,unten);ctx.stroke();
+     }
++    if(BA().takeshi&&aDa("burg_tor")&&xZiel>-60&&xZiel<W+60){
++      // DAS BURGTOR am Ziel — unter der Kamera wie die Ziellinie selbst.
++      ctx.drawImage(aBild.burg_tor,Math.round(xZiel-48),Math.round(oben-150+8));
++      for(const [n,dx,dy] of [["deko_pranger",-200,10],["deko_stock",-60,14],["deko_holz",60,4],["falle_fass",120,-6]]){ if(aDa(n))ctx.drawImage(aBild[n],Math.round(camX(0.25)+dx),Math.round(unten+dy)); }
++    }
+     if(xZiel>-4&&xZiel<W+4){
+       ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
+       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
+@@ -14826,6 +15016,9 @@
+       hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
+       hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
+       hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","STEHEN","TECHNIK","ROBUST","WUCHT"], huerdePreis:0.80,
++      // PROTOTYP (Fable-Plan 05.09.): ein Bild je Typ UND Durchgang — zehn verschiedene Fallen auf vierzehn Stationen
++      takeshi:true, fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
++      fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+       // Falle lesen (Honeycomb Maze) · Aufstehen/Balance (Skipping Stones) · Durchbrettern (Knock Knock) ·
+       // Wille (Bridge Ball) · Falle lesen · Nehmerqualitaet (Final Fall) · Durchbrettern — zweimal durch, 14 Fallen.
+       // Skill 20 friert 0,67 s je Falle ein, Skill 80 nur 0,29 s. Kein Motor: stepSpurt/tempoVon lesen
+@@ -14958,6 +15151,14 @@
+ 
+   function bauSpurt(saat){
+     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
++    // MESSPATCH (Fable, Takeshi-Optik-Plan): Fallenfolge je Renn-Saat variieren
++    window.__SEQ_TYPEN=null;
++    if(window.__SEQ_MODE&&BA().hindernisTypen){ const basis=BA().hindernisTypen; let s0=(Number(seed)>>>0)||1;
++      const rnd=()=>{s0=(Math.imul(s0,1664525)+1013904223)>>>0; return (s0>>>8)/16777216;};
++      if(window.__SEQ_MODE==='perm'){ const arr=[...basis,...basis]; for(let i=arr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];} window.__SEQ_TYPEN=arr; }
++      else if(window.__SEQ_MODE==='draw'){ window.__SEQ_TYPEN=Array.from({length:14},()=>basis[Math.floor(rnd()*basis.length)]); }
++      else if(window.__SEQ_MODE==='kurs'){ const K=window.__KURSE; window.__SEQ_TYPEN=K[Math.floor(rnd()*K.length)]; }
++    }
+     cam={zoom:1,cx:0.5}; bahnWahl=null;
+     const d=bahnDisc, art=BA(), n=art.jeSeite;
+     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
+@@ -15397,9 +15598,11 @@
+           // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
+           // `hindernisTypen` nicht und bleiben bit-identisch.
+           if(A.hindernisTypen){
+-            const hTyp=A.hindernisTypen[HUERDEN_N().indexOf(h)%A.hindernisTypen.length];
++            const _T=window.__SEQ_TYPEN||A.hindernisTypen;
++            const hTyp=_T[HUERDEN_N().indexOf(h)%_T.length];
+             const hSkill=u[hTyp]||0;
+             u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
++            u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
+           }
+           const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
+           if(rr()<=technik)continue;                       // sauber drueber
+@@ -15407,7 +15610,7 @@
+           if(rr()<=wucht){                                 // durchgebrochen
+             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
+             u.stolper=A.wuchtZeit??0.12;
+-            u.durchbruch=(u.durchbruch||0)+1;
++            u.durchbruch=(u.durchbruch||0)+1; if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
+             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
+             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
+             continue;
+@@ -15425,7 +15628,7 @@
+           // finden, den Griff neu setzen. Wer wendig ist, haengt kuerzer.
+           if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
+           if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
+-          u.gestolpert++;
++          u.gestolpert++; if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
+           // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
+           //
+           // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
+@@ -15651,7 +15854,9 @@
+         ctx.fillText(pl+zus,x,y-40);
+         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+       }
+-      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
++      if(BA().takeshi&&u.fertig==null){ const bpz="★ "+burgpunkte(u); ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
++        ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19); ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace"; }
++      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+(BA().takeshi?" · ★ "+burgpunkte(u):"");
+         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
+     }
+     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
+@@ -17398,6 +17603,23 @@
+             o[u.n]=-(u.etappenZeit??(u.fertig??60))+u.wechselKonto;
+           return o;
+         }
++        // MESSPATCH: Wertungsvarianten (window.__WERT), nur wo hindernisTypen gesetzt ist
++        const V=window.__WERT||'platz';
++        if(V!=='platz'&&BAHN_ART[bd].hindernisTypen){
++          const STUFE=window.__STUFE||{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3};
++          const reihe=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
++          const o={};
++          for(const u of LAEUFER){ let p=0;
++            for(const f of (u.fallen||[])){ const st=STUFE[f.typ]??1;
++              if(V==='binaer') p+=f.aus==='sauber'?1:0;
++              else if(V==='stufen') p+=f.aus==='sauber'?st:0;
++              else if(V==='stufen2') p+=f.aus==='sauber'?st:(f.aus==='durchbruch'?st/2:0);
++              else if(V==='stetig'||V==='stetigziel'||V==='stetigsturz') p+=st*(1-f.stoppAnteil)-(V!=='stetig'&&f.aus==='sturz'?st*0.5:0);
++            }
++            if(V==='stetigziel'&&u.fertig!=null&&!u.raus) p+=(LAEUFER.length-reihe.indexOf(u))*0.5;
++            o[u.n]=p; }
++          return o;
++        }
+         const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+           .forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
+       }
