@@ -114,27 +114,33 @@ type RawAttrs = {
 
 // Kern der Uebersetzung: jede der 15 BGM-Ratings ist eine dokumentierte, gewichtete
 // Mischung aus den 12 rohen Oly-Attributen -- keine Disziplin-Formel, rein generisch.
+//
+// Bewusst so verteilt, dass JEDES der 12 Attribute in mehreren Wertungen mitzaehlt
+// (nicht nur power/dexterity ueberall) -- insbesondere `spirit` (Teamgeist) sitzt in
+// praktisch jeder teamorientierten Wertung (ins, tp, oiq, diq, drb, pss, reb), damit
+// ein hoher Teamgeist spuerbar in fast jede Aktion einzahlt statt nur beim Dribbling,
+// und niemand allein durch Ego-Werte (power/dexterity) zum Ball-Hog wird.
 function toBbgmRatings(raw: RawAttrs, race: string | null | undefined) {
   const hgt = clamp(
-    scale100(blend([raw.power, 0.7], [raw.health, 0.3])) + raceHeightBonus(race),
+    scale100(blend([raw.power, 0.65], [raw.health, 0.25], [raw.stamina, 0.10])) + raceHeightBonus(race),
     0, 100,
   );
   return {
     hgt,
-    stre: scale100(raw.power),
-    spd: scale100(raw.speed),
-    jmp: scale100(blend([raw.power, 0.5], [raw.speed, 0.5])),
-    endu: scale100(blend([raw.stamina, 0.7], [raw.health, 0.3])),
-    ins: scale100(blend([raw.power, 0.5], [raw.dexterity, 0.5])),
-    dnk: scale100(blend([raw.power, 0.6], [raw.speed, 0.4])),
-    ft: scale100(blend([raw.dexterity, 0.6], [raw.determination, 0.4])),
-    fg: scale100(blend([raw.dexterity, 0.7], [raw.awareness, 0.3])),
-    tp: scale100(blend([raw.dexterity, 0.6], [raw.intelligence, 0.2], [raw.will, 0.2])),
-    oiq: scale100(blend([raw.intelligence, 0.6], [raw.awareness, 0.4])),
-    diq: scale100(blend([raw.awareness, 0.4], [raw.determination, 0.25], [raw.will, 0.15], [raw.torment, 0.2])),
-    drb: scale100(blend([raw.dexterity, 0.6], [raw.spirit, 0.4])),
-    pss: scale100(blend([raw.charisma, 0.4], [raw.intelligence, 0.3], [raw.dexterity, 0.3])),
-    reb: scale100(blend([raw.power, 0.5], [raw.determination, 0.3], [raw.will, 0.2])),
+    stre: scale100(blend([raw.power, 0.75], [raw.health, 0.15], [raw.determination, 0.10])),
+    spd: scale100(blend([raw.speed, 0.75], [raw.dexterity, 0.15], [raw.stamina, 0.10])),
+    jmp: scale100(blend([raw.power, 0.4], [raw.speed, 0.4], [raw.determination, 0.2])),
+    endu: scale100(blend([raw.stamina, 0.5], [raw.health, 0.2], [raw.will, 0.15], [raw.torment, 0.15])),
+    ins: scale100(blend([raw.power, 0.4], [raw.dexterity, 0.35], [raw.determination, 0.15], [raw.spirit, 0.10])),
+    dnk: scale100(blend([raw.power, 0.5], [raw.speed, 0.3], [raw.determination, 0.2])),
+    ft: scale100(blend([raw.dexterity, 0.5], [raw.determination, 0.3], [raw.awareness, 0.2])),
+    fg: scale100(blend([raw.dexterity, 0.55], [raw.awareness, 0.25], [raw.intelligence, 0.2])),
+    tp: scale100(blend([raw.dexterity, 0.5], [raw.intelligence, 0.2], [raw.will, 0.15], [raw.spirit, 0.15])),
+    oiq: scale100(blend([raw.intelligence, 0.45], [raw.awareness, 0.30], [raw.spirit, 0.15], [raw.charisma, 0.10])),
+    diq: scale100(blend([raw.awareness, 0.35], [raw.determination, 0.20], [raw.will, 0.15], [raw.torment, 0.15], [raw.spirit, 0.15])),
+    drb: scale100(blend([raw.dexterity, 0.5], [raw.spirit, 0.25], [raw.charisma, 0.15], [raw.torment, 0.10])),
+    pss: scale100(blend([raw.charisma, 0.35], [raw.intelligence, 0.20], [raw.dexterity, 0.20], [raw.spirit, 0.25])),
+    reb: scale100(blend([raw.power, 0.45], [raw.determination, 0.25], [raw.will, 0.15], [raw.spirit, 0.15])),
   };
 }
 
