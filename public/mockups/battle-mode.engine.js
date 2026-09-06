@@ -15767,8 +15767,17 @@
       // `wertung` (bleibt beim alten Zieleinlauf-Zaehler, s. bahnTeamstand-Kommentar).
       wertungTabelle:(basis,art)=>({...basis,
         spalten:basis.spalten.flatMap(s=>s.id==="res"
+          // NIE UNTER NULL (Review-Fund 06.09.): der Sturz, der ausscheiden laesst, zieht
+          // seinen vollen Betrag ab, BEVOR `u.nerven<=0` prueft — `u.nerven` landet damit
+          // regelmaessig im Minus, und in der Tabelle stand dann "-12 %" fuer einen
+          // Anteil, der per Definition zwischen 0 und 100 liegt (gemessen in einem
+          // Rennen: Krag'Zul -8 %, Greenkraut -12 %). Geklemmt wird NUR in der ANZEIGE:
+          // die Simulation liest `u.nerven` bereits ueberall durch `Math.max(0,…)`
+          // (Tempofaktor `nerv` in stepSpurt), eine Klemme am Wert selbst waere derselbe
+          // Effekt bei mehr Risiko. Der Fund ist aelter als dieser PR — die Spalte kam
+          // mit der Burgpunkte-Runde (#810) und stand so schon auf `main`.
           ?[{id:"nerv",kopf:"Nerv",titel:"Nervenkostüm — bei 0 scheidet er aus",
-              wert:z=>z.u.nervenMax?Math.round(z.u.nerven/z.u.nervenMax*100):null, fmt:v=>v+"%",
+              wert:z=>z.u.nervenMax?Math.round(Math.max(0,z.u.nerven)/z.u.nervenMax*100):null, fmt:v=>v+"%",
               farbe:v=>v<30?"var(--crit)":null}, s]
           :s.id==="rempl"
           ?[s,
@@ -16067,14 +16076,17 @@
     // dieselbe FNV-1a-Mischung wie normalisiereSaat (Offset 2166136261, Prime 16777619),
     // hier ueber die vier Bytes der Zahl-Saat und zweimal angewandt, danach der bekannte
     // LCG-Schritt. Warum zwei Runden UND der LCG-Schritt, gemessen ueber je 300k Saaten:
-    //   FNV allein (eine Runde, ohne LCG)  P(gleich) = 0,928  — Hochbits bleiben roh
-    //   FNV einmal + LCG-Schritt           P(gleich) = 0,322  — schon brauchbar
+    //   FNV allein (eine Runde, ohne LCG)  P(gleich) = 0,3656 — Hochbits bleiben roh
+    //   FNV einmal + LCG-Schritt           P(gleich) = 0,3224 — schon brauchbar
     //   FNV zweimal + LCG-Schritt          P(gleich) = 0,3333 — Sollwert
+    // (Die 0,3656 stand hier bis zum Review 06.09. als "0,928" — eine Zahl, die das
+    // Nachweis-Skript nirgends liefert; nachgefahren ergibt die Zeile 0,3656. Der Schluss
+    // bleibt: eine FNV-Runde allein liegt merklich ueber dem Sollwert 1/3.)
     // Zwei bis drei LCG-Schritte statt FNV waeren die andere naheliegende Variante, sind
     // aber unzuverlaessig: gemessen 2 Schritte 0,728, 3 Schritte 0,054 (anti-korreliert),
     // 4 Schritte 0,889 — die Gitterstruktur des LCG schwingt weiter, statt zu mischen.
     // Gleichverteilung bleibt in beiden Faellen erhalten (0,3341/0,3331/0,3328 ueber
-    // 300k Saaten); Textsaaten aendern sich in der Qualitaet nicht (0,3345 vorher wie
+    // 300k Saaten); Textsaaten waren nie betroffen und bleiben es (0,3220 vorher, 0,3339
     // nachher). Nachrechnen: docs/design/takeshi-kursmischer-nachweis-06-09.mjs.
     bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
     if(BA().kurse&&BA().kurse.length){
@@ -16705,8 +16717,18 @@
           // Variante P10 — Chris' Entscheidung 06.09.: einbauen).
           // Eigener rr()-Aufruf NUR hinter dem Feld — ohne `tackleAusweichen` faellt kein
           // zusaetzlicher Wurf an, Spurt bleibt bit-identisch.
+          //
+          // DIE KLAMMER UM DEN NENNER IST DIE GANZE POINTE (Review-Fund 06.09.). Vorher
+          // stand `duell*T/(T+W||1)`, und `/` bindet staerker als `||` — der Ausdruck war
+          // also `(duell*T/(T+W)) || 1`, das Null-Gate lag am ERGEBNIS statt am Nenner.
+          // Wer TECHNIK 0 hat, bekam damit ausw = 1 und nach dem Deckel 75 % Ausweichquote,
+          // also genau das Gegenteil des Gemeinten. Heute faellt es nicht auf, weil
+          // spurtWerte jeden Sub-Skill auf mindestens 1 klemmt und `tackleAb` WUCHT > 30
+          // verlangt (der Nenner kann gar nicht 0 werden) — es ist eine Falle fuer das
+          // naechste Rezept, nicht ein Fehler von heute. Nachgemessen: die Rangtreue-Zahlen
+          // aller zwanzig Disziplinen sind vor und nach dieser Klammer ziffernidentisch.
           const ausw=TA.tackleAusweichen?(TA.tackleAusweichen.duell!=null
-              ?TA.tackleAusweichen.duell*(o.TECHNIK||0)/((o.TECHNIK||0)+u.WUCHT||1)
+              ?TA.tackleAusweichen.duell*(o.TECHNIK||0)/(((o.TECHNIK||0)+u.WUCHT)||1)
               :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
           if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
             o.ausgewichen=(o.ausgewichen||0)+1;
