@@ -10486,11 +10486,19 @@
   // schachPin!=null haelt es fest (Klick auf ein Mini-Brett/den Kadernamen) und
   // schaltet die Regie-Automatik ab; schachMiniRects sind die zuletzt gezeichneten
   // Mini-Brett-Rechtecke, fuer den Klick-Trefftest (s. verdrahteSchachPin).
-  let schachFokus=0, schachPin=null, schachMiniRects=[];
+  // schachFokusRect ist das Rechteck des GROSSEN Bretts. Opus-Review-Fund (06.09.): ohne
+  // das war "ein zweiter Klick loest" (Plan A.5 Regel 2) unerreichbar — ein gepinntes
+  // Brett IST immer das Fokus-Brett, und das Fokus-Brett wird aus der Mini-Reihe
+  // herausgenommen (`if(i===fb)continue`). Damit stand sein Rechteck nie in
+  // schachMiniRects, der Zweig `schachPin===i` in schachPinUmschalten war toter Code, und
+  // der Pin liess sich nur noch VERSCHIEBEN, nie loesen. Der Plan sah als zweiten Weg die
+  // Kaderleiste vor; die ist bewusst nicht gebaut, also nimmt jetzt das Fokus-Brett
+  // selbst den Loese-Klick.
+  let schachFokus=0, schachPin=null, schachMiniRects=[], schachFokusRect=null;
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
-    floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[];
+    floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
@@ -11291,8 +11299,14 @@
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.font="700 30px 'Barlow Condensed',sans-serif"; ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
     const st=gew(0)+" : "+gew(1); ctx.strokeText(st,W/2,H*0.075); ctx.fillStyle="#f2e9d8"; ctx.fillText(st,W/2,H*0.075);
-    ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
-    ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name,W/2,H*0.125);
+    // Opus-Review-Fund (06.09.): dass die Regie gerade ABGESCHALTET ist, war nirgends zu
+    // sehen — der gelbe Rahmen unten wird nur an Mini-Brettern gezeichnet, und das
+    // gepinnte Brett ist nie eines. Ohne Hinweis sieht ein stehender Fokus aus wie eine
+    // haengende Automatik. Der Zusatz haengt an derselben Kopfzeile, damit er nicht mit
+    // den Uhren (by-38) kollidiert.
+    ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
+    ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
+      +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":""),W/2,H*0.125);
 
     // TISCH + BRETT — zwei braune Rechtecke und zwei Beine, wie die Hantel beim Heben:
     // keine neue Sprite-Pipeline, nur Primitiven.
@@ -11301,6 +11315,9 @@
     ctx.fillStyle="#5a3f2a"; ctx.fillRect(bx-22,by-10,bw+44,bw+22);
     ctx.fillStyle="#2a1d13"; ctx.fillRect(bx-20,by+bw+16,10,22); ctx.fillRect(bx+bw+10,by+bw+16,10,22);
     zeichneSchachBrett(bx,by,q,B,letzter,true);
+    // Fuer den Loese-Klick merken (s. verdrahteSchachPin): nur die Brettflaeche selbst,
+    // nicht die Tischplatte — daneben liegen Bewertungsbalken und Zugliste.
+    schachFokusRect={x0:bx,y0:by,x1:bx+bw,y1:by+bw};
 
     // ANNOTATION am Zielfeld: ! bei starkem Zug, ?! bei Zeitverlust — das Ereignis des
     // zuletzt enthuellten Zuges dieses Bretts, dieselbe Information, die sonst nur im
@@ -11350,7 +11367,9 @@
     ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
     const von=Math.max(0,halb-8);
     for(let i=von;i<halb;i++){
-      const z=partie.zuege[i]; const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
+      const z=partie.zuege[i]; if(!z)break;   // rundenN*2 == 20 Halbzuege je Partie; laeuft
+      // rundenN je hoeher, endet die Zugliste hier still statt an z.slice() zu werfen.
+      const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
       const gut=r&&r.ereignis===art.erfolgWort; ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
       ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+(gut?" !":" ?!"),bx+bw+34,by+10+(i-von)*13);
     }
@@ -16984,6 +17003,12 @@
       for(const k of schachMiniRects){
         if(Math.abs(mx-k.rx)<=k.halbW&&Math.abs(my-k.ry)<=k.halbH){ schachPinUmschalten(k.i); return; }
       }
+      // Opus-Review-Fund (06.09.): Klick auf das GROSSE Brett loest den Pin. Das ist der
+      // "zweite Klick" aus Plan A.5 Regel 2 — man klickt genau das Brett wieder an, das
+      // man gepinnt hat, denn ein gepinntes Brett steht immer gross in der Mitte und
+      // taucht in der Mini-Reihe nicht mehr auf. Ohne Pin macht der Klick nichts.
+      const F=schachFokusRect;
+      if(schachPin!=null&&F&&mx>=F.x0&&mx<=F.x1&&my>=F.y0&&my<=F.y1){ schachPin=null; }
     });
   }
 
