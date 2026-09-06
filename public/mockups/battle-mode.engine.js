@@ -10591,7 +10591,20 @@
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
     if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
     if(art.duell){
-      for(let i=0;i<n;i++){
+      // UNTERZAHL-FIX (Produktivierungswelle 1, 06.09.): NICHT die aeussere `n`
+      // (=art.jeSeite, eine feste Motor-Konstante, s. Kopfkommentar oben) als Brett-Zahl
+      // verwenden -- die zaehlt IMMER bis 6, unabhaengig davon, wieviele Spieler diese
+      // Seite tatsaechlich in diesem Duell stellt (`gesetzt.length` kann kleiner sein,
+      // z.B. bei einer gewuerfelten Feldgroesse < 6 oder echter Unterzahl). `mine[i]`
+      // waere sonst `undefined`, sobald weniger als sechs Spieler gesetzt sind --
+      // nachgemessen beim ersten Arena-Testlauf mit `feldgroesse=2`
+      // (docs/design/speed-schach-showcase-produktivierung.md). GENAU DASSELBE Muster wie
+      // `baueHebenDuelle()` direkt darueber, die aus demselben Grund ihre EIGENE lokale
+      // `n=Math.min(mine.length,gegner.length)` bildet, statt die aeussere `n` zu lesen --
+      // diese Zeile fehlte hier bisher, weil die Duell-Variante (anders als Heben) inline
+      // in bauBuehne() steht statt in einer eigenen Funktion.
+      const duellBretter=Math.min(mine.length,gegner.length);
+      for(let i=0;i<duellBretter;i++){
         const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
         const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
         if(!a||!b)continue;
@@ -17472,8 +17485,23 @@
     // dieselbe Formel, mit der p.d.tdm ueberhaupt erst entstanden ist (s. bauSpieler).
     const basis=(p.d&&p.d[dId]!=null)?p.d[dId]:(p.a?gewichtet(p.a,BASIS_JE_DISC[dId]||{}):0);
     const teile=[["Basis",basis,"Der Disziplinwert aus den zwölf Attributen."]];
-    if(sl)teile.push(["Slot",slotAufschlag(p,sl,dId),
-      "Passung zum Profil von "+SLOTVON[sl].label+" (+"+SLOTVON[sl].gross+" +"+SLOTVON[sl].klein+")."]);
+    // UNTERZAHL/LUECKEN-FIX (Produktivierungswelle 1, 06.09.): `SLOTVON[sl]` kann fehlen --
+    // nachgemessen fuer Speed-Schachs "endgame"/"gambit" (matchday-slot-roles.ts fuehrt SECHS
+    // Rollen fuer speed-schach, `SLOTS_JE_DISC["speed-schach"]" hier im Motor nur VIER; die
+    // Luecke ist eigenstaendig und aelter als diese Aenderung -- s. Produktivierungs-Bericht).
+    // `slotAufschlag()` behandelt eine fehlende `SLOTVON[sl]` bereits defensiv (`if(!s2)return
+    // 0`, s. dort); diese Zeile bekommt jetzt denselben Schutz, den drei andere Stellen in
+    // dieser Datei fuer genau diesen Fall schon haben (Zeilen ~12052/12055/16916:
+    // `SLOTVON[x]?SLOTVON[x].label:x`) -- vorher fehlte er hier und liess JEDE Seite mit einem
+    // in "endgame"/"gambit" gesetzten Spieler beim Einlauf-Rendern crashen (`renderEinlauf()`
+    // ruft `aufschluesselung()` fuer JEDEN gesetzten Spieler, unabhaengig von der Disziplin, in
+    // der er steht). Nie zuvor erreichbar, weil vor dieser Welle keine echte Aufstellung fuer
+    // Speed-Schach je durch die Arena-Bruecke lief.
+    if(sl){
+      const slotDef=SLOTVON[sl];
+      teile.push(["Slot",slotAufschlag(p,sl,dId),
+        "Passung zum Profil von "+(slotDef?slotDef.label:sl)+" (+"+(slotDef?slotDef.gross:"?")+" +"+(slotDef?slotDef.klein:"?")+")."]);
+    }
     const fk=formVon(p.n);
     if(fk)teile.push(["Form",fk,"Formkarte des Spieltags."]);
     if(!istGegner){
@@ -19511,6 +19539,76 @@
       const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore, gesamtKg};
+    },
+    // PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
+    // ZWEITER NEUER EINSTIEGSPUNKT NEBEN spieleBuehneHeben(), NICHT DESSEN ERWEITERUNG -- aus
+    // demselben Grund, der dort schon fuer spieleFeldspiel() galt (Kommentar oben): ein
+    // bereits produktiver, getesteter Pfad bleibt unangefasst.
+    //
+    // BUeHNEN-DUELL-CHASSIS FUER art.duell (Speed-Schach, I-Spy) -- STRUKTURELL DASSELBE
+    // Zweikampf-Chassis wie art.heben (Gewichtheben): beide bauen Zweikaempfe je Slot
+    // (baueHebenDuelle() bedient historisch beide, s. WERTUNG_HEBEN/WERTUNG_DUELL-Weiche bei
+    // `buehne:(art)=>...` weiter unten), beide fuellen TEILNEHMER mit `.side`/`.summe`. Der
+    // einzige Unterschied, den dieser Einstiegspunkt kennen muss, ist die SEITEN-ZAEHLUNG:
+    // Heben kennt kein Remis (IWF-Regel, s. Kommentar bei baueHebenDuelle -- "anders als bei
+    // Speed-Schach gibt es hier kein Remis"), ein Duell-Brett dagegen schon (`u.vorteil===0`
+    // bei gleichem Punktestand am Rundenende). `updateHudBuehne()`s eigener `BB().duell`-Zweig
+    // zaehlt deshalb NICHT ueber `duellGewonnen` (das heben-Feld kennt nur Sieg/Niederlage),
+    // sondern ueber `u.vorteil>0` je Seite ("bretter") -- exakt dieselbe Zaehlung uebernimmt
+    // dieser Einstiegspunkt hier, damit ein Arena-Duell dasselbe Ergebnis liefert wie das, was
+    // ein Zuschauer live auf der Buehne sieht.
+    //
+    // GENERISCH UEBER `art.duell`, NICHT AUF "speed-schach" HARDCODIERT: I-Spy (`duell:true`,
+    // s. BUEHNE_ART.["i-spy"]) laeuft hier automatisch mit, sobald es in
+    // ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_DUELL_DISCIPLINE_IDS steht -- keine
+    // weitere Kopie dieser Funktion.
+    //
+    // KEIN `gesamtKg`: ein Tiebreak bei Brettgleichstand ist hier nicht noetig, weil ein
+    // Duell-Gleichstand (z.B. 3:3 der sechs Bretter) ein ECHTES, plausibles Unentschieden ist
+    // (Remis sind Teil des Spiels) -- anders als bei Heben, wo ein 3:3 der Zweikaempfe nur aus
+    // Chris' Wunsch entsteht, moeglichst wenige Unentschieden zu haben (Plan 3.5). Ohne
+    // `gesamtKg` faellt `arenaTeamPointsForFixtureMitTiebreak()` fuer diese Disziplinen
+    // unveraendert auf `arenaTeamPointsForFixture()` zurueck -- ein echtes Remis bleibt eins.
+    spieleBuehneDuell:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].duell)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.vorteil>0).length;
+      const seiten=[bretter(0),bretter(1)];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
+    },
+    // BUeHNEN-AUFTRITT-CHASSIS FUER WERTUNG_AUFTRITT-Disziplinen (Showcase, Eiskunstlauf,
+    // Breaking, Wettessen, Tennis, Fechten -- jede BUEHNE_ART-Disziplin ohne `.heben`/`.duell`).
+    // Diese sechs Buehnen fuehren KEIN Zweikampf-Duell je Slot -- jeder Teilnehmer tritt fuer
+    // sich auf und bekommt einen eigenen Punktwert (`u.summe`, aus dem Rezept). Der Seiten-
+    // Punktestand ist deshalb keine Zaehlung gewonnener Duelle, sondern GENAU DIE SUMME, die
+    // `updateHudBuehne()`s eigener Nicht-Heben-Nicht-Duell-Zweig schon heute live anzeigt
+    // (`summe(s)=TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0)`) -- kein neuer
+    // Wertungsbegriff, nur derselbe, den das Spiel dem Zuschauer laengst zeigt, jetzt auch fuer
+    // die Arena ausgelesen.
+    //
+    // GENERISCH UEBER "kein heben, kein duell", NICHT AUF "showcase" HARDCODIERT: jede der
+    // fuenf anderen Auftritt-Buehnen laeuft hier automatisch mit, sobald sie in
+    // ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS steht.
+    spieleBuehneAuftritt:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||BUEHNE_ART[bd].heben||BUEHNE_ART[bd].duell)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0);
+      const seiten=[summe(0),summe(1)];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
     },
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,

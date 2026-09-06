@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS, type ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
+import {
+  ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
+  ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
+  ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+  type ArenaFixtureResult,
+} from "@/lib/battle/arena-headless-runner";
 import {
   ARENA_RESOLVED_DISCIPLINE_IDS,
   ARENA_TEAM_POINTS,
@@ -11,6 +16,10 @@ import {
   GEWICHTHEBEN_PPS_ANTEIL_MITTE,
   HOCKEY_INDIVIDUAL_PPS_MAX,
   HOCKEY_PPS_ANTEIL_MITTE,
+  SPEED_SCHACH_INDIVIDUAL_PPS_MAX,
+  SPEED_SCHACH_PPS_ANTEIL_MITTE,
+  SHOWCASE_INDIVIDUAL_PPS_MAX,
+  SHOWCASE_PPS_ANTEIL_MITTE,
   arenaTeamPointsForFixture,
   arenaTeamPointsForFixtureMitTiebreak,
   buildArenaMatchSeed,
@@ -21,11 +30,15 @@ import {
   ppsAusBasketballImpact,
   ppsAusGewichthebenImpact,
   ppsAusHockeyImpact,
+  ppsAusSpeedSchachImpact,
+  ppsAusShowcaseImpact,
   resolveArenaFieldSizeForMatchday,
   resolveArenaPpsReferenz,
   resolveBasketballPpsReferenz,
   resolveGewichthebenPpsReferenz,
   resolveHockeyPpsReferenz,
+  resolveSpeedSchachPpsReferenz,
+  resolveShowcasePpsReferenz,
   runBattleModeArenaMatchday,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 
@@ -61,24 +74,67 @@ describe("arenaTeamPointsForFixture", () => {
 });
 
 describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
-  it("enthaelt Basketball, Gewichtheben und Hockey (Hockey-Produktivierung)", () => {
+  it("enthaelt Basketball, Gewichtheben, Hockey, Speed-Schach und Showcase (Produktivierungswelle 1)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("basketball")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("speed-schach")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("showcase")).toBe(true);
   });
 
   /**
-   * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
-   * (arena-headless-runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei unabhaengig
-   * gepflegte Mengen -- jede Buehnen-Heben-Chassis-Disziplin MUSS auch arena-aufgeloest sein,
-   * sonst faellt der Chassis-Dispatch in `runArenaFixtures()` still auf den falschen Pfad
-   * (`spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts). Das Modul selbst wirft dafuer
-   * bereits beim Laden (s. Kommentar dort) -- dieser Test macht die Erwartung zusaetzlich
-   * explizit und dokumentiert sie an einer fuer beide Mengen sichtbaren Stelle.
+   * STAFFEL IST BEWUSST NICHT DABEI (Produktivierungswelle 1, s. Kommentar bei
+   * ARENA_RESOLVED_DISCIPLINE_IDS): `bahnTeamstand()` liefert fuer Staffel `gewertet:false` --
+   * das Spiel selbst kennt dort noch keine Wertung. Ein Regressionstest, kein Verhaltenstest:
+   * haelt fest, DASS diese Entscheidung bewusst getroffen wurde, nicht vergessen.
    */
-  it("jede Buehnen-Heben-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
-    for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
-      expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)).toBe(true);
+  it("enthaelt NICHT Staffel (bahnTeamstand() liefert dort gewertet:false, s. Kommentar)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(false);
+  });
+
+  /**
+   * QUERPRUEFUNG (Review-Fund PR #776, erweitert in Produktivierungswelle 1):
+   * `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`/`ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`/
+   * `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` (arena-headless-runner.ts) und
+   * `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind unabhaengig gepflegte Mengen -- jede Buehnen-
+   * Chassis-Disziplin MUSS auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch in
+   * `runArenaFixtures()` still auf den falschen Pfad (`spieleFeldspiel()` statt eines Buehnen-
+   * Einstiegspunkts). Das Modul selbst wirft dafuer bereits beim Laden (s. Kommentar dort) --
+   * dieser Test macht die Erwartung zusaetzlich explizit.
+   */
+  it("jede Buehnen-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
+    for (const menge of [
+      ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
+      ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
+      ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+    ]) {
+      for (const disziplinId of menge) {
+        expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * GEGENRICHTUNG (Review-Fund Produktivierungswelle 1): jede arena-aufgeloeste Disziplin
+   * braucht eine EIGENE gezogene PPS-Referenz. Ohne eigenen Eintrag faellt
+   * `loeseArenaImpactKonfigAuf()` still auf Basketballs Referenz zurueck -- und Basketballs
+   * Rohwert-Skala (iKrass ~51 bei Feldgroesse 6) liegt eine Groessenordnung unter jeder
+   * Buehnen-Skala (Showcase 575, Speed-Schach 1210), sodass JEDER Spieler kommentarlos die
+   * volle Hoechstpunktzahl bekaeme. Das Modul wirft dafuer beim Laden (s. Kommentar dort);
+   * dieser Test prueft dieselbe Zusage ueber die oeffentliche Schnittstelle
+   * (`resolveArenaPpsReferenz`), ohne den internen Map-Export zu brauchen.
+   */
+  it("jede arena-aufgeloeste Disziplin hat eine EIGENE PPS-Referenz, keinen stillen Basketball-Rueckfall", () => {
+    const basketball = resolveArenaPpsReferenz("basketball", 6).referenz;
+    for (const disziplinId of ARENA_RESOLVED_DISCIPLINE_IDS) {
+      const referenz = resolveArenaPpsReferenz(disziplinId, 6).referenz;
+      expect(referenz.iKrass).toBeGreaterThan(0);
+      expect(referenz.iKrass).toBeGreaterThan(referenz.iMittel);
+      if (disziplinId !== "basketball") {
+        // Ein stiller Rueckfall lieferte Basketballs Referenz Zahl fuer Zahl -- genau das
+        // schliesst dieser Vergleich aus.
+        expect(referenz).not.toEqual(basketball);
+      }
     }
   });
 });
@@ -297,6 +353,22 @@ describe("ppsAusArenaImpact (generischer Kern) / ppsAusGewichthebenImpact", () =
     expect(ppsAusHockeyImpact(referenz.iMittel, referenz)).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX * HOCKEY_PPS_ANTEIL_MITTE, 2);
     expect(ppsAusHockeyImpact(referenz.iKrass, referenz)).toBeCloseTo(HOCKEY_INDIVIDUAL_PPS_MAX, 5);
   });
+
+  it("ppsAusSpeedSchachImpact trifft bei iMittel/iKrass exakt Speed-Schachs eigene Anker (Produktivierungswelle 1)", () => {
+    expect(ppsAusSpeedSchachImpact(referenz.iMittel, referenz)).toBeCloseTo(
+      SPEED_SCHACH_INDIVIDUAL_PPS_MAX * SPEED_SCHACH_PPS_ANTEIL_MITTE,
+      2,
+    );
+    expect(ppsAusSpeedSchachImpact(referenz.iKrass, referenz)).toBeCloseTo(SPEED_SCHACH_INDIVIDUAL_PPS_MAX, 5);
+  });
+
+  it("ppsAusShowcaseImpact trifft bei iMittel/iKrass exakt Showcases eigene Anker (Produktivierungswelle 1)", () => {
+    expect(ppsAusShowcaseImpact(referenz.iMittel, referenz)).toBeCloseTo(
+      SHOWCASE_INDIVIDUAL_PPS_MAX * SHOWCASE_PPS_ANTEIL_MITTE,
+      2,
+    );
+    expect(ppsAusShowcaseImpact(referenz.iKrass, referenz)).toBeCloseTo(SHOWCASE_INDIVIDUAL_PPS_MAX, 5);
+  });
 });
 
 describe("resolveArenaPpsReferenz / resolveGewichthebenPpsReferenz (disziplinuebergreifend)", () => {
@@ -324,6 +396,26 @@ describe("resolveArenaPpsReferenz / resolveGewichthebenPpsReferenz (disziplinueb
     for (const n of [2, 3, 4, 5, 6]) {
       expect(resolveHockeyPpsReferenz(n)).toEqual(resolveArenaPpsReferenz("hockey", n, "feld"));
     }
+  });
+
+  it("resolveSpeedSchachPpsReferenz delegiert an resolveArenaPpsReferenz('speed-schach', ...)", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      expect(resolveSpeedSchachPpsReferenz(n)).toEqual(resolveArenaPpsReferenz("speed-schach", n));
+    }
+  });
+
+  it("resolveShowcasePpsReferenz delegiert an resolveArenaPpsReferenz('showcase', ...)", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      expect(resolveShowcasePpsReferenz(n)).toEqual(resolveArenaPpsReferenz("showcase", n));
+    }
+  });
+
+  it("Speed-Schach und Showcase tragen je EIGENE, von Basketball und voneinander unabhaengige Referenzverteilungen", () => {
+    const basketball = resolveArenaPpsReferenz("basketball", 6).referenz;
+    const speedSchach = resolveArenaPpsReferenz("speed-schach", 6).referenz;
+    const showcase = resolveArenaPpsReferenz("showcase", 6).referenz;
+    expect(speedSchach.iMittel).not.toBeCloseTo(basketball.iMittel, 0);
+    expect(showcase.iMittel).not.toBeCloseTo(basketball.iMittel, 0);
   });
 });
 
@@ -609,6 +701,20 @@ describe("computeIndividualBoxscorePpsFromFixtureResults (BOXSCORE-AN-PPS, V2 Im
     expect(ppsGewichtheben).toBeCloseTo(GEWICHTHEBEN_INDIVIDUAL_PPS_MAX * GEWICHTHEBEN_PPS_ANTEIL_MITTE, 1);
     expect(ppsBasketballDefault).toBeCloseTo(BASKETBALL_INDIVIDUAL_PPS_MAX, 1);
     expect(ppsGewichtheben).not.toBeCloseTo(ppsBasketballDefault, 0);
+  });
+
+  it("disciplineId='speed-schach'/'showcase' nutzen je ihre EIGENE Referenz (Produktivierungswelle 1)", () => {
+    for (const disziplin of ["speed-schach", "showcase"] as const) {
+      const { referenz } = resolveArenaPpsReferenz(disziplin, 6);
+      const fixtureResults: ArenaFixtureResult[] = [
+        { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [eintrag("X", referenz.iMittel, "p-x", "home")] },
+      ];
+      const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtureResults, 6, disziplin).get("p-x")!;
+      const konfig = disziplin === "speed-schach"
+        ? { max: SPEED_SCHACH_INDIVIDUAL_PPS_MAX, anteilMitte: SPEED_SCHACH_PPS_ANTEIL_MITTE }
+        : { max: SHOWCASE_INDIVIDUAL_PPS_MAX, anteilMitte: SHOWCASE_PPS_ANTEIL_MITTE };
+      expect(pps).toBeCloseTo(konfig.max * konfig.anteilMitte, 1);
+    }
   });
 
   /**
