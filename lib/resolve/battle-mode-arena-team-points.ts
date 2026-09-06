@@ -121,6 +121,8 @@ import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import {
   runArenaFixtures,
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
+  ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
+  ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
   type RunArenaFixturesOptions,
@@ -128,6 +130,8 @@ import {
 import basketballPpsReferenzJson from "@/data/generated/basketball-pps-referenz.json";
 import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-referenz.json";
 import hockeyPpsReferenzJson from "@/data/generated/hockey-pps-referenz.json";
+import speedSchachPpsReferenzJson from "@/data/generated/speed-schach-pps-referenz.json";
+import showcasePpsReferenzJson from "@/data/generated/showcase-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -137,32 +141,57 @@ import hockeyPpsReferenzJson from "@/data/generated/hockey-pps-referenz.json";
  * braucht zusaetzlich einen Eintrag in `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` (individuelle PPs) und,
  * falls sie ein anderes Chassis als Feldspiel/Buehnen-Heben braucht, Motor-Anbindung in
  * `arena-headless-runner.ts`.
+ *
+ * PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
+ * Speed-Schach und Showcase sind die vierte und fuenfte Arena-aufgeloeste Disziplin -- ueber
+ * ZWEI NEUE Buehnen-Chassis (`ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`/`ARENA_BUEHNE_AUFTRITT_
+ * DISCIPLINE_IDS`, arena-headless-runner.ts), nicht ueber das bestehende Feldspiel-/Buehnen-
+ * Heben-Chassis. STAFFEL IST BEWUSST NICHT DABEI, obwohl vom PM-Briefing (06.09., Abschnitt 4)
+ * fuer dieselbe Welle vorgeschlagen: `bahnTeamstand()` (battle-mode.engine.js) liefert fuer
+ * Staffel `{seiten:[...], gewertet:false}` -- das Spiel selbst fuehrt dort noch KEINE Wertung
+ * (die Live-HUD-Meldung sagt woertlich "fuer diese Disziplin gibt es noch keine Wertung", s.
+ * `updateHudBahn()`s `bahnEndeGemeldet`-Zweig). Ein Arena-Team-Sieg/-Niederlage/-Unentschieden
+ * auf Basis eines Wertes zu bauen, den das Spiel selbst als unbewertet kennzeichnet, waere kein
+ * Konfigurationsschritt mehr, sondern eine neue Wertungsmechanik fuer Staffel -- das ist
+ * "Wertungstabelle Welle 2" (PM-Briefing Schritt 4), nicht diese Welle. Staffel folgt, sobald
+ * es eine echte Punkte-je-Laeufer-Wertung hat.
  */
-export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["basketball", "gewichtheben", "hockey"]);
+export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "basketball",
+  "gewichtheben",
+  "hockey",
+  "speed-schach",
+  "showcase",
+]);
 
 /**
- * QUERPRUEFUNG (Review-Fund PR #776): `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS` (arena-headless-
- * runner.ts) und `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) sind zwei UNABHAENGIG GEPFLEGTE Mengen,
- * die trotzdem eine Teilmengen-Beziehung einhalten MUESSEN: jede Buehnen-Heben-Chassis-Disziplin
- * ist zwangslaeufig auch arena-aufgeloest (das Chassis ist nur fuer eine Disziplin relevant, die
- * ueberhaupt arena-simuliert wird). Ohne diese Pruefung wuerde eine kuenftige Disziplin, die nur
- * in EINER der beiden Mengen landet (Copy-Paste-Fehler beim Hinzufuegen), STILL auf den falschen
- * Chassis-Dispatch fallen: fehlt sie in `ARENA_RESOLVED_DISCIPLINE_IDS`, wird sie nie arena-
- * aufgeloest (der Fehler bliebe unbemerkt, bis jemand fragt, warum die Disziplin nicht ankommt);
- * fehlt sie umgekehrt (waere hier nicht der Fall, aber symmetrisch denkbar bei einem dritten
- * Chassis) in `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`, wuerde `runArenaFixtures()` faelschlich
- * `spieleFeldspiel()` statt eines Buehnen-Einstiegspunkts aufrufen und mit der (jetzt korrigierten,
- * s. `arena-headless-runner.ts`) Fehlermeldung "lieferte null" scheitern -- verwirrend statt klar.
- * Wirft SOFORT beim Modul-Laden (Fail-Fast), nicht erst beim ersten betroffenen Spieltag-Resolve.
+ * QUERPRUEFUNG (Review-Fund PR #776, erweitert in Produktivierungswelle 1): jede Buehnen-
+ * Chassis-Menge (Heben/Duell/Auftritt, alle drei in `arena-headless-runner.ts`) ist eine
+ * TEILMENGE von `ARENA_RESOLVED_DISCIPLINE_IDS` (hier) -- ein Chassis ist nur fuer eine
+ * Disziplin relevant, die ueberhaupt arena-simuliert wird. Ohne diese Pruefung wuerde eine
+ * kuenftige Disziplin, die nur in EINER der beiden Mengen landet (Copy-Paste-Fehler beim
+ * Hinzufuegen), STILL auf den falschen Chassis-Dispatch fallen: fehlt sie in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`, wird sie nie arena-aufgeloest (der Fehler bliebe unbemerkt,
+ * bis jemand fragt, warum die Disziplin nicht ankommt); fehlt sie umgekehrt in ihrer Chassis-
+ * Menge, wuerde `runArenaFixtures()` faelschlich `spieleFeldspiel()` aufrufen und mit der (in
+ * `arena-headless-runner.ts` korrigierten) Fehlermeldung "lieferte null" scheitern -- verwirrend
+ * statt klar. Wirft SOFORT beim Modul-Laden (Fail-Fast), nicht erst beim ersten betroffenen
+ * Spieltag-Resolve.
  */
-for (const buehneHebenId of ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS) {
-  if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(buehneHebenId)) {
-    throw new Error(
-      `battle-mode-arena-team-points: "${buehneHebenId}" steht in ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS ` +
-        "(arena-headless-runner.ts), aber NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- jede Buehnen-Heben-" +
-        "Chassis-Disziplin muss auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch still " +
-        "auf den falschen Pfad.",
-    );
+for (const [mengenName, menge] of [
+  ["ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS", ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS],
+  ["ARENA_BUEHNE_DUELL_DISCIPLINE_IDS", ARENA_BUEHNE_DUELL_DISCIPLINE_IDS],
+  ["ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS", ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS],
+] as const) {
+  for (const disziplinId of menge) {
+    if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)) {
+      throw new Error(
+        `battle-mode-arena-team-points: "${disziplinId}" steht in ${mengenName} ` +
+          "(arena-headless-runner.ts), aber NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- jede Buehnen-" +
+          "Chassis-Disziplin muss auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch still " +
+          "auf den falschen Pfad.",
+      );
+    }
   }
 }
 
@@ -253,6 +282,33 @@ export const HOCKEY_INDIVIDUAL_PPS_MAX = 5.5;
 export const HOCKEY_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER SPEED-SCHACH (Produktivierungswelle 1, 06.09.). Dieselbe
+ * Impact-Kurve wie die anderen drei Arena-Disziplinen, eigene Regler aus demselben Grund: der
+ * rohe Boxscore-Wert (`MOTOREN["speed-schach"].wert()` = `u.summe`, aus `WERTUNG_DUELL()`) liegt
+ * auf einer eigenen Skala, die vom Kader-/Attributniveau der Liga abhaengt.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben Grund
+ * wie bei Gewichtheben/Hockey (s. dortige Kommentare): Chris' Rahmen "max 5-6" und die
+ * 04.09.-Kurvenform-Messung gelten disziplinuebergreifend. EIGENE Konstanten statt Alias, damit
+ * eine spaetere speed-schach-spezifische Kalibrierung die anderen drei nicht beruehrt.
+ */
+export const SPEED_SCHACH_INDIVIDUAL_PPS_MAX = 5.5;
+export const SPEED_SCHACH_PPS_ANTEIL_MITTE = 0.25;
+
+/**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER SHOWCASE (Produktivierungswelle 1, 06.09.). Dieselbe
+ * Impact-Kurve, eigene Regler aus demselben Grund: der rohe Boxscore-Wert
+ * (`MOTOREN.showcase.wert()` = `u.summe`, aus `WERTUNG_AUFTRITT()`) liegt auf einer eigenen
+ * Skala, die vom Kader-/Attributniveau der Liga abhaengt.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- s. Kommentar bei
+ * SPEED_SCHACH_INDIVIDUAL_PPS_MAX direkt darueber. EIGENE Konstanten, damit eine spaetere
+ * showcase-spezifische Kalibrierung die anderen drei nicht beruehrt.
+ */
+export const SHOWCASE_INDIVIDUAL_PPS_MAX = 5.5;
+export const SHOWCASE_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -317,6 +373,12 @@ const HOCKEY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(hockeyPpsRefer
 const HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART = ladeReferenzFeldgroessenTorwart(
   hockeyPpsReferenzJson as ArenaPpsReferenzJson,
 );
+const SPEED_SCHACH_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  speedSchachPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const SHOWCASE_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  showcasePpsReferenzJson as ArenaPpsReferenzJson,
+);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -379,6 +441,29 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       katalogStandardgroesse: 5,
     },
   ],
+  [
+    "speed-schach",
+    {
+      referenzFeldgroessen: SPEED_SCHACH_PPS_REFERENZ_FELDGROESSEN,
+      max: SPEED_SCHACH_INDIVIDUAL_PPS_MAX,
+      anteilMitte: SPEED_SCHACH_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount (dataAdapter.ts) ist 2, NICHT 6 -- nachgesehen, nicht kopiert
+      // (s. scripts/ziehe-speed-schach-pps-referenz.ts Kopfkommentar). Nur der Katalog-
+      // Fallback fuer eine nicht ermittelbare Feldgroesse, wie bei Hockey.
+      katalogStandardgroesse: 2,
+    },
+  ],
+  [
+    "showcase",
+    {
+      referenzFeldgroessen: SHOWCASE_PPS_REFERENZ_FELDGROESSEN,
+      max: SHOWCASE_INDIVIDUAL_PPS_MAX,
+      anteilMitte: SHOWCASE_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount (dataAdapter.ts) ist 5, NICHT 6 -- nachgesehen, nicht kopiert
+      // (s. scripts/ziehe-showcase-pps-referenz.ts Kopfkommentar).
+      katalogStandardgroesse: 5,
+    },
+  ],
 ]);
 
 /**
@@ -433,7 +518,7 @@ export function resolveArenaPpsReferenz(
   if (verfuegbareGroessen.length === 0) {
     throw new Error(
       `battle-mode-arena-team-points: keine gueltige gezogene PPS-Referenz fuer "${disciplineId}" (Rolle "${rolle}") gefunden — ` +
-        "scripts/ziehe-basketball-pps-referenz.ts bzw. scripts/ziehe-gewichtheben-pps-referenz.ts/scripts/ziehe-hockey-pps-referenz.ts (neu) ausfuehren.",
+        "das passende scripts/ziehe-<disziplin>-pps-referenz.ts ausfuehren (basketball/gewichtheben/hockey/speed-schach/showcase).",
     );
   }
   const gerundet = playerCount != null && Number.isFinite(playerCount) ? Math.round(playerCount) : null;
@@ -474,6 +559,20 @@ export function resolveHockeyPpsReferenz(
   rolle: "feld" | "torwart" = "feld",
 ): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
   return resolveArenaPpsReferenz("hockey", playerCount, rolle);
+}
+
+/** Speed-Schach-Analogon zu `resolveBasketballPpsReferenz()`, s. dort. */
+export function resolveSpeedSchachPpsReferenz(
+  playerCount: number | null,
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  return resolveArenaPpsReferenz("speed-schach", playerCount);
+}
+
+/** Showcase-Analogon zu `resolveBasketballPpsReferenz()`, s. dort. */
+export function resolveShowcasePpsReferenz(
+  playerCount: number | null,
+): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
+  return resolveArenaPpsReferenz("showcase", playerCount);
 }
 
 const LEAGUE_TIERS: readonly LeagueTier[] = ["liga1", "liga2"];
@@ -643,6 +742,16 @@ export function ppsAusGewichthebenImpact(impact: number, referenz: ArenaPpsRefer
 /** Hockey-Analogon zu `ppsAusBasketballImpact()`, s. dort. */
 export function ppsAusHockeyImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
   return ppsAusArenaImpact(impact, referenz, HOCKEY_INDIVIDUAL_PPS_MAX, HOCKEY_PPS_ANTEIL_MITTE);
+}
+
+/** Speed-Schach-Analogon zu `ppsAusBasketballImpact()`, s. dort. */
+export function ppsAusSpeedSchachImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
+  return ppsAusArenaImpact(impact, referenz, SPEED_SCHACH_INDIVIDUAL_PPS_MAX, SPEED_SCHACH_PPS_ANTEIL_MITTE);
+}
+
+/** Showcase-Analogon zu `ppsAusBasketballImpact()`, s. dort. */
+export function ppsAusShowcaseImpact(impact: number, referenz: ArenaPpsReferenzFeldgroesse): number {
+  return ppsAusArenaImpact(impact, referenz, SHOWCASE_INDIVIDUAL_PPS_MAX, SHOWCASE_PPS_ANTEIL_MITTE);
 }
 
 /**

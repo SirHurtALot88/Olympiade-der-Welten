@@ -368,4 +368,79 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
+   * das Buehnen-Duell-Chassis fuer `art.duell` (`spieleBuehneDuell()` im Motor,
+   * `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` im Runner) -- strukturell dasselbe Zweikampf-Chassis
+   * wie Heben, aber mit einer eigenen Seiten-Zaehlung (gewonnene Bretter ueber `u.vorteil>0`,
+   * Remis moeglich, s. Kommentar am Motor-Einstiegspunkt selbst).
+   */
+  it(
+    "simuliert Speed-Schach ueber das Buehnen-Duell-Chassis: Brettstand 0..jeSeite, kein gesamtKg (Remis sind hier echt)",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "speed-schach-chassis-abnahme" }],
+        "speed-schach",
+      );
+
+      pruefeErgebnisForm(ergebnis, "team-heim", "team-gast");
+      // Brettstand: gewonnene Bretter je Seite, hoechstens jeSeite (6) -- ANDERS als Heben
+      // muss die Summe beider Seiten hier NICHT jeSeite ergeben (Remis-Bretter zaehlen fuer
+      // keine Seite).
+      for (const seite of ergebnis.seiten) {
+        expect(seite).toBeGreaterThanOrEqual(0);
+        expect(seite).toBeLessThanOrEqual(6);
+      }
+      // `gesamtKg` ist NUR fuer das Buehnen-Heben-Chassis gesetzt (Gewichtheben) -- ein
+      // Duell-Gleichstand bleibt fuer Speed-Schach ein echtes Unentschieden, kein Tiebreak.
+      expect(ergebnis.gesamtKg).toBeUndefined();
+      for (const eintrag of ergebnis.boxscore) {
+        expect(eintrag.wert).toBeGreaterThanOrEqual(0);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  /**
+   * PRODUKTIVIERUNGSWELLE 1: das Buehnen-Auftritt-Chassis fuer jede BUEHNE_ART-Disziplin ohne
+   * `.heben`/`.duell` (`spieleBuehneAuftritt()` im Motor, `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS`
+   * im Runner) -- KEIN Zweikampf je Slot, der Seitenstand ist die Summe der individuellen
+   * Auftrittswerte (s. Kommentar am Motor-Einstiegspunkt).
+   */
+  it(
+    "simuliert Showcase ueber das Buehnen-Auftritt-Chassis: Seitenstand ist die Summe der Auftrittswerte, kein gesamtKg",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "showcase-chassis-abnahme" }],
+        "showcase",
+      );
+
+      pruefeErgebnisForm(ergebnis, "team-heim", "team-gast");
+      // Seitenstand ist eine PUNKTSUMME, keine Duell-/Brettzaehlung -- kann jeden nicht-
+      // negativen Wert annehmen, nicht nur 0..jeSeite.
+      for (const seite of ergebnis.seiten) {
+        expect(seite).toBeGreaterThanOrEqual(0);
+      }
+      expect(ergebnis.gesamtKg).toBeUndefined();
+      // Die Summe beider Seiten muss der Summe aller Boxscore-Werte entsprechen -- derselbe
+      // Rechenweg wie `updateHudBuehne()`s eigener Nicht-Heben-Nicht-Duell-Zweig im Motor.
+      const summeBoxscore = ergebnis.boxscore.reduce((a, e) => a + e.wert, 0);
+      const summeSeiten = ergebnis.seiten[0] + ergebnis.seiten[1];
+      expect(summeSeiten).toBeCloseTo(summeBoxscore, 5);
+    },
+    LAUF_TIMEOUT_MS,
+  );
 });
