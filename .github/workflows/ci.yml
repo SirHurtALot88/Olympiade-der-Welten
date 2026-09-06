@@ -282,3 +282,37 @@ jobs:
       - run: npm ci
       - run: npm run ci:import-exists
       - run: npm run ci:persistenz-suiten
+
+  # PPS-REFERENZ-FRISCHE (Auftrag von Chris, 06.09.): jede der fuenf
+  # `data/generated/<disziplin>-pps-referenz.json` traegt einen `motorSha1` vom Zeitpunkt ihrer
+  # Ziehung -- genau damit erkennbar ist, wenn `public/mockups/battle-mode.engine.js` sich seitdem
+  # geaendert hat. Bislang wurde dieses Feld NIRGENDS geprueft: die Opus-Review PR #818/#820 fand
+  # so einen echten Bug in der gemeinsamen `bauBuehne()`-Chassis-Funktion, der Gewichthebens
+  # (bereits produktive) Referenz verzerrt hatte, ohne dass CI je etwas gemeldet haette. Dieser
+  # Job ist die fehlende Instanz -- s. scripts/pruefe-pps-referenz-frische.ts fuer die genaue
+  # Berechnung (identisch zu `ermittleMotorSha1()` in jedem scripts/ziehe-*-pps-referenz.ts).
+  #
+  # BEWUSST NICHT BLOCKIEREND (`continue-on-error: true`), anders als `persistenz-suiten` daneben.
+  # Grund, nachgemessen und keine Vorsichtsmassnahme auf Verdacht: der Vergleich laeuft ueber den
+  # Hash der GESAMTEN 20.000-Zeilen-Motor-Datei fuer alle zwanzig Disziplinen, nicht nur den
+  # disziplin-eigenen Rezeptblock -- eine feinere Pruefung waere zwar praeziser, haette aber genau
+  # den Gewichtheben-Fund verpasst (der sass in gemeinsamem Chassis-Code, nicht im eigenen
+  # Rezeptblock). Mit dem groben Hash bestaetigt: ZUM ZEITPUNKT DIESES PRs sind bereits ALLE
+  # FUENF Referenzen "veraltet", weil der Motor seit jeder Ziehung mindestens einmal fuer eine
+  # ANDERE Disziplin geaendert wurde. Ein Pflicht-Check waere also ab Tag eins dauerrot und wuerde
+  # so ignoriert, bevor er das eine Mal zaehlt, das wirklich zaehlt. Bleibt die Warnung ueber
+  # laengere Zeit gruen-bis-auf-eine-Zeile-fuer-dieselbe-Disziplin, ist das ein staerkeres Signal
+  # als ein pauschales Rot bei jedem Motor-Commit.
+  pps-referenz-frische:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: PPS-Referenz-Frische (informativ, blockiert den Merge nicht)
+        continue-on-error: true
+        run: npm run ci:pps-referenz-frische

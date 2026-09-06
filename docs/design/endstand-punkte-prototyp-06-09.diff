@@ -1,0 +1,269 @@
+diff --git a/public/mockups/battle-mode.engine.js b/public/mockups/battle-mode.engine.js
+index 2c170491..b9a76b71 100644
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -14559,9 +14559,28 @@
+   // Liest nur u.fertig/u.pos/u.seite/u.id, schreibt nichts: reine Auswertung. Wird sowohl
+   // von der laufenden Anzeige als auch von der Sonde (bahnLauf) und dem Endstand-Overlay
+   // aufgerufen — es gibt keine zweite Kopie dieser Logik.
++  // STAFFEL: DIE ETAPPENLEISTUNG (Prototyp 06.09., docs/design/endstand-punkte-staffel-
++  // takeshi-plan-06-09.md). In der Staffel teilen alle sechs einer Mannschaft `fertig`;
++  // nach Zielzeit sortiert stuenden die Sechs eines Teams also in beliebiger Reihenfolge
++  // hintereinander. Was einen EINZELNEN messbar macht, weiss der Motor laengst:
++  // `etappenZeit` (eigener Abschnitt, Wechselverlust herausgerechnet) und `wechselKonto`
++  // (Bilanz seiner Uebergaben, in Sekunden). -(etappenZeit)+wechselKonto ist EXAKT die
++  // Groesse, an der MOTOREN.staffel.wert() die Rangtreue misst (0,915) — hier nur als
++  // Sortierschluessel wiederverwendet, keine zweite Formel. Groesser ist besser. Wer seinen
++  // Abschnitt noch nicht gelaufen hat, hat keine Leistung (null): erst der Aktive, dann die
++  // Wartenden nach Bein — vorlaeufig, wie die Streckensortierung der anderen Bahnen.
++  function bahnLeistung(u){ return u.etappenZeit==null?null:-(u.etappenZeit)+u.wechselKonto; }
+   function bahnRangliste(){
+     const N=LAEUFER.length;
++    const staffel=!!BA().staffel;
+     const reihe=[...LAEUFER].sort((a,b)=>{
++      if(staffel){
++        const la=bahnLeistung(a), lb=bahnLeistung(b);
++        if(la!=null&&lb!=null)return lb-la;
++        if((la!=null)!==(lb!=null))return la!=null?-1:1;
++        if(!!a.aktiv!==!!b.aktiv)return a.aktiv?-1:1;
++        return (a.bein??0)-(b.bein??0);
++      }
+       const fa=a.fertig!=null, fb=b.fertig!=null;
+       if(fa&&fb)return a.fertig-b.fertig;
+       if(fa!==fb)return fa?-1:1;
+@@ -14574,25 +14593,56 @@
+   let bahnEndeGemeldet=false;
+ 
+   // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
+-  // liefern Rangpunkte (bahnRangliste). Staffel und Takeshi's Castle fuehren (noch) keine
+-  // eigene `wertung` und bleiben beim alten Zieleinlauf-Zaehler — fuer die Staffel ist das
+-  // vorlaeufig die einzige Antwort (eigener Auftrag, s. Abschnitt 5.5 im Plan), fuer
+-  // Takeshi steht die Burgpunkte-Wertung in einem PARALLELEN Auftrag aus. Kommt dort eine
+-  // eigene `wertung` dazu, reicht ein weiterer Zweig HIER — updateHudBahn, renderKader und
+-  // das Endstand-Overlay (renderEndstandBahn) lesen alle denselben Rueckgabewert und
+-  // brauchen dafuer keine eigene Anpassung.
+-  // `gewertet` sagt, ob hinter dem Stand eine ECHTE Wertung steht. Der Zieleinlauf-Zaehler
+-  // ist keine: bei Takeshi zaehlt er Ausgeschiedene mit (rennFertig nimmt sie auf, s.
+-  // nervenKosten-Zweig in stepSpurt), am Rennende steht darum IMMER 6:6 — genau der
+-  // Anzeigefehler, den diese Aenderung fuer die drei Rang-Bahnen behebt. Wer daraus ein
+-  // "Unentschieden" macht, behauptet ein Ergebnis, das der Motor nicht hergibt. Solange
+-  // `gewertet` false ist, meldet das Rennen deshalb nur, DASS es zu Ende ist. Kommt fuer
+-  // Takeshi/Staffel eine eigene `wertung` dazu, faellt das von selbst weg.
++  // liefern Rangpunkte (bahnRangliste); Staffel traegt "etappe", Takeshi's Castle "burg"
++  // (Prototyp 06.09., docs/design/endstand-punkte-staffel-takeshi-plan-06-09.md).
++  // updateHudBahn, renderKader, die Sonde (bahnLauf) und das Endstand-Overlay
++  // (renderEndstandBahn) lesen alle denselben Rueckgabewert:
++  //   seiten    Teamstand, groesser gewinnt (Rangpunkte / 1:0 / Burgpunkte)
++  //   punkte    Map id -> Punkte je Laeufer, oder null, wo es keine gibt
++  //   gewertet  ob hinter dem Stand eine ECHTE Wertung steht
++  //   fmt       optional, Anzeigeformat der Punkte (Burgpunkte: eine Nachkommastelle)
++  //   zeitVon/zeitKopf/platzKopf/zusatz  optional, nur fuer das Overlay (Staffel: Etappe
++  //             statt Teamzeit, Rang statt Platz, beide Zielzeiten in der Kopfzeile)
++  // Der Zieleinlauf-Zaehler ist keine Wertung: bei Takeshi zaehlt er Ausgeschiedene mit
++  // (rennFertig nimmt sie auf, s. nervenKosten-Zweig in stepSpurt), am Rennende stand
++  // darum IMMER 6:6. Solange `gewertet` false ist, meldet das Rennen nur, DASS es zu Ende
++  // ist — seit dem Prototyp betrifft das keine der fuenf Bahnen mehr.
+   function bahnTeamstand(){
+     if(BA().wertung==="rang"){
+       const w=bahnRangliste();
+       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
+     }
++    // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
++    // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
++    // Laeufer kann dem Zieleinlauf widersprechen (gemessen, s. Plan Abschnitt 2.3), und
++    // eine Staffel, die gewonnen hat, darf im Overlay nicht verlieren. Die Punkte JE
++    // LAEUFER sind der Rang seiner Etappenleistung ueber alle Laeufer beider Seiten
++    // (bahnRangliste, Sortierschluessel bahnLeistung) — dieselbe Groesse, an der die
++    // Rangtreue gemessen wird. `seiten` ist hier also NICHT die Summe von `punkte`.
++    if(BA().wertung==="etappe"){
++      const w=bahnRangliste();
++      const ziel=(s)=>{const u=LAEUFER.find(x=>x.seite===s&&x.fertig!=null); return u?u.fertig:null;};
++      const z=[ziel(0),ziel(1)];
++      const seiten=[0,0];
++      if(z[0]!=null&&(z[1]==null||z[0]<z[1]))seiten[0]=1;
++      else if(z[1]!=null&&(z[0]==null||z[1]<z[0]))seiten[1]=1;
++      return {seiten, suffix:"nach Zieleinlauf", punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
++        zusatz:z[0]!=null&&z[1]!=null?z[0].toFixed(1)+" s gegen "+z[1].toFixed(1)+" s":null,
++        zeitVon:(u)=>u.etappenZeit==null?"—":u.etappenZeit.toFixed(1)+" s"
++          +(u.wechselKonto<0?" · "+(-u.wechselKonto).toFixed(1)+" s Wechsel":""),
++        zeitKopf:"Etappe", platzKopf:"Rang"};
++    }
++    // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
++    // MOTOREN["takeshis-castle"].wert) — also stehen sie auch hier, je Laeufer und als
++    // Teamsumme, mit dem Zielbonus (burgwertung), damit Mauer, Kader, Kopfzeile, Overlay
++    // und Rangtreue-Messung EINE Zahl zeigen statt zwei.
++    if(BA().wertung==="burg"){
++      const punkte=new Map(), seiten=[0,0];
++      for(const u of LAEUFER){const p=burgwertung(u); punkte.set(u.id,p); seiten[u.seite]+=p;}
++      const r1=(v)=>Math.round(v*10)/10;
++      return {seiten:[r1(seiten[0]),r1(seiten[1])], suffix:"Burgpunkte", punkte, gewertet:true,
++        fmt:(v)=>v.toFixed(1).replace(/\.0$/,"")};
++    }
+     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
+   }
+@@ -14898,6 +14948,21 @@
+   function burgpunkte(u){ const St=BA().fallenStufe||{}; let p=0;
+     for(const f of (u.fallen||[])){ const st=St[f.typ]??1; p+=st*(1-f.stoppAnteil)-(f.aus==='sturz'?st*0.5:0); }
+     return p; }
++  // ZIELBONUS (der W4-Anteil, den die Sterne allein nicht tragen): wer ins Ziel kommt,
++  // bekommt (N - Platz) / 2, Ausgeschiedene nichts. Der Platz steht fest, sobald der
++  // Laeufer im Ziel ist (rennFertig ist die Zielreihenfolge; Ausgeschiedene stehen zwar
++  // auch darin, zaehlen aber nicht mit) — der Bonus ist also LIVE berechenbar, nicht erst
++  // am Rennende. Genau dieselbe Zahl, die MOTOREN["takeshis-castle"].wert() vergibt
++  // (dort: N minus Index in der nach `fertig` sortierten Reihe, Ausgeschiedene nach den
++  // Finishern, also identisch).
++  function zielbonus(u){
++    if(u.fertig==null||u.raus)return 0;
++    const platz=rennFertig.filter(x=>!x.raus).indexOf(u)+1;
++    return platz>0?(LAEUFER.length-platz)*0.5:0;
++  }
++  // DIE EINE ZAHL: Sterne plus Zielbonus = W4 = die Wertung. Mauer, Laeuferzeile,
++  // Kopfzeile, Overlay und wert() lesen alle diese Funktion (Prototyp 06.09.).
++  function burgwertung(u){ return burgpunkte(u)+zielbonus(u); }
+   function zeichneFalleTakeshi(i,x,y,b){
+     const look=fallenLook(i), t=rennT;
+     const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
+@@ -15102,7 +15167,7 @@
+     //    Groessen wie auf der alten Bahn, nur auf einem Band statt ueber der Zinnenmauer.
+     // Das Band liegt UNTEN, nicht oben wie auf der geraden Bahn: die Burg steht auf der
+     // Karte oben rechts, und ein Band ueber dem oberen Rand haette genau ihr Tor verdeckt.
+-    const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
++    const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
+     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
+     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'Barlow Condensed',sans-serif";
+     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+@@ -15203,15 +15268,16 @@
+         ctx.drawImage(z,x,Math.round(unten-4));
+       }
+     }
+-    // BURGPUNKTE-STAND beider Seiten ueber der Bahn — die Summe der Sterne (burgpunkte()),
+-    // nicht die Wertung selbst (die zaehlt zusaetzlich den Zielbonus fuer Finisher).
++    // BURGPUNKTE-STAND beider Seiten ueber der Bahn — seit dem Prototyp 06.09. die Summe
++    // der WERTUNG (burgwertung: Sterne plus Zielbonus), damit Mauer und Overlay eine Zahl
++    // zeigen. Vorher stand hier die Sternsumme ohne Bonus.
+     //
+     // NACH dem Zaun gezeichnet, nicht im Burg-Block darueber: der obere Zaun laeuft von
+     // `oben-28` bis `oben+4` und hat die Legendenzeile bei `oben-18` vorher vollstaendig
+     // uebermalt — sie stand im Code, war im Bild aber nie zu sehen (nachgemessen am
+     // Screenshot, 1240x470: Zaunkachel 32 px hoch bei `oben-z.naturalHeight+4`).
+     if(BA().takeshi&&aDa("burg_mauer")){
+-      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
++      const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
+       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+       ctx.font="700 22px 'Barlow Condensed',sans-serif";
+       const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+@@ -15592,6 +15658,10 @@
+       // situationsabhaengiger Vorteil, den das Koennen nicht steuert, ist genau das, was
+       // eine Rangtreue frisst.
+       schatten:false, tackle:false, grundTempo:92, tempoSpanne:0.90,
++      // WERTUNG NACH ETAPPE (Prototyp 06.09.): Rennen = wer zuerst im Ziel ist (1 : 0),
++      // Punkte je Laeufer = Rang der Etappenleistung (s. bahnLeistung/bahnTeamstand).
++      // Nur Anzeige, keine Zeile der Rennmechanik haengt daran.
++      wertung:"etappe",
+       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
+       kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+       rezept:{
+@@ -15802,8 +15872,10 @@
+       // BAHN_ART ist bereits aus #807 der String-Wertungsmodus fuer bahnTeamstand/bahnLauf
+       // ("rang" oder Fallback "zieleinlauf") — eine Funktion hier haette das kollidieren
+       // lassen (bahnTeamstand las eine Funktion statt "rang"/undefined, bahnLauf haette
+-      // eine Funktion statt "zieleinlauf" gemeldet). Takeshi fuehrt bewusst KEINE eigene
+-      // `wertung` (bleibt beim alten Zieleinlauf-Zaehler, s. bahnTeamstand-Kommentar).
++      // eine Funktion statt "zieleinlauf" gemeldet).
++      // WERTUNG "burg" (Prototyp 06.09.): Burgpunkte inkl. Zielbonus je Laeufer, Teamstand
++      // die Summe — dieselbe Zahl wie MOTOREN["takeshis-castle"].wert (s. burgwertung).
++      wertung:"burg",
+       wertungTabelle:(basis,art)=>({...basis,
+         spalten:basis.spalten.flatMap(s=>s.id==="res"
+           // NIE UNTER NULL (Review-Fund 06.09.): der Sturz, der ausscheiden laesst, zieht
+@@ -17042,7 +17114,7 @@
+       // Bahn (Spurt, Staffel, ...) bleibt die Zeile, dort stehen die Fertigen einzeln
+       // gestaffelt rechts neben der Ziellinie.
+       if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+
+-        (BA().takeshi?" · ★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,""):"");
++        (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
+         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
+     }
+     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
+@@ -18495,23 +18567,37 @@
+   function renderEndstandBahn(){
+     const rang=bahnRangliste(), stand=bahnTeamstand();
+     const [pL,pR]=stand.seiten;
+-    document.getElementById("esieger").textContent=stand.gewertet
++    document.getElementById("esieger").textContent=(stand.gewertet
+       ? (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
+         +" — "+pL+" : "+pR+" "+stand.suffix
+-      : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung";
++      : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung")
++      +(stand.zusatz?" ("+stand.zusatz+")":"");
++    // ZEILENFOLGE NACH PUNKTEN, wo es Punkte gibt (Prototyp 06.09.): bei "rang" ist das
++    // dieselbe Folge wie die Rangliste (Platz 1 hat die meisten Punkte), bei Takeshi
++    // stehen die Sterne nicht zwingend in Zielreihenfolge — der Endstand ordnet nach dem,
++    // was gewertet wird, wie das Kampf-Overlay nach Impact. `platz` bleibt der Index in
++    // der Rangliste (Zielreihenfolge bzw. Etappen-Rang bei der Staffel).
++    const platzVon=new Map(rang.reihe.map((u,i)=>[u.id,i+1]));
++    const zeilen=stand.punkte?[...rang.reihe].sort((a,b)=>stand.punkte.get(b.id)-stand.punkte.get(a.id)):rang.reihe;
++    const fmtP=stand.fmt||((v)=>String(v));
+     for(const seite of [0,1]){
+       const box=document.getElementById(seite===0?"etafelL":"etafelR");
+       box.textContent="";
+       box.appendChild(el("h5",null,VEREIN[seite].name));
+       const t=el("table"), kopf=el("tr");
+-      for(const lab of ["Läufer","Platz","Zeit","Punkte"])kopf.appendChild(el("th",null,lab));
++      for(const lab of ["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit","Punkte"])kopf.appendChild(el("th",null,lab));
+       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+       const tb=el("tbody");
+-      rang.reihe.forEach((u,i)=>{
++      zeilen.forEach((u)=>{
+         if(u.seite!==seite)return;
+         const tr=el("tr",u.raus?"tot":null);
+         tr.appendChild(el("td",null,u.n));
+-        tr.appendChild(el("td",null,String(i+1)));
++        tr.appendChild(el("td",null,String(platzVon.get(u.id))));
++        if(stand.zeitVon){
++          tr.appendChild(el("td",null,stand.zeitVon(u)));
++          tr.appendChild(el("td",null,fmtP(stand.punkte.get(u.id))));
++          tb.appendChild(tr); return;
++        }
+         // AUSGESCHIEDENE HABEN KEINE ZEIT. `u.fertig` traegt bei ihnen den Sortierschluessel
+         // 90+(1-pos)*10 aus dem nervenKosten-Zweig (s. stepSpurt), also 90..100 — in einem
+         // Rennen, das nach ~25 s vorbei ist. Als "93,7 s" gedruckt waere das eine erfundene
+@@ -18519,7 +18605,7 @@
+         // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
+         // Finisher, nur ANZEIGEN darf man ihn nicht.
+         tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
+-        tr.appendChild(el("td",null,stand.punkte?String(stand.punkte.get(u.id)):"—"));
++        tr.appendChild(el("td",null,stand.punkte?fmtP(stand.punkte.get(u.id)):"—"));
+         tb.appendChild(tr);
+       });
+       t.appendChild(tb); box.appendChild(t);
+@@ -18916,13 +19002,12 @@
+         // die der Saisonplan wuerfelt. `u.fallen` fuehrt jede Falle bereits mit (stepSpurt,
+         // rho-neutrales Protokoll), diese Formel liest nur.
+         if(BAHN_ART[bd].takeshi){
+-          const reihe=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
++          // Dieselbe Zahl wie Mauer, Laeuferzeile, Kopfzeile und Endstand-Overlay
++          // (burgwertung = burgpunkte + zielbonus). Vorher stand die Bonus-Rechnung hier
++          // ein zweites Mal ausgeschrieben; die Werte sind bit-identisch (nachgemessen,
++          // 0,861 kaderfest vor wie nach dem Umzug).
+           const o={};
+-          for(const u of LAEUFER){
+-            let p=burgpunkte(u);
+-            if(u.fertig!=null&&!u.raus)p+=(LAEUFER.length-reihe.indexOf(u))*0.5;
+-            o[u.n]=p;
+-          }
++          for(const u of LAEUFER)o[u.n]=burgwertung(u);
+           return o;
+         }
+         const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+@@ -19942,6 +20027,9 @@
+           // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit.
+           zeit:(u.fertig==null||u.raus)?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+           bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
++          etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
++          wechselKonto:+(u.wechselKonto||0).toFixed(4),
++          burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
+           reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+           sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
+           ansagen:u.ansagen||0}))};

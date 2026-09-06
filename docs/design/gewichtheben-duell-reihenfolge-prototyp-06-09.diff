@@ -1,0 +1,106 @@
+diff --git a/public/mockups/battle-mode.engine.js b/public/mockups/battle-mode.engine.js
+index 2c170491..db1aa95d 100644
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -10795,11 +10795,15 @@
+         u.anzeigeKg=sinclairAnzeige(u.zweikampf,u.groesse);
+       }
+       // DUELLENTSCHEID. Gleicher Zweikampf: es gewinnt, wer weniger Versuche gebraucht hat
+-      // (IWF seit 2017). Auch gleich: die Reihenfolge, also A. Ein halber Punkt ist damit
+-      // praktisch ausgeschlossen — anders als bei Speed-Schach gibt es hier kein Remis.
++      // (IWF seit 2017). Auch gleich: das Los, seeded — nicht mehr "die Reihenfolge, also A".
++      // Das war ein zweiter, kleiner Heimvorteil, der den Gastvorteil aus der festen
++      // Hebereihenfolge (s. hebeUebung) teilweise verdeckte: allein diesen Tiebreak zu losen,
++      // verschob den Spiegeltest von 36:184 auf 28:203; beides zusammen bringt ihn auf 50:50.
++      // Ein halber Punkt bleibt praktisch ausgeschlossen — anders als bei Speed-Schach gibt
++      // es hier kein Remis.
+       let sieger=null;
+       if(a.zweikampf!==b.zweikampf)sieger=a.zweikampf>b.zweikampf?a:b;
+-      else if(a.zweikampf>0)sieger=a.versucheBis<=b.versucheBis?a:b;
++      else if(a.zweikampf>0)sieger=a.versucheBis!==b.versucheBis?(a.versucheBis<b.versucheBis?a:b):(rr()<0.5?a:b);
+       a.duellGewonnen=sieger===a; b.duellGewonnen=sieger===b;
+       a.vorteil=a.zweikampf-b.zweikampf; b.vorteil=-a.vorteil;
+     }
+@@ -10819,6 +10823,18 @@
+   // Eine Uebung (Reissen oder Stossen) fuer ein Duellpaar, Versuch fuer Versuch im
+   // Wechsel. Beide Heber im selben Durchlauf, weil der dritte Versuch auf den Stand des
+   // Gegners reagiert.
++  //
++  // WER HEBT ZUERST? (Opus-Fund auf PR #820, docs/design/gewichtheben-duell-reihenfolge-
++  // plan-06-09.md.) Bis 06.09. lief jeder Durchgang fest als [a,b], a = Heim. Im ersten und
++  // zweiten Versuch ist das egal (niemand reagiert), im dritten nicht: b kannte a's FERTIGES
++  // Ergebnis, a nur b's Stand nach zwei Versuchen — das letzte Wort hatte immer der Gast.
++  // Im Spiegeltest (identischer Kader gegen sich selbst, 1000 Spiele, auf #820-Basis) gewann
++  // Gast 613:125. Jetzt gilt im dritten Versuch die reale IWF-Regel, die buehneQueue fuers
++  // Buehnenbild schon immer nutzte: beide sagen auf DEMSELBEN Stand (nach zwei Versuchen) an,
++  // die leichtere Ansage hebt zuerst, die schwerere zuletzt — und darf nach dem Ausgang noch
++  // einmal nachziehen (nur aufwaerts, wie im Wettkampf). Gleiche Ansage: das Los, seeded ueber
++  // rr() (die Losnummer der Wiegung). Das letzte Wort hat damit, wer mehr angesagt hat — in
++  // der Regel der Fuehrende, und das ist verdient, nicht die Seite. Spiegeltest danach 349:326.
+   function hebeUebung(a,b,plan,uebung){
+     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
+     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
+@@ -10835,27 +10851,43 @@
+       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
+       u.letzteLast=0;
+     }
++    // Die Last des naechsten Versuchs — die geplante Ansage, im dritten Versuch dazu die
++    // Reaktion auf den Duellstand. Als Funktion, weil die Reihenfolge des dritten Versuchs
++    // (s.u.) beide Ansagen kennen muss, BEVOR einer von beiden gehoben hat.
++    const lastFuer=(u,v)=>{
++      const gegner=u===a?b:a;
++      let kg=ansage[u.id];
++      // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
++      // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
++      // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
++      // Wechselspiel. Ob er es schafft, entscheiden LAST (wie weit ueber seinem Maximum
++      // die Ansage liegt) und NERVEN.
++      // ...aber nur, wenn es ueberhaupt in Reichweite ist. Ohne den Deckel sprang ein
++      // Heber, der gegen einen viel staerkeren Gegner antrat, weit ueber sein
++      // Tagesmaximum und riss fast sicher — gemessen fiel die Gelingensquote im dritten
++      // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
++      // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
++      // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
++      if(v===2&&beste(gegner)>beste(u)){
++        const ziel=Math.round(beste(gegner))+1;
++        if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
++      }
++      // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
++      return Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
++    };
+     for(let v=0;v<3;v++){
+-      for(const u of [a,b]){
+-        const gegner=u===a?b:a;
+-        let kg=ansage[u.id];
+-        // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
+-        // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
+-        // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
+-        // Wechselspiel. Ob er es schafft, entscheiden LAST (wie weit ueber seinem Maximum
+-        // die Ansage liegt) und NERVEN.
+-        // ...aber nur, wenn es ueberhaupt in Reichweite ist. Ohne den Deckel sprang ein
+-        // Heber, der gegen einen viel staerkeren Gegner antrat, weit ueber sein
+-        // Tagesmaximum und riss fast sicher — gemessen fiel die Gelingensquote im dritten
+-        // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
+-        // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
+-        // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
+-        if(v===2&&beste(gegner)>beste(u)){
+-          const ziel=Math.round(beste(gegner))+1;
+-          if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
+-        }
+-        // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
+-        kg=Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
++      // Erster und zweiter Versuch: Reihenfolge ohne Folgen, niemand reagiert. Dritter
++      // Versuch: die leichtere Ansage zuerst (IWF), gleiche Ansage per Los — s. Kopfkommentar.
++      // Wer als Zweiter hebt, rechnet seine Last unten NEU (lastFuer liest den frischen
++      // Stand) und zieht damit ggf. auf den Ausgang des Ersten nach; nur aufwaerts, weil
++      // lastFuer nie unter die geplante Ansage geht.
++      let reihe=[a,b];
++      if(v===2){
++        const ka=lastFuer(a,v), kb=lastFuer(b,v);
++        reihe=ka<kb?[a,b]:kb<ka?[b,a]:(rr()<0.5?[a,b]:[b,a]);
++      }
++      for(const u of reihe){
++        const kg=lastFuer(u,v);
+         // Risiko-Massstab statt nacktem Tagesmax: s. HEBEN_WAGNIS_ANSAGE_FLEX oben. Nur
+         // fuer die Erfolgschance gedehnt — Tagesmax/Sinclair-Anzeige bleiben unangetastet.
+         const risikoMax=Math.max(1,max(u)*(1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));

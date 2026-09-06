@@ -6,6 +6,7 @@ import type {
   SeasonDisciplineScheduleEntry,
   SeasonDisciplineScheduleSlot,
 } from "@/lib/data/olyDataTypes";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 
 const SCHEDULE_SOURCE_NOTE =
   "Legacy-Fallback fuer alte Saves ohne vollstaendigen Season-Schedule.";
@@ -15,7 +16,31 @@ type ScheduledDiscipline = {
   playerCount: number;
 };
 
-function toScheduleSlot(discipline: Discipline | null, playerCountOverride?: number | null): SeasonDisciplineScheduleSlot | null {
+/**
+ * WIE OFT kommt jede Disziplin in EINER Saison dieses Saves vor — Battle Mode 20 Spieltage
+ * (docs/design/battle-mode-20-spieltage-recherche-06-09.md, Chris 06.09.: „jede kommt 2x dran").
+ *
+ * W1 (diese PR) baut nur die repeat-bewusste Struktur (diese Funktion, `getRequiredSeason-
+ * DisciplineMatchdayCount`, `hasCompleteSeasonDisciplineSchedule`, `buildNormalizedMatchdayIds`,
+ * `buildSeasonSeededDisciplineSchedule`) und beweist sie per Test — sie wird bewusst NOCH NICHT
+ * aus `getSeasonDisciplineSchedule`/`buildResolvedSeasonDisciplineSchedule` heraus aufgerufen.
+ * Jeder Erzeuger der Saisonlaenge (E1 `dataAdapter.ts`, E2 `new-game-setup-service.ts`, E3
+ * `preseason-workflow-service.ts`) haelt weiterhin 10 `matchdayIds` fuer JEDEN Save, Battle
+ * Mode eingeschlossen — das Umschalten dieser Erzeuger ist W2 und braucht zuerst die aktive
+ * Erholung (Fatigue-PR3, s. `docs/design/fatigue-saisonlaenge-plan.md` Teil C). Bis dahin gibt
+ * kein Aufrufer im Produktionscode `repeat: 2` weiter, und jede Ausgabe bleibt bit-identisch zum
+ * Stand vor dieser PR — analog zu `isLeagueSplitActive()` in PR 1 des Liga-Splits (Schalter da,
+ * Erzeuger folgt spaeter).
+ */
+export function getSeasonDisciplineRepeatCount(gameState: Pick<GameState, "scenarioMeta">): 1 | 2 {
+  return isBattleModeSave(gameState) ? 2 : 1;
+}
+
+function toScheduleSlot(
+  discipline: Discipline | null,
+  playerCountOverride?: number | null,
+  occurrenceInSeason?: 1 | 2,
+): SeasonDisciplineScheduleSlot | null {
   if (!discipline) {
     return null;
   }
@@ -26,6 +51,7 @@ function toScheduleSlot(discipline: Discipline | null, playerCountOverride?: num
     order: discipline.displayOrder ?? discipline.originalOrder ?? null,
     playerCount: playerCountOverride ?? discipline.playerCount ?? null,
     category: discipline.category,
+    ...(occurrenceInSeason != null ? { occurrenceInSeason } : {}),
   };
 }
 
@@ -106,14 +132,96 @@ function buildSeasonPlayerCountByDiscipline(disciplines: Discipline[], seed: str
   return countByDisciplineId;
 }
 
+/**
+ * Seeded Derangement (fixpunktfreie Permutation) einer Indexmenge 0..size-1 — `sigma(i) != i`
+ * fuer alle i. Fisher-Yates ziehen, bei Fixpunkt verwerfen und weiterziehen (44 von 120
+ * Permutationen bei size=5 sind Derangements, erwartete Zuege < 3), gedeckelt auf 32 Versuche mit
+ * Rueckfall „Rotation um eine Position" (fuer size > 1 IMMER fixpunktfrei, terminiert also
+ * garantiert). Recherche Abschnitt 3b.
+ */
+function buildSeededDerangement(size: number, seed: string): number[] {
+  const identity = Array.from({ length: size }, (_, index) => index);
+  if (size <= 1) {
+    return identity;
+  }
+
+  const random = createSeededRandom(seed);
+  const MAX_ATTEMPTS = 32;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const permutation = [...identity];
+    for (let index = permutation.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(random() * (index + 1));
+      [permutation[index], permutation[swapIndex]] = [permutation[swapIndex], permutation[index]];
+    }
+    if (permutation.every((value, index) => value !== index)) {
+      return permutation;
+    }
+  }
+
+  return identity.map((_, index) => (index + 1) % size);
+}
+
+/**
+ * Kadergroesse des ZWEITEN Saison-Vorkommens je Disziplin — Derangement der Zuteilung des ersten
+ * Vorkommens (`baseCountByDisciplineId`), je Kategorie: Disziplin i bekommt die Groesse von
+ * Disziplin sigma(i) mit sigma(i) != i, also nie wieder ihre eigene Erstgroesse. Haelt damit
+ * `[2,3,4,5,6]` je Kategorie auch in Haelfte 2 exakt. Ersatzzweig fuer Kategorien != 5
+ * Disziplinen (heute nicht produktiv): gleichverteilt aus `{2..6} \ {erste Groesse}`.
+ */
+function buildDerangedPlayerCountByDiscipline(
+  disciplines: Discipline[],
+  baseCountByDisciplineId: Map<string, number>,
+  seed: string,
+): Map<string, number> {
+  const countByDisciplineId = new Map<string, number>();
+  const groupedByCategory = new Map<DisciplineCategory, Discipline[]>();
+
+  for (const discipline of disciplines) {
+    const group = groupedByCategory.get(discipline.category) ?? [];
+    group.push(discipline);
+    groupedByCategory.set(discipline.category, group);
+  }
+
+  for (const [category, categoryDisciplines] of groupedByCategory) {
+    const ordered = sortDisciplinesForSeasonSchedule(categoryDisciplines);
+    const baseCounts = ordered.map((discipline) => baseCountByDisciplineId.get(discipline.id) ?? null);
+
+    if (ordered.length === 5 && baseCounts.every((count): count is number => count != null)) {
+      const derangement = buildSeededDerangement(ordered.length, `${seed}:derangement:${category}`);
+      ordered.forEach((discipline, index) => {
+        countByDisciplineId.set(discipline.id, baseCounts[derangement[index]] as number);
+      });
+      continue;
+    }
+
+    ordered.forEach((discipline) => {
+      const base = baseCountByDisciplineId.get(discipline.id) ?? null;
+      const pool = ([2, 3, 4, 5, 6] as const).filter((value) => value !== base);
+      const random = createSeededRandom(`${seed}:derangement-fallback:${discipline.id}`);
+      const picked = pool[Math.floor(random() * pool.length)] ?? buildSeasonPlayerCount(discipline, seed);
+      countByDisciplineId.set(discipline.id, picked);
+    });
+  }
+
+  return countByDisciplineId;
+}
+
 function buildSeededDisciplinePairs(input: {
   disciplines: Discipline[];
   seed: string;
   requiredMatchdays: number;
   maxCombinedPlayerCount: number;
+  /**
+   * Additiv, optional: fertige Kadergroessen-Zuteilung, die statt der internen
+   * `buildSeasonPlayerCountByDiscipline`-Ziehung verwendet wird — der Weg, ueber den Haelfte 2
+   * eines Battle-Mode-Repeat-Spielplans ihre Derangement-Groessen einbringt, ohne diese Funktion
+   * sonst zu veraendern. Ohne dieses Feld (jeder heutige Aufrufer) exakt das alte Verhalten.
+   */
+  playerCountByDisciplineId?: Map<string, number>;
 }): { pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]>; warnings: string[] } {
   const shuffled = shuffleSeeded(sortDisciplinesForSeasonSchedule(input.disciplines), input.seed);
-  const playerCountByDisciplineId = buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
+  const playerCountByDisciplineId =
+    input.playerCountByDisciplineId ?? buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
   const available = shuffled.map((discipline) => ({
     discipline,
     playerCount: playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed),
@@ -166,8 +274,14 @@ export function sortDisciplinesForSeasonSchedule(disciplines: Discipline[]) {
   });
 }
 
-export function getRequiredSeasonDisciplineMatchdayCount(disciplines: Discipline[]) {
-  return Math.max(1, Math.ceil(sortDisciplinesForSeasonSchedule(disciplines).length / 2));
+/**
+ * Benoetigte Spieltage fuer den Spielplan — `repeat` ist, wie oft jede Disziplin in der Saison
+ * vorkommen soll (1 = heutiges Verhalten/Manager Mode, 2 = Battle Mode 20 Spieltage, W1/W2). Ohne
+ * zweites Argument bit-identisch zum Stand vor dieser PR.
+ */
+export function getRequiredSeasonDisciplineMatchdayCount(disciplines: Discipline[], repeat = 1) {
+  const disciplineCount = sortDisciplinesForSeasonSchedule(disciplines).length;
+  return Math.max(1, Math.ceil((disciplineCount * Math.max(1, repeat)) / 2));
 }
 
 function sortScheduleEntries(entries: SeasonDisciplineScheduleEntry[]) {
@@ -179,8 +293,13 @@ function sortScheduleEntries(entries: SeasonDisciplineScheduleEntry[]) {
   });
 }
 
-function buildNormalizedMatchdayIds(input: { seasonId: string; disciplines: Discipline[]; matchdayIds?: string[] | null }) {
-  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines);
+function buildNormalizedMatchdayIds(input: {
+  seasonId: string;
+  disciplines: Discipline[];
+  matchdayIds?: string[] | null;
+  repeat?: number;
+}) {
+  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines, input.repeat ?? 1);
   if (input.matchdayIds && input.matchdayIds.length >= requiredMatchdays) {
     return input.matchdayIds.slice(0, requiredMatchdays);
   }
@@ -194,8 +313,9 @@ export function hasCompleteSeasonDisciplineSchedule(input: {
   disciplines: Discipline[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[] | null;
   seasonId?: string | null;
+  repeat?: number;
 }) {
-  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines);
+  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines, input.repeat ?? 1);
   const schedule = (input.disciplineSchedule ?? []).filter((entry) => !input.seasonId || entry.seasonId === input.seasonId);
   if (schedule.length < requiredMatchdays) {
     return false;
@@ -250,10 +370,23 @@ export function buildSeasonSeededDisciplineSchedule(input: {
   matchdayCount?: number;
   matchdayIds?: string[];
   maxCombinedPlayerCount?: number;
+  /**
+   * Wie oft jede Disziplin in dieser Saison vorkommen soll — 1 (Default, heutiges Verhalten) oder
+   * 2 (Battle Mode 20 Spieltage, W1/W2). Ohne dieses Feld exakt der Stand vor dieser PR: EIN
+   * Aufruf von `buildSeededDisciplinePairs`, keine `occurrenceInSeason`-Markierung. Bei `repeat:
+   * 2` zwei Halbserien (`buildSeededDisciplinePairs` zweimal, Sub-Seeds `:half-1`/`:half-2`),
+   * Haelfte 2 mit einer Derangement-Kadergroesse je Kategorie (Recherche Abschnitt 3a/3b). KEIN
+   * Produktions-Aufrufer setzt dieses Feld heute — siehe `getSeasonDisciplineRepeatCount`.
+   */
+  repeat?: number;
 }): { entries: SeasonDisciplineScheduleEntry[]; matchdayIds: string[]; scheduleSeed: string; warnings: string[] } {
   const scheduleVersion = input.scheduleVersion ?? "season-setup-v3-balanced-slot-buckets";
   const scheduleSeed = `${input.saveId}:${input.seasonId}:${scheduleVersion}`;
-  const requiredMatchdays = Math.max(1, input.matchdayCount ?? getRequiredSeasonDisciplineMatchdayCount(input.disciplines));
+  const repeat = Math.max(1, Math.round(input.repeat ?? 1));
+  const requiredMatchdays = Math.max(
+    1,
+    input.matchdayCount ?? getRequiredSeasonDisciplineMatchdayCount(input.disciplines, repeat),
+  );
   const matchdayIds =
     input.matchdayIds && input.matchdayIds.length >= requiredMatchdays
       ? input.matchdayIds.slice(0, requiredMatchdays)
@@ -276,27 +409,76 @@ export function buildSeasonSeededDisciplineSchedule(input: {
    * Der Parameter bleibt, damit Tests und Sonderlaeufe weiterhin eng fuehren koennen.
    */
   const maxCombinedPlayerCount = input.maxCombinedPlayerCount ?? Number.POSITIVE_INFINITY;
-  const paired = buildSeededDisciplinePairs({
-    disciplines: input.disciplines,
-    seed: scheduleSeed,
-    requiredMatchdays,
-    maxCombinedPlayerCount,
-  });
+
+  let pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]>;
+  let pairWarnings: string[];
+  let occurrenceInSeasonByPairIndex: Array<1 | 2 | undefined>;
+
+  if (repeat <= 1) {
+    // Exakt der Pfad von vor dieser PR: EIN Aufruf, keine Halbserien, keine
+    // `occurrenceInSeason`-Markierung — Manager Mode und jeder Alt-Save.
+    const paired = buildSeededDisciplinePairs({
+      disciplines: input.disciplines,
+      seed: scheduleSeed,
+      requiredMatchdays,
+      maxCombinedPlayerCount,
+    });
+    pairs = paired.pairs;
+    pairWarnings = paired.warnings;
+    occurrenceInSeasonByPairIndex = pairs.map(() => undefined);
+  } else {
+    // Battle Mode, repeat=2: zwei Halbserien. Haelfte 1 nutzt exakt die heutige
+    // kategorie-balancierte Permutation (nur mit dem Sub-Seed `:half-1`); Haelfte 2 zieht je
+    // Kategorie ein Derangement von Haelfte 1s Zuteilung, damit KEINE Disziplin ihre Erstgroesse
+    // wiederholt (Recherche Abschnitt 3b). Kein Mindestabstand an der Nahtstelle Spieltag
+    // 10/11 (Chris 30.08., ausdruecklich bestaetigt).
+    const halfOneMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines, 1);
+    const halfTwoMatchdays = Math.max(0, requiredMatchdays - halfOneMatchdays);
+    const halfOneSeed = `${scheduleSeed}:half-1`;
+    const halfTwoSeed = `${scheduleSeed}:half-2`;
+
+    const halfOnePlayerCounts = buildSeasonPlayerCountByDiscipline(input.disciplines, halfOneSeed);
+    const halfTwoPlayerCounts = buildDerangedPlayerCountByDiscipline(input.disciplines, halfOnePlayerCounts, halfTwoSeed);
+
+    const halfOnePaired = buildSeededDisciplinePairs({
+      disciplines: input.disciplines,
+      seed: halfOneSeed,
+      requiredMatchdays: halfOneMatchdays,
+      maxCombinedPlayerCount,
+      playerCountByDisciplineId: halfOnePlayerCounts,
+    });
+    const halfTwoPaired = buildSeededDisciplinePairs({
+      disciplines: input.disciplines,
+      seed: halfTwoSeed,
+      requiredMatchdays: halfTwoMatchdays,
+      maxCombinedPlayerCount,
+      playerCountByDisciplineId: halfTwoPlayerCounts,
+    });
+
+    pairs = [...halfOnePaired.pairs, ...halfTwoPaired.pairs];
+    pairWarnings = [...halfOnePaired.warnings, ...halfTwoPaired.warnings];
+    occurrenceInSeasonByPairIndex = [
+      ...halfOnePaired.pairs.map(() => 1 as const),
+      ...halfTwoPaired.pairs.map(() => 2 as const),
+    ];
+  }
+
   const warnings = [
-    ...(input.disciplines.length < requiredMatchdays * 2 ? ["season_schedule_discipline_pool_smaller_than_slots"] : []),
-    ...paired.warnings,
+    ...(input.disciplines.length * repeat < requiredMatchdays * 2 ? ["season_schedule_discipline_pool_smaller_than_slots"] : []),
+    ...Array.from(new Set(pairWarnings)),
   ];
 
   const entries = matchdayIds.map((matchdayId, index) => {
-    const [discipline1, discipline2] = paired.pairs[index] ?? [null, null];
+    const [discipline1, discipline2] = pairs[index] ?? [null, null];
+    const occurrenceInSeason = occurrenceInSeasonByPairIndex[index];
 
     return {
       seasonId: input.seasonId,
       matchdayId,
       matchdayIndex: index + 1,
       matchdayLabel: `Spieltag ${index + 1}`,
-      discipline1: toScheduleSlot(discipline1?.discipline ?? null, discipline1?.playerCount ?? null),
-      discipline2: toScheduleSlot(discipline2?.discipline ?? null, discipline2?.playerCount ?? null),
+      discipline1: toScheduleSlot(discipline1?.discipline ?? null, discipline1?.playerCount ?? null, occurrenceInSeason),
+      discipline2: toScheduleSlot(discipline2?.discipline ?? null, discipline2?.playerCount ?? null, occurrenceInSeason),
       sourceStatus: "season_seed",
       sourceNote: `Season-spezifischer Schedule-Seed: ${scheduleSeed}`,
     } satisfies SeasonDisciplineScheduleEntry;
@@ -373,17 +555,41 @@ export function getSeasonDisciplineSchedule(gameState: GameState, options?: { sa
   return buildResolvedSeasonDisciplineSchedule(gameState, saveId);
 }
 
+/**
+ * EINE Kadergroesse je Disziplin fuer DIESE Saison — fuer Manager-Saves und jeden Alt-Save
+ * (repeat=1, also heute jeder Save) gibt es davon nur eines, dieselbe Ausgabe wie vor dieser PR.
+ *
+ * Kommt eine Disziplin zweimal vor (Battle Mode 20 Spieltage, repeat=2 — W1 baut die Struktur,
+ * kein Produktions-Aufrufer erzeugt das heute noch, s. `getSeasonDisciplineRepeatCount`), gewann
+ * bisher stillschweigend das LETZTE Vorkommen (`Map.set` ueberschreibt, Recherche Abschnitt 1.8).
+ * Ab jetzt gewinnt das naechste NOCH OFFENE Vorkommen (erster Spieltag-Index >=
+ * `season.currentMatchday`) — das ist, was Kaderprofil und Transfermarkt-Bedarf tatsaechlich
+ * fragen: „was brauche ich als naechstes". Sind alle Vorkommen bereits gespielt, faellt das auf
+ * das letzte zurueck (heutiges Verhalten als Ende-der-Saison-Fallback). Fuer Ansichten, die BEIDE
+ * Vorkommen zeigen wollen, siehe `getSeasonDisciplinePlayerCounts`.
+ */
 export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {
   const playerCountByDisciplineId = new Map<string, number | null>();
+  const currentMatchday = gameState.season.currentMatchday ?? 1;
 
+  const occurrencesByDisciplineId = new Map<string, Array<{ matchdayIndex: number; playerCount: number | null }>>();
   for (const entry of getSeasonDisciplineSchedule(gameState)) {
     const slots = [entry.discipline1, entry.discipline2];
     for (const slot of slots) {
       if (!slot?.disciplineId) {
         continue;
       }
-      playerCountByDisciplineId.set(slot.disciplineId, slot.playerCount ?? null);
+      const occurrences = occurrencesByDisciplineId.get(slot.disciplineId) ?? [];
+      occurrences.push({ matchdayIndex: entry.matchdayIndex, playerCount: slot.playerCount ?? null });
+      occurrencesByDisciplineId.set(slot.disciplineId, occurrences);
     }
+  }
+
+  for (const [disciplineId, occurrences] of occurrencesByDisciplineId) {
+    const sorted = [...occurrences].sort((left, right) => left.matchdayIndex - right.matchdayIndex);
+    const nextOpenOccurrence = sorted.find((occurrence) => occurrence.matchdayIndex >= currentMatchday);
+    const chosenOccurrence = nextOpenOccurrence ?? sorted[sorted.length - 1] ?? null;
+    playerCountByDisciplineId.set(disciplineId, chosenOccurrence?.playerCount ?? null);
   }
 
   for (const discipline of gameState.disciplines) {
@@ -393,6 +599,44 @@ export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {
   }
 
   return playerCountByDisciplineId;
+}
+
+export type SeasonDisciplinePlayerCountOccurrence = {
+  matchdayId: string;
+  matchdayIndex: number;
+  playerCount: number | null;
+  occurrenceInSeason: 1 | 2 | null;
+};
+
+/**
+ * ALLE Saison-Vorkommen einer Disziplin mit ihrer jeweiligen Kadergroesse — fuer Ansichten, die
+ * bei Battle-Mode-Repeat (repeat=2) beide Vorkommen zeigen wollen (z. B. „Hinrunde 4 · Rueckrunde
+ * 6"). Fuer repeat=1/jeden heutigen Save liefert das genau ein Element, identisch zu dem, was
+ * `buildSeasonDisciplinePlayerCountMap` fuer dieselbe Disziplin traegt. Der Umbau der neun
+ * Konsumenten aus Recherche-Abschnitt 1.8 auf diese Funktion ist W4, nicht Teil dieser PR — hier
+ * entsteht nur die Datenfunktion.
+ */
+export function getSeasonDisciplinePlayerCounts(
+  gameState: GameState,
+  disciplineId: string,
+): SeasonDisciplinePlayerCountOccurrence[] {
+  const occurrences: SeasonDisciplinePlayerCountOccurrence[] = [];
+
+  for (const entry of getSeasonDisciplineSchedule(gameState)) {
+    for (const slot of [entry.discipline1, entry.discipline2]) {
+      if (slot?.disciplineId !== disciplineId) {
+        continue;
+      }
+      occurrences.push({
+        matchdayId: entry.matchdayId,
+        matchdayIndex: entry.matchdayIndex,
+        playerCount: slot.playerCount ?? null,
+        occurrenceInSeason: slot.occurrenceInSeason ?? null,
+      });
+    }
+  }
+
+  return occurrences.sort((left, right) => left.matchdayIndex - right.matchdayIndex);
 }
 
 export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, saveId?: string | null): GameState {
