@@ -11646,10 +11646,16 @@
     ctx.fillStyle="#3b2a1c"; ctx.fillRect(bx-26,by-14,bw+52,bw+30);
     ctx.fillStyle="#5a3f2a"; ctx.fillRect(bx-22,by-10,bw+44,bw+22);
     ctx.fillStyle="#2a1d13"; ctx.fillRect(bx-20,by+bw+16,10,22); ctx.fillRect(bx+bw+10,by+bw+16,10,22);
-    // Glow-Ring HINTER dem Koenig der siegreichen Farbe, wie ein Scheinwerfer auf dem Feld,
-    // das gerade "gewonnen" hat — MUSS vor zeichneSchachBrett gemalt werden, sonst deckt das
-    // Brett (opake Feld-Rechtecke) den Glow gleich wieder zu; die Figur landet danach normal
-    // obendrauf, weil zeichneSchachBrett sie zuletzt zeichnet.
+    zeichneSchachBrett(bx,by,q,B,letzter,true);
+    // Fuer den Loese-Klick merken (s. verdrahteSchachPin): nur die Brettflaeche selbst,
+    // nicht die Tischplatte — daneben liegen Bewertungsbalken und Zugliste.
+    schachFokusRect={x0:bx,y0:by,x1:bx+bw,y1:by+bw};
+    // Glow-Ring UEBER dem Koenig der siegreichen Farbe, wie ein Scheinwerfer auf dem Feld,
+    // das gerade "gewonnen" hat — MUSS NACH zeichneSchachBrett gemalt werden (Opus-Review-Fund
+    // auf PR #838: vorher malte dieser Block VOR dem Brett, dessen opake Feld-Rechtecke den
+    // Glow sofort wieder zudeckten — die Figur landete "normal obendrauf", aber der Glow selbst
+    // war unsichtbar). "lighter" statt normalem alpha-Blend, damit die Koenigsfigur selbst unter
+    // dem additiv aufgehellten Glow erkennbar bleibt statt zugedeckt zu werden.
     if(alleFertig&&siegSeite!=null){
       const kf=schachKoenigsfeld(B,siegSeite===0?"w":"b");
       if(kf){
@@ -11657,15 +11663,11 @@
         const cx=bx+kf.x*q+q/2, cy=by+kf.y*q+q/2;
         const grad=ctx.createRadialGradient(cx,cy,q*0.12,cx,cy,q*0.9);
         grad.addColorStop(0,siegGlueh); grad.addColorStop(1,"rgba(0,0,0,0)");
-        ctx.globalAlpha=0.75; ctx.fillStyle=grad;
+        ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=0.75; ctx.fillStyle=grad;
         ctx.beginPath(); ctx.arc(cx,cy,q*0.9,0,6.283); ctx.fill();
         ctx.restore();
       }
     }
-    zeichneSchachBrett(bx,by,q,B,letzter,true);
-    // Fuer den Loese-Klick merken (s. verdrahteSchachPin): nur die Brettflaeche selbst,
-    // nicht die Tischplatte — daneben liegen Bewertungsbalken und Zugliste.
-    schachFokusRect={x0:bx,y0:by,x1:bx+bw,y1:by+bw};
 
     if(alleFertig){
       // Goldener/Team-farbener Gluehrahmen ums ganze Brett -- auf den ersten Blick sichtbar,
