@@ -106,6 +106,18 @@
           </div>
           <button class="btn" id="ezu">Schließen</button>
         </div>
+        <!-- VIERTELPAUSE (nur Basketball, Chris' Fund 06.09.: "da fehlt der Pausenbuzzer" —
+             die Pause selbst lief schon lautlos im Hintergrund ab, aber ohne sichtbaren
+             Break und ohne Ton wirkte sie nicht wie eine Pause. Liegt ueber der Leinwand
+             wie Einlauf/Endstand, verschwindet automatisch nach einer eigenen, rein
+             kosmetischen Echtzeit-Uhr (vpSichtbarBis, s. starteViertelpause/
+             updateHudFeldspiel) — bewusst NICHT an die (kuerzere) Simulationspause
+             fsLive.viertelpause.dauer gekoppelt, s. dortige Kommentare. -->
+        <div class="viertelpause" id="viertelpause" hidden>
+          <b id="vpTitel">Pause</b>
+          <span id="vpUntertitel">Ende 1. Viertel — Stand 0:0</span>
+          <em id="vpCountdown">3</em>
+        </div>
       </div>
       <!-- KADERLEISTE. Auf einen Blick: wer steht noch, wer ist raus. Beide Seiten,
            getrennt durch den Stand, mit Lebensbalken und durchgestrichenem Namen. -->
