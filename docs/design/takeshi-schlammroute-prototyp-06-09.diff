@@ -1,0 +1,269 @@
+diff --git a/public/mockups/battle-mode.engine.js b/public/mockups/battle-mode.engine.js
+index e2f7f8d6..89591cc1 100644
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -14218,7 +14218,10 @@
+     // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
+     "falle_tuer","falle_strickleiter","falle_spitzen","falle_walze","falle_fass",
+     "burg_mauer","burg_turm","burg_tor","deko_rad","boden_eis","deko_banner",
+-    "deko_pranger","deko_stock","deko_holz"];
++    "deko_pranger","deko_stock","deko_holz",
++    // Takeshi-Route (Prototyp): Untergruende der fuenf Zonen + Umgebungen (Terrain-Blatt)
++    "boden_wiese","boden_wald","boden_pfad","boden_kies","boden_schlamm","boden_see",
++    "boden_sumpf","boden_hang","boden_pflaster"];
+   const aBild={}, aMuster={};
+   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
+   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+@@ -14429,7 +14432,115 @@
+   // Spurt: Rasen, Bahnen, Huerden, Baumreihe. Bahnen und Huerden kommen aus DENSELBEN
+   // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
+   // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
++  // ============ TAKESHI'S CASTLE: DIE SCHLAMMROUTE (Prototyp) ============
++  // Kein Bahn-Rechteck, keine Spuren. Waldboden, Tuempel, EINE gewundene Schlammroute,
++  // die zehn Fallen-Bilder aus PR #810 an ihren Wegpunkten, die Burg am Routenende.
++  // Alles unter der Weltkamera (translate/scale), damit die Burg beim Heranzoomen
++  // wirklich "naeher kommt". Nur das HUD (Burgpunkte, Kurs) liegt im Bildschirmraum.
++  function bodenTakeshiRoute(){
++    const R=routeTabelle(), z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
++    ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
++    const Z=BA().zonen||[{bis:1,boden:"schlamm",um:"wald"}];
++    const zoneBei=(s)=>Z.find(q=>s<=q.bis)||Z[Z.length-1];
++    const zoneVon=(q)=>{const i=Z.indexOf(q); return i?Z[i-1].bis:0;};
++    const teilPfad=(s0,s1)=>{ ctx.beginPath(); const n=Math.max(2,Math.ceil((s1-s0)*160)); for(let k=0;k<=n;k++){const r=routeXY(s0+(s1-s0)*k/n); k?ctx.lineTo(r.x,r.y):ctx.moveTo(r.x,r.y);} };
++    const M=(n,f)=>aMust(n)||f;
++    const huelle=(um,rand)=>{ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,da=false; for(const q of Z){ if(q.um!==um)continue; const a=zoneVon(q); for(let k=0;k<=24;k++){const p=routeXY(a+(q.bis-a)*k/24); da=true; x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);} }
++      return da?{cx:(x0+x1)/2,cy:(y0+y1)/2,rx:(x1-x0)/2+rand,ry:(y1-y0)/2+rand}:null; };
++    const ell=(h,fill,dx,dy,f)=>{ if(!h)return; ctx.fillStyle=fill; ctx.beginPath(); ctx.ellipse(h.cx+(dx||0),h.cy+(dy||0),h.rx*(f||1),h.ry*(f||1),0,0,6.283); ctx.fill(); };
++    const inEll=(h,x,y,f)=>h&&Math.hypot((x-h.cx)/(h.rx*(f||1)),(y-h.cy)/(h.ry*(f||1)))<1;
++    // 1. Grundflaeche: Wiese. Midoriyama heisst "Gruener Berg" — offenes, huegeliges Gelaende.
++    ctx.fillStyle=M("boden_wiese","#2f6b2a"); ctx.fillRect(-W,-H,3*W,3*H);
++    // 2. Umgebungen je Zone als weiche Flaechen um den Routenabschnitt.
++    //    Wald um die Holzbauten und am oberen Rand; trockener Hang unter dem Anstieg zur
++    //    Burg; der See mit Schlammufer; Pflaster im Burghof.
++    const hWald=huelle("waelle",90); ell(hWald,M("boden_wald","#1f3a2a"),0,-24,1.2);
++    ctx.fillStyle=M("boden_wald","#1f3a2a"); ctx.beginPath(); ctx.ellipse(W*0.28,-H*0.02,W*0.5,H*0.32,0,0,6.283); ctx.fill();
++    ctx.beginPath(); ctx.ellipse(W*0.15,H*1.02,W*0.30,H*0.22,0,0,6.283); ctx.fill();
++    const hHang=huelle("huegel",80); ell(hHang,M("boden_hang","#7a5a2a"),24,-10,1.12);
++    const e=routeXY(1), hHof={cx:e.x,cy:e.y+44,rx:320,ry:125}; ell(hHof,M("boden_pflaster","#a08050"));
++    const hSee=huelle("see",56);
++    if(hSee){ hSee.cy+=14; hSee.ry=Math.min(hSee.ry,hSee.cy-(e.y+18));   // nie bis unter die Burgmauer ell(hSee,M("boden_schlamm","#5a3b22"),0,0,1.14); ell(hSee,M("boden_see","#2d6d8a"));
++      ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1; for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath(); ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();} }
++    for(const [fx,fy,rx,ry] of (BA().tuempel||[])){ const x=fx*W,y=fy*H; ctx.fillStyle="#3a2816"; ctx.beginPath(); ctx.ellipse(x,y,rx+7,ry+6,0,0,6.283); ctx.fill(); ctx.fillStyle=M("boden_sumpf","#3d6b78"); ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,6.283); ctx.fill(); }
++    // 3. Die Route, Abschnitt fuer Abschnitt mit dem Untergrund ihrer Zone.
++    ctx.lineJoin="round"; ctx.lineCap="round";
++    teilPfad(0,1); ctx.strokeStyle="#241a0f"; ctx.lineWidth=breite+8; ctx.stroke();
++    for(const q of Z){ const a=Math.max(0,zoneVon(q)-0.012), b=Math.min(1,q.bis+0.012);
++      if(q.boden==="planken"){ // der Steg ueber den See: Holz, Querbretter, Pfosten
++        teilPfad(a,b); ctx.strokeStyle="#7d5c34"; ctx.lineWidth=breite-8; ctx.stroke();
++        ctx.strokeStyle="rgba(40,24,10,.55)"; ctx.lineWidth=2; const n=Math.ceil((b-a)*R.len/9);
++        for(let k=0;k<=n;k++){const r=routeXY(a+(b-a)*k/n); ctx.beginPath(); ctx.moveTo(r.x-r.nx*(breite/2-5),r.y-r.ny*(breite/2-5)); ctx.lineTo(r.x+r.nx*(breite/2-5),r.y+r.ny*(breite/2-5)); ctx.stroke();}
++        ctx.fillStyle="#3e2a14"; const m=Math.ceil((b-a)*R.len/44);
++        for(let k=0;k<=m;k++){const r=routeXY(a+(b-a)*k/m); for(const sg of [-1,1])ctx.fillRect(Math.round(r.x+sg*r.nx*(breite/2-3))-2,Math.round(r.y+sg*r.ny*(breite/2-3))-9,4,11);} }
++      else { const bild={pfad:"boden_pfad",kies:"boden_kies",schlamm:"boden_schlamm",pflaster:"boden_pflaster"}[q.boden]||"boden_pfad";
++        teilPfad(a,b); ctx.strokeStyle=M(bild,"#8a6a3a"); ctx.lineWidth=breite; ctx.stroke(); } }
++    // Schlamm an Ein- und Ausstieg des Sees; Pfuetzen auf Pfad und Kies (nicht auf Steg/Pflaster)
++    for(const q of Z){ if(q.um!=="see")continue; for(const s of [zoneVon(q),q.bis]){ teilPfad(Math.max(0,s-0.035),Math.min(1,s+0.03)); ctx.strokeStyle=M("boden_schlamm","#5a3b22"); ctx.lineWidth=breite+2; ctx.stroke(); } }
++    for(let i=0;i<40;i++){ const s=bodenSaat(i+500), q=zoneBei(s); if(q.boden==="planken"||q.boden==="pflaster")continue; const r=routeXY(s), qq=(bodenSaat(i+540)-0.5)*(breite-18);
++      ctx.fillStyle="rgba(90,130,170,"+(0.16+bodenSaat(i+560)*0.22)+")"; ctx.beginPath(); ctx.ellipse(r.x+r.nx*qq,r.y+r.ny*qq,4+bodenSaat(i+580)*7,2+bodenSaat(i+620)*3,0,0,6.283); ctx.fill(); }
++    // 4. Holzbauten: Palisadenzaun beiderseits der Waelle-Zone; Felsbrocken am Hang.
++    if(aDa("zaun_holz")){ const zn=aBild.zaun_holz; for(const q of Z){ if(q.um!=="waelle")continue; const a=zoneVon(q), n=Math.ceil((q.bis-a)*R.len/30);
++      for(let k=0;k<=n;k++){const r=routeXY(a+(q.bis-a)*k/n); for(const sg of [-1,1])ctx.drawImage(zn,Math.round(r.x+sg*r.nx*(breite/2+12)-16),Math.round(r.y+sg*r.ny*(breite/2+12)-26));} } }
++    { const st=aMust("boden_stein"); for(const q of Z){ if(q.um!=="huegel")continue; const a=zoneVon(q); for(let i=0;i<16;i++){ const r=routeXY(a+bodenSaat(i+1000)*(q.bis-a)); const sg=bodenSaat(i+1050)>0.5?1:-1, d=breite/2+14+bodenSaat(i+1100)*46; const x=r.x+r.nx*sg*d, y=r.y+r.ny*sg*d, rr=5+bodenSaat(i+1150)*7;
++      if(inEll(hSee,x,y,1.1)||inEll(hHof,x,y))continue;
++      ctx.save(); ctx.beginPath(); ctx.ellipse(x,y,rr,rr*0.7,0,0,6.283); ctx.clip(); ctx.fillStyle=st||"#9a9486"; ctx.fillRect(x-rr,y-rr,2*rr,2*rr); ctx.restore(); ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(x,y,rr,rr*0.7,0,0,6.283); ctx.stroke(); } } }
++    // 5. Baeume: nur auf Wiese/Wald, nie auf Route, See, Hof, Burg — Fuss UND Krone geprueft.
++    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
++    const nahe=(x,y)=>{ let m=1e9; for(let i=0;i<R.pts.length;i+=2){const d=Math.hypot(R.pts[i].x-x,R.pts[i].y-y); if(d<m)m=d;} return m; };
++    const wald_=[]; for(let i=0;i<130;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
++      if(nahe(x,y)<breite*0.5+22||nahe(x,y-30)<breite*0.5+22)continue;
++      if(x>W*0.42&&y<H*0.36)continue;
++      if(inEll(hSee,x,y,1.2)||inEll(hSee,x,y-30,1.2)||inEll(hHof,x,y,1.05)||inEll(hHof,x,y-30,1.05))continue;
++      if((BA().tuempel||[]).some(([fx,fy,rx,ry])=>Math.hypot((x-fx*W)/(rx+12),(y-fy*H)/(ry+12))<1||Math.hypot((x-fx*W)/(rx+12),(y-30-fy*H)/(ry+12))<1))continue;
++      if(inEll(hHang,x,y,1.0)&&bodenSaat(i+800)<0.7)continue;             // am Hang nur wenige
++      wald_.push({x,y,i}); }
++    wald_.sort((a,b)=>a.y-b.y);
++    // 6. Das Tor am Sammelplatz: zwei Palisadenstuecke, Startlinie quer zur Route.
++    { const r=routeXY(0); if(aDa("hind_wand"))for(const sg of [-1,1])ctx.drawImage(aBild.hind_wand,Math.round(r.x+sg*r.nx*(breite/2+10)-16),Math.round(r.y+sg*r.ny*(breite/2+10)-58));
++      ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(r.x-r.nx*breite/2,r.y-r.ny*breite/2); ctx.lineTo(r.x+r.nx*breite/2,r.y+r.ny*breite/2); ctx.stroke(); }
++    // 7. Die Burg am Routenende: Torhaus auf dem Endpunkt, Mauer und Tuerme links/rechts,
++    //    Banner, Ruestkammer-Deko. Alles Welt — es kommt mit der Kamera naeher.
++    const bx=Math.round(e.x), by=Math.round(e.y);
++    if(aDa("burg_mauer")&&aDa("burg_turm")&&aDa("burg_tor")){
++      const mw=aBild.burg_mauer, tw=aBild.burg_turm, tor=aBild.burg_tor, top=by-140;
++      // Burghuegel: hellere, trockene Flaeche hinter der Mauer
++      for(const k of [0,1]){ ctx.drawImage(mw,bx-48-160*(k+1),top+86); ctx.drawImage(mw,bx+48+160*k,top+86); }
++      ctx.drawImage(tw,bx-48-320-30,top-8); ctx.drawImage(tw,bx+48+320-40,top-8);
++      ctx.drawImage(tor,bx-48,top);
++      if(aDa("deko_banner")){const bn=aBild.deko_banner; for(const x of [bx-150,bx+150])ctx.drawImage(bn,0,0,96,80,x-48,top+20,96,80);}
++      for(const [n,dx,dy] of [["deko_pranger",-150,-6],["deko_stock",-96,6],["deko_holz",70,-2],["falle_fass",130,-24]]){ if(aDa(n))ctx.drawImage(aBild[n],bx+dx,by+dy); }
++      // Ziellinie kurz vor dem Tor
++      const zl=routeXY(0.985); ctx.setLineDash([6,6]); ctx.lineWidth=3; ctx.strokeStyle="#fff";
++      ctx.beginPath(); ctx.moveTo(zl.x-zl.nx*breite/2,zl.y-zl.ny*breite/2); ctx.lineTo(zl.x+zl.nx*breite/2,zl.y+zl.ny*breite/2); ctx.stroke(); ctx.setLineDash([]);
++    }
++    // 8. Fallen an den Wegpunkten: DIESELBEN zehn Bilder wie PR #810, nur neu platziert.
++    //    Jede Station bekommt einen Wegpunkt-Pfahl mit Nummer und Sternen — die Karte liest sich
++    //    dann wie ein Kurs, nicht wie eine Bahn.
++    HUERDEN_N().forEach((h,i)=>{ const r=routeXY(h);
++      zeichneFalleTakeshi(i,r.x,r.y+12,i%3);
++      const st=(BA().fallenStufe||{})[HUERDEN_TYP(i)]||1;
++      const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
++      ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);
++      ctx.fillStyle="#e8d8a8"; ctx.beginPath(); ctx.moveTo(px-2,py-18); ctx.lineTo(px+12,py-14); ctx.lineTo(px-2,py-9); ctx.closePath(); ctx.fill();
++      ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a"; ctx.fillText("★".repeat(st),px-2,py-20);
++    });
++    // Baeume zuletzt (ueber Route und Fallen), sortiert nach y wie eine Tiefenreihe.
++    for(const b of wald_){ if(!baeume.length)break; const im=aBild[baeume[b.i%baeume.length]]; ctx.drawImage(im,Math.round(b.x-im.naturalWidth/2),Math.round(b.y-im.naturalHeight)); }
++    ctx.restore();
++    // 9. HUD im Bildschirmraum: Burgpunkte + Kursname auf einem dunklen Band.
++    const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgpunkte(u),0);
++    ctx.fillStyle="rgba(8,10,14,.55)"; ctx.fillRect(W/2-190,6,380,40);
++    ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'Barlow Condensed',sans-serif";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
++    const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,20); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,20);
++    ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
++    ctx.fillText((bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")+"je Falle 1–3 Sterne: sauber = alle, durchgebrochen = halbe, gestürzt = keine",W/2,37);
++    ctx.textBaseline="alphabetic";
++    if(cam.zoom>1.08){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left"; ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10); }
++  }
++
+   function bodenSpurt(){
++    if(BA().route&&aDa("boden_schlamm"))return bodenTakeshiRoute();
+     // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
+     // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
+     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
+@@ -14918,6 +15029,17 @@
+       // zeichneFalleTakeshi frei; `fallenStufe` ist die Schwierigkeit je Sub-Skill fuer
+       // die Burgpunkte (1-3 Sterne, s. burgpunkte() und MOTOREN["takeshis-castle"].wert).
+       takeshi:true,
++      // SCHLAMMROUTE (Prototyp, Chris 06.09.: "fortlaufende Route ... Schlamm ... bis zum
++      // Schloss"): Wegpunkte in Bruchteilen von W/H, Catmull-Rom dazwischen, Bogenlaenge
++      // parametrisiert. Start unten links, zwei Serpentinen, Burg oben rechts.
++      route:[[0.04,0.80],[0.13,0.86],[0.25,0.72],[0.32,0.50],[0.43,0.34],[0.55,0.42],[0.61,0.64],[0.71,0.80],[0.80,0.74],[0.86,0.56],[0.82,0.42],[0.77,0.31]],
++      routeBreite:56,
++      // FUENF ZONEN wie auf dem Midoriyama-Gelaende (Chris 06.09.: "nicht alles Schlamm"):
++      // Sammelplatz/Tor (Wiese, Trampelpfad) -> Holzbauten (Kies, Palisaden) -> der See
++      // (Steg, Schlammufer) -> der Hang (Erdpfad, Felsen, trockenes Gras) -> Burghof (Pflaster).
++      zonen:[{bis:0.12,boden:"pfad",um:"wiese"},{bis:0.36,boden:"kies",um:"waelle"},
++             {bis:0.60,boden:"planken",um:"see"},{bis:0.86,boden:"pfad",um:"huegel"},{bis:1,boden:"pflaster",um:"hof"}],
++      tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
+       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
+       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+       // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
+@@ -15053,12 +15175,68 @@
+   }
+   // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
+   const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
++
++  // ===================== SCHLAMMROUTE (Prototyp) =====================
++  // Die Simulation bleibt eindimensional (u.pos 0..1). Nur die ABBILDUNG aendert sich:
++  // statt x=pos*Breite liegt der Laeufer auf einer Kurve durch die Wegpunkte in
++  // BAHN_ART.route, quer dazu versetzt nach u.bahnZ. Eine Tabelle je (W,H,route).
++  let routeCache=null;
++  function routeTabelle(){
++    const A=BA(); if(!A.route)return null;
++    if(routeCache&&routeCache.W===W&&routeCache.H===H&&routeCache.src===A.route)return routeCache;
++    const P=A.route.map(([fx,fy])=>({x:fx*W,y:fy*H}));
++    const at=(i)=>P[Math.max(0,Math.min(P.length-1,i))];
++    const pts=[];
++    for(let i=0;i<P.length-1;i++){
++      const p0=at(i-1),p1=at(i),p2=at(i+1),p3=at(i+2);
++      for(let k=0;k<24;k++){const t=k/24,t2=t*t,t3=t2*t;
++        pts.push({x:0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
++                  y:0.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)});}
++    }
++    pts.push(P[P.length-1]);
++    const cum=[0]; for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y));
++    routeCache={W,H,src:A.route,pts,cum,len:cum[cum.length-1]}; return routeCache;
++  }
++  // s (Bogenlaenge 0..1) -> Weltpunkt, Tangente (tx,ty), Normale (nx,ny)
++  function routeXY(s){
++    const R=routeTabelle(); const d=Math.max(0,Math.min(1,s))*R.len;
++    let lo=0,hi=R.cum.length-1; while(hi-lo>1){const m=(lo+hi)>>1; if(R.cum[m]<=d)lo=m; else hi=m;}
++    const a=R.pts[lo], b=R.pts[hi], seg=(R.cum[hi]-R.cum[lo])||1, t=(d-R.cum[lo])/seg;
++    let tx=b.x-a.x, ty=b.y-a.y; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l;
++    return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t, tx,ty, nx:-ty, ny:tx};
++  }
++  const istRoute=()=>!!BA().route;
++  let camR={x:W/2,y:H/2};                       // Kameramitte in Weltkoordinaten (nur Route)
++  const weltZuSchirm=(wx,wy)=>({x:(wx-camR.x)*cam.zoom+W/2, y:(wy-camR.y)*cam.zoom+H/2});
++  // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
++  function laeuferXY(u){
++    const platz=rennFertig.indexOf(u);
++    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
++    const r=routeXY(u.pos), breite=BA().routeBreite||56;
++    const q=((u.bahnZ+0.5)/BAHNEN_N()-0.5)*(breite-14);      // quer zur Route, nach Spur
++    const v=platz>=0?(14+platz*8):0;                          // Eingelaufene: hinter dem Tor
++    return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
++  }
+   function kameraUpdate(dt){
+     const aktiv=LAEUFER.filter(u=>u.fertig==null);
+     const quelle=aktiv.length?aktiv:LAEUFER;
+     if(!quelle.length)return;
+     let minP=quelle[0].pos,maxP=quelle[0].pos;
+     for(const u of quelle){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
++    if(istRoute()){
++      const breite=BA().routeBreite||56;
++      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
++      const nimm=(r)=>{x0=Math.min(x0,r.x);y0=Math.min(y0,r.y);x1=Math.max(x1,r.x);y1=Math.max(y1,r.y);};
++      for(const u of quelle)nimm(routeXY(u.pos));
++      nimm(routeXY(Math.min(1,maxP+0.10))); nimm(routeXY(Math.max(0,minP-0.04)));   // naechste Falle schon im Bild
++      const z0=cam.zoom||1, bw=(x1-x0)+breite+90/z0, bh=(y1-y0)+breite+130/z0;   // Namen ueber dem Kopf, Balken darunter
++      const zielZoom=Math.max(1,Math.min(3.4,Math.min(W/bw,H/bh)));
++      const hw=W/2/zielZoom, hh=H/2/zielZoom;
++      const cx=Math.max(hw,Math.min(W-hw,(x0+x1)/2)), cy=Math.max(hh,Math.min(H-hh,(y0+y1)/2));
++      const t=Math.min(1,dt*1.8);
++      cam.zoom+=(zielZoom-cam.zoom)*t; camR.x+=(cx-camR.x)*t; camR.y+=(cy-camR.y)*t;
++      return;
++    }
+     const zielCx=Math.max(0,Math.min(1,(minP+maxP)/2));
+     // 0,10 Polster: das naechste Hindernis soll schon sichtbar sein, bevor es dran ist.
+     const spanne=Math.max(0.05,(maxP-minP)+0.10);
+@@ -15737,13 +15915,17 @@
+   const ANSAGE_FARBE="#b98cff";
+   function zeichneSpurt(){
+     zeichneBoden();
+-    for(const u of LAEUFER){
++    const reihe=istRoute()?[...LAEUFER].sort((a,b)=>laeuferXY(a).y-laeuferXY(b).y):LAEUFER;
++    const sk=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
++    for(const u of reihe){
+       const platz=rennFertig.indexOf(u);
+-      const x=camX(u.pos)+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
++      const {x,y}=laeuferXY(u);
+       ctx.globalAlpha=0.25;ctx.fillStyle="#000";
+-      ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
++      ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
++      ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
+       zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
+         lunge:u.kraft>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
++      ctx.restore();
+       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
+       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
+       if(u.imSchatten&&u.fertig==null){
+@@ -15810,7 +15992,7 @@
+     // auch dann noch zu finden ist, wenn zwei Figuren uebereinanderstehen.
+     const gewaehlt=bahnWahl==null?null:LAEUFER.find(u=>u.id===bahnWahl&&u.fertig==null);
+     if(gewaehlt){
+-      const gx=camX(gewaehlt.pos), gy=bahnY(gewaehlt.bahnZ);
++      const {x:gx,y:gy}=laeuferXY(gewaehlt);
+       ctx.save();
+       ctx.strokeStyle=ANSAGE_FARBE;ctx.lineWidth=2;
+       ctx.beginPath();ctx.ellipse(gx,gy+16,18,7.5,0,0,6.283);ctx.stroke();
+@@ -15844,8 +16026,8 @@
+       let fx=f.x, fy=f.y;
+       if(f._laeufer!=null){
+         const u=LAEUFER.find(x=>x.id===f._laeufer);
+-        if(u){ fx=camX(u.pos)+(f.ansage?20:-20);
+-               fy=bahnY(u.bahnZ)-22-((1-f.life)*14); }
++        if(u){ const p=laeuferXY(u); fx=p.x+(f.ansage?20:-20);
++               fy=p.y-22-((1-f.life)*14); }
+       }
+       ctx.fillText(f.txt,fx,fy);
+       ctx.globalAlpha=1;
+@@ -16837,7 +17019,7 @@
+       let treffer=null,minD=BAHN_GREIF_RADIUS;
+       for(const u of LAEUFER){
+         if(u.seite!==0||u.fertig!=null)continue;
+-        const d=Math.hypot(camX(u.pos)-mx,bahnY(u.bahnZ)-my);
++        const p=laeuferXY(u); const d=Math.hypot(p.x-mx,p.y-my);
+         if(d<minD){ minD=d; treffer=u; }
+       }
+       if(treffer)rennplanWaehlen(treffer.id);

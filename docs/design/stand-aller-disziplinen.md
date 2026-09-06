@@ -1,5 +1,27 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Dritter Nachtrag 06.09. — komplette Neumessung, alle zwanzig Zeilen.** Die beiden Nachtraege
+vom 05.09. hatten je eine Disziplin (Basketball, Spurt) einzeln nachgezogen und den Rest des
+Dokuments unangetastet gelassen. Das war genau die Luecke, vor der `docs/pm-briefings/
+pm-gesamtstand-2026-09-06.md` warnt: **vier Zeilen liefen seither an drei Tagen echter
+Umsetzung vorbei** — Staffel (0,681 → **0,915**), Takeshi's Castle (0,697 → **0,886**), Spurt
+(0,857 → **0,871**, PR #801 „Rezept-Paket B (feste Stationsfolge) + U3-Optik", 05.09., **nach**
+dem Stand, den der Zweite Nachtrag unten noch trug) und Football (0,468 → **0,516**, PR #803
+„eigene Spiel-Eignung im Motor statt Matrixaenderung", 05.09., **nach** dem Stand, den
+`football-review-bugfixes.md` und dieses Dokument zuletzt trugen). Zusaetzlich haben sich, ohne
+dass eine dieser drei etwas an ihrer Mechanik geaendert hat, auch die drei Arena-Zahlen
+messbar bewegt (Battlefield 0,325 → 0,387, TDM 0,113 → 0,253, Mini-DM 0,269 → 0,094) — nach der
+Faustregel dieses Dokuments (Abschnitt 2b) ist das bei einer Kader-Spannweite groesser als der
+eigene Median **Kaderrauschen, kein Befund** (s. PM-Briefing Abschnitt 1a).
+
+Alle zwanzig Zeilen unten sind heute (06.09.) frisch gemessen mit
+`node scripts/miss-alle-disziplinen.mjs 24` (kaderfest, `data/generated/kaderfamilie-live-save.json`)
+und `node scripts/baue-rangtreue-basislinie.mjs 24` — dieselbe Basislinie wurde damit auch
+neu eingecheckt, sodass `scripts/pruefe-rangtreue-schranke.mjs` wieder gegen den echten
+aktuellen Stand prueft, nicht mehr gegen den 04.09.-Stand (s. Abschnitt 2b). Jede Zahl unten
+ersetzt die aelteren Nachtraege vollstaendig — sie sind unten nur noch als Historie stehen
+gelassen, nicht mehr als aktueller Stand zu lesen.
+
 **Nachtrag 05.09.:** Basketballs Zeile (Abschnitt 1) und der Produktions-Abschnitt (Abschnitt 4,
 „Scoring und Produktion") sind auf den Stand nach K3 und der Hockey-Produktivierung
 nachgezogen — der Rest dieses Dokuments (Stand 03.09.) gilt unveraendert weiter, da keine
@@ -46,35 +68,37 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 
 | Disziplin | Chassis | rho je Spiel (Median) | Spannweite | rho Saison (Median) | Spannweite | Abnahme |
 |---|---|---:|---:|---:|---:|---|
+| **Staffel** | **Bahn** | **0,915** | 0,089 | 0,951 | 0,093 | **bestanden** |
 | Speed-Schach | Buehne | 0,889 | 0,060 | 0,979 | 0,021 | bestanden |
-| **Gewichtheben** | **Buehne** | **0,887** | 0,224 | 0,944 | 0,261 | **bestanden** |
+| Gewichtheben | Buehne | 0,887 | 0,224 | 0,944 | 0,261 | bestanden |
+| **Takeshi's Castle** | **Bahn** | **0,886** | 0,073 | 0,951 | 0,126 | **bestanden** |
 | Showcase | Buehne | 0,880 | 0,140 | 0,944 | 0,063 | bestanden |
+| Spurt | Bahn | 0,871 | 0,236 | 0,905 | 0,190 | bestanden |
 | Time-Trial | Bahn | 0,867 | 0,050 | 0,909 | 0,056 | bestanden |
-| **Spurt** | **Bahn** | **0,857** | 0,286 | 0,905 | 0,357 | **bestanden** |
 | Wettessen | Buehne | 0,844 | 0,233 | 0,916 | 0,126 | bestanden |
-| **Fechten** | **Buehne** | **0,840** | 0,230 | 0,874 | 0,252 | **bestanden** |
-| **Tennis** | **Buehne** | **0,814** | 0,176 | 0,839 | 0,294 | **bestanden** |
+| Fechten | Buehne | 0,840 | 0,230 | 0,874 | 0,252 | bestanden |
+| Tennis | Buehne | 0,814 | 0,176 | 0,839 | 0,294 | bestanden |
 | Breaking | Buehne | 0,801 | 0,114 | 0,874 | 0,119 | bestanden |
 | Climbing | Bahn | 0,790 | 0,192 | 0,851 | 0,308 | knapp |
 | Basketball | Feldspiel | 0,772 | 0,088 | 0,923 | 0,231 | knapp |
 | Eiskunstlauf | Buehne | 0,757 | 0,125 | 0,958 | 0,091 | knapp |
-| Takeshi's Castle | Bahn | 0,697 | 0,170 | 0,839 | 0,196 | durchgefallen |
 | I-Spy | Buehne | 0,692 | 0,384 | 0,727 | 0,441 | durchgefallen |
-| Staffel | Bahn | 0,681 | 0,398 | 0,706 | 0,650 | durchgefallen |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,669 | 0,181 | 0,832 | 0,259 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,719 | 0,182 | 0,818 | 0,259 | knapp |
-| Battlefield | Arena | 0,325 | 0,662 | 0,619 | 1,000 | durchgefallen |
-| **Football** | Feldspiel | **0,468** | 0,383 | 0,671 | 0,420 | durchgefallen |
-| Mini-DM | Arena | 0,269 | 0,802 | 0,500 | 1,167 | durchgefallen |
-| TDM | Arena | 0,113 | 0,387 | 0,070 | 0,441 | durchgefallen |
+| **Football** | **Feldspiel** | **0,516** | 0,172 | **0,811** | 0,168 | durchgefallen |
+| Battlefield | Arena | 0,387 | 0,938 | 0,595 | 1,095 | durchgefallen |
+| TDM | Arena | 0,253 | 0,328 | 0,217 | 0,308 | durchgefallen |
+| Mini-DM | Arena | 0,094 | 0,697 | 0,071 | 0,786 | durchgefallen |
 
-**Neun bestehen, drei sind knapp, acht fallen durch** (Stand nach der Spurt-Umsetzung vom 05.09.,
-zuvor acht/drei/neun; die Zwoelferzahlen der zwanzig echten
-Disziplinen; Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst durchgefallen —
-`scripts/miss-alle-disziplinen.mjs`). Die eingerueckte Hockey-Zeile ist kein einundzwanzigster
-Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden Torhueter (s. Abschnitt
-1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die ehrlichere Frage fuer „belohnt Hockeys
-Mechanik das Richtige".
+**Elf bestehen, drei sind knapp, sechs fallen durch** (Stand nach der kompletten Neumessung vom
+06.09., s. Nachtrag oben; zuvor in diesem Dokument neun/drei/acht — der Unterschied ist fast
+vollstaendig Dokumentationsrueckstand, nicht neue Arbeit seit gestern: Staffel und Takeshi's
+Castle waren schon vor dieser Neumessung bestanden, nur hier noch nicht nachgezogen; die
+Zwoelferzahlen der zwanzig echten Disziplinen; Bucketing: bestanden ab 0,80, knapp ab 0,70,
+sonst durchgefallen — `scripts/miss-alle-disziplinen.mjs`). Die eingerueckte Hockey-Zeile ist
+kein einundzwanzigster Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden
+Torhueter (s. Abschnitt 1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die ehrlichere
+Frage fuer „belohnt Hockeys Mechanik das Richtige".
 
 ### 1a. Hockey: zwei Zahlen, nicht eine — und welche Frage jede beantwortet
 
@@ -112,7 +136,7 @@ Nicht jede Bewegung gegenueber der 02.09.-Fassung ist eine echte Aenderung an de
 | Tennis | Feldspiel | 0,505 / 0,853 | **Buehne** | **0,814 / 0,839** | `tennis-fechten-buehne-umsetzung.md` |
 | Fechten | Arena | 0,153 / 0,378 | **Buehne** | **0,840 / 0,874** | `tennis-fechten-buehne-umsetzung.md` |
 | Gewichtheben | Buehne | 0,720 / 0,860 | Buehne | **0,887 / 0,944** | `gewichtheben-zufriedenstellend.md` |
-| Football | Feldspiel (Vorab-Pfad) | 0,345 / 0,699 | Feldspiel (**Live-Motor**) | **0,468 / 0,671** | `football-review-bugfixes.md` |
+| Football | Feldspiel (Vorab-Pfad) | 0,345 / 0,699 | Feldspiel (**Live-Motor**) | **0,516 / 0,811** | `football-review-bugfixes.md`, PR #803 |
 
 Tennis und Fechten sind der groesste Sprung, den dieses Dokument je in einer Runde gesehen
 hat: beide wechselten das Chassis komplett (nicht nur ein Rezept) und sprangen von
@@ -124,9 +148,15 @@ Platzhalter trug. Das ist inzwischen **nicht mehr der Stand**: eine eigene Rezep
 gegen echte NFL-2024-Quoten (`football-rezept-kalibrierung.md`, 04.09.) hat das Rezept
 gemessen und gefittet und die Kopfzahl auf 0,460 gehoben; eine anschliessende Down-Verdrahtung
 in vier bis dahin toten Entscheidungsfunktionen (`football-review-bugfixes.md`, ebenfalls
-04.09.) hat sie zuletzt auf **0,468** bewegt — eine Bewegung innerhalb der eigenen
-Kader-Spannweite, also von Null nicht unterscheidbar (s. Abschnitt 2). Football bleibt klar
-unter der 0,80-Schranke (s. Abschnitt 5), ist aber kein Platzhalter-Rezept mehr.
+04.09.) hat sie auf 0,468 bewegt. **Seither (PR #803, 05.09.) bekam Football einen eigenen
+`spielEignung`-Block statt weiterhin ueber `official-discipline-weights.ts` zu laufen — Chris'
+Vorgabe, die Matrix selbst nicht anzufassen, blieb dabei unangetastet (Diff dagegen leer,
+verifiziert im Commit) — und die Kopfzahl bewegte sich dadurch auf **0,516** (Spannweite
+0,383 → 0,172, Saisonzahl 0,671 → 0,811).** Diese letzte Bewegung ist grosser als die vorherige
+Kader-Spannweite und damit nach der eigenen Faustregel real (s. Abschnitt 2). Football bleibt
+klar unter der 0,80-Schranke (s. Abschnitt 5), ist aber kein Platzhalter-Rezept mehr, und die
+naechste Bewegung kam am Ende doch nicht aus einer weiteren Rezeptrunde, sondern aus einem
+eigenen Eignungspfad neben der gesperrten Matrix.
 
 **Alle uebrigen sechzehn Zeilen bewegten sich ausschliesslich, weil die Messmethode selbst sich
 geaendert hat** — an ihrem Motor-Code wurde nichts angefasst. Die 02.09.-Fassung mass jede
@@ -150,17 +180,19 @@ Befund ueber die Mechanik, sondern Kaderrauschen, das wie ein Befund aussah.
 Wo die Saisonzahl hoch und die Einzelspielzahl niedrig ist, belohnt die Mechanik das Richtige,
 aber zu laut — ein **Verlaesslichkeitsproblem**, das sich ueber Ereignisdichte loest, nicht
 ueber Rezepte. Hockey (Feldspieler: 0,719 gegen 0,818; alle 12: 0,669 gegen 0,832, s. Abschnitt
-1a) und Battlefield (0,325 gegen 0,619) stehen so da.
-Football faellt dagegen aus diesem Muster heraus: **beide** Zahlen sind kaderfest gemessen
-niedrig (0,468/0,671) — das ist nach der eigenen Rezeptkalibrierung UND der Down-Verdrahtung
-(Abschnitt 5) gemessen, nicht mehr der ungemessene Platzhalter-Stand direkt nach der
-Live-Migration, und sieht damit
-eher nach einer echten Validitaetslücke (Rezept/Matrix) aus als nach reinem
-Verlaesslichkeitsrauschen.
+1a) und Battlefield (0,387 gegen 0,595) stehen so da.
+Football ruecke naeher an dieses Muster heran, seit der eigene `spielEignung`-Block (PR #803)
+sowohl die Einzelspiel- als auch die Saisonzahl deutlich angehoben hat: **0,516/0,811**, statt
+zuvor **beider** Zahlen kaderfest niedrig (0,468/0,671). Die Luecke zur 0,80-Schranke bleibt
+in der Saisonzahl klein (0,811, ueber der Schranke) und in der Einzelspielzahl gross (0,516) —
+das ist naeher am Verlaesslichkeitsmuster (Mechanik belohnt das Richtige, aber zu laut) als am
+frueheren Befund einer echten Validitaetsluecke, aber bei nur einer Messrunde seit PR #803
+noch nicht abschliessend eingeordnet.
 
 Wo beide Zahlen niedrig sind, belohnt die Mechanik das Falsche — ein **Validitaetsproblem**. Die
-verbleibenden drei Arena-Disziplinen (TDM, Mini-DM, Battlefield) stehen so da, unveraendert seit
-der letzten Fassung: 0,07 bis 0,62 in der Saison.
+verbleibenden drei Arena-Disziplinen (TDM, Mini-DM, Battlefield) stehen so da: 0,07 bis 0,60 in
+der Saison (06.09.; die genauen Zahlen bewegen sich bei unveraenderter Mechanik messbar, s.
+Abschnitt 5 Punkt 1 — Kaderrauschen, kein Befund).
 
 ---
 
@@ -194,16 +226,17 @@ CI-Schranke (`scripts/pruefe-rangtreue-schranke.mjs`, Basislinie in
 `schranke = max(0,05; 0,3×Spannweite)`-Formel und was sie bewusst nicht faengt: siehe
 `docs/design/messgrundlage-kaderfest.md`.
 
-**Nebenbefund dieser Runde, fuer die naechste CI-Pflege wichtig:** die eingecheckte
-`rangtreue-basislinie.json` wurde am 03.09. um 12:07 UTC gebaut — **vor** den
-Tennis/Fechten-, Football- und Gewichtheben-Runden. Fuer sechzehn Disziplinen ist sie bis auf
-die letzte Nachkommastelle deckungsgleich mit der Messung in diesem Dokument (nachgeprueft,
-nicht vermutet). Fuer **Tennis, Fechten, Football und Gewichtheben traegt sie noch die alten
-Zahlen** (Tennis/Feldspiel 0,505, Fechten/Arena 0,153, Football-Vorab 0,345, Gewichtheben
-0,595) — die CI wuerde diese vier also aktuell gegen einen laengst ueberholten Massstab
-pruefen, nicht gegen den echten aktuellen Stand. `node scripts/baue-rangtreue-basislinie.mjs 24`
-sollte vor dem naechsten Merge, der diese Datei betrifft, einmal neu laufen; das ist bewusst
-nicht Teil dieser rein dokumentarischen Runde.
+**Nebenbefund vom 03.09., seit 06.09. behoben:** die eingecheckte `rangtreue-basislinie.json`
+war zwischenzeitlich mehrfach hinter dem Motor-Stand zurueckgeblieben — zuletzt auf dem 04.09.,
+also **vor** den Staffel-, Takeshi's-Castle-, Spurt- und Football-Runden vom 05./06.09. Die CI
+haette Staffel von 0,915 auf ihr altes 0,681 zurueckfallen lassen koennen, ohne rot zu werden
+(`docs/pm-briefings/pm-gesamtstand-2026-09-06.md` Abschnitt 3, „Basislinie schuetzt nichts").
+`node scripts/baue-rangtreue-basislinie.mjs 24` ist am 06.09. neu gelaufen und hat
+`rangtreue-basislinie.json` auf den in Abschnitt 1 dieses Dokuments gezeigten Stand gebracht;
+`scripts/pruefe-rangtreue-schranke.mjs` laeuft danach bit-identisch grün (alle zwanzig Zeilen
+±0,000 gegen die neue Basislinie). Das ist jetzt Teil des normalen Pflegezyklus, nicht mehr
+eine offene Luecke: **wer eine Zeile in Abschnitt 1 bewegt, zieht die Basislinie im selben PR
+nach**, sonst faellt das Dokument wieder hinter die CI-Schranke zurueck wie hier geschehen.
 
 ---
 
@@ -315,9 +348,9 @@ die Arena (`ARENA_RESOLVED_DISCIPLINE_IDS = {"basketball", "gewichtheben", "hock
 
 **Die anderen fuenfzehn** — einschliesslich Tennis, Fechten und Football trotz ihrer grossen
 Mechanik-Runden — laufen weiterhin ausschliesslich im Mockup, abgerechnet ueber den alten
-PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`). Sieben davon (Time-Trial, Wettessen,
-Fechten, Tennis, Breaking, Climbing, Eiskunstlauf) haben die Rangtreue-Schranke bereits
-bestanden oder liegen knapp darunter — bei ihnen fehlt nur die Produktivierung (Konfigurations-
+PPS-Rang-Pfad (`legacy-matchday-resolve-engine.ts`). Acht davon (Time-Trial, Wettessen,
+Fechten, Tennis, Breaking, Climbing, Eiskunstlauf, Takeshi's Castle) haben die Rangtreue-Schranke
+bereits bestanden oder liegen knapp darunter — bei ihnen fehlt nur die Produktivierung (Konfigurations-
 eintrag + eigene PPS-Referenz ziehen, ggf. mit einem neuen Buehnen-/Bahn-Chassis-Dispatch wie in
 dieser Welle), keine eigene Optik oder Bewegung. **Staffel bestand die Schranke ebenfalls
 (0,915), ist aber BEWUSST NICHT dabei**: `bahnTeamstand()` liefert fuer Staffel `gewertet:false`
@@ -345,7 +378,7 @@ Chassis) und der Tennis/Fechten-Chassis-Fehlgriff (Abschnitt 1, beide jetzt best
 bleibt bzw. neu hinzukommt:
 
 1. **Die Arena-Zielwahl — weiterhin der groesste ungehobene Hebel, jetzt mit einem konkreten
-   Vorschlag statt nur einer Diagnose.** TDM (0,113), Mini-DM (0,269) und Battlefield (0,325)
+   Vorschlag statt nur einer Diagnose.** TDM (0,253), Mini-DM (0,094) und Battlefield (0,387)
    bleiben alle deutlich unter der Schranke, mit derselben Ursache wie in jeder frueheren
    Fassung: die Zielwahl ist Geometrie, nicht Bedrohung (264 von 288 Kaempfern zielen auf den
    Naechsten). Fables Recherche vom 03.09.
@@ -353,27 +386,37 @@ bleibt bzw. neu hinzukommt:
    und liefert zusaetzlich einen konkreten, noch nicht gebauten Vorschlag: Zielwahl nach
    `u.zielP==="bedrohung"` (existiert bereits als Spieler-Option, ist aber nicht KI-Standard)
    mit Hysterese als Standardverhalten. **Reine Recherche, kein Commit an der Engine** — der
-   naechste Schritt ist Umsetzung, keine weitere Recherche.
-2. **Football: die Rezeptkalibrierung ist inzwischen gelaufen — der naechste Hebel ist die
-   MATRIX, nicht ein weiterer Rezeptanlauf.** Der Live-Motor selbst (Downs, Formationen,
-   eigene Kurve) war beim Umstieg der richtige Unterbau, aber alle acht Sub-Skill-Gewichte
-   und alle Wahrscheinlichkeitskonstanten waren zunaechst ungemessene Platzhalter, und die
-   Kopfzahl bewegte sich deshalb kaderfest zunaechst RUECKWAERTS (0,345 → 0,305). Das ist
-   **erledigt**: `football-rezept-kalibrierung.md` (04.09.) hat `skillMittel`/`steil`/
-   `korrektur` gegen reale NFL-2024-Quoten gefittet (Completion-Quote 65,3 %, Yards/Attempt
-   7,1) und den Football-Korridor (`scripts/miss-football-korridor.mjs`) gebaut; die
-   Kopfzahl stand seither bei 0,460 (`football-zufriedenstellend.md` bestaetigt sie per
-   Sicht-QA erneut). Eine anschliessende Down-Verdrahtung in vier bis dahin toten
+   naechste Schritt ist Umsetzung, keine weitere Recherche. **Achtung bei der Abnahme
+   einer kuenftigen Runde:** alle drei Arena-Zahlen haben sich zwischen dem 04.09. und dem
+   06.09. spuerbar bewegt, ohne dass an ihrer Mechanik etwas geaendert wurde (TDM 0,113→0,253,
+   Mini-DM 0,269→0,094, Battlefield 0,325→0,387) — bei einer Kader-Spannweite, die groesser
+   ist als der eigene Median, ist das nach der projekteigenen Faustregel **Kaderrauschen**,
+   kein Befund (`docs/pm-briefings/pm-gesamtstand-2026-09-06.md` Abschnitt 1a). Eine Arena-
+   Runde braucht deshalb zuerst eine groessere Stichprobe (n ≥ 96–150), bevor sie ihren eigenen
+   Erfolg ueberhaupt nachweisen kann.
+2. **Football: die Rezeptkalibrierung ist inzwischen gelaufen, und ein eigener Eignungspfad
+   neben der gesperrten Matrix hat den naechsten Sprung bereits gebracht.** Der Live-Motor
+   selbst (Downs, Formationen, eigene Kurve) war beim Umstieg der richtige Unterbau, aber alle
+   acht Sub-Skill-Gewichte und alle Wahrscheinlichkeitskonstanten waren zunaechst ungemessene
+   Platzhalter, und die Kopfzahl bewegte sich deshalb kaderfest zunaechst RUECKWAERTS
+   (0,345 → 0,305). Das ist **erledigt**: `football-rezept-kalibrierung.md` (04.09.) hat
+   `skillMittel`/`steil`/`korrektur` gegen reale NFL-2024-Quoten gefittet (Completion-Quote
+   65,3 %, Yards/Attempt 7,1) und den Football-Korridor (`scripts/miss-football-korridor.mjs`)
+   gebaut; die Kopfzahl stand seither bei 0,460 (`football-zufriedenstellend.md` bestaetigt sie
+   per Sicht-QA erneut). Eine anschliessende Down-Verdrahtung in vier bis dahin toten
    Entscheidungsfunktionen (`waehlePlayCall`/`waehleFormationOffense`/
    `waehleFormationDefense`/`waehleFootballTier`, `football-review-bugfixes.md`, ebenfalls
-   04.09.) hat sie auf **0,468** bewegt — eine Bewegung innerhalb der eigenen
-   Kader-Spannweite (0,258→0,383), also von Null nicht unterscheidbar, aber mechanisch
-   real (3rd & 8 spielt sich jetzt sichtbar anders als 1st & 10). Ein weiteres
-   Rezept-Grinding hat laut der Kalibrierungsrunde **abnehmenden Grenzertrag** — der von
-   ihr selbst benannte naechste Kandidat ist die Football-MATRIX (`BASIS_JE_DISC.football`:
-   spirit 25, torment 16 dominieren, power steht mit Gewicht 6 an neunter Stelle in einer
-   Kollisionssportart), nicht eine dritte Rezeptrunde — s.
-   `football-gewichtheben-opus-review.md` Abschnitt B.6.
+   04.09.) hat sie auf 0,468 bewegt. **Seither (PR #803, 05.09.) hat Football einen eigenen
+   `spielEignung`-Block in `FELDSPIEL_ART.football` bekommen, statt weiter ausschliesslich ueber
+   `official-discipline-weights.ts` zu laufen — genau der von der Kalibrierungsrunde selbst
+   benannte naechste Kandidat, nur ohne die gesperrte Matrix anzufassen (Diff dagegen leer,
+   verifiziert im Commit).** Die Kopfzahl bewegte sich dadurch auf **0,516** (Spannweite
+   0,383 → 0,172, Saisonzahl 0,671 → 0,811) — eine Bewegung deutlich groesser als die vorherige
+   Kader-Spannweite, also nach der eigenen Faustregel real. Football bleibt klar unter der
+   0,80-Schranke, aber der naechste Hebel ist damit teilweise bereits gezogen; ob weiteres
+   Feintuning an `spielEignung` selbst oder ein struktureller Schritt (z. B. Anzeige/KI-Kauf auf
+   dieselbe Eignung umstellen, s. das Risiko in Abschnitt 3 des PM-Briefings) sinnvoller ist,
+   ist eine offene Frage fuer die naechste Football-Runde.
 3. **Hockey: der billige Hebel ist gezogen, der teure (Zoneneintritt) hat sich zweimal nicht
    nachweisbar gehalten — ein dritter struktureller Anlauf ist nicht mehr das naechste
    Sinnvolle.** Nach drei Kalibrierrunden (Torwart-Fix, sieben-Schritt-Liste, eigene
@@ -436,7 +479,7 @@ frischen Recherche vom 03.09. (`arena-mini-dm-tdm-battlefield-rollout-plan.md`):
 |---|---|
 | Wertformel vergab 44 % fuer Getroffenwerden | **behoben** — `tank` gestrichen, `verh` auf 0,4 gesetzt, beides durchgemessen |
 | Eignung war Slot plus Formkarte plus Trait | **behoben** — vierte Fundstelle derselben Luecke |
-| Battlefield stellte Fuehrungsrollen faelschlich nach hinten (rho −0,49) | **behoben und nachgemessen** — Reihen-Fix vom 03.09., Saison-Validitaet jetzt 0,619 (kaderfest); die Zahl war frueher „nachzumessen", ist es nicht mehr |
+| Battlefield stellte Fuehrungsrollen faelschlich nach hinten (rho −0,49) | **behoben und nachgemessen** — Reihen-Fix vom 03.09., Saison-Validitaet 0,595 (kaderfest, 06.09.; stand zwischenzeitlich bei 0,619, die Bewegung dazwischen ist Kaderrauschen, s. Abschnitt 5 Punkt 1); die Zahl war frueher „nachzumessen", ist es nicht mehr |
 | Zielwahl ist Geometrie statt Bedrohung | **weiterhin offen** — jetzt mit einem konkreten, ausgearbeiteten Vorschlag (K1, s. u.), aber ohne Commit an der Engine |
 | Fechten gehoert nicht in die Arena | **behoben** — Fechten ist seit dem 03.09. eine Buehnen-Disziplin, taucht in dieser Tabelle nicht mehr auf |
 
@@ -471,26 +514,26 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 
 | Disziplin | fertig | rho | Was steht |
 |---|---:|---:|---|
-| Basketball | 92 % | 0,757 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (Perzentilmodell, PR #755 fuer eine absolute Impact-Kurve offen) |
-| Hockey | 71 % | 0,719 (Feldspieler) / 0,669 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **Produktivierung (04.09.) als PR vorbereitet** (`docs/design/hockey-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz (empirisch als noetig befunden, s. dort) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
-| **Fechten** | **48 %** | **0,840** | **Neu auf der Buehne** (vorher Arena, rho 0,153) · Rangtreue klar bestanden mit komfortablem Puffer · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
-| **Tennis** | **48 %** | **0,814** | **Neu auf der Buehne** (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert · nicht im echten Spielstand |
+| Basketball | 92 % | 0,772 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (K3, 04.09.: Feldkorb-Punkte zur Haelfte als `technik`-Erwartungswert statt binaer, rho 0,757→0,772, s. Abschnitt 4) |
+| Hockey | 71 % | 0,719 (Feldspieler) / 0,669 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
+| Fechten | 48 % | 0,840 | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue klar bestanden mit komfortablem Puffer · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
+| Tennis | 48 % | 0,814 | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert · nicht im echten Spielstand |
 | Time-Trial | 55 % | 0,867 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden · Bild vom Chassis |
-| **Gewichtheben** | **70 %** | **0,887** | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · **Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten** · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **S6-Produktivierung (04.09.) als PR vorbereitet** (`docs/design/gewichtheben-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
+| Gewichtheben | 70 % | 0,887 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Climbing | 48 % | 0,790 | Steigung und Kraftbudget statt Antritt · kaderfest knapp unter der Schranke (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
-| Speed-Schach | 45 % | 0,889 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · Bild vom Chassis · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
+| Speed-Schach | 45 % | 0,889 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | Wettessen | 40 % | 0,844 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Eiskunstlauf | 38 % | 0,757 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest knapp unter der Schranke (vorher bestanden) |
 | Breaking | 38 % | 0,801 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
 | Showcase | 40 % | 0,880 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
-| Takeshi's Castle | 45 % | 0,697 | Hindernisse und Nerven · kaderfest durchgefallen (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
-| Staffel | 40 % | 0,681 | Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze |
+| **Takeshi's Castle** | **50 %** | **0,886** | **Kaderfest bestanden (vorher als 0,697/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · nicht im echten Spielstand |
+| **Staffel** | **48 %** | **0,915** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |
 | I-Spy | 35 % | 0,692 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |
-| **Spurt** | **45 %** | **0,857** | **Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,857, Dexterity-Einfluss 3,5 % → 16,7 %** · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
-| **Football** | **28 %** | **0,468** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460) und mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468, Bewegung innerhalb der Kader-Spannweite) · naechster Hebel ist die MATRIX, nicht das Rezept (Abschnitt 5) · nicht im echten Spielstand |
-| Mini-DM | 30 % | 0,269 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt |
-| TDM | 30 % | 0,113 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
-| Battlefield | 30 % | 0,325 | Aufstellung repariert und nachgemessen (Siege Core stand hinten, jetzt Saison-Validitaet 0,619) · Zielwahl-Redesign recherchiert, nicht umgesetzt |
+| Spurt | 45 % | 0,871 | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
+| **Football** | **32 %** | **0,516** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
+| Mini-DM | 30 % | 0,094 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
+| TDM | 30 % | 0,253 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
+| Battlefield | 30 % | 0,387 | Aufstellung repariert und nachgemessen (Siege Core stand hinten, Saison-Validitaet 0,595) · Zielwahl-Redesign recherchiert, nicht umgesetzt |
 
 **Kein Durchschnitt ueber alles**, weil die Achsen ungleich schwer wiegen: die neunzehn
 Disziplinen ausserhalb von Basketball koennen zusammen keine 15 % erreichen, solange sie nicht

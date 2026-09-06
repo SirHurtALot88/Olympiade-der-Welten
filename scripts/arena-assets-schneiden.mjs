@@ -51,6 +51,44 @@ const SCHNITTE = [
   ['hind_mauer',    'zaun',    192, 352,  40,  32, false],
   ['hind_heu',      'deko',      0, 736,  64,  32, false],
   ['hind_feuer',    'deko',    256,1536, 160,  32, false],
+  // Takeshi's Castle: zehn Fallen-Typen + Burg-Deko auf vierzehn Stationen (docs/design/
+  // takeshi-schach-optik-gameplay-plan-05-09.md, Teil B, Anhang B.3). Koordinaten am
+  // gleichen 8x-Raster-Verfahren nachgemessen wie oben (Anhang B), zwei Korrekturen
+  // gegenueber dem Plan-Dokument: `deko_pranger`/`deko_stock` sassen dort auf der
+  // Wagen-Kachel eine Spalte daneben (x=128 statt 64 bzw. x=256/y=1440 statt 128/1474),
+  // `burg_mauer` ist auf 160 statt 256 Breite gekuerzt (die restlichen 96 px sind
+  // Fackelhalter-Reste, keine Mauer — beim Kacheln quer ueber den Bildschirm sonst eine
+  // sichtbare Luecke).
+  ['falle_tuer',         'zaun', 128, 512,  32,  64, false],
+  ['falle_strickleiter', 'zaun', 384,  64,  64,  64, false],
+  ['falle_spitzen',      'zaun', 288, 224,  96, 128, false],
+  ['burg_mauer',         'zaun',   0, 672, 160,  64, false],
+  ['burg_turm',          'zaun', 384, 512,  96, 150, false],
+  ['burg_tor',           'zaun', 256, 512,  96, 150, false],
+  ['deko_rad',           'deko', 416,1440,  32,  32, false],
+  ['falle_walze',        'deko', 416, 672,  32,  32, false],
+  ['boden_eis',       'terrain', 640, 928,  32,  32, false],
+  ['deko_banner',        'deko',   0,1216, 192,  80, false],
+  ['deko_pranger',       'deko',  64,1408,  64,  88, false],
+  ['deko_stock',         'deko', 128,1474,  64,  38, false],
+  ['deko_holz',          'deko', 352, 640,  64,  64, false],
+  ['falle_fass',         'deko',  64, 704,  32,  64, false],
+  // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
+  // Abschnitt 5): neun Untergruende fuer die fuenf Gelaende-Zonen. Alle aus demselben
+  // Terrain-Blatt, das oben schon geladen wird — kein neuer Download, kein neuer Credit.
+  // Jeder Terrain-Block in terrain-v7.png ist 96x224 (3 Spalten x 7 Reihen): Reihen 0-1
+  // Innenecken, 2-4 der 3x3-Uebergangssatz (Mitte = die "tile"-Koordinate der TSX-Datei),
+  // Reihen 5-6 volle Kacheln ohne Rand. Alle neun Schnitte sind Reihe-5-Kacheln
+  // (y = tile-y + 64) — dieselbe Reihe, aus der `boden_erde` (Dirt_Brown) stammt.
+  ['boden_wiese',     'terrain',  32, 384,  32,  32, false],   // Grass
+  ['boden_wald',      'terrain', 224, 384,  32,  32, false],   // Grass_Dark
+  ['boden_pfad',      'terrain',  32, 160,  32,  32, false],   // Dirt_Tan
+  ['boden_kies',      'terrain', 800, 384,  32,  32, false],   // Gravel_1
+  ['boden_schlamm',   'terrain', 896, 160,  32,  32, false],   // Mud_Brown
+  ['boden_see',       'terrain', 128, 608,  32,  32, false],   // Water
+  ['boden_sumpf',     'terrain',  32, 608,  32,  32, false],   // Water_Shallows_Dirt
+  ['boden_hang',      'terrain', 320, 384,  32,  32, false],   // Grass_Dead
+  ['boden_pflaster',  'terrain', 704, 832,  32,  32, false],   // Stone_Tan
 ];
 
 const BLATT = {
