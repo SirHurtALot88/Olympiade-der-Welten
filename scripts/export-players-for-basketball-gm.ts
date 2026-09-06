@@ -18,8 +18,13 @@
  * Browser laedt die Bilder beim Aufruf von play.basketball-gm.com direkt vom
  * Olympiade-Server, kein separates Hosting noetig.
  *
- * Alle Spieler laufen als Free Agent (tid: -1), analog zum FM-Export: Chris will
- * ingame draften/signen koennen statt fertige Kader zu bekommen.
+ * Kader: wer im Save auf einem Oly-Team-Roster steht, wird genau dorthin uebernommen
+ * (tid = das jeweilige BGM-Team) -- alle anderen (der weitaus groessere Teil der 2984)
+ * bleiben Free Agent (tid: -1). Erster Anlauf hatte ALLE als Free Agent exportiert
+ * (analog zum FM-Export), aber eine KI, die 31 Kader aus dem Nichts zusammenkaufen
+ * muss, tut das schlecht -- nachgemessen Team-Ratings von +97 bis -130, praktisch nur
+ * das handgepickte eigene Team konkurrenzfaehig. Die echten Oly-Kader als Startpunkt
+ * geben von Anfang an 32 einigermassen ausgeglichene Teams.
  *
  * Usage: OLY_APP_SQLITE_PATH=<db> npx tsx scripts/export-players-for-basketball-gm.ts \
  *   --save-id <id> --out <pfad.json> [--limit N] [--starting-season 2026]
@@ -274,10 +279,19 @@ function main() {
 
     const portraitRel = getPlayerPortraitBrowserUrl(p.id, p.portraitUrl ?? null, p.portraitPath ?? null);
 
+    // Echte Oly-Kader als Startaufstellung uebernehmen statt alle als Free Agent zu
+    // dumpen: eine KI, die 31 Kader aus 2984 Free Agents zusammenkaufen muss, tut das
+    // schlecht (nachgemessen: Team-Ratings von +97 bis -130, praktisch nur das
+    // handgepickte eigene Team konkurrenzfaehig). Wer im aktuellen Save auf keinem
+    // Roster steht, bleibt regulaerer Free Agent (tid -1) -- das ist der groessere Teil
+    // des Bestands und bleibt fuer Transfers/Scouting verfuegbar.
+    const roster = rosterByPlayerId.get(p.id);
+    const tid = roster ? tidByTeamId.get(roster.teamId) ?? -1 : -1;
+
     return {
       firstName: "",
       lastName: p.name,
-      tid: -1,
+      tid,
       born: { year: bornYear, loc: "" },
       weight,
       hgt: heightInches,
