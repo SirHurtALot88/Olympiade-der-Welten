@@ -10524,14 +10524,25 @@
     const gesetzt=inDisc(buehneDisc);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[buehneDisc]||0)-(a.d[buehneDisc]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
-    const gegner=OPP.slice(0,n);
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO WIE DIE HEIMSEITE — sonst macht dieses
+    // Rohr die beiden Seiten ungleich (Opus-Review auf PR #818, docs/BATTLE_ARENA_UEBERGABE.md
+    // Fehler #1, hier nie geschlossen): vorher immer `OPP.slice(0,n)`, unabhaengig von der
+    // tatsaechlich gesetzten Aufstellung. Zeichen fuer Zeichen wie bauFeldspiel.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===buehneDisc);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     let id=0;
-    const setz=(p,seite,istGegner,idx)=>{
-      const sl=istGegner?null:slotFuer(p,idx);
+    // BEIDE SEITEN GLEICH BAUEN — derselbe Fehler wie im Feldspiel vor seiner Korrektur:
+    // `istGegner` schaltete Slot-Aufschlag und Stufenwert fuer die Gastseite komplett ab.
+    // Spiegeltest (identischer Kader gegen sich selbst, 60 Spiele): Speed-Schach 40:4,
+    // Showcase 38:22, Gewichtheben 0:60 Heimsiege VORHER; 25:26, 30:30, 16:24 NACHHER.
+    // `place` enthaelt beide Aufstellungen, `slotFuer` wirkt also laengst auf beiden
+    // Seiten — kein `istGegner`-Sonderfall mehr noetig.
+    const setz=(p,seite,idx)=>{
+      const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
@@ -10579,8 +10590,8 @@
       }
       TEILNEHMER.push(L);
     };
-    mine.forEach((p,i)=>setz(p,0,false,i));
-    gegner.forEach((o,i)=>setz(o,1,true,i));
+    mine.forEach((p,i)=>setz(p,0,i));
+    gegner.forEach((o,i)=>setz(o,1,i));
 
     // DUELL-VARIANTE (Speed-Schach, I-Spy) — Fables Rat: kein eigener fuenfter Motor,
     // sondern Buehne mit zwei Aenderungen. Erstens Paarung statt Einzelauftritt: Brett i
