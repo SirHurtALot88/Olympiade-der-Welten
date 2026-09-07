@@ -5181,6 +5181,77 @@
   const FOKUS_GREIF_RADIUS=30;
 
   // ===================================================================================
+  // FOKUS-DOPPELN, VORGABE OHNE KLICK (06.09., Anschluss an die Recherche in
+  // docs/design/basketball-doppeln-taktik-pause-recherche-06-09.md, PR #834). Der
+  // wichtigste Fund dort: die Mechanik selbst (oben) und ihre Bedienung (unten,
+  // fokusUmschalten) sind seit PR #685 fertig UND kalibriert — es fehlte nur die
+  // Anbindung an die Spiele, die wirklich zaehlen (spieleFeldspiel(), s. dort und
+  // arena-headless-runner.ts), weil dort nie irgendjemand fokusZiel setzte.
+  //
+  // CHRIS' ZUSATZ (heute, woertlich): "Basketball recommend ist ok ai soll das aber
+  // nicht immer nur nutzen gibt ja sonst ne Luecke in der defense" — der Default darf
+  // also NICHT bedingungslos immer den staerksten Gegner doppeln. Zwei Fragen, zwei
+  // Antworten:
+  //
+  // 1) KOSTET EIN DOPPEL SCHON ETWAS? Ja, strukturell, schon vor dieser Aenderung: der
+  //    Helfer, der zum Ballfuehrer ruckt, bleibt Manndecker seines EIGENEN Mannes
+  //    (`u.deckt` unveraendert, s. bewegeSpielerLive/DOPPELN-Kommentar dort), laeuft ihn
+  //    aber fuer die Dauer des Hilfe-Fensters nicht mehr an — dessen deckerAbstand
+  //    steigt ganz ueber dieselbe dist()-Messung, die entscheideBallaktion ohnehin schon
+  //    fuer JEDEN Wurf liest (BEDRAENGT_RADIUS/bedraengnisGate). Es gibt also bereits
+  //    eine echte Luecke: kein zweites System noetig, nur eine Vorgabe, die diese Luecke
+  //    ERNST NIMMT statt sie zu ignorieren (Punkt 2).
+  //
+  // 2) WANN LOHNT SICH DER TAUSCH? Nur, wenn der freigegebene Mann deutlich schwaecher
+  //    ist als der gedoppelte — sonst tauscht man einen gefaehrlichen Gegner gegen einen
+  //    fast ebenso gefaehrlichen, offenen. Schwelle direkt aus CLAUDE.md uebernommen,
+  //    nicht neu erfunden: "Paare mit mindestens 15 Eignungspunkten Abstand werden zu
+  //    99% richtig geordnet" — unterhalb von 15 Punkten ist der Abstand nicht
+  //    verlaesslich genug, um zu wissen, wer tatsaechlich der gefaehrlichere von beiden
+  //    ist; ein Doppel dort ist eine Wette, kein Vorteil. `berechneFokusAuto()` doppelt
+  //    deshalb nur, wenn der beste Feldspieler des Gegners den zweitbesten um mindestens
+  //    diesen Abstand schlaegt (oder gar keinen zweiten Feldspieler auf dem Feld hat).
+  const FOKUS_EIG_MARGIN_MIN=15;
+  // Bestimmt fuer BEIDE Seiten unabhaengig, welchen gegnerischen Feldspieler ihre
+  // Hilfsverteidigung automatisch bevorzugt doppeln soll — aufgerufen einmal beim
+  // Spielaufbau (initFeldspielLive) und erneut bei jedem Viertelwechsel
+  // (starteViertelpause), s. Chris' eigene Vorgabe aus der Recherche: "neu bestimmt bei
+  // jedem Viertelwechsel", nicht einmalig zu Spielbeginn (ein Rotationswechsel oder ein
+  // Foulausstieg soll den Fokus mitnehmen). Wuerfelt nichts (kein rr()-Aufruf) — der
+  // historisch gemessene Rho-Schaden eines vorgezogenen zuordneDeckung(true) an genau
+  // diesen drei Zeitpunkten (s. starteViertelpause-Kommentar) betraf die Zufallskette
+  // der Bewegungssimulation, die hier unberuehrt bleibt.
+  //
+  // NUR BASKETBALL: `naechsterAngriff`/`starteViertelpause` sind geteilter Feldspiel-
+  // Code (die Viertel-/Perioden-Struktur gilt fuer jede Disziplin mit `LIVE().perioden`),
+  // das Doppel-Ziel selbst ist aber weiterhin ein rein Basketball-eigenes System (s.
+  // Kommentar bei FOKUS_FARBE oben) — andere Feldspiel-Disziplinen bleiben unangetastet.
+  function berechneFokusAuto(){
+    if(feldspielDisc!=="basketball"||!fsLive)return;
+    for(let seite=0;seite<2;seite++){
+      const gegner=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const sortiert=gegner.slice().sort((a,b)=>(b.eig||0)-(a.eig||0));
+      const top=sortiert[0], naechster=sortiert[1];
+      fsLive.fokusZielAuto[seite]=(top&&(!naechster||(top.eig-naechster.eig)>=FOKUS_EIG_MARGIN_MIN))
+        ?top.id:null;
+    }
+  }
+  // Der WIRKSAME Fokus, den die Hilfsverteidigung der Seite `seite` gerade verfolgt.
+  // Seite 0 (die Seite, die in der Arena "man selbst" ist, s. fokusUmschalten/"nur
+  // Gegner sind waehlbar") bevorzugt eine manuelle Wahl, SOBALD je geklickt wurde
+  // (fsLive.fokusManuell) — danach ist es "sein" Fokus, nicht mehr die Vorgabe, exakt
+  // das Verhalten, das die Recherche fuer das PERS-System an anderer Stelle beschreibt
+  // ("man stellt nur ein, was einen wirklich stoert, der Rest bleibt Charakter"). Seite 1
+  // hat keine eigene Bedienseite (nur EIN Betrachterstandpunkt in der Arena) und laeuft
+  // deshalb immer auf der Vorgabe — das ist genau das, was jedes reine KI-vs-KI-Spiel
+  // eines Spieltags braucht (arena-headless-runner.ts, keine Seite hat dort je geklickt).
+  function effektiverFokus(seite){
+    if(!fsLive)return null;
+    if(seite===0)return fsLive.fokusManuell?fsLive.fokusZiel:fsLive.fokusZielAuto[0];
+    return fsLive.fokusZielAuto[1];
+  }
+
+  // ===================================================================================
   // BEWEGUNGS-DYNAMIK (Chris, 30.08., woertlich): "Momentan gibt's quasi immer nur eine
   // Manndeckung und keine verschiedenen Bewegungen. Agile Spieler sollten zum Beispiel
   // das nutzen koennen, dass sie schneller sind und dann schneller zum anderen Korb
@@ -7082,13 +7153,24 @@
     // naechsterAngriff()/starteViertelpause() fuer die Grenzpruefung; `viertelpause` haelt
     // die Pausen-eigenen Daten und ist ausserhalb der Phase immer null, exakt wie `freiwurf`.
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null, viertel:1, viertelpause:null,
+      fastbreak:null, phase:"laufend", freiwurf:null, fokusZiel:null,
+      // fokusZielAuto/fokusManuell: die Default-Vorgabe ohne Klick (s. berechneFokusAuto/
+      // effektiverFokus oben) und ob je manuell eingegriffen wurde. Ein neues Spiel
+      // startet ohne manuelle Wahl — berechneFokusAuto() gleich unten fuellt fokusZielAuto,
+      // bevor der erste Ballbesitz beginnt.
+      fokusZielAuto:[null,null], fokusManuell:false,
+      viertel:1, viertelpause:null,
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
       beruehrungKette:[], beruehrungSeite:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
       football:null, snap:null};
+    // VORGABE OHNE KLICK, VOR DEM ERSTEN BALLBESITZ (s. berechneFokusAuto oben): nur
+    // Basketball fuellt fokusZielAuto ueberhaupt (die Funktion no-opt sonst), fuer jede
+    // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
+    // effektiverFokus() ueberall null — bit-identisch zum bisherigen Verhalten.
+    berechneFokusAuto();
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     // FOOTBALL STARTET NICHT UEBER ballUebernehmen()/spielmacherLos() — ein Empfangsteam
@@ -7274,6 +7356,13 @@
     // der Basissortierung.
     zuordneSlots(0,liegtZurueck(0));
     zuordneSlots(1,liegtZurueck(1));
+    // FOKUS-DOPPELN, NEU BESTIMMT (s. berechneFokusAuto oben): "neu bestimmt bei jedem
+    // Viertelwechsel", genau Chris' eigene Vorgabe aus der Recherche — ein Foulausstieg
+    // oder die Rotation zwei Zeilen ueber koennen den bisher staerksten Feldspieler vom
+    // Feld nehmen. Wuerfelt nichts, s. Kommentar dort: KEIN Wiederholungsrisiko fuer den
+    // gemessenen Rho-Schaden, den ein vorgezogenes zuordneDeckung(true) hier auslöste
+    // (naechster Kommentar) — diese Funktion ruft zuordneDeckung nicht auf.
+    berechneFokusAuto();
     // BEWUSST KEIN zuordneDeckung(true) hier, obwohl Chris' Formulierung beide Funktionen
     // nennt: der Wiederanpfiff (naechsterAngriff(...,true) im "viertelpause"-Zweig von
     // stepBasketballLive) laeuft ueber ballUebernehmen(), das zuordneDeckung(true) ohnehin
@@ -9062,12 +9151,15 @@
           // angelaufen — sein deckerAbstand steigt dadurch ganz natuerlich ueber dieselbe
           // dist()-Messung, die entscheideBallaktion ohnehin schon liest.
           const traeger=fsLive.ball.traeger;
-          // FOKUS-DOPPELN, s. FOKUS_*-Konstanten oben: der Nutzer hat GENAU DIESEN
-          // Ballfuehrer als Doppel-Ziel markiert. Dann — und nur dann — weiten sich die
-          // drei Tore der Hilfe-Entscheidung. Ist kein Fokus gesetzt (oder hat gerade ein
-          // anderer den Ball), sind alle Faktoren 1 und der Block ist zeichenweise das
-          // Verhalten von vorher, inklusive identischer rr()-Reihenfolge.
-          const fokus=!!(traeger&&fsLive.fokusZiel!=null&&traeger.id===fsLive.fokusZiel);
+          // FOKUS-DOPPELN, s. FOKUS_*-Konstanten oben: `u`s eigene Seite hat GENAU DIESEN
+          // Ballfuehrer als Doppel-Ziel — manuell markiert (nur Seite 0, s. fokusUmschalten)
+          // oder automatisch vorgegeben (effektiverFokus/berechneFokusAuto, 06.09.-Anschluss:
+          // s. der Kommentar dort). Dann — und nur dann — weiten sich die drei Tore der
+          // Hilfe-Entscheidung. Ist kein Fokus wirksam (oder hat gerade ein anderer den
+          // Ball), sind alle Faktoren 1 und der Block ist zeichenweise das Verhalten von
+          // vorher, inklusive identischer rr()-Reihenfolge.
+          const zielFuerSeite=effektiverFokus(u.side);
+          const fokus=!!(traeger&&zielFuerSeite!=null&&traeger.id===zielFuerSeite);
           if(traeger&&traeger.side!==u.side&&u.deckt!==traeger&&fsT>=(u.hilfeCd||0)){
             const primaerDecker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger);
             if(primaerDecker&&primaerDecker!==u
@@ -10268,7 +10360,7 @@
         // (s. unten) — hier stuende sie unter allen Figuren, und der Pfeil ueber dem Kopf
         // verschwaende hinter dem naechsten Sprite. Erster Anlauf war genau das, im
         // Screenshot war vom Pfeil nichts zu sehen.
-        if(fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel)fokusMarke={x,y};
+        if(fsLive&&effektiverFokus(0)===u.id)fokusMarke={x,y};
         // SPEED-SICHTBARKEIT, kosmetischer Teil (s. Bericht/Kommentar bei `tempoPx` in
         // bewegeSpielerLive): ein kurzer Bewegungs-Schweif macht den Tempo-Unterschied
         // fuer das Auge sichtbar, OHNE irgendetwas an der tatsaechlichen Bewegung zu
@@ -10327,7 +10419,7 @@
         // Spielort (u.x/u.y), nicht am entzerrten Zeichenort — sonst haenge eine reine
         // Optikkorrektur daran, wessen Name erscheint. Der fokussierte Gegner behaelt
         // seinen Namen immer: er ist die eine Figur, die der Nutzer selbst markiert hat.
-        const istFokus=fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel;
+        const istFokus=fsLive&&effektiverFokus(0)===u.id;
         const zeigName=!namensAnker||u===namensAnker||istFokus
           ||dist(u,namensAnker)<NAME_NAH_RADIUS;
         if(zeigName)schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
@@ -18584,16 +18676,26 @@
   function fokusAuswahlMoeglich(){
     return !!LIVE()&&istFeldspiel(disc)&&!!fsLive;
   }
+  // Liefert den gerade WIRKSAMEN Fokus-Spieler von Seite 0 — automatische Vorgabe oder
+  // manuelle Wahl, je nachdem was effektiverFokus() gerade greifen laesst (06.09.-
+  // Anschluss, s. Kommentar bei berechneFokusAuto oben). Die Kaderleiste/HUD zeigen
+  // damit immer den tatsaechlich gedoppelten Spieler, nicht nur eine manuelle Auswahl.
   function fokusSpieler(){
-    if(!fsLive||fsLive.fokusZiel==null)return null;
-    return FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsLive.fokusZiel)||null;
+    if(!fsLive)return null;
+    const ziel=effektiverFokus(0);
+    if(ziel==null)return null;
+    return FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===ziel)||null;
   }
   // Ein Klick auf denselben Spieler hebt den Fokus auf, ein Klick auf einen anderen
   // ersetzt ihn — ein Zustand, kein Stapel. Nur Gegner (side 1) sind zulaessig.
+  // fokusManuell=true macht diese Wahl fuer den Rest des Spiels zur massgeblichen: die
+  // automatische Vorgabe (berechneFokusAuto, neu bei jedem Viertelwechsel) ueberschreibt
+  // sie ab hier nicht mehr, s. effektiverFokus().
   function fokusUmschalten(id){
     if(!fokusAuswahlMoeglich())return;
     const u=FSTEAM[1].find(x=>x.id===id);
     if(!u)return;
+    fsLive.fokusManuell=true;
     fsLive.fokusZiel=(fsLive.fokusZiel===id)?null:id;
     renderKader();
   }
@@ -18605,6 +18707,9 @@
     if(!fokusAuswahlMoeglich()){ zeile.hidden=true; return; }
     zeile.hidden=false;
     const u=fokusSpieler();
+    // Automatisch vs. manuell in der Statuszeile unterscheiden — sonst sieht ein Manager
+    // eine Markierung entstehen, die er nie gesetzt hat, und haelt es fuer einen Fehler.
+    const manuell=!!fsLive.fokusManuell;
     // Zusammengesetzt aus Textknoten statt innerHTML: der Name kommt aus dem Spielstand
     // und darf nie als Markup ankommen.
     const txt=document.getElementById("fokustext");
@@ -18612,9 +18717,11 @@
     txt.textContent="";
     if(u){
       txt.appendChild(el("i","fmarke"));
-      txt.appendChild(document.createTextNode("Fokus-Doppeln auf "));
+      txt.appendChild(document.createTextNode(manuell?"Fokus-Doppeln auf ":"Automatisches Fokus-Doppeln auf "));
       txt.appendChild(el("b",null,u.n));
-      txt.appendChild(document.createTextNode(" — die Hilfsverteidigung geht bevorzugt auf ihn."));
+      txt.appendChild(document.createTextNode(manuell
+        ?" — die Hilfsverteidigung geht bevorzugt auf ihn."
+        :" — staerkster Gegenspieler, automatisch vorgegeben; anklicken uebernimmt die Wahl manuell."));
     } else {
       txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
     }
@@ -18661,7 +18768,10 @@
       if(treffer)fokusUmschalten(treffer.id);
     });
     const weg=document.getElementById("fokusweg");
-    if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
+    // "Kein Fokus" ist ebenfalls eine manuelle Entscheidung (Chris will explizit KEIN
+    // Doppel) — auch sie muss die automatische Vorgabe fuer den Rest des Spiels
+    // aussetzen, sonst kaeme sie beim naechsten Viertelwechsel klammheimlich zurueck.
+    if(weg)weg.addEventListener("click",()=>{ if(fsLive){fsLive.fokusManuell=true;fsLive.fokusZiel=null;} renderKader(); });
   }
 
   // ===================================================================================
@@ -19038,9 +19148,13 @@
         if(fokusAuswahlMoeglich()&&seite===1&&u.id!=null){
           k.dataset.fokusid=String(u.id);
           k.classList.add("waehlbar");
-          const gewaehlt=fsLive.fokusZiel===u.id;
+          // effektiverFokus(0) statt des rohen fsLive.fokusZiel (06.09.-Anschluss): die
+          // Kachel muss auch dann markiert sein, wenn niemand geklickt hat, aber die
+          // automatische Vorgabe gerade diesen Spieler doppelt (s. berechneFokusAuto).
+          const gewaehlt=effektiverFokus(0)===u.id;
           if(gewaehlt)k.classList.add("fokus");
-          k.title=u.n+(gewaehlt?" — wird gedoppelt (klicken hebt den Fokus auf)"
+          k.title=u.n+(gewaehlt?(fsLive.fokusManuell?" — wird gedoppelt (klicken hebt den Fokus auf)"
+                                 :" — wird automatisch gedoppelt (staerkster Gegenspieler; anklicken uebernimmt manuell)")
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
         // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
@@ -19930,8 +20044,21 @@
     if(M.vorher)M.vorher();
     M.bau(saat||1337);
     // Fokus-Doppeln, nur im Basketball-Live-Chassis vorhanden (fsLive), s. der Kommentar
-    // bei spieleBasketball unten.
-    if(o.fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===o.fokusName); if(z)fsLive.fokusZiel=z.id; }
+    // bei spieleBasketball unten. Seit dem 06.09.-Anschluss (berechneFokusAuto,
+    // effektiverFokus) steht `fsLive.fokusZielAuto` schon nach `M.bau()` — ein Spiel ohne
+    // `opt.fokusName`/`opt.fokusAus` laeuft deshalb NICHT mehr garantiert ohne Doppel:
+    // die automatische Vorgabe (staerkster Feldspieler des Gegners, Mindestabstand 15
+    // Eignungspunkte) greift wie in jedem echten Ligaspiel. `fokusName` erzwingt wie
+    // bisher ein manuelles Ziel (setzt zugleich fokusManuell, sonst wuerde die naechste
+    // Viertelpause die Vorgabe zurueckholen); `fokusAus` erzwingt das Gegenteil — ein
+    // garantiertes Nie-Doppeln fuer Vorher/Nachher-Vergleiche, die genau diesen Kontrast
+    // brauchen (s. window.__arena.spieleBasketballOhneFokus unten).
+    if(o.fokusName&&fsLive){
+      const z=FSTEAM[1].find(u=>u.n===o.fokusName);
+      if(z){ fsLive.fokusZiel=z.id; fsLive.fokusManuell=true; }
+    } else if(o.fokusAus&&fsLive){
+      fsLive.fokusZiel=null; fsLive.fokusManuell=true;
+    }
     M.lauf();
     const wert=M.wert(), namen=M.namen();
     const protokoll=istFeldspiel(dId)?fsZuege
@@ -20562,7 +20689,7 @@
       // fokusName wie bei spieleBasketball (s. dort): erlaubt es, die Doppel-Dichte um
       // einen markierten Spieler direkt aus den Positionen zu messen, statt sie aus
       // Wurfereignissen zu erschliessen.
-      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z)fsLive.fokusZiel=z.id; }
+      if(fokusName&&fsLive){ const z=FSTEAM[1].find(u=>u.n===fokusName); if(z){fsLive.fokusZiel=z.id;fsLive.fokusManuell=true;} }
       const eimer=[]; let naechster=0;
       while(!done&&fsT<(bis||30)){
         stepFeldspiel(1/60);
@@ -20586,9 +20713,12 @@
     // laesst (s. Bericht), ohne die UI zu bedienen.
     // ABNAHME DES FOKUS-DOPPELNS (29.08.): optional der Name eines GEGNERISCHEN
     // Spielers, der vor dem ersten Tick als fsLive.fokusZiel gesetzt wird — dieselbe
-    // eine Zustandsvariable, die auch der Klick in der UI setzt, nur ohne UI. Ohne das
-    // Argument bleibt fokusZiel null, und der Durchlauf ist zeichenweise der von
-    // vorher (das ist die Balance-Kontrolle, s. scripts/messe-arena-einfluss.mjs).
+    // eine Zustandsvariable, die auch der Klick in der UI setzt, nur ohne UI.
+    // SEIT DEM 06.09.-ANSCHLUSS NICHT MEHR DIE "KEIN FOKUS"-KONTROLLE: ohne das Argument
+    // greift jetzt die automatische Vorgabe (berechneFokusAuto, staerkster Feldspieler
+    // des Gegners je Viertel) wie in jedem echten Ligaspiel — der Durchlauf ist NICHT
+    // mehr zeichenweise der von vorher. Ein garantierter Nie-Fokus-Lauf steht als
+    // `window.__arena.spieleBasketballOhneFokus(saat)` daneben (s. dort).
     //
     // SEIT DER VERALLGEMEINERUNG (Plan 1.2 Punkt 2) ist das hier ein ALIAS auf
     // spieleDisziplin("basketball", ...) — Aufbau, Fokus-Ziel, Boxscore und Aufraeumen
@@ -20615,6 +20745,11 @@
     // hoechstens 25200 Ticks statt der 20000 hier — nur eben oberhalb der Spieldauer
     // statt darunter.
     spieleBasketball:(saat,fokusName)=>spieleDisziplin("basketball",saat,{fokusName,zustandBehalten:true}).protokoll,
+    // Garantiertes Nie-Doppeln (06.09.-Anschluss): seit die automatische Vorgabe
+    // (berechneFokusAuto) jedes Spiel ohne `fokusName` trifft, ist `spieleBasketball(saat)`
+    // KEIN "kein Fokus"-Referenzlauf mehr — wer den braucht (Vorher/Nachher-Vergleich der
+    // Fokus-Mechanik selbst), nutzt diesen Einstiegspunkt.
+    spieleBasketballOhneFokus:(saat)=>spieleDisziplin("basketball",saat,{fokusAus:true,zustandBehalten:true}).protokoll,
     // DERSELBE LAUF FUER JEDE DISZIPLIN: window.__arena.spiele(dId, saat) liefert
     // {disziplin, protokoll, wert, punkte, namen} — s. spieleDisziplin() oben, dort steht
     // auch, was "Protokoll" je Chassis heisst und warum "punkte" nur im Feldspiel
@@ -20698,10 +20833,25 @@
     // daneben — der Phasenzustand plus die Position des Schiedsrichters, damit sich von
     // aussen (Playwright) exakt der Moment abpassen laesst, in dem die Formation steht.
     // Fokus-Doppeln, read-only: WER gerade markiert ist (Name statt roher id, damit sich
-    // ein Klick in der UI von aussen abnehmen laesst). null = niemand.
-    fsFokus:()=>{ if(!fsLive||fsLive.fokusZiel==null)return null;
-      const u=FSTEAM[0].concat(FSTEAM[1]).find(x=>x.id===fsLive.fokusZiel);
-      return u?{id:u.id,n:u.n,side:u.side}:null; },
+    // ein Klick in der UI von aussen abnehmen laesst). null = niemand. Seit dem
+    // 06.09.-Anschluss der WIRKSAME Fokus (effektiverFokus(0) — automatische Vorgabe
+    // ODER manuelle Wahl, je nachdem was gerade gilt), mit `manuell` dabei, damit
+    // Playwright/Abnahme-Skripte die beiden Faelle auseinanderhalten koennen.
+    fsFokus:()=>{ if(!fsLive)return null;
+      const ziel=effektiverFokus(0); if(ziel==null)return null;
+      const u=FSTEAM[0].concat(FSTEAM[1]).find(x=>x.id===ziel);
+      return u?{id:u.id,n:u.n,side:u.side,manuell:!!fsLive.fokusManuell}:null; },
+    // Read-only Blick auf die automatische Vorgabe BEIDER Seiten (06.09.-Anschluss,
+    // berechneFokusAuto) — unabhaengig von einer manuellen Uebersteuerung. `[seite0Ziel,
+    // seite1Ziel]`, je Eintrag Name oder null. Fuer die Abnahme des Margin-Kriteriums
+    // (FOKUS_EIG_MARGIN_MIN) und um in Tests zu belegen, dass die Vorgabe pro Viertel
+    // neu bestimmt wird, statt nur einmal zu Spielbeginn.
+    fsFokusAuto:()=>{ if(!fsLive)return null;
+      return fsLive.fokusZielAuto.map(id=>{
+        if(id==null)return null;
+        const u=FSTEAM[0].concat(FSTEAM[1]).find(x=>x.id===id);
+        return u?u.n:null;
+      }); },
     fsPhase:()=>fsLive?{phase:fsLive.phase,
       freiwurf:fsLive.freiwurf?{schuetze:fsLive.freiwurf.schuetze.n,seite:fsLive.freiwurf.schuetze.side,
         anzahl:fsLive.freiwurf.anzahl,idx:fsLive.freiwurf.idx,gemacht:fsLive.freiwurf.gemacht,

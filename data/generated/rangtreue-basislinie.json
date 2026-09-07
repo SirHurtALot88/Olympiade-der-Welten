@@ -142,10 +142,10 @@
   },
   "basketball": {
    "chassis": "feldspiel",
-   "spielMedian": 0.772,
-   "spielSpannweite": 0.088,
+   "spielMedian": 0.769,
+   "spielSpannweite": 0.105,
    "saisonMedian": 0.923,
-   "saisonSpannweite": 0.231,
+   "saisonSpannweite": 0.224,
    "schranke": 0.05
   },
   "football": {
