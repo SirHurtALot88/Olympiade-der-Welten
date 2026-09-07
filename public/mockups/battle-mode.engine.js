@@ -15538,39 +15538,134 @@
   // DIE EINE ZAHL: Sterne plus Zielbonus = W4 = die Wertung. Mauer, Laeuferzeile,
   // Kopfzeile, Overlay und wert() lesen alle diese Funktion (Prototyp 06.09.).
   function burgwertung(u){ return burgpunkte(u)+zielbonus(u); }
+  // FALLEN-AUSGANG FUER DIE ZEICHNUNG (Item 3, Recherche-Dokument Abschnitt 2.2/2.3):
+  // reine Lesefunktion auf u.fallen[...].aus, das stepSpurt laengst schreibt (:'sauber'/
+  // 'durchbruch'/'sturz') -- schreibt selbst nichts zurueck, kein rr()-Aufruf, kein Einfluss
+  // auf wert()/Burgpunkte. `u.fallen.length-1===i` funktioniert, weil jeder Laeufer dieselbe
+  // Fallen-Reihenfolge in derselben Zaehlung durchlaeuft (kein Ueberspringen moeglich) --
+  // der Eintrag an Index `u.fallen.length-1` IST also die Falle Nummer i. `u.huerde>0` ist
+  // derselbe Zaehler, der den Stopp an der Falle laufen laesst (":Zeile 17029"), hier als
+  // "wie lange steht er noch davor" gelesen. Bei mehreren Laeufern an derselben Falle
+  // gewinnt der schwerere Ausgang (Sturz vor Durchbruch vor Sauber), damit die Falle nie
+  // den harmlosesten Fall zeigt, waehrend nebenan jemand stuerzt.
+  function fallenAusgang(i){
+    let aus=null;
+    for(const u of LAEUFER){
+      if(!(u.huerde>0)||!u.fallen||!u.fallen.length||u.fallen.length-1!==i)continue;
+      const a=u.fallen[u.fallen.length-1].aus;
+      if(a==="sturz")return "sturz";
+      if(a==="durchbruch")aus="durchbruch";
+      else if(a==="sauber"&&!aus)aus="sauber";
+    }
+    return aus;
+  }
   function zeichneFalleTakeshi(i,x,y,b){
     const look=fallenLook(i), t=rennT;
+    const aus=fallenAusgang(i);
     const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
     switch(look){
-      case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders
+      case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders.
+        // REAGIERT AUF DEN AUSGANG (Item 4): bei durchbruch wackeln die stehenbleibenden
+        // Mauerstuecke kurz nach, bei sauber gluehen die Kanten der Luecke kurz gruen.
         if(!aDa("burg_mauer"))break; const m=aBild.burg_mauer; const luecke=((b+i)%3);
-        const teile=[[x-30,0],[x-8,1],[x+14,2]]; for(const [tx,k] of teile){ if(k===luecke)continue; ctx.drawImage(m,k*40,8,36,56,Math.round(tx),Math.round(y-24),18,28);} break; }
-      case "steine": { // Skipping Stones: Wasser und drei Trittsteine
-        wasser(); const st=aMust("boden_stein"); for(const dx of [-18,0,18]){ ctx.save(); ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.clip(); ctx.fillStyle=st||"#9a9486"; ctx.fillRect(x+dx-8,y-10,16,12); ctx.restore(); ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.stroke(); } break; }
-      case "tuer": { // Knock Knock: Tueren — je Bahn eine aus Papier (hell) oder aus Holz
-        if(!aDa("falle_tuer"))break; ctx.drawImage(aBild.falle_tuer,Math.round(x-12),Math.round(y+3-48),24,48);
-        if((b+i)%2===0){ ctx.globalAlpha=0.38; ctx.fillStyle="#fff7e0"; ctx.fillRect(x-10,y+3-44,20,40); ctx.globalAlpha=1; } break; }
-      case "brueckenball": { // Bridge Ball: Planke ueber Wasser, ein Pendelball schwingt quer
+        const wackel=aus==="durchbruch"?Math.sin(t*30)*2:0;
+        const teile=[[x-30,0],[x-8,1],[x+14,2]]; for(const [tx,k] of teile){ if(k===luecke)continue; ctx.drawImage(m,k*40,8,36,56,Math.round(tx+wackel),Math.round(y-24),18,28);}
+        if(aus==="sauber"){ ctx.strokeStyle="rgba(120,220,140,.75)"; ctx.lineWidth=2;
+          ctx.strokeRect(Math.round(teile[luecke][0]-2),Math.round(y-26),22,32); }
+        break; }
+      case "steine": { // Skipping Stones: Wasser und drei Trittsteine.
+        // REAGIERT AUF DEN AUSGANG: der zuletzt genommene Stein (Kandidat unter dem
+        // Laeufer) hellt bei sauber kurz auf, kippt sichtbar bei durchbruch/sturz — bei
+        // sturz zusaetzlich ein Wasserring, derselbe Ring-Baustein wie bei den Blasen.
+        wasser(); const st=aMust("boden_stein");
+        const mitte=(b+i)%3;
+        const dxs=[-18,0,18];
+        dxs.forEach((dx,k)=>{
+          const treffer=aus&&k===mitte%3;
+          const kipp=treffer&&(aus==="durchbruch"||aus==="sturz")?0.22:0;
+          ctx.save(); ctx.translate(x+dx,y-4); if(kipp)ctx.rotate(kipp);
+          ctx.beginPath(); ctx.ellipse(0,0,7,5,0,0,6.283); ctx.clip();
+          ctx.fillStyle=treffer&&aus==="sauber"?"#c9c2ae":(st||"#9a9486"); ctx.fillRect(-8,-6,16,12);
+          ctx.restore();
+          ctx.strokeStyle="rgba(0,0,0,.45)"; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(x+dx,y-4,7,5,0,0,6.283); ctx.stroke();
+          if(treffer&&aus==="sturz"){ ctx.strokeStyle="rgba(150,200,230,.6)"; ctx.lineWidth=1.5;
+            ctx.beginPath(); ctx.ellipse(x+dx,y-2,11,6,0,0,6.283); ctx.stroke(); }
+        });
+        break; }
+      case "tuer": { // Knock Knock: Tueren — je Bahn eine aus Papier (hell) oder aus Holz.
+        // REAGIERT AUF DEN AUSGANG (Item 3): 'sauber' schwingt die Tuer weit auf (schmalere
+        // Breite ab der linken Angel), 'durchbruch' ruettelt sie samt Riss-Blitz, 'sturz'
+        // wackelt sie nur leicht nach.
+        if(!aDa("falle_tuer"))break;
+        const jitter=aus==="durchbruch"?Math.sin(t*40)*3:(aus==="sturz"?Math.sin(t*22)*1.5:0);
+        const w=aus==="sauber"?14:24;
+        ctx.drawImage(aBild.falle_tuer,Math.round(x-12+jitter),Math.round(y+3-48),w,48);
+        if((b+i)%2===0){ ctx.globalAlpha=0.38; ctx.fillStyle="#fff7e0"; ctx.fillRect(x-10+jitter,y+3-44,w-4,40); ctx.globalAlpha=1; }
+        if(aus==="durchbruch"){ ctx.strokeStyle="rgba(255,90,60,.85)"; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(x-2,y-30); ctx.lineTo(x+3,y-18); ctx.lineTo(x-2,y-6); ctx.stroke(); }
+        break; }
+      case "brueckenball": { // Bridge Ball: Planke ueber Wasser, ein Pendelball schwingt quer.
+        // REAGIERT AUF DEN AUSGANG: bei durchbruch/sturz schlaegt der Ball sichtbar staerker
+        // und schneller aus (Vorschlag des Berichts, Abschnitt 2.3), bei sturz zusaetzlich rot.
         wasser(); if(aDa("hind_balken"))ctx.drawImage(aBild.hind_balken,Math.round(x-32),Math.round(y-2-32));
-        const w=Math.sin(t*2.2+b*0.9)*0.7, px=x+Math.sin(w)*26, py=y-52+Math.cos(w)*26;
+        const heftig=aus==="durchbruch"||aus==="sturz";
+        const amp=heftig?1.35:0.7, tempo=heftig?4.4:2.2;
+        const w=Math.sin(t*tempo+b*0.9)*amp, px=x+Math.sin(w)*26, py=y-52+Math.cos(w)*26;
         ctx.strokeStyle="#d9c9a0"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x,y-54); ctx.lineTo(px,py); ctx.stroke();
-        ctx.fillStyle="#c0504a"; ctx.beginPath(); ctx.arc(px,py,6,0,6.283); ctx.fill(); ctx.strokeStyle="#5a1f1c"; ctx.stroke(); break; }
-      case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur
+        ctx.fillStyle=aus==="sturz"?"#e0685f":"#c0504a"; ctx.beginPath(); ctx.arc(px,py,heftig?7.5:6,0,6.283); ctx.fill(); ctx.strokeStyle="#5a1f1c"; ctx.stroke(); break; }
+      case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur.
+        // REAGIERT AUF DEN AUSGANG: bei sturz eine zusaetzliche, dunklere Rutschspur quer
+        // ueber die Bahn — die Linie, die der Sturz auf dem Eis hinterlassen haette.
         const e=aMust("boden_eis"); ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
-        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();} break; }
-      case "raeder": { // High Rollers: ein rollendes Rad pendelt ueber die Spur
-        if(!aDa("deko_rad"))break; const ox=Math.sin(t*1.3+b*0.7)*18; ctx.save(); ctx.translate(x+ox,y-12); ctx.rotate(t*3+b); ctx.drawImage(aBild.deko_rad,-14,-14,28,28); ctx.restore();
-        ctx.globalAlpha=0.25; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(x+ox,y+2,12,4,0,0,6.283); ctx.fill(); ctx.globalAlpha=1; break; }
-      case "seilwand": { // Border Wall: Palisade mit Strickleiter
+        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();}
+        if(aus==="sturz"){ ctx.strokeStyle="rgba(70,110,140,.55)"; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(x-20,y-6); ctx.lineTo(x+20,y-14); ctx.stroke(); }
+        break; }
+      case "raeder": { // High Rollers: ein rollendes Rad pendelt ueber die Spur.
+        // REAGIERT AUF DEN AUSGANG: schneller/weiter bei durchbruch, dazu ein paar Funken;
+        // langsamer, weiter ausholender Pendelschlag bei sturz.
+        if(!aDa("deko_rad"))break;
+        const heftig=aus==="durchbruch", gebremst=aus==="sturz";
+        const ox=Math.sin(t*(gebremst?2.6:1.3)+b*0.7)*(gebremst?26:18);
+        ctx.save(); ctx.translate(x+ox,y-12); ctx.rotate(t*(heftig?6:3)+b); ctx.drawImage(aBild.deko_rad,-14,-14,28,28); ctx.restore();
+        ctx.globalAlpha=0.25; ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(x+ox,y+2,12,4,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+        if(heftig){ ctx.strokeStyle="rgba(255,210,90,.9)"; ctx.lineWidth=1.5;
+          for(const ang of [0.3,2.4,4.5]){ ctx.beginPath();
+            ctx.moveTo(x+ox+Math.cos(ang)*14,y-12+Math.sin(ang)*14);
+            ctx.lineTo(x+ox+Math.cos(ang)*22,y-12+Math.sin(ang)*22); ctx.stroke(); } }
+        break; }
+      case "seilwand": { // Border Wall: Palisade mit Strickleiter.
+        // REAGIERT AUF DEN AUSGANG: die Leiter schwingt bei durchbruch/sturz sichtbar aus,
+        // ruhig bei sauber.
         if(aDa("hind_wand"))ctx.drawImage(aBild.hind_wand,Math.round(x-16),Math.round(y+3-64));
-        if(aDa("falle_strickleiter")){ctx.globalAlpha=0.95; ctx.drawImage(aBild.falle_strickleiter,8,0,24,64,Math.round(x-8),Math.round(y+1-60),16,60); ctx.globalAlpha=1;} break; }
-      case "walzen": { // Roller Game: zwei Rollen, die auf und ab wippen
-        if(!aDa("falle_walze"))break; for(const k of [-13,13]){ const dy=Math.sin(t*4+b+k)*3; ctx.drawImage(aBild.falle_walze,Math.round(x+k-14),Math.round(y-18+dy),28,28);} break; }
-      case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen
+        const heftig=aus==="durchbruch"||aus==="sturz";
+        const schwung=heftig?Math.sin(t*10)*4:0;
+        if(aDa("falle_strickleiter")){ctx.globalAlpha=0.95;
+          ctx.save(); ctx.translate(schwung,0);
+          ctx.drawImage(aBild.falle_strickleiter,8,0,24,64,Math.round(x-8),Math.round(y+1-60),16,60);
+          ctx.restore(); ctx.globalAlpha=1;}
+        break; }
+      case "walzen": { // Roller Game: zwei Rollen, die auf und ab wippen.
+        // REAGIERT AUF DEN AUSGANG: staerkeres, schnelleres Wippen bei durchbruch/sturz.
+        if(!aDa("falle_walze"))break;
+        const heftig=aus==="durchbruch"||aus==="sturz";
+        for(const k of [-13,13]){ const dy=Math.sin(t*(heftig?9:4)+b+k)*(heftig?6:3); ctx.drawImage(aBild.falle_walze,Math.round(x+k-14),Math.round(y-18+dy),28,28);}
+        break; }
+      case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen.
+        // REAGIERT AUF DEN AUSGANG: ein Sturz loest statt der ruhigen Blasen einen kurzen
+        // Spritzer aus (mehr, groessere Blasen, kurzzeitig) — ausgeloest statt zeitgesteuert.
         const er=aMust("boden_erde"); ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
-        ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();} break; }
-      case "spitzen": { // Final Fall: spanischer Reiter
-        if(!aDa("falle_spitzen"))break; ctx.drawImage(aBild.falle_spitzen,0,96,32,32,Math.round(x-16),Math.round(y+3-32),32,32); break; }
+        const spritzer=aus==="sturz";
+        ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
+        if(spritzer){ ctx.strokeStyle="rgba(255,255,255,.6)";
+          for(let k=0;k<5;k++){const ph=(t*2.4+k*0.31)%1; ctx.beginPath(); ctx.arc(x-24+k*12,y-6-ph*22,2+ph*4,0,6.283); ctx.stroke();} }
+        break; }
+      case "spitzen": { // Final Fall: spanischer Reiter.
+        // REAGIERT AUF DEN AUSGANG: bei durchbruch/sturz ein kurzer roter Aufprallblitz.
+        if(!aDa("falle_spitzen"))break; ctx.drawImage(aBild.falle_spitzen,0,96,32,32,Math.round(x-16),Math.round(y+3-32),32,32);
+        if(aus==="durchbruch"||aus==="sturz"){ ctx.strokeStyle="rgba(220,80,60,.7)"; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(x-10,y-20); ctx.lineTo(x+2,y-10); ctx.lineTo(x-6,y-2); ctx.stroke(); }
+        break; }
       default: { ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3); ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10); }
     }
   }
@@ -17195,6 +17290,7 @@
       if(u.huerde>0)u.huerde-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
       if(u.kraft>0)u.kraft-=dt;
+      if(u.lungeVis>0)u.lungeVis-=dt;    // rein kosmetisch, s. Setzstelle im Tackle-Zweig
       if(u.wechselCd>0)u.wechselCd-=dt;
       // DAS PUBLIKUM. Charisma steht in Takeshi's Matrix mit 14 — fuer eine Hindernisbahn
       // ungewoehnlich hoch, und es gibt genau einen Ort, an den es gehoert: die Menge
@@ -17337,6 +17433,16 @@
                 const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
                 u.huerde+=preis; u.gedraengt=(u.gedraengt||0)+1; u.gedraengeZeit=(u.gedraengeZeit||0)+preis;
                 u.fallen[u.fallen.length-1].gedraenge=extra;
+                // SICHTBARES GEDRAENGE (docs/design/takeshi-animationen-hilfe-behinderung-
+                // recherche-06-09.md, Abschnitt 1.2/1.5): derselbe Ring, der im Kampf eine
+                // Betaeubung markiert, liest sich an der Falle als Pulk-Welle. Reine
+                // Zeichnung -- effekt() liest nur Bildschirmkoordinaten, schreibt nichts
+                // zurueck, kein rr()-Aufruf. laeuferXY() statt camX/bahnY direkt: Takeshi
+                // laeuft auf der ROUTE (istRoute()), deren Bildschirmkoordinaten von der
+                // geraden Bahn abweichen (Catmull-Rom-Kurve statt x=pos*Breite) --
+                // laeuferXY() kennt beide Faelle bereits (s. dort), camX/bahnY allein waere
+                // fuer die Route falsch platziert.
+                { const p=laeuferXY(u); effekt({typ:"welle",x:p.x,y:p.y,r:34,seite:u.seite,dauer:.5}); }
                 schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
                 // Ticker EINMAL je Falle und Pulk (ab `melden` Mitlaeufern). Je Laeufer
                 // gemeldet waren es 39 Zeilen in einem Rennen — das haette die Fallen
@@ -17462,6 +17568,16 @@
           // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
           // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
           u.tackleCd=TA.tackleCd??1.8; u.kraft=TA.tackleKosten??0.26; u.tackles++;
+          // u.lungeVis: REIN KOSMETISCHER Timer fuer die Stoss-Pose in zeichneSpurt (Item 2,
+          // takeshi-animationen-hilfe-behinderung-recherche-06-09.md, Abschnitt 1.3). Vorher
+          // hing die Pose an u.kraft, und Takeshi setzt tackleKosten:0 (gemessen, Abschnitt 1.3
+          // dort) -- der Rempler zahlte dort nie den Tempo-/Kraftverbrauchs-Malus und bekam
+          // deshalb auch nie die Pose zu sehen. u.lungeVis wird NUR hier gesetzt, NUR beim
+          // Zeichnen gelesen (zeichneSpurt) und NIRGENDS sonst -- die Bedingung aus dem
+          // Bericht, ohne die die Trennung von u.kraft wirkungslos waere. Fester Wert (0,26s)
+          // statt TA.tackleKosten: die Pose soll fuer JEDE Bahn mit tackle:true gleich lang zu
+          // sehen sein, unabhaengig davon, was der jeweilige Tempo-Malus gerade betraegt.
+          u.lungeVis=0.26;
           // OUTSMART, Saeule "Gegner lesen" (Chris 06.09.: "faende es halt cool wenn man
           // gegner dort auch outsmarten kann"). Bevor das Duell WUCHT gegen ROBUST faellt,
           // darf das Opfer den Rempler KOMMEN SEHEN und ihn ins Leere laufen lassen:
@@ -17488,12 +17604,24 @@
               :(TA.tackleAusweichen.basis??0)+(o.TECHNIK||0)*(TA.tackleAusweichen.spanne??0)):0;
           if(TA.tackleAusweichen && rr()<Math.min(0.75,ausw)){
             o.ausgewichen=(o.ausgewichen||0)+1;
+            // AUSWEICHEN SICHTBAR (dieselbe Quelle wie oben): ein kurzer Ausweich-Ruck neben
+            // dem Opfer, derselbe Farbverlauf-Baustein wie beim Windschatten-Sog. Deutet die
+            // Seitwaertsbewegung nur an -- u.pos/u.bahnZ selbst aendern sich nicht.
+            // laeuferXY() statt camX/bahnY direkt, s. Begruendung beim Gedraenge-Effekt oben.
+            { const p=laeuferXY(o); effekt({typ:"spur",x:p.x-10,y:p.y,x2:p.x+16,y2:p.y-16,seite:o.seite,dauer:.4}); }
             schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"weicht aus",life:.9,crit:false,_laeufer:o.id});
             feed(o.seite,o.n+" sieht "+u.n+" kommen und lässt ihn ins Leere laufen.");
           } else {
             const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
             if(rr()<stark){
               o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
+              // REMPLER-TREFFER SICHTBAR: derselbe Bogenschlag, der im Kampf jeden Treffer
+              // markiert (effektFuer/"hieb"). u.lungeVis (s. unten) loest zugleich die
+              // vorhandene Stoss-Pose aus -- getrennt von u.kraft, das den gemessenen
+              // Tempo-/Kraftverbrauchs-Malus traegt und hier unveraendert bleibt.
+              // laeuferXY() statt camX/bahnY direkt, s. Begruendung beim Gedraenge-Effekt oben.
+              { const po=laeuferXY(o), pu=laeuferXY(u);
+                effekt({typ:"hieb",x:po.x,y:po.y,ux:pu.x,uy:pu.y,seite:u.seite,schwer:true,dauer:.42}); }
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:TA.tackleFenster?"gerammt":"getackelt",life:1,crit:true,_laeufer:o.id});
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
                                                 :" räumt "+o.n+" von der Bahn."));
@@ -17631,7 +17759,10 @@
       ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
       zeichneSprite(ctx,{n:u.n,id:u.id,
         vx:u.stolper>0?0:(tg?tg.tx*4:4), vy:tg?tg.ty*4:0, side:u.seite,
-        lunge:u.kraft>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+        // u.lungeVis statt u.kraft (Item 2): dieselbe Stoss-Pose, aber an einem rein
+        // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
+        // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
+        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
       ctx.restore();
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
@@ -17714,6 +17845,13 @@
       ctx.beginPath();ctx.moveTo(gx,gy+24);ctx.lineTo(gx,gy+30);ctx.stroke();
       ctx.restore();
     }
+    // PARTIKEL-EFFEKTE AUF DER BAHN (Item 1, s. Recherche-Dokument oben): dasselbe
+    // EFFEKTE/zeichneEffekte, das draw() im Kampf am Ende aufruft, war auf der Bahn nie
+    // verdrahtet -- effekt() wurde an den Chaos-Stellen in stepSpurt zwar schon gefuellt
+    // (Rempler-Treffer/Ausweichen/Gedraenge, s. dort), aber nie gezeichnet. Vor den
+    // Schwebetexten, damit ein Text nie unter einem frischen Effekt verschwindet --
+    // dieselbe Reihenfolge wie im Kampf-draw().
+    zeichneEffekte(1/60);
     // SCHWEBETEXTE. Sie fehlten auf der Bahn komplett: stepSpurt ruft schwebe() an acht
     // Stellen ("stolpert", "getackelt", "eingebrochen", "Stab weiter", "ausgeschieden"
     // ...), gezeichnet wurden sie aber nur im Kampf (draw), im Feldspiel und auf der
