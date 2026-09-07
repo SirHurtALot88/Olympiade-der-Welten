@@ -62,10 +62,10 @@
   },
   "takeshis-castle": {
    "chassis": "bahn",
-   "spielMedian": 0.886,
-   "spielSpannweite": 0.073,
-   "saisonMedian": 0.951,
-   "saisonSpannweite": 0.126,
+   "spielMedian": 0.861,
+   "spielSpannweite": 0.116,
+   "saisonMedian": 0.93,
+   "saisonSpannweite": 0.056,
    "schranke": 0.05
   },
   "gewichtheben": {
@@ -78,67 +78,67 @@
   },
   "showcase": {
    "chassis": "buehne",
-   "spielMedian": 0.88,
-   "spielSpannweite": 0.14,
-   "saisonMedian": 0.944,
-   "saisonSpannweite": 0.063,
+   "spielMedian": 0.892,
+   "spielSpannweite": 0.158,
+   "saisonMedian": 0.937,
+   "saisonSpannweite": 0.077,
    "schranke": 0.05
   },
   "eiskunstlauf": {
    "chassis": "buehne",
-   "spielMedian": 0.757,
-   "spielSpannweite": 0.125,
-   "saisonMedian": 0.958,
-   "saisonSpannweite": 0.091,
+   "spielMedian": 0.792,
+   "spielSpannweite": 0.13,
+   "saisonMedian": 0.944,
+   "saisonSpannweite": 0.077,
    "schranke": 0.05
   },
   "breaking": {
    "chassis": "buehne",
-   "spielMedian": 0.801,
-   "spielSpannweite": 0.114,
-   "saisonMedian": 0.874,
-   "saisonSpannweite": 0.119,
+   "spielMedian": 0.804,
+   "spielSpannweite": 0.133,
+   "saisonMedian": 0.937,
+   "saisonSpannweite": 0.197,
    "schranke": 0.05
   },
   "wettessen": {
    "chassis": "buehne",
-   "spielMedian": 0.844,
-   "spielSpannweite": 0.233,
-   "saisonMedian": 0.916,
-   "saisonSpannweite": 0.126,
-   "schranke": 0.07
+   "spielMedian": 0.845,
+   "spielSpannweite": 0.139,
+   "saisonMedian": 0.93,
+   "saisonSpannweite": 0.091,
+   "schranke": 0.05
   },
   "speed-schach": {
    "chassis": "buehne",
-   "spielMedian": 0.889,
-   "spielSpannweite": 0.06,
-   "saisonMedian": 0.979,
-   "saisonSpannweite": 0.021,
+   "spielMedian": 0.908,
+   "spielSpannweite": 0.066,
+   "saisonMedian": 0.972,
+   "saisonSpannweite": 0.042,
    "schranke": 0.05
   },
   "i-spy": {
    "chassis": "buehne",
-   "spielMedian": 0.692,
-   "spielSpannweite": 0.384,
-   "saisonMedian": 0.727,
-   "saisonSpannweite": 0.441,
-   "schranke": 0.115
+   "spielMedian": 0.684,
+   "spielSpannweite": 0.353,
+   "saisonMedian": 0.804,
+   "saisonSpannweite": 0.608,
+   "schranke": 0.106
   },
   "tennis": {
    "chassis": "buehne",
-   "spielMedian": 0.814,
-   "spielSpannweite": 0.176,
-   "saisonMedian": 0.839,
-   "saisonSpannweite": 0.294,
-   "schranke": 0.053
+   "spielMedian": 0.786,
+   "spielSpannweite": 0.194,
+   "saisonMedian": 0.846,
+   "saisonSpannweite": 0.273,
+   "schranke": 0.058
   },
   "fechten": {
    "chassis": "buehne",
-   "spielMedian": 0.84,
-   "spielSpannweite": 0.23,
-   "saisonMedian": 0.874,
-   "saisonSpannweite": 0.252,
-   "schranke": 0.069
+   "spielMedian": 0.816,
+   "spielSpannweite": 0.192,
+   "saisonMedian": 0.888,
+   "saisonSpannweite": 0.133,
+   "schranke": 0.058
   },
   "basketball": {
    "chassis": "feldspiel",
