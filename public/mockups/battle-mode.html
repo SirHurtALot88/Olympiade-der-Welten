@@ -104,6 +104,29 @@
              (s. Abschnitt 4 derselben Recherche). Blendet sich automatisch nach ein paar
              Sekunden wieder aus (s. callout() in der Engine). -->
         <div class="bbugcallout" id="bbugcallout" hidden></div>
+        <!-- BROADCAST-HUD DER STAFFEL (Recherche 06.09., docs/design/staffel-oval-
+             broadcast-hud-recherche-06-09.md Abschnitt 4). Zeigt aktuellen und
+             naechsten Laeufer je Seite mit ihrer festen Eignung, dazu das live
+             geschaetzte Zeit-Delta zwischen beiden Seiten (staffelZeitDelta() in
+             battle-mode.engine.js, ueber updateHudBahn() jeden Frame befuellt und
+             per [hidden] fuer jede andere Bahn-Disziplin ausgeblendet). Reine
+             Anzeige, pointer-events:none, damit sie die Laeufer-Auswahl per Klick
+             auf der Leinwand darunter nicht blockiert. Eigenes Panel statt Erweiterung
+             des generischen Broadcast-Bugs (#843) darueber: der Bug zeigt Team/Score/
+             Uhr, hier geht es um laeuferspezifische Werte (Eignung, Wechsel-Delta) --
+             beide sind gleichzeitig sichtbar, ohne sich zu ueberschneiden (Bug oben
+             links/rechts schmal, dieses Panel darunter volle Breite). -->
+        <div class="bahnhud" id="bahnHud" hidden>
+          <div class="bhside bhL">
+            <div class="bhrow"><span class="bhtag">Aktuell</span><span class="bhname" id="bhLcurName"></span><span class="bheig" id="bhLcurEig"></span></div>
+            <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhLnextName"></span><span class="bheig" id="bhLnextEig"></span></div>
+          </div>
+          <div class="bhdelta" id="bhDelta">—</div>
+          <div class="bhside bhR">
+            <div class="bhrow"><span class="bhtag">Aktuell</span><span class="bhname" id="bhRcurName"></span><span class="bheig" id="bhRcurEig"></span></div>
+            <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhRnextName"></span><span class="bheig" id="bhRnextEig"></span></div>
+          </div>
+        </div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->

@@ -15256,6 +15256,46 @@
       return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    // BROADCAST-HUD DER STAFFEL (Recherche-Dokument Abschnitt 4): aktueller und
+    // naechster Laeufer je Seite mit ihrer festen Eignung (u.eig, aendert sich
+    // waehrend des Rennens nie), dazu das live geschaetzte Zeit-Delta. Fuer jede
+    // andere Bahn-Disziplin bleibt das Panel ausgeblendet — dieselbe [hidden]-
+    // Konvention wie beim Viertelpause-Overlay.
+    const bhud=document.getElementById("bahnHud");
+    if(bhud){
+      if(!BA().staffel){ bhud.hidden=true; }
+      else {
+        bhud.hidden=false;
+        const setzLaeufer=(prefix,u)=>{
+          const nameEl=document.getElementById(prefix+"Name"), eigEl=document.getElementById(prefix+"Eig");
+          if(nameEl)nameEl.textContent=u?u.n:"—";
+          if(eigEl)eigEl.textContent=u?("Eig "+Math.round(u.eig)):"";
+        };
+        for(const [seite,praefix] of [[0,"bhL"],[1,"bhR"]]){
+          const aktivU=LAEUFER.find(o=>o.seite===seite&&o.aktiv);
+          const naechste=aktivU?LAEUFER.find(o=>o.seite===seite&&o.bein===aktivU.bein+1):null;
+          setzLaeufer(praefix+"cur",aktivU);
+          setzLaeufer(praefix+"next",naechste);
+        }
+        const deltaEl=document.getElementById("bhDelta");
+        if(deltaEl){
+          deltaEl.classList.remove("bh-home","bh-away");
+          if(done){
+            // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
+            // (bahnTeamstand().zusatz, "12,2 s gegen 11,1 s") — dieselbe Messung,
+            // hier nur final statt interpoliert. Keine zwei Wahrheiten.
+            deltaEl.textContent=stand.zusatz?("Ziel · "+stand.zusatz):"—";
+          } else {
+            const d=staffelZeitDelta();
+            if(d.unklar){ deltaEl.textContent="—"; }
+            else {
+              deltaEl.textContent=(d.seite===0?VEREIN[0].name:VEREIN[1].name)+" +"+d.delta.toFixed(1)+"s";
+              deltaEl.classList.add(d.seite===0?"bh-home":"bh-away");
+            }
+          }
+        }
+      }
+    }
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
@@ -15856,6 +15896,10 @@
     // TAKESHI LAEUFT UEBER DIE KARTE, nicht ueber das Bahn-Rechteck. Eine Weiche fuer
     // Boden UND Laeufer (istRoute()), damit beide nie auseinanderlaufen koennen.
     if(istRoute())return bodenTakeshiRoute();
+    // STAFFEL LAEUFT AUF DEM OVAL, nicht auf der geraden Bahn — dieselbe Weiche,
+    // dieselbe Garantie: `laeuferXY()`/`ovalPunkt()` und `bodenSpurtOval()` lesen
+    // beide `istOval()`, koennen also nie auseinanderlaufen.
+    if(istOval())return bodenSpurtOval();
     // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
     // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
@@ -16053,6 +16097,56 @@
       ctx.fillStyle="rgba(255,255,255,.55)";
       ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10);
     }
+  }
+
+  // BODEN DES STAFFEL-OVALS. Dasselbe Wiesengruen wie die gerade Bahn, aber der
+  // Bahnring selbst ist eine Ellipse statt eines Rechtecks — s. `ovalPunkt()`
+  // oben fuer die Laeufer-Geometrie, der diese Zeichnung 1:1 folgt (gleiches
+  // OVAL_CX/CY/RX/RY, gleiches OVAL_BAHN_ABSTAND). Bei festem Winkel haengt die
+  // Bildschirm-X-Koordinate nur von OVAL_RX ab (s. Herleitung an `ovalPunkt`),
+  // jede Bahn-/Ziellinien-Grenze bei konstantem Radius `r` ist deshalb genau die
+  // Ellipse ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,...) — keine Parallelkurven-
+  // Mathematik noetig.
+  function bodenSpurtOval(){
+    const rasen=aMust("rasen");
+    if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H); }
+    else { const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H); }
+    const v=ctx.createLinearGradient(0,0,0,H);
+    v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
+    v.addColorStop(1,"rgba(0,0,0,.30)");
+    ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    const BN=BAHNEN_N();
+    const rInnen=OVAL_RY-OVAL_BAHN_ABSTAND/2, rAussen=rInnen+BN*OVAL_BAHN_ABSTAND;
+    const rMitte=(rInnen+rAussen)/2, breite=rAussen-rInnen;
+    // Bahnring als dicker Ellipsen-Strich — dieselbe Ockerfarbe wie die Gerade.
+    ctx.lineWidth=breite+8; ctx.strokeStyle="#8a4a32";
+    ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,rMitte,0,0,6.283);ctx.stroke();
+    // Dasselbe Ocker-Rauschen wie die Gerade (bodenSaat) — Koernung statt Flaeche.
+    ctx.save(); ctx.globalAlpha=0.09;
+    for(let i=0;i<300;i++){
+      const w=bodenSaat(i+300)*6.283, r=rInnen+bodenSaat(i+340)*breite;
+      ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";
+      ctx.fillRect(OVAL_CX+Math.cos(w)*OVAL_RX-1, OVAL_CY+Math.sin(w)*r-1, 2, 2);
+    }
+    ctx.restore();
+    // Bahnlinien, eine je Grenze — konzentrische Ellipsen mit demselben OVAL_RX.
+    ctx.strokeStyle="rgba(255,255,255,.42)"; ctx.lineWidth=1.5;
+    for(let i=0;i<=BN;i++){
+      const r=rInnen+i*OVAL_BAHN_ABSTAND;
+      ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,0,0,6.283);ctx.stroke();
+    }
+    // ZIELLINIE oben (Winkel -90°, s. ovalWinkel): bei diesem Ansatz eine simple
+    // Strecke, weil x bei festem Winkel nicht vom Radius abhaengt (Herleitung an
+    // ovalPunkt oben) — alle Bahnen liegen also genau UNTEREINANDER auf x=OVAL_CX.
+    ctx.setLineDash([7,7]); ctx.lineWidth=4; ctx.strokeStyle="#fff";
+    ctx.beginPath();
+    ctx.moveTo(OVAL_CX, OVAL_CY-rAussen-6); ctx.lineTo(OVAL_CX, OVAL_CY-rInnen+6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Innenflaeche des Ovals bleibt Wiese — dort steht sonst nichts (kein
+    // Baumfries/keine Burg auf dieser Bahn-Art), das Grasgruen genuegt als Infield.
   }
 
   // ===================================================================================
@@ -16638,6 +16732,13 @@
   let bahnGedraengeGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // BROADCAST-HUD DER STAFFEL: ZEIT-DELTA. Fortschritt-Zeit-Verlaufspuffer je Seite,
+  // dieselbe Methode, mit der Radsport-/Zeitfahren-Uebertragungen den Rueckstand
+  // in Echtzeit einblenden (Recherche-Dokument Abschnitt 4.2). Nur befuellt und
+  // gelesen, wenn BA().staffel — reiner Beobachter, schreibt nie in u.pos/rennT/
+  // etappenZeit/wechselKonto. {t: rennT, p: Gesamtfortschritt 0..1} je Eintrag,
+  // push-only (in stepSpurt) und nur bei echtem Fortschritt, s. dort.
+  let fortschrittVerlauf={0:[],1:[]};
 
   // WERTUNGSTABELLE — BAHN-DEFAULTS (Plan Abschnitt 3.4/4.3). Live-Motor, kein
   // Spoiler-Problem (Abschnitt 1.4): alle Felder duerfen direkt gelesen werden. KEINE
@@ -16849,9 +16950,83 @@
   const istRoute=()=>!!BA().route;
   let camR={x:W/2,y:H/2};                       // Kameramitte in WELTkoordinaten (nur Route)
   const weltZuSchirm=(wx,wy)=>({x:(wx-camR.x)*cam.zoom+W/2, y:(wy-camR.y)*cam.zoom+H/2});
+  // ===================== OVAL DER STAFFEL =====================
+  // Chris (06.09.), woertlich: "staffel findet in einem groesseren oval statt! und
+  // die uebergabe ist IMMER an der ziel linie also nach einer gesamten runde ...
+  // aber auf jeden fall OVAL und man sieht dann immer nur die aktuellen spieler
+  // und die kommenden warten dann an der ziellinie". Recherche und Herleitung:
+  // docs/design/staffel-oval-broadcast-hud-recherche-06-09.md, Abschnitt 2.
+  //
+  // DIE SIMULATION BLEIBT EINDIMENSIONAL, GENAU WIE BEI DER TAKESHI-ROUTE OBEN.
+  // `u.pos` ist weiter 0..1 ueber das GANZE Rennen, `beinVon`/`beinBis` bleiben
+  // 1/n-Abschnitte, der Wechsel- und der Zielcheck (weiter unten in stepSpurt)
+  // lesen unveraendert `u.beinBis<1`/`u.pos>=1`. Es aendert sich einzig die
+  // ABBILDUNG auf den Bildschirm: `laufAnteil(u)` — die Groesse, auf der Tempo,
+  // Kurve und Ermuedung ohnehin schon rechnen (s. dort) — wird zum Winkel auf
+  // einer Ellipse statt zu camX(u.pos). Weil `laufAnteil` bei JEDEM Beinwechsel
+  // wieder bei 0 beginnt (u.pos===u.beinVon), ist jede Runde ein voller Umlauf,
+  // und die Uebergabe liegt immer am selben Punkt — der Ziellinie, Winkel -90°.
+  // Kein Leser von `laufAnteil`/`u.pos` sitzt hier: reine Zeichenfunktion, exakt
+  // wie `ovalXY()` im Recherche-Dokument Abschnitt 2.3 vorschlaegt.
+  //
+  // Groesse/Lage wie dort vorgeschlagen (Abschnitt 2.4): Canvas bleibt 1240x470,
+  // das Oval nimmt fast die volle Flaeche.
+  const OVAL_CX=W/2, OVAL_CY=H*0.56, OVAL_RX=W*0.386, OVAL_RY=H*0.30;
+  const OVAL_BAHN_ABSTAND=15;                  // Bahn 0 innen, Bahn 1 aussen (bahnenFest:2)
+  const istOval=()=>!!BA().staffel;
+  // Winkel 0 = Ziellinie oben (12 Uhr), im Uhrzeigersinn.
+  const ovalWinkel=(lokal)=>lokal*2*Math.PI-Math.PI/2;
+  function ovalPunkt(u){
+    const platz=rennFertig.indexOf(u);
+    const winkel=ovalWinkel(laufAnteil(u));
+    let vx=0, vy=0;                            // Bildschirm-Versatz, nur fuer Wartende/Fertige
+    if(platz>=0){
+      // GANZE MANNSCHAFT IM ZIEL (Staffel wird als Team gewertet, s. stepSpurt):
+      // alle sechs liegen rechnerisch auf demselben Ziellinien-Winkel (der zuletzt
+      // Aktive bei laufAnteil=1, jeder Vorgaenger bei laufAnteil=1 seines EIGENEN
+      // Abschnitts, s. Kommentar an laufAnteil oben). Dieselbe Auffaecherung wie
+      // auf der Geraden (der camX-Zweig unten, "+12+platz*9"), nur entlang der
+      // Tangente an der Ziellinie statt entlang x — dort ist die Tangente rein
+      // horizontal (Winkel -90°, s. Herleitung im Recherche-Dokument), beide
+      // Richtungen fallen also zusammen.
+      vx=12+platz*9;
+    } else if(!u.aktiv && u.fertig==null){
+      // WARTENDE STEHEN AN DER ZIELLINIE, GESTAFFELT (Abschnitt 3 des Dokuments):
+      // laufAnteil ist fuer sie exakt 0 oder 1 (u.pos steht auf einem Vielfachen
+      // von 1/n, s. Aufstellen/Wechsel) — sie liegen also OHNE jede weitere
+      // Rechnung schon auf dem Ziellinien-Winkel, egal fuer welchen Abschnitt sie
+      // warten. Ein Versatz senkrecht zur Laufrichtung faechert sie auf statt sie
+      // zu stapeln — an der Ziellinie (oben auf dem Oval) ist "senkrecht zur
+      // Laufrichtung" die Bildschirm-Y-Achse (dieselbe Idee wie die
+      // Bahn-Auffaecherung anderswo im Motor). Gruppe = ALLE nicht aktiven,
+      // noch nicht im Ziel angekommenen Team-Kollegen — sowohl die, die noch gar
+      // nicht liefen, als auch die, die ihren Abschnitt schon abgegeben haben:
+      // beide stehen sichtbar an derselben Ziellinie (Chris' "die kommenden
+      // warten an der Ziellinie", Abschnitt 3, Punkt 1 des Dokuments).
+      const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null)
+        .sort((a,b)=>(a.bein??0)-(b.bein??0));
+      const idx=wartende.indexOf(u);
+      // Geklemmt auf +-4 (Kadergroesse ist immer 2/4/5/6, s. season-discipline-
+      // schedule.ts — hoechstens fuenf Wartende bei sechs je Seite, idx 0..4, die
+      // Klemmung greift also nie und ist nur eine Absicherung nach oben).
+      vy=Math.max(-4,Math.min(4,idx))*13;
+      // ZWEI WARTEBEREICHE STATT EINEM: bahnZ trennt die beiden Seiten radial nur um
+      // OVAL_BAHN_ABSTAND (15px) — an der Ziellinie selbst (Winkel -90°, s. oben)
+      // haengt die Bildschirm-X aber NICHT vom Radius ab, beide Seiten laegen also
+      // ohne diesen Versatz genau uebereinander. Ein kleiner, seitenfester
+      // Horizontal-Schub schiebt die beiden Warteschlangen nebeneinander (Seite 0
+      // links, Seite 1 rechts) statt sie deckungsgleich zu stapeln — zwei
+      // Wechselzonen nebeneinander, wie bei einer echten Staffel an der Ziellinie.
+      vx=(u.seite===0?-1:1)*34;
+    }
+    const bahnR=OVAL_RY+u.bahnZ*OVAL_BAHN_ABSTAND;
+    return {x:OVAL_CX+Math.cos(winkel)*OVAL_RX+vx, y:OVAL_CY+Math.sin(winkel)*bahnR+vy};
+  }
+
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
+    if(istOval())return ovalPunkt(u);
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -16864,6 +17039,10 @@
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
   function kameraUpdate(dt){
+    // OVAL: die ganze Bahn liegt immer im Bild (Abschnitt 2.4 des Recherche-
+    // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
+    // schwenken oder heranzuzoomen. `ovalPunkt()` liest `cam` ohnehin nie.
+    if(istOval())return;
     const aktiv=LAEUFER.filter(u=>u.fertig==null);
     const quelle=aktiv.length?aktiv:LAEUFER;
     if(!quelle.length)return;
@@ -16902,6 +17081,7 @@
 
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    fortschrittVerlauf={0:[],1:[]};
     // DREI BENANNTE KURSE JE SAAT (Takeshi's Castle, B.4 des Plans, Chris' Entscheidung
     // 05.09.: fest verdrahtet, nicht hinter einem Debug-Flag). Obere Bits des LCG
     // (`(s0>>>8)/16777216`) wie zieheFormkarten seit dessen Fix — die untersten Bits
@@ -17277,9 +17457,49 @@
     return true;
   }
 
+  // Gesamtfortschritt einer Seite ueber das GANZE Rennen (0..1) — dieselbe Zahl wie
+  // die des aktiven Laeufers (`u.pos`, unveraendert von der Oval-Zeichnung oben),
+  // oder 1, wenn die Mannschaft schon im Ziel ist. Nur lesend, fuer das Broadcast-
+  // HUD (staffelZeitDelta unten) und dessen Verlaufspuffer.
+  function gesamtfortschritt(seite){
+    const a=LAEUFER.find(o=>o.seite===seite&&o.aktiv);
+    if(a)return a.pos;
+    const team=LAEUFER.filter(o=>o.seite===seite);
+    return team.length&&team.every(o=>o.fertig!=null)?1:0;
+  }
+  // LIVE-ZEIT-DELTA (Recherche-Dokument Abschnitt 4.2): dieselbe Fortschritt-Zeit-
+  // Interpolation, mit der Radsport-/Zeitfahren-Uebertragungen den Rueckstand zum
+  // Fuehrenden einblenden. Sucht in `fortschrittVerlauf` der FUEHRENDEN Seite den
+  // Zeitpunkt, an dem sie beim Fortschritt der ZURUECKLIEGENDEN Seite stand, und
+  // vergleicht ihn mit der aktuellen Rennzeit. Laeuft jeden Frame neu, springt nie,
+  // konvergiert am Ziel exakt auf den echten Zieleinlauf-Abstand (beide Groessen
+  // sind dieselbe Messung, einmal geschaetzt, einmal final). Liest nur `rennT`/
+  // `u.pos`/den Verlaufspuffer — schreibt nichts, aendert nichts an wert()/rho.
+  function staffelZeitDelta(){
+    const p0=gesamtfortschritt(0), p1=gesamtfortschritt(1);
+    const fuehrend=p0>=p1?0:1, pH=fuehrend===0?p1:p0;
+    const buf=fortschrittVerlauf[fuehrend];
+    const i=buf.findIndex(pt=>pt.p>=pH);
+    if(i<=0)return {seite:fuehrend, delta:0, unklar:true};  // noch keine Vergleichsbasis
+    const a=buf[i-1], b=buf[i];
+    const frac=(pH-a.p)/((b.p-a.p)||1);
+    const zeitFuehrendBeiPH=a.t+(b.t-a.t)*frac;
+    return {seite:fuehrend, delta:Math.max(0,rennT-zeitFuehrendBeiPH), unklar:false};
+  }
+
   function stepSpurt(dt){
     if(done)return;
     rennT+=dt;
+    // BROADCAST-HUD: Verlaufspuffer je Seite mitschreiben (nur push, s. Deklaration
+    // an fortschrittVerlauf oben). Push-only bei echtem Fortschritt haelt den
+    // Puffer klein und monoton in `p`, genau was staffelZeitDelta fuer die
+    // Interpolation braucht.
+    if(BA().staffel){
+      for(const s of [0,1]){
+        const p=gesamtfortschritt(s), buf=fortschrittVerlauf[s];
+        if(!buf.length||p>buf[buf.length-1].p)buf.push({t:rennT,p});
+      }
+    }
     const strecke=W-170;
     for(const u of LAEUFER){
       if(u.fertig!=null)continue;
@@ -17744,22 +17964,35 @@
     // Die Figur waechst mit der Kamera, damit sie auf einer bei 3,4x 190 px breiten Route
     // nicht als 32-px-Sprite verloren geht. Bei Zoom 1 ist sie so gross wie bisher.
     // Name, Plan und Sterne bleiben im Bildschirmraum, skalieren also NICHT mit.
-    const sk=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
+    const sk0=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
     for(const u of reihe){
       const platz=rennFertig.indexOf(u);
       const {x,y}=laeuferXY(u);
-      ctx.globalAlpha=0.25;ctx.fillStyle="#000";
-      ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
+      // AN DER ZIELLINIE WARTEND (nur Staffel, Abschnitt 3 des Recherche-Dokuments):
+      // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
+      // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
+      const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      const sk=wartet?sk0*0.88:sk0;
+      ctx.globalAlpha=wartet?0.72:1;
+      ctx.fillStyle="#000";
+      ctx.globalAlpha*=0.25;
+      ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();
+      ctx.globalAlpha=wartet?0.72:1;
       // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
       // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
       // vier Richtungen und braucht dafuer nur vx/vy — hier die Tangente, auf 4 skaliert
       // (die Schwelle |vy|>2 in blickAus verlangt einen Betrag ueber 2).
       const tg=istRoute()&&u.stolper<=0?routeXY(u.pos):null;
+      // WARTENDE JOGGEN NICHT AUF DER STELLE (Fund aus der 05-09-Recherche, Teil 4:
+      // vx:4 liess sie sichtbar laufen, obwohl sie stehen — vx:0 nutzt das schon
+      // vorhandene idle-Blatt in zeichneSprite, kein neues Asset noetig).
       ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
       zeichneSprite(ctx,{n:u.n,id:u.id,
-        vx:u.stolper>0?0:(tg?tg.tx*4:4), vy:tg?tg.ty*4:0, side:u.seite,
-        // u.lungeVis statt u.kraft (Item 2): dieselbe Stoss-Pose, aber an einem rein
+        // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
+        // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet.
+        vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
         lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
@@ -17823,6 +18056,7 @@
         (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
+    ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
     // Im Pulk (die Kamera zoomt bis 3,4x heran) malen die spaeter gezeichneten Sprites
     // sonst ueber die Marke des frueher gezeichneten Laeufers, und ausgerechnet im
@@ -18270,9 +18504,36 @@
   // scripts/miss-alle-disziplinen.mjs 24 spurt vor UND nach dieser Aenderung liefert
   // 0,871 rho/Spiel, 0,905 rho Saison — unveraendert, wie fuer eine reine dt-Streckung
   // erwartet.
+  //
+  // STAFFEL-AUSNAHME (Oval/Broadcast-HUD-Umsetzung, 06.09., docs/design/staffel-oval-
+  // broadcast-hud-recherche-06-09.md Abschnitt 6): Chris' Auftrag verlangt fuer die
+  // Staffel ausdruecklich dieselben "3 Minuten oder so" wie fuer Spurt, nicht die
+  // uniforme 60-s-Zielgroesse der anderen Bahnen — der alte Faktor 4,65 war auf 60 s
+  // gerechnet, nie auf 180 s. NICHT einfach uebernommen (die Herleitung im Dokument war
+  // eine Schaetzung aus einer AELTEREN Ist-Dauer-Messung), sondern nachgemessen, exakt
+  // dieselbe Methode wie beim Spurt-Fix direkt darueber (Playwright, Standard-Saat 1337,
+  // Chris' Formel-Klick "Kampf starten"): mit dem alten Faktor 4,65 dauerte ein
+  // Staffel-Rennen real 60,4 s bis zum Zieleinlauf. Die Oval-Zeichnung/das Broadcast-
+  // HUD in derselben PR aendern an dieser Ist-Dauer nichts (reine Praesentation, liest
+  // `u.pos` nur lesend, s. Kommentare an ovalPunkt()/staffelZeitDelta() oben) — die
+  // Messung gilt deshalb vor und nach jenen Aenderungen gleichermassen.
+  //
+  // Erster Hochrechnungsschritt (4,65 * 180/60,4 = 13,86) lag beim Nachmessen bei
+  // 170,3 s (2:49) statt 180 s — dieselbe Art Abweichung wie Spurts "Frame-Rundung im
+  // rAF-Loop" oben, hier deutlicher, weil ein groesserer Faktor den Simulationstick in
+  // kleinere dt-Schritte teilt und damit die GENAUE Abfolge der Zufallszuege (rr(),
+  // z.B. Wechselpatzer/Windschatten-Wechsel) leicht verschiebt — dieselbe Saat, aber
+  // nicht mehr exakt dieselbe Tick-Zahl bis zum Ziel. Zweiter, aus DIESER Messung
+  // linear nachskalierter Schritt (13,86 * 180/170,3 = 14,65): erneut nachgemessen,
+  // angezeigte Uhr beim Zieleinlauf 2:58 (178 s), innerhalb der ueblichen Toleranz.
+  //
+  // Dieselbe Garantie wie bei Spurt: stepSpurt/MOTOREN.staffel.wert() laufen nie durch
+  // diese Schleife, nachgemessen bit-identisch mit node scripts/miss-alle-disziplinen.mjs
+  // 24 staffel (0,915 rho/Spiel, 0,951 rho Saison, vor und nach dieser Zeile UND vor/nach
+  // Oval+HUD).
   const ZEIT_DEHNUNG={
     tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
-    spurt:11.14, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
+    spurt:11.14, staffel:14.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
     // Chris' Fund (29.08.): die Bewegung auf dem Court wirkt zu hektisch, um ihr zu
     // folgen. tempoPx selbst anzufassen wuerde die Matrix-Balance neu aufrollen (s.
     // die ausfuehrliche Herleitung beim tempoPx-Koeffizienten, bewegeSpielerLive) — der
