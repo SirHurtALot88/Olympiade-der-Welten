@@ -10788,14 +10788,62 @@
       // ABWEHR->WAGNIS, TEAMGEIST->PUBLIKUM — nur die Namen sind neu.
       label:"Tennis", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
       failAbzug:0.55, failWort:"vergibt den Punkt", erfolgWort:"gewinnt den Ballwechsel",
+      // TENNIS-EIGENE KALIBRIERUNG (07.09., docs/pm-briefings/pm-gesamtstand-07-09.md
+      // Abschnitt 6 Punkt 5). Das Rezept oben war bis hierher Zeile fuer Zeile aus
+      // FELDSPIEL_ART.tennis uebernommen (s. Kommentar am alten Standort, engine.js
+      // ~4581), nur auf die sieben Buehnen-Rollennamen umbenannt — nie eigens gegen
+      // Tennis' eigene MATRIX (BASIS_JE_DISC.tennis: intelligence 22, awareness 20,
+      // spirit 18, stamina 12, dexterity 12, determination 6, speed 6, charisma 4)
+      // gefittet. Gemessen (kaderfest, 24 Spiele, live-save-Kaderfamilie) vor dieser
+      // Aenderung: rho je Spiel 0,786 — knapp unter der 0,80-Schranke.
+      //
+      // Zwei Fehlstellen, dieselbe Art wie bei Gewichtheben/Breaking (s. deren
+      // NACHGEZOGEN-Kommentare oben): ein LEICHTGEWICHTIGES Matrix-Attribut sass in
+      // einer schwergewichtigen Rolle.
+      //
+      // 1) TECHNIK (einzige Rolle mit dem groessten erfolg-Koeffizienten, 0,0055 — der
+      //    Ausgang jedes Ballwechsels haengt ueberproportional an ihr) trug determination
+      //    (Matrixgewicht nur 6) mit 15 % Rollengewicht. Ersetzt durch dexterity
+      //    (Matrixgewicht 12, doppelt so hoch) — passt nebenbei auch inhaltlich besser:
+      //    Schlaegertechnik ist Handgelenk, nicht Willenskraft.
+      // 2) PUBLIKUM (reiner Festzuschlag, kein Erfolgs-Wuerfel dahinter, deshalb der
+      //    RAUSCHAERMSTE aller sieben Kanaele) trug charisma (Matrixgewicht 4, das
+      //    NIEDRIGSTE der ganzen Matrix) mit 45 % Rollengewicht — der groesste
+      //    Fehlbetrag im ganzen Rezept. Ersetzt durch awareness (Matrixgewicht 20, das
+      //    ZWEITHOECHSTE), charisma bleibt mit einem kleinen Rest drin statt ganz zu
+      //    verschwinden.
+      // 3) NERVEN trug stamina (bereits AUSDAUERs Hauptattribut, dort mit Gewicht 50
+      //    vertreten) UND determination (Matrixgewicht 6) fuer die zweite,
+      //    erfolgsrelevante Rolle. "Nerven" ist mental, nicht koerperliche Ausdauer —
+      //    stamina raus, awareness (20) und spirit (18) rein, determination bleibt mit
+      //    reduziertem Gewicht als Rest.
+      // GRUNDLAGE traf mit intelligence/awareness/spirit bereits die drei schwersten
+      // Matrixattribute, nur nicht in ihrem tatsaechlichen Verhaeltnis (40:35:25 statt
+      // Matrix 22:20:18 ≈ 37:33:30) — auf die Matrix-Proportion nachgezogen, keine
+      // Attribute getauscht. SPITZENMOMENT/WAGNIS liessen sich sonst nicht beanstanden
+      // und blieben strukturell gleich (SPITZENMOMENT nur leicht zugunsten von
+      // intelligence (22) statt speed (6) verschoben).
+      //
+      // GEMESSEN NACH DIESER AENDERUNG (kaderfest, 24 Spiele, live-save-Kaderfamilie,
+      // fuenf Kaderpaarungen): rho je Spiel 0,786 -> 0,830 (Saison 0,846 -> 0,867) — klar
+      // ueber der 0,80-Schranke, mit einer Reserve von rund 0,03 gegenueber dem
+      // Kaderrauschen dieser Disziplin (Spannweite ~0,21). s. auch
+      // data/generated/rangtreue-basislinie.json und docs/design/stand-aller-disziplinen.md.
+      // AUSDRUECKLICH NICHT die grosse Sinkhorn-Rezeptrunde aus Recherche-Teil F.2 (die
+      // fehlt fuer die Buehne weiterhin das Werkzeug) — nur die am staerksten
+      // fehlplatzierten Attribute nachgezogen, nach demselben Verfahren wie
+      // Gewichthebens/Breakings NACHGEZOGEN-Korrekturen oben. Das aspirative 0,85-Ziel
+      // (CLAUDE.md) ist damit nicht erreicht — dafuer braeuchte es vermutlich echte
+      // Sinkhorn-Kalibrierung, nicht nur eine Attribut-Umverteilung im bestehenden
+      // Sieben-Rollen-Rezept.
       rezept:{
-        GRUNDLAGE:    {intelligence:40,awareness:35,spirit:25},
-        SPITZENMOMENT:{dexterity:35,intelligence:35,speed:30},
-        TECHNIK:      {intelligence:50,awareness:35,determination:15},
-        NERVEN:       {stamina:40,determination:35,awareness:25},
+        GRUNDLAGE:    {intelligence:37,awareness:33,spirit:30},
+        SPITZENMOMENT:{intelligence:45,dexterity:30,speed:25},
+        TECHNIK:      {intelligence:50,awareness:35,dexterity:15},
+        NERVEN:       {awareness:44,spirit:40,determination:16},
         WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
-        PUBLIKUM:     {spirit:55,charisma:45},
-        AUSDAUER:     {stamina:50,determination:30,spirit:20}
+        PUBLIKUM:     {spirit:52,awareness:43,charisma:5},
+        AUSDAUER:     {stamina:55,spirit:30,determination:15}
       }
     },
 

@@ -126,11 +126,11 @@
   },
   "tennis": {
    "chassis": "buehne",
-   "spielMedian": 0.786,
-   "spielSpannweite": 0.194,
-   "saisonMedian": 0.846,
-   "saisonSpannweite": 0.273,
-   "schranke": 0.058
+   "spielMedian": 0.83,
+   "spielSpannweite": 0.211,
+   "saisonMedian": 0.867,
+   "saisonSpannweite": 0.28,
+   "schranke": 0.063
   },
   "fechten": {
    "chassis": "buehne",
