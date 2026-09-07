@@ -11089,6 +11089,33 @@
   // INNERHALB des riesigen LAST-Spielraums; jetzt greift er auch in die Erfolgschance
   // selbst, nicht nur in die Ansage.
   const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
+  // DER KUEHNE VERSUCH (Chris' Fund 06.09., Recherche mit Messung
+  // docs/design/gewichtheben-risiko-versuch-recherche-06-09.md). Die REAKTION AUF DEN
+  // DUELLSTAND unten zieht einen zurueckliegenden Heber im dritten Versuch schon immer auf
+  // Gegner-Bestwert+1 -- exakt Cassandras "127 kg, weil Gram 126 schaffte", aber IMMER nur
+  // das nackte Ausgleichskilo, nie mehr. Diese vier Konstanten fuegen einen FREIWILLIGEN
+  // Zuschlag darueber hinaus hinzu -- deterministisch aus ANSAGE (kein neuer Wuerfel fuer
+  // die Entscheidung "wie kuehn", s. lastFuer() unten; nur Ausgang und Verletzung wuerfeln
+  // weiter ueber rr()). Die Erfolgschance braucht KEINE neue Kurve: ein groesseres Ziel
+  // erhoeht automatisch `ueber` in der bestehenden HEBEN_WAGNIS_K-Gerade unten.
+  //
+  // GEMESSEN (Recherche Abschnitt 3, kaderfest, live-save-Kaderfamilie, n=24 UND n=96): der
+  // Zuschlag allein bewegt rho NICHT messbar -- 0,887/0,884 gegen 0,887/0,884 Basis, im
+  // Isolationstest (Zuschlag bis 20 kg statt 5, KEIN Bonuskanal) bit-identisch mit der
+  // Basis. Rund 3,7 kuehne Versuche je Spiel, 77,4 % Erfolg, 0,7 % Verletzungsquote DER
+  // KUEHNEN VERSUCHE (≈0,15 % aller dritten Versuche) bei den hier gewaehlten Werten
+  // (Recherche 3.3 -- Ausgangswerte, keine Feinkalibrierung, s. dortiger Abschnitt 5.6).
+  //
+  // KRITISCH, NICHT VERHANDELBAR (Recherche Abschnitt 0.3/3.1, CLAUDE.md): die Belohnung
+  // bei Gelingen ("Punktesieg") fliesst NICHT in `u.summe`/`u.zweikampf` -- ein Bonus DORT
+  // ist der einzige gemessene Hebel, der rho ueberhaupt bewegt (ab +20-40 % auf die
+  // Kilogramm, weit jenseits einer realistischen Belohnung). Sie bleibt eine Ticker-/
+  // Boxscore-Auszeichnung ausserhalb der gewerteten Zahl, s. "PUNKTESIEG" unten.
+  const HEBEN_WAGNIS_MAX_KG=5;      // hoechster Zuschlag ueber das Ausgleichs-Kilo hinaus
+  const HEBEN_WAGNIS_ANSAGE_K=0.08; // kg Zuschlag je ANSAGE-Punkt ueber 50, VOR dem Max-Deckel
+  const HEBEN_INJURY_BASIS=0.02;    // Grundrisiko bei jedem MISSLUNGENEN kuehnen Versuch
+  const HEBEN_INJURY_K=0.10;        // zusaetzliches Risiko je Anteil UEBER der Risikokapazitaet
+  const HEBEN_INJURY_CAP=0.12;      // hoechstens 12 % Verletzungsrisiko je misslungenem kuehnen Versuch
   const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
   // NACH EINEM FEHLVERSUCH SENKEN, NICHT WIEDERHOLEN (Chris' Fund, 06.09., woertlich: "wenn
   // jemand zb wie gram 117kg nicht schafft sollte der naechste versuch dann zb 110 sein und
@@ -11157,6 +11184,11 @@
         u.maxStossen=u.tagesmax*(1-HEBEN_ANTEIL_REISSEN)
                      *(0.94+(u.ERHOLUNG-50)*HEBEN_ERHOLUNG_K);
         u.besteReissen=0; u.besteStossen=0; u.versucheBis=0; u.nullwertung=false;
+        // KUEHNER VERSUCH — reine Zaehl-/Anzeigefelder (s. HEBEN_WAGNIS_MAX_KG oben).
+        // Keines davon fliesst in u.summe/u.zweikampf oder MOTOREN[...].wert() ein — sie
+        // sind additiv fuer Ticker/Buehnenbild/Boxscore, wie u.torwart es fuer Hockey ist
+        // (battle-mode-arena-team-points.ts, ArenaFixtureBoxscoreEintrag).
+        u.kuehneVersuche=0; u.kuehneErfolge=0; u.kuehnVerletzt=0;
       }
       hebeUebung(a,b,plan,"reissen");
       hebeUebung(a,b,plan,"stossen");
@@ -11227,12 +11259,20 @@
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
+    // KUEHN_FLAG: haelt fest, ob der ZULETZT von lastFuer() berechnete Versuch des Hebers
+    // ueber das nackte Ausgleichskilo hinausging (s. HEBEN_WAGNIS_MAX_KG oben). lastFuer()
+    // wird pro Versuch zweimal aufgerufen (einmal zur Reihenfolge-Sortierung, einmal fuer
+    // den tatsaechlichen Versuch direkt danach) — der zweite, tatsaechlich genutzte Aufruf
+    // ueberschreibt den Wert des ersten, bevor er unten gelesen wird, also ist stets der
+    // fuer den ECHTEN Versuch gueltige Stand zu sehen.
+    const kuehnFlag={};
     // Die Last des naechsten Versuchs — die geplante Ansage, im dritten Versuch dazu die
     // Reaktion auf den Duellstand. Als Funktion, weil die Reihenfolge des dritten Versuchs
     // (s.u.) beide Ansagen kennen muss, BEVOR einer von beiden gehoben hat.
     const lastFuer=(u,v)=>{
       const gegner=u===a?b:a;
       let kg=ansage[u.id];
+      kuehnFlag[u.id]=false;
       // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
       // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
       // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
@@ -11245,8 +11285,18 @@
       // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
       // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
       if(v===2&&beste(gegner)>beste(u)){
-        const ziel=Math.round(beste(gegner))+1;
-        if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
+        const basisZiel=Math.round(beste(gegner))+1;
+        // KUEHNER VERSUCH: freiwilliger Zuschlag ueber das Ausgleichskilo hinaus,
+        // deterministisch aus ANSAGE — ein selbstbewusster Heber wagt mehr, kein
+        // zusaetzlicher Wuerfel an dieser Stelle (s. HEBEN_WAGNIS_MAX_KG oben).
+        const zuschlag=Math.min(HEBEN_WAGNIS_MAX_KG, Math.max(0,u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_K);
+        const ziel=basisZiel+Math.round(zuschlag);
+        if(ziel<=max(u)*1.06){
+          kg=Math.max(kg,ziel);
+          // "kuehn" heisst: der tatsaechlich genutzte Zielwert liegt ECHT ueber dem nackten
+          // Ausgleichskilo — nicht nur die unveraenderte Minimalreaktion.
+          if(kg>basisZiel)kuehnFlag[u.id]=true;
+        }
       }
       // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
       return Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
@@ -11264,10 +11314,16 @@
       }
       for(const u of reihe){
         const kg=lastFuer(u,v);
+        // KUEHNER VERSUCH: der ZULETZT (also fuer DIESEN Versuch) berechnete Stand von
+        // kuehnFlag — der obige lastFuer(u,v)-Aufruf hat ihn gerade neu gesetzt.
+        const kuehn=!!kuehnFlag[u.id];
         // Risiko-Massstab statt nacktem Tagesmax: s. HEBEN_WAGNIS_ANSAGE_FLEX oben. Nur
         // fuer die Erfolgschance gedehnt — Tagesmax/Sinclair-Anzeige bleiben unangetastet.
         const risikoMax=Math.max(1,max(u)*(1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
         const ueber=Math.max(0,kg/risikoMax-1);
+        // KEINE NEUE KURVE: ein kuehnerer (also groesserer) kg-Wert erhoeht `ueber`
+        // automatisch — dieselbe -ueber*HEBEN_WAGNIS_K-Gerade bewertet jeden Versuch,
+        // ob Eroeffnung, Sprung oder kuehner Ausgleichsversuch (Recherche Abschnitt 2.3).
         const p=Math.max(0.05,Math.min(0.97,
           HEBEN_BASIS[uebung][v]
           +(u.TECHNIK-50)*HEBEN_TECHNIK_K
@@ -11283,6 +11339,29 @@
           -ueber*HEBEN_WAGNIS_K));
         u.letzteLast=kg;
         const gueltig=rr()<p;
+        // PUNKTESIEG/VERLETZUNG: nur beim kuehnen Versuch, und nur je einer der beiden je
+        // Versuch (Erfolg schliesst Verletzung aus, s. HEBEN_INJURY_BASIS-Kommentar oben).
+        let punktesieg=false, verletzt=false;
+        if(kuehn){
+          u.kuehneVersuche++;
+          if(gueltig){
+            // BELOHNUNG BEI GELINGEN — bewusst NICHT in u.summe/u.zweikampf (s. grosser
+            // Kommentar bei HEBEN_WAGNIS_MAX_KG oben; die echt gehobenen Kilogramm zaehlen
+            // dort schon ganz regulaer ueber setzeBeste() unten). "Punktesieg" ist eine
+            // reine Ticker-/Boxscore-Auszeichnung neben der gewerteten Zahl, kein
+            // zusaetzliches Kilogramm und keine zusaetzliche PPS-Injektion in wert().
+            punktesieg=true;
+            u.kuehneErfolge++;
+          } else {
+            // VERLETZUNG BEI MISSLINGEN — selten (Ziel ~0,7 % der kuehnen Versuche,
+            // Recherche 3.2), rein kosmetisch: kein zusaetzlicher Malus auf summe, die
+            // andere Uebung oder kuenftige Versuche. Der einzige numerische Effekt eines
+            // misslungenen kuehnen Versuchs bleibt der ohnehin bestehende Fehlversuch
+            // (0 Punkte fuer diese Uebung, s. HEBEN_FEHL_REDUKTION-Zweig unten).
+            const pVerletzt=Math.min(HEBEN_INJURY_CAP, HEBEN_INJURY_BASIS+HEBEN_INJURY_K*ueber);
+            if(rr()<pVerletzt){ verletzt=true; u.kuehnVerletzt++; }
+          }
+        }
         if(gueltig){
           setzeBeste(u,kg);
           u.versucheBis+=v+1;
@@ -11297,10 +11376,10 @@
           // eine bereits erfolgreich gehobene Last faellt.
           ansage[u.id]=Math.max(1,Math.round(kg*(1-HEBEN_FEHL_REDUKTION)));
         }
-        u.runden.push({kg, gueltig, uebung, versuch:v+1,
+        u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt,
           punkte:gueltig?kg:0,
           ereignis:(uebung==="reissen"?"Reissen":"Stossen")+", "+(v+1)+". Versuch, "+kg+" kg — "
-                   +(gueltig?"gueltig":"ungueltig")});
+                   +(gueltig?"gueltig":"ungueltig")+(kuehn?" (kühner Versuch)":"")});
       }
     }
   }
@@ -11327,10 +11406,20 @@
       // als big — keine neue Erkennung, nur dieselbe schon getroffene Entscheidung ein
       // zweites Mal gelesen. Vorher setzte KEIN einziger feed()-Aufruf in der Buehne das
       // Flag (Abschnitt 4.1: "Buehne fehlt vollstaendig").
-      const versuchBig=BB().heben?(r.gueltig&&r.versuch===3):(r.punkte>=60);
+      // KUEHNER VERSUCH ist ebenfalls big/crit — ein selbstgewaehlter Ausgleichs-Zuschlag
+      // verdient denselben Ausrufezeichen-Moment wie ein dritter-Versuch-Erfolg (s. Kommentar
+      // bei HEBEN_WAGNIS_MAX_KG oben), also einfach hier mit ODER angehaengt statt einer
+      // zweiten Bedingung.
+      const versuchBig=BB().heben?((r.gueltig&&r.versuch===3)||r.kuehn):(r.punkte>=60);
       if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
         crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
       else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+      // KUEHNER VERSUCH — eigener, staerkerer Pop zusaetzlich zum kg-Schweber oben, GENAU
+      // fuer den Ausgang (Punktesieg xor Verletzung), nie beides. Beide sind rein optisch:
+      // keins von beiden aendert u.summe/u.zweikampf oder einen kuenftigen Versuch (s.
+      // Kommentar bei HEBEN_WAGNIS_MAX_KG/im hebeUebung()-Rundenrechner oben).
+      if(BB().heben&&r.punktesieg)schwebe({x:0,y:0,txt:"PUNKTESIEG!",life:1.3,crit:true,_teilnehmer:u.id});
+      if(BB().heben&&r.verletzt)schwebe({x:0,y:0,txt:"VERLETZT!",life:1.3,crit:true,_def:true,_teilnehmer:u.id});
       // DUELL: statt "X Punkte" die laufende Vorteils-Anzeige — dieselbe Zahl, die auch
       // fuer wert() zaehlt, damit Anzeige und Messung nie auseinanderlaufen.
       if(BB().heben){
@@ -11345,6 +11434,17 @@
         // ZWEIKAMPF ENTSCHIEDEN: das Endergebnis eines Hebers (Gesamtkilo oder Nullwertung)
         // ist immer big — kein "vielleicht wichtig", sondern der Abschluss seines ganzen
         // Auftritts, analog zum K.o./Zieleinlauf anderer Chassis.
+        // KUEHNER VERSUCH, EIGENE TICKER-ZEILE (Recherche 2.5: "eigene Ereigniszeile").
+        // Nur bei einem tatsaechlich kuehnen Versuch (u.ANSAGE trieb einen Zuschlag ueber
+        // das Ausgleichskilo), unabhaengig vom Ausgang — immer big, s. versuchBig oben.
+        if(r.kuehn){
+          if(r.punktesieg)
+            feed(u.side,"KÜHNER VERSUCH GEGLÜCKT — "+u.n+" wagt mehr als nötig, um zu gewinnen. Punktesieg!",true);
+          else if(r.verletzt)
+            feed(u.side,"KÜHNER VERSUCH GESCHEITERT — "+u.n+" verletzt sich beim Wagnis!",true);
+          else
+            feed(u.side,"Kühner Versuch von "+u.n+" scheitert knapp.",true);
+        }
         if(u.aktuell+1>=BB().rundenN)
           feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
@@ -11771,6 +11871,26 @@
       ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,textY+34);
       ctx.font="400 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
       ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,textY+48);
+      // KUEHNER VERSUCH — eigenes Badge OBERHALB der kg-Zahl, NUR die visuelle Anzeige
+      // (kein Effekt auf u.summe/u.zweikampf, s. HEBEN_WAGNIS_MAX_KG-Kommentar oben). Gold
+      // fuer den Punktesieg (dieselbe Farbe wie der Sieg-Glow in zeichneSchach), --crit fuer
+      // Misslingen/Verletzung — ANSAGE_FARBE waere hier eine dritte, unnoetig Farbe, weil
+      // der Ausgang schon feststeht, sobald dieser Versuch enthuellt wird. OBERHALB statt
+      // unterhalb der Versuchszeile, weil dort schon der Lifter-Name/die Zweikampf-Anzeige
+      // sitzt (schrift() bei dy 58/72 direkt darueber im [[a,...],[b,...]]-forEach) -- ein
+      // Badge dort kollidierte sichtbar mit beidem (im Playwright-Screenshot geprueft).
+      // Ueber der kg-Zahl ist die Buehne dunkel und leer (die Duell-Kopfzeile sitzt bei
+      // H*0.155, weit oberhalb von textY-58).
+      if(zug.r.kuehn){
+        const kuehnTxt=zug.r.verletzt?"⚠ KÜHNER VERSUCH — VERLETZT"
+          :gueltig?"★ KÜHNER VERSUCH — PUNKTESIEG!"
+          :"KÜHNER VERSUCH GESCHEITERT";
+        ctx.font="700 12.5px 'Barlow Condensed',sans-serif";
+        ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.9)";ctx.lineJoin="round";
+        ctx.strokeText(kuehnTxt,bx,textY-58);
+        ctx.fillStyle=zug.r.verletzt?css("--crit"):gueltig?"#f2d75a":css("--crit");
+        ctx.fillText(kuehnTxt,bx,textY-58);
+      }
     } else {
       ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
       ctx.fillText("Erste Ansage folgt …",bx,textY-10);
@@ -21127,7 +21247,18 @@
       M.lauf();
       const wert=M.wert();
       const namen=M.namen();
-      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      // KUEHNER VERSUCH, BOXSCORE-ANHANG: rein additiv, GENAU wie `torwart` fuer Hockey
+      // oben im Feldspiel-Pendant (spieleFeldspiel-Boxscore) — nur angehaengt, wenn ein
+      // Spieler ueberhaupt einen kuehnen Versuch hatte, und niemals Teil von `wert` selbst.
+      // Ein Downstream-Verbraucher (Boxscore-Anzeige, kuenftige individuelle Auszeichnung)
+      // kann das lesen, ohne dass es je in die Rangtreue-Messung (ArenaFixtureBoxscoreEintrag
+      // .wert, s. battle-mode-arena-team-points.ts) einfliesst.
+      const boxscore=namen.map(n=>{
+        const teiln=TEILNEHMER.find(x=>x.n===n);
+        return {name:n, wert:wert[n]??0,
+          ...((teiln&&teiln.kuehneVersuche)?{kuehneVersuche:teiln.kuehneVersuche,
+            kuehneErfolge:teiln.kuehneErfolge||0, kuehnVerletzt:teiln.kuehnVerletzt||0}:{})};
+      });
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen).length;
       const seiten=[duelle(0),duelle(1)];
       const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
