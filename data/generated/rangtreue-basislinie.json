@@ -38,9 +38,9 @@
   },
   "time-trial": {
    "chassis": "bahn",
-   "spielMedian": 0.867,
-   "spielSpannweite": 0.05,
-   "saisonMedian": 0.909,
+   "spielMedian": 0.828,
+   "spielSpannweite": 0.087,
+   "saisonMedian": 0.832,
    "saisonSpannweite": 0.056,
    "schranke": 0.05
   },
