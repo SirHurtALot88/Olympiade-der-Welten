@@ -15025,8 +15025,23 @@
       const punkte=new Map(), seiten=[0,0];
       for(const u of LAEUFER){const p=burgwertung(u); punkte.set(u.id,p); seiten[u.seite]+=p;}
       const r1=(v)=>Math.round(v*10)/10;
+      const f1=(v)=>v.toFixed(1).replace(/\.0$/,"");
       return {seiten:[r1(seiten[0]),r1(seiten[1])], suffix:"Burgpunkte", punkte, gewertet:true,
-        fmt:(v)=>v.toFixed(1).replace(/\.0$/,"")};
+        fmt:f1,
+        // AUFSCHLUESSELUNG IM ENDSTAND (Chris 06.09., woertlich: "dann wenn man nach
+        // burgpunkten geht muessten die in der wertung auch stehen damit man weiss wie
+        // sich das zusammen setzt! also auch im end screen"). burgwertung() bleibt EINE
+        // Zahl fuer Mauer, Laeuferzeile, Kopfzeile und Rangtreue-Messung -- hier, nur in
+        // der Punkte-Spalte des Endstand-Overlays, zeigt sie zusaetzlich ihre zwei
+        // Quellen: die Sterne (burgpunkte, aus den Fallen) und den Zielbonus (zielbonus,
+        // aus dem Platz). Reine Anzeige -- ruft nur die zwei bestehenden Funktionen
+        // zusammen, keine dritte Formel, kein neuer Motorwert.
+        // Ausgeschiedene haben IMMER Zielbonus 0 (zielbonus() prueft u.raus) -- fuer sie
+        // waere "+ 0 Ziel" nur Rauschen, darum bei ihnen nur die Summe.
+        punkteVon:(u)=>{
+          const stern=burgpunkte(u), bonus=zielbonus(u);
+          return bonus>0 ? f1(stern+bonus)+" ("+f1(stern)+" Sterne + "+f1(bonus)+" Ziel)" : f1(stern+bonus);
+        }};
     }
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
@@ -19056,7 +19071,7 @@
         // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
         // Finisher, nur ANZEIGEN darf man ihn nicht.
         tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
-        tr.appendChild(el("td",null,stand.punkte?fmtP(stand.punkte.get(u.id)):"—"));
+        tr.appendChild(el("td",null,stand.punkte?(stand.punkteVon?stand.punkteVon(u):fmtP(stand.punkte.get(u.id))):"—"));
         tb.appendChild(tr);
       });
       t.appendChild(tb); box.appendChild(t);
