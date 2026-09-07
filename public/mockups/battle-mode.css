@@ -554,6 +554,47 @@
   .oly-battle-arena.oly-battle-arena .ehzeile.h{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .ehzeile.a{color:var(--away)}
 
+  /* BROADCAST-HUD DER STAFFEL (Recherche 06.09., Abschnitt 4.3): zwei Seitenboxen
+     links/rechts, das Delta mittig — dieselbe Anordnung wie eine echte
+     Zeitfahren-/Staffel-Uebertragung. Prozentuale Position statt fester Pixel,
+     weil die Leinwand selbst responsiv skaliert (canvas{width:100%;height:auto}
+     oben) — feste px wuerden bei kleinerer Darstellung von der Bahn abwandern.
+     pointer-events:none, damit die Laeufer-Auswahl per Klick auf der Leinwand
+     (bahnWahl) unter dem Panel weiter funktioniert.
+     TOP 15% statt 2.2% (Nachtrag beim Rebase auf #843): der generische
+     Broadcast-Bug (.bbug, top:8px) liegt jetzt IMMER mit im Bild, auch bei der
+     Staffel — dieses Panel muss darunter beginnen, sonst ueberlappen sich beide
+     Overlays am oberen Rand der Leinwand. 15% Leinwandhoehe raeumt dem Bug in
+     jeder getesteten Groesse Platz, bleibt aber klar oberhalb des Ovals
+     (OVAL_CY-OVAL_RY liegt bei ~22% der Leinwandhoehe, s. engine.js). */
+  .oly-battle-arena.oly-battle-arena .bahnhud{position:absolute;top:15%;left:2.2%;right:2.2%;
+    display:flex;justify-content:space-between;align-items:stretch;gap:8px;pointer-events:none}
+  /* KEIN eigener z-index: das Panel steht im Markup VOR .einlauf/.endstand/
+     .viertelpause (alle drei ohne eigenen z-index) — bei gleichem Stapel-Level
+     (auto) gewinnt die Dokumentreihenfolge, die drei Vollflaechen-Overlays decken
+     das HUD also waehrend Einlauf/Endstand/Pause korrekt zu. Ein z-index hier
+     wuerde das umkehren (Fund beim eigenen Sichttest: das Panel lag ueber der
+     "... gewinnt"-Kopfzeile des Endstands statt darunter). */
+  .oly-battle-arena.oly-battle-arena .bahnhud[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .bhside{flex:1;min-width:0;background:rgba(10,13,18,.72);
+    border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:4px 10px;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.55;color:#e7edf6}
+  .oly-battle-arena.oly-battle-arena .bhside.bhL{border-left:3px solid var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhside.bhR{border-right:3px solid var(--away);text-align:right}
+  .oly-battle-arena.oly-battle-arena .bhrow{display:flex;gap:6px;align-items:baseline;white-space:nowrap;overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .bhside.bhR .bhrow{flex-direction:row-reverse}
+  .oly-battle-arena.oly-battle-arena .bhtag{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:#93a1b3;flex:none}
+  .oly-battle-arena.oly-battle-arena .bhname{overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .oly-battle-arena.oly-battle-arena .bhrow.bhdim{opacity:.62;font-size:10px}
+  .oly-battle-arena.oly-battle-arena .bheig{color:#e8c07a;font-weight:600;flex:none}
+  .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:104px;text-align:center;
+    font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14.5px;letter-spacing:.02em;
+    background:rgba(10,13,18,.72);border:1px solid rgba(255,255,255,.16);border-radius:8px;
+    padding:5px 8px;color:#e7edf6}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
+
   /* Einlauf vor dem Anpfiff */
   .oly-battle-arena.oly-battle-arena .arenaraum{position:relative}
   .oly-battle-arena.oly-battle-arena .einlauf{position:absolute;inset:0;background:rgba(16,20,26,.94);display:flex;
