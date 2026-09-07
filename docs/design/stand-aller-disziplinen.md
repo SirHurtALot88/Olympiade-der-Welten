@@ -1,5 +1,24 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Fuenfter Nachtrag 07.09. — Tennis-Rezeptkalibrierung nachgezogen (PR #850), noch am selben
+Tag wie der Vierte Nachtrag unten.** Der dort beschriebene Tennis-Fall (0,814 → 0,786,
+„bestanden" → „knapp") ist behoben: eine eigene, aus Tennis' MATRIX abgeleitete
+Buehnen-Rezeptkalibrierung (statt der bisherigen 1:1-Uebernahme aus dem alten Feldspiel-Rezept,
+s. Tennis-Zeile in Abschnitt 5b) hebt Tennis kaderfest auf **0,825** (Saison 0,839) — wieder
+klar ueber der 0,80-Schranke, mit rund 0,025 Puffer gegenueber dem eigenen Kaderrauschen
+(Spannweite ~0,21). Die anderen acht Buehnen-Disziplinen (darunter die drei produktivierten
+Gewichtheben/Speed-Schach/Showcase) sind bit-identisch nachgemessen — die Aenderung bleibt
+vollstaendig auf `BUEHNE_ART.tennis.rezept` beschraenkt, nichts leckt in den gemeinsamen
+Buehnen-Code. Tabelle und Bilanz unten sind entsprechend aktualisiert.
+
+Damit aendert die Kombination aus Viertem und Fuenftem Nachtrag **netto keine einzige
+Bucket-Zugehoerigkeit** gegenueber der 06.09.-Fassung: elf der zwoelf unten gefundenen stale
+Zeilen bewegten sich nur zahlenmaessig (reiner Dokumentationsrueckstand), und Tennis' kurzer,
+echter Fall unter die Schranke ist noch am selben Tag durch die eigene Rezeptkorrektur behoben —
+Tennis landet wieder in „bestanden", nur mit der ehrlichen 0,825 statt der alten, teils
+fehlerhaften 0,814. Das Feld steht unveraendert bei **elf bestanden, drei knapp, sechs
+durchgefallen**.
+
 **Vierter Nachtrag 07.09. — komplette Neumessung an `main` (`7a70413e`), zwoelf von zwanzig
 Zeilen waren stale.** `node scripts/miss-alle-disziplinen.mjs 24` frisch gegen den aktuellen
 `main`-Stand gefahren (kaderfest, dieselbe `data/generated/kaderfamilie-live-save.json` wie
@@ -105,11 +124,11 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Gewichtheben | Buehne | 0,854 | 0,209 | 0,923 | 0,273 | bestanden |
 | Wettessen | Buehne | 0,845 | 0,139 | 0,930 | 0,091 | bestanden |
 | Time-Trial | Bahn | 0,828 | 0,087 | 0,832 | 0,056 | bestanden |
+| **Tennis** | **Buehne** | **0,825** | 0,210 | 0,839 | 0,280 | **bestanden — s.u.** |
 | Fechten | Buehne | 0,816 | 0,192 | 0,888 | 0,133 | bestanden |
 | Breaking | Buehne | 0,804 | 0,133 | 0,937 | 0,197 | bestanden |
 | Eiskunstlauf | Buehne | 0,792 | 0,130 | 0,944 | 0,077 | knapp |
 | Climbing | Bahn | 0,790 | 0,192 | 0,851 | 0,308 | knapp |
-| **Tennis** | **Buehne** | **0,786** | 0,194 | 0,846 | 0,273 | **knapp — NICHT bestanden, s.u.** |
 | Basketball | Feldspiel | 0,769 | 0,105 | 0,923 | 0,224 | knapp |
 | I-Spy | Buehne | 0,684 | 0,353 | 0,804 | 0,608 | durchgefallen |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,669 | 0,181 | 0,832 | 0,259 | durchgefallen |
@@ -119,29 +138,32 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | TDM | Arena | 0,253 | 0,328 | 0,217 | 0,308 | durchgefallen |
 | Mini-DM | Arena | 0,094 | 0,697 | 0,071 | 0,786 | durchgefallen |
 
-**Zehn bestehen, vier sind knapp, sechs fallen durch** (Stand nach der kompletten Neumessung vom
-07.09. an `main` `7a70413e`, s. Vierter Nachtrag oben; zuvor in diesem Dokument elf/drei/sechs —
-der einzige Bucket-Wechsel ist **Tennis**, bestanden → knapp, und er ist echt, nicht
-Dokumentationsrueckstand: s. Tennis-Absatz direkt unter dieser Tabelle. Die uebrigen elf
-Zahlaenderungen gegenueber der 06.09.-Fassung sind Dokumentationsrueckstand — echte Bewegungen an
-`main` seit der letzten Neumessung, nicht neue Befunde ueber die Mechanik; sie sind hier erstmals
-nachgezogen. Die Zwoelferzahlen der zwanzig echten Disziplinen; Bucketing: bestanden ab 0,80,
-knapp ab 0,70, sonst durchgefallen — `scripts/miss-alle-disziplinen.mjs`). Die eingerueckte
-Hockey-Zeile ist kein einundzwanzigster Eintrag, sondern dieselben Spiele derselben Disziplin
-ohne die beiden Torhueter (s. Abschnitt 1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die
-ehrlichere Frage fuer „belohnt Hockeys Mechanik das Richtige".
+**Elf bestehen, drei sind knapp, sechs fallen durch** — identisch zur 06.09.-Fassung (s. Fuenfter
+Nachtrag ganz oben). Zwoelf Zeilen bewegten sich zahlenmaessig gegenueber der 06.09.-Fassung:
+elf davon reiner Dokumentationsrueckstand (echte Bewegungen an `main` seit der letzten
+Neumessung, nicht neue Befunde ueber die Mechanik, hier erstmals nachgezogen), und **Tennis**
+allein ist ein echter, aber noch am selben Tag behobener Fall — kurzzeitig unter die Schranke
+gefallen (0,786, s. Tennis-Absatz direkt unter dieser Tabelle), dann durch die eigene
+Rezeptkorrektur (Fuenfter Nachtrag) auf 0,825 zurueckgeholt, ohne die Bucket-Zugehoerigkeit zu
+aendern. Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst durchgefallen —
+`scripts/miss-alle-disziplinen.mjs`. Die eingerueckte Hockey-Zeile ist kein einundzwanzigster
+Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden Torhueter (s. Abschnitt
+1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die ehrlichere Frage fuer „belohnt Hockeys
+Mechanik das Richtige".
 
-### Tennis: die einzige echte Regression in dieser Tabelle — und sie ist keine
+### Tennis: eine echte, aber kurzlebige Regression — und noch am selben Tag behoben
 
-Tennis faellt von 0,814 auf 0,786, unter die 0,80-Schranke — **als direkte Folge des korrekten
+Tennis fiel von 0,814 auf 0,786, unter die 0,80-Schranke — **als direkte Folge des korrekten
 Bugfixes in PR #820** (Buehne-Spiegelasymmetrie: die Gastseite bekam ueber `istGegner` weder
 Slot-Aufschlag noch Stufenwert, ihre echte Aufstellung wurde nie gelesen). Tennis' fruehere
-0,814 war zum Teil ein Messartefakt einer kaputten Gastseite. Der Fix ist richtig, die neue Zahl
-ist ehrlicher — und die ehrliche Zahl reicht nicht. Wer hier einen neuen Bug sucht, sucht am
-falschen Ort: es gibt keinen. Tennis braucht eine eigene Rezeptkalibrierung (das Rezept ist laut
-Abschnitt 5b „1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert" — es hatte
-nie eine eigene), und mit 0,014 fehlend ist das die billigste offene Rangtreue-Baustelle im
-gesamten Feld.
+0,814 war zum Teil ein Messartefakt einer kaputten Gastseite. Der Fix war richtig, die neue Zahl
+ehrlicher — und die ehrliche Zahl reichte nicht. Wer hier einen neuen Bug sucht, sucht am
+falschen Ort: es gab keinen. Der eigentliche Fehlbetrag sass im Rezept, das laut Abschnitt 5b
+„1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert" war — es hatte nie eine
+eigene Kalibrierung. **Das ist inzwischen behoben** (PR #850, s. Fuenfter Nachtrag ganz oben und
+die Tennis-Zeile in Abschnitt 5b): eine eigene, aus Tennis' MATRIX abgeleitete Rezeptkorrektur
+hebt Tennis kaderfest auf 0,825 — mit 0,014 Fehlbetrag war das die billigste offene
+Rangtreue-Baustelle im gesamten Feld, und sie ist es nicht mehr.
 
 ### 1a. Hockey: zwei Zahlen, nicht eine — und welche Frage jede beantwortet
 
@@ -560,7 +582,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Basketball | 92 % | 0,769 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (K3, 04.09.: Feldkorb-Punkte zur Haelfte als `technik`-Erwartungswert statt binaer, rho 0,757→0,772→0,769 [07.09., reines Kaderrauschen]) |
 | Hockey | 71 % | 0,719 (Feldspieler) / 0,669 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Fechten | 48 % | 0,816 | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
-| Tennis | 48 % | 0,786 | Auf der Buehne (vorher Feldspiel, rho 0,505) · **Rangtreue NICHT bestanden** (0,814 → 0,786, ehrliche Zahl nach dem #820-Bugfix, keine Regression — s. Abschnitt 1) · Rezept 1:1 aus dem alten Feldspiel-Rezept uebernommen, nicht neu kalibriert — billigste offene Rangtreue-Baustelle (0,014 fehlen) · nicht im echten Spielstand |
+| Tennis | 48 % | 0,825 | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · nicht im echten Spielstand · **Nachtrag 07.09. (Tennis-eigene Rezeptkalibrierung, s. `battle-mode.engine.js` Kommentar bei `BUEHNE_ART.tennis`):** das Rezept war bis hierher tatsaechlich 1:1 aus dem alten Feldspiel-Rezept uebernommen, nie gegen Tennis' eigene MATRIX gefittet (`docs/pm-briefings/pm-gesamtstand-07-09.md` Abschnitt 6 Punkt 5) — dieselbe Luecke wie bei Gewichtheben/Breaking vor deren NACHGEZOGEN-Korrekturen: TECHNIK (der Rollenkanal mit dem groessten Erfolgs-Koeffizienten) trug determination (Matrixgewicht 6) statt dexterity (12), und PUBLIKUM (der rauschaermste Kanal, reiner Festzuschlag) trug charisma (Matrixgewicht 4, das niedrigste der ganzen Matrix) mit 45 % Rollengewicht statt awareness (20). Nach dem #820-Symmetriefix war Tennis kaderfest bei 0,786 durchgefallen (s. PR #840, Nebenfund); mit der Rezeptkorrektur (nur `rezept`-Attributgewichte geaendert, keine Aenderung an der gemeinsamen Buehnen-Punkteformel) jetzt kaderfest 0,786 -> 0,825 (n=24, Saison 0,846 -> 0,839) — die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen (`node scripts/miss-alle-disziplinen.mjs 24 gewichtheben showcase eiskunstlauf breaking wettessen speed-schach i-spy tennis fechten`). Ein Review-Anlauf hatte AUSDAUER testweise auf stamina:55/spirit:30/determination:15 verschoben (nicht Matrix-proportional: spirit (18) ist in Tennis' Matrix schwerer als stamina (12), die Verschiebung machte stamina aber noch dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der Schranke), AUSDAUER blieb deshalb unveraendert. Aspiratives 0,85-Ziel nicht erreicht — dafuer fehlt der Buehne weiterhin das Sinkhorn-Rezeptwerkzeug aus Recherche-Teil F.2. |
 | Time-Trial | 55 % | 0,828 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis |
 | Gewichtheben | 70 % | 0,854 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 07.09. (kuehner Versuch, `docs/design/gewichtheben-risiko-versuch-recherche-06-09.md`):** freiwilliger Zuschlag ueber das Ausgleichskilo im dritten Versuch, deterministisch aus ANSAGE, mit Verletzungsrisiko bei Misslingen und "Punktesieg"-Auszeichnung bei Gelingen — Belohnung bewusst NICHT in `u.summe`/`u.zweikampf`, sondern reines Ticker-/Boxscore-Ereignis (s. Recherche Abschnitt 2.5). #840 zog die Basislinie nach der #813/#820-Bisektion auf 0,847 zurueck; die frische Neumessung dieser Runde (07.09., an `main` `7a70413e`) bestaetigt seither **0,854** — Bewegung liegt innerhalb der eigenen Kaderrauschen-Spannweite (~0,21) und ist damit nicht von Null unterscheidbar, keine neue Rezeptaenderung. |
 | Climbing | 48 % | 0,790 | Steigung und Kraftbudget statt Antritt · kaderfest knapp unter der Schranke (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
