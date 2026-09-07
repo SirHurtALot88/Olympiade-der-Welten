@@ -2552,8 +2552,29 @@
     // Ueberkopf-Bewegung, die der Baukasten kennt), aber ohne Waffen-Overlay (s. unten) —
     // naeher an einem Wurf als "slash", auch wenn sie urspruenglich fuer den Bogen
     // gezeichnet wurde. Chris' Wunsch: keine Waffenanimation im Feldspiel.
-    const bogen=!feldspiel&&b.waffe==="bogen";
-    const feuerwaffe=!feldspiel&&FEUERWAFFEN.includes(b.waffe);
+    // BUEHNE-WAFFENUEBERSCHREIBUNG (07.09., Fable-Recherche
+    // "fechten-eiskunstlauf-breaking-politur-recherche-07-09.md" Abschnitt 2.2/3.2/4.2):
+    // derselbe Fund wie beim Feldspiel oben, nur andersherum verteilt. Bislang schwang JEDE
+    // Buehnen-Disziplin ausser Gewichtheben/Speed-Schach beim Treffer die zufaellig
+    // zugewiesene KOSMETIK-Waffe (b.waffe) des Charakters, unabhaengig davon, was die
+    // Disziplin ueberhaupt ist — ein Fechter mit Axt-Kosmetik schwang eine Axt, ein
+    // Eiskunstlaeufer mit Bogen-Kosmetik spannte einen Pfeil. `istBuehne(disc)` (nicht nur
+    // `buehneDisc`, das nach einem Buehnen-Match stehenbleibt, genau die Falle, die der
+    // `feldspielDisc`-Kommentar oben schon einmal beschreibt) bestaetigt, dass GERADE eine
+    // Buehne laeuft, bevor `buehneDisc` gegen die drei Zieldisziplinen geprueft wird.
+    // Fechten (real ein Gefecht mit einer Klinge) bekommt IMMER die Schwert-Waffenebene,
+    // unabhaengig von der Kosmetik — kein neues Asset, `schwert` ist die einzige vorhandene
+    // schlanke Klingenwaffe. Eiskunstlauf/Breaking (real unbewaffnet) bekommen GAR KEINE
+    // Waffenebene — die "slash"-Pose selbst (ein bloßhaendiger Schwung) bleibt unveraendert,
+    // nur die aktiv falsche Waffe verschwindet. Showcase/Tennis/Wettessen/I-Spy haben
+    // denselben Bug (Recherche Abschnitt 0 Punkt 2), sind aber NICHT Teil dieser Ueberschreibung
+    // — Showcase ist zudem eine der drei live geschalteten Buehnen-Disziplinen
+    // (ARENA_RESOLVED_DISCIPLINE_IDS) und bewusst unangetastet.
+    const fechtenWaffe=istBuehne(disc)&&buehneDisc==="fechten";
+    const keineBuehnenWaffe=istBuehne(disc)&&(buehneDisc==="eiskunstlauf"||buehneDisc==="breaking");
+    const waffeEffektiv=fechtenWaffe?"schwert":(keineBuehnenWaffe?null:b.waffe);
+    const bogen=!feldspiel&&waffeEffektiv==="bogen";
+    const feuerwaffe=!feldspiel&&FEUERWAFFEN.includes(waffeEffektiv);
     // FOOTBALL-AUSRUESTUNG (05.09., "football-matrix-und-assets-recherche-05-09.md" Abschnitt
     // 3.3/3.4 — Fable-Fund: ein Football-Spieler war bis dahin ein umlackierter Arena-Kaempfer,
     // nur der Ball war football-spezifisch, die drei geladenen Kenney-Helme wurden nirgends
@@ -2693,10 +2714,10 @@
     // beide bleiben in der bestehenden if(b.schwanz)-Pruefung wahr (JS-Truthiness).
     if(b.schwanz==="katze")zeichne("katzenschwanzbg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
-    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
-    if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
-    if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
-    if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
     // Schild aus im Football (Sichtbefund bei der Verdrahtung, 05.09.: Johanna/Draco
     // trugen ihren Ritterschild weiterhin unterm Trikot mit — passt zu keiner Football-
     // Montur, dieselbe Suppression wie Krone/Hoerner/Bart/Kapuze oben).
@@ -2813,15 +2834,15 @@
     // Feuerwaffe bleibt in der Hand, solange der Kaempfer steht (Chris' Vorbild: ein Soldat
     // legt seine Waffe nicht ab) — anders als Schwert/Bogen, die nur waehrend ihres eigenen
     // Angriffs-Frames erscheinen, weil ihre Blaetter genau darauf zugeschnitten sind.
-    if(feuerwaffe&&!u.down)zeichneWaffenbild(b.waffe+"_walk");
+    if(feuerwaffe&&!u.down)zeichneWaffenbild(waffeEffektiv+"_walk");
     // Muendungsfeuer: optionaler Zusatz-Layer, nur waehrend der Schusspose sichtbar und nur
     // auf den letzten Frames des Waffen-Zyklus (angenaeherter Abzugsmoment — das Blatt selbst
     // traegt keine Frame-genaue Blitz-Markierung, s. quellen.json).
     if(feuerwaffe&&ani==="shoot"&&!u.down&&waffenF>=WAFFEN_N-3)zeichneWaffenbild("muendungsfeuer_walk");
-    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
-    if(!feldspiel&&b.waffe==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
-    if(!feldspiel&&b.waffe==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
-    if(!feldspiel&&b.waffe==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
     if(b.schild&&!footballGear)zeichneSchild("schild_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
     else if(b.fluegel==="fledermaus")zeichne("fluegel_fledermaus_fg_"+ani,64,0,0,null);
@@ -10653,7 +10674,26 @@
     eiskunstlauf:{
       // MATRIX: charisma 28, dexterity 18, spirit 16, awareness 14, speed 10,
       // intelligence 8, determination 6.
-      label:"Eiskunstlauf", jeSeite:6, rundenN:6, rundenDauer:0.85,
+      //
+      // RUNDENZAHL VERDOPPELT (07.09., Fable-Recherche
+      // "fechten-eiskunstlauf-breaking-politur-recherche-07-09.md" Abschnitt 3.3/3.4):
+      // Verlaesslichkeits-, kein Validitaetsproblem — die Saisonzahl (0,944) war schon vor
+      // dieser Aenderung die hoechste aller drei Zieldisziplinen, nur das EINE Spiel war zu
+      // laut (rho 0,792, knapp unter der 0,80-Schranke). Anders als bei Hockey (CLAUDE.md
+      // warnt dort ausdruecklich vor mehr Ereignissen) hat bauBuehne() keine RNG-Kaskade —
+      // jeder Durchgang ist ein unabhaengiger, vollstaendig im Voraus berechneter Erfolgs-/
+      // Fehlschlag-Wurf, ein Lehrbuch-Fall fuer die Spearman-Brown-Formel. Gemessen
+      // (kaderfest, live-save-Kaderfamilie): rho je Spiel 0,792 -> 0,875 (n=24) / 0,887
+      // (n=96), beide klar ueber der 0,85-Zielmarke, bei kaum bewegter Saisonzahl
+      // (0,944 -> 0,965/0,986) — genau das Muster einer reinen Reliabilitaetsverbesserung,
+      // keiner Validitaetsaenderung. rundenDauer halbiert (0,85 -> 0,425), damit die
+      // Gesamtdauer bei Chris' ~60-s-Ziel bleibt (12 x 6 x 2 x 0,425 s ≈ 61 s, vorher
+      // 6 x 6 x 2 x 0,85 s ≈ 61 s). Nebenbefund: ein echtes Kuerprogramm (ISU-Wertung)
+      // traegt rund 12-13 gewertete Elemente — rundenN:6 bildete strukturell nur ein halbes
+      // Programm ab, rundenN:12 trifft die reale Groessenordnung deutlich besser. Fechten
+      // (dieselbe Recherche) bleibt bewusst unveraendert — dort ist die Saisonzahl NIEDRIGER
+      // (0,888) und der Rezeptumbau ausdruecklich fuer eine spaetere Runde zurueckgestellt.
+      label:"Eiskunstlauf", jeSeite:6, rundenN:12, rundenDauer:0.425,
       failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
       rezept:{
         GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
@@ -10671,7 +10711,17 @@
       // dexterity 2, intelligence 2. KEIN Charisma — anders als die anderen drei
       // Buehnen-Disziplinen traegt hier nicht das Lächeln, sondern die Praesenz im
       // Battle. Publikum speist sich deshalb aus Wille und Torment, nicht aus Charisma.
-      label:"Breaking", jeSeite:6, rundenN:4, rundenDauer:1.25,
+      // RUNDENZAHL VERDOPPELT (07.09., dieselbe Fable-Recherche wie bei Eiskunstlauf oben,
+      // Abschnitt 4.3/4.4): derselbe Verlaesslichkeitsbefund, kleinerer Puffer — Breaking
+      // stand bei rho je Spiel 0,804, nur 0,004 ueber der Schranke, bei einer Saisonzahl von
+      // 0,937 (zweithoechste der drei Zieldisziplinen). Gemessen: rho je Spiel 0,804 -> 0,869
+      // (n=24) / 0,873 (n=96), beide ueber der 0,85-Zielmarke, Saisonzahl kaum bewegt
+      // (0,937 -> 0,951/0,958). rundenDauer halbiert (1,25 -> 0,625), Gesamtdauer bleibt bei
+      // 60 s (8 x 6 x 2 x 0,625 s = 60 s, vorher 4 x 6 x 2 x 1,25 s = 60 s). Nebenbefund: ein
+      // Breaking-Throw (WDSF-/Olympia-Bewertung) besteht aus mehreren Bewertungsmomenten
+      // (Einstieg, Power-Move, Freeze/Ausstieg) ueber typischerweise mehr als einen Durchgang
+      // — rundenN:4 bildete kaum mehr als einen Move-Zyklus ab, rundenN:8 sind zwei.
+      label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.625,
       failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
       // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
       // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
