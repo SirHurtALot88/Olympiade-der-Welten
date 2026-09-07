@@ -70,11 +70,11 @@
   },
   "gewichtheben": {
    "chassis": "buehne",
-   "spielMedian": 0.887,
-   "spielSpannweite": 0.224,
-   "saisonMedian": 0.944,
-   "saisonSpannweite": 0.261,
-   "schranke": 0.067
+   "spielMedian": 0.847,
+   "spielSpannweite": 0.215,
+   "saisonMedian": 0.916,
+   "saisonSpannweite": 0.301,
+   "schranke": 0.064
   },
   "showcase": {
    "chassis": "buehne",
