@@ -15115,6 +15115,27 @@
   // Abschnitt noch nicht gelaufen hat, hat keine Leistung (null): erst der Aktive, dann die
   // Wartenden nach Bein — vorlaeufig, wie die Streckensortierung der anderen Bahnen.
   function bahnLeistung(u){ return u.etappenZeit==null?null:-(u.etappenZeit)+u.wechselKonto; }
+  // EIGENE LAUFZEIT statt Zieluhrzeit (Zeitfahren, K5-Umsetzung 07.09., Recherche
+  // Abschnitt 4.2). `u.fertig` ist die absolute Rennuhr-Zeit; mit gestaffeltem Start
+  // (`u.startT`) misst sie nicht mehr die Leistung, sondern auch, wann jemand losfuhr.
+  // Fuer jede Bahn ausser Zeitfahren bleibt `u.startT` bei 0 (die Staffel setzt es
+  // waehrend des Rennens pro Bein um, misst sich aber ueber `bahnLeistung`/`etappenZeit`,
+  // nicht hierueber) — deshalb ist dieser Wechsel fuer Spurt/Climbing/Takeshi
+  // bit-identisch: `bahnZeit(u) === u.fertig` dort in jedem Fall.
+  function bahnZeit(u){ return u.fertig==null?null:u.fertig-(u.startT||0); }
+  // BESTZEIT IM FELD AN EINEM CHECKPOINT (Zeitfahren, Fable-Entscheidung 3: die Diff-
+  // Anzeige vergleicht gegen den BIS DAHIN schnellsten Laeufer, nicht gegen einen festen
+  // Rivalen — dieselbe "vorlaeufig, aber ehrlich"-Logik wie bahnRangliste). `ci` ist der
+  // Checkpoint-Index (0=ZZ1, 1=ZZ2, ...), `-1` meint die Zielzeit. Liest nur `u.zz`/
+  // `bahnZeit`, schreibt nichts.
+  function bahnBesteZeit(ci){
+    let best=null;
+    for(const u of LAEUFER){
+      const v=ci<0?bahnZeit(u):(u.zz&&u.zz[ci]!=null?u.zz[ci]:null);
+      if(v!=null&&(best==null||v<best))best=v;
+    }
+    return best;
+  }
   function bahnRangliste(){
     const N=LAEUFER.length;
     const staffel=!!BA().staffel;
@@ -15127,7 +15148,7 @@
         return (a.bein??0)-(b.bein??0);
       }
       const fa=a.fertig!=null, fb=b.fertig!=null;
-      if(fa&&fb)return a.fertig-b.fertig;
+      if(fa&&fb)return bahnZeit(a)-bahnZeit(b);
       if(fa!==fb)return fa?-1:1;
       return b.pos-a.pos;
     });
@@ -15259,6 +15280,7 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    renderZeitfahrenPanel();
   }
 
   function updateHud(){
@@ -16189,26 +16211,73 @@
       // MATRIX: dexterity 25, speed 22, intelligence 18, stamina 15, awareness 12,
       // power 5, torment 3.
       //
-      // Ein Zeitfahren ist ein Rennen OHNE Gegner: jeder faehrt fuer sich, niemand kann
-      // gerempelt werden, und es gibt keinen Windschatten zu erben. Deshalb sind beide
-      // Schalter aus — und genau deshalb muss die Strecke selbst die Entscheidung
-      // liefern. Das tun die Kurven: neun Stueck, und in jeder entscheidet die LINIE.
+      // K5-UMSETZUNG (07.09., docs/design/zeitfahren-recherche-06-09.md, Chris' Auftrag
+      // 06.09.: "time trial wie gesagt keine hindernisse ... manchmal wirds auch etwas
+      // huegelig oder so wo dann andere stats noch rein spielen"). Die neun Kurven mit
+      // echtem Sturzrisiko (`hindernisse`, dieselbe Technik/Wucht/Stolper-Mechanik wie
+      // eine Spurt-Huerde, nur "Kurve" genannt) sind ERSATZLOS gestrichen — ein
+      // Zeitfahren hat keine Gegner, die man umreissen oder von denen man gerempelt
+      // werden koennte, und ein Sturz ohne Gegner war ohnehin nur eine verkleidete
+      // Huerde. An ihre Stelle tritt ein STRECKENPROFIL aus Huegel- und technischen
+      // Kurvenzonen (`gelaende`, s. gelaendeAn/gelaendeFaktor) — STETIG, ohne rr()-Wurf,
+      // ohne Ausscheiden: eine Zone kostet Tempo an ihrem Rand nichts und in ihrer Mitte
+      // am meisten, wie ein echtes Hoehenprofil statt einer Falle.
       //
-      // Wer die Linie liest (Intelligence, Awareness) und haelt (Dexterity), verliert
-      // nichts. Wer sie verpasst, kann noch RISIKO nehmen — mehr Tempo in die Kurve
-      // tragen, als sauber waere. Das kostet Reserve und geht manchmal schief. So bekommt
-      // Torment seine 3 und Dexterity seine 25.
-      // Die Kurve ist der Kern des Zeitfahrens, also darf sie nicht fast immer gelingen:
-      // bei Linie 70 kommen 62 % sauber durch, der Rest muss RISIKO nehmen oder verliert
-      // die Linie. Der Haushalt ist grosszuegiger als im Sprint, weil hier niemand Sog
-      // erben kann — ohne das brachen 74 % ein, und ein Einbruch, den fast jeder hat, ist
-      // kein Drama, sondern Grundrauschen.
+      // Fable-Entscheidung 1 (Streckenanteil, Recherche Abschnitt 6 Frage 1): das
+      // AUSGEDEHNTE Profil (~75 % der Strecke huegelig/technisch, nicht die moderaten
+      // 57 %) — die Recherche mass fuer das moderate Profil einen Puffer von nur 0,024
+      // ueber der 0,80-Schranke bei 0,087 Kaderrauschen (kleiner als das Rauschen selbst,
+      // statistisch nicht von einem Fehlschlag zu unterscheiden). Das ausgedehnte Profil
+      // gibt Dexterity/Awareness (ueber WENDIGKEIT) auf drei statt zwei Kurvenzonen einen
+      // Kanal und bleibt trotzdem "mal huegelig, mal technisch" statt eines Dauer-
+      // Slaloms — die beiden Huegel liegen an denselben Stellen wie im moderaten Profil,
+      // nur die drei Kurvenzonen sind breiter (13 % statt 7 % je Zone).
+      //
+      // Fable-Entscheidung 2 (Tagesform, Frage 2): ±1,5 % Tempo, einmal je Rennen gezogen
+      // (`tagesform`, s. `formTag` in bauSpurt) — der kleinste der drei gemessenen Werte
+      // (0/1,5/3 %), gerade genug, damit dieselbe Kaderpaarung nicht jedes Mal exakt
+      // dasselbe Rennen liefert, ohne den ohnehin duennen Puffer weiter zu verkleinern.
       technikBasis:0.20, technikSpanne:0.0060, wuchtBasis:0.12, wuchtSpanne:0.0085,
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
       kraftBasis:290, kraftSpanne:2.7,
-      label:"Time-Trial", jeSeite:6, hindernisse:[0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90],
-      hindernisWort:"Kurve", boden:"#3c3f45", schatten:false, tackle:false, grundTempo:96, tempoSpanne:0.82,
+      label:"Time-Trial", jeSeite:6, hindernisse:[],
+      boden:"#3c3f45", schatten:false, tackle:false, grundTempo:96, tempoSpanne:0.82,
+      // GESTAFFELTER START (Fable-Entscheidung, Recherche Abschnitt 4.2): jeder Laeufer
+      // faehrt fuer sich, ein Startrampen-Feld statt eines Massenstarts. ACHTUNG,
+      // ZEIT_DEHNUNG.time-trial=4,38 (weiter unten) streckt jede SIMULATIONSSEKUNDE auf
+      // 4,38 echte Sekunden Zuschauzeit — ein zu grosser Abstand wuerde nicht nur das Feld
+      // gut staffeln, sondern die Zuschauzeit explodieren lassen: mit 2,2 s Abstand allein
+      // fuer die Startrampe (11 Luecken bis der letzte Laeufer los faehrt) waeren das
+      // 11×2,2×4,38 ≈ 106 REALE Sekunden, in denen nur EINER auf einer sonst leeren Bahn
+      // zu sehen ist — deutlich laenger, als das alte Massenstart-Zeitfahren insgesamt
+      // dauerte. 0,8 s haelt die Rampe sichtbar gestaffelt (jeder Start ≈3,5 reale
+      // Sekunden nach dem vorigen), ohne dass die Gesamtzuschauzeit eines Zeitfahrens
+      // (Rampe + Laufzeit, gestreckt) die anderer Bahnen sprengt. Betrifft NUR die
+      // Praesentation (`stepSim`-Streckung, s. ZEIT_DEHNUNG-Kommentar) — Rangtreue haengt
+      // an `bahnZeit()` (eigene Laufzeit), nicht am Abstand selbst; nachgemessen
+      // unveraendert bei 0,8 wie bei 2,2 (s. PR-Beschreibung). `startT` existiert als
+      // generisches Feld bereits (bisher nur von der Staffel gesetzt), `tempoVon()` liest
+      // es schon generisch — s. `bahnZeit()` fuer die dazugehoerige Korrektur der Wertung
+      // (eigene Laufzeit statt Zieluhrzeit).
+      startAbstand:0.8,
+      // ZWISCHENZEITEN (Recherche Abschnitt 4.4): an den Geraenden Uebergaengen der
+      // beiden Huegel platziert — genau dort, wo ein Zuschauer fragt "haelt er den
+      // Vorsprung vom Berg auf der Abfahrt?". Fable-Entscheidung 3: Diff gegen den BIS
+      // DAHIN schnellsten Laeufer im Feld (dieselbe "vorlaeufig, aber ehrlich"-Logik wie
+      // bahnRangliste fuer den laufenden Punktestand), nicht gegen einen festen Rivalen.
+      zwischenzeiten:[0.40,0.76],
+      gelaende:[
+        {von:0.04,bis:0.17,art:"kurve"},
+        {von:0.22,bis:0.34,art:"steigung"},{von:0.34,bis:0.40,art:"abfahrt"},
+        {von:0.42,bis:0.55,art:"kurve"},
+        {von:0.58,bis:0.70,art:"steigung"},{von:0.70,bis:0.76,art:"abfahrt"},
+        {von:0.80,bis:0.93,art:"kurve"}
+      ],
+      bergSkill:"ENDTEMPO", bergKosten:0.22, bergZehr:1.1,
+      abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
+      kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
+      tagesform:0.015,
       // WERTUNG NACH RANG (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
       // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND
       // Climbing): alle Laeufer beider Seiten in EINER Rangliste nach Zielzeit, Platz 1
@@ -16652,11 +16721,18 @@
         sauber:Math.max(0,erreicht-u.gestolpert-(u.durchbruch||0)),
         platz:u.fertig!=null&&!u.raus?rennFertig.filter(x=>!x.raus).indexOf(u)+1:null};
     });
+    // HINDERNIS-SPALTEN NUR, WO ES WELCHE GIBT (Zeitfahren, K5): ohne sie waeren "Kurv
+    // 0/0"/"Saub —"/... vier leere Spalten, die nichts mehr zeigen, seit die Kurven-
+    // Huerden gestrichen sind (Abschnitt 3.1 der Recherche). `art.hindernisse` bleibt
+    // fuer Spurt/Climbing/Takeshi unveraendert gesetzt, die Spalten bleiben dort also
+    // bit-identisch.
+    const mitHindernissen=!!(art.hindernisse&&art.hindernisse.length);
     const spalten=[
+      ...(mitHindernissen?[
       {id:"hind", kopf:hw.slice(0,4), titel:hw+"n erreicht", wert:z=>z.erreicht+"/"+H().length},
       {id:"sauber",kopf:"Saub", titel:"sauber genommen", top:true, wert:z=>z.sauber||null},
       {id:"durch", kopf:wucht.slice(0,5), titel:wucht, wert:z=>z.u.durchbruch||null},
-      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null},
+      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null}]:[]),
       ...(art.schatten?[{id:"sog",kopf:"Sog",titel:"Anteil im Windschatten",
         wert:z=>Math.round(z.u.schattenS/Math.max(0.1,z.u.schattenS+z.u.spitzeS)*100),fmt:v=>v+"%"}]:[]),
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
@@ -16664,12 +16740,21 @@
       {id:"weit", kopf:"Weit", titel:"erreichte Strecke", top:true, wert:z=>Math.round(z.u.pos*100), fmt:v=>v+"%"},
       {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
         farbe:v=>v==="leer"?"var(--crit)":null},
-      {id:"zeit", kopf:"Zeit", wert:z=>z.u.fertig!=null&&!z.u.raus?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+      // ZWISCHENZEITEN (Zeitfahren, K5): eine Spalte je Checkpoint, Diff gegen die
+      // Bestzeit im Feld an genau diesem Checkpoint (Fable-Entscheidung 3, s.
+      // bahnBesteZeit). Nur fuer Bahnen mit `art.zwischenzeiten` — heute nur Time-Trial.
+      ...((art.zwischenzeiten||[]).map((cp,ci)=>({
+        id:"zz"+ci, kopf:"ZZ"+(ci+1), titel:"Zwischenzeit bei "+Math.round(cp*100)+" % — Diff zur Bestzeit im Feld",
+        wert:z=>{const v=z.u.zz&&z.u.zz[ci]; if(v==null)return null;
+          const best=bahnBesteZeit(ci), diff=v-best; return Math.round(diff*100)/100;},
+        fmt:v=>v<=0.005?"Bestzeit":"+"+v.toFixed(2)+" s",
+        farbe:v=>v<=0.005?"var(--ok)":null}))),
+      {id:"zeit", kopf:"Zeit", wert:z=>bahnZeit(z.u)!=null&&!z.u.raus?+bahnZeit(z.u).toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
       {id:"stand",kopf:"Stand", wert:z=>z.u.raus?"raus":z.platz?"Ziel "+z.platz:"läuft",
         farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&v.startsWith("Ziel"))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
-      sortierung:(a,b)=>((a.u.fertig??99)-(b.u.fertig??99))||(b.u.pos-a.u.pos), fuss:""};
+      sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos), fuss:""};
   }
 
   // STAFFEL (`staffel:true`): nur einer je Team laeuft gleichzeitig — die anderen fuenf
@@ -16775,6 +16860,19 @@
   // nirgends, ein Rennen ohne Eingriff laeuft damit Tick fuer Tick wie vorher.
   let bahnWahl=null;
 
+  // ZEITFAHREN-FOKUS, Bedienzustand (Recherche zeitfahren-06-09.md Abschnitt 4.3): welcher
+  // Laeufer (u.id, beide Seiten) gerade die Einzelkamera traegt — oder null (Feldansicht).
+  // Getrennt von `bahnWahl` (Rennplan-Ansage, nur eigene Laeufer): hier geht es ums
+  // ZUSCHAUEN, nicht ums Eingreifen, deshalb sind beide Seiten waehlbar. Reine
+  // Anzeigegroesse wie `bahnWahl` — die Simulation liest sie nirgends.
+  let bahnFokus=null;
+  // AUTOMATISCHES DURCHSCHALTEN wie eine TV-Uebertragung (Fable-Entscheidung 4, Recherche
+  // Abschnitt 6 Frage 4): Standard ist AN, sobald ein Zeitfahren startet — sobald der
+  // fokussierte Laeufer im Ziel ist, springt die Kamera zum naechsten, der noch unterwegs
+  // ist (Startreihenfolge). Ein Klick auf einen Laeufer (Roster-Leiste, ◀/▶) schaltet auf
+  // manuell um; der "Auto"-Knopf nimmt es wieder auf.
+  let bahnFokusAuto=true;
+
   // ===================================================================================
   // KAMERA. Chris: "man kann ja auch raus zoomen oder rein zoomen und dann die ganze
   // strecke sehen ... die spieler werden in eine lane geforced wo man mehr miteinander
@@ -16864,6 +16962,24 @@
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
   function kameraUpdate(dt){
+    // EINZELKAMERA (Zeitfahren-Fokus, Recherche Abschnitt 4.3): zoomt eng auf GENAU einen
+    // Laeufer, wie ein Kamerawagen, der neben ihm herfaehrt — statt der Bounding-Box aller
+    // noch Laufenden darunter. Gated hinter `BA().startAbstand` (nur Time-Trial setzt es)
+    // UND `bahnFokus`; jede andere Bahn nimmt weiterhin den Feld-Zoom. Reine Praesentation:
+    // alle Laeufer werden unveraendert gemeinsam auf derselben Rennuhr simuliert
+    // (schatten:false, tackle:false — niemand beeinflusst einen anderen), die Kamera
+    // aendert nur, WAS man sieht, nicht WAS berechnet wird.
+    if(BA().startAbstand&&bahnFokus!=null){
+      const u=LAEUFER.find(x=>x.id===bahnFokus);
+      if(u){
+        const zielZoom=2.2;
+        const zielCx=Math.max(0,Math.min(1,u.pos));
+        const t=Math.min(1,dt*1.8);
+        cam.zoom+=(zielZoom-cam.zoom)*t;
+        cam.cx+=(zielCx-cam.cx)*t;
+        return;
+      }
+    }
     const aktiv=LAEUFER.filter(u=>u.fertig==null);
     const quelle=aktiv.length?aktiv:LAEUFER;
     if(!quelle.length)return;
@@ -16952,7 +17068,7 @@
       bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
     }
     bahnEndeGemeldet=false;
-    cam={zoom:1,cx:0.5}; bahnWahl=null;
+    cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
     // beim Kurswechsel nicht auf der alten Kurve zeichnet.
@@ -17068,10 +17184,25 @@
         L.bein=idx; L.beinVon=idx/n; L.beinBis=(idx+1)/n;
         L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
       }
+      // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
+      // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
+      // liest sich ueberall als 0). `L.id` ist die Startreihenfolge selbst (0..11, ueber
+      // beide Seiten hinweg in Aufstellungsreihenfolge vergeben).
+      if(art.startAbstand)L.startT=L.id*art.startAbstand;
+      // TAGESFORM (Zeitfahren, K5, Recherche Abschnitt 3.6): EINMAL je Laeufer gezogen,
+      // nicht je Tick — sonst waere es kein "Tagesform"-Rauschen, sondern ein zufaelliges
+      // Zittern ueber das ganze Rennen. Gated hinter `art.tagesform`; ohne das Feld bleibt
+      // `u.formTag` undefined und tempoVon() liest `(u.formTag||1)` als 1.
+      if(art.tagesform)L.formTag=1+(rr()-0.5)*2*art.tagesform;
       LAEUFER.push(L);
     };
     mine.forEach((p,i)=>setz(p,0,i*2,false,i));
     gegen.forEach((o,i)=>setz(o,1,i*2+1,true,i));
+    // ZEITFAHREN-FOKUS: die Kamera startet auf dem ersten Fahrer der Startrampe, nicht auf
+    // "niemand" — sonst zeigt das erste Bild eines Zeitfahrens die Feldansicht, obwohl nur
+    // einer unterwegs ist.
+    if(art.startAbstand&&LAEUFER.length)
+      bahnFokus=[...LAEUFER].sort((a,b)=>(a.startT||0)-(b.startT||0))[0].id;
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -17177,6 +17308,49 @@
     return 1-Math.max(0,Math.min(KURVE_KOSTEN,verlust));
   }
 
+  // ============================ GELAENDE (Zeitfahren, K5) ============================
+  // Chris' Auftrag woertlich: "manchmal wirds auch etwas huegelig oder so wo dann andere
+  // stats noch rein spielen". Ersetzt die neun Kurven-Huerden mit Sturzrisiko
+  // (docs/design/zeitfahren-recherche-06-09.md Abschnitt 3.1) durch ein STETIGES
+  // Streckenprofil: eine Zone kostet (oder schenkt) Tempo an ihrem Rand nichts und in
+  // ihrer Mitte am meisten, OHNE rr()-Aufruf und ohne Sturz/Ausscheiden — ein echtes
+  // Hoehenprofil statt einer Falle. Nur aktiv, wenn `BA().gelaende` gesetzt ist (heute
+  // nur Time-Trial); jede andere Bahn bleibt bit-identisch, weil `gelaendeAn` dort sofort
+  // `null` liefert und `gelaendeFaktor`/`gelaendeZehrFaktor` dann 1 zurueckgeben.
+  function skillLesen(u,name){ return u[name]||0; }
+  function gelaendeAn(pos){
+    const zn=BA().gelaende; if(!zn)return null;
+    for(const z of zn){ if(pos>=z.von&&pos<=z.bis){
+      const mitte=(z.von+z.bis)/2, halb=(z.bis-z.von)/2||1;
+      return {art:z.art, staerke:1-Math.abs(pos-mitte)/halb};
+    }}
+    return null;
+  }
+  function gelaendeFaktor(u){
+    const z=gelaendeAn(u.pos); if(!z)return 1;
+    const A=BA();
+    // STEIGUNG: kostet Tempo, abgefedert durch die Bergfaehigkeit (ENDTEMPO — "wer hinten
+    // noch Reserven hat, holt am Berg etwas raus", genau Chris' Fiktion).
+    if(z.art==="steigung"){ const skill=skillLesen(u,A.bergSkill||"ENDTEMPO");
+      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100)); }
+    // ABFAHRT: schenkt Tempo, mehr fuer wendige Laeufer — dieselbe Faehigkeit wie die
+    // Kurve, weil eine Abfahrt technisch genau das ist: eine lange, offene Kurve.
+    if(z.art==="abfahrt"){ const skill=skillLesen(u,A.abfahrtSkill||"WENDIGKEIT");
+      return 1+(A.abfahrtBonus??0.08)*z.staerke*(skill/100); }
+    // KURVE: technischer Streckenabschnitt, kostet Tempo, abgefedert durch WENDIGKEIT —
+    // ersetzt die alte Sturz-Huerde, aber STETIG statt binaer.
+    if(z.art==="kurve"){ const skill=skillLesen(u,A.kurveSkill||"WENDIGKEIT");
+      return 1-Math.max(0,(A.kurveKosten??0.10)*z.staerke*(1-skill/100)); }
+    return 1;
+  }
+  // Reserve-Mehrverbrauch am Anstieg, dieselbe Idee wie `steigung` beim Klettern, nur
+  // ZONAL statt ueber die ganze Strecke — eine Wand ist durchgehend steil, ein Zeitfahren
+  // nur an den Huegeln.
+  function gelaendeZehrFaktor(pos){
+    const z=gelaendeAn(pos); if(!z||z.art!=="steigung")return 1;
+    return 1+((BA().bergZehr??1)-1)*z.staerke;
+  }
+
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
@@ -17216,7 +17390,11 @@
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
-           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1);
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
+           // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
+           // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
+           // identisch, s. Kommentar bei gelaendeAn.
+           *gelaendeFaktor(u)*(u.formTag||1);
   }
 
   // ===================================================================================
@@ -17286,6 +17464,15 @@
       // In der Staffel laeuft immer nur einer je Mannschaft. Die anderen stehen in ihrer
       // Wechselzone — sie verbrauchen keine Kraft und bewegen sich nicht.
       if(BA().staffel && !u.aktiv)continue;
+      // GESTAFFELTER START (Zeitfahren, K5): wer seine Startzeit noch nicht erreicht hat,
+      // steht auf der Startrampe — kein Tempo, kein Verbrauch, keine Timer. Ohne diese
+      // Zeile lief `u.startT` nur in `bahnZeit()` mit, aber die Figur selbst bewegte sich
+      // von der ersten Sekunde an wie im Massenstart — mit dem Ergebnis, dass
+      // `u.fertig - u.startT` fuer spaet Gestartete NEGATIV wurde (sie "kamen an", bevor
+      // ihre eigene Uhr ueberhaupt lief). Gated hinter `startAbstand`, das nur Time-Trial
+      // setzt; jede andere Bahn traegt dort ohnehin nie ein `startT`>0 (die Staffel zaehlt
+      // ihre Wartezeit ueber `aktiv`, s. oben).
+      if(BA().startAbstand&&(u.startT||0)>rennT)continue;
       if(u.stolper>0)u.stolper-=dt;
       if(u.huerde>0)u.huerde-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
@@ -17339,6 +17526,18 @@
       const vor=u.pos;
       u.pos+=u.v*dt/strecke;
 
+      // ---- ZWISCHENZEITEN (Zeitfahren, Recherche Abschnitt 4.4). Reine Erfassung, kein
+      // rr()-Aufruf, keine Rueckwirkung auf die Simulation — dieselbe Uebergangs-Pruefung
+      // wie bei den fruehreren Hindernissen (`vor<h&&u.pos>=h`), nur ohne die Sturz-Logik
+      // dahinter. Gespeichert wird die EIGENE Laufzeit (rennT minus Startzeit), nicht die
+      // Rennuhr — sonst waere ein spaeter Gestarteter am Checkpoint scheinbar "langsamer".
+      if(BA().zwischenzeiten){
+        u.zz=u.zz||[];
+        BA().zwischenzeiten.forEach((cp,ci)=>{
+          if(u.zz[ci]==null&&vor<cp&&u.pos>=cp)u.zz[ci]=rennT-(u.startT||0);
+        });
+      }
+
       // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
       // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
@@ -17359,6 +17558,11 @@
       // STEIGUNG. Eine Wand ist unten leichter als oben. Der Verbrauch waechst mit der
       // Hoehe — deshalb entscheidet beim Klettern der Haushalt, nicht der Antritt.
       if(BA().steigung)zehr*=1+BA().steigung*u.pos;
+      // ZONALE STEIGUNG (Zeitfahren, K5): dieselbe Idee wie `steigung` oben, aber nur an
+      // den Huegel-Zonen statt ueber die ganze Strecke. Gated hinter `BA().gelaende` — fuer
+      // jede andere Bahn liefert gelaendeZehrFaktor ohnehin 1, die Guard-Zeile spart nur
+      // den Funktionsaufruf.
+      if(BA().gelaende)zehr*=gelaendeZehrFaktor(u.pos);
       if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
       if(u.huerde>0)zehr*=0.4;             // Stopp am Hindernis: ein Fuenftel bis die Haelfte, nicht Volllast
@@ -17724,6 +17928,20 @@
         }
       }
     }
+    // AUTOMATISCHES DURCHSCHALTEN (Zeitfahren-Fokus): sobald der fokussierte Laeufer im
+    // Ziel ist (oder noch niemand ausgewaehlt wurde), springt die Kamera zum naechsten
+    // Laeufer in Startreihenfolge, der noch unterwegs ist — wie eine TV-Regie, die immer
+    // dem naechsten Fahrer auf der Strecke folgt. Nur im Auto-Modus (`bahnFokusAuto`); ein
+    // Klick auf einen Laeufer schaltet manuell und bleibt so, bis "Auto" wieder gedrueckt
+    // wird (s. zeitfahrenFokusWaehlen/-AutoToggle).
+    if(BA().startAbstand&&bahnFokusAuto){
+      const aktueller=bahnFokus!=null?LAEUFER.find(x=>x.id===bahnFokus):null;
+      if(!aktueller||aktueller.fertig!=null){
+        const naechster=LAEUFER.filter(x=>x.fertig==null)
+          .sort((a,b)=>(a.startT||0)-(b.startT||0))[0];
+        if(naechster)bahnFokus=naechster.id;
+      }
+    }
     kameraUpdate(dt);
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
   }
@@ -17819,7 +18037,7 @@
       // und die Ziffern stehen ohnehin in der Wertungstabelle daneben. Auf der geraden
       // Bahn (Spurt, Staffel, ...) bleibt die Zeile, dort stehen die Fertigen einzeln
       // gestaffelt rechts neben der Ziellinie.
-      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s"+
+      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+bahnZeit(u).toFixed(1)+" s"+
         (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
@@ -19060,6 +19278,138 @@
   }
 
   // ===================================================================================
+  // ZEITFAHREN-FOKUS (Recherche zeitfahren-06-09.md Abschnitt 4.3/4.4). Nur sichtbar,
+  // solange die aktuelle Bahn gestaffelt startet (`BA().startAbstand`, heute nur
+  // Time-Trial) — jede andere Bahn zeigt die Zeile gar nicht erst.
+  // ===================================================================================
+  function zeitfahrenFokusMoeglich(){ return istBahn(disc)&&!!BA().startAbstand&&LAEUFER.length>0; }
+  function zeitfahrenFokusReihe(){ return [...LAEUFER].sort((a,b)=>(a.startT||0)-(b.startT||0)); }
+  function zeitfahrenFokusWaehlen(id){
+    if(!zeitfahrenFokusMoeglich())return;
+    if(!LAEUFER.some(x=>x.id===id))return;
+    bahnFokus=id; bahnFokusAuto=false;
+    ttPanelSig=""; renderZeitfahrenPanel();
+  }
+  function zeitfahrenFokusSchritt(delta){
+    if(!zeitfahrenFokusMoeglich())return;
+    const reihe=zeitfahrenFokusReihe();
+    const i=Math.max(0,reihe.findIndex(x=>x.id===bahnFokus));
+    const next=reihe[(i+delta+reihe.length)%reihe.length];
+    if(next)zeitfahrenFokusWaehlen(next.id);
+  }
+  function zeitfahrenFokusAutoToggle(){
+    if(!zeitfahrenFokusMoeglich())return;
+    bahnFokusAuto=!bahnFokusAuto;
+    ttPanelSig=""; renderZeitfahrenPanel();
+  }
+  // DOM wird nur bei einer Signaturaenderung neu GEBAUT (Roster-Chips, Gelaende-Baender —
+  // dieselbe Kachel-Stabilitaet wie bei rennplanSig/renderRennplanZeile, s. dortiger
+  // Kommentar zu mousedown-vs-Ersetzen); Zahlen (Marker-Position, Splits) werden JEDES
+  // Bild aktualisiert, weil sie sich ohnehin jeden Tick aendern.
+  let ttPanelSig="";
+  function renderZeitfahrenPanel(){
+    const panel=document.getElementById("ttfokus");
+    if(!panel)return;
+    if(!zeitfahrenFokusMoeglich()){ panel.hidden=true; ttPanelSig=""; return; }
+    panel.hidden=false;
+    const cps=BA().zwischenzeiten||[];
+    const sig=bahnDisc+"|"+LAEUFER.length+"|"+cps.join(",");
+    if(sig!==ttPanelSig){
+      ttPanelSig=sig;
+      // ROSTER-LEISTE, einmal je Rennaufbau gebaut.
+      const roster=document.getElementById("ttroster");
+      if(roster){
+        roster.textContent="";
+        zeitfahrenFokusReihe().forEach(u=>{
+          const chip=el("button","ttchip "+(u.seite===0?"heim":"gast"),u.n);
+          chip.type="button"; chip.dataset.id=String(u.id);
+          roster.appendChild(chip);
+        });
+      }
+      // HOEHENPROFIL-BAENDER, einmal gebaut — die Zonen aendern sich waehrend eines
+      // Rennens nicht.
+      const prof=document.getElementById("ttprofil");
+      if(prof){
+        prof.textContent="";
+        for(const z of (BA().gelaende||[])){
+          const b=el("div","ttzone "+(z.art==="steigung"?"berg":z.art==="abfahrt"?"tal":"kurve"));
+          b.style.left=(z.von*100)+"%"; b.style.width=((z.bis-z.von)*100)+"%";
+          b.title=(z.art==="steigung"?"Anstieg":z.art==="abfahrt"?"Abfahrt":"Technische Kurve")
+            +" ("+Math.round(z.von*100)+"–"+Math.round(z.bis*100)+" %)";
+          prof.appendChild(b);
+        }
+        cps.forEach((cp,ci)=>{
+          const m=el("div","ttcp"); m.style.left=(cp*100)+"%";
+          m.appendChild(el("b",null,"ZZ"+(ci+1)));
+          prof.appendChild(m);
+        });
+        const marker=el("div","ttmarker"); marker.id="ttmarker";
+        prof.appendChild(marker);
+      }
+    }
+    const u=LAEUFER.find(x=>x.id===bahnFokus);
+    // KOPFZEILE: Name, Plan, Nav-Zustand.
+    const name=document.getElementById("ttname"), planEl=document.getElementById("ttplan");
+    if(name)name.textContent=u?u.n:"—";
+    if(planEl)planEl.textContent=u?("· "+((BA().plaene[u.plan]||{}).label||"")
+      +(u.fertig==null&&(u.startT||0)>rennT?" · auf der Startrampe":"")):"";
+    const autoBtn=document.getElementById("ttauto");
+    if(autoBtn){ autoBtn.classList.toggle("an",bahnFokusAuto);
+      autoBtn.textContent=bahnFokusAuto?"Auto ✓":"Auto"; }
+    // ROSTER-ZUSTAND: wer fokussiert ist, wer im Ziel, wer noch wartet.
+    const roster=document.getElementById("ttroster");
+    if(roster)for(const chip of roster.children){
+      const id=Number(chip.dataset.id), ru=LAEUFER.find(x=>x.id===id);
+      chip.classList.toggle("an",id===bahnFokus);
+      chip.classList.toggle("fertig",!!(ru&&ru.fertig!=null));
+      chip.classList.toggle("wartet",!!(ru&&ru.fertig==null&&(ru.startT||0)>rennT));
+    }
+    // MARKER AUF DEM HOEHENPROFIL.
+    const marker=document.getElementById("ttmarker");
+    if(marker)marker.style.left=(Math.max(0,Math.min(1,u?u.pos:0))*100)+"%";
+    // ZWISCHENZEITEN-ZEILE: eine Zeile je Checkpoint plus die Zielzeit, jeweils mit Diff
+    // zur Bestzeit im Feld an genau diesem Punkt (Fable-Entscheidung 3).
+    const splits=document.getElementById("ttsplits");
+    if(splits){
+      splits.textContent="";
+      const zeile=(label,wert,diff,zusatz)=>{
+        const s=el("span");
+        s.appendChild(el("b",null,label+" "));
+        s.appendChild(document.createTextNode(wert==null?"—":wert.toFixed(2)+" s"));
+        if(diff!=null){
+          const d=el("span",diff<=0.005?"gut":"schlecht",
+            diff<=0.005?" Bestzeit":" +"+diff.toFixed(2)+" s");
+          s.appendChild(d);
+        }
+        if(zusatz)s.appendChild(document.createTextNode(" "+zusatz));
+        splits.appendChild(s);
+      };
+      cps.forEach((cp,ci)=>{
+        const v=u&&u.zz?u.zz[ci]:null;
+        zeile("ZZ"+(ci+1), v, v==null?null:v-bahnBesteZeit(ci));
+      });
+      if(u&&u.fertig!=null){
+        const gz=bahnZeit(u);
+        zeile("Ziel", gz, gz==null?null:gz-bahnBesteZeit(-1),
+          "· Platz "+(bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1));
+      }
+    }
+  }
+  function verdrahteZeitfahrenFokus(){
+    const prev=document.getElementById("ttprev"), next=document.getElementById("ttnext"),
+          auto=document.getElementById("ttauto"), roster=document.getElementById("ttroster");
+    if(prev)prev.addEventListener("click",()=>zeitfahrenFokusSchritt(-1));
+    if(next)next.addEventListener("click",()=>zeitfahrenFokusSchritt(1));
+    if(auto)auto.addEventListener("click",zeitfahrenFokusAutoToggle);
+    // Delegiert wie die Kaderleiste (mousedown statt click, s. verdrahteRennplanAnsage):
+    // die Chips stehen zwar still (eigene Sig-Kachel), aber derselbe Vorsichtsgrund gilt.
+    if(roster)roster.addEventListener("mousedown",ev=>{
+      const c=ev.target.closest?ev.target.closest(".ttchip[data-id]"):null;
+      if(c){ ev.preventDefault(); zeitfahrenFokusWaehlen(Number(c.dataset.id)); }
+    });
+  }
+
+  // ===================================================================================
   // SPEED-SCHACH: MINI-BRETT ANKLICKEN PINNT DEN FOKUS (Fable-Plan 05.09., A.5 Regel 2).
   //
   // Nur EIN Weg hier, nicht zwei wie beim Fokus-Doppeln/der Rennplan-Ansage: die sechs
@@ -19502,7 +19852,7 @@
         // Zahl, genau das, was die Punkte-Spalte hier bewusst vermeidet. Die Reihenfolge
         // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
         // Finisher, nur ANZEIGEN darf man ihn nicht.
-        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":u.fertig.toFixed(1)+" s"));
+        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":bahnZeit(u).toFixed(1)+" s"));
         tr.appendChild(el("td",null,stand.punkte?(stand.punkteVon?stand.punkteVon(u):fmtP(stand.punkte.get(u.id))):"—"));
         tb.appendChild(tr);
       });
@@ -19563,6 +19913,7 @@
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
   verdrahteRennplanAnsage();
+  verdrahteZeitfahrenFokus();
   verdrahteSchachPin();
   verdrahteZielansage();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
@@ -20139,7 +20490,11 @@
           for(const u of LAEUFER)o[u.n]=burgwertung(u);
           return o;
         }
-        const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+        // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
+        // bahnRangliste (s. dort), hier fuer die Rangtreue-Messung selbst: `disziplinProbe`
+        // liest `M.wert()`, nicht bahnRangliste. Fuer jede Bahn ausser Zeitfahren ist
+        // `bahnZeit(u) === u.fertig`, also bit-identisch.
+        const o={}; [...LAEUFER].sort((a,b)=>(bahnZeit(a)??99)-(bahnZeit(b)??99))
           .forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
       }
     };
@@ -20339,7 +20694,10 @@
       bauSpurt(1337+i*7919);
       let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }
       laeufe++;
-      const sortiert=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
+      // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
+      // bahnRangliste/MOTOREN[bd].wert() (s. dort); fuer jede Bahn ausser Zeitfahren
+      // bit-identisch.
+      const sortiert=[...LAEUFER].sort((a,b)=>(bahnZeit(a)??99)-(bahnZeit(b)??99));
       sortiert.forEach((u,platz)=>{
         const e=summe[u.n]||(summe[u.n]={n:u.n,seite:u.seite,plan:u.plan,eig:u.eig,
           platz:0,zeit:0,schatten:0,leer:0,stolper:0,tackles:0,getackelt:0,wechsel:0,
@@ -20347,7 +20705,7 @@
           // je Laeufer. Ausserhalb von Takeshi fuehrt keine Bahn die Felder, dort bleiben
           // beide Spalten 0 — die Serie zaehlt nur mit, sie rechnet nichts.
           ausgewichen:0,gedraengt:0,gedraengeZeit:0});
-        e.platz+=platz+1; e.zeit+=u.fertig??90;
+        e.platz+=platz+1; e.zeit+=bahnZeit(u)??90;
         e.schatten+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
         e.leer+=u.leer?1:0; e.stolper+=u.gestolpert; e.tackles+=u.tackles; e.getackelt+=u.getackelt;
         e.ausgewichen+=u.ausgewichen||0; e.gedraengt+=u.gedraengt||0; e.gedraengeZeit+=u.gedraengeZeit||0;
@@ -21183,8 +21541,13 @@
           raus:!!u.raus,
           ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
           // Ausgeschiedene: kein `zeit`. u.fertig traegt bei ihnen nur den Sortierschluessel
-          // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit.
-          zeit:(u.fertig==null||u.raus)?null:+u.fertig.toFixed(4), pos:+u.pos.toFixed(5),
+          // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit. `zeit` ist die
+          // EIGENE Laufzeit (bahnZeit), nicht die Zieluhrzeit — bei gestaffeltem Start
+          // (Zeitfahren) sonst durch die Startzeit verzerrt; fuer jede andere Bahn
+          // bit-identisch, weil `startT` dort 0 bleibt.
+          zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4), pos:+u.pos.toFixed(5),
+          startT:+(u.startT||0).toFixed(3),
+          zwischenzeiten:(u.zz||[]).map(v=>v==null?null:+v.toFixed(4)),
           bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
           etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
           wechselKonto:+(u.wechselKonto||0).toFixed(4),
