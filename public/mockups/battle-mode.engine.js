@@ -14836,7 +14836,18 @@
       if(u.dodge>0)u.dodge-=dt;
     }
     schrittPfeile(dt);
-    if(!live(0).length||!live(1).length||t>95)finish();
+    // N-WAY-FEST GEMACHT (Mini-DM-4-Team-FFA, docs/design/mini-dm-4-team-ffa-recherche-06-09.md
+    // Abschnitt 4.2): vorher `!live(0).length||!live(1).length` — dieselbe Behauptung wie bei
+    // gegner()/eigene() vor PR #671 ("es gibt genau zwei Parteien"), hier nur unbemerkt liegen
+    // geblieben. Fuer TDM/Battlefield/das normale 4-gegen-4-Mini-DM (nur Seiten 0 und 1 in U)
+    // ist die neue Zeile exakt aequivalent: die Menge der ueberlebenden Seiten hat dort nie mehr
+    // als zwei Mitglieder, und "Groesse <=1" ist bitgleich zu "eine der beiden Seiten leer".
+    // Fuer eine Vierergruppe (u.side 0..3, s. baueMiniDmFfaRunde) endet der Kampf jetzt erst,
+    // wenn hoechstens noch EINE Seite ueberhaupt einen lebenden Kaempfer stellt — echte
+    // Elimination statt eines Abbruchs, sobald zufaellig Seite 0 oder 1 leer ist, waehrend 2/3
+    // noch kaempfen.
+    const lebendeSeiten=new Set(U.filter(u=>!u.down).map(u=>u.side));
+    if(lebendeSeiten.size<=1||t>95)finish();
     updateHud();
   }
 
@@ -19676,6 +19687,226 @@
         for(const u of U)o[u.n]=beitragVon(u)/g*100; return o;}
     };
   }
+
+  // ===================================================================================
+  // MINI-DM ALS 4-TEAM-FREE-FOR-ALL — Chris' Sonderregel (06.09.), recherchiert in
+  // docs/design/mini-dm-4-team-ffa-recherche-06-09.md, hier als eigenstaendiger,
+  // testbarer Mechanismus umgesetzt (KEINE Spielplan-/Fixture-Integration, s. Abschnitt 5
+  // der Recherche — die bleibt ausdruecklich ein spaeterer, separater Durchgang).
+  //
+  // WEG 1 AUS DER RECHERCHE (Abschnitt 4.2), nicht Weg 2: eine Runde ist eine ECHTE
+  // Simulation mit vier Einheiten (u.side 0..3), keine Werteverglecihung ohne Kampf.
+  // gegner()/eigene() sind seit PR #671 bereits N-way-fest (Kommentar bei live(0)/live(1)
+  // oben); der Sieg-Check direkt darueber ist es seit dieser Aenderung ebenfalls. Was neu
+  // dazukommt, ist reine Geometrie: vier Startpunkte statt zwei Feldhaelften (die
+  // Recherche nennt genau das den "einzigen echten Motor-Aufwand", Abschnitt 4.2/6).
+  //
+  // BEWUSST NICHT GENERALISIERT (Recherche-Fund 1.2, unveraendert wahr): `own`/die
+  // MID-Klammern in chooseTarget, die Formations-/Flankenziele (gx/gy) und die
+  // Rueckzugsrichtung bleiben binaer und behandeln Seite 1, 2 UND 3 gleich ("die andere
+  // Haelfte"). Das ist fuer eine Vierergruppe unschoen, aber ungefaehrlich: die vier
+  // Slots dieser Disziplin tragen keinen `ord`-Sondereintrag (s. SLOT_ZUSATZ oben,
+  // frontliner/finisher/trickfighter/ironguard fehlen dort komplett), jede Einheit laeuft
+  // also mit dem Standardbefehl "mitlinie" — kein `decken` (das einzige, was `own`
+  // ueberhaupt liest) und kein `flanke`. Bei GENAU EINEM Kaempfer je Seite gibt es zudem
+  // keine Formation, die diese Klammern haetten schuetzen muessen (die Recherche nennt das
+  // explizit: "Formation/Reihe entfaellt komplett"). NACHGEMESSEN statt vermutet
+  // (scripts/miss-mini-dm-ffa-spiegel.mjs, vier byte-identische Kaempfer, 1600 Runden):
+  // nach dem Ecken-Lotterie-Fix (s. baueMiniDmFfaRunde) liegt die groesste Platz-1-
+  // Abweichung von 25 % noch bei 6,0 Prozentpunkten (Team an der Ecke mit dem Team-Index 0
+  // gewinnt 31,0 % statt 25 % UND landet ueberdurchschnittlich oft auf Platz 4 — ein
+  // zweigipfliges statt ein flaches Muster). Der wahrscheinlichste Rest-Taeter ist genau
+  // diese Zeile: die Rueckzugsrichtung nach einem Rueckstoss haengt an `u.side===0`
+  // (Team-Index, NICHT an der ausgewuerfelten Ecke), zieht Seite 0 also immer in
+  // dieselbe Richtung relativ zu ihrem eigenen Zuhause, waehrend 1/2/3 die gespiegelte
+  // Richtung nehmen. Bewusst NICHT gefixt: die Formel speist sich aus `u.hx` (Bildschirm-
+  // X), nicht aus einem Vektor zum Feldzentrum — fuer die bestehenden Zwei-Seiten-Disziplinen
+  // (Heim links, Gast rechts) ist "Richtung MID-/MID+" identisch mit "weg vom Zentrum", fuer
+  // die Vierergruppe (Ecken auf einem Kreis, nicht nur links/rechts) waere das nur eine
+  // Naeherung — eine echte Korrektur muesste die Formel auf einen echten Zentrums-Vektor
+  // umstellen und wuerde damit automatisch auch TDM/Battlefield/das normale 4-gegen-4
+  // Mini-DM veraendern (deren Heimatpunkte liegen nicht exakt auf der Mittellinie, s.
+  // homeFor: `y` variiert je Formationsreihe). Genau die Geometriearbeit, die die
+  // Recherche (Abschnitt 6, Punkt 3) als eigenen, separaten Prototyp vor jeder
+  // Produktivsetzung fordert — hier bewusst nicht mitgemacht, um kein bereits
+  // scharf vermessenes Chassis (TDM 54,2 Pp, Battlefield 12,0 Pp, ...) anzufassen.
+  //
+  // SPAWNPUNKTE: ein Quadrat um die Feldmitte, ein Kaempfer je Ecke, 90 Grad auseinander
+  // (Recherche Abschnitt 4.2: "ein Kreis mit vier Startpositionen bei 0/90/180/270 Grad").
+  // Seite 0 oben, danach im Uhrzeigersinn — reine Konvention, keine Seite ist dadurch naeher
+  // an einer anderen als die uebrigen (jeder Abstand Ecke-zu-Ecke ist gleich lang oder die
+  // Diagonale, symmetrisch fuer alle vier).
+  function miniDmFfaSpawn(side){
+    const cx=MID, cy=H/2, r=Math.min(W,H)*0.30;
+    const winkel=(-90+side*90)*Math.PI/180;
+    return {x:cx+r*Math.cos(winkel), y:cy+r*Math.sin(winkel)};
+  }
+
+  // Die vier festen Rollen dieser Disziplin, in der Reihenfolge aus SLOTS_JE_DISC["mini-dm"]
+  // (Frontliner, Finisher, Trick Fighter, Iron Guard) — das IST N=4 aus Chris' Auftrag,
+  // s. Recherche Abschnitt 4.1 ("N=4, eine Runde je bestehender Rolle", empfohlen statt
+  // eines neuen variablen Mini-DM-Kaders).
+  const MINI_DM_FFA_ROLLEN=Object.freeze(SLOTS_JE_DISC["mini-dm"].map(s2=>s2.id));
+
+  // RUNDENPUNKTE, unveraendert aus der Recherche (Abschnitt 4.3) — Chris hat NUR die
+  // Liga-Punkte-Frage ueberstimmt ("mini dm 2-1-0-0 will ich dann"), nicht diese hier.
+  const MINI_DM_FFA_RUNDENPUNKTE=Object.freeze([4,3,2,1]);
+
+  // LIGA-PUNKTE FUER DIE EVENT-ENDPLATZIERUNG — Chris' AUSDRUECKLICHE UEBERSTEUERUNG der
+  // recherchierten Empfehlung. Die Recherche (Abschnitt 3, Option A) empfahl "Sieger nimmt
+  // alles", 2/0/0/0, weil das als einzige der drei Optionen eins zu eins Chris' eigene
+  // Formulierung spiegelt ("das darf nicht so viel zaehlen wie zwei Disziplinen") UND weil
+  // die Summe dabei IMMER exakt 2 bleibt — genau das Budget, das ein normales Arena-Duell
+  // zahlt (ARENA_TEAM_POINTS in battle-mode-arena-team-points.ts: Sieg 2, Unentschieden
+  // 1, Niederlage 0, macht in Summe immer 2).
+  //
+  // Chris hat das, nach Vorlage dieser Empfehlung, AUSDRUECKLICH ANDERS ENTSCHIEDEN:
+  // woertlich "mini dm 2-1-0-0 will ich dann". Das wird hier eins zu eins umgesetzt, NICHT
+  // die Forschungsempfehlung. Ehrlich benannt, weil es die Recherche selbst so verlangt
+  // (Abschnitt 3 nennt die Budget-Rechnung als Grund fuer Option A): 2+1+0+0 = 3, nicht 2 —
+  // ein Mini-DM-Event zahlt damit anderthalbmal so viel Liga-Punkte-Summe wie jedes andere
+  // Arena-Duell an jedem anderen Spieltag, das Doppel-Sieger-Risiko, vor dem Chris selbst
+  // gewarnt hatte ("2 Sieger-Teams mit 2 Punkten waere wie zwei Diszis"), aber knapper.
+  // Das ist keine offene Frage mehr, sondern eine getroffene, hier dokumentierte
+  // Entscheidung — nicht in einer naechsten Runde durch die Forschungsempfehlung ersetzen.
+  const MINI_DM_FFA_LIGAPUNKTE=Object.freeze([2,1,0,0]);
+
+  // PLATZIERUNGSPUNKTE MIT GLEICHSTAND-TEILUNG — dieselbe Sport-Standard-Regel, die schon
+  // an den ligaweiten Rang-zu-Punkte-Tabellen und in der Recherche (Abschnitt 3/4.3) steht:
+  // wer gleichauf liegt, teilt die Punkte der belegten Plaetze untereinander auf. Nimmt
+  // WERTE (absteigend besser) und eine Punktetabelle je Platz, liefert Punkte in der
+  // Reihenfolge der uebergebenen Werte zurueck (nicht sortiert) plus den 1-basierten
+  // Platz je Eintrag (bei Gleichstand der BESTE der geteilten Plaetze, wie ueblich in
+  // Ranglisten — "gleichauf Erster" statt "gleichauf Zweiter").
+  function verteilePlatzierungspunkte(werte,punkteJePlatz){
+    const idxSortiert=werte.map((w,i)=>i).sort((a,b)=>werte[b]-werte[a]);
+    const punkte=new Array(werte.length).fill(0), platz=new Array(werte.length).fill(0);
+    let i=0;
+    while(i<idxSortiert.length){
+      let j=i;
+      while(j+1<idxSortiert.length&&werte[idxSortiert[j+1]]===werte[idxSortiert[i]])j++;
+      const geteilt=punkteJePlatz.slice(i,j+1).reduce((a,b)=>a+b,0)/(j-i+1);
+      for(let k=i;k<=j;k++){punkte[idxSortiert[k]]=geteilt; platz[idxSortiert[k]]=i+1;}
+      i=j+1;
+    }
+    return {punkte,platz};
+  }
+
+  // EINE RUNDE: vier Solo-Kaempfer, einer je Team, alle in derselben Rolle. Echte
+  // Simulation ueber denselben stepSimStumm-Takt wie MOTOREN["mini-dm"].lauf() (120 s
+  // Budget, kein Rendering) — kein Wert-Vergleich, s. Kopfkommentar. `vierSpieler` ist ein
+  // Array der Laenge 4 im ArenaSpieler-Format (arena-kader-adapter.ts): Team-Index i
+  // bekommt u.side===i. Rueckgabe: Rundenrang 1-4 je Team, nach `beitragVon` am Kampfende
+  // (Recherche Abschnitt 4.2: "Rang 1-4 nach Punktestand am Rundenende") mit
+  // Gleichstand-Teilung, PLUS die vollen Boxscore-Felder je Kaempfer fuer eine Abnahme.
+  function baueMiniDmFfaRunde(vierSpieler,slotId,saat){
+    if(!Array.isArray(vierSpieler)||vierSpieler.length!==4){
+      throw new Error("baueMiniDmFfaRunde: braucht genau 4 Spieler (einen je Team), bekam "+
+        (Array.isArray(vierSpieler)?vierSpieler.length:typeof vierSpieler)+".");
+    }
+    if(!MINI_DM_FFA_ROLLEN.includes(slotId)){
+      throw new Error("baueMiniDmFfaRunde: unbekannte Mini-DM-Rolle \""+slotId+"\" — erwartet "+
+        "eine von "+MINI_DM_FFA_ROLLEN.join(", ")+".");
+    }
+    KFOKUS=null; KFOKUS_CD=0;
+    disc="mini-dm";
+    seed=normalisiereSaat(saat); U=[]; floats.length=0; t=0; done=false;
+    freigabe=[false,false,false,false]; pfeile=[]; MESS={}; PLAN=null;
+    // ECKEN-LOTTERIE, SEED-BESTIMMT (Spiegeltest-Fund, s. PR-Beschreibung): Nahkampf hier ist
+    // VOLLSTAENDIG deterministisch — kein rr()-Wurf im ganzen Kampf ausser Fernkampf-Streuung
+    // (unsere vier Rollen sind alle Nahkaempfer), s. chooseTarget-Kommentar "Keine Wuerfe, kein
+    // Zufall". Die Standard-Zielwahl ("bedrohung", PERSZIEL.duellant) loest einen Gleichstand
+    // (am Rundenanfang haben alle drei Gegner Bedrohung 0) ueber das ERSTE Element von
+    // gegner(u) auf — und das ist schlicht die EINFUEGEREIHENFOLGE in U. Baut man U immer in
+    // Team-Reihenfolge 0,1,2,3, sehen Team 1/2/3 als ihren ersten Gleichstand-Kandidaten IMMER
+    // Team 0 zuerst, Team 0 dagegen IMMER Team 1 — eine strukturelle Schieflage (drei greifen
+    // Team 0 zuerst an, Team 0 nur einen), nicht im Mittel, sondern in JEDER Runde mit
+    // vergleichbar starken Kaempfern. Nachgemessen (scripts/miss-mini-dm-ffa-spiegel.mjs, vier
+    // byte-identische Kaempfer, 384 Runden): Team 1 gewann 50 % aller Runden, Team 3 0 % — eine
+    // Eckenlotterie statt eines Kampfes. Fix: WELCHES Team auf welcher Ecke steht (und damit an
+    // welcher Stelle in U/gegner()) wird selbst ausgewuerfelt, mit derselben Saat wie der Rest
+    // der Runde (reproduzierbar, Fisher-Yates ueber das schon vorhandene rr()) — der
+    // Team-Index (u.side) bleibt fuer die Punktezaehlung unveraendert, nur die Ecke wechselt.
+    const eckenReihenfolge=[0,1,2,3];
+    for(let i=eckenReihenfolge.length-1;i>0;i--){
+      const j=Math.floor(rr()*(i+1));
+      const tmp=eckenReihenfolge[i]; eckenReihenfolge[i]=eckenReihenfolge[j]; eckenReihenfolge[j]=tmp;
+    }
+    let id=0;
+    for(let ecke=0; ecke<4; ecke++){
+      const side=eckenReihenfolge[ecke];
+      const p=vierSpieler[side];
+      const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
+        zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
+      const spawn=miniDmFfaSpawn(ecke);
+      einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
+      U.push(einheit);
+    }
+    // U bleibt WAEHREND DES KAMPFES in der ausgewuerfelten Eckenreihenfolge (das ist der
+    // Fix von oben — gegner() muss die Ecken-Lotterie sehen, sonst greift sie nicht). Fuer
+    // die Rueckgabe wird trotzdem nach Team-Index sortiert, reine Lesbarkeit — jeder Eintrag
+    // traegt sein `side`-Feld ohnehin explizit, ein Aufrufer darf sich NICHT auf Array-
+    // Position statt auf `side` verlassen (s. spieleMiniDmFfaEvent unten, das genau deshalb
+    // ueber `.find(t=>t.side===side)` liest, nicht ueber Index).
+    let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
+    const beitraege=U.map(u=>beitragVon(u));
+    const {punkte,platz}=verteilePlatzierungspunkte(beitraege,MINI_DM_FFA_RUNDENPUNKTE);
+    const teams=U.map((u,i)=>({side:u.side,n:u.n,eig:+u.eig.toFixed(2),beitrag:+beitraege[i].toFixed(2),
+      rundenPlatz:platz[i], rundenPunkte:punkte[i], hp:Math.round(u.hp),
+      max:Math.round(u.max), down:!!u.down}));
+    teams.sort((a,b)=>a.side-b.side);
+    return {slotId, seed, dauer:+t.toFixed(2), teams};
+  }
+
+  // DAS GANZE EVENT: vier Runden (eine je Rolle, s. MINI_DM_FFA_ROLLEN), Rundenpunkte
+  // summiert ueber alle vier ergeben die Event-Endplatzierung, aus der die Liga-Punkte
+  // (2-1-0-0, s.o.) folgen. `vierTeams` ist ein Array von 4 Kadern (ArenaSpieler[] je
+  // Team, Format wie SQUAD/OPP/arena-kader-adapter.ts) — je Rolle wird der i-te Kaempfer
+  // nach absteigender Mini-DM-Eignung (`p.d["mini-dm"]`) gestellt, dieselbe Regel, mit der
+  // `build()` oben die normale 4-gegen-4-Aufstellung waehlt ("wer nicht gesetzt ist, wird
+  // nach Eignung gesetzt"). Ein Kader mit weniger als vier Eignungstraegern wiederholt sich
+  // zyklisch (Modulo), statt abzubrechen — praktisch fuer Testkader, in einer echten Liga
+  // hat jedes Team laengst mindestens vier Feldspieler.
+  //
+  // TIEBREAK FUER GLEICHE EVENT-GESAMTPUNKTE (von Chris nicht spezifiziert, hier als
+  // begruendete Vorgabe dokumentiert statt stillschweigend gewuerfelt): zuerst die Summe der
+  // vier `rundenPunkte` (die Event-Endplatzierung selbst), bei Gleichstand darin die Summe
+  // der vier rohen `beitrag`-Werte (feinere Aufloesung als die ganzzahligen Rundenpunkte —
+  // dasselbe Prinzip wie Options C in der Recherche, nur als Tiebreak statt als Hauptformel).
+  // Bleiben Teams AUCH DARIN exakt gleich, teilen sie sich die Liga-Punkte der betroffenen
+  // Plaetze (verteilePlatzierungspunkte leistet das automatisch).
+  function spieleMiniDmFfaEvent(vierTeams,saat){
+    if(!Array.isArray(vierTeams)||vierTeams.length!==4){
+      throw new Error("spieleMiniDmFfaEvent: braucht genau 4 Team-Kader, bekam "+
+        (Array.isArray(vierTeams)?vierTeams.length:typeof vierTeams)+".");
+    }
+    const saatBasis=normalisiereSaat(saat);
+    const sortiert=vierTeams.map(kader=>[...kader].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0)));
+    const runden=MINI_DM_FFA_ROLLEN.map((slotId,i)=>{
+      const vier=sortiert.map(kader=>kader.length?kader[i%kader.length]:null);
+      if(vier.some(p=>!p))throw new Error("spieleMiniDmFfaEvent: mindestens ein Team stellt keinen einzigen Mini-DM-Kaempfer.");
+      // Runden-Saat aus der Event-Saat abgeleitet, aber je Rolle verschieden, damit die
+      // vier Runden nicht denselben Zufallslauf viermal wiederholen — derselbe
+      // Hash-vor-Uebergabe-Kniff wie in normalisiereSaat()/seedZuZahl (arena-headless-
+      // runner.ts), nur hier ohne Fremdabhaengigkeit inline gehalten.
+      return baueMiniDmFfaRunde(vier,slotId,(saatBasis*2654435761+i*40503)>>>0);
+    });
+    const summeRundenpunkte=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].rundenPunkte,0));
+    const summeBeitrag=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].beitrag,0));
+    // Zweistufiger Vergleichswert fuers Sortieren/Gleichstand-Erkennen: Rundenpunkte zuerst,
+    // Beitrag nur als Bruchteil dahinter (kleiner als jeder moegliche Rundenpunkte-Abstand),
+    // damit verteilePlatzierungspunkte() beides in EINEM Wertevergleich abbildet.
+    const vergleichswert=[0,1,2,3].map(side=>summeRundenpunkte[side]+summeBeitrag[side]/1e6);
+    const {punkte:ligaPunkte,platz:eventPlatz}=verteilePlatzierungspunkte(vergleichswert,MINI_DM_FFA_LIGAPUNKTE);
+    return {
+      saat:saatBasis,
+      runden,
+      teams:[0,1,2,3].map(side=>({
+        side, rundenPunkteSumme:summeRundenpunkte[side], beitragSumme:+summeBeitrag[side].toFixed(2),
+        eventPlatz:eventPlatz[side], ligaPunkte:ligaPunkte[side]
+      }))
+    };
+  }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
   // Zeitfahren und die Wand. Kommt eine sechste Bahn dazu, reicht ein Eintrag in
@@ -20285,6 +20516,15 @@
   }
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
+    // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
+    // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
+    // Recherche, bewusst nicht Teil dieser Aenderung).
+    miniDmFfaRunde:(vierSpieler,slotId,saat)=>baueMiniDmFfaRunde(vierSpieler,slotId,saat),
+    miniDmFfaEvent:(vierTeams,saat)=>spieleMiniDmFfaEvent(vierTeams,saat),
+    miniDmFfaRollen:()=>[...MINI_DM_FFA_ROLLEN],
+    miniDmFfaLigapunkte:()=>[...MINI_DM_FFA_LIGAPUNKTE],
+    miniDmFfaRundenpunkte:()=>[...MINI_DM_FFA_RUNDENPUNKTE],
     zielansageLauf,
     // Zielansage, read-only: WER gerade angesagt ist und wie lange noch gesperrt ist
     // (Name statt roher id, damit sich ein Klick in der UI von aussen abnehmen laesst).
