@@ -81,6 +81,29 @@
       </div>
       <div class="arenaraum">
         <canvas id="cv" width="1240" height="470"></canvas>
+        <!-- BROADCAST-BUG. Persistentes HUD-Overlay ueber der Leinwand WAEHREND des
+             laufenden Spiels -- dieselbe Overlay-Infrastruktur wie .einlauf/.endstand
+             darunter (.arenaraum ist position:relative), nur eine kleine Randzone statt
+             inset:0 und halbtransparent statt blickdicht, wie ein echter TV-Score-Bug.
+             Steht bewusst VOR .einlauf/.endstand/.viertelpause im DOM: die natuerliche
+             Stapelreihenfolge (kein z-index) legt es damit automatisch UNTER alle drei
+             Vollflaechen-Overlays und UEBER die Leinwand. Inhalt kommt aus
+             aktualisiereBbug(), aufgerufen am Ende von updateHud()/updateHudBahn()/
+             updateHudBuehne()/updateHudFeldspiel() -- eine Wiederholung der bereits von
+             .scoreline geschriebenen Werte, keine neue Berechnung. Sichtbarkeit: nur
+             waehrend des laufenden Spiels (weder vor dem Anpfiff noch nach Spielende).
+             s. docs/design/broadcast-praesentation-uebergreifend-recherche-06-09.md
+             Abschnitt 3. -->
+        <div class="bbug" id="bbug" hidden>
+          <div class="seite l" id="bbugL"></div>
+          <div class="bbugmitte" id="bbugMitte"></div>
+          <div class="seite r" id="bbugR"></div>
+        </div>
+        <!-- CALLOUT. Kurzes Highlight-Banner fuer ein big-Ereignis aus feed() -- keine
+             neue Ereigniserkennung, derselbe big-Flag, der auch den Ticker fett setzt
+             (s. Abschnitt 4 derselben Recherche). Blendet sich automatisch nach ein paar
+             Sekunden wieder aus (s. callout() in der Engine). -->
+        <div class="bbugcallout" id="bbugcallout" hidden></div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
@@ -104,6 +127,11 @@
             <div class="etafel" id="etafelL"></div>
             <div class="etafel" id="etafelR"></div>
           </div>
+          <!-- HOEHEPUNKTE. Text-Rueckblick auf alle big-Ereignisse dieses Spiels (HIGHLIGHTS[],
+               gefuellt aus feed()) -- bewusst eine Textliste, kein Bild-Replay, s. Abschnitt 4.3
+               derselben Recherche. Nur befuellt/sichtbar, wo dieses Endstand-Overlay ueberhaupt
+               gezeigt wird (Kampf, Bahn); bleibt sonst leer und hidden. -->
+          <div class="ehighlights" id="ehighlights" hidden></div>
           <button class="btn" id="ezu">Schließen</button>
         </div>
         <!-- VIERTELPAUSE (nur Basketball, Chris' Fund 06.09.: "da fehlt der Pausenbuzzer" —

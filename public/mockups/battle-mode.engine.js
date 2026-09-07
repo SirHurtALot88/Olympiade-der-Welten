@@ -6845,7 +6845,8 @@
     if(neuerSpot<=0){
       if(traeger)traeger.punkte+=6;
       fsPunkte[fb.side]+=6;
-      feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true);
+      feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true,
+        traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined);
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
       if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feed(fb.side,"Extra-Punkt ist gut."); }
@@ -8612,7 +8613,8 @@
       if(a1){a1.assists++; a1.assists1++;}
       if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
-      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true);
+      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true,
+        waehleCaption(CAPTION_TOR,schuetze.n,a1?a1.n:null));
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
@@ -9744,6 +9746,41 @@
     fsLerpPositionen(dt);
   }
 
+  // BROADCAST-BUG: generisches HUD-Overlay ueber der Leinwand (Abschnitt 3 derselben
+  // Recherche), aufgerufen am Ende von updateHud()/updateHudBahn()/updateHudBuehne()/
+  // updateHudFeldspiel() -- also NACHDEM diese Funktionen #tnameL/#tnameR/#score/#clock
+  // bereits disziplinspezifisch beschrieben haben. Liest deshalb nur, was #scoreline in
+  // genau diesem Moment schon zeigt (Abschnitt 3.5: "Wiederholung derselben Zahl, kein
+  // Ersatz fuer .scoreline") -- eine einzige Fuellfunktion fuer alle vier Chassis statt
+  // vier eigener, weil die zugrundeliegenden Elemente bei allen vieren dieselben sind.
+  // Sichtbar nur waehrend des laufenden Spiels: weder waehrend des Einlaufs (die
+  // #einlauf-Vollflaeche deckt den Bug ohnehin ab) noch nach Spielende.
+  function aktualisiereBbug(){
+    const bug=document.getElementById("bbug");
+    if(!bug)return;
+    const einlauf=document.getElementById("einlauf");
+    bug.hidden=!!(einlauf&&!einlauf.hidden)||!!done;
+    if(bug.hidden)return;
+    const zeile=(tnameId)=>{
+      const wrap=document.getElementById(tnameId);
+      if(!wrap)return "";
+      const name=(wrap.firstChild&&wrap.firstChild.nodeType===3?wrap.firstChild.nodeValue:"").trim();
+      const em=wrap.querySelector("em");
+      let html="<b>"+name+"</b>";
+      if(em){const zusatz=em.textContent.trim();if(zusatz)html+="<small>"+zusatz+"</small>";}
+      return html;
+    };
+    const txt=(id)=>{const e=document.getElementById(id);return e?e.textContent.trim():"";};
+    const bl=document.getElementById("bbugL"),br=document.getElementById("bbugR"),
+      mitte=document.getElementById("bbugMitte");
+    if(bl)bl.innerHTML=zeile("tnameL");
+    if(br)br.innerHTML=zeile("tnameR");
+    if(mitte){
+      const teile=[txt("score"),txt("clock")].filter(Boolean);
+      mitte.textContent=teile.join(" · ");
+    }
+  }
+
   function updateHudFeldspiel(){
     document.getElementById("clock").textContent=
       Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
@@ -9800,6 +9837,7 @@
     }
     renderWertungTabelle();
     renderKader();
+    aktualisiereBbug();
   }
 
   // Basketball bekommt einen echten Platz — zwei Koerbe, Zonen, Dreierlinien. Die
@@ -11191,9 +11229,16 @@
       // der dreimal dasselbe leichte Gewicht hebt.
       if(!BB().heben)u.summe+=r.punkte;
       u.lunge=0.5;
+      // BIG-FLAG (Nachtrag, s. docs/design/broadcast-praesentation-uebergreifend-recherche-
+      // 06-09.md Abschnitt 4.1/4.4): dieselbe Bedingung, die hier schon lange den
+      // Schwebetext hervorhebt (schwebe()s `crit`), markiert jetzt AUCH die Ticker-Zeile
+      // als big — keine neue Erkennung, nur dieselbe schon getroffene Entscheidung ein
+      // zweites Mal gelesen. Vorher setzte KEIN einziger feed()-Aufruf in der Buehne das
+      // Flag (Abschnitt 4.1: "Buehne fehlt vollstaendig").
+      const versuchBig=BB().heben?(r.gueltig&&r.versuch===3):(r.punkte>=60);
       if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
-        crit:r.gueltig&&r.versuch===3,_def:!r.gueltig,_teilnehmer:u.id});
-      else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
+        crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
+      else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
       // DUELL: statt "X Punkte" die laufende Vorteils-Anzeige — dieselbe Zahl, die auch
       // fuer wert() zaehlt, damit Anzeige und Messung nie auseinanderlaufen.
       if(BB().heben){
@@ -11204,16 +11249,27 @@
         const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
         feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
           +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")
-          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".");
+          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig);
+        // ZWEIKAMPF ENTSCHIEDEN: das Endergebnis eines Hebers (Gesamtkilo oder Nullwertung)
+        // ist immer big — kein "vielleicht wichtig", sondern der Abschluss seines ganzen
+        // Auftritts, analog zum K.o./Zieleinlauf anderer Chassis.
         if(u.aktuell+1>=BB().rundenN)
           feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
-            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".");
+            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
-          " · Vorteil "+(v>0?"+":"")+v+" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").");
+          " · Vorteil "+(v>0?"+":"")+v+" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+        // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
+        // der Zuege dieses Teilnehmers steht endgueltig fest, ob das Brett gewonnen,
+        // verloren oder remis ist — derselbe u.verlauf, den auch die Wertungstabelle
+        // (renderWertungTabelle, Spalte "Stand") schon liest, hier nur zusaetzlich als
+        // big-Ereignis gemeldet statt nur in einer Tabellenzelle.
+        if(u.aktuell+1>=BB().rundenN)
+          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "
+            +(v>0?"gewonnen":v<0?"verloren":"unentschieden")+" (Vorteil "+(v>0?"+":"")+v+").",true);
       } else {
-        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").");
+        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       }
       buehneAkt=BB().rundenDauer;
     }
@@ -11267,6 +11323,7 @@
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     renderWertungTabelle();
     renderKader();
+    aktualisiereBbug();
   }
 
   function bodenBuehne(){
@@ -13463,7 +13520,7 @@
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
-    if(tg.hp===0&&!tg.down){tg.down=true;tg.st.tode++;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true);}
+    if(tg.hp===0&&!tg.down){tg.down=true;tg.st.tode++;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));}
   }
 
   // EINE UHR FUER ALLE.
@@ -13895,7 +13952,7 @@
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,crit);
-        if(z.hp===0&&!z.down){z.down=true;z.st.tode++;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true);}
+        if(z.hp===0&&!z.down){z.down=true;z.st.tode++;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,z.n));}
         pf.tot=true;
         continue;
       }
@@ -15080,11 +15137,15 @@
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
+      // Caption nur bei einem klaren Sieger — bei Unentschieden gibt es kein "s", fuer das
+      // eine der ZIELEINLAUF-Phrasen (Abschnitt 5) einen Namen einsetzen koennte.
+      const siegerName=pL>pR?VEREIN[0].name:pR>pL?VEREIN[1].name:null;
       feed(0,stand.gewertet
         ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
           +pL+":"+pR+" "+stand.suffix
         : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
-          +" (fuer diese Disziplin gibt es noch keine Wertung)",true);
+          +" (fuer diese Disziplin gibt es noch keine Wertung)",true,
+        siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
@@ -15094,6 +15155,7 @@
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     renderWertungTabelle();
     renderKader();
+    aktualisiereBbug();
   }
 
   function updateHud(){
@@ -15128,6 +15190,7 @@
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
     renderWertungTabelle();
     renderKader();
+    aktualisiereBbug();
   }
 
   // ===================================================================================
@@ -17809,7 +17872,78 @@
     }
   }
 
-  function feed(side,txt,big){
+  // HIGHLIGHTS: alle big-Ereignisse dieses Spiels, in der Reihenfolge, in der feed() sie
+  // meldet -- dieselbe Sammlung, die die Callout-Anzeige (s. callout() unten) und den
+  // Text-Rueckblick im Endstand (s. renderHighlights()) speist. Reiner Leser von
+  // side/txt/anzeigeT, die feed() ohnehin schon berechnet -- kein neuer Zustand, keine
+  // Ruecklesung durch wert()/stepSim/stepSpurt/stepBuehne/stepFeldspiel. Auf reset()
+  // geleert (s. dort), damit ein neues Spiel nicht die Hoehepunkte des letzten zeigt.
+  // s. docs/design/broadcast-praesentation-uebergreifend-recherche-06-09.md Abschnitt 4.4.
+  let HIGHLIGHTS=[];
+  let calloutTimer=null;
+
+  // CALLOUT: kurzes Highlight-Banner im #bbugcallout-Overlay (Abschnitt 4.3/4.4 derselben
+  // Recherche) -- 2,6 s sichtbar, dann automatisch ausgeblendet, dieselbe Empfehlung wie
+  // dort konkret vorgeschlagen. Reine DOM-Anzeige: liest nur den fertigen Text, schreibt
+  // nichts in den Sim-Zustand zurueck.
+  const CALLOUT_DAUER_MS=2600;
+  function callout(txt,caption){
+    if(stumm)return;
+    const banner=document.getElementById("bbugcallout");
+    if(!banner)return;
+    banner.textContent="";
+    banner.appendChild(document.createTextNode(txt));
+    if(caption){
+      const em=document.createElement("em");
+      em.textContent=caption;
+      banner.appendChild(em);
+    }
+    banner.hidden=false;
+    banner.classList.remove("zu");
+    // Reflow erzwingen: zwei big-Ereignisse kurz hintereinander sollen die Transition
+    // beide sichtbar abspielen, statt an der schon aktiven opacity:1 haengen zu bleiben.
+    void banner.offsetWidth;
+    banner.classList.add("zu");
+    if(calloutTimer)clearTimeout(calloutTimer);
+    calloutTimer=setTimeout(()=>{
+      banner.classList.remove("zu");
+      setTimeout(()=>{ if(!banner.classList.contains("zu"))banner.hidden=true; },380);
+    },CALLOUT_DAUER_MS);
+  }
+
+  // CAPTION-TEMPLATES (Abschnitt 5 derselben Recherche): kurze, alternative Formulierungen
+  // fuer die haeufigsten big-Ereignistypen, aus genau denselben Variablen gebaut, die der
+  // jeweilige feed()-Aufruf ohnehin schon zusammensetzt -- kein neues Datenfeld, keine
+  // Sprachmodell-Anbindung. Startumfang bewusst klein (4 Ereignistypen), wie in Abschnitt
+  // 5.3 empfohlen. Auswahl ueber einen lokalen Rundlauf-Zaehler statt rr(): ein
+  // zusaetzlicher rr()-Aufruf wuerde JEDEN nachfolgenden Wurf in der gemeinsamen
+  // Zufallskette verschieben (Abschnitt 6, Zeile 13165 zeigt denselben fortlaufenden LCG-
+  // Strom fuer alle Sim-Zwecke) -- der Rundlauf bleibt deterministisch (gleicher
+  // Spielverlauf -> derselbe Kommentar), ohne dieses rho-neutrale, aber unnoetige Risiko
+  // ueberhaupt einzugehen.
+  let captionZaehler=0;
+  const waehleCaption=(phrasen,...args)=>phrasen[(captionZaehler++)%phrasen.length](...args);
+  const CAPTION_TOR=[
+    (s,a)=>s+" verwandelt"+(a?" nach Vorlage von "+a:"")+" eiskalt!",
+    (s,a)=>"Da ist er drin — "+s+" trifft"+(a?" nach Zuspiel von "+a:"")+"!",
+    (s)=>s+" lässt dem Torwart keine Chance!",
+  ];
+  const CAPTION_TOUCHDOWN=[
+    (s)=>s+" tanzt in die Endzone — Touchdown!",
+    (s)=>"Sechs Punkte! "+s+" bringt den Ball nach Hause.",
+    (s)=>s+" lässt die Verteidigung stehen — TOUCHDOWN!",
+  ];
+  const CAPTION_KO=[
+    (s)=>s+" geht zu Boden — raus aus dem Kampf!",
+    (s)=>"Das war's für "+s+" — ausgeschieden!",
+    (s)=>s+" kann nicht mehr weiter.",
+  ];
+  const CAPTION_ZIELEINLAUF=[
+    (s)=>s+" — geschafft, das Rennen ist entschieden!",
+    (s)=>"Zielband durch — "+s+".",
+  ];
+
+  function feed(side,txt,big,caption){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -17828,6 +17962,15 @@
     f.appendChild(d);
     while(f.children.length>140)f.removeChild(f.firstChild);
     f.scrollTop=f.scrollHeight;
+    // BROADCAST-CALLOUT + HOEHEPUNKTE: dasselbe big-Flag, das oben schon die Ticker-Zeile
+    // fett setzt, loest hier zusaetzlich den kurzen Banner aus und sammelt das Ereignis
+    // fuer den Endstand-Rueckblick (Abschnitt 4.3/4.4). Reine Anzeige-Folge desselben
+    // Aufrufs -- big selbst entscheidet nach wie vor NUR ueber die CSS-Klasse oben, hier
+    // kommt keine zweite Bedeutung dazu.
+    if(big){
+      HIGHLIGHTS.push({side,txt,t:anzeigeT});
+      callout(txt,caption);
+    }
   }
 
   function finish(){
@@ -18968,6 +19111,31 @@
   // Spalte H zeigte nur die Summe, ohne die Adresse. Derselbe Mechanismus wie bei
   // dmg/cc/ko, nur mit dem eigenen Team als Ziel statt der gegnerischen Seite.
   const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl",heal:"heil"};
+  // HOEHEPUNKTE-RUECKBLICK: Text-Liste aller big-Ereignisse dieses Spiels (HIGHLIGHTS[],
+  // gefuellt in feed()), gerendert wie eine kurze, fertige Ticker-Kopie im Endstand-Overlay
+  // -- ausdruecklich KEIN Bild-Replay (Abschnitt 4.3 derselben Recherche haelt das fuer
+  // unverhaeltnismaessig teuer gegenueber dem Informationsgewinn). Nur an den beiden
+  // Stellen aufgerufen, die #endstand ueberhaupt zeigen (Kampf/renderEndstand, Bahn/
+  // renderEndstandBahn) -- Feldspiel und Buehne zeigen heute kein Endstand-Overlay,
+  // s. Kommentar bei stepFeldspielLive/stepBuehne, das bleibt unveraendert.
+  function renderHighlights(){
+    const box=document.getElementById("ehighlights");
+    if(!box)return;
+    if(!HIGHLIGHTS.length){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false;
+    box.textContent="";
+    box.appendChild(el("h5",null,"Höhepunkte"));
+    const liste=el("div","ehlist");
+    for(const h of HIGHLIGHTS){
+      const zeile=el("div","ehzeile "+(h.side===0?"h":"a"));
+      zeile.appendChild(el("span","eht",
+        Math.floor(h.t/60)+":"+String(Math.floor(h.t%60)).padStart(2,"0")));
+      zeile.appendChild(el("span",null,h.txt));
+      liste.appendChild(zeile);
+    }
+    box.appendChild(liste);
+  }
+
   function renderEndstand(){
     const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
     document.getElementById("esieger").textContent =
@@ -19015,6 +19183,7 @@
       }
       t.appendChild(tb); box.appendChild(t);
     }
+    renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -19076,11 +19245,19 @@
       });
       t.appendChild(tb); box.appendChild(t);
     }
+    renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
 
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
+    // Broadcast-Bausteine fuer ein neues Spiel zuruecksetzen: HIGHLIGHTS gehoert zum
+    // ABGELAUFENEN Spiel und darf im naechsten Endstand nicht mehr auftauchen; ein noch
+    // sichtbarer Callout aus dem letzten Spiel darf nicht ueber den neuen Einlauf stehen.
+    HIGHLIGHTS=[];
+    if(calloutTimer){clearTimeout(calloutTimer);calloutTimer=null;}
+    const bc=document.getElementById("bbugcallout");
+    if(bc){bc.hidden=true;bc.classList.remove("zu");}
     bkLoopStop();
     build();
     document.getElementById("feed").textContent="";
