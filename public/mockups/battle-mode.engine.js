@@ -10724,6 +10724,17 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
+    // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
+    // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
+    // Overlays abfragen. Ohne diese Zeile wuerde ein Heber, der NACH einem Hockey- oder
+    // Football-Match (ohne Neuladen der Seite) antritt, faelschlich mit Hockeyschlaeger
+    // bzw. Football-Ausruestung gezeichnet, weil `feldspielDisc` beim Verlassen eines
+    // Feldspiel-Matches nie zurueckgesetzt wird (nur `bauFeldspiel()` schreibt es, s. dort).
+    // Leerer String traegt bei keinem der beiden Checks je zu, unabhaengig davon, was vorher
+    // lief — betrifft ausschliesslich, WELCHE Ausruestung zeichneSprite() zeichnet, nichts
+    // an der Heben-Mechanik selbst.
+    feldspielDisc="";
     const art=BB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
@@ -10949,6 +10960,21 @@
   // selbst, nicht nur in die Ansage.
   const HEBEN_WAGNIS_ANSAGE_FLEX=0.0045; // je Punkt ANSAGE ueber 50, Dehnung des Risiko-Massstabs
   const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // NACH EINEM FEHLVERSUCH SENKEN, NICHT WIEDERHOLEN (Chris' Fund, 06.09., woertlich: "wenn
+  // jemand zb wie gram 117kg nicht schafft sollte der naechste versuch dann zb 110 sein und
+  // nicht 127kg weil das schafft er eh nicht und kostet ihn nur einen versuch"). Die
+  // eigene Versuchs-SEQUENZ eines Hebers eskalierte nachweislich nie nach einem eigenen
+  // Fehlversuch (diag-gewichtheben-nach-fehlversuch.mjs, v=0->1: 0 von 984 Faellen steigt,
+  // 100% wiederholen exakt dieselbe Last; v=1->2 zeigt nur die unten unveraenderte, separate
+  // Gegner-reaktive Ausnahme). Aber "wiederholen" ist trotzdem nicht, was Chris will: ein
+  // Heber, der 117 reisst, soll als naechstes eher 110 ansagen als stur wieder 117 zu wagen.
+  // 6% Abschlag trifft Chris' eigenes Zahlenbeispiel fast exakt (117*0,94=109,98 -> 110).
+  // Der bestehende Floor direkt unten ("Last steigt nie... unter die schon gehobene") bleibt
+  // unangetastet: eine bereits ERFOLGREICH gehobene Last kann die Reduktion nie unterschreiten,
+  // nur der freie Raum darueber wird kleiner genutzt. Die separate Gegner-reaktive Ausnahme
+  // (v===2, "REAKTION AUF DEN DUELLSTAND" unten) bleibt ebenfalls unangetastet — sie greift
+  // NACH dieser Reduktion und darf weiterhin nur nach oben ziehen.
+  const HEBEN_FEHL_REDUKTION=0.06;
   // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
   // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
   // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
@@ -11015,11 +11041,15 @@
         u.anzeigeKg=sinclairAnzeige(u.zweikampf,u.groesse);
       }
       // DUELLENTSCHEID. Gleicher Zweikampf: es gewinnt, wer weniger Versuche gebraucht hat
-      // (IWF seit 2017). Auch gleich: die Reihenfolge, also A. Ein halber Punkt ist damit
-      // praktisch ausgeschlossen — anders als bei Speed-Schach gibt es hier kein Remis.
+      // (IWF seit 2017). Auch gleich: das Los, seeded — nicht mehr "die Reihenfolge, also A".
+      // Das war ein zweiter, kleiner Heimvorteil, der den Gastvorteil aus der festen
+      // Hebereihenfolge (s. hebeUebung) teilweise verdeckte: allein diesen Tiebreak zu losen,
+      // verschob den Spiegeltest von 36:184 auf 28:203; beides zusammen bringt ihn auf 50:50.
+      // Ein halber Punkt bleibt praktisch ausgeschlossen — anders als bei Speed-Schach gibt
+      // es hier kein Remis.
       let sieger=null;
       if(a.zweikampf!==b.zweikampf)sieger=a.zweikampf>b.zweikampf?a:b;
-      else if(a.zweikampf>0)sieger=a.versucheBis<=b.versucheBis?a:b;
+      else if(a.zweikampf>0)sieger=a.versucheBis!==b.versucheBis?(a.versucheBis<b.versucheBis?a:b):(rr()<0.5?a:b);
       a.duellGewonnen=sieger===a; b.duellGewonnen=sieger===b;
       a.vorteil=a.zweikampf-b.zweikampf; b.vorteil=-a.vorteil;
     }
@@ -11039,6 +11069,18 @@
   // Eine Uebung (Reissen oder Stossen) fuer ein Duellpaar, Versuch fuer Versuch im
   // Wechsel. Beide Heber im selben Durchlauf, weil der dritte Versuch auf den Stand des
   // Gegners reagiert.
+  //
+  // WER HEBT ZUERST? (Opus-Fund auf PR #820, docs/design/gewichtheben-duell-reihenfolge-
+  // plan-06-09.md.) Bis 06.09. lief jeder Durchgang fest als [a,b], a = Heim. Im ersten und
+  // zweiten Versuch ist das egal (niemand reagiert), im dritten nicht: b kannte a's FERTIGES
+  // Ergebnis, a nur b's Stand nach zwei Versuchen — das letzte Wort hatte immer der Gast.
+  // Im Spiegeltest (identischer Kader gegen sich selbst, 1000 Spiele, auf #820-Basis) gewann
+  // Gast 613:125. Jetzt gilt im dritten Versuch die reale IWF-Regel, die buehneQueue fuers
+  // Buehnenbild schon immer nutzte: beide sagen auf DEMSELBEN Stand (nach zwei Versuchen) an,
+  // die leichtere Ansage hebt zuerst, die schwerere zuletzt — und darf nach dem Ausgang noch
+  // einmal nachziehen (nur aufwaerts, wie im Wettkampf). Gleiche Ansage: das Los, seeded ueber
+  // rr() (die Losnummer der Wiegung). Das letzte Wort hat damit, wer mehr angesagt hat — in
+  // der Regel der Fuehrende, und das ist verdient, nicht die Seite. Spiegeltest danach 349:326.
   function hebeUebung(a,b,plan,uebung){
     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
@@ -11055,27 +11097,43 @@
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
+    // Die Last des naechsten Versuchs — die geplante Ansage, im dritten Versuch dazu die
+    // Reaktion auf den Duellstand. Als Funktion, weil die Reihenfolge des dritten Versuchs
+    // (s.u.) beide Ansagen kennen muss, BEVOR einer von beiden gehoben hat.
+    const lastFuer=(u,v)=>{
+      const gegner=u===a?b:a;
+      let kg=ansage[u.id];
+      // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
+      // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
+      // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
+      // Wechselspiel. Ob er es schafft, entscheiden LAST (wie weit ueber seinem Maximum
+      // die Ansage liegt) und NERVEN.
+      // ...aber nur, wenn es ueberhaupt in Reichweite ist. Ohne den Deckel sprang ein
+      // Heber, der gegen einen viel staerkeren Gegner antrat, weit ueber sein
+      // Tagesmaximum und riss fast sicher — gemessen fiel die Gelingensquote im dritten
+      // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
+      // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
+      // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
+      if(v===2&&beste(gegner)>beste(u)){
+        const ziel=Math.round(beste(gegner))+1;
+        if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
+      }
+      // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
+      return Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
+    };
     for(let v=0;v<3;v++){
-      for(const u of [a,b]){
-        const gegner=u===a?b:a;
-        let kg=ansage[u.id];
-        // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
-        // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
-        // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
-        // Wechselspiel. Ob er es schafft, entscheiden LAST (wie weit ueber seinem Maximum
-        // die Ansage liegt) und NERVEN.
-        // ...aber nur, wenn es ueberhaupt in Reichweite ist. Ohne den Deckel sprang ein
-        // Heber, der gegen einen viel staerkeren Gegner antrat, weit ueber sein
-        // Tagesmaximum und riss fast sicher — gemessen fiel die Gelingensquote im dritten
-        // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
-        // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
-        // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
-        if(v===2&&beste(gegner)>beste(u)){
-          const ziel=Math.round(beste(gegner))+1;
-          if(ziel<=max(u)*1.06)kg=Math.max(kg,ziel);
-        }
-        // Die Last steigt nie und geht nie abwaerts unter die schon gehobene.
-        kg=Math.max(kg,Math.round(beste(u))+ (beste(u)>0?1:0));
+      // Erster und zweiter Versuch: Reihenfolge ohne Folgen, niemand reagiert. Dritter
+      // Versuch: die leichtere Ansage zuerst (IWF), gleiche Ansage per Los — s. Kopfkommentar.
+      // Wer als Zweiter hebt, rechnet seine Last unten NEU (lastFuer liest den frischen
+      // Stand) und zieht damit ggf. auf den Ausgang des Ersten nach; nur aufwaerts, weil
+      // lastFuer nie unter die geplante Ansage geht.
+      let reihe=[a,b];
+      if(v===2){
+        const ka=lastFuer(a,v), kb=lastFuer(b,v);
+        reihe=ka<kb?[a,b]:kb<ka?[b,a]:(rr()<0.5?[a,b]:[b,a]);
+      }
+      for(const u of reihe){
+        const kg=lastFuer(u,v);
         // Risiko-Massstab statt nacktem Tagesmax: s. HEBEN_WAGNIS_ANSAGE_FLEX oben. Nur
         // fuer die Erfolgschance gedehnt — Tagesmax/Sinclair-Anzeige bleiben unangetastet.
         const risikoMax=Math.max(1,max(u)*(1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
@@ -11102,8 +11160,12 @@
           const sprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
           ansage[u.id]=Math.max(kg+1,Math.round(kg*(1+sprung)));
         } else {
-          // Fehlversuch: dieselbe Last noch einmal, wie im echten Wettkampf.
-          ansage[u.id]=kg;
+          // Fehlversuch: die Last SENKEN statt zu wiederholen (Chris' Fund, s.
+          // HEBEN_FEHL_REDUKTION oben) — ein realistischerer Versuchsplan reagiert auf einen
+          // gerissenen Versuch, statt ihn stur zu wiederholen. Der Floor am Kopf der naechsten
+          // Runde ("Last steigt nie... unter die schon gehobene") verhindert, dass das je unter
+          // eine bereits erfolgreich gehobene Last faellt.
+          ansage[u.id]=Math.max(1,Math.round(kg*(1-HEBEN_FEHL_REDUKTION)));
         }
         u.runden.push({kg, gueltig, uebung, versuch:v+1,
           punkte:gueltig?kg:0,
@@ -11477,7 +11539,16 @@
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
       ctx.beginPath();ctx.ellipse(x,y+26,22,8,0,0,6.3);ctx.fill();
       ctx.globalAlpha=1;
-      zeichneSprite(ctx,u,x,y);
+      // `true` als vierter Parameter erzwingt dieselbe Weiche, die Feldspiel (Korbleger/
+      // Wurf) schon nutzt (s. Kommentar bei zeichneSprite): die "shoot"-Pose (einzige
+      // Ueberkopf-Bewegung im Baukasten, kein Waffen-Overlay) statt "slash"/"shoot" MIT
+      // sichtbarem Schwert/Pfeil — Chris' Fund (06.09.): "da ist gar kein gewicht als asset
+      // was die spieler versuchen zu stämmen sondern es wird sich nur aus der ferne
+      // gehauen". Ohne diesen Parameter waehlte zeichneSprite() bei u.lunge>0 (s. dort,
+      // gesetzt in stepBuehne fuer JEDEN enthuellten Versuch) je nach Bausatz-Waffe eine
+      // Schwert-/Axt-/Bogen-Kampfanimation — ein Heber schlug oder schoss, hob aber nie
+      // etwas. Die tatsaechliche Hantel s.u.
+      zeichneSprite(ctx,u,x,y,true);
       const schrift=(txt,dy,farbe,groesse,gewicht)=>{
         ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
@@ -11491,33 +11562,69 @@
     });
 
     // DIE HANTEL — Balken mit zwei Scheibenpaaren, keine neue Sprite-Pipeline, nur
-    // Primitiven. Traegt die zuletzt angesagte/gehobene Last als grosse Zahl.
-    const bx=W/2,by=y+2;
-    ctx.strokeStyle="#5a5568";ctx.lineWidth=5;
+    // Primitiven, JETZT ANIMIERT (Chris' zweiter Fund, 06.09.: "das gewicht müsste
+    // angehoben werden und entweder schafft man es oder nicht"). Vorher stand die Hantel
+    // reglos mittig, nur die Zahl/das Wort daneben verrieten gueltig/ungueltig — jetzt
+    // wandert sie sichtbar vom Boden (nahe den Haenden) zur Streckung ueber dem Kopf, bleibt
+    // dort haengen bei einem gueltigen Versuch und faellt zurueck bei einem ungueltigen.
+    // `bx` folgt dem Heber, der gerade dran ist (dieselbe Regel wie aktivNr oben) statt fest
+    // in der Mitte zu stehen — vor dem allerersten Versuch (zug===null) bleibt sie mittig,
+    // reglos am Boden, wie ein Geraet, das noch niemand angefasst hat.
+    //
+    // FORTSCHRITT kommt aus buehneAkt/art.rundenDauer — DERSELBEN Zahl, die stepBuehne()
+    // ohnehin fuehrt, um den naechsten Versuch zu takten (buehneAkt zaehlt von rundenDauer
+    // auf 0 herunter). Kein zweiter Zeitgeber, kein neuer Zustand auf u/TEILNEHMER — rein
+    // praesentational: disziplinProbe()/miss-alle-disziplinen.mjs rufen stepBuehne()
+    // weiterhin direkt mit festem 1/60 auf, lesen buehneAkt nie fuer die Wertung und
+    // durchlaufen diese Zeichenfunktion nie. Farbe/Ausgang kommen wie bei der Zahl daneben
+    // sofort aus zug.r.gueltig — dieselbe sofortige Klarheit, die die KG-Zahl schon hat,
+    // kein kuenstlich verzoegerter Spannungsaufbau.
+    const zug=letzterHebenZug;
+    const aktiverHeber=zug?zug.u:null;
+    const bx=aktiverHeber?(aktiverHeber.side===0?W*0.30:W*0.70):W/2;
+    const boden=y+40, ueberkopf=y-58;
+    // 0..0.35: Aufstieg. Gueltig: bleibt ab da oben (gehalten). Ungueltig: faellt 0.35..0.55
+    // zurueck auf den Boden und bleibt dort liegen, bis der naechste Versuch beginnt.
+    const fortschritt=zug?Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1))):0;
+    const steigPhase=Math.min(1,fortschritt/0.35);
+    const gueltigJetzt=!zug||zug.r.gueltig;
+    let by;
+    if(zug&&!gueltigJetzt&&fortschritt>0.35){
+      const fallPhase=Math.min(1,(fortschritt-0.35)/0.20);
+      by=ueberkopf+(boden-ueberkopf)*fallPhase;
+    } else {
+      by=boden+(ueberkopf-boden)*steigPhase;
+    }
+    const balkenFarbe=zug?(gueltigJetzt?css("--ok"):css("--crit")):"#5a5568";
+    const scheibeFarbe=zug?(gueltigJetzt?css("--ok"):css("--crit")):"#3a3648";
+    ctx.strokeStyle=balkenFarbe;ctx.lineWidth=5;
     ctx.beginPath();ctx.moveTo(bx-46,by);ctx.lineTo(bx+46,by);ctx.stroke();
-    ctx.fillStyle="#3a3648";
+    ctx.fillStyle=scheibeFarbe;
     for(const dx of [-46,-38,38,46])
       {ctx.beginPath();ctx.ellipse(bx+dx,by,Math.abs(dx)===46?11:8,Math.abs(dx)===46?11:8,0,0,6.3);ctx.fill();}
 
-    const zug=letzterHebenZug;
+    // TEXT-KARTE bleibt an einer FESTEN Hoehe (unabhaengig von `by`, das sich mit der Hantel
+    // bewegt) — sonst haetten Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar
+    // zu bleiben, waehrend das Auge der Hantel folgt.
+    const textY=y+2;
     ctx.textAlign="center";ctx.textBaseline="middle";
     if(zug){
       const gueltig=zug.r.gueltig;
       const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
       ctx.font="700 22px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
-      ctx.strokeText(zeigeKg+" kg",bx,by-34);
+      ctx.strokeText(zeigeKg+" kg",bx,textY-34);
       ctx.fillStyle=gueltig?css("--ok"):css("--crit");
-      ctx.fillText(zeigeKg+" kg",bx,by-34);
+      ctx.fillText(zeigeKg+" kg",bx,textY-34);
       // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
       // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
       ctx.font="700 15px 'Barlow Condensed',sans-serif";
-      ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,by+34);
+      ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,textY+34);
       ctx.font="400 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,by+48);
+      ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,textY+48);
     } else {
       ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.fillText("Erste Ansage folgt …",bx,by-10);
+      ctx.fillText("Erste Ansage folgt …",bx,textY-10);
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
@@ -17797,7 +17904,24 @@
     // Court): 240 s Simulationszeit werden damit zu rund 8 Minuten Zuschauzeit. Eishockey
     // ist im Original schneller als Basketball, aber die Lesbarkeit auf einem 1240x470
     // grossen Feld haengt an der Zeichenflaeche, nicht am Vorbild.
-    hockey:2
+    hockey:2,
+    // GEWICHTHEBEN (Chris' Fund, 06.09., woertlich: "dann geht es sehr schnell und ist sehr
+    // unueberischtlich"). BUEHNE_ART.gewichtheben.rundenDauer=1,55 ist eine SIMULATIONS-
+    // Sekunde je Versuch — bei Faktor 1 (die Buehne stand bislang NICHT in dieser Tabelle,
+    // der Kommentar oben nennt Buehne pauschal "steuert ihr Tempo schon anders", was fuer
+    // Gewichtheben real nur ein einziger fester rundenDauer-Wert ist, keine dt-Physik) sind
+    // das 1,55 ECHTE Sekunden zwischen Ansage, Hebung und Ergebnis — zu knapp, um Ansage,
+    // Hantel-Animation (s. zeichneHeben) und gueltig/ungueltig nacheinander wahrzunehmen.
+    // Faktor 4 macht daraus rund 6,2 s je Versuch (72 Versuche je Spiel, sechs Duelle) —
+    // in der Mitte von Chris' Zielspanne 4 bis 8 s, in derselben Groessenordnung wie die
+    // bereits gedehnten Bahn-Disziplinen (staffel 4,65, time-trial/climbing 4,38), ohne das
+    // gesamte Spiel (dann rund 7,4 statt bisher 1,9 Minuten) unangemessen zu strecken.
+    // REINE PRAESENTATION, genau wie basketball/hockey oben: stepBuehne() haengt an dt wie
+    // jede andere Formel in diesem Motor, disziplinProbe()/miss-alle-disziplinen.mjs rufen
+    // stepBuehne() weiterhin direkt mit festem 1/60 auf und laufen NIE durch zeitFaktor() —
+    // nachgemessen bit-identisch (rho je Spiel 0,845, rho Saison 0,930, unveraendert vor und
+    // nach dieser Zeile, s. PR-Beschreibung).
+    gewichtheben:4
   };
   const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
 
