@@ -11596,6 +11596,14 @@
     }
     return {B,letzter};
   }
+  // Feld des Koenigs einer Farbe ("w"/"b") in der aktuellen Stellung -- fuers
+  // Sieger-Glow (s. zeichneSchach): Heim ist immer Weiss, Gast immer Schwarz (dieselbe
+  // Zuordnung wie die "Weiß"/"Schwarz"-Beschriftung neben den Spielern unten), also ist der
+  // Koenig der GEWINNENDEN Seite eindeutig "w" oder "b".
+  function schachKoenigsfeld(B,farbe){
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++)if(B[y][x]===farbe+"k")return {x,y};
+    return null;
+  }
   // Zeichnet EIN Brett (Fokus oder Mini) an (bx,by) mit Feldgroesse q. `gross` schaltet
   // Figuren-Sprites und den Zug-Pfeil zu — auf 6-px-Mini-Feldern traegt ohnehin keine
   // 48er-Figur, dort bleiben es Kreise (derselbe Rueckfall wie ohne geladenes Blatt).
@@ -11690,9 +11698,30 @@
     // gepinnte Brett ist nie eines. Ohne Hinweis sieht ein stehender Fokus aus wie eine
     // haengende Automatik. Der Zusatz haengt an derselben Kopfzeile, damit er nicht mit
     // den Uhren (by-38) kollidiert.
-    ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
-    ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
-      +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":""),W/2,H*0.125);
+    // SIEGER AUF DEM BRETT (Chris' Wunsch 06.09.: "man den sieger dann auch auf dem brett
+    // erkennen kann"), nicht nur im HUD-Score oder im generischen #endstand-Overlay (das
+    // fuer Buehne bislang ohnehin nie aufgerufen wird, s. finish()/renderEndstand -- reiner
+    // Kampf-Pfad). Erst wenn ALLE Bretter fertig sind (`alleFertig`, oben schon fuer die
+    // Regie berechnet) gilt das Duell als entschieden -- derselbe `gew()` von oben
+    // ("gewonnene Bretter", u.vorteil>0) wie die grosse Duellstand-Zeile, dieselbe Zaehlung
+    // wie updateHudBuehne()s BB().duell-Zweig. Heim ist per Konvention immer Weiss, Gast
+    // immer Schwarz (dieselbe Zuordnung wie die Beschriftung neben den Spielern unten) --
+    // Rahmen-Glow und Koenigs-Glow nutzen deshalb dieselben --home/--away-Tokens wie
+    // ueberall sonst im Motor (kein neuer Farbbegriff), der Koenig der siegreichen Farbe
+    // ("w" fuer Heim/Weiss, "b" fuer Gast/Schwarz) ist damit eindeutig bestimmt.
+    const siegSeite=alleFertig?(gew(0)>gew(1)?0:gew(1)>gew(0)?1:null):undefined;
+    const siegGlueh=alleFertig?(siegSeite!=null?css(siegSeite===0?"--home":"--away"):"#f2d75a"):null;
+    if(alleFertig){
+      // ERSETZT die Brett/Zug-Info-Zeile statt eine zweite Zeile daneben zu setzen --
+      // sonst kollidiert der Text mit den Schachuhren direkt darunter (by-38).
+      ctx.font="700 13px 'Barlow Condensed',sans-serif"; ctx.fillStyle=siegGlueh; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.9)";
+      const siegTxt=(siegSeite!=null?"SIEG — "+VEREIN[siegSeite].name:"UNENTSCHIEDEN")+" ("+gew(0)+":"+gew(1)+")";
+      ctx.strokeText(siegTxt,W/2,H*0.125); ctx.fillText(siegTxt,W/2,H*0.125);
+    } else {
+      ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
+      ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
+        +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":""),W/2,H*0.125);
+    }
 
     // TISCH + BRETT — zwei braune Rechtecke und zwei Beine, wie die Hantel beim Heben:
     // keine neue Sprite-Pipeline, nur Primitiven.
@@ -11704,6 +11733,35 @@
     // Fuer den Loese-Klick merken (s. verdrahteSchachPin): nur die Brettflaeche selbst,
     // nicht die Tischplatte — daneben liegen Bewertungsbalken und Zugliste.
     schachFokusRect={x0:bx,y0:by,x1:bx+bw,y1:by+bw};
+    // Glow-Ring UEBER dem Koenig der siegreichen Farbe, wie ein Scheinwerfer auf dem Feld,
+    // das gerade "gewonnen" hat — MUSS NACH zeichneSchachBrett gemalt werden (Opus-Review-Fund
+    // auf PR #838: vorher malte dieser Block VOR dem Brett, dessen opake Feld-Rechtecke den
+    // Glow sofort wieder zudeckten — die Figur landete "normal obendrauf", aber der Glow selbst
+    // war unsichtbar). "lighter" statt normalem alpha-Blend, damit die Koenigsfigur selbst unter
+    // dem additiv aufgehellten Glow erkennbar bleibt statt zugedeckt zu werden.
+    if(alleFertig&&siegSeite!=null){
+      const kf=schachKoenigsfeld(B,siegSeite===0?"w":"b");
+      if(kf){
+        ctx.save();
+        const cx=bx+kf.x*q+q/2, cy=by+kf.y*q+q/2;
+        const grad=ctx.createRadialGradient(cx,cy,q*0.12,cx,cy,q*0.9);
+        grad.addColorStop(0,siegGlueh); grad.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=0.75; ctx.fillStyle=grad;
+        ctx.beginPath(); ctx.arc(cx,cy,q*0.9,0,6.283); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    if(alleFertig){
+      // Goldener/Team-farbener Gluehrahmen ums ganze Brett -- auf den ersten Blick sichtbar,
+      // auch ohne die Kopfzeile zu lesen, und unabhaengig vom Koenigs-Glow oben (der nur bei
+      // eindeutigem Sieger erscheint, dieser Rahmen auch bei Unentschieden).
+      ctx.save();
+      ctx.shadowColor=siegGlueh; ctx.shadowBlur=20;
+      ctx.strokeStyle=siegGlueh; ctx.lineWidth=5;
+      ctx.strokeRect(bx-4,by-4,bw+8,bw+8);
+      ctx.restore();
+    }
 
     // ANNOTATION am Zielfeld: ! bei starkem Zug, ?! bei Zeitverlust — das Ereignis des
     // zuletzt enthuellten Zuges dieses Bretts, dieselbe Information, die sonst nur im
