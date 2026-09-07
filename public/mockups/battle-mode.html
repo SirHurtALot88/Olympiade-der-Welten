@@ -203,6 +203,24 @@
         <span class="rpknoepfe" id="rennplanknoepfe"></span>
         <button class="btn g" id="rennplanzu" type="button" hidden>Schließen</button>
       </div>
+      <!-- ZEITFAHREN-FOKUS (nur Time-Trial, Recherche zeitfahren-06-09 Abschnitt 4.3/4.4).
+           Einzelkamera auf genau einen Laeufer statt des Feld-Zooms, plus die beiden
+           Zwischenzeiten mit Diff zur Bestzeit im Feld. Chris' Auftrag woertlich: "man
+           alle spieler einzeln sieht wie sie auf einer strecke fahren ... eingebettet die
+           zeiten der anderen ... mit so 2 chrono zwischenzeiten". -->
+      <div class="ttfokus" id="ttfokus" hidden>
+        <div class="ttkopf">
+          <b id="ttname">—</b><span id="ttplan"></span>
+          <span class="ttnav">
+            <button class="btn g" id="ttprev" type="button" title="voriger Läufer (Startreihenfolge)">◀</button>
+            <button class="btn g" id="ttauto" type="button">Auto</button>
+            <button class="btn g" id="ttnext" type="button" title="nächster Läufer (Startreihenfolge)">▶</button>
+          </span>
+        </div>
+        <div class="ttroster" id="ttroster"></div>
+        <div class="ttprofil" id="ttprofil"></div>
+        <div class="ttsplits" id="ttsplits"></div>
+      </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>
