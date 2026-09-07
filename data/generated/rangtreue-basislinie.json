@@ -126,9 +126,9 @@
   },
   "tennis": {
    "chassis": "buehne",
-   "spielMedian": 0.83,
-   "spielSpannweite": 0.211,
-   "saisonMedian": 0.867,
+   "spielMedian": 0.825,
+   "spielSpannweite": 0.21,
+   "saisonMedian": 0.839,
    "saisonSpannweite": 0.28,
    "schranke": 0.063
   },

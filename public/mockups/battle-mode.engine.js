@@ -10820,13 +10820,19 @@
       // GRUNDLAGE traf mit intelligence/awareness/spirit bereits die drei schwersten
       // Matrixattribute, nur nicht in ihrem tatsaechlichen Verhaeltnis (40:35:25 statt
       // Matrix 22:20:18 ≈ 37:33:30) — auf die Matrix-Proportion nachgezogen, keine
-      // Attribute getauscht. SPITZENMOMENT/WAGNIS liessen sich sonst nicht beanstanden
-      // und blieben strukturell gleich (SPITZENMOMENT nur leicht zugunsten von
-      // intelligence (22) statt speed (6) verschoben).
+      // Attribute getauscht. SPITZENMOMENT/WAGNIS/AUSDAUER liessen sich sonst nicht
+      // beanstanden und blieben strukturell gleich (SPITZENMOMENT nur leicht zugunsten
+      // von intelligence (22) statt speed (6) verschoben). Ein Review-Anlauf hatte
+      // AUSDAUER vorher testweise auf stamina:55/spirit:30/determination:15 verschoben
+      // (Matrix-proportional waere das FALSCH herum: spirit (18) ist in der Matrix
+      // schwerer als stamina (12), die Verschiebung machte stamina aber noch
+      // dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit
+      // Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der
+      // Schranke), also blieb AUSDAUER auf den Original-Gewichten.
       //
       // GEMESSEN NACH DIESER AENDERUNG (kaderfest, 24 Spiele, live-save-Kaderfamilie,
-      // fuenf Kaderpaarungen): rho je Spiel 0,786 -> 0,830 (Saison 0,846 -> 0,867) — klar
-      // ueber der 0,80-Schranke, mit einer Reserve von rund 0,03 gegenueber dem
+      // fuenf Kaderpaarungen): rho je Spiel 0,786 -> 0,825 (Saison 0,846 -> 0,839) — klar
+      // ueber der 0,80-Schranke, mit einer Reserve von rund 0,025 gegenueber dem
       // Kaderrauschen dieser Disziplin (Spannweite ~0,21). s. auch
       // data/generated/rangtreue-basislinie.json und docs/design/stand-aller-disziplinen.md.
       // AUSDRUECKLICH NICHT die grosse Sinkhorn-Rezeptrunde aus Recherche-Teil F.2 (die
@@ -10843,7 +10849,7 @@
         NERVEN:       {awareness:44,spirit:40,determination:16},
         WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
         PUBLIKUM:     {spirit:52,awareness:43,charisma:5},
-        AUSDAUER:     {stamina:55,spirit:30,determination:15}
+        AUSDAUER:     {stamina:50,determination:30,spirit:20}
       }
     },
 
