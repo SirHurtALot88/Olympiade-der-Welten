@@ -1,5 +1,37 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Sechster Nachtrag 07.09. — Fechten/Eiskunstlauf/Breaking-Politur umgesetzt (Fable-Recherche
+`fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`), noch am selben Tag wie der Fuenfte
+Nachtrag unten.** Zwei unabhaengige Befunde, zwei getrennte Aenderungen:
+
+1. **Waffenschwung-Pose korrigiert (alle drei Disziplinen, rho-neutral).** Jede Buehne-Disziplin
+   ausser Gewichtheben/Speed-Schach zeichnete beim Treffer die zufaellig zugewiesene
+   Kosmetik-Waffe des Charakters (`b.waffe`), unabhaengig von der Disziplin — ein Fechter mit
+   Axt-Kosmetik schwang eine Axt. Behoben nach dem bestehenden Football-Ausruestungs-Muster:
+   Fechten bekommt jetzt IMMER die Schwert-Waffenebene, Eiskunstlauf und Breaking bekommen GAR
+   KEINE Waffenebene mehr (die "slash"-Pose selbst bleibt, nur die Waffe verschwindet). Reine
+   Zeichenaenderung, keine Zahl in `rezept`/`erfolg`/`punkte` beruehrt — Fechten bit-identisch
+   nachgemessen (0,816 vorher/nachher). Showcase hat denselben Bug, ist aber bewusst NICHT
+   angefasst (eine der drei live geschalteten Buehnen-Disziplinen, ausserhalb dieses Auftrags).
+2. **Eiskunstlauf/Breaking: Durchgangszahl verdoppelt, Rundendauer halbiert.** Beide hatten ein
+   Verlaesslichkeits-, kein Validitaetsproblem (Saisonzahl 0,944/0,937, hoeher als Fechtens
+   0,888) — anders als bei Hockey (CLAUDE.md warnt dort explizit) hat `bauBuehne()` keine
+   RNG-Kaskade, ein Lehrbuch-Fall fuer Spearman-Brown. `BUEHNE_ART.eiskunstlauf`: `rundenN` 6→12,
+   `rundenDauer` 0,85→0,425. `BUEHNE_ART.breaking`: `rundenN` 4→8, `rundenDauer` 1,25→0,625 —
+   beide halten die Gesamtdauer bei Chris' ~60-s-Ziel. Gemessen (kaderfest,
+   live-save-Kaderfamilie): Eiskunstlauf **0,792 → 0,875** (n=24) / 0,887 (n=96), Breaking
+   **0,804 → 0,869** (n=24) / 0,873 (n=96) — beide klar ueber der 0,85-Zielmarke, Saisonzahlen
+   kaum bewegt (0,944→0,965, 0,937→0,951). Die anderen sieben Buehne-Disziplinen (darunter die
+   drei produktivierten Gewichtheben/Speed-Schach/Showcase) bit-identisch nachgemessen — die
+   Aenderung bleibt vollstaendig auf die beiden `BUEHNE_ART`-Eintraege plus den neuen
+   disziplin-spezifischen Zeichenzweig beschraenkt. Fechten bekommt in dieser Runde bewusst
+   KEINEN Rezeptumbau (0,816 bestanden, Puffer-Beobachtung bleibt fuer die naechste Runde offen,
+   s. Fechten-Zeile in Abschnitt 5b).
+
+Damit wandert Eiskunstlauf von „knapp" nach „bestanden" — das Feld steht jetzt bei **zwoelf
+bestanden, zwei knapp, sechs durchgefallen** (vorher elf/drei/sechs). Tabelle und Tally in
+Abschnitt 1 sowie die Eiskunstlauf-/Breaking-Zeilen in Abschnitt 5b sind aktualisiert.
+
 **Fuenfter Nachtrag 07.09. — Tennis-Rezeptkalibrierung nachgezogen (PR #850), noch am selben
 Tag wie der Vierte Nachtrag unten.** Der dort beschriebene Tennis-Fall (0,814 → 0,786,
 „bestanden" → „knapp") ist behoben: eine eigene, aus Tennis' MATRIX abgeleitete
@@ -119,15 +151,15 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Staffel** | **Bahn** | **0,915** | 0,089 | 0,951 | 0,093 | **bestanden** |
 | Speed-Schach | Buehne | 0,908 | 0,066 | 0,972 | 0,042 | bestanden |
 | Showcase | Buehne | 0,892 | 0,158 | 0,937 | 0,077 | bestanden |
+| **Eiskunstlauf** | **Buehne** | **0,875** | 0,075 | 0,965 | 0,049 | **bestanden** |
 | Spurt | Bahn | 0,871 | 0,236 | 0,905 | 0,190 | bestanden |
+| **Breaking** | **Buehne** | **0,869** | 0,114 | 0,951 | 0,168 | **bestanden** |
 | **Takeshi's Castle** | **Bahn** | **0,861** | 0,116 | 0,930 | 0,056 | **bestanden** |
 | Gewichtheben | Buehne | 0,854 | 0,209 | 0,923 | 0,273 | bestanden |
 | Wettessen | Buehne | 0,845 | 0,139 | 0,930 | 0,091 | bestanden |
 | Time-Trial | Bahn | 0,828 | 0,087 | 0,832 | 0,056 | bestanden |
 | **Tennis** | **Buehne** | **0,825** | 0,210 | 0,839 | 0,280 | **bestanden — s.u.** |
 | Fechten | Buehne | 0,816 | 0,192 | 0,888 | 0,133 | bestanden |
-| Breaking | Buehne | 0,804 | 0,133 | 0,937 | 0,197 | bestanden |
-| Eiskunstlauf | Buehne | 0,792 | 0,130 | 0,944 | 0,077 | knapp |
 | Climbing | Bahn | 0,790 | 0,192 | 0,851 | 0,308 | knapp |
 | Basketball | Feldspiel | 0,769 | 0,105 | 0,923 | 0,224 | knapp |
 | I-Spy | Buehne | 0,684 | 0,353 | 0,804 | 0,608 | durchgefallen |
@@ -138,14 +170,15 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | TDM | Arena | 0,253 | 0,328 | 0,217 | 0,308 | durchgefallen |
 | Mini-DM | Arena | 0,094 | 0,697 | 0,071 | 0,786 | durchgefallen |
 
-**Elf bestehen, drei sind knapp, sechs fallen durch** — identisch zur 06.09.-Fassung (s. Fuenfter
-Nachtrag ganz oben). Zwoelf Zeilen bewegten sich zahlenmaessig gegenueber der 06.09.-Fassung:
-elf davon reiner Dokumentationsrueckstand (echte Bewegungen an `main` seit der letzten
-Neumessung, nicht neue Befunde ueber die Mechanik, hier erstmals nachgezogen), und **Tennis**
-allein ist ein echter, aber noch am selben Tag behobener Fall — kurzzeitig unter die Schranke
-gefallen (0,786, s. Tennis-Absatz direkt unter dieser Tabelle), dann durch die eigene
-Rezeptkorrektur (Fuenfter Nachtrag) auf 0,825 zurueckgeholt, ohne die Bucket-Zugehoerigkeit zu
-aendern. Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst durchgefallen —
+**Zwoelf bestehen, zwei sind knapp, sechs fallen durch** (Sechster Nachtrag ganz oben: vorher
+elf/drei/sechs — Eiskunstlauf wandert von „knapp" nach „bestanden", nachdem seine
+Durchgangszahl verdoppelt wurde). Zwoelf Zeilen bewegten sich gegenueber der 06.09.-Fassung
+zahlenmaessig aus reinem Dokumentationsrueckstand; **Tennis** war noch am selben Tag ein echter,
+aber behobener Fall (0,814 → 0,786 → 0,825, s. Tennis-Absatz direkt unter dieser Tabelle); und
+**Eiskunstlauf/Breaking** sind der erste ECHTE Bucket-Wechsel dieser Runde, aus einer gezielten
+Rezept-/Timing-Aenderung (Durchgangszahl verdoppelt, s. Sechster Nachtrag ganz oben), nicht aus
+Kaderrauschen oder Dokumentationsrueckstand. Bucketing: bestanden ab 0,80, knapp ab 0,70, sonst
+durchgefallen —
 `scripts/miss-alle-disziplinen.mjs`. Die eingerueckte Hockey-Zeile ist kein einundzwanzigster
 Eintrag, sondern dieselben Spiele derselben Disziplin ohne die beiden Torhueter (s. Abschnitt
 1a) — sie zaehlt nicht mit in diese Bilanz, ist aber die ehrlichere Frage fuer „belohnt Hockeys
@@ -581,15 +614,15 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 |---|---:|---:|---|
 | Basketball | 92 % | 0,769 | Live-Motor mit Zonen, Manndeckung und Spielzuegen · eigener Court · einzige Disziplin im echten Spielstand · **individuelle PPs jetzt aus dem echten Boxscore-Impact, nicht mehr aus dem alten PPS-Rang** (K3, 04.09.: Feldkorb-Punkte zur Haelfte als `technik`-Erwartungswert statt binaer, rho 0,757→0,772→0,769 [07.09., reines Kaderrauschen]) |
 | Hockey | 71 % | 0,719 (Feldspieler) / 0,669 (alle 12) | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
-| Fechten | 48 % | 0,816 | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · nicht im echten Spielstand |
+| Fechten | 48 % | 0,816 | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf, bewusst NICHT in dieser Runde umgebaut (Puffer 0,016 kleiner als das eigene Kaderrauschen 0,192 — Beobachtungspunkt fuer die naechste Neumessung, s. Sechster Nachtrag) · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · **Nachtrag 07.09.:** Waffenschwung-Pose zeigt jetzt IMMER eine Schwertwaffenebene statt der zufaelligen Kosmetik-Waffe, rho bit-identisch bestaetigt · nicht im echten Spielstand |
 | Tennis | 48 % | 0,825 | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · nicht im echten Spielstand · **Nachtrag 07.09. (Tennis-eigene Rezeptkalibrierung, s. `battle-mode.engine.js` Kommentar bei `BUEHNE_ART.tennis`):** das Rezept war bis hierher tatsaechlich 1:1 aus dem alten Feldspiel-Rezept uebernommen, nie gegen Tennis' eigene MATRIX gefittet (`docs/pm-briefings/pm-gesamtstand-07-09.md` Abschnitt 6 Punkt 5) — dieselbe Luecke wie bei Gewichtheben/Breaking vor deren NACHGEZOGEN-Korrekturen: TECHNIK (der Rollenkanal mit dem groessten Erfolgs-Koeffizienten) trug determination (Matrixgewicht 6) statt dexterity (12), und PUBLIKUM (der rauschaermste Kanal, reiner Festzuschlag) trug charisma (Matrixgewicht 4, das niedrigste der ganzen Matrix) mit 45 % Rollengewicht statt awareness (20). Nach dem #820-Symmetriefix war Tennis kaderfest bei 0,786 durchgefallen (s. PR #840, Nebenfund); mit der Rezeptkorrektur (nur `rezept`-Attributgewichte geaendert, keine Aenderung an der gemeinsamen Buehnen-Punkteformel) jetzt kaderfest 0,786 -> 0,825 (n=24, Saison 0,846 -> 0,839) — die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen (`node scripts/miss-alle-disziplinen.mjs 24 gewichtheben showcase eiskunstlauf breaking wettessen speed-schach i-spy tennis fechten`). Ein Review-Anlauf hatte AUSDAUER testweise auf stamina:55/spirit:30/determination:15 verschoben (nicht Matrix-proportional: spirit (18) ist in Tennis' Matrix schwerer als stamina (12), die Verschiebung machte stamina aber noch dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der Schranke), AUSDAUER blieb deshalb unveraendert. Aspiratives 0,85-Ziel nicht erreicht — dafuer fehlt der Buehne weiterhin das Sinkhorn-Rezeptwerkzeug aus Recherche-Teil F.2. |
 | Time-Trial | 55 % | 0,828 | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis |
 | Gewichtheben | 70 % | 0,854 | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 07.09. (kuehner Versuch, `docs/design/gewichtheben-risiko-versuch-recherche-06-09.md`):** freiwilliger Zuschlag ueber das Ausgleichskilo im dritten Versuch, deterministisch aus ANSAGE, mit Verletzungsrisiko bei Misslingen und "Punktesieg"-Auszeichnung bei Gelingen — Belohnung bewusst NICHT in `u.summe`/`u.zweikampf`, sondern reines Ticker-/Boxscore-Ereignis (s. Recherche Abschnitt 2.5). #840 zog die Basislinie nach der #813/#820-Bisektion auf 0,847 zurueck; die frische Neumessung dieser Runde (07.09., an `main` `7a70413e`) bestaetigt seither **0,854** — Bewegung liegt innerhalb der eigenen Kaderrauschen-Spannweite (~0,21) und ist damit nicht von Null unterscheidbar, keine neue Rezeptaenderung. |
 | Climbing | 48 % | 0,790 | Steigung und Kraftbudget statt Antritt · kaderfest knapp unter der Schranke (vorher bestanden, reines Kaderrauschen) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,908 | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld ausser Staffel · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | Wettessen | 40 % | 0,845 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
-| Eiskunstlauf | 38 % | 0,792 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest knapp unter der Schranke (Zahl war zwischenzeitlich niedriger dokumentiert, 0,757 — Dokumentationsrueckstand, s. Vierter Nachtrag) |
-| Breaking | 38 % | 0,804 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
+| Eiskunstlauf | 40 % | 0,875 | Nur Buehnen-Durchgaenge mit eigenem Rezept · **Nachtrag 07.09. (Fable-Recherche `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`):** stand kaderfest knapp unter der Schranke (0,792, reines Verlaesslichkeitsproblem bei exzellenter Saisonzahl 0,944) — `rundenN` 6→12, `rundenDauer` 0,85→0,425 (Spearman-Brown-Fall, keine RNG-Kaskade wie bei Hockey) hebt kaderfest auf **0,875** (Saison 0,965), die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen. Dazu die Waffenpose korrigiert: keine Waffenebene mehr beim Landen (vorher zufaellige Kampfwaffe je nach Kosmetik), rho-neutral |
+| Breaking | 40 % | 0,869 | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik · **Nachtrag 07.09. (dieselbe Recherche wie Eiskunstlauf):** stand kaderfest mit knappstem Puffer aller bestandenen Disziplinen (0,804, nur 0,004 ueber der Schranke) — `rundenN` 4→8, `rundenDauer` 1,25→0,625 hebt kaderfest auf **0,869** (Saison 0,951). Dazu dieselbe Waffenpose-Korrektur wie Eiskunstlauf, rho-neutral |
 | Showcase | 40 % | 0,892 | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,861** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · nicht im echten Spielstand |
 | **Staffel** | **48 %** | **0,915** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |

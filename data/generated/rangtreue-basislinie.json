@@ -86,18 +86,18 @@
   },
   "eiskunstlauf": {
    "chassis": "buehne",
-   "spielMedian": 0.792,
-   "spielSpannweite": 0.13,
-   "saisonMedian": 0.944,
-   "saisonSpannweite": 0.077,
+   "spielMedian": 0.875,
+   "spielSpannweite": 0.075,
+   "saisonMedian": 0.965,
+   "saisonSpannweite": 0.049,
    "schranke": 0.05
   },
   "breaking": {
    "chassis": "buehne",
-   "spielMedian": 0.804,
-   "spielSpannweite": 0.133,
-   "saisonMedian": 0.937,
-   "saisonSpannweite": 0.197,
+   "spielMedian": 0.869,
+   "spielSpannweite": 0.114,
+   "saisonMedian": 0.951,
+   "saisonSpannweite": 0.168,
    "schranke": 0.05
   },
   "wettessen": {
