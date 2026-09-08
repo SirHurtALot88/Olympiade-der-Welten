@@ -3600,12 +3600,12 @@
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
-      {id:"powermove",label:"Power Move",text:"Drueckt schwere Moves über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
-      {id:"footwork",label:"Footwork",text:"Sammelt Punkte über Health und Dexterity.",gross:"health",klein:"dexterity",last:"will",mueh:"medium",profil:{will:25.5,health:23.4,torment:20.1,power:9.2,determination:9.2,stamina:7.3,dexterity:3.5,intelligence:1.9}},
-      {id:"freezecontrol",label:"Freeze Control",text:"Haelt Kontrolle über Health und Determination.",gross:"health",klein:"determination",last:"torment",mueh:"medium",profil:{will:24.4,health:23.4,torment:19.2,determination:13.4,power:8.8,stamina:7.1,dexterity:1.8,intelligence:1.8}},
-      {id:"musicality",label:"Musicality",text:"Findet Flow über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
-      {id:"battlenerve",label:"Battle Nerve",text:"Antwortet im Battle über Torment und Will.",gross:"torment",klein:"will",last:"health",mueh:"high",profil:{will:31.4,torment:27.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
-      {id:"finaleset",label:"Finale Set",text:"Setzt den Abschluss über Power und Torment.",gross:"power",klein:"stamina",last:"determination",mueh:"medium",profil:{torment:21.2,will:19.8,power:17.1,health:16.6,stamina:13.5,determination:7.6,intelligence:3,dexterity:1.4}}
+      {id:"powermove",label:"Bruchpunkt",text:"Treibt den schwersten Move bis zum Bruchpunkt — über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"footwork",label:"Standhalten",text:"Hält die Position im Kreis und sammelt Punkte — über Health und Dexterity.",gross:"health",klein:"dexterity",last:"will",mueh:"medium",profil:{will:25.5,health:23.4,torment:20.1,power:9.2,determination:9.2,stamina:7.3,dexterity:3.5,intelligence:1.9}},
+      {id:"freezecontrol",label:"Steingesicht",text:"Erstarrt zum Steingesicht und hält die Kontrolle — über Health und Determination.",gross:"health",klein:"determination",last:"torment",mueh:"medium",profil:{will:24.4,health:23.4,torment:19.2,determination:13.4,power:8.8,stamina:7.1,dexterity:1.8,intelligence:1.8}},
+      {id:"musicality",label:"Aushalten",text:"Findet den Rhythmus im bloßen Aushalten — über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
+      {id:"battlenerve",label:"Zermürbung",text:"Hält der Zermürbung stand und antwortet im Battle — über Torment und Will.",gross:"torment",klein:"will",last:"health",mueh:"high",profil:{will:31.4,torment:27.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"finaleset",label:"Unbroken",text:"Setzt den Schlusspunkt, unversehrt — über Power und Torment.",gross:"power",klein:"stamina",last:"determination",mueh:"medium",profil:{torment:21.2,will:19.8,power:17.1,health:16.6,stamina:13.5,determination:7.6,intelligence:3,dexterity:1.4}}
     ],
     "wettessen":[
       {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
@@ -10729,6 +10729,17 @@
       // (Einstieg, Power-Move, Freeze/Ausstieg) ueber typischerweise mehr als einen Durchgang
       // — rundenN:4 bildete kaum mehr als einen Move-Zyklus ab, rundenN:8 sind zwei.
       label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.625,
+      // EIGENES BUEHNENBILD "BREAKING CYPHER" (Fable-Recherche
+      // docs/design/breaking-folter-survival-visuelle-identitaet-recherche-08-09.md, Opus-
+      // Synthese docs/pm-briefings/opus-synthese-eiskunstlauf-breaking-08-09.md, Umsetzung
+      // 08.09.): cypher:true schaltet zeichneBuehne() auf zeichneBreaking() um -- dieselbe
+      // Weiche wie heben/schach oben, dritte Instanz desselben Musters. Uebersetzt die
+      // kanonische, bereits produktive React/SVG-Buehne
+      // (app/foundation/discipline-stage/arena/disciplines/breaking.tsx: lila Druck-Arena,
+      // vier Ring-Zonen GEBROCHEN/SCHMERZGRENZE/STONE FACE/MIND FORTRESS, zentraler
+      // SURVIVOR-Spotlight) in Canvas-Primitiven. Rein zeichnerisch: rezept/failAbzug/
+      // erfolgWort/failWort bleiben unveraendert, keine Formel wird beruehrt.
+      cypher:true,
       failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
       // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
       // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
@@ -11712,11 +11723,12 @@
     // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
     if(art.heben){ zeichneHeben(art); return; }
     if(art.schach){ zeichneSchach(art); return; }
+    if(art.cypher){ zeichneBreaking(art); return; }
     // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
     // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
-    // zeichneDuett() unten. Alle sieben anderen Nicht-Heben/Nicht-Schach-Buehnen
-    // (Speed-Schach faellt oben schon raus, bleiben also I-Spy/Tennis/Fechten/Showcase/
-    // Breaking/Wettessen) durchlaufen den generischen Zweig darunter unveraendert.
+    // zeichneDuett() unten. Alle sechs anderen Nicht-Heben/Nicht-Schach/Nicht-Breaking-
+    // Buehnen (I-Spy/Tennis/Fechten/Showcase/Wettessen) durchlaufen den generischen
+    // Zweig darunter unveraendert.
     if(art.duett){ zeichneDuett(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
@@ -12512,6 +12524,182 @@
       if(f._teilnehmer!==a.id&&f._teilnehmer!==b.id)continue;
       ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.crit?css("--ok"):css("--ink"); ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       const x=f._teilnehmer===a.id?bx-110:bx+bw+110; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== BREAKING: EIGENE "CYPHER"-BUEHNE (Fable-Recherche 08.09.,
+  // docs/design/breaking-folter-survival-visuelle-identitaet-recherche-08-09.md, und Opus-
+  // Synthese docs/pm-briefings/opus-synthese-eiskunstlauf-breaking-08-09.md) ==================
+  // Dritte bespoke Buehne nach exakt demselben Muster wie zeichneHeben()/zeichneSchach():
+  // BUEHNE_ART.breaking.cypher schaltet zeichneBuehne() auf diese Funktion um. Uebersetzt
+  // die kanonische, bereits produktive React/SVG-Buehne
+  // (app/foundation/discipline-stage/arena/disciplines/breaking.tsx) 1:1 in Canvas-
+  // Primitiven: vier Druck-Ringe (GEBROCHEN/SCHMERZGRENZE/STONE FACE/MIND FORTRESS,
+  // breaking.tsx:62-67), ein pulsierender Survivor-Kern (breaking.tsx:123-139), neun
+  // deterministische Boden-Risse (breaking.tsx:111-121, derselbe Zickzack-Stil wie der
+  // gluehende Lava-Golem-Riss oben, :2302ff, nur ohne Feuerfarbe).
+  //
+  // EINZIGE bewusste Abweichung von breaking.tsx, ausdruecklich begruendet (Recherche
+  // Abschnitt 3.3.C): breaking.tsx zeichnet einen einzelnen gemischten Ring aus bis zu N
+  // Teams (offene Lobby, keine Teamtrennung noetig). Dieses Chassis ist ein festes
+  // 6-gegen-6-Duell zweier Seiten (art.jeSeite) -- ein gemischter Ring wuerde die
+  // Team-Zugehoerigkeit unkenntlich machen, die die bestehende Zwei-Reihen-Ansicht heute
+  // klar zeigt. Loesung: zwei Halbkreise statt zwei Reihen, Heim links (100-260 Grad),
+  // Gast rechts (-80-80 Grad), innerhalb der eigenen Haelfte nach Index verteilt (derselbe
+  // "13er-Schritt gegen Klumpen" wie breaking.tsx:52, auf sechs statt N Positionen
+  // heruntergerechnet). Radius bleibt exakt breaking.tsx's Formel (Naehe zum Zentrum
+  // proportional zum Punktestand) -- hier ueber die im Motor bereits vorhandene
+  // maxSumme-Normierung (:11654/:11615, dieselbe Zahl, die die Punktesaeule der anderen
+  // acht Buehnen-Disziplinen relativ zum Feld haelt) statt eines eigenen finalMax.
+  //
+  // REIN PRAESENTATIONAL, exakt wie zeichneHeben() (s. Kommentar dort): liest ausschliesslich
+  // bereits vorhandene Felder (u.summe/u.side/u.aktuell/u.runden/u.lunge/u.n/u.groesse/
+  // u.id, art.rundenN/art.erfolgWort/art.failWort), schreibt nichts Neues auf TEILNEHMER.
+  // disziplinProbe()/miss-alle-disziplinen.mjs rufen stepBuehne() weiterhin direkt mit
+  // festem 1/60 auf, lesen buehneAkt/buehneT nie fuer die Wertung und durchlaufen diese
+  // Zeichenfunktion nie -- Rangtreue bleibt unberuehrt.
+  function zeichneBreaking(art){
+    if(!TEILNEHMER.length)return;
+    const cx=W/2, cy=H*0.54, rOut=Math.min(W*0.46,H*0.44), rIn=rOut*0.14, KY=0.82;
+
+    // A. Grundflaeche: vollflaechiger radialer Verlauf, 1:1 aus breaking.tsx's brkBg-Gradient
+    // (Canvas createRadialGradient statt SVG radialGradient) -- UEBER bodenBuehne()s eigenem
+    // Verlauf (schon dunkel-violett, :11625ff): radikalisiert die vorhandene Buehnenfarbe,
+    // statt eine neue gegen eine neutrale Flaeche durchzusetzen (Recherche Abschnitt 3.1).
+    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,rOut*1.5);
+    bg.addColorStop(0,"hsl(275 55% 22%)");
+    bg.addColorStop(0.55,"hsl(278 50% 13%)");
+    bg.addColorStop(1,"hsl(280 45% 7%)");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    // B. Vier Druck-Ringe, exakt breaking.tsx:62-67s vier Zonen und Radien.
+    const zonen=[[1.0,"GEBROCHEN"],[0.72,"SCHMERZGRENZE"],[0.46,"STONE FACE"],[0.22,"MIND FORTRESS"]];
+    for(const [f,label] of zonen){
+      const rr=rIn+(rOut-rIn)*f;
+      ctx.setLineDash([4,8]); ctx.strokeStyle="rgba(214,150,255,.16)"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.ellipse(cx,cy,rr,rr*KY,0,0,6.2832); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.textAlign="center"; ctx.font="800 8px 'IBM Plex Mono',monospace";
+      ctx.fillStyle="rgba(214,170,255,.5)";
+      ctx.fillText(label,cx,cy-rr*KY-3);
+    }
+
+    // Boden-Risse -- neun deterministische Zickzack-Pfade vom Kern nach aussen (fester
+    // Index statt Math.random(), dieselbe Idee wie breaking.tsx:111-121), damit die Buehne
+    // bei jedem Redraw identisch aussieht.
+    ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=1.4;
+    for(let i=0;i<9;i++){
+      const a=(i/9)*Math.PI*2+0.4;
+      const r1=rIn+6, r2=rOut*(0.6+((i*37)%40)/100);
+      const mx=cx+Math.cos(a)*(r1+r2)*0.5+(((i*53)%20)-10);
+      const my=cy+Math.sin(a)*(r1+r2)*0.5*KY;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1*KY);
+      ctx.quadraticCurveTo(mx,my,cx+Math.cos(a)*r2,cy+Math.sin(a)*r2*KY);
+      ctx.stroke();
+    }
+
+    // Survivor-Kern (Zentrum) -- pulsierend ueber buehneT (bereits vorhandene Motor-Zeit,
+    // kein neuer Zustand, dieselbe Idee wie zeichneHeben()s buehneAkt-getriebene Animation).
+    const puls=0.5+0.5*Math.sin(buehneT*2.4);
+    const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rIn*2.4);
+    glow.addColorStop(0,"rgba(214,150,255,"+(0.5*puls).toFixed(3)+")");
+    glow.addColorStop(1,"rgba(214,150,255,0)");
+    ctx.fillStyle=glow;
+    ctx.beginPath(); ctx.ellipse(cx,cy,rIn*2.4,rIn*2.4*KY,0,0,6.2832); ctx.fill();
+    ctx.setLineDash([6,5]); ctx.lineWidth=1.6; ctx.strokeStyle="#f2d75a";
+    ctx.globalAlpha=0.5+0.5*puls;
+    ctx.beginPath(); ctx.ellipse(cx,cy,rIn,rIn*KY,0,0,6.2832); ctx.stroke();
+    ctx.globalAlpha=1; ctx.setLineDash([]);
+    ctx.font="900 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a"; ctx.textAlign="center";
+    ctx.fillText("SURVIVOR · UNBROKEN",cx,cy-rIn*KY-8);
+
+    // Feld-Wasserzeichen, wie breaking.tsx:142-146.
+    ctx.textAlign="left"; ctx.font="800 15px 'Barlow Condensed',sans-serif";
+    ctx.fillStyle="rgba(214,170,255,.55)"; ctx.fillText("BREAKING",16,24);
+
+    // C. Zwoelf Teilnehmer auf zwei Halbkreisen statt zwei Reihen (die zentrale, bewusste
+    // Abweichung von breaking.tsx, s. Funktionskopf oben) -- Heim links, Gast rechts, Radius
+    // score-proportional ueber dieselbe maxSumme-Normierung wie die Punktesaeule der
+    // anderen acht Buehnen-Disziplinen.
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    // Fuehrer = Survivor: kleinster Radius, also die hoechste Summe -- derselbe Rang-1-
+    // Begriff wie breaking.tsx:158 (t.rank===1).
+    let fuehrer=TEILNEHMER[0];
+    for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
+    const grad=Math.PI/180;
+    const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
+    for(const [side,startA,endA] of hemis){
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const n=Math.max(1,g.length);
+      g.forEach((u,i)=>{
+        // 13er-Schritt gegen Klumpen (breaking.tsx:52), auf die feste Seitenlaenge n
+        // (statt der offenen Team-Zahl N in breaking.tsx) heruntergerechnet.
+        const perm=(i*13)%n;
+        const frac=n>1?perm/(n-1):0.5;
+        const a=startA+(endA-startA)*frac;
+        const radius=rOut-(u.summe/maxSumme)*(rOut-rIn);
+        const x=cx+Math.cos(a)*radius, y=cy+Math.sin(a)*radius*KY;
+
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c; ctx.globalAlpha=0.20;
+        ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.2832); ctx.fill();
+        ctx.globalAlpha=1;
+
+        // D. Erfolg/Fehlschlag -- rein aus u.runden[u.aktuell].ereignis gelesen, exakt
+        // dieselbe Unterscheidung, die WERTUNG_AUFTRITT (:11818) fuer die Boxscore-Spalte
+        // "Fehl" schon liest. Kein neues Feld auf TEILNEHMER, keine Aenderung an
+        // stepBuehne() -- u.lunge (0,5 s Zerfallszeit, von stepBuehne gesetzt) ist die
+        // einzige Zeitbasis. Die Position des Tokens (oben berechnet) bleibt in beiden
+        // Faellen exakt score-treu -- "Score bleibt Wahrheit", wie in breaking.tsx.
+        const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
+        const geradeDran=u.lunge>0&&zug;
+        if(geradeDran&&zug.ereignis===art.erfolgWort){
+          // Erfolg: ein sich ZUSAMMENZIEHENDER Lila-Gold-Puls-Ring -- "ich halte stand"
+          // liest sich als Verengung, nicht als Explosion (Recherche Abschnitt 3.3.D).
+          const p=u.lunge/0.5;
+          ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
+          ctx.globalAlpha=1;
+        } else if(geradeDran&&zug.ereignis===art.failWort){
+          // Fehlschlag: roter Zickzack-Riss-Flash direkt am Token -- derselbe gluehende-
+          // Riss-Zeichenstil wie EFFEKT_ARTEN oben (:2302ff, Lava Golem), nur rot statt
+          // orange und nur fuer die u.lunge-Dauer sichtbar statt permanent.
+          const p=u.lunge/0.5;
+          ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
+          ctx.beginPath();
+          const segs=4;
+          for(let s=0;s<=segs;s++){
+            const py=y-14+28*(s/segs);
+            const zick=Math.sin(u.id*4.1+s*2.3)*7;
+            if(s===0)ctx.moveTo(x+zick,py); else ctx.lineTo(x+zick,py);
+          }
+          ctx.stroke(); ctx.globalAlpha=1; ctx.lineCap="butt";
+        }
+
+        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
+        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
+        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
+        zeichneSprite(ctx,u,x,y);
+
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3"; ctx.textAlign="center";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+68);
+
+        // E. Survivor-Krone (niedrige Prioritaet, aus derselben Vorlage wie breaking.tsx:
+        // 177-181): der aktuelle Rang-1-Teilnehmer bekommt dasselbe 👑-Textzeichen ueber
+        // dem Sprite, kein neues Asset.
+        if(u===fuehrer){
+          ctx.font="14px sans-serif"; ctx.fillText("👑",x,y-34);
+        }
+      });
     }
   }
 
