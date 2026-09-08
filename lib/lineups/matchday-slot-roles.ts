@@ -206,12 +206,12 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
     roleTheme("finalwall", "Final Wall", "Braucht Determination und Will im letzten Hindernis.", ["determination", "will"], "health", "high", ["hero"]),
   ],
   breaking: [
-    roleTheme("powermove", "Power Move", "Drueckt schwere Moves über Will und Torment.", ["will", "torment"], "health", "high", ["berserker"]),
-    roleTheme("footwork", "Footwork", "Sammelt Punkte über Health und Dexterity.", ["health", "dexterity"], "will", "medium", ["rogue"]),
-    roleTheme("freezecontrol", "Freeze Control", "Haelt Kontrolle über Health und Determination.", ["health", "determination"], "torment", "medium", ["tank"]),
-    roleTheme("musicality", "Musicality", "Findet Flow über Will und Determination.", ["will", "determination"], "power", "low", ["bard"]),
-    roleTheme("battlenerve", "Battle Nerve", "Antwortet im Battle über Torment und Will.", ["torment", "will"], "health", "high", ["renegade"]),
-    roleTheme("finaleset", "Finale Set", "Setzt den Abschluss über Power und Torment.", ["power", "torment"], "determination", "medium", ["hero"]),
+    roleTheme("powermove", "Bruchpunkt", "Treibt den schwersten Move bis zum Bruchpunkt — über Will und Torment.", ["will", "torment"], "health", "high", ["berserker"]),
+    roleTheme("footwork", "Standhalten", "Hält die Position im Kreis und sammelt Punkte — über Health und Dexterity.", ["health", "dexterity"], "will", "medium", ["rogue"]),
+    roleTheme("freezecontrol", "Steingesicht", "Erstarrt zum Steingesicht und hält die Kontrolle — über Health und Determination.", ["health", "determination"], "torment", "medium", ["tank"]),
+    roleTheme("musicality", "Aushalten", "Findet den Rhythmus im bloßen Aushalten — über Will und Determination.", ["will", "determination"], "power", "low", ["bard"]),
+    roleTheme("battlenerve", "Zermürbung", "Hält der Zermürbung stand und antwortet im Battle — über Torment und Will.", ["torment", "will"], "health", "high", ["renegade"]),
+    roleTheme("finaleset", "Unbroken", "Setzt den Schlusspunkt, unversehrt — über Power und Torment.", ["power", "torment"], "determination", "medium", ["hero"]),
   ],
   wettessen: [
     roleTheme("capacity", "Capacity", "Hat Grundvolumen über Health und Stamina.", ["health", "stamina"], "will", "high", ["tank"]),
