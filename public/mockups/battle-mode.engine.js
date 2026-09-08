@@ -10693,7 +10693,14 @@
       // Programm ab, rundenN:12 trifft die reale Groessenordnung deutlich besser. Fechten
       // (dieselbe Recherche) bleibt bewusst unveraendert — dort ist die Saisonzahl NIEDRIGER
       // (0,888) und der Rezeptumbau ausdruecklich fuer eine spaetere Runde zurueckgestellt.
-      label:"Eiskunstlauf", jeSeite:6, rundenN:12, rundenDauer:0.425,
+      // DUETT (08.09., Fable-Recherche "eiskunstlauf-duett-paarlauf-recherche-08-09.md" /
+      // Opus-Synthese "opus-synthese-eiskunstlauf-breaking-08-09.md" Abschnitt 3): bei
+      // gerader tatsaechlicher Feldgroesse (bauBuehne(), s. dortigen "DUETT"-Kommentar)
+      // laufen benachbarte Paare (nach `eig` sortiert) mit einem 80/20-Eigen-/Partneranteil
+      // — `duett:true` ist die eine Weiche, analog zu `heben`/`duell` oben. Kein anderer
+      // Buehnen-Achter (gewichtheben/showcase/breaking/wettessen/speed-schach/i-spy/
+      // tennis/fechten) traegt dieses Flag.
+      label:"Eiskunstlauf", jeSeite:6, rundenN:12, rundenDauer:0.425, duett:true,
       failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
       rezept:{
         GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
@@ -11082,6 +11089,63 @@
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
       }
+    }
+
+    // DUETT (Eiskunstlauf, #856/#857) — FUSION AUF RUNDENEBENE, NICHT AUF SUMME. Die
+    // urspruengliche Recherche wollte auf `summe` fusionieren; die Opus-Synthese (Abschnitt
+    // 3.4) hat das korrigiert: `summe` existiert an dieser Stelle noch gar nicht (bleibt 0
+    // bis stepBuehne() sie Enthuellung fuer Enthuellung aufbaut, `u.summe+=r.punkte`) — eine
+    // Fusion dort haette den Live-Punktestand waehrend des Auftritts unfusioniert gelassen
+    // und am Ende springen lassen, UND die Wertungstabelle (WERTUNG_AUFTRITT: "Pkt" aus
+    // summe, aber "Ø"/"Best"/"Letzt" aus runden[]) inkonsistent gemacht (Oe x Durchgaenge
+    // != Pkt, "Best" groesser als jeder Einzelbeitrag). Hier, VOR der Warteschlange, sind
+    // beide Partner-`runden[]` schon vollstaendig berechnet — genau der Punkt, an dem sich
+    // `punkte` je Durchgangsindex paarweise ueberschreiben laesst, bevor irgendetwas live
+    // nachgezogen wird. Weil die Fusion LINEAR ist (0,8a+0,2b + 0,8b+0,2a = a+b), bleibt die
+    // Teamsumme exakt erhalten — Score-Anzeige (":11612-11613") und `maxSumme`-Normierung
+    // sehen keinen Unterschied, und das Endergebnis ist zahlengleich zum in der Recherche auf
+    // Summenebene gemessenen Prototyp (rho/Spiel 0,903, n=24), bis auf Rundung je Durchgang.
+    //
+    // JE SEITE GETRENNT, NICHT GLOBAL (Opus-Synthese Abschnitt 3.2): `mine` faellt auf
+    // `ersatz` zurueck, `gegner` auf `OPP` — die Seiten koennen unterschiedliche Laenge und
+    // damit unterschiedliche Paritaet haben (Heim 5, Gast 6 ist moeglich). Derselbe
+    // Unterzahl-Fix-Praezedenzfall wie die Duell-Variante direkt oben — deshalb zweimal,
+    // einmal je Seite, nie ueber eine gemeinsame Zahl.
+    //
+    // PAARUNG NACH EIGNUNG, NICHT NACH AUFSTELLUNGS-REIHENFOLGE: `ersatz` kommt zwar schon
+    // absteigend nach `p.d[buehneDisc]` sortiert aus dieser Funktion, `gesetzt` (Abschnitt 3
+    // der Recherche) aber nicht garantiert — hier wird deshalb ausdruecklich nach dem echten
+    // `eig` der TEILNEHMER sortiert (derselbe Wert, den auch die Rangtreue-Sonde misst),
+    // unabhaengig vom Aufstellungsweg.
+    //
+    // FRAGE A (offene Chris-Entscheidung, Opus-Synthese Abschnitt 5, "mach weiter" statt
+    // Antwort): was passiert bei ungerader Feldgroesse? In 2 von 5 Saisons ist Eiskunstlauf
+    // ungerade (buildSeasonPlayerCountByDiscipline zieht {2,3,4,5,6} gleichverteilt) — kein
+    // Randfall, ein zweiter Hauptpfad. Entscheidung: der uebrige Laeufer bleibt unveraendert
+    // solo (kein Trio, keine neue Mechanik) — die einfachste, am wenigsten ueberraschende
+    // Loesung, deckungsgleich mit jeder anderen Ungerade-Rest-Regel dieses Projekts.
+    //
+    // FRAGE B (dieselbe Quelle): greift Duett auch bei Feldgroesse 2 (die ganze Seite ist
+    // ein einziges Paar)? Entscheidung: ja — konsistent mit "gerade Zahl -> automatisch
+    // Duett", eine Ausnahme nur fuer die kleinste gerade Zahl waere eine unbegruendete
+    // Inkonsistenz. Beides braucht hier keinen Sonderfall: die Schleife unten paart einfach
+    // je zwei benachbarte Eintraege und laesst einen etwaigen letzten Rest unangetastet.
+    if(art.duett){
+      const fusioniereSeite=(seite)=>{
+        const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
+        for(let i=0;i+1<g.length;i+=2){
+          const a=g[i], b=g[i+1];
+          a.duettN=b.n; b.duettN=a.n;
+          for(let r=0;r<art.rundenN;r++){
+            const ra=a.runden[r], rb=b.runden[r];
+            if(!ra||!rb)continue;
+            const pa=ra.punkte, pb=rb.punkte;
+            ra.punkte=Math.round(0.8*pa+0.2*pb);
+            rb.punkte=Math.round(0.8*pb+0.2*pa);
+          }
+        }
+      };
+      fusioniereSeite(0); fusioniereSeite(1);
     }
 
     // REIHENFOLGE. Rundenweise abwechselnd wie eine Setzliste — Durchgang 1 fuer alle,
@@ -11648,6 +11712,12 @@
     // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
     if(art.heben){ zeichneHeben(art); return; }
     if(art.schach){ zeichneSchach(art); return; }
+    // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
+    // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
+    // zeichneDuett() unten. Alle sieben anderen Nicht-Heben/Nicht-Schach-Buehnen
+    // (Speed-Schach faellt oben schon raus, bleiben also I-Spy/Tennis/Fechten/Showcase/
+    // Breaking/Wettessen) durchlaufen den generischen Zweig darunter unveraendert.
+    if(art.duett){ zeichneDuett(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
@@ -11712,6 +11782,123 @@
           ctx.fillText(f.txt,x,y);
         }
       }
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== EISKUNSTLAUF: DUETT-BUEHNENBILD (#856/#857) ==================
+  // Eigene Zeichenfunktion, exklusiv hinter `art.duett` (BUEHNE_ART.eiskunstlauf) — die
+  // einzige Beruehrung mit dem geteilten `zeichneBuehne()`-Dispatcher ist die eine
+  // Zeile dort, genau das von der Opus-Synthese verlangte Muster (Abschnitt 7 der
+  // Recherche / Abschnitt 4 der Synthese: eigener Flag, eigene Funktion, kein Eingriff
+  // in den generischen Zweig, den die sieben Geschwister-Buehnen weiter durchlaufen).
+  //
+  // BORDMITTEL STATT NEUEM SPRITE-RIG (Recherche Abschnitt 6, Vorbild zeichneHeben()):
+  // zwei zeichneSprite()-Aufrufe eng nebeneinander (statt ueber die volle Reihenbreite
+  // verteilt) plus eine gemeinsam gezeichnete Eisspur — reine Canvas-Primitiven, wie die
+  // Hantel bei Gewichtheben. Anders als zeichneHeben() zeigt diese Funktion aber ALLE
+  // Paare (und einen etwaigen Solo-Rest bei ungerader Feldgroesse, s. "Frage A" im
+  // bauBuehne()-Kommentar) gleichzeitig, kein "ein aktives Duell"-Fokus — Eiskunstlauf
+  // bleibt ein Reihenbild, nur mit Paaren statt zwoelf Einzelfiguren.
+  //
+  // DIE FUSION SELBST PASSIERT NICHT HIER. Sie steht in bauBuehne() (Kommentar "DUETT"
+  // dort), lange bevor irgendetwas gezeichnet wird — diese Funktion liest nur `u.duettN`
+  // (von derselben Stelle gesetzt), um zu wissen, wer neben wem steht. `u.summe`/
+  // `u.runden` sind zu diesem Zeitpunkt schon die fertig fusionierten Werte, exakt wie bei
+  // jeder anderen Buehnen-Disziplin — deshalb reicht hier derselbe "Pkt"/Punktesaeule-Code
+  // wie im generischen Zweig, nur mit anderer Positionierung.
+  function zeichneDuett(art){
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    const posMap=new Map();
+    [0,1].forEach(side=>{
+      const liste=TEILNEHMER.filter(u=>u.side===side);
+      const gesehen=new Set(), gruppen=[];
+      for(const u of liste){
+        if(gesehen.has(u.id))continue;
+        const partner=u.duettN?liste.find(x=>x.n===u.duettN&&!gesehen.has(x.id)):null;
+        if(partner){ gesehen.add(u.id); gesehen.add(partner.id); gruppen.push([u,partner]); }
+        else { gesehen.add(u.id); gruppen.push([u]); }
+      }
+      const y=side===0?H*0.32:H*0.66;
+      const c=side===0?css("--home"):css("--away");
+      const schriftAn=(x,txt,dy,farbe,groesse)=>{
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
+      };
+      const punktsaeule=(x,u,breite)=>{
+        const p=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-breite/2,y+64,breite,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-breite/2,y+64,breite*p,3);
+      };
+      gruppen.forEach((grp,i)=>{
+        const x=90+(W-180)*(gruppen.length>1?i/(gruppen.length-1):0.5);
+        if(grp.length===2){
+          // dx grosszuegig (26px, ueber die drei Duo-Slots verteilt bleibt reichlich
+          // Abstand zur naechsten Gruppe) — bei den urspruenglich engeren 15px liefen die
+          // Namens-/Punktezeilen beider Partner ineinander (im Playwright-Screenshot
+          // geprueft, s. PR-Beschreibung).
+          const [a,b]=grp, dx=26;
+          posMap.set(a.id,{x:x-dx,y}); posMap.set(b.id,{x:x+dx,y});
+          // GEMEINSAMES REQUISIT: eine Eisspur unter BEIDEN statt je eines eigenen
+          // Schattens — Primitiven, keine neue Sprite-Pipeline, genau wie die Hantel bei
+          // zeichneHeben().
+          ctx.globalAlpha=0.20; ctx.fillStyle=c;
+          ctx.beginPath(); ctx.ellipse(x,y+19,dx+18,7,0,0,6.3); ctx.fill();
+          ctx.globalAlpha=0.5; ctx.strokeStyle="rgba(190,230,255,.55)"; ctx.lineWidth=1.4;
+          ctx.beginPath(); ctx.ellipse(x-9,y+15,13,5,0.3,0,6.3); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(x+9,y+15,13,5,-0.3,0,6.3); ctx.stroke();
+          ctx.globalAlpha=1;
+          [[a,x-dx],[b,x+dx]].forEach(([u,ux])=>{
+            ctx.globalAlpha=u.lunge>0?1:0.92;
+            // `true` (feldspiel-Parameter): dieselbe "shoot"-Pose wie bei Gewichtheben,
+            // nur beim Aufblitzen des naechsten enthuellten Durchgangs (u.lunge>0) —
+            // "Arme hoch" statt Nahkampf-Slash, kein neues Rig.
+            zeichneSprite(ctx,u,ux,y,true);
+            ctx.globalAlpha=1;
+            // NUR VORNAME (u.n.split(" ")[0]) statt der vollen, abgeschnittenen Zeile —
+            // dasselbe Muster wie die wartenden Paare bei zeichneHeben() ("rx,ry+kw/2+10").
+            // Bei nur 52px Abstand zwischen den Partnern liefe eine 10-12-Zeichen-Zeile
+            // sonst in die des Nachbarn.
+            schriftAn(ux,u.n.split(" ")[0],44,c,8.5);
+            schriftAn(ux,String(u.summe)+" Pkt",56,"#dfe6ef",8.5);
+            punktsaeule(ux,u,26);
+            ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+            ctx.textAlign="center";
+            ctx.fillText((u.aktuell+1)+"/"+art.rundenN,ux,y+74);
+          });
+          ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+          ctx.textAlign="center"; ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)";
+          ctx.strokeText("DUETT",x,y-38); ctx.fillText("DUETT",x,y-38);
+        } else {
+          // SOLO-REST (ungerade Feldgroesse, "Frage A"): unveraendertes Bild wie im
+          // generischen Zweig — keine neue Sondermechanik, auch nicht visuell.
+          const u=grp[0];
+          posMap.set(u.id,{x,y});
+          ctx.globalAlpha=u.lunge>0?1:0.92;
+          ctx.fillStyle=c; ctx.globalAlpha=0.20;
+          ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+          ctx.globalAlpha=1;
+          zeichneSprite(ctx,u,x,y);
+          schriftAn(x,u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+          schriftAn(x,String(u.summe)+" Pkt",56,"#dfe6ef",9);
+          punktsaeule(x,u,30);
+          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+          ctx.textAlign="center";
+          ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        }
+      });
+    });
+    for(const f of floats){
+      if(f._teilnehmer==null)continue;
+      const pos=posMap.get(f._teilnehmer);
+      if(!pos)continue;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText(f.txt,pos.x,pos.y-30-((1-f.life)*20));
       ctx.globalAlpha=1;
     }
   }
