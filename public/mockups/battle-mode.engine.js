@@ -14104,7 +14104,14 @@
     // fehlt der Plan, greift derselbe Standard wie bei uns.
     // Die Gegnerliste ist fuer sechs gebaut. Bei vier Koepfen je Seite werden die besten
     // vier genommen und neu auf die Reihen verteilt, statt zwei Reihen leer zu lassen.
-    const gegner=OPP.slice(0,n);
+    //
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO WIE DIE HEIMSEITE — sonst rechnet die
+    // Arena immer mit `art.jeSeite` Gegnern, egal wie viele der Gegner-Manager tatsaechlich
+    // gesetzt hat. Zeichen fuer Zeichen wie bauFeldspiel/bauBuehne (dort `feldspielDisc`/
+    // `buehneDisc`, hier `d`, das oben bereits `disc` ist). Ohne Aufstellung Zeichen fuer
+    // Zeichen das alte `OPP.slice(0,n)`.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     const oByRow={0:[],1:[],2:[]};
     // Wertung-Bug (01.09., Chris live in der Arena: Score/Feed liefen, die Wertungstabelle
     // blieb aber komplett leer — kein Standbild-Fund wie Bug 1/2, sondern ein Absturz VOR dem
@@ -17865,7 +17872,13 @@
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
-    const gegen=OPP.slice(0,n);
+    // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO WIE DIE HEIMSEITE — sonst rechnet die
+    // Bahn immer mit `art.jeSeite` Gegnern, egal wie viele der Gegner-Manager tatsaechlich
+    // gesetzt hat. Zeichen fuer Zeichen wie bauFeldspiel/bauBuehne (dort `feldspielDisc`/
+    // `buehneDisc`, hier `d`, das oben bereits `bahnDisc` ist). Ohne Aufstellung Zeichen
+    // fuer Zeichen das alte `OPP.slice(0,n)`.
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegen=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
       // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
