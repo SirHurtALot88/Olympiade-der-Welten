@@ -105,20 +105,54 @@ export const ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["
  * PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
  * zweite Buehnen-Chassis-Menge, GENAU DASSELBE Muster wie `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
  * direkt darueber -- nur fuer `BUEHNE_ART[d].duell` statt `.heben` (`window.__arena.
- * spieleBuehneDuell()`, battle-mode.engine.js). Speed-Schach ist der erste Eintrag; I-Spy
- * (ebenfalls `duell:true` im Motor) ist NICHT enthalten -- kein Auftrag dafuer in dieser
+ * spieleBuehneDuell()`, battle-mode.engine.js). Speed-Schach war der erste Eintrag; I-Spy
+ * (ebenfalls `duell:true` im Motor) war NICHT enthalten -- kein Auftrag dafuer in jener
  * Welle, s. PM-Briefing 06.09. Abschnitt 4 (nur Speed-Schach/Staffel/Showcase bestanden UND
  * beauftragt).
+ *
+ * PRODUKTIVIERUNGSWELLE 2 (docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md,
+ * 09.09.): TENNIS und FECHTEN kommen hinzu -- beide tragen `duell:true` in `BUEHNE_ART`
+ * (battle-mode.engine.js, nachgesehen an den Zeilen `label:"Tennis"`/`label:"Fechten"`), beide
+ * haben die Rangtreue-Schranke kaderfest bestanden (0,825 bzw. 0,816, s. PM-Briefing
+ * Abschnitt 2) und beide brauchen deshalb GENAU DAS BESTEHENDE Duell-Chassis -- kein Byte neuer
+ * Motor-Code, exakt der "nur ein weiterer Eintrag"-Fall, den der Kommentar oben vorhersagt.
+ *
+ * I-SPY BLEIBT WEITERHIN AUSSEN VOR, jetzt aus einem gemessenen statt nur einem
+ * Auftrags-Grund: es traegt zwar ebenfalls `duell:true`, ist aber mit rho 0,684 je Spiel die
+ * einzige der vier Duell-Buehnen UNTER der 0,80-Schranke (`data/generated/
+ * rangtreue-basislinie.json`) -- eine Disziplin produktiv zu schalten, die ihre eigene Abnahme
+ * nicht besteht, waere genau die Vermischung der beiden Achsen (Rangtreue / Produktions-
+ * anbindung), vor der das PM-Briefing in Abschnitt 1 warnt.
  */
-export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["speed-schach"]);
+export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "speed-schach",
+  "tennis",
+  "fechten",
+]);
 
 /**
  * DRITTE BUeHNEN-CHASSIS-MENGE (Produktivierungswelle 1): fuer die sechs "Auftritt"-Buehnen
- * (`BUEHNE_ART[d]` ohne `.heben` UND ohne `.duell`) -- Showcase ist der erste Eintrag.
+ * (`BUEHNE_ART[d]` ohne `.heben` UND ohne `.duell`) -- Showcase war der erste Eintrag.
  * `window.__arena.spieleBuehneAuftritt()` liest denselben summenbasierten Seitenstand, den
  * `updateHudBuehne()`s eigener Nicht-Heben-Nicht-Duell-Zweig bereits live anzeigt.
+ *
+ * PRODUKTIVIERUNGSWELLE 2 (s. Kommentar bei `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`):
+ * EISKUNSTLAUF, BREAKING und WETTESSEN kommen hinzu -- alle drei ohne `.heben`/`.duell` in
+ * `BUEHNE_ART` (nachgesehen), alle drei kaderfest ueber der Schranke (0,875 / 0,869 / 0,845).
+ *
+ * EISKUNSTLAUFS `duett:true` IST KEIN CHASSIS-FLAG (nachgesehen, nicht angenommen): es steuert
+ * in `bauBuehne()` die automatische Paarung bei gerader Feldgroesse (PR #859) und laesst den
+ * Auftritts-Charakter der Wertung unberuehrt -- `BUEHNE_ART.eiskunstlauf` traegt weder `.heben`
+ * noch `.duell`, `spieleBuehneAuftritt()` ist damit der richtige und einzige Einstiegspunkt.
+ * Die Namensaehnlichkeit `duett`/`duell` ist die eine Falle dieser Welle; sie ist hier
+ * ausdruecklich benannt, damit ein kuenftiger Leser sie nicht fuer einen Copy-Paste-Fehler haelt.
  */
-export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["showcase"]);
+export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "showcase",
+  "eiskunstlauf",
+  "breaking",
+  "wettessen",
+]);
 
 function seedZuZahl(seed: string | number): number {
   if (typeof seed === "number" && Number.isFinite(seed)) return seed;

@@ -7,7 +7,28 @@ import { describe, expect, it } from "vitest";
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
-import { ARENA_TEAM_POINTS, runBattleModeArenaMatchday } from "@/lib/resolve/battle-mode-arena-team-points";
+import {
+  ARENA_RESOLVED_DISCIPLINE_IDS,
+  ARENA_TEAM_POINTS,
+  runBattleModeArenaMatchday,
+} from "@/lib/resolve/battle-mode-arena-team-points";
+
+/**
+ * DIE D2-KONTROLLDISZIPLIN: eine Disziplin, die NICHT arena-aufgeloest ist -- die Gegenprobe
+ * dieses Tests ("bleibt konsistent ueber getRankToPointsValue") prueft nur dann etwas, wenn das
+ * auch stimmt. Hier stand frueher "fechten"; Produktivierungswelle 2 (09.09.,
+ * docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md) hat Fechten arena-
+ * aufgeloest und diese Gegenprobe damit still entwertet. Der Wachhund unten faengt den naechsten
+ * solchen Fall ab, bevor er als verwirrender Zahlendiff auftaucht -- dieselbe Konstruktion wie
+ * in tests/battle-mode-arena-resolve-engine.test.ts.
+ */
+const D2_KONTROLL_DISZIPLIN = "football";
+
+describe("D2-Kontrolldisziplin (Arena-E2E)", () => {
+  it("ist NICHT arena-aufgeloest -- sonst prueft die Gegenprobe unten nichts mehr", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D2_KONTROLL_DISZIPLIN)).toBe(false);
+  });
+});
 
 /**
  * ECHTER END-ZU-END-NACHWEIS FUER PR 7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt
@@ -106,7 +127,7 @@ function baueBattleModeGameState(): GameState {
     season: { id: "season-1" },
     disciplines: [
       { id: "basketball", name: "Basketball", category: "tactics" },
-      { id: "fechten", name: "Fechten", category: "speed" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
     ],
     seasonState: {
       leagueByTeamId: {
@@ -139,7 +160,7 @@ function createContext(input: {
       activePlayerId: `active-${input.teamId}-d1-${index}`,
     })),
     ...input.d2Scores.map((score, index) => ({
-      disciplineId: "fechten",
+      disciplineId: D2_KONTROLL_DISZIPLIN,
       disciplineSide: "d2" as const,
       slotIndex: index,
       playerId: `${input.teamId}-d2-${index}`,
@@ -154,7 +175,7 @@ function createContext(input: {
     teamId: input.teamId,
     gameState: input.gameState,
     entries,
-    disciplinePlayerCounts: { basketball: input.d1Scores.length, fechten: input.d2Scores.length },
+    disciplinePlayerCounts: { basketball: input.d1Scores.length, [D2_KONTROLL_DISZIPLIN]: input.d2Scores.length },
     activePlayers: entries.map((entry) => ({
       id: entry.activePlayerId ?? `missing-${entry.playerId}`,
       saveId: "save-1",
@@ -164,7 +185,7 @@ function createContext(input: {
     })),
     disciplineScores: [
       ...input.d1Scores.map((score, index) => ({ playerId: `${input.teamId}-d1-${index}`, disciplineId: "basketball", score })),
-      ...input.d2Scores.map((score, index) => ({ playerId: `${input.teamId}-d2-${index}`, disciplineId: "fechten", score })),
+      ...input.d2Scores.map((score, index) => ({ playerId: `${input.teamId}-d2-${index}`, disciplineId: D2_KONTROLL_DISZIPLIN, score })),
     ],
     save: { id: "save-1", name: "Save 1", status: "active" },
     season: { id: "season-1", saveId: "save-1", name: "Season 1", year: 1, currentMatchday: 1, status: "active" },
@@ -184,12 +205,12 @@ function createContext(input: {
     rosterPlayers: entries.map((entry) => ({ id: entry.playerId, name: entry.playerId, coreStats: { pow: 1, spe: 1, men: 1, soc: 1 } })),
     disciplines: [
       { id: "basketball", name: "Basketball", category: "tactics" },
-      { id: "fechten", name: "Fechten", category: "speed" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [
       { disciplineId: "basketball", originalOrder: 1, displayOrder: 1, playerCount: input.d1Scores.length, mutator1: null, mutator2: null },
-      { disciplineId: "fechten", originalOrder: 2, displayOrder: 2, playerCount: input.d2Scores.length, mutator1: null, mutator2: null },
+      { disciplineId: D2_KONTROLL_DISZIPLIN, originalOrder: 2, displayOrder: 2, playerCount: input.d2Scores.length, mutator1: null, mutator2: null },
     ],
     existingDraft: {
       lineupId: `lineup-${input.teamId}`,
@@ -212,7 +233,7 @@ function createContext(input: {
       matchdayId: "matchday-1",
       teamId: input.teamId,
       d1DisciplineId: "basketball",
-      d2DisciplineId: "fechten",
+      d2DisciplineId: D2_KONTROLL_DISZIPLIN,
     },
     fatigueByPlayerId: null,
     fatigueSourceStatus: "missing_source",
@@ -228,7 +249,7 @@ function createContext(input: {
 
 describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Resolve-Pipeline", () => {
   it(
-    "ein echtes Arena-Ergebnis kommt an, traegt resolutionSource:arena + sichtbaren Seed, und Fechten (PPS) bleibt konsistent ueber getRankToPointsValue",
+    "ein echtes Arena-Ergebnis kommt an, traegt resolutionSource:arena + sichtbaren Seed, und die D2-Kontrolldisziplin (PPS) bleibt konsistent ueber getRankToPointsValue",
     async () => {
       const gameState = baueBattleModeGameState();
 
@@ -270,11 +291,11 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
         expect(team.teamPoints).toBe(overridesByTeamId.get(team.teamId)?.teamPoints);
       }
 
-      // Fechten (D2, keine Arena-Disziplin) bleibt exakt beim bestehenden, gerankten PPS-Pfad --
+      // Die Kontrolldisziplin (D2, keine Arena-Disziplin) bleibt exakt beim bestehenden, gerankten PPS-Pfad --
       // "konsistent mit einer Nicht-Arena-Disziplin desselben Spieltags" aus dem Auftrag.
-      const fechten = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
-      expect(fechten).toBeDefined();
-      for (const team of fechten?.teamResults ?? []) {
+      const kontrolle = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
+      expect(kontrolle).toBeDefined();
+      for (const team of kontrolle?.teamResults ?? []) {
         expect(team.resolutionSource).toBe("pps");
         expect(team.pointSource).toBe("rank_to_points_final_score_share");
         expect(team.arenaMatchSeed ?? null).toBeNull();

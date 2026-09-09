@@ -132,6 +132,16 @@ import gewichthebenPpsReferenzJson from "@/data/generated/gewichtheben-pps-refer
 import hockeyPpsReferenzJson from "@/data/generated/hockey-pps-referenz.json";
 import speedSchachPpsReferenzJson from "@/data/generated/speed-schach-pps-referenz.json";
 import showcasePpsReferenzJson from "@/data/generated/showcase-pps-referenz.json";
+// PRODUKTIVIERUNGSWELLE 2 (09.09., s. ARENA_RESOLVED_DISCIPLINE_IDS): fuenf weitere Buehnen-
+// Disziplinen, alle fuenf ueber die BEIDEN BEREITS BESTEHENDEN Buehnen-Chassis aus Welle 1 --
+// gezogen von scripts/ziehe-buehne-pps-referenz.ts (EIN generisches Skript statt fuenf Kopien,
+// Begruendung in dessen Kopfkommentar), methodisch identisch zu Welle 1 (dieselbe Fixture-Zahl,
+// dieselbe Paarungs-/Seed-Mechanik, dieselben Quantile).
+import eiskunstlaufPpsReferenzJson from "@/data/generated/eiskunstlauf-pps-referenz.json";
+import breakingPpsReferenzJson from "@/data/generated/breaking-pps-referenz.json";
+import wettessenPpsReferenzJson from "@/data/generated/wettessen-pps-referenz.json";
+import tennisPpsReferenzJson from "@/data/generated/tennis-pps-referenz.json";
+import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -155,6 +165,38 @@ import showcasePpsReferenzJson from "@/data/generated/showcase-pps-referenz.json
  * Konfigurationsschritt mehr, sondern eine neue Wertungsmechanik fuer Staffel -- das ist
  * "Wertungstabelle Welle 2" (PM-Briefing Schritt 4), nicht diese Welle. Staffel folgt, sobald
  * es eine echte Punkte-je-Laeufer-Wertung hat.
+ *
+ * PRODUKTIVIERUNGSWELLE 2 (docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md,
+ * 09.09.): EISKUNSTLAUF, BREAKING, WETTESSEN, TENNIS und FECHTEN -- die sechste bis zehnte
+ * arena-aufgeloeste Disziplin. Damit laeuft die HAELFTE des Feldes ueber die Arena statt ueber
+ * den alten PPS-Rang-Pfad.
+ *
+ * WARUM GENAU DIESE FUENF, UND WARUM DAS EINE REINE KONFIGURATIONSAENDERUNG IST. Zwei
+ * unabhaengige Achsen muessen erfuellt sein, und beide sind es hier nachweislich:
+ *
+ *  1. RANGTREUE BESTANDEN. Alle fuenf liegen kaderfest ueber der 0,80-Schranke aus CLAUDE.md
+ *     (`data/generated/rangtreue-basislinie.json`, 24 Spiele je Kader-Variante, Median ueber
+ *     fuenf echte Team-Paarungen): Eiskunstlauf 0,875 · Breaking 0,869 · Wettessen 0,845 ·
+ *     Tennis 0,825 · Fechten 0,816. Sie sind damit die fuenf am hoechsten bewerteten
+ *     Disziplinen des Feldes, die die Schranke bestehen UND noch nicht angeschlossen waren.
+ *  2. CHASSIS EXISTIERT BEREITS. Keine der fuenf braucht eine neue Motor-Funktion: Eiskunstlauf/
+ *     Breaking/Wettessen laufen ueber `spieleBuehneAuftritt()` (Showcases Chassis aus Welle 1),
+ *     Tennis/Fechten ueber `spieleBuehneDuell()` (Speed-Schachs Chassis). Das ist EXAKT der Fall,
+ *     den der Kommentar oben vorhersagt -- "eine reine Konfigurationsaenderung (Eintrag hier plus
+ *     eigene PPS-Referenz/Kurvenkonstanten) statt eines zweiten Sonderfalls". Der Diff dieser
+ *     Welle an `public/mockups/battle-mode.engine.js` ist deshalb LEER.
+ *
+ * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem der beiden Gruende jeweils:
+ *  - STAFFEL (rho 0,915, die beste des Feldes), SPURT (0,871), TAKESHI'S CASTLE (0,861),
+ *    TIME-TRIAL (0,828): Rangtreue bestanden, aber ACHSE 2 fehlt -- alle vier sind BAHN-
+ *    Disziplinen, und fuer die Bahn gibt es ueberhaupt kein Arena-Chassis (`spieleBahn*()`
+ *    existiert nicht). Bei Staffel kommt der oben beschriebene `gewertet:false`-Befund hinzu.
+ *    Das ist die naechste Welle und ein echter Bauauftrag, keine Konfiguration.
+ *  - I-SPY (0,684), CLIMBING (0,790), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516),
+ *    BATTLEFIELD/TDM/MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene
+ *    Abnahme nicht. I-Spy waere technisch der billigste Eintrag von allen (es traegt `duell:true`
+ *    und braeuchte nur diese eine Zeile), ist aber genau deshalb der wichtigste Nicht-Eintrag:
+ *    die beiden Achsen duerfen nicht vermischt werden, nur weil eine davon billig zu erfuellen ist.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -162,6 +204,12 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "hockey",
   "speed-schach",
   "showcase",
+  // Produktivierungswelle 2 (09.09.), s. Kommentar oben.
+  "eiskunstlauf",
+  "breaking",
+  "wettessen",
+  "tennis",
+  "fechten",
 ]);
 
 /**
@@ -309,6 +357,40 @@ export const SHOWCASE_INDIVIDUAL_PPS_MAX = 5.5;
 export const SHOWCASE_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER DIE FUENF DISZIPLINEN DER PRODUKTIVIERUNGSWELLE 2
+ * (09.09., s. `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve wie fuer die ersten fuenf
+ * (`ppsAusArenaImpact()`), eigene Regler aus GENAU DEMSELBEN Grund wie bei Gewichtheben/Hockey/
+ * Speed-Schach/Showcase (s. deren Kommentare): der rohe Boxscore-Wert jeder dieser Disziplinen
+ * (`u.summe` aus `WERTUNG_AUFTRITT()` bzw. `WERTUNG_DUELL()`) liegt auf einer EIGENEN Skala, die
+ * vom Kader-/Attributniveau der Liga abhaengt -- nachweisbar an den gezogenen `iKrass`-Werten,
+ * die sich zwischen diesen Disziplinen um ein Vielfaches unterscheiden (s. die jeweilige
+ * `data/generated/<disziplin>-pps-referenz.json`). Genau diese Streuung ist der Grund, aus dem
+ * der Fail-Fast weiter unten einen stillen Rueckfall auf Basketballs Referenz verhindert.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben Grund
+ * wie in Welle 1: Chris' Rahmen "max 5-6" und die 04.09.-Messung der Kurvenform an 352 Duellen
+ * sind Aussagen ueber die KURVE, nicht ueber Basketball-spezifische Zahlen. Was disziplin-
+ * spezifisch ist, steckt vollstaendig in der gezogenen Referenz (`iMittel`/`iKrass`), nicht in
+ * diesen beiden Reglern.
+ *
+ * EIGENE KONSTANTEN STATT EINES GEMEINSAMEN ALIAS -- bewusst dieselbe Entscheidung wie in
+ * Welle 1 (s. `GEWICHTHEBEN_INDIVIDUAL_PPS_MAX`): eine spaetere, disziplin-spezifische
+ * Kalibrierung (z.B. nach echten Spieldaten aus einem Battle-Mode-Save) soll GENAU EINE dieser
+ * zehn Disziplinen beruehren koennen, ohne die neun anderen mitzuziehen. Der Preis ist
+ * Wiederholung im Quelltext, der Gegenwert ist, dass jede Zeile einzeln aenderbar bleibt.
+ */
+export const EISKUNSTLAUF_INDIVIDUAL_PPS_MAX = 5.5;
+export const EISKUNSTLAUF_PPS_ANTEIL_MITTE = 0.25;
+export const BREAKING_INDIVIDUAL_PPS_MAX = 5.5;
+export const BREAKING_PPS_ANTEIL_MITTE = 0.25;
+export const WETTESSEN_INDIVIDUAL_PPS_MAX = 5.5;
+export const WETTESSEN_PPS_ANTEIL_MITTE = 0.25;
+export const TENNIS_INDIVIDUAL_PPS_MAX = 5.5;
+export const TENNIS_PPS_ANTEIL_MITTE = 0.25;
+export const FECHTEN_INDIVIDUAL_PPS_MAX = 5.5;
+export const FECHTEN_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -378,6 +460,25 @@ const SPEED_SCHACH_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 );
 const SHOWCASE_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   showcasePpsReferenzJson as ArenaPpsReferenzJson,
+);
+// PRODUKTIVIERUNGSWELLE 2 (09.09.): keine dieser fuenf Disziplinen hat eine Rolle mit eigener
+// Wertformel (wie Hockeys Torwart) -- `feldgroessenTorwart` fehlt in ihren JSON-Dateien
+// vollstaendig, `referenzFeldgroessenTorwart` bleibt deshalb unten `undefined`, genau wie bei
+// Basketball/Gewichtheben/Speed-Schach/Showcase.
+const EISKUNSTLAUF_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  eiskunstlaufPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const BREAKING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  breakingPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const WETTESSEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  wettessenPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const TENNIS_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  tennisPpsReferenzJson as ArenaPpsReferenzJson,
+);
+const FECHTEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  fechtenPpsReferenzJson as ArenaPpsReferenzJson,
 );
 
 /**
@@ -461,6 +562,68 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       anteilMitte: SHOWCASE_PPS_ANTEIL_MITTE,
       // Discipline.playerCount (dataAdapter.ts) ist 5, NICHT 6 -- nachgesehen, nicht kopiert
       // (s. scripts/ziehe-showcase-pps-referenz.ts Kopfkommentar).
+      katalogStandardgroesse: 5,
+    },
+  ],
+  // ============================ PRODUKTIVIERUNGSWELLE 2 (09.09.) ============================
+  // Fuenf Eintraege, kein neuer Code-Pfad: `ppsAusArenaImpact()` und
+  // `computeIndividualBoxscorePpsFromFixtureResults()` bleiben unveraendert -- genau die
+  // "reine Konfigurationsaenderung", die der Kopfkommentar dieser Datei seit der Gewichtheben-
+  // Produktivierung ankuendigt.
+  //
+  // JEDE `katalogStandardgroesse` UNTEN IST EINZELN IN lib/data/dataAdapter.ts NACHGESEHEN,
+  // nicht von einer Vorlage kopiert -- und keine der fuenf ist 6. Die naheliegende Falle waere,
+  // stattdessen `BUEHNE_ART[d].jeSeite` zu nehmen: die ist fuer ALLE fuenf 6, ist aber die
+  // MOTOR-Feldgroesse und der falsche Wert an dieser Stelle (dieselbe Unterscheidung, die die
+  // Kommentare bei Hockey/Speed-Schach/Showcase oben bereits treffen).
+  [
+    "eiskunstlauf",
+    {
+      referenzFeldgroessen: EISKUNSTLAUF_PPS_REFERENZ_FELDGROESSEN,
+      max: EISKUNSTLAUF_INDIVIDUAL_PPS_MAX,
+      anteilMitte: EISKUNSTLAUF_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 3 (dataAdapter.ts, Eintrag "eiskunstlauf" -- Anzeigename
+      // "Eiskunst"), NICHT 6.
+      katalogStandardgroesse: 3,
+    },
+  ],
+  [
+    "breaking",
+    {
+      referenzFeldgroessen: BREAKING_PPS_REFERENZ_FELDGROESSEN,
+      max: BREAKING_INDIVIDUAL_PPS_MAX,
+      anteilMitte: BREAKING_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 4, NICHT 6.
+      katalogStandardgroesse: 4,
+    },
+  ],
+  [
+    "wettessen",
+    {
+      referenzFeldgroessen: WETTESSEN_PPS_REFERENZ_FELDGROESSEN,
+      max: WETTESSEN_INDIVIDUAL_PPS_MAX,
+      anteilMitte: WETTESSEN_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 5, NICHT 6.
+      katalogStandardgroesse: 5,
+    },
+  ],
+  [
+    "tennis",
+    {
+      referenzFeldgroessen: TENNIS_PPS_REFERENZ_FELDGROESSEN,
+      max: TENNIS_INDIVIDUAL_PPS_MAX,
+      anteilMitte: TENNIS_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 3, NICHT 6.
+      katalogStandardgroesse: 3,
+    },
+  ],
+  [
+    "fechten",
+    {
+      referenzFeldgroessen: FECHTEN_PPS_REFERENZ_FELDGROESSEN,
+      max: FECHTEN_INDIVIDUAL_PPS_MAX,
+      anteilMitte: FECHTEN_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 5, NICHT 6.
       katalogStandardgroesse: 5,
     },
   ],

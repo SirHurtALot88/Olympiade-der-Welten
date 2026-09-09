@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
-import { ARENA_TEAM_POINTS } from "@/lib/resolve/battle-mode-arena-team-points";
+import { ARENA_RESOLVED_DISCIPLINE_IDS, ARENA_TEAM_POINTS } from "@/lib/resolve/battle-mode-arena-team-points";
 
 /**
  * Einhaengen des Arena-Team-Punkte-Adapters in `buildLegacyMatchdayResolvePreview()` (PR 7 von 9,
@@ -16,7 +16,28 @@ import { ARENA_TEAM_POINTS } from "@/lib/resolve/battle-mode-arena-team-points";
  * darf NUR fuer `disciplineId === "basketball"` in einem `isBattleModeSave()`-Save greifen — jede
  * andere Kombination (Manager Mode, jede andere Disziplin, fehlender gameState) bleibt exakt beim
  * bisherigen PPS-Pfad, selbst wenn die Map gesetzt ist.
+
+*/
+
+/**
+ * DIE D2-KONTROLLDISZIPLIN: eine Disziplin, die NICHT arena-aufgeloest ist. Die Tests unten
+ * benutzen sie als Gegenprobe -- sie muss im selben Preview byte-identisch beim alten PPS-Pfad
+ * bleiben, waehrend D1 (Basketball) ueber die Arena laeuft.
+ *
+ * FRUEHER STAND HIER "fechten", UND DAS IST IN PRODUKTIVIERUNGSWELLE 2 (09.09.,
+ * docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md) GEBROCHEN: Fechten wurde
+ * arena-aufgeloest, womit die Gegenprobe still ihren eigenen Gegenstand verlor und mit einem
+ * verwirrenden Zahlendiff rot wurde ("pointsAwarded 3,77 statt 6,6") statt mit ihrer echten
+ * Ursache. Deshalb steht die Wahl jetzt an EINER benannten Stelle -- und der Wachhund darunter
+ * sagt beim naechsten Mal direkt, was zu tun ist.
  */
+const D2_KONTROLL_DISZIPLIN = "football";
+
+describe("D2-Kontrolldisziplin", () => {
+  it("ist NICHT arena-aufgeloest -- sonst pruefen die Gegenproben unten nichts mehr", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D2_KONTROLL_DISZIPLIN)).toBe(false);
+  });
+});
 
 function createContext(input: {
   teamId: string;
@@ -36,7 +57,7 @@ function createContext(input: {
       activePlayerId: `active-${input.teamId}-d1-${index}`,
     })),
     ...input.d2Scores.map((score, index) => ({
-      disciplineId: "fechten",
+      disciplineId: D2_KONTROLL_DISZIPLIN,
       disciplineSide: "d2" as const,
       slotIndex: index,
       playerId: `${input.teamId}-d2-${index}`,
@@ -53,7 +74,7 @@ function createContext(input: {
     entries,
     disciplinePlayerCounts: {
       [d1DisciplineId]: input.d1Scores.length,
-      fechten: input.d2Scores.length,
+      [D2_KONTROLL_DISZIPLIN]: input.d2Scores.length,
     },
     activePlayers: entries.map((entry) => ({
       id: entry.activePlayerId ?? `missing-${entry.playerId}`,
@@ -70,7 +91,7 @@ function createContext(input: {
       })),
       ...input.d2Scores.map((score, index) => ({
         playerId: `${input.teamId}-d2-${index}`,
-        disciplineId: "fechten",
+        disciplineId: D2_KONTROLL_DISZIPLIN,
         score,
       })),
     ],
@@ -96,12 +117,12 @@ function createContext(input: {
     })),
     disciplines: [
       { id: d1DisciplineId, name: "Basketball", category: "tactics" },
-      { id: "fechten", name: "Fechten", category: "speed" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [
       { disciplineId: d1DisciplineId, originalOrder: 1, displayOrder: 1, playerCount: input.d1Scores.length, mutator1: null, mutator2: null },
-      { disciplineId: "fechten", originalOrder: 2, displayOrder: 2, playerCount: input.d2Scores.length, mutator1: null, mutator2: null },
+      { disciplineId: D2_KONTROLL_DISZIPLIN, originalOrder: 2, displayOrder: 2, playerCount: input.d2Scores.length, mutator1: null, mutator2: null },
     ],
     existingDraft: {
       lineupId: `lineup-${input.teamId}`,
@@ -124,7 +145,7 @@ function createContext(input: {
       matchdayId: "matchday-1",
       teamId: input.teamId,
       d1DisciplineId,
-      d2DisciplineId: "fechten",
+      d2DisciplineId: D2_KONTROLL_DISZIPLIN,
     },
     fatigueByPlayerId: null,
     fatigueSourceStatus: "missing_source",
@@ -187,9 +208,9 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
     expect(beta?.resolutionSource).toBe("arena");
     expect(beta?.teamPoints).toBe(ARENA_TEAM_POINTS.loss);
 
-    // Fechten (D2, keine Arena-Disziplin) bleibt exakt beim bestehenden PPS-Pfad im selben Preview.
-    const fechten = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
-    for (const team of fechten?.teamResults ?? []) {
+    // Die Kontrolldisziplin (D2, keine Arena-Disziplin) bleibt exakt beim bestehenden PPS-Pfad im selben Preview.
+    const kontrolle = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
+    for (const team of kontrolle?.teamResults ?? []) {
       expect(team.resolutionSource).toBe("pps");
       expect(team.arenaMatchSeed ?? null).toBeNull();
     }
@@ -331,7 +352,7 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
    * vollstaendig ignorieren, s. Kommentar an `isBattleModeArenaEligible`/
    * `arenaIndividualPpsForThisDiscipline`.
    */
-  it("Fechten (D2) bleibt byte-identisch, selbst wenn arenaIndividualBoxscorePpsByPlayerId einen Eintrag fuer dieselbe playerId traegt", () => {
+  it("Die D2-Kontrolldisziplin bleibt byte-identisch, selbst wenn arenaIndividualBoxscorePpsByPlayerId einen Eintrag fuer dieselbe playerId traegt", () => {
     const gameState = buildBattleModeGameState();
     const contexts = [
       createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40, 30] }),
@@ -342,7 +363,7 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
       ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
       ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
     ]);
-    // "A-A-d2-0" existiert nur auf der Fechten-Seite (D2) -- traegt hier trotzdem probeweise einen
+    // "A-A-d2-0" existiert nur auf der Kontroll-Seite (D2) -- traegt hier trotzdem probeweise einen
     // Boxscore-Eintrag, um zu beweisen, dass die Disziplin-Sperre wirklich greift, nicht nur die
     // ID zufaellig nirgends vorkommt.
     const arenaIndividualBoxscorePpsByPlayerId = new Map([
@@ -357,10 +378,10 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
       arenaIndividualBoxscorePpsByPlayerId,
     });
 
-    const fechtenWithout = withoutArena.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
-    const fechtenWith = withArena.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
+    const kontrolleWithout = withoutArena.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
+    const kontrolleWith = withArena.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
 
-    expect(fechtenWith).toEqual(fechtenWithout);
+    expect(kontrolleWith).toEqual(kontrolleWithout);
   });
 
   it("ignoriert die Arena-Punkte-Map vollstaendig in einem Manager-Mode-Save (Sicherheitsrahmen)", () => {

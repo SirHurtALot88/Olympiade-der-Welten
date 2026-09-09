@@ -83,6 +83,21 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   });
 
   /**
+   * PRODUKTIVIERUNGSWELLE 2 (docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md,
+   * 09.09.): fuenf weitere Buehnen-Disziplinen, alle ueber die BEIDEN BESTEHENDEN Buehnen-
+   * Chassis aus Welle 1 -- Eiskunstlauf/Breaking/Wettessen ueber `spieleBuehneAuftritt()`,
+   * Tennis/Fechten ueber `spieleBuehneDuell()`. Alle fuenf haben die Rangtreue-Schranke
+   * kaderfest bestanden (0,875 / 0,869 / 0,845 / 0,825 / 0,816).
+   */
+  it("enthaelt Eiskunstlauf, Breaking, Wettessen, Tennis und Fechten (Produktivierungswelle 2)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("eiskunstlauf")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("breaking")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("wettessen")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("tennis")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("fechten")).toBe(true);
+  });
+
+  /**
    * STAFFEL IST BEWUSST NICHT DABEI (Produktivierungswelle 1, s. Kommentar bei
    * ARENA_RESOLVED_DISCIPLINE_IDS): `bahnTeamstand()` liefert fuer Staffel `gewertet:false` --
    * das Spiel selbst kennt dort noch keine Wertung. Ein Regressionstest, kein Verhaltenstest:
@@ -90,6 +105,20 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    */
   it("enthaelt NICHT Staffel (bahnTeamstand() liefert dort gewertet:false, s. Kommentar)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(false);
+  });
+
+  /**
+   * I-SPY IST BEWUSST NICHT DABEI (Produktivierungswelle 2) -- und ist der schaerfere der beiden
+   * Nicht-Eintrag-Faelle, weil er NICHT an fehlender Technik scheitert: I-Spy traegt `duell:true`
+   * in `BUEHNE_ART` wie Tennis/Fechten/Speed-Schach und braeuchte technisch nur diese eine Zeile.
+   * Was fehlt, ist die ANDERE Achse: mit rho 0,684 je Spiel (`data/generated/
+   * rangtreue-basislinie.json`) besteht es seine eigene Abnahme nicht (Schranke 0,80, CLAUDE.md).
+   * Genau deshalb steht dieser Test hier: damit "es waere ja nur ein Eintrag" nicht irgendwann
+   * die Rangtreue-Achse ueberstimmt. Wird I-Spy spaeter ueber 0,80 gehoben, faellt dieser Test
+   * absichtlich rot und ist DANN mit der neuen Zahl zu aktualisieren.
+   */
+  it("enthaelt NICHT I-Spy (traegt zwar duell:true, besteht aber die Rangtreue-Schranke nicht)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(false);
   });
 
   /**
