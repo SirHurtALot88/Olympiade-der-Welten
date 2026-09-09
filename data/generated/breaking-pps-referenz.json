@@ -1,0 +1,115 @@
+{
+ "disziplin": "breaking",
+ "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) DES ROHEN BUEHNEN-WERTS (MOTOREN.breaking.wert() = u.summe, s. WERTUNG_AUFTRITT() in public/mockups/battle-mode.engine.js), JE FELDGROESSE getrennt gezogen -- gebaut von scripts/ziehe-buehne-pps-referenz.ts gegen echte Liga-Kader (buildArenaTeam()) ueber runArenaFixtures()/spieleBuehneAuftritt(). Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. KATALOG-STANDARDGROESSE IST 4, NICHT 6 (Discipline.playerCount in lib/data/dataAdapter.ts; BUEHNE_ART[d].jeSeite im Motor ist 6, das ist die MOTOR-Feldgroesse und der falsche Wert dafuer) -- nur der Fallback fuer eine nicht ermittelbare Feldgroesse, s. Skript-Kopfkommentar. KLEINERE STICHPROBE ALS BASKETBALLS REFERENZ (60 statt 300+ Fixtures je Feldgroesse) -- unveraendert dieselbe Zeitbudget-Entscheidung wie in Produktivierungswelle 1 (06.09.2026), keine methodische. Neu ziehen nach jeder Aenderung, die den rohen Wert verschiebt (BUEHNE_ART.breaking.rezept, WERTUNG_AUFTRITT(), Kadergenerierung/Attributniveau der Liga).",
+ "gezogenAm": "2026-09-09T16:02:06.835Z",
+ "motorSha1": "c93f0f3b491be6865d7f99e228123e713ab17df9",
+ "repoCommit": "e6461933bbf5804cc5e5fc74ac85adbafaeb6f8c",
+ "quelle": {
+  "saveId": "new-game-1787123325719-swnjlk",
+  "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+  "mechanismus": "runArenaFixtures/spieleBuehneAuftritt gegen echte Liga-Kader (buildArenaTeam)"
+ },
+ "fixturesJeFeldgroesse": 60,
+ "feldgroessen": {
+  "2": {
+   "n": 2,
+   "fixtures": 64,
+   "spielerwerte": 256,
+   "iMittel": 657.5,
+   "iKrass": 1055.2,
+   "quantile": {
+    "p1": 381.1,
+    "p5": 433.25,
+    "p10": 489,
+    "p25": 563.75,
+    "p50": 657.5,
+    "p75": 755.25,
+    "p90": 810,
+    "p95": 866,
+    "p99": 1023.2,
+    "p99_5": 1055.2,
+    "p99_9": 1064
+   }
+  },
+  "3": {
+   "n": 3,
+   "fixtures": 64,
+   "spielerwerte": 384,
+   "iMittel": 648,
+   "iKrass": 1034.72,
+   "quantile": {
+    "p1": 361.96,
+    "p5": 419.6,
+    "p10": 471,
+    "p25": 550,
+    "p50": 648,
+    "p75": 740,
+    "p90": 792,
+    "p95": 840,
+    "p99": 1000,
+    "p99_5": 1034.72,
+    "p99_9": 1064
+   }
+  },
+  "4": {
+   "n": 4,
+   "fixtures": 64,
+   "spielerwerte": 512,
+   "iMittel": 608,
+   "iKrass": 1046.24,
+   "quantile": {
+    "p1": 339.11,
+    "p5": 400.55,
+    "p10": 444.2,
+    "p25": 524.5,
+    "p50": 608,
+    "p75": 710.25,
+    "p90": 786,
+    "p95": 832,
+    "p99": 992.96,
+    "p99_5": 1046.24,
+    "p99_9": 1064
+   }
+  },
+  "5": {
+   "n": 5,
+   "fixtures": 64,
+   "spielerwerte": 640,
+   "iMittel": 582,
+   "iKrass": 1025.76,
+   "quantile": {
+    "p1": 293.51,
+    "p5": 352.95,
+    "p10": 400.8,
+    "p25": 478.5,
+    "p50": 582,
+    "p75": 692,
+    "p90": 760,
+    "p95": 801,
+    "p99": 973.09,
+    "p99_5": 1025.76,
+    "p99_9": 1064
+   }
+  },
+  "6": {
+   "n": 6,
+   "fixtures": 64,
+   "spielerwerte": 768,
+   "iMittel": 552,
+   "iKrass": 947.66,
+   "quantile": {
+    "p1": 287,
+    "p5": 332.7,
+    "p10": 362.7,
+    "p25": 442,
+    "p50": 552,
+    "p75": 668,
+    "p90": 748,
+    "p95": 794,
+    "p99": 901.28,
+    "p99_5": 947.66,
+    "p99_9": 1064
+   }
+  }
+ }
+}
