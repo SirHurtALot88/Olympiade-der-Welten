@@ -21629,6 +21629,14 @@
     // TON_KATALOG-Loops (aktuell nur Breaking, s. tonLoopStart()-Aufrufe unten). Ein
     // No-Op, wenn gerade kein Loop laeuft (tonLoopStop() prueft das selbst).
     tonLoopStop();
+    // N1-FIX (Opus-Review PR #879, Abschnitt 6): tonLoopStop() hier oben beendet auch einen
+    // laufenden Gewichtheben-Publikums-Loop, aber die Flagge hebenPublikumAn blieb bislang
+    // stehen -- ihr einziger anderer Loeschpfad ist bodenBuehne(), die nach einem Reset
+    // aber gar nicht mehr zwingend laeuft (z.B. beim Neustart DERSELBEN Disziplin). Ohne
+    // diese Zeile haelt bodenHeben() die Flagge fuer "schon gestartet" und startet den
+    // Loop ab dem zweiten Gewichtheben-Kampf nie wieder -- das Publikum bliebe dauerhaft
+    // stumm. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    hebenPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
