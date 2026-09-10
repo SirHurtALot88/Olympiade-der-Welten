@@ -154,6 +154,28 @@ export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set
   "wettessen",
 ]);
 
+/**
+ * VIERTE CHASSIS-MENGE, UND DAS ERSTE MAL FUER EIN GANZES CHASSIS STATT EINER BUEHNEN-
+ * UNTERART (docs/pm-briefings/opus-plan-feinschliff-vier-disziplinen-09-10.md, Abschnitt 6.1/
+ * 6.3a): die BAHN (`BAHN_ART`-Disziplinen, `window.__arena.spieleBahn()`) teilt mit der Buehne
+ * keine einzige Zustandsvariable (LAEUFER statt TEILNEHMER, stepSpurt statt stepBuehne) --
+ * deshalb eine eigene Menge und eine eigene Browser-Funktion, kein Eintrag in einer der drei
+ * Buehnen-Mengen oben.
+ *
+ * ALLE VIER BESTANDENEN BAHNEN AUF EINMAL: Staffel (rho 0,915), Spurt (0,871), Takeshi's
+ * Castle (0,861), Time-Trial (0,828) -- der Dispatch ist fuer alle vier identisch
+ * (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-Disziplin in derselben Schleife registriert).
+ * CLIMBING BLEIBT AUSSEN VOR: rho 0,790 je Spiel, 0,010 unter der 0,80-Schranke -- dieselbe
+ * Regel, die I-Spy (0,684) aus `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es
+ * technisch nur eine Zeile waere.
+ */
+export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "staffel",
+  "spurt",
+  "takeshis-castle",
+  "time-trial",
+]);
+
 function seedZuZahl(seed: string | number): number {
   if (typeof seed === "number" && Number.isFinite(seed)) return seed;
   const text = String(seed);
@@ -378,9 +400,10 @@ async function simuliereFixturesImBrowser(payload: {
   }[];
   disziplin: string;
   // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
-  // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` oben. NUR
-  // diese Weiche entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
-  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt";
+  // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` /
+  // `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche entscheidet, keine Disziplins-ID-Kenntnis
+  // im Browser-Code selbst.
+  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn";
   timeoutMs: number;
 }): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
@@ -389,6 +412,7 @@ async function simuliereFixturesImBrowser(payload: {
       spieleBuehneHeben: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneDuell: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneAuftritt: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBahn: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
     };
     __olyArenaKader?: unknown;
   };
@@ -440,6 +464,8 @@ async function simuliereFixturesImBrowser(payload: {
         ? fenster.__arena.spieleBuehneDuell(payload.disziplin, fixture.seed)
         : payload.chassis === "buehneAuftritt"
         ? fenster.__arena.spieleBuehneAuftritt(payload.disziplin, fixture.seed)
+        : payload.chassis === "bahn"
+        ? fenster.__arena.spieleBahn(payload.disziplin, fixture.seed)
         : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
     );
   }
@@ -514,7 +540,7 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
+    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
       disziplin,
     )
       ? "buehneHeben"
@@ -522,6 +548,8 @@ export async function runArenaFixtures(
       ? "buehneDuell"
       : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
       ? "buehneAuftritt"
+      : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
+      ? "bahn"
       : "feldspiel";
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
       fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
@@ -548,6 +576,8 @@ export async function runArenaFixtures(
         ? "spieleBuehneDuell"
         : chassis === "buehneAuftritt"
         ? "spieleBuehneAuftritt"
+        : chassis === "bahn"
+        ? "spieleBahn"
         : "spieleFeldspiel";
     return rohErgebnisse.map((ergebnis, index) => {
       if (!ergebnis) {

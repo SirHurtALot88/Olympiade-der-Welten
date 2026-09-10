@@ -123,6 +123,7 @@ import {
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
   ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+  ARENA_BAHN_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
   type RunArenaFixturesOptions,
@@ -142,6 +143,13 @@ import breakingPpsReferenzJson from "@/data/generated/breaking-pps-referenz.json
 import wettessenPpsReferenzJson from "@/data/generated/wettessen-pps-referenz.json";
 import tennisPpsReferenzJson from "@/data/generated/tennis-pps-referenz.json";
 import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
+// BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6.3): vier Bahn-Disziplinen, ueber das NEUE
+// Bahn-Chassis (`ARENA_BAHN_DISCIPLINE_IDS`, `spieleBahn()`) -- gezogen vom selben, erweiterten
+// scripts/ziehe-buehne-pps-referenz.ts (jetzt auch `chassis:"bahn"` kennend, s. dort).
+import staffelPpsReferenzJson from "@/data/generated/staffel-pps-referenz.json";
+import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
+import takeshisCastlePpsReferenzJson from "@/data/generated/takeshis-castle-pps-referenz.json";
+import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -156,15 +164,19 @@ import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
  * Speed-Schach und Showcase sind die vierte und fuenfte Arena-aufgeloeste Disziplin -- ueber
  * ZWEI NEUE Buehnen-Chassis (`ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`/`ARENA_BUEHNE_AUFTRITT_
  * DISCIPLINE_IDS`, arena-headless-runner.ts), nicht ueber das bestehende Feldspiel-/Buehnen-
- * Heben-Chassis. STAFFEL IST BEWUSST NICHT DABEI, obwohl vom PM-Briefing (06.09., Abschnitt 4)
- * fuer dieselbe Welle vorgeschlagen: `bahnTeamstand()` (battle-mode.engine.js) liefert fuer
- * Staffel `{seiten:[...], gewertet:false}` -- das Spiel selbst fuehrt dort noch KEINE Wertung
- * (die Live-HUD-Meldung sagt woertlich "fuer diese Disziplin gibt es noch keine Wertung", s.
- * `updateHudBahn()`s `bahnEndeGemeldet`-Zweig). Ein Arena-Team-Sieg/-Niederlage/-Unentschieden
- * auf Basis eines Wertes zu bauen, den das Spiel selbst als unbewertet kennzeichnet, waere kein
- * Konfigurationsschritt mehr, sondern eine neue Wertungsmechanik fuer Staffel -- das ist
- * "Wertungstabelle Welle 2" (PM-Briefing Schritt 4), nicht diese Welle. Staffel folgt, sobald
- * es eine echte Punkte-je-Laeufer-Wertung hat.
+ * Heben-Chassis. STAFFEL WAR IN DIESER WELLE NOCH NICHT DABEI (Stand 06.09.) -- der Grund von
+ * damals ist SEIT PR #827 UEBERHOLT und wird hier korrigiert statt stehen gelassen: der
+ * Kommentar sprach von einem `bahnTeamstand()`-Befund `{seiten:[...], gewertet:false}` fuer
+ * Staffel. NACHGESEHEN (10.09., Audit Abschnitt 4.1, docs/design/
+ * gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md): das stimmt seit PR #827 fuer KEINE
+ * der fuenf Bahnen mehr -- `bahnTeamstand()` liefert fuer Staffel `wertung:"etappe"` mit
+ * `gewertet:true` (Rang der Etappenleistung je Laeufer aus `bahnRangliste()`), fuer Takeshi's
+ * Castle `wertung:"burg"`/`gewertet:true` (burgwertung), fuer Spurt/Time-Trial/Climbing
+ * `wertung:"rang"`/`gewertet:true`. Der eigentliche Blocker war nie die fehlende Wertung,
+ * sondern ACHSE 2 (kein Arena-Chassis fuer die Bahn) -- s. `ARENA_BAHN_DISCIPLINE_IDS`
+ * (arena-headless-runner.ts) und `spieleBahn()` (battle-mode.engine.js). Mit der Bahn-
+ * Produktivierung (10.09., Ziel 3) faellt dieser Blocker fuer Staffel/Spurt/Takeshi's
+ * Castle/Time-Trial weg -- alle vier stehen jetzt unten in `ARENA_RESOLVED_DISCIPLINE_IDS`.
  *
  * PRODUKTIVIERUNGSWELLE 2 (docs/pm-briefings/opus-overseer-plan-naechste-disziplinen-09-09.md,
  * 09.09.): EISKUNSTLAUF, BREAKING, WETTESSEN, TENNIS und FECHTEN -- die sechste bis zehnte
@@ -186,17 +198,24 @@ import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
  *     eigene PPS-Referenz/Kurvenkonstanten) statt eines zweiten Sonderfalls". Der Diff dieser
  *     Welle an `public/mockups/battle-mode.engine.js` ist deshalb LEER.
  *
+ * BAHN-PRODUKTIVIERUNG (10.09., docs/pm-briefings/opus-plan-feinschliff-vier-disziplinen-09-10.md
+ * Abschnitt 6): STAFFEL (rho 0,915, die beste des Feldes), SPURT (0,871), TAKESHI'S CASTLE
+ * (0,861) und TIME-TRIAL (0,828) sind die elfte bis vierzehnte arena-aufgeloeste Disziplin --
+ * ueber das NEUE Bahn-Chassis (`ARENA_BAHN_DISCIPLINE_IDS`, arena-headless-runner.ts,
+ * `window.__arena.spieleBahn()`), das ERSTE MAL fuer ein ganzes Chassis statt einer Buehnen-
+ * Unterart. Der Dispatch ist fuer alle vier identisch (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-
+ * Disziplin in derselben Schleife registriert, battle-mode.engine.js) -- ein `spieleBahn()`, das
+ * nur Takeshi bediente, haette kuenstlich verengt werden muessen.
+ *
  * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem der beiden Gruende jeweils:
- *  - STAFFEL (rho 0,915, die beste des Feldes), SPURT (0,871), TAKESHI'S CASTLE (0,861),
- *    TIME-TRIAL (0,828): Rangtreue bestanden, aber ACHSE 2 fehlt -- alle vier sind BAHN-
- *    Disziplinen, und fuer die Bahn gibt es ueberhaupt kein Arena-Chassis (`spieleBahn*()`
- *    existiert nicht). Bei Staffel kommt der oben beschriebene `gewertet:false`-Befund hinzu.
- *    Das ist die naechste Welle und ein echter Bauauftrag, keine Konfiguration.
- *  - I-SPY (0,684), CLIMBING (0,790), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516),
- *    BATTLEFIELD/TDM/MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene
- *    Abnahme nicht. I-Spy waere technisch der billigste Eintrag von allen (es traegt `duell:true`
- *    und braeuchte nur diese eine Zeile), ist aber genau deshalb der wichtigste Nicht-Eintrag:
- *    die beiden Achsen duerfen nicht vermischt werden, nur weil eine davon billig zu erfuellen ist.
+ *  - CLIMBING (rho 0,790 je Spiel): Rangtreue NICHT bestanden -- 0,010 unter der 0,80-Schranke
+ *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die vier anderen Bahnen),
+ *    und genau deshalb ist es der wichtige Nicht-Eintrag: dieselbe Regel, die I-Spy (0,684) aus
+ *    `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es `duell:true` traegt -- die
+ *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
+ *    eine davon billig zu erfuellen waere.
+ *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516), BATTLEFIELD/TDM/
+ *    MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -210,6 +229,11 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "wettessen",
   "tennis",
   "fechten",
+  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen.
+  "staffel",
+  "spurt",
+  "takeshis-castle",
+  "time-trial",
 ]);
 
 /**
@@ -230,6 +254,7 @@ for (const [mengenName, menge] of [
   ["ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS", ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS],
   ["ARENA_BUEHNE_DUELL_DISCIPLINE_IDS", ARENA_BUEHNE_DUELL_DISCIPLINE_IDS],
   ["ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS", ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS],
+  ["ARENA_BAHN_DISCIPLINE_IDS", ARENA_BAHN_DISCIPLINE_IDS],
 ] as const) {
   for (const disziplinId of menge) {
     if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)) {
@@ -391,6 +416,29 @@ export const FECHTEN_INDIVIDUAL_PPS_MAX = 5.5;
 export const FECHTEN_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER DIE VIER BAHN-DISZIPLINEN (Bahn-Produktivierung, 10.09.,
+ * Ziel 3 Abschnitt 6.3b). Dieselbe Impact-Kurve (`ppsAusArenaImpact()`), eigene Regler aus
+ * GENAU DEMSELBEN Grund wie bei jeder bisherigen Arena-Disziplin: der rohe Boxscore-Wert dieser
+ * vier (`bahnTeamstand().punkte`, s. `spieleBahn()`-Kommentar in battle-mode.engine.js -- NICHT
+ * `MOTOREN[bd].wert()`, das fuer Rang/Etappe negativ waere) liegt auf einer EIGENEN Skala je
+ * Wertungsmodus (Rangpunkte 1..N bei Spurt/Time-Trial, Etappen-Rangpunkte bei Staffel,
+ * Burgpunkte bei Takeshi's Castle).
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben Grund
+ * wie bei jeder vorigen Welle: Chris' Rahmen "max 5-6" und die 04.09.-Kurvenform-Messung sind
+ * Aussagen ueber die KURVE, nicht ueber Basketball-spezifische Zahlen. EIGENE KONSTANTEN statt
+ * Alias (dieselbe begruendete Wiederholung wie in Welle 1/2, s. `EISKUNSTLAUF_INDIVIDUAL_PPS_MAX`).
+ */
+export const STAFFEL_INDIVIDUAL_PPS_MAX = 5.5;
+export const STAFFEL_PPS_ANTEIL_MITTE = 0.25;
+export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
+export const SPURT_PPS_ANTEIL_MITTE = 0.25;
+export const TAKESHIS_CASTLE_INDIVIDUAL_PPS_MAX = 5.5;
+export const TAKESHIS_CASTLE_PPS_ANTEIL_MITTE = 0.25;
+export const TIME_TRIAL_INDIVIDUAL_PPS_MAX = 5.5;
+export const TIME_TRIAL_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -479,6 +527,17 @@ const TENNIS_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 );
 const FECHTEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   fechtenPpsReferenzJson as ArenaPpsReferenzJson,
+);
+// BAHN-PRODUKTIVIERUNG (10.09.): keine der vier hat eine Rolle mit eigener Wertformel (wie
+// Hockeys Torwart) -- `feldgroessenTorwart` bleibt in ihren JSON-Dateien leer, genau wie bei
+// jeder Nicht-Hockey-Disziplin oben.
+const STAFFEL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(staffelPpsReferenzJson as ArenaPpsReferenzJson);
+const SPURT_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(spurtPpsReferenzJson as ArenaPpsReferenzJson);
+const TAKESHIS_CASTLE_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  takeshisCastlePpsReferenzJson as ArenaPpsReferenzJson,
+);
+const TIME_TRIAL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
+  timeTrialPpsReferenzJson as ArenaPpsReferenzJson,
 );
 
 /**
@@ -625,6 +684,54 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       anteilMitte: FECHTEN_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 5, NICHT 6.
       katalogStandardgroesse: 5,
+    },
+  ],
+  // ============================ BAHN-PRODUKTIVIERUNG (10.09.) ============================
+  // Vier Eintraege, kein neuer Code-Pfad in `ppsAusArenaImpact()`/
+  // `computeIndividualBoxscorePpsFromFixtureResults()` -- die "reine Konfigurationsaenderung"
+  // gilt auch fuer das neue Chassis, weil der Boxscore-Rohwert (`ArenaFixtureBoxscoreEintrag.wert`)
+  // strukturell derselbe bleibt, egal ob er aus `spieleBuehneAuftritt()`/`spieleBuehneDuell()`
+  // oder `spieleBahn()` kommt. `katalogStandardgroesse` EINZELN in lib/data/dataAdapter.ts
+  // nachgesehen, nicht kopiert -- keine der vier ist 6, `BAHN_ART[d].jeSeite` (Motor-Feldgroesse,
+  // fuer alle vier 6) waere hier der falsche Wert, dieselbe Falle wie bei jeder vorigen Welle.
+  [
+    "staffel",
+    {
+      referenzFeldgroessen: STAFFEL_PPS_REFERENZ_FELDGROESSEN,
+      max: STAFFEL_INDIVIDUAL_PPS_MAX,
+      anteilMitte: STAFFEL_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 3 (dataAdapter.ts), NICHT 6.
+      katalogStandardgroesse: 3,
+    },
+  ],
+  [
+    "spurt",
+    {
+      referenzFeldgroessen: SPURT_PPS_REFERENZ_FELDGROESSEN,
+      max: SPURT_INDIVIDUAL_PPS_MAX,
+      anteilMitte: SPURT_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 2 (dataAdapter.ts), NICHT 6.
+      katalogStandardgroesse: 2,
+    },
+  ],
+  [
+    "takeshis-castle",
+    {
+      referenzFeldgroessen: TAKESHIS_CASTLE_PPS_REFERENZ_FELDGROESSEN,
+      max: TAKESHIS_CASTLE_INDIVIDUAL_PPS_MAX,
+      anteilMitte: TAKESHIS_CASTLE_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 4 (dataAdapter.ts), NICHT 6.
+      katalogStandardgroesse: 4,
+    },
+  ],
+  [
+    "time-trial",
+    {
+      referenzFeldgroessen: TIME_TRIAL_PPS_REFERENZ_FELDGROESSEN,
+      max: TIME_TRIAL_INDIVIDUAL_PPS_MAX,
+      anteilMitte: TIME_TRIAL_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 4 (dataAdapter.ts), NICHT 6.
+      katalogStandardgroesse: 4,
     },
   ],
 ]);

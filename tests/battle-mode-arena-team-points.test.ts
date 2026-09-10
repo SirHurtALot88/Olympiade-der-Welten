@@ -5,6 +5,7 @@ import {
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
   ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+  ARENA_BAHN_DISCIPLINE_IDS,
   type ArenaFixtureResult,
 } from "@/lib/battle/arena-headless-runner";
 import {
@@ -98,13 +99,31 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * STAFFEL IST BEWUSST NICHT DABEI (Produktivierungswelle 1, s. Kommentar bei
-   * ARENA_RESOLVED_DISCIPLINE_IDS): `bahnTeamstand()` liefert fuer Staffel `gewertet:false` --
-   * das Spiel selbst kennt dort noch keine Wertung. Ein Regressionstest, kein Verhaltenstest:
-   * haelt fest, DASS diese Entscheidung bewusst getroffen wurde, nicht vergessen.
+   * BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6): Staffel, Spurt, Takeshi's Castle und
+   * Time-Trial sind jetzt arena-aufgeloest, ueber das NEUE Bahn-Chassis (`spieleBahn()`,
+   * `ARENA_BAHN_DISCIPLINE_IDS`). Der Grund, aus dem Staffel VORHER fehlte, war ein STALE
+   * Befund (`bahnTeamstand()` angeblich `gewertet:false` fuer Staffel) -- der stimmt seit PR #827
+   * fuer keine der fuenf Bahnen mehr (Audit Abschnitt 4.1). Der eigentliche Blocker war stets
+   * ACHSE 2 (kein Arena-Chassis fuer die Bahn), nicht die fehlende Wertung -- s. korrigierter
+   * Kommentar bei ARENA_RESOLVED_DISCIPLINE_IDS. Dieser Test ersetzt den alten
+   * "enthaelt NICHT Staffel"-Regressionstest, der die ueberholte Annahme festgeschrieben hatte.
    */
-  it("enthaelt NICHT Staffel (bahnTeamstand() liefert dort gewertet:false, s. Kommentar)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(false);
+  it("enthaelt Staffel, Spurt, Takeshi's Castle und Time-Trial (Bahn-Produktivierung, 10.09.)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("takeshis-castle")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("time-trial")).toBe(true);
+  });
+
+  /**
+   * CLIMBING BLEIBT BEWUSST DRAUSSEN (Bahn-Produktivierung, 10.09.): rho 0,790 je Spiel, 0,010
+   * unter der 0,80-Schranke aus CLAUDE.md -- dieselbe Regel wie bei I-Spy zwei Tests weiter unten.
+   * Ein Regressionstest, kein Verhaltenstest: haelt fest, DASS diese Entscheidung bewusst
+   * getroffen wurde (es waere technisch nur eine weitere Zeile im selben Bahn-Dispatch), nicht
+   * vergessen. Wird Climbing spaeter ueber 0,80 gehoben, faellt dieser Test absichtlich rot.
+   */
+  it("enthaelt NICHT Climbing (besteht die Rangtreue-Schranke knapp nicht, 0,790 < 0,80)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("climbing")).toBe(false);
   });
 
   /**
@@ -131,11 +150,12 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * Einstiegspunkts). Das Modul selbst wirft dafuer bereits beim Laden (s. Kommentar dort) --
    * dieser Test macht die Erwartung zusaetzlich explizit.
    */
-  it("jede Buehnen-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
+  it("jede Buehnen-/Bahn-Chassis-Disziplin (arena-headless-runner.ts) ist auch arena-aufgeloest", () => {
     for (const menge of [
       ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
       ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
       ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+      ARENA_BAHN_DISCIPLINE_IDS,
     ]) {
       for (const disziplinId of menge) {
         expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)).toBe(true);
