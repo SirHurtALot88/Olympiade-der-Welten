@@ -4578,16 +4578,53 @@
       // (0,460 gegen 0,431/0,453/0,343) und bleibt deshalb unveraendert stehen — der
       // eigentliche Hebel war die Zielrolle (TEAMGEIST als Receiver-Los), nicht die
       // Attributmischung dahinter.
+      // ===============================================================================
+      // REZEPT C (Opus-Plan 10.09., Abschnitt 5.2) — ZWEI KOPIEN GELOEST, QB-KANAL REPARIERT.
+      //
+      // BEFUND 1, ZWEI SUB-SKILLS WAREN ZEICHEN FUER ZEICHEN KOPIEN: TEAMGEIST war exakt
+      // LAUFKRAFT und BALLSICHERHEIT exakt PASSGENAUIGKEIT. Damit war der Hebel des
+      // dritten Durchgangs (TEAMGEIST als Receiver-Los, s. resolvePass-Kommentar) wieder
+      // aufgehoben: die "dritte, von Passer UND Rusher unabhaengige Kreditvergabe-Achse"
+      // zog aus DERSELBEN Verteilung wie das Laeufer-Los, derselbe Spieler war Running
+      // Back UND Nummer-eins-Receiver. Genau der Zustand, den die Kalibrierung als Fehler
+      // beschrieb ("vereinnahmten dieselben ein bis zwei laufstarken Spieler fast den
+      // GESAMTEN Offensiv-Ertrag") — nur per Rezept statt per Lotterie.
+      //
+      // BEFUND 2, DER QUARTERBACK-KANAL MASS NICHTS. {determination:71,dexterity:29}
+      // korrelierte INNERHALB der zwoelf tatsaechlich Antretenden mit nur rho 0,135 zur
+      // Football-Eignung (kaderfest, 120 Spiele) — die beiden Attribute tragen zusammen
+      // 14 von 100 Gewichtspunkten in spielEignung. Passversuche, Passyards (12,6 % des
+      // Impacts), Completions (8,6 %) und das Interception-Risiko haengen damit an einem
+      // Wert, der mit der gemessenen Eignung fast nichts zu tun hat: ueber ein Fuenftel
+      // des Box Scores war strukturell Rauschen.
+      //
+      // DIE AUSWAHL ist NICHT per Sinkhorn entstanden (dessen Blindfleck beschreiben die
+      // Kommentare oben ausfuehrlich), sondern gegen die INNERHALB der zwoelf Antretenden
+      // gemessene Korrelation zur Eignung, mit einer harten Nebenbedingung: keine zwei
+      // Sub-Skills duerfen dieselbe Mischung tragen.
+      //
+      // GEMESSENER IRRWEG, DAMIT IHN NIEMAND NOCHMAL GEHT (Plan 5.3): der naheliegende
+      // "lehrbuchmaessige" Receiver {speed:40,power:30,dexterity:30} plus ein QB aus
+      // determination/torment/health (Variante B) mass rho je Spiel 0,629 / Saison 0,692
+      // — SCHLECHTER als die Lotterie allein. Grund: Footballs spielEignung ist
+      // power-dominant (power allein rho 0,853 zur Eignung), speed traegt nur 0,144. Die
+      // Loesung ist nicht "andere Attribute", sondern "derselbe Anker, anderes Profil":
+      // jeder fachliche Sub-Skill braucht einen Anteil an power/health/torment PLUS ein
+      // eigenes Unterscheidungsmerkmal. Football-fachlich liest sich das genau so, wie es
+      // gemeint ist — der Quarterback ist Arm (power) + Kaltbluetigkeit (determination) +
+      // Griff (dexterity); der Running Back ist Wucht + Robustheit + Antritt; der Receiver
+      // ist der GROSSE, ZAEHE Zielspieler (health/torment/speed) statt eines zweiten
+      // Running Backs; die Passverteidigung ist Aggression + Wucht + Antritt.
       rezept:{
-        PASSGENAUIGKEIT: {determination:71,dexterity:29},
-        LAUFKRAFT:       {power:41,health:33,speed:26},
-        PASSSCHUTZ:      {power:40,health:40,awareness:20},   // Hand: O-Line = Anker, nicht Wahrnehmung (Sinkhorn: awareness 100)
-        ABWEHR_PASS:     {speed:40,awareness:30,torment:30},   // Hand: CB/S = Speed + Lesen (Sinkhorn: torment 100)
-        ABWEHR_LAUF:     {torment:100},
-        BALLSICHERHEIT:  {determination:71,dexterity:29},
-        TEAMGEIST:       {power:41,health:33,speed:26},        // Receiver-Los: der grosse Receiver (PR #796, Lauf E gegen H)
-        AUSDAUER:        {stamina:67,will:33},
-        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}    // unveraendert, disziplinuebergreifend
+        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert
+        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT
+        PASSSCHUTZ:      {power:40,health:40,awareness:20},         // rho 0,853  UNVERAENDERT (Hand: O-Line = Anker, nicht Wahrnehmung)
+        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt
+        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck
+        BALLSICHERHEIT:  {power:35,health:35,determination:30},     // Dopplung mit PASSGENAUIGKEIT geloest
+        TEAMGEIST:       {health:45,torment:30,speed:25},           // rho 0,905; Rangkorr. zu LAUFKRAFT nur 0,87 — Dopplung geloest, Achse wieder unabhaengig
+        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (hat bis heute keinen mechanischen Kanal, s. Plan 6.4)
+        LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
       // Football-Konzepten. Auf die neuen Sub-Skill-Namen nachgezogen, damit hier keine
@@ -6377,8 +6414,18 @@
       // jede Liga spielt) — ohne die generische Fallback-Formel (unten) waeren Yards, die
       // in Football die wichtigste kontinuierliche Faehigkeits-Anzeige sind, komplett
       // unsichtbar fuer die Rangtreue-Messung.
+      // SOLO-TACKLE mit 0,15 (Opus-Plan 10.09. Abschnitt 5.4, GEMESSEN gegen 0,12/0,20/
+      // 0,35): der defensive Standard-Eintrag jedes NFL-Boxscores. Er war die einzige
+      // grosse Luecke im Box Score — der Motor zieht jeden Snap einen Verteidiger, schrieb
+      // ihn aber nirgends gut, sodass sechs Verteidiger je Team um im Mittel 0,5
+      // Ereignisse konkurrierten. Wirkung kaderfest gemessen: rho je Spiel 0,775 -> 0,800,
+      // Kader-Spannweite 0,091 -> 0,054. Das Gewicht liegt auf einem FLACHEN Plateau
+      // (0,12 -> 0,794; 0,20 -> 0,792; 0,35 -> 0,772), ist also robust und nicht
+      // uebergefittet. `checks` ist football-seitig ausschliesslich der Solo-Tackle aus
+      // vollziehFootballErgebnis (Zweige "lauf"/"komplett").
       return u.punkte*1.0 + (u.passYards||0)/25 + (u.laufYards||0)/10 + (u.fangYards||0)/10
-        + u.assists*0.3 + u.bloecke*1.0 + u.steals*2.0 + u.rebounds*1.0 - u.verluste*2.0;
+        + u.assists*0.3 + u.bloecke*1.0 + u.steals*2.0 + u.rebounds*1.0 - u.verluste*2.0
+        + (u.checks||0)*0.15;
     }
     if((dId||feldspielDisc)==="hockey"){
       // DER TORWART WIRD WIE IM ECHTEN EISHOCKEY BEWERTET: ueber GSAA (goals saved above
@@ -6763,9 +6810,38 @@
   // nach Faehigkeit — schlechter fuer die Football-Erzaehlung ("derselbe Star wirft nicht
   // jeden Pass"), aber besser fuer die Rangtreue, weil alle sechs Spieler eine von Null
   // verschiedene Chance behalten. Bei Fumble-Recovery/Receiver war das ohnehin schon so.
+  // ===================================================================================
+  // FOOTBALL-EIGENE ROLLENLOTTERIE (Opus-Plan 10.09., docs/pm-briefings/opus-plan-
+  // football-gameplay-09-10.md Abschnitt 5.1). Dieselbe FORM, die Basketball seit dem
+  // NBA2K-Eingriff benutzt (losGewicht/LOS_NULLPUNKT/LOS_KAPPA, s. dort) — Football lief
+  // bis hierher auf der flachen, linearen gewichtetesLos().
+  //
+  // WARUM DAS BEI FOOTBALL BESONDERS WEH TUT. Ein Feldspieler hat in einem
+  // Football-Spiel rund 12 Ballberuehrungen (Basketball: ~100 Ballwechsel). Bei so
+  // wenigen Ereignissen ist die VOLUMENDIFFERENZ zwischen dem Besten und dem
+  // Schlechtesten der einzige Kanal, ueber den sich in EINEM Spiel ueberhaupt eine
+  // Rangfolge herausbilden kann; linear verschenkt ihn. Gemessen korrelierte die
+  // groesste Box-Score-Position (Fangyards, 32,9 % des Impacts) nur mit rho 0,323 zur
+  // Eignung, obwohl das Los, das sie vergibt, mit rho 0,807 korreliert — die Auswahl
+  // WEISS, wer besser ist, sie handelt nur nicht danach. Genau das Profil, das CLAUDE.mds
+  // Zwei-Spalten-Regel als "Verlaesslichkeit fehlt, Validitaet steht" beschreibt:
+  // Football hatte rho Saison 0,811 bei rho je Spiel 0,516.
+  //
+  // WIRKUNG an realistischen Werten: 70 gegen 40 sind linear 64:36, mit Nullpunkt 20 und
+  // kappa 3 dagegen 50^3 : 20^3 = 94:6.
+  //
+  // EIGENE KONSTANTE STATT EINER AENDERUNG AN gewichtetesLos(): der Kommentar bei
+  // LOS_KAPPA sagt woertlich, dass eine Aenderung an gewichtetesLos() "ausschliesslich
+  // Football/Hockey/Tennis verschieben" wuerde. Football holt sie hier nach — Hockey und
+  // Tennis rufen weiter die unveraenderte gewichtetesLos() auf und bleiben bit-identisch.
+  // gewichtetesLosNach() ist eine Funktionsdeklaration (hoisted), LOS_NULLPUNKT eine
+  // Modul-Konstante weiter oben — beide zur Aufrufzeit sichtbar, keine Reihenfolge-Falle.
+  const FK_LOS_KAPPA=3;   // GEMESSEN gegen 2 und 4 (0,687 / 0,714 / 0,688 rho je Spiel, Prototyp)
+  const fkLos=(sp,rolle)=>gewichtetesLosNach(sp,u=>Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA));
+
   function resolveLauf(off,def){
-    const rusher=gewichtetesLos(off,"LAUFKRAFT");
-    const abwehr=gewichtetesLos(def,"ABWEHR_LAUF");
+    const rusher=fkLos(off,"LAUFKRAFT");
+    const abwehr=fkLos(def,"ABWEHR_LAUF");
     // FUMBLE zuerst — Ballsicherheit des Traegers gegen die Tackling-Staerke der Abwehr
     // (zengm `probFumble`-Struktur als Vorbild, Football-Plan A.2/A.3).
     // BASIS 0,032 STATT 0,014 (Korridor-Fit): unser Motor kennt Fumbles nur aus Laufzuegen
@@ -6817,8 +6893,8 @@
   // EIGENEM kurve-Block (FB().kurve, s. FELDSPIEL_ART.football) — dieselben drei
   // Funktionen, die Basketball/Hockey fuer ihre Wurf-/Schusserfolgsquote nutzen.
   function resolvePass(off,def,down,toGo,spielTyp){
-    const passer=gewichtetesLos(off,"PASSGENAUIGKEIT");
-    const rusher=gewichtetesLos(def,"ABWEHR_PASS");
+    const passer=fkLos(off,"PASSGENAUIGKEIT");
+    const rusher=fkLos(def,"ABWEHR_PASS");
     // BASIS 0,07 (Korridor-Fit): 2,42 Sacks / (29,9 Passversuche + 2,42 Sacks) = 7,5 %
     // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
     // nur 4,6-5,1 %.
@@ -6842,7 +6918,7 @@
     // PASSSCHUTZ, AUSDAUER) das einzig bessere. TEAMGEIST hatte davor kaum mechanisches
     // Gewicht (Sondierung: 5,2 %) und keine zweite Ballberuehrungs-Rolle — jetzt eine
     // DRITTE, von Passer UND Rusher unabhaengige Kreditvergabe-Achse.
-    const receiver=restOff.length?gewichtetesLos(restOff,"TEAMGEIST"):passer;
+    const receiver=restOff.length?fkLos(restOff,"TEAMGEIST"):passer;
     const chance=steilerMake(lageBasisFuer(tier),skillTeilFuer(passer,tier),tier);
     // BASIS/ZUSCHLAEGE GESENKT (Korridor-Fit): Ziel ~2,1-2,4 % je Passversuch, hergeleitet
     // aus 658 Turnovern minus ~0,5 verlorenen Fumbles je Team (271 Fumbles verloren / 272
@@ -7085,7 +7161,7 @@
         // Spieler (die Boxscore-Sonde liest e.spieler.id ungeprueft, s.
         // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
         // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
-        logZug(fb.side,"treffer",{spieler:gewichtetesLos(off,"PASSGENAUIGKEIT"),punkte:3});
+        logZug(fb.side,"treffer",{spieler:fkLos(off,"PASSGENAUIGKEIT"),punkte:3});
         if(fsFbLog){ fsFbLog.fgAtt++; fsFbLog.fgMade++; }
         fsLive.football=null; naechsterAngriff(1-fb.side);
       } else {
@@ -7118,7 +7194,7 @@
       if(fsFbLog){ fsFbLog.fumbles++; fsFbLog.rushAtt++; }
       const gewinntDef=rr()<0.58; // real ~55-60% aller Fumbles landen bei der Defense
       if(fsFbLog&&gewinntDef)fsFbLog.fumblesLost++;
-      const recover=gewinntDef?gewichtetesLos(def,"ABWEHR_LAUF"):gewichtetesLos(off,"BALLSICHERHEIT");
+      const recover=gewinntDef?fkLos(def,"ABWEHR_LAUF"):fkLos(off,"BALLSICHERHEIT");
       recover.rebounds++;
       feed(recover.side,erg.spieler.n+" verliert den Ball — "+recover.n+" mit der "+FB().wortRebound+"!",true);
       schwebe({x:0,y:0,txt:"FUMBLE!",life:1.2,crit:true,_spieler:erg.spieler.id});
@@ -7154,6 +7230,17 @@
     }
     if(erg.typ==="komplett"){
       erg.spieler.passYards+=erg.yards; erg.spieler.assists++; erg.receiver.fangYards+=erg.yards;
+      // SOLO-TACKLE (Opus-Plan 10.09. Abschnitt 5.4). Der Motor zieht ohnehin jeden Snap
+      // einen `erg.verteidiger` (seit der Bewegungs-Runde 06.09. an lauf/komplett/
+      // incomplete/sack/interception vorhanden) und schrieb ihn bis hierher NIRGENDS gut:
+      // ein Verteidiger sammelte in einem ganzen Spiel im Mittel 0,5 Box-Score-Ereignisse
+      // (Sacks 1,7 + INTs 0,7 + Fumble-Recoveries 0,5 je Team, auf sechs Leute) und war
+      // die halbe Spielzeit unsichtbar. Der Solo-Tackle ist die defensive Standardzeile
+      // JEDES NFL-Boxscores — dasselbe hat das Projekt bei Hockey schon einmal getan
+      // (Steals nachgetragen, weil "Puck erobern eine Hauptaufgabe ist", s. feldspielWert).
+      // `checks` existiert an jeder Einheit (Hockey-Bodycheck) und wird ausserhalb der
+      // jeweiligen Disziplin nie inkrementiert — kein neues Feld noetig.
+      if(erg.verteidiger)erg.verteidiger.checks++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.receiver);
@@ -7161,6 +7248,7 @@
     }
     if(erg.typ==="lauf"){
       erg.spieler.laufYards+=erg.yards;
+      if(erg.verteidiger)erg.verteidiger.checks++;   // Solo-Tackle, s. Zweig "komplett" oben
       if(fsFbLog)fsFbLog.rushAtt++;
       feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.spieler);
@@ -18431,11 +18519,13 @@
   // der Einheit (`passYards/laufYards/fangYards/bloecke/steals/verluste`, s.
   // vollziehFootballErgebnis). „Kompl\" ist football-eigen dasselbe Feld `assists`, das bei
   // Hockey/Basketball Vorlagen zaehlt — hier zaehlt es Completions (s. Z. 6811).
-  // KEIN eigener Tackle-Zaehler: anders als der ausformulierte Wunsch nach „Tkl" hat der
-  // Motor keine einzige Play-Auswertung, die einem Verteidiger einen Tackle fuer sich
-  // gutschreibt (resolveLauf/resolvePass kennen nur sack/fumble/interception/komplett/
-  // incomplete/lauf als Ergebnistypen) — "Int/Rec" (das Feld `steals`) ist die einzige
-  // echte Verteidiger-Zahl, die der Motor fuehrt, s. PR-Beschreibung.
+  // TACKLE-ZAEHLER JETZT DA (Opus-Plan 10.09. Abschnitt 5.4) — der frueher hier stehende
+  // Vorbehalt ("KEIN eigener Tackle-Zaehler ... der Motor hat keine einzige
+  // Play-Auswertung, die einem Verteidiger einen Tackle fuer sich gutschreibt") ist
+  // eingeloest: vollziehFootballErgebnis bucht in den Zweigen "lauf"/"komplett" den
+  // ohnehin gezogenen `erg.verteidiger` als Solo-Tackle auf `u.checks`. „Tkl" ist damit
+  // die zweite echte Verteidiger-Zahl neben „Int/Rec" und die Standardzeile, die jeder
+  // NFL-Boxscore fuehrt.
   function WERTUNG_FOOTBALL(art){
     const zeilen=()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,
       u,imp:feldspielWert(u,"football")}));
@@ -18446,13 +18536,14 @@
         {id:"laufy", kopf:"LaufY", titel:"Laufyards", wert:z=>z.u.laufYards||null},
         {id:"fangy", kopf:"FangY", titel:"Fangyards", wert:z=>z.u.fangYards||null},
         {id:"kompl", kopf:"Kompl", titel:"angekommene Pässe (Completions)", wert:z=>z.u.assists||null},
+        {id:"tkl",   kopf:"Tkl",   titel:"Tackles — der Verteidiger, der den Lauf bzw. den gefangenen Pass gestellt hat", wert:z=>z.u.checks||null},
         {id:"sack",  kopf:"Sack",  titel:"Sacks (als Verteidiger)", wert:z=>z.u.bloecke||null},
         {id:"intr",  kopf:"Int/Rec", titel:"Interceptions + Fumble-Recoveries (als Verteidiger)", wert:z=>z.u.steals||null},
         {id:"to",    kopf:"TO",    titel:"eigene Turnover — Fumbles verloren oder Interception geworfen", wert:z=>z.u.verluste||null},
         {id:"imp",   kopf:"Imp",   titel:"Kompositwert — exakt der Wert aus MOTOREN.football.wert() (feldspielWert, Fantasy-Scoring)",
           wert:z=>z.imp||null, fmt:v=>v.toFixed(1)},
         {id:"eig",   kopf:"Eig",   wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"„PassY\" enthält die verlorenen Yards eines Sacks. „Kompl\" zählt angekommene Pässe. „Int/Rec\" ist die einzige Verteidiger-Zahl, die der Motor führt (Tackles werden nicht gezählt) — Sacks stehen eigens unter „Sack\". „Imp\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt."};
+      fuss:"„PassY\" enthält die verlorenen Yards eines Sacks. „Kompl\" zählt angekommene Pässe. „Tkl\" ist der Solo-Tackle: der Verteidiger, der den Lauf oder den gefangenen Pass gestellt hat — Sacks stehen eigens unter „Sack\", Interceptions und eroberte Fumbles unter „Int/Rec\". „Imp\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt."};
   }
 
   // RENNPLAN-ANSAGE, Bedienzustand: welcher EIGENE Laeufer gerade fuer eine Ansage
