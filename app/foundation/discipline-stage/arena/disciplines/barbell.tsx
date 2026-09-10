@@ -10,9 +10,14 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { hueForIdx, TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
+import { TRACK_ROUND_MS } from "../DisciplineStageNativeArena";
 import type { DisciplineFieldProps, RT } from "./types";
 import { TokenChrome, tokenRadius } from "./benchmark";
+
+// IWF-Scheibenfarben (25/20/15/10 kg) statt `hsl(hue…)` nach Team (4.3) — die Teamfarbe
+// trägt schon der Token-Rahmen/Logo-Ring (TokenChrome), die Scheiben selbst sind bei einer
+// echten Hantel immer dieselbe genormte Farbstaffel, unabhängig davon, wer sie hebt.
+const IWF_PLATE_COLORS = ["#c0392b", "#2f6fd1", "#e2c23a", "#3a9450"];
 
 type BarbellState = {
   fromY: number;
@@ -35,6 +40,56 @@ export function resolveBarbellGlideStart(state: Pick<BarbellState, "fromY" | "to
   return state.glideT < 1 ? state.fromY + (state.toY - state.fromY) * state.glideT : state.toY;
 }
 
+/**
+ * Geforderte Last AN RUNDE `s` (0-basiert) — dieselbe Formel, mit der der Host die Latte
+ * je Runde hochzieht (DisciplineStageNativeArena.tsx, `nextBar` im `prim === "barbell"`-
+ * Zweig von `advance`/`doOne`). Rein abgeleitet aus `axTop`/`kgMax`/`slotCount`, die das
+ * Feld ohnehin schon bekommt — KEIN neuer Datenpfad, nur dieselbe Formel ein zweites Mal
+ * gelesen, um die Drei-Versuche-Tafel (s. `barbellAttemptStatus`) für VERGANGENE Runden
+ * zu rekonstruieren, die der Host selbst nicht mehr vorhält.
+ */
+export function barbellDemandAtRound(s: number, axTop: number, kgMax: number, slotCount: number): number {
+  return s + 1 >= slotCount ? kgMax : axTop + (kgMax - axTop) * ((s + 1) / slotCount);
+}
+
+/**
+ * Erste Runde (0-basiert), an der ein Team mit Endgewicht `endKg` die geforderte Last
+ * NICHT mehr packt — `slotCount`, wenn es (Champion-Kandidat) nie reißt.
+ */
+function barbellFirstFailRound(endKg: number, axTop: number, kgMax: number, slotCount: number): number {
+  for (let s = 0; s < slotCount; s += 1) {
+    if (barbellDemandAtRound(s, axTop, kgMax, slotCount) > endKg) return s;
+  }
+  return slotCount;
+}
+
+export type BarbellAttemptMark = "pending" | "ok" | "fail" | "skip";
+
+/**
+ * Status EINES Versuchs (0-basierte Runde `s`) für ein Team — die Drei-Versuche-Tafel
+ * (4.3, ○/✓/✗) ist reine Ableitung aus vorhandenen Daten (endKg, thrownSlot, axTop/kgMax/
+ * slotCount), kein neuer Datenpfad und keine literale kg-Remap (die bleibt ausdrücklich
+ * Folge-Ticket, s. Kopfkommentar):
+ *   - "pending" — Runde noch nicht enthüllt (s > thrownSlot).
+ *   - "ok"      — Last bei dieser Runde noch gepackt.
+ *   - "fail"    — GENAU die Runde, in der das Team reißt (erste nicht mehr gepackte Last).
+ *   - "skip"    — das Team ist schon VOR dieser Runde ausgeschieden, kein weiterer Versuch.
+ */
+export function barbellAttemptStatus(
+  s: number,
+  thrownSlot: number,
+  endKg: number,
+  axTop: number,
+  kgMax: number,
+  slotCount: number,
+): BarbellAttemptMark {
+  if (s > thrownSlot) return "pending";
+  const failRound = barbellFirstFailRound(endKg, axTop, kgMax, slotCount);
+  if (s < failRound) return "ok";
+  if (s === failRound) return "fail";
+  return "skip";
+}
+
 export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
@@ -47,6 +102,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
     N,
     geo,
     layout,
+    slotCount,
     rt,
     barbellSorted,
     barbellInfo,
@@ -188,6 +244,26 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   // Macht die Eliminations-Mechanik lesbar — „N/32 stemmen die geforderte Last noch".
   const liveCount = demandKg == null ? rt.length : rt.filter((t) => !barbellEliminated(t.code)).length;
 
+  // REISSEN/STOSSEN ALS ZWEI BENANNTE PHASEN (4.3) — rein präsentational über den
+  // vorhandenen `slotCount`/`thrownSlot`-Rahmen gelegt, KEIN neuer Datenpfad und KEINE
+  // literale Zweikampf-Kilogramm-Remap (die bleibt ausdrücklich Folge-Ticket, s.
+  // Kopfkommentar). `slotCount` ist bei Gewichtheben 6 (dataAdapter.ts, playerCount),
+  // die erste Hälfte der Runden wird als „Reißen", die zweite als „Stoßen" gelesen — exakt
+  // die IWF-Struktur (2 Übungen × 3 Versuche), ohne dass der Host je „Reißen"/„Stoßen"
+  // wissen müsste. `curSlot`: höchste enthüllte Runde über alle Teams (alle Teams teilen
+  // sich dieselbe Runden-Uhr, s. `t.thrownSlot = slot` im Host).
+  const halbe = Math.max(1, Math.ceil(slotCount / 2));
+  const curSlot = rt.length ? Math.max(-1, ...rt.map((t) => t.thrownSlot)) : -1;
+  const uebungLabel = demandKg == null || curSlot < 0 ? null : curSlot < halbe ? "REISSEN" : "STOSSEN";
+  const versuchNr = demandKg == null || curSlot < 0 ? null : (curSlot % halbe) + 1;
+  // Welche drei Runden die Versuchstafel zeigt: die STOSSEN-Haelfte, sobald wir dort sind
+  // (oder der Wettkampf fertig ist und ueberhaupt eine zweite Haelfte existiert) — sonst
+  // die REISSEN-Haelfte (auch vor Wettkampfbeginn, als reine "○○○"-Vorschau).
+  const phaseSlots =
+    uebungLabel === "STOSSEN" || (done && slotCount > halbe)
+      ? Array.from({ length: Math.max(0, slotCount - halbe) }, (_, i) => halbe + i)
+      : Array.from({ length: halbe }, (_, i) => i);
+
   return (
     <>
       <defs>
@@ -282,9 +358,23 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         <rect x={axX - 5} y={-11} width={9} height={22} rx={3} fill="var(--nl-mut)" />
         <rect x={rightX - 4} y={-11} width={9} height={22} rx={3} fill="var(--nl-mut)" />
         <g transform={`translate(${axX + 8} -22)`}>
-          <rect x={0} y={0} width={demandKg != null && demandKg >= 100 ? 118 : 108} height={19} rx={5} fill="var(--nl-warn)" />
+          {/* REISSEN/STOSSEN + Versuch VOR der kg-Zahl (4.3) — statt der bisher namenlosen
+              Last. `uebungLabel` ist null vor Wettkampfbeginn ODER nach der letzten Runde
+              (`done`), dann bleibt die alte, kürzere Fassung stehen. */}
+          <rect
+            x={0}
+            y={0}
+            width={uebungLabel && !done ? 190 : demandKg != null && demandKg >= 100 ? 118 : 108}
+            height={19}
+            rx={5}
+            fill="var(--nl-warn)"
+          />
           <text x={7} y={13} fontSize={11} fontWeight={900} fontFamily="ui-monospace, monospace" fill="var(--nl-bg)">
-            {demandKg == null ? "GEFORDERT —" : done ? `GESTEMMT ${Math.round(dLine)} kg` : `GEFORDERT ${Math.round(dLine)} kg`}
+            {demandKg == null
+              ? "GEFORDERT —"
+              : done
+                ? `GESTEMMT ${Math.round(dLine)} kg`
+                : `${uebungLabel} #${versuchNr} · GEFORDERT ${Math.round(dLine)} kg`}
           </text>
         </g>
       </g>
@@ -305,6 +395,32 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
           >
             {t.code}
           </text>
+        );
+      })}
+
+      {/* DREI-VERSUCHE-TAFEL je Team (4.3) — ○ wartet / ✓ gepackt / ✗ gerissen / – schon
+          ausgeschieden, für die drei Versuche der AKTUELLEN Übungshälfte (Reißen ODER
+          Stoßen — `phaseSlots`). Reine Ableitung aus vorhandenen Daten
+          (`barbellAttemptStatus`: endKg/thrownSlot/axTop/kgMax/slotCount), kein neuer
+          Datenpfad — die einzige Information, die Gewichtheben von jeder anderen
+          Zähldisziplin unterscheidet und die vorher komplett fehlte. */}
+      {barbellSorted.map((t) => {
+        const laneIdx = barbellSorted.indexOf(t);
+        const x = axX + laneIdx * colW + colW / 2;
+        const endKg = barbellInfo.endKgByCode.get(t.code) ?? barbellInfo.kgMax;
+        return (
+          <g key={`att-${t.code}`} transform={`translate(${x} ${baseY + 23})`} pointerEvents="none">
+            {phaseSlots.map((s, i) => {
+              const mark = barbellAttemptStatus(s, t.thrownSlot, endKg, barbellInfo.axTop, barbellInfo.kgMax, slotCount);
+              const glyph = mark === "ok" ? "✓" : mark === "fail" ? "✗" : mark === "pending" ? "○" : "–";
+              const color = mark === "ok" ? "var(--nl-good)" : mark === "fail" ? "var(--nl-risk)" : "var(--nl-mut-2)";
+              return (
+                <text key={s} x={(i - (phaseSlots.length - 1) / 2) * 10} y={0} textAnchor="middle" fontSize={8} fontWeight={800} fill={color}>
+                  {glyph}
+                </text>
+              );
+            })}
+          </g>
         );
       })}
 
@@ -329,7 +445,6 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
       {barbellSorted.map((t) => {
         const laneIdx = barbellSorted.indexOf(t);
         const laneX = axX + laneIdx * colW + colW / 2;
-        const hue = hueForIdx(t.idx);
         const bbOut = barbellEliminated(t.code);
         // Turm bis zum ENDGEWICHT zeichnen (die höchste Last, die dieses Team je stemmt) und
         // per Clip auf die animierte Höhe beschneiden. `barbellKgOf` ist durch das Endgewicht
@@ -375,7 +490,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
                         width={pW}
                         height={10}
                         rx={1}
-                        fill={`hsl(${hue} 40% ${50 + pIdx * 3}%)`}
+                        fill={IWF_PLATE_COLORS[pIdx % IWF_PLATE_COLORS.length]}
                         opacity={0.75}
                         stroke="rgba(143,166,192,.3)"
                         strokeWidth={0.5}
@@ -431,11 +546,17 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
               {/* Eliminated: roter Ring */}
               {bbOut ? <circle r={r + 3.5} fill="none" stroke="var(--nl-risk)" strokeWidth={2.4} /> : null}
 
-              {/* Kampfrichter-Lampe (Gültig/Gerissen) */}
+              {/* KAMPFRICHTERLAMPEN — eine echte Dreier-Reihe (IWF-Geste) statt der
+                  einzelnen ⚪/🔴-Emoji-Lampe. Alle drei Lampen zeigen denselben Ausgang
+                  (`bbOut`) — es gibt keine drei unabhängigen Kampfrichter-Daten im Host,
+                  nur EIN Gültig/Gerissen-Signal; die drei Lampen sind die IWF-typische
+                  FORM dieser Anzeige, kein neu erfundener 3-Richter-Datenpfad. */}
               {demandKg != null ? (
-                <text x={-(r + 1)} y={r + 4} textAnchor="end" fontSize={11}>
-                  {bbOut ? "🔴" : "⚪"}
-                </text>
+                <g transform={`translate(${-(r + 16)} ${r + 4})`}>
+                  {[-6, 0, 6].map((dx) => (
+                    <circle key={dx} cx={dx} cy={0} r={2.6} fill={bbOut ? "#c0392b" : "#f2ede0"} stroke="rgba(8,10,14,.6)" strokeWidth={0.6} />
+                  ))}
+                </g>
               ) : null}
 
               {/* Champion-Krone */}
