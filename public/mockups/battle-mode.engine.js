@@ -11749,7 +11749,12 @@
       const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
       const paarId=partner?Math.min(u.id,partner.id):u.id;
       const phi=kuerHash(paarId,1)*6.2832, w1=0.15+kuerHash(paarId,2)*0.09, w2=0.11+kuerHash(paarId,3)*0.08;
-      const eigenPh=kuerHash(u.id,9)*6.2832, eigenR=partner?19:0;
+      // N1 (Opus-Overseer-Review PR #874, Abschnitt 6): Phase aus der PAAR-ID statt aus
+      // der eigenen u.id, plus Math.PI fuer den zweiten Partner — unabhaengig gehashte
+      // Phasen konnten den Abstand auf 1,6px zusammenfallen lassen (5 von 30 Paarungen
+      // praktisch deckungsgleich). Mit diametralem Versatz ist der Abstand geometrisch
+      // garantiert eigenR*sqrt(1+3*cos^2) in [19px,38px], nie null.
+      const eigenPh=kuerHash(paarId,9)*6.2832+((partner&&u.id!==paarId)?Math.PI:0), eigenR=partner?19:0;
       const grundX=F.cx+F.ax*Math.sin(w1*buehneT+phi);
       const grundY=F.cy+F.ay*Math.sin(w2*buehneT+phi*1.6+kuerHash(paarId,4)*6.2832);
       const zielX=grundX+eigenR*Math.cos(buehneT*0.5+eigenPh);
@@ -11779,7 +11784,14 @@
       const haeltStelle=u.vizSturz||(u.vizPhase==="pirouette"&&u.vizPhaseT>0);
       let nx=u.vizX, ny=u.vizY;
       if(u.vizPhase==="schlusspose"){
-        const zx=F.cx+(partner?(u.id===paarId?-16:16):0), zy=F.cy;
+        // N2 (Opus-Overseer-Review PR #874, Abschnitt 6): Zielpunkt trug bisher NUR den
+        // Partner-Versatz (±16px), keinen Versatz je PAAR — alle Paare liefen deshalb auf
+        // dieselben zwei Punkte in der Mitte. `paarId` ist als kleinere der beiden u.id
+        // je Paar eindeutig (bauBuehne() vergibt Ids fortlaufend ueber das ganze Feld,
+        // :11021), die lineare Abbildung auf [0,TEILNEHMER.length-1] ist deshalb injektiv
+        // und verteilt jedes Paar auf einen eigenen Punkt ueber die Flaechenbreite, wie es
+        // das alte Raster (zeichneDuett()s gridPos) tat.
+        const zx=F.cx+(TEILNEHMER.length>1?(paarId/(TEILNEHMER.length-1)-0.5)*F.ax*1.5:0)+(partner?(u.id===paarId?-16:16):0), zy=F.cy;
         const dxs=zx-u.vizX, dys=zy-u.vizY, dist=Math.hypot(dxs,dys);
         if(dist>0.5){ const schritt=Math.min(dist,140*dt); nx=u.vizX+dxs/dist*schritt; ny=u.vizY+dys/dist*schritt; }
       } else if(!haeltStelle){
