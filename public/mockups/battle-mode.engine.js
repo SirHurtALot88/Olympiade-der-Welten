@@ -17005,6 +17005,49 @@
       platsch:  {synth:(vol)=>tonRauschen(vol,900,0.4,false)},
       tor:      {synth:(vol)=>tonMetall(vol,300,0.6)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    "speed-schach":{
+      zug:      {synth:(vol)=>tonKlick(vol,2200,0.04)},
+      schlag:   {synth:(vol)=>{ tonKlick(vol,2000,0.05); tonMetall((vol??0.6)*0.5,700,0.15); }},
+      uhr:      {synth:(vol)=>tonKlick(vol,3400,0.03)},
+      matt:     {synth:(vol)=>tonMetall(vol,220,0.6)},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    staffel:{
+      startschuss: {synth:(vol)=>{ tonKlick(vol,4000,0.03); tonRauschen((vol??0.6)*0.7,3000,0.08,false); }},
+      uebergabe:   {synth:(vol)=>{ tonKlick(vol,1600,0.04); tonKlick((vol??0.6)*0.7,2000,0.03); }},
+      fehlwechsel: {synth:(vol)=>{ tonMetall((vol??0.6)*0.7,500,0.2); tonRauschen((vol??0.6)*0.5,300,0.3,false); }},
+      ziel:        {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    football:{
+      snap:       {synth:(vol)=>tonSchlag(vol,300,150,0.08)},
+      pass:       {synth:(vol)=>tonRauschen(vol,1000,0.25,false)},
+      tackle:     {synth:(vol)=>{ tonSchlag(vol,180,60,0.22); tonRauschen((vol??0.6)*0.5,400,0.15,false); }},
+      touchdown:  {synth:(vol)=>{ tonDoppelton(vol,440,660,0.35); tonTon((vol??0.6)*0.7,880,0.3); }},
+      pfiff:      {synth:(vol)=>tonTon(vol,2600,0.35)},
+      publikum:   {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    "time-trial":{
+      start:         {synth:(vol)=>tonSchlag(vol,900,300,0.12)},
+      zwischenzeit:  {synth:(vol)=>tonKlick(vol,2400,0.04)},
+      bergauf:       {synth:(vol)=>tonMetall(vol,350,0.3)},
+      ziel:          {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)},
+      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    spurt:{
+      startschuss: {synth:(vol)=>{ tonKlick(vol,4000,0.03); tonRauschen((vol??0.6)*0.7,3000,0.08,false); }},
+      huerde:      {synth:(vol)=>tonKlick(vol,1200,0.06)},
+      riss:        {synth:(vol)=>{ tonSchlag(vol,500,80,0.2); tonRauschen((vol??0.6)*0.6,600,0.25,false); }},
+      ziel:        {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)},
+      publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    fechten:{
+      klingen:  {synth:(vol)=>{ tonMetall(vol,1500,0.12); tonKlick((vol??0.6)*0.5,3000,0.03); }},
+      treffer:  {synth:(vol)=>tonSchlag(vol,600,200,0.1)},
+      lampe:    {synth:(vol)=>tonTon(vol,1800,0.15)},
+      halt:     {synth:(vol)=>tonBuzzer(vol,0.2)},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
     }
   };
 
