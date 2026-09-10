@@ -10607,6 +10607,14 @@
     }
   }
 
+  // BREAKING_BPM (Ziel 4, Opus-Plan Abschnitt 7.4): EINE Zahl, aus der Bewegung
+  // (stepCypher()s Wippen), Bild-Puls (zeichneBreaking()s Survivor-Kern-Puls, und
+  // breaking.tsxs Druckwelle) UND Ton (TON_KATALOG.breaking, s. dort) dieselbe
+  // Zeitbasis ziehen — statt dreier unabhaengig gewaehlter Zahlen, die zufaellig
+  // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
+  // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
+  const BREAKING_BPM=100;
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -11679,6 +11687,139 @@
     if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
   }
 
+  // ================== ZIEL 4: DER CYPHER WIRD ECHT (stepCypher) ==================
+  // Opus-Plan "opus-plan-feinschliff-vier-disziplinen-09-10.md" Abschnitt 7.1. Ersetzt
+  // "rein zeichnerisch" (BUEHNE_ART.breaking.cypher-Kommentar) durch eine echte
+  // Zustandsmaschine: in einem echten Cypher tanzt IMMER GENAU EINER in der Mitte, der
+  // Rest steht im Ring -- genau das bildet die vorhandene Warteschlange (buehneQueue/
+  // buehneZeiger, s. stepBuehne) schon ab, weil sie ohnehin nur einen Teilnehmer pro
+  // Enthuellung markiert (u.lunge=0.5). Das ist zugleich die strukturelle Behebung des
+  // Sicht-QA-Befunds (docs/design/sicht-qa-10-09-breaking.png): vier Tokens stapelten
+  // sich im Zentrum, weil der Radius bisher den SCORE trug (rOut-(summe/maxSumme)*...) --
+  // mehrere aehnlich hohe Summen ergaben aehnliche Radien. Ab jetzt traegt der Radius nur
+  // noch Choreografie (rOut im Ring, ~0 in der Mitte); der Score bleibt ueber die
+  // RING-REIHENFOLGE sichtbar (s. cypherRingWinkel unten) UND unveraendert ueber die
+  // Krone (zeichneBreaking() liest weiterhin u.summe fuer `fuehrer`, s. dort).
+  //
+  // HARTER VERTRAG (PR 0, s. Kommentar oben bei buehnenBewegung, hier zusaetzlich WOERTLICH
+  // eingehalten): kein rr()-Aufruf, keine Schreibzugriffe auf u.summe/u.runden/u.aktuell/
+  // u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done. Gelesen werden nur bereits
+  // vorhandene Felder (dt, buehneT, u.id, u.side, u.summe, u.aktuell, u.lunge,
+  // u.runden[u.aktuell].ereignis, art.erfolgWort/art.failWort) -- geschrieben wird
+  // AUSSCHLIESSLICH auf die fuenf neuen viz*-Felder (u.vizR/u.vizA/u.vizPhase/
+  // u.vizPhaseT/u.vizMove), kein einziges bestehendes Feld wird angefasst.
+  //
+  // Reiner Hash aus zwei Ganzzahlen statt rr() -- deterministisch, kein globaler Zustand,
+  // also unabhaengig davon, wie oft/wann er aufgerufen wird (anders als rr()s linearer
+  // Kongruenzgenerator). Nur fuer PRAeSENTATION verwendet (Move-Wahl, Wippen-Phase).
+  function cypherHash(a,b){
+    let h=(Math.imul(a|0,2654435761)^Math.imul((b|0)+1,40503))>>>0;
+    h^=h>>>13; h=Math.imul(h,0x85ebca6b)>>>0; h^=h>>>16;
+    return h>>>0;
+  }
+  // Ring-Winkel eines Teilnehmers: gleichmaessig verteilt INNERHALB der eigenen
+  // Team-Haelfte (dieselben zwei Halbkreise, die zeichneBreaking schon fuer die
+  // Team-Trennung nutzt -- die "EINZIGE bewusste Abweichung von breaking.tsx", s.
+  // Funktionskopf dort, bleibt damit erhalten), aber nach RANG (u.summe) sortiert statt
+  // nach fester Kader-Reihenfolge, PLUS einer langsamen gemeinsamen Rotation (der
+  // rang/n-Anteil wandert mit buehneT weiter und wickelt sich am Rand der Haelfte wieder
+  // ein -- das "vizA += ω·dt" aus dem Plan, hier als geschlossene Funktion von buehneT
+  // statt als inkrementeller Zustand, damit nichts akkumulieren/drifften kann). Aendert
+  // sich der Rang eines Teilnehmers (sein Durchgang wird enthuellt, u.summe steigt), ist
+  // das an einer sichtbar neuen Ringposition abzulesen -- das ist die "RING-REIHENFOLGE",
+  // ueber die der Score sichtbar bleibt (Plan-Abschnitt 7.1).
+  function cypherRingWinkel(u,seiten){
+    const grad=Math.PI/180;
+    const HEMIS={0:[100*grad,260*grad],1:[-80*grad,80*grad]};
+    const [startA,endA]=HEMIS[u.side]||HEMIS[0];
+    const gruppe=seiten[u.side];
+    const n=Math.max(1,gruppe.length);
+    const rang=gruppe.indexOf(u);
+    const ROT_HZ=1/48; // eine volle Umrundung der eigenen Haelfte alle 48s
+    const frac=((rang/n)+buehneT*ROT_HZ)%1;
+    return startA+(endA-startA)*frac;
+  }
+  function cypherRingRadius(u,rOut){
+    // Kleines Wippen im Takt (Plan: "sin(buehneT*2π*bpm/60)") -- deterministische
+    // Phasenverschiebung je Teilnehmer aus dem Hash, kein rr().
+    const phase=(cypherHash(u.id,7)/4294967295)*Math.PI*2;
+    const WOBBLE=0.018;
+    return rOut*(1+WOBBLE*Math.sin(buehneT*2*Math.PI*BREAKING_BPM/60+phase));
+  }
+  function stepCypher(dt,art){
+    if(!TEILNEHMER.length)return;
+    const rOut=Math.min(W*0.46,H*0.44);
+    // Rang je Teamhaelfte, absteigend nach Summe (Ties nach id, damit die Reihenfolge
+    // innerhalb eines Frames stabil ist) -- rein lesend, exakt dieselbe Grundlage wie
+    // zeichneBreaking()s `fuehrer`-Ermittlung (dort global, hier je Haelfte).
+    const seiten={
+      0:TEILNEHMER.filter(u=>u.side===0).sort((a,b)=>b.summe-a.summe||a.id-b.id),
+      1:TEILNEHMER.filter(u=>u.side===1).sort((a,b)=>b.summe-a.summe||a.id-b.id)
+    };
+    // Dauern: eintritt/throwdown sind die im Plan (7.1) genannten 0,15s/0,25s.
+    // freeze/rueckzug sind bewusst KURZ (0,15s statt der ersten Fassung mit 0,35/0,3s) --
+    // ALLE VIER zusammen muessen unter art.rundenDauer (0,625s) bleiben, sonst startet
+    // die naechste Enthuellung (alle 0,625s, s. stepBuehne) den naechsten Teilnehmer,
+    // WAEHREND der vorige noch in der Mitte steht: zwei Tanzende gleichzeitig -- genau der
+    // Fehler, den dieser ganze Umbau beheben soll ("immer GENAU EINER in der Mitte").
+    // 0,15+0,25+0,15=0,55s < 0,625s laesst 0,075s Puffer (bei einem Frame ~0,0167s bei
+    // 60fps also ~4-5 Frames).
+    const EINTRITT_T=0.15, THROWDOWN_T=0.25, FREEZE_T=0.15, RUECKZUG_T=0.15;
+    const NAECHER=(u,ziel,tau)=>{ u.vizR+=(ziel-u.vizR)*(1-Math.exp(-dt/tau)); };
+    for(const u of TEILNEHMER){
+      if(u.vizPhase==null){
+        // Erstinitialisierung (erster stepCypher()-Durchlauf fuer diesen Teilnehmer).
+        u.vizPhase="ring"; u.vizPhaseT=0; u.vizMove=0;
+        u.vizA=cypherRingWinkel(u,seiten); u.vizR=cypherRingRadius(u,rOut);
+      }
+      // FRISCH ENTHUELLT: stepBuehne() baut u.lunge JEDEN Frame zuerst ab (Math.max(0,
+      // u.lunge-dt)) und setzt es DANACH, nur im Enthuellungs-Frame, exakt auf 0.5 --
+      // buehnenBewegung(dt) (und damit stepCypher) laeuft in stepBuehne() erst NACH
+      // diesem Block, das exakte Float-"===0.5" ist deshalb ein sicherer Einmal-pro-
+      // Durchgang-Trigger (kein Abbau kann je wieder exakt bei 0.5 vorbeikommen).
+      const frischEnthuellt=u.lunge===0.5 && u.aktuell>=0;
+      if(frischEnthuellt){
+        u.vizA=cypherRingWinkel(u,seiten); // Sichtwinkel beim Eintritt einfrieren
+        u.vizPhase="eintritt"; u.vizPhaseT=0;
+        u.vizMove=cypherHash(u.id,u.aktuell)%4; // 0 Toprock·1 Footwork·2 Powermove·3 Freeze
+      }
+      if(u.vizPhase==="ring"){
+        u.vizA=cypherRingWinkel(u,seiten);
+        u.vizR=cypherRingRadius(u,rOut);
+        continue;
+      }
+      u.vizPhaseT+=dt;
+      if(u.vizPhase==="eintritt"){
+        NAECHER(u,0,0.05);
+        if(u.vizPhaseT>=EINTRITT_T){
+          u.vizPhase="throwdown"; u.vizPhaseT=0;
+          if(u.vizMove===2)sfx("breaking","powermove"); // Windmill-Rauschsweep beim Ansatz
+        }
+      } else if(u.vizPhase==="throwdown"){
+        NAECHER(u,0,0.05);
+        if(u.vizPhaseT>=THROWDOWN_T){
+          const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
+          if(zug&&zug.ereignis===art.erfolgWort){
+            u.vizPhase="freeze"; sfx("breaking","freeze");
+          } else {
+            u.vizPhase="rueckzug"; sfx("breaking","abbruch");
+          }
+          u.vizPhaseT=0;
+        }
+      } else if(u.vizPhase==="freeze"){
+        // Erst wirklich "eingefroren" halten (Plan: "Ein Frame eingefroren"), erst danach
+        // zurueck in den Ring gleiten -- ein sofortiger Rueckglitt waere kein Standbild.
+        const HOLD=0.08;
+        if(u.vizPhaseT<HOLD) NAECHER(u,0,0.05);
+        else NAECHER(u,cypherRingRadius(u,rOut),0.04);
+        if(u.vizPhaseT>=FREEZE_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
+      } else if(u.vizPhase==="rueckzug"){
+        NAECHER(u,cypherRingRadius(u,rOut),0.05);
+        if(u.vizPhaseT>=RUECKZUG_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
+      }
+    }
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -12633,7 +12774,11 @@
 
     // Survivor-Kern (Zentrum) -- pulsierend ueber buehneT (bereits vorhandene Motor-Zeit,
     // kein neuer Zustand, dieselbe Idee wie zeichneHeben()s buehneAkt-getriebene Animation).
-    const puls=0.5+0.5*Math.sin(buehneT*2.4);
+    // AB JETZT AUF BREAKING_BPM GERASTERT (Ziel 4, Plan 7.4): eine 4-Schlag-Phrase bei
+    // 100 BPM = 2,4 s (vorher 2π/2,4 ≈ 2,62 s frei laufend) -- derselbe Takt, den
+    // stepCypher()s Wippen und der TON_KATALOG.breaking-Beat referenzieren.
+    const PULS_PERIODE=60/BREAKING_BPM*4;
+    const puls=0.5+0.5*Math.sin(buehneT*2*Math.PI/PULS_PERIODE);
     const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rIn*2.4);
     glow.addColorStop(0,"rgba(214,150,255,"+(0.5*puls).toFixed(3)+")");
     glow.addColorStop(1,"rgba(214,150,255,0)");
@@ -12661,43 +12806,107 @@
     for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
     const grad=Math.PI/180;
     const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
+    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Powermove -- ein paar kleine, deterministisch
+    // aus u.id/buehneT berechnete Punkte am Fusspunkt, dieselbe "keine Partikel-Arrays,
+    // nur billige Sinusformen"-Idee wie zeichnePartikelEffekt() in zeichneSprite (s. dort).
+    const zeichneBodenstaub=(fx,fy,id)=>{
+      ctx.fillStyle="#cbb98a";
+      for(let i=0;i<5;i++){
+        const ph=buehneT*6+id*1.7+i*1.3;
+        const lauf=(ph%1);
+        const wx=fx+Math.cos(id+i)*10*lauf, wy=fy-4*lauf*(1-lauf)*4;
+        ctx.globalAlpha=0.5*(1-lauf);
+        ctx.beginPath(); ctx.arc(wx,wy,1.6,0,6.2832); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    };
     for(const [side,startA,endA] of hemis){
       const g=TEILNEHMER.filter(u=>u.side===side);
       const n=Math.max(1,g.length);
       g.forEach((u,i)=>{
-        // 13er-Schritt gegen Klumpen (breaking.tsx:52), auf die feste Seitenlaenge n
-        // (statt der offenen Team-Zahl N in breaking.tsx) heruntergerechnet.
+        // POSITION AUS stepCypher() (Ziel 4, Plan 7.1): u.vizA/u.vizR statt Score-Radius
+        // und Index-Permutation -- das behebt das Sicht-QA-Stapelproblem strukturell,
+        // weil der Radius jetzt Choreografie ist (rOut im Ring, ~0 in der Mitte), nicht
+        // mehr der Score. Fallback nur fuer den allerersten Redraw VOR dem ersten
+        // stepBuehne()-Aufruf (reset() zeichnet einmal vor dem ersten step).
         const perm=(i*13)%n;
         const frac=n>1?perm/(n-1):0.5;
-        const a=startA+(endA-startA)*frac;
-        const radius=rOut-(u.summe/maxSumme)*(rOut-rIn);
+        const a=u.vizA!=null?u.vizA:startA+(endA-startA)*frac;
+        const radius=u.vizR!=null?u.vizR:rOut-(u.summe/maxSumme)*(rOut-rIn);
         const x=cx+Math.cos(a)*radius, y=cy+Math.sin(a)*radius*KY;
+        const fussY=y+19; // derselbe Bodenpunkt, an dem der Schatten schon immer sass
 
         const c=side===0?css("--home"):css("--away");
+        const phase=u.vizPhase||"ring";
+        // Schatten-Streckung (Plan 7.2): je naeher am Zentrum (radius -> 0), desto mehr
+        // Bewegungs-"Zug" im Schatten -- rein kosmetisch, tokenTreue Radius/Winkel bleiben
+        // unberuehrt. Powermove bekommt zusaetzlich die Windmill-Drehrichtung mit.
+        const naeheZumKern=phase==="ring"?0:Math.max(0,1-radius/rOut);
+        const streckX=16*(1+naeheZumKern*0.7), streckY=6*(1-naeheZumKern*0.3);
+        ctx.save();
+        ctx.translate(x,fussY);
+        if(phase==="throwdown"&&u.vizMove===2)ctx.rotate(buehneT*9+u.id);
         ctx.fillStyle=c; ctx.globalAlpha=0.20;
-        ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.2832); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0,0,streckX,streckY,0,0,6.2832); ctx.fill();
         ctx.globalAlpha=1;
+        ctx.restore();
 
-        // D. Erfolg/Fehlschlag -- rein aus u.runden[u.aktuell].ereignis gelesen, exakt
-        // dieselbe Unterscheidung, die WERTUNG_AUFTRITT (:11818) fuer die Boxscore-Spalte
-        // "Fehl" schon liest. Kein neues Feld auf TEILNEHMER, keine Aenderung an
-        // stepBuehne() -- u.lunge (0,5 s Zerfallszeit, von stepBuehne gesetzt) ist die
-        // einzige Zeitbasis. Die Position des Tokens (oben berechnet) bleibt in beiden
-        // Faellen exakt score-treu -- "Score bleibt Wahrheit", wie in breaking.tsx.
-        const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
-        const geradeDran=u.lunge>0&&zug;
-        if(geradeDran&&zug.ereignis===art.erfolgWort){
-          // Erfolg: ein sich ZUSAMMENZIEHENDER Lila-Gold-Puls-Ring -- "ich halte stand"
-          // liest sich als Verengung, nicht als Explosion (Recherche Abschnitt 3.3.D).
-          const p=u.lunge/0.5;
+        // D. Move-Posen (Plan 7.2) -- ausschliesslich Canvas-Transformationen um den
+        // Bodenpunkt (fussY), keine neuen Sprite-Blaetter, keine Aenderung an
+        // zeichneSprite()/u.down/u.lunge (die bleiben deren eigene Kampf-/Ausfallschritt-
+        // Felder, s. Kommentar bei stepCypher). u.vizMove (0..3, aus stepCypher) waehlt
+        // die Pose waehrend `throwdown`; `freeze`/`rueckzug` ueberschreiben sie mit der
+        // Erfolgs-/Fehlschlag-Darstellung.
+        ctx.save();
+        if(phase==="throwdown"){
+          if(u.vizMove===0){
+            // Toprock: Gehzyklus (zeichneSprite() Default), Blickrichtung wechselt im
+            // Takt -- per Spiegelung um die eigene Achse statt eines Feldzugriffs auf
+            // u.vx/u.vy (die fuer Buehnen-Teilnehmer sowieso 0 bleiben).
+            if(Math.floor(buehneT*BREAKING_BPM/60*2+u.id)%2===1){
+              ctx.translate(2*x,0); ctx.scale(-1,1);
+            }
+          } else if(u.vizMove===1){
+            // Footwork: tief gesetzt (y-Versatz nach unten + leichte Stauchung).
+            ctx.translate(x,fussY); ctx.scale(1,0.92); ctx.translate(-x,-(fussY-6));
+          } else if(u.vizMove===2){
+            // Powermove: Windmill -- Rotation um den Fusspunkt.
+            ctx.translate(x,fussY); ctx.rotate(buehneT*9+u.id); ctx.translate(-x,-fussY);
+            zeichneBodenstaub(x,fussY,u.id);
+          } else {
+            // Freeze (als GEWAEHLTER Move, noch vor dem Erfolg/Fehlschlag-Ausgang):
+            // leichte Vorschau-Kippung.
+            ctx.translate(x,fussY); ctx.rotate(0.18); ctx.translate(-x,-fussY);
+          }
+        } else if(phase==="freeze"){
+          // Erfolg: eingefrorenes, gekipptes Standbild plus goldener Standbild-Ring
+          // (zusammenziehend -- "ich halte stand" liest sich als Verengung).
+          ctx.translate(x,fussY); ctx.rotate(0.22); ctx.translate(-x,-fussY);
+        } else if(phase==="rueckzug"){
+          // Fehlschlag: kurzes Torkeln beim Rueckzug aus der Mitte.
+          ctx.translate(Math.sin(u.vizPhaseT*40+u.id)*2.5,0);
+        }
+        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
+        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
+        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
+        zeichneSprite(ctx,u,x,y);
+        ctx.restore();
+
+        // Erfolg/Fehlschlag-Ringe, jetzt aus u.vizPhase (stepCypher) statt aus u.lunge
+        // gelesen -- exakt, weil vizPhase die Zustandsmaschine ist, die diese Ausgaenge
+        // ueberhaupt erst erzeugt (u.runden[u.aktuell].ereignis gegen art.erfolgWort/
+        // art.failWort, s. dort). Farbschema/Stil unveraendert aus der ersten Fassung.
+        if(phase==="freeze"){
+          const p=Math.max(0,1-u.vizPhaseT/0.35);
           ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
           ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
           ctx.globalAlpha=1;
-        } else if(geradeDran&&zug.ereignis===art.failWort){
-          // Fehlschlag: roter Zickzack-Riss-Flash direkt am Token -- derselbe gluehende-
-          // Riss-Zeichenstil wie EFFEKT_ARTEN oben (:2302ff, Lava Golem), nur rot statt
-          // orange und nur fuer die u.lunge-Dauer sichtbar statt permanent.
-          const p=u.lunge/0.5;
+        } else if(phase==="rueckzug"){
+          // Riss-Flash JETZT AN DER MITTE gebunden (Plan 7.2: "kuenftig an die Mitte statt
+          // an den Ringplatz gebunden") -- (x,y) IST bereits die Mitte, weil radius hier
+          // noch nahe 0 liegt (NAECHER() in stepCypher glitet erst waehrend rueckzug
+          // wieder nach aussen).
+          const p=Math.max(0,1-u.vizPhaseT/0.3);
           ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
           ctx.beginPath();
           const segs=4;
@@ -12708,11 +12917,6 @@
           }
           ctx.stroke(); ctx.globalAlpha=1; ctx.lineCap="butt";
         }
-
-        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
-        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
-        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
-        zeichneSprite(ctx,u,x,y);
 
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
@@ -12727,7 +12931,8 @@
 
         // E. Survivor-Krone (niedrige Prioritaet, aus derselben Vorlage wie breaking.tsx:
         // 177-181): der aktuelle Rang-1-Teilnehmer bekommt dasselbe 👑-Textzeichen ueber
-        // dem Sprite, kein neues Asset.
+        // dem Sprite, kein neues Asset. Unveraendert score-basiert (u.summe), unabhaengig
+        // von der jetzt choreografischen Ringposition.
         if(u===fuehrer){
           ctx.font="14px sans-serif"; ctx.fillText("👑",x,y-34);
         }
@@ -20997,6 +21202,11 @@
     const bc=document.getElementById("bbugcallout");
     if(bc){bc.hidden=true;bc.classList.remove("zu");}
     bkLoopStop();
+    // TON-SCHICHT (Ziel 4, 7.4): jeder Reset (auch ein Disziplinwechsel mitten im Spiel)
+    // beendet einen laufenden Ton-Loop -- genau wie bkLoopStop() daneben, nur fuer
+    // TON_KATALOG-Loops (aktuell nur Breaking, s. tonLoopStart()-Aufrufe unten). Ein
+    // No-Op, wenn gerade kein Loop laeuft (tonLoopStop() prueft das selbst).
+    tonLoopStop();
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
@@ -21034,6 +21244,11 @@
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
     // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
+    // TON-SCHICHT, BREAKING-BEAT (Ziel 4, 7.4): derselbe Play/Pause-Rahmen wie beim
+    // Basketball-Dribbeln oben, nur ueber TON_KATALOG.breaking.beat statt einer Audio-
+    // Datei. tonLoopStart()/-Stop() sind selbst try/catch-abgesichert (No-Op ohne
+    // AudioContext bzw. vor der ersten Nutzergeste).
+    if(disc==="breaking"){ if(running)tonLoopStart("breaking"); else tonLoopStop(); }
     // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
     // AudioContext fuer sfx()/tonLoop* darf erst nach einer echten Nutzergeste starten.
     // Dieser Klick ist die erste; try/catch macht jeden frueheren sfx()-Aufruf zum No-Op.
@@ -22407,6 +22622,13 @@
       const punkte=zeichneHockeyschlaeger(cctx,x??48,y??70,s??1,richtung??2,phase??"halten");
       return {dataUrl:c.toDataURL(), punkte};
     },
+    // CYPHER-VIZ-PROBE (Ziel 4, Opus-Plan 7.1): rein diagnostisch, wie renderProbe/
+    // figurProbe daneben — liest die fuenf viz*-Felder aller TEILNEHMER von aussen
+    // (Playwright, ohne UI), damit sich die "immer nur EINER in der Mitte"-Garantie ohne
+    // Pixel-Vergleich nachmessen laesst: `data.filter(d=>d.phase!=="ring").length` darf
+    // ueber jede Sample-Reihe nie > 1 sein. Reines Lesen, kein Einfluss auf die Simulation.
+    cypherVizProbe:()=>TEILNEHMER.map(u=>({id:u.id,n:u.n,phase:u.vizPhase,
+      r:Math.round(u.vizR),a:Math.round((u.vizA||0)*100)/100,summe:u.summe,aktuell:u.aktuell})),
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
