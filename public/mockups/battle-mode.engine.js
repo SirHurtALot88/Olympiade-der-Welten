@@ -11150,7 +11150,14 @@
       // Test aus der Recherche (Scratchpad, nie committet): rho je Spiel 0,495 -> 0,894
       // (Saison 0,559 -> 0,958), robust bei jeSeite 6/4/2 (0,894/0,880/0,908). Noch keine
       // Sinkhorn-Kalibrierrunde (Recherche F.2) — Startpunkt, kein fertiges Ergebnis.
-      label:"Fechten", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      //
+      // VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 7.1,
+      // Kollision 1): `duell:true` allein reicht als Weiche fuer buehnenBewegung() nicht,
+      // es traegt auch I-Spy und Tennis. `fechten:true` gibt Fechten dieselbe eigene
+      // Schranke, die `schach:true` (:11008) neben demselben geteilten `duell:true` schon
+      // fuer Speed-Schach traegt — genau das Muster, mit dem PR #883 es dort vorgemacht hat.
+      // Rein deskriptiv, ohne Wirkung, bis Ziel-PR 10 `stepFechten()` liefert.
+      label:"Fechten", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
       rezept:{
         GRUNDLAGE:    {torment:45,dexterity:30,awareness:25},
@@ -11880,6 +11887,13 @@
     const art=BB();
     if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
     if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
+    // VORAB ANGELEGT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 7.1, Kollision
+    // 1): drei spaetere Ziel-PRs (Gewichtheben, Speed-Schach, Fechten) haetten sonst alle
+    // dieselbe Dispatcher-Zeile angefasst. Mit den drei Zweigen hier liefert jede dieser
+    // PRs nur noch ihre eigene Funktion, keine Aenderung mehr an dieser Stelle.
+    if(art.heben && typeof stepHeben==="function"){ stepHeben(dt,art); return; }     // Ziel 1
+    if(art.schach && typeof stepSchach==="function"){ stepSchach(dt,art); return; }  // Ziel 5
+    if(art.fechten && typeof stepFechten==="function"){ stepFechten(dt,art); return; } // Ziel 10
   }
 
   // ================== EISKUNSTLAUF: KUER-BEWEGUNGSMASCHINE (stepKuer, Ziel 2) ==================
@@ -17820,7 +17834,14 @@
   // ===================================================================================
   const BAHN_ART={
     spurt:{
-      label:"Spurt", jeSeite:4, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
+      // `spurt:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt
+      // 3.3): bahnBewegung() (s. unten, nahe stepSpurt()) braucht eine eigene Disziplin-
+      // Schranke fuer Spurt, so wie `BAHN_ART.staffel.staffel` und `BAHN_ART["takeshis-
+      // castle"].takeshi` (:18186 vor dieser PR) sie schon hatten. Ohne eigene Flagge waere
+      // die einzige heute vorhandene Unterscheidung `feuerZiel`/`hindernisBilder` gewesen —
+      // Werte, die zufaellig nur hier gesetzt sind, aber nicht dafuer gedacht sind, Spurt zu
+      // erkennen. Rein deskriptiv, ohne Wirkung, bis Ziel-PR 9 `stepHuerden()` liefert.
+      label:"Spurt", jeSeite:4, spurt:true, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
       // BILD JE STATION (U3). Parallel zu `hindernisse` und `hindernisTypen`: Index i ist
       // dieselbe Station. "wasser" zeichnet zwei Uferkacheln, "balken" dieselben zwei plus die
       // Planke darueber. Fehlt eine Kachel, faellt genau diese Station auf die alten Pfosten
@@ -17922,7 +17943,13 @@
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
       kraftBasis:290, kraftSpanne:2.7,
-      label:"Time-Trial", jeSeite:6, hindernisse:[],
+      // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
+      // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
+      // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
+      // gewesen (nur hier gesetzt), ist aber fuer den gestaffelten Start gedacht, nicht als
+      // Disziplin-Erkennung — eine eigene, deskriptive Flagge haelt beides auseinander.
+      // Rein deskriptiv, ohne Wirkung, bis Ziel-PR 8 `stepZeitfahren()` liefert.
+      label:"Time-Trial", jeSeite:6, zeitfahren:true, hindernisse:[],
       boden:"#3c3f45", schatten:false, tackle:false, grundTempo:96, tempoSpanne:0.82,
       // GESTAFFELTER START (Fable-Entscheidung, Recherche Abschnitt 4.2): jeder Laeufer
       // faehrt fuer sich, ein Startrampen-Feld statt eines Massenstarts. ACHTUNG,
@@ -19778,7 +19805,39 @@
       }
     }
     kameraUpdate(dt);
+    bahnBewegung(dt);
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
+  }
+
+  // BEWEGUNGS-EINSTIEGSPUNKT FUER DIE BAHN (PR 0.3, Opus-Plan Zehn-Disziplinen 09-10,
+  // Abschnitt 3.3). Die Buehne hat mit buehnenBewegung() (s. dort, `:11879`) schon lange
+  // einen solchen Dispatcher; die Bahn (Takeshi's Castle/Staffel/Time-Trial/Spurt) lief
+  // ohne einen aequivalenten Einstiegspunkt, weshalb M2 dort strukturell bei 12-15 von 25
+  // haengt. Der Dispatcher ist absichtlich LEER, bis Ziel-PRs stepParcours()/stepStaffel()/
+  // stepZeitfahren()/stepHuerden() liefern — der typeof-Waechterschutz macht ihre
+  // Abwesenheit zu einem stillen No-Op statt zu einem ReferenceError, genau wie bei
+  // buehnenBewegung() oben.
+  //
+  // DERSELBE VERTRAG WIE BUEHNENBEWEGUNG, WOeRTLICH (Opus-Plan Abschnitt 3.3):
+  //
+  // Eine bahnBewegung-Implementierung darf ausschliesslich neue, praesentationale
+  // viz*-Felder schreiben. Niemals rr(), niemals u.pos, niemals irgendetwas, das in
+  // MOTOREN[d].wert() einfliesst.
+  //
+  // FLAGGEN: `art.takeshi` (BAHN_ART["takeshis-castle"].takeshi, `:18186` vor dieser PR)
+  // und `art.staffel` (BAHN_ART.staffel.staffel) standen schon vor dieser PR und dienen
+  // bereits als Disziplin-Schranken in stepSpurt() oben. `art.zeitfahren` und `art.spurt`
+  // gab es nicht — BAHN_ART["time-trial"] und BAHN_ART.spurt hatten keine eigene boolesche
+  // Weiche, nur Werte, die zufaellig nur dort gesetzt sind (`startAbstand`, `feuerZiel`).
+  // Beide oben ergaenzt, nach demselben Muster, mit dem PR #883 `schach:true` neben das
+  // bereits geteilte `duell:true` gesetzt hat (`:11008`): zwei neue, rein deskriptive
+  // Flaggen, sonst unveraendert an Rezept/Rangtreue.
+  function bahnBewegung(dt){
+    const art=BA();
+    if(art.takeshi && typeof stepParcours==="function"){ stepParcours(dt,art); return; }        // Ziel 3
+    if(art.staffel && typeof stepStaffel==="function"){ stepStaffel(dt,art); return; }           // Ziel 6
+    if(art.zeitfahren && typeof stepZeitfahren==="function"){ stepZeitfahren(dt,art); return; }  // Ziel 8
+    if(art.spurt && typeof stepHuerden==="function"){ stepHuerden(dt,art); return; }             // Ziel 9
   }
 
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
