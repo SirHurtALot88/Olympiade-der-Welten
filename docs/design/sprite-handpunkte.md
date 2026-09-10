@@ -145,3 +145,64 @@ node scripts/erzeuge-sprite-handpunkte-beweisbild.mjs  # Rohbilder für ein neue
 
 Playwright-Browser: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (wie im Auftrag
 vorgegeben, dieselbe Technik wie `scripts/erzeuge-sprite-vorschauen.mjs`).
+
+## Gewichtheben — `HEBEN_HAND` (Ziel 1, 10.09.)
+
+Griffpunkt für die Hantel (`zeichneHantel()`, `HEBEN_HAND`/`HEBEN_PHASEN` in
+`battle-mode.engine.js`), gemessen an der **"shoot"-Pose** — der einzigen
+Überkopf-/Stoßbewegung im Baukasten, die `zeichneHeben()` für jeden enthüllten Versuch
+ohnehin erzwingt (der feste vierte Parameter `true` am `zeichneSprite()`-Aufruf dort
+zwingt `ani` auf `"shoot"` statt `"slash"`, s. Kommentar an dieser Stelle).
+
+### Methode
+
+Anders als beim Laufzyklus hängt `ani==="shoot"` an keiner laufenden Kampfzeit — die Pose
+lässt sich direkt über den fünften `renderProbe`-Parameter ansteuern:
+`window.__arena.renderProbe(name,"shoot",true,dir,lunge,256)`. Skript:
+`scripts/messe-heben-handpunkt.mjs`. Für jede der vier Blickrichtungen wird über mehrere
+Frames der 13-Bild-`shoot`-Sequenz die Alphakontur im Brustband (Zellkoordinaten y=20–44)
+nach dem am weitesten seitlich ausladenden Punkt durchsucht (dieselbe
+"Vollausschlag"-Suche wie beim Hockeyschläger-Beweisbild), danach die Gegenprobe: dieselbe
+Stelle im **echten**, hochskalierten Rendering markiert und per Auge bestätigt, dass der
+Punkt auf einer Faust sitzt und nicht auf Gürtel/Rüstung.
+
+### Befund — keine Archer-Überkopfpose, sondern ein seitlicher Stoßgriff
+
+`ani="shoot"` ist im vorhandenen Sprite-Blatt kein Bogenzug mit erhobenen Händen, sondern
+eine Stoßbewegung: eine Faust bleibt nah am Körper (Brust-/Kinnhöhe), die andere streckt
+sich in Profilrichtung weit heraus. In Front-/Rückenansicht kreuzt der Arm stattdessen vor
+der Brust — es gibt keinen echten Frontal-Frame mit beidseitig sichtbarer Streckung. Das
+ist der tatsächliche Bewegungsablauf des Blatts, nicht die anatomisch „richtige" Hebe-Pose;
+`HEBEN_HAND` verankert die Hantel trotzdem an einem echten, gemessenen Körperpunkt statt
+am freischwebenden Bildpunkt der alten Fassung — das war der eigentliche Auftrag.
+
+| Richtung | Punkt (Zellkoordinaten 0..63) | gemessen an |
+|---|---|---|
+| hinten | x=39, y=38 | sichtbare Faust vor der Brust (gekreuzter Arm) |
+| links | x=11, y=32 | ausgestreckte Faust (Vollausschlag, Frame 8/12) |
+| vorn | x=24, y=37 | sichtbare Faust vor der Brust (gekreuzter Arm) |
+| rechts | x=52, y=32 | ausgestreckte Faust (Vollausschlag, Frame 8/12), spiegelbildlich zu links |
+
+`links`/`rechts` sind bis auf das Vorzeichen identisch (11 und 52 liegen symmetrisch um
+die Bildmitte x≈32, beide bei y=32) — erwartbar, weil die Profilpose links/rechts nur
+gespiegelt wird. `hinten`/`vorn` liegen näher an der Körpermitte (x=39 bzw. x=24), weil
+dort die sichtbare Faust die angezogene, nicht die gestreckte ist.
+
+### Beweisbild
+
+`scripts/messe-heben-handpunkt.mjs` schreibt die vier gewählten Frames roh nach
+`docs/design/`; das eingezeichnete Ergebnis:
+
+![Beweisbild: HEBEN_HAND-Punkte auf der shoot-Pose, vier Blickrichtungen](./sprite-handpunkte-beweis-gewichtheben.png)
+
+In allen vier Feldern sitzt der Punkt sichtbar auf einer Faust.
+
+### Unsicherheiten
+
+- **Nur EIN Punkt je Richtung**, verwendet für ALLE vier `HEBEN_PHASEN` (`boden`/`zug`/
+  `hoch`/`abwurf`) — das Sprite-Blatt hat keine eigene Hebe-Animation, die Phasen sind
+  eine reine Canvas-Überlagerung (Stangenhöhe/-neigung relativ zum Ankerpunkt), nicht vier
+  verschiedene gemessene Handpositionen. Während der `walk`-Pose (wartender Gegner) sitzt
+  derselbe Punkt entsprechend nicht exakt auf der (dort ruhenden) Hand — für eine
+  Requisite, die ohnehin nur angedeutet wird, eine bewusste Vereinfachung, keine Messung.
+- **Reproduzieren**: `node scripts/messe-heben-handpunkt.mjs [zielordner]`.

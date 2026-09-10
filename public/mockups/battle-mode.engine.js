@@ -345,6 +345,86 @@
     ctx.beginPath();ctx.moveTo(ferseX,ferseY);ctx.lineTo(spitzeX,spitzeY);ctx.stroke();
     return {startX,startY,ferseX,ferseY,spitzeX,spitzeY};
   }
+
+  // ================== GEWICHTHEBEN: HANTEL AN DER HAND (Ziel 1, 10.09.) ==================
+  // Vorbild ist zeichneHockeyschlaeger()/HOCKEY_HAND direkt oberhalb: x/y ist wieder die
+  // HAND, nicht ein freischwebender Bildpunkt (Chris' Fund, 06.09.: "da ist gar kein
+  // gewicht als asset was die spieler versuchen zu stämmen"). Ausgemessen an der
+  // "shoot"-Pose — die zeichneHeben() ohnehin fuer jeden enthuellten Versuch erzwingt,
+  // s. der feste vierte Parameter `true` am zeichneSprite()-Aufruf dort — ueber
+  // window.__arena.renderProbe(name,"shoot",true,dir,lunge,256), Pixelscan der Alpha-
+  // kontur statt Schaetzung. Verfahren und Rohbilder: docs/design/sprite-handpunkte.md,
+  // Abschnitt "Gewichtheben". Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const HEBEN_HAND=[
+    {x:39,y:38}, // hinten
+    {x:11,y:32}, // links
+    {x:24,y:37}, // vorn
+    {x:52,y:32}, // rechts
+  ];
+  // Stangenhoehe RELATIV zur Hand (dy, positiv = tiefer) und Neigung je Phase — dieselbe
+  // Idee wie HOCKEY_PHASEN (schaftA/kelleA relativ zum Handpunkt), nur fuer eine gerade
+  // Stange statt Schaft+Kelle. Das Sprite-Blatt kennt keine eigene Hebe-Animation — die
+  // Stange wandert an der Hand vorbei, genau das Bild, das die alte freistehende Hantel
+  // schon zeigte (buehneAkt-Fortschritt, s. hebePhase() bei zeichneHeben), jetzt an einen
+  // echten Koerperpunkt verankert statt an der Bildmitte.
+  const HEBEN_PHASEN={
+    boden:  {dy:34, neigung:0.03}, // Stange am Boden, Heber (praesentational) gebueckt
+    zug:    {dy:2,  neigung:0},    // Umsetzen: Stange auf Brusthoehe, nah an der Hand
+    hoch:   {dy:-49,neigung:0},    // Streckung ueber Kopf, Arme durch — hoch genug ueber
+                                   // dem Anker, um nicht in die "kg"-Textzeile der
+                                   // Textkarte zu laufen (s. Screenshot-Gegenprobe)
+    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen
+  };
+  // Scheibengroesse/-anzahl AUS kg — schwerere Last = mehr/dickere Scheiben, statt der
+  // alten vier immer gleich grossen Punkte. Schwellen grob am internen HEBEN_KG_BASIS/
+  // HEBEN_KG_PRO_LAST-Bereich orientiert (s. dort), nicht an einer Formel — rein optisch.
+  const HEBEN_SCHEIBEN_STUFEN=[
+    {ab:0,   r:[6]},
+    {ab:120, r:[8]},
+    {ab:200, r:[10,7]},
+    {ab:300, r:[11,9,6]},
+    {ab:400, r:[12,10,8,6]},
+  ];
+  function scheibenFuer(kg){
+    let stufe=HEBEN_SCHEIBEN_STUFEN[0];
+    for(const s of HEBEN_SCHEIBEN_STUFEN) if(kg>=s.ab) stufe=s;
+    return stufe.r;
+  }
+  // x/y ist die Hand (aus HEBEN_HAND), s die Groesse (Z), richtung 0..3 wie blickAus(),
+  // phase einer der vier HEBEN_PHASEN-Schluessel (unbekannt faellt auf "zug" zurueck,
+  // dasselbe Sicherheitsnetz wie bei zeichneHockeyschlaeger), kg die aktuell anzuzeigende
+  // Last (u._vizKg, rein praesentational). Perspektive wie beim Schlaeger: im Profil die
+  // volle Laenge, in Front/Ruecken ein verkuerzter Stummel.
+  function zeichneHantel(ctx,x,y,s,richtung,phase,kg){
+    const p=HEBEN_PHASEN[phase]||HEBEN_PHASEN.zug;
+    const by=y+p.dy*s;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const seitlich=blick!==0;
+    const halbLaenge=(seitlich?34:18)*s;
+    const kippung=p.neigung*(blick||1);
+    const ux=Math.cos(kippung), uy=Math.sin(kippung);
+    const x1=x-ux*halbLaenge, y1=by-uy*halbLaenge;
+    const x2=x+ux*halbLaenge, y2=by+uy*halbLaenge;
+    ctx.strokeStyle="#9098a8"; ctx.lineWidth=Math.max(1,3*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    // Griffband am Ankerpunkt (der Hand), wie das Griffband beim Schlaeger.
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath(); ctx.arc(x,by,Math.max(0.9,1.6*s),0,Math.PI*2); ctx.fill();
+    const radien=scheibenFuer(kg||0);
+    const IWF_FARBEN=["#c0392b","#2f6fd1","#e2c23a","#3a9450"]; // 25/20/15/10 kg-Staffel
+    [-1,1].forEach(seite=>{
+      let entlang=halbLaenge*0.8;
+      radien.forEach((r,i)=>{
+        const rs=Math.max(2,r*s*0.6);
+        const px=x+ux*seite*entlang, py=by+uy*seite*entlang;
+        ctx.fillStyle=IWF_FARBEN[i%IWF_FARBEN.length];
+        ctx.beginPath(); ctx.arc(px,py,rs,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=1; ctx.stroke();
+        entlang+=rs*1.3;
+      });
+    });
+  }
+
   // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
   // blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts. Koordinaten sind Zell-Koordinaten
   // (0..63) IM SELBEN 64x64-Rahmen, in dem renderProbe zeichnet — unabhaengig von der
@@ -2892,6 +2972,17 @@
       // feststehen) und gehoert in eine eigene Runde.
       const pose=u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten";
       zeichneHockeyschlaeger(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,pose);
+    }
+    // HANTEL. Dasselbe Muster wie der Hockeyschlaeger direkt oberhalb: `feldspiel` ist
+    // hier `true`, weil zeichneHeben() diesen Parameter genauso erzwingt wie fuer die
+    // Feldspiel-Korblegerpose (s. Kommentar am Aufruf dort) — istHeben() selbst prueft
+    // zusaetzlich istBuehne(disc)/buehneDisc (s. Kommentar an istHeben oben), nicht nur
+    // diesen Parameter. hebePhase(u) liefert boden/zug/hoch/abwurf aus buehneAkt/
+    // art.rundenDauer (derselbe Fortschritt, den die alte freistehende Hantel nutzte) —
+    // fuer den wartenden Gegner (u ist nicht der aktive Zug) immer "boden".
+    if(feldspiel&&istHeben()&&!u.down){
+      const hp=HEBEN_HAND[r]||HEBEN_HAND[2];
+      zeichneHantel(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,hebePhase(u),u._vizKg||0);
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -6258,6 +6349,13 @@
 
   const istHockey=()=>feldspielDisc==="hockey";
   const istFootball=()=>feldspielDisc==="football";
+  // GEWICHTHEBEN — ANDERS ALS istHockey()/istFootball(): die Buehne kennt kein eigenes
+  // "feldspielDisc"-Aequivalent, ihr Zustand ist `buehneDisc`, das (wie feldspielDisc)
+  // nach dem jeweils letzten Buehnen-Match STEHENBLEIBT. `istBuehne(disc)` bestaetigt
+  // deshalb zusaetzlich, dass GERADE eine Buehne laeuft — exakt die Vorpruefung, die der
+  // Requisiten-Tabellen-Kommentar bei DISZIPLIN_WAFFE (PR 0) fuer denselben Fall verlangt.
+  const istHeben=()=>istBuehne(disc)&&buehneDisc==="gewichtheben";
+
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
   // Bis hierher stand Basketballs Box-Score-Formel an ZWEI Stellen (MOTOREN[fd].wert und
@@ -11598,7 +11696,10 @@
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
-      if(BB().heben)letzterHebenZug={u,r};
+      // _tonPhase: rein praesentationale Buchfuehrung fuer sfx() bei zeichneHeben() (s.
+      // dort) — auf dem transienten {u,r}-Container, nicht auf u/TEILNEHMER, s. Vertrag
+      // bei buehnenBewegung. "ansage" (Ansage-Gong) feuert einmal pro enthuelltem Versuch.
+      if(BB().heben){ letzterHebenZug={u,r,_tonPhase:"boden"}; sfx("gewichtheben","ansage"); }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
@@ -12004,6 +12105,85 @@
     ctx.fillStyle="#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
     ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
     for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*W/8,H*0.78);ctx.lineTo(i*W/8,H);ctx.stroke();}
+    // Publikums-Loop beenden, falls wir GERADE von Gewichtheben herkommen (s. bodenHeben
+    // unten) — reines Praesentations-Bookkeeping, kein Motorzustand.
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+  }
+
+  // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
+  // Screenshot-Befund: "generischer dunkler Buehnenboden" fuer eine Sportart mit einer
+  // sehr konkreten, jedem bekannten Kulisse. Wettkampfplattform, drei Kampfrichterlampen,
+  // Anzeigetafel (liest ausschliesslich letzterHebenZug, dieselbe Quelle wie die Textkarte
+  // in zeichneHeben()), Kreide-/Magnesiakiste, Hantelstaender, Publikumssilhouetten.
+  let hebenPublikumAn=false; // rein praesentational, s. bodenBuehne() oben fuer den Stop.
+  function bodenHeben(){
+    if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#14171d");g.addColorStop(1,"#0a0b0e");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    // Publikumssilhouetten im Dunkeln, oberer Rand.
+    ctx.fillStyle="#1c1f27";
+    for(let i=0;i<26;i++){
+      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4;
+      ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
+    }
+    // WETTKAMPFPLATTFORM: helles Quadrat mit Kante, mittig in der Bildebene der Heber.
+    const platY=H*0.40, platW=W*0.46, platH=H*0.40;
+    ctx.fillStyle="#3a3f4c";
+    ctx.fillRect(W/2-platW/2-4,platY-4,platW+8,platH+8);
+    const pg=ctx.createLinearGradient(0,platY,0,platY+platH);
+    pg.addColorStop(0,"#d8cfa8");pg.addColorStop(1,"#b9ad82");
+    ctx.fillStyle=pg;
+    ctx.fillRect(W/2-platW/2,platY,platW,platH);
+    ctx.strokeStyle="#8f8560";ctx.lineWidth=2;
+    ctx.strokeRect(W/2-platW/2,platY,platW,platH);
+    // DREI KAMPFRICHTERLAMPEN ueber der Plattform — weiss/rot je nach zug.r.gueltig. Das
+    // ist die IWF-Geste, die es heute nur als "✓ gültig"-Text gibt (bleibt zusaetzlich
+    // bestehen, s. zeichneHeben() Textkarte).
+    const zug=letzterHebenZug;
+    const gueltig=zug?zug.r.gueltig:null;
+    const lampY=platY-24;
+    [-1,0,1].forEach(i=>{
+      const lx=W/2+i*22;
+      ctx.beginPath();ctx.arc(lx,lampY,7,0,Math.PI*2);
+      ctx.fillStyle=gueltig==null?"#3a3d46":(gueltig?"#f2ede0":"#c0392b");
+      ctx.fill();
+      ctx.lineWidth=1.5;ctx.strokeStyle="#15161a";ctx.stroke();
+      if(gueltig!=null){
+        ctx.save();ctx.globalAlpha=0.5;ctx.fillStyle=gueltig?"#fff9e8":"#ff5b45";
+        ctx.beginPath();ctx.arc(lx,lampY,12,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+    });
+    // ANZEIGETAFEL oben rechts: Uebung, Versuch, angesagte kg — liest ausschliesslich
+    // letzterHebenZug, dieselbe Datenquelle wie die Textkarte in zeichneHeben().
+    // tafelY unter der HTML-Team-Karte oben rechts (".card"/aufgetreten-Zeile, DOM-Overlay
+    // ausserhalb des Canvas) statt darueber — sonst kollidieren beide Textbloecke, s.
+    // Sicht-QA-Screenshot dieses PRs (docs/design/gewichtheben-nachher-10-09.png, erste
+    // Fassung).
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=54;
+    ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
+    ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
+    ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.font="700 11px 'Barlow Condensed',sans-serif";
+    ctx.fillStyle="#f2c34d";
+    ctx.fillText(zug?(zug.r.uebung==="reissen"?"REISSEN":"STOSSEN"):"—",tafelX+10,tafelY+16);
+    ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#c7ccd6";
+    ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
+    ctx.font="700 16px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
+    ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
+    // KREIDE-/MAGNESIAKISTE, unten links auf der Plattformkante.
+    ctx.fillStyle="#e9e6de";ctx.fillRect(W*0.08,platY+platH-14,26,14);
+    ctx.strokeStyle="#9a9788";ctx.lineWidth=1;ctx.strokeRect(W*0.08,platY+platH-14,26,14);
+    // HANTELSTAENDER am rechten Rand — zwei Saeulen mit je drei liegenden Scheiben.
+    ctx.strokeStyle="#5c5346";ctx.lineWidth=3;
+    for(const dx of [0,18]){
+      ctx.beginPath();ctx.moveTo(W*0.90+dx,platY+platH-2);ctx.lineTo(W*0.90+dx,platY+platH-40);ctx.stroke();
+    }
+    ctx.fillStyle="#3a3227";
+    for(const dy of [0,7,14]){
+      ctx.beginPath();ctx.ellipse(W*0.90+3,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(W*0.90+15,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
+    }
   }
 
   // ================== EISKUNSTLAUF: EISFLAECHE STATT PODEST (bodenEis) ==================
@@ -12053,13 +12233,14 @@
   }
 
   function zeichneBuehne(){
-    // BODEN-DISPATCH (Opus-Plan 10.09., Ziel 2, Abschnitt 5.2): Eiskunstlauf bekommt eine
-    // eigene Eisflaeche statt des generischen violetten Podests -- dasselbe Muster wie der
+    // BODEN-DISPATCH (Opus-Plan 10.09., Ziel 2, Abschnitt 5.2, erweitert per Opus-Review
+    // PR #879, Abschnitt 8): Gewichtheben und Eiskunstlauf bekommen je eine eigene
+    // Bodenzeichnung statt des generischen violetten Podests -- dasselbe Muster wie der
     // Zweig direkt darunter (art.heben/schach/cypher/duett), nur fuer den BODEN statt fuer
-    // die Teilnehmer-Zeichnung. Faellt ein spaeterer Agent eine eigene bodenHeben() dazu,
-    // ist das eine weitere else-if-Zeile hier, keine Umstrukturierung.
-    if(BB().duett)bodenEis(); else bodenBuehne();
+    // die Teilnehmer-Zeichnung. Faellt ein spaeterer Agent eine weitere eigene Boden-
+    // funktion dazu, ist das eine weitere else-if-Zeile hier, keine Umstrukturierung.
     const art=BB();
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -12467,6 +12648,22 @@
       fuss:w.fuss||"„Last\" ist die zuletzt gehobene Last (Sinclair-normiert), nicht die angesagte nächste. „Vers\" zählt gültige Versuche von den bisher gezeigten. „Stand\" wird erst am Ende des Duells entschieden."};
   }
 
+  // Phase der Hantel an der Hand (s. HEBEN_PHASEN/zeichneHantel oben), aus buehneAkt/
+  // art.rundenDauer — DERSELBEN Zahl, mit der die alte freistehende Hantel schon
+  // animierte. Hierher verschoben (statt lokal in zeichneHeben), weil zeichneSprite()
+  // diese Phase auch fuer den WARTENDEN Gegner braucht (s. Aufrufstelle bei HEBEN_HAND).
+  // Kein zweiter Zeitgeber, keine Formel — reine Ableitung aus vorhandenem Zustand, ruft
+  // niemals rr() auf und schreibt nichts auf u/TEILNEHMER.
+  function hebePhase(u){
+    const zug=letzterHebenZug;
+    if(!zug||zug.u!==u)return "boden"; // wartender Gegner haelt die Stange am Boden
+    const art=BB();
+    const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
+    if(fortschritt<0.12)return "boden";
+    if(fortschritt<0.35)return "zug";
+    if(zug.r.gueltig)return "hoch";
+    return fortschritt<0.55?"abwurf":"boden";
+  }
   function zeichneHeben(art){
     if(!TEILNEHMER.length)return;
     const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
@@ -12500,6 +12697,15 @@
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
       ctx.beginPath();ctx.ellipse(x,y+26,22,8,0,0,6.3);ctx.fill();
       ctx.globalAlpha=1;
+      // GESAMTLAST BISHER — vorgezogen (frueher erst unten bei der Namensbeschriftung
+      // berechnet), weil u._vizKg direkt darunter sie schon braucht.
+      const zwSoFar=bestBisher(u,"reissen")+bestBisher(u,"stossen");
+      // PRAESENTATIONALES GEWICHT AN DER HANTEL (s. zeichneHantel/HEBEN_HAND, Aufruf in
+      // zeichneSprite): der gerade aktive Heber zeigt seine enthuellte Last, der
+      // wartende Gegner seine bislang beste Zweikampf-Summe (vor dem ersten Versuch:
+      // leere Stange). Rein praesentational — in keiner Formel gelesen, dasselbe
+      // Praefix-Prinzip wie die viz*-Felder aus buehnenBewegung (PR 0).
+      u._vizKg=(letzterHebenZug&&letzterHebenZug.u===u)?letzterHebenZug.r.kg:zwSoFar;
       // `true` als vierter Parameter erzwingt dieselbe Weiche, die Feldspiel (Korbleger/
       // Wurf) schon nutzt (s. Kommentar bei zeichneSprite): die "shoot"-Pose (einzige
       // Ueberkopf-Bewegung im Baukasten, kein Waffen-Overlay) statt "slash"/"shoot" MIT
@@ -12508,7 +12714,7 @@
       // gehauen". Ohne diesen Parameter waehlte zeichneSprite() bei u.lunge>0 (s. dort,
       // gesetzt in stepBuehne fuer JEDEN enthuellten Versuch) je nach Bausatz-Waffe eine
       // Schwert-/Axt-/Bogen-Kampfanimation — ein Heber schlug oder schoss, hob aber nie
-      // etwas. Die tatsaechliche Hantel s.u.
+      // etwas. Die Hantel haengt jetzt an der Hand, s. HEBEN_HAND-Aufruf in zeichneSprite.
       zeichneSprite(ctx,u,x,y,true);
       const schrift=(txt,dy,farbe,groesse,gewicht)=>{
         ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
@@ -12518,55 +12724,35 @@
       schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
-      const zwSoFar=bestBisher(u,"reissen")+bestBisher(u,"stossen");
       schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
     });
 
-    // DIE HANTEL — Balken mit zwei Scheibenpaaren, keine neue Sprite-Pipeline, nur
-    // Primitiven, JETZT ANIMIERT (Chris' zweiter Fund, 06.09.: "das gewicht müsste
-    // angehoben werden und entweder schafft man es oder nicht"). Vorher stand die Hantel
-    // reglos mittig, nur die Zahl/das Wort daneben verrieten gueltig/ungueltig — jetzt
-    // wandert sie sichtbar vom Boden (nahe den Haenden) zur Streckung ueber dem Kopf, bleibt
-    // dort haengen bei einem gueltigen Versuch und faellt zurueck bei einem ungueltigen.
-    // `bx` folgt dem Heber, der gerade dran ist (dieselbe Regel wie aktivNr oben) statt fest
-    // in der Mitte zu stehen — vor dem allerersten Versuch (zug===null) bleibt sie mittig,
-    // reglos am Boden, wie ein Geraet, das noch niemand angefasst hat.
-    //
-    // FORTSCHRITT kommt aus buehneAkt/art.rundenDauer — DERSELBEN Zahl, die stepBuehne()
-    // ohnehin fuehrt, um den naechsten Versuch zu takten (buehneAkt zaehlt von rundenDauer
-    // auf 0 herunter). Kein zweiter Zeitgeber, kein neuer Zustand auf u/TEILNEHMER — rein
-    // praesentational: disziplinProbe()/miss-alle-disziplinen.mjs rufen stepBuehne()
-    // weiterhin direkt mit festem 1/60 auf, lesen buehneAkt nie fuer die Wertung und
-    // durchlaufen diese Zeichenfunktion nie. Farbe/Ausgang kommen wie bei der Zahl daneben
-    // sofort aus zug.r.gueltig — dieselbe sofortige Klarheit, die die KG-Zahl schon hat,
-    // kein kuenstlich verzoegerter Spannungsaufbau.
+    // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
+    // ungueltig/scheiben_fall beim Uebergang ->abwurf. `letzterHebenZug._tonPhase` merkt
+    // sich, welche Phase fuer DIESEN Zug schon vertont wurde, damit nicht jeder Frame den
+    // Ton erneut abfeuert — ein Feld auf dem transienten {u,r}-Container, nicht auf u
+    // selbst, rein praesentational (sfx() ist ein No-Op ohne AudioContext, s. dort).
     const zug=letzterHebenZug;
+    if(zug){
+      const jetzt=hebePhase(zug.u);
+      if(jetzt!==zug._tonPhase){
+        if(jetzt==="hoch"&&zug._tonPhase==="zug"){ sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch"); }
+        if(jetzt==="abwurf"&&zug._tonPhase!=="abwurf"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
+        zug._tonPhase=jetzt;
+      }
+    }
+    // `bx` — die Bildschirm-Spalte des GERADE aktiven Hebers (dieselbe Regel wie aktivNr
+    // oben), fuer die TEXT-KARTE unten. Die Hantel selbst haengt seit Ziel 1 (10.09.) an
+    // der Hand (HEBEN_HAND/zeichneHantel, Aufruf in zeichneSprite) statt hier freistehend
+    // gezeichnet zu werden — die alte, an keinem Koerperpunkt verankerte Primitive
+    // (Chris' Fund, 06.09.: "da ist gar kein gewicht als asset was die spieler versuchen
+    // zu stämmen") entfaellt ersatzlos.
     const aktiverHeber=zug?zug.u:null;
     const bx=aktiverHeber?(aktiverHeber.side===0?W*0.30:W*0.70):W/2;
-    const boden=y+40, ueberkopf=y-58;
-    // 0..0.35: Aufstieg. Gueltig: bleibt ab da oben (gehalten). Ungueltig: faellt 0.35..0.55
-    // zurueck auf den Boden und bleibt dort liegen, bis der naechste Versuch beginnt.
-    const fortschritt=zug?Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1))):0;
-    const steigPhase=Math.min(1,fortschritt/0.35);
-    const gueltigJetzt=!zug||zug.r.gueltig;
-    let by;
-    if(zug&&!gueltigJetzt&&fortschritt>0.35){
-      const fallPhase=Math.min(1,(fortschritt-0.35)/0.20);
-      by=ueberkopf+(boden-ueberkopf)*fallPhase;
-    } else {
-      by=boden+(ueberkopf-boden)*steigPhase;
-    }
-    const balkenFarbe=zug?(gueltigJetzt?css("--ok"):css("--crit")):"#5a5568";
-    const scheibeFarbe=zug?(gueltigJetzt?css("--ok"):css("--crit")):"#3a3648";
-    ctx.strokeStyle=balkenFarbe;ctx.lineWidth=5;
-    ctx.beginPath();ctx.moveTo(bx-46,by);ctx.lineTo(bx+46,by);ctx.stroke();
-    ctx.fillStyle=scheibeFarbe;
-    for(const dx of [-46,-38,38,46])
-      {ctx.beginPath();ctx.ellipse(bx+dx,by,Math.abs(dx)===46?11:8,Math.abs(dx)===46?11:8,0,0,6.3);ctx.fill();}
 
-    // TEXT-KARTE bleibt an einer FESTEN Hoehe (unabhaengig von `by`, das sich mit der Hantel
-    // bewegt) — sonst haetten Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar
-    // zu bleiben, waehrend das Auge der Hantel folgt.
+    // TEXT-KARTE bleibt an einer FESTEN Hoehe, unabhaengig von der Hantel, die jetzt an
+    // der Hand haengt und sich mit dem Phasenwechsel (hebePhase) bewegt — sonst haetten
+    // Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar zu bleiben.
     const textY=y+2;
     ctx.textAlign="center";ctx.textBaseline="middle";
     if(zug){
@@ -21443,6 +21629,14 @@
     // TON_KATALOG-Loops (aktuell nur Breaking, s. tonLoopStart()-Aufrufe unten). Ein
     // No-Op, wenn gerade kein Loop laeuft (tonLoopStop() prueft das selbst).
     tonLoopStop();
+    // N1-FIX (Opus-Review PR #879, Abschnitt 6): tonLoopStop() hier oben beendet auch einen
+    // laufenden Gewichtheben-Publikums-Loop, aber die Flagge hebenPublikumAn blieb bislang
+    // stehen -- ihr einziger anderer Loeschpfad ist bodenBuehne(), die nach einem Reset
+    // aber gar nicht mehr zwingend laeuft (z.B. beim Neustart DERSELBEN Disziplin). Ohne
+    // diese Zeile haelt bodenHeben() die Flagge fuer "schon gestartet" und startet den
+    // Loop ab dem zweiten Gewichtheben-Kampf nie wieder -- das Publikum bliebe dauerhaft
+    // stumm. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    hebenPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
