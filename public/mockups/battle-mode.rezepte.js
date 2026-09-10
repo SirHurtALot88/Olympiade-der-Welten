@@ -395,13 +395,14 @@ window.__ARENA_REZEPTE = {
   // 1337, 4242 und 99991 — vorher wie nachher byte-identisch, dasselbe Verfahren, mit
   // dem #726 den Basketball-Umzug belegt hat.
   //
-  // WAS MAN BEIM NAECHSTEN ANFASSEN WISSEN MUSS. Hockey faehrt heute NICHT den
-  // Live-Motor, sondern den Vorab-Pfad: bauFeldspiel rechnet das Ergebnis in einer
-  // Schleife durch, es gibt keine Manndeckung, keine Zonen und keine Standphasen. Die
-  // sieben Sub-Skills unten sind deshalb Basketballs alte Sieben, nicht hockeyeigene.
-  // Gemessen (scripts/miss-hockey-bestand.mjs) tragen sie mechanisch sehr ungleich:
-  // ABWEHR 33,5 % gegen ZWEITCHANCE 1,4 %, und stamina hat mit AUSDAUER als einziger
-  // Heimat 1,6 % verfuegbar bei Matrixvorgabe 10. Die Pp-Abweichung liegt bei 48,1
+  // STAND VOR DER LIVE-MIGRATION (historisch, ueberholt seit 02.09. — s. "INZWISCHEN
+  // UEBERHOLT" im Absatz direkt darunter). Zum Zeitpunkt dieses Absatzes fuhr Hockey
+  // NICHT den Live-Motor, sondern den Vorab-Pfad: bauFeldspiel rechnete das Ergebnis in
+  // einer Schleife durch, es gab keine Manndeckung, keine Zonen und keine Standphasen.
+  // Die sieben Sub-Skills unten waren deshalb Basketballs alte Sieben, nicht hockeyeigene.
+  // Gemessen (scripts/miss-hockey-bestand.mjs) trugen sie mechanisch sehr ungleich:
+  // ABWEHR 33,5 % gegen ZWEITCHANCE 1,4 %, und stamina hatte mit AUSDAUER als einziger
+  // Heimat 1,6 % verfuegbar bei Matrixvorgabe 10. Die Pp-Abweichung lag bei 48,1
   // (n=48), die Rangtreue bei rho 0,493 (n=24, jeSeite 6, seit PR #732 messbar).
   //
   // AN DIESEN ZAHLEN JETZT ZU DREHEN LOHNT NICHT — und das ist ein Befund, keine

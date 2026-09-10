@@ -4840,8 +4840,12 @@
   //
   // gewichtetesLos() SELBST bleibt bewusst unangetastet: seine Aufrufstellen (Zeilen im
   // Vorab-Durchlauf von bauFeldspiel) laufen fuer Basketball nie (die Funktion springt
-  // vorher in initBasketballLive) — sie zu aendern wuerde ausschliesslich Football/
-  // Hockey/Tennis verschieben, die in dieser Runde nicht angefasst werden.
+  // vorher in initBasketballLive). Zum Zeitpunkt dieses Eingriffs (25.08.) haette eine
+  // Aenderung ausschliesslich Football/Hockey/Tennis verschoben — das gilt nicht mehr:
+  // Hockey ist am 02.09. auf die eigene Live-Engine umgezogen, Football am 03.09.,
+  // Tennis auf die Buehne (s. :4750). Der Vorab-Durchlauf faehrt seitdem fuer KEINE
+  // Disziplin mehr (Fable-Befund E2, s. Kommentar bei der Vorab-Schleife weiter unten) —
+  // eine Aenderung an gewichtetesLos() selbst bewegt heute nichts in Produktion.
   const LOS_NULLPUNKT=20;
   const LOS_KAPPA=3;   // GESETZT, gegen kappa 2 durchgemessen (s. Bericht/PR-Tabelle)
   const losGewicht=(wert,kappa)=>Math.pow(Math.max(1,wert-LOS_NULLPUNKT),
@@ -4880,14 +4884,14 @@
   const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
 
   // ===================================================================================
-  // HOCKEY — SCHUSSABLAUF (Daten fuer einen Bewegungsablauf, KEIN Live-Motor). Hockey hat
-  // noch keine Live-Engine wie stepBasketballLive (die MOTOREN[hockey] weiter unten
-  // rechnet die Partie vorab durch, s. Kommentar dort) — das hier ist Vorarbeit fuer den
-  // Moment, in dem eine entsteht: WANN welche Haltung gilt, nicht WIE sie gezeichnet
-  // wird (das macht der Schlaeger-Zeichenagent) oder WER wann schiesst (das der Live-
-  // Motor, spaetere Runde). Nach demselben Muster wie die Freiwurf-Sequenz oben (FW_*,
-  // freiwurfGeo/-Aufstellung, stepFreiwurfPhase): eine Zeitvariable je Phase, keine
-  // Bildnummern-Tabelle.
+  // HOCKEY — SCHUSSABLAUF (Daten fuer einen Bewegungsablauf, keine Entscheidungslogik).
+  // Hockey hat seit dem 02.09. eine eigene Live-Engine (stepFeldspielLive, mit
+  // hockey-eigenen Verzweigungen ueber istHockey(), s. dort) — das hier bleibt trotzdem
+  // reine Vorarbeit fuer den Zeichenagent: WANN welche Haltung gilt, nicht WIE sie
+  // gezeichnet wird (das macht der Schlaeger-Zeichenagent) oder WER wann schiesst (das
+  // entscheidet der Live-Motor selbst, per Zweikampf-Los, nicht dieser Ablauf). Nach
+  // demselben Muster wie die Freiwurf-Sequenz oben (FW_*, freiwurfGeo/-Aufstellung,
+  // stepFreiwurfPhase): eine Zeitvariable je Phase, keine Bildnummern-Tabelle.
   //
   // ZWEI SCHUSSARTEN, nicht eine — begruendet aus demselben Rezept, das Hockey im Plan
   // schon hat (docs/design/hockey-rollout-plan.md, Abschnitt B.2/B.3): SCHUSS_NAH
@@ -5713,15 +5717,25 @@
       const p=fsIdlePos(side,i,team.length); u.x=p.x; u.y=p.y;
     }));
 
-    // BASKETBALL LAEUFT AB HIER LIVE (Chris' Entscheidung: Feldspiel soll sich wie
-    // Kampf/Bahn anfuehlen — Ereignisse entstehen beim Zusehen, nicht vorab feststehend.
-    // Erster Schritt, nur diese eine Disziplin, siehe initBasketballLive/
-    // stepBasketballLive). Football/Hockey/Tennis bleiben unten beim bewaehrten
-    // Vorab-Durchlauf, bis sich das Muster bewaehrt hat.
+    // FELDSPIEL LAEUFT AB HIER LIVE, wenn die Disziplin einen `live`-Block traegt (Chris'
+    // Entscheidung: Feldspiel soll sich wie Kampf/Bahn anfuehlen — Ereignisse entstehen
+    // beim Zusehen, nicht vorab feststehend). Basketball war am 25.08. der erste Umzug
+    // (initFeldspielLive/stepFeldspielLive, damals nur fuer diese eine Disziplin
+    // geschrieben) — Hockey ist am 02.09. gefolgt, Football am 03.09.; beide haengen
+    // heute am selben `art.live`-Zweig, mit eigenen istHockey()/istFootball()-
+    // Verzweigungen im Live-Motor selbst. Tennis ist stattdessen auf die Buehne
+    // umgezogen (:4750) und durchlaeuft bauFeldspiel ueberhaupt nicht mehr.
     if(art.live){ initFeldspielLive(art); return; }
 
     // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
     // steht fest, bevor die Enthuellung beginnt.
+    //
+    // STAND 10.09.: dieser Durchlauf faehrt fuer KEINE Disziplin mehr. Nicht Tennis'
+    // Umzug auf die Buehne (03.09., 15:10 UTC) hat das bewirkt — Football lief hier bis
+    // zum selben Nachmittag noch durch —, sondern Footballs eigene Live-Migration rund
+    // zwei Stunden spaeter (03.09., 17:12 UTC); Hockey war schon am 02.09. gegangen.
+    // NICHT LOESCHEN: der Block bleibt die Naht fuer eine spaetere Vorab-Disziplin (und
+    // das Denkduell-Muster), nur die Beschriftung war falsch.
     fsZuege=[];
     const gesamtZuege=art.zuegeJeSeite*2;
     let amBall=0; // 0 oder 1, wer beginnt
@@ -5809,8 +5823,9 @@
     }
   }
 
-  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. Das alte Vorab-Modell (fuer
-  // Football/Hockey/Tennis unten weiter aktiv) rechnet die ganze Partie im Voraus durch
+  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. Das alte Vorab-Modell (oben,
+  // seit Footballs Live-Migration (03.09.) fuer KEINE Disziplin mehr aktiv, s. Kommentar
+  // bei der Vorab-Schleife) rechnet die ganze Partie im Voraus durch
   // und schreibt dabei direkt in die Spielerobjekte (punkte, assists, rebounds, steals,
   // bloecke, verluste) und in fsPunkte: bequem zum Bauen, aber als Anzeige wären es
   // Spoiler — genau der Fehler, der im Denkduell schon einmal behoben wurde (u.vorteil
@@ -6279,6 +6294,9 @@
     taeter.strafminuten+=2; taeter.fouls++;
     if(taeter.hatBall){ taeter.hatBall=false; fsLive.ball.traeger=null; }
     taeter.deckt=null;
+    // TON (Assets 80->100, TON_KATALOG.hockey.pfiff): genau hier wird "wirklich gepfiffen"
+    // (s. Funktionskommentar oben) — reine Praesentation, kein rr()-Aufruf.
+    sfx("hockey","pfiff");
     feed(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
     schwebe({x:0,y:0,txt:"STRAFE!",life:1.2,crit:true,_def:true,_spieler:taeter.id});
     logZug(opfer.side,"strafe",{verteidiger:taeter,spieler:opfer});
@@ -8271,6 +8289,10 @@
     // fest, waehrend der Puck fliegt.
     const hk=istHockey()?hockeySchussAusgang(schuetze,technik,blockKandidat):null;
     if(hk){
+      // TON (Assets 80->100, TON_KATALOG.hockey.schuss): der Abwurf selbst, unabhaengig
+      // vom Ausgang — reine Praesentation, kein rr()-Aufruf (der ist schon oben in
+      // hockeySchussAusgang gefallen).
+      sfx("hockey","schuss");
       // Handgelenkschuss aus der Naehe, Schlagschuss von der blauen Linie — dieselbe
       // Unterscheidung, die auch das Rezept mit SCHUSS_NAH und SCHUSS_FERN trifft.
       schuetze.schussArt=(tier==="fern"||tier==="mit")?"schlag":"handgelenk";
@@ -8778,6 +8800,10 @@
         traeger.taumeltBis=fsT+HK_TAUMEL;
         traeger.down=true; traeger.downBis=fsT+HK_STURZ;
         decker.checks++;
+        // TON (Assets 80->100, TON_KATALOG.hockey.treffer): der sitzende, nicht gepfiffene
+        // Bodycheck — der zu harte Zweig oben endet stattdessen in verhaengeStrafe()/pfiff.
+        // Reine Praesentation, kein rr()-Aufruf.
+        sfx("hockey","treffer");
         feed(decker.side,decker.n+" checkt "+traeger.n+" von den Kufen.");
         schwebe({x:0,y:0,txt:"CHECK!",life:1.0,crit:true,_def:true,_spieler:decker.id});
         logZug(decker.side,"check",{verteidiger:decker,spieler:traeger});
@@ -8912,6 +8938,9 @@
     const rein=torX>MID?-1:1;
     if(hk.ausgang==="tor"){
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
+      // TON (Assets 80->100, TON_KATALOG.hockey.tor): dieselbe Stelle wie das "TOR!"-
+      // Schwebetext/Feed weiter unten. Reine Praesentation, kein rr()-Aufruf.
+      sfx("hockey","tor");
       // VORLAGEN AUS DER BERUEHRUNGSKETTE (Impact-Verteilung-Recherche 5.4, statt des
       // reinen ASSIST_FENSTER-Zeitfensters): A1 ist der Ballbesitzer unmittelbar vor dem
       // Schuetzen in derselben ununterbrochenen Kette (s. merkeBeruehrung), A2 der davor —
@@ -10193,7 +10222,15 @@
     ctx.lineTo(l,o+e); ctx.quadraticCurveTo(l,o,l+e,o);
     ctx.closePath();
   }
+  // TON (Assets 80->100, TON_KATALOG.hockey.publikum, 10.09.): Publikums-Loop, exakt
+  // dasselbe Muster wie hebenPublikumAn/tonLoopStart("gewichtheben") bei bodenHeben()
+  // und takeshiPublikumAn/tonLoopStart("takeshis-castle") bei bodenTakeshiRoute() --
+  // inklusive des N1-Fixes aus Opus-Review PR #879 (Abschnitt 6): reset() setzt
+  // hockeyPublikumAn unten explizit zurueck, sonst haelt die Flagge nach dem ersten
+  // Reset "schon gestartet" und der Loop kommt im zweiten Hockey-Spiel nie wieder.
+  let hockeyPublikumAn=false;
   function eisflaeche(){
+    if(!hockeyPublikumAn){ tonLoopStart("hockey"); hockeyPublikumAn=true; }
     const k=RINK();
     // Eis. Ein kalter Verlauf statt einer flachen Flaeche — sonst liest sich die Mitte
     // wie Papier und das Feld verliert jede Tiefe.
@@ -10284,6 +10321,11 @@
   }
 
   function bodenFeldspiel(){
+    // TON (Assets 80->100, TON_KATALOG.hockey.publikum): Publikums-Loop beenden, falls wir
+    // GERADE von Hockey herkommen (s. eisflaeche() unten) und jetzt eine andere Feldspiel-
+    // Disziplin zeichnen, ohne dass zwischendurch reset() lief — dasselbe Bookkeeping wie
+    // bodenBuehne() fuer hebenPublikumAn bzw. bodenSpurt() fuer takeshiPublikumAn.
+    if(feldspielDisc!=="hockey"&&hockeyPublikumAn){ tonLoopStop(); hockeyPublikumAn=false; }
     const g=ctx.createLinearGradient(0,0,0,H);
     // Ausserhalb der Spielflaeche: Rasenton fuer die Feldsportarten, kalte Halle fuer
     // das Eis. Ein gruener Rand um eine Eisflaeche liest sich sofort falsch.
@@ -16973,10 +17015,12 @@
     osc.start(t0); osc.stop(t0+d+0.03);
   }
 
-  // Katalog je Disziplin. Die anderen 15 Disziplinen bleiben hier ABSICHTLICH ohne Eintrag
+  // Katalog je Disziplin. Die anderen 14 Disziplinen bleiben hier ABSICHTLICH ohne Eintrag
   // (Opus-Plan Abschnitt 9.3: "Ton fuer die uebrigen 15 Disziplinen ... ist je Disziplin
-  // eine eigene kleine Runde") — sfx() auf eine unbekannte Disziplin/ein unbekanntes
-  // Ereignis ist ein stiller No-Op, kein Fehler.
+  // eine eigene kleine Runde" — Stand vor Hockeys Runde hier, 10.09.: mit Basketballs
+  // separatem bkSfx()/Audio-Dateien-System dazugezaehlt sind das jetzt 6 von 20 mit
+  // irgendeiner Tonbehandlung, 14 bleiben offen) — sfx() auf eine unbekannte Disziplin/ein
+  // unbekanntes Ereignis ist ein stiller No-Op, kein Fehler.
   const TON_KATALOG={
     gewichtheben:{
       ansage:        {synth:(vol)=>tonTon(vol,300,0.5)},
@@ -17005,6 +17049,29 @@
       platsch:  {synth:(vol)=>tonRauschen(vol,900,0.4,false)},
       tor:      {synth:(vol)=>tonMetall(vol,300,0.6)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    // HOCKEY (Fable-Entscheidung E2, Abschnitt 2.4 Punkt 3, 10.09.): Assets 80 -> 100.
+    // eisflaeche() hat mit der vollen Eis-/Bande-/Tor-Kulisse schon das Bild, aber laut
+    // Audit A4=0 (kein Ton) — die guenstigste verbleibende Achse. Fuenf Ereignisse,
+    // dieselben fuenf Synth-Bausteine wie ueberall sonst im Katalog, keine sechste Form:
+    //  - schuss  (tonKlick+tonSchlag): der kurze, harte Schlag von Schlaeger auf Puck,
+    //    im Moment des Abwurfs in wirf() (istHockey()-Zweig).
+    //  - treffer (tonSchlag+tonRauschen): der dumpfe Aufprall eines sitzenden Bodychecks
+    //    (der GEPFIFFENE Check laeuft stattdessen ueber pfiff, s. verhaengeStrafe()).
+    //  - pfiff   (tonDoppelton, hoch): die Schiedsrichterpfeife, an derselben Stelle wie
+    //    "STRAFE!" im Feed (verhaengeStrafe() — "gibt true zurueck, wenn wirklich
+    //    gepfiffen wurde", s. dort).
+    //  - tor     (tonTon+tonMetall): die Torsirene/-hupe, an derselben Stelle wie
+    //    "TOR!" im Feed (loeseHockeySchuss(), hk.ausgang==="tor").
+    //  - publikum (Loop): exakt das Gewichtheben-/Takeshi-Muster (bodenHeben()/
+    //    bodenBuehne(), bodenTakeshiRoute()/bodenSpurt()) — hier eisflaeche()/
+    //    bodenFeldspiel(), inklusive des N1-Fixes in reset() (hockeyPublikumAn).
+    hockey:{
+      schuss:   {synth:(vol)=>{ tonKlick(vol,2200,0.045); tonSchlag((vol??0.6)*0.7,420,140,0.11); }},
+      treffer:  {synth:(vol)=>{ tonSchlag(vol,170,45,0.22); tonRauschen((vol??0.6)*0.5,650,0.18,false); }},
+      pfiff:    {synth:(vol)=>tonDoppelton(vol,2600,3100,0.42)},
+      tor:      {synth:(vol)=>{ tonTon(vol,220,0.6); tonMetall((vol??0.6)*0.7,440,0.5); }},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,480,0,true)}
     }
   };
 
@@ -21767,6 +21834,11 @@
     // Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder
     // Rangtreue.
     takeshiPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER HOCKEY (E2, Assets 80->100, 10.09.): ohne diese Zeile haelt
+    // eisflaeche() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
+    // zweiten Hockey-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
+    // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    hockeyPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
