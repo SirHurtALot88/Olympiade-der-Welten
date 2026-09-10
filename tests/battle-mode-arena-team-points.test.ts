@@ -99,18 +99,18 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6): Staffel, Spurt, Takeshi's Castle und
-   * Time-Trial sind jetzt arena-aufgeloest, ueber das NEUE Bahn-Chassis (`spieleBahn()`,
+   * BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6): Staffel, Takeshi's Castle und Time-Trial
+   * sind jetzt arena-aufgeloest, ueber das NEUE Bahn-Chassis (`spieleBahn()`,
    * `ARENA_BAHN_DISCIPLINE_IDS`). Der Grund, aus dem Staffel VORHER fehlte, war ein STALE
    * Befund (`bahnTeamstand()` angeblich `gewertet:false` fuer Staffel) -- der stimmt seit PR #827
    * fuer keine der fuenf Bahnen mehr (Audit Abschnitt 4.1). Der eigentliche Blocker war stets
    * ACHSE 2 (kein Arena-Chassis fuer die Bahn), nicht die fehlende Wertung -- s. korrigierter
    * Kommentar bei ARENA_RESOLVED_DISCIPLINE_IDS. Dieser Test ersetzt den alten
    * "enthaelt NICHT Staffel"-Regressionstest, der die ueberholte Annahme festgeschrieben hatte.
+   * SPURT ABSICHTLICH NICHT HIER -- s. eigener Regressionstest direkt darunter.
    */
-  it("enthaelt Staffel, Spurt, Takeshi's Castle und Time-Trial (Bahn-Produktivierung, 10.09.)", () => {
+  it("enthaelt Staffel, Takeshi's Castle und Time-Trial (Bahn-Produktivierung, 10.09.)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("takeshis-castle")).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("time-trial")).toBe(true);
   });
@@ -124,6 +124,21 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    */
   it("enthaelt NICHT Climbing (besteht die Rangtreue-Schranke knapp nicht, 0,790 < 0,80)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("climbing")).toBe(false);
+  });
+
+  /**
+   * SPURT BLEIBT (VORERST) BEWUSST DRAUSSEN (Opus-Review PR #881, Fund F1, 10.09.) -- anders als
+   * Climbing NICHT wegen der Rangtreue (rho 0,871 besteht die 0,80-Schranke klar), sondern weil
+   * ein Kommentar in `scripts/ziehe-buehne-pps-referenz.ts` faelschlich `BAHN_ART.spurt.jeSeite`
+   * mit 6 annahm, obwohl der Motor tatsaechlich `jeSeite = 4` faehrt. Gegen den echten Spielstand
+   * gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures): ALLE 64 Fixtures lieferten einen zu
+   * kleinen Boxscore (512 statt 768 Eintraege), UND 4 von 64 liefen 4-gegen-2 statt 4-gegen-4.
+   * Ein Regressionstest wie bei Climbing: haelt fest, DASS Spurt bewusst draussen bleibt, bis die
+   * PPS-Referenz bei Feldgroesse 4 neu gezogen ist (eigenes Folge-Ticket). Wird Spurt spaeter
+   * angeschlossen, faellt dieser Test absichtlich rot und ist DANN zu aktualisieren.
+   */
+  it("enthaelt NICHT Spurt (Feldgroessen-Diskrepanz jeSeite 4 vs. angenommene 6, Opus-Review PR #881 Fund F1)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(false);
   });
 
   /**

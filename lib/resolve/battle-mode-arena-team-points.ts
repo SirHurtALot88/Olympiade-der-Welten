@@ -143,11 +143,11 @@ import breakingPpsReferenzJson from "@/data/generated/breaking-pps-referenz.json
 import wettessenPpsReferenzJson from "@/data/generated/wettessen-pps-referenz.json";
 import tennisPpsReferenzJson from "@/data/generated/tennis-pps-referenz.json";
 import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
-// BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6.3): vier Bahn-Disziplinen, ueber das NEUE
+// BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6.3): drei Bahn-Disziplinen (Spurt bewusst
+// nicht angeschlossen, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS` unten), ueber das NEUE
 // Bahn-Chassis (`ARENA_BAHN_DISCIPLINE_IDS`, `spieleBahn()`) -- gezogen vom selben, erweiterten
 // scripts/ziehe-buehne-pps-referenz.ts (jetzt auch `chassis:"bahn"` kennend, s. dort).
 import staffelPpsReferenzJson from "@/data/generated/staffel-pps-referenz.json";
-import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
 import takeshisCastlePpsReferenzJson from "@/data/generated/takeshis-castle-pps-referenz.json";
 import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.json";
 
@@ -199,21 +199,37 @@ import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.j
  *     Welle an `public/mockups/battle-mode.engine.js` ist deshalb LEER.
  *
  * BAHN-PRODUKTIVIERUNG (10.09., docs/pm-briefings/opus-plan-feinschliff-vier-disziplinen-09-10.md
- * Abschnitt 6): STAFFEL (rho 0,915, die beste des Feldes), SPURT (0,871), TAKESHI'S CASTLE
- * (0,861) und TIME-TRIAL (0,828) sind die elfte bis vierzehnte arena-aufgeloeste Disziplin --
- * ueber das NEUE Bahn-Chassis (`ARENA_BAHN_DISCIPLINE_IDS`, arena-headless-runner.ts,
+ * Abschnitt 6): STAFFEL (rho 0,915, die beste des Feldes), TAKESHI'S CASTLE (0,861) und
+ * TIME-TRIAL (0,828) sind die elfte bis dreizehnte arena-aufgeloeste Disziplin -- ueber das NEUE
+ * Bahn-Chassis (`ARENA_BAHN_DISCIPLINE_IDS`, arena-headless-runner.ts,
  * `window.__arena.spieleBahn()`), das ERSTE MAL fuer ein ganzes Chassis statt einer Buehnen-
- * Unterart. Der Dispatch ist fuer alle vier identisch (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-
+ * Unterart. Der Dispatch ist fuer diese drei identisch (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-
  * Disziplin in derselben Schleife registriert, battle-mode.engine.js) -- ein `spieleBahn()`, das
  * nur Takeshi bediente, haette kuenstlich verengt werden muessen.
  *
- * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem der beiden Gruende jeweils:
+ * SPURT BEWUSST (NOCH) NICHT DABEI (Opus-Review PR #881, Fund F1, 10.09.): rho 0,871 besteht die
+ * Schranke, ABER ein Kommentar in `scripts/ziehe-buehne-pps-referenz.ts` ging faelschlich davon
+ * aus, `BAHN_ART.spurt.jeSeite` sei wie bei den anderen drei Bahnen 6 -- tatsaechlich ist
+ * `jeSeite` fuer Spurt 4 (die einzige der vier Bahnen, bei der Motor-Feldgroesse und Saison-
+ * Maximalfeldgroesse auseinanderfallen). Gegen den echten Spielstand gemessen
+ * (`runArenaFixtures()`, 32 Teams, 64 Fixtures):
+ * ALLE 64 Fixtures liefern einen zu kleinen Boxscore (512 statt 768 Eintraege, ein bis zwei
+ * nominierte Laeufer je Seite laufen gar nicht mit und fallen auf den alten PPS-Pfad zurueck),
+ * UND 4 von 64 Fixtures liefen 4-gegen-2 statt 4-gegen-4 (ein Team bekam seine Aufstellung nicht
+ * angewendet). Das ist echte Punkteverzerrung, kein kosmetischer Fehler -- Spurt bleibt deshalb
+ * aussen vor, bis die PPS-Referenz bei der korrekten Feldgroesse (4) neu gezogen ist (eigenes
+ * Folge-Ticket, s. PR-Beschreibung).
+ *
+ * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem der drei Gruende jeweils:
  *  - CLIMBING (rho 0,790 je Spiel): Rangtreue NICHT bestanden -- 0,010 unter der 0,80-Schranke
- *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die vier anderen Bahnen),
+ *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die anderen Bahnen),
  *    und genau deshalb ist es der wichtige Nicht-Eintrag: dieselbe Regel, die I-Spy (0,684) aus
  *    `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es `duell:true` traegt -- die
  *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
  *    eine davon billig zu erfuellen waere.
+ *  - SPURT (rho 0,871): Rangtreue bestanden, aber Feldgroessen-Fund F1 oben -- eine dritte, neue
+ *    Art von Grund (weder Achse 1 noch Achse 2 fehlt, sondern die Kalibrierung der Referenz ist
+ *    fuer die tatsaechliche Motor-Feldgroesse falsch).
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516), BATTLEFIELD/TDM/
  *    MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
@@ -229,9 +245,9 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "wettessen",
   "tennis",
   "fechten",
-  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen.
+  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen,
+  // Spurt ebenso (Opus-Review PR #881, Fund F1 -- Feldgroessen-Diskrepanz, eigenes Folge-Ticket).
   "staffel",
-  "spurt",
   "takeshis-castle",
   "time-trial",
 ]);
@@ -416,13 +432,14 @@ export const FECHTEN_INDIVIDUAL_PPS_MAX = 5.5;
 export const FECHTEN_PPS_ANTEIL_MITTE = 0.25;
 
 /**
- * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER DIE VIER BAHN-DISZIPLINEN (Bahn-Produktivierung, 10.09.,
- * Ziel 3 Abschnitt 6.3b). Dieselbe Impact-Kurve (`ppsAusArenaImpact()`), eigene Regler aus
- * GENAU DEMSELBEN Grund wie bei jeder bisherigen Arena-Disziplin: der rohe Boxscore-Wert dieser
- * vier (`bahnTeamstand().punkte`, s. `spieleBahn()`-Kommentar in battle-mode.engine.js -- NICHT
- * `MOTOREN[bd].wert()`, das fuer Rang/Etappe negativ waere) liegt auf einer EIGENEN Skala je
- * Wertungsmodus (Rangpunkte 1..N bei Spurt/Time-Trial, Etappen-Rangpunkte bei Staffel,
- * Burgpunkte bei Takeshi's Castle).
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER DIE DREI ANGESCHLOSSENEN BAHN-DISZIPLINEN (Bahn-
+ * Produktivierung, 10.09., Ziel 3 Abschnitt 6.3b -- Spurt bewusst nicht dabei, s. Opus-Review
+ * PR #881 Fund F1 und der Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve
+ * (`ppsAusArenaImpact()`), eigene Regler aus GENAU DEMSELBEN Grund wie bei jeder bisherigen
+ * Arena-Disziplin: der rohe Boxscore-Wert dieser drei (`bahnTeamstand().punkte`, s.
+ * `spieleBahn()`-Kommentar in battle-mode.engine.js -- NICHT `MOTOREN[bd].wert()`, das fuer
+ * Rang/Etappe negativ waere) liegt auf einer EIGENEN Skala je Wertungsmodus (Rangpunkte 1..N bei
+ * Time-Trial, Etappen-Rangpunkte bei Staffel, Burgpunkte bei Takeshi's Castle).
  *
  * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben Grund
  * wie bei jeder vorigen Welle: Chris' Rahmen "max 5-6" und die 04.09.-Kurvenform-Messung sind
@@ -431,8 +448,6 @@ export const FECHTEN_PPS_ANTEIL_MITTE = 0.25;
  */
 export const STAFFEL_INDIVIDUAL_PPS_MAX = 5.5;
 export const STAFFEL_PPS_ANTEIL_MITTE = 0.25;
-export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
-export const SPURT_PPS_ANTEIL_MITTE = 0.25;
 export const TAKESHIS_CASTLE_INDIVIDUAL_PPS_MAX = 5.5;
 export const TAKESHIS_CASTLE_PPS_ANTEIL_MITTE = 0.25;
 export const TIME_TRIAL_INDIVIDUAL_PPS_MAX = 5.5;
@@ -528,11 +543,11 @@ const TENNIS_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 const FECHTEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   fechtenPpsReferenzJson as ArenaPpsReferenzJson,
 );
-// BAHN-PRODUKTIVIERUNG (10.09.): keine der vier hat eine Rolle mit eigener Wertformel (wie
-// Hockeys Torwart) -- `feldgroessenTorwart` bleibt in ihren JSON-Dateien leer, genau wie bei
-// jeder Nicht-Hockey-Disziplin oben.
+// BAHN-PRODUKTIVIERUNG (10.09.): keine der drei angeschlossenen hat eine Rolle mit eigener
+// Wertformel (wie Hockeys Torwart) -- `feldgroessenTorwart` bleibt in ihren JSON-Dateien leer,
+// genau wie bei jeder Nicht-Hockey-Disziplin oben. Spurt bewusst nicht angeschlossen (Opus-Review
+// PR #881 Fund F1), s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
 const STAFFEL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(staffelPpsReferenzJson as ArenaPpsReferenzJson);
-const SPURT_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(spurtPpsReferenzJson as ArenaPpsReferenzJson);
 const TAKESHIS_CASTLE_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   takeshisCastlePpsReferenzJson as ArenaPpsReferenzJson,
 );
@@ -687,13 +702,23 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
     },
   ],
   // ============================ BAHN-PRODUKTIVIERUNG (10.09.) ============================
-  // Vier Eintraege, kein neuer Code-Pfad in `ppsAusArenaImpact()`/
-  // `computeIndividualBoxscorePpsFromFixtureResults()` -- die "reine Konfigurationsaenderung"
-  // gilt auch fuer das neue Chassis, weil der Boxscore-Rohwert (`ArenaFixtureBoxscoreEintrag.wert`)
-  // strukturell derselbe bleibt, egal ob er aus `spieleBuehneAuftritt()`/`spieleBuehneDuell()`
-  // oder `spieleBahn()` kommt. `katalogStandardgroesse` EINZELN in lib/data/dataAdapter.ts
-  // nachgesehen, nicht kopiert -- keine der vier ist 6, `BAHN_ART[d].jeSeite` (Motor-Feldgroesse,
-  // fuer alle vier 6) waere hier der falsche Wert, dieselbe Falle wie bei jeder vorigen Welle.
+  // Drei Eintraege (Staffel/Takeshi's Castle/Time-Trial), kein neuer Code-Pfad in
+  // `ppsAusArenaImpact()`/`computeIndividualBoxscorePpsFromFixtureResults()` -- die "reine
+  // Konfigurationsaenderung" gilt auch fuer das neue Chassis, weil der Boxscore-Rohwert
+  // (`ArenaFixtureBoxscoreEintrag.wert`) strukturell derselbe bleibt, egal ob er aus
+  // `spieleBuehneAuftritt()`/`spieleBuehneDuell()` oder `spieleBahn()` kommt.
+  // `katalogStandardgroesse` EINZELN in lib/data/dataAdapter.ts nachgesehen, nicht kopiert --
+  // keine der drei ist 6, `BAHN_ART[d].jeSeite` (Motor-Feldgroesse) waere hier der falsche Wert,
+  // dieselbe Falle wie bei jeder vorigen Welle.
+  //
+  // SPURT (Discipline.playerCount 2, BAHN_ART.spurt.jeSeite 4) ABSICHTLICH NICHT HIER (Opus-
+  // Review PR #881, Fund F1, 10.09.): die vierte Bahn-Disziplin bestand die Rangtreue-Schranke
+  // (rho 0,871), aber gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64
+  // Fixtures) nominiert die Saison bis zu 6 Laeufer je Seite, waehrend der Motor `jeSeite = 4`
+  // faehrt -- ALLE 64 Fixtures lieferten dadurch einen zu kleinen Boxscore (512 statt 768
+  // Eintraege, ueberzaehlige Laeufer fallen auf den alten PPS-Pfad zurueck), UND 4 von 64
+  // Fixtures liefen 4-gegen-2 statt 4-gegen-4. Spurt wird erst angeschlossen, wenn die PPS-
+  // Referenz bei Feldgroesse 4 neu gezogen ist (eigenes Folge-Ticket, s. PR-Beschreibung).
   [
     "staffel",
     {
@@ -702,16 +727,6 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       anteilMitte: STAFFEL_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 3 (dataAdapter.ts), NICHT 6.
       katalogStandardgroesse: 3,
-    },
-  ],
-  [
-    "spurt",
-    {
-      referenzFeldgroessen: SPURT_PPS_REFERENZ_FELDGROESSEN,
-      max: SPURT_INDIVIDUAL_PPS_MAX,
-      anteilMitte: SPURT_PPS_ANTEIL_MITTE,
-      // Discipline.playerCount ist 2 (dataAdapter.ts), NICHT 6.
-      katalogStandardgroesse: 2,
     },
   ],
   [

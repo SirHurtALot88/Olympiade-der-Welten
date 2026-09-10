@@ -162,16 +162,26 @@ export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set
  * deshalb eine eigene Menge und eine eigene Browser-Funktion, kein Eintrag in einer der drei
  * Buehnen-Mengen oben.
  *
- * ALLE VIER BESTANDENEN BAHNEN AUF EINMAL: Staffel (rho 0,915), Spurt (0,871), Takeshi's
- * Castle (0,861), Time-Trial (0,828) -- der Dispatch ist fuer alle vier identisch
+ * DREI DER VIER BESTANDENEN BAHNEN: Staffel (rho 0,915), Takeshi's Castle (0,861),
+ * Time-Trial (0,828) -- der Dispatch ist fuer alle Bahn-Disziplinen identisch
  * (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-Disziplin in derselben Schleife registriert).
  * CLIMBING BLEIBT AUSSEN VOR: rho 0,790 je Spiel, 0,010 unter der 0,80-Schranke -- dieselbe
  * Regel, die I-Spy (0,684) aus `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es
  * technisch nur eine Zeile waere.
+ *
+ * SPURT BEWUSST NICHT ENTHALTEN (Opus-Review PR #881, Fund F1, 10.09.): ein Kommentar in
+ * `scripts/ziehe-buehne-pps-referenz.ts` ging faelschlich davon aus, `BAHN_ART.spurt.jeSeite`
+ * sei wie bei den anderen drei Bahnen 6 -- tatsaechlich ist `jeSeite` fuer Spurt 4, die einzige
+ * der vier Bahnen, bei der Motor-Feldgroesse und Saison-Maximalfeldgroesse auseinanderfallen.
+ * Gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures) fuehrte das
+ * in ALLEN 64 Fixtures zu einem Boxscore mit zu wenigen Eintraegen (512 statt 768) UND in 4 von
+ * 64 Fixtures zu einem Team, das seine Aufstellung gar nicht angewendet bekam (4 gegen 2 statt 4
+ * gegen 4). Spurt wird erst produktionsangeschlossen, wenn die PPS-Referenz bei Feldgroesse 4
+ * neu gezogen ist (eigenes Folge-Ticket) -- bis dahin bleibt Spurt aus dieser Menge draussen,
+ * genau wie Climbing.
  */
 export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "staffel",
-  "spurt",
   "takeshis-castle",
   "time-trial",
 ]);
