@@ -17227,7 +17227,16 @@
   // damit die Burg beim Heranzoomen wirklich naeher kommt und die Kachelmuster mitwachsen.
   // Nur das HUD (Burgpunkte, Kursname, Zoom) liegt im Bildschirmraum.
   // Entwurf und Quellen: docs/design/takeshi-schlammroute-plan-06-09.md, Abschnitt 3/4.
+  //
+  // TON (Ziel 3, A4, 10.09.): Publikums-Loop, exakt dasselbe Muster wie hebenPublikumAn/
+  // tonLoopStart("gewichtheben") bei bodenHeben() (:12119) und der Breaking-Publikums-Loop
+  // aus PR #875/#876 -- inklusive des N1-Fixes aus Opus-Review PR #879 (Abschnitt 6):
+  // reset() setzt takeshiPublikumAn unten explizit zurueck, sonst haelt die Flagge nach
+  // dem ersten Reset "schon gestartet" und der Loop kommt im zweiten Takeshi-Kampf nie
+  // wieder.
+  let takeshiPublikumAn=false;
   function bodenTakeshiRoute(){
+    if(!takeshiPublikumAn){ tonLoopStart("takeshis-castle"); takeshiPublikumAn=true; }
     const R=routeTabelle(), z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
     ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
     const Z=BA().zonen||[{bis:1,boden:"pfad",um:"wiese"}];
@@ -17400,6 +17409,11 @@
   }
 
   function bodenSpurt(){
+    // Publikums-Loop beenden, falls wir GERADE von Takeshi's Castle herkommen (s.
+    // bodenTakeshiRoute oben) und jetzt eine andere Bahn-Disziplin zeichnen, ohne dass
+    // zwischendurch reset() lief -- dasselbe Bookkeeping wie bodenBuehne() fuer
+    // hebenPublikumAn.
+    if(!istRoute()&&takeshiPublikumAn){ tonLoopStop(); takeshiPublikumAn=false; }
     // TAKESHI LAEUFT UEBER DIE KARTE, nicht ueber das Bahn-Rechteck. Eine Weiche fuer
     // Boden UND Laeufer (istRoute()), damit beide nie auseinanderlaufen koennen.
     if(istRoute())return bodenTakeshiRoute();
@@ -19324,6 +19338,11 @@
             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
             u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
+            // TON (Ziel 3, A4, 10.09.): Falle ausgeloest. `A.takeshi` gated, weil dieser
+            // Zweig auch fuer Spurt laeuft (s. Kommentar oben, "hindernisTypen fuehrt");
+            // ohne die Gate wuerde bei Spurt der Takeshi-Fallenton mitlaufen. Reine
+            // sfx()-Praesentation, kein rr()-Aufruf, keine Score-Mutation.
+            if(A.takeshi)sfx("takeshis-castle","falle");
             // GEDRAENGE AN DER FALLE (Chris 06.09.: "so chaotisch ... jeder versucht zu
             // ueberleben"; docs/design/takeshi-chaos-tackle-plan-06-09.md, Abschnitt 3.1).
             // Das ist der Knock-Knock-Modus der Sendung: alle stuermen gleichzeitig auf
@@ -19423,11 +19442,20 @@
             // 3.3, Patch T0.
             u.raus=true; u.fertig=90+(1-u.pos)*10;
             rennFertig.push(u);
+            // TON (Ziel 3, A4): dieser Zweig laeuft nur, wenn BA().nervenKosten gesetzt ist
+            // -- exklusiv Takeshi (s. Katalog :18158) -- die A.takeshi-Gate ist hier nur
+            // Verteidigung in der Tiefe, nicht die eigentliche Schranke.
+            if(A.takeshi)sfx("takeshis-castle","tor");
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
           }
+          // TON (Ziel 3, A4): Laeufer stuerzt (nicht ausgeschieden). Diese Zeile laeuft fuer
+          // JEDE Bahn-Disziplin mit Huerden (Spurt, Staffel, Klettern, Zeitfahren, Takeshi),
+          // deshalb dieselbe A.takeshi-Gate wie bei "falle" -- sonst hoerte man den
+          // Takeshi-Sturzton auch im Spurt.
+          if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
@@ -19635,6 +19663,11 @@
           feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
         } else {
           u.fertig=rennT;rennFertig.push(u);
+          // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
+          // ALLE nicht-Staffel-Bahn-Disziplinen (Spurt, Zeitfahren, Klettern, Takeshi) --
+          // `BA().takeshi` ist hier die Schranke, `A` (aus der Huerden-Schleife weiter oben)
+          // ist an dieser Stelle nicht mehr in Scope.
+          if(BA().takeshi)sfx("takeshis-castle","tor");
           feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
         }
       }
@@ -21637,6 +21670,12 @@
     // Loop ab dem zweiten Gewichtheben-Kampf nie wieder -- das Publikum bliebe dauerhaft
     // stumm. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     hebenPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER TAKESHI'S CASTLE (Ziel 3, A4, 10.09.): ohne diese Zeile
+    // haelt bodenTakeshiRoute() die Flagge fuer "schon gestartet" und der Publikums-Loop
+    // kaeme ab dem zweiten Takeshi-Kampf nie wieder -- derselbe Fehler, den PR #879 fuer
+    // Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue.
+    takeshiPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
