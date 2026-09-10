@@ -22989,6 +22989,24 @@
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
+    // VIERTES CHASSIS. Eigener Einstiegspunkt statt einer Erweiterung von spieleBuehneAuftritt()
+    // — aus demselben Grund, den spieleBuehneHeben() fuer spieleFeldspiel() nennt (s. dort):
+    // ein produktiver, getesteter Pfad bleibt unangefasst. Bahn teilt mit der Buehne keine einzige
+    // Zustandsvariable (LAEUFER statt TEILNEHMER, stepSpurt statt stepBuehne).
+    spieleBahn:(bd,saat)=>{
+      if(typeof BAHN_ART==="undefined"||!BAHN_ART[bd])return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      stumm=true;
+      try{ M.bau(saat); M.lauf(); } finally { stumm=false; }
+      const st=bahnTeamstand();
+      const namen=M.namen();
+      const punkteVonName=new Map(LAEUFER.map(u=>[u.n, st.punkte?(st.punkte.get(u.id)??0):0]));
+      const boxscore=namen.map(n=>({name:n, wert:punkteVonName.get(n)??0}));
+      const seiten=[st.seiten[0], st.seiten[1]];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
+    },
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
     // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster

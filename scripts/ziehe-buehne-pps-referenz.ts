@@ -116,6 +116,40 @@ const DISZIPLINEN = {
     wertHerkunft: "MOTOREN.fechten.wert() = u.summe, s. WERTUNG_DUELL()",
     rezeptOrt: "BUEHNE_ART.fechten.rezept, WERTUNG_DUELL()",
   },
+  // ====================== BAHN-PRODUKTIVIERUNG (10.09., Ziel 3 Abschnitt 6.3c) ======================
+  // VIERTES CHASSIS, `chassis:"bahn"` -- `window.__arena.spieleBahn()` statt der beiden Buehnen-
+  // Funktionen oben. `wertHerkunft` dokumentiert HIER bewusst `bahnTeamstand().punkte`, NICHT
+  // `MOTOREN[bd].wert()`: der rohe Boxscore-Wert, den `spieleBahn()` tatsaechlich liefert, kommt aus
+  // `bahnTeamstand().punkte` (ordnungsidentische, nicht-negative Zwillingsgroesse -- s. Kommentar an
+  // `spieleBahn()` in battle-mode.engine.js), weil `MOTOREN[bd].wert()` fuer Rang/Etappe NEGATIVE
+  // Zahlen liefert und die Impact-Kurve daraus fuer jeden Bahn-Laeufer 0 PPs machen wuerde.
+  // `katalogStandardgroesse` EINZELN in lib/data/dataAdapter.ts nachgesehen, NICHT `BAHN_ART[d].
+  // jeSeite` (Motor-Feldgroesse, hier der falsche Wert) -- staffel 3, spurt 2, takeshis-castle 4,
+  // time-trial 4, keine ist 6.
+  staffel: {
+    chassis: "bahn",
+    katalogStandardgroesse: 3,
+    wertHerkunft: "bahnTeamstand().punkte, wertung:\"etappe\" -- Rang der Etappenleistung (bahnLeistung), s. spieleBahn()",
+    rezeptOrt: "BAHN_ART.staffel, stepSpurt()/bauSpurt()",
+  },
+  spurt: {
+    chassis: "bahn",
+    katalogStandardgroesse: 2,
+    wertHerkunft: "bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn()",
+    rezeptOrt: "BAHN_ART.spurt, stepSpurt()/bauSpurt()",
+  },
+  "takeshis-castle": {
+    chassis: "bahn",
+    katalogStandardgroesse: 4,
+    wertHerkunft: "bahnTeamstand().punkte, wertung:\"burg\" -- burgwertung() je Laeufer, s. spieleBahn()",
+    rezeptOrt: "BAHN_ART[\"takeshis-castle\"], stepSpurt()/bauSpurt()",
+  },
+  "time-trial": {
+    chassis: "bahn",
+    katalogStandardgroesse: 4,
+    wertHerkunft: "bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn()",
+    rezeptOrt: "BAHN_ART[\"time-trial\"], stepSpurt()/bauSpurt()",
+  },
 } as const;
 
 type DisziplinId = keyof typeof DISZIPLINEN;
@@ -306,7 +340,8 @@ function schreibeErgebnis(
   quelle: { saveId: string; saveName: string },
 ) {
   const konfig = DISZIPLINEN[disziplin];
-  const motorFunktion = konfig.chassis === "duell" ? "spieleBuehneDuell" : "spieleBuehneAuftritt";
+  const motorFunktion =
+    konfig.chassis === "bahn" ? "spieleBahn" : konfig.chassis === "duell" ? "spieleBuehneDuell" : "spieleBuehneAuftritt";
   const feldgroessen: Record<string, unknown> = {};
   for (const n of FELDGROESSEN) {
     const ergebnis = ergebnisseNachGroesse.get(n);
