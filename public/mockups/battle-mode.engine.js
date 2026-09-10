@@ -2683,16 +2683,22 @@
     // unten), damit auch der Schild sie sehen kann — ein Ritterschild passt zu keiner
     // Football-Montur, s. Kommentar dort.
     const footballGear=feldspiel&&istFootball();
+    // EISKUNSTLAUF-STURZ (Opus-Plan 10.09., Ziel 2, Abschnitt 5.4): u.down ist ein
+    // Kampf-Feld und wuerde ueber diese eine gemeinsame Weiche in andere Zweige lecken
+    // (Feldspiel-Kollaps, Arena-K.o.), wenn stepKuer() es setzen wuerde -- deshalb liest
+    // diese Zeile zusaetzlich das eigene, praesentationale u.vizSturz. Fuer jede andere
+    // Disziplin bleibt u.vizSturz immer undefined, also ohne jede Wirkung.
+    const kuerSturz=!!u.vizSturz;
     let ani="walk";
-    if(u.down)ani="hurt";
+    if(u.down||kuerSturz)ani="hurt";
     else if(u.lunge>0)ani=feldspiel?"shoot":((bogen||feuerwaffe)?"shoot":"slash");
     else if(Math.abs(u.vx||0)+Math.abs(u.vy||0)<3)ani="walk";
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
     // Gang in Schleife. So passt das Bild zu dem, was die Simulation gerade tut.
-    const f=(u.lunge>0&&!u.down)
+    const f=(u.lunge>0&&!u.down&&!kuerSturz)
       ? Math.min(n-1, Math.floor((1-u.lunge/0.2)*n))
-      : (u.down?n-1:Math.floor((t*7+u.id)%n));
+      : ((u.down||kuerSturz)?n-1:Math.floor((t*7+u.id)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
     // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte. Z ist seit
@@ -10705,6 +10711,14 @@
     }
   }
 
+  // BREAKING_BPM (Ziel 4, Opus-Plan Abschnitt 7.4): EINE Zahl, aus der Bewegung
+  // (stepCypher()s Wippen), Bild-Puls (zeichneBreaking()s Survivor-Kern-Puls, und
+  // breaking.tsxs Druckwelle) UND Ton (TON_KATALOG.breaking, s. dort) dieselbe
+  // Zeitbasis ziehen — statt dreier unabhaengig gewaehlter Zahlen, die zufaellig
+  // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
+  // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
+  const BREAKING_BPM=100;
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -11780,6 +11794,252 @@
     if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
   }
 
+  // ================== EISKUNSTLAUF: KUER-BEWEGUNGSMASCHINE (stepKuer, Ziel 2) ==================
+  // Opus-Plan 10.09. ("opus-plan-feinschliff-vier-disziplinen-09-10.md" Abschnitt 5.1).
+  // Angeschlossen ueber buehnenBewegung() oben, exklusiv auf art.duett gegated
+  // (BUEHNE_ART.eiskunstlauf — kein anderer Buehnen-Achter traegt dieses Flag, s. Kommentar
+  // dort). DER VERTRAG AUS PR 0 GILT HIER WOeRTLICH: diese Funktion schreibt AUSSCHLIESSLICH
+  // neue, praesentationale viz*-Felder auf `u`, NIEMALS u.summe/u.runden/u.aktuell/
+  // u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done, und ruft NIEMALS rr() auf —
+  // disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen sie mit jedem Frame mit.
+  //
+  // Heute (vor diesem PR) positioniert zeichneDuett() jedes Paar auf einem FESTEN
+  // Rasterplatz und zeichnet eine statische Doppelellipse als Eisspur — das Reihenbild,
+  // das die Sicht-QA (docs/design/sicht-qa-10-09-eiskunstlauf.png) als "sechs Paare stehen
+  // bewegungslos im Raster" beschreibt. Ab hier bekommt jedes Paar eine eigene Bahn ueber
+  // die Flaeche.
+  //
+  // GRUNDFAHRT: eine Lissajous-Figur (x=cx+a*sin(w1*t+phi), y=cy+b*sin(w2*t)), deren
+  // Parameter phi/w1/w2 DETERMINISTISCH aus einer Paar-ID gehasht werden (kuerHash(), kein
+  // rr()!) — dieselbe Grundidee wie eiskunst.tsx:80-109 (dort hash(t.code) fuer die
+  // React-Buehne), hier zum ersten Mal auch im Motor. Beide Partner eines Duetts teilen
+  // dieselbe Grundkurve (Paar-ID = die kleinere der beiden u.id, symmetrisch fuer beide
+  // Partner berechenbar) und bekommen zusaetzlich einen kleinen EIGENEN Versatz aus der
+  // eigenen u.id — zwei Laeufer NEBENEINANDER, nicht exakt uebereinander. Ein Solo-Rest
+  // (ungerade Feldgroesse, s. bauBuehne()-Kommentar "FRAGE A") hat keinen Partner und faehrt
+  // seine eigene Kurve allein (paarId=eigene u.id, eigenR=0).
+  //
+  // ELEMENTE: sobald stepBuehne() einen Durchgang enthuellt (u.aktuell zaehlt hoch — hier
+  // NUR gelesen, nie geschrieben; u.vizAktuell haelt den zuletzt GESEHENEN Wert fest, damit
+  // der Uebergang genau einmal pro Durchgang ausgeloest wird), wechselt vizPhase in ein
+  // Element: pirouette/hebung/wurf nach u.aktuell%3 — deterministisch, kein Zufall. Erfolg/
+  // Fehlschlag kommen direkt aus u.runden[u.aktuell].ereignis gegen art.erfolgWort/
+  // art.failWort — genau die Unterscheidung, die zeichneBreaking() (oben) fuer sich schon
+  // liest. Ein Fehlschlag ueberschreibt das Element optisch mit vizSturz (liegen bleiben,
+  // dann weiterfahren) statt es sauber zu zeigen.
+  function kuerHash(id,salt){
+    const x=Math.sin(id*12.9898+salt*78.233+4.1)*43758.5453;
+    return x-Math.floor(x);
+  }
+  // Eisflaeche fuer BEWEGUNG (hier) UND ZEICHNUNG (bodenEis() oben) — eine Stelle, damit
+  // Kufenbahn und Eisoval nie auseinanderlaufen.
+  function kuerFlaeche(){
+    return {cx:W*0.5, cy:H*0.5, ax:W*0.35, ay:H*0.28};
+  }
+  const KUER_ELEMENT_DAUER=1.4, KUER_STURZ_DAUER=1.0;
+  function stepKuer(dt,art){
+    const F=kuerFlaeche();
+    for(const u of TEILNEHMER){
+      if(u.vizSpur==null){
+        // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf das alte Raster
+        // zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten stepKuer()-Aufruf
+        // gibt es eine echte Position.
+        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
+        u.vizX=F.cx; u.vizY=F.cy; u.vizRi=0;
+      }
+      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+      const paarId=partner?Math.min(u.id,partner.id):u.id;
+      const phi=kuerHash(paarId,1)*6.2832, w1=0.15+kuerHash(paarId,2)*0.09, w2=0.11+kuerHash(paarId,3)*0.08;
+      // N1 (Opus-Overseer-Review PR #874, Abschnitt 6): Phase aus der PAAR-ID statt aus
+      // der eigenen u.id, plus Math.PI fuer den zweiten Partner — unabhaengig gehashte
+      // Phasen konnten den Abstand auf 1,6px zusammenfallen lassen (5 von 30 Paarungen
+      // praktisch deckungsgleich). Mit diametralem Versatz ist der Abstand geometrisch
+      // garantiert eigenR*sqrt(1+3*cos^2) in [19px,38px], nie null.
+      const eigenPh=kuerHash(paarId,9)*6.2832+((partner&&u.id!==paarId)?Math.PI:0), eigenR=partner?19:0;
+      const grundX=F.cx+F.ax*Math.sin(w1*buehneT+phi);
+      const grundY=F.cy+F.ay*Math.sin(w2*buehneT+phi*1.6+kuerHash(paarId,4)*6.2832);
+      const zielX=grundX+eigenR*Math.cos(buehneT*0.5+eigenPh);
+      const zielY=grundY+eigenR*0.5*Math.sin(buehneT*0.5+eigenPh);
+
+      // NEUEN DURCHGANG ERKENNEN — reiner Lesevergleich auf u.aktuell, kein Schreiben
+      // darauf. vizAktuell ist selbst ein neues viz*-Feld.
+      if(u.aktuell>=0 && u.aktuell!==u.vizAktuell){
+        u.vizAktuell=u.aktuell;
+        if(u.aktuell+1>=art.rundenN){
+          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
+        } else {
+          const zug=u.runden[u.aktuell];
+          const fehl=!!(zug&&zug.ereignis===art.failWort);
+          u.vizPhase=["pirouette","hebung","wurf"][u.aktuell%3];
+          u.vizPhaseT=fehl?KUER_STURZ_DAUER:KUER_ELEMENT_DAUER;
+          u.vizSturz=fehl;
+        }
+      }
+      if(u.vizPhaseT>0)u.vizPhaseT=Math.max(0,u.vizPhaseT-dt);
+      if(u.vizSturz && u.vizPhaseT<=0)u.vizSturz=false;
+      if(u.vizPhase!=="schlusspose" && u.vizPhaseT<=0 && !u.vizSturz)u.vizPhase="gleiten";
+
+      // POSITION: waehrend Pirouette oder Sturz haelt die Figur die Stelle ("Radius geht
+      // gegen Null" bzw. sie liegt), sonst folgt sie der Grundfahrt bzw. — nach dem letzten
+      // Durchgang — der Schlusspose in der Mitte.
+      const haeltStelle=u.vizSturz||(u.vizPhase==="pirouette"&&u.vizPhaseT>0);
+      let nx=u.vizX, ny=u.vizY;
+      if(u.vizPhase==="schlusspose"){
+        // N2 (Opus-Overseer-Review PR #874, Abschnitt 6): Zielpunkt trug bisher NUR den
+        // Partner-Versatz (±16px), keinen Versatz je PAAR — alle Paare liefen deshalb auf
+        // dieselben zwei Punkte in der Mitte. `paarId` ist als kleinere der beiden u.id
+        // je Paar eindeutig (bauBuehne() vergibt Ids fortlaufend ueber das ganze Feld,
+        // :11021), die lineare Abbildung auf [0,TEILNEHMER.length-1] ist deshalb injektiv
+        // und verteilt jedes Paar auf einen eigenen Punkt ueber die Flaechenbreite, wie es
+        // das alte Raster (zeichneDuett()s gridPos) tat.
+        const zx=F.cx+(TEILNEHMER.length>1?(paarId/(TEILNEHMER.length-1)-0.5)*F.ax*1.5:0)+(partner?(u.id===paarId?-16:16):0), zy=F.cy;
+        const dxs=zx-u.vizX, dys=zy-u.vizY, dist=Math.hypot(dxs,dys);
+        if(dist>0.5){ const schritt=Math.min(dist,140*dt); nx=u.vizX+dxs/dist*schritt; ny=u.vizY+dys/dist*schritt; }
+      } else if(!haeltStelle){
+        nx=zielX; ny=zielY;
+      }
+      if(Math.abs(nx-u.vizX)+Math.abs(ny-u.vizY)>0.05)u.vizRi=Math.atan2(ny-u.vizY,nx-u.vizX);
+      u.vizX=nx; u.vizY=ny;
+
+      // KUFENSPUR: Ringpuffer der letzten ~60 Positionen.
+      u.vizSpur.push({x:u.vizX,y:u.vizY});
+      if(u.vizSpur.length>60)u.vizSpur.shift();
+    }
+  }
+
+  // ================== ZIEL 4: DER CYPHER WIRD ECHT (stepCypher) ==================
+  // Opus-Plan "opus-plan-feinschliff-vier-disziplinen-09-10.md" Abschnitt 7.1. Ersetzt
+  // "rein zeichnerisch" (BUEHNE_ART.breaking.cypher-Kommentar) durch eine echte
+  // Zustandsmaschine: in einem echten Cypher tanzt IMMER GENAU EINER in der Mitte, der
+  // Rest steht im Ring -- genau das bildet die vorhandene Warteschlange (buehneQueue/
+  // buehneZeiger, s. stepBuehne) schon ab, weil sie ohnehin nur einen Teilnehmer pro
+  // Enthuellung markiert (u.lunge=0.5). Das ist zugleich die strukturelle Behebung des
+  // Sicht-QA-Befunds (docs/design/sicht-qa-10-09-breaking.png): vier Tokens stapelten
+  // sich im Zentrum, weil der Radius bisher den SCORE trug (rOut-(summe/maxSumme)*...) --
+  // mehrere aehnlich hohe Summen ergaben aehnliche Radien. Ab jetzt traegt der Radius nur
+  // noch Choreografie (rOut im Ring, ~0 in der Mitte); der Score bleibt ueber die
+  // RING-REIHENFOLGE sichtbar (s. cypherRingWinkel unten) UND unveraendert ueber die
+  // Krone (zeichneBreaking() liest weiterhin u.summe fuer `fuehrer`, s. dort).
+  //
+  // HARTER VERTRAG (PR 0, s. Kommentar oben bei buehnenBewegung, hier zusaetzlich WOERTLICH
+  // eingehalten): kein rr()-Aufruf, keine Schreibzugriffe auf u.summe/u.runden/u.aktuell/
+  // u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done. Gelesen werden nur bereits
+  // vorhandene Felder (dt, buehneT, u.id, u.side, u.summe, u.aktuell, u.lunge,
+  // u.runden[u.aktuell].ereignis, art.erfolgWort/art.failWort) -- geschrieben wird
+  // AUSSCHLIESSLICH auf die fuenf neuen viz*-Felder (u.vizR/u.vizA/u.vizPhase/
+  // u.vizPhaseT/u.vizMove), kein einziges bestehendes Feld wird angefasst.
+  //
+  // Reiner Hash aus zwei Ganzzahlen statt rr() -- deterministisch, kein globaler Zustand,
+  // also unabhaengig davon, wie oft/wann er aufgerufen wird (anders als rr()s linearer
+  // Kongruenzgenerator). Nur fuer PRAeSENTATION verwendet (Move-Wahl, Wippen-Phase).
+  function cypherHash(a,b){
+    let h=(Math.imul(a|0,2654435761)^Math.imul((b|0)+1,40503))>>>0;
+    h^=h>>>13; h=Math.imul(h,0x85ebca6b)>>>0; h^=h>>>16;
+    return h>>>0;
+  }
+  // Ring-Winkel eines Teilnehmers: gleichmaessig verteilt INNERHALB der eigenen
+  // Team-Haelfte (dieselben zwei Halbkreise, die zeichneBreaking schon fuer die
+  // Team-Trennung nutzt -- die "EINZIGE bewusste Abweichung von breaking.tsx", s.
+  // Funktionskopf dort, bleibt damit erhalten), aber nach RANG (u.summe) sortiert statt
+  // nach fester Kader-Reihenfolge, PLUS einer langsamen gemeinsamen Rotation (der
+  // rang/n-Anteil wandert mit buehneT weiter und wickelt sich am Rand der Haelfte wieder
+  // ein -- das "vizA += ω·dt" aus dem Plan, hier als geschlossene Funktion von buehneT
+  // statt als inkrementeller Zustand, damit nichts akkumulieren/drifften kann). Aendert
+  // sich der Rang eines Teilnehmers (sein Durchgang wird enthuellt, u.summe steigt), ist
+  // das an einer sichtbar neuen Ringposition abzulesen -- das ist die "RING-REIHENFOLGE",
+  // ueber die der Score sichtbar bleibt (Plan-Abschnitt 7.1).
+  function cypherRingWinkel(u,seiten){
+    const grad=Math.PI/180;
+    const HEMIS={0:[100*grad,260*grad],1:[-80*grad,80*grad]};
+    const [startA,endA]=HEMIS[u.side]||HEMIS[0];
+    const gruppe=seiten[u.side];
+    const n=Math.max(1,gruppe.length);
+    const rang=gruppe.indexOf(u);
+    const ROT_HZ=1/48; // eine volle Umrundung der eigenen Haelfte alle 48s
+    const frac=((rang/n)+buehneT*ROT_HZ)%1;
+    return startA+(endA-startA)*frac;
+  }
+  function cypherRingRadius(u,rOut){
+    // Kleines Wippen im Takt (Plan: "sin(buehneT*2π*bpm/60)") -- deterministische
+    // Phasenverschiebung je Teilnehmer aus dem Hash, kein rr().
+    const phase=(cypherHash(u.id,7)/4294967295)*Math.PI*2;
+    const WOBBLE=0.018;
+    return rOut*(1+WOBBLE*Math.sin(buehneT*2*Math.PI*BREAKING_BPM/60+phase));
+  }
+  function stepCypher(dt,art){
+    if(!TEILNEHMER.length)return;
+    const rOut=Math.min(W*0.46,H*0.44);
+    // Rang je Teamhaelfte, absteigend nach Summe (Ties nach id, damit die Reihenfolge
+    // innerhalb eines Frames stabil ist) -- rein lesend, exakt dieselbe Grundlage wie
+    // zeichneBreaking()s `fuehrer`-Ermittlung (dort global, hier je Haelfte).
+    const seiten={
+      0:TEILNEHMER.filter(u=>u.side===0).sort((a,b)=>b.summe-a.summe||a.id-b.id),
+      1:TEILNEHMER.filter(u=>u.side===1).sort((a,b)=>b.summe-a.summe||a.id-b.id)
+    };
+    // Dauern: eintritt/throwdown sind die im Plan (7.1) genannten 0,15s/0,25s.
+    // freeze/rueckzug sind bewusst KURZ (0,15s statt der ersten Fassung mit 0,35/0,3s) --
+    // ALLE VIER zusammen muessen unter art.rundenDauer (0,625s) bleiben, sonst startet
+    // die naechste Enthuellung (alle 0,625s, s. stepBuehne) den naechsten Teilnehmer,
+    // WAEHREND der vorige noch in der Mitte steht: zwei Tanzende gleichzeitig -- genau der
+    // Fehler, den dieser ganze Umbau beheben soll ("immer GENAU EINER in der Mitte").
+    // 0,15+0,25+0,15=0,55s < 0,625s laesst 0,075s Puffer (bei einem Frame ~0,0167s bei
+    // 60fps also ~4-5 Frames).
+    const EINTRITT_T=0.15, THROWDOWN_T=0.25, FREEZE_T=0.15, RUECKZUG_T=0.15;
+    const NAECHER=(u,ziel,tau)=>{ u.vizR+=(ziel-u.vizR)*(1-Math.exp(-dt/tau)); };
+    for(const u of TEILNEHMER){
+      if(u.vizPhase==null){
+        // Erstinitialisierung (erster stepCypher()-Durchlauf fuer diesen Teilnehmer).
+        u.vizPhase="ring"; u.vizPhaseT=0; u.vizMove=0;
+        u.vizA=cypherRingWinkel(u,seiten); u.vizR=cypherRingRadius(u,rOut);
+      }
+      // FRISCH ENTHUELLT: stepBuehne() baut u.lunge JEDEN Frame zuerst ab (Math.max(0,
+      // u.lunge-dt)) und setzt es DANACH, nur im Enthuellungs-Frame, exakt auf 0.5 --
+      // buehnenBewegung(dt) (und damit stepCypher) laeuft in stepBuehne() erst NACH
+      // diesem Block, das exakte Float-"===0.5" ist deshalb ein sicherer Einmal-pro-
+      // Durchgang-Trigger (kein Abbau kann je wieder exakt bei 0.5 vorbeikommen).
+      const frischEnthuellt=u.lunge===0.5 && u.aktuell>=0;
+      if(frischEnthuellt){
+        u.vizA=cypherRingWinkel(u,seiten); // Sichtwinkel beim Eintritt einfrieren
+        u.vizPhase="eintritt"; u.vizPhaseT=0;
+        u.vizMove=cypherHash(u.id,u.aktuell)%4; // 0 Toprock·1 Footwork·2 Powermove·3 Freeze
+      }
+      if(u.vizPhase==="ring"){
+        u.vizA=cypherRingWinkel(u,seiten);
+        u.vizR=cypherRingRadius(u,rOut);
+        continue;
+      }
+      u.vizPhaseT+=dt;
+      if(u.vizPhase==="eintritt"){
+        NAECHER(u,0,0.05);
+        if(u.vizPhaseT>=EINTRITT_T){
+          u.vizPhase="throwdown"; u.vizPhaseT=0;
+          if(u.vizMove===2)sfx("breaking","powermove"); // Windmill-Rauschsweep beim Ansatz
+        }
+      } else if(u.vizPhase==="throwdown"){
+        NAECHER(u,0,0.05);
+        if(u.vizPhaseT>=THROWDOWN_T){
+          const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
+          if(zug&&zug.ereignis===art.erfolgWort){
+            u.vizPhase="freeze"; sfx("breaking","freeze");
+          } else {
+            u.vizPhase="rueckzug"; sfx("breaking","abbruch");
+          }
+          u.vizPhaseT=0;
+        }
+      } else if(u.vizPhase==="freeze"){
+        // Erst wirklich "eingefroren" halten (Plan: "Ein Frame eingefroren"), erst danach
+        // zurueck in den Ring gleiten -- ein sofortiger Rueckglitt waere kein Standbild.
+        const HOLD=0.08;
+        if(u.vizPhaseT<HOLD) NAECHER(u,0,0.05);
+        else NAECHER(u,cypherRingRadius(u,rOut),0.04);
+        if(u.vizPhaseT>=FREEZE_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
+      } else if(u.vizPhase==="rueckzug"){
+        NAECHER(u,cypherRingRadius(u,rOut),0.05);
+        if(u.vizPhaseT>=RUECKZUG_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
+      }
+    }
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -11926,9 +12186,61 @@
     }
   }
 
+  // ================== EISKUNSTLAUF: EISFLAECHE STATT PODEST (bodenEis) ==================
+  // Opus-Plan 10.09., Ziel 2, Abschnitt 5.2. Sicht-QA-Befund (docs/design/
+  // sicht-qa-10-09-eiskunstlauf.png): "Es gibt kein Eis. Die Kuer laeuft auf
+  // bodenBuehne() — dunkelviolettes Podest mit Scheinwerferkegeln." Vorbild ist
+  // eisflaeche() weiter oben (bislang nur fuer Hockey) — uebernommen werden Idee und
+  // Farbwelt (kalter Verlauf, weisse Bande, goldene Kante), AUSDRUeCKLICH NICHT der
+  // Hockey-Aufbau: keine blaue Linie, kein Bullykreis, kein Tor. `eisRundweg()` (bei
+  // eisflaeche() definiert) ist eine reine Pfad-Routine aus einem {l,r,o,u,ecke}-Objekt
+  // und kennt kein Hockey-spezifisches Detail — hier mit eigenen Grenzen wiederverwendet,
+  // keine Kopie. `kuerFlaeche()` (bei stepKuer() weiter unten) ist DIESELBE Geometrie, die
+  // auch die Bewegung begrenzt — eine Stelle, damit Eisflaeche und Kufenbahn nie
+  // auseinanderlaufen.
+  function bodenEis(){
+    const bg=ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,"#11151f");bg.addColorStop(1,"#080a10");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    // Scheinwerferkegel von oben — dieselbe Bauart wie bodenBuehne(), nur kaelteres Licht,
+    // damit die Kulisse trotz eigener Eisflaeche denselben Buehnen-Rahmen behaelt.
+    for(const x of [W*0.22,W*0.5,W*0.78]){
+      const s=ctx.createRadialGradient(x,0,10,x,H*0.55,W*0.28);
+      s.addColorStop(0,"rgba(210,235,255,.16)");s.addColorStop(1,"rgba(210,235,255,0)");
+      ctx.fillStyle=s;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x-90,H);ctx.lineTo(x+90,H);
+      ctx.closePath();ctx.fill();
+    }
+    // Zuschauerraenge unten — wie bodenBuehne()s dunkle Reihen, dieselbe Bauart.
+    ctx.fillStyle="#171c26";ctx.fillRect(0,H*0.90,W,H*0.10);
+    ctx.strokeStyle="rgba(255,255,255,.08)";ctx.lineWidth=1;
+    for(let i=1;i<10;i++){ctx.beginPath();ctx.moveTo(i*W/10,H*0.90);ctx.lineTo(i*W/10,H);ctx.stroke();}
+
+    const F=kuerFlaeche();
+    const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};
+    // Eisflaeche: derselbe kalte Verlauf wie eisflaeche() (Hockey), eigene Grenzen.
+    const eis=ctx.createLinearGradient(0,k.o,0,k.u);
+    eis.addColorStop(0,"#dce9f2");eis.addColorStop(0.5,"#eef5fa");eis.addColorStop(1,"#d3e2ee");
+    eisRundweg(k,0);ctx.fillStyle=eis;ctx.fill();
+    ctx.lineWidth=6;ctx.strokeStyle="#f2f4f7";eisRundweg(k,0);ctx.stroke();
+    // Goldene Bandenkante — der eine Farbakzent, den der Plan ausdruecklich nennt.
+    ctx.lineWidth=2;ctx.strokeStyle="rgba(214,172,54,.85)";eisRundweg(k,4);ctx.stroke();
+
+    // Kampfgericht-Tisch, unterhalb der Bande am unteren Rand.
+    ctx.fillStyle="#232838";ctx.fillRect(W*0.36,k.u+6,W*0.28,15);
+    ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;ctx.strokeRect(W*0.36,k.u+6,W*0.28,15);
+    ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#c7cedb";ctx.textAlign="center";
+    ctx.fillText("KAMPFGERICHT",W*0.5,k.u+16);
+  }
+
   function zeichneBuehne(){
+    // BODEN-DISPATCH (Opus-Plan 10.09., Ziel 2, Abschnitt 5.2, erweitert per Opus-Review
+    // PR #879, Abschnitt 8): Gewichtheben und Eiskunstlauf bekommen je eine eigene
+    // Bodenzeichnung statt des generischen violetten Podests -- dasselbe Muster wie der
+    // Zweig direkt darunter (art.heben/schach/cypher/duett), nur fuer den BODEN statt fuer
+    // die Teilnehmer-Zeichnung. Faellt ein spaeterer Agent eine weitere eigene Boden-
+    // funktion dazu, ist das eine weitere else-if-Zeile hier, keine Umstrukturierung.
     const art=BB();
-    if(art.heben)bodenHeben(); else bodenBuehne();
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -12010,7 +12322,7 @@
     }
   }
 
-  // ================== EISKUNSTLAUF: DUETT-BUEHNENBILD (#856/#857) ==================
+  // ================== EISKUNSTLAUF: DUETT-BUEHNENBILD (#856/#857, gehaertet Ziel 2) ==================
   // Eigene Zeichenfunktion, exklusiv hinter `art.duett` (BUEHNE_ART.eiskunstlauf) — die
   // einzige Beruehrung mit dem geteilten `zeichneBuehne()`-Dispatcher ist die eine
   // Zeile dort, genau das von der Opus-Synthese verlangte Muster (Abschnitt 7 der
@@ -12018,12 +12330,10 @@
   // in den generischen Zweig, den die sieben Geschwister-Buehnen weiter durchlaufen).
   //
   // BORDMITTEL STATT NEUEM SPRITE-RIG (Recherche Abschnitt 6, Vorbild zeichneHeben()):
-  // zwei zeichneSprite()-Aufrufe eng nebeneinander (statt ueber die volle Reihenbreite
-  // verteilt) plus eine gemeinsam gezeichnete Eisspur — reine Canvas-Primitiven, wie die
-  // Hantel bei Gewichtheben. Anders als zeichneHeben() zeigt diese Funktion aber ALLE
-  // Paare (und einen etwaigen Solo-Rest bei ungerader Feldgroesse, s. "Frage A" im
-  // bauBuehne()-Kommentar) gleichzeitig, kein "ein aktives Duell"-Fokus — Eiskunstlauf
-  // bleibt ein Reihenbild, nur mit Paaren statt zwoelf Einzelfiguren.
+  // zeichneSprite()-Aufrufe plus selbst gezeichnete Kufenspuren — reine Canvas-Primitiven,
+  // wie die Hantel bei Gewichtheben. Diese Funktion zeigt ALLE Paare (und einen etwaigen
+  // Solo-Rest bei ungerader Feldgroesse, s. "Frage A" im bauBuehne()-Kommentar)
+  // gleichzeitig, kein "ein aktives Duell"-Fokus.
   //
   // DIE FUSION SELBST PASSIERT NICHT HIER. Sie steht in bauBuehne() (Kommentar "DUETT"
   // dort), lange bevor irgendetwas gezeichnet wird — diese Funktion liest nur `u.duettN`
@@ -12031,9 +12341,38 @@
   // `u.runden` sind zu diesem Zeitpunkt schon die fertig fusionierten Werte, exakt wie bei
   // jeder anderen Buehnen-Disziplin — deshalb reicht hier derselbe "Pkt"/Punktesaeule-Code
   // wie im generischen Zweig, nur mit anderer Positionierung.
+  //
+  // OPUS-PLAN 10.09., ZIEL 2, ABSCHNITT 5.3-HAeRTUNG (gegenueber der urspruenglichen
+  // Fassung): Position kommt jetzt aus stepKuer()s u.vizX/u.vizY statt aus einem festen
+  // Rasterplatz — mit Rueckfall auf genau dieses alte Raster, SOLANGE u.vizX==null ist
+  // (z.B. im allerersten Frame, bevor stepKuer() ueberhaupt einmal gelaufen ist). Die
+  // statische Doppelellipse weicht der echten, ausblendenden Kufenspur (u.vizSpur). Weil
+  // sich Paare jetzt frei ueber die Flaeche bewegen statt in zwei festen Reihen zu stehen,
+  // kommt eine Tiefensortierung nach vizY dazu (der alte Rastercode brauchte das nicht).
+  // Etiketten haengen an vizY und klappen nahe am unteren Bandenrand nach oben (die
+  // Sicht-QA zeigte hier "schneidet in die Podestkante").
+  function zeichneEisstaub(x,y,seed){
+    // M4 (Abschnitt 5.4): kurzlebige helle Partikel am Kufenpunkt bei Landung/Pirouette.
+    // Eigene, kleine Routine statt der zeichnePartikelEffekt()-Closure aus zeichneSprite()
+    // (die dort lokal ist und nur fuer b.effekt-Requisiten EINES Sprites gebaut wird) —
+    // gleiche Bauart wie diese: rein aus buehneT/seed berechnet, kein Array, kein rr().
+    for(let i=0;i<5;i++){
+      const phase=(buehneT*2.6+seed*1.7+i*1.3)%1;
+      const a=0.7*(1-phase);
+      if(a<=0.03)continue;
+      const ang=seed*2.1+i*1.9, dist=phase*11;
+      ctx.globalAlpha=a; ctx.fillStyle="#eaf6ff";
+      ctx.beginPath(); ctx.arc(x+Math.cos(ang)*dist,y+Math.sin(ang)*dist*0.5,1.3,0,6.2832); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
   function zeichneDuett(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const posMap=new Map();
+    // GRUPPEN JE SEITE: unveraendert ermittelt (u.duettN, benachbart nach eig sortiert in
+    // bauBuehne()) — gebraucht fuers Fallback-Raster, das "DUETT"-Etikett und die
+    // Vorname-Zeile, die die Partnernamen unterscheidet.
+    const gruppenJeSeite={};
     [0,1].forEach(side=>{
       const liste=TEILNEHMER.filter(u=>u.side===side);
       const gesehen=new Set(), gruppen=[];
@@ -12043,76 +12382,115 @@
         if(partner){ gesehen.add(u.id); gesehen.add(partner.id); gruppen.push([u,partner]); }
         else { gesehen.add(u.id); gruppen.push([u]); }
       }
-      const y=side===0?H*0.32:H*0.66;
-      const c=side===0?css("--home"):css("--away");
-      const schriftAn=(x,txt,dy,farbe,groesse)=>{
-        ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
-        ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-        ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
-      };
-      const punktsaeule=(x,u,breite)=>{
-        const p=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-breite/2,y+64,breite,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-breite/2,y+64,breite*p,3);
-      };
+      gruppenJeSeite[side]=gruppen;
+    });
+    // FALLBACK-RASTER (5.3): dieselbe Formel wie vor dieser Haertung, nur in eine Map
+    // gelegt statt sofort gezeichnet — greift ausschliesslich, solange u.vizX==null.
+    const gridPos=new Map();
+    [0,1].forEach(side=>{
+      const y=side===0?H*0.32:H*0.66, gruppen=gruppenJeSeite[side];
       gruppen.forEach((grp,i)=>{
         const x=90+(W-180)*(gruppen.length>1?i/(gruppen.length-1):0.5);
-        if(grp.length===2){
-          // dx grosszuegig (26px, ueber die drei Duo-Slots verteilt bleibt reichlich
-          // Abstand zur naechsten Gruppe) — bei den urspruenglich engeren 15px liefen die
-          // Namens-/Punktezeilen beider Partner ineinander (im Playwright-Screenshot
-          // geprueft, s. PR-Beschreibung).
-          const [a,b]=grp, dx=26;
-          posMap.set(a.id,{x:x-dx,y}); posMap.set(b.id,{x:x+dx,y});
-          // GEMEINSAMES REQUISIT: eine Eisspur unter BEIDEN statt je eines eigenen
-          // Schattens — Primitiven, keine neue Sprite-Pipeline, genau wie die Hantel bei
-          // zeichneHeben().
-          ctx.globalAlpha=0.20; ctx.fillStyle=c;
-          ctx.beginPath(); ctx.ellipse(x,y+19,dx+18,7,0,0,6.3); ctx.fill();
-          ctx.globalAlpha=0.5; ctx.strokeStyle="rgba(190,230,255,.55)"; ctx.lineWidth=1.4;
-          ctx.beginPath(); ctx.ellipse(x-9,y+15,13,5,0.3,0,6.3); ctx.stroke();
-          ctx.beginPath(); ctx.ellipse(x+9,y+15,13,5,-0.3,0,6.3); ctx.stroke();
-          ctx.globalAlpha=1;
-          [[a,x-dx],[b,x+dx]].forEach(([u,ux])=>{
-            ctx.globalAlpha=u.lunge>0?1:0.92;
-            // `true` (feldspiel-Parameter): dieselbe "shoot"-Pose wie bei Gewichtheben,
-            // nur beim Aufblitzen des naechsten enthuellten Durchgangs (u.lunge>0) —
-            // "Arme hoch" statt Nahkampf-Slash, kein neues Rig.
-            zeichneSprite(ctx,u,ux,y,true);
-            ctx.globalAlpha=1;
-            // NUR VORNAME (u.n.split(" ")[0]) statt der vollen, abgeschnittenen Zeile —
-            // dasselbe Muster wie die wartenden Paare bei zeichneHeben() ("rx,ry+kw/2+10").
-            // Bei nur 52px Abstand zwischen den Partnern liefe eine 10-12-Zeichen-Zeile
-            // sonst in die des Nachbarn.
-            schriftAn(ux,u.n.split(" ")[0],44,c,8.5);
-            schriftAn(ux,String(u.summe)+" Pkt",56,"#dfe6ef",8.5);
-            punktsaeule(ux,u,26);
-            ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-            ctx.textAlign="center";
-            ctx.fillText((u.aktuell+1)+"/"+art.rundenN,ux,y+74);
-          });
-          ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
-          ctx.textAlign="center"; ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)";
-          ctx.strokeText("DUETT",x,y-38); ctx.fillText("DUETT",x,y-38);
-        } else {
-          // SOLO-REST (ungerade Feldgroesse, "Frage A"): unveraendertes Bild wie im
-          // generischen Zweig — keine neue Sondermechanik, auch nicht visuell.
-          const u=grp[0];
-          posMap.set(u.id,{x,y});
-          ctx.globalAlpha=u.lunge>0?1:0.92;
-          ctx.fillStyle=c; ctx.globalAlpha=0.20;
-          ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-          ctx.globalAlpha=1;
-          zeichneSprite(ctx,u,x,y);
-          schriftAn(x,u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-          schriftAn(x,String(u.summe)+" Pkt",56,"#dfe6ef",9);
-          punktsaeule(x,u,30);
-          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-          ctx.textAlign="center";
-          ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
-        }
+        if(grp.length===2){ const dx=26; gridPos.set(grp[0].id,{x:x-dx,y}); gridPos.set(grp[1].id,{x:x+dx,y}); }
+        else gridPos.set(grp[0].id,{x,y});
       });
+    });
+    const schriftAn=(x,y,txt,dy,farbe,groesse)=>{
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
+    };
+    const punktsaeule=(x,y,u,breite)=>{
+      const p=Math.min(1,u.summe/maxSumme);
+      ctx.fillStyle=css("--line");ctx.fillRect(x-breite/2,y,breite,3);
+      ctx.fillStyle=css("--ok");ctx.fillRect(x-breite/2,y,breite*p,3);
+    };
+    // TIEFENSORTIERUNG (5.3): nach der tatsaechlichen Bildhoehe (vizY, sonst Fallback-y)
+    // gezeichnet, sonst laufen frei bewegte Paare durcheinander — der alte Rastercode
+    // brauchte das nicht, weil jede Zeile eine feste Bildhoehe hatte.
+    const anzeige=TEILNEHMER.map(u=>{
+      const g=gridPos.get(u.id)||{x:W/2,y:H/2};
+      return {u, px:(u.vizX!=null?u.vizX:g.x), py:(u.vizY!=null?u.vizY:g.y)};
+    }).sort((a,b)=>a.py-b.py);
+    for(const {u,px,py} of anzeige){
+      const c=u.side===0?css("--home"):css("--away");
+      // KUFENSPUR (5.1/5.3/5.4): u.vizSpur als ausblendender heller Streckenzug statt der
+      // urspruenglichen statischen Doppelellipse. Solange noch keine Spur existiert (ganz
+      // erster Frame), bleibt die alte, statische Schatten-Ellipse als Rueckfall stehen.
+      if(u.vizSpur&&u.vizSpur.length>1){
+        // Zwei Durchgaenge statt einem: ein weicher dunkler Schatten (liest sich als Rille
+        // im Eis) plus ein schmaler blauer Kern obendrauf — ein einzelner heller Strich
+        // (die urspruengliche Fassung) verschwand gegen die fast weisse Eisflaeche fast
+        // vollstaendig (im Playwright-Screenshot geprueft).
+        ctx.beginPath();
+        u.vizSpur.forEach((p,i)=>{ if(i===0)ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+        ctx.lineJoin="round"; ctx.lineCap="round";
+        ctx.globalAlpha=0.22; ctx.strokeStyle="rgba(20,40,60,.6)"; ctx.lineWidth=3.2; ctx.stroke();
+        ctx.globalAlpha=0.65; ctx.strokeStyle="rgba(90,165,220,.85)"; ctx.lineWidth=1.4; ctx.stroke();
+        ctx.globalAlpha=1;
+      } else {
+        ctx.globalAlpha=0.20; ctx.fillStyle=c;
+        ctx.beginPath(); ctx.ellipse(px,py+19,16,6,0,0,6.2832); ctx.fill();
+        ctx.globalAlpha=1;
+      }
+      // ELEMENT-/STURZ-DARSTELLUNG (M4, Abschnitt 5.4): reine Zeichen-Transformationen aus
+      // u.vizPhase/u.vizPhaseT/u.vizSturz — stepKuer() liefert nur den Zustand, gezeichnet
+      // wird ausschliesslich hier.
+      const sturz=!!u.vizSturz, phase=u.vizPhase;
+      let rx=px, ry=py;
+      if(!sturz&&phase==="hebung"&&u.lunge>0){
+        // Hebefigur: vertikaler Versatz nach oben, "shoot"-Pose (Arme hoch) kommt automatisch
+        // aus u.lunge>0+feldspiel=true unten (dieselbe Weiche wie bisher).
+        ry=py-14;
+      } else if(!sturz&&phase==="wurf"&&u.vizPhaseT>0){
+        // Wurf: ein kurzer Bogen laengs der Fahrtrichtung, landet ~40px weiter.
+        const p=Math.min(1,1-u.vizPhaseT/KUER_ELEMENT_DAUER), ri=u.vizRi||0;
+        rx=px+Math.cos(ri)*40*p; ry=py+Math.sin(ri)*40*p-Math.sin(Math.min(1,p)*Math.PI)*16;
+      }
+      ctx.save();
+      if(sturz){
+        // Sturz: hurt-Pose (ueber u.vizSturz, s. zeichneSprite()) plus liegende Kippung —
+        // NICHT u.down, das ist ein Kampf-Feld und wuerde in andere Zweige lecken.
+        ctx.translate(rx,ry); ctx.rotate(1.15); ctx.translate(-rx,-ry);
+      } else if(phase==="pirouette"&&u.vizPhaseT>0){
+        // Pirouette: Drehung auf der Stelle um den eigenen Fusspunkt.
+        ctx.translate(rx,ry); ctx.rotate((buehneT*9+u.id)%6.2832); ctx.translate(-rx,-ry);
+      }
+      ctx.globalAlpha=u.lunge>0?1:0.92;
+      zeichneSprite(ctx,u,rx,ry,true);
+      ctx.globalAlpha=1;
+      ctx.restore();
+      // EISSTAUB (M4): bei sauberer Landung oder waehrend einer laufenden Pirouette.
+      if(!sturz){
+        const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
+        if(u.lunge>0&&zug&&zug.ereignis===art.erfolgWort) zeichneEisstaub(rx,ry+16,u.id);
+        else if(phase==="pirouette"&&u.vizPhaseT>0) zeichneEisstaub(rx,ry+16,u.id+7);
+      }
+      posMap.set(u.id,{x:rx,y:ry});
+      // ETIKETTEN (5.3): an vizY gehaengt, nahe am unteren Bandenrand nach oben geklappt —
+      // die Sicht-QA zeigte hier "schneidet in die Podestkante".
+      const flip=py>H*0.68;
+      const dyName=flip?-46:44, dyPkt=flip?-58:56, dyBar=flip?-70:64, dyProg=flip?-80:74;
+      schriftAn(px,py,u.n.split(" ")[0],dyName,c,8.5);
+      schriftAn(px,py,String(u.summe)+" Pkt",dyPkt,"#dfe6ef",8.5);
+      punktsaeule(px,py+dyBar,u,26);
+      ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.textAlign="center";
+      ctx.fillText((u.aktuell+1)+"/"+art.rundenN,px,py+dyProg);
+    }
+    // DUETT-ETIKETT: einmal je Paar, am Mittelpunkt der beiden AKTUELLEN Zeichenpositionen
+    // (posMap, nach der Element-/Wurf-Transformation) statt eines festen Rasterplatzes.
+    [0,1].forEach(side=>{
+      for(const grp of gruppenJeSeite[side]){
+        if(grp.length!==2)continue;
+        const pa=posMap.get(grp[0].id), pb=posMap.get(grp[1].id);
+        if(!pa||!pb)continue;
+        const mx=(pa.x+pb.x)/2, my=Math.min(pa.y,pb.y)-38;
+        ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+        ctx.textAlign="center"; ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)";
+        ctx.strokeText("DUETT",mx,my); ctx.fillText("DUETT",mx,my);
+      }
     });
     for(const f of floats){
       if(f._teilnehmer==null)continue;
@@ -12818,7 +13196,11 @@
 
     // Survivor-Kern (Zentrum) -- pulsierend ueber buehneT (bereits vorhandene Motor-Zeit,
     // kein neuer Zustand, dieselbe Idee wie zeichneHeben()s buehneAkt-getriebene Animation).
-    const puls=0.5+0.5*Math.sin(buehneT*2.4);
+    // AB JETZT AUF BREAKING_BPM GERASTERT (Ziel 4, Plan 7.4): eine 4-Schlag-Phrase bei
+    // 100 BPM = 2,4 s (vorher 2π/2,4 ≈ 2,62 s frei laufend) -- derselbe Takt, den
+    // stepCypher()s Wippen und der TON_KATALOG.breaking-Beat referenzieren.
+    const PULS_PERIODE=60/BREAKING_BPM*4;
+    const puls=0.5+0.5*Math.sin(buehneT*2*Math.PI/PULS_PERIODE);
     const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rIn*2.4);
     glow.addColorStop(0,"rgba(214,150,255,"+(0.5*puls).toFixed(3)+")");
     glow.addColorStop(1,"rgba(214,150,255,0)");
@@ -12846,43 +13228,107 @@
     for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
     const grad=Math.PI/180;
     const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
+    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Powermove -- ein paar kleine, deterministisch
+    // aus u.id/buehneT berechnete Punkte am Fusspunkt, dieselbe "keine Partikel-Arrays,
+    // nur billige Sinusformen"-Idee wie zeichnePartikelEffekt() in zeichneSprite (s. dort).
+    const zeichneBodenstaub=(fx,fy,id)=>{
+      ctx.fillStyle="#cbb98a";
+      for(let i=0;i<5;i++){
+        const ph=buehneT*6+id*1.7+i*1.3;
+        const lauf=(ph%1);
+        const wx=fx+Math.cos(id+i)*10*lauf, wy=fy-4*lauf*(1-lauf)*4;
+        ctx.globalAlpha=0.5*(1-lauf);
+        ctx.beginPath(); ctx.arc(wx,wy,1.6,0,6.2832); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    };
     for(const [side,startA,endA] of hemis){
       const g=TEILNEHMER.filter(u=>u.side===side);
       const n=Math.max(1,g.length);
       g.forEach((u,i)=>{
-        // 13er-Schritt gegen Klumpen (breaking.tsx:52), auf die feste Seitenlaenge n
-        // (statt der offenen Team-Zahl N in breaking.tsx) heruntergerechnet.
+        // POSITION AUS stepCypher() (Ziel 4, Plan 7.1): u.vizA/u.vizR statt Score-Radius
+        // und Index-Permutation -- das behebt das Sicht-QA-Stapelproblem strukturell,
+        // weil der Radius jetzt Choreografie ist (rOut im Ring, ~0 in der Mitte), nicht
+        // mehr der Score. Fallback nur fuer den allerersten Redraw VOR dem ersten
+        // stepBuehne()-Aufruf (reset() zeichnet einmal vor dem ersten step).
         const perm=(i*13)%n;
         const frac=n>1?perm/(n-1):0.5;
-        const a=startA+(endA-startA)*frac;
-        const radius=rOut-(u.summe/maxSumme)*(rOut-rIn);
+        const a=u.vizA!=null?u.vizA:startA+(endA-startA)*frac;
+        const radius=u.vizR!=null?u.vizR:rOut-(u.summe/maxSumme)*(rOut-rIn);
         const x=cx+Math.cos(a)*radius, y=cy+Math.sin(a)*radius*KY;
+        const fussY=y+19; // derselbe Bodenpunkt, an dem der Schatten schon immer sass
 
         const c=side===0?css("--home"):css("--away");
+        const phase=u.vizPhase||"ring";
+        // Schatten-Streckung (Plan 7.2): je naeher am Zentrum (radius -> 0), desto mehr
+        // Bewegungs-"Zug" im Schatten -- rein kosmetisch, tokenTreue Radius/Winkel bleiben
+        // unberuehrt. Powermove bekommt zusaetzlich die Windmill-Drehrichtung mit.
+        const naeheZumKern=phase==="ring"?0:Math.max(0,1-radius/rOut);
+        const streckX=16*(1+naeheZumKern*0.7), streckY=6*(1-naeheZumKern*0.3);
+        ctx.save();
+        ctx.translate(x,fussY);
+        if(phase==="throwdown"&&u.vizMove===2)ctx.rotate(buehneT*9+u.id);
         ctx.fillStyle=c; ctx.globalAlpha=0.20;
-        ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.2832); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0,0,streckX,streckY,0,0,6.2832); ctx.fill();
         ctx.globalAlpha=1;
+        ctx.restore();
 
-        // D. Erfolg/Fehlschlag -- rein aus u.runden[u.aktuell].ereignis gelesen, exakt
-        // dieselbe Unterscheidung, die WERTUNG_AUFTRITT (:11818) fuer die Boxscore-Spalte
-        // "Fehl" schon liest. Kein neues Feld auf TEILNEHMER, keine Aenderung an
-        // stepBuehne() -- u.lunge (0,5 s Zerfallszeit, von stepBuehne gesetzt) ist die
-        // einzige Zeitbasis. Die Position des Tokens (oben berechnet) bleibt in beiden
-        // Faellen exakt score-treu -- "Score bleibt Wahrheit", wie in breaking.tsx.
-        const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
-        const geradeDran=u.lunge>0&&zug;
-        if(geradeDran&&zug.ereignis===art.erfolgWort){
-          // Erfolg: ein sich ZUSAMMENZIEHENDER Lila-Gold-Puls-Ring -- "ich halte stand"
-          // liest sich als Verengung, nicht als Explosion (Recherche Abschnitt 3.3.D).
-          const p=u.lunge/0.5;
+        // D. Move-Posen (Plan 7.2) -- ausschliesslich Canvas-Transformationen um den
+        // Bodenpunkt (fussY), keine neuen Sprite-Blaetter, keine Aenderung an
+        // zeichneSprite()/u.down/u.lunge (die bleiben deren eigene Kampf-/Ausfallschritt-
+        // Felder, s. Kommentar bei stepCypher). u.vizMove (0..3, aus stepCypher) waehlt
+        // die Pose waehrend `throwdown`; `freeze`/`rueckzug` ueberschreiben sie mit der
+        // Erfolgs-/Fehlschlag-Darstellung.
+        ctx.save();
+        if(phase==="throwdown"){
+          if(u.vizMove===0){
+            // Toprock: Gehzyklus (zeichneSprite() Default), Blickrichtung wechselt im
+            // Takt -- per Spiegelung um die eigene Achse statt eines Feldzugriffs auf
+            // u.vx/u.vy (die fuer Buehnen-Teilnehmer sowieso 0 bleiben).
+            if(Math.floor(buehneT*BREAKING_BPM/60*2+u.id)%2===1){
+              ctx.translate(2*x,0); ctx.scale(-1,1);
+            }
+          } else if(u.vizMove===1){
+            // Footwork: tief gesetzt (y-Versatz nach unten + leichte Stauchung).
+            ctx.translate(x,fussY); ctx.scale(1,0.92); ctx.translate(-x,-(fussY-6));
+          } else if(u.vizMove===2){
+            // Powermove: Windmill -- Rotation um den Fusspunkt.
+            ctx.translate(x,fussY); ctx.rotate(buehneT*9+u.id); ctx.translate(-x,-fussY);
+            zeichneBodenstaub(x,fussY,u.id);
+          } else {
+            // Freeze (als GEWAEHLTER Move, noch vor dem Erfolg/Fehlschlag-Ausgang):
+            // leichte Vorschau-Kippung.
+            ctx.translate(x,fussY); ctx.rotate(0.18); ctx.translate(-x,-fussY);
+          }
+        } else if(phase==="freeze"){
+          // Erfolg: eingefrorenes, gekipptes Standbild plus goldener Standbild-Ring
+          // (zusammenziehend -- "ich halte stand" liest sich als Verengung).
+          ctx.translate(x,fussY); ctx.rotate(0.22); ctx.translate(-x,-fussY);
+        } else if(phase==="rueckzug"){
+          // Fehlschlag: kurzes Torkeln beim Rueckzug aus der Mitte.
+          ctx.translate(Math.sin(u.vizPhaseT*40+u.id)*2.5,0);
+        }
+        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
+        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
+        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
+        zeichneSprite(ctx,u,x,y);
+        ctx.restore();
+
+        // Erfolg/Fehlschlag-Ringe, jetzt aus u.vizPhase (stepCypher) statt aus u.lunge
+        // gelesen -- exakt, weil vizPhase die Zustandsmaschine ist, die diese Ausgaenge
+        // ueberhaupt erst erzeugt (u.runden[u.aktuell].ereignis gegen art.erfolgWort/
+        // art.failWort, s. dort). Farbschema/Stil unveraendert aus der ersten Fassung.
+        if(phase==="freeze"){
+          const p=Math.max(0,1-u.vizPhaseT/0.35);
           ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
           ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
           ctx.globalAlpha=1;
-        } else if(geradeDran&&zug.ereignis===art.failWort){
-          // Fehlschlag: roter Zickzack-Riss-Flash direkt am Token -- derselbe gluehende-
-          // Riss-Zeichenstil wie EFFEKT_ARTEN oben (:2302ff, Lava Golem), nur rot statt
-          // orange und nur fuer die u.lunge-Dauer sichtbar statt permanent.
-          const p=u.lunge/0.5;
+        } else if(phase==="rueckzug"){
+          // Riss-Flash JETZT AN DER MITTE gebunden (Plan 7.2: "kuenftig an die Mitte statt
+          // an den Ringplatz gebunden") -- (x,y) IST bereits die Mitte, weil radius hier
+          // noch nahe 0 liegt (NAECHER() in stepCypher glitet erst waehrend rueckzug
+          // wieder nach aussen).
+          const p=Math.max(0,1-u.vizPhaseT/0.3);
           ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
           ctx.beginPath();
           const segs=4;
@@ -12893,11 +13339,6 @@
           }
           ctx.stroke(); ctx.globalAlpha=1; ctx.lineCap="butt";
         }
-
-        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
-        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
-        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
-        zeichneSprite(ctx,u,x,y);
 
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
@@ -12912,7 +13353,8 @@
 
         // E. Survivor-Krone (niedrige Prioritaet, aus derselben Vorlage wie breaking.tsx:
         // 177-181): der aktuelle Rang-1-Teilnehmer bekommt dasselbe 👑-Textzeichen ueber
-        // dem Sprite, kein neues Asset.
+        // dem Sprite, kein neues Asset. Unveraendert score-basiert (u.summe), unabhaengig
+        // von der jetzt choreografischen Ringposition.
         if(u===fuehrer){
           ctx.font="14px sans-serif"; ctx.fillText("👑",x,y-34);
         }
@@ -21182,6 +21624,11 @@
     const bc=document.getElementById("bbugcallout");
     if(bc){bc.hidden=true;bc.classList.remove("zu");}
     bkLoopStop();
+    // TON-SCHICHT (Ziel 4, 7.4): jeder Reset (auch ein Disziplinwechsel mitten im Spiel)
+    // beendet einen laufenden Ton-Loop -- genau wie bkLoopStop() daneben, nur fuer
+    // TON_KATALOG-Loops (aktuell nur Breaking, s. tonLoopStart()-Aufrufe unten). Ein
+    // No-Op, wenn gerade kein Loop laeuft (tonLoopStop() prueft das selbst).
+    tonLoopStop();
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
@@ -21219,6 +21666,11 @@
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
     // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
+    // TON-SCHICHT, BREAKING-BEAT (Ziel 4, 7.4): derselbe Play/Pause-Rahmen wie beim
+    // Basketball-Dribbeln oben, nur ueber TON_KATALOG.breaking.beat statt einer Audio-
+    // Datei. tonLoopStart()/-Stop() sind selbst try/catch-abgesichert (No-Op ohne
+    // AudioContext bzw. vor der ersten Nutzergeste).
+    if(disc==="breaking"){ if(running)tonLoopStart("breaking"); else tonLoopStop(); }
     // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
     // AudioContext fuer sfx()/tonLoop* darf erst nach einer echten Nutzergeste starten.
     // Dieser Klick ist die erste; try/catch macht jeden frueheren sfx()-Aufruf zum No-Op.
@@ -22592,6 +23044,13 @@
       const punkte=zeichneHockeyschlaeger(cctx,x??48,y??70,s??1,richtung??2,phase??"halten");
       return {dataUrl:c.toDataURL(), punkte};
     },
+    // CYPHER-VIZ-PROBE (Ziel 4, Opus-Plan 7.1): rein diagnostisch, wie renderProbe/
+    // figurProbe daneben — liest die fuenf viz*-Felder aller TEILNEHMER von aussen
+    // (Playwright, ohne UI), damit sich die "immer nur EINER in der Mitte"-Garantie ohne
+    // Pixel-Vergleich nachmessen laesst: `data.filter(d=>d.phase!=="ring").length` darf
+    // ueber jede Sample-Reihe nie > 1 sein. Reines Lesen, kein Einfluss auf die Simulation.
+    cypherVizProbe:()=>TEILNEHMER.map(u=>({id:u.id,n:u.n,phase:u.vizPhase,
+      r:Math.round(u.vizR),a:Math.round((u.vizA||0)*100)/100,summe:u.summe,aktuell:u.aktuell})),
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
