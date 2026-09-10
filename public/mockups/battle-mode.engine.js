@@ -2086,6 +2086,29 @@
   // zeigt Frame 9-12 beim 13-Bilder-"shoot" ins Leere. Zeilenordnung ist Standard-LPC wie
   // beim Koerper (0/1/2/3), nachgemessen an den Seitenansichten in Reihe 1/3.
   const FEUERWAFFEN=["pistole","schrotflinte","sturmgewehr"];
+  // REQUISITEN-TABELLE UEBER ALLE CHASSIS (PR 0, Opus-Plan Abschnitt 3.2 — Nachfolger der
+  // drei Buehne-Sonderzeilen von 07.09., s. Kommentar bei zeichneSprite). null bedeutet
+  // "keine Waffenebene zeichnen" (Kosmetikwaffe b.waffe sperren), ein String bedeutet "immer
+  // diese Waffe, unabhaengig von der Kosmetik", undefined (= kein Tabelleneintrag) bedeutet
+  // "Kosmetik behalten". Fechten ist real ein Klingengefecht → immer "schwert". Alle anderen
+  // Buehnen-Disziplinen sind real unbewaffnet → null; vorher behielten Showcase/Tennis/
+  // Wettessen/Speed-Schach/I-Spy noch ihre zufaellige Kosmetikwaffe (derselbe Bug, den die
+  // alte Recherche fuer Eiskunstlauf/Breaking schon fand, s. "fechten-eiskunstlauf-breaking-
+  // politur-recherche-07-09.md" Abschnitt 0 Punkt 2). Die BAHN gehoert jetzt ausdruecklich
+  // mit in die Pruefung — sie tat es vorher NIE (`keineBuehnenWaffe` fragte nur nach
+  // `istBuehne(disc)`), und genau das liess einen Takeshi's-Castle-Laeufer mit
+  // Schrotflinten-Kosmetik den ganzen Parcours entlanglaufen (Sicht-QA 10.09., Plan
+  // Abschnitt 2 Befund 2): niemand laeuft einen Hindernisparcours mit Sturmgewehr.
+  // Waffenauswahl fliesst in KEINE Rangtreue-Formel ein, nur in Zeichenpfade
+  // (waffeEffektiv wird ausschliesslich bei :2717-2720/:2837/:2842-2845 gelesen) — die
+  // Tabelle bildet das heutige Verhalten fuer Fechten/Eiskunstlauf/Breaking 1:1 nach.
+  const DISZIPLIN_WAFFE={
+    fechten:"schwert",
+    eiskunstlauf:null, breaking:null, gewichtheben:null, showcase:null,
+    tennis:null, wettessen:null, "speed-schach":null, "i-spy":null,
+    // BAHN: niemand laeuft einen Hindernisparcours mit Sturmgewehr.
+    spurt:null, staffel:null, "time-trial":null, climbing:null, "takeshis-castle":null
+  };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
@@ -2552,27 +2575,16 @@
     // Ueberkopf-Bewegung, die der Baukasten kennt), aber ohne Waffen-Overlay (s. unten) —
     // naeher an einem Wurf als "slash", auch wenn sie urspruenglich fuer den Bogen
     // gezeichnet wurde. Chris' Wunsch: keine Waffenanimation im Feldspiel.
-    // BUEHNE-WAFFENUEBERSCHREIBUNG (07.09., Fable-Recherche
-    // "fechten-eiskunstlauf-breaking-politur-recherche-07-09.md" Abschnitt 2.2/3.2/4.2):
-    // derselbe Fund wie beim Feldspiel oben, nur andersherum verteilt. Bislang schwang JEDE
-    // Buehnen-Disziplin ausser Gewichtheben/Speed-Schach beim Treffer die zufaellig
-    // zugewiesene KOSMETIK-Waffe (b.waffe) des Charakters, unabhaengig davon, was die
-    // Disziplin ueberhaupt ist — ein Fechter mit Axt-Kosmetik schwang eine Axt, ein
-    // Eiskunstlaeufer mit Bogen-Kosmetik spannte einen Pfeil. `istBuehne(disc)` (nicht nur
-    // `buehneDisc`, das nach einem Buehnen-Match stehenbleibt, genau die Falle, die der
-    // `feldspielDisc`-Kommentar oben schon einmal beschreibt) bestaetigt, dass GERADE eine
-    // Buehne laeuft, bevor `buehneDisc` gegen die drei Zieldisziplinen geprueft wird.
-    // Fechten (real ein Gefecht mit einer Klinge) bekommt IMMER die Schwert-Waffenebene,
-    // unabhaengig von der Kosmetik — kein neues Asset, `schwert` ist die einzige vorhandene
-    // schlanke Klingenwaffe. Eiskunstlauf/Breaking (real unbewaffnet) bekommen GAR KEINE
-    // Waffenebene — die "slash"-Pose selbst (ein bloßhaendiger Schwung) bleibt unveraendert,
-    // nur die aktiv falsche Waffe verschwindet. Showcase/Tennis/Wettessen/I-Spy haben
-    // denselben Bug (Recherche Abschnitt 0 Punkt 2), sind aber NICHT Teil dieser Ueberschreibung
-    // — Showcase ist zudem eine der drei live geschalteten Buehnen-Disziplinen
-    // (ARENA_RESOLVED_DISCIPLINE_IDS) und bewusst unangetastet.
-    const fechtenWaffe=istBuehne(disc)&&buehneDisc==="fechten";
-    const keineBuehnenWaffe=istBuehne(disc)&&(buehneDisc==="eiskunstlauf"||buehneDisc==="breaking");
-    const waffeEffektiv=fechtenWaffe?"schwert":(keineBuehnenWaffe?null:b.waffe);
+    // REQUISITEN-UEBERSCHREIBUNG (07.09. urspruenglich nur fuer die Buehne, 10.09. auf alle
+    // Chassis erweitert — PR 0, s. DISZIPLIN_WAFFE oben). `istBuehne(disc)`/`istBahn(disc)`
+    // (nicht nur `buehneDisc`/`bahnDisc`, die nach dem jeweils letzten Match stehenbleiben,
+    // genau die Falle, die der `feldspielDisc`-Kommentar oben schon einmal beschreibt)
+    // bestaetigen, dass GERADE eine Buehne bzw. eine Bahn laeuft, bevor die jeweilige Disc
+    // gegen die Tabelle geprueft wird. `undefined` (kein Tabelleneintrag, z.B. jede
+    // Feldspiel-/Arena-Disziplin) behaelt die Kosmetikwaffe `b.waffe`.
+    const aktiveDisc=istBuehne(disc)?buehneDisc:(istBahn(disc)?bahnDisc:null);
+    const erzwungen=aktiveDisc!=null?DISZIPLIN_WAFFE[aktiveDisc]:undefined;
+    const waffeEffektiv=erzwungen===undefined?b.waffe:erzwungen;
     const bogen=!feldspiel&&waffeEffektiv==="bogen";
     const feuerwaffe=!feldspiel&&FEUERWAFFEN.includes(waffeEffektiv);
     // FOOTBALL-AUSRUESTUNG (05.09., "football-matrix-und-assets-recherche-05-09.md" Abschnitt
@@ -11644,7 +11656,27 @@
       }
       buehneAkt=BB().rundenDauer;
     }
+    buehnenBewegung(dt);
     if(buehneZeiger>=buehneQueue.length)done=true;
+  }
+
+  // BEWEGUNGS-EINSTIEGSPUNKT (PR 0, Opus-Plan Abschnitt 3.3). Der Dispatcher ist absichtlich
+  // leer, bis Ziel-PRs stepKuer()/stepCypher() liefern — das typeof-Wachterschutz macht
+  // seine Abwesenheit zu einem stillen No-Op statt zu einem ReferenceError.
+  //
+  // Eine buehnenBewegung-Implementierung darf ausschliesslich neue, praesentationale Felder
+  // auf `u` schreiben (Praefix `viz`), niemals `u.summe`, `u.runden`, `u.aktuell`,
+  // `u.vorteil`, `u.zweikampf`, `u.lunge`, `buehneAkt`, `buehneZeiger`, `done`. Sie darf
+  // niemals `rr()` aufrufen — `rr()` (`:13913`) ist ein linearer Kongruenzgenerator mit
+  // EINEM globalen Zustand; ein zusaetzlicher Zug daraus verschiebt jede spaetere Ziehung
+  // und aendert damit die Rangtreue jeder Buehnen-Disziplin. Wer Streuung braucht, nimmt
+  // einen reinen Hash aus `u.id`. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen
+  // diese Funktion mit — die Rangtreue-Neutralitaet ist deshalb keine Hoeflichkeit, sondern
+  // Bedingung.
+  function buehnenBewegung(dt){
+    const art=BB();
+    if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
+    if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
   }
 
   function updateHudBuehne(){
@@ -16084,6 +16116,226 @@
   }
   function bkLoopPause(){ if(bkLoop.publikum)bkLoop.publikum.pause(); }
   function bkLoopStop(){ bkLoopPause(); if(bkLoop.publikum)bkLoop.publikum.currentTime=0; }
+
+  // TON-SCHICHT FUER VIER DISZIPLINEN (PR 0, Opus-Plan "opus-plan-feinschliff-vier-
+  // disziplinen-09-10.md" Abschnitt 3.1). NICHT dasselbe wie der Basketball-Block oben:
+  // bkSfx()/bkLoop* spielen fertige Dateien aus public/sound/basketball/ ab, die es fuer
+  // die vier Zieldisziplinen dieser Runde (Gewichtheben, Eiskunstlauf, Breaking, Takeshi's
+  // Castle) nicht gibt und in dieser Umgebung auch nicht gibt (CLAUDE.md: der
+  // Umgebungs-Proxy laesst nur GitHub/npm durch, jede andere Audio-Quelle scheitert mit
+  // "403 CONNECT tunnel failed"). sfx() erzeugt seine Toene deshalb PROZEDURAL per
+  // WebAudio — ein eigener AudioContext, ein einmalig gebauter Rausch-Puffer, und fuenf
+  // kleine Bausteine (tonKlick/tonSchlag/tonMetall/tonRauschen/tonTon), aus denen sich der
+  // ganze Katalog zusammensetzt. bkVolume/bkMuted/bkPegel() werden WIEDERVERWENDET, nicht
+  // dupliziert — ein Regler in der UI soll weiterhin jeden Ton im Spiel steuern, Basketball
+  // eingeschlossen.
+  //
+  // DER WEG ZURUECK BLEIBT OFFEN: jeder TON_KATALOG-Eintrag darf statt {synth:...} ein
+  // {datei:"/sound/<disziplin>/<name>.ext"} tragen. sfx()/tonLoopStart() bevorzugen dann
+  // die Datei und fallen nur zurueck auf den Synth, wenn keine da ist. Wer spaeter echte
+  // Aufnahmen einspielt, aendert eine Tabellenzeile, keinen Code.
+  //
+  // HARTE REGEL, PROJEKTWEIT: sfx()/tonLoopStart()/tonLoopStop() rufen NIEMALS rr() auf
+  // (der lineare Kongruenzgenerator hat EINEN globalen Zustand — ein zusaetzlicher Zug
+  // daraus verschoebe jede spaetere Ziehung und damit die Rangtreue jeder Disziplin) und
+  // schreiben NIEMALS auf u/TEILNEHMER/LAEUFER. Sie lesen hoechstens Argumente — sonst
+  // nichts. disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese Funktionen unbesorgt
+  // mitlaufen lassen.
+  let tonCtx=null;
+  function tonKontext(){
+    if(tonCtx)return tonCtx;
+    try{ tonCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ tonCtx=null; }
+    return tonCtx;
+  }
+  // Autoplay-Sperre: derselbe Grundsatz wie beim Basketball-Ton — der Browser blockt Audio
+  // ohne echte Nutzergeste. Der #play-Klick weiter unten ruft ctx.resume() auf; jeder
+  // sfx()-Aufruf VOR dieser Geste ist wegen des try/catch ein stiller No-Op, nie ein Fehler.
+  let tonRauschPuffer=null;
+  function tonRauschPufferHolen(ctx){
+    if(tonRauschPuffer)return tonRauschPuffer;
+    const sekunden=2, sr=ctx.sampleRate;
+    const buf=ctx.createBuffer(1,Math.floor(sr*sekunden),sr);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    tonRauschPuffer=buf;
+    return buf;
+  }
+  function tonHuelle(gain,t0,attack,decay,peak){
+    gain.gain.cancelScheduledValues(t0);
+    gain.gain.setValueAtTime(0,t0);
+    gain.gain.linearRampToValueAtTime(Math.max(peak,0.0001),t0+attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t0+attack+decay);
+  }
+  // Baustein 1/5: klick — kurzer gefilterter Rauschimpuls. Kufenschlag, Beat-Hi-Hat.
+  function tonKlick(vol,frequenz,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const buf=tonRauschPufferHolen(ctx);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const filt=ctx.createBiquadFilter(); filt.type="highpass"; filt.frequency.value=frequenz??1800;
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime, d=dauer??0.045;
+    tonHuelle(gain,t0,0.001,d,bkPegel(vol??0.5));
+    src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+    src.start(t0); src.stop(t0+d+0.03);
+  }
+  // Baustein 2/5: schlag — Sinus mit Frequenz-Abfall (oder -Anstieg). Hantel-Aufsetzer,
+  // Sturz, Falle, Sprungansatz.
+  function tonSchlag(vol,f0,f1,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const osc=ctx.createOscillator(); osc.type="sine";
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime, d=dauer??0.18;
+    osc.frequency.setValueAtTime(Math.max(f0??220,1),t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(f1??60,1),t0+d);
+    tonHuelle(gain,t0,0.002,d,bkPegel(vol??0.6));
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+d+0.03);
+  }
+  // Baustein 3/5: metall — zwei leicht verstimmte Rechtecke durch einen Bandpass.
+  // Scheibenklirren, Stangen-Klack, Gong.
+  function tonMetall(vol,frequenz,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const filt=ctx.createBiquadFilter(); filt.type="bandpass"; filt.frequency.value=frequenz??900; filt.Q.value=5;
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime, d=dauer??0.25;
+    tonHuelle(gain,t0,0.001,d,bkPegel(vol??0.6));
+    for(const verstimmung of [1,1.0075]){
+      const osc=ctx.createOscillator(); osc.type="square"; osc.frequency.value=(frequenz??900)*verstimmung;
+      osc.connect(filt); osc.start(t0); osc.stop(t0+d+0.03);
+    }
+    filt.connect(gain); gain.connect(ctx.destination);
+  }
+  // Baustein 4/5: rauschen — gefiltertes Rauschen, einmalig ODER als Loop (Publikum, Beat-
+  // Unterbett). loop:true liefert das Knoten-Paar zurueck, damit tonLoopStop() es stoppen kann.
+  function tonRauschen(vol,bandMitte,dauer,loop){
+    const ctx=tonKontext(); if(!ctx)return null;
+    const buf=tonRauschPufferHolen(ctx);
+    const src=ctx.createBufferSource(); src.buffer=buf; src.loop=!!loop;
+    const filt=ctx.createBiquadFilter(); filt.type="bandpass"; filt.frequency.value=bandMitte??1200; filt.Q.value=0.8;
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime;
+    if(loop){ gain.gain.setValueAtTime(0,t0); gain.gain.linearRampToValueAtTime(bkPegel(vol??0.16),t0+0.6); }
+    else tonHuelle(gain,t0,0.01,dauer??0.4,bkPegel(vol??0.5));
+    src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+    src.start(t0);
+    if(!loop)src.stop(t0+(dauer??0.4)+0.05);
+    return {src,gain};
+  }
+  // Baustein 5/5: ton — reiner Sinus mit weicher Huelle. Ansage-Gong, Torsignal.
+  function tonTon(vol,frequenz,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const osc=ctx.createOscillator(); osc.type="sine"; osc.frequency.value=frequenz??880;
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime, d=dauer??0.3;
+    tonHuelle(gain,t0,0.02,d,bkPegel(vol??0.6));
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+d+0.05);
+  }
+  // Zwei kleine Verbundtoene aus den fuenf Bausteinen — kein sechster Baustein, nur eine
+  // Komposition der vorhandenen.
+  function tonDoppelton(vol,f1,f2,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const d=dauer??0.32;
+    tonTon(vol,f1,d*0.55);
+    const c2=tonKontext(); if(!c2)return;
+    const osc=c2.createOscillator(); osc.type="sine"; osc.frequency.value=f2;
+    const gain=c2.createGain();
+    const t0=c2.currentTime+d*0.32;
+    tonHuelle(gain,t0,0.015,d*0.5,bkPegel(vol??0.6));
+    osc.connect(gain); gain.connect(c2.destination);
+    osc.start(t0); osc.stop(t0+d*0.5+0.05);
+  }
+  function tonBuzzer(vol,dauer){
+    const ctx=tonKontext(); if(!ctx)return;
+    const osc=ctx.createOscillator(); osc.type="sawtooth"; osc.frequency.value=110;
+    const gain=ctx.createGain();
+    const t0=ctx.currentTime, d=dauer??0.3;
+    const peak=bkPegel(vol??0.5);
+    gain.gain.setValueAtTime(peak,t0);
+    gain.gain.setValueAtTime(peak,t0+d*0.8);
+    gain.gain.linearRampToValueAtTime(0.0001,t0+d);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0+d+0.03);
+  }
+
+  // Katalog je Disziplin. Die anderen 15 Disziplinen bleiben hier ABSICHTLICH ohne Eintrag
+  // (Opus-Plan Abschnitt 9.3: "Ton fuer die uebrigen 15 Disziplinen ... ist je Disziplin
+  // eine eigene kleine Runde") — sfx() auf eine unbekannte Disziplin/ein unbekanntes
+  // Ereignis ist ein stiller No-Op, kein Fehler.
+  const TON_KATALOG={
+    gewichtheben:{
+      ansage:        {synth:(vol)=>tonTon(vol,300,0.5)},
+      stange_hoch:   {synth:(vol)=>tonMetall(vol,650,0.22)},
+      gueltig:       {synth:(vol)=>tonDoppelton(vol,660,990,0.3)},
+      ungueltig:     {synth:(vol)=>tonBuzzer(vol,0.35)},
+      scheiben_fall: {synth:(vol)=>{ tonMetall((vol??0.6)*0.85,600,0.3); tonRauschen((vol??0.6)*0.6,280,0.4,false); }},
+      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    eiskunstlauf:{
+      kufe:     {synth:(vol)=>tonKlick(vol,3200,0.05)},
+      sprung:   {synth:(vol)=>tonSchlag(vol,320,900,0.22)},
+      landung:  {synth:(vol)=>{ tonSchlag((vol??0.6)*0.7,600,140,0.12); tonKlick((vol??0.6)*0.8,2600,0.04); }},
+      sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,450,0,true)}
+    },
+    breaking:{
+      beat:      {loop:true, synth:(vol)=>tonRauschen(vol,220,0,true)},
+      freeze:    {synth:(vol)=>{ tonKlick(vol,2400,0.05); tonMetall((vol??0.6)*0.6,500,0.12); }},
+      powermove: {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
+      abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)}
+    },
+    "takeshis-castle":{
+      falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
+      sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      platsch:  {synth:(vol)=>tonRauschen(vol,900,0.4,false)},
+      tor:      {synth:(vol)=>tonMetall(vol,300,0.6)},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    }
+  };
+
+  const tonSfxPool={};
+  // Einschuss-Ton: sfx("gewichtheben","gueltig") o.ae. `vol` optional (0..1, vor bkPegel).
+  // Unbekannte Disziplin/Ereignis, ein fehlender AudioContext (z.B. in Node/Playwright ohne
+  // Audio-Geraet) oder ein Aufruf vor der ersten Nutzergeste sind alle stille No-Ops.
+  function sfx(disziplin,ereignis,vol){
+    try{
+      const eintrag=(TON_KATALOG[disziplin]||{})[ereignis];
+      if(!eintrag||eintrag.loop)return; // Loop-Eintraege laufen ueber tonLoopStart/-Stop
+      if(eintrag.datei){
+        if(!tonSfxPool[disziplin])tonSfxPool[disziplin]={};
+        let pool=tonSfxPool[disziplin][ereignis];
+        if(!pool)pool=tonSfxPool[disziplin][ereignis]=[0,1,2].map(()=>{const a=new Audio(eintrag.datei);a.preload="auto";return a;});
+        const frei=pool.find(a=>a.paused||a.ended)||pool[0];
+        frei.currentTime=0; frei.volume=bkPegel(vol??0.6); frei.play().catch(()=>{});
+        return;
+      }
+      if(typeof eintrag.synth==="function")eintrag.synth(vol??0.6);
+    }catch(e){}
+  }
+  let tonLoopAktiv=null; // {disziplin, audio} ODER {disziplin, knoten:{src,gain}}
+  function tonLoopStart(disziplin){
+    try{
+      tonLoopStop();
+      const katalog=TON_KATALOG[disziplin]; if(!katalog)return;
+      const name=katalog.publikum?"publikum":(katalog.beat?"beat":null); if(!name)return;
+      const eintrag=katalog[name];
+      if(eintrag.datei){
+        const a=new Audio(eintrag.datei); a.loop=true; a.volume=bkPegel(0.16); a.play().catch(()=>{});
+        tonLoopAktiv={disziplin,audio:a};
+        return;
+      }
+      const knoten=eintrag.synth&&eintrag.synth(0.14);
+      if(knoten)tonLoopAktiv={disziplin,knoten};
+    }catch(e){}
+  }
+  function tonLoopStop(){
+    try{
+      if(!tonLoopAktiv)return;
+      if(tonLoopAktiv.audio)tonLoopAktiv.audio.pause();
+      else if(tonLoopAktiv.knoten&&tonLoopAktiv.knoten.src){ try{tonLoopAktiv.knoten.src.stop();}catch(e){} }
+      tonLoopAktiv=null;
+    }catch(e){}
+  }
 
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
@@ -20782,6 +21034,10 @@
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
     // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
+    // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
+    // AudioContext fuer sfx()/tonLoop* darf erst nach einer echten Nutzergeste starten.
+    // Dieser Klick ist die erste; try/catch macht jeden frueheren sfx()-Aufruf zum No-Op.
+    try{ const c=tonKontext(); if(c&&c.state==="suspended")c.resume(); }catch(e){}
   });
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
@@ -22150,6 +22406,19 @@
       const cctx=c.getContext("2d"); cctx.imageSmoothingEnabled=false;
       const punkte=zeichneHockeyschlaeger(cctx,x??48,y??70,s??1,richtung??2,phase??"halten");
       return {dataUrl:c.toDataURL(), punkte};
+    },
+    // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
+    // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
+    // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
+    // ersten Nutzergeste MUSS ok:true liefern (stiller No-Op) — das ist die Autoplay-
+    // No-Op-Garantie aus dem Plan, hier von aussen pruefbar.
+    sfxProbe:(disziplin,ereignis,vol)=>{
+      try{ sfx(disziplin,ereignis,vol); return {ok:true}; }
+      catch(e){ return {ok:false, fehler:String(e)}; }
+    },
+    tonLoopProbe:(disziplin)=>{
+      try{ tonLoopStart(disziplin); tonLoopStop(); return {ok:true}; }
+      catch(e){ return {ok:false, fehler:String(e)}; }
     },
     renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
     diagPositionen:(saat)=>{
