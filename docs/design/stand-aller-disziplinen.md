@@ -1,5 +1,19 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Siebter Nachtrag 10.09. — die Football-Zeile in der Tabelle unten (0,516) ist ZWEIMAL
+ueberholt.** Erstens war sie schon vor heute stale: sie stammt aus dem 06.09.-Lauf, vor PR #884
+(Rezept C + `fkLos`). Auf `origin/main` misst Football heute **0,800** je Spiel bei n=24
+(0,800 auch bei n=48), nicht 0,516. Zweitens hat die Fable-Entscheidung **E3**
+(`docs/pm-briefings/fable-entscheidung-e1-e2-e3-basketball-hockey-football-10-09.md` Abschnitt 3)
+Footballs Anzeige-/Kauf-Seite auf die Spiel-Eignung gezogen: die Sonde stellt seither nach
+demselben `p.d.football` auf, nach dem auch ein Manager aufstellt, die sechs Besten liegen
+dadurch enger beieinander — der im Voraus benannte **F2-Effekt** (Fable 3.4 Punkt 1). Gemessen
+nach dem Umbau: **0,714** bei n=24 (Spannweite 0,168), **0,724** bei n=48 (Spannweite 0,156),
+Saison 0,881. Football faellt damit unter 0,80; nach Fable 3.4 Punkt 1 heisst das **G1 22 statt
+35 und Gameplay 82**. `data/generated/rangtreue-basislinie.json` traegt fuer Football weiterhin
+die 0,516 und ist mit dem Vermerk neu zu ziehen, dass sie jetzt eine andere Aufstellungsregel
+misst (Reihenfolge aus Fable 3.4: Umbau → Messung → Basislinie/PPS → Anschluss).
+
 **Sechster Nachtrag 07.09. — Fechten/Eiskunstlauf/Breaking-Politur umgesetzt (Fable-Recherche
 `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`), noch am selben Tag wie der Fuenfte
 Nachtrag unten.** Zwei unabhaengige Befunde, zwei getrennte Aenderungen:

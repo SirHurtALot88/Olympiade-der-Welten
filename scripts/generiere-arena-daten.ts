@@ -28,9 +28,9 @@ import { resolve } from "node:path";
 import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
 import {
   officialDisciplineWeightOrder,
-  officialDisciplineWeightTable,
   playerGeneratorAttributeKeys,
 } from "@/lib/player-generator/official-discipline-weights";
+import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 
 const MARKER_AUF = "  // <<< GENERIERT: arena-daten — nicht von Hand ändern";
@@ -56,12 +56,20 @@ function zahl(n: number): string {
 function matrixBlock(): string {
   const zeilen: string[] = [];
   for (const id of officialDisciplineWeightOrder) {
-    // ACHTUNG, die Tabelle ist TRANSPONIERT: sie ist nach Attribut geschlüsselt, nicht
-    // nach Disziplin. officialDisciplineWeightTable.power["tdm"] ist 28, nicht
-    // officialDisciplineWeightTable["tdm"].power. Ich hatte es andersherum angenommen
-    // und bekam zwanzig leere Matrizen — lautlos, weil eine leere Zeile kein Fehler ist.
+    // GEWICHTSQUELLE ist resolveDisciplineWeightProfile, nicht die Matrix direkt: eine
+    // Disziplin mit Spiel-Eignungs-Override (heute nur Football) speist BASIS_JE_DISC mit
+    // DEREN Gewichten, damit der Motor dieselbe Rangfolge rechnet wie p.d[disziplin] im
+    // Spiel (s. lib/player-generator/spiel-eignung-overrides.ts). Jede andere Disziplin
+    // bekommt weiterhin die unveraenderte offizielle Matrix.
+    //
+    // ACHTUNG, die zugrundeliegende Tabelle ist TRANSPONIERT: sie ist nach Attribut
+    // geschluesselt, nicht nach Disziplin — officialDisciplineWeightTable.power["tdm"] ist
+    // 28, nicht officialDisciplineWeightTable["tdm"].power. Ich hatte es andersherum
+    // angenommen und bekam zwanzig leere Matrizen — lautlos, weil eine leere Zeile kein
+    // Fehler ist. resolveDisciplineWeightProfile liefert bereits nach Disziplin sortiert.
+    const profil = resolveDisciplineWeightProfile(id);
     const w = Object.fromEntries(
-      playerGeneratorAttributeKeys.map((k) => [k, officialDisciplineWeightTable[k]?.[id] ?? 0]),
+      playerGeneratorAttributeKeys.map((k) => [k, profil[k] ?? 0]),
     ) as Record<string, number>;
     if (!Object.values(w).some((v) => v > 0)) continue;
     // Nur Attribute mit Gewicht: eine Null im Datensatz ist eine Aussage ("dieses
@@ -119,8 +127,9 @@ function bericht(): string {
   const z: string[] = [];
   z.push("Disziplin        Slots  Attribute mit Gewicht > 0 (absteigend)");
   for (const id of officialDisciplineWeightOrder) {
+    const profil = resolveDisciplineWeightProfile(id);
     const w = Object.fromEntries(
-      playerGeneratorAttributeKeys.map((k) => [k, officialDisciplineWeightTable[k]?.[id] ?? 0]),
+      playerGeneratorAttributeKeys.map((k) => [k, profil[k] ?? 0]),
     ) as Record<string, number>;
     const oben = playerGeneratorAttributeKeys
       .map((k) => [k, w[k] ?? 0] as const)
@@ -143,6 +152,7 @@ const block = [
   MARKER_AUF,
   "  // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:",
   "  //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)",
+  "  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)",
   "  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen)",
   "  // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.",
   matrixBlock(),

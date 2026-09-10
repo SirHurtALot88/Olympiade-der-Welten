@@ -3,12 +3,12 @@ import { getFatiguePerformancePenaltyPercent, getFatigueRiskLevel } from "@/lib/
 import { computeProjectedScoreBand, getIntensityMean } from "@/lib/lineups/matchday-score-band";
 import {
   officialDisciplineWeightLabels,
-  officialDisciplineWeightMatrix,
   officialDisciplineWeightOrder,
   playerGeneratorAttributeKeys,
   type OfficialDisciplineWeightId,
   type PlayerGeneratorAttributeKey,
 } from "@/lib/player-generator/official-discipline-weights";
+import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 
 export type MatchdayIntensityStage = "conserve" | "normal" | "push";
 
@@ -229,13 +229,27 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
     roleTheme("clutchshot", "Clutch Shot", "Braucht Spirit und Charisma im Wurfmoment.", ["spirit", "charisma"], "awareness", "medium", ["bard", "hero"]),
     roleTheme("fastbreak", "Fast Break", "Läuft Punkte über Speed und Dexterity.", ["speed", "dexterity"], "stamina", "high", ["sprinter"]),
   ],
+  // FOOTBALL-TEXTE UND -FOKUS FOLGEN DER SPIEL-EIGNUNG (10.09., Fable-Entscheidung E3).
+  // Bis hierher standen hier „Spirit und Torment"/„Spirit und Charisma" — geschrieben zur
+  // alten Matrix (spirit 25, torment 16, charisma 4). Footballs Gewichtsquelle ist jetzt der
+  // Spiel-Eignungs-Override (power 22, health 18, speed 14, torment 12, determination 10,
+  // awareness 8, stamina 6, dexterity 4, spirit 3, will 3 — CHARISMA UND INTELLIGENCE
+  // WIEGEN NULL). Ein Fokus auf charisma waere von resolveThemeFocus stillschweigend
+  // weggefiltert worden, und die Texte haetten dem Manager weiter das falsche Attribut
+  // genannt. Die sechs Rollen bleiben dieselben Rollen, nur ueber die Attribute, die
+  // Football heute wirklich bezahlt.
   football: [
-    roleTheme("linepower", "Line Power", "Gewinnt Kontakt über Spirit und Torment.", ["spirit", "torment"], "health", "high", ["tank", "berserker"]),
-    roleTheme("routeburst", "Route Burst", "Schafft Separation über Health und Will.", ["health", "will"], "awareness", "medium", ["sprinter"]),
+    roleTheme("linepower", "Line Power", "Gewinnt Kontakt über Power und Health.", ["power", "health"], "stamina", "high", ["tank", "berserker"]),
+    roleTheme("routeburst", "Route Burst", "Schafft Separation über Speed und Dexterity.", ["speed", "dexterity"], "stamina", "medium", ["sprinter"]),
     roleTheme("fieldread", "Field Read", "Liest Plays über Awareness und Determination.", ["awareness", "determination"], "torment", "low", ["tactician"]),
     roleTheme("ballhawk", "Ball Hawk", "Greift Chancen über Torment und Awareness.", ["torment", "awareness"], "health", "medium", ["rogue"]),
-    roleTheme("redzone", "Red Zone", "Braucht Spirit und Power nahe der Linie.", ["spirit", "power"], "will", "high", ["hero"]),
-    roleTheme("lockerleader", "Locker Leader", "Fuehrt über Spirit und Charisma.", ["spirit", "charisma"], "health", "low", ["bard", "hero"]),
+    roleTheme("redzone", "Red Zone", "Braucht Power und Torment nahe der Linie.", ["power", "torment"], "health", "high", ["hero"]),
+    // AUSGLEICHSSLOT: die LETZTE Rolle einer Disziplin traegt in buildSlotWeightProfiles das
+    // negative Summendelta aller anderen (`finalDelta`) — ihr Profil ist damit nicht frei
+    // waehlbar, sondern das, was die fuenf davor uebrig lassen. Hier sind das health/stamina
+    // (weil linepower/redzone Power ziehen und health drainen). Der Text nennt deshalb genau
+    // die zwei Attribute, die der Slot wirklich belohnt, statt ein Wunschprofil.
+    roleTheme("lockerleader", "Locker Leader", "Haelt die Einheit über Health und Stamina.", ["health", "stamina"], "torment", "low", ["bard", "hero"]),
   ],
   eiskunstlauf: [
     roleTheme("edgecontrol", "Edge Control", "Traegt Technik über Charisma und Dexterity.", ["charisma", "dexterity"], "awareness", "medium", ["rogue", "bard"]),
@@ -318,8 +332,14 @@ function roundWeight(value: number) {
   return Number(value.toFixed(2));
 }
 
+// GEWICHTSQUELLE der Slot-Profile: resolveDisciplineWeightProfile, nicht die Matrix direkt.
+// Die Slot-Aufschlaege sind DELTAS auf das Grundprofil der Disziplin (s. buildInitialDelta) —
+// bliebe das Grundprofil hier auf der Matrix stehen, waehrend p.d[disziplin] und BASIS_JE_DISC
+// dem Spiel-Eignungs-Override folgen, zoege der Slot-Aufschlag an Attributen, die fuer die
+// Disziplin nichts mehr wiegen. Genau die zwei Ordnungen, die der Override abschafft
+// (s. lib/player-generator/spiel-eignung-overrides.ts).
 function getBaseWeightProfile(disciplineId: OfficialDisciplineWeightId): MatchdaySlotRoleWeightProfile {
-  return { ...officialDisciplineWeightMatrix[disciplineId] };
+  return resolveDisciplineWeightProfile(disciplineId);
 }
 
 function getPositiveAttributes(baseWeights: MatchdaySlotRoleWeightProfile) {
