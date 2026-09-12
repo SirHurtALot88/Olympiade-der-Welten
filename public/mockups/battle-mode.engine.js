@@ -476,6 +476,70 @@
     ctx.beginPath(); ctx.arc(x,by-bh/2-p.schlagY*s-2.6*s,Math.max(0.9,1.3*s),0,Math.PI*2); ctx.fill();
   }
 
+  // ================== EISKUNSTLAUF: KUFE AM FUSSPUNKT (Welle 1, Opus-Plan 09-10 Abschnitt
+  // 4.4, DISZIPLIN_PROP-Vorlage aus PR 0.2) ==================
+  // ANDERER VERANKERUNGSPUNKT ALS HOCKEY/GEWICHTHEBEN: eine Kufe sitzt am FUSS, nicht an der
+  // Hand — DISZIPLIN_PROP-Eintraege sind freie Objektliteral-Felder, die Tabelle selbst
+  // verlangt kein festes "hand"-Feld (s. Kommentar bei DISZIPLIN_PROP: „hand ist der
+  // Tabellenname aus dem Plan; der Verankerungspunkt selbst kann je Requisite ein anderer
+  // Koerperteil sein"). Dieser Eintrag traegt deshalb `fuss` statt `hand` — bestehende
+  // Konsumenten (`DISZIPLIN_PROP.gewichtheben.hand` an der istHeben()-Stelle) lesen ihr
+  // eigenes Feld unveraendert, nichts davon wird hier angefasst.
+  //
+  // ANDERS ALS DIE HAND-PUNKTE VON GEWICHTHEBEN/HOCKEY (per Pixelscan der Alphakontur
+  // ausgemessen, docs/design/sprite-handpunkte*.md — noetig, weil die Hand je nach
+  // Griffpose an ganz verschiedenen Stellen sitzt): der Fusspunkt eines stehenden
+  // Standard-Sprites ist keine variable Griffpose, sondern dieselbe Bildkonstante fuer
+  // JEDES Sprite auf dem 64x64-Rahmen — "Massstab 1: ein Sprite ist 64 px breit und steht
+  // mit den Fuessen auf dem Schatten" (Kommentar bei der Feldspiel-Zeichnung, :2739) und
+  // "Fuesse auf y+18..19" (HOCKEY_PHASEN-Kommentar oben, :269, dort zur Schaftlaenge
+  // herangezogen). In Zell-Koordinaten (x-32*Z+cx*Z / y-46*Z+cy*Z, s. Kommentar bei
+  // DISZIPLIN_PROP) heisst das cy=64 (Blattunterkante). x bleibt bei 32 (Sprite-Mitte) in
+  // Front/Ruecken und wandert im Profil leicht zum vorderen Fuss — derselbe Aufbau wie
+  // HEBEN_HAND/HOCKEY_HAND, nur mit der Bildkonstante statt einer neuen Pixelscan-Serie.
+  // Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const FUSS_EISKUNSTLAUF=[
+    {x:32,y:64}, // hinten
+    {x:25,y:64}, // links  — vorderer Fuss im Profil
+    {x:32,y:64}, // vorn
+    {x:39,y:64}, // rechts — vorderer Fuss im Profil
+  ];
+  // Kufenwinkel relativ zum Fusspunkt je vizPhase (s. stepKuer()) — "gleiten"/"einlauf"
+  // flach am Eis, "pirouette" auf der Kante (staerkere Neigung), "hebung"/"wurf" leicht
+  // angehoben (das Bein ist in der Luft), "schlusspose" wieder flach.
+  const KUFE_PHASEN={
+    einlauf:    {neigung:0.05, laenge:15},
+    gleiten:    {neigung:0.05, laenge:15},
+    pirouette:  {neigung:0.55, laenge:13},
+    hebung:     {neigung:0.30, laenge:12},
+    wurf:       {neigung:0.30, laenge:12},
+    schlusspose:{neigung:0.05, laenge:15},
+  };
+  // x/y ist der Fuss (aus FUSS_EISKUNSTLAUF), s die Groesse (Z), richtung 0..3 wie
+  // blickAus(), phase einer der KUFE_PHASEN-Schluessel (unbekannt faellt auf "gleiten"
+  // zurueck, dasselbe Sicherheitsnetz wie bei zeichneHockeyschlaeger/zeichneHantel).
+  // `farbe` ist der vierte, freie DISZIPLIN_PROP-Nutzwert (wie `kg` bei der Hantel) — hier
+  // die Kostuemfarbe des Paares (A3, s. Aufrufstelle), gemalt als kurzer Bund am Knoechel
+  // direkt ueber der Kufe, statt eines zweiten, unabhaengigen Zeichenpfads.
+  function zeichneKufe(ctx,x,y,s,richtung,phase,farbe){
+    const p=KUFE_PHASEN[phase]||KUFE_PHASEN.gleiten;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const laenge=(blick!==0?p.laenge:p.laenge*0.6)*s;
+    const winkel=p.neigung*(blick||1);
+    const spitzeX=x+Math.cos(winkel)*laenge, spitzeY=y+Math.sin(winkel)*laenge*0.35;
+    const fersenX=x-Math.cos(winkel)*laenge*0.35, fersenY=y-Math.sin(winkel)*laenge*0.12;
+    // Kostuembund am Knoechel, direkt ueber dem Fusspunkt — der einzige Ort, an dem die
+    // Paarfarbe (A3, Kostuem) auf dem Sprite selbst sichtbar wird.
+    ctx.fillStyle=farbe||"#c7cedb";
+    ctx.beginPath(); ctx.arc(x,y-3*s,Math.max(1,1.8*s),0,Math.PI*2); ctx.fill();
+    // Kufe: helle, schmale Klinge knapp unter dem Fuss, mit dunklerem Schlittschuhstiefel
+    // am Ansatz.
+    ctx.strokeStyle="#2b2f3a"; ctx.lineWidth=Math.max(1,2*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(fersenX,fersenY); ctx.lineTo(x,y); ctx.stroke();
+    ctx.strokeStyle="#e6edf5"; ctx.lineWidth=Math.max(0.8,1.1*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(fersenX,fersenY); ctx.lineTo(spitzeX,spitzeY); ctx.stroke();
+  }
+
   // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
   // blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts. Koordinaten sind Zell-Koordinaten
   // (0..63) IM SELBEN 64x64-Rahmen, in dem renderProbe zeichnet — unabhaengig von der
@@ -2273,6 +2337,12 @@
   // beiden Ad-hoc-Muster passt (andere Phasen-Schluessel, `zeichne` ohne den vierten
   // `extra`-Parameter). zeichneHantel()/zeichneHockeyschlaeger() selbst sind NICHT veraendert
   // — die Tabelle referenziert exakt dieselben Funktions-/Datenobjekte, keine Kopien.
+  // EISKUNSTLAUF (Welle 1, Opus-Plan 09-10 Abschnitt 4.4, A3 15->25): erster Eintrag
+  // dieser Tabelle mit einem ANDEREN Verankerungsfeld als "hand" — `fuss`, s. Kommentar bei
+  // FUSS_EISKUNSTLAUF/zeichneKufe oben. Beweist, dass die Tabelle das ohne Umbau traegt:
+  // ein Objektliteral-Feld ist frei benennbar, kein Konsument liest hier ein hartkodiertes
+  // "hand". Aufgerufen wird sie an der istEis()-Stelle unten (zeichneSprite()), analog zur
+  // istHeben()-Stelle daneben.
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
@@ -2280,6 +2350,7 @@
     // Schachuhr, s. SCHACH_HAND/SCHACH_UHR_PHASEN/zeichneSchachuhr oben. Aufrufstelle wie
     // bei den zwei bestehenden Eintraegen, s. istSchach()-Block unten bei zeichneSprite.
     "speed-schach":{ hand:SCHACH_HAND, phasen:SCHACH_UHR_PHASEN, zeichne:zeichneSchachuhr },
+    eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3092,6 +3163,24 @@
       const prop=DISZIPLIN_PROP["speed-schach"];
       const hp=prop.hand[r]||prop.hand[2];
       prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,(u.vizUhrSchlagT>0)?"schlag":"ruhend");
+    }
+    // KUFE. Dasselbe Muster wie Hockeyschlaeger/Hantel direkt oberhalb, nur am FUSS statt
+    // an der Hand verankert (s. Kommentar bei FUSS_EISKUNSTLAUF/DISZIPLIN_PROP.eiskunstlauf
+    // oben) — Welle 1, Opus-Plan 09-10 Abschnitt 4.4, A3 15->25. `feldspiel` ist hier
+    // ebenfalls `true`, weil zeichneDuett() denselben erzwungenen Aufruf wie zeichneHeben()
+    // nutzt (s. Kommentar am Hantel-Block oben); istEis() prueft zusaetzlich istBuehne(disc)/
+    // buehneDisc, nicht nur diesen Parameter.
+    if(feldspiel&&istEis()&&!u.down){
+      const prop=DISZIPLIN_PROP.eiskunstlauf;
+      const fp=prop.fuss[r]||prop.fuss[2];
+      // KOSTUEMFARBE JE PAAR (A3): derselbe paarId-Hash wie in stepKuer() (kuerHash(paarId,
+      // ...), Paar-ID = die kleinere der beiden u.id) — ein Solo-Rest (ungerade
+      // Feldgroesse) bekommt seine eigene, ebenso stabile Farbe (paarId=eigene u.id). Nur
+      // gelesen, nie rr(), deshalb rangtreue-neutral wie jede andere PROP-Zeichnung hier.
+      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+      const paarId=partner?Math.min(u.id,partner.id):u.id;
+      const farbe="hsl("+Math.floor(kuerHash(paarId,11)*360)+" 70% 55%)";
+      prop.zeichne(ctx,x-32*Z+fp.x*Z,y-46*Z+fp.y*Z,Z,r,u.vizPhase,farbe);
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -6524,6 +6613,9 @@
   // "speed-schach" stehengeblieben ist). Fuer die Schachuhr-Requisite (DISZIPLIN_PROP,
   // Ziel 5) unten in zeichneSprite.
   const istSchach=()=>istBuehne(disc)&&buehneDisc==="speed-schach";
+  // EISKUNSTLAUF, exakt dasselbe Muster wie istHeben() direkt darueber — gebraucht an der
+  // DISZIPLIN_PROP.eiskunstlauf-Aufrufstelle unten (Kufe am Fusspunkt, A3 15->25).
+  const istEis=()=>istBuehne(disc)&&buehneDisc==="eiskunstlauf";
 
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
@@ -12117,6 +12209,12 @@
         u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
         u.vizX=F.cx; u.vizY=F.cy; u.vizRi=0;
       }
+      // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4): TON_KATALOG.eiskunstlauf
+      // steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/publikum), nur die
+      // Aufrufstellen fehlten — Zeile fuer Zeile PR #883s Takeshi-Verdrahtung, nur auf der
+      // Buehne statt auf der Bahn. Alle vier Rufe unten schreiben NICHTS auf `u`, sie lesen
+      // nur bereits gesetzte viz*-Felder und rufen sfx() auf — reine Praesentation, kein
+      // rr()-Aufruf, deshalb rangtreue-neutral (s. Verifikations-Pflichtteil).
       const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
       const paarId=partner?Math.min(u.id,partner.id):u.id;
       const phi=kuerHash(paarId,1)*6.2832, w1=0.15+kuerHash(paarId,2)*0.09, w2=0.11+kuerHash(paarId,3)*0.08;
@@ -12143,11 +12241,34 @@
           u.vizPhase=["pirouette","hebung","wurf"][u.aktuell%3];
           u.vizPhaseT=fehl?KUER_STURZ_DAUER:KUER_ELEMENT_DAUER;
           u.vizSturz=fehl;
+          // Sprungansatz bei JEDEM neuen Element (Pirouette/Hebung/Wurf — das Motorbild
+          // kennt keine feinere Unterscheidung, alle drei zaehlen hier als "Sprung"-Ansatz),
+          // unabhaengig vom spaeteren Ausgang. Misslingt der Versuch, zusaetzlich sofort der
+          // Sturz-Klang — vizSturz ist in der Zeile darueber schon gesetzt.
+          sfx("eiskunstlauf","sprung");
+          if(fehl)sfx("eiskunstlauf","sturz");
         }
       }
+      // warSturzVorAblauf: reiner Lesevergleich VOR dem Ablauf-Reset unten, damit "Landung"
+      // (Klang) nur bei einem sauber abgeschlossenen Element feuert, nicht auch beim
+      // Wiederaufstehen nach einem Sturz (dafuer steht der Sturz-Klang oben schon).
+      const warSturzVorAblauf=u.vizSturz;
       if(u.vizPhaseT>0)u.vizPhaseT=Math.max(0,u.vizPhaseT-dt);
       if(u.vizSturz && u.vizPhaseT<=0)u.vizSturz=false;
-      if(u.vizPhase!=="schlusspose" && u.vizPhaseT<=0 && !u.vizSturz)u.vizPhase="gleiten";
+      if(u.vizPhase!=="schlusspose" && u.vizPhaseT<=0 && !u.vizSturz){
+        // Bewegungsstart (kufe): der EINMALIGE Uebergang aus "einlauf" — der Antritt zu
+        // Beginn der Kuer, bevor irgendein Element gelaufen ist. Landung: der Uebergang aus
+        // einem sauber abgeschlossenen Element (Pirouette/Hebung/Wurf, kein Sturz) zurueck
+        // ins Gleiten. Die `!=="gleiten"`-Wache ist noetig, weil dieser ganze Zweig sonst
+        // JEDEN Frame erneut liefe, solange u.aktuell nicht weiterzaehlt (vizPhaseT bleibt
+        // bei 0) — ohne sie wuerde "landung" nach dem ersten Uebergang bei jedem Frame neu
+        // feuern statt nur einmal am eigentlichen Uebergang.
+        if(u.vizPhase!=="gleiten"){
+          if(u.vizPhase==="einlauf")sfx("eiskunstlauf","kufe");
+          else if(!warSturzVorAblauf)sfx("eiskunstlauf","landung");
+        }
+        u.vizPhase="gleiten";
+      }
 
       // POSITION: waehrend Pirouette oder Sturz haelt die Figur die Stelle ("Radius geht
       // gegen Null" bzw. sie liegt), sonst folgt sie der Grundfahrt bzw. — nach dem letzten
@@ -12467,6 +12588,10 @@
     // Start/Stop-Paar-Muster wie hebenPublikumAn direkt darueber.
     if(BB().schach){ if(!schachPublikumAn){ tonLoopStart("speed-schach"); schachPublikumAn=true; } }
     else if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    // Dasselbe fuer Eiskunstlauf (s. bodenEis() unten) — derselbe Wechsel-Fall, falls wir
+    // GERADE von einem Duett-Kampf auf eine der sieben generischen Buehnen-Disziplinen
+    // (Speed-Schach/Breaking/Fechten/Tennis/Wettessen/Showcase/I-Spy) wechseln.
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
   }
   // rein praesentational, s. bodenBuehne() oben fuer Start/Stop und reset() (N1-Fix) fuer
   // den Rueckstell-Zwang beim naechsten Speed-Schach-Spiel.
@@ -12560,7 +12685,14 @@
   // keine Kopie. `kuerFlaeche()` (bei stepKuer() weiter unten) ist DIESELBE Geometrie, die
   // auch die Bewegung begrenzt — eine Stelle, damit Eisflaeche und Kufenbahn nie
   // auseinanderlaufen.
+  // Publikums-Loop, dasselbe Muster wie hebenPublikumAn/tonLoopStart("gewichtheben") bei
+  // bodenHeben() und takeshiPublikumAn/tonLoopStart("takeshis-castle") bei
+  // bodenTakeshiRoute() — die Flagge wird in bodenBuehne() (Wechsel auf eine andere
+  // Buehnen-Disziplin) UND in reset() (naechster Kampf, s. dort fuer die N1-Falle)
+  // zurueckgesetzt.
+  let eiskunstlaufPublikumAn=false;
   function bodenEis(){
+    if(!eiskunstlaufPublikumAn){ tonLoopStart("eiskunstlauf"); eiskunstlaufPublikumAn=true; }
     const bg=ctx.createLinearGradient(0,0,0,H);
     bg.addColorStop(0,"#11151f");bg.addColorStop(1,"#080a10");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
@@ -22243,6 +22375,14 @@
     // Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder
     // Rangtreue.
     schachPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER EISKUNSTLAUF (Welle 1, Opus-Plan 09-10 Abschnitt 4.4, A4
+    // 0->20, 12.09.): ohne diese Zeile haelt bodenEis() die Flagge fuer "schon gestartet"
+    // und der Publikums-Loop kaeme ab dem ZWEITEN Eiskunstlauf-Kampf nie wieder — genau die
+    // Falle, die PR #883 bei Takeshi teuer bezahlt hat (s. Kommentar dort) und die dieser
+    // PR eigens per Gegenprobe ueber vier aufeinanderfolgende Kaempfe nachweist
+    // (scripts/probe-eiskunstlauf-ton.mjs). Reiner Praesentationszustand, kein Einfluss auf
+    // rr() oder Rangtreue.
+    eiskunstlaufPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
