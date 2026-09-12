@@ -88,7 +88,7 @@ Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kader
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **12.09.** Ton verdrahtet, Assets 80→100 (E2, PR #893) |
 | 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 87 % | **96 %** | 0,854 | ja | 10.09. Assets 60→100 (Hantel/Hebebuehne/Ton, PR #876) |
 | 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 85 % | **94 %** | 0,861 | nein | 10.09. Bahn-Produktivierung + Ton (PR #880/#883) |
-| 4 | Breaking | Buehne | 85 % | 100 % | 95 % | 92 % | **93 %** | 0,869 | ja | 10.09. Assets+Movement 65/55→100/92 (PR #875) |
+| 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
 | 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
 | 7 | Speed-Schach | Buehne | 80 % | 75 % | 100 % | 80 % | **84 %** | 0,908 | ja | unveraendert seit 07.09. |
@@ -232,14 +232,23 @@ Animationsstellen (PR #880), eigener Ton (PR #883).
 Durchbruch, gruenes Gluehen bei sauber). M2 (Bahn-Bewegungsdispatcher) bleibt die Luecke bis zur
 Welle-1-Zielumsetzung, s. `bahnBewegung()`-Fundament (PR 0.3, #891).
 
-### Breaking — 93 % (85/100/95/92)
+### Breaking — 96 % (95/100/95/92)
 **10.09. Update:** Assets 65→100, Movement 55→92 (PR #875, PRODUKTIONSCODE, Opus-Review FREIGEBEN
 MIT NACHTRAG). Echter Cypher mit Move-Mechanik ersetzt die rein zeichnerische Kulisse. 12.09.: PR
 #895 (Kleinbefund #3/#4) korrigiert die Freeze-/Rueckzug-Fade-Divisoren (rissen bei halber
 Deckkraft ab) und glaettet den Ringwinkel bei Rangwechseln — Politur, keine Punktaenderung.
-**Konzept 85:** eigenes Torment/Will-Rezept ohne Charisma, mit gemessener NACHGEZOGEN-Korrektur
-(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung. Eigenes Fable-Dokument
-(`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`).
+**12.09. Update:** Konzept 85→95 (PR #897, reines Dokument, kein Codechange). K4 ("Rezept
+nachweislich kalibriert, offene Designfragen entschieden") war die letzte offene Konzept-Luecke.
+Neues Dokument `docs/design/breaking-kalibrierung-10-09.md` kalibriert gegen echte WDSF-Daten: die
+Rundenzahl (`rundenN:8`) passt zur realen Battle-Struktur (2-3 Throwdowns a ~5 Teile), zwei
+Rezept-Hypothesen (`rundenN`8→12, `failAbzug`0,55→0,35) wurden gemessen und bewegen beide weniger
+als Breakings Kader-Spannweite (0,114) — eine sogar in die falsche Richtung — also blieb der Code
+unveraendert. Charisma-Gewicht 0 bestaetigt sich gegen die tatsaechlichen fuenf WDSF-Kriterien.
+**Konzept 95:** eigenes Torment/Will-Rezept ohne Charisma, mit gemessener NACHGEZOGEN-Korrektur
+(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung, jetzt zusaetzlich gegen echte Sportdaten
+kalibriert (s.o.). Zwei eigene Fable-/Design-Dokumente
+(`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`,
+`breaking-kalibrierung-10-09.md`).
 **Assets 100:** `zeichneBreaking()` (lila Cypher mit vier Ringzonen und SURVIVOR-Spotlight),
 `breaking.tsx` seit PR #875 deutlich gewachsen.
 **Gameplay 95:** rho **0,869**, produktiviert (Welle 2).
