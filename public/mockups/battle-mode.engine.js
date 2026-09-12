@@ -3587,6 +3587,7 @@
   // <<< GENERIERT: arena-daten — nicht von Hand ändern
   // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:
   //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)
+  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)
   //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen)
   // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.
   const BASIS_JE_DISC={
@@ -3606,7 +3607,7 @@
     "breaking": {will:28,torment:22,health:18,power:10,determination:10,stamina:8,dexterity:2,intelligence:2},
     "wettessen": {will:26,health:22,stamina:22,determination:16,intelligence:8,torment:6},
     "basketball": {spirit:22,intelligence:16,awareness:14,charisma:11,speed:10,dexterity:8,power:7,stamina:6,torment:6},
-    "football": {spirit:25,torment:16,health:14,awareness:11,will:10,determination:8,power:6,stamina:6,charisma:4},
+    "football": {power:22,health:18,speed:14,torment:12,determination:10,awareness:8,stamina:6,dexterity:4,will:3,spirit:3},
     "eiskunstlauf": {charisma:28,dexterity:18,spirit:16,awareness:14,speed:10,intelligence:8,determination:6},
     "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
     "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
@@ -3733,12 +3734,12 @@
       {id:"fastbreak",label:"Fast Break",text:"Läuft Punkte über Speed und Dexterity.",gross:"power",klein:"stamina",last:"stamina",mueh:"high",profil:{intelligence:13.6,charisma:13.3,spirit:13.1,speed:11.9,power:11.4,stamina:9.7,torment:9.7,awareness:8.8,dexterity:8.7}}
     ],
     "football":[
-      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Spirit und Torment.",gross:"spirit",klein:"torment",last:"health",mueh:"high",profil:{spirit:30.4,torment:19.4,health:11.8,awareness:9.3,will:8.5,determination:6.8,power:5.1,stamina:5.1,charisma:3.5}},
-      {id:"routeburst",label:"Route Burst",text:"Schafft Separation über Health und Will.",gross:"health",klein:"will",last:"awareness",mueh:"medium",profil:{spirit:22,health:19.4,torment:14.1,will:13.4,awareness:9.7,determination:7.1,power:5.4,stamina:5.4,charisma:3.6}},
-      {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{spirit:22.4,awareness:15.9,torment:14.3,health:12.6,determination:11.4,will:9,power:5.4,stamina:5.4,charisma:3.6}},
-      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{spirit:21.8,torment:21.4,awareness:14.4,health:12.3,will:8.8,determination:7.1,power:5.3,stamina:5.3,charisma:3.6}},
-      {id:"redzone",label:"Red Zone",text:"Braucht Spirit und Power nahe der Linie.",gross:"spirit",klein:"power",last:"will",mueh:"high",profil:{spirit:30.4,torment:14.1,health:12.3,awareness:9.7,will:8.8,power:8.7,determination:7.1,stamina:5.3,charisma:3.6}},
-      {id:"lockerleader",label:"Locker Leader",text:"Fuehrt über Spirit und Charisma.",gross:"stamina",klein:"spirit",last:"health",mueh:"low",profil:{spirit:23.1,health:15.6,torment:12.7,will:11.5,stamina:9.4,determination:8.5,awareness:7,power:6.1,charisma:6.1}}
+      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:27.4,health:21.4,speed:11.8,torment:10.2,determination:8.5,awareness:6.8,stamina:5.1,dexterity:3.5,will:2.6,spirit:2.6}},
+      {id:"routeburst",label:"Route Burst",text:"Schafft Separation über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"stamina",mueh:"medium",profil:{power:20,speed:19.4,health:16.4,torment:10.9,determination:9.1,awareness:7.3,dexterity:5.8,stamina:5.5,will:2.8,spirit:2.8}},
+      {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
+      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
+      {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
+      {id:"lockerleader",label:"Locker Leader",text:"Haelt die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
     ],
     "eiskunstlauf":[
       {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
@@ -4421,8 +4422,15 @@
       // gelassen, keine neue Bedeutung.
       label:"Football", jeSeite:6, zuegeJeSeite:24, zugDauer:1.25,
       punkteNah:6, punkteFern:3, fernAnteil:0.30,
-      // PROTOTYP-SCHALTER (s. bauSpieler): Football-eigene Spiel-Eignung aus p.a.
-      spielEignung:{gewichte:{power:22,health:18,speed:14,torment:12,determination:10,awareness:8,stamina:6,dexterity:4,spirit:3,will:3}},
+      // KEIN spielEignung MEHR (10.09., Fable-Entscheidung E3). Bis hierher stand hier ein
+      // PROTOTYP-SCHALTER mit Footballs eigenen Gewichten (power 22, health 18, speed 14,
+      // torment 12, determination 10, awareness 8, stamina 6, dexterity 4, spirit 3, will 3,
+      // PR #803) — weil die Anzeige-Ordnung (p.d.football aus der Matrix) und die
+      // Spiel-Ordnung auseinanderliefen (rho 0,427). Jetzt liest die Anzeige-/Kauf-Seite
+      // GENAU DIESE Gewichte, ueber lib/player-generator/spiel-eignung-overrides.ts:
+      // p.d.football und BASIS_JE_DISC.football tragen sie, `produktionsWert` in bauSpieler
+      // liefert damit dieselbe Rangfolge wie der Schalter, und Football faellt auf die
+      // Standardzeile zurueck wie jede andere Disziplin. Eine Quelle statt zwei.
       wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
       // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
       // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht),
@@ -5665,9 +5673,13 @@
       // noch aus den kleinen Slot-/Form-Zuschlaegen (typisch -5 bis +10 statt eines echten
       // Fertigkeitswerts). gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der
       // p.d.tdm ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken.
-      const spielE=FB().spielEignung;
-      const produktionsWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
-      const basisWert=spielE?gewichtet(p.a,spielE.gewichte):produktionsWert;
+      // Bis zum 10.09. stand hier eine Verzweigung auf `FB().spielEignung` — ein
+      // Prototyp-Schalter, mit dem NUR Football seine Eignung an der Anzeige-Ordnung vorbei
+      // aus p.a rechnete. Der ist weg: Footballs Gewichte stehen jetzt in
+      // lib/player-generator/spiel-eignung-overrides.ts und speisen p.d.football wie
+      // BASIS_JE_DISC.football, also liefert `produktionsWert` dieselbe Rangfolge. Jede
+      // Disziplin faehrt wieder dieselbe eine Zeile (Fable-Entscheidung E3).
+      const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         // groesse (Skala 1-10, s. groesseFaktor): reine ZEICHEN-Angabe fuer zeichneSprite,
         // faehrt in KEINE hier oben schon berechnete Zahl ein (eig/R2 stehen VOR dieser
