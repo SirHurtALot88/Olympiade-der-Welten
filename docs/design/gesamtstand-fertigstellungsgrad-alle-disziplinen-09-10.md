@@ -1,3 +1,16 @@
+**Achter Nachtrag 12.09. — Tabelle korrigiert (war zwei Runden veraltet) und neue Spalte
+"Letzte Aenderung" eingefuehrt.** Diese Datei ist die Scorecard, nach der Chris am 12.09. gefragt
+hat: „die scorecard soll der overseer immer up to date halten, neue spalte einfügen mit latest
+changes + datum". Die Tabelle unten war seit ihrer eigenen Erstellung (`c56fffd7`) durch zwei
+spaetere Runden ueberholt worden, ohne dass sie hier nachgezogen wurde: die Feinschliff-Runde
+(Gewichtheben-Assets, Eiskunstlauf-Movement, Breaking-Assets+Movement, Takeshi-Bahn-Produktivierung,
+alle PR #872-#884, 10.09.) und die Football-Gameplay-Runde 1 (rho 0,516 → 0,800, PR #884, 10.09.).
+Die korrekte Zwischenstufe stand bereits in
+`docs/pm-briefings/opus-plan-zehn-disziplinen-alle-kategorien-09-10.md` Abschnitt 1.1 — von dort
+uebernommen, plus die eine echte Aenderung von heute (Hockey-Ton, E2, PR #893, Assets 80→100).
+**Ab jetzt gilt:** nach jeder Runde, die eine Zeile unten bewegt, wird diese Tabelle noch in
+derselben Sitzung nachgezogen — nicht erst beim naechsten grossen Audit.
+
 # Gesamtstand 10.09. — wie fertig ist jede der zwanzig Disziplinen?
 
 **Auftrag von Chris (woertlich, 10.09.):** „kannst du mir in % noch mal sagen wie fertig alle
@@ -70,31 +83,39 @@ Basketball/Hockey/Gewichtheben, und Football/TDM/Mini-DM/Battlefield fallen deut
 Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kaderfest, n=24).
 „Arena" = Produktionsanschluss (`ARENA_RESOLVED_DISCIPLINE_IDS`).
 
-| # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Statusnotiz |
+| # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
-| 1 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | Referenz des Projekts · einzige Disziplin mit Ton · rho unter der Schranke, von Chris abgenommen |
-| 2 | Hockey | Feldspiel | 100 % | 80 % | 72 % | 100 % | **88 %** | 0,669 / 0,719 | ja | vollstaendig, aber ohne Ton · rho ausdruecklich von Chris abgenommen |
-| 3 | Gewichtheben | Buehne | 100 % | 60 % | 95 % | 85 % | **85 %** | 0,854 | ja | fertig bis auf Optik: `barbell.tsx` bewusst kosmetisch, Heber traegt Zufallswaffe |
-| 4 | Speed-Schach | Buehne | 80 % | 75 % | 100 % | 80 % | **84 %** | 0,908 | ja | Gameplay komplett · kein eigenes Recherche-Dokument, Zugfolge ist Kosmetik |
-| 5 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 60 % | **79 %** | 0,885 | ja | Duett + Ereignisdichte gemessen erledigt · Kuer selbst ist ein Reihenbild, keine Bewegung |
-| 6 | Takeshi's Castle | Bahn | 100 % | 60 % | 67 % | 75 % | **76 %** | 0,861 | nein | inhaltlich die reichste Bahn · fehlt nur der Produktionsanschluss |
-| 7 | Breaking | Buehne | 85 % | 65 % | 95 % | 55 % | **75 %** | 0,869 | ja | Cypher-Buehne ist rein zeichnerisch · `breaking.tsx` ist die duennste Feld-Datei (187 Z.) |
-| 8 | Staffel | Bahn | 95 % | 55 % | 67 % | 70 % | **72 %** | 0,915 | nein | **beste Rangtreue im Feld** · Wertung existiert entgegen der Doku bereits (s. 4.1) |
-| 9 | Football | Feldspiel | 90 % | 75 % | 35 % | 85 % | **71 %** | 0,516 | nein | Motor/Optik/Bewegung stehen, das REZEPT ist die Luecke · groesste Schere im Feld |
-| 10 | Spurt | Bahn | 95 % | 55 % | 67 % | 60 % | **69 %** | 0,871 | nein | zweimal gemessen nachgezogen · fehlt nur Anschluss |
-| 11 | Time-Trial | Bahn | 95 % | 45 % | 62 % | 50 % | **63 %** | 0,828 | nein | Gelaendeprofil existiert mechanisch, ist auf der Bahn aber unsichtbar |
-| 12 | Fechten | Buehne | 55 % | 55 % | 90 % | 35 % | **59 %** | 0,816 | ja | live, aber auf einem ausdruecklich nicht finalen Rezeptentwurf · Puffer < Kaderrauschen |
-| 13 | Tennis | Buehne | 75 % | 30 % | 90 % | 20 % | **54 %** | 0,825 | ja | live · optisch ein generisches Buehnen-Reihenbild, Spieler schwingt Zufallswaffe |
-| 14 | Mini-DM | Arena | 70 % | 60 % | 22 % | 55 % | **52 %** | 0,094 | nein | schlechteste Rangtreue im gesamten Feld |
-| 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 55 % | **52 %** | 0,387 | nein | Aufstellung repariert, Zielwahl weiter Geometrie statt Bedrohung |
-| 16 | TDM | Arena | 55 % | 65 % | 22 % | 60 % | **51 %** | 0,253 | nein | aeltester Motor · roher Impact bis 900 landet ungenormt im Endstand |
-| 17 | Climbing | Bahn | 65 % | 40 % | 49 % | 40 % | **49 %** | 0,790 | nein | 0,010 unter der Schranke · nie eine eigene Rezeptrunde gehabt |
-| 18 | Wettessen | Buehne | 35 % | 30 % | 95 % | 15 % | **44 %** | 0,845 | ja | **kein eigenes Konzept** · live geschaltet, aber optisch/bewegungsseitig leer |
-| 19 | Showcase | Buehne | 25 % | 30 % | 95 % | 20 % | **43 %** | 0,892 | ja | **kein eigenes Konzept** · die duennste Disziplin unter den zehn produktiven |
-| 20 | I-Spy | Buehne | 55 % | 30 % | 37 % | 20 % | **36 %** | 0,684 | nein | einzige Buehne, die die Abnahme nicht besteht · bewusst nicht angeschlossen |
+| 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **12.09.** Ton verdrahtet, Assets 80→100 (E2, PR #893) |
+| 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 87 % | **96 %** | 0,854 | ja | 10.09. Assets 60→100 (Hantel/Hebebuehne/Ton, PR #876) |
+| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 85 % | **94 %** | 0,861 | nein | 10.09. Bahn-Produktivierung + Ton (PR #880/#883) |
+| 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
+| 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
+| 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
+| 7 | Speed-Schach | Buehne | 80 % | 75 % | 100 % | 80 % | **84 %** | 0,908 | ja | unveraendert seit 07.09. |
+| 8 | Staffel | Bahn | 95 % | 55 % | 97 % | 70 % | **79 %** | 0,915 | nein | 10.09. Bahn-Produktivierung (PR #880) |
+| 9 | Football | Feldspiel | 90 % | 75 % | 65 % | 85 % | **79 %** | 0,800 | nein | 10.09. Rezept Runde 1, rho 0,516→0,800 (PR #884) · **E3 in Pruefung** (Anzeige-Korrektur, PR #894, NICHT gemergt — wartet auf Chris) |
+| 10 | Time-Trial | Bahn | 95 % | 45 % | 92 % | 50 % | **71 %** | 0,828 | nein | 10.09. Bahn-Produktivierung (PR #880) |
+| 11 | Spurt | Bahn | 95 % | 55 % | 67 % | 60 % | **69 %** | 0,871 | nein | unveraendert seit 07.09. |
+| 12 | Fechten | Buehne | 55 % | 55 % | 90 % | 35 % | **59 %** | 0,816 | ja | unveraendert seit 07.09. |
+| 13 | Tennis | Buehne | 75 % | 40 % | 90 % | 20 % | **56 %** | 0,825 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
+| 14 | Mini-DM | Arena | 70 % | 60 % | 22 % | 55 % | **52 %** | 0,094 | nein | unveraendert |
+| 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 55 % | **52 %** | 0,387 | nein | unveraendert |
+| 16 | TDM | Arena | 55 % | 65 % | 22 % | 60 % | **51 %** | 0,253 | nein | unveraendert |
+| 17 | Climbing | Bahn | 65 % | 40 % | 49 % | 40 % | **49 %** | 0,790 | nein | unveraendert |
+| 18 | Wettessen | Buehne | 35 % | 40 % | 95 % | 15 % | **46 %** | 0,845 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
+| 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
+| 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig: 65 %.**
-Je Achse: **Konzept 77 % · Assets 57 % · Gameplay 68 % · Movement 57 %.**
+**Durchschnitt ueber alle zwanzig: 71 %** (war 65 % am 10.09. vor der Feinschliff-/Football-Runde).
+Je Achse: **Konzept 78 % · Assets 68 % · Gameplay 71 % · Movement 65 %.**
+
+**Welle 0 (Fundament, gemergt 12.09., PR #892/#889/#891/#895): noch ohne eigene Punktewirkung.**
+Vier PRs — Ton-Katalog-Daten fuer sechs Disziplinen, die generische `DISZIPLIN_PROP`-Requisiten-
+Tabelle, ein leerer `bahnBewegung(dt)`-Dispatcher fuer die vier Bahn-Disziplinen, plus sechs kleine
+Praesentationsfixes (Breaking/Eiskunstlauf/Takeshi) — legen nur die Fundamente fuer die naechste
+Runde (Welle 1: Speed-Schach/Staffel/Football/Time-Trial/Spurt/Fechten-Ton, Eiskunstlauf/Staffel/
+Takeshi-Requisiten). Keine Zeile oben aendert sich dadurch; sie werden erst in der Spalte "Letzte
+Aenderung" sichtbar, sobald die jeweilige Ziel-Disziplin ihre Aufrufstellen bekommt.
 
 Die Botschaft dieser vier Zahlen in einem Satz: **das Projekt hat mehr DESIGN als DARSTELLUNG.**
 Konzept liegt zwanzig Punkte ueber Assets und Movement — es ist ueberall durchdacht, was passiert,
@@ -119,6 +140,21 @@ gemeldet hat. **Es gibt keine Regression irgendwo im Feld.**
 
 ## 2. Jede Disziplin einzeln
 
+### Hockey — 93 % (100/100/72/100)
+**12.09. Update:** Assets 80→100. Fable-Entscheidung E2 (PR #893) hat den letzten Assets-Ruecksand
+geschlossen — neuer `TON_KATALOG.hockey`-Eintrag (schuss/treffer/pfiff/tor/publikum), verdrahtet an
+den fuenf bestehenden Aufrufstellen (Abwurf, Bodycheck, Strafe, Torerfolg, Publikums-Loop mit dem
+etablierten N1-Reset-Muster). Gameplay/Movement/Konzept unveraendert — s. urspruengliche Zeile unten.
+**Konzept 100:** Torwart mit eigener Wertformel (`HK_TW_BASIS`/`HK_TW_REF`), Bodycheck, Strafen,
+Ueberzahl, Passqualitaet, xG-Buchung (K3). Zwei eigene Fable-Dokumente plus ein NHL-Review
+(`hockey-opus-review-nhl.md`).
+**Assets 100:** `rink.tsx` (419 Z., 14 Animationsstellen), eigene Eisflaeche im Motor
+(`:10128 eisflaeche()`), eigener Hockeyschlaeger als Sprite-Ebene (`zeichneHockeyschlaeger`, `:311`),
+seit 12.09. eigener Ton (fuenf Ereignisse, s.o.).
+**Gameplay 72:** rho 0,669 (alle zwoelf) / 0,719 (nur Feldspieler) — ausdruecklich von Chris
+abgenommen, Aufgabe #20 geschlossen. Produktiviert mit eigener Torwart-PPS-Referenz.
+**Movement 100:** eigene Torwartbogen-, Schuss- und Bandenzweikampf-Phasen (`:9553`).
+
 ### Basketball — 96 % (100/100/82/100)
 **Konzept 100:** eigenes Rezept plus `BASKETBALL_POS_MOD` (`battle-mode.engine.js:5513`), Live-Motor
 mit Zonen/Manndeckung/Spielzuegen, zwei eigene Fable-Dokumente
@@ -133,29 +169,21 @@ Boxscore-an-PPs-Kurve.
 **Movement 100:** Dribbel-Bounce mit Bodenkontakt-Ton (`BK_DRIBBEL_PERIODE`), Wurfbahnen, Zonen —
 plus `useTokenGlide`/`GhostLayer` in `court.tsx`.
 
-### Hockey — 88 % (100/80/72/100)
-**Konzept 100:** Torwart mit eigener Wertformel (`HK_TW_BASIS`/`HK_TW_REF`), Bodycheck, Strafen,
-Ueberzahl, Passqualitaet, xG-Buchung (K3). Zwei eigene Fable-Dokumente plus ein NHL-Review
-(`hockey-opus-review-nhl.md`).
-**Assets 80:** `rink.tsx` (419 Z., 14 Animationsstellen), eigene Eisflaeche im Motor
-(`:10128 eisflaeche()`), eigener Hockeyschlaeger als Sprite-Ebene (`zeichneHockeyschlaeger`, `:311`).
-**Kein Ton** — das kostet die vollen 20 Punkte.
-**Gameplay 72:** rho 0,669 (alle zwoelf) / 0,719 (nur Feldspieler) — ausdruecklich von Chris
-abgenommen, Aufgabe #20 geschlossen. Produktiviert mit eigener Torwart-PPS-Referenz.
-**Movement 100:** eigene Torwartbogen-, Schuss- und Bandenzweikampf-Phasen (`:9553`).
-
-### Gewichtheben — 85 % (100/60/95/85)
+### Gewichtheben — 96 % (100/100/95/87)
+**10.09. Update:** Assets 60→100 (PR #876, PRODUKTIONSCODE, Opus-Review FREIGEBEN). Hantel liegt
+jetzt an per Pixelscan ausgemessenen Handpunkten (`HEBEN_HAND`, analog zu Hockeys Schlaeger),
+eigene Hebebuehne, Ton verdrahtet. Movement bleibt bei 87 — die Luecke ist M2 (keine eigene
+Schrittlogik, `hebePhase()` leitet die Pose nur aus dem Fortschrittsbalken ab, s. Plan-Dokument
+Abschnitt 1.2). Konzept/Gameplay unveraendert.
 **Konzept 100:** eigenes FUENF-Sub-Skill-Rezept statt der sieben Buehnen-Rollen
 (`BUEHNE_ART.gewichtheben`, `:10598`), Reissen/Stossen, drei Versuche, Nullwertung, Ansage. Die
 offene Architekturfrage („darf Charisma die physische Obergrenze beruehren?") ist am 04.09.
 entschieden und gemessen (`HEBEN_TAGESMAX_ANSAGE_K`, rho 0,720 → 0,887).
-**Assets 60:** eigenes Buehnenbild `zeichneHeben()` (`:12061`, 227 Zeilen — nur das aktive Duell,
-Hantel mit Last). Aber `barbell.tsx` ist laut `gewichtheben-produktivierung.md` (S6) **bewusst
-kosmetisch belassen**, und der Heber traegt weiterhin seine Zufalls-Kosmetikwaffe (`:2575` schliesst
-nur Fechten/Eiskunstlauf/Breaking ein).
+**Assets 100:** eigenes Buehnenbild `zeichneHeben()`, Hantel an ausgemessenen Handpunkten
+(`HEBEN_HAND`/`HEBEN_PHASEN`), eigene Hebebuehne, eigener Ton (PR #876).
 **Gameplay 95:** rho **0,854**, produktiviert, Gesamt-kg-Tiebreak, eigene `WERTUNG_HEBEN`.
-**Movement 85:** Versuchs-Zustandsmaschine plus eigenes Bild; es gibt aber keine echte
-Hebe-Bewegung — der Sprite steht, die Hantel wird als Primitive daneben gezeichnet.
+**Movement 87:** Versuchs-Zustandsmaschine plus eigenes Bild; M2 fehlt weiterhin — keine eigene
+Hebe-Zustandsmaschine, `hebePhase()` liest nur den Fortschrittsbalken.
 
 ### Speed-Schach — 84 % (80/75/100/80)
 **Konzept 80:** `duell:true` + `schach:true`, Brett-gegen-Brett mit laufendem Vorteil je Zug,
@@ -170,43 +198,67 @@ mit „Brett"/„Stark"/„Zeit−".
 **Movement 80:** eigene Szene, aber die Zugfolge auf dem Brett ist ausdruecklich „eine plausible
 Zugfolge" (Kommentar `:10788`), keine Schach-Logik.
 
-### Eiskunstlauf — 79 % (90/70/95/60)
+### Eiskunstlauf — 87 % (90/70/95/94)
+**10.09. Update:** Movement 60→94 (PR #874, PRODUKTIONSCODE, Opus-Review FREIGEBEN MIT NACHTRAG).
+Echte Kuer-Bewegung ersetzt das Reihenbild — Laeufer gleiten statt zu stehen. 12.09.: der
+Kufenspur-Ringpuffer pausiert jetzt waehrend `haeltStelle` (PR #895, Kleinbefund #2), sonst fiel
+die Spur bei einer Pirouette auf einen Punkt zusammen — Politur, keine Punktaenderung.
 **Konzept 90:** `duett:true` (automatische Paarung bei gerader Feldgroesse, PR #859), `rundenN` an
 der realen ISU-Programmlaenge (12 statt 6, Spearman-Brown-Runde vom 07.09., gemessen 0,792 → 0,875).
 Eigenes Fable-Dokument (`eiskunstlauf-duett-paarlauf-recherche-08-09.md`) plus die Politur-Recherche.
 **Assets 70:** `eiskunst.tsx` (599 Z.) und `zeichneDuett()` (`:11822`, ~100 Z., Paare + Eisspur).
 Die Waffenebene ist korrekt entfernt (`:2574`) — aber es gibt keine Schlittschuhe, kein Kostuem.
 **Gameplay 95:** rho **0,885** (frisch gemessen, 0,010 ueber der Basislinie), produktiviert.
-**Movement 60:** `eiskunst.tsx` hat nur 4 Animationsstellen (auf 599 Zeilen), und `zeichneDuett()`
-positioniert Paare, laesst sie aber nicht laufen — eine Kuer ist hier ein Reihenbild.
+**Movement 94:** echte Kuer-Bewegungsmaschine (`stepKuer`, PR #874) statt Reihenbild — Laeufer
+gleiten sichtbar ueber das Eis, Kufenspur folgt korrekt (inkl. Pause waehrend `haeltStelle`).
 
-### Takeshi's Castle — 76 % (100/60/67/75)
+### Takeshi's Castle — 94 % (100/95/97/85)
+**10.09. Update:** Assets 60→95, Gameplay 67→97 (PR #880 Bahn-Produktivierung, Opus-Review
+FREIGEBEN; PR #883 Ton-Verdrahtung). `takeshi.tsx` waechst von 273 auf 517 Zeilen / 3 auf 14
+Animationsstellen; Ton (A4 0→20) ueber vier Aufrufstellen plus Loop-Start/-Stop/-Reset, Leck-Test
+in den vier Geschwister-Bahnen bestanden. 12.09.: PR #895 (Kleinbefund #5/#6) tauscht den
+Ausscheiden-Klang von "tor" auf "platsch" (semantisch richtig) und drosselt Falle/Sturz/Tor auf
+0,12s — Politur, keine Punktaenderung.
 **Konzept 100:** die inhaltlich reichste Disziplin des Projekts — Ausscheiden nach drei Stuerzen,
 vierzehn Fallen in fuenf Typen mit eigener Stufe (`fallenStufe`), drei benannte Kurse,
 Chaos/Tackle-Fenster, Gedraenge, Burgpunkte als echte Wertung. Vier eigene Dokumente
 (`takeshi-animationen-hilfe-behinderung-recherche-06-09.md`, `takeshi-chaos-tackle-plan-06-09.md`,
 `takeshi-schlammroute-plan-06-09.md`, `takeshi-schach-optik-gameplay-plan-05-09.md`).
-**Assets 60:** `bodenTakeshiRoute()` (`:16351`, 171 Z., Schlangenroute mit fuenf Gelaendezonen,
-Tuempeln, Burgmauer und Tor) plus `zeichneFalleTakeshi()` (`:16230`, 120 Z., zehn Fallenbilder).
-Aber `takeshi.tsx` hat nur 273 Zeilen und **3 Animationsstellen** — die produktive Buehne ist
-deutlich duenner als das Mockup.
-**Gameplay 67:** rho **0,861**, eigene Burgpunkte-Wertung mit Aufschluesselung im Endstand —
-**aber kein Produktionsanschluss** (Bahn hat kein Arena-Chassis).
-**Movement 75:** Fallen reagieren sichtbar auf den Ausgang (`fallenAusgang()`, Nachwackeln bei
-Durchbruch, gruenes Gluehen bei sauber).
+**Assets 95:** `bodenTakeshiRoute()` (Schlangenroute mit fuenf Gelaendezonen, Tuempeln, Burgmauer
+und Tor), `zeichneFalleTakeshi()` (zehn Fallenbilder), `takeshi.tsx` jetzt 517 Zeilen/14
+Animationsstellen (PR #880), eigener Ton (PR #883).
+**Gameplay 97:** rho **0,861**, eigene Burgpunkte-Wertung, seit PR #880 produktionsangeschlossen.
+**Movement 85:** Fallen reagieren sichtbar auf den Ausgang (`fallenAusgang()`, Nachwackeln bei
+Durchbruch, gruenes Gluehen bei sauber). M2 (Bahn-Bewegungsdispatcher) bleibt die Luecke bis zur
+Welle-1-Zielumsetzung, s. `bahnBewegung()`-Fundament (PR 0.3, #891).
 
-### Breaking — 75 % (85/65/95/55)
-**Konzept 85:** eigenes Torment/Will-Rezept ohne Charisma, mit gemessener NACHGEZOGEN-Korrektur
-(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung. Eigenes Fable-Dokument
-(`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`).
-**Assets 65:** `zeichneBreaking()` (`:12561`, ~144 Z., lila Cypher mit vier Ringzonen und
-SURVIVOR-Spotlight) — aber `breaking.tsx` ist mit **187 Zeilen die duennste** aller zwanzig
-Feld-Dateien.
+### Breaking — 96 % (95/100/95/92)
+**10.09. Update:** Assets 65→100, Movement 55→92 (PR #875, PRODUKTIONSCODE, Opus-Review FREIGEBEN
+MIT NACHTRAG). Echter Cypher mit Move-Mechanik ersetzt die rein zeichnerische Kulisse. 12.09.: PR
+#895 (Kleinbefund #3/#4) korrigiert die Freeze-/Rueckzug-Fade-Divisoren (rissen bei halber
+Deckkraft ab) und glaettet den Ringwinkel bei Rangwechseln — Politur, keine Punktaenderung.
+**12.09. Update:** Konzept 85→95 (PR #897, reines Dokument, kein Codechange). K4 ("Rezept
+nachweislich kalibriert, offene Designfragen entschieden") war die letzte offene Konzept-Luecke.
+Neues Dokument `docs/design/breaking-kalibrierung-10-09.md` kalibriert gegen echte WDSF-Daten: die
+Rundenzahl (`rundenN:8`) passt zur realen Battle-Struktur (2-3 Throwdowns a ~5 Teile), zwei
+Rezept-Hypothesen (`rundenN`8→12, `failAbzug`0,55→0,35) wurden gemessen und bewegen beide weniger
+als Breakings Kader-Spannweite (0,114) — eine sogar in die falsche Richtung — also blieb der Code
+unveraendert. Charisma-Gewicht 0 bestaetigt sich gegen die tatsaechlichen fuenf WDSF-Kriterien.
+**Konzept 95:** eigenes Torment/Will-Rezept ohne Charisma, mit gemessener NACHGEZOGEN-Korrektur
+(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung, jetzt zusaetzlich gegen echte Sportdaten
+kalibriert (s.o.). Zwei eigene Fable-/Design-Dokumente
+(`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`,
+`breaking-kalibrierung-10-09.md`).
+**Assets 100:** `zeichneBreaking()` (lila Cypher mit vier Ringzonen und SURVIVOR-Spotlight),
+`breaking.tsx` seit PR #875 deutlich gewachsen.
 **Gameplay 95:** rho **0,869**, produktiviert (Welle 2).
-**Movement 55:** `cypher:true` ist laut eigenem Kommentar (`:10733`) **rein zeichnerisch** — keine
-Zeile Mechanik dahinter. Es gibt keine Move-Bewegung, nur eine andere Buehnenkulisse.
+**Movement 92:** echte Move-Mechanik (`stepCypher`, PR #875) statt reiner Zeichenkulisse —
+Toprock/Footwork/Powermove/Freeze-Phasen, Ringposition glaettet jetzt bei Rangwechseln (PR #895).
 
-### Staffel — 72 % (95/55/67/70)
+### Staffel — 79 % (95/55/97/70)
+**10.09. Update:** Gameplay 67→97 (PR #880, PRODUKTIONSCODE, Opus-Review FREIGEBEN). Bahn-Chassis
+ist jetzt produktionsangeschlossen (G2 0→30) — die beste Rangtreue im Feld (rho 0,915) zaehlt jetzt
+auch im echten Spielstand.
 **Konzept 95:** die einzige Bahn, auf der nicht alle gleichzeitig laufen — sechs Abschnitte, fuenf
 Wechsel, Wechselzeit als eigene Groesse (`wechselBasis`/`wechselSpanne`/`wechselStrafe`),
 Windschatten bewusst AUS mit gemessener Begruendung. Drei eigene Dokumente
@@ -219,17 +271,24 @@ Animationsstellen). **Kein Staffelstab-Sprite** — der Stab ist Mechanik, kein 
 **Movement 70:** wartende Laeufer stehen sichtbar in ihrer Wechselzone (`:18297`), fliegende
 Uebergabe, Zug an der Spitze.
 
-### Football — 71 % (90/75/35/85)
-**Die groesste Schere im Feld: Konzept/Assets/Movement sind fast fertig, das Rezept nicht.**
+### Football — 79 % (90/75/65/85)
+**10.09. Update: Gameplay 35→65.** PR #884 (PRODUKTIONSCODE, Opus-Review) hat Rezept Runde 1
+gebaut — `fkLos`/kappa 3, Rezept C, eigene Tackle-Zeile. rho **0,516 → 0,800**, genau auf der
+Schranke (0,80–0,85-Stufe → G1 35). Kein Produktionsanschluss (G2 bleibt 0).
+**12.09. — E3 in Pruefung, NICHT gemergt:** Fable-Entscheidung E3 (PR #894, Draft) zieht die
+Anzeige-/KI-Kauf-Seite auf dieselben Gewichte wie das Minispiel (Override-Tabelle statt
+Matrix-Aenderung, s. `lib/player-generator/spiel-eignung-overrides.ts`). Gemessener Nebeneffekt
+(F2, im Plan vorab benannt): rho faellt dabei auf **0,714 (n=24) / 0,724 (n=48)** — G1 wieder auf 22,
+Gesamt 79→71. **Wartet auf Chris' explizite Bestaetigung im Chat**, bevor gemergt wird — die Zeile
+oben zeigt den AKTUELLEN, gemergten Stand (0,800), nicht den Stand nach E3.
 **Konzept 90:** Downs, Line of Scrimmage, echte Formationen, Playcall, eigener `spielEignung`-Block
 neben der gesperrten Matrix (PR #803). Kalibriert gegen echte NFL-2024-Quoten
 (`football-rezept-kalibrierung.md`). K4 nur teilweise: Anzeige/Teamstaerke/KI-Kauf ordnen Football
-weiterhin nach der ALTEN Matrix, das Minispiel nach der neuen — eine offene Entscheidung von Chris.
+weiterhin nach der ALTEN Matrix, das Minispiel nach der neuen — genau die Frage, die E3 loesen soll.
 **Assets 75:** eigene Ausruestung (Helme/Montur, `footballGear`, `:2593`), Endzonen und Line of
 Scrimmage im geteilten Feldspielbild (`:10089`), `football.tsx` (348 Z.).
-**Gameplay 35:** rho **0,516** — der groesste Einzelrueckstand ausserhalb der Arena. Kein
-Produktionsanschluss; dient im Testcode inzwischen als benannte Kontrolldisziplin
-(`D2_KONTROLL_DISZIPLIN = "football"`).
+**Gameplay 65:** rho **0,800** (PR #884), genau auf der Schranke. Kein Produktionsanschluss;
+dient im Testcode weiterhin als benannte Kontrolldisziplin (`D2_KONTROLL_DISZIPLIN = "football"`).
 **Movement 85:** Snap-Standphase plus fuenf visuell unterschiedene Spielzugtypen mit je eigener
 Ballflugbahn — laut eigenem Bericht strukturell fertig, aber noch nicht poliert.
 
@@ -245,7 +304,8 @@ Bild-je-Station. `bump.tsx` (394 Z., 12 Animationsstellen).
 **Movement 60:** eigene Schrittlogik mit Hindernis-Stopp, Rempler, Windschatten, drei Rennplaenen —
 aber kein eigener Zeichenzweig, alles laeuft durch `bodenSpurt()`.
 
-### Time-Trial — 63 % (95/45/62/50)
+### Time-Trial — 71 % (95/45/92/50)
+**10.09. Update:** Gameplay 62→92 (PR #880, Bahn-Produktivierung). Produktionsanschluss (G2 0→30).
 **Konzept 95:** die K5-Umsetzung hat die neun Sturz-Kurven **ersatzlos gestrichen** (ein Zeitfahren
 hat keine Gegner) und durch ein stetiges Streckenprofil ersetzt — sieben Gelaendezonen
 (Steigung/Abfahrt/Kurve), gestaffelter Start, Zwischenzeiten, Tagesform ±1,5 %. Eigenes Dokument
@@ -268,13 +328,15 @@ und seit 07.09. korrekt IMMER die Schwert-Waffenebene (`:2573`). Aber keine eige
 **Movement 35:** kein eigener Zeichenzweig, kein eigener Paar-Rechner (bewusst, s.
 `tennis-fechten-rollout-plan.md` E.2) — zwei Reihen Figuren mit Schwert.
 
-### Tennis — 54 % (75/30/90/20)
+### Tennis — 56 % (75/40/90/20)
+**10.09. Update:** Assets 30→40. Der Zufallswaffen-Bug (Abschnitt 3.2) ist projektweit geschlossen
+— `DISZIPLIN_WAFFE` fuehrt Tennis heute mit `null`, der Spieler schwingt keine Kosmetikwaffe mehr.
 **Konzept 75:** eigene, aus Tennis' MATRIX abgeleitete Rezeptkalibrierung (07.09., `:10837-10922`,
 0,786 → 0,825) — das war die Behebung der 1:1-Uebernahme aus dem alten Feldspiel-Rezept. Die
 Mechanik selbst ist aber Speed-Schachs `duell:true`, kein eigener Ballwechsel-Rechner.
-**Assets 30:** `tennis.tsx` (424 Z., 17 Animationsstellen) — im Mockup jedoch **das generische
-Buehnen-Reihenbild**, und der Tennisspieler schwingt beim Punktgewinn weiterhin seine zufaellige
-Kosmetikwaffe (im Code ausdruecklich als offener Bug benannt, `:2569`).
+**Assets 40:** `tennis.tsx` (424 Z., 17 Animationsstellen) — im Mockup weiterhin **das generische
+Buehnen-Reihenbild**, aber die Zufallswaffe ist seit dem 10.09. weg (`DISZIPLIN_WAFFE` mit `null`).
+Eigene Requisiten (Schlaeger) gibt es weiterhin nicht — daher 40, nicht mehr.
 **Gameplay 90:** rho 0,825, produktiviert (Welle 2).
 **Movement 20:** nichts Eigenes im Motor.
 
@@ -322,34 +384,39 @@ Nie kalibriert.
 Rangtreue-Baustelle. Aber das eigene Kaderrauschen ist 0,192, das Neunzehnfache des Fehlbetrags.
 **Movement 40:** Steigungs-Zehrung im Schritt, sonst generisch.
 
-### Wettessen — 44 % (35/30/95/15) — **kein eigenes Konzept**
+### Wettessen — 46 % (35/40/95/15) — **kein eigenes Konzept**
+**10.09. Update:** Assets 30→40, Zufallswaffen-Bug geschlossen.
 **Konzept 35:** es gibt ein eigenes, aus der Matrix abgeleitetes Rezept (will 26/health 22/
 stamina 22, bewusst ohne Charisma, `:10761`) und eine eigene `wertungTabelle` mit Chris' eigenem
 Wort „Pause". Das war es. **Es gibt kein Dokument, das Wettessen als Sportart modelliert**, keine
 eigene Mechanik, keine Kalibrierrunde — es ist der generische Buehnen-Durchgangsrechner mit
 anderen Attributgewichten.
-**Assets 30:** `platter.tsx` (441 Z., 6 Animationsstellen, leergegessene Teller) — im Motor das
-generische Reihenbild, mit dem Zufallswaffen-Bug.
+**Assets 40:** `platter.tsx` (441 Z., 6 Animationsstellen, leergegessene Teller) — im Motor das
+generische Reihenbild, aber ohne Zufallswaffe mehr (seit 10.09.).
 **Gameplay 95:** rho **0,845**, produktiviert (Welle 2) — die Zahl ist gut, weil das
 Buehnen-Chassis gut ist, nicht weil Wettessen gut ist.
 **Movement 15:** nichts.
 
-### Showcase — 43 % (25/30/95/20) — **kein eigenes Konzept**
+### Showcase — 45 % (25/40/95/20) — **kein eigenes Konzept**
+**10.09. Update:** Assets 30→40. Die alte Notiz ("Showcase bewusst unangetastet") ist ueberholt —
+`DISZIPLIN_WAFFE` fuehrt heute alle vier betroffenen Buehnen (Showcase/Tennis/Wettessen/I-Spy)
+projektweit mit `null`, selbst nachgelesen.
 **Konzept 25:** die duennste Disziplin unter den zehn produktiven. `BUEHNE_ART.showcase` (`:10658`)
 ist der Sieben-Rollen-Standard mit Charisma-Gewichten — **kein Flag, kein Zweig, keine
 NACHGEZOGEN-Korrektur, kein eigenes Dokument**. Der einzige Text ueber Showcase ist die
 Produktivierungs-Notiz, die es mit Speed-Schach teilt.
-**Assets 30:** `showcase.tsx` (623 Z., aber nur **3 Animationsstellen**). Im Motor generisch — und
-der Waffen-Bug ist bei Showcase **ausdruecklich nicht behoben worden** (`:2570`: „Showcase ist
-zudem eine der drei live geschalteten Buehnen-Disziplinen und bewusst unangetastet").
+**Assets 40:** `showcase.tsx` (623 Z., aber nur **3 Animationsstellen**). Im Motor generisch, aber
+seit 10.09. ohne Zufallswaffe.
 **Gameplay 95:** rho **0,892** (drittbeste im Feld), produktiviert seit Welle 1.
 **Movement 20:** nichts Eigenes.
 
-### I-Spy — 36 % (55/30/37/20)
+### I-Spy — 38 % (55/40/37/20)
+**10.09. Update:** Assets 30→40, Zufallswaffen-Bug geschlossen.
 **Konzept 55:** die **breiteste Matrix aller zwanzig** (zehn Attribute mit Gewicht) und eine
 gemessene NACHGEZOGEN-Korrektur (`:10821`). Aber `duell:true` von Speed-Schach uebernommen, und der
 einzige Konzepttext ist Abschnitt 4 von `arena-duell-recherche-fable.md` (Differenzwert), geteilt.
-**Assets 30:** `spybar.tsx` (589 Z., 17 Animationsstellen) — im Motor generisch, Waffen-Bug offen.
+**Assets 40:** `spybar.tsx` (589 Z., 17 Animationsstellen) — im Motor generisch, aber seit 10.09.
+ohne Zufallswaffe.
 **Gameplay 37:** rho **0,684 — die einzige Buehnen-Disziplin, die die Abnahme nicht besteht.**
 Technisch waere der Anschluss eine einzige Zeile (`duell:true` liegt vor); er ist **bewusst
 unterlassen** und mit einem eigenen Regressionstest festgehalten (PM-Briefing 09.09., „die beiden
@@ -360,20 +427,27 @@ Achsen duerfen nicht deshalb vermischt werden, weil eine davon billig zu erfuell
 
 ## 3. Zwei Querschnittsbefunde, die jede Zeile oben beeinflussen
 
-### 3.1 Ton gibt es weiterhin nur fuer Basketball — der Befund gilt unveraendert
-Nachgeprueft, nicht uebernommen: `public/sound/` enthaelt **genau einen Ordner**, `basketball/`,
-mit sechs Dateien. Alle vierzehn `bkSfx()`-Aufrufstellen im Motor liegen in Basketball- oder
-Feldspiel-Basketball-Zweigen; der Publikums-Loop laedt fest
-`/sound/basketball/publikum_ambiente.ogg` (`:16080`). Es gibt keine Audio-Abstraktion je Disziplin,
-keinen zweiten Ordner, keine Musik. **Neunzehn von zwanzig Disziplinen sind stumm** — das kostet
-jede von ihnen 20 Assets-Punkte und ist der einzelne groesste, gleichfoermigste Rueckstand im
-gesamten Projekt.
+### 3.1 Ton — Stand 12.09.: zwei von zwanzig haben eigene Audio-Dateien, sechs weitere haben jetzt
+### einen prozeduralen `TON_KATALOG`-Eintrag (noch ohne Aufrufstellen)
+Basketball bleibt die einzige Disziplin mit echten Audio-DATEIEN: `public/sound/basketball/` mit
+sechs Dateien, ueber `bkSfx()` angebunden. **Hockey** hat seit dem 12.09. (E2, PR #893) einen
+vollstaendig verdrahteten, prozeduralen `TON_KATALOG.hockey`-Eintrag (fuenf Ereignisse, synthetisch
+erzeugt statt Audio-Datei — der Umgebungs-Proxy laesst keine Audio-Dateien durch) und zaehlt damit
+ebenfalls als "hat Ton" (A4 0→20). PR 0.1 (#892, 12.09.) hat ausserdem **sechs weitere**
+Katalogeintraege angelegt (Speed-Schach/Staffel/Football/Time-Trial/Spurt/Fechten) — reine Daten,
+noch **ohne eine einzige Aufrufstelle**, also noch ohne Punktewirkung (A4 bleibt bei diesen sechs
+bei 0, bis eine Ziel-PR sie tatsaechlich verdrahtet). **Elf von zwanzig Disziplinen bleiben stumm**
+(war neunzehn am 10.09.) — der Rueckstand ist kleiner geworden, aber noch immer der groesste
+gleichfoermige im Projekt.
 
-### 3.2 Der Zufallswaffen-Bug ist zu drei Fuenfteln behoben — und bei den falschen zwei offen
-`:2573-2575` erzwingt fuer **Fechten** immer die Schwertebene und entfernt sie fuer
-**Eiskunstlauf/Breaking**. **Showcase, Tennis, Wettessen und I-Spy tragen den Bug weiter** — im
-Code selbst benannt (`:2569`). Drei dieser vier sind seit Welle 2 **produktionsangeschlossen**. Ein
-Wettesser mit Kriegsaxt steht damit heute naeher am echten Spielstand als vor der Welle.
+### 3.2 Der Zufallswaffen-Bug ist seit dem 10.09. projektweit geschlossen
+**Ueberholt:** dieser Abschnitt sagte bis zum 10.09., der Bug sei bei Showcase/Tennis/Wettessen/
+I-Spy weiterhin offen. Nachgesehen im aktuellen Code: `DISZIPLIN_WAFFE` fuehrt heute alle vier mit
+`null`, zusammen mit den fuenf Bahn-Disziplinen. Kein Kaempfer/Spieler traegt mehr eine
+Zufallswaffe, die zu seiner Disziplin nicht passt — das hat allen vier Buehnen je 10 Assets-Punkte
+gebracht (s. Tabelle oben). Eigene, disziplinrichtige Requisiten (statt nur "keine Waffe") gibt es
+fuer diese vier weiterhin nicht — das bleibt offen und ist Aufgabe der `DISZIPLIN_PROP`-Tabelle
+(PR 0.2, #889), sobald eine Ziel-PR ihnen eine eigene Requisite gibt.
 
 ### 3.3 Die 2–6-Spieler-Luecke ist im Code geschlossen, aber nicht nachgemessen
 `pruefung-2-6-spieler-tauglichkeit-alle-disziplinen-08-09.md` fand, dass die Gegnerseite bei

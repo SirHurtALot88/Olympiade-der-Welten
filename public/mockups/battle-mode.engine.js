@@ -438,6 +438,57 @@
     });
   }
 
+  // ================== SPEED-SCHACH: SCHACHUHR AN DER HAND (Ziel 5, Opus-Plan 09-10
+  // Abschnitt 5.1/7.1, A3 20->25) ==================
+  // Drittes Requisit nach demselben Muster wie HOCKEY_HAND/zeichneHockeyschlaeger und
+  // HEBEN_HAND/zeichneHantel direkt oberhalb: x/y ist die HAND, per Pixelscan der
+  // Alphakontur an der STAND-Pose gemessen (nicht geschaetzt) — Speed-Schach zwingt seine
+  // Spieler anders als Gewichtheben NIE in die "shoot"-Pose (u.lunge ist die meiste Zeit
+  // 0), deshalb ist die stehende Pose die richtige Referenz, dieselbe, die HOCKEY_HAND
+  // schon nutzt. Verfahren, Beweisbilder und die vollstaendige Messung:
+  // scripts/messe-schach-uhr-handpunkt.mjs, docs/design/speed-schach-fable-recherche-12-09.md
+  // Abschnitt 3. Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const SCHACH_HAND=[
+    {x:46,y:44}, // hinten
+    {x:23,y:44}, // links
+    {x:46,y:44}, // vorn
+    {x:40,y:44}, // rechts
+  ];
+  // Zwei Phasen statt der drei/vier bei Hantel/Schlaeger: eine Schachuhr haengt ruhig an
+  // der Hand ("ruhend"), bis ein Zug enthuellt wird -- dann schlaegt die Hand kurz auf den
+  // Knopf ("schlag", getrieben von u.vizUhrSchlagT, s. stepSchach() weiter unten). dy ist
+  // relativ zur Hand wie bei HEBEN_PHASEN; schlagY hebt den Knopf beim Schlag kurz an, statt
+  // ihn nur einzufaerben, damit die Bewegung auch im Standbild eines Screenshots sichtbar ist.
+  const SCHACH_UHR_PHASEN={
+    ruhend: {dy:20, schlagY:0},
+    schlag: {dy:20, schlagY:1.2},
+  };
+  // x/y ist die Hand (aus SCHACH_HAND), s die Groesse (Z), richtung 0..3 wie blickAus()
+  // (hier ungenutzt -- die Uhr haengt symmetrisch, anders als Schlaeger/Hantel kein
+  // Laengenprofil, das sich mit der Blickrichtung streckt), phase "ruhend"/"schlag"
+  // (unbekannt faellt auf "ruhend" zurueck, dasselbe Sicherheitsnetz wie bei den anderen
+  // beiden Requisiten).
+  function zeichneSchachuhr(ctx,x,y,s,richtung,phase){
+    const p=SCHACH_UHR_PHASEN[phase]||SCHACH_UHR_PHASEN.ruhend;
+    const by=y+p.dy*s;
+    const bw=11*s, bh=6.5*s;
+    ctx.fillStyle="#1c1f27"; ctx.fillRect(x-bw/2,by-bh/2,bw,bh);
+    ctx.strokeStyle="#000"; ctx.lineWidth=Math.max(0.6,0.8*s); ctx.strokeRect(x-bw/2,by-bh/2,bw,bh);
+    // Zwei Zifferblaetter, wie eine echte Doppel-Schachuhr.
+    ctx.fillStyle="#e8e2d0";
+    ctx.fillRect(x-bw*0.42,by-bh*0.26,bw*0.36,bh*0.52);
+    ctx.fillRect(x+bw*0.06,by-bh*0.26,bw*0.36,bh*0.52);
+    // Knopf obenauf, mittig — golden und kurz angehoben waehrend "schlag" (M4: die Hand,
+    // die auf den Uhrenknopf schlaegt, s. DISZIPLIN_PROP-Aufrufstelle in zeichneSprite).
+    ctx.fillStyle=phase==="schlag"?"#f2d75a":"#8a93a3";
+    ctx.beginPath(); ctx.arc(x,by-bh/2-p.schlagY*s,Math.max(0.8,1.1*s),0,Math.PI*2); ctx.fill();
+    // Die schlagende Hand selbst — ein kleiner heller Kreis, der beim Schlag naeher an den
+    // Knopf heranrueckt, sonst knapp darueber ruht (nie ganz weg, sonst saehe es aus, als
+    // wuerde die Hand jedes Mal neu ins Bild springen).
+    ctx.fillStyle="#e0b48a";
+    ctx.beginPath(); ctx.arc(x,by-bh/2-p.schlagY*s-2.6*s,Math.max(0.9,1.3*s),0,Math.PI*2); ctx.fill();
+  }
+
   // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
   // blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts. Koordinaten sind Zell-Koordinaten
   // (0..63) IM SELBEN 64x64-Rahmen, in dem renderProbe zeichnet — unabhaengig von der
@@ -2238,6 +2289,10 @@
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
+    // DRITTER EINTRAG (Ziel 5, Opus-Plan 09-10 Abschnitt 5.1, A3 20->25, 12.09.): die
+    // Schachuhr, s. SCHACH_HAND/SCHACH_UHR_PHASEN/zeichneSchachuhr oben. Aufrufstelle wie
+    // bei den zwei bestehenden Eintraegen, s. istSchach()-Block unten bei zeichneSprite.
+    "speed-schach":{ hand:SCHACH_HAND, phasen:SCHACH_UHR_PHASEN, zeichne:zeichneSchachuhr },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3039,6 +3094,19 @@
       const prop=DISZIPLIN_PROP.gewichtheben;
       const hp=prop.hand[r]||prop.hand[2];
       prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizPhase||hebePhase(u),u._vizKg||0);
+    }
+    // SCHACHUHR. Dasselbe Muster wie Hockeyschlaeger/Hantel direkt oberhalb (PR 0.2,
+    // DISZIPLIN_PROP) — Ziel 5 (Opus-Plan 09-10, Abschnitt 5.1, Speed-Schach A3 20->25).
+    // `feldspiel` erzwingt hier `true`, weil zeichneSchach() (wie zeichneHeben()) diesen
+    // Parameter fuer ihre zwei Fokus-Spieler setzt (s. Kommentar dort) — dieselbe Weiche
+    // schaltet bei u.lunge>0 auf die "shoot"-Pose statt eines Schwert-/Bogen-Schwungs
+    // (kein Schachspieler zieht am Brett ein Schwert). Phase kommt aus u.vizUhrSchlagT
+    // (stepSchach(), rein praesentational, s. Vertrag bei buehnenBewegung) — "schlag"
+    // waehrend die Hand gerade auf den Knopf trifft, sonst "ruhend".
+    if(feldspiel&&istSchach()&&!u.down){
+      const prop=DISZIPLIN_PROP["speed-schach"];
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,(u.vizUhrSchlagT>0)?"schlag":"ruhend");
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -6466,6 +6534,11 @@
   // deshalb zusaetzlich, dass GERADE eine Buehne laeuft — exakt die Vorpruefung, die der
   // Requisiten-Tabellen-Kommentar bei DISZIPLIN_WAFFE (PR 0) fuer denselben Fall verlangt.
   const istHeben=()=>istBuehne(disc)&&buehneDisc==="gewichtheben";
+  // SPEED-SCHACH — dieselbe Vorpruefung wie istHeben() direkt oberhalb (istBuehne(disc)
+  // bestaetigt, dass GERADE eine Buehne laeuft, nicht nur, dass buehneDisc zufaellig auf
+  // "speed-schach" stehengeblieben ist). Fuer die Schachuhr-Requisite (DISZIPLIN_PROP,
+  // Ziel 5) unten in zeichneSprite.
+  const istSchach=()=>istBuehne(disc)&&buehneDisc==="speed-schach";
 
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
@@ -11289,10 +11362,17 @@
   // Kaderleiste vor; die ist bewusst nicht gebaut, also nimmt jetzt das Fokus-Brett
   // selbst den Loese-Klick.
   let schachFokus=0, schachPin=null, schachMiniRects=[], schachFokusRect=null;
+  // "matt"-Ton (Ziel 5, A4) darf nur EINMAL je Spiel feuern, sobald das Duell entschieden
+  // ist (alleFertig && siegSeite!=null, s. zeichneSchach) — sonst spielt jeder weitere
+  // Frame nach dem Sieg den Ton erneut ab. Reset hier statt in reset() (s. Kommentar dort
+  // fuer den Loop-N1-Fix): bauBuehne() laeuft garantiert bei JEDEM neuen Buehnen-Match,
+  // ob ueber reset() oder einen frischen setDisc().
+  let schachMattGehoert=false;
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    schachMattGehoert=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -12338,6 +12418,67 @@
     }
   }
 
+  // ================== ZIEL 5: SPEED-SCHACH BEWEGT SICH (stepSchach) ==================
+  // Opus-Plan "opus-plan-zehn-disziplinen-alle-kategorien-09-10.md" Abschnitt 5.1 (Platz 5,
+  // Movement 80 -> 95, M2+M4). Vierter Zweig in buehnenBewegung() (:art.schach-Gate, PR 0.3
+  // hat es leer vorbereitet). Der Motorkommentar bei BUEHNE_ART["speed-schach"] sagt selbst,
+  // die Zugfolge sei "eine plausible Zugfolge", keine echte Schachlogik — das AENDERT DIESE
+  // FUNKTION NICHT: sie liest nur, was `zeichneSchach()` ohnehin schon liest
+  // (a/b.aktuell/runden/brett/side, `schachFokus`, `art.erfolgWort/failWort`), und schreibt
+  // ausschliesslich drei neue, praesentationale viz*-Felder. HARTER VERTRAG WIE BEI
+  // stepKuer()/stepCypher() (s. dortige Kommentare, woertlich uebernommen): niemals rr(),
+  // niemals u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/u.lunge/buehneAkt/
+  // buehneZeiger/done anfassen — disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese
+  // Funktion mit jedem Frame mitlaufen lassen, ohne dass sich eine Rangtreue-Zahl bewegt.
+  //
+  // NUR DAS FOKUS-BRETT (schachFokus) bekommt eine Gleit-/Uhr-Animation: die fuenf Minis
+  // zeigen ohnehin nur Kreise auf 6px-Feldern (kein Platz fuer eine sichtbare
+  // Gleitbewegung, s. zeichneSchachBrett()), und nur das Fokus-Brett zeichnet echte
+  // Figuren-Sprites. Springt die Regie (alle 3s) auf ein anderes Brett, faengt die
+  // Animation dort einfach bei ihrem naechsten enthuellten Zug neu an — kein Zustand
+  // haengt am vorherigen Fokus, kein Sonderfall noetig.
+  //
+  // UHR: `schachUhrWert(u,art)` ist dieselbe Formel, die zeichneSchach() bisher als lokale
+  // Konstante `uhr` gefuehrt hat (s. dort, jetzt ein Aufruf hierher) — rein praesentational,
+  // in keiner Formel gelesen. stepSchach() naehert u.vizUhrAnzeige an diesen Wert an
+  // (exponentiell, wie NAECHER() bei stepCypher oben), statt ihn beim naechsten Zug
+  // schlagartig zu setzen — genau das macht aus "springt alle 0,5s um 8 oder 20" ein
+  // sichtbares Herunterticken (M2/M4).
+  const SCHACH_GLEIT_T=0.28, SCHACH_SCHLAG_T=0.18;
+  function schachUhrWert(u,art){
+    let t=180;
+    for(let i=0;i<=u.aktuell;i++){ const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20); }
+    return Math.max(0,t);
+  }
+  function stepSchach(dt,art){
+    if(!TEILNEHMER.length)return;
+    const fb=schachFokus;
+    const a=TEILNEHMER.find(u=>u.side===0&&u.brett===fb);
+    const b=TEILNEHMER.find(u=>u.side===1&&u.brett===fb);
+    if(a&&b){
+      const halb=(a.aktuell+1)+(b.aktuell+1);
+      if(a.vizSchachHalb==null){ a.vizSchachHalb=halb; a.vizSchachGlideT=0; }
+      else if(halb>a.vizSchachHalb){
+        // Neuer Halbzug seit dem letzten Frame enthuellt — die Gleitbewegung faengt von
+        // vorn an. Der ZIEHER (wer diesen Halbzug gerade enthuellt bekam, dieselbe Parity-
+        // Regel wie `letzterZieher` in zeichneSchach()) bekommt zusaetzlich den Hand-Schlag
+        // auf die eigene Uhr — in echtem Blitzschach draueckt, wer gezogen hat, die eigene
+        // Taste, nicht der Gegner.
+        a.vizSchachHalb=halb; a.vizSchachGlideT=SCHACH_GLEIT_T;
+        const zieher=(halb%2===1)?a:b;
+        zieher.vizUhrSchlagT=SCHACH_SCHLAG_T;
+      } else if(a.vizSchachGlideT>0){
+        a.vizSchachGlideT=Math.max(0,a.vizSchachGlideT-dt);
+      }
+      for(const u of [a,b]){
+        if(u.vizUhrSchlagT>0)u.vizUhrSchlagT=Math.max(0,u.vizUhrSchlagT-dt);
+        const ziel=schachUhrWert(u,art);
+        if(u.vizUhrAnzeige==null)u.vizUhrAnzeige=ziel;
+        else u.vizUhrAnzeige+=(ziel-u.vizUhrAnzeige)*(1-Math.exp(-dt/0.25));
+      }
+    }
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -12406,7 +12547,19 @@
     // Publikums-Loop beenden, falls wir GERADE von Gewichtheben herkommen (s. bodenHeben
     // unten) — reines Praesentations-Bookkeeping, kein Motorzustand.
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    // SPEED-SCHACH (Ziel 5, A4, 12.09.): bodenBuehne() ist der geteilte Boden fuer alle
+    // Nicht-Heben/Nicht-Duett-Buehnen (Schach eingeschlossen, s. zeichneBuehne()s
+    // Boden-Dispatch) — anders als Gewichtheben/Eiskunstlauf bekommt Schach kein eigenes
+    // bodenSchach(), nur den Publikums-Loop hier hinein gegated. `BB().schach` startet ihn
+    // beim Betreten, das else stoppt ihn beim Verlassen (Wechsel auf eine der sechs
+    // anderen Buehnen, die ebenfalls durch diesen Zweig laufen) — dasselbe
+    // Start/Stop-Paar-Muster wie hebenPublikumAn direkt darueber.
+    if(BB().schach){ if(!schachPublikumAn){ tonLoopStart("speed-schach"); schachPublikumAn=true; } }
+    else if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
   }
+  // rein praesentational, s. bodenBuehne() oben fuer Start/Stop und reset() (N1-Fix) fuer
+  // den Rueckstell-Zwang beim naechsten Speed-Schach-Spiel.
+  let schachPublikumAn=false;
 
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
   // Screenshot-Befund: "generischer dunkler Buehnenboden" fuer eine Sportart mit einer
@@ -13186,7 +13339,13 @@
   // Zeichnet EIN Brett (Fokus oder Mini) an (bx,by) mit Feldgroesse q. `gross` schaltet
   // Figuren-Sprites und den Zug-Pfeil zu — auf 6-px-Mini-Feldern traegt ohnehin keine
   // 48er-Figur, dort bleiben es Kreise (derselbe Rueckfall wie ohne geladenes Blatt).
-  function zeichneSchachBrett(bx,by,q,B,letzter,gross){
+  // `gleit` (Ziel 5, M2, optional): {frac 0..1, x0,y0,x1,y1} — waehrend frac<1 wird die
+  // Figur auf dem ZIELFELD des zuletzt enthuellten Zuges beim normalen Durchlauf
+  // uebersprungen (s. unten) und stattdessen separat an einer zwischen Start- und Zielfeld
+  // interpolierten Position gezeichnet: sie GLEITET herueber statt zu springen. Nur am
+  // Fokus-Brett wirksam (gross&&gleit) — die Minis zeigen weiterhin sofort die fertige
+  // Stellung, s. stepSchach()-Kommentar ("nur das Fokus-Brett bekommt eine Animation").
+  function zeichneSchachBrett(bx,by,q,B,letzter,gross,gleit){
     for(let y=0;y<8;y++)for(let x=0;x<8;x++){
       ctx.fillStyle=((x+y)%2===0)?"#e9dcc3":"#7a5236"; ctx.fillRect(bx+x*q,by+y*q,q,q);
       if(letzter&&((x===letzter.x0&&y===letzter.y0)||(x===letzter.x1&&y===letzter.y1))){
@@ -13194,17 +13353,29 @@
       }
     }
     ctx.strokeStyle="#2b2016"; ctx.lineWidth=gross?3:1; ctx.strokeRect(bx-1,by-1,8*q+2,8*q+2);
-    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-      const p=B[y][x]; if(!p)continue;
+    const gleitAktiv=gross&&gleit&&gleit.frac<1?gleit:null;
+    const zeichneFigur=(p,fx,fy)=>{
       const blatt=p[0]==="w"?"schach_weiss":"schach_schwarz";
       if(gross&&sbDa(blatt)){
         ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(sbBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,bx+x*q,by+y*q-q*0.15,q,q);
+        ctx.drawImage(sbBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,bx+fx*q,by+fy*q-q*0.15,q,q);
         ctx.imageSmoothingEnabled=true;
       } else {
         ctx.fillStyle=p[0]==="w"?"#fff6e6":"#26221f";
-        ctx.beginPath(); ctx.arc(bx+x*q+q/2,by+y*q+q/2,q*0.32,0,6.283); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx+fx*q+q/2,by+fy*q+q/2,q*0.32,0,6.283); ctx.fill();
         ctx.strokeStyle=p[0]==="w"?"#6b5a45":"#000"; ctx.lineWidth=0.7; ctx.stroke();
+      }
+    };
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+      if(gleitAktiv&&x===gleitAktiv.x1&&y===gleitAktiv.y1)continue; // separat unten gezeichnet
+      const p=B[y][x]; if(!p)continue;
+      zeichneFigur(p,x,y);
+    }
+    if(gleitAktiv){
+      const p=B[gleitAktiv.y1][gleitAktiv.x1];
+      if(p){
+        const f=gleitAktiv.frac;
+        zeichneFigur(p, gleitAktiv.x0+(gleitAktiv.x1-gleitAktiv.x0)*f, gleitAktiv.y0+(gleitAktiv.y1-gleitAktiv.y0)*f);
       }
     }
     if(letzter&&gross){
@@ -13290,6 +13461,12 @@
     // ("w" fuer Heim/Weiss, "b" fuer Gast/Schwarz) ist damit eindeutig bestimmt.
     const siegSeite=alleFertig?(gew(0)>gew(1)?0:gew(1)>gew(0)?1:null):undefined;
     const siegGlueh=alleFertig?(siegSeite!=null?css(siegSeite===0?"--home":"--away"):"#f2d75a"):null;
+    // TON (A4, Ziel 5): "matt" feuert genau einmal je Spiel, sobald das gesamte Duell
+    // entschieden ist (alle Bretter fertig UND ein eindeutiger Sieger, kein Unentschieden)
+    // — schachMattGehoert wird in bauBuehne() bei jedem neuen Match zurueckgesetzt (s.
+    // dortiger Kommentar), sonst wuerde jeder weitere Frame nach dem Sieg den Ton erneut
+    // abspielen.
+    if(alleFertig&&siegSeite!=null&&!schachMattGehoert){ schachMattGehoert=true; sfx("speed-schach","matt"); }
     if(alleFertig){
       // ERSETZT die Brett/Zug-Info-Zeile statt eine zweite Zeile daneben zu setzen --
       // sonst kollidiert der Text mit den Schachuhren direkt darunter (by-38).
@@ -13308,7 +13485,15 @@
     ctx.fillStyle="#3b2a1c"; ctx.fillRect(bx-26,by-14,bw+52,bw+30);
     ctx.fillStyle="#5a3f2a"; ctx.fillRect(bx-22,by-10,bw+44,bw+22);
     ctx.fillStyle="#2a1d13"; ctx.fillRect(bx-20,by+bw+16,10,22); ctx.fillRect(bx+bw+10,by+bw+16,10,22);
-    zeichneSchachBrett(bx,by,q,B,letzter,true);
+    // GLEITEN (Ziel 5, M2): stepSchach() zaehlt a.vizSchachGlideT von SCHACH_GLEIT_T auf 0
+    // herunter, sobald dieses Brett einen neuen Halbzug enthuellt bekommt — waehrend das
+    // laeuft, interpoliert zeichneSchachBrett() die zuletzt gezogene Figur zwischen Start-
+    // und Zielfeld, statt sie sofort auf dem Zielfeld zu zeigen. `a` ist derselbe
+    // TEILNEHMER, auf dem stepSchach() das Feld fuehrt (s. dortiger Kommentar).
+    const gleit=(letzter&&a.vizSchachGlideT>0)
+      ? {frac:Math.max(0,Math.min(1,1-a.vizSchachGlideT/SCHACH_GLEIT_T)),x0:letzter.x0,y0:letzter.y0,x1:letzter.x1,y1:letzter.y1}
+      : null;
+    zeichneSchachBrett(bx,by,q,B,letzter,true,gleit);
     // Fuer den Loese-Klick merken (s. verdrahteSchachPin): nur die Brettflaeche selbst,
     // nicht die Tischplatte — daneben liegen Bewertungsbalken und Zugliste.
     schachFokusRect={x0:bx,y0:by,x1:bx+bw,y1:by+bw};
@@ -13351,6 +13536,18 @@
       ctx.fillStyle=gut?css("--ok"):css("--crit"); ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=3;
       const tx=bx+letzter.x1*q+q-2, ty=by+letzter.y1*q+4;
       ctx.strokeText(gut?"!":"?!",tx,ty); ctx.fillText(gut?"!":"?!",tx,ty);
+      // TON (A4, Ziel 5): Figurenklack (oder Schlagklack bei einem Schlagzug,
+      // `letzter.schlag` steht schon in schachStellung()) plus der Druck auf die
+      // Schachuhr, an derselben Stelle, wo die !/?!-Annotation dasselbe Ereignis liest.
+      // `_tonHalb` auf dem tatsaechlichen Zieher (a/b sind persistente TEILNEHMER, keine
+      // transiente Zugkarte wie letzterHebenZug beim Gewichtheben) verhindert Wiederholung,
+      // wenn die Regie (alle 3s) zwischenzeitlich auf ein anderes Brett springt und
+      // spaeter zu diesem Halbzug zurueckkehrt.
+      if(letzterZieher._tonHalb!==halb){
+        letzterZieher._tonHalb=halb;
+        sfx("speed-schach",letzter.schlag?"schlag":"zug");
+        sfx("speed-schach","uhr");
+      }
     }
 
     // BEWERTUNGSBALKEN links vom Brett (lichess-Art): Weiss-Anteil aus dem laufenden
@@ -13363,15 +13560,21 @@
     ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
 
     // SCHACHUHREN ueber dem Brett: 3:00 Blitz, ein starker Zug kostet 8 s, ein
-    // verpatzter 20 s — wer am Zug ist, hat die helle Uhr.
-    const uhr=(u)=>{let t=180;for(let i=0;i<=u.aktuell;i++){const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20);} return Math.max(0,t);};
+    // verpatzter 20 s — wer am Zug ist, hat die helle Uhr. `uhr()` selbst ist unveraendert
+    // (jetzt schachUhrWert(), s. stepSchach()-Kommentar) — die ANZEIGE liest bevorzugt
+    // u.vizUhrAnzeige (Ziel 5, M2: stepSchach() naehert sie stetig an denselben Wert an,
+    // statt bei jedem Zug in 8er/20er-Spruengen zu springen — "sichtbar heruntertickend"),
+    // mit Rueckfall auf den harten Wert, solange stepSchach() noch nie gelaufen ist (Pause
+    // vor dem ersten "Kampf starten").
+    const uhr=(u)=>schachUhrWert(u,art);
     const mmss=(t)=>Math.floor(t/60)+":"+String(Math.floor(t)%60).padStart(2,"0");
     const amZug=(halb%2===0)?a:b;
     [[a,bx+bw*0.25],[b,bx+bw*0.75]].forEach(([u,x])=>{
       const dran=u===amZug;
       ctx.fillStyle=dran?"#f2e9d8":"#2a2233"; ctx.fillRect(x-34,by-38,68,22);
       ctx.strokeStyle="#000"; ctx.strokeRect(x-34,by-38,68,22);
-      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3"; ctx.fillText(mmss(uhr(u)),x,by-27);
+      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3";
+      ctx.fillText(mmss(u.vizUhrAnzeige!=null?u.vizUhrAnzeige:uhr(u)),x,by-27);
     });
 
     // DIE ZWEI SPIELER am Tisch (Sitz-Animation ist bewusst nicht Teil dieser Runde —
@@ -13381,7 +13584,11 @@
     const py=by+bw*0.55;
     [[a,bx-110,"--home","Weiß"],[b,bx+bw+110,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
       const c=css(farbVar); ctx.fillStyle=c; ctx.globalAlpha=0.22; ctx.beginPath();ctx.ellipse(x,py+26,22,8,0,0,6.3);ctx.fill(); ctx.globalAlpha=1;
-      zeichneSprite(ctx,u,x,py);
+      // `true` (Ziel 5, A3) erzwingt dieselbe Weiche, die zeichneHeben() schon nutzt (s.
+      // Kommentar dort): schaltet den istSchach()-Requisitenblock in zeichneSprite() frei
+      // (die Schachuhr an der Hand, DISZIPLIN_PROP["speed-schach"]) und waehlt bei
+      // u.lunge>0 die "shoot"-Ueberkopf-Pose statt eines Schwert-/Bogen-Schwungs.
+      zeichneSprite(ctx,u,x,py,true);
       const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
       schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5);
     });
@@ -22126,6 +22333,12 @@
     // zweiten Hockey-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     hockeyPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER SPEED-SCHACH (Ziel 5, A4, 12.09.): ohne diese Zeile haelt
+    // bodenBuehne() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
+    // zweiten Speed-Schach-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer
+    // Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue.
+    schachPublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
