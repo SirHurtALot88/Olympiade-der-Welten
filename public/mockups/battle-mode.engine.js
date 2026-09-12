@@ -2189,6 +2189,43 @@
     // BAHN: niemand laeuft einen Hindernisparcours mit Sturmgewehr.
     spurt:null, staffel:null, "time-trial":null, climbing:null, "takeshis-castle":null
   };
+  // ================= DISZIPLIN_PROP: POSITIVE Requisite an einem Koerperpunkt =================
+  // (PR 0.2, Zehn-Disziplinen-Plan 10.09., Abschnitt 3.2). DISZIPLIN_WAFFE oben kann nur
+  // WEGNEHMEN (null) oder eine bestehende Kosmetikwaffe ERZWINGEN ("schwert") — was fehlt,
+  // ist eine dritte Moeglichkeit: eine EIGENE, an einem Koerperpunkt verankerte Requisite.
+  // Genau die gibt es im Motor bereits zweimal, ad hoc und nicht wiederverwendbar:
+  //   - zeichneHockeyschlaeger()/HOCKEY_HAND/HOCKEY_PHASEN (oben, :264-347)
+  //   - zeichneHantel()/HEBEN_HAND/HEBEN_PHASEN (oben, :358-426, PR #876)
+  // Diese Tabelle verallgemeinert das MUSTER der beiden — sie ist die Form, in der eine
+  // kuenftige Requisite (Eiskunstlauf-Kufe, Staffelstab, Schachuhr, ...) in einer spaeteren
+  // PR registriert wird. Jeder Eintrag:
+  //   hand    — vier Koerperpunkte {x,y}, wie HEBEN_HAND/HOCKEY_HAND, Reihenfolge wie
+  //             blickAus() (0 hinten, 1 links, 2 vorn, 3 rechts), per Pixelscan der
+  //             Alphakontur ausgemessen, nicht geschaetzt (docs/design/sprite-handpunkte*.md).
+  //             "hand" ist der Tabellenname aus dem Plan; der Verankerungspunkt selbst kann
+  //             je Requisite ein anderer Koerperteil sein (z.B. der Fuss bei einer Kufe).
+  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (dy/neigung)
+  //             oder HOCKEY_PHASEN (schaftA/kelleA); die Form ist frei, `zeichne` interpretiert
+  //             sie selbst.
+  //   zeichne — (ctx,x,y,s,richtung,phase,extra) => {...}; x/y ist bereits der umgerechnete
+  //             Bildschirmpunkt (s. Aufrufstelle bei istHeben() unten), extra ein optionaler
+  //             vierter Nutzwert wie kg bei der Hantel (bei Hockey ungenutzt).
+  //
+  // DIESE PR liefert NUR die zwei BESTEHENDEN Requisiten als Eintraege — kein Neubau. Ueber
+  // die Tabelle aufgerufen wird ausschliesslich Gewichtheben, an der Stelle, an der
+  // zeichneHantel() bisher direkt stand (s. istHeben()-Block unten). Hockey bleibt an all
+  // seinen bestehenden Aufrufstellen (zeichneSprite oben, Kader-Vorschau, Vollbild-Pfad)
+  // unangetastet direkt verdrahtet und wird in DIESER PR nirgends ueber die Tabelle
+  // aufgerufen — das haelt Hockey trivial bit-identisch und bleibt im vom Plan vorgegebenen
+  // Regionszuschnitt (Abschnitt 3.2/7.1: nur :2185-2200 und :2980-2990). Der Hockey-Eintrag
+  // steht trotzdem vollstaendig hier, als Beweis, dass die Form auch fuer das AELTERE der
+  // beiden Ad-hoc-Muster passt (andere Phasen-Schluessel, `zeichne` ohne den vierten
+  // `extra`-Parameter). zeichneHantel()/zeichneHockeyschlaeger() selbst sind NICHT veraendert
+  // — die Tabelle referenziert exakt dieselben Funktions-/Datenobjekte, keine Kopien.
+  const DISZIPLIN_PROP={
+    gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
+    hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
+  };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
@@ -2981,8 +3018,12 @@
     // art.rundenDauer (derselbe Fortschritt, den die alte freistehende Hantel nutzte) —
     // fuer den wartenden Gegner (u ist nicht der aktive Zug) immer "boden".
     if(feldspiel&&istHeben()&&!u.down){
-      const hp=HEBEN_HAND[r]||HEBEN_HAND[2];
-      zeichneHantel(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,hebePhase(u),u._vizKg||0);
+      // Ueber DISZIPLIN_PROP.gewichtheben statt direkt ueber HEBEN_HAND/zeichneHantel (PR
+      // 0.2) — reine Aufrufpfad-Umleitung, `prop.hand`/`prop.zeichne` SIND dieselben Objekte/
+      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis.
+      const prop=DISZIPLIN_PROP.gewichtheben;
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,hebePhase(u),u._vizKg||0);
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
