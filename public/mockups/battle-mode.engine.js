@@ -12286,9 +12286,9 @@
   // Bestandsphasen (boden/zug/hoch/abwurf) auch schon nur die Hantel bewegen, nie den Heber.
   //
   // FUeNF ZUSTAeNDE (Plan-Tabelle 4.1): warten (="boden", Stange am Boden, s. Init unten) ->
-  // antritt (NEU, ~0,25*rundenDauer) -> zug (Umsetzen, ~0,20) -> hoch (Ausstossen+Halten,
-  // ~0,25, NUR bei gueltigem Versuch) -> ablage (NEU, Hantel fallen lassen + zurueckweichen,
-  // ~0,20) -> zurueck zu warten/"boden". Ein UNGUELTIGER Versuch (r.gueltig false) ueberspringt
+  // antritt (NEU, ~0,10*rundenDauer) -> zug (Umsetzen, ~0,19) -> hoch (Ausstossen+Halten,
+  // ~0,44, NUR bei gueltigem Versuch) -> ablage (NEU, Hantel fallen lassen + zurueckweichen,
+  // ~0,22) -> zurueck zu warten/"boden". Ein UNGUELTIGER Versuch (r.gueltig false) ueberspringt
   // "hoch" und geht direkt von "zug" nach "ablage" — dieselbe Verzweigung, die hebePhase()
   // heute schon kennt (gueltig?"hoch":"abwurf"), hier nur zeitgesteuert statt
   // fortschrittsgesteuert. "Frisch enthuellt" wird — wie in stepCypher — daran erkannt, dass
@@ -12296,12 +12296,24 @@
   // dort); kein Abbau kann je wieder exakt bei 0.5 vorbeikommen, also ein sicherer
   // Einmal-pro-Versuch-Trigger je Teilnehmer.
   //
+  // GEWICHTUNG NACH REVIEW (PR #898, Befund B): die erste Fassung hatte alle vier Phasen
+  // gleichmaessig ueber die Budgetzeit verteilt (0,25/0,20/0,25/0,20) und dabei "hoch" von
+  // 65% der rundenDauer (altes hebePhase(): Fortschritt 0,35-1,0) auf 25% verkleinert. Bei
+  // ZEIT_DEHNUNG.gewichtheben=4 (s. dort, Chris' Fund 06.09.: "sehr schnell und
+  // unuebersichtlich") heisst das den sichtbaren Ueberkopf-Halt von ~4,0s auf ~1,55s zu
+  // stauchen — GENAU der Moment, den diese Konstante lesbar machen sollte. "hoch" bekommt
+  // deshalb wieder den groessten Anteil (0,44 statt 0,25, real ~2,7s statt ~1,55s, gegenueber
+  // den alten ~4,0s immer noch kuerzer, aber nicht mehr auf ein Viertel zusammengestaucht);
+  // "antritt" bleibt kurz (0,10) — die neue Bewegung soll den Blick auf den Halt nicht
+  // verdraengen, ein knapper Antritt gibt der Beobachtung trotzdem sichtbar mehr als die
+  // alten vier Phasen (die "antritt" ueberhaupt nicht kannten).
+  //
   // TIMING-BUDGET MUSS UNTER art.rundenDauer BLEIBEN (Plan, dieselbe Rechnung wie stepCypher,
-  // s. dort: 0,55s < 0,625s): 0,25+0,20+0,25+0,20 = 0,90*rundenDauer = 0,90*1,55s = 1,395s <
-  // 1,55s — 0,155s Puffer (~10 %, dieselbe Groessenordnung wie Cyphers 0,075s/12%). Der
-  // kuerzere Fehlschlagpfad (ohne "hoch": 0,25+0,20+0,20 = 0,65*rundenDauer = 1,0075s) bleibt
-  // erst recht darunter.
-  const HEBEN_ANTRITT_T=0.25, HEBEN_ZUG_T=0.20, HEBEN_HOCH_T=0.25, HEBEN_ABLAGE_T=0.20;
+  // s. dort: 0,55s < 0,625s): 0,10+0,19+0,44+0,22 = 0,95*rundenDauer = 0,95*1,55s = 1,4725s <
+  // 1,55s — 0,0775s Puffer (~5 %, in Simulationssekunden dieselbe Groessenordnung wie Cyphers
+  // 0,075s/12% Puffer bei rundenDauer=0,625s ohne ZEIT_DEHNUNG). Der kuerzere Fehlschlagpfad
+  // (ohne "hoch": 0,10+0,19+0,22 = 0,51*rundenDauer = 0,7905s) bleibt erst recht darunter.
+  const HEBEN_ANTRITT_T=0.10, HEBEN_ZUG_T=0.19, HEBEN_HOCH_T=0.44, HEBEN_ABLAGE_T=0.22;
   function stepHeben(dt,art){
     const dauer=art.rundenDauer||1;
     for(const u of TEILNEHMER){
