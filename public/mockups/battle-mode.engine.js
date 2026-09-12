@@ -369,11 +369,24 @@
   // echten Koerperpunkt verankert statt an der Bildmitte.
   const HEBEN_PHASEN={
     boden:  {dy:34, neigung:0.03}, // Stange am Boden, Heber (praesentational) gebueckt
+    // ANTRITT (NEU, Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
+    // unten): der Heber tritt an die Plattform — die Stange liegt noch am Boden wie in
+    // "boden", aber ohne dessen leichte Grund-Neigung (0 statt 0.03), damit der Uebergang
+    // "boden"(Gegner wartet)->"antritt"(eigener Antritt) trotz gleicher Hoehe sichtbar bleibt.
+    antritt:{dy:34, neigung:0},
     zug:    {dy:2,  neigung:0},    // Umsetzen: Stange auf Brusthoehe, nah an der Hand
     hoch:   {dy:-49,neigung:0},    // Streckung ueber Kopf, Arme durch — hoch genug ueber
                                    // dem Anker, um nicht in die "kg"-Textzeile der
                                    // Textkarte zu laufen (s. Screenshot-Gegenprobe)
-    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen
+    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur noch
+                                   // vom LEGACY-Fallback hebePhase() genutzt (s. dort)
+    // ABLAGE (NEU, wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
+    // ob der Versuch gueltig war oder nicht — im echten Gewichtheben wird die Stange nach
+    // JEDEM Versuch aus der Ueberkopfposition fallen gelassen, nicht nur bei einem Fehlversuch
+    // (s. Kommentar bei stepHeben). Etwas tiefer und staerker gekippt als "abwurf", damit der
+    // Fall aus voller Streckung wuchtiger wirkt als der fruehere Fehlversuch-Sturz aus
+    // Brusthoehe.
+    ablage: {dy:40, neigung:0.4},
   };
   // Scheibengroesse/-anzahl AUS kg — schwerere Last = mehr/dickere Scheiben, statt der
   // alten vier immer gleich grossen Punkte. Schwellen grob am internen HEBEN_KG_BASIS/
@@ -3014,16 +3027,18 @@
     // hier `true`, weil zeichneHeben() diesen Parameter genauso erzwingt wie fuer die
     // Feldspiel-Korblegerpose (s. Kommentar am Aufruf dort) — istHeben() selbst prueft
     // zusaetzlich istBuehne(disc)/buehneDisc (s. Kommentar an istHeben oben), nicht nur
-    // diesen Parameter. hebePhase(u) liefert boden/zug/hoch/abwurf aus buehneAkt/
-    // art.rundenDauer (derselbe Fortschritt, den die alte freistehende Hantel nutzte) —
-    // fuer den wartenden Gegner (u ist nicht der aktive Zug) immer "boden".
+    // diesen Parameter. u.vizPhase (stepHeben(), Ziel 1) liefert boden/antritt/zug/hoch/
+    // ablage aus einer echten Zustandsmaschine statt eines Fortschrittsbalkens — fuer den
+    // wartenden Gegner bleibt es "boden". Fallback auf das alte hebePhase() (Balken aus
+    // buehneAkt/art.rundenDauer), SOLANGE u.vizPhase noch null ist — derselbe
+    // "solange vizX==null"-Vertrag wie bei stepKuer.
     if(feldspiel&&istHeben()&&!u.down){
       // Ueber DISZIPLIN_PROP.gewichtheben statt direkt ueber HEBEN_HAND/zeichneHantel (PR
       // 0.2) — reine Aufrufpfad-Umleitung, `prop.hand`/`prop.zeichne` SIND dieselben Objekte/
       // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis.
       const prop=DISZIPLIN_PROP.gewichtheben;
       const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,hebePhase(u),u._vizKg||0);
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizPhase||hebePhase(u),u._vizKg||0);
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -12249,6 +12264,68 @@
     }
   }
 
+  // ================== ZIEL 1: GEWICHTHEBEN WIRD ECHTE BEWEGUNG (stepHeben) ==================
+  // Opus-Plan "opus-plan-zehn-disziplinen-alle-kategorien-09-10.md" Abschnitt 4.1 (die einzige
+  // Luecke in Gewichthebens Movement, M2 12/25). Angeschlossen ueber buehnenBewegung() oben,
+  // exklusiv auf art.heben gegated (BUEHNE_ART.gewichtheben — kein anderer Buehnen-Achter
+  // traegt dieses Flag). Ersetzt hebePhase()s reinen Fortschrittsbalken (ein Bruchteil von
+  // buehneAkt/rundenDauer, unten unveraendert als Fallback stehen gelassen) durch eine echte
+  // Zustandsmaschine mit einer Bewegung, die es bisher gar nicht gab: dem Antritt zur Hantel.
+  //
+  // HARTER VERTRAG (PR 0, s. Kommentar bei buehnenBewegung, hier wie bei stepKuer/stepCypher
+  // woertlich eingehalten): kein rr()-Aufruf, keine Schreibzugriffe auf u.summe/u.runden/
+  // u.aktuell/u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done. Gelesen werden nur
+  // bereits vorhandene Felder (dt, u.lunge, u.aktuell, u.runden[u.aktuell].gueltig, art.
+  // rundenDauer) — geschrieben wird AUSSCHLIESSLICH auf die zwei neuen viz*-Felder
+  // (u.vizPhase/u.vizPhaseT).
+  //
+  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest bei W*0.30/W*0.70 (s.
+  // zeichneHeben) — "geht zur Hantel" ist deshalb nicht als u.vizX/u.vizY modelliert, sondern
+  // als eigene Hantel-Phase ("antritt", s. HEBEN_PHASEN oben): die Stange bewegt sich relativ
+  // zur Hand, der Heber selbst bleibt auf seinem Podestplatz — genau wie die vier
+  // Bestandsphasen (boden/zug/hoch/abwurf) auch schon nur die Hantel bewegen, nie den Heber.
+  //
+  // FUeNF ZUSTAeNDE (Plan-Tabelle 4.1): warten (="boden", Stange am Boden, s. Init unten) ->
+  // antritt (NEU, ~0,25*rundenDauer) -> zug (Umsetzen, ~0,20) -> hoch (Ausstossen+Halten,
+  // ~0,25, NUR bei gueltigem Versuch) -> ablage (NEU, Hantel fallen lassen + zurueckweichen,
+  // ~0,20) -> zurueck zu warten/"boden". Ein UNGUELTIGER Versuch (r.gueltig false) ueberspringt
+  // "hoch" und geht direkt von "zug" nach "ablage" — dieselbe Verzweigung, die hebePhase()
+  // heute schon kennt (gueltig?"hoch":"abwurf"), hier nur zeitgesteuert statt
+  // fortschrittsgesteuert. "Frisch enthuellt" wird — wie in stepCypher — daran erkannt, dass
+  // stepBuehne() u.lunge in GENAU dem Frame der Enthuellung exakt auf 0.5 setzt (s. Kommentar
+  // dort); kein Abbau kann je wieder exakt bei 0.5 vorbeikommen, also ein sicherer
+  // Einmal-pro-Versuch-Trigger je Teilnehmer.
+  //
+  // TIMING-BUDGET MUSS UNTER art.rundenDauer BLEIBEN (Plan, dieselbe Rechnung wie stepCypher,
+  // s. dort: 0,55s < 0,625s): 0,25+0,20+0,25+0,20 = 0,90*rundenDauer = 0,90*1,55s = 1,395s <
+  // 1,55s — 0,155s Puffer (~10 %, dieselbe Groessenordnung wie Cyphers 0,075s/12%). Der
+  // kuerzere Fehlschlagpfad (ohne "hoch": 0,25+0,20+0,20 = 0,65*rundenDauer = 1,0075s) bleibt
+  // erst recht darunter.
+  const HEBEN_ANTRITT_T=0.25, HEBEN_ZUG_T=0.20, HEBEN_HOCH_T=0.25, HEBEN_ABLAGE_T=0.20;
+  function stepHeben(dt,art){
+    const dauer=art.rundenDauer||1;
+    for(const u of TEILNEHMER){
+      if(u.vizPhase==null){ u.vizPhase="boden"; u.vizPhaseT=0; } // Erstinitialisierung
+      const frischEnthuellt=u.lunge===0.5 && u.aktuell>=0;
+      if(frischEnthuellt){ u.vizPhase="antritt"; u.vizPhaseT=0; }
+      if(u.vizPhase==="boden")continue; // wartet seitlich, keine Uhr laeuft
+      u.vizPhaseT+=dt;
+      if(u.vizPhase==="antritt"){
+        if(u.vizPhaseT>=HEBEN_ANTRITT_T*dauer){ u.vizPhase="zug"; u.vizPhaseT=0; }
+      } else if(u.vizPhase==="zug"){
+        if(u.vizPhaseT>=HEBEN_ZUG_T*dauer){
+          const r=u.aktuell>=0?u.runden[u.aktuell]:null;
+          u.vizPhase=(r&&r.gueltig)?"hoch":"ablage"; // ungueltig: kein Ueberkopf-Halt
+          u.vizPhaseT=0;
+        }
+      } else if(u.vizPhase==="hoch"){
+        if(u.vizPhaseT>=HEBEN_HOCH_T*dauer){ u.vizPhase="ablage"; u.vizPhaseT=0; }
+      } else if(u.vizPhase==="ablage"){
+        if(u.vizPhaseT>=HEBEN_ABLAGE_T*dauer){ u.vizPhase="boden"; u.vizPhaseT=0; }
+      }
+    }
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -12937,15 +13014,22 @@
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
-    // ungueltig/scheiben_fall beim Uebergang ->abwurf. `letzterHebenZug._tonPhase` merkt
-    // sich, welche Phase fuer DIESEN Zug schon vertont wurde, damit nicht jeder Frame den
-    // Ton erneut abfeuert — ein Feld auf dem transienten {u,r}-Container, nicht auf u
-    // selbst, rein praesentational (sfx() ist ein No-Op ohne AudioContext, s. dort).
+    // ungueltig/scheiben_fall beim Uebergang zug->ablage (Ziel 1: stepHeben() ueberspringt
+    // "hoch" bei einem ungueltigen Versuch und geht direkt von "zug" nach "ablage" — genau
+    // dieser direkte Sprung, an `zug._tonPhase==="zug"` erkennbar, ist jetzt das Signal fuer
+    // den Fehlversuch; ein gueltiger Versuch durchlaeuft "hoch" zuerst und erfuellt die
+    // Bedingung deshalb nie). `letzterHebenZug._tonPhase` merkt sich, welche Phase fuer
+    // DIESEN Zug schon vertont wurde, damit nicht jeder Frame den Ton erneut abfeuert — ein
+    // Feld auf dem transienten {u,r}-Container, nicht auf u selbst, rein praesentational
+    // (sfx() ist ein No-Op ohne AudioContext, s. dort). u.vizPhase (stepHeben()) mit Fallback
+    // auf das alte hebePhase(), SOLANGE u.vizPhase noch null ist — s. Kommentar am
+    // Aufruf in zeichneSprite.
     const zug=letzterHebenZug;
     if(zug){
-      const jetzt=hebePhase(zug.u);
+      const jetzt=zug.u.vizPhase||hebePhase(zug.u);
       if(jetzt!==zug._tonPhase){
         if(jetzt==="hoch"&&zug._tonPhase==="zug"){ sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch"); }
+        if(jetzt==="ablage"&&zug._tonPhase==="zug"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
         if(jetzt==="abwurf"&&zug._tonPhase!=="abwurf"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
         zug._tonPhase=jetzt;
       }
