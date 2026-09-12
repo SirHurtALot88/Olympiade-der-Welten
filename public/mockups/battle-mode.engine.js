@@ -2222,9 +2222,53 @@
   // beiden Ad-hoc-Muster passt (andere Phasen-Schluessel, `zeichne` ohne den vierten
   // `extra`-Parameter). zeichneHantel()/zeichneHockeyschlaeger() selbst sind NICHT veraendert
   // — die Tabelle referenziert exakt dieselben Funktions-/Datenobjekte, keine Kopien.
+  //
+  // ================== STAFFEL: DER STAB (zeichneStab, Ziel 6, Opus-Plan Abschnitt 5.2) ====
+  // A3 war 0: "es gibt keinen Staffelstab-Sprite ... die Disziplin heisst nach dem
+  // Gegenstand, den man nicht sieht." Ueber genau diese Tabelle, im selben Muster wie
+  // Hantel/Hockeyschlaeger — eine an einem Koerperpunkt verankerte, gezeichnete Requisite.
+  //
+  // HANDPUNKT: KEINE neue Pixelscan-Runde. STAFFEL_HAND ist woertlich HOCKEY_HAND (oben,
+  // ":305-310"). Beide Requisiten sitzen an DERSELBEN gemessenen Stelle desselben
+  // Koerperblatts (body_walk, die VORDERE Hand im Profil-Vollausschlag der Laufanimation,
+  // docs/design/sprite-handpunkte.md, Tabelle "Links/rechts ... Spalte 5") — ein
+  // Staffellaeufer traegt den Stab in genau der Hand, mit der ein Hockeyspieler seinen
+  // Schlaeger haelt. Auf der Staffel-Bahn ist der Fall sogar einfacher als im Feldspiel:
+  // zeichneSpurt() (s. dort) gibt einem LAUFENDEN Staffellaeufer IMMER vx:4, blickAus()
+  // liefert damit IMMER richtung 3 ("rechts"), unabhaengig von der Seite — eine eigene
+  // Messrunde haette an derselben, schon dokumentierten Zahl geendet.
+  const STAFFEL_HAND=HOCKEY_HAND;
+  // Kein Phasen-Faecher wie HOCKEY_PHASEN/HEBEN_PHASEN — der Stab aendert seine Haltung nie
+  // (kein Schuss, kein Heben, nur Halten). `phase` bleibt trotzdem im Funktionskopf, weil
+  // DISZIPLIN_PROP.zeichne(...) es an jeder Aufrufstelle immer mitgibt.
+  function zeichneStab(ctx,x,y,s,richtung,phase){
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const seitlich=blick!==0;
+    // Front/Ruecken (kein Profil): kurzer Stummel quer vor dem Koerper, dieselbe Idee wie
+    // die verkuerzte Kelle des Hockeyschlaegers dort (":327", `seitlich?9:4`).
+    const laenge=(seitlich?22:11)*s;
+    const winkel=0.20*(blick||1);
+    const ux=Math.cos(winkel), uy=-Math.sin(winkel);
+    // Ankerpunkt (Hand) bei 35% der Laenge statt in der Mitte — ein Staffelstab wird am
+    // unteren Drittel gefasst, das laengere Stueck ragt nach vorn ueber die Faust hinaus.
+    const x1=x-ux*laenge*0.35, y1=y-uy*laenge*0.35;
+    const x2=x+ux*laenge*0.65, y2=y+uy*laenge*0.65;
+    ctx.strokeStyle="#c8401c"; ctx.lineWidth=Math.max(1,3.2*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    // Griffband am Ankerpunkt, wie bei Hantel/Hockeyschlaeger.
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.9,1.25*s),0,Math.PI*2);ctx.fill();
+    // Zwei helle Endkappen — ohne sie waere der Stab in der kurzen Uebergabe-Animation
+    // (s. stepStaffel weiter unten) schwer als eigenes Objekt von Arm/Schaft zu unterscheiden.
+    ctx.fillStyle="#ffcf6b";
+    ctx.beginPath();ctx.arc(x2,y2,Math.max(1,1.5*s),0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x1,y1,Math.max(1,1.2*s),0,Math.PI*2);ctx.fill();
+    return {x1,y1,x2,y2};
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
+    staffel:     { hand:STAFFEL_HAND, phasen:null,          zeichne:zeichneStab },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -17711,6 +17755,10 @@
     // zwischendurch reset() lief -- dasselbe Bookkeeping wie bodenBuehne() fuer
     // hebenPublikumAn.
     if(!istRoute()&&takeshiPublikumAn){ tonLoopStop(); takeshiPublikumAn=false; }
+    // DASSELBE FUER STAFFEL (Ziel 6, A4): Publikums-Loop beenden, falls wir GERADE vom
+    // Oval herkommen und jetzt eine andere Bahn-Disziplin zeichnen, ohne dass zwischendurch
+    // reset() lief -- s. staffelPublikumAn/bodenSpurtOval() unten.
+    if(!istOval()&&staffelPublikumAn){ tonLoopStop(); staffelPublikumAn=false; }
     // TAKESHI LAEUFT UEBER DIE KARTE, nicht ueber das Bahn-Rechteck. Eine Weiche fuer
     // Boden UND Laeufer (istRoute()), damit beide nie auseinanderlaufen koennen.
     if(istRoute())return bodenTakeshiRoute();
@@ -17925,7 +17973,16 @@
   // jede Bahn-/Ziellinien-Grenze bei konstantem Radius `r` ist deshalb genau die
   // Ellipse ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,...) — keine Parallelkurven-
   // Mathematik noetig.
+  //
+  // TON (Ziel 6, A4, Opus-Plan Abschnitt 5.2): Publikums-Loop, exakt dasselbe Muster wie
+  // hebenPublikumAn/tonLoopStart("gewichtheben") bei bodenHeben() und takeshiPublikumAn/
+  // tonLoopStart("takeshis-castle") bei bodenTakeshiRoute() (":17578") -- inklusive des
+  // N1-Fixes aus Opus-Review PR #879: reset() setzt staffelPublikumAn unten explizit
+  // zurueck, sonst haelt die Flagge nach dem ersten Reset "schon gestartet" und der Loop
+  // kommt im zweiten Staffel-Rennen nie wieder (Loop-Reset-Gegenversuch, s. PR-Verifikation).
+  let staffelPublikumAn=false;
   function bodenSpurtOval(){
+    if(!staffelPublikumAn){ tonLoopStart("staffel"); staffelPublikumAn=true; }
     const rasen=aMust("rasen");
     if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H); }
     else { const g=ctx.createLinearGradient(0,0,0,H);
@@ -18928,6 +18985,16 @@
       // links, Seite 1 rechts) statt sie deckungsgleich zu stapeln — zwei
       // Wechselzonen nebeneinander, wie bei einer echten Staffel an der Ziellinie.
       vx=(u.seite===0?-1:1)*34;
+      // ANLAUF (stepStaffel, Ziel 6 M1/M2): der NAECHSTE in der Wartereihe (idx===0) zieht
+      // sichtbar Richtung Bahn, sobald sein Vordermann sich der Wechselzone naehert.
+      // u.vizAnlauf (0..1) schreibt ausschliesslich stepStaffel; hier wird es nur GELESEN,
+      // um ihn teilweise aus der Warteschlange herauszuziehen — u.pos/u.bahnZ/u.aktiv
+      // bleiben unangetastet, es ist dieselbe reine Bildschirm-Interpolation wie u.vizX/
+      // u.vizY in stepKuer.
+      if(idx===0 && u.vizAnlauf>0){
+        const zug=Math.min(1,u.vizAnlauf);
+        vx*=(1-0.55*zug); vy*=(1-0.55*zug);
+      }
     }
     const bahnR=OVAL_RY+u.bahnZ*OVAL_BAHN_ABSTAND;
     return {x:OVAL_CX+Math.cos(winkel)*OVAL_RX+vx, y:OVAL_CY+Math.sin(winkel)*bahnR+vy};
@@ -20039,6 +20106,92 @@
     if(art.spurt && typeof stepHuerden==="function"){ stepHuerden(dt,art); return; }             // Ziel 9
   }
 
+  // ================== STAFFEL: DIE FLIEGENDE UEBERGABE (stepStaffel, Ziel 6) ==================
+  // Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 5.2/7.1. Angeschlossen ueber bahnBewegung()
+  // oben, exklusiv auf art.staffel gegated (kein anderer Bahn-Achter traegt dieses Flag).
+  // DERSELBE VERTRAG WIE bahnBewegung/buehnenBewegung, WOeRTLICH: stepStaffel() schreibt
+  // AUSSCHLIESSLICH neue, praesentationale viz*-Felder auf LAEUFER-Eintraege, NIEMALS
+  // u.pos/u.aktiv/u.bahnZ/u.etappenZeit/u.wechselKonto/u.wechselVerlust/u.stolper/rennT/
+  // rennFertig/done, und ruft NIEMALS rr() auf — disziplinProbe()/miss-alle-disziplinen.mjs
+  // durchlaufen sie mit jedem Frame mit (Verifikation: bit-identische Rangtreue vor/nach
+  // dieser PR, s. PR-Beschreibung).
+  //
+  // DREI LUECKEN, MIT DER TECHNIK GESCHLOSSEN, DIE stepKuer() SCHON EINMAL VORGEMACHT HAT:
+  //
+  //  1. ANLAUF. Der naechste Laeufer stand bewegungslos in seiner Wechselzone, bis er im
+  //     selben Bild von 0 auf Volltempo sprang (aktiv=true, s. stepSpurt). u.vizAnlauf
+  //     (0..1, reine Bildschirmgroesse) zieht ihn ab ~86% des Vordermann-Abschnitts sichtbar
+  //     aus der Wartereihe — ovalPunkt() (oben, ":18889") und zeichneSpurt() (unten) lesen
+  //     es, ausschliesslich stepStaffel schreibt es. Reiner Lesezugriff auf
+  //     laufAnteil(vorgaenger); nichts an vorgaenger wird angefasst.
+  //  2. DER STAB. u.durch kippt fuer den GEBER genau einmal auf true (":19902") — NUR
+  //     GELESEN, nie geschrieben, exakt das Muster, das stepKuer() fuer u.aktuell nutzt
+  //     (":12056", "NUR gelesen, nie geschrieben"). u.wechselN waere derselbe Ausloeser
+  //     gewesen, zaehlt aber fuer GEBER UND NEHMER im selben Tick hoch (":19958") — ein
+  //     Vergleich darauf haette den Stabwechsel zweimal ausgeloest, einmal je Beteiligtem.
+  //     u.durch aendert sich nur beim Geber, deshalb hier die Wahl. u.vizDurchGesehen haelt
+  //     den Uebergang einmalig fest. Der Nehmer bekommt einen 0,55-Sekunden-Timer
+  //     (u.vizUebergabeT) plus die Geber-Id; zeichneSpurt() laesst den Stab waehrenddessen
+  //     vom Geber zum Nehmer wandern statt ihn hart springen zu lassen.
+  //  3. DER TON. TON_KATALOG.staffel steht seit PR 0.1 vollstaendig (startschuss/uebergabe/
+  //     fehlwechsel/ziel/publikum), nur nie aufgerufen — genau das Muster, mit dem
+  //     stepCypher() bereits sfx("breaking","powermove") direkt aus einer step*-Funktion
+  //     ausloest (":12225", selbst dem viz-Vertrag unterworfen). uebergabe/fehlwechsel
+  //     unterscheidet u.gestolpert: die Funktion inkrementiert es fuer den GEBER genau
+  //     einmal (":19961"), im selben stepSpurt()-Tick, in dem u.durch auf true kippt — und
+  //     bei Staffel (hindernisse:[]) ist das die EINZIGE Stelle, die u.gestolpert je
+  //     veraendert (die Huerden-Schleife, ":19730", hat bei leerem hindernisse-Array nichts
+  //     zu iterieren) — ein reiner Lesevergleich, kein zweiter Zufallszug.
+  const STAFFEL_ANLAUF_AB=0.86;       // ab wie viel Vordermann-Fortschritt der Naechste anzieht
+  const STAFFEL_UEBERGABE_DAUER=0.55; // Sekunden, die der Stab sichtbar zwischen den Haenden unterwegs ist
+  let staffelStartschussAn=false;     // rein praesentational; s. reset() fuer den N1-Fix (PR #879-Muster)
+  function stepStaffel(dt,art){
+    // STARTSCHUSS: einmal je Rennen, beim allerersten Aufruf nach bau(). Modul-Flagge statt
+    // eines Laeufer-Feldes, dasselbe Muster wie hebenPublikumAn/takeshiPublikumAn/
+    // hockeyPublikumAn — reset() setzt sie explizit zurueck (N1-Fix), sonst bliebe der
+    // Startschuss ab dem zweiten Staffel-Rennen stumm.
+    if(!staffelStartschussAn){ sfx("staffel","startschuss"); staffelStartschussAn=true; }
+    for(const u of LAEUFER){
+      if(u.vizInitDone==null){
+        u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
+        u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true;
+      }
+      // ---- 1. ANLAUF, s. Kommentar oben. Nur wer der NAECHSTE in der Wartereihe ist (sein
+      // Vordermann laeuft gerade), bekommt ein Zielwert>0; ein Laeufer, der noch zwei oder
+      // mehr Abschnitte entfernt ist, der Startlaeufer (kein Vordermann) und wer selbst schon
+      // laeuft oder fertig ist, bleiben bei 0.
+      if(!u.aktiv && u.fertig==null && !u.durch){
+        const vorgaenger=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein-1);
+        const fortschritt=vorgaenger&&vorgaenger.aktiv?laufAnteil(vorgaenger):0;
+        const ziel=fortschritt>STAFFEL_ANLAUF_AB
+          ?Math.min(1,(fortschritt-STAFFEL_ANLAUF_AB)/(1-STAFFEL_ANLAUF_AB)):0;
+        u.vizAnlauf+=(ziel-u.vizAnlauf)*(1-Math.exp(-dt/0.15));
+      } else {
+        u.vizAnlauf=0;
+      }
+      // ---- 2. DER STAB WECHSELT DIE HAND, s. Kommentar oben. `!u.vizDurchGesehen` haelt
+      // den Uebergang einmalig fest, genau wie vizAktuell es in stepKuer fuer u.aktuell tut.
+      if(u.durch && !u.vizDurchGesehen){
+        u.vizDurchGesehen=true;
+        const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        if(naechster){
+          naechster.vizUebergabeT=STAFFEL_UEBERGABE_DAUER;
+          naechster.vizUebergabeGeberId=u.id;
+          sfx("staffel", u.gestolpert>0 ? "fehlwechsel" : "uebergabe");
+        }
+      }
+      if(u.vizUebergabeT>0)u.vizUebergabeT=Math.max(0,u.vizUebergabeT-dt);
+      // ---- 3. ZIEL. Genau EIN Laeufer je Seite durchlaeuft in stepSpurt den Zielcheck (der
+      // Schlusslaeufer, Bein art.jeSeite-1) — derselbe, dessen u.fertig dort tatsaechlich NEU
+      // gesetzt wird; die uebrigen fuenf werden im selben Tick nur MITgesetzt (s. ":19979").
+      // Der Wachposten haengt deshalb am Bein, nicht an "wurde gerade fertig", sonst loest
+      // ein Sechser-Ziel den Ton sechsfach aus.
+      if(u.fertig!=null && !u.vizZielGesehen && u.bein===(art.jeSeite-1)){
+        u.vizZielGesehen=true; sfx("staffel","ziel");
+      }
+    }
+  }
+
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
   // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
@@ -20078,16 +20231,52 @@
       // WARTENDE JOGGEN NICHT AUF DER STELLE (Fund aus der 05-09-Recherche, Teil 4:
       // vx:4 liess sie sichtbar laufen, obwohl sie stehen — vx:0 nutzt das schon
       // vorhandene idle-Blatt in zeichneSprite, kein neues Asset noetig).
+      // ANLAUF, WEITER (stepStaffel, Ziel 6 M1): der wartende Naechste wechselt sichtbar
+      // von der Idle-Pose in den Laufzyklus, sobald u.vizAnlauf ueber die Haelfte seines
+      // Vorlaufs gestiegen ist -- reiner Lesezugriff auf ein Feld, das ausschliesslich
+      // stepStaffel schreibt, greift NUR bei Staffel (wartet ist sonst immer false).
+      const anlaufLaeuft=wartet && u.vizAnlauf>0.4;
       ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
       zeichneSprite(ctx,{n:u.n,id:u.id,
         // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
-        // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet.
-        vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet -- AUSSER er ist der
+        // Naechste in der Wechselzone und laut vizAnlauf schon am Anlaufen.
+        vx:u.stolper>0?0:(tg?tg.tx*4:((wartet&&!anlaufLaeuft)?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
         lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
       ctx.restore();
+      // DER STAB (A3/M-Ziel 6, DISZIPLIN_PROP.staffel/zeichneStab, s. dort): nur der
+      // AKTUELLE Traeger zeigt ihn -- im Normalfall der gerade Laufende, waehrend der
+      // 0,55-Sekunden-Uebergabe-Animation (stepStaffel, s. dort) eine Zwischenposition
+      // zwischen Geber- und Nehmerhand. Reiner Lesezugriff auf viz*-Felder, die
+      // ausschliesslich stepStaffel schreibt -- diese Zeichenfunktion selbst schreibt nichts.
+      if(BA().staffel && u.aktiv){
+        const prop=DISZIPLIN_PROP.staffel;
+        // s. Kommentar an STAFFEL_HAND: ein laufender Staffellaeufer bekommt oben immer
+        // vx:4, blickAus() liefert damit immer richtung 3 ("rechts").
+        const hp=prop.hand[3]||prop.hand[2];
+        // Derselbe Massstab (sk) und dieselbe Transform-Mitte (x,y+16), mit der die Figur
+        // gerade oben gezeichnet wurde (ctx.translate/scale-Block) -- reproduziert exakt,
+        // wohin die Hand auf dem Bildschirm gerutscht ist, ohne den Canvas-Zustand selbst
+        // dafuer erneut zu skalieren.
+        const handPunkt=(px,py,skala,punkt)=>({x:px+skala*(punkt.x-32), y:(py+16)+skala*(punkt.y-62)});
+        let stab=handPunkt(x,y,sk,hp);
+        if(u.vizUebergabeT>0 && u.vizUebergabeGeberId!=null){
+          const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
+          if(geber){
+            const gp=laeuferXY(geber);
+            const gwartet=BA().staffel && !geber.aktiv && geber.fertig==null;
+            const gsk=gwartet?sk0*0.88:sk0;
+            const ghp=prop.hand[gwartet?(geber.seite===0?3:1):3]||prop.hand[2];
+            const geberStab=handPunkt(gp.x,gp.y,gsk,ghp);
+            const t=1-u.vizUebergabeT/STAFFEL_UEBERGABE_DAUER;
+            stab={x:geberStab.x+(stab.x-geberStab.x)*t, y:geberStab.y+(stab.y-geberStab.y)*t};
+          }
+        }
+        prop.zeichne(ctx,stab.x,stab.y,sk,3,"halten");
+      }
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
       if(u.imSchatten&&u.fertig==null){
@@ -22030,6 +22219,14 @@
     // zweiten Hockey-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     hockeyPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER STAFFEL (Ziel 6, A4, Opus-Plan Abschnitt 5.2): ohne diese
+    // Zeile haelt bodenSpurtOval() die Flagge fuer "schon gestartet" und der Publikums-Loop
+    // kaeme ab dem zweiten Staffel-Rennen nie wieder -- derselbe Fehler, den PR #879 fuer
+    // Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue. staffelStartschussAn braucht denselben Reset, aus demselben Grund: sonst
+    // ertoent der Startschuss nur im allerersten Staffel-Rennen der Session.
+    staffelPublikumAn=false;
+    staffelStartschussAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
@@ -23470,6 +23667,22 @@
     // ueber jede Sample-Reihe nie > 1 sein. Reines Lesen, kein Einfluss auf die Simulation.
     cypherVizProbe:()=>TEILNEHMER.map(u=>({id:u.id,n:u.n,phase:u.vizPhase,
       r:Math.round(u.vizR),a:Math.round((u.vizA||0)*100)/100,summe:u.summe,aktuell:u.aktuell})),
+    // STAFFEL-VIZ-PROBE (Ziel 6, Opus-Plan Abschnitt 5.2/6): rein diagnostisch, wie
+    // cypherVizProbe direkt oberhalb — liest die stepStaffel()-eigenen viz*-Felder aller
+    // LAEUFER von aussen. `vizInitDoneGesetzt:false` bei EINEM Laeufer beweist bereits, dass
+    // stepStaffel() fuer das laufende Rennen noch nie aufgerufen wurde (die Lazy-Init in
+    // stepStaffel setzt es beim allerersten Durchlauf) — das ist der schaerfere, code-nahe
+    // Ton-Leck-Beweis fuer Geschwister-Bahn-Disziplinen (Takeshi/Zeitfahren/Spurt teilen
+    // sich sfx()-Klangbausteine mit Staffel bis auf die Frequenz hinaus, ein reiner
+    // Oszillator-Fingerabdruck waere dort mehrdeutig): stepStaffel() ist die EINZIGE Stelle,
+    // die sfx("staffel",...) aufruft, und sie wird ausschliesslich ueber bahnBewegung()
+    // erreicht, gegated auf art.staffel — laeuft eine andere Bahn-Disziplin, bleibt jedes
+    // vizInitDoneGesetzt hier false. Reines Lesen, kein Einfluss auf die Simulation.
+    staffelVizProbe:()=>(typeof LAEUFER!=="undefined"?LAEUFER:[]).map(u=>({
+      n:u.n, seite:u.seite, bein:u.bein, aktiv:!!u.aktiv, durch:!!u.durch,
+      vizInitDoneGesetzt:u.vizInitDone!==undefined,
+      vizAnlauf:u.vizAnlauf===undefined?null:+u.vizAnlauf.toFixed(3),
+      vizUebergabeT:u.vizUebergabeT===undefined?null:+u.vizUebergabeT.toFixed(3)})),
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
