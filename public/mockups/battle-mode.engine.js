@@ -2225,33 +2225,26 @@
   //
   // ================= TAKESHI: STARTNUMMERNBAND (Ziel 3, Plan Abschnitt 4.3, A3 20→25) ==========
   // Dritter Eintrag, diesmal ein wirklicher NEUBAU (die beiden oben registrieren nur
-  // Bestehendes). Anker ist bewusst NICHT "hand" (der Plan erlaubt das ausdruecklich, s.
-  // Kommentar oben) — Takeshi's Castle/Sasuke geben jedem Kandidaten ein Startnummernband am
-  // OBERARM, kein Handgeraet. Tabellenfeld heisst deshalb `arm`.
+  // Bestehendes). Feld heisst wie im Plan-Vertrag vorgeschrieben `hand` (s. Kommentar oben,
+  // ":2202-2205") — nur der verankerte Koerperpunkt ist ein anderer, genau wie das Beispiel
+  // dort ("z.B. der Fuss bei einer Kufe"): Takeshi's Castle/Sasuke geben jedem Kandidaten ein
+  // Startnummernband am OBERARM, kein Handgeraet, aber das Tabellenfeld bleibt `hand`, damit
+  // ein generischer `.hand`-Leser Takeshi nicht stillschweigend uebergeht (Review-Fund
+  // 12.09.: mit einem eigenen Feldnamen `arm` funktionierte es nur zufaellig, weil beide
+  // heutigen Konsumenten den Schluessel hartkodieren).
   //
-  // ABWEICHUNG VOM PIXELSCAN-VERFAHREN, OFFEN AUSGEWIESEN: HEBEN_HAND/HOCKEY_HAND sind per
-  // window.__arena.renderProbe(...) an der echten Sprite-Alphakontur in einer Browser-Session
-  // ausgemessen (s. Kommentar oben, "nicht schaetzen"). Diese Session hat keinen Browser/kein
-  // Canvas (headless), ein Pixelscan war hier nicht durchfuehrbar. Statt einen Fantasiewert
-  // auf die 0..63-Zellkoordinate des body_walk-Sprites zu raten, verankert `TAKESHI_ARM`
-  // deshalb an einem GANZ ANDEREN, bereits vermessenen Punkt: dem (x,y)-Ankerpunkt, den der
-  // Bahn-Zeichenpfad fuer JEDEN Laeufer ohnehin benutzt (Schatten bei y+16, Kraftreserve-
-  // Balken bei y+20, s. dort) — kleine, konservative Pixel-Offsets relativ dazu, keine
-  // Vermessung einer fremden Kontur. Fehlt also die uebliche Beweisbild-Datei; das ist eine
-  // ANNAEHERUNG, nicht der Pixelscan-Beweis der beiden Eintraege oben, und braucht bei der
-  // ersten echten Browser-Review dieselbe Beweisbild-Nachlieferung wie
-  // docs/design/sprite-handpunkte-beweis-gewichtheben.png (s. PR-Beschreibung).
-  //
-  // `s` (der dritte zeichne()-Parameter) ist hier bewusst NICHT der interne
-  // groesseFaktor()-Z der Kampf-Sprites, sondern ein kleiner, fester Massstab — der Aufrufer
-  // (Bahn-Zeichenpfad, s. dort) sitzt bereits INNERHALB des per-Laeufer ctx.scale(sk,...)-
-  // Blocks (M4-Posen, selbe PR), das Band skaliert also automatisch mit dem Zoom der Kamera
-  // mit, ohne einen zweiten Skalierungsfaktor durchzureichen.
-  const TAKESHI_ARM=[
-    {x:7, y:-3},  // hinten
-    {x:-8,y:-2},  // links (Profil, kameranaher Oberarm)
-    {x:-7,y:-3},  // vorn
-    {x:8, y:-2},  // rechts (Profil, kameranaher Oberarm)
+  // Per Pixelscan der Sprite-Alphakontur vermessen — window.__arena.renderProbe("takeshi"-
+  // Laeufer, body_walk, 64px-Zellraster) in einer echten Browser-Session (Review 12.09.,
+  // nachdem der urspruenglich hier geschaetzte Anker um 5-7px zu tief lag, genau auf dem am
+  // Sprite bereits gezeichneten Gueertel mit Schnalle statt am Oberarm). Schulter bei y=32,
+  // Armende/Hand bei y=49-50, Oberarm (25 % zwischen beiden) bei y=36-39 je Richtung.
+  // Beweisbild: docs/design/sprite-armpunkte-beweis-takeshi.png. Reihenfolge wie blickAus():
+  // 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const TAKESHI_HAND=[
+    {x:43,y:36}, // hinten
+    {x:26,y:37}, // links
+    {x:20,y:37}, // vorn
+    {x:37,y:37}, // rechts
   ];
   // Neigung des Bands je Zustand — nutzt dieselben vier stepParcours()-Zustaende, an die es
   // ohnehin gebunden ist (kein fuenfter Zustand extra fuers Band): im Sturz haengt es schief,
@@ -2262,11 +2255,13 @@
     sturz:         {neigung:0.45},
     aufrappeln:    {neigung:0.20},
   };
-  // x/y ist der Bandmittelpunkt (aus TAKESHI_ARM, bereits auf den Laeufer-Ankerpunkt
-  // umgerechnet, s. Aufrufstelle), s ein kleiner fester Massstab (s. Kommentar oben), richtung
-  // 0..3 wie blickAus(), phase einer der vier TAKESHI_PHASEN-Schluessel (unbekannt faellt auf
-  // "laufen" zurueck, dasselbe Sicherheitsnetz wie bei zeichneHantel/-Hockeyschlaeger), nummer
-  // die anzuzeigende Startnummer (rein praesentational, aus u.id).
+  // x/y ist der Bandmittelpunkt (aus TAKESHI_HAND, bereits ueber dieselbe x-32*Z+cx*Z-Formel
+  // wie HOCKEY_HAND/HEBEN_HAND auf den Bildschirm umgerechnet, s. Aufrufstelle), s ist DIESES
+  // Z (nicht mehr ein fester Wert, Review-Fund 12.09.: ohne Z-Skalierung driftete das Band
+  // 5-10px je nach Laeufergroesse), richtung 0..3 wie blickAus(), phase einer der vier
+  // TAKESHI_PHASEN-Schluessel (unbekannt faellt auf "laufen" zurueck, dasselbe Sicherheitsnetz
+  // wie bei zeichneHantel/-Hockeyschlaeger), nummer die anzuzeigende Startnummer (rein
+  // praesentational, aus u.id).
   function zeichneStartnummer(ctx,x,y,s,richtung,phase,nummer){
     const p=TAKESHI_PHASEN[phase]||TAKESHI_PHASEN.laufen;
     const seite=(richtung===1||richtung===0)?-1:1; // links/hinten kippt anders als rechts/vorn
@@ -2281,9 +2276,9 @@
     ctx.restore();
   }
   const DISZIPLIN_PROP={
-    gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
-    takeshi:     { arm:TAKESHI_ARM,  phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
-    hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
+    gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
+    takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
+    hockey:      { hand:HOCKEY_HAND,  phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -20222,16 +20217,22 @@
       // zeichneSprite()-Aufruf direkt darunter, damit Band und Laeufer nie auseinanderlaufen.
       const parcRicht=parcTakeshi
         ? blickAus({vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)),vy:tg?tg.ty*4:0,side:u.seite}) : 0;
-      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel)ctx.rotate(parcTaumel);
-      ctx.scale(sk,sk*parcDuck); ctx.translate(-x,-(y+16));
-      zeichneSprite(ctx,{n:u.n,id:u.id,
+      // Sprite-Argumentobjekt in einer Variablen (statt inline wie zuvor), weil das
+      // Startnummernband unten DIESELBE Z-Formel braucht, die zeichneSprite() intern fuer
+      // GENAU dieses Objekt berechnet (Review-Fund 12.09.: ohne sie driftete das Band 5-10px
+      // je nach Laeufergroesse) — Wiederverwendung statt einer zweiten, potenziell
+      // abweichenden Berechnung.
+      const parcSpriteArg={n:u.n,id:u.id,
         // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet.
         vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel)ctx.rotate(parcTaumel);
+      ctx.scale(sk,sk*parcDuck); ctx.translate(-x,-(y+16));
+      zeichneSprite(ctx,parcSpriteArg,x,y);
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -20239,9 +20240,21 @@
       // Schleife, ein zusaetzliches Band dort waere nur Rauschen. Sitzt INNERHALB desselben
       // ctx.save/scale/restore-Blocks wie der Laeufer selbst, erbt also Position, Kamera-Zoom
       // und den Taumel-/Duck-Ausschlag der M4-Posen automatisch mit.
+      //
+      // ANKERFORMEL WIE HOCKEY/HEBEN (Review-Fund 12.09., zuvor bei :3011/:3026 kopiert,
+      // s. Kommentar dort "eine Zellkoordinate (cx,cy) liegt auf dem Bildschirm bei
+      // x-32*Z+cx*Z und y-46*Z+cy*Z"): Z ist derselbe Faktor, den zeichneSprite() intern fuer
+      // parcSpriteArg berechnet (groesseFaktor*hoehenKorrektur*bauSkala) — hier repliziert,
+      // weil der Aufruf ausserhalb von zeichneSprite liegt und dessen internes Z nicht
+      // zurueckgibt. groesseFaktor(parcSpriteArg.groesse) ist fuer Bahn-Laeufer immer 1
+      // (kein `.groesse`-Feld gesetzt), bleibt aber Teil der Formel fuer den Fall, dass sich
+      // das aendert.
       if(parcTakeshi&&u.fertig==null){
-        const prop=DISZIPLIN_PROP.takeshi, ap=prop.arm[parcRicht]||prop.arm[2];
-        prop.zeichne(ctx,x+ap.x,y+ap.y,1,parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
+        const prop=DISZIPLIN_PROP.takeshi, hp=prop.hand[parcRicht]||prop.hand[2];
+        const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
+          *bauSkala(BAU[u.n]||BAU_STD);
+        prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,
+          parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
       }
       ctx.restore();
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
