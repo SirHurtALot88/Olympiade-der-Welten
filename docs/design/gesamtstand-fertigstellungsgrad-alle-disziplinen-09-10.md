@@ -91,7 +91,7 @@ Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kader
 | 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
 | 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
-| 7 | Speed-Schach | Buehne | 80 % | 75 % | 100 % | 80 % | **84 %** | 0,908 | ja | unveraendert seit 07.09. |
+| 7 | Speed-Schach | Buehne | 95 % | 95 % | 100 % | 95 % | **96 %** | 0,908 | ja | **12.09.** Konzept/Assets/Movement 80/75/80→95 — eigenes Fable-Dokument, Ton, Schachuhr-Requisite, `stepSchach()` (PR #902) |
 | 8 | Staffel | Bahn | 95 % | 55 % | 97 % | 70 % | **79 %** | 0,915 | nein | 10.09. Bahn-Produktivierung (PR #880) |
 | 9 | Football | Feldspiel | 90 % | 75 % | 65 % | 85 % | **79 %** | 0,800 | nein | 10.09. Rezept Runde 1, rho 0,516→0,800 (PR #884) · **E3 in Pruefung** (Anzeige-Korrektur, PR #894, NICHT gemergt — wartet auf Chris) |
 | 10 | Time-Trial | Bahn | 95 % | 45 % | 92 % | 50 % | **71 %** | 0,828 | nein | 10.09. Bahn-Produktivierung (PR #880) |
@@ -185,18 +185,24 @@ entschieden und gemessen (`HEBEN_TAGESMAX_ANSAGE_K`, rho 0,720 → 0,887).
 **Movement 87:** Versuchs-Zustandsmaschine plus eigenes Bild; M2 fehlt weiterhin — keine eigene
 Hebe-Zustandsmaschine, `hebePhase()` liest nur den Fortschrittsbalken.
 
-### Speed-Schach — 84 % (80/75/100/80)
-**Konzept 80:** `duell:true` + `schach:true`, Brett-gegen-Brett mit laufendem Vorteil je Zug,
-Fokus-Brett mit Pin (`schachPin`). **Aber kein eigenes Fable-Recherche-Dokument** — der Entwurf
-steht in `takeshi-schach-optik-gameplay-plan-05-09.md` Teil A und in
-`arena-duell-recherche-fable.md` Abschnitt 4, beide geteilt mit anderen Disziplinen; K3 daher nur
-teilweise.
-**Assets 75:** `schach.tsx` (473 Z., 18 Animationsstellen) und `zeichneSchach()` (`:12333`, 227 Z.,
-Fokus-Brett, Uhren, Bewertungsbalken).
+### Speed-Schach — 96 % (95/95/100/95)
+**12.09. Update:** Konzept/Assets/Movement 80/75/80→95 (PR #902, PRODUKTIONSCODE, Opus-Review
+FREIGEBEN). Alle drei Luecken auf einmal geschlossen — keine davon war Forschung.
+**Konzept 95:** neues eigenstaendiges Fable-Recherche-Dokument
+(`docs/design/speed-schach-fable-recherche-12-09.md`) — Blitzschach als Mannschaftsdisziplin
+(FIDE-Schacholympiade, Bundesliga/4NCL, World Team Rapid & Blitz Championships 2026),
+Brett-vs-Mannschaftspunkte, Zeitnot-Schwellenwert bei 10-30s Restzeit. Loest damit auch die K3-
+Luecke, die bisher geteilt in `takeshi-schach-optik-gameplay-plan-05-09.md` Teil A und
+`arena-duell-recherche-fable.md` Abschnitt 4 steckte.
+**Assets 95:** `TON_KATALOG.speed-schach` (seit PR 0.1) jetzt verdrahtet (zug/schlag/uhr/matt/
+Publikum, mit N1-Loop-Reset), dritter `DISZIPLIN_PROP`-Eintrag (Schachuhr an der Hand, per
+Pixelscan gemessen, unabhaengig von der Review nachgemessen und bestaetigt).
 **Gameplay 100:** rho **0,908** (zweitbeste im Feld), produktiviert, eigene `wertungTabelle`
-mit „Brett"/„Stark"/„Zeit−".
-**Movement 80:** eigene Szene, aber die Zugfolge auf dem Brett ist ausdruecklich „eine plausible
-Zugfolge" (Kommentar `:10788`), keine Schach-Logik.
+mit „Brett"/„Stark"/„Zeit−" — unveraendert.
+**Movement 95:** `stepSchach()` als vierter Zweig in `buehnenBewegung()` — Figuren gleiten am
+Fokus-Brett statt zu springen, Schachuhr tickt exponentiell statt in Spruengen, Hand schlaegt
+sichtbar auf den Knopf. Die Zugfolge selbst bleibt bewusst „eine plausible Zugfolge" (Kommentar
+`:10788`), keine Schach-Engine — das war nie Teil des Auftrags.
 
 ### Eiskunstlauf — 87 % (90/70/95/94)
 **10.09. Update:** Movement 60→94 (PR #874, PRODUKTIONSCODE, Opus-Review FREIGEBEN MIT NACHTRAG).
