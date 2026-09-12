@@ -90,12 +90,24 @@ await seite.addInitScript(() => {
     return osc;
   };
 
+  // WICHTIG: haengt sich an die Zielseite (dest instanceof BiquadFilterNode), nicht an den
+  // Filter selbst — sonst verwechselt die Sonde tonMetall() (zwei QUADRAT-Oszillatoren durch
+  // ein Bandpass-Filter, s. TON_KATALOG-Baustein 3/5) mit tonRauschen() (ein RAUSCH-Buffer
+  // durch ein Bandpass-Filter, Baustein 4/5) — beide sind vom Filtertyp/Frequenz allein nicht
+  // zu unterscheiden, wenn zufaellig dieselbe Frequenz gewaehlt wurde (genau das passierte:
+  // speed-schachs "schlag" nutzt tonMetall(...,700,...), kollidierte mit sturz' tonRauschen
+  // (...,700,...) im ersten Fassungsversuch dieser Sonde). `quelle` haelt fest, ob ein
+  // Oszillator oder ein Buffer-Rauschen in den Filter gespeist wird.
   const origConnect = AudioNode.prototype.connect;
-  AudioNode.prototype.connect = function (...args) {
-    if (typeof BiquadFilterNode !== "undefined" && this instanceof BiquadFilterNode) {
-      window.__filterLog.push({ ftype: this.type, freq: Math.round(this.frequency.value) });
+  AudioNode.prototype.connect = function (dest, ...rest) {
+    if (typeof BiquadFilterNode !== "undefined" && dest instanceof BiquadFilterNode) {
+      const quelle =
+        (typeof OscillatorNode !== "undefined" && this instanceof OscillatorNode) ? "osc" :
+        (typeof AudioBufferSourceNode !== "undefined" && this instanceof AudioBufferSourceNode) ? "buf" :
+        "andere";
+      window.__filterLog.push({ ftype: dest.type, freq: Math.round(dest.frequency.value), quelle });
     }
-    return origConnect.apply(this, args);
+    return origConnect.call(this, dest, ...rest);
   };
 
   const origBuf = AudioContext.prototype.createBufferSource;
@@ -201,13 +213,13 @@ const nahe = (f, ziel, tol) => Math.abs(f - ziel) <= tol;
 const sprungTreffer = log1.filter((e) => e.wave === "sine" && e.f1 != null && e.f1 > e.f0).length;
 // kufe: tonKlick(vol,3200,...) -> highpass 3200. Naechster Nachbar: fechten klingen 3000
 // (Abstand 200), speed-schach uhr 3400 (Abstand 200).
-const kufeTreffer = filt1.filter((e) => e.ftype === "highpass" && nahe(e.freq, 3200, 20)).length;
+const kufeTreffer = filt1.filter((e) => e.quelle === "buf" && e.ftype === "highpass" && nahe(e.freq, 3200, 20)).length;
 // landung (Klick-Anteil): tonKlick(vol*0.8,2600,...) -> highpass 2600. Naechster Nachbar:
 // breaking freeze 2400 (Abstand 200).
-const landungTreffer = filt1.filter((e) => e.ftype === "highpass" && nahe(e.freq, 2600, 20)).length;
+const landungTreffer = filt1.filter((e) => e.quelle === "buf" && e.ftype === "highpass" && nahe(e.freq, 2600, 20)).length;
 // sturz (Rauschen-Anteil): tonRauschen(vol*0.5,700,...) -> bandpass 700. Naechster Nachbar:
 // gewichtheben scheiben_fall 280 (Abstand 420), breaking powermove 1600 (Abstand 900).
-const sturzTreffer = filt1.filter((e) => e.ftype === "bandpass" && nahe(e.freq, 700, 20)).length;
+const sturzTreffer = filt1.filter((e) => e.quelle === "buf" && e.ftype === "bandpass" && nahe(e.freq, 700, 20)).length;
 
 console.log("TEIL C — Ein-Schuss-Ereignisse waehrend eines echten 4x-Kuer-Laufs (15 s Wallclock):");
 console.log("  sprung  (einziger steigender Sinus im Katalog): " + sprungTreffer + " Treffer");
@@ -248,10 +260,10 @@ for (const d of GESCHWISTER) {
   const log = await seite.evaluate(() => window.__oscLog.slice());
   const filt = await seite.evaluate(() => window.__filterLog.slice());
   const sprung = log.filter((e) => e.wave === "sine" && e.f1 != null && e.f1 > e.f0).length;
-  const kufe = filt.filter((e) => e.ftype === "highpass" && nahe(e.freq, 3200, 20)).length;
-  const landung = filt.filter((e) => e.ftype === "highpass" && nahe(e.freq, 2600, 20)).length;
-  const sturz = filt.filter((e) => e.ftype === "bandpass" && nahe(e.freq, 700, 20)).length;
-  const publikum = filt.filter((e) => e.ftype === "bandpass" && nahe(e.freq, 450, 15)).length;
+  const kufe = filt.filter((e) => e.quelle === "buf" && e.ftype === "highpass" && nahe(e.freq, 3200, 20)).length;
+  const landung = filt.filter((e) => e.quelle === "buf" && e.ftype === "highpass" && nahe(e.freq, 2600, 20)).length;
+  const sturz = filt.filter((e) => e.quelle === "buf" && e.ftype === "bandpass" && nahe(e.freq, 700, 20)).length;
+  const publikum = filt.filter((e) => e.quelle === "buf" && e.ftype === "bandpass" && nahe(e.freq, 450, 15)).length;
   const summe = sprung + kufe + landung + sturz + publikum;
   leckErgebnisse.push({ d, sprung, kufe, landung, sturz, publikum, summe });
   await seite.click("#reset");
