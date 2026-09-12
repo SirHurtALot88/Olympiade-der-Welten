@@ -2273,9 +2273,63 @@
   // beiden Ad-hoc-Muster passt (andere Phasen-Schluessel, `zeichne` ohne den vierten
   // `extra`-Parameter). zeichneHantel()/zeichneHockeyschlaeger() selbst sind NICHT veraendert
   // — die Tabelle referenziert exakt dieselben Funktions-/Datenobjekte, keine Kopien.
+  //
+  // ================= TAKESHI: STARTNUMMERNBAND (Ziel 3, Plan Abschnitt 4.3, A3 20→25) ==========
+  // Dritter Eintrag, diesmal ein wirklicher NEUBAU (die beiden oben registrieren nur
+  // Bestehendes). Feld heisst wie im Plan-Vertrag vorgeschrieben `hand` (s. Kommentar oben,
+  // ":2202-2205") — nur der verankerte Koerperpunkt ist ein anderer, genau wie das Beispiel
+  // dort ("z.B. der Fuss bei einer Kufe"): Takeshi's Castle/Sasuke geben jedem Kandidaten ein
+  // Startnummernband am OBERARM, kein Handgeraet, aber das Tabellenfeld bleibt `hand`, damit
+  // ein generischer `.hand`-Leser Takeshi nicht stillschweigend uebergeht (Review-Fund
+  // 12.09.: mit einem eigenen Feldnamen `arm` funktionierte es nur zufaellig, weil beide
+  // heutigen Konsumenten den Schluessel hartkodieren).
+  //
+  // Per Pixelscan der Sprite-Alphakontur vermessen — window.__arena.renderProbe("takeshi"-
+  // Laeufer, body_walk, 64px-Zellraster) in einer echten Browser-Session (Review 12.09.,
+  // nachdem der urspruenglich hier geschaetzte Anker um 5-7px zu tief lag, genau auf dem am
+  // Sprite bereits gezeichneten Gueertel mit Schnalle statt am Oberarm). Schulter bei y=32,
+  // Armende/Hand bei y=49-50, Oberarm (25 % zwischen beiden) bei y=36-39 je Richtung.
+  // Beweisbild: docs/design/sprite-armpunkte-beweis-takeshi.png. Reihenfolge wie blickAus():
+  // 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const TAKESHI_HAND=[
+    {x:43,y:36}, // hinten
+    {x:26,y:37}, // links
+    {x:20,y:37}, // vorn
+    {x:37,y:37}, // rechts
+  ];
+  // Neigung des Bands je Zustand — nutzt dieselben vier stepParcours()-Zustaende, an die es
+  // ohnehin gebunden ist (kein fuenfter Zustand extra fuers Band): im Sturz haengt es schief,
+  // beim Aufrappeln schwingt es sich wieder ein.
+  const TAKESHI_PHASEN={
+    laufen:        {neigung:0.05},
+    fallenkontakt: {neigung:0.12},
+    sturz:         {neigung:0.45},
+    aufrappeln:    {neigung:0.20},
+  };
+  // x/y ist der Bandmittelpunkt (aus TAKESHI_HAND, bereits ueber dieselbe x-32*Z+cx*Z-Formel
+  // wie HOCKEY_HAND/HEBEN_HAND auf den Bildschirm umgerechnet, s. Aufrufstelle), s ist DIESES
+  // Z (nicht mehr ein fester Wert, Review-Fund 12.09.: ohne Z-Skalierung driftete das Band
+  // 5-10px je nach Laeufergroesse), richtung 0..3 wie blickAus(), phase einer der vier
+  // TAKESHI_PHASEN-Schluessel (unbekannt faellt auf "laufen" zurueck, dasselbe Sicherheitsnetz
+  // wie bei zeichneHantel/-Hockeyschlaeger), nummer die anzuzeigende Startnummer (rein
+  // praesentational, aus u.id).
+  function zeichneStartnummer(ctx,x,y,s,richtung,phase,nummer){
+    const p=TAKESHI_PHASEN[phase]||TAKESHI_PHASEN.laufen;
+    const seite=(richtung===1||richtung===0)?-1:1; // links/hinten kippt anders als rechts/vorn
+    ctx.save(); ctx.translate(x,y); ctx.rotate(p.neigung*seite);
+    ctx.fillStyle="#e8c34a"; ctx.strokeStyle="rgba(20,16,4,.55)"; ctx.lineWidth=Math.max(0.6,0.8*s);
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-4*s,-3*s,8*s,6*s,1.3*s); else ctx.rect(-4*s,-3*s,8*s,6*s);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#241d09"; ctx.font=Math.max(5,5*s).toFixed(1)+"px 'IBM Plex Mono',monospace";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(String(nummer??""),0,0.4*s);
+    ctx.restore();
+  }
   const DISZIPLIN_PROP={
-    gewichtheben:{ hand:HEBEN_HAND,  phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
-    hockey:      { hand:HOCKEY_HAND, phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
+    gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
+    takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
+    hockey:      { hand:HOCKEY_HAND,  phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
     // DRITTER EINTRAG (Ziel 5, Opus-Plan 09-10 Abschnitt 5.1, A3 20->25, 12.09.): die
     // Schachuhr, s. SCHACH_HAND/SCHACH_UHR_PHASEN/zeichneSchachuhr oben. Aufrufstelle wie
     // bei den zwei bestehenden Eintraegen, s. istSchach()-Block unten bei zeichneSprite.
@@ -20246,6 +20300,64 @@
     if(art.spurt && typeof stepHuerden==="function"){ stepHuerden(dt,art); return; }             // Ziel 9
   }
 
+  // ================= stepParcours(): DER LAEUFER SELBST REAGIERT (Ziel 3, Opus-Plan =========
+  // Zehn-Disziplinen 10.09., Abschnitt 4.3, M2). Bisher reagierte an einer Falle sichtbar nur
+  // die Falle (zeichneFalleTakeshi, Ticker, schwebende Texte) — der Laeufer selbst lief mit
+  // unveraendertem Schrittzyklus weiter, auch waehrend er festhing oder gerade lag. Diese
+  // Funktion liest AUSSCHLIESSLICH Felder, die stepSpurt() (oben, `:19486ff`) laengst schreibt
+  // und die schon VOR dieser PR fuer die eigentliche Simulation galten (`u.huerde`, `u.stolper`,
+  // `u.fallen[].aus`, `u.raus`) — genau der "NUR gelesen, nie geschrieben"-Vertrag, den
+  // stepKuer() fuer u.aktuell/u.summe vormacht (s. Kommentar dort, `:12013`). Geschrieben
+  // werden nur NEUE, praesentationale `viz*`-Felder: kein `rr()`, kein `u.pos`, keine
+  // Ruecklesung durch `MOTOREN["takeshis-castle"].wert()` — derselbe Vertrag wie
+  // `buehnenBewegung()` (`:11870-11878`) und `bahnBewegung()` selbst (Kommentar oben, `:20020`).
+  //
+  // ZUSTAENDE, alle aus vorhandenen Daten abgeleitet (Plan-Wortlaut):
+  //   laufen         -- Normalzustand, weder Falle noch Sturz.
+  //   fallenkontakt  -- u.huerde>0: der Laeufer haengt gerade in einer Falle (Zeitpreis
+  //                     laeuft, egal ob es am Ende sauber, mit Durchbruch oder als Sturz
+  //                     endet). u.vizFalleTyp haelt fest WELCHE (aus u.fallen[].typ), fuer M4.
+  //   sturz          -- die Falle endete als echter Sturz (u.fallen[].aus==='sturz'), solange
+  //                     der physische Stolper-Malus (u.stolper) laeuft. `durchbruch` (WUCHT
+  //                     gelingt, kurzer u.stolper) zaehlt bewusst NICHT als Sturz -- das ist
+  //                     Muskel, kein Fallen, s. BAHN_ART-Kommentar "durchgebrochen" `:19708`.
+  //   aufrappeln     -- rein kosmetischer Nachlauf, sobald u.stolper physisch abgelaufen ist:
+  //                     ohne ihn sprang die Figur im selben Bild von "liegt" auf "rennt voll",
+  //                     was bei einer Sturzdisziplin unglaubwuerdig aussah. `vizAufrappelnT`
+  //                     ist ein NEUER, rein visueller Timer -- er verlaengert nichts an der
+  //                     Simulation (die laeuft ab `u.stolper<=0` bereits mit vollem Tempo
+  //                     weiter, s. tempoVon `:19372`), nur die Anzeige zeigt kurz ein Taumeln.
+  //   ausgeschieden  -- u.raus (die bestehende Nerven-Ausscheide-Bedingung, `:19749-19769`,
+  //                     im Rezept-Kommentar "wer dreimal faellt, ist raus" beschrieben, `:18350`
+  //                     -- ein Zaehler dafuer ist nicht noetig, u.raus deckt es ab).
+  //
+  // Kein init-Block in der LAEUFER-Fabrik noetig: wie u.vizSpur bei stepKuer (`:12033`)
+  // initialisiert sich jedes Feld beim ersten Bild dieser Funktion selbst.
+  const PARCOURS_AUFRAPPELN_T=0.35;
+  function stepParcours(dt,art){
+    for(const u of LAEUFER){
+      if(u.vizZustand==null){ u.vizZustand="laufen"; u.vizFalleTyp=null; u.vizAufrappelnT=0; }
+      if(u.raus){ u.vizZustand="ausgeschieden"; continue; }
+      if(u.fertig!=null){ u.vizZustand="laufen"; u.vizFalleTyp=null; continue; }
+      const letzteFalle=(u.fallen&&u.fallen.length)?u.fallen[u.fallen.length-1]:null;
+      if(u.stolper>0 && letzteFalle && letzteFalle.aus==="sturz"){
+        u.vizZustand="sturz"; u.vizFalleTyp=letzteFalle.typ; u.vizAufrappelnT=PARCOURS_AUFRAPPELN_T;
+      } else if(u.vizZustand==="sturz"){
+        // u.stolper ist in diesem Bild abgelaufen -- physisch rennt die Figur schon wieder
+        // voll (s. Kommentar oben), der Uebergang bleibt rein kosmetisch beim Taumeln.
+        u.vizZustand="aufrappeln";
+      } else if(u.vizZustand==="aufrappeln"){
+        u.vizAufrappelnT=Math.max(0,u.vizAufrappelnT-dt);
+        if(u.vizAufrappelnT<=0){ u.vizZustand="laufen"; u.vizFalleTyp=null; }
+      } else if(u.huerde>0){
+        u.vizZustand="fallenkontakt";
+        if(letzteFalle)u.vizFalleTyp=letzteFalle.typ;
+      } else {
+        u.vizZustand="laufen"; u.vizFalleTyp=null;
+      }
+    }
+  }
+
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
   // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
@@ -20285,15 +20397,72 @@
       // WARTENDE JOGGEN NICHT AUF DER STELLE (Fund aus der 05-09-Recherche, Teil 4:
       // vx:4 liess sie sichtbar laufen, obwohl sie stehen — vx:0 nutzt das schon
       // vorhandene idle-Blatt in zeichneSprite, kein neues Asset noetig).
-      ctx.save(); ctx.translate(x,y+16); ctx.scale(sk,sk); ctx.translate(-x,-(y+16));
-      zeichneSprite(ctx,{n:u.n,id:u.id,
+      //
+      // TAKESHI M4-POSEN (Ziel 3, Plan Abschnitt 4.3): drei zusaetzliche Haltungen, gesteuert
+      // ausschliesslich ueber die neuen viz*-Felder aus stepParcours() -- rein praesentational,
+      // nichts hier fliesst in tempoVon()/rr()/MOTOREN["takeshis-castle"].wert() zurueck. Fuer
+      // jede andere Bahn ist u.vizZustand/u.vizFalleTyp/u.vizAufrappelnT undefined, alle drei
+      // Werte bleiben also bei ihrem Neutralwert (0/1/0) und der Zeichenpfad bit-identisch.
+      const parcTakeshi=BA().takeshi;
+      // SPRUNG UEBER DIE HUERDE: waehrend u.huerde laeuft, ein kurzer Bogen nach oben --
+      // Fortschritt aus dem Verhaeltnis von noch verbleibendem u.huerde zur vollen Preis-Dauer
+      // (BA().huerdePreis), sinusfoermig 0 -> Scheitel -> 0 (Absprung/Landung), NICHT fuer die
+      // STEHEN-Fallen (s. parcDuck direkt darunter -- dort wird geduckt, nicht gehopst).
+      const parcHop=(parcTakeshi&&u.vizZustand==="fallenkontakt"&&u.vizFalleTyp!=="STEHEN"&&u.huerde>0)
+        ? Math.sin(Math.PI*Math.min(1,1-u.huerde/(BA().huerdePreis||0.8)))*7*sk0 : 0;
+      // GEBUECKT IM SCHLAMM: STEHEN ist im Fallenkatalog Bridge Ball/Schlamm
+      // (`fallenBild.STEHEN`, `:18456`) -- der einzige Fallentyp, an dem der Plan ausdruecklich
+      // eine Duckhaltung statt eines Sprungs will (waten/robben statt hopsen).
+      const parcDuck=(parcTakeshi&&u.vizZustand==="fallenkontakt"&&u.vizFalleTyp==="STEHEN")?0.82:1;
+      // TAUMELN NACH DEM STURZ: u.vizAufrappelnT (stepParcours) laeuft rein kosmetisch aus,
+      // NACHDEM u.stolper (der physische Malus) schon bei 0 ist -- ein abklingendes Schlingern
+      // statt des harten Schnitts "liegt" -> "rennt wie frisch" (u.down ist zu diesem Zeitpunkt
+      // laengst false, s. down:u.stolper>0 unten).
+      const parcTaumel=(parcTakeshi&&u.vizZustand==="aufrappeln")
+        ? Math.sin(t*16+u.id)*0.10*(u.vizAufrappelnT/PARCOURS_AUFRAPPELN_T) : 0;
+      // Richtung fuer das Startnummernband unten -- dieselbe blickAus()-Eingabe wie der
+      // zeichneSprite()-Aufruf direkt darunter, damit Band und Laeufer nie auseinanderlaufen.
+      const parcRicht=parcTakeshi
+        ? blickAus({vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)),vy:tg?tg.ty*4:0,side:u.seite}) : 0;
+      // Sprite-Argumentobjekt in einer Variablen (statt inline wie zuvor), weil das
+      // Startnummernband unten DIESELBE Z-Formel braucht, die zeichneSprite() intern fuer
+      // GENAU dieses Objekt berechnet (Review-Fund 12.09.: ohne sie driftete das Band 5-10px
+      // je nach Laeufergroesse) — Wiederverwendung statt einer zweiten, potenziell
+      // abweichenden Berechnung.
+      const parcSpriteArg={n:u.n,id:u.id,
         // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet.
         vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel)ctx.rotate(parcTaumel);
+      ctx.scale(sk,sk*parcDuck); ctx.translate(-x,-(y+16));
+      zeichneSprite(ctx,parcSpriteArg,x,y);
+      // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
+      // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
+      // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
+      // ohnehin schon eine eigene Platz-/"ausgeschieden"-Zeile, s. weiter unten in dieser
+      // Schleife, ein zusaetzliches Band dort waere nur Rauschen. Sitzt INNERHALB desselben
+      // ctx.save/scale/restore-Blocks wie der Laeufer selbst, erbt also Position, Kamera-Zoom
+      // und den Taumel-/Duck-Ausschlag der M4-Posen automatisch mit.
+      //
+      // ANKERFORMEL WIE HOCKEY/HEBEN (Review-Fund 12.09., zuvor bei :3011/:3026 kopiert,
+      // s. Kommentar dort "eine Zellkoordinate (cx,cy) liegt auf dem Bildschirm bei
+      // x-32*Z+cx*Z und y-46*Z+cy*Z"): Z ist derselbe Faktor, den zeichneSprite() intern fuer
+      // parcSpriteArg berechnet (groesseFaktor*hoehenKorrektur*bauSkala) — hier repliziert,
+      // weil der Aufruf ausserhalb von zeichneSprite liegt und dessen internes Z nicht
+      // zurueckgibt. groesseFaktor(parcSpriteArg.groesse) ist fuer Bahn-Laeufer immer 1
+      // (kein `.groesse`-Feld gesetzt), bleibt aber Teil der Formel fuer den Fall, dass sich
+      // das aendert.
+      if(parcTakeshi&&u.fertig==null){
+        const prop=DISZIPLIN_PROP.takeshi, hp=prop.hand[parcRicht]||prop.hand[2];
+        const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
+          *bauSkala(BAU[u.n]||BAU_STD);
+        prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,
+          parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
+      }
       ctx.restore();
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
