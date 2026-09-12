@@ -20198,6 +20198,24 @@
   // Violett: es darf mit keiner Farbe verwechselbar sein, die auf der Bahn schon etwas
   // bedeutet — Team-Orange/Cyan (Namen), Gruen/Orange/Rot (Reserve), Blau (Sog).
   const ANSAGE_FARBE="#b98cff";
+  // WELCHE RICHTUNG ZEIGT DIESER STAFFELLAEUFER GERADE (fuer den Stab, s. DISZIPLIN_PROP.
+  // staffel/zeichneStab weiter unten)? Review-Fund an PR #901 (Befund 2): der Nehmer wurde
+  // beim Uebergabe-Ausschnitt hart auf Richtung 3 ("rechts") gezeichnet, weil "ein laufender
+  // Staffellaeufer bekommt immer vx:4" nur fuer den Normalfall stimmt. GENAU IN DER
+  // Uebergabe-Animation ist das falsch: stepSpurt() setzt `naechster.stolper=verlust` im
+  // selben Tick wie `naechster.aktiv=true` (s. dort), und der zeichneSprite()-Aufruf unten
+  // liest bei `u.stolper>0` `vx:0` -- blickAus() faellt dann auf `u.side===0?3:1` zurueck,
+  // fuer Seite 1 also Richtung 1 ("links"), nicht 3. Diese Funktion bildet EXAKT dieselbe
+  // vx-Bedingung wie am zeichneSprite()-Aufruf ab (minus `tg`, das fuer Staffel/istOval()
+  // immer null ist -- die Tangente gilt nur auf Takeshis Route), damit Koerperpose und
+  // Stab-Handpunkt nie auseinanderlaufen, unabhaengig davon, ob `o` die Schleifenvariable
+  // (der aktuelle Traeger) oder ein per LAEUFER.find() nachgeschlagener Geber ist.
+  function staffelBlickRichtung(o){
+    const owartet=!o.aktiv && o.fertig==null;
+    const oAnlaufLaeuft=owartet && o.vizAnlauf>0.4;
+    const ovx=o.stolper>0?0:((owartet&&!oAnlaufLaeuft)?0:4);
+    return ovx!==0?3:(o.seite===0?3:1);
+  }
   function zeichneSpurt(){
     zeichneBoden();
     // AUF DER ROUTE nach Bildschirm-y sortiert zeichnen: wer weiter unten steht, ueberdeckt
@@ -20254,9 +20272,11 @@
       // ausschliesslich stepStaffel schreibt -- diese Zeichenfunktion selbst schreibt nichts.
       if(BA().staffel && u.aktiv){
         const prop=DISZIPLIN_PROP.staffel;
-        // s. Kommentar an STAFFEL_HAND: ein laufender Staffellaeufer bekommt oben immer
-        // vx:4, blickAus() liefert damit immer richtung 3 ("rechts").
-        const hp=prop.hand[3]||prop.hand[2];
+        // staffelBlickRichtung() statt hart Richtung 3 (Review-Fund PR #901, Befund 2, s.
+        // Kommentar an der Funktion oben): waehrend u.stolper>0 (direkt nach einer
+        // Uebergabe) faellt ein Seite-1-Laeufer auf Richtung 1 ("links") zurueck.
+        const r=staffelBlickRichtung(u);
+        const hp=prop.hand[r]||prop.hand[2];
         // Derselbe Massstab (sk) und dieselbe Transform-Mitte (x,y+16), mit der die Figur
         // gerade oben gezeichnet wurde (ctx.translate/scale-Block) -- reproduziert exakt,
         // wohin die Hand auf dem Bildschirm gerutscht ist, ohne den Canvas-Zustand selbst
@@ -20267,15 +20287,19 @@
           const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
           if(geber){
             const gp=laeuferXY(geber);
-            const gwartet=BA().staffel && !geber.aktiv && geber.fertig==null;
+            const gwartet=!geber.aktiv && geber.fertig==null;
             const gsk=gwartet?sk0*0.88:sk0;
-            const ghp=prop.hand[gwartet?(geber.seite===0?3:1):3]||prop.hand[2];
+            // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
+            // beim Nehmer oben) -- fuer den Geber war sie schon richtig, jetzt aus derselben
+            // einen Quelle statt zweimal von Hand nachgebaut.
+            const gr=staffelBlickRichtung(geber);
+            const ghp=prop.hand[gr]||prop.hand[2];
             const geberStab=handPunkt(gp.x,gp.y,gsk,ghp);
             const t=1-u.vizUebergabeT/STAFFEL_UEBERGABE_DAUER;
             stab={x:geberStab.x+(stab.x-geberStab.x)*t, y:geberStab.y+(stab.y-geberStab.y)*t};
           }
         }
-        prop.zeichne(ctx,stab.x,stab.y,sk,3,"halten");
+        prop.zeichne(ctx,stab.x,stab.y,sk,r,"halten");
       }
       // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
       // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
