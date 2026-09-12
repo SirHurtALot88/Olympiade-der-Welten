@@ -34,16 +34,28 @@ das heutige Rezept gehalten:
    Durchgang gleich hoher Sockelwert, unabhängig vom Element-Ausgang. TECHNIK/WAGNIS/
    SPITZENMOMENT (dexterity/awareness/speed-lastig) tragen dagegen die Erfolgschance und
    variieren mit ihr, analog zum TES. Auch das trifft die reale Trennung.
-3. **Elite-Kür ist NICHT beliebig fehlerarm — Stürze/Fehlschläge sind bei Top-Läufern selten,
-   aber nicht null**, gerade bei den Elementen mit dem höchsten Basiswert (Vierfach-/
-   Dreifach-Kombinationen). `failAbzug:0,35` bei `WAGNIS`-lastigen Elementen produziert genau
-   dieses Bild: seltene, aber spielentscheidende Ausreißer statt einer Fehlerquote nahe null.
+3. **Korrigiert (Opus-Overseer-Review PR #903, Fund 3): die Fehlschlagquote ist NICHT selten.**
+   Die erste Fassung dieses Punkts behauptete "seltene, aber spielentscheidende Ausreißer".
+   Das ist falsch und war unbelegt — der Reviewer hat mit der bestehenden Sonde
+   (`scripts/probe-eiskunstlauf-ton.mjs`, Teil C) nachgezählt: **58 Stürze zu 66 sauberen
+   Landungen bei 125 Elementen, also eine Fehlschlagquote von 47 %.** Das ist fast jedes
+   zweite Element, nicht "selten" — reale Elite-Kür liegt deutlich darunter (ein Sturz pro
+   Programm ist schon ein schlechter Tag, nicht der Normalfall über ein Dutzend Elemente).
+   `failAbzug:0,35` und die Erfolgschance, die aus `art.failWort` gegen die TECHNIK/WAGNIS-
+   Rollen berechnet wird, produzieren strukturell also ein deutlich fehleranfälligeres Bild,
+   als die reale Sportart es zeigt.
 
-**Ergebnis der strukturellen Prüfung: keine der drei Eigenschaften zeigt eine Lücke, die einen
-Rezeptumbau nahelegt.** Anders als bei Breaking (dort fehlte laut Plan eine eigene Kalibrierrunde
-komplett) hat Eiskunstlauf mit der Spearman-Brown-Runde bereits eine Kalibrierrunde hinter sich,
-und die drei oben geprüften Struktureigenschaften bestätigen die bestehende Rollenaufteilung,
-statt eine neue zu verlangen.
+**Ergebnis der strukturellen Prüfung, korrigiert: zwei der drei Eigenschaften bestätigen die
+bestehende Rollenaufteilung, die dritte (Fehlschlagquote) zeigt eine reale, messbare Lücke
+zwischen Modell und Vorbild.** Das ändert die K4-Kernaussage dieser Runde trotzdem nicht: eine
+Absenkung von `failAbzug` oder der Erfolgschance ist eine Rezeptänderung an der VALIDITÄTS-Seite
+(wie realistisch die Fehlerquote wirkt), nicht zwangsläufig an der Rangtreue — ob und wie stark
+sie rho bewegt, ist mit den obigen Zahlen (Punkt 3) allein nicht beantwortet, sondern bräuchte
+eine eigene Vorher/Nachher-Messung wie bei Breaking. Innerhalb des Umfangs dieser Runde (Vergleich
+gegen ISU-Struktur, keine Motoränderung) bleibt festzuhalten: die 47-%-Quote ist ein dokumentierter
+Befund für eine spätere Rezeptrunde, kein in dieser Runde gemessener rho-Effekt größer als das
+Kaderrauschen (0,083) — die Entscheidung, das Rezept jetzt nicht anzufassen, bleibt deshalb
+bestehen, ihre Begründung stützt sich aber auf "nicht gemessen", nicht auf "unauffällig".
 
 ## 3. Warum trotzdem nichts am Rezept geändert wird
 
@@ -56,12 +68,19 @@ Größenordnung dieser Spannweite — jede Rezeptfeinjustierung, die kleiner bew
 ohne einen klaren strukturellen Befund wie bei Breaking ist das der zu erwartende Fall), wäre von
 Kaderrauschen nicht unterscheidbar und würde das Bild nur verrauschen, nicht verbessern.
 
-**Entscheidung: Rezept unverändert.** Die drei offenen Designfragen der Reliabilitäts-Runde
-(Sturz-Gewichtung, PUBLIKUM-Sockel, Element-Anzahl) sind mit obigem Vergleich beantwortet, ohne
-dass eine Codezeile angefasst wurde — genau der von Abschnitt 4.4 des Plans vorgesehene Fall
-("die daraus folgende Rezeptanpassung nur, wenn sie mehr bewegt als das Kaderrauschen"). K4 gilt
-damit als erfüllt: die Kalibrierrunde fand statt, ihr Ergebnis ist dokumentiert, und die
-Entscheidung, nichts zu ändern, ist begründet statt unterlassen.
+**Entscheidung: Rezept unverändert — mit einem offenen Punkt für eine spätere Runde.** Zwei der
+drei offenen Designfragen der Reliabilitäts-Runde (Sturz-Gewichtung trifft nur ein Element,
+PUBLIKUM-Sockel programmweit konstant) bestätigt der obige Vergleich. Die dritte
+(Fehlschlagquote 47 % gegen eine deutlich niedrigere reale Elite-Quote) ist NICHT beantwortet,
+sondern als quantifizierte Lücke festgehalten — eine Korrektur würde die Validität (wie
+realistisch das Bild wirkt) verbessern, ihre Wirkung auf rho ist ungemessen und in dieser Runde
+bewusst nicht spekuliert. Genau das ist der von Abschnitt 4.4 des Plans vorgesehene Fall
+("die daraus folgende Rezeptanpassung nur, wenn sie mehr bewegt als das Kaderrauschen") plus ein
+ehrlich benannter Rest: ohne eine eigene Vorher/Nachher-Messung lässt sich "bewegt mehr als 0,083"
+für die Fehlschlagquote nicht behaupten, also wird hier nichts geändert. K4 gilt trotzdem als
+erfüllt: die Kalibrierrunde fand statt, ihr Ergebnis (zwei Bestätigungen, eine offene, quantifizierte
+Lücke) ist dokumentiert, und die Entscheidung, in dieser Runde nichts zu ändern, ist begründet statt
+unterlassen oder schöngeredet.
 
 ## 4. Geänderte Dateien
 

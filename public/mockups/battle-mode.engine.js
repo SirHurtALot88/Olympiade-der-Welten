@@ -486,23 +486,36 @@
   // Konsumenten (`DISZIPLIN_PROP.gewichtheben.hand` an der istHeben()-Stelle) lesen ihr
   // eigenes Feld unveraendert, nichts davon wird hier angefasst.
   //
-  // ANDERS ALS DIE HAND-PUNKTE VON GEWICHTHEBEN/HOCKEY (per Pixelscan der Alphakontur
-  // ausgemessen, docs/design/sprite-handpunkte*.md — noetig, weil die Hand je nach
-  // Griffpose an ganz verschiedenen Stellen sitzt): der Fusspunkt eines stehenden
-  // Standard-Sprites ist keine variable Griffpose, sondern dieselbe Bildkonstante fuer
-  // JEDES Sprite auf dem 64x64-Rahmen — "Massstab 1: ein Sprite ist 64 px breit und steht
-  // mit den Fuessen auf dem Schatten" (Kommentar bei der Feldspiel-Zeichnung, :2739) und
-  // "Fuesse auf y+18..19" (HOCKEY_PHASEN-Kommentar oben, :269, dort zur Schaftlaenge
-  // herangezogen). In Zell-Koordinaten (x-32*Z+cx*Z / y-46*Z+cy*Z, s. Kommentar bei
-  // DISZIPLIN_PROP) heisst das cy=64 (Blattunterkante). x bleibt bei 32 (Sprite-Mitte) in
-  // Front/Ruecken und wandert im Profil leicht zum vorderen Fuss — derselbe Aufbau wie
-  // HEBEN_HAND/HOCKEY_HAND, nur mit der Bildkonstante statt einer neuen Pixelscan-Serie.
+  // KORRIGIERT (Opus-Overseer-Review PR #903, Fund 1): die erste Fassung leitete cy=64
+  // (Blattunterkante) aus "Massstab 1"/"Fuesse auf y+18..19" ab, OHNE das Blatt selbst
+  // anzusehen — eine Verwechslung von "die Figur steht auf dem Schatten am unteren
+  // Rahmenrand" mit "die unterste KOeRPERZEILE liegt auf dem Rahmenrand". Der Reviewer hat
+  // `body_walk`/`bodyw_walk` per echtem Pixelscan der Alphakontur ueber alle 4 Richtungen x
+  // 9 Laufbilder vermessen: die unterste Koerperzeile (Sohle) liegt bei cy=60..62, der
+  // Schatten selbst nimmt die restlichen 2-4 Zeilen bis 64 ein. cy=64 liess die Kufe
+  // sichtbar im Schatten unter der Sohle schweben. Auf den gemessenen Mittelwert **61**
+  // korrigiert.
+  //
+  // x IST KEINE KONSTANTE, sondern wandert im Laufzyklus ueber x=21..42 (derselbe
+  // Reviewer-Pixelscan) — anders als bei HEBEN_HAND/HOCKEY_HAND (an einer EINZELNEN
+  // festen Pose gemessen, "shoot"/"halten") gibt es fuer den Fuss keine einzelne
+  // repraesentative Pose, weil stepKuer()/zeichneDuett() ausschliesslich mit dem
+  // Standard-"walk"-Zyklus zeichnen (kein fester "shoot"-Frame wie beim Hantel-/
+  // Schlaeger-Griff) und diese Aufrufstelle keinen Zugriff auf den aktuellen
+  // Animationsframe hat, um den Punkt frame-genau nachzufuehren. Die Werte unten (25/39
+  // im Profil) sind EIN Punkt aus der gemessenen Bandbreite (21..42), kein Extremwert und
+  // kein Mittelwert — eine bewusste Vereinfachung: die Kufe ist ein kleiner, rein
+  // kosmetischer Knoechel-/Klingen-Akzent ohne Wirkung auf `rr()`/Rangtreue, ein paar Pixel
+  // Wackeln relativ zum tatsaechlichen Laufzyklus-Fuss ist der akzeptierte Kompromiss
+  // gegenueber einer frame-genauen Nachverfolgung (die einen eigenen Motor-Umbau braeuchte,
+  // um den aktuellen Frame-Index an diese Aufrufstelle durchzureichen). Front/Ruecken
+  // bleiben bei x=32 (Sprite-Mitte, keine Profilseite zum Verschieben).
   // Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
   const FUSS_EISKUNSTLAUF=[
-    {x:32,y:64}, // hinten
-    {x:25,y:64}, // links  — vorderer Fuss im Profil
-    {x:32,y:64}, // vorn
-    {x:39,y:64}, // rechts — vorderer Fuss im Profil
+    {x:32,y:61}, // hinten
+    {x:25,y:61}, // links  — ein Punkt aus der gemessenen Bandbreite x=21..42, s. Kommentar oben
+    {x:32,y:61}, // vorn
+    {x:39,y:61}, // rechts — ein Punkt aus der gemessenen Bandbreite x=21..42, s. Kommentar oben
   ];
   // Kufenwinkel relativ zum Fusspunkt je vizPhase (s. stepKuer()) — "gleiten"/"einlauf"
   // flach am Eis, "pirouette" auf der Kante (staerkere Neigung), "hebung"/"wurf" leicht
@@ -538,6 +551,18 @@
     ctx.beginPath(); ctx.moveTo(fersenX,fersenY); ctx.lineTo(x,y); ctx.stroke();
     ctx.strokeStyle="#e6edf5"; ctx.lineWidth=Math.max(0.8,1.1*s); ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(fersenX,fersenY); ctx.lineTo(spitzeX,spitzeY); ctx.stroke();
+  }
+  // KOSTUEMFARBE JE PAAR (A3), EINMAL gebaut statt an beiden Kufen-Aufrufstellen in
+  // zeichneSprite() dupliziert (normaler LPC-Koerper UND b.vollbild-Zweig, s. beide
+  // istEis()-Bloecke dort, Opus-Overseer-Review PR #903 Fund 2). Derselbe paarId-Hash wie in
+  // stepKuer() (kuerHash(paarId,...), Paar-ID = die kleinere der beiden u.id) — ein
+  // Solo-Rest (ungerade Feldgroesse) bekommt seine eigene, ebenso stabile Farbe
+  // (paarId=eigene u.id). Nur gelesen, nie rr(), deshalb rangtreue-neutral wie jede andere
+  // PROP-Zeichnung hier.
+  function eiskunstlaufKostuemfarbe(u){
+    const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+    const paarId=partner?Math.min(u.id,partner.id):u.id;
+    return "hsl("+Math.floor(kuerHash(paarId,11)*360)+" 70% 55%)";
   }
 
   // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
@@ -2737,6 +2762,32 @@
           :(u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten");
         zeichneHockeyschlaeger(ctx,x-32*Z+gp.x*Z,y-46*Z+gp.y*Z,Z,r0,pose);
       }
+      // KUFE FUER VOLLBILD-LAeUFER (Opus-Overseer-Review PR #903, Fund 2): der fruehe
+      // `return;` unten liess JEDEN ueber b.vollbild gezeichneten Eiskunstlauf-Teilnehmer
+      // (Kreaturen mit einem eigenen Fremdbild statt des LPC-Standardkoerpers, z.B. Lava
+      // Golem/Krolach/Vorrak/Krag'Zul/Brightpaw/Tidesprinter — nach Kaderzusammensetzung der
+      // HAeUFIGERE Fall, nicht der seltene) ganz ohne Requisite stehen, weil dieser
+      // Aufrufzweig vor dem normalen Zeichenpfad (mit dem istEis()-Block dort) endet.
+      //
+      // ANDERS ALS VOLLBILD_SCHLAEGER (Hand-Position variiert stark je Kreatur/Blatt und
+      // wird deshalb je Eintrag per Augenschein/Pixelscan einzeln vermessen, s.
+      // docs/design/vollbild-schlaeger-griffpunkte.md): der Fusspunkt braucht KEINE eigene
+      // Vermessung je der ueber 65 Vollbild-Kreaturen. Der drawImage()-Aufruf oben skaliert
+      // JEDES Blatt unabhaengig von seiner nativen Groesse IMMER auf dh=64*Z, mit dem
+      // Bodenkontakt/Schatten am unteren Rahmenrand (derselbe Kommentar "Boden-Anker
+      // (y-46) skaliert mit Z... sonst rutschen die Fuesse relativ zum Schatten weg" gilt
+      // hier genauso wie beim Standardkoerper) — ein gemeinsamer, generischer Punktesatz
+      // (derselbe wie FUSS_EISKUNSTLAUF, s. dort inkl. der Reviewer-Korrektur auf cy=61)
+      // trifft deshalb bei jeder Kreatur ungefaehr den unteren Bildbereich, in dem Beine/
+      // Bodenkontakt sitzen. Das ist bewusst WENIGER genau als ein gegriffenes Objekt (ein
+      // Schlaeger, der an der falschen Stelle haengt, faellt sofort auf; ein kleiner
+      // Knoechel-Akzent ein paar Pixel daneben nicht) — Genauigkeit auf Kosten von 65
+      // Einzelmessungen waere hier unverhaeltnismaessig. Rein kosmetisch, kein `rr()`.
+      if(feldspiel&&istEis()&&!u.down){
+        const propV=DISZIPLIN_PROP.eiskunstlauf;
+        const fpV=propV.fuss[r0]||propV.fuss[2];
+        propV.zeichne(ctx,x-32*Z+fpV.x*Z,y-46*Z+fpV.y*Z,Z,r0,u.vizPhase,eiskunstlaufKostuemfarbe(u));
+      }
       // Chris' Fund (01.09.): die Shroomgator-Pilze schwebten komplett UEBER dem Krokodil,
       // gar nicht auf ihm — die generische Spanne y-44*Z..y+16*Z ist auf eine AUFRECHTE
       // 64px-Figur zugeschnitten (Kopf oben, Fuesse unten). Ein liegendes Quadruped fuellt
@@ -3173,14 +3224,7 @@
     if(feldspiel&&istEis()&&!u.down){
       const prop=DISZIPLIN_PROP.eiskunstlauf;
       const fp=prop.fuss[r]||prop.fuss[2];
-      // KOSTUEMFARBE JE PAAR (A3): derselbe paarId-Hash wie in stepKuer() (kuerHash(paarId,
-      // ...), Paar-ID = die kleinere der beiden u.id) — ein Solo-Rest (ungerade
-      // Feldgroesse) bekommt seine eigene, ebenso stabile Farbe (paarId=eigene u.id). Nur
-      // gelesen, nie rr(), deshalb rangtreue-neutral wie jede andere PROP-Zeichnung hier.
-      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
-      const paarId=partner?Math.min(u.id,partner.id):u.id;
-      const farbe="hsl("+Math.floor(kuerHash(paarId,11)*360)+" 70% 55%)";
-      prop.zeichne(ctx,x-32*Z+fp.x*Z,y-46*Z+fp.y*Z,Z,r,u.vizPhase,farbe);
+      prop.zeichne(ctx,x-32*Z+fp.x*Z,y-46*Z+fp.y*Z,Z,r,u.vizPhase,eiskunstlaufKostuemfarbe(u));
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
