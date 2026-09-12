@@ -11866,7 +11866,12 @@
   }
 
   function stepBuehne(dt){
-    if(done)return;
+    // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
+    // `done` einmal gesetzt war -- buehnenBewegung() (rein praesentational, s. Vertrag dort)
+    // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Tanzender in
+    // "eintritt", letzte Eiskunstlauf-Schlusspose) fror auf halbem Weg ein. `done` bleibt hier
+    // unveraendert -- nur buehnenBewegung() darf nach dem Abschluss weiterlaufen.
+    if(done){ buehnenBewegung(dt); return; }
     buehneT+=dt;
     for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     buehneAkt-=dt;
@@ -12086,9 +12091,14 @@
       if(Math.abs(nx-u.vizX)+Math.abs(ny-u.vizY)>0.05)u.vizRi=Math.atan2(ny-u.vizY,nx-u.vizX);
       u.vizX=nx; u.vizY=ny;
 
-      // KUFENSPUR: Ringpuffer der letzten ~60 Positionen.
-      u.vizSpur.push({x:u.vizX,y:u.vizY});
-      if(u.vizSpur.length>60)u.vizSpur.shift();
+      // KUFENSPUR: Ringpuffer der letzten ~60 Positionen. N-Fix (PR 0.4 #2): waehrend
+      // haeltStelle (Pirouette/Sturz) bleibt die Position stehen -- ohne diese Bedingung
+      // wuerde der Puffer sich mit ~60 identischen Punkten fuellen und die Spur faellt auf
+      // einen Punkt zusammen, statt (unveraendert) zu ueberleben.
+      if(!haeltStelle){
+        u.vizSpur.push({x:u.vizX,y:u.vizY});
+        if(u.vizSpur.length>60)u.vizSpur.shift();
+      }
     }
   }
 
@@ -12151,6 +12161,11 @@
     const WOBBLE=0.018;
     return rOut*(1+WOBBLE*Math.sin(buehneT*2*Math.PI*BREAKING_BPM/60+phase));
   }
+  // FREEZE_T/RUECKZUG_T stehen hier auf Closure-Ebene (statt lokal in stepCypher), damit
+  // zeichneBreaking() (unten, N-Fix PR 0.4 #3) dieselben Zahlen fuer ihr Fade-Timing lesen
+  // kann, statt 0,15s ein zweites Mal als Literal zu tragen (das dort bisher veraltete
+  // 0,35/0,3 waren -- Ringe rissen bei halber Deckkraft ab statt sauber auszublenden).
+  const FREEZE_T=0.15, RUECKZUG_T=0.15;
   function stepCypher(dt,art){
     if(!TEILNEHMER.length)return;
     const rOut=Math.min(W*0.46,H*0.44);
@@ -12169,8 +12184,17 @@
     // Fehler, den dieser ganze Umbau beheben soll ("immer GENAU EINER in der Mitte").
     // 0,15+0,25+0,15=0,55s < 0,625s laesst 0,075s Puffer (bei einem Frame ~0,0167s bei
     // 60fps also ~4-5 Frames).
-    const EINTRITT_T=0.15, THROWDOWN_T=0.25, FREEZE_T=0.15, RUECKZUG_T=0.15;
+    const EINTRITT_T=0.15, THROWDOWN_T=0.25;
     const NAECHER=(u,ziel,tau)=>{ u.vizR+=(ziel-u.vizR)*(1-Math.exp(-dt/tau)); };
+    // N-Fix (PR 0.4 #4): glaettet u.vizA statt es direkt auf den Rangwinkel zu springen --
+    // ein Rangwechsel (u.summe steigt bei einer frischen Enthuellung) sprang bisher sofort
+    // auf die neue Ringposition, bis zu 2,80 rad in einem Frame (PR-875-Review). Die
+    // Winkeldifferenz wird zuerst auf [-pi,pi] normalisiert (kuerzerer Weg um den Kreis),
+    // dann exponentiell angenaehert -- derselbe NAECHER()-Stil wie beim Radius oben.
+    const WINKEL_NAECHER=(u,ziel,tau)=>{
+      let d=((ziel-u.vizA+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+      u.vizA+=d*(1-Math.exp(-dt/tau));
+    };
     for(const u of TEILNEHMER){
       if(u.vizPhase==null){
         // Erstinitialisierung (erster stepCypher()-Durchlauf fuer diesen Teilnehmer).
@@ -12189,7 +12213,7 @@
         u.vizMove=cypherHash(u.id,u.aktuell)%4; // 0 Toprock·1 Footwork·2 Powermove·3 Freeze
       }
       if(u.vizPhase==="ring"){
-        u.vizA=cypherRingWinkel(u,seiten);
+        WINKEL_NAECHER(u,cypherRingWinkel(u,seiten),0.3);
         u.vizR=cypherRingRadius(u,rOut);
         continue;
       }
@@ -13504,7 +13528,10 @@
         // ueberhaupt erst erzeugt (u.runden[u.aktuell].ereignis gegen art.erfolgWort/
         // art.failWort, s. dort). Farbschema/Stil unveraendert aus der ersten Fassung.
         if(phase==="freeze"){
-          const p=Math.max(0,1-u.vizPhaseT/0.35);
+          // N-Fix (PR 0.4 #3): Divisor an FREEZE_T (0,15s, s. stepCypher) angeglichen -- der
+          // alte 0,35 gehoerte zur ersten Fassung der Zustandsdauer und war seit deren
+          // Verkuerzung auf 0,15s stehen geblieben, der Ring riss deshalb bei p~0.57 ab.
+          const p=Math.max(0,1-u.vizPhaseT/FREEZE_T);
           ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
           ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
           ctx.globalAlpha=1;
@@ -13513,7 +13540,9 @@
           // an den Ringplatz gebunden") -- (x,y) IST bereits die Mitte, weil radius hier
           // noch nahe 0 liegt (NAECHER() in stepCypher glitet erst waehrend rueckzug
           // wieder nach aussen).
-          const p=Math.max(0,1-u.vizPhaseT/0.3);
+          // N-Fix (PR 0.4 #3): Divisor an RUECKZUG_T (0,15s, s. stepCypher) angeglichen,
+          // gleicher Befund wie beim Freeze-Ring oben.
+          const p=Math.max(0,1-u.vizPhaseT/RUECKZUG_T);
           ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
           ctx.beginPath();
           const segs=4;
@@ -17174,6 +17203,15 @@
   };
 
   const tonSfxPool={};
+  // Drossel (PR 0.4 #6, Opus-Plan 3.4): Takeshi's Castle loeste falle/sturz/tor ungedrosselt
+  // aus -- 227 Ein-Schuss-Toene je Rennen (Review PR #883), es klang wie ein Geigerzaehler.
+  // Rein praesentational: unterdrueckt nur den Klang je (Disziplin,Ereignis)-Paar innerhalb
+  // eines Mindestabstands, ruehrt Spielzustand/Boxscore/rr() nicht an. Bewusst auf Takeshi
+  // begrenzt, statt global fuer alle sfx()-Aufrufer -- die anderen Disziplinen loesen ihre
+  // Ein-Schuss-Toene selten genug aus, dass eine globale Drossel nur unbeteiligtes Verhalten
+  // riskieren wuerde.
+  const tonSfxLetzte={};
+  const TON_DROSSEL_S=0.12;
   // Einschuss-Ton: sfx("gewichtheben","gueltig") o.ae. `vol` optional (0..1, vor bkPegel).
   // Unbekannte Disziplin/Ereignis, ein fehlender AudioContext (z.B. in Node/Playwright ohne
   // Audio-Geraet) oder ein Aufruf vor der ersten Nutzergeste sind alle stille No-Ops.
@@ -17181,6 +17219,12 @@
     try{
       const eintrag=(TON_KATALOG[disziplin]||{})[ereignis];
       if(!eintrag||eintrag.loop)return; // Loop-Eintraege laufen ueber tonLoopStart/-Stop
+      if(disziplin==="takeshis-castle"){
+        const jetzt=(typeof performance!=="undefined"?performance.now():Date.now())/1000;
+        const key=disziplin+"|"+ereignis;
+        if(jetzt-(tonSfxLetzte[key]??-Infinity)<TON_DROSSEL_S)return;
+        tonSfxLetzte[key]=jetzt;
+      }
       if(eintrag.datei){
         if(!tonSfxPool[disziplin])tonSfxPool[disziplin]={};
         let pool=tonSfxPool[disziplin][ereignis];
@@ -19714,7 +19758,11 @@
             // TON (Ziel 3, A4): dieser Zweig laeuft nur, wenn BA().nervenKosten gesetzt ist
             // -- exklusiv Takeshi (s. Katalog :18158) -- die A.takeshi-Gate ist hier nur
             // Verteidigung in der Tiefe, nicht die eigentliche Schranke.
-            if(A.takeshi)sfx("takeshis-castle","tor");
+            // N-Fix (PR 0.4 #5): "tor" war der Zielklang, semantisch falsch fuer ein
+            // Ausscheiden (Review PR #883) -- die Strecke hat an drei Stellen echtes Wasser
+            // (steine/brueckenball/schlamm), "platsch" (bislang toter Katalogeintrag) passt
+            // zum "im Wasser landen"-Charakter des Scheiterns.
+            if(A.takeshi)sfx("takeshis-castle","platsch");
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
