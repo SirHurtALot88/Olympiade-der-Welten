@@ -17917,6 +17917,44 @@
     const m=Math.floor(sek/60), r=sek-m*60;
     return m+":"+(r<10?"0":"")+r.toFixed(1).replace(".",",")+" min";
   }
+  // ================= ANGEZEIGTE ZEIT STATT SIMULATIONSZEIT (13.09.) =================
+  // Chris, woertlich: "und auch die zeiten passen nicht, wenn die diszi 3 minuten dauert
+  // dann sind auch die zeiten der laeufer 3 minutneun und nicht 1,5 sekunden!"
+  //
+  // Er hat recht, und es war ein reiner Anzeigefehler. Die Rennuhr im HUD rechnete laengst
+  // richtig (`rennT*zeitFaktor()` in updateHudBahn, seit dem Spurt-Fix) — JEDE ANDERE
+  // Zeitangabe der Staffel gab dagegen rohe SIMULATIONSSEKUNDEN aus: die Etappenzeit im
+  // Endstand und im Boxscore, der Wechselverlust, der Zieleinlauf-Abstand und das
+  // Broadcast-Delta. Bei ZEIT_DEHNUNG.staffel=14,65 heisst das, dass eine Etappe von
+  // gemessenen 1,75 Sim-Sekunden als "1.8 s" dastand, obwohl der Zuschauer sie 25,7
+  // Sekunden lang sieht, und ein Rueckstand von 0,1 Sim-Sekunden als "+0.1s", obwohl es
+  // real 1,5 Sekunden sind. Deshalb wirkte das Delta-Feld auch bedeutungslos: es zeigte
+  // fast immer 0.0 oder 0.1.
+  //
+  // Dieselbe Umrechnung wie die Uhr, an EINER Stelle. Reine Anzeige: `u.etappenZeit`,
+  // `u.wechselKonto`, `u.fertig` und `rennT` selbst bleiben unangetastet, und
+  // `bahnLeistung()`/`MOTOREN.staffel.wert()` rechnen weiter in Simulationssekunden —
+  // die Rangtreue kann sich daran nicht aendern (nachgemessen, s. PR-Beschreibung).
+  //
+  // EINE Umrechnung und EIN Zahlenformat fuer alle fuenf Bahn-Disziplinen. Diese Zeilen
+  // hiessen bis zum Rebase auf PR #908 eigene Implementierungen — `bahnRealSek` war
+  // zeichengleich das dort entstandene `bahnSpanneAnzeige`, und die Ausgabe stand auf
+  // Punkt-Dezimaltrennung ohne Einheit ("2:59.6", "24.4 s"). Beides waere im selben
+  // Endstand neben dem Zeitfahren gelandet, das ueber `bahnZeitText` mit Komma und
+  // Einheit schreibt ("2:59,6 min", "24,4 s"): dieselbe Groesse in zwei Schreibweisen
+  // auf einem Bildschirm. Deshalb sind die Staffel-Namen jetzt duenne Aliasse auf die
+  // generischen Funktionen — kein zweiter Massstab, kein zweites Format, und die
+  // staffelspezifischen Aufrufstellen behalten ihre sprechenden Namen.
+  const bahnRealSek=bahnSpanneAnzeige;
+  // Kurze Dauer (eine Etappe, ein Wechselverlust, ein Rueckstand): "24,4 s".
+  const fmtDauer=(sim)=>bahnZeitText(bahnRealSek(sim));
+  // Lange Dauer (eine Zielzeit): "2:59,6 min" — Minuten, sobald es welche gibt. Zwei
+  // Einstiege, damit eine Spalte, die ihren Wert zum Sortieren ohnehin schon in ECHTEN
+  // Sekunden haelt, ihn nicht erst durch zeitFaktor() zurueckrechnen muss: dieser
+  // Rundungs-Umweg liess dieselbe Zielzeit einmal als 2:59.6 (Kopfzeile) und einmal als
+  // 2:59.5 (Wertungstabelle) erscheinen.
+  const fmtRealZielzeit=bahnZeitText;
+  const fmtZielzeit=(sim)=>bahnZeitText(bahnRealSek(sim));
   // BESTZEIT IM FELD AN EINEM CHECKPOINT (Zeitfahren, Fable-Entscheidung 3: die Diff-
   // Anzeige vergleicht gegen den BIS DAHIN schnellsten Laeufer, nicht gegen einen festen
   // Rivalen — dieselbe "vorlaeufig, aber ehrlich"-Logik wie bahnRangliste). `ci` ist der
@@ -18026,10 +18064,29 @@
       const seiten=[0,0];
       if(z[0]!=null&&(z[1]==null||z[0]<z[1]))seiten[0]=1;
       else if(z[1]!=null&&(z[0]==null||z[1]<z[0]))seiten[1]=1;
-      return {seiten, suffix:"nach Zieleinlauf", punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
-        zusatz:z[0]!=null&&z[1]!=null?z[0].toFixed(1)+" s gegen "+z[1].toFixed(1)+" s":null,
-        zeitVon:(u)=>u.etappenZeit==null?"—":u.etappenZeit.toFixed(1)+" s"
-          +(u.wechselKonto<0?" · "+(-u.wechselKonto).toFixed(1)+" s Wechsel":""),
+      // ===== WER FUEHRT, STEHT JETZT AUCH WAEHREND DES RENNENS DA (13.09.) =====
+      // Chris, woertlich: "und dadurch dass es immer 0-0 steht weiss man aktuell gar nicht
+      // wer fuehrt". Genau so war es: `seiten` blieb [0,0], bis der ERSTE Schlusslaeufer
+      // durchs Ziel lief — ueber die vollen zweieinhalb Minuten davor stand oben "0 : 0",
+      // und die einzige Fuehrungsangabe war ein winziges "+0.1s"-Feld, das wegen des
+      // Zeitfehlers oben (s. bahnRealSek) auch noch fast immer 0.0 zeigte.
+      //
+      // Jetzt zeigt der Stand WAEHREND des Rennens den Fuehrenden mit 1 : 0 an — dieselbe
+      // Groesse, die am Ende ueber Sieg und Niederlage entscheidet (wer zuerst im Ziel
+      // ist), nur vorlaeufig statt endgueltig. Der Fuehrende kommt aus `staffelZeitDelta()`,
+      // also aus demselben Verlaufspuffer wie das Delta-Feld daneben: eine Wahrheit, kein
+      // zweiter Vergleich, der ihr widersprechen koennte. `suffix` sagt ausserdem, dass es
+      // vorlaeufig ist (updateHudBahn haengt " · vorlaeufig" an, solange nicht `done`).
+      // Reine Anzeige — `bahnLeistung()` und MOTOREN.staffel.wert() sehen davon nichts.
+      if(z[0]==null&&z[1]==null){
+        const d=staffelZeitDelta();
+        if(!d.unklar&&d.delta>0){ seiten[d.seite]=1; }
+      }
+      return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
+        punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
+        zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
+        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit)
+          +(u.wechselKonto<0?" · "+fmtDauer(-u.wechselKonto)+" Wechsel":""),
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
     // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
@@ -18144,19 +18201,37 @@
           setzLaeufer(praefix+"cur",aktivU);
           setzLaeufer(praefix+"next",naechste);
         }
+        // DAS FUEHRUNGSFELD (13.09. ueberarbeitet). Vorher: ein 104 px schmales Kaestchen
+        // mit "V-W +0.1s" — zu klein, um es waehrend des Rennens wahrzunehmen, und die
+        // Zahl darin war Simulationszeit, also fast immer 0.0 oder 0.1 (s. bahnRealSek
+        // oben). Jetzt steht dort in zwei Zeilen, was eine Uebertragung einblendet: WER
+        // fuehrt, und um WIE VIEL in echten Sekunden — dazu ein Balken, der den Abstand
+        // auch ohne Lesen zeigt. Der Fuehrende ist derselbe, den der Stand oben mit 1 : 0
+        // meldet (beide aus staffelZeitDelta, s. bahnTeamstand).
         const deltaEl=document.getElementById("bhDelta");
         if(deltaEl){
           deltaEl.classList.remove("bh-home","bh-away");
+          const balken=(anteil,klasse)=>'<span class="bhbar"><i class="'+klasse
+            +'" style="width:'+Math.round(Math.max(3,Math.min(100,anteil*100)))+'%"></i></span>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
-            // (bahnTeamstand().zusatz, "12,2 s gegen 11,1 s") — dieselbe Messung,
+            // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
             // hier nur final statt interpoliert. Keine zwei Wahrheiten.
-            deltaEl.textContent=stand.zusatz?("Ziel · "+stand.zusatz):"—";
+            const sieger=stand.seiten[0]>stand.seiten[1]?0:stand.seiten[1]>stand.seiten[0]?1:null;
+            deltaEl.innerHTML='<b>'+(sieger==null?"Ziel":(VEREIN[sieger].name+" gewinnt"))+'</b>'
+              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>';
+            if(sieger!=null)deltaEl.classList.add(sieger===0?"bh-home":"bh-away");
           } else {
             const d=staffelZeitDelta();
-            if(d.unklar){ deltaEl.textContent="—"; }
-            else {
-              deltaEl.textContent=(d.seite===0?VEREIN[0].name:VEREIN[1].name)+" +"+d.delta.toFixed(1)+"s";
+            if(d.unklar||d.delta<=0){
+              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>';
+            } else {
+              // Balkenlaenge relativ zu 5 realen Sekunden: darueber ist es ohnehin eine
+              // klare Fuehrung, darunter macht jede Zehntelsekunde noch sichtbar etwas aus.
+              const real=bahnRealSek(d.delta);
+              deltaEl.innerHTML='<b>'+(d.seite===0?VEREIN[0].name:VEREIN[1].name)+' führt</b>'
+                +'<span class="bhsub">+'+bahnZeitText(real)+'</span>'
+                +balken(real/5,d.seite===0?"bh-home":"bh-away");
               deltaEl.classList.add(d.seite===0?"bh-home":"bh-away");
             }
           }
@@ -19288,14 +19363,12 @@
     }
   }
 
-  // BODEN DES STAFFEL-OVALS. Dasselbe Wiesengruen wie die gerade Bahn, aber der
-  // Bahnring selbst ist eine Ellipse statt eines Rechtecks — s. `ovalPunkt()`
-  // oben fuer die Laeufer-Geometrie, der diese Zeichnung 1:1 folgt (gleiches
-  // OVAL_CX/CY/RX/RY, gleiches OVAL_BAHN_ABSTAND). Bei festem Winkel haengt die
-  // Bildschirm-X-Koordinate nur von OVAL_RX ab (s. Herleitung an `ovalPunkt`),
-  // jede Bahn-/Ziellinien-Grenze bei konstantem Radius `r` ist deshalb genau die
-  // Ellipse ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,...) — keine Parallelkurven-
-  // Mathematik noetig.
+  // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
+  // mit Quellen am OVAL_*-Block bei `ovalPunkt()` weiter unten. Diese Zeichnung folgt der
+  // Laeufer-Geometrie 1:1, weil sie DIESELBE Funktion benutzt: `bahnPfad(r)` ist der
+  // Canvas-Pfad zu genau der Kurve, die `bahnPunkt(anteil,r)` punktweise abfaehrt. Damit
+  // kann Boden und Laeufer gar nicht mehr auseinanderlaufen — vorher waren es zwei
+  // getrennte Formeln, die nur zufaellig dieselbe Ellipse trafen.
   //
   // TON (Ziel 6, A4, Opus-Plan Abschnitt 5.2): Publikums-Loop, exakt dasselbe Muster wie
   // hebenPublikumAn/tonLoopStart("gewichtheben") bei bodenHeben() und takeshiPublikumAn/
@@ -19315,36 +19388,84 @@
     v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
     v.addColorStop(1,"rgba(0,0,0,.30)");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
-    const BN=BAHNEN_N();
-    const rInnen=OVAL_RY-OVAL_BAHN_ABSTAND/2, rAussen=rInnen+BN*OVAL_BAHN_ABSTAND;
-    const rMitte=(rInnen+rAussen)/2, breite=rAussen-rInnen;
-    // Bahnring als dicker Ellipsen-Strich — dieselbe Ockerfarbe wie die Gerade.
-    ctx.lineWidth=breite+8; ctx.strokeStyle="#8a4a32";
-    ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,rMitte,0,0,6.283);ctx.stroke();
-    // Dasselbe Ocker-Rauschen wie die Gerade (bodenSaat) — Koernung statt Flaeche.
-    ctx.save(); ctx.globalAlpha=0.09;
-    for(let i=0;i<300;i++){
-      const w=bodenSaat(i+300)*6.283, r=rInnen+bodenSaat(i+340)*breite;
+    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+
+    // ---- 1. INNENFELD, zuerst. Dunkleres, kuehleres Gruen als der Rasen aussen — der
+    // Stadioninnenraum liegt im Schatten der Tribuenen. Ohne ihn ginge die Bahn in einer
+    // durchgehenden Wiese unter, statt sich davon abzuheben.
+    ctx.beginPath(); bahnPfad(rInnen);
+    ctx.fillStyle="#1b3a21"; ctx.fill();
+
+    // ---- 2. BELAG. Die Flaeche ZWISCHEN Aussen- und Innenkante, als Fuellung mit
+    // "evenodd" (beide Konturen in EINEM Pfad — evenodd stanzt die innere heraus). Vorher
+    // war es ein dicker STRICH auf der Mittellinie; ein Strich hat eine konstante Breite in
+    // Pixeln, folgt der Stauchung also nicht, und genau dadurch wurde der Ring an den
+    // Scheiteln links und rechts sichtbar zu dick.
+    ctx.save();
+    ctx.beginPath();
+    bahnPfad(rAussen); bahnPfad(rInnen);
+    ctx.fillStyle="#b5442f";                 // Ziegelrot (Mondo-Bahn), s. Herleitung Punkt 4
+    ctx.fill("evenodd");
+    // Leichte Aufhellung nach vorn: die untere Haelfte liegt naeher an der Kamera und
+    // bekommt auf jedem Stadionbild mehr Licht ab als die Gegengerade im Hintergrund.
+    ctx.clip("evenodd");
+    const lg=ctx.createLinearGradient(0,OVAL_CY-rAussen*OVAL_STAUCH,0,OVAL_CY+rAussen*OVAL_STAUCH);
+    lg.addColorStop(0,"rgba(0,0,0,.22)"); lg.addColorStop(0.55,"rgba(0,0,0,0)");
+    lg.addColorStop(1,"rgba(255,255,255,.07)");
+    ctx.fillStyle=lg; ctx.fillRect(0,0,W,H);
+    // Dieselbe Koernung wie die Gerade (bodenSaat) — Struktur statt lackierter Flaeche.
+    // Innerhalb des Clips gestreut, deshalb genuegt ein grobes Rechteckraster.
+    ctx.globalAlpha=0.10;
+    for(let i=0;i<420;i++){
+      const x=bodenSaat(i+300)*W, y=OVAL_CY+(bodenSaat(i+340)*2-1)*rAussen*OVAL_STAUCH;
       ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";
-      ctx.fillRect(OVAL_CX+Math.cos(w)*OVAL_RX-1, OVAL_CY+Math.sin(w)*r-1, 2, 2);
+      ctx.fillRect(x,y,2,2);
     }
     ctx.restore();
-    // Bahnlinien, eine je Grenze — konzentrische Ellipsen mit demselben OVAL_RX.
-    ctx.strokeStyle="rgba(255,255,255,.42)"; ctx.lineWidth=1.5;
-    for(let i=0;i<=BN;i++){
-      const r=rInnen+i*OVAL_BAHN_ABSTAND;
-      ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,0,0,6.283);ctx.stroke();
+
+    // ---- 3. BAHNLINIEN. Jetzt echte Parallelkurven (gleiche Geradenlaenge, Radius je
+    // Spurgrenze) — der Abstand ist ueberall gleich, statt an den Scheiteln auf Null zu
+    // fallen. Das war der groesste sichtbare Fehler am alten Bild.
+    ctx.strokeStyle="rgba(255,255,255,.40)"; ctx.lineWidth=1.4;
+    for(let i=1;i<OVAL_BAHNEN;i++){ ctx.beginPath(); bahnPfad(rInnen+i*OVAL_BAHN_ABSTAND); ctx.stroke(); }
+    // Aussenkante etwas kraeftiger, Innenkante als weisser RANDSTEIN — auf jedem
+    // Stadionbild die auffaelligste Linie ueberhaupt und das, was Bahn und Innenfeld
+    // sichtbar trennt (World Athletics: erhoehter Bord an der Innenkante von Bahn 1).
+    ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=2;
+    ctx.beginPath(); bahnPfad(rAussen); ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=3;
+    ctx.beginPath(); bahnPfad(rInnen); ctx.stroke();
+
+    // ---- 4. WECHSELZONEN. Auf einer echten Staffelbahn steht in der Bahnmitte an jeder
+    // Zone ein Dreieck (30-m-Zone, World Athletics seit 2018). Bei uns liegen die Zonen an
+    // den Beingrenzen, also — bei OVAL_BEINE_JE_RUNDE=2 — an der Ziellinie (Anteil 0) und
+    // auf der Gegengeraden (Anteil 0,5). Sie sagen dem Zuschauer, wo der naechste Wechsel
+    // faellt, und sind der zweite Grund, warum die Bahn jetzt als Bahn lesbar ist.
+    for(let z=0;z<OVAL_BEINE_JE_RUNDE;z++){
+      const a=z/OVAL_BEINE_JE_RUNDE, obenZone=ovalAmZiel(a);
+      for(let i=0;i<OVAL_BAHNEN;i++){
+        const p=bahnPunkt(a,ovalSpurR(i));
+        const h=obenZone?6:-6;
+        ctx.fillStyle="rgba(255,225,120,.75)";
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y+h); ctx.lineTo(p.x-4.5,p.y-h*0.35); ctx.lineTo(p.x+4.5,p.y-h*0.35);
+        ctx.closePath(); ctx.fill();
+      }
     }
-    // ZIELLINIE oben (Winkel -90°, s. ovalWinkel): bei diesem Ansatz eine simple
-    // Strecke, weil x bei festem Winkel nicht vom Radius abhaengt (Herleitung an
-    // ovalPunkt oben) — alle Bahnen liegen also genau UNTEREINANDER auf x=OVAL_CX.
-    ctx.setLineDash([7,7]); ctx.lineWidth=4; ctx.strokeStyle="#fff";
-    ctx.beginPath();
-    ctx.moveTo(OVAL_CX, OVAL_CY-rAussen-6); ctx.lineTo(OVAL_CX, OVAL_CY-rInnen+6);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // Innenflaeche des Ovals bleibt Wiese — dort steht sonst nichts (kein
-    // Baumfries/keine Burg auf dieser Bahn-Art), das Grasgruen genuegt als Infield.
+
+    // ---- 5. ZIELLINIE, oben in der Mitte der Zielgeraden (Anteil 0). Beide Zonen liegen
+    // auf einer GERADEN, die Linie steht dort also senkrecht auf der Bahn und ist ein
+    // simples Lot von der Innen- zur Aussenkante. Kariert statt gestrichelt — das ist das
+    // Muster, an dem man eine Ziellinie auf jedem Uebertragungsbild erkennt.
+    const yA=OVAL_CY-rAussen*OVAL_STAUCH, yI=OVAL_CY-rInnen*OVAL_STAUCH;
+    const kn=14, kh=(yI-yA)/kn;
+    for(let i=0;i<kn;i++){
+      ctx.fillStyle=(i%2===0)?"#fff":"rgba(20,20,20,.85)";
+      ctx.fillRect(OVAL_CX-3.5,yA+i*kh,7,kh+0.5);
+    }
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+    ctx.fillText("ZIEL",OVAL_CX,yI+11);
   }
 
   // ===================================================================================
@@ -20139,18 +20260,22 @@
     return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
       spalten:[
         {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
+        // Beide Zeitspalten in ECHTEN Sekunden, nicht in Simulationssekunden (13.09.,
+        // s. bahnRealSek oben) — vorher stand hier "1.8 s" fuer eine Etappe, die der
+        // Zuschauer 25,7 Sekunden lang sieht. `wert` traegt weiterhin eine Zahl (die
+        // Sortierung der Spalte haengt daran), nur eben die umgerechnete.
         {id:"etappe",kopf:"Etappe", titel:"Zeit für den eigenen Abschnitt",
-          wert:z=>z.u.etappenZeit!=null?+z.u.etappenZeit.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.etappenZeit!=null?+bahnRealSek(z.u.etappenZeit).toFixed(1):null, fmt:bahnZeitText},
         {id:"wechs",kopf:"Wechs", titel:"Übergaben, an denen beteiligt", wert:z=>z.u.wechselN||null},
         {id:"verl", kopf:"Verl", titel:"bei Übergaben verlorene Zeit",
-          wert:z=>z.u.wechselKonto<0?Math.round(-z.u.wechselKonto*10)/10:null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.wechselKonto<0?+bahnRealSek(-z.u.wechselKonto).toFixed(1):null, fmt:bahnZeitText},
         {id:"patz", kopf:"Patz", titel:"gestürzt oder Übergabe verpatzt", wert:z=>z.u.gestolpert||null},
         {id:"weit", kopf:"Weit", titel:"Fortschritt im eigenen Abschnitt", top:true,
           wert:z=>Math.round(laufAnteil(z.u)*100), fmt:v=>v+"%"},
         {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
           farbe:v=>v==="leer"?"var(--crit)":null},
         {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
-          wert:z=>z.u.fertig!=null?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.fertig!=null?+bahnRealSek(z.u.fertig).toFixed(1):null, fmt:fmtRealZielzeit},
         {id:"stand",kopf:"Stand", wert:z=>z.u.fertig!=null?"Ziel":z.u.durch?"übergeben":z.u.aktiv?"läuft":"wartet",
           farbe:v=>v==="Ziel"?"var(--ok)":null},
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
@@ -20340,68 +20465,253 @@
   // Kein Leser von `laufAnteil`/`u.pos` sitzt hier: reine Zeichenfunktion, exakt
   // wie `ovalXY()` im Recherche-Dokument Abschnitt 2.3 vorschlaegt.
   //
-  // Groesse/Lage wie dort vorgeschlagen (Abschnitt 2.4): Canvas bleibt 1240x470,
-  // das Oval nimmt fast die volle Flaeche.
-  const OVAL_CX=W/2, OVAL_CY=H*0.56, OVAL_RX=W*0.386, OVAL_RY=H*0.30;
-  const OVAL_BAHN_ABSTAND=15;                  // Bahn 0 innen, Bahn 1 aussen (bahnenFest:2)
+  // ===== UEBERARBEITUNG 13.09. — Chris, woertlich, nach dem ersten Live-Rennen: =====
+  // "da war ja das alte oval deutlich huebscher was wir hatten, bitte anpassen das sieht
+  // haesslich aus ... das oval muss groesser werden damit nicht staendig ueberrundet wird!"
+  //
+  // WAS AM ALTEN BILD FALSCH WAR, an einem echten Stadion nachgesehen (Quellen unten):
+  //
+  //  1. EINE ELLIPSE IST KEINE LAUFBAHN. Eine 400-m-Bahn ist eine STADIONFORM: zwei
+  //     Geraden von je 84,39 m und zwei HALBKREISE (Innenradius 36,5 m) — nicht eine
+  //     durchgehend gekruemmte Ellipse. Das Auge kennt den Unterschied sofort; der alte
+  //     Ring las sich als Reifen, nicht als Bahn. Quelle: World Athletics, Track and
+  //     Field Facilities Manual 2019, "400 Metre Standard Track, Marking Plan", und
+  //     dimensions.com/element/track-and-field-400m-running-track (Gesamtmass 176,91 m x
+  //     92,52 m, Gerade 84,39 m, Innenradius 36,5 m, Bahnbreite 1,22 m).
+  //
+  //  2. DIE BAHNEN LIEFEN INEINANDER. Der alte Code zog alle Bahngrenzen als konzentrische
+  //     Ellipsen mit DEMSELBEN OVAL_RX und nur verschiedenem Radius in y. Das ist keine
+  //     Parallelkurve: an den beiden Scheiteln links und rechts (3 und 9 Uhr) fiel der
+  //     Bahnabstand auf NULL, die Linien klebten dort aufeinander und faecherten oben und
+  //     unten wieder auf. Auf dem Vorher-Bild ist genau das der haessliche Teil. Bei der
+  //     Stadionform ist der Parallelversatz dagegen trivial und exakt: eine Stadionform um
+  //     d nach aussen versetzt ist wieder eine Stadionform mit gleicher Geradenlaenge und
+  //     Radius r+d. Der Bahnabstand ist damit ueberall gleich — wie auf einer echten Bahn.
+  //
+  //  3. DAS SEITENVERHAELTNIS. Alt: RX/RY = 478/141 = 3,4:1. Eine echte Bahn ist
+  //     176,91/92,52 = 1,91:1. Ein Bild mit 3,4:1 ist keine Bahn von oben, das ist eine
+  //     plattgedrueckte Bahn. 1,91:1 passt bei 1240x470 aber nicht hinein (die Bahn waere
+  //     nur 650 px breit und liesse links und rechts die halbe Leinwand leer).
+  //     AUFLOESUNG, UND ZWAR DIE REALISTISCHE: eine Uebertragung zeigt die Bahn NIE
+  //     unverzerrt von senkrecht oben, sondern von einer erhoehten Kamera — und die
+  //     staucht die Tiefenachse. Wir zeichnen deshalb die ECHTEN Proportionen und stauchen
+  //     y um OVAL_STAUCH=0,57, was einem Kamerawinkel von rund 35 Grad entspricht
+  //     (sin 35 Grad = 0,57). Das ist dieselbe Verkuerzung, die man auf jedem
+  //     Stadion-Weitwinkel sieht, statt einer frei erfundenen Ellipse.
+  //
+  //  4. FARBE. #8a4a32 ist ein stumpfes Braun. Wettkampfbahnen sind Ziegelrot (Mondo,
+  //     Tokio 2020 und alle Spiele davor; Paris 2024 erstmals Violett — s.
+  //     olympics.com/en/news/paris-2024-olympic-paralympic-athletics-mondo-purple-track).
+  //     Wir bleiben beim klassischen Ziegelrot, aber gesaettigt statt schlammig, mit
+  //     hellerem Randstein (der weisse Innenbord ist auf jedem Bild das Erste, was die
+  //     Bahn vom Innenraum trennt) und einem dunkleren Innenfeld.
+  //
+  //  5. KEINE MARKIERUNGEN. Eine echte Staffelbahn traegt an jeder Wechselzone
+  //     Dreiecke in der Bahnmitte (30-m-Zone seit 2018, World Athletics). Die zeichnen wir
+  //     jetzt — sie sagen dem Zuschauer ausserdem, WO der naechste Wechsel faellt.
+  //
+  // WIEVIEL GROESSER: halbe Breite von 478 auf 560 px (Bahn 1120 statt 957 px breit), die
+  // Hoehe ist durch das Broadcast-HUD oben (#bahnHud, top:15% = y 70..116) und den
+  // Leinwandrand unten gedeckelt — mehr als +-167 px um die Mitte geht nicht, ohne unter
+  // das HUD zu laufen. Der spuerbare Gewinn kommt darum aus der Breite UND daraus, dass
+  // die Laeufer nicht mehr sechsmal, sondern dreimal herumlaufen (s. OVAL_RUNDEN unten).
+  //
+  // Reine Zeichengeometrie: keine dieser Konstanten wird von tempoVon()/stepSpurt()/
+  // MOTOREN.staffel.wert() gelesen. Rangtreue bit-identisch, s. PR-Beschreibung.
+  const OVAL_CX=W/2, OVAL_CY=H*0.615;
+  const OVAL_STAUCH=0.57;                      // Kameraverkuerzung der Tiefenachse, s. Punkt 3
+  const OVAL_HL=263;                           // halbe Geradenlaenge (= 84,39 m massstaeblich)
+  const OVAL_R_AUSSEN=288;                     // Aussenradius der Kurve (= 92,52/2 m), 263/288 = 0,913 wie real
+  const OVAL_BAHN_ABSTAND=26;                  // Bahnbreite in Zeichen-Einheiten, s. Kommentar an OVAL_BAHNEN
+  // WIEVIELE BAHNEN GEZEICHNET WERDEN. Mechanisch laufen genau zwei Mannschaften
+  // (`bahnenFest:2`, BAHNEN_N()===2) — eine Bahn, auf der nur zwei Spuren liegen, sieht
+  // aber nicht aus wie ein Stadion, sondern wie eine Radrennbahn. Ein echter Wettkampf
+  // hat acht. Wir zeichnen SECHS und setzen die beiden Mannschaften auf die Spuren 2 und 3
+  // (nebeneinander, mittig) — rein praesentational, `u.bahnZ` bleibt 0/1 und wird beim
+  // Zeichnen nur verschoben. Die echte Bahnbreite (1,22 m von 46,26 m Aussenradius, also
+  // 2,6 % davon) waere bei unserem Massstab 7,7 px und die beiden Laeufer damit auf den
+  // Geraden nur 4 px auseinander — unter 32-px-Figuren unsichtbar. 26 px ueberzeichnet die
+  // Bahnbreite bewusst um gut das Dreifache, damit die zwei Mannschaften trennbar bleiben;
+  // das ist dieselbe Lesbarkeits-Ueberzeichnung wie bei den Spielfeldlinien im Feldspiel.
+  const OVAL_BAHNEN=6;
+  const OVAL_SPUR0=2;                          // auf welche gezeichnete Spur Mannschaft 0 gelegt wird
   const istOval=()=>!!BA().staffel;
-  // Winkel 0 = Ziellinie oben (12 Uhr), im Uhrzeigersinn.
-  const ovalWinkel=(lokal)=>lokal*2*Math.PI-Math.PI/2;
+  // WIE VIELE RUNDEN DAS GANZE RENNEN LANG SIND — der eigentliche Fund hinter Chris'
+  // "damit nicht staendig ueberrundet wird" und "man weiss gar nicht wer fuehrt".
+  //
+  // ALT: `laufAnteil(u)` wurde zum Winkel. Das ist der Fortschritt IM EIGENEN ABSCHNITT und
+  // faengt bei JEDEM Wechsel wieder bei 0 an — jedes Bein war damit eine volle Runde, das
+  // Rennen sechs. Der Fehler daran ist nicht die Rundenzahl, sondern dass die Bildposition
+  // dann NICHT MEHR SAGT, WER FUEHRT: uebergibt Mannschaft A an der Ziellinie, waehrend B
+  // noch bei 90 % ihres Beins steht, springt A auf 0 Grad zurueck und steht sichtbar HINTER
+  // B — obwohl A fuehrt. Weil die Uebergabe genau auf der Ziellinie liegt, passiert das bei
+  // JEDEM Wechsel. Das ist das "staendige Ueberrunden", und es ist kein Ueberrunden,
+  // sondern ein Anzeigefehler.
+  //
+  // NEU: der Winkel kommt aus dem GESAMTfortschritt `u.pos` (0..1 ueber das ganze Rennen),
+  // mal OVAL_RUNDEN. Damit ist die Winkelreihenfolge beider Mannschaften ueber das ganze
+  // Rennen dieselbe wie die Rennreihenfolge, solange der Rueckstand kleiner als eine Runde
+  // ist — bei drei Runden also kleiner als ein Drittel des Rennens (rund 60 reale
+  // Sekunden). Gemessener Zielabstand im Median: 1,05 Sim-s von 10,5, also ein Zehntel
+  // davon. WER VORNE LAEUFT, FUEHRT — ab jetzt immer.
+  //
+  // WARUM DREI UND NICHT EINE: sechs Beine zu je einer halben Runde sind 6 x 200 m = 1200 m,
+  // also die Staffel-Variante, die es wirklich gibt (4x200 m steht im Regelwerk von World
+  // Athletics, en.wikipedia.org/wiki/4_%C3%97_200_metres_relay). Eine einzige Runde
+  // (6 x 66 m) waere zwar noch eindeutiger, wuerde die Figuren aber auf ein Drittel des
+  // bisherigen Tempos bremsen — und "sehr sehr statisch" ist genau der andere Punkt auf
+  // Chris' Liste. Drei Runden halten rund 36 px/s Bildtempo (vorher 70, bei einer Runde
+  // waeren es 12) und legen die Wechsel abwechselnd auf die Ziellinie (Beine 0/2/4) und auf
+  // die Gegengerade (Beine 1/3/5) — zwei feste Wechselzonen, wie auf einer echten Bahn.
+  const OVAL_BEINE_JE_RUNDE=2;
+  const OVAL_RUNDEN=()=>Math.max(1,(BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
+  // Wie weit ist diese Mannschaft auf dem Oval — in Runden, ab der Ziellinie im
+  // Uhrzeigersinn. Ganze Zahl = Ziellinie (oben, Mitte der Zielgeraden), x,5 = Gegengerade.
+  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN();
+  // EIN PUNKT AUF DER STADIONFORM. `anteil` 0..1 ist der Bruchteil EINER Runde ab der
+  // Ziellinie (oben Mitte) im Uhrzeigersinn, `r` der Kurvenradius dieser Spur (vor der
+  // Stauchung). Bogenlaengen-treu parametrisiert, damit ein Laeufer auf der Geraden und in
+  // der Kurve dasselbe Tempo zeigt: Umfang = 4*HL + 2*PI*r, davon 4*HL auf den beiden
+  // Geraden. Reihenfolge ab der Ziellinie: halbe Zielgerade nach rechts, Rechtskurve,
+  // ganze Gegengerade nach links, Linkskurve, halbe Zielgerade zurueck zur Mitte.
+  function bahnPunkt(anteil,r){
+    const U=4*OVAL_HL+2*Math.PI*r;
+    let s=(((anteil%1)+1)%1)*U;
+    const ry=(dy)=>OVAL_CY+dy*OVAL_STAUCH;
+    if(s<OVAL_HL)                 return {x:OVAL_CX+s, y:ry(-r)};
+    s-=OVAL_HL;
+    if(s<Math.PI*r){ const w=-Math.PI/2+s/r;
+      return {x:OVAL_CX+OVAL_HL+Math.cos(w)*r, y:ry(Math.sin(w)*r)}; }
+    s-=Math.PI*r;
+    if(s<2*OVAL_HL)               return {x:OVAL_CX+OVAL_HL-s, y:ry(r)};
+    s-=2*OVAL_HL;
+    if(s<Math.PI*r){ const w=Math.PI/2+s/r;
+      return {x:OVAL_CX-OVAL_HL+Math.cos(w)*r, y:ry(Math.sin(w)*r)}; }
+    s-=Math.PI*r;
+    return {x:OVAL_CX-OVAL_HL+s, y:ry(-r)};
+  }
+  // Radius der gezeichneten Spur `i` (0 = innen) in ihrer MITTE.
+  const ovalSpurR=(i)=>OVAL_R_AUSSEN-(OVAL_BAHNEN-i-0.5)*OVAL_BAHN_ABSTAND;
+  // DIESELBE Stadionform als Canvas-Pfad. Die zwei Halbkreise werden nach der Stauchung zu
+  // Halb-ELLIPSEN mit rx=r, ry=r*OVAL_STAUCH — deckungsgleich mit bahnPunkt() oben, damit
+  // Boden und Laeufer nie auseinanderlaufen. Die Stauchung steckt in den Radien und NICHT
+  // in einem ctx.scale(), sonst wuerde sie die Linienstaerke mitverzerren.
+  //
+  // HAENGT NUR AN, oeffnet KEINEN neuen Pfad: der Belag wird als Flaeche zwischen zwei
+  // Stadionformen gefuellt, und dafuer muessen beide Konturen im SELBEN Pfad liegen
+  // (Fuellregel "evenodd" stanzt die innere dann heraus). Ein ctx.beginPath() hier haette
+  // die erste Kontur jedes Mal weggeworfen — genau dieser Fehler hat beim ersten Anlauf
+  // das Innenfeld ziegelrot und die Bahn gruen gefaerbt. Jeder Aufrufer setzt sein
+  // ctx.beginPath() selbst.
+  function bahnPfad(r){
+    const ry=r*OVAL_STAUCH;
+    ctx.moveTo(OVAL_CX-OVAL_HL,OVAL_CY-ry);
+    ctx.lineTo(OVAL_CX+OVAL_HL,OVAL_CY-ry);
+    ctx.ellipse(OVAL_CX+OVAL_HL,OVAL_CY,r,ry,0,-Math.PI/2,Math.PI/2);
+    ctx.lineTo(OVAL_CX-OVAL_HL,OVAL_CY+ry);
+    ctx.ellipse(OVAL_CX-OVAL_HL,OVAL_CY,r,ry,0,Math.PI/2,3*Math.PI/2);
+    ctx.closePath();
+  }
+  // Liegt dieser Oval-Anteil an der Ziellinie (oben) oder auf der Gegengeraden (unten)?
+  // Beides sind GERADEN, die Tangente ist dort also waagerecht und "quer zur Laufrichtung"
+  // heisst an beiden Zonen schlicht: die Bildschirm-Y-Achse. Genau deshalb funktioniert die
+  // Auffaecherung der Wartenden unten an beiden Wechselzonen mit derselben Rechnung.
+  const ovalAmZiel=(anteil)=>{const f=(((anteil%1)+1)%1); return f<0.25||f>0.75;};
   function ovalPunkt(u){
     const platz=rennFertig.indexOf(u);
-    const winkel=ovalWinkel(laufAnteil(u));
+    const anteil=ovalAnteil(u);
+    // SPUR: mechanisch gibt es zwei (u.bahnZ 0/1), gezeichnet werden sechs — die beiden
+    // Mannschaften liegen auf den mittleren Spuren OVAL_SPUR0 und OVAL_SPUR0+1. u.bahnZ
+    // wird waehrend eines Bahnwechsels weich interpoliert und ist dann gebrochen; das
+    // traegt sich hier unveraendert durch, der Laeufer wandert also weiterhin sichtbar
+    // zwischen den Spuren statt zu springen.
+    let bahnR=ovalSpurR(OVAL_SPUR0+u.bahnZ);
     let vx=0, vy=0;                            // Bildschirm-Versatz, nur fuer Wartende/Fertige
     if(platz>=0){
-      // GANZE MANNSCHAFT IM ZIEL (Staffel wird als Team gewertet, s. stepSpurt):
-      // alle sechs liegen rechnerisch auf demselben Ziellinien-Winkel (der zuletzt
-      // Aktive bei laufAnteil=1, jeder Vorgaenger bei laufAnteil=1 seines EIGENEN
-      // Abschnitts, s. Kommentar an laufAnteil oben). Dieselbe Auffaecherung wie
-      // auf der Geraden (der camX-Zweig unten, "+12+platz*9"), nur entlang der
-      // Tangente an der Ziellinie statt entlang x — dort ist die Tangente rein
-      // horizontal (Winkel -90°, s. Herleitung im Recherche-Dokument), beide
-      // Richtungen fallen also zusammen.
+      // GANZE MANNSCHAFT IM ZIEL (Staffel wird als Team gewertet, s. stepSpurt): sie
+      // bekommen alle dieselbe Zielzeit, stehen aber NICHT alle am selben Punkt — hier
+      // stand bis zum Review 13.09. das Gegenteil ("alle sechs liegen auf u.pos=1"), und
+      // das war seit der Umstellung auf den Gesamtfortschritt falsch.
+      //
+      // Nur der SCHLUSSLAEUFER laeuft bis `u.pos=1`. Die anderen fuenf behalten das `u.pos`
+      // ihrer Uebergabe (`u.pos=u.beinBis` im Wechselzweig von stepStaffel) und bleiben
+      // damit an der Wechselzone stehen, an der sie den Stab abgegeben haben. Bei sechs
+      // Beinen sind das 1/6 ... 5/6, mal OVAL_RUNDEN=3 also abwechselnd halbe und ganze
+      // Runden: nachgemessen liegen Bein 2, 4 und 6 an der Ziellinie und Bein 1, 3 und 5
+      // auf der Gegengeraden — drei und drei, nicht sechs auf einem Punkt. Die Mannschaft
+      // steht im Ziel also so verteilt, wie sie gelaufen ist.
+      //
+      // Ueberlagern koennen sich damit nur die drei je Zone, und dagegen faechert der
+      // Versatz entlang der Tangente auf: an BEIDEN Zonen ist die waagerecht (beides sind
+      // Geraden, s. ovalAmZiel), also entlang x, genau wie der camX-Zweig auf der Geraden.
+      // Gemessen bleiben zwischen zwei Figuren derselben Zone 18 px.
       vx=12+platz*9;
     } else if(!u.aktiv && u.fertig==null){
-      // WARTENDE STEHEN AN DER ZIELLINIE, GESTAFFELT (Abschnitt 3 des Dokuments):
-      // laufAnteil ist fuer sie exakt 0 oder 1 (u.pos steht auf einem Vielfachen
-      // von 1/n, s. Aufstellen/Wechsel) — sie liegen also OHNE jede weitere
-      // Rechnung schon auf dem Ziellinien-Winkel, egal fuer welchen Abschnitt sie
-      // warten. Ein Versatz senkrecht zur Laufrichtung faechert sie auf statt sie
-      // zu stapeln — an der Ziellinie (oben auf dem Oval) ist "senkrecht zur
-      // Laufrichtung" die Bildschirm-Y-Achse (dieselbe Idee wie die
-      // Bahn-Auffaecherung anderswo im Motor). Gruppe = ALLE nicht aktiven,
-      // noch nicht im Ziel angekommenen Team-Kollegen — sowohl die, die noch gar
-      // nicht liefen, als auch die, die ihren Abschnitt schon abgegeben haben:
-      // beide stehen sichtbar an derselben Ziellinie (Chris' "die kommenden
-      // warten an der Ziellinie", Abschnitt 3, Punkt 1 des Dokuments).
-      const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null)
+      // WARTENDE STEHEN AN IHRER EIGENEN WECHSELZONE. u.pos steht fuer sie exakt auf einer
+      // Beingrenze (`L.pos=L.beinVon` beim Aufstellen, `naechster.pos=u.beinBis` beim
+      // Wechsel) — mal OVAL_RUNDEN ist das eine ganze Zahl (Ziellinie) oder x,5
+      // (Gegengerade). Sie liegen also OHNE jede Sonderrechnung schon auf der richtigen
+      // Zone, und zwar jetzt auf ZWEI Zonen verteilt statt alle sechs auf einem Haufen an
+      // der Ziellinie — das war auf Chris' Bild der unleserliche Namensbrei.
+      //
+      // Gruppe = die Team-Kollegen an DERSELBEN Zone, nicht mehr alle Wartenden der
+      // Mannschaft: sonst bekaeme ein Laeufer an der Gegengeraden einen Versatz, der fuer
+      // die Warteschlange an der Ziellinie gedacht war.
+      //
+      // NACH ZONE, NICHT NACH u.pos (Review-Fund 13.09.). Der erste Anlauf gruppierte ueber
+      // `Math.abs(o.pos-u.pos)<1e-6` — und traf damit NIE zu. Zwei Wartende an derselben
+      // SICHTBAREN Zone haben verschiedene `u.pos`: `L.pos=L.beinVon=idx/6` unterscheidet
+      // sich je Bein, und die Beine 0/2/4 landen nur deshalb am selben Bildpunkt, weil sie
+      // sich um GANZE RUNDEN unterscheiden (anteil = pos*3 = 0 / 1 / 2). Die Gruppen waren
+      // damit ausnahmslos einelementig, `idx` immer 0 und die Auffaecherung tot: drei
+      // Laeufer standen auf der Gegengeraden auf demselben Pixel, zwei weitere an der
+      // Ziellinie. Massgeblich ist die ZONE, und die sagt `ovalAmZiel()` — genau die
+      // Funktion, die den Ganzzahl-/Halbrunden-Unterschied wegrechnet.
+      const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null
+          &&ovalAmZiel(ovalAnteil(o))===ovalAmZiel(anteil))
         .sort((a,b)=>(a.bein??0)-(b.bein??0));
-      const idx=wartende.indexOf(u);
-      // Geklemmt auf +-4 (Kadergroesse ist immer 2/4/5/6, s. season-discipline-
-      // schedule.ts — hoechstens fuenf Wartende bei sechs je Seite, idx 0..4, die
-      // Klemmung greift also nie und ist nur eine Absicherung nach oben).
-      vy=Math.max(-4,Math.min(4,idx))*13;
-      // ZWEI WARTEBEREICHE STATT EINEM: bahnZ trennt die beiden Seiten radial nur um
-      // OVAL_BAHN_ABSTAND (15px) — an der Ziellinie selbst (Winkel -90°, s. oben)
-      // haengt die Bildschirm-X aber NICHT vom Radius ab, beide Seiten laegen also
-      // ohne diesen Versatz genau uebereinander. Ein kleiner, seitenfester
-      // Horizontal-Schub schiebt die beiden Warteschlangen nebeneinander (Seite 0
-      // links, Seite 1 rechts) statt sie deckungsgleich zu stapeln — zwei
-      // Wechselzonen nebeneinander, wie bei einer echten Staffel an der Ziellinie.
-      vx=(u.seite===0?-1:1)*34;
+      const idx=Math.max(0,wartende.indexOf(u));
+      // SIE STEHEN IM INNENFELD, NICHT AUF DER BAHN. Umgesetzt ueber den RADIUS statt ueber
+      // einen Pixel-Versatz: ein kleinerer Radius ist auf der Stadionform ueberall "weiter
+      // innen", und beide Wechselzonen liegen auf einer GERADEN, wo ein kleinerer Radius
+      // genau senkrecht von der Bahn wegfuehrt. Ein fester vy haette an der Ziellinie nach
+      // innen und auf der Gegengeraden nach aussen gezeigt — oder umgekehrt.
+      // WIE VIELE ES JE ZONE WIRKLICH SIND. Die Beine wechseln sich zwischen den zwei Zonen
+      // ab (gerade Beine Ziellinie, ungerade Gegengerade), bei sechs je Seite also drei und
+      // zwei — der Aktive faellt aus der Zaehlung, es warten hoechstens DREI an einer Zone.
+      // `idx` laeuft damit 0..2 und der Radius ueber 106 / 76 / 46 px: drei klar getrennte
+      // Ringe im Innenfeld. Nachgemessen (echtes Rennen im Browser, Position ueber
+      // laeuferXY ausgelesen) stehen zwei Wartende derselben Zone 17,1 px auseinander
+      // (30 px Radius mal OVAL_STAUCH), kein Paar naeher als 12 px — vorher lagen drei
+      // Figuren auf der Gegengeraden und zwei an der Ziellinie auf DEMSELBEN Pixel.
+      // Das `Math.max` darunter ist reine Absicherung und im Spiel nie
+      // aktiv — es faengt ab, dass ein Radius je negativ wuerde (ab idx=4 taete er das, und
+      // ein negativer Radius spiegelt den Punkt auf die andere Bahnseite, statt nur eng zu
+      // werden). Kadergroessen sind 2/4/5/6 (s. season-discipline-schedule.ts), und in jeder
+      // davon bleibt die groesste Zonengruppe bei drei.
+      const rInnenkante=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+      bahnR=Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
+      // ZWEI WARTEBEREICHE STATT EINEM: ohne einen seitenfesten Horizontal-Schub staenden
+      // die beiden Warteschlangen ineinander, denn an einer Wechselzone liegen die Spuren
+      // beider Mannschaften senkrecht untereinander. Seite 0 links, Seite 1 rechts von der
+      // Zonenmitte: zwei Wechselzonen nebeneinander, wie bei einer echten Staffel.
+      vx=(u.seite===0?-1:1)*40;
       // ANLAUF (stepStaffel, Ziel 6 M1/M2): der NAECHSTE in der Wartereihe (idx===0) zieht
       // sichtbar Richtung Bahn, sobald sein Vordermann sich der Wechselzone naehert.
       // u.vizAnlauf (0..1) schreibt ausschliesslich stepStaffel; hier wird es nur GELESEN,
-      // um ihn teilweise aus der Warteschlange herauszuziehen — u.pos/u.bahnZ/u.aktiv
-      // bleiben unangetastet, es ist dieselbe reine Bildschirm-Interpolation wie u.vizX/
-      // u.vizY in stepKuer.
+      // um ihn aus dem Innenfeld auf SEINE Spur zu ziehen — u.pos/u.bahnZ/u.aktiv bleiben
+      // unangetastet, es ist dieselbe reine Bildschirm-Interpolation wie u.vizX/u.vizY in
+      // stepKuer. Interpoliert wird jetzt der RADIUS (Wartepunkt -> Laufspur) statt eines
+      // Pixel-Versatzes: er tritt damit sichtbar aus dem Innenfeld in seine Bahn, statt
+      // im letzten Bild dorthin zu springen.
       if(idx===0 && u.vizAnlauf>0){
         const zug=Math.min(1,u.vizAnlauf);
-        vx*=(1-0.55*zug); vy*=(1-0.55*zug);
+        bahnR+=(ovalSpurR(OVAL_SPUR0+u.bahnZ)-bahnR)*zug;
+        vx*=(1-0.75*zug);
       }
     }
-    const bahnR=OVAL_RY+u.bahnZ*OVAL_BAHN_ABSTAND;
-    return {x:OVAL_CX+Math.cos(winkel)*OVAL_RX+vx, y:OVAL_CY+Math.sin(winkel)*bahnR+vy};
+    const p=bahnPunkt(anteil,bahnR);
+    return {x:p.x+vx, y:p.y+vy};
   }
 
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
@@ -20804,8 +21114,66 @@
   // rho je Spiel 0,906, kostet nichts an anderer Stelle.
   const WECHSEL_PATZER=0.11;       // Grundchance auf einen echten Patzer
   const WECHSEL_PATZER_K=0.0020;   // wieviel Koennen sie senkt
-  const WECHSEL_PATZER_KOSTEN=0.9; // was ein Patzer obendrauf kostet
   const WECHSEL_ROBUST_K=0.0012;   // wieviel Verlaesslichkeit die Patzerchance senkt
+  // ============ DIE UEBERGABE BEKOMMT EINE AUSFUEHRUNG (13.09.) ============
+  // Chris, woertlich, nach dem ersten Live-Rennen: "und auch hier gilt spieler sollen ggf.
+  // mal aufholen koennen usw und momentan ist es schon sehr sehr statiscch".
+  //
+  // NACHGEMESSEN, und er hat noch untertrieben. Ueber 200 Rennen mit 200 verschiedenen
+  // Saaten (Sonde: Fuehrung an jeder der sechs Beingrenzen aus `etappenZeit` und
+  // `wechselKonto` rekonstruiert):
+  //
+  //   * Die Wechselverluste waren ZEICHENGLEICH IDENTISCH ueber alle Saaten hinweg —
+  //     Seite 0 bekam in JEDEM Rennen 0.166 / 0.278 / 0.332 / 0.254 / 0.260 Sim-Sekunden.
+  //   * Fuehrungswechsel: in 100 % der Rennen exakt einer, immer an derselben Stelle.
+  //     Wer nach Bein 1 fuehrte, gewann in 0,0 % der Rennen — nicht, weil es spannend
+  //     waere, sondern weil ES IMMER DASSELBE RENNEN WAR.
+  //   * Zielabstand: Median 1,05 Sim-s von 10,5, also zehn Prozent. Nie ein Fotofinish.
+  //
+  // ZWEI URSACHEN, beide hier:
+  //
+  //  1. `verlust` war eine REINE FUNKTION von TECHNIK. max(MIN, MAX - koennen*K) hat
+  //     keinen Zufallsanteil. Zwei feste Kader ergaben damit fuenf feste Zahlen.
+  //  2. Der Patzer, der das auffangen sollte, feuerte praktisch nie. Seine Chance ist
+  //     max(0.01, 0.11 - koennen*0.0020 - verlaesslich*0.0012); bei den ueblichen Werten
+  //     (koennen und verlaesslich je 40-55) wird der Ausdruck NEGATIV und faellt auf den
+  //     Boden 0,01. Der Kommentar an WECHSEL_PATZER oben zielte auf 4,5-4,6 % je Wechsel
+  //     — angekommen sind 1 %, weil der Boden die eigentliche Zahl ueberschrieb.
+  //
+  // WAS ECHTE STAFFELN SPANNEND MACHT, ist genau das, was hier fehlte: die AUSFUEHRUNG
+  // der Uebergabe schwankt von Lauf zu Lauf, auch bei denselben zwei Laeufern. Der
+  // Abnehmende startet auf seine Marke und muss auf Hoechsttempo sein, wenn der Stab
+  // kommt; passt das Timing in der 30-m-Zone nicht, kostet es Zehntel, ohne dass jemand
+  // etwas falsch gemacht haette (World Athletics, 30-m-Wechselzone seit 2018). Genau das
+  // — und NICHT irgendein erfundener Zusatzmechanismus — kommt jetzt dazu:
+  //
+  //   verlust = Grundwert(TECHNIK) + Ausfuehrungsstreuung + ggf. Patzer
+  //
+  // Die Streuung ist DREIECKSFOERMIG ((rr()+rr())-1 statt 2*rr()-1): kleine Abweichungen
+  // sind haeufig, grosse selten — dieselbe Form, die eine echte Uebergabe hat. Ihre
+  // BREITE sinkt mit dem Koennen, gute Paare liefern also verlaesslicher ab. Damit bleibt
+  // die Rangtreue am Koennen haengen und nicht am Wurf.
+  //
+  // WIE BREIT, NACHGEMESSEN STATT GERATEN. Ein erster Anlauf mit 0,24/0,0022/0,06 kostete
+  // an Rangtreue NICHTS (rho je Spiel 0,915 -> 0,918, bei einer Kader-Spannweite von
+  // 0,099 — also nicht von Null unterscheidbar), bewegte aber auch nur wenig: die Zahl
+  // VERSCHIEDENER Rennausgaenge stieg von 27 auf 60 je 200 Saaten. Weil die Rangtreue so
+  // viel Luft hat (Schranke 0,80, gemessen 0,92), ist die Streuung danach fast verdoppelt
+  // worden — die Messung unten in der PR-Beschreibung zeigt, was das bringt und was es
+  // kostet. Mehr geht bewusst nicht: die Uebergabe soll ein Wettkampf sein, kein Wuerfeln.
+  const WECHSEL_STREU_MAX=0.40;    // Streubreite bei Koennen 0 (Sim-Sekunden, +/-)
+  const WECHSEL_STREU_K=0.0035;    // wieviel Koennen sie einengt
+  const WECHSEL_STREU_MIN=0.10;    // enger wird auch ein Weltklasse-Paar nicht
+  // PATZERBODEN statt 0,01: die Zahl, die der Kommentar an WECHSEL_PATZER immer gemeint
+  // hat (4,5 % je Wechsel, real ~21 % der Teams je Rennen). Bei zehn Uebergaben je Rennen
+  // sieht damit rund ein Drittel der Rennen einen echten Patzer statt einem von zehn.
+  const WECHSEL_PATZER_MIN=0.045;
+  // ...UND ER KOSTET WENIGER. 0,9 Sim-s waren 13 reale Sekunden auf ein Rennen von 154 —
+  // 8,6 % der Gesamtzeit. Ein wirklich verpatzter Wechsel kostet real eher 0,5 bis 1,0 s
+  // auf 38 s eines 4x100, also 1,3 bis 2,6 %. 0,34 Sim-s sind 5 reale Sekunden = 3,2 %,
+  // in derselben Groessenordnung. Der Patzer wird damit HAEUFIGER UND KLEINER — er
+  // entscheidet ein enges Rennen, statt es als seltener Totalausfall zu erschlagen.
+  const WECHSEL_PATZER_KOSTEN=0.34;
   const SPITZE_ZUG=0.0038;         // wieviel WUCHT die Fuehrungsarbeit verbilligt (Staffel)
   const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
   const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
@@ -21554,13 +21922,26 @@
           // das eine Staffel ausmacht.
           const koennen=(u.TECHNIK+naechster.TECHNIK)/2;
           let verlust=Math.max(WECHSEL_MIN,WECHSEL_MAX-koennen*WECHSEL_K);
+          // AUSFUEHRUNG (13.09., s. den ausfuehrlichen Block an WECHSEL_STREU_MAX oben).
+          // Bis hierher stand der Verlust damit FEST — dieselben zwei Laeufer ergaben in
+          // jedem Rennen dieselbe Zahl, und das Rennen war ein Abspielen statt eines
+          // Wettkampfs. Zwei Wuerfe ergeben eine dreiecksfoermige Streuung um 0: das
+          // Timing in der Wechselzone sitzt meistens ungefaehr, selten sehr gut und selten
+          // schlecht. Die Breite engt das Koennen ein, ein gutes Paar schwankt also
+          // weniger — die Rangtreue bleibt dadurch am TECHNIK-Wert haengen.
+          const streu=Math.max(WECHSEL_STREU_MIN,WECHSEL_STREU_MAX-koennen*WECHSEL_STREU_K);
+          verlust=Math.max(WECHSEL_MIN,verlust+streu*((rr()+rr())-1));
           // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
           // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
           // gerempelt wird hier nicht. Jetzt senkt es die Chance auf den echten Patzer —
           // genau das, was "verlaesslich" heisst. Gerechnet wird mit dem Schnitt beider
           // Beteiligten, wie beim Koennen auch.
           const verlaesslich=(u.ROBUST+naechster.ROBUST)/2;
-          const patzer=rr()<Math.max(0.01,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
+          // Boden jetzt WECHSEL_PATZER_MIN statt 0,01: der alte Boden hat die ganze
+          // Formel darueber ueberschrieben (der Ausdruck wird bei den ueblichen Werten
+          // negativ) und den Patzer damit auf 1 % je Wechsel eingefroren — s. den Block
+          // an WECHSEL_STREU_MAX oben, Ursache 2.
+          const patzer=rr()<Math.max(WECHSEL_PATZER_MIN,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
                                           -verlaesslich*WECHSEL_ROBUST_K);
           if(patzer)verlust+=WECHSEL_PATZER_KOSTEN
             *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
@@ -21590,10 +21971,10 @@
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+verlust.toFixed(2)+" s verloren.");
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.");
           } else {
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+verlust.toFixed(2)+" s im Wechsel.");
+            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
         continue;
@@ -21607,7 +21988,7 @@
           u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
-          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".");
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
