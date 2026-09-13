@@ -477,6 +477,15 @@ Saison-Zahl ausschließlich an **B** hängt: die duellbewusste Eröffnung ist es
 Validität hebt — der Favorit erreicht dasselbe Zielgewicht über einen Weg, auf dem er weniger
 oft in eine Wiederholung gedrängt wird.
 
+**Und die anderen neunzehn Disziplinen: unverändert, nachgemessen.**
+`scripts/miss-alle-disziplinen.mjs 24` einmal vor und einmal nach dem Eingriff, beide gegen
+dieselbe Basis (`961b7793`) und dieselbe Kaderfamilie. Im `diff` der beiden Tabellen steht
+**genau eine** geänderte Zeile — Gewichtheben (0,854 → 0,843, Saison 0,923 → 0,930). Alle
+neunzehn übrigen Zeilen sind **zeichengleich**, Seitenfehler in beiden Läufen keine. Das deckt
+sich mit dem statischen Befund: `hebeUebung` wird nur aus `baueHebenDuelle` gerufen, das nur
+hinter `if(art.heben)` steht, und `heben:true` trägt genau ein `BUEHNE_ART`-Eintrag
+(Gewichtheben) — es gibt keinen zweiten Pfad in den geänderten Code.
+
 ### 5.3 IWF-Korridor — hält
 
 | Größe | vorher | nachher | Ziel |
