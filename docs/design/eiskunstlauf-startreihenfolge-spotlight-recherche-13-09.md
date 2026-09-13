@@ -52,10 +52,17 @@ Krolach   grp2 kuer (531,317)   Johanna  grp2 kuer (780,212)
 ```
 
 **249 px auseinander** — zwei Partner eines Duetts, die nebeneinander laufen sollen. Grund: die
-gemessene Sturzhäufigkeit. `erfolg = min(0.94, 0.15 + TECHNIK*0.0055 + NERVEN*0.0035)` liegt bei
-realen Kadern zwischen ~0,51 und ~0,87; dazu hält jeder dritte Durchgang als Pirouette an. Ein
-Partner steht damit rund die Hälfte der Zeit, und in dieser Zeit läuft ihm die Kurve schneller
-davon, als ein gedeckelter Schritt sie wieder einholt. Der Rückstand **akkumuliert**.
+Sturzhäufigkeit. `erfolg = min(0.94, 0.15 + TECHNIK*0.0055 + NERVEN*0.0035)` liegt bei realen
+Kadern zwischen ~0,51 und ~0,87; dazu hält jeder dritte Durchgang als Pirouette an. Ein Partner
+steht damit rund die Hälfte der Zeit, und in dieser Zeit läuft ihm die Kurve schneller davon, als
+ein gedeckelter Schritt sie wieder einholt. Der Rückstand **akkumuliert**.
+
+*Unabhängig bestätigt:* `docs/design/eiskunstlauf-kalibrierung-10-09.md` Abschnitt 2, Punkt 3
+(Opus-Overseer-Review zu PR #903) hat mit `scripts/probe-eiskunstlauf-ton.mjs` Teil C
+nachgezählt: **58 Stürze zu 66 sauberen Landungen bei 125 Elementen, Fehlschlagquote 47 %.** Das
+ist dieselbe Zahl, aus einer anderen Richtung gemessen, und der Grund, warum ein Haltefenster in
+voller Elementlänge hier lückenlos überlappt. (Dass 47 % gegenüber der realen Sportart zu hoch
+sind, ist ein Rezept-Thema und steht in jenem Dokument — diese PR fasst das Rezept nicht an.)
 
 ### 1.2 Die tragfähige Behebung: eine Bahnuhr je Paar
 
@@ -226,18 +233,28 @@ ausschließlich auf neue `viz*`-Felder (`vizBahnT`, `vizRolle`, `vizGrp`, `vizGr
 
 ## 6. Abnahme
 
-`node scripts/miss-alle-disziplinen.mjs 24`, vorher gegen nachher, alle zwanzig Disziplinen:
+`node scripts/miss-alle-disziplinen.mjs 24`, Baseline gegen Nachher, alle zwanzig Disziplinen:
 **bit-identisch**, Eiskunstlauf bei rho je Spiel **0,885** / rho Saison **0,979** (Median über
 die Kader-Familie aus dem live-save-Abbild). Das ist die erwartete und geforderte Aussage — eine
-reine Präsentationsänderung darf die Zahl nicht bewegen. Die Einzelzahlen stehen in der
-PR-Beschreibung.
+reine Präsentationsänderung darf die Zahl nicht bewegen.
+
+Gemessen wurde zweimal: einmal gegen den `main`-Stand vor PR #903/#908/#910 und, nachdem diese
+drei währenddessen gelandet sind, ein zweites Mal gegen den frischen `main` nach dem Merge — bei
+letzterem wurde `public/mockups/` vorübergehend auf `origin/main` zurückgesetzt, gemessen,
+wiederhergestellt und erneut gemessen, damit Baseline und Nachher sich nur um diese PR
+unterscheiden. Die Einzelzahlen stehen in der PR-Beschreibung.
 
 Weiter geprüft: `node --check`, `npx tsc --noEmit` (Diff gegen `main` leer),
 `npx tsx scripts/pruefe-slot-invariante.ts`.
 
-**Ton:** nicht berührt. `TON_KATALOG.eiskunstlauf` existiert auf `main`, hat aber noch **keine**
-`sfx()`-Aufrufstelle (die liefert PR #903). Diese Änderung fügt keine hinzu und verschiebt keine
-— ein Ton-Leck-Test hat hier nichts zu prüfen.
+**Ton:** PR #903 ist während dieser Arbeit auf `main` gelandet und hat die
+`sfx("eiskunstlauf", …)`-Aufrufstellen in `stepKuer()` gebracht. Sie sind beim Merge unverändert
+in den neuen Durchgang 1 übernommen worden; die Spotlight-Rotation ändert an ihrer Zahl und
+Reihenfolge nichts, weil `u.aktuell` weiterhin nur für den gerade enthüllten Teilnehmer hochzählt
+— das ist jetzt eben immer einer aus dem Paar im Spotlight. Nachgewiesen mit der Sonde aus
+derselben PR: `node scripts/probe-eiskunstlauf-ton.mjs` → **GESAMT: BESTANDEN** (Teil B
+Loop-Reset 1/2/3/4 über vier Kämpfe, Teil C kufe/sprung/landung/sturz feuern im echten Lauf,
+Teil D Ton-Leck in allen acht Geschwister-Bühnen exakt 0).
 
 **Geschwister-Disziplinen:** jede Änderung an `bauBuehne()`/`zeichneBuehne()` liegt hinter
 `art.duett`, das ausschließlich `BUEHNE_ART.eiskunstlauf` trägt. Die acht anderen Bühnen
