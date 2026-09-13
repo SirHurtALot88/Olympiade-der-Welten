@@ -432,6 +432,20 @@
     background:color-mix(in srgb,var(--tt) 14%,transparent)}
   .oly-battle-arena.oly-battle-arena .ttchip.fertig{opacity:.55;text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .ttchip.wartet{opacity:.6}
+  /* STARTNUMMER vor dem Namen (Chris' Fund 13.09., Punkt 1): macht sichtbar, dass die
+     Leiste in STARTREIHENFOLGE steht und der versetzte Start Absicht ist. */
+  .oly-battle-arena.oly-battle-arena .ttchip i{display:inline-block;min-width:13px;
+    margin-right:5px;padding:0 2px;border-radius:3px;font-style:normal;font-weight:700;
+    background:color-mix(in srgb,var(--ink) 12%,transparent);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .ttchip.an i{background:color-mix(in srgb,var(--tt) 28%,transparent);
+    color:var(--tt)}
+  /* LIVE-STAND: Rang, Rueckstand, Reserve (Chris' Fund 13.09., Punkte 4 und 6). */
+  .oly-battle-arena.oly-battle-arena .ttstand{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+    color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .ttstand b{color:var(--tt);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ttstand .gut{color:var(--ok)}
+  .oly-battle-arena.oly-battle-arena .ttstand .knapp{color:var(--warn,#e0a341)}
+  .oly-battle-arena.oly-battle-arena .ttstand .schlecht{color:var(--crit)}
   /* HOEHENPROFIL: eine flache Leiste, farbige Baender je Gelaendezone, ein Marker fuer die
      Position des fokussierten Laeufers, zwei Striche fuer die Checkpoints. Bewusst kein
      Canvas/SVG-Nachbau eines echten Hoehenprofils (die Recherche nennt das explizit ein

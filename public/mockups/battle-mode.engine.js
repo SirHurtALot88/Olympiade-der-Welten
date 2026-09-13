@@ -3020,9 +3020,17 @@
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
     // Gang in Schleife. So passt das Bild zu dem, was die Simulation gerade tut.
+    // EIGENE SCHRITTPHASE STATT DER WELTUHR (Zeitfahren, Ziel 8, s. stepZeitfahren).
+    // `u.vizAniPhase` ist die Zahl der bereits gelaufenen LAUFZYKLEN (nicht Bilder) —
+    // hier mit der Bildzahl des aktuellen Blattes multipliziert, damit der Aufrufer nichts
+    // ueber Sprite-Blaetter wissen muss. ADDITIV: wer das Feld nicht setzt (jede andere
+    // Disziplin, jeder andere Zeichenpfad), faellt Zeichen fuer Zeichen auf die alte
+    // `(t*7+u.id)`-Formel zurueck — bit-identisch.
+    const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))
+      ? u.vizAniPhase*n : (t*7+u.id);
     const f=(u.lunge>0&&!u.down&&!kuerSturz)
       ? Math.min(n-1, Math.floor((1-u.lunge/0.2)*n))
-      : ((u.down||kuerSturz)?n-1:Math.floor((t*7+u.id)%n));
+      : ((u.down||kuerSturz)?n-1:Math.floor(((zyklus%n)+n)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
     // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte. Z ist seit
@@ -17178,6 +17186,48 @@
   // nicht hierueber) — deshalb ist dieser Wechsel fuer Spurt/Climbing/Takeshi
   // bit-identisch: `bahnZeit(u) === u.fertig` dort in jedem Fall.
   function bahnZeit(u){ return u.fertig==null?null:u.fertig-(u.startT||0); }
+  // ===================================================================================
+  // DIE ANGEZEIGTE ZEIT IST DIE ZEIT, DIE MAN ZUGESCHAUT HAT (Chris' Fund 13.09.).
+  //
+  // Chris woertlich: "und auch hier hat er bei ner diszi die 1:26 dauert nur 8,1 sekunden
+  // gebraucht. macht keinen sinn das sind ja erfundene stats! du sollst es ja simulieren
+  // und dann dauert es logischerweise auch so lang wie der spieler braucht in der diszi!"
+  //
+  // NACHGEMESSEN, und er hat recht: `bahnZeit()` liefert SIMULATIONSSEKUNDEN. Die Uhr
+  // oben im HUD rechnet dagegen seit jeher `rennT*zeitFaktor()` auf ECHTE Sekunden um
+  // (s. updateHudBahn) — bei ZEIT_DEHNUNG["time-trial"]=4,38 laufen beide also um
+  // Faktor 4,38 auseinander. Ein Rennen, das 1:26 zu sehen ist, endet mit einer
+  // Siegerzeit von "8,1 s". Gemessen (scripts/probe-zeitfahren-anzeige.mjs, vor dieser
+  // PR): Uhr 1:26, Tidesprinter Platz 1 mit bahnZeit 8,079 s — exakt Chris' Zahlen.
+  //
+  // DASSELBE TICKET STAND SCHON EINMAL OFFEN, halb erledigt. Fuer Spurt sagte Chris am
+  // 06.09. woertlich: "und bei den spurt zeiten sollte das dann auch so stehen! und nicht
+  // es dauert 3 minuten und zeit steht 13,5 sekunden!" — PR #830 hat davon nur die ERSTE
+  // Haelfte umgesetzt (die Zuschauzeit auf drei Minuten gestreckt) und die zweite
+  // ausdruecklich liegen lassen ("Die angezeigte Zielzeit haengt NICHT an ZEIT_DEHNUNG:
+  // sie bleibt rennT im Simulationsmassstab"). Das ist der Rest jener Runde.
+  //
+  // REINE ANZEIGE, ABSICHTLICH NEBEN `bahnZeit()` STATT DARIN. `bahnZeit()` ist der
+  // Sortierschluessel von bahnRangliste() und die Groesse, an der
+  // MOTOREN["time-trial"].wert() und miss-alle-disziplinen.mjs die Rangtreue messen —
+  // sie bleibt unangetastet im Simulationsmassstab. `bahnZeitAnzeige()` multipliziert nur
+  // mit demselben `zeitFaktor()`, den die Uhr schon benutzt: eine KONSTANTE, positive
+  // Zahl, also rangordnungserhaltend (dieselbe Reihenfolge, dieselben Punkte) — und fuer
+  // jede Disziplin ohne ZEIT_DEHNUNG-Eintrag ist der Faktor 1 und die Funktion Zeichen
+  // fuer Zeichen `bahnZeit()`.
+  const bahnZeitAnzeige=(u)=>{ const z=bahnZeit(u); return z==null?null:z*zeitFaktor(); };
+  // Dieselbe Umrechnung fuer eine BEREITS berechnete Zeitspanne in Simulationssekunden
+  // (Zwischenzeiten `u.zz[ci]`, Rueckstaende aus bahnBesteZeit) — damit im Panel, im
+  // Endstand und im Ticker nur EIN Massstab vorkommt und nie zwei nebeneinander.
+  const bahnSpanneAnzeige=(s)=>s==null?null:s*zeitFaktor();
+  // Sekunden als "m:ss,s" ab einer Minute, darunter "12,4 s" — eine Zeitfahrzeit von
+  // 35 s liest sich als Zahl, eine von 95 s nicht mehr.
+  function bahnZeitText(sek){
+    if(sek==null)return "—";
+    if(sek<60)return sek.toFixed(1).replace(".",",")+" s";
+    const m=Math.floor(sek/60), r=sek-m*60;
+    return m+":"+(r<10?"0":"")+r.toFixed(1).replace(".",",")+" min";
+  }
   // BESTZEIT IM FELD AN EINEM CHECKPOINT (Zeitfahren, Fable-Entscheidung 3: die Diff-
   // Anzeige vergleicht gegen den BIS DAHIN schnellsten Laeufer, nicht gegen einen festen
   // Rivalen — dieselbe "vorlaeufig, aber ehrlich"-Logik wie bahnRangliste). `ci` ist der
@@ -17191,9 +17241,44 @@
     }
     return best;
   }
+  // HOCHRECHNUNG FUER DEN, DER NOCH FAEHRT (Chris' Fund 13.09.). Der vorlaeufige Stand
+  // sortierte die noch Laufenden nach `b.pos-a.pos`, also nach ROHER STRECKE. Bei einem
+  // Massenstart ist das richtig — dort sind alle gleich lange unterwegs, mehr Strecke
+  // heisst schneller. Bei GESTAFFELTEM Start (`startAbstand`, nur Time-Trial) ist es
+  // schlicht die falsche Groesse: wer 8,8 s frueher von der Rampe gerollt ist, hat immer
+  // mehr Strecke, ohne deshalb schneller zu sein. Nachgemessen (scripts/probe-zeitfahren-
+  // anzeige.mjs, Stand vor dieser PR): bei rennT=0,26 s — EIN Laeufer hatte sich ueberhaupt
+  // bewegt — stand oben im HUD schon "57 : 21", der rechnerisch groesstmoegliche Vorsprung
+  // (12+11+10+9+8+7 gegen 6+5+4+3+2+1). Weil `id` seitenweise vergeben wird (mine zuerst,
+  // dann gegen, s. bauSpurt) und `startT = id * startAbstand`, faehrt die GESAMTE Heimseite
+  // vor der gesamten Gastseite los — der vorlaeufige Stand zeigte also ueber fast das ganze
+  // Rennen die Startreihenfolge und kippte erst im Ziel auf das echte Ergebnis. Genau das
+  // ist Chris' "die Diszi ist nach 1:26 vorbei und dann steht es ploetzlich 38:40" und sein
+  // "dort sieht man Tidesprinter als schnellsten mit Abstand, vorhin beim Laufen war er
+  // optisch aber nur 4.".
+  //
+  // Die ehrliche vorlaeufige Groesse ist die HOCHGERECHNETE EIGENE ZEIT: wie lange er fuer
+  // die ganze Strecke braucht, wenn er sein bisheriges Mitteltempo haelt —
+  // `(rennT - startT) / pos`. Das ist dieselbe "vorlaeufig, aber ehrlich"-Idee, mit der
+  // bahnRangliste den Zwischenstand ueberhaupt eingefuehrt hat, nur mit der Uhr, die zu
+  // einem Einzelstart gehoert. Wer noch auf der Rampe steht (pos=0), hat keine Information
+  // und landet hinten (Infinity) — richtig so, er hat noch keinen Meter gezeigt.
+  //
+  // GEGATED auf `BA().startAbstand`: fuer Spurt, Climbing, Takeshi und die Staffel (alle
+  // ohne dieses Feld) bleibt die Zeile Zeichen fuer Zeichen die alte `b.pos-a.pos`.
+  // RHO-NEUTRAL, nicht nur behauptet: dieser Zweig greift AUSSCHLIESSLICH, solange
+  // mindestens einer noch faehrt. Am Rennende (`done`), wo MOTOREN["time-trial"].wert()
+  // und miss-alle-disziplinen.mjs die Rangliste lesen, ist `u.fertig` fuer jeden gesetzt
+  // und nur der `fa&&fb`-Zweig darueber laeuft — unveraendert. Nachgemessen: 0,828 rho je
+  // Spiel / 0,832 Saison vor UND nach dieser PR (s. PR-Beschreibung).
+  function bahnHochrechnung(u){
+    if(u.pos<=0)return Infinity;
+    return (rennT-(u.startT||0))/u.pos;
+  }
   function bahnRangliste(){
     const N=LAEUFER.length;
     const staffel=!!BA().staffel;
+    const einzelstart=!!BA().startAbstand;
     const reihe=[...LAEUFER].sort((a,b)=>{
       if(staffel){
         const la=bahnLeistung(a), lb=bahnLeistung(b);
@@ -17205,6 +17290,11 @@
       const fa=a.fertig!=null, fb=b.fertig!=null;
       if(fa&&fb)return bahnZeit(a)-bahnZeit(b);
       if(fa!==fb)return fa?-1:1;
+      if(einzelstart){
+        const ha=bahnHochrechnung(a), hb=bahnHochrechnung(b);
+        if(ha!==hb)return ha-hb;
+        return b.pos-a.pos;                       // beide noch auf der Rampe: Startfolge
+      }
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
@@ -17310,9 +17400,21 @@
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
+    // "56 : 22" SIEHT AUS WIE EINE UHRZEIT (Chris' Fund 13.09., Punkt 6: "oben die punkte
+    // zb 56:22 sagen gar nichts aus. Man kann es nicht nachvollziehen!"). Es SIND
+    // Rangpunkte — die Summe beider Seiten ist immer N*(N+1)/2, bei zwoelf Laeufern also
+    // 78, weshalb "56:22" und "38:40" dieselbe Groesse zeigen. Zwei Aenderungen, beide
+    // reine Anzeige: ein Trennzeichen, das keine Uhr ist ("·" statt ":"), und ein Suffix,
+    // das die Summe mitnennt, damit die Zahl einordenbar wird. Der ZWEITE, wichtigere
+    // Teil dieses Punktes steckt nicht hier, sondern in bahnRangliste(): der vorlaeufige
+    // Stand zeigte bei gestaffeltem Start ueber fast das ganze Rennen die Startreihenfolge
+    // statt des Rennstands und sprang erst im Ziel auf das echte Ergebnis (s. dort).
+    const rangSpiel=stand.gewertet&&BA().wertung==="rang";
     document.getElementById("klsuffix").textContent=
-      stand.suffix+(stand.gewertet&&!done?" · vorläufig":"");
-    document.getElementById("score").textContent=stand.seiten[0]+" : "+stand.seiten[1];
+      stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
+      +(stand.gewertet&&!done?" · vorläufig":"");
+    document.getElementById("score").textContent=
+      stand.seiten[0]+(rangSpiel?" · ":" : ")+stand.seiten[1];
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
@@ -19244,13 +19346,26 @@
       // bahnBesteZeit). Nur fuer Bahnen mit `art.zwischenzeiten` — heute nur Time-Trial.
       ...((art.zwischenzeiten||[]).map((cp,ci)=>({
         id:"zz"+ci, kopf:"ZZ"+(ci+1), titel:"Zwischenzeit bei "+Math.round(cp*100)+" % — Diff zur Bestzeit im Feld",
+        // Rueckstand in ZUSCHAUsekunden (s. bahnZeitAnzeige) — derselbe Massstab wie die
+        // Uhr oben und wie die Zeit-Spalte daneben.
         wert:z=>{const v=z.u.zz&&z.u.zz[ci]; if(v==null)return null;
-          const best=bahnBesteZeit(ci), diff=v-best; return Math.round(diff*100)/100;},
-        fmt:v=>v<=0.005?"Bestzeit":"+"+v.toFixed(2)+" s",
+          const best=bahnBesteZeit(ci), diff=bahnSpanneAnzeige(v-best); return Math.round(diff*100)/100;},
+        fmt:v=>v<=0.005?"Bestzeit":"+"+v.toFixed(2).replace(".",",")+" s",
         farbe:v=>v<=0.005?"var(--ok)":null}))),
-      {id:"zeit", kopf:"Zeit", wert:z=>bahnZeit(z.u)!=null&&!z.u.raus?+bahnZeit(z.u).toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
-      {id:"stand",kopf:"Stand", wert:z=>z.u.raus?"raus":z.platz?"Ziel "+z.platz:"läuft",
-        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&v.startsWith("Ziel"))?"var(--ok)":null},
+      {id:"zeit", kopf:"Zeit", titel:"eigene Laufzeit, in der Zeit gemessen, die man zugesehen hat",
+        wert:z=>bahnZeitAnzeige(z.u)!=null&&!z.u.raus?+bahnZeitAnzeige(z.u).toFixed(1):null,
+        fmt:v=>bahnZeitText(v)},
+      // "Stand" zeigte auf der Bahn den ZIELEINLAUF ("Ziel 3"). Bei gestaffeltem Start ist
+      // das nicht der Rang (wer frueher losfaehrt, kommt frueher an) — dort steht deshalb
+      // der Rang aus bahnRangliste, dieselbe Quelle wie HUD und Endstand.
+      {id:"stand",kopf:"Stand", wert:z=>{
+        if(z.u.raus)return "raus";
+        if(BA().startAbstand){
+          if(z.u.fertig==null)return (z.u.startT||0)>rennT?"Rampe":"fährt";
+          return "Rang "+(bahnRangliste().reihe.findIndex(x=>x.id===z.u.id)+1);
+        }
+        return z.platz?"Ziel "+z.platz:"läuft";},
+        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
       sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos), fuss:""};
@@ -19547,6 +19662,12 @@
     const v=platz>=0?(14+platz*8):0;            // Eingelaufene: hinter dem Tor im Burghof
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
+  // ZEITFAHREN-EINZELKAMERA, Ausschnittsgroessen (Chris' Fund 13.09., s. kameraUpdate).
+  // ZF_MIN_AUSSCHNITT 0,56 heisst: nie weniger als 56 % der Strecke im Bild (Zoom <= 1,8,
+  // gegen die bisherigen 2,2). ZF_NACHBAR_FENSTER 0,30 zieht jeden Laeufer in den Kasten,
+  // der hoechstens 30 % der Strecke entfernt ist; ZF_POLSTER laesst dem aeussersten noch
+  // Luft fuer Namensschild und Reserve-Balken.
+  const ZF_MIN_AUSSCHNITT=0.56, ZF_NACHBAR_FENSTER=0.30, ZF_POLSTER=0.14;
   function kameraUpdate(dt){
     // OVAL: die ganze Bahn liegt immer im Bild (Abschnitt 2.4 des Recherche-
     // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
@@ -19562,8 +19683,29 @@
     if(BA().startAbstand&&bahnFokus!=null){
       const u=LAEUFER.find(x=>x.id===bahnFokus);
       if(u){
-        const zielZoom=2.2;
-        const zielCx=Math.max(0,Math.min(1,u.pos));
+        // WEITER ALS BISHER (Chris' Fund 13.09., woertlich: "Der zoom ausschnitt muesste
+        // ein wenig groesser sein dass man mehr von den spielern sieht"). Die Einzelkamera
+        // stand fest auf Zoom 2,2 und zeigte damit rund 45 % der Strecke — in der Praxis
+        // fast immer GENAU EINEN Laeufer, weil die uebrigen bei 0,8 s Startabstand weit
+        // auseinanderliegen. Das war als "Kamerawagen neben dem Fahrer" gedacht, nimmt
+        // aber jeden Vergleich weg, und Vergleichen ist beim Zeitfahren die ganze Sache.
+        //
+        // Jetzt: ein Kasten um den Fokus UND seine unmittelbaren Nachbarn auf der Strecke
+        // (alle, die hoechstens ZF_NACHBAR_FENSTER der Strecke entfernt sind), mit einer
+        // Mindestbreite ZF_MIN_AUSSCHNITT. Der Zoom bleibt damit zwischen 1,25 und 1,8 —
+        // immer deutlich weiter als die alten 2,2, und er OEFFNET sich zusaetzlich, sobald
+        // wirklich jemand in der Naehe ist. Reine Praesentation: kameraUpdate() schreibt
+        // nur cam, und cam liest ausser dem Zeichnen niemand.
+        let von=u.pos, bis=u.pos;
+        for(const o of LAEUFER){
+          if(o===u||o.fertig!=null)continue;
+          if((o.startT||0)>rennT)continue;                 // steht noch auf der Rampe
+          if(Math.abs(o.pos-u.pos)>ZF_NACHBAR_FENSTER)continue;
+          von=Math.min(von,o.pos); bis=Math.max(bis,o.pos);
+        }
+        const spanne=Math.max(ZF_MIN_AUSSCHNITT,(bis-von)+ZF_POLSTER);
+        const zielZoom=Math.max(1,Math.min(1.8,1/spanne));
+        const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
         const t=Math.min(1,dt*1.8);
         cam.zoom+=(zielZoom-cam.zoom)*t;
         cam.cx+=(zielCx-cam.cx)*t;
@@ -19783,9 +19925,44 @@
       }
       // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
       // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
-      // liest sich ueberall als 0). `L.id` ist die Startreihenfolge selbst (0..11, ueber
-      // beide Seiten hinweg in Aufstellungsreihenfolge vergeben).
-      if(art.startAbstand)L.startT=L.id*art.startAbstand;
+      // liest sich ueberall als 0).
+      //
+      // STARTFOLGE JETZT IM WECHSEL STATT SEITENWEISE (Chris' Fund 13.09., woertlich: "es
+      // wird sich nur mit gleichbleibender geschwindikeit bewegt also gewinnt der der am
+      // anfang vorne ist auch auf jeden fall"). Bisher stand hier `L.id`, und `id` wird
+      // seitenweise vergeben (erst `mine.forEach`, dann `gegen.forEach`, s. unten) — die
+      // GESAMTE Heimseite fuhr also vor der gesamten Gastseite los (startT 0,0-4,0 gegen
+      // 4,8-8,8). Auf dem Bildschirm lagen damit ueber fast das ganze Rennen sechs
+      // Heimfahrer vorn und sechs Gastfahrer hinten, ohne dass das irgendetwas ueber
+      // Tempo gesagt haette. Nachgemessen (scripts/probe-zeitfahren-anzeige.mjs, vor
+      // dieser PR): die ersten vier Plaetze auf dem Bild waren ueber das ganze Rennen
+      // Draco/Lava Golem/Krolach/Johanna — alle vier Heimseite, alle vier
+      // Startnummern 1-4 — waehrend der spaetere Sieger Tidesprinter (Startnummer 9) dort
+      // nie auftauchte. Genau Chris' "vorhin beim laufen war er optisch aber nur 4.".
+      //
+      // `idx*2+seite` staffelt im Wechsel (Heim 0, Gast 1, Heim 2, ...), wie es ein
+      // echtes Zeitfahren mit zwei Mannschaften auch setzen wuerde. Der Startabstand
+      // selbst (0,8 s) und die Gesamtdauer bleiben unveraendert.
+      //
+      // DIES IST DIE EINZIGE ZEILE DIESER PR, DIE DIE SIMULATION BERUEHRT — alles andere
+      // ist Anzeige. Deshalb hier die Messung im Klartext, statt sie zu behaupten:
+      //
+      //   nur die Anzeige-Aenderungen, Startfolge unveraendert  0,828 / 0,832 (Spannw. 0,087)
+      //   mit dieser Zeile (Startfolge im Wechsel)              0,825 / 0,825 (Spannw. 0,082)
+      //
+      // Die Rennen sind untereinander unabhaengig (`schatten:false, tackle:false` —
+      // vordermann() liefert sofort null, kein Bahnwechsel, und waehrend eines Zeitfahrens
+      // faellt ueberhaupt kein rr()-Aufruf an), und gewertet wird `bahnZeit()` = eigene
+      // Laufzeit, nicht die Zieluhrzeit. Die Startfolge kann die Rangordnung deshalb
+      // ANALYTISCH nicht verschieben; was bleibt, ist die Tick-Quantisierung am
+      // Startgatter: eine um einen Tick (1/60 s) verschobene Startfreigabe aendert eine
+      // Zehn-Sekunden-Zeit um 0,17 % und kippt damit gelegentlich ein enges Paar. Die
+      // 0,003 liegen weit INNERHALB der Kader-Spannweite von 0,082 und sind nach der Regel
+      // aus docs/design/messgrundlage-kaderfest.md von null nicht zu unterscheiden.
+      // Wer trotzdem Ziffern-Identitaet will, ersetzt `(idx*2+seite)` wieder durch `L.id`
+      // — dann steht wieder die gesamte Heimseite vor der gesamten Gastseite, mit der
+      // Optik, die Chris gemeldet hat.
+      if(art.startAbstand)L.startT=(idx*2+seite)*art.startAbstand;
       // TAGESFORM (Zeitfahren, K5, Recherche Abschnitt 3.6): EINMAL je Laeufer gezogen,
       // nicht je Tick — sonst waere es kein "Tagesform"-Rauschen, sondern ein zufaelliges
       // Zittern ueber das ganze Rennen. Gated hinter `art.tagesform`; ohne das Feld bleibt
@@ -20584,6 +20761,16 @@
           // `BA().takeshi` ist hier die Schranke, `A` (aus der Huerden-Schleife weiter oben)
           // ist an dieser Stelle nicht mehr in Scope.
           if(BA().takeshi)sfx("takeshis-castle","tor");
+          // EINZELSTART: "Platz N" ist hier die ZIELEINLAUF-Reihenfolge (rennFertig), und
+          // die ist bei gestaffeltem Start NICHT der Rang — wer frueher startet, kommt auch
+          // frueher an. Der Ticker nannte trotzdem beides "Platz". Jetzt steht dort die
+          // eigene Laufzeit in Zuschauzeit (s. bahnZeitAnzeige) und der Rang aus derselben
+          // Rangliste, die das HUD und der Endstand lesen — eine Wahrheit statt zweier.
+          if(BA().startAbstand){
+            const rang=bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1;
+            feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
+          } else
           feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
         }
       }
@@ -20782,6 +20969,82 @@
     }
   }
 
+  // ============ ZEITFAHREN: DER SCHRITT KOMMT AUS DEM TEMPO (stepZeitfahren, Ziel 8) ============
+  // Angeschlossen ueber bahnBewegung() oben, exklusiv auf `art.zeitfahren` gegated. Der
+  // Dispatcher wartet seit PR 0.3 auf diese Funktion ("Rein deskriptiv, ohne Wirkung, bis
+  // Ziel-PR 8 stepZeitfahren() liefert", s. BAHN_ART["time-trial"]) — bis dahin fiel
+  // Time-Trial durch den typeof-Waechter still durch, ohne jede Bewegungsschicht.
+  //
+  // CHRIS' FUND 13.09., woertlich: "lauf animationen! momentan schweben alle."
+  //
+  // DIE URSACHE IST GEMESSEN, NICHT VERMUTET, und sie ist haerter als "zu langsam": die
+  // globale Sprite-Animationsuhr `t` (s. Deklaration, `:15159`) wird AUSSCHLIESSLICH in
+  // stepSim() hochgezaehlt — und zwar HINTER den drei fruehen Ruecksprungzeilen
+  //     if(istFeldspiel(disc))return stepFeldspiel(dt);
+  //     if(istBuehne(disc))return stepBuehne(dt);
+  //     if(istBahn(disc))return stepSpurt(dt);
+  //     ...
+  //     t+=dt;
+  // Auf der BAHN wird `t+=dt` also nie erreicht. Der Bildindex in zeichneSprite() ist
+  // `Math.floor((t*7+u.id)%n)` — bei eingefrorenem `t` eine KONSTANTE je Laeufer. Jede
+  // Figur auf jeder Bahn gleitet als STEHENDES Einzelbild ueber die Strecke; das ist
+  // genau das "Schweben", das Chris sieht. Nachgemessen ueber ein ganzes Zeitfahren
+  // (scripts/probe-zeitfahren-anzeige.mjs): `aniT` bleibt ueber alle 103 Messpunkte
+  // exakt 0,0000.
+  //
+  // REPARIERT WIRD HIER NUR TIME-TRIAL, und zwar BESSER als der alte Weltzeit-Zyklus:
+  // die Schrittfrequenz kommt aus dem TEMPO des Laeufers (`u.v`), nicht aus einer Uhr —
+  // wer schneller faehrt, tritt sichtbar schneller, wer einbricht, wird auch im Schritt
+  // langsamer. Das ist dieselbe Groesse, die Chris in Punkt 2 seiner Liste vermisst
+  // ("es wird sich nur mit gleichbleibender geschwindikeit bewegt"): das Tempo VARIIERT
+  // laengst (Plan, Ermuedung, Gelaende, Reserve — s. tempoVon), man konnte es nur nirgends
+  // sehen. Jetzt sieht man es an den Beinen.
+  //
+  // DERSELBE VERTRAG WIE stepStaffel/stepParcours, WOeRTLICH: geschrieben werden
+  // AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`, `vizErschoepft`,
+  // `vizRampe`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done, und es faellt
+  // KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese
+  // Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach dieser
+  // PR (0,828 rho je Spiel, 0,832 Saison, s. PR-Beschreibung).
+  //
+  // SCHRITTLAENGE. `u.v` ist Bildschirm-Pixel je SIMULATIONSsekunde (s. stepSpurt:
+  // `u.pos += u.v*dt/strecke`); typisch 110-135. ZF_SCHRITT_PX ist die Strecke, die ein
+  // voller Laufzyklus zuruecklegt — 46 px ergeben bei v=130 rund 2,8 Zyklen je
+  // ZUSCHAUsekunde, also etwa 170 Schritte je Minute: die Trittfrequenz, mit der ein
+  // Mensch tatsaechlich laeuft. Gerechnet wird bewusst in ZUSCHAU-Sekunden
+  // (`dt*zeitFaktor()`), nicht in Simulationssekunden: sonst zoege ZEIT_DEHNUNG
+  // ["time-trial"]=4,38 den Zyklus um denselben Faktor in die Laenge und die Beine
+  // schlichen wieder — derselbe Fehler in Gruen, nur eine Etage tiefer.
+  const ZF_SCHRITT_PX=46;
+  function stepZeitfahren(dt,art){
+    const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
+    for(const u of LAEUFER){
+      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; }
+      // ---- 1. AUF DER STARTRAMPE? Reine Ablesung derselben Bedingung, die stepSpurt
+      // oben zum Ueberspringen benutzt — hier nur, um die Figur stehen und das Panel
+      // "startet in 3,4 s" zeigen zu lassen (s. renderZeitfahrenPanel/zeichneSpurt).
+      const wartet=u.fertig==null && (u.startT||0)>rennT;
+      u.vizRampe=wartet?Math.max(0,(u.startT||0)-rennT):0;
+      // ---- 2. SCHRITTPHASE AUS DEM TEMPO. Wer steht (Rampe) oder im Ziel ist, tritt
+      // nicht. Die Phase zaehlt in ZYKLEN, nicht in Bildern — zeichneSprite() rechnet sie
+      // auf die Bildzahl des jeweiligen Blattes um (s. vizAniPhase dort), damit diese
+      // Funktion nichts ueber Sprite-Blaetter wissen muss.
+      const faehrt=!wartet && u.fertig==null;
+      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/ZF_SCHRITT_PX;
+      // ---- 3. ERSCHOEPFUNG, 0..1 (Chris Punkt 4: "ausdauer muss besser funktionieren").
+      // Die Kraftreserve GIBT es laengst und sie wirkt laengst (u.leer senkt das Tempo in
+      // tempoVon), sie war nur nirgends abzulesen: ein 4 px schmaler Balken unter den
+      // Fuessen, bei zwoelf Laeufern auf einem Bild. `vizErschoepft` ist dieselbe Zahl,
+      // nur als weiche 0..1-Groesse, an der zeichneSpurt die Figur sichtbar schwerer
+      // werden laesst und das Fokus-Panel eine Prozentzahl zeigt. Weich nachgezogen
+      // (dieselbe exp-Glaettung wie u.vizAnlauf in stepStaffel), damit der Uebergang
+      // "geht noch" -> "ist leer" kein harter Schnitt ist.
+      const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
+      const ziel=u.leer?1:Math.max(0,1-anteil/0.35);   // ab einem Drittel Restreserve sichtbar
+      u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+    }
+  }
+
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
   // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
@@ -20881,6 +21144,11 @@
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet -- AUSSER er ist der
         // Naechste in der Wechselzone und laut vizAnlauf schon am Anlaufen.
         vx:u.stolper>0?0:(tg?tg.tx*4:((wartet&&!anlaufLaeuft)?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        // SCHRITTPHASE AUS DEM EIGENEN TEMPO (Zeitfahren, Ziel 8, s. stepZeitfahren):
+        // ausschliesslich stepZeitfahren schreibt u.vizSchritt, diese Zeichenfunktion
+        // liest es nur. Fuer jede andere Bahn ist es undefined und zeichneSprite faellt
+        // auf die bisherige Weltuhr-Formel zurueck (s. dort) — bit-identisch.
+        vizAniPhase:u.vizSchritt,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
@@ -20961,11 +21229,46 @@
       }
       // KRAFTRESERVE als schmaler Balken unter den Fuessen — der Ersatz fuer den
       // Lebensbalken des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist.
+      //
+      // IM ZEITFAHREN DEUTLICHER (Chris' Fund 13.09., Punkt 4: "ausdauer muss besser
+      // funktionieren"). Die Mechanik funktionierte schon — gemessen kam der Letzte des
+      // Testrennens mit 0 % Reserve und dem "eingebrochen"-Vermerk ins Ziel, der Sieger
+      // mit 58 % — aber 26x3 px unter zwoelf Figuren sind nicht zu lesen. Auf der
+      // Einzelstart-Bahn (nur Time-Trial) ist der Balken darum breiter und hoeher, hat
+      // eine Rahmenlinie und eine Marke bei einem Drittel Restreserve: DAS ist der Punkt,
+      // ab dem `mued`/`leer` in tempoVon spuerbar zubeissen. Reine Zeichenarbeit.
       if(u.fertig==null){
-        const bw=26, a=Math.max(0,u.reserve/u.reserveMax);
-        ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,3);
+        // FARBEN UNVERAENDERT gruen / orange unter 20 % / rot — dieselbe Sprachregelung,
+        // die docs/design/hockey-ausdauer-checks-konzept-13-09.md (Abschnitt 9.6, "Eine
+        // Leiste, drei Chassis", Branch claude/hockey-ausdauer-konzept-13-09, noch nicht
+        // gemergt) fuer ALLE bewegungsintensiven Disziplinen festschreiben will. Diese PR
+        // macht die Leiste nur GROESSER und beschriftet sie im Fokus-Panel; die Skala
+        // selbst bleibt bewusst die, auf die sich das Konzept einigt.
+        const breit=!!BA().startAbstand;
+        const bw=breit?38:26, bh=breit?5:3, a=Math.max(0,u.reserve/u.reserveMax);
+        ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,bh);
         ctx.fillStyle=u.leer?"#c0504a":(a<0.2?"#d98b3a":"#5FD08A");
-        ctx.fillRect(x-bw/2,y+20,bw*a,3);
+        ctx.fillRect(x-bw/2,y+20,bw*a,bh);
+        if(breit){
+          ctx.strokeStyle="rgba(8,10,14,.8)"; ctx.lineWidth=1;
+          ctx.strokeRect(x-bw/2+0.5,y+20.5,bw-1,bh-1);
+          // Marke bei 20 %: die Schwelle, ab der die Leiste umschlaegt — und ungefaehr
+          // die Gegend, in der `mued`/`leer` in tempoVon spuerbar zubeissen.
+          ctx.fillStyle="rgba(255,255,255,.45)";
+          ctx.fillRect(x-bw/2+bw*0.2,y+20,1,bh);
+        }
+      }
+      // STARTRAMPE (Chris' Fund 13.09., Punkt 1: "zum start laufen nicht alle gleichzeitig
+      // los"). Der Einzelstart ist richtig und gewollt — er war nur nicht angesagt. Wer
+      // noch wartet, bekommt jetzt einen sichtbaren Countdown ueber dem Kopf, in
+      // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
+      // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
+      if(u.vizRampe>0){
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
+        ctx.strokeText(txt,x,y-19); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19);
+        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       ctx.textAlign="center";
       ctx.font="400 9.5px 'IBM Plex Mono',monospace";
@@ -22314,9 +22617,17 @@
       const roster=document.getElementById("ttroster");
       if(roster){
         roster.textContent="";
-        zeitfahrenFokusReihe().forEach(u=>{
-          const chip=el("button","ttchip "+(u.seite===0?"heim":"gast"),u.n);
+        // STARTNUMMER VOR DEN NAMEN (Chris' Punkt 1). Die Leiste steht ohnehin in
+        // Startreihenfolge (zeitfahrenFokusReihe sortiert nach startT) — die Ziffer sagt
+        // es jetzt auch, damit "die fahren nacheinander los" als ABSICHT zu lesen ist und
+        // nicht als Fehler. Der Titel nennt die Startzeit in Zuschausekunden.
+        zeitfahrenFokusReihe().forEach((u,i)=>{
+          const chip=el("button","ttchip "+(u.seite===0?"heim":"gast"));
           chip.type="button"; chip.dataset.id=String(u.id);
+          chip.appendChild(el("i",null,String(i+1)));
+          chip.appendChild(document.createTextNode(u.n));
+          chip.title=u.n+" — Startnummer "+(i+1)+", faehrt bei "
+            +bahnZeitText(bahnSpanneAnzeige(u.startT||0))+" los";
           roster.appendChild(chip);
         });
       }
@@ -22345,8 +22656,66 @@
     // KOPFZEILE: Name, Plan, Nav-Zustand.
     const name=document.getElementById("ttname"), planEl=document.getElementById("ttplan");
     if(name)name.textContent=u?u.n:"—";
+    // STARTRAMPE MIT COUNTDOWN (Chris' Punkt 1: "zum start laufen nicht alle gleichzeitig
+    // los"). Der gestaffelte Start ist RICHTIG — ein Zeitfahren ist ein Einzelstart, und
+    // genau so ist Time-Trial ausgelegt (BAHN_ART["time-trial"].startAbstand, Recherche
+    // Abschnitt 4.2). Er sah nur aus wie ein Fehler, weil nichts ihn ansagte: die
+    // Wartenden standen wortlos herum. Jetzt laeuft ein Countdown, in ZUSCHAUsekunden
+    // (s. bahnSpanneAnzeige) — 0,8 Simulationssekunden Abstand sind 3,5 Sekunden, die man
+    // wirklich wartet.
     if(planEl)planEl.textContent=u?("· "+((BA().plaene[u.plan]||{}).label||"")
-      +(u.fertig==null&&(u.startT||0)>rennT?" · auf der Startrampe":"")):"";
+      +(u.fertig==null&&(u.startT||0)>rennT
+        ?" · Startrampe, los in "+bahnZeitText(bahnSpanneAnzeige((u.startT||0)-rennT))
+        :"")):"";
+    // LIVE-STAND DES FOKUSSIERTEN (Chris' Punkt 6: "oben die punkte zb 56:22 sagen gar
+    // nichts aus. Man kann es nicht nachvollziehen!"). Der Punktestand oben IST eine
+    // ehrliche Zahl (Rangpunkte, Summe immer N*(N+1)/2), aber er steht im Uhr-Feld und
+    // liest sich deshalb wie eine Zeit. Hier steht die Groesse, die ein Zeitfahren
+    // wirklich hat: aktueller Rang und Rueckstand auf die Bestzeit im Feld — dieselbe
+    // Rangliste, aus der am Ende die Punkte fallen, nur schon waehrend des Rennens.
+    const standEl=document.getElementById("ttstand");
+    if(standEl){
+      standEl.textContent="";
+      if(u){
+        const rl=bahnRangliste();
+        const rang=rl.reihe.findIndex(x=>x.id===u.id)+1;
+        standEl.appendChild(el("b",null,"Rang "+rang+"/"+LAEUFER.length));
+        // RUECKSTAND: im Ziel gegen die echte Bestzeit, unterwegs gegen die beste
+        // Hochrechnung im Feld — beides dieselbe Groesse wie in bahnRangliste, nur
+        // einmal final und einmal vorlaeufig. Keine zweite Rechnung.
+        let rueck=null, vorlaeufig=false;
+        if(u.fertig!=null){ const b=bahnBesteZeit(-1); if(b!=null)rueck=bahnZeit(u)-b; }
+        else {
+          let best=Infinity;
+          for(const o of LAEUFER){
+            const h=o.fertig!=null?bahnZeit(o):bahnHochrechnung(o);
+            if(isFinite(h)&&h<best)best=h;
+          }
+          const eigen=bahnHochrechnung(u);
+          if(isFinite(best)&&isFinite(eigen)){ rueck=eigen-best; vorlaeufig=true; }
+        }
+        if(rueck!=null){
+          const txt=rueck<=0.005?" · Bestzeit"
+            :" · +"+bahnZeitText(bahnSpanneAnzeige(rueck))+(vorlaeufig?" (hochgerechnet)":"");
+          standEl.appendChild(el("span",rueck<=0.005?"gut":"schlecht",txt));
+        } else if(u.fertig==null){
+          standEl.appendChild(el("span",null," · noch keine Zeit"));
+        }
+        // AUSDAUER ALS ZAHL, MIT DEM WORT DARAN (Chris' Punkt 4: "ausdauer muss besser
+        // funktionieren"). Die Mechanik gibt es laengst (KRAFT_VON/`zehr`/`u.leer` senken
+        // das Tempo in tempoVon), sie war nur unlesbar — und zwar doppelt: ein 3-px-Balken
+        // unter zwoelf Figuren, und nirgends stand das Wort. Genau dieser zweite Punkt
+        // steht auch in docs/design/hockey-ausdauer-checks-konzept-13-09.md Abschnitt 5.3
+        // ("Der Balken unter den Fuessen ist unbeschriftet ... heisst nirgends Ausdauer").
+        // Deshalb hier ausdruecklich "Ausdauer" und nicht "Reserve" — dieselbe
+        // Sprachregelung, auf die jenes Konzept fuer alle Chassis hinauswill (Abschnitt
+        // 9.6), und dieselbe Zahl, die die Wertungstabelle in ihrer "Res"-Spalte fuehrt.
+        const anteil=u.reserveMax>0?Math.max(0,u.reserve/u.reserveMax):0;
+        const res=el("span",u.leer?"schlecht":anteil<0.2?"knapp":null,
+          " · Ausdauer "+(u.leer?"leer":Math.round(anteil*100)+" %"));
+        standEl.appendChild(res);
+      } else standEl.textContent="—";
+    }
     const autoBtn=document.getElementById("ttauto");
     if(autoBtn){ autoBtn.classList.toggle("an",bahnFokusAuto);
       autoBtn.textContent=bahnFokusAuto?"Auto ✓":"Auto"; }
@@ -22366,13 +22735,16 @@
     const splits=document.getElementById("ttsplits");
     if(splits){
       splits.textContent="";
+      // ALLE ZEITEN IN ZUSCHAUSEKUNDEN (Chris' Fund 13.09., s. bahnZeitAnzeige):
+      // Zwischenzeit, Rueckstand und Zielzeit gehen durch denselben `zeitFaktor()`, den
+      // die Uhr oben benutzt — im Panel steht damit kein zweiter Massstab neben ihr.
       const zeile=(label,wert,diff,zusatz)=>{
         const s=el("span");
         s.appendChild(el("b",null,label+" "));
-        s.appendChild(document.createTextNode(wert==null?"—":wert.toFixed(2)+" s"));
+        s.appendChild(document.createTextNode(bahnZeitText(bahnSpanneAnzeige(wert))));
         if(diff!=null){
           const d=el("span",diff<=0.005?"gut":"schlecht",
-            diff<=0.005?" Bestzeit":" +"+diff.toFixed(2)+" s");
+            diff<=0.005?" Bestzeit":" +"+bahnZeitText(bahnSpanneAnzeige(diff)));
           s.appendChild(d);
         }
         if(zusatz)s.appendChild(document.createTextNode(" "+zusatz));
@@ -22846,7 +23218,9 @@
         // Zahl, genau das, was die Punkte-Spalte hier bewusst vermeidet. Die Reihenfolge
         // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
         // Finisher, nur ANZEIGEN darf man ihn nicht.
-        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":bahnZeit(u).toFixed(1)+" s"));
+        // ANGEZEIGT WIRD DIE ZUSCHAUZEIT, nicht die Simulationssekunde (Chris' Fund
+        // 13.09., s. bahnZeitAnzeige): dieselbe Uhr, die waehrend des Rennens oben lief.
+        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":bahnZeitText(bahnZeitAnzeige(u))));
         tr.appendChild(el("td",null,stand.punkte?(stand.punkteVon?stand.punkteVon(u):fmtP(stand.punkte.get(u.id))):"—"));
         tb.appendChild(tr);
       });
@@ -24368,6 +24742,36 @@
       vizInitDoneGesetzt:u.vizInitDone!==undefined,
       vizAnlauf:u.vizAnlauf===undefined?null:+u.vizAnlauf.toFixed(3),
       vizUebergabeT:u.vizUebergabeT===undefined?null:+u.vizUebergabeT.toFixed(3)})),
+    // ZEITFAHREN-VIZ-PROBE (Chris' Fundliste 13.09.): rein diagnostisch, wie
+    // cypherVizProbe/staffelVizProbe daneben — liest von aussen (Playwright, ohne UI) die
+    // vier Groessen, an denen Chris' Beschwerden haengen, damit man sie MESSEN statt
+    // vermuten kann:
+    //   aniT       die globale Sprite-Animationsuhr `t`. Stand sie ueber ein ganzes Rennen
+    //              still, ist der Laufzyklus jedes Sprites eingefroren ("alle schweben").
+    //   standLive  der VORLAEUFIGE Rangpunktestand (bahnTeamstand().seiten) — die Zahl, die
+    //              waehrend des Rennens oben im HUD steht.
+    //   reihe      je Laeufer: Startzeit, Strecke, aktuelles Tempo, eigene Laufzeit und der
+    //              vorlaeufige Platz. Damit laesst sich pruefen, ob die auf dem Bildschirm
+    //              sichtbare Reihenfolge (nach `pos`) mit der Rangliste uebereinstimmt.
+    // Reines Lesen, kein rr()-Aufruf, kein Einfluss auf die Simulation.
+    zeitfahrenVizProbe:()=>{
+      const L=(typeof LAEUFER!=="undefined"?LAEUFER:[]);
+      const rl=L.length?bahnRangliste():{reihe:[],punkte:new Map()};
+      const platz=new Map(rl.reihe.map((u,i)=>[u.id,i+1]));
+      return {
+        aniT:+t.toFixed(4), rennT:+rennT.toFixed(3), zeitFaktor:zeitFaktor(),
+        standLive:L.length?bahnTeamstand().seiten:null,
+        reihe:L.map(u=>({id:u.id, n:u.n, seite:u.seite,
+          startT:+(u.startT||0).toFixed(2), pos:+u.pos.toFixed(4), v:+(u.v||0).toFixed(2),
+          eigenzeit:u.fertig!=null?+bahnZeit(u).toFixed(3):+(rennT-(u.startT||0)).toFixed(3),
+          fertig:u.fertig!=null, reserve:Math.round(u.reserve/Math.max(1,u.reserveMax)*100),
+          leer:!!u.leer, platz:platz.get(u.id)||null,
+          // stepZeitfahren-eigene viz*-Felder (Ziel 8): gelaufene Laufzyklen, sichtbare
+          // Erschoepfung, Restwartezeit auf der Startrampe. Alle drei nur gelesen.
+          vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3),
+          vizErschoepft:u.vizErschoepft==null?null:+u.vizErschoepft.toFixed(3),
+          vizRampe:u.vizRampe==null?null:+u.vizRampe.toFixed(2)}))};
+    },
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
