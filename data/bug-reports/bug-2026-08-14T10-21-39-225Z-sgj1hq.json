@@ -1,0 +1,42 @@
+{
+  "note": "Wenn man mehrere Teams spielt, und Lineup speichert wird jedes mal neu berechnet oder aktualisiert? \n\nWeil eigentlich würde das reichen wenn man für die ersten eigenen Teams nur sein Lineup speichert und erst beim letzten manuellen Team von Mir und Franky die Arena dann Ready wird",
+  "view": "lineup",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=lineup&team=C-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T10:21:46.841Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T10-21-39-225Z-sgj1hq",
+  "createdAt": "2026-08-14T10:21:39.225Z",
+  "page": {
+    "path": "/foundation",
+    "view": "lineup",
+    "tab": null,
+    "label": "Spieltag · Einsatzliste"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 5,
+    "matchdayId": "season-2-matchday-5",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

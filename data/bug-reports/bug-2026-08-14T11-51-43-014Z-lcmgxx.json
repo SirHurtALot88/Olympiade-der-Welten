@@ -1,0 +1,42 @@
+{
+  "note": "In der ewigen Tabelle soll die Entwicklung gezeigt werden von Season zu season mit Marktwert und Cash in der Tabelle, nicht nur der beste und der aktuelle Wert\n\nund darunter soll eine Grafik für ALLE teams in einem sein wo man so die changes sehen kann und ein team hervorgehoben wird wenn man es anklickt - und mein eigenes standardmäßig das hervorgehobene ist!",
+  "view": "allTimeTable",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=allTimeTable&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T11:51:50.574Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T11-51-43-014Z-lcmgxx",
+  "createdAt": "2026-08-14T11:51:43.014Z",
+  "page": {
+    "path": "/foundation",
+    "view": "allTimeTable",
+    "tab": null,
+    "label": "Team · Ewige Tabelle"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 6,
+    "matchdayId": "season-2-matchday-6",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

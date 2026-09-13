@@ -1,0 +1,41 @@
+{
+  "note": "Wenn man einen Spieler nicht einsetzen kann steht da immer Riskant wegen Fatigue, aber der eigentliche Grund ist doch dass der spieler verletzt ist. Entsprchend sollte das auch angegeben sein +Icon!",
+  "view": "lineup",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=lineup&team=V-W",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2752,
+    "height": 1044
+  },
+  "clientTime": "2026-08-21T11:05:40.873Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-21T11-05-40-932Z-9ykeqt",
+  "createdAt": "2026-08-21T11:05:40.932Z",
+  "page": {
+    "path": "/foundation",
+    "view": "lineup",
+    "tab": null,
+    "label": "Spieltag · Einsatzliste"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "active",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}

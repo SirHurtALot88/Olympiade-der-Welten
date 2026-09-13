@@ -1,0 +1,42 @@
+{
+  "note": "S-C sollte in Basketball 9,1 Punkte haben laut Arena, hat im Saisonstand dann aber 9,9 Punkte stehen. Mutator kann es nicht sein, woran liegt das? bitte intensiv prüfen da darf nichts anderes raus kommen",
+  "view": "seasonV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=seasonV2&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T10:17:20.507Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T10-17-12-933Z-vjirth",
+  "createdAt": "2026-08-14T10:17:12.933Z",
+  "page": {
+    "path": "/foundation",
+    "view": "seasonV2",
+    "tab": null,
+    "label": "Spieltag · Saisonstand"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 5,
+    "matchdayId": "season-2-matchday-5",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

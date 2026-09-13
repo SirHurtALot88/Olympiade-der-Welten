@@ -1,0 +1,41 @@
+{
+  "note": "bitte schauen dass die bilder in den hovers und team karte geladen werden während die diszi läuft damit die verfügbar sind wenn man mal den drawer öffnet",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-04T15:59:42.303Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T15-59-37-826Z-2tlf67",
+  "createdAt": "2026-08-04T15:59:37.826Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 6,
+    "matchdayId": "matchday-6",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

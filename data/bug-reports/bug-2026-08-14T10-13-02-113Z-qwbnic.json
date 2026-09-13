@@ -1,0 +1,42 @@
+{
+  "note": "Hier wurde anscheinend eine falsche Form berechnet? bitte checken! \n\nS-C soll +18,4 gehabt haben - hat in realität aber bei jedem Spieler eine negative Form gehabt! bitte prüfen dass nicht wieder die slots vertauscht wurden",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T10:13:09.728Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T10-13-02-113Z-qwbnic",
+  "createdAt": "2026-08-14T10:13:02.113Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 4,
+    "matchdayId": "season-2-matchday-4",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

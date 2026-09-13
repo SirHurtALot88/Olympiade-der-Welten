@@ -1,0 +1,41 @@
+{
+  "note": "Top Disziplinen hat z.B. auch PPs -1 Pps und All-Time -> da fehlt jeweils auch der Rank das hatten wir früher drin und ist super hilfreich! bitte hinzufügen",
+  "view": "playerProfile",
+  "path": "/foundation",
+  "tab": "details",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=playerProfile&tab=details&playerId=player-0344-gronn&team=S-C",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3440,
+    "height": 1271
+  },
+  "clientTime": "2026-08-04T13:23:38.190Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T13-23-39-256Z-uzetn6",
+  "createdAt": "2026-08-04T13:23:39.256Z",
+  "page": {
+    "path": "/foundation",
+    "view": "playerProfile",
+    "tab": "details",
+    "label": "Team · Spieler"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "active",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 5,
+    "matchdayId": "matchday-5",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
