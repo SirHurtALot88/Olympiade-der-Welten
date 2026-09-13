@@ -178,6 +178,14 @@ async function fuehreArenaMatchdayApplyAus(input: {
       // BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): individuelle Spieler-PPs aus dem echten
       // Arena-Boxscore, s. lib/resolve/battle-mode-arena-team-points.ts.
       arenaIndividualBoxscorePpsByPlayerId: individualBoxscorePpsByPlayerId,
+      // FUER WELCHE Disziplin die beiden Maps oben gelaufen sind (N-Team-Infrastruktur-Audit
+      // 13.09., Fund B2). Ohne diese Angabe entscheidet der Resolve-Engine nur nach Mengen-
+      // Zugehoerigkeit zu `ARENA_RESOLVED_DISCIPLINE_IDS` und wuerde denselben einen Duellausgang
+      // auch der ZWEITEN arena-aufgeloesten Disziplin desselben Spieltags buchen. Dass das heute
+      // nicht passiert, haengt allein an der `mehrdeutig`-Wache in `kickoffArenaMatchdayApply()`
+      // weiter unten -- eine Deckung aus einer anderen Datei. Hier steht sie jetzt am Ergebnis
+      // selbst.
+      arenaDisciplineId,
     });
 
     const service = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
