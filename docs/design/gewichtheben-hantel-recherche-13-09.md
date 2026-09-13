@@ -344,6 +344,22 @@ Stangenmitte damit bei Bildschirm-x 53, während der Körper um x=32 steht. Das 
 Eine Hantel wird zweihändig und symmetrisch gegriffen; ihre Mitte hängt deshalb an der
 **Körpermittelachse**, nicht an einer einzelnen Faust.
 
+**Das war schon einmal aufgeschrieben.** Die unabhängige Review zu PR #876 (10.09.,
+`docs/pm-briefings/opus-review-pr-876-feinschliff-ziel1-gewichtheben-09-10.md`, Befund N3) hat
+genau diesen Punkt notiert — und die Folge vorhergesagt, die Chris drei Tage später gemeldet hat:
+
+> **N3 — die Stange haengt an EINER Faust, nicht zwischen beiden.** […] Sichtbar in jedem
+> Screenshot: die Hantel steht seitlich versetzt zur Koerperachse. Zusammen mit
+> `HEBEN_PHASEN.hoch.dy=-49` fuehrt das dazu, dass die Stange in der Streckungsphase eher ueber
+> dem Kopf **schwebt**, als in den Haenden zu liegen […] Der richtige Ankerpunkt waere die Mitte
+> zwischen den beiden gemessenen Faeusten (x≈32) […] **Kein Blocker** […] Aber der naechste
+> Anfassende sollte es wissen.
+
+Die hier unabhängig gemessene Mittelachse (31,5) bestätigt die damals geschätzte Zahl (≈32), und
+die Kombination aus beidem — Faust-Anker **plus** `dy=-49` — ist wörtlich das, was Chris als
+„weit über den kopf geworfen" beschreibt. Der Befund war als „kein Blocker" eingestuft und blieb
+liegen; das ist die Runde, die ihn abarbeitet.
+
 Gemessen wurde die Mittelachse auf zwei Arten, weil die „shoot"-Pose die Silhouette verzerrt
 (ein Arm stößt weit heraus, der andere kreuzt vor der Brust; die Beine stehen im Ausfallschritt):
 
