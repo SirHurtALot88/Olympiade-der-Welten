@@ -285,18 +285,43 @@ einzeln gemessen:
    `tempo`), damit die `versucheSteal`-Kaskade unberührt bleibt.
 3. Erst danach die Stärke kalibrieren — vorher ist jede Zahl geraten.
 
-### 4.4 Hockey mit neutralisierten Faktoren — die Gegenprobe
+### 4.4 Hockey mit neutralisierten Faktoren — die Gegenprobe, und sie geht auf
 
-Mit `tempoMin`/`wuchtMin`/`zweikampfMin` auf exakt 1 muss Hockey wieder ziffernidentisch zur
-Basislinie liegen. Die Zahl steht in der PR-Beschreibung; sie ist die Abnahme dafür, dass die
-sichtbare Puste wirklich folgenlos ist.
+| | rho je Spiel | Spannweite | rho Saison | Spannweite |
+|---|---:|---:|---:|---:|
+| Basislinie | 0,669 | 0,181 | 0,832 | 0,259 |
+| **mit sichtbarer Puste** | **0,669** | **0,181** | **0,832** | **0,259** |
+| Basislinie, nur Feldspieler | 0,719 | 0,182 | 0,818 | 0,259 |
+| **mit sichtbarer Puste, nur Feldspieler** | **0,719** | **0,182** | **0,818** | **0,259** |
 
-### 4.5 Die Bahn behält ihre Wirkung — gemessen gegen fünf eigene Schranken
+**Ziffernidentisch in allen vier Spalten, auf beiden Zeilen.** Das war vorher schon
+bewiesen — `pusteFaktor(u,1)` ist `1 + 0·anteil`, und `x*1 === x` gilt in IEEE 754 ohne
+Rundung, während kein Puste-Pfad einen `rr()`-Wurf zieht — aber ein Beweis, den man auch
+messen kann, misst man.
 
-Die Bahn ist der andere Fall: dort gab es die Leiste samt Tackle-Kosten schon, neu sind nur
-Chris' Erholung und Takeshis `pusteHindernis`. Die fünf Zahlen stehen in der
-PR-Beschreibung. Reißt eine davon ihre Schranke, wird `pusteRegen` für **diese** Disziplin
-abgeschaltet, nicht die Schranke nachgezogen.
+### 4.5 Die Bahn behält ihre Wirkung — alle fünf bestehen
+
+| Disziplin | Basislinie (Spiel/Saison) | jetzt | Boden | Abnahme |
+|---|---|---|---:|---|
+| staffel | 0,915 / 0,951 | **0,915 / 0,951** | 0,865 | bestanden, identisch |
+| spurt | 0,871 / 0,905 | **0,871 / 0,905** | 0,800 | bestanden, identisch |
+| takeshis-castle | 0,861 / 0,930 | **0,855 / 0,937** | 0,811 | bestanden |
+| time-trial | 0,828 / 0,832 | **0,828 / 0,832** | 0,778 | bestanden, identisch |
+| climbing | 0,790 / 0,851 | **0,791 / 0,860** | 0,732 | bestanden |
+
+**Drei der fünf sind ziffernidentisch, und das ist kein Zufall, sondern die Bauart der
+Zeile.** Erholt wird nur in drei Zuständen: am Hindernis (`u.huerde>0`), während des
+Einbruchs (`u.leer`) und unter Plantempo (`1−ueber`). In Spurt, Staffel und Time-Trial läuft
+das Feld über die kurze Distanz durchgehend auf Plantempo und bricht nicht ein — die
+Gutschrift feuert dort schlicht nie. Bewegt hat sich genau dort etwas, wo Läufer wirklich an
+Hindernissen stehen und leerlaufen: Takeshi (−0,006 / +0,007) und Climbing (+0,001 /
++0,009).
+
+Beide Bewegungen liegen **weit innerhalb der Kader-Spannweite** (Takeshi 0,123 / 0,063,
+Climbing 0,191 / 0,308) und sind nach `messgrundlage-kaderfest.md` von Null nicht zu
+unterscheiden — diesmal in der Richtung, in der diese Regel gedacht ist: **es wird keine
+Verbesserung behauptet.** Beide behalten komfortablen Abstand zu ihrem Boden (Takeshi 0,044,
+Climbing 0,059).
 
 ### 4.6 Die Regeln, gegen die gemessen wird
 
