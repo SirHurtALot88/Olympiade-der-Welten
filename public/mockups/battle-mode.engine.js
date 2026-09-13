@@ -17233,7 +17233,7 @@
     // Teil dieses Punktes steckt nicht hier, sondern in bahnRangliste(): der vorlaeufige
     // Stand zeigte bei gestaffeltem Start ueber fast das ganze Rennen die Startreihenfolge
     // statt des Rennstands und sprang erst im Ziel auf das echte Ergebnis (s. dort).
-    const rangSpiel=stand.gewertet&&BA().wertung==="rang";
+    const rangSpiel=stand.gewertet&&BA().wertung==="rang"&&LAEUFER.length>0;
     document.getElementById("klsuffix").textContent=
       stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
       +(stand.gewertet&&!done?" · vorläufig":"");
@@ -20594,8 +20594,9 @@
             const rang=bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1;
             feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
               +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
-          } else
-          feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+          } else {
+            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+          }
         }
       }
     }

@@ -58,7 +58,10 @@ seite.on("pageerror", (e) => fehler.push(String(e)));
 // Sprite-Blaetter, von denen ein Teil in einem frischen Worktree fehlt (404) — auf
 // `networkidle` zu warten ist dort ein Gluecksspiel. Der Waechter darunter wartet ohnehin
 // gezielt auf die Engine-Bruecke, das ist die schaerfere Bedingung.
-await seite.goto(SEITE, { waitUntil: "domcontentloaded" });
+// Grosszuegiger Navigations-Timeout: auf einer Maschine, auf der parallel ein
+// `tsc --noEmit` laeuft, braucht der erste Seitenaufbau (mehrere hundert Sprite-Blaetter)
+// deutlich mehr als die Playwright-Voreinstellung von 30 s.
+await seite.goto(SEITE, { waitUntil: "domcontentloaded", timeout: 180000 });
 await seite.waitForFunction(() => window.__arena && window.__arena.zeitfahrenVizProbe, null, { timeout: 90000 });
 await seite.click("#t2");
 await seite.evaluate(() => window.__arena.setDisc("time-trial"));
