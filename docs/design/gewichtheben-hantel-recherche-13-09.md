@@ -455,15 +455,21 @@ eine Hantel gezeichnet wird, nicht *wo*:
 |---|---|---|---|
 | Tidesprinter | vollbild | **1,5 Zellen unter der Sohle** | 19,5 über Scheitel |
 | Seraph-11 | reiherMech | **2,0 Zellen unter der Sohle** | 11,0 über Scheitel |
-| Inefinna | vollbild | **27,5 über der Sohle — schwebt auf halber Rumpfhöhe** | **3,0 unter Scheitel** |
-| King Arlen | vollbild | ok | **3,0 unter Scheitel** |
 | Krolach | vollbild | ok | **2,0 unter Scheitel** |
 | Lava Golem | vollbild | ok | **3,0 unter Scheitel** |
 | Krag'Zul | vollbild | nicht messbar (Figur an der Leinwandkante abgeschnitten) | nicht messbar |
+| Inefinna | Standardkörper | ~~27,5 über der Sohle~~ — **Messartefakt**, s. unten | ~~3,0 unter Scheitel~~ — **Landmarken-Artefakt**, s. unten |
+| King Arlen | Standardkörper | ok | ~~3,0 unter Scheitel~~ — **Landmarken-Artefakt**, s. unten |
 
 „Unter der Sohle" heißt: die Stange liegt **im Boden** — derselbe Befund („viel zu weit unten"),
-den diese Runde zu beheben antrat. „Unter dem Scheitel" heißt: die Stange schneidet in der
-Überkopfphase **durch Kopf/Helm**.
+den diese Runde zu beheben antrat.
+
+**Zwei der ursprünglich sieben Zeilen waren Messfehler der Sonde selbst**, nicht des Motors
+(Inefinna und King Arlen, beide Standardkörper mit `krone:true`) — nachgewiesen und behoben
+unter „Zwei Werkzeug-Korrekturen" weiter unten. Sie stehen hier durchgestrichen statt getilgt,
+weil die erste Fassung sie als echte Fehler gelesen hat und der Unterschied lehrreich ist: eine
+Sonde, deren Landmarke nicht das misst, was ihr Name sagt, erzeugt genauso zuverlässig falsche
+Befunde wie falschen Freispruch. **Die fünf übrigen Zeilen sind echt.**
 
 ### Die Ursache: absolute Zelleinheiten an einem fremden Blatt
 
@@ -525,6 +531,22 @@ Kreaturen außerhalb des Beispielkaders nicht.
   `boden` darf nicht unter die Sohle, `hoch` nicht unter den Scheitel (Toleranz 0,5 Zellen).
   Ein grüner Haken über einer Ausgabe, die den Fehler im Klartext enthält, ist schlimmer als gar
   keine Prüfung — er lädt dazu ein, „behoben" zu schreiben.
+- **Partikel wurden für die Hantel gehalten.** Die Sonde misst die *Differenz* zweier
+  Renderings — und darin stehen auch die zeitabhängigen `b.effekt`-Partikel, die zwischen den
+  zwei Aufnahmen weitergelaufen sind. Inefinnas „heilig"-Kopfeffekt sitzt **über** dem Kopf und
+  zog den Messkasten nach oben, bis die Ruhestange scheinbar auf halber Rumpfhöhe schwebte:
+  `boden-Mitte 34.5` ist exakt die Mitte zwischen Heiligenschein (≈12) und Stange (57).
+  **Das war ein Messartefakt, kein Zeichenfehler** — die 27,5 aus der Tabelle oben gehören
+  insoweit korrigiert. Die Stange ist das Einzige in der Differenz, das eine *lange
+  Waagerechte* ist (68 Zellen im Profil); ein Mindestlauf von 12 zusammenhängenden Pixeln je
+  Zeile trennt sie ohne Figurenwissen von jedem Partikel.
+- **„Scheitel" ist nicht immer der Kopf.** `krone:true` (King Arlen, Inefinna) zeichnet eine
+  Krone ~13px über den Kopf. Gemessen an der Kronenspitze schien die Überkopfstange „im Kopf"
+  zu liegen — sie steht aber bei King Arlen auf **exakt derselben** Bildschirmhöhe wie bei
+  Johanna (gleicher Körper, gleiche `groesse`, beide 141,5), die dort 8,5 Zellen „über dem
+  Scheitel" misst. **Dieselbe, richtige Höhe; nur eine andere Landmarke.** Die Sonde weist das
+  jetzt als Hinweis statt als Fehler aus — eine Mindestbreite je Zeile hilft nur halb, weil
+  sie bei Gram 8px Horn-und-Kopf und bei Seraph-11 die dünnen Reiherbeine mit wegschneidet.
 - **`renderProbe` nimmt einen optionalen Anker.** Der Zeichenpunkt lag fest auf `(32,46)`,
   *unabhängig* von `leinwand` — eine größere Leinwand gab einer großen Figur nur unten und rechts
   Platz. Krag'Zul (Z≈1,71, Sprite ab `y-46*Z` = −32) klebte deshalb oben an der Kante, und die
