@@ -72,8 +72,16 @@ fällt unter die verschärfte Review-Sorgfalt für Produktionscode.
    Ansage verbergen (hinfällig, sie wird gar nicht vorab gezeigt) und ein kühner Versuch auch für
    den Führenden (Abschnitt 5.6 — er scheitert schon heute an 29 % seiner dritten Versuche, und
    die gewünschte Fallhöhe liefert Maßnahme B ohne Rangtreue-Risiko gleich mit). Abschnitt 6.
-7. **Rangtreue gehalten.** Vorher 0,854 / Saison 0,923; nachher siehe Abschnitt 5. Der
-   IWF-Korridor (Gelingensquoten, Fehlversuche, Nullwertungen, Reißen-Anteil) hält.
+7. **Rangtreue gehalten, Spannung gewonnen — beides gemessen.** rho je Spiel 0,854 → 0,843 bei
+   n=24 und 0,844 → **0,851** bei n=48: die Bewegung ist kleiner als das Kaderrauschen
+   (Spannweite ~0,20) und **wechselt das Vorzeichen mit der Stichprobengröße**, ist also von
+   Null nicht unterscheidbar. Die Saison-Zahl steigt dagegen in beiden Stichprobengrößen
+   konsistent (0,923 → 0,930 / 0,937) — in der CLAUDE.md-Zerlegung heißt das: **Validität hoch,
+   Verlässlichkeit runter, und genau das ist Spannung als Zahl.** Der IWF-Korridor hält in allen
+   Zeilen. Chris' Kernbeschwerde („Eröffnung > jeder Versuch des Gegners") fällt von **66,2 % auf
+   50,0 %**, die Entscheidung fällt fast doppelt so oft erst in der letzten Hantel (2,9 →
+   5,7 %), und in den **engen** Duellen ist der Führende nach Versuch 1 jetzt eine Münze
+   (56,3 → **49,0 %**). Abschnitt 5.
 
 ---
 
