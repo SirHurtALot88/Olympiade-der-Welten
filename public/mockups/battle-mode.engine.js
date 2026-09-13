@@ -11762,6 +11762,60 @@
   // (v===2, "REAKTION AUF DEN DUELLSTAND" unten) bleibt ebenfalls unangetastet — sie greift
   // NACH dieser Reduktion und darf weiterhin nur nach oben ziehen.
   const HEBEN_FEHL_REDUKTION=0.06;
+  // ================ SPANNUNG IM DUELLVERLAUF (Chris' Fund 13.09.) ================
+  // Woertlich: "man sieht ja am anfang schon der eine hebt hoehere gewichte als der andere von
+  // anfang an und das wird dann auch der sein der am ende gewinnt". Recherche mit Messung:
+  // docs/design/gewichtheben-spannung-recherche-13-09.md, Sonde
+  // scripts/diag-gewichtheben-spannung.mjs.
+  //
+  // NACHGEMESSEN, NICHT VERMUTET (200 Spiele, 1200 Duelle): die hoehere EROEFFNUNGSANSAGE
+  // gewinnt 82,8 % aller Duelle, und in 66,2 % liegt die Eroeffnung des einen Hebers schon
+  // ueber dem HOECHSTEN Versuch, den der andere im ganzen Wettkampf ansagt — Chris' Satz als
+  // Zahl. ABER: der Hauptgrund ist die PAARUNG (ueber den Slot, nicht ueber die Staerke, s.
+  // baueHebenDuelle) bei einem Kader von 104 bis 476 kg Tagesmaximum, nicht die Planung. Nach
+  // Kraefteverhaeltnis getrennt gewinnt der Fuehrende nach Versuch 1 in ENGEN Duellen
+  // (Tagesmax-Abstand 3-10 %) nur 56,3 %, mit 59,8 % Fuehrungswechseln — die sind schon
+  // spannend. In DEUTLICHEN (10-25 %) sind es 91,7 % bei 165 kg Abstand. Ein Eingriff, der so
+  // ein Duell eng macht, waere gelogen und wuerde rho kosten. Beide Konstanten unten haben
+  // deshalb ihre NULLSTELLE im ausgeglichenen Duell und greifen nur in schiefen.
+  //
+  // (A) DER ZWEIKAMPF ZAEHLT, NICHT DIE UEBUNG. hebeUebung("stossen") startet mit
+  // besteStossen=0 fuer beide und verglich im dritten Versuch NUR besteStossen — der
+  // Reiss-Ausgang steht zu dem Zeitpunkt endgueltig auf u.besteReissen und wurde nirgends
+  // gelesen. Folge in beide Richtungen falsch: wer im Reissen 10 kg verlor, zog im Stossen auf
+  // Gegner+1 und verlor den Zweikampf trotzdem um 9 (Risiko getragen, nichts davon gehabt);
+  // und wer im Reissen 10 kg vorn lag, riskierte im Stossen einen Ausgleichsversuch, den er gar
+  // nicht brauchte. Reale Referenz: Hou Zhihui, Paris 2024 — Rueckstand nach dem Reissen,
+  // Aufholjagd ueber den ZWEIKAMPF im Stossen. IM REISSEN ist die neue Rechnung bit-identisch
+  // zur alten (der gebuchte Vorlauf ist dort beidseitig 0), die Aenderung beruehrt
+  // ausschliesslich den dritten Stossversuch — nachgemessen, die Reissen-Gelingensquoten sind
+  // zeichengleich. Ein-Zeilen-Umkehr: auf false setzen.
+  const HEBEN_DUELL_ZWEIKAMPF=true;
+  // (B) DUELLBEWUSSTE EROEFFNUNG BEI UNVERAENDERTEM ZIELGEWICHT. Die Eroeffnung kannte den
+  // Gegner ueberhaupt nicht, obwohl sie im echten Sport der am staerksten gegnerabhaengige Zug
+  // des Tages ist: wer die Wahl hat, sichert erst den Zweikampf und eroeffnet konservativ; wer
+  // sie nicht hat, zockt von Anfang an (Greg Everett/Catalyst: "open much higher than normal",
+  // wenn Qualifikation oder Medaille auf dem Spiel steht — reale Referenz: Pizzolato, Paris
+  // 2024, eroeffnet das Stossen bei 212 kg, 5 kg unter seinem Weltrekord, WEIL das Reissen
+  // misslang).
+  //
+  // WARUM DAS ZIELGEWICHT FIX BLEIBEN MUSS — und das ist kein Balancing-Geschmack, sondern
+  // zwingend: `ueber` in der Erfolgskurve unten ist NULL, solange die Ansage unter risikoMax
+  // liegt. Einen Heber einfach hoeher eroeffnen zu lassen kostet ihn deshalb keine
+  // Erfolgschance, hebt aber seine erreichbare Decke — ein Gratis-Buff, der die Rangtreue
+  // verschoebe. Also wird nur der WEG veraendert, nicht die Decke: der Versatz auf den
+  // Eroeffnungsanteil wird durch eine Nachskalierung BEIDER Spruenge exakt ausgeglichen
+  // (sprungFaktor = Wurzel(anteilOhneVersatz/anteil), damit anteil*(1+s1')*(1+s2') unveraendert
+  // bleibt). Weil beide Spruenge denselben Faktor bekommen, bleibt auch die von der Lehrmeinung
+  // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen bleiben in
+  // derselben Reihenfolge unterscheidbar.
+  //
+  // Der Spannungsgewinn steckt genau darin, dass der Favorit denselben Zielwert jetzt mit einem
+  // GROESSEREN letzten Sprung erreicht (Rechenbeispiel Recherche 4.2: 368-383-394 wird zu
+  // 349-373-395, die sichtbare Luecke bei Versuch 1 faellt von 55 auf 22 kg).
+  // Ein-Zeilen-Umkehr: HEBEN_DUELL_EROEFFNUNG_MAX auf 0 setzen.
+  const HEBEN_DUELL_EROEFFNUNG_K=0.30;   // Anteilsversatz je Anteil Kraeftevorsprung
+  const HEBEN_DUELL_EROEFFNUNG_MAX=0.05; // Deckel des Versatzes in beide Richtungen
   // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
   // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
   // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
@@ -11877,7 +11931,20 @@
     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
+    // DER ZWEIKAMPF-STAND, NICHT DER UEBUNGS-STAND (s. HEBEN_DUELL_ZWEIKAMPF oben).
+    // `gebucht` ist, was aus der ANDEREN Uebung schon endgueltig auf dem Konto steht — im
+    // Reissen beidseitig 0 (das Stossen kommt erst), im Stossen das fertige Reiss-Ergebnis.
+    // `duellStand` ist damit genau die Zahl, die im Wettkampf auf der Anzeigetafel steht,
+    // inklusive der Haerte des Sports: wer im Reissen genullt hat, steht bei 0, egal was im
+    // Stossen noch kommt (dieselbe Regel, die baueHebenDuelle als u.nullwertung auswertet).
+    const gebucht=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen")?x.besteReissen:0;
+    const duellStand=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&x.besteReissen<=0)
+      ?0:gebucht(x)+beste(x);
     const ansage={};
+    // Nachskalierung der geplanten Spruenge, damit der Eroeffnungs-Versatz aus (B) das
+    // geplante ZIELGEWICHT nicht verschiebt — s. HEBEN_DUELL_EROEFFNUNG_K oben. 1 bedeutet
+    // "kein Versatz", und dann rechnet der Sprung unten bit-identisch wie bisher.
+    const sprungFaktor={};
     for(const u of [a,b]){
       // Deckel bei 97 % des Tagesmaximums: ohne ihn eroeffnete ein Heber mit ANSAGE nahe
       // 99 rechnerisch ueber 100 % seines Maximums (0,94 Basis + 49*0,0016 = 1,018) und
@@ -11885,7 +11952,42 @@
       // den dritten Versuchen ohne Deckel auftrat (s. Kommentar bei "REAKTION AUF DEN
       // DUELLSTAND" unten). Der Deckel laesst ANSAGE weiter die Eroeffnungshoehe heben,
       // ohne sie ins garantierte Misslingen zu schicken.
-      const anteil=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      const anteilRein=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      // DUELLBEWUSSTE EROEFFNUNG (s. HEBEN_DUELL_EROEFFNUNG_K oben). `kraft` ist der
+      // erreichbare Zweikampf-Stand: schon Gebuchtes plus das, was in dieser Uebung noch
+      // maximal geht. Im Reissen ist das das Verhaeltnis der Tagesmaxima (die "Meldeleistung",
+      // die im echten Wettkampf vor der Sitzung bekannt ist); im Stossen zaehlt der tatsaechlich
+      // gehobene Reiss-Ausgang mit, ein im Reissen Abgestuerzter eroeffnet das Stossen also
+      // mutig — genau Pizzolatos 212 kg.
+      const gegner=u===a?b:a;
+      const kraftU=gebucht(u)+max(u), kraftG=gebucht(gegner)+max(gegner);
+      const lage=kraftG>0?kraftU/kraftG-1:0;
+      const versatz=Math.max(-HEBEN_DUELL_EROEFFNUNG_MAX,
+        Math.min(HEBEN_DUELL_EROEFFNUNG_MAX,-HEBEN_DUELL_EROEFFNUNG_K*lage));
+      // MUTIGER EROEFFNEN JA, UEBER DIE EIGENE SICHERHEIT HINAUS NEIN. Die Lehrmeinung ist an
+      // dieser Stelle eindeutig: die Eroeffnung ist "ein Gewicht, das der Heber schon oft
+      // gemacht hat und dem er voll vertraut" (Greg Everett) — "missing an opener is a bad way
+      // to start a meet". Der Versatz nach OBEN darf den Heber deshalb hoechstens bis an seinen
+      // eigenen Risiko-Massstab schieben (denselben, den die Erfolgskurve unten als risikoMax
+      // benutzt, s. HEBEN_WAGNIS_ANSAGE_FLEX), nie darueber.
+      // OHNE DIESEN DECKEL GEMESSEN (200 Spiele): das Gelingen im ersten Reissversuch fiel von
+      // 85,3 auf 81,3 % und damit unter den IWF-Korridor (84-90 %) — ein vorsichtiger Heber
+      // (niedrige ANSAGE, also niedriger risikoMax) wurde von der Duell-Lage in eine Eroeffnung
+      // gedraengt, die er nach der eigenen Risikokurve gar nicht halten kann. Math.max mit
+      // anteilRein sorgt dafuer, dass der Deckel nur den ZUSCHLAG begrenzt und nie die heutige
+      // Eroeffnung absenkt; bei versatz<=0 ist er ohne Wirkung. Der 0,97-Deckel bleibt daneben
+      // wie bisher bestehen (er haelt einen Heber mit hoher ANSAGE davon ab, den ERSTEN Versuch
+      // quasi sicher zu reissen, s. Kommentar darunter).
+      const mutDeckel=Math.max(anteilRein,
+        Math.min(0.97,1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
+      const anteil=Math.min(0.97,mutDeckel,Math.max(0.5,anteilRein+versatz));
+      // Zielgewicht-Invarianz: anteil*(1+s1')*(1+s2') = anteilRein*(1+s1)*(1+s2), erreicht
+      // ueber denselben Faktor auf BEIDE Spruenge — deshalb bleibt die von der Lehrmeinung
+      // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen
+      // bleiben in derselben Reihenfolge unterscheidbar. Immer wenn anteil am Ende gleich
+      // anteilRein ist — ausgeglichenes Duell (versatz=0) oder einer der beiden Deckel
+      // schneidet den Versatz weg — ist der Faktor exakt 1 und der Sprung unten bit-identisch.
+      sprungFaktor[u.id]=Math.sqrt(anteilRein/anteil);
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
@@ -11914,8 +12016,18 @@
       // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
       // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
       // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
-      if(v===2&&beste(gegner)>beste(u)){
-        const basisZiel=Math.round(beste(gegner))+1;
+      // ZWEIKAMPF STATT UEBUNG (s. HEBEN_DUELL_ZWEIKAMPF oben): verglichen wird der Stand auf
+      // der Anzeigetafel, nicht der Stand in der laufenden Uebung. Im Reissen ist `gebucht`
+      // beidseitig 0 und `duellStand` identisch `beste` — der Ausdruck reduziert sich dort
+      // exakt auf den alten Math.round(beste(gegner))+1, die Aenderung greift also nur im
+      // dritten Stossversuch. Wer im Reissen genullt hat, kann den Zweikampf nicht mehr
+      // gewinnen (Zweikampf 0) und hebt sein eigenes Programm zu Ende, statt eine Jagd zu
+      // fahren, die ihm nichts mehr bringen kann.
+      const kannZweikampf=!(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&u.besteReissen<=0);
+      if(v===2&&kannZweikampf&&duellStand(gegner)>duellStand(u)){
+        // Was in DIESER Uebung noetig ist, damit der eigene Zweikampf-Stand vorn liegt:
+        // gebucht(u) + kg > duellStand(gegner).
+        const basisZiel=Math.round(duellStand(gegner)-gebucht(u))+1;
         // KUEHNER VERSUCH: freiwilliger Zuschlag ueber das Ausgleichskilo hinaus,
         // deterministisch aus ANSAGE — ein selbstbewusster Heber wagt mehr, kein
         // zusaetzlicher Wuerfel an dieser Stelle (s. HEBEN_WAGNIS_MAX_KG oben).
@@ -11996,7 +12108,11 @@
           setzeBeste(u,kg);
           u.versucheBis+=v+1;
           // Naechste Ansage: geplanter Sprung, groesser bei hoher ANSAGE.
-          const sprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          const basisSprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          // Nachskalierung aus (B): sie haelt das geplante Zielgewicht trotz verschobener
+          // Eroeffnung fest (s. sprungFaktor oben). Faktor 1 = unveraendert. Der Boden
+          // Math.max(kg+1,...) bleibt die reale IWF-Mindeststeigerung von 1 kg.
+          const sprung=(1+basisSprung)*sprungFaktor[u.id]-1;
           ansage[u.id]=Math.max(kg+1,Math.round(kg*(1+sprung)));
         } else {
           // Fehlversuch: die Last SENKEN statt zu wiederholen (Chris' Fund, s.
