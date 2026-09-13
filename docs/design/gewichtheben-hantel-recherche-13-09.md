@@ -437,16 +437,112 @@ Textkarte (`textY+48` = `y+50`) lagen acht Pixel auseinander — bei 10- bzw. 11
 Zweikampfzeile rücken auf `y+70`/`y+84`; nach unten ist Platz bis zur Warteschlangenzeile bei
 `H*0.90` (= `y+207`).
 
+## 6a. Nachtrag — die erste Fassung war nur für den Standardkörper kalibriert
+
+**Diese Korrektur stammt aus der unabhängigen Review zu dieser PR und hebt Teile von
+Abschnitt 6 auf.** Sie steht hier und nicht am Ende, weil sie den dort beschriebenen Anker
+ersetzt.
+
+Die erste Fassung dieser Runde hat den Hantel-Block in alle drei Zeichenpfade gezogen
+(Abschnitt 3) und die Offsets neu vermessen (Abschnitt 4) — beides am **Standardkörper**,
+51 Zellen hoch, Scheitel 11,4, Sohle 62,3. Die Zusammenfassung der eigenen Sonde
+(`scripts/pruefe-heben-hantel-vollzaehlig.mjs`) lautete danach „Alle 17 Figuren zeichnen eine
+Hantel", und genau diese eine Zeile stand in der PR. **Die Zeilenausgabe derselben Sonde zeigte
+zugleich, dass die Geometrie für sechs Figuren noch falsch war** — die Prüfung fragte nur, *ob*
+eine Hantel gezeichnet wird, nicht *wo*:
+
+| Figur | Pfad | `boden` | `hoch` |
+|---|---|---|---|
+| Tidesprinter | vollbild | **1,5 Zellen unter der Sohle** | 19,5 über Scheitel |
+| Seraph-11 | reiherMech | **2,0 Zellen unter der Sohle** | 11,0 über Scheitel |
+| Inefinna | vollbild | **27,5 über der Sohle — schwebt auf halber Rumpfhöhe** | **3,0 unter Scheitel** |
+| King Arlen | vollbild | ok | **3,0 unter Scheitel** |
+| Krolach | vollbild | ok | **2,0 unter Scheitel** |
+| Lava Golem | vollbild | ok | **3,0 unter Scheitel** |
+| Krag'Zul | vollbild | nicht messbar (Figur an der Leinwandkante abgeschnitten) | nicht messbar |
+
+„Unter der Sohle" heißt: die Stange liegt **im Boden** — derselbe Befund („viel zu weit unten"),
+den diese Runde zu beheben antrat. „Unter dem Scheitel" heißt: die Stange schneidet in der
+Überkopfphase **durch Kopf/Helm**.
+
+### Die Ursache: absolute Zelleinheiten an einem fremden Blatt
+
+`HEBEN_PHASEN.dy` stand in **absoluten Zellen** relativ zum Griffpunkt. Das ist richtig, solange
+jede Figur denselben 51-Zellen-Körper benutzt. Zwei Quellen taten das nicht:
+
+1. **`zeichneReiherMech`** (Seraph-11) zeichnet von `cy-19*Z` bis `cy+19*Z`, also **38 statt 51
+   Zellen**. Ein `+25` aus der Standardkörper-Kalibrierung schießt an einem 38-Zellen-Körper
+   zwangsläufig unter die Sohle, ein `-27` zwangsläufig weit über den Kopf. Ein anderer
+   *Ankerpunkt* hätte das nicht geheilt: kein fester Punkt kann `boden` **und** `hoch` zugleich
+   treffen, wenn die Höhe selbst abweicht.
+2. **Der vollbild-Pfad** las die Griffhöhe aus `VOLLBILD_SCHLAEGER[...].griff.punkte[r0].y` — einer
+   Tabelle mit **Faust**punkten für den Hockeyschläger. Deren `y` streut über die Blätter von 8
+   (Inefinnas Blatt) bis 45 (kraken); golem liegt bei ~33, weshalb ausgerechnet die Figuren im
+   Beweisbild richtig aussahen. Die Stangenhöhe hing damit an einer Größe **ohne jeden Bezug zur
+   Körperhöhe** — bis zu einer viertel Körperhöhe Fehler, je nach Blatt.
+
+### Die Behebung: Anteil der Körperhöhe statt absoluter Zellen
+
+`HEBEN_PHASEN` steht jetzt in **`anteil`** — dem Anteil der Körperhöhe, vom Scheitel nach unten
+gemessen (0 = Scheitel, 1 = Sohle) — statt in `dy`. Die Stangenhöhe ist damit
+
+    Stangenmitte = Scheitel(Blatt) + anteil × Körperhöhe(Blatt)
+
+und der **Griffpunkt geht überhaupt nicht mehr ein**. Das ist dieselbe Einsicht wie bei der
+x-Achse in Abschnitt 6, eine Ebene tiefer: eine zweihändig gegriffene Hantel hängt am **Körper**,
+nicht an einer Faust — weder seitlich noch in der Höhe.
+
+| Phase | alt (`dy`) | neu (`anteil`) | Rechnung |
+|---|---:|---:|---|
+| boden / antritt | 25 | **0,896** | (32+25−11,4)/50,9 |
+| zug | −4 | **0,326** | (32−4−11,4)/50,9 |
+| hoch | −27 | **−0,126** | (32−27−11,4)/50,9 |
+| abwurf / ablage | 26 | **0,916** | (32+26−11,4)/50,9 |
+
+**Es ist dieselbe Geometrie, nur umgerechnet.** Für den Standardkörper zeichnet es pixelgleich
+(nachgerechnet: `boden` 11,4+0,896×50,9 = 57,0 gegen 32+25 = 57; `hoch` 11,4−0,126×50,9 = 4,99
+gegen 32−27 = 5). Die Änderung wirkt ausschließlich auf Blätter, deren Höhe von 51 Zellen abweicht.
+
+Die Körperspanne kommt je Pfad aus der Quelle, die sie wirklich kennt:
+
+| Pfad | Spanne (Zellen) | Woher |
+|---|---|---|
+| Standardkörper | 11,4 … 62,3 | die gemessenen Landmarken aus Abschnitt 4.1 |
+| reiherMech | 27 … 65 | `zeichneReiherMech` zeichnet genau diese Grenzen — **der Code ist die Quelle** |
+| vollbild | je Blatt gemessen | `blattSpanne()`: ein Alpha-Durchlauf über die ganze Blattzeile, einmal je Blatt+Richtung, danach im Zwischenspeicher |
+
+`blattSpanne()` folgt demselben Grundsatz wie `hoehenKorrektur()` daneben — *„GEMESSEN STATT
+TABELLIERT. Eine generierte Tabelle wäre die zweite Kopie derselben Wahrheit"* — nur am **Blatt**
+statt an der fertig gezeichneten Figur, weil `zeichneSprite()` sich sonst über `hantelAnPunkt`
+selbst aufrufen würde. Das Blatt reicht auch: `drawImage()` skaliert jede Zelle unabhängig von
+ihrer nativen Größe immer auf `dh=64*Z`, die Zellspanne ist also direkt die Spanne im 64er-Rahmen.
+Damit braucht **kein** neues Blatt je wieder eine Einzelmessung — auch die über 65 Vollbild-
+Kreaturen außerhalb des Beispielkaders nicht.
+
+### Zwei Werkzeug-Korrekturen, die dabei nötig wurden
+
+- **`pruefe-heben-hantel-vollzaehlig.mjs` prüft jetzt die Geometrie mit**, nicht nur die Existenz:
+  `boden` darf nicht unter die Sohle, `hoch` nicht unter den Scheitel (Toleranz 0,5 Zellen).
+  Ein grüner Haken über einer Ausgabe, die den Fehler im Klartext enthält, ist schlimmer als gar
+  keine Prüfung — er lädt dazu ein, „behoben" zu schreiben.
+- **`renderProbe` nimmt einen optionalen Anker.** Der Zeichenpunkt lag fest auf `(32,46)`,
+  *unabhängig* von `leinwand` — eine größere Leinwand gab einer großen Figur nur unten und rechts
+  Platz. Krag'Zul (Z≈1,71, Sprite ab `y-46*Z` = −32) klebte deshalb oben an der Kante, und die
+  Sonde meldete Scheitel 0 und Stangenmitte 0: **beides nur die abgeschnittene Bildkante**, keine
+  Messung. Ohne Argument bleibt es wortgleich bei `(32,46)`, jede bestehende Messung im Repo
+  zeichnet unverändert.
+
 ## 7. Was NICHT geändert wurde
 
 - **`HEBEN_HAND.y`** bleibt wie gemessen — die Höhe des Griffs ist richtig, nur die Seite war es
-  nicht.
+  nicht. (Nachtrag: der Hantel-Pfad liest seit Abschnitt 6a **weder** `x` **noch** `y` daraus; die
+  Tabelle bleibt für ihre anderen Nutzer und für den `DISZIPLIN_PROP`-Vertrag stehen.)
 - **`hoehenKorrektur()`** (Abschnitt 5.1) — vorbestehend, außerhalb des Auftrags, würde jede
   Disziplin betreffen.
 - **Stangenlänge** (`34*Z` im Profil): eine echte Hantel misst ~1,2 Körperhöhen, unsere 68 Zellen
   gegen ~51 Zellen Körperhöhe sind 1,33 — nah genug, kein Handlungsbedarf.
 - **Scheibenradius wirkt nicht auf die Stangenhöhe.** In der Realität hebt eine größere Scheibe
-  die Stange höher; hier bleibt `dy` fest. Nachgerechnet macht das zwischen der kleinsten und der
+  die Stange höher; hier bleibt der Phasen-Anteil fest. Nachgerechnet macht das zwischen der kleinsten und der
   größten Scheibenstufe ~2px Unterschied — unter der Wahrnehmungsschwelle, bewusst nicht gebaut.
 - **Alle Motor-/Wertungspfade.** Diese Runde fasst ausschließlich Zeichenkoordinaten an; die
   Rangtreue muss bit-identisch bleiben (s. PR-Verifikation).
