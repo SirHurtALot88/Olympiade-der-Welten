@@ -87,7 +87,7 @@ Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kader
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **12.09.** Ton verdrahtet, Assets 80→100 (E2, PR #893) |
 | 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 87 % | **96 %** | 0,854 | ja | 10.09. Assets 60→100 (Hantel/Hebebuehne/Ton, PR #876) |
-| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 85 % | **94 %** | 0,861 | nein | 10.09. Bahn-Produktivierung + Ton (PR #880/#883) |
+| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 85 % | **94 %** | 0,883 | nein | **13.09.** Fallentyp entscheidet den Sauber-Wurf mit (`fallenKoennen`), rho 0,861→0,883 — Fable-Recherche `takeshi-hindernis-vs-strecke-recherche-13-09.md` |
 | 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
 | 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
