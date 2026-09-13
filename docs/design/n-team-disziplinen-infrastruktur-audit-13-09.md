@@ -78,8 +78,8 @@ Die gesamte Umsetzung liegt in `public/mockups/battle-mode.engine.js`:
 | Testschnittstelle `window.__arena.miniDmFfa*` | 23884-23888 | nur für die Mess-Skripte |
 
 Die einzigen Aufrufer außerhalb des Motors sind **drei Messskripte**
-(`scripts/miss-mini-dm-ffa-spiegel.mjs`, `-event-probe.mjs`, `-rangtreue.mjs`) und
-`scripts/abnahme-neues-spiel.ts`. **Kein Produktionspfad.**
+(`scripts/miss-mini-dm-ffa-spiegel.mjs`, `-event-probe.mjs`, `-rangtreue.mjs`).
+**Kein Produktionspfad.**
 
 Zusätzlich, und unabhängig davon: `mini-dm` steht **nicht** in `ARENA_RESOLVED_DISCIPLINE_IDS`
 (`lib/resolve/battle-mode-arena-team-points.ts:236-253`). Mini-DM wird heute im echten Spiel also
