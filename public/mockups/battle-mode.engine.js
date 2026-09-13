@@ -18868,6 +18868,67 @@
       tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+      // WER DIESE FALLE MEISTERT — Chris 13.09. (docs/design/takeshi-hindernis-vs-
+      // strecke-recherche-13-09.md):
+      //
+      //   "bei takeshi sollen nicht ALLE spieler immer gefuehlt an allen fallen hin fallen
+      //    sondern man soll nen unterschied sehen ob jemand eine meistert und dadurch
+      //    aufholt oder eben hinfaellt ... das kann auch n 80er sein der stark bei
+      //    hindernissen ist und dazwischen nur avg."
+      //
+      // Der Befund (Abschnitt 1 der Recherche, 120 Rennen kaderfest): der Typ der Falle
+      // entschied bis hier NUR ueber die Stoppdauer. Ob einer sauber durchkam, durchbrach
+      // oder stuerzte, wuerfelte an ALLEN vierzehn Fallen dieselbe TECHNIK — gemessen war
+      // die Sauber-Quote desselben Laeufers an seinem STAERKSTEN und seinem SCHWAECHSTEN
+      // Fallentyp 1,3 Prozentpunkte auseinander. Es gab die Geschichte "er meistert DIESE
+      // Falle" mechanisch also gar nicht, nur "der Techniker kommt ueberall etwas oefter
+      // durch". Mit `fallenKoennen:0.75` sind es 13,8 Prozentpunkte.
+      //
+      // 0,75 und nicht 1,0: ein Viertel "Falle lesen" bleibt an JEDER Falle stehen — das
+      // ist die blaue, mentale Seite der Disziplin (Intelligence 36 + Awareness 30 sitzen
+      // in TECHNIK, s. takeshi-chaos-tackle-plan-06-09.md Abschnitt 3.2), und sie soll
+      // nicht auf die vier TECHNIK-Stationen zusammenschnurren. Gemessen liegen 0,75 und
+      // 1,0 bei rho gleichauf (0,883); 0,75 laesst den Star in der Abnahme-Saat seltener
+      // gewinnen (75,8 % gegen 80,0 %). Die Star-Spalte haelt der Replikation ueber drei
+      // Saatensaetze allerdings NICHT stand (Recherche 4.5) — die Entscheidung fuer 0,75
+      // steht deshalb auf dem Konzept, nicht auf dieser Zahl.
+      //
+      // Warum das rho HEBT statt kostet (0,861 -> 0,883): der Wurf haengt nicht mehr an
+      // TECHNIK allein, dem Sub-Skill, der mit der Eignung am schwaechsten laeuft
+      // (r=0,60), sondern an der Kursmischung aus fuenf Sub-Skills (r=0,60 bis 0,88).
+      // Deren Mittel IST nach `mengeAusEignung` die Eignung — der Kanal wird breiter,
+      // nicht lauter. Das ist derselbe Grund, aus dem `lesenBonus` damals rausflog.
+      fallenKoennen:0.75,
+      // Der Durchbruch-Wurf bleibt reine WUCHT: mit Gewalt durchkommen ist Gewalt, egal
+      // welche Falle davorsteht. `fallenDurchbruch` liest der Motor, wenn es da ist —
+      // gemessen 0,874 gegen 0,883, also kein Gewinn, deshalb nicht gesetzt. Ebenso
+      // `stufePreis` (Stoppzeit nach Schwierigkeit: 0,869 allein, 0,878 zusammen mit
+      // fallenKoennen) und `fallenStolper` (Sturzdauer nach Typ: 0,869) — alle drei
+      // unter den 0,883 von `fallenKoennen` allein.
+      //
+      // Ab wann eine Falle eine Ticker-Zeile bekommt: der Sub-Skill dieser Falle muss
+      // `fallenMelden` Punkte ueber (Glanz) oder unter (Patzer) dem Mittel seiner fuenf
+      // Fallen-Sub-Skills liegen UND sein hoechster bzw. niedrigster sein. Reine Anzeige.
+      fallenMelden:10,
+      // WIE EINE FALLE FORDERT — Kategorisierung fuer die "Puste" (Chris 13.09., zur
+      // Ausdauer-Runde: "ja das kann es beeinflussen je nach hindernis aber MUSS nicht
+      // zwangsweise haengt von art und schwierigkeit ab -> du muesstest also realistisch
+      // schwierigkeiten und arten von hindernissen vergeben und diese kategorisieren").
+      // Die SCHWIERIGKEIT steht schon in `fallenStufe` (1-3); das hier ist die zweite
+      // Achse, die ART. `koerperlich` sind die Fallen, an denen ein Muedes den Unterschied
+      // spuert (Tuer und Seilwand durchbrechen, sich an Bruecke und Seil ueber dem Wasser
+      // halten, Rollen und Schlaege wegstecken), `technisch` die, die ein Erschoepfter mit
+      // Koennen trotzdem loest (Labyrinth, Eisflaeche — lesen und orientieren),
+      // `gemischt` die Balance-Fallen (Trittsteine, Walzen: Koennen zuerst, aber muede
+      // Beine wackeln).
+      //
+      // DIESER PR LIEST DAS FELD NICHT. Es ist reine Beschreibung, als Anschluss fuer die
+      // Puste-Runde (Zweig claude/hockey-ausdauer-konzept-13-09) gedacht, damit die nicht
+      // eine zweite, widerspruechliche Einteilung erfinden muss. Wer die Puste hier
+      // ansetzt, misst sie kaderfest wie jede Mechanik — die Einteilung selbst ist eine
+      // Behauptung ueber die Sendung, keine gemessene Zahl.
+      fallenArt:{TECHNIK:"technisch",WENDIGKEIT:"gemischt",WUCHT:"koerperlich",
+                 STEHEN:"koerperlich",ROBUST:"koerperlich"},
       // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
       // Saat gewaehlt — keine freie Ziehung). Jeder Kurs ist dieselbe Multimenge von
       // vierzehn Fallen (2x jeder der sieben Typen) in anderer Reihenfolge, deshalb
@@ -19021,6 +19082,13 @@
   // Welche Fallen in diesem Rennen schon eine Gedraenge-Zeile im Ticker hatten. Reine
   // Anzeige-Buchhaltung, kein Simulationszustand.
   let bahnGedraengeGemeldet=new Set();
+  // Dasselbe fuer die Staerken-/Schwaechen-Zeile an der Falle (`fallenMelden`, Chris
+  // 13.09.: "man soll nen unterschied sehen ob jemand eine meistert ... oder eben
+  // hinfaellt"). Ohne sie rechnet die neue Typ-Weiche zwar, ist im Ticker aber so
+  // unsichtbar, wie es Rempler und Gedraenge vor der Animationsrunde waren. Schluessel
+  // ist "Station|art", damit eine Falle je eine Glanz- und eine Patzer-Zeile bekommt und
+  // nicht zwoelf. Reine Anzeige-Buchhaltung, kein Simulationszustand.
+  let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
   // BROADCAST-HUD DER STAFFEL: ZEIT-DELTA. Fortschritt-Zeit-Verlaufspuffer je Seite,
@@ -19471,6 +19539,7 @@
     // 300k Saaten); Textsaaten waren nie betroffen und bleiben es (0,3220 vorher, 0,3339
     // nachher). Nachrechnen: docs/design/takeshi-kursmischer-nachweis-06-09.mjs.
     bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
+    bahnKoennenGemeldet=new Set();
     if(BA().kurse&&BA().kurse.length){
       let s0=(Number(seed)>>>0)||1;
       for(let runde=0;runde<2;runde++){
@@ -20064,15 +20133,36 @@
           // Zeit (0,2 s bei Elite-Sprintern); bei uns kostete ein Gelingen bisher nichts,
           // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
           // `hindernisTypen` nicht und bleiben bit-identisch.
+          // HINDERNIS-TYP UND -KOENNEN stehen ausserhalb des Blocks, weil die zwei
+          // Ausgangs-Wuerfe weiter unten sie brauchen (`fallenKoennen`, s. dort). Ohne
+          // `hindernisTypen` bleiben sie null/0 und beide Wuerfe rechnen Zeichen fuer
+          // Zeichen wie vorher.
+          let hTyp=null, hSkill=0;
           if(A.hindernisTypen){
-            const hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
-            const hSkill=u[hTyp]||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
+            hSkill=u[hTyp]||0;
+            // STOPPZEIT NACH SCHWIERIGKEIT — GEBAUT, GEMESSEN, NICHT GESETZT.
+            // `fallenStufe` (1-3 Sterne je Sub-Skill) steht nur in den Burgpunkten; fuer
+            // die Uhr sind alle vierzehn Fallen gleich teuer, eine Stufe-1-Wendigkeits-
+            // falle kostet so viel wie eine Stufe-3-Wuchtfalle. `stufePreis` wuerde das
+            // in Sekunden nachziehen (Faktor je Stufe, `huerdePreis` gegengerechnet, also
+            // Umverteilung statt Erhoehung). Kaderfest gemessen bringt es NICHTS und
+            // schadet in der scharfen Fassung: 0,869 allein (0,70/1,00/1,30), 0,848 bei
+            // 0,55/1,00/1,45, 0,878 zusammen mit `fallenKoennen` — alle unter den 0,883
+            // von `fallenKoennen` allein (Recherche Abschnitt 4.2). Das Feld bleibt im
+            // Motor und in BAHN_ART ungesetzt; ohne es ist der Faktor 1 (jede Bahn).
+            const stFaktor=A.stufePreis?(A.stufePreis[(A.fallenStufe||{})[hTyp]]??1):1;
+            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
+            // `stoppAnteil` bleibt BEWUSST der reine Koennens-Anteil (1 - 0,8 x Skill/100)
+            // und traegt den `stufePreis`-Faktor NICHT mit: die Schwierigkeit der Falle
+            // steht in den Burgpunkten schon als `fallenStufe`-Multiplikator (s.
+            // burgpunkte()), ein zweites Mal hier waere sie quadratisch drin. Die
+            // Wertungsformel bleibt dadurch Zeichen fuer Zeichen die gemessene aus #810.
             u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
             // TON (Ziel 3, A4, 10.09.): Falle ausgeloest. `A.takeshi` gated, weil dieser
             // Zweig auch fuer Spurt laeuft (s. Kommentar oben, "hindernisTypen fuehrt");
@@ -20125,9 +20215,74 @@
               }
             }
           }
-          const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
-          if(rr()<=technik)continue;                       // sauber drueber
-          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+u.WUCHT*(A.wuchtSpanne??0.0090));
+          // WER DIESE FALLE MEISTERT — UND NICHT: WER FALLEN ALLGEMEIN MEISTERT.
+          //
+          // Chris 13.09., nach einem live geschauten Rennen: "bei takeshi sollen nicht ALLE
+          // spieler immer gefuehlt an allen fallen hin fallen sondern man soll nen
+          // unterschied sehen ob jemand eine meistert und dadurch aufholt oder eben
+          // hinfaellt ... das kann auch n 80er sein der stark bei hindernissen ist und
+          // dazwischen nur avg."
+          //
+          // NACHGEMESSEN (docs/design/takeshi-hindernis-vs-strecke-recherche-13-09.md,
+          // Abschnitt 1): ein Unterschied WAR da — oberstes TECHNIK-Fuenftel 65,1 % sauber
+          // gegen 37,9 % im untersten —, aber er haengt an EINER Groesse. Der `hTyp` der
+          // Falle entschied bis hier NUR ueber die Stoppdauer, NIE ueber Gelingen oder
+          // Sturz: an einer Wendigkeits-, Wucht-, Willens- und Nehmerqualitaets-Falle
+          // wuerfelte jeder mit derselben TECHNIK. Damit gab es die Geschichte "ER kommt
+          // an DIESER Falle durch, wo der andere liegt" mechanisch gar nicht — nur "der
+          // Techniker kommt ueberall etwas oefter durch".
+          //
+          // `fallenKoennen` mischt das Koennen zum TYP der Falle in den Sauber-Wurf,
+          // `fallenDurchbruch` dasselbe in den Durchbruch-Wurf. Das ist KEIN neuer Kanal:
+          // dieselben fuenf Sub-Skills entscheiden bereits die Stoppdauer derselben Falle
+          // (`hSkill` oben), und ihr Mittel IST nach `mengeAusEignung` die Eignung — der
+          // Wurf wird damit nicht lauter, sondern breiter aufgestellt. Gemessen hebt das
+          // rho sogar leicht, weil TECHNIK der mit der Eignung am schwaechsten laufende
+          // Sub-Skill ist (r=0,60) und die anderen vier zwischen 0,67 und 0,88 liegen.
+          //
+          // Ohne die zwei Felder (jede andere Bahn, Spurt eingeschlossen) sind `koennen`
+          // und `durch` Zeichen fuer Zeichen `u.TECHNIK` bzw. `u.WUCHT`, und rr() wird in
+          // genau denselben Faellen und in derselben Reihenfolge gerufen.
+          let koennen=u.TECHNIK, durch=u.WUCHT;
+          if(hTyp){
+            const mK=A.fallenKoennen??0, mD=A.fallenDurchbruch??0;
+            if(mK)koennen=(1-mK)*u.TECHNIK+mK*hSkill;
+            if(mD)durch=(1-mD)*u.WUCHT+mD*hSkill;
+          }
+          // SEINE FALLE — UND SEINE SCHWACHSTELLE, im Ticker (`fallenMelden`).
+          //
+          // `stark`/`schwach` fragen nur, ob der Sub-Skill DIESER Falle der hoechste bzw.
+          // niedrigste der fuenf Fallentypen dieses Laeufers ist, und ob er weit genug von
+          // der Mitte weg liegt (`fallenMelden` ist die Schwelle in Punkten). Reine
+          // Anzeige: kein rr(), kein Schreiben in u.* ausser der Melde-Buchhaltung, kein
+          // Einfluss auf burgpunkte()/wert(). Je Station hoechstens eine Glanz- und eine
+          // Patzer-Zeile (bahnKoennenGemeldet) — sonst stuenden bei zwoelf Laeufern
+          // vierzehn mal zwoelf Zeilen im Ticker.
+          const meldeTyp=(A.fallenMelden&&hTyp&&A.fallenStufe)?(()=>{
+            const T=Object.keys(A.fallenStufe); if(T.length<2)return null;
+            let hoch=T[0],tief=T[0];
+            for(const t of T){ if((u[t]||0)>(u[hoch]||0))hoch=t; if((u[t]||0)<(u[tief]||0))tief=t; }
+            const mitte=T.reduce((s,t)=>s+(u[t]||0),0)/T.length;
+            if(hTyp===hoch && hSkill-mitte>=A.fallenMelden)return "stark";
+            if(hTyp===tief && mitte-hSkill>=A.fallenMelden)return "schwach";
+            return null;
+          })():null;
+          const meldeStation=HUERDEN_N().indexOf(h);
+          const melde=(art2,txt)=>{
+            const key=meldeStation+"|"+art2;
+            if(bahnKoennenGemeldet.has(key))return;
+            bahnKoennenGemeldet.add(key); feed(u.seite,txt);
+          };
+          const technik=Math.min(0.97,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065));
+          if(rr()<=technik){                               // sauber drueber
+            if(meldeTyp==="stark"){
+              schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+              melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
+            }
+            continue;
+          }
+          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090));
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
@@ -20137,7 +20292,10 @@
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
-          u.stolper=(BA().stolperGrund??0.45)+ (1-u.TECHNIK/100)*(BA().stolperSpanne??0.5);
+          // WIE LANGE ER LIEGT, haengt an demselben Koennen wie das Gelingen — mit
+          // `fallenStolper` am Koennen ZU DIESER Falle (`koennen` oben), sonst weiter an
+          // TECHNIK allein. Ohne das Feld ist der Ausdruck Zeichen fuer Zeichen der alte.
+          u.stolper=(BA().stolperGrund??0.45)+ (1-(BA().fallenStolper?koennen:u.TECHNIK)/100)*(BA().stolperSpanne??0.5);
           // WENDIGKEIT, WO ES KEINE SPUR ZU WECHSELN GIBT.
           //
           // Im Sprint entscheidet Wendigkeit ueber Bahnwechsel: in den Sog kommen, am
@@ -20197,7 +20355,14 @@
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
-          feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
+          // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
+          if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+            melde("schwach",u.n+" liegt an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+              " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
+          } else {
+            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          }
         }
       }
 
