@@ -2,7 +2,7 @@
 
 **Reine Präsentationsrunde.** Kein Rezept, keine Matrix, keine Rundenzahl, kein `failAbzug`, keine
 Zeile in `wert()`. Gemessen vorher und nachher mit `node scripts/miss-alle-disziplinen.mjs 24` über
-alle zwanzig Disziplinen; Erwartung und Ergebnis: **bit-identisch**.
+alle zwanzig Disziplinen; Ergebnis: **bit-identisch**, beide Ergebnisdateien mit derselben MD5.
 
 ---
 
@@ -249,7 +249,7 @@ eine eigene, kleine Aufräumrunde.
 | `node --check public/mockups/battle-mode.engine.js` | bestanden |
 | `npx tsc --noEmit` | Diff gegen `main` leer — s. Anmerkung unten |
 | `npx tsx scripts/pruefe-slot-invariante.ts` | hält, max. Abweichung 0,005 Pp über alle 20 × 6 |
-| `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig) | **bit-identisch** vorher/nachher |
+| `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig) | **bit-identisch** — `diff` liefert nichts, beide Ergebnisdateien haben dieselbe MD5 `4d31300812cc22ad39693d196a6d72ab` |
 | Playwright-Screenshots | `Seitenfehler: keine` in jedem Lauf; s. Tabelle unten |
 | `ctx.save()`/`ctx.restore()` in `zeichneBreaking()` | 5/5, ausgeglichen (maschinell nachgezählt) |
 
@@ -271,6 +271,24 @@ stehen unverändert auch auf `main`.
 Eine Gegenprobe, die beim Lesen der Bilder hilft: in allen drei Nachher-Bildern trägt der Ticker
 denselben Namen wie die mit `ERTRÄGT` beschriftete Figur. Das ist kein Zufall, sondern der Beweis,
 dass `cypherPaar()` dieselbe Figur als Ertragenden führt, die `stepBuehne()` gerade enthüllt hat.
+
+**Die Messung im Detail.** Basislauf auf `ec9190c5` (dem Abzweigpunkt), Nachlauf auf dem
+**gemergten** Stand dieses Branches. Breaking steht in beiden Läufen bei
+`0,869 / 0,114 / 0,951 / 0,168 · bestanden` — exakt die in CLAUDE.md und
+`breaking-kalibrierung-10-09.md` dokumentierte Zahl. Alle übrigen neunzehn Zeilen stimmen ebenfalls
+zeichengenau überein.
+
+Der Nachlauf enthält den Merge von `main` (u. a. PR #903, Eiskunstlauf-Ton). Dass er trotzdem
+zeichengleich zum Basislauf ist, belegt **zwei** Dinge auf einmal: diese Runde ist
+rangtreue-neutral, und die parallel gemergte Eiskunstlauf-Runde ist es ebenso.
+
+Ein Wort zur Durchführung, weil es für die nächste Runde nützlich ist: auf dieser Maschine arbeiten
+mehrere Agenten gleichzeitig, und unter der Last stirbt Playwright reproduzierbar mit
+`Target page, context or browser has been closed`. Drei Läufe sind daran gescheitert, bevor einer
+durchlief. Das Messskript wurde deshalb in eine Wiederholschleife gepackt, die zusätzlich die
+**MD5-Summe der Motordatei vor und nach dem Lauf** vergleicht — ein Lauf, während dessen die Datei
+sich ändert (z. B. durch einen Merge), ist wertlos und wäre sonst unbemerkt geblieben. Der gewertete
+Lauf meldet `public/mockups/battle-mode.engine.js: OK`.
 
 Warum die Rangtreue per Konstruktion unberührt bleibt, hält der Code an derselben Stelle fest, an
 der es schon für `zeichneHeben()` steht: `disziplinProbe()`/`miss-alle-disziplinen.mjs` rufen
