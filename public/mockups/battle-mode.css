@@ -1,7 +1,7 @@
   .oly-battle-arena.oly-battle-arena{--ground:#F2F5F9;--surface:#FFF;--surface-2:#E9EEF5;--sunk:#DFE6EF;--pitch:#E4EAF2;
     --line:#CFD8E4;--line-soft:#E3E9F1;--ink:#111823;--muted:#5A6678;--faint:#8B98AA;
     --home:#B26A12;--home-bg:#F2A03D26;--away:#15707F;--away-bg:#45B0C926;
-    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
+    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--wucht:#D2562A;--puste-knapp:#B5761F;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
   /* Die dunklen Flaechen-Tokens zeigen mit var(--nl-*, Rueckfall) auf die Design-Tokens
      der App (app/globals.css, .is-new-look): eingebettet uebernimmt der Entwurf damit
      EXAKT die Flaechen, Linien und Textfarben des Foundation-Shells — inklusive der
@@ -13,11 +13,11 @@
     --ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
   .oly-battle-arena.oly-battle-arena[data-theme="dark"]{--ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
 
   /* EINBETTUNGS-MODUS (.im-spiel, gesetzt vom Host in FoundationBattleArenaHost.tsx).
      Der Entwurf sitzt dann nativ zwischen den Panels des Foundation-Shells:
@@ -348,6 +348,16 @@
   .oly-battle-arena.oly-battle-arena #kaderR .kk b{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
+  /* KACHEL-ZAHL rechts neben dem Namen: was die Leiste frueher trug (Streckenanteil auf der
+     Bahn, Punktestand im Feldspiel/auf der Buehne), seit die Leiste die Puste zeigt.
+     <i> statt <span>, damit kein bestehender Selektor darauf zielt. */
+  .oly-battle-arena.oly-battle-arena .kk .kkzahl{margin-left:auto;flex:none;font-style:normal;
+    font:600 9px/1.4 var(--mono,ui-monospace,monospace);color:var(--faint);white-space:nowrap}
+  /* PUSTE-LEISTE: dieselbe Ampel wie der Balken unter den Fuessen auf der Bahn/dem Feld
+     (zeichneSpurt/zeichneFeldspiel) — gruen, orange unter einem Fuenftel, rot bei leer.
+     Eine Leiste, drei Chassis, eine Farbsprache. */
+  .oly-battle-arena.oly-battle-arena .kk .kbar.puste s.knapp{background:var(--puste-knapp)}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.puste s.leer{background:var(--crit)}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}

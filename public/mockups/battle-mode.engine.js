@@ -4878,6 +4878,14 @@
       label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
       punkteNah:1, punkteFern:1, fernAnteil:0,
       wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      // ZWEI VERSCHIEDENE AKTIONEN, ZWEI VERSCHIEDENE WOERTER (Chris, 13.09.: "ich sehe
+      // keine checks oder tackles"). Nachgemessen (docs/design/hockey-ausdauer-checks-
+      // konzept-13-09.md, Abschnitt 3.4): der Bodycheck faellt 10,5-mal je Spiel und der
+      // Stockcheck am Traeger 8,1-mal — und BEIDE schrieben denselben Schwebetext "CHECK!",
+      // weil der Steal-Zweig `wortAbwehr` liest und das hier "Check" ist. `wortSteal`
+      // trennt die beiden Woerter; wo es fehlt (Basketball, Football), faellt der Code auf
+      // `wortAbwehr` zurueck und schreibt zeichengleich dasselbe wie bisher.
+      wortSteal:"Stockcheck",
       // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
       // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht,
       // und der Torwart hat keine eigene Zeile), s. WERTUNG_HOCKEY() weiter unten bei den
@@ -5907,6 +5915,9 @@
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
+        // REINE ZEICHEN-FELDER fuer den Bodycheck-Aufprall (s. HK_CHECK_VIS/versucheSteal).
+        // Keine Formel liest sie, ausserhalb von Hockey setzt sie nichts.
+        wuchtVis:0, wuchtZielX:0, wuchtZielY:0,
         // Strafbank: `strafeBis` ist der Zeitpunkt (Spielzeit fsT), ab dem er wieder
         // aufs Eis darf, `strafminuten` die Statistikspalte. Ausserhalb von Hockey
         // bleiben beide 0 — `aufDemEis` liest dann immer true.
@@ -6402,6 +6413,13 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
+  // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
+  // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
+  // stepFeldspielLive abgebaut. Bei ZEIT_DEHNUNG.hockey=2 sind 0,5 s Spielzeit rund eine
+  // Sekunde Zuschauzeit — lang genug, um den Stoss zu sehen, kurz genug, um den naechsten
+  // nicht zu ueberdecken (die Luecke zwischen zwei Checks liegt im Median bei 14,4 s).
+  const HK_CHECK_VIS=0.5;
   // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
   // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
   // bei 78 (Netfront), 165 (Half-Wall) und 295 px (Point, blaue Linie). Mit Basketballs
@@ -9031,7 +9049,22 @@
         // Reine Praesentation, kein rr()-Aufruf.
         sfx("hockey","treffer");
         feed(decker.side,decker.n+" checkt "+traeger.n+" von den Kufen.");
-        schwebe({x:0,y:0,txt:"CHECK!",life:1.0,crit:true,_def:true,_spieler:decker.id});
+        // EIGENES BILD FUER DEN KOERPEREINSATZ (Chris, 13.09.). Gemessen fielen je Spiel
+        // rund 103 Schwebetexte derselben Klasse `_def` (69,3 Save/Block, 18,0 Steal,
+        // 10,5 Bodycheck, 5,5 Strafe) — gleiche Farbe, gleiche Groesse, gleiche Position,
+        // einer alle 4,6 Zuschausekunden. Der Bodycheck war darin nicht auffindbar, obwohl
+        // er je Skater HAEUFIGER faellt als in der NHL (1,60 gegen rund 1,2). `_wucht` ist
+        // eine dritte Float-Klasse neben `_def`/`_gross`: eigenes Wort, eigene Farbe,
+        // groesser, laenger stehend. Reine Zeichnung, kein rr()-Aufruf.
+        schwebe({x:0,y:0,txt:"BODYCHECK!",life:1.5,crit:true,_wucht:true,_spieler:decker.id});
+        // STOSS-POSE UND AUFPRALL-BOGEN. `lunge` steht schon (Zeile oben, VOR dem Wuerfel,
+        // also identisch fuer Treffer und Fehlversuch) — genau deshalb sah man bisher nicht,
+        // dass jemand einen Koerperkontakt SUCHT, nur dass jemand umfaellt. `wuchtVis` ist
+        // ein reiner Zeichen-Zaehler (abgebaut in stepFeldspielLive neben `down`), aus dem
+        // zeichneFeldspiel den Bogen zeichnet; `wuchtZielX/Y` halten den Aufprallpunkt fest.
+        // Weder Simulation noch Boxscore lesen eines dieser drei Felder.
+        decker.wuchtVis=HK_CHECK_VIS; decker.lunge=Math.max(decker.lunge,HK_CHECK_VIS);
+        decker.wuchtZielX=traeger.x; decker.wuchtZielY=traeger.y;
         logZug(decker.side,"check",{verteidiger:decker,spieler:traeger});
         // WER LIEGT, FUEHRT KEINEN PUCK (Overseer-Fund). Bis hierher war der Check von der
         // Puckfrage vollstaendig entkoppelt: in rund 84 % der Faelle lag der Getroffene am
@@ -9050,12 +9083,16 @@
     }
     if(rr()<proVersuch){
       decker.steals++; traeger.verluste++;
-      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+art.wortAbwehr+".");
+      // `wortSteal` statt `wortAbwehr`, wo die Disziplin es fuehrt (Hockey: "Stockcheck"
+      // gegen den Bodycheck darueber, s. FELDSPIEL_ART.hockey). Ohne das Feld — Basketball,
+      // Football — ist die Zeile zeichengleich die alte.
+      const wortStahl=art.wortSteal||art.wortAbwehr;
+      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+wortStahl+".");
       // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
       // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
       // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
       // Float-Rendering, das jetzt zwischen Angriffs- und Abwehr-Highlight unterscheidet.
-      schwebe({x:0,y:0,txt:art.wortAbwehr.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
+      schwebe({x:0,y:0,txt:wortStahl.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
@@ -9866,6 +9903,10 @@
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
       if(u.down&&fsT>=u.downBis)u.down=false;
+      // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
+      // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
+      // auslaufen, sonst haengt der Bogen im letzten Bild fest.
+      if(u.wuchtVis>0)u.wuchtVis=Math.max(0,u.wuchtVis-dt);
       // ZURUECK AUFS EIS. `strafeBis` wird auf 0 gesetzt statt nur ablaufen gelassen,
       // damit der Wiedereintritt EIN Ereignis ist und nicht in jedem Tick neu erkannt
       // wird — nur so laesst sich die Aufstellung genau einmal neu machen.
@@ -10887,6 +10928,25 @@
           }
         }
         zeichneSprite(ctx,u,x,y,true);
+        // AUFPRALL-BOGEN DES BODYCHECKS (13.09.). Dieselbe Bauform wie der "hieb"-Effekt
+        // im Kampf und beim Bahn-Rempler (zeichneEffekte, typ:"hieb"): ein Bogen um den
+        // Aufprallpunkt, aus der Richtung des Checkenden geoeffnet, mit der Restzeit
+        // verblassend. Bewusst KEIN Eintrag in EFFEKTE — dieses Array wird in
+        // zeichneFeldspiel nie geleert und wuerde in einer headless-Sonde ueber viele
+        // Spiele wachsen; `u.wuchtVis` ist eine Zahl an der Einheit und laeuft in
+        // stepFeldspielLive von selbst aus.
+        if(u.wuchtVis>0){
+          const a=Math.max(0,Math.min(1,u.wuchtVis/HK_CHECK_VIS));
+          const zx=u.wuchtZielX+(u._zvx||0), zy=u.wuchtZielY+(u._zvy||0);
+          const w=Math.atan2(zy-y,zx-x), r=30*(0.6+0.4*(1-a));
+          ctx.save();
+          ctx.strokeStyle=css("--wucht");ctx.globalAlpha=a*0.95;
+          ctx.lineWidth=5;ctx.lineCap="round";
+          ctx.beginPath();ctx.arc(zx,zy,r,w-1.25,w+1.25);ctx.stroke();
+          ctx.strokeStyle="rgba(255,255,255,.75)";ctx.globalAlpha=a*0.6;ctx.lineWidth=1.5;
+          ctx.beginPath();ctx.arc(zx,zy,r+5,w-1.0,w+1.0);ctx.stroke();
+          ctx.restore();
+        }
         if(FS_DEBUG_ZIELE&&u._zielHomeX!=null){
           ctx.fillStyle=c;ctx.globalAlpha=0.9;
           ctx.beginPath();ctx.arc(u._zielHomeX,u._zielHomeY,4,0,6.3);ctx.fill();
@@ -11054,8 +11114,13 @@
       // _def (Chris' Fund, 29.08.: Highlights auch fuer Steal/Block, nicht nur fuer
       // Treffer) bekommt eine eigene Farbe (--crit), damit Abwehr- und Angriffs-Jubel
       // auf den ersten Blick auseinanderzuhalten sind.
-      ctx.fillStyle=f._def?css("--crit"):f._gross?css("--warn"):css("--ok");
-      ctx.font=(f._gross?"800 22px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      // DRITTE KLASSE `_wucht` (13.09.): der Bodycheck. Eigene Farbe (--wucht, in keiner
+      // Teamfarbe und in keiner der beiden bestehenden Klassen enthalten) und eine eigene
+      // Groesse zwischen Abwehr-Text (15) und Tor-Jubel (22) — sonst liest er sich entweder
+      // wie ein Save oder wie ein Tor. Begruendung und Messung: docs/design/
+      // hockey-ausdauer-checks-konzept-13-09.md, Abschnitt 3.4 Ursache A.
+      ctx.fillStyle=f._wucht?css("--wucht"):f._def?css("--crit"):f._gross?css("--warn"):css("--ok");
+      ctx.font=(f._gross?"800 22px":f._wucht?"800 18px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
         const u=FSTEAM[side].find(x=>x.id===f._spieler);
@@ -22425,6 +22490,18 @@
     return c;
   }
 
+  // Welche Groesse die Kachelleiste einer FELDSPIEL-Disziplin zeigt. Heute der enthuellte
+  // Punktestand — im Eishockey also die Tore, und damit eine Leiste, die bei ueber der
+  // Haelfte der Spieler das ganze Spiel auf null steht (Konzeptdokument 4.2). Eine
+  // Disziplin mit eigenem Ausdauer-Modell bekommt hier ihre Puste-Leiste; bis dahin ist
+  // das Ergebnis dieselbe Belegung wie vorher, nur mit richtigem Namen im Tooltip.
+  function fsLeisteFuer(u,fsStand){
+    const punkte=(fsStand.spieler.get(u.id)||{punkte:0}).punkte;
+    const maxP=Math.max(1,...FSTEAM[0].concat(FSTEAM[1])
+      .map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte));
+    return {wert:punkte,max:maxP,wort:istHockey()?"Tore":"Punkte",zusatz:String(punkte)};
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -22433,16 +22510,44 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
+      // WAS DIE KACHELLEISTE ZEIGT — UND WIE SIE HEISST (Chris, 13.09.: "die health bars
+      // sind ja hier quatsch").
+      //
+      // Bis hierher trug `.kbar` in allen vier Chassis dieselbe Form (gruener Balken im
+      // Gewand einer Lebensanzeige) und denselben Tooltip ("N von M Leben") — bei drei von
+      // vier Chassis fuer etwas, das mit Leben nichts zu tun hat:
+      //   Bahn      1 - pos, also die RESTSTRECKE. Wer fuehrte, hatte die LEERSTE Leiste.
+      //   Buehne    Punktestand.
+      //   Feldspiel `punkte`, im Eishockey also TORE — und nachgemessen standen 175 von 288
+      //             Kachelzeilen das ganze Spiel auf null (docs/design/
+      //             hockey-ausdauer-checks-konzept-13-09.md, Abschnitt 4.2).
+      //   Kampf     echte Lebenspunkte, als einziges Chassis.
+      //
+      // `leiste` macht daraus eine benannte Groesse: `wert`/`max` fuellen den Balken,
+      // `wort` beschriftet den Tooltip, `zusatz` steht als Zahl neben dem Namen, damit
+      // nichts verloren geht, was die Leiste vorher trug (Bahn: Streckenanteil; Feldspiel:
+      // der Punktestand). Reine Anzeige — renderKader wird aus dem Zeichen-Takt gerufen und
+      // schreibt in keinen Simulationszustand.
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
           // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
           // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
           // Identitaet wie die Figur auf der Bahn.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan}))
+          // PUSTE STATT RESTSTRECKE: `reserve/reserveMax` ist genau der Balken, den die
+          // Bahn unter den Fuessen schon zeichnet (s. zeichneSpurt, "der Ersatz fuer den
+          // Lebensbalken des Kampfes") — die Kachel zeigt jetzt dieselbe Groesse wie das
+          // Feld, statt einer invertierten Fortschrittsanzeige.
+          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+            leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
+                    leer:!!x.leer,art:"puste",
+                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"}}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
-          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
+          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
+          leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
+                  zusatz:Math.round(x.summe*10)/10+""}}))
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
-          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
+          leiste:fsLeisteFuer(x,fsStand)}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         // Sprite links, Name rechts daneben — die Lebens-/Punkteleiste bleibt darunter
@@ -22450,11 +22555,25 @@
         const kopf=el("div","kkkopf");
         kopf.appendChild(kaderFigur(u.n));
         kopf.appendChild(el("b",null,u.n));
+        // Was die Leiste frueher trug, steht jetzt als Zahl neben dem Namen — der
+        // Streckenanteil auf der Bahn, der Punktestand im Feldspiel/auf der Buehne. Eine
+        // Zahl ist ohnehin lesbarer als ein Balken mit drei Stufen (im Eishockey war der
+        // Nenner im Median 3, s. Konzeptdokument 4.2).
+        if(u.leiste&&u.leiste.zusatz!=null)kopf.appendChild(el("i","kkzahl",u.leiste.zusatz));
         k.appendChild(kopf);
-        const bar=el("div","kbar");
-        const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
+        const anteil=u.leiste?u.leiste.wert/Math.max(1e-6,u.leiste.max):u.hp/u.max;
+        const bar=el("div","kbar"+(u.leiste&&u.leiste.art==="puste"?" puste":""));
+        const f=el("s"); f.style.width=Math.max(0,Math.min(100,anteil*100))+"%";
+        if(u.leiste&&u.leiste.art==="puste")f.className=u.leiste.leer?"leer":(anteil<0.2?"knapp":"");
         bar.appendChild(f); k.appendChild(bar);
-        k.title=u.n+(u.down?" — ausgeschieden":" — "+Math.round(u.hp)+" von "+u.max+" Leben");
+        // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
+        // Name der Groesse, die der Balken wirklich zeigt.
+        k.title=u.n+(u.down?" — ausgeschieden"
+          :u.leiste&&u.leiste.art==="puste"
+            ? " — "+Math.round(anteil*100)+" % "+u.leiste.wort+(u.leiste.leer?" (eingebrochen)":"")
+          :u.leiste
+            ? " — "+(Math.round(u.leiste.wert*10)/10)+" "+u.leiste.wort
+            : " — "+Math.round(u.hp)+" von "+u.max+" Leben");
         // FOKUS-DOPPELN: die Kaderleiste ist die zweite (und die verlaesslichere)
         // Auswahlflaeche neben dem Klick aufs Feld — die Kacheln stehen still, waehrend
         // die Figuren auf der Leinwand laufen. Nur die GEGNER-Seite ist waehlbar: die
