@@ -331,6 +331,16 @@ bewiesen — `pusteFaktor(u,1)` ist `1 + 0·anteil`, und `x*1 === x` gilt in IEE
 Rundung, während kein Puste-Pfad einen `rr()`-Wurf zieht — aber ein Beweis, den man auch
 messen kann, misst man.
 
+**Nach dem Merge von `main` noch einmal gemessen, und zwar aus einem konkreten Grund:** #910
+ist als Squash auf `main` gelandet, während dieser Zweig denselben Inhalt als eigenen Commit
+trägt. Das ergab sechs Konflikte im Motor — alle mit *leerer* `main`-Seite, also reine
+Squash-Artefakte. Aufgelöst wurde Hunk für Hunk mit einem Skript, das **abbricht, sobald eine
+`main`-Seite nicht leer ist**, damit eine echte Kollision stehen bleibt statt still
+plattgebügelt zu werden; danach wurde auf Doppelungen geprüft (`pusteRegen` 5×, die
+Erholungskonstanten 5×, jeder Hockey-Block genau 1×). Weil eine Merge-Auflösung den Motor
+anfasst, gilt eine Abnahme davor nicht mehr automatisch danach — nachgemessen auf dem
+gemergten Stand: **0,669 / 0,181 / 0,832 / 0,259**, unverändert.
+
 ### 4.5 Die Bahn behält ihre Wirkung — alle fünf bestehen
 
 Gemessen mit der **endgültigen** Kalibrierung (`leerRegen` 6,0 / `pusteFangen` 0,12), also
