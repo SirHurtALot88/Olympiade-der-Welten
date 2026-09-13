@@ -351,7 +351,7 @@ mit einer Erholung, die wirklich feuert:
 | staffel | 0,915 / 0,951 | **0,915 / 0,951** | 0,865 | 0,050 | bestanden, identisch |
 | spurt | 0,871 / 0,905 | **0,871 / 0,905** | 0,800 | 0,071 | bestanden, identisch |
 | takeshis-castle | 0,861 / 0,930 | **0,852 / 0,937** | 0,811 | 0,041 | bestanden |
-| time-trial | 0,828 / 0,832 | **0,828 / 0,832** | 0,778 | 0,050 | bestanden, identisch |
+| time-trial | 0,828 / 0,832 | **0,825 / 0,825** | 0,778 | 0,047 | bestanden (s.u.) |
 | climbing | 0,790 / 0,851 | **0,782 / 0,839** | 0,732 | 0,050 | bestanden |
 
 **Drei der fünf sind ziffernidentisch, und das ist kein Zufall, sondern die Bauart der
@@ -362,8 +362,18 @@ das Feld über die kurze Distanz durchgehend auf Plantempo und bricht so gut wie
 nicht. Bewegt hat sich genau dort etwas, wo Läufer wirklich an Hindernissen stehen und
 leerlaufen: **Takeshi −0,009** und **Climbing −0,008** auf der Spielzahl.
 
-Beide Bewegungen liegen **weit innerhalb der Kader-Spannweite** (Takeshi 0,120, Climbing
-0,191) und sind nach `messgrundlage-kaderfest.md` von Null nicht zu unterscheiden. Hier gilt
+**Time-Trial, und die Zurechnung ist ehrlich offen:** die Zahl stand vor dem Merge von #908
+noch ziffernidentisch bei 0,828 / 0,832 und liegt danach bei **0,825 / 0,825**. In genau
+diesem Zeitraum hat #908 („Zeitfahren: Ergebnis-Konsistenz, Kamera, Laufanimation,
+Ausdauer-Lesbarkeit") dieselbe Disziplin angefasst — unter anderem die Startrampe. Die
+Bewegung von −0,003 lässt sich deshalb **nicht sauber einer der beiden Änderungen
+zuschreiben**, und beide Kandidaten sind plausibel: die Basislinie 0,828 stammt aus der Zeit
+vor #908, und seit der Erholungs-Kalibrierung können die gemessenen 4,7 % Eingebrochenen im
+Zeitfahren sich erstmals wieder fangen. Was sich sagen lässt: −0,003 liegt weit unter der
+Kader-Spannweite von 0,082, und der Abstand zum Boden beträgt 0,047.
+
+Beide übrigen Bewegungen liegen **weit innerhalb der Kader-Spannweite** (Takeshi 0,120,
+Climbing 0,191) und sind nach `messgrundlage-kaderfest.md` von Null nicht zu unterscheiden. Hier gilt
 dieselbe Vorsicht wie bei Hockey — mit zwei Unterschieden, die den Fall tragen: beide
 Vorzeichen sind kleiner als ein Drittel dessen, was Hockey verloren hat, und beide behalten
 **mindestens 0,041 Abstand zu ihrem Boden**, statt einen Tausendstel. Dafür tut die Mechanik
