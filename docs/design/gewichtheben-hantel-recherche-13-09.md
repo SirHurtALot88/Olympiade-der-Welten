@@ -148,7 +148,7 @@ in Abschnitt 5.1).
   Griffpunkt, den `HEBEN_HAND` beim Standardkörper hat — liegt bei `cy-3*Z`, in Zellschreibweise
   `y:43`.
 
-## 3.1 Beim Gegenprüfen aufgefallen: der aktive Heber verschwand ganz
+### 3.1 Beim Gegenprüfen aufgefallen: der aktive Heber verschwand ganz
 
 Das Beweisbild des Vollbild-Duells (Abschnitt 9) zeigte Lava Golem mit Hantel — und von
 Krag'Zul nur Schatten, Hantel und zwei Void-Partikel. **Kein Körper.** Das ist ein
@@ -402,7 +402,7 @@ Zwei Messvorbehalte, ausgewiesen statt weggelassen:
   einem Zeichenanker von x=32 ragt die linke Stangenhälfte (bis ~54*Z) über den linken Rand
   hinaus. Für die Höhenmessung ist das ohne Belang, für eine Breitenmessung wäre es eine Falle.
 
-## 6.2 Die Textkarte musste weichen
+### 6.2 Die Textkarte musste weichen
 
 `zeichneHeben()` setzte die kg-Zahl auf `textY-34` und das Kühn-Badge auf `textY-58`, also 32 bzw.
 56px über dem Fußpunkt. Das ging nur deshalb gut, weil die Stange mit `dy=-49` **über** die ganze
@@ -460,4 +460,12 @@ Versuchszeile überlappen nicht mehr.
 
 ![Nachher: Gewichtheben-Duell, 13.09.](./gewichtheben-nachher-13-09.png)
 
-<!-- VOLLBILD -->
+**Das Vollbild-Duell** (Duell 2 des Beispielkaders, Lava Golem gegen Krag'Zul) zeigt beide
+Befunde dieser Runde auf einmal. Vorher: Lava Golem ohne Hantel, und von Krag'Zul nur Schatten,
+Hantel und zwei Void-Partikel — **kein Körper** (Abschnitt 3.1).
+
+![Vorher: Vollbild-Duell, keiner mit Hantel, der aktive Heber unsichtbar](./gewichtheben-vollbild-vorher-13-09.png)
+
+Nachher: beide Golems sind sichtbar, beide haben eine Hantel, beide liegen auf der Plattform.
+
+![Nachher: Vollbild-Duell Lava Golem gegen Krag'Zul](./gewichtheben-vollbild-13-09.png)
