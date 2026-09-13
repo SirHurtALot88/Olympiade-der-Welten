@@ -197,6 +197,24 @@ dort die sichtbare Faust die angezogene, nicht die gestreckte ist.
 
 In allen vier Feldern sitzt der Punkt sichtbar auf einer Faust.
 
+### Nachtrag 13.09.: die x-Werte gelten weiter, der Hantel-Pfad liest sie nur nicht mehr
+
+Die vier Punkte oben sind unverändert richtig — sie beschreiben je Blickrichtung eine **Faust**,
+und genau das verlangt der `DISZIPLIN_PROP`-Vertrag. Für die **Hantel** ist eine Faust aber der
+falsche Aufhängepunkt: eine Hantel wird zweihändig und symmetrisch gegriffen, ihre Mitte gehört
+auf die Körpermittelachse. Nachgemessen hing die Stange dadurch 21 Zellen (0,41 Körperhöhen)
+neben der Figur — Chris' Befund „das muss sich viel mehr am modell orientieren".
+
+Der Hantel-Zeichenpfad nimmt seit dem 13.09. deshalb nur noch das **`y`** aus dieser Tabelle (die
+Griffhöhe, weiterhin gemessen) und setzt `x` auf die Zeichen-x der Figur. Gemessen liegt die
+Silhouettenmitte ab Schulterhöhe im Profil bei Zelle **31,5** — der geometrischen Mitte der
+64er-Zelle, beide Profilrichtungen, drei Figuren übereinstimmend. Vollständige Messung,
+Körperlandmarken und die vier neu vermessenen `HEBEN_PHASEN`-Offsets:
+`docs/design/gewichtheben-hantel-recherche-13-09.md`.
+
+Andere Nutzer der Tabelle (der `DISZIPLIN_PROP`-Vertrag, künftige Requisiten) verwenden `x`
+unverändert weiter.
+
 ### Unsicherheiten
 
 - **Nur EIN Punkt je Richtung**, verwendet für ALLE vier `HEBEN_PHASEN` (`boden`/`zug`/
