@@ -21,6 +21,12 @@ sagt, was es bräuchte, um die Wirkung doch einzuschalten.
 **Auf der Bahn bleibt die Wirkung an**, weil dort die Leiste samt Tackle-Kosten schon vorher
 existierte und nur Chris' Erholung fehlte — die Messung dazu steht in Abschnitt 4.5.
 
+**Und eine zweite unbequeme Stelle, die dieselbe Runde gefunden hat:** der erste Satz der
+Erholungs-Konstanten war **tot**. Über 960 Läufer kamen 0,0 % Erholungen zustande, weil die
+Schwelle unerreichbar hoch stand — das Feature, um das Chris gebeten hatte, tat nichts, und
+die Rangtreue meldete trotzdem grün, weil eine tote Zeile nichts verändert. Gefunden hat das
+`scripts/miss-bahn-puste.mjs`, nicht die Abnahme. Abschnitt 3.1 hat die Zahlen.
+
 ## 0. Chris' Antworten, wörtlich
 
 | Frage aus dem Konzept | Antwort |
@@ -162,13 +168,39 @@ Neu sind vier Zahlen je Bahn und eine Zeile Logik:
 |---|---:|---|
 | `pusteRegen` | 1,0 | Grund-Gutschrift, skaliert mit **STEHEN** (`0,45 + STEHEN·0,011`) |
 | `leerSchonung` | 0,45 | Verbrauchs-Faktor eines Eingebrochenen — er schleppt sich und zahlt weniger |
-| `leerRegen` | 3,2 | Erholungs-Faktor, solange er eingebrochen ist |
-| `pusteFangen` | 0,22 | Anteil des Vorrats, ab dem er sich wieder fängt |
+| `leerRegen` | **6,0** | Erholungs-Faktor, solange er eingebrochen ist |
+| `pusteFangen` | **0,12** | Anteil des Vorrats, ab dem er sich wieder fängt |
 
 Erholt wird in drei Zuständen, alle aus schon vorhandenen Größen: **am Hindernis**
 (`u.huerde>0`, volle Gutschrift), **eingebrochen** (`u.leer`, `leerRegen`-fach), **unter
 Plantempo** (anteilig `1−ueber` — genau „wenn man weniger rennt"). Bei Volllast ist die Zeile
 rechnerisch nicht vorhanden.
+
+### 3.1 Die beiden letzten Zahlen sind gemessen, nicht geschätzt — und der erste Satz war falsch
+
+Der erste Anlauf stand auf `leerRegen` 3,2 und `pusteFangen` 0,22. Das sah plausibel aus und
+**funktionierte nicht**: `scripts/miss-bahn-puste.mjs` meldete über 960 Läufer und fünf
+Disziplinen hinweg **0,0 % Erholungen**. Die Schwelle von 22 % des Vorrats war für einen
+Eingebrochenen schlicht unerreichbar — er kam nie so weit hoch, und damit war genau das
+Feature tot, um das Chris gebeten hatte („manche laufen aus und müssen kurz regenerieren").
+Die Rangtreue hätte das nie gezeigt: sie war grün, weil eine tote Zeile nichts verändert.
+
+Die Gegenprobe mit `pusteFangen` 0,02 belegte, dass der Codepfad selbst richtig ist
+(Erholungen traten auf) — aber sie erzeugte das Flackern, vor dem der Kommentar an der Zeile
+selbst warnt: 101 Erholungen bei 44 Läufern, also 2,3 je Läufer, ein Stottern zwischen zwei
+Zuständen statt einer Verschnaufpause.
+
+Gemessen, je 6 Rennen, mit der gewählten Fassung (6,0 / 0,12):
+
+| Disziplin | brechen ein (am Ende noch leer) | fangen sich | Erholungen je betroffenem Läufer |
+|---|---:|---:|---:|
+| takeshis-castle | 21,4 % → **12,5 %** | 0 % → **11,1 %** | **genau 1,0** |
+| climbing | 69,3 % → **31,9 %** | 0 % → **59,7 %** | **1,2** |
+
+Das ist Chris' Satz, Wort für Wort: **manche** laufen aus und fangen sich wieder, **manche**
+bleiben leer, **manche** schaffen die Strecke ohne Einbruch. Und es ist der Grund, warum
+`miss-bahn-puste.mjs` in dieser Runde entstanden ist — die Rangtreue allein hätte den toten
+Code nie auffliegen lassen.
 
 `leerSchonung` ist der Teil, ohne den nichts davon funktioniert: bis hierher zehrte ein leerer
 Läufer weiter mit dem vollen Satz seines Plans, obwohl `tempoVon` ihn längst auf rund drei
@@ -301,27 +333,31 @@ messen kann, misst man.
 
 ### 4.5 Die Bahn behält ihre Wirkung — alle fünf bestehen
 
-| Disziplin | Basislinie (Spiel/Saison) | jetzt | Boden | Abnahme |
-|---|---|---|---:|---|
-| staffel | 0,915 / 0,951 | **0,915 / 0,951** | 0,865 | bestanden, identisch |
-| spurt | 0,871 / 0,905 | **0,871 / 0,905** | 0,800 | bestanden, identisch |
-| takeshis-castle | 0,861 / 0,930 | **0,855 / 0,937** | 0,811 | bestanden |
-| time-trial | 0,828 / 0,832 | **0,828 / 0,832** | 0,778 | bestanden, identisch |
-| climbing | 0,790 / 0,851 | **0,791 / 0,860** | 0,732 | bestanden |
+Gemessen mit der **endgültigen** Kalibrierung (`leerRegen` 6,0 / `pusteFangen` 0,12), also
+mit einer Erholung, die wirklich feuert:
+
+| Disziplin | Basislinie (Spiel/Saison) | jetzt | Boden | Abstand | Abnahme |
+|---|---|---|---:|---:|---|
+| staffel | 0,915 / 0,951 | **0,915 / 0,951** | 0,865 | 0,050 | bestanden, identisch |
+| spurt | 0,871 / 0,905 | **0,871 / 0,905** | 0,800 | 0,071 | bestanden, identisch |
+| takeshis-castle | 0,861 / 0,930 | **0,852 / 0,937** | 0,811 | 0,041 | bestanden |
+| time-trial | 0,828 / 0,832 | **0,828 / 0,832** | 0,778 | 0,050 | bestanden, identisch |
+| climbing | 0,790 / 0,851 | **0,782 / 0,839** | 0,732 | 0,050 | bestanden |
 
 **Drei der fünf sind ziffernidentisch, und das ist kein Zufall, sondern die Bauart der
 Zeile.** Erholt wird nur in drei Zuständen: am Hindernis (`u.huerde>0`), während des
 Einbruchs (`u.leer`) und unter Plantempo (`1−ueber`). In Spurt, Staffel und Time-Trial läuft
-das Feld über die kurze Distanz durchgehend auf Plantempo und bricht nicht ein — die
-Gutschrift feuert dort schlicht nie. Bewegt hat sich genau dort etwas, wo Läufer wirklich an
-Hindernissen stehen und leerlaufen: Takeshi (−0,006 / +0,007) und Climbing (+0,001 /
-+0,009).
+das Feld über die kurze Distanz durchgehend auf Plantempo und bricht so gut wie nie ein
+(Staffel gemessen 0,0 %, Spurt 5,5 %, Time-Trial 4,7 %) — die Gutschrift feuert dort schlicht
+nicht. Bewegt hat sich genau dort etwas, wo Läufer wirklich an Hindernissen stehen und
+leerlaufen: **Takeshi −0,009** und **Climbing −0,008** auf der Spielzahl.
 
-Beide Bewegungen liegen **weit innerhalb der Kader-Spannweite** (Takeshi 0,123 / 0,063,
-Climbing 0,191 / 0,308) und sind nach `messgrundlage-kaderfest.md` von Null nicht zu
-unterscheiden — diesmal in der Richtung, in der diese Regel gedacht ist: **es wird keine
-Verbesserung behauptet.** Beide behalten komfortablen Abstand zu ihrem Boden (Takeshi 0,044,
-Climbing 0,059).
+Beide Bewegungen liegen **weit innerhalb der Kader-Spannweite** (Takeshi 0,120, Climbing
+0,191) und sind nach `messgrundlage-kaderfest.md` von Null nicht zu unterscheiden. Hier gilt
+dieselbe Vorsicht wie bei Hockey — mit zwei Unterschieden, die den Fall tragen: beide
+Vorzeichen sind kleiner als ein Drittel dessen, was Hockey verloren hat, und beide behalten
+**mindestens 0,041 Abstand zu ihrem Boden**, statt einen Tausendstel. Dafür tut die Mechanik
+dort etwas Sichtbares, das vorher nachweislich gar nicht existierte.
 
 ### 4.6 Die Regeln, gegen die gemessen wird
 

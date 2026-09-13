@@ -18686,8 +18686,14 @@
       // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
       // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
       // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
-      // er wieder voll laeuft.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:3.2, pusteFangen:0.22,
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
       // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
       // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
@@ -18788,8 +18794,14 @@
       // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
       // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
       // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
-      // er wieder voll laeuft.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:3.2, pusteFangen:0.22,
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
       // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
       // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
@@ -18894,8 +18906,14 @@
       // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
       // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
       // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
-      // er wieder voll laeuft.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:3.2, pusteFangen:0.22,
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
@@ -18972,13 +18990,19 @@
       // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
       // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
       // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
-      // er wieder voll laeuft.
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
       // STAFFEL, EHRLICHE EINSCHRAENKUNG: gemessen endet hier KEIN Laeufer unter 77 % Puste
       // (Median 88,3 %), also greift die Erholung praktisch nie und die Leiste steht weiter
       // nahe voll. Das ist Absicht in dieser Runde — die Staffel hat mit rho 0,915 die beste
       // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
       // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:3.2, pusteFangen:0.22,
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       rezept:{
         ANTRITT:    {speed:44,spirit:30,stamina:26},
         ENDTEMPO:   {speed:38,stamina:35,will:27},
@@ -19159,8 +19183,14 @@
       // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
       // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
       // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
-      // er wieder voll laeuft.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:3.2, pusteFangen:0.22,
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // PUSTE AN DEN HINDERNISSEN — Chris' eigene Vorgabe, 13.09.: "ja das kann es
       // beeinflussen je nach hindernis aber MUSS nicht zwangsweise haengt von art und
       // schwierigkeit ab -> du muesstest also realistisch schwierigkeiten und arten von
