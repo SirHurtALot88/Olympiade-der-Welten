@@ -86,8 +86,8 @@ Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kader
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **12.09.** Ton verdrahtet, Assets 80→100 (E2, PR #893) |
-| 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 87 % | **96 %** | 0,854 | ja | 10.09. Assets 60→100 (Hantel/Hebebuehne/Ton, PR #876) |
-| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 85 % | **94 %** | 0,861 | nein | 10.09. Bahn-Produktivierung + Ton (PR #880/#883) |
+| 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 100 % | **99 %** | 0,854 | ja | **12.09.** Movement 87→100 — echte Zustandsmaschine `stepHeben()` statt Fortschrittsbalken (PR #898) |
+| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 95 % | **97 %** | 0,861 | nein | **12.09.** Movement 85→95 — `stepParcours()` (Laeufer-Zustandsmaschine) + drei Posen, Anker per Pixelscan korrigiert (PR #900) |
 | 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
 | 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
@@ -169,12 +169,18 @@ Boxscore-an-PPs-Kurve.
 **Movement 100:** Dribbel-Bounce mit Bodenkontakt-Ton (`BK_DRIBBEL_PERIODE`), Wurfbahnen, Zonen —
 plus `useTokenGlide`/`GhostLayer` in `court.tsx`.
 
-### Gewichtheben — 96 % (100/100/95/87)
+### Gewichtheben — 99 % (100/100/95/100)
 **10.09. Update:** Assets 60→100 (PR #876, PRODUKTIONSCODE, Opus-Review FREIGEBEN). Hantel liegt
 jetzt an per Pixelscan ausgemessenen Handpunkten (`HEBEN_HAND`, analog zu Hockeys Schlaeger),
-eigene Hebebuehne, Ton verdrahtet. Movement bleibt bei 87 — die Luecke ist M2 (keine eigene
-Schrittlogik, `hebePhase()` leitet die Pose nur aus dem Fortschrittsbalken ab, s. Plan-Dokument
-Abschnitt 1.2). Konzept/Gameplay unveraendert.
+eigene Hebebuehne, Ton verdrahtet.
+**12.09. Update:** Movement 87→100 (PR #898, PRODUKTIONSCODE). M2 (die letzte offene
+Movement-Luecke, Plan-Dokument Abschnitt 4.1) war eine reine Fortschrittsbalken-Pose ohne eigene
+Zustandsmaschine — `stepHeben(dt,art)` ersetzt sie durch fuenf echte Zustaende
+(warten/antritt/zug/hoch/ablage), der Antritt zur Hantel ist jetzt eine sichtbare Bewegung, die es
+vorher gar nicht gab. Review-Fund B (Zeit-Budget) korrigiert: der Ueberkopf-Halt "hoch" behaelt
+mit 0,44*rundenDauer (~2,7s) den groessten Anteil statt auf ein Viertel zusammenzuschrumpfen — sonst
+haette die Aenderung Chris' eigenen 06.09-Fund ("sehr schnell und unuebersichtlich",
+`ZEIT_DEHNUNG.gewichtheben=4`) wieder rueckgaengig gemacht. Konzept/Gameplay unveraendert.
 **Konzept 100:** eigenes FUENF-Sub-Skill-Rezept statt der sieben Buehnen-Rollen
 (`BUEHNE_ART.gewichtheben`, `:10598`), Reissen/Stossen, drei Versuche, Nullwertung, Ansage. Die
 offene Architekturfrage („darf Charisma die physische Obergrenze beruehren?") ist am 04.09.
@@ -182,8 +188,10 @@ entschieden und gemessen (`HEBEN_TAGESMAX_ANSAGE_K`, rho 0,720 → 0,887).
 **Assets 100:** eigenes Buehnenbild `zeichneHeben()`, Hantel an ausgemessenen Handpunkten
 (`HEBEN_HAND`/`HEBEN_PHASEN`), eigene Hebebuehne, eigener Ton (PR #876).
 **Gameplay 95:** rho **0,854**, produktiviert, Gesamt-kg-Tiebreak, eigene `WERTUNG_HEBEN`.
-**Movement 87:** Versuchs-Zustandsmaschine plus eigenes Bild; M2 fehlt weiterhin — keine eigene
-Hebe-Zustandsmaschine, `hebePhase()` liest nur den Fortschrittsbalken.
+**Movement 100:** `stepHeben()` als dritter Zweig in `buehnenBewegung()` — echte
+Fuenf-Zustands-Maschine (warten/antritt/zug/hoch/ablage) statt reinem Fortschrittsbalken, schreibt
+ausschliesslich `u.vizPhase`/`u.vizPhaseT`, ruft nie `rr()` — derselbe Vertrag wie
+`stepKuer`/`stepCypher`.
 
 ### Speed-Schach — 96 % (95/95/100/95)
 **12.09. Update:** Konzept/Assets/Movement 80/75/80→95 (PR #902, PRODUKTIONSCODE, Opus-Review
@@ -218,13 +226,23 @@ Die Waffenebene ist korrekt entfernt (`:2574`) — aber es gibt keine Schlittsch
 **Movement 94:** echte Kuer-Bewegungsmaschine (`stepKuer`, PR #874) statt Reihenbild — Laeufer
 gleiten sichtbar ueber das Eis, Kufenspur folgt korrekt (inkl. Pause waehrend `haeltStelle`).
 
-### Takeshi's Castle — 94 % (100/95/97/85)
+### Takeshi's Castle — 97 % (100/95/97/95)
 **10.09. Update:** Assets 60→95, Gameplay 67→97 (PR #880 Bahn-Produktivierung, Opus-Review
 FREIGEBEN; PR #883 Ton-Verdrahtung). `takeshi.tsx` waechst von 273 auf 517 Zeilen / 3 auf 14
 Animationsstellen; Ton (A4 0→20) ueber vier Aufrufstellen plus Loop-Start/-Stop/-Reset, Leck-Test
 in den vier Geschwister-Bahnen bestanden. 12.09.: PR #895 (Kleinbefund #5/#6) tauscht den
 Ausscheiden-Klang von "tor" auf "platsch" (semantisch richtig) und drosselt Falle/Sturz/Tor auf
 0,12s — Politur, keine Punktaenderung.
+**12.09. Update:** Movement 85→95 (PR #900, PRODUKTIONSCODE). M2 (Laeufer-Zustandsmaschine) und
+M4 (drei Posen) waren die letzten offenen Movement-Luecken (Plan-Dokument Abschnitt 4.3):
+`stepParcours(dt,art)` gibt dem Laeufer selbst eine Zustandsmaschine (laufen → fallenkontakt →
+sturz/aufrappeln → laufen) statt nur der Falle, dazu Sprungbogen/Duck-Scale/Taumeln je nach
+Fallentyp. Unabhaengige Review fand drei blockierende Befunde, alle behoben: der geschaetzte
+Startnummernband-Ankerpunkt sass 5-7px zu tief (per echtem Pixelscan korrigiert, Beweisbild
+`docs/design/sprite-armpunkte-beweis-takeshi.png`), fehlende Z-Skalierung liess das Band 5-10px je
+nach Laeufergroesse driften (jetzt dieselbe `x-32*Z+cx*Z`-Formel wie `HOCKEY_HAND`/`HEBEN_HAND`),
+und das Feld hiess `arm` statt des vom `DISZIPLIN_PROP`-Vertrag vorgeschriebenen `hand`
+(umbenannt zu `TAKESHI_HAND`).
 **Konzept 100:** die inhaltlich reichste Disziplin des Projekts — Ausscheiden nach drei Stuerzen,
 vierzehn Fallen in fuenf Typen mit eigener Stufe (`fallenStufe`), drei benannte Kurse,
 Chaos/Tackle-Fenster, Gedraenge, Burgpunkte als echte Wertung. Vier eigene Dokumente
@@ -234,9 +252,10 @@ Chaos/Tackle-Fenster, Gedraenge, Burgpunkte als echte Wertung. Vier eigene Dokum
 und Tor), `zeichneFalleTakeshi()` (zehn Fallenbilder), `takeshi.tsx` jetzt 517 Zeilen/14
 Animationsstellen (PR #880), eigener Ton (PR #883).
 **Gameplay 97:** rho **0,861**, eigene Burgpunkte-Wertung, seit PR #880 produktionsangeschlossen.
-**Movement 85:** Fallen reagieren sichtbar auf den Ausgang (`fallenAusgang()`, Nachwackeln bei
-Durchbruch, gruenes Gluehen bei sauber). M2 (Bahn-Bewegungsdispatcher) bleibt die Luecke bis zur
-Welle-1-Zielumsetzung, s. `bahnBewegung()`-Fundament (PR 0.3, #891).
+**Movement 95:** `stepParcours()` als eigener Zweig im Bahn-Bewegungspfad — Laeufer-Zustandsmaschine
+(laufen/fallenkontakt/sturz/aufrappeln) plus drei sichtbare Posen (Sprungbogen/Duck-Scale/Taumeln),
+Startnummernband per Pixelscan verankert und Z-skaliert. Noch nicht produktionsangeschlossen
+(kein Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS`).
 
 ### Breaking — 96 % (95/100/95/92)
 **10.09. Update:** Assets 65→100, Movement 55→92 (PR #875, PRODUKTIONSCODE, Opus-Review FREIGEBEN
