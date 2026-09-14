@@ -14,6 +14,12 @@ const SCHEDULE_SOURCE_NOTE =
 type ScheduledDiscipline = {
   discipline: Discipline;
   playerCount: number;
+  /**
+   * REVIEW-FIX (PR #930, 14.09.): der `playerCount`-Wert VOR der Mini-DM-Ueberschreibung — fuer
+   * jede Disziplin ausser Mini-DM identisch zu `playerCount`. S. ausfuehrliche Begruendung an
+   * `SeasonDisciplineScheduleSlot.legacyScorePlayerCount` (lib/data/olyDataTypes.ts).
+   */
+  legacyScorePlayerCount: number;
 };
 
 /**
@@ -40,6 +46,13 @@ function toScheduleSlot(
   discipline: Discipline | null,
   playerCountOverride?: number | null,
   occurrenceInSeason?: 1 | 2,
+  /**
+   * REVIEW-FIX (PR #930, 14.09.): getrennt von `playerCountOverride`, damit Mini-DMs
+   * Kader-/Pod-Wert (`1`) NICHT auch der legacy-PPS-Scoring-Pfad zu lesen bekommt. Fehlt dieser
+   * Parameter (jeder Aufrufer vor diesem Fix), faellt das Feld auf `playerCountOverride`/
+   * `discipline.playerCount` zurueck — bit-identisch zum Stand davor.
+   */
+  legacyScorePlayerCountOverride?: number | null,
 ): SeasonDisciplineScheduleSlot | null {
   if (!discipline) {
     return null;
@@ -52,6 +65,8 @@ function toScheduleSlot(
     playerCount: playerCountOverride ?? discipline.playerCount ?? null,
     category: discipline.category,
     ...(occurrenceInSeason != null ? { occurrenceInSeason } : {}),
+    legacyScorePlayerCount:
+      legacyScorePlayerCountOverride ?? playerCountOverride ?? discipline.playerCount ?? null,
   };
 }
 
@@ -266,13 +281,18 @@ function buildSeededDisciplinePairs(input: {
   const shuffled = shuffleSeeded(sortDisciplinesForSeasonSchedule(input.disciplines), input.seed);
   const playerCountByDisciplineId =
     input.playerCountByDisciplineId ?? buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
-  const available = shuffled.map((discipline) => ({
-    discipline,
-    playerCount: withMiniDmPlayerCountOverride(
+  const available = shuffled.map((discipline) => {
+    const rawPlayerCount =
+      playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed);
+    return {
       discipline,
-      playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed),
-    ),
-  }));
+      playerCount: withMiniDmPlayerCountOverride(discipline, rawPlayerCount),
+      // REVIEW-FIX (PR #930, 14.09.): der ungezogene Rohwert, bevor Mini-DMs Kader-/Pod-Wert (1)
+      // ihn ueberschreibt — fliesst NUR in `legacyScorePlayerCount` des Spielplan-Slots, nie in
+      // die obige `playerCount` (Pairing-Kapazitaet/Kader/Pod bleiben unveraendert bei 1).
+      legacyScorePlayerCount: rawPlayerCount,
+    };
+  });
   const pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]> = [];
   const warnings: string[] = [];
 
@@ -524,8 +544,18 @@ export function buildSeasonSeededDisciplineSchedule(input: {
       matchdayId,
       matchdayIndex: index + 1,
       matchdayLabel: `Spieltag ${index + 1}`,
-      discipline1: toScheduleSlot(discipline1?.discipline ?? null, discipline1?.playerCount ?? null, occurrenceInSeason),
-      discipline2: toScheduleSlot(discipline2?.discipline ?? null, discipline2?.playerCount ?? null, occurrenceInSeason),
+      discipline1: toScheduleSlot(
+        discipline1?.discipline ?? null,
+        discipline1?.playerCount ?? null,
+        occurrenceInSeason,
+        discipline1?.legacyScorePlayerCount ?? null,
+      ),
+      discipline2: toScheduleSlot(
+        discipline2?.discipline ?? null,
+        discipline2?.playerCount ?? null,
+        occurrenceInSeason,
+        discipline2?.legacyScorePlayerCount ?? null,
+      ),
       sourceStatus: "season_seed",
       sourceNote: `Season-spezifischer Schedule-Seed: ${scheduleSeed}`,
     } satisfies SeasonDisciplineScheduleEntry;

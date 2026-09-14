@@ -135,8 +135,17 @@ export function resolveDisciplinePlayerCount(
   const scheduledDiscipline =
     input.disciplineSide === "d1" ? scheduleRow?.discipline1 : scheduleRow?.discipline2;
 
-  if (scheduledDiscipline?.disciplineId === input.disciplineId && isFiniteNumber(scheduledDiscipline.playerCount)) {
-    return scheduledDiscipline.playerCount;
+  // REVIEW-FIX (PR #930, 14.09.): `legacyScorePlayerCount` bevorzugt, `playerCount` nur als
+  // Rueckfall fuer Spielplan-Eintraege ohne das neue Feld — s. ausfuehrliche Begruendung an
+  // `SeasonDisciplineScheduleSlot.legacyScorePlayerCount` (lib/data/olyDataTypes.ts). Fuer jede
+  // Disziplin ausser Mini-DM sind beide Werte identisch, diese Zeile ist fuer sie folgenlos.
+  if (scheduledDiscipline?.disciplineId === input.disciplineId) {
+    if (isFiniteNumber(scheduledDiscipline.legacyScorePlayerCount)) {
+      return scheduledDiscipline.legacyScorePlayerCount;
+    }
+    if (isFiniteNumber(scheduledDiscipline.playerCount)) {
+      return scheduledDiscipline.playerCount;
+    }
   }
 
   const discipline = gameState.disciplines.find((entry) => entry.id === input.disciplineId);

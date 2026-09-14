@@ -362,6 +362,8 @@ export function buildLegacyMatchdayResolvePreview(
     context: LegacyLineupLoadedContext;
     side: "d1" | "d2";
     score: ReturnType<typeof scoreLegacyLineupDisciplineSide>;
+    /** REVIEW-FIX (PR #930, 14.09.): s. Kommentar an `sideLegacyScorePlayers` weiter oben. */
+    legacyScorePlayerCount: number | null;
   }>>();
 
   /**
@@ -412,6 +414,16 @@ export function buildLegacyMatchdayResolvePreview(
         context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
         context.disciplinePlayerCounts[meta.disciplineId] ??
         null;
+      // REVIEW-FIX (PR #930, 14.09.): NUR fuer die legacy-PPS-Scoring-Lookup
+      // (getRankToPointsValue()/distributeRankPointsToPlayers() weiter unten) -- Kader-Kappung,
+      // Slot-Rollen-/Form-Modifikatoren und die Roster-/Draft-Validierung bleiben ALLE bei
+      // `sideRequiredPlayers` (Mini-DMs echter Kaderwert, 1). Fehlt der Schluessel (jede Disziplin
+      // ausser Mini-DM, jeder Aufrufer/Test vor diesem Fix), ist dieser Wert identisch zu
+      // `sideRequiredPlayers` -- bit-identisch zum Stand davor. S. Begruendung an
+      // `SeasonDisciplineScheduleSlot.legacyScorePlayerCount`.
+      const sideLegacyScorePlayers =
+        context.disciplineSideLegacyScorePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
+        sideRequiredPlayers;
       // Ueberzaehlige Draft-Eintraege auch fuer die Nebenkanaele (Slot-Rollen, Form-
       // playerCount, Mutator-Slots) kappen — dieselbe Regel wie in der Score-Engine:
       // es werten nur die ersten requiredPlayers Slots (slotIndex-sortiert). Sonst
@@ -572,6 +584,8 @@ export function buildLegacyMatchdayResolvePreview(
         context,
         side: meta.disciplineSide,
         score,
+        // REVIEW-FIX (PR #930, 14.09.): s. Kommentar an `sideLegacyScorePlayers` oben.
+        legacyScorePlayerCount: sideLegacyScorePlayers,
       });
       disciplineBuckets.set(meta.disciplineId, bucket);
 
@@ -752,8 +766,12 @@ export function buildLegacyMatchdayResolvePreview(
         teamPoints: arenaOverride
           ? arenaOverride.teamPoints
           : getRankToPointsValue(
-              bucket.find((entry) => entry.context.team.id === item.teamId && entry.side === item.disciplineSide)?.score
-                .requiredPlayers ?? item.entries.length,
+              // REVIEW-FIX (PR #930, 14.09.): `legacyScorePlayerCount` statt `score.requiredPlayers`
+              // -- fuer Mini-DM ist `requiredPlayers` seit dieser PR fest 1 (Kader-/Pod-Zweck),
+              // waehrend die rank-to-points-Tabelle nur Zeilen fuer 2..6 hat. S. Kommentar an
+              // `sideLegacyScorePlayers` weiter oben.
+              bucket.find((entry) => entry.context.team.id === item.teamId && entry.side === item.disciplineSide)
+                ?.legacyScorePlayerCount ?? item.entries.length,
               rank,
             ),
         pointSource: arenaOverride ? "battle_mode_arena_win_draw_loss" : "rank_to_points_final_score_share",
@@ -762,7 +780,7 @@ export function buildLegacyMatchdayResolvePreview(
       };
     });
 
-    const rawPlayerEntries = bucket.flatMap(({ context, score, side }) => {
+    const rawPlayerEntries = bucket.flatMap(({ context, score, side, legacyScorePlayerCount }) => {
       // Propagate the team-power debuff (applied to the team score in
       // applyTeamPowerDebuffs) down to the player level, proportionally, so
       // that Σ finalPlayerScore matches the debuffed team score. `factor`
@@ -779,7 +797,8 @@ export function buildLegacyMatchdayResolvePreview(
       const rankedTeam = teamResultsRanked.find((entry) => entry.teamId === context.team.id && entry.disciplineSide === side);
 
       const distributedPoints = distributeRankPointsToPlayers({
-        playerCount: score.requiredPlayers ?? rankedWithinTeam.length,
+        // REVIEW-FIX (PR #930, 14.09.): s. Kommentar an der `teamPoints`-Zuweisung oben.
+        playerCount: legacyScorePlayerCount ?? score.requiredPlayers ?? rankedWithinTeam.length,
         rank: rankedTeam?.rank ?? null,
         entries: rankedWithinTeam.map(({ entry }) => ({
           baseValue: entry.baseDisciplineScore ?? entry.score ?? 0,

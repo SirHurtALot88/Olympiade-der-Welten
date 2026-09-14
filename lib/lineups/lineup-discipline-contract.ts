@@ -43,6 +43,13 @@ export type MatchdayDisciplineSlotContract = {
   rankSourceStatus: LineupContractSourceStatus;
   sourceStatus: LineupContractSourceStatus;
   disciplineSide: LineupDisciplineSide;
+  /**
+   * REVIEW-FIX (PR #930, 14.09.): der `playerCount`, den die legacy-PPS-Scoring-Tabelle
+   * (`getRankToPointsValue()`) fuer diese Seite lesen muss — fuer jede Disziplin ausser Mini-DM
+   * identisch zu `requiredPlayers`. NICHT fuer Kader-/Lineup-Zwecke verwenden (dafuer bleibt
+   * `requiredPlayers` die richtige Zahl, s. `SeasonDisciplineScheduleSlot.legacyScorePlayerCount`).
+   */
+  legacyScorePlayerCount: number | null;
 };
 
 function normalizeDisciplineRankField(disciplineId: string) {
@@ -141,6 +148,8 @@ export function buildMatchdayLineupContract(input: {
           rankSourceStatus: discipline.rankSourceStatus,
           sourceStatus: discipline.sourceStatus,
           disciplineSide,
+          legacyScorePlayerCount:
+            scheduleSlot?.legacyScorePlayerCount ?? scheduleSlot?.playerCount ?? discipline.requiredPlayers,
         }
       : null;
 

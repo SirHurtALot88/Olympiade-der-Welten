@@ -251,6 +251,36 @@ describe("buildSeasonSeededDisciplineSchedule · repeat=2 (Battle Mode 20 Spielt
     }
   });
 
+  it("(iv-b) REVIEW-FIX PR #930: legacyScorePlayerCount traegt weiterhin den echten [2..6]-Wert, playerCount bleibt 1", () => {
+    // Unabhaengiges Review von PR #930 (14.09.): `playerCount: 1` floss unveraendert auch in den
+    // laengst aktiven legacy-PPS-Scoring-Pfad (`getRankToPointsValue()`/
+    // `resolveDisciplinePlayerCount()`), dessen Referenztabelle keine Zeile fuer `playerCount: 1`
+    // hat -- jeder Mini-DM-Spieltag haette ab Merge lautlos 0 Liga-Punkte gebucht. Der Fix haelt
+    // beide Werte getrennt: `playerCount` bleibt 1 (Kader-/Pod-Zweck), `legacyScorePlayerCount`
+    // traegt den Wert, den Mini-DM OHNE die Pod-Ueberschreibung gezogen haette -- also weiterhin
+    // eine von vier PAARWEISE VERSCHIEDENEN {2..6}-Zahlen (mit tdm/gewichtheben/hockey/breaking
+    // zusammen genau [2,3,4,5,6] je Kategorie/Haelfte), niemals 1.
+    const legacyScoreValuesSeen = new Set<number>();
+    for (const seasonId of seasonIds) {
+      const { entries } = buildRepeatTwoSchedule(seasonId);
+      for (const entry of entries) {
+        for (const slot of [entry.discipline1, entry.discipline2]) {
+          if (slot?.disciplineId !== "mini-dm") continue;
+          expect(slot.playerCount, `${seasonId}/mini-dm playerCount`).toBe(1);
+          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount`).not.toBeNull();
+          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount != 1`).not.toBe(1);
+          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount in {2..6}`).toBeGreaterThanOrEqual(2);
+          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount in {2..6}`).toBeLessThanOrEqual(6);
+          legacyScoreValuesSeen.add(slot.legacyScorePlayerCount as number);
+        }
+      }
+    }
+    // Ueber 200 Saison-Seeds sollten alle fuenf moeglichen Werte mindestens einmal als "der an
+    // Mini-DM gegangene, verworfene Wert" auftauchen -- derselbe Beweis wie fuer die vier anderen
+    // Power-Disziplinen oben, nur diesmal fuer das Feld, das den Wert NICHT verwirft.
+    expect([...legacyScoreValuesSeen].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6]);
+  });
+
   it("erlaubt dieselbe Disziplin an Spieltag 10 und 11 direkt hintereinander (Chris 30.08., keine Mindestabstands-Logik)", () => {
     // Kein Assert auf Abwesenheit -- die Regel ist "erlaubt", nicht "erzwungen". Diese Suche
     // beweist nur, dass der Code eine solche Ziehung nicht ausschliesst/crasht, ueber genug
