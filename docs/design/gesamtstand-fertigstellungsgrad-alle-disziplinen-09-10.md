@@ -418,8 +418,8 @@ Commit-Titel uebernommen: `zeichneStab()` und `DISZIPLIN_PROP.staffel` stehen in
 `battle-mode.engine.js:2530/2616` (Handpunkt = `HOCKEY_HAND`, weil ein laufender Staffellaeufer in
 `zeichneSpurt()` immer `vx:4/richtung 3` bekommt — exakt die Pose, fuer die `HOCKEY_HAND` schon
 per Pixelscan vermessen ist), und `TON_KATALOG.staffel` ist an **vier** Stellen verdrahtet.
-Der Satz „**Kein Staffelstab-Sprite** — der Stab ist Mechanik, kein Bild" weiter unten galt bis
-zum 12.09. und gilt nicht mehr.
+Die Assets-Zeile unten sagte bis heute „**Kein Staffelstab-Sprite** — der Stab ist Mechanik, kein
+Bild". Das galt bis zum 12.09. und ist entsprechend ersetzt.
 
 **14.09. Update: rho 0,915 → 0,899 (PR #916).** Chris hat das erste Live-Rennen gesehen und fuenf
 Dinge gemeldet; drei davon waren echte Fehler.
