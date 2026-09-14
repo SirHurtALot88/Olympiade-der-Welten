@@ -13237,6 +13237,44 @@
     for(let i=0;i<gruppen.length;i++)if(gruppen[i].indexOf(u)>=0)return i;
     return 0;
   }
+  // ---- PHASENENDE: EIN KLANG, ZWEI AUSLOESER (14.09.) -------------------------------
+  // Hier endet eine laufende Phase: der passende Klang faellt und die Figur geht zurueck
+  // ins Gleiten. Die Klangregeln sind woertlich die aus PR #903 und stehen bewusst an
+  // EINER Stelle, weil es seit der Spotlight-Rotation ZWEI Wege gibt, auf denen eine Phase
+  // endet:
+  //
+  //   1. DIE UHR LAEUFT AB (u.vizPhaseT<=0) — der alte, einzige Weg.
+  //   2. DIE NAECHSTE ENTHUELLUNG KOMMT ZUERST — neu und seit 13.09. der Normalfall.
+  //
+  // WARUM WEG 2 NOETIG WURDE (nachgemessen, nicht vermutet). Die Runden-Warteschlange von
+  // vorher enthuellte jeden Laeufer nur alle ~5,1 s (12 Laeufer x 0,425 s Umlauf); die
+  // Elementdauer von 1,4 s lief in dieser Luecke bequem ab, Weg 1 trug alles. Die
+  // Startreihenfolge enthuellt die beiden Partner eines Paares abwechselnd alle ~0,867 s —
+  // KUeRZER ALS KUER_ELEMENT_DAUER. Die naechste Enthuellung setzt u.vizPhaseT damit wieder
+  // auf 1,4 s, BEVOR die Uhr je null erreicht: fuer ein sauber gestandenes Element kam Weg 1
+  // nie mehr zum Zug und der Landungsklang fiel lautlos aus. Belegt mit
+  // scripts/probe-eiskunstlauf-ton.mjs Teil C: "landung" 66 Treffer auf main, 0 auf diesem
+  // Branch (sprung/kufe/sturz unveraendert, weil die alle am Enthuellungsrand haengen und
+  // nicht an der Uhr). Genau diese Klasse Regression faengt die Sonde jetzt selbst ab, s.
+  // dortige Abnahmebedingung.
+  //
+  // WELCHER KLANG WANN — unveraendert gegenueber PR #903, nur der Zeitpunkt wandert:
+  //   "einlauf"     -> kufe    (einmaliger Bewegungsstart zu Beginn der Kuer)
+  //   Element sauber-> landung (Pirouette/Hebung/Wurf zurueck ins Gleiten)
+  //   Element Sturz -> STILL   (der Sturzklang ist beim Ansatz schon gefallen; ein
+  //                             Wiederaufstehen ist keine Landung — dieselbe Unterscheidung,
+  //                             die warSturzVorAblauf auf Weg 1 trifft)
+  //   "schlusspose" -> STILL   (Programmende, kein Element)
+  //   "gleiten"     -> STILL   (schon abgeschlossen; die Wache gegen ein zweites Feuern,
+  //                             wenn beide Wege denselben Uebergang sehen)
+  //
+  // Reine Praesentation wie alles hier: schreibt nur auf u.vizPhase, ruft kein rr().
+  function kuerPhaseEnde(u,warSturz){
+    if(u.vizPhase==null||u.vizPhase==="gleiten"||u.vizPhase==="schlusspose")return;
+    if(u.vizPhase==="einlauf")sfx("eiskunstlauf","kufe");
+    else if(!warSturz)sfx("eiskunstlauf","landung");
+    u.vizPhase="gleiten";
+  }
   function stepKuer(dt,art){
     const B=kuerBahn();
     const gruppen=kuerStartliste();
@@ -13274,15 +13312,29 @@
       // TON_KATALOG.eiskunstlauf steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/
       // publikum). Alle vier Rufe unten schreiben NICHTS auf `u`, sie lesen nur bereits
       // gesetzte viz*-Felder und rufen sfx() auf — reine Praesentation, kein rr()-Aufruf,
-      // deshalb rangtreue-neutral. Die Spotlight-Rotation (13.09.) aendert an ihrer Zahl und
-      // Reihenfolge nichts: `u.aktuell` zaehlt weiterhin nur fuer den Teilnehmer hoch, den
-      // stepBuehne() gerade enthuellt hat, und das ist jetzt eben immer einer aus dem Paar
-      // im Spotlight. Ueber ein ganzes Spiel faellt damit genau derselbe Satz Klaenge.
+      // deshalb rangtreue-neutral.
+      //
+      // KORREKTUR 14.09. (Review zu dieser PR): die erste Fassung dieses Kommentars behauptete,
+      // die Spotlight-Rotation aendere an Zahl und Reihenfolge der Klaenge nichts. Fuer
+      // sprung/sturz stimmt das — die haengen am Enthuellungsrand. Fuer landung/kufe stimmte
+      // es NICHT: die haengen an der ablaufenden Phasenuhr, und die Enthuellungen kommen jetzt
+      // dichter als die Elementdauer. Der Landungsklang fiel dadurch komplett aus (Sonde: 66
+      // auf main, 0 hier). Behoben ueber kuerPhaseEnde() oben, das die Phase auch dann
+      // abschliesst, wenn die naechste Enthuellung der Uhr zuvorkommt.
 
       // NEUEN DURCHGANG ERKENNEN — reiner Lesevergleich auf u.aktuell, kein Schreiben
       // darauf. vizAktuell ist selbst ein neues viz*-Feld.
       if(u.aktuell>=0 && u.aktuell!==u.vizAktuell){
         u.vizAktuell=u.aktuell;
+        // ZUERST DIE VORIGE PHASE ABSCHLIESSEN, DANN DIE NEUE SETZEN. Die Enthuellung ist
+        // der Moment, in dem der Ausgang des VORIGEN Elements feststeht — wer sein Element
+        // sauber gestanden hat, landet jetzt. Ohne diese Zeile verschluckt die Zuweisung
+        // darunter (vizPhase/vizPhaseT/vizSturz) den Uebergang ersatzlos, weil die Uhr des
+        // vorigen Elements bei der Enthuellungsdichte der Startreihenfolge gar nicht mehr
+        // ablaeuft — die ganze Begruendung steht bei kuerPhaseEnde() oben. u.vizSturz traegt
+        // hier noch den Stand des VORIGEN Elements (ueberschrieben wird es erst unten), ist
+        // also genau das, was warSturzVorAblauf auf dem Uhrenweg leistet.
+        kuerPhaseEnde(u,u.vizSturz);
         if(u.aktuell+1>=art.rundenN){
           u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
         } else {
@@ -13306,17 +13358,12 @@
       if(u.vizPhaseT>0)u.vizPhaseT=Math.max(0,u.vizPhaseT-dt);
       if(u.vizSturz && u.vizPhaseT<=0)u.vizSturz=false;
       if(u.vizPhase!=="schlusspose" && u.vizPhaseT<=0 && !u.vizSturz){
-        // Bewegungsstart (kufe): der EINMALIGE Uebergang aus "einlauf" — der Antritt zu
-        // Beginn der Kuer, bevor irgendein Element gelaufen ist. Landung: der Uebergang aus
-        // einem sauber abgeschlossenen Element (Pirouette/Hebung/Wurf, kein Sturz) zurueck
-        // ins Gleiten. Die `!=="gleiten"`-Wache ist noetig, weil dieser ganze Zweig sonst
-        // JEDEN Frame erneut liefe, solange u.aktuell nicht weiterzaehlt (vizPhaseT bleibt
-        // bei 0) — ohne sie wuerde "landung" nach dem ersten Uebergang bei jedem Frame neu
-        // feuern statt nur einmal am eigentlichen Uebergang.
-        if(u.vizPhase!=="gleiten"){
-          if(u.vizPhase==="einlauf")sfx("eiskunstlauf","kufe");
-          else if(!warSturzVorAblauf)sfx("eiskunstlauf","landung");
-        }
+        // WEG 1 (Uhr abgelaufen) — Klangregeln und Wachen stehen geschlossen in
+        // kuerPhaseEnde() oben, damit beide Wege nicht auseinanderlaufen koennen. Die
+        // `!=="gleiten"`-Wache steckt dort mit drin: ohne sie liefe dieser Zweig JEDEN Frame
+        // erneut, solange u.aktuell nicht weiterzaehlt (vizPhaseT bleibt bei 0), und
+        // "landung" feuerte nach dem ersten Uebergang bei jedem Frame neu.
+        kuerPhaseEnde(u,warSturzVorAblauf);
         u.vizPhase="gleiten";
       }
 
