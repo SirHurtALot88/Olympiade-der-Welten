@@ -62,6 +62,15 @@ describe("league-split.ts — Fundament", () => {
     expect(RELEGATION_COUNT).toBe(3);
   });
 
+  it("LEAGUE_SIZE/TEAM_COUNT_TOTAL sind Vielfache von 4 (Mini-DM-Pod-Voraussetzung, 14.09.)", () => {
+    // Chris' Entscheidung: Liga-Groessen bleiben Vielfache von 4, damit ein Mini-DM-Spieltag
+    // restlos in Vierergruppen zerfaellt -- keine Trio-/Bye-Sonderregel noetig
+    // (lib/season/mini-dm-pod-schedule.ts). Beide Konstanten sind heute fest verdrahtet, nicht
+    // user-konfigurierbar; dieser Test haelt die Invariante fest, falls sie je angefasst wird.
+    expect(LEAGUE_SIZE % 4).toBe(0);
+    expect(TEAM_COUNT_TOTAL % 4).toBe(0);
+  });
+
   it("isLeagueSplitActive: aktiv seit PR 2+3+6, sobald leagueByTeamId gesetzt und nicht leer ist", () => {
     // Scharfgeschaltet in PR 2+3+6 (docs/design/liga-split-plan.md, Abschnitt 9) —
     // buildNewGameStateFromBaseline (lib/game/new-game-setup-service.ts) setzt das Feld seither fuer

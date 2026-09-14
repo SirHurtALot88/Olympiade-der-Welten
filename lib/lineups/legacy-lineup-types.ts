@@ -326,6 +326,15 @@ export type LegacyLineupRepositoryContext = LegacyLineupKeyParams & {
   disciplinePlayerCounts: Record<string, number>;
   disciplineSidePlayerCounts?: Record<string, number>;
   disciplineSideCaptainCounts?: Record<string, number>;
+  /**
+   * REVIEW-FIX (PR #930, 14.09.): additiv, optional — dieselben Schluessel wie
+   * `disciplineSidePlayerCounts` ("<disciplineId>::d1"/"::d2"), aber mit dem `playerCount`, das
+   * NUR die legacy-PPS-Scoring-Lookup (`getRankToPointsValue()`) lesen darf. Fehlt der Schluessel
+   * (jeder Aufrufer/Test vor diesem Fix), faellt der Leser auf `disciplineSidePlayerCounts`/
+   * `disciplinePlayerCounts` zurueck — bit-identisch zum Stand davor. S.
+   * `SeasonDisciplineScheduleSlot.legacyScorePlayerCount` fuer die volle Begruendung.
+   */
+  disciplineSideLegacyScorePlayerCounts?: Record<string, number>;
   activePlayers: LegacyActivePlayerRef[];
   disciplineScores: LegacyDisciplineScoreRef[];
 };

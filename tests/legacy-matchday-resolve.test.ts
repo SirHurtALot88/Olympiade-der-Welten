@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { Discipline, GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
+import { buildMatchdayLineupContract } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyMatchdayResolvePreview, getResolveStatusForSides } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
+import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 
 function createContext(input: {
   teamId: string;
@@ -766,5 +768,334 @@ describe("legacy matchday resolve preview payload", () => {
       );
     expect(d1ScoreSum(previewWithInjury!.preview)).toBe(d1ScoreSum(appliedPreview));
     expect(d1ScoreSum(previewWithInjury!.preview)).toBeLessThan(d1ScoreSum(previewNoInjury!.preview));
+  });
+});
+
+/**
+ * REVIEW-FIX PR #930 (14.09., "Mini-DM-Spielplan: 4-Team-Pods, Kadergroesse 1, FFA-Motor-Wiring"):
+ * unabhaengiges Review fand einen konkreten, reproduzierten Produktions-Bug -- s.
+ * docs/design/mini-dm-spielplan-umsetzung-14-09.md und den Review-Kommentar auf PR #930.
+ *
+ * `withMiniDmPlayerCountOverride` setzt Mini-DMs Spielplan-Slot fest auf `playerCount: 1`
+ * (Kader-/Pod-Zweck, korrekt). Mini-DM haengt aber weiterhin NICHT in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` -- es laeuft also weiterhin ueber das laengst aktive,
+ * liga-weite PPS-Renn-Scoring (`getRankToPointsValue()`/`distributeRankPointsToPlayers()`,
+ * `lib/resolve/rank-to-points.ts`), dessen Referenztabelle (`references/sheets/rank-to-points.json`)
+ * nur Zeilen fuer `playerCount` 2 bis 6 hat. Ohne Trennung floss derselbe `1`-Wert auch in diesen
+ * Lookup -- `getRankToPointsValue(1, rang)` liefert `null` fuer JEDEN Rang, `distributeRankPoints-
+ * ToPlayers()` liefert `pointSource: "rank_to_points_missing"`, und `standings-apply-service.ts`
+ * behandelt ein `null` `projectedPoints` als "keine Aenderung" -- jeder Mini-DM-Spieltag haette ab
+ * Merge fuer JEDES Team lautlos 0 Liga-Punkte gebucht.
+ *
+ * Der Fix haelt zwei Werte getrennt (`SeasonDisciplineScheduleSlot.legacyScorePlayerCount` in
+ * lib/data/olyDataTypes.ts traegt die volle Begruendung): `playerCount` bleibt 1 fuer Kader-/
+ * Lineup-/Pod-Zwecke, `legacyScorePlayerCount` traegt den Wert, den Mini-DM OHNE die Pod-
+ * Ueberschreibung gezogen haette, und NUR dieser zweite Wert erreicht `getRankToPointsValue()`.
+ *
+ * Diese Suite deckt genau die Luecke ab, die die PR-eigenen Tests nicht sahen: sie spannt den
+ * Bogen von einem ECHTEN, ueber `buildSeasonSeededDisciplineSchedule()` gezogenen Mini-DM-
+ * Spielplan-Slot durch `buildMatchdayLineupContract()` (denselben Layer, den
+ * `legacy-lineup-local-service.ts` fuer den echten Resolve-Kontext liest) bis in
+ * `buildLegacyMatchdayResolvePreview()` -- nicht nur den Schedule-/Pod-Layer isoliert
+ * (`tests/mini-dm-pod-schedule.test.ts`), sondern bis zum tatsaechlichen Scoring-Ergebnis.
+ */
+describe("review-fix PR #930: Mini-DM legacy PPS scoring survives the playerCount:1 schedule override", () => {
+  // Fuenf "power"-Disziplinen (loest denselben [2,3,4,5,6]-Kategorie-Shuffle aus wie der echte
+  // Katalog) plus drei weitere, damit Mini-DM auf seinem Spieltag einen Partner-Slot bekommt.
+  const REVIEW_FIX_DISCIPLINES: Discipline[] = [
+    { id: "mini-dm", name: "Mini DM", category: "power", weight: 1, originalOrder: 1, displayOrder: 1, playerCount: 2 },
+    { id: "tdm", name: "TDM", category: "power", weight: 1, originalOrder: 2, displayOrder: 2, playerCount: 3 },
+    { id: "gewichtheben", name: "Gewichtheben", category: "power", weight: 1, originalOrder: 3, displayOrder: 3, playerCount: 6 },
+    { id: "hockey", name: "Hockey", category: "power", weight: 1, originalOrder: 4, displayOrder: 4, playerCount: 5 },
+    { id: "breaking", name: "Breaking", category: "power", weight: 1, originalOrder: 5, displayOrder: 5, playerCount: 4 },
+    { id: "fechten", name: "Fechten", category: "speed", weight: 1, originalOrder: 6, displayOrder: 6, playerCount: 5 },
+    { id: "speed-schach", name: "Schach", category: "mental", weight: 1, originalOrder: 7, displayOrder: 7, playerCount: 2 },
+    { id: "showcase", name: "Showcase", category: "social", weight: 1, originalOrder: 8, displayOrder: 8, playerCount: 5 },
+  ];
+
+  /**
+   * Generalisierte Variante von `createContext` oben (die bleibt fuer jeden bestehenden Test
+   * unveraendert) -- parametrisiert Disziplin-ID/Kadergroesse je Seite, damit dieser Kontext genau
+   * das nachbildet, was `buildMatchdayLineupContract()` fuer einen echten Mini-DM-Spieltag liefert:
+   * `requiredPlayers` (Kader-/Pod-Zweck) UND `legacyScorePlayerCount` (legacy-PPS-Scoring-Zweck)
+   * getrennt je Seite, genau wie `legacy-lineup-local-service.ts` es fuer den echten
+   * Resolve-Kontext befuellt.
+   */
+  function createReviewFixContext(input: {
+    teamId: string;
+    teamName: string;
+    d1DisciplineId: string;
+    d1Scores: number[];
+    d1RequiredPlayers: number;
+    d1LegacyScorePlayerCount: number;
+    d2DisciplineId: string;
+    d2Scores: number[];
+    d2RequiredPlayers: number;
+    d2LegacyScorePlayerCount: number;
+  }): LegacyLineupLoadedContext {
+    const entries = [
+      ...input.d1Scores.map((score, index) => ({
+        disciplineId: input.d1DisciplineId,
+        disciplineSide: "d1" as const,
+        slotIndex: index,
+        playerId: `${input.teamId}-d1-${index}`,
+        activePlayerId: `active-${input.teamId}-d1-${index}`,
+      })),
+      ...input.d2Scores.map((score, index) => ({
+        disciplineId: input.d2DisciplineId,
+        disciplineSide: "d2" as const,
+        slotIndex: index,
+        playerId: `${input.teamId}-d2-${index}`,
+        activePlayerId: `active-${input.teamId}-d2-${index}`,
+      })),
+    ];
+
+    return {
+      saveId: "save-review-fix",
+      seasonId: "season-review-fix",
+      matchdayId: "matchday-review-fix-1",
+      teamId: input.teamId,
+      entries,
+      disciplinePlayerCounts: {
+        [input.d1DisciplineId]: input.d1RequiredPlayers,
+        [input.d2DisciplineId]: input.d2RequiredPlayers,
+      },
+      // Kader-/Lineup-Zweck: bleibt bei Mini-DMs echtem Kaderwert (1) -- diese Zahlen duerfen sich
+      // durch den Fix NICHT aendern.
+      disciplineSidePlayerCounts: {
+        [`${input.d1DisciplineId}::d1`]: input.d1RequiredPlayers,
+        [`${input.d2DisciplineId}::d2`]: input.d2RequiredPlayers,
+      },
+      // Legacy-PPS-Scoring-Zweck (REVIEW-FIX): getrennt, genau der Wert, den
+      // getRankToPointsValue()/distributeRankPointsToPlayers() lesen muss.
+      disciplineSideLegacyScorePlayerCounts: {
+        [`${input.d1DisciplineId}::d1`]: input.d1LegacyScorePlayerCount,
+        [`${input.d2DisciplineId}::d2`]: input.d2LegacyScorePlayerCount,
+      },
+      activePlayers: entries.map((entry) => ({
+        id: entry.activePlayerId,
+        saveId: "save-review-fix",
+        seasonId: "season-review-fix",
+        teamId: input.teamId,
+        playerId: entry.playerId,
+      })),
+      disciplineScores: [
+        ...input.d1Scores.map((score, index) => ({
+          playerId: `${input.teamId}-d1-${index}`,
+          disciplineId: input.d1DisciplineId,
+          score,
+        })),
+        ...input.d2Scores.map((score, index) => ({
+          playerId: `${input.teamId}-d2-${index}`,
+          disciplineId: input.d2DisciplineId,
+          score,
+        })),
+      ],
+      save: { id: "save-review-fix", name: "Save Review Fix", status: "active" },
+      season: {
+        id: "season-review-fix",
+        saveId: "save-review-fix",
+        name: "Season Review Fix",
+        year: 1,
+        currentMatchday: 1,
+        status: "active",
+      },
+      matchday: {
+        id: "matchday-review-fix-1",
+        seasonId: "season-review-fix",
+        index: 1,
+        label: "Spieltag 1",
+        status: "planning",
+      },
+      team: { id: input.teamId, shortCode: input.teamId, name: input.teamName },
+      teamSeasonState: {
+        id: `tss-${input.teamId}`,
+        saveId: "save-review-fix",
+        seasonId: "season-review-fix",
+        teamId: input.teamId,
+        cash: 100,
+        budget: 100,
+        rosterLimit: 10,
+        playerOpt: 10,
+      },
+      teamIdentity: { pow: 10, spe: 10, men: 10, soc: 10 },
+      rosterPlayers: entries.map((entry) => ({
+        id: entry.playerId,
+        name: entry.playerId,
+        coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+      })),
+      disciplines: [
+        { id: input.d1DisciplineId, name: input.d1DisciplineId, category: "power" },
+        { id: input.d2DisciplineId, name: input.d2DisciplineId, category: "speed" },
+      ],
+      disciplineWeights: [],
+      seasonDisciplineConfigs: [
+        {
+          disciplineId: input.d1DisciplineId,
+          originalOrder: 1,
+          displayOrder: 1,
+          playerCount: input.d1RequiredPlayers,
+          mutator1: null,
+          mutator2: null,
+        },
+        {
+          disciplineId: input.d2DisciplineId,
+          originalOrder: 2,
+          displayOrder: 2,
+          playerCount: input.d2RequiredPlayers,
+          mutator1: null,
+          mutator2: null,
+        },
+      ],
+      existingDraft: {
+        lineupId: `lineup-${input.teamId}`,
+        saveId: "save-review-fix",
+        seasonId: "season-review-fix",
+        matchdayId: "matchday-review-fix-1",
+        teamId: input.teamId,
+        status: "draft",
+        entries,
+        modifiers: {
+          d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+          d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+        },
+        createdAt: "2026-09-14T00:00:00.000Z",
+        updatedAt: "2026-09-14T00:00:00.000Z",
+      },
+      contextMeta: {
+        saveId: "save-review-fix",
+        seasonId: "season-review-fix",
+        matchdayId: "matchday-review-fix-1",
+        teamId: input.teamId,
+        d1DisciplineId: input.d1DisciplineId,
+        d2DisciplineId: input.d2DisciplineId,
+      },
+      fatigueByPlayerId: {},
+      fatigueSourceStatus: "mapped",
+      injuryByPlayerId: null,
+      injurySourceStatus: "not_applied",
+      contextLoadMode: "sqlite_local",
+      formCardSource: { selectionStatus: "ready", effectStatus: "ready", sourceLabel: "test", warnings: [] },
+      mutatorSource: { selectionStatus: "ready", effectStatus: "ready", sourceLabel: "test", warnings: [] },
+      teamPowerSource: { selectionStatus: "ready", effectStatus: "ready", sourceLabel: "test", warnings: [] },
+      formCards: [],
+    } as unknown as LegacyLineupLoadedContext;
+  }
+
+  it("keeps the legacy rank-to-points lookup alive for a real, seeded Mini-DM schedule slot", () => {
+    const schedule = buildSeasonSeededDisciplineSchedule({
+      saveId: "save-review-fix",
+      seasonId: "season-review-fix",
+      disciplines: REVIEW_FIX_DISCIPLINES,
+    });
+
+    const miniDmEntry = schedule.entries.find(
+      (entry) => entry.discipline1?.disciplineId === "mini-dm" || entry.discipline2?.disciplineId === "mini-dm",
+    );
+    expect(miniDmEntry).toBeTruthy();
+
+    const miniDmIsD1 = miniDmEntry!.discipline1?.disciplineId === "mini-dm";
+    const miniDmSlot = (miniDmIsD1 ? miniDmEntry!.discipline1 : miniDmEntry!.discipline2)!;
+    const otherSlot = miniDmIsD1 ? miniDmEntry!.discipline2 : miniDmEntry!.discipline1;
+    expect(otherSlot).toBeTruthy();
+
+    // Kader-/Pod-Zweck: bleibt fest 1 (Chris' Entscheidung, PR #930) -- unveraendert durch den Fix.
+    expect(miniDmSlot.playerCount).toBe(1);
+    // Legacy-PPS-Scoring-Zweck (REVIEW-FIX): der EIGENTLICHE, seed-gezogene [2..6]-Wert -- genau
+    // der Review-Fund: ohne diese Trennung waere dieser Wert ebenfalls 1, und rank-to-points.json
+    // hat keine Zeile fuer playerCount 1.
+    expect(miniDmSlot.legacyScorePlayerCount).not.toBe(1);
+    expect(miniDmSlot.legacyScorePlayerCount).toBeGreaterThanOrEqual(2);
+    expect(miniDmSlot.legacyScorePlayerCount).toBeLessThanOrEqual(6);
+
+    const matchdayContract = buildMatchdayLineupContract({
+      season: {
+        id: "season-review-fix",
+        name: "Season Review Fix",
+        year: 1,
+        currentMatchday: 1,
+        matchdayIds: schedule.matchdayIds,
+      },
+      matchday: {
+        id: miniDmEntry!.matchdayId,
+        seasonId: "season-review-fix",
+        index: miniDmEntry!.matchdayIndex,
+        label: miniDmEntry!.matchdayLabel,
+        fixtureIds: [],
+      },
+      disciplines: REVIEW_FIX_DISCIPLINES,
+      disciplineSchedule: schedule.entries,
+    });
+    const miniDmContract = (miniDmIsD1 ? matchdayContract.discipline1 : matchdayContract.discipline2)!;
+    const otherContract = (miniDmIsD1 ? matchdayContract.discipline2 : matchdayContract.discipline1)!;
+    expect(miniDmContract).toBeTruthy();
+    expect(otherContract).toBeTruthy();
+
+    // Dieselbe Trennung, jetzt durch den Lineup-Contract-Layer durch -- den Layer, den
+    // `legacy-lineup-local-service.ts` tatsaechlich fuer den echten Resolve-Kontext liest.
+    expect(miniDmContract.requiredPlayers).toBe(1);
+    expect(miniDmContract.legacyScorePlayerCount).toBe(miniDmSlot.legacyScorePlayerCount);
+
+    const otherRequiredPlayers = otherContract.requiredPlayers ?? 2;
+    const buildTeamContext = (teamId: string, teamName: string, miniDmScore: number, otherBaseScore: number) => {
+      const otherScores = Array.from({ length: otherRequiredPlayers }, (_, index) => otherBaseScore - index);
+      const miniDmSide = {
+        disciplineId: "mini-dm",
+        scores: [miniDmScore],
+        requiredPlayers: miniDmContract.requiredPlayers ?? 1,
+        legacyScorePlayerCount: miniDmContract.legacyScorePlayerCount ?? 1,
+      };
+      const otherSide = {
+        disciplineId: otherContract.disciplineId,
+        scores: otherScores,
+        requiredPlayers: otherRequiredPlayers,
+        legacyScorePlayerCount: otherContract.legacyScorePlayerCount ?? otherRequiredPlayers,
+      };
+      const d1 = miniDmIsD1 ? miniDmSide : otherSide;
+      const d2 = miniDmIsD1 ? otherSide : miniDmSide;
+
+      return createReviewFixContext({
+        teamId,
+        teamName,
+        d1DisciplineId: d1.disciplineId,
+        d1Scores: d1.scores,
+        d1RequiredPlayers: d1.requiredPlayers,
+        d1LegacyScorePlayerCount: d1.legacyScorePlayerCount,
+        d2DisciplineId: d2.disciplineId,
+        d2Scores: d2.scores,
+        d2RequiredPlayers: d2.requiredPlayers,
+        d2LegacyScorePlayerCount: d2.legacyScorePlayerCount,
+      });
+    };
+
+    const preview = buildLegacyMatchdayResolvePreview([
+      buildTeamContext("A-A", "Alpha", 90, 40),
+      buildTeamContext("B-B", "Beta", 50, 30),
+    ]);
+
+    // Der Spieltag insgesamt bleibt "ready" -- genau wie im Review-Fund (das war ja das Tueckische:
+    // der Fehler war unsichtbar auf Spieltag-Ebene, nur Mini-DMs eigene teamPoints waren null).
+    expect(preview.status).toBe("ready");
+
+    const miniDmPreview = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+    expect(miniDmPreview).toBeTruthy();
+    expect(miniDmPreview!.teamResults.length).toBeGreaterThan(0);
+    for (const teamResult of miniDmPreview!.teamResults) {
+      // DER REVIEW-FUND: vor diesem Fix war `teamPoints` hier IMMER `null` und `pointSource` IMMER
+      // "rank_to_points_missing", weil getRankToPointsValue(1, rang) keine Zeile fuer
+      // `playerCount: 1` findet -- jeder Mini-DM-Spieltag haette lautlos 0 Liga-Punkte gebucht.
+      expect(teamResult.teamPoints).not.toBeNull();
+      expect(typeof teamResult.teamPoints).toBe("number");
+      expect(teamResult.pointSource).not.toBe("rank_to_points_missing");
+      expect(teamResult.warnings.some((warning) => warning.startsWith("rank_to_points_missing"))).toBe(false);
+    }
+
+    // Und die Team-Uebersicht (D1+D2) bucht fuer beide Teams eine echte Zahl -- keine stille 0.
+    for (const teamId of ["A-A", "B-B"]) {
+      const teamResult = preview.teamResults.find((entry) => entry.teamId === teamId);
+      expect(teamResult).toBeTruthy();
+      const miniDmPoints = miniDmIsD1 ? teamResult!.d1Points : teamResult!.d2Points;
+      expect(miniDmPoints).not.toBeNull();
+    }
   });
 });

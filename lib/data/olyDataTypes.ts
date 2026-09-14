@@ -2437,6 +2437,21 @@ export type SeasonDisciplineScheduleSlot = {
    * `getSeasonDisciplineRepeatCount` in lib/season/season-discipline-schedule.ts.
    */
   occurrenceInSeason?: 1 | 2;
+  /**
+   * Additiv, optional (mini-dm-spielplan-verankerung-Review-Fix, 14.09.): der `playerCount`-Wert,
+   * den diese Disziplin/Seite OHNE eine spaetere, nur-fuer-Kader/Pod-Zwecke gedachte Ueberschreibung
+   * gezogen haette — fuer JEDE Disziplin ausser Mini-DM identisch zu `playerCount`. Mini-DM ist die
+   * einzige Ausnahme: `playerCount` ist fuer sie fest `1` (Kadergroesse/FFA-Pod, s.
+   * `MINI_DM_FIXED_PLAYER_COUNT`), waehrend `legacyScorePlayerCount` weiterhin den eigentlichen,
+   * seed-gezogenen `[2..6]`-Wert traegt — genau den Wert, den das bereits laengst aktive,
+   * liga-weite PPS-Renn-Scoring (`getRankToPointsValue()`/`resolveDisciplinePlayerCount()`) lesen
+   * MUSS, weil `references/sheets/rank-to-points.json` keine Zeile fuer `playerCount: 1` hat. Ohne
+   * diese Trennung wuerde derselbe Wert (`1`) sowohl in den Kader-/Pod-Pfad als auch in den
+   * PPS-Scoring-Pfad einfliessen und dort JEDEN Mini-DM-Spieltag lautlos auf 0 Liga-Punkte setzen
+   * (Review-Fund PR #930). `undefined`/fehlend faellt auf `playerCount` zurueck — bit-identisch zum
+   * Stand vor diesem Feld fuer jeden aelteren, bereits persistierten Spielplan-Eintrag.
+   */
+  legacyScorePlayerCount?: number | null;
 };
 
 export type SeasonDisciplineScheduleEntry = {

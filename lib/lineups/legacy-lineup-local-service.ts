@@ -752,6 +752,16 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
           .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
           .map((entry) => [`${entry.disciplineId}::${entry.disciplineSide}`, entry.requiredPlayers ?? 0] as const),
       ),
+      // REVIEW-FIX (PR #930, 14.09.): separat von `disciplineSidePlayerCounts` -- s. Begruendung an
+      // `LegacyLineupRepositoryContext.disciplineSideLegacyScorePlayerCounts`.
+      disciplineSideLegacyScorePlayerCounts: Object.fromEntries(
+        [matchdayContract.discipline1, matchdayContract.discipline2]
+          .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+          .map(
+            (entry) =>
+              [`${entry.disciplineId}::${entry.disciplineSide}`, entry.legacyScorePlayerCount ?? entry.requiredPlayers ?? 0] as const,
+          ),
+      ),
       disciplineSideCaptainCounts: Object.fromEntries(
         [matchdayContract.discipline1, matchdayContract.discipline2]
           .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
