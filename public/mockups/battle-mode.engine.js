@@ -13138,7 +13138,7 @@
   }
   // Warteplatz Nummer `slot` (0 = als naechstes dran) an der rechten Bande, von oben nach
   // unten. Bei sechs Startgruppen warten hoechstens fuenf, der unterste Platz liegt damit
-  // bei H*0.62 und bleibt ueber dem Kiss-and-Cry.
+  // bei H*0.335+4*H*0.082 = H*0.663 und bleibt ueber dem Kiss-and-Cry (H*0.755).
   function kuerWarte(slot){
     return {x:W*0.875, y:H*0.335+Math.min(Math.max(slot,0),4)*H*0.082};
   }
@@ -13182,8 +13182,9 @@
   //    fuer die Schlusspose dastand (`Math.min(dist, tempo*dt)` entlang der
   //    Verbindungslinie), jetzt fuer JEDEN Zielpunkt. Auf der Bahn selbst ist es nach
   //    Behebung 1 praktisch ein No-Op (die Kurve wandert je Bild ≤1,3 px bei 60 fps, der
-  //    Deckel erlaubt 3,2 px — `Math.min` greift nicht, die Figur sitzt exakt auf
-  //    zielX/zielY wie vorher); es ist das Sicherheitsnetz gegen jede kuenftige Quelle
+  //    Deckel erlaubt 4,3 px, KUER_TEMPO 260 px/s bei 60 fps — `Math.min` greift nicht,
+  //    die Figur sitzt exakt auf zielX/zielY wie vorher); es ist das Sicherheitsnetz
+  //    gegen jede kuenftige Quelle
   //    eines Sprungs und zugleich der Weg, auf dem die Spotlight-Rotation ein- und
   //    ausfaehrt.
   //
@@ -14418,7 +14419,7 @@
       ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
       if(rolle==="kuer"){
         if(grp.length!==2)return;
-        if(pos.some(p=>p.x>=W*0.78))return;   // noch im Einlaufen, s. `aufBahn` oben
+        if(pos.some(p=>p.x>=W*0.78))return;   // noch im Einlaufen, s. "BESCHRIFTUNG ERST AUF DEM EIS" oben
         // UNTER das Paar statt darueber (13.09.): oben haengen die Schwebetexte ("+92"),
         // die sich mit dem Etikett gegenseitig unleserlich gemacht haben. Unten ist die
         // Spalte zwischen den beiden auseinandergeschobenen Namensetiketten frei.
@@ -14456,7 +14457,7 @@
       // letzter Schweber noch ein paar Zehntel nachlebt.)
       const traeger=TEILNEHMER.find(u=>u.id===f._teilnehmer);
       if(traeger&&traeger.vizRolle&&traeger.vizRolle!=="kuer")continue;
-      if(pos.x>=W*0.78)continue;   // noch im Einlaufen, s. `aufBahn` oben
+      if(pos.x>=W*0.78)continue;   // noch im Einlaufen, s. "BESCHRIFTUNG ERST AUF DEM EIS" oben
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
