@@ -162,28 +162,39 @@ export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set
  * deshalb eine eigene Menge und eine eigene Browser-Funktion, kein Eintrag in einer der drei
  * Buehnen-Mengen oben.
  *
- * DREI DER VIER BESTANDENEN BAHNEN: Staffel (rho 0,915), Takeshi's Castle (0,861),
- * Time-Trial (0,828) -- der Dispatch ist fuer alle Bahn-Disziplinen identisch
- * (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-Disziplin in derselben Schleife registriert).
- * CLIMBING BLEIBT AUSSEN VOR: rho 0,790 je Spiel, 0,010 unter der 0,80-Schranke -- dieselbe
- * Regel, die I-Spy (0,684) aus `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es
- * technisch nur eine Zeile waere.
+ * VIER DER VIER BAHNEN BESTANDEN: Staffel (rho 0,915), Takeshi's Castle (0,861),
+ * Time-Trial (0,828), SPURT (0,894, s.u.) -- der Dispatch ist fuer alle Bahn-Disziplinen
+ * identisch (`MOTOREN[bd]` wird fuer jede `BAHN_ART`-Disziplin in derselben Schleife
+ * registriert). CLIMBING BLEIBT AUSSEN VOR: rho 0,790 je Spiel, 0,010 unter der
+ * 0,80-Schranke -- dieselbe Regel, die I-Spy (0,684) aus `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`
+ * draussen haelt, obwohl es technisch nur eine Zeile waere.
  *
- * SPURT BEWUSST NICHT ENTHALTEN (Opus-Review PR #881, Fund F1, 10.09.): ein Kommentar in
- * `scripts/ziehe-buehne-pps-referenz.ts` ging faelschlich davon aus, `BAHN_ART.spurt.jeSeite`
- * sei wie bei den anderen drei Bahnen 6 -- tatsaechlich ist `jeSeite` fuer Spurt 4, die einzige
- * der vier Bahnen, bei der Motor-Feldgroesse und Saison-Maximalfeldgroesse auseinanderfallen.
- * Gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures) fuehrte das
- * in ALLEN 64 Fixtures zu einem Boxscore mit zu wenigen Eintraegen (512 statt 768) UND in 4 von
- * 64 Fixtures zu einem Team, das seine Aufstellung gar nicht angewendet bekam (4 gegen 2 statt 4
- * gegen 4). Spurt wird erst produktionsangeschlossen, wenn die PPS-Referenz bei Feldgroesse 4
- * neu gezogen ist (eigenes Folge-Ticket) -- bis dahin bleibt Spurt aus dieser Menge draussen,
- * genau wie Climbing.
+ * SPURT JETZT ENTHALTEN (Produktionsanbindung 14.09., loest Opus-Review PR #881 Fund F1
+ * auf): der Fund war real -- `BAHN_ART.spurt.jeSeite` war 4, waehrend die Saison fuer JEDE
+ * Disziplin gleichverteilt 2..6 Laeufer je Seite wuerfelt
+ * (`buildSeasonPlayerCountByDiscipline()`, season-discipline-schedule.ts) -- die einzige der
+ * vier Bahnen, bei der Motor-Feldgroesse und Saison-Maximalfeldgroesse auseinanderfielen.
+ * Gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures) fuehrte
+ * das in ALLEN 64 Fixtures zu einem Boxscore mit zu wenigen Eintraegen (512 statt 768) UND in
+ * 4 von 64 Fixtures zu einem Team, das seine Aufstellung gar nicht angewendet bekam (4 gegen 2
+ * statt 4 gegen 4).
+ *
+ * DER FIX (public/mockups/battle-mode.engine.js, `BAHN_ART.spurt`): `jeSeite` 4 -> 6, dieselbe
+ * Feldgroesse wie die anderen drei Bahnen, plus die zwei Slots (drivephase/photofinish), die
+ * `lib/lineups/matchday-slot-roles.ts` fuer Spurt bereits fuehrte (`scripts/
+ * generiere-arena-daten.ts` zieht sie jetzt mit, s. dortige `SLOT_ZAHL_UEBERSCHREIBUNG`).
+ * Kaderfest (n=24) gemessen: rho/Spiel 0,894 (Spannweite 0,138, Saison 0,916) bei jeSeite 6 --
+ * BESSER als vorher bei jeSeite 4 (0,871/0,236/0,905), s. docs/design/
+ * spurt-offene-fragen-plus-optik-plan-05-09.md Abschnitt 3.3 fuer die Vorabmessung. Die PPS-
+ * Referenz (`data/generated/spurt-pps-referenz.json`) wurde mit dem reparierten Motor neu
+ * gezogen -- die alte Datei war bei n=4..6 auf denselben 512 Boxscore-Eintraegen je 64
+ * Fixtures eingefroren, s. deren `hinweis`-Feld vor dieser PR.
  */
 export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "staffel",
   "takeshis-castle",
   "time-trial",
+  "spurt",
 ]);
 
 function seedZuZahl(seed: string | number): number {

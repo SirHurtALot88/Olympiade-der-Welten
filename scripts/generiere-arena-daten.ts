@@ -36,14 +36,37 @@ import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles
 const MARKER_AUF = "  // <<< GENERIERT: arena-daten — nicht von Hand ändern";
 const MARKER_ZU = "  // >>> ENDE GENERIERT: arena-daten";
 
+/**
+ * SPURT-UEBERSCHREIBUNG (Produktionsanbindung 14.09., docs/design/
+ * spurt-modellierung-recherche-05-09.md Abschnitt 1.3, Opus-Review PR #881 Fund F1):
+ * `BAHN_ART.spurt.jeSeite` in public/mockups/battle-mode.engine.js ist jetzt 6 (Motor-
+ * Feldgroesse = Saison-Maximalfeldgroesse, wie bei den anderen drei produktiv
+ * angeschlossenen Bahn-Disziplinen Staffel/Takeshi's Castle/Time-Trial). Die generische
+ * Formel darunter (`roh*2`, `roh = Discipline.playerCount`) liefert fuer Spurts
+ * Katalogwert 2 nur 4 Slots — genau die Zahl, die vorher (fälschlich) auch `jeSeite`
+ * war. `lib/lineups/matchday-slot-roles.ts` fuehrt fuer Spurt bereits sechs Rollen
+ * (blockstart/acceleration/topspeed/lanecontrol/drivephase/photofinish); diese
+ * Ueberschreibung sorgt dafuer, dass der Generator alle sechs auch tatsaechlich zieht,
+ * statt bei den ersten vier abzuschneiden. `Discipline.playerCount` selbst bleibt bei 2
+ * (das ist die TYPISCHE, nicht die maximale Feldgroesse — s. Kommentare an
+ * `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`/`katalogStandardgroesse` in
+ * lib/resolve/battle-mode-arena-team-points.ts), nur diese lokale Slot-Zahl wird
+ * ueberschrieben.
+ */
+const SLOT_ZAHL_UEBERSCHREIBUNG: Partial<Record<string, number>> = {
+  spurt: 6,
+};
+
 /** Wie viele Slots eine Disziplin in der Arena zeigt. */
 function slotZahl(disziplinId: string): number {
+  const ueberschrieben = SLOT_ZAHL_UEBERSCHREIBUNG[disziplinId];
+  if (ueberschrieben != null) return ueberschrieben;
   const stamm = foundationSeedDisciplines.find((d) => d.id === disziplinId);
-  // Die Stammdaten nennen für TDM 3 und für Spurt 2, gebaut sind 6 und 4. Welche Zahl
-  // gilt, ist eine offene Frage an Chris (siehe docs/BATTLE_ARENA_UEBERGABE.md).
-  // Bis sie beantwortet ist, bleibt es bei dem, was der Entwurf zeigt: die Stammzahl
-  // verdoppelt, mindestens vier, höchstens sechs. Das ist eine ANNAHME und steht
-  // deshalb hier an einer Stelle, statt zwanzigmal verstreut.
+  // Die Stammdaten nennen für TDM 3, gebaut sind 6. Welche Zahl gilt, ist eine offene
+  // Frage an Chris (siehe docs/BATTLE_ARENA_UEBERGABE.md). Bis sie beantwortet ist,
+  // bleibt es bei dem, was der Entwurf zeigt: die Stammzahl verdoppelt, mindestens vier,
+  // höchstens sechs. Das ist eine ANNAHME und steht deshalb hier an einer Stelle, statt
+  // zwanzigmal verstreut.
   const roh = stamm?.playerCount ?? 4;
   return Math.max(4, Math.min(6, roh * 2));
 }

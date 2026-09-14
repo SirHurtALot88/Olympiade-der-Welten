@@ -1,5 +1,28 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Siebter Nachtrag 14.09. — Spurt produktionsangebunden, Feldgroessen-Fund F1 behoben.**
+`BAHN_ART.spurt.jeSeite` war 4, waehrend die Saison fuer jede Disziplin gleichverteilt 2..6
+Laeufer je Seite wuerfelt (`buildSeasonPlayerCountByDiscipline()`) — die einzige der vier
+Bahnen, bei der Motor-Feldgroesse und Saison-Maximalfeldgroesse auseinanderfielen (Opus-Review
+PR #881, Fund F1). Gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64
+Fixtures) fuehrte das in ALLEN 64 Fixtures zu einem zu kleinen Boxscore (512 statt 768
+Eintraege) UND in 4 von 64 zu 4-gegen-2 statt 4-gegen-4. Fix: `jeSeite` 4 -> 6 (dieselbe
+Feldgroesse wie Staffel/Takeshi's Castle/Time-Trial), plus die zwei Slots (drivephase/
+photofinish), die `lib/lineups/matchday-slot-roles.ts` fuer Spurt bereits fuehrte, jetzt auch
+im Motor (`scripts/generiere-arena-daten.ts`, neue `SLOT_ZAHL_UEBERSCHREIBUNG`). Kaderfest
+(n=24) gemessen: rho/Spiel 0,871 → **0,894** (Spannweite 0,236 → 0,138, Saison 0,905 → 0,916)
+— eine reale, aber kleine Bewegung (innerhalb der eigenen Kaderrauschen-Spannweite, s.
+`docs/design/messgrundlage-kaderfest.md`), reproduzierbar auf denselben Kadern/Seeds. Die
+anderen drei Bahn-Disziplinen bit-identisch nachgemessen (staffel 0,899, takeshis-castle
+0,879, time-trial 0,825, climbing 0,782 — alle exakt wie vorher). Spurt steht jetzt in
+`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, PPS-Referenz gegen den
+reparierten Motor neu gezogen. Dazu Teil B: `stepHuerden()` ergaenzt (fehlte als einzige der
+vier Bahnen, `bahnBewegung()` wartete seit PR 0.3 explizit darauf) — die Laeufer-Sprites
+hatten wie Time-Trial vor PR #908 keine eigene Bewegungspose (die globale Sprite-Uhr `t` ist
+auf der Bahn immer eingefroren) und standen animatorisch still waehrend der Bewegung; jetzt
+per `u.vizSchritt` (1:1 aus `stepZeitfahren()` uebertragen), rein praesentational, rho-neutral
+nachgemessen. S. PR-Beschreibung fuer Details und Screenshots.
+
 **Sechster Nachtrag 07.09. — Fechten/Eiskunstlauf/Breaking-Politur umgesetzt (Fable-Recherche
 `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`), noch am selben Tag wie der Fuenfte
 Nachtrag unten.** Zwei unabhaengige Befunde, zwei getrennte Aenderungen:
@@ -153,7 +176,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | Showcase | Buehne | 0,892 | 0,158 | 0,937 | 0,077 | bestanden |
 | **Eiskunstlauf** | **Buehne** | **0,875** | 0,075 | 0,965 | 0,049 | **bestanden** |
 | **Takeshi's Castle** | **Bahn** | **0,883** | 0,071 | 0,951 | 0,042 | **bestanden — 13.09. `fallenKoennen`, vorher 0,861 / 0,116 / 0,930 / 0,056** |
-| Spurt | Bahn | 0,871 | 0,236 | 0,905 | 0,190 | bestanden |
+| Spurt | Bahn | 0,894 | 0,138 | 0,916 | 0,105 | bestanden |
 | **Breaking** | **Buehne** | **0,869** | 0,114 | 0,951 | 0,168 | **bestanden** |
 | Gewichtheben | Buehne | 0,854 | 0,209 | 0,923 | 0,273 | bestanden |
 | Wettessen | Buehne | 0,845 | 0,139 | 0,930 | 0,091 | bestanden |
@@ -654,7 +677,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | **Takeshi's Castle** | **50 %** | **0,883** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |
 | **Staffel** | **48 %** | **0,915** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |
 | I-Spy | 35 % | 0,684 | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt |
-| Spurt | 45 % | 0,871 | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis |
+| Spurt | 55 % | 0,894 | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | **Football** | **32 %** | **0,516** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
 | Mini-DM | 30 % | 0,094 | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
 | TDM | 30 % | 0,253 | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
