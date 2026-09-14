@@ -20953,7 +20953,12 @@
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
-      label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
+      // `climbing:true` NACHTRAEGLICH ERGAENZT (Bahn-Animation, 14.09.): Climbing war die
+      // einzige der fuenf Bahn-Disziplinen ganz ohne eigene Flagge in bahnBewegung() — nicht
+      // einmal ein NO-OP-Zweig, sondern schlicht kein Treffer, s. dortiger Kommentar. Rein
+      // deskriptiv, ohne Wirkung auf Rezept/Matrix/wert().
+      label:"Climbing", jeSeite:6, climbing:true,
+      hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
@@ -23407,6 +23412,13 @@
     if(art.staffel && typeof stepStaffel==="function"){ stepStaffel(dt,art); return; }           // Ziel 6
     if(art.zeitfahren && typeof stepZeitfahren==="function"){ stepZeitfahren(dt,art); return; }  // Ziel 8
     if(art.spurt && typeof stepHuerden==="function"){ stepHuerden(dt,art); return; }             // Ziel 9
+    // `art.climbing` (BAHN_ART.climbing.climbing, 14.09. ergaenzt): Climbing hatte bisher
+    // GAR KEIN eigenes Flag und lief hier durch alle vier Zeilen oben ohne zu treffen — es
+    // bekam nicht einmal einen NO-OP-Zweig, sondern schlicht keinen Aufruf. Fuenfte und
+    // letzte Bahn-Schranke, nach demselben Muster wie `art.zeitfahren`/`art.spurt` oben
+    // (PR 0.3 fuer die ersten vier). Rein deskriptiv, s. stepClimbing()-Kommentar unten fuer
+    // den gemessenen Befund (Bahn-Animation, 14.09.).
+    if(art.climbing && typeof stepClimbing==="function"){ stepClimbing(dt,art); return; }
   }
 
   // ================== STAFFEL: DIE FLIEGENDE UEBERGABE (stepStaffel, Ziel 6) ==================
@@ -23447,6 +23459,14 @@
   //     zu iterieren) — ein reiner Lesevergleich, kein zweiter Zufallszug.
   const STAFFEL_ANLAUF_AB=0.86;       // ab wie viel Vordermann-Fortschritt der Naechste anzieht
   const STAFFEL_UEBERGABE_DAUER=0.55; // Sekunden, die der Stab sichtbar zwischen den Haenden unterwegs ist
+  // BAHN_SCHRITT_PX: dieselbe Schrittlaenge/Herleitung wie ZF_SCHRITT_PX bei stepZeitfahren
+  // weiter unten (46 px, s. dortiger Kommentar fuer die volle Rechnung mit v~110-135 ->
+  // ~170 Schritte/Minute) — eigener Name statt Wiederverwendung von ZF_SCHRITT_PX, weil
+  // dieser Wert hier VOR jeder Zeitfahren-spezifischen Logik gebraucht wird und stepStaffel/
+  // stepParcours/stepClimbing nichts ueber Zeitfahren wissen sollen. Derselbe Zahlenwert,
+  // weil u.v in allen fuenf Bahn-Disziplinen dieselbe Einheit ist (Bildschirm-Pixel je
+  // Simulationssekunde, s. stepSpurt: `u.pos+=u.v*dt/strecke`).
+  const BAHN_SCHRITT_PX=46;
   let staffelStartschussAn=false;     // rein praesentational; s. reset() fuer den N1-Fix (PR #879-Muster)
   function stepStaffel(dt,art){
     // STARTSCHUSS: einmal je Rennen, beim allerersten Aufruf nach bau(). Modul-Flagge statt
@@ -23454,11 +23474,29 @@
     // hockeyPublikumAn — reset() setzt sie explizit zurueck (N1-Fix), sonst bliebe der
     // Startschuss ab dem zweiten Staffel-Rennen stumm.
     if(!staffelStartschussAn){ sfx("staffel","startschuss"); staffelStartschussAn=true; }
+    // EIGENE SCHRITTPHASE STATT DER EINGEFRORENEN WELTUHR (Bahn-Animation, 14.09., Befund
+    // aus PR #908/stepZeitfahren, dort dieselbe Ursache fuer Time-Trial behoben: die globale
+    // Sprite-Uhr `t` zaehlt nur in stepSim() hoch, HINTER dem `istBahn(disc)`-Ruecksprung —
+    // auf der gesamten Bahn wird `t+=dt` also nie erreicht, und der Bildindex in
+    // zeichneSprite() `Math.floor((t*7+u.id)%n)` ist bei eingefrorenem `t` je Laeufer eine
+    // KONSTANTE. Nachgeprueft fuer Staffel trotz der grossen Ueberarbeitung in PR #916: kein
+    // Aufruf in stepStaffel schrieb bislang `u.vizSchritt`, PR #916 hat also nur die Strecken-
+    // /Zeit-/Positionslogik beruehrt, nicht die Sprite-Animation. dtSicht*u.v/BAHN_SCHRITT_PX
+    // ist exakt dieselbe Formel wie stepZeitfahren (s. dort) — nur die Bedingung, WANN sie
+    // laeuft, ist die staffelspezifische: ausschliesslich der aktuell aktive Laeufer bewegt
+    // sich (`u.aktiv`, dieselbe Bedingung wie das `if(BA().staffel&&!u.aktiv)continue;` in
+    // stepSpurt, das u.v fuer wartende Laeufer gar nicht erst neu berechnet — ohne diese
+    // Bedingung wuerde ein Laeufer nach seinem Wechsel mit seinem zuletzt gemessenen,
+    // moeglicherweise hohen u.v in der Wechselzone stehend "weiterlaufen"). DERSELBE
+    // VERTRAG: neues, rein praesentationales viz*-Feld, niemals rr(), niemals u.pos/u.v
+    // selbst gelesen fuer irgendetwas ausser dieser Anzeige.
+    const dtSicht=dt*zeitFaktor();
     for(const u of LAEUFER){
       if(u.vizInitDone==null){
         u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
-        u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true;
+        u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true; u.vizSchritt=(u.id||0)*2.3;
       }
+      if(u.aktiv && u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       // ---- 1. ANLAUF, s. Kommentar oben. Nur wer der NAECHSTE in der Wartereihe ist (sein
       // Vordermann laeuft gerade), bekommt ein Zielwert>0; ein Laeufer, der noch zwei oder
       // mehr Abschnitte entfernt ist, der Startlaeufer (kein Vordermann) und wer selbst schon
@@ -23530,8 +23568,25 @@
   // initialisiert sich jedes Feld beim ersten Bild dieser Funktion selbst.
   const PARCOURS_AUFRAPPELN_T=0.35;
   function stepParcours(dt,art){
+    // EIGENE SCHRITTPHASE STATT DER EINGEFRORENEN WELTUHR (Bahn-Animation, 14.09.), derselbe
+    // Befund und dieselbe Formel wie bei stepStaffel (s. dortiger Kommentar) und stepZeitfahren
+    // (Ursprung, PR #908): `t` zaehlt auf der Bahn nie hoch, also braucht jede Bahn-Disziplin
+    // ihre eigene, aus `u.v` gespeiste Phase, sonst bleibt der Bildindex in zeichneSprite()
+    // je Laeufer konstant. Anders als bei Staffel gibt es bei Takeshi keinen "wartet"-Zustand
+    // -- alle Laeufer starten gemeinsam (kein `startAbstand`, s. BAHN_ART-Kommentar bei
+    // bahnRangliste) -- deshalb reicht dieselbe Bedingung wie bei Zeitfahren/Climbing,
+    // `u.fertig==null`. u.v ist ueber tempoVon() bereits 0, waehrend `u.huerde>0` (in einer
+    // Falle haengend, s. dort `*(u.huerde>0?0:1)`) -- die Schrittphase bleibt also von selbst
+    // stehen, waehrend der Laeufer feststeckt, ohne dass diese Funktion das extra pruefen
+    // muesste. Waehrend eines echten Sturzes (u.stolper>0, vizZustand "sturz") zeigt
+    // zeichneSprite ohnehin die feste "liegt"-Pose ueber `u.down` (s. dort `u.down?n-1:...`),
+    // unabhaengig vom Wert dieser Phase -- ein Weiterlaufen der Phase waehrend des Liegens
+    // aendert also nichts Sichtbares. DERSELBE VERTRAG wie oben: neues, rein
+    // praesentationales viz*-Feld, kein rr(), keine Ruecklesung in wert().
+    const dtSicht=dt*zeitFaktor();
     for(const u of LAEUFER){
-      if(u.vizZustand==null){ u.vizZustand="laufen"; u.vizFalleTyp=null; u.vizAufrappelnT=0; }
+      if(u.vizZustand==null){ u.vizZustand="laufen"; u.vizFalleTyp=null; u.vizAufrappelnT=0; u.vizSchritt=(u.id||0)*2.3; }
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       if(u.raus){ u.vizZustand="ausgeschieden"; continue; }
       if(u.fertig!=null){ u.vizZustand="laufen"; u.vizFalleTyp=null; continue; }
       const letzteFalle=(u.fallen&&u.fallen.length)?u.fallen[u.fallen.length-1]:null;
@@ -23550,6 +23605,38 @@
       } else {
         u.vizZustand="laufen"; u.vizFalleTyp=null;
       }
+    }
+  }
+
+  // ================= CLIMBING: DER SCHRITT KOMMT AUS DEM TEMPO (stepClimbing, 14.09.) =========
+  // Befund staerker als bei Staffel/Takeshi: Climbing hatte VOR dieser PR ueberhaupt keinen
+  // eigenen bahnBewegung()-Zweig und damit auch KEINE eigene step*-Funktion -- weder ein Flag
+  // (`art.climbing` gab es nicht) noch einen Aufruf. bahnBewegung() fiel fuer Climbing also
+  // durch alle vier bestehenden Zeilen durch, ohne je zu treffen (s. dortiger Kommentar).
+  // Die Figuren liefen deshalb komplett ueber die eingefrorene Weltuhr `t`
+  // (Math.floor((t*7+u.id)%n) in zeichneSprite, s. PR #908/stepZeitfahren-Kommentar fuer die
+  // volle Herleitung) -- staerker eingefroren als Staffel/Takeshi, die wenigstens schon einen
+  // (bislang nur nicht-animierenden) Step-Zweig hatten.
+  //
+  // Climbing ist von den fuenf Bahn-Disziplinen dem Zeitfahren am naechsten: Einzelleistung
+  // gegen die Uhr, `wertung:"rang"` wie Time-Trial (s. BAHN_ART.climbing/bahnTeamstand), aber
+  // OHNE gestaffelten Start (`startAbstand` setzt nur Time-Trial, s. Kommentar bei
+  // bahnRangliste "fuer Spurt, Climbing, Takeshi und die Staffel, alle ohne dieses Feld") --
+  // alle Kletterer beginnen gemeinsam. Deshalb keine eigene Rampen-/Wartephase wie in
+  // stepZeitfahren (dort ausschliesslich fuer den gestaffelten Start gebraucht), sondern
+  // dieselbe simple Bedingung wie bei stepParcours: `u.fertig==null`. u.v ist ueber tempoVon()
+  // schon 0, waehrend `u.huerde>0` (im Griff haengend, "Fehlgriff wirft nicht um, er kostet
+  // Zeit und Kraft", s. BAHN_ART.climbing-Kommentar) -- die Schrittphase haelt beim Griff also
+  // von selbst an, ohne dass diese Funktion das gesondert abfragen muesste. DERSELBE VERTRAG
+  // wie stepStaffel/stepParcours/stepZeitfahren, WOeRTLICH: einziges geschriebenes Feld ist
+  // das neue, rein praesentationale `u.vizSchritt`; niemals rr(), niemals u.pos/u.v selbst,
+  // niemals etwas, das MOTOREN.climbing.wert() liest. Kein init-Block in der LAEUFER-Fabrik
+  // noetig, das Feld initialisiert sich beim ersten Bild selbst (Muster aus stepZeitfahren).
+  function stepClimbing(dt,art){
+    const dtSicht=dt*zeitFaktor();
+    for(const u of LAEUFER){
+      if(u.vizSchritt==null)u.vizSchritt=(u.id||0)*2.3;
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
     }
   }
 
@@ -27521,6 +27608,21 @@
           vizErschoepft:u.vizErschoepft==null?null:+u.vizErschoepft.toFixed(3),
           vizRampe:u.vizRampe==null?null:+u.vizRampe.toFixed(2)}))};
     },
+    // BAHN-ANIMATIONS-PROBE (14.09., Bahn-Animation Staffel/Climbing/Takeshi): dieselbe
+    // Idee wie zeitfahrenVizProbe()s Teil (A) direkt oberhalb, aber DISZIPLIN-GENERISCH statt
+    // fest auf Time-Trial verdrahtet -- die globale Sprite-Uhr `aniT` (`t`) und je Laeufer
+    // `vizSchritt` sind fuer jede der fuenf Bahn-Disziplinen dieselben zwei Groessen, an denen
+    // haengt, ob der Laufzyklus in zeichneSprite() (`u.vizAniPhase!=null?u.vizAniPhase*n:
+    // (t*7+u.id)`) steht oder laeuft. Nur gelesen, kein rr(), kein Einfluss auf die
+    // Simulation -- exakt die Probe, mit der der Befund fuer diese PR gemessen wurde
+    // (stepStaffel/stepParcours/stepClimbing setzten `u.vizSchritt` vor dieser PR nicht,
+    // `aniT` steht auf der Bahn ohnehin immer still, s. bahnBewegung()-Kommentar).
+    bahnVizProbe:()=>({
+      disc, aniT:+t.toFixed(4), rennT:(typeof rennT!=="undefined")?+rennT.toFixed(3):null,
+      reihe:(typeof LAEUFER!=="undefined"?LAEUFER:[]).map(u=>({id:u.id, n:u.n,
+        fertig:u.fertig!=null, aktiv:!!u.aktiv, raus:!!u.raus,
+        vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3)}))
+    }),
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
