@@ -150,6 +150,12 @@ import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
 import staffelPpsReferenzJson from "@/data/generated/staffel-pps-referenz.json";
 import takeshisCastlePpsReferenzJson from "@/data/generated/takeshis-castle-pps-referenz.json";
 import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.json";
+// SPURT-PRODUKTIONSANBINDUNG (14.09., loest Opus-Review PR #881 Fund F1 auf, s. Kommentar an
+// `ARENA_BAHN_DISCIPLINE_IDS` in arena-headless-runner.ts): vierte Bahn-Disziplin, ueber
+// dasselbe Chassis wie die anderen drei -- `BAHN_ART.spurt.jeSeite` ist jetzt 6 (vorher 4,
+// das war der Feldgroessen-Fehler), die Referenz unten wurde GEGEN DEN REPARIERTEN MOTOR neu
+// gezogen (`scripts/ziehe-buehne-pps-referenz.ts spurt`).
+import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -207,29 +213,31 @@ import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.j
  * Disziplin in derselben Schleife registriert, battle-mode.engine.js) -- ein `spieleBahn()`, das
  * nur Takeshi bediente, haette kuenstlich verengt werden muessen.
  *
- * SPURT BEWUSST (NOCH) NICHT DABEI (Opus-Review PR #881, Fund F1, 10.09.): rho 0,871 besteht die
- * Schranke, ABER ein Kommentar in `scripts/ziehe-buehne-pps-referenz.ts` ging faelschlich davon
- * aus, `BAHN_ART.spurt.jeSeite` sei wie bei den anderen drei Bahnen 6 -- tatsaechlich ist
- * `jeSeite` fuer Spurt 4 (die einzige der vier Bahnen, bei der Motor-Feldgroesse und Saison-
- * Maximalfeldgroesse auseinanderfallen). Gegen den echten Spielstand gemessen
- * (`runArenaFixtures()`, 32 Teams, 64 Fixtures):
- * ALLE 64 Fixtures liefern einen zu kleinen Boxscore (512 statt 768 Eintraege, ein bis zwei
- * nominierte Laeufer je Seite laufen gar nicht mit und fallen auf den alten PPS-Pfad zurueck),
- * UND 4 von 64 Fixtures liefen 4-gegen-2 statt 4-gegen-4 (ein Team bekam seine Aufstellung nicht
- * angewendet). Das ist echte Punkteverzerrung, kein kosmetischer Fehler -- Spurt bleibt deshalb
- * aussen vor, bis die PPS-Referenz bei der korrekten Feldgroesse (4) neu gezogen ist (eigenes
- * Folge-Ticket, s. PR-Beschreibung).
+ * SPURT JETZT DABEI, DER OPUS-REVIEW-FUND F1 IST BEHOBEN (Produktionsanbindung 14.09.): am
+ * 10.09. bestand rho 0,871 die Schranke, ABER `BAHN_ART.spurt.jeSeite` war 4 statt 6 -- die
+ * einzige der vier Bahnen, bei der Motor-Feldgroesse und Saison-Maximalfeldgroesse
+ * auseinanderfielen (die Saison wuerfelt fuer JEDE Disziplin gleichverteilt 2..6 Laeufer je
+ * Seite, `buildSeasonPlayerCountByDiscipline()`). Gegen den echten Spielstand gemessen
+ * (`runArenaFixtures()`, 32 Teams, 64 Fixtures) fuehrte das in ALLEN 64 Fixtures zu einem
+ * Boxscore mit zu wenigen Eintraegen (512 statt 768) UND in 4 von 64 Fixtures zu einem Team,
+ * das seine Aufstellung nicht angewendet bekam (4 gegen 2 statt 4 gegen 4) -- echte
+ * Punkteverzerrung, kein kosmetischer Fehler.
  *
- * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem der drei Gruende jeweils:
+ * DER FIX: `BAHN_ART.spurt.jeSeite` 4 -> 6 (public/mockups/battle-mode.engine.js), dieselbe
+ * Feldgroesse wie die anderen drei Bahnen, plus die zwei fehlenden Slots (drivephase/
+ * photofinish, `lib/lineups/matchday-slot-roles.ts` fuehrte sie schon). Kaderfest (n=24)
+ * gemessen: rho/Spiel 0,894 (Spannweite 0,138, Saison 0,916) -- BESSER als vorher bei jeSeite
+ * 4 (0,871/0,236/0,905). Die PPS-Referenz unten wurde GEGEN DEN REPARIERTEN MOTOR neu gezogen
+ * (die alte Datei war bei n=4..6 auf denselben 512 Boxscore-Eintraegen je 64 Fixtures
+ * eingefroren, s. deren `hinweis`-Feld vor dieser PR).
+ *
+ * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund:
  *  - CLIMBING (rho 0,790 je Spiel): Rangtreue NICHT bestanden -- 0,010 unter der 0,80-Schranke
  *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die anderen Bahnen),
  *    und genau deshalb ist es der wichtige Nicht-Eintrag: dieselbe Regel, die I-Spy (0,684) aus
  *    `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es `duell:true` traegt -- die
  *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
  *    eine davon billig zu erfuellen waere.
- *  - SPURT (rho 0,871): Rangtreue bestanden, aber Feldgroessen-Fund F1 oben -- eine dritte, neue
- *    Art von Grund (weder Achse 1 noch Achse 2 fehlt, sondern die Kalibrierung der Referenz ist
- *    fuer die tatsaechliche Motor-Feldgroesse falsch).
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516), BATTLEFIELD/TDM/
  *    MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
@@ -245,11 +253,12 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "wettessen",
   "tennis",
   "fechten",
-  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen,
-  // Spurt ebenso (Opus-Review PR #881, Fund F1 -- Feldgroessen-Diskrepanz, eigenes Folge-Ticket).
+  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen.
   "staffel",
   "takeshis-castle",
   "time-trial",
+  // Spurt-Produktionsanbindung (14.09.): Feldgroessen-Fund F1 behoben, s. Kommentar oben.
+  "spurt",
 ]);
 
 /**
@@ -454,6 +463,20 @@ export const TIME_TRIAL_INDIVIDUAL_PPS_MAX = 5.5;
 export const TIME_TRIAL_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER SPURT (Produktionsanbindung 14.09., loest Opus-Review
+ * PR #881 Fund F1 auf -- s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe
+ * Impact-Kurve wie die anderen drei Bahn-Disziplinen (`ppsAusArenaImpact()`), eigene Regler
+ * aus GENAU DEMSELBEN Grund: der rohe Boxscore-Wert (`bahnTeamstand().punkte`,
+ * `wertung:"rang"` -- Rangpunkte aus `bahnRangliste()`, s. `spieleBahn()`) liegt auf einer
+ * EIGENEN Skala je Wertungsmodus.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben
+ * Grund wie bei jeder vorigen Welle (s. `STAFFEL_INDIVIDUAL_PPS_MAX`-Kommentar).
+ */
+export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
+export const SPURT_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -554,6 +577,10 @@ const TAKESHIS_CASTLE_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 const TIME_TRIAL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   timeTrialPpsReferenzJson as ArenaPpsReferenzJson,
 );
+// SPURT-PRODUKTIONSANBINDUNG (14.09.): auch keine eigene Wertformel-Rolle -- `feldgroessenTorwart`
+// fehlt in ihrer JSON-Datei, genau wie bei jeder Nicht-Hockey-Disziplin oben. Die Datei wurde
+// GEGEN DEN REPARIERTEN MOTOR (jeSeite 6) neu gezogen, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
+const SPURT_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(spurtPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -711,14 +738,27 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
   // keine der drei ist 6, `BAHN_ART[d].jeSeite` (Motor-Feldgroesse) waere hier der falsche Wert,
   // dieselbe Falle wie bei jeder vorigen Welle.
   //
-  // SPURT (Discipline.playerCount 2, BAHN_ART.spurt.jeSeite 4) ABSICHTLICH NICHT HIER (Opus-
-  // Review PR #881, Fund F1, 10.09.): die vierte Bahn-Disziplin bestand die Rangtreue-Schranke
-  // (rho 0,871), aber gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64
-  // Fixtures) nominiert die Saison bis zu 6 Laeufer je Seite, waehrend der Motor `jeSeite = 4`
-  // faehrt -- ALLE 64 Fixtures lieferten dadurch einen zu kleinen Boxscore (512 statt 768
-  // Eintraege, ueberzaehlige Laeufer fallen auf den alten PPS-Pfad zurueck), UND 4 von 64
-  // Fixtures liefen 4-gegen-2 statt 4-gegen-4. Spurt wird erst angeschlossen, wenn die PPS-
-  // Referenz bei Feldgroesse 4 neu gezogen ist (eigenes Folge-Ticket, s. PR-Beschreibung).
+  // SPURT (Discipline.playerCount 2, BAHN_ART.spurt.jeSeite JETZT 6) -- Opus-Review PR #881
+  // Fund F1 behoben (Produktionsanbindung 14.09.): die vierte Bahn-Disziplin bestand die
+  // Rangtreue-Schranke bereits am 10.09. (rho 0,871), aber `jeSeite` war 4, waehrend die Saison
+  // bis zu 6 Laeufer je Seite nominiert -- ALLE 64 gemessenen Fixtures lieferten dadurch einen
+  // zu kleinen Boxscore (512 statt 768 Eintraege), UND 4 von 64 liefen 4-gegen-2 statt
+  // 4-gegen-4. Mit `jeSeite:6` (s. BAHN_ART.spurt, public/mockups/battle-mode.engine.js) stimmt
+  // Motor- und Saison-Feldgroesse ueberein, wie bei den anderen drei Bahnen -- die Referenz
+  // unten ist GEGEN DEN REPARIERTEN MOTOR neu gezogen (`scripts/ziehe-buehne-pps-referenz.ts
+  // spurt`), kaderfest gemessen rho/Spiel 0,894 (Spannweite 0,138, Saison 0,916).
+  [
+    "spurt",
+    {
+      referenzFeldgroessen: SPURT_PPS_REFERENZ_FELDGROESSEN,
+      max: SPURT_INDIVIDUAL_PPS_MAX,
+      anteilMitte: SPURT_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 2 (dataAdapter.ts), NICHT 6 -- dieselbe Falle wie bei jeder
+      // vorigen Bahn/Buehne: `BAHN_ART.spurt.jeSeite` (6) ist die MOTOR-Feldgroesse, nicht die
+      // Katalog-Standardgroesse, und waere hier der falsche Wert.
+      katalogStandardgroesse: 2,
+    },
+  ],
   [
     "staffel",
     {

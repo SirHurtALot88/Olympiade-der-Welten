@@ -4366,7 +4366,9 @@
       {id:"blockstart",label:"Block Start",text:"Explodiert aus dem Start über Speed und Determination.",gross:"speed",klein:"determination",last:"stamina",mueh:"high",profil:{speed:23.4,determination:18.4,will:12.1,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
-      {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"power",last:"speed",mueh:"low",profil:{dexterity:16.8,determination:15.6,will:14.3,torment:14.3,power:13.9,awareness:9.7,health:8.2,stamina:5.4,speed:1.8}}
+      {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"awareness",last:"speed",mueh:"low",profil:{dexterity:17.3,speed:16.1,determination:13.4,will:12.5,torment:12.5,awareness:10.1,power:9,health:5.4,stamina:3.6}},
+      {id:"drivephase",label:"Drive Phase",text:"Drueckt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
+      {id:"photofinish",label:"Photo Finish",text:"Braucht Nerven und Torment für den letzten Meter.",gross:"will",klein:"torment",last:"speed",mueh:"medium",profil:{will:17.5,torment:17.5,dexterity:12.9,determination:11.8,power:11.5,health:9.5,awareness:7.4,stamina:6.2,speed:5.9}}
     ],
     "tennis":[
       {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
@@ -5152,21 +5154,34 @@
         base:0.20,
         geoBonus:{dunk:0.34, nah:0.14, mit:0.0, fern:-0.18},
         radien:{dunk:0, nah:0, mit:0, fern:0}, // ohne Bedeutung, s. Kommentar oben
-        // skillMittel GEMESSEN (nicht mehr geraten): window.__arena.feldspielSubskills(
-        // "football") auf dem 12-Spieler-Testkader (dasselbe Kader, das jede Sondierung/
-        // jeder Korridor-Lauf benutzt, s. docs/design/hockey-rezept-ursache.md fuer den
-        // Praezedenzfall) liefert PASSGENAUIGKEIT-Mittel 58,3, TEAMGEIST-Mittel 48,2 ->
-        // 58,3*0,0060 + 48,2*0,0020 = 0,446. Der alte Platzhalter 0,30 war zu niedrig und
-        // gab jedem Spieler mit durchschnittlichem Skill einen unbeabsichtigten
-        // Bonus-Logit von +14*(0,446-0,30)=+2,0 obendrauf — kein Effekt der Eignung,
-        // sondern ein Messfehler in der Kurve selbst.
-        skillMittel:0.446,
-        // steil/korrektur GEGEN DEN NFL-KORRIDOR GEFITTET (docs/design/football-rezept-
-        // kalibrierung.md, scripts/miss-football-korridor.mjs): Completion-Quote 65,3 %,
-        // Yards/Attempt 7,1 (NFL 2024, football-rollout-plan.md A.1) — dieselbe
-        // Fit-Reihenfolge wie ueberall (steil/skillMittel ZUERST, korrektur ZULETZT).
-        steil:14,
+        // skillMittel NEU GEMESSEN (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1) —
+        // der Referenzwert unten von 0,446 stammt aus der Zeit VOR fkLos()/kappa=3 und ist
+        // mit der neuen Lotterie die FALSCHE Referenz geworden, genau wie der Plan es
+        // vorhersagt: "skillMittel ist mit kappa=3 die falsche Referenz geworden — die
+        // Referenz muss der ERWARTETE Akteur der Lotterie sein, nicht der Kadermittelwert."
+        // GEMESSEN (node scripts/miss-football-korridor.mjs 120, passerPgSum/passerTgSum/
+        // passerN aus fsFbLog, s. dortiger Kommentar): der tatsaechlich von
+        // fkLos(off,"PASSGENAUIGKEIT") gezogene Passer liegt im Mittel bei PASSGENAUIGKEIT
+        // 71,2 / TEAMGEIST 66,1 (Kadermittel war 58,3 / 48,2) -> 71,2*0,0060+66,1*0,0020 =
+        // 0,559. Kappa=3 zieht ueberproportional die staerksten Passer je Snap — genau der
+        // Effekt, den die Lotterie soll (Rangtreue), aber `skillMittel` MUSS diesem
+        // verschobenen Erwartungswert folgen, sonst schlaegt der volle steil-Bonus auf
+        // einen Akteur durch, der laengst ueber dem alten Mittel liegt (der mechanische
+        // Grund fuer den Korridor-Shift auf 76,5 % Completion, s. Bericht).
+        skillMittel:0.559,
+        // steil UNVERAENDERT (0,801 rho Passer<->Eignung nach Rezept C, s. rezept-
+        // Kommentar unten — der Steilheitsparameter selbst war nie das Problem).
+        // base/korrektur NEU GEGEN DEN NFL-KORRIDOR GEFITTET, NACH skillMittel (Korridor-
+        // Refit-Runde, docs/pm-briefings/opus-review-pr-884-football-runde1-09-10.md,
+        // scripts/miss-football-korridor.mjs 120): Completion-Quote 65,3 %, Yards/Attempt
+        // 7,1 (NFL 2024, football-rollout-plan.md A.1) — dieselbe Fit-Reihenfolge wie
+        // ueberall (steil/skillMittel ZUERST, base/korrektur ZULETZT). base -0,05 statt
+        // 0,20: mit dem hoeheren skillMittel als Bezugspunkt lag die Completion-Quote bei
+        // gleichem `base` noch bei 68,4 % (der geoBonus-Mix der vier Tiers zieht den
+        // Mittelwert etwas ueber den Roh-Logit), -0,05 trifft 65,1 %.
+        base:0.24,
         korrektur:{dunk:0, nah:0, mit:0, fern:0},
+        steil:14,
         skillTerme:[{feld:"PASSGENAUIGKEIT",koeff:0.0060},{feld:"TEAMGEIST",koeff:0.0020}]
       },
       // SUB-SKILLS (Football-Plan Abschnitt D, Diskussionsvorschlag dort UMGESETZT statt
@@ -6350,8 +6365,15 @@
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
+    // passerPgSum/passerTgSum/passerN NEU (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt
+    // 6.1): messen den TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer statt
+    // den Kadermittelwert — genau der Unterschied, den kappa=3 zwischen "Referenzakteur der
+    // Lotterie" und "Kadermittel" aufreisst (s. FELDSPIEL_ART.football.kurve.skillMittel-
+    // Kommentar). scripts/miss-football-korridor.mjs liest sie ueber denselben generischen
+    // fsFbLog-Mechanismus wie jede andere Kennzahl hier.
     fsFbLog=feldspielDisc==="football"?{passAtt:0,passComp:0,passInt:0,sacks:0,rushAtt:0,
-      fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0}:null;
+      fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0,
+      passerPgSum:0,passerTgSum:0,passerN:0}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -7736,6 +7758,10 @@
   function resolvePass(off,def,down,toGo,spielTyp){
     const passer=fkLos(off,"PASSGENAUIGKEIT");
     const rusher=fkLos(def,"ABWEHR_PASS");
+    // Korridor-Refit-Messung, s. fsFbLog-Kopfkommentar in bauFeldspiel — EIN Zaehler je
+    // Dropback (Sack/Interception/incomplete/komplett zaehlen alle, weil derselbe gezogene
+    // Passer allen vier Ausgaengen zugrunde liegt), keine Wirkung auf eine Wahrscheinlichkeit.
+    if(fsFbLog){ fsFbLog.passerPgSum+=passer.PASSGENAUIGKEIT; fsFbLog.passerTgSum+=passer.TEAMGEIST; fsFbLog.passerN++; }
     // BASIS 0,07 (Korridor-Fit): 2,42 Sacks / (29,9 Passversuche + 2,42 Sacks) = 7,5 %
     // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
     // nur 4,6-5,1 %.
@@ -8081,7 +8107,13 @@
       // (Steals nachgetragen, weil "Puck erobern eine Hauptaufgabe ist", s. feldspielWert).
       // `checks` existiert an jeder Einheit (Hockey-Bodycheck) und wird ausserhalb der
       // jeweiligen Disziplin nie inkrementiert — kein neues Feld noetig.
-      if(erg.verteidiger)erg.verteidiger.checks++;
+      // KEIN TACKLE AUF EINEM TOUCHDOWN-ZUG (Korridor-Refit-Runde, Opus-Review PR #884
+      // Fund F5): `footballDownWeiter` entscheidet ERST danach, ob `fb.spot-erg.yards<=0`
+      // die Endzone erreicht — bis hierher wurde der Solo-Tackle unbedingt gebucht, auch
+      // wenn der Zug in genau diesem Moment ein Touchdown war (~5 % aller Tkl-Eintraege
+      // bei ~2,6 TDs je Team/Spiel, nachgemessen). Reine Box-Score-Korrektheit, KEINE
+      // Wirkung auf Punktestand/Down/Distance/eine Wahrscheinlichkeit — rho-neutral.
+      if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.receiver);
@@ -8089,7 +8121,8 @@
     }
     if(erg.typ==="lauf"){
       erg.spieler.laufYards+=erg.yards;
-      if(erg.verteidiger)erg.verteidiger.checks++;   // Solo-Tackle, s. Zweig "komplett" oben
+      // KEIN TACKLE AUF EINEM TOUCHDOWN-ZUG, s. Zweig "komplett" oben (F5).
+      if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog)fsFbLog.rushAtt++;
       feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.spieler);
@@ -20711,7 +20744,27 @@
       // die einzige heute vorhandene Unterscheidung `feuerZiel`/`hindernisBilder` gewesen —
       // Werte, die zufaellig nur hier gesetzt sind, aber nicht dafuer gedacht sind, Spurt zu
       // erkennen. Rein deskriptiv, ohne Wirkung, bis Ziel-PR 9 `stepHuerden()` liefert.
-      label:"Spurt", jeSeite:4, spurt:true, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
+      //
+      // FELDGROESSE 4 -> 6 (Produktionsanbindung 14.09., docs/design/
+      // spurt-modellierung-recherche-05-09.md Abschnitt 1.3, Opus-Review PR #881 Fund F1).
+      // `jeSeite` war die einzige Konstante, in der eine Bahn-Motor-Feldgroesse von der
+      // Saison-Maximalfeldgroesse abwich: `buildSeasonPlayerCountByDiscipline()`
+      // (season-discipline-schedule.ts) wuerfelt fuer JEDE der zwanzig Disziplinen
+      // gleichverteilt 2..6 Laeufer je Seite, aber der Motor liess fuer Spurt nur 4 auf die
+      // Bahn (`mine=(gesetzt.length?gesetzt:ersatz).slice(0,n)` unten, `n=art.jeSeite`).
+      // Gegen den echten Spielstand gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures,
+      // s. PR-Beschreibung): bei jeSeite 4 lieferten ALLE 64 Fixtures einen zu kleinen
+      // Boxscore (512 statt 768 Eintraege — ueberzaehlige Laeufer fielen auf den alten
+      // PPS-Pfad zurueck), UND 4 von 64 liefen 4-gegen-2 statt 4-gegen-4 (ein Team bekam
+      // seine Aufstellung nicht vollstaendig angewendet). Mit jeSeite 6 stimmen Motor- und
+      // Saison-Feldgroesse ueberein, genau wie bei Staffel/Takeshi's Castle/Time-Trial.
+      // Kaderfest (n=24, Paket B unveraendert) gemessen: rho/Spiel bei 6 je Seite 0,918
+      // (Spannweite 0,106, Saison 0,909) — BESSER als bei 4 (0,871/0,236/0,905), s.
+      // spurt-offene-fragen-plus-optik-plan-05-09.md Abschnitt 3.3. Die zwei fehlenden
+      // Slots (drivephase/photofinish, lib/lineups/matchday-slot-roles.ts fuehrte sie
+      // schon, s. SLOTS_JE_DISC.spurt unten und scripts/generiere-arena-daten.ts) kommen
+      // mit derselben Aenderung dazu.
+      label:"Spurt", jeSeite:6, spurt:true, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
       // BILD JE STATION (U3). Parallel zu `hindernisse` und `hindernisTypen`: Index i ist
       // dieselbe Station. "wasser" zeichnet zwei Uferkacheln, "balken" dieselben zwei plus die
       // Planke darueber. Fehlt eine Kachel, faellt genau diese Station auf die alten Pfosten
@@ -20790,7 +20843,17 @@
         kick:    {label:"Schlusssprint", tempo:0.90, sucht:0.55, ab:0.62,
                   text:"Hält sich zurück und wirft alles auf das letzte Drittel."}
       },
-      planJeSlot:{blockstart:"vorn", acceleration:"vorn", topspeed:"kick", lanecontrol:"schatten"}
+      // DRIVEPHASE/PHOTOFINISH (Produktionsanbindung 14.09., Frage 6 aus
+      // spurt-offene-fragen-plus-optik-plan-05-09.md): die beiden Slots, die
+      // lib/lineups/matchday-slot-roles.ts fuer Spurt schon fuehrte, aber der Motor bei
+      // jeSeite:4 nie brauchte. Ohne eigenen Eintrag waere `planJeSlot[sl]` `undefined`
+      // gewesen und `Object.keys(P)[1]||Object.keys(P)[0]` haette beide auf "Windschatten"
+      // zurueckfallen lassen (engine.js, `setz()`) — funktional harmlos, aber nicht die
+      // Absicht der beiden Rollen. "Drive Phase" (Determination/Power) passt zu "Von vorn"
+      // wie Blockstart/Acceleration; "Photo Finish" (Torment/Will) passt zum
+      // Schlusssprint-Nervenmoment wie Topspeed.
+      planJeSlot:{blockstart:"vorn", acceleration:"vorn", topspeed:"kick", lanecontrol:"schatten",
+                  drivephase:"vorn", photofinish:"kick"}
     },
 
     "time-trial":{
@@ -23625,6 +23688,61 @@
       // "geht noch" -> "ist leer" kein harter Schnitt ist.
       const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
       const ziel=u.leer?1:Math.max(0,1-anteil/0.35);   // ab einem Drittel Restreserve sichtbar
+      u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+    }
+  }
+
+  // ================ SPURT: DER SCHRITT KOMMT AUS DEM TEMPO (stepHuerden, Ziel 9) ================
+  // Angeschlossen ueber bahnBewegung() oben, exklusiv auf `art.spurt` gegated
+  // (`if(art.spurt && typeof stepHuerden==="function"){...}` — dieser Waechter wartete seit
+  // PR 0.3 auf genau diese Funktion, "Rein deskriptiv, ohne Wirkung, bis Ziel-PR 9
+  // stepHuerden() liefert", s. BAHN_ART.spurt-Kopfkommentar). Spurt war damit die letzte der
+  // vier Bahnen ohne eigene Bewegungspose — Takeshi (stepParcours)/Staffel (stepStaffel)/
+  // Zeitfahren (stepZeitfahren) hatten ihre schon.
+  //
+  // DIESELBE URSACHE WIE BEI ZEITFAHREN (Chris 13.09., "lauf animationen! momentan schweben
+  // alle" — PR #908, s. stepZeitfahren-Kommentar direkt oberhalb): `stepSim()` springt fuer
+  // JEDE Bahn-Disziplin ueber `if(istBahn(disc))return stepSpurt(dt);` aus der Funktion,
+  // BEVOR die Zeile `t+=dt;` erreicht wird — die globale Sprite-Animationsuhr `t` bleibt auf
+  // der gesamten Bahn eingefroren. `zeichneSpurt()`s `parcSpriteArg.vizAniPhase:u.vizSchritt`
+  // liest deshalb, wenn niemand `u.vizSchritt` schreibt, `zeichneSprite()`s Rueckfallformel
+  // `(t*7+u.id)` — bei eingefrorenem `t` eine KONSTANTE je Laeufer: jede Figur gleitet als
+  // stehendes Einzelbild ueber die Bahn. PR #908 hat das nur fuer Time-Trial behoben
+  // (`art.zeitfahren`-Zweig in bahnBewegung); dieselbe Lecke stand fuer Spurt weiterhin offen
+  // (empirisch bestaetigt VOR dieser Aenderung: `typeof stepHuerden` war `"undefined"`, der
+  // Waechter in bahnBewegung() also ein stiller No-Op, exakt wie der Kopfkommentar an
+  // BAHN_ART.spurt es seit PR 0.3 ankuendigt).
+  //
+  // DAS MUSTER 1:1 AUS stepZeitfahren UEBERTRAGEN — mit einer Kuerzung: Spurt kennt keine
+  // Startrampe (`art.startAbstand` ist nur bei Time-Trial gesetzt, s. BAHN_ART["time-trial"];
+  // Spurts `u.startT` bleibt fuer jeden Laeufer 0, alle starten gemeinsam), der
+  // `wartet`/`vizRampe`-Zweig aus stepZeitfahren entfaellt deshalb ganz. Neu dazu kommt der
+  // Hindernis-Stopp: waehrend `u.huerde>0` (Technik-/Wucht-Wurf an einer Station laeuft, s.
+  // BAHN_ART.spurt.hindernisTypen/huerdePreis) treten die Beine still, genau wie beim
+  // Warten auf der Zeitfahren-Rampe.
+  //
+  // DERSELBE VERTRAG WIE stepZeitfahren/stepStaffel/stepParcours, WOeRTLICH: geschrieben
+  // werden AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`,
+  // `vizErschoepft`), NIEMALS u.pos/u.v/u.reserve/u.huerde/u.fertig/rennT/rennFertig/done,
+  // und es faellt KEIN rr()-Aufruf an — disziplinProbe()/miss-alle-disziplinen.mjs
+  // durchlaufen diese Funktion mit jedem Frame mit. NACHGEMESSEN, nicht nur behauptet:
+  // `node scripts/miss-alle-disziplinen.mjs 24 spurt` liefert vor und nach dieser Funktion
+  // exakt dieselbe Rangtreue (s. PR-Beschreibung) — die einzige Bewegung, die Spurt in
+  // dieser PR zeigt, kommt aus der Feldgroessen-Aenderung (jeSeite 4->6) oben, nicht von
+  // hier.
+  const HUERDEN_SCHRITT_PX=46;   // dieselbe Trittfrequenz-Kalibrierung wie ZF_SCHRITT_PX oben
+  function stepHuerden(dt,art){
+    const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
+    for(const u of LAEUFER){
+      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; }
+      // WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL — derselbe Gedanke wie
+      // stepZeitfahrens Startrampe, hier an `u.huerde>0` statt an `u.startT` gegated.
+      const faehrt=u.fertig==null && !(u.huerde>0);
+      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
+      // ERSCHOEPFUNG, 0..1 — zeichenidentisch zu stepZeitfahren (s. dort fuer die
+      // Begruendung der Konstanten 0,35).
+      const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
+      const ziel=u.leer?1:Math.max(0,1-anteil/0.35);
       u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
     }
   }
