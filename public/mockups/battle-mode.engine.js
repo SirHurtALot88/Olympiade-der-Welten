@@ -12354,6 +12354,54 @@
         }
       };
       fusioniereSeite(0); fusioniereSeite(1);
+      // STARTREIHENFOLGE STATT RUNDEN-SETZLISTE (13.09., Chris: "aktuell bewegen sie sich
+      // zwar viel, aber ich weiss nicht ob alle gleichzeitig sinnvoll ist"). Der generische
+      // Zweig unten enthuellt Durchgang 1 fuer ALLE, dann Durchgang 2 fuer alle — zwoelf
+      // Laeufer wechseln sich also im Sekundentakt ab, und auf dem Eis ist deshalb immer
+      // das ganze Feld gleichzeitig unterwegs. Im echten Eiskunstlauf gibt es das genau
+      // einmal, im sechsminuetigen Aufwaermen der Startgruppe; danach verlaesst die Gruppe
+      // das Eis und JEDES PAAR LAEUFT SEIN PROGRAMM ALLEIN (ISU-Wettkampfformat, s.
+      // docs/design/eiskunstlauf-startreihenfolge-spotlight-recherche-13-09.md Abschnitt 2).
+      // Dieselbe strukturelle Korrektur, die Breaking mit stepCypher() schon bekommen hat
+      // ("in einem echten Cypher tanzt IMMER GENAU EINER in der Mitte") — dort reichte die
+      // vorhandene Warteschlange, weil sie ohnehin einen Teilnehmer je Enthuellung markiert;
+      // hier muss zusaetzlich die REIHENFOLGE zusammenhaengend werden, damit ein Paar seine
+      // zwoelf Elemente am Stueck zeigt statt verteilt ueber das ganze Spiel.
+      //
+      // RANGTREUE-NEUTRAL, UND ZWAR BEWEISBAR: die Warteschlange bestimmt AUSSCHLIESSLICH,
+      // in welcher Reihenfolge bereits vollstaendig vorberechnete `runden[]`-Eintraege
+      // aufgedeckt werden. stepBuehne() addiert je Enthuellung `u.summe+=r.punkte` — eine
+      // Summe ueber dieselbe Menge, also reihenfolgeunabhaengig — und zieht dabei NIE rr().
+      // Laenge und damit Spieldauer bleiben identisch (12 Teilnehmer x rundenN Eintraege).
+      // Deshalb liefert miss-alle-disziplinen.mjs bit-identische Zahlen, s. PR-Beschreibung.
+      //
+      // SCHWAECHSTE GRUPPE ZUERST, SEITEN ABWECHSELND. Im echten Wettkampf laufen die
+      // schwaecher gesetzten Paare in den fruehen Startgruppen, die staerksten zuletzt —
+      // der Wettkampf baut sich auf, statt nach dem ersten Auftritt entschieden zu sein.
+      // `fusioniereSeite` hat je Seite bereits absteigend nach `eig` sortiert; hier wird
+      // die Gruppenliste je Seite deshalb nur umgedreht und dann seitenweise verzahnt,
+      // damit kein Team geschlossen zuerst dran ist (dieselbe Absicht wie im generischen
+      // Zweig unten).
+      const gruppenJeSeite=[0,1].map(seite=>{
+        const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
+        const grp=[];
+        for(let i=0;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
+        return grp.reverse();
+      });
+      buehneQueue=[];
+      const maxGrp=Math.max(gruppenJeSeite[0].length,gruppenJeSeite[1].length);
+      for(let gi=0;gi<maxGrp;gi++){
+        for(const seite of [0,1]){
+          const grp=gruppenJeSeite[seite][gi];
+          if(!grp)continue;
+          // Ein Programm am Stueck: Durchgang fuer Durchgang, innerhalb eines Durchgangs
+          // beide Partner — so entsteht genau EIN zusammenhaengender Auftritt je Paar
+          // (bei rundenN 12 und zwei Partnern 24 Enthuellungen x 0,425 s ≈ 10 s, die
+          // Groessenordnung eines echten Kuerprogramms).
+          for(let r=0;r<art.rundenN;r++)for(const u of grp)buehneQueue.push(u);
+        }
+      }
+      return;
     }
 
     // REIHENFOLGE. Rundenweise abwechselnd wie eine Setzliste — Durchgang 1 fuer alle,
@@ -13004,19 +13052,28 @@
   // u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done, und ruft NIEMALS rr() auf —
   // disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen sie mit jedem Frame mit.
   //
-  // Heute (vor diesem PR) positioniert zeichneDuett() jedes Paar auf einem FESTEN
-  // Rasterplatz und zeichnet eine statische Doppelellipse als Eisspur — das Reihenbild,
-  // das die Sicht-QA (docs/design/sicht-qa-10-09-eiskunstlauf.png) als "sechs Paare stehen
-  // bewegungslos im Raster" beschreibt. Ab hier bekommt jedes Paar eine eigene Bahn ueber
-  // die Flaeche.
+  // SPOTLIGHT STATT GEDRAENGE (13.09.). Bis hierher fuhren ALLE sechs Paare gleichzeitig
+  // ueber die Flaeche — Chris: "aktuell bewegen sie sich zwar viel, aber ich weiss nicht ob
+  // alle gleichzeitig sinnvoll ist". Im echten Eiskunstlauf ist die ganze Startgruppe nur
+  // im sechsminuetigen Aufwaermen gemeinsam auf dem Eis; danach laeuft JEDES PAAR SEIN
+  // PROGRAMM ALLEIN, die uebrigen warten ausserhalb (ISU-Format, Quellen in
+  // docs/design/eiskunstlauf-startreihenfolge-spotlight-recherche-13-09.md Abschnitt 3).
+  // Dieselbe strukturelle Korrektur, die stepCypher() Breaking schon gebracht hat ("in einem
+  // echten Cypher tanzt IMMER GENAU EINER in der Mitte, der Rest steht im Ring"). Jeder
+  // Teilnehmer traegt dafuer eine ROLLE (u.vizRolle: kuer / warte / kiss / weg), die sich
+  // allein aus der Startgruppe und dem Stand der Warteschlange ergibt — s. kuerStartliste()
+  // und kuerAktiveGruppe() unten. Die Reihenfolge selbst baut bauBuehne() (dortiger
+  // Kommentar "STARTREIHENFOLGE"); hier wird sie nur GELESEN.
   //
   // GRUNDFAHRT: eine Lissajous-Figur (x=cx+a*sin(w1*t+phi), y=cy+b*sin(w2*t)), deren
   // Parameter phi/w1/w2 DETERMINISTISCH aus einer Paar-ID gehasht werden (kuerHash(), kein
   // rr()!) — dieselbe Grundidee wie eiskunst.tsx:80-109 (dort hash(t.code) fuer die
   // React-Buehne), hier zum ersten Mal auch im Motor. Beide Partner eines Duetts teilen
   // dieselbe Grundkurve (Paar-ID = die kleinere der beiden u.id, symmetrisch fuer beide
-  // Partner berechenbar) und bekommen zusaetzlich einen kleinen EIGENEN Versatz aus der
-  // eigenen u.id — zwei Laeufer NEBENEINANDER, nicht exakt uebereinander. Ein Solo-Rest
+  // Partner berechenbar) und stehen mit festem Seitenversatz nebeneinander darauf (s.
+  // u.vizVersatz unten). Das `t` darin ist seit 13.09. NICHT mehr die globale `buehneT`,
+  // sondern u.vizBahnT — eine eigene Uhr je Paar, die bei einem Halt stehenbleibt; das ist
+  // der Kern der Sturz-Teleport-Behebung, s. Kommentar bei KUER_TEMPO unten. Ein Solo-Rest
   // (ungerade Feldgroesse, s. bauBuehne()-Kommentar "FRAGE A") hat keinen Partner und faehrt
   // seine eigene Kurve allein (paarId=eigene u.id, eigenR=0).
   //
@@ -13032,46 +13089,253 @@
     const x=Math.sin(id*12.9898+salt*78.233+4.1)*43758.5453;
     return x-Math.floor(x);
   }
-  // Eisflaeche fuer BEWEGUNG (hier) UND ZEICHNUNG (bodenEis() oben) — eine Stelle, damit
-  // Kufenbahn und Eisoval nie auseinanderlaufen.
+  // Eisflaeche fuer die ZEICHNUNG des Ovals (bodenEis() oben) — unveraendert, das Eis
+  // behaelt seine Groesse. Die BEWEGUNG laeuft seit dem Spotlight-Umbau (13.09.) nicht
+  // mehr auf dieser Flaeche, sondern auf der engeren kuerBahn() direkt darunter.
   function kuerFlaeche(){
     return {cx:W*0.5, cy:H*0.5, ax:W*0.35, ay:H*0.28};
   }
+  // ---- SPOTLIGHT-GEOMETRIE (13.09.) ------------------------------------------------
+  // DREI ZONEN auf derselben, unveraenderten Eisflaeche, alle aus EINER Stelle, damit
+  // Bewegung (stepKuer) und Zeichnung (zeichneDuett) nie auseinanderlaufen — dasselbe
+  // Prinzip, das kuerFlaeche() schon fuer Eisoval und Kufenbahn durchhaelt.
+  //
+  //   kuerBahn()   — die Kuerbahn des GERADE laufenden Paares (Mitte-rechts vom Eis).
+  //   kuerWarte()  — Startbereich an der Bande: die Paare, die noch nicht dran waren.
+  //   kuerKiss()   — "Kiss and Cry": das Paar, das eben fertig ist, wartet auf die Wertung.
+  //
+  // WARUM DIE BAHN OBEN NICHT WEITER HOCHREICHEN DARF. Chris, 13.09.: "das embedded ist
+  // genau ueber den charakteren die duerften sich nicht darueber bewegen". Ueber der
+  // Leinwand liegt ein HTML-Overlay — der Broadcast-Bug (.bbug, battle-mode.html/.css,
+  // top:8px, rund 47 Anzeige-Pixel hoch) und, auf derselben Hoehe, der zentrierte
+  // .bbugcallout. Weil die Leinwand responsiv skaliert (canvas{width:100%}, intern
+  // 1240x470), belegen diese FESTEN CSS-Pixel je nach Darstellungsbreite immer mehr
+  // LEINWANDHOEHE. Nachgemessen (Playwright, .bbug-Unterkante in Leinwand-Anteilen):
+  //
+  //     Fenster 1300px -> Leinwand 1242px -> Bug bis 10,0 % H
+  //     Fenster 1024px -> Leinwand  966px -> Bug bis 12,9 % H
+  //     Fenster  820px -> Leinwand  762px -> Bug bis 16,4 % H
+  //     Fenster  600px -> Leinwand  542px -> Bug bis 23,0 % H
+  //     Fenster  420px -> Leinwand  362px -> Bug bis 44,3 % H
+  //
+  // Das deckt sich mit dem, was der CSS-Kommentar bei .bahnhud (Staffel-HUD) schon als
+  // getesteten Platzbedarf festhaelt ("15% Leinwandhoehe raeumt dem Bug in jeder
+  // getesteten Groesse Platz") — und zeigt zugleich, dass es darunter noch enger wird.
+  //
+  // DIE ALTE BAHN (kuerFlaeche) reichte bis H*0.22, und Sprite-Koepfe stehen ~35 px, die
+  // Schwebetexte bis 50 px UEBER dem Fusspunkt. Im Vorher-Beleg landete das
+  // "DUETT"-Etikett bei y≈46 und ein "+111"-Schweber bei y≈47 — exakt auf der Unterkante
+  // des Bugs (gemessen 47,2). Genau die Ueberlappung, die Chris beschreibt.
+  //
+  // JETZT: Bahn ab H*0.50-H*0.145 = H*0.355, Sprite-Kopf damit ab H*0.281; oberster
+  // Warteplatz H*0.335, Kopf ab H*0.261. Beides bleibt bis hinunter zu einem 600-px-
+  // Fenster ueber dem Bug. Die Schwebetexte bekommen in zeichneDuett() zusaetzlich eine
+  // harte Obergrenze bei H*0.27, weil sie als einzige Beschriftung nach OBEN wandern.
+  // Bei 420 px Fensterbreite frisst der Bug 44 % der Leinwandhoehe — dort hilft keine
+  // Geometrie mehr, das ist ein CSS-Thema des Overlays selbst und nicht Sache der Kuer.
+  function kuerBahn(){
+    return {cx:W*0.54, cy:H*0.50, ax:W*0.168, ay:H*0.145};
+  }
+  // Warteplatz Nummer `slot` (0 = als naechstes dran) an der rechten Bande, von oben nach
+  // unten. Bei sechs Startgruppen warten hoechstens fuenf, der unterste Platz liegt damit
+  // bei H*0.335+4*H*0.082 = H*0.663 und bleibt ueber dem Kiss-and-Cry (H*0.755).
+  function kuerWarte(slot){
+    return {x:W*0.875, y:H*0.335+Math.min(Math.max(slot,0),4)*H*0.082};
+  }
+  function kuerKiss(){
+    return {x:W*0.875, y:H*0.755};
+  }
   const KUER_ELEMENT_DAUER=1.4, KUER_STURZ_DAUER=1.0;
+  // ================== DER STURZ-TELEPORT UND SEINE BEHEBUNG (13.09.) ==================
+  // Chris, woertlich: "wenn caraktere fallen teleportieren sie sich dann weiter obwohl sie
+  // ja am selben punkt bleiben muessten eigentlich."
+  //
+  // BEFUND, NACHGESTELLT UND BESTAETIGT. zielX/zielY waren eine reine Funktion der GLOBALEN
+  // Buehnenuhr `buehneT` (Math.sin(w1*buehneT+phi)). Die Uhr laeuft weiter, WAEHREND ein
+  // Laeufer stuerzt und deshalb absichtlich auf der Stelle bleibt (`haeltStelle` — das ist
+  // NICHT der Fehler, das ist gewollt und bleibt). Der Fehler stand in der Zeile danach:
+  //
+  //     else if(!haeltStelle){ nx=zielX; ny=zielY; }
+  //
+  // — ein unbedingter Sprung auf den Punkt, an den die Kurve inzwischen weitergelaufen ist,
+  // ohne jede Zwischenstufe. Genau das sieht man als Teleport, und zwar in dem Moment, in
+  // dem der Laeufer wieder aufsteht (nach KUER_STURZ_DAUER = 1,0 s; bei bis zu 76 px/s
+  // Bahngeschwindigkeit also ein Satz von bis zu 76 px in EINEM Bild).
+  //
+  // ZWEI BEHEBUNGEN, WEIL EINE ALLEIN NICHT REICHT:
+  //
+  // 1. EIGENE BAHNUHR JE PAAR (`u.vizBahnT`), die STEHENBLEIBT, solange das Paar haelt.
+  //    Damit gibt es die Luecke gar nicht mehr, die der Sprung ueberbrueckt hat: beim
+  //    Aufstehen laeuft die Kurve genau dort weiter, wo sie beim Sturz stehengeblieben
+  //    ist — buchstaeblich Chris' "muessten ja am selben punkt bleiben". Ein reiner
+  //    Tempo-Deckel haette das NICHT geloest: nachgemessen (Playwright-Zustandsabzug,
+  //    t=40 s) trieben die beiden Partner eines Paares auf 249 px auseinander, weil
+  //    jeder Partner rund die Haelfte der Zeit in einer Pirouette haelt und die Kurve in
+  //    dieser Zeit schneller davonlaeuft, als ein gedeckelter Schritt sie wieder einholt.
+  //    Die Uhr ist PAARWEISE gemeinsam (beide Partner tragen denselben Wert und sie steht
+  //    still, sobald EINER von beiden haelt) — sonst laufen die Uhren der Partner
+  //    auseinander und das Duett zerfaellt genauso. Nebenbei ist das die realistischere
+  //    Darstellung: im Paarlauf werden Pirouetten nebeneinander gelaufen, und wer stuerzt,
+  //    wird vom Partner abgewartet.
+  //
+  // 2. GEDECKELTER SCHRITT statt Sprung auf den Zielpunkt — das Muster, das vorher nur
+  //    fuer die Schlusspose dastand (`Math.min(dist, tempo*dt)` entlang der
+  //    Verbindungslinie), jetzt fuer JEDEN Zielpunkt. Auf der Bahn selbst ist es nach
+  //    Behebung 1 praktisch ein No-Op (die Kurve wandert je Bild ≤1,3 px bei 60 fps, der
+  //    Deckel erlaubt 4,3 px, KUER_TEMPO 260 px/s bei 60 fps — `Math.min` greift nicht,
+  //    die Figur sitzt exakt auf zielX/zielY wie vorher); es ist das Sicherheitsnetz
+  //    gegen jede kuenftige Quelle
+  //    eines Sprungs und zugleich der Weg, auf dem die Spotlight-Rotation ein- und
+  //    ausfaehrt.
+  //
+  // ZAHLEN: 260 px/s liegt weit ueber der schnellsten Stelle der Grundfahrt auf kuerBahn()
+  // (ax*w1_max = W*0.175*0.24 ≈ 52 px/s waagerecht, ay*w2_max ≈ 14 px/s senkrecht, plus
+  // Partnerversatz 24*0.5 = 12 px/s, zusammen ≤ ~78 px/s) — auf der Bahn greift der Deckel
+  // deshalb im Normalfall gar nicht (bei 60 fps wandert das Ziel ≤1,3 px je Bild, erlaubt
+  // sind 4,3 px), die Figur sitzt exakt auf zielX/zielY wie vorher. Er greift nur nach
+  // einem EINSEITIGEN Halt (ein Partner liegt, der andere faehrt weiter: Rueckstand ≤39 px,
+  // aufgeholt in ~0,2 s) und beim Ein-/Auslaufen der Spotlight-Rotation (gut 500 px von der
+  // Bande zur Bahn: ~1,9 s, langsam genug, um als Fahrt lesbar zu bleiben, kurz genug, um
+  // nicht in die Elemente des naechsten Paares hineinzuragen). EIN Tempo fuer alles — es
+  // gibt keinen Fall, in dem zwei verschiedene besser waeren.
+  const KUER_TEMPO=260;
+  // Wie lange eine Figur beim Element/Sturz tatsaechlich stehen bleibt — kuerzer als die
+  // Elementdauer, s. Begruendung bei u.vizHalt in stepKuer().
+  const KUER_HALT=0.5;
+  // ---- STARTLISTE UND SPOTLIGHT (13.09.) -------------------------------------------
+  // Die Startliste ist die Gruppenfolge, in der bauBuehne() die Warteschlange gebaut hat
+  // (s. dortigen "STARTREIHENFOLGE"-Kommentar) — hier NUR GELESEN und aus der Reihenfolge
+  // des ersten Auftauchens in `buehneQueue` rekonstruiert, damit diese Funktion keine
+  // zweite Quelle der Wahrheit aufmacht. Sie kommt auch mit einer nicht gruppierten
+  // Warteschlange zurecht (dann steht jede Gruppe eben dort, wo ihr erster Partner zuerst
+  // auftaucht) — kein Sonderfall, kein Absturzpfad.
+  //
+  // ZWISCHENGESPEICHERT, weil sie je Bild gebraucht wird und sich innerhalb eines Spiels
+  // nie aendert: der Cache haengt an der Identitaet des buehneQueue-Arrays, das bauBuehne()
+  // je Spiel genau einmal neu anlegt.
+  let kuerListeCache=null, kuerListeQuelle=null;
+  function kuerStartliste(){
+    if(kuerListeQuelle===buehneQueue && kuerListeCache)return kuerListeCache;
+    const gesehen=new Set(), gruppen=[];
+    for(const u of buehneQueue){
+      if(!u||gesehen.has(u.id))continue;
+      gesehen.add(u.id);
+      const p=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN&&!gesehen.has(x.id)):null;
+      if(p){ gesehen.add(p.id); gruppen.push([u,p]); } else gruppen.push([u]);
+    }
+    kuerListeQuelle=buehneQueue; kuerListeCache=gruppen;
+    return gruppen;
+  }
+  // Welche Startgruppe ist gerade im Spotlight? Der zuletzt enthuellte Teilnehmer bestimmt
+  // sie — dieselbe Regel, mit der zeichneHeben() sein aktives Duell findet ("das des zuletzt
+  // enthuellten Zugs", s. `aktivNr` dort). `buehneZeiger` wird hier ausschliesslich GELESEN;
+  // vor der ersten Enthuellung (Zeiger 0) und nach der letzten (Zeiger === Laenge) faellt
+  // der Index sauber auf die erste bzw. letzte Gruppe.
+  function kuerAktiveGruppe(gruppen){
+    if(!buehneQueue.length)return 0;
+    const u=buehneQueue[Math.min(Math.max(buehneZeiger-1,0),buehneQueue.length-1)];
+    if(!u)return 0;
+    for(let i=0;i<gruppen.length;i++)if(gruppen[i].indexOf(u)>=0)return i;
+    return 0;
+  }
+  // ---- PHASENENDE: EIN KLANG, ZWEI AUSLOESER (14.09.) -------------------------------
+  // Hier endet eine laufende Phase: der passende Klang faellt und die Figur geht zurueck
+  // ins Gleiten. Die Klangregeln sind woertlich die aus PR #903 und stehen bewusst an
+  // EINER Stelle, weil es seit der Spotlight-Rotation ZWEI Wege gibt, auf denen eine Phase
+  // endet:
+  //
+  //   1. DIE UHR LAEUFT AB (u.vizPhaseT<=0) — der alte, einzige Weg.
+  //   2. DIE NAECHSTE ENTHUELLUNG KOMMT ZUERST — neu und seit 13.09. der Normalfall.
+  //
+  // WARUM WEG 2 NOETIG WURDE (nachgemessen, nicht vermutet). Die Runden-Warteschlange von
+  // vorher enthuellte jeden Laeufer nur alle ~5,1 s (12 Laeufer x 0,425 s Umlauf); die
+  // Elementdauer von 1,4 s lief in dieser Luecke bequem ab, Weg 1 trug alles. Die
+  // Startreihenfolge enthuellt die beiden Partner eines Paares abwechselnd alle ~0,867 s —
+  // KUeRZER ALS KUER_ELEMENT_DAUER. Die naechste Enthuellung setzt u.vizPhaseT damit wieder
+  // auf 1,4 s, BEVOR die Uhr je null erreicht: fuer ein sauber gestandenes Element kam Weg 1
+  // nie mehr zum Zug und der Landungsklang fiel lautlos aus. Belegt mit
+  // scripts/probe-eiskunstlauf-ton.mjs Teil C: "landung" 66 Treffer auf main, 0 auf diesem
+  // Branch (sprung/kufe/sturz unveraendert, weil die alle am Enthuellungsrand haengen und
+  // nicht an der Uhr). Genau diese Klasse Regression faengt die Sonde jetzt selbst ab, s.
+  // dortige Abnahmebedingung.
+  //
+  // WELCHER KLANG WANN — unveraendert gegenueber PR #903, nur der Zeitpunkt wandert:
+  //   "einlauf"     -> kufe    (einmaliger Bewegungsstart zu Beginn der Kuer)
+  //   Element sauber-> landung (Pirouette/Hebung/Wurf zurueck ins Gleiten)
+  //   Element Sturz -> STILL   (der Sturzklang ist beim Ansatz schon gefallen; ein
+  //                             Wiederaufstehen ist keine Landung — dieselbe Unterscheidung,
+  //                             die warSturzVorAblauf auf Weg 1 trifft)
+  //   "schlusspose" -> STILL   (Programmende, kein Element)
+  //   "gleiten"     -> STILL   (schon abgeschlossen; die Wache gegen ein zweites Feuern,
+  //                             wenn beide Wege denselben Uebergang sehen)
+  //
+  // Reine Praesentation wie alles hier: schreibt nur auf u.vizPhase, ruft kein rr().
+  function kuerPhaseEnde(u,warSturz){
+    if(u.vizPhase==null||u.vizPhase==="gleiten"||u.vizPhase==="schlusspose")return;
+    if(u.vizPhase==="einlauf")sfx("eiskunstlauf","kufe");
+    else if(!warSturz)sfx("eiskunstlauf","landung");
+    u.vizPhase="gleiten";
+  }
   function stepKuer(dt,art){
-    const F=kuerFlaeche();
+    const B=kuerBahn();
+    const gruppen=kuerStartliste();
+    const aktiv=kuerAktiveGruppe(gruppen);
+
+    // ---- DURCHGANG 1: Rolle, Elementphase, Haltezustand -----------------------------
+    // Bewusst ein eigener Durchgang VOR der Bewegung: die Bahnuhr eines Paares (Schritt 2)
+    // muss wissen, ob IRGENDEIN Partner haelt, und das steht erst fest, wenn die
+    // Elementphase beider Partner in diesem Bild aktualisiert ist.
     for(const u of TEILNEHMER){
       if(u.vizSpur==null){
-        // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf das alte Raster
-        // zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten stepKuer()-Aufruf
-        // gibt es eine echte Position.
+        // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf seinen eigenen
+        // Rueckfallplatz zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten
+        // stepKuer()-Aufruf gibt es eine echte Position.
         u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
-        u.vizX=F.cx; u.vizY=F.cy; u.vizRi=0;
+        u.vizX=B.cx; u.vizY=B.cy; u.vizRi=0; u.vizNeu=true; u.vizAus=1; u.vizBahnT=0;
       }
-      // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4): TON_KATALOG.eiskunstlauf
-      // steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/publikum), nur die
-      // Aufrufstellen fehlten — Zeile fuer Zeile PR #883s Takeshi-Verdrahtung, nur auf der
-      // Buehne statt auf der Bahn. Alle vier Rufe unten schreiben NICHTS auf `u`, sie lesen
-      // nur bereits gesetzte viz*-Felder und rufen sfx() auf — reine Praesentation, kein
-      // rr()-Aufruf, deshalb rangtreue-neutral (s. Verifikations-Pflichtteil).
-      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
-      const paarId=partner?Math.min(u.id,partner.id):u.id;
-      const phi=kuerHash(paarId,1)*6.2832, w1=0.15+kuerHash(paarId,2)*0.09, w2=0.11+kuerHash(paarId,3)*0.08;
-      // N1 (Opus-Overseer-Review PR #874, Abschnitt 6): Phase aus der PAAR-ID statt aus
-      // der eigenen u.id, plus Math.PI fuer den zweiten Partner — unabhaengig gehashte
-      // Phasen konnten den Abstand auf 1,6px zusammenfallen lassen (5 von 30 Paarungen
-      // praktisch deckungsgleich). Mit diametralem Versatz ist der Abstand geometrisch
-      // garantiert eigenR*sqrt(1+3*cos^2) in [19px,38px], nie null.
-      const eigenPh=kuerHash(paarId,9)*6.2832+((partner&&u.id!==paarId)?Math.PI:0), eigenR=partner?19:0;
-      const grundX=F.cx+F.ax*Math.sin(w1*buehneT+phi);
-      const grundY=F.cy+F.ay*Math.sin(w2*buehneT+phi*1.6+kuerHash(paarId,4)*6.2832);
-      const zielX=grundX+eigenR*Math.cos(buehneT*0.5+eigenPh);
-      const zielY=grundY+eigenR*0.5*Math.sin(buehneT*0.5+eigenPh);
+      // ROLLE IN DER ROTATION. `vizGrp` (Startnummer der eigenen Gruppe, 0-basiert) und
+      // `vizRolle` sind beides neue viz*-Felder; zeichneDuett() liest nur sie und muss die
+      // Startliste nicht ein zweites Mal auswerten.
+      let gi=0;
+      for(let i=0;i<gruppen.length;i++)if(gruppen[i].indexOf(u)>=0){gi=i;break;}
+      u.vizGrp=gi; u.vizGrpN=gruppen.length;
+      //   "kuer"  — laeuft gerade das Programm
+      //   "warte" — steht am Startbereich an der Bande, noch nicht dran
+      //   "kiss"  — eben fertig, wartet im Kiss-and-Cry auf die Wertung
+      //   "weg"   — schon laenger fertig, verlaesst das Bild (die Zahlen bleiben im
+      //             Zwischenstand stehen, s. zeichneEisStand)
+      u.vizRolle=gi>aktiv?"warte":(gi===aktiv?"kuer":(gi===aktiv-1?"kiss":"weg"));
+      // AUSBLENDEN statt Verschwinden: eine Figur, die von einem Bild aufs naechste weg
+      // ist, liest sich als Fehler. 0,8 s Ueberblendung, rein zeichnerisch.
+      u.vizAus=u.vizRolle==="weg"?Math.max(0,(u.vizAus??1)-dt/0.8):1;
+
+      // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4, uebernommen aus PR #903):
+      // TON_KATALOG.eiskunstlauf steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/
+      // publikum). Alle vier Rufe unten schreiben NICHTS auf `u`, sie lesen nur bereits
+      // gesetzte viz*-Felder und rufen sfx() auf — reine Praesentation, kein rr()-Aufruf,
+      // deshalb rangtreue-neutral.
+      //
+      // KORREKTUR 14.09. (Review zu dieser PR): die erste Fassung dieses Kommentars behauptete,
+      // die Spotlight-Rotation aendere an Zahl und Reihenfolge der Klaenge nichts. Fuer
+      // sprung/sturz stimmt das — die haengen am Enthuellungsrand. Fuer landung/kufe stimmte
+      // es NICHT: die haengen an der ablaufenden Phasenuhr, und die Enthuellungen kommen jetzt
+      // dichter als die Elementdauer. Der Landungsklang fiel dadurch komplett aus (Sonde: 66
+      // auf main, 0 hier). Behoben ueber kuerPhaseEnde() oben, das die Phase auch dann
+      // abschliesst, wenn die naechste Enthuellung der Uhr zuvorkommt.
 
       // NEUEN DURCHGANG ERKENNEN — reiner Lesevergleich auf u.aktuell, kein Schreiben
       // darauf. vizAktuell ist selbst ein neues viz*-Feld.
       if(u.aktuell>=0 && u.aktuell!==u.vizAktuell){
         u.vizAktuell=u.aktuell;
+        // ZUERST DIE VORIGE PHASE ABSCHLIESSEN, DANN DIE NEUE SETZEN. Die Enthuellung ist
+        // der Moment, in dem der Ausgang des VORIGEN Elements feststeht — wer sein Element
+        // sauber gestanden hat, landet jetzt. Ohne diese Zeile verschluckt die Zuweisung
+        // darunter (vizPhase/vizPhaseT/vizSturz) den Uebergang ersatzlos, weil die Uhr des
+        // vorigen Elements bei der Enthuellungsdichte der Startreihenfolge gar nicht mehr
+        // ablaeuft — die ganze Begruendung steht bei kuerPhaseEnde() oben. u.vizSturz traegt
+        // hier noch den Stand des VORIGEN Elements (ueberschrieben wird es erst unten), ist
+        // also genau das, was warSturzVorAblauf auf dem Uhrenweg leistet.
+        kuerPhaseEnde(u,u.vizSturz);
         if(u.aktuell+1>=art.rundenN){
           u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
         } else {
@@ -13095,49 +13359,136 @@
       if(u.vizPhaseT>0)u.vizPhaseT=Math.max(0,u.vizPhaseT-dt);
       if(u.vizSturz && u.vizPhaseT<=0)u.vizSturz=false;
       if(u.vizPhase!=="schlusspose" && u.vizPhaseT<=0 && !u.vizSturz){
-        // Bewegungsstart (kufe): der EINMALIGE Uebergang aus "einlauf" — der Antritt zu
-        // Beginn der Kuer, bevor irgendein Element gelaufen ist. Landung: der Uebergang aus
-        // einem sauber abgeschlossenen Element (Pirouette/Hebung/Wurf, kein Sturz) zurueck
-        // ins Gleiten. Die `!=="gleiten"`-Wache ist noetig, weil dieser ganze Zweig sonst
-        // JEDEN Frame erneut liefe, solange u.aktuell nicht weiterzaehlt (vizPhaseT bleibt
-        // bei 0) — ohne sie wuerde "landung" nach dem ersten Uebergang bei jedem Frame neu
-        // feuern statt nur einmal am eigentlichen Uebergang.
-        if(u.vizPhase!=="gleiten"){
-          if(u.vizPhase==="einlauf")sfx("eiskunstlauf","kufe");
-          else if(!warSturzVorAblauf)sfx("eiskunstlauf","landung");
-        }
+        // WEG 1 (Uhr abgelaufen) — Klangregeln und Wachen stehen geschlossen in
+        // kuerPhaseEnde() oben, damit beide Wege nicht auseinanderlaufen koennen. Die
+        // `!=="gleiten"`-Wache steckt dort mit drin: ohne sie liefe dieser Zweig JEDEN Frame
+        // erneut, solange u.aktuell nicht weiterzaehlt (vizPhaseT bleibt bei 0), und
+        // "landung" feuerte nach dem ersten Uebergang bei jedem Frame neu.
+        kuerPhaseEnde(u,warSturzVorAblauf);
         u.vizPhase="gleiten";
       }
 
-      // POSITION: waehrend Pirouette oder Sturz haelt die Figur die Stelle ("Radius geht
-      // gegen Null" bzw. sie liegt), sonst folgt sie der Grundfahrt bzw. — nach dem letzten
-      // Durchgang — der Schlusspose in der Mitte.
-      const haeltStelle=u.vizSturz||(u.vizPhase==="pirouette"&&u.vizPhaseT>0);
+      // HAELT DIE STELLE: waehrend Pirouette (Drehung auf der Stelle), Sturz (liegt) oder
+      // Schlusspose (gehaltene Endpose — im echten Kuerlauf endet jedes Programm so, nicht
+      // mit Weiterfahren). Die frueher an dieser Stelle stehende Schlusspose-ZIELPOSITION
+      // (N2, PR #874: alle Paare verteilten sich am Ende ueber die Flaechenbreite) ist mit
+      // dem Spotlight gegenstandslos — es steht ohnehin nur noch ein Paar auf dem Eis, und
+      // die Pose wird dort gehalten, wo das letzte Element geendet hat. Danach uebernimmt
+      // die Rolle "kiss" und faehrt das Paar an die Bank.
+      //
+      // DIE HALTEFENSTER SIND KUERZER ALS DIE ELEMENTE (13.09., nachgemessen). Ein
+      // Durchgang wird alle 2*rundenDauer = 0,85 s je Partner enthuellt, die Elementdauern
+      // sind aber 1,4 s (Element) bzw. 1,0 s (Sturz). Haelt die Figur die volle Elementdauer,
+      // ueberlappen sich die Haltefenster beider Partner LUECKENLOS — im Playwright-Abzug
+      // stand die Bahnuhr eines Paares nach zwoelf Sekunden immer noch bei bt=0,02 und ein
+      // Partner war nie von seinem Startplatz an der Bande losgefahren. Gehalten wird
+      // deshalb nur der ANFANG des Elements (0,5 s), gezeichnet wird weiter ueber die volle
+      // Dauer (Drehung/Sturzpose in zeichneDuett()) — Halt und Optik sind zwei Dinge.
+      u.vizHalt=u.vizRolle==="kuer"&&(
+        (u.vizPhase==="schlusspose")
+        ||(u.vizSturz&&u.vizPhaseT>KUER_STURZ_DAUER-KUER_HALT)
+        ||(!u.vizSturz&&u.vizPhase==="pirouette"&&u.vizPhaseT>KUER_ELEMENT_DAUER-KUER_HALT));
+    }
+
+    // ---- DURCHGANG 2: die Bahnuhr JE PAAR -------------------------------------------
+    // Der Kern der Teleport-Behebung, s. Kommentar bei KUER_TEMPO oben: die Uhr, aus
+    // der die Lissajous-Grundfahrt entsteht, ist NICHT mehr die globale `buehneT`, sondern
+    // eine eigene je Paar — und die steht still, solange einer der beiden Partner haelt.
+    // Beide Partner tragen denselben Wert (einmal gerechnet, zweimal geschrieben), damit
+    // ihre Kurven nicht auseinanderlaufen koennen. Sie laeuft nur, waehrend das Paar
+    // tatsaechlich auf dem Eis ist — so beginnt jedes Programm am selben Kurvenanfang.
+    for(const grp of gruppen){
+      if(!grp.length)continue;
+      // ALLE, NICHT EINER (13.09., nachgemessen): steht die Uhr schon, sobald EIN Partner
+      // haelt, dann steht sie bei der gemessenen Sturzhaeufigkeit praktisch immer (s. den
+      // Befund beim Haltefenster oben) und das Paar bewegt sich gar nicht mehr. Sie steht
+      // deshalb nur bei einem GEMEINSAMEN Halt — beide gestuerzt, beide in der Pirouette,
+      // beide in der Schlusspose. Haelt nur einer, bleibt er stehen und faehrt danach mit
+      // dem gedeckelten Schritt wieder auf: der Rueckstand ist dabei durch
+      // Haltefenster x Bahntempo begrenzt (0,5 s x ≤78 px/s ≈ 39 px) und binnen ~0,2 s
+      // aufgeholt — eine weiche Korrektur, kein Sprung.
+      const laeuft=grp[0].vizRolle==="kuer" && !grp.every(x=>x.vizHalt);
+      const neu=(grp[0].vizBahnT||0)+(laeuft?dt:0);
+      for(const x of grp)x.vizBahnT=neu;
+    }
+
+    // ---- DURCHGANG 3: Zielpunkt und Bewegung ----------------------------------------
+    for(const u of TEILNEHMER){
+      const gi=u.vizGrp||0, rolle=u.vizRolle;
+      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+      const paarId=partner?Math.min(u.id,partner.id):u.id;
+      const phi=kuerHash(paarId,1)*6.2832, w1=0.15+kuerHash(paarId,2)*0.09, w2=0.11+kuerHash(paarId,3)*0.08;
+      // PARTNERVERSATZ: FESTE SEITE STATT DIAMETRALER PHASE (13.09.).
+      //
+      // N1 (Opus-Overseer-Review PR #874, Abschnitt 6) hatte den Versatz ueber zwei um
+      // Math.PI verschobene Phasen gebaut, weil unabhaengig gehashte Phasen den Abstand auf
+      // 1,6 px zusammenfallen lassen konnten (5 von 30 Paarungen praktisch deckungsgleich).
+      // Das Ziel dieser Haertung — nie deckungsgleich — bleibt und wird hier sogar
+      // verschaerft; nur der Weg aendert sich: bei einer diametralen Phase steht das Paar
+      // mal nebeneinander und mal UEBEREINANDER (cos nahe null), und im Spotlight, wo die
+      // beiden allein auf dem Eis sind, schoben sich dann ihre Namens-/Punkte-Etiketten
+      // ineinander (im Nachher-Beleg "Lava 217 Pkt" auf "Gram ... Pkt" gestapelt).
+      //
+      // Jetzt hat jeder Partner eine FESTE Seite (`vizVersatz`, -1 links / +1 rechts, aus
+      // u.id===paarId; ein Solo-Rest hat 0) und der gemeinsame Rotationsanteil moduliert nur
+      // noch den ABSTAND, nicht mehr die Seite. Der waagerechte Abstand ist damit
+      // 2*eigenR*(0.75+0.25*cos) und liegt geometrisch garantiert zwischen 34 und 68 px —
+      // nie null, nie uebereinander. Dieselbe -1/+1 verschiebt in zeichneDuett() auch
+      // Etiketten und Schwebetexte auf die jeweils eigene Seite, sodass Figur und
+      // Beschriftung zusammenbleiben. eigenR 19 -> 34, weil das Paar jetzt allein und
+      // gross im Bild steht statt zu sechst.
+      const rotPh=kuerHash(paarId,9)*6.2832, eigenR=partner?34:0;
+      u.vizVersatz=partner?(u.id===paarId?-1:1):0;
+      const bt=u.vizBahnT||0;
+      const rot=bt*0.5+rotPh;
+      const grundX=B.cx+B.ax*Math.sin(w1*bt+phi);
+      const grundY=B.cy+B.ay*Math.sin(w2*bt+phi*1.6+kuerHash(paarId,4)*6.2832);
+      // ZIELPUNKT JE ROLLE. Nur die Kuer faehrt die Lissajous-Grundfahrt; Warteplatz und
+      // Kiss-and-Cry sind feste Punkte an der Bande. Der gedeckelte Schritt weiter unten
+      // ist fuer alle drei derselbe — deshalb gibt es fuers Ein- und Auslaufen keinen
+      // eigenen Codepfad und keinen zweiten Sprung.
+      let zielX, zielY;
+      if(rolle==="kuer"){
+        zielX=grundX+u.vizVersatz*eigenR*(0.75+0.25*Math.cos(rot));
+        zielY=grundY+u.vizVersatz*eigenR*0.3*Math.sin(rot);
+      } else {
+        const p=rolle==="warte"?kuerWarte(gi-aktiv-1):kuerKiss();
+        zielX=p.x+u.vizVersatz*14; zielY=p.y;
+      }
+      // Allererstes Bild: direkt auf den eigenen Platz setzen, statt ihn von der
+      // Bahnmitte aus anzufahren — sonst zoege das ganze Feld im ersten Moment sichtbar
+      // aus der Mitte an die Bande.
+      if(u.vizNeu){ u.vizX=zielX; u.vizY=zielY; u.vizNeu=false; }
+
       let nx=u.vizX, ny=u.vizY;
-      if(u.vizPhase==="schlusspose"){
-        // N2 (Opus-Overseer-Review PR #874, Abschnitt 6): Zielpunkt trug bisher NUR den
-        // Partner-Versatz (±16px), keinen Versatz je PAAR — alle Paare liefen deshalb auf
-        // dieselben zwei Punkte in der Mitte. `paarId` ist als kleinere der beiden u.id
-        // je Paar eindeutig (bauBuehne() vergibt Ids fortlaufend ueber das ganze Feld,
-        // :11021), die lineare Abbildung auf [0,TEILNEHMER.length-1] ist deshalb injektiv
-        // und verteilt jedes Paar auf einen eigenen Punkt ueber die Flaechenbreite, wie es
-        // das alte Raster (zeichneDuett()s gridPos) tat.
-        const zx=F.cx+(TEILNEHMER.length>1?(paarId/(TEILNEHMER.length-1)-0.5)*F.ax*1.5:0)+(partner?(u.id===paarId?-16:16):0), zy=F.cy;
-        const dxs=zx-u.vizX, dys=zy-u.vizY, dist=Math.hypot(dxs,dys);
-        if(dist>0.5){ const schritt=Math.min(dist,140*dt); nx=u.vizX+dxs/dist*schritt; ny=u.vizY+dys/dist*schritt; }
-      } else if(!haeltStelle){
-        nx=zielX; ny=zielY;
+      if(!u.vizHalt){
+        // GEDECKELTER SCHRITT STATT SPRUNG — s. Kommentar bei KUER_TEMPO oben.
+        // Dieselbe Rechnung wie die frueher hier stehende Schlusspose-Annaeherung, jetzt
+        // fuer jeden Zielpunkt: Grundfahrt, Warteplatz, Kiss-and-Cry und der Weg zurueck
+        // in die Bahn laufen alle durch diese eine Zeile.
+        const dxs=zielX-u.vizX, dys=zielY-u.vizY, dist=Math.hypot(dxs,dys);
+        if(dist>0.5){ const schritt=Math.min(dist,KUER_TEMPO*dt); nx=u.vizX+dxs/dist*schritt; ny=u.vizY+dys/dist*schritt; }
+        else { nx=zielX; ny=zielY; }
       }
       if(Math.abs(nx-u.vizX)+Math.abs(ny-u.vizY)>0.05)u.vizRi=Math.atan2(ny-u.vizY,nx-u.vizX);
       u.vizX=nx; u.vizY=ny;
 
       // KUFENSPUR: Ringpuffer der letzten ~60 Positionen. N-Fix (PR 0.4 #2): waehrend
-      // haeltStelle (Pirouette/Sturz) bleibt die Position stehen -- ohne diese Bedingung
+      // eines Halts (Pirouette/Sturz) bleibt die Position stehen -- ohne diese Bedingung
       // wuerde der Puffer sich mit ~60 identischen Punkten fuellen und die Spur faellt auf
       // einen Punkt zusammen, statt (unveraendert) zu ueberleben.
-      if(!haeltStelle){
-        u.vizSpur.push({x:u.vizX,y:u.vizY});
-        if(u.vizSpur.length>60)u.vizSpur.shift();
+      //
+      // NUR IN DER KUER (13.09.): wer am Startbereich steht oder im Kiss-and-Cry sitzt,
+      // zieht keine Spur. Beim Rollenwechsel wird der Puffer geleert, damit kein alter
+      // Streckenzug quer ueber das Eis stehen bleibt, waehrend die Figur schon an der
+      // Bande sitzt.
+      if(rolle==="kuer"){
+        if(!u.vizHalt){
+          u.vizSpur.push({x:u.vizX,y:u.vizY});
+          if(u.vizSpur.length>60)u.vizSpur.shift();
+        }
+      } else if(u.vizSpur.length){
+        u.vizSpur.length=0;
       }
     }
   }
@@ -13595,9 +13946,10 @@
   // Hockey-Aufbau: keine blaue Linie, kein Bullykreis, kein Tor. `eisRundweg()` (bei
   // eisflaeche() definiert) ist eine reine Pfad-Routine aus einem {l,r,o,u,ecke}-Objekt
   // und kennt kein Hockey-spezifisches Detail — hier mit eigenen Grenzen wiederverwendet,
-  // keine Kopie. `kuerFlaeche()` (bei stepKuer() weiter unten) ist DIESELBE Geometrie, die
-  // auch die Bewegung begrenzt — eine Stelle, damit Eisflaeche und Kufenbahn nie
-  // auseinanderlaufen.
+  // keine Kopie. `kuerFlaeche()` (weiter oben) ist die EINE Stelle, aus der das Oval
+  // kommt. Die BEWEGUNG begrenzt sie seit dem Spotlight-Umbau (13.09.) nicht mehr — dafuer
+  // gibt es kuerBahn()/kuerWarte()/kuerKiss(), s. dortigen Kommentar; auch diese drei
+  // stehen an genau einer Stelle, damit Bewegung und Zeichnung nie auseinanderlaufen.
   // Publikums-Loop, dasselbe Muster wie hebenPublikumAn/tonLoopStart("gewichtheben") bei
   // bodenHeben() und takeshiPublikumAn/tonLoopStart("takeshis-castle") bei
   // bodenTakeshiRoute() — die Flagge wird in bodenBuehne() (Wechsel auf eine andere
@@ -13637,6 +13989,27 @@
     ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;ctx.strokeRect(W*0.36,k.u+6,W*0.28,15);
     ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#c7cedb";ctx.textAlign="center";
     ctx.fillText("KAMPFGERICHT",W*0.5,k.u+16);
+
+    // STARTBEREICH UND KISS-AND-CRY (13.09.). Zwei Markierungen an der rechten Bande,
+    // damit die beiden Warteplaetze der Spotlight-Rotation (kuerWarte()/kuerKiss(), s.
+    // dort) als Orte lesbar sind und nicht wie zufaellig herumstehende Figuren. Reine
+    // Canvas-Primitiven wie der Kampfgericht-Tisch darueber — kein neues Asset, dasselbe
+    // Prinzip wie die Hantel bei Gewichtheben.
+    const wo=kuerWarte(0), wu=kuerWarte(5), kk=kuerKiss();
+    ctx.strokeStyle="rgba(110,140,170,.38)"; ctx.lineWidth=1.5;
+    ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(wo.x,wo.y-26); ctx.lineTo(wu.x,wu.y+18); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(90,120,150,.85)";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("STARTBEREICH",wo.x,wo.y-34);
+    // Kiss-and-Cry: Bank plus kleiner Monitor-Sockel. Im echten Wettkampf liegt sie in
+    // einer Ecke der Eisflaeche, hier an der rechten Bande unterhalb des Startbereichs.
+    ctx.fillStyle="rgba(35,40,56,.85)";
+    ctx.fillRect(kk.x-34,kk.y+13,68,9);
+    ctx.strokeStyle="rgba(214,172,54,.45)"; ctx.lineWidth=1;
+    ctx.strokeRect(kk.x-34,kk.y+13,68,9);
+    ctx.fillStyle="rgba(20,26,36,.75)"; ctx.fillRect(kk.x-12,kk.y+24,24,8);
   }
 
   function zeichneBuehne(){
@@ -13738,9 +14111,19 @@
   //
   // BORDMITTEL STATT NEUEM SPRITE-RIG (Recherche Abschnitt 6, Vorbild zeichneHeben()):
   // zeichneSprite()-Aufrufe plus selbst gezeichnete Kufenspuren — reine Canvas-Primitiven,
-  // wie die Hantel bei Gewichtheben. Diese Funktion zeigt ALLE Paare (und einen etwaigen
-  // Solo-Rest bei ungerader Feldgroesse, s. "Frage A" im bauBuehne()-Kommentar)
-  // gleichzeitig, kein "ein aktives Duell"-Fokus.
+  // wie die Hantel bei Gewichtheben.
+  //
+  // DREI ROLLEN STATT EINES GEDRAENGES (13.09.). Bis hierher zeigte diese Funktion ALLE
+  // Paare gleichzeitig in voller Groesse. Jetzt richtet sie sich nach u.vizRolle (aus
+  // stepKuer(), s. dort): das Paar im Spotlight wird unveraendert gross mit Kufenspur,
+  // Elementen und voller Beschriftung gezeichnet, der Startbereich an der Bande klein
+  // (0,58) und gedimmt mit blosser Startnummer, das Kiss-and-Cry mittelgross mit seiner
+  // Endpunktzahl auf einem Monitor, und wer laenger fertig ist, blendet ueber u.vizAus aus.
+  // Der Solo-Rest bei ungerader Feldgroesse ("Frage A" im bauBuehne()-Kommentar) ist dabei
+  // einfach eine Gruppe mit einem Mitglied, kein Sonderfall.
+  //
+  // DAZU DIE ZWISCHENSTAND-TAFEL (zeichneEisStand() direkt darueber) — Chris' "man hat gar
+  // keine indikation welche leute sich gerade besser schlagen als andere".
   //
   // DIE FUSION SELBST PASSIERT NICHT HIER. Sie steht in bauBuehne() (Kommentar "DUETT"
   // dort), lange bevor irgendetwas gezeichnet wird — diese Funktion liest nur `u.duettN`
@@ -13750,9 +14133,11 @@
   // wie im generischen Zweig, nur mit anderer Positionierung.
   //
   // OPUS-PLAN 10.09., ZIEL 2, ABSCHNITT 5.3-HAeRTUNG (gegenueber der urspruenglichen
-  // Fassung): Position kommt jetzt aus stepKuer()s u.vizX/u.vizY statt aus einem festen
-  // Rasterplatz — mit Rueckfall auf genau dieses alte Raster, SOLANGE u.vizX==null ist
-  // (z.B. im allerersten Frame, bevor stepKuer() ueberhaupt einmal gelaufen ist). Die
+  // Fassung): Position kommt aus stepKuer()s u.vizX/u.vizY statt aus einem festen
+  // Rasterplatz — mit Rueckfall auf den Platz, den stepKuer() im ersten Durchlauf ohnehin
+  // setzen wird, SOLANGE u.vizX==null ist (also nur im allerersten Bild, bevor stepKuer()
+  // ueberhaupt einmal gelaufen ist; das alte Zwei-Reihen-Raster als Rueckfall ist mit der
+  // Spotlight-Rotation gegenstandslos geworden). Die
   // statische Doppelellipse weicht der echten, ausblendenden Kufenspur (u.vizSpur). Weil
   // sich Paare jetzt frei ueber die Flaeche bewegen statt in zwei festen Reihen zu stehen,
   // kommt eine Tiefensortierung nach vizY dazu (der alte Rastercode brauchte das nicht).
@@ -13773,35 +14158,130 @@
     }
     ctx.globalAlpha=1;
   }
+  // ZWISCHENSTAND-TAFEL (13.09., Chris: "man hat gar keine indikation welche leute sich
+  // gerade besser schlagen als andere"). Direkt nach dem Vorbild der Wertungsgrafik, die
+  // in jeder ISU-Uebertragung oben links steht: sie "always lists the event leader at the
+  // top", darunter die laufende Punktzahl des gerade Laufenden, und darunter eine Reihe
+  // farbiger Kaesten je Element — gruen sauber, rot gestuerzt/abgewertet (Sports
+  // Illustrated, "How to Understand the Top-Left Scoring Graphic in Figure Skating
+  // Broadcasts", 21.02.2018; Quellen gesammelt in
+  // docs/design/eiskunstlauf-startreihenfolge-spotlight-recherche-13-09.md Abschnitt 3).
+  //
+  // RECHNET NICHTS. Jede Zahl hier ist eine bereits vorhandene: `u.summe` (von stepBuehne()
+  // Enthuellung fuer Enthuellung aufgebaut), `u.aktuell`, `u.runden[r].ereignis` gegen
+  // art.erfolgWort/art.failWort — dieselben Felder, die die Wertungstabelle
+  // (WERTUNG_AUFTRITT) und zeichneBreaking() schon lesen. Kein neues Feld, keine neue
+  // Formel, kein Schreibzugriff.
+  //
+  // SPOILER-REGEL (wie bei WERTUNG_AUFTRITT, s. dort): gelesen wird ausschliesslich
+  // `runden[0..aktuell]`, also nur, was bereits aufgedeckt ist. Ein noch nicht gelaufenes
+  // Paar zeigt seine Startnummer, keine Punktzahl.
+  function zeichneEisStand(art,gruppen,aktiv){
+    if(!gruppen.length)return;
+    const pad=8, zeilH=19, kopfH=19, kastenH=28;
+    // Breite/Lage so gewaehlt, dass die Tafel und die Kuerbahn sich nicht beruehren: die
+    // Tafel endet bei W*0.29, der am weitesten links moegliche Laeufer steht bei
+    // W*0.54-W*0.168-34px ≈ W*0.345, sein Etikett (30 px Versatz, ~28 px halbe Breite)
+    // beginnt bei ~W*0.298. Zehn Pixel Luft, im Playwright-Bild nachgeprueft.
+    const br=W*0.205, x0=W*0.085;
+    const hoeh=kopfH+gruppen.length*zeilH+kastenH+pad;
+    const y0=H*0.50-hoeh/2;
+    const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+      ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
+    ctx.globalAlpha=0.88; ctx.fillStyle="#10141c"; rund(x0,y0,br,hoeh,7); ctx.fill();
+    ctx.globalAlpha=1; ctx.lineWidth=1; ctx.strokeStyle="rgba(214,172,54,.55)"; rund(x0,y0,br,hoeh,7); ctx.stroke();
+    ctx.textBaseline="middle"; ctx.textAlign="left";
+    ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d6ac36";
+    ctx.fillText("ZWISCHENSTAND",x0+pad,y0+kopfH*0.55);
+    ctx.textAlign="right"; ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+    ctx.fillText("Paar "+(aktiv+1)+"/"+gruppen.length,x0+br-pad,y0+kopfH*0.55);
+    ctx.strokeStyle="rgba(255,255,255,.12)"; ctx.beginPath();
+    ctx.moveTo(x0+pad,y0+kopfH); ctx.lineTo(x0+br-pad,y0+kopfH); ctx.stroke();
+
+    // REIHENFOLGE DER TAFEL: wer schon gelaufen ist (oder gerade laeuft), steht nach
+    // Punkten oben — der Fuehrende zuoberst, wie im Vorbild. Wer noch kommt, haengt in
+    // Startreihenfolge darunter, mit der Startnummer statt einer Zahl. Das ist zugleich
+    // Ergebnisliste UND Startliste, genau wie die Anzeigetafel in der Halle.
+    const zeilen=gruppen.map((grp,i)=>({
+      grp, i, gelaufen:i<=aktiv,
+      pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
+      side:grp[0].side
+    }));
+    zeilen.sort((a,b)=>(a.gelaufen===b.gelaufen)?(a.gelaufen?b.pkt-a.pkt:a.i-b.i):(a.gelaufen?-1:1));
+    let rang=0;
+    zeilen.forEach((z,k)=>{
+      const y=y0+kopfH+k*zeilH+zeilH*0.5;
+      const laeuft=z.i===aktiv;
+      if(laeuft){
+        ctx.globalAlpha=0.22; ctx.fillStyle="#d6ac36";
+        ctx.fillRect(x0+3,y-zeilH*0.5+1,br-6,zeilH-2); ctx.globalAlpha=1;
+      }
+      ctx.fillStyle=z.side===0?css("--home"):css("--away");
+      ctx.fillRect(x0+pad,y-5,2.5,10);
+      ctx.textAlign="left"; ctx.font="400 9px 'IBM Plex Mono',monospace";
+      if(z.gelaufen){ rang++; ctx.fillStyle=rang===1?"#f2d75a":"#c7cedb"; ctx.fillText(String(rang)+".",x0+pad+7,y); }
+      else { ctx.fillStyle="#6d7686"; ctx.fillText("–",x0+pad+7,y); }
+      const namen=z.grp.map(u=>u.n.split(" ")[0]).join(" & ");
+      ctx.fillStyle=z.gelaufen?"#e7edf6":"#7f8899";
+      ctx.fillText(namen.length>21?namen.slice(0,20)+"…":namen,x0+pad+22,y);
+      ctx.textAlign="right";
+      if(z.gelaufen){ ctx.fillStyle=laeuft?"#f2d75a":"#dfe6ef"; ctx.font="600 10px 'IBM Plex Mono',monospace";
+        ctx.fillText(String(z.pkt),x0+br-pad,y); }
+      else { ctx.fillStyle="#6d7686"; ctx.font="400 8px 'IBM Plex Mono',monospace";
+        ctx.fillText("Start "+(z.i+1),x0+br-pad,y); }
+    });
+
+    // ELEMENTKAESTEN des laufenden Paares — das Vorbild-Detail aus der SI-Beschreibung:
+    // "a series of colored boxes representing each planned movement", gruen fuer sauber
+    // ausgefuehrt, rot fuer Sturz/Abwertung. EINE REIHE JE LAEUFER (nicht eine gemeinsame
+    // Reihe fuers Paar): im Vorbild gehoert die Kastenreihe zu der Person, die gerade
+    // laeuft, und bei zwei Laeufern mit getrennten Durchgaengen ist die ehrliche
+    // Uebersetzung zwei Reihen. Eine zusammengefasste Reihe muesste ausserdem "einer von
+    // beiden gestuerzt" in eine dritte Farbe pressen und faerbte bei der realen
+    // Sturzhaeufigkeit fast jeden Kasten bernstein — sie saehe schlechter aus, als das
+    // Paar gelaufen ist.
+    //
+    // SPOILERREGEL wie in WERTUNG_AUFTRITT: gefuellt wird nur bis `u.aktuell`, alles
+    // danach bleibt grau. Der Vorname davor sagt, welche Reihe zu wem gehoert.
+    const grp=gruppen[aktiv]||[];
+    const n=art.rundenN, bx=x0+pad+13, bw=(br-pad-13-pad-(n-1)*1.6)/n;
+    const by=y0+kopfH+gruppen.length*zeilH+3;
+    grp.slice(0,2).forEach((u,j)=>{
+      const zy=by+j*7;
+      ctx.textAlign="left"; ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
+      ctx.fillText((u.n.split(" ")[0]||"?").slice(0,1),x0+pad,zy+2.5);
+      for(let r=0;r<n;r++){
+        const z=r<=u.aktuell?u.runden[r]:null;
+        ctx.fillStyle=!z?"rgba(255,255,255,.10)"
+          :(z.ereignis===art.failWort?"rgba(216,84,84,.92)":"rgba(70,200,120,.92)");
+        ctx.fillRect(bx+r*(bw+1.6),zy,bw,5);
+      }
+    });
+    const bisWo=grp.length?Math.max(...grp.map(u=>u.aktuell)):-1;
+    ctx.textAlign="left"; ctx.font="400 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
+    ctx.fillText("Elemente "+Math.max(0,bisWo+1)+"/"+n,x0+pad,by+grp.slice(0,2).length*7+7);
+  }
+
   function zeichneDuett(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const posMap=new Map();
-    // GRUPPEN JE SEITE: unveraendert ermittelt (u.duettN, benachbart nach eig sortiert in
-    // bauBuehne()) — gebraucht fuers Fallback-Raster, das "DUETT"-Etikett und die
-    // Vorname-Zeile, die die Partnernamen unterscheidet.
-    const gruppenJeSeite={};
-    [0,1].forEach(side=>{
-      const liste=TEILNEHMER.filter(u=>u.side===side);
-      const gesehen=new Set(), gruppen=[];
-      for(const u of liste){
-        if(gesehen.has(u.id))continue;
-        const partner=u.duettN?liste.find(x=>x.n===u.duettN&&!gesehen.has(x.id)):null;
-        if(partner){ gesehen.add(u.id); gesehen.add(partner.id); gruppen.push([u,partner]); }
-        else { gesehen.add(u.id); gruppen.push([u]); }
-      }
-      gruppenJeSeite[side]=gruppen;
-    });
-    // FALLBACK-RASTER (5.3): dieselbe Formel wie vor dieser Haertung, nur in eine Map
-    // gelegt statt sofort gezeichnet — greift ausschliesslich, solange u.vizX==null.
-    const gridPos=new Map();
-    [0,1].forEach(side=>{
-      const y=side===0?H*0.32:H*0.66, gruppen=gruppenJeSeite[side];
-      gruppen.forEach((grp,i)=>{
-        const x=90+(W-180)*(gruppen.length>1?i/(gruppen.length-1):0.5);
-        if(grp.length===2){ const dx=26; gridPos.set(grp[0].id,{x:x-dx,y}); gridPos.set(grp[1].id,{x:x+dx,y}); }
-        else gridPos.set(grp[0].id,{x,y});
-      });
-    });
+    // STARTLISTE UND SPOTLIGHT: dieselbe Quelle wie stepKuer() (kuerStartliste()/
+    // kuerAktiveGruppe(), s. dort) — die Zeichnung bildet keine zweite Gruppenliste mehr,
+    // sonst koennten Bewegung und Bild auf verschiedene Paare zeigen.
+    const gruppen=kuerStartliste();
+    const aktiv=kuerAktiveGruppe(gruppen);
+    const grpVon=new Map();
+    gruppen.forEach((grp,i)=>grp.forEach(u=>grpVon.set(u.id,i)));
+    // FALLBACK-PLATZ, solange u.vizX==null (5.3-Vertrag: nur das allererste Bild, bevor
+    // stepKuer() ueberhaupt einmal gelaufen ist). Frueher war das ein Zwei-Reihen-Raster;
+    // seit dem Spotlight ist der richtige Rueckfall schlicht derselbe Platz, den stepKuer()
+    // im ersten Durchlauf ohnehin setzt.
+    const fallback=(u)=>{
+      const gi=grpVon.get(u.id)??0, B=kuerBahn();
+      if(gi===0)return {x:B.cx,y:B.cy};
+      const p=kuerWarte(gi-1);
+      return {x:p.x,y:p.y};
+    };
     const schriftAn=(x,y,txt,dy,farbe,groesse)=>{
       ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
@@ -13813,15 +14293,36 @@
       ctx.fillStyle=css("--line");ctx.fillRect(x-breite/2,y,breite,3);
       ctx.fillStyle=css("--ok");ctx.fillRect(x-breite/2,y,breite*p,3);
     };
+    zeichneEisStand(art,gruppen,aktiv);
     // TIEFENSORTIERUNG (5.3): nach der tatsaechlichen Bildhoehe (vizY, sonst Fallback-y)
     // gezeichnet, sonst laufen frei bewegte Paare durcheinander — der alte Rastercode
     // brauchte das nicht, weil jede Zeile eine feste Bildhoehe hatte.
     const anzeige=TEILNEHMER.map(u=>{
-      const g=gridPos.get(u.id)||{x:W/2,y:H/2};
+      const g=fallback(u);
       return {u, px:(u.vizX!=null?u.vizX:g.x), py:(u.vizY!=null?u.vizY:g.y)};
-    }).sort((a,b)=>a.py-b.py);
+    }).filter(a=>(a.u.vizAus==null||a.u.vizAus>0.02)).sort((a,b)=>a.py-b.py);
     for(const {u,px,py} of anzeige){
       const c=u.side===0?css("--home"):css("--away");
+      const rolle=u.vizRolle||"kuer";
+      // WER NICHT LAEUFT, WIRD KLEIN UND RUHIG GEZEICHNET (13.09.). Der Startbereich an
+      // der Bande und die Kiss-and-Cry-Bank sind keine zweite Buehne — sie sollen zeigen,
+      // wer noch kommt und wer eben fertig ist, ohne dem laufenden Paar die Aufmerksamkeit
+      // zu nehmen. Groesse/Deckkraft sind reine Zeichen-Transformationen (ctx.scale um den
+      // eigenen Fusspunkt), kein zweites Sprite-Rig.
+      const skala=rolle==="kuer"?1:(rolle==="warte"?0.58:0.78);
+      const grund=(rolle==="warte"?0.72:1)*(u.vizAus==null?1:u.vizAus);
+      if(rolle!=="kuer"){
+        ctx.save();
+        ctx.translate(px,py); ctx.scale(skala,skala); ctx.translate(-px,-py);
+        ctx.globalAlpha=grund*0.25; ctx.fillStyle=c;
+        ctx.beginPath(); ctx.ellipse(px,py+19,15,5,0,0,6.2832); ctx.fill();
+        ctx.globalAlpha=grund;
+        zeichneSprite(ctx,u,px,py,true);
+        ctx.globalAlpha=1;
+        ctx.restore();
+        posMap.set(u.id,{x:px,y:py});
+        continue;
+      }
       // KUFENSPUR (5.1/5.3/5.4): u.vizSpur als ausblendender heller Streckenzug statt der
       // urspruenglichen statischen Doppelellipse. Solange noch keine Spur existiert (ganz
       // erster Frame), bleibt die alte, statische Schatten-Ellipse als Rueckfall stehen.
@@ -13876,38 +14377,102 @@
       }
       posMap.set(u.id,{x:rx,y:ry});
       // ETIKETTEN (5.3): an vizY gehaengt, nahe am unteren Bandenrand nach oben geklappt —
-      // die Sicht-QA zeigte hier "schneidet in die Podestkante".
-      const flip=py>H*0.68;
-      const dyName=flip?-46:44, dyPkt=flip?-58:56, dyBar=flip?-70:64, dyProg=flip?-80:74;
-      schriftAn(px,py,u.n.split(" ")[0],dyName,c,8.5);
-      schriftAn(px,py,String(u.summe)+" Pkt",dyPkt,"#dfe6ef",8.5);
-      punktsaeule(px,py+dyBar,u,26);
-      ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.textAlign="center";
-      ctx.fillText((u.aktuell+1)+"/"+art.rundenN,px,py+dyProg);
+      // die Sicht-QA zeigte hier "schneidet in die Podestkante". Die neue kuerBahn() endet
+      // unten bei H*0.645, die Etiketten reichen damit bis H*0.80 und bleiben innerhalb der
+      // Bande (H*0.875) — die Klappregel greift auf dieser Bahn also nicht mehr, bleibt
+      // aber als Schutz stehen, falls jemand die Bahn wieder nach unten zieht.
+      // BESCHRIFTUNG ERST AUF DEM EIS (13.09.): ein Paar faehrt zu Beginn seines Auftritts
+      // rund 500 px vom Startbereich an der Bande bis in die Kuerbahn. Waehrend dieser
+      // knapp zwei Sekunden lagen Name/Punkte/Fortschritt ueber den WARTENDEN Paaren und
+      // machten genau die Ecke unleserlich, die zeigen soll, wer noch kommt. W*0.78 liegt
+      // zwischen dem rechten Rand der Bahn (W*0.708) und dem Startbereich (W*0.875).
+      if(px<W*0.78){
+        const flip=py>H*0.68;
+        const dyName=flip?-46:44, dyPkt=flip?-58:56, dyBar=flip?-70:64, dyProg=flip?-80:74;
+        // ETIKETTEN AUSEINANDERGESCHOBEN (13.09.): beide Partner standen bisher auf
+        // derselben Bildspalte und schrieben Name/Punkte/Balken uebereinander (in den
+        // Vorher-Bildern als Zahlensalat zu sehen, z. B. "Nrolach 55 Pkt" in "Johanna
+        // 92 Pkt"). vizVersatz (-1/+1, aus stepKuer) schiebt die Beschriftung jedes
+        // Partners auf seine eigene Seite.
+        const lx=px+(u.vizVersatz||0)*30;
+        schriftAn(lx,py,u.n.split(" ")[0],dyName,c,8.5);
+        schriftAn(lx,py,String(u.summe)+" Pkt",dyPkt,"#dfe6ef",8.5);
+        punktsaeule(lx,py+dyBar,u,26);
+        ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.textAlign="center";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,lx,py+dyProg);
+      }
     }
-    // DUETT-ETIKETT: einmal je Paar, am Mittelpunkt der beiden AKTUELLEN Zeichenpositionen
-    // (posMap, nach der Element-/Wurf-Transformation) statt eines festen Rasterplatzes.
-    [0,1].forEach(side=>{
-      for(const grp of gruppenJeSeite[side]){
-        if(grp.length!==2)continue;
-        const pa=posMap.get(grp[0].id), pb=posMap.get(grp[1].id);
-        if(!pa||!pb)continue;
-        const mx=(pa.x+pb.x)/2, my=Math.min(pa.y,pb.y)-38;
+    // GRUPPEN-ETIKETTEN: einmal je Startgruppe, am Mittelpunkt der AKTUELLEN
+    // Zeichenpositionen (posMap, nach der Element-/Wurf-Transformation) statt eines festen
+    // Rasterplatzes. Je nach Rolle drei verschiedene Beschriftungen — das laufende Paar
+    // bekommt wie bisher "DUETT", der Startbereich nur seine Startnummer, das Kiss-and-Cry
+    // die Endpunktzahl auf einem kleinen Monitor (so, wie die Bank in der Halle einen
+    // Monitor mit dem Ergebnis hat, s. Recherche Abschnitt 3).
+    gruppen.forEach((grp,gi)=>{
+      const pos=grp.map(u=>posMap.get(u.id)).filter(Boolean);
+      if(!pos.length)return;
+      const rolle=grp[0].vizRolle||"kuer";
+      if(rolle==="weg")return;
+      const mx=pos.reduce((s,p)=>s+p.x,0)/pos.length, oben=Math.min(...pos.map(p=>p.y));
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+      if(rolle==="kuer"){
+        if(grp.length!==2)return;
+        if(pos.some(p=>p.x>=W*0.78))return;   // noch im Einlaufen, s. "BESCHRIFTUNG ERST AUF DEM EIS" oben
+        // UNTER das Paar statt darueber (13.09.): oben haengen die Schwebetexte ("+92"),
+        // die sich mit dem Etikett gegenseitig unleserlich gemacht haben. Unten ist die
+        // Spalte zwischen den beiden auseinandergeschobenen Namensetiketten frei.
+        const unten=Math.max(...pos.map(p=>p.y));
         ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
-        ctx.textAlign="center"; ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)";
-        ctx.strokeText("DUETT",mx,my); ctx.fillText("DUETT",mx,my);
+        ctx.strokeText("DUETT",mx,unten+86); ctx.fillText("DUETT",mx,unten+86);
+      } else if(rolle==="warte"){
+        // Startnummer NEBEN das wartende Paar (13.09.): ueber ihm lag sie im Bild des
+        // naechsthoeheren Warteplatzes.
+        ctx.textAlign="right";
+        ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa6b6";
+        const t=String(gi+1)+".";
+        const lx=Math.min(...pos.map(p=>p.x))-16, ly=pos.reduce((s,p)=>s+p.y,0)/pos.length;
+        ctx.strokeText(t,lx,ly); ctx.fillText(t,lx,ly);
+      } else {
+        const pkt=grp.reduce((s,u)=>s+(u.summe||0),0);
+        const mw=64, my=oben-34;
+        ctx.globalAlpha=0.9; ctx.fillStyle="#10141c";
+        ctx.fillRect(mx-mw/2,my-9,mw,20); ctx.globalAlpha=1;
+        ctx.strokeStyle="rgba(214,172,54,.6)"; ctx.lineWidth=1;
+        ctx.strokeRect(mx-mw/2,my-9,mw,20);
+        ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
+        ctx.fillText("KISS & CRY",mx,my-3);
+        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.fillText(String(pkt),mx,my+6);
       }
     });
     for(const f of floats){
       if(f._teilnehmer==null)continue;
       const pos=posMap.get(f._teilnehmer);
       if(!pos)continue;
+      // NUR FUER DAS LAUFENDE PAAR: ein "+92" ueber einer Figur, die am Startbereich steht
+      // oder schon im Kiss-and-Cry sitzt, gehoert dort nicht hin — Punkte entstehen nur auf
+      // dem Eis. (Praktisch kann das ohnehin nur die Kiss-and-Cry-Gruppe treffen, deren
+      // letzter Schweber noch ein paar Zehntel nachlebt.)
+      const traeger=TEILNEHMER.find(u=>u.id===f._teilnehmer);
+      if(traeger&&traeger.vizRolle&&traeger.vizRolle!=="kuer")continue;
+      if(pos.x>=W*0.78)continue;   // noch im Einlaufen, s. "BESCHRIFTUNG ERST AUF DEM EIS" oben
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";
-      ctx.fillText(f.txt,pos.x,pos.y-30-((1-f.life)*20));
+      // Auf die eigene Paarhaelfte geschoben (13.09., derselbe Grund wie bei den Etiketten
+      // oben): beide Partner werden im Abstand von 0,425 s enthuellt, ihre Schweber lagen
+      // sonst uebereinander ("+56" auf "+33").
+      //
+      // OBERGRENZE H*0.27 (13.09.): der Schweber ist die EINZIGE Beschriftung dieser
+      // Disziplin, die nach oben wandert (bis 50 px ueber den Fusspunkt, und waehrend er
+      // ausblendet nochmal 20 px weiter). Ohne Deckel schiebt er sich bei schmaler
+      // Darstellung unter den Broadcast-Bug — s. die Messtabelle bei kuerBahn(). H*0.27
+      // liegt ueber dem Bug bis hinunter zu einem 600-px-Fenster (dort 23,0 % H).
+      const fy=Math.max(H*0.27,pos.y-30-((1-f.life)*20));
+      ctx.fillText(f.txt,pos.x+(traeger&&traeger.vizVersatz?traeger.vizVersatz*22:0),fy);
       ctx.globalAlpha=1;
     }
   }
