@@ -298,12 +298,17 @@ eine eigene, kleine Aufräumrunde.
 | `ctx.save()`/`ctx.restore()` in `zeichneBreaking()` | 5/5, ausgeglichen (maschinell nachgezählt) |
 
 **Nachmessung 14.09., nach dem Review und nach dem Merge von `main`.** Beide Läufe frisch gefahren,
-weil `main` seit dem 13.09. vier rangtreue-wirksame Runden aufgenommen hat (Puste #914,
-Sprite-Bildindex #915, Staffel #916, Höhenkorrektur #918) — die alte MD5 aus der ersten Messung
-gilt deshalb nicht mehr, und ein Vergleich gegen sie wäre wertlos gewesen. Basislauf auf
-`7a07de2f` (`origin/main`, nur `battle-mode.engine.js` auf den Stand von `main` zurückgetauscht),
+weil `main` seit dem 13.09. mehrere rangtreue-wirksame Runden aufgenommen hat (Puste #914,
+Sprite-Bildindex #915, Staffel #916, Eiskunstlauf #917, Höhenkorrektur #918) — die alte MD5 aus der
+ersten Messung gilt deshalb nicht mehr, und ein Vergleich gegen sie wäre wertlos gewesen. Basislauf
+auf `48aede4d` (`origin/main`, nur `battle-mode.engine.js` auf den Stand von `main` zurückgetauscht),
 Nachlauf auf diesem Branch. `diff` liefert **keine einzige Zeile**; Breaking steht in beiden bei
 `0,869 / 0,114 / 0,951 / 0,168 · bestanden`.
+
+*Zwischendurch ist `main` zweimal weitergezogen (`7a07de2f` → `48aede4d`, u. a. PR #917, das den
+Motor anfasst). Die Messung wurde deshalb **beidseitig wiederholt**, statt den alten Basislauf
+weiterzuverwenden — ein Basislauf gegen einen überholten `main` beweist nichts. Beide Paare
+liefern dieselbe Datei, MD5 `bbad04182726bd6c9a0c0a76f122ab2c`.*
 
 Dass das auch für die Korrekturen dieser Runde gilt, ist keine Überraschung, sondern Bauart: die
 beiden geänderten `text:`-Strings sind Anzeigetexte aus `SLOTS_JE_DISC`, das geänderte `FÜGT ZU` ist
@@ -354,7 +359,7 @@ Peiniger mit `FÜGT ZU`, sein eigenes Sprite-Schild im selben Bild mit `PEINIGT`
 dieselbe Rolle in derselben Szene. Beide sagen jetzt `PEINIGT` — das Wort, das auch der Fließtext
 dieses Dokuments durchgehend benutzt.
 
-**Die Messung im Detail (Stand 14.09.).** Basislauf auf `origin/main` = `7a07de2f`, Nachlauf auf
+**Die Messung im Detail (Stand 14.09.).** Basislauf auf `origin/main` = `48aede4d`, Nachlauf auf
 dem gemergten Stand dieses Branches. Breaking steht in beiden Läufen bei
 `0,869 / 0,114 / 0,951 / 0,168 · bestanden` — exakt die in CLAUDE.md und
 `breaking-kalibrierung-10-09.md` dokumentierte Zahl. Alle übrigen neunzehn Zeilen stimmen ebenfalls
