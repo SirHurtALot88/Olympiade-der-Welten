@@ -13833,13 +13833,11 @@
         NAECHER(u,0,0.05);
         if(u.vizPhaseT>=EINTRITT_T){
           u.vizPhase="throwdown"; u.vizPhaseT=0;
-          // Rauschsweep beim Aufbaeumen. Der TON_KATALOG-Schluessel heisst weiterhin
-          // "powermove" — bewusst NICHT umbenannt (13.09.): er wird ausserhalb der beiden
-          // Breaking-Regionen im Ton-Kommentar von stepStaffel() zitiert, an dem gerade
-          // parallel gearbeitet wird. Eine reine Schluesselumbenennung waere die einzige
-          // Zeile dieses PRs ausserhalb von Breaking und damit der einzige Konfliktpunkt —
-          // sie gehoert in eine eigene, kleine Aufraeumrunde.
-          if(u.vizMove===2)sfx("breaking","powermove");
+          // Rauschsweep beim Aufbaeumen (TON_KATALOG.breaking.hieb). Schluessel am 14.09.
+          // von "powermove" auf "hieb" umbenannt — eigene kleine Aufraeumrunde, wie von
+          // PR #913 vorgemerkt (s. stepStaffel()-Kommentar unten fuer die zweite,
+          // gleichzeitig umbenannte Fundstelle).
+          if(u.vizMove===2)sfx("breaking","hieb");
         }
       } else if(u.vizPhase==="throwdown"){
         NAECHER(u,0,0.05);
@@ -19740,7 +19738,7 @@
     breaking:{
       beat:      {loop:true, synth:(vol)=>tonRauschen(vol,220,0,true)},
       freeze:    {synth:(vol)=>{ tonKlick(vol,2400,0.05); tonMetall((vol??0.6)*0.6,500,0.12); }},
-      powermove: {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
+      hieb:      {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
       abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)}
     },
     "takeshis-castle":{
@@ -23438,7 +23436,7 @@
   //     vom Geber zum Nehmer wandern statt ihn hart springen zu lassen.
   //  3. DER TON. TON_KATALOG.staffel steht seit PR 0.1 vollstaendig (startschuss/uebergabe/
   //     fehlwechsel/ziel/publikum), nur nie aufgerufen — genau das Muster, mit dem
-  //     stepCypher() bereits sfx("breaking","powermove") direkt aus einer step*-Funktion
+  //     stepCypher() bereits sfx("breaking","hieb") direkt aus einer step*-Funktion
   //     ausloest (":12225", selbst dem viz-Vertrag unterworfen). uebergabe/fehlwechsel
   //     unterscheidet u.gestolpert: die Funktion inkrementiert es fuer den GEBER genau
   //     einmal (":19961"), im selben stepSpurt()-Tick, in dem u.durch auf true kippt — und

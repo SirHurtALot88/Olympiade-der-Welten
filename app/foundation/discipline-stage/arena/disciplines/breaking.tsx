@@ -11,7 +11,7 @@
 // ZIEL 4 (Opus-Plan "opus-plan-feinschliff-vier-disziplinen-09-10.md" Abschnitt 7.3, A1
 // 20→30): vier Ergänzungen, alle rein dekorativ — keine Änderung an `tokenPos`/`angOf`
 // (die Positions-/Score-Logik ist unverändert die Wahrheit des Hosts):
-//   1. Cypher-Boden: ein Linoleum-Kreis mit Nahtlinien statt eines reinen Verlaufs.
+//   1. Druck-Boden: ein Beton-Kreis mit Nahtlinien statt eines reinen Verlaufs.
 //   2. DJ-Pult/Boombox/Lautsprecher am Rand — die Kulisse, die die Disziplin benennt.
 //   3. Battle-Bracket-Leiste oben ("wer gegen wen, welche Runde") — Breaking ist ein
 //      K.-o.-Format, das bis hierhin nirgends sichtbar war. Paart benachbarte Ränge aus
@@ -137,9 +137,10 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
           <stop offset="0%" stopColor="rgba(214,150,255,.5)" />
           <stop offset="100%" stopColor="rgba(214,150,255,0)" />
         </radialGradient>
-        {/* Linoleum-Bodenverlauf fuer den Cypher-Kreis (Plan 7.3, Punkt 1) -- ein Hauch
+        {/* Beton-Bodenverlauf fuer den Druck-Kreis (Plan 7.3, Punkt 1) -- ein Hauch
             heller/waermer als der Buehnen-Hintergrund, damit der Ring als eigene Flaeche
-            (ein Tanzboden) lesbar wird statt nur als weiterer Farbverlauf. */}
+            (der Arena-Boden, auf dem der Druck lastet) lesbar wird statt nur als weiterer
+            Farbverlauf. */}
         <radialGradient id="brkFloor" cx="50%" cy="46%" r="58%">
           <stop offset="0%" stopColor="hsl(276 32% 19%)" />
           <stop offset="70%" stopColor="hsl(277 34% 15%)" />
@@ -154,10 +155,10 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
       <polygon points={`${cx - 40},0 ${cx - rOut * 0.5},${cy} ${cx + rOut * 0.2},${cy}`} fill="rgba(214,150,255,.05)" />
       <polygon points={`${cx + 40},0 ${cx - rOut * 0.2},${cy} ${cx + rOut * 0.5},${cy}`} fill="rgba(160,210,255,.045)" />
 
-      {/* CYPHER-BODEN (Plan 7.3, Punkt 1): Linoleum-Kreis mit Nahtlinien statt reinem
-          Verlauf -- ein echter Tanzboden, kein bloss eingefaerbter Ausschnitt des
+      {/* DRUCK-BODEN (Plan 7.3, Punkt 1): Beton-Kreis mit Nahtlinien statt reinem
+          Verlauf -- eine echte Arena-Flaeche, kein bloss eingefaerbter Ausschnitt des
           Buehnenhintergrunds. Nahtlinien = sechs Sehnen ueber den ganzen Kreis (wie echte
-          Bahnen-/Plattenstoesse), plus eine Aussenkontur. Rein dekorativ, unter den
+          Beton-/Plattenfugen), plus eine Aussenkontur. Rein dekorativ, unter den
           Druck-Ringen/Rissen/Tokens gezeichnet. */}
       <ellipse cx={cx} cy={cy} rx={rOut} ry={rOut * KY} fill="url(#brkFloor)" opacity={0.9} pointerEvents="none" />
       <ellipse cx={cx} cy={cy} rx={rOut} ry={rOut * KY} fill="none" stroke="rgba(0,0,0,.4)" strokeWidth={2} pointerEvents="none" />
