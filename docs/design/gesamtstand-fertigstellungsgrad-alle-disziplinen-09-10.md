@@ -96,7 +96,7 @@ Basketball/Hockey/Gewichtheben, und Football/TDM/Mini-DM/Battlefield fallen deut
 ## 1. Die Zusammenfassungstabelle
 
 Die Nummerierung ist die Reihenfolge des Ursprungsberichts vom 10.09. und **nicht mehr nach Gesamt
-sortiert** — sie bleibt stehen, damit sich frueherere Nachtraege weiter auf dieselben Zeilennummern
+sortiert** — sie bleibt stehen, damit sich fruehere Nachtraege weiter auf dieselben Zeilennummern
 beziehen koennen. `rho` = kaderfest gemessen, n=24, Median ueber fuenf echte Team-Paarungen; die
 zehn Zeilen, die der 13./14.09. bewegt hat, sind auf `main` @ `7a07de2f` neu gemessen, die uebrigen
 stehen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
@@ -143,8 +143,11 @@ Takeshi-Requisiten). Keine Zeile oben aendert sich dadurch; sie werden erst in d
 Aenderung" sichtbar, sobald die jeweilige Ziel-Disziplin ihre Aufrufstellen bekommt.
 
 Die Botschaft dieser vier Zahlen in einem Satz: **das Projekt hat mehr DESIGN als DARSTELLUNG.**
-Konzept liegt zwanzig Punkte ueber Assets und Movement — es ist ueberall durchdacht, was passiert,
-und an dreizehn von zwanzig Stellen nicht zu sehen.
+Konzept liegt neun Punkte ueber Assets und zwoelf ueber Movement — es ist ueberall durchdacht, was
+passiert, und laengst nicht ueberall zu sehen. *(Der Abstand war bis zum 12.09. rund zwanzig
+Punkte; die Darstellungs-Wellen der letzten Tage haben ihn halbiert, ohne ihn zu schliessen. Und
+er sitzt fast ganz unten: bei den oberen elf Zeilen betraegt der Abstand Konzept−Movement noch
+**6,7** Punkte (95,9 gegen 89,2), bei den unteren neun **18,9** (56,1 gegen 37,2).)*
 
 ### Die frisch gemessenen Zahlen (10.09.) gegen die eingecheckte Basislinie (06.09.)
 
