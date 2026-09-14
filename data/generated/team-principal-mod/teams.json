@@ -1,0 +1,3170 @@
+[
+	{
+		"name": "Mayhem Mavericks",
+		"color_rgb": [
+			99,
+			110,
+			126
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 60,
+		"form_prestige": 31,
+		"prestige_base": 46,
+		"budget_m": 325,
+		"starting_balance_m": 280.9,
+		"headquarters": {
+			"hospitality_pr_center": 3,
+			"wind_tunnel": 3,
+			"engine_plant": 2,
+			"test_track": 5,
+			"driver_centre": 3,
+			"factory": 3,
+			"cfd_center": 3,
+			"recon_centre": 3
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 645,
+		"braking": 51,
+		"acceleration": 48,
+		"team_pace": 56,
+		"attr": {
+			"slow": 64,
+			"med": 58,
+			"high": 55,
+			"straight": 48
+		},
+		"tyre_management": 54,
+		"dirty_air_sensitivity": 58.333,
+		"chassis_reliability": 65,
+		"aero_efficiency": 0.917,
+		"chassis_starting_potential": {
+			"team_pace": 59,
+			"slow": 59,
+			"med": 58,
+			"high": 60,
+			"straight": 54,
+			"tyre_management": 54,
+			"chassis_reliability": 69,
+			"dirty_air_sensitivity": 62.333,
+			"acceleration": 58,
+			"braking": 55
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 10
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Scuderia Ferrari",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Scuderia Ferrari",
+			"engine": "Ferrari",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 1
+	},
+	{
+		"name": "Zero Heroes",
+		"color_rgb": [
+			161,
+			84,
+			212
+		],
+		"secondary_color_rgb": [
+			35,
+			32,
+			39
+		],
+		"heritage_prestige": 68,
+		"form_prestige": 20,
+		"prestige_base": 44,
+		"budget_m": 320,
+		"starting_balance_m": 186.8,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 2,
+			"test_track": 6,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 646.3333333333334,
+		"braking": 51.666666666666664,
+		"acceleration": 54,
+		"team_pace": 56,
+		"attr": {
+			"slow": 60,
+			"med": 55.333333333333336,
+			"high": 58.333333333333336,
+			"straight": 53.333333333333336
+		},
+		"tyre_management": 52.666666666666664,
+		"dirty_air_sensitivity": 52.77766666666667,
+		"chassis_reliability": 63,
+		"aero_efficiency": 0.929,
+		"chassis_starting_potential": {
+			"team_pace": 62.333333333333336,
+			"slow": 62.333333333333336,
+			"med": 58.666666666666664,
+			"high": 62.666666666666664,
+			"straight": 58,
+			"tyre_management": 57,
+			"chassis_reliability": 67,
+			"dirty_air_sensitivity": 56.77766666666667,
+			"acceleration": 60.666666666666664,
+			"braking": 57
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes-AMG",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Mercedes-AMG",
+			"engine": "Mercedes",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 2
+	},
+	{
+		"name": "Cold Steel",
+		"color_rgb": [
+			228,
+			43,
+			37
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 85,
+		"form_prestige": 90,
+		"prestige_base": 88,
+		"budget_m": 315,
+		"starting_balance_m": 382.8,
+		"headquarters": {
+			"hospitality_pr_center": 5,
+			"wind_tunnel": 5,
+			"engine_plant": 4,
+			"test_track": 4,
+			"driver_centre": 5,
+			"factory": 5,
+			"cfd_center": 5,
+			"recon_centre": 5
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 647.6666666666666,
+		"braking": 51,
+		"acceleration": 55,
+		"team_pace": 54.333333333333336,
+		"attr": {
+			"slow": 56,
+			"med": 53,
+			"high": 56.333333333333336,
+			"straight": 53.666666666666664
+		},
+		"tyre_management": 51.333333333333336,
+		"dirty_air_sensitivity": 47.22233333333333,
+		"chassis_reliability": 60.666666666666664,
+		"aero_efficiency": 0.9263333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 61,
+			"slow": 61.333333333333336,
+			"med": 58.333333333333336,
+			"high": 60.333333333333336,
+			"straight": 57.666666666666664,
+			"tyre_management": 58.666666666666664,
+			"chassis_reliability": 64.66666666666667,
+			"dirty_air_sensitivity": 51.22233333333333,
+			"acceleration": 59.666666666666664,
+			"braking": 57
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes-AMG",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Mercedes-AMG",
+			"engine": "Mercedes",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 3
+	},
+	{
+		"name": "Golden Gladiators",
+		"color_rgb": [
+			239,
+			203,
+			57
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 76,
+		"form_prestige": 88,
+		"prestige_base": 82,
+		"budget_m": 310,
+		"starting_balance_m": 321.8,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 649,
+		"braking": 49,
+		"acceleration": 51,
+		"team_pace": 51,
+		"attr": {
+			"slow": 52,
+			"med": 51,
+			"high": 49,
+			"straight": 49
+		},
+		"tyre_management": 50,
+		"dirty_air_sensitivity": 41.667,
+		"chassis_reliability": 58,
+		"aero_efficiency": 0.909,
+		"chassis_starting_potential": {
+			"team_pace": 55,
+			"slow": 56,
+			"med": 57,
+			"high": 53,
+			"straight": 53,
+			"tyre_management": 58,
+			"chassis_reliability": 62,
+			"dirty_air_sensitivity": 45.667,
+			"acceleration": 55,
+			"braking": 55
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Mercedes",
+			"engine": "Mercedes",
+			"start_season": 1,
+			"expires_season": 3,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 4
+	},
+	{
+		"name": "Last Ride",
+		"color_rgb": [
+			45,
+			49,
+			57
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 68,
+		"form_prestige": 39,
+		"prestige_base": 54,
+		"budget_m": 305,
+		"starting_balance_m": 192.5,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 2,
+			"test_track": 5,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 653.6666666666666,
+		"braking": 49.666666666666664,
+		"acceleration": 49,
+		"team_pace": 49.666666666666664,
+		"attr": {
+			"slow": 55.333333333333336,
+			"med": 47.666666666666664,
+			"high": 45,
+			"straight": 47
+		},
+		"tyre_management": 50.666666666666664,
+		"dirty_air_sensitivity": 47.22233333333333,
+		"chassis_reliability": 46,
+		"aero_efficiency": 1.0363333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 54.333333333333336,
+			"slow": 56.666666666666664,
+			"med": 52.333333333333336,
+			"high": 51.666666666666664,
+			"straight": 51.666666666666664,
+			"tyre_management": 56,
+			"chassis_reliability": 50,
+			"dirty_air_sensitivity": 51.22233333333333,
+			"acceleration": 53.666666666666664,
+			"braking": 56.333333333333336
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "Red Bull Racing",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Red Bull Racing",
+			"engine": "RBPT",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 5
+	},
+	{
+		"name": "Project Suicide",
+		"color_rgb": [
+			161,
+			118,
+			203
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 40,
+		"form_prestige": 56,
+		"prestige_base": 48,
+		"budget_m": 300,
+		"starting_balance_m": 219.7,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 2,
+			"test_track": 2,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 652.3333333333334,
+		"braking": 48.66666666666667,
+		"acceleration": 47.666666666666664,
+		"team_pace": 49,
+		"attr": {
+			"slow": 51.00000000000001,
+			"med": 45.666666666666664,
+			"high": 43.333333333333336,
+			"straight": 46.333333333333336
+		},
+		"tyre_management": 49.66666666666667,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 41.666666666666664,
+		"aero_efficiency": 1.0883333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 50,
+			"slow": 51.66666666666667,
+			"med": 49,
+			"high": 49.333333333333336,
+			"straight": 50,
+			"tyre_management": 53.66666666666667,
+			"chassis_reliability": 45.666666666666664,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 52,
+			"braking": 54.333333333333336
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "Red Bull Racing",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Red Bull Racing",
+			"engine": "RBPT",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 6
+	},
+	{
+		"name": "Raging Lunatics",
+		"color_rgb": [
+			126,
+			209,
+			71
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 67,
+		"form_prestige": 45,
+		"prestige_base": 56,
+		"budget_m": 295,
+		"starting_balance_m": 158.3,
+		"headquarters": {
+			"hospitality_pr_center": 1,
+			"wind_tunnel": 1,
+			"engine_plant": 1,
+			"test_track": 5,
+			"driver_centre": 1,
+			"factory": 1,
+			"cfd_center": 1,
+			"recon_centre": 1
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 645,
+		"braking": 46,
+		"acceleration": 47,
+		"team_pace": 49,
+		"attr": {
+			"slow": 39,
+			"med": 45,
+			"high": 44,
+			"straight": 47
+		},
+		"tyre_management": 47,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 45,
+		"aero_efficiency": 1.065,
+		"chassis_starting_potential": {
+			"team_pace": 49,
+			"slow": 41,
+			"med": 47,
+			"high": 46,
+			"straight": 48,
+			"tyre_management": 51,
+			"chassis_reliability": 49,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 49
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Renault",
+		"engine_supplier": "Alpine",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"type": "works",
+			"supplier": "Alpine",
+			"engine": "Renault",
+			"start_season": 1,
+			"expires_season": 9999,
+			"partner_bonus_level": 2,
+			"dev_guidance": true,
+			"units_per_season": 6
+		},
+		"engine_contract_seasons": 6,
+		"engine_units_per_season": 6,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 7
+	},
+	{
+		"name": "Wrecking Legionnaires",
+		"color_rgb": [
+			135,
+			148,
+			161
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 52,
+		"form_prestige": 81,
+		"prestige_base": 67,
+		"budget_m": 290,
+		"starting_balance_m": 406,
+		"headquarters": {
+			"hospitality_pr_center": 6,
+			"wind_tunnel": 6,
+			"engine_plant": 0,
+			"test_track": 3,
+			"driver_centre": 6,
+			"factory": 6,
+			"cfd_center": 6,
+			"recon_centre": 6
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 649.6666666666666,
+		"braking": 47.333333333333336,
+		"acceleration": 46.333333333333336,
+		"team_pace": 49,
+		"attr": {
+			"slow": 45,
+			"med": 42.33333333333333,
+			"high": 42.666666666666664,
+			"straight": 44.33333333333333
+		},
+		"tyre_management": 45.666666666666664,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 41.666666666666664,
+		"aero_efficiency": 1.0883333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 49,
+			"slow": 48.333333333333336,
+			"med": 45.666666666666664,
+			"high": 46,
+			"straight": 47.333333333333336,
+			"tyre_management": 49.666666666666664,
+			"chassis_reliability": 44.33333333333333,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "RBPT",
+		"engine_contract_type": "partner",
+		"engine_contract": {
+			"type": "partner",
+			"supplier": "RBPT",
+			"engine": "RBPT",
+			"start_season": 1,
+			"expires_season": 20,
+			"units_per_season": 6,
+			"partner_bonus_level": 2,
+			"dev_guidance": true
+		},
+		"engine_contract_seasons": 20,
+		"engine_units_per_season": 6,
+		"engine_contract_bonus": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 8
+	},
+	{
+		"name": "Hell Raisers",
+		"color_rgb": [
+			237,
+			67,
+			49
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 75,
+		"form_prestige": 34,
+		"prestige_base": 55,
+		"budget_m": 285,
+		"starting_balance_m": 151.3,
+		"headquarters": {
+			"hospitality_pr_center": 1,
+			"wind_tunnel": 1,
+			"engine_plant": 0,
+			"test_track": 5,
+			"driver_centre": 1,
+			"factory": 1,
+			"cfd_center": 1,
+			"recon_centre": 1
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 652.6666666666666,
+		"braking": 47.666666666666664,
+		"acceleration": 45.666666666666664,
+		"team_pace": 47.66666666666667,
+		"attr": {
+			"slow": 46.66666666666667,
+			"med": 42.33333333333333,
+			"high": 42.666666666666664,
+			"straight": 44.666666666666664
+		},
+		"tyre_management": 45.666666666666664,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 38.333333333333336,
+		"aero_efficiency": 1.0943333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 49.333333333333336,
+			"slow": 50.66666666666667,
+			"med": 46.33333333333333,
+			"high": 46.666666666666664,
+			"straight": 48.666666666666664,
+			"tyre_management": 50,
+			"chassis_reliability": 41,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51.666666666666664
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "RBPT",
+		"engine_contract_type": "partner",
+		"engine_contract": {
+			"type": "partner",
+			"supplier": "RBPT",
+			"engine": "RBPT",
+			"start_season": 1,
+			"expires_season": 20,
+			"units_per_season": 6,
+			"partner_bonus_level": 2,
+			"dev_guidance": true
+		},
+		"engine_contract_seasons": 20,
+		"engine_units_per_season": 6,
+		"engine_contract_bonus": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 9
+	},
+	{
+		"name": "Silver Soldiers",
+		"color_rgb": [
+			178,
+			184,
+			189
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 63,
+		"form_prestige": 79,
+		"prestige_base": 71,
+		"budget_m": 280,
+		"starting_balance_m": 312.8,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 3,
+			"test_track": 3,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 654,
+		"braking": 47,
+		"acceleration": 45,
+		"team_pace": 45,
+		"attr": {
+			"slow": 44,
+			"med": 45,
+			"high": 44,
+			"straight": 48
+		},
+		"tyre_management": 47,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 35,
+		"aero_efficiency": 1.083,
+		"chassis_starting_potential": {
+			"team_pace": 50,
+			"slow": 48,
+			"med": 49,
+			"high": 48,
+			"straight": 52,
+			"tyre_management": 52,
+			"chassis_reliability": 39,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Audi",
+		"engine_supplier": "Audi",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Audi",
+			"engine": "Audi",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 10
+	},
+	{
+		"name": "Black Panthers",
+		"color_rgb": [
+			94,
+			105,
+			120
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 77,
+		"form_prestige": 51,
+		"prestige_base": 64,
+		"budget_m": 275,
+		"starting_balance_m": 251.6,
+		"headquarters": {
+			"hospitality_pr_center": 3,
+			"wind_tunnel": 3,
+			"engine_plant": 0,
+			"test_track": 5,
+			"driver_centre": 3,
+			"factory": 3,
+			"cfd_center": 3,
+			"recon_centre": 3
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 651.3333333333334,
+		"braking": 45.66666666666667,
+		"acceleration": 46.33333333333333,
+		"team_pace": 43,
+		"attr": {
+			"slow": 47.33333333333333,
+			"med": 43,
+			"high": 44,
+			"straight": 46.66666666666667
+		},
+		"tyre_management": 46.333333333333336,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 50.999999999999986,
+		"aero_efficiency": 1.071,
+		"chassis_starting_potential": {
+			"team_pace": 48.66666666666667,
+			"slow": 51.33333333333333,
+			"med": 47,
+			"high": 48,
+			"straight": 50.66666666666667,
+			"tyre_management": 50.66666666666667,
+			"chassis_reliability": 54.999999999999986,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50.666666666666664,
+			"braking": 49.66666666666667
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Ferrari",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Ferrari",
+			"engine": "Ferrari",
+			"start_season": 1,
+			"expires_season": 5,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 5,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 11
+	},
+	{
+		"name": "Nunchuck Ninjas",
+		"color_rgb": [
+			44,
+			136,
+			242
+		],
+		"secondary_color_rgb": [
+			36,
+			39,
+			46
+		],
+		"heritage_prestige": 46,
+		"form_prestige": 62,
+		"prestige_base": 54,
+		"budget_m": 270,
+		"starting_balance_m": 178.1,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 3,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 657,
+		"braking": 44,
+		"acceleration": 46.666666666666664,
+		"team_pace": 41.333333333333336,
+		"attr": {
+			"slow": 44.333333333333336,
+			"med": 40.66666666666667,
+			"high": 42,
+			"straight": 46.666666666666664
+		},
+		"tyre_management": 45.333333333333336,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 53.66666666666667,
+		"aero_efficiency": 1.0623333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 46,
+			"slow": 48.333333333333336,
+			"med": 44.66666666666667,
+			"high": 46,
+			"straight": 50.666666666666664,
+			"tyre_management": 49.333333333333336,
+			"chassis_reliability": 58.333333333333336,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 51,
+			"braking": 48
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Ferrari",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Ferrari",
+			"engine": "Ferrari",
+			"start_season": 1,
+			"expires_season": 5,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 5,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 12
+	},
+	{
+		"name": "Natures Wrath",
+		"color_rgb": [
+			106,
+			161,
+			69
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 62,
+		"form_prestige": 70,
+		"prestige_base": 66,
+		"budget_m": 265,
+		"starting_balance_m": 200.2,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 3,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 671,
+		"braking": 42,
+		"acceleration": 46,
+		"team_pace": 40,
+		"attr": {
+			"slow": 35,
+			"med": 38,
+			"high": 38,
+			"straight": 48
+		},
+		"tyre_management": 44,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 43,
+		"aero_efficiency": 1.057,
+		"chassis_starting_potential": {
+			"team_pace": 42,
+			"slow": 39,
+			"med": 42,
+			"high": 42,
+			"straight": 52,
+			"tyre_management": 48,
+			"chassis_reliability": 49,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 51,
+			"braking": 46
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Mercedes",
+			"engine": "Mercedes",
+			"start_season": 1,
+			"expires_season": 3,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 13
+	},
+	{
+		"name": "Death Peaches",
+		"color_rgb": [
+			184,
+			159,
+			219
+		],
+		"secondary_color_rgb": [
+			23,
+			23,
+			28
+		],
+		"heritage_prestige": 62,
+		"form_prestige": 88,
+		"prestige_base": 75,
+		"budget_m": 240,
+		"starting_balance_m": 152.5,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 664.3333333333334,
+		"braking": 44,
+		"acceleration": 44,
+		"team_pace": 36.66666666666666,
+		"attr": {
+			"slow": 39.00000000000001,
+			"med": 41.33333333333334,
+			"high": 36,
+			"straight": 34.66666666666664
+		},
+		"tyre_management": 49.33333333333334,
+		"dirty_air_sensitivity": 47.221999999999994,
+		"chassis_reliability": 16.333333333333286,
+		"aero_efficiency": 1.0216666666666665,
+		"chassis_starting_potential": {
+			"team_pace": 46.00000000000001,
+			"slow": 45.66666666666668,
+			"med": 48.000000000000014,
+			"high": 43.333333333333336,
+			"straight": 41.333333333333314,
+			"tyre_management": 53.33333333333334,
+			"chassis_reliability": 32.3333333333333,
+			"dirty_air_sensitivity": 51.221999999999994,
+			"acceleration": 48.33333333333333,
+			"braking": 50.00000000000001
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Honda",
+		"engine_supplier": "Honda",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Honda",
+			"engine": "Honda",
+			"start_season": 1,
+			"expires_season": 2,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 14
+	},
+	{
+		"name": "Wicked Wizards",
+		"color_rgb": [
+			60,
+			119,
+			221
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 71,
+		"form_prestige": 64,
+		"prestige_base": 68,
+		"budget_m": 255,
+		"starting_balance_m": 284.1,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 664,
+		"braking": 43.33333333333333,
+		"acceleration": 42.666666666666664,
+		"team_pace": 35,
+		"attr": {
+			"slow": 37.33333333333333,
+			"med": 38.99999999999999,
+			"high": 33.666666666666664,
+			"straight": 32.00000000000001
+		},
+		"tyre_management": 48.66666666666666,
+		"dirty_air_sensitivity": 47.222,
+		"chassis_reliability": 13.000000000000018,
+		"aero_efficiency": 1.0303333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 44.66666666666666,
+			"slow": 43.99999999999999,
+			"med": 45.66666666666666,
+			"high": 40.99999999999999,
+			"straight": 38.66666666666667,
+			"tyre_management": 52.66666666666666,
+			"chassis_reliability": 29.000000000000007,
+			"dirty_air_sensitivity": 51.222,
+			"acceleration": 46.666666666666664,
+			"braking": 49.33333333333333
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Honda",
+		"engine_supplier": "Honda",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Honda",
+			"engine": "Honda",
+			"start_season": 1,
+			"expires_season": 2,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 15
+	},
+	{
+		"name": "Vicious & Delicious",
+		"color_rgb": [
+			48,
+			166,
+			87
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 69,
+		"form_prestige": 57,
+		"prestige_base": 63,
+		"budget_m": 250,
+		"starting_balance_m": 180.6,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 2,
+			"test_track": 3,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 670,
+		"braking": 40,
+		"acceleration": 42,
+		"team_pace": 35,
+		"attr": {
+			"slow": 30,
+			"med": 31,
+			"high": 31,
+			"straight": 40
+		},
+		"tyre_management": 42,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 33,
+		"aero_efficiency": 1.083,
+		"chassis_starting_potential": {
+			"team_pace": 38,
+			"slow": 34,
+			"med": 35,
+			"high": 35,
+			"straight": 44,
+			"tyre_management": 46,
+			"chassis_reliability": 39,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 46,
+			"braking": 44
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Cadillac",
+		"engine_supplier": "Cadillac",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Cadillac",
+			"engine": "Cadillac",
+			"start_season": 1,
+			"expires_season": 9999,
+			"type": "works"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": true,
+		"previous_constructor_position": 16
+	},
+	{
+		"name": "Mortal Sin",
+		"color_rgb": [
+			249,
+			195,
+			31
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 67,
+		"form_prestige": 95,
+		"prestige_base": 81,
+		"budget_m": 245,
+		"starting_balance_m": 256.5,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 3,
+			"test_track": 2,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 645,
+		"braking": 51,
+		"acceleration": 48,
+		"team_pace": 56,
+		"attr": {
+			"slow": 64,
+			"med": 58,
+			"high": 55,
+			"straight": 48
+		},
+		"tyre_management": 54,
+		"dirty_air_sensitivity": 58.333,
+		"chassis_reliability": 65,
+		"aero_efficiency": 0.917,
+		"chassis_starting_potential": {
+			"team_pace": 59,
+			"slow": 59,
+			"med": 58,
+			"high": 60,
+			"straight": 54,
+			"tyre_management": 54,
+			"chassis_reliability": 69,
+			"dirty_air_sensitivity": 62.333,
+			"acceleration": 58,
+			"braking": 55
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 10
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Scuderia Ferrari",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Scuderia Ferrari",
+			"engine": "Ferrari",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 1,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Dire Legion",
+		"color_rgb": [
+			50,
+			54,
+			62
+		],
+		"secondary_color_rgb": [
+			151,
+			157,
+			165
+		],
+		"heritage_prestige": 80,
+		"form_prestige": 77,
+		"prestige_base": 79,
+		"budget_m": 195,
+		"starting_balance_m": 164.5,
+		"headquarters": {
+			"hospitality_pr_center": 3,
+			"wind_tunnel": 3,
+			"engine_plant": 2,
+			"test_track": 4,
+			"driver_centre": 3,
+			"factory": 3,
+			"cfd_center": 3,
+			"recon_centre": 3
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 646.3333333333334,
+		"braking": 51.666666666666664,
+		"acceleration": 54,
+		"team_pace": 56,
+		"attr": {
+			"slow": 60,
+			"med": 55.333333333333336,
+			"high": 58.333333333333336,
+			"straight": 53.333333333333336
+		},
+		"tyre_management": 52.666666666666664,
+		"dirty_air_sensitivity": 52.77766666666667,
+		"chassis_reliability": 63,
+		"aero_efficiency": 0.929,
+		"chassis_starting_potential": {
+			"team_pace": 62.333333333333336,
+			"slow": 62.333333333333336,
+			"med": 58.666666666666664,
+			"high": 62.666666666666664,
+			"straight": 58,
+			"tyre_management": 57,
+			"chassis_reliability": 67,
+			"dirty_air_sensitivity": 56.77766666666667,
+			"acceleration": 60.666666666666664,
+			"braking": 57
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes-AMG",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Mercedes-AMG",
+			"engine": "Mercedes",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 4,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Undercover Agents",
+		"color_rgb": [
+			156,
+			149,
+			139
+		],
+		"secondary_color_rgb": [
+			73,
+			66,
+			60
+		],
+		"heritage_prestige": 74,
+		"form_prestige": 71,
+		"prestige_base": 73,
+		"budget_m": 190,
+		"starting_balance_m": 145.8,
+		"headquarters": {
+			"hospitality_pr_center": 3,
+			"wind_tunnel": 3,
+			"engine_plant": 2,
+			"test_track": 4,
+			"driver_centre": 3,
+			"factory": 3,
+			"cfd_center": 3,
+			"recon_centre": 3
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 647.6666666666666,
+		"braking": 51,
+		"acceleration": 55,
+		"team_pace": 54.333333333333336,
+		"attr": {
+			"slow": 56,
+			"med": 53,
+			"high": 56.333333333333336,
+			"straight": 53.666666666666664
+		},
+		"tyre_management": 51.333333333333336,
+		"dirty_air_sensitivity": 47.22233333333333,
+		"chassis_reliability": 60.666666666666664,
+		"aero_efficiency": 0.9263333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 61,
+			"slow": 61.333333333333336,
+			"med": 58.333333333333336,
+			"high": 60.333333333333336,
+			"straight": 57.666666666666664,
+			"tyre_management": 58.666666666666664,
+			"chassis_reliability": 64.66666666666667,
+			"dirty_air_sensitivity": 51.22233333333333,
+			"acceleration": 59.666666666666664,
+			"braking": 57
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes-AMG",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Mercedes-AMG",
+			"engine": "Mercedes",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 1,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Vigilante Wranglers",
+		"color_rgb": [
+			249,
+			213,
+			31
+		],
+		"secondary_color_rgb": [
+			36,
+			39,
+			46
+		],
+		"heritage_prestige": 71,
+		"form_prestige": 75,
+		"prestige_base": 73,
+		"budget_m": 180,
+		"starting_balance_m": 115.6,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 3,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 649,
+		"braking": 49,
+		"acceleration": 51,
+		"team_pace": 51,
+		"attr": {
+			"slow": 52,
+			"med": 51,
+			"high": 49,
+			"straight": 49
+		},
+		"tyre_management": 50,
+		"dirty_air_sensitivity": 41.667,
+		"chassis_reliability": 58,
+		"aero_efficiency": 0.909,
+		"chassis_starting_potential": {
+			"team_pace": 55,
+			"slow": 56,
+			"med": 57,
+			"high": 53,
+			"straight": 53,
+			"tyre_management": 58,
+			"chassis_reliability": 62,
+			"dirty_air_sensitivity": 45.667,
+			"acceleration": 55,
+			"braking": 55
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "partner",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Mercedes",
+			"engine": "Mercedes",
+			"start_season": 1,
+			"expires_season": 3,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "easy",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 4,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Lost Kingdom",
+		"color_rgb": [
+			227,
+			28,
+			55
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 57,
+		"form_prestige": 81,
+		"prestige_base": 69,
+		"budget_m": 225,
+		"starting_balance_m": 250.2,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 3,
+			"test_track": 4,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 653.6666666666666,
+		"braking": 49.666666666666664,
+		"acceleration": 49,
+		"team_pace": 49.666666666666664,
+		"attr": {
+			"slow": 55.333333333333336,
+			"med": 47.666666666666664,
+			"high": 45,
+			"straight": 47
+		},
+		"tyre_management": 50.666666666666664,
+		"dirty_air_sensitivity": 47.22233333333333,
+		"chassis_reliability": 46,
+		"aero_efficiency": 1.0363333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 54.333333333333336,
+			"slow": 56.666666666666664,
+			"med": 52.333333333333336,
+			"high": 51.666666666666664,
+			"straight": 51.666666666666664,
+			"tyre_management": 56,
+			"chassis_reliability": 50,
+			"dirty_air_sensitivity": 51.22233333333333,
+			"acceleration": 53.666666666666664,
+			"braking": 56.333333333333336
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "Red Bull Racing",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Red Bull Racing",
+			"engine": "RBPT",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 3,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Stronghold Crusaders",
+		"color_rgb": [
+			230,
+			25,
+			60
+		],
+		"secondary_color_rgb": [
+			255,
+			255,
+			255
+		],
+		"heritage_prestige": 79,
+		"form_prestige": 59,
+		"prestige_base": 69,
+		"budget_m": 205,
+		"starting_balance_m": 196.8,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 3,
+			"test_track": 5,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 652.3333333333334,
+		"braking": 48.66666666666667,
+		"acceleration": 47.666666666666664,
+		"team_pace": 49,
+		"attr": {
+			"slow": 51.00000000000001,
+			"med": 45.666666666666664,
+			"high": 43.333333333333336,
+			"straight": 46.333333333333336
+		},
+		"tyre_management": 49.66666666666667,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 41.666666666666664,
+		"aero_efficiency": 1.0883333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 50,
+			"slow": 51.66666666666667,
+			"med": 49,
+			"high": 49.333333333333336,
+			"straight": 50,
+			"tyre_management": 53.66666666666667,
+			"chassis_reliability": 45.666666666666664,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 52,
+			"braking": 54.333333333333336
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "Red Bull Racing",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Red Bull Racing",
+			"engine": "RBPT",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 3,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Pirate Crew",
+		"color_rgb": [
+			89,
+			114,
+			145
+		],
+		"secondary_color_rgb": [
+			199,
+			204,
+			209
+		],
+		"heritage_prestige": 57,
+		"form_prestige": 73,
+		"prestige_base": 65,
+		"budget_m": 200,
+		"starting_balance_m": 265.7,
+		"headquarters": {
+			"hospitality_pr_center": 6,
+			"wind_tunnel": 6,
+			"engine_plant": 5,
+			"test_track": 3,
+			"driver_centre": 6,
+			"factory": 6,
+			"cfd_center": 6,
+			"recon_centre": 6
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 645,
+		"braking": 46,
+		"acceleration": 47,
+		"team_pace": 49,
+		"attr": {
+			"slow": 39,
+			"med": 45,
+			"high": 44,
+			"straight": 47
+		},
+		"tyre_management": 47,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 45,
+		"aero_efficiency": 1.065,
+		"chassis_starting_potential": {
+			"team_pace": 49,
+			"slow": 41,
+			"med": 47,
+			"high": 46,
+			"straight": 48,
+			"tyre_management": 51,
+			"chassis_reliability": 49,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 49
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Renault",
+		"engine_supplier": "Alpine",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"type": "works",
+			"supplier": "Alpine",
+			"engine": "Renault",
+			"start_season": 1,
+			"expires_season": 9999,
+			"partner_bonus_level": 2,
+			"dev_guidance": true,
+			"units_per_season": 6
+		},
+		"engine_contract_seasons": 6,
+		"engine_units_per_season": 6,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 7,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "The Chantry",
+		"color_rgb": [
+			48,
+			156,
+			232
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 38,
+		"form_prestige": 87,
+		"prestige_base": 63,
+		"budget_m": 210,
+		"starting_balance_m": 252.9,
+		"headquarters": {
+			"hospitality_pr_center": 5,
+			"wind_tunnel": 5,
+			"engine_plant": 0,
+			"test_track": 2,
+			"driver_centre": 5,
+			"factory": 5,
+			"cfd_center": 5,
+			"recon_centre": 5
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 649.6666666666666,
+		"braking": 47.333333333333336,
+		"acceleration": 46.333333333333336,
+		"team_pace": 49,
+		"attr": {
+			"slow": 45,
+			"med": 42.33333333333333,
+			"high": 42.666666666666664,
+			"straight": 44.33333333333333
+		},
+		"tyre_management": 45.666666666666664,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 41.666666666666664,
+		"aero_efficiency": 1.0883333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 49,
+			"slow": 48.333333333333336,
+			"med": 45.666666666666664,
+			"high": 46,
+			"straight": 47.333333333333336,
+			"tyre_management": 49.666666666666664,
+			"chassis_reliability": 44.33333333333333,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "RBPT",
+		"engine_contract_type": "partner",
+		"engine_contract": {
+			"type": "partner",
+			"supplier": "RBPT",
+			"engine": "RBPT",
+			"start_season": 1,
+			"expires_season": 20,
+			"units_per_season": 6,
+			"partner_bonus_level": 2,
+			"dev_guidance": true
+		},
+		"engine_contract_seasons": 20,
+		"engine_units_per_season": 6,
+		"engine_contract_bonus": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 8,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Vigorous Vikings",
+		"color_rgb": [
+			100,
+			193,
+			216
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 80,
+		"form_prestige": 39,
+		"prestige_base": 60,
+		"budget_m": 235,
+		"starting_balance_m": 135.9,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 6,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 652.6666666666666,
+		"braking": 47.666666666666664,
+		"acceleration": 45.666666666666664,
+		"team_pace": 47.66666666666667,
+		"attr": {
+			"slow": 46.66666666666667,
+			"med": 42.33333333333333,
+			"high": 42.666666666666664,
+			"straight": 44.666666666666664
+		},
+		"tyre_management": 45.666666666666664,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 38.333333333333336,
+		"aero_efficiency": 1.0943333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 49.333333333333336,
+			"slow": 50.66666666666667,
+			"med": 46.33333333333333,
+			"high": 46.666666666666664,
+			"straight": 48.666666666666664,
+			"tyre_management": 50,
+			"chassis_reliability": 41,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51.666666666666664
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "RBPT",
+		"engine_supplier": "RBPT",
+		"engine_contract_type": "partner",
+		"engine_contract": {
+			"type": "partner",
+			"supplier": "RBPT",
+			"engine": "RBPT",
+			"start_season": 1,
+			"expires_season": 20,
+			"units_per_season": 6,
+			"partner_bonus_level": 2,
+			"dev_guidance": true
+		},
+		"engine_contract_seasons": 20,
+		"engine_units_per_season": 6,
+		"engine_contract_bonus": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 11,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Cash Creators",
+		"color_rgb": [
+			54,
+			201,
+			73
+		],
+		"secondary_color_rgb": [
+			37,
+			39,
+			45
+		],
+		"heritage_prestige": 35,
+		"form_prestige": 83,
+		"prestige_base": 59,
+		"budget_m": 215,
+		"starting_balance_m": 294.4,
+		"headquarters": {
+			"hospitality_pr_center": 6,
+			"wind_tunnel": 6,
+			"engine_plant": 5,
+			"test_track": 2,
+			"driver_centre": 6,
+			"factory": 6,
+			"cfd_center": 6,
+			"recon_centre": 6
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 654,
+		"braking": 47,
+		"acceleration": 45,
+		"team_pace": 45,
+		"attr": {
+			"slow": 44,
+			"med": 45,
+			"high": 44,
+			"straight": 48
+		},
+		"tyre_management": 47,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 35,
+		"aero_efficiency": 1.083,
+		"chassis_starting_potential": {
+			"team_pace": 50,
+			"slow": 48,
+			"med": 49,
+			"high": 48,
+			"straight": 52,
+			"tyre_management": 52,
+			"chassis_reliability": 39,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50,
+			"braking": 51
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Audi",
+		"engine_supplier": "Audi",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Audi",
+			"engine": "Audi",
+			"type": "works",
+			"start_season": 1,
+			"expires_season": 9999
+		},
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "medium",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 15,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Riptide Rivers",
+		"color_rgb": [
+			77,
+			182,
+			203
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 45,
+		"form_prestige": 63,
+		"prestige_base": 54,
+		"budget_m": 170,
+		"starting_balance_m": 188.3,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 0,
+			"test_track": 2,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 651.3333333333334,
+		"braking": 45.66666666666667,
+		"acceleration": 46.33333333333333,
+		"team_pace": 43,
+		"attr": {
+			"slow": 47.33333333333333,
+			"med": 43,
+			"high": 44,
+			"straight": 46.66666666666667
+		},
+		"tyre_management": 46.333333333333336,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 50.999999999999986,
+		"aero_efficiency": 1.071,
+		"chassis_starting_potential": {
+			"team_pace": 48.66666666666667,
+			"slow": 51.33333333333333,
+			"med": 47,
+			"high": 48,
+			"straight": 50.66666666666667,
+			"tyre_management": 50.66666666666667,
+			"chassis_reliability": 54.999999999999986,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 50.666666666666664,
+			"braking": 49.66666666666667
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Ferrari",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Ferrari",
+			"engine": "Ferrari",
+			"start_season": 1,
+			"expires_season": 5,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 5,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 17,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Terrible Teachers",
+		"color_rgb": [
+			117,
+			174,
+			215
+		],
+		"secondary_color_rgb": [
+			36,
+			61,
+			96
+		],
+		"heritage_prestige": 39,
+		"form_prestige": 69,
+		"prestige_base": 54,
+		"budget_m": 260,
+		"starting_balance_m": 304.5,
+		"headquarters": {
+			"hospitality_pr_center": 5,
+			"wind_tunnel": 5,
+			"engine_plant": 0,
+			"test_track": 3,
+			"driver_centre": 5,
+			"factory": 5,
+			"cfd_center": 5,
+			"recon_centre": 5
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 657,
+		"braking": 44,
+		"acceleration": 46.666666666666664,
+		"team_pace": 41.333333333333336,
+		"attr": {
+			"slow": 44.333333333333336,
+			"med": 40.66666666666667,
+			"high": 42,
+			"straight": 46.666666666666664
+		},
+		"tyre_management": 45.333333333333336,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 53.66666666666667,
+		"aero_efficiency": 1.0623333333333334,
+		"chassis_starting_potential": {
+			"team_pace": 46,
+			"slow": 48.333333333333336,
+			"med": 44.66666666666667,
+			"high": 46,
+			"straight": 50.666666666666664,
+			"tyre_management": 49.333333333333336,
+			"chassis_reliability": 58.333333333333336,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 51,
+			"braking": 48
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Ferrari",
+		"engine_supplier": "Ferrari",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Ferrari",
+			"engine": "Ferrari",
+			"start_season": 1,
+			"expires_season": 5,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 5,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 19,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Royal Court",
+		"color_rgb": [
+			221,
+			178,
+			60
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 54,
+		"form_prestige": 46,
+		"prestige_base": 50,
+		"budget_m": 220,
+		"starting_balance_m": 230.6,
+		"headquarters": {
+			"hospitality_pr_center": 4,
+			"wind_tunnel": 4,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 4,
+			"factory": 4,
+			"cfd_center": 4,
+			"recon_centre": 4
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 671,
+		"braking": 42,
+		"acceleration": 46,
+		"team_pace": 40,
+		"attr": {
+			"slow": 35,
+			"med": 38,
+			"high": 38,
+			"straight": 48
+		},
+		"tyre_management": 44,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 43,
+		"aero_efficiency": 1.057,
+		"chassis_starting_potential": {
+			"team_pace": 42,
+			"slow": 39,
+			"med": 42,
+			"high": 42,
+			"straight": 52,
+			"tyre_management": 48,
+			"chassis_reliability": 49,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 51,
+			"braking": 46
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Mercedes",
+		"engine_supplier": "Mercedes",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Mercedes",
+			"engine": "Mercedes",
+			"start_season": 1,
+			"expires_season": 3,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 23,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "The Giants",
+		"color_rgb": [
+			190,
+			109,
+			55
+		],
+		"secondary_color_rgb": [
+			17,
+			17,
+			17
+		],
+		"heritage_prestige": 54,
+		"form_prestige": 40,
+		"prestige_base": 47,
+		"budget_m": 230,
+		"starting_balance_m": 135.8,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 664.3333333333334,
+		"braking": 44,
+		"acceleration": 44,
+		"team_pace": 36.66666666666666,
+		"attr": {
+			"slow": 39.00000000000001,
+			"med": 41.33333333333334,
+			"high": 36,
+			"straight": 34.66666666666664
+		},
+		"tyre_management": 49.33333333333334,
+		"dirty_air_sensitivity": 47.221999999999994,
+		"chassis_reliability": 16.333333333333286,
+		"aero_efficiency": 1.0216666666666665,
+		"chassis_starting_potential": {
+			"team_pace": 46.00000000000001,
+			"slow": 45.66666666666668,
+			"med": 48.000000000000014,
+			"high": 43.333333333333336,
+			"straight": 41.333333333333314,
+			"tyre_management": 53.33333333333334,
+			"chassis_reliability": 32.3333333333333,
+			"dirty_air_sensitivity": 51.221999999999994,
+			"acceleration": 48.33333333333333,
+			"braking": 50.00000000000001
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Honda",
+		"engine_supplier": "Honda",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Honda",
+			"engine": "Honda",
+			"start_season": 1,
+			"expires_season": 2,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 90,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Blazing Beasts",
+		"color_rgb": [
+			102,
+			223,
+			58
+		],
+		"secondary_color_rgb": [
+			33,
+			35,
+			39
+		],
+		"heritage_prestige": 52,
+		"form_prestige": 27,
+		"prestige_base": 40,
+		"budget_m": 185,
+		"starting_balance_m": 130.4,
+		"headquarters": {
+			"hospitality_pr_center": 2,
+			"wind_tunnel": 2,
+			"engine_plant": 0,
+			"test_track": 4,
+			"driver_centre": 2,
+			"factory": 2,
+			"cfd_center": 2,
+			"recon_centre": 2
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 664,
+		"braking": 43.33333333333333,
+		"acceleration": 42.666666666666664,
+		"team_pace": 35,
+		"attr": {
+			"slow": 37.33333333333333,
+			"med": 38.99999999999999,
+			"high": 33.666666666666664,
+			"straight": 32.00000000000001
+		},
+		"tyre_management": 48.66666666666666,
+		"dirty_air_sensitivity": 47.222,
+		"chassis_reliability": 13.000000000000018,
+		"aero_efficiency": 1.0303333333333333,
+		"chassis_starting_potential": {
+			"team_pace": 44.66666666666666,
+			"slow": 43.99999999999999,
+			"med": 45.66666666666666,
+			"high": 40.99999999999999,
+			"straight": 38.66666666666667,
+			"tyre_management": 52.66666666666666,
+			"chassis_reliability": 29.000000000000007,
+			"dirty_air_sensitivity": 51.222,
+			"acceleration": 46.666666666666664,
+			"braking": 49.33333333333333
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Honda",
+		"engine_supplier": "Honda",
+		"engine_contract_type": "customer",
+		"engine_contract": {
+			"supplier": "Honda",
+			"engine": "Honda",
+			"start_season": 1,
+			"expires_season": 2,
+			"type": "customer"
+		},
+		"engine_contract_seasons": 2,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 97,
+		"previous_constructor_position": null
+	},
+	{
+		"name": "Armageddon Aftermath",
+		"color_rgb": [
+			151,
+			157,
+			165
+		],
+		"secondary_color_rgb": [
+			50,
+			54,
+			62
+		],
+		"heritage_prestige": 53,
+		"form_prestige": 22,
+		"prestige_base": 38,
+		"budget_m": 175,
+		"starting_balance_m": 86.8,
+		"headquarters": {
+			"hospitality_pr_center": 1,
+			"wind_tunnel": 1,
+			"engine_plant": 1,
+			"test_track": 5,
+			"driver_centre": 1,
+			"factory": 1,
+			"cfd_center": 1,
+			"recon_centre": 1
+		},
+		"negotiation_points": 0,
+		"performance_scale": "rating_100",
+		"car_mass_kg": 670,
+		"braking": 40,
+		"acceleration": 42,
+		"team_pace": 35,
+		"attr": {
+			"slow": 30,
+			"med": 31,
+			"high": 31,
+			"straight": 40
+		},
+		"tyre_management": 42,
+		"dirty_air_sensitivity": 50,
+		"chassis_reliability": 33,
+		"aero_efficiency": 1.083,
+		"chassis_starting_potential": {
+			"team_pace": 38,
+			"slow": 34,
+			"med": 35,
+			"high": 35,
+			"straight": 44,
+			"tyre_management": 46,
+			"chassis_reliability": 39,
+			"dirty_air_sensitivity": 54,
+			"acceleration": 46,
+			"braking": 44
+		},
+		"tyre_contract": {
+			"supplier": "Pirelli",
+			"type": "customer",
+			"start_season": 1,
+			"expires_season": 2
+		},
+		"engine": "Cadillac",
+		"engine_supplier": "Cadillac",
+		"engine_contract_type": "works",
+		"engine_contract": {
+			"supplier": "Cadillac",
+			"engine": "Cadillac",
+			"start_season": 1,
+			"expires_season": 9999,
+			"type": "works"
+		},
+		"engine_contract_seasons": 3,
+		"driver_aids": {
+			"active_suspension": 0,
+			"active_aero": 0,
+			"traction_control": 0,
+			"abs": 0,
+			"advanced_tpms": 0
+		},
+		"driver_focus": {
+			"cornering": 20,
+			"braking": 20,
+			"consistency": 20,
+			"smoothness": 20,
+			"control": 20
+		},
+		"history": {
+			"seasons": 0,
+			"championships": 0,
+			"wins": 0,
+			"podiums": 0,
+			"poles": 0
+		},
+		"difficulty": "hard",
+		"nationality": "international",
+		"active": false,
+		"first_active_season": 95,
+		"previous_constructor_position": null
+	}
+]

@@ -1,0 +1,9314 @@
+[
+  {
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing",
+    "cornering": 20,
+    "braking": 19,
+    "consistency": 19,
+    "smoothness": 19,
+    "control": 18,
+    "balance_preference": 92,
+    "traction_preference": 35,
+    "history": {
+      "seasons": 11,
+      "championships": 4,
+      "wins": 71,
+      "podiums": 127,
+      "poles": 48
+    },
+    "contract": {
+      "team": "Red Bull Racing",
+      "length_weeks": 156,
+      "salary_m": 49.2,
+      "start_week": 1,
+      "role": "main",
+      "status": "first",
+      "priority": "first"
+    },
+    "age": 28,
+    "talent": 99,
+    "traits": [
+      "overtake_artist",
+      "rainmaster"
+    ],
+    "personality": "ambitious",
+    "nationality": "dutch"
+  },
+  {
+    "name": "Isack Hadjar",
+    "team": "Red Bull Racing",
+    "cornering": 15,
+    "braking": 13,
+    "consistency": 13,
+    "smoothness": 15,
+    "control": 17,
+    "balance_preference": 67,
+    "traction_preference": 52,
+    "contract": {
+      "team": "Red Bull Racing",
+      "length_weeks": 52,
+      "salary_m": 12.4,
+      "start_week": 1,
+      "role": "main",
+      "status": "second",
+      "priority": "second"
+    },
+    "age": 20,
+    "history": {
+      "seasons": 1,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 1,
+      "poles": 0
+    },
+    "talent": 87,
+    "traits": [
+      "tyre_whisperer",
+      "crash_happy"
+    ],
+    "personality": "ambitious",
+    "nationality": "french",
+    "personalities": [
+      "ambitious",
+      "impatient"
+    ]
+  },
+  {
+    "name": "Charles Leclerc",
+    "team": "Scuderia Ferrari",
+    "cornering": 19,
+    "braking": 19,
+    "consistency": 18,
+    "smoothness": 19,
+    "control": 17,
+    "balance_preference": 78,
+    "traction_preference": 45,
+    "contract": {
+      "team": "Scuderia Ferrari",
+      "length_weeks": 208,
+      "salary_m": 62.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 28,
+    "history": {
+      "seasons": 8,
+      "championships": 0,
+      "wins": 8,
+      "podiums": 50,
+      "poles": 27
+    },
+    "talent": 95,
+    "traits": [
+      "hotlapper",
+      "tyre_abuser"
+    ],
+    "personality": "security_seeker",
+    "nationality": "monegasque"
+  },
+  {
+    "name": "Lewis Hamilton",
+    "team": "Scuderia Ferrari",
+    "cornering": 19,
+    "braking": 18,
+    "consistency": 19,
+    "smoothness": 19,
+    "control": 18,
+    "balance_preference": 60,
+    "traction_preference": 70,
+    "contract": {
+      "team": "Scuderia Ferrari",
+      "length_weeks": 104,
+      "salary_m": 74.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 40,
+    "history": {
+      "seasons": 19,
+      "championships": 7,
+      "wins": 105,
+      "podiums": 202,
+      "poles": 104
+    },
+    "talent": 90,
+    "traits": [
+      "overtake_artist",
+      "bottlejob"
+    ],
+    "personality": "mercenary",
+    "nationality": "british"
+  },
+  {
+    "name": "George Russell",
+    "team": "Mercedes-AMG",
+    "cornering": 18,
+    "braking": 18,
+    "consistency": 20,
+    "smoothness": 18,
+    "control": 16,
+    "balance_preference": 64,
+    "traction_preference": 62,
+    "contract": {
+      "team": "Mercedes-AMG",
+      "length_weeks": 156,
+      "salary_m": 44.4,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 27,
+    "history": {
+      "seasons": 7,
+      "championships": 0,
+      "wins": 5,
+      "podiums": 24,
+      "poles": 7
+    },
+    "talent": 95,
+    "traits": [
+      "mechanic",
+      "nervous"
+    ],
+    "personality": "ambitious",
+    "nationality": "british",
+    "personalities": [
+      "ambitious",
+      "security_seeker"
+    ]
+  },
+  {
+    "name": "Kimi Antonelli",
+    "team": "Mercedes-AMG",
+    "cornering": 18,
+    "braking": 19,
+    "consistency": 18,
+    "smoothness": 18,
+    "control": 18,
+    "balance_preference": 72,
+    "traction_preference": 45,
+    "contract": {
+      "team": "Mercedes-AMG",
+      "length_weeks": 104,
+      "salary_m": 15.6,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 19,
+    "history": {
+      "seasons": 1,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 3,
+      "poles": 0
+    },
+    "talent": 98,
+    "traits": [
+      "clean_air_merchant",
+      "bottlejob"
+    ],
+    "personality": "security_seeker",
+    "nationality": "italian"
+  },
+  {
+    "name": "Lando Norris",
+    "team": "McLaren Racing",
+    "cornering": 19,
+    "braking": 19,
+    "consistency": 18,
+    "smoothness": 18,
+    "control": 19,
+    "balance_preference": 65,
+    "traction_preference": 55,
+    "contract": {
+      "team": "McLaren Racing",
+      "length_weeks": 104,
+      "salary_m": 39.6,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 26,
+    "history": {
+      "seasons": 7,
+      "championships": 1,
+      "wins": 11,
+      "podiums": 44,
+      "poles": 16
+    },
+    "talent": 94,
+    "traits": [
+      "hotlapper",
+      "crash_happy"
+    ],
+    "personality": "security_seeker",
+    "nationality": "british"
+  },
+  {
+    "name": "Oscar Piastri",
+    "team": "McLaren Racing",
+    "cornering": 19,
+    "braking": 19,
+    "consistency": 17,
+    "smoothness": 17,
+    "control": 17,
+    "balance_preference": 56,
+    "traction_preference": 68,
+    "contract": {
+      "team": "McLaren Racing",
+      "length_weeks": 104,
+      "salary_m": 39.6,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 24,
+    "history": {
+      "seasons": 3,
+      "championships": 0,
+      "wins": 9,
+      "podiums": 26,
+      "poles": 6
+    },
+    "talent": 93,
+    "traits": [
+      "tyre_whisperer",
+      "bottlejob"
+    ],
+    "personality": "prestigious",
+    "nationality": "australian"
+  },
+  {
+    "name": "Fernando Alonso",
+    "team": "Aston Martin",
+    "number": 14,
+    "cornering": 18,
+    "braking": 18,
+    "consistency": 20,
+    "smoothness": 18,
+    "control": 19,
+    "balance_preference": 70,
+    "traction_preference": 56,
+    "contract": {
+      "team": "Aston Martin",
+      "length_weeks": 52,
+      "salary_m": 54.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "first",
+      "priority": "first"
+    },
+    "age": 44,
+    "history": {
+      "seasons": 22,
+      "championships": 2,
+      "wins": 32,
+      "podiums": 106,
+      "poles": 22
+    },
+    "talent": 100,
+    "traits": [
+      "clean_air_merchant",
+      "nervous"
+    ],
+    "personality": "prestigious",
+    "nationality": "spanish",
+    "personalities": [
+      "prestigious",
+      "mercenary",
+      "security_seeker"
+    ]
+  },
+  {
+    "name": "Lance Stroll",
+    "team": "Aston Martin",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 14,
+    "smoothness": 16,
+    "control": 10,
+    "balance_preference": 45,
+    "traction_preference": 72,
+    "contract": {
+      "team": "Aston Martin",
+      "length_weeks": 156,
+      "salary_m": 3.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "second",
+      "priority": "second"
+    },
+    "age": 27,
+    "history": {
+      "seasons": 9,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 3,
+      "poles": 1
+    },
+    "talent": 75,
+    "traits": [
+      "pay_driver",
+      "crash_happy"
+    ],
+    "pay_driver_amount_m": 12.0,
+    "personality": "loyal",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Franco Colapinto",
+    "team": "Alpine",
+    "cornering": 14,
+    "braking": 15,
+    "consistency": 13,
+    "smoothness": 16,
+    "control": 17,
+    "balance_preference": 50,
+    "traction_preference": 39,
+    "contract": {
+      "team": "Alpine",
+      "length_weeks": 52,
+      "salary_m": 9.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 27,
+    "history": {
+      "seasons": 2,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 88,
+    "traits": [
+      "hotlapper",
+      "tyre_abuser"
+    ],
+    "personality": "security_seeker",
+    "nationality": "argentine"
+  },
+  {
+    "name": "Pierre Gasly",
+    "team": "Alpine",
+    "cornering": 16,
+    "braking": 16,
+    "consistency": 17,
+    "smoothness": 14,
+    "control": 18,
+    "balance_preference": 63,
+    "traction_preference": 58,
+    "contract": {
+      "team": "Alpine",
+      "length_weeks": 104,
+      "salary_m": 34.00000000000002,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 29,
+    "history": {
+      "seasons": 9,
+      "championships": 0,
+      "wins": 1,
+      "podiums": 4,
+      "poles": 0
+    },
+    "talent": 89,
+    "traits": [
+      "tyre_whisperer",
+      "nervous"
+    ],
+    "personality": "prestigious",
+    "nationality": "french"
+  },
+  {
+    "name": "Alexander Albon",
+    "team": "Williams Racing",
+    "cornering": 16,
+    "braking": 16,
+    "consistency": 14,
+    "smoothness": 15,
+    "control": 18,
+    "balance_preference": 58,
+    "traction_preference": 72,
+    "contract": {
+      "team": "Williams Racing",
+      "length_weeks": 52,
+      "salary_m": 32.4,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 28,
+    "history": {
+      "seasons": 6,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 2,
+      "poles": 0
+    },
+    "talent": 89,
+    "traits": [
+      "tyre_whisperer",
+      "crash_happy"
+    ],
+    "personality": "mercenary",
+    "nationality": "thai"
+  },
+  {
+    "name": "Carlos Sainz",
+    "team": "Williams Racing",
+    "cornering": 17,
+    "braking": 17,
+    "consistency": 18,
+    "smoothness": 18,
+    "control": 15,
+    "balance_preference": 42,
+    "traction_preference": 78,
+    "contract": {
+      "team": "Williams Racing",
+      "length_weeks": 52,
+      "salary_m": 10.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 30,
+    "history": {
+      "seasons": 11,
+      "championships": 0,
+      "wins": 4,
+      "podiums": 29,
+      "poles": 6
+    },
+    "talent": 70,
+    "traits": [
+      "pay_driver",
+      "bottlejob"
+    ],
+    "pay_driver_amount_m": 12.0,
+    "personality": "prestigious",
+    "nationality": "spanish",
+    "personalities": [
+      "prestigious",
+      "company_man"
+    ]
+  },
+  {
+    "name": "Esteban Ocon",
+    "team": "Haas",
+    "cornering": 16,
+    "braking": 15,
+    "consistency": 16,
+    "smoothness": 18,
+    "control": 15,
+    "balance_preference": 55,
+    "traction_preference": 60,
+    "contract": {
+      "team": "Haas",
+      "length_weeks": 52,
+      "salary_m": 6.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 31,
+    "history": {
+      "seasons": 9,
+      "championships": 0,
+      "wins": 1,
+      "podiums": 4,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [
+      "pay_driver",
+      "tyre_abuser"
+    ],
+    "pay_driver_amount_m": 7.0,
+    "personality": "loyal",
+    "nationality": "french",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "short_termist"
+    ]
+  },
+  {
+    "name": "Oliver Bearman",
+    "team": "Haas",
+    "cornering": 17,
+    "braking": 16,
+    "consistency": 12,
+    "smoothness": 16,
+    "control": 15,
+    "balance_preference": 72,
+    "traction_preference": 48,
+    "contract": {
+      "team": "Haas",
+      "length_weeks": 104,
+      "salary_m": 27.6,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 19,
+    "history": {
+      "seasons": 2,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 86,
+    "traits": [
+      "hotlapper",
+      "nervous"
+    ],
+    "personality": "mercenary",
+    "nationality": "british"
+  },
+  {
+    "name": "Liam Lawson",
+    "team": "Racing Bulls",
+    "cornering": 15,
+    "braking": 15,
+    "consistency": 15,
+    "smoothness": 18,
+    "control": 14,
+    "balance_preference": 70,
+    "traction_preference": 45,
+    "contract": {
+      "team": "Racing Bulls",
+      "length_weeks": 52,
+      "salary_m": 2.5,
+      "start_week": 1,
+      "role": "main",
+      "status": "first",
+      "priority": "first"
+    },
+    "age": 23,
+    "history": {
+      "seasons": 3,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 86,
+    "traits": [
+      "pay_driver",
+      "crash_happy"
+    ],
+    "pay_driver_amount_m": 6.0,
+    "personality": "short_termist",
+    "nationality": "new_zealander"
+  },
+  {
+    "name": "Arvid Lindblad",
+    "team": "Racing Bulls",
+    "cornering": 14,
+    "braking": 14,
+    "consistency": 15,
+    "smoothness": 14,
+    "control": 14,
+    "balance_preference": 33,
+    "traction_preference": 51,
+    "contract": {
+      "team": "Racing Bulls",
+      "length_weeks": 52,
+      "salary_m": 4.000000000000009,
+      "start_week": 1,
+      "role": "main",
+      "status": "second",
+      "priority": "second"
+    },
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 84,
+    "traits": [
+      "overtake_artist",
+      "bottlejob"
+    ],
+    "personality": "mentor",
+    "nationality": "british"
+  },
+  {
+    "name": "Nico H\u00fclkenberg",
+    "team": "Audi",
+    "cornering": 17,
+    "braking": 17,
+    "consistency": 12,
+    "smoothness": 16,
+    "control": 18,
+    "balance_preference": 55,
+    "traction_preference": 68,
+    "contract": {
+      "team": "Audi",
+      "length_weeks": 52,
+      "salary_m": 28.8,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 37,
+    "history": {
+      "seasons": 14,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 1,
+      "poles": 1
+    },
+    "talent": 84,
+    "traits": [
+      "clean_air_merchant",
+      "nervous"
+    ],
+    "personality": "security_seeker",
+    "nationality": "german"
+  },
+  {
+    "name": "Gabriel Bortoleto",
+    "team": "Audi",
+    "cornering": 15,
+    "braking": 17,
+    "consistency": 16,
+    "smoothness": 15,
+    "control": 15,
+    "balance_preference": 58,
+    "traction_preference": 66,
+    "contract": {
+      "team": "Audi",
+      "length_weeks": 104,
+      "salary_m": 24.0,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 23,
+    "history": {
+      "seasons": 1,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [
+      "pay_driver",
+      "tyre_abuser"
+    ],
+    "pay_driver_amount_m": 15.0,
+    "personality": "security_seeker",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Sergio P\u00e9rez",
+    "team": "Cadillac",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 19,
+    "smoothness": 18,
+    "control": 18,
+    "balance_preference": 35,
+    "traction_preference": 82,
+    "contract": {
+      "team": "Cadillac",
+      "length_weeks": 104,
+      "salary_m": 8.4,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 36,
+    "history": {
+      "seasons": 14,
+      "championships": 0,
+      "wins": 6,
+      "podiums": 39,
+      "poles": 3
+    },
+    "talent": 81,
+    "pay_driver_amount_m": 9.0,
+    "traits": [
+      "pay_driver",
+      "rainmaster"
+    ],
+    "personality": "mercenary",
+    "nationality": "mexican"
+  },
+  {
+    "name": "Valtteri Bottas",
+    "team": "Cadillac",
+    "cornering": 15,
+    "braking": 15,
+    "consistency": 18,
+    "smoothness": 15,
+    "control": 16,
+    "balance_preference": 48,
+    "traction_preference": 74,
+    "contract": {
+      "team": "Cadillac",
+      "length_weeks": 104,
+      "salary_m": 2.4,
+      "start_week": 1,
+      "role": "main",
+      "status": "equal",
+      "priority": "equal"
+    },
+    "age": 36,
+    "history": {
+      "seasons": 12,
+      "championships": 0,
+      "wins": 10,
+      "podiums": 67,
+      "poles": 20
+    },
+    "talent": 88,
+    "pay_driver_amount_m": 5.0,
+    "traits": [
+      "pay_driver",
+      "rainmaster"
+    ],
+    "personality": "prestigious",
+    "nationality": "finnish"
+  },
+  {
+    "name": "Remy Roadman",
+    "team": null,
+    "cornering": 11,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 12,
+    "control": 11,
+    "balance_preference": 52,
+    "traction_preference": 67,
+    "age": 28,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 67,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "ambitious",
+    "nationality": "french",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Romain Grosjean",
+    "team": null,
+    "cornering": 16,
+    "braking": 16,
+    "consistency": 11,
+    "smoothness": 16,
+    "control": 7,
+    "balance_preference": 75,
+    "traction_preference": 40,
+    "age": 38,
+    "history": {
+      "seasons": 10,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 10,
+      "poles": 0
+    },
+    "talent": 65,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "mentor",
+    "nationality": "french"
+  },
+  {
+    "name": "Nia Swift",
+    "team": null,
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 13,
+    "balance_preference": 65,
+    "traction_preference": 53,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 73,
+    "traits": [
+      "overtake_artist",
+      "cautious"
+    ],
+    "personality": "mercenary",
+    "nationality": "german"
+  },
+  {
+    "name": "Tim Mittens",
+    "team": null,
+    "cornering": 15,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 15,
+    "control": 11,
+    "balance_preference": 54,
+    "traction_preference": 43,
+    "age": 35,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "security_seeker",
+    "nationality": "german",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "General Trelane",
+    "team": null,
+    "cornering": 16,
+    "braking": 3,
+    "consistency": 4,
+    "smoothness": 15,
+    "control": 2,
+    "balance_preference": 48,
+    "traction_preference": 58,
+    "age": 29,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "clean_air_merchant",
+      "cautious"
+    ],
+    "personality": "mentor",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Bruhlee Donkan",
+    "team": null,
+    "cornering": 16,
+    "braking": 5,
+    "consistency": 14,
+    "smoothness": 15,
+    "control": 10,
+    "balance_preference": 63,
+    "traction_preference": 64,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "mechanic",
+      "cautious"
+    ],
+    "personality": "prestigious",
+    "nationality": "british",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Dai Me",
+    "team": null,
+    "cornering": 8,
+    "braking": 14,
+    "consistency": 10,
+    "smoothness": 17,
+    "control": 11,
+    "balance_preference": 41,
+    "traction_preference": 67,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 78,
+    "pay_driver_amount_m": 5.0,
+    "traits": [
+      "pay_driver",
+      "cautious"
+    ],
+    "personality": "loyal",
+    "nationality": "chinese"
+  },
+  {
+    "name": "Christian Lundgaard",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 17,
+    "smoothness": 13,
+    "control": 18,
+    "balance_preference": 63,
+    "traction_preference": 46,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 82,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "short_termist",
+    "nationality": "danish",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.2000000000000002,
+      "start_week": 1
+    }
+  },
+  {
+    "name": "Tran ThienPhung",
+    "team": null,
+    "cornering": 9,
+    "braking": 11,
+    "consistency": 9,
+    "smoothness": 16,
+    "control": 18,
+    "balance_preference": 53,
+    "traction_preference": 48,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [],
+    "personality": "ambitious",
+    "nationality": "vietnamese",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Tibbe Shorts",
+    "team": null,
+    "cornering": 15,
+    "braking": 12,
+    "consistency": 10,
+    "smoothness": 4,
+    "control": 12,
+    "balance_preference": 60,
+    "traction_preference": 29,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 63,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "mercenary",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Patrick Smith",
+    "team": null,
+    "cornering": 14,
+    "braking": 16,
+    "consistency": 12,
+    "smoothness": 14,
+    "control": 10,
+    "balance_preference": 37,
+    "traction_preference": 52,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "turkish",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Ethan Marchetti",
+    "team": null,
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 10,
+    "smoothness": 7,
+    "control": 9,
+    "balance_preference": 55,
+    "traction_preference": 51,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 53,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "prestigious",
+    "nationality": "singaporean"
+  },
+  {
+    "name": "Toby Renard",
+    "team": null,
+    "cornering": 7,
+    "braking": 6,
+    "consistency": 8,
+    "smoothness": 6,
+    "control": 7,
+    "balance_preference": 57,
+    "traction_preference": 53,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 44,
+    "traits": [],
+    "personality": "prestigious",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Milo Petrov",
+    "team": null,
+    "cornering": 11,
+    "braking": 10,
+    "consistency": 9,
+    "smoothness": 8,
+    "control": 11,
+    "balance_preference": 46,
+    "traction_preference": 31,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 59,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "quiet_professional",
+    "nationality": "malaysian",
+    "personalities": [
+      "quiet_professional"
+    ]
+  },
+  {
+    "name": "Luca Fernandez",
+    "team": null,
+    "cornering": 12,
+    "braking": 9,
+    "consistency": 11,
+    "smoothness": 10,
+    "control": 8,
+    "balance_preference": 51,
+    "traction_preference": 39,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 60,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "nationality": "argentine"
+  },
+  {
+    "name": "Jasper Cole",
+    "team": null,
+    "cornering": 5,
+    "braking": 6,
+    "consistency": 7,
+    "smoothness": 5,
+    "control": 6,
+    "balance_preference": 35,
+    "traction_preference": 45,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 89,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "croatian"
+  },
+  {
+    "name": "Noah Ishikawa",
+    "team": null,
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 6,
+    "smoothness": 9,
+    "control": 8,
+    "balance_preference": 58,
+    "traction_preference": 44,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 48,
+    "traits": [],
+    "personality": "mercenary",
+    "nationality": "japanese"
+  },
+  {
+    "name": "Felix Duarte",
+    "team": null,
+    "cornering": 10,
+    "braking": 9,
+    "consistency": 12,
+    "smoothness": 10,
+    "control": 9,
+    "balance_preference": 37,
+    "traction_preference": 39,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 60,
+    "traits": [],
+    "personality": "short_termist",
+    "nationality": "saudi"
+  },
+  {
+    "name": "Bram Visser",
+    "team": null,
+    "cornering": 6,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 7,
+    "control": 5,
+    "balance_preference": 51,
+    "traction_preference": 61,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 37,
+    "traits": [],
+    "personality": "mentor",
+    "nationality": "lithuanian"
+  },
+  {
+    "name": "Oliver Quinn",
+    "team": null,
+    "cornering": 7,
+    "braking": 8,
+    "consistency": 6,
+    "smoothness": 7,
+    "control": 8,
+    "balance_preference": 61,
+    "traction_preference": 32,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 46,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "british"
+  },
+  {
+    "name": "Mateo Alvarez",
+    "team": null,
+    "cornering": 9,
+    "braking": 10,
+    "consistency": 11,
+    "smoothness": 8,
+    "control": 10,
+    "balance_preference": 64,
+    "traction_preference": 49,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 58,
+    "traits": [],
+    "personality": "short_termist",
+    "nationality": "uruguayan"
+  },
+  {
+    "name": "Aiden Mallory",
+    "team": null,
+    "cornering": 3,
+    "braking": 3,
+    "consistency": 3,
+    "smoothness": 3,
+    "control": 3,
+    "balance_preference": 47,
+    "traction_preference": 48,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 56,
+    "traits": [
+      "nervous",
+      "tyre_abuser"
+    ],
+    "personality": "short_termist",
+    "nationality": "serbian"
+  },
+  {
+    "name": "Niko Sato",
+    "team": null,
+    "cornering": 2,
+    "braking": 3,
+    "consistency": 2,
+    "smoothness": 4,
+    "control": 3,
+    "balance_preference": 40,
+    "traction_preference": 45,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 58,
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "mercenary",
+    "nationality": "japanese",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Sofia DeWitt",
+    "team": null,
+    "cornering": 4,
+    "braking": 3,
+    "consistency": 3,
+    "smoothness": 3,
+    "control": 4,
+    "balance_preference": 60,
+    "traction_preference": 52,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 63,
+    "traits": [
+      "hotlapper",
+      "bottlejob"
+    ],
+    "personality": "prestigious",
+    "nationality": "swiss"
+  },
+  {
+    "name": "Jonah Pettersen",
+    "team": null,
+    "cornering": 3,
+    "braking": 2,
+    "consistency": 4,
+    "smoothness": 3,
+    "control": 3,
+    "balance_preference": 65,
+    "traction_preference": 55,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 57,
+    "traits": [
+      "pay_driver",
+      "overtake_artist"
+    ],
+    "personality": "ambitious",
+    "nationality": "norwegian"
+  },
+  {
+    "name": "Mira Van Dalen",
+    "team": null,
+    "cornering": 4,
+    "braking": 4,
+    "consistency": 3,
+    "smoothness": 3,
+    "control": 3,
+    "balance_preference": 47,
+    "traction_preference": 54,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 59,
+    "traits": [
+      "tyre_whisperer",
+      "nervous"
+    ],
+    "personality": "short_termist",
+    "nationality": "indonesian",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Thiago Montrel",
+    "team": null,
+    "cornering": 3,
+    "braking": 4,
+    "consistency": 3,
+    "smoothness": 2,
+    "control": 3,
+    "balance_preference": 48,
+    "traction_preference": 28,
+    "age": 14,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 61,
+    "traits": [
+      "crash_happy",
+      "hotlapper"
+    ],
+    "personality": "mentor",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Caleb Roussel",
+    "team": null,
+    "cornering": 5,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 4,
+    "balance_preference": 46,
+    "traction_preference": 49,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 65,
+    "traits": [
+      "mechanic",
+      "tyre_whisperer"
+    ],
+    "personality": "loyal",
+    "nationality": "israeli"
+  },
+  {
+    "name": "Kenji Yamura",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 64,
+    "traction_preference": 29,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 68,
+    "traits": [
+      "clean_air_merchant",
+      "hotlapper"
+    ],
+    "personality": "mercenary",
+    "nationality": "japanese"
+  },
+  {
+    "name": "Priya Nandor",
+    "team": null,
+    "cornering": 4,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 64,
+    "traction_preference": 60,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "overtake_artist",
+      "tyre_abuser"
+    ],
+    "personality": "mentor",
+    "nationality": "kazakh"
+  },
+  {
+    "name": "Oscar Lindqvist",
+    "team": null,
+    "cornering": 6,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 4,
+    "balance_preference": 68,
+    "traction_preference": 61,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 66,
+    "traits": [
+      "pay_driver",
+      "mechanic"
+    ],
+    "personality": "mercenary",
+    "nationality": "swedish"
+  },
+  {
+    "name": "Leila Carbone",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 5,
+    "control": 5,
+    "balance_preference": 38,
+    "traction_preference": 35,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [
+      "hotlapper",
+      "clean_air_merchant"
+    ],
+    "personality": "loyal",
+    "nationality": "swiss"
+  },
+  {
+    "name": "Mateusz Gorka",
+    "team": null,
+    "cornering": 6,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 66,
+    "traction_preference": 38,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 67,
+    "traits": [
+      "tyre_whisperer",
+      "crash_happy"
+    ],
+    "personality": "short_termist",
+    "nationality": "spanish"
+  },
+  {
+    "name": "Gianni Moretti",
+    "team": null,
+    "cornering": 1,
+    "braking": 3,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 4,
+    "balance_preference": 51,
+    "traction_preference": 33,
+    "age": 15,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 69,
+    "traits": [
+      "nervous",
+      "pay_driver"
+    ],
+    "personality": "mercenary",
+    "nationality": "american"
+  },
+  {
+    "name": "Felix Tanzer",
+    "team": null,
+    "cornering": 6,
+    "braking": 7,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 6,
+    "balance_preference": 52,
+    "traction_preference": 37,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "short_termist",
+    "nationality": "irish"
+  },
+  {
+    "name": "Ivy Calder",
+    "team": null,
+    "cornering": 7,
+    "braking": 6,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 6,
+    "balance_preference": 57,
+    "traction_preference": 48,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "hotlapper",
+      "overtake_artist"
+    ],
+    "personality": "security_seeker",
+    "nationality": "panamanian"
+  },
+  {
+    "name": "Rafael Ibarra",
+    "team": null,
+    "cornering": 11,
+    "braking": 7,
+    "consistency": 12,
+    "smoothness": 14,
+    "control": 6,
+    "balance_preference": 48,
+    "traction_preference": 49,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 78,
+    "traits": [
+      "tyre_whisperer",
+      "mechanic"
+    ],
+    "personality": "prestigious",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Dawson Pierce",
+    "team": null,
+    "cornering": 6,
+    "braking": 6,
+    "consistency": 7,
+    "smoothness": 6,
+    "control": 7,
+    "balance_preference": 38,
+    "traction_preference": 38,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "pay_driver",
+      "hotlapper"
+    ],
+    "personality": "short_termist",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Hyejin Park",
+    "team": null,
+    "cornering": 7,
+    "braking": 6,
+    "consistency": 7,
+    "smoothness": 6,
+    "control": 7,
+    "balance_preference": 56,
+    "traction_preference": 47,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 79,
+    "traits": [
+      "tyre_whisperer",
+      "clean_air_merchant"
+    ],
+    "personality": "mentor",
+    "nationality": "south_korean"
+  },
+  {
+    "name": "Marco Bellini",
+    "team": null,
+    "cornering": 7,
+    "braking": 7,
+    "consistency": 6,
+    "smoothness": 7,
+    "control": 6,
+    "balance_preference": 55,
+    "traction_preference": 41,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [
+      "overtake_artist",
+      "mechanic"
+    ],
+    "personality": "short_termist",
+    "nationality": "italian"
+  },
+  {
+    "name": "Artiom Markelov",
+    "team": null,
+    "cornering": 14,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 15,
+    "control": 8,
+    "balance_preference": 54,
+    "traction_preference": 64,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 93,
+    "traits": [
+      "clean_air_merchant",
+      "hotlapper"
+    ],
+    "personality": "prestigious",
+    "nationality": "russian"
+  },
+  {
+    "name": "Elena Vasari",
+    "team": null,
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 9,
+    "balance_preference": 42,
+    "traction_preference": 60,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 88,
+    "traits": [
+      "overtake_artist",
+      "tyre_whisperer"
+    ],
+    "personality": "prestigious",
+    "nationality": "argentine"
+  },
+  {
+    "name": "Noah Hartley",
+    "team": null,
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "balance_preference": 39,
+    "traction_preference": 39,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 86,
+    "traits": [
+      "mechanic",
+      "nervous"
+    ],
+    "personality": "prestigious",
+    "nationality": "new_zealander"
+  },
+  {
+    "name": "Talia Mendes",
+    "team": null,
+    "cornering": 12,
+    "braking": 15,
+    "consistency": 8,
+    "smoothness": 12,
+    "control": 5,
+    "balance_preference": 47,
+    "traction_preference": 69,
+    "age": 16,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 90,
+    "traits": [
+      "hotlapper",
+      "pay_driver"
+    ],
+    "personality": "prestigious",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Bruno Richter",
+    "team": null,
+    "cornering": 12,
+    "braking": 7,
+    "consistency": 13,
+    "smoothness": 10,
+    "control": 11,
+    "balance_preference": 45,
+    "traction_preference": 52,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 67,
+    "traits": [
+      "clean_air_merchant",
+      "mechanic"
+    ],
+    "personality": "mentor",
+    "nationality": "german"
+  },
+  {
+    "name": "Kaya Storme",
+    "team": null,
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 9,
+    "smoothness": 6,
+    "control": 9,
+    "balance_preference": 42,
+    "traction_preference": 57,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 92,
+    "traits": [
+      "overtake_artist",
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "hungarian"
+  },
+  {
+    "name": "Luca Bramwell",
+    "team": null,
+    "cornering": 4,
+    "braking": 3,
+    "consistency": 4,
+    "smoothness": 3,
+    "control": 4,
+    "balance_preference": 62,
+    "traction_preference": 43,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 60,
+    "traits": [],
+    "personality": "mercenary",
+    "nationality": "british"
+  },
+  {
+    "name": "Mara Ishida",
+    "team": null,
+    "cornering": 3,
+    "braking": 4,
+    "consistency": 3,
+    "smoothness": 4,
+    "control": 3,
+    "balance_preference": 49,
+    "traction_preference": 46,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 63,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "mercenary",
+    "nationality": "japanese"
+  },
+  {
+    "name": "Theo Kravitz",
+    "team": null,
+    "cornering": 4,
+    "braking": 4,
+    "consistency": 4,
+    "smoothness": 3,
+    "control": 4,
+    "balance_preference": 51,
+    "traction_preference": 41,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 91,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "loyal",
+    "nationality": "german"
+  },
+  {
+    "name": "Elena Dufour",
+    "team": null,
+    "cornering": 3,
+    "braking": 3,
+    "consistency": 4,
+    "smoothness": 3,
+    "control": 3,
+    "balance_preference": 54,
+    "traction_preference": 33,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 58,
+    "traits": [],
+    "personality": "short_termist",
+    "nationality": "belgian"
+  },
+  {
+    "name": "Ravi Coulson",
+    "team": null,
+    "cornering": 4,
+    "braking": 4,
+    "consistency": 4,
+    "smoothness": 4,
+    "control": 4,
+    "balance_preference": 56,
+    "traction_preference": 39,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 64,
+    "traits": [
+      "nervous"
+    ],
+    "personality": "loyal",
+    "nationality": "british"
+  },
+  {
+    "name": "Diogo Marquez",
+    "team": null,
+    "cornering": 3,
+    "braking": 4,
+    "consistency": 4,
+    "smoothness": 4,
+    "control": 3,
+    "balance_preference": 61,
+    "traction_preference": 52,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 62,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "security_seeker",
+    "nationality": "portuguese"
+  },
+  {
+    "name": "Owen Halabi",
+    "team": null,
+    "cornering": 4,
+    "braking": 3,
+    "consistency": 3,
+    "smoothness": 4,
+    "control": 3,
+    "balance_preference": 38,
+    "traction_preference": 45,
+    "age": 9,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 59,
+    "traits": [],
+    "personality": "mercenary",
+    "nationality": "israeli"
+  },
+  {
+    "name": "Jules Tenner",
+    "team": null,
+    "cornering": 5,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 5,
+    "control": 4,
+    "balance_preference": 53,
+    "traction_preference": 34,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "prestigious",
+    "nationality": "maltese"
+  },
+  {
+    "name": "Naomi Kessel",
+    "team": null,
+    "cornering": 4,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 5,
+    "control": 4,
+    "balance_preference": 58,
+    "traction_preference": 62,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 68,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "prestigious",
+    "nationality": "british"
+  },
+  {
+    "name": "Diego Petrovic",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 5,
+    "control": 4,
+    "balance_preference": 50,
+    "traction_preference": 35,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 69,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "security_seeker",
+    "nationality": "serbian"
+  },
+  {
+    "name": "Iris Watanabe",
+    "team": null,
+    "cornering": 4,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 64,
+    "traction_preference": 36,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 67,
+    "traits": [],
+    "personality": "loyal",
+    "nationality": "indonesian"
+  },
+  {
+    "name": "Callum Viera",
+    "team": null,
+    "cornering": 5,
+    "braking": 4,
+    "consistency": 4,
+    "smoothness": 5,
+    "control": 4,
+    "balance_preference": 43,
+    "traction_preference": 58,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 66,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "security_seeker",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Sophie Lindberg",
+    "team": null,
+    "cornering": 4,
+    "braking": 5,
+    "consistency": 4,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 50,
+    "traction_preference": 37,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 65,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "security_seeker",
+    "nationality": "german"
+  },
+  {
+    "name": "Mateo Jafari",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 5,
+    "smoothness": 4,
+    "control": 4,
+    "balance_preference": 61,
+    "traction_preference": 54,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "mercenary",
+    "nationality": "moroccan"
+  },
+  {
+    "name": "Pietro Novak",
+    "team": null,
+    "cornering": 6,
+    "braking": 5,
+    "consistency": 5,
+    "smoothness": 5,
+    "control": 5,
+    "balance_preference": 50,
+    "traction_preference": 61,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "loyal",
+    "nationality": "kuwaiti"
+  },
+  {
+    "name": "Anya Rios",
+    "team": null,
+    "cornering": 5,
+    "braking": 6,
+    "consistency": 5,
+    "smoothness": 5,
+    "control": 5,
+    "balance_preference": 40,
+    "traction_preference": 47,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 73,
+    "traits": [],
+    "personality": "loyal",
+    "nationality": "colombian"
+  },
+  {
+    "name": "Felix Danvers",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 6,
+    "smoothness": 5,
+    "control": 5,
+    "balance_preference": 63,
+    "traction_preference": 49,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "hotlapper",
+      "nervous"
+    ],
+    "personality": "prestigious",
+    "nationality": "french"
+  },
+  {
+    "name": "Lena Myles",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 6,
+    "smoothness": 4,
+    "control": 5,
+    "balance_preference": 61,
+    "traction_preference": 48,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [],
+    "personality": "prestigious",
+    "nationality": "austrian"
+  },
+  {
+    "name": "Noah Seong",
+    "team": null,
+    "cornering": 5,
+    "braking": 5,
+    "consistency": 5,
+    "smoothness": 6,
+    "control": 5,
+    "balance_preference": 44,
+    "traction_preference": 48,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "short_termist",
+    "nationality": "israeli"
+  },
+  {
+    "name": "Ahmir Al-Salak",
+    "team": null,
+    "cornering": 5,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 6,
+    "control": 5,
+    "balance_preference": 65,
+    "traction_preference": 42,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "ambitious",
+    "nationality": "kuwaiti"
+  },
+  {
+    "name": "Tomas Richter",
+    "team": null,
+    "cornering": 6,
+    "braking": 5,
+    "consistency": 5,
+    "smoothness": 5,
+    "control": 6,
+    "balance_preference": 58,
+    "traction_preference": 44,
+    "age": 11,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "security_seeker",
+    "nationality": "andorran"
+  },
+  {
+    "name": "Hugo Albrecht",
+    "team": null,
+    "cornering": 6,
+    "braking": 6,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 6,
+    "balance_preference": 44,
+    "traction_preference": 44,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 78,
+    "traits": [],
+    "personality": "prestigious",
+    "nationality": "canadian"
+  },
+  {
+    "name": "Mika Tan",
+    "team": null,
+    "cornering": 9,
+    "braking": 12,
+    "consistency": 14,
+    "smoothness": 10,
+    "control": 8,
+    "balance_preference": 54,
+    "traction_preference": 51,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 95,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "vietnamese"
+  },
+  {
+    "name": "Sara Olivetti",
+    "team": null,
+    "cornering": 6,
+    "braking": 6,
+    "consistency": 7,
+    "smoothness": 6,
+    "control": 5,
+    "balance_preference": 45,
+    "traction_preference": 56,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 79,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "impatient",
+    "nationality": "italian"
+  },
+  {
+    "name": "Liam Draycott",
+    "team": null,
+    "cornering": 6,
+    "braking": 7,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 6,
+    "balance_preference": 58,
+    "traction_preference": 54,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 81,
+    "traits": [],
+    "personality": "security_seeker",
+    "nationality": "belarusian"
+  },
+  {
+    "name": "Cleo Sato",
+    "team": null,
+    "cornering": 9,
+    "braking": 13,
+    "consistency": 6,
+    "smoothness": 7,
+    "control": 6,
+    "balance_preference": 44,
+    "traction_preference": 47,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 82,
+    "traits": [
+      "tyre_abuser"
+    ],
+    "personality": "short_termist",
+    "nationality": "japanese"
+  },
+  {
+    "name": "Victor Malden",
+    "team": null,
+    "cornering": 12,
+    "braking": 6,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 7,
+    "balance_preference": 72,
+    "traction_preference": 35,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 83,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "mercenary",
+    "nationality": "hong_konger"
+  },
+  {
+    "name": "Mateo Calabresi",
+    "team": null,
+    "cornering": 6,
+    "braking": 6,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 7,
+    "balance_preference": 51,
+    "traction_preference": 53,
+    "age": 12,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 84,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "mercenary",
+    "nationality": "argentine"
+  },
+  {
+    "name": "Adrien Koenig",
+    "team": null,
+    "cornering": 7,
+    "braking": 7,
+    "consistency": 7,
+    "smoothness": 7,
+    "control": 7,
+    "balance_preference": 65,
+    "traction_preference": 38,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 85,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "mercenary",
+    "nationality": "polish"
+  },
+  {
+    "name": "Nora Velasco",
+    "team": null,
+    "cornering": 7,
+    "braking": 7,
+    "consistency": 6,
+    "smoothness": 7,
+    "control": 7,
+    "balance_preference": 37,
+    "traction_preference": 33,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 84,
+    "traits": [
+      "hotlapper",
+      "tyre_whisperer"
+    ],
+    "personality": "prestigious",
+    "nationality": "venezuelan"
+  },
+  {
+    "name": "Maxime Russo",
+    "team": null,
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 7,
+    "smoothness": 7,
+    "control": 7,
+    "balance_preference": 44,
+    "traction_preference": 39,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 86,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "mentor",
+    "nationality": "ukrainian"
+  },
+  {
+    "name": "Yara Petrow",
+    "team": null,
+    "cornering": 7,
+    "braking": 8,
+    "consistency": 7,
+    "smoothness": 7,
+    "control": 7,
+    "balance_preference": 40,
+    "traction_preference": 33,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 87,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "security_seeker",
+    "nationality": "russian"
+  },
+  {
+    "name": "Elias Duarte",
+    "team": null,
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 7,
+    "smoothness": 7,
+    "control": 8,
+    "balance_preference": 49,
+    "traction_preference": 61,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 88,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "prestigious",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Helena Brooks",
+    "team": null,
+    "cornering": 7,
+    "braking": 7,
+    "consistency": 8,
+    "smoothness": 7,
+    "control": 7,
+    "balance_preference": 36,
+    "traction_preference": 45,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 59,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "short_termist",
+    "nationality": "costa_rican"
+  },
+  {
+    "name": "Jonas McRae",
+    "team": "",
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 7,
+    "smoothness": 8,
+    "control": 7,
+    "balance_preference": 45,
+    "traction_preference": 39,
+    "age": 13,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 90,
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "security_seeker",
+    "nationality": "indian",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "",
+      "length_weeks": 16,
+      "salary_m": 0.20000000000000015,
+      "start_week": 1
+    }
+  },
+  {
+    "name": "Liam Lawley",
+    "team": null,
+    "cornering": 10,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "balance_preference": 35,
+    "traction_preference": 61,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 78,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "british"
+  },
+  {
+    "name": "Th\u00e9o Pourchaire",
+    "team": null,
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 12,
+    "balance_preference": 38,
+    "traction_preference": 55,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "mercenary",
+    "nationality": "french"
+  },
+  {
+    "name": "Ayumi Iwasa",
+    "team": "Racing Bulls",
+    "cornering": 14,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 13,
+    "control": 13,
+    "balance_preference": 43,
+    "traction_preference": 36,
+    "age": 23,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "mercenary",
+    "nationality": "japanese",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "Racing Bulls",
+      "length_weeks": 104,
+      "salary_m": 1.6000000000000005,
+      "start_week": 1,
+      "role": "reserve"
+    },
+    "role": "reserve"
+  },
+  {
+    "name": "Frederik Vesti",
+    "team": "Mercedes-AMG",
+    "cornering": 16,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 13,
+    "control": 13,
+    "balance_preference": 36,
+    "traction_preference": 46,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "security_seeker",
+    "nationality": "danish",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "Mercedes-AMG",
+      "length_weeks": 104,
+      "salary_m": 1.4000000000000004,
+      "start_week": 1,
+      "role": "reserve"
+    },
+    "role": "reserve"
+  },
+  {
+    "name": "Jack Doohan",
+    "team": "Haas",
+    "cornering": 14,
+    "braking": 15,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 13,
+    "balance_preference": 63,
+    "traction_preference": 59,
+    "age": 21,
+    "history": {
+      "seasons": 1,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 81,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "security_seeker",
+    "nationality": "australian",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "Haas",
+      "length_weeks": 52,
+      "salary_m": 0.30000000000000016,
+      "start_week": 1,
+      "role": "reserve"
+    },
+    "role": "reserve"
+  },
+  {
+    "name": "Logan Sargeant",
+    "team": null,
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "balance_preference": 49,
+    "traction_preference": 60,
+    "age": 22,
+    "history": {
+      "seasons": 2,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 65,
+    "traits": [
+      "bottlejob",
+      "crash_happy"
+    ],
+    "personality": "security_seeker",
+    "nationality": "american"
+  },
+  {
+    "name": "Denis Hauger",
+    "team": null,
+    "cornering": 14,
+    "braking": 14,
+    "consistency": 13,
+    "smoothness": 13,
+    "control": 13,
+    "balance_preference": 57,
+    "traction_preference": 60,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 73,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "mercenary",
+    "nationality": "norwegian"
+  },
+  {
+    "name": "Cl\u00e9ment Novalak",
+    "team": null,
+    "cornering": 10,
+    "braking": 9,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "balance_preference": 45,
+    "traction_preference": 53,
+    "age": 25,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 62,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "loyal",
+    "nationality": "french"
+  },
+  {
+    "name": "Marcus Strongarm",
+    "team": null,
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "balance_preference": 40,
+    "traction_preference": 54,
+    "age": 23,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "security_seeker",
+    "nationality": "american"
+  },
+  {
+    "name": "Enzo Fitipaldi",
+    "team": null,
+    "cornering": 9,
+    "braking": 10,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 10,
+    "balance_preference": 41,
+    "traction_preference": 58,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "ambitious",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Felipe Drugovich",
+    "team": null,
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 12,
+    "balance_preference": 62,
+    "traction_preference": 47,
+    "age": 23,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 80,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "ambitious",
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Victor Martel",
+    "team": null,
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 9,
+    "control": 10,
+    "balance_preference": 56,
+    "traction_preference": 46,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "nationality": "french"
+  },
+  {
+    "name": "Zane Molloy",
+    "team": null,
+    "cornering": 9,
+    "braking": 10,
+    "consistency": 9,
+    "smoothness": 10,
+    "control": 9,
+    "balance_preference": 61,
+    "traction_preference": 65,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "security_seeker",
+    "nationality": "australian"
+  },
+  {
+    "name": "Arthur Leclerc",
+    "team": null,
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "balance_preference": 36,
+    "traction_preference": 45,
+    "age": 23,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 68,
+    "traits": [
+      "nervous"
+    ],
+    "personality": "short_termist",
+    "nationality": "monegasque"
+  },
+  {
+    "name": "Jehan Daruvala",
+    "team": null,
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 10,
+    "smoothness": 9,
+    "control": 9,
+    "balance_preference": 35,
+    "traction_preference": 41,
+    "age": 27,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 66,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "ambitious",
+    "nationality": "indian"
+  },
+  {
+    "name": "Juri Vipponen",
+    "team": null,
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 9,
+    "control": 10,
+    "balance_preference": 52,
+    "traction_preference": 56,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "mentor",
+    "nationality": "finnish"
+  },
+  {
+    "name": "David Beckler",
+    "team": null,
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "balance_preference": 41,
+    "traction_preference": 40,
+    "age": 23,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 64,
+    "traits": [
+      "tyre_abuser"
+    ],
+    "personality": "loyal",
+    "nationality": "german"
+  },
+  {
+    "name": "Tatiana Calder\u00f3n",
+    "team": null,
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 9,
+    "control": 8,
+    "balance_preference": 39,
+    "traction_preference": 62,
+    "age": 25,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 58,
+    "traits": [
+      "mechanic",
+      "pay_driver"
+    ],
+    "personality": "prestigious",
+    "nationality": "colombian",
+    "personalities": [
+      "prestigious",
+      "company_man"
+    ]
+  },
+  {
+    "name": "Alex Palou",
+    "team": "",
+    "cornering": 19,
+    "braking": 18,
+    "consistency": 18,
+    "smoothness": 19,
+    "control": 17,
+    "age": 25,
+    "talent": 99,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "hotlapper",
+      "overtake_artist"
+    ],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "ambitious"
+    ],
+    "nationality": "spanish",
+    "history": {},
+    "traction_preference": 70.0,
+    "balance_preference": 40.0
+  },
+  {
+    "name": "Jaume Prat",
+    "team": "",
+    "cornering": 11,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 12,
+    "age": 16,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter"
+    ],
+    "nationality": "andorran",
+    "history": {}
+  },
+  {
+    "name": "Louis Vipond",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 11,
+    "smoothness": 11,
+    "control": 11,
+    "age": 14,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "ambitious"
+    ],
+    "nationality": "french",
+    "history": {}
+  },
+  {
+    "name": "Gonzalo Veragua",
+    "team": "",
+    "cornering": 15,
+    "braking": 14,
+    "consistency": 4,
+    "smoothness": 11,
+    "control": 11,
+    "age": 25,
+    "talent": 93,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "hotlapper"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "team_player",
+      "ambitious"
+    ],
+    "nationality": "spanish",
+    "history": {}
+  },
+  {
+    "name": "Daniel Ricciardo",
+    "team": "",
+    "cornering": 16,
+    "braking": 18,
+    "consistency": 7,
+    "smoothness": 16,
+    "control": 15,
+    "age": 36,
+    "talent": 71,
+    "contract": {
+      "team": "",
+      "length_weeks": 0,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "overtake_artist",
+      "mechanic"
+    ],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "australian",
+    "history": {
+      "seasons": 13,
+      "championships": 0,
+      "wins": 8,
+      "podiums": 32,
+      "poles": 3
+    },
+    "balance_preference": 80.0,
+    "traction_preference": 70.0,
+    "role": "reserve"
+  },
+  {
+    "name": "David Castilla",
+    "team": "",
+    "cornering": 13,
+    "braking": 14,
+    "consistency": 16,
+    "smoothness": 16,
+    "control": 10,
+    "age": 26,
+    "talent": 90,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "spanish",
+    "history": {}
+  },
+  {
+    "name": "Mark Zvir",
+    "team": "",
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 11,
+    "control": 11,
+    "age": 18,
+    "talent": 95,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "comeback_artist"
+    ],
+    "nationality": "singaporean",
+    "history": {},
+    "balance_preference": 50.0
+  },
+  {
+    "name": "Jack Crawford",
+    "team": "Aston Martin",
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 12,
+    "age": 21,
+    "talent": 65,
+    "contract": {
+      "team": "Aston Martin",
+      "length_weeks": 52,
+      "salary_m": 0.7000000000000001,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "tyre_abuser",
+      "clean_air_merchant"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor",
+      "company_man"
+    ],
+    "nationality": "american",
+    "history": {},
+    "role": "reserve"
+  },
+  {
+    "name": "Luke Browning",
+    "team": "Williams Racing",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 11,
+    "smoothness": 9,
+    "control": 9,
+    "age": 24,
+    "talent": 72,
+    "contract": {
+      "team": "Williams Racing",
+      "length_weeks": 52,
+      "salary_m": 0.20000000000000015,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "comeback_artist"
+    ],
+    "nationality": "british",
+    "history": {},
+    "role": "reserve"
+  },
+  {
+    "name": "Colton Herta",
+    "team": "Cadillac",
+    "cornering": 14,
+    "braking": 16,
+    "consistency": 13,
+    "smoothness": 14,
+    "control": 15,
+    "age": 26,
+    "talent": 86,
+    "contract": {
+      "team": "Cadillac",
+      "length_weeks": 54,
+      "salary_m": 12.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "overtake_artist",
+      "mechanic"
+    ],
+    "personality": "prima_donna",
+    "personalities": [
+      "prima_donna",
+      "comeback_artist"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 25.0,
+    "traction_preference": 76.0,
+    "role": "reserve"
+  },
+  {
+    "name": "Stoffel Vandoorne",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 11,
+    "age": 34,
+    "talent": 37,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "bottlejob"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "belgian",
+    "history": {
+      "seasons": 2
+    }
+  },
+  {
+    "name": "Ritomo Miyata",
+    "team": null,
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 11,
+    "age": 26,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "overtake_artist",
+      "nervous"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "fragile_ego",
+      "loyal"
+    ],
+    "nationality": "japanese"
+  },
+  {
+    "name": "Joshua Durksen",
+    "team": null,
+    "cornering": 16,
+    "braking": 10,
+    "consistency": 13,
+    "smoothness": 13,
+    "control": 12,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "mechanic",
+      "pay_driver"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "paraguayan"
+  },
+  {
+    "name": "Rafael Camara",
+    "team": null,
+    "cornering": 15,
+    "braking": 14,
+    "consistency": 15,
+    "smoothness": 14,
+    "control": 12,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 92,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "brazilian",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Robin Raikkonen",
+    "team": null,
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 9,
+    "control": 10,
+    "age": 10,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 94,
+    "traits": [
+      "rainmaster",
+      "mechanic"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "team_player",
+      "comeback_artist"
+    ],
+    "nationality": "finnish"
+  },
+  {
+    "name": "Zane Maloney",
+    "team": "Audi",
+    "cornering": 14,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 15,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "cautious",
+      "rainmaster"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "comeback_artist",
+      "loyal"
+    ],
+    "nationality": "barbadian",
+    "contract": {
+      "status": "equal",
+      "priority": "equal",
+      "team": "Audi",
+      "length_weeks": 0,
+      "salary_m": 1.1,
+      "start_week": 1,
+      "role": "reserve"
+    },
+    "role": "reserve"
+  },
+  {
+    "name": "Gerrard Xie",
+    "team": null,
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 12,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 68,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "chinese"
+  },
+  {
+    "name": "Nandhavud Bhirombhakdi",
+    "team": null,
+    "cornering": 5,
+    "braking": 7,
+    "consistency": 11,
+    "smoothness": 4,
+    "control": 10,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 60,
+    "pay_driver_amount_m": 5,
+    "traits": [
+      "pay_driver",
+      "tyre_abuser"
+    ],
+    "personality": "mercenary",
+    "personalities": [
+      "mercenary",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "thai"
+  },
+  {
+    "name": "Nicola Lacorte",
+    "team": null,
+    "cornering": 14,
+    "braking": 12,
+    "consistency": 14,
+    "smoothness": 17,
+    "control": 5,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [
+      "crash_happy",
+      "overtake_artist"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "italian"
+  },
+  {
+    "name": "Fernando Barrichello",
+    "team": null,
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 12,
+    "control": 9,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 73,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Yevan David",
+    "team": null,
+    "cornering": 14,
+    "braking": 13,
+    "consistency": 5,
+    "smoothness": 14,
+    "control": 14,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "mechanic",
+      "nervous"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "sri_lankan"
+  },
+  {
+    "name": "Brad Benavides",
+    "team": null,
+    "cornering": 12,
+    "braking": 15,
+    "consistency": 8,
+    "smoothness": 12,
+    "control": 5,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 69,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "american"
+  },
+  {
+    "name": "Jin Nakamura",
+    "team": null,
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 17,
+    "control": 11,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "clean_air_merchant",
+      "mechanic"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "japanese"
+  },
+  {
+    "name": "Fionn McLaughlin",
+    "team": null,
+    "cornering": 17,
+    "braking": 17,
+    "consistency": 13,
+    "smoothness": 9,
+    "control": 12,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 88,
+    "traits": [
+      "overtake_artist",
+      "hotlapper"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "irish",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Michael Shin",
+    "team": null,
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 14,
+    "smoothness": 13,
+    "control": 11,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "south_korean"
+  },
+  {
+    "name": "Jose Garfias",
+    "team": null,
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 10,
+    "smoothness": 11,
+    "control": 11,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 70,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "mexican"
+  },
+  {
+    "name": "James Wharton",
+    "team": null,
+    "cornering": 14,
+    "braking": 11,
+    "consistency": 10,
+    "smoothness": 12,
+    "control": 13,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "australian"
+  },
+  {
+    "name": "Louis Sharp",
+    "team": null,
+    "cornering": 18,
+    "braking": 12,
+    "consistency": 8,
+    "smoothness": 16,
+    "control": 11,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 81,
+    "traits": [
+      "bottlejob",
+      "clean_air_merchant"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "new_zealander"
+  },
+  {
+    "name": "Christian Ho",
+    "team": null,
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 16,
+    "smoothness": 12,
+    "control": 9,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "nervous"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "singaporean"
+  },
+  {
+    "name": "Brando Badoer",
+    "team": null,
+    "cornering": 11,
+    "braking": 14,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 11,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "italian"
+  },
+  {
+    "name": "Pedro Clerot",
+    "team": null,
+    "cornering": 13,
+    "braking": 11,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 13,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [],
+    "personality": "security_seeker",
+    "personalities": [
+      "security_seeker",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Bruno del Pino",
+    "team": null,
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 15,
+    "smoothness": 11,
+    "control": 12,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "spanish"
+  },
+  {
+    "name": "Enzo Deligny",
+    "team": null,
+    "cornering": 13,
+    "braking": 11,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 11,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "french"
+  },
+  {
+    "name": "Hiyu Yamakoshi",
+    "team": null,
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 17,
+    "smoothness": 11,
+    "control": 11,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "japanese"
+  },
+  {
+    "name": "Kanato Le",
+    "team": null,
+    "cornering": 10,
+    "braking": 13,
+    "consistency": 15,
+    "smoothness": 10,
+    "control": 11,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 71,
+    "traits": [
+      "bottlejob"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "japanese"
+  },
+  {
+    "name": "Maciej Gladysz",
+    "team": null,
+    "cornering": 15,
+    "braking": 13,
+    "consistency": 11,
+    "smoothness": 12,
+    "control": 14,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 83,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "polish"
+  },
+  {
+    "name": "Taito Kato",
+    "team": null,
+    "cornering": 13,
+    "braking": 15,
+    "consistency": 14,
+    "smoothness": 11,
+    "control": 12,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 84,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "japanese"
+  },
+  {
+    "name": "Alessandro Giusti",
+    "team": null,
+    "cornering": 13,
+    "braking": 14,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 13,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "french",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Tuukka Taponen",
+    "team": null,
+    "cornering": 13,
+    "braking": 11,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 12,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "finnish"
+  },
+  {
+    "name": "Mattia Colnaghi",
+    "team": null,
+    "cornering": 15,
+    "braking": 10,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 11,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 85,
+    "traits": [],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "italian"
+  },
+  {
+    "name": "Matteo De Palo",
+    "team": null,
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 12,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "hotlapper",
+      "nervous"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "fragile_ego",
+      "security_seeker"
+    ],
+    "nationality": "italian"
+  },
+  {
+    "name": "Freddie Slater",
+    "team": null,
+    "cornering": 15,
+    "braking": 14,
+    "consistency": 15,
+    "smoothness": 10,
+    "control": 8,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 92,
+    "traits": [
+      "hotlapper",
+      "clean_air_merchant"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "british"
+  },
+  {
+    "name": "Noah Stromsted",
+    "team": null,
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 10,
+    "control": 13,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "cautious"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "danish"
+  },
+  {
+    "name": "Ernesto Rivera",
+    "team": null,
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 11,
+    "age": 17,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "mexican",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Ugo Ugochukwu",
+    "team": null,
+    "cornering": 16,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 10,
+    "control": 9,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 82,
+    "traits": [
+      "mechanic",
+      "bottlejob"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "team_player",
+      "security_seeker"
+    ],
+    "nationality": "american"
+  },
+  {
+    "name": "Theophile Nael",
+    "team": null,
+    "cornering": 14,
+    "braking": 13,
+    "consistency": 8,
+    "smoothness": 12,
+    "control": 11,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 78,
+    "traits": [],
+    "personality": "security_seeker",
+    "personalities": [
+      "security_seeker",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "french"
+  },
+  {
+    "name": "John Bennett",
+    "team": null,
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 14,
+    "smoothness": 10,
+    "control": 9,
+    "age": 22,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 69,
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "british"
+  },
+  {
+    "name": "Laurens van Hoepen",
+    "team": null,
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 14,
+    "control": 13,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 72,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "dutch",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Rafael Villagomez",
+    "team": null,
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 11,
+    "age": 24,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 68,
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "mexican"
+  },
+  {
+    "name": "Nicolas Varrone",
+    "team": null,
+    "cornering": 14,
+    "braking": 13,
+    "consistency": 15,
+    "smoothness": 13,
+    "control": 14,
+    "age": 25,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "tyre_abuser"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "argentine"
+  },
+  {
+    "name": "Cian Shields",
+    "team": null,
+    "cornering": 12,
+    "braking": 6,
+    "consistency": 8,
+    "smoothness": 9,
+    "control": 5,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 83,
+    "pay_driver_amount_m": 4,
+    "traits": [
+      "pay_driver",
+      "cautious"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "mercenary",
+      "quiet_professional"
+    ],
+    "nationality": "british"
+  },
+  {
+    "name": "Emerson Fittipaldi Jr.",
+    "team": null,
+    "cornering": 10,
+    "braking": 12,
+    "consistency": 13,
+    "smoothness": 13,
+    "control": 13,
+    "age": 18,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "brazilian"
+  },
+  {
+    "name": "Tasanapol Inthraphuvasak",
+    "team": null,
+    "cornering": 12,
+    "braking": 14,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 13,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "thai"
+  },
+  {
+    "name": "Richard Verschoor",
+    "team": null,
+    "cornering": 14,
+    "braking": 13,
+    "consistency": 16,
+    "smoothness": 15,
+    "control": 13,
+    "age": 25,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 77,
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "dutch",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Alex Dunne",
+    "team": null,
+    "cornering": 18,
+    "braking": 14,
+    "consistency": 13,
+    "smoothness": 15,
+    "control": 9,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 91,
+    "traits": [
+      "crash_happy",
+      "hotlapper"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "irish"
+  },
+  {
+    "name": "Martinius Stenshorne",
+    "team": null,
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 13,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 75,
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "security_seeker",
+      "loyal"
+    ],
+    "nationality": "norwegian"
+  },
+  {
+    "name": "Mari Boya",
+    "team": null,
+    "cornering": 15,
+    "braking": 15,
+    "consistency": 12,
+    "smoothness": 10,
+    "control": 11,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 76,
+    "traits": [
+      "hotlapper",
+      "crash_happy"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "spanish"
+  },
+  {
+    "name": "Sebastian Montoya",
+    "team": null,
+    "cornering": 8,
+    "braking": 12,
+    "consistency": 15,
+    "smoothness": 13,
+    "control": 10,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 69,
+    "pay_driver_amount_m": 3.5,
+    "traits": [
+      "pay_driver",
+      "clean_air_merchant"
+    ],
+    "personality": "mercenary",
+    "personalities": [
+      "mercenary",
+      "quiet_professional",
+      "security_seeker"
+    ],
+    "nationality": "colombian"
+  },
+  {
+    "name": "Oliver Goethe",
+    "team": null,
+    "cornering": 10,
+    "braking": 11,
+    "consistency": 15,
+    "smoothness": 14,
+    "control": 13,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 73,
+    "traits": [
+      "hotlapper",
+      "bottlejob"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "fragile_ego",
+      "loyal"
+    ],
+    "nationality": "german"
+  },
+  {
+    "name": "Gabriele Mini",
+    "team": null,
+    "cornering": 13,
+    "braking": 15,
+    "consistency": 15,
+    "smoothness": 14,
+    "control": 10,
+    "age": 20,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 83,
+    "traits": [
+      "overtake_artist",
+      "hotlapper"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "italian"
+  },
+  {
+    "name": "Roman Bilinski",
+    "team": null,
+    "cornering": 9,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 15,
+    "control": 14,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 74,
+    "traits": [
+      "rainmaster"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "polish"
+  },
+  {
+    "name": "Dino Beganovic",
+    "team": null,
+    "cornering": 13,
+    "braking": 14,
+    "consistency": 15,
+    "smoothness": 13,
+    "control": 13,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 81,
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "team_player",
+    "personalities": [
+      "team_player",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "swedish",
+    "contract": {
+      "status": "equal",
+      "priority": "equal"
+    }
+  },
+  {
+    "name": "Nikola Tsolov",
+    "team": null,
+    "cornering": 17,
+    "braking": 12,
+    "consistency": 9,
+    "smoothness": 14,
+    "control": 15,
+    "age": 19,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 94,
+    "traits": [
+      "overtake_artist",
+      "nervous"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "hot_streaker",
+      "fragile_ego"
+    ],
+    "nationality": "bulgarian"
+  },
+  {
+    "name": "Noel Leon",
+    "team": null,
+    "cornering": 15,
+    "braking": 12,
+    "consistency": 14,
+    "smoothness": 13,
+    "control": 13,
+    "age": 21,
+    "history": {
+      "seasons": 0,
+      "championships": 0,
+      "wins": 0,
+      "podiums": 0,
+      "poles": 0
+    },
+    "talent": 79,
+    "traits": [
+      "bottlejob",
+      "clean_air_merchant"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "mexican"
+  },
+  {
+    "name": "Antonio Giovinazzi",
+    "team": "Scuderia Ferrari",
+    "cornering": 13,
+    "braking": 15,
+    "consistency": 16,
+    "smoothness": 14,
+    "control": 12,
+    "age": 32,
+    "talent": 73,
+    "contract": {
+      "team": "Scuderia Ferrari",
+      "length_weeks": 156,
+      "salary_m": 1.2000000000000002,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "crash_happy"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "italian",
+    "history": {},
+    "balance_preference": 90.0,
+    "traction_preference": 90.0,
+    "role": "reserve"
+  },
+  {
+    "name": "Kyle Kirkwoord",
+    "team": "",
+    "cornering": 12,
+    "braking": 16,
+    "consistency": 17,
+    "smoothness": 14,
+    "control": 14,
+    "age": 27,
+    "talent": 82,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "mechanic",
+      "cautious"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor",
+      "security_seeker"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 20.0,
+    "traction_preference": 20.0
+  },
+  {
+    "name": "Josef Newgarden",
+    "team": "",
+    "cornering": 17,
+    "braking": 16,
+    "consistency": 17,
+    "smoothness": 14,
+    "control": 15,
+    "age": 34,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "mechanic",
+      "overtake_artist"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "security_seeker"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Sting Ray Robb",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 12,
+    "control": 14,
+    "age": 24,
+    "talent": 50,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "crash_happy"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "media_darling",
+      "team_player"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Pato O'Ward",
+    "team": "",
+    "cornering": 16,
+    "braking": 17,
+    "consistency": 12,
+    "smoothness": 16,
+    "control": 14,
+    "age": 27,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 104,
+      "salary_m": 2.000000000000001,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "security_seeker",
+      "team_player"
+    ],
+    "nationality": "mexican",
+    "history": {}
+  },
+  {
+    "name": "Valentino Rossi",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 11,
+    "smoothness": 11,
+    "control": 11,
+    "age": 47,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "short_termist"
+    ],
+    "nationality": "italian",
+    "history": {},
+    "traction_preference": 80.0,
+    "balance_preference": 70.0
+  },
+  {
+    "name": "Mike Dawton",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 13,
+    "smoothness": 12,
+    "control": 12,
+    "age": 20,
+    "talent": 75,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "ambitious"
+    ],
+    "nationality": "canadian",
+    "history": {}
+  },
+  {
+    "name": "Brendon Hartley",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 16,
+    "smoothness": 12,
+    "control": 14,
+    "age": 36,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "hotlapper"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man"
+    ],
+    "nationality": "new_zealander",
+    "history": {
+      "seasons": 2
+    }
+  },
+  {
+    "name": "Kevin Magnussen",
+    "team": "",
+    "cornering": 16,
+    "braking": 17,
+    "consistency": 14,
+    "smoothness": 8,
+    "control": 12,
+    "age": 33,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "crash_happy",
+      "nervous"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "comeback_artist",
+      "security_seeker"
+    ],
+    "nationality": "danish",
+    "history": {
+      "poles": 1,
+      "podiums": 1,
+      "seasons": 9
+    },
+    "balance_preference": 10.0,
+    "traction_preference": 12.0
+  },
+  {
+    "name": "Jack Aitken",
+    "team": "",
+    "cornering": 15,
+    "braking": 12,
+    "consistency": 17,
+    "smoothness": 9,
+    "control": 8,
+    "age": 30,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "crash_happy"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "british",
+    "history": {
+      "seasons": 1,
+      "starts": 1
+    }
+  },
+  {
+    "name": "Francisco Guimora",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 8,
+    "control": 9,
+    "age": 14,
+    "talent": 86,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "rainmaster",
+      "tyre_whisperer"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "short_termist",
+      "company_man"
+    ],
+    "nationality": "portuguese",
+    "history": {}
+  },
+  {
+    "name": "Robert Kubica",
+    "team": "",
+    "cornering": 14,
+    "braking": 12,
+    "consistency": 18,
+    "smoothness": 6,
+    "control": 12,
+    "age": 41,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "mechanic",
+      "clean_air_merchant"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "loyal",
+      "quiet_professional"
+    ],
+    "nationality": "polish",
+    "history": {
+      "seasons": 6,
+      "poles": 1,
+      "wins": 1,
+      "podiums": 12,
+      "points": 274,
+      "starts": 99
+    },
+    "balance_preference": 22.0,
+    "traction_preference": 25.0
+  },
+  {
+    "name": "Jenson Button",
+    "team": "",
+    "cornering": 13,
+    "braking": 14,
+    "consistency": 18,
+    "smoothness": 8,
+    "control": 14,
+    "age": 46,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious"
+    ],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "company_man"
+    ],
+    "nationality": "british",
+    "history": {
+      "championships": 1,
+      "seasons": 17,
+      "podiums": 50,
+      "poles": 8,
+      "wins": 15,
+      "starts": 306
+    },
+    "balance_preference": 12.0,
+    "traction_preference": 28.0
+  },
+  {
+    "name": "Guanyu Zhou",
+    "team": "",
+    "cornering": 12,
+    "braking": 16,
+    "consistency": 11,
+    "smoothness": 13,
+    "control": 14,
+    "age": 27,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "pay_driver",
+      "nervous"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "security_seeker"
+    ],
+    "nationality": "chinese",
+    "history": {
+      "starts": 68,
+      "seasons": 2
+    },
+    "balance_preference": 45.0,
+    "traction_preference": 62.0
+  },
+  {
+    "name": "Esteban Masson",
+    "team": "",
+    "cornering": 14,
+    "braking": 14,
+    "consistency": 16,
+    "smoothness": 14,
+    "control": 13,
+    "age": 21,
+    "talent": 97,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "tyre_whisperer"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "short_termist"
+    ],
+    "nationality": "french",
+    "history": {},
+    "balance_preference": 90.0,
+    "traction_preference": 80.0
+  },
+  {
+    "name": "Doriane Pin",
+    "team": "",
+    "cornering": 11,
+    "braking": 14,
+    "consistency": 17,
+    "smoothness": 13,
+    "control": 12,
+    "age": 22,
+    "talent": 85,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "overtake_artist",
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "team_player"
+    ],
+    "nationality": "french",
+    "history": {}
+  },
+  {
+    "name": "Christian Costoya",
+    "team": "",
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 8,
+    "age": 15,
+    "talent": 94,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer",
+      "overtake_artist"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "team_player",
+      "ambitious"
+    ],
+    "nationality": "spanish",
+    "history": {}
+  },
+  {
+    "name": "Luna Flux\u00e1",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 10,
+    "smoothness": 7,
+    "control": 8,
+    "age": 15,
+    "talent": 91,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "pay_driver"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "team_player"
+    ],
+    "nationality": "spanish",
+    "history": {},
+    "balance_preference": 22.0,
+    "traction_preference": 34.0
+  },
+  {
+    "name": "Dries Van Langendonck",
+    "team": "",
+    "cornering": 9,
+    "braking": 11,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 11,
+    "age": 15,
+    "talent": 94,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "belgian",
+    "history": {}
+  },
+  {
+    "name": "James Hayes",
+    "team": "",
+    "cornering": 6,
+    "braking": 6,
+    "consistency": 6,
+    "smoothness": 6,
+    "control": 6,
+    "age": 14,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "canadian",
+    "history": {}
+  },
+  {
+    "name": "Pascal Whehrlein",
+    "team": "",
+    "cornering": 18,
+    "braking": 17,
+    "consistency": 11,
+    "smoothness": 12,
+    "control": 12,
+    "age": 31,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "mercenary"
+    ],
+    "nationality": "german",
+    "history": {
+      "seasons": 2,
+      "poles": 0,
+      "starts": 39
+    },
+    "traction_preference": 10.0,
+    "balance_preference": 40.0
+  },
+  {
+    "name": "Pepe Mart\u00ed",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 13,
+    "age": 21,
+    "talent": 60,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_abuser",
+      "clean_air_merchant"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "spanish",
+    "history": {}
+  },
+  {
+    "name": "Dan Ticktum",
+    "team": "",
+    "cornering": 15,
+    "braking": 14,
+    "consistency": 12,
+    "smoothness": 13,
+    "control": 16,
+    "age": 27,
+    "talent": 77,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "crash_happy",
+      "hotlapper"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "fragile_ego"
+    ],
+    "nationality": "british",
+    "history": {}
+  },
+  {
+    "name": "Enzo Fitipaldi",
+    "team": "",
+    "cornering": 11,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 14,
+    "age": 24,
+    "talent": 77,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "bottlejob"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "brazilian",
+    "history": {},
+    "balance_preference": 50.0
+  },
+  {
+    "name": "Tymek Kucharczyk",
+    "team": "",
+    "cornering": 14,
+    "braking": 10,
+    "consistency": 12,
+    "smoothness": 13,
+    "control": 11,
+    "age": 21,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "rainmaster"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "polish",
+    "history": {},
+    "balance_preference": 70.0,
+    "traction_preference": 80.0
+  },
+  {
+    "name": "Kevin Estre",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 18,
+    "smoothness": 12,
+    "control": 12,
+    "age": 37,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "french",
+    "history": {}
+  },
+  {
+    "name": "Antonio Fuoco",
+    "team": "",
+    "cornering": 14,
+    "braking": 16,
+    "consistency": 15,
+    "smoothness": 8,
+    "control": 8,
+    "age": 30,
+    "talent": 62,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "italian",
+    "history": {}
+  },
+  {
+    "name": "Sean Gelael",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 15,
+    "smoothness": 10,
+    "control": 10,
+    "age": 29,
+    "talent": 59,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "nervous"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "indonesian",
+    "history": {}
+  },
+  {
+    "name": "Tom Slotz",
+    "team": "",
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 7,
+    "smoothness": 9,
+    "control": 8,
+    "age": 17,
+    "talent": 62,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver"
+    ],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "mercenary",
+      "ambitious"
+    ],
+    "nationality": "hungarian",
+    "history": {}
+  },
+  {
+    "name": "Kimi R\u00e4ikk\u00f6nen",
+    "team": "",
+    "cornering": 8,
+    "braking": 12,
+    "consistency": 13,
+    "smoothness": 12,
+    "control": 12,
+    "age": 46,
+    "talent": 90,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "finnish",
+    "history": {
+      "seasons": 19,
+      "championships": 1,
+      "starts": 349,
+      "podiums": 103,
+      "points": 1873,
+      "wins": 21,
+      "poles": 18
+    }
+  },
+  {
+    "name": "Kalle Rovanper\u00e4",
+    "team": "",
+    "cornering": 9,
+    "braking": 6,
+    "consistency": 5,
+    "smoothness": 5,
+    "control": 10,
+    "age": 25,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious",
+      "quiet_professional",
+      "short_termist"
+    ],
+    "nationality": "finnish",
+    "history": {},
+    "balance_preference": 70.0,
+    "traction_preference": 30.0
+  },
+  {
+    "name": "Clark Akkerman Jr",
+    "team": "",
+    "cornering": 6,
+    "braking": 3,
+    "consistency": 7,
+    "smoothness": 5,
+    "control": 4,
+    "age": 15,
+    "talent": 96,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "ambitious"
+    ],
+    "nationality": "austrian",
+    "history": {}
+  },
+  {
+    "name": "Xavier Peugeot",
+    "team": "",
+    "cornering": 4,
+    "braking": 5,
+    "consistency": 6,
+    "smoothness": 5,
+    "control": 4,
+    "age": 14,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant",
+      "rainmaster"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "french",
+    "history": {}
+  },
+  {
+    "name": "Marcus Ericsson",
+    "team": "",
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 16,
+    "smoothness": 14,
+    "control": 12,
+    "age": 35,
+    "talent": 54,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "crash_happy"
+    ],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "company_man"
+    ],
+    "nationality": "swedish",
+    "history": {
+      "seasons": 4,
+      "starts": 97,
+      "points": 18
+    }
+  },
+  {
+    "name": "Rinus VeeKay",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 13,
+    "control": 12,
+    "age": 25,
+    "talent": 54,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "tyre_abuser"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "ambitious"
+    ],
+    "nationality": "dutch",
+    "history": {}
+  },
+  {
+    "name": "Takuma Sato",
+    "team": "",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 10,
+    "smoothness": 13,
+    "control": 13,
+    "age": 49,
+    "talent": 64,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "japanese",
+    "history": {
+      "podiums": 1,
+      "points": 44,
+      "wins": 0,
+      "seasons": 6,
+      "starts": 90
+    },
+    "balance_preference": 50.0
+  },
+  {
+    "name": "Scott Dixon",
+    "team": "",
+    "cornering": 14,
+    "braking": 16,
+    "consistency": 15,
+    "smoothness": 12,
+    "control": 15,
+    "age": 46,
+    "talent": 85,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "new_zealander",
+    "history": {},
+    "balance_preference": 50.0
+  },
+  {
+    "name": "David Malukas",
+    "team": "",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 12,
+    "age": 24,
+    "talent": 76,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "cautious"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "short_termist"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 12.0,
+    "traction_preference": 17.0
+  },
+  {
+    "name": "Ryan Hunter-Ray",
+    "team": "",
+    "cornering": 15,
+    "braking": 15,
+    "consistency": 17,
+    "smoothness": 15,
+    "control": 14,
+    "age": 45,
+    "talent": 97,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "overtake_artist"
+    ],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "comeback_artist"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 90.0,
+    "traction_preference": 77.0
+  },
+  {
+    "name": "Leonard Alonso",
+    "team": "",
+    "cornering": 1,
+    "braking": 1,
+    "consistency": 1,
+    "smoothness": 1,
+    "control": 1,
+    "age": 1,
+    "talent": 100,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "tyre_whisperer"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "glory_hunter",
+      "ambitious"
+    ],
+    "nationality": "spanish",
+    "history": {},
+    "balance_preference": 70.0,
+    "traction_preference": 82.0
+  },
+  {
+    "name": "Daniel Juncadella",
+    "team": "",
+    "cornering": 12,
+    "braking": 14,
+    "consistency": 19,
+    "smoothness": 12,
+    "control": 12,
+    "age": 35,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "rainmaster"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "spanish",
+    "history": {},
+    "balance_preference": 12.0,
+    "traction_preference": 15.0
+  },
+  {
+    "name": "Will Stevens",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "age": 35,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "nervous"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "fragile_ego"
+    ],
+    "nationality": "british",
+    "history": {
+      "starts": 18,
+      "seasons": 2
+    }
+  },
+  {
+    "name": "Sebastian Vettel",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "german",
+    "retired": true,
+    "history": {
+      "seasons": 16,
+      "starts": 299,
+      "wins": 53,
+      "championships": 4,
+      "points": 3098,
+      "podiums": 112,
+      "poles": 57
+    }
+  },
+  {
+    "name": "Tobbias Verstappen",
+    "team": "",
+    "cornering": 1,
+    "braking": 1,
+    "consistency": 1,
+    "smoothness": 1,
+    "control": 1,
+    "age": 1,
+    "talent": 85,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "dutch",
+    "history": {
+      "seasons": 0,
+      "starts": 0,
+      "wins": 0,
+      "championships": 0,
+      "points": 0,
+      "podiums": 0,
+      "poles": 0
+    }
+  },
+  {
+    "name": "Jacob Micallef",
+    "team": "",
+    "cornering": 7,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 6,
+    "control": 5,
+    "age": 16,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "short_termist",
+    "personalities": [
+      "nervous"
+    ],
+    "nationality": "maltese",
+    "history": {},
+    "balance_preference": 62.0,
+    "traction_preference": 55.0
+  },
+  {
+    "name": "Felix Rosenqvist",
+    "team": "",
+    "cornering": 11,
+    "braking": 9,
+    "consistency": 14,
+    "smoothness": 11,
+    "control": 15,
+    "age": 34,
+    "talent": 52,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "mechanic"
+    ],
+    "nationality": "swedish",
+    "history": {},
+    "balance_preference": 62.0,
+    "traction_preference": 55.0
+  },
+  {
+    "name": "Graham Rahal",
+    "team": "",
+    "cornering": 13,
+    "braking": 15,
+    "consistency": 10,
+    "smoothness": 12,
+    "control": 14,
+    "age": 37,
+    "talent": 52,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "mechanic"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 42.0,
+    "traction_preference": 38.0
+  },
+  {
+    "name": "Santino Ferrucci",
+    "team": "",
+    "cornering": 15,
+    "braking": 15,
+    "consistency": 7,
+    "smoothness": 8,
+    "control": 17,
+    "age": 28,
+    "talent": 66,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "fragile_ego",
+    "personalities": [
+      "glory_hunter"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 42.0,
+    "traction_preference": 38.0
+  },
+  {
+    "name": "S\u00e9bastien Buemi",
+    "team": "",
+    "cornering": 12,
+    "braking": 15,
+    "consistency": 17,
+    "smoothness": 9,
+    "control": 13,
+    "age": 37,
+    "talent": 81,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "bottlejob"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "security_seeker"
+    ],
+    "nationality": "swiss",
+    "history": {
+      "wins": 0,
+      "starts": 55,
+      "seasons": 3,
+      "championships": 0,
+      "podiums": 0,
+      "points": 29
+    },
+    "balance_preference": 70.0,
+    "traction_preference": 32.0
+  },
+  {
+    "name": "Leonardo Fornaroli",
+    "team": "McLaren Racing",
+    "cornering": 5,
+    "braking": 13,
+    "consistency": 16,
+    "smoothness": 13,
+    "control": 15,
+    "age": 21,
+    "talent": 93,
+    "contract": {
+      "team": "McLaren Racing",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "tyre_whisperer",
+      "pay_driver"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "short_termist"
+    ],
+    "nationality": "italian",
+    "history": {},
+    "role": "reserve"
+  },
+  {
+    "name": "Roland Nagy",
+    "team": "",
+    "cornering": 5,
+    "braking": 10,
+    "consistency": 5,
+    "smoothness": 6,
+    "control": 7,
+    "age": 14,
+    "talent": 81,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "rainmaster",
+      "clean_air_merchant"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker"
+    ],
+    "nationality": "hungarian",
+    "history": {},
+    "balance_preference": 30.0,
+    "traction_preference": 35.0
+  },
+  {
+    "name": "Santiago Vermont",
+    "team": "",
+    "cornering": 8,
+    "braking": 7,
+    "consistency": 8,
+    "smoothness": 7,
+    "control": 8,
+    "age": 15,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Mang Lee",
+    "team": "",
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 7,
+    "smoothness": 9,
+    "control": 9,
+    "age": 14,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "nervous"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker"
+    ],
+    "nationality": "hong_konger",
+    "history": {}
+  },
+  {
+    "name": "Ferdinanz Van der Putten",
+    "team": "",
+    "cornering": 8,
+    "braking": 5,
+    "consistency": 9,
+    "smoothness": 8,
+    "control": 8,
+    "age": 14,
+    "talent": 75,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "fragile_ego",
+      "short_termist"
+    ],
+    "nationality": "dutch",
+    "history": {}
+  },
+  {
+    "name": "Mat\u00edas Evora",
+    "team": "",
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 12,
+    "smoothness": 9,
+    "control": 9,
+    "age": 14,
+    "talent": 95,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional",
+      "company_man"
+    ],
+    "nationality": "portuguese",
+    "history": {
+      "starts": 0
+    }
+  },
+  {
+    "name": "Yifei Ye",
+    "team": "",
+    "cornering": 7,
+    "braking": 9,
+    "consistency": 15,
+    "smoothness": 8,
+    "control": 9,
+    "age": 26,
+    "talent": 66,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "tyre_abuser"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "chinese",
+    "history": {}
+  },
+  {
+    "name": "Daniil Kvyat",
+    "team": "",
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 17,
+    "smoothness": 14,
+    "control": 8,
+    "age": 32,
+    "talent": 81,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "bottlejob",
+      "mechanic"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "team_player"
+    ],
+    "nationality": "russian",
+    "history": {
+      "seasons": 5,
+      "starts": 110,
+      "points": 202,
+      "podiums": 3
+    },
+    "balance_preference": 30.0,
+    "traction_preference": 70.0
+  },
+  {
+    "name": "Nick De Vries",
+    "team": "",
+    "cornering": 11,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 8,
+    "control": 13,
+    "age": 31,
+    "talent": 57,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "clean_air_merchant"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "ambitious",
+      "security_seeker"
+    ],
+    "nationality": "dutch",
+    "history": {
+      "starts": 11,
+      "poles": 0,
+      "points": 2,
+      "seasons": 2
+    }
+  },
+  {
+    "name": "Kamui Kobayashi",
+    "team": "",
+    "cornering": 8,
+    "braking": 14,
+    "consistency": 19,
+    "smoothness": 13,
+    "control": 15,
+    "age": 39,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant",
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "japanese",
+    "history": {
+      "starts": 75,
+      "poles": 0,
+      "podiums": 1,
+      "points": 125,
+      "seasons": 5
+    }
+  },
+  {
+    "name": "Kakunosin Ohta",
+    "team": "",
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 15,
+    "smoothness": 9,
+    "control": 13,
+    "age": 27,
+    "talent": 81,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "hotlapper"
+    ],
+    "personality": "security_seeker",
+    "personalities": [
+      "security_seeker",
+      "company_man"
+    ],
+    "nationality": "japanese",
+    "history": {}
+  },
+  {
+    "name": "Bruce McQueen",
+    "team": "",
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "age": 18,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "overtake_artist"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "ambitious",
+      "team_player"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 70.0,
+    "traction_preference": 54.0
+  },
+  {
+    "name": "James Cluj",
+    "team": "",
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 10,
+    "smoothness": 9,
+    "control": 8,
+    "age": 19,
+    "talent": 66,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "nervous"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "romanian",
+    "history": {}
+  },
+  {
+    "name": "Felipe Nsar",
+    "team": "",
+    "cornering": 9,
+    "braking": 15,
+    "consistency": 17,
+    "smoothness": 9,
+    "control": 9,
+    "age": 33,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "rainmaster"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "fragile_ego"
+    ],
+    "nationality": "brazilian",
+    "history": {
+      "seasons": 2,
+      "starts": 39,
+      "podiums": 0,
+      "wins": 0,
+      "points": 29
+    },
+    "balance_preference": 32.0,
+    "traction_preference": 22.0
+  },
+  {
+    "name": "Juju Noda",
+    "team": "",
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 11,
+    "smoothness": 13,
+    "control": 14,
+    "age": 20,
+    "talent": 88,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer",
+      "pay_driver"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "ambitious",
+      "short_termist"
+    ],
+    "nationality": "japanese",
+    "history": {},
+    "balance_preference": 79.0,
+    "traction_preference": 32.0
+  },
+  {
+    "name": "Igor Fraga",
+    "team": "",
+    "cornering": 9,
+    "braking": 14,
+    "consistency": 17,
+    "smoothness": 13,
+    "control": 8,
+    "age": 27,
+    "talent": 68,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant",
+      "cautious"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "security_seeker"
+    ],
+    "nationality": "brazilian",
+    "history": {},
+    "traction_preference": 68.0,
+    "balance_preference": 91.0
+  },
+  {
+    "name": "Connor Zilisch",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "age": 20,
+    "talent": 79,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "comeback_artist",
+      "short_termist"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Chiara B\u00e4tting",
+    "team": "",
+    "cornering": 10,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "age": 16,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "hotlapper"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "quiet_professional"
+    ],
+    "nationality": "swiss",
+    "history": {}
+  },
+  {
+    "name": "Shane van Gisbergen",
+    "team": "",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 14,
+    "control": 15,
+    "age": 37,
+    "talent": 77,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "hotlapper"
+    ],
+    "personality": "security_seeker",
+    "personalities": [
+      "security_seeker",
+      "mentor"
+    ],
+    "nationality": "new_zealander",
+    "history": {}
+  },
+  {
+    "name": "Corey Heim",
+    "team": "",
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 9,
+    "smoothness": 11,
+    "control": 12,
+    "age": 24,
+    "talent": 79,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Louis Foster",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 10,
+    "smoothness": 12,
+    "control": 12,
+    "age": 23,
+    "talent": 76,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_abuser",
+      "nervous"
+    ],
+    "personality": "security_seeker",
+    "personalities": [
+      "security_seeker"
+    ],
+    "nationality": "british",
+    "history": {}
+  },
+  {
+    "name": "Nico Pino",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 17,
+    "smoothness": 8,
+    "control": 11,
+    "age": 21,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "cautious"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "quiet_professional"
+    ],
+    "nationality": "chilean",
+    "history": {},
+    "balance_preference": 22.0,
+    "traction_preference": 73.0
+  },
+  {
+    "name": "Jordan Taylor",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 14,
+    "smoothness": 11,
+    "control": 12,
+    "age": 35,
+    "talent": 20,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Rick Taylor",
+    "team": "",
+    "cornering": 11,
+    "braking": 12,
+    "consistency": 15,
+    "smoothness": 11,
+    "control": 12,
+    "age": 37,
+    "talent": 55,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "company_man"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Patrick Chujian",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 6,
+    "smoothness": 9,
+    "control": 8,
+    "age": 14,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "crash_happy",
+      "bottlejob"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "hong_konger",
+    "history": {}
+  },
+  {
+    "name": "Valentin Manzi",
+    "team": "",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 19,
+    "smoothness": 12,
+    "control": 15,
+    "age": 26,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "nervous",
+      "rainmaster"
+    ],
+    "personality": "media_darling",
+    "personalities": [
+      "media_darling",
+      "fragile_ego",
+      "team_player"
+    ],
+    "nationality": "rwandan",
+    "history": {}
+  },
+  {
+    "name": "Giancarlo del Castello",
+    "team": "",
+    "cornering": 12,
+    "braking": 14,
+    "consistency": 15,
+    "smoothness": 11,
+    "control": 12,
+    "age": 24,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "italian",
+    "history": {}
+  },
+  {
+    "name": "Santiago Cervantes",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 11,
+    "smoothness": 11,
+    "control": 10,
+    "age": 20,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "chilean",
+    "history": {}
+  },
+  {
+    "name": "Tekito Soseki",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "age": 17,
+    "talent": 81,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional"
+    ],
+    "nationality": "japanese",
+    "history": {}
+  },
+  {
+    "name": "Andrea Fangio IV",
+    "team": "",
+    "cornering": 1,
+    "braking": 1,
+    "consistency": 1,
+    "smoothness": 1,
+    "control": 1,
+    "age": 14,
+    "talent": 83,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "italian",
+    "history": {}
+  },
+  {
+    "name": "Jack Wolff",
+    "team": "",
+    "cornering": 4,
+    "braking": 3,
+    "consistency": 3,
+    "smoothness": 3,
+    "control": 4,
+    "age": 8,
+    "talent": 91,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor",
+      "hot_streaker"
+    ],
+    "nationality": "austrian",
+    "history": {}
+  },
+  {
+    "name": "Paul Aron",
+    "team": "Alpine",
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 13,
+    "smoothness": 12,
+    "control": 12,
+    "age": 22,
+    "talent": 73,
+    "contract": {
+      "team": "Alpine",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "pay_driver",
+      "mechanic"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "ambitious"
+    ],
+    "nationality": "estonian",
+    "history": {},
+    "role": "reserve"
+  },
+  {
+    "name": "Melvin Kalousdian",
+    "team": "",
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 7,
+    "smoothness": 8,
+    "control": 8,
+    "age": 14,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "crash_happy"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "hot_streaker",
+      "team_player"
+    ],
+    "nationality": "swedish",
+    "history": {}
+  },
+  {
+    "name": "Lucas Auer",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 10,
+    "smoothness": 13,
+    "control": 12,
+    "age": 31,
+    "talent": 61,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "overtake_artist",
+      "hotlapper"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor",
+      "hot_streaker",
+      "security_seeker"
+    ],
+    "nationality": "austrian",
+    "history": {},
+    "role": "reserve"
+  },
+  {
+    "name": "Yume Tanaka",
+    "team": "",
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 18,
+    "smoothness": 12,
+    "control": 11,
+    "age": 31,
+    "talent": 66,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "japanese",
+    "history": {},
+    "balance_preference": 56.0,
+    "traction_preference": 53.0
+  },
+  {
+    "name": "Laura Carvalho",
+    "team": "",
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 17,
+    "smoothness": 13,
+    "control": 13,
+    "age": 29,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "mechanic"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor"
+    ],
+    "nationality": "brazilian",
+    "history": {},
+    "balance_preference": 55.0,
+    "traction_preference": 56.0
+  },
+  {
+    "name": "Calum Illot",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 17,
+    "smoothness": 12,
+    "control": 12,
+    "age": 27,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "tyre_abuser"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "loyal",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "history": {},
+    "balance_preference": 30.0,
+    "traction_preference": 22.0
+  },
+  {
+    "name": "Robert Shwartzman",
+    "team": "",
+    "cornering": 15,
+    "braking": 13,
+    "consistency": 16,
+    "smoothness": 12,
+    "control": 9,
+    "age": 26,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant",
+      "pay_driver"
+    ],
+    "personality": "mentor",
+    "personalities": [
+      "mentor",
+      "company_man"
+    ],
+    "nationality": "israeli",
+    "history": {},
+    "balance_preference": 70.0,
+    "traction_preference": 40.0
+  },
+  {
+    "name": "Alberto Di Mario",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 10,
+    "smoothness": 8,
+    "control": 8,
+    "age": 14,
+    "talent": 99,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "overtake_artist",
+      "tyre_whisperer"
+    ],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter",
+      "ambitious"
+    ],
+    "nationality": "san_marinese",
+    "history": {},
+    "balance_preference": 38.0,
+    "traction_preference": 73.0
+  },
+  {
+    "name": "Marino Sato",
+    "team": "",
+    "cornering": 13,
+    "braking": 12,
+    "consistency": 8,
+    "smoothness": 13,
+    "control": 13,
+    "age": 27,
+    "talent": 65,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "bottlejob"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "fragile_ego",
+      "team_player"
+    ],
+    "nationality": "japanese",
+    "history": {}
+  },
+  {
+    "name": "Mark Webber",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "age": 47,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "australian",
+    "retired": true,
+    "history": {
+      "starts": 215,
+      "seasons": 12,
+      "poles": 13,
+      "wins": 9,
+      "podiums": 42,
+      "points": 1048
+    }
+  },
+  {
+    "name": "Michael Schumacher",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "age": 20,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "german",
+    "retired": true,
+    "history": {
+      "seasons": 19,
+      "starts": 306,
+      "wins": 91,
+      "championships": 7,
+      "podiums": 155,
+      "poles": 68,
+      "points": 1566
+    }
+  },
+  {
+    "name": "Max Esterson",
+    "team": "",
+    "cornering": 9,
+    "braking": 11,
+    "consistency": 15,
+    "smoothness": 12,
+    "control": 13,
+    "age": 23,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "nervous"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "company_man"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Mick Schumacher",
+    "team": "",
+    "cornering": 11,
+    "braking": 15,
+    "consistency": 17,
+    "smoothness": 7,
+    "control": 8,
+    "age": 27,
+    "talent": 79,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "bottlejob"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "fragile_ego",
+      "short_termist"
+    ],
+    "nationality": "german",
+    "history": {
+      "seasons": 2,
+      "starts": 43,
+      "podiums": 0,
+      "points": 12
+    }
+  },
+  {
+    "name": "Nolan Siegel",
+    "team": "",
+    "cornering": 10,
+    "braking": 10,
+    "consistency": 10,
+    "smoothness": 10,
+    "control": 10,
+    "age": 21,
+    "talent": 42,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver",
+      "bottlejob"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker",
+      "team_player",
+      "comeback_artist"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Alp Aksoy",
+    "team": "",
+    "cornering": 9,
+    "braking": 10,
+    "consistency": 8,
+    "smoothness": 7,
+    "control": 9,
+    "age": 15,
+    "talent": 67,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "pay_driver"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man"
+    ],
+    "nationality": "turkish",
+    "history": {},
+    "balance_preference": 50.0
+  },
+  {
+    "name": "Edu Robinson",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 11,
+    "control": 11,
+    "age": 16,
+    "talent": 67,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "rainmaster",
+      "bottlejob"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "spanish",
+    "history": {}
+  },
+  {
+    "name": "Nicolo Maccagnani",
+    "team": "",
+    "cornering": 12,
+    "braking": 9,
+    "consistency": 9,
+    "smoothness": 7,
+    "control": 8,
+    "age": 20,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer",
+      "mechanic"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego"
+    ],
+    "nationality": "italian",
+    "history": {},
+    "balance_preference": 45.0,
+    "traction_preference": 44.0
+  },
+  {
+    "name": "Elia Weiss",
+    "team": "",
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 7,
+    "control": 9,
+    "age": 16,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant",
+      "pay_driver"
+    ],
+    "personality": "fragile_ego",
+    "personalities": [
+      "fragile_ego"
+    ],
+    "nationality": "german",
+    "history": {}
+  },
+  {
+    "name": "Matteo Mazzanti",
+    "team": "",
+    "cornering": 7,
+    "braking": 9,
+    "consistency": 7,
+    "smoothness": 8,
+    "control": 10,
+    "age": 14,
+    "talent": 74,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "glory_hunter",
+    "personalities": [
+      "glory_hunter"
+    ],
+    "nationality": "san_marinese",
+    "history": {}
+  },
+  {
+    "name": "Alessandro de Tullio",
+    "team": "",
+    "cornering": 12,
+    "braking": 12,
+    "consistency": 12,
+    "smoothness": 11,
+    "control": 12,
+    "age": 20,
+    "talent": 77,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "hotlapper"
+    ],
+    "personality": "quiet_professional",
+    "personalities": [
+      "quiet_professional"
+    ],
+    "nationality": "argentine",
+    "history": {}
+  },
+  {
+    "name": "Tyler Gonzalez",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 11,
+    "smoothness": 11,
+    "control": 11,
+    "age": 15,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient"
+    ],
+    "nationality": "filipino",
+    "history": {}
+  },
+  {
+    "name": "Noah Baglin",
+    "team": "",
+    "cornering": 5,
+    "braking": 4,
+    "consistency": 5,
+    "smoothness": 7,
+    "control": 6,
+    "age": 14,
+    "talent": 77,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "overtake_artist"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious"
+    ],
+    "nationality": "british",
+    "history": {},
+    "balance_preference": 47.0,
+    "traction_preference": 47.0
+  },
+  {
+    "name": "Oliver Rosberg",
+    "team": "",
+    "cornering": 3,
+    "braking": 3,
+    "consistency": 3,
+    "smoothness": 3,
+    "control": 3,
+    "age": -7,
+    "talent": 92,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "german",
+    "history": {}
+  },
+  {
+    "name": "Nico Rosberg",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 20,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "german",
+    "retired": true,
+    "history": {
+      "wins": 23,
+      "starts": 206,
+      "podiums": 57,
+      "seasons": 10,
+      "poles": 30,
+      "championships": 1,
+      "points": 1595
+    }
+  },
+  {
+    "name": "Juan Manuel Fangio",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 65,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "argentine",
+    "retired": true,
+    "history": {
+      "seasons": 0,
+      "wins": 24,
+      "championships": 5,
+      "starts": 51,
+      "poles": 29,
+      "podiums": 35,
+      "points": 245
+    }
+  },
+  {
+    "name": "Alberto Ascari",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 36,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "italian",
+    "retired": true,
+    "history": {
+      "championships": 2,
+      "wins": 13,
+      "starts": 32,
+      "seasons": 5,
+      "poles": 14,
+      "podiums": 17,
+      "points": 108
+    }
+  },
+  {
+    "name": "Giuseppe Farina",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 65,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "italian",
+    "retired": true,
+    "history": {
+      "seasons": 6,
+      "wins": 5,
+      "starts": 33,
+      "poles": 5,
+      "championships": 1,
+      "podiums": 20,
+      "points": 116
+    }
+  },
+  {
+    "name": "Rob Andretti",
+    "team": "",
+    "cornering": 2,
+    "braking": 2,
+    "consistency": 2,
+    "smoothness": 2,
+    "control": 2,
+    "age": -5,
+    "talent": 86,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "american",
+    "history": {}
+  },
+  {
+    "name": "Jake Dennis",
+    "team": "",
+    "cornering": 13,
+    "braking": 11,
+    "consistency": 17,
+    "smoothness": 13,
+    "control": 9,
+    "age": 31,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer",
+      "mechanic"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker"
+    ],
+    "nationality": "british",
+    "history": {}
+  },
+  {
+    "name": "Taylor Barnard",
+    "team": "",
+    "cornering": 13,
+    "braking": 13,
+    "consistency": 13,
+    "smoothness": 8,
+    "control": 13,
+    "age": 22,
+    "talent": 78,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "british",
+    "history": {}
+  },
+  {
+    "name": "Caio Collet",
+    "team": "",
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 14,
+    "smoothness": 12,
+    "control": 13,
+    "age": 24,
+    "talent": 76,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "mechanic",
+      "pay_driver"
+    ],
+    "personality": "comeback_artist",
+    "personalities": [
+      "comeback_artist",
+      "team_player"
+    ],
+    "nationality": "brazilian",
+    "history": {}
+  },
+  {
+    "name": "Scott McLaughlin",
+    "team": "",
+    "cornering": 14,
+    "braking": 14,
+    "consistency": 12,
+    "smoothness": 15,
+    "control": 15,
+    "age": 33,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "hotlapper",
+      "mechanic"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "short_termist"
+    ],
+    "nationality": "new_zealander",
+    "history": {},
+    "balance_preference": 43.0,
+    "traction_preference": 63.0
+  },
+  {
+    "name": "Alex O'Grady",
+    "team": "",
+    "cornering": 9,
+    "braking": 8,
+    "consistency": 7,
+    "smoothness": 9,
+    "control": 8,
+    "age": 17,
+    "talent": 79,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man"
+    ],
+    "nationality": "irish",
+    "history": {},
+    "balance_preference": 41.0,
+    "traction_preference": 36.0
+  },
+  {
+    "name": "Thibaut Ramaekers",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 9,
+    "smoothness": 6,
+    "control": 8,
+    "age": 16,
+    "talent": 87,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man"
+    ],
+    "nationality": "belgian",
+    "history": {},
+    "balance_preference": 22.0,
+    "traction_preference": 89.0
+  },
+  {
+    "name": "Kabir Anurag",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 9,
+    "control": 8,
+    "age": 19,
+    "talent": 73,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "singaporean",
+    "history": {}
+  },
+  {
+    "name": "Yuki Tsunoda",
+    "team": "Red Bull Racing",
+    "cornering": 16,
+    "braking": 14,
+    "consistency": 9,
+    "smoothness": 12,
+    "control": 16,
+    "age": 26,
+    "talent": 78,
+    "contract": {
+      "team": "Red Bull Racing",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal",
+      "role": "reserve"
+    },
+    "traits": [
+      "bottlejob",
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal",
+      "comeback_artist",
+      "security_seeker"
+    ],
+    "nationality": "japanese",
+    "history": {
+      "seasons": 5,
+      "starts": 111,
+      "points": 124
+    },
+    "role": "reserve"
+  },
+  {
+    "name": "Alain Prost",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "french",
+    "retired": true,
+    "history": {
+      "seasons": 13,
+      "starts": 199,
+      "wins": 51,
+      "championships": 4,
+      "points": 798,
+      "podiums": 106,
+      "poles": 33
+    }
+  },
+  {
+    "name": "Ayrton Senna",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "brazilian",
+    "retired": true,
+    "history": {
+      "seasons": 11,
+      "starts": 161,
+      "wins": 41,
+      "championships": 3,
+      "points": 614,
+      "podiums": 80,
+      "poles": 65
+    }
+  },
+  {
+    "name": "Nigel Mansell",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 15,
+      "starts": 187,
+      "wins": 31,
+      "championships": 1,
+      "points": 482,
+      "podiums": 59,
+      "poles": 32
+    }
+  },
+  {
+    "name": "Jackie Stewart",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 9,
+      "starts": 99,
+      "wins": 27,
+      "championships": 3,
+      "points": 360,
+      "podiums": 43,
+      "poles": 17
+    }
+  },
+  {
+    "name": "Jim Clark",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 9,
+      "starts": 72,
+      "wins": 25,
+      "championships": 2,
+      "points": 274,
+      "podiums": 32,
+      "poles": 33
+    }
+  },
+  {
+    "name": "Niki Lauda",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "austrian",
+    "retired": true,
+    "history": {
+      "seasons": 13,
+      "starts": 171,
+      "wins": 25,
+      "championships": 3,
+      "points": 420,
+      "podiums": 54,
+      "poles": 24
+    }
+  },
+  {
+    "name": "Nelson Piquet",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "brazilian",
+    "retired": true,
+    "history": {
+      "seasons": 14,
+      "starts": 204,
+      "wins": 23,
+      "championships": 3,
+      "points": 485,
+      "podiums": 60,
+      "poles": 24
+    }
+  },
+  {
+    "name": "Damon Hill",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 8,
+      "starts": 115,
+      "wins": 22,
+      "championships": 1,
+      "points": 360,
+      "podiums": 42,
+      "poles": 20
+    }
+  },
+  {
+    "name": "Mika Hakkinen",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "finnish",
+    "retired": true,
+    "history": {
+      "seasons": 11,
+      "starts": 161,
+      "wins": 20,
+      "championships": 2,
+      "points": 420,
+      "podiums": 51,
+      "poles": 26
+    }
+  },
+  {
+    "name": "Stirling Moss",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 11,
+      "starts": 66,
+      "wins": 16,
+      "championships": 0,
+      "points": 187,
+      "podiums": 24,
+      "poles": 16
+    }
+  },
+  {
+    "name": "Graham Hill",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "british",
+    "retired": true,
+    "history": {
+      "seasons": 18,
+      "starts": 175,
+      "wins": 14,
+      "championships": 2,
+      "points": 289,
+      "podiums": 36,
+      "poles": 13
+    }
+  },
+  {
+    "name": "Jack Brabham",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "australian",
+    "retired": true,
+    "history": {
+      "seasons": 16,
+      "starts": 123,
+      "wins": 14,
+      "championships": 3,
+      "points": 261,
+      "podiums": 31,
+      "poles": 13
+    }
+  },
+  {
+    "name": "Emerson Fittipaldi",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 8,
+    "age": 39,
+    "talent": 1,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 100.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "ambitious"
+    ],
+    "nationality": "brazilian",
+    "retired": true,
+    "history": {
+      "seasons": 11,
+      "starts": 144,
+      "wins": 14,
+      "championships": 2,
+      "points": 281,
+      "podiums": 35,
+      "poles": 6
+    }
+  },
+  {
+    "name": "Thomas Preining",
+    "team": "",
+    "cornering": 12,
+    "braking": 13,
+    "consistency": 12,
+    "smoothness": 13,
+    "control": 10,
+    "age": 28,
+    "talent": 70,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer",
+      "hotlapper"
+    ],
+    "personality": "company_man",
+    "personalities": [
+      "company_man",
+      "loyal",
+      "comeback_artist"
+    ],
+    "nationality": "austrian",
+    "history": {},
+    "balance_preference": 24.0,
+    "traction_preference": 89.0
+  },
+  {
+    "name": "Kush Maini",
+    "team": "",
+    "cornering": 9,
+    "braking": 10,
+    "consistency": 9,
+    "smoothness": 9,
+    "control": 9,
+    "age": 25,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1,
+      "status": "equal",
+      "priority": "equal"
+    },
+    "traits": [
+      "crash_happy",
+      "pay_driver"
+    ],
+    "personality": "impatient",
+    "personalities": [
+      "impatient",
+      "company_man",
+      "short_termist"
+    ],
+    "nationality": "indian",
+    "history": {},
+    "balance_preference": 32.0,
+    "traction_preference": 75.0
+  },
+  {
+    "name": "Damian Clunny",
+    "team": "",
+    "cornering": 9,
+    "braking": 9,
+    "consistency": 11,
+    "smoothness": 12,
+    "control": 11,
+    "age": 17,
+    "talent": 82,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "clean_air_merchant"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "french",
+    "history": {},
+    "balance_preference": 43.0,
+    "traction_preference": 53.0
+  },
+  {
+    "name": "Johs Pierson",
+    "team": "",
+    "cornering": 12,
+    "braking": 11,
+    "consistency": 16,
+    "smoothness": 12,
+    "control": 11,
+    "age": 20,
+    "talent": 78,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "overtake_artist",
+      "pay_driver"
+    ],
+    "personality": "hot_streaker",
+    "personalities": [
+      "hot_streaker"
+    ],
+    "nationality": "american",
+    "history": {},
+    "balance_preference": 20.0,
+    "traction_preference": 90.0
+  },
+  {
+    "name": "Thomas Strauven",
+    "team": "",
+    "cornering": 11,
+    "braking": 11,
+    "consistency": 14,
+    "smoothness": 11,
+    "control": 11,
+    "age": 18,
+    "talent": 90,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "cautious",
+      "mechanic"
+    ],
+    "personality": "ambitious",
+    "personalities": [
+      "ambitious"
+    ],
+    "nationality": "belgian",
+    "history": {}
+  },
+  {
+    "name": "Shar Al-Nataly",
+    "team": "",
+    "cornering": 8,
+    "braking": 8,
+    "consistency": 13,
+    "smoothness": 8,
+    "control": 9,
+    "age": 16,
+    "talent": 72,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "pay_driver"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "armenian",
+    "history": {}
+  },
+  {
+    "name": "Ean Eyckmans",
+    "team": "",
+    "cornering": 10,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 11,
+    "control": 9,
+    "age": 18,
+    "talent": 89,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [],
+    "personality": "company_man",
+    "personalities": [
+      "company_man"
+    ],
+    "nationality": "belgian",
+    "history": {}
+  },
+  {
+    "name": "Tom Buffon",
+    "team": "",
+    "cornering": 8,
+    "braking": 9,
+    "consistency": 8,
+    "smoothness": 8,
+    "control": 7,
+    "age": 14,
+    "talent": 69,
+    "contract": {
+      "team": "",
+      "length_weeks": 52,
+      "salary_m": 1.0,
+      "start_week": 1
+    },
+    "traits": [
+      "tyre_whisperer"
+    ],
+    "personality": "loyal",
+    "personalities": [
+      "loyal"
+    ],
+    "nationality": "czech",
+    "history": {}
+  }
+]
