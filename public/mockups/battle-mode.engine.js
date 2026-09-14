@@ -3870,13 +3870,48 @@
   const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
   // ZIELPRIORITAET — uebersteuert die Neigung der Persoenlichkeit.
   // Welche Zielwahl jede Persoenlichkeit von sich aus trifft — das ist der Stern-Eintrag.
-  const PERSZIEL={bollwerk:"naechster",draufgaenger:"naechster",duellant:"bedrohung",
-    schleicher:"hinten",beschuetzer:"naechster",opportunist:"schwach"};
+  //
+  // CHRIS AM 13.09. ZUM LIVE-TDM: „die charaktere suchen sich anscheinend einen gegner und
+  // hauen drauf aber es gibt gar nicht ne dynamik wo manche versuchen laut ihrem charakter
+  // oder stil eher die backrow oder sonstwas standardmaessig zu attacken."
+  //
+  // Er hat recht, und diese Tabelle war der Grund. DREI der sechs Archetypen standen auf
+  // "naechster" — bollwerk, draufgaenger UND beschuetzer. "naechster" ist aber gar keine
+  // Neigung, sondern die Abwesenheit einer: rein geometrisch, ohne jeden Bezug zur Reihe,
+  // zur Rolle oder zum Charakter. Von sechs Persoenlichkeiten hatte damit genau EINE
+  // (schleicher) ueberhaupt eine Stellungsabsicht — und die war ausgerechnet in Mini-DM ein
+  // stiller Leerlauf (s. hintersteReihe weiter unten). Wer keinen Schleicher im Kader hatte,
+  // sah im ganzen Kampf niemanden, der etwas anderes versuchte als den naechsten Koerper.
+  //
+  // ZWEI der drei bleiben unveraendert, und zwar begruendet:
+  //   duellant -> "bedrohung" und opportunist -> "schwach" sind echte, eingemessene
+  //   Neigungen und werden hier NICHT verwaessert.
+  //   bollwerk -> "naechster" bleibt ebenfalls: das Bollwerk IST der Schirm, "nimm, was auf
+  //   dich zukommt" ist fuer ihn eine Charakterisierung und kein Platzhalter.
+  // Die beiden anderen bekommen je eine eigene, STELLUNGSBEZOGENE Neigung (s. ZIELE):
+  //   draufgaenger -> "speer"   (die Spitze der gegnerischen Formation aufbrechen)
+  //   beschuetzer  -> "schild"  (den wegschlagen, der an den eigenen Leuten haengt)
+  // Fuenf verschiedene Neigungen auf sechs Archetypen, DREI davon lesen die Aufstellung
+  // (speer/hinten/schild) statt nur den Abstand.
+  //
+  // NICHT der Weg, den `docs/design/arena-mini-dm-tdm-battlefield-rollout-plan.md`
+  // Abschnitt 4.1 als "Option A" empfiehlt (alle drei "naechster" auf "bedrohung"). Der
+  // Plan ist aelter als Chris' Meldung und beantwortet eine ANDERE Frage — er sucht den
+  // staerksten rho-Hebel, Chris verlangt sichtbare VIELFALT. Option A haette vier von sechs
+  // Archetypen auf dieselbe Neigung gelegt und damit genau die Gleichfoermigkeit vergroessert,
+  // die er beanstandet; der Plan benennt diesen Nachteil selbst ("Fokusfeuer [...] wird zum
+  // Normalfall, nicht mehr zur Ausnahme"). Option C desselben Abschnitts — "Reihe/Formation
+  // bleibt der Skill-Kanal" — ist dagegen genau das, was der zweite Teil dieser Aenderung
+  // umsetzt (s. reihenAnker weiter unten).
+  const PERSZIEL={bollwerk:"naechster",draufgaenger:"speer",duellant:"bedrohung",
+    schleicher:"hinten",beschuetzer:"schild",opportunist:"schwach"};
   const ZIELE=[
     ["bedrohung","Größte Bedrohung","Greift den Gegner mit dem höchsten Angriffswert an, egal wie weit er entfernt ist."],
     ["schwach","Angeschlagensten","Greift den Gegner mit den wenigsten verbleibenden Lebenspunkten an — Fokusfeuer, um ihn schnell auszuschalten."],
     ["naechster","Nächsten","Greift immer den nächststehenden Gegner an. Läuft niemandem hinterher."],
-    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten gegnerischen Reihe, sofern eines erreichbar ist."],
+    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten besetzten gegnerischen Reihe. Steht der Gegner nur noch in einer Reihe, gilt wieder die natürliche Neigung."],
+    ["speer","Spitze aufbrechen","Greift den Gegner an, der am weitesten vorgerückt ist — die Spitze der gegnerischen Formation. Mehrere mit diesem Ziel bündeln sich auf denselben Vorstoß, statt sich auf je einen Nachbarn zu verteilen."],
+    ["schild","Kameraden freischlagen","Greift nicht den an, der IHM am nächsten steht, sondern den, der einem seiner Leute am nächsten steht. Er räumt den weg, der an der eigenen Linie hängt."],
     ["heiler","Heiler zuerst","Greift bevorzugt gegnerische Heiler an. Steht keiner im Feld, gilt wieder die natürliche Neigung."]
   ];
   const ZIELTIP=Object.fromEntries(ZIELE.map(([v,l,t])=>[v,{l,t}]));
@@ -15577,7 +15612,7 @@
       skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
       ...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
       schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,
-      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,leineHielt:false,
       st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}};
   }
 
@@ -16012,10 +16047,49 @@
     return dist(u,z)<=KF_RUF?z:null;
   }
 
+  // DIE HINTERSTE BESETZTE REIHE — nicht "Reihe 2".
+  //
+  // Bis hierher stand an zwei Stellen `foes.filter(f=>f.row===2)`. Das ist NUR fuer TDM
+  // richtig: sechs Slots ergeben die Reihen 0,0,1,1,2,2. Mini-DM hat VIER Slots und faellt
+  // mangels SLOT_ZUSATZ-Eintrag auf floor(Listenplatz/2) zurueck, also auf die Reihen
+  // 0,0,1,1 — eine Reihe 2 gibt es dort ueberhaupt NICHT. Die einzige stellungsbezogene
+  // Neigung, die der Motor bis hierher kannte (schleicher -> "hinten"), war in Mini-DM damit
+  // ein stiller Leerlauf: der Filter traf nie, die Zeile fiel durch, und der Schleicher
+  // griff den Naechsten an wie jeder andere. Genau das Nichts, das Chris gesehen hat.
+  //
+  // Jetzt heisst "hinten" das, was das Wort sagt: die hinterste Reihe, in der ueberhaupt
+  // noch jemand steht. Faellt die gegnerische Backrow, rueckt die Absicht auf die naechste
+  // Reihe nach, statt ins Leere zu greifen. Steht der Gegner nur noch in EINER Reihe, gibt
+  // es keine hintere mehr — dann liefert die Funktion null, und die natuerliche Neigung
+  // greift, genau wie der Tooltip es verspricht.
+  function hintersteReihe(foes){
+    const reihen=foes.map(f=>f.row||0);
+    const max=Math.max(...reihen);
+    if(max===Math.min(...reihen))return null;
+    return foes.filter(f=>(f.row||0)===max);
+  }
+
   function chooseTarget(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
     const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+    // "speer": wer von den Gegnern am weitesten in UNSERE Richtung vorgerueckt ist. Das ist
+    // bewusst NICHT "der Naechste" — der Naechste ist relativ zum eigenen Kopf (fuer einen
+    // Hinteren oft ein abgedrifteter Flankierer), die Spitze ist relativ zur FRONT. Dadurch
+    // buendeln sich mehrere Draufgaenger auf denselben Vorstoss, statt sich still auf je
+    // einen eigenen Nachbarn zu verteilen — das sichtbare Gegenstueck zum Schleicher, der
+    // in dieselbe Formation von hinten hineingeht.
+    const spitze=()=>foes.reduce((b,x)=>((u.side===0?x.x<b.x:x.x>b.x)?x:b));
+    // "schild": der Gegner mit dem kleinsten Abstand zu IRGENDEINEM meiner Leute. Ein
+    // Beschuetzer fragt nicht, wer IHM am naechsten steht, sondern wer an seinen Kameraden
+    // haengt. Ohne Kameraden (letzter Ueberlebender) faellt er auf den Naechsten zurueck —
+    // dann ist er selbst die Linie, die er decken soll.
+    const amKameraden=()=>{
+      const kam=eigene(u).filter(a=>a!==u);
+      if(!kam.length)return nearest(foes);
+      const naehe=(f)=>kam.reduce((m,k)=>Math.min(m,dist(f,k)),Infinity);
+      return foes.reduce((b,x)=>naehe(x)<naehe(b)?x:b);
+    };
 
     // Wer sich zurueckzieht, sucht kein Ziel.
     if(u.retreat>0)return null;
@@ -16079,7 +16153,9 @@
       if(u.zielP==="bedrohung")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
       if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
       if(u.zielP==="naechster")return nearest(foes);
-      if(u.zielP==="hinten"){const bk=foes.filter(f=>f.row===2);if(bk.length)return nearest(bk);}
+      if(u.zielP==="hinten"){const bk=hintersteReihe(foes);if(bk)return nearest(bk);}
+      if(u.zielP==="speer")return spitze();
+      if(u.zielP==="schild")return amKameraden();
       if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
       // "fels": genau den binden, den der Plan benannt hat.
       if(u.zielP==="fels"&&PLAN&&PLAN.felsName){
@@ -16098,7 +16174,7 @@
     // Grundneigung aus der Persoenlichkeit
     if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
     if(u.ziel==="schwaechster")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
-    if(u.ziel==="hinten"){const back=foes.filter(f=>f.row===2);if(back.length)return nearest(back);}
+    if(u.ziel==="hinten"){const back=hintersteReihe(foes);if(back)return nearest(back);}
     return nearest(foes);
   }
 
@@ -16114,6 +16190,84 @@
     const linie=g.filter(u=>!u.fern&&!u.heiler);
     const xs=(linie.length?linie:g).map(u=>u.x).sort((a,b)=>a-b);
     return xs[Math.floor(xs.length/2)];
+  }
+
+  // DIE REIHE HAELT AUCH IM KAMPF — der zweite Teil von Chris' Meldung vom 13.09.:
+  // „so richtig ne formation front und backrow gibt es nciht, da musst du die slots
+  // konsequenter umsetzen."
+  //
+  // Er hat auch hier recht, und zwar aus einem Grund, den man dem Bauweg nicht ansieht: die
+  // Reihen sind GAR NICHT falsch gebaut. `build()` verteilt beide Seiten sauber ueber
+  // slotReihe() auf byRow[0/1/2], und homeFor() macht daraus drei Spalten im Abstand von
+  // 160 px (MID∓140/300/460). Nur war das eine STARTAUFSTELLUNG und sonst nichts. Ab dem
+  // ersten Bild laeuft jeder auf sein Ziel zu, und die einzige Klammer, die ihn zurueckhaelt
+  // — die Formationsleine — haengt an teamFront(): EINER Linie fuer die ganze Mannschaft,
+  // fuer alle drei Reihen dieselbe. Die Backrow durfte also genau so weit nach vorn wie die
+  // Front, und sie tat es.
+  //
+  // NACHGEMESSEN, nicht vermutet (scripts/miss-arena-formation.mjs, 24 Kaempfe je Disziplin,
+  // Abtastung alle 0,5 s Kampfzeit), VOR dieser Aenderung:
+  //
+  //   Disziplin      Reihenabstand   davon verkehrt herum   Durchbruch aktiv
+  //   tdm                  20,4 px          32,6 %               23,1 %
+  //   mini-dm               8,8 px          31,5 %               18,3 %
+  //   battlefield          34,5 px          34,4 %               20,0 %
+  //
+  // Zwanzig Pixel, wo die Aufstellung 320 vorsieht, und in jedem dritten Bild steht die
+  // hintere Reihe VOR der vorderen. Das ist keine Formation, das ist ein Knaeuel — genau das
+  // Bild, das Chris „zu statisch" genannt hat: nicht zu wenig Bewegung, zu wenig STRUKTUR.
+  //
+  // Die Leine bleibt, wie sie ist — nur ihr ANKER wird reihenbewusst. Reihe 0 haengt weiter
+  // an der Linie selbst, jede weitere an einem um REIHEN_ABSTAND nach hinten versetzten
+  // Punkt. Das ist genau die Geometrie, die homeFor() beim Start ohnehin vergibt; sie gilt
+  // jetzt bis zum Schluss statt bis zum ersten Schritt. Kein zweiter Mechanismus, eine
+  // Zeile mehr im bestehenden.
+  //
+  // DER RANG WIRD GEZAEHLT, NICHT GELESEN. Nicht `u.row` direkt, sondern der Platz von u.row
+  // unter den Reihen, die ueberhaupt noch besetzt sind. Sonst wuerde eine Mannschaft, deren
+  // Front gefallen ist, mit ihrem Rest weiter 320 px hinter einer Linie warten, die niemand
+  // mehr bildet — sie wuerde vor einem leeren Feld zurueckweichen. So rueckt die zweite
+  // Reihe nach, wenn die erste weg ist, und wird selbst zur Front.
+  //
+  // Heiler zaehlen beim Ermitteln der besetzten Reihen nicht mit, aus demselben Grund, aus
+  // dem teamFront() sie ausschliesst: sie stehen ohnehin nach eigener Regel hinter der
+  // Gruppe und wuerden sonst eine Reihe vortaeuschen, die es taktisch nicht gibt.
+  const REIHEN_ABSTAND=160;   // = der Spaltenabstand in homeFor(), nicht neu erfunden
+  function reihenAnker(u){
+    const g=live(u.side).filter(a=>!a.heiler);
+    if(!g.length)return 0;
+    const reihen=[...new Set(g.map(a=>a.row||0))].sort((a,b)=>a-b);
+    const rang=Math.max(0,reihen.indexOf(u.row||0));
+    return (u.side===0?-1:1)*REIHEN_ABSTAND*rang;
+  }
+
+  // ABGEFANGEN HEISST ABGEFANGEN — VON GEGNERN.
+  //
+  // Der Durchbruch loest die Formationsleine, und das soll er: wer wirklich aufgehalten
+  // wird, geht durch. Die Bedingung dafuer war aber nur „dasselbe Ziel seit ueber 3 s und
+  // immer noch zu weit weg" — und das trifft auf JEDEN zu, den die EIGENE Aufstellung
+  // haelt. Der Hintermann erklaerte also nach ein paar Sekunden seine eigene Reihe fuer
+  // aufgehoben, obwohl ihn kein einziger Gegner angefasst hatte. Gemessen war der Durchbruch
+  // in jedem fuenften Einheit-Bild aktiv (Tabelle oben) — der Ausnahmezustand war der
+  // Normalzustand, und ohne diese Haelfte des Fixes waere der Anker oben nach spaetestens
+  // 5,5 s wieder wirkungslos.
+  //
+  // Der Tooltip sagt seit jeher „gilt als abgefangen". Das hier ist die fehlende Haelfte
+  // dieses Satzes: es muss jemand IM WEG stehen, und zwar in Reichweite. Entweder haengt
+  // einer in Schlagweite an ihm (u.bindAn — dieselbe Bindung, die auch den Trennschlag
+  // traegt), oder ein Gegner steht auf der Strecke zu seinem Ziel UND nah genug, dass er ihn
+  // wirklich aufhaelt; gemessen mit bahnAbstand(), derselben Funktion, mit der der
+  // Sturmangriff entscheidet, wer auf seiner Bahn steht. Ein Gegner, der weit vorn in der
+  // Bahn steht, haelt ihn NICHT auf — den hat er nur noch nicht erreicht.
+  //
+  // u.bindAn wird weiter unten im selben Takt neu gesetzt; hier steht also der Wert des
+  // Vorbilds, ein Sechzigstel alt. Fuer eine Ja/Nein-Frage, die ueber Sekunden entschieden
+  // wird, ist das ohne Belang.
+  function versperrt(u){
+    if(!u.tgt||u.tgt.down)return false;
+    if(u.bindAn)return true;
+    return gegner(u).some(f=>f!==u.tgt&&!f.down&&dist(u,f)<=u.reach*1.6&&
+      bahnAbstand(f,u.x,u.y,u.tgt.x,u.tgt.y)<KOERPER_X);
   }
 
   // ===================================================================================
@@ -16586,6 +16740,25 @@
       }
     }
 
+    // STEHT UEBERHAUPT JEMAND IM KONTAKT? Einmal je Bild fuer die ganze Seite, nicht je Kopf.
+    //
+    // Das ist die Notbremse hinter dem Reihenanker: solange irgendeiner der Eigenen in
+    // Schlagweite eines Gegners steht, LAEUFT der Kampf, und die Hinteren haben einen Grund
+    // zu warten — genau dafuer stehen sie hinten. Steht niemand im Kontakt, wartet die
+    // Mannschaft auf nichts, und dann darf die Aufstellung sie nicht laenger festhalten.
+    //
+    // Bewusst auf SEITENEBENE und nicht je Einzelnem: fragte man jeden fuer sich („habe ich
+    // selbst einen Gegner in Reichweite?"), waere schon der Anmarsch ein Patt — in den ersten
+    // Sekunden hat NIEMAND jemanden in Reichweite, und die ganze Formation loeste sich auf,
+    // bevor sie einmal getroffen haette. Die beiden Fronten starten 280 px auseinander
+    // (homeFor, Spalten MID∓140) und beruehren sich nach rund einer Sekunde, also lange vor
+    // den 4,5 s, nach denen der Offensivzwang greift.
+    const kontakt=[false,false,false,false];
+    for(const a of U){
+      if(a.down||kontakt[a.side])continue;
+      if(gegner(a).some(f=>dist(a,f)<=a.reach))kontakt[a.side]=true;
+    }
+
     for(const u of U){
       if(u.down)continue;
       const fat=t>35?Math.max(0.55,1-(100-u.AUS)*0.0011*(t-35)):1;
@@ -16635,7 +16808,16 @@
       // wer laenger als 3,5 s ueberhaupt kein Ziel hatte, und das Endspiel.
       // Ein Flankierer, der noch laeuft, ist nicht untaetig — er ist unterwegs.
       const flankeUnterwegs=u.ord==="flanke"&&(!freigabe[u.side]||!(u.side===0?u.x>MID+180:u.x<MID-180));
-      if(!u.tgt&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
+      // DRITTER FALL, neu: er HAT ein Ziel, kommt aber nicht heran, weil die eigene Leine
+      // ihn haelt (u.leineHielt, weiter unten im selben Takt gesetzt — also aus dem Vorbild,
+      // ein Sechzigstel alt) UND auf seiner Seite steht niemand im Kontakt. Fuer die Stellung
+      // ist das derselbe Zustand wie gar kein Ziel: er richtet nichts aus, und die Formation
+      // schuetzt niemanden mehr, weil es nichts zu schuetzen gibt. Ohne diese Zeile koennte
+      // der Reihenanker eine Mannschaft dauerhaft hinten parken, wenn der Gegner seinerseits
+      // nicht kommt — ein Patt, das kein Spieler sehen will. Mit ihr greift nach 4,5 s
+      // derselbe Offensivzwang wie bisher, samt derselben Meldung im Ticker.
+      const wirkungslos=u.leineHielt&&!kontakt[u.side];
+      if((!u.tgt||wirkungslos)&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
       const zwangVor=u.zwang;
       u.zwang=endspiel||u.leer>4.5;
       if(u.zwang&&!zwangVor)feed(u.side,u.n+" lässt die Stellung sein und sucht den Kampf.");
@@ -16667,7 +16849,9 @@
       const durchAb=1.5+u.opp/100*4;
       // Ein Opportunist geht nicht durch, solange direkt vor ihm etwas Angeschlagenes steht.
       const beuteDa=u.opp>=60&&gegner(u).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
-      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa){
+      // ... und niemand geht durch, den gar niemand aufhaelt (s. versperrt oben). Sonst ist
+      // "Durchbruch" nur der Name dafuer, dass einer seine eigene Reihe verlaesst.
+      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa&&versperrt(u)){
         u.durch=true;
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
       }
@@ -16706,9 +16890,18 @@
       // sonst waere er keiner. Vorher hing die Leine auch an ihm: die Flankierer sind nie
       // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
       // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
+      u.leineHielt=false;
       if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
         const leine=40+(100-formMitFuehrung(u))*3.4;
-        if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+        // Der Anker ist die eigene REIHE, nicht mehr die eine Linie fuer alle (s.
+        // reihenAnker oben): Reihe 0 haelt die Linie, jede weitere ihren Abstand dahinter.
+        // Die Leinenlaenge selbst bleibt unveraendert, und damit bleibt auch die Rangfolge
+        // der Befehle erhalten: wer "eigenmaechtig" aufgestellt ist, hat mit 380 px so viel
+        // Spiel, dass ihn auch der Reihenversatz nicht bindet, wer "dicht" steht, mit 40 px
+        // fast keines. Der Zusammenhalt bleibt die Stellschraube, ueber die Formation
+        // entschieden wird — die Reihe sagt jetzt nur noch, WORAN die Leine haengt.
+        const anker=front+reihenAnker(u);
+        if(Math.abs(gx-anker)>leine){ gx=anker+Math.sign(gx-anker)*leine; u.leineHielt=true; }
       }
 
       // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
@@ -24719,7 +24912,69 @@
         jeSeite:o.jeSeite||altJeSeite, spiele};
   }
 
+  // ARENA-FORMATIONSSONDE — rein diagnostisch, im selben sichern/bau/zurueck-Rahmen wie
+  // namenVon und feldspielSubskills weiter unten. Sie greift NICHT in die Simulation ein:
+  // sie faehrt einen echten Kampf im stepSimStumm-Takt und liest zwischendurch Positionen.
+  //
+  // WARUM SIE GEBRAUCHT WIRD: Chris' Meldung vom 13.09. („so richtig ne formation front und
+  // backrow gibt es nciht") ist eine Aussage ueber GEOMETRIE. rho kann sie prinzipiell nicht
+  // beantworten — Rangtreue sagt, ob die Mechanik das Richtige belohnt, und nichts darueber,
+  // wo jemand steht. Eine Aenderung an der Formation, die man nur an rho misst, misst am
+  // Vorwurf vorbei. Also wird der Vorwurf selbst zu einer Zahl gemacht:
+  //
+  //   reihenAbstand   Abstand der hintersten zur vordersten BESETZTEN Reihe, in
+  //                   Blickrichtung der Seite. homeFor() setzt ihn beim Start auf 160 px
+  //                   je Reihe; faellt er im Kampf gegen 0, war die Aufstellung ein
+  //                   Startbild und sonst nichts.
+  //   verkehrt        Anteil der Abtastungen, in denen die hintere Reihe VOR der vorderen
+  //                   steht — die Formation ist dann nicht flach, sondern umgedreht.
+  //   durchAnteil     Anteil der Einheit-Abtastungen mit aktivem Durchbruch. Der Durchbruch
+  //                   hebt die Formationsleine auf; ist er der Normalfall statt der
+  //                   Ausnahme, gibt es per Konstruktion keine Formation.
+  //
+  // Heiler zaehlen nicht mit, aus demselben Grund, aus dem teamFront()/reihenAnker() sie
+  // ausschliessen: sie stehen nach eigener Regel hinter der Gruppe und wuerden eine Reihe
+  // vortaeuschen, die es taktisch nicht gibt.
+  function arenaFormationsProbe(dId,saat){
+    const M=MOTOREN[dId]; if(!M||!istArena(dId))return null;
+    const g=M.sichern();
+    try{
+      if(M.vorher)M.vorher();
+      M.bau(saat);
+      const abstaende=[];
+      let einheitProben=0, durchProben=0, zwangProben=0, verkehrt=0, sim=0, seitAbtast=0;
+      while(!done&&sim<120){
+        stepSimStumm(1/60); sim+=1/60; seitAbtast+=1/60;
+        if(seitAbtast<0.5)continue;
+        seitAbtast=0;
+        for(const seite of[0,1]){
+          const leben=live(seite).filter(u=>!u.heiler);
+          if(!leben.length)continue;
+          for(const u of leben){einheitProben++; if(u.durch)durchProben++; if(u.zwang)zwangProben++;}
+          const reihen=[...new Set(leben.map(u=>u.row||0))].sort((a,b)=>a-b);
+          if(reihen.length<2)continue;
+          const mittelX=(r)=>{const xs=leben.filter(u=>(u.row||0)===r).map(u=>u.x);
+            return xs.reduce((a,b)=>a+b,0)/xs.length;};
+          // "Tiefe" = wie weit hinter der Mittellinie, aus Sicht DIESER Seite. Damit ist
+          // die Zahl fuer beide Seiten dieselbe Groesse und nicht spiegelverkehrt.
+          const tiefe=(x)=>seite===0?(MID-x):(x-MID);
+          const d=tiefe(mittelX(reihen[reihen.length-1]))-tiefe(mittelX(reihen[0]));
+          abstaende.push(d); if(d<0)verkehrt++;
+        }
+      }
+      const sortiert=[...abstaende].sort((a,b)=>a-b);
+      const med=sortiert.length?sortiert[Math.floor(sortiert.length/2)]:0;
+      const mit=sortiert.length?sortiert.reduce((a,b)=>a+b,0)/sortiert.length:0;
+      return {disziplin:dId, saat, dauer:+sim.toFixed(2), proben:abstaende.length,
+        reihenAbstandMittel:+mit.toFixed(1), reihenAbstandMedian:+med.toFixed(1),
+        verkehrtAnteil:abstaende.length?+(verkehrt/abstaende.length).toFixed(3):0,
+        durchAnteil:einheitProben?+(durchProben/einheitProben).toFixed(3):0,
+        zwangAnteil:einheitProben?+(zwangProben/einheitProben).toFixed(3):0};
+    } finally { M.zurueck(g); }
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
