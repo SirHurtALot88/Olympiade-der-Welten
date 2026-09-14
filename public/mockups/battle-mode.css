@@ -1,7 +1,7 @@
   .oly-battle-arena.oly-battle-arena{--ground:#F2F5F9;--surface:#FFF;--surface-2:#E9EEF5;--sunk:#DFE6EF;--pitch:#E4EAF2;
     --line:#CFD8E4;--line-soft:#E3E9F1;--ink:#111823;--muted:#5A6678;--faint:#8B98AA;
     --home:#B26A12;--home-bg:#F2A03D26;--away:#15707F;--away-bg:#45B0C926;
-    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
+    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--wucht:#D2562A;--puste-knapp:#B5761F;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
   /* Die dunklen Flaechen-Tokens zeigen mit var(--nl-*, Rueckfall) auf die Design-Tokens
      der App (app/globals.css, .is-new-look): eingebettet uebernimmt der Entwurf damit
      EXAKT die Flaechen, Linien und Textfarben des Foundation-Shells — inklusive der
@@ -13,11 +13,11 @@
     --ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
   .oly-battle-arena.oly-battle-arena[data-theme="dark"]{--ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
 
   /* EINBETTUNGS-MODUS (.im-spiel, gesetzt vom Host in FoundationBattleArenaHost.tsx).
      Der Entwurf sitzt dann nativ zwischen den Panels des Foundation-Shells:
@@ -348,6 +348,16 @@
   .oly-battle-arena.oly-battle-arena #kaderR .kk b{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
+  /* KACHEL-ZAHL rechts neben dem Namen: was die Leiste frueher trug (Streckenanteil auf der
+     Bahn, Punktestand im Feldspiel/auf der Buehne), seit die Leiste die Puste zeigt.
+     <i> statt <span>, damit kein bestehender Selektor darauf zielt. */
+  .oly-battle-arena.oly-battle-arena .kk .kkzahl{margin-left:auto;flex:none;font-style:normal;
+    font:600 9px/1.4 var(--mono,ui-monospace,monospace);color:var(--faint);white-space:nowrap}
+  /* PUSTE-LEISTE: dieselbe Ampel wie der Balken unter den Fuessen auf der Bahn/dem Feld
+     (zeichneSpurt/zeichneFeldspiel) — gruen, orange unter einem Fuenftel, rot bei leer.
+     Eine Leiste, drei Chassis, eine Farbsprache. */
+  .oly-battle-arena.oly-battle-arena .kk .kbar.puste s.knapp{background:var(--puste-knapp)}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.puste s.leer{background:var(--crit)}
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}
@@ -432,6 +442,20 @@
     background:color-mix(in srgb,var(--tt) 14%,transparent)}
   .oly-battle-arena.oly-battle-arena .ttchip.fertig{opacity:.55;text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .ttchip.wartet{opacity:.6}
+  /* STARTNUMMER vor dem Namen (Chris' Fund 13.09., Punkt 1): macht sichtbar, dass die
+     Leiste in STARTREIHENFOLGE steht und der versetzte Start Absicht ist. */
+  .oly-battle-arena.oly-battle-arena .ttchip i{display:inline-block;min-width:13px;
+    margin-right:5px;padding:0 2px;border-radius:3px;font-style:normal;font-weight:700;
+    background:color-mix(in srgb,var(--ink) 12%,transparent);color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .ttchip.an i{background:color-mix(in srgb,var(--tt) 28%,transparent);
+    color:var(--tt)}
+  /* LIVE-STAND: Rang, Rueckstand, Reserve (Chris' Fund 13.09., Punkte 4 und 6). */
+  .oly-battle-arena.oly-battle-arena .ttstand{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+    color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .ttstand b{color:var(--tt);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .ttstand .gut{color:var(--ok)}
+  .oly-battle-arena.oly-battle-arena .ttstand .knapp{color:var(--warn,#e0a341)}
+  .oly-battle-arena.oly-battle-arena .ttstand .schlecht{color:var(--crit)}
   /* HOEHENPROFIL: eine flache Leiste, farbige Baender je Gelaendezone, ein Marker fuer die
      Position des fokussierten Laeufers, zwei Striche fuer die Checkpoints. Bewusst kein
      Canvas/SVG-Nachbau eines echten Hoehenprofils (die Recherche nennt das explizit ein
@@ -588,10 +612,25 @@
   .oly-battle-arena.oly-battle-arena .bhname{overflow:hidden;text-overflow:ellipsis;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bhrow.bhdim{opacity:.62;font-size:10px}
   .oly-battle-arena.oly-battle-arena .bheig{color:#e8c07a;font-weight:600;flex:none}
-  .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:104px;text-align:center;
-    font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14.5px;letter-spacing:.02em;
-    background:rgba(10,13,18,.72);border:1px solid rgba(255,255,255,.16);border-radius:8px;
-    padding:5px 8px;color:#e7edf6}
+  /* FUEHRUNGSFELD. Bis 13.09. ein 104px schmales Kaestchen mit einer Zeile ("V-W +0.1s") —
+     Chris' Befund: "dadurch dass es immer 0-0 steht weiss man aktuell gar nicht wer
+     fuehrt". Jetzt zwei Zeilen (wer fuehrt / um wie viel in ECHTEN Sekunden) plus ein
+     Balken, wie ihn eine Uebertragung einblendet, und deutlich groesser. Gegenstueck in
+     battle-mode.engine.js: updateHudBahn(), Abschnitt "DAS FUEHRUNGSFELD". */
+  .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:196px;text-align:center;
+    font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;
+    background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.22);border-radius:8px;
+    padding:4px 12px 6px;color:#e7edf6;line-height:1.12}
+  .oly-battle-arena.oly-battle-arena .bhdelta b{display:block;font-weight:700;font-size:16px}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhsub{display:block;font-weight:700;font-size:21px;
+    font-variant-numeric:tabular-nums;color:#fff}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-home .bhsub{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-away .bhsub{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar{display:block;height:4px;margin-top:4px;
+    border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i{display:block;height:100%;border-radius:2px}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-home{background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-away{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
 

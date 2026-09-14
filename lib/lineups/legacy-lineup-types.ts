@@ -560,4 +560,29 @@ export type LegacyResolvePreviewOptions = {
    * beim bisherigen PPS-Pfad. `undefined`/leer/fehlender Eintrag aendert nichts.
    */
   arenaIndividualBoxscorePpsByPlayerId?: ReadonlyMap<string, number> | null;
+  /**
+   * FUER WELCHE DISZIPLIN die beiden Arena-Maps oben gerechnet wurden (N-Team-Infrastruktur-Audit
+   * 13.09., Fund B2 — docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md).
+   *
+   * `runBattleModeArenaMatchday()` laeuft immer fuer GENAU EINE Disziplin je Spieltag und liefert
+   * EINE teamId-keyed Map mit deren Duellausgang. Bis zu diesem Feld fragte der Einhaenge-Punkt im
+   * Resolve-Engine nur, ob die gerade gewertete Disziplin ueberhaupt in
+   * `ARENA_RESOLVED_DISCIPLINE_IDS` steht (Mengen-ZUGEHOERIGKEIT) — nicht, ob sie DIE Disziplin
+   * ist, fuer die diese Map gelaufen ist (IDENTITAET). Sind D1 und D2 desselben Spieltags beide
+   * arena-aufgeloest, buchte derselbe eine Duellausgang damit in BEIDE Disziplinen: ein Team
+   * kassierte den Sieg eines einzigen gelaufenen Duells zweimal in die Saisontabelle
+   * (nachgestellt und festgehalten in tests/arena-override-nur-fuer-die-gelaufene-disziplin.test.ts
+   * — vor dem Fix vier arena-gewertete Team-Zeilen statt zwei).
+   *
+   * Erreichbar war das bisher nicht, aber NUR durch eine Wache in einer ANDEREN Datei:
+   * `kickoffArenaMatchdayApply()` (lib/season/arena-matchday-resolve-service.ts) steigt bei zwei
+   * Arena-Disziplinen an einem Spieltag komplett aus. Diese Ferndeckung traegt umso weniger, je
+   * mehr Disziplinen arena-aufgeloest sind — 13 der 20 sind es inzwischen, der Fall "beide Seiten
+   * Arena" trifft gemessen 41 % aller Spieltage. Mit diesem Feld steht die Invariante LOKAL dort,
+   * wo sie gilt.
+   *
+   * `undefined`/`null` (aeltere Aufrufer, Sonderlaeufe, Tests) faellt bewusst auf das alte
+   * Mengen-Verhalten zurueck — bit-identisch zum Stand vor diesem Fix.
+   */
+  arenaDisciplineId?: string | null;
 };

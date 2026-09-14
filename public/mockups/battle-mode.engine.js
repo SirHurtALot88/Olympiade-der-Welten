@@ -355,6 +355,14 @@
   // window.__arena.renderProbe(name,"shoot",true,dir,lunge,256), Pixelscan der Alpha-
   // kontur statt Schaetzung. Verfahren und Rohbilder: docs/design/sprite-handpunkte.md,
   // Abschnitt "Gewichtheben". Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  //
+  // SEIT 13.09. LIEST DER HANTEL-PFAD NUR NOCH `y` DARAUS. Die x-Werte bleiben unveraendert
+  // stehen, weil sie gemessen und richtig sind — sie beschreiben eine Faust, und der
+  // DISZIPLIN_PROP-Vertrag verlangt genau das. Fuer eine HANTEL ist eine Faust aber der
+  // falsche Aufhaengepunkt: sie wird zweihaendig symmetrisch gegriffen, ihre Mitte gehoert
+  // auf die Koerpermittelachse. Die Begruendung und die Messung stehen an hantelAnPunkt()
+  // in zeichneSprite() bzw. in docs/design/gewichtheben-hantel-recherche-13-09.md
+  // Abschnitt 6; hier nur der Hinweis, damit niemand die x-Werte fuer tot haelt.
   const HEBEN_HAND=[
     {x:39,y:38}, // hinten
     {x:11,y:32}, // links
@@ -367,27 +375,100 @@
   // Stange wandert an der Hand vorbei, genau das Bild, das die alte freistehende Hantel
   // schon zeigte (buehneAkt-Fortschritt, s. hebePhase() bei zeichneHeben), jetzt an einen
   // echten Koerperpunkt verankert statt an der Bildmitte.
+  //
+  // ALLE VIER dy NEU VERMESSEN (13.09., Chris' Befund: "dann hat nur einer eine hantel. die
+  // ist viel zu weit unten und beim heben wird sie quasi weit ueber den kopf geworfen. Das
+  // muss sich viel mehr am modell orientieren."). Die alten Zahlen waren nie an einer Figur
+  // gemessen, sondern am freien Bildeindruck der Vorgaenger-Hantel gewaehlt — nachgemessen
+  // per scripts/messe-heben-geometrie.mjs (Alpha-Differenz zweier echter renderProbe-
+  // Renderings, Verfahren und volle Zahlen in docs/design/gewichtheben-hantel-recherche-13-09.md):
+  //
+  //   Phase    dy alt   Stange lag bei (Koerperanteil 0=Scheitel, 1=Sohle)
+  //   boden      34     1,065  — also UNTER den Fuessen, im Boden
+  //   zug         2     0,417  — unterhalb des Brustbeins, nicht im Front-Rack
+  //   hoch      -49    -0,545  — eine halbe Koerperhoehe ueber dem Scheitel ("geworfen")
+  //   ablage     40     1,181  — noch tiefer im Boden als "boden"
+  //
+  // Die neuen Zahlen sind aus den GEMESSENEN Koerperlandmarken des Standardblatts gerechnet
+  // (Zellkoordinaten, Groesse 5: Scheitel 11,4 · Schulter 26,8 · Brustbein 30,6 · Huefte 43,1
+  // · Sohle 62,3 · Koerperhoehe 51,0 Zellen; Handanker HEBEN_HAND liegt bei 32, also bei 0,40
+  // der Koerperhoehe). Weil dy in ZELLEINHEITEN steht und die Koerperhoehe ~51 Zellen betraegt,
+  // ist dy/51 direkt der Anteil der Koerperhoehe, um den die Stange vom Handanker abweicht —
+  // unabhaengig von Z und damit von der Modellgroesse.
+  //
+  // ==== KORREKTUR 13.09., ZWEITE RUNDE: ANTEIL STATT ABSOLUTER ZELLEN ==================
+  // Die erste Fassung dieser Tabelle stand in ABSOLUTEN Zelleinheiten relativ zum
+  // Griffpunkt (dy). Das ist genau so lange richtig, wie jede Figur den Standardkoerper
+  // benutzt — 51 Zellen hoch, Scheitel 11,4, Sohle 62,3. Die unabhaengige Review zu DIESER
+  // PR hat nachgewiesen, dass das fuer die zwei ANDEREN Zeichenpfade nicht stimmt, und die
+  // eigene Sonde scripts/pruefe-heben-hantel-vollzaehlig.mjs hatte es auch schon gezeigt:
+  //
+  //   Tidesprinter (vollbild)   boden 1,5 Zellen UNTER der Sohle · hoch 19,5 ueber Scheitel
+  //   Seraph-11 (reiherMech)    boden 2,0 Zellen UNTER der Sohle · hoch 11,0 ueber Scheitel
+  //   Inefinna (vollbild)       boden auf halber Rumpfhoehe SCHWEBEND (27,5 ueber Sohle)
+  //   King Arlen/Krolach/...    hoch 2..3 Zellen UNTER dem Scheitel, Stange IM Kopf/Helm
+  //
+  // ZWEI unabhaengige Ursachen, beide dieselbe Wurzel "absolute Zellen an einem fremden
+  // Blatt":
+  //   1. DIE BLATTHOEHE. zeichneReiherMech zeichnet von cy-19*Z bis cy+19*Z, also 38 statt
+  //      51 Zellen. Ein +25 aus der Standardkoerper-Kalibrierung schiesst an einem 38-Zellen-
+  //      Koerper zwangslaeufig unter die Sohle, ein -27 zwangslaeufig weit ueber den Kopf.
+  //      Ein anderer ANKERPUNKT haette daran nichts geaendert: kein einzelner fester Punkt
+  //      kann "boden" UND "hoch" zugleich treffen, wenn die Hoehe selbst abweicht.
+  //   2. DER ANKERPUNKT SELBST. Der vollbild-Pfad las die Griffhoehe aus VOLLBILD_SCHLAEGER
+  //      — einer Tabelle mit FAUSTpunkten fuer den Hockeyschlaeger, deren y ueber die
+  //      Blaetter von 8 (Inefinna) bis 45 (kraken) streut. Damit hing die Stangenhoehe an
+  //      einer Groesse, die mit der Koerperhoehe gar nichts zu tun hat — bis zu einer
+  //      viertel Koerperhoehe Fehler, je nachdem welches Blatt eine Figur benutzt.
+  //
+  // BEIDE Ursachen verschwinden, wenn die Stangenhoehe als ANTEIL DER KOERPERHOEHE des
+  // JEWEILIGEN Blattes ausgedrueckt wird, gemessen vom Scheitel nach unten (0 = Scheitel,
+  // 1 = Sohle). Der Griffpunkt geht in die Stangenhoehe dann ueberhaupt nicht mehr ein —
+  // was richtig ist: eine zweihaendig gegriffene Hantel haengt am Koerper, nicht an einer
+  // Faust (dieselbe Einsicht wie bei der x-Achse, s. hantelAnPunkt).
+  //
+  // DIE ZAHLEN SIND DIESELBE GEOMETRIE WIE VORHER, nur umgerechnet: anteil = (32+dy-11,4)/50,9
+  // aus den Standardkoerper-Landmarken darueber. Fuer den Standardkoerper zeichnet das
+  // deshalb PIXELGLEICH wie die dy-Fassung (nachgerechnet: boden 11,4+0,896*50,9 = 57,0
+  // gegen 32+25 = 57; hoch 11,4-0,126*50,9 = 4,99 gegen 32-27 = 5) — die Aenderung wirkt
+  // ausschliesslich auf die Blaetter, deren Hoehe von 51 Zellen abweicht.
   const HEBEN_PHASEN={
-    boden:  {dy:34, neigung:0.03}, // Stange am Boden, Heber (praesentational) gebueckt
-    // ANTRITT (NEU, Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
+    // BODEN: Stangenmitte einen Scheibenradius ueber der Sohle (Sohle 62,3 minus ~5,5 Zellen
+    // Scheibenradius = 56,8; 56,8-32 = 24,8). Genau so liegt eine belegte Stange auf der
+    // Plattform: die Scheiben tragen, die Stange schwebt auf Scheibenmitte. Vorher lag sie
+    // 3 Zellen UNTER der Sohle.
+    boden:  {anteil:0.896, neigung:0.03}, // Stange auf der Plattform, Heber (praesentational) gebueckt
+    // ANTRITT (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
     // unten): der Heber tritt an die Plattform — die Stange liegt noch am Boden wie in
     // "boden", aber ohne dessen leichte Grund-Neigung (0 statt 0.03), damit der Uebergang
     // "boden"(Gegner wartet)->"antritt"(eigener Antritt) trotz gleicher Hoehe sichtbar bleibt.
-    antritt:{dy:34, neigung:0},
-    zug:    {dy:2,  neigung:0},    // Umsetzen: Stange auf Brusthoehe, nah an der Hand
-    hoch:   {dy:-49,neigung:0},    // Streckung ueber Kopf, Arme durch — hoch genug ueber
-                                   // dem Anker, um nicht in die "kg"-Textzeile der
-                                   // Textkarte zu laufen (s. Screenshot-Gegenprobe)
-    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur noch
-                                   // vom LEGACY-Fallback hebePhase() genutzt (s. dort)
-    // ABLAGE (NEU, wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
+    antritt:{anteil:0.896, neigung:0},
+    // ZUG: Umsetzen, Stange im Front-Rack auf den Schluesselbeinen — Schulterlinie liegt bei
+    // Zelle 26,8, das Schluesselbein gut eine Zelle darunter (28); 28-32 = -4. Vorher (dy 2)
+    // lag sie unterhalb des Brustbeins, also eine knappe Handbreit zu tief fuer ein Umsetzen.
+    zug:    {anteil:0.326, neigung:0},
+    // HOCH: Ausstossen/Streckung. Scheitel liegt bei Zelle 11,4; die Stange steht ~6 Zellen
+    // (0,12 Koerperhoehen) darueber, also klar ueber dem Kopf, aber noch in Reichweite der
+    // Figur. -27 statt -49: die alte Zahl hob sie auf 0,545 Koerperhoehen ueber den Scheitel
+    // — das ist der von Chris beschriebene "Wurf". Warum nicht die anatomisch korrekten ~0,25
+    // Koerperhoehen einer echten Ausstossung: das Blatt hat gar keine Ueberkopf-Pose (die
+    // erzwungene "shoot"-Pose ist ein seitlicher Stossgriff auf Brusthoehe, s. Kommentar an
+    // HEBEN_HAND) — je hoeher die Stange ueber diesen Haenden steht, desto mehr schwebt sie
+    // frei. 0,12 ist der Kompromiss, der "ueber Kopf" liest, ohne sich vom Modell zu loesen.
+    hoch:   {anteil:-0.126,neigung:0},
+    abwurf: {anteil:0.916, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur
+                                   // noch vom LEGACY-Fallback hebePhase() genutzt (s. dort)
+    // ABLAGE (wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
     // ob der Versuch gueltig war oder nicht — im echten Gewichtheben wird die Stange nach
     // JEDEM Versuch aus der Ueberkopfposition fallen gelassen, nicht nur bei einem Fehlversuch
-    // (s. Kommentar bei stepHeben). Etwas tiefer und staerker gekippt als "abwurf", damit der
-    // Fall aus voller Streckung wuchtiger wirkt als der fruehere Fehlversuch-Sturz aus
-    // Brusthoehe.
-    ablage: {dy:40, neigung:0.4},
+    // (s. Kommentar bei stepHeben). Eine Zelle tiefer als "boden" und staerker gekippt: die
+    // Stange ist gefallen und liegt schief, aber weiterhin AUF der Plattform statt darunter.
+    ablage: {anteil:0.916, neigung:0.4},
   };
+  // Koerperspanne des STANDARDKOERPERS in Zellkoordinaten des 64er-Rahmens (die gemessenen
+  // Landmarken oben: Scheitel 11,4 · Sohle 62,3). Zugleich der Rueckfall fuer jedes Blatt,
+  // dessen Spanne sich nicht messen laesst — dann zeichnet es wie bisher.
+  const HEBEN_KOERPER_STD={oben:11.4, unten:62.3};
   // Scheibengroesse/-anzahl AUS kg — schwerere Last = mehr/dickere Scheiben, statt der
   // alten vier immer gleich grossen Punkte. Schwellen grob am internen HEBEN_KG_BASIS/
   // HEBEN_KG_PRO_LAST-Bereich orientiert (s. dort), nicht an einer Formel — rein optisch.
@@ -408,9 +489,18 @@
   // dasselbe Sicherheitsnetz wie bei zeichneHockeyschlaeger), kg die aktuell anzuzeigende
   // Last (u._vizKg, rein praesentational). Perspektive wie beim Schlaeger: im Profil die
   // volle Laenge, in Front/Ruecken ein verkuerzter Stummel.
-  function zeichneHantel(ctx,x,y,s,richtung,phase,kg){
+  // y IST SEIT DEM 13.09. (zweite Runde) DER SCHEITEL, nicht mehr der Griffpunkt, und
+  // koerperHoehe die Koerperhoehe DIESER Figur in Bildschirmpixeln (also bereits mit Z
+  // multipliziert). Aus beidem zusammen ergibt sich die Stangenhoehe als Anteil der
+  // Koerperhoehe — s. die ausfuehrliche Herleitung an HEBEN_PHASEN oben. Fehlt der Wert,
+  // greift die Standardkoerper-Hoehe, dann rechnet es wie vor der Aenderung.
+  // Der DISZIPLIN_PROP-Vertrag deckt das ab: "der Verankerungspunkt selbst kann je
+  // Requisite ein anderer Koerperteil sein" (s. dort).
+  function zeichneHantel(ctx,x,y,s,richtung,phase,kg,koerperHoehe){
     const p=HEBEN_PHASEN[phase]||HEBEN_PHASEN.zug;
-    const by=y+p.dy*s;
+    const kh=(typeof koerperHoehe==="number"&&koerperHoehe>0)
+      ? koerperHoehe : (HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*s;
+    const by=y+p.anteil*kh;
     const blick=richtung===3?1:richtung===1?-1:0;
     const seitlich=blick!==0;
     const halbLaenge=(seitlich?34:18)*s;
@@ -420,9 +510,22 @@
     const x2=x+ux*halbLaenge, y2=by+uy*halbLaenge;
     ctx.strokeStyle="#9098a8"; ctx.lineWidth=Math.max(1,3*s); ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    // Griffband am Ankerpunkt (der Hand), wie das Griffband beim Schlaeger.
+    // ZWEI GRIFFBAENDER statt einem (13.09.). Bis dahin sass genau ein Band auf dem
+    // Ankerpunkt — richtig, solange der Ankerpunkt EINE Faust war (HEBEN_HAND, Pixelscan
+    // 10.09.). Seit der Anker die Koerpermittelachse ist (s. Kommentar an HEBEN_HAND), waere
+    // ein einzelnes Band in der Stangenmitte sinnlos: dort ist beim Gewichtheben nichts, die
+    // Haende liegen links und rechts davon. Zwei symmetrische Baender auf Schulterbreite
+    // (+-9 Zellen im Profil, ~die gemessene Rumpfbreite der Standardfigur; in Front/Ruecken
+    // ist die Stange nur ein verkuerzter Stummel, dort entsprechend +-5) zeigen einen
+    // zweihaendigen Griff — genau das, was Chris mit "muss sich viel mehr am modell
+    // orientieren" meint.
+    const griffAbstand=(seitlich?9:5)*s;
     ctx.fillStyle="#e8e2d0";
-    ctx.beginPath(); ctx.arc(x,by,Math.max(0.9,1.6*s),0,Math.PI*2); ctx.fill();
+    for(const seite of [-1,1]){
+      ctx.beginPath();
+      ctx.arc(x+ux*seite*griffAbstand,by+uy*seite*griffAbstand,Math.max(0.9,1.6*s),0,Math.PI*2);
+      ctx.fill();
+    }
     const radien=scheibenFuer(kg||0);
     const IWF_FARBEN=["#c0392b","#2f6fd1","#e2c23a","#3a9450"]; // 25/20/15/10 kg-Staffel
     [-1,1].forEach(seite=>{
@@ -1999,9 +2102,39 @@
   const HOEHEN_BEZUG=52;        // PLATZHALTER: Median der gemessenen Blatthoehen im Kader
   const HOEHEN_KORR_MIN=0.80, HOEHEN_KORR_MAX=1.25;
   const hoehenKorrSpeicher=new Map();
+  // Zwischenspeicher der gemessenen Vollbild-Blattspannen (s. blattSpanne() in
+  // zeichneSprite) — auf Modulebene, damit er ueber Aufrufe hinweg haelt, wie
+  // hoehenKorrSpeicher direkt darueber.
+  const blattSpanneSpeicher=new Map();
+  //
+  // DIE MESSUNG MUSS SICH SELBST AUSSPERREN (13.09., s. docs/design/hoehenkorrektur-
+  // rekursion-13-09.md fuer die vollstaendige Messreihe). Der Messdurchlauf unten ruft
+  // zeichneSprite() auf, und zeichneSprite() rechnet in seiner ersten Zeile
+  // `Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b)` — also hoehenKorrektur()
+  // fuer DENSELBEN Namen zurueck. Solange der Zwischenspeicher erst NACH der Messung
+  // gefuellt wurde, fand dieser Rueckruf nichts vor und mass erneut: gemessen 1057 bis 2309
+  // Ebenen tief, bis der JS-Stapel ueberlief. Den RangeError schluckte das try/catch daneben
+  // lautlos.
+  //
+  // Und beim Abwickeln kippte der Wert dann hin und her, weil jede Ebene das Bild der Ebene
+  // darunter MISST: Ebene n zeichnet mit dem korr von Ebene n+1. Johanna, echte Messreihe:
+  // Z=1 -> Blatt 49 px -> korr 52/49 = 1,061; damit gezeichnet -> 52 px -> korr 52/52 = 1,000;
+  // damit gezeichnet -> wieder 49 px -> wieder 1,061 ... Ein sauberer Zweierzyklus, und
+  // gespeichert wurde, was die AEUSSERSTE Ebene gerade in der Hand hielt — also die PARITAET
+  // der zufaelligen Ueberlauftiefe. Nachgewiesen, indem dieselbe Figur aus verschieden tiefen
+  // Aufrufstapeln gemessen wurde: Johanna 1,000/1,061, Krag'Zul 1,000/0,881, Alarm
+  // 1,000/0,813 — je nachdem, wie viel Stapel gerade frei war. Damit war der Wert, den die
+  // Arena fuer eine Figur benutzt, nicht reproduzierbar, und in ungefaehr der Haelfte der
+  // Faelle fiel er auf 1,000 zurueck, d.h. die Korrektur fand gar nicht statt.
+  //
+  // Die Sperre ist eine Zeile: VOR der Messung eine 1 in den Zwischenspeicher legen. Der
+  // Rueckruf aus zeichneSprite() findet sie, gibt 1 zurueck, und die Messfigur wird genau so
+  // gezeichnet, wie der Kommentar direkt darueber es immer gemeint hat — "ohne Groesse, so
+  // misst der Durchlauf das BLATT, nicht das Ergebnis". Ein Zeichendurchlauf statt zweitausend.
   function hoehenKorrektur(u){
     if(!u||!u.n)return 1;
     if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
+    hoehenKorrSpeicher.set(u.n,1);
     let korr=1;
     try{
       // DOPPELT SO GROSSE MESSLEINWAND wie die Zelle. Bei 64x64 klebt ein hohes Blatt
@@ -2357,7 +2490,7 @@
   //             Alphakontur ausgemessen, nicht geschaetzt (docs/design/sprite-handpunkte*.md).
   //             "hand" ist der Tabellenname aus dem Plan; der Verankerungspunkt selbst kann
   //             je Requisite ein anderer Koerperteil sein (z.B. der Fuss bei einer Kufe).
-  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (dy/neigung)
+  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (anteil/neigung)
   //             oder HOCKEY_PHASEN (schaftA/kelleA); die Form ist frei, `zeichne` interpretiert
   //             sie selbst.
   //   zeichne — (ctx,x,y,s,richtung,phase,extra) => {...}; x/y ist bereits der umgerechnete
@@ -2496,6 +2629,93 @@
     // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
     // Ersatzes fuer u.groesse.
     const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    // HANTEL AN EINEM ZELLPUNKT (13.09.). Eine Stelle statt drei: den Hantel-Zeichenblock gab
+    // es bisher NUR im normalen Sprite-Zeichenpfad ganz unten — der b.reiherMech- und der
+    // b.vollbild-Zweig direkt darunter kehren beide vorher zurueck (`return`), und damit
+    // bekamen genau die Figuren, die ueber eines dieser beiden Blaetter gezeichnet werden,
+    // in KEINER Phase eine Hantel. Nachgemessen (scripts/messe-heben-geometrie.mjs, Erhebung
+    // ueber den ganzen Beispielkader): 5 von 17 Figuren — Lava Golem, Krolach, Krag'Zul,
+    // Tidesprinter (alle b.vollbild) und Seraph-11 (b.reiherMech). Das ist Chris' Befund
+    // "dann hat nur einer eine hantel": in jedem Duell, in dem einer der beiden eine solche
+    // Kreatur ist, stemmt genau ein Heber Luft.
+    //
+    // Der Aufruf ist WOERTLICH derselbe wie im normalen Pfad (DISZIPLIN_PROP.gewichtheben,
+    // Umrechnung Zellkoordinate->Bildschirm ueber x-32*Z+hp.x*Z / y-46*Z+hp.y*Z) — nur der
+    // Ankerpunkt kommt je Zweig aus einer anderen, fuer das jeweilige Blatt gemessenen
+    // Tabelle. Kein zweiter Skalierungsweg, keine Kopie der Zeichenfunktion.
+    //
+    // NUR DIE HOEHE KOMMT AUS DEM GRIFFPUNKT, die Seite nicht (13.09.). Die Griffpunkt-
+    // Tabellen (HEBEN_HAND, VOLLBILD_SCHLAEGER) sind per Pixelscan an EINER Faust vermessen
+    // — fuer einen Schlaeger richtig, den man einhaendig am Ende fasst, fuer eine Hantel
+    // falsch: die wird zweihaendig und symmetrisch gegriffen, ihre Mitte haengt an der
+    // KOERPERMITTELACHSE. Gemessen (scripts/messe-heben-geometrie.mjs) hing die Stange
+    // dadurch 21 Zellen = 0,41 Koerperhoehen neben der Figur, sichtbar als frei schwebende
+    // Stange im Vorher-Bild.
+    //
+    // Die Mittelachse ist die Zeichen-x der Figur selbst: `x-32*Z+hp.x*Z` mit hp.x=32 ist
+    // exakt `x`, deshalb steht hier `x` statt einer Rechnung. Nachgemessen deckt sich das
+    // mit dem Bild: im Profil liegt die Silhouettenmitte ab Schulterhoehe bei Zelle 31,5
+    // (beide Profilrichtungen, mehrere Figuren) — der geometrischen Mitte der 64er-Zelle.
+    //
+    // ==== ZWEITE RUNDE 13.09.: NICHT MEHR EIN PUNKT, SONDERN DIE KOERPERSPANNE ==========
+    // Der Parameter ist seit der Review zu dieser PR kein GRIFFPUNKT mehr, sondern die
+    // Koerperspanne {oben,unten} des jeweiligen Blattes in Zellkoordinaten des 64er-
+    // Rahmens. Warum: die Stangenhoehe steht in HEBEN_PHASEN jetzt als ANTEIL der
+    // Koerperhoehe (volle Herleitung dort) — der Griffpunkt geht in die Hoehe gar nicht
+    // mehr ein, weil er sie nie bestimmt hat. Bis dahin las der vollbild-Zweig die
+    // Griffhoehe aus VOLLBILD_SCHLAEGER, wo sie je Blatt zwischen 8 und 45 streut: die
+    // Stange hing damit an einer Groesse, die mit der Koerperhoehe nichts zu tun hat.
+    //
+    // Die x-Achse bleibt unveraendert die Koerpermittelachse (`x`), aus dem Grund, der
+    // direkt darueber steht.
+    const hantelAnPunkt=(spanne,richtung)=>{
+      const prop=DISZIPLIN_PROP.gewichtheben;
+      const sp=spanne||HEBEN_KOERPER_STD;
+      prop.zeichne(ctx,x,y-46*Z+sp.oben*Z,Z,richtung,u.vizPhase||hebePhase(u),u._vizKg||0,
+        (sp.unten-sp.oben)*Z);
+    };
+    // KOERPERSPANNE EINES VOLLBILD-BLATTES, gemessen statt tabelliert — dasselbe Prinzip und
+    // dieselbe Begruendung wie bei hoehenKorrektur() oben ("GEMESSEN STATT TABELLIERT. Eine
+    // generierte Tabelle waere die zweite Kopie derselben Wahrheit"), nur am BLATT statt an
+    // der fertig gezeichneten Figur: ein Alpha-Durchlauf ueber die ganze Zeile (alle Spalten
+    // des Gehzyklus, damit eine einzelne Streckpose die Spanne nicht verzerrt), einmal je
+    // Blatt+Zeile, danach im Zwischenspeicher.
+    //
+    // AM BLATT, NICHT AN DER FIGUR: zeichneSprite() ruft sich sonst selbst auf (so wie
+    // hoehenKorrektur() es tut) — hier gaebe es dadurch eine Rekursion ueber hantelAnPunkt.
+    // Das Blatt reicht auch voellig: drawImage() skaliert JEDE Zelle unabhaengig von ihrer
+    // nativen Groesse immer auf dh=64*Z (s. dort), die Zellspanne ist also direkt die Spanne
+    // im 64er-Rahmen, sobald man sie mit 64/spec.ch umrechnet.
+    //
+    // Bei jedem Fehlschlag (Bild noch nicht geladen, getImageData nicht erlaubt, Blatt ganz
+    // transparent) bleibt der Wert null und der Aufrufer faellt auf HEBEN_KOERPER_STD
+    // zurueck — also genau auf das Verhalten vor dieser Aenderung.
+    const blattSpanne=(im,spec,reihe)=>{
+      const k=spec.key+"#"+reihe;
+      if(blattSpanneSpeicher.has(k))return blattSpanneSpeicher.get(k);
+      let sp=null;
+      try{
+        // Auf die echten Bildmasse begrenzt: ein Blatt, das schmaler/flacher ist als
+        // cols*cw bzw. (reihe+1)*ch, wuerde sonst ueber den Rand hinaus gelesen und
+        // lieferte eine zu grosse (weil leere) Spanne.
+        const bw=Math.min(spec.cw*spec.cols, im.width);
+        const bh=Math.min(spec.ch, im.height-reihe*spec.ch);
+        if(bw<=0||bh<=8)throw new Error("Blattmasse passen nicht");
+        const c=document.createElement("canvas"); c.width=bw; c.height=bh;
+        const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+        cx.drawImage(im,0,reihe*spec.ch,bw,bh,0,0,bw,bh);
+        const px=cx.getImageData(0,0,bw,bh).data;
+        let oben=null,unten=null;
+        for(let yy=0;yy<bh;yy++)for(let xx=0;xx<bw;xx++)
+          if(px[(yy*bw+xx)*4+3]>16){ if(oben==null)oben=yy; unten=yy; break; }
+        // Mindesthoehe 8 Zellen wie bei hoehenKorrektur — ein fast leeres Blatt soll die
+        // Hantel nicht auf einen Punkt zusammenziehen.
+        if(oben!=null&&unten-oben+1>8)
+          sp={oben:oben*64/spec.ch, unten:(unten+1)*64/spec.ch};
+      }catch(e){}
+      blattSpanneSpeicher.set(k,sp);
+      return sp;
+    };
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -2839,6 +3059,25 @@
       // zeichneReiherMech() zurueck, ist also fuer JEDES Bild bereits die echte,
       // gerade gezeichnete Position und keine separat gemessene/geschaetzte Zahl.
       if(feldspiel&&istHockey()&&!u.down)zeichneHockeyschlaeger(ctx,kopf.kopfX,kopf.kopfY,Z,r0,"quer");
+      // HANTEL (13.09., s. hantelAnPunkt oben) — NICHT am Kopf/Schnabel wie der Schlaeger:
+      // eine Hantel haengt am Rumpf, und die HEBEN_PHASEN-Abstaende sind vom Rumpfanker aus
+      // gerechnet, nicht vom Kopf. Der Reiher-Mech wird rein prozedural gezeichnet (kein
+      // Blatt, s. zeichneReiherMech direkt oberhalb), seine Masse stehen deshalb im Code
+      // statt in einem Pixelscan: Rumpf-Oval bei cy+1*Z, Beine bis cy+19*Z (Fuss), Kopf bei
+      // cy-17*Z (Scheitel also ~cy-19*Z). Das ergibt eine Koerperhoehe von ~39 Zellen mit
+      // 0,40 davon — derselbe relative Griffpunkt, den HEBEN_HAND beim Standardkoerper hat —
+      // bei cy-3*Z, in der Zellschreibweise dieser Datei also y:43.
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): der relative Griffpunkt stimmte, die
+      // daran haengenden ABSOLUTEN Abstaende aus HEBEN_PHASEN nicht — die sind an einem
+      // 51 Zellen hohen Standardkoerper kalibriert, dieser hier ist 38 Zellen hoch. Gemessen
+      // lag die Ruhestange dadurch 2 Zellen UNTER der Sohle und die Ueberkopfstange
+      // 11 Zellen ueber dem Scheitel. Statt des Punktes geht jetzt die SPANNE hinein:
+      // cy ist Zelle 46 (Ankerzeile dieser Datei), Scheitel also 46-19=27, Sohle 46+19=65.
+      // Die Zahlen stehen weiterhin im Code statt in einem Pixelscan, weil zeichneReiherMech
+      // direkt darueber genau diese beiden Grenzen zeichnet — hier ist die Quelle der
+      // Wahrheit der Code selbst, nicht ein Blatt.
+      if(feldspiel&&istHeben()&&!u.down)hantelAnPunkt({oben:27,unten:65},r0);
       if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
       return;
     }
@@ -2849,8 +3088,13 @@
       if(im&&im.width){
         const row=vollbildRow(spec,r0);
         const vn=spec.cols;
+        // Math.max(0,...) wie beim Standardkoerper-Bildindex `f` oben (13.09., ausfuehrliche
+        // Begruendung und Messwerte dort): fuer u.lunge>0,2 — was Buehne und Feldspiel
+        // setzen — wurde der Index negativ und drawImage zeichnete gar nichts. Vollbild-
+        // Kreaturen verschwanden dadurch komplett, sichtbar im Gewichtheben-Duell
+        // Lava Golem gegen Krag'Zul.
         const vf=(u.lunge>0&&!u.down)
-          ? Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn))
+          ? Math.max(0, Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn)))
           : (u.down?vn-1:Math.floor((t*7+u.id)%vn));
         // dh/dw UND der Boden-Anker (y-46) skalieren mit Z (s. groesseFaktor oben) — sonst
         // waechst nur die Breite/Hoehe des Bilds, aber die Fuesse rutschen relativ zum
@@ -2872,6 +3116,32 @@
           :(u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten");
         zeichneHockeyschlaeger(ctx,x-32*Z+gp.x*Z,y-46*Z+gp.y*Z,Z,r0,pose);
       }
+      // HANTEL (13.09., s. hantelAnPunkt oben). Derselbe Ankerpunkt wie der Schlaeger eine
+      // Zeile darueber — VOLLBILD_SCHLAEGER heisst nur nach seinem ersten Nutzer, der
+      // Tabellenkopf nennt sich selbst "GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN"
+      // und ist genau das: je Blatt ein per Augenschein am hochskalierten renderProbe-PNG
+      // vermessener Koerperpunkt (docs/design/vollbild-schlaeger-griffpunkte.md).
+      //
+      // ANDERS ALS BEIM SCHLAEGER kein `griff&&`-Vorbehalt: fehlt ein Blatt in der Tabelle,
+      // faellt der Anker auf HEBEN_HAND zurueck (prop.hand, der Standardkoerper-Punkt im
+      // selben 64er-Rahmen) statt gar nichts zu zeichnen. Beim Schlaeger ist "lieber kein
+      // Schlaeger als einer an der falschen Stelle" richtig — ein Hockeyspieler ohne
+      // Schlaeger ist unauffaellig. Beim Gewichtheben ist es umgekehrt: ein Heber ohne
+      // Hantel stemmt sichtbar Luft, und genau das ist der gemeldete Fehler. Von den
+      // 16 tatsaechlich benutzten b.vollbild-Schluesseln fehlt heute nur "singvogel".
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): VOLLBILD_SCHLAEGER wird hier gar nicht
+      // mehr gelesen. Seine y-Werte streuen ueber die Blaetter von 8 (Inefinnas Blatt) bis
+      // 45 (kraken) — als GRIFFhoehe fuer einen einhaendig gefassten Schlaeger richtig, als
+      // Aufhaengung fuer eine Hantel aber eine Groesse ohne jeden Bezug zur Koerperhoehe.
+      // Gemessen schwebte Inefinnas Ruhestange dadurch auf halber Rumpfhoehe (27,5 Zellen
+      // ueber der Sohle) und Tidesprinters 1,5 Zellen UNTER der Sohle, waehrend derselbe
+      // Code bei golem (y~33) zufaellig richtig aussah. Statt des Punktes geht jetzt die am
+      // Blatt GEMESSENE Koerperspanne hinein (s. blattSpanne oben) — damit haengt die
+      // Stangenhoehe an der Koerperhoehe des Blattes und an sonst nichts. Ohne Messung
+      // (Bild noch nicht geladen) faellt es auf den Standardkoerper zurueck, wie bisher.
+      if(feldspiel&&istHeben()&&!u.down)
+        hantelAnPunkt((im&&im.width)?blattSpanne(im,spec,vollbildRow(spec,r0)):null,r0);
       // KUFE FUER VOLLBILD-LAeUFER (Opus-Overseer-Review PR #903, Fund 2): der fruehe
       // `return;` unten liess JEDEN ueber b.vollbild gezeichneten Eiskunstlauf-Teilnehmer
       // (Kreaturen mit einem eigenen Fremdbild statt des LPC-Standardkoerpers, z.B. Lava
@@ -3020,9 +3290,40 @@
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
     // Gang in Schleife. So passt das Bild zu dem, was die Simulation gerade tut.
+    //
+    // UNTERGRENZE 0 (13.09.). Die Rechnung (1-u.lunge/0.2)*n setzt voraus, dass u.lunge bei
+    // 0,2 STARTET. Das stimmt in der Arena — auf der Buehne und im Feldspiel aber nicht:
+    // dort setzen stepBuehne() und die Wurf-/Block-/Torwart-Pfade u.lunge auf 0,5 (s. die
+    // Fundstellen dort; auf der Buehne ist die 0,5 sogar bewusst als Einmal-pro-Versuch-
+    // Marke gewaehlt). Fuer u.lunge>0,2 wird der Ausdruck NEGATIV, Math.min() laesst ihn
+    // negativ, und drawImage() mit negativem Quell-x zeichnet GAR NICHTS.
+    //
+    // Nachgemessen an origin/main per renderProbe (Alpha-Pixel derselben Figur, Disziplin
+    // Gewichtheben, scripts/_lunge-Sonde im PR beschrieben): Krag'Zul 1603px bei lunge 0,19
+    // gegen 53px bei lunge 0,21; Lava Golem 1848 gegen 283; Johanna 1577 gegen 827. Der
+    // gerade aktive Heber verschwand damit fuer die ersten 0,3 Simulationssekunden JEDES
+    // enthuellten Versuchs — bei ZEIT_DEHNUNG.gewichtheben=4 gut eine Sekunde, und zwar
+    // genau die Figur, auf der die Kamera steht.
+    //
+    // Math.max(0,...) statt einer Umrechnung, weil der Startwert nirgends festgehalten wird:
+    // waehrend 0,5->0,2 haelt die Figur jetzt das ERSTE Bild (Ausholen) und spielt die
+    // Sequenz danach wie bisher ueber 0,2->0 ab. Fuer u.lunge<=0,2 aendert sich nichts —
+    // dort liegt der Ausdruck schon in [0,n-1], die Klammer ist dann wirkungslos.
+    //
+    // EIGENE SCHRITTPHASE STATT DER WELTUHR (Zeitfahren, Ziel 8, s. stepZeitfahren).
+    // `u.vizAniPhase` ist die Zahl der bereits gelaufenen LAUFZYKLEN (nicht Bilder) —
+    // hier mit der Bildzahl des aktuellen Blattes multipliziert, damit der Aufrufer nichts
+    // ueber Sprite-Blaetter wissen muss. ADDITIV: wer das Feld nicht setzt (jede andere
+    // Disziplin, jeder andere Zeichenpfad), faellt Zeichen fuer Zeichen auf die alte
+    // `(t*7+u.id)`-Formel zurueck — bit-identisch. (Beim Zusammenfuehren mit der
+    // Untergrenze-0-Aenderung oben: die beiden greifen an verschiedenen Zweigen desselben
+    // Ausdrucks an — `zyklus` nur im Leerlauf-/Gang-Zweig, Math.max(0,...) nur im
+    // Ausfallschritt-Zweig. Sie beruehren einander nicht.)
+    const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))
+      ? u.vizAniPhase*n : (t*7+u.id);
     const f=(u.lunge>0&&!u.down&&!kuerSturz)
-      ? Math.min(n-1, Math.floor((1-u.lunge/0.2)*n))
-      : ((u.down||kuerSturz)?n-1:Math.floor((t*7+u.id)%n));
+      ? Math.max(0, Math.min(n-1, Math.floor((1-u.lunge/0.2)*n)))
+      : ((u.down||kuerSturz)?n-1:Math.floor(((zyklus%n)+n)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
     // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte. Z ist seit
@@ -3035,7 +3336,7 @@
     // von f/n der aktuellen Animation.
     const WAFFEN_N=9;
     const waffenF=(u.lunge>0&&!u.down)
-      ? Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N))
+      ? Math.max(0, Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N)))
       : (u.down?WAFFEN_N-1:Math.floor((t*7+u.id)%WAFFEN_N));
     const zeichneWaffenbild=(key)=>{
       const im=sprBild[key]; if(!im||!im.width)return;
@@ -3309,10 +3610,18 @@
     if(feldspiel&&istHeben()&&!u.down){
       // Ueber DISZIPLIN_PROP.gewichtheben statt direkt ueber HEBEN_HAND/zeichneHantel (PR
       // 0.2) — reine Aufrufpfad-Umleitung, `prop.hand`/`prop.zeichne` SIND dieselben Objekte/
-      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis.
-      const prop=DISZIPLIN_PROP.gewichtheben;
-      const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizPhase||hebePhase(u),u._vizKg||0);
+      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis. Seit 13.09.
+      // ueber dieselbe Hilfsfunktion wie die zwei frueher zurueckkehrenden Zweige oben
+      // (hantelAnPunkt, s. dort) — damit es die Umrechnung Zellkoordinate->Bildschirm
+      // genau EINMAL in dieser Funktion gibt und die drei Faelle nicht auseinanderlaufen
+      // koennen. `blickAus(u)` dort ist dasselbe `r`, das hier schon berechnet ist.
+      // SPANNE STATT HANDPUNKT (zweite Runde 13.09., s. hantelAnPunkt/HEBEN_PHASEN): fuer
+      // den Standardkoerper ist das die gemessene Landmarken-Spanne Scheitel 11,4 ..
+      // Sohle 62,3, also GENAU die Kalibrierung, aus der die Anteile gerechnet sind —
+      // dieser Zweig zeichnet dadurch pixelgleich wie vorher. `prop.hand` bleibt fuer den
+      // DISZIPLIN_PROP-Vertrag stehen, wird vom Hantel-Pfad aber nicht mehr gelesen: eine
+      // Faust bestimmt keine Stangenhoehe (s. dort).
+      hantelAnPunkt(HEBEN_KOERPER_STD,r);
     }
     // SCHACHUHR. Dasselbe Muster wie Hockeyschlaeger/Hantel direkt oberhalb (PR 0.2,
     // DISZIPLIN_PROP) — Ziel 5 (Opus-Plan 09-10, Abschnitt 5.1, Speed-Schach A3 20->25).
@@ -3862,13 +4171,48 @@
   const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
   // ZIELPRIORITAET — uebersteuert die Neigung der Persoenlichkeit.
   // Welche Zielwahl jede Persoenlichkeit von sich aus trifft — das ist der Stern-Eintrag.
-  const PERSZIEL={bollwerk:"naechster",draufgaenger:"naechster",duellant:"bedrohung",
-    schleicher:"hinten",beschuetzer:"naechster",opportunist:"schwach"};
+  //
+  // CHRIS AM 13.09. ZUM LIVE-TDM: „die charaktere suchen sich anscheinend einen gegner und
+  // hauen drauf aber es gibt gar nicht ne dynamik wo manche versuchen laut ihrem charakter
+  // oder stil eher die backrow oder sonstwas standardmaessig zu attacken."
+  //
+  // Er hat recht, und diese Tabelle war der Grund. DREI der sechs Archetypen standen auf
+  // "naechster" — bollwerk, draufgaenger UND beschuetzer. "naechster" ist aber gar keine
+  // Neigung, sondern die Abwesenheit einer: rein geometrisch, ohne jeden Bezug zur Reihe,
+  // zur Rolle oder zum Charakter. Von sechs Persoenlichkeiten hatte damit genau EINE
+  // (schleicher) ueberhaupt eine Stellungsabsicht — und die war ausgerechnet in Mini-DM ein
+  // stiller Leerlauf (s. hintersteReihe weiter unten). Wer keinen Schleicher im Kader hatte,
+  // sah im ganzen Kampf niemanden, der etwas anderes versuchte als den naechsten Koerper.
+  //
+  // ZWEI der drei bleiben unveraendert, und zwar begruendet:
+  //   duellant -> "bedrohung" und opportunist -> "schwach" sind echte, eingemessene
+  //   Neigungen und werden hier NICHT verwaessert.
+  //   bollwerk -> "naechster" bleibt ebenfalls: das Bollwerk IST der Schirm, "nimm, was auf
+  //   dich zukommt" ist fuer ihn eine Charakterisierung und kein Platzhalter.
+  // Die beiden anderen bekommen je eine eigene, STELLUNGSBEZOGENE Neigung (s. ZIELE):
+  //   draufgaenger -> "speer"   (die Spitze der gegnerischen Formation aufbrechen)
+  //   beschuetzer  -> "schild"  (den wegschlagen, der an den eigenen Leuten haengt)
+  // Fuenf verschiedene Neigungen auf sechs Archetypen, DREI davon lesen die Aufstellung
+  // (speer/hinten/schild) statt nur den Abstand.
+  //
+  // NICHT der Weg, den `docs/design/arena-mini-dm-tdm-battlefield-rollout-plan.md`
+  // Abschnitt 4.1 als "Option A" empfiehlt (alle drei "naechster" auf "bedrohung"). Der
+  // Plan ist aelter als Chris' Meldung und beantwortet eine ANDERE Frage — er sucht den
+  // staerksten rho-Hebel, Chris verlangt sichtbare VIELFALT. Option A haette vier von sechs
+  // Archetypen auf dieselbe Neigung gelegt und damit genau die Gleichfoermigkeit vergroessert,
+  // die er beanstandet; der Plan benennt diesen Nachteil selbst ("Fokusfeuer [...] wird zum
+  // Normalfall, nicht mehr zur Ausnahme"). Option C desselben Abschnitts — "Reihe/Formation
+  // bleibt der Skill-Kanal" — ist dagegen genau das, was der zweite Teil dieser Aenderung
+  // umsetzt (s. reihenAnker weiter unten).
+  const PERSZIEL={bollwerk:"naechster",draufgaenger:"speer",duellant:"bedrohung",
+    schleicher:"hinten",beschuetzer:"schild",opportunist:"schwach"};
   const ZIELE=[
     ["bedrohung","Größte Bedrohung","Greift den Gegner mit dem höchsten Angriffswert an, egal wie weit er entfernt ist."],
     ["schwach","Angeschlagensten","Greift den Gegner mit den wenigsten verbleibenden Lebenspunkten an — Fokusfeuer, um ihn schnell auszuschalten."],
     ["naechster","Nächsten","Greift immer den nächststehenden Gegner an. Läuft niemandem hinterher."],
-    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten gegnerischen Reihe, sofern eines erreichbar ist."],
+    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten besetzten gegnerischen Reihe. Steht der Gegner nur noch in einer Reihe, gilt wieder die natürliche Neigung."],
+    ["speer","Spitze aufbrechen","Greift den Gegner an, der am weitesten vorgerückt ist — die Spitze der gegnerischen Formation. Mehrere mit diesem Ziel bündeln sich auf denselben Vorstoß, statt sich auf je einen Nachbarn zu verteilen."],
+    ["schild","Kameraden freischlagen","Greift nicht den an, der IHM am nächsten steht, sondern den, der einem seiner Leute am nächsten steht. Er räumt den weg, der an der eigenen Linie hängt."],
     ["heiler","Heiler zuerst","Greift bevorzugt gegnerische Heiler an. Steht keiner im Feld, gilt wieder die natürliche Neigung."]
   ];
   const ZIELTIP=Object.fromEntries(ZIELE.map(([v,l,t])=>[v,{l,t}]));
@@ -5011,6 +5355,72 @@
       label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
       punkteNah:1, punkteFern:1, fernAnteil:0,
       wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      // ZWEI VERSCHIEDENE AKTIONEN, ZWEI VERSCHIEDENE WOERTER (Chris, 13.09.: "ich sehe
+      // keine checks oder tackles"). Nachgemessen (docs/design/hockey-ausdauer-checks-
+      // konzept-13-09.md, Abschnitt 3.4): der Bodycheck faellt 10,5-mal je Spiel und der
+      // Stockcheck am Traeger 8,1-mal — und BEIDE schrieben denselben Schwebetext "CHECK!",
+      // weil der Steal-Zweig `wortAbwehr` liest und das hier "Check" ist. `wortSteal`
+      // trennt die beiden Woerter; wo es fehlt (Basketball, Football), faellt der Code auf
+      // `wortAbwehr` zurueck und schreibt zeichengleich dasselbe wie bisher.
+      wortSteal:"Stockcheck",
+      // ============================== PUSTE ==============================
+      // Chris, 13.09.: „die health bars sind ja hier quatsch, die koennten eher ausdauer
+      // sein und tackles kosten ggf. ausdauer? nicht zu verwechseln mit unserer fatigue ich
+      // meine speziell fuer die diszi. man laedt in pausen etwas auf oder wenn man weniger
+      // rennt etc aber verliert was wenn man tacklet oder getackled wird je nachdem welcher
+      // spieler staerker war". Und auf die Frage nach dem Endzustand: „haengt ab von den
+      // Spieler-Stats, manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag." Name „Puste" ist seine Entscheidung („ja erstmal okay") —
+      // ausdruecklich NICHT „Ausdauer", weil dieses Wort im Spiel schon zweimal vergeben ist
+      // (der Sub-Skill AUSDAUER und die Saison-Fatigue).
+      //
+      // NICHT ZU VERWECHSELN MIT DER SAISON-FATIGUE, und das ist nachgemessen, nicht
+      // versprochen: der Kader-Adapter (lib/foundation/battle-arena/arena-kader-adapter.ts)
+      // uebergibt dem Motor {n,id,c,r,sub,tp,tn,d,groesse,a} — KEIN fatigue-Feld. Die
+      // Saison-Fatigue wirkt VOR dem Spiel auf den Score (fatiguePenalty), die Puste
+      // WAEHREND des Spiels auf die Bewegung. Sie treffen sich an keiner Zeile.
+      //
+      // KEIN WERTPOSTEN. `feldspielWert` bleibt unangetastet — der Check-Posten wurde
+      // bewusst gestrichen (s. dort, "CHECKS GESTRICHEN"), weil Hit-Differenzen real
+      // NEGATIV mit Tordifferenzen korrelieren. Die Puste wirkt ueber Tempo und
+      // Zweikaempfe, nicht ueber die Wertformel.
+      //
+      // DIE STREUUNG KOMMT AUS `basis + AUSDAUER*jeAusdauer` — genau Chris' „haengt ab von
+      // den Spieler-Stats". Auf der echten Kader-Familie liegt AUSDAUER zwischen 21 und 75
+      // (Median 59); der Vorrat spreizt sich damit um rund den Faktor 1,7 zwischen dem
+      // zaehesten und dem schwaechsten Feldspieler. AUSDAUER hatte im Eishockey bis heute
+      // genau EINEN mechanischen Kanal (den wucht-Kontrast im Bodycheck, gemessen 4,4 %
+      // Gewicht) — die Puste ist sein zweiter, und zwar ein sichtbarer.
+      //
+      // ALLE ZAHLEN SIND KALIBRIERT, NICHT GESETZT: s. docs/design/
+      // hockey-puste-kalibrierung-13-09.md und scripts/miss-hockey-puste.mjs.
+      puste:{
+        basis:20, jeAusdauer:1.42,   // Vorrat: 50 (AUSDAUER 21) bis 127 (AUSDAUER 75)
+        regen:0.34,                  // Punkte je Sekunde, IMMER gutgeschrieben (Netto-Modell)
+        jePx:0.0038,                 // Punkte je tatsaechlich gelaufenem Pixel
+        strafbankRegen:2.2,          // Faktor auf `regen`, solange er auf der Strafbank sitzt
+        pause:0.28,                  // Anteil des Vorrats, der beim Drittelwechsel zurueckkommt
+        checkGeben:5, checkNehmen:9, // Kosten des Koerpereinsatzes, s. kontrast* unten
+        kontrastSkala:40, kontrastGewicht:0.5,
+        // WIRKUNG AUF DEN AUSGANG: ABGESCHALTET, und zwar nachgemessen begruendet.
+        // Zwei Laeufe (24 Spiele x 5 Kader) mit wirksamer Puste ergaben rho je Spiel 0,616
+        // (tempoMin 0,86 / wuchtMin 0,70 / zweikampfMin 0,78) und 0,628 (0,95 / 0,75 / 0,94)
+        // gegen eine Basislinie von 0,669. Das Abschwaechen um zwei Drittel der Wirkung holte
+        // NICHTS zurueck — die Einbusse haengt also nicht an der Staerke der Faktoren, sondern
+        // daran, DASS Positionen und Zweikampfgewichte ueberhaupt verschoben werden: das
+        // aendert die Zahl der versucheSteal()-Aufrufe und damit die Zufallsbahn aller
+        // folgenden Ereignisse (dieselbe Kaskade wie beim Zoneneintritt, s.
+        // hockey-zoneneintritt-umsetzung.md). Dazu haengt der Verbrauch an der gelaufenen
+        // Strecke, und die korreliert mit LAUFTEMPO (0,852) — die Puste bestrafte damit
+        // teilweise genau das, wofuer die Eignung bezahlt.
+        // Auf 1 ist jede Multiplikation exakt neutral (x*1 === x, auch in Gleitkomma), die
+        // Simulation also bitgleich. Die Leiste, die Kosten und der Vorrat laufen weiter und
+        // sind vollstaendig sichtbar — nur der AUSGANG bleibt unberuehrt, bis die Einbusse
+        // verstanden ist. Siehe docs/design/hockey-puste-kalibrierung-13-09.md, Abschnitt 4.2.
+        tempoMin:1,                  // 0,95 gemessen: rho 0,669 -> 0,628
+        wuchtMin:1,                  // 0,75 gemessen: s.o.
+        zweikampfMin:1               // 0,94 gemessen: s.o.
+      },
       // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
       // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht,
       // und der Torwart hat keine eigene Zeile), s. WERTUNG_HOCKEY() weiter unten bei den
@@ -6040,6 +6450,15 @@
         // Nach einem Bodycheck: `taumeltBis` bremst, `downBis` legt kurz hin. Beide in
         // Spielzeit (fsT), beide ausserhalb von Hockey immer 0 und damit wirkungslos.
         taumeltBis:0, downBis:0,
+        // REINE ZEICHEN-FELDER fuer den Bodycheck-Aufprall (s. HK_CHECK_VIS/versucheSteal).
+        // Keine Formel liest sie, ausserhalb von Hockey setzt sie nichts.
+        wuchtVis:0, wuchtZielX:0, wuchtZielY:0,
+        // PUSTE (s. FELDSPIEL_ART.hockey.puste). `pusteMax` bleibt 0, wo die Disziplin
+        // kein Puste-Rezept fuehrt — dann ist jede Puste-Zeile im Motor wirkungslos.
+        // `pusteMin` haelt den TIEFSTEN Stand des Spiels fest (fuer die Abnahme: ein
+        // Spieler, der einmal leer war und sich wieder gefangen hat, sieht am Ende aus
+        // wie einer, der nie leer war). `weg` ist die gelaufene Strecke in Pixeln.
+        puste:pusteMaxVon(R2), pusteMax:pusteMaxVon(R2), pusteMin:pusteMaxVon(R2), weg:0,
         // Strafbank: `strafeBis` ist der Zeitpunkt (Spielzeit fsT), ab dem er wieder
         // aufs Eis darf, `strafminuten` die Statistikspalte. Ausserhalb von Hockey
         // bleiben beide 0 — `aufDemEis` liest dann immer true.
@@ -6535,6 +6954,48 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
+  // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
+  // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
+  // stepFeldspielLive abgebaut. Bei ZEIT_DEHNUNG.hockey=2 sind 0,5 s Spielzeit rund eine
+  // Sekunde Zuschauzeit — lang genug, um den Stoss zu sehen, kurz genug, um den naechsten
+  // nicht zu ueberdecken (die Luecke zwischen zwei Checks liegt im Median bei 14,4 s).
+  const HK_CHECK_VIS=0.5;
+  // ============================== PUSTE (Feldspiel) ==============================
+  // Rezept und Begruendung stehen an FELDSPIEL_ART.hockey.puste. Hier nur die drei
+  // Funktionen, die sie bewegen. Eine Disziplin OHNE `art.puste` (Basketball, Football)
+  // laeuft durch jede von ihnen mit `pusteMax === 0` und damit Zeichen fuer Zeichen wie
+  // vorher: `pusteAnteil` gibt 1, `pusteFaktor` gibt 1, `pusteTick` kehrt sofort um.
+  const pusteAnteil=(u)=>u&&u.pusteMax>0?Math.max(0,Math.min(1,u.puste/u.pusteMax)):1;
+  const pusteFaktor=(u,min)=>min+(1-min)*pusteAnteil(u);
+  // NETTO STATT SPERRKLINKE. Der gemessene Fehler auf der Bahn (u.reserve kennt fuenf
+  // Abzuege und keine einzige Gutschrift, u.leer wird nie geloescht) ist derselbe Ratchet,
+  // den docs/design/fatigue-saisonlaenge-plan.md B.2 fuer die Saison-Fatigue beschreibt.
+  // Hier wird er von vornherein vermieden: `regen` laeuft IMMER, der Verbrauch haengt an
+  // der tatsaechlich gelaufenen Strecke. Wer steht, gewinnt; wer sprintet, verliert; wer im
+  // Normaltempo unterwegs ist, haelt ungefaehr. Das ist gleichzeitig die woertliche
+  // Uebersetzung von Chris' „man laedt in pausen etwas auf oder wenn man weniger rennt":
+  // „weniger rennen" ist im Motor keine Absichtserklaerung, sondern `hypot(vx,vy)`.
+  //
+  // `u.vx/u.vy` sind der im LETZTEN Tick tatsaechlich gegangene Schritt (bewegeSpielerLive
+  // schreibt sie dort, s. Opus-Review-Fund #12) — ein Tick Verzug, der bei 1/60 s keine
+  // Rolle spielt, dafuer ist es die ehrlichste verfuegbare Bewegungsgroesse: sie enthaelt
+  // Fastbreak-Zuschlag, Taumel-Bremse, Deckungsvorsprung und Strafbank-Marsch schon fertig.
+  // Der Vorrat eines Spielers, aus seinen schon gerechneten Sub-Skills (R2 in bauSpieler).
+  // 0, wo die Disziplin kein Puste-Rezept fuehrt — dann bleibt die ganze Mechanik still.
+  function pusteMaxVon(R2){
+    const P=FB().puste;
+    return P?Math.round(P.basis+(R2.AUSDAUER||50)*P.jeAusdauer):0;
+  }
+  function pusteTick(u,dt){
+    if(!(u.pusteMax>0))return;
+    const weg=Math.hypot(u.vx||0,u.vy||0);
+    u.weg=(u.weg||0)+weg;
+    const P=FB().puste;
+    const regen=P.regen*(aufDemEis(u)?1:(P.strafbankRegen??1));
+    u.puste=Math.max(0,Math.min(u.pusteMax,u.puste+regen*dt-weg*P.jePx));
+    if(u.puste<u.pusteMin)u.pusteMin=u.puste;
+  }
   // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
   // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
   // bei 78 (Netfront), 165 (Half-Wall) und 295 px (Point, blaue Linie). Mit Basketballs
@@ -7955,6 +8416,14 @@
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
     feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
+    // PUSTE IN DER PAUSE (Chris: „man laedt in pausen etwas auf"). Bewusst eine EINMALIGE
+    // Gutschrift am Drittelwechsel und NICHT eine laengere Simulationspause: der
+    // Kommentar an FELDSPIEL_ART.basketball.live haelt nachgemessen fest, dass schon eine
+    // Anhebung von periodenPause auf 3,0 die Rangtreue verschiebt (0,772 -> 0,771), weil
+    // die zusaetzlichen Leerlauf-Ticks denselben deterministischen Zufallsstrom
+    // weiterschieben. Diese Zeile verbraucht keinen Tick und keinen rr()-Wurf.
+    if(FB().puste)for(const team of FSTEAM)for(const u of team)
+      u.puste=Math.min(u.pusteMax,u.puste+u.pusteMax*FB().puste.pause);
     fsLive.viertel=zuEnde+1;
     // ROTATION (Auftrag 2): s. zuordneSlots()-Kommentar fuer die Regel selbst. Beide
     // Seiten unabhaengig voneinander geprueft — bei Gleichstand bleibt es fuer beide bei
@@ -9134,8 +9603,31 @@
     // stabil im Stand ist, faellt seltener. Die drei Zeiten (Sturz, Taumeln, Tempo) sind
     // PLATZHALTER und im UI gegen den Bewegungseindruck geprueft, nicht gegen eine Zahl.
     if(istHockey()){
-      const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-traeger.AUSDAUER)*0.0040));
+      // PUSTE IM WUCHT-KONTRAST. Die Formel bleibt Zeichen fuer Zeichen dieselbe, nur das
+      // Argument wechselt: statt der ROHEN AUSDAUER steht dort die WIRKSAME — ein Spieler
+      // mit leerer Puste steht schlechter im Stand und faellt leichter. Genau das ist
+      // Chris' „verliert was wenn man tacklet oder getackled wird je nachdem welcher
+      // spieler staerker war", nur von der anderen Seite gelesen: die Kosten von vorhin
+      // aendern den Ausgang von jetzt. Ohne Puste-Rezept gibt pusteFaktor 1 und
+      // `ausdauerWirk` ist bitgleich `traeger.AUSDAUER`.
+      const ausdauerWirk=traeger.AUSDAUER*(traeger.pusteMax>0?pusteFaktor(traeger,FB().puste.wuchtMin):1);
+      const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-ausdauerWirk)*0.0040));
       if(rr()<wucht){
+        // WAS DER KOERPEREINSATZ KOSTET — beide Seiten, gestaffelt nach dem Kraefte-
+        // verhaeltnis. `kontrast` ist derselbe Vergleich, den `wucht` direkt darueber
+        // schon zieht (ABWEHR des Checkenden gegen die wirksame AUSDAUER des Getroffenen),
+        // nur auf -1..+1 normiert: +1 heisst „der Checkende war klar staerker", dann zahlt
+        // der Getroffene mehr und der Checkende weniger; -1 dreht es um. Kein neuer
+        // rr()-Wurf, kein neuer Zweig — nur zwei Subtraktionen an einer Stelle, an der die
+        // Simulation ohnehin schon steht.
+        if(traeger.pusteMax>0){
+          const P=FB().puste;
+          const kontrast=Math.max(-1,Math.min(1,(decker.ABWEHR-ausdauerWirk)/P.kontrastSkala));
+          traeger.puste=Math.max(0,traeger.puste-P.checkNehmen*(1+P.kontrastGewicht*kontrast));
+          decker.puste =Math.max(0,decker.puste -P.checkGeben *(1-P.kontrastGewicht*kontrast));
+          if(traeger.puste<traeger.pusteMin)traeger.pusteMin=traeger.puste;
+          if(decker.puste<decker.pusteMin)decker.pusteMin=decker.puste;
+        }
         // ZU HART: derselbe Check, nur ueber die Grenze. Gepfiffen wird VOR der Wirkung,
         // weil im echten Eishockey die Pfeife das Spiel unterbricht — der Getroffene
         // faellt dann nicht mehr in ein Gerangel um den losen Puck, sondern es gibt ein
@@ -9167,7 +9659,22 @@
         // Reine Praesentation, kein rr()-Aufruf.
         sfx("hockey","treffer");
         feed(decker.side,decker.n+" checkt "+traeger.n+" von den Kufen.");
-        schwebe({x:0,y:0,txt:"CHECK!",life:1.0,crit:true,_def:true,_spieler:decker.id});
+        // EIGENES BILD FUER DEN KOERPEREINSATZ (Chris, 13.09.). Gemessen fielen je Spiel
+        // rund 103 Schwebetexte derselben Klasse `_def` (69,3 Save/Block, 18,0 Steal,
+        // 10,5 Bodycheck, 5,5 Strafe) — gleiche Farbe, gleiche Groesse, gleiche Position,
+        // einer alle 4,6 Zuschausekunden. Der Bodycheck war darin nicht auffindbar, obwohl
+        // er je Skater HAEUFIGER faellt als in der NHL (1,60 gegen rund 1,2). `_wucht` ist
+        // eine dritte Float-Klasse neben `_def`/`_gross`: eigenes Wort, eigene Farbe,
+        // groesser, laenger stehend. Reine Zeichnung, kein rr()-Aufruf.
+        schwebe({x:0,y:0,txt:"BODYCHECK!",life:1.5,crit:true,_wucht:true,_spieler:decker.id});
+        // STOSS-POSE UND AUFPRALL-BOGEN. `lunge` steht schon (Zeile oben, VOR dem Wuerfel,
+        // also identisch fuer Treffer und Fehlversuch) — genau deshalb sah man bisher nicht,
+        // dass jemand einen Koerperkontakt SUCHT, nur dass jemand umfaellt. `wuchtVis` ist
+        // ein reiner Zeichen-Zaehler (abgebaut in stepFeldspielLive neben `down`), aus dem
+        // zeichneFeldspiel den Bogen zeichnet; `wuchtZielX/Y` halten den Aufprallpunkt fest.
+        // Weder Simulation noch Boxscore lesen eines dieser drei Felder.
+        decker.wuchtVis=HK_CHECK_VIS; decker.lunge=Math.max(decker.lunge,HK_CHECK_VIS);
+        decker.wuchtZielX=traeger.x; decker.wuchtZielY=traeger.y;
         logZug(decker.side,"check",{verteidiger:decker,spieler:traeger});
         // WER LIEGT, FUEHRT KEINEN PUCK (Overseer-Fund). Bis hierher war der Check von der
         // Puckfrage vollstaendig entkoppelt: in rund 84 % der Faelle lag der Getroffene am
@@ -9186,12 +9693,16 @@
     }
     if(rr()<proVersuch){
       decker.steals++; traeger.verluste++;
-      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+art.wortAbwehr+".");
+      // `wortSteal` statt `wortAbwehr`, wo die Disziplin es fuehrt (Hockey: "Stockcheck"
+      // gegen den Bodycheck darueber, s. FELDSPIEL_ART.hockey). Ohne das Feld — Basketball,
+      // Football — ist die Zeile zeichengleich die alte.
+      const wortStahl=art.wortSteal||art.wortAbwehr;
+      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+wortStahl+".");
       // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
       // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
       // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
       // Float-Rendering, das jetzt zwischen Angriffs- und Abwehr-Highlight unterscheidet.
-      schwebe({x:0,y:0,txt:art.wortAbwehr.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
+      schwebe({x:0,y:0,txt:wortStahl.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:decker.id});
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
@@ -9971,6 +10482,11 @@
       if(!aufDemEis(u)){ const z=strafbankZiel(u); zx=z.x; zy=z.y; tempoMul=1.3; }
       else if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
       if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
+      // PUSTE AUFS TEMPO (Chris: „oder langsamer wird"). Dieselbe Bauform wie `leer`/`nerv`
+      // in tempoVon auf der Bahn: ein Faktor, der bei vollem Vorrat exakt 1 ist und bei
+      // leerem auf `tempoMin` faellt. Ohne Puste-Rezept gibt pusteFaktor 1 zurueck und die
+      // Zeile ist rechnerisch nicht vorhanden.
+      if(u.pusteMax>0)tempoMul*=pusteFaktor(u,FB().puste.tempoMin);
       const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
@@ -10002,6 +10518,14 @@
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
       if(u.down&&fsT>=u.downBis)u.down=false;
+      // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
+      // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
+      // auslaufen, sonst haengt der Bogen im letzten Bild fest.
+      if(u.wuchtVis>0)u.wuchtVis=Math.max(0,u.wuchtVis-dt);
+      // PUSTE, hier oben aus demselben Grund wie `down`: sie muss auch waehrend der
+      // Drittelpause und auf der Strafbank weiterlaufen — genau dort laedt sie ja auf.
+      // Ausserhalb einer Disziplin mit Puste-Rezept ist der Aufruf ein sofortiges return.
+      pusteTick(u,dt);
       // ZURUECK AUFS EIS. `strafeBis` wird auf 0 gesetzt statt nur ablaufen gelassen,
       // damit der Wiedereintritt EIN Ereignis ist und nicht in jedem Tick neu erkannt
       // wird — nur so laesst sich die Aufstellung genau einmal neu machen.
@@ -10231,9 +10755,16 @@
           //
           // `f.vonSeite` ist die Seite, die geworfen hat; wer NICHT von dort kommt,
           // verteidigt und bekommt den Ausbox-Vorteil.
+          // PUSTE IM GERANGEL (dritter und letzter Wirkungspfad). Wer leer ist, setzt sich
+          // am losen Puck schlechter durch — dieselbe Idee wie beim Tempo, an derselben
+          // Stelle wie der Ausbox-Vorteil und der Wettlauf-Term, und wie diese ein reiner
+          // Faktor auf das Gewicht: er verschiebt NICHT, aus welchem Topf der Gewinner
+          // kommt, sondern nur, wer ihn innerhalb des Topfes holt. Ohne Puste-Rezept ist
+          // der Faktor exakt 1 und die Zeile rechnerisch nicht vorhanden.
+          const pusteGewicht=(k)=>k.pusteMax>0?pusteFaktor(k,FB().puste.zweikampfMin):1;
           const gewinner=gewichtetesLosNach(kandidaten,
             k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT)
-              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1));
+              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1)*pusteGewicht(k));
           gewinner.rebounds++;
           if(duellVerloren)for(const k of kandidaten)
             if(k!==gewinner&&k.side!==gewinner.side)k.taumeltBis=fsT+HK_DUELL_TAUMEL;
@@ -11023,6 +11554,37 @@
           }
         }
         zeichneSprite(ctx,u,x,y,true);
+        // AUFPRALL-BOGEN DES BODYCHECKS (13.09.). Dieselbe Bauform wie der "hieb"-Effekt
+        // im Kampf und beim Bahn-Rempler (zeichneEffekte, typ:"hieb"): ein Bogen um den
+        // Aufprallpunkt, aus der Richtung des Checkenden geoeffnet, mit der Restzeit
+        // verblassend. Bewusst KEIN Eintrag in EFFEKTE — dieses Array wird in
+        // zeichneFeldspiel nie geleert und wuerde in einer headless-Sonde ueber viele
+        // Spiele wachsen; `u.wuchtVis` ist eine Zahl an der Einheit und laeuft in
+        // stepFeldspielLive von selbst aus.
+        if(u.wuchtVis>0){
+          const a=Math.max(0,Math.min(1,u.wuchtVis/HK_CHECK_VIS));
+          const zx=u.wuchtZielX+(u._zvx||0), zy=u.wuchtZielY+(u._zvy||0);
+          const w=Math.atan2(zy-y,zx-x), r=30*(0.6+0.4*(1-a));
+          ctx.save();
+          ctx.strokeStyle=css("--wucht");ctx.globalAlpha=a*0.95;
+          ctx.lineWidth=5;ctx.lineCap="round";
+          ctx.beginPath();ctx.arc(zx,zy,r,w-1.25,w+1.25);ctx.stroke();
+          ctx.strokeStyle="rgba(255,255,255,.75)";ctx.globalAlpha=a*0.6;ctx.lineWidth=1.5;
+          ctx.beginPath();ctx.arc(zx,zy,r+5,w-1.0,w+1.0);ctx.stroke();
+          ctx.restore();
+        }
+        // PUSTE-LEISTE UNTER DEN FUESSEN — dieselbe Bauform, dieselbe Ampel und dieselbe
+        // Groesse wie der Kraftreserve-Balken auf der Bahn (zeichneSpurt, "der Ersatz fuer
+        // den Lebensbalken des Kampfes"). Eine Leiste, drei Chassis: der Zuschauer lernt
+        // sie einmal und liest sie ueberall. Nur dort gezeichnet, wo die Disziplin ein
+        // Puste-Rezept fuehrt — Basketball und Football bleiben zeichengleich ohne Balken.
+        if(u.pusteMax>0){
+          const p=Math.max(0,Math.min(1,u.puste/u.pusteMax));
+          const bw=26;
+          ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,3);
+          ctx.fillStyle=p<=0?"#c0504a":(p<0.2?"#d98b3a":"#5FD08A");
+          ctx.fillRect(x-bw/2,y+20,bw*p,3);
+        }
         if(FS_DEBUG_ZIELE&&u._zielHomeX!=null){
           ctx.fillStyle=c;ctx.globalAlpha=0.9;
           ctx.beginPath();ctx.arc(u._zielHomeX,u._zielHomeY,4,0,6.3);ctx.fill();
@@ -11190,8 +11752,13 @@
       // _def (Chris' Fund, 29.08.: Highlights auch fuer Steal/Block, nicht nur fuer
       // Treffer) bekommt eine eigene Farbe (--crit), damit Abwehr- und Angriffs-Jubel
       // auf den ersten Blick auseinanderzuhalten sind.
-      ctx.fillStyle=f._def?css("--crit"):f._gross?css("--warn"):css("--ok");
-      ctx.font=(f._gross?"800 22px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      // DRITTE KLASSE `_wucht` (13.09.): der Bodycheck. Eigene Farbe (--wucht, in keiner
+      // Teamfarbe und in keiner der beiden bestehenden Klassen enthalten) und eine eigene
+      // Groesse zwischen Abwehr-Text (15) und Tor-Jubel (22) — sonst liest er sich entweder
+      // wie ein Save oder wie ein Tor. Begruendung und Messung: docs/design/
+      // hockey-ausdauer-checks-konzept-13-09.md, Abschnitt 3.4 Ursache A.
+      ctx.fillStyle=f._wucht?css("--wucht"):f._def?css("--crit"):f._gross?css("--warn"):css("--ok");
+      ctx.font=(f._gross?"800 22px":f._wucht?"800 18px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
         const u=FSTEAM[side].find(x=>x.id===f._spieler);
@@ -12061,6 +12628,60 @@
   // (v===2, "REAKTION AUF DEN DUELLSTAND" unten) bleibt ebenfalls unangetastet — sie greift
   // NACH dieser Reduktion und darf weiterhin nur nach oben ziehen.
   const HEBEN_FEHL_REDUKTION=0.06;
+  // ================ SPANNUNG IM DUELLVERLAUF (Chris' Fund 13.09.) ================
+  // Woertlich: "man sieht ja am anfang schon der eine hebt hoehere gewichte als der andere von
+  // anfang an und das wird dann auch der sein der am ende gewinnt". Recherche mit Messung:
+  // docs/design/gewichtheben-spannung-recherche-13-09.md, Sonde
+  // scripts/diag-gewichtheben-spannung.mjs.
+  //
+  // NACHGEMESSEN, NICHT VERMUTET (200 Spiele, 1200 Duelle): die hoehere EROEFFNUNGSANSAGE
+  // gewinnt 82,8 % aller Duelle, und in 66,2 % liegt die Eroeffnung des einen Hebers schon
+  // ueber dem HOECHSTEN Versuch, den der andere im ganzen Wettkampf ansagt — Chris' Satz als
+  // Zahl. ABER: der Hauptgrund ist die PAARUNG (ueber den Slot, nicht ueber die Staerke, s.
+  // baueHebenDuelle) bei einem Kader von 104 bis 476 kg Tagesmaximum, nicht die Planung. Nach
+  // Kraefteverhaeltnis getrennt gewinnt der Fuehrende nach Versuch 1 in ENGEN Duellen
+  // (Tagesmax-Abstand 3-10 %) nur 56,3 %, mit 59,8 % Fuehrungswechseln — die sind schon
+  // spannend. In DEUTLICHEN (10-25 %) sind es 91,7 % bei 165 kg Abstand. Ein Eingriff, der so
+  // ein Duell eng macht, waere gelogen und wuerde rho kosten. Beide Konstanten unten haben
+  // deshalb ihre NULLSTELLE im ausgeglichenen Duell und greifen nur in schiefen.
+  //
+  // (A) DER ZWEIKAMPF ZAEHLT, NICHT DIE UEBUNG. hebeUebung("stossen") startet mit
+  // besteStossen=0 fuer beide und verglich im dritten Versuch NUR besteStossen — der
+  // Reiss-Ausgang steht zu dem Zeitpunkt endgueltig auf u.besteReissen und wurde nirgends
+  // gelesen. Folge in beide Richtungen falsch: wer im Reissen 10 kg verlor, zog im Stossen auf
+  // Gegner+1 und verlor den Zweikampf trotzdem um 9 (Risiko getragen, nichts davon gehabt);
+  // und wer im Reissen 10 kg vorn lag, riskierte im Stossen einen Ausgleichsversuch, den er gar
+  // nicht brauchte. Reale Referenz: Hou Zhihui, Paris 2024 — Rueckstand nach dem Reissen,
+  // Aufholjagd ueber den ZWEIKAMPF im Stossen. IM REISSEN ist die neue Rechnung bit-identisch
+  // zur alten (der gebuchte Vorlauf ist dort beidseitig 0), die Aenderung beruehrt
+  // ausschliesslich den dritten Stossversuch — nachgemessen, die Reissen-Gelingensquoten sind
+  // zeichengleich. Ein-Zeilen-Umkehr: auf false setzen.
+  const HEBEN_DUELL_ZWEIKAMPF=true;
+  // (B) DUELLBEWUSSTE EROEFFNUNG BEI UNVERAENDERTEM ZIELGEWICHT. Die Eroeffnung kannte den
+  // Gegner ueberhaupt nicht, obwohl sie im echten Sport der am staerksten gegnerabhaengige Zug
+  // des Tages ist: wer die Wahl hat, sichert erst den Zweikampf und eroeffnet konservativ; wer
+  // sie nicht hat, zockt von Anfang an (Greg Everett/Catalyst: "open much higher than normal",
+  // wenn Qualifikation oder Medaille auf dem Spiel steht — reale Referenz: Pizzolato, Paris
+  // 2024, eroeffnet das Stossen bei 212 kg, 5 kg unter seinem Weltrekord, WEIL das Reissen
+  // misslang).
+  //
+  // WARUM DAS ZIELGEWICHT FIX BLEIBEN MUSS — und das ist kein Balancing-Geschmack, sondern
+  // zwingend: `ueber` in der Erfolgskurve unten ist NULL, solange die Ansage unter risikoMax
+  // liegt. Einen Heber einfach hoeher eroeffnen zu lassen kostet ihn deshalb keine
+  // Erfolgschance, hebt aber seine erreichbare Decke — ein Gratis-Buff, der die Rangtreue
+  // verschoebe. Also wird nur der WEG veraendert, nicht die Decke: der Versatz auf den
+  // Eroeffnungsanteil wird durch eine Nachskalierung BEIDER Spruenge exakt ausgeglichen
+  // (sprungFaktor = Wurzel(anteilOhneVersatz/anteil), damit anteil*(1+s1')*(1+s2') unveraendert
+  // bleibt). Weil beide Spruenge denselben Faktor bekommen, bleibt auch die von der Lehrmeinung
+  // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen bleiben in
+  // derselben Reihenfolge unterscheidbar.
+  //
+  // Der Spannungsgewinn steckt genau darin, dass der Favorit denselben Zielwert jetzt mit einem
+  // GROESSEREN letzten Sprung erreicht (Rechenbeispiel Recherche 4.2: 368-383-394 wird zu
+  // 349-373-395, die sichtbare Luecke bei Versuch 1 faellt von 55 auf 22 kg).
+  // Ein-Zeilen-Umkehr: HEBEN_DUELL_EROEFFNUNG_MAX auf 0 setzen.
+  const HEBEN_DUELL_EROEFFNUNG_K=0.30;   // Anteilsversatz je Anteil Kraeftevorsprung
+  const HEBEN_DUELL_EROEFFNUNG_MAX=0.05; // Deckel des Versatzes in beide Richtungen
   // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
   // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
   // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
@@ -12176,7 +12797,20 @@
     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
+    // DER ZWEIKAMPF-STAND, NICHT DER UEBUNGS-STAND (s. HEBEN_DUELL_ZWEIKAMPF oben).
+    // `gebucht` ist, was aus der ANDEREN Uebung schon endgueltig auf dem Konto steht — im
+    // Reissen beidseitig 0 (das Stossen kommt erst), im Stossen das fertige Reiss-Ergebnis.
+    // `duellStand` ist damit genau die Zahl, die im Wettkampf auf der Anzeigetafel steht,
+    // inklusive der Haerte des Sports: wer im Reissen genullt hat, steht bei 0, egal was im
+    // Stossen noch kommt (dieselbe Regel, die baueHebenDuelle als u.nullwertung auswertet).
+    const gebucht=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen")?x.besteReissen:0;
+    const duellStand=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&x.besteReissen<=0)
+      ?0:gebucht(x)+beste(x);
     const ansage={};
+    // Nachskalierung der geplanten Spruenge, damit der Eroeffnungs-Versatz aus (B) das
+    // geplante ZIELGEWICHT nicht verschiebt — s. HEBEN_DUELL_EROEFFNUNG_K oben. 1 bedeutet
+    // "kein Versatz", und dann rechnet der Sprung unten bit-identisch wie bisher.
+    const sprungFaktor={};
     for(const u of [a,b]){
       // Deckel bei 97 % des Tagesmaximums: ohne ihn eroeffnete ein Heber mit ANSAGE nahe
       // 99 rechnerisch ueber 100 % seines Maximums (0,94 Basis + 49*0,0016 = 1,018) und
@@ -12184,7 +12818,42 @@
       // den dritten Versuchen ohne Deckel auftrat (s. Kommentar bei "REAKTION AUF DEN
       // DUELLSTAND" unten). Der Deckel laesst ANSAGE weiter die Eroeffnungshoehe heben,
       // ohne sie ins garantierte Misslingen zu schicken.
-      const anteil=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      const anteilRein=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      // DUELLBEWUSSTE EROEFFNUNG (s. HEBEN_DUELL_EROEFFNUNG_K oben). `kraft` ist der
+      // erreichbare Zweikampf-Stand: schon Gebuchtes plus das, was in dieser Uebung noch
+      // maximal geht. Im Reissen ist das das Verhaeltnis der Tagesmaxima (die "Meldeleistung",
+      // die im echten Wettkampf vor der Sitzung bekannt ist); im Stossen zaehlt der tatsaechlich
+      // gehobene Reiss-Ausgang mit, ein im Reissen Abgestuerzter eroeffnet das Stossen also
+      // mutig — genau Pizzolatos 212 kg.
+      const gegner=u===a?b:a;
+      const kraftU=gebucht(u)+max(u), kraftG=gebucht(gegner)+max(gegner);
+      const lage=kraftG>0?kraftU/kraftG-1:0;
+      const versatz=Math.max(-HEBEN_DUELL_EROEFFNUNG_MAX,
+        Math.min(HEBEN_DUELL_EROEFFNUNG_MAX,-HEBEN_DUELL_EROEFFNUNG_K*lage));
+      // MUTIGER EROEFFNEN JA, UEBER DIE EIGENE SICHERHEIT HINAUS NEIN. Die Lehrmeinung ist an
+      // dieser Stelle eindeutig: die Eroeffnung ist "ein Gewicht, das der Heber schon oft
+      // gemacht hat und dem er voll vertraut" (Greg Everett) — "missing an opener is a bad way
+      // to start a meet". Der Versatz nach OBEN darf den Heber deshalb hoechstens bis an seinen
+      // eigenen Risiko-Massstab schieben (denselben, den die Erfolgskurve unten als risikoMax
+      // benutzt, s. HEBEN_WAGNIS_ANSAGE_FLEX), nie darueber.
+      // OHNE DIESEN DECKEL GEMESSEN (200 Spiele): das Gelingen im ersten Reissversuch fiel von
+      // 85,3 auf 81,3 % und damit unter den IWF-Korridor (84-90 %) — ein vorsichtiger Heber
+      // (niedrige ANSAGE, also niedriger risikoMax) wurde von der Duell-Lage in eine Eroeffnung
+      // gedraengt, die er nach der eigenen Risikokurve gar nicht halten kann. Math.max mit
+      // anteilRein sorgt dafuer, dass der Deckel nur den ZUSCHLAG begrenzt und nie die heutige
+      // Eroeffnung absenkt; bei versatz<=0 ist er ohne Wirkung. Der 0,97-Deckel bleibt daneben
+      // wie bisher bestehen (er haelt einen Heber mit hoher ANSAGE davon ab, den ERSTEN Versuch
+      // quasi sicher zu reissen, s. Kommentar darunter).
+      const mutDeckel=Math.max(anteilRein,
+        Math.min(0.97,1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
+      const anteil=Math.min(0.97,mutDeckel,Math.max(0.5,anteilRein+versatz));
+      // Zielgewicht-Invarianz: anteil*(1+s1')*(1+s2') = anteilRein*(1+s1)*(1+s2), erreicht
+      // ueber denselben Faktor auf BEIDE Spruenge — deshalb bleibt die von der Lehrmeinung
+      // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen
+      // bleiben in derselben Reihenfolge unterscheidbar. Immer wenn anteil am Ende gleich
+      // anteilRein ist — ausgeglichenes Duell (versatz=0) oder einer der beiden Deckel
+      // schneidet den Versatz weg — ist der Faktor exakt 1 und der Sprung unten bit-identisch.
+      sprungFaktor[u.id]=Math.sqrt(anteilRein/anteil);
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
@@ -12213,8 +12882,18 @@
       // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
       // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
       // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
-      if(v===2&&beste(gegner)>beste(u)){
-        const basisZiel=Math.round(beste(gegner))+1;
+      // ZWEIKAMPF STATT UEBUNG (s. HEBEN_DUELL_ZWEIKAMPF oben): verglichen wird der Stand auf
+      // der Anzeigetafel, nicht der Stand in der laufenden Uebung. Im Reissen ist `gebucht`
+      // beidseitig 0 und `duellStand` identisch `beste` — der Ausdruck reduziert sich dort
+      // exakt auf den alten Math.round(beste(gegner))+1, die Aenderung greift also nur im
+      // dritten Stossversuch. Wer im Reissen genullt hat, kann den Zweikampf nicht mehr
+      // gewinnen (Zweikampf 0) und hebt sein eigenes Programm zu Ende, statt eine Jagd zu
+      // fahren, die ihm nichts mehr bringen kann.
+      const kannZweikampf=!(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&u.besteReissen<=0);
+      if(v===2&&kannZweikampf&&duellStand(gegner)>duellStand(u)){
+        // Was in DIESER Uebung noetig ist, damit der eigene Zweikampf-Stand vorn liegt:
+        // gebucht(u) + kg > duellStand(gegner).
+        const basisZiel=Math.round(duellStand(gegner)-gebucht(u))+1;
         // KUEHNER VERSUCH: freiwilliger Zuschlag ueber das Ausgleichskilo hinaus,
         // deterministisch aus ANSAGE — ein selbstbewusster Heber wagt mehr, kein
         // zusaetzlicher Wuerfel an dieser Stelle (s. HEBEN_WAGNIS_MAX_KG oben).
@@ -12295,7 +12974,11 @@
           setzeBeste(u,kg);
           u.versucheBis+=v+1;
           // Naechste Ansage: geplanter Sprung, groesser bei hoher ANSAGE.
-          const sprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          const basisSprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          // Nachskalierung aus (B): sie haelt das geplante Zielgewicht trotz verschobener
+          // Eroeffnung fest (s. sprungFaktor oben). Faktor 1 = unveraendert. Der Boden
+          // Math.max(kg+1,...) bleibt die reale IWF-Mindeststeigerung von 1 kg.
+          const sprung=(1+basisSprung)*sprungFaktor[u.id]-1;
           ansage[u.id]=Math.max(kg+1,Math.round(kg*(1+sprung)));
         } else {
           // Fehlversuch: die Last SENKEN statt zu wiederholen (Chris' Fund, s.
@@ -12836,7 +13519,7 @@
   // rundenDauer) — geschrieben wird AUSSCHLIESSLICH auf die zwei neuen viz*-Felder
   // (u.vizPhase/u.vizPhaseT).
   //
-  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest bei W*0.30/W*0.70 (s.
+  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest auf HEBEN_SPALTE (s.
   // zeichneHeben) — "geht zur Hantel" ist deshalb nicht als u.vizX/u.vizY modelliert, sondern
   // als eigene Hantel-Phase ("antritt", s. HEBEN_PHASEN oben): die Stange bewegt sich relativ
   // zur Hand, der Heber selbst bleibt auf seinem Podestplatz — genau wie die vier
@@ -13603,6 +14286,24 @@
     if(zug.r.gueltig)return "hoch";
     return fortschritt<0.55?"abwurf":"boden";
   }
+  // DIE ZWEI PODESTPLAETZE, als Anteil der Buehnenbreite (13.09.). Vorher standen die zwei
+  // Zahlen 0.30/0.70 an ZWEI Stellen woertlich im Code (hier im forEach der beiden Heber und
+  // unten bei `bx` fuer die Textkarte) — eine Konstante, damit sie nicht auseinanderlaufen
+  // koennen und der Wert genau einmal begruendet dasteht.
+  //
+  // 0.38/0.62 statt 0.30/0.70 (Chris, 13.09.: "momentan stehen die 2 spieler unnoetig weit
+  // am rand statt zentraler im vergleich in der mitte"). Auf der 1240px-Buehne ruecken die
+  // Saeulen damit von 372/868 auf 471/769, der Abstand der beiden Mittelachsen schrumpft von
+  // 496 auf 298px. Naeher geht es NICHT beliebig, und die Schranke ist nachgerechnet, nicht
+  // geraten: die Hantel ist im Profil 34*Z lang, mit der aeussersten Scheibe reicht sie bis
+  // ~54*Z von der Mittelachse. Die groesste Figur im Beispielkader zeichnet mit Z~1.71
+  // (Krag'Zul, per scripts/messe-heben-geometrie.mjs), macht ~92px Halbbreite je Seite — bei
+  // 0.38/0.62 bleiben zwischen den beiden Stangenenden (563 und 677) noch 114px Luft. Bei
+  // 0.42/0.58 (Abstand 198px) waeren es nur noch 14px, zwei grosse Heber wuerden ihre
+  // Scheiben kreuzen. Die Namens-/Zweikampfzeilen darunter sind schmaler als die Hantel
+  // (16 Zeichen IBM Plex Mono 11px = ~106px, also ~53px je Seite) und deshalb nicht
+  // die bindende Schranke.
+  const HEBEN_SPALTE=[0.38,0.62];
   function zeichneHeben(art){
     if(!TEILNEHMER.length)return;
     const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
@@ -13630,7 +14331,7 @@
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
     // Chris beschrieben hat ("immer 2 gleichzeitig").
     const y=H*0.46;
-    [[a,W*0.30,"--home"],[b,W*0.70,"--away"]].forEach(([u,x,farbVar])=>{
+    [[a,W*HEBEN_SPALTE[0],"--home"],[b,W*HEBEN_SPALTE[1],"--away"]].forEach(([u,x,farbVar])=>{
       const c=css(farbVar);
       ctx.globalAlpha=u.lunge>0?1:0.94;
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
@@ -13660,10 +14361,17 @@
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
-      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
+      // NAME UND ZWEIKAMPF 12px TIEFER (13.09., dy 70/84 statt 58/72). Die Textkarte des
+      // AKTIVEN Hebers steht in derselben Spalte (bx) und schreibt ihre Versuchszeile bei
+      // textY+48, also y+50 — der Name lag mit y+58 acht Pixel darunter, bei 10- bzw.
+      // 11px-Schrift heisst das ueberlappend. Im Vorher-Screenshot
+      // (docs/design/gewichtheben-vorher-13-09.png) steht "Reißen, 1. Versuch" sichtbar im
+      // Namen "Greenkraut". Mit y+70 bleiben 20px Abstand; nach unten ist Platz bis zur
+      // Warteschlangen-Zeile bei H*0.90 (= y+207).
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,70,c,11);
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
-      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
+      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),84,"#8a93a3",8.5);
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
@@ -13694,21 +14402,35 @@
     // (Chris' Fund, 06.09.: "da ist gar kein gewicht als asset was die spieler versuchen
     // zu stämmen") entfaellt ersatzlos.
     const aktiverHeber=zug?zug.u:null;
-    const bx=aktiverHeber?(aktiverHeber.side===0?W*0.30:W*0.70):W/2;
+    const bx=aktiverHeber?(aktiverHeber.side===0?W*HEBEN_SPALTE[0]:W*HEBEN_SPALTE[1]):W/2;
 
     // TEXT-KARTE bleibt an einer FESTEN Hoehe, unabhaengig von der Hantel, die jetzt an
     // der Hand haengt und sich mit dem Phasenwechsel (hebePhase) bewegt — sonst haetten
     // Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar zu bleiben.
     const textY=y+2;
+    // ZWEI OBERE ZEILEN AUS DER FLUGBAHN DER STANGE GENOMMEN (13.09.). kg-Zahl und
+    // Kuehn-Badge sassen bei textY-34 bzw. textY-58, also 32 bzw. 56px ueber dem Fusspunkt
+    // — genau dort, wo die Stange in der Phase "hoch" jetzt steht. Vorher ging das nur
+    // deshalb auf, weil die Stange mit dy=-49 hoch ueber die ganze Karte hinausflog; genau
+    // das war Chris' "wird quasi weit ueber den kopf geworfen". Mit der korrigierten
+    // Ueberkopf-Hoehe muss stattdessen die Karte weichen.
+    //
+    // FESTE BUEHNENHOEHE statt eines Abstands zum Fusspunkt, weil die Ueberkopf-Hoehe am Z
+    // der jeweiligen Figur haengt und ueber den Beispielkader um ~28px streut (gemessen:
+    // Stangenoberkante zwischen Buehnen-y 167 bei Johanna/Z~1.04 und 138 bei Krag'Zul/
+    // Z~1.71, s. docs/design/gewichtheben-hantel-recherche-13-09.md). Ein fester Abstand
+    // haette fuer die eine Figur gepasst und fuer die andere nicht. H*0.245 (=115px bei
+    // H=470) liegt ueber BEIDEN, und noch unter der Duell-Kopfzeile bei H*0.155 (=73px).
+    const kopfZeileY=H*0.245, kuehnZeileY=H*0.20;
     ctx.textAlign="center";ctx.textBaseline="middle";
     if(zug){
       const gueltig=zug.r.gueltig;
       const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
       ctx.font="700 22px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
-      ctx.strokeText(zeigeKg+" kg",bx,textY-34);
+      ctx.strokeText(zeigeKg+" kg",bx,kopfZeileY);
       ctx.fillStyle=gueltig?css("--ok"):css("--crit");
-      ctx.fillText(zeigeKg+" kg",bx,textY-34);
+      ctx.fillText(zeigeKg+" kg",bx,kopfZeileY);
       // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
       // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
       ctx.font="700 15px 'Barlow Condensed',sans-serif";
@@ -13721,23 +14443,24 @@
       // Misslingen/Verletzung — ANSAGE_FARBE waere hier eine dritte, unnoetig Farbe, weil
       // der Ausgang schon feststeht, sobald dieser Versuch enthuellt wird. OBERHALB statt
       // unterhalb der Versuchszeile, weil dort schon der Lifter-Name/die Zweikampf-Anzeige
-      // sitzt (schrift() bei dy 58/72 direkt darueber im [[a,...],[b,...]]-forEach) -- ein
+      // sitzt (schrift() direkt darueber im [[a,...],[b,...]]-forEach) -- ein
       // Badge dort kollidierte sichtbar mit beidem (im Playwright-Screenshot geprueft).
-      // Ueber der kg-Zahl ist die Buehne dunkel und leer (die Duell-Kopfzeile sitzt bei
-      // H*0.155, weit oberhalb von textY-58).
+      // Seit 13.09. sitzt es zusammen mit der kg-Zahl im festen oberen Band (kuehnZeileY,
+      // s. dort) statt in Abstaenden zum Fusspunkt — aus demselben Grund: die Stange
+      // erreicht in der Phase "hoch" die alte Badge-Hoehe.
       if(zug.r.kuehn){
         const kuehnTxt=zug.r.verletzt?"⚠ KÜHNER VERSUCH — VERLETZT"
           :gueltig?"★ KÜHNER VERSUCH — PUNKTESIEG!"
           :"KÜHNER VERSUCH GESCHEITERT";
         ctx.font="700 12.5px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.9)";ctx.lineJoin="round";
-        ctx.strokeText(kuehnTxt,bx,textY-58);
+        ctx.strokeText(kuehnTxt,bx,kuehnZeileY);
         ctx.fillStyle=zug.r.verletzt?css("--crit"):gueltig?"#f2d75a":css("--crit");
-        ctx.fillText(kuehnTxt,bx,textY-58);
+        ctx.fillText(kuehnTxt,bx,kuehnZeileY);
       }
     } else {
       ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.fillText("Erste Ansage folgt …",bx,textY-10);
+      ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
@@ -15916,7 +16639,7 @@
       skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
       ...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
       schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,
-      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,leineHielt:false,
       st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}};
   }
 
@@ -16351,10 +17074,49 @@
     return dist(u,z)<=KF_RUF?z:null;
   }
 
+  // DIE HINTERSTE BESETZTE REIHE — nicht "Reihe 2".
+  //
+  // Bis hierher stand an zwei Stellen `foes.filter(f=>f.row===2)`. Das ist NUR fuer TDM
+  // richtig: sechs Slots ergeben die Reihen 0,0,1,1,2,2. Mini-DM hat VIER Slots und faellt
+  // mangels SLOT_ZUSATZ-Eintrag auf floor(Listenplatz/2) zurueck, also auf die Reihen
+  // 0,0,1,1 — eine Reihe 2 gibt es dort ueberhaupt NICHT. Die einzige stellungsbezogene
+  // Neigung, die der Motor bis hierher kannte (schleicher -> "hinten"), war in Mini-DM damit
+  // ein stiller Leerlauf: der Filter traf nie, die Zeile fiel durch, und der Schleicher
+  // griff den Naechsten an wie jeder andere. Genau das Nichts, das Chris gesehen hat.
+  //
+  // Jetzt heisst "hinten" das, was das Wort sagt: die hinterste Reihe, in der ueberhaupt
+  // noch jemand steht. Faellt die gegnerische Backrow, rueckt die Absicht auf die naechste
+  // Reihe nach, statt ins Leere zu greifen. Steht der Gegner nur noch in EINER Reihe, gibt
+  // es keine hintere mehr — dann liefert die Funktion null, und die natuerliche Neigung
+  // greift, genau wie der Tooltip es verspricht.
+  function hintersteReihe(foes){
+    const reihen=foes.map(f=>f.row||0);
+    const max=Math.max(...reihen);
+    if(max===Math.min(...reihen))return null;
+    return foes.filter(f=>(f.row||0)===max);
+  }
+
   function chooseTarget(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
     const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+    // "speer": wer von den Gegnern am weitesten in UNSERE Richtung vorgerueckt ist. Das ist
+    // bewusst NICHT "der Naechste" — der Naechste ist relativ zum eigenen Kopf (fuer einen
+    // Hinteren oft ein abgedrifteter Flankierer), die Spitze ist relativ zur FRONT. Dadurch
+    // buendeln sich mehrere Draufgaenger auf denselben Vorstoss, statt sich still auf je
+    // einen eigenen Nachbarn zu verteilen — das sichtbare Gegenstueck zum Schleicher, der
+    // in dieselbe Formation von hinten hineingeht.
+    const spitze=()=>foes.reduce((b,x)=>((u.side===0?x.x<b.x:x.x>b.x)?x:b));
+    // "schild": der Gegner mit dem kleinsten Abstand zu IRGENDEINEM meiner Leute. Ein
+    // Beschuetzer fragt nicht, wer IHM am naechsten steht, sondern wer an seinen Kameraden
+    // haengt. Ohne Kameraden (letzter Ueberlebender) faellt er auf den Naechsten zurueck —
+    // dann ist er selbst die Linie, die er decken soll.
+    const amKameraden=()=>{
+      const kam=eigene(u).filter(a=>a!==u);
+      if(!kam.length)return nearest(foes);
+      const naehe=(f)=>kam.reduce((m,k)=>Math.min(m,dist(f,k)),Infinity);
+      return foes.reduce((b,x)=>naehe(x)<naehe(b)?x:b);
+    };
 
     // Wer sich zurueckzieht, sucht kein Ziel.
     if(u.retreat>0)return null;
@@ -16418,7 +17180,9 @@
       if(u.zielP==="bedrohung")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
       if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
       if(u.zielP==="naechster")return nearest(foes);
-      if(u.zielP==="hinten"){const bk=foes.filter(f=>f.row===2);if(bk.length)return nearest(bk);}
+      if(u.zielP==="hinten"){const bk=hintersteReihe(foes);if(bk)return nearest(bk);}
+      if(u.zielP==="speer")return spitze();
+      if(u.zielP==="schild")return amKameraden();
       if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
       // "fels": genau den binden, den der Plan benannt hat.
       if(u.zielP==="fels"&&PLAN&&PLAN.felsName){
@@ -16437,7 +17201,7 @@
     // Grundneigung aus der Persoenlichkeit
     if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
     if(u.ziel==="schwaechster")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
-    if(u.ziel==="hinten"){const back=foes.filter(f=>f.row===2);if(back.length)return nearest(back);}
+    if(u.ziel==="hinten"){const back=hintersteReihe(foes);if(back)return nearest(back);}
     return nearest(foes);
   }
 
@@ -16453,6 +17217,84 @@
     const linie=g.filter(u=>!u.fern&&!u.heiler);
     const xs=(linie.length?linie:g).map(u=>u.x).sort((a,b)=>a-b);
     return xs[Math.floor(xs.length/2)];
+  }
+
+  // DIE REIHE HAELT AUCH IM KAMPF — der zweite Teil von Chris' Meldung vom 13.09.:
+  // „so richtig ne formation front und backrow gibt es nciht, da musst du die slots
+  // konsequenter umsetzen."
+  //
+  // Er hat auch hier recht, und zwar aus einem Grund, den man dem Bauweg nicht ansieht: die
+  // Reihen sind GAR NICHT falsch gebaut. `build()` verteilt beide Seiten sauber ueber
+  // slotReihe() auf byRow[0/1/2], und homeFor() macht daraus drei Spalten im Abstand von
+  // 160 px (MID∓140/300/460). Nur war das eine STARTAUFSTELLUNG und sonst nichts. Ab dem
+  // ersten Bild laeuft jeder auf sein Ziel zu, und die einzige Klammer, die ihn zurueckhaelt
+  // — die Formationsleine — haengt an teamFront(): EINER Linie fuer die ganze Mannschaft,
+  // fuer alle drei Reihen dieselbe. Die Backrow durfte also genau so weit nach vorn wie die
+  // Front, und sie tat es.
+  //
+  // NACHGEMESSEN, nicht vermutet (scripts/miss-arena-formation.mjs, 24 Kaempfe je Disziplin,
+  // Abtastung alle 0,5 s Kampfzeit), VOR dieser Aenderung:
+  //
+  //   Disziplin      Reihenabstand   davon verkehrt herum   Durchbruch aktiv
+  //   tdm                  20,4 px          32,6 %               23,1 %
+  //   mini-dm               8,8 px          31,5 %               18,3 %
+  //   battlefield          34,5 px          34,4 %               20,0 %
+  //
+  // Zwanzig Pixel, wo die Aufstellung 320 vorsieht, und in jedem dritten Bild steht die
+  // hintere Reihe VOR der vorderen. Das ist keine Formation, das ist ein Knaeuel — genau das
+  // Bild, das Chris „zu statisch" genannt hat: nicht zu wenig Bewegung, zu wenig STRUKTUR.
+  //
+  // Die Leine bleibt, wie sie ist — nur ihr ANKER wird reihenbewusst. Reihe 0 haengt weiter
+  // an der Linie selbst, jede weitere an einem um REIHEN_ABSTAND nach hinten versetzten
+  // Punkt. Das ist genau die Geometrie, die homeFor() beim Start ohnehin vergibt; sie gilt
+  // jetzt bis zum Schluss statt bis zum ersten Schritt. Kein zweiter Mechanismus, eine
+  // Zeile mehr im bestehenden.
+  //
+  // DER RANG WIRD GEZAEHLT, NICHT GELESEN. Nicht `u.row` direkt, sondern der Platz von u.row
+  // unter den Reihen, die ueberhaupt noch besetzt sind. Sonst wuerde eine Mannschaft, deren
+  // Front gefallen ist, mit ihrem Rest weiter 320 px hinter einer Linie warten, die niemand
+  // mehr bildet — sie wuerde vor einem leeren Feld zurueckweichen. So rueckt die zweite
+  // Reihe nach, wenn die erste weg ist, und wird selbst zur Front.
+  //
+  // Heiler zaehlen beim Ermitteln der besetzten Reihen nicht mit, aus demselben Grund, aus
+  // dem teamFront() sie ausschliesst: sie stehen ohnehin nach eigener Regel hinter der
+  // Gruppe und wuerden sonst eine Reihe vortaeuschen, die es taktisch nicht gibt.
+  const REIHEN_ABSTAND=160;   // = der Spaltenabstand in homeFor(), nicht neu erfunden
+  function reihenAnker(u){
+    const g=live(u.side).filter(a=>!a.heiler);
+    if(!g.length)return 0;
+    const reihen=[...new Set(g.map(a=>a.row||0))].sort((a,b)=>a-b);
+    const rang=Math.max(0,reihen.indexOf(u.row||0));
+    return (u.side===0?-1:1)*REIHEN_ABSTAND*rang;
+  }
+
+  // ABGEFANGEN HEISST ABGEFANGEN — VON GEGNERN.
+  //
+  // Der Durchbruch loest die Formationsleine, und das soll er: wer wirklich aufgehalten
+  // wird, geht durch. Die Bedingung dafuer war aber nur „dasselbe Ziel seit ueber 3 s und
+  // immer noch zu weit weg" — und das trifft auf JEDEN zu, den die EIGENE Aufstellung
+  // haelt. Der Hintermann erklaerte also nach ein paar Sekunden seine eigene Reihe fuer
+  // aufgehoben, obwohl ihn kein einziger Gegner angefasst hatte. Gemessen war der Durchbruch
+  // in jedem fuenften Einheit-Bild aktiv (Tabelle oben) — der Ausnahmezustand war der
+  // Normalzustand, und ohne diese Haelfte des Fixes waere der Anker oben nach spaetestens
+  // 5,5 s wieder wirkungslos.
+  //
+  // Der Tooltip sagt seit jeher „gilt als abgefangen". Das hier ist die fehlende Haelfte
+  // dieses Satzes: es muss jemand IM WEG stehen, und zwar in Reichweite. Entweder haengt
+  // einer in Schlagweite an ihm (u.bindAn — dieselbe Bindung, die auch den Trennschlag
+  // traegt), oder ein Gegner steht auf der Strecke zu seinem Ziel UND nah genug, dass er ihn
+  // wirklich aufhaelt; gemessen mit bahnAbstand(), derselben Funktion, mit der der
+  // Sturmangriff entscheidet, wer auf seiner Bahn steht. Ein Gegner, der weit vorn in der
+  // Bahn steht, haelt ihn NICHT auf — den hat er nur noch nicht erreicht.
+  //
+  // u.bindAn wird weiter unten im selben Takt neu gesetzt; hier steht also der Wert des
+  // Vorbilds, ein Sechzigstel alt. Fuer eine Ja/Nein-Frage, die ueber Sekunden entschieden
+  // wird, ist das ohne Belang.
+  function versperrt(u){
+    if(!u.tgt||u.tgt.down)return false;
+    if(u.bindAn)return true;
+    return gegner(u).some(f=>f!==u.tgt&&!f.down&&dist(u,f)<=u.reach*1.6&&
+      bahnAbstand(f,u.x,u.y,u.tgt.x,u.tgt.y)<KOERPER_X);
   }
 
   // ===================================================================================
@@ -16925,6 +17767,25 @@
       }
     }
 
+    // STEHT UEBERHAUPT JEMAND IM KONTAKT? Einmal je Bild fuer die ganze Seite, nicht je Kopf.
+    //
+    // Das ist die Notbremse hinter dem Reihenanker: solange irgendeiner der Eigenen in
+    // Schlagweite eines Gegners steht, LAEUFT der Kampf, und die Hinteren haben einen Grund
+    // zu warten — genau dafuer stehen sie hinten. Steht niemand im Kontakt, wartet die
+    // Mannschaft auf nichts, und dann darf die Aufstellung sie nicht laenger festhalten.
+    //
+    // Bewusst auf SEITENEBENE und nicht je Einzelnem: fragte man jeden fuer sich („habe ich
+    // selbst einen Gegner in Reichweite?"), waere schon der Anmarsch ein Patt — in den ersten
+    // Sekunden hat NIEMAND jemanden in Reichweite, und die ganze Formation loeste sich auf,
+    // bevor sie einmal getroffen haette. Die beiden Fronten starten 280 px auseinander
+    // (homeFor, Spalten MID∓140) und beruehren sich nach rund einer Sekunde, also lange vor
+    // den 4,5 s, nach denen der Offensivzwang greift.
+    const kontakt=[false,false,false,false];
+    for(const a of U){
+      if(a.down||kontakt[a.side])continue;
+      if(gegner(a).some(f=>dist(a,f)<=a.reach))kontakt[a.side]=true;
+    }
+
     for(const u of U){
       if(u.down)continue;
       const fat=t>35?Math.max(0.55,1-(100-u.AUS)*0.0011*(t-35)):1;
@@ -16974,7 +17835,16 @@
       // wer laenger als 3,5 s ueberhaupt kein Ziel hatte, und das Endspiel.
       // Ein Flankierer, der noch laeuft, ist nicht untaetig — er ist unterwegs.
       const flankeUnterwegs=u.ord==="flanke"&&(!freigabe[u.side]||!(u.side===0?u.x>MID+180:u.x<MID-180));
-      if(!u.tgt&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
+      // DRITTER FALL, neu: er HAT ein Ziel, kommt aber nicht heran, weil die eigene Leine
+      // ihn haelt (u.leineHielt, weiter unten im selben Takt gesetzt — also aus dem Vorbild,
+      // ein Sechzigstel alt) UND auf seiner Seite steht niemand im Kontakt. Fuer die Stellung
+      // ist das derselbe Zustand wie gar kein Ziel: er richtet nichts aus, und die Formation
+      // schuetzt niemanden mehr, weil es nichts zu schuetzen gibt. Ohne diese Zeile koennte
+      // der Reihenanker eine Mannschaft dauerhaft hinten parken, wenn der Gegner seinerseits
+      // nicht kommt — ein Patt, das kein Spieler sehen will. Mit ihr greift nach 4,5 s
+      // derselbe Offensivzwang wie bisher, samt derselben Meldung im Ticker.
+      const wirkungslos=u.leineHielt&&!kontakt[u.side];
+      if((!u.tgt||wirkungslos)&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
       const zwangVor=u.zwang;
       u.zwang=endspiel||u.leer>4.5;
       if(u.zwang&&!zwangVor)feed(u.side,u.n+" lässt die Stellung sein und sucht den Kampf.");
@@ -17006,7 +17876,9 @@
       const durchAb=1.5+u.opp/100*4;
       // Ein Opportunist geht nicht durch, solange direkt vor ihm etwas Angeschlagenes steht.
       const beuteDa=u.opp>=60&&gegner(u).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
-      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa){
+      // ... und niemand geht durch, den gar niemand aufhaelt (s. versperrt oben). Sonst ist
+      // "Durchbruch" nur der Name dafuer, dass einer seine eigene Reihe verlaesst.
+      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa&&versperrt(u)){
         u.durch=true;
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
       }
@@ -17045,9 +17917,18 @@
       // sonst waere er keiner. Vorher hing die Leine auch an ihm: die Flankierer sind nie
       // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
       // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
+      u.leineHielt=false;
       if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
         const leine=40+(100-formMitFuehrung(u))*3.4;
-        if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+        // Der Anker ist die eigene REIHE, nicht mehr die eine Linie fuer alle (s.
+        // reihenAnker oben): Reihe 0 haelt die Linie, jede weitere ihren Abstand dahinter.
+        // Die Leinenlaenge selbst bleibt unveraendert, und damit bleibt auch die Rangfolge
+        // der Befehle erhalten: wer "eigenmaechtig" aufgestellt ist, hat mit 380 px so viel
+        // Spiel, dass ihn auch der Reihenversatz nicht bindet, wer "dicht" steht, mit 40 px
+        // fast keines. Der Zusammenhalt bleibt die Stellschraube, ueber die Formation
+        // entschieden wird — die Reihe sagt jetzt nur noch, WORAN die Leine haengt.
+        const anker=front+reihenAnker(u);
+        if(Math.abs(gx-anker)>leine){ gx=anker+Math.sign(gx-anker)*leine; u.leineHielt=true; }
       }
 
       // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
@@ -17590,6 +18471,86 @@
   // nicht hierueber) — deshalb ist dieser Wechsel fuer Spurt/Climbing/Takeshi
   // bit-identisch: `bahnZeit(u) === u.fertig` dort in jedem Fall.
   function bahnZeit(u){ return u.fertig==null?null:u.fertig-(u.startT||0); }
+  // ===================================================================================
+  // DIE ANGEZEIGTE ZEIT IST DIE ZEIT, DIE MAN ZUGESCHAUT HAT (Chris' Fund 13.09.).
+  //
+  // Chris woertlich: "und auch hier hat er bei ner diszi die 1:26 dauert nur 8,1 sekunden
+  // gebraucht. macht keinen sinn das sind ja erfundene stats! du sollst es ja simulieren
+  // und dann dauert es logischerweise auch so lang wie der spieler braucht in der diszi!"
+  //
+  // NACHGEMESSEN, und er hat recht: `bahnZeit()` liefert SIMULATIONSSEKUNDEN. Die Uhr
+  // oben im HUD rechnet dagegen seit jeher `rennT*zeitFaktor()` auf ECHTE Sekunden um
+  // (s. updateHudBahn) — bei ZEIT_DEHNUNG["time-trial"]=4,38 laufen beide also um
+  // Faktor 4,38 auseinander. Ein Rennen, das 1:26 zu sehen ist, endet mit einer
+  // Siegerzeit von "8,1 s". Gemessen (scripts/probe-zeitfahren-anzeige.mjs, vor dieser
+  // PR): Uhr 1:26, Tidesprinter Platz 1 mit bahnZeit 8,079 s — exakt Chris' Zahlen.
+  //
+  // DASSELBE TICKET STAND SCHON EINMAL OFFEN, halb erledigt. Fuer Spurt sagte Chris am
+  // 06.09. woertlich: "und bei den spurt zeiten sollte das dann auch so stehen! und nicht
+  // es dauert 3 minuten und zeit steht 13,5 sekunden!" — PR #830 hat davon nur die ERSTE
+  // Haelfte umgesetzt (die Zuschauzeit auf drei Minuten gestreckt) und die zweite
+  // ausdruecklich liegen lassen ("Die angezeigte Zielzeit haengt NICHT an ZEIT_DEHNUNG:
+  // sie bleibt rennT im Simulationsmassstab"). Das ist der Rest jener Runde.
+  //
+  // REINE ANZEIGE, ABSICHTLICH NEBEN `bahnZeit()` STATT DARIN. `bahnZeit()` ist der
+  // Sortierschluessel von bahnRangliste() und die Groesse, an der
+  // MOTOREN["time-trial"].wert() und miss-alle-disziplinen.mjs die Rangtreue messen —
+  // sie bleibt unangetastet im Simulationsmassstab. `bahnZeitAnzeige()` multipliziert nur
+  // mit demselben `zeitFaktor()`, den die Uhr schon benutzt: eine KONSTANTE, positive
+  // Zahl, also rangordnungserhaltend (dieselbe Reihenfolge, dieselben Punkte) — und fuer
+  // jede Disziplin ohne ZEIT_DEHNUNG-Eintrag ist der Faktor 1 und die Funktion Zeichen
+  // fuer Zeichen `bahnZeit()`.
+  const bahnZeitAnzeige=(u)=>{ const z=bahnZeit(u); return z==null?null:z*zeitFaktor(); };
+  // Dieselbe Umrechnung fuer eine BEREITS berechnete Zeitspanne in Simulationssekunden
+  // (Zwischenzeiten `u.zz[ci]`, Rueckstaende aus bahnBesteZeit) — damit im Panel, im
+  // Endstand und im Ticker nur EIN Massstab vorkommt und nie zwei nebeneinander.
+  const bahnSpanneAnzeige=(s)=>s==null?null:s*zeitFaktor();
+  // Sekunden als "m:ss,s" ab einer Minute, darunter "12,4 s" — eine Zeitfahrzeit von
+  // 35 s liest sich als Zahl, eine von 95 s nicht mehr.
+  function bahnZeitText(sek){
+    if(sek==null)return "—";
+    if(sek<60)return sek.toFixed(1).replace(".",",")+" s";
+    const m=Math.floor(sek/60), r=sek-m*60;
+    return m+":"+(r<10?"0":"")+r.toFixed(1).replace(".",",")+" min";
+  }
+  // ================= ANGEZEIGTE ZEIT STATT SIMULATIONSZEIT (13.09.) =================
+  // Chris, woertlich: "und auch die zeiten passen nicht, wenn die diszi 3 minuten dauert
+  // dann sind auch die zeiten der laeufer 3 minutneun und nicht 1,5 sekunden!"
+  //
+  // Er hat recht, und es war ein reiner Anzeigefehler. Die Rennuhr im HUD rechnete laengst
+  // richtig (`rennT*zeitFaktor()` in updateHudBahn, seit dem Spurt-Fix) — JEDE ANDERE
+  // Zeitangabe der Staffel gab dagegen rohe SIMULATIONSSEKUNDEN aus: die Etappenzeit im
+  // Endstand und im Boxscore, der Wechselverlust, der Zieleinlauf-Abstand und das
+  // Broadcast-Delta. Bei ZEIT_DEHNUNG.staffel=14,65 heisst das, dass eine Etappe von
+  // gemessenen 1,75 Sim-Sekunden als "1.8 s" dastand, obwohl der Zuschauer sie 25,7
+  // Sekunden lang sieht, und ein Rueckstand von 0,1 Sim-Sekunden als "+0.1s", obwohl es
+  // real 1,5 Sekunden sind. Deshalb wirkte das Delta-Feld auch bedeutungslos: es zeigte
+  // fast immer 0.0 oder 0.1.
+  //
+  // Dieselbe Umrechnung wie die Uhr, an EINER Stelle. Reine Anzeige: `u.etappenZeit`,
+  // `u.wechselKonto`, `u.fertig` und `rennT` selbst bleiben unangetastet, und
+  // `bahnLeistung()`/`MOTOREN.staffel.wert()` rechnen weiter in Simulationssekunden —
+  // die Rangtreue kann sich daran nicht aendern (nachgemessen, s. PR-Beschreibung).
+  //
+  // EINE Umrechnung und EIN Zahlenformat fuer alle fuenf Bahn-Disziplinen. Diese Zeilen
+  // hiessen bis zum Rebase auf PR #908 eigene Implementierungen — `bahnRealSek` war
+  // zeichengleich das dort entstandene `bahnSpanneAnzeige`, und die Ausgabe stand auf
+  // Punkt-Dezimaltrennung ohne Einheit ("2:59.6", "24.4 s"). Beides waere im selben
+  // Endstand neben dem Zeitfahren gelandet, das ueber `bahnZeitText` mit Komma und
+  // Einheit schreibt ("2:59,6 min", "24,4 s"): dieselbe Groesse in zwei Schreibweisen
+  // auf einem Bildschirm. Deshalb sind die Staffel-Namen jetzt duenne Aliasse auf die
+  // generischen Funktionen — kein zweiter Massstab, kein zweites Format, und die
+  // staffelspezifischen Aufrufstellen behalten ihre sprechenden Namen.
+  const bahnRealSek=bahnSpanneAnzeige;
+  // Kurze Dauer (eine Etappe, ein Wechselverlust, ein Rueckstand): "24,4 s".
+  const fmtDauer=(sim)=>bahnZeitText(bahnRealSek(sim));
+  // Lange Dauer (eine Zielzeit): "2:59,6 min" — Minuten, sobald es welche gibt. Zwei
+  // Einstiege, damit eine Spalte, die ihren Wert zum Sortieren ohnehin schon in ECHTEN
+  // Sekunden haelt, ihn nicht erst durch zeitFaktor() zurueckrechnen muss: dieser
+  // Rundungs-Umweg liess dieselbe Zielzeit einmal als 2:59.6 (Kopfzeile) und einmal als
+  // 2:59.5 (Wertungstabelle) erscheinen.
+  const fmtRealZielzeit=bahnZeitText;
+  const fmtZielzeit=(sim)=>bahnZeitText(bahnRealSek(sim));
   // BESTZEIT IM FELD AN EINEM CHECKPOINT (Zeitfahren, Fable-Entscheidung 3: die Diff-
   // Anzeige vergleicht gegen den BIS DAHIN schnellsten Laeufer, nicht gegen einen festen
   // Rivalen — dieselbe "vorlaeufig, aber ehrlich"-Logik wie bahnRangliste). `ci` ist der
@@ -17603,9 +18564,44 @@
     }
     return best;
   }
+  // HOCHRECHNUNG FUER DEN, DER NOCH FAEHRT (Chris' Fund 13.09.). Der vorlaeufige Stand
+  // sortierte die noch Laufenden nach `b.pos-a.pos`, also nach ROHER STRECKE. Bei einem
+  // Massenstart ist das richtig — dort sind alle gleich lange unterwegs, mehr Strecke
+  // heisst schneller. Bei GESTAFFELTEM Start (`startAbstand`, nur Time-Trial) ist es
+  // schlicht die falsche Groesse: wer 8,8 s frueher von der Rampe gerollt ist, hat immer
+  // mehr Strecke, ohne deshalb schneller zu sein. Nachgemessen (scripts/probe-zeitfahren-
+  // anzeige.mjs, Stand vor dieser PR): bei rennT=0,26 s — EIN Laeufer hatte sich ueberhaupt
+  // bewegt — stand oben im HUD schon "57 : 21", der rechnerisch groesstmoegliche Vorsprung
+  // (12+11+10+9+8+7 gegen 6+5+4+3+2+1). Weil `id` seitenweise vergeben wird (mine zuerst,
+  // dann gegen, s. bauSpurt) und `startT = id * startAbstand`, faehrt die GESAMTE Heimseite
+  // vor der gesamten Gastseite los — der vorlaeufige Stand zeigte also ueber fast das ganze
+  // Rennen die Startreihenfolge und kippte erst im Ziel auf das echte Ergebnis. Genau das
+  // ist Chris' "die Diszi ist nach 1:26 vorbei und dann steht es ploetzlich 38:40" und sein
+  // "dort sieht man Tidesprinter als schnellsten mit Abstand, vorhin beim Laufen war er
+  // optisch aber nur 4.".
+  //
+  // Die ehrliche vorlaeufige Groesse ist die HOCHGERECHNETE EIGENE ZEIT: wie lange er fuer
+  // die ganze Strecke braucht, wenn er sein bisheriges Mitteltempo haelt —
+  // `(rennT - startT) / pos`. Das ist dieselbe "vorlaeufig, aber ehrlich"-Idee, mit der
+  // bahnRangliste den Zwischenstand ueberhaupt eingefuehrt hat, nur mit der Uhr, die zu
+  // einem Einzelstart gehoert. Wer noch auf der Rampe steht (pos=0), hat keine Information
+  // und landet hinten (Infinity) — richtig so, er hat noch keinen Meter gezeigt.
+  //
+  // GEGATED auf `BA().startAbstand`: fuer Spurt, Climbing, Takeshi und die Staffel (alle
+  // ohne dieses Feld) bleibt die Zeile Zeichen fuer Zeichen die alte `b.pos-a.pos`.
+  // RHO-NEUTRAL, nicht nur behauptet: dieser Zweig greift AUSSCHLIESSLICH, solange
+  // mindestens einer noch faehrt. Am Rennende (`done`), wo MOTOREN["time-trial"].wert()
+  // und miss-alle-disziplinen.mjs die Rangliste lesen, ist `u.fertig` fuer jeden gesetzt
+  // und nur der `fa&&fb`-Zweig darueber laeuft — unveraendert. Nachgemessen: 0,828 rho je
+  // Spiel / 0,832 Saison vor UND nach dieser PR (s. PR-Beschreibung).
+  function bahnHochrechnung(u){
+    if(u.pos<=0)return Infinity;
+    return (rennT-(u.startT||0))/u.pos;
+  }
   function bahnRangliste(){
     const N=LAEUFER.length;
     const staffel=!!BA().staffel;
+    const einzelstart=!!BA().startAbstand;
     const reihe=[...LAEUFER].sort((a,b)=>{
       if(staffel){
         const la=bahnLeistung(a), lb=bahnLeistung(b);
@@ -17617,6 +18613,11 @@
       const fa=a.fertig!=null, fb=b.fertig!=null;
       if(fa&&fb)return bahnZeit(a)-bahnZeit(b);
       if(fa!==fb)return fa?-1:1;
+      if(einzelstart){
+        const ha=bahnHochrechnung(a), hb=bahnHochrechnung(b);
+        if(ha!==hb)return ha-hb;
+        return b.pos-a.pos;                       // beide noch auf der Rampe: Startfolge
+      }
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
@@ -17659,10 +18660,29 @@
       const seiten=[0,0];
       if(z[0]!=null&&(z[1]==null||z[0]<z[1]))seiten[0]=1;
       else if(z[1]!=null&&(z[0]==null||z[1]<z[0]))seiten[1]=1;
-      return {seiten, suffix:"nach Zieleinlauf", punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
-        zusatz:z[0]!=null&&z[1]!=null?z[0].toFixed(1)+" s gegen "+z[1].toFixed(1)+" s":null,
-        zeitVon:(u)=>u.etappenZeit==null?"—":u.etappenZeit.toFixed(1)+" s"
-          +(u.wechselKonto<0?" · "+(-u.wechselKonto).toFixed(1)+" s Wechsel":""),
+      // ===== WER FUEHRT, STEHT JETZT AUCH WAEHREND DES RENNENS DA (13.09.) =====
+      // Chris, woertlich: "und dadurch dass es immer 0-0 steht weiss man aktuell gar nicht
+      // wer fuehrt". Genau so war es: `seiten` blieb [0,0], bis der ERSTE Schlusslaeufer
+      // durchs Ziel lief — ueber die vollen zweieinhalb Minuten davor stand oben "0 : 0",
+      // und die einzige Fuehrungsangabe war ein winziges "+0.1s"-Feld, das wegen des
+      // Zeitfehlers oben (s. bahnRealSek) auch noch fast immer 0.0 zeigte.
+      //
+      // Jetzt zeigt der Stand WAEHREND des Rennens den Fuehrenden mit 1 : 0 an — dieselbe
+      // Groesse, die am Ende ueber Sieg und Niederlage entscheidet (wer zuerst im Ziel
+      // ist), nur vorlaeufig statt endgueltig. Der Fuehrende kommt aus `staffelZeitDelta()`,
+      // also aus demselben Verlaufspuffer wie das Delta-Feld daneben: eine Wahrheit, kein
+      // zweiter Vergleich, der ihr widersprechen koennte. `suffix` sagt ausserdem, dass es
+      // vorlaeufig ist (updateHudBahn haengt " · vorlaeufig" an, solange nicht `done`).
+      // Reine Anzeige — `bahnLeistung()` und MOTOREN.staffel.wert() sehen davon nichts.
+      if(z[0]==null&&z[1]==null){
+        const d=staffelZeitDelta();
+        if(!d.unklar&&d.delta>0){ seiten[d.seite]=1; }
+      }
+      return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
+        punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
+        zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
+        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit)
+          +(u.wechselKonto<0?" · "+fmtDauer(-u.wechselKonto)+" Wechsel":""),
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
     // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
@@ -17722,9 +18742,21 @@
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
+    // "56 : 22" SIEHT AUS WIE EINE UHRZEIT (Chris' Fund 13.09., Punkt 6: "oben die punkte
+    // zb 56:22 sagen gar nichts aus. Man kann es nicht nachvollziehen!"). Es SIND
+    // Rangpunkte — die Summe beider Seiten ist immer N*(N+1)/2, bei zwoelf Laeufern also
+    // 78, weshalb "56:22" und "38:40" dieselbe Groesse zeigen. Zwei Aenderungen, beide
+    // reine Anzeige: ein Trennzeichen, das keine Uhr ist ("·" statt ":"), und ein Suffix,
+    // das die Summe mitnennt, damit die Zahl einordenbar wird. Der ZWEITE, wichtigere
+    // Teil dieses Punktes steckt nicht hier, sondern in bahnRangliste(): der vorlaeufige
+    // Stand zeigte bei gestaffeltem Start ueber fast das ganze Rennen die Startreihenfolge
+    // statt des Rennstands und sprang erst im Ziel auf das echte Ergebnis (s. dort).
+    const rangSpiel=stand.gewertet&&BA().wertung==="rang"&&LAEUFER.length>0;
     document.getElementById("klsuffix").textContent=
-      stand.suffix+(stand.gewertet&&!done?" · vorläufig":"");
-    document.getElementById("score").textContent=stand.seiten[0]+" : "+stand.seiten[1];
+      stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
+      +(stand.gewertet&&!done?" · vorläufig":"");
+    document.getElementById("score").textContent=
+      stand.seiten[0]+(rangSpiel?" · ":" : ")+stand.seiten[1];
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
@@ -17765,19 +18797,37 @@
           setzLaeufer(praefix+"cur",aktivU);
           setzLaeufer(praefix+"next",naechste);
         }
+        // DAS FUEHRUNGSFELD (13.09. ueberarbeitet). Vorher: ein 104 px schmales Kaestchen
+        // mit "V-W +0.1s" — zu klein, um es waehrend des Rennens wahrzunehmen, und die
+        // Zahl darin war Simulationszeit, also fast immer 0.0 oder 0.1 (s. bahnRealSek
+        // oben). Jetzt steht dort in zwei Zeilen, was eine Uebertragung einblendet: WER
+        // fuehrt, und um WIE VIEL in echten Sekunden — dazu ein Balken, der den Abstand
+        // auch ohne Lesen zeigt. Der Fuehrende ist derselbe, den der Stand oben mit 1 : 0
+        // meldet (beide aus staffelZeitDelta, s. bahnTeamstand).
         const deltaEl=document.getElementById("bhDelta");
         if(deltaEl){
           deltaEl.classList.remove("bh-home","bh-away");
+          const balken=(anteil,klasse)=>'<span class="bhbar"><i class="'+klasse
+            +'" style="width:'+Math.round(Math.max(3,Math.min(100,anteil*100)))+'%"></i></span>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
-            // (bahnTeamstand().zusatz, "12,2 s gegen 11,1 s") — dieselbe Messung,
+            // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
             // hier nur final statt interpoliert. Keine zwei Wahrheiten.
-            deltaEl.textContent=stand.zusatz?("Ziel · "+stand.zusatz):"—";
+            const sieger=stand.seiten[0]>stand.seiten[1]?0:stand.seiten[1]>stand.seiten[0]?1:null;
+            deltaEl.innerHTML='<b>'+(sieger==null?"Ziel":(VEREIN[sieger].name+" gewinnt"))+'</b>'
+              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>';
+            if(sieger!=null)deltaEl.classList.add(sieger===0?"bh-home":"bh-away");
           } else {
             const d=staffelZeitDelta();
-            if(d.unklar){ deltaEl.textContent="—"; }
-            else {
-              deltaEl.textContent=(d.seite===0?VEREIN[0].name:VEREIN[1].name)+" +"+d.delta.toFixed(1)+"s";
+            if(d.unklar||d.delta<=0){
+              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>';
+            } else {
+              // Balkenlaenge relativ zu 5 realen Sekunden: darueber ist es ohnehin eine
+              // klare Fuehrung, darunter macht jede Zehntelsekunde noch sichtbar etwas aus.
+              const real=bahnRealSek(d.delta);
+              deltaEl.innerHTML='<b>'+(d.seite===0?VEREIN[0].name:VEREIN[1].name)+' führt</b>'
+                +'<span class="bhsub">+'+bahnZeitText(real)+'</span>'
+                +balken(real/5,d.seite===0?"bh-home":"bh-away");
               deltaEl.classList.add(d.seite===0?"bh-home":"bh-away");
             }
           }
@@ -18909,14 +19959,12 @@
     }
   }
 
-  // BODEN DES STAFFEL-OVALS. Dasselbe Wiesengruen wie die gerade Bahn, aber der
-  // Bahnring selbst ist eine Ellipse statt eines Rechtecks — s. `ovalPunkt()`
-  // oben fuer die Laeufer-Geometrie, der diese Zeichnung 1:1 folgt (gleiches
-  // OVAL_CX/CY/RX/RY, gleiches OVAL_BAHN_ABSTAND). Bei festem Winkel haengt die
-  // Bildschirm-X-Koordinate nur von OVAL_RX ab (s. Herleitung an `ovalPunkt`),
-  // jede Bahn-/Ziellinien-Grenze bei konstantem Radius `r` ist deshalb genau die
-  // Ellipse ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,...) — keine Parallelkurven-
-  // Mathematik noetig.
+  // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
+  // mit Quellen am OVAL_*-Block bei `ovalPunkt()` weiter unten. Diese Zeichnung folgt der
+  // Laeufer-Geometrie 1:1, weil sie DIESELBE Funktion benutzt: `bahnPfad(r)` ist der
+  // Canvas-Pfad zu genau der Kurve, die `bahnPunkt(anteil,r)` punktweise abfaehrt. Damit
+  // kann Boden und Laeufer gar nicht mehr auseinanderlaufen — vorher waren es zwei
+  // getrennte Formeln, die nur zufaellig dieselbe Ellipse trafen.
   //
   // TON (Ziel 6, A4, Opus-Plan Abschnitt 5.2): Publikums-Loop, exakt dasselbe Muster wie
   // hebenPublikumAn/tonLoopStart("gewichtheben") bei bodenHeben() und takeshiPublikumAn/
@@ -18936,36 +19984,84 @@
     v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
     v.addColorStop(1,"rgba(0,0,0,.30)");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
-    const BN=BAHNEN_N();
-    const rInnen=OVAL_RY-OVAL_BAHN_ABSTAND/2, rAussen=rInnen+BN*OVAL_BAHN_ABSTAND;
-    const rMitte=(rInnen+rAussen)/2, breite=rAussen-rInnen;
-    // Bahnring als dicker Ellipsen-Strich — dieselbe Ockerfarbe wie die Gerade.
-    ctx.lineWidth=breite+8; ctx.strokeStyle="#8a4a32";
-    ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,rMitte,0,0,6.283);ctx.stroke();
-    // Dasselbe Ocker-Rauschen wie die Gerade (bodenSaat) — Koernung statt Flaeche.
-    ctx.save(); ctx.globalAlpha=0.09;
-    for(let i=0;i<300;i++){
-      const w=bodenSaat(i+300)*6.283, r=rInnen+bodenSaat(i+340)*breite;
+    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+
+    // ---- 1. INNENFELD, zuerst. Dunkleres, kuehleres Gruen als der Rasen aussen — der
+    // Stadioninnenraum liegt im Schatten der Tribuenen. Ohne ihn ginge die Bahn in einer
+    // durchgehenden Wiese unter, statt sich davon abzuheben.
+    ctx.beginPath(); bahnPfad(rInnen);
+    ctx.fillStyle="#1b3a21"; ctx.fill();
+
+    // ---- 2. BELAG. Die Flaeche ZWISCHEN Aussen- und Innenkante, als Fuellung mit
+    // "evenodd" (beide Konturen in EINEM Pfad — evenodd stanzt die innere heraus). Vorher
+    // war es ein dicker STRICH auf der Mittellinie; ein Strich hat eine konstante Breite in
+    // Pixeln, folgt der Stauchung also nicht, und genau dadurch wurde der Ring an den
+    // Scheiteln links und rechts sichtbar zu dick.
+    ctx.save();
+    ctx.beginPath();
+    bahnPfad(rAussen); bahnPfad(rInnen);
+    ctx.fillStyle="#b5442f";                 // Ziegelrot (Mondo-Bahn), s. Herleitung Punkt 4
+    ctx.fill("evenodd");
+    // Leichte Aufhellung nach vorn: die untere Haelfte liegt naeher an der Kamera und
+    // bekommt auf jedem Stadionbild mehr Licht ab als die Gegengerade im Hintergrund.
+    ctx.clip("evenodd");
+    const lg=ctx.createLinearGradient(0,OVAL_CY-rAussen*OVAL_STAUCH,0,OVAL_CY+rAussen*OVAL_STAUCH);
+    lg.addColorStop(0,"rgba(0,0,0,.22)"); lg.addColorStop(0.55,"rgba(0,0,0,0)");
+    lg.addColorStop(1,"rgba(255,255,255,.07)");
+    ctx.fillStyle=lg; ctx.fillRect(0,0,W,H);
+    // Dieselbe Koernung wie die Gerade (bodenSaat) — Struktur statt lackierter Flaeche.
+    // Innerhalb des Clips gestreut, deshalb genuegt ein grobes Rechteckraster.
+    ctx.globalAlpha=0.10;
+    for(let i=0;i<420;i++){
+      const x=bodenSaat(i+300)*W, y=OVAL_CY+(bodenSaat(i+340)*2-1)*rAussen*OVAL_STAUCH;
       ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";
-      ctx.fillRect(OVAL_CX+Math.cos(w)*OVAL_RX-1, OVAL_CY+Math.sin(w)*r-1, 2, 2);
+      ctx.fillRect(x,y,2,2);
     }
     ctx.restore();
-    // Bahnlinien, eine je Grenze — konzentrische Ellipsen mit demselben OVAL_RX.
-    ctx.strokeStyle="rgba(255,255,255,.42)"; ctx.lineWidth=1.5;
-    for(let i=0;i<=BN;i++){
-      const r=rInnen+i*OVAL_BAHN_ABSTAND;
-      ctx.beginPath();ctx.ellipse(OVAL_CX,OVAL_CY,OVAL_RX,r,0,0,6.283);ctx.stroke();
+
+    // ---- 3. BAHNLINIEN. Jetzt echte Parallelkurven (gleiche Geradenlaenge, Radius je
+    // Spurgrenze) — der Abstand ist ueberall gleich, statt an den Scheiteln auf Null zu
+    // fallen. Das war der groesste sichtbare Fehler am alten Bild.
+    ctx.strokeStyle="rgba(255,255,255,.40)"; ctx.lineWidth=1.4;
+    for(let i=1;i<OVAL_BAHNEN;i++){ ctx.beginPath(); bahnPfad(rInnen+i*OVAL_BAHN_ABSTAND); ctx.stroke(); }
+    // Aussenkante etwas kraeftiger, Innenkante als weisser RANDSTEIN — auf jedem
+    // Stadionbild die auffaelligste Linie ueberhaupt und das, was Bahn und Innenfeld
+    // sichtbar trennt (World Athletics: erhoehter Bord an der Innenkante von Bahn 1).
+    ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=2;
+    ctx.beginPath(); bahnPfad(rAussen); ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=3;
+    ctx.beginPath(); bahnPfad(rInnen); ctx.stroke();
+
+    // ---- 4. WECHSELZONEN. Auf einer echten Staffelbahn steht in der Bahnmitte an jeder
+    // Zone ein Dreieck (30-m-Zone, World Athletics seit 2018). Bei uns liegen die Zonen an
+    // den Beingrenzen, also — bei OVAL_BEINE_JE_RUNDE=2 — an der Ziellinie (Anteil 0) und
+    // auf der Gegengeraden (Anteil 0,5). Sie sagen dem Zuschauer, wo der naechste Wechsel
+    // faellt, und sind der zweite Grund, warum die Bahn jetzt als Bahn lesbar ist.
+    for(let z=0;z<OVAL_BEINE_JE_RUNDE;z++){
+      const a=z/OVAL_BEINE_JE_RUNDE, obenZone=ovalAmZiel(a);
+      for(let i=0;i<OVAL_BAHNEN;i++){
+        const p=bahnPunkt(a,ovalSpurR(i));
+        const h=obenZone?6:-6;
+        ctx.fillStyle="rgba(255,225,120,.75)";
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y+h); ctx.lineTo(p.x-4.5,p.y-h*0.35); ctx.lineTo(p.x+4.5,p.y-h*0.35);
+        ctx.closePath(); ctx.fill();
+      }
     }
-    // ZIELLINIE oben (Winkel -90°, s. ovalWinkel): bei diesem Ansatz eine simple
-    // Strecke, weil x bei festem Winkel nicht vom Radius abhaengt (Herleitung an
-    // ovalPunkt oben) — alle Bahnen liegen also genau UNTEREINANDER auf x=OVAL_CX.
-    ctx.setLineDash([7,7]); ctx.lineWidth=4; ctx.strokeStyle="#fff";
-    ctx.beginPath();
-    ctx.moveTo(OVAL_CX, OVAL_CY-rAussen-6); ctx.lineTo(OVAL_CX, OVAL_CY-rInnen+6);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // Innenflaeche des Ovals bleibt Wiese — dort steht sonst nichts (kein
-    // Baumfries/keine Burg auf dieser Bahn-Art), das Grasgruen genuegt als Infield.
+
+    // ---- 5. ZIELLINIE, oben in der Mitte der Zielgeraden (Anteil 0). Beide Zonen liegen
+    // auf einer GERADEN, die Linie steht dort also senkrecht auf der Bahn und ist ein
+    // simples Lot von der Innen- zur Aussenkante. Kariert statt gestrichelt — das ist das
+    // Muster, an dem man eine Ziellinie auf jedem Uebertragungsbild erkennt.
+    const yA=OVAL_CY-rAussen*OVAL_STAUCH, yI=OVAL_CY-rInnen*OVAL_STAUCH;
+    const kn=14, kh=(yI-yA)/kn;
+    for(let i=0;i<kn;i++){
+      ctx.fillStyle=(i%2===0)?"#fff":"rgba(20,20,20,.85)";
+      ctx.fillRect(OVAL_CX-3.5,yA+i*kh,7,kh+0.5);
+    }
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+    ctx.fillText("ZIEL",OVAL_CX,yI+11);
   }
 
   // ===================================================================================
@@ -19045,6 +20141,20 @@
       hindernisBilder:["huerde","balken","wand","seil","wasser","mauer","heu"], feuerZiel:true,
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
       technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
       // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
       // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
@@ -19139,6 +20249,20 @@
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
       kraftBasis:290, kraftSpanne:2.7,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
       // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
       // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
@@ -19237,6 +20361,20 @@
       wendigErholt:0.0045,
       wuchtKraft:18, wuchtZeit:0.18, stolperGrund:0.42, stolperSpanne:0.5, stolperKraft:8,
       kraftBasis:310, kraftSpanne:3.1,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
@@ -19307,6 +20445,25 @@
       wertung:"etappe",
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
       kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      // STAFFEL, EHRLICHE EINSCHRAENKUNG: gemessen endet hier KEIN Laeufer unter 77 % Puste
+      // (Median 88,3 %), also greift die Erholung praktisch nie und die Leiste steht weiter
+      // nahe voll. Das ist Absicht in dieser Runde — die Staffel hat mit rho 0,915 die beste
+      // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
+      // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       rezept:{
         ANTRITT:    {speed:44,spirit:30,stamina:26},
         ENDTEMPO:   {speed:38,stamina:35,will:27},
@@ -19456,6 +20613,67 @@
       tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+      // WER DIESE FALLE MEISTERT — Chris 13.09. (docs/design/takeshi-hindernis-vs-
+      // strecke-recherche-13-09.md):
+      //
+      //   "bei takeshi sollen nicht ALLE spieler immer gefuehlt an allen fallen hin fallen
+      //    sondern man soll nen unterschied sehen ob jemand eine meistert und dadurch
+      //    aufholt oder eben hinfaellt ... das kann auch n 80er sein der stark bei
+      //    hindernissen ist und dazwischen nur avg."
+      //
+      // Der Befund (Abschnitt 1 der Recherche, 120 Rennen kaderfest): der Typ der Falle
+      // entschied bis hier NUR ueber die Stoppdauer. Ob einer sauber durchkam, durchbrach
+      // oder stuerzte, wuerfelte an ALLEN vierzehn Fallen dieselbe TECHNIK — gemessen war
+      // die Sauber-Quote desselben Laeufers an seinem STAERKSTEN und seinem SCHWAECHSTEN
+      // Fallentyp 1,3 Prozentpunkte auseinander. Es gab die Geschichte "er meistert DIESE
+      // Falle" mechanisch also gar nicht, nur "der Techniker kommt ueberall etwas oefter
+      // durch". Mit `fallenKoennen:0.75` sind es 13,8 Prozentpunkte.
+      //
+      // 0,75 und nicht 1,0: ein Viertel "Falle lesen" bleibt an JEDER Falle stehen — das
+      // ist die blaue, mentale Seite der Disziplin (Intelligence 36 + Awareness 30 sitzen
+      // in TECHNIK, s. takeshi-chaos-tackle-plan-06-09.md Abschnitt 3.2), und sie soll
+      // nicht auf die vier TECHNIK-Stationen zusammenschnurren. Gemessen liegen 0,75 und
+      // 1,0 bei rho gleichauf (0,883); 0,75 laesst den Star in der Abnahme-Saat seltener
+      // gewinnen (75,8 % gegen 80,0 %). Die Star-Spalte haelt der Replikation ueber drei
+      // Saatensaetze allerdings NICHT stand (Recherche 4.5) — die Entscheidung fuer 0,75
+      // steht deshalb auf dem Konzept, nicht auf dieser Zahl.
+      //
+      // Warum das rho HEBT statt kostet (0,861 -> 0,883): der Wurf haengt nicht mehr an
+      // TECHNIK allein, dem Sub-Skill, der mit der Eignung am schwaechsten laeuft
+      // (r=0,60), sondern an der Kursmischung aus fuenf Sub-Skills (r=0,60 bis 0,88).
+      // Deren Mittel IST nach `mengeAusEignung` die Eignung — der Kanal wird breiter,
+      // nicht lauter. Das ist derselbe Grund, aus dem `lesenBonus` damals rausflog.
+      fallenKoennen:0.75,
+      // Der Durchbruch-Wurf bleibt reine WUCHT: mit Gewalt durchkommen ist Gewalt, egal
+      // welche Falle davorsteht. `fallenDurchbruch` liest der Motor, wenn es da ist —
+      // gemessen 0,874 gegen 0,883, also kein Gewinn, deshalb nicht gesetzt. Ebenso
+      // `stufePreis` (Stoppzeit nach Schwierigkeit: 0,869 allein, 0,878 zusammen mit
+      // fallenKoennen) und `fallenStolper` (Sturzdauer nach Typ: 0,869) — alle drei
+      // unter den 0,883 von `fallenKoennen` allein.
+      //
+      // Ab wann eine Falle eine Ticker-Zeile bekommt: der Sub-Skill dieser Falle muss
+      // `fallenMelden` Punkte ueber (Glanz) oder unter (Patzer) dem Mittel seiner fuenf
+      // Fallen-Sub-Skills liegen UND sein hoechster bzw. niedrigster sein. Reine Anzeige.
+      fallenMelden:10,
+      // WIE EINE FALLE FORDERT — Kategorisierung fuer die "Puste" (Chris 13.09., zur
+      // Ausdauer-Runde: "ja das kann es beeinflussen je nach hindernis aber MUSS nicht
+      // zwangsweise haengt von art und schwierigkeit ab -> du muesstest also realistisch
+      // schwierigkeiten und arten von hindernissen vergeben und diese kategorisieren").
+      // Die SCHWIERIGKEIT steht schon in `fallenStufe` (1-3); das hier ist die zweite
+      // Achse, die ART. `koerperlich` sind die Fallen, an denen ein Muedes den Unterschied
+      // spuert (Tuer und Seilwand durchbrechen, sich an Bruecke und Seil ueber dem Wasser
+      // halten, Rollen und Schlaege wegstecken), `technisch` die, die ein Erschoepfter mit
+      // Koennen trotzdem loest (Labyrinth, Eisflaeche — lesen und orientieren),
+      // `gemischt` die Balance-Fallen (Trittsteine, Walzen: Koennen zuerst, aber muede
+      // Beine wackeln).
+      //
+      // DIESER PR LIEST DAS FELD NICHT. Es ist reine Beschreibung, als Anschluss fuer die
+      // Puste-Runde (Zweig claude/hockey-ausdauer-konzept-13-09) gedacht, damit die nicht
+      // eine zweite, widerspruechliche Einteilung erfinden muss. Wer die Puste hier
+      // ansetzt, misst sie kaderfest wie jede Mechanik — die Einteilung selbst ist eine
+      // Behauptung ueber die Sendung, keine gemessene Zahl.
+      fallenArt:{TECHNIK:"technisch",WENDIGKEIT:"gemischt",WUCHT:"koerperlich",
+                 STEHEN:"koerperlich",ROBUST:"koerperlich"},
       // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
       // Saat gewaehlt — keine freie Ziehung). Jeder Kurs ist dieselbe Multimenge von
       // vierzehn Fallen (2x jeder der sieben Typen) in anderer Reihenfolge, deshalb
@@ -19481,6 +20699,45 @@
       // Budgets an das Eignungs-Niveau angepasst (Kader-Mittel 42 statt Rezept-Mittel 53) — sonst
       // verdoppelt die Kopplung (mengeAusEignung) die Ausscheidequote, s. Bericht Teil 2.4/3.3 (T1f).
       wendigErholt:0.0030, kraftBasis:334, kraftSpanne:2.8, nervenKosten:27, nervenRegen:0.05,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTE AN DEN HINDERNISSEN — Chris' eigene Vorgabe, 13.09.: "ja das kann es
+      // beeinflussen je nach hindernis aber MUSS nicht zwangsweise haengt von art und
+      // schwierigkeit ab -> du muesstest also realistisch schwierigkeiten und arten von
+      // hindernissen vergeben und diese kategorisieren".
+      //
+      // BEIDE KATEGORIEN GIBT ES BEREITS, und zwar genau so, wie er sie beschreibt — es
+      // musste dafuer keine neue Taxonomie erfunden werden (wichtig, weil parallel eine
+      // eigene Runde an Takeshis Hindernis-Balance arbeitet):
+      //   ART           `hindernisTypen` — je Station der Sub-Skill, der sie entscheidet
+      //                 (TECHNIK, WENDIGKEIT, WUCHT, STEHEN, ROBUST)
+      //   SCHWIERIGKEIT `fallenStufe`    — 1 bis 3 Sterne je Art (WUCHT/ROBUST 3, TECHNIK/
+      //                 STEHEN 2, WENDIGKEIT 1)
+      //
+      // `pusteHindernis` sagt je ART, wie stark ein leerer Laeufer dort zusaetzlich
+      // scheitert. Die Staffelung ist die sportlich naheliegende und keine freie Wahl: an
+      // einer Wucht- oder Nehmerqualitaets-Station zahlt Muedigkeit voll (man muss die
+      // Kraft aufbringen, die man nicht mehr hat), an einer Technik- oder
+      // Wendigkeits-Station kaum (die Bewegung sitzt oder sie sitzt nicht). Multipliziert
+      // wird mit der Schwierigkeit aus `fallenStufe`, damit eine Drei-Sterne-Station
+      // haerter bestraft als eine Ein-Stern-Station — genau Chris' "haengt von art UND
+      // schwierigkeit ab".
+      //
+      // WIRKUNG NUR NACH UNTEN: bei voller Puste ist der Faktor exakt 1, die Station also
+      // unveraendert. Nur ein leerer Laeufer verliert etwas.
+      pusteHindernis:{WUCHT:0.30, ROBUST:0.26, STEHEN:0.20, TECHNIK:0.06, WENDIGKEIT:0.05},
       rezept:{
         ANTRITT:    {will:40,determination:32,speed:28},
         ENDTEMPO:   {will:38,determination:33,stamina:29},
@@ -19609,6 +20866,13 @@
   // Welche Fallen in diesem Rennen schon eine Gedraenge-Zeile im Ticker hatten. Reine
   // Anzeige-Buchhaltung, kein Simulationszustand.
   let bahnGedraengeGemeldet=new Set();
+  // Dasselbe fuer die Staerken-/Schwaechen-Zeile an der Falle (`fallenMelden`, Chris
+  // 13.09.: "man soll nen unterschied sehen ob jemand eine meistert ... oder eben
+  // hinfaellt"). Ohne sie rechnet die neue Typ-Weiche zwar, ist im Ticker aber so
+  // unsichtbar, wie es Rempler und Gedraenge vor der Animationsrunde waren. Schluessel
+  // ist "Station|art", damit eine Falle je eine Glanz- und eine Patzer-Zeile bekommt und
+  // nicht zwoelf. Reine Anzeige-Buchhaltung, kein Simulationszustand.
+  let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
   // BROADCAST-HUD DER STAFFEL: ZEIT-DELTA. Fortschritt-Zeit-Verlaufspuffer je Seite,
@@ -19649,20 +20913,33 @@
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
         wert:z=>(z.u.tackles||z.u.getackelt)?z.u.tackles+"/"+z.u.getackelt:null}]:[]),
       {id:"weit", kopf:"Weit", titel:"erreichte Strecke", top:true, wert:z=>Math.round(z.u.pos*100), fmt:v=>v+"%"},
-      {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+      {id:"res",  kopf:"Pus", titel:"Puste — der disziplineigene Kraftvorrat aus STEHEN und ROBUST, NICHT die Saison-Fatigue. Wer einbricht, wird langsamer und kann sich wieder fangen.", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
         farbe:v=>v==="leer"?"var(--crit)":null},
       // ZWISCHENZEITEN (Zeitfahren, K5): eine Spalte je Checkpoint, Diff gegen die
       // Bestzeit im Feld an genau diesem Checkpoint (Fable-Entscheidung 3, s.
       // bahnBesteZeit). Nur fuer Bahnen mit `art.zwischenzeiten` — heute nur Time-Trial.
       ...((art.zwischenzeiten||[]).map((cp,ci)=>({
         id:"zz"+ci, kopf:"ZZ"+(ci+1), titel:"Zwischenzeit bei "+Math.round(cp*100)+" % — Diff zur Bestzeit im Feld",
+        // Rueckstand in ZUSCHAUsekunden (s. bahnZeitAnzeige) — derselbe Massstab wie die
+        // Uhr oben und wie die Zeit-Spalte daneben.
         wert:z=>{const v=z.u.zz&&z.u.zz[ci]; if(v==null)return null;
-          const best=bahnBesteZeit(ci), diff=v-best; return Math.round(diff*100)/100;},
-        fmt:v=>v<=0.005?"Bestzeit":"+"+v.toFixed(2)+" s",
+          const best=bahnBesteZeit(ci), diff=bahnSpanneAnzeige(v-best); return Math.round(diff*100)/100;},
+        fmt:v=>v<=0.005?"Bestzeit":"+"+v.toFixed(2).replace(".",",")+" s",
         farbe:v=>v<=0.005?"var(--ok)":null}))),
-      {id:"zeit", kopf:"Zeit", wert:z=>bahnZeit(z.u)!=null&&!z.u.raus?+bahnZeit(z.u).toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
-      {id:"stand",kopf:"Stand", wert:z=>z.u.raus?"raus":z.platz?"Ziel "+z.platz:"läuft",
-        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&v.startsWith("Ziel"))?"var(--ok)":null},
+      {id:"zeit", kopf:"Zeit", titel:"eigene Laufzeit, in der Zeit gemessen, die man zugesehen hat",
+        wert:z=>bahnZeitAnzeige(z.u)!=null&&!z.u.raus?+bahnZeitAnzeige(z.u).toFixed(1):null,
+        fmt:v=>bahnZeitText(v)},
+      // "Stand" zeigte auf der Bahn den ZIELEINLAUF ("Ziel 3"). Bei gestaffeltem Start ist
+      // das nicht der Rang (wer frueher losfaehrt, kommt frueher an) — dort steht deshalb
+      // der Rang aus bahnRangliste, dieselbe Quelle wie HUD und Endstand.
+      {id:"stand",kopf:"Stand", wert:z=>{
+        if(z.u.raus)return "raus";
+        if(BA().startAbstand){
+          if(z.u.fertig==null)return (z.u.startT||0)>rennT?"Rampe":"fährt";
+          return "Rang "+(bahnRangliste().reihe.findIndex(x=>x.id===z.u.id)+1);
+        }
+        return z.platz?"Ziel "+z.platz:"läuft";},
+        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
       sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos), fuss:""};
@@ -19679,18 +20956,22 @@
     return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
       spalten:[
         {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
+        // Beide Zeitspalten in ECHTEN Sekunden, nicht in Simulationssekunden (13.09.,
+        // s. bahnRealSek oben) — vorher stand hier "1.8 s" fuer eine Etappe, die der
+        // Zuschauer 25,7 Sekunden lang sieht. `wert` traegt weiterhin eine Zahl (die
+        // Sortierung der Spalte haengt daran), nur eben die umgerechnete.
         {id:"etappe",kopf:"Etappe", titel:"Zeit für den eigenen Abschnitt",
-          wert:z=>z.u.etappenZeit!=null?+z.u.etappenZeit.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.etappenZeit!=null?+bahnRealSek(z.u.etappenZeit).toFixed(1):null, fmt:bahnZeitText},
         {id:"wechs",kopf:"Wechs", titel:"Übergaben, an denen beteiligt", wert:z=>z.u.wechselN||null},
         {id:"verl", kopf:"Verl", titel:"bei Übergaben verlorene Zeit",
-          wert:z=>z.u.wechselKonto<0?Math.round(-z.u.wechselKonto*10)/10:null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.wechselKonto<0?+bahnRealSek(-z.u.wechselKonto).toFixed(1):null, fmt:bahnZeitText},
         {id:"patz", kopf:"Patz", titel:"gestürzt oder Übergabe verpatzt", wert:z=>z.u.gestolpert||null},
         {id:"weit", kopf:"Weit", titel:"Fortschritt im eigenen Abschnitt", top:true,
           wert:z=>Math.round(laufAnteil(z.u)*100), fmt:v=>v+"%"},
-        {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+        {id:"res",  kopf:"Pus", titel:"Puste — der disziplineigene Kraftvorrat aus STEHEN und ROBUST, NICHT die Saison-Fatigue. Wer einbricht, wird langsamer und kann sich wieder fangen.", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
           farbe:v=>v==="leer"?"var(--crit)":null},
         {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
-          wert:z=>z.u.fertig!=null?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
+          wert:z=>z.u.fertig!=null?+bahnRealSek(z.u.fertig).toFixed(1):null, fmt:fmtRealZielzeit},
         {id:"stand",kopf:"Stand", wert:z=>z.u.fertig!=null?"Ziel":z.u.durch?"übergeben":z.u.aktiv?"läuft":"wartet",
           farbe:v=>v==="Ziel"?"var(--ok)":null},
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
@@ -19724,6 +21005,17 @@
         {id:"blk",  kopf:"Blk",  titel:"geblockte gegnerische Schüsse (nicht die Torwart-Paraden — die stehen unter Par)",
           wert:z=>z.torwart?null:z.u.bloecke||null},
         {id:"chk",  kopf:"Chk",  titel:"Bodychecks", wert:z=>z.torwart?null:z.u.checks||null},
+        // PUSTE. Zwei Spalten, weil eine nicht reicht: ohne den TIEFSTEN Stand sieht ein
+        // Spieler, der einmal leer war und sich in der Drittelpause wieder gefangen hat,
+        // am Ende aus wie einer, der nie an seine Grenze kam — und genau dieser Unterschied
+        // ist das, was Chris sehen will („manche laufen aus und muessen kurz regenerieren,
+        // manche schaffen den kompletten Spieltag").
+        {id:"pus",  kopf:"Pus",  titel:"Puste am Spielende — ein disziplineigener Kraftvorrat aus AUSDAUER, NICHT die Saison-Fatigue",
+          wert:z=>z.u.pusteMax?Math.round(z.u.puste/z.u.pusteMax*100):null, fmt:v=>v+"%",
+          farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
+        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollstaendig leer",
+          wert:z=>z.u.pusteMax?Math.round(z.u.pusteMin/z.u.pusteMax*100):null, fmt:v=>v+"%",
+          farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
         {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
         {id:"str",  kopf:"Str",  titel:"Strafminuten", wert:z=>z.torwart?null:z.u.strafminuten||null},
         {id:"par",  kopf:"Par",  titel:"Paraden (nur Torwart)", wert:z=>z.torwart?(z.u.saves||null):null},
@@ -19880,68 +21172,253 @@
   // Kein Leser von `laufAnteil`/`u.pos` sitzt hier: reine Zeichenfunktion, exakt
   // wie `ovalXY()` im Recherche-Dokument Abschnitt 2.3 vorschlaegt.
   //
-  // Groesse/Lage wie dort vorgeschlagen (Abschnitt 2.4): Canvas bleibt 1240x470,
-  // das Oval nimmt fast die volle Flaeche.
-  const OVAL_CX=W/2, OVAL_CY=H*0.56, OVAL_RX=W*0.386, OVAL_RY=H*0.30;
-  const OVAL_BAHN_ABSTAND=15;                  // Bahn 0 innen, Bahn 1 aussen (bahnenFest:2)
+  // ===== UEBERARBEITUNG 13.09. — Chris, woertlich, nach dem ersten Live-Rennen: =====
+  // "da war ja das alte oval deutlich huebscher was wir hatten, bitte anpassen das sieht
+  // haesslich aus ... das oval muss groesser werden damit nicht staendig ueberrundet wird!"
+  //
+  // WAS AM ALTEN BILD FALSCH WAR, an einem echten Stadion nachgesehen (Quellen unten):
+  //
+  //  1. EINE ELLIPSE IST KEINE LAUFBAHN. Eine 400-m-Bahn ist eine STADIONFORM: zwei
+  //     Geraden von je 84,39 m und zwei HALBKREISE (Innenradius 36,5 m) — nicht eine
+  //     durchgehend gekruemmte Ellipse. Das Auge kennt den Unterschied sofort; der alte
+  //     Ring las sich als Reifen, nicht als Bahn. Quelle: World Athletics, Track and
+  //     Field Facilities Manual 2019, "400 Metre Standard Track, Marking Plan", und
+  //     dimensions.com/element/track-and-field-400m-running-track (Gesamtmass 176,91 m x
+  //     92,52 m, Gerade 84,39 m, Innenradius 36,5 m, Bahnbreite 1,22 m).
+  //
+  //  2. DIE BAHNEN LIEFEN INEINANDER. Der alte Code zog alle Bahngrenzen als konzentrische
+  //     Ellipsen mit DEMSELBEN OVAL_RX und nur verschiedenem Radius in y. Das ist keine
+  //     Parallelkurve: an den beiden Scheiteln links und rechts (3 und 9 Uhr) fiel der
+  //     Bahnabstand auf NULL, die Linien klebten dort aufeinander und faecherten oben und
+  //     unten wieder auf. Auf dem Vorher-Bild ist genau das der haessliche Teil. Bei der
+  //     Stadionform ist der Parallelversatz dagegen trivial und exakt: eine Stadionform um
+  //     d nach aussen versetzt ist wieder eine Stadionform mit gleicher Geradenlaenge und
+  //     Radius r+d. Der Bahnabstand ist damit ueberall gleich — wie auf einer echten Bahn.
+  //
+  //  3. DAS SEITENVERHAELTNIS. Alt: RX/RY = 478/141 = 3,4:1. Eine echte Bahn ist
+  //     176,91/92,52 = 1,91:1. Ein Bild mit 3,4:1 ist keine Bahn von oben, das ist eine
+  //     plattgedrueckte Bahn. 1,91:1 passt bei 1240x470 aber nicht hinein (die Bahn waere
+  //     nur 650 px breit und liesse links und rechts die halbe Leinwand leer).
+  //     AUFLOESUNG, UND ZWAR DIE REALISTISCHE: eine Uebertragung zeigt die Bahn NIE
+  //     unverzerrt von senkrecht oben, sondern von einer erhoehten Kamera — und die
+  //     staucht die Tiefenachse. Wir zeichnen deshalb die ECHTEN Proportionen und stauchen
+  //     y um OVAL_STAUCH=0,57, was einem Kamerawinkel von rund 35 Grad entspricht
+  //     (sin 35 Grad = 0,57). Das ist dieselbe Verkuerzung, die man auf jedem
+  //     Stadion-Weitwinkel sieht, statt einer frei erfundenen Ellipse.
+  //
+  //  4. FARBE. #8a4a32 ist ein stumpfes Braun. Wettkampfbahnen sind Ziegelrot (Mondo,
+  //     Tokio 2020 und alle Spiele davor; Paris 2024 erstmals Violett — s.
+  //     olympics.com/en/news/paris-2024-olympic-paralympic-athletics-mondo-purple-track).
+  //     Wir bleiben beim klassischen Ziegelrot, aber gesaettigt statt schlammig, mit
+  //     hellerem Randstein (der weisse Innenbord ist auf jedem Bild das Erste, was die
+  //     Bahn vom Innenraum trennt) und einem dunkleren Innenfeld.
+  //
+  //  5. KEINE MARKIERUNGEN. Eine echte Staffelbahn traegt an jeder Wechselzone
+  //     Dreiecke in der Bahnmitte (30-m-Zone seit 2018, World Athletics). Die zeichnen wir
+  //     jetzt — sie sagen dem Zuschauer ausserdem, WO der naechste Wechsel faellt.
+  //
+  // WIEVIEL GROESSER: halbe Breite von 478 auf 560 px (Bahn 1120 statt 957 px breit), die
+  // Hoehe ist durch das Broadcast-HUD oben (#bahnHud, top:15% = y 70..116) und den
+  // Leinwandrand unten gedeckelt — mehr als +-167 px um die Mitte geht nicht, ohne unter
+  // das HUD zu laufen. Der spuerbare Gewinn kommt darum aus der Breite UND daraus, dass
+  // die Laeufer nicht mehr sechsmal, sondern dreimal herumlaufen (s. OVAL_RUNDEN unten).
+  //
+  // Reine Zeichengeometrie: keine dieser Konstanten wird von tempoVon()/stepSpurt()/
+  // MOTOREN.staffel.wert() gelesen. Rangtreue bit-identisch, s. PR-Beschreibung.
+  const OVAL_CX=W/2, OVAL_CY=H*0.615;
+  const OVAL_STAUCH=0.57;                      // Kameraverkuerzung der Tiefenachse, s. Punkt 3
+  const OVAL_HL=263;                           // halbe Geradenlaenge (= 84,39 m massstaeblich)
+  const OVAL_R_AUSSEN=288;                     // Aussenradius der Kurve (= 92,52/2 m), 263/288 = 0,913 wie real
+  const OVAL_BAHN_ABSTAND=26;                  // Bahnbreite in Zeichen-Einheiten, s. Kommentar an OVAL_BAHNEN
+  // WIEVIELE BAHNEN GEZEICHNET WERDEN. Mechanisch laufen genau zwei Mannschaften
+  // (`bahnenFest:2`, BAHNEN_N()===2) — eine Bahn, auf der nur zwei Spuren liegen, sieht
+  // aber nicht aus wie ein Stadion, sondern wie eine Radrennbahn. Ein echter Wettkampf
+  // hat acht. Wir zeichnen SECHS und setzen die beiden Mannschaften auf die Spuren 2 und 3
+  // (nebeneinander, mittig) — rein praesentational, `u.bahnZ` bleibt 0/1 und wird beim
+  // Zeichnen nur verschoben. Die echte Bahnbreite (1,22 m von 46,26 m Aussenradius, also
+  // 2,6 % davon) waere bei unserem Massstab 7,7 px und die beiden Laeufer damit auf den
+  // Geraden nur 4 px auseinander — unter 32-px-Figuren unsichtbar. 26 px ueberzeichnet die
+  // Bahnbreite bewusst um gut das Dreifache, damit die zwei Mannschaften trennbar bleiben;
+  // das ist dieselbe Lesbarkeits-Ueberzeichnung wie bei den Spielfeldlinien im Feldspiel.
+  const OVAL_BAHNEN=6;
+  const OVAL_SPUR0=2;                          // auf welche gezeichnete Spur Mannschaft 0 gelegt wird
   const istOval=()=>!!BA().staffel;
-  // Winkel 0 = Ziellinie oben (12 Uhr), im Uhrzeigersinn.
-  const ovalWinkel=(lokal)=>lokal*2*Math.PI-Math.PI/2;
+  // WIE VIELE RUNDEN DAS GANZE RENNEN LANG SIND — der eigentliche Fund hinter Chris'
+  // "damit nicht staendig ueberrundet wird" und "man weiss gar nicht wer fuehrt".
+  //
+  // ALT: `laufAnteil(u)` wurde zum Winkel. Das ist der Fortschritt IM EIGENEN ABSCHNITT und
+  // faengt bei JEDEM Wechsel wieder bei 0 an — jedes Bein war damit eine volle Runde, das
+  // Rennen sechs. Der Fehler daran ist nicht die Rundenzahl, sondern dass die Bildposition
+  // dann NICHT MEHR SAGT, WER FUEHRT: uebergibt Mannschaft A an der Ziellinie, waehrend B
+  // noch bei 90 % ihres Beins steht, springt A auf 0 Grad zurueck und steht sichtbar HINTER
+  // B — obwohl A fuehrt. Weil die Uebergabe genau auf der Ziellinie liegt, passiert das bei
+  // JEDEM Wechsel. Das ist das "staendige Ueberrunden", und es ist kein Ueberrunden,
+  // sondern ein Anzeigefehler.
+  //
+  // NEU: der Winkel kommt aus dem GESAMTfortschritt `u.pos` (0..1 ueber das ganze Rennen),
+  // mal OVAL_RUNDEN. Damit ist die Winkelreihenfolge beider Mannschaften ueber das ganze
+  // Rennen dieselbe wie die Rennreihenfolge, solange der Rueckstand kleiner als eine Runde
+  // ist — bei drei Runden also kleiner als ein Drittel des Rennens (rund 60 reale
+  // Sekunden). Gemessener Zielabstand im Median: 1,05 Sim-s von 10,5, also ein Zehntel
+  // davon. WER VORNE LAEUFT, FUEHRT — ab jetzt immer.
+  //
+  // WARUM DREI UND NICHT EINE: sechs Beine zu je einer halben Runde sind 6 x 200 m = 1200 m,
+  // also die Staffel-Variante, die es wirklich gibt (4x200 m steht im Regelwerk von World
+  // Athletics, en.wikipedia.org/wiki/4_%C3%97_200_metres_relay). Eine einzige Runde
+  // (6 x 66 m) waere zwar noch eindeutiger, wuerde die Figuren aber auf ein Drittel des
+  // bisherigen Tempos bremsen — und "sehr sehr statisch" ist genau der andere Punkt auf
+  // Chris' Liste. Drei Runden halten rund 36 px/s Bildtempo (vorher 70, bei einer Runde
+  // waeren es 12) und legen die Wechsel abwechselnd auf die Ziellinie (Beine 0/2/4) und auf
+  // die Gegengerade (Beine 1/3/5) — zwei feste Wechselzonen, wie auf einer echten Bahn.
+  const OVAL_BEINE_JE_RUNDE=2;
+  const OVAL_RUNDEN=()=>Math.max(1,(BA().jeSeite||6)/OVAL_BEINE_JE_RUNDE);
+  // Wie weit ist diese Mannschaft auf dem Oval — in Runden, ab der Ziellinie im
+  // Uhrzeigersinn. Ganze Zahl = Ziellinie (oben, Mitte der Zielgeraden), x,5 = Gegengerade.
+  const ovalAnteil=(u)=>u.pos*OVAL_RUNDEN();
+  // EIN PUNKT AUF DER STADIONFORM. `anteil` 0..1 ist der Bruchteil EINER Runde ab der
+  // Ziellinie (oben Mitte) im Uhrzeigersinn, `r` der Kurvenradius dieser Spur (vor der
+  // Stauchung). Bogenlaengen-treu parametrisiert, damit ein Laeufer auf der Geraden und in
+  // der Kurve dasselbe Tempo zeigt: Umfang = 4*HL + 2*PI*r, davon 4*HL auf den beiden
+  // Geraden. Reihenfolge ab der Ziellinie: halbe Zielgerade nach rechts, Rechtskurve,
+  // ganze Gegengerade nach links, Linkskurve, halbe Zielgerade zurueck zur Mitte.
+  function bahnPunkt(anteil,r){
+    const U=4*OVAL_HL+2*Math.PI*r;
+    let s=(((anteil%1)+1)%1)*U;
+    const ry=(dy)=>OVAL_CY+dy*OVAL_STAUCH;
+    if(s<OVAL_HL)                 return {x:OVAL_CX+s, y:ry(-r)};
+    s-=OVAL_HL;
+    if(s<Math.PI*r){ const w=-Math.PI/2+s/r;
+      return {x:OVAL_CX+OVAL_HL+Math.cos(w)*r, y:ry(Math.sin(w)*r)}; }
+    s-=Math.PI*r;
+    if(s<2*OVAL_HL)               return {x:OVAL_CX+OVAL_HL-s, y:ry(r)};
+    s-=2*OVAL_HL;
+    if(s<Math.PI*r){ const w=Math.PI/2+s/r;
+      return {x:OVAL_CX-OVAL_HL+Math.cos(w)*r, y:ry(Math.sin(w)*r)}; }
+    s-=Math.PI*r;
+    return {x:OVAL_CX-OVAL_HL+s, y:ry(-r)};
+  }
+  // Radius der gezeichneten Spur `i` (0 = innen) in ihrer MITTE.
+  const ovalSpurR=(i)=>OVAL_R_AUSSEN-(OVAL_BAHNEN-i-0.5)*OVAL_BAHN_ABSTAND;
+  // DIESELBE Stadionform als Canvas-Pfad. Die zwei Halbkreise werden nach der Stauchung zu
+  // Halb-ELLIPSEN mit rx=r, ry=r*OVAL_STAUCH — deckungsgleich mit bahnPunkt() oben, damit
+  // Boden und Laeufer nie auseinanderlaufen. Die Stauchung steckt in den Radien und NICHT
+  // in einem ctx.scale(), sonst wuerde sie die Linienstaerke mitverzerren.
+  //
+  // HAENGT NUR AN, oeffnet KEINEN neuen Pfad: der Belag wird als Flaeche zwischen zwei
+  // Stadionformen gefuellt, und dafuer muessen beide Konturen im SELBEN Pfad liegen
+  // (Fuellregel "evenodd" stanzt die innere dann heraus). Ein ctx.beginPath() hier haette
+  // die erste Kontur jedes Mal weggeworfen — genau dieser Fehler hat beim ersten Anlauf
+  // das Innenfeld ziegelrot und die Bahn gruen gefaerbt. Jeder Aufrufer setzt sein
+  // ctx.beginPath() selbst.
+  function bahnPfad(r){
+    const ry=r*OVAL_STAUCH;
+    ctx.moveTo(OVAL_CX-OVAL_HL,OVAL_CY-ry);
+    ctx.lineTo(OVAL_CX+OVAL_HL,OVAL_CY-ry);
+    ctx.ellipse(OVAL_CX+OVAL_HL,OVAL_CY,r,ry,0,-Math.PI/2,Math.PI/2);
+    ctx.lineTo(OVAL_CX-OVAL_HL,OVAL_CY+ry);
+    ctx.ellipse(OVAL_CX-OVAL_HL,OVAL_CY,r,ry,0,Math.PI/2,3*Math.PI/2);
+    ctx.closePath();
+  }
+  // Liegt dieser Oval-Anteil an der Ziellinie (oben) oder auf der Gegengeraden (unten)?
+  // Beides sind GERADEN, die Tangente ist dort also waagerecht und "quer zur Laufrichtung"
+  // heisst an beiden Zonen schlicht: die Bildschirm-Y-Achse. Genau deshalb funktioniert die
+  // Auffaecherung der Wartenden unten an beiden Wechselzonen mit derselben Rechnung.
+  const ovalAmZiel=(anteil)=>{const f=(((anteil%1)+1)%1); return f<0.25||f>0.75;};
   function ovalPunkt(u){
     const platz=rennFertig.indexOf(u);
-    const winkel=ovalWinkel(laufAnteil(u));
+    const anteil=ovalAnteil(u);
+    // SPUR: mechanisch gibt es zwei (u.bahnZ 0/1), gezeichnet werden sechs — die beiden
+    // Mannschaften liegen auf den mittleren Spuren OVAL_SPUR0 und OVAL_SPUR0+1. u.bahnZ
+    // wird waehrend eines Bahnwechsels weich interpoliert und ist dann gebrochen; das
+    // traegt sich hier unveraendert durch, der Laeufer wandert also weiterhin sichtbar
+    // zwischen den Spuren statt zu springen.
+    let bahnR=ovalSpurR(OVAL_SPUR0+u.bahnZ);
     let vx=0, vy=0;                            // Bildschirm-Versatz, nur fuer Wartende/Fertige
     if(platz>=0){
-      // GANZE MANNSCHAFT IM ZIEL (Staffel wird als Team gewertet, s. stepSpurt):
-      // alle sechs liegen rechnerisch auf demselben Ziellinien-Winkel (der zuletzt
-      // Aktive bei laufAnteil=1, jeder Vorgaenger bei laufAnteil=1 seines EIGENEN
-      // Abschnitts, s. Kommentar an laufAnteil oben). Dieselbe Auffaecherung wie
-      // auf der Geraden (der camX-Zweig unten, "+12+platz*9"), nur entlang der
-      // Tangente an der Ziellinie statt entlang x — dort ist die Tangente rein
-      // horizontal (Winkel -90°, s. Herleitung im Recherche-Dokument), beide
-      // Richtungen fallen also zusammen.
+      // GANZE MANNSCHAFT IM ZIEL (Staffel wird als Team gewertet, s. stepSpurt): sie
+      // bekommen alle dieselbe Zielzeit, stehen aber NICHT alle am selben Punkt — hier
+      // stand bis zum Review 13.09. das Gegenteil ("alle sechs liegen auf u.pos=1"), und
+      // das war seit der Umstellung auf den Gesamtfortschritt falsch.
+      //
+      // Nur der SCHLUSSLAEUFER laeuft bis `u.pos=1`. Die anderen fuenf behalten das `u.pos`
+      // ihrer Uebergabe (`u.pos=u.beinBis` im Wechselzweig von stepStaffel) und bleiben
+      // damit an der Wechselzone stehen, an der sie den Stab abgegeben haben. Bei sechs
+      // Beinen sind das 1/6 ... 5/6, mal OVAL_RUNDEN=3 also abwechselnd halbe und ganze
+      // Runden: nachgemessen liegen Bein 2, 4 und 6 an der Ziellinie und Bein 1, 3 und 5
+      // auf der Gegengeraden — drei und drei, nicht sechs auf einem Punkt. Die Mannschaft
+      // steht im Ziel also so verteilt, wie sie gelaufen ist.
+      //
+      // Ueberlagern koennen sich damit nur die drei je Zone, und dagegen faechert der
+      // Versatz entlang der Tangente auf: an BEIDEN Zonen ist die waagerecht (beides sind
+      // Geraden, s. ovalAmZiel), also entlang x, genau wie der camX-Zweig auf der Geraden.
+      // Gemessen bleiben zwischen zwei Figuren derselben Zone 18 px.
       vx=12+platz*9;
     } else if(!u.aktiv && u.fertig==null){
-      // WARTENDE STEHEN AN DER ZIELLINIE, GESTAFFELT (Abschnitt 3 des Dokuments):
-      // laufAnteil ist fuer sie exakt 0 oder 1 (u.pos steht auf einem Vielfachen
-      // von 1/n, s. Aufstellen/Wechsel) — sie liegen also OHNE jede weitere
-      // Rechnung schon auf dem Ziellinien-Winkel, egal fuer welchen Abschnitt sie
-      // warten. Ein Versatz senkrecht zur Laufrichtung faechert sie auf statt sie
-      // zu stapeln — an der Ziellinie (oben auf dem Oval) ist "senkrecht zur
-      // Laufrichtung" die Bildschirm-Y-Achse (dieselbe Idee wie die
-      // Bahn-Auffaecherung anderswo im Motor). Gruppe = ALLE nicht aktiven,
-      // noch nicht im Ziel angekommenen Team-Kollegen — sowohl die, die noch gar
-      // nicht liefen, als auch die, die ihren Abschnitt schon abgegeben haben:
-      // beide stehen sichtbar an derselben Ziellinie (Chris' "die kommenden
-      // warten an der Ziellinie", Abschnitt 3, Punkt 1 des Dokuments).
-      const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null)
+      // WARTENDE STEHEN AN IHRER EIGENEN WECHSELZONE. u.pos steht fuer sie exakt auf einer
+      // Beingrenze (`L.pos=L.beinVon` beim Aufstellen, `naechster.pos=u.beinBis` beim
+      // Wechsel) — mal OVAL_RUNDEN ist das eine ganze Zahl (Ziellinie) oder x,5
+      // (Gegengerade). Sie liegen also OHNE jede Sonderrechnung schon auf der richtigen
+      // Zone, und zwar jetzt auf ZWEI Zonen verteilt statt alle sechs auf einem Haufen an
+      // der Ziellinie — das war auf Chris' Bild der unleserliche Namensbrei.
+      //
+      // Gruppe = die Team-Kollegen an DERSELBEN Zone, nicht mehr alle Wartenden der
+      // Mannschaft: sonst bekaeme ein Laeufer an der Gegengeraden einen Versatz, der fuer
+      // die Warteschlange an der Ziellinie gedacht war.
+      //
+      // NACH ZONE, NICHT NACH u.pos (Review-Fund 13.09.). Der erste Anlauf gruppierte ueber
+      // `Math.abs(o.pos-u.pos)<1e-6` — und traf damit NIE zu. Zwei Wartende an derselben
+      // SICHTBAREN Zone haben verschiedene `u.pos`: `L.pos=L.beinVon=idx/6` unterscheidet
+      // sich je Bein, und die Beine 0/2/4 landen nur deshalb am selben Bildpunkt, weil sie
+      // sich um GANZE RUNDEN unterscheiden (anteil = pos*3 = 0 / 1 / 2). Die Gruppen waren
+      // damit ausnahmslos einelementig, `idx` immer 0 und die Auffaecherung tot: drei
+      // Laeufer standen auf der Gegengeraden auf demselben Pixel, zwei weitere an der
+      // Ziellinie. Massgeblich ist die ZONE, und die sagt `ovalAmZiel()` — genau die
+      // Funktion, die den Ganzzahl-/Halbrunden-Unterschied wegrechnet.
+      const wartende=LAEUFER.filter(o=>o.seite===u.seite&&!o.aktiv&&o.fertig==null
+          &&ovalAmZiel(ovalAnteil(o))===ovalAmZiel(anteil))
         .sort((a,b)=>(a.bein??0)-(b.bein??0));
-      const idx=wartende.indexOf(u);
-      // Geklemmt auf +-4 (Kadergroesse ist immer 2/4/5/6, s. season-discipline-
-      // schedule.ts — hoechstens fuenf Wartende bei sechs je Seite, idx 0..4, die
-      // Klemmung greift also nie und ist nur eine Absicherung nach oben).
-      vy=Math.max(-4,Math.min(4,idx))*13;
-      // ZWEI WARTEBEREICHE STATT EINEM: bahnZ trennt die beiden Seiten radial nur um
-      // OVAL_BAHN_ABSTAND (15px) — an der Ziellinie selbst (Winkel -90°, s. oben)
-      // haengt die Bildschirm-X aber NICHT vom Radius ab, beide Seiten laegen also
-      // ohne diesen Versatz genau uebereinander. Ein kleiner, seitenfester
-      // Horizontal-Schub schiebt die beiden Warteschlangen nebeneinander (Seite 0
-      // links, Seite 1 rechts) statt sie deckungsgleich zu stapeln — zwei
-      // Wechselzonen nebeneinander, wie bei einer echten Staffel an der Ziellinie.
-      vx=(u.seite===0?-1:1)*34;
+      const idx=Math.max(0,wartende.indexOf(u));
+      // SIE STEHEN IM INNENFELD, NICHT AUF DER BAHN. Umgesetzt ueber den RADIUS statt ueber
+      // einen Pixel-Versatz: ein kleinerer Radius ist auf der Stadionform ueberall "weiter
+      // innen", und beide Wechselzonen liegen auf einer GERADEN, wo ein kleinerer Radius
+      // genau senkrecht von der Bahn wegfuehrt. Ein fester vy haette an der Ziellinie nach
+      // innen und auf der Gegengeraden nach aussen gezeigt — oder umgekehrt.
+      // WIE VIELE ES JE ZONE WIRKLICH SIND. Die Beine wechseln sich zwischen den zwei Zonen
+      // ab (gerade Beine Ziellinie, ungerade Gegengerade), bei sechs je Seite also drei und
+      // zwei — der Aktive faellt aus der Zaehlung, es warten hoechstens DREI an einer Zone.
+      // `idx` laeuft damit 0..2 und der Radius ueber 106 / 76 / 46 px: drei klar getrennte
+      // Ringe im Innenfeld. Nachgemessen (echtes Rennen im Browser, Position ueber
+      // laeuferXY ausgelesen) stehen zwei Wartende derselben Zone 17,1 px auseinander
+      // (30 px Radius mal OVAL_STAUCH), kein Paar naeher als 12 px — vorher lagen drei
+      // Figuren auf der Gegengeraden und zwei an der Ziellinie auf DEMSELBEN Pixel.
+      // Das `Math.max` darunter ist reine Absicherung und im Spiel nie
+      // aktiv — es faengt ab, dass ein Radius je negativ wuerde (ab idx=4 taete er das, und
+      // ein negativer Radius spiegelt den Punkt auf die andere Bahnseite, statt nur eng zu
+      // werden). Kadergroessen sind 2/4/5/6 (s. season-discipline-schedule.ts), und in jeder
+      // davon bleibt die groesste Zonengruppe bei drei.
+      const rInnenkante=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+      bahnR=Math.max(16,rInnenkante-26-Math.min(4,idx)*30);
+      // ZWEI WARTEBEREICHE STATT EINEM: ohne einen seitenfesten Horizontal-Schub staenden
+      // die beiden Warteschlangen ineinander, denn an einer Wechselzone liegen die Spuren
+      // beider Mannschaften senkrecht untereinander. Seite 0 links, Seite 1 rechts von der
+      // Zonenmitte: zwei Wechselzonen nebeneinander, wie bei einer echten Staffel.
+      vx=(u.seite===0?-1:1)*40;
       // ANLAUF (stepStaffel, Ziel 6 M1/M2): der NAECHSTE in der Wartereihe (idx===0) zieht
       // sichtbar Richtung Bahn, sobald sein Vordermann sich der Wechselzone naehert.
       // u.vizAnlauf (0..1) schreibt ausschliesslich stepStaffel; hier wird es nur GELESEN,
-      // um ihn teilweise aus der Warteschlange herauszuziehen — u.pos/u.bahnZ/u.aktiv
-      // bleiben unangetastet, es ist dieselbe reine Bildschirm-Interpolation wie u.vizX/
-      // u.vizY in stepKuer.
+      // um ihn aus dem Innenfeld auf SEINE Spur zu ziehen — u.pos/u.bahnZ/u.aktiv bleiben
+      // unangetastet, es ist dieselbe reine Bildschirm-Interpolation wie u.vizX/u.vizY in
+      // stepKuer. Interpoliert wird jetzt der RADIUS (Wartepunkt -> Laufspur) statt eines
+      // Pixel-Versatzes: er tritt damit sichtbar aus dem Innenfeld in seine Bahn, statt
+      // im letzten Bild dorthin zu springen.
       if(idx===0 && u.vizAnlauf>0){
         const zug=Math.min(1,u.vizAnlauf);
-        vx*=(1-0.55*zug); vy*=(1-0.55*zug);
+        bahnR+=(ovalSpurR(OVAL_SPUR0+u.bahnZ)-bahnR)*zug;
+        vx*=(1-0.75*zug);
       }
     }
-    const bahnR=OVAL_RY+u.bahnZ*OVAL_BAHN_ABSTAND;
-    return {x:OVAL_CX+Math.cos(winkel)*OVAL_RX+vx, y:OVAL_CY+Math.sin(winkel)*bahnR+vy};
+    const p=bahnPunkt(anteil,bahnR);
+    return {x:p.x+vx, y:p.y+vy};
   }
 
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
@@ -19959,6 +21436,12 @@
     const v=platz>=0?(14+platz*8):0;            // Eingelaufene: hinter dem Tor im Burghof
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
+  // ZEITFAHREN-EINZELKAMERA, Ausschnittsgroessen (Chris' Fund 13.09., s. kameraUpdate).
+  // ZF_MIN_AUSSCHNITT 0,56 heisst: nie weniger als 56 % der Strecke im Bild (Zoom <= 1,8,
+  // gegen die bisherigen 2,2). ZF_NACHBAR_FENSTER 0,30 zieht jeden Laeufer in den Kasten,
+  // der hoechstens 30 % der Strecke entfernt ist; ZF_POLSTER laesst dem aeussersten noch
+  // Luft fuer Namensschild und Reserve-Balken.
+  const ZF_MIN_AUSSCHNITT=0.56, ZF_NACHBAR_FENSTER=0.30, ZF_POLSTER=0.14;
   function kameraUpdate(dt){
     // OVAL: die ganze Bahn liegt immer im Bild (Abschnitt 2.4 des Recherche-
     // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
@@ -19974,8 +21457,29 @@
     if(BA().startAbstand&&bahnFokus!=null){
       const u=LAEUFER.find(x=>x.id===bahnFokus);
       if(u){
-        const zielZoom=2.2;
-        const zielCx=Math.max(0,Math.min(1,u.pos));
+        // WEITER ALS BISHER (Chris' Fund 13.09., woertlich: "Der zoom ausschnitt muesste
+        // ein wenig groesser sein dass man mehr von den spielern sieht"). Die Einzelkamera
+        // stand fest auf Zoom 2,2 und zeigte damit rund 45 % der Strecke — in der Praxis
+        // fast immer GENAU EINEN Laeufer, weil die uebrigen bei 0,8 s Startabstand weit
+        // auseinanderliegen. Das war als "Kamerawagen neben dem Fahrer" gedacht, nimmt
+        // aber jeden Vergleich weg, und Vergleichen ist beim Zeitfahren die ganze Sache.
+        //
+        // Jetzt: ein Kasten um den Fokus UND seine unmittelbaren Nachbarn auf der Strecke
+        // (alle, die hoechstens ZF_NACHBAR_FENSTER der Strecke entfernt sind), mit einer
+        // Mindestbreite ZF_MIN_AUSSCHNITT. Der Zoom bleibt damit zwischen 1,25 und 1,8 —
+        // immer deutlich weiter als die alten 2,2, und er OEFFNET sich zusaetzlich, sobald
+        // wirklich jemand in der Naehe ist. Reine Praesentation: kameraUpdate() schreibt
+        // nur cam, und cam liest ausser dem Zeichnen niemand.
+        let von=u.pos, bis=u.pos;
+        for(const o of LAEUFER){
+          if(o===u||o.fertig!=null)continue;
+          if((o.startT||0)>rennT)continue;                 // steht noch auf der Rampe
+          if(Math.abs(o.pos-u.pos)>ZF_NACHBAR_FENSTER)continue;
+          von=Math.min(von,o.pos); bis=Math.max(bis,o.pos);
+        }
+        const spanne=Math.max(ZF_MIN_AUSSCHNITT,(bis-von)+ZF_POLSTER);
+        const zielZoom=Math.max(1,Math.min(1.8,1/spanne));
+        const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
         const t=Math.min(1,dt*1.8);
         cam.zoom+=(zielZoom-cam.zoom)*t;
         cam.cx+=(zielCx-cam.cx)*t;
@@ -20059,6 +21563,7 @@
     // 300k Saaten); Textsaaten waren nie betroffen und bleiben es (0,3220 vorher, 0,3339
     // nachher). Nachrechnen: docs/design/takeshi-kursmischer-nachweis-06-09.mjs.
     bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
+    bahnKoennenGemeldet=new Set();
     if(BA().kurse&&BA().kurse.length){
       let s0=(Number(seed)>>>0)||1;
       for(let runde=0;runde<2;runde++){
@@ -20195,9 +21700,44 @@
       }
       // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
       // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
-      // liest sich ueberall als 0). `L.id` ist die Startreihenfolge selbst (0..11, ueber
-      // beide Seiten hinweg in Aufstellungsreihenfolge vergeben).
-      if(art.startAbstand)L.startT=L.id*art.startAbstand;
+      // liest sich ueberall als 0).
+      //
+      // STARTFOLGE JETZT IM WECHSEL STATT SEITENWEISE (Chris' Fund 13.09., woertlich: "es
+      // wird sich nur mit gleichbleibender geschwindikeit bewegt also gewinnt der der am
+      // anfang vorne ist auch auf jeden fall"). Bisher stand hier `L.id`, und `id` wird
+      // seitenweise vergeben (erst `mine.forEach`, dann `gegen.forEach`, s. unten) — die
+      // GESAMTE Heimseite fuhr also vor der gesamten Gastseite los (startT 0,0-4,0 gegen
+      // 4,8-8,8). Auf dem Bildschirm lagen damit ueber fast das ganze Rennen sechs
+      // Heimfahrer vorn und sechs Gastfahrer hinten, ohne dass das irgendetwas ueber
+      // Tempo gesagt haette. Nachgemessen (scripts/probe-zeitfahren-anzeige.mjs, vor
+      // dieser PR): die ersten vier Plaetze auf dem Bild waren ueber das ganze Rennen
+      // Draco/Lava Golem/Krolach/Johanna — alle vier Heimseite, alle vier
+      // Startnummern 1-4 — waehrend der spaetere Sieger Tidesprinter (Startnummer 9) dort
+      // nie auftauchte. Genau Chris' "vorhin beim laufen war er optisch aber nur 4.".
+      //
+      // `idx*2+seite` staffelt im Wechsel (Heim 0, Gast 1, Heim 2, ...), wie es ein
+      // echtes Zeitfahren mit zwei Mannschaften auch setzen wuerde. Der Startabstand
+      // selbst (0,8 s) und die Gesamtdauer bleiben unveraendert.
+      //
+      // DIES IST DIE EINZIGE ZEILE DIESER PR, DIE DIE SIMULATION BERUEHRT — alles andere
+      // ist Anzeige. Deshalb hier die Messung im Klartext, statt sie zu behaupten:
+      //
+      //   nur die Anzeige-Aenderungen, Startfolge unveraendert  0,828 / 0,832 (Spannw. 0,087)
+      //   mit dieser Zeile (Startfolge im Wechsel)              0,825 / 0,825 (Spannw. 0,082)
+      //
+      // Die Rennen sind untereinander unabhaengig (`schatten:false, tackle:false` —
+      // vordermann() liefert sofort null, kein Bahnwechsel, und waehrend eines Zeitfahrens
+      // faellt ueberhaupt kein rr()-Aufruf an), und gewertet wird `bahnZeit()` = eigene
+      // Laufzeit, nicht die Zieluhrzeit. Die Startfolge kann die Rangordnung deshalb
+      // ANALYTISCH nicht verschieben; was bleibt, ist die Tick-Quantisierung am
+      // Startgatter: eine um einen Tick (1/60 s) verschobene Startfreigabe aendert eine
+      // Zehn-Sekunden-Zeit um 0,17 % und kippt damit gelegentlich ein enges Paar. Die
+      // 0,003 liegen weit INNERHALB der Kader-Spannweite von 0,082 und sind nach der Regel
+      // aus docs/design/messgrundlage-kaderfest.md von null nicht zu unterscheiden.
+      // Wer trotzdem Ziffern-Identitaet will, ersetzt `(idx*2+seite)` wieder durch `L.id`
+      // — dann steht wieder die gesamte Heimseite vor der gesamten Gastseite, mit der
+      // Optik, die Chris gemeldet hat.
+      if(art.startAbstand)L.startT=(idx*2+seite)*art.startAbstand;
       // TAGESFORM (Zeitfahren, K5, Recherche Abschnitt 3.6): EINMAL je Laeufer gezogen,
       // nicht je Tick — sonst waere es kein "Tagesform"-Rauschen, sondern ein zufaelliges
       // Zittern ueber das ganze Rennen. Gated hinter `art.tagesform`; ohne das Feld bleibt
@@ -20281,8 +21821,66 @@
   // rho je Spiel 0,906, kostet nichts an anderer Stelle.
   const WECHSEL_PATZER=0.11;       // Grundchance auf einen echten Patzer
   const WECHSEL_PATZER_K=0.0020;   // wieviel Koennen sie senkt
-  const WECHSEL_PATZER_KOSTEN=0.9; // was ein Patzer obendrauf kostet
   const WECHSEL_ROBUST_K=0.0012;   // wieviel Verlaesslichkeit die Patzerchance senkt
+  // ============ DIE UEBERGABE BEKOMMT EINE AUSFUEHRUNG (13.09.) ============
+  // Chris, woertlich, nach dem ersten Live-Rennen: "und auch hier gilt spieler sollen ggf.
+  // mal aufholen koennen usw und momentan ist es schon sehr sehr statiscch".
+  //
+  // NACHGEMESSEN, und er hat noch untertrieben. Ueber 200 Rennen mit 200 verschiedenen
+  // Saaten (Sonde: Fuehrung an jeder der sechs Beingrenzen aus `etappenZeit` und
+  // `wechselKonto` rekonstruiert):
+  //
+  //   * Die Wechselverluste waren ZEICHENGLEICH IDENTISCH ueber alle Saaten hinweg —
+  //     Seite 0 bekam in JEDEM Rennen 0.166 / 0.278 / 0.332 / 0.254 / 0.260 Sim-Sekunden.
+  //   * Fuehrungswechsel: in 100 % der Rennen exakt einer, immer an derselben Stelle.
+  //     Wer nach Bein 1 fuehrte, gewann in 0,0 % der Rennen — nicht, weil es spannend
+  //     waere, sondern weil ES IMMER DASSELBE RENNEN WAR.
+  //   * Zielabstand: Median 1,05 Sim-s von 10,5, also zehn Prozent. Nie ein Fotofinish.
+  //
+  // ZWEI URSACHEN, beide hier:
+  //
+  //  1. `verlust` war eine REINE FUNKTION von TECHNIK. max(MIN, MAX - koennen*K) hat
+  //     keinen Zufallsanteil. Zwei feste Kader ergaben damit fuenf feste Zahlen.
+  //  2. Der Patzer, der das auffangen sollte, feuerte praktisch nie. Seine Chance ist
+  //     max(0.01, 0.11 - koennen*0.0020 - verlaesslich*0.0012); bei den ueblichen Werten
+  //     (koennen und verlaesslich je 40-55) wird der Ausdruck NEGATIV und faellt auf den
+  //     Boden 0,01. Der Kommentar an WECHSEL_PATZER oben zielte auf 4,5-4,6 % je Wechsel
+  //     — angekommen sind 1 %, weil der Boden die eigentliche Zahl ueberschrieb.
+  //
+  // WAS ECHTE STAFFELN SPANNEND MACHT, ist genau das, was hier fehlte: die AUSFUEHRUNG
+  // der Uebergabe schwankt von Lauf zu Lauf, auch bei denselben zwei Laeufern. Der
+  // Abnehmende startet auf seine Marke und muss auf Hoechsttempo sein, wenn der Stab
+  // kommt; passt das Timing in der 30-m-Zone nicht, kostet es Zehntel, ohne dass jemand
+  // etwas falsch gemacht haette (World Athletics, 30-m-Wechselzone seit 2018). Genau das
+  // — und NICHT irgendein erfundener Zusatzmechanismus — kommt jetzt dazu:
+  //
+  //   verlust = Grundwert(TECHNIK) + Ausfuehrungsstreuung + ggf. Patzer
+  //
+  // Die Streuung ist DREIECKSFOERMIG ((rr()+rr())-1 statt 2*rr()-1): kleine Abweichungen
+  // sind haeufig, grosse selten — dieselbe Form, die eine echte Uebergabe hat. Ihre
+  // BREITE sinkt mit dem Koennen, gute Paare liefern also verlaesslicher ab. Damit bleibt
+  // die Rangtreue am Koennen haengen und nicht am Wurf.
+  //
+  // WIE BREIT, NACHGEMESSEN STATT GERATEN. Ein erster Anlauf mit 0,24/0,0022/0,06 kostete
+  // an Rangtreue NICHTS (rho je Spiel 0,915 -> 0,918, bei einer Kader-Spannweite von
+  // 0,099 — also nicht von Null unterscheidbar), bewegte aber auch nur wenig: die Zahl
+  // VERSCHIEDENER Rennausgaenge stieg von 27 auf 60 je 200 Saaten. Weil die Rangtreue so
+  // viel Luft hat (Schranke 0,80, gemessen 0,92), ist die Streuung danach fast verdoppelt
+  // worden — die Messung unten in der PR-Beschreibung zeigt, was das bringt und was es
+  // kostet. Mehr geht bewusst nicht: die Uebergabe soll ein Wettkampf sein, kein Wuerfeln.
+  const WECHSEL_STREU_MAX=0.40;    // Streubreite bei Koennen 0 (Sim-Sekunden, +/-)
+  const WECHSEL_STREU_K=0.0035;    // wieviel Koennen sie einengt
+  const WECHSEL_STREU_MIN=0.10;    // enger wird auch ein Weltklasse-Paar nicht
+  // PATZERBODEN statt 0,01: die Zahl, die der Kommentar an WECHSEL_PATZER immer gemeint
+  // hat (4,5 % je Wechsel, real ~21 % der Teams je Rennen). Bei zehn Uebergaben je Rennen
+  // sieht damit rund ein Drittel der Rennen einen echten Patzer statt einem von zehn.
+  const WECHSEL_PATZER_MIN=0.045;
+  // ...UND ER KOSTET WENIGER. 0,9 Sim-s waren 13 reale Sekunden auf ein Rennen von 154 —
+  // 8,6 % der Gesamtzeit. Ein wirklich verpatzter Wechsel kostet real eher 0,5 bis 1,0 s
+  // auf 38 s eines 4x100, also 1,3 bis 2,6 %. 0,34 Sim-s sind 5 reale Sekunden = 3,2 %,
+  // in derselben Groessenordnung. Der Patzer wird damit HAEUFIGER UND KLEINER — er
+  // entscheidet ein enges Rennen, statt es als seltener Totalausfall zu erschlagen.
+  const WECHSEL_PATZER_KOSTEN=0.34;
   const SPITZE_ZUG=0.0038;         // wieviel WUCHT die Fuehrungsarbeit verbilligt (Staffel)
   const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
   const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
@@ -20615,11 +22213,52 @@
       if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
       if(u.huerde>0)zehr*=0.4;             // Stopp am Hindernis: ein Fuenftel bis die Haelfte, nicht Volllast
+      // WER EINGEBROCHEN IST, SCHLEPPT SICH — UND VERBRAUCHT DABEI WENIGER (13.09.).
+      // Bis hierher zehrte ein leerer Laeufer weiter mit dem vollen Satz seines PLANS,
+      // obwohl tempoVon ihn laengst auf rund drei Viertel heruntergesetzt hat. Damit
+      // konnte er sich per Konstruktion nie wieder fangen: `u.leer` war eine Sperrklinke,
+      // die nie geloescht wurde. Chris am 13.09.: "manche laufen aus und muessen kurz
+      // regenerieren, manche schaffen den kompletten Spieltag".
+      if(u.leer&&BA().leerSchonung)zehr*=BA().leerSchonung;
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
+      // ---- PUSTE LAEDT WIEDER AUF (13.09.).
+      //
+      // Der Befund, der das noetig macht, steht in docs/design/
+      // hockey-ausdauer-checks-konzept-13-09.md Abschnitt 5.3: `u.reserve` kannte FUENF
+      // Abzuege und keine einzige Gutschrift — derselbe Ratchet, den
+      // fatigue-saisonlaenge-plan.md B.2 fuer die Saison-Fatigue beschreibt, nur eine
+      // Ebene tiefer. Gemessen endeten bei Takeshi 44,8 % der Laeufer leer und beim
+      // Klettern 73,3 %, ohne dass es einen Weg zurueck gab.
+      //
+      // DREI ERHOLUNGS-ZUSTAENDE, alle aus schon vorhandenen Groessen:
+      //   am Hindernis (u.huerde>0)   er steht — volle Gutschrift
+      //   eingebrochen (u.leer)       er schleppt sich und holt Luft — `leerRegen`-fach
+      //   unter Plantempo (ueber<1)   anteilig (1-ueber), genau Chris' "wenn man weniger rennt"
+      //   Volllast                    nichts — bei `ueber===1` ist die Zeile rechnerisch weg
+      // Wieviel dabei zurueckkommt, haengt an STEHEN: das ist der Bahn-Sub-Skill fuer
+      // Stehvermoegen und damit die Antwort auf "haengt ab von den Spieler-Stats".
+      //
+      // Eine Bahn OHNE `pusteRegen` (heute keine) bleibt bit-identisch.
+      if(BA().pusteRegen){
+        const ruhe=u.huerde>0?1:(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
+        if(ruhe>0)u.reserve=Math.min(u.reserveMax,
+          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
+      }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
         schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
-        feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+      }
+      // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
+      // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
+      // moeglich. `pusteFangen` ist der Anteil des eigenen Vorrats, ab dem er wieder voll
+      // laeuft — bewusst kein kleiner Rest, sonst bricht er im naechsten Atemzug erneut ein
+      // und die Figur flackert zwischen zwei Zustaenden.
+      else if(u.leer && BA().pusteFangen && u.reserve>=BA().pusteFangen*u.reserveMax){
+        u.leer=false;
+        u.gefangen=(u.gefangen||0)+1;
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
+        feed(u.seite,u.n+" fängt sich wieder — Puste zurück bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
@@ -20652,15 +22291,36 @@
           // Zeit (0,2 s bei Elite-Sprintern); bei uns kostete ein Gelingen bisher nichts,
           // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
           // `hindernisTypen` nicht und bleiben bit-identisch.
+          // HINDERNIS-TYP UND -KOENNEN stehen ausserhalb des Blocks, weil die zwei
+          // Ausgangs-Wuerfe weiter unten sie brauchen (`fallenKoennen`, s. dort). Ohne
+          // `hindernisTypen` bleiben sie null/0 und beide Wuerfe rechnen Zeichen fuer
+          // Zeichen wie vorher.
+          let hTyp=null, hSkill=0;
           if(A.hindernisTypen){
-            const hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
-            const hSkill=u[hTyp]||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
+            hSkill=u[hTyp]||0;
+            // STOPPZEIT NACH SCHWIERIGKEIT — GEBAUT, GEMESSEN, NICHT GESETZT.
+            // `fallenStufe` (1-3 Sterne je Sub-Skill) steht nur in den Burgpunkten; fuer
+            // die Uhr sind alle vierzehn Fallen gleich teuer, eine Stufe-1-Wendigkeits-
+            // falle kostet so viel wie eine Stufe-3-Wuchtfalle. `stufePreis` wuerde das
+            // in Sekunden nachziehen (Faktor je Stufe, `huerdePreis` gegengerechnet, also
+            // Umverteilung statt Erhoehung). Kaderfest gemessen bringt es NICHTS und
+            // schadet in der scharfen Fassung: 0,869 allein (0,70/1,00/1,30), 0,848 bei
+            // 0,55/1,00/1,45, 0,878 zusammen mit `fallenKoennen` — alle unter den 0,883
+            // von `fallenKoennen` allein (Recherche Abschnitt 4.2). Das Feld bleibt im
+            // Motor und in BAHN_ART ungesetzt; ohne es ist der Faktor 1 (jede Bahn).
+            const stFaktor=A.stufePreis?(A.stufePreis[(A.fallenStufe||{})[hTyp]]??1):1;
+            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
+            // `stoppAnteil` bleibt BEWUSST der reine Koennens-Anteil (1 - 0,8 x Skill/100)
+            // und traegt den `stufePreis`-Faktor NICHT mit: die Schwierigkeit der Falle
+            // steht in den Burgpunkten schon als `fallenStufe`-Multiplikator (s.
+            // burgpunkte()), ein zweites Mal hier waere sie quadratisch drin. Die
+            // Wertungsformel bleibt dadurch Zeichen fuer Zeichen die gemessene aus #810.
             u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
             // TON (Ziel 3, A4, 10.09.): Falle ausgeloest. `A.takeshi` gated, weil dieser
             // Zweig auch fuer Spurt laeuft (s. Kommentar oben, "hindernisTypen fuehrt");
@@ -20713,9 +22373,96 @@
               }
             }
           }
-          const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
-          if(rr()<=technik)continue;                       // sauber drueber
-          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+u.WUCHT*(A.wuchtSpanne??0.0090));
+          // PUSTE AM HINDERNIS (13.09.) — Chris: "ja das kann es beeinflussen je nach
+          // hindernis aber MUSS nicht zwangsweise haengt von art und schwierigkeit ab".
+          // `pusteHindernis` (s. BAHN_ART) sagt je HINDERNISART, wie stark Muedigkeit dort
+          // zahlt; multipliziert mit der SCHWIERIGKEIT aus `fallenStufe`. Beide Kategorien
+          // standen bereits im Rezept — hier wird nichts neu kategorisiert.
+          //
+          // NACH #909 neu aufgesetzt: jene PR hat denselben Block umgebaut (`koennen`/
+          // `durch` statt roher TECHNIK/WUCHT) und berechnet `hTyp` bereits weiter oben —
+          // der Abzug nutzt jetzt DIESE Groesse, statt sie ein zweites Mal zu bestimmen.
+          // Er sitzt bewusst NACH beiden Wuerfen im Text, aber VOR ihnen in der Rechnung:
+          // er verschiebt nur die Schwelle, nie die Zahl oder Reihenfolge der rr()-Wuerfe.
+          //
+          // `pusteAbzug` ist 0, solange die Puste voll ist, und eine Bahn OHNE
+          // `pusteHindernis` (Spurt, Staffel, Zeitfahren, Klettern) bekommt ihn nie: fuer
+          // die bleibt der Block Zeichen fuer Zeichen der alte, inklusive der Zufallsfolge.
+          let pusteAbzug=0;
+          if(A.pusteHindernis&&hTyp&&u.reserveMax>0){
+            const empf=A.pusteHindernis[hTyp]||0;
+            const stufe=(A.fallenStufe||{})[hTyp]||1;
+            const leerAnteil=Math.max(0,1-u.reserve/u.reserveMax);
+            pusteAbzug=empf*(stufe/3)*leerAnteil;
+          }
+          // WER DIESE FALLE MEISTERT — UND NICHT: WER FALLEN ALLGEMEIN MEISTERT.
+          //
+          // Chris 13.09., nach einem live geschauten Rennen: "bei takeshi sollen nicht ALLE
+          // spieler immer gefuehlt an allen fallen hin fallen sondern man soll nen
+          // unterschied sehen ob jemand eine meistert und dadurch aufholt oder eben
+          // hinfaellt ... das kann auch n 80er sein der stark bei hindernissen ist und
+          // dazwischen nur avg."
+          //
+          // NACHGEMESSEN (docs/design/takeshi-hindernis-vs-strecke-recherche-13-09.md,
+          // Abschnitt 1): ein Unterschied WAR da — oberstes TECHNIK-Fuenftel 65,1 % sauber
+          // gegen 37,9 % im untersten —, aber er haengt an EINER Groesse. Der `hTyp` der
+          // Falle entschied bis hier NUR ueber die Stoppdauer, NIE ueber Gelingen oder
+          // Sturz: an einer Wendigkeits-, Wucht-, Willens- und Nehmerqualitaets-Falle
+          // wuerfelte jeder mit derselben TECHNIK. Damit gab es die Geschichte "ER kommt
+          // an DIESER Falle durch, wo der andere liegt" mechanisch gar nicht — nur "der
+          // Techniker kommt ueberall etwas oefter durch".
+          //
+          // `fallenKoennen` mischt das Koennen zum TYP der Falle in den Sauber-Wurf,
+          // `fallenDurchbruch` dasselbe in den Durchbruch-Wurf. Das ist KEIN neuer Kanal:
+          // dieselben fuenf Sub-Skills entscheiden bereits die Stoppdauer derselben Falle
+          // (`hSkill` oben), und ihr Mittel IST nach `mengeAusEignung` die Eignung — der
+          // Wurf wird damit nicht lauter, sondern breiter aufgestellt. Gemessen hebt das
+          // rho sogar leicht, weil TECHNIK der mit der Eignung am schwaechsten laufende
+          // Sub-Skill ist (r=0,60) und die anderen vier zwischen 0,67 und 0,88 liegen.
+          //
+          // Ohne die zwei Felder (jede andere Bahn, Spurt eingeschlossen) sind `koennen`
+          // und `durch` Zeichen fuer Zeichen `u.TECHNIK` bzw. `u.WUCHT`, und rr() wird in
+          // genau denselben Faellen und in derselben Reihenfolge gerufen.
+          let koennen=u.TECHNIK, durch=u.WUCHT;
+          if(hTyp){
+            const mK=A.fallenKoennen??0, mD=A.fallenDurchbruch??0;
+            if(mK)koennen=(1-mK)*u.TECHNIK+mK*hSkill;
+            if(mD)durch=(1-mD)*u.WUCHT+mD*hSkill;
+          }
+          // SEINE FALLE — UND SEINE SCHWACHSTELLE, im Ticker (`fallenMelden`).
+          //
+          // `stark`/`schwach` fragen nur, ob der Sub-Skill DIESER Falle der hoechste bzw.
+          // niedrigste der fuenf Fallentypen dieses Laeufers ist, und ob er weit genug von
+          // der Mitte weg liegt (`fallenMelden` ist die Schwelle in Punkten). Reine
+          // Anzeige: kein rr(), kein Schreiben in u.* ausser der Melde-Buchhaltung, kein
+          // Einfluss auf burgpunkte()/wert(). Je Station hoechstens eine Glanz- und eine
+          // Patzer-Zeile (bahnKoennenGemeldet) — sonst stuenden bei zwoelf Laeufern
+          // vierzehn mal zwoelf Zeilen im Ticker.
+          const meldeTyp=(A.fallenMelden&&hTyp&&A.fallenStufe)?(()=>{
+            const T=Object.keys(A.fallenStufe); if(T.length<2)return null;
+            let hoch=T[0],tief=T[0];
+            for(const t of T){ if((u[t]||0)>(u[hoch]||0))hoch=t; if((u[t]||0)<(u[tief]||0))tief=t; }
+            const mitte=T.reduce((s,t)=>s+(u[t]||0),0)/T.length;
+            if(hTyp===hoch && hSkill-mitte>=A.fallenMelden)return "stark";
+            if(hTyp===tief && mitte-hSkill>=A.fallenMelden)return "schwach";
+            return null;
+          })():null;
+          const meldeStation=HUERDEN_N().indexOf(h);
+          const melde=(art2,txt)=>{
+            const key=meldeStation+"|"+art2;
+            if(bahnKoennenGemeldet.has(key))return;
+            bahnKoennenGemeldet.add(key); feed(u.seite,txt);
+          };
+          const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
+          if(rr()<=technik){                               // sauber drueber
+            if(meldeTyp==="stark"){
+              schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+              melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
+            }
+            continue;
+          }
+          const wucht=Math.min(0.92,Math.max(0.02,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090)-pusteAbzug));
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
@@ -20725,7 +22472,10 @@
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
-          u.stolper=(BA().stolperGrund??0.45)+ (1-u.TECHNIK/100)*(BA().stolperSpanne??0.5);
+          // WIE LANGE ER LIEGT, haengt an demselben Koennen wie das Gelingen — mit
+          // `fallenStolper` am Koennen ZU DIESER Falle (`koennen` oben), sonst weiter an
+          // TECHNIK allein. Ohne das Feld ist der Ausdruck Zeichen fuer Zeichen der alte.
+          u.stolper=(BA().stolperGrund??0.45)+ (1-(BA().fallenStolper?koennen:u.TECHNIK)/100)*(BA().stolperSpanne??0.5);
           // WENDIGKEIT, WO ES KEINE SPUR ZU WECHSELN GIBT.
           //
           // Im Sprint entscheidet Wendigkeit ueber Bahnwechsel: in den Sog kommen, am
@@ -20785,7 +22535,14 @@
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
-          feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
+          // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
+          if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+            melde("schwach",u.n+" liegt an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+              " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
+          } else {
+            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          }
         }
       }
 
@@ -20935,13 +22692,26 @@
           // das eine Staffel ausmacht.
           const koennen=(u.TECHNIK+naechster.TECHNIK)/2;
           let verlust=Math.max(WECHSEL_MIN,WECHSEL_MAX-koennen*WECHSEL_K);
+          // AUSFUEHRUNG (13.09., s. den ausfuehrlichen Block an WECHSEL_STREU_MAX oben).
+          // Bis hierher stand der Verlust damit FEST — dieselben zwei Laeufer ergaben in
+          // jedem Rennen dieselbe Zahl, und das Rennen war ein Abspielen statt eines
+          // Wettkampfs. Zwei Wuerfe ergeben eine dreiecksfoermige Streuung um 0: das
+          // Timing in der Wechselzone sitzt meistens ungefaehr, selten sehr gut und selten
+          // schlecht. Die Breite engt das Koennen ein, ein gutes Paar schwankt also
+          // weniger — die Rangtreue bleibt dadurch am TECHNIK-Wert haengen.
+          const streu=Math.max(WECHSEL_STREU_MIN,WECHSEL_STREU_MAX-koennen*WECHSEL_STREU_K);
+          verlust=Math.max(WECHSEL_MIN,verlust+streu*((rr()+rr())-1));
           // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
           // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
           // gerempelt wird hier nicht. Jetzt senkt es die Chance auf den echten Patzer —
           // genau das, was "verlaesslich" heisst. Gerechnet wird mit dem Schnitt beider
           // Beteiligten, wie beim Koennen auch.
           const verlaesslich=(u.ROBUST+naechster.ROBUST)/2;
-          const patzer=rr()<Math.max(0.01,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
+          // Boden jetzt WECHSEL_PATZER_MIN statt 0,01: der alte Boden hat die ganze
+          // Formel darueber ueberschrieben (der Ausdruck wird bei den ueblichen Werten
+          // negativ) und den Patzer damit auf 1 % je Wechsel eingefroren — s. den Block
+          // an WECHSEL_STREU_MAX oben, Ursache 2.
+          const patzer=rr()<Math.max(WECHSEL_PATZER_MIN,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
                                           -verlaesslich*WECHSEL_ROBUST_K);
           if(patzer)verlust+=WECHSEL_PATZER_KOSTEN
             *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
@@ -20971,10 +22741,10 @@
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+verlust.toFixed(2)+" s verloren.");
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.");
           } else {
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+verlust.toFixed(2)+" s im Wechsel.");
+            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
         continue;
@@ -20988,7 +22758,7 @@
           u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
-          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".");
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
@@ -20996,7 +22766,18 @@
           // `BA().takeshi` ist hier die Schranke, `A` (aus der Huerden-Schleife weiter oben)
           // ist an dieser Stelle nicht mehr in Scope.
           if(BA().takeshi)sfx("takeshis-castle","tor");
-          feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+          // EINZELSTART: "Platz N" ist hier die ZIELEINLAUF-Reihenfolge (rennFertig), und
+          // die ist bei gestaffeltem Start NICHT der Rang — wer frueher startet, kommt auch
+          // frueher an. Der Ticker nannte trotzdem beides "Platz". Jetzt steht dort die
+          // eigene Laufzeit in Zuschauzeit (s. bahnZeitAnzeige) und der Rang aus derselben
+          // Rangliste, die das HUD und der Endstand lesen — eine Wahrheit statt zweier.
+          if(BA().startAbstand){
+            const rang=bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1;
+            feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
+          } else {
+            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+          }
         }
       }
     }
@@ -21194,6 +22975,82 @@
     }
   }
 
+  // ============ ZEITFAHREN: DER SCHRITT KOMMT AUS DEM TEMPO (stepZeitfahren, Ziel 8) ============
+  // Angeschlossen ueber bahnBewegung() oben, exklusiv auf `art.zeitfahren` gegated. Der
+  // Dispatcher wartet seit PR 0.3 auf diese Funktion ("Rein deskriptiv, ohne Wirkung, bis
+  // Ziel-PR 8 stepZeitfahren() liefert", s. BAHN_ART["time-trial"]) — bis dahin fiel
+  // Time-Trial durch den typeof-Waechter still durch, ohne jede Bewegungsschicht.
+  //
+  // CHRIS' FUND 13.09., woertlich: "lauf animationen! momentan schweben alle."
+  //
+  // DIE URSACHE IST GEMESSEN, NICHT VERMUTET, und sie ist haerter als "zu langsam": die
+  // globale Sprite-Animationsuhr `t` (s. Deklaration, `:15159`) wird AUSSCHLIESSLICH in
+  // stepSim() hochgezaehlt — und zwar HINTER den drei fruehen Ruecksprungzeilen
+  //     if(istFeldspiel(disc))return stepFeldspiel(dt);
+  //     if(istBuehne(disc))return stepBuehne(dt);
+  //     if(istBahn(disc))return stepSpurt(dt);
+  //     ...
+  //     t+=dt;
+  // Auf der BAHN wird `t+=dt` also nie erreicht. Der Bildindex in zeichneSprite() ist
+  // `Math.floor((t*7+u.id)%n)` — bei eingefrorenem `t` eine KONSTANTE je Laeufer. Jede
+  // Figur auf jeder Bahn gleitet als STEHENDES Einzelbild ueber die Strecke; das ist
+  // genau das "Schweben", das Chris sieht. Nachgemessen ueber ein ganzes Zeitfahren
+  // (scripts/probe-zeitfahren-anzeige.mjs): `aniT` bleibt ueber alle 103 Messpunkte
+  // exakt 0,0000.
+  //
+  // REPARIERT WIRD HIER NUR TIME-TRIAL, und zwar BESSER als der alte Weltzeit-Zyklus:
+  // die Schrittfrequenz kommt aus dem TEMPO des Laeufers (`u.v`), nicht aus einer Uhr —
+  // wer schneller faehrt, tritt sichtbar schneller, wer einbricht, wird auch im Schritt
+  // langsamer. Das ist dieselbe Groesse, die Chris in Punkt 2 seiner Liste vermisst
+  // ("es wird sich nur mit gleichbleibender geschwindikeit bewegt"): das Tempo VARIIERT
+  // laengst (Plan, Ermuedung, Gelaende, Reserve — s. tempoVon), man konnte es nur nirgends
+  // sehen. Jetzt sieht man es an den Beinen.
+  //
+  // DERSELBE VERTRAG WIE stepStaffel/stepParcours, WOeRTLICH: geschrieben werden
+  // AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`, `vizErschoepft`,
+  // `vizRampe`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done, und es faellt
+  // KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese
+  // Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach dieser
+  // PR (0,828 rho je Spiel, 0,832 Saison, s. PR-Beschreibung).
+  //
+  // SCHRITTLAENGE. `u.v` ist Bildschirm-Pixel je SIMULATIONSsekunde (s. stepSpurt:
+  // `u.pos += u.v*dt/strecke`); typisch 110-135. ZF_SCHRITT_PX ist die Strecke, die ein
+  // voller Laufzyklus zuruecklegt — 46 px ergeben bei v=130 rund 2,8 Zyklen je
+  // ZUSCHAUsekunde, also etwa 170 Schritte je Minute: die Trittfrequenz, mit der ein
+  // Mensch tatsaechlich laeuft. Gerechnet wird bewusst in ZUSCHAU-Sekunden
+  // (`dt*zeitFaktor()`), nicht in Simulationssekunden: sonst zoege ZEIT_DEHNUNG
+  // ["time-trial"]=4,38 den Zyklus um denselben Faktor in die Laenge und die Beine
+  // schlichen wieder — derselbe Fehler in Gruen, nur eine Etage tiefer.
+  const ZF_SCHRITT_PX=46;
+  function stepZeitfahren(dt,art){
+    const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
+    for(const u of LAEUFER){
+      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; }
+      // ---- 1. AUF DER STARTRAMPE? Reine Ablesung derselben Bedingung, die stepSpurt
+      // oben zum Ueberspringen benutzt — hier nur, um die Figur stehen und das Panel
+      // "startet in 3,4 s" zeigen zu lassen (s. renderZeitfahrenPanel/zeichneSpurt).
+      const wartet=u.fertig==null && (u.startT||0)>rennT;
+      u.vizRampe=wartet?Math.max(0,(u.startT||0)-rennT):0;
+      // ---- 2. SCHRITTPHASE AUS DEM TEMPO. Wer steht (Rampe) oder im Ziel ist, tritt
+      // nicht. Die Phase zaehlt in ZYKLEN, nicht in Bildern — zeichneSprite() rechnet sie
+      // auf die Bildzahl des jeweiligen Blattes um (s. vizAniPhase dort), damit diese
+      // Funktion nichts ueber Sprite-Blaetter wissen muss.
+      const faehrt=!wartet && u.fertig==null;
+      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/ZF_SCHRITT_PX;
+      // ---- 3. ERSCHOEPFUNG, 0..1 (Chris Punkt 4: "ausdauer muss besser funktionieren").
+      // Die Kraftreserve GIBT es laengst und sie wirkt laengst (u.leer senkt das Tempo in
+      // tempoVon), sie war nur nirgends abzulesen: ein 4 px schmaler Balken unter den
+      // Fuessen, bei zwoelf Laeufern auf einem Bild. `vizErschoepft` ist dieselbe Zahl,
+      // nur als weiche 0..1-Groesse, an der zeichneSpurt die Figur sichtbar schwerer
+      // werden laesst und das Fokus-Panel eine Prozentzahl zeigt. Weich nachgezogen
+      // (dieselbe exp-Glaettung wie u.vizAnlauf in stepStaffel), damit der Uebergang
+      // "geht noch" -> "ist leer" kein harter Schnitt ist.
+      const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
+      const ziel=u.leer?1:Math.max(0,1-anteil/0.35);   // ab einem Drittel Restreserve sichtbar
+      u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+    }
+  }
+
   const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
   // RENNPLAN-ANSAGE, Farbe. CSS-Gegenstueck: --ansage in battle-mode.css. Bewusst ein
@@ -21293,6 +23150,11 @@
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet -- AUSSER er ist der
         // Naechste in der Wechselzone und laut vizAnlauf schon am Anlaufen.
         vx:u.stolper>0?0:(tg?tg.tx*4:((wartet&&!anlaufLaeuft)?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        // SCHRITTPHASE AUS DEM EIGENEN TEMPO (Zeitfahren, Ziel 8, s. stepZeitfahren):
+        // ausschliesslich stepZeitfahren schreibt u.vizSchritt, diese Zeichenfunktion
+        // liest es nur. Fuer jede andere Bahn ist es undefined und zeichneSprite faellt
+        // auf die bisherige Weltuhr-Formel zurueck (s. dort) — bit-identisch.
+        vizAniPhase:u.vizSchritt,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
@@ -21371,13 +23233,50 @@
         ctx.lineTo(x-30,y+3);ctx.lineTo(x+6,y+9);ctx.closePath();ctx.fill();
         ctx.restore();
       }
-      // KRAFTRESERVE als schmaler Balken unter den Fuessen — der Ersatz fuer den
-      // Lebensbalken des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist.
+      // PUSTE als schmaler Balken unter den Fuessen — der Ersatz fuer den Lebensbalken
+      // des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist. SEIT 13.09. traegt
+      // die Kachelleiste (renderKader) dieselbe Groesse: eine Leiste, drei Chassis; der
+      // Name "Puste" ist Chris' Entscheidung und loest "Kraftreserve" ueberall ab.
+      //
+      // IM ZEITFAHREN DEUTLICHER (Chris' Fund 13.09., Punkt 4: "ausdauer muss besser
+      // funktionieren"). Die Mechanik funktionierte schon — gemessen kam der Letzte des
+      // Testrennens mit 0 % Reserve und dem "eingebrochen"-Vermerk ins Ziel, der Sieger
+      // mit 58 % — aber 26x3 px unter zwoelf Figuren sind nicht zu lesen. Auf der
+      // Einzelstart-Bahn (nur Time-Trial) ist der Balken darum breiter und hoeher, hat
+      // eine Rahmenlinie und eine Marke bei einem Drittel Restreserve: DAS ist der Punkt,
+      // ab dem `mued`/`leer` in tempoVon spuerbar zubeissen. Reine Zeichenarbeit.
       if(u.fertig==null){
-        const bw=26, a=Math.max(0,u.reserve/u.reserveMax);
-        ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,3);
+        // FARBEN UNVERAENDERT gruen / orange unter 20 % / rot — dieselbe Sprachregelung,
+        // die docs/design/hockey-ausdauer-checks-konzept-13-09.md (Abschnitt 9.6, "Eine
+        // Leiste, drei Chassis", Branch claude/hockey-ausdauer-konzept-13-09, noch nicht
+        // gemergt) fuer ALLE bewegungsintensiven Disziplinen festschreiben will. Diese PR
+        // macht die Leiste nur GROESSER und beschriftet sie im Fokus-Panel; die Skala
+        // selbst bleibt bewusst die, auf die sich das Konzept einigt.
+        const breit=!!BA().startAbstand;
+        const bw=breit?38:26, bh=breit?5:3, a=Math.max(0,u.reserve/u.reserveMax);
+        ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,bh);
         ctx.fillStyle=u.leer?"#c0504a":(a<0.2?"#d98b3a":"#5FD08A");
-        ctx.fillRect(x-bw/2,y+20,bw*a,3);
+        ctx.fillRect(x-bw/2,y+20,bw*a,bh);
+        if(breit){
+          ctx.strokeStyle="rgba(8,10,14,.8)"; ctx.lineWidth=1;
+          ctx.strokeRect(x-bw/2+0.5,y+20.5,bw-1,bh-1);
+          // Marke bei 20 %: die Schwelle, ab der die Leiste umschlaegt — und ungefaehr
+          // die Gegend, in der `mued`/`leer` in tempoVon spuerbar zubeissen.
+          ctx.fillStyle="rgba(255,255,255,.45)";
+          ctx.fillRect(x-bw/2+bw*0.2,y+20,1,bh);
+        }
+      }
+      // STARTRAMPE (Chris' Fund 13.09., Punkt 1: "zum start laufen nicht alle gleichzeitig
+      // los"). Der Einzelstart ist richtig und gewollt — er war nur nicht angesagt. Wer
+      // noch wartet, bekommt jetzt einen sichtbaren Countdown ueber dem Kopf, in
+      // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
+      // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
+      if(u.vizRampe>0){
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
+        ctx.strokeText(txt,x,y-19); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19);
+        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       ctx.textAlign="center";
       ctx.font="400 9.5px 'IBM Plex Mono',monospace";
@@ -22726,9 +24625,17 @@
       const roster=document.getElementById("ttroster");
       if(roster){
         roster.textContent="";
-        zeitfahrenFokusReihe().forEach(u=>{
-          const chip=el("button","ttchip "+(u.seite===0?"heim":"gast"),u.n);
+        // STARTNUMMER VOR DEN NAMEN (Chris' Punkt 1). Die Leiste steht ohnehin in
+        // Startreihenfolge (zeitfahrenFokusReihe sortiert nach startT) — die Ziffer sagt
+        // es jetzt auch, damit "die fahren nacheinander los" als ABSICHT zu lesen ist und
+        // nicht als Fehler. Der Titel nennt die Startzeit in Zuschausekunden.
+        zeitfahrenFokusReihe().forEach((u,i)=>{
+          const chip=el("button","ttchip "+(u.seite===0?"heim":"gast"));
           chip.type="button"; chip.dataset.id=String(u.id);
+          chip.appendChild(el("i",null,String(i+1)));
+          chip.appendChild(document.createTextNode(u.n));
+          chip.title=u.n+" — Startnummer "+(i+1)+", faehrt bei "
+            +bahnZeitText(bahnSpanneAnzeige(u.startT||0))+" los";
           roster.appendChild(chip);
         });
       }
@@ -22757,8 +24664,69 @@
     // KOPFZEILE: Name, Plan, Nav-Zustand.
     const name=document.getElementById("ttname"), planEl=document.getElementById("ttplan");
     if(name)name.textContent=u?u.n:"—";
+    // STARTRAMPE MIT COUNTDOWN (Chris' Punkt 1: "zum start laufen nicht alle gleichzeitig
+    // los"). Der gestaffelte Start ist RICHTIG — ein Zeitfahren ist ein Einzelstart, und
+    // genau so ist Time-Trial ausgelegt (BAHN_ART["time-trial"].startAbstand, Recherche
+    // Abschnitt 4.2). Er sah nur aus wie ein Fehler, weil nichts ihn ansagte: die
+    // Wartenden standen wortlos herum. Jetzt laeuft ein Countdown, in ZUSCHAUsekunden
+    // (s. bahnSpanneAnzeige) — 0,8 Simulationssekunden Abstand sind 3,5 Sekunden, die man
+    // wirklich wartet.
     if(planEl)planEl.textContent=u?("· "+((BA().plaene[u.plan]||{}).label||"")
-      +(u.fertig==null&&(u.startT||0)>rennT?" · auf der Startrampe":"")):"";
+      +(u.fertig==null&&(u.startT||0)>rennT
+        ?" · Startrampe, los in "+bahnZeitText(bahnSpanneAnzeige((u.startT||0)-rennT))
+        :"")):"";
+    // LIVE-STAND DES FOKUSSIERTEN (Chris' Punkt 6: "oben die punkte zb 56:22 sagen gar
+    // nichts aus. Man kann es nicht nachvollziehen!"). Der Punktestand oben IST eine
+    // ehrliche Zahl (Rangpunkte, Summe immer N*(N+1)/2), aber er steht im Uhr-Feld und
+    // liest sich deshalb wie eine Zeit. Hier steht die Groesse, die ein Zeitfahren
+    // wirklich hat: aktueller Rang und Rueckstand auf die Bestzeit im Feld — dieselbe
+    // Rangliste, aus der am Ende die Punkte fallen, nur schon waehrend des Rennens.
+    const standEl=document.getElementById("ttstand");
+    if(standEl){
+      standEl.textContent="";
+      if(u){
+        const rl=bahnRangliste();
+        const rang=rl.reihe.findIndex(x=>x.id===u.id)+1;
+        standEl.appendChild(el("b",null,"Rang "+rang+"/"+LAEUFER.length));
+        // RUECKSTAND: im Ziel gegen die echte Bestzeit, unterwegs gegen die beste
+        // Hochrechnung im Feld — beides dieselbe Groesse wie in bahnRangliste, nur
+        // einmal final und einmal vorlaeufig. Keine zweite Rechnung.
+        let rueck=null, vorlaeufig=false;
+        if(u.fertig!=null){ const b=bahnBesteZeit(-1); if(b!=null)rueck=bahnZeit(u)-b; }
+        else {
+          let best=Infinity;
+          for(const o of LAEUFER){
+            const h=o.fertig!=null?bahnZeit(o):bahnHochrechnung(o);
+            if(isFinite(h)&&h<best)best=h;
+          }
+          const eigen=bahnHochrechnung(u);
+          if(isFinite(best)&&isFinite(eigen)){ rueck=eigen-best; vorlaeufig=true; }
+        }
+        if(rueck!=null){
+          const txt=rueck<=0.005?" · Bestzeit"
+            :" · +"+bahnZeitText(bahnSpanneAnzeige(rueck))+(vorlaeufig?" (hochgerechnet)":"");
+          standEl.appendChild(el("span",rueck<=0.005?"gut":"schlecht",txt));
+        } else if(u.fertig==null){
+          standEl.appendChild(el("span",null," · noch keine Zeit"));
+        }
+        // AUSDAUER ALS ZAHL, MIT DEM WORT DARAN (Chris' Punkt 4: "ausdauer muss besser
+        // funktionieren"). Die Mechanik gibt es laengst (KRAFT_VON/`zehr`/`u.leer` senken
+        // das Tempo in tempoVon), sie war nur unlesbar — und zwar doppelt: ein 3-px-Balken
+        // unter zwoelf Figuren, und nirgends stand das Wort. Genau dieser zweite Punkt
+        // steht auch in docs/design/hockey-ausdauer-checks-konzept-13-09.md Abschnitt 5.3
+        // ("Der Balken unter den Fuessen ist unbeschriftet ... heisst nirgends Ausdauer").
+        // Deshalb hier ausdruecklich ein WORT und nicht "Reserve". Das Wort ist seit
+        // 13.09. "Puste": #908 schrieb hier "Ausdauer", weil Chris die Namensfrage (11.6)
+        // damals noch nicht beantwortet hatte — inzwischen hat er es getan ("ja erstmal
+        // okay" auf den Vorschlag "Puste"), und die Wertungstabelle fuehrt die Spalte
+        // seither als "Pus" statt "Res". Zwei Namen fuer dieselbe Groesse in derselben
+        // Disziplin waeren genau die Unklarheit, die Punkt 4 beheben sollte.
+        const anteil=u.reserveMax>0?Math.max(0,u.reserve/u.reserveMax):0;
+        const res=el("span",u.leer?"schlecht":anteil<0.2?"knapp":null,
+          " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %"));
+        standEl.appendChild(res);
+      } else standEl.textContent="—";
+    }
     const autoBtn=document.getElementById("ttauto");
     if(autoBtn){ autoBtn.classList.toggle("an",bahnFokusAuto);
       autoBtn.textContent=bahnFokusAuto?"Auto ✓":"Auto"; }
@@ -22778,13 +24746,16 @@
     const splits=document.getElementById("ttsplits");
     if(splits){
       splits.textContent="";
+      // ALLE ZEITEN IN ZUSCHAUSEKUNDEN (Chris' Fund 13.09., s. bahnZeitAnzeige):
+      // Zwischenzeit, Rueckstand und Zielzeit gehen durch denselben `zeitFaktor()`, den
+      // die Uhr oben benutzt — im Panel steht damit kein zweiter Massstab neben ihr.
       const zeile=(label,wert,diff,zusatz)=>{
         const s=el("span");
         s.appendChild(el("b",null,label+" "));
-        s.appendChild(document.createTextNode(wert==null?"—":wert.toFixed(2)+" s"));
+        s.appendChild(document.createTextNode(bahnZeitText(bahnSpanneAnzeige(wert))));
         if(diff!=null){
           const d=el("span",diff<=0.005?"gut":"schlecht",
-            diff<=0.005?" Bestzeit":" +"+diff.toFixed(2)+" s");
+            diff<=0.005?" Bestzeit":" +"+bahnZeitText(bahnSpanneAnzeige(diff)));
           s.appendChild(d);
         }
         if(zusatz)s.appendChild(document.createTextNode(" "+zusatz));
@@ -23013,6 +24984,23 @@
     return c;
   }
 
+  // Welche Groesse die Kachelleiste einer FELDSPIEL-Disziplin zeigt. Heute der enthuellte
+  // Punktestand — im Eishockey also die Tore, und damit eine Leiste, die bei ueber der
+  // Haelfte der Spieler das ganze Spiel auf null steht (Konzeptdokument 4.2). Eine
+  // Disziplin mit eigenem Ausdauer-Modell bekommt hier ihre Puste-Leiste; bis dahin ist
+  // das Ergebnis dieselbe Belegung wie vorher, nur mit richtigem Namen im Tooltip.
+  function fsLeisteFuer(u,fsStand){
+    const punkte=(fsStand.spieler.get(u.id)||{punkte:0}).punkte;
+    // MIT PUSTE-REZEPT zeigt die Leiste die Puste und der Punktestand wandert als Zahl
+    // neben den Namen — die Belegung, die Chris verlangt hat. Ohne Puste-Rezept bleibt
+    // alles wie bisher, nur mit richtigem Namen im Tooltip.
+    if(u.pusteMax>0)return {wert:u.puste,max:u.pusteMax,wort:"Puste",art:"puste",
+      leer:u.puste<=0,zusatz:String(punkte)};
+    const maxP=Math.max(1,...FSTEAM[0].concat(FSTEAM[1])
+      .map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte));
+    return {wert:punkte,max:maxP,wort:istHockey()?"Tore":"Punkte",zusatz:String(punkte)};
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -23021,16 +25009,44 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
+      // WAS DIE KACHELLEISTE ZEIGT — UND WIE SIE HEISST (Chris, 13.09.: "die health bars
+      // sind ja hier quatsch").
+      //
+      // Bis hierher trug `.kbar` in allen vier Chassis dieselbe Form (gruener Balken im
+      // Gewand einer Lebensanzeige) und denselben Tooltip ("N von M Leben") — bei drei von
+      // vier Chassis fuer etwas, das mit Leben nichts zu tun hat:
+      //   Bahn      1 - pos, also die RESTSTRECKE. Wer fuehrte, hatte die LEERSTE Leiste.
+      //   Buehne    Punktestand.
+      //   Feldspiel `punkte`, im Eishockey also TORE — und nachgemessen standen 175 von 288
+      //             Kachelzeilen das ganze Spiel auf null (docs/design/
+      //             hockey-ausdauer-checks-konzept-13-09.md, Abschnitt 4.2).
+      //   Kampf     echte Lebenspunkte, als einziges Chassis.
+      //
+      // `leiste` macht daraus eine benannte Groesse: `wert`/`max` fuellen den Balken,
+      // `wort` beschriftet den Tooltip, `zusatz` steht als Zahl neben dem Namen, damit
+      // nichts verloren geht, was die Leiste vorher trug (Bahn: Streckenanteil; Feldspiel:
+      // der Punktestand). Reine Anzeige — renderKader wird aus dem Zeichen-Takt gerufen und
+      // schreibt in keinen Simulationszustand.
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
           // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
           // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
           // Identitaet wie die Figur auf der Bahn.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan}))
+          // PUSTE STATT RESTSTRECKE: `reserve/reserveMax` ist genau der Balken, den die
+          // Bahn unter den Fuessen schon zeichnet (s. zeichneSpurt, "der Ersatz fuer den
+          // Lebensbalken des Kampfes") — die Kachel zeigt jetzt dieselbe Groesse wie das
+          // Feld, statt einer invertierten Fortschrittsanzeige.
+          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+            leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
+                    leer:!!x.leer,art:"puste",
+                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"}}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
-          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
+          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
+          leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
+                  zusatz:Math.round(x.summe*10)/10+""}}))
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
-          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
+          leiste:fsLeisteFuer(x,fsStand)}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         // Sprite links, Name rechts daneben — die Lebens-/Punkteleiste bleibt darunter
@@ -23038,11 +25054,25 @@
         const kopf=el("div","kkkopf");
         kopf.appendChild(kaderFigur(u.n));
         kopf.appendChild(el("b",null,u.n));
+        // Was die Leiste frueher trug, steht jetzt als Zahl neben dem Namen — der
+        // Streckenanteil auf der Bahn, der Punktestand im Feldspiel/auf der Buehne. Eine
+        // Zahl ist ohnehin lesbarer als ein Balken mit drei Stufen (im Eishockey war der
+        // Nenner im Median 3, s. Konzeptdokument 4.2).
+        if(u.leiste&&u.leiste.zusatz!=null)kopf.appendChild(el("i","kkzahl",u.leiste.zusatz));
         k.appendChild(kopf);
-        const bar=el("div","kbar");
-        const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
+        const anteil=u.leiste?u.leiste.wert/Math.max(1e-6,u.leiste.max):u.hp/u.max;
+        const bar=el("div","kbar"+(u.leiste&&u.leiste.art==="puste"?" puste":""));
+        const f=el("s"); f.style.width=Math.max(0,Math.min(100,anteil*100))+"%";
+        if(u.leiste&&u.leiste.art==="puste")f.className=u.leiste.leer?"leer":(anteil<0.2?"knapp":"");
         bar.appendChild(f); k.appendChild(bar);
-        k.title=u.n+(u.down?" — ausgeschieden":" — "+Math.round(u.hp)+" von "+u.max+" Leben");
+        // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
+        // Name der Groesse, die der Balken wirklich zeigt.
+        k.title=u.n+(u.down?" — ausgeschieden"
+          :u.leiste&&u.leiste.art==="puste"
+            ? " — "+Math.round(anteil*100)+" % "+u.leiste.wort+(u.leiste.leer?" (eingebrochen)":"")
+          :u.leiste
+            ? " — "+(Math.round(u.leiste.wert*10)/10)+" "+u.leiste.wort
+            : " — "+Math.round(u.hp)+" von "+u.max+" Leben");
         // FOKUS-DOPPELN: die Kaderleiste ist die zweite (und die verlaesslichere)
         // Auswahlflaeche neben dem Klick aufs Feld — die Kacheln stehen still, waehrend
         // die Figuren auf der Leinwand laufen. Nur die GEGNER-Seite ist waehlbar: die
@@ -23258,7 +25288,9 @@
         // Zahl, genau das, was die Punkte-Spalte hier bewusst vermeidet. Die Reihenfolge
         // stimmt trotzdem: der Schluessel ordnet sie nach erreichter Strecke hinter die
         // Finisher, nur ANZEIGEN darf man ihn nicht.
-        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":bahnZeit(u).toFixed(1)+" s"));
+        // ANGEZEIGT WIRD DIE ZUSCHAUZEIT, nicht die Simulationssekunde (Chris' Fund
+        // 13.09., s. bahnZeitAnzeige): dieselbe Uhr, die waehrend des Rennens oben lief.
+        tr.appendChild(el("td",null,u.raus?"ausgeschieden":u.fertig==null?"—":bahnZeitText(bahnZeitAnzeige(u))));
         tr.appendChild(el("td",null,stand.punkte?(stand.punkteVon?stand.punkteVon(u):fmtP(stand.punkte.get(u.id))):"—"));
         tb.appendChild(tr);
       });
@@ -24430,6 +26462,12 @@
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               strafminuten:u.strafminuten, xg:+((u.xg||0).toFixed(3)),
+              // PUSTE (s. FELDSPIEL_ART.hockey.puste): Endstand, tiefster Stand und die
+              // tatsaechlich gelaufene Strecke in Pixeln — die drei Zahlen, aus denen die
+              // Kalibrierung besteht (scripts/miss-hockey-puste.mjs). Ausserhalb einer
+              // Disziplin mit Puste-Rezept alle drei 0.
+              puste:+((u.puste||0).toFixed(1)), pusteMax:u.pusteMax||0,
+              pusteMin:+((u.pusteMin||0).toFixed(1)), weg:Math.round(u.weg||0),
               // NUR BASKETBALL (K3-Analog zu xg oben): aufsummierte Feldkorb-Trefferwahr-
               // scheinlichkeit, s. wirf()/feldspielWert. Ausserhalb von Basketball immer 0.
               xp:+((u.xp||0).toFixed(3)),
@@ -24472,7 +26510,69 @@
         jeSeite:o.jeSeite||altJeSeite, spiele};
   }
 
+  // ARENA-FORMATIONSSONDE — rein diagnostisch, im selben sichern/bau/zurueck-Rahmen wie
+  // namenVon und feldspielSubskills weiter unten. Sie greift NICHT in die Simulation ein:
+  // sie faehrt einen echten Kampf im stepSimStumm-Takt und liest zwischendurch Positionen.
+  //
+  // WARUM SIE GEBRAUCHT WIRD: Chris' Meldung vom 13.09. („so richtig ne formation front und
+  // backrow gibt es nciht") ist eine Aussage ueber GEOMETRIE. rho kann sie prinzipiell nicht
+  // beantworten — Rangtreue sagt, ob die Mechanik das Richtige belohnt, und nichts darueber,
+  // wo jemand steht. Eine Aenderung an der Formation, die man nur an rho misst, misst am
+  // Vorwurf vorbei. Also wird der Vorwurf selbst zu einer Zahl gemacht:
+  //
+  //   reihenAbstand   Abstand der hintersten zur vordersten BESETZTEN Reihe, in
+  //                   Blickrichtung der Seite. homeFor() setzt ihn beim Start auf 160 px
+  //                   je Reihe; faellt er im Kampf gegen 0, war die Aufstellung ein
+  //                   Startbild und sonst nichts.
+  //   verkehrt        Anteil der Abtastungen, in denen die hintere Reihe VOR der vorderen
+  //                   steht — die Formation ist dann nicht flach, sondern umgedreht.
+  //   durchAnteil     Anteil der Einheit-Abtastungen mit aktivem Durchbruch. Der Durchbruch
+  //                   hebt die Formationsleine auf; ist er der Normalfall statt der
+  //                   Ausnahme, gibt es per Konstruktion keine Formation.
+  //
+  // Heiler zaehlen nicht mit, aus demselben Grund, aus dem teamFront()/reihenAnker() sie
+  // ausschliessen: sie stehen nach eigener Regel hinter der Gruppe und wuerden eine Reihe
+  // vortaeuschen, die es taktisch nicht gibt.
+  function arenaFormationsProbe(dId,saat){
+    const M=MOTOREN[dId]; if(!M||!istArena(dId))return null;
+    const g=M.sichern();
+    try{
+      if(M.vorher)M.vorher();
+      M.bau(saat);
+      const abstaende=[];
+      let einheitProben=0, durchProben=0, zwangProben=0, verkehrt=0, sim=0, seitAbtast=0;
+      while(!done&&sim<120){
+        stepSimStumm(1/60); sim+=1/60; seitAbtast+=1/60;
+        if(seitAbtast<0.5)continue;
+        seitAbtast=0;
+        for(const seite of[0,1]){
+          const leben=live(seite).filter(u=>!u.heiler);
+          if(!leben.length)continue;
+          for(const u of leben){einheitProben++; if(u.durch)durchProben++; if(u.zwang)zwangProben++;}
+          const reihen=[...new Set(leben.map(u=>u.row||0))].sort((a,b)=>a-b);
+          if(reihen.length<2)continue;
+          const mittelX=(r)=>{const xs=leben.filter(u=>(u.row||0)===r).map(u=>u.x);
+            return xs.reduce((a,b)=>a+b,0)/xs.length;};
+          // "Tiefe" = wie weit hinter der Mittellinie, aus Sicht DIESER Seite. Damit ist
+          // die Zahl fuer beide Seiten dieselbe Groesse und nicht spiegelverkehrt.
+          const tiefe=(x)=>seite===0?(MID-x):(x-MID);
+          const d=tiefe(mittelX(reihen[reihen.length-1]))-tiefe(mittelX(reihen[0]));
+          abstaende.push(d); if(d<0)verkehrt++;
+        }
+      }
+      const sortiert=[...abstaende].sort((a,b)=>a-b);
+      const med=sortiert.length?sortiert[Math.floor(sortiert.length/2)]:0;
+      const mit=sortiert.length?sortiert.reduce((a,b)=>a+b,0)/sortiert.length:0;
+      return {disziplin:dId, saat, dauer:+sim.toFixed(2), proben:abstaende.length,
+        reihenAbstandMittel:+mit.toFixed(1), reihenAbstandMedian:+med.toFixed(1),
+        verkehrtAnteil:abstaende.length?+(verkehrt/abstaende.length).toFixed(3):0,
+        durchAnteil:einheitProben?+(durchProben/einheitProben).toFixed(3):0,
+        zwangAnteil:einheitProben?+(zwangProben/einheitProben).toFixed(3):0};
+    } finally { M.zurueck(g); }
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
@@ -24702,7 +26802,20 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
-    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand)=>{
+    // HOEHENKORREKTUR DIREKT ABLESEN (13.09.) statt sie aus gerenderten Pixelhoehen
+    // rueckwaerts zu erraten — genau daran ist die erste Fehlermeldung zu diesem Thema
+    // gescheitert (sie schloss aus "Krag'Zul ist 94 px hoch" auf "korr haengt am oberen
+    // Deckel", in Wahrheit war es der Zweierzyklus der Selbstrekursion, s. Kommentar bei
+    // hoehenKorrektur). `frisch` leert den Zwischenspeicher fuer diesen Namen vorher, damit
+    // die Sonde die MESSUNG sieht und nicht nur, was irgendwann einmal gespeichert wurde.
+    // Read-only, kein Gameplay, kein rr() — dasselbe Prinzip wie renderProbe daneben.
+    hoehenKorrProbe:(name,frisch)=>{
+      if(frisch)hoehenKorrSpeicher.delete(name);
+      const b=BAU[name]||BAU_STD;
+      return {name, korr:hoehenKorrektur({n:name}), vollbild:b.vollbild||null, bauSkala:bauSkala(b),
+        bezug:HOEHEN_BEZUG, deckel:[HOEHEN_KORR_MIN,HOEHEN_KORR_MAX]};
+    },
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
       // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
@@ -24730,7 +26843,27 @@
       const u={n:name,x:gr/2,y:gr*46/64,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
         lunge:lunge!==undefined&&lunge!==null?lunge:((ani==="slash"||ani==="shoot")?0.1:0),
         down:ani==="hurt",side:0,hop:0};
-      zeichneSprite(ctx,u,32,46,!!feldspiel);
+      // vizPhase (optional, 13.09.): setzt dasselbe Feld, das stepHeben()/stepSchach() im
+      // laufenden Spiel schreiben, damit sich EINE Requisiten-Phase gezielt ansteuern
+      // laesst statt nur der, die der Fallback gerade liefert. Ohne laufendes Duell gibt
+      // hebePhase() immer "boden" zurueck — die Ueberkopf-Phase "hoch" war ueber diese
+      // Sonde bis dahin gar nicht messbar, und genau sie steht in Chris' Befund vom
+      // 13.09. ("beim heben wird sie quasi weit ueber den kopf geworfen"). Dieselbe Rolle
+      // wie `lunge`/`leinwand` darueber: ein Aufrufwert, der einen sonst festen Normalfall
+      // ueberschreibt, rein diagnostisch — ohne Argument bleibt u.vizPhase undefined und
+      // der Zeichenpfad waehlt exakt wie bisher.
+      if(vizPhase!==undefined&&vizPhase!==null)u.vizPhase=vizPhase;
+      // ANKER (optional, 13.09. zweite Runde): der Zeichenpunkt lag hier fest auf (32,46),
+      // UNABHAENGIG von `leinwand`. Eine groessere Leinwand gab einer grossen Figur damit
+      // nur unten und rechts mehr Platz — nach OBEN klebte sie weiter an der Kante, weil
+      // der Sprite bei y-46*Z ansetzt und bei Z=1,71 (Krag'Zul) schon bei -32 beginnt.
+      // Genau daran scheiterte die Ueberkopf-Messung der groessten Kaderfiguren: die Sonde
+      // meldete Scheitel 0 und Stangenmitte 0, beides nur die abgeschnittene Bildkante.
+      // OHNE Argument bleibt es wortgleich bei (32,46) — jeder bestehende Aufrufer (und
+      // jede im Repo dokumentierte Messung) zeichnet damit unveraendert.
+      const ax=(anker&&typeof anker.x==="number")?anker.x:32;
+      const ay=(anker&&typeof anker.y==="number")?anker.y:46;
+      zeichneSprite(ctx,u,ax,ay,!!feldspiel);
       return c.toDataURL();
     },
     // Debug-Gegenstueck zu renderProbe, nur fuer die KADER-VORSCHAU (figur(), dieselbe
@@ -24780,6 +26913,36 @@
       vizInitDoneGesetzt:u.vizInitDone!==undefined,
       vizAnlauf:u.vizAnlauf===undefined?null:+u.vizAnlauf.toFixed(3),
       vizUebergabeT:u.vizUebergabeT===undefined?null:+u.vizUebergabeT.toFixed(3)})),
+    // ZEITFAHREN-VIZ-PROBE (Chris' Fundliste 13.09.): rein diagnostisch, wie
+    // cypherVizProbe/staffelVizProbe daneben — liest von aussen (Playwright, ohne UI) die
+    // vier Groessen, an denen Chris' Beschwerden haengen, damit man sie MESSEN statt
+    // vermuten kann:
+    //   aniT       die globale Sprite-Animationsuhr `t`. Stand sie ueber ein ganzes Rennen
+    //              still, ist der Laufzyklus jedes Sprites eingefroren ("alle schweben").
+    //   standLive  der VORLAEUFIGE Rangpunktestand (bahnTeamstand().seiten) — die Zahl, die
+    //              waehrend des Rennens oben im HUD steht.
+    //   reihe      je Laeufer: Startzeit, Strecke, aktuelles Tempo, eigene Laufzeit und der
+    //              vorlaeufige Platz. Damit laesst sich pruefen, ob die auf dem Bildschirm
+    //              sichtbare Reihenfolge (nach `pos`) mit der Rangliste uebereinstimmt.
+    // Reines Lesen, kein rr()-Aufruf, kein Einfluss auf die Simulation.
+    zeitfahrenVizProbe:()=>{
+      const L=(typeof LAEUFER!=="undefined"?LAEUFER:[]);
+      const rl=L.length?bahnRangliste():{reihe:[],punkte:new Map()};
+      const platz=new Map(rl.reihe.map((u,i)=>[u.id,i+1]));
+      return {
+        aniT:+t.toFixed(4), rennT:+rennT.toFixed(3), zeitFaktor:zeitFaktor(),
+        standLive:L.length?bahnTeamstand().seiten:null,
+        reihe:L.map(u=>({id:u.id, n:u.n, seite:u.seite,
+          startT:+(u.startT||0).toFixed(2), pos:+u.pos.toFixed(4), v:+(u.v||0).toFixed(2),
+          eigenzeit:u.fertig!=null?+bahnZeit(u).toFixed(3):+(rennT-(u.startT||0)).toFixed(3),
+          fertig:u.fertig!=null, reserve:Math.round(u.reserve/Math.max(1,u.reserveMax)*100),
+          leer:!!u.leer, platz:platz.get(u.id)||null,
+          // stepZeitfahren-eigene viz*-Felder (Ziel 8): gelaufene Laufzyklen, sichtbare
+          // Erschoepfung, Restwartezeit auf der Startrampe. Alle drei nur gelesen.
+          vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3),
+          vizErschoepft:u.vizErschoepft==null?null:+u.vizErschoepft.toFixed(3),
+          vizRampe:u.vizRampe==null?null:+u.vizRampe.toFixed(2)}))};
+    },
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
@@ -25079,6 +27242,11 @@
           wechselKonto:+(u.wechselKonto||0).toFixed(4),
           burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
           reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+          // Wie oft er sich nach einem Einbruch wieder gefangen hat (13.09., s.
+          // `pusteFangen` in stepSpurt) — die Zahl, an der sich "manche laufen aus und
+          // muessen kurz regenerieren" ueberhaupt erst messen laesst. Ohne
+          // Puste-Erholung immer 0.
+          gefangen:u.gefangen||0,
           sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
           ansagen:u.ansagen||0}))};
       M.zurueck(gesichert);
