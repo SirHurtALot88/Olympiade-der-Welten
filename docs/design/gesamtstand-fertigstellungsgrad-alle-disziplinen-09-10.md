@@ -746,8 +746,8 @@ Achsen duerfen nicht deshalb vermischt werden, weil eine davon billig zu erfuell
 
 ## 3. Querschnittsbefunde, die jede Zeile oben beeinflussen
 
-### 3.1 Ton — Stand 12.09.: zwei von zwanzig haben eigene Audio-Dateien, sechs weitere haben jetzt
-### einen prozeduralen `TON_KATALOG`-Eintrag (noch ohne Aufrufstellen)
+### 3.1 Ton — Stand 14.09. (nachgezaehlt): acht von zwanzig haben verdrahteten Ton, zwoelf sind
+### stumm; echte Audio-DATEIEN hat weiterhin nur Basketball
 Basketball bleibt die einzige Disziplin mit echten Audio-DATEIEN: `public/sound/basketball/` mit
 sechs Dateien, ueber `bkSfx()` angebunden. **Hockey** hat seit dem 12.09. (E2, PR #893) einen
 vollstaendig verdrahteten, prozeduralen `TON_KATALOG.hockey`-Eintrag (fuenf Ereignisse, synthetisch
