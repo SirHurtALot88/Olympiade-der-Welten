@@ -4407,10 +4407,10 @@
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
-      {id:"powermove",label:"Bruchpunkt",text:"Treibt den schwersten Move bis zum Bruchpunkt — über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"powermove",label:"Bruchpunkt",text:"Treibt den schwersten Hieb bis zum Bruchpunkt — über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
       {id:"footwork",label:"Standhalten",text:"Hält die Position im Kreis und sammelt Punkte — über Health und Dexterity.",gross:"health",klein:"dexterity",last:"will",mueh:"medium",profil:{will:25.5,health:23.4,torment:20.1,power:9.2,determination:9.2,stamina:7.3,dexterity:3.5,intelligence:1.9}},
       {id:"freezecontrol",label:"Steingesicht",text:"Erstarrt zum Steingesicht und hält die Kontrolle — über Health und Determination.",gross:"health",klein:"determination",last:"torment",mueh:"medium",profil:{will:24.4,health:23.4,torment:19.2,determination:13.4,power:8.8,stamina:7.1,dexterity:1.8,intelligence:1.8}},
-      {id:"musicality",label:"Aushalten",text:"Findet den Rhythmus im bloßen Aushalten — über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
+      {id:"musicality",label:"Aushalten",text:"Findet die Ruhe im bloßen Aushalten — über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
       {id:"battlenerve",label:"Zermürbung",text:"Hält der Zermürbung stand und antwortet im Battle — über Torment und Will.",gross:"torment",klein:"will",last:"health",mueh:"high",profil:{will:31.4,torment:27.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
       {id:"finaleset",label:"Unbroken",text:"Setzt den Schlusspunkt, unversehrt — über Power und Torment.",gross:"power",klein:"stamina",last:"determination",mueh:"medium",profil:{torment:21.2,will:19.8,power:17.1,health:16.6,stamina:13.5,determination:7.6,intelligence:3,dexterity:1.4}}
     ],
@@ -11778,6 +11778,121 @@
   // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
   const BREAKING_BPM=100;
 
+  // ================== DIE FOLTERBANK: ZEHN GERAETE, DIE IMMER SCHLIMMER WERDEN ==================
+  // Chris am 13.09., woertlich: „evtl müssen wir dafür assets suchen wo die instrumente immer
+  // schlimmer werden mit denen man foltert sowas wie sägen oder große hämmer etc weißt du?" und
+  // „dass da so ein tisch ist mit 10 folterinstrumenten und die charaktere nutzen die dann sogar
+  // und gehen zum tisch nehmen sie auf step by step und sie werden immer schlimmer".
+  //
+  // KEINE ASSET-SUCHE — aber NICHT, weil es keine Asset-Pipeline gaebe. Eine fruehere
+  // Fassung dieses Kommentars behauptete das; sie war falsch und ist hier korrigiert.
+  // NACHGESEHEN, NICHT VERMUTET: dieser Motor laedt sehr wohl echte PNG-Blaetter — A_TEILE aus
+  // /sprites/arena/, SB_TEILE aus /sprites/buehne/, BK_TEILE aus /sprites/basketball/,
+  // FK_TEILE aus /sprites/football/ (je ein new Image() pro Kachel, jeder Ordner mit eigener
+  // quellen.json, Rueckfall ueber aDa() auf Primitive, wenn ein Blatt fehlt). Und
+  // zeichneFalleTakeshi() ist gerade KEIN Primitivbeispiel, sondern einer der Hauptabnehmer
+  // dieser Kacheln (aBild.burg_mauer, aBild.falle_tuer, aBild.falle_walze ...).
+  //
+  // Die zehn Geraete werden trotzdem von Hand gezeichnet, und zwar aus Einfachheit und
+  // Gleichklang: sie sind ~15-40 px gross, muessen im Griff-Frame des Peinigers MITDREHEN und
+  // zugleich flach auf dem Tisch liegen, und genau dafuer gibt es mit zeichneHantel() (rein
+  // primitiv, kein drawImage) bereits das passende Vorbild im Haus. Ein eigenes Folter-Blatt
+  // waere zehn neue Kacheln plus Lizenzrecherche fuer einen Effekt, den vier Pfade je Geraet
+  // ebenso gut treffen. „Assets suchen" heisst hier also: zehn Geraete als einfache Primitive
+  // ZEICHNEN, im selben Massstab wie die vorhandenen Requisiten.
+  //
+  // AUFBAU. Jede zeichne(c)-Funktion arbeitet in einem bereits verschobenen, gedrehten und
+  // skalierten Koerperframe: Ursprung = GRIFF (die Hand), das Geraet reicht nach +x. Damit ist
+  // dieselbe Funktion einmal fuer die Ablage auf dem Tisch und einmal fuer die Faust des
+  // Peinigers verwendbar, ohne zweite Zeichenroutine.
+  //
+  // REIHENFOLGE = ESKALATION. 0 ist das mildeste, 9 das schlimmste; die beiden letzten sind
+  // woertlich Chris' eigene Beispiele (Saege, grosser Hammer). Rein praesentational: keine
+  // dieser Zahlen fliesst in rezept/wert()/punkte ein.
+  const FOLTER_HOLZ="#6b4a2e", FOLTER_METALL="#aab4c4", FOLTER_GLUT="#ff6a2a";
+  const FOLTER_GERAETE=[
+    {name:"STRICK", zeichne(c){
+      c.strokeStyle="#c9b48a"; c.lineWidth=2; c.lineCap="round";
+      c.beginPath(); c.moveTo(0,0); c.lineTo(8,0); c.stroke();
+      c.beginPath(); c.arc(14,0,6,0,6.2832); c.stroke(); c.lineCap="butt";
+    }},
+    {name:"RUTE", zeichne(c){
+      c.strokeStyle=FOLTER_HOLZ; c.lineWidth=2.4;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
+      c.strokeStyle="#8d6b41"; c.lineWidth=1.2;
+      for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(6,0); c.quadraticCurveTo(14,(i-1)*3,22,(i-1)*6); c.stroke(); }
+    }},
+    {name:"PEITSCHE", zeichne(c){
+      c.strokeStyle="#3c3026"; c.lineWidth=3;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(7,0); c.stroke();
+      c.strokeStyle="#5a4634"; c.lineWidth=1.6;
+      c.beginPath(); c.moveTo(7,0); c.bezierCurveTo(15,-6,22,6,28,-2); c.stroke();
+    }},
+    {name:"DAUMENSCHRAUBE", zeichne(c){
+      c.fillStyle=FOLTER_METALL; c.fillRect(6,-6,10,12);
+      c.strokeStyle="#7f8a9c"; c.lineWidth=1.4;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
+      c.beginPath(); c.moveTo(11,-9); c.lineTo(11,-6); c.stroke();
+      c.beginPath(); c.arc(11,-11,3,0,6.2832); c.stroke();
+    }},
+    {name:"ZANGE", zeichne(c){
+      c.strokeStyle=FOLTER_METALL; c.lineWidth=2.2; c.lineCap="round";
+      c.beginPath(); c.moveTo(0,-3); c.lineTo(12,-1); c.lineTo(24,-7); c.stroke();
+      c.beginPath(); c.moveTo(0, 3); c.lineTo(12, 1); c.lineTo(24, 7); c.stroke();
+      c.fillStyle=FOLTER_GLUT; c.globalAlpha=0.85;
+      c.beginPath(); c.arc(24,-7,2,0,6.2832); c.fill();
+      c.beginPath(); c.arc(24, 7,2,0,6.2832); c.fill();
+      c.globalAlpha=1; c.lineCap="butt";
+    }},
+    {name:"BRANDEISEN", zeichne(c){
+      c.strokeStyle="#4a4f59"; c.lineWidth=2.4;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(17,0); c.stroke();
+      c.fillStyle=FOLTER_GLUT; c.fillRect(17,-5,8,10);
+      c.globalAlpha=0.45; c.fillStyle="#ffb066"; c.fillRect(15,-7,12,14); c.globalAlpha=1;
+    }},
+    {name:"KEIL", zeichne(c){
+      c.fillStyle=FOLTER_HOLZ; c.fillRect(0,-3,8,6);
+      c.fillStyle=FOLTER_METALL;
+      c.beginPath(); c.moveTo(8,-7); c.lineTo(26,0); c.lineTo(8,7); c.closePath(); c.fill();
+      c.strokeStyle="#7f8a9c"; c.lineWidth=1; c.stroke();
+    }},
+    {name:"NAGELKEULE", zeichne(c){
+      c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(13,0); c.stroke();
+      c.fillStyle="#54402b"; c.beginPath(); c.ellipse(20,0,8,7,0,0,6.2832); c.fill();
+      c.strokeStyle=FOLTER_METALL; c.lineWidth=1.6;
+      for(let i=0;i<6;i++){ const a=i/6*6.2832;
+        c.beginPath(); c.moveTo(20+Math.cos(a)*6,Math.sin(a)*5);
+        c.lineTo(20+Math.cos(a)*12,Math.sin(a)*10); c.stroke(); }
+    }},
+    {name:"SÄGE", zeichne(c){
+      c.fillStyle="#3c3026"; c.fillRect(0,-4,8,8);
+      c.fillStyle=FOLTER_METALL;
+      c.beginPath(); c.moveTo(8,-5); c.lineTo(30,-3); c.lineTo(30,2); c.lineTo(8,2); c.closePath(); c.fill();
+      c.strokeStyle="#e6edf6"; c.lineWidth=1;
+      c.beginPath();
+      for(let i=0;i<9;i++){ c.moveTo(9+i*2.4,2); c.lineTo(10.2+i*2.4,6); }
+      c.stroke();
+    }},
+    {name:"VORSCHLAGHAMMER", zeichne(c){
+      c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3.4;
+      c.beginPath(); c.moveTo(0,0); c.lineTo(22,0); c.stroke();
+      c.fillStyle="#8f99a9"; c.fillRect(21,-10,12,20);
+      c.fillStyle="#6d7686"; c.fillRect(21,-10,4,20);
+      c.strokeStyle="#c6cfdd"; c.lineWidth=1; c.strokeRect(21,-10,12,20);
+    }}
+  ];
+  // Welches Geraet gehoert zu Durchgang `runde` (0-basiert) bei `rundenN` Durchgaengen?
+  // Die Leiter wird auf die volle Breite der zehn Geraete gespreizt, damit der letzte
+  // Durchgang IMMER beim Vorschlaghammer endet und der erste beim Strick beginnt — bei
+  // rundenN:8 (heutiger Stand) bleiben zwei Sprossen uebersprungen; sie liegen trotzdem
+  // sichtbar auf dem Tisch, weil der Tisch die GANZE Leiter zeigt, nicht nur die genutzten
+  // Stufen („sie werden immer schlimmer" ist erst zu sehen, wenn man sieht, was noch kommt).
+  const folterStufe=(runde,rundenN)=>{
+    const n=Math.max(1,(rundenN|0)-1);
+    return Math.max(0,Math.min(FOLTER_GERAETE.length-1,Math.round((runde|0)*(FOLTER_GERAETE.length-1)/n)));
+  };
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -11920,10 +12035,26 @@
       // kanonische, bereits produktive React/SVG-Buehne
       // (app/foundation/discipline-stage/arena/disciplines/breaking.tsx: lila Druck-Arena,
       // vier Ring-Zonen GEBROCHEN/SCHMERZGRENZE/STONE FACE/MIND FORTRESS, zentraler
-      // SURVIVOR-Spotlight) in Canvas-Primitiven. Rein zeichnerisch: rezept/failAbzug/
-      // erfolgWort/failWort bleiben unveraendert, keine Formel wird beruehrt.
+      // SURVIVOR-Spotlight) in Canvas-Primitiven. Rein zeichnerisch: rezept/failAbzug
+      // bleiben unveraendert, keine Formel wird beruehrt.
       cypher:true,
-      failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
+      // WORTWAHL FOLTER STATT BREAKDANCE (13.09.). Chris, woertlich: „das ist doch quasch
+      // sett den move oder so klingt wie breakdance" — und zur Klarstellung des Konzepts:
+      // „wir hatten schon clarified dass breaking NICHT breakdance ist sondern ein foltern!!!!
+      // […] einer schmerz zufügt der andere muss es aushalten dann ist wieder der andere dran
+      // bis einer aufgibt". Die alten Worte („setzt den Move" / „Move bricht ab") stammten aus
+      // dem Breakdance-Missverstaendnis und waren die EINZIGE Stelle, an der dieses Vokabular
+      // noch im Ticker und in der Wertungstabelle sichtbar war — die sechs Slot-Namen
+      // (SLOTS_JE_DISC.breaking: Bruchpunkt/Standhalten/Steingesicht/Aushalten/Zermuerbung/
+      // Unbroken) und die vier Ring-Zonen tragen die Folter-Erzaehlung laengst.
+      //
+      // RANGTREUE-NEUTRAL PER BAUART, nicht per Hoffnung: erfolgWort/failWort werden im
+      // gesamten File AUSSCHLIESSLICH ueber `art.erfolgWort`/`art.failWort` gelesen und
+      // immer nur gegen sich selbst verglichen (:11549/:11552 schreiben `ereignis`,
+      // :12254/:12423/:13127/:13128/:13157/:13632/:13700/:12547 vergleichen dagegen) —
+      // kein einziger Vergleich gegen ein Stringliteral. Der Wert ist ein Etikett, kein
+      // Eingabewert. Nachgemessen (miss-alle-disziplinen.mjs 24, alle zwanzig): bit-identisch.
+      failAbzug:0.55, failWort:"bricht ein", erfolgWort:"hält stand",
       // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
       // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
       // mehr als Wille (28, der Hoechstwert). Torment (22, zweithoechster Wert) sass NUR
@@ -12927,7 +13058,7 @@
   function stepBuehne(dt){
     // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
     // `done` einmal gesetzt war -- buehnenBewegung() (rein praesentational, s. Vertrag dort)
-    // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Tanzender in
+    // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Ertragender in
     // "eintritt", letzte Eiskunstlauf-Schlusspose) fror auf halbem Weg ein. `done` bleibt hier
     // unveraendert -- nur buehnenBewegung() darf nach dem Abschluss weiterlaufen.
     if(done){ buehnenBewegung(dt); return; }
@@ -13494,9 +13625,18 @@
   }
 
   // ================== ZIEL 4: DER CYPHER WIRD ECHT (stepCypher) ==================
+  // NACHTRAG 13.09. ZUM RAHMEN DIESER FUNKTION: „Breaking" ist in diesem Spiel KEIN
+  // Breakdance, sondern eine erfundene Folter-/Survival-Disziplin (Chris, woertlich: „wir
+  // hatten schon clarified dass breaking NICHT breakdance ist sondern ein foltern!!!! […]
+  // einer schmerz zufügt der andere muss es aushalten dann ist wieder der andere dran bis
+  // einer aufgibt"). Die Zustandsmaschine unten ist davon UNBERUEHRT richtig — genau EINER
+  // steht in der Mitte, der Rest sieht zu —, nur ihre Lesart war falsch: der in der Mitte
+  // TANZT nicht, er HAELT AUS. Was daraus folgt, steht bei cypherPaar()/cypherStandFaktor()
+  // (Rollen und Standplaetze) und in zeichneBreaking() (Haltungen, Folterbank, Druckachse).
+  //
   // Opus-Plan "opus-plan-feinschliff-vier-disziplinen-09-10.md" Abschnitt 7.1. Ersetzt
   // "rein zeichnerisch" (BUEHNE_ART.breaking.cypher-Kommentar) durch eine echte
-  // Zustandsmaschine: in einem echten Cypher tanzt IMMER GENAU EINER in der Mitte, der
+  // Zustandsmaschine: es steht IMMER GENAU EINER in der Mitte, der
   // Rest steht im Ring -- genau das bildet die vorhandene Warteschlange (buehneQueue/
   // buehneZeiger, s. stepBuehne) schon ab, weil sie ohnehin nur einen Teilnehmer pro
   // Enthuellung markiert (u.lunge=0.5). Das ist zugleich die strukturelle Behebung des
@@ -13534,7 +13674,46 @@
   // sich der Rang eines Teilnehmers (sein Durchgang wird enthuellt, u.summe steigt), ist
   // das an einer sichtbar neuen Ringposition abzulesen -- das ist die "RING-REIHENFOLGE",
   // ueber die der Score sichtbar bleibt (Plan-Abschnitt 7.1).
-  function cypherRingWinkel(u,seiten){
+  // ================== DAS ZWEIERPAAR (13.09.) ==================
+  // Chris' Befund zur alten Fassung, woertlich: „so ist das weird wenn alle im kreis stehen in
+  // der mitte kurz rein ploppen und dann punkte raus kommen […] entweder zeigst du immer nur 2
+  // charaktere gegeneinadner die miteinadner interagieren". Genau das ist mit vorhandenem
+  // Zustand ableitbar, ohne eine Zeile Mechanik anzufassen:
+  //
+  // buehneQueue wird rundenweise ABWECHSELND gebaut (s. Kommentar „REIHENFOLGE" bei bauBuehne:
+  // fuer jede Runde ri, fuer jeden Index i erst die Heim-, dann die Gastfigur). Aufeinander
+  // folgende Queue-Paare (2k, 2k+1) sind deshalb IMMER heim/gast — dieselben zwei Figuren,
+  // zweimal hintereinander enthuellt. Das ist bereits die Struktur, die Chris beschreibt:
+  // „einer schmerz zufügt der andere muss es aushalten dann ist wieder der andere dran".
+  //
+  // ROLLENZUWEISUNG, und warum herum. Der gerade ENTHUELLTE ist der ERTRAGENDE, nicht der
+  // Peiniger: seine Runde wird gewertet, und alle sechs Slot-Namen dieser Disziplin
+  // (SLOTS_JE_DISC.breaking) sind Ausharre-Worte — Standhalten, Aushalten, Steingesicht,
+  // Zermuerbung, Unbroken. Punkte entstehen hier durch AUSHALTEN, also gehoert der Enthuellte
+  // in die Mitte unter das SURVIVOR-Spotlight, und sein Paarpartner ist der, der ihm zusetzt.
+  // Beim naechsten Zug tauschen die beiden die Rollen, weil dann der andere enthuellt wird.
+  //
+  // REIN LESEND. buehneQueue/buehneZeiger werden NUR gelesen (harter Vertrag, s. oben).
+  function cypherPaar(){
+    if(!buehneQueue.length)return null;
+    const zi=Math.min(buehneQueue.length-1,Math.max(0,buehneZeiger-1));
+    const ertraeger=buehneQueue[zi]||null;
+    if(!ertraeger)return null;
+    const p=zi-(zi%2);
+    const a=buehneQueue[p]||null, b=buehneQueue[p+1]||null;
+    // Fallback ohne Partner (ungerade Queue, ungleiche Kaderstaerken): dann bleibt es beim
+    // Einzelauftritt statt eines erfundenen Gegenuebers.
+    const peiniger=(a&&b&&a.side!==b.side)?(ertraeger===a?b:a):null;
+    return {ertraeger,peiniger};
+  }
+  const istDuellant=(u,paar)=>!!paar&&(u===paar.ertraeger||u===paar.peiniger);
+  // STANDPLATZ: die beiden Duellanten stehen sich auf der WAAGRECHTEN durch das Zentrum
+  // gegenueber (Heim 180 Grad = links, Gast 0 Grad = rechts). Sie rotieren nicht mit dem Ring
+  // mit, sondern halten ihre Position, solange das Paar laeuft — das ist der ganze Unterschied
+  // zwischen „zwoelf Leute drehen sich im Kreis" und „diese zwei stehen sich gegenueber".
+  const cypherStandWinkel=(u)=>u.side===0?Math.PI:0;
+  function cypherRingWinkel(u,seiten,paar){
+    if(istDuellant(u,paar))return cypherStandWinkel(u);
     const grad=Math.PI/180;
     const HEMIS={0:[100*grad,260*grad],1:[-80*grad,80*grad]};
     const [startA,endA]=HEMIS[u.side]||HEMIS[0];
@@ -13545,12 +13724,36 @@
     const frac=((rang/n)+buehneT*ROT_HZ)%1;
     return startA+(endA-startA)*frac;
   }
-  function cypherRingRadius(u,rOut){
+  // Wie weit vorne steht wer? Die zehn Unbeteiligten bleiben am aeusseren Ring (Faktor 1) --
+  // sie sind das Publikum. Die beiden Duellanten treten vor; der Peiniger rueckt zusaetzlich
+  // nach, WAEHREND sein Gegenueber in der Mitte den Durchgang aushaelt (das „zusetzen"), und
+  // weicht danach wieder auf seinen Standplatz zurueck.
+  // ABSTAND IST EIN ENTWURFSWERT, KEIN ZUFALL. Der erste Anlauf setzte den Peiniger bei
+  // 0,33*rOut an (~68 px vom Zentrum) -- im Bild standen die beiden dann so dicht, dass sich
+  // ihre Namensschilder ueberlappten und man wieder nicht sah, wer wer ist. 0,52 haelt sie auf
+  // ~108 px, breit genug fuer zwei Schilder nebeneinander und immer noch nah genug, dass der
+  // Schlag ankommt.
+  function cypherStandFaktor(u,paar){
+    if(!paar)return 1;
+    // Der Ertragende bleibt AUCH ZWISCHEN seinen Durchgaengen nahe am Kern (0,30 statt wie
+    // urspruenglich 1,0 am Aussenring). Grund, im Bild nachgeprueft: er steht nur waehrend
+    // Eintritt+Throwdown (0,40 s von 0,625 s) wirklich in der Mitte; mit einem Standplatz am
+    // Aussenring war der SURVIVOR-Kern in jedem dritten Frame leer und das Bild fiel zurueck
+    // in „zwoelf Leute stehen im Kreis". Nah am Kern geparkt liest es sich durchgehend als
+    // „der da in der Mitte ist gerade dran".
+    if(u===paar.ertraeger)return 0.30;
+    if(u===paar.peiniger){
+      const ph=(paar.ertraeger&&paar.ertraeger.vizPhase)||"ring";
+      return ph==="throwdown"?0.62:ph==="eintritt"?0.70:0.78;
+    }
+    return 1;
+  }
+  function cypherRingRadius(u,rOut,paar){
     // Kleines Wippen im Takt (Plan: "sin(buehneT*2π*bpm/60)") -- deterministische
     // Phasenverschiebung je Teilnehmer aus dem Hash, kein rr().
     const phase=(cypherHash(u.id,7)/4294967295)*Math.PI*2;
     const WOBBLE=0.018;
-    return rOut*(1+WOBBLE*Math.sin(buehneT*2*Math.PI*BREAKING_BPM/60+phase));
+    return rOut*cypherStandFaktor(u,paar)*(1+WOBBLE*Math.sin(buehneT*2*Math.PI*BREAKING_BPM/60+phase));
   }
   // FREEZE_T/RUECKZUG_T stehen hier auf Closure-Ebene (statt lokal in stepCypher), damit
   // zeichneBreaking() (unten, N-Fix PR 0.4 #3) dieselben Zahlen fuer ihr Fade-Timing lesen
@@ -13567,11 +13770,16 @@
       0:TEILNEHMER.filter(u=>u.side===0).sort((a,b)=>b.summe-a.summe||a.id-b.id),
       1:TEILNEHMER.filter(u=>u.side===1).sort((a,b)=>b.summe-a.summe||a.id-b.id)
     };
+    // Das aktuelle Zweierpaar (13.09., s. cypherPaar oben) -- einmal je Frame ermittelt und
+    // durch alle Winkel-/Radiusaufrufe durchgereicht, damit Choreografie und Bild dieselbe
+    // Rollenzuweisung sehen. zeichneBreaking() ruft cypherPaar() fuer sich noch einmal auf
+    // (reine Funktion aus buehneQueue/buehneZeiger, also zwangslaeufig dasselbe Ergebnis).
+    const paar=cypherPaar();
     // Dauern: eintritt/throwdown sind die im Plan (7.1) genannten 0,15s/0,25s.
     // freeze/rueckzug sind bewusst KURZ (0,15s statt der ersten Fassung mit 0,35/0,3s) --
     // ALLE VIER zusammen muessen unter art.rundenDauer (0,625s) bleiben, sonst startet
     // die naechste Enthuellung (alle 0,625s, s. stepBuehne) den naechsten Teilnehmer,
-    // WAEHREND der vorige noch in der Mitte steht: zwei Tanzende gleichzeitig -- genau der
+    // WAEHREND der vorige noch in der Mitte steht: zwei Ertragende gleichzeitig -- genau der
     // Fehler, den dieser ganze Umbau beheben soll ("immer GENAU EINER in der Mitte").
     // 0,15+0,25+0,15=0,55s < 0,625s laesst 0,075s Puffer (bei einem Frame ~0,0167s bei
     // 60fps also ~4-5 Frames).
@@ -13590,7 +13798,7 @@
       if(u.vizPhase==null){
         // Erstinitialisierung (erster stepCypher()-Durchlauf fuer diesen Teilnehmer).
         u.vizPhase="ring"; u.vizPhaseT=0; u.vizMove=0;
-        u.vizA=cypherRingWinkel(u,seiten); u.vizR=cypherRingRadius(u,rOut);
+        u.vizA=cypherRingWinkel(u,seiten,paar); u.vizR=cypherRingRadius(u,rOut,paar);
       }
       // FRISCH ENTHUELLT: stepBuehne() baut u.lunge JEDEN Frame zuerst ab (Math.max(0,
       // u.lunge-dt)) und setzt es DANACH, nur im Enthuellungs-Frame, exakt auf 0.5 --
@@ -13599,13 +13807,25 @@
       // Durchgang-Trigger (kein Abbau kann je wieder exakt bei 0.5 vorbeikommen).
       const frischEnthuellt=u.lunge===0.5 && u.aktuell>=0;
       if(frischEnthuellt){
-        u.vizA=cypherRingWinkel(u,seiten); // Sichtwinkel beim Eintritt einfrieren
+        u.vizA=cypherRingWinkel(u,seiten,paar); // Sichtwinkel beim Eintritt einfrieren
         u.vizPhase="eintritt"; u.vizPhaseT=0;
-        u.vizMove=cypherHash(u.id,u.aktuell)%4; // 0 Toprock·1 Footwork·2 Powermove·3 Freeze
+        // VIER AUSHARRE-HALTUNGEN statt vier Breakdance-Moves (13.09.). Die alte Belegung
+        // (0 Toprock · 1 Footwork · 2 Powermove · 3 Freeze) stammte aus dem
+        // Breakdance-Missverstaendnis und war der Grund, warum das Bild fuer Chris „aussieht
+        // wie breakdance": vizMove===2 liess die Figur als Windmill um den Fusspunkt
+        // ROTIEREN. Neue Belegung, alles Reaktionen des Ertragenden auf das, was ihm
+        // zugefuegt wird: 0 Standhalten · 1 Zusammenkruemmen · 2 Aufbaeumen · 3 Steingesicht.
+        // Dieselbe Hash-Ziehung, dieselben vier Werte — nur eine andere Lesart im Bild.
+        u.vizMove=cypherHash(u.id,u.aktuell)%4;
       }
       if(u.vizPhase==="ring"){
-        WINKEL_NAECHER(u,cypherRingWinkel(u,seiten),0.3);
-        u.vizR=cypherRingRadius(u,rOut);
+        // Duellanten fahren ihren Standplatz straffer an (tau 0,10 statt 0,30) und gleiten im
+        // Radius weich, statt hart gesetzt zu werden -- sonst RUCKT der Peiniger bei jedem
+        // Phasenwechsel seines Gegenuebers vor und zurueck, statt zuzusetzen und abzulassen.
+        const duellant=istDuellant(u,paar);
+        WINKEL_NAECHER(u,cypherRingWinkel(u,seiten,paar),duellant?0.10:0.3);
+        if(duellant)NAECHER(u,cypherRingRadius(u,rOut,paar),0.08);
+        else u.vizR=cypherRingRadius(u,rOut,paar);
         continue;
       }
       u.vizPhaseT+=dt;
@@ -13613,7 +13833,13 @@
         NAECHER(u,0,0.05);
         if(u.vizPhaseT>=EINTRITT_T){
           u.vizPhase="throwdown"; u.vizPhaseT=0;
-          if(u.vizMove===2)sfx("breaking","powermove"); // Windmill-Rauschsweep beim Ansatz
+          // Rauschsweep beim Aufbaeumen. Der TON_KATALOG-Schluessel heisst weiterhin
+          // "powermove" — bewusst NICHT umbenannt (13.09.): er wird ausserhalb der beiden
+          // Breaking-Regionen im Ton-Kommentar von stepStaffel() zitiert, an dem gerade
+          // parallel gearbeitet wird. Eine reine Schluesselumbenennung waere die einzige
+          // Zeile dieses PRs ausserhalb von Breaking und damit der einzige Konfliktpunkt —
+          // sie gehoert in eine eigene, kleine Aufraeumrunde.
+          if(u.vizMove===2)sfx("breaking","powermove");
         }
       } else if(u.vizPhase==="throwdown"){
         NAECHER(u,0,0.05);
@@ -13631,10 +13857,10 @@
         // zurueck in den Ring gleiten -- ein sofortiger Rueckglitt waere kein Standbild.
         const HOLD=0.08;
         if(u.vizPhaseT<HOLD) NAECHER(u,0,0.05);
-        else NAECHER(u,cypherRingRadius(u,rOut),0.04);
+        else NAECHER(u,cypherRingRadius(u,rOut,paar),0.04);
         if(u.vizPhaseT>=FREEZE_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
       } else if(u.vizPhase==="rueckzug"){
-        NAECHER(u,cypherRingRadius(u,rOut),0.05);
+        NAECHER(u,cypherRingRadius(u,rOut,paar),0.05);
         if(u.vizPhaseT>=RUECKZUG_T){ u.vizPhase="ring"; u.vizPhaseT=0; }
       }
     }
@@ -15290,10 +15516,42 @@
     ctx.textAlign="left"; ctx.font="800 15px 'Barlow Condensed',sans-serif";
     ctx.fillStyle="rgba(214,170,255,.55)"; ctx.fillText("BREAKING",16,24);
 
-    // C. Zwoelf Teilnehmer auf zwei Halbkreisen statt zwei Reihen (die zentrale, bewusste
-    // Abweichung von breaking.tsx, s. Funktionskopf oben) -- Heim links, Gast rechts, Radius
-    // score-proportional ueber dieselbe maxSumme-Normierung wie die Punktesaeule der
-    // anderen acht Buehnen-Disziplinen.
+    // FLECKEN UM DEN FOLTERPLATZ (13.09.). Sieben deterministisch aus dem Index berechnete,
+    // sehr dunkle Rotflecken rund um die Mitte -- derselbe Determinismus-Grundsatz wie bei den
+    // Boden-Rissen oben (fester Index statt Math.random(), kein Geflacker). Das ist der
+    // billigste mögliche Hinweis darauf, WAS hier in der Mitte passiert, und er kostet sieben
+    // Ellipsen.
+    ctx.fillStyle="rgba(96,10,16,.30)";
+    for(let i=0;i<7;i++){
+      const a=i*2.39996, rr=rIn*1.2+((i*61)%40)/40*rIn*2.2;
+      ctx.beginPath();
+      ctx.ellipse(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*KY,5+((i*29)%7),3+((i*17)%4),a,0,6.2832);
+      ctx.fill();
+    }
+
+    // ================== C. ZWEI RÄNGE STATT ZWÖLF GLEICHER (13.09.) ==================
+    // Chris' Befund an der alten Fassung, woertlich: „so ist das weird wenn alle im kreis
+    // stehen in der mitte kurz rein ploppen und dann punkte raus kommen. Du verstehst was ich
+    // meine? speed schach takeshi spurt usw sind wirklich gut und unique und man erkennt sie
+    // sofort - hier wird es schwer bei breaking es hervorzuheben."
+    //
+    // Der Befund ist richtig, und er lag NICHT an der Mechanik: stepCypher() markiert laengst
+    // genau einen Aktiven. Er lag daran, dass dieser eine im Bild nichts hatte, was ihn von den
+    // elf anderen unterschied ausser einem etwas kleineren Radius -- und dass ihm niemand
+    // GEGENUEBERSTAND. Zwoelf gleich grosse, gleich helle, gleich beschriftete Figuren sind
+    // zwoelf Unbeteiligte; ein Zweikampf braucht zwei Beteiligte und zehn Zuschauer.
+    //
+    // Diese Fassung zeichnet deshalb in zwei Raengen:
+    //   RANG 1 (zehn): klein (0,72), unbeschriftet, am aeusseren Ring, anschliessend von einer
+    //           Vignette zusaetzlich abgedunkelt -- Publikum, kein Mitspieler.
+    //   RANG 2 (zwei): das Paar aus cypherPaar(), in voller Groesse und Helligkeit, NACH der
+    //           Vignette gezeichnet (also unabgedunkelt), mit Namensschild, Rolle, Haltung,
+    //           Folterwerkzeug und einer Druckachse zwischen beiden.
+    // Die Vignette ist bewusst das Mittel der Wahl statt globalAlpha auf den Sprites:
+    // zeichneSprite() setzt fuer Effekt-/Partikelfiguren (EFFEKT_ARTEN) intern selbst
+    // globalAlpha und stellt es auf 1 zurueck -- ein von aussen gesetztes Alpha ueberlebt das
+    // nicht zuverlaessig. Eine Flaeche darueber schon.
+    const paar=cypherPaar();
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     // Fuehrer = Survivor: kleinster Radius, also die hoechste Summe -- derselbe Rang-1-
     // Begriff wie breaking.tsx:158 (t.rank===1).
@@ -15301,7 +15559,7 @@
     for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
     const grad=Math.PI/180;
     const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
-    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Powermove -- ein paar kleine, deterministisch
+    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Aufbaeumen (vizMove===2) -- ein paar kleine, deterministisch
     // aus u.id/buehneT berechnete Punkte am Fusspunkt, dieselbe "keine Partikel-Arrays,
     // nur billige Sinusformen"-Idee wie zeichnePartikelEffekt() in zeichneSprite (s. dort).
     const zeichneBodenstaub=(fx,fy,id)=>{
@@ -15315,128 +15573,295 @@
       }
       ctx.globalAlpha=1;
     };
+    // POSITIONEN einmal fuer alle zwoelf bestimmen, damit beide Raenge und die Druckachse
+    // dieselben Koordinaten benutzen statt sie zweimal auszurechnen.
+    // POSITION AUS stepCypher() (Ziel 4, Plan 7.1): u.vizA/u.vizR statt Score-Radius und
+    // Index-Permutation -- der Radius ist Choreografie (rOut im Ring, ~0 in der Mitte), nicht
+    // mehr der Score. Fallback nur fuer den allerersten Redraw VOR dem ersten
+    // stepBuehne()-Aufruf (reset() zeichnet einmal vor dem ersten step).
+    const orte=new Map();
     for(const [side,startA,endA] of hemis){
       const g=TEILNEHMER.filter(u=>u.side===side);
       const n=Math.max(1,g.length);
       g.forEach((u,i)=>{
-        // POSITION AUS stepCypher() (Ziel 4, Plan 7.1): u.vizA/u.vizR statt Score-Radius
-        // und Index-Permutation -- das behebt das Sicht-QA-Stapelproblem strukturell,
-        // weil der Radius jetzt Choreografie ist (rOut im Ring, ~0 in der Mitte), nicht
-        // mehr der Score. Fallback nur fuer den allerersten Redraw VOR dem ersten
-        // stepBuehne()-Aufruf (reset() zeichnet einmal vor dem ersten step).
         const perm=(i*13)%n;
         const frac=n>1?perm/(n-1):0.5;
         const a=u.vizA!=null?u.vizA:startA+(endA-startA)*frac;
         const radius=u.vizR!=null?u.vizR:rOut-(u.summe/maxSumme)*(rOut-rIn);
-        const x=cx+Math.cos(a)*radius, y=cy+Math.sin(a)*radius*KY;
-        const fussY=y+19; // derselbe Bodenpunkt, an dem der Schatten schon immer sass
+        orte.set(u,{a,radius,x:cx+Math.cos(a)*radius,y:cy+Math.sin(a)*radius*KY});
+      });
+    }
+    const farbeVon=(u)=>u.side===0?css("--home"):css("--away");
 
-        const c=side===0?css("--home"):css("--away");
-        const phase=u.vizPhase||"ring";
-        // Schatten-Streckung (Plan 7.2): je naeher am Zentrum (radius -> 0), desto mehr
-        // Bewegungs-"Zug" im Schatten -- rein kosmetisch, tokenTreue Radius/Winkel bleiben
-        // unberuehrt. Powermove bekommt zusaetzlich die Windmill-Drehrichtung mit.
-        const naeheZumKern=phase==="ring"?0:Math.max(0,1-radius/rOut);
-        const streckX=16*(1+naeheZumKern*0.7), streckY=6*(1-naeheZumKern*0.3);
-        ctx.save();
-        ctx.translate(x,fussY);
-        if(phase==="throwdown"&&u.vizMove===2)ctx.rotate(buehneT*9+u.id);
-        ctx.fillStyle=c; ctx.globalAlpha=0.20;
-        ctx.beginPath(); ctx.ellipse(0,0,streckX,streckY,0,0,6.2832); ctx.fill();
-        ctx.globalAlpha=1;
-        ctx.restore();
+    // ---------- RANG 1: die zehn Zuschauer am Ring ----------
+    for(const u of TEILNEHMER){
+      if(istDuellant(u,paar))continue;
+      const o=orte.get(u); if(!o)continue;
+      const fussY=o.y+19;
+      ctx.fillStyle=farbeVon(u); ctx.globalAlpha=0.16;
+      ctx.beginPath(); ctx.ellipse(o.x,fussY,11,4,0,0,6.2832); ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.save();
+      ctx.translate(o.x,fussY); ctx.scale(0.72,0.72); ctx.translate(-o.x,-fussY);
+      zeichneSprite(ctx,u,o.x,o.y);
+      ctx.restore();
+      // Die Krone gehoert dem Punktbesten, auch wenn der gerade nur zusieht. Ohne diesen Zweig
+      // verschwaende sie in jedem Frame, in dem der Fuehrende nicht zufaellig im Paar steht --
+      // und das ist der Normalfall (zwei von zwoelf).
+      if(u===fuehrer){
+        ctx.font="13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+        ctx.fillText("👑",o.x,o.y-28);
+      }
+    }
 
-        // D. Move-Posen (Plan 7.2) -- ausschliesslich Canvas-Transformationen um den
-        // Bodenpunkt (fussY), keine neuen Sprite-Blaetter, keine Aenderung an
-        // zeichneSprite()/u.down/u.lunge (die bleiben deren eigene Kampf-/Ausfallschritt-
-        // Felder, s. Kommentar bei stepCypher). u.vizMove (0..3, aus stepCypher) waehlt
-        // die Pose waehrend `throwdown`; `freeze`/`rueckzug` ueberschreiben sie mit der
-        // Erfolgs-/Fehlschlag-Darstellung.
-        ctx.save();
+    // ---------- DIE VIGNETTE: der Ring tritt zurueck, die Mitte tritt vor ----------
+    // Ein einziger radialer Verlauf ueber die ganze Flaeche, in der Mitte durchsichtig, zum
+    // Rand hin fast schwarz. Er dunkelt die zehn Zuschauer UND alles andere am Rand ab; die
+    // beiden Duellanten werden danach gezeichnet und bleiben deshalb voll hell. Das ist der
+    // gesamte "Fokus"-Mechanismus dieser Buehne -- ein Fill, kein Zustand.
+    const vig=ctx.createRadialGradient(cx,cy,rOut*0.30,cx,cy,rOut*1.25);
+    vig.addColorStop(0,"rgba(6,3,10,0)");
+    vig.addColorStop(0.55,"rgba(6,3,10,.42)");
+    vig.addColorStop(1,"rgba(6,3,10,.78)");
+    ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+    // ---------- DIE FOLTERBANK: zehn Geraete, eskalierend ----------
+    // Chris: „dass da so ein tisch ist mit 10 folterinstrumenten und die charaktere nutzen die
+    // dann sogar und gehen zum tisch nehmen sie auf step by step und sie werden immer
+    // schlimmer". Der Tisch steht im VORDERGRUND (nach der Vignette gezeichnet, also nicht
+    // abgedunkelt) am unteren Rand -- dort, wo bei dieser Buehne ohnehin nichts steht.
+    // Stufe = Durchgang des gerade Ertragenden (s. folterStufe oben). Die Leiter ist immer
+    // vollstaendig zu sehen: was schon dran war, ist ausgegraut; was noch kommt, steht dunkel
+    // bereit. Genau das macht „es wird immer schlimmer" ueberhaupt sichtbar.
+    const stufe=paar&&paar.ertraeger?folterStufe(paar.ertraeger.aktuell,art.rundenN):0;
+    const geraet=FOLTER_GERAETE[stufe];
+    const tischB=Math.min(W*0.84,920), tischX=cx-tischB/2, tischY=H-24;
+    const fachB=tischB/FOLTER_GERAETE.length;
+    ctx.fillStyle="#2c2129"; ctx.fillRect(tischX,tischY,tischB,9);
+    ctx.fillStyle="#4a3a45"; ctx.fillRect(tischX,tischY,tischB,2);
+    ctx.fillStyle="#1a1319";
+    ctx.fillRect(tischX+10,tischY+9,8,10); ctx.fillRect(tischX+tischB-18,tischY+9,8,10);
+    for(let i=0;i<FOLTER_GERAETE.length;i++){
+      const fx=tischX+fachB*(i+0.5), fy=tischY-11;
+      if(i===stufe){
+        // In Benutzung: leerer Platz, golden markiert -- das Geraet ist gerade in der Faust
+        // des Peinigers (unten gezeichnet), nicht auf dem Tisch.
+        ctx.setLineDash([3,3]); ctx.strokeStyle="rgba(242,215,90,.9)"; ctx.lineWidth=1.3;
+        ctx.strokeRect(fx-fachB*0.36,fy-12,fachB*0.72,24); ctx.setLineDash([]);
+        continue;
+      }
+      ctx.save();
+      // Schon benutzt: ausgegraut und schwach. Kommt noch: fast voll sichtbar -- WEIL der Blick
+      // nach rechts auf das gehen soll, was noch bevorsteht.
+      ctx.globalAlpha=i<stufe?0.26:0.82;
+      if(i<stufe)ctx.filter="grayscale(1)";
+      ctx.translate(fx-fachB*0.32,fy); ctx.scale(0.95,0.95);
+      FOLTER_GERAETE[i].zeichne(ctx);
+      ctx.restore();
+    }
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.font="800 10px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+    ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length,cx,tischY-30);
+    ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(214,170,255,.6)";
+    ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
+
+    // ---------- RANG 2: die beiden, um die es gerade geht ----------
+    const ertraeger=paar?paar.ertraeger:null, peiniger=paar?paar.peiniger:null;
+
+    // DRUCKACHSE: drei Winkel, die vom Peiniger auf den Ertragenden zeigen, im Takt
+    // pulsierend. Sie beantwortet die Frage, die das alte Bild offen liess -- WER setzt hier
+    // gerade WEM zu.
+    if(ertraeger&&peiniger&&ertraeger.vizPhase!=="ring"){
+      const a=orte.get(peiniger), b=orte.get(ertraeger);
+      if(a&&b){
+        const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
+        const ux=dx/len, uy=dy/len, nx=-uy, ny=ux;
+        const takt=0.45+0.55*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60));
+        ctx.strokeStyle="#ff5a4a"; ctx.lineWidth=1.6; ctx.lineCap="round";
+        ctx.globalAlpha=0.30*takt;
+        ctx.beginPath(); ctx.moveTo(a.x+ux*22,a.y+uy*22); ctx.lineTo(b.x-ux*20,b.y-uy*20); ctx.stroke();
+        ctx.globalAlpha=0.75*takt;
+        for(let k=0;k<3;k++){
+          const t=0.42+k*0.16, px=a.x+dx*t, py=a.y+dy*t;
+          ctx.beginPath();
+          ctx.moveTo(px-ux*5+nx*5,py-uy*5+ny*5);
+          ctx.lineTo(px+ux*4,py+uy*4);
+          ctx.lineTo(px-ux*5-nx*5,py-uy*5-ny*5);
+          ctx.stroke();
+        }
+        ctx.globalAlpha=1; ctx.lineCap="butt";
+      }
+    }
+
+    // Ein Duellant, vollstaendig gezeichnet: Schatten, Haltung, Sprite, Ausgangsring,
+    // Namensschild. `rolle` ist "ertraegt" oder "peinigt" -- die einzige Unterscheidung, aus
+    // der alles Weitere folgt.
+    const zeichneDuellant=(u,rolle)=>{
+      const o=orte.get(u); if(!o)return;
+      const x=o.x, y=o.y, radius=o.radius;
+      const fussY=y+19; // derselbe Bodenpunkt, an dem der Schatten schon immer sass
+      const c=farbeVon(u);
+      const phase=u.vizPhase||"ring";
+      // Schatten-Streckung (Plan 7.2): je naeher am Zentrum, desto mehr Bewegungs-"Zug".
+      const naeheZumKern=phase==="ring"?0:Math.max(0,1-radius/rOut);
+      const streckX=16*(1+naeheZumKern*0.7), streckY=6*(1-naeheZumKern*0.3);
+      ctx.save();
+      ctx.translate(x,fussY);
+      ctx.fillStyle=c; ctx.globalAlpha=0.24;
+      ctx.beginPath(); ctx.ellipse(0,0,streckX,streckY,0,0,6.2832); ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.restore();
+
+      // Standlicht: ein Kegel unter dem Duellanten, damit die zwei auch dann aus dem Feld
+      // herausstechen, wenn gerade niemand in der Mitte steht. Der Ertragende bekommt das
+      // hellere -- er steht im Scheinwerfer, das ist die ganze Idee des SURVIVOR-Kerns.
+      const hell=rolle==="ertraegt";
+      const lichtG=ctx.createRadialGradient(x,y+4,0,x,y+4,hell?46:34);
+      lichtG.addColorStop(0,hell?"rgba(255,232,150,.34)":"rgba(255,90,74,.18)");
+      lichtG.addColorStop(0.6,hell?"rgba(242,215,90,.14)":"rgba(255,90,74,.07)");
+      lichtG.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=lichtG;
+      ctx.beginPath(); ctx.ellipse(x,y+4,hell?46:34,hell?34:22,0,0,6.2832); ctx.fill();
+
+      // D. HALTUNGEN. Ausschliesslich Canvas-Transformationen um den Bodenpunkt (fussY),
+      // keine neuen Sprite-Blaetter, keine Aenderung an zeichneSprite()/u.down/u.lunge.
+      //
+      // 13.09.: die vier Breakdance-Posen (Toprock/Footwork/Windmill/Freeze) sind ERSETZT.
+      // Die alte vizMove===2-Pose liess die Figur mit ctx.rotate(buehneT*9+u.id) um den
+      // Fusspunkt KREISEN -- ein Windmill, und damit die eine Zeile, die das ganze Bild
+      // „wie breakdance" aussehen liess. Ersetzt durch vier Reaktionen auf Schmerz.
+      ctx.save();
+      if(rolle==="ertraegt"){
         if(phase==="throwdown"){
           if(u.vizMove===0){
-            // Toprock: Gehzyklus (zeichneSprite() Default), Blickrichtung wechselt im
-            // Takt -- per Spiegelung um die eigene Achse statt eines Feldzugriffs auf
-            // u.vx/u.vy (die fuer Buehnen-Teilnehmer sowieso 0 bleiben).
-            if(Math.floor(buehneT*BREAKING_BPM/60*2+u.id)%2===1){
-              ctx.translate(2*x,0); ctx.scale(-1,1);
-            }
+            // Standhalten: aufrecht, aber im Zittern -- hochfrequent, winzige Amplitude.
+            ctx.translate(Math.sin(buehneT*46+u.id)*1.3,0);
           } else if(u.vizMove===1){
-            // Footwork: tief gesetzt (y-Versatz nach unten + leichte Stauchung).
-            ctx.translate(x,fussY); ctx.scale(1,0.92); ctx.translate(-x,-(fussY-6));
+            // Zusammenkruemmen: in sich zusammensacken, um den Bodenpunkt gestaucht.
+            ctx.translate(x,fussY); ctx.scale(1.04,0.80); ctx.translate(-x,-fussY);
           } else if(u.vizMove===2){
-            // Powermove: Windmill -- Rotation um den Fusspunkt.
-            ctx.translate(x,fussY); ctx.rotate(buehneT*9+u.id); ctx.translate(-x,-fussY);
+            // Aufbaeumen: der Oberkoerper reisst nach hinten, die Fuesse bleiben stehen --
+            // eine begrenzte Kippung um den Fusspunkt, KEINE volle Rotation.
+            ctx.translate(x,fussY);
+            ctx.rotate(-0.34*Math.abs(Math.sin(buehneT*10+u.id)));
+            ctx.translate(-x,-fussY);
             zeichneBodenstaub(x,fussY,u.id);
           } else {
-            // Freeze (als GEWAEHLTER Move, noch vor dem Erfolg/Fehlschlag-Ausgang):
-            // leichte Vorschau-Kippung.
-            ctx.translate(x,fussY); ctx.rotate(0.18); ctx.translate(-x,-fussY);
+            // Steingesicht: vollkommen reglos. Absichtlich KEINE Transformation -- in einem
+            // Bild, in dem alles andere wackelt, ist Stillstand die auffaelligste Haltung.
           }
         } else if(phase==="freeze"){
-          // Erfolg: eingefrorenes, gekipptes Standbild plus goldener Standbild-Ring
-          // (zusammenziehend -- "ich halte stand" liest sich als Verengung).
-          ctx.translate(x,fussY); ctx.rotate(0.22); ctx.translate(-x,-fussY);
+          // Ausgang „haelt stand": aufgerichtet, Kinn hoch.
+          ctx.translate(x,fussY); ctx.rotate(-0.10); ctx.translate(-x,-fussY);
         } else if(phase==="rueckzug"){
-          // Fehlschlag: kurzes Torkeln beim Rueckzug aus der Mitte.
+          // Ausgang „bricht ein": sackt weg und taumelt aus der Mitte.
+          ctx.translate(x,fussY); ctx.scale(1,0.78); ctx.rotate(0.26); ctx.translate(-x,-fussY);
           ctx.translate(Math.sin(u.vizPhaseT*40+u.id)*2.5,0);
         }
-        // zeichneSprite() unveraendert wiederverwendet -- keine neue Sprite-Pipeline, die
-        // #854-Waffenunterdrueckung fuer Breaking gilt automatisch weiter (haengt an
-        // buehneDisc, nicht an der aufrufenden Zeichenfunktion).
-        zeichneSprite(ctx,u,x,y);
+      } else {
+        // Der Peiniger lehnt sich in den Schlag hinein, waehrend sein Gegenueber aushaelt.
+        const zusetzen=ertraeger&&ertraeger.vizPhase==="throwdown";
+        const neig=(u.side===0?1:-1)*(zusetzen?0.16:0.06);
+        ctx.translate(x,fussY); ctx.rotate(neig); ctx.translate(-x,-fussY);
+      }
+      zeichneSprite(ctx,u,x,y);
+      ctx.restore();
+
+      // DAS GERAET IN DER FAUST (nur der Peiniger). Dieselbe zeichne()-Funktion wie auf dem
+      // Tisch, nur in ein anderes Frame gestellt: Ursprung = Hand, +x zeigt zum Gegenueber
+      // (Spiegelung ueber das Vorzeichen der x-Skalierung), Drehung = Ausholen im Takt.
+      if(rolle==="peinigt"){
+        const dir=u.side===0?1:-1;
+        const zusetzen=ertraeger&&ertraeger.vizPhase==="throwdown";
+        const schwung=zusetzen
+          ? -0.95+1.75*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60))
+          : -0.60;
+        ctx.save();
+        ctx.translate(x+dir*11,y+2);
+        ctx.scale(dir*1.05,1.05);
+        ctx.rotate(schwung);
+        geraet.zeichne(ctx);
         ctx.restore();
+      }
 
-        // Erfolg/Fehlschlag-Ringe, jetzt aus u.vizPhase (stepCypher) statt aus u.lunge
-        // gelesen -- exakt, weil vizPhase die Zustandsmaschine ist, die diese Ausgaenge
-        // ueberhaupt erst erzeugt (u.runden[u.aktuell].ereignis gegen art.erfolgWort/
-        // art.failWort, s. dort). Farbschema/Stil unveraendert aus der ersten Fassung.
-        if(phase==="freeze"){
-          // N-Fix (PR 0.4 #3): Divisor an FREEZE_T (0,15s, s. stepCypher) angeglichen -- der
-          // alte 0,35 gehoerte zur ersten Fassung der Zustandsdauer und war seit deren
-          // Verkuerzung auf 0,15s stehen geblieben, der Ring riss deshalb bei p~0.57 ab.
-          const p=Math.max(0,1-u.vizPhaseT/FREEZE_T);
-          ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
-          ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
-          ctx.globalAlpha=1;
-        } else if(phase==="rueckzug"){
-          // Riss-Flash JETZT AN DER MITTE gebunden (Plan 7.2: "kuenftig an die Mitte statt
-          // an den Ringplatz gebunden") -- (x,y) IST bereits die Mitte, weil radius hier
-          // noch nahe 0 liegt (NAECHER() in stepCypher glitet erst waehrend rueckzug
-          // wieder nach aussen).
-          // N-Fix (PR 0.4 #3): Divisor an RUECKZUG_T (0,15s, s. stepCypher) angeglichen,
-          // gleicher Befund wie beim Freeze-Ring oben.
-          const p=Math.max(0,1-u.vizPhaseT/RUECKZUG_T);
-          ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
-          ctx.beginPath();
-          const segs=4;
-          for(let s=0;s<=segs;s++){
-            const py=y-14+28*(s/segs);
-            const zick=Math.sin(u.id*4.1+s*2.3)*7;
-            if(s===0)ctx.moveTo(x+zick,py); else ctx.lineTo(x+zick,py);
-          }
-          ctx.stroke(); ctx.globalAlpha=1; ctx.lineCap="butt";
+      // Erfolg/Fehlschlag-Ringe, aus u.vizPhase (stepCypher) gelesen -- exakt, weil vizPhase
+      // die Zustandsmaschine ist, die diese Ausgaenge ueberhaupt erst erzeugt
+      // (u.runden[u.aktuell].ereignis gegen art.erfolgWort/art.failWort, s. dort).
+      if(phase==="freeze"){
+        // N-Fix (PR 0.4 #3): Divisor an FREEZE_T (0,15s, s. stepCypher) angeglichen.
+        const p=Math.max(0,1-u.vizPhaseT/FREEZE_T);
+        ctx.globalAlpha=0.75*p; ctx.strokeStyle="#f2d75a"; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(x,y,8+14*p,0,6.2832); ctx.stroke();
+        ctx.globalAlpha=1;
+      } else if(phase==="rueckzug"){
+        // Riss-Flash an der Mitte gebunden (Plan 7.2) -- (x,y) IST bereits die Mitte, weil
+        // radius hier noch nahe 0 liegt. N-Fix (PR 0.4 #3): Divisor an RUECKZUG_T angeglichen.
+        const p=Math.max(0,1-u.vizPhaseT/RUECKZUG_T);
+        ctx.globalAlpha=0.85*p; ctx.strokeStyle="#ff3b3b"; ctx.lineWidth=2; ctx.lineCap="round";
+        ctx.beginPath();
+        const segs=4;
+        for(let s=0;s<=segs;s++){
+          const py=y-14+28*(s/segs);
+          const zick=Math.sin(u.id*4.1+s*2.3)*7;
+          if(s===0)ctx.moveTo(x+zick,py); else ctx.lineTo(x+zick,py);
         }
+        ctx.stroke(); ctx.globalAlpha=1; ctx.lineCap="butt";
+      }
 
-        ctx.textAlign="center"; ctx.textBaseline="middle";
-        const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
-          ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
-          ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
-        };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3"; ctx.textAlign="center";
-        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+68);
+      // BESCHRIFTUNG BEWUSST KNAPP: Rolle und Name, mehr nicht. Punktzahl und Durchgang stehen
+      // schon auf der Seitentafel (unten) -- eine dritte Zeile unter dem Sprite hatte im ersten
+      // Anlauf nur dafuer gesorgt, dass sich die Schilder der beiden Duellanten ueberlappten.
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      const schrift=(txt,dy,farbe,groesse,fett)=>{
+        ctx.font=(fett?"700 ":"400 ")+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=3.5; ctx.strokeStyle="rgba(8,10,14,.92)"; ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
+      };
+      schrift(rolle==="ertraegt"?"ERTRÄGT":"PEINIGT",36,rolle==="ertraegt"?"#f2d75a":"#ff7a66",9,true);
+      schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,48,c,10,true);
 
-        // E. Survivor-Krone (niedrige Prioritaet, aus derselben Vorlage wie breaking.tsx:
-        // 177-181): der aktuelle Rang-1-Teilnehmer bekommt dasselbe 👑-Textzeichen ueber
-        // dem Sprite, kein neues Asset. Unveraendert score-basiert (u.summe), unabhaengig
-        // von der jetzt choreografischen Ringposition.
-        if(u===fuehrer){
-          ctx.font="14px sans-serif"; ctx.fillText("👑",x,y-34);
-        }
-      });
+      // E. Survivor-Krone (aus derselben Vorlage wie breaking.tsx:177-181): der aktuelle
+      // Rang-1-Teilnehmer bekommt dasselbe 👑-Textzeichen ueber dem Sprite, kein neues Asset.
+      // Unveraendert score-basiert (u.summe), unabhaengig von der Ringposition.
+      if(u===fuehrer){ ctx.font="14px sans-serif"; ctx.fillText("👑",x,y-34); }
+      ctx.textBaseline="alphabetic";
+    };
+    // Der Peiniger zuerst, der Ertragende darueber -- wer ausgehalten wird, steht im Bild vorn.
+    if(peiniger)zeichneDuellant(peiniger,"peinigt");
+    if(ertraeger)zeichneDuellant(ertraeger,"ertraegt");
+
+    // ---------- DIE ZWEI SEITENTAFELN ----------
+    // Die grossen leeren Raender links und rechts des Rings (der Ring ist hoehenbegrenzt,
+    // rOut=min(W*0,46;H*0,44), bei Breitbild bleibt also links und rechts viel Platz) tragen
+    // jetzt die eine Information, die das Bild bisher gar nicht hatte: WER gegen WEN, mit
+    // welcher Rolle. Das ist das Gegenstueck zu Speed-Schachs Brett oder Spurts Bahnen -- das
+    // Element, an dem man die Disziplin auf einen Blick erkennt.
+    const tafel=(u,rolle,links)=>{
+      if(!u)return;
+      const bw=Math.min(190,W*0.20), bh=64;
+      const bx=links?12:W-12-bw, by=cy-bh/2-18;
+      ctx.fillStyle="rgba(10,6,14,.78)"; ctx.fillRect(bx,by,bw,bh);
+      ctx.fillStyle=farbeVon(u); ctx.fillRect(bx,by,3,bh);
+      ctx.strokeStyle=rolle==="ertraegt"?"rgba(242,215,90,.55)":"rgba(255,90,74,.5)";
+      ctx.lineWidth=1; ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+      ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+      ctx.font="800 9px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=rolle==="ertraegt"?"#f2d75a":"#ff7a66";
+      // Dasselbe Wort wie am Sprite-Schild (s. schrift(...) oben): Seitentafel und Figur
+      // beschriften dieselbe Rolle im selben Bild, also duerfen sie nicht zweierlei sagen.
+      ctx.fillText(rolle==="ertraegt"?"ERTRÄGT":"PEINIGT",bx+12,by+17);
+      ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#eef3fa";
+      ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,bx+12,by+35);
+      ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#9aa4b4";
+      ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
+    };
+    if(ertraeger&&peiniger){
+      const heim=ertraeger.side===0?ertraeger:peiniger;
+      const gast=ertraeger.side===0?peiniger:ertraeger;
+      tafel(heim,heim===ertraeger?"ertraegt":"peinigt",true);
+      tafel(gast,gast===ertraeger?"ertraegt":"peinigt",false);
+    } else if(ertraeger){
+      tafel(ertraeger,"ertraegt",ertraeger.side===0);
     }
   }
 
