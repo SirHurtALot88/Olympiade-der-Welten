@@ -230,8 +230,14 @@ import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.j
  *  - SPURT (rho 0,871): Rangtreue bestanden, aber Feldgroessen-Fund F1 oben -- eine dritte, neue
  *    Art von Grund (weder Achse 1 noch Achse 2 fehlt, sondern die Kalibrierung der Referenz ist
  *    fuer die tatsaechliche Motor-Feldgroesse falsch).
- *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516), BATTLEFIELD/TDM/
- *    MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
+ *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
+ *    (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
+ *  - FOOTBALL: NICHT MEHR ACHSE 1 (Korridor-Refit-Runde, 14.09. — rho je Spiel 0,516 -> 0,800,
+ *    NFL-Korridor jetzt in der Nachbarschaft, s. docs/pm-briefings/
+ *    opus-review-pr-884-football-runde1-09-10.md fuer die Auflage, die diese Runde erfuellt),
+ *    sondern ACHSE 2: es fehlt weiterhin ein eigener `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag
+ *    (eigene PPS-Referenz noch nicht gezogen, `scripts/ziehe-football-pps-referenz.ts` existiert
+ *    nicht) -- ohne den wirft die Querpruefung unten beim Modul-Laden, s. dort.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
