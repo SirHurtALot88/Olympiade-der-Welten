@@ -5337,6 +5337,64 @@
       // trennt die beiden Woerter; wo es fehlt (Basketball, Football), faellt der Code auf
       // `wortAbwehr` zurueck und schreibt zeichengleich dasselbe wie bisher.
       wortSteal:"Stockcheck",
+      // ============================== PUSTE ==============================
+      // Chris, 13.09.: „die health bars sind ja hier quatsch, die koennten eher ausdauer
+      // sein und tackles kosten ggf. ausdauer? nicht zu verwechseln mit unserer fatigue ich
+      // meine speziell fuer die diszi. man laedt in pausen etwas auf oder wenn man weniger
+      // rennt etc aber verliert was wenn man tacklet oder getackled wird je nachdem welcher
+      // spieler staerker war". Und auf die Frage nach dem Endzustand: „haengt ab von den
+      // Spieler-Stats, manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag." Name „Puste" ist seine Entscheidung („ja erstmal okay") —
+      // ausdruecklich NICHT „Ausdauer", weil dieses Wort im Spiel schon zweimal vergeben ist
+      // (der Sub-Skill AUSDAUER und die Saison-Fatigue).
+      //
+      // NICHT ZU VERWECHSELN MIT DER SAISON-FATIGUE, und das ist nachgemessen, nicht
+      // versprochen: der Kader-Adapter (lib/foundation/battle-arena/arena-kader-adapter.ts)
+      // uebergibt dem Motor {n,id,c,r,sub,tp,tn,d,groesse,a} — KEIN fatigue-Feld. Die
+      // Saison-Fatigue wirkt VOR dem Spiel auf den Score (fatiguePenalty), die Puste
+      // WAEHREND des Spiels auf die Bewegung. Sie treffen sich an keiner Zeile.
+      //
+      // KEIN WERTPOSTEN. `feldspielWert` bleibt unangetastet — der Check-Posten wurde
+      // bewusst gestrichen (s. dort, "CHECKS GESTRICHEN"), weil Hit-Differenzen real
+      // NEGATIV mit Tordifferenzen korrelieren. Die Puste wirkt ueber Tempo und
+      // Zweikaempfe, nicht ueber die Wertformel.
+      //
+      // DIE STREUUNG KOMMT AUS `basis + AUSDAUER*jeAusdauer` — genau Chris' „haengt ab von
+      // den Spieler-Stats". Auf der echten Kader-Familie liegt AUSDAUER zwischen 21 und 75
+      // (Median 59); der Vorrat spreizt sich damit um rund den Faktor 1,7 zwischen dem
+      // zaehesten und dem schwaechsten Feldspieler. AUSDAUER hatte im Eishockey bis heute
+      // genau EINEN mechanischen Kanal (den wucht-Kontrast im Bodycheck, gemessen 4,4 %
+      // Gewicht) — die Puste ist sein zweiter, und zwar ein sichtbarer.
+      //
+      // ALLE ZAHLEN SIND KALIBRIERT, NICHT GESETZT: s. docs/design/
+      // hockey-puste-kalibrierung-13-09.md und scripts/miss-hockey-puste.mjs.
+      puste:{
+        basis:20, jeAusdauer:1.42,   // Vorrat: 50 (AUSDAUER 21) bis 127 (AUSDAUER 75)
+        regen:0.34,                  // Punkte je Sekunde, IMMER gutgeschrieben (Netto-Modell)
+        jePx:0.0038,                 // Punkte je tatsaechlich gelaufenem Pixel
+        strafbankRegen:2.2,          // Faktor auf `regen`, solange er auf der Strafbank sitzt
+        pause:0.28,                  // Anteil des Vorrats, der beim Drittelwechsel zurueckkommt
+        checkGeben:5, checkNehmen:9, // Kosten des Koerpereinsatzes, s. kontrast* unten
+        kontrastSkala:40, kontrastGewicht:0.5,
+        // WIRKUNG AUF DEN AUSGANG: ABGESCHALTET, und zwar nachgemessen begruendet.
+        // Zwei Laeufe (24 Spiele x 5 Kader) mit wirksamer Puste ergaben rho je Spiel 0,616
+        // (tempoMin 0,86 / wuchtMin 0,70 / zweikampfMin 0,78) und 0,628 (0,95 / 0,75 / 0,94)
+        // gegen eine Basislinie von 0,669. Das Abschwaechen um zwei Drittel der Wirkung holte
+        // NICHTS zurueck — die Einbusse haengt also nicht an der Staerke der Faktoren, sondern
+        // daran, DASS Positionen und Zweikampfgewichte ueberhaupt verschoben werden: das
+        // aendert die Zahl der versucheSteal()-Aufrufe und damit die Zufallsbahn aller
+        // folgenden Ereignisse (dieselbe Kaskade wie beim Zoneneintritt, s.
+        // hockey-zoneneintritt-umsetzung.md). Dazu haengt der Verbrauch an der gelaufenen
+        // Strecke, und die korreliert mit LAUFTEMPO (0,852) — die Puste bestrafte damit
+        // teilweise genau das, wofuer die Eignung bezahlt.
+        // Auf 1 ist jede Multiplikation exakt neutral (x*1 === x, auch in Gleitkomma), die
+        // Simulation also bitgleich. Die Leiste, die Kosten und der Vorrat laufen weiter und
+        // sind vollstaendig sichtbar — nur der AUSGANG bleibt unberuehrt, bis die Einbusse
+        // verstanden ist. Siehe docs/design/hockey-puste-kalibrierung-13-09.md, Abschnitt 4.2.
+        tempoMin:1,                  // 0,95 gemessen: rho 0,669 -> 0,628
+        wuchtMin:1,                  // 0,75 gemessen: s.o.
+        zweikampfMin:1               // 0,94 gemessen: s.o.
+      },
       // WERTUNGSTABELLE, WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5):
       // ERSETZT den Feldspiel-Default komplett (Basketball-Woerter/-Zaehlung passen nicht,
       // und der Torwart hat keine eigene Zeile), s. WERTUNG_HOCKEY() weiter unten bei den
@@ -6369,6 +6427,12 @@
         // REINE ZEICHEN-FELDER fuer den Bodycheck-Aufprall (s. HK_CHECK_VIS/versucheSteal).
         // Keine Formel liest sie, ausserhalb von Hockey setzt sie nichts.
         wuchtVis:0, wuchtZielX:0, wuchtZielY:0,
+        // PUSTE (s. FELDSPIEL_ART.hockey.puste). `pusteMax` bleibt 0, wo die Disziplin
+        // kein Puste-Rezept fuehrt — dann ist jede Puste-Zeile im Motor wirkungslos.
+        // `pusteMin` haelt den TIEFSTEN Stand des Spiels fest (fuer die Abnahme: ein
+        // Spieler, der einmal leer war und sich wieder gefangen hat, sieht am Ende aus
+        // wie einer, der nie leer war). `weg` ist die gelaufene Strecke in Pixeln.
+        puste:pusteMaxVon(R2), pusteMax:pusteMaxVon(R2), pusteMin:pusteMaxVon(R2), weg:0,
         // Strafbank: `strafeBis` ist der Zeitpunkt (Spielzeit fsT), ab dem er wieder
         // aufs Eis darf, `strafminuten` die Statistikspalte. Ausserhalb von Hockey
         // bleiben beide 0 — `aufDemEis` liest dann immer true.
@@ -6871,6 +6935,41 @@
   // Sekunde Zuschauzeit — lang genug, um den Stoss zu sehen, kurz genug, um den naechsten
   // nicht zu ueberdecken (die Luecke zwischen zwei Checks liegt im Median bei 14,4 s).
   const HK_CHECK_VIS=0.5;
+  // ============================== PUSTE (Feldspiel) ==============================
+  // Rezept und Begruendung stehen an FELDSPIEL_ART.hockey.puste. Hier nur die drei
+  // Funktionen, die sie bewegen. Eine Disziplin OHNE `art.puste` (Basketball, Football)
+  // laeuft durch jede von ihnen mit `pusteMax === 0` und damit Zeichen fuer Zeichen wie
+  // vorher: `pusteAnteil` gibt 1, `pusteFaktor` gibt 1, `pusteTick` kehrt sofort um.
+  const pusteAnteil=(u)=>u&&u.pusteMax>0?Math.max(0,Math.min(1,u.puste/u.pusteMax)):1;
+  const pusteFaktor=(u,min)=>min+(1-min)*pusteAnteil(u);
+  // NETTO STATT SPERRKLINKE. Der gemessene Fehler auf der Bahn (u.reserve kennt fuenf
+  // Abzuege und keine einzige Gutschrift, u.leer wird nie geloescht) ist derselbe Ratchet,
+  // den docs/design/fatigue-saisonlaenge-plan.md B.2 fuer die Saison-Fatigue beschreibt.
+  // Hier wird er von vornherein vermieden: `regen` laeuft IMMER, der Verbrauch haengt an
+  // der tatsaechlich gelaufenen Strecke. Wer steht, gewinnt; wer sprintet, verliert; wer im
+  // Normaltempo unterwegs ist, haelt ungefaehr. Das ist gleichzeitig die woertliche
+  // Uebersetzung von Chris' „man laedt in pausen etwas auf oder wenn man weniger rennt":
+  // „weniger rennen" ist im Motor keine Absichtserklaerung, sondern `hypot(vx,vy)`.
+  //
+  // `u.vx/u.vy` sind der im LETZTEN Tick tatsaechlich gegangene Schritt (bewegeSpielerLive
+  // schreibt sie dort, s. Opus-Review-Fund #12) — ein Tick Verzug, der bei 1/60 s keine
+  // Rolle spielt, dafuer ist es die ehrlichste verfuegbare Bewegungsgroesse: sie enthaelt
+  // Fastbreak-Zuschlag, Taumel-Bremse, Deckungsvorsprung und Strafbank-Marsch schon fertig.
+  // Der Vorrat eines Spielers, aus seinen schon gerechneten Sub-Skills (R2 in bauSpieler).
+  // 0, wo die Disziplin kein Puste-Rezept fuehrt — dann bleibt die ganze Mechanik still.
+  function pusteMaxVon(R2){
+    const P=FB().puste;
+    return P?Math.round(P.basis+(R2.AUSDAUER||50)*P.jeAusdauer):0;
+  }
+  function pusteTick(u,dt){
+    if(!(u.pusteMax>0))return;
+    const weg=Math.hypot(u.vx||0,u.vy||0);
+    u.weg=(u.weg||0)+weg;
+    const P=FB().puste;
+    const regen=P.regen*(aufDemEis(u)?1:(P.strafbankRegen??1));
+    u.puste=Math.max(0,Math.min(u.pusteMax,u.puste+regen*dt-weg*P.jePx));
+    if(u.puste<u.pusteMin)u.pusteMin=u.puste;
+  }
   // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
   // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
   // bei 78 (Netfront), 165 (Half-Wall) und 295 px (Point, blaue Linie). Mit Basketballs
@@ -8291,6 +8390,14 @@
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
     feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
+    // PUSTE IN DER PAUSE (Chris: „man laedt in pausen etwas auf"). Bewusst eine EINMALIGE
+    // Gutschrift am Drittelwechsel und NICHT eine laengere Simulationspause: der
+    // Kommentar an FELDSPIEL_ART.basketball.live haelt nachgemessen fest, dass schon eine
+    // Anhebung von periodenPause auf 3,0 die Rangtreue verschiebt (0,772 -> 0,771), weil
+    // die zusaetzlichen Leerlauf-Ticks denselben deterministischen Zufallsstrom
+    // weiterschieben. Diese Zeile verbraucht keinen Tick und keinen rr()-Wurf.
+    if(FB().puste)for(const team of FSTEAM)for(const u of team)
+      u.puste=Math.min(u.pusteMax,u.puste+u.pusteMax*FB().puste.pause);
     fsLive.viertel=zuEnde+1;
     // ROTATION (Auftrag 2): s. zuordneSlots()-Kommentar fuer die Regel selbst. Beide
     // Seiten unabhaengig voneinander geprueft — bei Gleichstand bleibt es fuer beide bei
@@ -9470,8 +9577,31 @@
     // stabil im Stand ist, faellt seltener. Die drei Zeiten (Sturz, Taumeln, Tempo) sind
     // PLATZHALTER und im UI gegen den Bewegungseindruck geprueft, nicht gegen eine Zahl.
     if(istHockey()){
-      const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-traeger.AUSDAUER)*0.0040));
+      // PUSTE IM WUCHT-KONTRAST. Die Formel bleibt Zeichen fuer Zeichen dieselbe, nur das
+      // Argument wechselt: statt der ROHEN AUSDAUER steht dort die WIRKSAME — ein Spieler
+      // mit leerer Puste steht schlechter im Stand und faellt leichter. Genau das ist
+      // Chris' „verliert was wenn man tacklet oder getackled wird je nachdem welcher
+      // spieler staerker war", nur von der anderen Seite gelesen: die Kosten von vorhin
+      // aendern den Ausgang von jetzt. Ohne Puste-Rezept gibt pusteFaktor 1 und
+      // `ausdauerWirk` ist bitgleich `traeger.AUSDAUER`.
+      const ausdauerWirk=traeger.AUSDAUER*(traeger.pusteMax>0?pusteFaktor(traeger,FB().puste.wuchtMin):1);
+      const wucht=Math.max(0.04,Math.min(0.45,0.16+(decker.ABWEHR-ausdauerWirk)*0.0040));
       if(rr()<wucht){
+        // WAS DER KOERPEREINSATZ KOSTET — beide Seiten, gestaffelt nach dem Kraefte-
+        // verhaeltnis. `kontrast` ist derselbe Vergleich, den `wucht` direkt darueber
+        // schon zieht (ABWEHR des Checkenden gegen die wirksame AUSDAUER des Getroffenen),
+        // nur auf -1..+1 normiert: +1 heisst „der Checkende war klar staerker", dann zahlt
+        // der Getroffene mehr und der Checkende weniger; -1 dreht es um. Kein neuer
+        // rr()-Wurf, kein neuer Zweig — nur zwei Subtraktionen an einer Stelle, an der die
+        // Simulation ohnehin schon steht.
+        if(traeger.pusteMax>0){
+          const P=FB().puste;
+          const kontrast=Math.max(-1,Math.min(1,(decker.ABWEHR-ausdauerWirk)/P.kontrastSkala));
+          traeger.puste=Math.max(0,traeger.puste-P.checkNehmen*(1+P.kontrastGewicht*kontrast));
+          decker.puste =Math.max(0,decker.puste -P.checkGeben *(1-P.kontrastGewicht*kontrast));
+          if(traeger.puste<traeger.pusteMin)traeger.pusteMin=traeger.puste;
+          if(decker.puste<decker.pusteMin)decker.pusteMin=decker.puste;
+        }
         // ZU HART: derselbe Check, nur ueber die Grenze. Gepfiffen wird VOR der Wirkung,
         // weil im echten Eishockey die Pfeife das Spiel unterbricht — der Getroffene
         // faellt dann nicht mehr in ein Gerangel um den losen Puck, sondern es gibt ein
@@ -10326,6 +10456,11 @@
       if(!aufDemEis(u)){ const z=strafbankZiel(u); zx=z.x; zy=z.y; tempoMul=1.3; }
       else if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
       if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
+      // PUSTE AUFS TEMPO (Chris: „oder langsamer wird"). Dieselbe Bauform wie `leer`/`nerv`
+      // in tempoVon auf der Bahn: ein Faktor, der bei vollem Vorrat exakt 1 ist und bei
+      // leerem auf `tempoMin` faellt. Ohne Puste-Rezept gibt pusteFaktor 1 zurueck und die
+      // Zeile ist rechnerisch nicht vorhanden.
+      if(u.pusteMax>0)tempoMul*=pusteFaktor(u,FB().puste.tempoMin);
       const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
@@ -10361,6 +10496,10 @@
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
       if(u.wuchtVis>0)u.wuchtVis=Math.max(0,u.wuchtVis-dt);
+      // PUSTE, hier oben aus demselben Grund wie `down`: sie muss auch waehrend der
+      // Drittelpause und auf der Strafbank weiterlaufen — genau dort laedt sie ja auf.
+      // Ausserhalb einer Disziplin mit Puste-Rezept ist der Aufruf ein sofortiges return.
+      pusteTick(u,dt);
       // ZURUECK AUFS EIS. `strafeBis` wird auf 0 gesetzt statt nur ablaufen gelassen,
       // damit der Wiedereintritt EIN Ereignis ist und nicht in jedem Tick neu erkannt
       // wird — nur so laesst sich die Aufstellung genau einmal neu machen.
@@ -10590,9 +10729,16 @@
           //
           // `f.vonSeite` ist die Seite, die geworfen hat; wer NICHT von dort kommt,
           // verteidigt und bekommt den Ausbox-Vorteil.
+          // PUSTE IM GERANGEL (dritter und letzter Wirkungspfad). Wer leer ist, setzt sich
+          // am losen Puck schlechter durch — dieselbe Idee wie beim Tempo, an derselben
+          // Stelle wie der Ausbox-Vorteil und der Wettlauf-Term, und wie diese ein reiner
+          // Faktor auf das Gewicht: er verschiebt NICHT, aus welchem Topf der Gewinner
+          // kommt, sondern nur, wer ihn innerhalb des Topfes holt. Ohne Puste-Rezept ist
+          // der Faktor exakt 1 und die Zeile rechnerisch nicht vorhanden.
+          const pusteGewicht=(k)=>k.pusteMax>0?pusteFaktor(k,FB().puste.zweikampfMin):1;
           const gewinner=gewichtetesLosNach(kandidaten,
             k=>losGewicht(k.ZWEITCHANCE)*(k.side===f.vonSeite?1:REB_BOXOUT)
-              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1));
+              *(ankunft?Math.exp(-(ankunft.get(k)||0)/PUCK_ANKUNFT_TAU):1)*pusteGewicht(k));
           gewinner.rebounds++;
           if(duellVerloren)for(const k of kandidaten)
             if(k!==gewinner&&k.side!==gewinner.side)k.taumeltBis=fsT+HK_DUELL_TAUMEL;
@@ -11400,6 +11546,18 @@
           ctx.strokeStyle="rgba(255,255,255,.75)";ctx.globalAlpha=a*0.6;ctx.lineWidth=1.5;
           ctx.beginPath();ctx.arc(zx,zy,r+5,w-1.0,w+1.0);ctx.stroke();
           ctx.restore();
+        }
+        // PUSTE-LEISTE UNTER DEN FUESSEN — dieselbe Bauform, dieselbe Ampel und dieselbe
+        // Groesse wie der Kraftreserve-Balken auf der Bahn (zeichneSpurt, "der Ersatz fuer
+        // den Lebensbalken des Kampfes"). Eine Leiste, drei Chassis: der Zuschauer lernt
+        // sie einmal und liest sie ueberall. Nur dort gezeichnet, wo die Disziplin ein
+        // Puste-Rezept fuehrt — Basketball und Football bleiben zeichengleich ohne Balken.
+        if(u.pusteMax>0){
+          const p=Math.max(0,Math.min(1,u.puste/u.pusteMax));
+          const bw=26;
+          ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,3);
+          ctx.fillStyle=p<=0?"#c0504a":(p<0.2?"#d98b3a":"#5FD08A");
+          ctx.fillRect(x-bw/2,y+20,bw*p,3);
         }
         if(FS_DEBUG_ZIELE&&u._zielHomeX!=null){
           ctx.fillStyle=c;ctx.globalAlpha=0.9;
@@ -19424,6 +19582,20 @@
       hindernisBilder:["huerde","balken","wand","seil","wasser","mauer","heu"], feuerZiel:true,
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
       technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
       // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
       // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
@@ -19518,6 +19690,20 @@
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
       kraftBasis:290, kraftSpanne:2.7,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
       // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
       // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
@@ -19616,6 +19802,20 @@
       wendigErholt:0.0045,
       wuchtKraft:18, wuchtZeit:0.18, stolperGrund:0.42, stolperSpanne:0.5, stolperKraft:8,
       kraftBasis:310, kraftSpanne:3.1,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
@@ -19686,6 +19886,25 @@
       wertung:"etappe",
       wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
       kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      // STAFFEL, EHRLICHE EINSCHRAENKUNG: gemessen endet hier KEIN Laeufer unter 77 % Puste
+      // (Median 88,3 %), also greift die Erholung praktisch nie und die Leiste steht weiter
+      // nahe voll. Das ist Absicht in dieser Runde — die Staffel hat mit rho 0,915 die beste
+      // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
+      // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
       rezept:{
         ANTRITT:    {speed:44,spirit:30,stamina:26},
         ENDTEMPO:   {speed:38,stamina:35,will:27},
@@ -19921,6 +20140,45 @@
       // Budgets an das Eignungs-Niveau angepasst (Kader-Mittel 42 statt Rezept-Mittel 53) — sonst
       // verdoppelt die Kopplung (mengeAusEignung) die Ausscheidequote, s. Bericht Teil 2.4/3.3 (T1f).
       wendigErholt:0.0030, kraftBasis:334, kraftSpanne:2.8, nervenKosten:27, nervenRegen:0.05,
+      // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
+      // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
+      // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
+      // ausfuehrlich. Kurz: `pusteRegen` ist die Grund-Gutschrift je Sekunde (skaliert mit
+      // STEHEN), `leerSchonung` senkt den Verbrauch eines Eingebrochenen (er schleppt sich),
+      // `leerRegen` ist sein Erholungsfaktor, `pusteFangen` der Anteil des Vorrats, ab dem
+      // er wieder voll laeuft. DIE LETZTEN BEIDEN ZAHLEN SIND GEMESSEN: der erste Satz
+      // (leerRegen 3,2 / pusteFangen 0,22) ergab ueber 960 Laeufer 0,0 % Erholungen — die
+      // Schwelle war fuer einen Eingebrochenen unerreichbar, das Feature also tot, und die
+      // Rangtreue haette das nie gezeigt (eine tote Zeile aendert nichts). Mit 0,02 trat das
+      // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
+      // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
+      // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTE AN DEN HINDERNISSEN — Chris' eigene Vorgabe, 13.09.: "ja das kann es
+      // beeinflussen je nach hindernis aber MUSS nicht zwangsweise haengt von art und
+      // schwierigkeit ab -> du muesstest also realistisch schwierigkeiten und arten von
+      // hindernissen vergeben und diese kategorisieren".
+      //
+      // BEIDE KATEGORIEN GIBT ES BEREITS, und zwar genau so, wie er sie beschreibt — es
+      // musste dafuer keine neue Taxonomie erfunden werden (wichtig, weil parallel eine
+      // eigene Runde an Takeshis Hindernis-Balance arbeitet):
+      //   ART           `hindernisTypen` — je Station der Sub-Skill, der sie entscheidet
+      //                 (TECHNIK, WENDIGKEIT, WUCHT, STEHEN, ROBUST)
+      //   SCHWIERIGKEIT `fallenStufe`    — 1 bis 3 Sterne je Art (WUCHT/ROBUST 3, TECHNIK/
+      //                 STEHEN 2, WENDIGKEIT 1)
+      //
+      // `pusteHindernis` sagt je ART, wie stark ein leerer Laeufer dort zusaetzlich
+      // scheitert. Die Staffelung ist die sportlich naheliegende und keine freie Wahl: an
+      // einer Wucht- oder Nehmerqualitaets-Station zahlt Muedigkeit voll (man muss die
+      // Kraft aufbringen, die man nicht mehr hat), an einer Technik- oder
+      // Wendigkeits-Station kaum (die Bewegung sitzt oder sie sitzt nicht). Multipliziert
+      // wird mit der Schwierigkeit aus `fallenStufe`, damit eine Drei-Sterne-Station
+      // haerter bestraft als eine Ein-Stern-Station — genau Chris' "haengt von art UND
+      // schwierigkeit ab".
+      //
+      // WIRKUNG NUR NACH UNTEN: bei voller Puste ist der Faktor exakt 1, die Station also
+      // unveraendert. Nur ein leerer Laeufer verliert etwas.
+      pusteHindernis:{WUCHT:0.30, ROBUST:0.26, STEHEN:0.20, TECHNIK:0.06, WENDIGKEIT:0.05},
       rezept:{
         ANTRITT:    {will:40,determination:32,speed:28},
         ENDTEMPO:   {will:38,determination:33,stamina:29},
@@ -20096,7 +20354,7 @@
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
         wert:z=>(z.u.tackles||z.u.getackelt)?z.u.tackles+"/"+z.u.getackelt:null}]:[]),
       {id:"weit", kopf:"Weit", titel:"erreichte Strecke", top:true, wert:z=>Math.round(z.u.pos*100), fmt:v=>v+"%"},
-      {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+      {id:"res",  kopf:"Pus", titel:"Puste — der disziplineigene Kraftvorrat aus STEHEN und ROBUST, NICHT die Saison-Fatigue. Wer einbricht, wird langsamer und kann sich wieder fangen.", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
         farbe:v=>v==="leer"?"var(--crit)":null},
       // ZWISCHENZEITEN (Zeitfahren, K5): eine Spalte je Checkpoint, Diff gegen die
       // Bestzeit im Feld an genau diesem Checkpoint (Fable-Entscheidung 3, s.
@@ -20147,7 +20405,7 @@
         {id:"patz", kopf:"Patz", titel:"gestürzt oder Übergabe verpatzt", wert:z=>z.u.gestolpert||null},
         {id:"weit", kopf:"Weit", titel:"Fortschritt im eigenen Abschnitt", top:true,
           wert:z=>Math.round(laufAnteil(z.u)*100), fmt:v=>v+"%"},
-        {id:"res",  kopf:"Res", titel:"Kraftreserve", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
+        {id:"res",  kopf:"Pus", titel:"Puste — der disziplineigene Kraftvorrat aus STEHEN und ROBUST, NICHT die Saison-Fatigue. Wer einbricht, wird langsamer und kann sich wieder fangen.", wert:z=>z.u.leer?"leer":Math.round(z.u.reserve/Math.max(1,z.u.reserveMax)*100)+"%",
           farbe:v=>v==="leer"?"var(--crit)":null},
         {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
           wert:z=>z.u.fertig!=null?+z.u.fertig.toFixed(1):null, fmt:v=>v.toFixed(1)+" s"},
@@ -20184,6 +20442,17 @@
         {id:"blk",  kopf:"Blk",  titel:"geblockte gegnerische Schüsse (nicht die Torwart-Paraden — die stehen unter Par)",
           wert:z=>z.torwart?null:z.u.bloecke||null},
         {id:"chk",  kopf:"Chk",  titel:"Bodychecks", wert:z=>z.torwart?null:z.u.checks||null},
+        // PUSTE. Zwei Spalten, weil eine nicht reicht: ohne den TIEFSTEN Stand sieht ein
+        // Spieler, der einmal leer war und sich in der Drittelpause wieder gefangen hat,
+        // am Ende aus wie einer, der nie an seine Grenze kam — und genau dieser Unterschied
+        // ist das, was Chris sehen will („manche laufen aus und muessen kurz regenerieren,
+        // manche schaffen den kompletten Spieltag").
+        {id:"pus",  kopf:"Pus",  titel:"Puste am Spielende — ein disziplineigener Kraftvorrat aus AUSDAUER, NICHT die Saison-Fatigue",
+          wert:z=>z.u.pusteMax?Math.round(z.u.puste/z.u.pusteMax*100):null, fmt:v=>v+"%",
+          farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
+        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollstaendig leer",
+          wert:z=>z.u.pusteMax?Math.round(z.u.pusteMin/z.u.pusteMax*100):null, fmt:v=>v+"%",
+          farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
         {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
         {id:"str",  kopf:"Str",  titel:"Strafminuten", wert:z=>z.torwart?null:z.u.strafminuten||null},
         {id:"par",  kopf:"Par",  titel:"Paraden (nur Torwart)", wert:z=>z.torwart?(z.u.saves||null):null},
@@ -21138,11 +21407,52 @@
       if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
       if(u.huerde>0)zehr*=0.4;             // Stopp am Hindernis: ein Fuenftel bis die Haelfte, nicht Volllast
+      // WER EINGEBROCHEN IST, SCHLEPPT SICH — UND VERBRAUCHT DABEI WENIGER (13.09.).
+      // Bis hierher zehrte ein leerer Laeufer weiter mit dem vollen Satz seines PLANS,
+      // obwohl tempoVon ihn laengst auf rund drei Viertel heruntergesetzt hat. Damit
+      // konnte er sich per Konstruktion nie wieder fangen: `u.leer` war eine Sperrklinke,
+      // die nie geloescht wurde. Chris am 13.09.: "manche laufen aus und muessen kurz
+      // regenerieren, manche schaffen den kompletten Spieltag".
+      if(u.leer&&BA().leerSchonung)zehr*=BA().leerSchonung;
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
+      // ---- PUSTE LAEDT WIEDER AUF (13.09.).
+      //
+      // Der Befund, der das noetig macht, steht in docs/design/
+      // hockey-ausdauer-checks-konzept-13-09.md Abschnitt 5.3: `u.reserve` kannte FUENF
+      // Abzuege und keine einzige Gutschrift — derselbe Ratchet, den
+      // fatigue-saisonlaenge-plan.md B.2 fuer die Saison-Fatigue beschreibt, nur eine
+      // Ebene tiefer. Gemessen endeten bei Takeshi 44,8 % der Laeufer leer und beim
+      // Klettern 73,3 %, ohne dass es einen Weg zurueck gab.
+      //
+      // DREI ERHOLUNGS-ZUSTAENDE, alle aus schon vorhandenen Groessen:
+      //   am Hindernis (u.huerde>0)   er steht — volle Gutschrift
+      //   eingebrochen (u.leer)       er schleppt sich und holt Luft — `leerRegen`-fach
+      //   unter Plantempo (ueber<1)   anteilig (1-ueber), genau Chris' "wenn man weniger rennt"
+      //   Volllast                    nichts — bei `ueber===1` ist die Zeile rechnerisch weg
+      // Wieviel dabei zurueckkommt, haengt an STEHEN: das ist der Bahn-Sub-Skill fuer
+      // Stehvermoegen und damit die Antwort auf "haengt ab von den Spieler-Stats".
+      //
+      // Eine Bahn OHNE `pusteRegen` (heute keine) bleibt bit-identisch.
+      if(BA().pusteRegen){
+        const ruhe=u.huerde>0?1:(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
+        if(ruhe>0)u.reserve=Math.min(u.reserveMax,
+          u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
+      }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
         schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
-        feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+      }
+      // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
+      // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
+      // moeglich. `pusteFangen` ist der Anteil des eigenen Vorrats, ab dem er wieder voll
+      // laeuft — bewusst kein kleiner Rest, sonst bricht er im naechsten Atemzug erneut ein
+      // und die Figur flackert zwischen zwei Zustaenden.
+      else if(u.leer && BA().pusteFangen && u.reserve>=BA().pusteFangen*u.reserveMax){
+        u.leer=false;
+        u.gefangen=(u.gefangen||0)+1;
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
+        feed(u.seite,u.n+" fängt sich wieder — Puste zurück bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
@@ -21257,6 +21567,28 @@
               }
             }
           }
+          // PUSTE AM HINDERNIS (13.09.) — Chris: "ja das kann es beeinflussen je nach
+          // hindernis aber MUSS nicht zwangsweise haengt von art und schwierigkeit ab".
+          // `pusteHindernis` (s. BAHN_ART) sagt je HINDERNISART, wie stark Muedigkeit dort
+          // zahlt; multipliziert mit der SCHWIERIGKEIT aus `fallenStufe`. Beide Kategorien
+          // standen bereits im Rezept — hier wird nichts neu kategorisiert.
+          //
+          // NACH #909 neu aufgesetzt: jene PR hat denselben Block umgebaut (`koennen`/
+          // `durch` statt roher TECHNIK/WUCHT) und berechnet `hTyp` bereits weiter oben —
+          // der Abzug nutzt jetzt DIESE Groesse, statt sie ein zweites Mal zu bestimmen.
+          // Er sitzt bewusst NACH beiden Wuerfen im Text, aber VOR ihnen in der Rechnung:
+          // er verschiebt nur die Schwelle, nie die Zahl oder Reihenfolge der rr()-Wuerfe.
+          //
+          // `pusteAbzug` ist 0, solange die Puste voll ist, und eine Bahn OHNE
+          // `pusteHindernis` (Spurt, Staffel, Zeitfahren, Klettern) bekommt ihn nie: fuer
+          // die bleibt der Block Zeichen fuer Zeichen der alte, inklusive der Zufallsfolge.
+          let pusteAbzug=0;
+          if(A.pusteHindernis&&hTyp&&u.reserveMax>0){
+            const empf=A.pusteHindernis[hTyp]||0;
+            const stufe=(A.fallenStufe||{})[hTyp]||1;
+            const leerAnteil=Math.max(0,1-u.reserve/u.reserveMax);
+            pusteAbzug=empf*(stufe/3)*leerAnteil;
+          }
           // WER DIESE FALLE MEISTERT — UND NICHT: WER FALLEN ALLGEMEIN MEISTERT.
           //
           // Chris 13.09., nach einem live geschauten Rennen: "bei takeshi sollen nicht ALLE
@@ -21315,7 +21647,7 @@
             if(bahnKoennenGemeldet.has(key))return;
             bahnKoennenGemeldet.add(key); feed(u.seite,txt);
           };
-          const technik=Math.min(0.97,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065));
+          const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
           if(rr()<=technik){                               // sauber drueber
             if(meldeTyp==="stark"){
               schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
@@ -21324,7 +21656,7 @@
             }
             continue;
           }
-          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090));
+          const wucht=Math.min(0.92,Math.max(0.02,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090)-pusteAbzug));
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
@@ -22082,8 +22414,10 @@
         ctx.lineTo(x-30,y+3);ctx.lineTo(x+6,y+9);ctx.closePath();ctx.fill();
         ctx.restore();
       }
-      // KRAFTRESERVE als schmaler Balken unter den Fuessen — der Ersatz fuer den
-      // Lebensbalken des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist.
+      // PUSTE als schmaler Balken unter den Fuessen — der Ersatz fuer den Lebensbalken
+      // des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist. SEIT 13.09. traegt
+      // die Kachelleiste (renderKader) dieselbe Groesse: eine Leiste, drei Chassis; der
+      // Name "Puste" ist Chris' Entscheidung und loest "Kraftreserve" ueberall ab.
       //
       // IM ZEITFAHREN DEUTLICHER (Chris' Fund 13.09., Punkt 4: "ausdauer muss besser
       // funktionieren"). Die Mechanik funktionierte schon — gemessen kam der Letzte des
@@ -23562,12 +23896,15 @@
         // unter zwoelf Figuren, und nirgends stand das Wort. Genau dieser zweite Punkt
         // steht auch in docs/design/hockey-ausdauer-checks-konzept-13-09.md Abschnitt 5.3
         // ("Der Balken unter den Fuessen ist unbeschriftet ... heisst nirgends Ausdauer").
-        // Deshalb hier ausdruecklich "Ausdauer" und nicht "Reserve" — dieselbe
-        // Sprachregelung, auf die jenes Konzept fuer alle Chassis hinauswill (Abschnitt
-        // 9.6), und dieselbe Zahl, die die Wertungstabelle in ihrer "Res"-Spalte fuehrt.
+        // Deshalb hier ausdruecklich ein WORT und nicht "Reserve". Das Wort ist seit
+        // 13.09. "Puste": #908 schrieb hier "Ausdauer", weil Chris die Namensfrage (11.6)
+        // damals noch nicht beantwortet hatte — inzwischen hat er es getan ("ja erstmal
+        // okay" auf den Vorschlag "Puste"), und die Wertungstabelle fuehrt die Spalte
+        // seither als "Pus" statt "Res". Zwei Namen fuer dieselbe Groesse in derselben
+        // Disziplin waeren genau die Unklarheit, die Punkt 4 beheben sollte.
         const anteil=u.reserveMax>0?Math.max(0,u.reserve/u.reserveMax):0;
         const res=el("span",u.leer?"schlecht":anteil<0.2?"knapp":null,
-          " · Ausdauer "+(u.leer?"leer":Math.round(anteil*100)+" %"));
+          " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %"));
         standEl.appendChild(res);
       } else standEl.textContent="—";
     }
@@ -23835,6 +24172,11 @@
   // das Ergebnis dieselbe Belegung wie vorher, nur mit richtigem Namen im Tooltip.
   function fsLeisteFuer(u,fsStand){
     const punkte=(fsStand.spieler.get(u.id)||{punkte:0}).punkte;
+    // MIT PUSTE-REZEPT zeigt die Leiste die Puste und der Punktestand wandert als Zahl
+    // neben den Namen — die Belegung, die Chris verlangt hat. Ohne Puste-Rezept bleibt
+    // alles wie bisher, nur mit richtigem Namen im Tooltip.
+    if(u.pusteMax>0)return {wert:u.puste,max:u.pusteMax,wort:"Puste",art:"puste",
+      leer:u.puste<=0,zusatz:String(punkte)};
     const maxP=Math.max(1,...FSTEAM[0].concat(FSTEAM[1])
       .map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte));
     return {wert:punkte,max:maxP,wort:istHockey()?"Tore":"Punkte",zusatz:String(punkte)};
@@ -25301,6 +25643,12 @@
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               strafminuten:u.strafminuten, xg:+((u.xg||0).toFixed(3)),
+              // PUSTE (s. FELDSPIEL_ART.hockey.puste): Endstand, tiefster Stand und die
+              // tatsaechlich gelaufene Strecke in Pixeln — die drei Zahlen, aus denen die
+              // Kalibrierung besteht (scripts/miss-hockey-puste.mjs). Ausserhalb einer
+              // Disziplin mit Puste-Rezept alle drei 0.
+              puste:+((u.puste||0).toFixed(1)), pusteMax:u.pusteMax||0,
+              pusteMin:+((u.pusteMin||0).toFixed(1)), weg:Math.round(u.weg||0),
               // NUR BASKETBALL (K3-Analog zu xg oben): aufsummierte Feldkorb-Trefferwahr-
               // scheinlichkeit, s. wirf()/feldspielWert. Ausserhalb von Basketball immer 0.
               xp:+((u.xp||0).toFixed(3)),
@@ -26062,6 +26410,11 @@
           wechselKonto:+(u.wechselKonto||0).toFixed(4),
           burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
           reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+          // Wie oft er sich nach einem Einbruch wieder gefangen hat (13.09., s.
+          // `pusteFangen` in stepSpurt) — die Zahl, an der sich "manche laufen aus und
+          // muessen kurz regenerieren" ueberhaupt erst messen laesst. Ohne
+          // Puste-Erholung immer 0.
+          gefangen:u.gefangen||0,
           sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
           ansagen:u.ansagen||0}))};
       M.zurueck(gesichert);
