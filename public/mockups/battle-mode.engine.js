@@ -20843,6 +20843,8 @@
         kick:    {label:"Schlusssprint", tempo:0.90, sucht:0.55, ab:0.62,
                   text:"Hält sich zurück und wirft alles auf das letzte Drittel."}
       },
+      planJeSlot:{blockstart:"vorn", acceleration:"vorn", topspeed:"kick", lanecontrol:"schatten",
+                  drivephase:"vorn", photofinish:"kick"}
       // DRIVEPHASE/PHOTOFINISH (Produktionsanbindung 14.09., Frage 6 aus
       // spurt-offene-fragen-plus-optik-plan-05-09.md): die beiden Slots, die
       // lib/lineups/matchday-slot-roles.ts fuer Spurt schon fuehrte, aber der Motor bei
@@ -20852,8 +20854,6 @@
       // Absicht der beiden Rollen. "Drive Phase" (Determination/Power) passt zu "Von vorn"
       // wie Blockstart/Acceleration; "Photo Finish" (Torment/Will) passt zum
       // Schlusssprint-Nervenmoment wie Topspeed.
-      planJeSlot:{blockstart:"vorn", acceleration:"vorn", topspeed:"kick", lanecontrol:"schatten",
-                  drivephase:"vorn", photofinish:"kick"}
     },
 
     "time-trial":{
