@@ -37,7 +37,7 @@ const w = await seite.evaluate((n) => {
   const x = window.__arena.feldspielProbe("football", { n, jeSeite: 6 });
   const summe = { punkte: 0, passAtt: 0, passComp: 0, passInt: 0, sacks: 0, rushAtt: 0,
     fumbles: 0, fumblesLost: 0, tds: 0, fgAtt: 0, fgMade: 0, punts: 0, passYards: 0,
-    laufYards: 0, fangYards: 0, verluste: 0 };
+    laufYards: 0, fangYards: 0, verluste: 0, passerPgSum: 0, passerTgSum: 0, passerN: 0 };
   const staende = [];
   for (const s of x.spiele) {
     summe.punkte += s.seiten[0] + s.seiten[1];
@@ -70,6 +70,12 @@ console.log(zeile("Fumbles gesamt je Team", jeTeam(w.summe.fumbles).toFixed(2), 
 console.log(zeile("Field Goals gemacht/versucht je Team", `${jeTeam(w.summe.fgMade).toFixed(2)}/${jeTeam(w.summe.fgAtt).toFixed(2)}`, "~1,72/2,16 (Plan A.1)", ""));
 console.log(zeile("Field-Goal-Quote", (100 * w.summe.fgMade / Math.max(1, w.summe.fgAtt)).toFixed(1), "~85 (NFL 2024, alle Distanzen)", "%"));
 console.log(zeile("Punts je Team", jeTeam(w.summe.punts).toFixed(2), "~4 (Plan A.1, grobe Naeherung)", ""));
+const passerPgMittel = w.summe.passerPgSum / Math.max(1, w.summe.passerN);
+const passerTgMittel = w.summe.passerTgSum / Math.max(1, w.summe.passerN);
+const skillMittelGezogen = passerPgMittel * 0.0060 + passerTgMittel * 0.0020;
+console.log(zeile("PASSGENAUIGKEIT gezogener Passer", passerPgMittel.toFixed(1), "(Referenz fuer kurve.skillMittel, Opus-Plan 6.1)", ""));
+console.log(zeile("TEAMGEIST gezogener Passer", passerTgMittel.toFixed(1), "(dito)", ""));
+console.log(zeile("-> kurve.skillMittel (gezogen)", skillMittelGezogen.toFixed(4), "aktuell im Rezept eingetragen: s. FELDSPIEL_ART.football.kurve.skillMittel", ""));
 console.log(`\nErste Endstaende: ${w.staende.slice(0, 8).map((s) => s.join(":")).join("  ")}`);
 console.log(`Seitenfehler: ${seitenfehler.length ? seitenfehler.slice(0, 3).join(" | ") : "keine"}`);
 await browser.close();

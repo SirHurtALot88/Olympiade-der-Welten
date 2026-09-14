@@ -5149,22 +5149,40 @@
       // Struktur-Konsistenz stehen, hat fuer Football aber KEINE geometrische Bedeutung
       // (klassifiziereWurfdistanz() wird von Football nicht aufgerufen, s. dort).
       kurve:{
-        base:0.20,
+        // base NEU GEGEN DEN NFL-KORRIDOR GEFITTET, NACH skillMittel (Korridor-Refit-Runde,
+        // Opus-Plan 10.09. Abschnitt 6.1, docs/pm-briefings/
+        // opus-review-pr-884-football-runde1-09-10.md — der Nachtrag, der die Freigabe von
+        // PR #884 an "Football darf NICHT in ARENA_RESOLVED_DISCIPLINE_IDS, bevor der
+        // Korridor-Refit aus Runde 2 sitzt" bindet). GEMESSEN (node scripts/
+        // miss-football-korridor.mjs 200, dieselbe Fit-Reihenfolge wie ueberall: steil/
+        // skillMittel ZUERST, base/korrektur ZULETZT): mit dem unten neu gemessenen
+        // skillMittel und unveraendertem base=0,20 lag die Completion-Quote noch bei 63,7 %
+        // (Ziel 65,3 %) — 0,24 trifft 64,9 % bei Yards/Attempt 7,18 (Ziel 7,1).
+        base:0.24,
         geoBonus:{dunk:0.34, nah:0.14, mit:0.0, fern:-0.18},
         radien:{dunk:0, nah:0, mit:0, fern:0}, // ohne Bedeutung, s. Kommentar oben
-        // skillMittel GEMESSEN (nicht mehr geraten): window.__arena.feldspielSubskills(
-        // "football") auf dem 12-Spieler-Testkader (dasselbe Kader, das jede Sondierung/
-        // jeder Korridor-Lauf benutzt, s. docs/design/hockey-rezept-ursache.md fuer den
-        // Praezedenzfall) liefert PASSGENAUIGKEIT-Mittel 58,3, TEAMGEIST-Mittel 48,2 ->
-        // 58,3*0,0060 + 48,2*0,0020 = 0,446. Der alte Platzhalter 0,30 war zu niedrig und
-        // gab jedem Spieler mit durchschnittlichem Skill einen unbeabsichtigten
-        // Bonus-Logit von +14*(0,446-0,30)=+2,0 obendrauf — kein Effekt der Eignung,
-        // sondern ein Messfehler in der Kurve selbst.
-        skillMittel:0.446,
-        // steil/korrektur GEGEN DEN NFL-KORRIDOR GEFITTET (docs/design/football-rezept-
-        // kalibrierung.md, scripts/miss-football-korridor.mjs): Completion-Quote 65,3 %,
-        // Yards/Attempt 7,1 (NFL 2024, football-rollout-plan.md A.1) — dieselbe
-        // Fit-Reihenfolge wie ueberall (steil/skillMittel ZUERST, korrektur ZULETZT).
+        // skillMittel NEU GEMESSEN (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1):
+        // der Wert unten (0,446) stammte aus der Zeit VOR fkLos()/FK_LOS_KAPPA=3 und ist
+        // seit der Football-Runde-1-PR (#884) die FALSCHE Referenz — genau wie der Plan es
+        // vorhersagt: "skillMittel ist mit kappa=3 die falsche Referenz geworden — die
+        // Referenz muss der ERWARTETE Akteur der Lotterie sein, nicht der Kadermittelwert."
+        // ALT: window.__arena.feldspielSubskills("football") auf dem 12-Spieler-Testkader
+        // (Kadermittel, nicht lotteriegewichtet) lieferte PASSGENAUIGKEIT-Mittel 58,3,
+        // TEAMGEIST-Mittel 48,2 -> 0,446.
+        // NEU: node scripts/miss-football-korridor.mjs 120/200, ueber fsFbLog.passerPgSum/
+        // passerTgSum/passerN (s. dortiger Kommentar und resolvePass unten) — misst den
+        // TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer, nicht den
+        // Kaderschnitt. Gemessener Mittelwert: PASSGENAUIGKEIT 71,2 / TEAMGEIST 66,1 (zwei
+        // unabhaengige 120er- bzw. 200er-Laeufe: 71,2/66,1 und 71,1/65,9) ->
+        // 71,2*0,0060 + 66,1*0,0020 = 0,559. Kappa=3 zieht ueberproportional den staerksten
+        // Passer je Snap — beabsichtigt fuer die Rangtreue, aber `skillMittel` MUSS diesem
+        // verschobenen Erwartungswert folgen, sonst schlaegt der volle `steil`-Bonus auf
+        // einen Akteur durch, der laengst ueber dem alten Mittel liegt (der mechanische
+        // Grund fuer den Korridor-Shift auf 76,5 % Completion / 8,70 Yards je Attempt, den
+        // die Runde-1-PR selbst schon so vorhergesagt und offengelassen hatte).
+        skillMittel:0.559,
+        // steil UNVERAENDERT (rho zur Eignung 0,801 nach Rezept C, s. rezept-Kommentar
+        // unten — der Steilheitsparameter selbst war nie der Befund dieser Runde).
         steil:14,
         korrektur:{dunk:0, nah:0, mit:0, fern:0},
         skillTerme:[{feld:"PASSGENAUIGKEIT",koeff:0.0060},{feld:"TEAMGEIST",koeff:0.0020}]
@@ -6350,8 +6368,15 @@
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
+    // passerPgSum/passerTgSum/passerN NEU (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt
+    // 6.1): messen den TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer statt
+    // den Kadermittelwert — genau der Unterschied, den kappa=3 zwischen "Referenzakteur der
+    // Lotterie" und "Kadermittel" aufreisst (s. FELDSPIEL_ART.football.kurve.skillMittel-
+    // Kommentar). scripts/miss-football-korridor.mjs liest sie ueber denselben generischen
+    // fsFbLog-Mechanismus wie jede andere Kennzahl hier.
     fsFbLog=feldspielDisc==="football"?{passAtt:0,passComp:0,passInt:0,sacks:0,rushAtt:0,
-      fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0}:null;
+      fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0,
+      passerPgSum:0,passerTgSum:0,passerN:0}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -7701,7 +7726,19 @@
     // Wahrscheinlichkeit/Yards-Formel etwas.
     if(rr()<pFumble)return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
-    const meanYds=Math.max(-3,Math.min(11,3.6+diff*0.055));
+    // BASIS 4,0 STATT 3,6 (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1): fkLos()/
+    // kappa=3 zieht Rusher UND Run-Stopper beide bevorzugt aus dem staerksten Ende ihres
+    // jeweiligen Sub-Skills (s. fkLos-Kommentar oben) — `diff` mittelt sich dadurch ueber
+    // viele Laeufe naeher an 0 als bei der alten linearen Lotterie, und der alte Mittelwert
+    // 3,6 (gegen eine durchschnittliche Paarung gefittet) traf gemessen nur noch 3,5
+    // Yards/Carry (Ziel ~4,3, Football-Plan A.1).
+    // NICHT 4,4 (der rechnerisch naheliegende Wert, um exakt 4,3 zu treffen): kaderfest
+    // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 24 football) senkte 4,4 rho je Spiel
+    // auf 0,787 (durchgefallen) — 4,0 trifft rho 0,813 (bestanden) bei Yards/Carry 3,92
+    // (Ziel ~4,3, node scripts/miss-football-korridor.mjs 200), der bessere Kompromiss aus
+    // Korridor-Naehe UND Rangtreue. Der Laufkorridor bleibt damit ein Stueck unter dem Ziel
+    // stehen (bewusst, s. PR-Beschreibung) statt ihn exakt zu treffen und rho zu opfern.
+    const meanYds=Math.max(-3,Math.min(11,4.0+diff*0.055));
     const yards=Math.round(meanYds+(rr()-0.5)*9);
     return {typ:"lauf",spieler:rusher,verteidiger:abwehr,yards};
   }
@@ -7736,6 +7773,10 @@
   function resolvePass(off,def,down,toGo,spielTyp){
     const passer=fkLos(off,"PASSGENAUIGKEIT");
     const rusher=fkLos(def,"ABWEHR_PASS");
+    // Korridor-Refit-Messung, s. fsFbLog-Kopfkommentar in bauFeldspiel — EIN Zaehler je
+    // Dropback (Sack/Interception/incomplete/komplett zaehlen alle, weil derselbe gezogene
+    // Passer allen vier Ausgaengen zugrunde liegt), keine Wirkung auf eine Wahrscheinlichkeit.
+    if(fsFbLog){ fsFbLog.passerPgSum+=passer.PASSGENAUIGKEIT; fsFbLog.passerTgSum+=passer.TEAMGEIST; fsFbLog.passerN++; }
     // BASIS 0,07 (Korridor-Fit): 2,42 Sacks / (29,9 Passversuche + 2,42 Sacks) = 7,5 %
     // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
     // nur 4,6-5,1 %.
@@ -7765,7 +7806,12 @@
     // aus 658 Turnovern minus ~0,5 verlorenen Fumbles je Team (271 Fumbles verloren / 272
     // Spiele 2024, WebSearch) ueber 544 Team-Spiele bei 29,9 Passversuchen/Team — die alte
     // Fassung (Basis 0,03, +0,03 fern) mass 5-5,6 %, mehr als doppelt so hoch.
-    const pInt=Math.max(0.008,Math.min(0.10,0.014+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
+    // BASIS NOCH EINMAL LEICHT GESENKT, 0,014 -> 0,011 (Korridor-Refit-Runde, Opus-Plan
+    // 10.09. Abschnitt 6.1, Punkt "pInt-Basis leicht senken"): mit fkLos()/kappa=3 zieht
+    // `rusher` (ABWEHR_PASS) ebenso bevorzugt aus dem staerksten Ende wie `passer`
+    // (PASSGENAUIGKEIT) — beide Seiten der Differenz sind jetzt haeufiger elitaer,
+    // wodurch die alte Basis 0,014 gemessen 2,5-2,9 % statt 2,1-2,4 % traf.
+    const pInt=Math.max(0.008,Math.min(0.10,0.011+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
       +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
     if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
     // `verteidiger:rusher` NEU an "komplett"/"incomplete" (06.09., Bewegungs-Runde) —
@@ -8081,7 +8127,13 @@
       // (Steals nachgetragen, weil "Puck erobern eine Hauptaufgabe ist", s. feldspielWert).
       // `checks` existiert an jeder Einheit (Hockey-Bodycheck) und wird ausserhalb der
       // jeweiligen Disziplin nie inkrementiert — kein neues Feld noetig.
-      if(erg.verteidiger)erg.verteidiger.checks++;
+      // KEIN TACKLE AUF EINEM TOUCHDOWN-ZUG (Korridor-Refit-Runde, Opus-Review PR #884
+      // Fund F5): `footballDownWeiter` entscheidet ERST danach, ob `fb.spot-erg.yards<=0`
+      // die Endzone erreicht — bis hierher wurde der Solo-Tackle unbedingt gebucht, auch
+      // wenn der Zug in genau diesem Moment ein Touchdown war (~5 % aller Tkl-Eintraege bei
+      // ~2,6 TDs je Team/Spiel, so vom Review nachgemessen). Reine Box-Score-Korrektheit,
+      // KEINE Wirkung auf Punktestand/Down/Distance/eine Wahrscheinlichkeit — rho-neutral.
+      if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.receiver);
@@ -8089,7 +8141,8 @@
     }
     if(erg.typ==="lauf"){
       erg.spieler.laufYards+=erg.yards;
-      if(erg.verteidiger)erg.verteidiger.checks++;   // Solo-Tackle, s. Zweig "komplett" oben
+      // KEIN TACKLE AUF EINEM TOUCHDOWN-ZUG, s. Zweig "komplett" oben (F5).
+      if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog)fsFbLog.rushAtt++;
       feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
       footballDownWeiter(fb,erg.yards,erg.spieler);
