@@ -12441,7 +12441,22 @@
       // Schranke, die `schach:true` (:11008) neben demselben geteilten `duell:true` schon
       // fuer Speed-Schach traegt — genau das Muster, mit dem PR #883 es dort vorgemacht hat.
       // Rein deskriptiv, ohne Wirkung, bis Ziel-PR 10 `stepFechten()` liefert.
-      label:"Fechten", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true, fechten:true,
+      //
+      // PERIODEN + TREFFERSTAND (docs/design/fechten-punkte-mehrrunden-konzept-14-09.md,
+      // Option 1+2, Chris' Go am 14.09.). `rundenN` von 10 auf 9 — durch 3 teilbar, also
+      // drei "Perioden" zu je drei Gaengen (FIE-Analogie), bei praktisch derselben
+      // Gesamtdauer (rundenDauer waechst im selben Verhaeltnis, s. unten). Das ist REINE
+      // Enthuellungs-/Ticker-Gruppierung: `wert()`, `rezept` und die Erfolgskurve oben in
+      // dieser Datei (der generische `for(let ri=0;ri<art.rundenN;ri++)`-Block bei setz())
+      // bleiben unangetastet — derselbe rho-neutrale Hebel, den Eiskunstlauf/Breaking fuer
+      // ihre eigene rundenN-Anpassung schon genutzt haben (rundenN:12 bzw. rundenN:8,
+      // s. deren Kommentare bei BUEHNE_ART.eiskunstlauf/.breaking oben). Die
+      // Perioden-Beat-Zeile im Feed steht in stepBuehne() (Suche
+      // "PERIODE BEENDET"), der Trefferstand (`u.treffer`) daneben in setz()/stepBuehne()
+      // (Suche "TREFFERSTAND"), streng nach dem additiven `u.kuehneVersuche`-Muster
+      // (Gewichtheben, s. baueHebenDuelle-Kommentar oben): keines von beiden fliesst in
+      // u.summe/u.vorteil/u.verlauf oder MOTOREN[...].wert() ein.
+      label:"Fechten", jeSeite:6, rundenN:9, rundenDauer:60/(9*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
       rezept:{
         GRUNDLAGE:    {torment:45,dexterity:30,awareness:25},
@@ -12555,6 +12570,12 @@
       // fuer sich ausrechnen — baueHebenDuelle() macht das unten, nachdem beide Seiten
       // stehen. Fuer die sechs anderen Buehnen-Disziplinen aendert sich hier nichts.
       if(art.heben){ TEILNEHMER.push(L); return; }
+      // TREFFERSTAND (s. grosser Kommentar bei BUEHNE_ART.fechten oben, Option 2): reines
+      // additives Anzeigefeld nach dem u.kuehneVersuche-Muster, nur fuer Fechten befuellt
+      // (art.fechten) — die sechs Geschwister-Buehnen (Schach/Tennis/I-Spy/Wettessen/
+      // Showcase/Eiskunstlauf/Breaking) durchlaufen genau denselben setz()-Zweig, bleiben
+      // aber ohne dieses Feld, weil es fuer sie nirgends gelesen wird.
+      if(art.fechten)L.treffer=0;
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
@@ -13311,8 +13332,35 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
+        // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
+        // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
+        // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
+        // hochgezaehlt statt beim Bauen des Duells.
+        if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
+        const fechtGegner=BB().fechten?TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side):null;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
-          " · Vorteil "+(v>0?"+":"")+v+" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+          " · Vorteil "+(v>0?"+":"")+v
+          +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
+          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+        // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
+        // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
+        // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
+        // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
+        // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
+        // darunter schon "BRETT ENTSCHIEDEN".
+        if(BB().fechten&&u.side===0){
+          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
+          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
+          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
+          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
+          const proPeriode=BB().rundenN/3;
+          if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
+            const periode=(u.aktuell+1)/proPeriode;
+            feed(u.side,"Periode "+periode+" beendet — "+u.n+" gegen "+u.gegnerN+
+              ": Vorteil "+(v>0?"+":"")+v+", Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)+".",true);
+          }
+        }
         // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
         // der Zuege dieses Teilnehmers steht endgueltig fest, ob das Brett gewonnen,
         // verloren oder remis ist — derselbe u.verlauf, den auch die Wertungstabelle
@@ -14190,6 +14238,11 @@
     const sd=document.querySelector(".hpbars .sd");
     if(sd)sd.textContent=BB().heben
       ? "Reißen und Stoßen, je drei Versuche — Duell um Duell"
+      : BB().fechten
+      // PERIODEN (Option 1, s. BUEHNE_ART.fechten-Kommentar): eigene Unterzeile statt
+      // der generischen Duell-Zeile, nach demselben Muster wie Gewichthebens
+      // "Reißen und Stoßen" direkt darueber — nur Text, keine eigene Uhr.
+      ? "3 Perioden zu je 3 Gängen — Trefferstand läuft mit"
       : BB().duell
       ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
@@ -14484,6 +14537,14 @@
           ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
           ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
           ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
+          // TREFFERSTAND (Option 2, s. BUEHNE_ART.fechten-Kommentar): eigene, kleine
+          // Zeile neben der Vorteils-Anzeige — Zierde, kein zweiter Wertungsmassstab
+          // (der bleibt v/u.vorteil oben). Nur Fechten fuehrt u.treffer, die uebrigen
+          // Duell-Buehnen (Schach/Tennis/I-Spy) zeigen diese Zeile deshalb gar nicht.
+          if(art.fechten){
+            const fechtGegner=TEILNEHMER.find(gg=>gg.brett===u.brett&&gg.side!==u.side);
+            ctx.fillText("Treffer "+(u.treffer||0)+":"+(fechtGegner?fechtGegner.treffer||0:0),x,y+84);
+          }
         } else {
           schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
           // Punktesaeule: wie weit im Feld, nicht absolut — sonst waere Gewichtheben
