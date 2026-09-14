@@ -612,10 +612,25 @@
   .oly-battle-arena.oly-battle-arena .bhname{overflow:hidden;text-overflow:ellipsis;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bhrow.bhdim{opacity:.62;font-size:10px}
   .oly-battle-arena.oly-battle-arena .bheig{color:#e8c07a;font-weight:600;flex:none}
-  .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:104px;text-align:center;
-    font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14.5px;letter-spacing:.02em;
-    background:rgba(10,13,18,.72);border:1px solid rgba(255,255,255,.16);border-radius:8px;
-    padding:5px 8px;color:#e7edf6}
+  /* FUEHRUNGSFELD. Bis 13.09. ein 104px schmales Kaestchen mit einer Zeile ("V-W +0.1s") —
+     Chris' Befund: "dadurch dass es immer 0-0 steht weiss man aktuell gar nicht wer
+     fuehrt". Jetzt zwei Zeilen (wer fuehrt / um wie viel in ECHTEN Sekunden) plus ein
+     Balken, wie ihn eine Uebertragung einblendet, und deutlich groesser. Gegenstueck in
+     battle-mode.engine.js: updateHudBahn(), Abschnitt "DAS FUEHRUNGSFELD". */
+  .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:196px;text-align:center;
+    font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;
+    background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.22);border-radius:8px;
+    padding:4px 12px 6px;color:#e7edf6;line-height:1.12}
+  .oly-battle-arena.oly-battle-arena .bhdelta b{display:block;font-weight:700;font-size:16px}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhsub{display:block;font-weight:700;font-size:21px;
+    font-variant-numeric:tabular-nums;color:#fff}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-home .bhsub{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhdelta.bh-away .bhsub{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar{display:block;height:4px;margin-top:4px;
+    border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i{display:block;height:100%;border-radius:2px}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-home{background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-away{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
 
