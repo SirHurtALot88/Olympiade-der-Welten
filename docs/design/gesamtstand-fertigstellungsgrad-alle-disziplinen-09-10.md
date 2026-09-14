@@ -1,3 +1,17 @@
+**Zehnter Nachtrag 14.09. — Eiskunstlauf und Breaking nachgezogen (PR #917/#913), plus eine seit
+dem 13.09. liegengebliebene Eiskunstlauf-Zeile gefunden.** Der neunte Nachtrag (direkt darunter)
+hat Eiskunstlauf/Breaking ausdruecklich ausgespart, weil PR #917 und #913 noch in Pruefung waren —
+beide sind seither gemergt (`a82a90d1`, `8aecd880`) und werden hier nachgezogen. **rho fuer beide
+FRISCH auf dem heutigen `main` gemessen**, nicht aus den PR-Texten uebernommen: `node
+scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf breaking` liefert Eiskunstlauf **0,885** und
+Breaking **0,869 / 0,114 / 0,951 / 0,168** — beide bit-identisch zu den PR-Texten und zur
+bestehenden Tabelle. **Anders als beim neunten Nachtrag gab es diesmal keinen Widerspruch
+zwischen Messung und PR-Text.** Ein Fund ausserhalb der beiden PRs: die Eiskunstlauf-Zeile war
+bereits seit PR #903 (13.09., „Ton-Aufrufstellen, Kufe-Requisite, K4-Kalibrierung", Konzept 90→95,
+Assets 70→95) stale — dieselbe Art Luecke wie Staffel im neunten Nachtrag, nur eine Runde aelter
+und vom neunten Nachtrag selbst nicht gefunden, weil er nur die zehn PRs seiner eigenen Merge-Welle
+geprueft hat. S. 4.4.
+
 **Neunter Nachtrag 14.09. — Nachzug fuer die Merge-Welle vom 13./14.09.** Zehn PRs sind seit dem
 achten Nachtrag auf `main` gelandet (#910, #908, #911, #909, #912, #907, #915, #914, #916, #918);
 #909 stand bereits drin, die uebrigen neun waren offen. **Alle rho-Zahlen dieses Nachtrags sind
@@ -97,9 +111,10 @@ Basketball/Hockey/Gewichtheben, und Football/TDM/Mini-DM/Battlefield fallen deut
 
 Die Nummerierung ist die Reihenfolge des Ursprungsberichts vom 10.09. und **nicht mehr nach Gesamt
 sortiert** — sie bleibt stehen, damit sich fruehere Nachtraege weiter auf dieselben Zeilennummern
-beziehen koennen. `rho` = kaderfest gemessen, n=24, Median ueber fuenf echte Team-Paarungen; die
-zehn Zeilen, die der 13./14.09. bewegt hat, sind auf `main` @ `7a07de2f` neu gemessen, die uebrigen
-stehen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
+beziehen koennen. `rho` = kaderfest gemessen, n=24, Median ueber fuenf echte Team-Paarungen; Zeile
+4 (Breaking) und 6 (Eiskunstlauf) sind fuer den zehnten Nachtrag auf dem heutigen `main` (nach
+`8aecd880`, PR #913) neu gemessen, die zehn Zeilen des neunten Nachtrags stehen auf `main` @
+`7a07de2f`, alle uebrigen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
 (`ARENA_RESOLVED_DISCIPLINE_IDS`).
 
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
@@ -107,9 +122,9 @@ stehen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
 | 2 | Gewichtheben | Buehne | 100 % | 100 % | 90 % | 100 % | **98 %** | 0,843 | ja | **14.09.** Zweikampf statt Einzeluebung im dritten Versuch + duellbewusste Eroeffnung, Chris' Kernbeschwerde 66,2 %→50,0 % (PR #907); Hantel blattproportional statt absoluter Pixel (PR #915). rho 0,854→**0,843** → G1 eine Stufe tiefer, Gameplay 95→90 · 12.09. Movement 87→100 — `stepHeben()` (PR #898) |
 | 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 95 % | **97 %** | 0,879 | ja | **14.09.** Puste-Erholung am Hindernis wirksam (PR #914), rho 0,883→**0,879** — gleiche G1-Stufe, keine Achse bewegt · Arena-Spalte korrigiert (stand seit 10.09. faelschlich auf „nein") · **13.09.** Fallentyp entscheidet den Sauber-Wurf mit (`fallenKoennen`), rho 0,861→0,883 — Fable-Recherche `takeshi-hindernis-vs-strecke-recherche-13-09.md` · 12.09. Movement 85→95 — `stepParcours()` (Laeufer-Zustandsmaschine) + drei Posen, Anker per Pixelscan korrigiert (PR #900) |
-| 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
+| 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 96 % | **97 %** | 0,869 / 0,114 / 0,951 / 0,168 | ja | **14.09.** Klares 1v1 (Ertraegender im Spotlight, Peiniger mit 10-stufiger Folterbank) statt zwoelf gleichrangiger Figuren im Ring — Movement 92→96 (PR #913, rho bit-identisch frisch gemessen). Assets bleibt bei 100 (bereits Deckel) · 12.09. K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
-| 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
+| 6 | Eiskunstlauf | Buehne | 95 % | 100 % | 95 % | 94 % | **96 %** | 0,885 | ja | **14.09.** Spotlight-Reihenfolge (gruppenweise statt „alle zwoelf gleichzeitig") + drei Zonen (Kuerbahn/Startbereich/Kiss-and-Cry) + Live-Standings-Tafel `zeichneEisStand()` vervollstaendigen die eigene Szene — Assets 95→100 (PR #917, rho bit-identisch frisch gemessen); Sturz-Teleport-Bug behoben (gedeckelte Paar-Uhr), Movement bleibt 94 (Reparatur einer bereits gezaehlten Achse, keine neue) · **Nachzug 13.09.:** Konzept 90→95, Assets 70→95 — Ton-Aufrufstellen + Kufe-Requisite + K4-Kalibrierung (PR #903, in der Tabelle nie nachgezogen) |
 | 7 | Speed-Schach | Buehne | 95 % | 95 % | 100 % | 95 % | **96 %** | 0,908 | ja | **12.09.** Konzept/Assets/Movement 80/75/80→95 — eigenes Fable-Dokument, Ton, Schachuhr-Requisite, `stepSchach()` (PR #902) |
 | 8 | Staffel | Bahn | 95 % | 95 % | 97 % | 95 % | **96 %** | 0,899 | ja | **14.09.** Oval als echte Stadionform, Bildposition aus dem Gesamtfortschritt, alle Zeitanzeigen in echten Sekunden, Ausfuehrungsstreuung beim Wechsel — rho 0,915→**0,899** (gepaart reproduziert, gleiche G1-Stufe) (PR #916) · **Nachzug 13.09.:** Assets 55→95, Movement 70→95 (Stab-Sprite + Ton, PR #901, in der Tabelle nie nachgezogen) · Arena-Spalte korrigiert |
 | 9 | Football | Feldspiel | 90 % | 75 % | 65 % | 85 % | **79 %** | 0,800 | nein | 10.09. Rezept Runde 1, rho 0,516→0,800 (PR #884) · **E3 in Pruefung** (Anzeige-Korrektur, PR #894, NICHT gemergt — wartet auf Chris) |
@@ -125,14 +140,15 @@ stehen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
 | 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig: 72 %** (war 71 % vor der Merge-Welle vom 13./14.09., 65 % am
-10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 78 % · Assets 69 % · Gameplay
-74 % · Movement 66 %.**
+**Durchschnitt ueber alle zwanzig: 72 %** (rechnerisch 72,2 %, war 71,7 % vor dem Eiskunstlauf-/
+Breaking-Nachzug, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 78 % ·
+Assets 70 % · Gameplay 74 % · Movement 66 %.**
 
-*Die vier Achsenzahlen sind fuer diesen Nachtrag aus der Spalte darueber neu aufsummiert worden.
-Drei von ihnen standen vorher falsch da (Assets 68 statt gerechnet 67, Gameplay 71 statt 74,
-Movement 65 statt 63) — sie waren beim achten Nachtrag nicht mit der Tabelle mitgezogen worden.
-Die Gesamtzahl 71 % stimmte.*
+*Die vier Achsenzahlen sind fuer diesen Nachtrag erneut aus der Spalte darueber aufsummiert worden.
+Assets bewegt sich sichtbar (69→70 %, Eiskunstlauf 70→100), die drei anderen bleiben beim
+gerundeten Wert, obwohl Konzept (+0,25 Pp durch Eiskunstlauf) und Movement (+0,2 Pp durch
+Breaking) intern leicht steigen — beides zu klein, um die Rundung zu kippen. Gameplay bewegt sich
+gar nicht: rho aendert sich bei keiner der beiden Zeilen.*
 
 **Welle 0 (Fundament, gemergt 12.09., PR #892/#889/#891/#895): noch ohne eigene Punktewirkung.**
 Vier PRs — Ton-Katalog-Daten fuer sechs Disziplinen, die generische `DISZIPLIN_PROP`-Requisiten-
@@ -327,19 +343,52 @@ Fokus-Brett statt zu springen, Schachuhr tickt exponentiell statt in Spruengen, 
 sichtbar auf den Knopf. Die Zugfolge selbst bleibt bewusst „eine plausible Zugfolge" (Kommentar
 `:10788`), keine Schach-Engine — das war nie Teil des Auftrags.
 
-### Eiskunstlauf — 87 % (90/70/95/94)
-**10.09. Update:** Movement 60→94 (PR #874, PRODUKTIONSCODE, Opus-Review FREIGEBEN MIT NACHTRAG).
-Echte Kuer-Bewegung ersetzt das Reihenbild — Laeufer gleiten statt zu stehen. 12.09.: der
-Kufenspur-Ringpuffer pausiert jetzt waehrend `haeltStelle` (PR #895, Kleinbefund #2), sonst fiel
-die Spur bei einer Pirouette auf einen Punkt zusammen — Politur, keine Punktaenderung.
-**Konzept 90:** `duett:true` (automatische Paarung bei gerader Feldgroesse, PR #859), `rundenN` an
-der realen ISU-Programmlaenge (12 statt 6, Spearman-Brown-Runde vom 07.09., gemessen 0,792 → 0,875).
-Eigenes Fable-Dokument (`eiskunstlauf-duett-paarlauf-recherche-08-09.md`) plus die Politur-Recherche.
-**Assets 70:** `eiskunst.tsx` (599 Z.) und `zeichneDuett()` (`:11822`, ~100 Z., Paare + Eisspur).
-Die Waffenebene ist korrekt entfernt (`:2574`) — aber es gibt keine Schlittschuhe, kein Kostuem.
-**Gameplay 95:** rho **0,885** (frisch gemessen, 0,010 ueber der Basislinie), produktiviert.
-**Movement 94:** echte Kuer-Bewegungsmaschine (`stepKuer`, PR #874) statt Reihenbild — Laeufer
-gleiten sichtbar ueber das Eis, Kufenspur folgt korrekt (inkl. Pause waehrend `haeltStelle`).
+### Eiskunstlauf — 96 % (95/100/95/94)
+**NACHZUG 13.09. — Konzept 90→95, Assets 70→95 (PR #903).** Diese Zeile stand seit ihrer letzten
+Pflege unveraendert auf 90/70 und ist erst jetzt, mit dem 14.09.-Nachzug, nachgezogen worden —
+dieselbe Art Luecke wie Staffel im neunten Nachtrag. Nachgelesen, nicht aus dem Commit-Titel
+uebernommen: `sfx("eiskunstlauf", …)` steht jetzt in `stepKuer()` (kufe/sprung/landung/sturz) und
+`tonLoopStart("eiskunstlauf")` im Publikums-Loop (A4 0→20); `DISZIPLIN_PROP.eiskunstlauf` haengt
+eine Kufe an einen neuen Fusspunkt (`FUSS_EISKUNSTLAUF`, per Pixelscan auf `cy=61` korrigiert) und
+gibt jedem Paar eine Kostuemfarbe als Knoechelbund (A3 15→25); `eiskunstlauf-kalibrierung-10-09.md`
+modelliert das Rezept strukturell gegen die ISU-Wertungslogik (TES/PCS-Trennung), ohne eine Zahl zu
+aendern (K4). Die alte Assets-Zeile unten sagte bis heute „keine Schlittschuhe, kein Kostuem" —
+das galt bis zum 13.09. und ist entsprechend ersetzt.
+**14.09. Update: Assets 95→100 (PR #917).** Chris' Beschwerde („das sieht weird aus … man hat gar
+keine indikation welche leute sich gerade besser schlagen") plus ein echter Bug (Sturz-Teleport)
+haben eine konzeptionelle Ueberarbeitung ausgeloest, die **keine einzige Rezeptzahl anfasst** (rho
+bit-identisch, s.u.) und ausschliesslich die letzte offene Assets-Luecke schliesst: `bauBuehne()`
+baut die Warteschlange fuer `art.duett` jetzt **gruppenweise** statt rundenweise (schwaechstes Paar
+zuerst, wie im echten ISU-Wettkampf), die Bahn teilt sich in drei Zonen — `kuerBahn()` (das
+laufende Paar, volle Groesse), `kuerWarte()` (Startbereich, gedimmt, Startnummer) und `kuerKiss()`
+(Kiss-and-Cry, das eben fertige Paar mit Bank und Endpunktzahl) — und eine neue Zwischenstand-Tafel
+`zeichneEisStand()` zeigt Fuehrenden, laufendes Paar und Elementkaesten (gruen/rot/grau), nach dem
+Vorbild von Speed-Schachs Brett und Breakings Seitentafeln. Das vervollstaendigt A2 (eigene Szene
+ueber das geteilte Chassis-Bild hinaus): vorher gab es nur die eine Duett-Paarung auf einer Flaeche,
+jetzt drei benannte Zonen plus eine eigene Ergebnistafel. Nebenbei behoben, ohne Punktewirkung: der
+Sturz-Teleport (`stepKuer` sprang beim Aufstehen bis zu 78 px in einem Bild, weil der Zielpunkt an
+der globalen Buehnenuhr statt an einer eigenen Paar-Uhr haengte — jetzt `u.vizBahnT`, ein
+gedeckelter Schritt bleibt als Sicherheitsnetz) und die HUD-Ueberlappung (`kuerFlaeche()` bleibt
+das Eis, die Bewegung laeuft auf der neuen, engeren `kuerBahn()`, damit Etiketten nicht mehr auf
+der Unterkante des Broadcast-Bugs landen). Beides ist eine Korrektur innerhalb bereits gezaehlter
+Kriterien (M2/M3), keine neue.
+**Konzept 95:** `duett:true` (automatische Paarung bei gerader Feldgroesse, PR #859), `rundenN` an
+der realen ISU-Programmlaenge (12 statt 6, Spearman-Brown-Runde vom 07.09., gemessen 0,792 → 0,875),
+K4 seit PR #903 strukturell kalibriert gegen die ISU-Wertungslogik. Drei eigene Dokumente
+(`eiskunstlauf-duett-paarlauf-recherche-08-09.md`, `eiskunstlauf-kalibrierung-10-09.md`,
+`eiskunstlauf-startreihenfolge-spotlight-recherche-13-09.md`).
+**Assets 100:** `eiskunst.tsx` (599 Z.), `zeichneDuett()` (Paare + Eisspur), eigene Kufe am
+Fusspunkt mit Paar-Kostuemfarbe (PR #903), eigener Ton an vier Aufrufstellen (PR #903), seit PR
+#917 drei benannte Zonen (Kuerbahn/Startbereich/Kiss-and-Cry) plus eigene Live-Standings-Tafel
+`zeichneEisStand()`. Die Waffenebene ist korrekt entfernt (`:2574`).
+**Gameplay 95:** rho **0,885** (14.09. erneut frisch gemessen, bit-identisch vor und nach PR #917),
+produktiviert.
+**Movement 94:** echte Kuer-Bewegungsmaschine (`stepKuer`) statt Reihenbild — Laeufer gleiten
+sichtbar ueber das Eis, Kufenspur folgt korrekt (inkl. Pause waehrend `haeltStelle`), seit PR #917
+mit gedeckelter Paar-Uhr statt globaler Buehnenuhr (kein Sturz-Teleport mehr) und Ein-/Auslaufen in
+die Kiss-and-Cry-Zone ueber denselben gedeckelten Schritt. Bleibt bei 94, weil die eigentliche Luecke
+(echte Hebefigur-Pose, s. 3.6) unangetastet ist — die Bewegungsaenderungen dieser Runde reparieren
+eine bereits gezaehlte Achse, sie eroeffnen keine neue.
 
 ### Takeshi's Castle — 97 % (100/95/97/95)
 **10.09. Update:** Assets 60→95, Gameplay 67→97 (PR #880 Bahn-Produktivierung, Opus-Review
@@ -387,7 +436,7 @@ Nachgelesen: `takeshis-castle` steht dort seit der Bahn-Produktivierung
 (`lib/resolve/battle-mode-arena-team-points.ts:251`). Die Gameplay-Zeile hatte recht, dieser Satz
 nicht; die Arena-Spalte in der Tabelle oben ist entsprechend auf „ja" korrigiert.
 
-### Breaking — 96 % (95/100/95/92)
+### Breaking — 97 % (95/100/95/96)
 **10.09. Update:** Assets 65→100, Movement 55→92 (PR #875, PRODUKTIONSCODE, Opus-Review FREIGEBEN
 MIT NACHTRAG). Echter Cypher mit Move-Mechanik ersetzt die rein zeichnerische Kulisse. 12.09.: PR
 #895 (Kleinbefund #3/#4) korrigiert die Freeze-/Rueckzug-Fade-Divisoren (rissen bei halber
@@ -399,16 +448,51 @@ Rundenzahl (`rundenN:8`) passt zur realen Battle-Struktur (2-3 Throwdowns a ~5 T
 Rezept-Hypothesen (`rundenN`8→12, `failAbzug`0,55→0,35) wurden gemessen und bewegen beide weniger
 als Breakings Kader-Spannweite (0,114) — eine sogar in die falsche Richtung — also blieb der Code
 unveraendert. Charisma-Gewicht 0 bestaetigt sich gegen die tatsaechlichen fuenf WDSF-Kriterien.
+**14.09. Update: Movement 92→96 (PR #913).** Chris: „entweder zeigst du immer nur 2 charaktere
+gegeneinander die miteinander interagieren … so ist das weird wenn alle im kreis stehen in der
+mitte kurz rein ploppen". Die Mechanik war nie das Problem — `stepCypher()` markiert seit #875
+genau einen Aktiven je Zug und `buehneQueue` wechselt bereits rundenweise zwischen den Seiten
+(Konzept/Gameplay bleiben unangetastet, rho bit-identisch, s.u.) — nur zu sehen war das nicht:
+zwoelf gleichrangige Figuren standen gleich gross und gleich hell im Ring, ohne dass irgendwer
+irgendwem sichtbar gegenueberstand. Neu: **zwei Raenge statt zwoelf gleicher** — die zehn
+Unbeteiligten treten (Faktor 0,72, kein Namensschild, per Vignette abgedunkelt) hinter das Paar
+zurueck, das sich auf der Waagrechten durch das Zentrum gegenuebersteht (Heim 180°, Gast 0°); der
+Peiniger rueckt sichtbar nach, waehrend der Ertragende ausharrt (Radiusfaktor 0,62→0,33), und weicht
+danach zurueck — eine **Druckachse** aus drei pulsierenden Winkeln zeigt, wer hier gerade wem
+zusetzt. Dazu, unabhaengig gefunden und behoben: drei echte Breakdance-Ueberreste trotz
+Folter-Survival-Konzept — eine volle Windmill-Rotation bei `vizMove===2` (jetzt „Aufbaeumen": eine
+begrenzte Kippung, **keine** volle Rotation), die vier Posen hiessen intern Toprock/Footwork/
+Powermove/Freeze (jetzt Standhalten/Zusammenkruemmen/Aufbaeumen/Steingesicht) und der Ticker sagte
+„setzt den Move"/„Move bricht ab" (jetzt „haelt stand"/„bricht ein", ausschliesslich ueber
+`art.erfolgWort`/`art.failWort` gelesen, kein Stringvergleich). Das ist eine Korrektur, keine neue
+Achse — die vier Posen waren als eigene Bewegungs-Zustaende schon vorher gezaehlt, nur mit der
+falschen Sport-Flagge beschriftet. Die **Folterbank** mit zehn eskalierenden Geraeten (Strick bis
+Vorschlaghammer, Chris' eigene Idee, `folterStufe()` auf die Durchgangszahl gespreizt) ist ein
+echtes neues Requisit am Sprite — sie landet in A3, das bereits vor dieser PR bei 100 stand, und
+hebt Assets deshalb nicht weiter an. Nach Review nachgebessert: Breakdance-Reste auch in den
+SICHTBAREN Slot-Beschreibungen gefunden (`matchday-slot-roles.ts` + `battle-mode.engine.js`,
+„Move"→„Hieb", „Rhythmus"→„Ruhe"), eine falsche „keine Asset-Pipeline"-Behauptung korrigiert (der
+Motor laedt sehr wohl PNG-Kacheln, `zeichneFalleTakeshi()` ist Hauptabnehmer — die Folterbank bleibt
+trotzdem Handzeichnung, aus Einfachheit, nicht aus Mangel), PEINIGT/FUEGT ZU auf ein Wort
+vereinheitlicht. **Warum nicht mehr als 96:** der Gang zum Tisch bleibt unanimiert (der leere,
+golden markierte Platz erzaehlt „das naechste Geraet", kein Laufweg — s. 3.6), und die Rollenrichtung
+(Ertragender im Spotlight statt Peiniger) ist von der PR selbst als „begruendet, aber nicht
+unumstoesslich" markiert.
 **Konzept 95:** eigenes Torment/Will-Rezept ohne Charisma, mit gemessener NACHGEZOGEN-Korrektur
-(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung, jetzt zusaetzlich gegen echte Sportdaten
-kalibriert (s.o.). Zwei eigene Fable-/Design-Dokumente
-(`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`,
-`breaking-kalibrierung-10-09.md`).
+(`:10744`), `rundenN` 4 → 8 an der realen WDSF-Bewertung, gegen echte Sportdaten kalibriert (s.o.).
+Drei eigene Fable-/Design-Dokumente (`breaking-folter-survival-visuelle-identitaet-recherche-08-09.md`,
+`breaking-kalibrierung-10-09.md`, `breaking-folter-zweikampf-praesentation-13-09.md`).
 **Assets 100:** `zeichneBreaking()` (lila Cypher mit vier Ringzonen und SURVIVOR-Spotlight),
-`breaking.tsx` seit PR #875 deutlich gewachsen.
-**Gameplay 95:** rho **0,869**, produktiviert (Welle 2).
-**Movement 92:** echte Move-Mechanik (`stepCypher`, PR #875) statt reiner Zeichenkulisse —
-Toprock/Footwork/Powermove/Freeze-Phasen, Ringposition glaettet jetzt bei Rangwechseln (PR #895).
+`breaking.tsx` seit PR #875 deutlich gewachsen, seit PR #913 eine Folterbank mit zehn eskalierenden
+Geraeten am Sprite und zwei Seitentafeln (wer gegen wen, mit Rolle) als eigenes Erkennungszeichen —
+beides Qualitaet innerhalb bereits voller Kriterien, der Deckel bleibt 100.
+**Gameplay 95:** rho **0,869 / 0,114 / 0,951 / 0,168** (14.09. erneut frisch gemessen,
+bit-identisch vor und nach PR #913), produktiviert (Welle 2).
+**Movement 96:** echte Move-Mechanik (`stepCypher`, PR #875) statt reiner Zeichenkulisse — seit
+PR #913 als klares 1v1 (Ertragender im Spotlight, Peiniger mit Folterbank) statt zwoelf
+gleichrangiger Figuren, mit Naeher-/Zurueckweichen und Druckachse; die vier Bewegungs-Zustaende
+sind jetzt disziplineigen benannt und animiert (Standhalten/Zusammenkruemmen/Aufbaeumen/
+Steingesicht) statt Breakdance-Posen zu tragen. Offen bleibt der unanimierte Gang zum Tisch (3.6).
 
 ### Staffel — 96 % (95/95/97/95)
 **NACHZUG 13.09. — Assets 55→95, Movement 70→95 (PR #901).** Diese Zeile war bei ihrer letzten
@@ -877,6 +961,47 @@ dort, wo sie gilt (`arenaDisciplineId`, mit eigenem Test und bit-identischem Rue
 **Keine Punktewirkung auf die Tabelle oben** — G2 misst, ob eine Disziplin in
 `ARENA_RESOLVED_DISCIPLINE_IDS` steht, und daran aendert das Audit nichts.
 
+### 3.6 Offene Nachfolgepunkte aus PR #917 (Eiskunstlauf) und #913 (Breaking) — 14.09.
+Beide PRs benennen selbst, was sie **bewusst nicht** angefasst haben. Damit das nicht verloren
+geht, bevor die naechste Runde an diesen Disziplinen ansetzt, hier gesammelt — keiner der Punkte
+bewegt eine Zahl oben:
+
+**Eiskunstlauf (PR #917):**
+- **Sturz-Gleiten (~39 px).** Haelt nur ein Partner, bleibt er stehen und faehrt danach mit dem
+  gedeckelten Schritt (260 px/s) wieder auf — bei einem Haltefenster von 0,5 s und ≤78 px/s
+  Bahntempo ein Rueckstand von bis zu 39 px, der sich in ~0,2 s aufholt. Eine weiche Korrektur,
+  kein Sprung mehr, aber sichtbares Gleiten bleibt.
+- **Broadcast-Bug bei sehr schmaler Darstellung.** Bei 420 px Fensterbreite frisst der Bug 44 % der
+  Leinwandhoehe — dort hilft keine Geometrie der Kuer-Bahn mehr. Ein CSS-Thema des Overlays selbst,
+  eigenes Ticket.
+- **Kurzprogramm + Kuer als zwei Segmente.** Die reale ISU-Struktur hat zwei Segmente; das Spiel
+  hat weiterhin nur eines.
+- **Die 47 %-Sturzquote-Kalibrierung.** Von der Opus-Overseer-Review zu PR #903 nachgezaehlt (58
+  Stuerze zu 66 Landungen bei 125 Elementen) und in `eiskunstlauf-kalibrierung-10-09.md` als
+  offener, quantifizierter Befund festgehalten — eine reale Fehlschlagquote, die hoeher liegt als
+  im echten Sport. Ist ein Rezept-Thema, keine Praesentationsfrage, und PR #917 fasst das Rezept
+  ausdruecklich nicht an.
+- **Echte Hebefigur-Pose.** Weiterhin keine eigene Pose fuer Hebefiguren — der Rest von Movements
+  Luecke zu 100 (M4).
+
+**Breaking (PR #913):**
+- **Sichtbarer Gang zum Tisch.** Kein Laufweg zur Folterbank und zurueck — bei `rundenDauer:0,625 s`
+  ist dafuer kein Zeitbudget, ohne die Zustandsmaschine zu verlaengern. Erzaehlt ueber den leeren,
+  golden markierten Geraeteplatz statt ueber Bewegung.
+- **Rollenrichtung.** Der Ertragende steht im Spotlight, der Peiniger daneben — von der PR selbst
+  als „begruendet, aber nicht unumstoesslich" markiert; die umgekehrte Zuweisung waere ein Einzeiler
+  in `cypherPaar()`.
+- **`TON_KATALOG`-Schluessel `"powermove"`.** Heisst weiterhin so, obwohl Breakdance-Vokabular,
+  weil derselbe Schluessel parallel in einem Staffel-Kommentar zitiert wird — Umbenennung als eigene
+  kleine Aufraeumrunde vorgesehen.
+- **Eigene Foltergeraeusche je Stufe.** Der Ton ist unveraendert (`TON_KATALOG.breaking` mit vier
+  Schluesseln, drei `sfx()`-Aufrufe) — kein eigenes Geraeusch je Eskalationsstufe der Folterbank.
+- **Interne Breakdance-IDs.** `powermove`/`footwork`/`freezecontrol`/`musicality` bleiben als
+  interne Slot-`id`s stehen — sie sind der Vertrag mit gespeicherten Aufstellungen, eine Umbenennung
+  braucht eine Migration.
+- **Kommentar-Reste in `breaking.tsx`.** Nicht Teil dieser PR (die Aenderungen liegen in
+  `battle-mode.engine.js`), noch nicht durchgesehen.
+
 ---
 
 ## 4. Was ich beim Nachsehen gefunden habe und was in der Doku falsch steht
@@ -916,6 +1041,20 @@ dreizehn Eintraege, darunter `staffel`, `takeshis-castle` und `time-trial`. **Cl
 stehen dort bewusst NICHT** — Climbing, weil es die Rangtreue-Schranke nicht besteht, Spurt wegen
 des Feldgroessen-Fundes F1 (`jeSeite` ist 4, nicht 6). Beide Spalten sind entsprechend korrigiert;
 an den Prozentzahlen aendert sich dadurch nichts, weil sie die Menge schon richtig gelesen hatten.
+
+### 4.4 Eiskunstlauf stand seit PR #903 (13.09.) auf einer ueberholten Zeile — 14.09. korrigiert
+Derselbe Fehler wie bei Staffel (4.1 des neunten Nachtrags), nur eine Runde aelter und vom neunten
+Nachtrag selbst nicht gefangen: der neunte Nachtrag hat ausdruecklich nur die zehn PRs seiner
+eigenen Merge-Welle (#910/#908/#911/#909/#912/#907/#915/#914/#916/#918) geprueft und Eiskunstlauf
+bewusst uebersprungen, weil PR #917 noch offen war — dabei aber nicht bemerkt, dass die Zeile schon
+VOR dieser Merge-Welle stale war. PR #903 (13.09., „Ton-Aufrufstellen, Kufe-Requisite,
+K4-Kalibrierung") stand mit Konzept 90→95 und Assets 70→95 im eigenen Commit-Titel und war zum
+Zeitpunkt des neunten Nachtrags laengst auf `main` — die Tabelle zeigte trotzdem weiterhin 90/70.
+Mit diesem (zehnten) Nachtrag nachgezogen, zusammen mit PR #917. **Lehre fuer kuenftige Nachtraege:**
+ein Nachtrag, der sich nur auf „die PRs der letzten Merge-Welle" beschraenkt, kann eine Zeile
+uebersehen, die eine Welle davor liegengeblieben ist — ein `git log -- <scorecard-datei>` gegen
+`git log --oneline main -- public/mockups/battle-mode.engine.js` seit dem letzten Nachtrag waere
+der zuverlaessigere Check.
 
 ---
 
