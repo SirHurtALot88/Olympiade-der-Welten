@@ -4407,10 +4407,10 @@
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
-      {id:"powermove",label:"Bruchpunkt",text:"Treibt den schwersten Move bis zum Bruchpunkt — über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"powermove",label:"Bruchpunkt",text:"Treibt den schwersten Hieb bis zum Bruchpunkt — über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
       {id:"footwork",label:"Standhalten",text:"Hält die Position im Kreis und sammelt Punkte — über Health und Dexterity.",gross:"health",klein:"dexterity",last:"will",mueh:"medium",profil:{will:25.5,health:23.4,torment:20.1,power:9.2,determination:9.2,stamina:7.3,dexterity:3.5,intelligence:1.9}},
       {id:"freezecontrol",label:"Steingesicht",text:"Erstarrt zum Steingesicht und hält die Kontrolle — über Health und Determination.",gross:"health",klein:"determination",last:"torment",mueh:"medium",profil:{will:24.4,health:23.4,torment:19.2,determination:13.4,power:8.8,stamina:7.1,dexterity:1.8,intelligence:1.8}},
-      {id:"musicality",label:"Aushalten",text:"Findet den Rhythmus im bloßen Aushalten — über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
+      {id:"musicality",label:"Aushalten",text:"Findet die Ruhe im bloßen Aushalten — über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
       {id:"battlenerve",label:"Zermürbung",text:"Hält der Zermürbung stand und antwortet im Battle — über Torment und Will.",gross:"torment",klein:"will",last:"health",mueh:"high",profil:{will:31.4,torment:27.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
       {id:"finaleset",label:"Unbroken",text:"Setzt den Schlusspunkt, unversehrt — über Power und Torment.",gross:"power",klein:"stamina",last:"determination",mueh:"medium",profil:{torment:21.2,will:19.8,power:17.1,health:16.6,stamina:13.5,determination:7.6,intelligence:3,dexterity:1.4}}
     ],
@@ -11784,11 +11784,22 @@
   // „dass da so ein tisch ist mit 10 folterinstrumenten und die charaktere nutzen die dann sogar
   // und gehen zum tisch nehmen sie auf step by step und sie werden immer schlimmer".
   //
-  // KEINE ASSET-SUCHE, WEIL ES KEINE ASSET-PIPELINE GIBT — nachgesehen, nicht vermutet: dieser
-  // Motor zeichnet JEDE Requisite als Canvas-Primitive (zeichneHantel() fuer die Gewichtheber-
-  // Hantel, zeichneFalleTakeshi() fuer Takeshis Fallen, der Schachuhr-Block in zeichneSchach()).
-  // Es wird kein einziges Bild geladen. „Assets suchen" heisst hier also: zehn Geraete als
-  // einfache Primitive ZEICHNEN, im selben Massstab wie die vorhandenen Requisiten (~15-40 px).
+  // KEINE ASSET-SUCHE — aber NICHT, weil es keine Asset-Pipeline gaebe. Eine fruehere
+  // Fassung dieses Kommentars behauptete das; sie war falsch und ist hier korrigiert.
+  // NACHGESEHEN, NICHT VERMUTET: dieser Motor laedt sehr wohl echte PNG-Blaetter — A_TEILE aus
+  // /sprites/arena/, SB_TEILE aus /sprites/buehne/, BK_TEILE aus /sprites/basketball/,
+  // FK_TEILE aus /sprites/football/ (je ein new Image() pro Kachel, jeder Ordner mit eigener
+  // quellen.json, Rueckfall ueber aDa() auf Primitive, wenn ein Blatt fehlt). Und
+  // zeichneFalleTakeshi() ist gerade KEIN Primitivbeispiel, sondern einer der Hauptabnehmer
+  // dieser Kacheln (aBild.burg_mauer, aBild.falle_tuer, aBild.falle_walze ...).
+  //
+  // Die zehn Geraete werden trotzdem von Hand gezeichnet, und zwar aus Einfachheit und
+  // Gleichklang: sie sind ~15-40 px gross, muessen im Griff-Frame des Peinigers MITDREHEN und
+  // zugleich flach auf dem Tisch liegen, und genau dafuer gibt es mit zeichneHantel() (rein
+  // primitiv, kein drawImage) bereits das passende Vorbild im Haus. Ein eigenes Folter-Blatt
+  // waere zehn neue Kacheln plus Lizenzrecherche fuer einen Effekt, den vier Pfade je Geraet
+  // ebenso gut treffen. „Assets suchen" heisst hier also: zehn Geraete als einfache Primitive
+  // ZEICHNEN, im selben Massstab wie die vorhandenen Requisiten.
   //
   // AUFBAU. Jede zeichne(c)-Funktion arbeitet in einem bereits verschobenen, gedrehten und
   // skalierten Koerperframe: Ursprung = GRIFF (die Hand), das Geraet reicht nach +x. Damit ist
@@ -12999,7 +13010,7 @@
   function stepBuehne(dt){
     // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
     // `done` einmal gesetzt war -- buehnenBewegung() (rein praesentational, s. Vertrag dort)
-    // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Tanzender in
+    // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Ertragender in
     // "eintritt", letzte Eiskunstlauf-Schlusspose) fror auf halbem Weg ein. `done` bleibt hier
     // unveraendert -- nur buehnenBewegung() darf nach dem Abschluss weiterlaufen.
     if(done){ buehnenBewegung(dt); return; }
@@ -13417,7 +13428,7 @@
     // freeze/rueckzug sind bewusst KURZ (0,15s statt der ersten Fassung mit 0,35/0,3s) --
     // ALLE VIER zusammen muessen unter art.rundenDauer (0,625s) bleiben, sonst startet
     // die naechste Enthuellung (alle 0,625s, s. stepBuehne) den naechsten Teilnehmer,
-    // WAEHREND der vorige noch in der Mitte steht: zwei Tanzende gleichzeitig -- genau der
+    // WAEHREND der vorige noch in der Mitte steht: zwei Ertragende gleichzeitig -- genau der
     // Fehler, den dieser ganze Umbau beheben soll ("immer GENAU EINER in der Mitte").
     // 0,15+0,25+0,15=0,55s < 0,625s laesst 0,075s Puffer (bei einem Frame ~0,0167s bei
     // 60fps also ~4-5 Frames).
@@ -14983,7 +14994,7 @@
     for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
     const grad=Math.PI/180;
     const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
-    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Powermove -- ein paar kleine, deterministisch
+    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Aufbaeumen (vizMove===2) -- ein paar kleine, deterministisch
     // aus u.id/buehneT berechnete Punkte am Fusspunkt, dieselbe "keine Partikel-Arrays,
     // nur billige Sinusformen"-Idee wie zeichnePartikelEffekt() in zeichneSprite (s. dort).
     const zeichneBodenstaub=(fx,fy,id)=>{
@@ -15271,7 +15282,9 @@
       ctx.textAlign="left"; ctx.textBaseline="alphabetic";
       ctx.font="800 9px 'IBM Plex Mono',monospace";
       ctx.fillStyle=rolle==="ertraegt"?"#f2d75a":"#ff7a66";
-      ctx.fillText(rolle==="ertraegt"?"ERTRÄGT":"FÜGT ZU",bx+12,by+17);
+      // Dasselbe Wort wie am Sprite-Schild (s. schrift(...) oben): Seitentafel und Figur
+      // beschriften dieselbe Rolle im selben Bild, also duerfen sie nicht zweierlei sagen.
+      ctx.fillText(rolle==="ertraegt"?"ERTRÄGT":"PEINIGT",bx+12,by+17);
       ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#eef3fa";
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,bx+12,by+35);
       ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#9aa4b4";

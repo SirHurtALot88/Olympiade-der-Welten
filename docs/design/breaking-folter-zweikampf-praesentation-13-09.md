@@ -160,11 +160,26 @@ Chris, wörtlich:
 > folterinstrumenten und die charaktere nutzen die dann sogar und gehen zum tisch nehmen sie auf
 > step by step und sie werden immer schlimmer"
 
-**Keine Asset-Suche, weil es keine Asset-Pipeline gibt** — nachgesehen, nicht vermutet: dieser Motor
-zeichnet jede Requisite als Canvas-Primitive (`zeichneHantel()` für die Hantel, `zeichneFalleTakeshi()`
-für Takeshis Fallen, der Uhrenblock in `zeichneSchach()`). Es wird kein einziges Bild geladen.
-„Assets suchen" heißt hier: zehn Geräte als einfache Primitive **zeichnen**, im Maßstab der
-vorhandenen Requisiten (~15–40 px).
+**Keine Asset-Suche — aber nicht, weil es keine Asset-Pipeline gäbe.**
+
+> **Korrektur nach dem Review (14.09.).** Die erste Fassung dieses Abschnitts (und der zugehörige
+> Kommentar im Motor) behauptete, dieser Motor lade „kein einziges Bild" und `zeichneFalleTakeshi()`
+> sei ein Beispiel für reine Primitive. **Beides ist falsch**, und der Review hat es zu Recht
+> aufgegriffen. Nachgesehen, diesmal wirklich: `battle-mode.engine.js` lädt echte PNG-Blätter —
+> `A_TEILE` aus `/sprites/arena/`, `SB_TEILE` aus `/sprites/buehne/`, `BK_TEILE` aus
+> `/sprites/basketball/`, `FK_TEILE` aus `/sprites/football/`, je ein `new Image()` pro Kachel,
+> jeder Ordner mit eigener `quellen.json`, mit dokumentiertem Rückfall über `aDa()` auf Primitive,
+> falls ein Blatt fehlt. Und `zeichneFalleTakeshi()` ist gerade **kein** Gegenbeispiel, sondern
+> einer der Hauptabnehmer dieser Kacheln (`ctx.drawImage(aBild.burg_mauer, …)`,
+> `aBild.falle_tuer`, `aBild.falle_walze`).
+
+Die Entscheidung selbst bleibt — nur ihre Begründung war unhaltbar. Die zehn Geräte werden von Hand
+gezeichnet aus **Einfachheit und Gleichklang**: sie sind ~15–40 px groß, müssen im Griff-Frame des
+Peinigers mitdrehen *und* flach auf dem Tisch liegen, und dafür gibt es mit `zeichneHantel()` — das
+tatsächlich rein primitiv ist, kein `drawImage` — bereits das passende Vorbild im Haus. Ein eigenes
+Folter-Blatt wären zehn neue Kacheln plus Lizenzrecherche für einen Effekt, den vier Pfade je Gerät
+ebenso gut treffen. „Assets suchen" heißt hier also: zehn Geräte als einfache Primitive
+**zeichnen**, im Maßstab der vorhandenen Requisiten (~15–40 px).
 
 Die Leiter, mild nach schlimm — die beiden letzten sind wörtlich Chris' eigene Beispiele:
 
@@ -222,14 +237,43 @@ verglichen — `:11549`/`:11552` schreiben `ereignis`, alle Vergleichsstellen le
 `art`-Wert zurück. **Kein einziger Vergleich gegen ein Stringliteral** (nachgeprüft über alle
 Fundstellen von `erfolgWort`/`failWort`). Der Wert ist ein Etikett, kein Eingabewert.
 
+### 2.7 Zwei Slot-Beschreibungen, die der erste Anlauf übersehen hat (14.09.)
+
+Der Review hat nachgefasst, wo dieser PR nur den Ticker aufgeräumt hatte: **die Slot-Beschreibungen,
+die Chris in der Aufstellung liest**, trugen weiter Tanz-Vokabular. Zwei von sechs:
+
+| Slot | alt | **neu** |
+|---|---|---|
+| `powermove` / **Bruchpunkt** | „Treibt den schwersten **Move** bis zum Bruchpunkt …" | „Treibt den schwersten **Hieb** bis zum Bruchpunkt …" |
+| `musicality` / **Aushalten** | „Findet den **Rhythmus** im bloßen Aushalten …" | „Findet die **Ruhe** im bloßen Aushalten …" |
+
+„Hieb" ist dabei kein neues Wort, sondern dasselbe, das Abschnitt 5 schon als künftigen
+Ton-Schlüsselnamen vorschlägt; „Ruhe" hält die Satzform und tauscht nur die Musik gegen das, was der
+Slot tatsächlich belohnt (`will`/`determination`, `mueh:"low"`).
+
+**In beiden Dateien gleichlautend**, weil es zwei Spiegel derselben Tabelle sind:
+`SLOTS_JE_DISC.breaking[*].text` in `public/mockups/battle-mode.engine.js` und
+`roleTheme(..., description, ...)` in `lib/lineups/matchday-slot-roles.ts`. `id`, `gross`/`klein`/
+`last`, `mueh` und `profil` bleiben in beiden unangetastet — nur der Anzeigetext ändert sich, und
+kein Pfad liest ihn je als Wert.
+
+Die vier übrigen Beschreibungen bleiben, wie sie sind: sie sind bereits Ausharre-Sprache. Die
+internen `id`s (`powermove`, `footwork`, `freezecontrol`, `musicality`) bleiben ebenfalls stehen —
+sie sind der Vertrag zwischen den beiden Dateien und den gespeicherten Aufstellungen, nicht
+Anzeigetext. Sie umzubenennen ist eine eigene Runde mit Migration, siehe Abschnitt 5.
+
 ---
 
 ## 3. Was NICHT angefasst wurde
 
 `rezept`, `failAbzug`, `rundenN`, `rundenDauer`, die Attributmatrix, `SLOTS_JE_DISC.breaking`
-(`id`/`profil`/`gross`/`klein`/`last`/`mueh`), `lib/lineups/matchday-slot-roles.ts`, `stepBuehne()`,
-`bauBuehne()`, `WERTUNG_AUFTRITT`, jede andere `BUEHNE_ART`, `zeichneHeben()`, `zeichneSchach()`,
-`zeichneKuer()`, `zeichneSprite()`.
+(`id`/`profil`/`gross`/`klein`/`last`/`mueh`), `stepBuehne()`, `bauBuehne()`, `WERTUNG_AUFTRITT`,
+jede andere `BUEHNE_ART`, `zeichneHeben()`, `zeichneSchach()`, `zeichneKuer()`, `zeichneSprite()`.
+
+An `lib/lineups/matchday-slot-roles.ts` ändern sich seit dem 14.09. **zwei `description`-Strings**
+und sonst nichts (Abschnitt 2.7) — die Datei stand vorher auf dieser Liste, steht jetzt mit dieser
+einen Einschränkung dort. Rollen-`id`s, Attribut-Fokus, `strain`, `fatigueProfile` und
+`classHints` sind unberührt; die `roleTheme`-Signatur ebenso.
 
 **Der Ton ist unverändert.** `TON_KATALOG.breaking` behält alle vier Schlüssel, und die drei
 `sfx()`-Aufrufe in `stepCypher()` stehen an derselben Stelle mit derselben Bedingung wie vorher —
@@ -247,11 +291,24 @@ eine eigene, kleine Aufräumrunde.
 |---|---|
 | Spiegelfrische (`pruefe-spiegel-frische.ts`) | beide frisch (`live-save` 0,0 h, `bug-reports` 0,2 h), vor der Arbeit geprüft |
 | `node --check public/mockups/battle-mode.engine.js` | bestanden |
-| `npx tsc --noEmit` | Diff gegen `main` leer — s. Anmerkung unten |
+| `npx tsc --noEmit` | 906 Zeilen hier wie auf `main`, **dieselben Meldungen** (alle in `tests/`) — s. Anmerkung unten |
 | `npx tsx scripts/pruefe-slot-invariante.ts` | hält, max. Abweichung 0,005 Pp über alle 20 × 6 |
-| `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig) | **bit-identisch** — `diff` liefert nichts, beide Ergebnisdateien haben dieselbe MD5 `4d31300812cc22ad39693d196a6d72ab` |
+| `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig) | **bit-identisch** — `diff` liefert nichts, beide Ergebnisdateien mit MD5 `bbad04182726bd6c9a0c0a76f122ab2c` |
 | Playwright-Screenshots | `Seitenfehler: keine` in jedem Lauf; s. Tabelle unten |
 | `ctx.save()`/`ctx.restore()` in `zeichneBreaking()` | 5/5, ausgeglichen (maschinell nachgezählt) |
+
+**Nachmessung 14.09., nach dem Review und nach dem Merge von `main`.** Beide Läufe frisch gefahren,
+weil `main` seit dem 13.09. vier rangtreue-wirksame Runden aufgenommen hat (Puste #914,
+Sprite-Bildindex #915, Staffel #916, Höhenkorrektur #918) — die alte MD5 aus der ersten Messung
+gilt deshalb nicht mehr, und ein Vergleich gegen sie wäre wertlos gewesen. Basislauf auf
+`7a07de2f` (`origin/main`, nur `battle-mode.engine.js` auf den Stand von `main` zurückgetauscht),
+Nachlauf auf diesem Branch. `diff` liefert **keine einzige Zeile**; Breaking steht in beiden bei
+`0,869 / 0,114 / 0,951 / 0,168 · bestanden`.
+
+Dass das auch für die Korrekturen dieser Runde gilt, ist keine Überraschung, sondern Bauart: die
+beiden geänderten `text:`-Strings sind Anzeigetexte aus `SLOTS_JE_DISC`, das geänderte `FÜGT ZU` ist
+ein Literal in einer `ctx.fillText`-Zeile, und der Rest sind Kommentare, Bilder und Dokumentation.
+`disziplinProbe()`/`miss-alle-disziplinen.mjs` durchlaufen die Zeichenfunktionen ohnehin nie.
 
 **Anmerkung zu `tsc`:** die einzige geänderte Codedatei ist `public/mockups/battle-mode.engine.js`,
 und `tsconfig.json` listet unter `include` ausschließlich `**/*.ts`, `**/*.tsx` und `**/*.mts` —
@@ -259,28 +316,53 @@ und `tsconfig.json` listet unter `include` ausschließlich `**/*.ts`, `**/*.tsx`
 Änderung darin kann die `tsc`-Ausgabe nicht bewegen. Die verbleibenden Meldungen (alle in `tests/`)
 stehen unverändert auch auf `main`.
 
-**Die Bildbelege** (alle mit `node scripts/screenshot-disziplin.mjs breaking <ms> <datei>`):
+**Die Bildbelege.** Das Vorher-Bild stammt weiter aus
+`node scripts/screenshot-disziplin.mjs breaking <ms> <datei>`. Die drei **Nachher-Bilder sind am
+14.09. neu aufgenommen** — mit `node docs/design/breaking-bildbeleg-sonde-13-09.mjs <ordner> [n]`,
+und aus **einem** Lauf, damit die Namen zueinander passen.
+
+> **Warum neu (Review-Fund 14.09.).** Die erste Fassung dieser Bilder war mit einer festen
+> Millisekunde geschossen und traf die Bühne dadurch systematisch daneben: der Callout-Banner oben
+> springt **nur** bei `big` (`r.punkte>=60`) um, der SURVIVOR-Scheinwerfer dagegen bei **jeder**
+> Enthüllung alle 0,625 s — und `cv.screenshot()` selbst braucht unter Last länger als eine
+> Rundendauer. Das Bild war also regelmäßig eine Enthüllung weiter als der Banner, und im
+> `-mitte`-Bild fiel der Schuss zusätzlich in einen Frame, in dem die Sprite-Bildindex-Rechnung
+> (inzwischen auf `main` mit einem `Math.max(0,…)`-Clamp repariert, PR #915) die Figur des
+> Ertragenden gar nicht zeichnete: leerer Scheinwerfer mit schwebendem Schild. **Kein Fehler
+> dieser Runde und keiner, den es noch gibt** — aber die Bilder belegten dadurch das Gegenteil
+> dessen, was ihre Bildunterschrift behauptete.
+>
+> Die neue Sonde erkennt den Bannerwechsel **im Browser** und hält die Simulation dort per Klick
+> auf `#play` an, bevor irgendetwas nach Node zurückgeht (260 ms nach dem Wechsel — Eintritt und
+> Throwdown sind dann durch, die nächste Enthüllung noch nicht da). Der Screenshot fällt danach
+> auf ein stehendes Bild.
 
 | Datei | zeigt |
 |---|---|
 | `breaking-vorher-13-09.png` | der Ist-Zustand: zwölf gleichrangige Figuren, der Aktive nicht erkennbar, Ticker „setzt den Move" |
-| `breaking-nachher-13-09-mitte.png` | Durchgang läuft: der Ertragende im Scheinwerfer **auf** dem SURVIVOR-Kern, der Peiniger von seiner Seite her, Druckachse dazwischen |
-| `breaking-nachher-13-09-stufe4.png` | Stufe 4/10 (Daumenschraube); die drei benutzten Geräte ausgegraut, Ticker „hält stand" |
+| `breaking-nachher-13-09-mitte.png` | Durchgang 5/8, Stufe 6/10 (Brandeisen): der Ertragende (Krolach) im Scheinwerfer **auf** dem SURVIVOR-Kern, der Peiniger (Tidesprinter) von seiner Seite her mit dem glühenden Eisen, Druckachse dazwischen |
+| `breaking-nachher-13-09-stufe4.png` | Stufe 4/10 (Daumenschraube); die drei benutzten Geräte ausgegraut, der Platz des aktuellen golden leer, Ticker „hält stand" |
 | `breaking-nachher-13-09-stufe7.png` | Stufe 7/10 (Keil); sechs ausgegraut, **Nagelkeule, Säge und Vorschlaghammer sichtbar noch bevorstehend** — der Beleg, dass die Eskalation im Bild ankommt |
 
 Eine Gegenprobe, die beim Lesen der Bilder hilft: in allen drei Nachher-Bildern trägt der Ticker
-denselben Namen wie die mit `ERTRÄGT` beschriftete Figur. Das ist kein Zufall, sondern der Beweis,
-dass `cypherPaar()` dieselbe Figur als Ertragenden führt, die `stepBuehne()` gerade enthüllt hat.
+denselben Namen wie die mit `ERTRÄGT` beschriftete Figur, **und beide Figuren sind gezeichnet**.
+Das ist kein Zufall, sondern der Beweis, dass `cypherPaar()` dieselbe Figur als Ertragenden führt,
+die `stepBuehne()` gerade enthüllt hat — die Sonde erzwingt genau diesen Frame.
 
-**Die Messung im Detail.** Basislauf auf `ec9190c5` (dem Abzweigpunkt), Nachlauf auf dem
-**gemergten** Stand dieses Branches. Breaking steht in beiden Läufen bei
+**Ein Wort gleich lautend, nicht zwei.** Ebenfalls aus dem Review: die Seitentafel beschriftete den
+Peiniger mit `FÜGT ZU`, sein eigenes Sprite-Schild im selben Bild mit `PEINIGT`. Zwei Wörter für
+dieselbe Rolle in derselben Szene. Beide sagen jetzt `PEINIGT` — das Wort, das auch der Fließtext
+dieses Dokuments durchgehend benutzt.
+
+**Die Messung im Detail (Stand 14.09.).** Basislauf auf `origin/main` = `7a07de2f`, Nachlauf auf
+dem gemergten Stand dieses Branches. Breaking steht in beiden Läufen bei
 `0,869 / 0,114 / 0,951 / 0,168 · bestanden` — exakt die in CLAUDE.md und
 `breaking-kalibrierung-10-09.md` dokumentierte Zahl. Alle übrigen neunzehn Zeilen stimmen ebenfalls
-zeichengenau überein.
+zeichengenau überein; `diff` über die vollständigen Ausgaben ist leer.
 
-Der Nachlauf enthält den Merge von `main` (u. a. PR #903, Eiskunstlauf-Ton). Dass er trotzdem
-zeichengleich zum Basislauf ist, belegt **zwei** Dinge auf einmal: diese Runde ist
-rangtreue-neutral, und die parallel gemergte Eiskunstlauf-Runde ist es ebenso.
+*(Die frühere Messung vom 13.09. stand gegen den damaligen Abzweigpunkt `ec9190c5` und meldete MD5
+`4d31300812cc22ad39693d196a6d72ab`. Die Zahl ist überholt: `main` hat seither vier
+rangtreue-wirksame Runden aufgenommen, also wurden beide Seiten neu gefahren.)*
 
 Ein Wort zur Durchführung, weil es für die nächste Runde nützlich ist: auf dieser Maschine arbeiten
 mehrere Agenten gleichzeitig, und unter der Last stirbt Playwright reproduzierbar mit
@@ -308,3 +390,12 @@ Diese Runde schreibt weiterhin ausschließlich auf `viz*`-Felder und liest `bueh
    Staffel-Kommentars, wenn dort gerade nicht gearbeitet wird.
 4. **Eigene Folter-Geräusche** je Eskalationsstufe — heute klingt der Vorschlaghammer wie der
    Strick.
+5. **Die internen Breakdance-`id`s** (`powermove`, `footwork`, `freezecontrol`, `musicality`) —
+   nicht sichtbar, aber irreführend beim Lesen. Sie stehen in beiden Slot-Tabellen **und** in
+   gespeicherten Aufstellungen; eine Umbenennung braucht deshalb eine Migration und gehört nicht
+   in eine Präsentationsrunde.
+6. **Kommentar-Reste in `app/foundation/discipline-stage/arena/disciplines/breaking.tsx`**
+   („Cypher-Boden", „Linoleum-Kreis"). Rein in Kommentaren, kein gerenderter Text — die dortigen
+   sichtbaren Beschriftungen (`GEBROCHEN`/`SCHMERZGRENZE`/`STONE FACE`/`MIND FORTRESS`) sind
+   bereits durchgehend Folter-Vokabular. Bewusst nicht in diesem PR, weil die Datei sonst nicht
+   angefasst wird.
