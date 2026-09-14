@@ -13268,7 +13268,11 @@
         // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
         // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
         // darunter schon "BRETT ENTSCHIEDEN".
-        if(BB().fechten){
+        if(BB().fechten&&u.side===0){
+          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
+          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
+          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
+          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
           const proPeriode=BB().rundenN/3;
           if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
             const periode=(u.aktuell+1)/proPeriode;
