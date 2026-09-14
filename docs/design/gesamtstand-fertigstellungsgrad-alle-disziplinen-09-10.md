@@ -830,6 +830,13 @@ der Inhalt — ein Vollbild-Blatt fuellt seine Zelle gar nicht aus, gemessen Kra
 und **es ist nicht vollbild-spezifisch**: die vier Figuren, die im Zufallsfall auf 1,000 standen,
 sind alle vier Baukasten-Figuren.
 
+**Eine Nachpruefung fuer Chris, aus der Review zu #918** (Merge-Commit `7a07de2f`): die Figuren mit
+dem Groessen-Stellrad `b.skala` — **Bloater, Burster, Mushu** — werden durch den Fix jetzt
+**zuverlaessig** korrigiert statt zufaellig. Bei Bloater ist die Statur-Anpassung vom 04.09.
+(`bloater-modell-verbessert.md`, `bloater-vorher-nachher.png`) damals gegen ein Bild kalibriert
+worden, das die Korrektur nur in etwa der Haelfte der Faelle angewandt hatte; sie wirkt jetzt
+konsistent und sollte einmal angesehen werden.
+
 **Was das fuer die Assets-Spalte heisst.** Keine Zeile oben bewegt sich — die A-Kriterien fragen
 nach eigener Flaeche, eigener Szene, eigenen Requisiten und Ton, nicht nach Renderkonstanz. Aber
 die Einstufungen dieser Spalte sind ab jetzt auf einem Bild gemacht, das **reproduzierbar** ist;
