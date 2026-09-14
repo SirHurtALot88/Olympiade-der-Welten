@@ -5151,37 +5151,42 @@
       // Struktur-Konsistenz stehen, hat fuer Football aber KEINE geometrische Bedeutung
       // (klassifiziereWurfdistanz() wird von Football nicht aufgerufen, s. dort).
       kurve:{
-        base:0.20,
+        // base NEU GEGEN DEN NFL-KORRIDOR GEFITTET, NACH skillMittel (Korridor-Refit-Runde,
+        // Opus-Plan 10.09. Abschnitt 6.1, docs/pm-briefings/
+        // opus-review-pr-884-football-runde1-09-10.md — der Nachtrag, der die Freigabe von
+        // PR #884 an "Football darf NICHT in ARENA_RESOLVED_DISCIPLINE_IDS, bevor der
+        // Korridor-Refit aus Runde 2 sitzt" bindet). GEMESSEN (node scripts/
+        // miss-football-korridor.mjs 200, dieselbe Fit-Reihenfolge wie ueberall: steil/
+        // skillMittel ZUERST, base/korrektur ZULETZT): mit dem unten neu gemessenen
+        // skillMittel und unveraendertem base=0,20 lag die Completion-Quote noch bei 63,7 %
+        // (Ziel 65,3 %) — 0,24 trifft 64,9 % bei Yards/Attempt 7,18 (Ziel 7,1).
+        base:0.24,
         geoBonus:{dunk:0.34, nah:0.14, mit:0.0, fern:-0.18},
         radien:{dunk:0, nah:0, mit:0, fern:0}, // ohne Bedeutung, s. Kommentar oben
-        // skillMittel NEU GEMESSEN (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1) —
-        // der Referenzwert unten von 0,446 stammt aus der Zeit VOR fkLos()/kappa=3 und ist
-        // mit der neuen Lotterie die FALSCHE Referenz geworden, genau wie der Plan es
+        // skillMittel NEU GEMESSEN (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1):
+        // der Wert unten (0,446) stammte aus der Zeit VOR fkLos()/FK_LOS_KAPPA=3 und ist
+        // seit der Football-Runde-1-PR (#884) die FALSCHE Referenz — genau wie der Plan es
         // vorhersagt: "skillMittel ist mit kappa=3 die falsche Referenz geworden — die
         // Referenz muss der ERWARTETE Akteur der Lotterie sein, nicht der Kadermittelwert."
-        // GEMESSEN (node scripts/miss-football-korridor.mjs 120, passerPgSum/passerTgSum/
-        // passerN aus fsFbLog, s. dortiger Kommentar): der tatsaechlich von
-        // fkLos(off,"PASSGENAUIGKEIT") gezogene Passer liegt im Mittel bei PASSGENAUIGKEIT
-        // 71,2 / TEAMGEIST 66,1 (Kadermittel war 58,3 / 48,2) -> 71,2*0,0060+66,1*0,0020 =
-        // 0,559. Kappa=3 zieht ueberproportional die staerksten Passer je Snap — genau der
-        // Effekt, den die Lotterie soll (Rangtreue), aber `skillMittel` MUSS diesem
-        // verschobenen Erwartungswert folgen, sonst schlaegt der volle steil-Bonus auf
+        // ALT: window.__arena.feldspielSubskills("football") auf dem 12-Spieler-Testkader
+        // (Kadermittel, nicht lotteriegewichtet) lieferte PASSGENAUIGKEIT-Mittel 58,3,
+        // TEAMGEIST-Mittel 48,2 -> 0,446.
+        // NEU: node scripts/miss-football-korridor.mjs 120/200, ueber fsFbLog.passerPgSum/
+        // passerTgSum/passerN (s. dortiger Kommentar und resolvePass unten) — misst den
+        // TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer, nicht den
+        // Kaderschnitt. Gemessener Mittelwert: PASSGENAUIGKEIT 71,2 / TEAMGEIST 66,1 (zwei
+        // unabhaengige 120er- bzw. 200er-Laeufe: 71,2/66,1 und 71,1/65,9) ->
+        // 71,2*0,0060 + 66,1*0,0020 = 0,559. Kappa=3 zieht ueberproportional den staerksten
+        // Passer je Snap — beabsichtigt fuer die Rangtreue, aber `skillMittel` MUSS diesem
+        // verschobenen Erwartungswert folgen, sonst schlaegt der volle `steil`-Bonus auf
         // einen Akteur durch, der laengst ueber dem alten Mittel liegt (der mechanische
-        // Grund fuer den Korridor-Shift auf 76,5 % Completion, s. Bericht).
+        // Grund fuer den Korridor-Shift auf 76,5 % Completion / 8,70 Yards je Attempt, den
+        // die Runde-1-PR selbst schon so vorhergesagt und offengelassen hatte).
         skillMittel:0.559,
-        // steil UNVERAENDERT (0,801 rho Passer<->Eignung nach Rezept C, s. rezept-
-        // Kommentar unten — der Steilheitsparameter selbst war nie das Problem).
-        // base/korrektur NEU GEGEN DEN NFL-KORRIDOR GEFITTET, NACH skillMittel (Korridor-
-        // Refit-Runde, docs/pm-briefings/opus-review-pr-884-football-runde1-09-10.md,
-        // scripts/miss-football-korridor.mjs 120): Completion-Quote 65,3 %, Yards/Attempt
-        // 7,1 (NFL 2024, football-rollout-plan.md A.1) — dieselbe Fit-Reihenfolge wie
-        // ueberall (steil/skillMittel ZUERST, base/korrektur ZULETZT). base -0,05 statt
-        // 0,20: mit dem hoeheren skillMittel als Bezugspunkt lag die Completion-Quote bei
-        // gleichem `base` noch bei 68,4 % (der geoBonus-Mix der vier Tiers zieht den
-        // Mittelwert etwas ueber den Roh-Logit), -0,05 trifft 65,1 %.
-        base:0.24,
-        korrektur:{dunk:0, nah:0, mit:0, fern:0},
+        // steil UNVERAENDERT (rho zur Eignung 0,801 nach Rezept C, s. rezept-Kommentar
+        // unten — der Steilheitsparameter selbst war nie der Befund dieser Runde).
         steil:14,
+        korrektur:{dunk:0, nah:0, mit:0, fern:0},
         skillTerme:[{feld:"PASSGENAUIGKEIT",koeff:0.0060},{feld:"TEAMGEIST",koeff:0.0020}]
       },
       // SUB-SKILLS (Football-Plan Abschnitt D, Diskussionsvorschlag dort UMGESETZT statt
@@ -6475,6 +6480,9 @@
         // REINE ZEICHEN-FELDER fuer den Bodycheck-Aufprall (s. HK_CHECK_VIS/versucheSteal).
         // Keine Formel liest sie, ausserhalb von Hockey setzt sie nichts.
         wuchtVis:0, wuchtZielX:0, wuchtZielY:0,
+        // Dasselbe fuer den leichten Stockcheck (s. HK_STEAL_VIS/versucheSteal,
+        // Erfolgszweig ohne Koerpereinsatz). Ebenfalls reine Zeichnung.
+        steckVis:0, steckZielX:0, steckZielY:0,
         // PUSTE (s. FELDSPIEL_ART.hockey.puste). `pusteMax` bleibt 0, wo die Disziplin
         // kein Puste-Rezept fuehrt — dann ist jede Puste-Zeile im Motor wirkungslos.
         // `pusteMin` haelt den TIEFSTEN Stand des Spiels fest (fuer die Abnahme: ein
@@ -6983,6 +6991,16 @@
   // Sekunde Zuschauzeit — lang genug, um den Stoss zu sehen, kurz genug, um den naechsten
   // nicht zu ueberdecken (die Luecke zwischen zwei Checks liegt im Median bei 14,4 s).
   const HK_CHECK_VIS=0.5;
+  // HK_STEAL_VIS: dieselbe Idee, fuer den LEICHTEN Stockcheck (versucheSteal-Erfolgszweig
+  // ohne Koerpereinsatz — der `wucht`-Wurf oben ist ein eigener, unabhaengiger Zweig).
+  // Bisher wechselte der Puck dort nur ueber den Ticker-Text sichtbar die Seite ("erobert
+  // den Puck") — auf dem Feld selbst sah man den Offense/Defense-Wechsel nicht, der Puck
+  // stand im naechsten Bild einfach beim neuen Besitzer. `steckVis` ist wie `wuchtVis`
+  // eine REINE ZEICHEN-DAUER (keine Formel liest sie), bewusst KUERZER und kein Bogen
+  // sondern ein schmaler Blitz zwischen den zwei beteiligten Figuren (s. zeichneFeldspiel)
+  // — er darf mit dem Bodycheck-Bogen nicht verwechselt werden, das bleibt die groessere,
+  // seltenere Aktion.
+  const HK_STEAL_VIS=0.35;
   // ============================== PUSTE (Feldspiel) ==============================
   // Rezept und Begruendung stehen an FELDSPIEL_ART.hockey.puste. Hier nur die drei
   // Funktionen, die sie bewegen. Eine Disziplin OHNE `art.puste` (Basketball, Football)
@@ -7723,7 +7741,19 @@
     // Wahrscheinlichkeit/Yards-Formel etwas.
     if(rr()<pFumble)return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
-    const meanYds=Math.max(-3,Math.min(11,3.6+diff*0.055));
+    // BASIS 4,0 STATT 3,6 (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1): fkLos()/
+    // kappa=3 zieht Rusher UND Run-Stopper beide bevorzugt aus dem staerksten Ende ihres
+    // jeweiligen Sub-Skills (s. fkLos-Kommentar oben) — `diff` mittelt sich dadurch ueber
+    // viele Laeufe naeher an 0 als bei der alten linearen Lotterie, und der alte Mittelwert
+    // 3,6 (gegen eine durchschnittliche Paarung gefittet) traf gemessen nur noch 3,5
+    // Yards/Carry (Ziel ~4,3, Football-Plan A.1).
+    // NICHT 4,4 (der rechnerisch naheliegende Wert, um exakt 4,3 zu treffen): kaderfest
+    // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 24 football) senkte 4,4 rho je Spiel
+    // auf 0,787 (durchgefallen) — 4,0 trifft rho 0,813 (bestanden) bei Yards/Carry 3,92
+    // (Ziel ~4,3, node scripts/miss-football-korridor.mjs 200), der bessere Kompromiss aus
+    // Korridor-Naehe UND Rangtreue. Der Laufkorridor bleibt damit ein Stueck unter dem Ziel
+    // stehen (bewusst, s. PR-Beschreibung) statt ihn exakt zu treffen und rho zu opfern.
+    const meanYds=Math.max(-3,Math.min(11,4.0+diff*0.055));
     const yards=Math.round(meanYds+(rr()-0.5)*9);
     return {typ:"lauf",spieler:rusher,verteidiger:abwehr,yards};
   }
@@ -7791,7 +7821,12 @@
     // aus 658 Turnovern minus ~0,5 verlorenen Fumbles je Team (271 Fumbles verloren / 272
     // Spiele 2024, WebSearch) ueber 544 Team-Spiele bei 29,9 Passversuchen/Team — die alte
     // Fassung (Basis 0,03, +0,03 fern) mass 5-5,6 %, mehr als doppelt so hoch.
-    const pInt=Math.max(0.008,Math.min(0.10,0.014+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
+    // BASIS NOCH EINMAL LEICHT GESENKT, 0,014 -> 0,011 (Korridor-Refit-Runde, Opus-Plan
+    // 10.09. Abschnitt 6.1, Punkt "pInt-Basis leicht senken"): mit fkLos()/kappa=3 zieht
+    // `rusher` (ABWEHR_PASS) ebenso bevorzugt aus dem staerksten Ende wie `passer`
+    // (PASSGENAUIGKEIT) — beide Seiten der Differenz sind jetzt haeufiger elitaer,
+    // wodurch die alte Basis 0,014 gemessen 2,5-2,9 % statt 2,1-2,4 % traf.
+    const pInt=Math.max(0.008,Math.min(0.10,0.011+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
       +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
     if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
     // `verteidiger:rusher` NEU an "komplett"/"incomplete" (06.09., Bewegungs-Runde) —
@@ -8110,9 +8145,9 @@
       // KEIN TACKLE AUF EINEM TOUCHDOWN-ZUG (Korridor-Refit-Runde, Opus-Review PR #884
       // Fund F5): `footballDownWeiter` entscheidet ERST danach, ob `fb.spot-erg.yards<=0`
       // die Endzone erreicht — bis hierher wurde der Solo-Tackle unbedingt gebucht, auch
-      // wenn der Zug in genau diesem Moment ein Touchdown war (~5 % aller Tkl-Eintraege
-      // bei ~2,6 TDs je Team/Spiel, nachgemessen). Reine Box-Score-Korrektheit, KEINE
-      // Wirkung auf Punktestand/Down/Distance/eine Wahrscheinlichkeit — rho-neutral.
+      // wenn der Zug in genau diesem Moment ein Touchdown war (~5 % aller Tkl-Eintraege bei
+      // ~2,6 TDs je Team/Spiel, so vom Review nachgemessen). Reine Box-Score-Korrektheit,
+      // KEINE Wirkung auf Punktestand/Down/Distance/eine Wahrscheinlichkeit — rho-neutral.
       if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
@@ -9730,7 +9765,22 @@
       // gegen den Bodycheck darueber, s. FELDSPIEL_ART.hockey). Ohne das Feld — Basketball,
       // Football — ist die Zeile zeichengleich die alte.
       const wortStahl=art.wortSteal||art.wortAbwehr;
-      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+wortStahl+".");
+      // SICHTBARER OFFENSE/DEFENSE-WECHSEL (Hockey, 14.09.): der Ticker nannte bisher nur
+      // den Dieb ("X erobert den Puck"), nicht von wem — und auf dem Feld selbst stand der
+      // Puck im naechsten Bild einfach beim neuen Besitzer, ohne jede sichtbare Aktion
+      // zwischen den beiden Figuren. Fuer Hockey jetzt namentlich BEIDE Seiten im Text
+      // ("X uebernimmt den Puck von Y") plus ein kurzer Blitz zwischen ihnen (steckVis,
+      // s. HK_STEAL_VIS/zeichneFeldspiel) — genau in diesem Frame, in dem `traeger` den
+      // Puck verliert und `decker` ihn uebernimmt. Ausserhalb von Hockey bleibt der
+      // Text zeichengleich die alte Zeile; `steckVis` bleibt dort ungesetzt (0) und
+      // zeichneFeldspiel liest es nur bei Hockey.
+      feed(decker.side,istHockey()
+        ?decker.n+" uebernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
+        :decker.n+" erobert den Ball — "+wortStahl+".");
+      if(istHockey()){
+        decker.steckVis=HK_STEAL_VIS;
+        decker.steckZielX=traeger.x; decker.steckZielY=traeger.y;
+      }
       // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
       // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
       // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
@@ -10555,6 +10605,8 @@
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
       if(u.wuchtVis>0)u.wuchtVis=Math.max(0,u.wuchtVis-dt);
+      // Derselbe Abbau fuer den leichten Stockcheck-Blitz (s. HK_STEAL_VIS).
+      if(u.steckVis>0)u.steckVis=Math.max(0,u.steckVis-dt);
       // PUSTE, hier oben aus demselben Grund wie `down`: sie muss auch waehrend der
       // Drittelpause und auf der Strafbank weiterlaufen — genau dort laedt sie ja auf.
       // Ausserhalb einer Disziplin mit Puste-Rezept ist der Aufruf ein sofortiges return.
@@ -11604,6 +11656,22 @@
           ctx.beginPath();ctx.arc(zx,zy,r,w-1.25,w+1.25);ctx.stroke();
           ctx.strokeStyle="rgba(255,255,255,.75)";ctx.globalAlpha=a*0.6;ctx.lineWidth=1.5;
           ctx.beginPath();ctx.arc(zx,zy,r+5,w-1.0,w+1.0);ctx.stroke();
+          ctx.restore();
+        }
+        // STOCKCHECK-BLITZ (14.09.): der leichte Steal-Erfolg (versucheSteal, Zweig ohne
+        // Koerpereinsatz) bekommt einen eigenen, KUERZEREN und SCHMALEREN Effekt als der
+        // Bodycheck-Bogen darueber — ein gestrichelter Blitz von der aktuellen Position
+        // des Diebes zu der Stelle, an der er den Puck uebernommen hat (`steckZielX/Y`,
+        // im Moment des Steals auf `traeger`s Position gesetzt). Reine Zeichnung, dieselbe
+        // Bauform (Restzeit -> Alpha) wie `wuchtVis` direkt darueber; `steckVis` wird nur
+        // hier gelesen und in stepFeldspielLive abgebaut.
+        if(u.steckVis>0){
+          const a=Math.max(0,Math.min(1,u.steckVis/HK_STEAL_VIS));
+          ctx.save();
+          ctx.strokeStyle=css("--crit");ctx.globalAlpha=a*0.85;ctx.lineWidth=2.5;
+          ctx.setLineDash([5,4]);
+          ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(u.steckZielX,u.steckZielY);ctx.stroke();
+          ctx.setLineDash([]);
           ctx.restore();
         }
         // PUSTE-LEISTE UNTER DEN FUESSEN — dieselbe Bauform, dieselbe Ampel und dieselbe
@@ -13866,13 +13934,11 @@
         NAECHER(u,0,0.05);
         if(u.vizPhaseT>=EINTRITT_T){
           u.vizPhase="throwdown"; u.vizPhaseT=0;
-          // Rauschsweep beim Aufbaeumen. Der TON_KATALOG-Schluessel heisst weiterhin
-          // "powermove" — bewusst NICHT umbenannt (13.09.): er wird ausserhalb der beiden
-          // Breaking-Regionen im Ton-Kommentar von stepStaffel() zitiert, an dem gerade
-          // parallel gearbeitet wird. Eine reine Schluesselumbenennung waere die einzige
-          // Zeile dieses PRs ausserhalb von Breaking und damit der einzige Konfliktpunkt —
-          // sie gehoert in eine eigene, kleine Aufraeumrunde.
-          if(u.vizMove===2)sfx("breaking","powermove");
+          // Rauschsweep beim Aufbaeumen (TON_KATALOG.breaking.hieb). Schluessel am 14.09.
+          // von "powermove" auf "hieb" umbenannt — eigene kleine Aufraeumrunde, wie von
+          // PR #913 vorgemerkt (s. stepStaffel()-Kommentar unten fuer die zweite,
+          // gleichzeitig umbenannte Fundstelle).
+          if(u.vizMove===2)sfx("breaking","hieb");
         }
       } else if(u.vizPhase==="throwdown"){
         NAECHER(u,0,0.05);
@@ -19773,7 +19839,7 @@
     breaking:{
       beat:      {loop:true, synth:(vol)=>tonRauschen(vol,220,0,true)},
       freeze:    {synth:(vol)=>{ tonKlick(vol,2400,0.05); tonMetall((vol??0.6)*0.6,500,0.12); }},
-      powermove: {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
+      hieb:      {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
       abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)}
     },
     "takeshis-castle":{
@@ -21016,7 +21082,12 @@
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
-      label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
+      // `climbing:true` NACHTRAEGLICH ERGAENZT (Bahn-Animation, 14.09.): Climbing war die
+      // einzige der fuenf Bahn-Disziplinen ganz ohne eigene Flagge in bahnBewegung() — nicht
+      // einmal ein NO-OP-Zweig, sondern schlicht kein Treffer, s. dortiger Kommentar. Rein
+      // deskriptiv, ohne Wirkung auf Rezept/Matrix/wert().
+      label:"Climbing", jeSeite:6, climbing:true,
+      hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
       steigung:0.85,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
@@ -23470,6 +23541,13 @@
     if(art.staffel && typeof stepStaffel==="function"){ stepStaffel(dt,art); return; }           // Ziel 6
     if(art.zeitfahren && typeof stepZeitfahren==="function"){ stepZeitfahren(dt,art); return; }  // Ziel 8
     if(art.spurt && typeof stepHuerden==="function"){ stepHuerden(dt,art); return; }             // Ziel 9
+    // `art.climbing` (BAHN_ART.climbing.climbing, 14.09. ergaenzt): Climbing hatte bisher
+    // GAR KEIN eigenes Flag und lief hier durch alle vier Zeilen oben ohne zu treffen — es
+    // bekam nicht einmal einen NO-OP-Zweig, sondern schlicht keinen Aufruf. Fuenfte und
+    // letzte Bahn-Schranke, nach demselben Muster wie `art.zeitfahren`/`art.spurt` oben
+    // (PR 0.3 fuer die ersten vier). Rein deskriptiv, s. stepClimbing()-Kommentar unten fuer
+    // den gemessenen Befund (Bahn-Animation, 14.09.).
+    if(art.climbing && typeof stepClimbing==="function"){ stepClimbing(dt,art); return; }
   }
 
   // ================== STAFFEL: DIE FLIEGENDE UEBERGABE (stepStaffel, Ziel 6) ==================
@@ -23501,7 +23579,7 @@
   //     vom Geber zum Nehmer wandern statt ihn hart springen zu lassen.
   //  3. DER TON. TON_KATALOG.staffel steht seit PR 0.1 vollstaendig (startschuss/uebergabe/
   //     fehlwechsel/ziel/publikum), nur nie aufgerufen — genau das Muster, mit dem
-  //     stepCypher() bereits sfx("breaking","powermove") direkt aus einer step*-Funktion
+  //     stepCypher() bereits sfx("breaking","hieb") direkt aus einer step*-Funktion
   //     ausloest (":12225", selbst dem viz-Vertrag unterworfen). uebergabe/fehlwechsel
   //     unterscheidet u.gestolpert: die Funktion inkrementiert es fuer den GEBER genau
   //     einmal (":19961"), im selben stepSpurt()-Tick, in dem u.durch auf true kippt — und
@@ -23510,6 +23588,14 @@
   //     zu iterieren) — ein reiner Lesevergleich, kein zweiter Zufallszug.
   const STAFFEL_ANLAUF_AB=0.86;       // ab wie viel Vordermann-Fortschritt der Naechste anzieht
   const STAFFEL_UEBERGABE_DAUER=0.55; // Sekunden, die der Stab sichtbar zwischen den Haenden unterwegs ist
+  // BAHN_SCHRITT_PX: dieselbe Schrittlaenge/Herleitung wie ZF_SCHRITT_PX bei stepZeitfahren
+  // weiter unten (46 px, s. dortiger Kommentar fuer die volle Rechnung mit v~110-135 ->
+  // ~170 Schritte/Minute) — eigener Name statt Wiederverwendung von ZF_SCHRITT_PX, weil
+  // dieser Wert hier VOR jeder Zeitfahren-spezifischen Logik gebraucht wird und stepStaffel/
+  // stepParcours/stepClimbing nichts ueber Zeitfahren wissen sollen. Derselbe Zahlenwert,
+  // weil u.v in allen fuenf Bahn-Disziplinen dieselbe Einheit ist (Bildschirm-Pixel je
+  // Simulationssekunde, s. stepSpurt: `u.pos+=u.v*dt/strecke`).
+  const BAHN_SCHRITT_PX=46;
   let staffelStartschussAn=false;     // rein praesentational; s. reset() fuer den N1-Fix (PR #879-Muster)
   function stepStaffel(dt,art){
     // STARTSCHUSS: einmal je Rennen, beim allerersten Aufruf nach bau(). Modul-Flagge statt
@@ -23517,11 +23603,29 @@
     // hockeyPublikumAn — reset() setzt sie explizit zurueck (N1-Fix), sonst bliebe der
     // Startschuss ab dem zweiten Staffel-Rennen stumm.
     if(!staffelStartschussAn){ sfx("staffel","startschuss"); staffelStartschussAn=true; }
+    // EIGENE SCHRITTPHASE STATT DER EINGEFRORENEN WELTUHR (Bahn-Animation, 14.09., Befund
+    // aus PR #908/stepZeitfahren, dort dieselbe Ursache fuer Time-Trial behoben: die globale
+    // Sprite-Uhr `t` zaehlt nur in stepSim() hoch, HINTER dem `istBahn(disc)`-Ruecksprung —
+    // auf der gesamten Bahn wird `t+=dt` also nie erreicht, und der Bildindex in
+    // zeichneSprite() `Math.floor((t*7+u.id)%n)` ist bei eingefrorenem `t` je Laeufer eine
+    // KONSTANTE. Nachgeprueft fuer Staffel trotz der grossen Ueberarbeitung in PR #916: kein
+    // Aufruf in stepStaffel schrieb bislang `u.vizSchritt`, PR #916 hat also nur die Strecken-
+    // /Zeit-/Positionslogik beruehrt, nicht die Sprite-Animation. dtSicht*u.v/BAHN_SCHRITT_PX
+    // ist exakt dieselbe Formel wie stepZeitfahren (s. dort) — nur die Bedingung, WANN sie
+    // laeuft, ist die staffelspezifische: ausschliesslich der aktuell aktive Laeufer bewegt
+    // sich (`u.aktiv`, dieselbe Bedingung wie das `if(BA().staffel&&!u.aktiv)continue;` in
+    // stepSpurt, das u.v fuer wartende Laeufer gar nicht erst neu berechnet — ohne diese
+    // Bedingung wuerde ein Laeufer nach seinem Wechsel mit seinem zuletzt gemessenen,
+    // moeglicherweise hohen u.v in der Wechselzone stehend "weiterlaufen"). DERSELBE
+    // VERTRAG: neues, rein praesentationales viz*-Feld, niemals rr(), niemals u.pos/u.v
+    // selbst gelesen fuer irgendetwas ausser dieser Anzeige.
+    const dtSicht=dt*zeitFaktor();
     for(const u of LAEUFER){
       if(u.vizInitDone==null){
         u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
-        u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true;
+        u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true; u.vizSchritt=(u.id||0)*2.3;
       }
+      if(u.aktiv && u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       // ---- 1. ANLAUF, s. Kommentar oben. Nur wer der NAECHSTE in der Wartereihe ist (sein
       // Vordermann laeuft gerade), bekommt ein Zielwert>0; ein Laeufer, der noch zwei oder
       // mehr Abschnitte entfernt ist, der Startlaeufer (kein Vordermann) und wer selbst schon
@@ -23593,8 +23697,25 @@
   // initialisiert sich jedes Feld beim ersten Bild dieser Funktion selbst.
   const PARCOURS_AUFRAPPELN_T=0.35;
   function stepParcours(dt,art){
+    // EIGENE SCHRITTPHASE STATT DER EINGEFRORENEN WELTUHR (Bahn-Animation, 14.09.), derselbe
+    // Befund und dieselbe Formel wie bei stepStaffel (s. dortiger Kommentar) und stepZeitfahren
+    // (Ursprung, PR #908): `t` zaehlt auf der Bahn nie hoch, also braucht jede Bahn-Disziplin
+    // ihre eigene, aus `u.v` gespeiste Phase, sonst bleibt der Bildindex in zeichneSprite()
+    // je Laeufer konstant. Anders als bei Staffel gibt es bei Takeshi keinen "wartet"-Zustand
+    // -- alle Laeufer starten gemeinsam (kein `startAbstand`, s. BAHN_ART-Kommentar bei
+    // bahnRangliste) -- deshalb reicht dieselbe Bedingung wie bei Zeitfahren/Climbing,
+    // `u.fertig==null`. u.v ist ueber tempoVon() bereits 0, waehrend `u.huerde>0` (in einer
+    // Falle haengend, s. dort `*(u.huerde>0?0:1)`) -- die Schrittphase bleibt also von selbst
+    // stehen, waehrend der Laeufer feststeckt, ohne dass diese Funktion das extra pruefen
+    // muesste. Waehrend eines echten Sturzes (u.stolper>0, vizZustand "sturz") zeigt
+    // zeichneSprite ohnehin die feste "liegt"-Pose ueber `u.down` (s. dort `u.down?n-1:...`),
+    // unabhaengig vom Wert dieser Phase -- ein Weiterlaufen der Phase waehrend des Liegens
+    // aendert also nichts Sichtbares. DERSELBE VERTRAG wie oben: neues, rein
+    // praesentationales viz*-Feld, kein rr(), keine Ruecklesung in wert().
+    const dtSicht=dt*zeitFaktor();
     for(const u of LAEUFER){
-      if(u.vizZustand==null){ u.vizZustand="laufen"; u.vizFalleTyp=null; u.vizAufrappelnT=0; }
+      if(u.vizZustand==null){ u.vizZustand="laufen"; u.vizFalleTyp=null; u.vizAufrappelnT=0; u.vizSchritt=(u.id||0)*2.3; }
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       if(u.raus){ u.vizZustand="ausgeschieden"; continue; }
       if(u.fertig!=null){ u.vizZustand="laufen"; u.vizFalleTyp=null; continue; }
       const letzteFalle=(u.fallen&&u.fallen.length)?u.fallen[u.fallen.length-1]:null;
@@ -23613,6 +23734,38 @@
       } else {
         u.vizZustand="laufen"; u.vizFalleTyp=null;
       }
+    }
+  }
+
+  // ================= CLIMBING: DER SCHRITT KOMMT AUS DEM TEMPO (stepClimbing, 14.09.) =========
+  // Befund staerker als bei Staffel/Takeshi: Climbing hatte VOR dieser PR ueberhaupt keinen
+  // eigenen bahnBewegung()-Zweig und damit auch KEINE eigene step*-Funktion -- weder ein Flag
+  // (`art.climbing` gab es nicht) noch einen Aufruf. bahnBewegung() fiel fuer Climbing also
+  // durch alle vier bestehenden Zeilen durch, ohne je zu treffen (s. dortiger Kommentar).
+  // Die Figuren liefen deshalb komplett ueber die eingefrorene Weltuhr `t`
+  // (Math.floor((t*7+u.id)%n) in zeichneSprite, s. PR #908/stepZeitfahren-Kommentar fuer die
+  // volle Herleitung) -- staerker eingefroren als Staffel/Takeshi, die wenigstens schon einen
+  // (bislang nur nicht-animierenden) Step-Zweig hatten.
+  //
+  // Climbing ist von den fuenf Bahn-Disziplinen dem Zeitfahren am naechsten: Einzelleistung
+  // gegen die Uhr, `wertung:"rang"` wie Time-Trial (s. BAHN_ART.climbing/bahnTeamstand), aber
+  // OHNE gestaffelten Start (`startAbstand` setzt nur Time-Trial, s. Kommentar bei
+  // bahnRangliste "fuer Spurt, Climbing, Takeshi und die Staffel, alle ohne dieses Feld") --
+  // alle Kletterer beginnen gemeinsam. Deshalb keine eigene Rampen-/Wartephase wie in
+  // stepZeitfahren (dort ausschliesslich fuer den gestaffelten Start gebraucht), sondern
+  // dieselbe simple Bedingung wie bei stepParcours: `u.fertig==null`. u.v ist ueber tempoVon()
+  // schon 0, waehrend `u.huerde>0` (im Griff haengend, "Fehlgriff wirft nicht um, er kostet
+  // Zeit und Kraft", s. BAHN_ART.climbing-Kommentar) -- die Schrittphase haelt beim Griff also
+  // von selbst an, ohne dass diese Funktion das gesondert abfragen muesste. DERSELBE VERTRAG
+  // wie stepStaffel/stepParcours/stepZeitfahren, WOeRTLICH: einziges geschriebenes Feld ist
+  // das neue, rein praesentationale `u.vizSchritt`; niemals rr(), niemals u.pos/u.v selbst,
+  // niemals etwas, das MOTOREN.climbing.wert() liest. Kein init-Block in der LAEUFER-Fabrik
+  // noetig, das Feld initialisiert sich beim ersten Bild selbst (Muster aus stepZeitfahren).
+  function stepClimbing(dt,art){
+    const dtSicht=dt*zeitFaktor();
+    for(const u of LAEUFER){
+      if(u.vizSchritt==null)u.vizSchritt=(u.id||0)*2.3;
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
     }
   }
 
@@ -27639,6 +27792,21 @@
           vizErschoepft:u.vizErschoepft==null?null:+u.vizErschoepft.toFixed(3),
           vizRampe:u.vizRampe==null?null:+u.vizRampe.toFixed(2)}))};
     },
+    // BAHN-ANIMATIONS-PROBE (14.09., Bahn-Animation Staffel/Climbing/Takeshi): dieselbe
+    // Idee wie zeitfahrenVizProbe()s Teil (A) direkt oberhalb, aber DISZIPLIN-GENERISCH statt
+    // fest auf Time-Trial verdrahtet -- die globale Sprite-Uhr `aniT` (`t`) und je Laeufer
+    // `vizSchritt` sind fuer jede der fuenf Bahn-Disziplinen dieselben zwei Groessen, an denen
+    // haengt, ob der Laufzyklus in zeichneSprite() (`u.vizAniPhase!=null?u.vizAniPhase*n:
+    // (t*7+u.id)`) steht oder laeuft. Nur gelesen, kein rr(), kein Einfluss auf die
+    // Simulation -- exakt die Probe, mit der der Befund fuer diese PR gemessen wurde
+    // (stepStaffel/stepParcours/stepClimbing setzten `u.vizSchritt` vor dieser PR nicht,
+    // `aniT` steht auf der Bahn ohnehin immer still, s. bahnBewegung()-Kommentar).
+    bahnVizProbe:()=>({
+      disc, aniT:+t.toFixed(4), rennT:(typeof rennT!=="undefined")?+rennT.toFixed(3):null,
+      reihe:(typeof LAEUFER!=="undefined"?LAEUFER:[]).map(u=>({id:u.id, n:u.n,
+        fertig:u.fertig!=null, aktiv:!!u.aktiv, raus:!!u.raus,
+        vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3)}))
+    }),
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der

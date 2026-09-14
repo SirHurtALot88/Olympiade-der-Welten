@@ -315,6 +315,33 @@ verbleibenden drei Arena-Disziplinen (TDM, Mini-DM, Battlefield) stehen so da: 0
 der Saison (06.09.; die genauen Zahlen bewegen sich bei unveraenderter Mechanik messbar, s.
 Abschnitt 5 Punkt 1 — Kaderrauschen, kein Befund).
 
+### 1b. Ticket geschlossen (14.09.): Hockey-Puste-Risiko nahe der CI-Schranke
+
+Eine fruehere Notiz hatte gewarnt, eine geplante, **ausgangsrelevante** Hockey-Puste-Mechanik
+koenne rho zu nah an die 0,80-Schranke draengen (konkret genannt: 0,616 gegen 0,615). PR #914
+(`docs/design/hockey-puste-kalibrierung-13-09.md` Abschnitt 4) hat diese Sorge nachgemessen,
+nicht nur diskutiert: eine wirksame Puste kostete Hockey tatsaechlich rho — 0,669 → 0,616 (alle
+zwoelf) bzw. 0,719 → 0,689 (nur Feldspieler), auch nach Abschwaechen der Wirkung um zwei Drittel
+kam es nur auf 0,628 zurueck (Abschnitt 4.2 dort). Die Entscheidung: `tempoMin`,
+`wuchtMin`, `zweikampfMin` (`FELDSPIEL_ART.hockey.puste` in `battle-mode.engine.js`, Suche nach
+diesen drei Namen) stehen auf **exakt 1** — jede Multiplikation ist damit algebraisch neutral
+(`x*1 === x` in IEEE 754) und die Simulation gegenueber der Basislinie **bitgleich**, gemessen
+und dokumentiert bestaetigt (Abschnitt 4.4 dort). Die Puste-Leiste ist in Hockey also **nur
+sichtbar**, nie ausgangsrelevant — sie kann rho nicht bewegen, weder heute noch durch spaeteres
+Kalibrieren ihrer (wirkungslosen) Konstanten.
+
+Frisch nachgemessen fuer diese Aufraeumrunde (`node scripts/miss-alle-disziplinen.mjs 24
+hockey`, 14.09.): **0,669 / 0,719**, unveraendert gegenueber der Basislinie — Hockey bleibt
+durchgefallen bzw. knapp, aber das ist das bekannte, groessere Validitaetsproblem aus Abschnitt
+1a/5 Punkt 3, nicht das hier gemeinte Nahe-an-der-Schranke-Risiko einer wirksamen Puste. **Dieses
+Ticket ist damit geschlossen:** die Sorge war berechtigt (die Messung bestaetigt sie sogar), die
+Entscheidung „nur sichtbar" raeumt sie vollstaendig aus — es gibt keine im Motor aktive oder in
+offenen Docs geplante ausgangsrelevante Hockey-Puste-Version, die diese Schranke noch gefaehrden
+koennte. Abschnitt 4.3 des Kalibrierungsdokuments nennt zwar Bedingungen, unter denen man eine
+wirksame Version *in Zukunft* erneut versuchen koennte (Verbrauch von LAUFTEMPO entkoppeln, nur
+auf positionsneutrale Kanaele wirken) — das ist explizit ein hypothetischer Pfad fuer eine
+etwaige spaetere Runde, keine geplante oder angefangene Umsetzung.
+
 ---
 
 ## 2. Warum die alten Zahlen nicht mehr gelten — zwei unabhaengige Gruende

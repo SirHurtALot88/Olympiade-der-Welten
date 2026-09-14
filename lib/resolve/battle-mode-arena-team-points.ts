@@ -238,8 +238,14 @@ import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
  *    `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es `duell:true` traegt -- die
  *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
  *    eine davon billig zu erfuellen waere.
- *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, FOOTBALL (0,516), BATTLEFIELD/TDM/
- *    MINI-DM (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
+ *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
+ *    (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
+ *  - FOOTBALL: NICHT MEHR ACHSE 1 (Korridor-Refit-Runde, 14.09. — rho je Spiel 0,516 -> 0,800,
+ *    NFL-Korridor jetzt in der Nachbarschaft, s. docs/pm-briefings/
+ *    opus-review-pr-884-football-runde1-09-10.md fuer die Auflage, die diese Runde erfuellt),
+ *    sondern ACHSE 2: es fehlt weiterhin ein eigener `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag
+ *    (eigene PPS-Referenz noch nicht gezogen, `scripts/ziehe-football-pps-referenz.ts` existiert
+ *    nicht) -- ohne den wirft die Querpruefung unten beim Modul-Laden, s. dort.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
