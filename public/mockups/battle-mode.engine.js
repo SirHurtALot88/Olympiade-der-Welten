@@ -355,6 +355,14 @@
   // window.__arena.renderProbe(name,"shoot",true,dir,lunge,256), Pixelscan der Alpha-
   // kontur statt Schaetzung. Verfahren und Rohbilder: docs/design/sprite-handpunkte.md,
   // Abschnitt "Gewichtheben". Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  //
+  // SEIT 13.09. LIEST DER HANTEL-PFAD NUR NOCH `y` DARAUS. Die x-Werte bleiben unveraendert
+  // stehen, weil sie gemessen und richtig sind — sie beschreiben eine Faust, und der
+  // DISZIPLIN_PROP-Vertrag verlangt genau das. Fuer eine HANTEL ist eine Faust aber der
+  // falsche Aufhaengepunkt: sie wird zweihaendig symmetrisch gegriffen, ihre Mitte gehoert
+  // auf die Koerpermittelachse. Die Begruendung und die Messung stehen an hantelAnPunkt()
+  // in zeichneSprite() bzw. in docs/design/gewichtheben-hantel-recherche-13-09.md
+  // Abschnitt 6; hier nur der Hinweis, damit niemand die x-Werte fuer tot haelt.
   const HEBEN_HAND=[
     {x:39,y:38}, // hinten
     {x:11,y:32}, // links
@@ -367,27 +375,100 @@
   // Stange wandert an der Hand vorbei, genau das Bild, das die alte freistehende Hantel
   // schon zeigte (buehneAkt-Fortschritt, s. hebePhase() bei zeichneHeben), jetzt an einen
   // echten Koerperpunkt verankert statt an der Bildmitte.
+  //
+  // ALLE VIER dy NEU VERMESSEN (13.09., Chris' Befund: "dann hat nur einer eine hantel. die
+  // ist viel zu weit unten und beim heben wird sie quasi weit ueber den kopf geworfen. Das
+  // muss sich viel mehr am modell orientieren."). Die alten Zahlen waren nie an einer Figur
+  // gemessen, sondern am freien Bildeindruck der Vorgaenger-Hantel gewaehlt — nachgemessen
+  // per scripts/messe-heben-geometrie.mjs (Alpha-Differenz zweier echter renderProbe-
+  // Renderings, Verfahren und volle Zahlen in docs/design/gewichtheben-hantel-recherche-13-09.md):
+  //
+  //   Phase    dy alt   Stange lag bei (Koerperanteil 0=Scheitel, 1=Sohle)
+  //   boden      34     1,065  — also UNTER den Fuessen, im Boden
+  //   zug         2     0,417  — unterhalb des Brustbeins, nicht im Front-Rack
+  //   hoch      -49    -0,545  — eine halbe Koerperhoehe ueber dem Scheitel ("geworfen")
+  //   ablage     40     1,181  — noch tiefer im Boden als "boden"
+  //
+  // Die neuen Zahlen sind aus den GEMESSENEN Koerperlandmarken des Standardblatts gerechnet
+  // (Zellkoordinaten, Groesse 5: Scheitel 11,4 · Schulter 26,8 · Brustbein 30,6 · Huefte 43,1
+  // · Sohle 62,3 · Koerperhoehe 51,0 Zellen; Handanker HEBEN_HAND liegt bei 32, also bei 0,40
+  // der Koerperhoehe). Weil dy in ZELLEINHEITEN steht und die Koerperhoehe ~51 Zellen betraegt,
+  // ist dy/51 direkt der Anteil der Koerperhoehe, um den die Stange vom Handanker abweicht —
+  // unabhaengig von Z und damit von der Modellgroesse.
+  //
+  // ==== KORREKTUR 13.09., ZWEITE RUNDE: ANTEIL STATT ABSOLUTER ZELLEN ==================
+  // Die erste Fassung dieser Tabelle stand in ABSOLUTEN Zelleinheiten relativ zum
+  // Griffpunkt (dy). Das ist genau so lange richtig, wie jede Figur den Standardkoerper
+  // benutzt — 51 Zellen hoch, Scheitel 11,4, Sohle 62,3. Die unabhaengige Review zu DIESER
+  // PR hat nachgewiesen, dass das fuer die zwei ANDEREN Zeichenpfade nicht stimmt, und die
+  // eigene Sonde scripts/pruefe-heben-hantel-vollzaehlig.mjs hatte es auch schon gezeigt:
+  //
+  //   Tidesprinter (vollbild)   boden 1,5 Zellen UNTER der Sohle · hoch 19,5 ueber Scheitel
+  //   Seraph-11 (reiherMech)    boden 2,0 Zellen UNTER der Sohle · hoch 11,0 ueber Scheitel
+  //   Inefinna (vollbild)       boden auf halber Rumpfhoehe SCHWEBEND (27,5 ueber Sohle)
+  //   King Arlen/Krolach/...    hoch 2..3 Zellen UNTER dem Scheitel, Stange IM Kopf/Helm
+  //
+  // ZWEI unabhaengige Ursachen, beide dieselbe Wurzel "absolute Zellen an einem fremden
+  // Blatt":
+  //   1. DIE BLATTHOEHE. zeichneReiherMech zeichnet von cy-19*Z bis cy+19*Z, also 38 statt
+  //      51 Zellen. Ein +25 aus der Standardkoerper-Kalibrierung schiesst an einem 38-Zellen-
+  //      Koerper zwangslaeufig unter die Sohle, ein -27 zwangslaeufig weit ueber den Kopf.
+  //      Ein anderer ANKERPUNKT haette daran nichts geaendert: kein einzelner fester Punkt
+  //      kann "boden" UND "hoch" zugleich treffen, wenn die Hoehe selbst abweicht.
+  //   2. DER ANKERPUNKT SELBST. Der vollbild-Pfad las die Griffhoehe aus VOLLBILD_SCHLAEGER
+  //      — einer Tabelle mit FAUSTpunkten fuer den Hockeyschlaeger, deren y ueber die
+  //      Blaetter von 8 (Inefinna) bis 45 (kraken) streut. Damit hing die Stangenhoehe an
+  //      einer Groesse, die mit der Koerperhoehe gar nichts zu tun hat — bis zu einer
+  //      viertel Koerperhoehe Fehler, je nachdem welches Blatt eine Figur benutzt.
+  //
+  // BEIDE Ursachen verschwinden, wenn die Stangenhoehe als ANTEIL DER KOERPERHOEHE des
+  // JEWEILIGEN Blattes ausgedrueckt wird, gemessen vom Scheitel nach unten (0 = Scheitel,
+  // 1 = Sohle). Der Griffpunkt geht in die Stangenhoehe dann ueberhaupt nicht mehr ein —
+  // was richtig ist: eine zweihaendig gegriffene Hantel haengt am Koerper, nicht an einer
+  // Faust (dieselbe Einsicht wie bei der x-Achse, s. hantelAnPunkt).
+  //
+  // DIE ZAHLEN SIND DIESELBE GEOMETRIE WIE VORHER, nur umgerechnet: anteil = (32+dy-11,4)/50,9
+  // aus den Standardkoerper-Landmarken darueber. Fuer den Standardkoerper zeichnet das
+  // deshalb PIXELGLEICH wie die dy-Fassung (nachgerechnet: boden 11,4+0,896*50,9 = 57,0
+  // gegen 32+25 = 57; hoch 11,4-0,126*50,9 = 4,99 gegen 32-27 = 5) — die Aenderung wirkt
+  // ausschliesslich auf die Blaetter, deren Hoehe von 51 Zellen abweicht.
   const HEBEN_PHASEN={
-    boden:  {dy:34, neigung:0.03}, // Stange am Boden, Heber (praesentational) gebueckt
-    // ANTRITT (NEU, Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
+    // BODEN: Stangenmitte einen Scheibenradius ueber der Sohle (Sohle 62,3 minus ~5,5 Zellen
+    // Scheibenradius = 56,8; 56,8-32 = 24,8). Genau so liegt eine belegte Stange auf der
+    // Plattform: die Scheiben tragen, die Stange schwebt auf Scheibenmitte. Vorher lag sie
+    // 3 Zellen UNTER der Sohle.
+    boden:  {anteil:0.896, neigung:0.03}, // Stange auf der Plattform, Heber (praesentational) gebueckt
+    // ANTRITT (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
     // unten): der Heber tritt an die Plattform — die Stange liegt noch am Boden wie in
     // "boden", aber ohne dessen leichte Grund-Neigung (0 statt 0.03), damit der Uebergang
     // "boden"(Gegner wartet)->"antritt"(eigener Antritt) trotz gleicher Hoehe sichtbar bleibt.
-    antritt:{dy:34, neigung:0},
-    zug:    {dy:2,  neigung:0},    // Umsetzen: Stange auf Brusthoehe, nah an der Hand
-    hoch:   {dy:-49,neigung:0},    // Streckung ueber Kopf, Arme durch — hoch genug ueber
-                                   // dem Anker, um nicht in die "kg"-Textzeile der
-                                   // Textkarte zu laufen (s. Screenshot-Gegenprobe)
-    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur noch
-                                   // vom LEGACY-Fallback hebePhase() genutzt (s. dort)
-    // ABLAGE (NEU, wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
+    antritt:{anteil:0.896, neigung:0},
+    // ZUG: Umsetzen, Stange im Front-Rack auf den Schluesselbeinen — Schulterlinie liegt bei
+    // Zelle 26,8, das Schluesselbein gut eine Zelle darunter (28); 28-32 = -4. Vorher (dy 2)
+    // lag sie unterhalb des Brustbeins, also eine knappe Handbreit zu tief fuer ein Umsetzen.
+    zug:    {anteil:0.326, neigung:0},
+    // HOCH: Ausstossen/Streckung. Scheitel liegt bei Zelle 11,4; die Stange steht ~6 Zellen
+    // (0,12 Koerperhoehen) darueber, also klar ueber dem Kopf, aber noch in Reichweite der
+    // Figur. -27 statt -49: die alte Zahl hob sie auf 0,545 Koerperhoehen ueber den Scheitel
+    // — das ist der von Chris beschriebene "Wurf". Warum nicht die anatomisch korrekten ~0,25
+    // Koerperhoehen einer echten Ausstossung: das Blatt hat gar keine Ueberkopf-Pose (die
+    // erzwungene "shoot"-Pose ist ein seitlicher Stossgriff auf Brusthoehe, s. Kommentar an
+    // HEBEN_HAND) — je hoeher die Stange ueber diesen Haenden steht, desto mehr schwebt sie
+    // frei. 0,12 ist der Kompromiss, der "ueber Kopf" liest, ohne sich vom Modell zu loesen.
+    hoch:   {anteil:-0.126,neigung:0},
+    abwurf: {anteil:0.916, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur
+                                   // noch vom LEGACY-Fallback hebePhase() genutzt (s. dort)
+    // ABLAGE (wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
     // ob der Versuch gueltig war oder nicht — im echten Gewichtheben wird die Stange nach
     // JEDEM Versuch aus der Ueberkopfposition fallen gelassen, nicht nur bei einem Fehlversuch
-    // (s. Kommentar bei stepHeben). Etwas tiefer und staerker gekippt als "abwurf", damit der
-    // Fall aus voller Streckung wuchtiger wirkt als der fruehere Fehlversuch-Sturz aus
-    // Brusthoehe.
-    ablage: {dy:40, neigung:0.4},
+    // (s. Kommentar bei stepHeben). Eine Zelle tiefer als "boden" und staerker gekippt: die
+    // Stange ist gefallen und liegt schief, aber weiterhin AUF der Plattform statt darunter.
+    ablage: {anteil:0.916, neigung:0.4},
   };
+  // Koerperspanne des STANDARDKOERPERS in Zellkoordinaten des 64er-Rahmens (die gemessenen
+  // Landmarken oben: Scheitel 11,4 · Sohle 62,3). Zugleich der Rueckfall fuer jedes Blatt,
+  // dessen Spanne sich nicht messen laesst — dann zeichnet es wie bisher.
+  const HEBEN_KOERPER_STD={oben:11.4, unten:62.3};
   // Scheibengroesse/-anzahl AUS kg — schwerere Last = mehr/dickere Scheiben, statt der
   // alten vier immer gleich grossen Punkte. Schwellen grob am internen HEBEN_KG_BASIS/
   // HEBEN_KG_PRO_LAST-Bereich orientiert (s. dort), nicht an einer Formel — rein optisch.
@@ -408,9 +489,18 @@
   // dasselbe Sicherheitsnetz wie bei zeichneHockeyschlaeger), kg die aktuell anzuzeigende
   // Last (u._vizKg, rein praesentational). Perspektive wie beim Schlaeger: im Profil die
   // volle Laenge, in Front/Ruecken ein verkuerzter Stummel.
-  function zeichneHantel(ctx,x,y,s,richtung,phase,kg){
+  // y IST SEIT DEM 13.09. (zweite Runde) DER SCHEITEL, nicht mehr der Griffpunkt, und
+  // koerperHoehe die Koerperhoehe DIESER Figur in Bildschirmpixeln (also bereits mit Z
+  // multipliziert). Aus beidem zusammen ergibt sich die Stangenhoehe als Anteil der
+  // Koerperhoehe — s. die ausfuehrliche Herleitung an HEBEN_PHASEN oben. Fehlt der Wert,
+  // greift die Standardkoerper-Hoehe, dann rechnet es wie vor der Aenderung.
+  // Der DISZIPLIN_PROP-Vertrag deckt das ab: "der Verankerungspunkt selbst kann je
+  // Requisite ein anderer Koerperteil sein" (s. dort).
+  function zeichneHantel(ctx,x,y,s,richtung,phase,kg,koerperHoehe){
     const p=HEBEN_PHASEN[phase]||HEBEN_PHASEN.zug;
-    const by=y+p.dy*s;
+    const kh=(typeof koerperHoehe==="number"&&koerperHoehe>0)
+      ? koerperHoehe : (HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*s;
+    const by=y+p.anteil*kh;
     const blick=richtung===3?1:richtung===1?-1:0;
     const seitlich=blick!==0;
     const halbLaenge=(seitlich?34:18)*s;
@@ -420,9 +510,22 @@
     const x2=x+ux*halbLaenge, y2=by+uy*halbLaenge;
     ctx.strokeStyle="#9098a8"; ctx.lineWidth=Math.max(1,3*s); ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    // Griffband am Ankerpunkt (der Hand), wie das Griffband beim Schlaeger.
+    // ZWEI GRIFFBAENDER statt einem (13.09.). Bis dahin sass genau ein Band auf dem
+    // Ankerpunkt — richtig, solange der Ankerpunkt EINE Faust war (HEBEN_HAND, Pixelscan
+    // 10.09.). Seit der Anker die Koerpermittelachse ist (s. Kommentar an HEBEN_HAND), waere
+    // ein einzelnes Band in der Stangenmitte sinnlos: dort ist beim Gewichtheben nichts, die
+    // Haende liegen links und rechts davon. Zwei symmetrische Baender auf Schulterbreite
+    // (+-9 Zellen im Profil, ~die gemessene Rumpfbreite der Standardfigur; in Front/Ruecken
+    // ist die Stange nur ein verkuerzter Stummel, dort entsprechend +-5) zeigen einen
+    // zweihaendigen Griff — genau das, was Chris mit "muss sich viel mehr am modell
+    // orientieren" meint.
+    const griffAbstand=(seitlich?9:5)*s;
     ctx.fillStyle="#e8e2d0";
-    ctx.beginPath(); ctx.arc(x,by,Math.max(0.9,1.6*s),0,Math.PI*2); ctx.fill();
+    for(const seite of [-1,1]){
+      ctx.beginPath();
+      ctx.arc(x+ux*seite*griffAbstand,by+uy*seite*griffAbstand,Math.max(0.9,1.6*s),0,Math.PI*2);
+      ctx.fill();
+    }
     const radien=scheibenFuer(kg||0);
     const IWF_FARBEN=["#c0392b","#2f6fd1","#e2c23a","#3a9450"]; // 25/20/15/10 kg-Staffel
     [-1,1].forEach(seite=>{
@@ -1999,6 +2102,10 @@
   const HOEHEN_BEZUG=52;        // PLATZHALTER: Median der gemessenen Blatthoehen im Kader
   const HOEHEN_KORR_MIN=0.80, HOEHEN_KORR_MAX=1.25;
   const hoehenKorrSpeicher=new Map();
+  // Zwischenspeicher der gemessenen Vollbild-Blattspannen (s. blattSpanne() in
+  // zeichneSprite) — auf Modulebene, damit er ueber Aufrufe hinweg haelt, wie
+  // hoehenKorrSpeicher direkt darueber.
+  const blattSpanneSpeicher=new Map();
   function hoehenKorrektur(u){
     if(!u||!u.n)return 1;
     if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
@@ -2357,7 +2464,7 @@
   //             Alphakontur ausgemessen, nicht geschaetzt (docs/design/sprite-handpunkte*.md).
   //             "hand" ist der Tabellenname aus dem Plan; der Verankerungspunkt selbst kann
   //             je Requisite ein anderer Koerperteil sein (z.B. der Fuss bei einer Kufe).
-  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (dy/neigung)
+  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (anteil/neigung)
   //             oder HOCKEY_PHASEN (schaftA/kelleA); die Form ist frei, `zeichne` interpretiert
   //             sie selbst.
   //   zeichne — (ctx,x,y,s,richtung,phase,extra) => {...}; x/y ist bereits der umgerechnete
@@ -2496,6 +2603,93 @@
     // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
     // Ersatzes fuer u.groesse.
     const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    // HANTEL AN EINEM ZELLPUNKT (13.09.). Eine Stelle statt drei: den Hantel-Zeichenblock gab
+    // es bisher NUR im normalen Sprite-Zeichenpfad ganz unten — der b.reiherMech- und der
+    // b.vollbild-Zweig direkt darunter kehren beide vorher zurueck (`return`), und damit
+    // bekamen genau die Figuren, die ueber eines dieser beiden Blaetter gezeichnet werden,
+    // in KEINER Phase eine Hantel. Nachgemessen (scripts/messe-heben-geometrie.mjs, Erhebung
+    // ueber den ganzen Beispielkader): 5 von 17 Figuren — Lava Golem, Krolach, Krag'Zul,
+    // Tidesprinter (alle b.vollbild) und Seraph-11 (b.reiherMech). Das ist Chris' Befund
+    // "dann hat nur einer eine hantel": in jedem Duell, in dem einer der beiden eine solche
+    // Kreatur ist, stemmt genau ein Heber Luft.
+    //
+    // Der Aufruf ist WOERTLICH derselbe wie im normalen Pfad (DISZIPLIN_PROP.gewichtheben,
+    // Umrechnung Zellkoordinate->Bildschirm ueber x-32*Z+hp.x*Z / y-46*Z+hp.y*Z) — nur der
+    // Ankerpunkt kommt je Zweig aus einer anderen, fuer das jeweilige Blatt gemessenen
+    // Tabelle. Kein zweiter Skalierungsweg, keine Kopie der Zeichenfunktion.
+    //
+    // NUR DIE HOEHE KOMMT AUS DEM GRIFFPUNKT, die Seite nicht (13.09.). Die Griffpunkt-
+    // Tabellen (HEBEN_HAND, VOLLBILD_SCHLAEGER) sind per Pixelscan an EINER Faust vermessen
+    // — fuer einen Schlaeger richtig, den man einhaendig am Ende fasst, fuer eine Hantel
+    // falsch: die wird zweihaendig und symmetrisch gegriffen, ihre Mitte haengt an der
+    // KOERPERMITTELACHSE. Gemessen (scripts/messe-heben-geometrie.mjs) hing die Stange
+    // dadurch 21 Zellen = 0,41 Koerperhoehen neben der Figur, sichtbar als frei schwebende
+    // Stange im Vorher-Bild.
+    //
+    // Die Mittelachse ist die Zeichen-x der Figur selbst: `x-32*Z+hp.x*Z` mit hp.x=32 ist
+    // exakt `x`, deshalb steht hier `x` statt einer Rechnung. Nachgemessen deckt sich das
+    // mit dem Bild: im Profil liegt die Silhouettenmitte ab Schulterhoehe bei Zelle 31,5
+    // (beide Profilrichtungen, mehrere Figuren) — der geometrischen Mitte der 64er-Zelle.
+    //
+    // ==== ZWEITE RUNDE 13.09.: NICHT MEHR EIN PUNKT, SONDERN DIE KOERPERSPANNE ==========
+    // Der Parameter ist seit der Review zu dieser PR kein GRIFFPUNKT mehr, sondern die
+    // Koerperspanne {oben,unten} des jeweiligen Blattes in Zellkoordinaten des 64er-
+    // Rahmens. Warum: die Stangenhoehe steht in HEBEN_PHASEN jetzt als ANTEIL der
+    // Koerperhoehe (volle Herleitung dort) — der Griffpunkt geht in die Hoehe gar nicht
+    // mehr ein, weil er sie nie bestimmt hat. Bis dahin las der vollbild-Zweig die
+    // Griffhoehe aus VOLLBILD_SCHLAEGER, wo sie je Blatt zwischen 8 und 45 streut: die
+    // Stange hing damit an einer Groesse, die mit der Koerperhoehe nichts zu tun hat.
+    //
+    // Die x-Achse bleibt unveraendert die Koerpermittelachse (`x`), aus dem Grund, der
+    // direkt darueber steht.
+    const hantelAnPunkt=(spanne,richtung)=>{
+      const prop=DISZIPLIN_PROP.gewichtheben;
+      const sp=spanne||HEBEN_KOERPER_STD;
+      prop.zeichne(ctx,x,y-46*Z+sp.oben*Z,Z,richtung,u.vizPhase||hebePhase(u),u._vizKg||0,
+        (sp.unten-sp.oben)*Z);
+    };
+    // KOERPERSPANNE EINES VOLLBILD-BLATTES, gemessen statt tabelliert — dasselbe Prinzip und
+    // dieselbe Begruendung wie bei hoehenKorrektur() oben ("GEMESSEN STATT TABELLIERT. Eine
+    // generierte Tabelle waere die zweite Kopie derselben Wahrheit"), nur am BLATT statt an
+    // der fertig gezeichneten Figur: ein Alpha-Durchlauf ueber die ganze Zeile (alle Spalten
+    // des Gehzyklus, damit eine einzelne Streckpose die Spanne nicht verzerrt), einmal je
+    // Blatt+Zeile, danach im Zwischenspeicher.
+    //
+    // AM BLATT, NICHT AN DER FIGUR: zeichneSprite() ruft sich sonst selbst auf (so wie
+    // hoehenKorrektur() es tut) — hier gaebe es dadurch eine Rekursion ueber hantelAnPunkt.
+    // Das Blatt reicht auch voellig: drawImage() skaliert JEDE Zelle unabhaengig von ihrer
+    // nativen Groesse immer auf dh=64*Z (s. dort), die Zellspanne ist also direkt die Spanne
+    // im 64er-Rahmen, sobald man sie mit 64/spec.ch umrechnet.
+    //
+    // Bei jedem Fehlschlag (Bild noch nicht geladen, getImageData nicht erlaubt, Blatt ganz
+    // transparent) bleibt der Wert null und der Aufrufer faellt auf HEBEN_KOERPER_STD
+    // zurueck — also genau auf das Verhalten vor dieser Aenderung.
+    const blattSpanne=(im,spec,reihe)=>{
+      const k=spec.key+"#"+reihe;
+      if(blattSpanneSpeicher.has(k))return blattSpanneSpeicher.get(k);
+      let sp=null;
+      try{
+        // Auf die echten Bildmasse begrenzt: ein Blatt, das schmaler/flacher ist als
+        // cols*cw bzw. (reihe+1)*ch, wuerde sonst ueber den Rand hinaus gelesen und
+        // lieferte eine zu grosse (weil leere) Spanne.
+        const bw=Math.min(spec.cw*spec.cols, im.width);
+        const bh=Math.min(spec.ch, im.height-reihe*spec.ch);
+        if(bw<=0||bh<=8)throw new Error("Blattmasse passen nicht");
+        const c=document.createElement("canvas"); c.width=bw; c.height=bh;
+        const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+        cx.drawImage(im,0,reihe*spec.ch,bw,bh,0,0,bw,bh);
+        const px=cx.getImageData(0,0,bw,bh).data;
+        let oben=null,unten=null;
+        for(let yy=0;yy<bh;yy++)for(let xx=0;xx<bw;xx++)
+          if(px[(yy*bw+xx)*4+3]>16){ if(oben==null)oben=yy; unten=yy; break; }
+        // Mindesthoehe 8 Zellen wie bei hoehenKorrektur — ein fast leeres Blatt soll die
+        // Hantel nicht auf einen Punkt zusammenziehen.
+        if(oben!=null&&unten-oben+1>8)
+          sp={oben:oben*64/spec.ch, unten:(unten+1)*64/spec.ch};
+      }catch(e){}
+      blattSpanneSpeicher.set(k,sp);
+      return sp;
+    };
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -2839,6 +3033,25 @@
       // zeichneReiherMech() zurueck, ist also fuer JEDES Bild bereits die echte,
       // gerade gezeichnete Position und keine separat gemessene/geschaetzte Zahl.
       if(feldspiel&&istHockey()&&!u.down)zeichneHockeyschlaeger(ctx,kopf.kopfX,kopf.kopfY,Z,r0,"quer");
+      // HANTEL (13.09., s. hantelAnPunkt oben) — NICHT am Kopf/Schnabel wie der Schlaeger:
+      // eine Hantel haengt am Rumpf, und die HEBEN_PHASEN-Abstaende sind vom Rumpfanker aus
+      // gerechnet, nicht vom Kopf. Der Reiher-Mech wird rein prozedural gezeichnet (kein
+      // Blatt, s. zeichneReiherMech direkt oberhalb), seine Masse stehen deshalb im Code
+      // statt in einem Pixelscan: Rumpf-Oval bei cy+1*Z, Beine bis cy+19*Z (Fuss), Kopf bei
+      // cy-17*Z (Scheitel also ~cy-19*Z). Das ergibt eine Koerperhoehe von ~39 Zellen mit
+      // 0,40 davon — derselbe relative Griffpunkt, den HEBEN_HAND beim Standardkoerper hat —
+      // bei cy-3*Z, in der Zellschreibweise dieser Datei also y:43.
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): der relative Griffpunkt stimmte, die
+      // daran haengenden ABSOLUTEN Abstaende aus HEBEN_PHASEN nicht — die sind an einem
+      // 51 Zellen hohen Standardkoerper kalibriert, dieser hier ist 38 Zellen hoch. Gemessen
+      // lag die Ruhestange dadurch 2 Zellen UNTER der Sohle und die Ueberkopfstange
+      // 11 Zellen ueber dem Scheitel. Statt des Punktes geht jetzt die SPANNE hinein:
+      // cy ist Zelle 46 (Ankerzeile dieser Datei), Scheitel also 46-19=27, Sohle 46+19=65.
+      // Die Zahlen stehen weiterhin im Code statt in einem Pixelscan, weil zeichneReiherMech
+      // direkt darueber genau diese beiden Grenzen zeichnet — hier ist die Quelle der
+      // Wahrheit der Code selbst, nicht ein Blatt.
+      if(feldspiel&&istHeben()&&!u.down)hantelAnPunkt({oben:27,unten:65},r0);
       if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
       return;
     }
@@ -2849,8 +3062,13 @@
       if(im&&im.width){
         const row=vollbildRow(spec,r0);
         const vn=spec.cols;
+        // Math.max(0,...) wie beim Standardkoerper-Bildindex `f` oben (13.09., ausfuehrliche
+        // Begruendung und Messwerte dort): fuer u.lunge>0,2 — was Buehne und Feldspiel
+        // setzen — wurde der Index negativ und drawImage zeichnete gar nichts. Vollbild-
+        // Kreaturen verschwanden dadurch komplett, sichtbar im Gewichtheben-Duell
+        // Lava Golem gegen Krag'Zul.
         const vf=(u.lunge>0&&!u.down)
-          ? Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn))
+          ? Math.max(0, Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn)))
           : (u.down?vn-1:Math.floor((t*7+u.id)%vn));
         // dh/dw UND der Boden-Anker (y-46) skalieren mit Z (s. groesseFaktor oben) — sonst
         // waechst nur die Breite/Hoehe des Bilds, aber die Fuesse rutschen relativ zum
@@ -2872,6 +3090,32 @@
           :(u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten");
         zeichneHockeyschlaeger(ctx,x-32*Z+gp.x*Z,y-46*Z+gp.y*Z,Z,r0,pose);
       }
+      // HANTEL (13.09., s. hantelAnPunkt oben). Derselbe Ankerpunkt wie der Schlaeger eine
+      // Zeile darueber — VOLLBILD_SCHLAEGER heisst nur nach seinem ersten Nutzer, der
+      // Tabellenkopf nennt sich selbst "GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN"
+      // und ist genau das: je Blatt ein per Augenschein am hochskalierten renderProbe-PNG
+      // vermessener Koerperpunkt (docs/design/vollbild-schlaeger-griffpunkte.md).
+      //
+      // ANDERS ALS BEIM SCHLAEGER kein `griff&&`-Vorbehalt: fehlt ein Blatt in der Tabelle,
+      // faellt der Anker auf HEBEN_HAND zurueck (prop.hand, der Standardkoerper-Punkt im
+      // selben 64er-Rahmen) statt gar nichts zu zeichnen. Beim Schlaeger ist "lieber kein
+      // Schlaeger als einer an der falschen Stelle" richtig — ein Hockeyspieler ohne
+      // Schlaeger ist unauffaellig. Beim Gewichtheben ist es umgekehrt: ein Heber ohne
+      // Hantel stemmt sichtbar Luft, und genau das ist der gemeldete Fehler. Von den
+      // 16 tatsaechlich benutzten b.vollbild-Schluesseln fehlt heute nur "singvogel".
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): VOLLBILD_SCHLAEGER wird hier gar nicht
+      // mehr gelesen. Seine y-Werte streuen ueber die Blaetter von 8 (Inefinnas Blatt) bis
+      // 45 (kraken) — als GRIFFhoehe fuer einen einhaendig gefassten Schlaeger richtig, als
+      // Aufhaengung fuer eine Hantel aber eine Groesse ohne jeden Bezug zur Koerperhoehe.
+      // Gemessen schwebte Inefinnas Ruhestange dadurch auf halber Rumpfhoehe (27,5 Zellen
+      // ueber der Sohle) und Tidesprinters 1,5 Zellen UNTER der Sohle, waehrend derselbe
+      // Code bei golem (y~33) zufaellig richtig aussah. Statt des Punktes geht jetzt die am
+      // Blatt GEMESSENE Koerperspanne hinein (s. blattSpanne oben) — damit haengt die
+      // Stangenhoehe an der Koerperhoehe des Blattes und an sonst nichts. Ohne Messung
+      // (Bild noch nicht geladen) faellt es auf den Standardkoerper zurueck, wie bisher.
+      if(feldspiel&&istHeben()&&!u.down)
+        hantelAnPunkt((im&&im.width)?blattSpanne(im,spec,vollbildRow(spec,r0)):null,r0);
       // KUFE FUER VOLLBILD-LAeUFER (Opus-Overseer-Review PR #903, Fund 2): der fruehe
       // `return;` unten liess JEDEN ueber b.vollbild gezeichneten Eiskunstlauf-Teilnehmer
       // (Kreaturen mit einem eigenen Fremdbild statt des LPC-Standardkoerpers, z.B. Lava
@@ -3020,16 +3264,39 @@
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
     // Gang in Schleife. So passt das Bild zu dem, was die Simulation gerade tut.
+    //
+    // UNTERGRENZE 0 (13.09.). Die Rechnung (1-u.lunge/0.2)*n setzt voraus, dass u.lunge bei
+    // 0,2 STARTET. Das stimmt in der Arena — auf der Buehne und im Feldspiel aber nicht:
+    // dort setzen stepBuehne() und die Wurf-/Block-/Torwart-Pfade u.lunge auf 0,5 (s. die
+    // Fundstellen dort; auf der Buehne ist die 0,5 sogar bewusst als Einmal-pro-Versuch-
+    // Marke gewaehlt). Fuer u.lunge>0,2 wird der Ausdruck NEGATIV, Math.min() laesst ihn
+    // negativ, und drawImage() mit negativem Quell-x zeichnet GAR NICHTS.
+    //
+    // Nachgemessen an origin/main per renderProbe (Alpha-Pixel derselben Figur, Disziplin
+    // Gewichtheben, scripts/_lunge-Sonde im PR beschrieben): Krag'Zul 1603px bei lunge 0,19
+    // gegen 53px bei lunge 0,21; Lava Golem 1848 gegen 283; Johanna 1577 gegen 827. Der
+    // gerade aktive Heber verschwand damit fuer die ersten 0,3 Simulationssekunden JEDES
+    // enthuellten Versuchs — bei ZEIT_DEHNUNG.gewichtheben=4 gut eine Sekunde, und zwar
+    // genau die Figur, auf der die Kamera steht.
+    //
+    // Math.max(0,...) statt einer Umrechnung, weil der Startwert nirgends festgehalten wird:
+    // waehrend 0,5->0,2 haelt die Figur jetzt das ERSTE Bild (Ausholen) und spielt die
+    // Sequenz danach wie bisher ueber 0,2->0 ab. Fuer u.lunge<=0,2 aendert sich nichts —
+    // dort liegt der Ausdruck schon in [0,n-1], die Klammer ist dann wirkungslos.
+    //
     // EIGENE SCHRITTPHASE STATT DER WELTUHR (Zeitfahren, Ziel 8, s. stepZeitfahren).
     // `u.vizAniPhase` ist die Zahl der bereits gelaufenen LAUFZYKLEN (nicht Bilder) —
     // hier mit der Bildzahl des aktuellen Blattes multipliziert, damit der Aufrufer nichts
     // ueber Sprite-Blaetter wissen muss. ADDITIV: wer das Feld nicht setzt (jede andere
     // Disziplin, jeder andere Zeichenpfad), faellt Zeichen fuer Zeichen auf die alte
-    // `(t*7+u.id)`-Formel zurueck — bit-identisch.
+    // `(t*7+u.id)`-Formel zurueck — bit-identisch. (Beim Zusammenfuehren mit der
+    // Untergrenze-0-Aenderung oben: die beiden greifen an verschiedenen Zweigen desselben
+    // Ausdrucks an — `zyklus` nur im Leerlauf-/Gang-Zweig, Math.max(0,...) nur im
+    // Ausfallschritt-Zweig. Sie beruehren einander nicht.)
     const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))
       ? u.vizAniPhase*n : (t*7+u.id);
     const f=(u.lunge>0&&!u.down&&!kuerSturz)
-      ? Math.min(n-1, Math.floor((1-u.lunge/0.2)*n))
+      ? Math.max(0, Math.min(n-1, Math.floor((1-u.lunge/0.2)*n)))
       : ((u.down||kuerSturz)?n-1:Math.floor(((zyklus%n)+n)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
@@ -3043,7 +3310,7 @@
     // von f/n der aktuellen Animation.
     const WAFFEN_N=9;
     const waffenF=(u.lunge>0&&!u.down)
-      ? Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N))
+      ? Math.max(0, Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N)))
       : (u.down?WAFFEN_N-1:Math.floor((t*7+u.id)%WAFFEN_N));
     const zeichneWaffenbild=(key)=>{
       const im=sprBild[key]; if(!im||!im.width)return;
@@ -3317,10 +3584,18 @@
     if(feldspiel&&istHeben()&&!u.down){
       // Ueber DISZIPLIN_PROP.gewichtheben statt direkt ueber HEBEN_HAND/zeichneHantel (PR
       // 0.2) — reine Aufrufpfad-Umleitung, `prop.hand`/`prop.zeichne` SIND dieselben Objekte/
-      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis.
-      const prop=DISZIPLIN_PROP.gewichtheben;
-      const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizPhase||hebePhase(u),u._vizKg||0);
+      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis. Seit 13.09.
+      // ueber dieselbe Hilfsfunktion wie die zwei frueher zurueckkehrenden Zweige oben
+      // (hantelAnPunkt, s. dort) — damit es die Umrechnung Zellkoordinate->Bildschirm
+      // genau EINMAL in dieser Funktion gibt und die drei Faelle nicht auseinanderlaufen
+      // koennen. `blickAus(u)` dort ist dasselbe `r`, das hier schon berechnet ist.
+      // SPANNE STATT HANDPUNKT (zweite Runde 13.09., s. hantelAnPunkt/HEBEN_PHASEN): fuer
+      // den Standardkoerper ist das die gemessene Landmarken-Spanne Scheitel 11,4 ..
+      // Sohle 62,3, also GENAU die Kalibrierung, aus der die Anteile gerechnet sind —
+      // dieser Zweig zeichnet dadurch pixelgleich wie vorher. `prop.hand` bleibt fuer den
+      // DISZIPLIN_PROP-Vertrag stehen, wird vom Hantel-Pfad aber nicht mehr gelesen: eine
+      // Faust bestimmt keine Stangenhoehe (s. dort).
+      hantelAnPunkt(HEBEN_KOERPER_STD,r);
     }
     // SCHACHUHR. Dasselbe Muster wie Hockeyschlaeger/Hantel direkt oberhalb (PR 0.2,
     // DISZIPLIN_PROP) — Ziel 5 (Opus-Plan 09-10, Abschnitt 5.1, Speed-Schach A3 20->25).
@@ -13003,7 +13278,7 @@
   // rundenDauer) — geschrieben wird AUSSCHLIESSLICH auf die zwei neuen viz*-Felder
   // (u.vizPhase/u.vizPhaseT).
   //
-  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest bei W*0.30/W*0.70 (s.
+  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest auf HEBEN_SPALTE (s.
   // zeichneHeben) — "geht zur Hantel" ist deshalb nicht als u.vizX/u.vizY modelliert, sondern
   // als eigene Hantel-Phase ("antritt", s. HEBEN_PHASEN oben): die Stange bewegt sich relativ
   // zur Hand, der Heber selbst bleibt auf seinem Podestplatz — genau wie die vier
@@ -13770,6 +14045,24 @@
     if(zug.r.gueltig)return "hoch";
     return fortschritt<0.55?"abwurf":"boden";
   }
+  // DIE ZWEI PODESTPLAETZE, als Anteil der Buehnenbreite (13.09.). Vorher standen die zwei
+  // Zahlen 0.30/0.70 an ZWEI Stellen woertlich im Code (hier im forEach der beiden Heber und
+  // unten bei `bx` fuer die Textkarte) — eine Konstante, damit sie nicht auseinanderlaufen
+  // koennen und der Wert genau einmal begruendet dasteht.
+  //
+  // 0.38/0.62 statt 0.30/0.70 (Chris, 13.09.: "momentan stehen die 2 spieler unnoetig weit
+  // am rand statt zentraler im vergleich in der mitte"). Auf der 1240px-Buehne ruecken die
+  // Saeulen damit von 372/868 auf 471/769, der Abstand der beiden Mittelachsen schrumpft von
+  // 496 auf 298px. Naeher geht es NICHT beliebig, und die Schranke ist nachgerechnet, nicht
+  // geraten: die Hantel ist im Profil 34*Z lang, mit der aeussersten Scheibe reicht sie bis
+  // ~54*Z von der Mittelachse. Die groesste Figur im Beispielkader zeichnet mit Z~1.71
+  // (Krag'Zul, per scripts/messe-heben-geometrie.mjs), macht ~92px Halbbreite je Seite — bei
+  // 0.38/0.62 bleiben zwischen den beiden Stangenenden (563 und 677) noch 114px Luft. Bei
+  // 0.42/0.58 (Abstand 198px) waeren es nur noch 14px, zwei grosse Heber wuerden ihre
+  // Scheiben kreuzen. Die Namens-/Zweikampfzeilen darunter sind schmaler als die Hantel
+  // (16 Zeichen IBM Plex Mono 11px = ~106px, also ~53px je Seite) und deshalb nicht
+  // die bindende Schranke.
+  const HEBEN_SPALTE=[0.38,0.62];
   function zeichneHeben(art){
     if(!TEILNEHMER.length)return;
     const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
@@ -13797,7 +14090,7 @@
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
     // Chris beschrieben hat ("immer 2 gleichzeitig").
     const y=H*0.46;
-    [[a,W*0.30,"--home"],[b,W*0.70,"--away"]].forEach(([u,x,farbVar])=>{
+    [[a,W*HEBEN_SPALTE[0],"--home"],[b,W*HEBEN_SPALTE[1],"--away"]].forEach(([u,x,farbVar])=>{
       const c=css(farbVar);
       ctx.globalAlpha=u.lunge>0?1:0.94;
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
@@ -13827,10 +14120,17 @@
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
-      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
+      // NAME UND ZWEIKAMPF 12px TIEFER (13.09., dy 70/84 statt 58/72). Die Textkarte des
+      // AKTIVEN Hebers steht in derselben Spalte (bx) und schreibt ihre Versuchszeile bei
+      // textY+48, also y+50 — der Name lag mit y+58 acht Pixel darunter, bei 10- bzw.
+      // 11px-Schrift heisst das ueberlappend. Im Vorher-Screenshot
+      // (docs/design/gewichtheben-vorher-13-09.png) steht "Reißen, 1. Versuch" sichtbar im
+      // Namen "Greenkraut". Mit y+70 bleiben 20px Abstand; nach unten ist Platz bis zur
+      // Warteschlangen-Zeile bei H*0.90 (= y+207).
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,70,c,11);
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
-      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
+      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),84,"#8a93a3",8.5);
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
@@ -13861,21 +14161,35 @@
     // (Chris' Fund, 06.09.: "da ist gar kein gewicht als asset was die spieler versuchen
     // zu stämmen") entfaellt ersatzlos.
     const aktiverHeber=zug?zug.u:null;
-    const bx=aktiverHeber?(aktiverHeber.side===0?W*0.30:W*0.70):W/2;
+    const bx=aktiverHeber?(aktiverHeber.side===0?W*HEBEN_SPALTE[0]:W*HEBEN_SPALTE[1]):W/2;
 
     // TEXT-KARTE bleibt an einer FESTEN Hoehe, unabhaengig von der Hantel, die jetzt an
     // der Hand haengt und sich mit dem Phasenwechsel (hebePhase) bewegt — sonst haetten
     // Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar zu bleiben.
     const textY=y+2;
+    // ZWEI OBERE ZEILEN AUS DER FLUGBAHN DER STANGE GENOMMEN (13.09.). kg-Zahl und
+    // Kuehn-Badge sassen bei textY-34 bzw. textY-58, also 32 bzw. 56px ueber dem Fusspunkt
+    // — genau dort, wo die Stange in der Phase "hoch" jetzt steht. Vorher ging das nur
+    // deshalb auf, weil die Stange mit dy=-49 hoch ueber die ganze Karte hinausflog; genau
+    // das war Chris' "wird quasi weit ueber den kopf geworfen". Mit der korrigierten
+    // Ueberkopf-Hoehe muss stattdessen die Karte weichen.
+    //
+    // FESTE BUEHNENHOEHE statt eines Abstands zum Fusspunkt, weil die Ueberkopf-Hoehe am Z
+    // der jeweiligen Figur haengt und ueber den Beispielkader um ~28px streut (gemessen:
+    // Stangenoberkante zwischen Buehnen-y 167 bei Johanna/Z~1.04 und 138 bei Krag'Zul/
+    // Z~1.71, s. docs/design/gewichtheben-hantel-recherche-13-09.md). Ein fester Abstand
+    // haette fuer die eine Figur gepasst und fuer die andere nicht. H*0.245 (=115px bei
+    // H=470) liegt ueber BEIDEN, und noch unter der Duell-Kopfzeile bei H*0.155 (=73px).
+    const kopfZeileY=H*0.245, kuehnZeileY=H*0.20;
     ctx.textAlign="center";ctx.textBaseline="middle";
     if(zug){
       const gueltig=zug.r.gueltig;
       const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
       ctx.font="700 22px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
-      ctx.strokeText(zeigeKg+" kg",bx,textY-34);
+      ctx.strokeText(zeigeKg+" kg",bx,kopfZeileY);
       ctx.fillStyle=gueltig?css("--ok"):css("--crit");
-      ctx.fillText(zeigeKg+" kg",bx,textY-34);
+      ctx.fillText(zeigeKg+" kg",bx,kopfZeileY);
       // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
       // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
       ctx.font="700 15px 'Barlow Condensed',sans-serif";
@@ -13888,23 +14202,24 @@
       // Misslingen/Verletzung — ANSAGE_FARBE waere hier eine dritte, unnoetig Farbe, weil
       // der Ausgang schon feststeht, sobald dieser Versuch enthuellt wird. OBERHALB statt
       // unterhalb der Versuchszeile, weil dort schon der Lifter-Name/die Zweikampf-Anzeige
-      // sitzt (schrift() bei dy 58/72 direkt darueber im [[a,...],[b,...]]-forEach) -- ein
+      // sitzt (schrift() direkt darueber im [[a,...],[b,...]]-forEach) -- ein
       // Badge dort kollidierte sichtbar mit beidem (im Playwright-Screenshot geprueft).
-      // Ueber der kg-Zahl ist die Buehne dunkel und leer (die Duell-Kopfzeile sitzt bei
-      // H*0.155, weit oberhalb von textY-58).
+      // Seit 13.09. sitzt es zusammen mit der kg-Zahl im festen oberen Band (kuehnZeileY,
+      // s. dort) statt in Abstaenden zum Fusspunkt — aus demselben Grund: die Stange
+      // erreicht in der Phase "hoch" die alte Badge-Hoehe.
       if(zug.r.kuehn){
         const kuehnTxt=zug.r.verletzt?"⚠ KÜHNER VERSUCH — VERLETZT"
           :gueltig?"★ KÜHNER VERSUCH — PUNKTESIEG!"
           :"KÜHNER VERSUCH GESCHEITERT";
         ctx.font="700 12.5px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.9)";ctx.lineJoin="round";
-        ctx.strokeText(kuehnTxt,bx,textY-58);
+        ctx.strokeText(kuehnTxt,bx,kuehnZeileY);
         ctx.fillStyle=zug.r.verletzt?css("--crit"):gueltig?"#f2d75a":css("--crit");
-        ctx.fillText(kuehnTxt,bx,textY-58);
+        ctx.fillText(kuehnTxt,bx,kuehnZeileY);
       }
     } else {
       ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.fillText("Erste Ansage folgt …",bx,textY-10);
+      ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
@@ -25668,7 +25983,7 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
-    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand)=>{
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
       // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
@@ -25696,7 +26011,27 @@
       const u={n:name,x:gr/2,y:gr*46/64,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
         lunge:lunge!==undefined&&lunge!==null?lunge:((ani==="slash"||ani==="shoot")?0.1:0),
         down:ani==="hurt",side:0,hop:0};
-      zeichneSprite(ctx,u,32,46,!!feldspiel);
+      // vizPhase (optional, 13.09.): setzt dasselbe Feld, das stepHeben()/stepSchach() im
+      // laufenden Spiel schreiben, damit sich EINE Requisiten-Phase gezielt ansteuern
+      // laesst statt nur der, die der Fallback gerade liefert. Ohne laufendes Duell gibt
+      // hebePhase() immer "boden" zurueck — die Ueberkopf-Phase "hoch" war ueber diese
+      // Sonde bis dahin gar nicht messbar, und genau sie steht in Chris' Befund vom
+      // 13.09. ("beim heben wird sie quasi weit ueber den kopf geworfen"). Dieselbe Rolle
+      // wie `lunge`/`leinwand` darueber: ein Aufrufwert, der einen sonst festen Normalfall
+      // ueberschreibt, rein diagnostisch — ohne Argument bleibt u.vizPhase undefined und
+      // der Zeichenpfad waehlt exakt wie bisher.
+      if(vizPhase!==undefined&&vizPhase!==null)u.vizPhase=vizPhase;
+      // ANKER (optional, 13.09. zweite Runde): der Zeichenpunkt lag hier fest auf (32,46),
+      // UNABHAENGIG von `leinwand`. Eine groessere Leinwand gab einer grossen Figur damit
+      // nur unten und rechts mehr Platz — nach OBEN klebte sie weiter an der Kante, weil
+      // der Sprite bei y-46*Z ansetzt und bei Z=1,71 (Krag'Zul) schon bei -32 beginnt.
+      // Genau daran scheiterte die Ueberkopf-Messung der groessten Kaderfiguren: die Sonde
+      // meldete Scheitel 0 und Stangenmitte 0, beides nur die abgeschnittene Bildkante.
+      // OHNE Argument bleibt es wortgleich bei (32,46) — jeder bestehende Aufrufer (und
+      // jede im Repo dokumentierte Messung) zeichnet damit unveraendert.
+      const ax=(anker&&typeof anker.x==="number")?anker.x:32;
+      const ay=(anker&&typeof anker.y==="number")?anker.y:46;
+      zeichneSprite(ctx,u,ax,ay,!!feldspiel);
       return c.toDataURL();
     },
     // Debug-Gegenstueck zu renderProbe, nur fuer die KADER-VORSCHAU (figur(), dieselbe
