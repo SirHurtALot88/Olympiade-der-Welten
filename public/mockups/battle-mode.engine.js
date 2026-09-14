@@ -355,6 +355,14 @@
   // window.__arena.renderProbe(name,"shoot",true,dir,lunge,256), Pixelscan der Alpha-
   // kontur statt Schaetzung. Verfahren und Rohbilder: docs/design/sprite-handpunkte.md,
   // Abschnitt "Gewichtheben". Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  //
+  // SEIT 13.09. LIEST DER HANTEL-PFAD NUR NOCH `y` DARAUS. Die x-Werte bleiben unveraendert
+  // stehen, weil sie gemessen und richtig sind — sie beschreiben eine Faust, und der
+  // DISZIPLIN_PROP-Vertrag verlangt genau das. Fuer eine HANTEL ist eine Faust aber der
+  // falsche Aufhaengepunkt: sie wird zweihaendig symmetrisch gegriffen, ihre Mitte gehoert
+  // auf die Koerpermittelachse. Die Begruendung und die Messung stehen an hantelAnPunkt()
+  // in zeichneSprite() bzw. in docs/design/gewichtheben-hantel-recherche-13-09.md
+  // Abschnitt 6; hier nur der Hinweis, damit niemand die x-Werte fuer tot haelt.
   const HEBEN_HAND=[
     {x:39,y:38}, // hinten
     {x:11,y:32}, // links
@@ -367,27 +375,100 @@
   // Stange wandert an der Hand vorbei, genau das Bild, das die alte freistehende Hantel
   // schon zeigte (buehneAkt-Fortschritt, s. hebePhase() bei zeichneHeben), jetzt an einen
   // echten Koerperpunkt verankert statt an der Bildmitte.
+  //
+  // ALLE VIER dy NEU VERMESSEN (13.09., Chris' Befund: "dann hat nur einer eine hantel. die
+  // ist viel zu weit unten und beim heben wird sie quasi weit ueber den kopf geworfen. Das
+  // muss sich viel mehr am modell orientieren."). Die alten Zahlen waren nie an einer Figur
+  // gemessen, sondern am freien Bildeindruck der Vorgaenger-Hantel gewaehlt — nachgemessen
+  // per scripts/messe-heben-geometrie.mjs (Alpha-Differenz zweier echter renderProbe-
+  // Renderings, Verfahren und volle Zahlen in docs/design/gewichtheben-hantel-recherche-13-09.md):
+  //
+  //   Phase    dy alt   Stange lag bei (Koerperanteil 0=Scheitel, 1=Sohle)
+  //   boden      34     1,065  — also UNTER den Fuessen, im Boden
+  //   zug         2     0,417  — unterhalb des Brustbeins, nicht im Front-Rack
+  //   hoch      -49    -0,545  — eine halbe Koerperhoehe ueber dem Scheitel ("geworfen")
+  //   ablage     40     1,181  — noch tiefer im Boden als "boden"
+  //
+  // Die neuen Zahlen sind aus den GEMESSENEN Koerperlandmarken des Standardblatts gerechnet
+  // (Zellkoordinaten, Groesse 5: Scheitel 11,4 · Schulter 26,8 · Brustbein 30,6 · Huefte 43,1
+  // · Sohle 62,3 · Koerperhoehe 51,0 Zellen; Handanker HEBEN_HAND liegt bei 32, also bei 0,40
+  // der Koerperhoehe). Weil dy in ZELLEINHEITEN steht und die Koerperhoehe ~51 Zellen betraegt,
+  // ist dy/51 direkt der Anteil der Koerperhoehe, um den die Stange vom Handanker abweicht —
+  // unabhaengig von Z und damit von der Modellgroesse.
+  //
+  // ==== KORREKTUR 13.09., ZWEITE RUNDE: ANTEIL STATT ABSOLUTER ZELLEN ==================
+  // Die erste Fassung dieser Tabelle stand in ABSOLUTEN Zelleinheiten relativ zum
+  // Griffpunkt (dy). Das ist genau so lange richtig, wie jede Figur den Standardkoerper
+  // benutzt — 51 Zellen hoch, Scheitel 11,4, Sohle 62,3. Die unabhaengige Review zu DIESER
+  // PR hat nachgewiesen, dass das fuer die zwei ANDEREN Zeichenpfade nicht stimmt, und die
+  // eigene Sonde scripts/pruefe-heben-hantel-vollzaehlig.mjs hatte es auch schon gezeigt:
+  //
+  //   Tidesprinter (vollbild)   boden 1,5 Zellen UNTER der Sohle · hoch 19,5 ueber Scheitel
+  //   Seraph-11 (reiherMech)    boden 2,0 Zellen UNTER der Sohle · hoch 11,0 ueber Scheitel
+  //   Inefinna (vollbild)       boden auf halber Rumpfhoehe SCHWEBEND (27,5 ueber Sohle)
+  //   King Arlen/Krolach/...    hoch 2..3 Zellen UNTER dem Scheitel, Stange IM Kopf/Helm
+  //
+  // ZWEI unabhaengige Ursachen, beide dieselbe Wurzel "absolute Zellen an einem fremden
+  // Blatt":
+  //   1. DIE BLATTHOEHE. zeichneReiherMech zeichnet von cy-19*Z bis cy+19*Z, also 38 statt
+  //      51 Zellen. Ein +25 aus der Standardkoerper-Kalibrierung schiesst an einem 38-Zellen-
+  //      Koerper zwangslaeufig unter die Sohle, ein -27 zwangslaeufig weit ueber den Kopf.
+  //      Ein anderer ANKERPUNKT haette daran nichts geaendert: kein einzelner fester Punkt
+  //      kann "boden" UND "hoch" zugleich treffen, wenn die Hoehe selbst abweicht.
+  //   2. DER ANKERPUNKT SELBST. Der vollbild-Pfad las die Griffhoehe aus VOLLBILD_SCHLAEGER
+  //      — einer Tabelle mit FAUSTpunkten fuer den Hockeyschlaeger, deren y ueber die
+  //      Blaetter von 8 (Inefinna) bis 45 (kraken) streut. Damit hing die Stangenhoehe an
+  //      einer Groesse, die mit der Koerperhoehe gar nichts zu tun hat — bis zu einer
+  //      viertel Koerperhoehe Fehler, je nachdem welches Blatt eine Figur benutzt.
+  //
+  // BEIDE Ursachen verschwinden, wenn die Stangenhoehe als ANTEIL DER KOERPERHOEHE des
+  // JEWEILIGEN Blattes ausgedrueckt wird, gemessen vom Scheitel nach unten (0 = Scheitel,
+  // 1 = Sohle). Der Griffpunkt geht in die Stangenhoehe dann ueberhaupt nicht mehr ein —
+  // was richtig ist: eine zweihaendig gegriffene Hantel haengt am Koerper, nicht an einer
+  // Faust (dieselbe Einsicht wie bei der x-Achse, s. hantelAnPunkt).
+  //
+  // DIE ZAHLEN SIND DIESELBE GEOMETRIE WIE VORHER, nur umgerechnet: anteil = (32+dy-11,4)/50,9
+  // aus den Standardkoerper-Landmarken darueber. Fuer den Standardkoerper zeichnet das
+  // deshalb PIXELGLEICH wie die dy-Fassung (nachgerechnet: boden 11,4+0,896*50,9 = 57,0
+  // gegen 32+25 = 57; hoch 11,4-0,126*50,9 = 4,99 gegen 32-27 = 5) — die Aenderung wirkt
+  // ausschliesslich auf die Blaetter, deren Hoehe von 51 Zellen abweicht.
   const HEBEN_PHASEN={
-    boden:  {dy:34, neigung:0.03}, // Stange am Boden, Heber (praesentational) gebueckt
-    // ANTRITT (NEU, Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
+    // BODEN: Stangenmitte einen Scheibenradius ueber der Sohle (Sohle 62,3 minus ~5,5 Zellen
+    // Scheibenradius = 56,8; 56,8-32 = 24,8). Genau so liegt eine belegte Stange auf der
+    // Plattform: die Scheiben tragen, die Stange schwebt auf Scheibenmitte. Vorher lag sie
+    // 3 Zellen UNTER der Sohle.
+    boden:  {anteil:0.896, neigung:0.03}, // Stange auf der Plattform, Heber (praesentational) gebueckt
+    // ANTRITT (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 4.1/Ziel 1, ueber stepHeben()
     // unten): der Heber tritt an die Plattform — die Stange liegt noch am Boden wie in
     // "boden", aber ohne dessen leichte Grund-Neigung (0 statt 0.03), damit der Uebergang
     // "boden"(Gegner wartet)->"antritt"(eigener Antritt) trotz gleicher Hoehe sichtbar bleibt.
-    antritt:{dy:34, neigung:0},
-    zug:    {dy:2,  neigung:0},    // Umsetzen: Stange auf Brusthoehe, nah an der Hand
-    hoch:   {dy:-49,neigung:0},    // Streckung ueber Kopf, Arme durch — hoch genug ueber
-                                   // dem Anker, um nicht in die "kg"-Textzeile der
-                                   // Textkarte zu laufen (s. Screenshot-Gegenprobe)
-    abwurf: {dy:36, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur noch
-                                   // vom LEGACY-Fallback hebePhase() genutzt (s. dort)
-    // ABLAGE (NEU, wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
+    antritt:{anteil:0.896, neigung:0},
+    // ZUG: Umsetzen, Stange im Front-Rack auf den Schluesselbeinen — Schulterlinie liegt bei
+    // Zelle 26,8, das Schluesselbein gut eine Zelle darunter (28); 28-32 = -4. Vorher (dy 2)
+    // lag sie unterhalb des Brustbeins, also eine knappe Handbreit zu tief fuer ein Umsetzen.
+    zug:    {anteil:0.326, neigung:0},
+    // HOCH: Ausstossen/Streckung. Scheitel liegt bei Zelle 11,4; die Stange steht ~6 Zellen
+    // (0,12 Koerperhoehen) darueber, also klar ueber dem Kopf, aber noch in Reichweite der
+    // Figur. -27 statt -49: die alte Zahl hob sie auf 0,545 Koerperhoehen ueber den Scheitel
+    // — das ist der von Chris beschriebene "Wurf". Warum nicht die anatomisch korrekten ~0,25
+    // Koerperhoehen einer echten Ausstossung: das Blatt hat gar keine Ueberkopf-Pose (die
+    // erzwungene "shoot"-Pose ist ein seitlicher Stossgriff auf Brusthoehe, s. Kommentar an
+    // HEBEN_HAND) — je hoeher die Stange ueber diesen Haenden steht, desto mehr schwebt sie
+    // frei. 0,12 ist der Kompromiss, der "ueber Kopf" liest, ohne sich vom Modell zu loesen.
+    hoch:   {anteil:-0.126,neigung:0},
+    abwurf: {anteil:0.916, neigung:0.5},  // faellt, kippt zur Seite, Scheiben prallen — nur
+                                   // noch vom LEGACY-Fallback hebePhase() genutzt (s. dort)
+    // ABLAGE (wie ANTRITT): der gemeinsame Schlusszustand von stepHeben() nach "hoch",
     // ob der Versuch gueltig war oder nicht — im echten Gewichtheben wird die Stange nach
     // JEDEM Versuch aus der Ueberkopfposition fallen gelassen, nicht nur bei einem Fehlversuch
-    // (s. Kommentar bei stepHeben). Etwas tiefer und staerker gekippt als "abwurf", damit der
-    // Fall aus voller Streckung wuchtiger wirkt als der fruehere Fehlversuch-Sturz aus
-    // Brusthoehe.
-    ablage: {dy:40, neigung:0.4},
+    // (s. Kommentar bei stepHeben). Eine Zelle tiefer als "boden" und staerker gekippt: die
+    // Stange ist gefallen und liegt schief, aber weiterhin AUF der Plattform statt darunter.
+    ablage: {anteil:0.916, neigung:0.4},
   };
+  // Koerperspanne des STANDARDKOERPERS in Zellkoordinaten des 64er-Rahmens (die gemessenen
+  // Landmarken oben: Scheitel 11,4 · Sohle 62,3). Zugleich der Rueckfall fuer jedes Blatt,
+  // dessen Spanne sich nicht messen laesst — dann zeichnet es wie bisher.
+  const HEBEN_KOERPER_STD={oben:11.4, unten:62.3};
   // Scheibengroesse/-anzahl AUS kg — schwerere Last = mehr/dickere Scheiben, statt der
   // alten vier immer gleich grossen Punkte. Schwellen grob am internen HEBEN_KG_BASIS/
   // HEBEN_KG_PRO_LAST-Bereich orientiert (s. dort), nicht an einer Formel — rein optisch.
@@ -408,9 +489,18 @@
   // dasselbe Sicherheitsnetz wie bei zeichneHockeyschlaeger), kg die aktuell anzuzeigende
   // Last (u._vizKg, rein praesentational). Perspektive wie beim Schlaeger: im Profil die
   // volle Laenge, in Front/Ruecken ein verkuerzter Stummel.
-  function zeichneHantel(ctx,x,y,s,richtung,phase,kg){
+  // y IST SEIT DEM 13.09. (zweite Runde) DER SCHEITEL, nicht mehr der Griffpunkt, und
+  // koerperHoehe die Koerperhoehe DIESER Figur in Bildschirmpixeln (also bereits mit Z
+  // multipliziert). Aus beidem zusammen ergibt sich die Stangenhoehe als Anteil der
+  // Koerperhoehe — s. die ausfuehrliche Herleitung an HEBEN_PHASEN oben. Fehlt der Wert,
+  // greift die Standardkoerper-Hoehe, dann rechnet es wie vor der Aenderung.
+  // Der DISZIPLIN_PROP-Vertrag deckt das ab: "der Verankerungspunkt selbst kann je
+  // Requisite ein anderer Koerperteil sein" (s. dort).
+  function zeichneHantel(ctx,x,y,s,richtung,phase,kg,koerperHoehe){
     const p=HEBEN_PHASEN[phase]||HEBEN_PHASEN.zug;
-    const by=y+p.dy*s;
+    const kh=(typeof koerperHoehe==="number"&&koerperHoehe>0)
+      ? koerperHoehe : (HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*s;
+    const by=y+p.anteil*kh;
     const blick=richtung===3?1:richtung===1?-1:0;
     const seitlich=blick!==0;
     const halbLaenge=(seitlich?34:18)*s;
@@ -420,9 +510,22 @@
     const x2=x+ux*halbLaenge, y2=by+uy*halbLaenge;
     ctx.strokeStyle="#9098a8"; ctx.lineWidth=Math.max(1,3*s); ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    // Griffband am Ankerpunkt (der Hand), wie das Griffband beim Schlaeger.
+    // ZWEI GRIFFBAENDER statt einem (13.09.). Bis dahin sass genau ein Band auf dem
+    // Ankerpunkt — richtig, solange der Ankerpunkt EINE Faust war (HEBEN_HAND, Pixelscan
+    // 10.09.). Seit der Anker die Koerpermittelachse ist (s. Kommentar an HEBEN_HAND), waere
+    // ein einzelnes Band in der Stangenmitte sinnlos: dort ist beim Gewichtheben nichts, die
+    // Haende liegen links und rechts davon. Zwei symmetrische Baender auf Schulterbreite
+    // (+-9 Zellen im Profil, ~die gemessene Rumpfbreite der Standardfigur; in Front/Ruecken
+    // ist die Stange nur ein verkuerzter Stummel, dort entsprechend +-5) zeigen einen
+    // zweihaendigen Griff — genau das, was Chris mit "muss sich viel mehr am modell
+    // orientieren" meint.
+    const griffAbstand=(seitlich?9:5)*s;
     ctx.fillStyle="#e8e2d0";
-    ctx.beginPath(); ctx.arc(x,by,Math.max(0.9,1.6*s),0,Math.PI*2); ctx.fill();
+    for(const seite of [-1,1]){
+      ctx.beginPath();
+      ctx.arc(x+ux*seite*griffAbstand,by+uy*seite*griffAbstand,Math.max(0.9,1.6*s),0,Math.PI*2);
+      ctx.fill();
+    }
     const radien=scheibenFuer(kg||0);
     const IWF_FARBEN=["#c0392b","#2f6fd1","#e2c23a","#3a9450"]; // 25/20/15/10 kg-Staffel
     [-1,1].forEach(seite=>{
@@ -1999,6 +2102,10 @@
   const HOEHEN_BEZUG=52;        // PLATZHALTER: Median der gemessenen Blatthoehen im Kader
   const HOEHEN_KORR_MIN=0.80, HOEHEN_KORR_MAX=1.25;
   const hoehenKorrSpeicher=new Map();
+  // Zwischenspeicher der gemessenen Vollbild-Blattspannen (s. blattSpanne() in
+  // zeichneSprite) — auf Modulebene, damit er ueber Aufrufe hinweg haelt, wie
+  // hoehenKorrSpeicher direkt darueber.
+  const blattSpanneSpeicher=new Map();
   function hoehenKorrektur(u){
     if(!u||!u.n)return 1;
     if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
@@ -2357,7 +2464,7 @@
   //             Alphakontur ausgemessen, nicht geschaetzt (docs/design/sprite-handpunkte*.md).
   //             "hand" ist der Tabellenname aus dem Plan; der Verankerungspunkt selbst kann
   //             je Requisite ein anderer Koerperteil sein (z.B. der Fuss bei einer Kufe).
-  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (dy/neigung)
+  //   phasen  — Zustand -> Geometrie relativ zum Ankerpunkt, wie HEBEN_PHASEN (anteil/neigung)
   //             oder HOCKEY_PHASEN (schaftA/kelleA); die Form ist frei, `zeichne` interpretiert
   //             sie selbst.
   //   zeichne — (ctx,x,y,s,richtung,phase,extra) => {...}; x/y ist bereits der umgerechnete
@@ -2496,6 +2603,93 @@
     // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
     // Ersatzes fuer u.groesse.
     const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    // HANTEL AN EINEM ZELLPUNKT (13.09.). Eine Stelle statt drei: den Hantel-Zeichenblock gab
+    // es bisher NUR im normalen Sprite-Zeichenpfad ganz unten — der b.reiherMech- und der
+    // b.vollbild-Zweig direkt darunter kehren beide vorher zurueck (`return`), und damit
+    // bekamen genau die Figuren, die ueber eines dieser beiden Blaetter gezeichnet werden,
+    // in KEINER Phase eine Hantel. Nachgemessen (scripts/messe-heben-geometrie.mjs, Erhebung
+    // ueber den ganzen Beispielkader): 5 von 17 Figuren — Lava Golem, Krolach, Krag'Zul,
+    // Tidesprinter (alle b.vollbild) und Seraph-11 (b.reiherMech). Das ist Chris' Befund
+    // "dann hat nur einer eine hantel": in jedem Duell, in dem einer der beiden eine solche
+    // Kreatur ist, stemmt genau ein Heber Luft.
+    //
+    // Der Aufruf ist WOERTLICH derselbe wie im normalen Pfad (DISZIPLIN_PROP.gewichtheben,
+    // Umrechnung Zellkoordinate->Bildschirm ueber x-32*Z+hp.x*Z / y-46*Z+hp.y*Z) — nur der
+    // Ankerpunkt kommt je Zweig aus einer anderen, fuer das jeweilige Blatt gemessenen
+    // Tabelle. Kein zweiter Skalierungsweg, keine Kopie der Zeichenfunktion.
+    //
+    // NUR DIE HOEHE KOMMT AUS DEM GRIFFPUNKT, die Seite nicht (13.09.). Die Griffpunkt-
+    // Tabellen (HEBEN_HAND, VOLLBILD_SCHLAEGER) sind per Pixelscan an EINER Faust vermessen
+    // — fuer einen Schlaeger richtig, den man einhaendig am Ende fasst, fuer eine Hantel
+    // falsch: die wird zweihaendig und symmetrisch gegriffen, ihre Mitte haengt an der
+    // KOERPERMITTELACHSE. Gemessen (scripts/messe-heben-geometrie.mjs) hing die Stange
+    // dadurch 21 Zellen = 0,41 Koerperhoehen neben der Figur, sichtbar als frei schwebende
+    // Stange im Vorher-Bild.
+    //
+    // Die Mittelachse ist die Zeichen-x der Figur selbst: `x-32*Z+hp.x*Z` mit hp.x=32 ist
+    // exakt `x`, deshalb steht hier `x` statt einer Rechnung. Nachgemessen deckt sich das
+    // mit dem Bild: im Profil liegt die Silhouettenmitte ab Schulterhoehe bei Zelle 31,5
+    // (beide Profilrichtungen, mehrere Figuren) — der geometrischen Mitte der 64er-Zelle.
+    //
+    // ==== ZWEITE RUNDE 13.09.: NICHT MEHR EIN PUNKT, SONDERN DIE KOERPERSPANNE ==========
+    // Der Parameter ist seit der Review zu dieser PR kein GRIFFPUNKT mehr, sondern die
+    // Koerperspanne {oben,unten} des jeweiligen Blattes in Zellkoordinaten des 64er-
+    // Rahmens. Warum: die Stangenhoehe steht in HEBEN_PHASEN jetzt als ANTEIL der
+    // Koerperhoehe (volle Herleitung dort) — der Griffpunkt geht in die Hoehe gar nicht
+    // mehr ein, weil er sie nie bestimmt hat. Bis dahin las der vollbild-Zweig die
+    // Griffhoehe aus VOLLBILD_SCHLAEGER, wo sie je Blatt zwischen 8 und 45 streut: die
+    // Stange hing damit an einer Groesse, die mit der Koerperhoehe nichts zu tun hat.
+    //
+    // Die x-Achse bleibt unveraendert die Koerpermittelachse (`x`), aus dem Grund, der
+    // direkt darueber steht.
+    const hantelAnPunkt=(spanne,richtung)=>{
+      const prop=DISZIPLIN_PROP.gewichtheben;
+      const sp=spanne||HEBEN_KOERPER_STD;
+      prop.zeichne(ctx,x,y-46*Z+sp.oben*Z,Z,richtung,u.vizPhase||hebePhase(u),u._vizKg||0,
+        (sp.unten-sp.oben)*Z);
+    };
+    // KOERPERSPANNE EINES VOLLBILD-BLATTES, gemessen statt tabelliert — dasselbe Prinzip und
+    // dieselbe Begruendung wie bei hoehenKorrektur() oben ("GEMESSEN STATT TABELLIERT. Eine
+    // generierte Tabelle waere die zweite Kopie derselben Wahrheit"), nur am BLATT statt an
+    // der fertig gezeichneten Figur: ein Alpha-Durchlauf ueber die ganze Zeile (alle Spalten
+    // des Gehzyklus, damit eine einzelne Streckpose die Spanne nicht verzerrt), einmal je
+    // Blatt+Zeile, danach im Zwischenspeicher.
+    //
+    // AM BLATT, NICHT AN DER FIGUR: zeichneSprite() ruft sich sonst selbst auf (so wie
+    // hoehenKorrektur() es tut) — hier gaebe es dadurch eine Rekursion ueber hantelAnPunkt.
+    // Das Blatt reicht auch voellig: drawImage() skaliert JEDE Zelle unabhaengig von ihrer
+    // nativen Groesse immer auf dh=64*Z (s. dort), die Zellspanne ist also direkt die Spanne
+    // im 64er-Rahmen, sobald man sie mit 64/spec.ch umrechnet.
+    //
+    // Bei jedem Fehlschlag (Bild noch nicht geladen, getImageData nicht erlaubt, Blatt ganz
+    // transparent) bleibt der Wert null und der Aufrufer faellt auf HEBEN_KOERPER_STD
+    // zurueck — also genau auf das Verhalten vor dieser Aenderung.
+    const blattSpanne=(im,spec,reihe)=>{
+      const k=spec.key+"#"+reihe;
+      if(blattSpanneSpeicher.has(k))return blattSpanneSpeicher.get(k);
+      let sp=null;
+      try{
+        // Auf die echten Bildmasse begrenzt: ein Blatt, das schmaler/flacher ist als
+        // cols*cw bzw. (reihe+1)*ch, wuerde sonst ueber den Rand hinaus gelesen und
+        // lieferte eine zu grosse (weil leere) Spanne.
+        const bw=Math.min(spec.cw*spec.cols, im.width);
+        const bh=Math.min(spec.ch, im.height-reihe*spec.ch);
+        if(bw<=0||bh<=8)throw new Error("Blattmasse passen nicht");
+        const c=document.createElement("canvas"); c.width=bw; c.height=bh;
+        const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+        cx.drawImage(im,0,reihe*spec.ch,bw,bh,0,0,bw,bh);
+        const px=cx.getImageData(0,0,bw,bh).data;
+        let oben=null,unten=null;
+        for(let yy=0;yy<bh;yy++)for(let xx=0;xx<bw;xx++)
+          if(px[(yy*bw+xx)*4+3]>16){ if(oben==null)oben=yy; unten=yy; break; }
+        // Mindesthoehe 8 Zellen wie bei hoehenKorrektur — ein fast leeres Blatt soll die
+        // Hantel nicht auf einen Punkt zusammenziehen.
+        if(oben!=null&&unten-oben+1>8)
+          sp={oben:oben*64/spec.ch, unten:(unten+1)*64/spec.ch};
+      }catch(e){}
+      blattSpanneSpeicher.set(k,sp);
+      return sp;
+    };
     // Element-/Aura-Effekte (25.08., urspruenglich nur Feuer fuer Gram/Lava Golem, Chris:
     // "Gram hat sowas Feuriges am Kopf" / "Lava Golem ist ja komplett aus Lava" — 25.08.,
     // zweite Runde, Chris: "Kannst du mehr an solchen Effekten raussuchen fuer Feuer, Eis,
@@ -2839,6 +3033,25 @@
       // zeichneReiherMech() zurueck, ist also fuer JEDES Bild bereits die echte,
       // gerade gezeichnete Position und keine separat gemessene/geschaetzte Zahl.
       if(feldspiel&&istHockey()&&!u.down)zeichneHockeyschlaeger(ctx,kopf.kopfX,kopf.kopfY,Z,r0,"quer");
+      // HANTEL (13.09., s. hantelAnPunkt oben) — NICHT am Kopf/Schnabel wie der Schlaeger:
+      // eine Hantel haengt am Rumpf, und die HEBEN_PHASEN-Abstaende sind vom Rumpfanker aus
+      // gerechnet, nicht vom Kopf. Der Reiher-Mech wird rein prozedural gezeichnet (kein
+      // Blatt, s. zeichneReiherMech direkt oberhalb), seine Masse stehen deshalb im Code
+      // statt in einem Pixelscan: Rumpf-Oval bei cy+1*Z, Beine bis cy+19*Z (Fuss), Kopf bei
+      // cy-17*Z (Scheitel also ~cy-19*Z). Das ergibt eine Koerperhoehe von ~39 Zellen mit
+      // 0,40 davon — derselbe relative Griffpunkt, den HEBEN_HAND beim Standardkoerper hat —
+      // bei cy-3*Z, in der Zellschreibweise dieser Datei also y:43.
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): der relative Griffpunkt stimmte, die
+      // daran haengenden ABSOLUTEN Abstaende aus HEBEN_PHASEN nicht — die sind an einem
+      // 51 Zellen hohen Standardkoerper kalibriert, dieser hier ist 38 Zellen hoch. Gemessen
+      // lag die Ruhestange dadurch 2 Zellen UNTER der Sohle und die Ueberkopfstange
+      // 11 Zellen ueber dem Scheitel. Statt des Punktes geht jetzt die SPANNE hinein:
+      // cy ist Zelle 46 (Ankerzeile dieser Datei), Scheitel also 46-19=27, Sohle 46+19=65.
+      // Die Zahlen stehen weiterhin im Code statt in einem Pixelscan, weil zeichneReiherMech
+      // direkt darueber genau diese beiden Grenzen zeichnet — hier ist die Quelle der
+      // Wahrheit der Code selbst, nicht ein Blatt.
+      if(feldspiel&&istHeben()&&!u.down)hantelAnPunkt({oben:27,unten:65},r0);
       if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
       return;
     }
@@ -2849,8 +3062,13 @@
       if(im&&im.width){
         const row=vollbildRow(spec,r0);
         const vn=spec.cols;
+        // Math.max(0,...) wie beim Standardkoerper-Bildindex `f` oben (13.09., ausfuehrliche
+        // Begruendung und Messwerte dort): fuer u.lunge>0,2 — was Buehne und Feldspiel
+        // setzen — wurde der Index negativ und drawImage zeichnete gar nichts. Vollbild-
+        // Kreaturen verschwanden dadurch komplett, sichtbar im Gewichtheben-Duell
+        // Lava Golem gegen Krag'Zul.
         const vf=(u.lunge>0&&!u.down)
-          ? Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn))
+          ? Math.max(0, Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn)))
           : (u.down?vn-1:Math.floor((t*7+u.id)%vn));
         // dh/dw UND der Boden-Anker (y-46) skalieren mit Z (s. groesseFaktor oben) — sonst
         // waechst nur die Breite/Hoehe des Bilds, aber die Fuesse rutschen relativ zum
@@ -2872,6 +3090,32 @@
           :(u.schussSeit!=null?hockeySchussPhase(u.schussSeit,u.schussArt).phase:"halten");
         zeichneHockeyschlaeger(ctx,x-32*Z+gp.x*Z,y-46*Z+gp.y*Z,Z,r0,pose);
       }
+      // HANTEL (13.09., s. hantelAnPunkt oben). Derselbe Ankerpunkt wie der Schlaeger eine
+      // Zeile darueber — VOLLBILD_SCHLAEGER heisst nur nach seinem ersten Nutzer, der
+      // Tabellenkopf nennt sich selbst "GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN"
+      // und ist genau das: je Blatt ein per Augenschein am hochskalierten renderProbe-PNG
+      // vermessener Koerperpunkt (docs/design/vollbild-schlaeger-griffpunkte.md).
+      //
+      // ANDERS ALS BEIM SCHLAEGER kein `griff&&`-Vorbehalt: fehlt ein Blatt in der Tabelle,
+      // faellt der Anker auf HEBEN_HAND zurueck (prop.hand, der Standardkoerper-Punkt im
+      // selben 64er-Rahmen) statt gar nichts zu zeichnen. Beim Schlaeger ist "lieber kein
+      // Schlaeger als einer an der falschen Stelle" richtig — ein Hockeyspieler ohne
+      // Schlaeger ist unauffaellig. Beim Gewichtheben ist es umgekehrt: ein Heber ohne
+      // Hantel stemmt sichtbar Luft, und genau das ist der gemeldete Fehler. Von den
+      // 16 tatsaechlich benutzten b.vollbild-Schluesseln fehlt heute nur "singvogel".
+      //
+      // KORREKTUR (zweite Runde 13.09., Review-Fund): VOLLBILD_SCHLAEGER wird hier gar nicht
+      // mehr gelesen. Seine y-Werte streuen ueber die Blaetter von 8 (Inefinnas Blatt) bis
+      // 45 (kraken) — als GRIFFhoehe fuer einen einhaendig gefassten Schlaeger richtig, als
+      // Aufhaengung fuer eine Hantel aber eine Groesse ohne jeden Bezug zur Koerperhoehe.
+      // Gemessen schwebte Inefinnas Ruhestange dadurch auf halber Rumpfhoehe (27,5 Zellen
+      // ueber der Sohle) und Tidesprinters 1,5 Zellen UNTER der Sohle, waehrend derselbe
+      // Code bei golem (y~33) zufaellig richtig aussah. Statt des Punktes geht jetzt die am
+      // Blatt GEMESSENE Koerperspanne hinein (s. blattSpanne oben) — damit haengt die
+      // Stangenhoehe an der Koerperhoehe des Blattes und an sonst nichts. Ohne Messung
+      // (Bild noch nicht geladen) faellt es auf den Standardkoerper zurueck, wie bisher.
+      if(feldspiel&&istHeben()&&!u.down)
+        hantelAnPunkt((im&&im.width)?blattSpanne(im,spec,vollbildRow(spec,r0)):null,r0);
       // KUFE FUER VOLLBILD-LAeUFER (Opus-Overseer-Review PR #903, Fund 2): der fruehe
       // `return;` unten liess JEDEN ueber b.vollbild gezeichneten Eiskunstlauf-Teilnehmer
       // (Kreaturen mit einem eigenen Fremdbild statt des LPC-Standardkoerpers, z.B. Lava
@@ -3020,16 +3264,39 @@
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
     // Gang in Schleife. So passt das Bild zu dem, was die Simulation gerade tut.
+    //
+    // UNTERGRENZE 0 (13.09.). Die Rechnung (1-u.lunge/0.2)*n setzt voraus, dass u.lunge bei
+    // 0,2 STARTET. Das stimmt in der Arena — auf der Buehne und im Feldspiel aber nicht:
+    // dort setzen stepBuehne() und die Wurf-/Block-/Torwart-Pfade u.lunge auf 0,5 (s. die
+    // Fundstellen dort; auf der Buehne ist die 0,5 sogar bewusst als Einmal-pro-Versuch-
+    // Marke gewaehlt). Fuer u.lunge>0,2 wird der Ausdruck NEGATIV, Math.min() laesst ihn
+    // negativ, und drawImage() mit negativem Quell-x zeichnet GAR NICHTS.
+    //
+    // Nachgemessen an origin/main per renderProbe (Alpha-Pixel derselben Figur, Disziplin
+    // Gewichtheben, scripts/_lunge-Sonde im PR beschrieben): Krag'Zul 1603px bei lunge 0,19
+    // gegen 53px bei lunge 0,21; Lava Golem 1848 gegen 283; Johanna 1577 gegen 827. Der
+    // gerade aktive Heber verschwand damit fuer die ersten 0,3 Simulationssekunden JEDES
+    // enthuellten Versuchs — bei ZEIT_DEHNUNG.gewichtheben=4 gut eine Sekunde, und zwar
+    // genau die Figur, auf der die Kamera steht.
+    //
+    // Math.max(0,...) statt einer Umrechnung, weil der Startwert nirgends festgehalten wird:
+    // waehrend 0,5->0,2 haelt die Figur jetzt das ERSTE Bild (Ausholen) und spielt die
+    // Sequenz danach wie bisher ueber 0,2->0 ab. Fuer u.lunge<=0,2 aendert sich nichts —
+    // dort liegt der Ausdruck schon in [0,n-1], die Klammer ist dann wirkungslos.
+    //
     // EIGENE SCHRITTPHASE STATT DER WELTUHR (Zeitfahren, Ziel 8, s. stepZeitfahren).
     // `u.vizAniPhase` ist die Zahl der bereits gelaufenen LAUFZYKLEN (nicht Bilder) —
     // hier mit der Bildzahl des aktuellen Blattes multipliziert, damit der Aufrufer nichts
     // ueber Sprite-Blaetter wissen muss. ADDITIV: wer das Feld nicht setzt (jede andere
     // Disziplin, jeder andere Zeichenpfad), faellt Zeichen fuer Zeichen auf die alte
-    // `(t*7+u.id)`-Formel zurueck — bit-identisch.
+    // `(t*7+u.id)`-Formel zurueck — bit-identisch. (Beim Zusammenfuehren mit der
+    // Untergrenze-0-Aenderung oben: die beiden greifen an verschiedenen Zweigen desselben
+    // Ausdrucks an — `zyklus` nur im Leerlauf-/Gang-Zweig, Math.max(0,...) nur im
+    // Ausfallschritt-Zweig. Sie beruehren einander nicht.)
     const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))
       ? u.vizAniPhase*n : (t*7+u.id);
     const f=(u.lunge>0&&!u.down&&!kuerSturz)
-      ? Math.min(n-1, Math.floor((1-u.lunge/0.2)*n))
+      ? Math.max(0, Math.min(n-1, Math.floor((1-u.lunge/0.2)*n)))
       : ((u.down||kuerSturz)?n-1:Math.floor(((zyklus%n)+n)%n));
     // Massstab 1: ein Sprite ist 64 px breit und steht mit den Fuessen auf dem Schatten.
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
@@ -3043,7 +3310,7 @@
     // von f/n der aktuellen Animation.
     const WAFFEN_N=9;
     const waffenF=(u.lunge>0&&!u.down)
-      ? Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N))
+      ? Math.max(0, Math.min(WAFFEN_N-1, Math.floor((1-u.lunge/0.2)*WAFFEN_N)))
       : (u.down?WAFFEN_N-1:Math.floor((t*7+u.id)%WAFFEN_N));
     const zeichneWaffenbild=(key)=>{
       const im=sprBild[key]; if(!im||!im.width)return;
@@ -3317,10 +3584,18 @@
     if(feldspiel&&istHeben()&&!u.down){
       // Ueber DISZIPLIN_PROP.gewichtheben statt direkt ueber HEBEN_HAND/zeichneHantel (PR
       // 0.2) — reine Aufrufpfad-Umleitung, `prop.hand`/`prop.zeichne` SIND dieselben Objekte/
-      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis.
-      const prop=DISZIPLIN_PROP.gewichtheben;
-      const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizPhase||hebePhase(u),u._vizKg||0);
+      // Funktionen wie vorher, keine Kopien, deshalb bit-identisches Ergebnis. Seit 13.09.
+      // ueber dieselbe Hilfsfunktion wie die zwei frueher zurueckkehrenden Zweige oben
+      // (hantelAnPunkt, s. dort) — damit es die Umrechnung Zellkoordinate->Bildschirm
+      // genau EINMAL in dieser Funktion gibt und die drei Faelle nicht auseinanderlaufen
+      // koennen. `blickAus(u)` dort ist dasselbe `r`, das hier schon berechnet ist.
+      // SPANNE STATT HANDPUNKT (zweite Runde 13.09., s. hantelAnPunkt/HEBEN_PHASEN): fuer
+      // den Standardkoerper ist das die gemessene Landmarken-Spanne Scheitel 11,4 ..
+      // Sohle 62,3, also GENAU die Kalibrierung, aus der die Anteile gerechnet sind —
+      // dieser Zweig zeichnet dadurch pixelgleich wie vorher. `prop.hand` bleibt fuer den
+      // DISZIPLIN_PROP-Vertrag stehen, wird vom Hantel-Pfad aber nicht mehr gelesen: eine
+      // Faust bestimmt keine Stangenhoehe (s. dort).
+      hantelAnPunkt(HEBEN_KOERPER_STD,r);
     }
     // SCHACHUHR. Dasselbe Muster wie Hockeyschlaeger/Hantel direkt oberhalb (PR 0.2,
     // DISZIPLIN_PROP) — Ziel 5 (Opus-Plan 09-10, Abschnitt 5.1, Speed-Schach A3 20->25).
@@ -3870,13 +4145,48 @@
   const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
   // ZIELPRIORITAET — uebersteuert die Neigung der Persoenlichkeit.
   // Welche Zielwahl jede Persoenlichkeit von sich aus trifft — das ist der Stern-Eintrag.
-  const PERSZIEL={bollwerk:"naechster",draufgaenger:"naechster",duellant:"bedrohung",
-    schleicher:"hinten",beschuetzer:"naechster",opportunist:"schwach"};
+  //
+  // CHRIS AM 13.09. ZUM LIVE-TDM: „die charaktere suchen sich anscheinend einen gegner und
+  // hauen drauf aber es gibt gar nicht ne dynamik wo manche versuchen laut ihrem charakter
+  // oder stil eher die backrow oder sonstwas standardmaessig zu attacken."
+  //
+  // Er hat recht, und diese Tabelle war der Grund. DREI der sechs Archetypen standen auf
+  // "naechster" — bollwerk, draufgaenger UND beschuetzer. "naechster" ist aber gar keine
+  // Neigung, sondern die Abwesenheit einer: rein geometrisch, ohne jeden Bezug zur Reihe,
+  // zur Rolle oder zum Charakter. Von sechs Persoenlichkeiten hatte damit genau EINE
+  // (schleicher) ueberhaupt eine Stellungsabsicht — und die war ausgerechnet in Mini-DM ein
+  // stiller Leerlauf (s. hintersteReihe weiter unten). Wer keinen Schleicher im Kader hatte,
+  // sah im ganzen Kampf niemanden, der etwas anderes versuchte als den naechsten Koerper.
+  //
+  // ZWEI der drei bleiben unveraendert, und zwar begruendet:
+  //   duellant -> "bedrohung" und opportunist -> "schwach" sind echte, eingemessene
+  //   Neigungen und werden hier NICHT verwaessert.
+  //   bollwerk -> "naechster" bleibt ebenfalls: das Bollwerk IST der Schirm, "nimm, was auf
+  //   dich zukommt" ist fuer ihn eine Charakterisierung und kein Platzhalter.
+  // Die beiden anderen bekommen je eine eigene, STELLUNGSBEZOGENE Neigung (s. ZIELE):
+  //   draufgaenger -> "speer"   (die Spitze der gegnerischen Formation aufbrechen)
+  //   beschuetzer  -> "schild"  (den wegschlagen, der an den eigenen Leuten haengt)
+  // Fuenf verschiedene Neigungen auf sechs Archetypen, DREI davon lesen die Aufstellung
+  // (speer/hinten/schild) statt nur den Abstand.
+  //
+  // NICHT der Weg, den `docs/design/arena-mini-dm-tdm-battlefield-rollout-plan.md`
+  // Abschnitt 4.1 als "Option A" empfiehlt (alle drei "naechster" auf "bedrohung"). Der
+  // Plan ist aelter als Chris' Meldung und beantwortet eine ANDERE Frage — er sucht den
+  // staerksten rho-Hebel, Chris verlangt sichtbare VIELFALT. Option A haette vier von sechs
+  // Archetypen auf dieselbe Neigung gelegt und damit genau die Gleichfoermigkeit vergroessert,
+  // die er beanstandet; der Plan benennt diesen Nachteil selbst ("Fokusfeuer [...] wird zum
+  // Normalfall, nicht mehr zur Ausnahme"). Option C desselben Abschnitts — "Reihe/Formation
+  // bleibt der Skill-Kanal" — ist dagegen genau das, was der zweite Teil dieser Aenderung
+  // umsetzt (s. reihenAnker weiter unten).
+  const PERSZIEL={bollwerk:"naechster",draufgaenger:"speer",duellant:"bedrohung",
+    schleicher:"hinten",beschuetzer:"schild",opportunist:"schwach"};
   const ZIELE=[
     ["bedrohung","Größte Bedrohung","Greift den Gegner mit dem höchsten Angriffswert an, egal wie weit er entfernt ist."],
     ["schwach","Angeschlagensten","Greift den Gegner mit den wenigsten verbleibenden Lebenspunkten an — Fokusfeuer, um ihn schnell auszuschalten."],
     ["naechster","Nächsten","Greift immer den nächststehenden Gegner an. Läuft niemandem hinterher."],
-    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten gegnerischen Reihe, sofern eines erreichbar ist."],
+    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten besetzten gegnerischen Reihe. Steht der Gegner nur noch in einer Reihe, gilt wieder die natürliche Neigung."],
+    ["speer","Spitze aufbrechen","Greift den Gegner an, der am weitesten vorgerückt ist — die Spitze der gegnerischen Formation. Mehrere mit diesem Ziel bündeln sich auf denselben Vorstoß, statt sich auf je einen Nachbarn zu verteilen."],
+    ["schild","Kameraden freischlagen","Greift nicht den an, der IHM am nächsten steht, sondern den, der einem seiner Leute am nächsten steht. Er räumt den weg, der an der eigenen Linie hängt."],
     ["heiler","Heiler zuerst","Greift bevorzugt gegnerische Heiler an. Steht keiner im Feld, gilt wieder die natürliche Neigung."]
   ];
   const ZIELTIP=Object.fromEntries(ZIELE.map(([v,l,t])=>[v,{l,t}]));
@@ -12062,6 +12372,60 @@
   // (v===2, "REAKTION AUF DEN DUELLSTAND" unten) bleibt ebenfalls unangetastet — sie greift
   // NACH dieser Reduktion und darf weiterhin nur nach oben ziehen.
   const HEBEN_FEHL_REDUKTION=0.06;
+  // ================ SPANNUNG IM DUELLVERLAUF (Chris' Fund 13.09.) ================
+  // Woertlich: "man sieht ja am anfang schon der eine hebt hoehere gewichte als der andere von
+  // anfang an und das wird dann auch der sein der am ende gewinnt". Recherche mit Messung:
+  // docs/design/gewichtheben-spannung-recherche-13-09.md, Sonde
+  // scripts/diag-gewichtheben-spannung.mjs.
+  //
+  // NACHGEMESSEN, NICHT VERMUTET (200 Spiele, 1200 Duelle): die hoehere EROEFFNUNGSANSAGE
+  // gewinnt 82,8 % aller Duelle, und in 66,2 % liegt die Eroeffnung des einen Hebers schon
+  // ueber dem HOECHSTEN Versuch, den der andere im ganzen Wettkampf ansagt — Chris' Satz als
+  // Zahl. ABER: der Hauptgrund ist die PAARUNG (ueber den Slot, nicht ueber die Staerke, s.
+  // baueHebenDuelle) bei einem Kader von 104 bis 476 kg Tagesmaximum, nicht die Planung. Nach
+  // Kraefteverhaeltnis getrennt gewinnt der Fuehrende nach Versuch 1 in ENGEN Duellen
+  // (Tagesmax-Abstand 3-10 %) nur 56,3 %, mit 59,8 % Fuehrungswechseln — die sind schon
+  // spannend. In DEUTLICHEN (10-25 %) sind es 91,7 % bei 165 kg Abstand. Ein Eingriff, der so
+  // ein Duell eng macht, waere gelogen und wuerde rho kosten. Beide Konstanten unten haben
+  // deshalb ihre NULLSTELLE im ausgeglichenen Duell und greifen nur in schiefen.
+  //
+  // (A) DER ZWEIKAMPF ZAEHLT, NICHT DIE UEBUNG. hebeUebung("stossen") startet mit
+  // besteStossen=0 fuer beide und verglich im dritten Versuch NUR besteStossen — der
+  // Reiss-Ausgang steht zu dem Zeitpunkt endgueltig auf u.besteReissen und wurde nirgends
+  // gelesen. Folge in beide Richtungen falsch: wer im Reissen 10 kg verlor, zog im Stossen auf
+  // Gegner+1 und verlor den Zweikampf trotzdem um 9 (Risiko getragen, nichts davon gehabt);
+  // und wer im Reissen 10 kg vorn lag, riskierte im Stossen einen Ausgleichsversuch, den er gar
+  // nicht brauchte. Reale Referenz: Hou Zhihui, Paris 2024 — Rueckstand nach dem Reissen,
+  // Aufholjagd ueber den ZWEIKAMPF im Stossen. IM REISSEN ist die neue Rechnung bit-identisch
+  // zur alten (der gebuchte Vorlauf ist dort beidseitig 0), die Aenderung beruehrt
+  // ausschliesslich den dritten Stossversuch — nachgemessen, die Reissen-Gelingensquoten sind
+  // zeichengleich. Ein-Zeilen-Umkehr: auf false setzen.
+  const HEBEN_DUELL_ZWEIKAMPF=true;
+  // (B) DUELLBEWUSSTE EROEFFNUNG BEI UNVERAENDERTEM ZIELGEWICHT. Die Eroeffnung kannte den
+  // Gegner ueberhaupt nicht, obwohl sie im echten Sport der am staerksten gegnerabhaengige Zug
+  // des Tages ist: wer die Wahl hat, sichert erst den Zweikampf und eroeffnet konservativ; wer
+  // sie nicht hat, zockt von Anfang an (Greg Everett/Catalyst: "open much higher than normal",
+  // wenn Qualifikation oder Medaille auf dem Spiel steht — reale Referenz: Pizzolato, Paris
+  // 2024, eroeffnet das Stossen bei 212 kg, 5 kg unter seinem Weltrekord, WEIL das Reissen
+  // misslang).
+  //
+  // WARUM DAS ZIELGEWICHT FIX BLEIBEN MUSS — und das ist kein Balancing-Geschmack, sondern
+  // zwingend: `ueber` in der Erfolgskurve unten ist NULL, solange die Ansage unter risikoMax
+  // liegt. Einen Heber einfach hoeher eroeffnen zu lassen kostet ihn deshalb keine
+  // Erfolgschance, hebt aber seine erreichbare Decke — ein Gratis-Buff, der die Rangtreue
+  // verschoebe. Also wird nur der WEG veraendert, nicht die Decke: der Versatz auf den
+  // Eroeffnungsanteil wird durch eine Nachskalierung BEIDER Spruenge exakt ausgeglichen
+  // (sprungFaktor = Wurzel(anteilOhneVersatz/anteil), damit anteil*(1+s1')*(1+s2') unveraendert
+  // bleibt). Weil beide Spruenge denselben Faktor bekommen, bleibt auch die von der Lehrmeinung
+  // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen bleiben in
+  // derselben Reihenfolge unterscheidbar.
+  //
+  // Der Spannungsgewinn steckt genau darin, dass der Favorit denselben Zielwert jetzt mit einem
+  // GROESSEREN letzten Sprung erreicht (Rechenbeispiel Recherche 4.2: 368-383-394 wird zu
+  // 349-373-395, die sichtbare Luecke bei Versuch 1 faellt von 55 auf 22 kg).
+  // Ein-Zeilen-Umkehr: HEBEN_DUELL_EROEFFNUNG_MAX auf 0 setzen.
+  const HEBEN_DUELL_EROEFFNUNG_K=0.30;   // Anteilsversatz je Anteil Kraeftevorsprung
+  const HEBEN_DUELL_EROEFFNUNG_MAX=0.05; // Deckel des Versatzes in beide Richtungen
   // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
   // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
   // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
@@ -12177,7 +12541,20 @@
     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
+    // DER ZWEIKAMPF-STAND, NICHT DER UEBUNGS-STAND (s. HEBEN_DUELL_ZWEIKAMPF oben).
+    // `gebucht` ist, was aus der ANDEREN Uebung schon endgueltig auf dem Konto steht — im
+    // Reissen beidseitig 0 (das Stossen kommt erst), im Stossen das fertige Reiss-Ergebnis.
+    // `duellStand` ist damit genau die Zahl, die im Wettkampf auf der Anzeigetafel steht,
+    // inklusive der Haerte des Sports: wer im Reissen genullt hat, steht bei 0, egal was im
+    // Stossen noch kommt (dieselbe Regel, die baueHebenDuelle als u.nullwertung auswertet).
+    const gebucht=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen")?x.besteReissen:0;
+    const duellStand=(x)=>(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&x.besteReissen<=0)
+      ?0:gebucht(x)+beste(x);
     const ansage={};
+    // Nachskalierung der geplanten Spruenge, damit der Eroeffnungs-Versatz aus (B) das
+    // geplante ZIELGEWICHT nicht verschiebt — s. HEBEN_DUELL_EROEFFNUNG_K oben. 1 bedeutet
+    // "kein Versatz", und dann rechnet der Sprung unten bit-identisch wie bisher.
+    const sprungFaktor={};
     for(const u of [a,b]){
       // Deckel bei 97 % des Tagesmaximums: ohne ihn eroeffnete ein Heber mit ANSAGE nahe
       // 99 rechnerisch ueber 100 % seines Maximums (0,94 Basis + 49*0,0016 = 1,018) und
@@ -12185,7 +12562,42 @@
       // den dritten Versuchen ohne Deckel auftrat (s. Kommentar bei "REAKTION AUF DEN
       // DUELLSTAND" unten). Der Deckel laesst ANSAGE weiter die Eroeffnungshoehe heben,
       // ohne sie ins garantierte Misslingen zu schicken.
-      const anteil=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      const anteilRein=Math.min(0.97,plan.eroeffnung+(u.ANSAGE-50)*HEBEN_ANSAGE_EROEFFNUNG);
+      // DUELLBEWUSSTE EROEFFNUNG (s. HEBEN_DUELL_EROEFFNUNG_K oben). `kraft` ist der
+      // erreichbare Zweikampf-Stand: schon Gebuchtes plus das, was in dieser Uebung noch
+      // maximal geht. Im Reissen ist das das Verhaeltnis der Tagesmaxima (die "Meldeleistung",
+      // die im echten Wettkampf vor der Sitzung bekannt ist); im Stossen zaehlt der tatsaechlich
+      // gehobene Reiss-Ausgang mit, ein im Reissen Abgestuerzter eroeffnet das Stossen also
+      // mutig — genau Pizzolatos 212 kg.
+      const gegner=u===a?b:a;
+      const kraftU=gebucht(u)+max(u), kraftG=gebucht(gegner)+max(gegner);
+      const lage=kraftG>0?kraftU/kraftG-1:0;
+      const versatz=Math.max(-HEBEN_DUELL_EROEFFNUNG_MAX,
+        Math.min(HEBEN_DUELL_EROEFFNUNG_MAX,-HEBEN_DUELL_EROEFFNUNG_K*lage));
+      // MUTIGER EROEFFNEN JA, UEBER DIE EIGENE SICHERHEIT HINAUS NEIN. Die Lehrmeinung ist an
+      // dieser Stelle eindeutig: die Eroeffnung ist "ein Gewicht, das der Heber schon oft
+      // gemacht hat und dem er voll vertraut" (Greg Everett) — "missing an opener is a bad way
+      // to start a meet". Der Versatz nach OBEN darf den Heber deshalb hoechstens bis an seinen
+      // eigenen Risiko-Massstab schieben (denselben, den die Erfolgskurve unten als risikoMax
+      // benutzt, s. HEBEN_WAGNIS_ANSAGE_FLEX), nie darueber.
+      // OHNE DIESEN DECKEL GEMESSEN (200 Spiele): das Gelingen im ersten Reissversuch fiel von
+      // 85,3 auf 81,3 % und damit unter den IWF-Korridor (84-90 %) — ein vorsichtiger Heber
+      // (niedrige ANSAGE, also niedriger risikoMax) wurde von der Duell-Lage in eine Eroeffnung
+      // gedraengt, die er nach der eigenen Risikokurve gar nicht halten kann. Math.max mit
+      // anteilRein sorgt dafuer, dass der Deckel nur den ZUSCHLAG begrenzt und nie die heutige
+      // Eroeffnung absenkt; bei versatz<=0 ist er ohne Wirkung. Der 0,97-Deckel bleibt daneben
+      // wie bisher bestehen (er haelt einen Heber mit hoher ANSAGE davon ab, den ERSTEN Versuch
+      // quasi sicher zu reissen, s. Kommentar darunter).
+      const mutDeckel=Math.max(anteilRein,
+        Math.min(0.97,1+(u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_FLEX));
+      const anteil=Math.min(0.97,mutDeckel,Math.max(0.5,anteilRein+versatz));
+      // Zielgewicht-Invarianz: anteil*(1+s1')*(1+s2') = anteilRein*(1+s1)*(1+s2), erreicht
+      // ueber denselben Faktor auf BEIDE Spruenge — deshalb bleibt die von der Lehrmeinung
+      // geforderte ABNEHMENDE Sprungfolge (93-97-100) erhalten und die sechs Slot-Rollen
+      // bleiben in derselben Reihenfolge unterscheidbar. Immer wenn anteil am Ende gleich
+      // anteilRein ist — ausgeglichenes Duell (versatz=0) oder einer der beiden Deckel
+      // schneidet den Versatz weg — ist der Faktor exakt 1 und der Sprung unten bit-identisch.
+      sprungFaktor[u.id]=Math.sqrt(anteilRein/anteil);
       ansage[u.id]=Math.max(1,Math.round(max(u)*anteil));
       u.letzteLast=0;
     }
@@ -12214,8 +12626,18 @@
       // Versuch dadurch auf 36,7 % (Ziel 50 bis 63) und die Nullwertungen stiegen auf
       // 4,8 % (Ziel hoechstens 3). Real versucht das auch niemand: wer sechs Prozent
       // ueber seinem Maximum ansagen muesste, hebt sein eigenes Programm zu Ende.
-      if(v===2&&beste(gegner)>beste(u)){
-        const basisZiel=Math.round(beste(gegner))+1;
+      // ZWEIKAMPF STATT UEBUNG (s. HEBEN_DUELL_ZWEIKAMPF oben): verglichen wird der Stand auf
+      // der Anzeigetafel, nicht der Stand in der laufenden Uebung. Im Reissen ist `gebucht`
+      // beidseitig 0 und `duellStand` identisch `beste` — der Ausdruck reduziert sich dort
+      // exakt auf den alten Math.round(beste(gegner))+1, die Aenderung greift also nur im
+      // dritten Stossversuch. Wer im Reissen genullt hat, kann den Zweikampf nicht mehr
+      // gewinnen (Zweikampf 0) und hebt sein eigenes Programm zu Ende, statt eine Jagd zu
+      // fahren, die ihm nichts mehr bringen kann.
+      const kannZweikampf=!(HEBEN_DUELL_ZWEIKAMPF&&uebung==="stossen"&&u.besteReissen<=0);
+      if(v===2&&kannZweikampf&&duellStand(gegner)>duellStand(u)){
+        // Was in DIESER Uebung noetig ist, damit der eigene Zweikampf-Stand vorn liegt:
+        // gebucht(u) + kg > duellStand(gegner).
+        const basisZiel=Math.round(duellStand(gegner)-gebucht(u))+1;
         // KUEHNER VERSUCH: freiwilliger Zuschlag ueber das Ausgleichskilo hinaus,
         // deterministisch aus ANSAGE — ein selbstbewusster Heber wagt mehr, kein
         // zusaetzlicher Wuerfel an dieser Stelle (s. HEBEN_WAGNIS_MAX_KG oben).
@@ -12296,7 +12718,11 @@
           setzeBeste(u,kg);
           u.versucheBis+=v+1;
           // Naechste Ansage: geplanter Sprung, groesser bei hoher ANSAGE.
-          const sprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          const basisSprung=(v===0?plan.sprung1:plan.sprung2)*(1+(u.ANSAGE-50)*HEBEN_ANSAGE_SPRUNG);
+          // Nachskalierung aus (B): sie haelt das geplante Zielgewicht trotz verschobener
+          // Eroeffnung fest (s. sprungFaktor oben). Faktor 1 = unveraendert. Der Boden
+          // Math.max(kg+1,...) bleibt die reale IWF-Mindeststeigerung von 1 kg.
+          const sprung=(1+basisSprung)*sprungFaktor[u.id]-1;
           ansage[u.id]=Math.max(kg+1,Math.round(kg*(1+sprung)));
         } else {
           // Fehlversuch: die Last SENKEN statt zu wiederholen (Chris' Fund, s.
@@ -12997,7 +13423,7 @@
   // rundenDauer) — geschrieben wird AUSSCHLIESSLICH auf die zwei neuen viz*-Felder
   // (u.vizPhase/u.vizPhaseT).
   //
-  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest bei W*0.30/W*0.70 (s.
+  // KEINE BEWEGUNG UEBER DIE FLAeCHE: die zwei Heber stehen fest auf HEBEN_SPALTE (s.
   // zeichneHeben) — "geht zur Hantel" ist deshalb nicht als u.vizX/u.vizY modelliert, sondern
   // als eigene Hantel-Phase ("antritt", s. HEBEN_PHASEN oben): die Stange bewegt sich relativ
   // zur Hand, der Heber selbst bleibt auf seinem Podestplatz — genau wie die vier
@@ -13978,6 +14404,24 @@
     if(zug.r.gueltig)return "hoch";
     return fortschritt<0.55?"abwurf":"boden";
   }
+  // DIE ZWEI PODESTPLAETZE, als Anteil der Buehnenbreite (13.09.). Vorher standen die zwei
+  // Zahlen 0.30/0.70 an ZWEI Stellen woertlich im Code (hier im forEach der beiden Heber und
+  // unten bei `bx` fuer die Textkarte) — eine Konstante, damit sie nicht auseinanderlaufen
+  // koennen und der Wert genau einmal begruendet dasteht.
+  //
+  // 0.38/0.62 statt 0.30/0.70 (Chris, 13.09.: "momentan stehen die 2 spieler unnoetig weit
+  // am rand statt zentraler im vergleich in der mitte"). Auf der 1240px-Buehne ruecken die
+  // Saeulen damit von 372/868 auf 471/769, der Abstand der beiden Mittelachsen schrumpft von
+  // 496 auf 298px. Naeher geht es NICHT beliebig, und die Schranke ist nachgerechnet, nicht
+  // geraten: die Hantel ist im Profil 34*Z lang, mit der aeussersten Scheibe reicht sie bis
+  // ~54*Z von der Mittelachse. Die groesste Figur im Beispielkader zeichnet mit Z~1.71
+  // (Krag'Zul, per scripts/messe-heben-geometrie.mjs), macht ~92px Halbbreite je Seite — bei
+  // 0.38/0.62 bleiben zwischen den beiden Stangenenden (563 und 677) noch 114px Luft. Bei
+  // 0.42/0.58 (Abstand 198px) waeren es nur noch 14px, zwei grosse Heber wuerden ihre
+  // Scheiben kreuzen. Die Namens-/Zweikampfzeilen darunter sind schmaler als die Hantel
+  // (16 Zeichen IBM Plex Mono 11px = ~106px, also ~53px je Seite) und deshalb nicht
+  // die bindende Schranke.
+  const HEBEN_SPALTE=[0.38,0.62];
   function zeichneHeben(art){
     if(!TEILNEHMER.length)return;
     const gesamtDuelle=Math.max(1,...TEILNEHMER.map(u=>(u.duellNr??0)+1));
@@ -14005,7 +14449,7 @@
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
     // Chris beschrieben hat ("immer 2 gleichzeitig").
     const y=H*0.46;
-    [[a,W*0.30,"--home"],[b,W*0.70,"--away"]].forEach(([u,x,farbVar])=>{
+    [[a,W*HEBEN_SPALTE[0],"--home"],[b,W*HEBEN_SPALTE[1],"--away"]].forEach(([u,x,farbVar])=>{
       const c=css(farbVar);
       ctx.globalAlpha=u.lunge>0?1:0.94;
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
@@ -14035,10 +14479,17 @@
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
-      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11);
+      // NAME UND ZWEIKAMPF 12px TIEFER (13.09., dy 70/84 statt 58/72). Die Textkarte des
+      // AKTIVEN Hebers steht in derselben Spalte (bx) und schreibt ihre Versuchszeile bei
+      // textY+48, also y+50 — der Name lag mit y+58 acht Pixel darunter, bei 10- bzw.
+      // 11px-Schrift heisst das ueberlappend. Im Vorher-Screenshot
+      // (docs/design/gewichtheben-vorher-13-09.png) steht "Reißen, 1. Versuch" sichtbar im
+      // Namen "Greenkraut". Mit y+70 bleiben 20px Abstand; nach unten ist Platz bis zur
+      // Warteschlangen-Zeile bei H*0.90 (= y+207).
+      schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,70,c,11);
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
-      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),72,"#8a93a3",8.5);
+      schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),84,"#8a93a3",8.5);
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
@@ -14069,21 +14520,35 @@
     // (Chris' Fund, 06.09.: "da ist gar kein gewicht als asset was die spieler versuchen
     // zu stämmen") entfaellt ersatzlos.
     const aktiverHeber=zug?zug.u:null;
-    const bx=aktiverHeber?(aktiverHeber.side===0?W*0.30:W*0.70):W/2;
+    const bx=aktiverHeber?(aktiverHeber.side===0?W*HEBEN_SPALTE[0]:W*HEBEN_SPALTE[1]):W/2;
 
     // TEXT-KARTE bleibt an einer FESTEN Hoehe, unabhaengig von der Hantel, die jetzt an
     // der Hand haengt und sich mit dem Phasenwechsel (hebePhase) bewegt — sonst haetten
     // Zahl/Wort waehrend der Hebung mitgezittert, statt ruhig lesbar zu bleiben.
     const textY=y+2;
+    // ZWEI OBERE ZEILEN AUS DER FLUGBAHN DER STANGE GENOMMEN (13.09.). kg-Zahl und
+    // Kuehn-Badge sassen bei textY-34 bzw. textY-58, also 32 bzw. 56px ueber dem Fusspunkt
+    // — genau dort, wo die Stange in der Phase "hoch" jetzt steht. Vorher ging das nur
+    // deshalb auf, weil die Stange mit dy=-49 hoch ueber die ganze Karte hinausflog; genau
+    // das war Chris' "wird quasi weit ueber den kopf geworfen". Mit der korrigierten
+    // Ueberkopf-Hoehe muss stattdessen die Karte weichen.
+    //
+    // FESTE BUEHNENHOEHE statt eines Abstands zum Fusspunkt, weil die Ueberkopf-Hoehe am Z
+    // der jeweiligen Figur haengt und ueber den Beispielkader um ~28px streut (gemessen:
+    // Stangenoberkante zwischen Buehnen-y 167 bei Johanna/Z~1.04 und 138 bei Krag'Zul/
+    // Z~1.71, s. docs/design/gewichtheben-hantel-recherche-13-09.md). Ein fester Abstand
+    // haette fuer die eine Figur gepasst und fuer die andere nicht. H*0.245 (=115px bei
+    // H=470) liegt ueber BEIDEN, und noch unter der Duell-Kopfzeile bei H*0.155 (=73px).
+    const kopfZeileY=H*0.245, kuehnZeileY=H*0.20;
     ctx.textAlign="center";ctx.textBaseline="middle";
     if(zug){
       const gueltig=zug.r.gueltig;
       const zeigeKg=sinclairAnzeige(zug.r.kg,zug.u.groesse);
       ctx.font="700 22px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";
-      ctx.strokeText(zeigeKg+" kg",bx,textY-34);
+      ctx.strokeText(zeigeKg+" kg",bx,kopfZeileY);
       ctx.fillStyle=gueltig?css("--ok"):css("--crit");
-      ctx.fillText(zeigeKg+" kg",bx,textY-34);
+      ctx.fillText(zeigeKg+" kg",bx,kopfZeileY);
       // GUELTIG/UNGUELTIG ALS GESTE: ein Haken bzw. Kreuz UND das Wort, nicht nur Farbe —
       // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
       ctx.font="700 15px 'Barlow Condensed',sans-serif";
@@ -14096,23 +14561,24 @@
       // Misslingen/Verletzung — ANSAGE_FARBE waere hier eine dritte, unnoetig Farbe, weil
       // der Ausgang schon feststeht, sobald dieser Versuch enthuellt wird. OBERHALB statt
       // unterhalb der Versuchszeile, weil dort schon der Lifter-Name/die Zweikampf-Anzeige
-      // sitzt (schrift() bei dy 58/72 direkt darueber im [[a,...],[b,...]]-forEach) -- ein
+      // sitzt (schrift() direkt darueber im [[a,...],[b,...]]-forEach) -- ein
       // Badge dort kollidierte sichtbar mit beidem (im Playwright-Screenshot geprueft).
-      // Ueber der kg-Zahl ist die Buehne dunkel und leer (die Duell-Kopfzeile sitzt bei
-      // H*0.155, weit oberhalb von textY-58).
+      // Seit 13.09. sitzt es zusammen mit der kg-Zahl im festen oberen Band (kuehnZeileY,
+      // s. dort) statt in Abstaenden zum Fusspunkt — aus demselben Grund: die Stange
+      // erreicht in der Phase "hoch" die alte Badge-Hoehe.
       if(zug.r.kuehn){
         const kuehnTxt=zug.r.verletzt?"⚠ KÜHNER VERSUCH — VERLETZT"
           :gueltig?"★ KÜHNER VERSUCH — PUNKTESIEG!"
           :"KÜHNER VERSUCH GESCHEITERT";
         ctx.font="700 12.5px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.9)";ctx.lineJoin="round";
-        ctx.strokeText(kuehnTxt,bx,textY-58);
+        ctx.strokeText(kuehnTxt,bx,kuehnZeileY);
         ctx.fillStyle=zug.r.verletzt?css("--crit"):gueltig?"#f2d75a":css("--crit");
-        ctx.fillText(kuehnTxt,bx,textY-58);
+        ctx.fillText(kuehnTxt,bx,kuehnZeileY);
       }
     } else {
       ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-      ctx.fillText("Erste Ansage folgt …",bx,textY-10);
+      ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
@@ -16094,7 +16560,7 @@
       skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
       ...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
       schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,
-      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,leineHielt:false,
       st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}};
   }
 
@@ -16529,10 +16995,49 @@
     return dist(u,z)<=KF_RUF?z:null;
   }
 
+  // DIE HINTERSTE BESETZTE REIHE — nicht "Reihe 2".
+  //
+  // Bis hierher stand an zwei Stellen `foes.filter(f=>f.row===2)`. Das ist NUR fuer TDM
+  // richtig: sechs Slots ergeben die Reihen 0,0,1,1,2,2. Mini-DM hat VIER Slots und faellt
+  // mangels SLOT_ZUSATZ-Eintrag auf floor(Listenplatz/2) zurueck, also auf die Reihen
+  // 0,0,1,1 — eine Reihe 2 gibt es dort ueberhaupt NICHT. Die einzige stellungsbezogene
+  // Neigung, die der Motor bis hierher kannte (schleicher -> "hinten"), war in Mini-DM damit
+  // ein stiller Leerlauf: der Filter traf nie, die Zeile fiel durch, und der Schleicher
+  // griff den Naechsten an wie jeder andere. Genau das Nichts, das Chris gesehen hat.
+  //
+  // Jetzt heisst "hinten" das, was das Wort sagt: die hinterste Reihe, in der ueberhaupt
+  // noch jemand steht. Faellt die gegnerische Backrow, rueckt die Absicht auf die naechste
+  // Reihe nach, statt ins Leere zu greifen. Steht der Gegner nur noch in EINER Reihe, gibt
+  // es keine hintere mehr — dann liefert die Funktion null, und die natuerliche Neigung
+  // greift, genau wie der Tooltip es verspricht.
+  function hintersteReihe(foes){
+    const reihen=foes.map(f=>f.row||0);
+    const max=Math.max(...reihen);
+    if(max===Math.min(...reihen))return null;
+    return foes.filter(f=>(f.row||0)===max);
+  }
+
   function chooseTarget(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
     const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+    // "speer": wer von den Gegnern am weitesten in UNSERE Richtung vorgerueckt ist. Das ist
+    // bewusst NICHT "der Naechste" — der Naechste ist relativ zum eigenen Kopf (fuer einen
+    // Hinteren oft ein abgedrifteter Flankierer), die Spitze ist relativ zur FRONT. Dadurch
+    // buendeln sich mehrere Draufgaenger auf denselben Vorstoss, statt sich still auf je
+    // einen eigenen Nachbarn zu verteilen — das sichtbare Gegenstueck zum Schleicher, der
+    // in dieselbe Formation von hinten hineingeht.
+    const spitze=()=>foes.reduce((b,x)=>((u.side===0?x.x<b.x:x.x>b.x)?x:b));
+    // "schild": der Gegner mit dem kleinsten Abstand zu IRGENDEINEM meiner Leute. Ein
+    // Beschuetzer fragt nicht, wer IHM am naechsten steht, sondern wer an seinen Kameraden
+    // haengt. Ohne Kameraden (letzter Ueberlebender) faellt er auf den Naechsten zurueck —
+    // dann ist er selbst die Linie, die er decken soll.
+    const amKameraden=()=>{
+      const kam=eigene(u).filter(a=>a!==u);
+      if(!kam.length)return nearest(foes);
+      const naehe=(f)=>kam.reduce((m,k)=>Math.min(m,dist(f,k)),Infinity);
+      return foes.reduce((b,x)=>naehe(x)<naehe(b)?x:b);
+    };
 
     // Wer sich zurueckzieht, sucht kein Ziel.
     if(u.retreat>0)return null;
@@ -16596,7 +17101,9 @@
       if(u.zielP==="bedrohung")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
       if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
       if(u.zielP==="naechster")return nearest(foes);
-      if(u.zielP==="hinten"){const bk=foes.filter(f=>f.row===2);if(bk.length)return nearest(bk);}
+      if(u.zielP==="hinten"){const bk=hintersteReihe(foes);if(bk)return nearest(bk);}
+      if(u.zielP==="speer")return spitze();
+      if(u.zielP==="schild")return amKameraden();
       if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
       // "fels": genau den binden, den der Plan benannt hat.
       if(u.zielP==="fels"&&PLAN&&PLAN.felsName){
@@ -16615,7 +17122,7 @@
     // Grundneigung aus der Persoenlichkeit
     if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
     if(u.ziel==="schwaechster")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
-    if(u.ziel==="hinten"){const back=foes.filter(f=>f.row===2);if(back.length)return nearest(back);}
+    if(u.ziel==="hinten"){const back=hintersteReihe(foes);if(back)return nearest(back);}
     return nearest(foes);
   }
 
@@ -16631,6 +17138,84 @@
     const linie=g.filter(u=>!u.fern&&!u.heiler);
     const xs=(linie.length?linie:g).map(u=>u.x).sort((a,b)=>a-b);
     return xs[Math.floor(xs.length/2)];
+  }
+
+  // DIE REIHE HAELT AUCH IM KAMPF — der zweite Teil von Chris' Meldung vom 13.09.:
+  // „so richtig ne formation front und backrow gibt es nciht, da musst du die slots
+  // konsequenter umsetzen."
+  //
+  // Er hat auch hier recht, und zwar aus einem Grund, den man dem Bauweg nicht ansieht: die
+  // Reihen sind GAR NICHT falsch gebaut. `build()` verteilt beide Seiten sauber ueber
+  // slotReihe() auf byRow[0/1/2], und homeFor() macht daraus drei Spalten im Abstand von
+  // 160 px (MID∓140/300/460). Nur war das eine STARTAUFSTELLUNG und sonst nichts. Ab dem
+  // ersten Bild laeuft jeder auf sein Ziel zu, und die einzige Klammer, die ihn zurueckhaelt
+  // — die Formationsleine — haengt an teamFront(): EINER Linie fuer die ganze Mannschaft,
+  // fuer alle drei Reihen dieselbe. Die Backrow durfte also genau so weit nach vorn wie die
+  // Front, und sie tat es.
+  //
+  // NACHGEMESSEN, nicht vermutet (scripts/miss-arena-formation.mjs, 24 Kaempfe je Disziplin,
+  // Abtastung alle 0,5 s Kampfzeit), VOR dieser Aenderung:
+  //
+  //   Disziplin      Reihenabstand   davon verkehrt herum   Durchbruch aktiv
+  //   tdm                  20,4 px          32,6 %               23,1 %
+  //   mini-dm               8,8 px          31,5 %               18,3 %
+  //   battlefield          34,5 px          34,4 %               20,0 %
+  //
+  // Zwanzig Pixel, wo die Aufstellung 320 vorsieht, und in jedem dritten Bild steht die
+  // hintere Reihe VOR der vorderen. Das ist keine Formation, das ist ein Knaeuel — genau das
+  // Bild, das Chris „zu statisch" genannt hat: nicht zu wenig Bewegung, zu wenig STRUKTUR.
+  //
+  // Die Leine bleibt, wie sie ist — nur ihr ANKER wird reihenbewusst. Reihe 0 haengt weiter
+  // an der Linie selbst, jede weitere an einem um REIHEN_ABSTAND nach hinten versetzten
+  // Punkt. Das ist genau die Geometrie, die homeFor() beim Start ohnehin vergibt; sie gilt
+  // jetzt bis zum Schluss statt bis zum ersten Schritt. Kein zweiter Mechanismus, eine
+  // Zeile mehr im bestehenden.
+  //
+  // DER RANG WIRD GEZAEHLT, NICHT GELESEN. Nicht `u.row` direkt, sondern der Platz von u.row
+  // unter den Reihen, die ueberhaupt noch besetzt sind. Sonst wuerde eine Mannschaft, deren
+  // Front gefallen ist, mit ihrem Rest weiter 320 px hinter einer Linie warten, die niemand
+  // mehr bildet — sie wuerde vor einem leeren Feld zurueckweichen. So rueckt die zweite
+  // Reihe nach, wenn die erste weg ist, und wird selbst zur Front.
+  //
+  // Heiler zaehlen beim Ermitteln der besetzten Reihen nicht mit, aus demselben Grund, aus
+  // dem teamFront() sie ausschliesst: sie stehen ohnehin nach eigener Regel hinter der
+  // Gruppe und wuerden sonst eine Reihe vortaeuschen, die es taktisch nicht gibt.
+  const REIHEN_ABSTAND=160;   // = der Spaltenabstand in homeFor(), nicht neu erfunden
+  function reihenAnker(u){
+    const g=live(u.side).filter(a=>!a.heiler);
+    if(!g.length)return 0;
+    const reihen=[...new Set(g.map(a=>a.row||0))].sort((a,b)=>a-b);
+    const rang=Math.max(0,reihen.indexOf(u.row||0));
+    return (u.side===0?-1:1)*REIHEN_ABSTAND*rang;
+  }
+
+  // ABGEFANGEN HEISST ABGEFANGEN — VON GEGNERN.
+  //
+  // Der Durchbruch loest die Formationsleine, und das soll er: wer wirklich aufgehalten
+  // wird, geht durch. Die Bedingung dafuer war aber nur „dasselbe Ziel seit ueber 3 s und
+  // immer noch zu weit weg" — und das trifft auf JEDEN zu, den die EIGENE Aufstellung
+  // haelt. Der Hintermann erklaerte also nach ein paar Sekunden seine eigene Reihe fuer
+  // aufgehoben, obwohl ihn kein einziger Gegner angefasst hatte. Gemessen war der Durchbruch
+  // in jedem fuenften Einheit-Bild aktiv (Tabelle oben) — der Ausnahmezustand war der
+  // Normalzustand, und ohne diese Haelfte des Fixes waere der Anker oben nach spaetestens
+  // 5,5 s wieder wirkungslos.
+  //
+  // Der Tooltip sagt seit jeher „gilt als abgefangen". Das hier ist die fehlende Haelfte
+  // dieses Satzes: es muss jemand IM WEG stehen, und zwar in Reichweite. Entweder haengt
+  // einer in Schlagweite an ihm (u.bindAn — dieselbe Bindung, die auch den Trennschlag
+  // traegt), oder ein Gegner steht auf der Strecke zu seinem Ziel UND nah genug, dass er ihn
+  // wirklich aufhaelt; gemessen mit bahnAbstand(), derselben Funktion, mit der der
+  // Sturmangriff entscheidet, wer auf seiner Bahn steht. Ein Gegner, der weit vorn in der
+  // Bahn steht, haelt ihn NICHT auf — den hat er nur noch nicht erreicht.
+  //
+  // u.bindAn wird weiter unten im selben Takt neu gesetzt; hier steht also der Wert des
+  // Vorbilds, ein Sechzigstel alt. Fuer eine Ja/Nein-Frage, die ueber Sekunden entschieden
+  // wird, ist das ohne Belang.
+  function versperrt(u){
+    if(!u.tgt||u.tgt.down)return false;
+    if(u.bindAn)return true;
+    return gegner(u).some(f=>f!==u.tgt&&!f.down&&dist(u,f)<=u.reach*1.6&&
+      bahnAbstand(f,u.x,u.y,u.tgt.x,u.tgt.y)<KOERPER_X);
   }
 
   // ===================================================================================
@@ -17103,6 +17688,25 @@
       }
     }
 
+    // STEHT UEBERHAUPT JEMAND IM KONTAKT? Einmal je Bild fuer die ganze Seite, nicht je Kopf.
+    //
+    // Das ist die Notbremse hinter dem Reihenanker: solange irgendeiner der Eigenen in
+    // Schlagweite eines Gegners steht, LAEUFT der Kampf, und die Hinteren haben einen Grund
+    // zu warten — genau dafuer stehen sie hinten. Steht niemand im Kontakt, wartet die
+    // Mannschaft auf nichts, und dann darf die Aufstellung sie nicht laenger festhalten.
+    //
+    // Bewusst auf SEITENEBENE und nicht je Einzelnem: fragte man jeden fuer sich („habe ich
+    // selbst einen Gegner in Reichweite?"), waere schon der Anmarsch ein Patt — in den ersten
+    // Sekunden hat NIEMAND jemanden in Reichweite, und die ganze Formation loeste sich auf,
+    // bevor sie einmal getroffen haette. Die beiden Fronten starten 280 px auseinander
+    // (homeFor, Spalten MID∓140) und beruehren sich nach rund einer Sekunde, also lange vor
+    // den 4,5 s, nach denen der Offensivzwang greift.
+    const kontakt=[false,false,false,false];
+    for(const a of U){
+      if(a.down||kontakt[a.side])continue;
+      if(gegner(a).some(f=>dist(a,f)<=a.reach))kontakt[a.side]=true;
+    }
+
     for(const u of U){
       if(u.down)continue;
       const fat=t>35?Math.max(0.55,1-(100-u.AUS)*0.0011*(t-35)):1;
@@ -17152,7 +17756,16 @@
       // wer laenger als 3,5 s ueberhaupt kein Ziel hatte, und das Endspiel.
       // Ein Flankierer, der noch laeuft, ist nicht untaetig — er ist unterwegs.
       const flankeUnterwegs=u.ord==="flanke"&&(!freigabe[u.side]||!(u.side===0?u.x>MID+180:u.x<MID-180));
-      if(!u.tgt&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
+      // DRITTER FALL, neu: er HAT ein Ziel, kommt aber nicht heran, weil die eigene Leine
+      // ihn haelt (u.leineHielt, weiter unten im selben Takt gesetzt — also aus dem Vorbild,
+      // ein Sechzigstel alt) UND auf seiner Seite steht niemand im Kontakt. Fuer die Stellung
+      // ist das derselbe Zustand wie gar kein Ziel: er richtet nichts aus, und die Formation
+      // schuetzt niemanden mehr, weil es nichts zu schuetzen gibt. Ohne diese Zeile koennte
+      // der Reihenanker eine Mannschaft dauerhaft hinten parken, wenn der Gegner seinerseits
+      // nicht kommt — ein Patt, das kein Spieler sehen will. Mit ihr greift nach 4,5 s
+      // derselbe Offensivzwang wie bisher, samt derselben Meldung im Ticker.
+      const wirkungslos=u.leineHielt&&!kontakt[u.side];
+      if((!u.tgt||wirkungslos)&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
       const zwangVor=u.zwang;
       u.zwang=endspiel||u.leer>4.5;
       if(u.zwang&&!zwangVor)feed(u.side,u.n+" lässt die Stellung sein und sucht den Kampf.");
@@ -17184,7 +17797,9 @@
       const durchAb=1.5+u.opp/100*4;
       // Ein Opportunist geht nicht durch, solange direkt vor ihm etwas Angeschlagenes steht.
       const beuteDa=u.opp>=60&&gegner(u).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
-      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa){
+      // ... und niemand geht durch, den gar niemand aufhaelt (s. versperrt oben). Sonst ist
+      // "Durchbruch" nur der Name dafuer, dass einer seine eigene Reihe verlaesst.
+      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa&&versperrt(u)){
         u.durch=true;
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
       }
@@ -17223,9 +17838,18 @@
       // sonst waere er keiner. Vorher hing die Leine auch an ihm: die Flankierer sind nie
       // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
       // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
+      u.leineHielt=false;
       if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
         const leine=40+(100-formMitFuehrung(u))*3.4;
-        if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+        // Der Anker ist die eigene REIHE, nicht mehr die eine Linie fuer alle (s.
+        // reihenAnker oben): Reihe 0 haelt die Linie, jede weitere ihren Abstand dahinter.
+        // Die Leinenlaenge selbst bleibt unveraendert, und damit bleibt auch die Rangfolge
+        // der Befehle erhalten: wer "eigenmaechtig" aufgestellt ist, hat mit 380 px so viel
+        // Spiel, dass ihn auch der Reihenversatz nicht bindet, wer "dicht" steht, mit 40 px
+        // fast keines. Der Zusammenhalt bleibt die Stellschraube, ueber die Formation
+        // entschieden wird — die Reihe sagt jetzt nur noch, WORAN die Leine haengt.
+        const anker=front+reihenAnker(u);
+        if(Math.abs(gx-anker)>leine){ gx=anker+Math.sign(gx-anker)*leine; u.leineHielt=true; }
       }
 
       // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
@@ -19728,6 +20352,67 @@
       tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+      // WER DIESE FALLE MEISTERT — Chris 13.09. (docs/design/takeshi-hindernis-vs-
+      // strecke-recherche-13-09.md):
+      //
+      //   "bei takeshi sollen nicht ALLE spieler immer gefuehlt an allen fallen hin fallen
+      //    sondern man soll nen unterschied sehen ob jemand eine meistert und dadurch
+      //    aufholt oder eben hinfaellt ... das kann auch n 80er sein der stark bei
+      //    hindernissen ist und dazwischen nur avg."
+      //
+      // Der Befund (Abschnitt 1 der Recherche, 120 Rennen kaderfest): der Typ der Falle
+      // entschied bis hier NUR ueber die Stoppdauer. Ob einer sauber durchkam, durchbrach
+      // oder stuerzte, wuerfelte an ALLEN vierzehn Fallen dieselbe TECHNIK — gemessen war
+      // die Sauber-Quote desselben Laeufers an seinem STAERKSTEN und seinem SCHWAECHSTEN
+      // Fallentyp 1,3 Prozentpunkte auseinander. Es gab die Geschichte "er meistert DIESE
+      // Falle" mechanisch also gar nicht, nur "der Techniker kommt ueberall etwas oefter
+      // durch". Mit `fallenKoennen:0.75` sind es 13,8 Prozentpunkte.
+      //
+      // 0,75 und nicht 1,0: ein Viertel "Falle lesen" bleibt an JEDER Falle stehen — das
+      // ist die blaue, mentale Seite der Disziplin (Intelligence 36 + Awareness 30 sitzen
+      // in TECHNIK, s. takeshi-chaos-tackle-plan-06-09.md Abschnitt 3.2), und sie soll
+      // nicht auf die vier TECHNIK-Stationen zusammenschnurren. Gemessen liegen 0,75 und
+      // 1,0 bei rho gleichauf (0,883); 0,75 laesst den Star in der Abnahme-Saat seltener
+      // gewinnen (75,8 % gegen 80,0 %). Die Star-Spalte haelt der Replikation ueber drei
+      // Saatensaetze allerdings NICHT stand (Recherche 4.5) — die Entscheidung fuer 0,75
+      // steht deshalb auf dem Konzept, nicht auf dieser Zahl.
+      //
+      // Warum das rho HEBT statt kostet (0,861 -> 0,883): der Wurf haengt nicht mehr an
+      // TECHNIK allein, dem Sub-Skill, der mit der Eignung am schwaechsten laeuft
+      // (r=0,60), sondern an der Kursmischung aus fuenf Sub-Skills (r=0,60 bis 0,88).
+      // Deren Mittel IST nach `mengeAusEignung` die Eignung — der Kanal wird breiter,
+      // nicht lauter. Das ist derselbe Grund, aus dem `lesenBonus` damals rausflog.
+      fallenKoennen:0.75,
+      // Der Durchbruch-Wurf bleibt reine WUCHT: mit Gewalt durchkommen ist Gewalt, egal
+      // welche Falle davorsteht. `fallenDurchbruch` liest der Motor, wenn es da ist —
+      // gemessen 0,874 gegen 0,883, also kein Gewinn, deshalb nicht gesetzt. Ebenso
+      // `stufePreis` (Stoppzeit nach Schwierigkeit: 0,869 allein, 0,878 zusammen mit
+      // fallenKoennen) und `fallenStolper` (Sturzdauer nach Typ: 0,869) — alle drei
+      // unter den 0,883 von `fallenKoennen` allein.
+      //
+      // Ab wann eine Falle eine Ticker-Zeile bekommt: der Sub-Skill dieser Falle muss
+      // `fallenMelden` Punkte ueber (Glanz) oder unter (Patzer) dem Mittel seiner fuenf
+      // Fallen-Sub-Skills liegen UND sein hoechster bzw. niedrigster sein. Reine Anzeige.
+      fallenMelden:10,
+      // WIE EINE FALLE FORDERT — Kategorisierung fuer die "Puste" (Chris 13.09., zur
+      // Ausdauer-Runde: "ja das kann es beeinflussen je nach hindernis aber MUSS nicht
+      // zwangsweise haengt von art und schwierigkeit ab -> du muesstest also realistisch
+      // schwierigkeiten und arten von hindernissen vergeben und diese kategorisieren").
+      // Die SCHWIERIGKEIT steht schon in `fallenStufe` (1-3); das hier ist die zweite
+      // Achse, die ART. `koerperlich` sind die Fallen, an denen ein Muedes den Unterschied
+      // spuert (Tuer und Seilwand durchbrechen, sich an Bruecke und Seil ueber dem Wasser
+      // halten, Rollen und Schlaege wegstecken), `technisch` die, die ein Erschoepfter mit
+      // Koennen trotzdem loest (Labyrinth, Eisflaeche — lesen und orientieren),
+      // `gemischt` die Balance-Fallen (Trittsteine, Walzen: Koennen zuerst, aber muede
+      // Beine wackeln).
+      //
+      // DIESER PR LIEST DAS FELD NICHT. Es ist reine Beschreibung, als Anschluss fuer die
+      // Puste-Runde (Zweig claude/hockey-ausdauer-konzept-13-09) gedacht, damit die nicht
+      // eine zweite, widerspruechliche Einteilung erfinden muss. Wer die Puste hier
+      // ansetzt, misst sie kaderfest wie jede Mechanik — die Einteilung selbst ist eine
+      // Behauptung ueber die Sendung, keine gemessene Zahl.
+      fallenArt:{TECHNIK:"technisch",WENDIGKEIT:"gemischt",WUCHT:"koerperlich",
+                 STEHEN:"koerperlich",ROBUST:"koerperlich"},
       // DREI BENANNTE KURSE (Teil B.4, Chris' Entscheidung 05.09.: fest verdrahtet, per
       // Saat gewaehlt — keine freie Ziehung). Jeder Kurs ist dieselbe Multimenge von
       // vierzehn Fallen (2x jeder der sieben Typen) in anderer Reihenfolge, deshalb
@@ -19881,6 +20566,13 @@
   // Welche Fallen in diesem Rennen schon eine Gedraenge-Zeile im Ticker hatten. Reine
   // Anzeige-Buchhaltung, kein Simulationszustand.
   let bahnGedraengeGemeldet=new Set();
+  // Dasselbe fuer die Staerken-/Schwaechen-Zeile an der Falle (`fallenMelden`, Chris
+  // 13.09.: "man soll nen unterschied sehen ob jemand eine meistert ... oder eben
+  // hinfaellt"). Ohne sie rechnet die neue Typ-Weiche zwar, ist im Ticker aber so
+  // unsichtbar, wie es Rempler und Gedraenge vor der Animationsrunde waren. Schluessel
+  // ist "Station|art", damit eine Falle je eine Glanz- und eine Patzer-Zeile bekommt und
+  // nicht zwoelf. Reine Anzeige-Buchhaltung, kein Simulationszustand.
+  let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
   // BROADCAST-HUD DER STAFFEL: ZEIT-DELTA. Fortschritt-Zeit-Verlaufspuffer je Seite,
@@ -20371,6 +21063,7 @@
     // 300k Saaten); Textsaaten waren nie betroffen und bleiben es (0,3220 vorher, 0,3339
     // nachher). Nachrechnen: docs/design/takeshi-kursmischer-nachweis-06-09.mjs.
     bahnFallenTypen=null; bahnKursName=null; bahnKursChaos=null; bahnGedraengeGemeldet=new Set();
+    bahnKoennenGemeldet=new Set();
     if(BA().kurse&&BA().kurse.length){
       let s0=(Number(seed)>>>0)||1;
       for(let runde=0;runde<2;runde++){
@@ -20999,15 +21692,36 @@
           // Zeit (0,2 s bei Elite-Sprintern); bei uns kostete ein Gelingen bisher nichts,
           // deshalb zahlten Dexterity/Torment/Power praktisch nicht. Andere Bahnen setzen
           // `hindernisTypen` nicht und bleiben bit-identisch.
+          // HINDERNIS-TYP UND -KOENNEN stehen ausserhalb des Blocks, weil die zwei
+          // Ausgangs-Wuerfe weiter unten sie brauchen (`fallenKoennen`, s. dort). Ohne
+          // `hindernisTypen` bleiben sie null/0 und beide Wuerfe rechnen Zeichen fuer
+          // Zeichen wie vorher.
+          let hTyp=null, hSkill=0;
           if(A.hindernisTypen){
-            const hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
-            const hSkill=u[hTyp]||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            hTyp=HUERDEN_TYP(HUERDEN_N().indexOf(h));
+            hSkill=u[hTyp]||0;
+            // STOPPZEIT NACH SCHWIERIGKEIT — GEBAUT, GEMESSEN, NICHT GESETZT.
+            // `fallenStufe` (1-3 Sterne je Sub-Skill) steht nur in den Burgpunkten; fuer
+            // die Uhr sind alle vierzehn Fallen gleich teuer, eine Stufe-1-Wendigkeits-
+            // falle kostet so viel wie eine Stufe-3-Wuchtfalle. `stufePreis` wuerde das
+            // in Sekunden nachziehen (Faktor je Stufe, `huerdePreis` gegengerechnet, also
+            // Umverteilung statt Erhoehung). Kaderfest gemessen bringt es NICHTS und
+            // schadet in der scharfen Fassung: 0,869 allein (0,70/1,00/1,30), 0,848 bei
+            // 0,55/1,00/1,45, 0,878 zusammen mit `fallenKoennen` — alle unter den 0,883
+            // von `fallenKoennen` allein (Recherche Abschnitt 4.2). Das Feld bleibt im
+            // Motor und in BAHN_ART ungesetzt; ohne es ist der Faktor 1 (jede Bahn).
+            const stFaktor=A.stufePreis?(A.stufePreis[(A.fallenStufe||{})[hTyp]]??1):1;
+            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
             // ebenfalls hindernisTypen fuehrt). Gelesen wird es einzig von burgpunkte() und
             // der Takeshi-Wertung (MOTOREN["takeshis-castle"].wert).
+            // `stoppAnteil` bleibt BEWUSST der reine Koennens-Anteil (1 - 0,8 x Skill/100)
+            // und traegt den `stufePreis`-Faktor NICHT mit: die Schwierigkeit der Falle
+            // steht in den Burgpunkten schon als `fallenStufe`-Multiplikator (s.
+            // burgpunkte()), ein zweites Mal hier waere sie quadratisch drin. Die
+            // Wertungsformel bleibt dadurch Zeichen fuer Zeichen die gemessene aus #810.
             u.fallen=u.fallen||[]; u.fallen.push({typ:hTyp,skill:hSkill,stoppAnteil:(1-0.8*hSkill/100),aus:'sauber'});
             // TON (Ziel 3, A4, 10.09.): Falle ausgeloest. `A.takeshi` gated, weil dieser
             // Zweig auch fuer Spurt laeuft (s. Kommentar oben, "hindernisTypen fuehrt");
@@ -21060,9 +21774,74 @@
               }
             }
           }
-          const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
-          if(rr()<=technik)continue;                       // sauber drueber
-          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+u.WUCHT*(A.wuchtSpanne??0.0090));
+          // WER DIESE FALLE MEISTERT — UND NICHT: WER FALLEN ALLGEMEIN MEISTERT.
+          //
+          // Chris 13.09., nach einem live geschauten Rennen: "bei takeshi sollen nicht ALLE
+          // spieler immer gefuehlt an allen fallen hin fallen sondern man soll nen
+          // unterschied sehen ob jemand eine meistert und dadurch aufholt oder eben
+          // hinfaellt ... das kann auch n 80er sein der stark bei hindernissen ist und
+          // dazwischen nur avg."
+          //
+          // NACHGEMESSEN (docs/design/takeshi-hindernis-vs-strecke-recherche-13-09.md,
+          // Abschnitt 1): ein Unterschied WAR da — oberstes TECHNIK-Fuenftel 65,1 % sauber
+          // gegen 37,9 % im untersten —, aber er haengt an EINER Groesse. Der `hTyp` der
+          // Falle entschied bis hier NUR ueber die Stoppdauer, NIE ueber Gelingen oder
+          // Sturz: an einer Wendigkeits-, Wucht-, Willens- und Nehmerqualitaets-Falle
+          // wuerfelte jeder mit derselben TECHNIK. Damit gab es die Geschichte "ER kommt
+          // an DIESER Falle durch, wo der andere liegt" mechanisch gar nicht — nur "der
+          // Techniker kommt ueberall etwas oefter durch".
+          //
+          // `fallenKoennen` mischt das Koennen zum TYP der Falle in den Sauber-Wurf,
+          // `fallenDurchbruch` dasselbe in den Durchbruch-Wurf. Das ist KEIN neuer Kanal:
+          // dieselben fuenf Sub-Skills entscheiden bereits die Stoppdauer derselben Falle
+          // (`hSkill` oben), und ihr Mittel IST nach `mengeAusEignung` die Eignung — der
+          // Wurf wird damit nicht lauter, sondern breiter aufgestellt. Gemessen hebt das
+          // rho sogar leicht, weil TECHNIK der mit der Eignung am schwaechsten laufende
+          // Sub-Skill ist (r=0,60) und die anderen vier zwischen 0,67 und 0,88 liegen.
+          //
+          // Ohne die zwei Felder (jede andere Bahn, Spurt eingeschlossen) sind `koennen`
+          // und `durch` Zeichen fuer Zeichen `u.TECHNIK` bzw. `u.WUCHT`, und rr() wird in
+          // genau denselben Faellen und in derselben Reihenfolge gerufen.
+          let koennen=u.TECHNIK, durch=u.WUCHT;
+          if(hTyp){
+            const mK=A.fallenKoennen??0, mD=A.fallenDurchbruch??0;
+            if(mK)koennen=(1-mK)*u.TECHNIK+mK*hSkill;
+            if(mD)durch=(1-mD)*u.WUCHT+mD*hSkill;
+          }
+          // SEINE FALLE — UND SEINE SCHWACHSTELLE, im Ticker (`fallenMelden`).
+          //
+          // `stark`/`schwach` fragen nur, ob der Sub-Skill DIESER Falle der hoechste bzw.
+          // niedrigste der fuenf Fallentypen dieses Laeufers ist, und ob er weit genug von
+          // der Mitte weg liegt (`fallenMelden` ist die Schwelle in Punkten). Reine
+          // Anzeige: kein rr(), kein Schreiben in u.* ausser der Melde-Buchhaltung, kein
+          // Einfluss auf burgpunkte()/wert(). Je Station hoechstens eine Glanz- und eine
+          // Patzer-Zeile (bahnKoennenGemeldet) — sonst stuenden bei zwoelf Laeufern
+          // vierzehn mal zwoelf Zeilen im Ticker.
+          const meldeTyp=(A.fallenMelden&&hTyp&&A.fallenStufe)?(()=>{
+            const T=Object.keys(A.fallenStufe); if(T.length<2)return null;
+            let hoch=T[0],tief=T[0];
+            for(const t of T){ if((u[t]||0)>(u[hoch]||0))hoch=t; if((u[t]||0)<(u[tief]||0))tief=t; }
+            const mitte=T.reduce((s,t)=>s+(u[t]||0),0)/T.length;
+            if(hTyp===hoch && hSkill-mitte>=A.fallenMelden)return "stark";
+            if(hTyp===tief && mitte-hSkill>=A.fallenMelden)return "schwach";
+            return null;
+          })():null;
+          const meldeStation=HUERDEN_N().indexOf(h);
+          const melde=(art2,txt)=>{
+            const key=meldeStation+"|"+art2;
+            if(bahnKoennenGemeldet.has(key))return;
+            bahnKoennenGemeldet.add(key); feed(u.seite,txt);
+          };
+          const technik=Math.min(0.97,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065));
+          if(rr()<=technik){                               // sauber drueber
+            if(meldeTyp==="stark"){
+              schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+              melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
+            }
+            continue;
+          }
+          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090));
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
@@ -21072,7 +21851,10 @@
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
-          u.stolper=(BA().stolperGrund??0.45)+ (1-u.TECHNIK/100)*(BA().stolperSpanne??0.5);
+          // WIE LANGE ER LIEGT, haengt an demselben Koennen wie das Gelingen — mit
+          // `fallenStolper` am Koennen ZU DIESER Falle (`koennen` oben), sonst weiter an
+          // TECHNIK allein. Ohne das Feld ist der Ausdruck Zeichen fuer Zeichen der alte.
+          u.stolper=(BA().stolperGrund??0.45)+ (1-(BA().fallenStolper?koennen:u.TECHNIK)/100)*(BA().stolperSpanne??0.5);
           // WENDIGKEIT, WO ES KEINE SPUR ZU WECHSELN GIBT.
           //
           // Im Sprint entscheidet Wendigkeit ueber Bahnwechsel: in den Sog kommen, am
@@ -21132,7 +21914,14 @@
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
-          feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
+          // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
+          if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+            melde("schwach",u.n+" liegt an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+              " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
+          } else {
+            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          }
         }
       }
 
@@ -25071,7 +25860,69 @@
         jeSeite:o.jeSeite||altJeSeite, spiele};
   }
 
+  // ARENA-FORMATIONSSONDE — rein diagnostisch, im selben sichern/bau/zurueck-Rahmen wie
+  // namenVon und feldspielSubskills weiter unten. Sie greift NICHT in die Simulation ein:
+  // sie faehrt einen echten Kampf im stepSimStumm-Takt und liest zwischendurch Positionen.
+  //
+  // WARUM SIE GEBRAUCHT WIRD: Chris' Meldung vom 13.09. („so richtig ne formation front und
+  // backrow gibt es nciht") ist eine Aussage ueber GEOMETRIE. rho kann sie prinzipiell nicht
+  // beantworten — Rangtreue sagt, ob die Mechanik das Richtige belohnt, und nichts darueber,
+  // wo jemand steht. Eine Aenderung an der Formation, die man nur an rho misst, misst am
+  // Vorwurf vorbei. Also wird der Vorwurf selbst zu einer Zahl gemacht:
+  //
+  //   reihenAbstand   Abstand der hintersten zur vordersten BESETZTEN Reihe, in
+  //                   Blickrichtung der Seite. homeFor() setzt ihn beim Start auf 160 px
+  //                   je Reihe; faellt er im Kampf gegen 0, war die Aufstellung ein
+  //                   Startbild und sonst nichts.
+  //   verkehrt        Anteil der Abtastungen, in denen die hintere Reihe VOR der vorderen
+  //                   steht — die Formation ist dann nicht flach, sondern umgedreht.
+  //   durchAnteil     Anteil der Einheit-Abtastungen mit aktivem Durchbruch. Der Durchbruch
+  //                   hebt die Formationsleine auf; ist er der Normalfall statt der
+  //                   Ausnahme, gibt es per Konstruktion keine Formation.
+  //
+  // Heiler zaehlen nicht mit, aus demselben Grund, aus dem teamFront()/reihenAnker() sie
+  // ausschliessen: sie stehen nach eigener Regel hinter der Gruppe und wuerden eine Reihe
+  // vortaeuschen, die es taktisch nicht gibt.
+  function arenaFormationsProbe(dId,saat){
+    const M=MOTOREN[dId]; if(!M||!istArena(dId))return null;
+    const g=M.sichern();
+    try{
+      if(M.vorher)M.vorher();
+      M.bau(saat);
+      const abstaende=[];
+      let einheitProben=0, durchProben=0, zwangProben=0, verkehrt=0, sim=0, seitAbtast=0;
+      while(!done&&sim<120){
+        stepSimStumm(1/60); sim+=1/60; seitAbtast+=1/60;
+        if(seitAbtast<0.5)continue;
+        seitAbtast=0;
+        for(const seite of[0,1]){
+          const leben=live(seite).filter(u=>!u.heiler);
+          if(!leben.length)continue;
+          for(const u of leben){einheitProben++; if(u.durch)durchProben++; if(u.zwang)zwangProben++;}
+          const reihen=[...new Set(leben.map(u=>u.row||0))].sort((a,b)=>a-b);
+          if(reihen.length<2)continue;
+          const mittelX=(r)=>{const xs=leben.filter(u=>(u.row||0)===r).map(u=>u.x);
+            return xs.reduce((a,b)=>a+b,0)/xs.length;};
+          // "Tiefe" = wie weit hinter der Mittellinie, aus Sicht DIESER Seite. Damit ist
+          // die Zahl fuer beide Seiten dieselbe Groesse und nicht spiegelverkehrt.
+          const tiefe=(x)=>seite===0?(MID-x):(x-MID);
+          const d=tiefe(mittelX(reihen[reihen.length-1]))-tiefe(mittelX(reihen[0]));
+          abstaende.push(d); if(d<0)verkehrt++;
+        }
+      }
+      const sortiert=[...abstaende].sort((a,b)=>a-b);
+      const med=sortiert.length?sortiert[Math.floor(sortiert.length/2)]:0;
+      const mit=sortiert.length?sortiert.reduce((a,b)=>a+b,0)/sortiert.length:0;
+      return {disziplin:dId, saat, dauer:+sim.toFixed(2), proben:abstaende.length,
+        reihenAbstandMittel:+mit.toFixed(1), reihenAbstandMedian:+med.toFixed(1),
+        verkehrtAnteil:abstaende.length?+(verkehrt/abstaende.length).toFixed(3):0,
+        durchAnteil:einheitProben?+(durchProben/einheitProben).toFixed(3):0,
+        zwangAnteil:einheitProben?+(zwangProben/einheitProben).toFixed(3):0};
+    } finally { M.zurueck(g); }
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
@@ -25301,7 +26152,7 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
-    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand)=>{
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
       // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
@@ -25329,7 +26180,27 @@
       const u={n:name,x:gr/2,y:gr*46/64,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
         lunge:lunge!==undefined&&lunge!==null?lunge:((ani==="slash"||ani==="shoot")?0.1:0),
         down:ani==="hurt",side:0,hop:0};
-      zeichneSprite(ctx,u,32,46,!!feldspiel);
+      // vizPhase (optional, 13.09.): setzt dasselbe Feld, das stepHeben()/stepSchach() im
+      // laufenden Spiel schreiben, damit sich EINE Requisiten-Phase gezielt ansteuern
+      // laesst statt nur der, die der Fallback gerade liefert. Ohne laufendes Duell gibt
+      // hebePhase() immer "boden" zurueck — die Ueberkopf-Phase "hoch" war ueber diese
+      // Sonde bis dahin gar nicht messbar, und genau sie steht in Chris' Befund vom
+      // 13.09. ("beim heben wird sie quasi weit ueber den kopf geworfen"). Dieselbe Rolle
+      // wie `lunge`/`leinwand` darueber: ein Aufrufwert, der einen sonst festen Normalfall
+      // ueberschreibt, rein diagnostisch — ohne Argument bleibt u.vizPhase undefined und
+      // der Zeichenpfad waehlt exakt wie bisher.
+      if(vizPhase!==undefined&&vizPhase!==null)u.vizPhase=vizPhase;
+      // ANKER (optional, 13.09. zweite Runde): der Zeichenpunkt lag hier fest auf (32,46),
+      // UNABHAENGIG von `leinwand`. Eine groessere Leinwand gab einer grossen Figur damit
+      // nur unten und rechts mehr Platz — nach OBEN klebte sie weiter an der Kante, weil
+      // der Sprite bei y-46*Z ansetzt und bei Z=1,71 (Krag'Zul) schon bei -32 beginnt.
+      // Genau daran scheiterte die Ueberkopf-Messung der groessten Kaderfiguren: die Sonde
+      // meldete Scheitel 0 und Stangenmitte 0, beides nur die abgeschnittene Bildkante.
+      // OHNE Argument bleibt es wortgleich bei (32,46) — jeder bestehende Aufrufer (und
+      // jede im Repo dokumentierte Messung) zeichnet damit unveraendert.
+      const ax=(anker&&typeof anker.x==="number")?anker.x:32;
+      const ay=(anker&&typeof anker.y==="number")?anker.y:46;
+      zeichneSprite(ctx,u,ax,ay,!!feldspiel);
       return c.toDataURL();
     },
     // Debug-Gegenstueck zu renderProbe, nur fuer die KADER-VORSCHAU (figur(), dieselbe

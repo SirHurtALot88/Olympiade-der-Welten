@@ -332,6 +332,7 @@ export function buildLegacyMatchdayResolvePreview(
     captainMode: options?.captainMode ?? "selected_captain",
     arenaTeamPointsByTeamId: options?.arenaTeamPointsByTeamId ?? null,
     arenaIndividualBoxscorePpsByPlayerId: options?.arenaIndividualBoxscorePpsByPlayerId ?? null,
+    arenaDisciplineId: options?.arenaDisciplineId ?? null,
   };
   const base = contexts[0];
   /**
@@ -716,14 +717,26 @@ export function buildLegacyMatchdayResolvePreview(
     // die PPS-Rang-Formel — jede andere Disziplin/jeder andere Modus bleibt exakt beim Bisherigen.
     // Diese Stelle selbst brauchte fuer die Erweiterung KEINE Code-Aenderung — sie pruefte schon
     // vor der Gewichtheben-Produktivierung Mengen-Zugehoerigkeit, nicht `disciplineId === "basketball"`.
+    //
+    // IDENTITAET STATT MENGEN-ZUGEHOERIGKEIT (N-Team-Infrastruktur-Audit 13.09., Fund B2 —
+    // docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md): die mitgelieferten Maps
+    // gehoeren zu GENAU EINER gelaufenen Disziplin (`runBattleModeArenaMatchday()` laeuft je
+    // Spieltag fuer eine). Steht diese Disziplin in `resolveOptions.arenaDisciplineId`, gilt die
+    // Uebersteuerung NUR fuer sie — sonst buchte ein einziger gelaufener Duellausgang in BEIDE
+    // arena-aufgeloesten Disziplinen desselben Spieltags, also denselben Sieg zweimal in die
+    // Saisontabelle (s. tests/arena-override-nur-fuer-die-gelaufene-disziplin.test.ts). Ohne das
+    // Feld (aeltere Aufrufer/Tests) bleibt es beim alten Mengen-Verhalten, bit-identisch.
+    const istDieGelaufeneArenaDisziplin =
+      resolveOptions.arenaDisciplineId != null
+        ? disciplineId === resolveOptions.arenaDisciplineId
+        : ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId);
     const arenaOverridesForThisDiscipline =
-      isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
+      isBattleModeArenaEligible && istDieGelaufeneArenaDisziplin
         ? resolveOptions.arenaTeamPointsByTeamId ?? null
         : null;
-    // BOXSCORE-AN-PPS: dieselbe Sperre wie oben (jede arena-aufgeloeste Disziplin) — s.
-    // docs/design/boxscore-an-pps.md.
+    // BOXSCORE-AN-PPS: dieselbe Sperre wie oben — s. docs/design/boxscore-an-pps.md.
     const arenaIndividualPpsForThisDiscipline =
-      isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
+      isBattleModeArenaEligible && istDieGelaufeneArenaDisziplin
         ? resolveOptions.arenaIndividualBoxscorePpsByPlayerId ?? null
         : null;
     const teamResultsRanked = rankWithinLeagueScope(
