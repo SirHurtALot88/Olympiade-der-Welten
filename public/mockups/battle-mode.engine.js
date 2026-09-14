@@ -6453,6 +6453,9 @@
         // REINE ZEICHEN-FELDER fuer den Bodycheck-Aufprall (s. HK_CHECK_VIS/versucheSteal).
         // Keine Formel liest sie, ausserhalb von Hockey setzt sie nichts.
         wuchtVis:0, wuchtZielX:0, wuchtZielY:0,
+        // Dasselbe fuer den leichten Stockcheck (s. HK_STEAL_VIS/versucheSteal,
+        // Erfolgszweig ohne Koerpereinsatz). Ebenfalls reine Zeichnung.
+        steckVis:0, steckZielX:0, steckZielY:0,
         // PUSTE (s. FELDSPIEL_ART.hockey.puste). `pusteMax` bleibt 0, wo die Disziplin
         // kein Puste-Rezept fuehrt — dann ist jede Puste-Zeile im Motor wirkungslos.
         // `pusteMin` haelt den TIEFSTEN Stand des Spiels fest (fuer die Abnahme: ein
@@ -6961,6 +6964,16 @@
   // Sekunde Zuschauzeit — lang genug, um den Stoss zu sehen, kurz genug, um den naechsten
   // nicht zu ueberdecken (die Luecke zwischen zwei Checks liegt im Median bei 14,4 s).
   const HK_CHECK_VIS=0.5;
+  // HK_STEAL_VIS: dieselbe Idee, fuer den LEICHTEN Stockcheck (versucheSteal-Erfolgszweig
+  // ohne Koerpereinsatz — der `wucht`-Wurf oben ist ein eigener, unabhaengiger Zweig).
+  // Bisher wechselte der Puck dort nur ueber den Ticker-Text sichtbar die Seite ("erobert
+  // den Puck") — auf dem Feld selbst sah man den Offense/Defense-Wechsel nicht, der Puck
+  // stand im naechsten Bild einfach beim neuen Besitzer. `steckVis` ist wie `wuchtVis`
+  // eine REINE ZEICHEN-DAUER (keine Formel liest sie), bewusst KUERZER und kein Bogen
+  // sondern ein schmaler Blitz zwischen den zwei beteiligten Figuren (s. zeichneFeldspiel)
+  // — er darf mit dem Bodycheck-Bogen nicht verwechselt werden, das bleibt die groessere,
+  // seltenere Aktion.
+  const HK_STEAL_VIS=0.35;
   // ============================== PUSTE (Feldspiel) ==============================
   // Rezept und Begruendung stehen an FELDSPIEL_ART.hockey.puste. Hier nur die drei
   // Funktionen, die sie bewegen. Eine Disziplin OHNE `art.puste` (Basketball, Football)
@@ -9697,7 +9710,22 @@
       // gegen den Bodycheck darueber, s. FELDSPIEL_ART.hockey). Ohne das Feld — Basketball,
       // Football — ist die Zeile zeichengleich die alte.
       const wortStahl=art.wortSteal||art.wortAbwehr;
-      feed(decker.side,decker.n+" erobert "+(istHockey()?"den Puck":"den Ball")+" — "+wortStahl+".");
+      // SICHTBARER OFFENSE/DEFENSE-WECHSEL (Hockey, 14.09.): der Ticker nannte bisher nur
+      // den Dieb ("X erobert den Puck"), nicht von wem — und auf dem Feld selbst stand der
+      // Puck im naechsten Bild einfach beim neuen Besitzer, ohne jede sichtbare Aktion
+      // zwischen den beiden Figuren. Fuer Hockey jetzt namentlich BEIDE Seiten im Text
+      // ("X uebernimmt den Puck von Y") plus ein kurzer Blitz zwischen ihnen (steckVis,
+      // s. HK_STEAL_VIS/zeichneFeldspiel) — genau in diesem Frame, in dem `traeger` den
+      // Puck verliert und `decker` ihn uebernimmt. Ausserhalb von Hockey bleibt der
+      // Text zeichengleich die alte Zeile; `steckVis` bleibt dort ungesetzt (0) und
+      // zeichneFeldspiel liest es nur bei Hockey.
+      feed(decker.side,istHockey()
+        ?decker.n+" uebernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
+        :decker.n+" erobert den Ball — "+wortStahl+".");
+      if(istHockey()){
+        decker.steckVis=HK_STEAL_VIS;
+        decker.steckZielX=traeger.x; decker.steckZielY=traeger.y;
+      }
       // Chris' Fund (29.08.): grosse Defensiv-Aktionen (Steal/Block) verschwanden im
       // Ticker-Text, waehrend ein Treffer schon lange einen auffaelligen Schwebetext
       // bekommt (s. "+e.punkte" oben). Gleiches Muster, eigene Farbe (_def) — s.
@@ -10522,6 +10550,8 @@
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
       if(u.wuchtVis>0)u.wuchtVis=Math.max(0,u.wuchtVis-dt);
+      // Derselbe Abbau fuer den leichten Stockcheck-Blitz (s. HK_STEAL_VIS).
+      if(u.steckVis>0)u.steckVis=Math.max(0,u.steckVis-dt);
       // PUSTE, hier oben aus demselben Grund wie `down`: sie muss auch waehrend der
       // Drittelpause und auf der Strafbank weiterlaufen — genau dort laedt sie ja auf.
       // Ausserhalb einer Disziplin mit Puste-Rezept ist der Aufruf ein sofortiges return.
@@ -11571,6 +11601,22 @@
           ctx.beginPath();ctx.arc(zx,zy,r,w-1.25,w+1.25);ctx.stroke();
           ctx.strokeStyle="rgba(255,255,255,.75)";ctx.globalAlpha=a*0.6;ctx.lineWidth=1.5;
           ctx.beginPath();ctx.arc(zx,zy,r+5,w-1.0,w+1.0);ctx.stroke();
+          ctx.restore();
+        }
+        // STOCKCHECK-BLITZ (14.09.): der leichte Steal-Erfolg (versucheSteal, Zweig ohne
+        // Koerpereinsatz) bekommt einen eigenen, KUERZEREN und SCHMALEREN Effekt als der
+        // Bodycheck-Bogen darueber — ein gestrichelter Blitz von der aktuellen Position
+        // des Diebes zu der Stelle, an der er den Puck uebernommen hat (`steckZielX/Y`,
+        // im Moment des Steals auf `traeger`s Position gesetzt). Reine Zeichnung, dieselbe
+        // Bauform (Restzeit -> Alpha) wie `wuchtVis` direkt darueber; `steckVis` wird nur
+        // hier gelesen und in stepFeldspielLive abgebaut.
+        if(u.steckVis>0){
+          const a=Math.max(0,Math.min(1,u.steckVis/HK_STEAL_VIS));
+          ctx.save();
+          ctx.strokeStyle=css("--crit");ctx.globalAlpha=a*0.85;ctx.lineWidth=2.5;
+          ctx.setLineDash([5,4]);
+          ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(u.steckZielX,u.steckZielY);ctx.stroke();
+          ctx.setLineDash([]);
           ctx.restore();
         }
         // PUSTE-LEISTE UNTER DEN FUESSEN — dieselbe Bauform, dieselbe Ampel und dieselbe
