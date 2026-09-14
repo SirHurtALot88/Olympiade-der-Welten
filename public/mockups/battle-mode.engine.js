@@ -2106,9 +2106,35 @@
   // zeichneSprite) — auf Modulebene, damit er ueber Aufrufe hinweg haelt, wie
   // hoehenKorrSpeicher direkt darueber.
   const blattSpanneSpeicher=new Map();
+  //
+  // DIE MESSUNG MUSS SICH SELBST AUSSPERREN (13.09., s. docs/design/hoehenkorrektur-
+  // rekursion-13-09.md fuer die vollstaendige Messreihe). Der Messdurchlauf unten ruft
+  // zeichneSprite() auf, und zeichneSprite() rechnet in seiner ersten Zeile
+  // `Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b)` — also hoehenKorrektur()
+  // fuer DENSELBEN Namen zurueck. Solange der Zwischenspeicher erst NACH der Messung
+  // gefuellt wurde, fand dieser Rueckruf nichts vor und mass erneut: gemessen 1057 bis 2309
+  // Ebenen tief, bis der JS-Stapel ueberlief. Den RangeError schluckte das try/catch daneben
+  // lautlos.
+  //
+  // Und beim Abwickeln kippte der Wert dann hin und her, weil jede Ebene das Bild der Ebene
+  // darunter MISST: Ebene n zeichnet mit dem korr von Ebene n+1. Johanna, echte Messreihe:
+  // Z=1 -> Blatt 49 px -> korr 52/49 = 1,061; damit gezeichnet -> 52 px -> korr 52/52 = 1,000;
+  // damit gezeichnet -> wieder 49 px -> wieder 1,061 ... Ein sauberer Zweierzyklus, und
+  // gespeichert wurde, was die AEUSSERSTE Ebene gerade in der Hand hielt — also die PARITAET
+  // der zufaelligen Ueberlauftiefe. Nachgewiesen, indem dieselbe Figur aus verschieden tiefen
+  // Aufrufstapeln gemessen wurde: Johanna 1,000/1,061, Krag'Zul 1,000/0,881, Alarm
+  // 1,000/0,813 — je nachdem, wie viel Stapel gerade frei war. Damit war der Wert, den die
+  // Arena fuer eine Figur benutzt, nicht reproduzierbar, und in ungefaehr der Haelfte der
+  // Faelle fiel er auf 1,000 zurueck, d.h. die Korrektur fand gar nicht statt.
+  //
+  // Die Sperre ist eine Zeile: VOR der Messung eine 1 in den Zwischenspeicher legen. Der
+  // Rueckruf aus zeichneSprite() findet sie, gibt 1 zurueck, und die Messfigur wird genau so
+  // gezeichnet, wie der Kommentar direkt darueber es immer gemeint hat — "ohne Groesse, so
+  // misst der Durchlauf das BLATT, nicht das Ergebnis". Ein Zeichendurchlauf statt zweitausend.
   function hoehenKorrektur(u){
     if(!u||!u.n)return 1;
     if(hoehenKorrSpeicher.has(u.n))return hoehenKorrSpeicher.get(u.n);
+    hoehenKorrSpeicher.set(u.n,1);
     let korr=1;
     try{
       // DOPPELT SO GROSSE MESSLEINWAND wie die Zelle. Bei 64x64 klebt ein hohes Blatt
@@ -26364,6 +26390,19 @@
     // eigenen Funktionsnamen (statt einem "...Probe"-Alias), damit der Aufruf von aussen
     // 1:1 der Funktionssignatur im Auftrag entspricht: window.__arena.hockeySchussPhase(t,art).
     hockeySchussPhase,
+    // HOEHENKORREKTUR DIREKT ABLESEN (13.09.) statt sie aus gerenderten Pixelhoehen
+    // rueckwaerts zu erraten — genau daran ist die erste Fehlermeldung zu diesem Thema
+    // gescheitert (sie schloss aus "Krag'Zul ist 94 px hoch" auf "korr haengt am oberen
+    // Deckel", in Wahrheit war es der Zweierzyklus der Selbstrekursion, s. Kommentar bei
+    // hoehenKorrektur). `frisch` leert den Zwischenspeicher fuer diesen Namen vorher, damit
+    // die Sonde die MESSUNG sieht und nicht nur, was irgendwann einmal gespeichert wurde.
+    // Read-only, kein Gameplay, kein rr() — dasselbe Prinzip wie renderProbe daneben.
+    hoehenKorrProbe:(name,frisch)=>{
+      if(frisch)hoehenKorrSpeicher.delete(name);
+      const b=BAU[name]||BAU_STD;
+      return {name, korr:hoehenKorrektur({n:name}), vollbild:b.vollbild||null, bauSkala:bauSkala(b),
+        bezug:HOEHEN_BEZUG, deckel:[HOEHEN_KORR_MIN,HOEHEN_KORR_MAX]};
+    },
     renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
