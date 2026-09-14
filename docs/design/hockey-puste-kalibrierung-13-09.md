@@ -350,7 +350,7 @@ mit einer Erholung, die wirklich feuert:
 |---|---|---|---:|---:|---|
 | staffel | 0,915 / 0,951 | **0,915 / 0,951** | 0,865 | 0,050 | bestanden, identisch |
 | spurt | 0,871 / 0,905 | **0,871 / 0,905** | 0,800 | 0,071 | bestanden, identisch |
-| takeshis-castle | 0,861 / 0,930 | **0,852 / 0,937** | 0,811 | 0,041 | bestanden |
+| takeshis-castle | **0,883** / 0,930 (nach #909) | **0,879 / 0,958** | 0,811 | 0,068 | bestanden, s.u. |
 | time-trial | 0,828 / 0,832 | **0,825 / 0,825** | 0,778 | 0,047 | bestanden (s.u.) |
 | climbing | 0,790 / 0,851 | **0,782 / 0,839** | 0,732 | 0,050 | bestanden |
 
@@ -361,6 +361,30 @@ das Feld über die kurze Distanz durchgehend auf Plantempo und bricht so gut wie
 (Staffel gemessen 0,0 %, Spurt 5,5 %, Time-Trial 4,7 %) — die Gutschrift feuert dort schlicht
 nicht. Bewegt hat sich genau dort etwas, wo Läufer wirklich an Hindernissen stehen und
 leerlaufen: **Takeshi −0,009** und **Climbing −0,008** auf der Spielzahl.
+
+**Takeshi, gegen den richtigen Vergleichswert gemessen.** #909 („Hindernis- vs. Streckentempo")
+ist nach der ersten Messung dieser Runde gelandet und hat genau die beiden Würfe umgebaut, an
+denen `pusteHindernis` hängt: statt roher TECHNIK/WUCHT entscheiden jetzt `koennen`/`durch`, in
+die der Sub-Skill der jeweiligen Falle eingemischt ist. Damit war die frühere Zahl dieser Runde
+(0,852) gegen einen Code gemessen, den es nicht mehr gibt — **genau der Fall, den Abschnitt 6
+vorab benannt hatte.**
+
+Der ehrliche Vergleich ist deshalb nicht die alte Basislinie 0,861, sondern **#909s eigener
+Messwert 0,883** (`takeshi-hindernis-vs-strecke-recherche-13-09.md`, Punkt 7). Auf deren Stand
+mit `pusteHindernis` obendrauf: **0,879**, also **−0,004**. Das ist ein Zwanzigstel der
+Kader-Spannweite (0,101) und nach `messgrundlage-kaderfest.md` von Null nicht zu unterscheiden.
+Die Disziplin steht damit **besser da als je zuvor in dieser Runde** — 0,879 gegen einen Boden
+von 0,811, also 0,068 Luft.
+
+Beim Zusammenführen wurde der Abzug auf #909s neue Größen aufgesetzt, nicht neben sie: er zieht
+jetzt von `koennen` bzw. `durch` ab. Das ist sachlich die bessere Fassung — ein Müder verliert
+an **der Fähigkeit, die diese Falle entscheidet**, statt pauschal an TECHNIK. Nebenbei entfiel
+eine doppelte Berechnung: #909 bestimmt `hTyp` bereits weiter oben aus demselben Ausdruck.
+
+**Nachtrag zur Messgrundlage:** `data/generated/rangtreue-basislinie.json` führt Takeshi weiter
+mit 0,861 — #909 hat die Datei nicht nachgezogen. Für das nächtliche Gate ist das unkritisch
+(der Wert ist gestiegen, die Schranke hält erst recht), aber die Basislinie ist an dieser Zeile
+veraltet und sollte nachgezogen werden, wenn beide Runden gelandet sind.
 
 **Time-Trial, und die Zurechnung ist ehrlich offen:** die Zahl stand vor dem Merge von #908
 noch ziffernidentisch bei 0,828 / 0,832 und liegt danach bei **0,825 / 0,825**. In genau
