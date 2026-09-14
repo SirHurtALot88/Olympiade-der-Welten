@@ -122,12 +122,36 @@ function ScheduleSlotRow({ slot }: { slot: ScheduleSlot }) {
   );
 }
 
+/** Ein Mitglied der eigenen Mini-DM-Vierergruppe, s. `ScheduleMiniDmPodRow`. */
+type ScheduleMiniDmPodTeam = { teamId: string; name: string | null; logoPath: string | null; isActiveTeam: boolean };
+
+/**
+ * Mini-DM-Pod-Zeile (Entscheidung 5, mini-dm-spielplan-verankerung, 14.09.): ein 4-Team-Pod hat
+ * kein Heim/Auswaerts-Paar, deshalb ersetzt diese Zeile die normale `ScheduleOpponentRow` fuer
+ * einen Mini-DM-Spieltag komplett, statt einen der drei anderen Pod-Teams als "den" Gegner
+ * misszuverstehen.
+ */
+function ScheduleMiniDmPodRow({ pod }: { pod: ScheduleMiniDmPodTeam[] }) {
+  return (
+    <div className="nl-diszis-md-opponent nl-diszis-md-minidm-pod">
+      <span className="nl-diszis-md-opponent-name">
+        4er-Pod: {pod.map((team) => team.name ?? team.teamId).join(" · ")}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Gegner-Zeile der Spieltag-Karte (docs/design/liga-split-plan.md, Abschnitt 6). Nur sichtbar, wenn
  * der Cross-Tab-Hook ueberhaupt Gegnerdaten mitgibt — ohne aktiven Liga-Split (jeder heutige Save)
  * liefert er `opponentTeamId: null`, die Karte sieht dann exakt wie vor dieser Aenderung aus.
  */
 function ScheduleOpponentRow({ row }: { row: ScheduleRow }) {
+  const miniDmPod = (row.miniDmPod as ScheduleMiniDmPodTeam[] | null | undefined) ?? null;
+  if (miniDmPod && miniDmPod.length > 0) {
+    return <ScheduleMiniDmPodRow pod={miniDmPod} />;
+  }
+
   const opponentTeamId = row.opponentTeamId as string | null | undefined;
   if (!opponentTeamId) {
     return null;

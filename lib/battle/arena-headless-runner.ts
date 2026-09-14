@@ -632,3 +632,237 @@ export async function runArenaFixtures(
     await schliesseBrowserHart(browser);
   }
 }
+
+/**
+ * MINI-DM-POD-RUNNER (mini-dm-spielplan-verankerung, 14.09.) — wiring von
+ * `lib/season/mini-dm-pod-schedule.ts`s 4-Team-Pods an den bereits fertigen, bislang nur ueber
+ * `window.__arena.miniDmFfaEvent()` per Testschnittstelle erreichbaren FFA-Kampfmotor
+ * (`spieleMiniDmFfaEvent()`/`baueMiniDmFfaRunde()`, battle-mode.engine.js, "vier Rollenrunden").
+ *
+ * BEWUSST NICHT ueber `runArenaFixtures()`/`ARENA_TEAM_POINTS`/`ARENA_RESOLVED_DISCIPLINE_IDS`
+ * verdrahtet — Mini-DMs eigentliche Liga-Tabellenpunkte kommen weiterhin unveraendert aus dem
+ * generischen, liga-weiten PPS-Renn-Scoring (Chris' ausdrueckliche Ausklammerung fuer diese
+ * Runde: rho 0,256 kaderfest liegt weit unter der 0,80-Schranke, ein separates, groesseres
+ * Validitaetsproblem). Dieser Runner liefert ausschliesslich einen ECHTEN, simulierten
+ * Boxscore je Pod fuer Praesentationszwecke (z. B. die N-generische Buehne,
+ * `DisciplineStageNativeArena.tsx`) — kein Aufrufer bucht sein Ergebnis heute in die
+ * Saisontabelle.
+ *
+ * STRUKTURELL EINFACHER als `runArenaFixtures()`: `spieleMiniDmFfaEvent(vierTeams, saat)` nimmt
+ * die vier Kader als EXPLIZITE Funktionsargumente entgegen (kein Umweg ueber
+ * `window.__olyArenaKader`/SQUAD/OPP wie beim 2-Team-Chassis) — ein Pod-Batch braucht deshalb
+ * NUR EINEN Motor-Ladevorgang fuer die gesamte Seite, kein Neu-Einhaengen von
+ * `<script src="battle-mode.engine.js">` je Pod (s. `simuliereFixturesImBrowser` oben).
+ */
+export type MiniDmFfaPodFixtureInput = {
+  podId: string;
+  teamIds: readonly [string, string, string, string];
+  /** Deterministischer Seed, s. `seedZuZahl()`-Kommentar oben — derselbe FNV-1a-Weg wie bei
+   *  `runArenaFixtures()`, damit ein String-Seed nicht auf 0 kollabiert. */
+  seed: string | number;
+};
+
+export type MiniDmFfaPodBoxscoreEintrag = {
+  slotId: string;
+  name: string;
+  playerId: string | null;
+  teamId: string | null;
+  /** Pod-lokaler Team-Index 0..3, s. `MiniDmPod.teamIds`-Reihenfolge in mini-dm-pod-schedule.ts. */
+  podSide: number;
+  rundenPlatz: number;
+  rundenPunkte: number;
+  beitrag: number;
+};
+
+export type MiniDmFfaPodTeamResult = {
+  teamId: string;
+  podSide: number;
+  rundenPunkteSumme: number;
+  beitragSumme: number;
+  eventPlatz: number;
+  /** Chris' ausdrueckliche Uebersteuerung [2,1,0,0] (Summe 3, s. Kopfkommentar) — REIN
+   *  informativ aus diesem Runner heraus, wird von KEINEM heutigen Aufrufer in die
+   *  Saisontabelle gebucht. */
+  ligaPunkte: number;
+};
+
+export type MiniDmFfaPodFixtureResult = {
+  podId: string;
+  teamIds: readonly [string, string, string, string];
+  teams: MiniDmFfaPodTeamResult[];
+  boxscore: MiniDmFfaPodBoxscoreEintrag[];
+};
+
+type RoherMiniDmFfaRundenTeamEintrag = {
+  side: number;
+  n: string;
+  eig: number;
+  beitrag: number;
+  rundenPlatz: number;
+  rundenPunkte: number;
+  hp: number;
+  max: number;
+  down: boolean;
+};
+type RoherMiniDmFfaRunde = { slotId: string; seed: number; dauer: number; teams: RoherMiniDmFfaRundenTeamEintrag[] };
+type RoherMiniDmFfaEventErgebnis = {
+  saat: number;
+  runden: RoherMiniDmFfaRunde[];
+  teams: Array<{ side: number; rundenPunkteSumme: number; beitragSumme: number; eventPlatz: number; ligaPunkte: number }>;
+};
+
+export type RunMiniDmFfaPodFixturesOptions = {
+  attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  chromiumExecutablePath?: string;
+  seitenTimeoutMs?: number;
+};
+
+/**
+ * Ordnet jeden Boxscore-Namen EINES Teams genau einem Spieler zu — nur, wenn der Name in GENAU
+ * EINEM Kadereintrag DIESES Teams vorkommt (analog `baueEindeutigeNamenZuordnung` oben, aber pro
+ * einzelnem Pod-Team statt pro Heim/Gast-Paar, weil ein Pod-Kaempfer im rohen Ergebnis bereits
+ * sein `side`/Team explizit traegt — anders als beim 2-Team-Chassis muss hier nichts ueber
+ * mehrere Kader hinweg disambiguiert werden).
+ */
+function baueEindeutigeNamenZuordnungFuerTeam(kader: ArenaSpieler[]): Map<string, string> {
+  const vorkommen = new Map<string, number>();
+  for (const spieler of kader) {
+    vorkommen.set(spieler.n, (vorkommen.get(spieler.n) ?? 0) + 1);
+  }
+  const zuordnung = new Map<string, string>();
+  for (const spieler of kader) {
+    if (vorkommen.get(spieler.n) === 1) zuordnung.set(spieler.n, spieler.id);
+  }
+  return zuordnung;
+}
+
+/**
+ * Laeuft im Browser-Kontext (s. `simuliereFixturesImBrowser`-Kommentar oben zu denselben
+ * Einschraenkungen: nur Argumente + Browser-Globale, keine Node-Closures).
+ */
+async function simuliereMiniDmFfaPodsImBrowser(payload: {
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number }>;
+  timeoutMs: number;
+}): Promise<Array<RoherMiniDmFfaEventErgebnis | null>> {
+  const fenster = window as unknown as {
+    __arena?: {
+      miniDmFfaEvent: (vierTeams: ArenaSpieler[][], saat: number) => RoherMiniDmFfaEventErgebnis | null;
+    };
+  };
+
+  const start = Date.now();
+  while (typeof fenster.__arena === "undefined") {
+    if (Date.now() - start > payload.timeoutMs) {
+      throw new Error("arena-headless-runner: window.__arena wurde nicht rechtzeitig bereit.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed));
+}
+
+/**
+ * Fuehrt eine Menge Mini-DM-Pods (typischerweise alle Pods eines Mini-DM-Spieltags, s.
+ * `getMiniDmPodsForMatchday()`) headless aus und liefert je Pod einen echten, simulierten
+ * Boxscore — PRAESENTATIONSZWECK, s. Kopfkommentar oben. Ein Pod, dessen Team KEINEN einzigen
+ * einsatzfaehigen Kader stellt (fehlende Attribut-Boegen, leeres Roster), wird NICHT geworfen,
+ * sondern als `null` an derselben Position zurueckgegeben — anders als `runArenaFixtures()`
+ * (das bei EINEM leeren Kader auf eine 1-gegen-0-Notaufstellung ausweicht), weil
+ * `spieleMiniDmFfaEvent()` selbst hart abbricht, sobald ein Team keinen Mini-DM-Kaempfer stellt,
+ * und ein einzelner unvollstaendiger Pod (z. B. ein frisch angelegtes Team ohne Kader) den Rest
+ * des Batches nicht mitreissen soll.
+ */
+export async function runMiniDmFfaPodFixtures(
+  gameState: GameState,
+  pods: MiniDmFfaPodFixtureInput[],
+  options: RunMiniDmFfaPodFixturesOptions = {},
+): Promise<Array<MiniDmFfaPodFixtureResult | null>> {
+  if (pods.length === 0) return [];
+
+  const vorbereitet = pods.map((pod) => ({
+    ...pod,
+    seed: seedZuZahl(pod.seed),
+    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+  }));
+
+  const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
+
+  const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
+  if (!existsSync(seitenPfad)) {
+    throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
+  }
+  const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const laufbarePods = vorbereitet.filter((_, index) => einsatzfaehig[index]);
+  if (laufbarePods.length === 0) {
+    return vorbereitet.map(() => null);
+  }
+
+  const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
+  try {
+    const page: Page = await browser.newPage();
+    // Derselbe tsx/esbuild-`__name`-Shim wie bei `runArenaFixtures()` oben — noetig, weil
+    // `page.evaluate()` Funktionen nur als Text ueberträgt (s. Kommentar dort).
+    await page.addInitScript(() => {
+      const fenster = window as unknown as { __name?: (fn: unknown, name?: string) => unknown };
+      if (typeof fenster.__name !== "function") {
+        fenster.__name = (fn) => fn;
+      }
+    });
+    // `window.__olyArenaKader` MUSS beim Laden irgendeinen validen 2-Team-Kader tragen (s.
+    // "BRUECKE ZUR ECHTEN APP" in battle-mode.engine.js), sonst wartet das Modul auf ein Signal,
+    // das hier nie kommt — `miniDmFfaEvent()` selbst LIEST diesen Wert nirgends (Kader kommen als
+    // explizite Funktionsargumente), er dient ausschliesslich dem Bootstrap.
+    const bootstrapPod = laufbarePods[0]!;
+    await page.addInitScript(
+      (kader) => {
+        (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
+      },
+      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {} },
+    );
+
+    await page.goto(pathToFileURL(seitenPfad).href);
+
+    const rohErgebnisse = await page.evaluate(simuliereMiniDmFfaPodsImBrowser, {
+      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed })),
+      timeoutMs,
+    });
+
+    let laufbarIndex = 0;
+    return vorbereitet.map((pod, index) => {
+      if (!einsatzfaehig[index]) {
+        return null;
+      }
+      const ergebnis = rohErgebnisse[laufbarIndex]!;
+      laufbarIndex += 1;
+      if (!ergebnis) {
+        return null;
+      }
+
+      const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
+      const boxscore: MiniDmFfaPodBoxscoreEintrag[] = ergebnis.runden.flatMap((runde) =>
+        runde.teams.map((eintrag) => ({
+          slotId: runde.slotId,
+          name: eintrag.n,
+          playerId: namenJeTeam[eintrag.side]?.get(eintrag.n) ?? null,
+          teamId: pod.teamIds[eintrag.side] ?? null,
+          podSide: eintrag.side,
+          rundenPlatz: eintrag.rundenPlatz,
+          rundenPunkte: eintrag.rundenPunkte,
+          beitrag: eintrag.beitrag,
+        })),
+      );
+      const teams: MiniDmFfaPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
+        teamId: pod.teamIds[eintrag.side] ?? "",
+        podSide: eintrag.side,
+        rundenPunkteSumme: eintrag.rundenPunkteSumme,
+        beitragSumme: eintrag.beitragSumme,
+        eventPlatz: eintrag.eventPlatz,
+        ligaPunkte: eintrag.ligaPunkte,
+      }));
+
+      return { podId: pod.podId, teamIds: pod.teamIds, teams, boxscore };
+    });
+  } finally {
+    await schliesseBrowserHart(browser);
+  }
+}

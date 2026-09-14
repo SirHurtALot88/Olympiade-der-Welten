@@ -9,8 +9,9 @@ import {
   type SpielplanDisciplineMutatorSummary,
   type SpielplanMutatorSlotSummary,
 } from "@/lib/foundation/spielplan-mutator-summary";
-import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { getSeasonDisciplineSchedule, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import { getOpponentOf } from "@/lib/season/season-fixture-schedule";
+import { getMiniDmPodForTeam } from "@/lib/season/mini-dm-pod-schedule";
 import { isLeagueSplitActive } from "@/lib/season/league-split";
 import {
   shouldBuildDisciplineConfigDerivations as resolveShouldBuildDisciplineConfigDerivations,
@@ -88,6 +89,22 @@ type SeasonSnapshotInput = NonNullable<GameState["seasonState"]["seasonSnapshots
  * Team; die Gegner-Felder sind es NICHT — sie gelten fuer `activeTeamId`. Ohne aktiven Liga-Split
  * oder ohne `activeTeamId` bleiben sie `null` (kein Gegner-Konzept im Legacy-32er-Rennen).
  */
+/** Ein Mitglied von `activeTeamId`s Mini-DM-Vierergruppe an diesem Spieltag (sich selbst
+ *  eingeschlossen) — s. `FoundationSeasonDisciplineScheduleRow.miniDmPod`. */
+export type FoundationMiniDmPodTeamInfo = {
+  teamId: string;
+  name: string | null;
+  logoPath: string | null;
+  isActiveTeam: boolean;
+};
+
+/**
+ * Spielplan-Zeile MIT Gegner (docs/design/liga-split-plan.md, Abschnitt 6, PR 2+3+6-UI-Teil).
+ *
+ * Die reinen Disziplin-Slots (`discipline1`/`discipline2`) sind saisonweit identisch fuer jedes
+ * Team; die Gegner-Felder sind es NICHT — sie gelten fuer `activeTeamId`. Ohne aktiven Liga-Split
+ * oder ohne `activeTeamId` bleiben sie `null` (kein Gegner-Konzept im Legacy-32er-Rennen).
+ */
 export type FoundationSeasonDisciplineScheduleRow = SeasonDisciplineScheduleEntry & {
   opponentTeamId: string | null;
   opponentName: string | null;
@@ -96,6 +113,15 @@ export type FoundationSeasonDisciplineScheduleRow = SeasonDisciplineScheduleEntr
   opponentLeagueRank: number | null;
   /** Team-Disziplin-Raenge des Gegners (dieselbe Rangfunktion wie die Ranks-Tabelle, liga-lokal). */
   opponentDisciplineRanks: Record<string, number> | null;
+  /**
+   * MINI-DM HAT KEIN HEIM/AUSWAERTS-PAAR (Entscheidung 5, mini-dm-spielplan-verankerung, 14.09.):
+   * an einem Mini-DM-Spieltag (D1 ODER D2 == "mini-dm") ist dieses Feld die eigene Vierergruppe
+   * (`activeTeamId` eingeschlossen, 4 Eintraege) statt eines einzelnen Gegners — die
+   * `opponent*`-Felder oben bleiben fuer diesen Spieltag `null`, weil ein Pod strukturell kein
+   * Duell ist. `null`, wenn dieser Spieltag KEIN Mini-DM traegt (praktisch jeder andere) oder ohne
+   * `activeTeamId`.
+   */
+  miniDmPod: FoundationMiniDmPodTeamInfo[] | null;
 };
 
 export function shouldBuildFoundationDisciplineRanks(input: {
@@ -256,6 +282,31 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     );
   }, [input.activeTeamId, input.gameState, input.orderedDisciplines, splitActive]);
 
+  // Ist dieser Slot-Eintrag ein Mini-DM-Spieltag (D1 ODER D2)? Vierergruppe statt Gegner (s.
+  // `FoundationSeasonDisciplineScheduleRow.miniDmPod`-Kommentar).
+  const buildMiniDmPod = (entry: SeasonDisciplineScheduleEntry): FoundationMiniDmPodTeamInfo[] | null => {
+    if (!input.activeTeamId) {
+      return null;
+    }
+    const hasMiniDmSlot = entry.discipline1?.disciplineId === MINI_DM_DISCIPLINE_ID || entry.discipline2?.disciplineId === MINI_DM_DISCIPLINE_ID;
+    if (!hasMiniDmSlot) {
+      return null;
+    }
+    const pod = getMiniDmPodForTeam(input.gameState, input.activeTeamId, entry.matchdayId, { saveId: input.activeSaveId });
+    if (!pod) {
+      return null;
+    }
+    return pod.teamIds.map((teamId) => {
+      const team = teamsById.get(teamId) ?? null;
+      return {
+        teamId,
+        name: team?.name ?? null,
+        logoPath: team?.logoPath ?? null,
+        isActiveTeam: teamId === input.activeTeamId,
+      };
+    });
+  };
+
   const seasonDisciplineScheduleRows: FoundationSeasonDisciplineScheduleRow[] = useMemo(() => {
     if (!splitActive || !input.activeTeamId) {
       return rawSeasonDisciplineScheduleRows.map((entry) => ({
@@ -265,11 +316,27 @@ export function useFoundationCrossTabDisciplineRanks(input: {
         opponentLogo: null,
         opponentLeagueRank: null,
         opponentDisciplineRanks: null,
+        miniDmPod: buildMiniDmPod(entry),
       }));
     }
 
     const standings = input.gameState.seasonState.standings ?? {};
     return rawSeasonDisciplineScheduleRows.map((entry) => {
+      const miniDmPod = buildMiniDmPod(entry);
+      if (miniDmPod) {
+        // Ein Pod hat kein Heim/Auswaerts-Paar (Entscheidung 5) — die Gegner-Felder bleiben fuer
+        // diesen Spieltag `null`, statt einen der drei anderen Pod-Teams als "den" Gegner
+        // auszugeben.
+        return {
+          ...entry,
+          opponentTeamId: null,
+          opponentName: null,
+          opponentLogo: null,
+          opponentLeagueRank: null,
+          opponentDisciplineRanks: null,
+          miniDmPod,
+        };
+      }
       const opponentTeamId = getOpponentOf(input.gameState, input.activeTeamId!, entry.matchdayId);
       const opponentTeam = opponentTeamId ? teamsById.get(opponentTeamId) ?? null : null;
       return {
@@ -279,9 +346,10 @@ export function useFoundationCrossTabDisciplineRanks(input: {
         opponentLogo: opponentTeam?.logoPath ?? null,
         opponentLeagueRank: opponentTeamId ? standings[opponentTeamId]?.rank ?? null : null,
         opponentDisciplineRanks: opponentTeamId ? disciplineRankRowByTeamId.get(opponentTeamId) ?? null : null,
+        miniDmPod: null,
       };
     });
-  }, [disciplineRankRowByTeamId, input.activeTeamId, input.gameState, rawSeasonDisciplineScheduleRows, splitActive, teamsById]);
+  }, [disciplineRankRowByTeamId, input.activeSaveId, input.activeTeamId, input.gameState, rawSeasonDisciplineScheduleRows, splitActive, teamsById]);
 
   const seasonBriefingScheduleReady = useMemo(
     () =>

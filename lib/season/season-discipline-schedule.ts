@@ -104,6 +104,50 @@ function buildSeasonPlayerCount(discipline: Discipline, seed: string) {
   return 2 + Math.floor(random() * 5);
 }
 
+/**
+ * Mini-DMs Disziplin-ID -- der einzige Ort im Katalog, an dem "mini-dm" als String vorkommen
+ * darf, statt an jeder Stelle neu abgetippt zu werden (`lib/data/dataAdapter.ts:56`).
+ */
+export const MINI_DM_DISCIPLINE_ID = "mini-dm";
+
+/**
+ * Mini-DM ist rollenfest (vier feste Rollen, s. `SLOTS_JE_DISC["mini-dm"]` im Kampfmotor) und
+ * tritt ab jetzt als 4-Team-Pod an (`lib/season/mini-dm-pod-schedule.ts`), nicht mehr als
+ * generische 2-6-Ziehung -- Chris' Entscheidung (14.09., mini-dm-spielplan-verankerung): "mini
+ * dm sind immer 4 teams mit je 1 spieler die antreten". Der Wert `1` ersetzt damit die
+ * `[2,3,4,5,6]`-Ziehung, die Mini-DM bis hierher wie jede andere Power-Disziplin durchlaufen hat.
+ */
+export const MINI_DM_FIXED_PLAYER_COUNT = 1;
+
+/**
+ * MINI-DM AUS DER KATEGORIE-BALANCE HERAUSNEHMEN, OHNE SIE FUER DIE VIER ANDEREN
+ * POWER-DISZIPLINEN ANZUFASSEN.
+ *
+ * Der einfachste, sicherste Weg ist NICHT, Mini-DM aus der Gruppierung vor dem Shuffle zu
+ * entfernen (dann bekaeme die "power"-Kategorie nur noch 4 Mitglieder, `ordered.length===5`
+ * schluege fehl, und tdm/gewichtheben/hockey/breaking fielen auf den unabhaengigen
+ * Gleichverteilungs-Zweig zurueck -- eine tatsaechliche Verhaltensaenderung fuer alle vier) und
+ * auch NICHT, den `[2,3,4,5,6]`-Shuffle-/Derangement-Output selbst nachtraeglich zu ueberschreiben
+ * (das wuerde "1" ALS WERT in den Fuenferpool schieben -- bei `repeat:2` liest die Derangement-
+ * Funktion `baseCountByDisciplineId` genau dieser Kategorie und wuerde "1" an eine der VIER
+ * ANDEREN Disziplinen weiterreichen, sigma(i)!=i vorausgesetzt).
+ *
+ * Stattdessen bleiben `buildSeasonPlayerCountByDiscipline`/`buildDerangedPlayerCountByDiscipline`
+ * unten VOELLIG UNVERAENDERT -- der `[2,3,4,5,6]`-Shuffle laeuft weiter ueber alle fuenf
+ * Power-Disziplinen (Mini-DM eingeschlossen, mit einem fuer sie bedeutungslosen Platzhalterwert),
+ * bit-identisch zum Stand vor dieser Aenderung, in BEIDEN Saison-Haelften. Die Umschaltung auf
+ * `1` passiert ERST an der einzigen Stelle, an der ein Wert aus dieser Map tatsaechlich Teil
+ * eines Spielplan-Slots wird: `buildSeededDisciplinePairs()` unten, direkt beim Aufbau der
+ * `available`-Liste. tdm/gewichtheben/hockey/breaking sehen dadurch in KEINEM Schritt (weder
+ * Shuffle noch Derangement noch Pairing) je den Wert `1` -- nur Mini-DMs eigener, gezogener Wert
+ * wird an dieser letzten Stelle verworfen und ersetzt. Das ist ohnehin folgenlos fuer die Arena:
+ * Mini-DMs jeSeite im Kampfmotor war schon immer fest 4, unabhaengig von diesem Feld (Recherche
+ * mini-dm-4-team-ffa-recherche-06-09.md, Abschnitt 1.1).
+ */
+function withMiniDmPlayerCountOverride(discipline: Discipline, playerCount: number): number {
+  return discipline.id === MINI_DM_DISCIPLINE_ID ? MINI_DM_FIXED_PLAYER_COUNT : playerCount;
+}
+
 function buildSeasonPlayerCountByDiscipline(disciplines: Discipline[], seed: string) {
   const countByDisciplineId = new Map<string, number>();
   const groupedByCategory = new Map<DisciplineCategory, Discipline[]>();
@@ -224,7 +268,10 @@ function buildSeededDisciplinePairs(input: {
     input.playerCountByDisciplineId ?? buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
   const available = shuffled.map((discipline) => ({
     discipline,
-    playerCount: playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed),
+    playerCount: withMiniDmPlayerCountOverride(
+      discipline,
+      playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed),
+    ),
   }));
   const pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]> = [];
   const warnings: string[] = [];
@@ -594,7 +641,16 @@ export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {
 
   for (const discipline of gameState.disciplines) {
     if (!playerCountByDisciplineId.has(discipline.id)) {
-      playerCountByDisciplineId.set(discipline.id, discipline.playerCount ?? null);
+      // Ohne ein einziges Schedule-Vorkommen (defensiv, sollte bei einem vollstaendigen
+      // 20-Disziplinen-Spielplan nie eintreten) faellt dieser Zweig auf den Katalog-Default
+      // zurueck -- der fuer Mini-DM `2` traegt (dataAdapter.ts:56), nicht mehr die aktuelle
+      // Wahrheit. Derselbe Override wie beim eigentlichen Schedule-Aufbau, damit kein Aufrufer
+      // hier je wieder die alte 2-6-Ziehung fuer Mini-DM zu sehen bekommt.
+      const catalogPlayerCount = discipline.playerCount ?? null;
+      playerCountByDisciplineId.set(
+        discipline.id,
+        catalogPlayerCount == null ? null : withMiniDmPlayerCountOverride(discipline, catalogPlayerCount),
+      );
     }
   }
 

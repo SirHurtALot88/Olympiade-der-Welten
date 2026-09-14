@@ -17,10 +17,26 @@
  */
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
-/** Groesse EINER Liga nach dem Split. Der Rangraum, in dem Sponsor/Scoring/Standings kuenftig laufen. */
+/**
+ * Groesse EINER Liga nach dem Split. Der Rangraum, in dem Sponsor/Scoring/Standings kuenftig laufen.
+ *
+ * MUSS EIN VIELFACHES VON 4 SEIN (Chris' Entscheidung, mini-dm-spielplan-verankerung, 14.09.):
+ * Mini-DMs 4-Team-Pods (`lib/season/mini-dm-pod-schedule.ts`) zerlegen genau diese Zahl restlos in
+ * Vierergruppen -- 16 ist bereits ein Vielfaches von 4 (vier saubere Pods je Liga), keine
+ * Rest-/Bye-Behandlung noetig. Diese Konstante ist heute fest verdrahtet, nicht user-konfigurierbar
+ * (keine Liga-/Team-Groessen-UI im Repo, s. `TEAM_COUNT_TOTAL` unten und
+ * `lib/game/league-setup-draft-service.ts`, das ebenfalls fest von 32 Teams ausgeht) -- diese
+ * Invariante ist damit bereits erfuellt, nicht bloss angestrebt. `tests/mini-dm-pod-schedule.test.ts`
+ * baut auf genau dieser Zahl auf; wer sie je aendert, muss `mini-dm-pod-schedule.ts` erneut pruefen.
+ */
 export const LEAGUE_SIZE = 16;
 
-/** Teams IM SAVE insgesamt — bleibt 32, Split oder nicht (Plan-Abschnitt 0, Fund 7). */
+/**
+ * Teams IM SAVE insgesamt — bleibt 32, Split oder nicht (Plan-Abschnitt 0, Fund 7).
+ *
+ * Ebenfalls ein Vielfaches von 4 (Mini-DM-Pods im Legacy-32er-Modus ohne Liga-Split, s.
+ * `mini-dm-pod-schedule.ts`s Ein-Pool-Fallback) — derselbe Grund wie bei `LEAGUE_SIZE` oben.
+ */
 export const TEAM_COUNT_TOTAL = 32;
 
 /** Anzahl Auf-/Absteiger je Saisonuebergang (Plan-Abschnitt 1). */

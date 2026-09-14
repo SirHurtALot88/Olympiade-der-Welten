@@ -60,15 +60,21 @@ function shuffleSeeded<T>(items: T[], seed: string) {
   return next;
 }
 
-type RoundPairing = { homeTeamId: string; awayTeamId: string };
+export type RoundPairing = { homeTeamId: string; awayTeamId: string };
 
 /**
  * Circle-Methode: n Teams (n gerade) -> n-1 Runden a n/2 Paarungen, jede der C(n,2) Paarungen genau
  * einmal ueber alle Runden hinweg. Team 0 bleibt fix, der Rest rotiert eine Position je Runde.
  * Heim/Auswaerts alterniert je Runde, damit nicht dieselbe Haelfte immer "Heim" traegt — hat keinen
  * Effekt auf Scoring (das bleibt liga-lokales Renn-Scoring je Disziplin, nicht Duell-Scoring).
+ *
+ * Exportiert (zusaetzlich zum internen Gebrauch hier) fuer `lib/season/mini-dm-pod-schedule.ts`:
+ * Mini-DMs 4-Team-Pods sind eine Nachbearbeitung von je zwei benachbarten Paaren AUS GENAU DIESEM
+ * Verfahren, auf einer eigenen, pod-spezifisch geseedeten Team-Permutation (Chris' Entscheidung,
+ * 14.09.: "additiv, ohne Fixture/RoundPairing anzufassen, den vorhandenen Rundengenerator
+ * wiederverwenden") -- keine zweite, potenziell abweichende Paarungsimplementierung.
  */
-function buildCircleRounds(teamIds: readonly string[]): RoundPairing[][] {
+export function buildCircleRounds(teamIds: readonly string[]): RoundPairing[][] {
   const n = teamIds.length;
   if (n < 2) {
     return [];
