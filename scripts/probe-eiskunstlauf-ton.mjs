@@ -226,15 +226,30 @@ console.log("  sprung  (einziger steigender Sinus im Katalog): " + sprungTreffer
 console.log("  kufe    (highpass ~3200 Hz):  " + kufeTreffer + " Treffer");
 console.log("  landung (highpass ~2600 Hz):  " + landungTreffer + " Treffer");
 console.log("  sturz   (bandpass ~700 Hz):   " + sturzTreffer + " Treffer");
-const sfxOk = sprungTreffer > 0 && kufeTreffer > 0;
-// landung/sturz sind seltener (landung nur bei sauberem Element, sturz nur bei Fehlschlag —
-// je nach Zufall der Runde kann ein 15s-Fenster den einen oder anderen verpassen). kufe
-// (einmal je Kuer, am Anfang) und sprung (bei JEDEM Element) sind haeufig genug, dass ihr
-// Ausbleiben auf einen echten Verdrahtungsfehler hindeuten wuerde.
-console.log(sfxOk ? "TEIL C (Kern: sprung/kufe): BESTANDEN" : "TEIL C (Kern: sprung/kufe): FEHLGESCHLAGEN");
-console.log((landungTreffer > 0 || sturzTreffer > 0)
-  ? "TEIL C (landung/sturz): mindestens eines von beiden beobachtet"
-  : "TEIL C (landung/sturz): keines im Fenster beobachtet (selten, kein Fehlschlag fuer sich allein)");
+// ALLE VIER MUESSEN FEUERN — verschaerft am 14.09. (Review zu PR #917).
+//
+// Bis dahin pruefte diese Zeile nur sprung/kufe; landung/sturz standen unter dem Vorbehalt,
+// ein 15s-Fenster koenne "je nach Zufall der Runde" den einen oder anderen verpassen, und
+// wurden nur als Hinweiszeile mit einem ODER ausgegeben. Dieser Vorbehalt war unbegruendet
+// und hat genau einmal Schaden angerichtet: PR #917 verdichtete die Enthuellungen von ~5,1 s
+// auf ~0,867 s je Laeufer, der Landungsklang haengt an einer 1,4-s-Phasenuhr, die damit nie
+// mehr ablief — "landung" fiel von 66 auf 0 Treffer und die Sonde meldete trotzdem
+// "GESAMT: BESTANDEN", weil sturz alleine das ODER schon erfuellte.
+//
+// Die Zahlen tragen die Verschaerfung: in einem 15s-Fenster bei 4x laufen rund 125 Elemente,
+// und die gemessene Fehlschlagquote von 47 % (docs/design/eiskunstlauf-kalibrierung-10-09.md
+// Abschnitt 2 Punkt 3) liefert dabei rund 66 saubere Landungen UND rund 58 Stuerze. Dass
+// eines von beiden auf null faellt, ist kein Zufall der Runde, sondern immer ein Befund.
+const sfxOk = sprungTreffer > 0 && kufeTreffer > 0 && landungTreffer > 0 && sturzTreffer > 0;
+const fehlend = [
+  sprungTreffer > 0 ? null : "sprung",
+  kufeTreffer > 0 ? null : "kufe",
+  landungTreffer > 0 ? null : "landung",
+  sturzTreffer > 0 ? null : "sturz",
+].filter(Boolean);
+console.log(sfxOk
+  ? "TEIL C: BESTANDEN (alle vier Klaenge feuern im echten Lauf)"
+  : "TEIL C: FEHLGESCHLAGEN — ohne einen Treffer: " + fehlend.join(", "));
 console.log("");
 
 // ---------------------------------------------------------------------------------------
