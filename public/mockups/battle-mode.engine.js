@@ -2609,6 +2609,65 @@
   // ein Objektliteral-Feld ist frei benennbar, kein Konsument liest hier ein hartkodiertes
   // "hand". Aufgerufen wird sie an der istEis()-Stelle unten (zeichneSprite()), analog zur
   // istHeben()-Stelle daneben.
+  //
+  // ================== TENNIS: SCHLAEGER AN DER HAND (Feinschliff 14.09.) ==================
+  // Fuenfter Eintrag, nach demselben Muster wie Hantel/Hockeyschlaeger/Schachuhr/Kufe oben.
+  // Tennis hatte bislang KEINE eigene Requisite und keinen eigenen Zeichenzweig — es lief
+  // durch den generischen Buehnen-Zweig wie I-Spy/Fechten/Showcase/Wettessen (docs/design/
+  // gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md, Tennis-Abschnitt: "Movement
+  // 20: nichts Eigenes im Motor"). DISZIPLIN_WAFFE.tennis ist bewusst null (ein Schlaeger
+  // ist keine "Waffe", s. Kommentar dort) — das liess einen Tennisspieler bei jeder
+  // enthuellten Runde (u.lunge>0) bisher einen unbewaffneten Faustschlag ("slash" ohne
+  // sichtbare Waffe, s. `ani`-Weiche in zeichneSprite) schwingen, ANSTATT eines Schlaegers.
+  //
+  // ANKERPUNKT: SCHACH_HAND wiederverwendet, nicht neu vermessen — derselbe Standardkoerper,
+  // derselbe stehende Griffpunkt, dieselbe Wiederverwendung wie STAFFEL_HAND=HOCKEY_HAND
+  // oben. `feldspiel=true` (s. Aufruf in zeichneTennis()) schaltet wie bei Heben/Schach bei
+  // u.lunge>0 kurz auf die "shoot"-Ueberkopf-Pose um — bei einem Aufschlag/Ueberkopf-Schlag
+  // sogar die inhaltlich richtigere Pose, kein reiner Nebeneffekt wie bei der Schachuhr.
+  const TENNIS_HAND=SCHACH_HAND;
+  // Zwei Phasen wie die Schachuhr ("ruhend"/"schlag") statt der mehrstufigen Sequenz der
+  // Hantel — ein Ballwechsel kennt nur "gerade dran" (u.lunge>0) oder nicht, keine
+  // Zwischenstufen. `winkel` ist der Ausschlag der Schlaegerachse ab der Senkrechten, wie
+  // schaftA bei HOCKEY_PHASEN.
+  const TENNIS_PHASEN={
+    ruhend:{winkel:0.25},
+    schlag:{winkel:-1.15},
+  };
+  // x/y ist die Hand (TENNIS_HAND), s die Groesse (Z), richtung 0..3 wie blickAus() (0
+  // hinten, 1 links, 2 vorn, 3 rechts), phase "ruhend"/"schlag" (unbekannt faellt auf
+  // "ruhend" zurueck, derselbe Schutz wie bei den drei anderen Requisiten). Reine Canvas-
+  // Primitiven statt eines neuen Sprite-Blatts (Bordmittel, wie schon Hantel/Kufe): Griff +
+  // Schaft als eine Linie, ovaler Rahmen mit angedeuteter Bespannung am Ende.
+  function zeichneSchlaeger(ctx,x,y,s,richtung,phase){
+    const p=TENNIS_PHASEN[phase]||TENNIS_PHASEN.ruhend;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const winkel=p.winkel*eff;
+    const ux=Math.sin(winkel), uy=-Math.cos(winkel);
+    const griffL=9*s, schaftL=13*s;
+    const gx=x-ux*griffL*0.3, gy=y-uy*griffL*0.3;
+    const kx=x+ux*schaftL, ky=y+uy*schaftL;
+    // Griff (dunkel) + Schaft (heller) als eine durchgehende Linie vom Griffende bis zum
+    // Rahmenansatz — dieselbe Zwei-Ton-Idee wie Schaft+helle Kante beim Hockeyschlaeger.
+    ctx.strokeStyle="#2c2620"; ctx.lineWidth=Math.max(1,2*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(x,y);ctx.stroke();
+    ctx.strokeStyle="#8a6a3a"; ctx.lineWidth=Math.max(1,1.8*s);
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(kx,ky);ctx.stroke();
+    // Griffband am Ankerpunkt, wie bei jeder anderen Requisite dieser Tabelle.
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.8,1.1*s),0,Math.PI*2);ctx.fill();
+    // Ovaler Rahmen am Schaftende, quer zur Schlaegerachse gedreht.
+    ctx.save();ctx.translate(kx,ky);ctx.rotate(winkel);
+    ctx.strokeStyle="#d9cfa8"; ctx.lineWidth=Math.max(1,1.4*s);
+    ctx.beginPath();ctx.ellipse(0,0,4.4*s,6.2*s,0,0,Math.PI*2);ctx.stroke();
+    // Bespannung nur angedeutet (ein Kreuz), nicht vollstaendig gerastert — bei
+    // Kader-Distanz waere ein volles Gitter nur Rauschen.
+    ctx.strokeStyle="rgba(230,230,220,.5)"; ctx.lineWidth=Math.max(0.5,0.6*s);
+    ctx.beginPath();ctx.moveTo(0,-5.6*s);ctx.lineTo(0,5.6*s);ctx.moveTo(-3.6*s,0);ctx.lineTo(3.6*s,0);ctx.stroke();
+    ctx.restore();
+    return {kx,ky};
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
@@ -2619,6 +2678,7 @@
     // bei den zwei bestehenden Eintraegen, s. istSchach()-Block unten bei zeichneSprite.
     "speed-schach":{ hand:SCHACH_HAND, phasen:SCHACH_UHR_PHASEN, zeichne:zeichneSchachuhr },
     eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
+    tennis:      { hand:TENNIS_HAND, phasen:TENNIS_PHASEN, zeichne:zeichneSchlaeger },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3646,6 +3706,17 @@
       const prop=DISZIPLIN_PROP.eiskunstlauf;
       const fp=prop.fuss[r]||prop.fuss[2];
       prop.zeichne(ctx,x-32*Z+fp.x*Z,y-46*Z+fp.y*Z,Z,r,u.vizPhase,eiskunstlaufKostuemfarbe(u));
+    }
+    // SCHLAEGER. Dasselbe Muster wie Hantel/Schachuhr/Kufe direkt oberhalb (DISZIPLIN_PROP,
+    // Feinschliff 14.09.) — Tennis hatte bislang KEINE eigene Requisite (DISZIPLIN_WAFFE.
+    // tennis:null, ein Schlaeger ist keine Waffe, s. Kommentar dort). `feldspiel` erzwingt
+    // hier `true`, weil zeichneTennis() (wie zeichneHeben()/zeichneSchach()) diesen
+    // Parameter fuer ihre eigenen Teilnehmer setzt; istTennis() prueft zusaetzlich
+    // istBuehne(disc)/buehneDisc, nicht nur diesen Parameter.
+    if(feldspiel&&istTennis()&&!u.down){
+      const prop=DISZIPLIN_PROP.tennis;
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,(u.lunge>0)?"schlag":"ruhend");
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -7273,6 +7344,11 @@
   // EISKUNSTLAUF, exakt dasselbe Muster wie istHeben() direkt darueber — gebraucht an der
   // DISZIPLIN_PROP.eiskunstlauf-Aufrufstelle unten (Kufe am Fusspunkt, A3 15->25).
   const istEis=()=>istBuehne(disc)&&buehneDisc==="eiskunstlauf";
+  // TENNIS (Feinschliff 14.09.), exakt dasselbe Muster wie istEis()/istHeben() direkt
+  // darueber — gebraucht an der DISZIPLIN_PROP.tennis-Aufrufstelle unten (Schlaeger an
+  // der Hand). In zeichneTennis() selbst nicht noetig, weil `art.tennis` (BUEHNE_ART.tennis)
+  // dort schon exklusiv gated.
+  const istTennis=()=>istBuehne(disc)&&buehneDisc==="tennis";
 
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
@@ -12269,7 +12345,12 @@
       //
       // AUFBAU->GRUNDLAGE, ABSCHLUSS->SPITZENMOMENT, ZWEITCHANCE->NERVEN,
       // ABWEHR->WAGNIS, TEAMGEIST->PUBLIKUM — nur die Namen sind neu.
-      label:"Tennis", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      // TENNIS:TRUE (Feinschliff 14.09.) — dasselbe Muster wie schach:true/fechten:true
+      // neben demselben geteilten duell:true: eine eigene Schranke fuer zeichneBuehne()
+      // (eigenes Buehnenbild, zeichneTennis()) und den Requisiten-Aufruf in zeichneSprite()
+      // (Schlaeger an der Hand, DISZIPLIN_PROP.tennis). Aendert nichts an rezept/wert() —
+      // rein praesentational, s. zeichneTennis()-Kommentar unten.
+      label:"Tennis", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true, tennis:true,
       failAbzug:0.55, failWort:"vergibt den Punkt", erfolgWort:"gewinnt den Ballwechsel",
       // TENNIS-EIGENE KALIBRIERUNG (07.09., docs/pm-briefings/pm-gesamtstand-07-09.md
       // Abschnitt 6 Punkt 5). Das Rezept oben war bis hierher Zeile fuer Zeile aus
@@ -14353,11 +14434,18 @@
     if(art.heben){ zeichneHeben(art); return; }
     if(art.schach){ zeichneSchach(art); return; }
     if(art.cypher){ zeichneBreaking(art); return; }
+    // TENNIS (Feinschliff 14.09.): eigener Zweig, exklusiv auf `art.tennis` gegated (s.
+    // BUEHNE_ART.tennis) — dasselbe Muster wie die drei Zweige direkt oberhalb. Schlaeger an
+    // der Hand (DISZIPLIN_PROP.tennis) + Ballwechsel-Visualisierung, s. zeichneTennis()
+    // unten. Aendert nichts an Eiskunstlauf (eigener Duett-Zweig direkt darunter) oder den
+    // vier verbleibenden Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis-Buehnen
+    // (I-Spy/Fechten/Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
+    if(art.tennis){ zeichneTennis(art); return; }
     // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
     // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
-    // zeichneDuett() unten. Alle sechs anderen Nicht-Heben/Nicht-Schach/Nicht-Breaking-
-    // Buehnen (I-Spy/Tennis/Fechten/Showcase/Wettessen) durchlaufen den generischen
-    // Zweig darunter unveraendert.
+    // zeichneDuett() unten. Die vier verbleibenden Nicht-Heben/Nicht-Schach/Nicht-
+    // Breaking/Nicht-Tennis-Buehnen (I-Spy/Fechten/Showcase/Wettessen) durchlaufen den
+    // generischen Zweig darunter weiterhin unveraendert.
     if(art.duett){ zeichneDuett(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
@@ -14421,6 +14509,110 @@
           const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
           const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
           ctx.fillText(f.txt,x,y);
+        }
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== TENNIS: EIGENES BUEHNENBILD (Feinschliff 14.09.) ==================
+  // Exklusiv auf `art.tennis` gegated (BUEHNE_ART.tennis) — I-Spy/Fechten/Showcase/
+  // Wettessen durchlaufen den generischen Zweig in zeichneBuehne() (oben) unveraendert
+  // weiter, genau das von den Vorgaenger-Zweigen (Heben/Schach/Breaking/Duett) verlangte
+  // Muster: eigener Flag, eigene Funktion, kein Eingriff in den geteilten Zweig.
+  //
+  // Zeilen-Geometrie und Vorteils-Beschriftung sind wortgleich aus dem generischen Zweig
+  // uebernommen (dieselbe Positionsformel `90+(W-180)*i/(g.length-1)`, dieselbe "Vorteil"-
+  // Anzeige) — kein Layout-Risiko, nur zwei rein optische Ergaenzungen obendrauf:
+  //
+  //   1. Ein Schlaeger an der Hand (DISZIPLIN_PROP.tennis/zeichneSchlaeger, Aufrufstelle in
+  //      zeichneSprite), der bei u.lunge>0 in die Ausholpose schwingt. Vorher schwang hier
+  //      ein unbewaffneter Faustschlag — DISZIPLIN_WAFFE.tennis ist bewusst null (ein
+  //      Schlaeger ist keine "Waffe"), aber bis hierher gab es keinen Ersatz dafuer.
+  //   2. Ein Ball, der bei jeder frischen Enthuellung von der Hand des gerade enthuellten
+  //      Spielers zu dessen Brett-Gegner fliegt (u.brett gruppiert die Paare, s. bauBuehne()
+  //      "DUELL-VARIANTE") und bei einem Fehlschlag (r.ereignis===art.failWort) auf halber
+  //      Strecke absinkt statt anzukommen — derselbe Ass/Netzroller-Gegensatz, den
+  //      tennis.tsx (die produktive Arena-Buehnen-Komponente) schon zeigt, hier zum ersten
+  //      Mal auch im Mockup-Motor.
+  //
+  // BEIDE ERGAeNZUNGEN LESEN AUSSCHLIESSLICH BEREITS VORHANDENE FELDER (u.lunge/u.aktuell/
+  // u.runden/u.brett/u.side/u.vorteil/u.verlauf) — kein neuer buehnenBewegung()-Zweig, kein
+  // neues Feld auf `u`, rr() wird nirgends aufgerufen. Der Ball-Fortschritt kommt direkt aus
+  // u.lunge selbst (0,5 im Enthuellungs-Frame -> 0 nach 0,5 realen Sekunden, s. stepBuehne()
+  // ":13167/:13182") statt einer eigenen Uhr — disziplinProbe()/miss-alle-disziplinen.mjs
+  // lesen dadurch exakt dieselben Felder wie zuvor, die Rangtreue-Neutralitaet ist also
+  // strukturell gegeben, nicht nur behauptet.
+  function zeichneTennis(art){
+    const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
+    const posVon=(u)=>{
+      const g=TEILNEHMER.filter(x=>x.side===u.side);
+      const i=g.indexOf(u);
+      return {x:90+(W-180)*(g.length>1?i/(g.length-1):0.5), y:u.side===0?H*0.32:H*0.66};
+    };
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const y=side===0?H*0.32:H*0.66;
+      g.forEach((u,i)=>{
+        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        ctx.globalAlpha=u.lunge>0?1:0.92;
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+        ctx.globalAlpha=1;
+        // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei
+        // (Schlaeger an der Hand) und waehlt bei u.lunge>0 die "shoot"-Ueberkopf-Pose statt
+        // eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach oben.
+        zeichneSprite(ctx,u,x,y,true);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+        schrift((v>0?"+":"")+v+" Vorteil",56,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),9);
+        const w=30,mitte=x,halb=Math.min(w/2,(w/2)*Math.abs(v)/maxVorteil);
+        ctx.fillStyle=css("--line");ctx.fillRect(mitte-w/2,y+64,w,3);
+        ctx.fillStyle=v>=0?css("--ok"):css("--crit");
+        ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
+        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
+      });
+    });
+    // BALLWECHSEL — genau EIN Ball zur Zeit: stepBuehne() (":13159") dequeued global immer
+    // nur EINEN Teilnehmer je Tick (buehneQueue ist nicht je Brett getrennt), es gibt also
+    // nie zwei gleichzeitig frisch enthuellte Zuege, fuer die zwei Baelle noetig waeren.
+    const schlaeger=TEILNEHMER.find(u=>u.lunge>0&&u.aktuell>=0);
+    if(schlaeger){
+      const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
+      if(gegner){
+        const r=schlaeger.runden[schlaeger.aktuell];
+        const treffer=!!r&&r.ereignis===art.erfolgWort;
+        // Fortschritt AUS u.lunge selbst (0,5->0 ueber 0,5 reale Sekunden) — keine neue Uhr,
+        // kein neues Feld: 0 im Enthuellungs-Frame, 1 sobald der Marker ausgelaufen ist.
+        const u01=Math.min(1,Math.max(0,1-schlaeger.lunge/0.5));
+        const von=posVon(schlaeger), nach=posVon(gegner);
+        // Fehlschlag: der Ball erreicht den Gegner nie, sondern haelt auf halber Strecke
+        // an — derselbe Ass/Netzroller-Gegensatz wie in tennis.tsx.
+        const zielX=treffer?nach.x:(von.x+(nach.x-von.x)*0.5);
+        const zielY=treffer?nach.y:(von.y+(nach.y-von.y)*0.5);
+        const bx=von.x+(zielX-von.x)*u01;
+        const by=von.y+(zielY-von.y)*u01-Math.sin(u01*Math.PI)*22; // Flugbogen
+        ctx.fillStyle="#f0ff7a"; ctx.strokeStyle="#b8d426"; ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(bx,by,4,0,Math.PI*2);ctx.fill();ctx.stroke();
+      }
+    }
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      if(f._teilnehmer!=null){
+        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
+        if(u){const p=posVon(u);
+          ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
         }
       }
       ctx.globalAlpha=1;
