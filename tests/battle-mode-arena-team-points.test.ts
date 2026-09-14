@@ -107,7 +107,8 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * ACHSE 2 (kein Arena-Chassis fuer die Bahn), nicht die fehlende Wertung -- s. korrigierter
    * Kommentar bei ARENA_RESOLVED_DISCIPLINE_IDS. Dieser Test ersetzt den alten
    * "enthaelt NICHT Staffel"-Regressionstest, der die ueberholte Annahme festgeschrieben hatte.
-   * SPURT ABSICHTLICH NICHT HIER -- s. eigener Regressionstest direkt darunter.
+   * SPURT ABSICHTLICH NICHT HIER -- s. eigener Test direkt darunter (jetzt "enthaelt Spurt",
+   * seit Produktionsanbindung 14.09.).
    */
   it("enthaelt Staffel, Takeshi's Castle und Time-Trial (Bahn-Produktivierung, 10.09.)", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(true);
@@ -127,18 +128,17 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * SPURT BLEIBT (VORERST) BEWUSST DRAUSSEN (Opus-Review PR #881, Fund F1, 10.09.) -- anders als
-   * Climbing NICHT wegen der Rangtreue (rho 0,871 besteht die 0,80-Schranke klar), sondern weil
-   * ein Kommentar in `scripts/ziehe-buehne-pps-referenz.ts` faelschlich `BAHN_ART.spurt.jeSeite`
-   * mit 6 annahm, obwohl der Motor tatsaechlich `jeSeite = 4` faehrt. Gegen den echten Spielstand
-   * gemessen (`runArenaFixtures()`, 32 Teams, 64 Fixtures): ALLE 64 Fixtures lieferten einen zu
-   * kleinen Boxscore (512 statt 768 Eintraege), UND 4 von 64 liefen 4-gegen-2 statt 4-gegen-4.
-   * Ein Regressionstest wie bei Climbing: haelt fest, DASS Spurt bewusst draussen bleibt, bis die
-   * PPS-Referenz bei Feldgroesse 4 neu gezogen ist (eigenes Folge-Ticket). Wird Spurt spaeter
-   * angeschlossen, faellt dieser Test absichtlich rot und ist DANN zu aktualisieren.
+   * SPURT IST JETZT DRIN (Produktionsanbindung 14.09.) -- loest den Regressionstest ab, der seit
+   * Opus-Review PR #881 Fund F1 (10.09.) bewusst rot-bei-Anschluss angelegt war: ein Kommentar in
+   * `scripts/ziehe-buehne-pps-referenz.ts` nahm faelschlich `BAHN_ART.spurt.jeSeite = 6` an,
+   * obwohl der Motor `jeSeite = 4` fuhr -- Boxscore zu klein (512 statt 768) und 4 von 64
+   * Fixtures liefen 4-gegen-2 statt 4-gegen-4. `jeSeite` ist jetzt 4->6 korrigiert, die
+   * PPS-Referenz gegen den frischen Live-Save-Spiegel neu gezogen (768 Eintraege), Spurt in
+   * `ARENA_BAHN_DISCIPLINE_IDS`/`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_IMPACT_KONFIG_JE_DISZIPLIN`
+   * verankert. Rangtreue bestand die 0,80-Schranke schon vorher klar (rho 0,871).
    */
-  it("enthaelt NICHT Spurt (Feldgroessen-Diskrepanz jeSeite 4 vs. angenommene 6, Opus-Review PR #881 Fund F1)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(false);
+  it("enthaelt Spurt (Feldgroessen-Fix jeSeite 4->6, Produktionsanbindung 14.09.)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(true);
   });
 
   /**
