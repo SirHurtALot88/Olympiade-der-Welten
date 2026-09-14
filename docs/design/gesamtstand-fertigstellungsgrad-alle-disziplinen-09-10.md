@@ -87,7 +87,7 @@ Sortiert nach Gesamt. `rho` = frisch gemessen fuer diesen Bericht (10.09., kader
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **12.09.** Ton verdrahtet, Assets 80→100 (E2, PR #893) |
 | 2 | Gewichtheben | Buehne | 100 % | 100 % | 95 % | 100 % | **99 %** | 0,854 | ja | **12.09.** Movement 87→100 — echte Zustandsmaschine `stepHeben()` statt Fortschrittsbalken (PR #898) |
-| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 95 % | **97 %** | 0,861 | nein | **12.09.** Movement 85→95 — `stepParcours()` (Laeufer-Zustandsmaschine) + drei Posen, Anker per Pixelscan korrigiert (PR #900) |
+| 3 | Takeshi's Castle | Bahn | 100 % | 95 % | 97 % | 95 % | **97 %** | 0,883 | nein | **13.09.** Fallentyp entscheidet den Sauber-Wurf mit (`fallenKoennen`), rho 0,861→0,883 — Fable-Recherche `takeshi-hindernis-vs-strecke-recherche-13-09.md` · 12.09. Movement 85→95 — `stepParcours()` (Laeufer-Zustandsmaschine) + drei Posen, Anker per Pixelscan korrigiert (PR #900) |
 | 4 | Breaking | Buehne | 95 % | 100 % | 95 % | 92 % | **96 %** | 0,869 | ja | **12.09.** K4 erfuellt, Konzept 85→95 — Kalibrierrunde gegen echte WDSF-Daten, dokumentierter Nullbefund, kein Codechange (PR #897) |
 | 5 | Basketball | Feldspiel | 100 % | 100 % | 82 % | 100 % | **96 %** | 0,769 | ja | 10.09. E1 gemessen (G1\*-Kriterien nicht erfuellt, PR #890) — keine Aenderung |
 | 6 | Eiskunstlauf | Buehne | 90 % | 70 % | 95 % | 94 % | **87 %** | 0,885 | ja | 10.09. Movement 60→94 (Kuer-Bewegung, PR #874) |
@@ -251,7 +251,11 @@ Chaos/Tackle-Fenster, Gedraenge, Burgpunkte als echte Wertung. Vier eigene Dokum
 **Assets 95:** `bodenTakeshiRoute()` (Schlangenroute mit fuenf Gelaendezonen, Tuempeln, Burgmauer
 und Tor), `zeichneFalleTakeshi()` (zehn Fallenbilder), `takeshi.tsx` jetzt 517 Zeilen/14
 Animationsstellen (PR #880), eigener Ton (PR #883).
-**Gameplay 97:** rho **0,861**, eigene Burgpunkte-Wertung, seit PR #880 produktionsangeschlossen.
+**13.09. Update:** der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen`) — Hindernis-
+und Streckentempo werden getrennt, rho je Spiel **0,861 → 0,883**, Saison 0,930 → 0,951
+(Fable-Recherche `takeshi-hindernis-vs-strecke-recherche-13-09.md`). Die vier Prozentachsen bleiben
+unveraendert: die Aenderung schaerft eine Mechanik, die im Audit schon als vorhanden gezaehlt war.
+**Gameplay 97:** rho **0,883**, eigene Burgpunkte-Wertung, seit PR #880 produktionsangeschlossen.
 **Movement 95:** `stepParcours()` als eigener Zweig im Bahn-Bewegungspfad — Laeufer-Zustandsmaschine
 (laufen/fallenkontakt/sturz/aufrappeln) plus drei sichtbare Posen (Sprungbogen/Duck-Scale/Taumeln),
 Startnummernband per Pixelscan verankert und Z-skaliert. Noch nicht produktionsangeschlossen
@@ -513,7 +517,7 @@ gehoert in den naechsten Pflege-PR.
 ## 5. Top-Prioritaeten — sortiert nach Hebel je Aufwand
 
 1. **Bahn-Chassis bauen (`spieleBahn()`).** Vier Disziplinen auf einen Schlag: Staffel (0,915),
-   Spurt (0,871), Takeshi's Castle (0,861), Time-Trial (0,828) — alle vier bestehen die Abnahme,
+   Takeshi's Castle (0,883), Spurt (0,871), Time-Trial (0,828) — alle vier bestehen die Abnahme,
    alle vier haben eine echte Wertung, allen vier fehlt **nur** der Anschluss. Danach 14 von 20
    produktiv. **Und, neu in diesem Bericht: es ist keine Designfrage mehr vorgelagert** (4.1).
 2. **Ton fuer die uebrigen neunzehn.** Der einzige Rueckstand, der jede Disziplin gleich hart
