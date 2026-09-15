@@ -12,12 +12,12 @@
  * Exit-Code 1, wenn irgendwo mehr als 0,2 Pp Abweichung gemessen wird.
  */
 import {
-  officialDisciplineWeightMatrix,
   officialDisciplineWeightOrder,
   playerGeneratorAttributeKeys,
   type OfficialDisciplineWeightId,
   type PlayerGeneratorAttributeKey,
 } from "@/lib/player-generator/official-discipline-weights";
+import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 
 const TOLERANZ_PP = 0.2;
@@ -27,7 +27,12 @@ function z(wert: number, stellen = 3) {
 }
 
 function pruefeDisziplinGroesse(disciplineId: OfficialDisciplineWeightId, groesse: number) {
-  const matrix = officialDisciplineWeightMatrix[disciplineId];
+  // Verglichen wird gegen DIE GEWICHTSQUELLE der Disziplin, nicht stur gegen die Matrix:
+  // eine Disziplin mit Spiel-Eignungs-Override (heute nur Football) leitet ihre Slot-Profile
+  // aus dem Override ab, also muss ihr Mittel auch wieder DORT landen. Gegen die Matrix zu
+  // pruefen wuerde fuer Football eine Verletzung melden, wo genau das Gewollte passiert
+  // (s. lib/player-generator/spiel-eignung-overrides.ts).
+  const matrix = resolveDisciplineWeightProfile(disciplineId);
   const rollen = resolveSlotRolesForDiscipline(disciplineId, disciplineId, groesse);
 
   if (rollen.length !== groesse) {

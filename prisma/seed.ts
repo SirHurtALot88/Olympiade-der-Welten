@@ -17,7 +17,11 @@ import {
   mapTeamRecord,
   mapTeamSeasonStateRecord,
 } from "../lib/db/seed/mappers";
-import { disciplineWeightSeedRows, seasonDisciplineConfigSeedRows } from "../lib/db/seed/seedSources";
+import {
+  DISCIPLINE_WEIGHT_SEED_SOURCES,
+  disciplineWeightSeedRows,
+  seasonDisciplineConfigSeedRows,
+} from "../lib/db/seed/seedSources";
 
 const prisma = new PrismaClient();
 
@@ -122,11 +126,14 @@ async function seedDisciplinesAndWeights(seasonId: string) {
     });
   });
 
+  // Altbestand aus frueheren Gewichtsquellen wegraeumen. Die Liste kommt aus seedSources,
+  // damit ein neuer Herkunftsvermerk (z.B. der Spiel-Eignungs-Override) nicht dazu fuehrt,
+  // dass dieser deleteMany die soeben geschriebenen Zeilen wieder loescht.
   await prisma.disciplineWeight.deleteMany({
     where: {
       seasonId,
       source: {
-        not: "official-weighted-average-matrix-2026-06",
+        notIn: [...DISCIPLINE_WEIGHT_SEED_SOURCES],
       },
     },
   });

@@ -1,5 +1,44 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Achter Nachtrag 15.09. — Football: Anzeige/KI-Kauf auf die Spiel-Eignung umgestellt
+(Fable-Entscheidung E3, `docs/pm-briefings/fable-entscheidung-e1-e2-e3-basketball-hockey-
+football-10-09.md` Abschnitt 3), auf dem aktuellen `main`-Stand nachgebaut — dabei einen
+echten rho-Preis unter der 0,80-Schranke gefunden.** Chris' Auftrag: "die Werte der Eignung
+sind fix! Danach muss gebalanced werden und es darf nur diese Wahrheit geben." Umgesetzt in
+`lib/player-generator/spiel-eignung-overrides.ts` (ein Eintrag, football, 1:1 aus dem
+bisherigen `FELDSPIEL_ART.football.spielEignung`-Prototyp-Schalter): `resolveDisciplineWeight
+Profile()` ist jetzt DIE EINE Gewichtsquelle fuer `p.d.football` (Kaderbildschirm/Transfermarkt/
+Teamstaerke/KI-Kauf/Training/Scouting), die DB-Seed-Zeilen (`weightPct`, KI-Needs-Engine), die
+Slot-Rollen-Grundprofile UND `BASIS_JE_DISC.football` im Motor — vier Konsumenten, ein und
+dieselbe Tabelle, per Skript nachgerechnet (`resolveDisciplineWeightProfile`,
+`disciplineWeightSeedRows`, `calculateRawDisciplineScore` und `resolveSlotRolesForDiscipline`
+liefern fuer denselben Beispielspieler identische Zahlen, s. PR-Beschreibung). Die Matrix
+(`official-discipline-weights.ts`) bleibt byte-identisch — Chris' Regel vom 05.09.
+
+**Der rho-Preis, kaderfest auf dem aktuellen `main` (nach PR #924s Korridor-Refit) gemessen:**
+Football stand bei rho 0,813/Spiel (0,916/Saison, bestanden) — NACH dem Override faellt das
+auf **0,722/Spiel (0,832/Saison, "knapp")**, unterhalb der Schranke. Root Cause identifiziert,
+nicht nur die vom 10.09. vorausgesagte "F2"-Kompression: die alten, matrix-treuen Slot-Rollen-
+Texte fuer Football boosteten ueberwiegend spirit/charisma/will — Attribute, die REZEPT C
+(PR #884/#924) fuer KEINEN einzigen Sub-Skill verwendet (PASSGENAUIGKEIT/LAUFKRAFT/PASSSCHUTZ/
+ABWEHR_PASS/ABWEHR_LAUF/BALLSICHERHEIT/TEAMGEIST rechnen ausschliesslich aus power/health/speed/
+torment/determination/dexterity/awareness/stamina/will). Der Slot-Bonus war fuer die Simulation
+also groesstenteils WIRKUNGSLOS. Mit dem Override zeigen die Slot-Rollen jetzt korrekt auf
+power/health/speed/torment/… — GENAU die Attribute, die Rezept C konsumiert — und die
+Slot-ZUWEISUNG (die nicht 1:1 der Eignung folgt) speist damit zum ersten Mal direkt in die
+tatsaechliche Ereignis-Berechnung ein. Das ist kein Implementierungsfehler dieses PRs, sondern
+eine STRUKTURELLE Kopplung, die erst durch die Vereinheitlichung sichtbar wird — und die exakte
+Balance-Runde, die Chris angekuendigt hat (PR #884 -> #924 brauchte zwei Runden fuer denselben
+Sprung in die andere Richtung). **Empfehlung: NICHT in dieser PR beheben** (haette denselben
+mehrstufigen Mess-/Kalibrierungsaufwand wie #884/#924 noetig) — Football steht ohnehin nicht in
+`ARENA_RESOLVED_DISCIPLINE_IDS` (PR #924 bewusst nicht produktiv geschaltet), das
+Minispiel-Risiko ist also erst beim naechsten Football-Anschluss real. Anzeige/KI-Kauf/DB-Seed
+werden durch DIESE PR schon korrekt vereinheitlicht (Chris' unmittelbarer Auftrag) — die
+minispiel-interne Rangtreue braucht eine eigene, dedizierte Runde vor dem naechsten
+Produktiv-Anschluss. Alle anderen 19 Disziplinen kaderfest bit-identisch nachgemessen (24
+Spiele, `node scripts/miss-alle-disziplinen.mjs 24`), `tsc --noEmit` gegen `origin/main` leer,
+Slot-Invariante haelt (max 0,005 Pp).
+
 **Siebter Nachtrag 14.09. — Spurt produktionsangebunden, Feldgroessen-Fund F1 behoben.**
 `BAHN_ART.spurt.jeSeite` war 4, waehrend die Saison fuer jede Disziplin gleichverteilt 2..6
 Laeufer je Seite wuerfelt (`buildSeasonPlayerCountByDiscipline()`) — die einzige der vier

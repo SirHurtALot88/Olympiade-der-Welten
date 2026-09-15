@@ -2,9 +2,9 @@ import type { Discipline, Player, PlayerGeneratorAttributes, PlayerGeneratorAttr
 import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
 import {
   officialDisciplineWeightOrder,
-  officialDisciplineWeightTable,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
+import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 import rankToDisciplineStatJson from "@/references/formulas/rank-to-discipline-stat.json";
 
 export type RankToDisciplineStatRow = {
@@ -22,16 +22,26 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-/** Weighted attribute sum used for league-wide discipline ranking (not divided by weight sum). */
+/**
+ * Weighted attribute sum used for league-wide discipline ranking (not divided by weight sum).
+ *
+ * GEWICHTSQUELLE ist seit dem 10.09. `resolveDisciplineWeightProfile`, nicht mehr die Matrix
+ * direkt: eine Disziplin, deren Minispiel gegen eine eigene Spiel-Eignung kalibriert wurde
+ * (heute nur Football), rechnet mit DEREN Gewichten, jede andere unveraendert mit der
+ * offiziellen Matrix. Das ist die EINE Stelle, ueber die `p.d[disziplin]` und damit jeder
+ * Leser von `disciplineRatings` nachzieht — Kaderbildschirm, Transfermarkt-Linse,
+ * Teamstaerke, KI-Kauf, Training, Scouting, `arena-kader-adapter`.
+ * Begruendung und Grenzen: `lib/player-generator/spiel-eignung-overrides.ts`.
+ */
 export function calculateRawDisciplineScore(
   attributes: PlayerGeneratorAttributes,
   disciplineId: OfficialDisciplineWeightId,
 ) {
+  const profile = resolveDisciplineWeightProfile(disciplineId);
   let weighted = 0;
   let hasWeight = false;
-  for (const [attribute, weights] of Object.entries(officialDisciplineWeightTable)) {
-    const weight = weights[disciplineId];
-    if (weight <= 0) continue;
+  for (const [attribute, weight] of Object.entries(profile)) {
+    if (weight == null || weight <= 0) continue;
     hasWeight = true;
     weighted += attributes[attribute as PlayerGeneratorAttributeName] * weight;
   }
