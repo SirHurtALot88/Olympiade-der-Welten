@@ -22,10 +22,14 @@ import {
  * solchen Fall ab, bevor er als verwirrender Zahlendiff auftaucht -- dieselbe Konstruktion wie
  * in tests/battle-mode-arena-resolve-engine.test.ts.
  *
- * DANACH STAND HIER "football" -- Football-Produktionsanbindung (15.09., s. Kommentar an
- * `ARENA_RESOLVED_DISCIPLINE_IDS` in battle-mode-arena-team-points.ts) hat auch das gebrochen,
- * der Wachhund hat es wie vorgesehen gefangen. `battlefield` (rho 0,387, ACHSE 1 klar nicht
- * bestanden) ersetzt es jetzt, mit deutlichem Abstand zur 0,80-Schranke.
+ * DANACH STAND HIER "football" -- diese PR wollte football urspruenglich zur 15. arena-
+ * aufgeloesten Disziplin machen (rho je Spiel 0,813, Korridor-Refit Runde 2, 14.09.), was auch
+ * das gebrochen haette. PARALLEL DAZU HAT PR #934 (Footballs vereinheitlichte Gewichtsquelle)
+ * Footballs kaderfeste Rangtreue auf 0,722 gesenkt, unter die 0,80-Schranke -- Football bleibt
+ * deshalb in dieser PR ohnehin ausserhalb von `ARENA_RESOLVED_DISCIPLINE_IDS` (s. dortiger
+ * Kommentar), waere also weiterhin ein gueltiger D2-Kontrollwert. `battlefield` (rho 0,251,
+ * ACHSE 1 klar nicht bestanden) ersetzt es trotzdem, mit deutlichem Abstand zur 0,80-Schranke --
+ * Football steht knapp davor und ist Ziel der naechsten Balance-Runde, kein stabiler Kontrollwert.
  */
 const D2_KONTROLL_DISZIPLIN = "battlefield";
 
