@@ -17,7 +17,10 @@ import {
   mapTeamRecord,
   mapTeamSeasonStateRecord,
 } from "../lib/db/seed/mappers";
-import { disciplineWeightSeedRows, seasonDisciplineConfigSeedRows } from "../lib/db/seed/seedSources";
+import {
+  disciplineWeightSeedRows,
+  seasonDisciplineConfigSeedRows,
+} from "../lib/db/seed/seedSources";
 
 const prisma = new PrismaClient();
 
@@ -122,13 +125,36 @@ async function seedDisciplinesAndWeights(seasonId: string) {
     });
   });
 
-  await prisma.disciplineWeight.deleteMany({
-    where: {
-      seasonId,
-      source: {
-        not: "official-weighted-average-matrix-2026-06",
+  // Altbestand wegraeumen: Unique-Key ist (disciplineId, attributeKey, seasonId), `source` ist
+  // nur ein unrestriktives Feld darauf. Eine Source-Whitelist (frueher: notIn DISCIPLINE_WEIGHT_
+  // SEED_SOURCES) trifft deshalb NICHT, wenn sich innerhalb derselben Source das Attribut-Set
+  // einer Disziplin aendert -- z.B. Football faellt von 10 auf 9 Attribute (kein `charisma`
+  // mehr) beim Umstieg auf den Spiel-Eignungs-Override, aber die Zeile `football/charisma`
+  // traegt weiter die alte, fuer die anderen 19 Disziplinen weiterhin gueltige Source und
+  // ueberlebt so jeden Season-Reseed. Stattdessen zielgenau auf (disciplineId, attributeKey)
+  // vergleichen: jede Zeile dieser Season, deren Paar NICHT mehr im aktuell berechneten Profil
+  // vorkommt, ist Altbestand -- unabhaengig von ihrer Source.
+  const currentDisciplineAttributePairs = new Set(
+    disciplineWeightSeedRows.map((row) => `${row.disciplineId}::${row.attributeKey}`),
+  );
+  const existingDisciplineWeightRows = await prisma.disciplineWeight.findMany({
+    where: { seasonId },
+    select: { disciplineId: true, attributeKey: true },
+  });
+  const staleDisciplineWeightRows = existingDisciplineWeightRows.filter(
+    (row) => !currentDisciplineAttributePairs.has(`${row.disciplineId}::${row.attributeKey}`),
+  );
+
+  await runInBatches(staleDisciplineWeightRows, SMALL_BATCH_SIZE, async (row) => {
+    await prisma.disciplineWeight.delete({
+      where: {
+        disciplineId_attributeKey_seasonId: {
+          disciplineId: row.disciplineId,
+          attributeKey: row.attributeKey,
+          seasonId,
+        },
       },
-    },
+    });
   });
 
   await runInBatches(seasonDisciplineConfigSeedRows, SMALL_BATCH_SIZE, async (row) => {
