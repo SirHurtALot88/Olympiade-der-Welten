@@ -17387,7 +17387,12 @@
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
       TMP:Math.round(KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)+" px/s Marschtempo · kürzt Abklingzeiten um "+cdKuerzungAnzeige+" %",
       AUS:"verliert ab Sekunde 35 "+((100-s.AUS)*0.11).toFixed(2)+" % je Sekunde"};
-    renderLevelUp(p);
+    // STUFENAUFSTIEG RAUSGENOMMEN (Chris, 15.09.): In-Match-Level-Ups wie in Eslabong
+    // funktionieren dort nur, weil es EINE Disziplin ist -- bei uns waeren das 20 separate
+    // Kurven. renderLevelUp() bleibt als Legacy-Code stehen (nicht geloescht), nur der
+    // Aufruf hier ist deaktiviert; das HTML-Markup (#lvlup/#lvlhint) ist in
+    // battle-mode.html analog auskommentiert.
+    // renderLevelUp(p);
     for(const k of KEYS){
       const r=el("div","bigstat");
       r.appendChild(el("b",null,k));r.appendChild(el("u",null,String(s[k])));
