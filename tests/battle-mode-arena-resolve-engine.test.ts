@@ -30,8 +30,21 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS, ARENA_TEAM_POINTS } from "@/lib/resolve/
  * verwirrenden Zahlendiff rot wurde ("pointsAwarded 3,77 statt 6,6") statt mit ihrer echten
  * Ursache. Deshalb steht die Wahl jetzt an EINER benannten Stelle -- und der Wachhund darunter
  * sagt beim naechsten Mal direkt, was zu tun ist.
+ *
+ * DANACH STAND HIER "football" -- diese PR wollte football urspruenglich zur 15. arena-
+ * aufgeloesten Disziplin machen (rho je Spiel 0,813, Korridor-Refit Runde 2, 14.09.), was genau
+ * denselben Wachhund-Fall ausgeloest haette wie bei Fechten oben ("ist NICHT arena-aufgeloest"
+ * wird `false`). PARALLEL DAZU HAT PR #934 (Footballs Gewichtsquelle vereinheitlicht: Kader-
+ * bildschirm-Anzeige, KI-Kauf UND Minispiel-Rezept lesen jetzt denselben Wert) Footballs
+ * kaderfeste Rangtreue von 0,813 auf 0,722 GESENKT -- unter die 0,80-Schranke. Football bleibt
+ * deshalb IN DIESER PR ohnehin ausserhalb von `ARENA_RESOLVED_DISCIPLINE_IDS` (s. dortiger
+ * Kommentar), waere also weiterhin ein gueltiger D2-Kontrollwert -- der Wechsel zu `battlefield`
+ * (rho 0,251, ACHSE 1 nicht bestanden, s. `ARENA_RESOLVED_DISCIPLINE_IDS`-Kommentar dort) bleibt
+ * trotzdem stehen: Football steht kurz vor der Schranke und ist Ziel der naechsten Balance-Runde
+ * (knapp-Feld), waehrend `battlefield` mit deutlichem Abstand draussen bleibt -- kein baldiger
+ * dritter Wechsel zu erwarten.
  */
-const D2_KONTROLL_DISZIPLIN = "football";
+const D2_KONTROLL_DISZIPLIN = "battlefield";
 
 describe("D2-Kontrolldisziplin", () => {
   it("ist NICHT arena-aufgeloest -- sonst pruefen die Gegenproben unten nichts mehr", () => {
@@ -117,7 +130,7 @@ function createContext(input: {
     })),
     disciplines: [
       { id: d1DisciplineId, name: "Basketball", category: "tactics" },
-      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Battlefield", category: "power" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [

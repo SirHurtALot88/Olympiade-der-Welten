@@ -156,6 +156,14 @@ import timeTrialPpsReferenzJson from "@/data/generated/time-trial-pps-referenz.j
 // das war der Feldgroessen-Fehler), die Referenz unten wurde GEGEN DEN REPARIERTEN MOTOR neu
 // gezogen (`scripts/ziehe-buehne-pps-referenz.ts spurt`).
 import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
+// FOOTBALL-VORARBEIT (15.09.): eigene PPS-Referenz gezogen (`scripts/ziehe-football-pps-
+// referenz.ts`, direktes Basketball-/Gewichtheben-Analogon: bestehendes Feldspiel-Chassis, keine
+// eigene Rolle mit eigener Wertformel wie Hockeys Torwart, s. Skript-Kopfkommentar) -- ACHSE 1
+// (Rangtreue) war zum Zeitpunkt dieser Referenz-Ziehung bestanden (rho je Spiel 0,813, Korridor-
+// Refit Runde 2, 14.09.), ist es NACH PR #934 (Footballs vereinheitlichte Gewichtsquelle) aber
+// NICHT mehr (rho 0,722) -- Football bleibt deshalb bewusst AUSSERHALB von
+// `ARENA_RESOLVED_DISCIPLINE_IDS`, s. dortiger Kommentar fuer die volle Herleitung.
+import footballPpsReferenzJson from "@/data/generated/football-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -231,7 +239,42 @@ import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
  * (die alte Datei war bei n=4..6 auf denselben 512 Boxscore-Eintraegen je 64 Fixtures
  * eingefroren, s. deren `hinweis`-Feld vor dieser PR).
  *
+ * FOOTBALL-VORARBEIT (PPS-Referenz gezogen 15.09.), ABER **NICHT PRODUKTIV GESCHALTET** --
+ * ACHSE 2 (eigener `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag, `scripts/ziehe-football-pps-
+ * referenz.ts`, `data/generated/football-pps-referenz.json`) ist fertig und unten eingetragen,
+ * aber ACHSE 1 (Rangtreue) ist zwischenzeitlich WIEDER GERISSEN. Der Korridor-Refit Runde 2
+ * (14.09., docs/pm-briefings/opus-review-pr-884-football-runde1-09-10.md) hatte rho je Spiel auf
+ * 0,516 -> 0,813 gehoben, ueber der 0,80-Schranke -- DIESE MESSUNG GALT VOR PR #934. #934
+ * ("eine Wahrheit" fuer Footballs Gewichtsquelle: Kaderbildschirm-Anzeige, KI-Kauf UND
+ * Minispiel-Rezept lesen jetzt DENSELBEN Wert) hat densselben Fund behoben, den Hockey/
+ * Basketball/Buehne/Bahn schon hatten (`p.d[disziplin] || 0` fehlte), UND DAMIT rho je Spiel
+ * (kaderfest, `node scripts/miss-alle-disziplinen.mjs 24 football`) auf 0,722 GESENKT -- unter
+ * die Schranke. Root Cause (Review-Konsens): die jetzt erstmals wirklich einkoppelnden Slot-
+ * Rollen-Ziele auf power/health/speed/torment verstaerken den Slot-Bonus-Effekt im Feldspiel-
+ * Chassis staerker, als der Korridor-Refit vorausgesetzt hatte. Football laeuft ueber DASSELBE
+ * Feldspiel-Chassis wie Basketball/Hockey (`spieleFeldspiel()`, `FELDSPIEL_ART.football` existiert
+ * bereits im Motor) -- kein neuer Dispatch, keine neue Verzweigung in `ppsAusArenaImpact()`.
+ * ANDERS ALS HOCKEY braucht Football KEINE eigene Rolle mit eigener Wertformel: der Football-Plan
+ * sieht bewusst keinen Kicker-Slot vor (Field Goals laufen ueber eine feste Distanzformel), und
+ * der Passer wird motor-intern pro Snap per gewichteter Verlosung gezogen
+ * (`fkLos(off,"PASSGENAUIGKEIT")`), nicht ueber einen fest zugewiesenen Aufstellungs-Slot wie
+ * Hockeys Torwart -- die Referenz-Ziehung braucht deshalb nur die besten n nach Football-Eignung,
+ * genau wie Basketballs Skript (s. `scripts/ziehe-football-pps-referenz.ts` Kopfkommentar fuer
+ * die volle Begruendung). DIE REFERENZ UND DER `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-EINTRAG BLEIBEN
+ * BEWUSST STEHEN -- das ist die Vorarbeit fuer den Moment, in dem eine dedizierte Football-
+ * Balance-Runde rho unter der neuen, einzig wahren Gewichtsquelle wieder ueber 0,80 bringt
+ * (Ansatzpunkt: Slot-Bonus-Staerke fuer Football reduzieren, oder Rezept C neu fitten). Bis
+ * dahin steht Football unten ABSICHTLICH NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` -- ein
+ * Eintrag in `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` OHNE Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS`
+ * ist der Normalzustand fuer eine vorbereitete, aber noch nicht produktiv geschaltete Disziplin
+ * (die Querpruefung unten prueft nur die Richtung "resolved -> hat Konfig", nie umgekehrt, s.
+ * dortiger Kommentar) und aendert am Laufzeitverhalten nichts: `loeseArenaImpactKonfigAuf()`
+ * wird fuer eine nicht-resolved Disziplin nie mit ihrer `disciplineId` aufgerufen.
+ *
  * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund:
+ *  - FOOTBALL (rho 0,722 je Spiel, s. oben): Rangtreue seit #934 NICHT mehr bestanden -- 0,078
+ *    unter der 0,80-Schranke aus CLAUDE.md. Config/Referenz sind fertig, der Eintrag hier fehlt
+ *    bewusst, bis eine Balance-Runde rho wieder ueber 0,80 gebracht hat.
  *  - CLIMBING (rho 0,790 je Spiel): Rangtreue NICHT bestanden -- 0,010 unter der 0,80-Schranke
  *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die anderen Bahnen),
  *    und genau deshalb ist es der wichtige Nicht-Eintrag: dieselbe Regel, die I-Spy (0,684) aus
@@ -239,13 +282,7 @@ import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
  *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
  *    eine davon billig zu erfuellen waere.
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
- *    (0,387/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
- *  - FOOTBALL: NICHT MEHR ACHSE 1 (Korridor-Refit-Runde, 14.09. — rho je Spiel 0,516 -> 0,800,
- *    NFL-Korridor jetzt in der Nachbarschaft, s. docs/pm-briefings/
- *    opus-review-pr-884-football-runde1-09-10.md fuer die Auflage, die diese Runde erfuellt),
- *    sondern ACHSE 2: es fehlt weiterhin ein eigener `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag
- *    (eigene PPS-Referenz noch nicht gezogen, `scripts/ziehe-football-pps-referenz.ts` existiert
- *    nicht) -- ohne den wirft die Querpruefung unten beim Modul-Laden, s. dort.
+ *    (0,251/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -265,6 +302,9 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "time-trial",
   // Spurt-Produktionsanbindung (14.09.): Feldgroessen-Fund F1 behoben, s. Kommentar oben.
   "spurt",
+  // Football BEWUSST NICHT HIER (15.09.): rho je Spiel seit #934 bei 0,722, unter der 0,80-
+  // Schranke -- Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN unten),
+  // der Produktiv-Eintrag folgt erst nach einer Balance-Runde, s. Kommentar oben.
 ]);
 
 /**
@@ -483,6 +523,25 @@ export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
 export const SPURT_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER FOOTBALL (PPS-Referenz-Vorarbeit 15.09., NOCH NICHT
+ * produktiv geschaltet -- s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve wie Basketball/Hockey
+ * (`ppsAusArenaImpact()`) -- Football teilt sich mit ihnen das Feldspiel-Chassis und denselben
+ * abstrakten Rohwert-Typ (`feldspielWert()`-Kompositwert, kein physikalisches Mass wie
+ * Gewichthebens kg). Eigene Regler aus GENAU DEMSELBEN Grund wie bei jeder vorigen Arena-
+ * Disziplin: Footballs Rohwert-Skala haengt am eigenen Rezept/den eigenen FB_*-Konstanten und
+ * am Kader-/Attributniveau der Liga, nachweisbar an `iKrass` in
+ * `data/generated/football-pps-referenz.json`, die sich von Basketballs/Hockeys unterscheidet.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben Grund
+ * wie bei jeder vorigen Welle (s. `STAFFEL_INDIVIDUAL_PPS_MAX`-Kommentar): Chris' Rahmen "max
+ * 5-6" und die 04.09.-Kurvenform-Messung sind Aussagen ueber die KURVE, nicht ueber Basketball-
+ * spezifische Zahlen. EIGENE KONSTANTEN statt Alias, damit eine spaetere football-spezifische
+ * Kalibrierung keine andere Disziplin mitzieht.
+ */
+export const FOOTBALL_INDIVIDUAL_PPS_MAX = 5.5;
+export const FOOTBALL_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -587,6 +646,10 @@ const TIME_TRIAL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 // fehlt in ihrer JSON-Datei, genau wie bei jeder Nicht-Hockey-Disziplin oben. Die Datei wurde
 // GEGEN DEN REPARIERTEN MOTOR (jeSeite 6) neu gezogen, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
 const SPURT_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(spurtPpsReferenzJson as ArenaPpsReferenzJson);
+// FOOTBALL-PRODUKTIONSANBINDUNG (15.09.): auch keine eigene Wertformel-Rolle (kein Kicker-Slot,
+// s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`) -- `feldgroessenTorwart` fehlt in der Datei,
+// genau wie bei jeder Nicht-Hockey-Disziplin oben.
+const FOOTBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(footballPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -792,6 +855,25 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       max: TIME_TRIAL_INDIVIDUAL_PPS_MAX,
       anteilMitte: TIME_TRIAL_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 4 (dataAdapter.ts), NICHT 6.
+      katalogStandardgroesse: 4,
+    },
+  ],
+  // ==================== FOOTBALL-VORARBEIT (15.09.) ====================
+  // EIGENE PPS-Referenz gezogen, ABER NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` -- rho je Spiel
+  // seit PR #934 bei 0,722, unter der 0,80-Schranke, s. Kommentar an
+  // `ARENA_RESOLVED_DISCIPLINE_IDS` fuer die volle Herleitung. Dieser Eintrag ist reine Vorarbeit
+  // fuer die anstehende Balance-Runde und wird erst mit deren Ergebnis scharf geschaltet. Football
+  // nutzt DASSELBE Feldspiel-Chassis wie Basketball/Hockey (`spieleFeldspiel()`), keine eigene
+  // Rolle mit eigener Wertformel.
+  [
+    "football",
+    {
+      referenzFeldgroessen: FOOTBALL_PPS_REFERENZ_FELDGROESSEN,
+      max: FOOTBALL_INDIVIDUAL_PPS_MAX,
+      anteilMitte: FOOTBALL_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 4 (dataAdapter.ts), NICHT die Motor-Feldgroesse (BUEHNE/
+      // FELDSPIEL_ART.football.size ist 6, dieselbe Falle wie bei jeder vorigen Welle -- s.
+      // dortige Kommentare, z.B. bei "spurt").
       katalogStandardgroesse: 4,
     },
   ],
