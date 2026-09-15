@@ -548,50 +548,44 @@ export type LegacyResolvePreviewOptions = {
   modifierMode?: LegacyResolveMutatorMode;
   captainMode?: "selected_captain" | "legacy_strongest_selected" | "missing_source";
   /**
-   * Battle Mode PR7 (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 3.3c/5.1): fertig
-   * gerechnete Arena-Team-Punkte (2/1/0, s. lib/resolve/battle-mode-arena-team-points.ts), keyed
-   * nach Team-ID. `buildLegacyMatchdayResolvePreview` wendet einen Eintrag NUR an, wenn
-   * `isBattleModeSave(gameState) && disciplineId === "basketball"` — jede andere Kombination
-   * (Manager Mode, jede andere Disziplin) ignoriert diese Map vollstaendig, auch wenn sie gesetzt
-   * ist. `undefined`/leer aendert nichts am bisherigen PPS-Pfad.
+   * WEG B (N-Team-Infrastruktur-Audit 13.09., Abschnitt 8 — Chris' ausdrueckliche Entscheidung
+   * 15.09.): disziplin-bewusste Arena-Team-Punkte, `disciplineId -> teamId -> Override`. Ersetzt
+   * die vorherigen flachen Felder `arenaTeamPointsByTeamId` + `arenaDisciplineId` aus dem B2-Fix
+   * (Fund B2, selbes Audit-Dokument Abschnitt 4) durch EINE geschachtelte Map.
+   *
+   * WARUM DIE SCHACHTELUNG UND NICHT LAENGER EIN GUARD-FELD: `runBattleModeArenaMatchday()`
+   * (lib/resolve/battle-mode-arena-team-points.ts) lief bis WEG B fuer HOECHSTENS EINE Disziplin
+   * je Spieltag — `kickoffArenaMatchdayApply()` (lib/season/arena-matchday-resolve-service.ts)
+   * liess bei ZWEI arena-aufgeloesten Disziplinen (D1 UND D2, gemessen 41 % aller Battle-Mode-
+   * Spieltage, Audit Abschnitt 3) den GESAMTEN Spieltag auf den PPS-Pfad zurueckfallen
+   * (`mehrdeutig`-Wache). Seit WEG B laeuft die Arena fuer BEIDE, wenn beide arena-aufgeloest
+   * sind — zwei unabhaengige Zwei-Team-Duelle, eins je Disziplin (kein Vierer-/N-Team-Event, s.
+   * Kommentar an `ArenaTeamPointsOverride`). Eine flache teamId-Map plus ein separates
+   * `arenaDisciplineId`-Guard-Feld (der B2-Fix) haette hier zwei parallele Ergebnisse nicht mehr
+   * tragen koennen, ohne dass eines das andere ueberschreibt — GENAU DAS beschreibt Fund B2. Mit
+   * `disciplineId` als aeusserem Map-Schluessel ist die Identitaet STRUKTURELL statt durch ein
+   * Guard-Feld erzwungen: `buildLegacyMatchdayResolvePreview()` liest fuer eine Disziplin NUR
+   * `get(disciplineId)` — es gibt keine flache Map mehr, die versehentlich fuer die falsche
+   * Disziplin gelesen werden koennte. Eine Disziplin ohne Eintrag hier (kein Arena-Duell gelaufen,
+   * weil sie selbst nicht arena-aufgeloest ist ODER — heute nur noch bei einem Playwright-Fehler
+   * fuer genau diese eine Disziplin — kein Ergebnis vorlag) bleibt unveraendert beim PPS-Pfad.
+   *
+   * `undefined`/leer/kein Eintrag fuer die aktuelle Disziplin aendert nichts am PPS-Pfad.
    */
-  arenaTeamPointsByTeamId?: ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }> | null;
+  arenaTeamPointsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }>> | null;
   /**
    * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7) — SEIT
-   * docs/design/pps-skalierung-umsetzung.md auf V2 umgestellt: individuelle Spieler-PPs
-   * (playerId -> PPs), berechnet ueber eine Impact-Kurve gegen eine feste, je Feldgroesse
-   * gezogene Referenz (nicht mehr ein Perzentilrang gegen den Spieltags-Pool — s.
+   * docs/design/pps-skalierung-umsetzung.md auf V2 umgestellt, seit WEG B (s. Kommentar an
+   * `arenaTeamPointsByDisciplineId`) disziplin-bewusst geschachtelt: `disciplineId -> playerId ->
+   * PPs`, berechnet ueber eine Impact-Kurve gegen eine feste, je Feldgroesse gezogene Referenz
+   * (nicht mehr ein Perzentilrang gegen den Spieltags-Pool — s.
    * lib/resolve/battle-mode-arena-team-points.ts, `computeIndividualBoxscorePpsFromFixtureResults()`
-   * und `BASKETBALL_INDIVIDUAL_PPS_MAX`/`BASKETBALL_PPS_ANTEIL_MITTE`). `buildLegacyMatchdayResolvePreview` setzt
-   * `pointsAwarded` fuer einen Spieler NUR aus dieser Map, wenn (a) `isBattleModeSave(gameState)
-   * && disciplineId === "basketball"` UND (b) die Map einen Eintrag fuer genau diesen Spieler
-   * enthaelt — jeder andere Spieler (auch derselben Seite/desselben Teams) bleibt unveraendert
-   * beim bisherigen PPS-Pfad. `undefined`/leer/fehlender Eintrag aendert nichts.
+   * und `BASKETBALL_INDIVIDUAL_PPS_MAX`/`BASKETBALL_PPS_ANTEIL_MITTE`). `buildLegacyMatchdayResolvePreview`
+   * setzt `pointsAwarded` fuer einen Spieler NUR aus dieser Map, wenn (a) `isBattleModeSave(gameState)`
+   * UND (b) die fuer die GERADE GEWERTETE Disziplin geschachtelte Map einen Eintrag fuer genau
+   * diesen Spieler enthaelt — jeder andere Spieler (auch derselben Seite/desselben Teams) und
+   * jede Disziplin ohne eigenen Eintrag bleiben unveraendert beim bisherigen PPS-Pfad.
+   * `undefined`/leer/fehlender Eintrag aendert nichts.
    */
-  arenaIndividualBoxscorePpsByPlayerId?: ReadonlyMap<string, number> | null;
-  /**
-   * FUER WELCHE DISZIPLIN die beiden Arena-Maps oben gerechnet wurden (N-Team-Infrastruktur-Audit
-   * 13.09., Fund B2 — docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md).
-   *
-   * `runBattleModeArenaMatchday()` laeuft immer fuer GENAU EINE Disziplin je Spieltag und liefert
-   * EINE teamId-keyed Map mit deren Duellausgang. Bis zu diesem Feld fragte der Einhaenge-Punkt im
-   * Resolve-Engine nur, ob die gerade gewertete Disziplin ueberhaupt in
-   * `ARENA_RESOLVED_DISCIPLINE_IDS` steht (Mengen-ZUGEHOERIGKEIT) — nicht, ob sie DIE Disziplin
-   * ist, fuer die diese Map gelaufen ist (IDENTITAET). Sind D1 und D2 desselben Spieltags beide
-   * arena-aufgeloest, buchte derselbe eine Duellausgang damit in BEIDE Disziplinen: ein Team
-   * kassierte den Sieg eines einzigen gelaufenen Duells zweimal in die Saisontabelle
-   * (nachgestellt und festgehalten in tests/arena-override-nur-fuer-die-gelaufene-disziplin.test.ts
-   * — vor dem Fix vier arena-gewertete Team-Zeilen statt zwei).
-   *
-   * Erreichbar war das bisher nicht, aber NUR durch eine Wache in einer ANDEREN Datei:
-   * `kickoffArenaMatchdayApply()` (lib/season/arena-matchday-resolve-service.ts) steigt bei zwei
-   * Arena-Disziplinen an einem Spieltag komplett aus. Diese Ferndeckung traegt umso weniger, je
-   * mehr Disziplinen arena-aufgeloest sind — 13 der 20 sind es inzwischen, der Fall "beide Seiten
-   * Arena" trifft gemessen 41 % aller Spieltage. Mit diesem Feld steht die Invariante LOKAL dort,
-   * wo sie gilt.
-   *
-   * `undefined`/`null` (aeltere Aufrufer, Sonderlaeufe, Tests) faellt bewusst auf das alte
-   * Mengen-Verhalten zurueck — bit-identisch zum Stand vor diesem Fix.
-   */
-  arenaDisciplineId?: string | null;
+  arenaIndividualBoxscorePpsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, number>> | null;
 };

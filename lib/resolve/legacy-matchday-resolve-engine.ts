@@ -16,7 +16,6 @@ import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/resolve/battle-mode-arena-team-points";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -330,16 +329,17 @@ export function buildLegacyMatchdayResolvePreview(
   const resolveOptions: LegacyResolvePreviewOptions = {
     modifierMode: options?.modifierMode ?? "legacy_selected_traits",
     captainMode: options?.captainMode ?? "selected_captain",
-    arenaTeamPointsByTeamId: options?.arenaTeamPointsByTeamId ?? null,
-    arenaIndividualBoxscorePpsByPlayerId: options?.arenaIndividualBoxscorePpsByPlayerId ?? null,
-    arenaDisciplineId: options?.arenaDisciplineId ?? null,
+    arenaTeamPointsByDisciplineId: options?.arenaTeamPointsByDisciplineId ?? null,
+    arenaIndividualBoxscorePpsByDisciplineId: options?.arenaIndividualBoxscorePpsByDisciplineId ?? null,
   };
   const base = contexts[0];
   /**
-   * SICHERHEITSRAHMEN Battle Mode PR7: die uebergebene Arena-Punkte-Map wird NUR angewendet, wenn
-   * (a) der Save Battle Mode ist UND (b) es sich um die Basketball-Disziplin handelt. Jede andere
-   * Kombination (Manager Mode, jede andere Disziplin, auch in einem Battle-Mode-Save) ignoriert
-   * `resolveOptions.arenaTeamPointsByTeamId` vollstaendig, selbst wenn sie gesetzt ist — keine
+   * SICHERHEITSRAHMEN Battle Mode PR7, seit WEG B disziplin-bewusst statt Basketball-fest: eine
+   * mitgelieferte Arena-Punkte-Map (jetzt `disciplineId -> teamId -> Override`) wird NUR fuer eine
+   * Disziplin angewendet, wenn (a) der Save Battle Mode ist UND (b) genau diese Disziplin einen
+   * eigenen Eintrag in `resolveOptions.arenaTeamPointsByDisciplineId` traegt. Jede andere
+   * Kombination (Manager Mode, eine Disziplin ohne eigenen Eintrag, auch in einem Battle-Mode-Save)
+   * bleibt exakt beim PPS-Pfad, selbst wenn die Map fuer eine ANDERE Disziplin gesetzt ist — keine
    * Verhaltensaenderung dort. Ohne `gameState` (aeltere/Test-Contexts ohne dieses Feld) bleibt es
    * defensiv beim bisherigen PPS-Pfad.
    */
@@ -725,33 +725,34 @@ export function buildLegacyMatchdayResolvePreview(
     const { results: teamResultsAfterPowers, factorByTeamId: teamPowerDebuffFactorByTeamId } = applyTeamPowerDebuffs(rawTeamResults);
     // Battle Mode PR7 (Plan Abschnitt 3.3c/5.1), seit der Gewichtheben-Produktivierung (S6,
     // docs/design/gewichtheben-produktivierung.md) DISZIPLINUEBERGREIFEND statt Basketball-fest:
-    // NUR fuer eine arena-aufgeloeste Disziplin (Mengen-Zugehoerigkeit zu
-    // `ARENA_RESOLVED_DISCIPLINE_IDS` — aktuell Basketball und Gewichtheben) ersetzt ein
-    // Arena-Ergebnis (Sieg=2/Unentschieden=1/Niederlage=0, s. battle-mode-arena-team-points.ts)
-    // die PPS-Rang-Formel — jede andere Disziplin/jeder andere Modus bleibt exakt beim Bisherigen.
-    // Diese Stelle selbst brauchte fuer die Erweiterung KEINE Code-Aenderung — sie pruefte schon
-    // vor der Gewichtheben-Produktivierung Mengen-Zugehoerigkeit, nicht `disciplineId === "basketball"`.
+    // fuer eine arena-aufgeloeste Disziplin ersetzt ein Arena-Ergebnis (Sieg=2/Unentschieden=1/
+    // Niederlage=0, s. battle-mode-arena-team-points.ts) die PPS-Rang-Formel — jede andere
+    // Disziplin/jeder andere Modus bleibt exakt beim Bisherigen.
     //
-    // IDENTITAET STATT MENGEN-ZUGEHOERIGKEIT (N-Team-Infrastruktur-Audit 13.09., Fund B2 —
-    // docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md): die mitgelieferten Maps
-    // gehoeren zu GENAU EINER gelaufenen Disziplin (`runBattleModeArenaMatchday()` laeuft je
-    // Spieltag fuer eine). Steht diese Disziplin in `resolveOptions.arenaDisciplineId`, gilt die
-    // Uebersteuerung NUR fuer sie — sonst buchte ein einziger gelaufener Duellausgang in BEIDE
-    // arena-aufgeloesten Disziplinen desselben Spieltags, also denselben Sieg zweimal in die
-    // Saisontabelle (s. tests/arena-override-nur-fuer-die-gelaufene-disziplin.test.ts). Ohne das
-    // Feld (aeltere Aufrufer/Tests) bleibt es beim alten Mengen-Verhalten, bit-identisch.
-    const istDieGelaufeneArenaDisziplin =
-      resolveOptions.arenaDisciplineId != null
-        ? disciplineId === resolveOptions.arenaDisciplineId
-        : ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId);
+    // IDENTITAET IST JETZT STRUKTURELL (WEG B, N-Team-Infrastruktur-Audit 13.09., Abschnitte 4/8 —
+    // docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md), nicht mehr durch ein
+    // Guard-Feld erzwungen: bis zum B2-Fix fragte diese Stelle nur, ob `disciplineId` ueberhaupt
+    // in `ARENA_RESOLVED_DISCIPLINE_IDS` steht (Mengen-Zugehoerigkeit) — nicht, ob sie DIE
+    // Disziplin ist, fuer die die mitgelieferten Maps gerechnet wurden. Der B2-Fix ergaenzte dafuer
+    // ein separates `arenaDisciplineId`-Feld (Identitaetsvergleich statt Mengen-Zugehoerigkeit).
+    // WEG B ersetzt dieses Guard-Feld durch eine disziplin-geschluesselte Map
+    // (`arenaTeamPointsByDisciplineId`/`arenaIndividualBoxscorePpsByDisciplineId`,
+    // lib/lineups/legacy-lineup-types.ts): `runBattleModeArenaMatchday()` kann jetzt fuer D1 UND
+    // D2 desselben Spieltags unabhaengig laufen (vorher liess die `mehrdeutig`-Wache in
+    // arena-matchday-resolve-service.ts den GANZEN Spieltag auf PPS zurueckfallen, sobald beide
+    // arena-aufgeloest waren — gemessen 41 % aller Battle-Mode-Spieltage, Audit Abschnitt 3). Ein
+    // `.get(disciplineId)` auf einer leeren/fehlenden Map liefert `undefined` -- es gibt keine
+    // flache Map mehr, die versehentlich fuer die falsche Disziplin gelesen werden koennte, der
+    // urspruengliche B2-Fehler ist damit strukturell ausgeschlossen statt nur durch einen Vergleich
+    // verhindert.
     const arenaOverridesForThisDiscipline =
-      isBattleModeArenaEligible && istDieGelaufeneArenaDisziplin
-        ? resolveOptions.arenaTeamPointsByTeamId ?? null
+      isBattleModeArenaEligible
+        ? resolveOptions.arenaTeamPointsByDisciplineId?.get(disciplineId) ?? null
         : null;
     // BOXSCORE-AN-PPS: dieselbe Sperre wie oben — s. docs/design/boxscore-an-pps.md.
     const arenaIndividualPpsForThisDiscipline =
-      isBattleModeArenaEligible && istDieGelaufeneArenaDisziplin
-        ? resolveOptions.arenaIndividualBoxscorePpsByPlayerId ?? null
+      isBattleModeArenaEligible
+        ? resolveOptions.arenaIndividualBoxscorePpsByDisciplineId?.get(disciplineId) ?? null
         : null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,

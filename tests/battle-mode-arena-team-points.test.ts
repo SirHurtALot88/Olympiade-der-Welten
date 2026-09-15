@@ -264,16 +264,31 @@ describe("computeArenaTeamPointsFromFixtureResults nutzt den Gesamt-kg-Tiebreak"
 });
 
 describe("buildArenaMatchSeed", () => {
-  it("baut den im Plan (Abschnitt 3.3c) vorgeschlagenen Seed-String", () => {
+  it("baut den im Plan (Abschnitt 3.3c) vorgeschlagenen Seed-String, seit WEG B mit disciplineId", () => {
     expect(
       buildArenaMatchSeed({
         saveId: "save-1",
         seasonId: "season-1",
         matchdayId: "matchday-3",
+        disciplineId: "basketball",
         homeTeamId: "team-a",
         awayTeamId: "team-b",
       }),
-    ).toBe("save-1:season-1:matchday-3:arena:team-a:team-b");
+    ).toBe("save-1:season-1:matchday-3:arena:basketball:team-a:team-b");
+  });
+
+  /**
+   * WEG B (N-Team-Infrastruktur-Audit 13.09.): ohne `disciplineId` im Seed haetten zwei
+   * gleichzeitig arena-aufgeloeste Disziplinen desselben Spieltags fuer DIESELBE Team-Paarung
+   * denselben Text-Seed bekommen -- und damit denselben numerischen PRNG-Startwert fuer zwei
+   * voellig verschiedene Motoren (s. Kommentar an `buildArenaMatchSeed`). Dieser Test haelt die
+   * Unabhaengigkeit fest, die das verhindert.
+   */
+  it("derselbe Spieltag/dieselbe Paarung ergibt fuer verschiedene Disziplinen verschiedene Seeds", () => {
+    const basis = { saveId: "save-1", seasonId: "season-1", matchdayId: "matchday-3", homeTeamId: "team-a", awayTeamId: "team-b" };
+    const seedBasketball = buildArenaMatchSeed({ ...basis, disciplineId: "basketball" });
+    const seedGewichtheben = buildArenaMatchSeed({ ...basis, disciplineId: "gewichtheben" });
+    expect(seedBasketball).not.toBe(seedGewichtheben);
   });
 });
 
@@ -1092,7 +1107,7 @@ describe("runBattleModeArenaMatchday (gemockter Runner, kein Browser)", () => {
     });
 
     const [, firstCallFixtures] = runArenaFixturesImpl.mock.calls[0];
-    expect(firstCallFixtures[0].seed).toBe("save-42:season-7:matchday-1:arena:liga1-a:liga1-b");
+    expect(firstCallFixtures[0].seed).toBe("save-42:season-7:matchday-1:arena:basketball:liga1-a:liga1-b");
   });
 
   it("eine Liga ohne Fixtures an diesem Spieltag wird uebersprungen, ohne den Lauf zu blockieren", async () => {
