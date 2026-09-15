@@ -23,7 +23,9 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
  *
  * WARUM DER HINTERGRUNDLAUF NOETIG IST: ein echter Playwright-Chromium-Lauf fuer 8-16 Arena-Duelle
  * dauert 6-16+ Sekunden (Plan Abschnitt 3.4/PR6-Messungen) — deutlich ueber dem, was ein normaler
- * HTTP-Request/Proxy-Timeout beim Klick auf "Spieltag simulieren" vertraegt.
+ * HTTP-Request/Proxy-Timeout beim Klick auf "Spieltag simulieren" vertraegt. Seit WEG B (s. unten)
+ * kann das PRO SPIELTAG bis zu zweimal anfallen (D1 UND D2 beide arena-aufgeloest) — bewusst
+ * sequenziell, nicht parallel (s. `fuehreArenaMatchdayApplyAus()`), also bis zu doppelte Laufzeit.
  *
  * SICHERHEITSRAHMEN: `kickoffArenaMatchdayApply()` prueft SELBST, ob dieser Spieltag ueberhaupt
  * betroffen ist (`isBattleModeSave()` UND MINDESTENS EINE arena-aufgeloeste Disziplin --
@@ -33,15 +35,31 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
  * bisherigen synchronen Pfad zurueck. Manager Mode und jeder Spieltag ohne Arena-Disziplin sind
  * dadurch komplett unveraendert.
  *
- * MEHRERE ARENA-DISZIPLINEN AM SELBEN SPIELTAG (D1 UND D2 BEIDE ARENA-AUFGELOEST): bewusst NICHT
- * unterstuetzt. `overridesByTeamId`/`arenaIndividualBoxscorePpsByPlayerId` sind je EIN
- * teamId-/playerId-keyed Ergebnis, das sich nicht disziplinuebergreifend zusammenfuehren laesst,
- * ohne die Preview-Schnittstelle (`buildLegacyMatchdayResolvePreview`) selbst
- * disziplin-bewusst zu machen — eine groessere Aenderung, die diese Runde bewusst NICHT anfasst
- * (Risiko fuer Produktionscode, s. docs/design/gewichtheben-produktivierung.md). Trifft dieser
- * seltene Fall ein (zwei Arena-Disziplinen als D1/D2 desselben Spieltags), faellt der GESAMTE
- * Spieltag auf den bestehenden, gut getesteten PPS-Pfad zurueck (`{ applicable: false }` plus
- * `console.error`) statt eine der beiden Disziplinen zu bevorzugen oder Ergebnisse zu vermengen.
+ * MEHRERE ARENA-DISZIPLINEN AM SELBEN SPIELTAG (D1 UND D2 BEIDE ARENA-AUFGELOEST) — WEG B, seit
+ * dem N-Team-Infrastruktur-Audit 13.09. (docs/design/n-team-disziplinen-infrastruktur-audit-13-09.md,
+ * Abschnitt 8, Chris' ausdrueckliche Entscheidung 15.09.): JETZT VOLL UNTERSTUETZT. Vorher liess
+ * die `mehrdeutig`-Wache (Audit Abschnitt 3, Fund B1) den GESAMTEN Spieltag auf den PPS-Pfad
+ * zurueckfallen, sobald D1 UND D2 beide arena-aufgeloest waren — gemessen 41,0-41,8 % aller
+ * Battle-Mode-Spieltage (×400 Saves, repeat 1 und 2 gleichermassen). Das war nur solange
+ * vertretbar, wie es fast nie zutraf (2 von 20 arena-aufgeloeste Disziplinen bei der
+ * urspruenglichen Entscheidung, PR7) — inzwischen sind es 13 von 20.
+ *
+ * Der Grund, warum das vorher nicht ging, war NICHT die Wache selbst, sondern die
+ * Preview-Schnittstelle dahinter: `overridesByTeamId`/`individualBoxscorePpsByPlayerId` waren je
+ * EIN teamId-/playerId-keyed Ergebnis ohne Disziplin-Dimension, das eine zweite Disziplin
+ * ueberschrieben oder mit ihr vermengt haette (exakt Fund B2, s. legacy-matchday-resolve-engine.ts).
+ * Mit der disziplin-geschluesselten Preview-Schnittstelle (`LegacyResolvePreviewOptions.
+ * arenaTeamPointsByDisciplineId`/`arenaIndividualBoxscorePpsByDisciplineId`, lib/lineups/
+ * legacy-lineup-types.ts) traegt der Arena-Lauf jetzt fuer D1 UND D2 unabhaengig je einen Eintrag,
+ * ohne dass einer den anderen ueberschreibt — `fuehreArenaMatchdayApplyAus()` unten ruft
+ * `runBattleModeArenaMatchday()` fuer JEDE ermittelte arena-aufgeloeste Disziplin (0, 1 oder 2)
+ * sequenziell auf und sammelt die Ergebnisse disziplin-geschluesselt.
+ *
+ * BALANCE-HINWEIS (Audit Abschnitt 2.1/8, benannt statt versteckt): ein Spieltag mit ZWEI echten
+ * Arena-Duellen statt bisher hoechstens einem schuettet an diesem Spieltag entsprechend mehr
+ * Liga-Punkte aus (zwei unabhaengige 2/1/0-Ergebnisse statt eines). Das ist eine erwartete,
+ * gemessene Folge von WEG B (s. PR-Beschreibung fuer die Vorher/Nachher-Zahlen), keine
+ * Kompensationsmechanik ist dafuer vorgesehen (vom Audit nicht verlangt).
  */
 
 export type ArenaMatchdayApplyKickoffInput = {
@@ -63,21 +81,22 @@ export type ArenaMatchdayApplyKickoffResult =
   | { applicable: true; save: PersistedSaveGame };
 
 /**
- * Welche arena-aufgeloeste Disziplin (falls ueberhaupt eine) an diesem Spieltag D1 oder D2 ist —
- * geprueft ueber dieselben geladenen Contexts, die der Lauf ohnehin braucht. Reine Mengen-
+ * WELCHE arena-aufgeloesten Disziplinen (0, 1 oder — seit WEG B — 2) an diesem Spieltag D1/D2
+ * sind — geprueft ueber dieselben geladenen Contexts, die der Lauf ohnehin braucht. Reine Mengen-
  * Zugehoerigkeit zu `ARENA_RESOLVED_DISCIPLINE_IDS`, KEIN Disziplins-Literal-Vergleich — eine
  * kuenftige Arena-Disziplin (Hockey war die dritte, s. docs/design/hockey-produktivierung.md --
  * dieser Code-Pfad brauchte dafuer tatsaechlich KEINE Aenderung) braucht hier keine
  * Code-Aenderung, nur einen Eintrag in dieser Menge.
  *
- * `arenaDisciplineId` ist `null`, wenn keine arena-aufgeloeste Disziplin gespielt wird.
- * `mehrdeutig` ist `true`, wenn D1 UND D2 BEIDE arena-aufgeloest sind (s. Dateikopf-Kommentar,
- * "MEHRERE ARENA-DISZIPLINEN...") — der Aufrufer behandelt das als NICHT anwendbar, statt zu
- * raten, welche der beiden Vorrang hat.
+ * `arenaDisciplineIds` ist leer, wenn keine arena-aufgeloeste Disziplin gespielt wird, hat einen
+ * Eintrag im bisher haeufigeren Fall (nur D1 ODER nur D2 arena-aufgeloest) und — WEG B,
+ * N-Team-Infrastruktur-Audit 13.09., Abschnitt 8 — zwei Eintraege, wenn D1 UND D2 desselben
+ * Spieltags BEIDE arena-aufgeloest sind (vorher: `mehrdeutig`, ganzer Spieltag fiel auf PPS
+ * zurueck). Der Aufrufer laeuft jetzt fuer JEDEN Eintrag dieser Liste einen eigenen Arena-Lauf.
  */
 function determineArenaDisciplineContexts(
   contextResults: ReturnType<typeof loadAllLocalLegacyLineupContexts>,
-): { contexts: LegacyLineupLoadedContext[]; arenaDisciplineId: string | null; mehrdeutig: boolean } {
+): { contexts: LegacyLineupLoadedContext[]; arenaDisciplineIds: string[] } {
   const contexts = contextResults.flatMap((result) => (result.ok ? [result.context] : []));
   const kandidaten = new Set<string>();
   for (const context of contexts) {
@@ -86,8 +105,7 @@ function determineArenaDisciplineContexts(
     if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1)) kandidaten.add(d1);
     if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
   }
-  const liste = [...kandidaten];
-  return { contexts, arenaDisciplineId: liste[0] ?? null, mehrdeutig: liste.length > 1 };
+  return { contexts, arenaDisciplineIds: [...kandidaten] };
 }
 
 function schreibeArenaMatchdayResolveStatus(
@@ -120,11 +138,15 @@ async function fuehreArenaMatchdayApplyAus(input: {
   forceReplace: boolean;
   allowIncompleteOverride: boolean;
   logPrefix: string;
-  /** Von `kickoffArenaMatchdayApply()` bereits ermittelt (Mengen-Zugehoerigkeit zu ARENA_RESOLVED_DISCIPLINE_IDS) — s. dort. */
-  arenaDisciplineId: string;
+  /**
+   * Von `kickoffArenaMatchdayApply()` bereits ermittelt (Mengen-Zugehoerigkeit zu
+   * ARENA_RESOLVED_DISCIPLINE_IDS) — s. dort. WEG B: 1 ODER 2 Eintraege, nie leer (der Aufrufer
+   * bricht vorher ab, wenn keine arena-aufgeloeste Disziplin an diesem Spieltag gespielt wird).
+   */
+  arenaDisciplineIds: string[];
   runArenaFixturesImpl?: typeof runArenaFixtures;
 }): Promise<void> {
-  const { persistence, saveId, seasonId, matchdayId, logPrefix, arenaDisciplineId } = input;
+  const { persistence, saveId, seasonId, matchdayId, logPrefix, arenaDisciplineIds } = input;
   try {
     const current = persistence.getSaveById(saveId);
     if (!current) {
@@ -132,20 +154,35 @@ async function fuehreArenaMatchdayApplyAus(input: {
       return;
     }
 
-    const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
-      gameState: current.gameState,
-      saveId,
-      seasonId,
-      matchdayId,
-      disciplineId: arenaDisciplineId,
-      runArenaFixturesImpl: input.runArenaFixturesImpl,
-    });
-    if (warnings.length > 0) {
-      console.warn(`${logPrefix} Arena-Matchday-Resolve: ${warnings.join(", ")}`);
+    // WEG B (N-Team-Infrastruktur-Audit 13.09., Abschnitt 8): SEQUENZIELL, NICHT PARALLEL — ein
+    // Arena-Lauf startet/schliesst pro Aufruf einen eigenen Chromium-Browser (s. Dateikopf-
+    // Kommentar und `runBattleModeArenaMatchday()`s eigener Kommentar zu den Liga-Stufen); zwei
+    // Disziplinen gleichzeitig parallel zu starten wuerde den Speicherbedarf verdoppeln, den genau
+    // dieses "ein Browser zur selben Zeit"-Muster bewusst begrenzt. Kostet dafuer bis zu doppelte
+    // Laufzeit (6-16+ Sekunden je Disziplin) — im Hintergrundlauf, den ohnehin niemand synchron
+    // abwartet, ein bewusst akzeptierter Preis.
+    const arenaTeamPointsByDisciplineId = new Map<string, Map<string, { teamPoints: number; arenaMatchSeed: string }>>();
+    const arenaIndividualBoxscorePpsByDisciplineId = new Map<string, Map<string, number>>();
+    const alleWarnungen: string[] = [];
+    for (const disziplinId of arenaDisciplineIds) {
+      const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
+        gameState: current.gameState,
+        saveId,
+        seasonId,
+        matchdayId,
+        disciplineId: disziplinId,
+        runArenaFixturesImpl: input.runArenaFixturesImpl,
+      });
+      arenaTeamPointsByDisciplineId.set(disziplinId, overridesByTeamId);
+      arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, individualBoxscorePpsByPlayerId);
+      alleWarnungen.push(...warnings.map((warning) => `${disziplinId}:${warning}`));
+    }
+    if (alleWarnungen.length > 0) {
+      console.warn(`${logPrefix} Arena-Matchday-Resolve: ${alleWarnungen.join(", ")}`);
     }
 
     // Frisch laden statt den Stand von oben weiterzureichen: der Arena-Lauf braucht 6-16+
-    // Sekunden, in denen (Koop) jemand anders geschrieben haben kann.
+    // Sekunden je Disziplin, in denen (Koop) jemand anders geschrieben haben kann.
     const beforeApply = persistence.getSaveById(saveId);
     if (!beforeApply) {
       console.error(`${logPrefix} Arena-Matchday-Apply: Save ${saveId} verschwand waehrend des Arena-Laufs.`);
@@ -174,18 +211,16 @@ async function fuehreArenaMatchdayApplyAus(input: {
     // service.ts, `previewToBook`. Das ist der einzige Weg, wie das Arena-Ergebnis garantiert
     // gebucht wird statt eines veralteten, ohne Arena-Overrides berechneten Snapshots.
     const preview = buildLegacyMatchdayResolvePreview(contexts, {
-      arenaTeamPointsByTeamId: overridesByTeamId,
+      // WEG B (N-Team-Infrastruktur-Audit 13.09., Abschnitt 8): disziplin-geschluesselt statt
+      // flach — D1 UND D2 tragen hier, falls beide arena-aufgeloest sind, je ihren EIGENEN
+      // Eintrag, ohne dass einer den anderen ueberschreibt (s. Kommentar an
+      // `LegacyResolvePreviewOptions.arenaTeamPointsByDisciplineId`, legacy-lineup-types.ts, und
+      // an `arenaOverridesForThisDiscipline`, legacy-matchday-resolve-engine.ts).
+      arenaTeamPointsByDisciplineId,
       // BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md): individuelle Spieler-PPs aus dem echten
-      // Arena-Boxscore, s. lib/resolve/battle-mode-arena-team-points.ts.
-      arenaIndividualBoxscorePpsByPlayerId: individualBoxscorePpsByPlayerId,
-      // FUER WELCHE Disziplin die beiden Maps oben gelaufen sind (N-Team-Infrastruktur-Audit
-      // 13.09., Fund B2). Ohne diese Angabe entscheidet der Resolve-Engine nur nach Mengen-
-      // Zugehoerigkeit zu `ARENA_RESOLVED_DISCIPLINE_IDS` und wuerde denselben einen Duellausgang
-      // auch der ZWEITEN arena-aufgeloesten Disziplin desselben Spieltags buchen. Dass das heute
-      // nicht passiert, haengt allein an der `mehrdeutig`-Wache in `kickoffArenaMatchdayApply()`
-      // weiter unten -- eine Deckung aus einer anderen Datei. Hier steht sie jetzt am Ergebnis
-      // selbst.
-      arenaDisciplineId,
+      // Arena-Boxscore, s. lib/resolve/battle-mode-arena-team-points.ts — ebenfalls disziplin-
+      // geschluesselt seit WEG B.
+      arenaIndividualBoxscorePpsByDisciplineId,
     });
 
     const service = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
@@ -219,9 +254,14 @@ async function fuehreArenaMatchdayApplyAus(input: {
 /**
  * Startet den Arena-Matchday-Apply im HINTERGRUND (detached) und kehrt sofort zurueck — analog zu
  * `kickoffLeagueSetupDraft()`. Liefert `{ applicable: false }`, wenn dieser Spieltag gar keinen
- * Arena-Pfad braucht (Manager Mode oder keine Basketball-Seite an diesem Spieltag); der Aufrufer
- * faellt dann auf den bestehenden synchronen `LegacyMatchdayResultApplyService`-Aufruf zurueck —
- * bit-identisches Verhalten zu vorher.
+ * Arena-Pfad braucht (Manager Mode oder keine arena-aufgeloeste Disziplin an D1/D2 dieses
+ * Spieltags); der Aufrufer faellt dann auf den bestehenden synchronen
+ * `LegacyMatchdayResultApplyService`-Aufruf zurueck — unveraendertes Verhalten fuer diesen Fall.
+ *
+ * WEG B (N-Team-Infrastruktur-Audit 13.09., Abschnitt 8): sind D1 UND D2 BEIDE arena-aufgeloest,
+ * gilt das SEIT DIESER AENDERUNG als anwendbar mit ZWEI Disziplinen, nicht mehr als `mehrdeutig`
+ * mit Rueckfall auf `{ applicable: false }` — s. `fuehreArenaMatchdayApplyAus()`, das jetzt fuer
+ * jede ermittelte Disziplin einen eigenen Arena-Lauf faehrt.
  */
 export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput): ArenaMatchdayApplyKickoffResult {
   const { persistence, saveId, matchdayId, logPrefix } = input;
@@ -236,17 +276,8 @@ export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput)
 
   const seasonId = input.seasonId ?? current.gameState.season.id;
   const contextResults = loadAllLocalLegacyLineupContexts({ saveId, seasonId, matchdayId }, persistence);
-  const { arenaDisciplineId, mehrdeutig } = determineArenaDisciplineContexts(contextResults);
-  if (mehrdeutig) {
-    // S. Dateikopf-Kommentar ("MEHRERE ARENA-DISZIPLINEN..."): D1 und D2 sind BEIDE
-    // arena-aufgeloest -- nicht unterstuetzt, ganzer Spieltag faellt auf den PPS-Pfad zurueck.
-    console.error(
-      `${logPrefix} Arena-Matchday: mehrere arena-aufgeloeste Disziplinen an einem Spieltag (${matchdayId}) -- ` +
-        "noch nicht unterstuetzt, falle auf den PPS-Pfad zurueck.",
-    );
-    return { applicable: false };
-  }
-  if (!arenaDisciplineId) {
+  const { arenaDisciplineIds } = determineArenaDisciplineContexts(contextResults);
+  if (arenaDisciplineIds.length === 0) {
     return { applicable: false };
   }
 
@@ -255,8 +286,9 @@ export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput)
     seasonState: { ...current.gameState.seasonState, arenaMatchdayResolveStatus: "in_progress" },
   });
 
-  // Detached (kein `await`): der Aufrufer (die Apply-Route) darf hier nicht 6-16+ Sekunden haengen.
-  // Das `.catch` ist kein Schmuck — ohne es waere jeder Fehler, den `fuehreArenaMatchdayApplyAus`
+  // Detached (kein `await`): der Aufrufer (die Apply-Route) darf hier nicht 6-16+ Sekunden (bzw.
+  // bis zu doppelt so lange bei zwei arena-aufgeloesten Disziplinen, s. WEG B oben) haengen. Das
+  // `.catch` ist kein Schmuck — ohne es waere jeder Fehler, den `fuehreArenaMatchdayApplyAus`
   // nicht selbst faengt, eine unbehandelte Ablehnung.
   void fuehreArenaMatchdayApplyAus({
     persistence,
@@ -266,7 +298,7 @@ export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput)
     forceReplace: input.forceReplace ?? false,
     allowIncompleteOverride: input.allowIncompleteOverride ?? false,
     logPrefix,
-    arenaDisciplineId,
+    arenaDisciplineIds,
     runArenaFixturesImpl: input.runArenaFixturesImpl,
   }).catch((error) => {
     console.error(`${logPrefix} Arena-Matchday-Resolve: unerwarteter Fehler ausserhalb des try/catch:`, error);

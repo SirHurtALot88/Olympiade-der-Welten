@@ -192,7 +192,7 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
         createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40], gameState }),
         createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35], gameState }),
       ],
-      { arenaTeamPointsByTeamId },
+      { arenaTeamPointsByDisciplineId: new Map([["basketball", arenaTeamPointsByTeamId]]) },
     );
 
     const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
@@ -225,9 +225,14 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
 
     const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
     const withArena = buildLegacyMatchdayResolvePreview(contexts, {
-      arenaTeamPointsByTeamId: new Map([
-        ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
-        ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+      arenaTeamPointsByDisciplineId: new Map([
+        [
+          "basketball",
+          new Map([
+            ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+            ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+          ]),
+        ],
       ]),
     });
 
@@ -263,15 +268,25 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
 
     const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
     const withArenaBoxscore = buildLegacyMatchdayResolvePreview(contexts, {
-      arenaTeamPointsByTeamId: new Map([
-        ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
-        ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+      arenaTeamPointsByDisciplineId: new Map([
+        [
+          "basketball",
+          new Map([
+            ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+            ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+          ]),
+        ],
       ]),
       // A-A-d1-0 hatte den HOEHEREN PPS-Score (10 vs. 5) -- hier ABSICHTLICH die NIEDRIGERE
       // Boxscore-PPs-Zahl, damit ein Effekt eindeutig auf den Boxscore zurueckzufuehren ist.
-      arenaIndividualBoxscorePpsByPlayerId: new Map([
-        ["A-A-d1-0", 0.5],
-        ["A-A-d1-1", 5.9],
+      arenaIndividualBoxscorePpsByDisciplineId: new Map([
+        [
+          "basketball",
+          new Map([
+            ["A-A-d1-0", 0.5],
+            ["A-A-d1-1", 5.9],
+          ]),
+        ],
       ]),
     });
 
@@ -313,15 +328,20 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
 
     const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
     const withPartialImpact = buildLegacyMatchdayResolvePreview(contexts, {
-      arenaTeamPointsByTeamId: new Map([
-        ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
-        ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+      arenaTeamPointsByDisciplineId: new Map([
+        [
+          "basketball",
+          new Map([
+            ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "seed-a-b" }],
+            ["B-B", { teamPoints: ARENA_TEAM_POINTS.loss, arenaMatchSeed: "seed-a-b" }],
+          ]),
+        ],
       ]),
       // NUR A-A-d1-0 hat einen Boxscore-Eintrag -- A-A-d1-1 fehlt (z.B. Namens-Kollision im
       // Boxscore desselben Duells). Anders als bei den Team-Punkten ist das hier PRO SPIELER
       // unabhaengig: d1-1 faellt fuer SICH ALLEIN auf den PPS-Pfad zurueck, d1-0 bekommt trotzdem
       // seine echte Boxscore-Zahl.
-      arenaIndividualBoxscorePpsByPlayerId: new Map([["A-A-d1-0", 3.3]]),
+      arenaIndividualBoxscorePpsByDisciplineId: new Map([["basketball", new Map([["A-A-d1-0", 3.3]])]]),
     });
 
     const alphaWithout = withoutArena.disciplinePreviews
@@ -374,8 +394,8 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
 
     const withoutArena = buildLegacyMatchdayResolvePreview(contexts);
     const withArena = buildLegacyMatchdayResolvePreview(contexts, {
-      arenaTeamPointsByTeamId,
-      arenaIndividualBoxscorePpsByPlayerId,
+      arenaTeamPointsByDisciplineId: new Map([["basketball", arenaTeamPointsByTeamId]]),
+      arenaIndividualBoxscorePpsByDisciplineId: new Map([["basketball", arenaIndividualBoxscorePpsByPlayerId]]),
     });
 
     const kontrolleWithout = withoutArena.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
@@ -396,7 +416,7 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
         createContext({ teamId: "A-A", teamName: "Alpha", d1Scores: [10, 5], d2Scores: [40], gameState }),
         createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35], gameState }),
       ],
-      { arenaTeamPointsByTeamId },
+      { arenaTeamPointsByDisciplineId: new Map([["basketball", arenaTeamPointsByTeamId]]) },
     );
 
     const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
@@ -420,8 +440,11 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
         createContext({ teamId: "B-B", teamName: "Beta", d1DisciplineId: "mini-dm", d1Scores: [50, 40], d2Scores: [35], gameState }),
       ],
       {
-        arenaTeamPointsByTeamId: new Map([
-          ["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "should-not-apply" }],
+        // Bewusst unter "basketball" abgelegt: die gewertete Disziplin ist hier "mini-dm", ein
+        // `.get("mini-dm")` auf dieser Map liefert `undefined` -- die Isolation ist strukturell,
+        // nicht mehr ueber eine `ARENA_RESOLVED_DISCIPLINE_IDS`-Mengenpruefung.
+        arenaTeamPointsByDisciplineId: new Map([
+          ["basketball", new Map([["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "should-not-apply" }]])],
         ]),
       },
     );
@@ -439,7 +462,7 @@ describe("battle mode arena team points in buildLegacyMatchdayResolvePreview", (
         createContext({ teamId: "B-B", teamName: "Beta", d1Scores: [50, 40], d2Scores: [35] }),
       ],
       {
-        arenaTeamPointsByTeamId: new Map([["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "x" }]]),
+        arenaTeamPointsByDisciplineId: new Map([["basketball", new Map([["A-A", { teamPoints: ARENA_TEAM_POINTS.win, arenaMatchSeed: "x" }]])]]),
       },
     );
 

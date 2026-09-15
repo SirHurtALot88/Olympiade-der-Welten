@@ -934,6 +934,20 @@ export function resolveShowcasePpsReferenz(
 
 const LEAGUE_TIERS: readonly LeagueTier[] = ["liga1", "liga2"];
 
+/**
+ * ENTSCHEIDUNG ZU `opponentTeamId`/`outcome` (WEG B, N-Team-Infrastruktur-Audit 13.09., Abschnitt 7
+ * Punkt 4 — dort als Frage fuer eine kuenftige N-Team-Disziplin wie Staffel gestellt: "muesste
+ * `opponentTeamId`/`outcome` entweder weglassen oder pluralisieren"). GEPRUEFT UND BEWUSST
+ * UNVERAENDERT GELASSEN: dieser Typ beschreibt das Ergebnis EINES Teams in EINEM Zwei-Team-Duell,
+ * und das bleibt fuer WEG B in JEDER Disziplin wahr, auch wenn D1 und D2 desselben Spieltags jetzt
+ * BEIDE arena-aufgeloest laufen koennen -- es entstehen dadurch ZWEI unabhaengige Zwei-Team-Duelle
+ * (eins je Disziplin), kein Vierer-/N-Team-Event. Singular bleibt also korrekt. Was WIRKLICH
+ * disziplin-bewusst werden musste, ist eine Ebene HOEHER: der BEHAELTER, der diese Overrides haelt
+ * (`LegacyResolvePreviewOptions.arenaTeamPointsByDisciplineId`, lib/lineups/legacy-lineup-types.ts)
+ * ist jetzt disciplineId -> teamId -> `ArenaTeamPointsOverride` statt einer flachen teamId-Map --
+ * DORT liegt die Pluralisierung, nicht hier. Die Frage aus Abschnitt 7 bleibt fuer eine ECHTE
+ * N-Team-Disziplin (Staffel als Vierergruppe, nicht Teil dieser PR) weiterhin offen.
+ */
 export type ArenaTeamPointsOverride = {
   teamPoints: number;
   arenaMatchSeed: string;
@@ -944,18 +958,35 @@ export type ArenaTeamPointsOverride = {
 };
 
 /**
- * Deterministischer Seed pro Duell — exakt das im Plan (Abschnitt 3.3c) vorgeschlagene Format.
- * `runArenaFixtures()` haelt Text-Seeds via FNV-1a-Hash selbst in eine Zahl um (s. PR6), diese
- * Funktion muss also NICHT selbst hashen.
+ * Deterministischer Seed pro Duell — Plan (Abschnitt 3.3c) plus `disciplineId` (WEG B,
+ * N-Team-Infrastruktur-Audit 13.09., Chris' Entscheidung 15.09.). `runArenaFixtures()` haelt
+ * Text-Seeds via FNV-1a-Hash selbst in eine Zahl um (s. PR6), diese Funktion muss also NICHT
+ * selbst hashen.
+ *
+ * `disciplineId` GEHOERT SEIT WEG B ZWINGEND IN DEN SEED (nicht optional, kein Default): solange
+ * an einem Spieltag hoechstens EINE Disziplin arena-aufgeloest lief, gab es fuer eine Team-Paarung
+ * ohnehin nur einen Aufruf, ein fehlendes Disziplin-Feld im Seed blieb also folgenlos. Sobald D1
+ * UND D2 desselben Spieltags beide arena-aufgeloest sind, laufen ZWEI `runArenaFixtures()`-Aufrufe
+ * fuer DIESELBE Team-Paarung (gleiche saveId/seasonId/matchdayId/home/away) -- ohne `disciplineId`
+ * im Seed haetten beide Aufrufe DENSELBEN Textseed und damit (FNV-1a haesht denselben String immer
+ * auf dieselbe Zahl) DENSELBEN numerischen PRNG-Startwert fuer zwei voellig verschiedene Motoren.
+ * Das waere kein Absturz und keine falsche Punktzahl, sondern eine STILLE, bis jetzt unerreichbare
+ * Korrelation zwischen den beiden Duellergebnissen desselben Spieltags (z.B. ein etwaiger, in den
+ * ersten PRNG-Ziehungen liegender Heimvorteil-Bias haette beide Disziplinen gleich getroffen,
+ * statt unabhaengig zu streuen) -- eine Invariante, die vor WEG B nirgends dokumentiert war, weil
+ * sie nie zwei gleichzeitige Arena-Laeufe fuer dieselbe Paarung gab. Mit `disciplineId` im Seed
+ * sind die beiden Laeufe wieder unabhaengig, exakt wie zwei verschiedene Team-Paarungen es heute
+ * schon sind.
  */
 export function buildArenaMatchSeed(input: {
   saveId: string;
   seasonId: string;
   matchdayId: string;
+  disciplineId: string;
   homeTeamId: string;
   awayTeamId: string;
 }): string {
-  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:${input.homeTeamId}:${input.awayTeamId}`;
+  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:${input.disciplineId}:${input.homeTeamId}:${input.awayTeamId}`;
 }
 
 /**
@@ -1269,6 +1300,7 @@ export async function runBattleModeArenaMatchday(
         saveId,
         seasonId,
         matchdayId,
+        disciplineId,
         homeTeamId: fixture.homeTeamId,
         awayTeamId: fixture.awayTeamId,
       });

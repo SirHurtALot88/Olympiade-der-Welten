@@ -280,7 +280,7 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
           createContext({ teamId: "liga2-a", teamName: "Liga2A", d1Scores: [30, 20], d2Scores: [20, 19], gameState }),
           createContext({ teamId: "liga2-b", teamName: "Liga2B", d1Scores: [15, 10], d2Scores: [45, 44], gameState }),
         ],
-        { arenaTeamPointsByTeamId: overridesByTeamId },
+        { arenaTeamPointsByDisciplineId: new Map([["basketball", overridesByTeamId]]) },
       );
 
       const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
@@ -438,8 +438,8 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
       };
 
       const preview = buildLegacyMatchdayResolvePreview([heimContext, gastContext], {
-        arenaTeamPointsByTeamId: overridesByTeamId,
-        arenaIndividualBoxscorePpsByPlayerId: individualBoxscorePpsByPlayerId,
+        arenaTeamPointsByDisciplineId: new Map([["basketball", overridesByTeamId]]),
+        arenaIndividualBoxscorePpsByDisciplineId: new Map([["basketball", individualBoxscorePpsByPlayerId]]),
       });
 
       const basketball = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "basketball");
