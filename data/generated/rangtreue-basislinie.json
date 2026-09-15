@@ -1,80 +1,80 @@
 {
  "hinweis": "Kaderfeste Rho-Basislinie (docs/design/messgrundlage-kaderfest.md). schranke ist der groesste erlaubte Rueckgang von spielMedian, bevor scripts/pruefe-rangtreue-schranke.mjs die CI rot macht — max(0.05, 0.3*spielSpannweite), s. Kopfkommentar dieses Skripts. Neu bauen mit: node scripts/baue-rangtreue-basislinie.mjs [spiele]",
- "gemessenAm": "2026-09-06T12:46:11.785Z",
+ "gemessenAm": "2026-09-15T14:20:54.153Z",
  "spiele": 24,
  "kaderFamilieQuelle": "live-save (Oly New Game Custom 19.8.2026, 09:08:45, gezogen 2026-09-03T11:40:56.959Z)",
  "disziplinen": {
   "tdm": {
    "chassis": "arena",
-   "spielMedian": 0.253,
-   "spielSpannweite": 0.328,
-   "saisonMedian": 0.217,
-   "saisonSpannweite": 0.308,
-   "schranke": 0.098
+   "spielMedian": 0.165,
+   "spielSpannweite": 0.272,
+   "saisonMedian": 0.322,
+   "saisonSpannweite": 0.245,
+   "schranke": 0.082
   },
   "mini-dm": {
    "chassis": "arena",
-   "spielMedian": 0.094,
-   "spielSpannweite": 0.697,
-   "saisonMedian": 0.071,
-   "saisonSpannweite": 0.786,
-   "schranke": 0.209
+   "spielMedian": 0.256,
+   "spielSpannweite": 0.661,
+   "saisonMedian": 0.643,
+   "saisonSpannweite": 0.738,
+   "schranke": 0.198
   },
   "battlefield": {
    "chassis": "arena",
-   "spielMedian": 0.387,
-   "spielSpannweite": 0.938,
-   "saisonMedian": 0.595,
-   "saisonSpannweite": 1.095,
-   "schranke": 0.281
+   "spielMedian": 0.251,
+   "spielSpannweite": 0.778,
+   "saisonMedian": 0.429,
+   "saisonSpannweite": 1.071,
+   "schranke": 0.233
   },
   "spurt": {
    "chassis": "bahn",
-   "spielMedian": 0.871,
-   "spielSpannweite": 0.236,
-   "saisonMedian": 0.905,
-   "saisonSpannweite": 0.19,
-   "schranke": 0.071
+   "spielMedian": 0.894,
+   "spielSpannweite": 0.138,
+   "saisonMedian": 0.916,
+   "saisonSpannweite": 0.105,
+   "schranke": 0.05
   },
   "time-trial": {
    "chassis": "bahn",
-   "spielMedian": 0.828,
-   "spielSpannweite": 0.087,
-   "saisonMedian": 0.832,
+   "spielMedian": 0.825,
+   "spielSpannweite": 0.082,
+   "saisonMedian": 0.825,
    "saisonSpannweite": 0.056,
    "schranke": 0.05
   },
   "climbing": {
    "chassis": "bahn",
-   "spielMedian": 0.79,
-   "spielSpannweite": 0.192,
-   "saisonMedian": 0.851,
-   "saisonSpannweite": 0.308,
-   "schranke": 0.058
+   "spielMedian": 0.782,
+   "spielSpannweite": 0.191,
+   "saisonMedian": 0.839,
+   "saisonSpannweite": 0.287,
+   "schranke": 0.057
   },
   "staffel": {
    "chassis": "bahn",
-   "spielMedian": 0.915,
-   "spielSpannweite": 0.089,
+   "spielMedian": 0.899,
+   "spielSpannweite": 0.1,
    "saisonMedian": 0.951,
-   "saisonSpannweite": 0.093,
+   "saisonSpannweite": 0.1,
    "schranke": 0.05
   },
   "takeshis-castle": {
    "chassis": "bahn",
-   "spielMedian": 0.861,
-   "spielSpannweite": 0.116,
-   "saisonMedian": 0.93,
-   "saisonSpannweite": 0.056,
+   "spielMedian": 0.879,
+   "spielSpannweite": 0.101,
+   "saisonMedian": 0.958,
+   "saisonSpannweite": 0.063,
    "schranke": 0.05
   },
   "gewichtheben": {
    "chassis": "buehne",
-   "spielMedian": 0.847,
-   "spielSpannweite": 0.215,
-   "saisonMedian": 0.916,
-   "saisonSpannweite": 0.301,
-   "schranke": 0.064
+   "spielMedian": 0.843,
+   "spielSpannweite": 0.208,
+   "saisonMedian": 0.93,
+   "saisonSpannweite": 0.28,
+   "schranke": 0.063
   },
   "showcase": {
    "chassis": "buehne",
@@ -86,10 +86,10 @@
   },
   "eiskunstlauf": {
    "chassis": "buehne",
-   "spielMedian": 0.875,
-   "spielSpannweite": 0.075,
-   "saisonMedian": 0.965,
-   "saisonSpannweite": 0.049,
+   "spielMedian": 0.885,
+   "spielSpannweite": 0.083,
+   "saisonMedian": 0.979,
+   "saisonSpannweite": 0.028,
    "schranke": 0.05
   },
   "breaking": {
@@ -134,11 +134,11 @@
   },
   "fechten": {
    "chassis": "buehne",
-   "spielMedian": 0.816,
-   "spielSpannweite": 0.192,
-   "saisonMedian": 0.888,
-   "saisonSpannweite": 0.133,
-   "schranke": 0.058
+   "spielMedian": 0.809,
+   "spielSpannweite": 0.184,
+   "saisonMedian": 0.909,
+   "saisonSpannweite": 0.14,
+   "schranke": 0.055
   },
   "basketball": {
    "chassis": "feldspiel",
@@ -150,11 +150,11 @@
   },
   "football": {
    "chassis": "feldspiel",
-   "spielMedian": 0.516,
-   "spielSpannweite": 0.172,
-   "saisonMedian": 0.811,
-   "saisonSpannweite": 0.168,
-   "schranke": 0.051
+   "spielMedian": 0.813,
+   "spielSpannweite": 0.074,
+   "saisonMedian": 0.916,
+   "saisonSpannweite": 0.091,
+   "schranke": 0.05
   },
   "hockey": {
    "chassis": "feldspiel",
