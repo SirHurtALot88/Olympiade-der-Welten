@@ -43,7 +43,8 @@ import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-servi
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
-import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
+import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
+import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
@@ -448,16 +449,17 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     }
   }
 
-  const localDisciplineWeights = requiredDisciplineIds.flatMap((disciplineId) =>
-    playerGeneratorAttributeKeys
+  const localDisciplineWeights = requiredDisciplineIds.flatMap((disciplineId) => {
+    const weightProfile = resolveDisciplineWeightProfile(disciplineId);
+    return playerGeneratorAttributeKeys
       .map((attributeKey) => ({
         disciplineId,
         attributeKey,
-        weightPct: officialDisciplineWeightTable[attributeKey][disciplineId as OfficialDisciplineWeightId] ?? 0,
+        weightPct: weightProfile[attributeKey] ?? 0,
       }))
       .filter((entry) => entry.weightPct > 0)
-      .sort((left, right) => right.weightPct - left.weightPct),
-  );
+      .sort((left, right) => right.weightPct - left.weightPct);
+  });
   const rosterAssignments = normalizedGameState.rosters.map((entry) => ({
     teamId: entry.teamId,
     playerId: entry.playerId,

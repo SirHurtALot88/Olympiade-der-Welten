@@ -36,12 +36,16 @@ const categoryColorGroup: Record<string, string> = {
 export const OFFICIAL_DISCIPLINE_WEIGHT_SOURCE = "official-weighted-average-matrix-2026-06";
 
 /**
- * Alle Herkunftsvermerke, die `disciplineWeightSeedRows` erzeugen KANN.
+ * Alle Herkunftsvermerke, die `disciplineWeightSeedRows` erzeugen KANN — rein informativ.
  *
- * `prisma/seed.ts` raeumt nach dem Seed jede DisciplineWeight-Zeile weg, deren `source` hier
- * NICHT drinsteht (Zweck: Altbestand aus frueheren Quellen loeschen). Kommt ein neuer
- * Herkunftsvermerk dazu, MUSS er hier stehen — sonst loescht der Seed die Zeilen, die er
- * gerade selbst geschrieben hat, und die Disziplin steht lautlos ohne Gewichte da.
+ * `prisma/seed.ts` raeumte frueher ueber eine Source-Whitelist auf (`notIn` dieser Liste).
+ * Das griff nicht, wenn sich innerhalb DERSELBEN Source das Attribut-Set einer Disziplin
+ * aendert (z.B. Football verliert `charisma` beim Umstieg auf den Spiel-Eignungs-Override,
+ * `official-weighted-average-matrix-2026-06` bleibt aber fuer die anderen 19 Disziplinen
+ * gueltig) — die veraltete Zeile ueberlebte jeden Reseed. Der Cleanup vergleicht deshalb
+ * seit dem 15.09. direkt (disciplineId, attributeKey) gegen `disciplineWeightSeedRows`, nicht
+ * mehr `source` gegen diese Liste. Sie bleibt als Dokumentation stehen, welche Herkunftsvermerke
+ * ueberhaupt vorkommen.
  */
 export const DISCIPLINE_WEIGHT_SEED_SOURCES = [
   OFFICIAL_DISCIPLINE_WEIGHT_SOURCE,
