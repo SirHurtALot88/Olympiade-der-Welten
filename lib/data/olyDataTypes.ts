@@ -2566,6 +2566,18 @@ export type DisciplineResultRecord = {
   readinessStatus: LegacyResultReadinessStatus;
   warnings: string[];
   createdAt: string;
+  /**
+   * STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): additive,
+   * optionale Felder -- durchgereicht aus `DisciplineResultWritePayload`
+   * (legacy-matchday-result-mapper.ts), das sie wiederum 1:1 aus der Live-Preview
+   * (`DisciplineTeamResolvePreview`) uebernimmt. Aeltere, bereits persistierte Zeilen (vor diesem
+   * Fix geschrieben) haben diese Felder nicht -- jeder Leser muss ihr Fehlen als
+   * `resolutionSource: "pps"` behandeln, nie werfen (kein Breaking Change am Schema).
+   */
+  teamPoints?: number | null;
+  pointSource?: string;
+  resolutionSource?: "pps" | "arena";
+  arenaMatchSeed?: string | null;
 };
 
 export type PlayerDisciplinePerformanceRecord = {

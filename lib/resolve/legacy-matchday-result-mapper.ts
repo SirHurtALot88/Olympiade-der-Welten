@@ -57,6 +57,18 @@ export type DisciplineResultWritePayload = {
   formModifier: number | null;
   readinessStatus: ResultReadinessStatus;
   warnings: string[];
+  /**
+   * STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): additiv
+   * durchgereicht aus `DisciplineTeamResolvePreview` (legacy-matchday-resolve-types.ts), das diese
+   * Felder schon 1:1 traegt. Vorher endete `teamPoints`/`pointSource`/`resolutionSource`/
+   * `arenaMatchSeed` genau hier -- der Mapper baute die Zeile nur aus `rank`/`baseScore`/
+   * `finalPreviewScore`, und der korrekt gerechnete Arena-Team-Punktestand (2/1/0) ging fuer alle
+   * 13 arena-aufgeloesten Disziplinen verloren, bevor er die Persistenz je erreichte.
+   */
+  teamPoints: number | null;
+  pointSource: string;
+  resolutionSource?: "pps" | "arena";
+  arenaMatchSeed?: string | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -202,6 +214,10 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           formModifier: teamResult.formModifier,
           readinessStatus,
           warnings: teamResult.warnings,
+          teamPoints: teamResult.teamPoints,
+          pointSource: teamResult.pointSource,
+          resolutionSource: teamResult.resolutionSource,
+          arenaMatchSeed: teamResult.arenaMatchSeed,
         };
       }),
   );

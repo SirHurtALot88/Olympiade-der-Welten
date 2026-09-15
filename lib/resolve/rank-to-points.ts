@@ -161,10 +161,19 @@ export function distributeRankPointsToPlayers<T extends {
     playerCount: number | null;
     rank: number | null;
     entries: T[];
+    /**
+     * STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): wenn gesetzt
+     * (arena-aufgeloeste Disziplin mit gebuchtem Arena-Team-Ergebnis), wird DIESER Wert unter den
+     * Spielern verteilt statt des per `rank`/`playerCount` aus der Tabelle nachgeschlagenen Werts
+     * -- die Verteilungslogik (Anteil am Endscore/Basiswert/Score-Beitrag) bleibt exakt dieselbe,
+     * nur die zu verteilende Summe aendert sich. `null`/`undefined` heisst: bisheriges Verhalten
+     * (PPS-Rang-Nachschlag), unveraendert fuer alle nicht-arena-aufgeloesten Disziplinen.
+     */
+    teamPointsOverride?: number | null;
   },
 ): DistributeRankPointsResult<T> {
   const warnings: string[] = [];
-  const teamPoints = getRankToPointsValue(input.playerCount, input.rank);
+  const teamPoints = input.teamPointsOverride ?? getRankToPointsValue(input.playerCount, input.rank);
 
   if (teamPoints == null) {
     warnings.push(

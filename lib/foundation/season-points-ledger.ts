@@ -180,6 +180,14 @@ function deriveRankPointsFromPerformances(
     playerCount,
     rank: teamResult.rank,
     entries: performances,
+    // STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): fuer
+    // arena-aufgeloeste Zeilen mit gebuchtem `teamPoints` (2/1/0) wird DIESER Wert verteilt statt
+    // des PPS-Rang-Nachschlags -- sonst ueberschreibt genau diese Nachbuchung den Fix aus
+    // standings-preview-engine.ts wieder (der urspruengliche Fund, Abschnitt 1.3 des Plans).
+    teamPointsOverride:
+      teamResult.resolutionSource === "arena" && teamResult.teamPoints != null
+        ? teamResult.teamPoints
+        : null,
   });
 
   if (distributed.teamPoints == null) {

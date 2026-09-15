@@ -347,8 +347,22 @@ function resolveDisciplinePoints(input: {
   rank: number | null;
   disciplineId: string;
   disciplineSide: "d1" | "d2";
+  /**
+   * STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): woher
+   * `teamPoints` unten stammt. Nur bei `"arena"` UND vorhandenem `teamPoints` wird der
+   * PPS-Rang-Pfad umgangen -- jede andere Zeile (`"pps"`, `undefined` fuer aeltere,
+   * vor dem Fix gebuchte Saves, oder `"arena"` ohne `teamPoints`) faellt exakt auf das bisherige
+   * Verhalten zurueck. Das haelt die sieben nicht-arena-aufgeloesten Disziplinen unveraendert.
+   */
+  resolutionSource?: "pps" | "arena";
+  teamPoints?: number | null;
 }): DisciplinePointsLookup {
   const warnings: string[] = [];
+
+  if (input.resolutionSource === "arena" && input.teamPoints != null) {
+    return { points: input.teamPoints, playerCount: input.playerCount, warnings };
+  }
+
   if (input.playerCount == null || input.rank == null) {
     warnings.push(`rank_to_points_missing:${input.disciplineId}:${input.disciplineSide}`);
     return { points: null, playerCount: input.playerCount, warnings };
@@ -503,6 +517,8 @@ export async function buildStandingsPreview(
         rank: row.rank,
         disciplineId: row.disciplineId,
         disciplineSide: row.disciplineSide,
+        resolutionSource: row.resolutionSource,
+        teamPoints: row.teamPoints,
       });
       if (row.disciplineSide === "d1") {
         current.d1Score = row.totalScore;
