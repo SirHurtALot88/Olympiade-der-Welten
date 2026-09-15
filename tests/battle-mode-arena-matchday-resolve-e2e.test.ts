@@ -21,8 +21,13 @@ import {
  * aufgeloest und diese Gegenprobe damit still entwertet. Der Wachhund unten faengt den naechsten
  * solchen Fall ab, bevor er als verwirrender Zahlendiff auftaucht -- dieselbe Konstruktion wie
  * in tests/battle-mode-arena-resolve-engine.test.ts.
+ *
+ * DANACH STAND HIER "football" -- Football-Produktionsanbindung (15.09., s. Kommentar an
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` in battle-mode-arena-team-points.ts) hat auch das gebrochen,
+ * der Wachhund hat es wie vorgesehen gefangen. `battlefield` (rho 0,387, ACHSE 1 klar nicht
+ * bestanden) ersetzt es jetzt, mit deutlichem Abstand zur 0,80-Schranke.
  */
-const D2_KONTROLL_DISZIPLIN = "football";
+const D2_KONTROLL_DISZIPLIN = "battlefield";
 
 describe("D2-Kontrolldisziplin (Arena-E2E)", () => {
   it("ist NICHT arena-aufgeloest -- sonst prueft die Gegenprobe unten nichts mehr", () => {
@@ -127,7 +132,7 @@ function baueBattleModeGameState(): GameState {
     season: { id: "season-1" },
     disciplines: [
       { id: "basketball", name: "Basketball", category: "tactics" },
-      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Battlefield", category: "power" },
     ],
     seasonState: {
       leagueByTeamId: {
@@ -205,7 +210,7 @@ function createContext(input: {
     rosterPlayers: entries.map((entry) => ({ id: entry.playerId, name: entry.playerId, coreStats: { pow: 1, spe: 1, men: 1, soc: 1 } })),
     disciplines: [
       { id: "basketball", name: "Basketball", category: "tactics" },
-      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Battlefield", category: "power" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [

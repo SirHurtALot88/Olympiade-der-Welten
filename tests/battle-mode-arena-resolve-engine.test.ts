@@ -30,8 +30,15 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS, ARENA_TEAM_POINTS } from "@/lib/resolve/
  * verwirrenden Zahlendiff rot wurde ("pointsAwarded 3,77 statt 6,6") statt mit ihrer echten
  * Ursache. Deshalb steht die Wahl jetzt an EINER benannten Stelle -- und der Wachhund darunter
  * sagt beim naechsten Mal direkt, was zu tun ist.
+ *
+ * DANACH STAND HIER "football", UND GENAU DAS IST JETZT PASSIERT (Football-Produktionsanbindung
+ * 15.09., s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS` in battle-mode-arena-team-points.ts):
+ * der Wachhund unten schlug wie vorgesehen an ("ist NICHT arena-aufgeloest" wurde `false`), statt
+ * eines verwirrenden Zahlendiffs. Football ist raus, `battlefield` (rho 0,387, ACHSE 1 nicht
+ * bestanden, s. `ARENA_RESOLVED_DISCIPLINE_IDS`-Kommentar dort) ist rein -- mit deutlichem
+ * Abstand zur 0,80-Schranke, also kein baldiger dritter Wechsel zu erwarten.
  */
-const D2_KONTROLL_DISZIPLIN = "football";
+const D2_KONTROLL_DISZIPLIN = "battlefield";
 
 describe("D2-Kontrolldisziplin", () => {
   it("ist NICHT arena-aufgeloest -- sonst pruefen die Gegenproben unten nichts mehr", () => {
@@ -117,7 +124,7 @@ function createContext(input: {
     })),
     disciplines: [
       { id: d1DisciplineId, name: "Basketball", category: "tactics" },
-      { id: D2_KONTROLL_DISZIPLIN, name: "Football", category: "power" },
+      { id: D2_KONTROLL_DISZIPLIN, name: "Battlefield", category: "power" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [
