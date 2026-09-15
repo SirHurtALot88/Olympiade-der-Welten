@@ -55,11 +55,13 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
  * `runBattleModeArenaMatchday()` fuer JEDE ermittelte arena-aufgeloeste Disziplin (0, 1 oder 2)
  * sequenziell auf und sammelt die Ergebnisse disziplin-geschluesselt.
  *
- * BALANCE-HINWEIS (Audit Abschnitt 2.1/8, benannt statt versteckt): ein Spieltag mit ZWEI echten
- * Arena-Duellen statt bisher hoechstens einem schuettet an diesem Spieltag entsprechend mehr
- * Liga-Punkte aus (zwei unabhaengige 2/1/0-Ergebnisse statt eines). Das ist eine erwartete,
- * gemessene Folge von WEG B (s. PR-Beschreibung fuer die Vorher/Nachher-Zahlen), keine
- * Kompensationsmechanik ist dafuer vorgesehen (vom Audit nicht verlangt).
+ * BALANCE-HINWEIS (Audit Abschnitt 8, benannt statt versteckt — NICHT Abschnitt 2.1, das behandelt
+ * Mini-DMs FFA-Budget-Bruch, ein anderes Thema): ein Spieltag mit ZWEI echten Arena-Duellen statt
+ * bisher hoechstens einem schuettet an diesem Spieltag entsprechend mehr Liga-Punkte aus (zwei
+ * unabhaengige 2/1/0-Ergebnisse statt eines). Abschnitt 8 nennt diesen Kostenfaktor bei der
+ * Weg-B-Empfehlung ("Zwei Duelle, zwei Mal Punkte"), ohne eine Kompensation zu fordern — das ist
+ * eine erwartete, gemessene Folge von WEG B (s. PR-Beschreibung fuer die Vorher/Nachher-Zahlen),
+ * keine Kompensationsmechanik ist dafuer vorgesehen.
  */
 
 export type ArenaMatchdayApplyKickoffInput = {
