@@ -195,6 +195,12 @@ export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "takeshis-castle",
   "time-trial",
   "spurt",
+  // CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): fuenfte und
+  // letzte Bahn-Disziplin. Bestand die Rangtreue-Schranke bis hierhin nicht (rho 0,782 je
+  // Spiel kaderfest, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS` in
+  // battle-mode-arena-team-points.ts) und stand deshalb bewusst draussen; die eigene
+  // Rezeptkalibrierung (BAHN_ART.climbing.rezept.STEHEN) hebt sie auf 0,834.
+  "climbing",
 ]);
 
 function seedZuZahl(seed: string | number): number {

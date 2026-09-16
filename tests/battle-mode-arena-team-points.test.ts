@@ -117,14 +117,19 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * CLIMBING BLEIBT BEWUSST DRAUSSEN (Bahn-Produktivierung, 10.09.): rho 0,790 je Spiel, 0,010
-   * unter der 0,80-Schranke aus CLAUDE.md -- dieselbe Regel wie bei I-Spy zwei Tests weiter unten.
-   * Ein Regressionstest, kein Verhaltenstest: haelt fest, DASS diese Entscheidung bewusst
-   * getroffen wurde (es waere technisch nur eine weitere Zeile im selben Bahn-Dispatch), nicht
-   * vergessen. Wird Climbing spaeter ueber 0,80 gehoben, faellt dieser Test absichtlich rot.
+   * CLIMBING IST JETZT DRIN (Kalibrierrunde 16.09., docs/design/climbing-kalibrierung-16-09.md)
+   * -- loest den Regressionstest ab, der seit der Bahn-Produktivierung (10.09.) bewusst
+   * rot-bei-Anschluss angelegt war: Climbing bestand die 0,80-Schranke damals knapp nicht
+   * (rho 0,782 je Spiel kaderfest). Ursache, nachgemessen mit `scripts/messe-arena-
+   * einfluss.mjs climbing 48`/`scripts/sondiere-feldspiel-subskills.mjs climbing`: ROBUST war
+   * ein mechanisch toter Sub-Skill (0,0 % Einfluss, sein einziger Kanal -- das 0,3-Gewicht in
+   * der Reserve-Obergrenze -- ist zu schwach), und genau dort waren WILL/HEALTH gefangen.
+   * `BAHN_ART.climbing.rezept.STEHEN` (public/mockups/battle-mode.engine.js) nimmt sie jetzt
+   * statt eines Teils von Stamina/Determination auf -- hebt rho kaderfest auf 0,834, alle
+   * anderen neunzehn Disziplinen bit-identisch nachgemessen.
    */
-  it("enthaelt NICHT Climbing (besteht die Rangtreue-Schranke knapp nicht, 0,790 < 0,80)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("climbing")).toBe(false);
+  it("enthaelt Climbing (eigene Rezeptkalibrierung hebt rho ueber die Schranke, 16.09.)", () => {
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("climbing")).toBe(true);
   });
 
   /**
