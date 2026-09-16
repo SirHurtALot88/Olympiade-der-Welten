@@ -1,3 +1,54 @@
+**Elfter Nachtrag 16.09. — sieben liegengebliebene PRs (#924/#925/#926/#928/#929/#930/#934) nachgezogen,
+alle zwanzig Zeilen gegenkontrolliert.** Der zehnte Nachtrag stand seit 14.09. vormittags; seither
+sind mindestens acht relevante PRs gemergt (#924, #925, #926, #928, #929, #930, #933/#934, #935–#940),
+ohne dass diese Tabelle nachgezogen wurde. **Alle rho-Zahlen unten sind heute (16.09.) frisch
+gemessen** — `node scripts/miss-alle-disziplinen.mjs 24` auf `main` @ `45af1c5d` — und bestätigen
+bit-identisch sowohl `docs/pm-briefings/pm-gesamtstand-15-09.md` als auch die am 15.09. erneuerte
+`data/generated/rangtreue-basislinie.json` (PR #932/#936); keine Ueberraschung, keine Regression.
+
+**Sechs Zeilen bewegen sich, sieben bleiben trotz Codeaenderung unbewegt bestehen, sieben sind
+schlicht unveraendert:**
+
+| Disziplin | Vorher (14.09.) | Jetzt (16.09.) | Ursache |
+|---|---:|---:|---|
+| **Spurt** | 69 % | **83 %** | PR #926: Feldgroesse 4→6 behoben, rho 0,871→0,894 (jetzt ≥0,85-Stufe, G1 40 statt 40 — aber **G2 30 neu**, Spurt ist die 14. arena-resolved Disziplin); dazu `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, die diese Tabelle bei Spurt bis heute als offenen Movement-Mangel gefuehrt hat — Movement 60→85. |
+| **Tennis** | 56 % | **71 %** | PR #929: `zeichneTennis()` ist jetzt ein eigener Buehnenzweig (vorher der geteilte Duell-Zweig) mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und einer Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch (0,825). |
+| **Fechten** | 59 % | **64 %** | PR #923 (Konzeptrecherche) + PR #928 (drei FIE-Perioden statt einer Punkteformel, laufender Trefferstand im Feed, Chris' Go 14.09.) heben Konzept 55→75 — aber das Rezept selbst bleibt im Code explizit „ERSTER, AUSDRUeCKLICH NICHT FINALER Sieben-Rollen-Entwurf" (`battle-mode.engine.js:12442`), keine Kalibrierrunde, also K4 weiterhin offen. Gameplay bleibt 90 (rho 0,816→0,809, dieselbe 0,80–0,85-Stufe). Movement bleibt 35: `stepFechten()` existiert bis heute nicht, `fechten:true` ist weiterhin rein deskriptiv (`:13416`, Waechter greift nie). Assets bleibt 55: `sfx("fechten"` steht 0x im Motor. |
+| **Football** | 79 % | **76 %** | Gegenlaeufige Bewegung in zwei Schritten: PR #924 (Korridor-Refit Runde 2) hob rho 0,800→0,813, **dann** PR #934 (E3, „eine Wahrheit" fuer Footballs Gewichtsquelle) senkte es strukturell auf **0,722** — unter die 0,80-Schranke. G1 faellt von der 0,80–0,85-Stufe (35) auf die 0,70–0,80-Stufe (22), Gameplay 65→52. PR #933 (Football-PPS-Referenz) liegt bereit, aber Football steht **weiterhin nicht** in `ARENA_RESOLVED_DISCIPLINE_IDS` — die Produktivschaltung ist laut PR #933 selbst bewusst zurueckgestellt, bis eine Balance-Runde (Plan in `docs/design/football-balance-runde-nach-e3-15-09.md`, PR #937) rho wieder ueber 0,80 bringt. Konzept/Assets/Movement unveraendert. |
+| **Climbing** | 49 % | **55 %** | PR #925: Climbing hatte als einzige der fuenf Bahn-Disziplinen **ueberhaupt keinen** `bahnBewegung()`-Zweig — kein `art.climbing`-Flag, kein Aufruf, die Figuren liefen komplett ueber die eingefrorene Weltuhr `t`. Neues `stepClimbing()` schreibt jetzt `u.vizSchritt` (1:1 aus `stepZeitfahren()` uebertragen) — M2 (eigene Schrittlogik) erstmals erfuellt, Movement 40→65. Rein praesentational, rho bit-identisch (0,782, weiterhin knapp durchgefallen). |
+| **Mini-DM** | 53 % | **54 %** | PR #927 (Spielplan-Anchoring, drei Chris-Entscheidungen eingeholt) + PR #930 (4-Team-Pods, `mini-dm-pod-schedule.ts`, echter Playwright-Aufrufer fuer den FFA-Motor) beantworten fuenf von sechs offenen Spielplanfragen (`mini-dm-4-team-ffa-recherche-06-09.md` Abschnitt 5) — Konzept 70→75 (K4-Teilfortschritt: „offene Designfragen entschieden"). **Ausdruecklich nicht** in die Live-Resolve-Pipeline verdrahtet, Mini-DM bleibt ausserhalb `ARENA_RESOLVED_DISCIPLINE_IDS`; Gameplay haengt weiterhin allein an rho (0,256, unveraendert) und bleibt bei 22 — ein fertiger Spielplan aendert nichts an einer durchfallenden Zielwahl-Mechanik. |
+
+**Unveraendert trotz eigener PR (rho-neutral, keine Achse bewegt):** TDM (PR #938 nimmt die
+Stufenaufstieg-Vorschau raus — auskommentiert, nicht geloescht; war laut PR-Text „ohnehin nie ein
+zaehlender Achsen-Baustein", rho bit-identisch 0,165, Konzept/Assets/Gameplay/Movement bleiben bei
+55/65/22/65). Hockey (PR #921/#922, reine Praesentation, rho bit-identisch). Staffel und Takeshi's
+Castle bekommen mit PR #925 dieselbe `stepZeitfahren()`-Reparatur wie Spurt/Climbing — bei ihnen war
+das Bein-Animationsbild aber schon vorher **teilweise** ueber ihre eigenen Zustandsmaschinen
+(`stepStaffel`/`stepParcours`) bewegt, M2 stand hier also schon vor der PR auf voller Punktzahl;
+die Reparatur schliesst eine kosmetische Restluecke innerhalb eines bereits gezaehlten Kriteriums,
+keine neue — Movement bleibt bei 95 (dasselbe Muster wie Eiskunstlaufs Sturz-Teleport-Fix im
+zehnten Nachtrag).
+
+**Sechs bestaetigt weiterhin auf demselben hohen Stand, rho-gegengeprueft (16.09.):** Gewichtheben
+(0,843), Takeshi's Castle (0,879), Breaking (0,869/0,114/0,951/0,168), Eiskunstlauf (0,885),
+Speed-Schach (0,908), Staffel (0,899) — alle sechs Zahlen bit-identisch zum letzten Stand, keine
+PR hat sie seit dem 14.09. angefasst. Basketball (0,769) und die uebrigen zwoelf unveraendert
+gebliebenen Zeilen (Time-Trial, Wettessen, Showcase, I-Spy, Battlefield) ebenfalls bit-identisch.
+
+**Reine Infrastruktur, ohne Wirkung auf eine der zwanzig Achsen-Zeilen:** PR #935 (Arena-Resolve
+Weg B — beide Disziplinen eines Spieltags laufen jetzt als echtes Duell, wenn beide arena-aufgeloest
+sind) und der daraus gefundene Standings-Bypass (PR #939 Diagnose, PR #940 Fix — Arena-Team-Punkte
+erreichten `SeasonState.standings` bislang fuer keine der arena-aufgeloesten Disziplinen) aendern,
+**wie** ein bereits arena-aufgeloestes Ergebnis in der Saisontabelle landet, nicht **ob** eine
+Disziplin arena-aufgeloest ist oder wie ihre vier Achsen stehen. Erwaehnt hier nur, damit niemand
+danach sucht, wo sie fehlen.
+
+**Neuer Durchschnitt: 74 %** (Konzept 80 % · Assets 72 % · Gameplay 75 % · Movement 70 %), vorher
+72 % am 14.09. Die Bewegung kommt fast vollstaendig aus den sechs oben genannten Zeilen; die
+uebrigen vierzehn sind ziffernidentisch zum zehnten Nachtrag.
+
+---
+
 **Zehnter Nachtrag 14.09. — Eiskunstlauf und Breaking nachgezogen (PR #917/#913), plus eine seit
 dem 13.09. liegengebliebene Eiskunstlauf-Zeile gefunden.** Der neunte Nachtrag (direkt darunter)
 hat Eiskunstlauf/Breaking ausdruecklich ausgespart, weil PR #917 und #913 noch in Pruefung waren —
@@ -117,6 +168,11 @@ beziehen koennen. `rho` = kaderfest gemessen, n=24, Median ueber fuenf echte Tea
 `7a07de2f`, alle uebrigen unveraendert auf dem Lauf vom 10.09. „Arena" = Produktionsanschluss
 (`ARENA_RESOLVED_DISCIPLINE_IDS`).
 
+**Fuer den elften Nachtrag (16.09.) sind alle zwanzig Zeilen frisch gegen `main` @ `45af1c5d`
+gemessen** (`node scripts/miss-alle-disziplinen.mjs 24`, kaderfest) — Zeilen 9, 11, 12, 13, 14 und
+17 sind unten entsprechend aktualisiert, die uebrigen vierzehn bit-identisch bestaetigt (s. elfter
+Nachtrag ganz oben fuer die Begruendung jeder Bewegung).
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -127,28 +183,29 @@ beziehen koennen. `rho` = kaderfest gemessen, n=24, Median ueber fuenf echte Tea
 | 6 | Eiskunstlauf | Buehne | 95 % | 100 % | 95 % | 94 % | **96 %** | 0,885 | ja | **14.09.** Spotlight-Reihenfolge (gruppenweise statt „alle zwoelf gleichzeitig") + drei Zonen (Kuerbahn/Startbereich/Kiss-and-Cry) + Live-Standings-Tafel `zeichneEisStand()` vervollstaendigen die eigene Szene — Assets 95→100 (PR #917, rho bit-identisch frisch gemessen); Sturz-Teleport-Bug behoben (gedeckelte Paar-Uhr), Movement bleibt 94 (Reparatur einer bereits gezaehlten Achse, keine neue) · **Nachzug 13.09.:** Konzept 90→95, Assets 70→95 — Ton-Aufrufstellen + Kufe-Requisite + K4-Kalibrierung (PR #903, in der Tabelle nie nachgezogen) |
 | 7 | Speed-Schach | Buehne | 95 % | 95 % | 100 % | 95 % | **96 %** | 0,908 | ja | **12.09.** Konzept/Assets/Movement 80/75/80→95 — eigenes Fable-Dokument, Ton, Schachuhr-Requisite, `stepSchach()` (PR #902) |
 | 8 | Staffel | Bahn | 95 % | 95 % | 97 % | 95 % | **96 %** | 0,899 | ja | **14.09.** Oval als echte Stadionform, Bildposition aus dem Gesamtfortschritt, alle Zeitanzeigen in echten Sekunden, Ausfuehrungsstreuung beim Wechsel — rho 0,915→**0,899** (gepaart reproduziert, gleiche G1-Stufe) (PR #916) · **Nachzug 13.09.:** Assets 55→95, Movement 70→95 (Stab-Sprite + Ton, PR #901, in der Tabelle nie nachgezogen) · Arena-Spalte korrigiert |
-| 9 | Football | Feldspiel | 90 % | 75 % | 65 % | 85 % | **79 %** | 0,800 | nein | 10.09. Rezept Runde 1, rho 0,516→0,800 (PR #884) · **E3 in Pruefung** (Anzeige-Korrektur, PR #894, NICHT gemergt — wartet auf Chris) |
-| 10 | Time-Trial | Bahn | 95 % | 50 % | 92 % | 65 % | **76 %** | 0,825 | ja | **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert |
-| 11 | Spurt | Bahn | 95 % | 55 % | 67 % | 60 % | **69 %** | 0,871 | nein | **14.09.** Puste-Erholung auf der Bahn eingeschaltet, rho ziffernidentisch 0,871 (PR #914) — keine Achse bewegt |
-| 12 | Fechten | Buehne | 55 % | 55 % | 90 % | 35 % | **59 %** | 0,816 | ja | unveraendert seit 07.09. |
-| 13 | Tennis | Buehne | 75 % | 40 % | 90 % | 20 % | **56 %** | 0,825 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
-| 14 | Mini-DM | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,256 | nein | **14.09.** Formationsleine haengt an der eigenen Reihe: Reihenabstand 8,8→59,0 px, Durchbruch 18,3→4,3 % → Movement 55→60 (PR #912). rho 0,094→0,256, Kaderrauschen 0,661 — gleiche G1-Stufe · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
-| 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe |
-| 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe |
-| 17 | Climbing | Bahn | 65 % | 40 % | 49 % | 40 % | **49 %** | 0,782 | nein | **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→**0,782** (PR #914), gleiche G1-Stufe |
+| 9 | Football | Feldspiel | 90 % | 75 % | **52 %** | 85 % | **76 %** | 0,722 | nein | **16.09.-Nachzug (Bewegung 14./15.09.):** PR #924 (Korridor-Refit Runde 2) hob rho 0,800→0,813, danach PR #934 (E3, „eine Wahrheit" fuer Footballs Gewichtsquelle) senkte es strukturell auf **0,722** — G1 faellt von der 0,80–0,85- auf die 0,70–0,80-Stufe, Gameplay 65→52. PR #933 (PPS-Referenz) liegt bereit, Produktivschaltung bewusst zurueckgestellt (Balance-Runde in Arbeit, PR #937) |
+| 10 | Time-Trial | Bahn | 95 % | 50 % | 92 % | 65 % | **76 %** | 0,825 | ja | **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert · **16.09. gegenkontrolliert:** unveraendert, PR #925 betraf Staffel/Climbing/Takeshi, nicht Time-Trial selbst |
+| 11 | Spurt | Bahn | 95 % | 55 % | **97 %** | **85 %** | **83 %** | 0,894 | **ja (neu)** | **16.09.-Nachzug (PR #926, 14.09.):** Feldgroesse 4→6 behoben, rho 0,871→0,894 (≥0,85-Stufe) plus **G2 30 neu** — Spurt ist die 14. arena-resolved Disziplin, Gameplay 67→97. `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, Movement 60→85 |
+| 12 | Fechten | Buehne | **75 %** | 55 % | 90 % | 35 % | **64 %** | 0,809 | ja | **16.09.-Nachzug (PR #923/#928, 14.09.):** drei FIE-Perioden statt einer Punkteformel + laufender Trefferstand im Feed heben Konzept 55→75 (K2/K3 erfuellt) — Rezept bleibt „erster, nicht finaler Sieben-Rollen-Entwurf" (`:12442`), K4 offen. Gameplay bleibt 90 (rho 0,816→0,809, gleiche Stufe). `stepFechten()` existiert weiterhin nicht, Movement bleibt 35 |
+| 13 | Tennis | Buehne | 75 % | **70 %** | 90 % | **50 %** | **71 %** | 0,825 | ja | **16.09.-Nachzug (PR #929, 14.09.):** `zeichneTennis()` als eigener Buehnenzweig mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch |
+| 14 | Mini-DM | Arena | **75 %** | 60 % | 22 % | 60 % | **54 %** | 0,256 | nein | **16.09.-Nachzug (PR #927/#930, 14.09.):** fuenf von sechs offenen Spielplanfragen beantwortet (4-Team-Pods, Kadergroesse 1, echter Playwright-Aufrufer fuer den FFA-Motor) — Konzept 70→75 (K4-Teilfortschritt). Weiterhin nicht in `ARENA_RESOLVED_DISCIPLINE_IDS` verdrahtet, Gameplay haengt allein an rho (0,256, unveraendert) · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
+| 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe · **16.09. gegenkontrolliert:** unveraendert |
+| 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe · **16.09.-Nachzug:** PR #938 (15.09.) nimmt die Stufenaufstieg-Vorschau raus (auskommentiert, nicht geloescht) — reine Anzeigefunktion, war nie ein zaehlender Achsen-Baustein, keine Zahl bewegt sich |
+| 17 | Climbing | Bahn | 65 % | 40 % | 49 % | **65 %** | **55 %** | 0,782 | nein | **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→**0,782** (PR #914), gleiche G1-Stufe · **16.09.-Nachzug (PR #925, 14.09.):** Climbing hatte als einzige der fuenf Bahnen ueberhaupt keinen `bahnBewegung()`-Zweig — neues `stepClimbing()` erfuellt M2 erstmals, Movement 40→65 |
 | 18 | Wettessen | Buehne | 35 % | 40 % | 95 % | 15 % | **46 %** | 0,845 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig: 72 %** (rechnerisch 72,2 %, war 71,7 % vor dem Eiskunstlauf-/
-Breaking-Nachzug, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 78 % ·
-Assets 70 % · Gameplay 74 % · Movement 66 %.**
+**Durchschnitt ueber alle zwanzig (16.09.): 74 %** (rechnerisch 74,1 %, war 72 % am 14.09. vor
+diesem Nachtrag, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 80 % ·
+Assets 72 % · Gameplay 75 % · Movement 70 %.**
 
-*Die vier Achsenzahlen sind fuer diesen Nachtrag erneut aus der Spalte darueber aufsummiert worden.
-Assets bewegt sich sichtbar (69→70 %, Eiskunstlauf 70→100), die drei anderen bleiben beim
-gerundeten Wert, obwohl Konzept (+0,25 Pp durch Eiskunstlauf) und Movement (+0,2 Pp durch
-Breaking) intern leicht steigen — beides zu klein, um die Rundung zu kippen. Gameplay bewegt sich
-gar nicht: rho aendert sich bei keiner der beiden Zeilen.*
+*Die Bewegung seit dem 14.09. (72 %→74 %) kommt aus sechs Zeilen (Spurt, Tennis, Fechten, Climbing,
+Mini-DM nach oben; Football nach unten, s. elfter Nachtrag ganz oben), die uebrigen vierzehn sind
+ziffernidentisch. Assets bewegt sich am staerksten (70→72 %, vor allem Tennis 40→70), Movement am
+zweitstaerksten (66→70 %, Tennis/Spurt/Climbing). Gameplay bewegt sich netto kaum (74→75 %): Spurts
++30 Punkte (Produktionsanschluss) und Footballs −13 Punkte (rho-Bruch durch #934) heben sich fast
+auf.*
 
 **Welle 0 (Fundament, gemergt 12.09., PR #892/#889/#891/#895): noch ohne eigene Punktewirkung.**
 Vier PRs — Ton-Katalog-Daten fuer sechs Disziplinen, die generische `DISZIPLIN_PROP`-Requisiten-
@@ -555,7 +612,27 @@ Praedikat, das **nie zutrifft** (Wartende derselben Zone unterscheiden sich um g
 nicht um null). Nachgemessen standen dadurch drei Figuren exakt aufeinander; jetzt 17,1 px
 Abstand, kein Paar naeher als 12 px.
 
-### Football — 79 % (90/75/65/85)
+### Football — 76 % (90/75/52/85)
+**16.09.-Nachzug: Gameplay 65→52, rho 0,800→0,722.** Zwei PRs, gegenlaeufig. PR #924
+(Korridor-Refit Runde 2, 14.09.) erfuellt die Auflage aus der #884-Freigabe — Completion 65,8 %,
+Yards/Attempt 7,22, Yards/Carry 4,28, Interception 2,5 %, NFL-nah — und hebt rho **0,800→0,813**,
+sauber ueber der Schranke. **Danach** setzt PR #934 (E3, „eine Wahrheit" fuer Footballs
+Gewichtsquelle: Kaderbildschirm-Anzeige, KI-Kauf und Minispiel-Rezept lesen jetzt denselben Wert
+statt zweier divergenter Skalen, `lib/player-generator/spiel-eignung-overrides.ts`) genau den Fund
+um, den `p.d`-Luecken-Fix schon bei Hockey/Basketball/Buehne/Bahn erledigt hatte — und foerdert
+dabei eine strukturelle Kopplung zutage: die matrix-treuen Slot-Rollen-Texte boosteten bislang
+ueberwiegend spirit/charisma/will, Attribute, die Rezept C (PR #884/#924) fuer KEINEN einzigen
+Sub-Skill verwendet. Mit dem Override zeigen die Slot-Rollen jetzt korrekt auf
+power/health/speed/torment/…, und die Slot-ZUWEISUNG speist damit zum ersten Mal wirklich in die
+Ereignis-Berechnung ein — kaderfest gemessen faellt rho auf **0,722** (Saison 0,832), unter die
+0,80-Schranke, G1 von der 0,80–0,85- auf die 0,70–0,80-Stufe, Gameplay 65→52. PR #933 hat die
+Football-PPS-Referenz bereits gezogen (`scripts/ziehe-football-pps-referenz.ts`,
+`data/generated/football-pps-referenz.json`) und einen `ARENA_IMPACT_KONFIG_JE_DISZIPLIN`-Eintrag
+vorbereitet — die Produktivschaltung selbst (Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS`) ist von
+derselben PR bewusst zurueckgestellt, bis eine dedizierte Balance-Runde rho wieder ueber 0,80
+bringt (Plan: `docs/design/football-balance-runde-nach-e3-15-09.md`, PR #937 — zwei Ansatzpunkte
+kaderfest gemessen, „breit statt eng"-Verteilung plus moderate Skalenreduktion bringt rho
+reproduzierbar auf 0,79–0,82, noch keine Umsetzungsrunde). Konzept/Assets/Movement unangetastet.
 **10.09. Update: Gameplay 35→65.** PR #884 (PRODUKTIONSCODE, Opus-Review) hat Rezept Runde 1
 gebaut — `fkLos`/kappa 3, Rezept C, eigene Tackle-Zeile. rho **0,516 → 0,800**, genau auf der
 Schranke (0,80–0,85-Stufe → G1 35). Kein Produktionsanschluss (G2 bleibt 0).
@@ -576,7 +653,20 @@ dient im Testcode weiterhin als benannte Kontrolldisziplin (`D2_KONTROLL_DISZIPL
 **Movement 85:** Snap-Standphase plus fuenf visuell unterschiedene Spielzugtypen mit je eigener
 Ballflugbahn — laut eigenem Bericht strukturell fertig, aber noch nicht poliert.
 
-### Spurt — 69 % (95/55/67/60)
+### Spurt — 83 % (95/55/97/85)
+**16.09.-Nachzug: Gameplay 67→97, Movement 60→85 (PR #926, 14.09.).** Fund F1 (Opus-Review PR
+#881): `BAHN_ART.spurt.jeSeite` stand auf 4, waehrend die Saison fuer jede Disziplin gleichverteilt
+2..6 Laeufer je Seite wuerfelt — die einzige der vier Bahnen mit dieser Diskrepanz, gemessen an
+allen 64 Fixtures des echten Spielstands zu klein besetzten Boxscores und in 4 von 64 Faellen
+4-gegen-2 statt 4-gegen-4. Fix: `jeSeite` 4→6, dieselbe Feldgroesse wie Staffel/Takeshi/Time-Trial.
+rho **0,871→0,894** (≥0,85-Stufe, G1 bleibt 40) — aber Spurt steht seither auch in
+`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, **G2 30 neu**, Gameplay 67→97. Spurt
+ist damit die 14. arena-resolved Disziplin. Teil B derselben PR ergaenzt `stepHuerden()` — Spurt
+war die letzte der fuenf Bahn-Disziplinen ganz ohne eigene Bewegungspose, die globale Sprite-Uhr
+`t` ist auf der Bahn immer eingefroren (s. Time-Trial-Kommentar), Laeufer standen animatorisch
+still waehrend der Bewegung. Jetzt per `u.vizSchritt` (1:1 aus `stepZeitfahren()` uebertragen,
+rein praesentational, rho-neutral) — M2 (eigene Schrittlogik) erstmals erfuellt, Movement 60→85.
+Konzept/Assets unangetastet.
 **Konzept 95:** Hindernislauf mit stetigem Zeitpreis je Station statt Ermuedungssprint
 (`hindernisTypen`, `huerdePreis`, `wuchtPreisFaktor`), feste Stationsfolge aus Paket B. **Zwei**
 gemessene Nachziehungen (rho 0,652 → 0,857 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 %). Eigene
@@ -591,9 +681,11 @@ aber kein eigener Zeichenzweig, alles laeuft durch `bodenSpurt()`.
 **14.09.:** die Puste-Erholung der Bahn-Welle (PR #914) ist eingeschaltet, feuert hier aber
 praktisch nicht — ueber die kurze Distanz laeuft das Feld durchgehend auf Plantempo und bricht nur
 zu 5,5 % ein; erholt wird nur am Hindernis, waehrend des Einbruchs und unter Plantempo. rho
-ziffernidentisch. Die **eingefrorene Sprite-Animation** (s. Time-Trial oben) gilt fuer Spurt
-weiterhin: PR #908 hat nur `stepZeitfahren()` repariert, die uebrigen vier Bahnen brauchen denselben
-Handgriff in ihrer eigenen step-Funktion. Das ist der billigste offene Movement-Posten der Bahn.
+ziffernidentisch. Die **eingefrorene Sprite-Animation** (s. Time-Trial oben) galt fuer Spurt bis
+zum 14.09.: PR #908 hatte nur `stepZeitfahren()` repariert, die uebrigen vier Bahnen brauchten
+denselben Handgriff in ihrer eigenen step-Funktion — das war der billigste offene Movement-Posten
+der Bahn. **Behoben mit PR #926 Teil B (s. 16.09.-Nachzug oben):** `stepHuerden()` liefert jetzt
+`u.vizSchritt` nach demselben Muster, Movement 60→85.
 
 ### Time-Trial — 76 % (95/50/92/65)
 **13.09. Update: Movement 50→65, Assets 45→50 (PR #908).** Chris hat ein laufendes Zeitfahren
@@ -644,8 +736,23 @@ das Update oben ueberholt.)*
 **Movement 65:** `stepZeitfahren()` als eigener Zweig im Bahn-Bewegungspfad (Laufzyklus aus dem
 Tempo, Erschoepfungspose, Rampe) — kein eigener Zeichenzweig, M1 bleibt offen.
 
-### Fechten — 59 % (55/55/90/35)
-**Konzept 55:** der Chassiswechsel von der Arena auf die Buehne war richtig (rho 0,153 → 0,816),
+### Fechten — 64 % (75/55/90/35)
+**16.09.-Nachzug: Konzept 55→75 (PR #923/#928, 14.09.).** PR #923 liefert eine eigenstaendige
+Konzeptrecherche (`docs/design/fechten-punkte-mehrrunden-konzept-14-09.md`, Punkte-/
+Mehrrunden-Struktur), PR #928 setzt sie um: drei FIE-Perioden statt einer einzelnen Punkteformel
+(`rundenN` 10→9, durch 3 teilbar, dieselbe Gesamtdauer) und ein laufender Trefferstand (`u.treffer`)
+im Feed, Chris' Go am 14.09. Beides ist **rein additiv** — `wert()`, `rezept` und die Erfolgskurve
+bleiben unangetastet, derselbe rho-neutrale Hebel, den Eiskunstlauf/Breaking fuer ihre eigene
+`rundenN`-Anpassung schon genutzt haben — rho bit-identisch innerhalb der G1-Stufe (0,816→0,809).
+Das erfuellt K2 (eigene Zustandsmaschine ueber das Chassis hinaus) und K3 (eigenes Konzeptdokument)
+zum ersten Mal wirklich. **Was sich NICHT bewegt und warum:** das Rezept selbst bleibt im Code
+explizit „ERSTER, AUSDRUeCKLICH NICHT FINALER Sieben-Rollen-Entwurf" (`battle-mode.engine.js:12442`)
+— K4 (kalibriert, offene Fragen entschieden) ist damit weiterhin nicht erfuellt, Konzept bleibt bei
+75, nicht 100. Gameplay bleibt bei 90 (rho 0,809, dieselbe 0,80–0,85-Stufe wie vorher). Movement
+bleibt bei 35: `stepFechten()` existiert bis heute nicht, `fechten:true` ist weiterhin rein
+deskriptiv — der Waechter `if(art.fechten && typeof stepFechten==="function")` (`:13416`) greift
+nie. Assets bleibt bei 55: `sfx("fechten"` steht 0x im Motor, keine eigene Ton-Aufrufstelle.
+**Konzept 55 (Stand vor dem 16.09.-Nachzug):** der Chassiswechsel von der Arena auf die Buehne war richtig (rho 0,153 → 0,816),
 aber das Rezept ist im Code selbst als **„ERSTER, AUSDRUECKLICH NICHT FINALER
 Sieben-Rollen-Entwurf"** bezeichnet (`:10934`) und hat nie eine Kalibrierrunde bekommen. Der Puffer
 zur Schranke (0,016) ist kleiner als das eigene Kaderrauschen (0,192) — die Disziplin steht live
@@ -656,7 +763,23 @@ und seit 07.09. korrekt IMMER die Schwert-Waffenebene (`:2573`). Aber keine eige
 **Movement 35:** kein eigener Zeichenzweig, kein eigener Paar-Rechner (bewusst, s.
 `tennis-fechten-rollout-plan.md` E.2) — zwei Reihen Figuren mit Schwert.
 
-### Tennis — 56 % (75/40/90/20)
+### Tennis — 71 % (75/70/90/50)
+**16.09.-Nachzug: Assets 40→70, Movement 20→50 (PR #929, 14.09.).** Tennis hatte bislang keine
+eigene Requisite und keinen eigenen Zeichenzweig — es lief durch den generischen Duell-Zweig, den
+sich Schach/I-Spy/Fechten/Wettessen/Showcase teilen. Neu: `DISZIPLIN_PROP.tennis` haengt einen
+Schlaeger an dieselbe Hand wie Speed-Schachs Uhr (`TENNIS_HAND=SCHACH_HAND`), `zeichneTennis()` ist
+jetzt ein exklusiv auf `art.tennis` gegateter eigener Zweig (Layout wortgleich aus dem generischen
+Zweig uebernommen, zwei echte Ergaenzungen obendrauf: Schlaeger in Ausholpose bei `u.lunge>0`, ein
+Ball, der bei jeder Enthuellung vom Schlaeger zum Brett-Gegner fliegt und bei einem Fehlschlag auf
+halber Strecke absinkt — derselbe Ass/Netzroller-Gegensatz, den `tennis.tsx` in der produktiven
+Arena-Buehne schon zeigt). Beide Ergaenzungen lesen ausschliesslich bereits vorhandene Felder
+(`u.lunge`/`u.aktuell`/`u.brett`/`u.vorteil`), kein neuer `buehnenBewegung()`-Zweig, kein neues Feld
+auf `u`, `rr()` wird nirgends aufgerufen — die Rangtreue-Neutralitaet ist strukturell gegeben, rho
+bit-identisch (0,825). Das erfuellt A2 (eigene Szene ueber das Chassis-Bild hinaus, jetzt echt statt
+kopiert) und A3 (disziplinrichtige Requisite statt der bisherigen `null`) sowie M1 (eigener
+Zeichenzweig) und M4 (eigene Pose, die Ueberkopf-Ausholbewegung) — vorher unbewaffneter
+Faustschlag. Kein eigener `stepTennis()` (M2 bleibt offen, der Ballfortschritt kommt aus `u.lunge`
+selbst statt einer eigenen Uhr), kein Ton (A4 bleibt bei 0). Konzept/Gameplay unangetastet.
 **10.09. Update:** Assets 30→40. Der Zufallswaffen-Bug (Abschnitt 3.2) ist projektweit geschlossen
 — `DISZIPLIN_WAFFE` fuehrt Tennis heute mit `null`, der Spieler schwingt keine Kosmetikwaffe mehr.
 **Konzept 75:** eigene, aus Tennis' MATRIX abgeleitete Rezeptkalibrierung (07.09., `:10837-10922`,
@@ -668,7 +791,25 @@ Eigene Requisiten (Schlaeger) gibt es weiterhin nicht — daher 40, nicht mehr.
 **Gameplay 90:** rho 0,825, produktiviert (Welle 2).
 **Movement 20:** nichts Eigenes im Motor.
 
-### Mini-DM — 53 % (70/60/22/60)
+### Mini-DM — 54 % (75/60/22/60)
+**16.09.-Nachzug: Konzept 70→75 (PR #927/#930, 14.09.).** PR #927 (Spielplan-Anchoring) ist reiner
+Befund ohne Umsetzung, holt aber drei Chris-Entscheidungen ein (Liga-Groesse bleibt Vielfaches von
+4, zweites Vorkommen wuerfelt neu, additive Pod-Struktur statt Fixture-Umbau). PR #930 setzt das
+um: `lib/season/mini-dm-pod-schedule.ts` (additive, nicht persistierte 4-Team-Pods je Spieltag,
+aus `buildCircleRounds()` abgeleitet), Kadergroesse fest auf 1
+(`withMiniDmPlayerCountOverride`), und ein echter Playwright-Aufrufer fuer den FFA-Kampfmotor, der
+bislang nur ueber Messskripte erreichbar war. Damit sind fuenf von sechs offenen Spielplanfragen
+(`mini-dm-4-team-ffa-recherche-06-09.md` Abschnitt 5) technisch beantwortet — nur die
+Kaderrobustheit bei Verletzung/Sperre im Pod-Kontext ist nie geprueft. Das ist K4-Fortschritt
+(„offene Designfragen entschieden"), Konzept 70→75. Ein echter Review-Fund wurde dabei mitbehoben:
+`playerCount:1` waere lautlos in den Legacy-PPS-Scoring-Pfad durchgesickert und haette jedem Team 0
+Ligapunkte gebucht (`rank-to-points.json` kennt keine Zeile fuer 1) — `legacyScorePlayerCount`
+entkoppelt beide Verwendungen. **Was sich NICHT bewegt:** Mini-DM ist weiterhin **ausdruecklich
+nicht** in die Live-Resolve-Pipeline verdrahtet (`ARENA_RESOLVED_DISCIPLINE_IDS` faehrt ohne
+Mini-DM), Gameplay haengt allein an rho (0,256, Kaderrauschen 0,661, unveraendert) und bleibt bei
+22 — ein fertiger Spielplan aendert nichts an einer durchfallenden Zielwahl-Mechanik, das bleibt
+ein Validitaetsproblem, kein Spielplan-Problem (s. `docs/pm-briefings/pm-gesamtstand-15-09.md`
+Abschnitt 3). Assets/Movement unangetastet.
 **14.09. Update: Movement 55→60 (PR #912).** S. den gemeinsamen Abschnitt „Die drei
 Kampf-Disziplinen" direkt unter TDM — der Reihenabstand steigt hier **8,8 → 59,0 px** und der
 Durchbruch faellt **18,3 → 4,3 %**, die deutlichste Entlastung der drei.
@@ -705,6 +846,13 @@ galt bis zum 13.09.
 **Movement 60:** wie Mini-DM/TDM, seit PR #912 mit dauerhafter Reihenformation.
 
 ### TDM — 52 % (55/65/22/65)
+**16.09.-Nachzug: unveraendert (PR #938, 15.09.).** Chris' Entscheidung: In-Match-Level-Ups wie in
+Eslabong funktionieren dort nur, weil es EINE Disziplin ist — bei uns waeren das 20 separate
+Kurven. `renderLevelUp()` und das zugehoerige Markup (`#lvlup`/`#lvlhint`) sind auskommentiert statt
+geloescht, falls die Idee spaeter in anderer Form wiederkommt. Reine Anzeige-Funktion ohne
+Persistenz und ohne Wirkung auf `wert()`/`rezept` — war laut PR-Text „ohnehin nie ein zaehlender
+Achsen-Baustein", rho bit-identisch (0,165), Slot-Invariante haelt. Keine der vier Zahlen bewegt
+sich.
 **14.09. Update: Movement 60→65 (PR #912).** Reihenabstand **20,4 → 81,3 px**.
 **Konzept 55:** teilt sich `REC.power` mit den anderen Arena-Disziplinen. Das ist ausdruecklich
 begruendet, nicht vergessen: **vier** eigene TDM-Rezepte wurden gebaut und gemessen (168 / 83 /
@@ -770,7 +918,18 @@ Die uebrigen siebzehn Disziplinen sind in allen vier Spalten **ziffernidentisch*
 ueber achtzehn Zeilen: leer) — strukturell zu erwarten, weil jede geaenderte Zeile im `istKampf`-
 Pfad liegt.
 
-### Climbing — 49 % (65/40/49/40)
+### Climbing — 55 % (65/40/49/65)
+**16.09.-Nachzug: Movement 40→65 (PR #925, 14.09.).** Climbing hatte als einzige der fuenf
+Bahn-Disziplinen ueberhaupt keinen eigenen `bahnBewegung()`-Zweig — kein Flag (`art.climbing` gab
+es nicht), kein Aufruf. Der Dispatcher fiel fuer Climbing durch alle vier bestehenden Zeilen durch,
+ohne je zu treffen; die Figuren liefen komplett ueber die eingefrorene Weltuhr `t`
+(`Math.floor((t*7+u.id)%n)` in `zeichneSprite`) — staerker eingefroren als Staffel/Takeshi, die
+wenigstens schon einen (bislang nur nicht-animierenden) Step-Zweig hatten. Neues `stepClimbing()`
+schreibt jetzt `u.vizSchritt` — dasselbe Muster wie `stepStaffel`/`stepParcours`/`stepZeitfahren`,
+einziges geschriebenes Feld ist das neue, rein praesentationale `vizSchritt`, niemals `rr()`,
+niemals etwas, das `MOTOREN.climbing.wert()` liest. Das erfuellt M2 (eigene Schrittlogik) zum
+ersten Mal, Movement 40→65. Rein praesentational, rho bit-identisch (0,782, weiterhin knapp
+durchgefallen, 0,018 unter der Schranke). Konzept/Assets/Gameplay unangetastet.
 **Konzept 65:** zehn Griffe mit Griff-dann-Kraftzug-Kette, `steigung:0,85` (die Wand wird nach oben
 steiler), kein Tackle. **Kein eigenes Dokument** — nur Abschnitt 4 der geteilten
 `bahn-disziplinen-recherche-fable.md`, und der wurde nie in eine eigene Umsetzungsrunde ueberfuehrt.
