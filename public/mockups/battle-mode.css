@@ -739,7 +739,7 @@
   .oly-battle-arena.oly-battle-arena .feed .tk{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .feed .h{color:var(--home)}.oly-battle-arena.oly-battle-arena .feed .a{color:var(--away)}.oly-battle-arena.oly-battle-arena .feed .big{color:var(--ink);font-weight:500}
 
-  .oly-battle-arena.oly-battle-arena .prof{display:grid;grid-template-columns:1fr 1fr}
+  .oly-battle-arena.oly-battle-arena .prof{display:grid;grid-template-columns:1fr 1fr;align-items:start}
   @media (max-width:860px){.oly-battle-arena.oly-battle-arena .prof{grid-template-columns:1fr}}
   .oly-battle-arena.oly-battle-arena .bigstat{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .bigstat:last-child{border-bottom:0}
