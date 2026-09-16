@@ -21067,6 +21067,23 @@
     // dieselbe Garantie: `laeuferXY()`/`ovalPunkt()` und `bodenSpurtOval()` lesen
     // beide `istOval()`, koennen also nie auseinanderlaufen.
     if(istOval())return bodenSpurtOval();
+    // ZEITFAHREN BEKOMMT EIN SICHTBARES HOEHENPROFIL statt der reinen HUD-Zahl (Opus-Plan
+    // Zehn-Disziplinen 09-10, Abschnitt 9.2, s. bodenZeitfahren()-Kommentar unten fuer den
+    // vollen Befund) — dieselbe Weiche wie istRoute()/istOval() zwei Zeilen darueber, nur
+    // auf das deskriptive Flag statt eine eigene ist*()-Funktion gegated (kein zweiter
+    // Zustand noetig, `BA().zeitfahren` steht bereits seit PR 0.3 fest).
+    if(BA().zeitfahren)return bodenZeitfahren();
+    return bodenSpurtGerade();
+  }
+
+  // Der gemeinsame Code fuer die GERADE Bahn (Spurt, Staffel-Warteschlange-Fallback,
+  // Climbing, Takeshi ohne Route) — ausgegliedert aus bodenSpurt() (vorher der Rest der
+  // Funktion inline), damit bodenZeitfahren() ihn per Aufruf wiederverwenden und danach nur
+  // das Hoehenprofil AUFSETZEN kann, statt Hintergrund/Bahn/Zaun/Ziellinie ein zweites Mal
+  // zu zeichnen. Fuer Spurt/Staffel/Climbing/Takeshi (istRoute()/istOval()/zeitfahren alle
+  // false) bit-identisch zum Vorherstand — nur der Funktionskoerper zog eine Ebene tiefer,
+  // keine Zeile darin hat sich veraendert.
+  function bodenSpurtGerade(){
     // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
     // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
@@ -21264,6 +21281,113 @@
       ctx.fillStyle="rgba(255,255,255,.55)";
       ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10);
     }
+  }
+
+  // ================== ZEITFAHREN: DAS HOEHENPROFIL WIRD SICHTBAR (bodenZeitfahren, ==========
+  // ================== Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 9.2, Ziel 8) ==============
+  // Befund woertlich aus dem Plan: "im Mockup ist das Streckenprofil UNSICHTBAR — `gelaende`
+  // wirkt in `gelaendeFaktor()` und erscheint nur als HUD-Balken, nicht auf der Bahn. Man
+  // sieht keinen Berg." Nachgeprueft im Code: `BAHN_ART["time-trial"].gelaende` (sieben
+  // Hoehenzonen, s. dort) wirkt seit K5 ausschliesslich in `tempoVon()` (ueber
+  // `gelaendeFaktor(u)`) und in `zehrFaktor()` (ueber `gelaendeZehrFaktor(pos)`) — beide rein
+  // PHYSIKALISCH, keine der beiden zeichnet je etwas. Diese Funktion LIEST `BA().gelaende`
+  // und ruft `gelaendeAn(pos)` nur zur Positionsbestimmung auf (dieselbe Funktion, die
+  // `gelaendeFaktor()` selbst benutzt) — sie AENDERT an keiner der drei Funktionen eine
+  // einzige Zeile, und `rr()`/`tempoVon()`/`bahnZeit()` bleiben unberuehrt. Reine
+  // Praesentation, s. Rangtreue-Nachweis in der PR-Beschreibung (bit-identisch 0,825).
+  //
+  // Dispatch analog zu bodenSpurtOval()/bodenTakeshiRoute() oben, s. bodenSpurt(): Time-Trial
+  // faellt hierher durch, bevor `bodenSpurtGerade()` — der jetzt ausgegliederte gemeinsame
+  // Gerade-Bahn-Code — fuer die anderen vier Bahn-Disziplinen unveraendert weiterlaeuft.
+  //
+  // ZWEI SCHICHTEN, beide rein additiv NACH `bodenSpurtGerade()`:
+  //  1. TERRAIN-TOENUNG AUF DER FAHRBAHN SELBST — je Zone ein transluzentes Farbband ueber
+  //     die volle Bahnhoehe, mit Schraffur-Richtung als ZWEITES Signal neben der Farbe
+  //     (ansteigende Schraffur = Steigung, abfallende = Abfahrt, Kreuzschraffur = Kurve) plus
+  //     einer dritten, formbasierten Kodierung (▲/▼/„S“-Glyphe) — dieselbe Dreifachkodierung
+  //     (Farbe + Neigung + Schraffur), die der Opus-Plan fuer Punkt 1 nennt, absichtlich auch
+  //     ohne Farbunterscheidung lesbar.
+  //  2. HOEHENSILHOUETTE UEBER DER BAHN — ein echter Huegel, der bei jeder Steigung ueber die
+  //     Baumreihe waechst und in der jeweils folgenden Abfahrt wieder auf die Grundlinie
+  //     faellt (die aktuelle Streckenfuehrung setzt jede Abfahrt exakt an das Ende der
+  //     zugehoerigen Steigung, s. `BAHN_ART["time-trial"].gelaende` — das Paar ergibt
+  //     zusammen einen geschlossenen Huegel). Kurve-Zonen aendern die Hoehe nicht (Kurve ist
+  //     technisch, keine Elevation, s. Kommentar an `gelaendeFaktor()`). Die Sprunghoehe je
+  //     Zone ist eine rein visuelle Konstante (`ZF_HUEGEL_PX`), unabhaengig von der
+  //     `staerke`-Formel in `gelaendeAn()` (die fuer die Physik gebraucht wird, symmetrisch
+  //     um die Zonenmitte) — die Kontur braucht eine monotone Rampe, keinen Buckel je Zone.
+  const ZF_HUEGEL_PX=34;
+  function bodenZeitfahren(){
+    bodenSpurtGerade();
+    const zonen=BA().gelaende; if(!zonen||!zonen.length)return;
+    const oben=H*0.14, unten=H*0.94;
+    // ---- Schicht 1: Terrain-Toenung + Schraffur, Zone fuer Zone ueber der fertigen Bahn.
+    for(const z of zonen){
+      const x0=camX(z.von), x1=camX(z.bis);
+      if(x1<-40||x0>W+40)continue;              // ausserhalb des Bildausschnitts
+      const steig=z.art==="steigung", ab=z.art==="abfahrt";
+      ctx.save();
+      ctx.beginPath();ctx.rect(x0,oben,Math.max(1,x1-x0),unten-oben);ctx.clip();
+      ctx.fillStyle=steig?"rgba(184,90,46,.22)":ab?"rgba(72,142,224,.20)":"rgba(242,215,90,.16)";
+      ctx.fillRect(x0,oben,x1-x0,unten-oben);
+      ctx.strokeStyle=steig?"rgba(255,200,150,.32)":ab?"rgba(190,225,255,.34)":"rgba(255,240,180,.30)";
+      ctx.lineWidth=1.4;
+      if(steig||ab){
+        // Schraeglinien: bei Steigung von unten-links nach oben-rechts (Anstieg), bei
+        // Abfahrt von oben-links nach unten-rechts (Gefaelle) — die Richtung selbst traegt
+        // die Aussage, unabhaengig von der Farbe.
+        for(let hx=x0-40;hx<x1+40;hx+=12){
+          ctx.beginPath();
+          if(steig){ctx.moveTo(hx,unten);ctx.lineTo(hx+40,oben);}
+          else{ctx.moveTo(hx,oben);ctx.lineTo(hx+40,unten);}
+          ctx.stroke();
+        }
+      } else {
+        // Kurve: Kreuzschraffur statt gerichteter Linien, weil eine Kurve keine Steigung
+        // hat — dieselbe „technisch, nicht bergig"-Aussage wie `gelaendeFaktor()` fuer
+        // `art==="kurve"` trifft (WENDIGKEIT statt ENDTEMPO/Bergfaehigkeit).
+        for(let hx=x0-16;hx<x1+16;hx+=16){
+          ctx.beginPath();ctx.moveTo(hx,oben);ctx.lineTo(hx+16,unten);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(hx+16,oben);ctx.lineTo(hx,unten);ctx.stroke();
+        }
+      }
+      ctx.restore();
+      // Glyphe als dritte, formbasierte Kodierung (s. Kopfkommentar).
+      const mx=(Math.max(x0,-20)+Math.min(x1,W+20))/2;
+      ctx.font="700 13px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
+      ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.8)";
+      const glyph=steig?"▲":ab?"▼":"S";
+      ctx.strokeText(glyph,mx,oben+17);
+      ctx.fillStyle=steig?"#e0956a":ab?"#8fc3f5":"#f2d75a";
+      ctx.fillText(glyph,mx,oben+17);
+    }
+    // ---- Schicht 2: Hoehensilhouette. Steigung addiert ZF_HUEGEL_PX, die naechste Abfahrt
+    // zieht dieselbe Menge wieder ab (geklemmt bei 0, falls die Streckenfuehrung sich je
+    // aendert und zwei Abfahrten aufeinanderfolgen); Kurven aendern die Hoehe nicht.
+    let h=0; const pts=[[0,0]];
+    for(const z of zonen){
+      pts.push([z.von,h]);
+      if(z.art==="steigung")h+=ZF_HUEGEL_PX; else if(z.art==="abfahrt")h=Math.max(0,h-ZF_HUEGEL_PX);
+      pts.push([z.bis,h]);
+    }
+    pts.push([1,h]);
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,oben);ctx.clip();   // der Huegel waechst NUR ueber die Bahn, nie hinein
+    ctx.beginPath();
+    ctx.moveTo(camX(pts[0][0]),oben);
+    for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
+    ctx.lineTo(camX(pts[pts.length-1][0]),oben);
+    ctx.closePath();
+    const hg=ctx.createLinearGradient(0,oben,0,oben-ZF_HUEGEL_PX*2.2);
+    hg.addColorStop(0,"rgba(58,74,42,.85)");hg.addColorStop(0.55,"rgba(94,74,46,.82)");
+    hg.addColorStop(1,"rgba(150,120,86,.78)");
+    ctx.fillStyle=hg;ctx.fill();
+    ctx.strokeStyle="rgba(230,220,190,.55)";ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(camX(pts[0][0]),oben-pts[0][1]);
+    for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
@@ -24432,10 +24556,20 @@
   //
   // DERSELBE VERTRAG WIE stepStaffel/stepParcours, WOeRTLICH: geschrieben werden
   // AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`, `vizErschoepft`,
-  // `vizRampe`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done, und es faellt
-  // KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese
-  // Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach dieser
-  // PR (0,828 rho je Spiel, 0,832 Saison, s. PR-Beschreibung).
+  // `vizRampe`, `vizNeigung`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done,
+  // und es faellt KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen
+  // diese Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach
+  // dieser PR (0,825 rho je Spiel, s. PR-Beschreibung).
+  //
+  // `vizNeigung` (Opus-Plan 9.2, Teil 2, "eine Bewegung, die Steigung und Abfahrt am Fahrer
+  // zeigt") LIEST `gelaendeAn(u.pos)` — dieselbe Positions-Funktion, die `gelaendeFaktor()`
+  // fuer die PHYSIK benutzt (s. dortiger Kommentar) — und schreibt daraus ausschliesslich
+  // einen neuen, rein visuellen -1..1-Wert: positiv waehrend einer Steigung (Vorlehnung,
+  // s. zeichneSpurt), negativ waehrend einer Abfahrt (aufrechtere Haltung), 0 sonst (Kurve,
+  // Rampe, Ziel). Weich nachgezogen wie `vizErschoepft` zwei Zeilen weiter unten, damit der
+  // Uebergang zwischen den Zonen kein harter Schnitt ist. `gelaendeFaktor()` selbst wird an
+  // keiner Stelle veraendert — reiner Lesezugriff, wie `gelaendeAn()`s Kopfkommentar es fuer
+  // jede andere Bahn ohnehin verspricht (dort `null`, hier also `vizNeigung` immer 0).
   //
   // SCHRITTLAENGE. `u.v` ist Bildschirm-Pixel je SIMULATIONSsekunde (s. stepSpurt:
   // `u.pos += u.v*dt/strecke`); typisch 110-135. ZF_SCHRITT_PX ist die Strecke, die ein
@@ -24449,7 +24583,7 @@
   function stepZeitfahren(dt,art){
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
-      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; }
+      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; u.vizNeigung=0; }
       // ---- 1. AUF DER STARTRAMPE? Reine Ablesung derselben Bedingung, die stepSpurt
       // oben zum Ueberspringen benutzt — hier nur, um die Figur stehen und das Panel
       // "startet in 3,4 s" zeigen zu lassen (s. renderZeitfahrenPanel/zeichneSpurt).
@@ -24472,6 +24606,14 @@
       const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
       const ziel=u.leer?1:Math.max(0,1-anteil/0.35);   // ab einem Drittel Restreserve sichtbar
       u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+      // ---- 4. NEIGUNG, s. Kopfkommentar. `gelaendeAn()` ist dieselbe Funktion, die
+      // `gelaendeFaktor()` fuer die Physik liest — hier nur zur Positionsbestimmung genutzt,
+      // NICHT der Rueckgabewert von `gelaendeFaktor()` selbst (der ist bereits ein Tempo-
+      // Multiplikator, kein Vorzeichen). Waehrend Rampe/Ziel bleibt das Ziel bei 0 (`faehrt`
+      // ist dann false), niemand lehnt sich im Stand oder im Ziel.
+      const zone=faehrt?gelaendeAn(u.pos):null;
+      const neigungZiel=zone&&zone.art==="steigung"?zone.staerke:zone&&zone.art==="abfahrt"?-zone.staerke:0;
+      u.vizNeigung+=(neigungZiel-u.vizNeigung)*(1-Math.exp(-dt/0.4));
     }
   }
 
@@ -24638,8 +24780,19 @@
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
         lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
-      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel)ctx.rotate(parcTaumel);
-      ctx.scale(sk,sk*parcDuck); ctx.translate(-x,-(y+16));
+      // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
+      // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
+      // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
+      // Zeichnung also bit-identisch zum Vorherstand. Steigung (vizNeigung>0): sichtbare
+      // Vorlehnung (Rotation um den Fusspunkt) plus ein leicht geduckter Rumpf -- Abfahrt
+      // (vizNeigung<0): kein Lehnwinkel, dafuer minimal gestreckter/aufrechter als in der
+      // Ebene. Beide Auspraegungen sind absichtlich klein (<=9°, <=5% Skalierung): Chris'
+      // Auftrag nennt "leicht", nicht eine neue Silhouette.
+      const zfNeigung=BA().zeitfahren?(u.vizNeigung||0):0;
+      const zfTilt=Math.max(0,zfNeigung)*0.16;
+      const zfHaltung=1-Math.max(0,zfNeigung)*0.05+Math.max(0,-zfNeigung)*0.03;
+      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
+      ctx.scale(sk,sk*parcDuck*zfHaltung); ctx.translate(-x,-(y+16));
       zeichneSprite(ctx,parcSpriteArg,x,y);
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
