@@ -12470,11 +12470,50 @@
       // u.summe/u.vorteil/u.verlauf oder MOTOREN[...].wert() ein.
       label:"Fechten", jeSeite:6, rundenN:9, rundenDauer:60/(9*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
+      // NACHKALIBRIERUNG (16.09., docs/design/fechten-rezeptkalibrierung-16-09.md) — die im
+      // Kommentar oben selbst angekuendigte Sinkhorn-Runde aus Recherche F.2, die es fuer die
+      // Buehne nie gab (kein `baue-feldspiel-rezept.mjs`-Aequivalent fuer dieses Chassis).
+      // Kaderfest lag Fechten bei rho 0,809/Spiel, 0,009 ueber der 0,80-Schranke bei einem
+      // Kaderrauschen von 0,184 — zwanzigmal so gross wie der Puffer
+      // (docs/pm-briefings/opus-plan-zehn-disziplinen-alle-kategorien-09-10.md Abschnitt 9.2).
+      // `scripts/sondiere-feldspiel-subskills.mjs fechten 24` (funktioniert unveraendert fuer
+      // ein Buehnen-Rezept) zeigt das MECHANISCHE Gewicht der sieben Rollen: GRUNDLAGE 36,5 %,
+      // TECHNIK 21,8 %, NERVEN 13,2 %, PUBLIKUM 10,8 %, SPITZENMOMENT 9,4 %, WAGNIS 6,5 %,
+      // AUSDAUER 1,9 % (kein toter Kanal wie Climbings ROBUST, nur schwach — ihre Ermuedungs-
+      // Formel ist chassis-generisch, kein Fechten-eigener Hebel).
+      // NERVEN (dritt-schwerste Rolle) trug determination (Matrixgewicht 6) mit 40 %
+      // Rollengewicht und health (Matrixgewicht 4) mit 25 % — nur awareness (Matrixgewicht 15)
+      // war mit 35 % einigermassen passend vertreten. Ersetzt durch awareness:55/
+      // determination:20/health:25 (Grid-Suche in 5-Punkt-Schritten um mehrere Mittelpunkte,
+      // s. Dokument Abschnitt 3 fuer die vollstaendige Tabelle) — determination bleibt mit
+      // reduziertem Gewicht drin statt ganz zu verschwinden, health unveraendert.
+      // GRUNDLAGE/TECHNIK (die beiden schwersten Rollen) lagen mit torment:45|40/dexterity:
+      // 30|35/awareness:25 schon nah an, aber nicht exakt auf der Matrix-Proportion der drei
+      // schwersten Attribute (25:20:15 ≈ 42:33:25) — auf 42/33/25 nachgezogen, keine Attribute
+      // getauscht.
+      // GEPRUEFT UND VERWORFEN: PUBLIKUM (intelligence:50/health:50, die zwei Matrix-leichtesten
+      // Attribute) sieht nach demselben Fehler aus wie Tennis'/Climbings PUBLIKUM/ROBUST-Funde
+      // — ist es hier NICHT. Ein voller Tausch gegen speed/power (die am staerksten
+      // unterrepraesentierten Attribute laut `messe-arena-einfluss.mjs`) senkte rho auf 0,798,
+      // ein Teiltausch gegen awareness auf 0,801 (Puffer nur 0,001) bzw. kombiniert mit der
+      // NERVEN-Korrektur auf 0,807 — in JEDER getesteten Fassung schlechter als PUBLIKUM
+      // unangetastet zu lassen. Vermutlich Attribut-Saettigung: awareness/torment/dexterity
+      // tragen nach der NERVEN-Korrektur bereits GRUNDLAGE+TECHNIK+NERVEN, ein weiterer Kanal
+      // auf demselben Attribut verstaerkt offenbar nur Kaderrauschen statt Signal (derselbe
+      // Kannibalisierungs-Effekt, den die Climbing-Kalibrierung fuer einen uebersteuerten
+      // STEHEN-Sub-Skill beschreibt). SPITZENMOMENT/WAGNIS/AUSDAUER blieben aus demselben Grund
+      // unangetastet (getestet, keine Verbesserung, s. Dokument).
+      // GEMESSEN NACH DIESER AENDERUNG (kaderfest, 24 Spiele, live-save-Kaderfamilie, fuenf
+      // Kaderpaarungen): rho je Spiel 0,809 -> 0,826 (Saison 0,909 -> 0,888), Puffer zur
+      // 0,80-Schranke 0,009 -> 0,026 — besser, aber WEITERHIN kleiner als das gemessene
+      // Kaderrauschen (Spannweite 0,203). Das aspirative 0,85-Ziel (CLAUDE.md) ist damit nicht
+      // erreicht; mehr steckt vermutlich nicht in einer reinen Attributverschiebung im
+      // bestehenden Sieben-Rollen-Rezept, s. Dokument Abschnitt "Was offen bleibt".
       rezept:{
-        GRUNDLAGE:    {torment:45,dexterity:30,awareness:25},
+        GRUNDLAGE:    {torment:42,dexterity:33,awareness:25},
         SPITZENMOMENT:{dexterity:40,speed:35,torment:25},
-        TECHNIK:      {torment:40,dexterity:35,awareness:25},
-        NERVEN:       {determination:40,awareness:35,health:25},
+        TECHNIK:      {torment:42,dexterity:33,awareness:25},
+        NERVEN:       {awareness:55,determination:20,health:25},
         PUBLIKUM:     {intelligence:50,health:50},
         AUSDAUER:     {speed:40,power:35,health:25},
         WAGNIS:       {speed:45,torment:30,power:25}
