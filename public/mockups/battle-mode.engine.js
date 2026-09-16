@@ -2727,6 +2727,134 @@
     ctx.beginPath();ctx.arc(kx,ky,Math.max(0.6,0.85*s),0,Math.PI*2);ctx.fill();
     return {kx,ky};
   }
+  // ================== TIME-TRIAL: STARTNUMMER-WESTE AUF DER BRUST (Ziel 10, Opus-Plan =========
+  // 16.09., NACHGEBESSERT nach Review-Fund an PR #952) ==================
+  // ERSTER ENTWURF WAR EIN AERO-HELM AM KOPF — per unabhaengiger Review an der VOLLEN
+  // 17-koepfigen SQUAD/OPP-Demoliste (nicht nur ein, zwei Beispielfiguren) verworfen: der
+  // Kopf-Anker war an `renderProbe("__Sondentest", ...)` gemessen, einer FIKTIVEN, komplett
+  // unDEKORIERTEN Referenzfigur, die im echten Kader gar nicht vorkommt. Nachgesehen im
+  // BAU-Katalog (`:1165 ff.`): alle 17 Kaderfiguren haben am Kopf bereits etwas — Helm+
+  // Hoerner (Draco), Krone+Haar (King Arlen Morgolor, Inefinna), langes Haar (Johanna,
+  // Jorund, Lulu, Ralazar the Balanced, Cassandra), Kapuze (Greenkraut) oder sind komplett
+  // vollbild/reiherMech (Lava Golem, Krolach, Krag'Zul, Tidesprinter, Seraph-11, je ein
+  // eigenes Blatt statt des LPC-Baukastens). Ein zweiter, GROESSERER/kontrastreicherer
+  // Kopf-Entwurf haette denselben Fehler nur weniger deutlich wiederholt — jede Requisite AM
+  // KOPF konkurriert dort mit etwas, das laut BAU-Katalog schon da ist.
+  //
+  // DESHALB: WEG VOM KOPF, AUF DIE BRUST — das ist eine der beiden Alternativen, die der
+  // Opus-Plan selbst als Ausweichoption nennt ("eine Zeitfahr-Rueckennummer in eigener
+  // Farbe", Abschnitt 8 Punkt 2). Per renderProbe-Pixelscan NEU gemessen (dieselbe Methode,
+  // diesmal fuer den Torso statt den Kopf): die Torsobreite ist ueber y=35..49 durchgehend
+  // 30+ px breit UND UEBER ALLE VIER RICHTUNGEN STABIL (anders als der schmale, stark
+  // dekorierte Kopfbereich) — kein BAU-Flag setzt dort eine eigene Dekoration, `ruest`
+  // faerbt nur die Grundflaeche ein, auf der eine hell-kontrastierte Weste TROTZDEM aufliegt
+  // (dasselbe Prinzip wie das Startnummernband auf dem Arm: es sitzt auf JEDER Armfarbe,
+  // weil es nach der Figur gezeichnet wird und selbst die Farbe vorgibt, nicht die Haut/
+  // Ruestung durchscheinen laesst).
+  //
+  // ANKERPUNKT gemessen (window.__arena.renderProbe("__Sondentest","walk",false,dir),
+  // Alphakontur y=28..52 abgesucht): bei y=41 (Torso-Mitte, deutlich unter der Schulterzeile
+  // y=32 aus dem TAKESHI_HAND-Befund und deutlich ueber der Hand-/Huefthoehe y=49-50) ist der
+  // Torso in JEDER Richtung mindestens 21px breit. x variiert leicht mit der Blickrichtung
+  // (der Torso dreht sich im Profil sichtbar), im Gegensatz zum praktisch fixen Kopf-x.
+  // Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const ZF_BRUST=[
+    {x:32,y:41}, // hinten
+    {x:34,y:41}, // links
+    {x:32,y:41}, // vorn
+    {x:30,y:41}, // rechts — der einzige praktisch erreichte Fall auf der geraden Bahn (kein
+                 // `route:true`, s. vorheriger Kommentar an dieser Stelle vor der Ueberarbeitung)
+  ];
+  // Drei Auspraegungen, weiterhin gesteuert von `u.vizNeigung` (PR #948) — dieselbe Kopplung
+  // wie beim verworfenen Helm-Entwurf, jetzt als leichte Vor-/Rueckneigung der ganzen Weste
+  // statt eines Helmkeils.
+  const ZF_BRUST_PHASEN={
+    steigung:{neigung:-0.06},
+    abfahrt: {neigung:0.10},
+    ebene:   {neigung:0.02},
+  };
+  // x/y ist die Brustmitte (aus ZF_BRUST), s die Groesse (Z), richtung 0..3 wie blickAus(),
+  // phase einer der drei ZF_BRUST_PHASEN-Schluessel (unbekannt faellt auf "ebene" zurueck,
+  // dasselbe Sicherheitsnetz wie bei den anderen acht Requisiten). Reine Canvas-Primitiven:
+  // eine helle, rechteckige Weste mit diagonalem Rennstreifen (Motorsport-Zeitfahr-Optik)
+  // und einer angedeuteten Ziffer — bewusst GROSS und FLAECHIG statt filigran, damit sie auf
+  // JEDER Ruestungs-/Hautfarbe als eigener Farbfleck lesbar bleibt, unabhaengig davon, was
+  // am Kopf ueber ihr passiert. Das Erkennungsmerkmal, das kein anderer Bahn-Laeufer traegt
+  // (Startnummernband am Arm=Takeshi, Stab=Staffel, Weste auf der Brust=Time-Trial).
+  function zeichneZeitfahrWeste(ctx,x,y,s,richtung,phase){
+    const p=ZF_BRUST_PHASEN[phase]||ZF_BRUST_PHASEN.ebene;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(p.neigung*eff);
+    // Grundflaeche: kraeftiges Magenta/Pink — NICHT das zuerst gewaehlte Gelb (Review-
+    // Nachbesserung, zweite Runde): `RUEST_TON.gold` faerbt Ruestungen bereits in
+    // "#D19B2E"/"#F0C858" (`:887 ff.`), praktisch demselben Ton wie das erste Gelb — bei
+    // King Arlen Morgolor UND Inefinna (beide `ruestTon:"gold"`) waere die Weste gegen die
+    // eigene Ruestungsfarbe verschwunden, GENAU der Fehler, den dieser Auftrag beheben soll,
+    // nur an anderer Stelle wiederholt. Kein Farbton im BAU-Katalog (gold/bronze/dunkel,
+    // die drei `RUEST_TON`-Rampen, dazu alle `vollbildFarbe`- und Hautfarbwerte) liegt nahe
+    // an Magenta — nachgesehen, nicht angenommen (s. Kommentar bei ZF_BRUST fuer den
+    // Diff-Beleg gegen alle 17 SQUAD/OPP-Figuren).
+    ctx.fillStyle="#ff2f92"; ctx.strokeStyle="rgba(20,16,4,.7)"; ctx.lineWidth=Math.max(0.7,0.8*s);
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-5.2*s,-5.6*s,10.4*s,11.2*s,1.6*s); else ctx.rect(-5.2*s,-5.6*s,10.4*s,11.2*s);
+    ctx.fill(); ctx.stroke();
+    // Diagonaler Rennstreifen quer ueber die Weste — Motorsport-Zeitfahr-Optik, zweiter
+    // Kontrastanker neben der Grundfarbe.
+    ctx.strokeStyle="#1f2a3a"; ctx.lineWidth=Math.max(1,2.2*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(-4.4*s,-4.4*s); ctx.lineTo(4.4*s,4.4*s); ctx.stroke();
+    // Ziffer (angedeutet als kurzer heller Balken statt echter Glyphe, wie die schmale
+    // Bespannungs-Andeutung beim Tennisschlaeger) — signalisiert "Startnummer", ohne eine
+    // echte Zifferngrafik zu brauchen.
+    ctx.fillStyle="rgba(20,16,4,.85)";
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-1.6*s,-2.4*s,3.2*s,4.8*s,0.8*s); else ctx.rect(-1.6*s,-2.4*s,3.2*s,4.8*s);
+    ctx.fill();
+    ctx.restore();
+  }
+  // ================== SPURT: SPIKES AM FUSS (Ziel 11, Opus-Plan 16.09.) ==================
+  // Zehnter Eintrag. Fuss-Anker statt Hand — ein Huerdenlaeufer traegt nichts in der Hand,
+  // s. Kommentar bei FUSS_EISKUNSTLAUF/DISZIPLIN_PROP.eiskunstlauf ("fuss" statt "hand" ist
+  // ein frei benennbares Feld, kein Umbau des Vertrags). SPURT_FUSS=FUSS_EISKUNSTLAUF
+  // WIEDERVERWENDET, NICHT NEU VERMESSEN — dieselbe Wiederverwendung wie STAFFEL_HAND=
+  // HOCKEY_HAND oben, hier sogar exakter: FUSS_EISKUNSTLAUF ist laut eigenem Kommentar am
+  // GENERISCHEN `body_walk`/`bodyw_walk`-Sprite gemessen (nicht an einem Eiskunstlauf-
+  // eigenen Blatt) — demselben Blatt, das jeder Bahn-Laeufer (Spurt eingeschlossen) fuer
+  // seinen Laufzyklus benutzt. Eine zweite, eigene Fuss-Geometrie fuer Spurt zu vermessen
+  // waere dieselbe Zahl noch einmal erhoben.
+  const SPURT_FUSS=FUSS_EISKUNSTLAUF;
+  // Zwei Auspraegungen statt der drei bei ZF_BRUST — ein Huerdenlauf kennt keine Steigung/
+  // Abfahrt, nur "laufen" und "ueber der Huerde" (s. `u.vizHuerde`/parcHop-Aufrufstelle
+  // unten): `hoehe` hebt den Spike-Ansatz waehrend des Sprungs sichtbar an, `kippe` neigt
+  // die Sohle nach vorn wie ein Fuss im Absprung.
+  const SPIKES_PHASEN={
+    laufen: {hoehe:0, kippe:0.05},
+    huerde: {hoehe:2.4, kippe:0.35},
+  };
+  // x/y ist der Fuss (aus SPURT_FUSS), s die Groesse (Z), richtung 0..3 wie blickAus(),
+  // phase "laufen"/"huerde" (unbekannt faellt auf "laufen" zurueck, dasselbe Sicherheitsnetz
+  // wie bei den anderen neun Requisiten). Reine Canvas-Primitiven wie zeichneKufe daneben:
+  // eine kurze, helle Spikes-Sohle mit angedeuteten Zacken statt eines zweiten Sprite-Blatts.
+  function zeichneSpikes(ctx,x,y,s,richtung,phase){
+    const p=SPIKES_PHASEN[phase]||SPIKES_PHASEN.laufen;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const fy=y-p.hoehe*s;
+    ctx.save(); ctx.translate(x,fy); ctx.rotate(p.kippe*eff);
+    // Sohle: kurzer heller Balken unter dem Fuss.
+    ctx.fillStyle="#e8e2d0"; ctx.strokeStyle="rgba(20,16,4,.55)"; ctx.lineWidth=Math.max(0.5,0.6*s);
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-3.6*s,-0.9*s,7.2*s,1.8*s,0.8*s); else ctx.rect(-3.6*s,-0.9*s,7.2*s,1.8*s);
+    ctx.fill(); ctx.stroke();
+    // Zacken: drei kurze dunkle Dreiecke unter der Sohle, das Spikes-Erkennungsmerkmal.
+    ctx.fillStyle="#2b2f3a";
+    for(const dx of [-2.2,0,2.2]){
+      ctx.beginPath();
+      ctx.moveTo((dx-0.6)*s,0.8*s); ctx.lineTo((dx+0.6)*s,0.8*s); ctx.lineTo(dx*s,1.8*s);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
@@ -2739,6 +2867,16 @@
     eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
     tennis:      { hand:TENNIS_HAND, phasen:TENNIS_PHASEN, zeichne:zeichneSchlaeger },
     fechten:     { hand:FECHTEN_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
+    // NEUNTER EINTRAG (Ziel 10, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.1,
+    // NACHGEBESSERT nach Review an PR #952 — Kopf-Entwurf gegen die volle Kaderliste
+    // verworfen, s. Kommentar bei ZF_BRUST oben): die Startnummer-Weste,
+    // s. ZF_BRUST/ZF_BRUST_PHASEN/zeichneZeitfahrWeste oben. Aufrufstelle in
+    // zeichneSpurt(), neben dem Startnummernband, gegated auf `BA().zeitfahren`.
+    "time-trial":{ brust:ZF_BRUST, phasen:ZF_BRUST_PHASEN, zeichne:zeichneZeitfahrWeste },
+    // ZEHNTER EINTRAG (Ziel 11, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.2): die
+    // Spikes, s. SPURT_FUSS/SPIKES_PHASEN/zeichneSpikes oben. Aufrufstelle in
+    // zeichneSpurt(), gegated auf `BA().spurt`.
+    spurt:       { fuss:SPURT_FUSS, phasen:SPIKES_PHASEN, zeichne:zeichneSpikes },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -24569,10 +24707,15 @@
   //
   // DERSELBE VERTRAG WIE stepStaffel/stepParcours, WOeRTLICH: geschrieben werden
   // AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`, `vizErschoepft`,
-  // `vizRampe`, `vizNeigung`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done,
-  // und es faellt KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen
-  // diese Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach
-  // dieser PR (0,825 rho je Spiel, s. PR-Beschreibung).
+  // `vizRampe`, `vizNeigung`, seit dem Ton-Auftrag unten zusaetzlich `vizStartTon`,
+  // `vizZone`, `vizZielTon`, `vizZzTonN` — alles Einmal-Merker/Kantenspeicher, kein einziger
+  // fliesst zurueck in tempoVon()/rr()/MOTOREN["time-trial"].wert()), NIEMALS
+  // u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done, und es faellt KEIN rr()-Aufruf an.
+  // disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese Funktion mit jedem Frame
+  // mit — nachgemessen bit-identische Rangtreue vor/nach dieser PR (0,825 rho je Spiel, s.
+  // PR-Beschreibung). `sfx()` selbst ruft nachweislich nie `rr()` (Kommentar bei der
+  // Definition) und ist ohne AudioContext ein stiller No-Op — derselbe Vertrag, mit dem
+  // stepStaffel() oben schon Ton aus einer step*-Funktion ausloest.
   //
   // `vizNeigung` (Opus-Plan 9.2, Teil 2, "eine Bewegung, die Steigung und Abfahrt am Fahrer
   // zeigt") LIEST `gelaendeAn(u.pos)` — dieselbe Positions-Funktion, die `gelaendeFaktor()`
@@ -24596,7 +24739,14 @@
   function stepZeitfahren(dt,art){
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
-      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; u.vizNeigung=0; }
+      if(u.vizSchritt==null){
+        u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; u.vizNeigung=0;
+        // TON-MERKER (A4, Opus-Plan 16.09. Abschnitt 5.1.b): vier reine Einmal-Kanten,
+        // dasselbe Init-Muster wie staffelStartschussAn/vizZielGesehen bei stepStaffel.
+        // `vizZone` haelt die zuletzt GESEHENE Gelaendeart fest (statt eines Booleans), weil
+        // `bergauf` nur beim WECHSEL auf "steigung" feuern soll, nicht bei jedem Frame darin.
+        u.vizStartTon=false; u.vizZone=null; u.vizZielTon=false; u.vizZzTonN=0;
+      }
       // ---- 1. AUF DER STARTRAMPE? Reine Ablesung derselben Bedingung, die stepSpurt
       // oben zum Ueberspringen benutzt — hier nur, um die Figur stehen und das Panel
       // "startet in 3,4 s" zeigen zu lassen (s. renderZeitfahrenPanel/zeichneSpurt).
@@ -24608,6 +24758,15 @@
       // Funktion nichts ueber Sprite-Blaetter wissen muss.
       const faehrt=!wartet && u.fertig==null;
       if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/ZF_SCHRITT_PX;
+      // ---- START-TON (TON_KATALOG["time-trial"].start). Time-Trial ist die einzige Bahn
+      // mit gestaffeltem Einzelstart (`startAbstand`, s. BAHN_ART["time-trial"]) — ein
+      // Startsignal JE FAHRER ist deshalb die richtige akustische Entsprechung, nicht ein
+      // einziges Rennstart-Signal wie bei stepStaffel. Ausloeser ist der Uebergang
+      // "wartet"->"faehrt", nicht "vizRampe faellt auf 0": deckt so auch den ersten Fahrer
+      // ab, dessen `startT` bereits <= dem allerersten `rennT` liegt und der `vizRampe`
+      // deshalb nie ueber 0 sieht. `vizStartTon` haelt den Uebergang einmalig fest, exakt
+      // wie `vizZielGesehen` bei stepStaffel.
+      if(!u.vizStartTon && faehrt){ u.vizStartTon=true; sfx("time-trial","start"); }
       // ---- 3. ERSCHOEPFUNG, 0..1 (Chris Punkt 4: "ausdauer muss besser funktionieren").
       // Die Kraftreserve GIBT es laengst und sie wirkt laengst (u.leer senkt das Tempo in
       // tempoVon), sie war nur nirgends abzulesen: ein 4 px schmaler Balken unter den
@@ -24625,8 +24784,30 @@
       // Multiplikator, kein Vorzeichen). Waehrend Rampe/Ziel bleibt das Ziel bei 0 (`faehrt`
       // ist dann false), niemand lehnt sich im Stand oder im Ziel.
       const zone=faehrt?gelaendeAn(u.pos):null;
+      const zoneArt=zone?zone.art:null;
+      // ---- BERGAUF-TON (TON_KATALOG["time-trial"].bergauf), an der KANTE, nicht am
+      // Zustand: feuert nur BEIM WECHSEL auf "steigung", nicht in jedem Frame, waehrend die
+      // Zone anhaelt (sonst ein Dauerton statt eines Ereignisses, derselbe Fehler, den die
+      // Takeshi-Drossel in sfx() fuer ein anderes Symptom schon einmal beheben musste).
+      if(zoneArt==="steigung" && u.vizZone!=="steigung")sfx("time-trial","bergauf");
+      u.vizZone=zoneArt;
       const neigungZiel=zone&&zone.art==="steigung"?zone.staerke:zone&&zone.art==="abfahrt"?-zone.staerke:0;
       u.vizNeigung+=(neigungZiel-u.vizNeigung)*(1-Math.exp(-dt/0.4));
+      // ---- ZWISCHENZEIT-TON (TON_KATALOG["time-trial"].zwischenzeit). `u.zz[]` fuellt
+      // stepSpurt() weiter oben BEREITS in diesem Tick (bahnBewegung(dt) — und damit
+      // stepZeitfahren — laeuft ganz am Ende von stepSpurt(), s. dortiger Aufruf): ein
+      // reiner Lesezugriff auf ein Array, das eine ANDERE Funktion schreibt, genau der
+      // "NUR gelesen, nie geschrieben"-Vertrag, den stepKuer() fuer u.aktuell/u.summe
+      // vormacht. `vizZzTonN` zaehlt die bereits VERTONTEN Zwischenzeiten (nicht die
+      // Streckenposition) — robust auch dann, wenn zwei Checkpoints im selben Frame faellen.
+      if(art.zwischenzeiten && u.zz){
+        const gesehen=u.zz.filter(v=>v!=null).length;
+        if(gesehen>(u.vizZzTonN||0)){ u.vizZzTonN=gesehen; sfx("time-trial","zwischenzeit"); }
+      }
+      // ---- ZIEL-TON (TON_KATALOG["time-trial"].ziel), einmalig wie `vizZielGesehen` bei
+      // stepStaffel. u.fertig selbst wird ausschliesslich von stepSpurt() gesetzt (s. dort)
+      // — hier NUR gelesen, um den Uebergang zu erkennen.
+      if(u.fertig!=null && !u.vizZielTon){ u.vizZielTon=true; sfx("time-trial","ziel"); }
     }
   }
 
@@ -24661,27 +24842,60 @@
   //
   // DERSELBE VERTRAG WIE stepZeitfahren/stepStaffel/stepParcours, WOeRTLICH: geschrieben
   // werden AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`,
-  // `vizErschoepft`), NIEMALS u.pos/u.v/u.reserve/u.huerde/u.fertig/rennT/rennFertig/done,
-  // und es faellt KEIN rr()-Aufruf an — disziplinProbe()/miss-alle-disziplinen.mjs
-  // durchlaufen diese Funktion mit jedem Frame mit. NACHGEMESSEN, nicht nur behauptet:
-  // `node scripts/miss-alle-disziplinen.mjs 24 spurt` liefert vor und nach dieser Funktion
-  // exakt dieselbe Rangtreue (s. PR-Beschreibung) — die einzige Bewegung, die Spurt in
-  // dieser PR zeigt, kommt aus der Feldgroessen-Aenderung (jeSeite 4->6) oben, nicht von
-  // hier.
+  // `vizErschoepft`, seit dem Ton-/Pose-Auftrag unten zusaetzlich `vizHuerdeTon`,
+  // `vizRissTon`, `vizZielTon`, `vizHuerde`), NIEMALS
+  // u.pos/u.v/u.reserve/u.huerde/u.fertig/rennT/rennFertig/done, und es faellt KEIN
+  // rr()-Aufruf an — disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese Funktion
+  // mit jedem Frame mit. NACHGEMESSEN, nicht nur behauptet: `node scripts/miss-alle-
+  // disziplinen.mjs 24 spurt` liefert vor und nach dieser Funktion exakt dieselbe
+  // Rangtreue (s. PR-Beschreibung) — die einzige Bewegung, die Spurt in dieser PR zeigt,
+  // kommt aus der Feldgroessen-Aenderung (jeSeite 4->6) oben, nicht von hier. `sfx()` ruft
+  // nachweislich nie `rr()` und ist ohne AudioContext ein stiller No-Op — derselbe Vertrag,
+  // mit dem stepStaffel()/stepZeitfahren() oben schon Ton aus einer step*-Funktion loesen.
   const HUERDEN_SCHRITT_PX=46;   // dieselbe Trittfrequenz-Kalibrierung wie ZF_SCHRITT_PX oben
+  let spurtStartschussAn=false;  // rein praesentational; s. reset() fuer den N1-Fix (PR #879-Muster)
   function stepHuerden(dt,art){
+    // STARTSCHUSS: einmal je Rennen, dasselbe Modul-Flaggen-Muster wie
+    // staffelStartschussAn (s. dort) — reset() setzt sie explizit zurueck (N1-Fix), sonst
+    // bliebe der Startschuss ab dem zweiten Spurt-Rennen stumm.
+    if(!spurtStartschussAn){ sfx("spurt","startschuss"); spurtStartschussAn=true; }
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
-      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; }
+      if(u.vizSchritt==null){
+        u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0;
+        // TON-/POSE-MERKER (A4+M4, Opus-Plan 16.09. Abschnitt 5.2): dasselbe Init-Muster
+        // wie bei stepZeitfahren oben. `vizHuerdeTon` haelt den zuletzt GESEHENEN
+        // Huerde-Zustand fest (Kante, nicht Zustand — sonst ein Klick je Frame waehrend der
+        // ganzen Huerdenberuehrung statt eines einzigen). `vizHuerde` ist NEU fuer M4 (den
+        // Sprungausschlag in zeichneSpurt(), s. dort): weich nachgezogen aus `u.huerde>0`,
+        // exakt dieselbe `1-Math.exp(-dt/…)`-Glaettung wie `vizErschoepft` zwei Zeilen
+        // darunter.
+        u.vizHuerdeTon=false; u.vizRissTon=false; u.vizZielTon=false; u.vizHuerde=0;
+      }
       // WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL — derselbe Gedanke wie
       // stepZeitfahrens Startrampe, hier an `u.huerde>0` statt an `u.startT` gegated.
       const faehrt=u.fertig==null && !(u.huerde>0);
       if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
+      // ---- HUERDEN-TON (TON_KATALOG.spurt.huerde), an der KANTE `u.huerde>0`: feuert nur
+      // beim EINTRITT in den Hindernis-Stopp, nicht in jedem Frame, waehrend er anhaelt.
+      const huerdeAktiv=u.huerde>0;
+      if(huerdeAktiv && !u.vizHuerdeTon)sfx("spurt","huerde");
+      u.vizHuerdeTon=huerdeAktiv;
+      // M4: HUERDENFLUG-POSE, weich aus `u.huerde>0` nachgezogen (s. Kommentar oben) --
+      // gelesen von zeichneSpurt() als Sprunghoehe/Beinstreckung, exakt nach dem
+      // zfTilt/zfHaltung-Muster, das PR #948 fuer Zeitfahren vorgemacht hat.
+      u.vizHuerde+=((huerdeAktiv?1:0)-u.vizHuerde)*(1-Math.exp(-dt/0.12));
+      // ---- RISS-TON (TON_KATALOG.spurt.riss), an der Kante `u.leer` (Erschoepfung
+      // erreicht) -- derselbe Zustand, den `ziel` zwei Zeilen unten fuer `vizErschoepft`
+      // schon liest, hier nur als Einmal-Ereignis statt einer stetigen Anzeige.
+      if(u.leer && !u.vizRissTon){ u.vizRissTon=true; sfx("spurt","riss"); }
       // ERSCHOEPFUNG, 0..1 — zeichenidentisch zu stepZeitfahren (s. dort fuer die
       // Begruendung der Konstanten 0,35).
       const anteil=u.reserveMax>0?Math.max(0,Math.min(1,u.reserve/u.reserveMax)):1;
       const ziel=u.leer?1:Math.max(0,1-anteil/0.35);
       u.vizErschoepft+=(ziel-u.vizErschoepft)*(1-Math.exp(-dt/0.35));
+      // ---- ZIEL-TON (TON_KATALOG.spurt.ziel), einmalig wie bei stepZeitfahren/stepStaffel.
+      if(u.fertig!=null && !u.vizZielTon){ u.vizZielTon=true; sfx("spurt","ziel"); }
     }
   }
 
@@ -24804,8 +25018,19 @@
       const zfNeigung=BA().zeitfahren?(u.vizNeigung||0):0;
       const zfTilt=Math.max(0,zfNeigung)*0.16;
       const zfHaltung=1-Math.max(0,zfNeigung)*0.05+Math.max(0,-zfNeigung)*0.03;
-      ctx.save(); ctx.translate(x,y+16-parcHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
-      ctx.scale(sk,sk*parcDuck*zfHaltung); ctx.translate(-x,-(y+16));
+      // M4: HUERDENFLUG-POSE (Ziel 11, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.2.c):
+      // reiner Lesezugriff auf `u.vizHuerde` (0..1, weich nachgezogen aus `u.huerde>0`),
+      // das ausschliesslich stepHuerden schreibt -- fuer jede andere Bahn ist es undefined
+      // und `huerdeHop`/`huerdeHaltung` bleiben bei ihrem Neutralwert (0/1), diese
+      // Zeichnung also bit-identisch zum Vorherstand. Exakt nach dem zfTilt/zfHaltung-
+      // Muster (PR #948, zwei Zeilen darueber) gebaut: eine kleine Sprunghoehe (nach oben
+      // verschoben) plus eine minimal gestreckte Silhouette waehrend des Huerdensprungs --
+      // "leicht", nicht eine neue Silhouette, wie schon bei zfTilt/zfHaltung.
+      const huerdeAusschlag=BA().spurt?(u.vizHuerde||0):0;
+      const huerdeHop=huerdeAusschlag*6*sk0;
+      const huerdeHaltung=1-huerdeAusschlag*0.06;
+      ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
+      ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
       zeichneSprite(ctx,parcSpriteArg,x,y);
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
@@ -24829,6 +25054,42 @@
           *bauSkala(BAU[u.n]||BAU_STD);
         prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,
           parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
+      }
+      // STARTNUMMER-WESTE (DISZIPLIN_PROP["time-trial"], A3 55→80, Ziel 10, Opus-Plan
+      // Top-Zehn-ueber-90 16.09. Abschnitt 5.1.a, NACHGEBESSERT nach Review an PR #952 --
+      // s. Kommentar bei ZF_BRUST oben fuer den vollstaendigen Befund und die Begruendung
+      // des Wechsels vom Kopf auf die Brust): sitzt wie das Startnummernband INNERHALB
+      // desselben ctx.save/scale/restore-Blocks wie der Laeufer selbst -- erbt Position,
+      // Kamera-Zoom und die M4-Duck-/Taumel-Ausschlaege automatisch mit, exakt wie beim
+      // Startnummernband oben. `bahnRicht` (statt `parcRicht`, das nur fuer Takeshis
+      // Routen-Tangente gilt) ist dieselbe blickAus()-Eingabe, die zeichneSprite() intern
+      // fuer GENAU dieses parcSpriteArg berechnet -- Time-Trial kennt kein `route:true`
+      // (anders als Takeshi), die Weste dreht sich also immer exakt mit dem Koerper, nie
+      // eine zweite, potenziell abweichende Berechnung. `zfNeigung` ist dieselbe Zahl, die
+      // zfTilt/zfHaltung zwei Zeilen oben fuer den Rumpf lesen -- die Weste zahlt auf GENAU
+      // dasselbe Bild ein statt eine dritte, unabhaengige Neigungsquelle zu erfinden.
+      if(BA().zeitfahren&&u.fertig==null){
+        const prop=DISZIPLIN_PROP["time-trial"];
+        const bahnRicht=blickAus(parcSpriteArg);
+        const bp=prop.brust[bahnRicht]||prop.brust[2];
+        const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
+          *bauSkala(BAU[u.n]||BAU_STD);
+        const zfWestePhase=zfNeigung>0.05?"steigung":zfNeigung<-0.05?"abfahrt":"ebene";
+        prop.zeichne(ctx,x-32*parcZ+bp.x*parcZ,y-46*parcZ+bp.y*parcZ,parcZ,bahnRicht,zfWestePhase);
+      }
+      // SPIKES (DISZIPLIN_PROP.spurt, A3 55→80, Ziel 11, Opus-Plan Top-Zehn-ueber-90 16.09.
+      // Abschnitt 5.2): dieselbe Aufrufstelle/Anker-Formel wie beim Aero-Helm oben, mit dem
+      // Fuss statt des Kopfes als Anker. `u.huerde>0` waehlt die Sprungphase -- dieselbe
+      // Bedingung, die `parcHop` bei Takeshi und die neue `u.vizHuerde`-Pose unten fuer den
+      // Sprung ueber die Huerde benutzen, damit Spikes und Koerper nie auseinanderlaufen.
+      if(BA().spurt&&u.fertig==null){
+        const prop=DISZIPLIN_PROP.spurt;
+        const bahnRicht=blickAus(parcSpriteArg);
+        const hp=prop.fuss[bahnRicht]||prop.fuss[2];
+        const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
+          *bauSkala(BAU[u.n]||BAU_STD);
+        prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,bahnRicht,
+          u.huerde>0?"huerde":"laufen");
       }
       ctx.restore();
       // DER STAB (A3/M-Ziel 6, DISZIPLIN_PROP.staffel/zeichneStab, s. dort): nur der
@@ -26987,6 +27248,11 @@
     // ertoent der Startschuss nur im allerersten Staffel-Rennen der Session.
     staffelPublikumAn=false;
     staffelStartschussAn=false;
+    // DASSELBE N1-MUSTER FUER SPURT (Ziel 11, A4, Opus-Plan Top-Zehn-ueber-90 16.09.
+    // Abschnitt 5.2): ohne diese Zeile bliebe der Startschuss ab dem zweiten Spurt-Rennen
+    // der Session stumm, aus demselben Grund wie bei staffelStartschussAn zwei Zeilen
+    // darueber. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    spurtStartschussAn=false;
     // DASSELBE N1-MUSTER FUER SPEED-SCHACH (Ziel 5, A4, 12.09.): ohne diese Zeile haelt
     // bodenBuehne() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
     // zweiten Speed-Schach-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer
@@ -28509,6 +28775,35 @@
       const ax=(anker&&typeof anker.x==="number")?anker.x:32;
       const ay=(anker&&typeof anker.y==="number")?anker.y:46;
       zeichneSprite(ctx,u,ax,ay,!!feldspiel);
+      return c.toDataURL();
+    },
+    // ZEITFAHR-WESTE GEGEN DEN VOLLEN KADER (Review-Fund an PR #952, 16.09.): derselbe
+    // Fehler wie beim urspruenglichen Aero-Helm-Entwurf darf sich hier nicht wiederholen —
+    // "an ein, zwei Beispielfiguren sieht gut aus" ist keine Verifikation gegen die 17
+    // tatsaechlichen SQUAD/OPP-Kaderfiguren, von denen JEDE eine eigene Kopf-/Vollbild-
+    // Dekoration traegt (s. Kommentar bei ZF_BRUST/BAU). Rein diagnostisch wie renderProbe/
+    // hockeyschlaegerProbe daneben: zeichnet die Figur GENAU wie renderProbe(name,"walk",
+    // false,dir) (Anker fest bei 32/46, kein Live-Duell noetig) und haengt DANACH exakt die
+    // PRODUKTIONS-Ankerformel/-Zeichenfunktion aus DISZIPLIN_PROP["time-trial"] an — kein
+    // zweites, potenziell abweichendes Formel-Duplikat, dieselbe Rechnung wie in
+    // zeichneSpurt(). `dir` (0-3, Default 3="rechts" — der auf der geraden Bahn praktisch
+    // einzig erreichte Fall, s. Kommentar bei ZF_BRUST) waehlt die Blickrichtung wie bei
+    // renderProbe. Kein rr()-Aufruf, kein Gameplay-Seiteneffekt.
+    zeitfahrWesteProbe:(name,dir)=>{
+      const c=document.createElement("canvas"); c.width=64; c.height=64;
+      const ctx=c.getContext("2d");
+      const richtung=[[0,-5],[-5,0],[0,5],[5,0]];
+      const d=dir!==undefined&&dir!==null?dir:3;
+      const [vx,vy]=richtung[d];
+      const kaderEintrag=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      const u={n:name,x:32,y:46,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
+        lunge:0,down:false,side:0,hop:0};
+      zeichneSprite(ctx,u,32,46,false);
+      const prop=DISZIPLIN_PROP["time-trial"];
+      const bahnRicht=blickAus(u);
+      const bp=prop.brust[bahnRicht]||prop.brust[2];
+      const parcZ=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(BAU[name]||BAU_STD);
+      prop.zeichne(ctx,32-32*parcZ+bp.x*parcZ,46-46*parcZ+bp.y*parcZ,parcZ,bahnRicht,"ebene");
       return c.toDataURL();
     },
     // Debug-Gegenstueck zu renderProbe, nur fuer die KADER-VORSCHAU (figur(), dieselbe
