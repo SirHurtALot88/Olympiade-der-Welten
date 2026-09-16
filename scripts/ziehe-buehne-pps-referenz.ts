@@ -150,6 +150,19 @@ const DISZIPLINEN = {
     wertHerkunft: "bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn()",
     rezeptOrt: "BAHN_ART[\"time-trial\"], stepSpurt()/bauSpurt()",
   },
+  // ====================== CLIMBING-KALIBRIERUNG (16.09.) ======================
+  // Fuenfte und letzte Bahn-Disziplin. War bis hierhin bewusst nicht angeschlossen (rho 0,782
+  // je Spiel kaderfest, unter der 0,80-Schranke), s. docs/design/climbing-kalibrierung-16-09.md.
+  // `katalogStandardgroesse` aus lib/data/dataAdapter.ts (Discipline.playerCount climbing = 6) --
+  // hier ausnahmsweise IDENTISCH mit der Motor-Feldgroesse (`BAHN_ART.climbing.jeSeite` ist
+  // ebenfalls 6), aber trotzdem einzeln nachgesehen statt angenommen, aus demselben Grund wie
+  // bei jeder vorigen Bahn.
+  climbing: {
+    chassis: "bahn",
+    katalogStandardgroesse: 6,
+    wertHerkunft: "bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn()",
+    rezeptOrt: "BAHN_ART.climbing, stepSpurt()/bauSpurt()",
+  },
 } as const;
 
 type DisziplinId = keyof typeof DISZIPLINEN;
@@ -355,6 +368,19 @@ function schreibeErgebnis(
       quantile: ergebnis.quantile,
     };
   }
+  // KATALOG-STANDARDGROESSE GEGEN DIE MOTOR-FELDGROESSE (immer 6, `BUEHNE_ART[d].jeSeite`/
+  // `BAHN_ART[d].jeSeite`): fuer jede bisherige Disziplin war das ein WARNHINWEIS ("NICHT 6"),
+  // weil Discipline.playerCount aus lib/data/dataAdapter.ts stets kleiner war. Climbing ist die
+  // erste Ausnahme (playerCount 6 == Motor-Feldgroesse) -- der Text unterscheidet die beiden
+  // Faelle jetzt, statt fuer Climbing das unsinnige "IST 6, NICHT 6" zu schreiben.
+  const katalogHinweis =
+    konfig.katalogStandardgroesse === 6
+      ? `KATALOG-STANDARDGROESSE IST ${konfig.katalogStandardgroesse} -- hier AUSNAHMSWEISE ` +
+        "identisch mit der Motor-Feldgroesse (BUEHNE_ART[d].jeSeite/BAHN_ART[d].jeSeite ist ebenfalls " +
+        "6), trotzdem einzeln aus Discipline.playerCount nachgesehen statt angenommen"
+      : `KATALOG-STANDARDGROESSE IST ${konfig.katalogStandardgroesse}, NICHT 6 (Discipline.playerCount ` +
+        "in lib/data/dataAdapter.ts; BUEHNE_ART[d].jeSeite/BAHN_ART[d].jeSeite im Motor ist 6, das " +
+        "ist die MOTOR-Feldgroesse und der falsche Wert dafuer)";
   const ausgabe = {
     disziplin,
     hinweis:
@@ -363,10 +389,8 @@ function schreibeErgebnis(
       `scripts/ziehe-buehne-pps-referenz.ts gegen echte Liga-Kader (buildArenaTeam()) ueber ` +
       `runArenaFixtures()/${motorFunktion}(). Gelesen von ` +
       "computeIndividualBoxscorePpsFromFixtureResults() in " +
-      `lib/resolve/battle-mode-arena-team-points.ts. KATALOG-STANDARDGROESSE IST ` +
-      `${konfig.katalogStandardgroesse}, NICHT 6 (Discipline.playerCount in lib/data/dataAdapter.ts; ` +
-      "BUEHNE_ART[d].jeSeite im Motor ist 6, das ist die MOTOR-Feldgroesse und der falsche Wert " +
-      "dafuer) -- nur der Fallback fuer eine nicht ermittelbare Feldgroesse, s. Skript-Kopfkommentar. " +
+      `lib/resolve/battle-mode-arena-team-points.ts. ${katalogHinweis} ` +
+      "-- nur der Fallback fuer eine nicht ermittelbare Feldgroesse, s. Skript-Kopfkommentar. " +
       "KLEINERE STICHPROBE ALS BASKETBALLS REFERENZ (60 statt 300+ Fixtures je Feldgroesse) -- " +
       "unveraendert dieselbe Zeitbudget-Entscheidung wie in Produktivierungswelle 1 (06.09.2026), " +
       "keine methodische. Neu ziehen nach jeder Aenderung, die den rohen Wert verschiebt " +

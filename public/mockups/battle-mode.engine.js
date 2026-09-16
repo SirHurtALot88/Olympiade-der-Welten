@@ -21848,11 +21848,24 @@
       // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.
       wertung:"rang",
       rezept:{
+        // STEHEN NEU GEWICHTET (Kalibrierrunde 16.09., docs/design/climbing-kalibrierung-
+        // 16-09.md): `scripts/messe-arena-einfluss.mjs climbing 48` mass eine Abweichung
+        // von 35 Pp zur Matrix — Stamina/Determination/Speed liefen 5-7 Pp ueber ihr
+        // Matrixgewicht (26/16/12), waehrend WILL (8) mit 2,3 % praktisch tot las und
+        // HEALTH (10) mit 4,8 % gut halb so viel wie sein Gewicht. Ursache, nachgemessen
+        // mit `scripts/sondiere-feldspiel-subskills.mjs climbing`: ROBUST — wo genau diese
+        // beiden Attribute mit 24/32 % ihr groesstes Zuhause hatten — traegt mechanisch
+        // 0,0 % (sein einziger Kanal, das 0,3-Gewicht in der Reserve-Obergrenze neben
+        // STEHENs 0,7, ist zu schwach, um je zu zaehlen). STEHEN traegt dagegen 30 % —
+        // der schwerste aller sieben Sub-Skills. Die beiden verwaisten Attribute ziehen
+        // deshalb hier ein, auf Kosten von Stamina/Determination, die STEHEN ohnehin schon
+        // ueberzeichnet. ANTRITT/ENDTEMPO/TECHNIK/WUCHT/WENDIGKEIT/ROBUST unveraendert —
+        // ein einzelner, isolierter Hebel.
         ANTRITT:    {power:38,dexterity:32,speed:30},
         ENDTEMPO:   {stamina:44,determination:31,speed:25},
         TECHNIK:    {dexterity:44,awareness:33,power:23},
         WENDIGKEIT: {dexterity:45,speed:32,awareness:23},
-        STEHEN:     {stamina:44,determination:26,will:18,health:12},
+        STEHEN:     {stamina:24,will:32,health:34,determination:10},
         WUCHT:      {power:42,determination:28,health:30},
         ROBUST:     {health:32,stamina:28,will:24,determination:16}
       },

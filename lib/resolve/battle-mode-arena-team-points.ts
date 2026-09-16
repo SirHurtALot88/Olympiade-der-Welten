@@ -164,6 +164,13 @@ import spurtPpsReferenzJson from "@/data/generated/spurt-pps-referenz.json";
 // NICHT mehr (rho 0,722) -- Football bleibt deshalb bewusst AUSSERHALB von
 // `ARENA_RESOLVED_DISCIPLINE_IDS`, s. dortiger Kommentar fuer die volle Herleitung.
 import footballPpsReferenzJson from "@/data/generated/football-pps-referenz.json";
+// CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): fuenfte und
+// letzte Bahn-Disziplin, ueber dasselbe Chassis wie Staffel/Takeshi's Castle/Time-Trial/Spurt.
+// War bewusst NICHT angeschlossen (rho 0,782 je Spiel kaderfest, unter der 0,80-Schranke) --
+// eine eigene Rezeptkalibrierung (BAHN_ART.climbing.rezept.STEHEN, public/mockups/
+// battle-mode.engine.js) hebt sie auf 0,834, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`
+// unten fuer die volle Herleitung.
+import climbingPpsReferenzJson from "@/data/generated/climbing-pps-referenz.json";
 
 /**
  * Arena-aufgeloeste Disziplinen (Plan Abschnitt 3.2, Option a, seit der Gewichtheben-
@@ -271,16 +278,30 @@ import footballPpsReferenzJson from "@/data/generated/football-pps-referenz.json
  * dortiger Kommentar) und aendert am Laufzeitverhalten nichts: `loeseArenaImpactKonfigAuf()`
  * wird fuer eine nicht-resolved Disziplin nie mit ihrer `disciplineId` aufgerufen.
  *
+ * CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): Climbing stand
+ * bis hierhin bewusst draussen (rho 0,782 je Spiel kaderfest, 0,010 unter der 0,80-Schranke) --
+ * derselbe Fall wie Football unten, nur mit dem billigeren Ausgang. `scripts/messe-arena-
+ * einfluss.mjs climbing 48` zeigte 35 Pp Abweichung zur Matrix: Stamina/Determination/Speed
+ * liefen 5-7 Pp ueber ihrem Matrixgewicht, waehrend WILL (Matrix 8) mit 2,3 % praktisch tot las
+ * und HEALTH (Matrix 10) mit 4,8 % nur gut halb so viel wie sein Gewicht brachte.
+ * `scripts/sondiere-feldspiel-subskills.mjs climbing` fand die Ursache: ROBUST -- wo genau
+ * diese beiden Attribute mit 24/32 % ihr groesstes Zuhause hatten -- traegt mechanisch 0,0 %
+ * (sein einziger Kanal, das 0,3-Gewicht in der Reserve-Obergrenze neben STEHENs 0,7, ist zu
+ * schwach, um je zu zaehlen), waehrend STEHEN mit 30 % der schwerste aller sieben Sub-Skills
+ * ist. Einziger Eingriff: `BAHN_ART.climbing.rezept.STEHEN` nimmt WILL/HEALTH statt eines
+ * Teils von Stamina/Determination auf (public/mockups/battle-mode.engine.js) -- Abweichung zur
+ * Matrix 35 -> 19,4 Pp, rho je Spiel kaderfest **0,782 -> 0,834** (Spannweite 0,191 -> 0,209,
+ * Saison 0,839 -> 0,860). Alle uebrigen neunzehn Disziplinen bit-identisch nachgemessen (reine
+ * Sub-Skill-Gewichtsverschiebung innerhalb eines einzelnen Bahn-Rezepts, kein gemeinsamer
+ * Bahn-Code beruehrt). Eigene PPS-Referenz gezogen (`scripts/ziehe-buehne-pps-referenz.ts
+ * climbing`, `chassis:"bahn"`, `katalogStandardgroesse` 6 aus dataAdapter.ts) -- derselbe
+ * Dispatch wie die anderen vier Bahnen, `ARENA_BAHN_DISCIPLINE_IDS` in arena-headless-
+ * runner.ts erweitert.
+ *
  * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund:
  *  - FOOTBALL (rho 0,722 je Spiel, s. oben): Rangtreue seit #934 NICHT mehr bestanden -- 0,078
  *    unter der 0,80-Schranke aus CLAUDE.md. Config/Referenz sind fertig, der Eintrag hier fehlt
  *    bewusst, bis eine Balance-Runde rho wieder ueber 0,80 gebracht hat.
- *  - CLIMBING (rho 0,790 je Spiel): Rangtreue NICHT bestanden -- 0,010 unter der 0,80-Schranke
- *    aus CLAUDE.md. Es waere technisch EINE ZEILE (derselbe Dispatch wie die anderen Bahnen),
- *    und genau deshalb ist es der wichtige Nicht-Eintrag: dieselbe Regel, die I-Spy (0,684) aus
- *    `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` draussen haelt, obwohl es `duell:true` traegt -- die
- *    beiden Achsen (Rangtreue / Produktionsanbindung) duerfen nicht vermischt werden, nur weil
- *    eine davon billig zu erfuellen waere.
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
  *    (0,251/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
@@ -296,12 +317,15 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "wettessen",
   "tennis",
   "fechten",
-  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben. Climbing bleibt bewusst draussen.
+  // Bahn-Produktivierung (10.09., Ziel 3), s. Kommentar oben.
   "staffel",
   "takeshis-castle",
   "time-trial",
   // Spurt-Produktionsanbindung (14.09.): Feldgroessen-Fund F1 behoben, s. Kommentar oben.
   "spurt",
+  // Climbing-Kalibrierung (16.09.): eigene Rezeptkalibrierung hebt rho ueber die Schranke,
+  // s. Kommentar oben.
+  "climbing",
   // Football BEWUSST NICHT HIER (15.09.): rho je Spiel seit #934 bei 0,722, unter der 0,80-
   // Schranke -- Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN unten),
   // der Produktiv-Eintrag folgt erst nach einer Balance-Runde, s. Kommentar oben.
@@ -542,6 +566,19 @@ export const FOOTBALL_INDIVIDUAL_PPS_MAX = 5.5;
 export const FOOTBALL_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER CLIMBING (Kalibrierrunde 16.09., s. Kommentar an
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve wie die anderen vier Bahn-
+ * Disziplinen (`ppsAusArenaImpact()`) -- eigene Regler aus demselben Grund: der rohe
+ * Boxscore-Wert (`bahnTeamstand().punkte`, `wertung:"rang"` -- Rangpunkte aus
+ * `bahnRangliste()`, s. `spieleBahn()`) liegt auf einer eigenen Skala je Wertungsmodus.
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben
+ * Grund wie bei jeder vorigen Welle (s. `STAFFEL_INDIVIDUAL_PPS_MAX`-Kommentar).
+ */
+export const CLIMBING_INDIVIDUAL_PPS_MAX = 5.5;
+export const CLIMBING_PPS_ANTEIL_MITTE = 0.25;
+
+/**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
  * (Median) und `iKrass` (99,5.-Perzentil) des rohen Boxscore-Werts, JE FELDGROESSE getrennt
  * gezogen — der Rohwert skaliert mit der Feldgroesse (Opus-Dokument Abschnitt 7 fuer Basketball;
@@ -650,6 +687,9 @@ const SPURT_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(spurtPpsReferen
 // s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`) -- `feldgroessenTorwart` fehlt in der Datei,
 // genau wie bei jeder Nicht-Hockey-Disziplin oben.
 const FOOTBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(footballPpsReferenzJson as ArenaPpsReferenzJson);
+// CLIMBING-KALIBRIERUNG (16.09.): auch keine eigene Wertformel-Rolle -- `feldgroessenTorwart`
+// fehlt in der Datei, genau wie bei jeder Nicht-Hockey-Disziplin oben.
+const CLIMBING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(climbingPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -875,6 +915,20 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       // FELDSPIEL_ART.football.size ist 6, dieselbe Falle wie bei jeder vorigen Welle -- s.
       // dortige Kommentare, z.B. bei "spurt").
       katalogStandardgroesse: 4,
+    },
+  ],
+  // ==================== CLIMBING-KALIBRIERUNG (16.09.) ====================
+  // Fuenfte und letzte Bahn-Disziplin, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
+  [
+    "climbing",
+    {
+      referenzFeldgroessen: CLIMBING_PPS_REFERENZ_FELDGROESSEN,
+      max: CLIMBING_INDIVIDUAL_PPS_MAX,
+      anteilMitte: CLIMBING_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 6 (dataAdapter.ts) -- hier ausnahmsweise identisch mit der
+      // Motor-Feldgroesse (BAHN_ART.climbing.jeSeite ist ebenfalls 6), trotzdem einzeln
+      // nachgesehen statt angenommen, aus demselben Grund wie bei jeder vorigen Bahn.
+      katalogStandardgroesse: 6,
     },
   ],
 ]);
