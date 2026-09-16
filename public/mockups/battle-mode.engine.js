@@ -2727,84 +2727,89 @@
     ctx.beginPath();ctx.arc(kx,ky,Math.max(0.6,0.85*s),0,Math.PI*2);ctx.fill();
     return {kx,ky};
   }
-  // ================== TIME-TRIAL: AERO-HELM AM KOPF (Ziel 10, Opus-Plan 16.09.) ==================
-  // Neunter Eintrag, erster mit einem KOPF- statt Hand-/Fuss-Anker — der DISZIPLIN_PROP-
-  // Vertrag verlangt kein festes Feld (s. Kommentar bei FUSS_EISKUNSTLAUF: "der
-  // Verankerungspunkt selbst kann je Disziplin ein anderer Koerperteil sein"), Eiskunstlauf
-  // hat mit `fuss` schon vorgemacht, dass ein frei benanntes Feld ohne Umbau traegt. Time-
-  // Trial hatte bislang KEINE eigene Requisite — ein Zeitfahrer trug buchstaeblich nichts,
-  // was ihn von einem Spurt-/Staffel-/Climbing-Laeufer unterscheidet (Scorecard-Befund,
-  // docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md, Time-Trial-
-  // Abschnitt A3; PR #948 hat es selbst als "bewusst ausgelassen" protokolliert).
+  // ================== TIME-TRIAL: STARTNUMMER-WESTE AUF DER BRUST (Ziel 10, Opus-Plan =========
+  // 16.09., NACHGEBESSERT nach Review-Fund an PR #952) ==================
+  // ERSTER ENTWURF WAR EIN AERO-HELM AM KOPF — per unabhaengiger Review an der VOLLEN
+  // 17-koepfigen SQUAD/OPP-Demoliste (nicht nur ein, zwei Beispielfiguren) verworfen: der
+  // Kopf-Anker war an `renderProbe("__Sondentest", ...)` gemessen, einer FIKTIVEN, komplett
+  // unDEKORIERTEN Referenzfigur, die im echten Kader gar nicht vorkommt. Nachgesehen im
+  // BAU-Katalog (`:1165 ff.`): alle 17 Kaderfiguren haben am Kopf bereits etwas — Helm+
+  // Hoerner (Draco), Krone+Haar (King Arlen Morgolor, Inefinna), langes Haar (Johanna,
+  // Jorund, Lulu, Ralazar the Balanced, Cassandra), Kapuze (Greenkraut) oder sind komplett
+  // vollbild/reiherMech (Lava Golem, Krolach, Krag'Zul, Tidesprinter, Seraph-11, je ein
+  // eigenes Blatt statt des LPC-Baukastens). Ein zweiter, GROESSERER/kontrastreicherer
+  // Kopf-Entwurf haette denselben Fehler nur weniger deutlich wiederholt — jede Requisite AM
+  // KOPF konkurriert dort mit etwas, das laut BAU-Katalog schon da ist.
   //
-  // ANKERPUNKT: per Pixelscan der body_walk-Alphakontur GEMESSEN (window.__arena.
-  // renderProbe("__Sondentest","walk",false,dir), dasselbe Werkzeug/Verfahren wie bei
-  // TAKESHI_HAND/FUSS_EISKUNSTLAUF), nicht geschaetzt. Ueber alle vier Richtungen deckungs-
-  // gleich: der Kopf beginnt bei y=11 (Scheitel) und erreicht bei y~17 seine volle
-  // Kopfbreite (~20px); die Schulterbreite (~25-31px) setzt erst ab y~30-32 ein — deckt sich
-  // mit dem TAKESHI_HAND-Befund "Schulter bei y=32". y=17 liegt damit sicher IM Kopf, knapp
-  // unter dem Scheitel: der Helm sitzt dort AUF dem Kopf, statt zu schweben oder ihn zu
-  // verdecken. x ist ueber alle vier Richtungen praktisch identisch (31-32, Sprite-Mitte) —
-  // anders als ein schwingender Arm bewegt sich der Kopf im Laufzyklus seitlich kaum.
-  // PRAKTISCH nur Richtung 3 ("rechts") erreicht: Time-Trial laeuft NICHT auf der Route
-  // (`istRoute()`/`BA().route` ist bei ihr false, anders als bei Takeshi), `blickAus()`
-  // liest deshalb ueberall dasselbe konstante vx:4/vy:0 wie jede andere Bahn ohne Route —
-  // die uebrigen drei Eintraege bleiben trotzdem vollstaendig, fuer denselben Fallback-
-  // Vertrag wie bei jeder anderen Requisite dieser Tabelle (unbekannte/andere Richtung
-  // faellt nie auf einen fehlenden Index zurueck).
+  // DESHALB: WEG VOM KOPF, AUF DIE BRUST — das ist eine der beiden Alternativen, die der
+  // Opus-Plan selbst als Ausweichoption nennt ("eine Zeitfahr-Rueckennummer in eigener
+  // Farbe", Abschnitt 8 Punkt 2). Per renderProbe-Pixelscan NEU gemessen (dieselbe Methode,
+  // diesmal fuer den Torso statt den Kopf): die Torsobreite ist ueber y=35..49 durchgehend
+  // 30+ px breit UND UEBER ALLE VIER RICHTUNGEN STABIL (anders als der schmale, stark
+  // dekorierte Kopfbereich) — kein BAU-Flag setzt dort eine eigene Dekoration, `ruest`
+  // faerbt nur die Grundflaeche ein, auf der eine hell-kontrastierte Weste TROTZDEM aufliegt
+  // (dasselbe Prinzip wie das Startnummernband auf dem Arm: es sitzt auf JEDER Armfarbe,
+  // weil es nach der Figur gezeichnet wird und selbst die Farbe vorgibt, nicht die Haut/
+  // Ruestung durchscheinen laesst).
+  //
+  // ANKERPUNKT gemessen (window.__arena.renderProbe("__Sondentest","walk",false,dir),
+  // Alphakontur y=28..52 abgesucht): bei y=41 (Torso-Mitte, deutlich unter der Schulterzeile
+  // y=32 aus dem TAKESHI_HAND-Befund und deutlich ueber der Hand-/Huefthoehe y=49-50) ist der
+  // Torso in JEDER Richtung mindestens 21px breit. x variiert leicht mit der Blickrichtung
+  // (der Torso dreht sich im Profil sichtbar), im Gegensatz zum praktisch fixen Kopf-x.
   // Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
-  const ZF_HELM=[
-    {x:32,y:17}, // hinten
-    {x:32,y:17}, // links
-    {x:32,y:17}, // vorn
-    {x:31,y:17}, // rechts — der einzige praktisch erreichte Fall auf der geraden Bahn, s.o.
+  const ZF_BRUST=[
+    {x:32,y:41}, // hinten
+    {x:34,y:41}, // links
+    {x:32,y:41}, // vorn
+    {x:30,y:41}, // rechts — der einzige praktisch erreichte Fall auf der geraden Bahn (kein
+                 // `route:true`, s. vorheriger Kommentar an dieser Stelle vor der Ueberarbeitung)
   ];
-  // Drei Auspraegungen, gesteuert von DEMSELBEN Feld, das PR #948 (Zeitfahren-
-  // Koerperhaltung, heute Nachmittag) bereits fuer den Rumpf liest: `u.vizNeigung`
-  // (-1..1, positiv=Steigung, negativ=Abfahrt, 0=Ebene, s. stepZeitfahren). Der Helm zahlt
-  // damit auf GENAU dasselbe Bild ein statt eine zweite, unabhaengige Neigungsquelle zu
-  // erfinden — s. Aufrufstelle in zeichneSpurt() fuer die Phasenwahl aus `zfNeigung`.
-  const ZF_HELM_PHASEN={
-    steigung:{neigung:-0.10, heck:0.85}, // Vorlehnung: Kinn leicht hoch, Heck etwas kuerzer
-    abfahrt: {neigung:0.22,  heck:1.15}, // Aero-Kauerhaltung: Helm kippt vor, Heck streckt sich
-    ebene:   {neigung:0.05,  heck:1.0},
+  // Drei Auspraegungen, weiterhin gesteuert von `u.vizNeigung` (PR #948) — dieselbe Kopplung
+  // wie beim verworfenen Helm-Entwurf, jetzt als leichte Vor-/Rueckneigung der ganzen Weste
+  // statt eines Helmkeils.
+  const ZF_BRUST_PHASEN={
+    steigung:{neigung:-0.06},
+    abfahrt: {neigung:0.10},
+    ebene:   {neigung:0.02},
   };
-  // x/y ist der Kopf (aus ZF_HELM), s die Groesse (Z), richtung 0..3 wie blickAus() (0
-  // hinten, 1 links, 2 vorn, 3 rechts), phase einer der drei ZF_HELM_PHASEN-Schluessel
-  // (unbekannt faellt auf "ebene" zurueck, dasselbe Sicherheitsnetz wie bei den anderen acht
-  // Requisiten). Reine Canvas-Primitiven (Bordmittel, wie Hantel/Kufe/Schlaeger/Degen): eine
-  // ovale Schale ueber dem Kopf plus ein laenglicher, spitz auslaufender Heckkeil entgegen
-  // der Blickrichtung — das Erkennungsmerkmal eines Zeitfahr-Aero-Helms, den kein anderer
-  // Bahn-Laeufer traegt (Startnummernband=Takeshi, Stab=Staffel, dieser Helm=Time-Trial).
-  function zeichneAeroHelm(ctx,x,y,s,richtung,phase){
-    const p=ZF_HELM_PHASEN[phase]||ZF_HELM_PHASEN.ebene;
+  // x/y ist die Brustmitte (aus ZF_BRUST), s die Groesse (Z), richtung 0..3 wie blickAus(),
+  // phase einer der drei ZF_BRUST_PHASEN-Schluessel (unbekannt faellt auf "ebene" zurueck,
+  // dasselbe Sicherheitsnetz wie bei den anderen acht Requisiten). Reine Canvas-Primitiven:
+  // eine helle, rechteckige Weste mit diagonalem Rennstreifen (Motorsport-Zeitfahr-Optik)
+  // und einer angedeuteten Ziffer — bewusst GROSS und FLAECHIG statt filigran, damit sie auf
+  // JEDER Ruestungs-/Hautfarbe als eigener Farbfleck lesbar bleibt, unabhaengig davon, was
+  // am Kopf ueber ihr passiert. Das Erkennungsmerkmal, das kein anderer Bahn-Laeufer traegt
+  // (Startnummernband am Arm=Takeshi, Stab=Staffel, Weste auf der Brust=Time-Trial).
+  function zeichneZeitfahrWeste(ctx,x,y,s,richtung,phase){
+    const p=ZF_BRUST_PHASEN[phase]||ZF_BRUST_PHASEN.ebene;
     const blick=richtung===3?1:richtung===1?-1:0;
     const eff=blick||1;
-    ctx.save(); ctx.translate(x,y); ctx.rotate(p.neigung*eff*0.5);
-    // Schale: kompakte, glatte Halbkugel ueber dem Kopf. Heller Blauton mit hellem statt
-    // dunklem Rand (Sichtbarkeits-Fund beim Playwright-Beleg, Opus-Plan Abschnitt 5.1.a
-    // Grenzen: ein dunkler Rand verschwindet gegen dunkelhaarige/dunkelhaeutige Koepfe bei
-    // 32px komplett — ein heller Rand plus ein zusaetzlicher Highlight-Streifen bleiben auf
-    // JEDER Kopffarbe als Kontur lesbar, s. Streifen unten) — etwas GROESSER als der erste
-    // Entwurf (4.4/3.4 -> 5.2/4.0), aus demselben Grund.
-    ctx.fillStyle="#4fa3e0"; ctx.strokeStyle="rgba(235,245,255,.85)"; ctx.lineWidth=Math.max(0.7,0.8*s);
-    ctx.beginPath(); ctx.ellipse(0,-1.2*s,5.2*s,4.0*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    // Mittelstreifen: ein heller Laengsstreifen ueber die Schalenmitte, das klassische
-    // Rennhelm-Erkennungsmerkmal UND ein zweiter Kontrastanker neben dem Rand.
-    ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=Math.max(0.8,1.0*s); ctx.lineCap="round";
-    ctx.beginPath(); ctx.moveTo(-eff*2.6*s,-3.0*s); ctx.lineTo(-eff*4.4*s,0.4*s); ctx.stroke();
-    // Heck: der laengliche Keil hinter der Schale — zeigt entgegen der Blickrichtung, wird
-    // in der Abfahrt-Kauerhaltung sichtbar laenger (aerodynamische Anlage).
-    ctx.fillStyle="#4fa3e0"; ctx.strokeStyle="rgba(235,245,255,.85)"; ctx.lineWidth=Math.max(0.7,0.8*s);
-    const heckSpitzeX=-eff*8.4*s*p.heck, heckSpitzeY=0.6*s;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(p.neigung*eff);
+    // Grundflaeche: kraeftiges Magenta/Pink — NICHT das zuerst gewaehlte Gelb (Review-
+    // Nachbesserung, zweite Runde): `RUEST_TON.gold` faerbt Ruestungen bereits in
+    // "#D19B2E"/"#F0C858" (`:887 ff.`), praktisch demselben Ton wie das erste Gelb — bei
+    // King Arlen Morgolor UND Inefinna (beide `ruestTon:"gold"`) waere die Weste gegen die
+    // eigene Ruestungsfarbe verschwunden, GENAU der Fehler, den dieser Auftrag beheben soll,
+    // nur an anderer Stelle wiederholt. Kein Farbton im BAU-Katalog (gold/bronze/dunkel,
+    // die drei `RUEST_TON`-Rampen, dazu alle `vollbildFarbe`- und Hautfarbwerte) liegt nahe
+    // an Magenta — nachgesehen, nicht angenommen (s. Kommentar bei ZF_BRUST fuer den
+    // Diff-Beleg gegen alle 17 SQUAD/OPP-Figuren).
+    ctx.fillStyle="#ff2f92"; ctx.strokeStyle="rgba(20,16,4,.7)"; ctx.lineWidth=Math.max(0.7,0.8*s);
     ctx.beginPath();
-    ctx.moveTo(-eff*3.6*s,-2.8*s);
-    ctx.lineTo(heckSpitzeX,heckSpitzeY);
-    ctx.lineTo(-eff*3.0*s,3.0*s);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Visier: schmaler dunkler Streifen an der Stirnseite, in Blickrichtung versetzt.
-    ctx.fillStyle="rgba(10,14,20,.85)";
-    ctx.beginPath(); ctx.ellipse(eff*2.8*s,-0.4*s,1.8*s,1.2*s,0,0,Math.PI*2); ctx.fill();
+    if(ctx.roundRect)ctx.roundRect(-5.2*s,-5.6*s,10.4*s,11.2*s,1.6*s); else ctx.rect(-5.2*s,-5.6*s,10.4*s,11.2*s);
+    ctx.fill(); ctx.stroke();
+    // Diagonaler Rennstreifen quer ueber die Weste — Motorsport-Zeitfahr-Optik, zweiter
+    // Kontrastanker neben der Grundfarbe.
+    ctx.strokeStyle="#1f2a3a"; ctx.lineWidth=Math.max(1,2.2*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(-4.4*s,-4.4*s); ctx.lineTo(4.4*s,4.4*s); ctx.stroke();
+    // Ziffer (angedeutet als kurzer heller Balken statt echter Glyphe, wie die schmale
+    // Bespannungs-Andeutung beim Tennisschlaeger) — signalisiert "Startnummer", ohne eine
+    // echte Zifferngrafik zu brauchen.
+    ctx.fillStyle="rgba(20,16,4,.85)";
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-1.6*s,-2.4*s,3.2*s,4.8*s,0.8*s); else ctx.rect(-1.6*s,-2.4*s,3.2*s,4.8*s);
+    ctx.fill();
     ctx.restore();
   }
   // ================== SPURT: SPIKES AM FUSS (Ziel 11, Opus-Plan 16.09.) ==================
@@ -2818,7 +2823,7 @@
   // seinen Laufzyklus benutzt. Eine zweite, eigene Fuss-Geometrie fuer Spurt zu vermessen
   // waere dieselbe Zahl noch einmal erhoben.
   const SPURT_FUSS=FUSS_EISKUNSTLAUF;
-  // Zwei Auspraegungen statt der drei bei ZF_HELM — ein Huerdenlauf kennt keine Steigung/
+  // Zwei Auspraegungen statt der drei bei ZF_BRUST — ein Huerdenlauf kennt keine Steigung/
   // Abfahrt, nur "laufen" und "ueber der Huerde" (s. `u.vizHuerde`/parcHop-Aufrufstelle
   // unten): `hoehe` hebt den Spike-Ansatz waehrend des Sprungs sichtbar an, `kippe` neigt
   // die Sohle nach vorn wie ein Fuss im Absprung.
@@ -2862,10 +2867,12 @@
     eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
     tennis:      { hand:TENNIS_HAND, phasen:TENNIS_PHASEN, zeichne:zeichneSchlaeger },
     fechten:     { hand:FECHTEN_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
-    // NEUNTER EINTRAG (Ziel 10, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.1): der
-    // Aero-Helm, s. ZF_HELM/ZF_HELM_PHASEN/zeichneAeroHelm oben. Aufrufstelle in
+    // NEUNTER EINTRAG (Ziel 10, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.1,
+    // NACHGEBESSERT nach Review an PR #952 — Kopf-Entwurf gegen die volle Kaderliste
+    // verworfen, s. Kommentar bei ZF_BRUST oben): die Startnummer-Weste,
+    // s. ZF_BRUST/ZF_BRUST_PHASEN/zeichneZeitfahrWeste oben. Aufrufstelle in
     // zeichneSpurt(), neben dem Startnummernband, gegated auf `BA().zeitfahren`.
-    "time-trial":{ kopf:ZF_HELM, phasen:ZF_HELM_PHASEN, zeichne:zeichneAeroHelm },
+    "time-trial":{ brust:ZF_BRUST, phasen:ZF_BRUST_PHASEN, zeichne:zeichneZeitfahrWeste },
     // ZEHNTER EINTRAG (Ziel 11, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.2): die
     // Spikes, s. SPURT_FUSS/SPIKES_PHASEN/zeichneSpikes oben. Aufrufstelle in
     // zeichneSpurt(), gegated auf `BA().spurt`.
@@ -25048,25 +25055,27 @@
         prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,
           parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
       }
-      // AERO-HELM (DISZIPLIN_PROP["time-trial"], A3 55→80, Ziel 10, Opus-Plan Top-Zehn-
-      // ueber-90 16.09. Abschnitt 5.1.a): sitzt wie das Startnummernband INNERHALB
+      // STARTNUMMER-WESTE (DISZIPLIN_PROP["time-trial"], A3 55→80, Ziel 10, Opus-Plan
+      // Top-Zehn-ueber-90 16.09. Abschnitt 5.1.a, NACHGEBESSERT nach Review an PR #952 --
+      // s. Kommentar bei ZF_BRUST oben fuer den vollstaendigen Befund und die Begruendung
+      // des Wechsels vom Kopf auf die Brust): sitzt wie das Startnummernband INNERHALB
       // desselben ctx.save/scale/restore-Blocks wie der Laeufer selbst -- erbt Position,
       // Kamera-Zoom und die M4-Duck-/Taumel-Ausschlaege automatisch mit, exakt wie beim
       // Startnummernband oben. `bahnRicht` (statt `parcRicht`, das nur fuer Takeshis
       // Routen-Tangente gilt) ist dieselbe blickAus()-Eingabe, die zeichneSprite() intern
       // fuer GENAU dieses parcSpriteArg berechnet -- Time-Trial kennt kein `route:true`
-      // (anders als Takeshi), der Helm dreht sich also immer exakt mit dem Koerper, nie
+      // (anders als Takeshi), die Weste dreht sich also immer exakt mit dem Koerper, nie
       // eine zweite, potenziell abweichende Berechnung. `zfNeigung` ist dieselbe Zahl, die
-      // zfTilt/zfHaltung zwei Zeilen oben fuer den Rumpf lesen -- der Helm zahlt auf GENAU
+      // zfTilt/zfHaltung zwei Zeilen oben fuer den Rumpf lesen -- die Weste zahlt auf GENAU
       // dasselbe Bild ein statt eine dritte, unabhaengige Neigungsquelle zu erfinden.
       if(BA().zeitfahren&&u.fertig==null){
         const prop=DISZIPLIN_PROP["time-trial"];
         const bahnRicht=blickAus(parcSpriteArg);
-        const hp=prop.kopf[bahnRicht]||prop.kopf[2];
+        const bp=prop.brust[bahnRicht]||prop.brust[2];
         const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
           *bauSkala(BAU[u.n]||BAU_STD);
-        const zfHelmPhase=zfNeigung>0.05?"steigung":zfNeigung<-0.05?"abfahrt":"ebene";
-        prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,bahnRicht,zfHelmPhase);
+        const zfWestePhase=zfNeigung>0.05?"steigung":zfNeigung<-0.05?"abfahrt":"ebene";
+        prop.zeichne(ctx,x-32*parcZ+bp.x*parcZ,y-46*parcZ+bp.y*parcZ,parcZ,bahnRicht,zfWestePhase);
       }
       // SPIKES (DISZIPLIN_PROP.spurt, A3 55→80, Ziel 11, Opus-Plan Top-Zehn-ueber-90 16.09.
       // Abschnitt 5.2): dieselbe Aufrufstelle/Anker-Formel wie beim Aero-Helm oben, mit dem
@@ -28766,6 +28775,35 @@
       const ax=(anker&&typeof anker.x==="number")?anker.x:32;
       const ay=(anker&&typeof anker.y==="number")?anker.y:46;
       zeichneSprite(ctx,u,ax,ay,!!feldspiel);
+      return c.toDataURL();
+    },
+    // ZEITFAHR-WESTE GEGEN DEN VOLLEN KADER (Review-Fund an PR #952, 16.09.): derselbe
+    // Fehler wie beim urspruenglichen Aero-Helm-Entwurf darf sich hier nicht wiederholen —
+    // "an ein, zwei Beispielfiguren sieht gut aus" ist keine Verifikation gegen die 17
+    // tatsaechlichen SQUAD/OPP-Kaderfiguren, von denen JEDE eine eigene Kopf-/Vollbild-
+    // Dekoration traegt (s. Kommentar bei ZF_BRUST/BAU). Rein diagnostisch wie renderProbe/
+    // hockeyschlaegerProbe daneben: zeichnet die Figur GENAU wie renderProbe(name,"walk",
+    // false,dir) (Anker fest bei 32/46, kein Live-Duell noetig) und haengt DANACH exakt die
+    // PRODUKTIONS-Ankerformel/-Zeichenfunktion aus DISZIPLIN_PROP["time-trial"] an — kein
+    // zweites, potenziell abweichendes Formel-Duplikat, dieselbe Rechnung wie in
+    // zeichneSpurt(). `dir` (0-3, Default 3="rechts" — der auf der geraden Bahn praktisch
+    // einzig erreichte Fall, s. Kommentar bei ZF_BRUST) waehlt die Blickrichtung wie bei
+    // renderProbe. Kein rr()-Aufruf, kein Gameplay-Seiteneffekt.
+    zeitfahrWesteProbe:(name,dir)=>{
+      const c=document.createElement("canvas"); c.width=64; c.height=64;
+      const ctx=c.getContext("2d");
+      const richtung=[[0,-5],[-5,0],[0,5],[5,0]];
+      const d=dir!==undefined&&dir!==null?dir:3;
+      const [vx,vy]=richtung[d];
+      const kaderEintrag=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      const u={n:name,x:32,y:46,vx,vy,id:0,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
+        lunge:0,down:false,side:0,hop:0};
+      zeichneSprite(ctx,u,32,46,false);
+      const prop=DISZIPLIN_PROP["time-trial"];
+      const bahnRicht=blickAus(u);
+      const bp=prop.brust[bahnRicht]||prop.brust[2];
+      const parcZ=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(BAU[name]||BAU_STD);
+      prop.zeichne(ctx,32-32*parcZ+bp.x*parcZ,46-46*parcZ+bp.y*parcZ,parcZ,bahnRicht,"ebene");
       return c.toDataURL();
     },
     // Debug-Gegenstueck zu renderProbe, nur fuer die KADER-VORSCHAU (figur(), dieselbe
