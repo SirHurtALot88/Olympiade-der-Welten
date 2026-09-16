@@ -2727,6 +2727,86 @@
     ctx.beginPath();ctx.arc(kx,ky,Math.max(0.6,0.85*s),0,Math.PI*2);ctx.fill();
     return {kx,ky};
   }
+  // ================== TIME-TRIAL: AERO-HELM AM KOPF (Ziel 10, Opus-Plan 16.09.) ==================
+  // Neunter Eintrag, erster mit einem KOPF- statt Hand-/Fuss-Anker — der DISZIPLIN_PROP-
+  // Vertrag verlangt kein festes Feld (s. Kommentar bei FUSS_EISKUNSTLAUF: "der
+  // Verankerungspunkt selbst kann je Disziplin ein anderer Koerperteil sein"), Eiskunstlauf
+  // hat mit `fuss` schon vorgemacht, dass ein frei benanntes Feld ohne Umbau traegt. Time-
+  // Trial hatte bislang KEINE eigene Requisite — ein Zeitfahrer trug buchstaeblich nichts,
+  // was ihn von einem Spurt-/Staffel-/Climbing-Laeufer unterscheidet (Scorecard-Befund,
+  // docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md, Time-Trial-
+  // Abschnitt A3; PR #948 hat es selbst als "bewusst ausgelassen" protokolliert).
+  //
+  // ANKERPUNKT: per Pixelscan der body_walk-Alphakontur GEMESSEN (window.__arena.
+  // renderProbe("__Sondentest","walk",false,dir), dasselbe Werkzeug/Verfahren wie bei
+  // TAKESHI_HAND/FUSS_EISKUNSTLAUF), nicht geschaetzt. Ueber alle vier Richtungen deckungs-
+  // gleich: der Kopf beginnt bei y=11 (Scheitel) und erreicht bei y~17 seine volle
+  // Kopfbreite (~20px); die Schulterbreite (~25-31px) setzt erst ab y~30-32 ein — deckt sich
+  // mit dem TAKESHI_HAND-Befund "Schulter bei y=32". y=17 liegt damit sicher IM Kopf, knapp
+  // unter dem Scheitel: der Helm sitzt dort AUF dem Kopf, statt zu schweben oder ihn zu
+  // verdecken. x ist ueber alle vier Richtungen praktisch identisch (31-32, Sprite-Mitte) —
+  // anders als ein schwingender Arm bewegt sich der Kopf im Laufzyklus seitlich kaum.
+  // PRAKTISCH nur Richtung 3 ("rechts") erreicht: Time-Trial laeuft NICHT auf der Route
+  // (`istRoute()`/`BA().route` ist bei ihr false, anders als bei Takeshi), `blickAus()`
+  // liest deshalb ueberall dasselbe konstante vx:4/vy:0 wie jede andere Bahn ohne Route —
+  // die uebrigen drei Eintraege bleiben trotzdem vollstaendig, fuer denselben Fallback-
+  // Vertrag wie bei jeder anderen Requisite dieser Tabelle (unbekannte/andere Richtung
+  // faellt nie auf einen fehlenden Index zurueck).
+  // Reihenfolge wie blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts.
+  const ZF_HELM=[
+    {x:32,y:17}, // hinten
+    {x:32,y:17}, // links
+    {x:32,y:17}, // vorn
+    {x:31,y:17}, // rechts — der einzige praktisch erreichte Fall auf der geraden Bahn, s.o.
+  ];
+  // Drei Auspraegungen, gesteuert von DEMSELBEN Feld, das PR #948 (Zeitfahren-
+  // Koerperhaltung, heute Nachmittag) bereits fuer den Rumpf liest: `u.vizNeigung`
+  // (-1..1, positiv=Steigung, negativ=Abfahrt, 0=Ebene, s. stepZeitfahren). Der Helm zahlt
+  // damit auf GENAU dasselbe Bild ein statt eine zweite, unabhaengige Neigungsquelle zu
+  // erfinden — s. Aufrufstelle in zeichneSpurt() fuer die Phasenwahl aus `zfNeigung`.
+  const ZF_HELM_PHASEN={
+    steigung:{neigung:-0.10, heck:0.85}, // Vorlehnung: Kinn leicht hoch, Heck etwas kuerzer
+    abfahrt: {neigung:0.22,  heck:1.15}, // Aero-Kauerhaltung: Helm kippt vor, Heck streckt sich
+    ebene:   {neigung:0.05,  heck:1.0},
+  };
+  // x/y ist der Kopf (aus ZF_HELM), s die Groesse (Z), richtung 0..3 wie blickAus() (0
+  // hinten, 1 links, 2 vorn, 3 rechts), phase einer der drei ZF_HELM_PHASEN-Schluessel
+  // (unbekannt faellt auf "ebene" zurueck, dasselbe Sicherheitsnetz wie bei den anderen acht
+  // Requisiten). Reine Canvas-Primitiven (Bordmittel, wie Hantel/Kufe/Schlaeger/Degen): eine
+  // ovale Schale ueber dem Kopf plus ein laenglicher, spitz auslaufender Heckkeil entgegen
+  // der Blickrichtung — das Erkennungsmerkmal eines Zeitfahr-Aero-Helms, den kein anderer
+  // Bahn-Laeufer traegt (Startnummernband=Takeshi, Stab=Staffel, dieser Helm=Time-Trial).
+  function zeichneAeroHelm(ctx,x,y,s,richtung,phase){
+    const p=ZF_HELM_PHASEN[phase]||ZF_HELM_PHASEN.ebene;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(p.neigung*eff*0.5);
+    // Schale: kompakte, glatte Halbkugel ueber dem Kopf. Heller Blauton mit hellem statt
+    // dunklem Rand (Sichtbarkeits-Fund beim Playwright-Beleg, Opus-Plan Abschnitt 5.1.a
+    // Grenzen: ein dunkler Rand verschwindet gegen dunkelhaarige/dunkelhaeutige Koepfe bei
+    // 32px komplett — ein heller Rand plus ein zusaetzlicher Highlight-Streifen bleiben auf
+    // JEDER Kopffarbe als Kontur lesbar, s. Streifen unten) — etwas GROESSER als der erste
+    // Entwurf (4.4/3.4 -> 5.2/4.0), aus demselben Grund.
+    ctx.fillStyle="#4fa3e0"; ctx.strokeStyle="rgba(235,245,255,.85)"; ctx.lineWidth=Math.max(0.7,0.8*s);
+    ctx.beginPath(); ctx.ellipse(0,-1.2*s,5.2*s,4.0*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    // Mittelstreifen: ein heller Laengsstreifen ueber die Schalenmitte, das klassische
+    // Rennhelm-Erkennungsmerkmal UND ein zweiter Kontrastanker neben dem Rand.
+    ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=Math.max(0.8,1.0*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(-eff*2.6*s,-3.0*s); ctx.lineTo(-eff*4.4*s,0.4*s); ctx.stroke();
+    // Heck: der laengliche Keil hinter der Schale — zeigt entgegen der Blickrichtung, wird
+    // in der Abfahrt-Kauerhaltung sichtbar laenger (aerodynamische Anlage).
+    ctx.fillStyle="#4fa3e0"; ctx.strokeStyle="rgba(235,245,255,.85)"; ctx.lineWidth=Math.max(0.7,0.8*s);
+    const heckSpitzeX=-eff*8.4*s*p.heck, heckSpitzeY=0.6*s;
+    ctx.beginPath();
+    ctx.moveTo(-eff*3.6*s,-2.8*s);
+    ctx.lineTo(heckSpitzeX,heckSpitzeY);
+    ctx.lineTo(-eff*3.0*s,3.0*s);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Visier: schmaler dunkler Streifen an der Stirnseite, in Blickrichtung versetzt.
+    ctx.fillStyle="rgba(10,14,20,.85)";
+    ctx.beginPath(); ctx.ellipse(eff*2.8*s,-0.4*s,1.8*s,1.2*s,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
@@ -2739,6 +2819,10 @@
     eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
     tennis:      { hand:TENNIS_HAND, phasen:TENNIS_PHASEN, zeichne:zeichneSchlaeger },
     fechten:     { hand:FECHTEN_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
+    // NEUNTER EINTRAG (Ziel 10, Opus-Plan Top-Zehn-ueber-90 16.09. Abschnitt 5.1): der
+    // Aero-Helm, s. ZF_HELM/ZF_HELM_PHASEN/zeichneAeroHelm oben. Aufrufstelle in
+    // zeichneSpurt(), neben dem Startnummernband, gegated auf `BA().zeitfahren`.
+    "time-trial":{ kopf:ZF_HELM, phasen:ZF_HELM_PHASEN, zeichne:zeichneAeroHelm },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -24569,10 +24653,15 @@
   //
   // DERSELBE VERTRAG WIE stepStaffel/stepParcours, WOeRTLICH: geschrieben werden
   // AUSSCHLIESSLICH neue, praesentationale viz*-Felder (`vizSchritt`, `vizErschoepft`,
-  // `vizRampe`, `vizNeigung`), NIEMALS u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done,
-  // und es faellt KEIN rr()-Aufruf an. disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen
-  // diese Funktion mit jedem Frame mit — nachgemessen bit-identische Rangtreue vor/nach
-  // dieser PR (0,825 rho je Spiel, s. PR-Beschreibung).
+  // `vizRampe`, `vizNeigung`, seit dem Ton-Auftrag unten zusaetzlich `vizStartTon`,
+  // `vizZone`, `vizZielTon`, `vizZzTonN` — alles Einmal-Merker/Kantenspeicher, kein einziger
+  // fliesst zurueck in tempoVon()/rr()/MOTOREN["time-trial"].wert()), NIEMALS
+  // u.pos/u.v/u.reserve/u.fertig/rennT/rennFertig/done, und es faellt KEIN rr()-Aufruf an.
+  // disziplinProbe()/miss-alle-disziplinen.mjs durchlaufen diese Funktion mit jedem Frame
+  // mit — nachgemessen bit-identische Rangtreue vor/nach dieser PR (0,825 rho je Spiel, s.
+  // PR-Beschreibung). `sfx()` selbst ruft nachweislich nie `rr()` (Kommentar bei der
+  // Definition) und ist ohne AudioContext ein stiller No-Op — derselbe Vertrag, mit dem
+  // stepStaffel() oben schon Ton aus einer step*-Funktion ausloest.
   //
   // `vizNeigung` (Opus-Plan 9.2, Teil 2, "eine Bewegung, die Steigung und Abfahrt am Fahrer
   // zeigt") LIEST `gelaendeAn(u.pos)` — dieselbe Positions-Funktion, die `gelaendeFaktor()`
@@ -24596,7 +24685,14 @@
   function stepZeitfahren(dt,art){
     const dtSicht=dt*zeitFaktor();          // Sekunden, die der ZUSCHAUER erlebt
     for(const u of LAEUFER){
-      if(u.vizSchritt==null){ u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; u.vizNeigung=0; }
+      if(u.vizSchritt==null){
+        u.vizSchritt=(u.id||0)*2.3; u.vizErschoepft=0; u.vizRampe=0; u.vizNeigung=0;
+        // TON-MERKER (A4, Opus-Plan 16.09. Abschnitt 5.1.b): vier reine Einmal-Kanten,
+        // dasselbe Init-Muster wie staffelStartschussAn/vizZielGesehen bei stepStaffel.
+        // `vizZone` haelt die zuletzt GESEHENE Gelaendeart fest (statt eines Booleans), weil
+        // `bergauf` nur beim WECHSEL auf "steigung" feuern soll, nicht bei jedem Frame darin.
+        u.vizStartTon=false; u.vizZone=null; u.vizZielTon=false; u.vizZzTonN=0;
+      }
       // ---- 1. AUF DER STARTRAMPE? Reine Ablesung derselben Bedingung, die stepSpurt
       // oben zum Ueberspringen benutzt — hier nur, um die Figur stehen und das Panel
       // "startet in 3,4 s" zeigen zu lassen (s. renderZeitfahrenPanel/zeichneSpurt).
@@ -24608,6 +24704,15 @@
       // Funktion nichts ueber Sprite-Blaetter wissen muss.
       const faehrt=!wartet && u.fertig==null;
       if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/ZF_SCHRITT_PX;
+      // ---- START-TON (TON_KATALOG["time-trial"].start). Time-Trial ist die einzige Bahn
+      // mit gestaffeltem Einzelstart (`startAbstand`, s. BAHN_ART["time-trial"]) — ein
+      // Startsignal JE FAHRER ist deshalb die richtige akustische Entsprechung, nicht ein
+      // einziges Rennstart-Signal wie bei stepStaffel. Ausloeser ist der Uebergang
+      // "wartet"->"faehrt", nicht "vizRampe faellt auf 0": deckt so auch den ersten Fahrer
+      // ab, dessen `startT` bereits <= dem allerersten `rennT` liegt und der `vizRampe`
+      // deshalb nie ueber 0 sieht. `vizStartTon` haelt den Uebergang einmalig fest, exakt
+      // wie `vizZielGesehen` bei stepStaffel.
+      if(!u.vizStartTon && faehrt){ u.vizStartTon=true; sfx("time-trial","start"); }
       // ---- 3. ERSCHOEPFUNG, 0..1 (Chris Punkt 4: "ausdauer muss besser funktionieren").
       // Die Kraftreserve GIBT es laengst und sie wirkt laengst (u.leer senkt das Tempo in
       // tempoVon), sie war nur nirgends abzulesen: ein 4 px schmaler Balken unter den
@@ -24625,8 +24730,30 @@
       // Multiplikator, kein Vorzeichen). Waehrend Rampe/Ziel bleibt das Ziel bei 0 (`faehrt`
       // ist dann false), niemand lehnt sich im Stand oder im Ziel.
       const zone=faehrt?gelaendeAn(u.pos):null;
+      const zoneArt=zone?zone.art:null;
+      // ---- BERGAUF-TON (TON_KATALOG["time-trial"].bergauf), an der KANTE, nicht am
+      // Zustand: feuert nur BEIM WECHSEL auf "steigung", nicht in jedem Frame, waehrend die
+      // Zone anhaelt (sonst ein Dauerton statt eines Ereignisses, derselbe Fehler, den die
+      // Takeshi-Drossel in sfx() fuer ein anderes Symptom schon einmal beheben musste).
+      if(zoneArt==="steigung" && u.vizZone!=="steigung")sfx("time-trial","bergauf");
+      u.vizZone=zoneArt;
       const neigungZiel=zone&&zone.art==="steigung"?zone.staerke:zone&&zone.art==="abfahrt"?-zone.staerke:0;
       u.vizNeigung+=(neigungZiel-u.vizNeigung)*(1-Math.exp(-dt/0.4));
+      // ---- ZWISCHENZEIT-TON (TON_KATALOG["time-trial"].zwischenzeit). `u.zz[]` fuellt
+      // stepSpurt() weiter oben BEREITS in diesem Tick (bahnBewegung(dt) — und damit
+      // stepZeitfahren — laeuft ganz am Ende von stepSpurt(), s. dortiger Aufruf): ein
+      // reiner Lesezugriff auf ein Array, das eine ANDERE Funktion schreibt, genau der
+      // "NUR gelesen, nie geschrieben"-Vertrag, den stepKuer() fuer u.aktuell/u.summe
+      // vormacht. `vizZzTonN` zaehlt die bereits VERTONTEN Zwischenzeiten (nicht die
+      // Streckenposition) — robust auch dann, wenn zwei Checkpoints im selben Frame faellen.
+      if(art.zwischenzeiten && u.zz){
+        const gesehen=u.zz.filter(v=>v!=null).length;
+        if(gesehen>(u.vizZzTonN||0)){ u.vizZzTonN=gesehen; sfx("time-trial","zwischenzeit"); }
+      }
+      // ---- ZIEL-TON (TON_KATALOG["time-trial"].ziel), einmalig wie `vizZielGesehen` bei
+      // stepStaffel. u.fertig selbst wird ausschliesslich von stepSpurt() gesetzt (s. dort)
+      // — hier NUR gelesen, um den Uebergang zu erkennen.
+      if(u.fertig!=null && !u.vizZielTon){ u.vizZielTon=true; sfx("time-trial","ziel"); }
     }
   }
 
@@ -24829,6 +24956,26 @@
           *bauSkala(BAU[u.n]||BAU_STD);
         prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,
           parcRicht,u.vizZustand||"laufen",(u.id??0)+1);
+      }
+      // AERO-HELM (DISZIPLIN_PROP["time-trial"], A3 55→80, Ziel 10, Opus-Plan Top-Zehn-
+      // ueber-90 16.09. Abschnitt 5.1.a): sitzt wie das Startnummernband INNERHALB
+      // desselben ctx.save/scale/restore-Blocks wie der Laeufer selbst -- erbt Position,
+      // Kamera-Zoom und die M4-Duck-/Taumel-Ausschlaege automatisch mit, exakt wie beim
+      // Startnummernband oben. `bahnRicht` (statt `parcRicht`, das nur fuer Takeshis
+      // Routen-Tangente gilt) ist dieselbe blickAus()-Eingabe, die zeichneSprite() intern
+      // fuer GENAU dieses parcSpriteArg berechnet -- Time-Trial kennt kein `route:true`
+      // (anders als Takeshi), der Helm dreht sich also immer exakt mit dem Koerper, nie
+      // eine zweite, potenziell abweichende Berechnung. `zfNeigung` ist dieselbe Zahl, die
+      // zfTilt/zfHaltung zwei Zeilen oben fuer den Rumpf lesen -- der Helm zahlt auf GENAU
+      // dasselbe Bild ein statt eine dritte, unabhaengige Neigungsquelle zu erfinden.
+      if(BA().zeitfahren&&u.fertig==null){
+        const prop=DISZIPLIN_PROP["time-trial"];
+        const bahnRicht=blickAus(parcSpriteArg);
+        const hp=prop.kopf[bahnRicht]||prop.kopf[2];
+        const parcZ=groesseFaktor(parcSpriteArg.groesse)*hoehenKorrektur(parcSpriteArg)
+          *bauSkala(BAU[u.n]||BAU_STD);
+        const zfHelmPhase=zfNeigung>0.05?"steigung":zfNeigung<-0.05?"abfahrt":"ebene";
+        prop.zeichne(ctx,x-32*parcZ+hp.x*parcZ,y-46*parcZ+hp.y*parcZ,parcZ,bahnRicht,zfHelmPhase);
       }
       ctx.restore();
       // DER STAB (A3/M-Ziel 6, DISZIPLIN_PROP.staffel/zeichneStab, s. dort): nur der
