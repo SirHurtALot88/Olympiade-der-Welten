@@ -1,6 +1,6 @@
 {
  "hinweis": "Kaderfeste Rho-Basislinie (docs/design/messgrundlage-kaderfest.md). schranke ist der groesste erlaubte Rueckgang von spielMedian, bevor scripts/pruefe-rangtreue-schranke.mjs die CI rot macht — max(0.05, 0.3*spielSpannweite), s. Kopfkommentar dieses Skripts. Neu bauen mit: node scripts/baue-rangtreue-basislinie.mjs [spiele]",
- "gemessenAm": "2026-09-15T16:25:16.724Z",
+ "gemessenAm": "2026-09-16T10:50:44.225Z",
  "spiele": 24,
  "kaderFamilieQuelle": "live-save (Oly New Game Custom 19.8.2026, 09:08:45, gezogen 2026-09-03T11:40:56.959Z)",
  "disziplinen": {
@@ -150,10 +150,10 @@
   },
   "football": {
    "chassis": "feldspiel",
-   "spielMedian": 0.722,
-   "spielSpannweite": 0.164,
-   "saisonMedian": 0.832,
-   "saisonSpannweite": 0.161,
+   "spielMedian": 0.796,
+   "spielSpannweite": 0.142,
+   "saisonMedian": 0.888,
+   "saisonSpannweite": 0.098,
    "schranke": 0.05
   },
   "hockey": {

@@ -4597,11 +4597,20 @@
   // Der Slot-Aufschlag: wie viel besser (oder schlechter) die Attribute des Spielers im
   // Profil dieses Slots dastehen als im Grundprofil der Disziplin. Faktor 2,2 und die
   // Grenzen bei plus/minus 8,5 stammen aus SLOT_PROFILE_MODIFIER_SCALE im Spiel.
+  // FOOTBALL-BALANCE-RUNDE (16.09., docs/design/football-balance-runde-nach-e3-15-09.md
+  // Abschnitt 6 Punkt 2): moderate Reduktion des Slot-Aufschlags NUR fuer Football, weil die
+  // Klemmung bei plus/minus 8,5 fuer Football seit PR #934 fast immer greift (die Attribute,
+  // die jetzt "eng" speisen, sind zugleich die schwersten der Eignungsmatrix). Startwert 0,35,
+  // gemessener robuster Bereich 0,15-0,5 (s. Dokument Abschnitt 3.2/4.2). Disziplin-uebergreifend
+  // bewusst NICHT angefasst -- SLOT_PROFILE_MODIFIER_SCALE (Faktor 2,2, Klemmung 8,5) bleibt fuer
+  // jede andere Disziplin exakt wie vorher.
+  const FOOTBALL_SLOT_AUFSCHLAG_SKALA=0.35;
   function slotAufschlag(p,slotId,d){
     const s2=SLOTVON[slotId]; if(!s2)return 0;
     const disz=d||(Object.keys(SLOTS_JE_DISC).find(k=>SLOTS_JE_DISC[k].some(x=>x.id===slotId)));
     const basis=BASIS_JE_DISC[disz]; if(!basis)return 0;
-    const roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
+    let roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
+    if(disz==="football")roh*=FOOTBALL_SLOT_AUFSCHLAG_SKALA;
     return Math.max(-8.5,Math.min(8.5,Math.round(roh*10)/10));
   }
   // Vier Stufen, wie Chris sie wollte. Die Grenzen sind gesetzt, nicht gemessen —
@@ -4729,6 +4738,20 @@
     const W=BASIS_JE_DISC[dId]||{};
     const breit=Object.keys(W).filter(k=>W[k]>0);
     if(!eng)return breit;
+    // FOOTBALL-BALANCE-RUNDE (16.09., docs/design/football-balance-runde-nach-e3-15-09.md
+    // Abschnitt 6): seit PR #934 speist BASIS_JE_DISC.football aus DERSELBEN Quelle wie
+    // Footballs Slot-Fokus-Attribute (spiel-eignung-overrides.ts) -- "eng" trifft deshalb
+    // fast immer die zwei SCHWERSTEN Attribute der Eignungsmatrix (power/health: 22+18 von
+    // 100 Punkten) und saettigt mitAufschlag()s Multiplikator strukturell (Nenner `traegt`
+    // wird kuenstlich klein). Football faehrt deshalb IMMER "breit": alle neun Attribute, die
+    // BASIS_JE_DISC.football ohnehin gewichtet, nicht nur die zwei Fokus-Attribute des Slots.
+    // Bewusst football-spezifisch statt einer allgemeinen Regel ("eng ist bedeutungslos, wenn
+    // Anzeige- und Spiel-Ordnung identisch sind") -- das Dokument selbst nennt beides
+    // vertretbar und raet zur pragmatischeren, risikoaermeren Variante: Basketball/Hockey/
+    // TDM nutzen weiterhin die gesperrte Matrix (eine andere Quelle als ihre Slot-Fokusse)
+    // und sind von dieser Zeile unberuehrt, s. Isolationsnachweis
+    // (node scripts/miss-alle-disziplinen.mjs 24, alle zwanzig, vor und nach dieser Runde).
+    if(dId==="football")return breit;
     const sl=SLOTVON[slotId]; if(!sl)return breit;
     // WELCHE REZEPTE HIER GEFRAGT SIND. Bis eben stand hier immer REC — die KAMPFrezepte.
     // Auf einer Bahn ist das die falsche Frage: dort speist kein Attribut einen Kampfwert,
