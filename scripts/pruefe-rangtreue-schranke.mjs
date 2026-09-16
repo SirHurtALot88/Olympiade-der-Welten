@@ -122,9 +122,12 @@ try {
     if (gefallen) rot = true;
 
     // ABSOLUTER WAECHTER (s. Kopfkommentar): nur relevant fuer Disziplinen, die arena-resolved
-    // sind UND deren Basislinie die 0,80-Schranke bereits erfuellte — sonst gibt es nichts, das
-    // "reissen" koennte (eine Disziplin, die schon in der Basislinie unter 0,80 stand, hat die
-    // Abnahme so oder so nicht bestanden und ist per Definition nicht arena-resolved).
+    // sind UND deren Basislinie die 0,80-Schranke bereits erfuellte. "arena-resolved" heisst
+    // NICHT automatisch "bisherBestanden" — Basketball (0,769) und Hockey (0,669) sind bewusste,
+    // von Chris fuer den Live-Betrieb abgenommene Gegenbeispiele (s. gesamtstand-fertigstellungs-
+    // grad-alle-disziplinen-09-10.md). Deshalb der eigenstaendige bisherBestanden-Check unten —
+    // ihn zu entfernen wuerde diese beiden bekannten Ausnahmen versehentlich unter den absoluten
+    // Waechter fallen lassen.
     const arenaResolved = ARENA_RESOLVED_DISCIPLINE_IDS.has(d);
     const bisherBestanden = basis.spielMedian >= SCHRANKE_ABSOLUT;
     const jetztBestanden = z.spielMed >= SCHRANKE_ABSOLUT;
