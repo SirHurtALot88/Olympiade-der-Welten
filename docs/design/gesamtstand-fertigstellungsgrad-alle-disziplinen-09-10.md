@@ -1,3 +1,108 @@
+**Zwölfter Nachtrag 16.09. — Fechten nachgezogen (PR #945/#946), die groesste Einzelbewegung
+einer Zeile in dieser Tabelle bisher.** Der elfte Nachtrag (direkt darunter) hatte Fechten zuletzt
+auf 64 % gebracht und dabei ausdruecklich festgehalten, dass Konzept/Assets/Movement offene
+Baustellen bleiben. Seither sind zwei weitere PRs auf `main` gelandet, beide ausschliesslich an
+Fechten: `docs/design/fechten-rezeptkalibrierung-16-09.md` (PR #945) und
+`docs/design/fechten-movement-assets-16-09.md` (PR #946). **rho frisch nachgemessen** auf `main`
+@ `9a50248f`: `node scripts/miss-alle-disziplinen.mjs 24 fechten` liefert **0,826** (Spannweite
+0,203, Saison-rho 0,888, Spannweite 0,161) — bit-identisch zu beiden PR-Texten, keine Ueberraschung.
+
+**Alle sechzehn Teilkriterien einzeln gegen den heutigen Code geprueft, nicht aus den PR-Texten
+uebernommen:**
+
+- **K1 (eigenes Rezept):** unveraendert erfuellt — `BUEHNE_ART.fechten.rezept`
+  (`battle-mode.engine.js:12510 ff.`) existiert seit dem Chassis-Umzug, PR #945 aendert nur Gewichte
+  darin.
+- **K2 (eigene Mechanik ueber das Chassis hinaus):** unveraendert erfuellt — die drei FIE-Perioden
+  plus laufender Trefferstand (`rundenN:9`, Kommentar „PERIODEN + TREFFERSTAND",
+  `:12538-12551`) stammen aus PR #928 (14.09.) und sind von den beiden 16.09.-PRs nicht angefasst.
+- **K3 (eigenes Fable-Dokument):** unveraendert erfuellt, jetzt sogar um zwei weitere Dokumente
+  verstaerkt (`fechten-rezeptkalibrierung-16-09.md`, `fechten-movement-assets-16-09.md`, zusaetzlich
+  zu `fechten-punkte-mehrrunden-konzept-14-09.md`).
+- **K4 (kalibriert, offene Fragen entschieden): weiterhin OFFEN, ausdruecklich geprueft.** PR #945
+  hebt den Puffer zur 0,80-Schranke von 0,009 auf 0,026 (rho 0,809→0,826) durch eine gezielte
+  Grid-Suche an `NERVEN`/`GRUNDLAGE`/`TECHNIK` — aber der Kopfkommentar direkt ueber dem Rezept
+  (`battle-mode.engine.js:12520`) heisst nach der Aenderung immer noch woertlich „ERSTER,
+  AUSDRUeCKLICH NICHT FINALER Sieben-Rollen-Entwurf", und das PR-Dokument selbst schreibt unter
+  „Ehrliche Einordnung": der neue Puffer (0,026) bleibt **kleiner als das gemessene Kaderrauschen**
+  (Spannweite 0,203) — das strenge Kriterium aus CLAUDE.md ist damit nicht erreicht, und eine
+  „echte Sinkhorn-Kalibrierung (Recherche F.2)" bleibt laut Dokument expliziter naechster Schritt,
+  sobald ein Buehnen-Aequivalent zu `baue-feldspiel-rezept.mjs` existiert. K4 zaehlt deshalb weiter
+  als nicht erfuellt. **Konzept bleibt bei 75, nicht 100.**
+- **A1 (eigene Feld-Datei im PRODUKTIVEN React-Renderer):** bereits VOR diesen beiden PRs erfuellt,
+  unveraendert — `app/foundation/discipline-stage/arena/disciplines/lamps.tsx` (551 Z.) existiert seit
+  laengerem und ist eine von nur DREI Feld-Dateien mit eigener Token-Zeichnung
+  (`shared/track/lamps`, s. `benchmark.tsx:149,195`), keine generische Wrapper-Datei. Keine der
+  beiden 16.09.-PRs hat diese Datei angefasst — ihr Diff liegt beide Male ausschliesslich in
+  `public/mockups/battle-mode.engine.js`. **A1 ist keine neue Bewegung dieser Runde**, sondern
+  bereits im vorherigen Assets-Stand (55) eingepreist.
+- **A2 (eigene Szene im Mockup-Motor):** NEU erfuellt. `zeichneFechten()` (PR #946) ist ein
+  exklusiv auf `art.fechten` gegateter Zweig, kompletter Layout-Bruch mit dem generischen
+  Zwei-Reihen-Duell-Zweig — jedes Brett bekommt seine eigene horizontale Fechtbahn (Piste) mit
+  Mittellinie, En-garde-Linien und Grenzlinien, eigene `posMap`.
+- **A3 (disziplinrichtige Requisite):** bereits vorher voll erfuellt (die immer korrekte
+  Schwert-Waffenebene, seit 07.09.), jetzt qualitativ ersetzt statt neu verdient: `FECHTEN_HAND`/
+  `FECHTEN_PHASEN`/`zeichneDegen()` (PR #946) zeichnen einen eigenen Degen (Klinge, Griff, Glocke)
+  konstant an der Hand, statt nur waehrend des kurzen `ani==="slash"`-Fensters. **Keine neue
+  Punktzahl** — A3 stand schon vorher auf voll, das ist eine Qualitaetsreparatur innerhalb eines
+  bereits gezaehlten Kriteriums (dasselbe Muster wie Gewichtheben/Hantel oder Takeshi/Startnummernband
+  in frueheren Nachtraegen).
+- **A4 (Ton, Musik, Kulisse):** NEU erfuellt. `TON_KATALOG.fechten` (klingen/treffer/lampe/halt/
+  publikum) existierte bereits vollstaendig, aber `sfx("fechten", …)` stand bei **null**
+  Aufrufstellen. `stepFechten()` (PR #946) verdrahtet jetzt zwei echte Ereignisse:
+  klingen+treffer bei einem Treffer, klingen+halt bei einem Fehlschlag. Dieselbe binaere Schwelle,
+  die diese Tabelle bei Hockey/Speed-Schach/Eiskunstlauf schon angewendet hat („hat Ton" = A4
+  0→20, unabhaengig von der Zahl der Aufrufstellen, s. Abschnitt 3.1) — ehrlich vermerkt bleibt
+  offen: kein Publikums-Loop, `lampe` bleibt ungenutzt. Das aendert die Punktzahl nicht, weil die
+  bisherige Praxis in diesem Dokument A4 nie fraktioniert vergeben hat.
+- **G1 (Rangtreue):** rho 0,809→0,826, **dieselbe 0,80–0,85-Stufe** (35 Punkte) — keine Bewegung.
+- **G2 (Produktionsanschluss):** unveraendert erfuellt, **keine neue Bewegung dieser Runde**.
+  Fechten steht bereits seit der Produktivierungswelle 2 (09.09.) in
+  `ARENA_RESOLVED_DISCIPLINE_IDS` (`lib/resolve/battle-mode-arena-team-points.ts:298`) — anders als
+  bei Spurt im elften Nachtrag ist das hier kein neuer Fund, nur eine Bestaetigung.
+- **G3 (eigene Wertung):** unveraendert erfuellt — eigene PPS-Referenz
+  (`FECHTEN_PPS_REFERENZ_FELDGROESSEN` u. a., `battle-mode-arena-team-points.ts:791 ff.`), von
+  keiner der beiden PRs angefasst.
+- **G4 (2–6-Spieler-Tauglichkeit):** unveraendert — `jeSeite:6`, Buehne-Chassis (12 Punkte je
+  Abschnitt 3), von keiner der beiden PRs angefasst. **Gameplay bleibt bei 90.**
+- **M1 (eigene Zeichenfunktion im Mockup-Motor):** NEU erfuellt — `zeichneFechten()`, s. A2 oben
+  (derselbe Code, zwei verschiedene Achsen: Assets fragt nach der Szene, Movement nach der
+  Zeichenfunktion selbst).
+- **M2 (eigene Bewegungs-/Schrittlogik):** NEU erfuellt — `stepFechten()` schreibt eine echte
+  Zustandsmaschine pro Teilnehmer (`u.vizFechtPhase`: „engarde"→„ausfall"→„erholung"/„parade"→zurueck),
+  haerterer Standard als z. B. Climbings `stepClimbing()` (das im zehnten/elften Nachtrag mit nur
+  einem geschriebenen Feld schon volle M2-Punktzahl bekam).
+- **M3 (sichtbare Animation in der produktiven React-Buehne):** bereits VOR diesen beiden PRs
+  erfuellt, unveraendert — `lamps.tsx` traegt eine eigene Touché-FX-Schicht: Ausfall-Lunge bei
+  Score-Anstieg, rot/gruen aufflammender Treffer-Melder, kreuzende Klingen mit Klirr-Funke am
+  Treffpunkt, Glow-Pulse (`lamps.tsx:16-17, 147-198, 290-322`). Genau die Art Beleg, die Basketballs
+  M3 ueber `useTokenGlide`/`GhostLayer` in `court.tsx` schon vorgemacht hat. **Keine neue Bewegung**
+  — von den beiden 16.09.-PRs unberuehrt (deren Diff liegt komplett in `battle-mode.engine.js`).
+- **M4 (disziplineigene Posen/FX an den Sprites):** NEU voll erfuellt, vorher nur teilweise. Vorher
+  zeigte der Fechter die Waffe nur waehrend des kurzen `ani==="slash"`-Fensters (ein generischer
+  Mechanismus, kein eigenes Posensystem) — jetzt haelt `FECHTEN_PHASEN` drei eigene Phasen
+  (engarde/ausfall/parade) mit je eigenem Klingenwinkel und Reichweitenfaktor, gezeichnet ueber
+  `zeichneDegen()`, dauerhaft sichtbar statt nur im Ausfallfenster. **Movement bleibt vollstaendig
+  bei 100**, s. u.
+
+**Ergebnis:** Konzept bleibt bei **75** (K4 weiterhin offen). Assets springt von **55 auf 100**
+(A2 und A4 neu, A1/A3 bereits vorher voll — kein Deckel-Kriterium mehr offen). Gameplay bleibt bei
+**90** (rho in derselben Stufe). Movement springt von **35 auf 100** (M1/M2 neu, M4 von teilweise
+auf voll, M3 bereits vorher voll). **Gesamt: 64 %→91 %** (75/100/90/100, rechnerisch 91,25 %) —
+die groesste Einzelbewegung, die dieses Dokument bisher fuer eine Zeile verzeichnet (bisher groesster
+Sprung: Spurt +14 Punkte im elften Nachtrag). Der Grund fuer die Groesse des Sprungs ist nicht eine
+grosszuegigere Messung, sondern dass die beiden PRs in einer konsolidierten Runde praktisch alle
+verbliebenen Assets-/Movement-Luecken auf einmal schliessen, waehrend die einzige verbliebene
+Konzept-Luecke (K4) und die Rangtreue-Stufe (G1) bewusst unangetastet bleiben — genau die zwei
+Achsen, an denen eine reine Praesentations-/Kalibrierrunde nichts aendern sollte und laut PR-Texten
+auch nichts geaendert hat.
+
+Der Abstand zwischen Konzept (Design) und Darstellung (Assets/Movement), den dieses Dokument seit
+dem 10.09. verfolgt, dreht sich fuer Fechten damit erstmals um: nicht mehr „mehr durchdacht als zu
+sehen", sondern „so weit dargestellt wie es das noch unfertige Rezept hergibt".
+
+---
+
 **Elfter Nachtrag 16.09. — sieben liegengebliebene PRs (#924/#925/#926/#928/#929/#930/#934) nachgezogen,
 alle zwanzig Zeilen gegenkontrolliert.** Der zehnte Nachtrag stand seit 14.09. vormittags; seither
 sind mindestens acht relevante PRs gemergt (#924, #925, #926, #928, #929, #930, #933/#934, #935–#940),
@@ -173,6 +278,11 @@ gemessen** (`node scripts/miss-alle-disziplinen.mjs 24`, kaderfest) — Zeilen 9
 17 sind unten entsprechend aktualisiert, die uebrigen vierzehn bit-identisch bestaetigt (s. elfter
 Nachtrag ganz oben fuer die Begruendung jeder Bewegung).
 
+**Fuer den zwoelften Nachtrag (16.09., `main` @ `9a50248f`) ist zusaetzlich Zeile 12 (Fechten)
+erneut aktualisiert** — rho frisch gemessen (`node scripts/miss-alle-disziplinen.mjs 24 fechten`),
+alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. zwoelfter Nachtrag ganz oben. Die
+uebrigen neunzehn Zeilen sind gegenueber dem elften Nachtrag unveraendert.
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -186,7 +296,7 @@ Nachtrag ganz oben fuer die Begruendung jeder Bewegung).
 | 9 | Football | Feldspiel | 90 % | 75 % | **52 %** | 85 % | **76 %** | 0,722 | nein | **16.09.-Nachzug (Bewegung 14./15.09.):** PR #924 (Korridor-Refit Runde 2) hob rho 0,800→0,813, danach PR #934 (E3, „eine Wahrheit" fuer Footballs Gewichtsquelle) senkte es strukturell auf **0,722** — G1 faellt von der 0,80–0,85- auf die 0,70–0,80-Stufe, Gameplay 65→52. PR #933 (PPS-Referenz) liegt bereit, Produktivschaltung bewusst zurueckgestellt (Balance-Runde in Arbeit, PR #937) |
 | 10 | Time-Trial | Bahn | 95 % | 50 % | 92 % | 65 % | **76 %** | 0,825 | ja | **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert · **16.09. gegenkontrolliert:** unveraendert, PR #925 betraf Staffel/Climbing/Takeshi, nicht Time-Trial selbst |
 | 11 | Spurt | Bahn | 95 % | 55 % | **97 %** | **85 %** | **83 %** | 0,894 | **ja (neu)** | **16.09.-Nachzug (PR #926, 14.09.):** Feldgroesse 4→6 behoben, rho 0,871→0,894 (≥0,85-Stufe) plus **G2 30 neu** — Spurt ist die 14. arena-resolved Disziplin, Gameplay 67→97. `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, Movement 60→85 |
-| 12 | Fechten | Buehne | **75 %** | 55 % | 90 % | 35 % | **64 %** | 0,809 | ja | **16.09.-Nachzug (PR #923/#928, 14.09.):** drei FIE-Perioden statt einer Punkteformel + laufender Trefferstand im Feed heben Konzept 55→75 (K2/K3 erfuellt) — Rezept bleibt „erster, nicht finaler Sieben-Rollen-Entwurf" (`:12442`), K4 offen. Gameplay bleibt 90 (rho 0,816→0,809, gleiche Stufe). `stepFechten()` existiert weiterhin nicht, Movement bleibt 35 |
+| 12 | Fechten | Buehne | 75 % | **100 %** | 90 % | **100 %** | **91 %** | 0,826 | ja | **16.09.-Nachzug 2 (PR #945/#946, 16.09.):** Rezeptkalibrierung (NERVEN/GRUNDLAGE/TECHNIK neu gewichtet) hebt rho 0,809→0,826, gleiche 0,80–0,85-Stufe, Gameplay bleibt 90 — Kopfkommentar bleibt „nicht finaler Entwurf" (`:12520`), Puffer (0,026) bleibt unter dem Kaderrauschen (0,203), K4 weiterhin offen, Konzept bleibt 75. `zeichneFechten()` (eigene Fechtbahnen je Brett, A2/M1 neu) + `stepFechten()` (eigene Zustandsmaschine engarde/ausfall/erholung/parade, M2 neu) + `sfx("fechten",…)` erstmals verdrahtet (A4 neu) + `FECHTEN_PHASEN`/`zeichneDegen()` als dauerhafte eigene Pose statt nur im Ausfallfenster (M4 voll) — Assets 55→100, Movement 35→100. A1/M3 waren ueber `lamps.tsx` (eine von drei Feldern mit eigener Token-Zeichnung, eigene Touché-FX) bereits vorher voll und unberuehrt |
 | 13 | Tennis | Buehne | 75 % | **70 %** | 90 % | **50 %** | **71 %** | 0,825 | ja | **16.09.-Nachzug (PR #929, 14.09.):** `zeichneTennis()` als eigener Buehnenzweig mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch |
 | 14 | Mini-DM | Arena | **75 %** | 60 % | 22 % | 60 % | **54 %** | 0,256 | nein | **16.09.-Nachzug (PR #927/#930, 14.09.):** fuenf von sechs offenen Spielplanfragen beantwortet (4-Team-Pods, Kadergroesse 1, echter Playwright-Aufrufer fuer den FFA-Motor) — Konzept 70→75 (K4-Teilfortschritt). Weiterhin nicht in `ARENA_RESOLVED_DISCIPLINE_IDS` verdrahtet, Gameplay haengt allein an rho (0,256, unveraendert) · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
 | 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe · **16.09. gegenkontrolliert:** unveraendert |
@@ -196,16 +306,22 @@ Nachtrag ganz oben fuer die Begruendung jeder Bewegung).
 | 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (16.09.): 74 %** (rechnerisch 74,1 %, war 72 % am 14.09. vor
-diesem Nachtrag, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 80 % ·
-Assets 72 % · Gameplay 75 % · Movement 70 %.**
+**Durchschnitt ueber alle zwanzig (16.09., nach dem zwoelften Nachtrag): 75 %** (rechnerisch
+75,3 %, war 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am 10.09. vor
+der Feinschliff-/Football-Runde). Je Achse: **Konzept 80 % · Assets 74 % · Gameplay 75 % ·
+Movement 73 %.**
 
-*Die Bewegung seit dem 14.09. (72 %→74 %) kommt aus sechs Zeilen (Spurt, Tennis, Fechten, Climbing,
-Mini-DM nach oben; Football nach unten, s. elfter Nachtrag ganz oben), die uebrigen vierzehn sind
-ziffernidentisch. Assets bewegt sich am staerksten (70→72 %, vor allem Tennis 40→70), Movement am
-zweitstaerksten (66→70 %, Tennis/Spurt/Climbing). Gameplay bewegt sich netto kaum (74→75 %): Spurts
-+30 Punkte (Produktionsanschluss) und Footballs −13 Punkte (rho-Bruch durch #934) heben sich fast
-auf.*
+*Die Bewegung seit dem elften Nachtrag (74 %→75 %) kommt ausschliesslich aus Fechten (64 %→91 %,
+s. zwoelfter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind ziffernidentisch. Assets bewegt
+sich am staerksten (72 %→74 %, allein aus Fechtens Assets 55→100), Movement am zweitstaerksten
+(70 %→73 %, allein aus Fechtens Movement 35→100). Konzept und Gameplay bewegen sich nicht — bei
+Fechten war es genau K4 und G1, die diese Runde bewusst unangetastet liess.*
+
+*Die Bewegung von 14.09. auf den elften Nachtrag (72 %→74 %) kam aus sechs Zeilen (Spurt, Tennis,
+Fechten, Climbing, Mini-DM nach oben; Football nach unten, s. elfter Nachtrag). Assets bewegte sich
+damals am staerksten (70→72 %, vor allem Tennis 40→70), Movement am zweitstaerksten (66→70 %,
+Tennis/Spurt/Climbing). Gameplay bewegte sich netto kaum (74→75 %): Spurts +30 Punkte
+(Produktionsanschluss) und Footballs −13 Punkte (rho-Bruch durch #934) hoben sich fast auf.*
 
 **Welle 0 (Fundament, gemergt 12.09., PR #892/#889/#891/#895): noch ohne eigene Punktewirkung.**
 Vier PRs — Ton-Katalog-Daten fuer sechs Disziplinen, die generische `DISZIPLIN_PROP`-Requisiten-
@@ -736,8 +852,48 @@ das Update oben ueberholt.)*
 **Movement 65:** `stepZeitfahren()` als eigener Zweig im Bahn-Bewegungspfad (Laufzyklus aus dem
 Tempo, Erschoepfungspose, Rampe) — kein eigener Zeichenzweig, M1 bleibt offen.
 
-### Fechten — 64 % (75/55/90/35)
-**16.09.-Nachzug: Konzept 55→75 (PR #923/#928, 14.09.).** PR #923 liefert eine eigenstaendige
+### Fechten — 91 % (75/100/90/100)
+**16.09.-Nachzug 2: Assets 55→100, Movement 35→100 (PR #945/#946, 16.09.).** Zwei PRs in
+derselben Sitzung, beide ausschliesslich an `public/mockups/battle-mode.engine.js`, keine an
+Konzept/Gameplay geruehrt:
+- **PR #945 (Rezeptkalibrierung):** `sondiere-feldspiel-subskills.mjs`/`messe-arena-einfluss.mjs`
+  finden ein Missverhaeltnis in NERVEN (drittschwerste Rolle, 13,2 % mechanisches Gewicht) — trug
+  determination (Matrixgewicht 6) mit 40 % und health (4) mit 25 %, nur awareness (15) mit 35 %.
+  Grid-Suche (`awareness:55/determination:20/health:25`) plus eine kleinere Matrix-Proportions-
+  Korrektur an GRUNDLAGE/TECHNIK heben rho 0,809→**0,826** (Puffer zur 0,80-Schranke 0,009→0,026).
+  PUBLIKUM/SPITZENMOMENT/WAGNIS wurden geprueft und verworfen (jede Variante verschlechterte rho).
+  **Ehrlich im Dokument selbst festgehalten:** der neue Puffer bleibt kleiner als das
+  Kaderrauschen (Spannweite 0,203) — das strenge CLAUDE.md-Kriterium ist nicht erreicht, und der
+  Kopfkommentar ueber dem Rezept (`:12520`) heisst weiterhin „ERSTER, AUSDRUeCKLICH NICHT FINALER
+  Sieben-Rollen-Entwurf". **K4 bleibt deshalb offen, Konzept bleibt bei 75.** Gameplay bleibt bei
+  90 — 0,826 liegt in derselben 0,80–0,85-Stufe wie die vorherigen 0,809.
+- **PR #946 (Movement + Assets):** liefert `stepFechten()` (Zustandsmaschine
+  engarde→ausfall→erholung/parade, M2 erstmals erfuellt), `zeichneFechten()` (eigener Buehnenzweig
+  mit einer Fechtbahn/Piste je Brett statt des generischen Zwei-Reihen-Zweigs, A2 und M1 erstmals
+  erfuellt) und `FECHTEN_HAND`/`FECHTEN_PHASEN`/`zeichneDegen()` als neuen
+  `DISZIPLIN_PROP.fechten`-Eintrag — ein Degen, der jetzt dauerhaft und phasenabhaengig
+  (engarde/ausfall/parade, je eigener Klingenwinkel/Reichweite) an der Hand haengt statt nur
+  waehrend des kurzen `ani==="slash"`-Fensters (M4 von teilweise auf voll). `sfx("fechten", …)`
+  wird erstmals aufgerufen (klingen+treffer bei Treffer, klingen+halt bei Fehlschlag) — A4 erstmals
+  erfuellt, nach derselben binaeren „hat Ton"-Schwelle wie bei Hockey/Speed-Schach/Eiskunstlauf,
+  auch wenn kein Publikums-Loop ergaenzt wurde (ehrlich vermerkt, aendert die Punktzahl laut
+  bisheriger Praxis dieses Dokuments nicht). **Ausdruecklich unangetastet:** `rezept`, `wert()`,
+  die Erfolgskurve, `rundenN`, `failAbzug` — rho bit-identisch zu PR #945 (0,826), Isolationsnachweis
+  ueber alle zwanzig Disziplinen bestaetigt keine Nebenwirkung.
+- **A1 und M3 waren schon VOR beiden PRs voll erfuellt und sind von keiner der beiden beruehrt:**
+  `app/foundation/discipline-stage/arena/disciplines/lamps.tsx` ist die produktive React-Feld-Datei
+  fuer Fechten — eine von nur drei Feldern mit eigener Token-Zeichnung
+  (`shared/track/lamps`, `benchmark.tsx:149,195`) statt der geteilten `FieldSvgInner` — und traegt
+  eine eigene Touché-FX-Schicht (Ausfall-Lunge, rot/gruen aufflammender Treffer-Melder, kreuzende
+  Klingen mit Klirr-Funke, Glow-Pulse, `lamps.tsx:16-17,147-198,290-322`). Beide PRs aendern nur
+  `public/mockups/battle-mode.engine.js` — `lamps.tsx` ist unberuehrt.
+
+Ergebnis: Assets 55→**100** (A1/A3 bereits voll, jetzt A2+A4 dazu — kein offenes Assets-Kriterium
+mehr). Movement 35→**100** (M1/M2 neu, M4 von teilweise auf voll, M3 bereits voll) — die einzigen
+beiden Achsen dieses Dokuments, in denen Fechten bislang am schwaechsten stand, stehen jetzt auf
+dem Deckel. Konzept (K4) und Gameplay (G1-Stufe) bleiben bewusst unveraendert. **Gesamt 64→91 %.**
+
+**16.09.-Nachzug 1: Konzept 55→75 (PR #923/#928, 14.09.).** PR #923 liefert eine eigenstaendige
 Konzeptrecherche (`docs/design/fechten-punkte-mehrrunden-konzept-14-09.md`, Punkte-/
 Mehrrunden-Struktur), PR #928 setzt sie um: drei FIE-Perioden statt einer einzelnen Punkteformel
 (`rundenN` 10→9, durch 3 teilbar, dieselbe Gesamtdauer) und ein laufender Trefferstand (`u.treffer`)
