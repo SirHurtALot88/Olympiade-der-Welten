@@ -1,0 +1,42 @@
+{
+  "note": "Historie -> achtung änderung ich seh egerade die verkäufe sind alle in S1 noch drin NUR die von mir manuell nicht!!! bitte so rum dann fixen dass meine verkäufe hier auch rein laufen\n\nund wenn man auf die teams klickt hätte ich gerne ein fenster was aufgeht wo die käufe und verkäufe des teams dann kompakt aufgehen mit allen relevanten infos -> bitte bauen",
+  "view": "historyV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=historyV2&team=B-P&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T08:10:07.683Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T08-10-02-425Z-kn3o08",
+  "createdAt": "2026-08-14T08:10:02.425Z",
+  "page": {
+    "path": "/foundation",
+    "view": "historyV2",
+    "tab": null,
+    "label": "Markt · Historie"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

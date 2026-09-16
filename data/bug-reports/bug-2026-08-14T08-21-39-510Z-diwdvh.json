@@ -1,0 +1,42 @@
+{
+  "note": "bei PP Entwicklung und Attributentwicklung fehlt der Startwert! so sieht man nicht ob die Spieler sich in S1 schon verbessert haben",
+  "view": "playerProfile",
+  "path": "/foundation",
+  "tab": "career",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=playerProfile&tab=career&playerId=player-0416-kaela-stormshield&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T08:21:47.088Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T08-21-39-510Z-diwdvh",
+  "createdAt": "2026-08-14T08:21:39.510Z",
+  "page": {
+    "path": "/foundation",
+    "view": "playerProfile",
+    "tab": "career",
+    "label": "Team · Spieler"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

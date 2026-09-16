@@ -1,0 +1,41 @@
+{
+  "note": "Spieler Pandemonium von T-T wird hier ausgewiesen in S1 mit -40 SP \n\ner soll angeblich extrem viel awareness und will verlieren was nicht korrekt ist. auf seinem spielerprofil sieht es normla aus. \n\nBrontar steht auch bei -13,4SP\n\nDas was als Netto/Saison hier steht muss gleich sein mit dem forecast der im spielerprofil drin steht - bitte prüfen was korrekt ist und nur eine Zahl ausweisen!",
+  "view": "trainingCompact",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=trainingCompact&team=T-T&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T07:05:42.334Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T07-05-34-688Z-dcut58",
+  "createdAt": "2026-08-14T07:05:34.688Z",
+  "page": {
+    "path": "/foundation",
+    "view": "trainingCompact",
+    "tab": null,
+    "label": "Team · Training"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

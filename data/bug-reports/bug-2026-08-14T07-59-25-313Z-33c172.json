@@ -1,0 +1,42 @@
+{
+  "note": "Bitte prüfen! anscheinend wurden verkäufe gestoppt wegen spieler minimum -> diesen grund darf es nicht geben der muss sauber entfernt werden weil beim verkauf gibt es ja kein spieler minimum - das hatten wir jetzt schon so oft! \n\nund bei nicht genug cash für geplanten kauf kann das AI team ja ggf. einen kredit ziehen. \n\nund alle teams die mit negativem cash in die season starten müssen dann doppelt erwägen ob sie nicht vorher lieber spieler verkaufen!",
+  "view": "homeV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=homeV2&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T07:59:32.847Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T07-59-25-313Z-33c172",
+  "createdAt": "2026-08-14T07:59:25.313Z",
+  "page": {
+    "path": "/foundation",
+    "view": "homeV2",
+    "tab": null,
+    "label": "Spieltag · Home"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

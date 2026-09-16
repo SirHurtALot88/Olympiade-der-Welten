@@ -1,0 +1,41 @@
+{
+  "note": "die Spieltagsranks oder Saisonand Ranks auf der Seite passen nicht wirklich überein. Nach MD1 hat Z-H Platz 1 im Spieltag geholt, soll in der Saison aber nur 2. sein. das kann ja gar nicht sein! ich tippe mal darauf es liegt an den Mutatorpunkten! Aber die sollen im Saisonstand ja auch einkalkuliert sein und Z-H müsste dann Platz 1 mit 17,3 vor M-S mit 17,1 Punkten haben! \n\nBitte fixen",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=V-W&saveId=new-game-1787123325719-swnjlk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2752,
+    "height": 1044
+  },
+  "clientTime": "2026-08-19T08:40:50.009Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-19T08-40-50-149Z-w4eloo",
+  "createdAt": "2026-08-19T08:40:50.149Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}
