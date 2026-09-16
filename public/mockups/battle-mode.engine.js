@@ -2668,6 +2668,65 @@
     ctx.restore();
     return {kx,ky};
   }
+  // ================== FECHTEN: DEGEN AN DER HAND (Ziel 10, 16.09.) ==================
+  // Sechster Eintrag, nach demselben Muster wie Hantel/Hockeyschlaeger/Schachuhr/Kufe/
+  // Schlaeger oben. Fechten hatte bislang KEINE eigene Requisite in diesem Sinn — nur die
+  // globale Kosmetikwaffen-Ueberschreibung DISZIPLIN_WAFFE.fechten="schwert" (weiter oben),
+  // die ausschliesslich WAeHREND der kurzen "slash"-Animation greift (0,5->0,2s Ausfallfenster,
+  // s. Kommentar bei `ani` in zeichneSprite) und nur bei `!feldspiel` — in der stehenden
+  // Grundstellung (u.lunge===0, die meiste Zeit jedes Gefechts) trug ein Fechter also GAR
+  // NICHTS in der Hand, exakt der Scorecard-Befund ("keine Waffen-Requisite in der Hand der
+  // Fechter", docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md). Wie
+  // schon bei Tennis (14.09.) ersetzt der eigene Buehnen-Zweig (zeichneFechten() unten) den
+  // generischen Duell-Zweig komplett und ruft zeichneSprite mit `feldspiel=true` — das
+  // schaltet den alten Schwert-Overlay-Pfad ab (der greift nur bei `!feldspiel`) und diesen
+  // hier frei, GENAU wie beim Schlaeger-Tausch bei Tennis.
+  //
+  // ANKERPUNKT: SCHACH_HAND wiederverwendet, nicht neu vermessen — dieselbe Begruendung wie
+  // bei TENNIS_HAND: ein Fechter in Grundstellung ist ein STEHENDER Koerper, keine Laufpose,
+  // derselbe Standardkoerper-Ankerpunkt wie Schachuhr/Schlaeger.
+  const FECHTEN_HAND=SCHACH_HAND;
+  // DREI PHASEN statt der zwei bei Schachuhr/Schlaeger — ein Gefecht kennt mehr als "ruhend"/
+  // "schlag": die Grundstellung (Klinge schraeg nach vorn-oben, angriffsbereit), den Ausfall
+  // (Klinge fast waagerecht durchgestreckt, s. stepFechten() weiter unten) und die Parade
+  // (Klinge hochgerissen, zum Abwehren). `winkel` ist der Ausschlag zur Waagerechten (0 =
+  // Klinge zeigt exakt zum Gegner), `laenge` ein Reichweiten-Faktor je Phase — beim Ausfall
+  // reicht die Klinge sichtbar weiter, bei der Parade wird sie verkuerzt gehalten.
+  const FECHTEN_PHASEN={
+    engarde: {winkel:0.55, laenge:0.74},
+    ausfall: {winkel:0.05, laenge:1.16},
+    parade:  {winkel:1.05, laenge:0.62},
+  };
+  // x/y ist die Hand (aus FECHTEN_HAND), s die Groesse (Z), richtung 0..3 wie blickAus() (0
+  // hinten, 1 links, 2 vorn, 3 rechts), phase eine der drei FECHTEN_PHASEN-Schluessel
+  // (unbekannt faellt auf "engarde" zurueck, dasselbe Sicherheitsnetz wie bei den anderen vier
+  // Requisiten). Reine Canvas-Primitiven (Bordmittel, wie Hantel/Kufe/Schlaeger): eine duenne
+  // helle Klinge, ein kurzer dunkler Griff, eine Glocke (Parierteller) am Ankerpunkt — bewusst
+  // KEIN ovaler Rahmen wie beim Tennisschlaeger, ein Degen ist keine Saitenflaeche.
+  function zeichneDegen(ctx,x,y,s,richtung,phase){
+    const p=FECHTEN_PHASEN[phase]||FECHTEN_PHASEN.engarde;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const ux=eff*Math.cos(p.winkel), uy=-Math.sin(p.winkel);
+    const klingeL=30*s*p.laenge, griffL=5*s;
+    const gx=x-ux*griffL, gy=y-uy*griffL;
+    const kx=x+ux*klingeL, ky=y+uy*klingeL;
+    // Griff, kurz und dunkel.
+    ctx.strokeStyle="#2c2620"; ctx.lineWidth=Math.max(1,2.1*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(x,y);ctx.stroke();
+    // Klinge — duenn und hell, ein Degen ist kein Schwert.
+    ctx.strokeStyle="#d8dde6"; ctx.lineWidth=Math.max(0.6,1.0*s);
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(kx,ky);ctx.stroke();
+    // Glocke (Parierteller) am Ankerpunkt — der Umriss, an dem man einen Degen von jeder
+    // anderen Requisite dieser Tabelle sofort unterscheidet.
+    ctx.fillStyle="#8f96a3"; ctx.strokeStyle="#3a3d46"; ctx.lineWidth=Math.max(0.5,0.7*s);
+    ctx.beginPath();ctx.arc(x,y,Math.max(1.6,2.3*s),0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Klingenspitze — kleiner heller Punkt, derselbe Punkt, an dem zeichneFechten() bei einem
+    // Treffer den Klingenkontakt-Funken zeichnet.
+    ctx.fillStyle="#f2f4f7";
+    ctx.beginPath();ctx.arc(kx,ky,Math.max(0.6,0.85*s),0,Math.PI*2);ctx.fill();
+    return {kx,ky};
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
@@ -2679,6 +2738,7 @@
     "speed-schach":{ hand:SCHACH_HAND, phasen:SCHACH_UHR_PHASEN, zeichne:zeichneSchachuhr },
     eiskunstlauf:{ fuss:FUSS_EISKUNSTLAUF, phasen:KUFE_PHASEN, zeichne:zeichneKufe },
     tennis:      { hand:TENNIS_HAND, phasen:TENNIS_PHASEN, zeichne:zeichneSchlaeger },
+    fechten:     { hand:FECHTEN_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3717,6 +3777,19 @@
       const prop=DISZIPLIN_PROP.tennis;
       const hp=prop.hand[r]||prop.hand[2];
       prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,(u.lunge>0)?"schlag":"ruhend");
+    }
+    // DEGEN. Dasselbe Muster wie Schlaeger/Schachuhr/Hantel/Kufe direkt oberhalb
+    // (DISZIPLIN_PROP, Ziel 10, 16.09.) — Fechten hatte bislang keine eigene Requisite (nur
+    // die globale "slash"-Overlay-Waffe, s. Kommentar bei FECHTEN_HAND oben, die in der
+    // stehenden Grundstellung nie griff). `feldspiel` erzwingt hier `true`, weil
+    // zeichneFechten() (wie zeichneTennis()/zeichneSchach()) diesen Parameter fuer ihre
+    // eigenen Teilnehmer setzt; istFechten() prueft zusaetzlich istBuehne(disc)/buehneDisc,
+    // nicht nur diesen Parameter. Phase kommt aus u.vizFechtPhase (stepFechten(), rein
+    // praesentational) — "engarde" solange stepFechten() noch nie gelaufen ist.
+    if(feldspiel&&istFechten()&&!u.down){
+      const prop=DISZIPLIN_PROP.fechten;
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizFechtPhase||"engarde");
     }
     if(b.effekt&&!u.down){
       if(b.effekt.pos==="kopf"){
@@ -7361,6 +7434,11 @@
   // der Hand). In zeichneTennis() selbst nicht noetig, weil `art.tennis` (BUEHNE_ART.tennis)
   // dort schon exklusiv gated.
   const istTennis=()=>istBuehne(disc)&&buehneDisc==="tennis";
+  // FECHTEN (Ziel 10, 16.09.), exakt dasselbe Muster wie istTennis()/istEis() direkt darueber
+  // — gebraucht an der DISZIPLIN_PROP.fechten-Aufrufstelle unten (Degen an der Hand). In
+  // zeichneFechten() selbst nicht noetig, weil `art.fechten` (BUEHNE_ART.fechten) dort schon
+  // exklusiv gated.
+  const istFechten=()=>istBuehne(disc)&&buehneDisc==="fechten";
 
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
@@ -12452,7 +12530,10 @@
       // es traegt auch I-Spy und Tennis. `fechten:true` gibt Fechten dieselbe eigene
       // Schranke, die `schach:true` (:11008) neben demselben geteilten `duell:true` schon
       // fuer Speed-Schach traegt — genau das Muster, mit dem PR #883 es dort vorgemacht hat.
-      // Rein deskriptiv, ohne Wirkung, bis Ziel-PR 10 `stepFechten()` liefert.
+      // War rein deskriptiv, ohne Wirkung, bis Ziel-PR 10 `stepFechten()` liefert — das ist
+      // jetzt geschehen (16.09., Movement/Assets-Nachzug, s. stepFechten()/zeichneFechten()
+      // weiter unten). Weder hier noch dort ruehrt diese PR `rezept`/`wert()`/die
+      // Erfolgskurve/`rundenN`/`failAbzug` an — reine Praesentation.
       //
       // PERIODEN + TREFFERSTAND (docs/design/fechten-punkte-mehrrunden-konzept-14-09.md,
       // Option 1+2, Chris' Go am 14.09.). `rundenN` von 10 auf 9 — durch 3 teilbar, also
@@ -14280,6 +14361,116 @@
     }
   }
 
+  // ================== ZIEL 10: FECHTEN BEWEGT SICH (stepFechten) ==================
+  // Scorecard-Fund (docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md,
+  // Fechten-Zeile, 16.09.): Movement 35 %, Assets 55 % — mit Abstand die schwaechsten zwei
+  // Achsen. Seit dem Chassis-Umzug (03.09., docs/design/tennis-fechten-buehne-umsetzung.md)
+  // lief Fechten rein optisch ueber den generischen Buehnen-Duell-Zweig (wie Speed-Schach/
+  // Tennis VOR deren eigener Politur): kein eigenes Buehnenbild, keine eigene Bewegung, keine
+  // Waffen-Requisite in der Hand (s. FECHTEN_HAND-Kommentar oben bei DISZIPLIN_PROP).
+  // `BUEHNE_ART.fechten` traegt das Flag `fechten:true` und buehnenBewegung() den
+  // typeof-gewachten Aufruf schon seit PR 0.3 ("Ziel 10") — diese Funktion ist der Nachzug,
+  // den der Kommentar dort ankuendigt.
+  //
+  // HARTER VERTRAG WIE BEI stepSchach()/stepCypher() (Kommentar dort woertlich uebernommen):
+  // niemals rr(), niemals u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/u.lunge/buehneAkt/
+  // buehneZeiger/done anfassen — nur neue, praesentationale `viz*`-Felder auf `u`.
+  // disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese Funktion mit jedem Frame
+  // mitlaufen lassen, ohne dass sich eine Rangtreue-Zahl bewegt. Rezept/wert()/Erfolgskurve/
+  // rundenN/failAbzug (BUEHNE_ART.fechten) sind in dieser PR nicht angefasst.
+  //
+  // WARUM EINE ECHTE ZUSTANDSMASCHINE, NICHT NUR u.lunge ABLESEN (wie zeichneTennis() es fuer
+  // den Ballwechsel tut): ein Ausfallschritt braucht drei sichtbar unterschiedene Phasen (hin,
+  // zurueck, Grundstellung), eine Parade eine vierte, unabhaengige — die noetig ist, WEIL sie
+  // an ein Ereignis (den Fehlschlag) auf einem ANDEREN Teilnehmer haengt als dem, der gerade
+  // enthuellt wurde (dem Angreifer). Dafuer gibt es kein bestehendes viz*-Feld, deshalb der
+  // eigene, u.aktuell-getriebene Zustandsautomat wie bei stepSchach()/stepCypher().
+  //
+  // ZUSTAENDE (u.vizFechtPhase): "engarde" (Grundstellung, Default/nach Rueckkehr), "ausfall"
+  // (der Angreifer stoesst nach vorn), "erholung" (derselbe Angreifer geht zurueck in die
+  // Grundstellung), "parade" (der GEGNER weicht/pariert bei einem Fehlschlag des Angreifers,
+  // s. Auftrag Punkt 1). u.vizFunkeT ist unabhaengig davon ein reiner Anzeige-Timer fuer den
+  // Klingenkontakt-Effekt bei einem Treffer (auf BEIDEN Beteiligten gesetzt, s.
+  // zeichneFechten()).
+  //
+  // ANTI-FREEZE (M1, dasselbe wiederkehrende Risikomuster wie in der Scorecard unter
+  // "eingefrorene Sprite-Animation" beschrieben): u.vizFechtBounceT laeuft IMMER, auch
+  // ausserhalb von Ausfall/Parade — ein sehr kleiner, dauerhafter Grundstellungs-Wipper
+  // (zeichneFechten() liest ihn als vizFechtBob), damit ein wartender Fechter nie als
+  // Standbild einfriert, selbst wenn gerade kein Treffer/Fehlschlag enthuellt wird.
+  const FECHT_AUSFALL_T=0.22, FECHT_ERHOL_T=0.24, FECHT_PARADE_T=0.28, FECHT_FUNKE_T=0.24;
+  const FECHT_AUSFALL_PX=30, FECHT_PARADE_PX=11;
+  function stepFechten(dt,art){
+    if(!TEILNEHMER.length)return;
+    // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild schachUhrWert()/vizSchachHalb-Vergleich bei
+    // stepSchach oben): u.vizFechtAktuell haelt fest, welchen Durchgang diese Funktion fuer
+    // `u` zuletzt gesehen hat. Anders als bei Speed-Schach (ein einzelnes Fokus-Brett) laeuft
+    // Fechten OHNE Spotlight — alle Bretter gleichzeitig, wie bei Tennis — deshalb hier eine
+    // Schleife ueber ALLE Teilnehmer statt nur ueber ein Brettpaar.
+    for(const u of TEILNEHMER){
+      if(u.brett==null)continue; // Sicherheitsnetz, sollte bei art.duell nie greifen.
+      if(u.vizFechtAktuell==null)u.vizFechtAktuell=-1;
+      if(u.aktuell>=0 && u.aktuell!==u.vizFechtAktuell){
+        u.vizFechtAktuell=u.aktuell;
+        u.vizFechtPhase="ausfall"; u.vizFechtT=0;
+        const r=u.runden[u.aktuell];
+        const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
+        if(gegner){
+          if(r&&r.ereignis===art.erfolgWort){
+            // TREFFER: Klingenkontakt-Funke auf BEIDEN Fechtern dieses Brettes
+            // (zeichneFechten() zeichnet ihn einmal am Beruehrungspunkt, s. dort) — der Gegner
+            // bleibt sonst in seiner aktuellen Phase (kein Ausweich-Sonderfall bei einem
+            // Treffer, nur bei einem Fehlschlag, s. Auftrag Punkt 1).
+            u.vizFunkeT=FECHT_FUNKE_T; gegner.vizFunkeT=FECHT_FUNKE_T;
+            sfx("fechten","klingen"); sfx("fechten","treffer");
+          } else {
+            // FEHLSCHLAG: der Gegner pariert/weicht aus — eigener Zustand auf dem GEGNER,
+            // nicht auf dem Angreifer (der bleibt im Ausfall, s. Auftrag Punkt 1: "ein
+            // Parade-Ausweichen bei Fehlschlag" ist eine Reaktion des Verteidigers).
+            gegner.vizFechtPhase="parade"; gegner.vizFechtT=0;
+            sfx("fechten","klingen"); sfx("fechten","halt");
+          }
+        }
+      }
+    }
+    // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein FRISCH auf
+    // "ausfall"/"parade" gesetzter Teilnehmer in DEMSELBEN Frame schon eine (winzige)
+    // Fortschrittszahl bekommt statt einen Frame lang bei 0 zu haengen — dieselbe Reihenfolge
+    // wie bei stepKuer/stepCypher (erst Ereignis erkennen, danach alle Uhren einmal
+    // weiterlaufen lassen).
+    for(const u of TEILNEHMER){
+      if(u.brett==null)continue;
+      if(u.vizFunkeT>0)u.vizFunkeT=Math.max(0,u.vizFunkeT-dt);
+      const phase=u.vizFechtPhase;
+      if(phase==="ausfall"){
+        u.vizFechtT=(u.vizFechtT||0)+dt;
+        if(u.vizFechtT>=FECHT_AUSFALL_T){ u.vizFechtPhase="erholung"; u.vizFechtT=0; }
+      } else if(phase==="erholung"){
+        u.vizFechtT=(u.vizFechtT||0)+dt;
+        if(u.vizFechtT>=FECHT_ERHOL_T){ u.vizFechtPhase="engarde"; u.vizFechtT=0; }
+      } else if(phase==="parade"){
+        u.vizFechtT=(u.vizFechtT||0)+dt;
+        if(u.vizFechtT>=FECHT_PARADE_T){ u.vizFechtPhase="engarde"; u.vizFechtT=0; }
+      }
+      // GRUNDSTELLUNGS-WIPPER (M1, Anti-Freeze) — laeuft immer, unabhaengig von der Phase
+      // oben; `+u.id` phasenverschiebt jedes Brett gegen die anderen, damit nicht alle
+      // Fechter im Gleichtakt wippen.
+      u.vizFechtBounceT=(u.vizFechtBounceT||0)+dt;
+      u.vizFechtBob=Math.sin(u.vizFechtBounceT*6.2+u.id)*1.4;
+    }
+  }
+  // Vorschub in Pixeln Richtung Gegner (positiv) bzw. von ihm weg (negativ), aus dem
+  // aktuellen u.vizFechtPhase/u.vizFechtT — reine Ableitung, kein weiterer Zustand. Von
+  // zeichneFechten() gelesen, direkt neben der Zustandsmaschine platziert, deren Felder sie
+  // liest.
+  function fechtVersatz(u){
+    const t=u.vizFechtT||0;
+    if(u.vizFechtPhase==="ausfall")return FECHT_AUSFALL_PX*Math.min(1,t/FECHT_AUSFALL_T);
+    if(u.vizFechtPhase==="erholung")return FECHT_AUSFALL_PX*Math.max(0,1-t/FECHT_ERHOL_T);
+    if(u.vizFechtPhase==="parade")return -FECHT_PARADE_PX*Math.sin(Math.PI*Math.min(1,t/FECHT_PARADE_T));
+    return 0;
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -14542,13 +14733,20 @@
     // BUEHNE_ART.tennis) — dasselbe Muster wie die drei Zweige direkt oberhalb. Schlaeger an
     // der Hand (DISZIPLIN_PROP.tennis) + Ballwechsel-Visualisierung, s. zeichneTennis()
     // unten. Aendert nichts an Eiskunstlauf (eigener Duett-Zweig direkt darunter) oder den
-    // vier verbleibenden Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis-Buehnen
-    // (I-Spy/Fechten/Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
+    // drei verbleibenden Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten-
+    // Buehnen (I-Spy/Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
     if(art.tennis){ zeichneTennis(art); return; }
+    // FECHTEN (Ziel 10, 16.09.): eigener Zweig, exklusiv auf `art.fechten` gegated (s.
+    // BUEHNE_ART.fechten) — dasselbe Muster wie die vier Zweige oberhalb. Eigene Fechtbahn +
+    // Degen an der Hand (DISZIPLIN_PROP.fechten) + Ausfallschritt-/Parade-Bewegung, s.
+    // stepFechten()/zeichneFechten() weiter unten. Aendert nichts an den drei verbleibenden
+    // Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten-Buehnen (I-Spy/
+    // Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
+    if(art.fechten){ zeichneFechten(art); return; }
     // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
     // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
-    // zeichneDuett() unten. Die vier verbleibenden Nicht-Heben/Nicht-Schach/Nicht-
-    // Breaking/Nicht-Tennis-Buehnen (I-Spy/Fechten/Showcase/Wettessen) durchlaufen den
+    // zeichneDuett() unten. Die drei verbleibenden Nicht-Heben/Nicht-Schach/Nicht-
+    // Breaking/Nicht-Tennis/Nicht-Fechten-Buehnen (I-Spy/Showcase/Wettessen) durchlaufen den
     // generischen Zweig darunter weiterhin unveraendert.
     if(art.duett){ zeichneDuett(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
@@ -14727,6 +14925,129 @@
           ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
         }
       }
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== FECHTEN: EIGENES BUEHNENBILD (Ziel 10, 16.09.) ==================
+  // Exklusiv auf `art.fechten` gegated (BUEHNE_ART.fechten) — dasselbe Muster wie die vier
+  // Zweige davor (Heben/Schach/Breaking/Tennis) in zeichneBuehne(): eigener Flag, eigene
+  // Funktion, kein Eingriff in den generischen Zweig, den I-Spy/Showcase/Wettessen weiterhin
+  // unveraendert durchlaufen.
+  //
+  // PISTE STATT DER GENERISCHEN ZWEI-REIHEN-FLAeCHE (Auftrag Punkt 2): eine Fechtbahn ist ein
+  // schmaler, LANGER Streifen, auf dem sich zwei Gegner aufeinander zu und wieder auseinander
+  // bewegen — strukturell naeher an Tennis' Ballwechsel-Achse als an der generischen
+  // Zwei-Reihen-Aufstellung (dort steht ein ganzes TEAM in einer Reihe, nicht ein Gegner-Paar
+  // gegenueber). Deshalb ein voelliger Layout-Bruch mit dem generischen Zweig, nach demselben
+  // Vorbild wie zeichneSchach()s eigenes Tisch-plus-Brett-Bild: JEDES Brett bekommt seine
+  // eigene horizontale Bahn, Heim links, Gast rechts — blickAus() liefert bei u.vx=u.vy=0
+  // (der Ruhezustand jedes Buehnen-Teilnehmers, s. bauBuehne()s `setz()`) fuer Seite 0 ohnehin
+  // schon "rechts" und fuer Seite 1 "links" (s. Kommentar bei blickAus()), Heim und Gast
+  // stehen sich also automatisch zugewandt gegenueber, ohne dass diese Funktion je u.vx/u.vy
+  // anfasst.
+  //
+  // ALLE BRETTER GLEICHZEITIG, KEIN SPOTLIGHT (wie Tennis, ANDERS als Speed-Schach) — ein
+  // Fechtgefecht ist mit neun Gaengen kurz genug, dass eine Spotlight-Regie hier mehr Zustand
+  // gekostet als Klarheit gebracht haette. Bei mehr als zwei Brettern schrumpfen die Figuren
+  // (`sk`, dieselbe ctx.scale-um-den-Fusspunkt-Technik wie bei den wartenden Eiskunstlauf-
+  // Paaren, s. Kommentar bei "WER NICHT LAEUFT, WIRD KLEIN..." weiter unten), damit sich die
+  // Bahnen bei jeSeite:6 nicht ueberlappen.
+  //
+  // BEWEGUNG UND FUNKEN LESEN AUSSCHLIESSLICH stepFechten()s viz*-Felder (vizFechtPhase/
+  // vizFechtT ueber fechtVersatz(), vizFechtBob, vizFunkeT) — kein neuer buehnenBewegung()-
+  // Zweig hier, kein rr()-Aufruf.
+  function zeichneFechten(art){
+    if(!TEILNEHMER.length)return;
+    const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
+    const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const xL=140, xR=W-140, mitte=(xL+xR)/2, bahnLen=xR-xL;
+    // En-garde-Abstand ~15% der Bahnlaenge vom Zentrum je Seite — das FIE-Regelwerk setzt die
+    // En-garde-Linien 2 m von der Mitte auf einer 14 m langen Bahn (~14%), hier aufgerundet
+    // fuer sichtbaren Abstand zwischen den Sprites.
+    const gardeAbstand=bahnLen*0.15;
+    const sk=Math.max(0.55,Math.min(1,1.12-0.09*(bretter-1)));
+    const posMap=new Map();
+    for(let i=0;i<bretter;i++){
+      const [a,b]=paar(i); if(!a||!b)continue;
+      const laneY=H*(bretter>1?0.16+0.68*(i/(bretter-1)):0.48);
+      const baseX0=mitte-gardeAbstand, baseX1=mitte+gardeAbstand;
+      // BAHN: schmaler heller Streifen mit Mittellinie, zwei gelben En-garde-Linien und den
+      // beiden roten Grenzlinien am Bahnende — das FIE-Bild einer Fechtbahn, keine erfundene
+      // Form.
+      ctx.fillStyle="rgba(60,66,82,.9)"; ctx.fillRect(xL,laneY-15,bahnLen,30);
+      ctx.strokeStyle="rgba(230,232,240,.35)"; ctx.lineWidth=1.5;
+      ctx.strokeRect(xL,laneY-15,bahnLen,30);
+      ctx.strokeStyle="rgba(230,232,240,.55)";
+      ctx.beginPath(); ctx.moveTo(mitte,laneY-15); ctx.lineTo(mitte,laneY+15); ctx.stroke();
+      ctx.strokeStyle="rgba(226,195,77,.6)"; ctx.setLineDash([3,3]);
+      [baseX0,baseX1].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
+      ctx.setLineDash([]);
+      ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
+      [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
+      ctx.lineWidth=1;
+      // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade), plus der
+      // Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
+      const dxA=fechtVersatz(a), dxB=fechtVersatz(b);
+      const ax=baseX0+dxA, ay=laneY+(a.vizFechtBob||0);
+      const bx=baseX1-dxB, by=laneY+(b.vizFechtBob||0);
+      posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
+      [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
+        const c=css(farbVar);
+        ctx.save(); ctx.translate(px,py); ctx.scale(sk,sk); ctx.translate(-px,-py);
+        ctx.fillStyle=c; ctx.globalAlpha=0.2;
+        ctx.beginPath(); ctx.ellipse(px,py+19,15,5,0,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+        // `true` schaltet den istFechten()-Requisitenblock in zeichneSprite() frei (Degen an
+        // der Hand statt des alten Schwert-Overlays, s. FECHTEN_HAND-Kommentar oben).
+        zeichneSprite(ctx,u,px,py,true);
+        ctx.restore();
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.font="400 9px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+        const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
+        ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
+      });
+      // KOPFZEILE JE BAHN: Treffer/Vorteil/Gang — dieselben drei Zahlen wie im generischen
+      // Zweig, nur als eine Zeile ueber statt drei Zeilen unter der Figur, weil bei sechs
+      // Bahnen kein Platz fuer den vollen generischen Block bleibt.
+      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+      ctx.font="700 10.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+      const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
+        +"  ·  Vorteil "+(v>0?"+":"")+v
+        +"  ·  Gang "+(Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN;
+      ctx.strokeText(kopf,mitte,laneY-24); ctx.fillText(kopf,mitte,laneY-24);
+      // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
+      // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
+      const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
+      if(funke>0){
+        const leben=funke/FECHT_FUNKE_T;
+        const fx=(ax+bx)/2, fy=(ay+by)/2;
+        ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
+        const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
+        grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(fx,fy,16,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4;
+        for(let s=0;s<5;s++){
+          const ang=(s/5)*Math.PI*2+funke*9;
+          ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+    // SCHWEBETEXTE ("+X"/"kommt zu spaet"/"setzt den Treffer", aus stepBuehne()s schwebe())
+    // — dieselbe Idee wie posVon() bei zeichneTennis(), nur ueber die hier gefuellte posMap
+    // statt einer eigenen Formel, weil die Bahn-Positionen (anders als bei Tennis) je Brett
+    // UND je Ausfall-/Parade-Phase schwanken.
+    for(const f of floats){
+      if(f._teilnehmer==null)continue;
+      const p=posMap.get(f._teilnehmer); if(!p)continue;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
       ctx.globalAlpha=1;
     }
   }
