@@ -8,17 +8,71 @@
 // verglich, nicht gegen den Tagesanfang. Dieses Skript ist die fehlende Instanz, die gegen die
 // Basislinie misst statt gegen den letzten Commit.
 //
-// Aufruf (s. .github/workflows/ci-nightly.yml, Job "rangtreue-schranke"):
-//   node scripts/pruefe-rangtreue-schranke.mjs
+// ZWEITER, ABSOLUTER WAECHTER (16.09., docs/pm-briefings/opus-plan-top-zehn-ueber-90-16-09.md
+// Abschnitt 4, Auftrag B3): der Rueckgangs-Check oben ist RELATIV zur eigenen Basislinie und
+// seine Schranke waechst mit der Kaderfest-Spannweite (max(0,05; 0,3 * spielSpannweite)) — bei
+// verrauschten Disziplinen (Fechten, Gewichtheben, Tennis, Climbing: Spannweite ueber 0,2) darf
+// rho dadurch bis zu 0,06 fallen, OHNE dass die CI rot wird. Das schuetzt nicht davor, dass eine
+// arena-resolved Disziplin unbemerkt unter die absolute 0,80-Abnahmeschranke aus CLAUDE.md faellt
+// ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine Saison"). Der zweite Waechter unten prueft
+// deshalb ZUSAETZLICH, unabhaengig von jeder Spannweite: faellt eine Disziplin, die als
+// arena-resolved gilt (`ARENA_RESOLVED_DISCIPLINE_IDS`, lib/resolve/battle-mode-arena-team-
+// points.ts — sie MUSS die Abnahme bestanden haben, um dort zu stehen) und deren Basislinie
+// bereits >=0,80 stand, jetzt unter 0,80, ist das ein Fehlschlag — komplett unabhaengig davon,
+// wie gross ihre Kaderfest-Spannweite ist. Der relative Waechter bleibt unveraendert daneben
+// bestehen (er faengt schleichende Regression frueher als 0,80); dieser hier faengt Stufenbrueche
+// unter die harte Abnahmeschranke, die der relative durchlassen wuerde.
 //
-// Exit-Code 0: keine Disziplin ist um mehr als ihre Schranke gefallen (Verbesserungen sind
-// immer erlaubt). Exit-Code 1: mindestens eine ist es — die Tabelle nennt welche und um wie viel.
+// Zusaetzlich (Idee aus demselben Plan-Abschnitt, reine Info, kein CI-Abbruch): eine G1-
+// Stufenwarnung nach der Scorecard-Methodik
+// (docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md Abschnitt 0, Zeile
+// "G1 (40)"): >=0,85 -> 40 Punkte, 0,80-0,85 -> 35, 0,70-0,80 -> 22, 0,50-0,70 -> 12, <0,50 -> 5.
+// Faellt eine Disziplin (jede, nicht nur arena-resolved) von einer dieser Stufen in die naechst-
+// tiefere, meldet das Skript eine Warnzeile — auch wenn der Rueckgang innerhalb der 0,80-Schranke
+// bleibt (z. B. 0,86 -> 0,84 bleibt ueber 0,80, senkt aber die G1-Punktzahl der Scorecard um 5).
+// Das ist nur ein Hinweis fuer den naechsten Scorecard-Nachtrag, kein Fehlschlag.
+//
+// Import von ARENA_RESOLVED_DISCIPLINE_IDS aus TypeScript ist der Grund, warum dieses Skript
+// jetzt ueber die tsx-Loader-Registrierung laeuft statt ueber puren `node` (s. package.json
+// "ci:rangtreue-schranke" und den Kommentar dort — derselbe `node --import tsx`-Kniff wie bei
+// "project:audit-write-safety"). Ein reiner `node scripts/pruefe-rangtreue-schranke.mjs`-Aufruf
+// schlaegt seither mit "Cannot find module '.../battle-mode-arena-team-points'" fehl (Node kann
+// .ts ohne Loader weder aufloesen noch transpilieren); `node --import tsx
+// scripts/pruefe-rangtreue-schranke.mjs` (oder `npm run ci:rangtreue-schranke`) ist der richtige
+// Aufruf.
+//
+// Aufruf (s. .github/workflows/ci-nightly.yml, Job "rangtreue-schranke"):
+//   npm run ci:rangtreue-schranke
+//   (entspricht: node --import tsx scripts/pruefe-rangtreue-schranke.mjs)
+//
+// Exit-Code 0: keine Disziplin ist relativ um mehr als ihre Schranke gefallen UND keine
+// arena-resolved Disziplin ist absolut unter 0,80 gefallen (Verbesserungen sind immer erlaubt).
+// Exit-Code 1: mindestens einer der beiden Waechter schlaegt an — die Tabelle nennt welche und
+// um wie viel.
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie } from "./lib/rangtreue-messung.mjs";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "../lib/resolve/battle-mode-arena-team-points";
+
+// Die harte Abnahmeschranke aus CLAUDE.md ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine
+// Saison") — rho kaderfest in EINEM Spiel, Ziel > 0,80.
+const SCHRANKE_ABSOLUT = 0.80;
+
+// G1-Stufen der Scorecard-Methodik (docs/design/gesamtstand-fertigstellungsgrad-alle-
+// disziplinen-09-10.md Abschnitt 0, Zeile "G1 (40)"), absteigend sortiert.
+const G1_STUFEN = [
+  { schwelle: 0.85, label: "≥0,85", punkte: 40 },
+  { schwelle: 0.80, label: "0,80–0,85", punkte: 35 },
+  { schwelle: 0.70, label: "0,70–0,80", punkte: 22 },
+  { schwelle: 0.50, label: "0,50–0,70", punkte: 12 },
+  { schwelle: -Infinity, label: "<0,50", punkte: 5 },
+];
+function g1Stufe(rhoWert) {
+  return G1_STUFEN.find((s) => rhoWert >= s.schwelle) ?? G1_STUFEN[G1_STUFEN.length - 1];
+}
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -66,7 +120,27 @@ try {
     const rueckgang = basis.spielMedian - z.spielMed; // positiv = gefallen, negativ = gestiegen
     const gefallen = rueckgang > basis.schranke;
     if (gefallen) rot = true;
-    zeilen.push({ d, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen });
+
+    // ABSOLUTER WAECHTER (s. Kopfkommentar): nur relevant fuer Disziplinen, die arena-resolved
+    // sind UND deren Basislinie die 0,80-Schranke bereits erfuellte — sonst gibt es nichts, das
+    // "reissen" koennte (eine Disziplin, die schon in der Basislinie unter 0,80 stand, hat die
+    // Abnahme so oder so nicht bestanden und ist per Definition nicht arena-resolved).
+    const arenaResolved = ARENA_RESOLVED_DISCIPLINE_IDS.has(d);
+    const bisherBestanden = basis.spielMedian >= SCHRANKE_ABSOLUT;
+    const jetztBestanden = z.spielMed >= SCHRANKE_ABSOLUT;
+    const absolutGerissen = arenaResolved && bisherBestanden && !jetztBestanden;
+    if (absolutGerissen) rot = true;
+
+    // G1-STUFENWARNUNG (Info, kein CI-Abbruch): fuer ALLE Disziplinen der Basislinie, nicht nur
+    // arena-resolved — die Scorecard fuehrt G1 fuer jede der zwanzig.
+    const stufeVorher = g1Stufe(basis.spielMedian);
+    const stufeJetzt = g1Stufe(z.spielMed);
+    const stufeGefallen = stufeJetzt.punkte < stufeVorher.punkte;
+
+    zeilen.push({
+      d, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen,
+      arenaResolved, absolutGerissen, stufeVorher, stufeJetzt, stufeGefallen,
+    });
   }
 } finally {
   await browser.close();
@@ -89,10 +163,39 @@ for (const z of zeilen) {
     + z.schranke.toFixed(3).padStart(11) + "   " + status);
 }
 
+// ZWEITER WAECHTER: absolute 0,80-Schranke aus CLAUDE.md, unabhaengig von jeder Kaderfest-
+// Spannweite. Eigener Abschnitt, damit ein Treffer hier nicht in der Rueckgangs-Tabelle oben
+// untergeht — genau die Faelle, die der relative Waechter durchlassen wuerde.
+const absoluteVerstoesse = zeilen.filter((z) => !z.fehler && z.absolutGerissen);
+console.log("\nAbsolute 0,80-Schranke (arena-resolved Disziplinen, CLAUDE.md \"Die Abnahme jeder");
+console.log("Disziplin\") — unabhaengig von der Kaderfest-Spannweite der relativen Pruefung oben:");
+if (absoluteVerstoesse.length) {
+  for (const z of absoluteVerstoesse) {
+    console.log(`  GERISSEN: ${z.d} — Basislinie ${z.basis.toFixed(3)} (>=0,80, arena-resolved) `
+      + `-> jetzt ${z.jetzt.toFixed(3)} (<0,80)`);
+  }
+} else {
+  console.log("  ok — keine arena-resolved Disziplin, die die 0,80-Schranke in der Basislinie");
+  console.log("  erfuellte, ist jetzt darunter gefallen.");
+}
+
+// G1-STUFENWARNUNG: reine Information fuer den naechsten Scorecard-Nachtrag, kein Fehlschlag.
+const stufenWarnungen = zeilen.filter((z) => !z.fehler && z.stufeGefallen);
+if (stufenWarnungen.length) {
+  console.log("\nG1-Stufenwarnung (Scorecard-Methodik, docs/design/gesamtstand-fertigstellungsgrad-");
+  console.log("alle-disziplinen-09-10.md Abschnitt 0) — Info, kein CI-Abbruch:");
+  for (const z of stufenWarnungen) {
+    console.log(`  ${z.d}: G1-Stufe "${z.stufeVorher.label}" (${z.stufeVorher.punkte} Pkt) -> `
+      + `"${z.stufeJetzt.label}" (${z.stufeJetzt.punkte} Pkt), rho ${z.basis.toFixed(3)} -> ${z.jetzt.toFixed(3)}`);
+  }
+}
+
 if (rot) {
-  console.log("\nFEHLGESCHLAGEN: mindestens eine Disziplin ist um mehr als ihre Schranke gefallen (oder");
-  console.log("liefert keine Spiele mehr). Basislinie neu ziehen nur, wenn der Rueckgang gewollt ist:");
+  console.log("\nFEHLGESCHLAGEN: mindestens eine Disziplin ist um mehr als ihre Schranke gefallen,");
+  console.log("liefert keine Spiele mehr, oder eine arena-resolved Disziplin ist unter die absolute");
+  console.log("0,80-Schranke gefallen. Basislinie neu ziehen nur, wenn der Rueckgang gewollt ist:");
   console.log("node scripts/baue-rangtreue-basislinie.mjs");
   process.exit(1);
 }
-console.log("\nBestanden: keine Disziplin ist um mehr als ihre Schranke gefallen.");
+console.log("\nBestanden: keine Disziplin ist um mehr als ihre Schranke gefallen, und keine");
+console.log("arena-resolved Disziplin ist unter die absolute 0,80-Schranke gefallen.");
