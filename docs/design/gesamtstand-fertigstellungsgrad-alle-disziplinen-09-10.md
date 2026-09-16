@@ -1,3 +1,93 @@
+**Vierzehnter Nachtrag 16.09. — Time-Trial und Spurt auf 97 %/98 % nachgezogen (PR #952), beide
+letzten A3/A4-Luecken der Bahn auf einen Schlag geschlossen.** Der dreizehnte Nachtrag (direkt
+darunter) hatte Time-Trial auf 86 % gebracht und dabei A3 (Requisite) und A4 (Ton) ausdruecklich
+offen gelassen; Spurt stand unveraendert bei 83 % mit denselben zwei Luecken plus einer nur
+teilweise erfuellten M4-Pose. `main` steht jetzt bei `41731cf9` (PR #952, Squash-Merge von
+`bahn-requisiten-ton-16-09`, Auftrag B1+B2 aus
+`docs/pm-briefings/opus-plan-top-zehn-ueber-90-16-09.md` Abschnitt 5). **rho fuer beide FRISCH
+gemessen, nicht aus dem PR-Text uebernommen:**
+
+```
+node scripts/miss-alle-disziplinen.mjs 24 time-trial spurt
+```
+→ Time-Trial **0,825** (Spannweite 0,082, Saison-rho 0,825), Spurt **0,894** (Spannweite 0,138,
+Saison-rho 0,916) — beide bit-identisch zur Ausgangslage vor PR #952, keine Ueberraschung: der PR
+aendert laut eigenem Dokument (`docs/design/bahn-requisiten-ton-16-09.md`) ausschliesslich
+Requisite und Ton, `wert()`/`tempoVon()`/`rr()`/die Rennlogik bleiben unberuehrt — bestaetigt per
+`git diff a283891e..41731cf9 --stat`: der PR aendert ausschliesslich `public/mockups/battle-mode.
+engine.js` (325 Zeilen) und das eigene Design-Dokument, **keine** `.tsx`-Datei im produktiven
+React-Renderer.
+
+**Alle sechzehn Teilkriterien fuer BEIDE Disziplinen einzeln gegen den heutigen Code geprueft, nicht
+aus dem PR-Text uebernommen:**
+
+**Time-Trial — nur A3/A4 bewegen sich, die uebrigen zwoelf Kriterien unangetastet.**
+- **A3 (Requisite): NEU erfuellt, nach einer eigenen Korrekturrunde innerhalb des PRs.**
+  `DISZIPLIN_PROP["time-trial"]` (`public/mockups/battle-mode.engine.js:2875`) existierte vor
+  PR #952 nicht — ein Zeitfahrer trug buchstaeblich nichts, was ihn von einem Spurt-/Staffel-Laeufer
+  unterscheidet (vom dreizehnten Nachtrag bereits so benannt). Der erste Entwurf (`ZF_HELM`,
+  Kopf-Anker) wurde **innerhalb derselben PR wieder verworfen**: eine Pixelscan-Verifikation gegen
+  alle 17 SQUAD/OPP-Kaderfiguren (nicht nur 1-2 Beispiele) ergab, dass jede von ihnen am Kopf
+  bereits eine eigene Dekoration traegt (Helm+Hoerner, Krone, langes Haar, Kapuze oder ein
+  komplett eigenes `vollbild`-Blatt) und ein zweiter Kopf-Anker dort **0 sichtbare Pixel** ergeben
+  haette (gemessen an Greenkraut, dem eigenen Positivbeispiel des ersten Entwurfs). Endgueltig:
+  `ZF_BRUST` (`:2761`, Brust-Anker `y=41`, `x` 30-34 je Blickrichtung) + `ZF_BRUST_PHASEN` (an
+  `u.vizNeigung` gekoppelt) + `zeichneZeitfahrWeste()` (`:2784`, magentafarben `#ff2f92` — eine
+  erste gelbe Fassung wurde verworfen, weil sie mit `RUEST_TON.gold` kollidierte). Fuer alle 17
+  Kaderfiguren per Diff-Test verifiziert (`window.__arena.zeitfahrWesteProbe()`, `:28792`),
+  Minimum 106 Diff-Pixel/27 Magenta-Kernpixel (King Arlen Morgolor) — kein Charakter zeigt 0 oder
+  nahe-0 wie der verworfene Helm-Entwurf.
+- **A4 (Ton): NEU erfuellt.** `TON_KATALOG["time-trial"]` stand seit PR 0.1 vollstaendig, `sfx
+  ("time-trial",…)` stand bei **0** Aufrufstellen. Vier neue Aufrufe in `stepZeitfahren()`: `start`
+  beim Uebergang wartet→faehrt (`:24769`), `bergauf` bei Zonenwechsel auf „steigung" (`:24792`),
+  `zwischenzeit` bei neuem `u.zz[]`-Eintrag (`:24805`), `ziel` bei erstem `u.fertig` (`:24810`) —
+  alle vier reine `viz*`-Einmalmerker, kein `rr()`-Aufruf. `publikum` (Loop) bleibt bewusst aus,
+  dieselbe binaere „hat Ton"-Schwelle wie bei Fechten/Hockey/Speed-Schach.
+- **A1/M1-M4/K1-K4/G1-G4: unveraendert.** A1 (`peloton.tsx`, 472 Z.) und M3 (Animation ebenda)
+  waren bereits vor dem dreizehnten Nachtrag voll und sind von PR #952 nicht beruehrt. Movement
+  stand seit dem dreizehnten Nachtrag bereits auf dem Deckel (100) — kein weiterer Spielraum.
+
+**Spurt — A3/A4 wie bei Time-Trial, PLUS M4 (Huerdenflug-Pose).**
+- **A3 (Requisite): NEU erfuellt.** `DISZIPLIN_PROP.spurt` (`:2879`) existierte vor PR #952 nicht.
+  `SPURT_FUSS` (`:2825`) ist **bewusst keine Neuvermessung**, sondern eine Wiederverwendung von
+  `FUSS_EISKUNSTLAUF` (dessen eigener Kommentar festhaelt, dass die Tabelle am generischen
+  `body_walk`-Sprite gemessen wurde, demselben Blatt, das jeder Bahn-Laeufer fuer seinen
+  Laufzyklus nutzt) + `SPIKES_PHASEN`/`zeichneSpikes()` (`:2838`, helle Sohle mit drei Zacken,
+  Phase aus `u.huerde>0`).
+- **A4 (Ton): NEU erfuellt.** `TON_KATALOG.spurt` stand seit PR 0.1 vollstaendig, `sfx("spurt",…)`
+  stand bei **0** Aufrufstellen. Vier neue Aufrufe in `stepHuerden()`: `startschuss` einmal je
+  Rennen ueber die Modul-Flagge `spurtStartschussAn` (`:24861`, inkl. `reset()`-Rueckstellung nach
+  dem `staffelStartschussAn`-Muster), `huerde` an der Kante `u.huerde>0` (`:24882`), `riss` an der
+  Kante `u.leer` (`:24891`), `ziel` an `u.fertig` (`:24898`).
+- **M4 (disziplineigene Pose): NEU voll erfuellt, vorher nur teilweise.** `u.vizHuerde` (`:24873`,
+  0..1, weich aus `u.huerde>0` nachgezogen, dieselbe Glaettungskonstante wie `vizErschoepft`) wird
+  in `zeichneSpurt()` gelesen (`:25029`, gegated auf `BA().spurt`) und ergibt eine kleine
+  Sprunghoehe plus gestreckte Silhouette waehrend des Huerdensprungs — exakt das `zfTilt`/
+  `zfHaltung`-Muster, das PR #948 fuer Zeitfahren vorgemacht hat. Vor PR #952 traten die Beine bei
+  `u.huerde>0` zwar still (bereits vorhandene `vizSchritt`-Logik, M2), aber die Figur sprang nicht
+  — genau die Luecke, die der Opus-Plan (Abschnitt 5.2) als einziges fehlendes Movement-Kriterium
+  benannt hatte (Spurt stand bei Movement 85 = 100 minus M4).
+- **A1/M1-M3/K1-K4/G1-G4: unveraendert.** `bump.tsx` (394 Z., 12 Animationsstellen) ist unberuehrt
+  (A1/M3 bereits voll). M1 bleibt wie zuvor eingestuft (weiterhin kein eigener `boden*`-Zweig fuer
+  Spurt, laeuft weiter durch das generische `bodenSpurtGerade()`), K1-K4/G1-G4 von PR #952 nicht
+  angefasst.
+
+**Ergebnis fuer die Tabelle:** Time-Trial Assets 55→**100** (A3+25, A4+20), Konzept/Gameplay/
+Movement unveraendert (95/92/100). **Gesamt: 86 %→97 %** (rechnerisch 96,75 %). Spurt Assets
+55→**100** (A3+25, A4+20), Movement 85→**100** (M4+15), Konzept/Gameplay unveraendert (95/97).
+**Gesamt: 83 %→98 %** (rechnerisch exakt 98,0 %).
+
+**Neuer Gesamtdurchschnitt: 76 %→78 %** (rechnerisch 77,7 %, war 76,4 % nach dem dreizehnten
+Nachtrag). Je Achse: Konzept unveraendert (79,5 % exakt, rundet weiter auf 80 %), Gameplay
+unveraendert (76,7 % exakt, rundet weiter auf 77 %) — beide Achsen von PR #952 nicht beruehrt.
+Assets springt am staerksten: 74,25 %→**78,75 %** (rundet auf 79 %, aus beiden Zeilen je +45
+Punkte). Movement bewegt sich nur ueber Spurt: 75,0 %→**75,75 %** (rundet auf 76 %, Time-Trial
+stand bereits auf dem Deckel). Anders als beim zwoelften/dreizehnten Nachtrag bewegt sich diese
+Runde fast ausschliesslich auf der **Assets-Achse** — beide Zeilen hatten dieselbe Luecke (A3+A4),
+Spurts zusaetzliches M4 ist der einzige Movement-Beitrag dieser Runde.
+
+---
+
 **Dreizehnter Nachtrag 16.09. — Time-Trial und Climbing nachgezogen (PR #948/#943), zwei
 gegensaetzliche Bewegungen in derselben Sitzung.** Der zwoelfte Nachtrag (direkt darunter) hatte
 Fechten zuletzt auf 91 % gebracht. Seither sind zwei weitere PRs auf `main` gelandet, beide an
@@ -381,6 +471,12 @@ und Zeile 17 (Climbing) aktualisiert** — rho fuer beide frisch gemessen
 Disziplin einzeln gegenkontrolliert, s. dreizehnter Nachtrag ganz oben. Die uebrigen achtzehn
 Zeilen sind gegenueber dem zwoelften Nachtrag unveraendert.
 
+**Fuer den vierzehnten Nachtrag (16.09., `main` @ `41731cf9`) sind zusaetzlich Zeile 10
+(Time-Trial) und Zeile 11 (Spurt) aktualisiert** — rho fuer beide frisch gemessen
+(`node scripts/miss-alle-disziplinen.mjs 24 time-trial spurt`), alle sechzehn Teilkriterien je
+Disziplin einzeln gegenkontrolliert, s. vierzehnter Nachtrag ganz oben. Die uebrigen achtzehn
+Zeilen sind gegenueber dem dreizehnten Nachtrag unveraendert.
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -392,8 +488,8 @@ Zeilen sind gegenueber dem zwoelften Nachtrag unveraendert.
 | 7 | Speed-Schach | Buehne | 95 % | 95 % | 100 % | 95 % | **96 %** | 0,908 | ja | **12.09.** Konzept/Assets/Movement 80/75/80→95 — eigenes Fable-Dokument, Ton, Schachuhr-Requisite, `stepSchach()` (PR #902) |
 | 8 | Staffel | Bahn | 95 % | 95 % | 97 % | 95 % | **96 %** | 0,899 | ja | **14.09.** Oval als echte Stadionform, Bildposition aus dem Gesamtfortschritt, alle Zeitanzeigen in echten Sekunden, Ausfuehrungsstreuung beim Wechsel — rho 0,915→**0,899** (gepaart reproduziert, gleiche G1-Stufe) (PR #916) · **Nachzug 13.09.:** Assets 55→95, Movement 70→95 (Stab-Sprite + Ton, PR #901, in der Tabelle nie nachgezogen) · Arena-Spalte korrigiert |
 | 9 | Football | Feldspiel | 90 % | 75 % | **52 %** | 85 % | **76 %** | 0,722 | nein | **16.09.-Nachzug (Bewegung 14./15.09.):** PR #924 (Korridor-Refit Runde 2) hob rho 0,800→0,813, danach PR #934 (E3, „eine Wahrheit" fuer Footballs Gewichtsquelle) senkte es strukturell auf **0,722** — G1 faellt von der 0,80–0,85- auf die 0,70–0,80-Stufe, Gameplay 65→52. PR #933 (PPS-Referenz) liegt bereit, Produktivschaltung bewusst zurueckgestellt (Balance-Runde in Arbeit, PR #937) |
-| 10 | Time-Trial | Bahn | 95 % | **55 %** | 92 % | **100 %** | **86 %** | 0,825 | ja | **16.09.-Nachzug (PR #948, 16.09.):** `bodenZeitfahren()` (neue, exklusiv auf `zeitfahren` gegatete Zeichenfunktion in `bodenSpurt()`) zeichnet erstmals das Streckenprofil selbst — Terrain-Toenung mit Schraegschraffur je `gelaende`-Zone plus Huegelsilhouette ueber der Bahn — und schliesst damit die bisherige Hauptluecke „man sieht keinen Berg"; A2 erstmals voll erfuellt (Assets 50→55) und dieselbe Funktion erfuellt zugleich M1 (eigene Zeichenfunktion statt der generischen `bodenSpurtGerade()`, die die anderen vier Bahnen weiterhin nutzen), Movement 65→100. `u.vizNeigung` in `stepZeitfahren()` plus Vorlehnung/Aufrichtung in `zeichneSpurt()` verstaerken M2/M4, beide bereits vorher voll, keine neue Punktzahl. rho bit-identisch **0,825** (reine Praesentation, `gelaendeFaktor()`/`gelaendeZehrFaktor()` unangetastet), Gameplay bleibt 92 · **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert |
-| 11 | Spurt | Bahn | 95 % | 55 % | **97 %** | **85 %** | **83 %** | 0,894 | **ja (neu)** | **16.09.-Nachzug (PR #926, 14.09.):** Feldgroesse 4→6 behoben, rho 0,871→0,894 (≥0,85-Stufe) plus **G2 30 neu** — Spurt ist die 14. arena-resolved Disziplin, Gameplay 67→97. `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, Movement 60→85 |
+| 10 | Time-Trial | Bahn | 95 % | **100 %** | 92 % | 100 % | **97 %** | 0,825 | ja | **16.09.-Nachzug 2 (PR #952, 16.09.):** `ZF_BRUST`-Anker (nach einer Korrekturrunde von Kopf auf Brust umgebaut, gegen alle 17 Kaderfiguren verifiziert) + `zeichneZeitfahrWeste()` (magenta Renn-Nummernweste) — A3 erstmals erfuellt; vier `sfx("time-trial",…)`-Aufrufe in `stepZeitfahren()` (start/bergauf/zwischenzeit/ziel) — A4 erstmals erfuellt. Assets 55→100. rho bit-identisch **0,825**, Konzept/Gameplay/Movement unveraendert (Movement bereits beim Deckel) · **16.09.-Nachzug (PR #948, 16.09.):** `bodenZeitfahren()` (neue, exklusiv auf `zeitfahren` gegatete Zeichenfunktion in `bodenSpurt()`) zeichnet erstmals das Streckenprofil selbst — Terrain-Toenung mit Schraegschraffur je `gelaende`-Zone plus Huegelsilhouette ueber der Bahn — und schliesst damit die bisherige Hauptluecke „man sieht keinen Berg"; A2 erstmals voll erfuellt (Assets 50→55) und dieselbe Funktion erfuellt zugleich M1 (eigene Zeichenfunktion statt der generischen `bodenSpurtGerade()`, die die anderen vier Bahnen weiterhin nutzen), Movement 65→100. `u.vizNeigung` in `stepZeitfahren()` plus Vorlehnung/Aufrichtung in `zeichneSpurt()` verstaerken M2/M4, beide bereits vorher voll, keine neue Punktzahl. rho bit-identisch **0,825** (reine Praesentation, `gelaendeFaktor()`/`gelaendeZehrFaktor()` unangetastet), Gameplay bleibt 92 · **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert |
+| 11 | Spurt | Bahn | 95 % | **100 %** | **97 %** | **100 %** | **98 %** | 0,894 | ja | **16.09.-Nachzug 2 (PR #952, 16.09.):** `DISZIPLIN_PROP.spurt` mit `SPURT_FUSS` (Wiederverwendung von `FUSS_EISKUNSTLAUF`) + `zeichneSpikes()` — A3 erstmals erfuellt; vier `sfx("spurt",…)`-Aufrufe in `stepHuerden()` (startschuss/huerde/riss/ziel) — A4 erstmals erfuellt; neues `u.vizHuerde`-Feld gibt eine Huerdenflug-Pose (Sprunghoehe + gestreckte Silhouette) in `zeichneSpurt()` — M4 von teilweise auf voll. Assets 55→100, Movement 85→100. rho bit-identisch **0,894**, Konzept/Gameplay unveraendert · **16.09.-Nachzug (PR #926, 14.09.):** Feldgroesse 4→6 behoben, rho 0,871→0,894 (≥0,85-Stufe) plus **G2 30 neu** — Spurt ist die 14. arena-resolved Disziplin, Gameplay 67→97. `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, Movement 60→85 |
 | 12 | Fechten | Buehne | 75 % | **100 %** | 90 % | **100 %** | **91 %** | 0,826 | ja | **16.09.-Nachzug 2 (PR #945/#946, 16.09.):** Rezeptkalibrierung (NERVEN/GRUNDLAGE/TECHNIK neu gewichtet) hebt rho 0,809→0,826, gleiche 0,80–0,85-Stufe, Gameplay bleibt 90 — Kopfkommentar bleibt „nicht finaler Entwurf" (`:12520`), Puffer (0,026) bleibt unter dem Kaderrauschen (0,203), K4 weiterhin offen, Konzept bleibt 75. `zeichneFechten()` (eigene Fechtbahnen je Brett, A2/M1 neu) + `stepFechten()` (eigene Zustandsmaschine engarde/ausfall/erholung/parade, M2 neu) + `sfx("fechten",…)` erstmals verdrahtet (A4 neu) + `FECHTEN_PHASEN`/`zeichneDegen()` als dauerhafte eigene Pose statt nur im Ausfallfenster (M4 voll) — Assets 55→100, Movement 35→100. A1/M3 waren ueber `lamps.tsx` (eine von drei Feldern mit eigener Token-Zeichnung, eigene Touché-FX) bereits vorher voll und unberuehrt |
 | 13 | Tennis | Buehne | 75 % | **70 %** | 90 % | **50 %** | **71 %** | 0,825 | ja | **16.09.-Nachzug (PR #929, 14.09.):** `zeichneTennis()` als eigener Buehnenzweig mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch |
 | 14 | Mini-DM | Arena | **75 %** | 60 % | 22 % | 60 % | **54 %** | 0,256 | nein | **16.09.-Nachzug (PR #927/#930, 14.09.):** fuenf von sechs offenen Spielplanfragen beantwortet (4-Team-Pods, Kadergroesse 1, echter Playwright-Aufrufer fuer den FFA-Motor) — Konzept 70→75 (K4-Teilfortschritt). Weiterhin nicht in `ARENA_RESOLVED_DISCIPLINE_IDS` verdrahtet, Gameplay haengt allein an rho (0,256, unveraendert) · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
@@ -404,10 +500,19 @@ Zeilen sind gegenueber dem zwoelften Nachtrag unveraendert.
 | 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (16.09., nach dem dreizehnten Nachtrag): 76 %** (rechnerisch
-76,4 %, war 75 % nach dem zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der
-Merge-Welle, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 80 % ·
-Assets 74 % · Gameplay 77 % · Movement 75 %.**
+**Durchschnitt ueber alle zwanzig (16.09., nach dem vierzehnten Nachtrag): 78 %** (rechnerisch
+77,7 %, war 76 % nach dem dreizehnten Nachtrag, 75 % nach dem zwoelften Nachtrag, 74 % nach dem
+elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am 10.09. vor der Feinschliff-/
+Football-Runde). Je Achse: **Konzept 80 % · Assets 79 % · Gameplay 77 % · Movement 76 %.**
+
+*Die Bewegung seit dem dreizehnten Nachtrag (76 %→78 %) kommt ausschliesslich aus Time-Trial
+(86 %→97 %) und Spurt (83 %→98 %, beide s. vierzehnter Nachtrag ganz oben), die uebrigen achtzehn
+Zeilen sind ziffernidentisch. Assets bewegt sich am staerksten (74,25 %→78,75 %, beide Zeilen je
++45 Punkte aus A3+A4), Movement nur leicht (75,0 %→75,75 %, allein aus Spurts M4-Sprung 85→100 —
+Time-Trial stand bereits auf dem Movement-Deckel). Konzept und Gameplay bewegen sich nicht
+(79,5 % bzw. 76,7 %, beide unveraendert) — bei beiden Zeilen war es diesmal ausschliesslich die
+Assets-Achse (plus bei Spurt zusaetzlich M4), waehrend PR #952 laut eigenem Dokument bewusst kein
+Rezept/keine Rangtreue anfasst.*
 
 *Die Bewegung seit dem zwoelften Nachtrag (75 %→76 %) kommt ausschliesslich aus Time-Trial
 (76 %→86 %) und Climbing (55 %→66 %, beide s. dreizehnter Nachtrag ganz oben), die uebrigen
@@ -877,8 +982,35 @@ dient im Testcode weiterhin als benannte Kontrolldisziplin (`D2_KONTROLL_DISZIPL
 **Movement 85:** Snap-Standphase plus fuenf visuell unterschiedene Spielzugtypen mit je eigener
 Ballflugbahn — laut eigenem Bericht strukturell fertig, aber noch nicht poliert.
 
-### Spurt — 83 % (95/55/97/85)
-**16.09.-Nachzug: Gameplay 67→97, Movement 60→85 (PR #926, 14.09.).** Fund F1 (Opus-Review PR
+### Spurt — 98 % (95/100/97/100)
+**16.09.-Nachzug 2: Assets 55→100, Movement 85→100 (PR #952).** Reine Praesentation, rho
+bit-identisch **0,894** (`node scripts/miss-alle-disziplinen.mjs 24 spurt`) — `wert()`/
+`tempoVon()`/`rr()`/die Rennlogik laut `docs/design/bahn-requisiten-ton-16-09.md` ausdruecklich nur
+gelesen, keine Zeile veraendert. Drei Teilkriterien, alle drei zuvor offen (der Opus-Plan,
+`docs/pm-briefings/opus-plan-top-zehn-ueber-90-16-09.md` Abschnitt 5.2, hatte sie einzeln benannt):
+- **A3:** neuer `DISZIPLIN_PROP.spurt`-Eintrag (`:2879`) — `SPURT_FUSS` (`:2825`) ist bewusst
+  keine Neuvermessung, sondern `FUSS_EISKUNSTLAUF` wiederverwendet (derselbe generische
+  `body_walk`-Sprite, den jeder Bahn-Laeufer fuer seinen Laufzyklus nutzt) + `SPIKES_PHASEN`/
+  `zeichneSpikes()` (`:2838`, helle Sohle mit drei Zacken, Phase aus `u.huerde>0`).
+- **A4:** vier neue `sfx("spurt",…)`-Aufrufe in `stepHuerden()` — `startschuss` (Modul-Flagge
+  `spurtStartschussAn`, `:24861`), `huerde` an der Kante `u.huerde>0` (`:24882`), `riss` an der
+  Kante `u.leer` (`:24891`), `ziel` an `u.fertig` (`:24898`). `TON_KATALOG.spurt` stand seit PR 0.1
+  vollstaendig, hatte aber 0 Aufrufstellen.
+- **M4:** neues `u.vizHuerde`-Feld (`:24873`, weich aus `u.huerde>0` nachgezogen), gelesen in
+  `zeichneSpurt()` (`:25029`, gegated auf `BA().spurt`) als Sprunghoehe plus gestreckte Silhouette
+  waehrend des Huerdensprungs — dasselbe `zfTilt`/`zfHaltung`-Muster wie bei Zeitfahren (PR #948).
+  Vorher traten die Beine bei `u.huerde>0` still (M2, bereits erfuellt), die Figur sprang aber
+  nicht — genau die Luecke, die Movement bei 85 = 100 minus M4 gehalten hatte.
+- **A1/M1-M3 unveraendert:** `bump.tsx` (394 Z., 12 Animationsstellen) ist von PR #952 nicht
+  beruehrt (Diff liegt ausschliesslich in `battle-mode.engine.js`); M1 bleibt offen (weiterhin kein
+  eigener `boden*`-Zweig, laeuft durch `bodenSpurtGerade()`).
+
+**Ergebnis:** Assets 55→**100** (A3+25, A4+20). Movement 85→**100** (M4+15). Konzept/Gameplay
+unveraendert (95/97). **Gesamt: 83 %→98 %** (rechnerisch exakt 98,0 %).
+
+---
+
+**16.09.-Nachzug 1: Gameplay 67→97, Movement 60→85 (PR #926, 14.09.).** Fund F1 (Opus-Review PR
 #881): `BAHN_ART.spurt.jeSeite` stand auf 4, waehrend die Saison fuer jede Disziplin gleichverteilt
 2..6 Laeufer je Seite wuerfelt — die einzige der vier Bahnen mit dieser Diskrepanz, gemessen an
 allen 64 Fixtures des echten Spielstands zu klein besetzten Boxscores und in 4 von 64 Faellen
@@ -911,8 +1043,34 @@ denselben Handgriff in ihrer eigenen step-Funktion — das war der billigste off
 der Bahn. **Behoben mit PR #926 Teil B (s. 16.09.-Nachzug oben):** `stepHuerden()` liefert jetzt
 `u.vizSchritt` nach demselben Muster, Movement 60→85.
 
-### Time-Trial — 86 % (95/55/92/100)
-**16.09.-Nachzug: Assets 50→55, Movement 65→100 (PR #948).** Reine Praesentation, rho bit-identisch
+### Time-Trial — 97 % (95/100/92/100)
+**16.09.-Nachzug 2: Assets 55→100 (PR #952).** Reine Praesentation, rho bit-identisch **0,825**
+(`node scripts/miss-alle-disziplinen.mjs 24 time-trial`) — `wert()`/`tempoVon()`/`rr()`/die
+Rennlogik laut `docs/design/bahn-requisiten-ton-16-09.md` ausdruecklich nur gelesen. Zwei
+Teilkriterien, beide zuvor offen:
+- **A3, nach einer Korrekturrunde innerhalb desselben PRs:** der erste Entwurf (`ZF_HELM`,
+  Kopf-Anker) wurde verworfen, weil die unabhaengige Review eine Pixelscan-Verifikation gegen alle
+  17 SQUAD/OPP-Kaderfiguren (statt nur 1-2 Beispiele) forderte — jede von ihnen traegt am Kopf
+  bereits eine eigene Dekoration (Helm+Hoerner, Krone, langes Haar, Kapuze oder ein eigenes
+  `vollbild`-Blatt), ein zweiter Kopf-Anker haette dort 0 sichtbare Pixel ergeben (gemessen an
+  Greenkraut, dem eigenen Positivbeispiel). Endgueltig: `ZF_BRUST` (`:2761`, Brust-Anker) +
+  `ZF_BRUST_PHASEN` (an `u.vizNeigung` gekoppelt) + `zeichneZeitfahrWeste()` (`:2784`, magenta
+  `#ff2f92`). Fuer alle 17 Kaderfiguren per Diff-Test verifiziert
+  (`window.__arena.zeitfahrWesteProbe()`, `:28792`), Minimum 106 Diff-Pixel/27 Magenta-Kernpixel.
+- **A4:** vier neue `sfx("time-trial",…)`-Aufrufe in `stepZeitfahren()` — `start` beim Uebergang
+  wartet→faehrt (`:24769`), `bergauf` bei Zonenwechsel auf „steigung" (`:24792`), `zwischenzeit`
+  bei neuem `u.zz[]`-Eintrag (`:24805`), `ziel` bei erstem `u.fertig` (`:24810`). `TON_KATALOG
+  ["time-trial"]` stand seit PR 0.1 vollstaendig, hatte aber 0 Aufrufstellen.
+- **A1/M1-M4/K1-K4/G1-G4 unveraendert:** `peloton.tsx` (472 Z.) und M3 (Animation ebenda) waren
+  bereits voll und von PR #952 nicht beruehrt (Diff liegt ausschliesslich in
+  `battle-mode.engine.js`); Movement stand seit dem PR-#948-Nachzug bereits auf dem Deckel (100).
+
+**Ergebnis:** Assets 55→**100** (A3+25, A4+20). Konzept/Gameplay/Movement unveraendert
+(95/92/100). **Gesamt: 86 %→97 %** (rechnerisch 96,75 %).
+
+---
+
+**16.09.-Nachzug 1: Assets 50→55, Movement 65→100 (PR #948).** Reine Praesentation, rho bit-identisch
 **0,825** (`node scripts/miss-alle-disziplinen.mjs 24 time-trial`, `gelaendeFaktor()`/
 `gelaendeZehrFaktor()`/`wert()`/die Rennlogik ausdruecklich unangetastet, laut PR-Dokument nur
 gelesen). Zwei Aenderungen, eine gemeinsame Wurzel:
