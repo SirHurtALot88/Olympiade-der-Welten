@@ -2855,11 +2855,57 @@
     }
     ctx.restore();
   }
+  // ================== SHOWCASE: MIKROFON AN DER HAND (Gesang, Talentshow-Konzept 17.09., ====
+  // PR S2 Abschnitt 5, Punkt 1) ==================
+  // Elfter Eintrag, dieselbe Bauart wie Schlaeger/Schachuhr/Degen oben. Showcase hatte bis
+  // PR S1 keine eigene Requisite -- DISZIPLIN_WAFFE.showcase ist bewusst null (Konzept
+  // Abschnitt 1.2), ein Mikrofon ist keine "Waffe" und braucht deshalb einen eigenen
+  // DISZIPLIN_PROP-Eintrag statt einer Kosmetikwaffen-Freigabe.
+  //
+  // ANKERPUNKT: SCHACH_HAND WIEDERVERWENDET -- DRITTE Wiederverwendung nach TENNIS_HAND/
+  // FECHTEN_HAND (s. dortige Kommentare), aus derselben Begruendung: ein Saenger/Redner ist
+  // ein STEHENDER Koerper in Grundstellung, keine Laufpose, derselbe Standardkoerper-
+  // Ankerpunkt wie Schachuhr/Schlaeger/Degen. Kein Pixelscan noetig (Konzept Abschnitt 5,
+  // PR-S2-Punkt 1).
+  const MIKRO_HAND=SCHACH_HAND;
+  // Zwei Phasen wie Schachuhr/Schlaeger -- "ruhend" (Mikrofon locker gehalten) und "canto"
+  // (waehrend u.lunge>0, angehoben zum Mund, wie mitten in der Zeile).
+  const MIKRO_PHASEN={
+    ruhend:{winkel:0.15,hoehe:0},
+    canto: {winkel:-0.30,hoehe:-2},
+  };
+  // x/y ist die Hand (MIKRO_HAND), s die Groesse (Z), richtung 0..3 wie blickAus() (0
+  // hinten, 1 links, 2 vorn, 3 rechts), phase "ruhend"/"canto" (unbekannt faellt auf
+  // "ruhend" zurueck, dasselbe Sicherheitsnetz wie bei jeder anderen Requisite dieser
+  // Tabelle). Reine Canvas-Primitiven: kurzer dunkler Griff, heller Mikrofonkopf mit
+  // angedeutetem Gitter.
+  function zeichneMikrofon(ctx,x,y,s,richtung,phase){
+    const p=MIKRO_PHASEN[phase]||MIKRO_PHASEN.ruhend;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const griffY=y+p.hoehe*s, kopfY=griffY-10*s;
+    ctx.strokeStyle="#2c2620"; ctx.lineWidth=Math.max(1,2*s); ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(x,griffY);ctx.lineTo(x,kopfY);ctx.stroke();
+    ctx.save();ctx.translate(x,kopfY);ctx.rotate(p.winkel*eff);
+    ctx.fillStyle="#e8e2d0";ctx.strokeStyle="#8a8578";ctx.lineWidth=Math.max(0.6,0.8*s);
+    ctx.beginPath();ctx.arc(0,-2.6*s,2.6*s,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.strokeStyle="rgba(60,56,48,.55)";ctx.lineWidth=Math.max(0.4,0.5*s);
+    ctx.beginPath();ctx.moveTo(-1.6*s,-3.6*s);ctx.lineTo(1.6*s,-1.6*s);
+    ctx.moveTo(-1.6*s,-1.6*s);ctx.lineTo(1.6*s,-3.6*s);ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.7,1*s),0,Math.PI*2);ctx.fill();
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
     hockey:      { hand:HOCKEY_HAND,  phasen:HOCKEY_PHASEN, zeichne:zeichneHockeyschlaeger },
     staffel:     { hand:STAFFEL_HAND, phasen:null,          zeichne:zeichneStab },
+    // ELFTER EINTRAG (PR S2, Talentshow-Konzept 17.09., Abschnitt 5 Punkt 1): das Mikrofon,
+    // s. MIKRO_HAND/MIKRO_PHASEN/zeichneMikrofon oben. Aufrufstelle in zeichneSprite() unten,
+    // gegated auf u.vizMikro statt feldspiel&&istXxx() -- Showcase zeichnet die Requisite nur
+    // am AKTIVEN Gesang-Performer, nicht an allen Buehnen-Teilnehmern gleichzeitig.
+    showcase:    { hand:MIKRO_HAND,   phasen:MIKRO_PHASEN,  zeichne:zeichneMikrofon },
     // DRITTER EINTRAG (Ziel 5, Opus-Plan 09-10 Abschnitt 5.1, A3 20->25, 12.09.): die
     // Schachuhr, s. SCHACH_HAND/SCHACH_UHR_PHASEN/zeichneSchachuhr oben. Aufrufstelle wie
     // bei den zwei bestehenden Eintraegen, s. istSchach()-Block unten bei zeichneSprite.
@@ -3336,7 +3382,17 @@
       // direkt darueber genau diese beiden Grenzen zeichnet — hier ist die Quelle der
       // Wahrheit der Code selbst, nicht ein Blatt.
       if(feldspiel&&istHeben()&&!u.down)hantelAnPunkt({oben:27,unten:65},r0);
-      if(b.gluehenderKern&&!u.down)zeichneKern(kopf.kopfX,kopf.kopfY,2.6*Z);
+      // MIKROFON FUER REIHERMECH-SAENGER (PR S2, bekannter Vollbild-Fallstrick, Konzept
+      // "Zwei bekannte Fallstricke"): derselbe fruehe `return;` unten liesse eine ueber
+      // b.reiherMech gezeichnete Gesang-Performance (Seraph-11 im heutigen Demokader) ganz
+      // ohne Requisite -- dasselbe Muster wie die Hantel-/Hockeyschlaeger-Nachbesserung
+      // direkt oberhalb, hier fuer die neue Mikrofon-Requisite. Anker am Kopf/Schnabel
+      // (kopf.kopfX/kopf.kopfY, s. zeichneReiherMech oben), leicht versetzt statt exakt am
+      // Schnabel, damit sich Mikrofon und Schnabel nicht ueberdecken.
+      if(u.vizMikro&&!u.down){
+        const prop=DISZIPLIN_PROP.showcase;
+        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"canto":"ruhend");
+      }
       return;
     }
     if(b.vollbild){
@@ -3426,6 +3482,19 @@
         const fpV=propV.fuss[r0]||propV.fuss[2];
         propV.zeichne(ctx,x-32*Z+fpV.x*Z,y-46*Z+fpV.y*Z,Z,r0,u.vizPhase,eiskunstlaufKostuemfarbe(u));
       }
+      // MIKROFON FUER VOLLBILD-SAENGER (PR S2, bekannter Vollbild-Fallstrick): derselbe
+      // fruehe `return;` unten liesse jede ueber b.vollbild gezeichnete Gesang-Performance
+      // (eine Vollbild-Kreatur, die per Klassen-/Sub-/Attribut-Punkten den Gesang-Act
+      // erhaelt, auch ohne eigene Waffe/Effekt) ohne Requisite -- dasselbe Muster wie die
+      // KUFE-Nachbesserung direkt oberhalb. Anker: Standardkoerper-Handpunkt (MIKRO_HAND),
+      // auf den Vollbild-Rahmen umgerechnet -- eine eigene Vermessung je der ueber 65
+      // Vollbild-Blaetter waere hier unverhaeltnismaessig (derselbe Kompromiss wie beim
+      // generischen KUFE-Fusspunkt, s. dortiger Kommentar).
+      if(u.vizMikro&&!u.down){
+        const prop=DISZIPLIN_PROP.showcase;
+        const hpV=prop.hand[r0]||prop.hand[2];
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,(u.lunge>0)?"canto":"ruhend");
+      }
       // Chris' Fund (01.09.): die Shroomgator-Pilze schwebten komplett UEBER dem Krokodil,
       // gar nicht auf ihm — die generische Spanne y-44*Z..y+16*Z ist auf eine AUFRECHTE
       // 64px-Figur zugeschnitten (Kopf oben, Fuesse unten). Ein liegendes Quadruped fuellt
@@ -3434,13 +3503,23 @@
       // bzw. weg) ist SCHLANK UND HOCH (Koerperpixel fast ueber die volle Bildhoehe), die
       // Seitenansicht (r0 1/3) ist ein schmales, fast bildbreites horizontales Band knapp
       // ueber der Mitte. Eigene Grenzen je Blickrichtung statt der Humanoid-Spanne.
-      if(b.effekt&&b.effekt.pos==="koerper"&&!u.down){
+      // SHOWCASE-ZAUBERSHOW AUF VOLLBILD (PR S2, bekannter Vollbild-Fallstrick, Konzept
+      // "Zwei bekannte Fallstricke"): derselbe u.vizEffekt-Override wie im normalen
+      // Zeichenpfad weiter unten (s. dortiger Kommentar) -- eine Vollbild-Kreatur KANN per
+      // Klassen-/Sub-/Attribut-Punkten den Zaubershow-Act erhalten, auch ohne eigenes
+      // b.effekt (z.B. ueber SHOWCASE_ACT_PUNKTE.klasse.Mage), und braeuchte den Effekt
+      // trotzdem sichtbar. Dieser Zweig liegt VOR dem fruehen `return;` weiter unten und
+      // wird deshalb tatsaechlich erreicht (anders als der Mikrofon-/Requisiten-Aufruf im
+      // normalen Zeichenpfad, den kein Vollbild-Sprite je sieht).
+      const effUV=u.vizEffekt||b.effekt;
+      if(effUV&&effUV.pos==="koerper"&&!u.down){
         if(b.vollbild==="krokodil"){
           const seite=r0===1||r0===3;
           const kTop=(seite?-15:-43)*Z, kBot=(seite?9:15)*Z, kStreu=(seite?20:9)*Z;
-          zeichnePartikelEffekt(x,y+kTop,y+kBot,kStreu,b.effekt.typ);
+          zeichnePartikelEffekt(x,y+kTop,y+kBot,kStreu,effUV.typ);
         }else{
-          zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
+          const streuungKV=effUV.streuung!=null?effUV.streuung:9;
+          zeichnePartikelEffekt(x,y-44*Z,y+16*Z,streuungKV*Z,effUV.typ);
         }
       }
       // Riss mittig auf der Brust (y-26..y-2, dieselbe Spanne wie im normalen Zeichenpfad
@@ -3516,7 +3595,16 @@
     // Feldspiel-/Arena-Disziplin) behaelt die Kosmetikwaffe `b.waffe`.
     const aktiveDisc=istBuehne(disc)?buehneDisc:(istBahn(disc)?bahnDisc:null);
     const erzwungen=aktiveDisc!=null?DISZIPLIN_WAFFE[aktiveDisc]:undefined;
-    const waffeEffektiv=erzwungen===undefined?b.waffe:erzwungen;
+    // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST (PR S2, Talentshow-Konzept Abschnitt 4.3): u.vizWaffe
+    // ueberschreibt JEDE andere Quelle -- auch die generische Showcase-Sperre DISZIPLIN_WAFFE.
+    // showcase=null direkt oberhalb -- und wird von stepShowcase() ausschliesslich auf dem
+    // gerade aktiven Kampfkunst-/Schuetzenkunst-Performer gesetzt (s. dort). Fuer jeden
+    // anderen Teilnehmer/jede andere Disziplin bleibt es immer `undefined`, aendert also
+    // nichts. Der Zufallswaffen-Bug vom 10.09. (DISZIPLIN_WAFFE.showcase wurde EINGEFUEHRT,
+    // um genau das zu verhindern) kommt dadurch nicht zurueck: die Waffe wird nur fuer EINEN
+    // Teilnehmer und nur waehrend seines eigenen Auftritts freigegeben, nie fuer den ganzen
+    // Buehnenzweig.
+    const waffeEffektiv=u.vizWaffe!==undefined?u.vizWaffe:(erzwungen===undefined?b.waffe:erzwungen);
     const bogen=!feldspiel&&waffeEffektiv==="bogen";
     const feuerwaffe=!feldspiel&&FEUERWAFFEN.includes(waffeEffektiv);
     // FOOTBALL-AUSRUESTUNG (05.09., "football-matrix-und-assets-recherche-05-09.md" Abschnitt
@@ -3543,7 +3631,17 @@
     const kuerSturz=!!u.vizSturz;
     let ani="walk";
     if(u.down||kuerSturz)ani="hurt";
-    else if(u.lunge>0)ani=feldspiel?"shoot":((bogen||feuerwaffe)?"shoot":"slash");
+    // SHOWCASE-GESANG/-AKROBATIK/-ZAUBERSHOW (PR S2, Konzept Abschnitt 4.3/5): u.vizPose
+    // haelt das walk-Blatt fest ODER erzwingt die shoot-Ueberkopf-Pose, OBWOHL u.lunge>0
+    // (der generische Buehnen-Enthuellungsmarker, den stepBuehne() JEDER Disziplin setzt,
+    // s. :13598) -- ein Saenger/Akrobat schlaegt sonst bei jeder Enthuellung denselben
+    // unbewaffneten "slash"-Faustschlag wie frueher JEDE Showcase-Figur (Konzept Abschnitt
+    // 1.2), und eine Zaubershow ohne Waffe bliebe ohne diese Zeile ebenfalls im "slash".
+    // Nur von stepShowcase() gesetzt, ausschliesslich am jeweils aktiven Performer -- fuer
+    // jede andere Figur/Disziplin bleibt u.vizPose immer `undefined`, diese Zeile also ohne
+    // jede Wirkung (bit-identisch).
+    else if(u.vizPose==="walk")ani="walk";
+    else if(u.lunge>0)ani=feldspiel?"shoot":((bogen||feuerwaffe||u.vizPose==="shoot")?"shoot":"slash");
     else if(Math.abs(u.vx||0)+Math.abs(u.vy||0)<3)ani="walk";
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
@@ -3929,16 +4027,37 @@
       const hp=prop.hand[r]||prop.hand[2];
       prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizFechtPhase||"engarde");
     }
-    if(b.effekt&&!u.down){
-      if(b.effekt.pos==="kopf"){
+    // MIKROFON (PR S2, Gesang-Act, s. DISZIPLIN_PROP.showcase/zeichneMikrofon oben) -- ANDERS
+    // als die fuenf Requisiten oberhalb (Hantel/Schachuhr/Kufe/Schlaeger/Degen) NICHT ueber
+    // `feldspiel&&istXxx()` gegated: Showcase zeichnet nicht ALLE Teilnehmer einer Disziplin
+    // mit derselben Requisite, sondern nur den einen gerade aktiven Performer mit dem
+    // Gesang-Act. u.vizMikro (bool) traegt deshalb die ganze Gating-Logik allein -- gesetzt
+    // von stepShowcase() ausschliesslich auf diesem einen Teilnehmer, s. dort.
+    if(u.vizMikro&&!u.down){
+      const prop=DISZIPLIN_PROP.showcase;
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,(u.lunge>0)?"canto":"ruhend");
+    }
+    // SHOWCASE-ZAUBERSHOW (PR S2, Konzept Abschnitt 4.3): u.vizEffekt ueberschreibt b.effekt
+    // komplett -- gesetzt von stepShowcase() ausschliesslich auf dem aktiven Zaubershow-
+    // Performer (auch fuer Charaktere OHNE eigenes b.effekt, dann mit einem Ersatztyp aus
+    // istHeiler()/"arkan", s. dort). Fuer jeden anderen Teilnehmer/jede andere Disziplin
+    // bleibt u.vizEffekt immer `undefined`, `effU` faellt dann 1:1 auf b.effekt zurueck --
+    // bit-identisch zum bisherigen Verhalten.
+    const effU=u.vizEffekt||b.effekt;
+    if(effU&&!u.down){
+      if(effU.pos==="kopf"){
         // streuung/hoehe sind optionale Ueberschreibungen im BAU-Eintrag (s. Gram:
         // "wirklich dezent, als waeren es seine Haare" — enger und dichter am Kopf statt
         // der Default-Werte 6/[56,34]).
-        const streuung=b.effekt.streuung!=null?b.effekt.streuung:6;
-        const hoehe=b.effekt.hoehe||[56,34];
-        zeichnePartikelEffekt(x,y-hoehe[0]*Z,y-hoehe[1]*Z,streuung*Z,b.effekt.typ);
+        const streuung=effU.streuung!=null?effU.streuung:6;
+        const hoehe=effU.hoehe||[56,34];
+        zeichnePartikelEffekt(x,y-hoehe[0]*Z,y-hoehe[1]*Z,streuung*Z,effU.typ);
       }
-      else if(b.effekt.pos==="koerper")zeichnePartikelEffekt(x,y-44*Z,y+16*Z,9*Z,b.effekt.typ);
+      else if(effU.pos==="koerper"){
+        const streuungK=effU.streuung!=null?effU.streuung:9;
+        zeichnePartikelEffekt(x,y-44*Z,y+16*Z,streuungK*Z,effU.typ);
+      }
     }
     // Riss ueber der fertigen Ruestung/Haut, aus demselben Grund wie b.effekt zuletzt
     // gezeichnet wird (s. Kommentar oben): sonst verdeckt Ruestung/Helm/Haar ihn wieder.
@@ -15531,6 +15650,219 @@
       scale:u.vizScale!=null?u.vizScale:ziel.scale
     };
   }
+  // ================== SHOWCASE: DIE SECHS ACT-ZEICHENFUNKTIONEN (PR S2, Talentshow- =========
+  // Konzept 17.09., Abschnitt 3.1/5) ===========================================================
+  // Vertrag (Konzept Abschnitt 3.2/4.3, woertlich): jede Act-Zeichenfunktion liest NUR
+  // u.runden[u.aktuell].ereignis (Erfolg/Fehlschlag), u.lunge, buehneT, u.id, u.vizAct --
+  // schreibt NUR viz*-Felder. Niemals wert()/rr()/u.summe/u.runden/u.aktuell aendern. Wird
+  // NUR fuer den gerade Aktiven aufgerufen (aus zeichneShowcase(), s. zeichneShowcaseAct()
+  // unten), nie fuer Backstage-Wartende.
+  //
+  // Z-SKALIERUNG (bekannter Fallstrick, Konzept "Zwei bekannte Fallstricke"): jede neue
+  // Requisite/jeder neue Versatz hier ist mit demselben Z multipliziert, das zeichneSprite()
+  // selbst benutzt (groesseFaktor*hoehenKorrektur*bauSkala) -- sonst driftet sie 5-10px je
+  // nach Charaktergroesse (dieselbe Lehre wie die Zeitfahr-Weste-Runde).
+  const showcaseZ=(u)=>groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(BAU[u.n]||BAU_STD);
+  // Fortschritt seit der zuletzt enthuellten Runde: 0 im Enthuellungs-Frame, 1 nach 0,5
+  // realen Sekunden -- dieselbe u.lunge-Uhr wie Tennis-Ball/Showcase-Buzzer (kein neues Feld).
+  const showcaseFortschritt=(u)=>Math.min(1,Math.max(0,1-(u.lunge||0)/0.5));
+  const showcaseErgebnis=(u)=>(u.aktuell>=0&&u.runden&&u.runden[u.aktuell])?u.runden[u.aktuell]:null;
+
+  // ---------- ZIELSCHEIBE (Schuetzenkunst-Requisite, Konzept: "3 Ringe, Stil FOLTER_GERAETE")
+  // Reine Canvas-Primitive im selben "zeichne an lokalem Ursprung, Aufrufer uebernimmt
+  // Translate"-Stil wie FOLTER_GERAETE oben.
+  function zeichneZielscheibe(x,y,s){
+    ctx.save();ctx.translate(x,y);
+    const ringe=[[16,"#f2f4f7"],[10.5,"#c0392b"],[5,"#f2f4f7"]];
+    for(const [r,farbe] of ringe){
+      ctx.fillStyle=farbe;ctx.beginPath();ctx.arc(0,0,r*s,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle="#c0392b";ctx.beginPath();ctx.arc(0,0,2*s,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(20,16,4,.6)";ctx.lineWidth=Math.max(1,1.2*s);
+    ctx.beginPath();ctx.arc(0,0,16*s,0,Math.PI*2);ctx.stroke();
+    // Staender: kurzer dunkler Fuss unter der Scheibe.
+    ctx.fillStyle="#3c3026";ctx.fillRect(-1.6*s,16*s,3.2*s,14*s);
+    ctx.restore();
+  }
+  // Feste Position am Buehnenrand -- rechts neben der Mitte auf Rampenlichthoehe, unabhaengig
+  // von der Seite des Performers (ein Trickschuss zielt immer auf dasselbe Ziel).
+  function showcaseZielPosFix(){ return {x:W*0.86,y:H*0.42}; }
+
+  // ---------- FELSBROCKEN (Kraftakt-Requisite, Konzept: "zwei Haelften, zerbricht bei
+  // Erfolg, faellt bei 'verpatzt' ganz") ----------
+  function zeichneFelsbrocken(x,y,s,fortschritt,ereignis,art){
+    const erfolg=!!(ereignis&&art&&ereignis.ereignis===art.erfolgWort);
+    const fail=!!(ereignis&&art&&ereignis.ereignis===art.failWort);
+    ctx.save();ctx.translate(x,y);
+    if(fail){
+      // Verpatzt: der ganze Brocken faellt -- kippt weg und blendet aus, statt sich zu teilen.
+      ctx.translate(0,fortschritt*18*s);ctx.rotate(fortschritt*0.6);
+      ctx.globalAlpha=1-fortschritt*0.7;
+      ctx.fillStyle="#5b5347";
+      ctx.beginPath();ctx.ellipse(0,0,10*s,8*s,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#726a5c";
+      ctx.beginPath();ctx.ellipse(-2*s,-2*s,4*s,3*s,0.4,0,Math.PI*2);ctx.fill();
+    } else {
+      // Erfolg: zwei Haelften bewegen sich mit fortschritt auseinander, bis sie sichtbar
+      // zerbrechen. Vor der Enthuellung (fortschritt/ereignis noch leer) bleiben sie
+      // zusammen -- ein ganzer, ungehobener Fels.
+      const spalt=erfolg?fortschritt*9*s:0;
+      ctx.fillStyle="#6b6255";
+      ctx.beginPath();ctx.moveTo(-spalt,0);ctx.lineTo(-spalt-9*s,-2*s);ctx.lineTo(-spalt-8*s,7*s);
+      ctx.lineTo(-spalt-1*s,8*s);ctx.closePath();ctx.fill();
+      ctx.fillStyle="#7d7364";
+      ctx.beginPath();ctx.moveTo(spalt,0);ctx.lineTo(spalt+9*s,-3*s);ctx.lineTo(spalt+8*s,7*s);
+      ctx.lineTo(spalt+1*s,8*s);ctx.closePath();ctx.fill();
+      if(erfolg&&fortschritt>0.15){
+        ctx.strokeStyle="rgba(255,225,150,"+(0.6*(1-fortschritt)).toFixed(3)+")";
+        ctx.lineWidth=Math.max(1,1.4*s);
+        ctx.beginPath();ctx.moveTo(0,-1.5*s);ctx.lineTo(0,7*s);ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------- 1. GESANG/REDE ----------
+  function zeichneActGesang(u,x,y,Z){
+    // Noten-Primitive steigen auf -- dieselbe "billige Sinusform, kein Array"-Bauart wie
+    // zeichnePartikelEffekt() innerhalb zeichneSprite(), hier eigenstaendig, weil jene
+    // Closure von aussen (zeichneShowcaseAct()) nicht erreichbar ist.
+    for(let i=0;i<3;i++){
+      const phase=buehneT*0.9+u.id*1.6+i*2.1;
+      const lauf=(phase%2.4)/2.4;
+      const nx=x+Math.sin(phase*1.7+i)*10*Z;
+      const ny=y-40*Z-lauf*34*Z;
+      const alpha=0.75*(1-lauf);
+      if(alpha<=0.02)continue;
+      ctx.globalAlpha=alpha;ctx.font=(9+3*Z).toFixed(1)+"px sans-serif";
+      ctx.fillStyle=i%2?"#f6c750":"#ffe9a8";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(i%2?"♪":"♫",nx,ny);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ---------- 2. KAMPFKUNST ----------
+  function zeichneActKampfkunst(u,x,y,Z,fortschritt){
+    if(!(u.lunge>0))return;
+    const b=BAU[u.n]||BAU_STD;
+    // Funken am Klingenweg -- entlang eines kurzen Bogens vor der Figur, waehrend des
+    // Ausfallschritts (dieselbe u.lunge-Uhr wie ueberall sonst in dieser Datei), im selben
+    // Radial-Funken-Stil wie der Klingenkontakt-Funke bei zeichneFechten().
+    const spitze=Math.sin(fortschritt*Math.PI);
+    const bx=x+22*Z*fortschritt, by=y-30*Z+8*Z*spitze;
+    ctx.save();ctx.globalAlpha=(1-fortschritt)*0.9;ctx.globalCompositeOperation="lighter";
+    const grad=ctx.createRadialGradient(bx,by,0,bx,by,10*Z);
+    grad.addColorStop(0,"#fff6d0");grad.addColorStop(0.5,"#f2c94c");grad.addColorStop(1,"rgba(242,201,76,0)");
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(bx,by,10*Z,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="#fff6d0";ctx.lineWidth=1.2;
+    for(let s=0;s<4;s++){
+      const ang=(s/4)*Math.PI*2+fortschritt*7;
+      ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(ang)*6*Z,by+Math.sin(ang)*6*Z);ctx.stroke();
+    }
+    ctx.restore();
+    // Schildschlag: ein kurzer Impact-Ring vor der Figur, nur bei b.schild.
+    if(b.schild){
+      ctx.save();ctx.globalAlpha=(1-fortschritt)*0.7;
+      ctx.strokeStyle="#c6cfdd";ctx.lineWidth=Math.max(1,2*Z);
+      ctx.beginPath();ctx.arc(x-16*Z,y-20*Z,8*Z*(0.6+fortschritt*0.6),0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---------- 3. ZAUBERSHOW ----------
+  // Kein eigener Aufwand mehr noetig hier -- u.vizEffekt/u.vizPose sind bereits ueber die
+  // beiden geteilten Beruehrungen in zeichneSprite() sichtbar (s. dort). Eine leere Funktion
+  // haelt trotzdem den SHOWCASE_ACT_ZEICHNEN-Vertrag "je Act eine Zeichenfunktion" ein und
+  // ist der Ort, an dem eine spaetere Zusatzschicht ansetzen wuerde.
+  function zeichneActZaubershow(){ }
+
+  // ---------- 4. KRAFTAKT ----------
+  function zeichneActKraftakt(u,x,y,Z,fortschritt,ereignis,art){
+    // Felsbrocken ueber dem Kopf -- Position unabhaengig von der Stauchung (die trifft den
+    // Koerper in zeichneShowcaseAct(), nicht die Requisite).
+    zeichneFelsbrocken(x,y-58*Z,Z,fortschritt,ereignis,art);
+    if(u.lunge>0){
+      zeichneBodenstaub(x-10*Z,y+18*Z,u.id);
+      zeichneBodenstaub(x+10*Z,y+18*Z,u.id+1);
+    }
+  }
+
+  // ---------- 5. SCHUETZENKUNST ----------
+  function zeichneActSchuetzenkunst(u,x,y,Z,fortschritt,ereignis,art){
+    const ziel=showcaseZielPosFix();
+    zeichneZielscheibe(ziel.x,ziel.y,1.1);
+    if(!(u.lunge>0))return;
+    const erfolg=!!(ereignis&&ereignis.ereignis===art.erfolgWort);
+    // Flugbogen wie zeichneTennis()s Ball (u.lunge 0,5->0 als Fortschritt, Sinusbogen) --
+    // bei Fehlschlag haelt der Schuss vor dem Ziel bzw. driftet daran vorbei.
+    const startY=y-14*Z;
+    const zielX=erfolg?ziel.x:(x+(ziel.x-x)*0.82);
+    const zielY=erfolg?ziel.y:(startY+(ziel.y-startY)*0.7);
+    const bx=x+(zielX-x)*fortschritt;
+    const by=startY+(zielY-startY)*fortschritt-Math.sin(fortschritt*Math.PI)*16*Z;
+    ctx.fillStyle="#e8e2d0";ctx.strokeStyle="#8a8578";ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(bx,by,Math.max(1.4,2*Z),0,Math.PI*2);ctx.fill();ctx.stroke();
+  }
+
+  // ---------- 6. AKROBATIK ----------
+  function zeichneActAkrobatik(u,x,y,Z,fortschritt){
+    if(u.vizSturz||!(u.lunge>0))return;
+    // Landung mit Staub, kurz bevor der Sprungbogen (s. zeichneShowcaseAct) den Boden
+    // wieder erreicht.
+    if(fortschritt>0.82)zeichneBodenstaub(x,y+18*Z,u.id);
+  }
+
+  const SHOWCASE_ACT_ZEICHNEN={
+    gesang:zeichneActGesang, kampfkunst:zeichneActKampfkunst, zaubershow:zeichneActZaubershow,
+    kraftakt:zeichneActKraftakt, schuetzenkunst:zeichneActSchuetzenkunst, akrobatik:zeichneActAkrobatik
+  };
+
+  // Choreografie + Dispatch fuer den einen aktiven Performer -- ersetzt den blossen
+  // `zeichneSprite(ctx,aktiver,x,y)`-Aufruf aus PR S1. Positions-/Rotationstransforme
+  // (Kraftakt-Stauchung, Akrobatik-Sprungbogen) liegen HIER statt in den einzelnen
+  // Act-Funktionen, weil sie den zeichneSprite()-Aufruf selbst umschliessen muessen und
+  // dadurch UNIFORM fuer LPC-Koerper UND Vollbild-/reiherMech-Kreaturen wirken (Konzept,
+  // bekannter Vollbild-Fallstrick) -- eine Transformation UM den Aufruf herum trifft beide
+  // Zeichenpfade gleich, ein Eingriff INNERHALB zeichneSprite() (hinter deren fruehen
+  // `return;`s) nicht.
+  function zeichneShowcaseAct(u,x,y,art){
+    const Z=showcaseZ(u);
+    const fortschritt=showcaseFortschritt(u);
+    const ereignis=showcaseErgebnis(u);
+    const b=BAU[u.n]||BAU_STD;
+    const act=u.vizAct;
+    if(act==="kraftakt"&&u.lunge>0){
+      // Stauchung/Kippung um den Fusspunkt (y+19*Z, dieselbe Fusshoehe wie die
+      // Schatten-Ellipse in showcasePosVon()/zeichneTennis()): beim Stampfen sackt die
+      // Figur kurz zusammen (Y schrumpft, X waechst leicht) und kippt minimal nach vorn --
+      // ein Wums, kein Sprung.
+      const pivotY=y+19*Z;
+      const wums=Math.sin(fortschritt*Math.PI);
+      ctx.save();
+      ctx.translate(x,pivotY);ctx.scale(1+wums*0.10,1-wums*0.14);ctx.rotate(wums*0.05);
+      ctx.translate(-x,-pivotY);
+      zeichneSprite(ctx,u,x,y);
+      ctx.restore();
+    } else if(act==="akrobatik"&&!b.fluegel&&u.lunge>0&&!u.vizSturz){
+      // Sprungbogen ueber die Buehnenmitte: Hoehe aus einem Sinusbogen, EINE volle Rotation
+      // (Salto) um den Koerpermittelpunkt waehrend des Bogens -- Pivot bei (angehobene
+      // Fusshoehe)-14*Z, die ungefaehre Koerpermitte des 64px-Rahmens (Kopf bei y-46*Z,
+      // Sohle bei y+18*Z). Fluegler (b.fluegel) schweben statt zu springen (Konzept
+      // Abschnitt 3.1) -- fuer sie greift dieser Zweig nicht, sie fallen auf den normalen,
+      // unrotierten Aufruf unten durch.
+      const hoehe=Math.sin(fortschritt*Math.PI)*30*Z;
+      const drawYA=y-hoehe, pivotYA=drawYA-14*Z;
+      ctx.save();
+      ctx.translate(x,pivotYA);ctx.rotate(fortschritt*Math.PI*2);ctx.translate(-x,-pivotYA);
+      zeichneSprite(ctx,u,x,drawYA);
+      ctx.restore();
+    } else {
+      zeichneSprite(ctx,u,x,y);
+    }
+    const fn=SHOWCASE_ACT_ZEICHNEN[act];
+    if(fn)fn(u,x,y,Z,fortschritt,ereignis,art);
+  }
+
   function stepShowcase(dt,art){
     // NAECHER(): woertlich derselbe exponentielle Anaeherungs-Stil wie stepCypher()s
     // gleichnamige Closure (:14347) -- hier auf kartesische x/y/scale statt Polarkoordinaten
@@ -15540,6 +15872,45 @@
     const aktiver=showcaseAktiver();
     for(const u of TEILNEHMER){
       if(u.vizAct==null)u.vizAct=actVon(u).act;
+      // ACT-UEBERSCHREIBUNGEN (PR S2, Konzept Abschnitt 4.3/5): NUR am gerade aktiven
+      // Performer gesetzt, sonst immer `undefined`/`false` -- exakt der Vertrag "u.vizWaffe =
+      // b.waffe NUR fuer den aktuell aktiven Teilnehmer, nur waehrend seines Auftritts".
+      // Jede dieser Zeilen laeuft JEDEN Frame fuer JEDEN Teilnehmer neu -- ein Performer, der
+      // gerade abgetreten ist, verliert seine Ueberschreibung im selben Frame wieder (kein
+      // Nachleuchten der Requisite/Pose beim naechsten Auftritt eines anderen). Kein rr(),
+      // reine Ableitung aus u.vizAct/BAU/istHeiler()/u.lunge (alles erlaubte Lesequellen).
+      const istAktiv=(u===aktiver);
+      const b=BAU[u.n]||BAU_STD;
+      u.vizWaffe=(istAktiv&&(u.vizAct==="kampfkunst"||u.vizAct==="schuetzenkunst"))?b.waffe:undefined;
+      // FEHLZUENDER BEI "VERPATZT" (Konzept Abschnitt 3.1: "Bei 'verpatzt' ein kurzer
+      // Fehlzuender (Alpha bricht ab)"): dieselbe u.lunge-Uhr wie beim Erfolg, aber die
+      // Streuung faellt STATT zu wachsen sofort wieder auf 0 -- ein kurzes Aufflackern, das
+      // abbricht, statt des vollen 6->18-Ausbruchs. r0Z liest nur u.runden[u.aktuell].
+      // ereignis (erlaubte Lesequelle) und schreibt ausschliesslich in dieses eine viz*-Feld.
+      const zsFortschritt=Math.min(1,Math.max(0,1-(u.lunge||0)/0.5));
+      const zsRunde=(istAktiv&&u.vizAct==="zaubershow"&&u.aktuell>=0)?u.runden[u.aktuell]:null;
+      const zsFail=!!(zsRunde&&zsRunde.ereignis===art.failWort);
+      u.vizEffekt=(istAktiv&&u.vizAct==="zaubershow")
+        ? {typ:(b.effekt&&b.effekt.typ)||(istHeiler(u)?"heilig":"arkan"), pos:"koerper",
+           // Erfolg/unentschieden: Streuung 6->18 waehrend lunge (Konzept Abschnitt 5,
+           // PR-S2-Punkt 3) -- dieselbe u.lunge-Uhr wie der Tennis-Ball/Showcase-Buzzer (0,5
+           // im Enthuellungs-Frame -> 0 nach 0,5 realen Sekunden), kein neues Feld/keine neue
+           // Uhr. Fehlschlag: kurzer Flacker (6 im Enthuellungs-Frame), der binnen 0,125s
+           // (Anteil 0,25 der 0,5s-Uhr) auf 0 abbricht.
+           streuung:zsFail?6*Math.max(0,1-zsFortschritt*4):6+12*zsFortschritt}
+        : undefined;
+      u.vizPose=(istAktiv&&(u.vizAct==="gesang"||u.vizAct==="akrobatik"))?"walk"
+        :(istAktiv&&u.vizAct==="zaubershow")?"shoot":undefined;
+      u.vizMikro=!!(istAktiv&&u.vizAct==="gesang");
+      // STURZ BEI "VERPATZT" (Akrobatik, Konzept Abschnitt 5 Punkt 6): u.vizSturz ist
+      // bereits ein generisches, act-neutral gelesenes Feld (zeichneSprite() ":3543"
+      // `kuerSturz=!!u.vizSturz`) -- WIEDERVERWENDET OHNE JEDEN UMBAU an zeichneSprite() (der
+      // vom Konzept ausdruecklich geforderte Vorab-Check: "pruefen, ob dieser Pfad
+      // act-gegated wiederverwendbar ist" -- Antwort: ja). Fenster identisch zum
+      // Buzzer/Tennis-Ball-Muster: die 0,5s nach der Enthuellung (u.lunge 0,5->0), nur wenn
+      // die soeben enthuellte Runde art.failWort traegt.
+      const rAkt=(istAktiv&&u.vizAct==="akrobatik"&&u.aktuell>=0)?u.runden[u.aktuell]:null;
+      u.vizSturz=!!(rAkt&&rAkt.ereignis===art.failWort&&u.lunge>0);
       const ziel=showcaseZielPos(u,aktiver);
       if(u.vizX==null){
         // Erstinitialisierung (erster stepShowcase()-Durchlauf fuer diesen Teilnehmer):
@@ -15600,7 +15971,10 @@
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
       ctx.beginPath();ctx.ellipse(x,y+19,17,6,0,0,6.2832);ctx.fill();
       ctx.globalAlpha=1;
-      zeichneSprite(ctx,aktiver,x,y);
+      // PR S2 (Talentshow-Konzept, Abschnitt 5): zeichneShowcaseAct() ersetzt den blossen
+      // zeichneSprite()-Aufruf -- sie zeichnet die Figur selbst (ggf. mit Kraftakt-/
+      // Akrobatik-Transform) UND die act-eigene Zusatzschicht (Requisite/Funken/Noten/...).
+      zeichneShowcaseAct(aktiver,x,y,art);
       const name=aktiver.n.length>13?aktiver.n.slice(0,12)+"…":aktiver.n;
       schriftAn(name,x,y+44,c,10.5,"700");
 
@@ -16802,6 +17176,27 @@
   // disziplinProbe()/miss-alle-disziplinen.mjs rufen stepBuehne() weiterhin direkt mit
   // festem 1/60 auf, lesen buehneAkt/buehneT nie fuer die Wertung und durchlaufen diese
   // Zeichenfunktion nie -- Rangtreue bleibt unberuehrt.
+  // BODENSTAUB (Ziel 4, Opus-Plan 7.1/7.2, urspruenglich nur fuer Breaking beim Aufbaeumen
+  // [vizMove===2]) -- ein paar kleine, deterministisch aus u.id/buehneT berechnete Punkte am
+  // Fusspunkt, dieselbe "keine Partikel-Arrays, nur billige Sinusformen"-Idee wie
+  // zeichnePartikelEffekt() in zeichneSprite (s. dort). AUF MODULEBENE GEHOBEN (PR S2,
+  // Talentshow-Konzept 17.09. Abschnitt 5, Punkt 4: "zeichneBodenstaub aus zeichneBreaking()
+  // in eine gemeinsame Hilfsfunktion heben, damit keine Kopie entsteht") -- Showcase
+  // benutzt dieselbe Funktion fuer den Kraftakt-Stampfer UND die Akrobatik-Landung
+  // (s. zeichneActKraftakt/zeichneActAkrobatik weiter unten). War bis zu dieser PR eine
+  // lokale Closure INNERHALB zeichneBreaking(); Koerper/Aufrufstelle in zeichneBreaking()
+  // unveraendert, nur die Definition ist umgezogen -- bit-identisch fuer Breaking selbst.
+  function zeichneBodenstaub(fx,fy,id){
+    ctx.fillStyle="#cbb98a";
+    for(let i=0;i<5;i++){
+      const ph=buehneT*6+id*1.7+i*1.3;
+      const lauf=(ph%1);
+      const wx=fx+Math.cos(id+i)*10*lauf, wy=fy-4*lauf*(1-lauf)*4;
+      ctx.globalAlpha=0.5*(1-lauf);
+      ctx.beginPath(); ctx.arc(wx,wy,1.6,0,6.2832); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
   function zeichneBreaking(art){
     if(!TEILNEHMER.length)return;
     const cx=W/2, cy=H*0.54, rOut=Math.min(W*0.46,H*0.44), rIn=rOut*0.14, KY=0.82;
@@ -16909,20 +17304,6 @@
     for(const u of TEILNEHMER)if(u.summe>fuehrer.summe)fuehrer=u;
     const grad=Math.PI/180;
     const hemis=[[0,100*grad,260*grad],[1,-80*grad,80*grad]];
-    // ZIEL 4 (Opus-Plan 7.1/7.2): Bodenstaub beim Aufbaeumen (vizMove===2) -- ein paar kleine, deterministisch
-    // aus u.id/buehneT berechnete Punkte am Fusspunkt, dieselbe "keine Partikel-Arrays,
-    // nur billige Sinusformen"-Idee wie zeichnePartikelEffekt() in zeichneSprite (s. dort).
-    const zeichneBodenstaub=(fx,fy,id)=>{
-      ctx.fillStyle="#cbb98a";
-      for(let i=0;i<5;i++){
-        const ph=buehneT*6+id*1.7+i*1.3;
-        const lauf=(ph%1);
-        const wx=fx+Math.cos(id+i)*10*lauf, wy=fy-4*lauf*(1-lauf)*4;
-        ctx.globalAlpha=0.5*(1-lauf);
-        ctx.beginPath(); ctx.arc(wx,wy,1.6,0,6.2832); ctx.fill();
-      }
-      ctx.globalAlpha=1;
-    };
     // POSITIONEN einmal fuer alle zwoelf bestimmen, damit beide Raenge und die Druckachse
     // dieselben Koordinaten benutzen statt sie zweimal auszurechnen.
     // POSITION AUS stepCypher() (Ziel 4, Plan 7.1): u.vizA/u.vizR statt Score-Radius und
