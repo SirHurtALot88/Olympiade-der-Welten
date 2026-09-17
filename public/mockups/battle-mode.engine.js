@@ -21566,6 +21566,34 @@
       ziel:        {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)},
       publikum:    {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
     },
+    // CLIMBING (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.1, D1.b): TON_KATALOG
+    // fuehrte bislang elf Disziplinen, Climbing war keine davon (nachgezaehlt). Vier Ereignisse
+    // aus genau den fuenf Ton-Primitiven, die der Katalog ueberall sonst benutzt (tonSchlag,
+    // tonKlick, tonMetall, tonDoppelton, tonRauschen) -- kein sechster Grundbaustein:
+    //  - griff     (tonKlick, kurz+hell): der Handkontakt an einem der zehn Griffe. Climbing
+    //    setzt `u.huerde` NIE (BAHN_ART.climbing fuehrt kein `hindernisTypen`, s. dortiger
+    //    Kommentar), der huerdeAktiv-Kanten-Trick aus TON_KATALOG.spurt.huerde greift hier
+    //    also nicht -- ein Griffversuch ist bei Climbing ein einzelner Framewechsel
+    //    (Positions-Ueberschreitung), keine mehrsekuendige Stopp-Phase. Ausloeser in
+    //    stepClimbing() ist deshalb ein Zaehler auf `u.pos` gegen BAHN_ART.climbing.hindernisse,
+    //    nicht `u.huerde`.
+    //  - fehlgriff (tonSchlag+tonRauschen, dieselbe Kombination wie ueberall sonst im Katalog
+    //    fuer einen Sturz, z.B. eiskunstlauf.sturz/takeshis-castle.sturz): der Griff geht
+    //    daneben (u.gestolpert steigt, s. dortiger "greift daneben"-Feed-Text).
+    //  - zug       (tonMetall, dumpf): der Kraftzug rettet einen misslungenen Griff mit Gewalt
+    //    (u.durchbruch steigt, s. dortiger "nimmt den Griff mit Gewalt"-Feed-Text) -- derselbe
+    //    Klangbaustein wie TON_KATALOG["time-trial"].bergauf fuer angestrengtes Ziehen.
+    //  - topout    (tonDoppelton, derselbe wie ueberall sonst "ziel"): die Wand ist bezwungen
+    //    (u.fertig!=null), wertungsgleich zum Zieleinlauf der anderen vier Bahnen.
+    // Kein `publikum`-Loop -- dieselbe Begruendung wie bei Spurt/Zeitfahren: Risiko ohne
+    // Punkte, A4 ist binaer (Katalogeintrag vorhanden oder nicht), kein Publikums-Bookkeeping
+    // noetig, das bodenClimbing() nicht ohnehin schon fuer die anderen vier Bahnen mitbringt.
+    climbing:{
+      griff:     {synth:(vol)=>tonKlick(vol,2000,0.05)},
+      fehlgriff: {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      zug:       {synth:(vol)=>tonMetall(vol,380,0.28)},
+      topout:    {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)}
+    },
     fechten:{
       klingen:  {synth:(vol)=>{ tonMetall(vol,1500,0.12); tonKlick((vol??0.6)*0.5,3000,0.03); }},
       treffer:  {synth:(vol)=>tonSchlag(vol,600,200,0.1)},
@@ -22164,6 +22192,11 @@
     // auf das deskriptive Flag statt eine eigene ist*()-Funktion gegated (kein zweiter
     // Zustand noetig, `BA().zeitfahren` steht bereits seit PR 0.3 fest).
     if(BA().zeitfahren)return bodenZeitfahren();
+    // CLIMBING BEKOMMT EINE WAND STATT DER GRAUEN GERADEN BAHN (Opus-Plan Naechste-Drei-
+    // Disziplinen 17-09, Abschnitt 3.1, D1.a) — dieselbe Weiche wie zeitfahren zwei Zeilen
+    // darueber, nur auf `BAHN_ART.climbing.climbing` gegated (rein deskriptiv seit 14.09.,
+    // ohne Wirkung auf Rezept/Matrix/wert(), s. Kommentar dort). Kein neues Flag noetig.
+    if(BA().climbing)return bodenClimbing();
     return bodenSpurtGerade();
   }
 
@@ -22479,6 +22512,82 @@
     for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
     ctx.stroke();
     ctx.restore();
+  }
+
+  // ================== CLIMBING: EINE WAND STATT EINER GRAUEN BAHN (bodenClimbing, ============
+  // ================== Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.1, D1.a) ========
+  // Climbing war die einzige der fuenf Bahn-Disziplinen ganz ohne eigenen Boden-Zweig: die
+  // Weiche in bodenSpurt() liess sie durch alle drei istRoute()/istOval()/zeitfahren-Zweige
+  // durchfallen, bis sie bei `bodenSpurtGerade()` landete -- demselben Zweig wie Spurt. Das
+  // Ergebnis war eine graue, flache Gerade mit denselben winzigen Griff-Punkten wie jedes
+  // andere Hindernis (BA().boden="#5d5a54", BA().baeume=false, s. Scorecard-Befund "Assets 40,
+  // die schlechteste Darstellung aller angeschlossenen Nicht-Buehnen-Disziplinen").
+  //
+  // GENAU DASSELBE MUSTER WIE bodenZeitfahren() OBEN: `bodenSpurtGerade()` zuerst aufrufen und
+  // das Eigene REIN ADDITIV aufsetzen, statt Hintergrund/Bahn/Zaun/Ziellinie/Huerden-Punkte ein
+  // zweites Mal zu zeichnen. Fuer die anderen vier Bahnen (Spurt/Staffel/Takeshi/Zeitfahren)
+  // aendert diese Funktion keine einzige Zeile -- sie wird fuer sie nie aufgerufen (Weiche in
+  // bodenSpurt() oben, `BA().climbing`).
+  //
+  // WAS AUFGESETZT WIRD, STEHT SCHON ALS DATEN DA (abgelesen, nicht erfunden, exakt wie beim
+  // Hoehenprofil oben):
+  //  1. UEBERHANG-SCHATTIERUNG, mit der Strecke zunehmend. BAHN_ART.climbing.steigung=0,85
+  //     ("die Wand wird nach oben steiler", s. Kommentar dort) liefert die STAERKE der
+  //     Verdunkelung von Start zu Ziel -- ZEHN gleich breite Baender ueber die volle Strecke
+  //     (dieselbe Bandtechnik wie die sieben `gelaende`-Zonen bei bodenZeitfahren, hier ohne
+  //     zonenspezifische Kanten, weil Climbing keine Zonen-Tabelle fuehrt), Deckkraft linear
+  //     von 0 am Start bis `steigung*ZW_UEBERHANG_MAX` am Ziel. Reiner Lesezugriff auf
+  //     `steigung` -- dieselbe Zahl, die tempoVon() fuer den Reserve-Verbrauch benutzt
+  //     (s. BAHN_ART.climbing-Kopfkommentar), hier nie geschrieben.
+  //  2. ZEHN GRIFFMARKEN an exakt `BAHN_ART.climbing.hindernisse` (dieselben zehn Positionen,
+  //     die HUERDEN_N() der Simulation liefert und die bodenSpurtGerade() bereits als winzige
+  //     Pro-Bahn-Punkte zeichnet, s. dortiger `wort==="Griff"`-Zweig) -- hier als groessere,
+  //     ueber die volle Wandhoehe sichtbare Kletter-Griffe, damit die Wand auch bei zwoelf
+  //     belegten Bahnen als WAND erkennbar bleibt, nicht nur als Punktreihe je Laeufer.
+  // Kein neues Bild noetig -- reine Vektorformen wie bodenZeitfahren() sie schon benutzt.
+  const ZW_UEBERHANG_MAX=0.34;
+  function bodenClimbing(){
+    bodenSpurtGerade();
+    const oben=H*0.14, unten=H*0.94;
+    const steigung=BA().steigung??0.85;
+    // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Start (0) zu
+    // Ziel (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" wird so zu
+    // "die Wand wird nach rechts dunkler", exakt die Fahrtrichtung, in der die Kamera laeuft.
+    const UEBERHANG_BAENDER=10;
+    for(let i=0;i<UEBERHANG_BAENDER;i++){
+      const von=i/UEBERHANG_BAENDER, bis=(i+1)/UEBERHANG_BAENDER;
+      const x0=camX(von), x1=camX(bis);
+      if(x1<-20||x0>W+20)continue;
+      const alpha=steigung*ZW_UEBERHANG_MAX*((i+1)/UEBERHANG_BAENDER);
+      ctx.fillStyle="rgba(12,10,9,"+alpha.toFixed(3)+")";
+      ctx.fillRect(x0,oben,Math.max(1,x1-x0),unten-oben);
+    }
+    // Ein paar Riss-/Kanten-Linien queruber die Wand, deterministisch aus derselben Saat
+    // wie die Boden-Koernung oben (bodenSaat) -- Struktur statt lackierter Flaeche, genau
+    // die Begruendung, mit der bodenSpurtGerade() seine eigene Koernung schon rechtfertigt.
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,oben,W,unten-oben);ctx.clip();
+    ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
+    for(let i=0;i<22;i++){
+      const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
+      const x0=fx*(W+120)-60, y0=oben+fy*(unten-oben);
+      const ang=(bodenSaat(i+980)-0.5)*0.9-0.3;
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
+    }
+    ctx.restore();
+    // ---- Schicht 2: die zehn Griffmarken, ueber die volle Wandhoehe statt nur je Bahn.
+    const griffe=BA().hindernisse||[];
+    griffe.forEach((posFrac,i)=>{
+      const x=camX(posFrac);
+      if(x<-24||x>W+24)return;
+      const gy=oben+(unten-oben)*(0.16+0.68*bodenSaat(i+1200));
+      ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
+      ctx.beginPath();ctx.ellipse(x,gy,9,6,0.35,0,6.283);ctx.fill();
+      ctx.fillStyle="rgba(255,255,255,.35)";
+      ctx.beginPath();ctx.ellipse(x-2,gy-2,3,1.8,0.35,0,6.283);ctx.fill();
+      ctx.fillStyle="#5c4326";
+      ctx.fillRect(x-1,gy,2,10);
+    });
   }
 
   // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
@@ -25619,11 +25728,45 @@
   // das neue, rein praesentationale `u.vizSchritt`; niemals rr(), niemals u.pos/u.v selbst,
   // niemals etwas, das MOTOREN.climbing.wert() liest. Kein init-Block in der LAEUFER-Fabrik
   // noetig, das Feld initialisiert sich beim ersten Bild selbst (Muster aus stepZeitfahren).
+  // TON (A4, Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.1, D1.b), nachtraeglich
+  // in dieselbe Funktion ergaenzt: VIER weitere, rein praesentationale Einmal-/Zaehl-Kanten
+  // (`vizGriffN`, `vizZugN`, `vizFehlgriffN`, `vizTopoutTon`), derselbe Vertrag wie oben --
+  // keine der vier liest je in tempoVon()/rr()/MOTOREN.climbing.wert() zurueck. Anders als
+  // beim huerdeAktiv-Trick in stepHuerden/stepZeitfahren (`u.huerde>0` als Kante) bleibt
+  // `u.huerde` bei Climbing IMMER 0 -- nachgemessen, nicht vermutet: die einzige Stelle, die
+  // `u.huerde` beschreibt (der `if(A.hindernisTypen){...}`-Block bei den Hindernissen oben),
+  // setzt das Feld nur, wenn `BAHN_ART[disc].hindernisTypen` existiert, und das fuehren
+  // ausschliesslich Spurt und Takeshi's Castle (s. dortige Eintraege) -- Climbings Rezept
+  // hat kein `hindernisTypen`. Ein Griffversuch ist bei Climbing deshalb ein einzelner
+  // Framewechsel (dieselbe `vor<h&&u.pos>=h`-Ueberschreitung, die die Simulation selbst
+  // prueft), keine mehrsekuendige Stopp-Phase wie bei einer Huerde. `vizGriffN` zaehlt daher
+  // die bereits VERTONTEN Ueberschreitungen aus `u.pos` gegen `HUERDEN_N()` -- exakt dieselbe
+  // Zaehl-statt-Zustand-Idee wie `vizZzTonN` bei stepZeitfahren, rein lesend, `u.pos` selbst
+  // bleibt unangetastet. `vizZugN`/`vizFehlgriffN` zaehlen ebenso die bestehenden, von der
+  // Simulation geschriebenen Ausgangs-Zaehler `u.durchbruch` (Kraftzug rettet den Griff mit
+  // Gewalt) und `u.gestolpert` (der Griff geht daneben) -- beide NUR gelesen, nie
+  // geschrieben. `vizTopoutTon` ist der einmalige Zielmerker, woertlich wie `vizZielTon`
+  // bei stepZeitfahren/stepHuerden.
   function stepClimbing(dt,art){
     const dtSicht=dt*zeitFaktor();
     for(const u of LAEUFER){
-      if(u.vizSchritt==null)u.vizSchritt=(u.id||0)*2.3;
+      if(u.vizSchritt==null){
+        u.vizSchritt=(u.id||0)*2.3;
+        u.vizGriffN=0; u.vizZugN=u.durchbruch||0; u.vizFehlgriffN=u.gestolpert||0; u.vizTopoutTon=false;
+      }
       if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
+      // ---- GRIFF-TON (TON_KATALOG.climbing.griff), an der Kante "ein weiterer der zehn
+      // Griffe wurde erreicht" -- reiner Lesezugriff auf u.pos, s. Kopfkommentar.
+      if(u.fertig==null){
+        const erreicht=HUERDEN_N().filter(h=>u.pos>=h).length;
+        if(erreicht>u.vizGriffN){ u.vizGriffN=erreicht; sfx("climbing","griff"); }
+      }
+      // ---- ZUG-/FEHLGRIFF-TON, an derselben Zaehl-Kante, aber auf den bestehenden
+      // Ausgangs-Zaehlern der Simulation.
+      if((u.durchbruch||0)>u.vizZugN){ u.vizZugN=u.durchbruch; sfx("climbing","zug"); }
+      if((u.gestolpert||0)>u.vizFehlgriffN){ u.vizFehlgriffN=u.gestolpert; sfx("climbing","fehlgriff"); }
+      // ---- TOPOUT-TON (TON_KATALOG.climbing.topout), einmalig wie ueberall sonst.
+      if(u.fertig!=null && !u.vizTopoutTon){ u.vizTopoutTon=true; sfx("climbing","topout"); }
     }
   }
 
