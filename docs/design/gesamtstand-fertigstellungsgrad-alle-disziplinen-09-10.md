@@ -1,3 +1,171 @@
+**Fünfzehnter Nachtrag 17.09. — Showcase auf 91 % nachgezogen (PR #957/#959/#960/#961), erste
+Bewegung einer Zeile ueber alle VIER Achsen zugleich seit Einfuehrung dieser Tabelle.** Der
+vierzehnte Nachtrag (direkt darunter) hatte Showcase unangetastet bei 45 % (Konzept 25/Assets
+40/Gameplay 95/Movement 20) stehen lassen — „kein eigenes Konzept" (Abschnitt 6). Seither sind
+vier sequenzielle PRs aus `docs/design/showcase-talentshow-konzept-17-09.md` (Fable-Konzept,
+17.09.) gemergt, alle ausschliesslich an Showcase: PR #957 (S0, Gerüst + Act-Ableitung), PR #959
+(S1, Bühnenbild + Rampenlicht), PR #960 (S2, sechs Act-Zeichenfunktionen), PR #961 (S3, Ton).
+`main` steht jetzt bei `65b1e603`. **rho FRISCH nachgemessen, nicht aus den vier PR-Texten
+übernommen:**
+
+```
+node scripts/miss-alle-disziplinen.mjs 24 showcase
+```
+→ **0,892** (Spannweite 0,158, Saison-rho 0,937, Spannweite 0,077), bestanden — bit-identisch zu
+allen vier PR-Texten und zur Basislinie vom 16.09. Keine Ueberraschung: keiner der vier PRs
+rührt `rezept`, `wert()` oder `rundenN`/`rundenDauer`/`failAbzug` an — das Konzeptdokument selbst
+begründet ausführlich (Abschnitt 4.1), warum das Rezept bewusst unangetastet bleibt (rho 0,892
+ist die drittbeste Zahl im Feld, eine Rezeptänderung müsste mehr als die Spannweite 0,158 bewegen,
+um überhaupt sichtbar zu sein, und nach oben ist kaum noch Platz).
+
+**Alle sechzehn Teilkriterien einzeln gegen den heutigen Code geprüft, nicht aus den vier
+PR-Texten übernommen:**
+
+**Konzept: 25→75.**
+- **K1 (eigenes Rezept):** unverändert erfüllt — `BUEHNE_ART.showcase.rezept`
+  (`battle-mode.engine.js:12480 ff.`) existiert seit dem Chassis-Umzug, keine der vier PRs ändert
+  ein Gewicht darin. **25.**
+- **K2 (eigene Mechanik über das Chassis hinaus): NEU erfüllt.** `showcase:true`
+  (`:12490`, gleiches Flag-Muster wie `heben`/`duell`/`schach`/`tennis`/`fechten`) plus eine
+  echte, eigene Zustandsmaschine: `actVon(u)` (`:15567-15605`, deterministische
+  Act-Ableitung aus BAU-Waffe/Vollbild/Flügel/Effekt/Klasse/Unterklassen/Rasse/Traits/
+  Attribut-Kipp-Regel, Tabelle `SHOWCASE_ACT_PUNKTE` `:15521 ff.`), `stepShowcase()`
+  (`:15873-15969`, Backstage/Spotlight-Choreografie über `NAECHER()`, Auftritts-/
+  Enthüllungs-Ton-Kanten) und eine eigene `buehneQueue`-Reihenfolge (PR S0: je Teilnehmer
+  zusammenhängend statt rundenweise, aufsteigend nach `eig`, Seiten verzahnt — Kür-Muster).
+  Das ist deutlich mehr als „andere Attributgewichte im generischen Rezept", der Zustand vor
+  PR #957. **25.**
+- **K3 (eigenes Fable-Dokument): NEU erfüllt.** `showcase-talentshow-konzept-17-09.md` modelliert
+  die Disziplin von Grund auf (Ist-Zustand, Act-Herleitung, sechs Acts, Rezept-Entscheidung,
+  Bauplan), dazu vier weitere Dokumente je PR (`showcase-s0-geruest-17-09.md`,
+  `showcase-s1-buehnenbild-17-09.md`, `showcase-s2-sechs-acts-17-09.md`,
+  `showcase-s3-ton-17-09.md`). Vorher war „die Produktivierungs-Notiz, die es mit Speed-Schach
+  teilt" der einzige Text. **25.**
+- **K4 (kalibriert, offene Designfragen entschieden): weiterhin OFFEN, ausdrücklich geprüft —
+  keine Bewegung.** Anders als bei Fechten (K4 offen, weil der Puffer unter dem Kaderrauschen
+  liegt) wurde hier **gar keine Kalibrierrunde versucht** — das Konzeptdokument selbst begründet
+  das explizit (Abschnitt 4.1: eine Rezeptänderung würde die Validität eher senken als heben,
+  weil die Acts sonst andere Attribute belohnen müssten als die Eignungsmatrix). Und Abschnitt 6
+  des Konzepts listet fünf „Offene Entscheidungen für Chris" (Act-Namen/-Kategorien, Act fest am
+  Charakter oder pro Spiel neu, Auftrittsreihenfolge, Waffen-Freigabe auf der Bühne,
+  `showcase.tsx`-Nachzug) — keine davon ist als von Chris entschieden dokumentiert; die vier PRs
+  haben die im Konzept empfohlenen Standardantworten umgesetzt, ohne dass ein Chris-Go dafür
+  vorliegt. K4 zählt deshalb weiter als nicht erfüllt, wie schon bei Fechten aus einem anderen
+  Grund. **0.**
+
+**Assets: 40→100.**
+- **A1 (eigene Feld-Datei im PRODUKTIVEN React-Renderer): bereits VOR den vier PRs voll erfüllt,
+  unverändert — keine Bewegung dieser Runde.** `app/foundation/discipline-stage/arena/
+  disciplines/showcase.tsx` (623 Z.) existiert seit längerem als eigene, showcase-spezifische
+  Datei (Vorhang, LED-Hype-Wall mit dB-Skala, Jury-Pult, Fame-Staircase, Podium — keine generische
+  Wrapper-Datei, dieselbe Kategorie wie `barbell.tsx`/`eiskunst.tsx`/`court.tsx`, die trotz
+  ebenfalls geteiltem `TokenChrome` alle A1=voll führen). **Wichtig, wie vom Auftrag verlangt:**
+  keine der vier PRs hat diese Datei angefasst (alle vier Diffs liegen ausschliesslich in
+  `public/mockups/battle-mode.engine.js` plus den eigenen Design-Dokumenten) — das
+  Konzeptdokument selbst sagt das ausdrücklich („Das ist eine andere Präsentationsebene (Token,
+  nicht Figuren) ... wird hier nicht angefasst", Abschnitt 1.3). A1 war schon vorher voll und
+  bleibt es unverändert. **30 (unverändert).**
+- **A2 (eigene Szene im Mockup-Motor über das geteilte Chassis-Bild hinaus): NEU voll erfüllt,
+  vorher nur teilweise.** `bodenShowcase()` (`:14905 ff.`, PR S1) ersetzt den geteilten
+  `bodenBuehne()`-Zweig (den Showcase bis PR #957 mit Wettessen/I-Spy/Tennis/Fechten/Schach
+  teilte) durch eine eigene Szene: roter Vorhang mit gerafften Falten, elf Rampenlicht-Kegel,
+  Jury-Pult mit drei Buzzern (`showcaseBuzzerPos()`), Publikums-Halbkreise, eigener
+  Publikums-Ton-Loop (`showcasePublikumAn`). Sicht-QA per Playwright bestätigt (S1-Dokument,
+  Screenshots `showcase-s1-nachher-17-09.png` u. a.). Vorher war die einzige „Bewegung" die
+  vom Zufallswaffen-Fix übrig gebliebene Teilverbesserung (kein eigener Boden, nur der geteilte
+  ohne Fremdwaffe) — das erklärt, warum die alte Zeile Assets 40 statt 30 führte (A1 voll=30 +
+  A2 damals nur ein kleiner Teilbonus=10 für den geschlossenen Bug, kein eigener Boden). **25.**
+- **A3 (disziplinrichtige Requisite): NEU voll erfüllt, vorher 0.** PR S2 gibt sechs
+  act-eigene Requisiten/Freigaben: `DISZIPLIN_PROP.showcase` (Mikrofon, dreifach abgesichert
+  gegen den Vollbild-/`reiherMech`-Fallstrick, `:3393,3494,4037`), freigegebene Bauplan-Waffe nur
+  am aktiven Kampfkunst-/Schützenkunst-Performer (`waffeEffektiv`-Override), Zielscheibe (3
+  Ringe, `FOLTER_GERAETE`-Stil) mit Geschoss-Flug, Felsbrocken-Primitive (Kraftakt). Keine
+  Zufallswaffe kommt zurück — `DISZIPLIN_WAFFE.showcase` bleibt `null`, nur `stepShowcase()`
+  überschreibt sie gezielt für den einen aktiven Performer. **25.**
+- **A4 (Ton, Musik, Kulisse): NEU voll erfüllt, vorher 0.** `TON_KATALOG.showcase` (`:21619 ff.`,
+  PR S3) mit acht Ereignissen (`auftritt`/`applaus`/`buzzer`/`klinge`/`schuss`/`zauber`/`stampf`/
+  `publikum`), verdrahtet an echten Kanten in `stepShowcase()` (Auftritts-Jingle beim
+  Wechsel auf „aktiv", Act-Aktionston + Applaus/Buzzer bei jeder Enthüllung), plus Publikums-Loop.
+  Dieselbe binäre „hat Ton"-Schwelle wie bei Hockey/Speed-Schach/Fechten/Eiskunstlauf. **20.**
+
+Kein Assets-Kriterium bleibt offen — **Deckel erreicht: 30+25+25+20=100.**
+
+**Gameplay: 95→95, keine Bewegung — ausdrücklich geprüft, keine der vier PRs rührt Rezept,
+Wertung oder Produktionsanschluss an.** G1 (rho 0,892, ≥0,85-Stufe → 40), G2 (produktionsangeschlossen
+seit Welle 1 → 30), G3 (`WERTUNG_AUFTRITT`, geteilt mit Wettessen/Eiskunstlauf/Breaking, deshalb
+weiterhin nur teilweise „eigene Wertung" → 10), G4 (`jeSeite:6`, Bühne-Chassis → 15) — Summe
+unverändert 95, rho bit-identisch bestätigt oben. **95.**
+
+**Movement: 20→95.**
+- **M1 (eigene Zeichenfunktion im Mockup-Motor): NEU voll erfüllt, vorher 0.** `zeichneShowcase()`
+  (`:15971 ff.`) ruft für den Aktiven `zeichneShowcaseAct()` (`:15835-15870`) auf, die wiederum
+  über `SHOWCASE_ACT_ZEICHNEN` (`:15815`) auf sechs eigene Act-Zeichenfunktionen dispatcht — kein
+  Fallback mehr auf die generische Zwei-Reihen-Darstellung, die Showcase bis PR #957 mit sechs
+  anderen Bühnen-Disziplinen teilte. **35.**
+- **M2 (eigene Bewegungs-/Schrittlogik): NEU voll erfüllt, vorher 0.** `stepShowcase()`
+  (`:15873-15969`) ist eine echte Zustandsmaschine: `showcaseAktiver()`/`showcaseZielPos()`
+  bestimmen Spotlight- vs. Backstage-Ziel, `NAECHER()` (wortgleicher exponentieller
+  Anäherungs-Stil wie `stepCypher()`) glide't `u.vizX/vizY/vizScale` dorthin, dazu je Act eigene
+  `viz*`-Felder (`vizPose`, `vizWaffe`, `vizEffekt`, `vizMikro`, `vizSturz`). Vorher setzte
+  `stepBuehne()` nur `u.lunge=0.5` — derselbe generische Enthüllungs-Mechanismus wie bei
+  Wettessen/I-Spy heute noch. **25.**
+- **M3 (sichtbare Animation in der PRODUKTIVEN React-Bühne): bleibt bei einer TEILWEISEN
+  Erfüllung, ausdrücklich NICHT auf voll gehoben — das ist die ehrliche, nicht schöngerechnete
+  Lesart, die der Auftrag verlangt.** `showcase.tsx` ist von keiner der vier PRs berührt (s. A1).
+  Anders als bei Fechten (`lamps.tsx`, eine von nur drei Feld-Dateien mit **eigener**
+  Token-Zeichnung statt `TokenChrome`, dazu eine eigene Touché-FX-Schicht: Ausfall-Lunge,
+  Treffer-Melder, kreuzende Klingen mit Klirr-Funke) hat `showcase.tsx` **keine** act-eigene oder
+  sonst showcase-spezifische Zusatzschicht — es zeigt weiterhin nur den geteilten
+  `useTokenGlide`/`GhostLayer`/`TokenChrome`-Bausatz (`benchmark.tsx`, wörtlich „die EINE geteilte
+  Bewegungsschicht ... für ALLE Disziplin-Felder"), plus die generische `olyGlowPulse`-Animation
+  bei besonderen Momenten. Das ist genau der Baustein, den M3 laut Abschnitt 0 explizit als
+  Beispiel nennt („Glide, Ghost, Übergänge") — er liefert deshalb weiterhin die TEILWEISE
+  Punktzahl, die schon vor diesen vier PRs galt (dieselbe Größenordnung wie bei Wettessen/I-Spy,
+  die denselben Bausatz ohne jede eigene Zusatzschicht nutzen), aber nicht die volle, weil nichts
+  showcase- oder act-Spezifisches hinzukommt. Ein production-seitiger Nachzug (`showcase.tsx` um
+  Act-Anzeige erweitern) ist im Konzeptdokument selbst als eigene, spätere Runde benannt
+  (Abschnitt 6, Punkt 5) und **bewusst nicht** Teil dieser vier PRs. **20 (unverändert).**
+- **M4 (disziplineigene Posen/FX an den Sprites): NEU voll erfüllt, vorher 0.** Alle sechs Acts
+  tragen eine eigene, im Fehlschlag-/Erfolgsfall unterschiedliche Zusatzschicht: Funken am
+  Klingenweg + Schildschlag (Kampfkunst), Zielscheibe + Geschossflug (Schützenkunst), Partikel-
+  Streuung 6→18 bzw. Fehlzünder (Zaubershow), Stauchung/Kippung + Felsbrocken + Bodenstaub
+  (Kraftakt, `zeichneBodenstaub` aus `zeichneBreaking()` zur Modul-Funktion gehoben), Sprungbogen
+  + Landungsstaub + Sturz-Wiederverwendung (Akrobatik), Mikrofon + Notenglyphen (Gesang). Geprüft
+  gegen den Vollbild-/`reiherMech`-Fallstrick an allen sechs Acts (nicht nur den zwei
+  offensichtlichen) — zwei echte Lücken gefunden und behoben (Zaubershow-Effekt im
+  `b.vollbild`-Pfad, Mikrofon im `b.reiherMech`-Pfad für Seraph-11), eine dokumentierte,
+  strukturelle Einschränkung stehen gelassen (keine Waffen-Requisite für Vollbild-Kampfkunst/
+  -Schützenkunst, weil kein Vollbild-BAU-Eintrag je ein `waffe`-Feld trägt) — kein Absturz, nur
+  fehlende Kosmetik in einem Randfall. **15.**
+
+**Ergebnis für die Tabelle:** Showcase Konzept 25→**75**, Assets 40→**100**, Gameplay 95→**95**
+(unverändert), Movement 20→**95**. **Gesamt: 45 %→91 %** (rechnerisch exakt 91,25 %) — die
+erste Zeile in diesem Dokument, die sich über alle vier Achsen gleichzeitig bewegt (bisher
+bewegte sich jede grosse Runde auf höchstens zwei/drei Achsen, z. B. Fechten zwölfter Nachtrag:
+Assets+Movement, Konzept/Gameplay blieben stehen). Der Grund: die vier PRs bauen eine Disziplin
+von „kein Flag, kein eigener Zweig, kein Dokument" komplett neu auf, während Time-Trial/Spurt/
+Fechten jeweils auf einem bereits produktionsangeschlossenen, teilweise ausgebauten Fundament
+aufsetzten.
+
+**Offener, nicht blockierender Befund aus der PR-#957-Review:** der Act-Gleichstand-Tiebreak
+(`actVon()`, `:15589-15602`) hasht `u.id` — und `u.id` ist laut eigenem Kommentar ein Laufindex
+(0..jeSeite*2-1), kein stabiles Charaktermerkmal; der Hash ist deshalb nur „stabil je Teilnehmer
+innerhalb desselben Spiels", nicht zwingend über Spiele mit anderer Aufstellungsreihenfolge
+hinweg. Betrifft nur die Minderheit der Teilnehmer mit echtem Punktegleichstand zwischen zwei
+Acts (im 17er-Demokader: keiner), bewegt rho nicht und ist keine PR-Blockade — eine spätere
+Runde könnte den Hash auf ein stabileres Merkmal (z. B. Name oder eine Kombination aus
+Klasse+Rasse) umstellen, ohne das Konzept zu ändern.
+
+**Neuer Gesamtdurchschnitt: 78 %→80 %** (rechnerisch 79,99 %, war 77,7 % nach dem vierzehnten
+Nachtrag). Je Achse: Konzept 79,5 %→**82,0 %**, Assets 78,75 %→**81,75 %**, Gameplay unverändert
+76,7 % (rundet weiter auf 77 %), Movement 75,75 %→**79,5 %** (rundet auf 80 %). Anders als bei
+den vorherigen vier Nachträgen (Time-Trial/Spurt/Fechten/Climbing, jeweils zwei bis drei Achsen)
+bewegt diese Runde alle vier Achsen zugleich, weil eine einzelne Zeile (Showcase) auf allen
+vieren gleichzeitig zulegt — die übrigen neunzehn Zeilen sind ziffernidentisch zum vierzehnten
+Nachtrag.
+
+---
+
 **Vierzehnter Nachtrag 16.09. — Time-Trial und Spurt auf 97 %/98 % nachgezogen (PR #952), beide
 letzten A3/A4-Luecken der Bahn auf einen Schlag geschlossen.** Der dreizehnte Nachtrag (direkt
 darunter) hatte Time-Trial auf 86 % gebracht und dabei A3 (Requisite) und A4 (Ton) ausdruecklich
@@ -477,6 +645,11 @@ Zeilen sind gegenueber dem zwoelften Nachtrag unveraendert.
 Disziplin einzeln gegenkontrolliert, s. vierzehnter Nachtrag ganz oben. Die uebrigen achtzehn
 Zeilen sind gegenueber dem dreizehnten Nachtrag unveraendert.
 
+**Fuer den fuenfzehnten Nachtrag (17.09., `main` @ `65b1e603`) ist zusaetzlich Zeile 19
+(Showcase) aktualisiert** — rho frisch gemessen (`node scripts/miss-alle-disziplinen.mjs 24
+showcase`), alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. fuenfzehnter Nachtrag ganz
+oben. Die uebrigen neunzehn Zeilen sind gegenueber dem vierzehnten Nachtrag unveraendert.
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -497,20 +670,28 @@ Zeilen sind gegenueber dem dreizehnten Nachtrag unveraendert.
 | 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe · **16.09.-Nachzug:** PR #938 (15.09.) nimmt die Stufenaufstieg-Vorschau raus (auskommentiert, nicht geloescht) — reine Anzeigefunktion, war nie ein zaehlender Achsen-Baustein, keine Zahl bewegt sich |
 | 17 | Climbing | Bahn | 65 % | 40 % | **92 %** | 65 % | **66 %** | 0,834 | **ja (neu)** | **16.09.-Nachzug (PR #943, 16.09.):** eigene Rezeptkalibrierung — `BAHN_ART.climbing.rezept.STEHEN` neu gewichtet (Grid-Suche gegen die Matrix-Abweichung, `messe-arena-einfluss.mjs`/`sondiere-feldspiel-subskills.mjs`) hebt rho 0,782→**0,834**, G1-Stufe wechselt von 0,70–0,80 (22) auf 0,80–0,85 (35); zugleich Produktionsanbindung — `"climbing"` neu in `ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, eigene PPS-Referenz gezogen, **G2 30 neu** — Climbing ist damit die 15. arena-resolved Disziplin, Gameplay 49→92. K4 bleibt bewusst offen (Puffer 0,034 kleiner als das Kaderrauschen 0,209, von der PR selbst als „duenner als Zeitfahrens" benannt), Konzept bleibt 65; Assets/Movement unangetastet (reine Rezept-/Anschluss-PR, keine Zeichen- oder Bewegungszeile) · **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→0,782 (PR #914), gleiche G1-Stufe · **Nachzug 14.09. (PR #925):** neues `stepClimbing()` erfuellt M2 erstmals, Movement 40→65 |
 | 18 | Wettessen | Buehne | 35 % | 40 % | 95 % | 15 % | **46 %** | 0,845 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
-| 19 | Showcase | Buehne | 25 % | 40 % | 95 % | 20 % | **45 %** | 0,892 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
+| 19 | Showcase | Buehne | **75 %** | **100 %** | 95 % | **95 %** | **91 %** | 0,892 | ja | **17.09.-Nachzug (PR #957/#959/#960/#961, 17.09.):** eigenes Flag `showcase:true` + `actVon()`-Act-Ableitung aus BAU-Bauplan/Klasse/Rasse/Traits (K2 neu) + eigenes Konzeptdokument (K3 neu) — Konzept 25→75 (K4 bewusst offen, Rezept unangetastet); `bodenShowcase()` (A2 neu), sechs Act-Requisiten (A3 neu), `TON_KATALOG.showcase` mit acht Ereignissen (A4 neu) — Assets 40→100 (A1 bereits vorher voll ueber `showcase.tsx`, unberuehrt); sechs eigene Act-Zeichenfunktionen (M1 neu) + `stepShowcase()`-Zustandsmaschine (M2 neu) + act-eigene Posen/FX (M4 neu) — Movement 20→95, **M3 bleibt bewusst teilweise** (`showcase.tsx`, der PRODUKTIVE React-Renderer, ist von keiner der vier PRs beruehrt — nur der geteilte `TokenChrome`/`useTokenGlide`-Bausatz, keine eigene Zusatzschicht). rho bit-identisch **0,892**, Gameplay unveraendert 95 (Rezept bewusst nicht angefasst) |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (16.09., nach dem vierzehnten Nachtrag): 78 %** (rechnerisch
-77,7 %, war 76 % nach dem dreizehnten Nachtrag, 75 % nach dem zwoelften Nachtrag, 74 % nach dem
-elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am 10.09. vor der Feinschliff-/
-Football-Runde). Je Achse: **Konzept 80 % · Assets 79 % · Gameplay 77 % · Movement 76 %.**
+**Durchschnitt ueber alle zwanzig (17.09., nach dem fuenfzehnten Nachtrag): 80 %** (rechnerisch
+79,99 %, war 78 % nach dem vierzehnten Nachtrag, 76 % nach dem dreizehnten Nachtrag, 75 % nach dem
+zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am
+10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 82 % · Assets 82 % · Gameplay
+77 % · Movement 80 %.**
 
-*Die Bewegung seit dem dreizehnten Nachtrag (76 %→78 %) kommt ausschliesslich aus Time-Trial
-(86 %→97 %) und Spurt (83 %→98 %, beide s. vierzehnter Nachtrag ganz oben), die uebrigen achtzehn
-Zeilen sind ziffernidentisch. Assets bewegt sich am staerksten (74,25 %→78,75 %, beide Zeilen je
-+45 Punkte aus A3+A4), Movement nur leicht (75,0 %→75,75 %, allein aus Spurts M4-Sprung 85→100 —
-Time-Trial stand bereits auf dem Movement-Deckel). Konzept und Gameplay bewegen sich nicht
-(79,5 % bzw. 76,7 %, beide unveraendert) — bei beiden Zeilen war es diesmal ausschliesslich die
+*Die Bewegung seit dem vierzehnten Nachtrag (78 %→80 %) kommt ausschliesslich aus Showcase
+(45 %→91 %, s. fuenfzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
+ziffernidentisch. Anders als bei jeder vorherigen Runde bewegen sich diesmal alle vier Achsen
+zugleich: Konzept 79,5 %→**82,0 %** (K2+K3 neu, K4 bleibt offen), Assets 78,75 %→**81,75 %**
+(A2+A3+A4 neu, A1 bereits vorher voll), Movement 75,75 %→**79,5 %** (M1+M2+M4 neu, M3 bewusst
+NICHT bewegt — der produktive React-Renderer `showcase.tsx` ist unberuehrt), Gameplay bleibt bei
+76,7 % (Showcases Rezept wurde bewusst nicht angefasst, rho bit-identisch 0,892).*
+
+*Die Bewegung vom dreizehnten zum vierzehnten Nachtrag (76 %→78 %) kam ausschliesslich aus
+Time-Trial (86 %→97 %) und Spurt (83 %→98 %). Assets bewegte sich am staerksten (74,25 %→78,75 %,
+beide Zeilen je +45 Punkte aus A3+A4), Movement nur leicht (75,0 %→75,75 %, allein aus Spurts
+M4-Sprung 85→100 — Time-Trial stand bereits auf dem Movement-Deckel). Konzept und Gameplay
+bewegten sich damals nicht (79,5 % bzw. 76,7 %) — bei beiden Zeilen war es ausschliesslich die
 Assets-Achse (plus bei Spurt zusaetzlich M4), waehrend PR #952 laut eigenem Dokument bewusst kein
 Rezept/keine Rangtreue anfasst.*
 
@@ -1482,18 +1663,32 @@ generische Reihenbild, aber ohne Zufallswaffe mehr (seit 10.09.).
 Buehnen-Chassis gut ist, nicht weil Wettessen gut ist.
 **Movement 15:** nichts.
 
-### Showcase — 45 % (25/40/95/20) — **kein eigenes Konzept**
-**10.09. Update:** Assets 30→40. Die alte Notiz ("Showcase bewusst unangetastet") ist ueberholt —
-`DISZIPLIN_WAFFE` fuehrt heute alle vier betroffenen Buehnen (Showcase/Tennis/Wettessen/I-Spy)
-projektweit mit `null`, selbst nachgelesen.
-**Konzept 25:** die duennste Disziplin unter den zehn produktiven. `BUEHNE_ART.showcase` (`:10658`)
-ist der Sieben-Rollen-Standard mit Charisma-Gewichten — **kein Flag, kein Zweig, keine
-NACHGEZOGEN-Korrektur, kein eigenes Dokument**. Der einzige Text ueber Showcase ist die
-Produktivierungs-Notiz, die es mit Speed-Schach teilt.
-**Assets 40:** `showcase.tsx` (623 Z., aber nur **3 Animationsstellen**). Im Motor generisch, aber
-seit 10.09. ohne Zufallswaffe.
-**Gameplay 95:** rho **0,892** (drittbeste im Feld), produktiviert seit Welle 1.
-**Movement 20:** nichts Eigenes.
+### Showcase — 91 % (75/100/95/95)
+**17.09.-Nachzug (PR #957/#959/#960/#961, s. fuenfzehnter Nachtrag ganz oben fuer die volle
+Herleitung mit Codezeilen).** Vier sequenzielle PRs aus
+`docs/design/showcase-talentshow-konzept-17-09.md` bauen Showcase von „kein eigenes Konzept" zur
+am staerksten bewegten Zeile dieses Dokuments um — als erste Zeile ueberhaupt auf allen vier
+Achsen zugleich. rho bit-identisch **0,892** (Spannweite 0,158), Rezept bewusst nicht angefasst.
+**Konzept 25→75:** eigenes Flag `showcase:true` + `actVon()` (deterministische Act-Ableitung aus
+BAU-Bauplan/Klasse/Rasse/Unterklassen/Traits/Attributen, kein neues Persistenz-Feld) erfuellen K2
+neu, das Konzeptdokument (plus drei weitere je PR) erfuellt K3 neu. **K4 bleibt bewusst offen** —
+keine Kalibrierrunde versucht (das Rezept soll laut Dokument bewusst unangetastet bleiben, rho
+0,892 liegt bereits sehr gut) und die fuenf „Offenen Entscheidungen fuer Chris" aus dem
+Konzeptdokument sind nicht als entschieden dokumentiert.
+**Assets 40→100:** `bodenShowcase()` (eigene Szene: Vorhang, Rampenlicht, Jury-Pult, Publikum)
+erfuellt A2, sechs act-eigene Requisiten (Mikrofon/freigegebene Waffe/Zielscheibe/Felsbrocken/
+Zaubereffekt) erfuellen A3, `TON_KATALOG.showcase` (acht Ereignisse) erfuellt A4 — alle drei neu
+voll. A1 war ueber `showcase.tsx` (623 Z., eigene Feld-Datei) bereits vorher voll und ist von
+keiner der vier PRs beruehrt.
+**Gameplay bleibt 95:** unveraendert, keine der vier PRs ruehrt Rezept, Wertung oder
+Produktionsanschluss an.
+**Movement 20→95:** sechs eigene Act-Zeichenfunktionen (M1 neu), `stepShowcase()`-Zustandsmaschine
+mit Backstage/Spotlight-Choreografie (M2 neu), act-eigene Posen/FX an allen sechs Acts (M4 neu).
+**M3 bleibt bewusst bei einer teilweisen Erfuellung** — der PRODUKTIVE React-Renderer
+`showcase.tsx` ist von keiner der vier PRs angefasst und zeigt weiterhin nur den geteilten
+`TokenChrome`/`useTokenGlide`/`GhostLayer`-Bausatz (`benchmark.tsx`), keine eigene,
+act-spezifische Zusatzschicht wie Fechtens `lamps.tsx` (Touché-FX, kreuzende Klingen). Ein
+`showcase.tsx`-Nachzug ist im Konzeptdokument selbst als eigene, spaetere Runde benannt.
 
 ### I-Spy — 38 % (55/40/37/20)
 **10.09. Update:** Assets 30→40, Zufallswaffen-Bug geschlossen.
@@ -1785,13 +1980,15 @@ der zuverlaessigere Check.
 
 ## 6. Wo es GAR KEIN eigenes Konzept gibt — die explizite Liste
 
-**Zwei Disziplinen haben kein eigenes Konzept im Sinne des Auftrags** (kein Dokument, das sie von
+**Noch eine Disziplin hat kein eigenes Konzept im Sinne des Auftrags** (kein Dokument, das sie von
 Grund auf modelliert; keine Mechanik ueber den Chassis-Standard hinaus; nur andere Attributzahlen
-im generischen Rezept):
+im generischen Rezept). **Showcase ist seit dem 17.09. (PR #957/#959/#960/#961) aus dieser Liste
+herausgefallen** — eigenes Flag, eigene Act-Ableitung (`actVon()`), eigenes Konzeptdokument
+(`showcase-talentshow-konzept-17-09.md`) plus drei Umsetzungsdokumente erfuellen K1-K3; nur K4
+(Kalibrierung) bleibt offen, s. fuenfzehnter Nachtrag und Abschnitt 2:
 
 | Disziplin | Was es gibt | Was fehlt | rho | live? |
 |---|---|---|---:|:--:|
-| **Showcase** | Sieben-Rollen-Standardrezept mit Charisma-Gewichten, sonst nichts | jedes Dokument, jedes Flag, jede eigene Regel, jede Kalibrierrunde | 0,892 | **ja** |
 | **Wettessen** | Matrix-Rezept (will/health/stamina, kein Charisma) + eigene `wertungTabelle` | jedes Dokument, jede eigene Mechanik, jede Kalibrierrunde | 0,845 | **ja** |
 
 **Drei weitere haben nur ein GETEILTES Konzeptdokument, kein eigenes** — das ist eine schwaechere,
