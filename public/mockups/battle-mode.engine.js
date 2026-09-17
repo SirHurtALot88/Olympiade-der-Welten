@@ -12361,7 +12361,14 @@
     showcase:{
       // MATRIX: charisma 27, spirit 16, determination 14, power 11, intelligence 10,
       // dexterity 9, speed 8, health 3, torment 2.
-      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0,
+      //
+      // SHOWCASE:TRUE (PR S0, Talentshow-Konzept 17.09., docs/design/showcase-talentshow-
+      // konzept-17-09.md Abschnitt 5): dasselbe Muster wie heben/duell/schach/tennis/
+      // fechten oben -- eine eigene Schranke fuer buehnenBewegung()/zeichneBuehne(), damit
+      // die vier Showcase-PRs (S0-S3) ihre eigenen Zweige bekommen, ohne den generischen
+      // Rest (Wettessen, I-Spy) zu beruehren. Rezept/rundenN/rundenDauer/failAbzug bleiben
+      // in dieser PR unangetastet (Abschnitt 4.1: rho 0,892 wird nicht angefasst).
+      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0, showcase:true,
       failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
       rezept:{
         GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
@@ -12846,6 +12853,13 @@
       // Showcase/Eiskunstlauf/Breaking) durchlaufen genau denselben setz()-Zweig, bleiben
       // aber ohne dieses Feld, weil es fuer sie nirgends gelesen wird.
       if(art.fechten)L.treffer=0;
+      // ACT-ABLEITUNG (PR S0, Talentshow-Konzept Abschnitt 3.2): actVon() braucht Klasse/
+      // Rasse/Unterklassen/Traits/Attribute, die `p` traegt, `L` (der TEILNEHMER) bisher
+      // aber nicht -- genau dasselbe u.treffer-Muster direkt darueber, nur fuer Showcase.
+      // Reines Durchreichen bereits vorhandener Adapter-Felder, kein neues Persistenz-Feld,
+      // keine Adapter-Aenderung. Nur fuer Showcase befuellt, die sechs Geschwister-Buehnen
+      // lesen diese Felder nirgends.
+      if(art.showcase){L.c=p.c;L.r=p.r;L.sub=p.sub;L.tp=p.tp;L.tn=p.tn;L.a=p.a;}
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
@@ -13003,6 +13017,36 @@
           // (bei rundenN 12 und zwei Partnern 24 Enthuellungen x 0,425 s ≈ 10 s, die
           // Groessenordnung eines echten Kuerprogramms).
           for(let r=0;r<art.rundenN;r++)for(const u of grp)buehneQueue.push(u);
+        }
+      }
+      return;
+    }
+
+    // TALENTSHOW-AUFTRITTSREIHENFOLGE (PR S0, Talentshow-Konzept 17.09., Abschnitt 3.3/5):
+    // wortgleich zum DUETT-Praezedenzfall direkt oberhalb, nur OHNE Fusion/Paarbildung --
+    // in einer Talentshow tritt jeder Teilnehmer fuer sich auf, nicht als Paar. Schwaechste
+    // Eignung zuerst, staerkste (der "Star") zuletzt, Seiten verzahnt, damit kein Team
+    // geschlossen zuerst dran ist.
+    //
+    // RANGTREUE-NEUTRAL AUS DEMSELBEN GRUND WIE BEIM DUETT: die Warteschlange bestimmt
+    // AUSSCHLIESSLICH, in welcher Reihenfolge bereits vollstaendig vorberechnete `runden[]`-
+    // Eintraege aufgedeckt werden. stepBuehne() addiert je Enthuellung `u.summe+=r.punkte`
+    // -- eine Summe ueber dieselbe Menge, also reihenfolgeunabhaengig -- und zieht dabei NIE
+    // rr(). Laenge und Spieldauer bleiben identisch (12 Teilnehmer x rundenN Eintraege).
+    // Deshalb liefert miss-alle-disziplinen.mjs eine bit-identische Zahl fuer Showcase.
+    if(art.showcase){
+      const jeSeiteAufsteigend=[0,1].map(seite=>
+        TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>x.eig-y.eig));
+      buehneQueue=[];
+      const maxLen=Math.max(jeSeiteAufsteigend[0].length,jeSeiteAufsteigend[1].length);
+      for(let i=0;i<maxLen;i++){
+        for(const seite of [0,1]){
+          const u=jeSeiteAufsteigend[seite][i];
+          if(!u)continue;
+          // Ein Auftritt am Stueck: alle rundenN Enthuellungen dieses Teilnehmers
+          // hintereinander, statt ueber das ganze Spiel verteilt (die generische
+          // Setzlisten-Reihenfolge direkt unten).
+          for(let r=0;r<art.rundenN;r++)buehneQueue.push(u);
         }
       }
       return;
@@ -13639,6 +13683,18 @@
         if(u.aktuell+1>=BB().rundenN)
           feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "
             +(v>0?"gewonnen":v<0?"verloren":"unentschieden")+" (Vorteil "+(v>0?"+":"")+v+").",true);
+      } else if(BB().showcase&&u.vizAct){
+        // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
+        // erfolgWort/failWort -- WERTUNG_AUFTRITT zaehlt Fehlschlaege ueber
+        // `r.ereignis===art.failWort` (:15667/:15669), ein act-eigenes Wort an dieser
+        // Stelle wuerde die Tabelle brechen. Der Act-Text ist nur Zierde AM Feed, kein
+        // zweiter Ereignisname. u.vizAct wird von stepShowcase() einmalig gesetzt (s. dort)
+        // -- vor dem ersten stepShowcase()-Durchlauf (erster Frame) faellt dieser Zweig auf
+        // den generischen Text im else-Zweig unten zurueck.
+        const ACT=SHOWCASE_ACTS.find(a=>a.id===u.vizAct);
+        const zier=ACT?ACT.text[r.ereignis===BB().erfolgWort?"erfolg":"fail"]:null;
+        feed(u.side,u.n+" — "+(ACT?ACT.label+": "+zier:r.ereignis)
+          +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       } else {
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       }
@@ -13672,6 +13728,10 @@
     if(art.heben && typeof stepHeben==="function"){ stepHeben(dt,art); return; }     // Ziel 1
     if(art.schach && typeof stepSchach==="function"){ stepSchach(dt,art); return; }  // Ziel 5
     if(art.fechten && typeof stepFechten==="function"){ stepFechten(dt,art); return; } // Ziel 10
+    // SHOWCASE (PR S0, Talentshow-Konzept 17.09.): dasselbe typeof-Wachterschutz-Muster wie
+    // die fuenf Zweige oberhalb. stepShowcase() setzt in dieser PR nur einmalig u.vizAct
+    // (s. dort) -- keine Bewegung, kein sichtbarer Unterschied zum bisherigen No-Op.
+    if(art.showcase && typeof stepShowcase==="function"){ stepShowcase(dt,art); return; }
   }
 
   // ================== EISKUNSTLAUF: KUER-BEWEGUNGSMASCHINE (stepKuer, Ziel 2) ==================
@@ -14881,6 +14941,13 @@
     // Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten-Buehnen (I-Spy/
     // Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
     if(art.fechten){ zeichneFechten(art); return; }
+    // SHOWCASE (PR S0, Talentshow-Konzept 17.09., docs/design/showcase-talentshow-konzept-
+    // 17-09.md Abschnitt 5): eigener Zweig, exklusiv auf `art.showcase` gegated (s.
+    // BUEHNE_ART.showcase) -- dasselbe Muster wie die vier Zweige oberhalb. Fuer PR S0
+    // zeichnet zeichneShowcase() noch 1:1 denselben generischen Zweig weiter (s. dessen
+    // Funktionskopf) -- Buehnenbild (PR S1) und die sechs Acts (PR S2) folgen. Aendert
+    // nichts an Wettessen/I-Spy, die weiterhin den generischen Zweig unten durchlaufen.
+    if(art.showcase && typeof zeichneShowcase==="function"){ zeichneShowcase(art); return; }
     // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
     // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
     // zeichneDuett() unten. Die drei verbleibenden Nicht-Heben/Nicht-Schach/Nicht-
@@ -15186,6 +15253,194 @@
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";
       ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== SHOWCASE: TALENTSHOW-GERUEST (PR S0, Konzept 17.09.) ==================
+  // docs/design/showcase-talentshow-konzept-17-09.md, Abschnitt 5, "PR S0 — Geruest und
+  // Act-Ableitung". Diese PR ist die erste von vieren (S0-S3) und baut NUR das Geruest:
+  // Flag (s. BUEHNE_ART.showcase), die sechs Acts, ihre deterministische Ableitung
+  // (actVon()), die Talentshow-Auftrittsreihenfolge (s. bauBuehne(), Kuer-Praezedenzfall)
+  // und eine kleine Feed-Zierde (s. stepBuehne()). `stepShowcase()`/`zeichneShowcase()`
+  // veraendern in dieser PR noch NICHTS Sichtbares -- sie sind zunaechst reine Durchreicher
+  // (zeichneShowcase() ist 1:1 der bisherige generische Zweig). Buehnenbild (PR S1) und die
+  // sechs Acts selbst (PR S2) kommen in spaeteren PRs.
+  //
+  // SECHS ACTS (Konzept Abschnitt 3.1): Kampfkunst, Schuetzenkunst, Zaubershow, Gesang,
+  // Kraftakt, Akrobatik. Fuer PR S0 genuegen `id`/`label`/`text` (die Feed-Zierde) --
+  // `pose`/`waffe` sind Platzhalter fuer PR S2 (zeichneAct[id]()), werden hier noch
+  // NIRGENDS ausgewertet.
+  const SHOWCASE_ACTS=[
+    {id:"kampfkunst",    label:"Kampfkunst",     pose:"slash", waffe:"eigene",
+      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Raeuspern im Saal"}},
+    {id:"schuetzenkunst",label:"Schuetzenkunst", pose:"shoot", waffe:"eigene",
+      text:{erfolg:"ein Trickschuss, der ins Schwarze trifft", fail:"der Schuss geht haarscharf am Ziel vorbei"}},
+    {id:"zaubershow",    label:"Zaubershow",     pose:"shoot", waffe:null,
+      text:{erfolg:"ein Funkenregen aus dem Nichts, das Publikum staunt", fail:"der Zauber verpufft mit einem traurigen Fauchen"}},
+    {id:"gesang",        label:"Gesang",         pose:"walk",  waffe:null,
+      text:{erfolg:"eine Stimme, die den ganzen Saal traegt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
+    {id:"kraftakt",      label:"Kraftakt",       pose:"slash", waffe:null,
+      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und faellt zu Boden"}},
+    {id:"akrobatik",     label:"Akrobatik",      pose:"hop",   waffe:null,
+      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstoehnen aus dem Publikum"}}
+  ];
+
+  // SHOWCASE_ACT_PUNKTE / actVon(): dasselbe Muster wie PW/leitePers() weiter unten
+  // (:16744) -- jede Quelle vergibt Punkte, die hoechste Summe je Act gewinnt. BAU-
+  // Bauplan ist die staerkste Quelle (3 Punkte), weil er das ist, was der Zuschauer
+  // tatsaechlich SIEHT (Waffe, Vollbild, Effekt, Fluegel, s. Konzept Abschnitt 2.2/3.2).
+  // Klasse (2)/Unterklassen (je 2)/Rasse (1)/Traits (je 1) sind dieselbe Kaskade wie bei
+  // der Persoenlichkeit. Attribute zaehlen NUR als Kipp-Regel mit einem einzigen Punkt
+  // (Konzept Abschnitt 3.2, Punkt 3) -- sonst wuerde dieselbe Eignungsmatrix
+  // (charisma/spirit/...), die auch `eig`/das Rezept speist, den Act mitbestimmen, und
+  // genau DAS ist die Validitaetsluecke, die Abschnitt 4.1 ausdruecklich vermeidet:
+  // actVon() liest `eig`/`wert()`/`rr()` nirgends und fliesst nirgends dorthin zurueck,
+  // nur umgekehrt (rein lesend aus BAU/Klasse/Rasse/Sub/Traits/Attributen).
+  const SHOWCASE_ACT_PUNKTE={
+    bauWaffe:{
+      schwert:{kampfkunst:3}, axt:{kampfkunst:3}, zweihaender:{kampfkunst:3},
+      bogen:{schuetzenkunst:3}, pistole:{schuetzenkunst:3}, schrotflinte:{schuetzenkunst:3}, sturmgewehr:{schuetzenkunst:3},
+      stab:{zaubershow:3}
+    },
+    // KRAFTAKT VS. AKROBATIK UNTER DEN VOLLBILD-KREATUREN (Konzept 3.1): schwer/massig
+    // stampft (Kraftakt), leicht/gewandt springt oder schwebt (Akrobatik). werwolf/spinne
+    // (gewandt, springt/klettert) und treant/schiff_pirat (schwer, unbeweglich) sind im
+    // Konzept nicht explizit vergeben -- hier nach demselben Bild einsortiert, s.
+    // docs/design/showcase-s0-geruest-17-09.md.
+    bauVollbild:{
+      golem:{kraftakt:3}, mech_gross:{kraftakt:3}, mech_transformer:{kraftakt:3}, roboter:{kraftakt:3},
+      krokodil:{kraftakt:3}, drache_hydra:{kraftakt:3}, drache_gold:{kraftakt:3}, treant:{kraftakt:3}, schiff_pirat:{kraftakt:3},
+      taube:{akrobatik:3}, singvogel:{akrobatik:3}, geist:{akrobatik:3}, kraken:{akrobatik:3}, froschmensch:{akrobatik:3},
+      werwolf:{akrobatik:3}, spinne:{akrobatik:3}
+    },
+    bauFluegel:{akrobatik:3},
+    bauEffekt:{zaubershow:3},
+    klasse:{
+      Warlord:{kampfkunst:2}, Berserker:{kampfkunst:2}, Tank:{kampfkunst:2}, Hero:{kampfkunst:2,gesang:2},
+      Badass:{kampfkunst:2}, Templar:{kampfkunst:2},
+      Mage:{zaubershow:2}, Overseer:{zaubershow:2}, Tactician:{zaubershow:2},
+      Bard:{gesang:2}
+    },
+    sub:{
+      Warrior:{kampfkunst:2}, Knight:{kampfkunst:2}, Viking:{kampfkunst:2}, Swashbuckler:{kampfkunst:2},
+      Ninja:{kampfkunst:2,akrobatik:2}, Monk:{kampfkunst:2}, Executioner:{kampfkunst:2},
+      Hunter:{schuetzenkunst:2}, Scout:{schuetzenkunst:2}, "Spec Ops":{schuetzenkunst:2}, Amazoness:{schuetzenkunst:2},
+      Agent:{schuetzenkunst:2}, Engineer:{schuetzenkunst:2},
+      Mage:{zaubershow:2}, Warlock:{zaubershow:2}, Alchemist:{zaubershow:2}, Apparition:{zaubershow:2},
+      Succubus:{zaubershow:2}, Wraith:{zaubershow:2}, Druid:{zaubershow:2}, Shaman:{zaubershow:2},
+      Royalty:{gesang:2}, Ambassador:{gesang:2}, Servant:{gesang:2},
+      Behemoth:{kraftakt:2}, Destroyer:{kraftakt:2}, Beast:{kraftakt:2}, Creature:{kraftakt:2},
+      Trickster:{akrobatik:2}, Assassin:{akrobatik:2}, Wayfarer:{akrobatik:2}
+    },
+    rasse:{ Construct:{kraftakt:1} },
+    plus:{ Eloquent:{gesang:1}, FanFavorite:{gesang:1} },
+    minus:{}
+  };
+
+  // actVon(u): reine, deterministische Funktion. Liest ausschliesslich BAU[u.n] und die
+  // Adapter-Felder u.c/u.r/u.sub/u.tp/u.tn/u.a (dieselben, die `p` im Kader traegt, s.
+  // setz()-Kommentar "ACT-ABLEITUNG" oben) -- KEIN neues Persistenz-Feld, KEIN rr(). Wird
+  // von stepShowcase() einmalig pro Teilnehmer aufgerufen (s. dort) und von der Sonde
+  // window.__arena.showcaseActProbe() direkt.
+  function actVon(u){
+    const b=BAU[u.n]||BAU_STD;
+    const sc={}, warum=[];
+    const add=(pts,label)=>{ if(!pts)return; for(const[k,v] of Object.entries(pts))sc[k]=(sc[k]||0)+v; warum.push(label); };
+    if(b.waffe)add(SHOWCASE_ACT_PUNKTE.bauWaffe[b.waffe],"Waffe: "+b.waffe);
+    if(b.vollbild)add(SHOWCASE_ACT_PUNKTE.bauVollbild[b.vollbild],"Vollbild: "+b.vollbild);
+    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Fluegel");
+    if(b.effekt)add(SHOWCASE_ACT_PUNKTE.bauEffekt,"Effekt: "+(b.effekt.typ||"?"));
+    add(SHOWCASE_ACT_PUNKTE.klasse[u.c],"Klasse: "+u.c);
+    (u.sub||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.sub[x],"Sub: "+x));
+    add(SHOWCASE_ACT_PUNKTE.rasse[u.r],"Rasse: "+u.r);
+    (u.tp||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.plus[x],"Trait: "+x));
+    (u.tn||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.minus[x],"Trait: "+x));
+    // ATTRIBUTE-KIPP-REGEL (Konzept 3.2, Punkt 3): das Maximum aus {charisma,power,
+    // intelligence,dexterity/speed} gibt genau EINEN Punkt an Gesang/Kraftakt/Zaubershow/
+    // Akrobatik -- absichtlich klein gegen die Bau-/Klassen-/Sub-Quellen, sonst wuerde die
+    // Eignungsmatrix (dieselben Attribute!) den Act zu stark mitbestimmen.
+    const a=u.a||{};
+    const kipp=[["gesang",a.charisma||0],["kraftakt",a.power||0],["zaubershow",a.intelligence||0],
+      ["akrobatik",Math.max(a.dexterity||0,a.speed||0)]];
+    let kb=kipp[0]; for(const k of kipp)if(k[1]>kb[1])kb=k;
+    sc[kb[0]]=(sc[kb[0]]||0)+1; warum.push("Attribut-Kipp: "+kb[0]);
+    // HOECHSTE SUMME GEWINNT. GLEICHSTAND: cypherHash(u.id,11) statt u.id nackt -- u.id
+    // ist ein Laufindex (0..jeSeite*2-1) und wuerde bei nackter Verwendung die Seiten
+    // systematisch verzerren (Konzept 3.2, Punkt 4). Kein rr(), deterministisch, stabil
+    // je Teilnehmer innerhalb desselben Spiels.
+    let best=-1, gleiche=[];
+    for(const A of SHOWCASE_ACTS){
+      const v=sc[A.id]||0;
+      if(v>best){best=v;gleiche=[A.id];}
+      else if(v===best)gleiche.push(A.id);
+    }
+    let act=gleiche[0];
+    if(gleiche.length>1){
+      act=gleiche[cypherHash(u.id,11)%gleiche.length];
+      warum.push("Gleichstand ("+gleiche.join("/")+") per Hash entschieden");
+    }
+    return {act,punkte:sc,warum};
+  }
+
+  // stepShowcase()/zeichneShowcase() -- angeschlossen ueber `art.showcase` in
+  // buehnenBewegung()/zeichneBuehne() (s. dort, Praezedenzfall Tennis/Fechten). Fuer PR S0
+  // ist stepShowcase() nur die Einmal-Initialisierung von u.vizAct, genau das Muster von
+  // stepCypher()s u.vizPhase-Init (:14298-14302): reine, praesentationale Erstbelegung,
+  // niemals u.summe/runden/aktuell/lunge/buehneAkt/buehneZeiger/done, nie rr().
+  // zeichneShowcase() ist noch die UNVERAENDERTE generische Zeichnung (identisch zu dem,
+  // was Showcase vorher ueber den Fallback-Zweig in zeichneBuehne() bekam) -- Buehnenbild
+  // und Acts folgen in PR S1/S2.
+  function stepShowcase(dt,art){
+    for(const u of TEILNEHMER){
+      if(u.vizAct==null)u.vizAct=actVon(u).act;
+    }
+  }
+
+  function zeichneShowcase(art){
+    // 1:1 der generische Zweig aus zeichneBuehne() (dort weiterhin fuer Wettessen/I-Spy
+    // aktiv) -- keine visuelle Aenderung in dieser PR, s. Funktionskopf oben.
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const y=side===0?H*0.32:H*0.66;
+      g.forEach((u,i)=>{
+        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        ctx.globalAlpha=u.lunge>0?1:0.92;
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+        ctx.globalAlpha=1;
+        zeichneSprite(ctx,u,x,y);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        const w=30,p=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+      });
+    });
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      if(f._teilnehmer!=null){
+        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
+        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
+          const i=g.indexOf(u);
+          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
+          ctx.fillText(f.txt,x,y);
+        }
+      }
       ctx.globalAlpha=1;
     }
   }
@@ -28725,6 +28980,20 @@
       const b=BAU[name]||BAU_STD;
       return {name, korr:hoehenKorrektur({n:name}), vollbild:b.vollbild||null, bauSkala:bauSkala(b),
         bezug:HOEHEN_BEZUG, deckel:[HOEHEN_KORR_MIN,HOEHEN_KORR_MAX]};
+    },
+    // SHOWCASE-ACT-SONDE (PR S0, Talentshow-Konzept 17.09., Abschnitt 5): reine
+    // Diagnose-Sonde, dasselbe Prinzip wie hoehenKorrProbe direkt oberhalb -- kein
+    // Gameplay, kein rr(), liest den Kader (SQUAD/OPP) genauso wie renderProbe. `id:0` ist
+    // ein fester Platzhalter fuer den Gleichstand-Hash (cypherHash(u.id,11) in actVon()):
+    // ausserhalb eines echten Auftritts gibt es kein TEILNEHMER.id, und im Demokader
+    // entscheidet ohnehin nirgends ein Gleichstand (nachgemessen, s.
+    // docs/design/showcase-s0-geruest-17-09.md) -- innerhalb eines echten Spiels traegt
+    // stepShowcase() das echte u.id ein, s. dort.
+    showcaseActProbe:(name)=>{
+      const p=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      if(!p)return null;
+      const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
+      return actVon(u);
     },
     renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
