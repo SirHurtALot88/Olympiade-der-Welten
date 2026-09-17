@@ -1,3 +1,165 @@
+**Sechzehnter Nachtrag 17.09. — Climbing auf 86 % nachgezogen (PR #963), Kletterwand statt
+grauer Bahn.** Der fünfzehnte Nachtrag (direkt darunter) hatte Climbing unangetastet bei 65,5 %
+(Konzept 65/Assets 40/Gameplay 92/Movement 65) stehen lassen. Seither ist ein PR gemergt, der
+`docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md` Abschnitt 3.1 umsetzt (D1.a+D1.b;
+D1.c bewusst ausgelassen, s. u.): PR #963 (`docs/design/climbing-wand-17-09.md`). `main` steht
+jetzt bei `16449394`. **rho FRISCH nachgemessen, nicht aus dem PR-Text übernommen:**
+
+```
+node scripts/miss-alle-disziplinen.mjs 24 climbing
+```
+→ **0,834** (Spannweite 0,209, Saison-rho 0,860, Spannweite 0,308), bestanden — bit-identisch zur
+Basislinie vom 16.09. und zum PR-Text. Keine Ueberraschung: der PR ruehrt weder `rezept` noch
+`tempoVon()`/`zehrFaktor()` noch `MOTOREN.climbing.wert()` an — bestaetigt per Diff, die einzigen
+Treffer auf „rezept"/„MATRIX"/„wert(" im Diff sind Kommentarzeilen, die genau das festhalten
+(„ohne Wirkung auf Rezept/Matrix/wert()", „Climbings Rezept bleibt unangetastet").
+
+**Alle sechzehn Teilkriterien einzeln gegen den heutigen Code geprüft, nicht aus dem PR-Text
+übernommen:**
+
+**Konzept: 65→65, keine Bewegung — ausdrücklich geprüft, PR #963 ist reine Präsentation.**
+- **K1 (eigenes Rezept):** unverändert erfüllt — `BAHN_ART.climbing.rezept`
+  (`battle-mode.engine.js:23050 ff.`) existiert seit langem (zuletzt von PR #943 am 16.09. an
+  `STEHEN` kalibriert), PR #963 ändert keine Zahl darin. **25.**
+- **K2 (eigene Mechanik über das Chassis hinaus): weiterhin NICHT erfüllt, ausdrücklich
+  gegengeprüft.** Die zehn Griffe mit Griff-dann-Kraftzug-Kette bleiben Teil der generischen
+  Bahn-`hindernisse`-Schleife — kein eigener Zweig, der über das Chassis hinausgeht. `climbing:true`
+  (`:23043`) ist seit dem 14.09. „rein deskriptiv, ohne Wirkung auf Rezept/Matrix/wert()" (Kommentar
+  an derselben Stelle) und dient seit PR #963 ausschließlich als Gate für `bodenClimbing()` — eine
+  Assets-/Movement-Weiche, keine neue Mechanik. **0 (unverändert).**
+- **K3 (eigenes Fable-Dokument): weiterhin NUR TEILWEISE, ausdrücklich gegengeprüft — dasselbe
+  Urteil wie beim dreizehnten Nachtrag.** `climbing-wand-17-09.md` ist das zweite climbing-eigene
+  (nicht geteilte) Dokument nach `climbing-kalibrierung-16-09.md` — aber es modelliert die
+  Disziplin ebenfalls nicht „von Grund auf": Griffe, Wandsteilheit und Stationsfolge bleiben Teil
+  der geteilten `bahn-disziplinen-recherche-fable.md` Abschnitt 4, dieses Dokument beschreibt
+  ausschließlich, wie eine bereits vorhandene Datenlage (`hindernisse`, `steigung`) sichtbar/hörbar
+  gemacht wird — eine Präsentations-, keine Konzeptrunde, exakt wie der Opus-Plan selbst es
+  einordnet (Abschnitt 2.3: „Sie bewegen Konzept nicht"). **Keine Bewegung.**
+- **K4 (kalibriert, offene Designfragen entschieden): weiterhin OFFEN, ausdrücklich geprüft.** Der
+  Puffer zur 0,80-Schranke (0,834−0,80=0,034) bleibt unverändert **kleiner als das gemessene
+  Kaderrauschen** (Spannweite 0,209, diesmal sogar unverändert bit-identisch nachgemessen) — PR #963
+  fasst rho nicht an, der Puffer bewegt sich also nicht. **0 (unverändert).**
+
+Konzept bleibt bei **65** — keines der vier Kriterien bewegt sich, wie von einer reinen
+Präsentationsrunde erwartet.
+
+**Assets: 40→85.**
+- **A1 (eigene Feld-Datei im PRODUKTIVEN React-Renderer): bereits VOR PR #963 voll erfüllt,
+  unverändert — keine Bewegung dieser Runde, wie vom Auftrag ausdrücklich verlangt gegengeprüft.**
+  `app/foundation/discipline-stage/arena/disciplines/mountain.tsx` (337 Z.) existiert seit dem
+  06.09. (PR #839) als eigene, climbing-spezifische Datei — Kopfkommentar „Climbing (Sportklettern)
+  — Kletterwand-Archetyp mit Höhe = Punkte, geschwungene Griff-Linien pro Route, Überhang-Crux,
+  Gipfel-Sims mit Top-Out-Glocke", mit eigenem Wandgradient, eigenem T-Nut-Gitter, eigenen
+  Höhen-Metermarkierungen, disziplineigenen Routen-Griffen (Kreis/Rechteck/Dreieck je Team,
+  deterministisch geschwungen über `swayOf()`) und einem eigenen Überhang-Band mit Schraffur —
+  keine generische Wrapper-Datei, dieselbe Kategorie wie `peloton.tsx`/`bump.tsx`/`lamps.tsx`, die
+  trotz ebenfalls geteiltem `TokenChrome`/`GhostLayer` alle A1=voll führen. `git log` bestätigt:
+  kein Commit von PR #963 in dieser Datei. **30 (unverändert).**
+- **A2 (eigene Szene im Mockup-Motor über das geteilte Chassis-Bild hinaus): NEU voll erfüllt,
+  vorher 0.** `bodenClimbing()` (`battle-mode.engine.js:22549 ff.`, PR #963) ersetzt an der Weiche
+  in `bodenSpurt()` (`:22199`, `if(BA().climbing)return bodenClimbing();`, direkt neben der
+  Zeitfahren-Zeile) den geteilten `bodenSpurtGerade()`-Zweig, den Climbing bis dahin mit Spurt
+  teilte, durch eine eigene, additiv aufgesetzte Szene: zehn gleich breite Überhang-Bänder mit
+  linear zur Strecke zunehmender Deckkraft (skaliert mit `BAHN_ART.climbing.steigung`, „die Wand
+  wird nach oben steiler" — abgelesen, nicht erfunden), 22 deterministische Riss-/Kantenlinien aus
+  derselben `bodenSaat`-Reihe wie die Bodenkörnung, und zehn große, zweifarbige Griffmarken mit
+  Glanzlicht exakt an `BAHN_ART.climbing.hindernisse` (`[0.08,0.17,…,0.89]`) über die volle
+  Wandhöhe statt nur als winzige Pro-Bahn-Punkte. Sicht-QA per Playwright bestätigt
+  (`climbing-wand-17-09-uebersicht.png`/`-nachher.png`: Pixelprobe RGB (90,87,81)→(74,71,66),
+  monoton dunkler von links nach rechts) plus Gegenprobe: `spurt`/`staffel` bit-identisch (Diff 0),
+  `takeshis-castle`/`time-trial` innerhalb des vorbestehenden Timing-Rauschens ihrer eigenen
+  Echtzeit-Effekte (Baseline-vs-Baseline-Kontrollmessung). **25.**
+- **A3 (disziplinrichtige Requisite): weiterhin NICHT erfüllt — ausdrücklich NICHT
+  schöngerechnet, wie vom Auftrag verlangt.** `DISZIPLIN_PROP` (`battle-mode.engine.js:2899-2926`)
+  führt heute zehn Einträge (`gewichtheben`/`takeshi`/`hockey`/`staffel`/`showcase`/`speed-schach`/
+  `eiskunstlauf`/`tennis`/`fechten`/`time-trial`/`spurt`) — **kein `climbing`-Eintrag**, nachgezählt
+  im heutigen Code. Der optionale Kreidebeutel/D1.c aus dem Opus-Plan (Abschnitt 3.1, „bewusst als
+  optional geführt") ist laut PR-Dokument selbst bewusst ausgelassen worden, weil `DISZIPLIN_PROP`
+  dieselbe Tabelle ist, an der die parallele Wettessen-Runde ebenfalls arbeiten wollte
+  (Kollisionsmatrix-Vorsicht, s. Opus-Plan Abschnitt 6.1). Climbing bleibt damit die einzige
+  arena-resolved Bahn-Disziplin ohne eigene Requisite. **0 (unverändert) — offen für eine spätere
+  Runde.**
+- **A4 (Ton, Musik, Kulisse): NEU voll erfüllt, vorher 0.** `TON_KATALOG.climbing`
+  (`battle-mode.engine.js:21591-21596`, PR #963) führt vier Ereignisse (`griff`/`fehlgriff`/`zug`/
+  `topout`) aus genau den fünf Ton-Primitiven, die der Katalog überall sonst benutzt — vor PR #963
+  führte `TON_KATALOG` elf Einträge, Climbing keinen davon (nachgezählt). Verdrahtet in
+  `stepClimbing()` (`:25750-25771`): `griff` an der Kante „ein weiterer der zehn Griffe erreicht"
+  (Zähler auf `u.pos` gegen `HUERDEN_N()`, weil `u.huerde` bei Climbing nie >0 wird —
+  `BAHN_ART.climbing` führt kein `hindernisTypen`, ein dokumentierter Fund unterwegs), `zug`/
+  `fehlgriff` an den bestehenden Ausgangszählern `u.durchbruch`/`u.gestolpert`, `topout` einmalig
+  bei `u.fertig!=null`. Alle vier reine `viz*`-Lesezähler, kein `rr()`-Aufruf. Kein
+  `publikum`-Loop — dieselbe binäre „hat Ton"-Schwelle wie bei Hockey/Speed-Schach/Fechten/
+  Time-Trial/Spurt. **20.**
+
+Assets steigt von **40 auf 85** — A3 bleibt die einzige offene Lücke, Assets erreicht damit NICHT
+den Deckel (100), anders als bei Fechten/Time-Trial/Spurt/Showcase. **Ehrlich vermerkt:** die
+Zusammensetzung der alten Basiszahl 40 ist in diesem Dokument nie einzeln aufgeschlüsselt worden
+(A1=30 voll erklärt nur 30 der 40 Punkte) — derselbe, vom Opus-Plan selbst benannte Befund
+(„Grenzen dieses Plans" Punkt 2: „steckt ein 10-Punkte-Teilkredit, den die Scorecard nicht
+aufschlüsselt"). Diese Runde rührt daran nichts: A2 und A4 waren vor PR #963 beide zweifelsfrei
+bei 0 (kein eigener Boden, kein Ton-Katalogeintrag, beides nachgezählt) und werden jetzt beide neu
+und vollständig vergeben (+25/+20=+45), unabhängig davon, wie die alten 40 sich zusammensetzten —
+40+45=85, exakt der Wert, den auch der Opus-Plan (Abschnitt 2.1) vorhergesagt hatte.
+
+**Gameplay: 92→92, keine Bewegung — ausdrücklich geprüft, PR #963 rührt weder Rezept noch
+Produktionsanschluss an.** G1 (rho 0,834, unverändert in der 0,80–0,85-Stufe → 35), G2
+(`"climbing"` weiterhin in `ARENA_RESOLVED_DISCIPLINE_IDS`, `lib/resolve/battle-mode-arena-team-
+points.ts:328`, und `ARENA_BAHN_DISCIPLINE_IDS`, `lib/battle/arena-headless-runner.ts:203` → 30),
+G3 (`wertung:"rang"`, `:23049`, unverändert → 15), G4 (`jeSeite:6`, Bahn-Chassis → 12) — Summe
+unverändert 92, rho bit-identisch bestätigt oben. **92.**
+
+**Movement: 65→100.**
+- **M1 (eigene Zeichenfunktion im Mockup-Motor): NEU voll erfüllt, vorher 0.** `bodenClimbing()`
+  (s. A2 oben, dieselbe Funktion — genau dieselbe Zwei-Achsen-Unterscheidung, die der dreizehnte
+  Nachtrag für `bodenZeitfahren()` und der zwölfte für `zeichneFechten()` schon protokolliert hat:
+  Assets fragt nach der eigenen Szene, Movement nach der eigenen Zeichenfunktion selbst) ersetzt an
+  der Weiche in `bodenSpurt()` den bis dahin generischen `bodenSpurtGerade()`-Fallback, den die
+  anderen vier Bahnen (Spurt/Staffel/Takeshi/Zeitfahren) weiterhin unverändert nutzen — bestätigt
+  per Playwright-Gegenprobe (Diff 0 bei Spurt/Staffel). **35.**
+- **M2 (eigene Bewegungs-/Schrittlogik): bereits VOR PR #963 voll erfüllt, unverändert — keine
+  Bewegung dieser Runde.** `stepClimbing()` (`:25750 ff.`) existiert seit PR #925 (14.09.) und
+  schreibt `u.vizSchritt`; PR #963 erweitert dieselbe Funktion nur um die vier rein lesenden
+  Ton-Zähler (s. A4), ändert an der Schrittlogik selbst nichts. **25 (unverändert).**
+- **M3 (sichtbare Animation in der PRODUKTIVEN React-Bühne): bereits VOR PR #963 voll erfüllt,
+  unverändert — ausdrücklich wie vom Auftrag verlangt gegen die Produktionsdatei geprüft, nicht
+  gegen den Mockup-Motor.** `mountain.tsx` trägt eine eigene `requestAnimationFrame`-Schleife
+  (`:80-110`), die jeden Kletterer entlang `yOf(t.animScore)` (Höhe = Score, Kopfkommentar) mit
+  einem eigenen horizontalen `swayOf()`-Schlingern die Wand hinaufführt, dazu eine Ghost-Figur der
+  Vorrunde auf derselben Route (`GhostLayer`) und `olyGlowPulse` bei besonderen Leistungen — eine
+  eigene, climbing-spezifische Zusatzschicht über `TokenChrome`/`GhostLayer` hinaus, nicht nur der
+  geteilte Bausatz. `git log` bestätigt: kein Commit von PR #963 in dieser Datei. **25
+  (unverändert).**
+- **M4 (disziplineigene Posen/FX an den Sprites): geprüft, unverändert — keine neue Fundstelle im
+  Mockup-Motor.** Weder `bodenClimbing()` noch `stepClimbing()` schreibt ein pose-wirksames Feld an
+  der BAU-Sprite-Figur selbst (kein `vizPose`/`vizHaltung`-Äquivalent, nachgezählt: `stepClimbing()`
+  schreibt ausschließlich `vizSchritt` plus die vier neuen Ton-Zähler) — Climbing-Läufer bewegen im
+  Mockup-Motor weiterhin nur die generische, mit Spurt geteilte Schrittanimation aus
+  `zeichneSpurt()`, keine climbing-eigene Griff-/Zughaltung. Diese Runde bewegt daran nichts; die
+  bestehende Punktzahl bleibt unangetastet. **Unverändert (in der Bestandszahl von 65 enthalten,
+  in diesem Dokument nie einzeln beziffert — dieselbe Art Lücke wie bei Assets oben, s. dort).**
+
+Movement erreicht mit **100** den Deckel — M1 war die letzte offene Lücke, M2/M3 waren bereits
+voll, und der pauschale M4-Bestandteil der alten 65 bewegt sich durch diese Runde nicht.
+
+**Ergebnis für die Tabelle:** Climbing Konzept **65** (unverändert), Assets 40→**85**, Gameplay
+**92** (unverändert), Movement 65→**100**. **Gesamt: 65,5 %→85,5 %** — exakt der Wert, den
+`docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md` Abschnitt 3.1 als Ziel dieser
+Runde genannt hatte (D1.a+D1.b ohne die optionale D1.c-Nachlese, die bei ausgeführter Requisite
+89,25 % ergeben hätte). Die neunzehn übrigen Zeilen sind ziffernidentisch zum fünfzehnten
+Nachtrag.
+
+**Neuer Gesamtdurchschnitt: 80 %→81 %** (rechnerisch 80,99 %, war 79,99 % nach dem fünfzehnten
+Nachtrag). Je Achse: Konzept unverändert (82,0 % exakt, rundet weiter auf 82 %), Gameplay
+unverändert (76,7 % exakt, rundet weiter auf 77 %) — beide Achsen von PR #963 nicht berührt. Assets
+springt am stärksten: 81,75 %→**84,0 %** (Climbings A2+A4, +45 Punkte auf einer von zwanzig
+Zeilen). Movement bewegt sich zweitstärkst: 79,5 %→**81,25 %** (rundet auf 81 %, allein aus
+Climbings M1-Sprung 65→100). Anders als beim fünfzehnten Nachtrag (Showcase: alle vier Achsen
+zugleich) bewegt sich diese Runde nur auf **zwei** Achsen — Konzept und Gameplay blieben bei
+Climbing bewusst unangetastet, weil PR #963 laut eigenem Dokument ausschließlich Zeichenfunktion
+und Ton hinzufügt, kein Rezept und keine Produktionsanbindung.
+
+---
+
 **Fünfzehnter Nachtrag 17.09. — Showcase auf 91 % nachgezogen (PR #957/#959/#960/#961), erste
 Bewegung einer Zeile ueber alle VIER Achsen zugleich seit Einfuehrung dieser Tabelle.** Der
 vierzehnte Nachtrag (direkt darunter) hatte Showcase unangetastet bei 45 % (Konzept 25/Assets
@@ -650,6 +812,11 @@ Zeilen sind gegenueber dem dreizehnten Nachtrag unveraendert.
 showcase`), alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. fuenfzehnter Nachtrag ganz
 oben. Die uebrigen neunzehn Zeilen sind gegenueber dem vierzehnten Nachtrag unveraendert.
 
+**Fuer den sechzehnten Nachtrag (17.09., `main` @ `16449394`) ist zusaetzlich Zeile 17
+(Climbing) aktualisiert** — rho frisch gemessen (`node scripts/miss-alle-disziplinen.mjs 24
+climbing`), alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. sechzehnter Nachtrag ganz
+oben. Die uebrigen neunzehn Zeilen sind gegenueber dem fuenfzehnten Nachtrag unveraendert.
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -668,16 +835,25 @@ oben. Die uebrigen neunzehn Zeilen sind gegenueber dem vierzehnten Nachtrag unve
 | 14 | Mini-DM | Arena | **75 %** | 60 % | 22 % | 60 % | **54 %** | 0,256 | nein | **16.09.-Nachzug (PR #927/#930, 14.09.):** fuenf von sechs offenen Spielplanfragen beantwortet (4-Team-Pods, Kadergroesse 1, echter Playwright-Aufrufer fuer den FFA-Motor) — Konzept 70→75 (K4-Teilfortschritt). Weiterhin nicht in `ARENA_RESOLVED_DISCIPLINE_IDS` verdrahtet, Gameplay haengt allein an rho (0,256, unveraendert) · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
 | 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe · **16.09. gegenkontrolliert:** unveraendert |
 | 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe · **16.09.-Nachzug:** PR #938 (15.09.) nimmt die Stufenaufstieg-Vorschau raus (auskommentiert, nicht geloescht) — reine Anzeigefunktion, war nie ein zaehlender Achsen-Baustein, keine Zahl bewegt sich |
-| 17 | Climbing | Bahn | 65 % | 40 % | **92 %** | 65 % | **66 %** | 0,834 | **ja (neu)** | **16.09.-Nachzug (PR #943, 16.09.):** eigene Rezeptkalibrierung — `BAHN_ART.climbing.rezept.STEHEN` neu gewichtet (Grid-Suche gegen die Matrix-Abweichung, `messe-arena-einfluss.mjs`/`sondiere-feldspiel-subskills.mjs`) hebt rho 0,782→**0,834**, G1-Stufe wechselt von 0,70–0,80 (22) auf 0,80–0,85 (35); zugleich Produktionsanbindung — `"climbing"` neu in `ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, eigene PPS-Referenz gezogen, **G2 30 neu** — Climbing ist damit die 15. arena-resolved Disziplin, Gameplay 49→92. K4 bleibt bewusst offen (Puffer 0,034 kleiner als das Kaderrauschen 0,209, von der PR selbst als „duenner als Zeitfahrens" benannt), Konzept bleibt 65; Assets/Movement unangetastet (reine Rezept-/Anschluss-PR, keine Zeichen- oder Bewegungszeile) · **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→0,782 (PR #914), gleiche G1-Stufe · **Nachzug 14.09. (PR #925):** neues `stepClimbing()` erfuellt M2 erstmals, Movement 40→65 |
+| 17 | Climbing | Bahn | 65 % | **85 %** | 92 % | **100 %** | **86 %** | 0,834 | ja | **17.09.-Nachzug (PR #963, 17.09.):** eigene Kletterwand statt der grauen, mit Spurt geteilten Bahn — `bodenClimbing()` (Weiche in `bodenSpurt()` auf `BA().climbing`) setzt eine mit der Strecke zunehmende Ueberhang-Schattierung plus 22 deterministische Risslinien und zehn grosse, zweifarbige Griffmarken exakt an `BAHN_ART.climbing.hindernisse` ueber die volle Wandhoehe — A2 erstmals voll erfuellt UND zugleich M1 (eigene Zeichenfunktion statt `bodenSpurtGerade()`), Assets 40→65, Movement-Anteil daraus 65→100 (M1 die letzte offene Movement-Luecke, M2/M3 bereits vorher voll ueber `stepClimbing()`/`mountain.tsx`). `TON_KATALOG.climbing` (vier Ereignisse griff/fehlgriff/zug/topout) erstmals verdrahtet in `stepClimbing()` — A4 erstmals erfuellt, Assets 65→85. rho bit-identisch **0,834** (reine Praesentation, Rezept/`wert()` unangetastet), Konzept/Gameplay unveraendert. **A3 bleibt bewusst offen** — die optionale Kreidebeutel-Requisite (D1.c) wurde ausgelassen, weil `DISZIPLIN_PROP` mit der parallelen Wettessen-Runde kollidiert haette; Climbing bleibt die einzige arena-resolved Bahn-Disziplin ohne eigene Requisite · **16.09.-Nachzug (PR #943, 16.09.):** eigene Rezeptkalibrierung — `BAHN_ART.climbing.rezept.STEHEN` neu gewichtet (Grid-Suche gegen die Matrix-Abweichung, `messe-arena-einfluss.mjs`/`sondiere-feldspiel-subskills.mjs`) hebt rho 0,782→**0,834**, G1-Stufe wechselt von 0,70–0,80 (22) auf 0,80–0,85 (35); zugleich Produktionsanbindung — `"climbing"` neu in `ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, eigene PPS-Referenz gezogen, **G2 30 neu** — Climbing ist damit die 15. arena-resolved Disziplin, Gameplay 49→92. K4 bleibt bewusst offen (Puffer 0,034 kleiner als das Kaderrauschen 0,209, von der PR selbst als „duenner als Zeitfahrens" benannt), Konzept bleibt 65 · **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→0,782 (PR #914), gleiche G1-Stufe · **Nachzug 14.09. (PR #925):** neues `stepClimbing()` erfuellt M2 erstmals, Movement 40→65 |
 | 18 | Wettessen | Buehne | 35 % | 40 % | 95 % | 15 % | **46 %** | 0,845 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 19 | Showcase | Buehne | **75 %** | **100 %** | 95 % | **95 %** | **91 %** | 0,892 | ja | **17.09.-Nachzug (PR #957/#959/#960/#961, 17.09.):** eigenes Flag `showcase:true` + `actVon()`-Act-Ableitung aus BAU-Bauplan/Klasse/Rasse/Traits (K2 neu) + eigenes Konzeptdokument (K3 neu) — Konzept 25→75 (K4 bewusst offen, Rezept unangetastet); `bodenShowcase()` (A2 neu), sechs Act-Requisiten (A3 neu), `TON_KATALOG.showcase` mit acht Ereignissen (A4 neu) — Assets 40→100 (A1 bereits vorher voll ueber `showcase.tsx`, unberuehrt); sechs eigene Act-Zeichenfunktionen (M1 neu) + `stepShowcase()`-Zustandsmaschine (M2 neu) + act-eigene Posen/FX (M4 neu) — Movement 20→95, **M3 bleibt bewusst teilweise** (`showcase.tsx`, der PRODUKTIVE React-Renderer, ist von keiner der vier PRs beruehrt — nur der geteilte `TokenChrome`/`useTokenGlide`-Bausatz, keine eigene Zusatzschicht). rho bit-identisch **0,892**, Gameplay unveraendert 95 (Rezept bewusst nicht angefasst) |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (17.09., nach dem fuenfzehnten Nachtrag): 80 %** (rechnerisch
-79,99 %, war 78 % nach dem vierzehnten Nachtrag, 76 % nach dem dreizehnten Nachtrag, 75 % nach dem
-zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am
-10.09. vor der Feinschliff-/Football-Runde). Je Achse: **Konzept 82 % · Assets 82 % · Gameplay
-77 % · Movement 80 %.**
+**Durchschnitt ueber alle zwanzig (17.09., nach dem sechzehnten Nachtrag): 81 %** (rechnerisch
+80,99 %, war 80 % nach dem fuenfzehnten Nachtrag, 78 % nach dem vierzehnten Nachtrag, 76 % nach dem
+dreizehnten Nachtrag, 75 % nach dem zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am
+14.09. vor der Merge-Welle, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse:
+**Konzept 82 % · Assets 84 % · Gameplay 77 % · Movement 81 %.**
+
+*Die Bewegung seit dem fuenfzehnten Nachtrag (80 %→81 %) kommt ausschliesslich aus Climbing
+(65,5 %→85,5 %, s. sechzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
+ziffernidentisch. Assets bewegt sich am staerksten (81,75 %→**84,0 %**, allein aus Climbings A2+A4,
++45 Punkte), Movement am zweitstaerksten (79,5 %→**81,25 %**, rundet auf 81 %, allein aus Climbings
+M1-Sprung 65→100). Konzept und Gameplay bewegen sich nicht (82,0 % bzw. 76,7 % exakt, rundet
+weiter auf 77 %) — bei Climbing war es ausschliesslich die Assets-/Movement-Achse, waehrend PR #963
+laut eigenem Dokument bewusst kein Rezept und keine Produktionsanbindung anfasst. Anders als beim
+fuenfzehnten Nachtrag (Showcase: alle vier Achsen zugleich) bewegen sich diesmal nur zwei Achsen.*
 
 *Die Bewegung seit dem vierzehnten Nachtrag (78 %→80 %) kommt ausschliesslich aus Showcase
 (45 %→91 %, s. fuenfzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
@@ -1567,7 +1743,52 @@ Die uebrigen siebzehn Disziplinen sind in allen vier Spalten **ziffernidentisch*
 ueber achtzehn Zeilen: leer) — strukturell zu erwarten, weil jede geaenderte Zeile im `istKampf`-
 Pfad liegt.
 
-### Climbing — 66 % (65/40/92/65)
+### Climbing — 86 % (65/85/92/100)
+**17.09.-Nachzug: Assets 40→85, Movement 65→100 (PR #963, 17.09.).** Eigene Kletterwand statt der
+mit Spurt geteilten grauen Bahn, setzt `docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md`
+Abschnitt 3.1 D1.a+D1.b um (`docs/design/climbing-wand-17-09.md`). **rho frisch gemessen**
+(`node scripts/miss-alle-disziplinen.mjs 24 climbing`): bit-identisch **0,834**, Spannweite 0,209 —
+reine Praesentation, keine Ueberraschung.
+- **A2+M1 (`bodenClimbing()`, `battle-mode.engine.js:22549 ff.`):** Weiche in `bodenSpurt()`
+  (`:22199`, `if(BA().climbing)return bodenClimbing();`) ersetzt den bis dahin generischen
+  `bodenSpurtGerade()`-Fallback (mit Spurt geteilt) durch eine eigene, additiv aufgesetzte Szene:
+  zehn Ueberhang-Baender mit zur Strecke linear zunehmender Deckkraft (skaliert mit
+  `BAHN_ART.climbing.steigung`), 22 deterministische Risslinien, zehn grosse Griffmarken exakt an
+  `BAHN_ART.climbing.hindernisse`. A2 UND M1 zugleich erstmals voll erfuellt — dieselbe
+  Zwei-Achsen-Wirkung wie zuvor bei `bodenZeitfahren()`/`zeichneFechten()`. Playwright-Gegenprobe:
+  `spurt`/`staffel` bit-identisch (Diff 0).
+- **A4 (`TON_KATALOG.climbing`, `:21591-21596` + vier `sfx()`-Aufrufe in `stepClimbing()`,
+  `:25758-25769`):** vier Ereignisse (griff/fehlgriff/zug/topout) aus den fuenf ueberall sonst
+  benutzten Ton-Primitiven — erstmals erfuellt, TON_KATALOG fuehrte vorher elf Eintraege, keinen
+  fuer Climbing.
+- **A3 bleibt bewusst offen, ausdruecklich NICHT schoengerechnet.** `DISZIPLIN_PROP`
+  (`:2899-2926`) fuehrt zehn Eintraege, keinen fuer `climbing` — der optionale Kreidebeutel (D1.c
+  im Opus-Plan) wurde bewusst ausgelassen, weil dieselbe Tabelle mit der parallelen
+  Wettessen-Runde kollidiert haette. Climbing bleibt die einzige arena-resolved Bahn-Disziplin ohne
+  eigene Requisite. Ohne D1.c waere Assets 100 und Gesamt 89,25 % erreichbar gewesen.
+- **A1 und M3 waren schon VOR PR #963 voll erfuellt und sind von ihr nicht beruehrt** — ausdruecklich
+  gegen die PRODUKTIVE Datei geprueft: `app/foundation/discipline-stage/arena/disciplines/
+  mountain.tsx` (337 Z., seit PR #839 06.09.) ist eine eigene, climbing-spezifische Feld-Datei mit
+  eigenem Wandgradient, eigenen Routen-Griffen und einem eigenen `requestAnimationFrame`-Kletterlauf
+  (Hoehe=Score, `swayOf()`-Schlingern, `GhostLayer` der Vorrunde) — dieselbe Kategorie wie
+  `peloton.tsx`/`bump.tsx`/`lamps.tsx`. `git log` bestaetigt: kein Commit von PR #963 in dieser
+  Datei.
+- **M2 war schon VOR PR #963 voll erfuellt (seit PR #925, 14.09.) und unberuehrt** — `stepClimbing()`
+  (`:25750 ff.`) schreibt weiterhin nur `u.vizSchritt` plus die vier neuen, rein lesenden
+  Ton-Zaehler; die Schrittlogik selbst aendert sich nicht.
+- **K1-K4/G1-G4 unveraendert, ausdruecklich geprueft:** PR #963 aendert keine Zeile in `rezept`,
+  `tempoVon()`, `zehrFaktor()` oder `MOTOREN.climbing.wert()` — die einzigen Diff-Treffer auf diese
+  Begriffe sind Kommentare, die das explizit festhalten. `climbing-wand-17-09.md` modelliert die
+  Disziplin nicht von Grund auf (K3 bewegt sich nicht, dieselbe Kategorie Dokument wie
+  `climbing-kalibrierung-16-09.md`). G1 (rho 0,834, gleiche Stufe), G2 (weiterhin in
+  `ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`), G3/G4 unveraendert.
+
+**Ergebnis:** Assets 40→**85** (A2+A4 neu, A3 bleibt offen). Movement 65→**100** (M1 neu, M2/M3
+bereits vorher voll, Deckel erreicht). Konzept bleibt 65, Gameplay bleibt 92. **Gesamt: 65,5 %→85,5 %**
+(rundet auf 86 %).
+
+---
+
 **16.09.-Nachzug 2: Gameplay 49→92 (PR #943, 16.09.).** Erste eigene Kalibrierrunde fuer Climbing —
 `docs/design/climbing-kalibrierung-16-09.md`. **rho frisch gemessen**
 (`node scripts/miss-alle-disziplinen.mjs 24 climbing`): **0,834** (vorher 0,782), Spannweite 0,209,
