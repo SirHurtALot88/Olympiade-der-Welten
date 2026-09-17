@@ -15816,6 +15816,13 @@
     gesang:zeichneActGesang, kampfkunst:zeichneActKampfkunst, zaubershow:zeichneActZaubershow,
     kraftakt:zeichneActKraftakt, schuetzenkunst:zeichneActSchuetzenkunst, akrobatik:zeichneActAkrobatik
   };
+  // TON JE ACT (PR S3, Konzept Abschnitt 5, Tabellenzeile "klinge/schuss/zauber/stampf"):
+  // Ereignisnamen in TON_KATALOG.showcase, gelesen von stepShowcase() an der Enthuellungs-
+  // Kante (s. dort). Gesang/Akrobatik tauchen bewusst nicht auf -- die Konzepttabelle nennt
+  // nur die vier waffen-/effektnahen Acts.
+  const SHOWCASE_AKTIONSTON={
+    kampfkunst:"klinge", schuetzenkunst:"schuss", zaubershow:"zauber", kraftakt:"stampf"
+  };
 
   // Choreografie + Dispatch fuer den einen aktiven Performer -- ersetzt den blossen
   // `zeichneSprite(ctx,aktiver,x,y)`-Aufruf aus PR S1. Positions-/Rotationstransforme
@@ -15871,7 +15878,17 @@
     const NAECHER=(u,feld,ziel,tau)=>{ u[feld]+=(ziel-u[feld])*(1-Math.exp(-dt/tau)); };
     const aktiver=showcaseAktiver();
     for(const u of TEILNEHMER){
-      if(u.vizAct==null)u.vizAct=actVon(u).act;
+      if(u.vizAct==null){
+        u.vizAct=actVon(u).act;
+        // TON-MERKER (PR S3, Konzept Abschnitt 5): zwei reine Einmal-/Kanten-Kennungen,
+        // dasselbe Init-Muster wie vizStartTon/vizZone bei stepZeitfahren. vizAuftrittTon
+        // ist ein EINWEG-Merker (bleibt fuer immer true, wie vizStartTon dort) -- jeder
+        // Teilnehmer wird ueber ein ganzes Spiel genau einmal aktiv (buehneQueue gruppiert
+        // seine rundenN Enthuellungen zusammenhaengend, PR S0), ein Rueckfall auf false
+        // ist deshalb nie noetig. vizShowcaseTonAktuell haelt den zuletzt VERTONTEN
+        // Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
+        u.vizAuftrittTon=false; u.vizShowcaseTonAktuell=-1;
+      }
       // ACT-UEBERSCHREIBUNGEN (PR S2, Konzept Abschnitt 4.3/5): NUR am gerade aktiven
       // Performer gesetzt, sonst immer `undefined`/`false` -- exakt der Vertrag "u.vizWaffe =
       // b.waffe NUR fuer den aktuell aktiven Teilnehmer, nur waehrend seines Auftritts".
@@ -15880,6 +15897,12 @@
       // Nachleuchten der Requisite/Pose beim naechsten Auftritt eines anderen). Kein rr(),
       // reine Ableitung aus u.vizAct/BAU/istHeiler()/u.lunge (alles erlaubte Lesequellen).
       const istAktiv=(u===aktiver);
+      // AUFTRITTS-JINGLE (TON_KATALOG.showcase.auftritt, PR S3): feuert an der Kante
+      // "wird aktiv" -- also genau EINMAL je Teilnehmer, sobald `showcaseAktiver()` ihn
+      // zum ersten Mal liefert (vor der allerersten Enthuellung zaehlt bereits der erste
+      // Warteschlangeneintrag als aktiv, s. showcaseAktiver()-Kommentar, deshalb feuert der
+      // Jingle fuer den allerersten Performer schon im allerersten stepShowcase()-Frame).
+      if(istAktiv && !u.vizAuftrittTon){ u.vizAuftrittTon=true; sfx("showcase","auftritt"); }
       const b=BAU[u.n]||BAU_STD;
       u.vizWaffe=(istAktiv&&(u.vizAct==="kampfkunst"||u.vizAct==="schuetzenkunst"))?b.waffe:undefined;
       // FEHLZUENDER BEI "VERPATZT" (Konzept Abschnitt 3.1: "Bei 'verpatzt' ein kurzer
@@ -15911,6 +15934,27 @@
       // die soeben enthuellte Runde art.failWort traegt.
       const rAkt=(istAktiv&&u.vizAct==="akrobatik"&&u.aktuell>=0)?u.runden[u.aktuell]:null;
       u.vizSturz=!!(rAkt&&rAkt.ereignis===art.failWort&&u.lunge>0);
+      // TON AN DER ENTHUELLUNGS-KANTE (TON_KATALOG.showcase, PR S3): u.aktuell wird
+      // AUSSCHLIESSLICH von der generischen Buehnen-Enthuellung weiter oben geschrieben
+      // (buehnenBewegung() laeuft in DEMSELBEN Tick DANACH, s. Aufrufstelle) -- diese
+      // Funktion liest es nur, "frisch enthuellt" erkannt exakt wie stepFechten()s
+      // vizFechtAktuell-Vergleich. Feuert nur fuer den Teilnehmer, dessen Durchgang
+      // GERADE enthuellt wurde -- das ist immer der aktuelle `aktiver` (buehneQueue
+      // dequeued genau ihn), ein zusaetzliches istAktiv-Gate ist deshalb nicht noetig.
+      if(u.aktuell>=0 && u.aktuell!==u.vizShowcaseTonAktuell){
+        u.vizShowcaseTonAktuell=u.aktuell;
+        // ACT-AKTIONSTON, unabhaengig vom Ausgang -- woertlich das Fechten-Vorbild
+        // (sfx("fechten","klingen") feuert bei stepFechten() auf BEIDEN Ausgaengen, nur
+        // der zweite Ton traegt den Ausgang). Gesang/Akrobatik haben keinen Eintrag hier
+        // (Konzept-Tabelle Abschnitt 5 nennt nur die vier waffen-/effektnahen Acts).
+        const aktionsTon=SHOWCASE_AKTIONSTON[u.vizAct];
+        if(aktionsTon)sfx("showcase",aktionsTon);
+        const r=u.runden[u.aktuell];
+        if(r){
+          if(r.ereignis===art.erfolgWort)sfx("showcase","applaus");
+          else if(r.ereignis===art.failWort)sfx("showcase","buzzer");
+        }
+      }
       const ziel=showcaseZielPos(u,aktiver);
       if(u.vizX==null){
         // Erstinitialisierung (erster stepShowcase()-Durchlauf fuer diesen Teilnehmer):
@@ -21551,6 +21595,46 @@
       pfiff:    {synth:(vol)=>tonDoppelton(vol,2600,3100,0.42)},
       tor:      {synth:(vol)=>{ tonTon(vol,220,0.6); tonMetall((vol??0.6)*0.7,440,0.5); }},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,480,0,true)}
+    },
+    // SHOWCASE (PR S3, Talentshow-Konzept 17.09., Abschnitt 5): letzte der vier
+    // Showcase-PRs, dieselben fuenf Grundbausteine wie ueberall im Katalog, sieben
+    // Ereignisse:
+    //  - auftritt  (tonDoppelton, kurz+hell): der Teilnehmer betritt die Buehnenmitte,
+    //    an der Kante "wird aktiv" in stepShowcase() (Jingle, ein Mal je Auftritt).
+    //  - applaus   (tonRauschen-Burst 0,6s) / buzzer (tonBuzzer 0,35s): an der Kante
+    //    "frisch enthuellter Durchgang" (r.ereignis===erfolgWort/failWort), dasselbe
+    //    "frisch enthuellt"-Muster wie stepFechten()s u.vizFechtAktuell-Vergleich.
+    //  - klinge/schuss/zauber/stampf: ACT-SPEZIFISCHER Aktionston, an DERSELBEN Kante,
+    //    unabhaengig vom Ausgang -- exakt das Fechten-Vorbild, wo `sfx("fechten",
+    //    "klingen")` auf BEIDEN Ausgaengen feuert und nur der zweite Ton (treffer/halt)
+    //    den Ausgang traegt. `zauber` baut, wie `tonDoppelton` es fuer den Katalog
+    //    schon vormacht, EINEN manuell zusammengesetzten Oszillator aus tonKontext()/
+    //    tonHuelle() -- kein sechster Grundbaustein, nur derselbe Bauplan wie
+    //    tonDoppelton fuer einen Fall, den die fixe Frequenz von tonTon() nicht deckt
+    //    (ein gleitender statt eines feststehenden Tons).
+    //  - publikum (Loop tonRauschen): dasselbe Loop-Muster wie ueberall sonst.
+    //    showcasePublikumAn/bodenShowcase() (PR S1) riefen tonLoopStart("showcase")
+    //    schon vorher auf -- bis zu diesem Eintrag war das ein sicherer No-Op
+    //    (tonLoopStart()s `if(!katalog)return`), ab hier spielt der Loop.
+    showcase:{
+      auftritt: {synth:(vol)=>tonDoppelton(vol,880,1320,0.28)},
+      applaus:  {synth:(vol)=>tonRauschen(vol,1500,0.6,false)},
+      buzzer:   {synth:(vol)=>tonBuzzer(vol,0.35)},
+      klinge:   {synth:(vol)=>tonMetall(vol,1400,0.16)},
+      schuss:   {synth:(vol)=>{ tonKlick(vol,2600,0.045); tonRauschen((vol??0.6)*0.5,1800,0.12,false); }},
+      zauber:   {synth:(vol)=>{
+        const ctx=tonKontext(); if(!ctx)return;
+        const osc=ctx.createOscillator(); osc.type="sine";
+        const gain=ctx.createGain();
+        const t0=ctx.currentTime, d=0.4;
+        osc.frequency.setValueAtTime(650,t0);
+        osc.frequency.exponentialRampToValueAtTime(1500,t0+d);
+        tonHuelle(gain,t0,0.02,d,bkPegel(vol??0.55));
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t0); osc.stop(t0+d+0.05);
+      }},
+      stampf:   {synth:(vol)=>tonSchlag(vol,180,55,0.3)},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
     }
   };
 
