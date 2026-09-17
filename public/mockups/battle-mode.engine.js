@@ -14752,13 +14752,113 @@
     if(BB().schach){ if(!schachPublikumAn){ tonLoopStart("speed-schach"); schachPublikumAn=true; } }
     else if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
     // Dasselbe fuer Eiskunstlauf (s. bodenEis() unten) — derselbe Wechsel-Fall, falls wir
-    // GERADE von einem Duett-Kampf auf eine der sieben generischen Buehnen-Disziplinen
-    // (Speed-Schach/Breaking/Fechten/Tennis/Wettessen/Showcase/I-Spy) wechseln.
+    // GERADE von einem Duett-Kampf auf eine der sechs generischen Buehnen-Disziplinen
+    // (Speed-Schach/Breaking/Fechten/Tennis/Wettessen/I-Spy) wechseln.
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    // SHOWCASE (PR S1, Konzept 17.09.): bekommt seit dieser PR ein eigenes bodenShowcase()
+    // (s. dort) statt dieser Funktion -- dasselbe Wechsel-Fall-Muster wie Heben/Eiskunstlauf
+    // direkt oberhalb, falls wir GERADE von Showcase auf eine der sechs verbleibenden
+    // generischen Buehnen wechseln.
+    if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
   }
   // rein praesentational, s. bodenBuehne() oben fuer Start/Stop und reset() (N1-Fix) fuer
   // den Rueckstell-Zwang beim naechsten Speed-Schach-Spiel.
   let schachPublikumAn=false;
+
+  // ================== SHOWCASE: EIGENES BUEHNENBILD (PR S1, Konzept 17.09.) ==================
+  // docs/design/showcase-talentshow-konzept-17-09.md, Abschnitt 3.3/5, "PR S1 — Buehnenbild
+  // und Rampenlicht". Vorbild fuer die Motive (roter Vorhang, LED-Hype-Wall/Rampenlicht,
+  // Jury-Buzzer, Publikum) ist app/foundation/discipline-stage/arena/disciplines/
+  // showcase.tsx -- NICHT 1:1 uebernommen (SVG vs. Canvas-Primitiven, andere Aufloesung),
+  // sondern dieselbe visuelle Sprache im Massstab von bodenHeben()/bodenEis() daneben.
+  // Publikums-Loop: dasselbe Start/Stop-Flaggen-Muster wie hebenPublikumAn/
+  // schachPublikumAn/eiskunstlaufPublikumAn -- tonLoopStart() ist bis TON_KATALOG.showcase
+  // (PR S3) ein sicherer No-Op (Funktionskopf `if(!katalog)return`, :20981), das
+  // Flaggen-Bookkeeping ist trotzdem schon jetzt richtig verdrahtet, s. reset() (N1-Fix).
+  let showcasePublikumAn=false;
+  // BUZZER-POSITIONEN: eigene Funktion statt Literale an zwei Stellen (bodenShowcase()
+  // zeichnet das Pult, zeichneShowcase() zuendet die Reaktion darauf) -- dieselbe
+  // "eine Quelle statt zweier Literale"-Regel wie posMap bei zeichneFechten().
+  function showcaseBuzzerPos(i){
+    const pultB=Math.min(W*0.30,220), pultX=W/2-pultB/2, pultY=H-26;
+    return {x:pultX+pultB*(i+0.5)/3, y:pultY+10};
+  }
+  function bodenShowcase(){
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(!showcasePublikumAn){ tonLoopStart("showcase"); showcasePublikumAn=true; }
+
+    // GRUNDFLAECHE: waermeres, violetteres Theaterlicht statt bodenBuehne()s neutralem
+    // Wettkampf-Podest.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#241224");g.addColorStop(1,"#0f0810");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    // ROTER VORHANG oben, zwei Portale mit je vier gerafften Falten (showcase.tsx' Curtain-
+    // Motiv, hier als Canvas-Primitiv statt SVG-Pfad).
+    const vorhangH=H*0.16;
+    [[0,W*0.18],[W*0.82,W]].forEach(([x0,x1])=>{
+      const falten=4, fw=(x1-x0)/falten;
+      for(let i=0;i<falten;i++){
+        const fx=x0+i*fw;
+        ctx.fillStyle=i%2?"#6e1628":"#8c1f34";
+        ctx.beginPath();
+        ctx.moveTo(fx,0);
+        ctx.quadraticCurveTo(fx+fw*0.5,vorhangH*0.7,fx,vorhangH);
+        ctx.lineTo(fx+fw,vorhangH);
+        ctx.quadraticCurveTo(fx+fw*0.6,vorhangH*0.6,fx+fw,0);
+        ctx.closePath();ctx.fill();
+      }
+    });
+    ctx.strokeStyle="rgba(246,199,80,.5)";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,vorhangH+2);ctx.lineTo(W,vorhangH+2);ctx.stroke();
+
+    // RAMPENLICHT: eine Reihe warmer Lichtkegel am Buehnenrand -- showcase.tsx' Footlights
+    // (dort 13 LEDs im SVG-Massstab, hier 11 im Canvas-Massstab). VOR dem Publikum gezeichnet,
+    // damit die Silhouetten (naeher an der Kamera, s. unten) davor stehen statt darin zu
+    // versinken.
+    const rampY=H*0.86;
+    ctx.fillStyle="#2a2233";ctx.fillRect(0,rampY-4,W,10);
+    for(let i=0;i<11;i++){
+      const rx=W*0.06+i*(W*0.88)/10;
+      const beam=ctx.createRadialGradient(rx,rampY,1,rx,rampY,H*0.28);
+      beam.addColorStop(0,"rgba(255,232,180,.20)");beam.addColorStop(1,"rgba(255,232,180,0)");
+      ctx.fillStyle=beam;ctx.beginPath();ctx.arc(rx,rampY,H*0.28,Math.PI,0);ctx.fill();
+      ctx.fillStyle="#f6c750";ctx.beginPath();ctx.arc(rx,rampY,2.4,0,6.2832);ctx.fill();
+    }
+
+    // JURY-PULT MIT DREI BUZZERN am unteren Rand -- showcase.tsx' "JURY BUZZER-PULT"-Zeile,
+    // hier als gezeichnetes Pult mit drei Tasten (Positionen aus showcaseBuzzerPos(), damit
+    // die Reaktionsanimation in zeichneShowcase() dieselben Koordinaten trifft).
+    const pultB=Math.min(W*0.30,220), pultX=W/2-pultB/2, pultY=H-26;
+    ctx.fillStyle="#1e1130";ctx.fillRect(pultX,pultY,pultB,20);
+    ctx.strokeStyle="#4a3760";ctx.lineWidth=1.4;ctx.strokeRect(pultX,pultY,pultB,20);
+    for(let i=0;i<3;i++){
+      const p=showcaseBuzzerPos(i);
+      ctx.fillStyle="#3a2a44";ctx.beginPath();ctx.arc(p.x,p.y,9,0,6.2832);ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.18)";ctx.lineWidth=1;ctx.stroke();
+    }
+    ctx.font="800 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(255,95,168,.65)";
+    ctx.textAlign="center";
+    ctx.fillText("JURY",W/2,pultY-6);
+
+    // PUBLIKUMS-SILHOUETTEN als dunkle Halbkreise, GANZ VORNE (naeher an der Kamera als
+    // Rampenlicht und Jury-Pult) -- dasselbe Prinzip wie showcase.tsx' Audience-Silhouette
+    // (dort zuletzt/vorne gezeichnet, Kommentar "Audience silhouette at bottom"). Ragt bewusst
+    // etwas ueber den unteren Bildrand hinaus, wie ein Publikum im Vordergrund einer
+    // Kamera-Perspektive.
+    const publikumY=showcasePublikumY();
+    ctx.fillStyle="rgba(0,0,0,.85)";
+    const kn=22;
+    for(let i=0;i<kn;i++){
+      const px=(i+0.5)*W/kn, r=16+((i*37)%9);
+      ctx.beginPath();ctx.arc(px,publikumY,r,Math.PI,0);ctx.fill();
+    }
+  }
+  // Gemeinsame Y-Koordinate des Publikums -- bodenShowcase() (Silhouetten) und
+  // zeichneShowcase() (Applaus-Ring, s. dort) muessen denselben Wert treffen.
+  function showcasePublikumY(){ return H*0.98; }
 
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
   // Screenshot-Befund: "generischer dunkler Buehnenboden" fuer eine Sportart mit einer
@@ -14919,7 +15019,9 @@
     // die Teilnehmer-Zeichnung. Faellt ein spaeterer Agent eine weitere eigene Boden-
     // funktion dazu, ist das eine weitere else-if-Zeile hier, keine Umstrukturierung.
     const art=BB();
-    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else bodenBuehne();
+    // SHOWCASE (PR S1, Konzept 17.09.): eigener Boden statt des generischen Podests --
+    // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -15384,49 +15486,182 @@
   }
 
   // stepShowcase()/zeichneShowcase() -- angeschlossen ueber `art.showcase` in
-  // buehnenBewegung()/zeichneBuehne() (s. dort, Praezedenzfall Tennis/Fechten). Fuer PR S0
-  // ist stepShowcase() nur die Einmal-Initialisierung von u.vizAct, genau das Muster von
-  // stepCypher()s u.vizPhase-Init (:14298-14302): reine, praesentationale Erstbelegung,
-  // niemals u.summe/runden/aktuell/lunge/buehneAkt/buehneZeiger/done, nie rr().
-  // zeichneShowcase() ist noch die UNVERAENDERTE generische Zeichnung (identisch zu dem,
-  // was Showcase vorher ueber den Fallback-Zweig in zeichneBuehne() bekam) -- Buehnenbild
-  // und Acts folgen in PR S1/S2.
+  // buehnenBewegung()/zeichneBuehne() (s. dort, Praezedenzfall Tennis/Fechten).
+  //
+  // PR S1 (Konzept Abschnitt 3.3/5, "Buehnenbild und Rampenlicht") baut ZWEI RAENGE, wie
+  // schon bei Breaking (zeichneBreaking()-Kommentar "ZWEI RAENGE STATT ZWOELF GLEICHER",
+  // :16649): der AKTIVE (der Teilnehmer, dessen Durchgang gerade laeuft) steht in voller
+  // Groesse im Rampenlicht; alle anderen warten backstage links/rechts, klein (0,72) und
+  // hinter einer Vignette. NEU sind ausschliesslich viz*-Felder (u.vizX/u.vizY/u.vizScale)
+  // -- u.summe/u.runden/u.aktuell/u.lunge/buehneAkt/buehneZeiger/done werden nirgends
+  // geschrieben, rr() wird nie aufgerufen (Vertrag aus buehnenBewegung()-Kommentar, :13711).
+  //
+  // WER IST "DER AKTIVE"? bauBuehne() baut buehneQueue fuer Showcase je Teilnehmer
+  // ZUSAMMENHAENGEND (PR S0, alle rundenN Eintraege hintereinander, s. dortiger Kommentar
+  // "TALENTSHOW-AUFTRITTSREIHENFOLGE"). Der zuletzt enthuellte Eintrag (buehneQueue[
+  // buehneZeiger-1]) ist deshalb ueber den GESAMTEN Auftritt (rundenN Enthuellungen a
+  // rundenDauer) derselbe Teilnehmer -- eine reine, lesende Ableitung, kein neuer
+  // Motorzustand. Vor der allerersten Enthuellung (buehneZeiger===0) gilt der erste
+  // Eintrag der Warteschlange als aktiv (er tritt als naechstes auf).
+  function showcaseAktiver(){
+    if(!buehneQueue.length)return null;
+    return buehneQueue[buehneZeiger>0?buehneZeiger-1:0]||null;
+  }
+  // ZIELPOSITION je Teilnehmer: der Aktive in die Buehnenmitte, alle anderen in eine feste
+  // Backstage-Spalte ihrer Seite (links Heim, rechts Gast) -- fester Index ueber
+  // TEILNEHMER.filter(...).indexOf(u), damit die Spalte nicht neu mischt, sobald jemand in
+  // die Mitte wechselt (die Luecke bleibt einfach offen, wie in einem echten Backstage-
+  // Bereich, in dem der aktuelle Act nicht an seinem Wartestuhl sitzt).
+  function showcaseZielPos(u,aktiver){
+    if(u===aktiver)return {x:W/2,y:H*0.50,scale:1};
+    const g=TEILNEHMER.filter(x=>x.side===u.side);
+    const n=Math.max(1,g.length), i=g.indexOf(u);
+    const x=u.side===0?W*0.13:W*0.87;
+    const y=H*0.20+(H*0.55)*(n>1?i/(n-1):0.5);
+    return {x,y,scale:0.72};
+  }
+  // AKTUELLE Zeichenposition -- fallback auf die Zielposition, solange stepShowcase() noch
+  // nicht ein einziges Mal gelaufen ist (derselbe Fallback-Gedanke wie orte.set() bei
+  // zeichneBreaking, :16706-16708, fuer den allerersten Redraw vor dem ersten stepBuehne()).
+  function showcasePosVon(u,aktiver){
+    const ziel=showcaseZielPos(u,aktiver);
+    return {
+      x:u.vizX!=null?u.vizX:ziel.x,
+      y:u.vizY!=null?u.vizY:ziel.y,
+      scale:u.vizScale!=null?u.vizScale:ziel.scale
+    };
+  }
   function stepShowcase(dt,art){
+    // NAECHER(): woertlich derselbe exponentielle Anaeherungs-Stil wie stepCypher()s
+    // gleichnamige Closure (:14347) -- hier auf kartesische x/y/scale statt Polarkoordinaten
+    // angewandt, weil die Showcase-Buehne (Mitte vs. zwei feste Backstage-Spalten) kein
+    // Ringlayout braucht.
+    const NAECHER=(u,feld,ziel,tau)=>{ u[feld]+=(ziel-u[feld])*(1-Math.exp(-dt/tau)); };
+    const aktiver=showcaseAktiver();
     for(const u of TEILNEHMER){
       if(u.vizAct==null)u.vizAct=actVon(u).act;
+      const ziel=showcaseZielPos(u,aktiver);
+      if(u.vizX==null){
+        // Erstinitialisierung (erster stepShowcase()-Durchlauf fuer diesen Teilnehmer):
+        // direkt auf die Zielposition setzen, kein Glide aus dem Nichts.
+        u.vizX=ziel.x; u.vizY=ziel.y; u.vizScale=ziel.scale;
+        continue;
+      }
+      NAECHER(u,"vizX",ziel.x,0.45);
+      NAECHER(u,"vizY",ziel.y,0.45);
+      NAECHER(u,"vizScale",ziel.scale,0.35);
     }
   }
 
   function zeichneShowcase(art){
-    // 1:1 der generische Zweig aus zeichneBuehne() (dort weiterhin fuer Wettessen/I-Spy
-    // aktiv) -- keine visuelle Aenderung in dieser PR, s. Funktionskopf oben.
-    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
-    [0,1].forEach(side=>{
-      const g=TEILNEHMER.filter(u=>u.side===side);
-      const y=side===0?H*0.32:H*0.66;
-      g.forEach((u,i)=>{
-        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-        ctx.globalAlpha=u.lunge>0?1:0.92;
-        const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
-        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=1;
-        zeichneSprite(ctx,u,x,y);
+    if(!TEILNEHMER.length)return;
+    const aktiver=showcaseAktiver();
+    const farbeVon=(u)=>u.side===0?css("--home"):css("--away");
+    const schriftAn=(txt,x,y,farbe,groesse,gewicht)=>{
+      ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.strokeText(txt,x,y);ctx.fillStyle=farbe;ctx.fillText(txt,x,y);
+    };
+
+    // ---------- BACKSTAGE: alle ausser dem Aktiven, klein + spaeter abgedunkelt ----------
+    for(const u of TEILNEHMER){
+      if(u===aktiver)continue;
+      const p=showcasePosVon(u,aktiver);
+      const fussY=p.y+19*p.scale;
+      ctx.fillStyle=farbeVon(u);ctx.globalAlpha=0.14;
+      ctx.beginPath();ctx.ellipse(p.x,fussY,11,4,0,0,6.2832);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.save();
+      ctx.translate(p.x,fussY);ctx.scale(p.scale,p.scale);ctx.translate(-p.x,-fussY);
+      zeichneSprite(ctx,u,p.x,p.y);
+      ctx.restore();
+    }
+
+    // ---------- VIGNETTE: Backstage tritt zurueck, die Mitte tritt vor ----------
+    // Dasselbe Mittel wie zeichneBreaking() (:16739-16743): ein einziger radialer Verlauf
+    // ueber die ganze Flaeche statt eines von aussen gesetzten globalAlpha (das
+    // zeichneSprite() fuer Effekt-/Partikelfiguren intern selbst wieder zurueckstellt und
+    // damit ueberschreiben wuerde).
+    const vig=ctx.createRadialGradient(W/2,H*0.50,H*0.16,W/2,H*0.50,W*0.62);
+    vig.addColorStop(0,"rgba(6,3,10,0)");
+    vig.addColorStop(0.6,"rgba(6,3,10,.40)");
+    vig.addColorStop(1,"rgba(6,3,10,.74)");
+    ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+
+    // ---------- DER AKTIVE: volle Groesse im Rampenlicht ----------
+    if(aktiver){
+      const p=showcasePosVon(aktiver,aktiver);
+      const x=p.x,y=p.y,c=farbeVon(aktiver);
+      const licht=ctx.createRadialGradient(x,y+8,0,x,y+8,70);
+      licht.addColorStop(0,"rgba(255,232,150,.30)");
+      licht.addColorStop(1,"rgba(255,232,150,0)");
+      ctx.fillStyle=licht;ctx.beginPath();ctx.ellipse(x,y+8,70,48,0,0,6.2832);ctx.fill();
+      ctx.fillStyle=c;ctx.globalAlpha=0.22;
+      ctx.beginPath();ctx.ellipse(x,y+19,17,6,0,0,6.2832);ctx.fill();
+      ctx.globalAlpha=1;
+      zeichneSprite(ctx,aktiver,x,y);
+      const name=aktiver.n.length>13?aktiver.n.slice(0,12)+"…":aktiver.n;
+      schriftAn(name,x,y+44,c,10.5,"700");
+
+      // ACT-SCHILD (Konzept Abschnitt 5, PR S1, Punkt 3): kleines Textschild unter dem
+      // Namen, zeigt SHOWCASE_ACTS[u.vizAct].label (PR S0). Nur der Aktive traegt eines --
+      // die Backstage-Wartenden sind unbeschriftete Silhouetten, dasselbe Sparsamkeits-
+      // Prinzip wie Rang 1 bei zeichneBreaking().
+      const ACT=SHOWCASE_ACTS.find(a=>a.id===aktiver.vizAct);
+      if(ACT){
+        const label=ACT.label.toUpperCase();
+        const schildB=label.length*6.2+16, schildX=x-schildB/2, schildY=y+52;
+        ctx.fillStyle="rgba(20,12,26,.78)";ctx.fillRect(schildX,schildY,schildB,14);
+        ctx.strokeStyle="rgba(246,199,80,.55)";ctx.lineWidth=1;ctx.strokeRect(schildX,schildY,schildB,14);
+        ctx.font="700 8.5px 'Barlow Condensed',sans-serif";ctx.fillStyle="#f6c750";
         ctx.textAlign="center";ctx.textBaseline="middle";
-        const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
-          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
-        };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        const w=30,p=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
-        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
-      });
-    });
+        ctx.fillText(label,x,schildY+7.5);
+      }
+
+      schriftAn(String(aktiver.summe)+" Pkt",x,y+72,"#dfe6ef",9);
+      const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+      const w=30,pr=Math.min(1,aktiver.summe/maxSumme);
+      ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+80,w,3);
+      ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+80,w*pr,3);
+      ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.textAlign="center";
+      ctx.fillText((aktiver.aktuell+1)+"/"+art.rundenN,x,y+92);
+
+      // ---------- BUZZER/APPLAUS-REAKTION (Konzept Punkt 4) ----------
+      // u.lunge als Uhr, exakt dasselbe Muster wie der Tennis-Ball (zeichneTennis()-
+      // Kommentar ":15108-15110": 0,5 im Enthuellungs-Frame -> 0 nach 0,5 realen Sekunden,
+      // keine neue Uhr, kein neues Feld). Liest nur u.runden[u.aktuell]/art.erfolgWort/
+      // art.failWort -- dieselben Felder, ueber die auch WERTUNG_AUFTRITT auswertet.
+      if(aktiver.lunge>0 && aktiver.aktuell>=0){
+        const r=aktiver.runden[aktiver.aktuell];
+        const fortschritt=Math.min(1,Math.max(0,1-aktiver.lunge/0.5));
+        if(r&&r.ereignis===art.failWort){
+          // Buzzer, deterministisch per cypherHash (kein rr()) auf einen der drei
+          // Pult-Knoepfe verteilt, leuchtet rot auf und blendet aus.
+          const bi=cypherHash(aktiver.id,aktiver.aktuell)%3;
+          const bp=showcaseBuzzerPos(bi);
+          const leben=1-fortschritt;
+          ctx.save();ctx.globalAlpha=leben;ctx.globalCompositeOperation="lighter";
+          const gl=ctx.createRadialGradient(bp.x,bp.y,0,bp.x,bp.y,20);
+          gl.addColorStop(0,"#ff5a4a");gl.addColorStop(1,"rgba(255,90,74,0)");
+          ctx.fillStyle=gl;ctx.beginPath();ctx.arc(bp.x,bp.y,20,0,6.2832);ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha=leben;ctx.fillStyle="#ff5a4a";
+          ctx.beginPath();ctx.arc(bp.x,bp.y,9,0,6.2832);ctx.fill();
+          ctx.globalAlpha=1;
+        } else if(r&&r.ereignis===art.erfolgWort){
+          // Applaus-Ring, der aus dem Publikum aufsteigt -- startet auf Publikumshoehe,
+          // waechst und steigt Richtung Buehnenmitte, blendet dabei aus.
+          const ry=showcasePublikumY()-fortschritt*H*0.30;
+          ctx.save();ctx.globalAlpha=(1-fortschritt)*0.8;
+          ctx.strokeStyle="#f6c750";ctx.lineWidth=2;
+          ctx.beginPath();ctx.arc(x,ry,10+fortschritt*26,0,6.2832);ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
@@ -15434,11 +15669,9 @@
       ctx.textAlign="center";
       if(f._teilnehmer!=null){
         const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
-        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
-          const i=g.indexOf(u);
-          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
-          ctx.fillText(f.txt,x,y);
+        if(u){
+          const p=showcasePosVon(u,aktiver);
+          ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
         }
       }
       ctx.globalAlpha=1;
@@ -27522,6 +27755,11 @@
     // (scripts/probe-eiskunstlauf-ton.mjs). Reiner Praesentationszustand, kein Einfluss auf
     // rr() oder Rangtreue.
     eiskunstlaufPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER SHOWCASE (PR S1, Konzept 17.09.): ohne diese Zeile haelt
+    // bodenShowcase() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
+    // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
+    // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    showcasePublikumAn=false;
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
