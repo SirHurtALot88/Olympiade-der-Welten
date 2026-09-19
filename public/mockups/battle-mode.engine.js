@@ -12607,7 +12607,14 @@
       // MATRIX: will 26, health 22, stamina 22, determination 16, intelligence 8,
       // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
       // eigene Wille, der den naechsten Bissen nimmt.
-      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65,
+      //
+      // EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a):
+      // wettessen:true schaltet zeichneBuehne()/buehnenBewegung() auf zeichneWettessen()/
+      // stepWettessen() um — Banketttafel samt Tellerstapel und Magen-Meter statt der
+      // generischen Zwei-Reihen-Darstellung, s. dortige Kommentare. Dasselbe Muster wie
+      // BUEHNE_ART.fechten/.tennis/.showcase: rein deskriptiv, ohne Wirkung auf
+      // rezept/wert()/rundenN/failAbzug/failWort/erfolgWort.
+      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65, wettessen:true,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -13847,6 +13854,12 @@
     if(art.heben && typeof stepHeben==="function"){ stepHeben(dt,art); return; }     // Ziel 1
     if(art.schach && typeof stepSchach==="function"){ stepSchach(dt,art); return; }  // Ziel 5
     if(art.fechten && typeof stepFechten==="function"){ stepFechten(dt,art); return; } // Ziel 10
+    // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.b): dasselbe
+    // typeof-Waechter-Muster wie die fuenf Zweige oberhalb. stepWettessen() liest den
+    // failWort/erfolgWort-Ausgang jedes frisch enthuellten Durchgangs und schreibt
+    // ausschliesslich neue, praesentationale viz*-Felder (vizEss*) — Vertrag wortgleich zu
+    // stepFechten(), s. Kommentar bei stepWettessen() weiter unten.
+    if(art.wettessen && typeof stepWettessen==="function"){ stepWettessen(dt,art); return; }
     // SHOWCASE (PR S0, Talentshow-Konzept 17.09.): dasselbe typeof-Wachterschutz-Muster wie
     // die fuenf Zweige oberhalb. stepShowcase() setzt in dieser PR nur einmalig u.vizAct
     // (s. dort) -- keine Bewegung, kein sichtbarer Unterschied zum bisherigen No-Op.
@@ -14788,6 +14801,79 @@
     return 0;
   }
 
+  // ================== WETTESSEN BEWEGT SICH (stepWettessen, Opus-Plan Naechste-Drei- =========
+  // Disziplinen 17-09, Abschnitt 3.2, D2.b) ====================================================
+  // Wettessen ist laut Plan "die am besten vorbereitete der beiden konzeptleeren Buehnen":
+  // BUEHNE_ART.wettessen fuehrt bereits rundenN:8 Durchgaenge, failWort:"muss kurz pausieren"
+  // und erfolgWort:"schlingt durch" — eine vollstaendige Ereignisliste fuer eine Szene, ohne
+  // dass diese Funktion sie erfindet.
+  //
+  // HARTER VERTRAG WIE BEI stepFechten()/stepSchach()/stepKuer() (Kommentar dort woertlich
+  // uebernommen): niemals rr(), niemals u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/
+  // u.lunge/buehneAkt/buehneZeiger/done anfassen — geschrieben werden AUSSCHLIESSLICH neue,
+  // praesentationale viz*-Felder (vizEssPhase/vizEssT/vizEssAktuell/vizEssErfolg).
+  // disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese Funktion mit jedem Frame
+  // mitlaufen lassen, ohne dass sich eine Rangtreue-Zahl bewegt. Rezept/wert()/rundenN/
+  // failAbzug (BUEHNE_ART.wettessen) sind in dieser PR nicht angefasst.
+  //
+  // WETTESSEN HAT KEIN `duell:true` (anders als Fechten/Schach/Tennis) — jeder Esser laeuft
+  // fuer sich, es gibt kein u.brett und keinen Gegner. Die Zustandsmaschine ist deshalb eine
+  // reine Pro-Teilnehmer-Schleife wie stepHeben(), nur mit vier statt fuenf Zustaenden.
+  //
+  // VIER ZUSTAENDE (u.vizEssPhase), in genau der Reihenfolge aus dem Auftrag: "greifen" (nach
+  // der Speise greifen, Default nach frischer Enthuellung) -> "schlingen" (nur beim
+  // erfolgWort-Ausgang, das genussvolle Schlingen) -> "kauen" (Nachlauf) -> "pause" (Nachlauf
+  // vor dem naechsten Griff — bei einem Fehlschlag springt "greifen" DIREKT und laenger in
+  // "pause", denn genau das ist Chris' eigenes Wort dafuer, s. BUEHNE_ART.wettessen.failWort
+  // "muss kurz pausieren"). Laeuft "pause" ab, ist der Esser wieder "warten" (Ruhepose ohne
+  // eigene Uhr, dieselbe Rolle wie stepHeben()s "boden") — TON_KATALOG.wettessen.gong (D2.c)
+  // markiert genau diesen Uebergang als Durchgangsende.
+  //
+  // TIMING-BUDGET MUSS UNTER art.rundenDauer BLEIBEN (0,65s, dieselbe Rechnung wie bei
+  // stepHeben()/stepCypher(), s. dort): Erfolgspfad 0,10+0,16+0,16+0,12 = 0,54s = 83% von
+  // 0,65s, 17% Puffer. Fehlschlagpfad (kein schlingen/kauen) 0,10+0,30 = 0,40s, erst recht
+  // darunter.
+  const WETT_GREIF_T=0.10, WETT_SCHLING_T=0.16, WETT_KAU_T=0.16,
+        WETT_PAUSE_T=0.12, WETT_PAUSE_FAIL_T=0.30;
+  function stepWettessen(dt,art){
+    if(!TEILNEHMER.length)return;
+    // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild vizFechtAktuell bei stepFechten oben):
+    // u.vizEssAktuell haelt fest, welchen Durchgang diese Funktion fuer `u` zuletzt gesehen
+    // hat.
+    for(const u of TEILNEHMER){
+      if(u.vizEssAktuell==null)u.vizEssAktuell=-1;
+      if(u.aktuell>=0 && u.aktuell!==u.vizEssAktuell){
+        u.vizEssAktuell=u.aktuell;
+        const r=u.runden[u.aktuell];
+        u.vizEssErfolg=!!r && r.ereignis===art.erfolgWort;
+        u.vizEssPhase="greifen"; u.vizEssT=0;
+        sfx("wettessen","biss");
+      }
+    }
+    // PHASEN-UHREN, getrennt von der Erkennungsschleife oben (dasselbe Reihenfolge-Muster wie
+    // stepFechten): ein frisch auf "greifen" gesetzter Esser bekommt in DEMSELBEN Frame schon
+    // eine kleine Fortschrittszahl statt einen Frame lang bei 0 zu haengen.
+    for(const u of TEILNEHMER){
+      if(u.vizEssPhase==null)continue;
+      u.vizEssT=(u.vizEssT||0)+dt;
+      if(u.vizEssPhase==="greifen"){
+        if(u.vizEssT>=WETT_GREIF_T){
+          if(u.vizEssErfolg){ u.vizEssPhase="schlingen"; u.vizEssT=0; sfx("wettessen","schlingen"); }
+          else { u.vizEssPhase="pause"; u.vizEssT=0; sfx("wettessen","pause"); }
+        }
+      } else if(u.vizEssPhase==="schlingen"){
+        if(u.vizEssT>=WETT_SCHLING_T){ u.vizEssPhase="kauen"; u.vizEssT=0; }
+      } else if(u.vizEssPhase==="kauen"){
+        if(u.vizEssT>=WETT_KAU_T){ u.vizEssPhase="pause"; u.vizEssT=0; }
+      } else if(u.vizEssPhase==="pause"){
+        const dauer=u.vizEssErfolg?WETT_PAUSE_T:WETT_PAUSE_FAIL_T;
+        if(u.vizEssT>=dauer){ u.vizEssPhase="warten"; u.vizEssT=0; sfx("wettessen","gong"); }
+      }
+      // "warten" laeuft ohne eigene Uhr weiter, bis die naechste Enthuellung "greifen" neu
+      // ausloest — kein weiterer Zweig noetig.
+    }
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -14871,14 +14957,21 @@
     if(BB().schach){ if(!schachPublikumAn){ tonLoopStart("speed-schach"); schachPublikumAn=true; } }
     else if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
     // Dasselbe fuer Eiskunstlauf (s. bodenEis() unten) — derselbe Wechsel-Fall, falls wir
-    // GERADE von einem Duett-Kampf auf eine der sechs generischen Buehnen-Disziplinen
-    // (Speed-Schach/Breaking/Fechten/Tennis/Wettessen/I-Spy) wechseln.
+    // GERADE von einem Duett-Kampf auf eine der verbleibenden generischen Buehnen-
+    // Disziplinen (Speed-Schach/Breaking/Fechten/Tennis/I-Spy) wechseln.
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
     // SHOWCASE (PR S1, Konzept 17.09.): bekommt seit dieser PR ein eigenes bodenShowcase()
     // (s. dort) statt dieser Funktion -- dasselbe Wechsel-Fall-Muster wie Heben/Eiskunstlauf
-    // direkt oberhalb, falls wir GERADE von Showcase auf eine der sechs verbleibenden
+    // direkt oberhalb, falls wir GERADE von Showcase auf eine der verbleibenden
     // generischen Buehnen wechseln.
     if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+    // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): bekommt seit dieser PR
+    // ebenfalls ein eigenes bodenWettessen() (s. dort) statt dieser Funktion -- derselbe
+    // Wechsel-Fall, falls wir GERADE von Wettessen auf eine der verbleibenden generischen
+    // Buehnen (Speed-Schach/Breaking/Fechten/Tennis/I-Spy) wechseln. Wettessen fuehrt
+    // keinen eigenen Publikums-Loop (D2.c) — es gibt deshalb kein wettessenPublikumAn und
+    // nichts hier zu stoppen; bodenWettessen() selbst stoppt beim Betreten alle VIER
+    // Loops oben (Heben/Schach/Eiskunstlauf/Showcase), s. dort.
   }
   // rein praesentational, s. bodenBuehne() oben fuer Start/Stop und reset() (N1-Fix) fuer
   // den Rueckstell-Zwang beim naechsten Speed-Schach-Spiel.
@@ -14978,6 +15071,65 @@
   // Gemeinsame Y-Koordinate des Publikums -- bodenShowcase() (Silhouetten) und
   // zeichneShowcase() (Applaus-Ring, s. dort) muessen denselben Wert treffen.
   function showcasePublikumY(){ return H*0.98; }
+
+  // ================== WETTESSEN: EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen ====
+  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // Vorbild fuer die Motive ist app/foundation/discipline-stage/arena/disciplines/platter.tsx
+  // ("Banquet-Tafel frontal ... Tellerstapel waechst unter jedem Esser ... Magen-Meter unten
+  // mit Gabel-Marker des Fuehrenden") -- NICHT 1:1 uebernommen (SVG vs. Canvas-Primitiven,
+  // andere Aufloesung), sondern dieselbe visuelle Sprache im Massstab von
+  // bodenHeben()/bodenShowcase() daneben. Ersetzt den generischen violetten
+  // Drei-Scheinwerferkegel-Boden (bodenBuehne()) durch eine Bankett-Halle: warmes
+  // Kerzenlicht statt kaltem Buehnenlicht, eine lange karierte Tafel quer durch die
+  // Bildmitte — genau dort, wo die Zwei-Reihen-Aufstellung (Heim oben, Gast unten, s.
+  // zeichneWettessen()) die beiden Seiten ohnehin schon gegenueber positioniert.
+  //
+  // KEIN Publikums-Loop (D2.c, dieselbe Begruendung wie Climbing/Spurt/Time-Trial: Risiko
+  // ohne Punkte, A4 ist binaer) — muss aber, wie bodenShowcase() es vormacht, saemtliche
+  // Loops der Buehnen VOR Wettessen abschalten, falls wir GERADE von einer von ihnen
+  // herkommen.
+  function bodenWettessen(){
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+
+    // GRUNDFLAECHE: warmes Bankett-Kerzenlicht statt bodenBuehne()s kaltem Wettkampf-Podest.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv).
+    ctx.fillStyle="rgba(20,10,6,.75)";ctx.fillRect(W/2-130,4,260,26);
+    ctx.strokeStyle="rgba(242,193,78,.7)";ctx.lineWidth=1;ctx.strokeRect(W/2-130,4,260,26);
+    ctx.font="800 15px Georgia,serif";ctx.fillStyle="rgba(242,193,78,.85)";
+    ctx.textAlign="center";ctx.fillText("W E T T E S S E N",W/2,22);
+
+    // WIMPELKETTE, dieselbe Idee wie platter.tsx' Banner-Band.
+    ctx.fillStyle="rgba(230,210,180,.35)";
+    for(let i=0;i<18;i++){
+      const wx=(i+0.5)*W/18;
+      ctx.beginPath();ctx.moveTo(wx,32);ctx.lineTo(wx+7,42);ctx.lineTo(wx-7,42);ctx.closePath();ctx.fill();
+    }
+
+    // LANGE BANKETTAFEL, karierte Tischdecke, quer durch die Bildmitte — dort, wo die
+    // beiden Reihen (Heim oben bei H*0.32, Gast unten bei H*0.66, s. zeichneWettessen())
+    // einander gegenuebersitzen.
+    const tafelY0=H*0.45, tafelY1=H*0.55, felder=28;
+    ctx.fillStyle="#5a2416";ctx.fillRect(0,tafelY0,W,tafelY1-tafelY0);
+    ctx.fillStyle="rgba(242,237,226,.14)";
+    for(let i=0;i<felder;i+=2)ctx.fillRect(i*W/felder,tafelY0,W/felder,tafelY1-tafelY0);
+    ctx.strokeStyle="rgba(0,0,0,.35)";ctx.lineWidth=1.5;ctx.strokeRect(0,tafelY0,W,tafelY1-tafelY0);
+
+    // KETCHUP-/SENF-FLASCHEN entlang der Tafel (platter.tsx' Buffet-Requisiten) — rein
+    // dekorativ, ohne Bezug zu einem einzelnen Teilnehmer.
+    for(let i=0;i<6;i++){
+      const bx=W*0.10+i*(W*0.80)/5;
+      ctx.fillStyle=i%2?"#f2c14e":"#e6432e";
+      ctx.fillRect(bx-2.5,tafelY0-14,5,14);
+      ctx.fillRect(bx-1.5,tafelY0-19,3,6);
+    }
+  }
 
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
   // Screenshot-Befund: "generischer dunkler Buehnenboden" fuer eine Sportart mit einer
@@ -15140,7 +15292,9 @@
     const art=BB();
     // SHOWCASE (PR S1, Konzept 17.09.): eigener Boden statt des generischen Podests --
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
-    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else bodenBuehne();
+    // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): genau die weitere
+    // else-if-Zeile, die der Kommentar oben ankuendigt -- s. bodenWettessen() oben.
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -15152,28 +15306,35 @@
     // BUEHNE_ART.tennis) — dasselbe Muster wie die drei Zweige direkt oberhalb. Schlaeger an
     // der Hand (DISZIPLIN_PROP.tennis) + Ballwechsel-Visualisierung, s. zeichneTennis()
     // unten. Aendert nichts an Eiskunstlauf (eigener Duett-Zweig direkt darunter) oder den
-    // drei verbleibenden Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten-
-    // Buehnen (I-Spy/Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
+    // verbleibenden Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis-Buehnen (I-Spy/
+    // Showcase/Fechten/Wettessen), die ueber die jeweils eigenen Zweige unten laufen.
     if(art.tennis){ zeichneTennis(art); return; }
     // FECHTEN (Ziel 10, 16.09.): eigener Zweig, exklusiv auf `art.fechten` gegated (s.
     // BUEHNE_ART.fechten) — dasselbe Muster wie die vier Zweige oberhalb. Eigene Fechtbahn +
     // Degen an der Hand (DISZIPLIN_PROP.fechten) + Ausfallschritt-/Parade-Bewegung, s.
-    // stepFechten()/zeichneFechten() weiter unten. Aendert nichts an den drei verbleibenden
+    // stepFechten()/zeichneFechten() weiter unten. Aendert nichts an den verbleibenden
     // Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten-Buehnen (I-Spy/
-    // Showcase/Wettessen), die weiterhin den generischen Zweig durchlaufen.
+    // Showcase/Wettessen), die ueber die jeweils eigenen Zweige unten laufen.
     if(art.fechten){ zeichneFechten(art); return; }
+    // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a): eigener
+    // Zweig, exklusiv auf `art.wettessen` gegated (s. BUEHNE_ART.wettessen) — dasselbe
+    // Muster wie die fuenf Zweige oberhalb. Banketttafel (bodenWettessen()) + Latz-
+    // Serviette/Tellerstapel/Magen-Meter, s. zeichneWettessen() weiter unten. Aendert
+    // nichts an I-Spy/Showcase, die weiterhin den generischen bzw. eigenen Zweig darunter
+    // durchlaufen.
+    if(art.wettessen){ zeichneWettessen(art); return; }
     // SHOWCASE (PR S0, Talentshow-Konzept 17.09., docs/design/showcase-talentshow-konzept-
     // 17-09.md Abschnitt 5): eigener Zweig, exklusiv auf `art.showcase` gegated (s.
-    // BUEHNE_ART.showcase) -- dasselbe Muster wie die vier Zweige oberhalb. Fuer PR S0
+    // BUEHNE_ART.showcase) -- dasselbe Muster wie die fuenf Zweige oberhalb. Fuer PR S0
     // zeichnet zeichneShowcase() noch 1:1 denselben generischen Zweig weiter (s. dessen
     // Funktionskopf) -- Buehnenbild (PR S1) und die sechs Acts (PR S2) folgen. Aendert
-    // nichts an Wettessen/I-Spy, die weiterhin den generischen Zweig unten durchlaufen.
+    // nichts an I-Spy, das weiterhin den generischen Zweig unten durchlaeuft.
     if(art.showcase && typeof zeichneShowcase==="function"){ zeichneShowcase(art); return; }
     // EISKUNSTLAUF-DUETT (#856/#857): eigener Zweig, exklusiv auf `art.duett` gegated —
     // die einzige Beruehrung mit diesem geteilten Dispatcher, s. Kommentar bei
-    // zeichneDuett() unten. Die drei verbleibenden Nicht-Heben/Nicht-Schach/Nicht-
-    // Breaking/Nicht-Tennis/Nicht-Fechten-Buehnen (I-Spy/Showcase/Wettessen) durchlaufen den
-    // generischen Zweig darunter weiterhin unveraendert.
+    // zeichneDuett() unten. Die verbleibende Nicht-Heben/Nicht-Schach/Nicht-Breaking/
+    // Nicht-Tennis/Nicht-Fechten/Nicht-Wettessen/Nicht-Showcase-Buehne (I-Spy) durchlaeuft
+    // den generischen Zweig darunter weiterhin unveraendert.
     if(art.duett){ zeichneDuett(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
@@ -15474,6 +15635,143 @@
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";
       ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== WETTESSEN: TEILNEHMER-BILD (Opus-Plan Naechste-Drei-Disziplinen ========
+  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // Exklusiv auf `art.wettessen` gegated (BUEHNE_ART.wettessen) -- dasselbe Muster wie die
+  // fuenf Zweige davor (Heben/Schach/Breaking/Tennis/Fechten) in zeichneBuehne(): eigener
+  // Flag, eigene Funktion, kein Eingriff in den generischen Zweig, den I-Spy weiterhin
+  // unveraendert durchlaeuft (Showcase hat inzwischen ebenfalls einen eigenen Zweig).
+  //
+  // AUFGESETZT AUF DIE GENERISCHE ZWEI-REIHEN-GEOMETRIE (dieselbe Positionsformel wie der
+  // generische Zweig/zeichneTennis: `90+(W-180)*i/(g.length-1)`, Heim oben bei H*0.32, Gast
+  // unten bei H*0.66) statt eines vollstaendigen Layoutbruchs — die beiden Reihen sitzen
+  // sich an der Bankettafel (bodenWettessen()) ohnehin schon gegenueber, "frontal" kommt
+  // aus dem Boden, nicht aus einer neuen Koordinatenformel. Kein Feld wird hier gelesen,
+  // das nicht auch der generische Zweig schon liest (u.summe/u.aktuell/u.n/u.lunge).
+  //
+  // DREI BESPOKE ERGAeNZUNGEN aus platter.tsx, alle rein zeichnerisch:
+  //   1. LATZ-SERVIETTE (rot-weiss gestreift) am Hals jedes Essers -- platter.tsx' Serviette,
+  //      hier OHNE DISZIPLIN_PROP (kein Requisiten-Overlay, D2.d bewusst ausgelassen wegen
+  //      moeglicher Kollision mit paralleler DISZIPLIN_PROP-Arbeit), direkt als eigenes
+  //      Canvas-Primitiv oberhalb der Figur gezeichnet.
+  //   2. TELLERSTAPEL unter jedem Esser -- waechst mit u.aktuell+1, genau der Zahl bereits
+  //      enthuellter Durchgaenge, die BUEHNE_ART.wettessen.rundenN:8 vorgibt.
+  //   3. MAGEN-METER mit Gabel-Marker des FUEHRENDEN (hoechstes u.summe ueber BEIDE Seiten)
+  //      am unteren Bildrand, platter.tsx' "Magen-Meter unten mit Gabel-Marker des
+  //      Fuehrenden".
+  //
+  // BEWEGUNG LIEST AUSSCHLIESSLICH stepWettessen()s viz*-Felder (vizEssPhase/vizEssT) fuer
+  // einen kleinen Kau-/Schling-Wipper — kein neuer buehnenBewegung()-Zweig hier, kein
+  // rr()-Aufruf.
+  function zeichneWettessen(art){
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const y=side===0?H*0.32:H*0.66;
+      g.forEach((u,i)=>{
+        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        ctx.globalAlpha=u.lunge>0?1:0.92;
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+        ctx.globalAlpha=1;
+
+        // TELLERSTAPEL, VOR der Figur gezeichnet (liegt hinter ihr auf dem Tisch) --
+        // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
+        // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
+        const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
+        for(let p=0;p<teller;p++){
+          ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
+          ctx.globalAlpha=0.65+p*0.03;
+          ctx.beginPath();ctx.ellipse(x,y+22-p*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
+        }
+        ctx.globalAlpha=1;
+
+        zeichneSprite(ctx,u,x,y);
+
+        // LATZ-SERVIETTE, rot-weiss gestreift, am Hals -- platter.tsx' Serviette-Motiv.
+        for(let s=0;s<4;s++){
+          ctx.fillStyle=s%2===0?"#f2ede2":"#e6432e";
+          ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
+        }
+
+        // KAU-/SCHLING-WIPPER: ein kleiner, an vizEssPhase gebundener Ausschlag, damit ein
+        // wartender Esser nicht als Standbild einfriert -- dasselbe Anti-Freeze-Prinzip wie
+        // stepFechten()s vizFechtBob, hier ohne eigenes Zeitfeld direkt aus vizEssT/
+        // vizEssPhase abgeleitet (kein weiteres viz*-Feld noetig).
+        const essPhase=u.vizEssPhase, essT=u.vizEssT||0;
+        let wipp=0;
+        if(essPhase==="schlingen")wipp=Math.sin(essT*26)*2.2;
+        else if(essPhase==="kauen")wipp=Math.sin(essT*18)*1.4;
+        if(wipp){
+          ctx.save();ctx.translate(x,y-8+wipp);
+          ctx.fillStyle="rgba(0,0,0,.18)";ctx.beginPath();ctx.ellipse(0,0,5,3,0,0,6.3);ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        const w=30,p=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+      });
+    });
+
+    // MAGEN-METER, unterer Bildrand, mit Gabel-Marker des Fuehrenden (platter.tsx' Magen-
+    // Meter + Gabel-Marker) — der Fuehrende ist, ueber BEIDE Seiten hinweg, wer die meisten
+    // Punkte hat. FUELLSTAND kommt bewusst NICHT aus leader.summe/maxSumme: `maxSumme` ist
+    // per Definition das Maximum ueber alle u.summe, der Fuehrende TRAeGT also immer genau
+    // diesen Wert — die Gabel stuende schon beim allerersten Biss am rechten Anschlag, statt
+    // sich ueber den Auftritt hinweg zu fuellen. Stattdessen (leader.aktuell+1)/art.rundenN:
+    // wie viele der acht Durchgaenge der Fuehrende schon geschafft hat — ein "Magen"-Fuellstand,
+    // der ueber den Auftritt hinweg tatsaechlich waechst, unabhaengig vom Punktestand.
+    const meterX0=90, meterX1=W-90, meterY=H-24;
+    ctx.fillStyle="rgba(16,9,6,.55)";ctx.strokeStyle="rgba(242,193,78,.4)";ctx.lineWidth=0.8;
+    ctx.fillRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
+    ctx.strokeRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.75)";
+    ctx.textAlign="left";ctx.fillText("MAGEN-METER",meterX0-4,meterY-15);
+    ctx.fillStyle="rgba(0,0,0,.5)";ctx.fillRect(meterX0,meterY-3,meterX1-meterX0,6);
+    const leader=TEILNEHMER.reduce((best,u)=>(!best||u.summe>best.summe)?u:best,null);
+    if(leader){
+      const lx=meterX0+(meterX1-meterX0)*Math.min(1,(leader.aktuell+1)/art.rundenN);
+      ctx.fillStyle="rgba(242,193,78,.4)";ctx.fillRect(meterX0,meterY-3,lx-meterX0,6);
+      // GABEL-MARKER: eine kleine gezeichnete Gabel statt eines Emoji — dieser Canvas-
+      // Renderer zeichnet ueberall ausschliesslich Vektor-Primitiven, kein einziges
+      // Ereignis im ganzen Motor nutzt eine Emoji-Glyphe (nachgezaehlt).
+      ctx.strokeStyle="#f2c14e";ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(lx,meterY-11);ctx.lineTo(lx,meterY-2);ctx.stroke();
+      for(const tx of [-2,0,2]){
+        ctx.beginPath();ctx.moveTo(lx+tx,meterY-11);ctx.lineTo(lx+tx,meterY-6);ctx.stroke();
+      }
+    }
+
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      if(f._teilnehmer!=null){
+        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
+        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
+          const i=g.indexOf(u);
+          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
+          ctx.fillText(f.txt,x,y);
+        }
+      }
       ctx.globalAlpha=1;
     }
   }
@@ -21663,6 +21961,26 @@
       }},
       stampf:   {synth:(vol)=>tonSchlag(vol,180,55,0.3)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.c): vier
+    // Ereignisse an genau den Kanten, die stepWettessen() ohnehin sieht (s. dort), dieselben
+    // Grundbausteine wie ueberall sonst im Katalog:
+    //  - biss      (tonKlick, kurz+hell): ein frisch enthuellter Durchgang beginnt -- der
+    //    Griff nach der naechsten Speise, an der Kante u.aktuell!==u.vizEssAktuell.
+    //  - schlingen (tonDoppelton, aufsteigend): der Erfolgsausgang (erfolgWort "schlingt
+    //    durch"), an der Kante "greifen" -> "schlingen".
+    //  - pause     (tonBuzzer): der Fehlschlagausgang -- Chris' eigenes Wort dafuer
+    //    (BUEHNE_ART.wettessen.failWort "muss kurz pausieren"), an der Kante "greifen" ->
+    //    "pause".
+    //  - gong      (tonMetall, dumpf): das Durchgangsende -- der Moment, in dem "pause"
+    //    auslaeuft und der naechste Griff wieder moeglich waere.
+    // KEIN Publikums-Loop -- dieselbe Begruendung wie bei Climbing/Spurt/Time-Trial: Risiko
+    // ohne Punkte, A4 ist binaer (Katalogeintrag vorhanden oder nicht).
+    wettessen:{
+      biss:      {synth:(vol)=>tonKlick(vol,1900,0.05)},
+      schlingen: {synth:(vol)=>tonDoppelton(vol,520,760,0.22)},
+      pause:     {synth:(vol)=>tonBuzzer(vol,0.3)},
+      gong:      {synth:(vol)=>tonMetall(vol,260,0.55)}
     }
   };
 
