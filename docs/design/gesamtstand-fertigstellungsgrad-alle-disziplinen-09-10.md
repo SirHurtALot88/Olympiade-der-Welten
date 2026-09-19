@@ -1,3 +1,182 @@
+**Siebzehnter Nachtrag 19.09. — Wettessen auf 72,5 % nachgezogen (PR #965), eigene Banketttafel
+statt generischem Podest.** Der sechzehnte Nachtrag (direkt darunter) hatte Wettessen unangetastet
+bei 46,25 % (Konzept 35/Assets 40/Gameplay 95/Movement 15) stehen lassen. Seither ist ein PR
+gemergt, der `docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md` Abschnitt 3.2 umsetzt
+(D2.a+D2.b+D2.c; D2.d bewusst ausgelassen, s. u.): PR #965 (`docs/design/wettessen-tafel-17-09.md`).
+`main` steht jetzt bei `2f478d6c`. **rho FRISCH nachgemessen, nicht aus dem PR-Text übernommen:**
+
+```
+node scripts/miss-alle-disziplinen.mjs 24 wettessen
+```
+→ **0,845** (Spannweite 0,139, Saison-rho 0,930, Spannweite 0,091), bestanden — bit-identisch zur
+Basislinie vom 17.09. und zum PR-Text. Keine Überraschung: der PR rührt weder `rezept` noch
+`wert()` noch `WERTUNG_AUFTRITT()` an — der PR-Text selbst hält das fest ("Rezept/wert()/rundenN/
+failAbzug (`BUEHNE_ART.wettessen`) sind in dieser PR nicht angefasst").
+
+**Alle sechzehn Teilkriterien einzeln gegen den heutigen Code geprüft, nicht aus dem PR-Text
+übernommen:**
+
+**Konzept: 35→35, keine Bewegung — ausdrücklich geprüft, PR #965 ist reine Präsentation.**
+- **K1 (eigenes Rezept):** unverändert erfüllt — `BUEHNE_ART.wettessen.rezept`
+  (`battle-mode.engine.js:12619-12627`) existiert seit dem Chassis-Umzug (MATRIX will 26/health
+  22/stamina 22/determination 16/intelligence 8/torment 6, bewusst ohne Charisma), PR #965 ändert
+  keine Zahl darin. **25.**
+- **K2 (eigene Mechanik über das Chassis hinaus): weiterhin NICHT erfüllt, ausdrücklich
+  gegengeprüft.** `wettessen:true` (`:12617`) ist "rein deskriptiv, ohne Wirkung auf
+  rezept/wert()/rundenN/failAbzug/failWort/erfolgWort" (Kommentar an derselben Stelle) und schaltet
+  ausschließlich zwischen Zeichen-/Bewegungsfunktionen um. `stepWettessen()` ist — wörtlich aus dem
+  Opus-Plan übernommen, Abschnitt 2.3, im PR-Kopfkommentar selbst zitiert: „ein wettessen:true-Flag
+  samt stepWettessen() ist Movement, nicht Konzept" — eine reine Präsentations-Zustandsmaschine
+  ohne Wirkung auf `u.summe`/`u.aktuell`/den Score selbst, genau die Tennis-Präzedenz (K2 trotz
+  eigenem Zeichenzweig unbewegt, weil „die Mechanik selbst" unverändert bleibt). **0 (unverändert).**
+- **K3 (eigenes Fable-Dokument): weiterhin NICHT erfüllt, ausdrücklich gegengeprüft.**
+  `wettessen-tafel-17-09.md` ist das erste wettessen-eigene Dokument überhaupt (vorher: „Es gibt
+  kein Dokument, das Wettessen als Sportart modelliert", altes Konzept-35-Zitat in Abschnitt 2) —
+  aber es modelliert die Disziplin ebenfalls nicht „von Grund auf": es beschreibt ausschließlich,
+  wie eine bereits vorhandene Ereignisliste (`rundenN`/`failWort`/`erfolgWort`) sichtbar/hörbar
+  gemacht wird, exakt die „Präsentations-, keine Konzeptrunde"-Einordnung, die der Opus-Plan sich
+  selbst gibt (Abschnitt 2.3: „Sie bewegen Konzept nicht"). **Keine Bewegung.**
+- **K4 (kalibriert, offene Designfragen entschieden): weiterhin OFFEN, ausdrücklich geprüft.** Keine
+  Kalibrierrunde versucht, rho bit-identisch. **0 (unverändert).**
+
+Konzept bleibt bei **35** — keines der vier Kriterien bewegt sich, wie von einer reinen
+Präsentationsrunde erwartet.
+
+**Assets: 40→85.**
+- **A1 (eigene Feld-Datei im PRODUKTIVEN React-Renderer): bereits VOR PR #965 voll erfüllt,
+  unverändert — keine Bewegung dieser Runde, wie vom Auftrag ausdrücklich verlangt gegengeprüft.**
+  `app/foundation/discipline-stage/arena/disciplines/platter.tsx` (441 Z.) existiert seit dem
+  06.09. (PR `7fb7c864`) als eigene, wettessen-spezifische Datei — Kopfkommentar „Banquet-Tafel
+  frontal: Esser-Tokens ... Tellerstapel wächst unter jedem Esser. Magen-Meter unten mit
+  Gabel-Marker des Führenden", mit eigener karierter Bankett-Tafel-Kunst, Neon-Schild „WETTESSEN",
+  Wimpel-Band, Buffet-Turm-/Champion-Gürtel-Dekoration und Ketchup-/Senf-Flaschen — keine generische
+  Wrapper-Datei, dieselbe Kategorie wie `mountain.tsx`/`showcase.tsx`, die trotz ebenfalls geteiltem
+  `TokenChrome`/`useTokenGlide`/`GhostLayer` (`benchmark.tsx`) alle A1=voll führen. `git log --
+  .../platter.tsx` bestätigt: **ein einziger** Commit überhaupt (`7fb7c864`, 06.09.), keiner davon
+  PR #965. **30 (unverändert).**
+- **A2 (eigene Szene im Mockup-Motor über das geteilte Chassis-Bild hinaus): NEU voll erfüllt,
+  vorher 0.** `bodenWettessen()` (`battle-mode.engine.js:15091-15132`, PR #965) ersetzt an der
+  Weiche in `zeichneBuehne()` (`:15297`, `else if(art.wettessen&&typeof
+  bodenWettessen==="function")bodenWettessen();`) den generischen `bodenBuehne()`-Zweig, den
+  Wettessen bis dahin mit I-Spy/Fechten/Tennis/Speed-Schach teilte, durch eine eigene Bankett-Halle:
+  warmes Kerzenlicht statt kaltem Wettkampf-Podest, Neon-Schild „WETTESSEN", 18-teilige
+  Wimpelkette, eine lange karierte Bankettafel quer durch die Bildmitte (`tafelY0=H*0.45`) und sechs
+  Ketchup-/Senf-Flaschen als Dekoration. `zeichneWettessen()` (`:15670 ff.`) zeichnet zusätzlich
+  einen mit `u.aktuell+1` wachsenden Tellerstapel je Esser und ein Magen-Meter mit Gabel-Marker
+  (`(leader.aktuell+1)/art.rundenN`, nach einer eigenen, im PR dokumentierten Korrekturrunde: die
+  erste Fassung teilte durch `maxSumme`, das der Führende per Definition immer selbst trägt, und
+  stand deshalb immer bei 100 %). Sicht-QA per Playwright bestätigt
+  (`wettessen-tafel-17-09-uebersicht.png`/`-nachher.png`: Tellerstapel/Meter wachsen sichtbar von
+  1/8 auf 2/8) plus Gegenprobe: I-Spy/Showcase Pixel-Diff in derselben Größenordnung wie die
+  Baseline-vs-Baseline-Kontrollmessung. **25.**
+- **A3 (disziplinrichtige Requisite): weiterhin NICHT voll erfüllt — ausdrücklich NICHT
+  schöngerechnet, wie vom Auftrag verlangt.** `DISZIPLIN_PROP` (`battle-mode.engine.js:2899-2926`)
+  führt heute elf Einträge (`gewichtheben`/`takeshi`/`hockey`/`staffel`/`showcase`/`speed-schach`/
+  `eiskunstlauf`/`tennis`/`fechten`/`time-trial`/`spurt`) — **kein `wettessen`-Eintrag**,
+  nachgezählt im heutigen Code. Die optionale Gabel-/Teller-Requisite aus D2.d („bewusst
+  ausgelassen ... weil DISZIPLIN_PROP die Tabelle ist, an der möglicherweise parallel laufende
+  Arbeit ebenfalls ansetzen will", PR-Text) wurde nicht gebaut — dieselbe Kollisionsvorsicht, die
+  Climbings A3 (D1.c) am 17.09. schon offen ließ. Der bestehende Bestandteil bleibt: die alte
+  Assets-Zeile trug bereits +10 aus dem 10.09.-Fund „Zufallswaffen-Bug geschlossen"
+  (`DISZIPLIN_WAFFE.wettessen:null`, `:2474`, unverändert) — derselbe undokumentierte Teilkredit,
+  den auch Climbings Zeile vor PR #963 trug (s. sechzehnter Nachtrag, „10-Punkte-Teilkredit, den die
+  Scorecard nicht aufschlüsselt"). Diese Runde bewegt daran nichts. **10 (unverändert) — offen für
+  eine spätere Runde.**
+- **A4 (Ton, Musik, Kulisse): NEU voll erfüllt, vorher 0.** `TON_KATALOG.wettessen`
+  (`battle-mode.engine.js:21979-21984`, PR #965) führt vier Ereignisse (`biss`/`schlingen`/`pause`/
+  `gong`) aus genau den fünf Ton-Primitiven, die der Katalog überall sonst benutzt. Verdrahtet in
+  `stepWettessen()` (`:14838-14875`): `biss` an der Kante „frisch enthüllter Durchgang beginnt"
+  (`u.aktuell!==u.vizEssAktuell`), `schlingen`/`pause` am Erfolgs-/Fehlschlagausgang
+  (`art.erfolgWort`/`art.failWort`), `gong` beim Verlassen von „pause". Alle vier reine
+  `viz*`-Lesezähler, kein `rr()`-Aufruf. Kein Publikums-Loop — dieselbe binäre „hat Ton"-Schwelle
+  wie bei Climbing/Spurt/Time-Trial. **20.**
+
+Assets steigt von **40 auf 85** — exakt der Wert, den der Opus-Plan (Abschnitt 2.1/3.2)
+vorhergesagt hatte (A1 30 unverändert + A3-Teilkredit 10 unverändert + A2 25 neu + A4 20 neu = 85).
+**A3 bleibt die einzige offene Lücke**, Assets erreicht damit NICHT den Deckel (100), anders als bei
+Fechten/Time-Trial/Spurt/Showcase (deren A3 bereits gezogen wurde) und wie bei Climbing (dessen A3
+ebenfalls bewusst zurückgestellt ist).
+
+**Gameplay: 95→95, keine Bewegung — ausdrücklich geprüft, PR #965 rührt weder Rezept noch
+Produktionsanschluss an.** G1 (rho 0,845, unverändert in der 0,80–0,85-Stufe → 35), G2
+(`"wettessen"` weiterhin in `ARENA_RESOLVED_DISCIPLINE_IDS`, `lib/resolve/battle-mode-arena-team-
+points.ts:317` und `:811` → 30), G4 (`jeSeite:6`, Bühne-Chassis → 15) — unverändert. **Ehrlich
+vermerkt, außerhalb des Auftrags dieser Runde:** G3 (eigene Wertung) rechnet sich für die
+bestehende Zeile bislang mit voller 15 (35+30+15+15=95), obwohl Wettessens Wertungstabelle über
+dieselbe geteilte `WERTUNG_AUFTRITT()`-Funktion (`:16860`) läuft wie Showcase/Eiskunstlauf/
+Breaking — und genau diese Teilung hat der fünfzehnte Nachtrag für Showcase als Grund für NUR eine
+TEILWEISE G3-Vergabe (10) festgehalten („WERTUNG_AUFTRITT, geteilt mit Wettessen/Eiskunstlauf/
+Breaking, deshalb weiterhin nur teilweise ‚eigene Wertung'"). Mit derselben Regel angewendet stünde
+Wettessen bei Gameplay 90, nicht 95 — eine Inkonsistenz, die schon vor PR #965 bestand (PR #965
+rührt `WERTUNG_AUFTRITT()` nicht an) und mutmaßlich mehrere andere „Auftritt"-Zeilen gleichermaßen
+betrifft (Gewichtheben/Eiskunstlauf/Breaking). **Diese Runde korrigiert das NICHT** — eine
+Gameplay-Änderung außerhalb dessen, was PR #965 tatsächlich bewegt hat, gehört in einen eigenen
+Gameplay-Audit über alle betroffenen Zeilen, nicht in einen Assets-/Movement-Nachtrag zu einer
+einzelnen PR. Gameplay bleibt in dieser Tabelle bei **95**, rho bit-identisch bestätigt oben.
+
+**Movement: 15→75.**
+- **M1 (eigene Zeichenfunktion im Mockup-Motor): NEU voll erfüllt, vorher 0.** `zeichneWettessen()`
+  (`:15670 ff.`, PR #965) ersetzt an der Weiche in `zeichneBuehne()` (`:15325`,
+  `if(art.wettessen){ zeichneWettessen(art); return; }`) den bis dahin generischen
+  Zwei-Reihen-Zweig, den Wettessen mit I-Spy weiterhin teilt — bestätigt per
+  Playwright-Gegenprobe (I-Spy/Showcase Diff in Rauschgrößenordnung). **35.**
+- **M2 (eigene Bewegungs-/Schrittlogik): NEU voll erfüllt, vorher 0.** `stepWettessen()`
+  (`:14838-14875`, PR #965) ist eine echte Zustandsmaschine mit vier Zuständen (`greifen`→
+  `schlingen`→`kauen`→`pause`), die den `failWort`/`erfolgWort`-Ausgang des Durchgangs liest und
+  ausschließlich `u.vizEssPhase`/`u.vizEssT`/`u.vizEssAktuell`/`u.vizEssErfolg` schreibt —
+  vertragsgleich zu `stepFechten()`/`stepSchach()`/`stepKuer()` (niemals `rr()`, niemals
+  `u.summe`/`u.aktuell`/`u.runden` anfassen). Vorher hatte Wettessen überhaupt keinen eigenen
+  `buehnenBewegung()`-Zweig (lief durch den generischen Fall). **25.**
+- **M3 (sichtbare Animation in der PRODUKTIVEN React-Bühne): bleibt bei einer TEILWEISEN
+  Erfüllung, unverändert — ausdrücklich wie vom Auftrag verlangt gegen die Produktionsdatei
+  geprüft, nicht gegen den Mockup-Motor.** `platter.tsx` ist von PR #965 nicht berührt (s. A1).
+  Anders als bei Climbing (`mountain.tsx`, eigene `requestAnimationFrame`-Schleife mit eigenem
+  `swayOf()`-Schlingern statt des geteilten `useTokenGlide`) oder Fechten (`lamps.tsx`, eigene
+  Token-Zeichnung statt `TokenChrome`) baut `platter.tsx` seine Token-Bewegung selbst auf dem
+  geteilten `useTokenGlide`-Hook auf (`:41`, `const { gRefs, ghostRefs } = useTokenGlide(props);`)
+  — nicht auf einem eigenen Positionierungssystem. Es trägt aber, anders als `showcase.tsx` vor
+  seiner eigenen Runde (das laut fünfzehntem Nachtrag „nur den geteilten Bausatz plus die
+  generische `olyGlowPulse`-Animation" zeigte), zusätzliche eigene, laufend animierte Elemente:
+  einen imperativ über `updateStackHeight()` (`:62-84`) nachgezogenen, mit dem Score wachsenden
+  Tellerstapel je Token, sowie ein Magen-Meter mit eigenem CSS-`transition`(„width 4,9s linear")-
+  Füllstand und einen Gabel-Marker, der per eigenem `transition`(„x 4,9s linear") plus
+  Drop-Shadow-Glow über das Feld wandert (`:317-346`). Das ist mehr als die reine Glide/Ghost-Basis,
+  aber kein vollständiges eigenes Bewegungssystem wie bei Climbing/Fechten — dieselbe Einstufung,
+  die dem alten Movement-Bestand von 15 offenbar schon zugrunde lag (M1=M2=M4=0, M3=15 von 25
+  teilweise; 0+0+15+0=15, rechnerisch stimmig mit der alten Zeile). PR #965 bewegt diese Achse
+  nicht. **15 (unverändert).**
+- **M4 (disziplineigene Posen/FX an den Sprites): weiterhin NICHT erfüllt, ausdrücklich
+  gegengeprüft.** Genau die Lücke, die D2.d als „Schling-/Pause-Pose" benennt und bewusst
+  ausgelassen hat. Weder `stepWettessen()` noch `zeichneWettessen()` schreibt ein pose-wirksames
+  Feld an die BAU-Sprite-Figur selbst — der einzige neue Bewegungszusatz ist ein kleiner, von
+  `vizEssPhase`/`vizEssT` abgeleiteter „Kau-/Schling-Wipper" (eine separat gezeichnete
+  Schatten-Ellipse über der Figur, `:15702-15714`), kein verändertes Sprite-Blatt/keine veränderte
+  Körperhaltung. **0 (unverändert).**
+
+Movement steigt von **15 auf 75** — M1 und M2 waren die beiden offenen Lücken, M3 bleibt bei seiner
+alten Teilerfüllung (Produktionsseite unberührt von PR #965), M4 bleibt offen wie von D2.d
+angekündigt.
+
+**Ergebnis für die Tabelle:** Wettessen Konzept **35** (unverändert), Assets 40→**85**, Gameplay
+**95** (unverändert), Movement 15→**75**. **Gesamt: 46,25 %→72,5 %** — exakt der Wert, den
+`docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md` Abschnitt 3.2 als Ziel dieser
+Runde genannt hatte (D2.a+D2.b+D2.c ohne die optionale D2.d-Nachlese, die bei ausgeführter
+Requisite/Pose 80,00 % ergeben hätte). Die neunzehn übrigen Zeilen sind ziffernidentisch zum
+sechzehnten Nachtrag.
+
+**Neuer Gesamtdurchschnitt: 81 %→82 %** (rechnerisch 82,30 %, war 80,99 % nach dem sechzehnten
+Nachtrag). Je Achse: Konzept unverändert (82,0 % exakt, rundet weiter auf 82 %), Gameplay
+unverändert (76,7 % exakt, rundet weiter auf 77 %) — beide Achsen von PR #965 nicht berührt.
+Movement bewegt sich am stärksten: 81,25 %→**84,25 %** (rundet auf 84 %, allein aus Wettessens
+M1+M2-Sprung 15→75, +60 Punkte auf einer von zwanzig Zeilen). Assets bewegt sich zweitstärkst:
+84,0 %→**86,25 %** (rundet auf 86 %, allein aus Wettessens A2+A4, +45 Punkte). Anders als beim
+fünfzehnten Nachtrag (Showcase: alle vier Achsen zugleich) bewegt sich diese Runde wie beim
+sechzehnten (Climbing) nur auf zwei Achsen — Konzept und Gameplay blieben bei Wettessen bewusst
+unangetastet, weil PR #965 laut eigenem Dokument ausschließlich Zeichenfunktion, Bewegung und Ton
+hinzufügt, kein Rezept und keine Produktionsanbindung.
+
+---
+
 **Sechzehnter Nachtrag 17.09. — Climbing auf 86 % nachgezogen (PR #963), Kletterwand statt
 grauer Bahn.** Der fünfzehnte Nachtrag (direkt darunter) hatte Climbing unangetastet bei 65,5 %
 (Konzept 65/Assets 40/Gameplay 92/Movement 65) stehen lassen. Seither ist ein PR gemergt, der
@@ -817,6 +996,11 @@ oben. Die uebrigen neunzehn Zeilen sind gegenueber dem vierzehnten Nachtrag unve
 climbing`), alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. sechzehnter Nachtrag ganz
 oben. Die uebrigen neunzehn Zeilen sind gegenueber dem fuenfzehnten Nachtrag unveraendert.
 
+**Fuer den siebzehnten Nachtrag (19.09., `main` @ `2f478d6c`) ist zusaetzlich Zeile 18
+(Wettessen) aktualisiert** — rho frisch gemessen (`node scripts/miss-alle-disziplinen.mjs 24
+wettessen`), alle sechzehn Teilkriterien einzeln gegenkontrolliert, s. siebzehnter Nachtrag ganz
+oben. Die uebrigen neunzehn Zeilen sind gegenueber dem sechzehnten Nachtrag unveraendert.
+
 | # | Disziplin | Chassis | Konzept | Assets | Gameplay | Movement | **Gesamt** | rho | Arena | Letzte Aenderung |
 |--:|---|---|--:|--:|--:|--:|--:|--:|:--:|---|
 | 1 | Hockey | Feldspiel | 100 % | 100 % | 72 % | 100 % | **93 %** | 0,669 / 0,719 | ja | **13./14.09.** Leisten zeigen, was sie messen + eigenes Bodycheck-Bild (PR #910), sichtbare Puste-Leiste aus AUSDAUER (PR #914) — beide rho-ziffernidentisch, keine Achse bewegt · 12.09. Ton verdrahtet, Assets 80→100 (E2, PR #893) |
@@ -836,15 +1020,26 @@ oben. Die uebrigen neunzehn Zeilen sind gegenueber dem fuenfzehnten Nachtrag unv
 | 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe · **16.09. gegenkontrolliert:** unveraendert |
 | 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe · **16.09.-Nachzug:** PR #938 (15.09.) nimmt die Stufenaufstieg-Vorschau raus (auskommentiert, nicht geloescht) — reine Anzeigefunktion, war nie ein zaehlender Achsen-Baustein, keine Zahl bewegt sich |
 | 17 | Climbing | Bahn | 65 % | **85 %** | 92 % | **100 %** | **86 %** | 0,834 | ja | **17.09.-Nachzug (PR #963, 17.09.):** eigene Kletterwand statt der grauen, mit Spurt geteilten Bahn — `bodenClimbing()` (Weiche in `bodenSpurt()` auf `BA().climbing`) setzt eine mit der Strecke zunehmende Ueberhang-Schattierung plus 22 deterministische Risslinien und zehn grosse, zweifarbige Griffmarken exakt an `BAHN_ART.climbing.hindernisse` ueber die volle Wandhoehe — A2 erstmals voll erfuellt UND zugleich M1 (eigene Zeichenfunktion statt `bodenSpurtGerade()`), Assets 40→65, Movement-Anteil daraus 65→100 (M1 die letzte offene Movement-Luecke, M2/M3 bereits vorher voll ueber `stepClimbing()`/`mountain.tsx`). `TON_KATALOG.climbing` (vier Ereignisse griff/fehlgriff/zug/topout) erstmals verdrahtet in `stepClimbing()` — A4 erstmals erfuellt, Assets 65→85. rho bit-identisch **0,834** (reine Praesentation, Rezept/`wert()` unangetastet), Konzept/Gameplay unveraendert. **A3 bleibt bewusst offen** — die optionale Kreidebeutel-Requisite (D1.c) wurde ausgelassen, weil `DISZIPLIN_PROP` mit der parallelen Wettessen-Runde kollidiert haette; Climbing bleibt die einzige arena-resolved Bahn-Disziplin ohne eigene Requisite · **16.09.-Nachzug (PR #943, 16.09.):** eigene Rezeptkalibrierung — `BAHN_ART.climbing.rezept.STEHEN` neu gewichtet (Grid-Suche gegen die Matrix-Abweichung, `messe-arena-einfluss.mjs`/`sondiere-feldspiel-subskills.mjs`) hebt rho 0,782→**0,834**, G1-Stufe wechselt von 0,70–0,80 (22) auf 0,80–0,85 (35); zugleich Produktionsanbindung — `"climbing"` neu in `ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`, eigene PPS-Referenz gezogen, **G2 30 neu** — Climbing ist damit die 15. arena-resolved Disziplin, Gameplay 49→92. K4 bleibt bewusst offen (Puffer 0,034 kleiner als das Kaderrauschen 0,209, von der PR selbst als „duenner als Zeitfahrens" benannt), Konzept bleibt 65 · **14.09.** Puste-Erholung wirksam — 69,3 %→31,9 % bleiben leer, 59,7 % fangen sich wieder; rho 0,790→0,782 (PR #914), gleiche G1-Stufe · **Nachzug 14.09. (PR #925):** neues `stepClimbing()` erfuellt M2 erstmals, Movement 40→65 |
-| 18 | Wettessen | Buehne | 35 % | 40 % | 95 % | 15 % | **46 %** | 0,845 | ja | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
+| 18 | Wettessen | Buehne | 35 % | **85 %** | 95 % | **75 %** | **73 %** | 0,845 | ja | **19.09.-Nachzug (PR #965, 19.09.):** eigene Banketttafel statt generischem Podest — `bodenWettessen()`/`zeichneWettessen()` (Weiche in `zeichneBuehne()` auf `art.wettessen`) setzen eine karierte Bankett-Halle mit Neon-Schild, Latz-Serviette, einem mit `u.aktuell+1` wachsenden Tellerstapel je Esser und einem Magen-Meter mit Gabel-Marker des Führenden — A2 erstmals voll erfüllt, Assets 40→65 (Zwischenschritt); `TON_KATALOG.wettessen` (vier Ereignisse biss/schlingen/pause/gong) erstmals verdrahtet in `stepWettessen()` — A4 erstmals erfüllt, Assets 65→85. `stepWettessen()` selbst ist eine neue Zustandsmaschine (greifen→schlingen→kauen→pause) — M1 (eigene Zeichenfunktion) UND M2 (eigene Schrittlogik) beide erstmals voll erfüllt, Movement 15→75 (M3 bleibt bei seiner alten Teilerfüllung über `platter.tsx`, von PR #965 nicht berührt). rho bit-identisch **0,845** (reine Präsentation, Rezept/`wert()`/`WERTUNG_AUFTRITT()` unangetastet), Konzept/Gameplay unverändert. **A3 und M4 bleiben bewusst offen** — die optionale Gabel-/Teller-Requisite samt Schling-/Pause-Pose (D2.d) wurde ausgelassen, weil `DISZIPLIN_PROP` mit paralleler Arbeit hätte kollidieren können; Wettessen bliebe ohne sie bei Assets 100/Movement 90 (Gesamt 80,00 %) · 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 | 19 | Showcase | Buehne | **75 %** | **100 %** | 95 % | **95 %** | **91 %** | 0,892 | ja | **17.09.-Nachzug (PR #957/#959/#960/#961, 17.09.):** eigenes Flag `showcase:true` + `actVon()`-Act-Ableitung aus BAU-Bauplan/Klasse/Rasse/Traits (K2 neu) + eigenes Konzeptdokument (K3 neu) — Konzept 25→75 (K4 bewusst offen, Rezept unangetastet); `bodenShowcase()` (A2 neu), sechs Act-Requisiten (A3 neu), `TON_KATALOG.showcase` mit acht Ereignissen (A4 neu) — Assets 40→100 (A1 bereits vorher voll ueber `showcase.tsx`, unberuehrt); sechs eigene Act-Zeichenfunktionen (M1 neu) + `stepShowcase()`-Zustandsmaschine (M2 neu) + act-eigene Posen/FX (M4 neu) — Movement 20→95, **M3 bleibt bewusst teilweise** (`showcase.tsx`, der PRODUKTIVE React-Renderer, ist von keiner der vier PRs beruehrt — nur der geteilte `TokenChrome`/`useTokenGlide`-Bausatz, keine eigene Zusatzschicht). rho bit-identisch **0,892**, Gameplay unveraendert 95 (Rezept bewusst nicht angefasst) |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (17.09., nach dem sechzehnten Nachtrag): 81 %** (rechnerisch
-80,99 %, war 80 % nach dem fuenfzehnten Nachtrag, 78 % nach dem vierzehnten Nachtrag, 76 % nach dem
-dreizehnten Nachtrag, 75 % nach dem zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am
-14.09. vor der Merge-Welle, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse:
-**Konzept 82 % · Assets 84 % · Gameplay 77 % · Movement 81 %.**
+**Durchschnitt ueber alle zwanzig (19.09., nach dem siebzehnten Nachtrag): 82 %** (rechnerisch
+82,30 %, war 81 % (80,99 %) nach dem sechzehnten Nachtrag, 80 % nach dem fuenfzehnten Nachtrag,
+78 % nach dem vierzehnten Nachtrag, 76 % nach dem dreizehnten Nachtrag, 75 % nach dem zwoelften
+Nachtrag, 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am 10.09. vor der
+Feinschliff-/Football-Runde). Je Achse: **Konzept 82 % · Assets 86 % · Gameplay 77 % ·
+Movement 84 %.**
+
+*Die Bewegung seit dem sechzehnten Nachtrag (81 %→82 %) kommt ausschliesslich aus Wettessen
+(46,25 %→72,5 %, s. siebzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
+ziffernidentisch. Movement bewegt sich am staerksten (81,25 %→**84,25 %**, rundet auf 84 %, allein
+aus Wettessens M1+M2-Sprung 15→75, +60 Punkte). Assets bewegt sich zweitstaerkst (84,0 %→**86,25 %**,
+rundet auf 86 %, allein aus Wettessens A2+A4, +45 Punkte). Konzept und Gameplay bewegen sich nicht
+(82,0 % bzw. 76,7 % exakt, rundet weiter auf 77 %) — bei Wettessen war es ausschliesslich die
+Assets-/Movement-Achse, waehrend PR #965 laut eigenem Dokument bewusst kein Rezept und keine
+Produktionsanbindung anfasst. Wie beim sechzehnten Nachtrag (Climbing) bewegen sich diesmal nur
+zwei Achsen, nicht alle vier wie beim fuenfzehnten (Showcase).*
 
 *Die Bewegung seit dem fuenfzehnten Nachtrag (80 %→81 %) kommt ausschliesslich aus Climbing
 (65,5 %→85,5 %, s. sechzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
@@ -1871,18 +2066,49 @@ gehoert: der **erste** Satz Erholungs-Konstanten war schlicht tot — 0,0 % Erho
 Laeufer, waehrend die Rangtreue gruen meldete. Gefunden hat das ein Verteilungs-Werkzeug, nicht das
 Abnahme-Gate. **Eine tote Zeile veraendert nichts und besteht deshalb jede Abnahme.**
 
-### Wettessen — 46 % (35/40/95/15) — **kein eigenes Konzept**
-**10.09. Update:** Assets 30→40, Zufallswaffen-Bug geschlossen.
-**Konzept 35:** es gibt ein eigenes, aus der Matrix abgeleitetes Rezept (will 26/health 22/
-stamina 22, bewusst ohne Charisma, `:10761`) und eine eigene `wertungTabelle` mit Chris' eigenem
-Wort „Pause". Das war es. **Es gibt kein Dokument, das Wettessen als Sportart modelliert**, keine
-eigene Mechanik, keine Kalibrierrunde — es ist der generische Buehnen-Durchgangsrechner mit
-anderen Attributgewichten.
-**Assets 40:** `platter.tsx` (441 Z., 6 Animationsstellen, leergegessene Teller) — im Motor das
-generische Reihenbild, aber ohne Zufallswaffe mehr (seit 10.09.).
-**Gameplay 95:** rho **0,845**, produktiviert (Welle 2) — die Zahl ist gut, weil das
-Buehnen-Chassis gut ist, nicht weil Wettessen gut ist.
-**Movement 15:** nichts.
+### Wettessen — 73 % (35/85/95/75) — **kein eigenes Konzept**
+**19.09.-Nachzug: Assets 40→85, Movement 15→75 (PR #965, 19.09.).** Eigene Banketttafel statt des
+generischen Buehnen-Podests, setzt `docs/pm-briefings/opus-plan-naechste-drei-disziplinen-17-09.md`
+Abschnitt 3.2 D2.a+D2.b+D2.c um (`docs/design/wettessen-tafel-17-09.md`). **rho frisch gemessen**
+(`node scripts/miss-alle-disziplinen.mjs 24 wettessen`): bit-identisch **0,845**, Spannweite
+0,139 — reine Praesentation, keine Ueberraschung.
+- **A2+M1 (`bodenWettessen()`/`zeichneWettessen()`, `battle-mode.engine.js:15091 ff.`/`:15670 ff.`):**
+  Weiche in `zeichneBuehne()` (`:15297`/`:15325`) ersetzt den bis dahin generischen
+  `bodenBuehne()`-Zweig durch eine eigene, additiv aufgesetzte Bankett-Halle: karierte Bankettafel,
+  Neon-Schild, Wimpelkette, mit `u.aktuell+1` wachsender Tellerstapel je Esser, Magen-Meter mit
+  Gabel-Marker des Fuehrenden. A2 UND M1 zugleich erstmals voll erfuellt — dieselbe
+  Zwei-Achsen-Wirkung wie zuvor bei `bodenClimbing()`/`bodenZeitfahren()`. Playwright-Gegenprobe:
+  I-Spy/Showcase Diff in Rauschgroessenordnung.
+- **M2 (`stepWettessen()`, `:14838-14875`):** neue Zustandsmaschine
+  greifen→schlingen→kauen→pause je Esser, schreibt ausschliesslich `vizEss*`-Felder, ruft niemals
+  `rr()` — erstmals erfuellt, Wettessen hatte vorher ueberhaupt keinen eigenen
+  `buehnenBewegung()`-Zweig.
+- **A4 (`TON_KATALOG.wettessen`, `:21979-21984` + vier `sfx()`-Aufrufe in `stepWettessen()`):**
+  vier Ereignisse (biss/schlingen/pause/gong) aus den fuenf ueberall sonst benutzten
+  Ton-Primitiven — erstmals erfuellt.
+- **A3 bleibt bewusst offen, ausdruecklich NICHT schoengerechnet.** `DISZIPLIN_PROP`
+  (`:2899-2926`) fuehrt elf Eintraege, keinen fuer `wettessen` — die optionale Gabel-/
+  Teller-Requisite (D2.d im Opus-Plan) wurde bewusst ausgelassen, weil dieselbe Tabelle mit
+  paralleler Arbeit haette kollidieren koennen. Der alte 10-Punkte-Teilkredit aus dem
+  10.09.-Zufallswaffen-Fix (`DISZIPLIN_WAFFE.wettessen:null`) bleibt unveraendert bestehen. Ohne
+  D2.d waere Assets 100 und Gesamt 80,00 % erreichbar gewesen.
+- **A1 und M3 waren schon VOR PR #965 (teilweise) erfuellt und sind von ihr nicht beruehrt** —
+  ausdruecklich gegen die PRODUKTIVE Datei geprueft: `app/foundation/discipline-stage/arena/
+  disciplines/platter.tsx` (441 Z., seit 06.09.) ist eine eigene, wettessen-spezifische Feld-Datei
+  (A1 voll) mit eigenem Tellerstapel-/Magen-Meter-/Gabel-Marker-Layer ueber dem geteilten
+  `useTokenGlide`-Bausatz — mehr als der reine Bausatz, aber kein eigenes Bewegungssystem wie bei
+  `mountain.tsx`/`lamps.tsx` (M3 bleibt bei der alten Teilerfuellung, 15 von 25). `git log` bestaetigt:
+  ein einziger Commit ueberhaupt in dieser Datei, keiner davon PR #965.
+- **M4 bleibt bewusst offen** — die Schling-/Pause-Pose war Teil des ausgelassenen D2.d, kein
+  pose-wirksames Feld an der BAU-Sprite-Figur.
+- **K1-K4/G1-G4 unveraendert, ausdruecklich geprueft:** PR #965 aendert keine Zeile in `rezept`,
+  `wert()` oder `WERTUNG_AUFTRITT()`. `wettessen-tafel-17-09.md` modelliert die Disziplin nicht von
+  Grund auf (K3 bewegt sich nicht — weiterhin „kein Dokument, das Wettessen als Sportart
+  modelliert" im K3-Sinn). G1 (rho 0,845, gleiche Stufe), G2 (weiterhin in
+  `ARENA_RESOLVED_DISCIPLINE_IDS`), G3/G4 unveraendert — **ehrlich vermerkt:** G3 rechnet sich hier
+  weiterhin mit voller 15 trotz geteilter `WERTUNG_AUFTRITT()`, dieselbe Inkonsistenz, die der
+  fuenfzehnte Nachtrag fuer Showcase als „nur teilweise" (10) einstuft; nicht Teil dieser Runde,
+  s. siebzehnter Nachtrag ganz oben.
 
 ### Showcase — 91 % (75/100/95/95)
 **17.09.-Nachzug (PR #957/#959/#960/#961, s. fuenfzehnter Nachtrag ganz oben fuer die volle
