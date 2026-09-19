@@ -2727,6 +2727,64 @@
     ctx.beginPath();ctx.arc(kx,ky,Math.max(0.6,0.85*s),0,Math.PI*2);ctx.fill();
     return {kx,ky};
   }
+  // ================== SHOWCASE: KAMPFKUNST/SCHUETZENKUNST-WAFFE (A0.1, 19.09.) ==================
+  // Siebter/achter Eintrag, ANGELEGT statt vom bestehenden Sprite-Overlay abgeleitet. Der
+  // Grund steht ausfuehrlich am Requisiten-Hook in zeichneSprite (s. dort, "SHOWCASE-
+  // KAMPFKUNST/-SCHUETZENKUNST-WAFFE"): das bestehende Waffen-Overlay (schwertbg_slash/
+  // schwertfg_slash/bogen_shoot, `:3796 ff.`) ist an den Lauf-/Angriffs-Frameindex `f`/
+  // `waffenF` des STANDARDKOERPERS gebunden — weder ein vollbild-Blatt (eigene vf-Zaehlung,
+  // eigenes Blattraster) noch der prozedurale Reiher-Mech (gar kein Frame-Konzept) hat diesen
+  // Index. Statt das Sprite-Overlay kuenstlich an zwei fremde Zeichensysteme anzuschliessen,
+  // nach demselben Bordmittel wie Schlaeger/Schachuhr/Degen oben: eine einfache, an EINEM
+  // Punkt verankerte Canvas-Form. Kampfkunst bekommt dieselbe Klinge wie Fechten
+  // (zeichneDegen wiederverwendet, kein zweites Klingen-Rezept), Schuetzenkunst einen neuen,
+  // ebenso simplen Bogen (zeichneShowcaseBogen).
+  //
+  // GEGATET WIRD NICHT UEBER feldspiel&&istXxx() wie die fuenf Requisiten oberhalb, sondern
+  // ueber `u.vizWaffe` (gesetzt von stepShowcase() ausschliesslich am aktiven Kampfkunst-/
+  // Schuetzenkunst-Performer, s. dortiger Kommentar) — derselbe Vertrag wie beim Mikrofon
+  // (u.vizMikro). ANKERPUNKT: SCHACH_HAND wiederverwendet, aus derselben Begruendung wie bei
+  // Tennis/Fechten/Mikrofon — ein Kampfkunst-/Schuetzenkunst-Performer steht in Grundstellung,
+  // keine Laufpose.
+  //
+  // HEUTE INERT: kein einziger vollbild-/reiherMech-BAU-Eintrag traegt ein eigenes `waffe`-
+  // Feld (nachgesehen, keiner der 65 Vollbild-Kreaturen/Seraph-11 — Bauplan-Daten wurden dafuer
+  // NICHT angefasst, s. Auftrag), `u.vizWaffe` bleibt fuer sie also bis auf Weiteres immer
+  // `undefined` und dieser Zweig zeichnet nichts. Trotzdem hier geschlossen, statt offen
+  // gelassen: Chris' eigene Befunde ("Vorrak — kein Bogen sichtbar", "Terradon — kein
+  // Schwert") beschreiben exakt diese Kombination, und ein spaeter ergaenztes `waffe`-Feld
+  // (oder eine kuenftige vollbild-/reiherMech-Kreatur mit Waffe) darf nicht denselben Fehler
+  // ein zweites Mal reproduzieren.
+  const NAHKAMPF_WAFFEN=["schwert","axt","zweihaender","stab"];
+  // x/y ist die Hand (aus SCHACH_HAND ueber DISZIPLIN_PROP.kampfkunst.hand), s die Groesse
+  // (Z), richtung 0..3 wie blickAus(), phase "engarde"/"ausfall"/"parade" wie bei
+  // FECHTEN_PHASEN (unbekannt faellt auf "engarde" zurueck, s. zeichneDegen). Kein eigenes
+  // Klingen-Rezept: eine Kampfkunst-Klinge und ein Fechtdegen sind auf Kader-Distanz nicht zu
+  // unterscheiden, ein zweites, fast identisches Rezept waere reine Kopie.
+  //
+  // x/y ist die Hand, s die Groesse (Z), richtung 0..3 wie blickAus(), phase "ruhend"/"schuss"
+  // (unbekannt faellt auf "ruhend" zurueck, dasselbe Sicherheitsnetz wie bei jeder anderen
+  // Requisite dieser Tabelle). Reine Canvas-Primitiven wie Schlaeger/Degen: ein gebogener
+  // Bogenkoerper mit Sehne, die bei "schuss" sichtbar weiter gespannt ist. EIN Rezept fuer
+  // ALLE vier Schuetzenkunst-Waffentypen (bogen/pistole/schrotflinte/sturmgewehr) — dieselbe
+  // Vereinfachung wie bei der generischen Eiskunstlauf-Kufe im vollbild-Zweig ("Genauigkeit
+  // auf Kosten vieler Einzelmessungen waere hier unverhaeltnismaessig"): auf Kader-Distanz
+  // zaehlt "haelt eine Fernkampfwaffe", nicht die genaue Silhouette.
+  function zeichneShowcaseBogen(ctx,x,y,s,richtung,phase){
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const spannung=phase==="schuss"?0.40:0.16;
+    ctx.save();ctx.translate(x,y);ctx.rotate(0.10*eff);
+    ctx.strokeStyle="#6b4a2f"; ctx.lineWidth=Math.max(1,1.6*s); ctx.lineCap="round";
+    ctx.beginPath(); ctx.arc(0,0,10*s,Math.PI*0.62,Math.PI*1.38); ctx.stroke();
+    const topX=10*s*Math.cos(Math.PI*0.62), topY=10*s*Math.sin(Math.PI*0.62);
+    const botX=10*s*Math.cos(Math.PI*1.38), botY=10*s*Math.sin(Math.PI*1.38);
+    ctx.strokeStyle="#e8e2d0"; ctx.lineWidth=Math.max(0.5,0.7*s);
+    ctx.beginPath(); ctx.moveTo(topX,topY); ctx.lineTo(-spannung*10*s*eff,0); ctx.lineTo(botX,botY); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle="#e8e2d0";
+    ctx.beginPath();ctx.arc(x,y,Math.max(0.8,1.1*s),0,Math.PI*2);ctx.fill();
+  }
   // ================== TIME-TRIAL: STARTNUMMER-WESTE AUF DER BRUST (Ziel 10, Opus-Plan =========
   // 16.09., NACHGEBESSERT nach Review-Fund an PR #952) ==================
   // ERSTER ENTWURF WAR EIN AERO-HELM AM KOPF — per unabhaengiger Review an der VOLLEN
@@ -2923,6 +2981,13 @@
     // Spikes, s. SPURT_FUSS/SPIKES_PHASEN/zeichneSpikes oben. Aufrufstelle in
     // zeichneSpurt(), gegated auf `BA().spurt`.
     spurt:       { fuss:SPURT_FUSS, phasen:SPIKES_PHASEN, zeichne:zeichneSpikes },
+    // ZWOELFTER/DREIZEHNTER EINTRAG (A0.1, 19.09.): Kampfkunst-/Schuetzenkunst-Waffe fuer
+    // reiherMech/vollbild, s. Kommentar bei NAHKAMPF_WAFFEN/zeichneShowcaseBogen oben. Anders
+    // als die elf Eintraege oberhalb wird diese Tabelle NICHT vom Standardkoerper-Zeichenpfad
+    // gelesen (der hat sein eigenes, sprite-basiertes Waffen-Overlay, s. Kommentar an der
+    // Aufrufstelle in zeichneSprite) -- nur die beiden fruehen Zweige.
+    kampfkunst:     { hand:SCHACH_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
+    schuetzenkunst: { hand:SCHACH_HAND, phasen:null,           zeichne:zeichneShowcaseBogen },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3393,6 +3458,54 @@
         const prop=DISZIPLIN_PROP.showcase;
         prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"canto":"ruhend");
       }
+      // SCHACHUHR/SCHLAEGER/DEGEN FUER REIHERMECH (A0.1, 19.09.): derselbe fruehe `return;`
+      // liesse eine ueber b.reiherMech gezeichnete Speed-Schach-/Tennis-/Fechten-Teilnahme
+      // (Seraph-11 im heutigen Demokader) ganz ohne Requisite -- dasselbe Muster wie Hantel/
+      // Hockeyschlaeger/Mikrofon oben, hier fuer die drei Requisiten, die bisher NUR im
+      // Normalpfad standen (`:4090 ff.`, s. dortiger Kommentar). Anker wie beim Mikrofon am
+      // Kopf/Schnabel (kopf.kopfX/kopf.kopfY) statt an einer Hand -- der Reiher-Mech hat
+      // keine, s. Kommentar bei zeichneReiherMech oben ("rein prozedural aus Formen") -- ein
+      // stehender Performer haelt seine Requisite deshalb naeher am Kopf, dieselbe
+      // Vereinfachung wie beim Mikrofon direkt oberhalb, nicht eine dritte, eigens vermessene
+      // Anker-Tabelle fuer einen einzigen Kader-Eintrag.
+      if(feldspiel&&istSchach()&&!u.down){
+        const prop=DISZIPLIN_PROP["speed-schach"];
+        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.vizUhrSchlagT>0)?"schlag":"ruhend");
+      }
+      if(feldspiel&&istTennis()&&!u.down){
+        const prop=DISZIPLIN_PROP.tennis;
+        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"schlag":"ruhend");
+      }
+      if(feldspiel&&istFechten()&&!u.down){
+        const prop=DISZIPLIN_PROP.fechten;
+        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,u.vizFechtPhase||"engarde");
+      }
+      // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST-WAFFE (A0.1, s. NAHKAMPF_WAFFEN/
+      // zeichneShowcaseBogen/DISZIPLIN_PROP.kampfkunst-schuetzenkunst oben fuer die
+      // vollstaendige Begruendung). Heute inert (kein reiherMech-Eintrag traegt `waffe`,
+      // s. dortiger Kommentar) -- hier trotzdem geschlossen, damit ein spaeter ergaenztes
+      // `waffe`-Feld nicht denselben Fehler reproduziert.
+      if(u.vizWaffe&&!u.down){
+        if(NAHKAMPF_WAFFEN.includes(u.vizWaffe)){
+          DISZIPLIN_PROP.kampfkunst.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"ausfall":"engarde");
+        }else{
+          DISZIPLIN_PROP.schuetzenkunst.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"schuss":"ruhend");
+        }
+      }
+      // ELEMENT-/AURA-EFFEKT FUER REIHERMECH (A0.1): derselbe fruehe `return;` liesse ein
+      // spaeter ergaenztes b.effekt/u.vizEffekt (Zaubershow-Act, s. Kommentar bei EFFEKT_ARTEN
+      // oben) unsichtbar bleiben -- heute inert (Seraph-11 traegt kein b.effekt, kein anderer
+      // reiherMech-Eintrag existiert), aus demselben Grund wie die Waffe direkt oberhalb
+      // trotzdem geschlossen. "koerper" ueber den Rumpf gespannt (Scheitel/Sohle wie bei der
+      // Hantel-Spanne oben, cy-19*Z..cy+19*Z), "kopf" am Schnabelansatz (kopf.kopfY).
+      const effUR=u.vizEffekt||b.effekt;
+      if(effUR&&!u.down){
+        if(effUR.pos==="kopf"){
+          zeichnePartikelEffekt(kopf.kopfX,kopf.kopfY-6*Z,kopf.kopfY+6*Z,(effUR.streuung!=null?effUR.streuung:6)*Z,effUR.typ);
+        }else if(effUR.pos==="koerper"){
+          zeichnePartikelEffekt(x,y-19*Z,y+19*Z,(effUR.streuung!=null?effUR.streuung:9)*Z,effUR.typ);
+        }
+      }
       return;
     }
     if(b.vollbild){
@@ -3495,6 +3608,41 @@
         const hpV=prop.hand[r0]||prop.hand[2];
         prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,(u.lunge>0)?"canto":"ruhend");
       }
+      // SCHACHUHR/SCHLAEGER/DEGEN FUER VOLLBILD (A0.1, 19.09.): derselbe fruehe `return;`
+      // liess jede ueber b.vollbild gezeichnete Speed-Schach-/Tennis-/Fechten-Teilnahme (Lava
+      // Golem/Krolach/Vorrak/Krag'Zul/Tidesprinter im heutigen Demokader) ohne Requisite --
+      // dasselbe Muster wie die KUFE-/MIKROFON-Nachbesserung direkt oberhalb, hier fuer die
+      // drei Requisiten, die bisher NUR im Normalpfad standen (`:4090 ff.`). Anker: derselbe
+      // generische Standardkoerper-Handpunkt (prop.hand ueber SCHACH_HAND/TENNIS_HAND/
+      // FECHTEN_HAND, alle drei ohnehin wortgleich SCHACH_HAND, s. Kommentare dort), auf den
+      // Vollbild-Rahmen umgerechnet -- derselbe Kompromiss wie beim Mikrofon eine Zeile
+      // oberhalb (keine eigene Vermessung je der ueber 65 Vollbild-Blaetter).
+      if(feldspiel&&istSchach()&&!u.down){
+        const prop=DISZIPLIN_PROP["speed-schach"];
+        const hpV=prop.hand[r0]||prop.hand[2];
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,(u.vizUhrSchlagT>0)?"schlag":"ruhend");
+      }
+      if(feldspiel&&istTennis()&&!u.down){
+        const prop=DISZIPLIN_PROP.tennis;
+        const hpV=prop.hand[r0]||prop.hand[2];
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,(u.lunge>0)?"schlag":"ruhend");
+      }
+      if(feldspiel&&istFechten()&&!u.down){
+        const prop=DISZIPLIN_PROP.fechten;
+        const hpV=prop.hand[r0]||prop.hand[2];
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,u.vizFechtPhase||"engarde");
+      }
+      // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST-WAFFE FUER VOLLBILD (A0.1, s. NAHKAMPF_WAFFEN/
+      // zeichneShowcaseBogen/DISZIPLIN_PROP.kampfkunst-schuetzenkunst oben fuer die
+      // vollstaendige Begruendung). Heute inert (kein vollbild-Eintrag traegt `waffe`, s.
+      // dortiger Kommentar) -- hier trotzdem geschlossen, damit ein spaeter ergaenztes
+      // `waffe`-Feld nicht denselben Fehler reproduziert (genau Chris' Befunde "Vorrak — kein
+      // Bogen sichtbar" / "Terradon — kein Schwert").
+      if(u.vizWaffe&&!u.down){
+        const propW=DISZIPLIN_PROP[NAHKAMPF_WAFFEN.includes(u.vizWaffe)?"kampfkunst":"schuetzenkunst"];
+        const hpW=propW.hand[r0]||propW.hand[2];
+        propW.zeichne(ctx,x-32*Z+hpW.x*Z,y-46*Z+hpW.y*Z,Z,r0,NAHKAMPF_WAFFEN.includes(u.vizWaffe)?((u.lunge>0)?"ausfall":"engarde"):((u.lunge>0)?"schuss":"ruhend"));
+      }
       // Chris' Fund (01.09.): die Shroomgator-Pilze schwebten komplett UEBER dem Krokodil,
       // gar nicht auf ihm — die generische Spanne y-44*Z..y+16*Z ist auf eine AUFRECHTE
       // 64px-Figur zugeschnitten (Kopf oben, Fuesse unten). Ein liegendes Quadruped fuellt
@@ -3521,6 +3669,19 @@
           const streuungKV=effUV.streuung!=null?effUV.streuung:9;
           zeichnePartikelEffekt(x,y-44*Z,y+16*Z,streuungKV*Z,effUV.typ);
         }
+      }
+      // "kopf" (A0.1, 19.09.): der Normalpfad kennt zwei Effekt-Positionen (`:4185 ff.`,
+      // "kopf"/"koerper"), hier stand bisher nur "koerper" -- derselbe fruehe `return;`
+      // wuerde ein spaeter mit pos:"kopf" ausgestattetes vollbild-BAU (oder ein
+      // Zaubershow-Act auf einer Vollbild-Kreatur ueber SHOWCASE_ACT_PUNKTE, s. Kommentar
+      // bei u.vizEffekt oben) unsichtbar lassen. Heute inert: kein vollbild-Eintrag nutzt
+      // pos:"kopf" (nachgesehen, keiner der 65 Blaetter). Dieselben Default-Werte wie im
+      // Normalpfad (streuung 6, hoehe [56,34] relativ zu y), keine eigene Kopf-Vermessung
+      // je Blatt -- derselbe generische Kompromiss wie beim KUFE-Fusspunkt oben.
+      else if(effUV&&effUV.pos==="kopf"&&!u.down){
+        const streuungKopfV=effUV.streuung!=null?effUV.streuung:6;
+        const hoeheKopfV=effUV.hoehe||[56,34];
+        zeichnePartikelEffekt(x,y-hoeheKopfV[0]*Z,y-hoeheKopfV[1]*Z,streuungKopfV*Z,effUV.typ);
       }
       // Riss mittig auf der Brust (y-26..y-2, dieselbe Spanne wie im normalen Zeichenpfad
       // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
@@ -30159,7 +30320,7 @@
       const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
       return actVon(u);
     },
-    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker)=>{
+    renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker,viz)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
       // 76 Pixel ab -8,7. Eine Groessenmessung las die vier groessten Figuren dadurch zu
@@ -30197,6 +30358,16 @@
       // ueberschreibt, rein diagnostisch — ohne Argument bleibt u.vizPhase undefined und
       // der Zeichenpfad waehlt exakt wie bisher.
       if(vizPhase!==undefined&&vizPhase!==null)u.vizPhase=vizPhase;
+      // VIZ (optional, A0.1 19.09.): ein Objekt beliebiger viz*-Felder (u.vizMikro/
+      // u.vizWaffe/u.vizFechtPhase/u.vizUhrSchlagT/u.vizEffekt/...), unveraendert auf `u`
+      // kopiert -- dieselbe Rolle wie `vizPhase` direkt oberhalb, nur nicht auf ein einzelnes
+      // Feld festgelegt. Ohne dieses Argument bleibt jedes viz*-Feld `undefined`, exakt wie
+      // vor dieser Ergaenzung -- kein bestehender Aufrufer aendert sein Ergebnis. Noetig, um
+      // die A0.1-Requisiten (Schachuhr/Schlaeger/Degen/Kampfkunst-Schuetzenkunst-Waffe/
+      // Mikrofon/Effekt) an reiherMech/vollbild-Kreaturen von aussen (Playwright, ohne echtes
+      // Duell) gezielt anzusteuern -- ohne laufendes stepShowcase()/stepSchach() waeren diese
+      // Felder sonst nie gesetzt. Rein diagnostisch, kein rr(), kein Gameplay-Seiteneffekt.
+      if(viz&&typeof viz==="object")Object.assign(u,viz);
       // ANKER (optional, 13.09. zweite Runde): der Zeichenpunkt lag hier fest auf (32,46),
       // UNABHAENGIG von `leinwand`. Eine groessere Leinwand gab einer grossen Figur damit
       // nur unten und rechts mehr Platz — nach OBEN klebte sie weiter an der Kante, weil
