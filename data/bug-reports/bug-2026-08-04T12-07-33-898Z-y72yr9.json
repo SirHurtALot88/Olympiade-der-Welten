@@ -1,0 +1,41 @@
+{
+  "note": "Kannst du die Bilder hier in der Team ansicht also die portraits noch größer amchen und dafür noch die aktuellen PP der Bereiche über die stats schreiben? AlsoPOW 5,3 über dem POW 42 stat? das wär top",
+  "view": "teamProfile",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=teamProfile&team=N-N&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3127,
+    "height": 1155
+  },
+  "clientTime": "2026-08-04T12:07:33.764Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T12-07-33-898Z-y72yr9",
+  "createdAt": "2026-08-04T12:07:33.898Z",
+  "page": {
+    "path": "/foundation",
+    "view": "teamProfile",
+    "tab": null,
+    "label": "Team · Teams"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 2,
+    "matchdayId": "matchday-2",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
