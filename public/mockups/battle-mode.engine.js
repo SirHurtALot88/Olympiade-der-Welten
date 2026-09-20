@@ -28859,6 +28859,29 @@
     return c;
   }
 
+  // ECHTES PORTRAIT NEBEN DEM SPRITE (Chris, 20.09., woertlich: "kannst du bei den
+  // portraits nicht daneben wieder den sprite machen in klein? dann sieht man das
+  // richtige bild aber auch wie der spieler ingame aussieht"). `portraet()` existiert
+  // bereits fuer das Aufstellungs-Board (s. oben, "GESICHT UND FIGUR in der Aufstellung")
+  // und loest genau das schon: Kuerzel auf farbigem Grund, das sich per <img>-Preload
+  // (kein <img> im DOM, also nie ein kaputtes Bild-Icon) durch das echte Bild ersetzt,
+  // sobald `/portraits/<namensslug>.jpg` existiert — sonst bleibt der Kuerzel-Rueckfall
+  // stehen. Zweite Zuordnungsfunktion (kennungVon) fuer denselben Zweck waere hier
+  // ueberfluessig, deshalb Wiederverwendung statt Neubau.
+  //
+  // ZWISCHENSPEICHER aus demselben Grund wie KADER_FIGUREN oben: renderKader laeuft im
+  // Zeichen-Takt, ein neues Image() je Bild wuerde den Portrait-Request jede Sekunde
+  // sechzigmal neu abfeuern. classList.add statt className-Ersatz (anders als bei
+  // kaderFigur/figur()): die Kachel-Groesse kommt ueber die zusaetzliche Klasse
+  // "kkportraet" (battle-mode.css), die Basisregeln fuer .portraet (Hintergrund, Rahmen,
+  // Bildausschnitt) bleiben dabei erhalten.
+  const KADER_PORTRAETS=new Map();
+  function kaderPortraet(name){
+    let c=KADER_PORTRAETS.get(name);
+    if(!c){ c=portraet(SPIELER_NACH_NAME[name]||{n:name}); c.classList.add("kkportraet"); KADER_PORTRAETS.set(name,c); }
+    return c;
+  }
+
   // Welche Groesse die Kachelleiste einer FELDSPIEL-Disziplin zeigt. Heute der enthuellte
   // Punktestand — im Eishockey also die Tore, und damit eine Leiste, die bei ueber der
   // Haelfte der Spieler das ganze Spiel auf null steht (Konzeptdokument 4.2). Eine
@@ -28924,9 +28947,13 @@
           leiste:fsLeisteFuer(x,fsStand)}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
-        // Sprite links, Name rechts daneben — die Lebens-/Punkteleiste bleibt darunter
-        // ueber die volle Kachelbreite, damit sie ablesbar bleibt.
+        // Portrait, Sprite, Name — die Lebens-/Punkteleiste bleibt darunter ueber die
+        // volle Kachelbreite, damit sie ablesbar bleibt. Portrait links vom Sprite (Chris,
+        // 20.09., s. Kommentar bei kaderPortraet oben): beide Bilder gleichzeitig sichtbar.
+        // Reine Anzeige: kaderPortraet() liest/schreibt nichts am Simulationszustand,
+        // genau wie kaderFigur() daneben.
         const kopf=el("div","kkkopf");
+        kopf.appendChild(kaderPortraet(u.n));
         kopf.appendChild(kaderFigur(u.n));
         kopf.appendChild(el("b",null,u.n));
         // Was die Leiste frueher trug, steht jetzt als Zahl neben dem Namen — der
