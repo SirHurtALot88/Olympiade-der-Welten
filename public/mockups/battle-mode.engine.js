@@ -4681,11 +4681,301 @@
   //
   // Umgekehrt habe ich zwei Werte uebersehen, die auf JEDER Karte stehen und die die
   // Arena bis eben komplett ignoriert hat: Betaeubungs- und Rueckstosswiderstand. Beide
-  // wirken jetzt. Sie sind Klassenwerte — solange kein Spieler einem Archetyp zugeordnet
-  // ist, tragen alle denselben Platzhalter (Fighter: 15 % und 30 %), so wie beim Kit.
+  // wirken jetzt.
+  //
+  // BACKLOG #156, SCHRITT 1 (docs/design/klassen-archetyp-konzept-20-09.md, Branch
+  // fable-klassen-archetyp-20-09): bis hierher trug JEDER Kaempfer denselben Platzhalter
+  // (Fighter: 15 % und 30 %), weil es keine Zuordnung von einem Spieler auf einen der 35
+  // Kampf-Archetypen gab. Die gibt es jetzt — `kampfArchetypVon(p)` unten verbindet drei
+  // bestehende Systeme (player-generator-archetypes.ts, subclass-archetypes.ts,
+  // archetype-registry.ts, s. lib/battle/combat-archetype-resolver.ts fuer die kanonische,
+  // in TypeScript gepruefte Fassung derselben Logik) und liefert GENAU EINEN Archetyp je
+  // Spieler, deterministisch aus Klasse+Unterklasse+Traits, kein RNG. `baueEinheit()`
+  // setzt `u.stunResist`/`u.knockbackResist` daraus; PLATZHALTER_ARCHETYP bleibt als
+  // Sicherheitsnetz stehen (greift nur noch, wenn ein Aufrufer `baueEinheit()` je
+  // umgeht und diese beiden Felder gar nicht erst setzt).
   const PLATZHALTER_ARCHETYP={name:"Fighter", stunResist:15, knockbackResist:30};
   const betWiderstand=(u)=>(u.stunResist??PLATZHALTER_ARCHETYP.stunResist)/100;
   const stossWiderstand=(u)=>(u.knockbackResist??PLATZHALTER_ARCHETYP.knockbackResist)/100;
+
+  // <<< GENERIERT: kampf-archetyp-daten — nicht von Hand ändern
+  // Erzeugt von scripts/generiere-kampf-archetyp-daten.ts aus den echten Quellen:
+  //   lib/player-generator/player-generator-archetypes.ts (14 breite Buckets)
+  //   lib/battle/subclass-archetypes.ts                   (Unterklasse->Archetyp, Bildbefunde)
+  //   lib/battle/archetype-registry.ts                    (35 Kampf-Archetypen)
+  // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.
+  const ARCHETYP_KAMPFWERTE={
+    "archmage":{name:"Archmage",stunResist:5,knockbackResist:5,hp:0.3684,atk:0.2,def:0,spd:0.2857},
+    "astralwing":{name:"Astralwing",stunResist:10,knockbackResist:10,hp:0.2395,atk:1,def:0.0733,spd:0.2857},
+    "barbarian":{name:"Barbarian",stunResist:20,knockbackResist:50,hp:0.8947,atk:0.6,def:0.1333,spd:0.2857},
+    "blackguard":{name:"Blackguard",stunResist:20,knockbackResist:30,hp:0.6079,atk:0.6,def:1,spd:0.1429},
+    "bowman":{name:"Bowman",stunResist:0,knockbackResist:0,hp:0.1868,atk:0.8,def:0,spd:0.3643},
+    "bullbreaker":{name:"Bullbreaker",stunResist:40,knockbackResist:40,hp:1,atk:0.6,def:0.9333,spd:0},
+    "cleric":{name:"Cleric",stunResist:5,knockbackResist:5,hp:0.1053,atk:0.6,def:0.6667,spd:0.1429},
+    "conjurer":{name:"Conjurer",stunResist:0,knockbackResist:0,hp:0.2632,atk:0.6,def:0.2067,spd:0.2857},
+    "crossbowman":{name:"Crossbowman",stunResist:0,knockbackResist:5,hp:0.0526,atk:0.6,def:0.2667,spd:0.1429},
+    "crusader":{name:"Crusader",stunResist:20,knockbackResist:25,hp:0.4737,atk:0.6,def:0.8,spd:0.1429},
+    "ember-priest":{name:"Ember Priest",stunResist:5,knockbackResist:5,hp:0.1868,atk:0.6,def:0.0733,spd:0.2857},
+    "fighter":{name:"Fighter",stunResist:15,knockbackResist:30,hp:0.6316,atk:0.6,def:0.8,spd:0.2857},
+    "fire-mage":{name:"Fire Mage",stunResist:0,knockbackResist:5,hp:0.2105,atk:0.6,def:0.0733,spd:0.2857},
+    "frost-knight":{name:"Frost Knight",stunResist:20,knockbackResist:25,hp:0.6605,atk:0.6,def:0.6667,spd:0.2214},
+    "goblin-archer":{name:"Goblin Archer",stunResist:0,knockbackResist:0,hp:0,atk:0.8,def:0.0733,spd:1},
+    "halberdier":{name:"Halberdier",stunResist:20,knockbackResist:10,hp:0.6605,atk:0.6,def:0.8,spd:0.2857},
+    "hunter":{name:"Hunter",stunResist:0,knockbackResist:0,hp:0.3421,atk:0.4,def:0.4,spd:0},
+    "ice-mage":{name:"Ice Mage",stunResist:10,knockbackResist:5,hp:0.1579,atk:0.6,def:0.0733,spd:0.4286},
+    "lancer":{name:"Lancer",stunResist:10,knockbackResist:20,hp:0.5553,atk:0.6,def:0.2667,spd:0.5},
+    "lightning-mage":{name:"Lightning Mage",stunResist:5,knockbackResist:5,hp:0.3421,atk:0.6,def:0.2067,spd:0.2857},
+    "matriarch":{name:"Matriarch",stunResist:10,knockbackResist:15,hp:0.4737,atk:0.4,def:0.9333,spd:0.1429},
+    "monk":{name:"Monk",stunResist:10,knockbackResist:15,hp:0.5789,atk:0.6,def:0.2067,spd:0.5},
+    "necromancer":{name:"Necromancer",stunResist:0,knockbackResist:0,hp:0.0289,atk:0,def:0,spd:0.2214},
+    "orc-shaman":{name:"Orc Shaman",stunResist:10,knockbackResist:10,hp:0.6316,atk:0.6,def:0,spd:0.2214},
+    "orc-warrior":{name:"Orc Warrior",stunResist:20,knockbackResist:30,hp:0.8947,atk:0.6,def:0.0733,spd:0.2214},
+    "priest":{name:"Priest",stunResist:0,knockbackResist:0,hp:0.1053,atk:0.6,def:0.0733,spd:0.3643},
+    "reaper-mage":{name:"Reaper Mage",stunResist:10,knockbackResist:10,hp:0.0816,atk:0.6,def:0.0733,spd:0.2857},
+    "reaver":{name:"Reaver",stunResist:10,knockbackResist:15,hp:0.6316,atk:0.6,def:0.2067,spd:0.4286},
+    "rogue":{name:"Rogue",stunResist:5,knockbackResist:0,hp:0.4211,atk:0.8,def:0.0733,spd:0.6429},
+    "spellblade":{name:"Spellblade",stunResist:10,knockbackResist:10,hp:0.45,atk:0.8,def:0.5333,spd:0.4286},
+    "steelwind":{name:"Steelwind",stunResist:10,knockbackResist:10,hp:0.4737,atk:0.6,def:0.4,spd:0.4286},
+    "stormhorn":{name:"Stormhorn",stunResist:20,knockbackResist:10,hp:0.5789,atk:0.4,def:0.4,spd:0.1429},
+    "templar":{name:"Templar",stunResist:0,knockbackResist:20,hp:0.4737,atk:0.8,def:0.0733,spd:0.4286},
+    "thunderclaw":{name:"Thunderclaw",stunResist:15,knockbackResist:20,hp:0.4211,atk:0.6,def:0.4,spd:0.4286},
+    "voidfist":{name:"Voidfist",stunResist:10,knockbackResist:15,hp:0.5789,atk:0.6,def:0.2067,spd:0.4286}
+  };
+  const BREITE_ARCHETYPEN={
+    "mage":{preferredClasses:["Mage","Tactician","Overseer","Templar"],disallowedClasses:["Sprinter"],preferredSubclasses:["Mage","Warlock","Cleric","Shaman","Strategist"],preferredPositiveTraits:["Disciplined","Cool","Resourceful","Motivated"],preferredNegativeTraits:["Obsessive","Paranoid"],identityKeywords:["mage","warlock","cleric","shaman","angel","succubus"],ziel:{hp:0,atk:-4,def:3.5,spd:0}},
+    "beast":{preferredClasses:["Berserker","Tank","Charger","Warlord"],disallowedClasses:["Bard"],preferredSubclasses:["Beast","Creature","Behemoth","Hunter","Jungle"],preferredPositiveTraits:["Fearless","Healthy","Motivated","FiredUp"],preferredNegativeTraits:["Feisty","ColdBlooded"],identityKeywords:["beast","creature","behemoth","hunter","jungle"],ziel:{hp:8,atk:10,def:3,spd:0}},
+    "rogue":{preferredClasses:["Rogue","Sprinter","Overseer"],disallowedClasses:["Tank"],preferredSubclasses:["Assassin","Scout","Trickster","Spec Ops","Ninja"],preferredPositiveTraits:["Flexible","Cool","Resourceful"],preferredNegativeTraits:["Devious","Mercenary"],identityKeywords:["rogue","assassin","ninja","scout","trickster","spec-ops"],ziel:{hp:-5,atk:0,def:0,spd:20}},
+    "tank":{preferredClasses:["Tank","Templar","Warlord"],disallowedClasses:["Sprinter"],preferredSubclasses:["Guardian","Knight","Warrior","Behemoth","Controller"],preferredPositiveTraits:["Healthy","Loyal","Disciplined"],preferredNegativeTraits:["Obsessive","ColdBlooded"],identityKeywords:["tank","guardian","knight","behemoth","warrior"],ziel:{hp:10,atk:0,def:8,spd:-6}},
+    "warrior":{preferredClasses:["Warlord","Berserker","Charger","Templar"],disallowedClasses:[],preferredSubclasses:["Warrior","Knight","Viking","Hunter","Guardian"],preferredPositiveTraits:["Fearless","Disciplined","Motivated"],preferredNegativeTraits:["Feisty","Obsessive"],identityKeywords:["warrior","knight","viking","hunter"],ziel:{hp:0,atk:8,def:3,spd:0}},
+    "social_icon":{preferredClasses:["Bard","Hero","Overseer"],disallowedClasses:["Tank"],preferredSubclasses:["Ambassador","Hero","Royalty","Angel","Cleric"],preferredPositiveTraits:["Eloquent","FanFavorite","Caring","Altruistic","Loyal"],preferredNegativeTraits:["Diva","Scandalous","Egomaniac"],identityKeywords:["ambassador","hero","bard","royalty","angel"],ziel:{hp:0,atk:-2.5,def:0,spd:0}},
+    "construct":{preferredClasses:["Tank","Overseer","Tactician"],disallowedClasses:["Bard"],preferredSubclasses:["Augmented","Bot","Engineer","Controller"],preferredPositiveTraits:["Disciplined","Resourceful","Cool"],preferredNegativeTraits:["ColdBlooded","Obsessive","Paranoid"],identityKeywords:["construct","augmented","bot","engineer","controller"],ziel:{hp:6,atk:0,def:8,spd:0}},
+    "undead":{preferredClasses:["Mage","Overseer","Templar","Tank","Tactician"],disallowedClasses:["Bard","Sprinter"],preferredSubclasses:["Undead","Vampire","Wraith","Apparition","Warlock","Knight","Strategist"],preferredPositiveTraits:["ColdBlooded","Fearless","Loyal","Diligent","Motivated"],preferredNegativeTraits:["Obsessive","Paranoid","FaintHearted"],identityKeywords:["undead","vampire","wraith","apparition","warlock"],ziel:{hp:0,atk:0,def:7.5,spd:-4}},
+    "nature":{preferredClasses:["Bard","Hero","Overseer","Templar"],disallowedClasses:[],preferredSubclasses:["Druid","Shaman","Jungle","Creature","Wayfarer"],preferredPositiveTraits:["Caring","Healthy","Altruistic","Flexible"],preferredNegativeTraits:["Timid","Obsessive"],identityKeywords:["druid","shaman","jungle","beast","creature"],ziel:{hp:0,atk:-2.5,def:2.5,spd:0}},
+    "demon":{preferredClasses:["Badass","Mage","Overseer","Berserker"],disallowedClasses:[],preferredSubclasses:["Succubus","Prime Evil","Warlock","Fallen Angel","Maniac"],preferredPositiveTraits:["Fearless","FiredUp","Resourceful"],preferredNegativeTraits:["ColdBlooded","Scandalous","Renegade"],identityKeywords:["demon","succubus","prime-evil","warlock","fallen-angel"],ziel:{hp:0,atk:11,def:0,spd:0}},
+    "angel":{preferredClasses:["Templar","Hero","Bard","Mage"],disallowedClasses:[],preferredSubclasses:["Angel","Fallen Angel","Cleric","God","Servant"],preferredPositiveTraits:["Altruistic","Caring","Loyal","Motivated","Disciplined"],preferredNegativeTraits:["Timid","FaintHearted"],identityKeywords:["angel","fallen-angel","cleric","god"],ziel:{hp:0,atk:-4,def:3.5,spd:0}},
+    "pirate":{preferredClasses:["Rogue","Bard","Sprinter","Warlord"],disallowedClasses:[],preferredSubclasses:["Pirate","Swashbuckler","Rebel","Vigilante","Scout"],preferredPositiveTraits:["Flexible","FanFavorite","Cool","Resourceful"],preferredNegativeTraits:["Mercenary","Scandalous","Gambler"],identityKeywords:["pirate","swashbuckler","rebel","vigilante"],ziel:{hp:0,atk:0,def:-1,spd:6}},
+    "ninja":{preferredClasses:["Rogue","Sprinter","Overseer"],disallowedClasses:["Tank"],preferredSubclasses:["Ninja","Assassin","Spec Ops","Scout","Trickster"],preferredPositiveTraits:["Disciplined","Flexible","Cool"],preferredNegativeTraits:["Devious","ColdBlooded"],identityKeywords:["ninja","assassin","spec-ops","shadow"],ziel:{hp:-6,atk:0,def:0,spd:20}},
+    "mercenary":{preferredClasses:["Warlord","Charger","Rogue","Tank","Overseer"],disallowedClasses:[],preferredSubclasses:["Spec Ops","Rebel","Warrior","Hunter","Executioner"],preferredPositiveTraits:["Resourceful","Disciplined","Fearless"],preferredNegativeTraits:["Mercenary","Renegade","Gambler"],identityKeywords:["mercenary","rebel","spec-ops","warrior"],ziel:{hp:0,atk:6,def:0,spd:5}}
+  };
+  const UNTERKLASSE_ARCHETYPEN={
+    "Warrior":["fighter","orc-warrior","barbarian","steelwind"],
+    "Trickster":["rogue","conjurer","astralwing"],
+    "Guardian":["blackguard","bullbreaker","frost-knight","matriarch"],
+    "Beast":["thunderclaw","barbarian","reaver"],
+    "Wayfarer":["monk","hunter","steelwind"],
+    "Mage":["archmage","fire-mage","ice-mage","lightning-mage","conjurer"],
+    "Destroyer":["reaver","barbarian","voidfist"],
+    "Knight":["frost-knight","crusader","templar","blackguard"],
+    "Isolated":["hunter","rogue","necromancer"],
+    "Warlock":["necromancer","reaper-mage","conjurer"],
+    "Assassin":["rogue","voidfist"],
+    "Bot":["steelwind","fighter","crossbowman"],
+    "Servant":["priest","matriarch","cleric"],
+    "Ambassador":["priest","matriarch","templar"],
+    "Undead":["necromancer","reaper-mage"],
+    "Behemoth":["bullbreaker","barbarian","orc-warrior"],
+    "Jungle":["hunter","thunderclaw","barbarian"],
+    "Agent":["rogue","crossbowman","astralwing"],
+    "Lord":["blackguard","crusader","templar"],
+    "Swashbuckler":["rogue","spellblade","steelwind"],
+    "Apparition":["reaper-mage","necromancer","astralwing"],
+    "Vigilante":["rogue","steelwind","crusader"],
+    "Maniac":["barbarian","reaver","voidfist"],
+    "Hunter":["hunter","bowman","crossbowman"],
+    "Royalty":["templar","crusader","matriarch"],
+    "Rebel":["rogue","reaver","barbarian"],
+    "Pet Master":["conjurer","necromancer","orc-shaman"],
+    "Augmented":["steelwind","spellblade","voidfist"],
+    "Druid":["orc-shaman","matriarch","priest"],
+    "Wraith":["reaper-mage","necromancer"],
+    "Shaman":["orc-shaman","priest","ember-priest"],
+    "Spec Ops":["crossbowman","rogue","bowman"],
+    "Angel":["templar","priest","cleric"],
+    "Alchemist":["conjurer","ember-priest","archmage"],
+    "Viking":["barbarian","orc-warrior","reaver"],
+    "Amazoness":["bowman","lancer","hunter"],
+    "Ninja":["rogue","voidfist","monk"],
+    "Succubus":["reaper-mage","necromancer","astralwing"],
+    "Cleric":["cleric","priest"],
+    "Vampire":["reaper-mage","necromancer","rogue"],
+    "Fallen Angel":["reaper-mage","blackguard","astralwing"],
+    "Pirate":["rogue","crossbowman","steelwind"],
+    "Healer":["priest","cleric","matriarch"],
+    "Monk":["monk","voidfist","priest"],
+    "Whore":["astralwing","reaper-mage"],
+    "God":["templar","archmage","matriarch"],
+    "Scout":["bowman","hunter","goblin-archer"],
+    "Prime Evil":["necromancer","reaper-mage","voidfist"],
+    "Controller":["lancer","ice-mage","conjurer","halberdier"],
+    "Drainer":["reaper-mage","necromancer"],
+    "Creature":["thunderclaw","barbarian","orc-warrior"],
+    "Strategist":["halberdier","lancer","archmage"],
+    "Executioner":["reaver","blackguard","voidfist"],
+    "Engineer":["crossbowman","steelwind","conjurer"],
+    "Aquatic":["stormhorn","ice-mage"],
+    "Klasse":[]
+  };
+  const BILDBEFUNDE_ARCHETYPEN={
+    "Cassandra":["bowman","hunter"],
+    "Draco":["blackguard","crusader","frost-knight","halberdier"],
+    "Krag'Zul":["bullbreaker","lightning-mage","conjurer"],
+    "Rhyx'Tal":["bullbreaker","voidfist"],
+    "Jorund":["matriarch"],
+    "Seraph-11":["priest","cleric"],
+    "Meira":["conjurer"],
+    "Yaezakura":["fighter","orc-warrior","barbarian"],
+    "Princess Pride":["templar","crusader","matriarch"],
+    "Robofighter":["crossbowman"],
+    "Orinex":["lightning-mage"],
+    "Nightowl":["hunter","rogue"],
+    "Calawynn":["astralwing","monk"],
+    "Impulse":["steelwind","rogue","fighter"],
+    "Alaric":["conjurer","ember-priest","archmage"],
+    "Slither":["rogue","steelwind"],
+    "Toasty":["rogue","steelwind","fighter","barbarian"],
+    "Cardinal Richelieu":["conjurer","ember-priest","archmage","necromancer"],
+    "Patience":["monk"],
+    "Radegas der Braune":["monk"],
+    "Pantina":["steelwind","thunderclaw"],
+    "Xandrix":["archmage","astralwing","conjurer"],
+    "Juggler":["conjurer","necromancer","rogue"],
+    "Udalf":["archmage","fire-mage","ice-mage"],
+    "Bruiser":["fighter","orc-warrior"],
+    "Slugger":["barbarian","fighter","orc-warrior"],
+    "Aerin":["rogue","conjurer"],
+    "Dorothy":["monk","conjurer"],
+    "Xelara":["priest"],
+    "Inefinna":["matriarch","templar","crusader"],
+    "Johanna":["matriarch","crusader","frost-knight"],
+    "Gram":["bullbreaker"],
+    "Lava Golem":["bullbreaker","monk","orc-warrior"],
+    "Krolach":["bullbreaker","frost-knight","voidfist"],
+    "Lulu":["orc-shaman","priest"],
+    "King Arlen Morgolor":["crusader","matriarch","fighter"],
+    "Lucky":["rogue","steelwind"],
+    "Terradon":["bullbreaker"],
+    "Clara":["ice-mage"],
+    "Arachna":["necromancer","reaper-mage"],
+    "Tavascron":["steelwind","bullbreaker","fighter"],
+    "Catherine":["crusader"],
+    "Breeze":["archmage"],
+    "Wu Tang":["orc-shaman"],
+    "Dyrth":["bullbreaker","matriarch"],
+    "Pinkypie":["archmage"],
+    "Jihanna":["rogue"],
+    "Serena":["rogue","fighter"],
+    "Nocture":["reaper-mage","necromancer"],
+    "Drop Dead":["rogue"],
+    "Nachtschatten":["rogue","voidfist"],
+    "Erna Wellenlaut":["priest","cleric"],
+    "Xerathis":["rogue"],
+    "Alarm":["steelwind","bullbreaker"],
+    "Aurora":["necromancer","reaper-mage"],
+    "Elyon":["blackguard","crusader","templar"],
+    "Vorrak":["bullbreaker","orc-warrior","voidfist"],
+    "Lilly":["rogue"],
+    "Elyssa Nightclaw":["rogue"],
+    "Lava Golem":["bullbreaker"],
+    "Inefinna":["priest"],
+    "Lulu":["priest"],
+    "Xelara":["priest"],
+    "Ralazar the Balanced":["fighter"],
+    "Byrnja":["reaper-mage","necromancer"],
+    "Elara":["bowman","hunter"],
+    "Aeon Flux":["steelwind","spellblade"],
+    "Mindtamer":["conjurer"],
+    "Tidesprinter":["barbarian"],
+    "Greenkraut":["orc-shaman","bullbreaker"],
+    "Tsubaki Cleaning":["orc-shaman"],
+    "Othrama":["thunderclaw","barbarian"],
+    "Butterfly":["hunter"],
+    "Myrkos":["voidfist"],
+    "Mavra":["orc-warrior","barbarian"],
+    "Murky":["barbarian"],
+    "Leviathan":["bullbreaker","thunderclaw"],
+    "Node":["steelwind","rogue"],
+    "Aegirion":["bullbreaker"],
+    "Starflame":["archmage","conjurer"],
+    "Starbound":["astralwing"],
+    "Brightpaw":["thunderclaw","matriarch"],
+    "Abysskraken":["barbarian","bullbreaker","thunderclaw"],
+    "Kreischende Kogge":["reaper-mage","necromancer"],
+    "Greybeard":["orc-shaman","barbarian"],
+    "Tropfina":["priest","matriarch"],
+    "Roddox Harthelm":["barbarian"],
+    "Ironhoof":["barbarian","orc-warrior"],
+    "Babuschinka":["conjurer","necromancer"],
+    "Rok Kyl":["voidfist"],
+    "Omniclops":["bullbreaker"],
+    "Enforcer":["crusader","templar"],
+    "Melody":["necromancer","reaper-mage"]
+  };
+  const STANDARD_ARCHETYP_ID="fighter";
+  // >>> ENDE GENERIERT: kampf-archetyp-daten
+
+  // AUFLOESUNG SELBST — Logik, keine Daten, deshalb von Hand geschrieben statt generiert
+  // (mechanisch identisch zu lib/battle/combat-archetype-resolver.ts, s. Kommentar oben
+  // an PLATZHALTER_ARCHETYP; scripts/pruefe-kampf-archetyp-abgleich.ts misst nach, dass
+  // beide Fassungen fuer dieselben Spieler dasselbe liefern).
+  //
+  // SCHRITT 1 — welcher der 14 breiten Buckets (player-generator-archetypes.ts) passt am
+  // besten zu Klasse+Unterklassen+Traits? Klasse in preferredClasses +3, in
+  // disallowedClasses -6, je Unterklasse in preferredSubclasses +2, je Trait in
+  // preferredPositiveTraits/preferredNegativeTraits +1, je Identitaets-Schluesselwort-
+  // Treffer (Klasse ODER eine Unterklasse, normalisiert auf "klein-mit-bindestrich") +1,5.
+  // Bleibt JEDER Bucket bei Score 0 (kein einziges Kriterium traf), gilt der explizite
+  // Default "warrior" statt des ersten Objekt-Schluessels.
+  const normKlasseFuerArchetyp=(s)=>String(s||"").trim().toLowerCase().replace(/\s+/g,"-");
+  function bestimmeBreitenBucket(p){
+    const klasse=p.c, subs=p.sub||[];
+    const identitaeten=[normKlasseFuerArchetyp(klasse),...subs.map(normKlasseFuerArchetyp)];
+    let bester=null,besterScore=-Infinity;
+    for(const key in BREITE_ARCHETYPEN){
+      const b=BREITE_ARCHETYPEN[key];
+      let score=0;
+      if(b.preferredClasses.includes(klasse))score+=3;
+      if(b.disallowedClasses.includes(klasse))score-=6;
+      for(const s of subs)if(b.preferredSubclasses.includes(s))score+=2;
+      for(const t of (p.tp||[]))if(b.preferredPositiveTraits.includes(t))score+=1;
+      for(const t of (p.tn||[]))if(b.preferredNegativeTraits.includes(t))score+=1;
+      for(const kw of b.identityKeywords)if(identitaeten.includes(kw))score+=1.5;
+      if(score>besterScore){besterScore=score;bester=key;}
+    }
+    return besterScore>0?bester:"warrior";
+  }
+  // SCHRITT 2 — Kandidatenmenge: Bildbefund (falls der Spielername vorliegt) ersetzt die
+  // Vereinigung, sonst Vereinigung ueber alle Unterklassen (Reihenfolge stabil: erste
+  // Unterklasse zuerst, keine Duplikate) — exakt `archetypenFuer()` aus
+  // subclass-archetypes.ts, nur mit IDs statt Archetype-Objekten.
+  function kandidatenArchetypIds(p){
+    const bild=BILDBEFUNDE_ARCHETYPEN[p.n];
+    if(bild)return bild;
+    const gesehen=new Set(),raus=[];
+    for(const s of (p.sub||[])){
+      for(const id of (UNTERKLASSE_ARCHETYPEN[s]||[])){
+        if(!gesehen.has(id)){gesehen.add(id);raus.push(id);}
+      }
+    }
+    return raus;
+  }
+  // SCHRITT 3 — aus der Kandidatenmenge genau EINEN waehlen: hoechstes Skalarprodukt
+  // zwischen dem normierten hp/atk/def/spd-Profil des Kandidaten und dem Zielvektor des
+  // Buckets (`BREITE_ARCHETYPEN[bucket].ziel`). Ein einzelner Kandidat ist trivial, eine
+  // leere Menge faellt auf STANDARD_ARCHETYP_ID zurueck (dokumentierter Default, s. dort).
+  function kampfArchetypVon(p){
+    const kandidaten=kandidatenArchetypIds(p);
+    if(!kandidaten.length)return ARCHETYP_KAMPFWERTE[STANDARD_ARCHETYP_ID];
+    if(kandidaten.length===1)return ARCHETYP_KAMPFWERTE[kandidaten[0]]||ARCHETYP_KAMPFWERTE[STANDARD_ARCHETYP_ID];
+    const ziel=BREITE_ARCHETYPEN[bestimmeBreitenBucket(p)].ziel;
+    let bester=null,besterScore=-Infinity;
+    for(const id of kandidaten){
+      const a=ARCHETYP_KAMPFWERTE[id];
+      if(!a)continue;
+      const score=a.hp*ziel.hp+a.atk*ziel.atk+a.def*ziel.def+a.spd*ziel.spd;
+      if(score>besterScore){besterScore=score;bester=a;}
+    }
+    return bester||ARCHETYP_KAMPFWERTE[STANDARD_ARCHETYP_ID];
+  }
 
   const KEYS=["LP","ANG","VER","TMP","AUS"];
   const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",AUS:"Ausdauer"};
@@ -19522,10 +19812,15 @@
     s.MANA=sMod.MANA;
     const h=homeFor(side,row,i,n);
     const fern=p.fern===true;
+    // BACKLOG #156, SCHRITT 1: Klassenwerte aus dem aufgeloesten Kampf-Archetyp statt aus
+    // PLATZHALTER_ARCHETYP — s. Kommentar dort. `arch` ist reines Debug-/Mess-Feld (u.a.
+    // disziplinProbe(), s. window.__arena weiter unten), veraendert kein Kampfverhalten.
+    const archetyp=kampfArchetypVon(p);
     return {id,n:p.n,side,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId||null,
       // groesse (s. groesseFaktor/bauFeldspiel::bauSpieler): reine Zeichen-Angabe, rein
       // additiv nach allen Kampfwerten oben berechnet.
       groesse:p.groesse??null,
+      arch:archetyp.name,stunResist:archetyp.stunResist,knockbackResist:archetyp.knockbackResist,
       ord:ordung||"mitlinie",zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
       hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
       dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -31116,8 +31411,10 @@
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
-            // dorthin stellt, wo sie etwas bewirken koennen.
-            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig,reihe:u.row}));
+            // dorthin stellt, wo sie etwas bewirken koennen. `arch` (Backlog #156, Schritt 1)
+            // ist der aufgeloeste Kampf-Archetyp-Name — reines Diagnosefeld fuer
+            // scripts/pruefe-kampf-archetyp-abgleich.ts, veraendert kein Kampfverhalten.
+            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig,reihe:u.row,arch:u.arch??null}));
           spiele.push({saat:saat0+i*schritt,
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
@@ -31125,6 +31422,7 @@
               ...(u.bein!=null?{bein:u.bein,
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
               ...(u.reihe!=null?{reihe:u.reihe}:{}),
+              ...(u.arch!=null?{arch:u.arch}:{}),
               ...(u.torwart?{torwart:true}:{})}))});
         }
         return spiele;
