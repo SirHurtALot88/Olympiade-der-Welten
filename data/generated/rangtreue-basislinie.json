@@ -6,34 +6,34 @@
  "disziplinen": {
   "tdm": {
    "chassis": "arena",
-   "spielMedian": 0.165,
-   "spielSpannweite": 0.272,
-   "saisonMedian": 0.322,
-   "saisonSpannweite": 0.245,
-   "schranke": 0.082
+   "spielMedian": 0.166,
+   "spielSpannweite": 0.613,
+   "saisonMedian": 0.168,
+   "saisonSpannweite": 0.951,
+   "schranke": 0.184
   },
   "mini-dm": {
    "chassis": "arena",
-   "spielMedian": 0.256,
-   "spielSpannweite": 0.661,
-   "saisonMedian": 0.643,
-   "saisonSpannweite": 0.738,
+   "spielMedian": 0.371,
+   "spielSpannweite": 0.658,
+   "saisonMedian": 0.429,
+   "saisonSpannweite": 1.262,
    "schranke": 0.198
   },
   "battlefield": {
    "chassis": "arena",
-   "spielMedian": 0.251,
-   "spielSpannweite": 0.778,
+   "spielMedian": 0.356,
+   "spielSpannweite": 0.906,
    "saisonMedian": 0.429,
-   "saisonSpannweite": 1.071,
-   "schranke": 0.233
+   "saisonSpannweite": 1.333,
+   "schranke": 0.272
   },
   "spurt": {
    "chassis": "bahn",
-   "spielMedian": 0.894,
-   "spielSpannweite": 0.138,
-   "saisonMedian": 0.916,
-   "saisonSpannweite": 0.105,
+   "spielMedian": 0.903,
+   "spielSpannweite": 0.15,
+   "saisonMedian": 0.923,
+   "saisonSpannweite": 0.152,
    "schranke": 0.05
   },
   "time-trial": {
@@ -62,10 +62,10 @@
   },
   "takeshis-castle": {
    "chassis": "bahn",
-   "spielMedian": 0.879,
-   "spielSpannweite": 0.101,
+   "spielMedian": 0.874,
+   "spielSpannweite": 0.065,
    "saisonMedian": 0.958,
-   "saisonSpannweite": 0.063,
+   "saisonSpannweite": 0.021,
    "schranke": 0.05
   },
   "gewichtheben": {
@@ -164,5 +164,16 @@
    "saisonSpannweite": 0.259,
    "schranke": 0.054
   }
+ },
+ "teilaktualisiertAm": {
+  "zeitpunkt": "2026-09-20T19:02:29.121237Z",
+  "disziplinen": [
+   "tdm",
+   "mini-dm",
+   "battlefield",
+   "spurt",
+   "takeshis-castle"
+  ],
+  "grund": "PR persOf/kaderSetzen-Fix (persOf wurde nach einem Kader-Tausch nicht neu berechnet) — betrifft nur die drei ARENA_ART-Disziplinen (ueber baueEinheit/behav) und Spurt/Takeshis Castle (ueber bauSpurts eigene persOf-Lesestelle fuer den Rempler-Mechanismus). Die uebrigen 15 Eintraege stammen unveraendert von gemessenAm."
  }
 }
