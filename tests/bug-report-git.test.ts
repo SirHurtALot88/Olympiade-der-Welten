@@ -69,6 +69,11 @@ function simulateServerCron(containerReports: string[]) {
   git(server, ["init", "-q", "-b", "main"]);
   git(server, ["config", "user.email", "s@s"]);
   git(server, ["config", "user.name", "S"]);
+  // gc.auto AUS (13.09., ENOTEMPTY beim Aufraeumen): git kann nach genug lose Objekten einen
+  // Hintergrund-`git gc --auto` abspalten, der nach dem Push noch im Verzeichnis schreibt --
+  // genau dann, wenn afterEach() `fs.rmSync` auf denselben Ordner ruft. Ohne Verbindung zum
+  // eigentlichen Testinhalt, aber sonst ein reproduzierbarer Rmdir-Fehlschlag im Aufraeumen.
+  git(server, ["config", "gc.auto", "0"]);
   git(server, ["remote", "add", "origin", remote]);
   const index = path.join(server, ".oly-index");
   const env = { GIT_INDEX_FILE: index };
@@ -109,9 +114,13 @@ beforeEach(() => {
   work = path.join(root, "work");
   fs.mkdirSync(work, { recursive: true });
   git(root, ["init", "--bare", "-q", remote]);
+  // gc.auto AUS, s. Kommentar in simulateServerCron() -- derselbe Rmdir-Fehlschlag kann auch
+  // hier auftreten, da `remote` ueber mehrere Force-Pushes hinweg Objekte ansammelt.
+  git(remote, ["config", "gc.auto", "0"]);
   git(work, ["init", "-q", "-b", "main"]);
   git(work, ["config", "user.email", "t@t"]);
   git(work, ["config", "user.name", "T"]);
+  git(work, ["config", "gc.auto", "0"]);
   fs.mkdirSync(reportsDir(), { recursive: true });
   fs.writeFileSync(path.join(reportsDir(), "README.md"), "x\n", "utf8");
   git(work, ["add", "-A"]);
