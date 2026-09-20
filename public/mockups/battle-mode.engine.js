@@ -9137,7 +9137,9 @@
     // Viertelpause, wie beim realen Vorbild — auch das rein kosmetisch.
     const perioden=(LIVE()||{}).perioden||VIERTEL_ANZAHL_BASKETBALL;
     const istHalbzeit=perioden>=4&&zuEnde===Math.floor(perioden/2);
-    vpSichtbarBis=performance.now()+(istHalbzeit?3600:2000);
+    // jetztMs() statt performance.now() direkt (A0.2, s. Definition oben bei sondenAktiv):
+    // im echten Spiel identisch, im Sonden-Modus die simulationsgebundene Uhr.
+    vpSichtbarBis=jetztMs()+(istHalbzeit?3600:2000);
     const vp=document.getElementById("viertelpause");
     if(vp){
       const titel=document.getElementById("vpTitel"), sub=document.getElementById("vpUntertitel");
@@ -11736,7 +11738,7 @@
     // GEZEICHNETEM Frame (requestAnimationFrame), nicht in stepFeldspielLive/stepSim.
     const vp=document.getElementById("viertelpause");
     if(vp&&!vp.hidden){
-      const restMs=vpSichtbarBis-performance.now();
+      const restMs=vpSichtbarBis-jetztMs(); // A0.2: jetztMs() statt performance.now(), s.o.
       if(restMs<=0)vp.hidden=true;
       else{
         const vpZahl=document.getElementById("vpCountdown");
@@ -19285,6 +19287,15 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  // SONDEN-MODUS (A0.2, docs/design/deterministischer-sonden-modus-19-09.md): additiver
+  // Schalter fuer Screenshot-QA. `sondenAktiv` schaltet jetztMs() (s. dort, unten bei den
+  // performance.now()-Lesestellen) von der echten Wanduhr auf eine SIMULATIONSGEBUNDENE Uhr
+  // um, die window.__arena.sondenLauf() weiter unten in festen Tick-Schritten fortschreibt.
+  // Ausserhalb eines Sonden-Laufs bleibt sondenAktiv false und jetztMs() liefert exakt
+  // performance.now() wie bisher — byte-identisches Verhalten im echten Spiel, nichts an
+  // loop()/requestAnimationFrame/rr()/wert() wird angefasst.
+  let sondenAktiv=false, sondenSimMs=0;
+  function jetztMs(){ return sondenAktiv?sondenSimMs:(typeof performance!=="undefined"?performance.now():Date.now()); }
   // FARB-TOKENS DER LEINWAND (Chris, 30.08.: "Spielernamen auf dem Feld in Teamfarbe").
   //
   // BEFUND, nachgemessen statt vermutet. Der Aufruf las bisher `document.body` — die
@@ -22163,7 +22174,7 @@
       const eintrag=(TON_KATALOG[disziplin]||{})[ereignis];
       if(!eintrag||eintrag.loop)return; // Loop-Eintraege laufen ueber tonLoopStart/-Stop
       if(disziplin==="takeshis-castle"){
-        const jetzt=(typeof performance!=="undefined"?performance.now():Date.now())/1000;
+        const jetzt=jetztMs()/1000; // A0.2: jetztMs() statt performance.now()/Date.now() direkt, s.o.
         const key=disziplin+"|"+ereignis;
         if(jetzt-(tonSfxLetzte[key]??-Infinity)<TON_DROSSEL_S)return;
         tonSfxLetzte[key]=jetzt;
@@ -22273,7 +22284,7 @@
     ctx.setLineDash([]);
     // Fackeln. Das Blatt hat neun Bilder zu 32x64; die Flamme laeuft nach der Wanduhr,
     // nicht nach der Simulationsuhr — sie ist Schmuck und darf keine Messung beruehren.
-    const fk=aDa("fackel"), bild=fk?Math.floor(performance.now()/110)%9:0;
+    const fk=aDa("fackel"), bild=fk?Math.floor(jetztMs()/110)%9:0; // A0.2: jetztMs(), s.o.
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
       if(fk) ctx.drawImage(aBild.fackel,bild*32,0,32,64,x-16,y-42,32,64);
       else { ctx.fillStyle="#2b2318";ctx.fillRect(x-3,y,6,22); }
@@ -27328,6 +27339,17 @@
   };
   const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
 
+  // SCHWEBETEXTE FORTSCHREIBEN — ausgelagert (A0.2), damit der Sonden-Modus (s.
+  // window.__arena.sondenLauf() weiter unten) dieselbe Formel je TICK anwenden kann statt
+  // sie zu duplizieren. AN DIESER STELLE UNVERAENDERT: loop() ruft sie weiter genau einmal
+  // je GEZEICHNETEM Frame auf, wortgleich wie vorher — das ist die bewusste Broadcast-
+  // Vorwuerdigung (Schwebetexte in Bildschirm-, nicht Simulationszeit) und bleibt fuer das
+  // echte Spiel unangetastet.
+  function stepFloats(){
+    floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
+    for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
+  }
+
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
@@ -27335,8 +27357,7 @@
       acc+=dt*speed;
       const zf=zeitFaktor();
       while(acc>=1/60){stepSim((1/60)/zf);acc-=1/60;}
-      floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
-      for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
+      stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
       if(istFeldspiel(disc))updateHudFeldspiel();
@@ -28783,6 +28804,13 @@
 
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
+    // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
+    // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
+    // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
+    // simulierte Uhr vom vorigen Kampf einfach weiterzaehlen -- der neue Kampf begaenne dann
+    // nicht bei Sonden-Zeit 0, obwohl er inhaltlich frisch aufgebaut ist. `sondenAktiv` selbst
+    // bleibt bewusst unangetastet (s. sondenLauf()-Kommentar bei window.__arena weiter unten).
+    sondenSimMs=0;
     // Broadcast-Bausteine fuer ein neues Spiel zuruecksetzen: HIGHLIGHTS gehoert zum
     // ABGELAUFENEN Spiel und darf im naechsten Endstand nicht mehr auftauchen; ein noch
     // sichtbarer Callout aus dem letzten Spiel darf nicht ueber den neuen Einlauf stehen.
@@ -30320,6 +30348,78 @@
       const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
       return actVon(u);
     },
+    // A0.2 — DETERMINISTISCHER SONDEN-MODUS FUER SCREENSHOT-QA
+    // (docs/design/deterministischer-sonden-modus-19-09.md, Opus-Synthese Echtzeit-vs-
+    // rundenbasiert Abschnitt 5.0). Ersetzt fuer Playwright-Screenshots den bisherigen Weg
+    // ueber den "Kampf starten"-Knopf + eine feste Wartezeit (`waitForTimeout`) — DAS ist die
+    // Quelle des Screenshot-Rauschens: loop() zaehlt echte Millisekunden in `acc` auf
+    // (`acc+=dt*speed`) und fuehrt stepSim() aus, sobald 1/60 davon zusammenkommen; wie viele
+    // Sechzigstel bis zum Ablauf der Wartezeit zusammenkommen, streut je nach Bildwiederhol-
+    // rate und Prozesslast um ein bis zwei Ticks. sondenLauf(ticks) umgeht diese Kopplung
+    // vollstaendig: es ruft stepSim() GENAU `ticks`-mal mit der immer gleichen festen
+    // Tick-Groesse (1/60)/zeitFaktor() auf — derselben Groesse, die loop() auch verwendet, nur
+    // ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Zwei Aufrufe mit demselben
+    // Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit exakt dieselbe
+    // Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig davon, wie lange der
+    // Prozess vorher lief oder wie schnell die Maschine ist.
+    //
+    // WAS SONST NOCH AN DER WANDUHR HING (alle drei Fundstellen, s. jetztMs() bei der
+    // Deklaration von sondenAktiv oben): die Viertelpause-Overlay-Restsekunden (vpSichtbarBis/
+    // restMs), die Fackel-Animation der Arena (Math.floor(.../110)%9) und die Takeshi-SFX-
+    // Drossel lasen performance.now() direkt. Waehrend sondenAktiv gesetzt ist, liest jetztMs()
+    // stattdessen sondenSimMs, die dieser Lauf in FESTEN 1000/60-ms-Schritten je Tick
+    // fortschreibt — Simulationszeit, nie die reale Wanduhr.
+    //
+    // `sondenAktiv` bleibt nach dem Lauf ABSICHTLICH gesetzt (kein Zuruecksetzen in einem
+    // finally): der Motor treibt unabhaengig von `running` ohnehin bei JEDEM
+    // requestAnimationFrame ein draw() (s. loop() oben, der Aufruf steht ausserhalb des
+    // `if(running)`-Zweigs). Faellt zwischen diesem Aufruf und dem tatsaechlichen Screenshot
+    // noch ein solcher Frame (Playwright wartet auf das Sceenshot-Versprechen, dazwischen kann
+    // der Browser einen weiteren rAF-Tick einschieben), wuerde er sonst mit echter
+    // performance.now() erneut zeichnen und den Fackel-/Overlay-Stand wieder verwuerfeln.
+    // sondenAus() direkt darunter kehrt zur echten Wanduhr zurueck, falls eine Seite danach
+    // noch interaktiv weiterlaufen soll (z.B. manuelles Nachschauen im Browser).
+    //
+    // SCHWEBETEXTE (floats): laufen im echten Spiel je GEZEICHNETEM Frame (loop() oben, ueber
+    // stepFloats()), bewusst UNVERAENDERT — das ist Broadcast-Feel (Chris' ZEIT_DEHNUNG-
+    // Anliegen), keine Messgroesse, und wird hier nicht angefasst. In diesem Sonden-Lauf
+    // laufen sie stattdessen je TICK (stepFloats() nach jedem stepSim()), damit ihre Position/
+    // Lebensdauer ausschliesslich von der Tick-Zahl abhaengt, nicht von der Bildwiederholrate.
+    //
+    // Ruehrt weder rr() noch wert()/Boxscore-/Rangtreue-Logik an: stepSim() ist dieselbe
+    // Funktion, die auch loop() aufruft, mit derselben Tick-Groesse (1/60)/zeitFaktor() — kein
+    // zweiter Motor, keine Kopie. Nur die AUSSENSTEUERUNG (wie oft, mit welchem dt) ist neu,
+    // rein additiv wie renderProbe/figurProbe/bahnVizProbe daneben.
+    //
+    // Aufruf (Playwright, ohne UI-Klick): window.__arena.setDisc(d) baut die Aufstellung
+    // frisch auf (reset(), running bleibt false) UND nullt dabei die Sonden-Uhr
+    // (sondenSimMs=0, s. reset()); window.__arena.sondenLauf(N) faehrt N feste Ticks und
+    // zeichnet einmal; danach direkt den Screenshot ziehen (kein waitForTimeout mehr noetig).
+    // Mehrere sondenLauf(k)-Aufrufe hintereinander OHNE dazwischenliegendes setDisc()/reset()
+    // summieren sich zu einem sondenLauf(k1+k2+...) — sondenSimMs laeuft dabei einfach durch;
+    // ERST ein erneutes setDisc()/reset() (neuer Kampf) setzt sie zurueck, NICHT dieser
+    // Aufruf selbst (die Nullstellung lebt bewusst an EINER Stelle, reset(), statt hier UND
+    // dort dieselbe Bedingung zu pflegen).
+    sondenLauf:(ticks)=>{
+      const n=Math.max(0,Math.floor(Number(ticks)||0));
+      sondenAktiv=true;
+      const zf=zeitFaktor();
+      for(let i=0;i<n;i++){
+        sondenSimMs+=1000/60;
+        stepSim((1/60)/zf);
+        stepFloats();
+        // Dieselbe HUD-Nachfuehrung wie in loop() (s. dort): fuer den Kampf ruft stepSim()
+        // updateHud() selbst, Feldspiel/Buehne/Bahn brauchen den Aufruf von aussen.
+        if(istFeldspiel(disc))updateHudFeldspiel();
+        else if(istBuehne(disc))updateHudBuehne();
+        else if(istBahn(disc))updateHudBahn();
+      }
+      draw();
+      return {disc, ticks:n, zeitFaktor:zf, simMs:+sondenSimMs.toFixed(1)};
+    },
+    // Kehrt zur echten Wanduhr zurueck (s. sondenLauf() oben) — z.B. wenn nach einem Sonden-
+    // Lauf noch interaktiv per "Kampf starten" weitergespielt werden soll.
+    sondenAus:()=>{ sondenAktiv=false; },
     renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker,viz)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also
