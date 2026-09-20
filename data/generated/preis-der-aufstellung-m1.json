@@ -1,0 +1,974 @@
+{
+ "hinweis": "M1-Sonde (PM-Plan 20.09., Abschnitt 3.3): rho je Spiel/Saison ueber die M0-Kaderfamilie, in drei Aufstellungs-Stufungen (motoroptimal/menschlich-plausibel/absichtlich-schlecht). Format wie scripts/lib/rangtreue-messung.mjs, numerisch vergleichbar mit miss-alle-disziplinen.mjs. Reiner Sondenpfad ueber scripts/lib/aufstellungs-stufungen.ts (\"Variante P\" fuer A1.0) — kein Motorcode geaendert.",
+ "spiele": 24,
+ "kaderQuelle": {
+  "saveId": "new-game-1787123325719-swnjlk",
+  "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+  "gezogenAm": "2026-09-20T10:21:30.843Z"
+ },
+ "zeilen": [
+  {
+   "disc": "tdm",
+   "stufung": "motoroptimal",
+   "spielMed": 0.3053769467408667,
+   "spielSpan": 0.7489191538440845,
+   "saisonMed": 0.3706293706293706,
+   "saisonSpan": 0.8391608391608392,
+   "teilnehmer": 12,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.3923682401684195,
+     "saison": 0.4405594405594406,
+     "teilnehmer": 12
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.28906778295084395,
+     "saison": 0.34965034965034963,
+     "teilnehmer": 12
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.7416338774343556,
+     "saison": 0.7202797202797203,
+     "teilnehmer": 12
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": 0.013705874910817128,
+     "saison": 0.006993006993006993,
+     "teilnehmer": 12
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.12646249456496567,
+     "saison": 0.1958041958041958,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.09502358584817733,
+     "saison": 0.15384615384615385,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.7626250287549016,
+     "saison": 0.8461538461538461,
+     "teilnehmer": 12
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.4446386946386946,
+     "saison": 0.5594405594405595,
+     "teilnehmer": 12
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.22074666133707588,
+     "saison": 0.3706293706293706,
+     "teilnehmer": 12
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.27687649778909246,
+     "saison": 0.2727272727272727,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.17485096570108227,
+     "saison": 0.17482517482517482,
+     "teilnehmer": 12
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.4785122154884464,
+     "saison": 0.5454545454545454,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.45500728823181985,
+     "saison": 0.46853146853146854,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.37033799533799533,
+     "saison": 0.36363636363636365,
+     "teilnehmer": 12
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.30001197680733355,
+     "saison": 0.3706293706293706,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.3107419166743998,
+     "saison": 0.38461538461538464,
+     "teilnehmer": 12
+    }
+   ]
+  },
+  {
+   "disc": "tdm",
+   "stufung": "menschlich-plausibel",
+   "spielMed": 0.3902536605239731,
+   "spielSpan": 0.5072278182624737,
+   "saisonMed": 0.5524475524475525,
+   "saisonSpan": 0.7692307692307692,
+   "teilnehmer": 12,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.5550508510624536,
+     "saison": 0.7692307692307693,
+     "teilnehmer": 12
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.15493210782029038,
+     "saison": 0.2097902097902098,
+     "teilnehmer": 12
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.375,
+     "saison": 0.5594405594405595,
+     "teilnehmer": 12
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": 0.22779176351418284,
+     "saison": 0.25874125874125875,
+     "teilnehmer": 12
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.4944164987097431,
+     "saison": 0.6223776223776224,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.4293842661853424,
+     "saison": 0.5104895104895105,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.44845721765251456,
+     "saison": 0.6853146853146853,
+     "teilnehmer": 12
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.1836389582344943,
+     "saison": 0.13286713286713286,
+     "teilnehmer": 12
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.3903613003031297,
+     "saison": 0.5454545454545454,
+     "teilnehmer": 12
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.39014602074481647,
+     "saison": 0.5874125874125874,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.20647948680166694,
+     "saison": 0.09090909090909091,
+     "teilnehmer": 12
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.662159926082764,
+     "saison": 0.8391608391608392,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.575347932035692,
+     "saison": 0.6503496503496503,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.3260855166449288,
+     "saison": 0.4405594405594406,
+     "teilnehmer": 12
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.6094647939382694,
+     "saison": 0.8601398601398601,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.36759329640401783,
+     "saison": 0.4125874125874126,
+     "teilnehmer": 12
+    }
+   ]
+  },
+  {
+   "disc": "tdm",
+   "stufung": "absichtlich-schlecht",
+   "spielMed": 0.28856592030024675,
+   "spielSpan": 0.685357587231003,
+   "saisonMed": 0.36013986013986016,
+   "saisonSpan": 1.083916083916084,
+   "teilnehmer": 12,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.16958041958041958,
+     "saison": 0.15384615384615385,
+     "teilnehmer": 12
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.28527939342586617,
+     "saison": 0.24475524475524477,
+     "teilnehmer": 12
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.22925272586785148,
+     "saison": 0.46153846153846156,
+     "teilnehmer": 12
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": -0.02021304357380482,
+     "saison": -0.15384615384615385,
+     "teilnehmer": 12
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.3094941868359566,
+     "saison": 0.2937062937062937,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.371377472236121,
+     "saison": 0.5244755244755245,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.5416211607540592,
+     "saison": 0.7902097902097902,
+     "teilnehmer": 12
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.3878562644174442,
+     "saison": 0.42657342657342656,
+     "teilnehmer": 12
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.2336957521104592,
+     "saison": 0.36363636363636365,
+     "teilnehmer": 12
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.025210509200894685,
+     "saison": -0.15384615384615385,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.3206832789078106,
+     "saison": 0.35664335664335667,
+     "teilnehmer": 12
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.6457305476039634,
+     "saison": 0.7692307692307693,
+     "teilnehmer": 12
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.10362400894618913,
+     "saison": 0.14685314685314685,
+     "teilnehmer": 12
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": -0.039627039627039624,
+     "saison": -0.2937062937062937,
+     "teilnehmer": 12
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.5121709834738731,
+     "saison": 0.5944055944055944,
+     "teilnehmer": 12
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.2918524471746273,
+     "saison": 0.3706293706293706,
+     "teilnehmer": 12
+    }
+   ]
+  },
+  {
+   "disc": "mini-dm",
+   "stufung": "motoroptimal",
+   "spielMed": 0.4343286766174211,
+   "spielSpan": 0.9685876382543647,
+   "saisonMed": 0.4642857142857143,
+   "saisonSpan": 1.1904761904761905,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.23115079365079363,
+     "saison": 0.3333333333333333,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.12896825396825398,
+     "saison": -0.047619047619047616,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.7410714285714285,
+     "saison": 0.8095238095238095,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": -0.21588403979179763,
+     "saison": -0.2619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.7527035984625671,
+     "saison": 0.9285714285714286,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.20039682539682535,
+     "saison": 0.30952380952380953,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.6071428571428571,
+     "saison": 0.6428571428571429,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.7430555555555557,
+     "saison": 0.8095238095238095,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.5932539682539683,
+     "saison": 0.7142857142857143,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.2658730158730158,
+     "saison": 0,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.5863095238095236,
+     "saison": 0.6190476190476191,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.4767922738697628,
+     "saison": 0.5476190476190477,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.5326442550103986,
+     "saison": 0.5952380952380952,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.39186507936507936,
+     "saison": 0.38095238095238093,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.2401091570436862,
+     "saison": 0.23809523809523808,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.14447930193468309,
+     "saison": 0.023809523809523808,
+     "teilnehmer": 8
+    }
+   ]
+  },
+  {
+   "disc": "mini-dm",
+   "stufung": "menschlich-plausibel",
+   "spielMed": 0.48570743445447484,
+   "spielSpan": 0.9781746031746033,
+   "saisonMed": 0.5714285714285714,
+   "saisonSpan": 1.2380952380952381,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.8630952380952381,
+     "saison": 0.8809523809523809,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.28075396825396826,
+     "saison": 0.3333333333333333,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.5684523809523809,
+     "saison": 0.6428571428571429,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": -0.1150793650793651,
+     "saison": -0.21428571428571427,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.7361111111111113,
+     "saison": 0.8333333333333334,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.17063492063492067,
+     "saison": 0.40476190476190477,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.6723166636411033,
+     "saison": 0.6904761904761905,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.6495707040380136,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.7569444444444443,
+     "saison": 0.7142857142857143,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.3184523809523809,
+     "saison": 0.30952380952380953,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.5178571428571428,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.398976358809722,
+     "saison": 0.4523809523809524,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.45355772605180683,
+     "saison": 0.6190476190476191,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.6498015873015872,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.2698412698412698,
+     "saison": 0.23809523809523808,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": -0.08143858224216972,
+     "saison": -0.35714285714285715,
+     "teilnehmer": 8
+    }
+   ]
+  },
+  {
+   "disc": "mini-dm",
+   "stufung": "absichtlich-schlecht",
+   "spielMed": 0.4742063492063492,
+   "spielSpan": 0.924113110169837,
+   "saisonMed": 0.5833333333333333,
+   "saisonSpan": 1.2142857142857144,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.46527777777777785,
+     "saison": 0.47619047619047616,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.2609126984126983,
+     "saison": 0.35714285714285715,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.5317460317460316,
+     "saison": 0.6666666666666666,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": -0.08579859608133152,
+     "saison": -0.30952380952380953,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.5129862012897888,
+     "saison": 0.5952380952380952,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.25552487072428776,
+     "saison": 0.19047619047619047,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.7275400432543931,
+     "saison": 0.7380952380952381,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.6746031746031745,
+     "saison": 0.6904761904761905,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.48313492063492053,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.3799603174603174,
+     "saison": 0.6666666666666666,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.8383145140885054,
+     "saison": 0.9047619047619048,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.7906746031746033,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.6747491641481779,
+     "saison": 0.8095238095238095,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.15079365079365079,
+     "saison": 0.023809523809523808,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.4576213143058884,
+     "saison": 0.5,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.20932539682539686,
+     "saison": -0.047619047619047616,
+     "teilnehmer": 8
+    }
+   ]
+  },
+  {
+   "disc": "battlefield",
+   "stufung": "motoroptimal",
+   "spielMed": 0.5411706349206349,
+   "spielSpan": 1.1707362133136126,
+   "saisonMed": 0.6190476190476191,
+   "saisonSpan": 1.3333333333333333,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.5347222222222223,
+     "saison": 0.42857142857142855,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.7827380952380953,
+     "saison": 0.9285714285714286,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.7008034901697235,
+     "saison": 0.9523809523809523,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": 0.41071428571428575,
+     "saison": 0.4523809523809524,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": -0.31855367363107273,
+     "saison": -0.38095238095238093,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.12103174603174603,
+     "saison": -0.07142857142857142,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.5138888888888888,
+     "saison": 0.6190476190476191,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.8521825396825399,
+     "saison": 0.9523809523809523,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.36322036434538685,
+     "saison": 0.42857142857142855,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.08029160053563639,
+     "saison": 0.07142857142857142,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.05654761904761905,
+     "saison": -0.023809523809523808,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.6468253968253967,
+     "saison": 0.6904761904761905,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.5476190476190476,
+     "saison": 0.6190476190476191,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.8183689812919414,
+     "saison": 0.9285714285714286,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.7675190085220133,
+     "saison": 0.8571428571428571,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.5492292899108594,
+     "saison": 0.8809523809523809,
+     "teilnehmer": 8
+    }
+   ]
+  },
+  {
+   "disc": "battlefield",
+   "stufung": "menschlich-plausibel",
+   "spielMed": 0.5362937349604167,
+   "spielSpan": 0.6955363065570689,
+   "saisonMed": 0.5714285714285714,
+   "saisonSpan": 0.8095238095238095,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.5919297288196389,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.826388888888889,
+     "saison": 0.9047619047619048,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.4140420213694654,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": 0.1308525823318201,
+     "saison": 0.09523809523809523,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": 0.5486111111111112,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.26091269841269843,
+     "saison": 0.09523809523809523,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.8028981480174308,
+     "saison": 0.9047619047619048,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.7996031746031745,
+     "saison": 0.8809523809523809,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.5198412698412699,
+     "saison": 0.5238095238095238,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.4133419191277488,
+     "saison": 0.5714285714285714,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.1543880200695896,
+     "saison": 0.11904761904761904,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.7103174603174603,
+     "saison": 0.7857142857142857,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.6330795093652493,
+     "saison": 0.7380952380952381,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.6074184372727424,
+     "saison": 0.6666666666666666,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.5208333333333334,
+     "saison": 0.5,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.5239763588097222,
+     "saison": 0.4523809523809524,
+     "teilnehmer": 8
+    }
+   ]
+  },
+  {
+   "disc": "battlefield",
+   "stufung": "absichtlich-schlecht",
+   "spielMed": 0.5604101160024479,
+   "spielSpan": 0.9742063492063493,
+   "saisonMed": 0.6785714285714286,
+   "saisonSpan": 1,
+   "teilnehmer": 8,
+   "varianten": [
+    {
+     "label": "vigilante-armageddon",
+     "spiel": 0.6021825396825397,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "goldengladiators-zeroheroes",
+     "spiel": 0.6646825396825397,
+     "saison": 0.7857142857142857,
+     "teilnehmer": 8
+    },
+    {
+     "label": "silversoldiers-royalcourt",
+     "spiel": 0.5656191919049319,
+     "saison": 0.8333333333333334,
+     "teilnehmer": 8
+    },
+    {
+     "label": "coldsteel-direlegion-erweitert",
+     "spiel": 0.09893971558559007,
+     "saison": 0.16666666666666666,
+     "teilnehmer": 8
+    },
+    {
+     "label": "deathpeaches-cashcreators",
+     "spiel": -0.1121031746031746,
+     "saison": -0.07142857142857142,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wickedwizards-raginglunatics-erweitert",
+     "spiel": 0.48728788478196566,
+     "saison": 0.5238095238095238,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lastride-viciousdelicious",
+     "spiel": 0.7837301587301586,
+     "saison": 0.8571428571428571,
+     "teilnehmer": 8
+    },
+    {
+     "label": "thegiants-hellraisers",
+     "spiel": 0.7410714285714287,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "terribleteachers-thechantry",
+     "spiel": 0.3027044913295138,
+     "saison": 0.4523809523809524,
+     "teilnehmer": 8
+    },
+    {
+     "label": "natureswrath-blackpanthers",
+     "spiel": 0.19345238095238096,
+     "saison": 0.35714285714285715,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mortalsin-projectsuicide",
+     "spiel": 0.1617063492063492,
+     "saison": 0.23809523809523808,
+     "teilnehmer": 8
+    },
+    {
+     "label": "nunchuckninjas-blazingbeasts",
+     "spiel": 0.6448412698412701,
+     "saison": 0.7619047619047619,
+     "teilnehmer": 8
+    },
+    {
+     "label": "wreckinglegionnaires-vigorousvikings",
+     "spiel": 0.6418650793650794,
+     "saison": 0.9285714285714286,
+     "teilnehmer": 8
+    },
+    {
+     "label": "mayhemmavericks-piratecrew-erweitert",
+     "spiel": 0.555201040099964,
+     "saison": 0.5952380952380952,
+     "teilnehmer": 8
+    },
+    {
+     "label": "undercoveragents-strongholdcrusaders",
+     "spiel": 0.8621031746031748,
+     "saison": 0.9285714285714286,
+     "teilnehmer": 8
+    },
+    {
+     "label": "lostkingdom-riptiderivers",
+     "spiel": 0.375,
+     "saison": 0.30952380952380953,
+     "teilnehmer": 8
+    }
+   ]
+  }
+ ]
+}
