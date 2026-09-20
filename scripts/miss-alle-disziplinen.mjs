@@ -38,12 +38,22 @@
 // Ohne Disziplinliste laufen alle zwanzig. Das dauert; mit einer Liste misst man gezielt.
 // `--einzelkader` schaltet auf das alte Verhalten zurueck (ein einziger Kader, eine Zahl je
 // Disziplin) — fuer einen schnellen Einzelcheck, NICHT fuer eine Abnahme- oder CI-Zahl.
+//
+// `--bootstrap-unsicherheit` (M0, 20.09.2026, ADDITIV — ohne den Schalter unveraendertes
+// Verhalten, byte-identisch zu vorher): haengt an jede Disziplinzeile mit Kader-Familie eine
+// dritte Statistik, die "Median-Unsicherheit" (Breite des 90%-Bootstrap-Konfidenzintervalls
+// ueber den Median der Paarungswerte, s. bootstrapMedianUnsicherheit in lib/rangtreue-
+// messung.mjs). Median und Spannweite sagen, WAS der Median ist und wie weit die Paarungen
+// auseinanderliegen; diese dritte Zahl sagt, wie PRAEZISE der Median selbst ist — klein heisst,
+// mehr Paarungen wuerden ihn kaum noch bewegen.
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie } from "./lib/rangtreue-messung.mjs";
+import {
+  disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, bootstrapMedianUnsicherheit,
+} from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -53,13 +63,14 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const roheArgs = process.argv.slice(2);
 const EINZELKADER = roheArgs.includes("--einzelkader");
+const BOOTSTRAP_UNSICHERHEIT = roheArgs.includes("--bootstrap-unsicherheit");
 // --je-seite=N: faehrt die kaderfeste Messung mit einer anderen Kadergroesse je Seite
 // (2/4/6 ...), zusaetzlich zur Kader-FAMILIE (fuenf Team-Paarungen). Additiv, ohne diesen
 // Schalter unveraendertes Verhalten — noetig fuer die Gewichtheben-Abnahme "rho >= 0,80 bei
 // 6, 4 UND 2 je Seite" (Plan 8.1), jetzt mit Median+Spannweite statt Einzelkader.
 const jeSeiteArg = roheArgs.find((a) => a.startsWith("--je-seite="));
 const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && !a.startsWith("--je-seite="));
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite="));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -113,6 +124,14 @@ for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) 
     + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
     + z.saisonMed.toFixed(3).padStart(21) + z.saisonSpan.toFixed(3).padStart(12)
     + "   " + ok);
+  // MEDIAN-UNSICHERHEIT (M0, 20.09.2026, additiv hinter --bootstrap-unsicherheit, s.
+  // Kopfkommentar). Nur sinnvoll mit einer Kader-Familie (z.varianten) und mindestens zwei
+  // Paarungen — sonst ist "Bootstrap ueber eine Ziehung" nur wieder dieselbe eine Zahl.
+  if (BOOTSTRAP_UNSICHERHEIT && z.varianten && z.varianten.length >= 2) {
+    const u = bootstrapMedianUnsicherheit(z.varianten.map((v) => v.spiel));
+    console.log(`  Median-Unsicherheit (90%-Bootstrap-CI, ${u.n} Paarungen, ${u.wiederholungen} Ziehungen): `
+      + `Breite ${u.breite.toFixed(3)} [${u.unten.toFixed(3)}, ${u.oben.toFixed(3)}]`);
+  }
   // FELDSPIELER-ONLY (Fable-Recherche 1.1/3.1): nur ausgefuellt, wenn die Disziplin eine
   // Rolle mit eigener, andersartiger Wertformel kennt (heute nur Hockeys Torwart) — die
   // Zwoelfer-Zahl oben bleibt die, gegen die pruefe-rangtreue-schranke.mjs misst (das reale
