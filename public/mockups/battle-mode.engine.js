@@ -28802,6 +28802,30 @@
     document.getElementById("endstand").hidden=false;
   }
 
+  // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
+  // "die gebuchte Saat durch den Host reichen"): GEBUCHTE SAAT FUER DEN INTERAKTIVEN AUFBAU.
+  // `echterKader.seedByDisciplineId` kommt vom Host (FoundationBattleArenaHost.tsx) — EXAKT der
+  // Seed-String, den `buildArenaMatchSeed()` + `seedZuZahl()` (lib/battle/arena-seed.ts) fuer
+  // das WIRKLICH gebuchte Duell dieser Disziplin an diesem Spieltag berechnen, DIESELBEN
+  // Funktionen, die auch `arena-headless-runner.ts` fuer die ZAEHLENDE Simulation aufruft (s.
+  // dessen Import von dort). Ohne Treffer (kein `echterKader`, keine `seedByDisciplineId`, oder
+  // `disc` ist fuer dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin — z.B.
+  // Standalone/Artefakt, freie Team-Erkundung im Host, oder eine der Nicht-Arena-Disziplinen)
+  // bleibt das Verhalten BYTE-IDENTISCH zu vorher: `undefined` faellt in `normalisiereSaat()`
+  // weiterhin auf die Ersatzsaat 1337 zurueck.
+  //
+  // BETRIFFT NUR DIESEN EINEN AUFRUF (die interaktive Wiedergabe unten in `reset()`) — jeder
+  // headless Mess-/Wertungspfad (`window.__arena.spiele*`, `disziplinProbe`, `bahnLauf`, ...)
+  // uebergibt seine Saat weiterhin explizit als Funktionsargument und liest `echterKader`
+  // hierfuer nicht; `scripts/miss-alle-disziplinen.mjs` und `runArenaFixtures()` sind von dieser
+  // Aenderung deshalb unberuehrt (nachgemessen, s. PR-Beschreibung).
+  function gebuchteSaatFuerAktuelleDisziplin(){
+    const karte=echterKader&&echterKader.seedByDisciplineId;
+    if(!karte||typeof karte!=="object")return undefined;
+    const saat=karte[disc];
+    return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
+  }
+
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
@@ -28875,7 +28899,7 @@
     // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     showcasePublikumAn=false;
-    build();
+    build(gebuchteSaatFuerAktuelleDisziplin());
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=

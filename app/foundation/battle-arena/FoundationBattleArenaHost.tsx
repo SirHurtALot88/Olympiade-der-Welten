@@ -9,6 +9,8 @@ import {
 } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/resolve/battle-mode-arena-team-points";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -194,6 +196,66 @@ export default function FoundationBattleArenaHost({
     [gameState, gastTeamId, sheetsByPlayerId],
   );
 
+  // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
+  // "die gebuchte Saat durch den Host reichen" — "Was Chris zuschaut, ist nicht das Spiel, das
+  // gezählt hat"): DIE GEBUCHTE SAAT, keyed nach disciplineId, fuer GENAU DAS Team-Paar, das
+  // gerade als Heim/Gast gewaehlt ist. `buildArenaMatchSeed()` + `seedZuZahl()` sind hier
+  // importiert von `@/lib/battle/arena-seed` — DENSELBEN Funktionen, die
+  // `lib/battle/arena-headless-runner.ts` fuer den ZAEHLENDEN Spieltagslauf aufruft (s. dessen
+  // Import von dort). Keine zweite Implementierung, kein zweiter Pfad — nur ein zweiter
+  // Aufrufer derselben Funktionen mit denselben Argumenten.
+  //
+  // Ein Eintrag entsteht NUR fuer eine Disziplin, die an DIESEM Spieltag (`disciplineSchedule`)
+  // als D1 ODER D2 gebucht UND arena-aufgeloest ist (`ARENA_RESOLVED_DISCIPLINE_IDS`, dieselbe
+  // Menge, die `runBattleModeArenaMatchday()` fuer die echte Wertung prueft) — jede andere vom
+  // eingebetteten Motor waehlbare Disziplin (inklusive des Standard-Tabs "tdm", der ueberhaupt
+  // keine gewertete Olympiade-Disziplin ist) hat hier bewusst KEINEN Eintrag und faellt im Motor
+  // unveraendert auf die bisherige Ersatzsaat 1337 zurueck (s. `gebuchteSaatFuerAktuelleDisziplin()`
+  // in battle-mode.engine.js) — GENAUSO, wenn Chris hier zwei beliebige Teams zum Erkunden waehlt,
+  // die an diesem Spieltag gar nicht gegeneinander gebucht sind: fuer sie wurde nie ein echtes
+  // Ergebnis gezaehlt, es gibt also keine Saat zum Nachstellen.
+  const arenaSeedByDisciplineId = useMemo(() => {
+    const karte: Record<string, number> = {};
+    const seasonId = gameState.season?.id;
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (
+      !saveId ||
+      saveId === "loading-save" ||
+      !seasonId ||
+      !matchdayId ||
+      !heimTeamId ||
+      !gastTeamId ||
+      heimTeamId === gastTeamId
+    ) {
+      return karte;
+    }
+    const spieltag = gameState.seasonState?.disciplineSchedule?.find(
+      (eintrag) => eintrag.matchdayId === matchdayId,
+    );
+    if (!spieltag) return karte;
+    for (const slot of [spieltag.discipline1, spieltag.discipline2]) {
+      if (!slot || !ARENA_RESOLVED_DISCIPLINE_IDS.has(slot.disciplineId)) continue;
+      karte[slot.disciplineId] = seedZuZahl(
+        buildArenaMatchSeed({
+          saveId,
+          seasonId,
+          matchdayId,
+          disciplineId: slot.disciplineId,
+          homeTeamId: heimTeamId,
+          awayTeamId: gastTeamId,
+        }),
+      );
+    }
+    return karte;
+  }, [
+    saveId,
+    gameState.season?.id,
+    gameState.matchdayState?.matchdayId,
+    gameState.seasonState?.disciplineSchedule,
+    heimTeamId,
+    gastTeamId,
+  ]);
+
   const keineTeams = teams.length === 0;
   // "Vollstaendig geladen, aber leer" (Team hat wirklich keinen Spieler mit Attribut-Bogen)
   // nur waehrend NICHT gerade nachgeladen wird — sonst zeigt buildArenaTeam() eine falsche
@@ -357,6 +419,10 @@ export default function FoundationBattleArenaHost({
           ligaGroesse: teams.length,
           spieltag: gameState.season?.currentMatchday ?? null,
         },
+        // A3: die gebuchte Saat je Disziplin (s. `arenaSeedByDisciplineId`-Kommentar oben) —
+        // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
+        // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
+        seedByDisciplineId: arenaSeedByDisciplineId,
       };
       motorLiefBereitsRef.current = true;
       for (const src of huelle.scriptSrcs) {
@@ -381,7 +447,7 @@ export default function FoundationBattleArenaHost({
     return () => {
       abgebrochen = true;
     };
-  }, [gerenderterKader, huelle, teams, gameState]);
+  }, [gerenderterKader, huelle, teams, gameState, arenaSeedByDisciplineId]);
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
   // Dependency-Array), nicht bei jedem Team-Wechsel — der raeumt sich selbst auf (s. oben).

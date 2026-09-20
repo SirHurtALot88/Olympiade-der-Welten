@@ -118,6 +118,7 @@
  */
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
+import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
 import {
   runArenaFixtures,
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
@@ -1113,17 +1114,18 @@ export type ArenaTeamPointsOverride = {
  * sie nie zwei gleichzeitige Arena-Laeufe fuer dieselbe Paarung gab. Mit `disciplineId` im Seed
  * sind die beiden Laeufe wieder unabhaengig, exakt wie zwei verschiedene Team-Paarungen es heute
  * schon sind.
+ *
+ * A3-NACHTRAG (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md 5.3): die
+ * Implementierung selbst wohnt seitdem in `lib/battle/arena-seed.ts` -- byte-identisch hierher
+ * verschoben, nicht neu geschrieben -- und wird von hier re-exportiert, damit bestehende Importe
+ * (`@/lib/resolve/battle-mode-arena-team-points`, z.B. in dieser Datei unten und in
+ * `tests/battle-mode-arena-team-points.test.ts`) unveraendert weiterlaufen. Grund fuer die
+ * Verschiebung: `FoundationBattleArenaHost.tsx` (Client-Bundle) braucht denselben Seed-String-Bau
+ * wie `runBattleModeArenaMatchday()` unten, darf dafuer aber nicht die ~15 PPS-Referenz-JSON-
+ * Importe dieser Datei mitziehen, die der Client dafuer nicht braucht -- EINE Funktion, mehrere
+ * Aufrufer, s. dortiger Kommentar.
  */
-export function buildArenaMatchSeed(input: {
-  saveId: string;
-  seasonId: string;
-  matchdayId: string;
-  disciplineId: string;
-  homeTeamId: string;
-  awayTeamId: string;
-}): string {
-  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:${input.disciplineId}:${input.homeTeamId}:${input.awayTeamId}`;
-}
+export { buildArenaMatchSeed };
 
 /**
  * Reine, synchrone Umrechnung: aus dem Punktestand EINES Arena-Duells (`ArenaFixtureResult.seiten`)
