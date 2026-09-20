@@ -18504,10 +18504,22 @@
     return{key:best,warum};
   }
   const persOf={},persWarum={};
+  // `neuPersBerechnen()`: fuellt persOf/persWarum aus dem AKTUELLEN SQUAD/OPP neu. `const`
+  // bleibt bewusst `const` — geleert und neu befuellt statt neu deklariert, damit jede
+  // Closure, die auf dieselbe Referenz zeigt (behav/baueEinheit/renderKader/bauSpurt/...),
+  // den aktuellen Stand sieht. Muss nach JEDEM Austausch von SQUAD/OPP nach dem Start laufen
+  // (s. kaderSetzen() und disziplinProbe()s Kaderfamilie weiter unten) — sonst bleibt
+  // persOf auf der Belegung vom Modul-Start eingefroren und jeder neue Spieler faellt auf
+  // den generischen "duellant"-Fallback zurueck (s. PR-Beschreibung fuer den Befund).
+  function neuPersBerechnen(){
+    for(const k in persOf)delete persOf[k];
+    for(const k in persWarum)delete persWarum[k];
+    [...SQUAD,...OPP].forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});
+  }
   // Beide Seiten. Vorher lief das nur ueber SQUAD, und die Gegner bekamen ihre
   // Persoenlichkeit stattdessen aus einer Rotation ["bollwerk","draufgaenger",...][i%6].
   // Damit hing das Verhalten eines Gegners an seiner Zeilennummer statt an seiner Klasse.
-  [...SQUAD,...OPP].forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste aller Zuteilungen von elf Spielern auf sechs Slots
+  neuPersBerechnen();  // Startbelegung: die beste aller Zuteilungen von elf Spielern auf sechs Slots
   // (332.640 Moeglichkeiten, durchgerechnet mit den echten Slot-Profilen), Summe 361,4.
   // Draco hat mit 66,1 den hoechsten TDM-Wert des Kaders und steht trotzdem als
   // Shotcaller — seine Charisma 89 bringt dort nur +0,4, aber jeder andere Slot kostet
@@ -31365,6 +31377,19 @@
     kaderSetzen:(kader)=>{
       if(kader&&Array.isArray(kader.heim)&&kader.heim.length)SQUAD=mitKit(kader.heim);
       if(kader&&Array.isArray(kader.gast)&&kader.gast.length)OPP=mitKit(kader.gast);
+      // PERSOF-FUND (PR #982): ohne diesen Aufruf blieb persOf/persWarum auf der Belegung
+      // vom Modul-Start eingefroren — jeder Spieler, der erst durch DIESEN Tausch
+      // hinzukommt, fiel bei jeder der Lesestellen auf den generischen "duellant"-Fallback
+      // zurueck, nie auf seine echte, aus Klasse/Rasse/Sub abgeleitete Persoenlichkeit.
+      // Betraf jede Kader-Familien-Messung ab der zweiten Aufteilung — nicht nur die drei
+      // ARENA_ART-Disziplinen (tdm/mini-dm/battlefield, ueber baueEinheit()/behav()),
+      // sondern zusaetzlich bauSpurt() (Bahn-Chassis: liest persOf ein zweites Mal, direkt
+      // und unabhaengig von baueEinheit(), fuer das `pers`-Feld jedes Laeufers — wirkt sich
+      // nachweislich nur bei Spurt und Takeshi's Castle numerisch aus, weil nur dort der
+      // Rempler-Mechanismus (willTackeln, s. dort) `u.pers` tatsaechlich abfragt; Staffel/
+      // Time-Trial/Climbing lesen dasselbe Feld, ohne dass es dort etwas bewirkt — s.
+      // PR-Beschreibung fuer den Nachweis per Vorher/Nachher-Messung).
+      neuPersBerechnen();
       return {heim:SQUAD.length,gast:OPP.length};
     },
     disziplinProbe:(dId,opt)=>{
@@ -31433,6 +31458,13 @@
           ergebnis=familie.map(v=>{
             if(v&&Array.isArray(v.heim)&&v.heim.length)SQUAD=mitKit(v.heim);
             if(v&&Array.isArray(v.gast)&&v.gast.length)OPP=mitKit(v.gast);
+            // PERSOF-FUND (PR #982, s. kaderSetzen oben): derselbe SQUAD/OPP-Tausch, nur
+            // inline statt ueber kaderSetzen() — braucht deshalb denselben Nachzug, sonst
+            // liest jede Paarung AUSSER der ersten ueberhaupt keinen der Namen, die persOf
+            // beim Modul-Start bekommen hat (betrifft tdm/mini-dm/battlefield UND, ueber
+            // bauSpurt()s eigene persOf-Lesestelle, Spurt/Takeshi's Castle — s. Kommentar an
+            // kaderSetzen oben) und faellt auf den generischen "duellant"-Fallback zurueck.
+            neuPersBerechnen();
             return {label:(v&&v.label)||null, spiele:einSpieldurchlauf()};
           });
         } else {
@@ -31440,7 +31472,7 @@
         }
       } finally {
         M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
-        if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;}
+        if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}
       }
       const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
         :istFeldspiel(dId)?"feldspiel":"arena";
