@@ -1,0 +1,189 @@
+<meta charset="utf-8">
+<title>Drehbuch: Aufstellung, dann Enthüllung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- Dieselbe Stilgrundlage wie der Battle-Mode-Entwurf (Farbtoken, .frame/.fbar/.pitch/
+     .zone/.unit, .scoreline, .arenaraum, .bbugcallout, .endstand). Nur die Stylesheet-Datei
+     wird geteilt — die Engine (battle-mode.engine.js) wird hier NICHT geladen. -->
+<link rel="stylesheet" href="battle-mode.css">
+<style>
+  /* Eigene Zutaten des Drehbuchs. Praefix .db-, damit nichts mit battle-mode.css kollidiert. */
+  .oly-battle-arena.oly-battle-arena .db-einsatz{display:inline-flex;align-items:center;gap:6px;
+    font-family:"Barlow Condensed",sans-serif;font-size:13px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:#0B1018;background:var(--warn);border-radius:5px;padding:3px 9px}
+  .oly-battle-arena.oly-battle-arena .db-zufallsfrei{display:inline-flex;align-items:center;gap:6px;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.02em;text-transform:none;
+    color:var(--ok);border:1px solid var(--ok);border-radius:5px;padding:3px 8px;margin-left:auto}
+  .oly-battle-arena.oly-battle-arena .db-zufallsfrei b{font-weight:600}
+  .oly-battle-arena.oly-battle-arena .db-zufallsfrei.kaputt{color:var(--crit);border-color:var(--crit)}
+  .oly-battle-arena.oly-battle-arena .db-lay{display:grid;grid-template-columns:1fr 290px}
+  @media (max-width:1000px){.oly-battle-arena.oly-battle-arena .db-lay{grid-template-columns:1fr}}
+  .oly-battle-arena.oly-battle-arena .db-reihen{display:grid;grid-template-rows:auto auto auto;gap:8px}
+  .oly-battle-arena.oly-battle-arena .db-reihe{display:grid;grid-template-columns:88px 1fr 1fr;gap:8px;align-items:stretch}
+  .oly-battle-arena.oly-battle-arena .db-reihenkopf{display:flex;flex-direction:column;justify-content:center;gap:2px;
+    padding:6px 4px}
+  .oly-battle-arena.oly-battle-arena .db-reihenkopf b{font-family:"Barlow Condensed",sans-serif;font-size:17px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .db-reihenkopf span{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);line-height:1.4}
+  .oly-battle-arena.oly-battle-arena .db-slot{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);
+    border-radius:7px;padding:7px 8px 8px;display:grid;grid-template-columns:56px 1fr;gap:9px;cursor:pointer;position:relative;
+    transition:border-color .13s ease,background-color .13s ease,box-shadow .13s ease}
+  .oly-battle-arena.oly-battle-arena .db-slot:hover{border-color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .db-slot.sel{box-shadow:0 0 0 2px var(--home);background:var(--home-bg)}
+  .oly-battle-arena.oly-battle-arena .db-slot.gegner{border-left-color:var(--away);cursor:default;grid-template-columns:44px 1fr;padding:5px 7px}
+  .oly-battle-arena.oly-battle-arena .db-slot.gegner:hover{border-color:var(--line)}
+  .oly-battle-arena.oly-battle-arena .db-portrait{width:56px;height:70px;border-radius:6px;object-fit:cover;background:var(--surface-2);
+    border:1px solid var(--line);display:block}
+  .oly-battle-arena.oly-battle-arena .db-slot.gegner .db-portrait{width:44px;height:54px}
+  .oly-battle-arena.oly-battle-arena .db-slotkopf{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .oly-battle-arena.oly-battle-arena .db-slotkopf b{font-size:13px;font-weight:600;line-height:1.2}
+  .oly-battle-arena.oly-battle-arena .db-slotkopf i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px;
+    letter-spacing:.06em;color:var(--faint);text-transform:uppercase;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .db-slotmeta{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);margin-top:1px}
+  .oly-battle-arena.oly-battle-arena .db-slotmeta em{font-style:normal;color:var(--ink);font-weight:600}
+  .oly-battle-arena.oly-battle-arena .db-pers{display:inline-block;margin-top:3px;font-family:"Barlow Condensed",sans-serif;font-size:11px;
+    letter-spacing:.05em;text-transform:uppercase;color:var(--home);background:var(--home-bg);border-radius:4px;padding:0 5px}
+  .oly-battle-arena.oly-battle-arena .db-slot.gegner .db-pers{color:var(--away);background:var(--away-bg)}
+  .oly-battle-arena.oly-battle-arena .db-wahl{display:grid;grid-template-columns:44px 1fr;gap:4px;align-items:center;margin-top:5px}
+  .oly-battle-arena.oly-battle-arena .db-wahl b{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.05em;color:var(--faint);font-weight:500}
+  .oly-battle-arena.oly-battle-arena .db-wahl select{width:100%;font-family:"IBM Plex Mono",monospace;font-size:9.5px;
+    background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:2px 3px;cursor:pointer}
+  .oly-battle-arena.oly-battle-arena .db-wahl select:disabled{opacity:.7;cursor:default}
+  .oly-battle-arena.oly-battle-arena .db-ziel{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--away);margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .db-ziel b{font-weight:600}
+  .oly-battle-arena.oly-battle-arena .db-abgabe{display:flex;align-items:center;gap:14px;margin-top:14px;padding:12px 14px;
+    border-radius:8px;background:var(--sunk);border:1px solid var(--line);flex-wrap:wrap}
+  .oly-battle-arena.oly-battle-arena .db-abgabe .btn{font-size:18px;padding:10px 24px}
+  .oly-battle-arena.oly-battle-arena .db-abgabe .btn:disabled{background:var(--ok);cursor:default;filter:none}
+  .oly-battle-arena.oly-battle-arena .db-abgabe p{margin:0;font-size:12px;color:var(--muted);max-width:52ch}
+  .oly-battle-arena.oly-battle-arena .db-abgabe p b{color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .db-versiegelt .db-slot{cursor:default;opacity:.92}
+  .oly-battle-arena.oly-battle-arena .db-vergleich{margin-top:10px;font-size:12px;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .db-vergleich summary{cursor:pointer;font-family:"IBM Plex Mono",monospace;font-size:10px;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .db-vergleich .btn{font-size:12px;padding:4px 10px;margin:6px 6px 0 0}
+  .oly-battle-arena.oly-battle-arena .db-gegnerliste{display:flex;flex-direction:column;gap:6px}
+  .oly-battle-arena.oly-battle-arena .db-gegnerreihe{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin:4px 0 0}
+  /* Buehne */
+  .oly-battle-arena.oly-battle-arena #arena[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .db-fokusbug{position:absolute;top:8px;left:8px;right:8px;display:flex;
+    justify-content:space-between;align-items:flex-start;pointer-events:none;gap:8px}
+  .oly-battle-arena.oly-battle-arena .db-fokusbug[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite{display:flex;align-items:center;gap:8px;background:rgba(17,24,35,.78);
+    border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:4px 8px;max-width:44%}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite.r{flex-direction:row-reverse;text-align:right}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite img{width:38px;height:46px;border-radius:5px;object-fit:cover;border:1px solid #39424f;flex:none}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite b{display:block;color:#fff;font-size:12px;font-weight:600;line-height:1.2}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;color:#c3ccd8}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite.l{border-color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .db-fokusseite.r{border-color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .db-einlauf{position:absolute;inset:0;background:rgba(16,20,26,.94);display:flex;
+    flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+  .oly-battle-arena.oly-battle-arena .db-einlauf[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .db-einlauf b{font:700 clamp(22px,3.6vw,38px)/1.1 "Barlow Condensed",sans-serif;
+    text-transform:uppercase;letter-spacing:.06em;color:#eef3f9}
+  .oly-battle-arena.oly-battle-arena .db-einlauf span{font:500 clamp(11px,1.5vw,15px)/1.4 system-ui,sans-serif;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .db-einlauf em{font:700 clamp(13px,1.8vw,18px)/1 "IBM Plex Mono",monospace;font-style:normal;color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .db-endzeile{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);text-align:center;max-width:64ch}
+  .oly-battle-arena.oly-battle-arena .db-endzeile b{color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .db-endknoepfe{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .oly-battle-arena.oly-battle-arena .db-fuss{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
+    padding:9px 18px;border-top:1px solid var(--line-soft);line-height:1.6}
+  .oly-battle-arena.oly-battle-arena .db-fuss b{color:var(--ok)}
+  .oly-battle-arena.oly-battle-arena .db-fuss code{font-size:10px;color:var(--ink)}
+</style>
+
+<div class="oly-battle-arena">
+<div class="wrap">
+  <p class="kicker">Olympiade der Welten · Drehbuch-Mockup B0′ · Entwurf, keine Implementierung</p>
+  <h1>Aufstellung, dann Enthüllung</h1>
+  <p class="lede">Ein Arena-Kampftag, der <strong>bei der Aufstellung beginnt</strong> und nicht beim Kampf. Drei Reihen, ein Befehl je Slot, eine Zielansage — dann „Aufstellung abgeben", und die Auflösung kommt als Enthüllung mit Rückbezug auf genau das, was du eben entschieden hast.</p>
+  <p class="lede"><strong>Zufallsfrei.</strong> Jeder Zug der Auflösung steht als Drehbuch fest; was sich ändert, ändert sich <strong>nur</strong> durch deine Aufstellung. <code>Math.random()</code> ist auf dieser Seite gesperrt und würde einen Fehler werfen — die Marke in der Kopfzeile prüft das beim Laden.</p>
+
+  <!-- ======================= SZENE 1: AUFSTELLUNG ======================= -->
+  <section class="panel" id="aufstellung">
+    <div class="frame" id="aufstellungFrame">
+      <div class="fbar"><span>Spieltag 7</span><span class="sep">·</span><span>Vigilante Wranglers — Armageddon Aftermath</span>
+        <span class="sep">·</span><span>TDM · 6 gegen 6</span>
+        <span class="db-einsatz">Zählt für Spieltag 7</span>
+        <span class="db-zufallsfrei" id="zufallsfrei" title="Beim Laden wird Math.random() durch eine Funktion ersetzt, die einen Fehler wirft. Jeder Zug der Auflösung steht in DREHBUCH in drehbuch-aufstellung.js."><b>Zufallsfrei</b> · jeder Zug vorgeschrieben · Math.random() gesperrt</span>
+      </div>
+      <div class="db-lay">
+        <div class="pad">
+          <h2>Deine Aufstellung</h2>
+          <p class="sub">Drei Reihen, links und rechts. Slot anklicken, zweiten Slot anklicken — die beiden tauschen. Jeder Spieler bekommt einen <b>Befehl</b> und eine <b>Zielansage</b>.</p>
+          <div class="pitch" id="tafel" style="grid-template-columns:1fr"></div>
+          <div class="hint" id="hinweis"><span>Ihre schnellen Leute laufen um deine Front herum — <b>links</b>, sagt der Scout. Wer deckt hinten links?</span></div>
+          <div class="db-abgabe">
+            <button class="btn" id="abgeben">Aufstellung abgeben</button>
+            <p><b>Danach ist nichts mehr zu ändern.</b> Die Aufstellung wird versiegelt und die Auflösung läuft für Spieltag 7 — mit allem, was daran hängt.</p>
+          </div>
+          <details class="db-vergleich">
+            <summary>Zum Vergleichen: drei Beispiel-Aufstellungen</summary>
+            <p>Dieselbe Auflösung, nur die Aufstellung ist eine andere. Genau das ist die Abnahmefrage: <em>War es die Aufstellung, oder war es die Inszenierung?</em></p>
+            <button class="btn g" data-vorgabe="standard">① Ausgangslage (Johanna deckt rechts)</button>
+            <button class="btn g" data-vorgabe="bollwerk">② Krolach deckt links</button>
+            <button class="btn g" data-vorgabe="verfolgen">③ Draco verfolgt den Schleicher</button>
+            <button class="btn g" data-vorgabe="tank">④ Zielansage auf den Tank</button>
+          </details>
+        </div>
+        <div class="pad bl">
+          <h2>Armageddon Aftermath</h2>
+          <p class="sub">Erwartete Aufstellung nach ihrem letzten Spieltag. Schwere Front, ein Schleicher in der Mitte, Bogen hinten.</p>
+          <div class="db-gegnerliste" id="gegner"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= SZENE 2: ENTHÜLLUNG ======================= -->
+  <section class="panel" id="arena" hidden>
+    <div class="frame" style="margin-top:18px">
+      <div class="fbar"><span>Arena</span><span class="sep">·</span><span>TDM</span><span class="sep">·</span><span>Spieltag 7</span>
+        <span class="db-einsatz">Zählt für Spieltag 7</span>
+        <span class="honest" id="honest">Drehbuch — jeder Zug vorgeschrieben, kein Zufallsgenerator beteiligt</span></div>
+      <div class="scoreline">
+        <div class="tname">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
+        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · Gefallene</small></div>
+        <div class="tname r">Armageddon Aftermath<em><span id="aliveR">6</span> im Kampf · A-A</em></div>
+      </div>
+      <div class="arenaraum">
+        <canvas id="cv" width="1240" height="470"></canvas>
+        <div class="db-fokusbug" id="fokusbug" hidden>
+          <div class="db-fokusseite l" id="fokusL"></div>
+          <div class="db-fokusseite r" id="fokusR"></div>
+        </div>
+        <!-- CALLOUT: dasselbe Element, dieselbe Klasse und dieselbe Einblend-Transition wie im
+             Battle-Mode-Entwurf (#bbugcallout / callout() in battle-mode.engine.js). -->
+        <div class="bbugcallout" id="bbugcallout" hidden></div>
+        <div class="db-einlauf" id="einlauf" hidden>
+          <b>Aufstellung versiegelt</b>
+          <span>Spieltag 7 · Vigilante Wranglers gegen Armageddon Aftermath · TDM</span>
+          <em id="einlaufZeile">Die Auflösung beginnt …</em>
+        </div>
+        <div class="endstand" id="endstand" hidden>
+          <div class="esieger" id="esieger"></div>
+          <div class="db-endzeile" id="endzeile"></div>
+          <div class="ehighlights" id="ehighlights"><h5>Höhepunkte</h5><div class="ehlist" id="ehlist"></div></div>
+          <div class="db-endknoepfe">
+            <button class="btn g" id="nochmal">Noch einmal abspielen</button>
+            <button class="btn" id="zurueck">Andere Aufstellung probieren</button>
+          </div>
+        </div>
+      </div>
+      <div class="ctrl">
+        <button class="btn g" id="pause">Pause</button>
+        <button class="btn g" id="weiter">Nächstes Duell ▸</button>
+        <button class="btn g" id="zurueck2">Zurück zur Aufstellung</button>
+        <span class="honest" id="drehbuchSchluessel"></span>
+      </div>
+      <div class="feed" id="feed" style="height:150px"></div>
+      <div class="db-fuss"><b>Zufallsfrei, nachprüfbar:</b> diese Seite lädt <code>drehbuch-aufstellung.js</code> und die Bildtabelle <code>drehbuch/sprites.js</code> (reine Daten) — sonst kein Skript, insbesondere nicht die Engine. Im Drehbuch gibt es keinen Zufallsgenerator; <code>Math.random</code> wird beim Laden durch eine Funktion ersetzt, die einen Fehler wirft. Die Auflösung ist eine Funktion <code>baueDrehbuch(aufstellung)</code> — gleiche Aufstellung, gleiche Auflösung, Zug für Zug. Figuren: dieselben Baukasten-Blätter wie in der Arena (<code>public/sprites/baukasten/</code>), vorgerendert über <code>scripts/rendere-drehbuch-sprites.mjs</code>.</div>
+    </div>
+  </section>
+</div>
+</div>
+<script src="drehbuch/sprites.js"></script>
+<script src="drehbuch-aufstellung.js"></script>

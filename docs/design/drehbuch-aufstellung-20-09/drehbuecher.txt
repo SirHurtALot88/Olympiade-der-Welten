@@ -1,0 +1,44 @@
+== standard ==
+Schluessel: front=greenkraut(Draco) · flanke=offen(Jorund) · hinten=schwach(Inefinna)
+Stand: 1:3 (Niederlage)
+  · Ansage Greenkraut — Draco nimmt den Warlord, bevor der Tank heran ist.
+  · Schleicher geht hinten rum — und links steht niemand.
+  · Jorund fällt. Niemand war da.
+  · Krag'Zul kommt nach — Draco hat nichts mehr übrig.
+  · Cassandra sucht die hintere Reihe — und findet Inefinna.
+  · Inefinna fällt.
+
+== bollwerk ==
+Schluessel: front=greenkraut(Draco) · flanke=gedeckt-stark(Krolach) · hinten=schwach(Inefinna) · suddenDeath=schleicher-tot
+Stand: 3:2 (Sieg)
+  · Ansage Greenkraut — Draco nimmt den Warlord, bevor der Tank heran ist.
+  · Schleicher geht hinten rum — dein Bollwerk steht links.
+  · Krolach hält.
+  · Krag'Zul kommt nach — Draco hat nichts mehr übrig.
+  · Cassandra sucht die hintere Reihe — und findet Inefinna.
+  · Inefinna fällt.
+  · Sudden Death — Krolach steht noch.
+  · Krolach entscheidet den Spieltag.
+
+== verfolgen ==
+Schluessel: front=greenkraut(Krolach) · flanke=verfolgt(Draco) · hinten=schwach(Inefinna) · suddenDeath=schleicher-tot
+Stand: 3:2 (Sieg)
+  · Ansage Greenkraut — Krolach nimmt den Warlord, bevor der Tank heran ist.
+  · Schleicher geht hinten rum — Draco hängt ihm im Nacken.
+  · Draco holt ihn ein. Der Schleicher kommt nie an.
+  · Krag'Zul kommt nach — Krolach hat nichts mehr übrig.
+  · Cassandra sucht die hintere Reihe — und findet Inefinna.
+  · Inefinna fällt.
+  · Sudden Death — Draco steht noch.
+  · Draco entscheidet den Spieltag.
+
+== tank ==
+Schluessel: front=tank(Draco) · flanke=offen(Jorund) · hinten=schwach(Inefinna)
+Stand: 1:3 (Niederlage)
+  · Alle auf den Tank.
+  · Krag'Zul steht noch — Draco nicht.
+  · Schleicher geht hinten rum — und links steht niemand.
+  · Jorund fällt. Niemand war da.
+  · Krolach hält die Front — Greenkraut fällt.
+  · Cassandra sucht die hintere Reihe — und findet Inefinna.
+  · Inefinna fällt.
