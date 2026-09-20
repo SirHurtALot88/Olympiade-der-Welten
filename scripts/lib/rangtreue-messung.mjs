@@ -82,6 +82,56 @@ export function spannweite(werte) {
   return Math.max(...werte) - Math.min(...werte);
 }
 
+// Deterministischer PRNG (identisch zum mulberry32 in scripts/ziehe-hockey-pps-referenz.ts u.a.)
+// — bewusst NICHT Math.random(), damit derselbe Aufruf reproduzierbar dieselbe Zahl liefert
+// (CLAUDE.md warnt an anderer Stelle genau davor: `zieheFormkarten` nahm z % n von einem LCG,
+// dessen unterste Bits eine winzige Periode hatten — hier gilt: ueberhaupt kein LCG, sondern
+// mulberry32 mit oberen Bits, und ein fester Seed statt einer Uhrzeit).
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * M0 (20.09.2026, PM-Plan Wave 1): DRITTE Statistik neben Median/Spannweite — additiv, keine
+ * bestehende Ausgabe aendert sich, solange der Aufrufer diese Funktion nicht selbst aufruft.
+ *
+ * Frage: ist der Median einer Kader-Familie eine PRAEZISE Zahl, oder haengt er stark davon ab,
+ * WELCHE Paarungen zufaellig in der Familie stehen? Bei nur fuenf Paarungen (Arena bisher) kann
+ * ein einziger Ausreisser den Median einer 5er-Familie kippen; bei sechzehn ist das viel
+ * schwerer. Bootstrap beantwortet das ohne Annahme ueber die Verteilung: `wiederholungen`-mal
+ * wird MIT Zuruecklegen aus den vorliegenden Paarungswerten (je Paarung EIN rho, z.B. `spiel` aus
+ * `varianten`) eine gleich grosse Ersatz-Familie gezogen und ihr Median berechnet. Die Breite
+ * eines zentralen `quantil`-Intervalls ueber diese Ersatz-Mediane ist die "Median-Unsicherheit":
+ * klein heisst, der gemeldete Median waere auch mit einer anderen Ziehung aehnlich herausgekommen
+ * — die Familie ist gross/konsistent genug, um zu MESSEN, nicht nur zu SCHAETZEN.
+ *
+ * Deterministisch (mulberry32 mit festem Default-Seed, kein Math.random) — derselbe Aufruf
+ * liefert immer dieselbe Zahl, unabhaengig davon, wie oft oder wann er laeuft.
+ */
+export function bootstrapMedianUnsicherheit(werte, { wiederholungen = 2000, quantil = 0.90, saat = 1337 } = {}) {
+  const n = werte.length;
+  if (n < 2) return { breite: NaN, unten: NaN, oben: NaN, wiederholungen: 0, n };
+  const zufall = mulberry32(saat);
+  const mediane = new Array(wiederholungen);
+  for (let r = 0; r < wiederholungen; r++) {
+    const ziehung = new Array(n);
+    for (let i = 0; i < n; i++) ziehung[i] = werte[Math.floor(zufall() * n)];
+    mediane[r] = median(ziehung);
+  }
+  mediane.sort((a, b) => a - b);
+  const alpha = (1 - quantil) / 2;
+  const untenIdx = Math.max(0, Math.floor(alpha * wiederholungen));
+  const obenIdx = Math.min(wiederholungen - 1, Math.ceil((1 - alpha) * wiederholungen) - 1);
+  return { breite: mediane[obenIdx] - mediane[untenIdx], unten: mediane[untenIdx], oben: mediane[obenIdx], wiederholungen, n };
+}
+
 /**
  * Laedt die Kader-Familie aus einer gezogenen live-save-Datei (s. scripts/ziehe-kader-familie.ts).
  * Gibt `null` zurueck, wenn die Datei fehlt — der Aufrufer entscheidet dann ueber den
