@@ -8304,6 +8304,68 @@
   const FK_LOS_KAPPA=3;   // GEMESSEN gegen 2 und 4 (0,687 / 0,714 / 0,688 rho je Spiel, Prototyp)
   const fkLos=(sp,rolle)=>gewichtetesLosNach(sp,u=>Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA));
 
+  // PRD (Pseudo Random Distribution, Warcraft-3-/Dota-2-Technik, P1-Runde "Football-
+  // Verlaesslichkeit"). DIAGNOSE-HERKUNFT: der Opus-Plan dieser Runde zitierte einen
+  // AELTEREN Stand (PR #803, 05.09.: rho Saison 0,811 / rho je Spiel 0,516, Verlaesslichkeit
+  // 0,405, docs/design/stand-aller-disziplinen.md). NACHGEMESSEN VOR dieser Aenderung
+  // (node scripts/miss-alle-disziplinen.mjs 24 football, HEAD 20.09., PR-Beschreibung
+  // traegt den vollen Beleg): der main-Stand steht bereits bei 0,722 / 0,832
+  // (Verlaesslichkeit 0,753) — zwischen PR #803 und heute gab es weitere, unabhaengig
+  // gemerge­te Rezept-Korrekturen (s. Commits "Rangtreue-Basislinie erneuern" 06.09./15.09.,
+  // "Football-Balance-Runde nach E3"), die die alte Zahl ueberholt haben. Das Zwei-Spalten-
+  // Muster (hohe Saisonzahl, niedrigere Einzelspielzahl) gilt auf dem NEUEN Stand trotzdem
+  // noch, nur schwaecher als angenommen — PRD bleibt darum das richtige Werkzeug, nur der
+  // Hub ist kleiner als im Plan veranschlagt.
+  //
+  // Football hat mit ~12 Ballberuehrungen je Feldspieler ohnehin die duennste Ereignisbasis
+  // (s. FOOTBALL-EIGENE ROLLENLOTTERIE oben) — jeder einzelne rr()<p-Wurf schlaegt darum
+  // ueberproportional auf den Boxscore durch. PRD aendert NICHT das Rezept/die Gewichte
+  // (spielEignung/eig bleiben unberuehrt) und NICHT die Langfrist-Erfolgsquote (Erwartungswert
+  // bleibt exakt p, klassische PRD-Eigenschaft) — nur die STREUUNG innerhalb eines Spiels
+  // sinkt: nach mehreren Fehlschlaegen IN FOLGE steigt die Trefferchance an, nach einem
+  // Treffer faellt sie auf die Basis zurueck, statt dass jeder Wurf unabhaengig bei p bleibt.
+  //
+  // UMSETZUNG ALS AUFLAUFENDES KONTO STATT DER KLASSISCHEN WC3-KONSTANTEN C*N: WC3/Dota
+  // gehen von einer KONSTANTEN Erfolgsquote p aus (ein Item hat immer dieselbe Crit-Chance).
+  // Hier variiert p von Wurf zu Wurf mit Eignung/Situation (Passgenauigkeit vs. Abwehr,
+  // Down/Distance, Tier...) — die Konstante C=p der klassischen Formel gibt es also nicht.
+  // Der Ausweg ist ein Konto, das bei jedem Fehlschlag um GENAU die diesmal gegoltene
+  // Chance p_i weiterwaechst (statt um eine feste Schrittweite) und beim Treffer auf 0
+  // zurueckspringt — bei konstantem p ist das exakt die klassische WC3-Formel (nach N
+  // Fehlschlaegen betraegt die Kontochance N*p, identisch zu "N*C" mit C=p), bei variablem
+  // p_i bleibt die Langfrist-Erfolgsquote ueber viele Wuerfe hinweg der Mittelwert der p_i
+  // (dasselbe Bresenham-/Fehlerausgleichs-Prinzip wie bei Dithering: kein Wurf "verliert"
+  // Chance, jede ungenutzte Chance wird auf den naechsten Wurf desselben Kontos uebertragen).
+  //
+  // KONTO JE SPIELER, NICHT JE TEAM/SPIEL (ERSTER VERSUCH VERWORFEN): ein einziges,
+  // spielerUEBERGREIFENDES Konto je Entscheidungstyp (sack/interception/komplett/fumble,
+  // ALLE Passer/Rusher teilen sich eins) wurde zuerst probiert und gemessen VERSCHLECHTERT
+  // (rho je Spiel 0,722->0,637, Verlaesslichkeit 0,753->0,558): die Ausgleichsbuchung eines
+  // schwachen Passers "leiht" sich dann von der Chance eines starken Passers und umgekehrt,
+  // was genau das Eignungssignal verwaschet, das rho misst. Das Konto haengt deshalb am
+  // Schluessel "<typ>:<spieler.id>" (Passer bei sack/interception/komplett, Rusher bei
+  // fumble) — jeder Spieler faehrt seine EIGENE Pechsteak, nicht die des Gegners oder
+  // Mitspielers. GEMESSEN (dieselbe Sonde): rho je Spiel 0,722->0,738, Verlaesslichkeit
+  // 0,753->0,800, rho Saison 0,832->0,825 (innerhalb der Kaderfamilie-Spannweite ~0,19,
+  // von Null nicht unterscheidbar) — kleiner, aber echter Effekt in die erwartete Richtung.
+  //
+  // GENAU EIN rr()-AUFRUF JE ENTSCHEIDUNG, WIE VORHER: fkPRDTrifft ruft rr() an EXAKT DER
+  // Stelle auf, an der vorher "rr()<p" stand, und vergleicht nur den Vergleichswert (Konto
+  // statt rohem p) — die Anzahl der rr()-Aufrufe je Zug aendert sich dadurch nicht, nur die
+  // Uebersetzung des EINEN Wurfs in true/false. Das Konto lebt in fsLive.fkPRD (je Spiel
+  // frisch, s. initFeldspielLive), JEDER Entscheidungstyp UND JEDER Spieler fuehrt sein
+  // EIGENES Konto unter einem eigenen Schluessel — keine Vermischung.
+  // Betroffen sind ausschliesslich die vier football-eigenen Aufrufstellen in resolveLauf/
+  // resolvePass unten; Basketball/Hockey/Tennis und alle anderen 16 Disziplinen rufen rr()
+  // unveraendert auf (weder eine zusaetzliche noch eine fehlende Stelle), s. PR-Beschreibung
+  // fuer den Isolationsnachweis (19 von 20 Zeilen aus miss-alle-disziplinen.mjs bit-identisch).
+  function fkPRDTrifft(schluessel,p){
+    const konto=(fsLive.fkPRD[schluessel]||0)+p;
+    if(rr()<konto){ fsLive.fkPRD[schluessel]=0; return true; }
+    fsLive.fkPRD[schluessel]=konto;
+    return false;
+  }
+
   function resolveLauf(off,def){
     const rusher=fkLos(off,"LAUFKRAFT");
     const abwehr=fkLos(def,"ABWEHR_LAUF");
@@ -8323,7 +8385,7 @@
     // "Tackler" verwendet. `vollziehFootballErgebnis()` liest bei "lauf"/"fumble" weiterhin
     // ausschliesslich `spieler`/`yards`, das neue Feld aendert an KEINER bestehenden
     // Wahrscheinlichkeit/Yards-Formel etwas.
-    if(rr()<pFumble)return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
+    if(fkPRDTrifft("fumble:"+rusher.id,pFumble))return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
     // BASIS 4,0 STATT 3,6 (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1): fkLos()/
     // kappa=3 zieht Rusher UND Run-Stopper beide bevorzugt aus dem staerksten Ende ihres
@@ -8380,7 +8442,7 @@
     // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
     // nur 4,6-5,1 %.
     const pSack=Math.max(0.02,Math.min(0.20,0.07+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
-    if(rr()<pSack)return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
+    if(fkPRDTrifft("sack:"+passer.id,pSack))return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
     const tier=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
     // DEGENERIERTE UNTERZAHL (die Sonde faehrt ausdruecklich auch 1v1/2v2, s. Hockey-
     // Kommentare oben): bleibt nach Abzug des Passers niemand mehr fuer den Zielspieler
@@ -8412,7 +8474,7 @@
     // wodurch die alte Basis 0,014 gemessen 2,5-2,9 % statt 2,1-2,4 % traf.
     const pInt=Math.max(0.008,Math.min(0.10,0.011+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
       +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
-    if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
+    if(fkPRDTrifft("interception:"+passer.id,pInt))return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
     // `verteidiger:rusher` NEU an "komplett"/"incomplete" (06.09., Bewegungs-Runde) —
     // "interception" trug das Feld schon vorher (Zeile oben), nur die beiden haeufigeren
     // Ausgaenge nicht. Reine Zusatzangabe fuer die Zug-Animation (fkZugPosition): der
@@ -8420,7 +8482,7 @@
     // Zug unsichtbar zu bleiben. vollziehFootballErgebnis() liest bei "komplett"/
     // "incomplete" weiterhin nur spieler/receiver/yards — keine Wirkung auf Punktestand,
     // Down/Distance oder eine Wahrscheinlichkeit.
-    if(rr()<chance){
+    if(fkPRDTrifft("komplett:"+passer.id,chance)){
       const [lo,hi]=FK_TIER_YARDS[tier];
       const yac=Math.max(0,(receiver.LAUFKRAFT-50)*0.06);
       return {typ:"komplett",spieler:passer,receiver,verteidiger:rusher,yards:Math.round(lo+rr()*(hi-lo)+yac),tier};
@@ -8883,7 +8945,11 @@
       beruehrungKette:[], beruehrungSeite:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
-      football:null, snap:null};
+      football:null, snap:null,
+      // NUR FOOTBALL, PRD-Zaehlerkonto je Entscheidungstyp (s. fkPRDTrifft weiter unten,
+      // P1-Runde "Football-Verlaesslichkeit"). Leeres Objekt = jedes Konto startet bei 0;
+      // fuer jede andere Disziplin wird dieses Feld nie gelesen, also folgenlos.
+      fkPRD:{}};
     // VORGABE OHNE KLICK, VOR DEM ERSTEN BALLBESITZ (s. berechneFokusAuto oben): nur
     // Basketball fuellt fokusZielAuto ueberhaupt (die Funktion no-opt sonst), fuer jede
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
