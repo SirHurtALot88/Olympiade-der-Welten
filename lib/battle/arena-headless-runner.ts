@@ -10,6 +10,7 @@ import {
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { seedZuZahl } from "@/lib/battle/arena-seed";
 
 /**
  * HEADLESS-RUNNER FUER window.__arena.spieleFeldspiel() (Plan Abschnitt 3.4, PR 6 von 9).
@@ -81,6 +82,13 @@ const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
  * unabhaengig von Laufzeit-/Node-Versionsdetails). Ein bereits numerischer Seed (wie in
  * scripts/miss-arena-spielefeldspiel.mjs, PR 5s eigener Abnahme) bleibt unveraendert
  * durchgereicht.
+ *
+ * A3-NACHTRAG (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md 5.3): die
+ * Hash-Funktion selbst (`seedZuZahl()`) wohnt seitdem in `lib/battle/arena-seed.ts` -- byte-
+ * identisch hierher verschoben, nicht neu geschrieben -- damit `FoundationBattleArenaHost.tsx`
+ * (Client-Bundle) sie importieren kann, ohne die Playwright-/`node:fs`-Importe dieser Datei
+ * mitzuziehen. Dieser Runner importiert sie von dort zurueck (s. Datei-Kopf-Import), statt eine
+ * eigene Kopie zu behalten -- EINE Funktion, zwei Aufrufer, s. dortiger Kommentar.
  */
 /**
  * BUEHNEN-DUELL-CHASSIS (Gewichtheben-Produktivierung, S6, docs/design/
@@ -202,17 +210,6 @@ export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // Rezeptkalibrierung (BAHN_ART.climbing.rezept.STEHEN) hebt sie auf 0,834.
   "climbing",
 ]);
-
-function seedZuZahl(seed: string | number): number {
-  if (typeof seed === "number" && Number.isFinite(seed)) return seed;
-  const text = String(seed);
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
 
 export type ArenaFixtureInput = {
   homeTeamId: string;
