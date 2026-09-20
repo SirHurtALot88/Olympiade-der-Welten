@@ -10,7 +10,7 @@ import {
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/resolve/battle-mode-arena-team-points";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
