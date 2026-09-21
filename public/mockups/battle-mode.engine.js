@@ -8618,7 +8618,28 @@
   // Tennis rufen weiter die unveraenderte gewichtetesLos() auf und bleiben bit-identisch.
   // gewichtetesLosNach() ist eine Funktionsdeklaration (hoisted), LOS_NULLPUNKT eine
   // Modul-Konstante weiter oben — beide zur Aufrufzeit sichtbar, keine Reihenfolge-Falle.
-  const FK_LOS_KAPPA=3;   // GEMESSEN gegen 2 und 4 (0,687 / 0,714 / 0,688 rho je Spiel, Prototyp)
+  // NEU GERASTERT NACH SLOT-FIX + PRD-RUECKNAHME (21.09., docs/design/football-prd-drift-
+  // befund-21-09.md Abschnitt 6, "Ansatzpunkt 3"): die Messung "0,687/0,714/0,688 gegen
+  // 2/3/4" oben stammt laut eigenem Kommentar vom Prototyp-Stand VOR dem Slot-Fix (PR #944)
+  // und der PRD-Ruecknahme — beide haben die Sub-Skill-Verteilung seither veraendert, ohne
+  // dass kappa neu gemessen wurde. Kaderfest neu gerastert (node scripts/miss-alle-
+  // disziplinen.mjs 24 football, live-save-Kaderfamilie, heutiger Stand als Basis kappa=3:
+  // rho 0,796): 1->0,636, 1,5->0,747, 2->0,730, 2,5->0,770, 3->0,796 (Basis), 3,25->0,817,
+  // 3,4->0,818, 3,5->0,817, 3,6->0,785, 3,75->0,802, 4->0,788, 4,5->0,814, 5->0,795 — kein
+  // glatter Anstieg (die Rollenlotterie ist eine diskrete Ziehung), aber ein klares Plateau
+  // 3,25-3,5 klar ueber der 0,80-Schranke, mit 3,4 als Spitzenwert. Korridor bei 3,4 (node
+  // scripts/miss-football-korridor.mjs 200) verbessert sich GEGENUEBER kappa=3 auf allen
+  // vier Zielgroessen zugleich: Completion 62,6%->64,7% (Ziel 65,3), Sack 7,5%->7,4% (Ziel
+  // ~7,0), Interception 2,6%->2,4% (Ziel 2,1-2,4, jetzt IM Zielband), Fumbles 0,37->0,45
+  // (Ziel ~0,5) — kein Zielkonflikt zwischen rho und Korridor bei diesem Regrid.
+  // Pp-BUDGET-CHECK (node scripts/messe-arena-einfluss.mjs football 48, CLAUDE.mds
+  // Budget-Methode): die Aenderung ist strukturell genug, um die Abweichung zur Matrix zu
+  // bewegen (66,1 Pp bei kappa=3 -> 58,8 Pp bei kappa=3,4) — UND bewegt sie naeher an die
+  // Matrix, nicht weiter weg. Der verbleibende Abstand (58,8 Pp, weit ueber der 25-Pp-
+  // Zielmarke) ist ein VORBESTEHENDER Zustand (schon bei kappa=3 66,1 Pp) und keine eigene
+  // Baustelle dieser Aenderung — mehrere Attribute (awareness/stamina/will/spirit/charisma/
+  // intelligence) tragen bei Football mechanisch 0 % bei, unabhaengig von kappa.
+  const FK_LOS_KAPPA=3.4;
   const fkLos=(sp,rolle)=>gewichtetesLosNach(sp,u=>Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA));
 
   // PRD (Pseudo Random Distribution) FUER SACK/FUMBLE/INTERCEPTION/COMPLETION WURDE WIEDER
