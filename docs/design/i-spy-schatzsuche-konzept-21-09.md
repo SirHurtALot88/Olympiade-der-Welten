@@ -318,10 +318,31 @@ Sub-Skills Gewicht in den wertvollsten Truhen als bisher angenommen — das muss
 Pp-Abweichungsrechnung in der ersten Kalibrierrunde mit einbeziehen, ist aber kein Zusatzschritt,
 sondern derselbe Messlauf mit dem erweiterten Rezept.
 
-**Offene Frage, ergänzt Abschnitt 8:** feste Paarung je Fundort-Position (immer dieselbe Truhe hat
-immer dieselben zwei Wege) oder pro Saat neu gewählt (mehr Abwechslung, aber ungleichere
-Kaderfamilien-Vergleichbarkeit)? Und: sollen auch Akten (Stufe 2) irgendwann Mehrwege bekommen, oder
-bleibt das bewusst den Tresoren vorbehalten?
+**Asymmetrische Wege (Chris' Nachtrag, 21.09.), ersetzt die reine `max()`-Symmetrie oben.** Chris,
+wörtlich: „wenn Intelligenz zum Beispiel 30 Punkte braucht, dann sind das die schwersten Kisten —
+und Leute, die das über Power oder Ähnliches lösen, sind dabei schwächer: die bringen dann nicht so
+viele Punkte, oder es dauert einfach länger, wenn sie so eine fette Intelligenz-Kiste knacken
+wollen." Die zwei Wege einer Truhe sind also nicht gleichwertig: jede Mehrwege-Truhe hat einen
+**Primärweg** (ihre "native" Rätselart, z. B. Logik bei einer Intelligenz-Truhe — volle Punktzahl,
+Chance wie in 1.4) und einen **Nebenweg** (z. B. Fingerfertigkeit/Power), der dieselbe Truhe zwar
+öffnen kann, aber schlechter gestellt ist. Chris nennt zwei Varianten, ohne sich für eine zu
+entscheiden — beide sind mit der bestehenden Formel-Familie billig umsetzbar und schließen sich
+nicht aus:
+
+- **A — weniger Punkte:** ein Nebenweg-Erfolg zahlt nur einen Teil des Punktwerts aus (z. B.
+  60–70 %), der Primärweg bleibt bei 100 %. Ein Multiplikator auf den Punktwert, keine neue Formel.
+- **B — länger/schwerer:** der Nebenweg braucht eine niedrigere Grundchance oder mehr
+  Fehlversuche/Fortschritt (1.4), bevor er greift — der Spieler knackt die Truhe trotzdem, nur
+  später. Ein zusätzlicher Abzugsterm in der p-Formel des Nebenwegs.
+
+`p = max(...)` aus dem vorigen Absatz bleibt als Formel-Skelett richtig, nur dass der Nebenweg-Term
+selbst schon abgewertet in die Rechnung eingeht (kleinere Chance und/oder kleinerer Punktwert) —
+**Primärweg schlägt Nebenweg**, nicht "der bessere gewinnt gleichwertig".
+
+**Offene Fragen, ergänzt Abschnitt 8:** A, B oder beide zugleich? Feste Paarung je Fundort-Position
+(immer dieselbe Truhe hat immer denselben Primär-/Nebenweg) oder pro Saat neu gewählt (mehr
+Abwechslung, aber ungleichere Kaderfamilien-Vergleichbarkeit)? Und: sollen auch Akten (Stufe 2)
+irgendwann Mehrwege bekommen, oder bleibt das bewusst den Tresoren vorbehalten?
 
 ---
 
@@ -736,10 +757,11 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
 11. **Reihenfolge im Projekt:** I-Spy stand bewusst am Ende der Liste. Dieses Konzept ist
     umsetzbar, aber PR 1 bindet eine Session für rund drei Tage, bevor eine Zahl da ist. Soll
     das vor oder nach den offenen Football-/Hockey-Punkten laufen?
-12. **Mehrwege-Truhen (1.6, Chris' Ergänzung 21.09.):** Grundsatz steht (Tresore bekommen zwei
-    alternative Lösungswege, Spieler nutzt automatisch seinen stärkeren). Offen: feste Paarung je
-    Fundort-Position oder pro Saat neu gewählt? Und bleibt das auf Tresore beschränkt, oder sollen
-    Akten später dieselbe Behandlung bekommen?
+12. **Mehrwege-Truhen (1.6, Chris' Ergänzung 21.09.):** Grundsatz steht (Tresore bekommen einen
+    Primärweg und einen schlechter gestellten Nebenweg, Spieler nutzt automatisch seinen
+    stärkeren). Offen: Nebenweg-Abwertung über weniger Punkte (A), über eine niedrigere/langsamere
+    Chance (B), oder beides zugleich? Feste Paarung je Fundort-Position oder pro Saat neu gewählt?
+    Und bleibt das auf Tresore beschränkt, oder sollen Akten später dieselbe Behandlung bekommen?
 
 ---
 
