@@ -104,6 +104,38 @@ Wertformel hat. Der vollständige Stand aller zwanzig steht in
 Mechanik das Richtige, aber zu laut — dann fehlen EREIGNISSE, nicht Rezepte. Sind beide niedrig,
 belohnt die Mechanik das Falsche. Das entscheidet, ob man an der Uhr oder am Rezept arbeitet.
 
+## Die Eignungsmatrix ist gesperrt — endgültig, für alle zwanzig Disziplinen
+
+**Nicht mehr nachfragen.** Chris am 21.09., nachdem die Frage bei Football (E3, 10.–16.09.) und
+bei I-Spy (Konzeptrunde, 21.09.) schon zweimal einzeln aufkam: die offizielle Gewichtsmatrix
+(`lib/player-generator/official-discipline-weights.ts`) bleibt für **jede** der zwanzig
+Disziplinen unangetastet — nicht nur für die, bei der es gerade zur Debatte steht. Das ist eine
+endgültige Entscheidung fürs Gesamtprojekt, keine Einzelfallfrage mehr: kein Agent soll sie
+künftig noch einmal stellen, egal welche Disziplin gerade an der Reihe ist. Ein Override auf einer
+tieferen Ebene (Muster `lib/player-generator/spiel-eignung-overrides.ts`, bisher nur für Football,
+dort ausdrücklich mit Chris' Bestätigung eingeführt) bleibt der einzige legitime Weg, wenn eine
+Disziplin intern andere Gewichte braucht als die Matrix zeigt — das ändert an der Matrix selbst
+nichts und bleibt eine bewusste, dokumentierte Ausnahme je Disziplin, keine stillschweigende Regel.
+
+**Die andere Hälfte derselben Entscheidung, wörtlich:** „diese Disziplingewichtungen, die
+vorgegeben sind, die müssen am Ende auch so rauskommen. Weil wenn ich einen Spieler mit einer Stat
+von 80 reinschicke, erwarte ich auch, dass da einer der Top-Leute ist und nicht, dass das dann am
+Ende so eine Hülpe ist." Die Matrix zu sperren heißt also nicht nur „nicht ändern", sondern auch:
+**jede Disziplin-Mechanik muss die Matrixgewichte tatsächlich durchreichen.** Ein Spieler, dessen
+stärkstes Attribut laut Matrix für eine Disziplin schwer zählt, muss in dieser Disziplin nachweisbar
+zu den Besten gehören — nicht bloß irgendwo im Mittelfeld verschwinden, weil das Rezept das
+Attribut in der Praxis kaum nutzt oder ein anderer Kanal (Slot, Trait, Form) es überdeckt.
+
+Das ist keine neue Erfindung, sondern die **Budget-Methode**, die das Projekt an mehreren Stellen
+schon einsetzt (`docs/design/neue-disziplin-handbuch.md` Abschnitt 2, Pipeline „Rezept →
+Pp-Abnahme"): `scripts/messe-arena-einfluss.mjs` / `einflussVon(dId,n)` misst, wie viel jedes
+Attribut in der fertigen Mechanik tatsächlich trägt, verglichen mit seinem Matrixgewicht. Zielwert
+**Pp-Abweichung ≤ 25** (zwei unabhängige Saatstämme). Was neu ist: das ist ab jetzt kein optionaler
+Politur-Schritt mehr, sondern eine **Pflichtprüfung für jede Disziplin, jede neue Mechanik und
+jedes Rezept** — genauso verbindlich wie die rho-über-0,80-Schranke oben, nicht nur "wenn gerade
+Zeit ist". Beide Abnahmen gehören zusammen: rho sagt, ob das RICHTIGE Ergebnis am Ende steht, die
+Pp-Abweichung sagt, ob es aus den RICHTIGEN Gründen (den vorgegebenen Attributen) zustande kommt.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
