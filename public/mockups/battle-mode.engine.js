@@ -13400,8 +13400,12 @@
       // WERTUNGSTABELLE (nur Woerter, wie bei Wettessen/Speed-Schach — Spalten kommen
       // unveraendert aus WERTUNG_AUFTRITT, s. Kommentar dort: "keine Aenderung an der
       // geteilten Buehnen-Punkteformel").
+      // WERTUNGSTABELLE-FUSS (PR 4, Politur): "Funde"/"Reak" sind die beiden additiven
+      // Anzeigefelder u.funde/u.reaktionen (PR 1/2, ":14629"/":14634" ff.) — die Spalten
+      // selbst kommen aus WERTUNG_AUFTRITT()s `art.schatzsuche`-Gate (s. dort), nur die
+      // Woerter im Fuss stehen hier, wie failKopf/das Fuss-Muster ueberall sonst.
       wertungTabelle:{failKopf:"Übersehen",
-        fuss:"„Pkt\" sind die Punktwerte der geknackten Fundorte (10 Notiz / 25 Akte / 60 Tresor) plus Teilpunkte für angebrochene, nicht geknackte Truhen. „Übersehen\" zählt Ticks ohne vollen Fund. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
+        fuss:"„Pkt\" sind die Punktwerte der geknackten Fundorte (10 Notiz / 25 Akte / 60 Tresor) plus Teilpunkte für angebrochene, nicht geknackte Truhen. „Übersehen\" zählt Ticks ohne vollen Fund. „Funde\" zeigt geknackte Fundorte nach Stufe (Notiz/Akte/Tresor). „Reak\" zählt, wie oft er als Läufer zu einem sichtbaren fremden Fund geschickt wurde (R-2) — beide rein additiv, ohne Einfluss auf „Pkt\". „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
     tennis:{
@@ -14812,6 +14816,53 @@
     }
   }
 
+  // TICKER-FEINSCHLIFF (PR 4, Konzept Abschnitt 4 + 5.4/7.2 "Ticker-Feinschliff"): baut die
+  // Textmuster aus dem Konzept ("Cassandra untersucht den Tresor (Logik, Stufe 3) —
+  // entdeckt den Hinweis! +60", "Vorrak scheitert am Zahlenschloss ... (+15% für den
+  // Nächsten)", "Ralazar übernimmt, was angebrochen war") aus GENAU den Feldern, die
+  // baueSchatzsuche() (PR 1/2) je Runde schon liefert (r.art/r.stufe/r.ereignis/r.punkte/
+  // r.reaktion) -- reine Textbausteine, `r.ereignis` selbst bleibt UNVERAENDERT
+  // erfolgWort/failWort (WERTUNG_AUFTRITT zaehlt darueber, s. Kommentar beim Showcase-Zweig
+  // direkt unterhalb dieser Funktion), genau das ACT-ZIERDE-Prinzip von Showcase.
+  //
+  // BEWUSST NICHT GEBAUT: eine Namensnennung "X hat vorgearbeitet, Y übernimmt" (das
+  // konkrete Beispiel im Konzept). Das würde verlangen, sich ueber Ticks hinweg zu merken,
+  // WER zuletzt an genau dieser Truhe gescheitert ist, und diesen Zustand in
+  // baueSchatzsuche() -- dem Gameplay-Tick-Rechner selbst, nicht einer step*()-Funktion --
+  // neu einzufuehren. Fuer eine PR, deren ganze Abnahme "bit-identisch, keine Beruehrung
+  // der Gameplay-Funktion" lautet, ist das Risiko groesser als der Politur-Gewinn eines
+  // Namens in einer Ticker-Zeile. Die Reaktion/Fortschritt-Uebernahme wird stattdessen ganz
+  // ohne neuen Zustand erzaehlt: `r.reaktion` (PR 2, bereits vorhanden) markiert einen
+  // Laeufer, der auf ein SICHTBARES gegnerisches Ereignis reagiert -- "uebernimmt"/"eilt
+  // herbei" ist deshalb wahr, auch ohne den Vorgaenger beim Namen zu nennen.
+  function ispyTickerZeile(u,r){
+    const ereignis=r.ereignis;
+    if(r.art==null){
+      // KEIN ZIEL DIESEN TICK (baueSchatzsuche(): "punkte:0, ereignis:art.failWort" ohne
+      // fundort/art/stufe, wenn keine Truhe frei/sichtbar war) — es gibt nichts zu
+      // beschreiben ausser dem Fehlschlagwort selbst.
+      return u.n+" — "+ereignis+" (kein Fund in Sicht).";
+    }
+    const artLabel=ISPY_ART_LABEL[r.art]||r.art;
+    const stufe=r.stufe||1;
+    const erfolg=ereignis===BUEHNE_ART["i-spy"].erfolgWort;
+    if(erfolg){
+      const praefix=r.reaktion?u.n+" eilt herbei und untersucht ":u.n+" untersucht ";
+      return praefix+(ISPY_STUFE_AKK[stufe]||"den Fund")+" ("+artLabel+", Stufe "+stufe+") — "
+        +ereignis+"! +"+r.punkte;
+    }
+    // FEHLSCHLAG: der Fortschrittsbonus (ISPY_FORTSCHRITT_SCHRITT=0,15) gilt je Versuch,
+    // unabhaengig vom Deckel (ISPY_FORTSCHRITT_DECKEL) -- "+15%" ist deshalb immer richtig,
+    // s. Kommentar bei den Konstanten oben. ISPY_STUFE_AN traegt die Praeposition schon
+    // mit ("am Tresor" ist "an dem Tresor", nicht "an" + "dem Tresor" zusammengesetzt).
+    const praefix=r.reaktion?u.n+" eilt herbei, scheitert aber ":u.n+" scheitert ";
+    return praefix+(ISPY_STUFE_AN[stufe]||"am Fund")+" ("+artLabel+", Stufe "+stufe+") — "
+      +ereignis+"; jetzt (weiter) angebrochen (+15% für den Nächsten). +"+r.punkte;
+  }
+  const ISPY_ART_LABEL={logik:"Logik",verhoer:"Verhör",mechanik:"Mechanik"};
+  const ISPY_STUFE_AKK={1:"die Notiz",2:"die Akte",3:"den Tresor"};
+  const ISPY_STUFE_AN={1:"an der Notiz",2:"an der Akte",3:"am Tresor"};
+
   function stepBuehne(dt){
     // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
     // `done` einmal gesetzt war -- buehnenBewegung() (rein praesentational, s. Vertrag dort)
@@ -14935,6 +14986,12 @@
         const zier=ACT?ACT.text[r.ereignis===BB().erfolgWort?"erfolg":"fail"]:null;
         feed(u.side,u.n+" — "+(ACT?ACT.label+": "+zier:r.ereignis)
           +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+      } else if(BB().schatzsuche){
+        // TICKER-FEINSCHLIFF (PR 4, Konzept Abschnitt 4/7.2): ispyTickerZeile() baut das
+        // Textmuster aus dem Konzept, s. Kommentar dort. `r.ereignis` bleibt UNVERAENDERT
+        // erfolgWort/failWort -- dieselbe Zierde-statt-zweites-Ereigniswort-Regel wie beim
+        // Showcase-Zweig direkt oberhalb.
+        feed(u.side,ispyTickerZeile(u,r),versuchBig);
       } else {
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       }
@@ -16057,6 +16114,11 @@
   const ISPY_VIZ_SUCHE_STARK_ENDE=0.60, ISPY_VIZ_SUCHE_SCHWACH_ENDE=0.80;
   const ISPY_VIZ_STARK_SCHWELLE=60;
   const ISPY_VIZ_JUBEL_T=0.35, ISPY_VIZ_KOPFSCHUETTEL_T=0.30;
+  // SCHLOSS-KLICK-TAKT (PR 4, TON_KATALOG["i-spy"].schloss): alle 0,12s ein leiser Klick
+  // waehrend "suchen" -- kurz genug, um bei der kuerzesten Suchphase (0,25 x 0,625s =
+  // 0,156s bei starkem Knacker) wenigstens einmal zu klicken, lang genug, um bei der
+  // laengsten (0,45 x 0,625s = 0,281s) nicht wie ein Dauerrasseln zu klingen.
+  const ISPY_TON_SCHLOSS_INTERVALL=0.12;
   // STARTPLATZ AM RAND, bevor der erste Fundort enthuellt ist (Konzept-Vertrag "solange
   // vizX==null" wie bei stepKuer/stepShowcase) — Heim links, Gast rechts, genau die Seite,
   // die `naeher` in ispySeiteTick() (":14680") schon fuer die Truhenwahl bevorzugt.
@@ -16099,6 +16161,12 @@
           // ganzen "gehen"-Phase fuer die gestrichelte Linie + das Ausrufezeichen.
           u.vizIspyReaktion=!!r.reaktion;
           u.vizPhase="gehen";
+          // ALARM-TON (TON_KATALOG["i-spy"].alarm, Konzept 5.4: "wenn die Reaktion der
+          // Gegenseite beginnt"): genau an dieser Kante, dem Moment, in dem PR 2s
+          // r.reaktion sichtbar wird und der Laeufer lossgeschickt wird -- kein neuer
+          // Vergleichszustand noetig, die Kante ist dieselbe "frisch enthuellt"-Kante wie
+          // fuer jeden anderen Zug auch.
+          if(u.vizIspyReaktion)sfx("i-spy","alarm");
         } else {
           // KEIN ZIEL DIESEN TICK (Konzept-Rechner: "punkte:0, ereignis:art.failWort" ohne
           // fundort, wenn keine Truhe frei/sichtbar war) — der Teilnehmer bleibt stehen.
@@ -16108,6 +16176,9 @@
           u.vizPhase="idle";
         }
         u.vizIspyT=0;
+        // SCHLOSS-ZAEHLER (TON_KATALOG["i-spy"].schloss) fuer jeden neuen Zug zurueckgesetzt,
+        // s. Klick-Zaehlung in der Phasen-Uhren-Schleife unten.
+        u.vizIspySchlossN=0;
       }
     }
     // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch
@@ -16127,6 +16198,13 @@
           u.vizY=u.vizIspyVonY+(u.vizIspyZielY-u.vizIspyVonY)*g;
         } else if(anteil<suchEnde){
           u.vizPhase="suchen"; u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
+          // SCHLOSS-KLICKS (TON_KATALOG["i-spy"].schloss, Konzept 5.4: "tonKlick leise,
+          // wiederholt -- Phase suchen"): zeitgetriebener Zaehler, KEIN rr()-Verbrauch,
+          // dasselbe Zaehler-Vergleichsmuster wie TON_KATALOG.climbing.griff/-.zug
+          // (u.vizGriffN/u.vizZugN, ":27759"/":27763") -- hier auf u.vizIspyT statt einem
+          // Motorzustand, weil "suchen" selbst keinen zaehlbaren Fortschrittswert hat.
+          const klickN=Math.floor((u.vizIspyT-ISPY_VIZ_GEHEN_ANTEIL*T)/ISPY_TON_SCHLOSS_INTERVALL);
+          if(klickN>(u.vizIspySchlossN||0)){ u.vizIspySchlossN=klickN; sfx("i-spy","schloss"); }
         } else {
           u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
           if(u.vizPhase!=="ergebnis"){
@@ -16138,6 +16216,13 @@
             // hier wird nur die KOeRPERREAKTION ausgeloest.
             if(u.vizIspyErfolg)u.vizJubelT=ISPY_VIZ_JUBEL_T;
             else u.vizIspyKopfschuettelT=ISPY_VIZ_KOPFSCHUETTEL_T;
+            // ERFOLGS-/FEHL-TON (TON_KATALOG["i-spy"].geknackt/.tresor/.fehl, Konzept 5.4):
+            // dieselbe Phasenkante, "tresor" (der krasse Fund) nur bei Stufe 3, sonst
+            // "geknackt" fuer Notiz/Akte -- u.vizIspyStufe/-Erfolg kommen unveraendert aus
+            // der Erkennungsschleife oben (r.stufe/r.ereignis===art.erfolgWort), kein
+            // neuer Zustand.
+            if(u.vizIspyErfolg)sfx("i-spy",u.vizIspyStufe===3?"tresor":"geknackt");
+            else sfx("i-spy","fehl");
           }
         }
       }
@@ -16298,6 +16383,10 @@
     // Publikums-Loop beenden, falls wir GERADE von Gewichtheben herkommen (s. bodenHeben
     // unten) — reines Praesentations-Bookkeeping, kein Motorzustand.
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    // I-SPY (PR 4, Ton und Politur): dasselbe Wechsel-Fall-Muster wie die vier Flaggen in
+    // diesem Block, falls wir GERADE von I-Spy auf eine der verbleibenden generischen
+    // Buehnen (Speed-Schach/Breaking/Fechten/Tennis) wechseln.
+    if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
     // SPEED-SCHACH (Ziel 5, A4, 12.09.): bodenBuehne() ist der geteilte Boden fuer alle
     // Nicht-Heben/Nicht-Duett-Buehnen (Schach eingeschlossen, s. zeichneBuehne()s
     // Boden-Dispatch) — anders als Gewichtheben/Eiskunstlauf bekommt Schach kein eigenes
@@ -16350,6 +16439,7 @@
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
     if(!showcasePublikumAn){ tonLoopStart("showcase"); showcasePublikumAn=true; }
 
     // GRUNDFLAECHE: waermeres, violetteres Theaterlicht statt bodenBuehne()s neutralem
@@ -16444,6 +16534,7 @@
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
     if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+    if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
 
     // GRUNDFLAECHE: warmes Bankett-Kerzenlicht statt bodenBuehne()s kaltem Wettkampf-Podest.
     const g=ctx.createLinearGradient(0,0,0,H);
@@ -16583,11 +16674,17 @@
   // Konzept 5.4/Bauplan "NICHT bauen fuer PR 3") — muss aber, wie jeder eigene Boden,
   // saemtliche Loops der Buehnen VOR I-Spy abschalten, falls wir GERADE von einer von ihnen
   // herkommen.
+  // PUBLIKUMS-/RAUM-LOOP (PR 4, TON_KATALOG["i-spy"].publikum, Konzept 5.4 "raum"): dasselbe
+  // Start/Stop-Flaggen-Muster wie hebenPublikumAn/schachPublikumAn/eiskunstlaufPublikumAn/
+  // showcasePublikumAn -- reines Praesentations-Bookkeeping, s. reset() (N1-Fix) fuer den
+  // Rueckstell-Zwang beim naechsten I-Spy-Spiel derselben Session.
+  let ispyRaumAn=false;
   function bodenSchatzsuche(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
     if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+    if(!ispyRaumAn){ tonLoopStart("i-spy"); ispyRaumAn=true; }
 
     const art=BB();
     // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
@@ -18511,6 +18608,20 @@
             const avg=(a)=>a.reduce((s,r)=>s+r.punkte,0)/a.length;
             return Math.round(avg(z.r.slice(halb))-avg(z.r.slice(0,halb)));},
           fmt:v=>(v>0?"+":"")+v, farbe:v=>v<0?"var(--crit)":v>0?"var(--ok)":null},
+        // I-SPY-SPALTEN (PR 4, Politur): u.funde/u.reaktionen sind PR-1/2-Anzeigefelder,
+        // rein additiv (nie in u.summe/wert() eingeflossen, s. Kommentar bei ihrer
+        // Befuellung, ":14629"/":14634" ff.) — hier nur die TABELLEN-DARSTELLUNG dazu, exakt
+        // das art.schatzsuche-Gate, mit dem auch der Feed-Zweig in stepBuehne() arbeitet.
+        // `art.schatzsuche` ist der einzige aktuelle Nutzer dieser beiden Spalten;
+        // Wettessen/Showcase/Eiskunstlauf/Breaking (die anderen vier WERTUNG_AUFTRITT-
+        // Disziplinen) fuehren u.funde/u.reaktionen nicht und sehen die Spalten deshalb nie.
+        ...(art.schatzsuche?[
+          {id:"funde",kopf:"Funde", titel:"geknackte Fundorte nach Stufe: Notiz/Akte/Tresor (1/2/3)",
+            wert:z=>{const f=z.u.funde; if(!f)return null;
+              const s1=f[1]||0,s2=f[2]||0,s3=f[3]||0; return (s1+s2+s3)?s1+"/"+s2+"/"+s3:null;}},
+          {id:"reak", kopf:"Reak", titel:"wie oft er als Läufer zu einem sichtbaren fremden Fund geschickt wurde (R-2)",
+            wert:z=>z.u.reaktionen||null}
+        ]:[]),
         {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
           farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
         {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
@@ -23660,6 +23771,50 @@
       schlingen: {synth:(vol)=>tonDoppelton(vol,520,760,0.22)},
       pause:     {synth:(vol)=>tonBuzzer(vol,0.3)},
       gong:      {synth:(vol)=>tonMetall(vol,260,0.55)}
+    },
+    // I-SPY (PR 4, Ton und Politur, docs/design/i-spy-schatzsuche-konzept-21-09.md
+    // Abschnitt 5.4): sechs Ereignisse, dieselben fuenf Grundbausteine wie ueberall im
+    // Katalog, aus stepSchatzsuche() (PR 3) abgefeuert:
+    //  - schloss (tonKlick leise, wiederholt): waehrend Phase "suchen" -- ein Zeit-
+    //    getriebener Zaehler (kein rr()) feuert alle ISPY_TON_SCHLOSS_INTERVALL Sekunden,
+    //    dasselbe Zaehler-Vergleichsmuster wie TON_KATALOG.climbing.griff/-.zug
+    //    (u.vizGriffN/u.vizZugN) -- hier auf u.vizIspySchlossN statt auf einem
+    //    Motorzustand.
+    //  - geknackt (tonDoppelton hell): Erfolg an Notiz/Akte (Stufe 1-2), an der
+    //    "ergebnis"-Phasenkante (u.vizIspyErfolg, s. stepSchatzsuche()).
+    //  - tresor  (tonDoppelton+tonRauschen-Burst): Erfolg am Tresor (Stufe 3) -- derselbe
+    //    Erfolgsklang wie "geknackt" plus ein kurzer Rausch-Burst fuer den "krassen Fund".
+    //  - fehl    (tonBuzzer 0,25s): Fehlschlag, an derselben Phasenkante.
+    //  - alarm   (tonTon gleitend abwaerts): die Reaktion der Gegenseite beginnt
+    //    (u.vizIspyReaktion, aus PR 2s r.reaktion) -- an der "frisch enthuellt"-Kante,
+    //    wenn der Laeufer lossgeschickt wird (Phase "gehen").
+    //  - publikum (Loop tonRauschen sehr leise, "Uhrticken" statt Zuschauerraunen --
+    //    Konzepttext 5.4 nennt das Ereignis "raum"; der Schluessel MUSS trotzdem
+    //    "publikum" heissen, weil tonLoopStart() ausschliesslich nach `katalog.publikum`
+    //    oder `katalog.beat` sucht, s. dortiger Kommentar "Loop-Eintraege laufen ueber
+    //    tonLoopStart/-Stop" -- ein Eintrag namens "raum" waere ein stiller No-Op
+    //    gewesen). bodenSchatzsuche() start / bodenBuehne()&Geschwister stop, exakt das
+    //    hebenPublikumAn/showcasePublikumAn-Muster (ispyRaumAn-Flagge).
+    // Kein sechster Grundbaustein -- "alarm" ist ein manuell zusammengesetzter Oszillator
+    // nach demselben Bauplan wie TON_KATALOG.showcase.zauber (gleitende statt einer
+    // festen Frequenz, tonTon() selbst kann das nicht).
+    "i-spy":{
+      schloss:  {synth:(vol)=>tonKlick(vol,2400,0.035)},
+      geknackt: {synth:(vol)=>tonDoppelton(vol,760,1140,0.26)},
+      tresor:   {synth:(vol)=>{ tonDoppelton(vol,760,1140,0.26); tonRauschen((vol??0.6)*0.6,1400,0.35,false); }},
+      fehl:     {synth:(vol)=>tonBuzzer(vol,0.25)},
+      alarm:    {synth:(vol)=>{
+        const ctx=tonKontext(); if(!ctx)return;
+        const osc=ctx.createOscillator(); osc.type="sine";
+        const gain=ctx.createGain();
+        const t0=ctx.currentTime, d=0.35;
+        osc.frequency.setValueAtTime(1400,t0);
+        osc.frequency.exponentialRampToValueAtTime(500,t0+d);
+        tonHuelle(gain,t0,0.01,d,bkPegel(vol??0.5));
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t0); osc.stop(t0+d+0.05);
+      }},
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,260,0,true)}
     }
   };
 
@@ -28843,6 +28998,16 @@
     // nachgemessen bit-identisch (rho je Spiel 0,845, rho Saison 0,930, unveraendert vor und
     // nach dieser Zeile, s. PR-Beschreibung).
     gewichtheben:4
+    // I-SPY (PR 4, Ton und Politur, Bauplan 7.2 "ZEIT_DEHNUNG"): geprueft, BEWUSST NICHT
+    // GESETZT. BUEHNE_ART["i-spy"].rundenDauer ist 60/(8*6*2)=0,625s -- exakt derselbe Wert
+    // wie Breaking (rundenDauer:0,625, ebenfalls kein Eintrag hier) und laenger als
+    // Speed-Schach/Tennis (60/(10*6*2)≈0,5s, auch ohne Eintrag). Anders als bei Basketball/
+    // Hockey/Gewichtheben gibt es keinen Chris-Fund "zu schnell/unuebersichtlich" fuer
+    // I-Spy -- die drei Faelle oben, die einen Faktor bekamen, taten das jeweils als
+    // Antwort auf eine konkrete Sichtbarkeits-Beschwerde, nicht als Standardzuschlag fuer
+    // jede Buehne. Ein ungefordertes Dehnen wuerde nur das GESAMTSPIEL verlaengern (8
+    // Ticks x 6 Teilnehmer x 2 Seiten), ohne dass irgendwo ein Lesbarkeits-Problem
+    // gemessen oder gemeldet waere -- reine Praesentation, aber ohne Grund keine Aenderung.
   };
   const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
 
@@ -30433,6 +30598,12 @@
     // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     showcasePublikumAn=false;
+    // DASSELBE N1-MUSTER FUER I-SPY (PR 4, Ton und Politur): ohne diese Zeile haelt
+    // bodenSchatzsuche() die Flagge fuer "schon gestartet" und der Publikums-/Raum-Loop
+    // kaeme ab dem zweiten I-Spy-Spiel der Session nie wieder -- derselbe Fehler, den
+    // PR #879 fuer Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss
+    // auf rr() oder Rangtreue.
+    ispyRaumAn=false;
     build(gebuchteSaatFuerAktuelleDisziplin());
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
