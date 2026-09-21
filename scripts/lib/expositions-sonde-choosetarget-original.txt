@@ -1,0 +1,108 @@
+  function chooseTarget(u){
+    const foes=gegner(u);if(!foes.length)return null;
+    const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
+    const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+    // "speer": wer von den Gegnern am weitesten in UNSERE Richtung vorgerueckt ist. Das ist
+    // bewusst NICHT "der Naechste" — der Naechste ist relativ zum eigenen Kopf (fuer einen
+    // Hinteren oft ein abgedrifteter Flankierer), die Spitze ist relativ zur FRONT. Dadurch
+    // buendeln sich mehrere Draufgaenger auf denselben Vorstoss, statt sich still auf je
+    // einen eigenen Nachbarn zu verteilen — das sichtbare Gegenstueck zum Schleicher, der
+    // in dieselbe Formation von hinten hineingeht.
+    const spitze=()=>foes.reduce((b,x)=>((u.side===0?x.x<b.x:x.x>b.x)?x:b));
+    // "schild": der Gegner mit dem kleinsten Abstand zu IRGENDEINEM meiner Leute. Ein
+    // Beschuetzer fragt nicht, wer IHM am naechsten steht, sondern wer an seinen Kameraden
+    // haengt. Ohne Kameraden (letzter Ueberlebender) faellt er auf den Naechsten zurueck —
+    // dann ist er selbst die Linie, die er decken soll.
+    const amKameraden=()=>{
+      const kam=eigene(u).filter(a=>a!==u);
+      if(!kam.length)return nearest(foes);
+      const naehe=(f)=>kam.reduce((m,k)=>Math.min(m,dist(f,k)),Infinity);
+      return foes.reduce((b,x)=>naehe(x)<naehe(b)?x:b);
+    };
+
+    // Wer sich zurueckzieht, sucht kein Ziel.
+    if(u.retreat>0)return null;
+
+    // DURCHBRUCH: wer entschlossen ist, laesst sich nicht umlenken. Er nimmt die Schlaege
+    // der Abfangenden in Kauf und geht zu dem, den er gemeint hat.
+    if(u.durch&&u.tgt&&!u.tgt.down)return u.tgt;
+
+    // ZIELANSAGE. Sie steht bewusst HINTER Rueckzug und Durchbruch — den beiden Faellen,
+    // in denen ein Kaempfer per Regel ueberhaupt nicht mehr zuhoert — und VOR allem
+    // anderen: vor dem Offensivzwang, vor den Stellungsbefehlen, vor der uebersteuerten
+    // Zielprioritaet und vor der Persoenlichkeit. Genau das macht sie zu einem BEFEHL und
+    // nicht zu einer weiteren Neigung, die sich mit fuenf anderen um den Vortritt streitet.
+    //
+    // WAS SIE TROTZDEM NICHT AUSHEBELT (und deshalb hier auch nicht steht):
+    //  - Wer in Schlagweite GESTELLT ist, wird gleich nach diesem Aufruf wieder auf seinen
+    //    Abfaenger zurueckgesetzt, sofern seine Bindung opportunistisch genug ist
+    //    (s. u.bindAn im Tick). Ein Ruf reisst niemanden aus einem laufenden Nahkampf.
+    //  - Wer sich loest, zahlt den Trennschlag (halber Schaden, s. Bewegung).
+    //  - Die Bewegungs-Klammern bleiben: "Ruecken decken" kommt nicht ueber die Mittellinie,
+    //    "hinter den Eigenen" nicht an der vordersten Einheit vorbei. Der Gerufene wird
+    //    angesagt, die Formation bleibt.
+    // Keine Wuerfe, kein Zufall — dieselbe deterministische Auswahl wie ringsherum.
+    //
+    // EINE AUSNAHME: der Flankierer, der noch UNTERWEGS ist. Sein Befehl IST der Umweg,
+    // und unten in der Bewegung haengt daran mehr als eine Zielwahl — sobald er ein Ziel
+    // hat, laeuft er dorthin statt an den Rand, und die Formationsleine, die fuer "flanke"
+    // ausdruecklich aufgehoben ist, greift wieder. Ein Ruf wuerde aus einer Flanke also
+    // stillschweigend eine Mitte machen, und zwar fuer den Rest des Kampfes. Angekommen
+    // (Freigabe erteilt und tief genug im gegnerischen Feld) hoert er wieder zu.
+    const flankeNochUnterwegs=u.ord==="flanke"&&
+      !(freigabe[u.side]&&(u.side===0?u.x>MID+180:u.x<MID-180));
+    const angesagt=flankeNochUnterwegs?null:kfZielFuer(u);
+    if(angesagt)return angesagt;
+
+    // OFFENSIVZWANG: Stellungsbefehle sind aufgehoben. Wer hier landet, hat entweder zu
+    // lange ohne Ziel dagestanden oder das Feld ist so leer, dass Position nichts mehr
+    // schuetzt. Dann zaehlt nur noch, dass ueberhaupt jemand angegriffen wird.
+    if(u.zwang)return nearest(foes);
+
+    // Ein Angreifer im Ruecken schlaegt jede Absicht — je opportunistischer, desto eher.
+    if(u.lastHit&&!u.lastHit.down&&dist(u,u.lastHit)<130&&u.opp>=45)return u.lastHit;
+
+    if(u.ord==="decken"){
+      const intr=foes.filter(own);
+      return intr.length?nearest(intr):null;
+    }
+    if(u.ord==="flanke"){
+      const deep=u.side===0?u.x>MID+180:u.x<MID-180;
+      if(!deep||!freigabe[u.side]){
+        // Unterwegs nur wehren, wenn wirklich jemand direkt dranhaengt.
+        const cling=foes.filter(f=>dist(u,f)<58);
+        return cling.length?nearest(cling):null;
+      }
+      // Angekommen sucht der Flankierer den, der am meisten anrichtet — nicht stur die
+      // hinterste Reihe. Sonst laeuft er am eigentlichen Problem vorbei.
+      return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
+    }
+    // Uebersteuerte Zielpriorität geht der Persoenlichkeit vor.
+    if(u.zielP){
+      if(u.zielP==="bedrohung")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
+      if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
+      if(u.zielP==="naechster")return nearest(foes);
+      if(u.zielP==="hinten"){const bk=hintersteReihe(foes);if(bk)return nearest(bk);}
+      if(u.zielP==="speer")return spitze();
+      if(u.zielP==="schild")return amKameraden();
+      if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
+      // "fels": genau den binden, den der Plan benannt hat.
+      if(u.zielP==="fels"&&PLAN&&PLAN.felsName){
+        const f=foes.find(x=>x.n===PLAN.felsName); if(f)return f;
+      }
+      // "lohnend": das beste Verhaeltnis aus dem, was jemand anrichtet, und dem, was es
+      // kostet ihn zu entfernen. Der Zaehste bleibt aussen vor, bis sonst niemand mehr
+      // steht — dann greifen ihn alle gemeinsam an.
+      if(u.zielP==="weich"||u.zielP==="lohnend"){
+        const wert=(x)=>(x.ANG*(x.heiler?0.9:1))/Math.max(1,x.hp*(1+x.VER/100));
+        const rest=PLAN&&PLAN.felsName?foes.filter(x=>x.n!==PLAN.felsName):foes;
+        const pool=rest.length?rest:foes;
+        return pool.reduce((b,x)=>wert(x)>wert(b)?x:b);
+      }
+    }
+    // Grundneigung aus der Persoenlichkeit
+    if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
+    if(u.ziel==="schwaechster")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
+    if(u.ziel==="hinten"){const back=hintersteReihe(foes);if(back)return nearest(back);}
+    return nearest(foes);
+  }

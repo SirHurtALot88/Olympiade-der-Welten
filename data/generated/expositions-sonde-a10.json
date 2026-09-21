@@ -1,0 +1,443 @@
+{
+ "hinweis": "A1.0-Sonde (PM-Plan 20.09., Abschnitt 3.5): sechs Varianten (A-E, P) auf der M0-Kaderfamilie (16 Paarungen), gemessen auf dem Stand NACH dem persOf-Fix (PR #984). E und P(motoroptimal) sind aus A UEBERNOMMEN (textlich/konstruktiv identisch, s. Skript-Kopfkommentar), nicht separat gemessen. Reiner Sondenpfad ueber scripts/lib/expositions-sonde-patches.mjs (B/C/D) bzw. scripts/lib/aufstellungs-stufungen.ts (P, aus M1 uebernommen) — kein Motorcode im Arbeitsbaum geaendert.",
+ "spieleJePaarung": 96,
+ "kaderQuelle": {
+  "saveId": "new-game-1787123325719-swnjlk",
+  "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+  "gezogenAm": "2026-09-20T10:21:30.843Z"
+ },
+ "zeilen": [
+  {
+   "variante": "A",
+   "disc": "mini-dm",
+   "spielMed": 0.44213074719995127,
+   "spielSpan": 0.960315228150094,
+   "saisonMed": 0.5,
+   "saisonSpan": 1.0476190476190477,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2135150406560441,
+    "unten": 0.34753764352949335,
+    "oben": 0.5610526841855374,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "A",
+   "disc": "battlefield",
+   "spielMed": 0.564694919852482,
+   "spielSpan": 1.1113446045164985,
+   "saisonMed": 0.6666666666666667,
+   "saisonSpan": 1.4761904761904763,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.302973947233374,
+    "unten": 0.3432859946156134,
+    "oben": 0.6462599418489874,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "A",
+   "disc": "tdm",
+   "spielMed": 0.29532143476582506,
+   "spielSpan": 0.7626446472592349,
+   "saisonMed": 0.4125874125874126,
+   "saisonSpan": 0.9790209790209791,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.1861710535066853,
+    "unten": 0.24747229386077782,
+    "oben": 0.43364334736746313,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "B",
+   "disc": "tdm",
+   "spielMed": 0.40149236098293584,
+   "spielSpan": 0.6510751068534928,
+   "saisonMed": 0.46853146853146854,
+   "saisonSpan": 0.9090909090909092,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.26518752540711077,
+    "unten": 0.218467420487751,
+    "oben": 0.48365494589486174,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "B",
+   "disc": "mini-dm",
+   "spielMed": 0.3434208032541666,
+   "spielSpan": 0.9727160218008869,
+   "saisonMed": 0.45238095238095233,
+   "saisonSpan": 1.2380952380952381,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.26211907506065013,
+    "unten": 0.31688236004236003,
+    "oben": 0.5790014351030102,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "C",
+   "disc": "mini-dm",
+   "spielMed": 0.4440703729948629,
+   "spielSpan": 0.8930135506698289,
+   "saisonMed": 0.5714285714285714,
+   "saisonSpan": 1.0952380952380953,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.29924095843468307,
+    "unten": 0.33551731251035927,
+    "oben": 0.6347582709450423,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "B",
+   "disc": "battlefield",
+   "spielMed": 0.39063486914567086,
+   "spielSpan": 1.1825977768701086,
+   "saisonMed": 0.5357142857142857,
+   "saisonSpan": 1.4047619047619047,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.3643896039871499,
+    "unten": 0.29609054870180995,
+    "oben": 0.6604801526889599,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "C",
+   "disc": "tdm",
+   "spielMed": 0.17757796590380037,
+   "spielSpan": 0.8314680197239875,
+   "saisonMed": 0.18181818181818182,
+   "saisonSpan": 1.020979020979021,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.22673923018550943,
+    "unten": 0.07616645113895473,
+    "oben": 0.30290568132446416,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "C",
+   "disc": "battlefield",
+   "spielMed": 0.47294858141994345,
+   "spielSpan": 1.0460765842760236,
+   "saisonMed": 0.6071428571428572,
+   "saisonSpan": 1.3571428571428572,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2478656985874778,
+    "unten": 0.34597190242689685,
+    "oben": 0.5938376010143747,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "D",
+   "disc": "mini-dm",
+   "spielMed": 0.45391894915928543,
+   "spielSpan": 0.7546177143305393,
+   "saisonMed": 0.5595238095238095,
+   "saisonSpan": 0.9047619047619048,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.21712951504798506,
+    "unten": 0.4035905359019877,
+    "oben": 0.6207200509499727,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "D",
+   "disc": "tdm",
+   "spielMed": 0.2520720164052129,
+   "spielSpan": 0.7409909928647632,
+   "saisonMed": 0.26223776223776224,
+   "saisonSpan": 0.965034965034965,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.23004044752898659,
+    "unten": 0.12437509768797386,
+    "oben": 0.35441554521696045,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "D",
+   "disc": "battlefield",
+   "spielMed": 0.49035642811759395,
+   "spielSpan": 1.0805731345984708,
+   "saisonMed": 0.6071428571428572,
+   "saisonSpan": 1.2380952380952381,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2743568561170061,
+    "unten": 0.28669852993069345,
+    "oben": 0.5610553860476996,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "E",
+   "disc": "tdm",
+   "spielMed": 0.29532143476582506,
+   "spielSpan": 0.7626446472592349,
+   "saisonMed": 0.4125874125874126,
+   "saisonSpan": 0.9790209790209791,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.1861710535066853,
+    "unten": 0.24747229386077782,
+    "oben": 0.43364334736746313,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "E",
+   "disc": "mini-dm",
+   "spielMed": 0.44213074719995127,
+   "spielSpan": 0.960315228150094,
+   "saisonMed": 0.5,
+   "saisonSpan": 1.0476190476190477,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2135150406560441,
+    "unten": 0.34753764352949335,
+    "oben": 0.5610526841855374,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "E",
+   "disc": "battlefield",
+   "spielMed": 0.564694919852482,
+   "spielSpan": 1.1113446045164985,
+   "saisonMed": 0.6666666666666667,
+   "saisonSpan": 1.4761904761904763,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.302973947233374,
+    "unten": 0.3432859946156134,
+    "oben": 0.6462599418489874,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P",
+   "disc": "mini-dm",
+   "spielMed": 0.5492305927518093,
+   "spielSpan": 0.9719302654317902,
+   "saisonMed": 0.5714285714285714,
+   "saisonSpan": 1.1904761904761905,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.26229223973828797,
+    "unten": 0.3794110336930404,
+    "oben": 0.6417032734313284,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P",
+   "disc": "battlefield",
+   "spielMed": 0.5734426771342858,
+   "spielSpan": 0.7294114170247429,
+   "saisonMed": 0.7023809523809523,
+   "saisonSpan": 0.8333333333333333,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.19312597664571307,
+    "unten": 0.42778250847859045,
+    "oben": 0.6209084851243035,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P",
+   "disc": "tdm",
+   "spielMed": 0.3294566546923962,
+   "spielSpan": 0.5536322717064773,
+   "saisonMed": 0.4755244755244755,
+   "saisonSpan": 0.8321678321678322,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2465944567542208,
+    "unten": 0.21131826899488657,
+    "oben": 0.45791272574910735,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(absichtlich-schlecht)",
+   "disc": "tdm",
+   "spielMed": 0.275604619704114,
+   "spielSpan": 0.7607194515230575,
+   "saisonMed": 0.35664335664335667,
+   "saisonSpan": 1.2587412587412588,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.1747749151444523,
+    "unten": 0.16288582648840969,
+    "oben": 0.33766074163286197,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(absichtlich-schlecht)",
+   "disc": "mini-dm",
+   "spielMed": 0.5095124894693506,
+   "spielSpan": 0.8987640977538065,
+   "saisonMed": 0.5357142857142857,
+   "saisonSpan": 0.9285714285714286,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2761038585071659,
+    "unten": 0.29592687965531017,
+    "oben": 0.5720307381624761,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(absichtlich-schlecht)",
+   "disc": "battlefield",
+   "spielMed": 0.5639577452319327,
+   "spielSpan": 1.0048404070338817,
+   "saisonMed": 0.6785714285714286,
+   "saisonSpan": 0.9761904761904762,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.17541742009564354,
+    "unten": 0.4488377897161584,
+    "oben": 0.6242552098118019,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(motoroptimal)=A",
+   "disc": "tdm",
+   "spielMed": 0.29532143476582506,
+   "spielSpan": 0.7626446472592349,
+   "saisonMed": 0.4125874125874126,
+   "saisonSpan": 0.9790209790209791,
+   "teilnehmer": 12,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.1861710535066853,
+    "unten": 0.24747229386077782,
+    "oben": 0.43364334736746313,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(motoroptimal)=A",
+   "disc": "mini-dm",
+   "spielMed": 0.44213074719995127,
+   "spielSpan": 0.960315228150094,
+   "saisonMed": 0.5,
+   "saisonSpan": 1.0476190476190477,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.2135150406560441,
+    "unten": 0.34753764352949335,
+    "oben": 0.5610526841855374,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  },
+  {
+   "variante": "P(motoroptimal)=A",
+   "disc": "battlefield",
+   "spielMed": 0.564694919852482,
+   "spielSpan": 1.1113446045164985,
+   "saisonMed": 0.6666666666666667,
+   "saisonSpan": 1.4761904761904763,
+   "teilnehmer": 8,
+   "n": 96,
+   "paarungen": 16,
+   "bootstrap": {
+    "breite": 0.302973947233374,
+    "unten": 0.3432859946156134,
+    "oben": 0.6462599418489874,
+    "wiederholungen": 2000,
+    "n": 16
+   }
+  }
+ ]
+}
