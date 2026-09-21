@@ -167,14 +167,19 @@ Erfolgsformel (`hebeUebung()`). Die Namen folgen den sechs vorhandenen Slots:
 
 Zwei Dinge daran sind bewusst so und sollten gemessen, nicht geglaubt werden:
 
-- **Awareness trägt hier weniger, als Chris' Satz „hohe Awareness" nahelegt.** Die Matrix gibt
-  Awareness 5 von 100. Ein Sub-Skill, der Awareness mit 35 % führt und in einer Erfolgschance
-  sitzt, würde Awareness strukturell über die Matrix hinaus gewichten (Handbuch 1.3: „ein
-  Attribut in einer Erfolgschance-Rolle gewinnt strukturell mehr Einfluss") und die Pp-Abweichung
-  hochtreiben. Wenn Awareness das Finden-Attribut sein SOLL, muss die **Matrix** geändert werden
-  (`lib/player-generator/official-discipline-weights.ts`) — das ist Produktionscode mit Folgen für
-  Spielergenerator, Gehälter und Marktwerte, ein Präzedenzfall dafür ist
-  `football-matrix-entscheidung.md`. Frage 1 an Chris (Abschnitt 8).
+- **Chris' Entscheidung (21.09.), Frage 1 damit geschlossen: die Matrix bleibt unangetastet.**
+  Awareness bleibt bei Matrixgewicht 5 — kein Override wie bei Football
+  (`spiel-eignung-overrides.ts`). Chris' Satz „hohe Awareness" war kein Auftrag, Awareness zum
+  dominanten Attribut zu machen, sondern eine Beschreibung der SPÜREN-Phase: ein Spieler mit hoher
+  Awareness erkennt schneller/besser, wohin er als nächstes gehen sollte (welche Stufe lohnt sich),
+  ein anderer braucht dafür länger — kann dafür aber das Rätsel selbst schneller lösen. Damit ist
+  die bestehende Aufteilung genau richtig: Awareness wirkt nur in SPÜRSINN (Phase 1, „wohin gehe
+  ich") mit 25 %, nicht in den KNACKEN-Sub-Skills. Zusätzlich bestätigt: **verschiedene Truhen/
+  Hinweise sollen verschiedene Attribute für das Knacken selbst verlangen** — nicht nur
+  Intelligenz, sondern je nach Rätselart auch Stärke (power), Torment oder andere Matrix-Attribute.
+  Das ist bereits so vorgesehen (LOGIK/MENSCHENKENNTNIS/FINGERFERTIGKEIT mit unterschiedlichen
+  Attributmischungen, Tabelle oben) und muss in der Kalibrierung nur beibehalten werden — keine
+  Konzeptänderung nötig.
 - **Torment 17 ist das zweithöchste Gewicht** und sitzt heute vor allem in SPITZENMOMENT/WAGNIS.
   Im Konzept wird es die Verhör-Rätselart (Druck ausüben, Verhalten lesen — genau der Social-
   Read-Slot-Text) und ein Drittel des Spürsinns. Wer Torment lieber als „Stressresistenz" liest,
@@ -210,6 +215,14 @@ Dann die **Wahl** unter den gesehenen, nicht besetzten Fundorten. Zwei Regeln zu
 Empfehlung F2, weil sie die Eignung als Kanal breiter macht (der Star wählt besser UND knackt
 besser). Bei Gleichstand entscheidet die Rätselart, deren Sub-Skill beim Spieler am höchsten ist,
 danach die Nähe zur eigenen Position (deterministisch, kein `rr()`).
+
+**„Schneller" heißt hier „öfter", und das ist Absicht.** Chris sagt an mehreren Stellen
+„findet schnell", „löst es schneller", „dauert länger" — also Zeit. Das Konzept übersetzt das
+durchgehend in Häufigkeit: ein Starker braucht nicht weniger Ticks je Truhe, er bekommt in
+jedem Tick eine höhere Chance. Der Grund ist die Hockey-Lehre aus `CLAUDE.md`: eine Mechanik,
+in der ein Schwacher zwei Ticks für eine Truhe braucht, senkt dessen Ereigniszahl und damit die
+Verlässlichkeit — genau die Größe, die I-Spy mit 0,72 ohnehin fehlt (0.2). „Schneller" wird
+deshalb nicht mechanisch, sondern optisch beantwortet (5.2).
 
 ### 1.4 Phase KNACKEN — die drei Stufen
 
@@ -256,10 +269,123 @@ Jeder Fundort trägt eine von drei Rätselarten — analog zu `hindernisTypen`:
 | Mechanik | FINGERFERTIGKEIT | Vorhängeschloss, Dietrich, Schublade mit Geheimfach | „öffnet" |
 | Verhör | MENSCHENKENNTNIS | Zeuge/Informant-Figur, Tagebuch, Foto mit Gesichtern | „bringt zum Reden" |
 
-Verteilung im Raum: je Art ein Drittel der Fundorte, über alle Stufen. Damit hat ein Kader mit
-einem Mechanik-Spezialisten und einem Logiker zwei Stars an verschiedenen Truhen — dieselbe
-Spreizung, die Takeshi mit `fallenKoennen` gemessen gebracht hat (rho 0,861 → 0,883: „der Kanal
-wird breiter, nicht lauter", `engine.js:24321-24325`).
+Verteilung im Raum: **proportional zur Matrixmasse der Rätselart, nicht zu Dritteln** — und
+gemessen wird die **Punktmasse**, nicht die Anzahl der Fundorte. Jede Art hat Anspruch auf den
+Anteil, den ihre Sub-Skill-Attribute in `BASIS_JE_DISC["i-spy"]` zusammen wiegen:
+
+| Art | Sub-Skill | Rechnung | Matrixmasse | Anspruch |
+|---|---|---|---:|---:|
+| Logik | intelligence 50, will 30, determination 20 | 0,50·18 + 0,30·12 + 0,20·8 | 14,2 | **37,6 %** |
+| Verhör | torment 50, charisma 30, spirit 20 | 0,50·17 + 0,30·9 + 0,20·13 | 13,8 | **36,5 %** |
+| Mechanik | dexterity 45, speed 35, torment 20 | 0,45·8 + 0,35·8 + 0,20·17 | 9,8 | **25,9 %** |
+
+Zwei Dinge sind daran wichtiger, als sie aussehen. Erstens: **Logik und Verhör liegen einen
+Prozentpunkt auseinander.** I-Spy hat die breiteste Matrix aller zwanzig (0.1); intelligence 18
+und torment 17 sind praktisch gleichauf, und Verhör bringt charisma 9 und spirit 13 mit. Eine
+„deutlich höhere" Menge Intelligenz-Truhen ist von der Matrix nicht gedeckt. Zweitens: **Mechanik
+hat Anspruch auf nur ein Viertel statt ein Drittel** — das ist der messbare Kern von Chris'
+„Power wird gebraucht, aber nicht so oft".
+
+Das Muster dafür steht bei Takeshi: dort liegt jeder der sieben Fallentypen genau zweimal im Kurs
+(`kurse[]`, `engine.js:24344-24349`) — gleich nach Anzahl —, aber `fallenStufe` gibt WUCHT und
+ROBUST drei Sterne und WENDIGKEIT einen (`:24275`). Gleiche Anzahl, ungleiches Gewicht. Damit hat
+ein Kader mit einem Mechanik-Spezialisten und einem Logiker weiter zwei Stars an verschiedenen
+Truhen — dieselbe Spreizung, die Takeshi mit `fallenKoennen` gemessen gebracht hat (rho 0,861 →
+0,883: „der Kanal wird breiter, nicht lauter", `engine.js:24321-24325`).
+
+**Was diese Umverteilung NICHT ist: eine Pp-Verbesserung.** Auf der Attributebene
+durchgerechnet (Gewichte aus 6.5) liegt die größte Abweichung mit dem korrigierten Layout bei
+3,4 Pp (dexterity) gegen 3,3 Pp (awareness) im Drittel-Layout — beide weit innerhalb des Budgets
+von 25. Die Umverteilung geschieht, weil Chris sie vorgegeben hat und weil sie die Disziplin
+erzählt, nicht weil sie die Messzahl rettet.
+
+**Chris' Entscheidung (21.09.), in zwei Nachrichten und scheinbar gegenläufig — es ist eine
+Regel.** Zuerst: die Rätselarten sollen „gleichmäßig verteilt" sein, „dass es auf die Attribute
+passt", keine Disziplin mit übermäßig vielen „Power-Sachen". Dann, im Nachtrag: Power „nicht so
+oft", Intelligenz-Truhen mehr, „weil das der höchste Wert in I-Spy ist". Der erste Satz setzt
+eine **Obergrenze** (nichts über sein Matrixgewicht hinaus), der zweite eine **Reihenfolge** (das
+Schwerste kommt am häufigsten vor). Beides zugleich erfüllt genau eine Regel: **proportional zur
+Matrix** — und das ist die Budget-Methode (Pp ≤ 25, Handbuch Schritt 7), jetzt von Chris
+ausdrücklich für i-spy bestätigt, nicht nur Projektkonvention.
+
+**Power kann in I-Spy nicht vorkommen, und das ist keine Auslegungsfrage.**
+`BASIS_JE_DISC["i-spy"]` (`engine.js:5167`) hat zehn Attribute, **keines davon power**. Jeder
+Sub-Skill, der power liest, kauft Einfluss ohne Matrixpreis (Handbuch-Fehler 9,
+`neue-disziplin-handbuch.md:475`) — und schlimmer: auf dem 17-Spieler-Testkader, gegen den
+abgenommen wird, korreliert power mit **r = −0,539** gegen die I-Spy-Eignung
+(`gewichtet(p.a, BASIS_JE_DISC["i-spy"])`). Ein power-Kanal belohnt hier systematisch die
+Spieler, die die Disziplin am wenigsten können. Chris' Wort „Power" ist deshalb **immer** in die
+matrixlegale Nachbarin zu übersetzen: **FINGERFERTIGKEIT** (dexterity 45, speed 35, torment 20 —
+zusammen 33 von 100), im Ticker als Aufstemmen/Aufbrechen erzählt. Das ist genau das, was der
+Motor bei Takeshi schon tut: die Falle heißt `tuer`, ist die schwerste Stufe, und ihr Sub-Skill
+WUCHT liest `{charisma:38, determination:32, torment:30}` — kein power, weil die Takeshi-Matrix
+auch keines hat (`engine.js:24274-24275`, `:24407`).
+
+### 1.6 Mehrwege-Truhen (Chris' Ergänzung, 21.09.)
+
+Chris, wörtlich: „ich habe mir vorgestellt, dass es verschiedene Lösungsarten gibt — ein
+Drei-Sterne-Clue, den du mit so und so vielen Punkten Intelligenz knacken kannst, oder so und so
+viel Power oder Dexterity. Jeder Spieler hat seine eigene Herangehensweise, und je nachdem, wie gut
+er in den jeweiligen Stats ist, löst er es schneller oder braucht länger."
+
+Das erweitert 1.5: statt einer einzigen festen Rätselart je Fundort bekommt eine Truhe — vor allem
+bei höheren Stufen, wo es am meisten zählt — **zwei alternative Lösungswege**, jeder mit eigenem
+Sub-Skill/Attributmix. Ein Spieler nutzt automatisch den Weg, der zu seinen Stats passt:
+
+    p(Truhe) = max(p_WegA(K_A), p_WegB(K_B))
+
+— dieselbe Formel wie in 1.4, nur zweimal berechnet und das bessere Ergebnis genommen. Kein
+zusätzlicher Klick, kein zweiter `rr()`-Verbrauch (die Auswahl ist deterministisch: der Spieler
+"nutzt" immer automatisch seinen stärkeren Weg). Ein Logik-Spezialist knackt den Tresor über
+Zahlenschloss/Chiffre, ein kraftbetonter Spieler denselben Tresor über den Dietrich — beide können
+ihn öffnen, nur mit unterschiedlicher Erfolgschance und auf unterschiedliche Art (unterschiedliches
+Ticker-Wort/Bild je nachdem, welcher Weg tatsächlich gezogen hat).
+
+**Vorschlag, um die Kalibrierung nicht zu verdoppeln:** nur Tresore (Stufe 3) bekommen zwei Wege,
+Notiz/Akte bleiben einwegig — dort zählt die Ereigniszahl mehr als die Vielfalt, und zwei Wege
+genügen, um „eigene Herangehensweise" sichtbar zu machen, ohne dass jede Truhenstufe eine eigene
+Mehrwege-Logik braucht. Drei mögliche Paarungen aus den Rätselarten (1.5): LOGIK+FINGERFERTIGKEIT,
+LOGIK+MENSCHENKENNTNIS, FINGERFERTIGKEIT+MENSCHENKENNTNIS — über die beiden Tresor-Fundorte im
+Zwölfer-Layout (2.1) verteilt, damit nicht dieselbe Paarung beide Male auftaucht.
+
+**Rangtreue-technisch unproblematisch, eher hilfreich:** `max()` zweier monoton in ihrem jeweiligen
+Sub-Skill steigender Funktionen bleibt selbst monoton in beiden — verletzt also keine der Regeln aus
+6.2 (kein Attribut über sein Matrixgewicht hinaus), solange jeder Weg für sich innerhalb seines
+eigenen Sub-Skills bleibt. Ein Tresor mit zwei Wegen ist im Schnitt für mehr Spieler lohnend als
+einer mit nur einem — das drückt den Erwartungswert-Vorteil des Stars (1.3, F2) nicht, weil der Star
+in JEDEM Attribut, in dem er stark ist, weiterhin eine hohe Chance hat; es verhindert nur, dass ein
+Spieler, der zufällig im EINEN geforderten Attribut schwach ist, komplett ausgeschlossen bleibt.
+
+**Was das für 6.5 (Budget-Methode) ändert:** mit zwei Wegen je Tresor tragen potenziell mehr
+Sub-Skills Gewicht in den wertvollsten Truhen als bisher angenommen — das muss die
+Pp-Abweichungsrechnung in der ersten Kalibrierrunde mit einbeziehen, ist aber kein Zusatzschritt,
+sondern derselbe Messlauf mit dem erweiterten Rezept.
+
+**Asymmetrische Wege (Chris' Nachtrag, 21.09.), ersetzt die reine `max()`-Symmetrie oben.** Chris,
+wörtlich: „wenn Intelligenz zum Beispiel 30 Punkte braucht, dann sind das die schwersten Kisten —
+und Leute, die das über Power oder Ähnliches lösen, sind dabei schwächer: die bringen dann nicht so
+viele Punkte, oder es dauert einfach länger, wenn sie so eine fette Intelligenz-Kiste knacken
+wollen." Die zwei Wege einer Truhe sind also nicht gleichwertig: jede Mehrwege-Truhe hat einen
+**Primärweg** (ihre "native" Rätselart, z. B. Logik bei einer Intelligenz-Truhe — volle Punktzahl,
+Chance wie in 1.4) und einen **Nebenweg** (z. B. Fingerfertigkeit/Power), der dieselbe Truhe zwar
+öffnen kann, aber schlechter gestellt ist. Chris nennt zwei Varianten, ohne sich für eine zu
+entscheiden — beide sind mit der bestehenden Formel-Familie billig umsetzbar und schließen sich
+nicht aus:
+
+- **A — weniger Punkte:** ein Nebenweg-Erfolg zahlt nur einen Teil des Punktwerts aus (z. B.
+  60–70 %), der Primärweg bleibt bei 100 %. Ein Multiplikator auf den Punktwert, keine neue Formel.
+- **B — länger/schwerer:** der Nebenweg braucht eine niedrigere Grundchance oder mehr
+  Fehlversuche/Fortschritt (1.4), bevor er greift — der Spieler knackt die Truhe trotzdem, nur
+  später. Ein zusätzlicher Abzugsterm in der p-Formel des Nebenwegs.
+
+`p = max(...)` aus dem vorigen Absatz bleibt als Formel-Skelett richtig, nur dass der Nebenweg-Term
+selbst schon abgewertet in die Rechnung eingeht (kleinere Chance und/oder kleinerer Punktwert) —
+**Primärweg schlägt Nebenweg**, nicht "der bessere gewinnt gleichwertig".
+
+**Offene Fragen, ergänzt Abschnitt 8:** A, B oder beide zugleich? Feste Paarung je Fundort-Position
+(immer dieselbe Truhe hat immer denselben Primär-/Nebenweg) oder pro Saat neu gewählt (mehr
+Abwechslung, aber ungleichere Kaderfamilien-Vergleichbarkeit)? Und: sollen auch Akten (Stufe 2)
+irgendwann Mehrwege bekommen, oder bleibt das bewusst den Tresoren vorbehalten?
 
 ---
 
@@ -271,18 +397,45 @@ Ein Raum, Draufsicht wie die Takeshi-Karte, Fundorte als feste Positionen in W/H
 (Muster `route[]`/`hindernisse[]`, auflösungsunabhängig):
 
 ```
-fundorte:[ {x:0.12,y:0.30,art:"logik",   stufe:1}, {x:0.30,y:0.18,art:"mechanik",stufe:2},
-           {x:0.50,y:0.12,art:"verhoer", stufe:3}, {x:0.70,y:0.18,art:"logik",   stufe:2},
-           {x:0.88,y:0.30,art:"mechanik",stufe:1}, {x:0.20,y:0.62,art:"verhoer", stufe:1},
-           {x:0.38,y:0.80,art:"logik",   stufe:2}, {x:0.50,y:0.55,art:"mechanik",stufe:3},
-           {x:0.62,y:0.80,art:"verhoer", stufe:2}, {x:0.80,y:0.62,art:"logik",   stufe:1},
-           {x:0.08,y:0.85,art:"mechanik",stufe:2}, {x:0.92,y:0.85,art:"verhoer", stufe:2} ]
+fundorte:[ {x:0.12,y:0.30,art:"logik",   stufe:1}, {x:0.30,y:0.18,art:"logik",   stufe:2},
+           {x:0.50,y:0.12,art:"logik",   stufe:3}, {x:0.70,y:0.18,art:"logik",   stufe:2},
+           {x:0.88,y:0.30,art:"logik",   stufe:1}, {x:0.20,y:0.62,art:"mechanik",stufe:1},
+           {x:0.38,y:0.80,art:"verhoer", stufe:2}, {x:0.50,y:0.55,art:"verhoer", stufe:3},
+           {x:0.62,y:0.80,art:"verhoer", stufe:2}, {x:0.80,y:0.62,art:"mechanik",stufe:1},
+           {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer"},
+           {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer"} ]
 ```
 
-Zwölf Fundorte (Vorschlag): 4× Notiz, 6× Akte, 2× Tresor — die beiden Tresore in der Mitte,
-für beide Seiten gleich weit, wie die Burg am Ende der Takeshi-Route. Heim startet links, Gast
-rechts (Symmetrie ist Pflicht: `miss-arena-buehne-spiegel.mjs` muss Heim:Gast nahe 50:50 lesen,
-s. `engine.js:13455-13462` für den Fehler, der genau das beim Feldspiel einmal gebrochen hat).
+Zwölf Fundorte (Vorschlag): 4× Notiz, 6× Akte, 2× Tresor — die beiden Tresore auf der Mittelachse
+(`x=0.50`), für beide Seiten gleich weit, wie die Burg am Ende der Takeshi-Route. Heim startet
+links, Gast rechts (Symmetrie ist Pflicht: `miss-arena-buehne-spiegel.mjs` muss Heim:Gast nahe
+50:50 lesen, s. `engine.js:13455-13462` für den Fehler, der genau das beim Feldspiel einmal
+gebrochen hat).
+
+**Die Arten sind nach Punktmasse verteilt, nicht nach Anzahl** (1.5). Weil die Symmetrie nur ganze
+Spiegelpaare zulässt, sind nicht alle Zielwerte erreichbar; das Layout oben ist die beste
+erreichbare Näherung:
+
+| Art | Fundorte | Stufen | Punktmasse | Anteil | Anspruch (1.5) |
+|---|---:|---|---:|---:|---:|
+| Logik | 5 | 1, 2, **3**, 2, 1 | 130 | 41,9 % | 37,6 % |
+| Verhör | 3 | 2, **3**, 2 | 110 | 35,5 % | 36,5 % |
+| Mechanik | 4 | 1, 1, 2, 2 | 70 | 22,6 % | 25,9 % |
+| | 12 | | 310 | | |
+
+Die Vorgängerfassung drittelte die **Anzahl** (4/4/4) und traf die **Punktmasse** damit auf
+22,6 / 38,7 / 38,7 % — beide Tresore lagen auf Mechanik und Verhör, Logik hatte keinen. Das
+schwerste Matrixattribut der Disziplin hatte die kleinste Masse; die Abweichung betrug 15,0 Pp
+statt jetzt 4,3.
+
+**Die beiden Akten in den unteren Ecken tragen `bild:"tuer"`** — eine je Seite, nahe der eigenen
+Startseite. Das ist Chris' „da ist eine Tür, die versperrt ist, und man braucht jemanden mit Power,
+um sie zu öffnen" (21.09.), als Fundort statt als Sperre: wer keinen guten Mechaniker hat, lässt
+die Tür liegen und verliert ihre Punkte — er verliert aber keinen Zug, und er blockiert niemanden.
+Warum die sperrende Variante nicht gebaut wird, steht in 6.2 (Regel 1) und in 9. Der Primärweg
+heißt im Ticker „stemmt die Tür auf" / „bricht das Schloss", die Mechanik ist FINGERFERTIGKEIT —
+dieselbe Trennung von Bild und Rezept, die Takeshi mit `tuer` / `WUCHT:"Durchbrettern"` seit dem
+06.09. fährt (`engine.js:24274`, `:24407`, `:24411`).
 
 **Drei Räume statt einem** (Vorschlag, Takeshis `kurse[]`-Muster): „Archiv", „Werkstatt",
 „Salon" — dieselbe Multimenge an Truhen in anderer Anordnung, per Saat gewählt. Bewegt rho
@@ -434,6 +587,14 @@ messen, R-3 danach als eigene Entscheidung.
   Stufe 3) — entschlüsselt ihn! +60" · „Draco (A-A) sieht den Jubel und eilt zum Salon." ·
   „Draco kommt zu spät — der Tresor ist leer; nimmt die Notiz daneben. +10" · „Vorrak scheitert
   am Zahlenschloss — das Schloss ist angebrochen (+15 % für den Nächsten)."
+- **Der Fortschritt ist die Kooperationsmechanik** (Chris 21.09.: Spirit-Starke sind die, „die
+  schneller ankommen und fragen, kann ich helfen, oder ich hab da was"). `+0,15` je Fehlversuch
+  ist in 1.4 ausdrücklich **seitenneutral** — wenn der Nächste ein Teamkollege ist, ist das genau
+  Chris' Bild: einer arbeitet vor, der andere macht es fertig. Es braucht dafür **keine** neue
+  Formel und keinen Helfer-Bonus; es braucht zwei Ticker-Zeilen, die den eigenen Fall erzählen:
+  „Xelara hat am Tresor vorgearbeitet — Ralazar übernimmt (+15 %)" · „Ralazar bekommt auf, was
+  Xelara angebrochen hat. +60". Warum ein **echter** Helfer-Bonus (Truhe wird leichter, weil ein
+  Mitspieler danebensteht) nicht gebaut wird, steht in 9.
 
 ---
 
@@ -462,7 +623,7 @@ Zustandsautomat je Teilnehmer nach dem `stepFechten()`-Muster (`u.vizPhase`):
 | Phase | Dauer im Zug (0,625 s) | Bild |
 |---|---|---|
 | `gehen` | 0–35 % | Gleitbewegung `u.vizX/vizY` zum Fundort (`NAECHER()`-Muster der Kür) |
-| `suchen` | 35–80 % | **Lupe über dem Kopf**, pulsierend; Spieler leicht gebeugt (Ausfallpose wie `u.lunge`) |
+| `suchen` | 35–80 %, obere Grenze aus dem Sub-Skill (starker Knacker 35–60 %, schwacher 35–80 %) | **Lupe über dem Kopf**, pulsierend; Spieler leicht gebeugt (Ausfallpose wie `u.lunge`) — der Starke ist sichtbar früher fertig. Reine `viz*`-Arithmetik aus `L.LOGIK` o. ä., kein `rr()`, keine gemessene Zahl bewegt sich; das ist die optische Antwort auf Chris' „löst es schneller" (1.3) |
 | `ergebnis` | 80–100 % | Erfolg: Jubel-Hüpfer (`u.vizJubelT`) + Schweber „+60" (`crit`, wie `versuchBig` `:14258`); Fehlschlag: Kopfschütteln, Truhe bekommt den Riss |
 | `reagieren` | Tick-Beginn, wenn `r.reaktion` | gestrichelte Linie vom Läufer zum Fundort (wie die Ansage-Linien der Arena), Ausrufezeichen über dem Kopf |
 
@@ -538,10 +699,23 @@ kein Messwert. Was daran zuerst kippen kann: die Tresor-Varianz. Deshalb gehört
 Punktwert-Abstand (60 gegen 25) zu den ersten Kalibrierschrauben, und Teilpunkte bleiben als
 Reserve in der Schublade.
 
-**Zwei Regeln aus der Projektgeschichte, die das Konzept einhalten muss:**
+**Drei Regeln aus der Projektgeschichte, die das Konzept einhalten muss:**
 
-1. Kein Kanal, in dem fremde Hand einen Zug vernichtet (K-C verworfen, Deckel auf den Läufer).
-2. Kein Attribut in einer Erfolgschance über sein Matrixgewicht hinaus (Awareness-Frage).
+1. **Kein Kanal, in dem fremde Hand einen Zug vernichtet — oder verhindert.** K-C ist deshalb
+   verworfen, der Läufer gedeckelt. Und deshalb gibt es **keine sperrende Tür**: ein Tor, das die
+   Fundorte dahinter für die ganze Seite schließt, bis ein Mitspieler es öffnet, nimmt fünf
+   Spielern ihre Züge durch die Schwäche eines sechsten. Das ist Takeshis `tackleNerven` (Saison
+   0,937 → 0,902, `engine.js:24205-24208`) in schwererer Form: dort kostete es einen Zug durch
+   Gegnerhand, hier kostet es alle Züge durch die eigene. Bei acht Ticks und einer Tür, die im
+   Mittel zwei Ticks zu bleibt, sind das rund ein Viertel der Ereignisse einer Seite — grob −0,06
+   auf rho je Spiel, bei einer Schätzung, die mit 0,81 ohnehin knapp über der Schranke liegt.
+   Die Tür bleibt als **Bild** (2.1), nicht als Sperre.
+2. Kein Attribut in einer Erfolgschance über sein Matrixgewicht hinaus.
+3. **Kein Attribut in einer Erfolgschance, das in der Matrix gar nicht vorkommt.** Für I-Spy
+   heißt das konkret: **power nie.** `BASIS_JE_DISC["i-spy"]` kennt es nicht (`engine.js:5167`),
+   `u.eig` gewichtet es mit null (`:13465-13467`), und gemessen läuft es mit **r = −0,539** gegen
+   die Eignung. Ein power-Kanal ist damit nicht bloß teuer, sondern dem Signal entgegengerichtet.
+   Was wie Kraft aussehen soll, wird über FINGERFERTIGKEIT erzählt (1.5).
 
 ### 6.3 Ehrlichere Abnahme
 
@@ -574,6 +748,14 @@ Rätselart ein Drittel), NERVEN ~10 %, TEAMGEIST ~10 %, AUSDAUER ~10 %. Damit la
 bei grob 20–25 % Einfluss (Matrix 18), Torment 15–20 (17), Spirit 12–15 (13), Will 10–12 (12) —
 und Awareness 5–7 (5). Pp-Abweichung nach dem ersten Bau geschätzt 25–35, also zwei
 Kalibrierrunden vom Ziel ≤ 25 entfernt.
+
+**Wo das Pp-Problem mit hoher Wahrscheinlichkeit sitzt, wenn es eines gibt: bei awareness, nicht
+bei der Truhenverteilung.** SPÜRSINN trägt geschätzt 25 % mechanisches Gewicht und besteht zu
+25 % aus awareness — 6,25 Punkte Einfluss gegen Matrixgewicht 5. Auf dem Papier ist das mit
++3,3 Pp die größte Einzelabweichung, und sie ist **unabhängig** davon, wie die Fundorte auf die
+Arten verteilt sind (die Rechnung in 1.5 liefert für Drittel- und Matrix-Layout dieselben 3,3).
+Erste Schraube, falls die Messung Pp-Ärger zeigt: der awareness-Anteil in SPÜRSINN (25 → 15 %,
+Rest auf intelligence), **nicht** das Layout.
 
 ---
 
@@ -639,13 +821,22 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
 
 ## 8. Offene Fragen für Chris
 
-1. **Awareness in der Matrix.** Soll Awareness das Finden-Attribut sein? Dann muss
-   `official-discipline-weights.ts` geändert werden (Produktionscode: Spielergenerator, Gehälter,
-   Marktwerte; Präzedenzfall Football). Bleibt die Matrix, trägt Intelligence das Finden und
-   Awareness bleibt Beiwerk — das Konzept funktioniert so, sagt aber etwas anderes als sein Satz.
-2. **Drei Rätselarten (Logik / Mechanik / Verhör) mit je einem Sub-Skill** — oder weniger (zwei)
-   oder mehr? Drei ist das Minimum, bei dem zwei Stars an verschiedenen Truhen glänzen können;
-   mehr als vier verdünnt jede Art auf drei Fundorte.
+1. ~~**Awareness in der Matrix.**~~ **Von Chris entschieden (21.09.): Matrix bleibt unangetastet.**
+   Awareness bleibt bei Matrixgewicht 5 und wirkt nur in der SPÜREN-Phase (schnelleres/besseres
+   Erkennen, wohin als nächstes zu gehen ist) — kein dominantes Erfolgs-Attribut. Zusätzlich
+   bestätigt: verschiedene Truhen/Rätselarten sollen für das KNACKEN selbst unterschiedliche
+   Matrix-Attribute verlangen (nicht nur Intelligenz — auch power/torment/etc., je nach Art). Die
+   in Abschnitt 1.2 vorgeschlagene Sub-Skill-Aufteilung (SPÜRSINN nur zu 25 % Awareness; LOGIK/
+   MENSCHENKENNTNIS/FINGERFERTIGKEIT mit je eigener Attributmischung) entspricht damit bereits
+   Chris' Vorstellung — keine Konzeptänderung nötig, nur bei der Kalibrierung beibehalten.
+2. ~~**Drei Rätselarten...**~~ **Von Chris entschieden (21.09., zwei Nachrichten):** die Verteilung
+   folgt der Matrixmasse, nicht der Anzahl — Mechanik ein Viertel, Logik und Verhör je gut ein
+   Drittel (Abschnitt 1.5, Layout in 2.1). **Eine Rückmeldung an Chris gehört dazu:** „deutlich
+   mehr Intelligenz-Truhen" deckt die Matrix nicht — intelligence 18 und torment 17 liegen einen
+   Punkt auseinander, und Verhör bringt charisma 9 und spirit 13 mit. Das Layout gibt Logik
+   trotzdem die meisten Fundorte (5) und einen Tresor; mehr wäre nicht mehr matrixproportional.
+   Offen bleibt nur die **Anzahl der Arten** — drei ist das Minimum, bei dem zwei Stars an
+   verschiedenen Truhen glänzen können; mehr als vier verdünnt jede Art auf drei Fundorte.
 3. **Sichtbarkeitsregel:** S-c (Akte-Erfolg, Tresor-Erfolg, Tresor-Fehlschlag) — oder nur der
    große Fund (S-b)? Und soll die Persönlichkeit über das Pokerface entscheiden (Schleicher
    jubelt nicht)?
@@ -668,6 +859,26 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
 11. **Reihenfolge im Projekt:** I-Spy stand bewusst am Ende der Liste. Dieses Konzept ist
     umsetzbar, aber PR 1 bindet eine Session für rund drei Tage, bevor eine Zahl da ist. Soll
     das vor oder nach den offenen Football-/Hockey-Punkten laufen?
+12. **Mehrwege-Truhen (1.6, Chris' Ergänzung 21.09.):** Grundsatz steht (Tresore bekommen einen
+    Primärweg und einen schlechter gestellten Nebenweg, Spieler nutzt automatisch seinen
+    stärkeren). Offen: Nebenweg-Abwertung über weniger Punkte (A), über eine niedrigere/langsamere
+    Chance (B), oder beides zugleich? Feste Paarung je Fundort-Position oder pro Saat neu gewählt?
+    Und bleibt das auf Tresore beschränkt, oder sollen Akten später dieselbe Behandlung bekommen?
+13. **Die versperrte Tür (Chris 21.09.).** Das Konzept nimmt das Bild und lässt die Sperre weg:
+    zwei Mechanik-Akten tragen `bild:"tuer"` (2.1), wer keinen Mechaniker hat, verliert Punkte
+    statt Züge. Begründung in 6.2 Regel 1 und 3. **Rückfrage an Chris:** reicht ihm das Bild, oder
+    besteht er auf der echten Sperre? Falls ja, ist das eine eigene PR mit eigener kaderfester
+    Messreihe und einem ausdrücklichen Abbruchkriterium (rho unter dem PR-1-Wert ⇒ zurück) — und
+    das „Power" darin müsste trotzdem FINGERFERTIGKEIT sein, weil power in der Matrix nicht
+    vorkommt.
+14. **Aktive Fundorte bei kleinen Kadern.** 2.2 aktiviert `2·max(mine,gegner)+2` Fundorte. Sobald
+    die Arten ungleich verteilt sind (5/3/4), entscheidet die **Auswahl** der aktiven Fundorte
+    über die Art-Anteile — bei 2 gegen 2 misst man sonst ein anderes Rezept als bei 6 gegen 6,
+    obwohl die Abnahme beides verlangt (7.2). Vorschlag: nur ganze Spiegelpaare plus die beiden
+    Mittelachsen-Tresore aktivieren, Reihenfolge so, dass die drei Anteile um höchstens 5 Pp vom
+    Zwölfer-Layout abweichen. Für 2 gegen 2 leistet das die Menge {beide Tresore, Notiz-Paar bei
+    y=0.30, Akten-Paar bei y=0.85} → 42,1 / 31,6 / 26,3 % gegen 41,9 / 35,5 / 22,6; für 4 gegen 4
+    „alles außer dem Notiz-Paar bei y=0.30" → 37,9 / 37,9 / 24,1.
 
 ---
 
@@ -679,8 +890,24 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
   `WERTUNG_AUFTRITT` oder an einer der acht Geschwister-Bühnen — jede PR weist das bit-identisch
   nach.
 - Kein Asset-Download; Truhen, Lupe und Raum sind Primitive.
-- Keine Matrix-Änderung ohne Chris' Entscheidung (Frage 1).
+- Keine Matrix-Änderung — von Chris am 21.09. entschieden (Frage 1, s.o.): die Matrix bleibt, wie
+  sie ist.
 - Kein Produktionsanschluss vor der kaderfest genommenen Schranke (PR 5 zuletzt).
+- **Keine sperrende Tür und kein Gate.** Chris' Bild (21.09.) ist übernommen, seine Sperre nicht:
+  ein Tor, das den Fortschritt einer ganzen Seite anhält, bis ein Mitspieler es öffnet, nimmt
+  fünf Spielern ihre Züge durch die Schwäche eines sechsten (6.2 Regel 1). Vorab rechenbar wäre es
+  — die Tick-Schleife in 3.4 koppelt ohnehin alle Teilnehmer —, nur eben nicht messbar gut: der
+  einzige bestehende Bühnen-Rechner mit Kopplung koppelt **zwei** Teilnehmer
+  (`baueHebenDuelle()`) und hat dafür zwei Spiegeltest-Reparaturen gebraucht (36:184 → 28:203 →
+  50:50, `engine.js:13964-13971`).
+- **Kein power in irgendeinem Sub-Skill.** Die Matrix kennt es nicht, und gemessen läuft es mit
+  r = −0,539 gegen die Eignung (6.2 Regel 3).
+- **Kein Helfer-Bonus.** Ein Mitspieler macht eine Truhe nicht dadurch leichter, dass er
+  danebensteht. Die Kooperation, die Chris beschreibt, ist der seitenneutrale Fortschritt aus 1.4
+  und wird im Ticker erzählt (4.), nicht als zweite Formel gebaut. Der Präzedenzfall gegen einen
+  echten Team-Bonus liegt vor: `takeshi-animationen-hilfe-behinderung-recherche-06-09.md` 4.2
+  („belohnt ‚am selben Fleck stehen' statt individuelle Eignung"), und in I-Spy käme hinzu, dass
+  sein Träger spirit wäre — der mit r = 0,194 schwächste verfügbare Kanal.
 
 ## Quellen (alle gelesen, nicht vermutet)
 
