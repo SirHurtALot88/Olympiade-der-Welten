@@ -14360,14 +14360,64 @@
     }
   }
 
-  // ================== SCHATZSUCHE: DER I-SPY-TICK-RECHNER (PR 1) ==================
+  // ================== SCHATZSUCHE: DER I-SPY-TICK-RECHNER (PR 1 + PR 2) ==================
   // I-Spy-Konzept (docs/design/i-spy-schatzsuche-konzept-21-09.md) Abschnitt 1, 1.4, 1.5,
-  // 1.6, 2.1, 2.2, 3.4 + Opus-Gegencheck (docs/design/i-spy-opus-gegencheck-21-09.md)
-  // Abschnitt 2/3/3.6. Bauplan-PR 1 (Konzept 7.2): Grundmechanik + Rezept, OHNE
-  // Sichtbarkeit/Reaktion zwischen den Seiten (das ist PR 2) — der Reaktionswurf wird
-  // trotzdem JEDEN Tick gezogen und verworfen, damit PR 2 den rr()-Verbrauch nicht
-  // verschiebt (Handbuch-Falle 17: bedingte rr()-Aufrufe verschieben die Zufallsfolge
-  // zwischen Basis- und Hebungslauf von einflussVon() und erzeugen ein Pp-Messartefakt).
+  // 1.6, 2.1, 2.2, 3, 3.4 + Opus-Gegencheck (docs/design/i-spy-opus-gegencheck-21-09.md)
+  // Abschnitt 2/3/3.6. PR 1 (Konzept 7.2) baute Grundmechanik + Rezept, OHNE
+  // Sichtbarkeit/Reaktion zwischen den Seiten — der Reaktionswurf wurde trotzdem JEDEN
+  // Tick gezogen und verworfen, damit dieser PR den rr()-Verbrauch nicht verschiebt
+  // (Handbuch-Falle 17: bedingte rr()-Aufrufe verschieben die Zufallsfolge zwischen
+  // Basis- und Hebungslauf von einflussVon() und erzeugen ein Pp-Messartefakt). PR 2
+  // (dieser Block) nutzt genau diesen bereits gezogenen Wurf jetzt inhaltlich — der
+  // rr()-Verbrauch je Seite je Tick bleibt dadurch EXAKT 1+3·Teilnehmer, unveraendert
+  // gegen PR 1.
+  //
+  // WAS PR 2 AENDERT — UND WAS BEWUSST GLEICH BLEIBT (Konzept Abschnitt 3):
+  //   S-c "Freude und Fluch" (3.1): Akte-Erfolg, Tresor-Erfolg, Tresor-Fehlschlag werden
+  //     fuer die Gegenseite sichtbar — NICHT die Notiz (Stufe 1). Sichtbar heisst konkret:
+  //     das Ereignis landet in `ispyEreignisse` und wirkt ERST im naechsten Tick auf die
+  //     GEGNERISCHE Reaktionswahl (dieselbe Ein-Tick-Verzoegerung wie bei der Zielansage,
+  //     "wirkt nicht sofort").
+  //   R-2 "bestgeeignet" (3.2): Reaktionswahrscheinlichkeit 0,30 + Oe TEAMGEIST(Seite)*0,006,
+  //     EIN rr()-Wurf JEDE Seite JEDEN Tick (s.o.). Bei Erfolg wird der Teilnehmer mit dem
+  //     hoechsten Sub-Skill der Raetselart des salientesten sichtbaren Fundes zum Laeufer —
+  //     ausser er hat im VORHERIGEN Tick selbst einen Tresor bearbeitet (deterministisch aus
+  //     dem Vorher-Tick gelesen, kein Vorausblick auf diesen Tick noetig) oder er ist durch
+  //     den Laeufer-Deckel gesperrt (s.u.).
+  //   Laeufer-Deckel (3.3, Ende): ein Teilnehmer, der in Tick t Laeufer war, kann in Tick
+  //     t+1 nicht nochmal Laeufer werden (`_letzteReaktionTick`) — Sperre EIN Tick, das
+  //     Tick-Analogon zur 7-Sekunden-Sperre der Zielansage.
+  //   K-D "Wettlauf mit Fortschritt" (3.3): die Truhe, zu der ein Laeufer geschickt wird,
+  //     bekommt in DIESEM Tick eine Ausnahme von der sonst geltenden "ein Besuch pro Tick
+  //     genuegt zur Sperre"-Regel (`belegt`, seit PR 1) — sie vertraegt ZWEI Versuche.
+  //     Wer zuerst dran ist (NERVEN-Reihenfolge, unveraendert aus PR 1), versucht zuerst;
+  //     scheitert er, bleibt die Truhe fuer den naechsten Interessenten (den Laeufer, wenn
+  //     der noch nicht dran war, sonst einen ganz normal waehlenden Teamkollegen) mit dem
+  //     Fortschrittsbonus aus PR 1 offen. Niemand verliert seinen Zug allein durch die
+  //     Kollision — nur durch normales Scheitern, exakt wie ueberall sonst.
+  //   ARCHITEKTUR-ENTSCHEIDUNG, EXPLIZIT DOKUMENTIERT: PR 1 hat aus gemessenen Gruenden
+  //     ("EIGENE, VOLLSTAENDIG UNABHAENGIGE SCHATZSUCHE JE SEITE" weiter unten) JEDER Seite
+  //     eine eigene Kopie des Raums gegeben, statt eines einzigen von beiden Seiten
+  //     gemeinsam bespielten Pools — ein echter gemeinsamer Pool ohne Reaktionsmechanik
+  //     mass rho auf 0,53 ab. Diese Entscheidung bleibt in PR 2 STEHEN: "dieselbe Truhe" in
+  //     K-D ist deshalb NICHT ein einziges, geteiltes Objekt zwischen Heim und Gast,
+  //     sondern die Truhe am SELBEN Fundort-Index auf dem eigenen (Spiegel-)Brett der
+  //     reagierenden Seite. Was ZWISCHEN den Seiten laeuft, ist ausschliesslich
+  //     INFORMATION (Sichtbarkeit + Wer wird Laeufer), nie das Truhen-Objekt selbst — genau
+  //     das haelt den PR-1-Befund intakt, ohne den er reproduziert werden muesste. Die
+  //     Kollisionsdynamik von K-D (Erster scheitert, Zweiter bekommt den Fortschrittsbonus)
+  //     entsteht dadurch INNERHALB der reagierenden Seite: der Laeufer und ein normal
+  //     waehlender Teamkollege koennen jetzt (nur fuer diese eine Truhe, nur in diesem
+  //     Tick) aufeinandertreffen, wo `belegt` das in PR 1 fuer JEDE Truhe kategorisch
+  //     ausschloss.
+  //
+  // Die Berechnung bleibt vorab-rechenbar wie in PR 1 (Konzept 3.4): `baueSchatzsuche()`
+  // laeuft jetzt ueber die Ticks und behandelt beide Seiten je Tick verzahnt (statt wie
+  // PR 1 jede Seite komplett fuer sich), weil eine Reaktion in Tick t+1 von einem
+  // sichtbaren Ereignis aus Tick t der JEWEILS ANDEREN Seite abhaengt. `stepBuehne()`,
+  // `wert()`, `disziplinProbe()` lesen weiterhin nur `u.runden[]`/`u.summe` — fuer sie
+  // sieht das aus wie jede andere Buehnen-Disziplin, unveraendert.
+  const ISPY_REAKTION_BASIS=0.30, ISPY_REAKTION_TEAMGEIST_K=0.006;
 
   const ISPY_PUNKTWERT={1:10,2:25,3:60};
   const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
@@ -14485,18 +14535,16 @@
     return (neben.p*neben.faktor*punktwert)>(primaer.p*primaer.faktor*punktwert)?neben:primaer;
   }
 
-  // EIGENE, VOLLSTAENDIG UNABHAENGIGE SCHATZSUCHE JE SEITE (Aufgabenstellung PR 1: "für PR 1
-  // reicht es, dass der Rechner pro Seite unabhängig läuft" — Sichtbarkeit/Reaktion ZWISCHEN
-  // den Seiten ist PR 2). Heim und Gast bekommen deshalb je eine EIGENE Kopie des Raums
-  // (eigene Truhen, eigener Fortschritt, eigene Leerung) statt eines einzigen, von beiden
-  // Seiten gemeinsam bespielten Pools — sonst haette (nachgemessen) die willkuerliche
-  // Zugriffsreihenfolge ueber ZWOELF Teilnehmer aus BEIDEN Teams mehr Gewicht auf das
-  // Ergebnis als der eigentliche Sub-Skill (rho brach auf 0,53 ein, deutlich unter die alte
-  // Duell-Fassung). Innerhalb EINER Seite bleibt die Truhen-Konkurrenz (NERVEN-Reihenfolge,
-  // "nicht besetzte Fundorte") bestehen — bei hoechstens sechs Teilnehmern je Seite ist ihr
-  // Effekt viel kleiner, weil deutlich weniger Teilnehmer um dieselben ein bis zwei
-  // hoechstwertigen Truhen konkurrieren.
-  function baueSchatzsucheSeite(art,teilnehmer){
+  // EIGENE, VOLLSTAENDIG UNABHAENGIGE TRUHEN JE SEITE, WIE IN PR 1 (Kopfkommentar oben,
+  // "ARCHITEKTUR-ENTSCHEIDUNG"). Heim und Gast bekommen weiterhin je eine eigene Kopie des
+  // Raums (eigene Truhen, eigener Fortschritt, eigene Leerung) statt eines einzigen, von
+  // beiden Seiten gemeinsam bespielten Pools — sonst haette (PR 1, nachgemessen) die
+  // willkuerliche Zugriffsreihenfolge ueber ZWOELF Teilnehmer aus BEIDEN Teams mehr Gewicht
+  // auf das Ergebnis als der eigentliche Sub-Skill (rho brach auf 0,53 ein). Innerhalb EINER
+  // Seite bleibt die Truhen-Konkurrenz (NERVEN-Reihenfolge, "nicht besetzte Fundorte")
+  // bestehen; K-D (Kopfkommentar) erweitert sie um genau EINE Ausnahme fuer die Truhe, zu
+  // der ein Laeufer geschickt wird.
+  function ispyBaueRaum(art,teilnehmer){
     const fundorte=art.fundorte;
     const aktivIdx=ispyAktiveFundorte(fundorte,teilnehmer.length);
     const truhen=aktivIdx.map(idx=>{
@@ -14504,106 +14552,193 @@
       return {idx, art:f.art, neben:f.neben||null, stufeAktuell:f.stufe, fortschritt:0,
         leer:false, folgePos:idx%ISPY_NACHFUELL_FOLGE.length, x:f.x};
     });
-    // u.funde (Konzept Abschnitt 4): rein additives Anzeigefeld je Stufe, fliesst NIE in
-    // wert()/u.summe — exakt das u.kuehneVersuche-Muster von Gewichtheben.
-    for(const u of teilnehmer){ u.funde={1:0,2:0,3:0}; }
+    for(const u of teilnehmer){
+      // u.funde (Konzept Abschnitt 4): rein additives Anzeigefeld je Stufe, fliesst NIE in
+      // wert()/u.summe — exakt das u.kuehneVersuche-Muster von Gewichtheben.
+      u.funde={1:0,2:0,3:0};
+      // u.reaktionen (Konzept Abschnitt 4): rein additives Anzeigefeld, wie oft dieser
+      // Teilnehmer als Laeufer losgeschickt wurde — fliesst ebenfalls NIE in wert()/u.summe.
+      u.reaktionen=0;
+      // _arbeitetTresor/_letzteReaktionTick: interner Zustand fuer R-2/den Laeufer-Deckel,
+      // NICHT additiv, NICHT Teil der Wertung — reiner Rechenzustand zwischen zwei Ticks,
+      // wie u.lunge es zwischen zwei Zuegen ist.
+      u._arbeitetTresor=false;
+      u._letzteReaktionTick=-Infinity;
+    }
+    return truhen;
+  }
 
-    // TEAMKOLLEGEN TEILEN SICH DIE TRUHEN DIESER SEITE (gemessen die bessere Wahl: eine
-    // vollstaendig unabhaengige Truhen-Kopie je Teilnehmer wurde gegengemessen und gab
-    // SCHLECHTERE Werte, rho je Spiel median 0,55 gegen 0,62 hier — ohne die Konkurrenz um
-    // dieselben wenigen wertvollen Truhen verliert der Star seinen Vorteil, mehrfach als
-    // erster an die besten Ziele zu kommen, und das Ergebnis naehert sich reinem Wuerfeln
-    // je Teilnehmer an). Reihenfolge und Belegung unten loesen das, ohne Sichtbarkeit
-    // ZWISCHEN den Seiten zu brauchen.
-    for(let tick=0;tick<art.rundenN;tick++){
-      // REAKTIONSWURF DIESER SEITE (PR-2-Vorarbeit, s. Kopfkommentar oben): gezogen, aber
-      // in DIESER PR verworfen — kein Laeufer, keine Sichtbarkeit ZWISCHEN den Seiten, nur
-      // fester rr()-Verbrauch, damit PR 2 ihn nicht verschiebt (Handbuch-Falle 17).
-      rr();
-      // REIHENFOLGE NACH NERVEN (3.3): wer im selben Tick mit einem Teamkollegen um
-      // dieselbe (durch F2 fuer mehrere attraktive) Truhe konkurriert, kommt zuerst dran,
-      // wenn er mehr NERVEN hat — deterministisch, kein zusaetzlicher rr()-Wurf.
-      const reihenfolge=[...teilnehmer].sort((a,b)=>(b.NERVEN-a.NERVEN)||(a.id-b.id));
-      // NICHT BESETZTE FUNDORTE (1.3: "die Wahl unter den gesehenen, NICHT BESETZTEN
-      // Fundorten"): sobald ein Teilnehmer eine Truhe in DIESEM Tick anvisiert (gleich ob
-      // die Knacken-Phase gelingt oder scheitert), ist sie fuer den Rest des Ticks belegt —
-      // wie ein Spieler, der schon mit der Lupe davorsteht.
-      const belegt=new Set();
-      for(const u of reihenfolge){
-        // SPUEREN: ein rr()-Wurf ueber alle drei Schwellen zugleich (1.3).
-        const x=rr();
-        const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
-        const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
-        const sichtbar=(t)=>t.stufeAktuell===1||(t.stufeAktuell===2&&x<sieht2)||(t.stufeAktuell===3&&x<sieht3);
-        const kandidaten=truhen.filter(t=>!t.leer&&!belegt.has(t.idx)&&sichtbar(t));
-        // F2 "ERWARTUNGSWERT" (1.3): Punktwert*Knackchance ueber den jeweils besseren Weg
-        // (Mehrwege, 1.6), sortiert absteigend. Tie-Break: hoehere Chance im gewaehlten Weg
-        // (steht fuer "der Sub-Skill dieser Raetselart ist bei ihm am hoechsten"), danach
-        // Naehe zur eigenen Seite (deterministisch, kein rr()) — 1.3 letzter Absatz.
-        const bewertet=kandidaten.map(t=>{
-          const weg=ispyBesterWeg(u,t);
-          return {t, weg, ev:ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*weg.p,
-            naeher:(u.side===0?t.x:(1-t.x))};
-        }).sort((a,b)=>(b.ev-a.ev)||(b.weg.p-a.weg.p)||(a.naeher-b.naeher));
-        const wahl=bewertet[0]||null;
-        if(wahl)belegt.add(wahl.t.idx);
-        // KNACKEN: 2RN-Wuerfel (Mittel zweier rr()) — FESTER Verbrauch, auch ohne Ziel
-        // (Handbuch-Falle 17: der rr()-Verbrauch je Teilnehmer darf nicht vom Ausgang
-        // abhaengen, sonst verschiebt sich die Zufallsfolge zwischen zwei Messlaeufen).
-        const wurf=(rr()+rr())/2;
-        if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort}); continue; }
-        const ziel=wahl.t, zielWeg=wahl.weg;
-        const ermued=Math.max(ISPY_AUSDAUER_BODEN,
-          1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
-        const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,zielWeg.p*ermued));
-        if(wurf<chance){
-          const punkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor);
-          u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
-          u.funde[ziel.stufeAktuell]=(u.funde[ziel.stufeAktuell]||0)+1;
-          ziel.leer=true;
-        } else {
-          ziel.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, ziel.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
-          const teilpunkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor*ISPY_TEILPUNKTE_ANTEIL);
-          u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
-        }
-      }
-      // NACHFUELLEN (2.2): jede in DIESEM Tick geknackte Truhe wird sofort danach wieder
-      // befuellt — sie bleibt damit GENAU EINEN Tick lang leer (leer waehrend des Ticks, in
-      // dem sie geknackt wurde, wieder da ab dem naechsten) — derselbe Art, naechste Stufe
-      // aus der festen Folge. `belegt`/`leer` sorgen im Tick selbst schon dafuer, dass
-      // niemand sie waehrend dieser einen leeren Runde antreffen kann.
-      for(const t of truhen){
-        if(t.leer){
-          t.stufeAktuell=ISPY_NACHFUELL_FOLGE[t.folgePos%ISPY_NACHFUELL_FOLGE.length];
-          t.folgePos++; t.fortschritt=0; t.leer=false;
+  // S-c "FREUDE UND FLUCH" (3.1): Notiz (Stufe 1) ist NIE sichtbar; eine Akte (Stufe 2) nur
+  // bei Erfolg (Jubel, kein Pokerface); ein Tresor (Stufe 3) bei Erfolg UND Fehlschlag
+  // (Fluch UND „jetzt angebrochen" lohnen sich beide fuer den Gegner, 3.1).
+  function ispySichtbar(stufe,warErfolg){
+    if(stufe===3)return true;
+    if(stufe===2)return warErfolg;
+    return false;
+  }
+
+  // EIN TICK EINER SEITE (Konzept 3.4-Pseudocode, an PR 1s Truhen-Architektur angepasst,
+  // s. Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG"). `sichtbareEreignisse` sind die S-c-Funde
+  // der ANDEREN Seite aus dem VORHERIGEN Tick (die Verzoegerung ist strukturell, s.o.);
+  // liefert die eigenen S-c-Funde DIESES Ticks zurueck, fuer die Reaktion der anderen Seite
+  // im naechsten Tick.
+  function ispySeiteTick(art,teilnehmer,truhen,tick,sichtbareEreignisse,avgTeamgeist){
+    // REAKTIONSWURF (R-2, 3.2): EIN rr()-Wurf, JEDEN Tick gezogen, UNABHAENGIG davon, ob
+    // es ueberhaupt ein sichtbares Ereignis gibt (Handbuch-Falle 17 — derselbe Wurf, den
+    // PR 1 hier schon zog und verwarf).
+    const wurf=rr();
+    const pReaktion=Math.max(0,Math.min(1,ISPY_REAKTION_BASIS+avgTeamgeist*ISPY_REAKTION_TEAMGEIST_K));
+    let laeufer=null, zielIdx=null;
+    if(sichtbareEreignisse.length&&wurf<pReaktion){
+      // SALIENTESTES EREIGNIS: bei mehreren sichtbaren Funden reagiert die Seite auf den
+      // wertvollsten (hoechster Punktwert, Tie-Break kleinster Fundort-Index) — EIN
+      // Reaktionswurf je Seite je Tick (3.2), nicht einer je Ereignis.
+      const ziel=[...sichtbareEreignisse].sort((a,b)=>
+        (ISPY_PUNKTWERT[b.stufe]-ISPY_PUNKTWERT[a.stufe])||(a.idx-b.idx))[0];
+      const truhe=truhen.find(t=>t.idx===ziel.idx&&!t.leer);
+      // Existiert die (gespiegelte) Truhe auf dem EIGENEN Brett nicht mehr oder gar nicht
+      // (unterschiedliche Kadergroessen koennen unterschiedliche aktive Fundorte ergeben),
+      // verpufft die Reaktion — niemand wird Laeufer, alle spielen normal.
+      if(truhe){
+        const primaerSkill=ISPY_RAETSEL_SUBSKILL[truhe.art];
+        // "der nicht selbst gerade einen Tresor bearbeitet" (3.2): aus dem VORHERIGEN Tick
+        // gelesen (kein Vorausblick auf die Wahl DIESES Ticks — die Reaktion wird laut
+        // Bauplan VOR den Spuer-/Wahl-Wuerfen der Teilnehmer bestimmt). Dazu der
+        // Laeufer-Deckel (3.3): wer in t-1 Laeufer war, kann es in t nicht wieder werden.
+        const kandidaten=teilnehmer.filter(u=>!u._arbeitetTresor&&u._letzteReaktionTick!==tick-1);
+        if(kandidaten.length){
+          laeufer=[...kandidaten].sort((a,b)=>(b[primaerSkill]-a[primaerSkill])||(a.id-b.id))[0];
+          zielIdx=truhe.idx;
+          laeufer.reaktionen++;
+          laeufer._letzteReaktionTick=tick;
         }
       }
     }
+
+    // REIHENFOLGE NACH NERVEN (3.3), UNVERAENDERT AUS PR 1: wer im selben Tick mit einem
+    // Teamkollegen um dieselbe (durch F2 fuer mehrere attraktive) Truhe konkurriert, kommt
+    // zuerst dran, wenn er mehr NERVEN hat — deterministisch, kein zusaetzlicher rr()-Wurf.
+    // Der Laeufer bekommt KEINEN Vorrang — er steht wie jeder andere an seiner NERVEN-
+    // Position; das IST der Wettlauf aus K-D (3.3): wer zuerst an der Ziel-Truhe ist,
+    // Laeufer oder ein normal waehlender Teamkollege, versucht zuerst.
+    const reihenfolge=[...teilnehmer].sort((a,b)=>(b.NERVEN-a.NERVEN)||(a.id-b.id));
+    // NICHT BESETZTE FUNDORTE (1.3), UNVERAENDERT: ein Besuch (Erfolg wie Fehlschlag)
+    // sperrt eine Truhe fuer den Rest des Ticks — AUSSER fuer `zielIdx` (K-D): die vertraegt
+    // in DIESEM Tick ZWEI Besuche, s. `versucheZiel` unten.
+    const belegt=new Set();
+    let versucheZiel=0;
+    const ereignisseDiesesTicks=[];
+    const merke=(t,warErfolg)=>{
+      if(ispySichtbar(t.stufeAktuell,warErfolg))ereignisseDiesesTicks.push({idx:t.idx,art:t.art,stufe:t.stufeAktuell});
+    };
+    for(const u of reihenfolge){
+      // Reset VOR dem eigenen Zug: `_arbeitetTresor` beschreibt den Ausgang DIESES Ticks
+      // (fuer die Laeufer-Auswahl im NAECHSTEN), nicht den des vorherigen.
+      u._arbeitetTresor=false;
+      if(u===laeufer){
+        const t=truhen.find(x=>x.idx===zielIdx);
+        if(t&&!t.leer&&versucheZiel<2){
+          // SPUEREN-SLOT, FEST VERBRAUCHT (Handbuch-Falle 17): der Laeufer sucht nicht
+          // selbst — er eilt direkt zur Ziel-Truhe (R-2) — aber der rr()-Verbrauch je
+          // Teilnehmer bleibt exakt 1 (Spueren) + 2 (Knacken), wie bei jedem anderen Zug.
+          rr();
+          const weg=ispyBesterWeg(u,t);
+          const knackwurf=(rr()+rr())/2;
+          const ermued=Math.max(ISPY_AUSDAUER_BODEN,
+            1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
+          const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,weg.p*ermued));
+          versucheZiel++;
+          if(t.stufeAktuell===3)u._arbeitetTresor=true;
+          if(knackwurf<chance){
+            const punkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor);
+            u.runden.push({punkte, ereignis:art.erfolgWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
+            u.funde[t.stufeAktuell]=(u.funde[t.stufeAktuell]||0)+1;
+            t.leer=true; belegt.add(t.idx);
+            merke(t,true);
+          } else {
+            t.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, t.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
+            const teilpunkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*ISPY_TEILPUNKTE_ANTEIL);
+            u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
+            if(versucheZiel>=2)belegt.add(t.idx);
+            merke(t,false);
+          }
+          continue;
+        }
+        // Ziel schon weg (leer/ausgereizt) — die Reaktion kommt zu spaet, der Laeufer
+        // macht wie jeder andere seinen eigenen, normalen Zug (kein verlorener Zug: 3.3).
+      }
+      // NORMALER ZUG (PR 1, mit EINER Ausnahme: `frei()` toleriert `zielIdx` zweimal).
+      const x=rr();
+      const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
+      const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
+      const sichtbarF=(t)=>t.stufeAktuell===1||(t.stufeAktuell===2&&x<sieht2)||(t.stufeAktuell===3&&x<sieht3);
+      const frei=(t)=>!belegt.has(t.idx)||(t.idx===zielIdx&&versucheZiel<2);
+      const kandidaten=truhen.filter(t=>!t.leer&&frei(t)&&sichtbarF(t));
+      const bewertet=kandidaten.map(t=>{
+        const weg=ispyBesterWeg(u,t);
+        return {t, weg, ev:ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*weg.p,
+          naeher:(u.side===0?t.x:(1-t.x))};
+      }).sort((a,b)=>(b.ev-a.ev)||(b.weg.p-a.weg.p)||(a.naeher-b.naeher));
+      const wahl=bewertet[0]||null;
+      if(wahl){
+        if(wahl.t.idx===zielIdx){ versucheZiel++; if(versucheZiel>=2)belegt.add(wahl.t.idx); }
+        else belegt.add(wahl.t.idx);
+      }
+      const wurf2=(rr()+rr())/2;
+      if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort}); continue; }
+      const ziel=wahl.t, zielWeg=wahl.weg;
+      const ermued=Math.max(ISPY_AUSDAUER_BODEN,
+        1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
+      const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,zielWeg.p*ermued));
+      if(ziel.stufeAktuell===3)u._arbeitetTresor=true;
+      if(wurf2<chance){
+        const punkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor);
+        u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        u.funde[ziel.stufeAktuell]=(u.funde[ziel.stufeAktuell]||0)+1;
+        ziel.leer=true;
+        merke(ziel,true);
+      } else {
+        ziel.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, ziel.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
+        const teilpunkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor*ISPY_TEILPUNKTE_ANTEIL);
+        u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        merke(ziel,false);
+      }
+    }
+    // NACHFUELLEN (2.2), UNVERAENDERT AUS PR 1: jede in DIESEM Tick geknackte Truhe wird
+    // sofort danach wieder befuellt — sie bleibt damit GENAU EINEN Tick lang leer.
+    for(const t of truhen){
+      if(t.leer){
+        t.stufeAktuell=ISPY_NACHFUELL_FOLGE[t.folgePos%ISPY_NACHFUELL_FOLGE.length];
+        t.folgePos++; t.fortschritt=0; t.leer=false;
+      }
+    }
+    return ereignisseDiesesTicks;
   }
 
   function baueSchatzsuche(art,mine,gegner){
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
-    // REIHENFOLGE MINE-DANN-GEGNER, NICHT VERZAHNT: komplett sequenziell je Seite, wie die
-    // generische Rundenformel weiter oben (`mine.forEach((p,i)=>setz(p,0,i));
-    // gegner.forEach((o,i)=>setz(o,1,i));`) es fuer JEDE andere Auftritt-Buehne bereits
-    // komplett sequenziell je TEILNEHMER tut — nur eine Ebene groeber (je Seite statt je
-    // Teilnehmer).
-    //
-    // REIHENFOLGE GEGENGEMESSEN, NICHT GERATEN: mit Gegner zuerst liest der Spiegeltest
-    // (identischer Kader gegen sich selbst, `miss-arena-buehne-spiegel.mjs`, 2000 Laeufe)
-    // Heim:Gast 52,9:47,0 statt 54,9:45,1 mit dieser (Mine-zuerst-)Reihenfolge — beide Werte
-    // liegen innerhalb des 45:55-Korridors aus dem Konzept (2.1), Mine-zuerst naeher an der
-    // Mitte. ABER: Gegner-zuerst kostete die Budget-Pruefung deutlich mehr, als es dem
-    // Spiegeltest half — `messe-arena-einfluss.mjs i-spy` (n=48 UND 96) stieg von 23,3/21,2
-    // auf 27,9/27,0 Pp, ueber die 25-Pp-Schranke. Die Pp-Schranke ist eine harte Zahl ohne
-    // Toleranzband (CLAUDE.md: "Pflichtpruefung ... genauso verbindlich wie die
-    // rho-Schranke"), waehrend der Spiegeltest-Korridor ausdruecklich eine SPANNE ist und
-    // 54,9:45,1 sie erfuellt. Deshalb bleibt es bei Mine-zuerst — die Punktesummen selbst
-    // liegen in beiden Reihenfolgen nur ~0,8 % auseinander (Rauschen); der Sieg-ANTEIL
-    // reagiert empfindlicher, weil er nur zaehlt, wer knapp vorn liegt.
-    baueSchatzsucheSeite(art,mineT);
-    baueSchatzsucheSeite(art,gegnerT);
+    const mineRaum=ispyBaueRaum(art,mineT);
+    const gegnerRaum=ispyBaueRaum(art,gegnerT);
+    const avg=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+u[feld],0)/arr.length:0;
+    const mineTeamgeist=avg(mineT,"TEAMGEIST"), gegnerTeamgeist=avg(gegnerT,"TEAMGEIST");
+    // VERZAHNTE TICK-SCHLEIFE (Konzept 3.4, Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG"): anders
+    // als PR 1 (komplett sequenziell je Seite ueber ALLE Ticks) laeuft dieser PR jetzt Tick
+    // fuer Tick ueber BEIDE Seiten, weil eine Reaktion in Tick t+1 von den S-c-Funden der
+    // JEWEILS ANDEREN Seite aus Tick t abhaengt. `sichtbarFuerMine`/`sichtbarFuerGegner`
+    // halten IMMER die Funde des VORHERIGEN Ticks — nie die dieses Ticks (sonst bekaeme die
+    // zuerst verarbeitete Seite eine kuerzere Verzoegerung als die zweite, ein Symmetrie-
+    // Bruch, den der Spiegeltest sofort zeigen wuerde). Reihenfolge INNERHALB eines Ticks
+    // bleibt Mine-dann-Gegner (PR 1, gegengemessen: `messe-arena-einfluss.mjs`/
+    // `miss-arena-buehne-spiegel.mjs`, s. PR-1-Kommentar-Historie) — das aendert an der
+    // Verzoegerung nichts, weil beide Seiten ausschliesslich aus dem VORHERIGEN Tick lesen.
+    let sichtbarFuerMine=[], sichtbarFuerGegner=[];
+    for(let tick=0;tick<art.rundenN;tick++){
+      const eigeneFuerGegner=ispySeiteTick(art,mineT,mineRaum,tick,sichtbarFuerMine,mineTeamgeist);
+      const eigeneFuerMine=ispySeiteTick(art,gegnerT,gegnerRaum,tick,sichtbarFuerGegner,gegnerTeamgeist);
+      sichtbarFuerMine=eigeneFuerMine;
+      sichtbarFuerGegner=eigeneFuerGegner;
+    }
   }
 
   function stepBuehne(dt){
@@ -31244,6 +31379,25 @@
       const seiten=[summe(0),summe(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
+    },
+    // I-SPY-SONDE (PR 2, Bauplan 7.2/PR-0-Vorschlag "schatzsuchProbe()"): rein lesend, wie
+    // spieleBuehneAuftritt() direkt darueber, aber zusaetzlich mit den additiven Feldern
+    // u.funde/u.reaktionen (die NIE in wert()/u.summe einfliessen, s. Kommentar bei
+    // ispyBaueRaum) — fuer die Korridor-Abnahme aus dem Konzept (6.4: sichtbare Ereignisse,
+    // Reaktionen je Seite je Spiel) ohne eigenes miss-i-spy-korridor.mjs bauen zu muessen.
+    ispyProbe:(saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART["i-spy"])return null;
+      const M=MOTOREN["i-spy"]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const teiln=TEILNEHMER.map(u=>({n:u.n,side:u.side,summe:u.summe||0,
+        funde:{...u.funde}, reaktionen:u.reaktionen||0,
+        // "runden" nur die additiven Anzeigefelder, keine internen _-Felder.
+        runden:u.runden.map(r=>({punkte:r.punkte,ereignis:r.ereignis,art:r.art||null,
+          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion}))}));
+      M.zurueck(g);
+      return {disziplin:"i-spy", teilnehmer:teiln};
     },
     // VIERTES CHASSIS. Eigener Einstiegspunkt statt einer Erweiterung von spieleBuehneAuftritt()
     // — aus demselben Grund, den spieleBuehneHeben() fuer spieleFeldspiel() nennt (s. dort):
