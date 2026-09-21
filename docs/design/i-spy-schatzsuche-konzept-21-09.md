@@ -278,6 +278,51 @@ taucht in `BASIS_JE_DISC["i-spy"]` heute gar nicht auf (die Matrix hat zehn Attr
 power) — sein Beispiel ist also generisch gemeint: kein Attribut, das im Rezept vorkommt, soll die
 Disziplin dominieren.
 
+### 1.6 Mehrwege-Truhen (Chris' Ergänzung, 21.09.)
+
+Chris, wörtlich: „ich habe mir vorgestellt, dass es verschiedene Lösungsarten gibt — ein
+Drei-Sterne-Clue, den du mit so und so vielen Punkten Intelligenz knacken kannst, oder so und so
+viel Power oder Dexterity. Jeder Spieler hat seine eigene Herangehensweise, und je nachdem, wie gut
+er in den jeweiligen Stats ist, löst er es schneller oder braucht länger."
+
+Das erweitert 1.5: statt einer einzigen festen Rätselart je Fundort bekommt eine Truhe — vor allem
+bei höheren Stufen, wo es am meisten zählt — **zwei alternative Lösungswege**, jeder mit eigenem
+Sub-Skill/Attributmix. Ein Spieler nutzt automatisch den Weg, der zu seinen Stats passt:
+
+    p(Truhe) = max(p_WegA(K_A), p_WegB(K_B))
+
+— dieselbe Formel wie in 1.4, nur zweimal berechnet und das bessere Ergebnis genommen. Kein
+zusätzlicher Klick, kein zweiter `rr()`-Verbrauch (die Auswahl ist deterministisch: der Spieler
+"nutzt" immer automatisch seinen stärkeren Weg). Ein Logik-Spezialist knackt den Tresor über
+Zahlenschloss/Chiffre, ein kraftbetonter Spieler denselben Tresor über den Dietrich — beide können
+ihn öffnen, nur mit unterschiedlicher Erfolgschance und auf unterschiedliche Art (unterschiedliches
+Ticker-Wort/Bild je nachdem, welcher Weg tatsächlich gezogen hat).
+
+**Vorschlag, um die Kalibrierung nicht zu verdoppeln:** nur Tresore (Stufe 3) bekommen zwei Wege,
+Notiz/Akte bleiben einwegig — dort zählt die Ereigniszahl mehr als die Vielfalt, und zwei Wege
+genügen, um „eigene Herangehensweise" sichtbar zu machen, ohne dass jede Truhenstufe eine eigene
+Mehrwege-Logik braucht. Drei mögliche Paarungen aus den Rätselarten (1.5): LOGIK+FINGERFERTIGKEIT,
+LOGIK+MENSCHENKENNTNIS, FINGERFERTIGKEIT+MENSCHENKENNTNIS — über die beiden Tresor-Fundorte im
+Zwölfer-Layout (2.1) verteilt, damit nicht dieselbe Paarung beide Male auftaucht.
+
+**Rangtreue-technisch unproblematisch, eher hilfreich:** `max()` zweier monoton in ihrem jeweiligen
+Sub-Skill steigender Funktionen bleibt selbst monoton in beiden — verletzt also keine der Regeln aus
+6.2 (kein Attribut über sein Matrixgewicht hinaus), solange jeder Weg für sich innerhalb seines
+eigenen Sub-Skills bleibt. Ein Tresor mit zwei Wegen ist im Schnitt für mehr Spieler lohnend als
+einer mit nur einem — das drückt den Erwartungswert-Vorteil des Stars (1.3, F2) nicht, weil der Star
+in JEDEM Attribut, in dem er stark ist, weiterhin eine hohe Chance hat; es verhindert nur, dass ein
+Spieler, der zufällig im EINEN geforderten Attribut schwach ist, komplett ausgeschlossen bleibt.
+
+**Was das für 6.5 (Budget-Methode) ändert:** mit zwei Wegen je Tresor tragen potenziell mehr
+Sub-Skills Gewicht in den wertvollsten Truhen als bisher angenommen — das muss die
+Pp-Abweichungsrechnung in der ersten Kalibrierrunde mit einbeziehen, ist aber kein Zusatzschritt,
+sondern derselbe Messlauf mit dem erweiterten Rezept.
+
+**Offene Frage, ergänzt Abschnitt 8:** feste Paarung je Fundort-Position (immer dieselbe Truhe hat
+immer dieselben zwei Wege) oder pro Saat neu gewählt (mehr Abwechslung, aber ungleichere
+Kaderfamilien-Vergleichbarkeit)? Und: sollen auch Akten (Stufe 2) irgendwann Mehrwege bekommen, oder
+bleibt das bewusst den Tresoren vorbehalten?
+
 ---
 
 ## 2. Kartenlayout und Rundenstruktur
@@ -691,6 +736,10 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
 11. **Reihenfolge im Projekt:** I-Spy stand bewusst am Ende der Liste. Dieses Konzept ist
     umsetzbar, aber PR 1 bindet eine Session für rund drei Tage, bevor eine Zahl da ist. Soll
     das vor oder nach den offenen Football-/Hockey-Punkten laufen?
+12. **Mehrwege-Truhen (1.6, Chris' Ergänzung 21.09.):** Grundsatz steht (Tresore bekommen zwei
+    alternative Lösungswege, Spieler nutzt automatisch seinen stärkeren). Offen: feste Paarung je
+    Fundort-Position oder pro Saat neu gewählt? Und bleibt das auf Tresore beschränkt, oder sollen
+    Akten später dieselbe Behandlung bekommen?
 
 ---
 
