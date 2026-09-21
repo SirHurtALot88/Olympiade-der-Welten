@@ -1,5 +1,4 @@
-**Achtzehnter Nachtrag 21.09. — Tennis auf 88,75 % nachgezogen, PR "Tennis-Movement-Ton
-(M2+A4) + M3-Nachbuchung" (Branch `tennis-movement-ton-21-09`).** Grundlage:
+**Achtzehnter Nachtrag 21.09. — Tennis auf 88,75 % nachgezogen (PR #988, 21.09.).** Grundlage:
 `docs/design/tennis-feinschliff-recherche-21-09.md` (reine Recherche, 21.09., derselbe Tag),
 die alle vier K/A/M-Achsen fuer Tennis einzeln gegen den Code gegengeprueft hat, nicht nur die
 zwei bewegten. **rho FRISCH nachgemessen, nicht behauptet:**
