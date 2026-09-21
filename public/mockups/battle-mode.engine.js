@@ -5382,11 +5382,20 @@
   // Der Slot-Aufschlag: wie viel besser (oder schlechter) die Attribute des Spielers im
   // Profil dieses Slots dastehen als im Grundprofil der Disziplin. Faktor 2,2 und die
   // Grenzen bei plus/minus 8,5 stammen aus SLOT_PROFILE_MODIFIER_SCALE im Spiel.
+  // FOOTBALL-BALANCE-RUNDE (16.09., docs/design/football-balance-runde-nach-e3-15-09.md
+  // Abschnitt 6 Punkt 2): moderate Reduktion des Slot-Aufschlags NUR fuer Football, weil die
+  // Klemmung bei plus/minus 8,5 fuer Football seit PR #934 fast immer greift (die Attribute,
+  // die jetzt "eng" speisen, sind zugleich die schwersten der Eignungsmatrix). Startwert 0,35,
+  // gemessener robuster Bereich 0,15-0,5 (s. Dokument Abschnitt 3.2/4.2). Disziplin-uebergreifend
+  // bewusst NICHT angefasst -- SLOT_PROFILE_MODIFIER_SCALE (Faktor 2,2, Klemmung 8,5) bleibt fuer
+  // jede andere Disziplin exakt wie vorher.
+  const FOOTBALL_SLOT_AUFSCHLAG_SKALA=0.35;
   function slotAufschlag(p,slotId,d){
     const s2=SLOTVON[slotId]; if(!s2)return 0;
     const disz=d||(Object.keys(SLOTS_JE_DISC).find(k=>SLOTS_JE_DISC[k].some(x=>x.id===slotId)));
     const basis=BASIS_JE_DISC[disz]; if(!basis)return 0;
-    const roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
+    let roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
+    if(disz==="football")roh*=FOOTBALL_SLOT_AUFSCHLAG_SKALA;
     return Math.max(-8.5,Math.min(8.5,Math.round(roh*10)/10));
   }
   // Vier Stufen, wie Chris sie wollte. Die Grenzen sind gesetzt, nicht gemessen —
@@ -5514,6 +5523,20 @@
     const W=BASIS_JE_DISC[dId]||{};
     const breit=Object.keys(W).filter(k=>W[k]>0);
     if(!eng)return breit;
+    // FOOTBALL-BALANCE-RUNDE (16.09., docs/design/football-balance-runde-nach-e3-15-09.md
+    // Abschnitt 6): seit PR #934 speist BASIS_JE_DISC.football aus DERSELBEN Quelle wie
+    // Footballs Slot-Fokus-Attribute (spiel-eignung-overrides.ts) -- "eng" trifft deshalb
+    // fast immer die zwei SCHWERSTEN Attribute der Eignungsmatrix (power/health: 22+18 von
+    // 100 Punkten) und saettigt mitAufschlag()s Multiplikator strukturell (Nenner `traegt`
+    // wird kuenstlich klein). Football faehrt deshalb IMMER "breit": alle neun Attribute, die
+    // BASIS_JE_DISC.football ohnehin gewichtet, nicht nur die zwei Fokus-Attribute des Slots.
+    // Bewusst football-spezifisch statt einer allgemeinen Regel ("eng ist bedeutungslos, wenn
+    // Anzeige- und Spiel-Ordnung identisch sind") -- das Dokument selbst nennt beides
+    // vertretbar und raet zur pragmatischeren, risikoaermeren Variante: Basketball/Hockey/
+    // TDM nutzen weiterhin die gesperrte Matrix (eine andere Quelle als ihre Slot-Fokusse)
+    // und sind von dieser Zeile unberuehrt, s. Isolationsnachweis
+    // (node scripts/miss-alle-disziplinen.mjs 24, alle zwanzig, vor und nach dieser Runde).
+    if(dId==="football")return breit;
     const sl=SLOTVON[slotId]; if(!sl)return breit;
     // WELCHE REZEPTE HIER GEFRAGT SIND. Bis eben stand hier immer REC — die KAMPFrezepte.
     // Auf einer Bahn ist das die falsche Frage: dort speist kein Attribut einen Kampfwert,
@@ -8598,67 +8621,28 @@
   const FK_LOS_KAPPA=3;   // GEMESSEN gegen 2 und 4 (0,687 / 0,714 / 0,688 rho je Spiel, Prototyp)
   const fkLos=(sp,rolle)=>gewichtetesLosNach(sp,u=>Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA));
 
-  // PRD (Pseudo Random Distribution, Warcraft-3-/Dota-2-Technik, P1-Runde "Football-
-  // Verlaesslichkeit"). DIAGNOSE-HERKUNFT: der Opus-Plan dieser Runde zitierte einen
-  // AELTEREN Stand (PR #803, 05.09.: rho Saison 0,811 / rho je Spiel 0,516, Verlaesslichkeit
-  // 0,405, docs/design/stand-aller-disziplinen.md). NACHGEMESSEN VOR dieser Aenderung
-  // (node scripts/miss-alle-disziplinen.mjs 24 football, HEAD 20.09., PR-Beschreibung
-  // traegt den vollen Beleg): der main-Stand steht bereits bei 0,722 / 0,832
-  // (Verlaesslichkeit 0,753) — zwischen PR #803 und heute gab es weitere, unabhaengig
-  // gemerge­te Rezept-Korrekturen (s. Commits "Rangtreue-Basislinie erneuern" 06.09./15.09.,
-  // "Football-Balance-Runde nach E3"), die die alte Zahl ueberholt haben. Das Zwei-Spalten-
-  // Muster (hohe Saisonzahl, niedrigere Einzelspielzahl) gilt auf dem NEUEN Stand trotzdem
-  // noch, nur schwaecher als angenommen — PRD bleibt darum das richtige Werkzeug, nur der
-  // Hub ist kleiner als im Plan veranschlagt.
+  // PRD (Pseudo Random Distribution) FUER SACK/FUMBLE/INTERCEPTION/COMPLETION WURDE WIEDER
+  // ENTFERNT (21.09., docs/design/football-prd-drift-befund-21-09.md). Die P1-Runde
+  // ("Football-Verlaesslichkeit", PR #978) hatte hier ein WC3-artiges Konto eingefuehrt, das
+  // beim Treffer auf 0 zurueckgesetzt wird. Der Kommentar an dieser Stelle behauptete, der
+  // Erwartungswert bleibe dabei exakt p ("klassische PRD-Eigenschaft") -- das ist FALSCH: ein
+  // Reset auf 0 mit C=p ist NICHT die WC3-Formel, sondern deren haeufigster Fehler. WC3/Dota
+  // tabellieren eine Konstante C<p genau deshalb, weil die Langfrist-Trefferquote bei diesem
+  // Schema 1/Summe_k Produkt_(j<=k)(1-j*C) betraegt, nicht C selbst. Mit C=p lag die effektive
+  // Quote fuer Footballs seltene Ereignisse (nachgemessen, 200 Spiele) beim 2,5- bis
+  // 3-fachen des Zielwerts: Sack-Quote 17,5% statt ~7%, Interception 7,6% statt 2,1-2,4%,
+  // verlorene Fumbles 1,24/Team statt ~0,5 -- der NFL-Korridor war unbemerkt kaputt, weil P1s
+  // eigene Verifikationsliste miss-football-korridor.mjs nicht enthielt.
   //
-  // Football hat mit ~12 Ballberuehrungen je Feldspieler ohnehin die duennste Ereignisbasis
-  // (s. FOOTBALL-EIGENE ROLLENLOTTERIE oben) — jeder einzelne rr()<p-Wurf schlaegt darum
-  // ueberproportional auf den Boxscore durch. PRD aendert NICHT das Rezept/die Gewichte
-  // (spielEignung/eig bleiben unberuehrt) und NICHT die Langfrist-Erfolgsquote (Erwartungswert
-  // bleibt exakt p, klassische PRD-Eigenschaft) — nur die STREUUNG innerhalb eines Spiels
-  // sinkt: nach mehreren Fehlschlaegen IN FOLGE steigt die Trefferchance an, nach einem
-  // Treffer faellt sie auf die Basis zurueck, statt dass jeder Wurf unabhaengig bei p bleibt.
-  //
-  // UMSETZUNG ALS AUFLAUFENDES KONTO STATT DER KLASSISCHEN WC3-KONSTANTEN C*N: WC3/Dota
-  // gehen von einer KONSTANTEN Erfolgsquote p aus (ein Item hat immer dieselbe Crit-Chance).
-  // Hier variiert p von Wurf zu Wurf mit Eignung/Situation (Passgenauigkeit vs. Abwehr,
-  // Down/Distance, Tier...) — die Konstante C=p der klassischen Formel gibt es also nicht.
-  // Der Ausweg ist ein Konto, das bei jedem Fehlschlag um GENAU die diesmal gegoltene
-  // Chance p_i weiterwaechst (statt um eine feste Schrittweite) und beim Treffer auf 0
-  // zurueckspringt — bei konstantem p ist das exakt die klassische WC3-Formel (nach N
-  // Fehlschlaegen betraegt die Kontochance N*p, identisch zu "N*C" mit C=p), bei variablem
-  // p_i bleibt die Langfrist-Erfolgsquote ueber viele Wuerfe hinweg der Mittelwert der p_i
-  // (dasselbe Bresenham-/Fehlerausgleichs-Prinzip wie bei Dithering: kein Wurf "verliert"
-  // Chance, jede ungenutzte Chance wird auf den naechsten Wurf desselben Kontos uebertragen).
-  //
-  // KONTO JE SPIELER, NICHT JE TEAM/SPIEL (ERSTER VERSUCH VERWORFEN): ein einziges,
-  // spielerUEBERGREIFENDES Konto je Entscheidungstyp (sack/interception/komplett/fumble,
-  // ALLE Passer/Rusher teilen sich eins) wurde zuerst probiert und gemessen VERSCHLECHTERT
-  // (rho je Spiel 0,722->0,637, Verlaesslichkeit 0,753->0,558): die Ausgleichsbuchung eines
-  // schwachen Passers "leiht" sich dann von der Chance eines starken Passers und umgekehrt,
-  // was genau das Eignungssignal verwaschet, das rho misst. Das Konto haengt deshalb am
-  // Schluessel "<typ>:<spieler.id>" (Passer bei sack/interception/komplett, Rusher bei
-  // fumble) — jeder Spieler faehrt seine EIGENE Pechsteak, nicht die des Gegners oder
-  // Mitspielers. GEMESSEN (dieselbe Sonde): rho je Spiel 0,722->0,738, Verlaesslichkeit
-  // 0,753->0,800, rho Saison 0,832->0,825 (innerhalb der Kaderfamilie-Spannweite ~0,19,
-  // von Null nicht unterscheidbar) — kleiner, aber echter Effekt in die erwartete Richtung.
-  //
-  // GENAU EIN rr()-AUFRUF JE ENTSCHEIDUNG, WIE VORHER: fkPRDTrifft ruft rr() an EXAKT DER
-  // Stelle auf, an der vorher "rr()<p" stand, und vergleicht nur den Vergleichswert (Konto
-  // statt rohem p) — die Anzahl der rr()-Aufrufe je Zug aendert sich dadurch nicht, nur die
-  // Uebersetzung des EINEN Wurfs in true/false. Das Konto lebt in fsLive.fkPRD (je Spiel
-  // frisch, s. initFeldspielLive), JEDER Entscheidungstyp UND JEDER Spieler fuehrt sein
-  // EIGENES Konto unter einem eigenen Schluessel — keine Vermischung.
-  // Betroffen sind ausschliesslich die vier football-eigenen Aufrufstellen in resolveLauf/
-  // resolvePass unten; Basketball/Hockey/Tennis und alle anderen 16 Disziplinen rufen rr()
-  // unveraendert auf (weder eine zusaetzliche noch eine fehlende Stelle), s. PR-Beschreibung
-  // fuer den Isolationsnachweis (19 von 20 Zeilen aus miss-alle-disziplinen.mjs bit-identisch).
-  function fkPRDTrifft(schluessel,p){
-    const konto=(fsLive.fkPRD[schluessel]||0)+p;
-    if(rr()<konto){ fsLive.fkPRD[schluessel]=0; return true; }
-    fsLive.fkPRD[schluessel]=konto;
-    return false;
-  }
+  // Die Rangtreue-Messung (zwoelf Varianten, football-prd-drift-befund-21-09.md Abschnitt 4)
+  // zeigt zudem: KEINE PRD-Form (weder das fehlerhafte Konto noch eine WC3-korrekte Variante
+  // noch Dithering) bringt einen messbaren rho-Gewinn gegenueber dem einfachen rr()<p -- alle
+  // Bootstrap-Konfidenzintervalle ueberlappen. Der Grund: bei ~12 Ballberuehrungen je Spieler
+  // und Football-Spiel ist PRD nur fuer die Completion (1/p ~ 1,5) ueberhaupt im Regime, in dem
+  // Erwartungstreue ueber viele Versuche greift; fuer Sack/Fumble/Interception (1/p zwischen
+  // 14 und 40) gibt es diese Versuchszahl in einem Spiel nicht. Alle vier Aufrufstellen sind
+  // deshalb wieder der direkte Wurf rr()<p, wie vor PR #978 -- Basketball/Hockey/Tennis und
+  // die anderen 16 Disziplinen waren von PRD nie betroffen und bleiben unberuehrt.
 
   function resolveLauf(off,def){
     const rusher=fkLos(off,"LAUFKRAFT");
@@ -8679,7 +8663,7 @@
     // "Tackler" verwendet. `vollziehFootballErgebnis()` liest bei "lauf"/"fumble" weiterhin
     // ausschliesslich `spieler`/`yards`, das neue Feld aendert an KEINER bestehenden
     // Wahrscheinlichkeit/Yards-Formel etwas.
-    if(fkPRDTrifft("fumble:"+rusher.id,pFumble))return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
+    if(rr()<pFumble)return {typ:"fumble",spieler:rusher,verteidiger:abwehr,yards:Math.round(rr()*3)};
     const diff=rusher.LAUFKRAFT-abwehr.ABWEHR_LAUF;
     // BASIS 4,0 STATT 3,6 (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt 6.1): fkLos()/
     // kappa=3 zieht Rusher UND Run-Stopper beide bevorzugt aus dem staerksten Ende ihres
@@ -8736,7 +8720,7 @@
     // Sack-Quote je Dropback (Football-Plan A.1, NFL 2024, StatMuse) — 0,05 traf gemessen
     // nur 4,6-5,1 %.
     const pSack=Math.max(0.02,Math.min(0.20,0.07+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
-    if(fkPRDTrifft("sack:"+passer.id,pSack))return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
+    if(rr()<pSack)return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
     const tier=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
     // DEGENERIERTE UNTERZAHL (die Sonde faehrt ausdruecklich auch 1v1/2v2, s. Hockey-
     // Kommentare oben): bleibt nach Abzug des Passers niemand mehr fuer den Zielspieler
@@ -8768,7 +8752,7 @@
     // wodurch die alte Basis 0,014 gemessen 2,5-2,9 % statt 2,1-2,4 % traf.
     const pInt=Math.max(0.008,Math.min(0.10,0.011+(rusher.ABWEHR_PASS-passer.PASSGENAUIGKEIT)*0.0008
       +(tier==="fern"?0.012:tier==="mit"?0.004:0)));
-    if(fkPRDTrifft("interception:"+passer.id,pInt))return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
+    if(rr()<pInt)return {typ:"interception",spieler:passer,receiver,verteidiger:rusher,tier};
     // `verteidiger:rusher` NEU an "komplett"/"incomplete" (06.09., Bewegungs-Runde) —
     // "interception" trug das Feld schon vorher (Zeile oben), nur die beiden haeufigeren
     // Ausgaenge nicht. Reine Zusatzangabe fuer die Zug-Animation (fkZugPosition): der
@@ -8776,7 +8760,7 @@
     // Zug unsichtbar zu bleiben. vollziehFootballErgebnis() liest bei "komplett"/
     // "incomplete" weiterhin nur spieler/receiver/yards — keine Wirkung auf Punktestand,
     // Down/Distance oder eine Wahrscheinlichkeit.
-    if(fkPRDTrifft("komplett:"+passer.id,chance)){
+    if(rr()<chance){
       const [lo,hi]=FK_TIER_YARDS[tier];
       const yac=Math.max(0,(receiver.LAUFKRAFT-50)*0.06);
       return {typ:"komplett",spieler:passer,receiver,verteidiger:rusher,yards:Math.round(lo+rr()*(hi-lo)+yac),tier};
@@ -9239,11 +9223,7 @@
       beruehrungKette:[], beruehrungSeite:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
-      football:null, snap:null,
-      // NUR FOOTBALL, PRD-Zaehlerkonto je Entscheidungstyp (s. fkPRDTrifft weiter unten,
-      // P1-Runde "Football-Verlaesslichkeit"). Leeres Objekt = jedes Konto startet bei 0;
-      // fuer jede andere Disziplin wird dieses Feld nie gelesen, also folgenlos.
-      fkPRD:{}};
+      football:null, snap:null};
     // VORGABE OHNE KLICK, VOR DEM ERSTEN BALLBESITZ (s. berechneFokusAuto oben): nur
     // Basketball fuellt fokusZielAuto ueberhaupt (die Funktion no-opt sonst), fuer jede
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
