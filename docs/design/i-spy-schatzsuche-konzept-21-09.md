@@ -266,6 +266,18 @@ einem Mechanik-Spezialisten und einem Logiker zwei Stars an verschiedenen Truhen
 Spreizung, die Takeshi mit `fallenKoennen` gemessen gebracht hat (rho 0,861 → 0,883: „der Kanal
 wird breiter, nicht lauter", `engine.js:24321-24325`).
 
+**Chris' Entscheidung (21.09.), bestätigt Frage 2 und verschärft Regel 2 aus 6.2:** die
+Rätselarten (und damit die Attribute, die sie brauchen) sollen gleichmäßig verteilt sein — keine
+Disziplin, in der ein einzelnes Attribut (sein Beispiel: „Power-Sachen") übermäßig oft gebraucht
+wird. Das Ein-Drittel-Layout oben erfüllt das für die Rätselart-SLOTS bereits; die eigentliche
+Prüfung ist aber die **Attribut-Ebene** darunter (6.5): keine der drei Knack-Attributmischungen
+darf am Ende so viel mechanisches Gewicht bekommen, dass ein Attribut deutlich über sein
+Matrixgewicht hinausragt. Das ist exakt die Budget-Methode (Pp ≤ 25), die 6.5 ohnehin als Ziel
+nennt — jetzt von Chris ausdrücklich für i-spy bestätigt, nicht nur Projektkonvention. Power selbst
+taucht in `BASIS_JE_DISC["i-spy"]` heute gar nicht auf (die Matrix hat zehn Attribute, keines davon
+power) — sein Beispiel ist also generisch gemeint: kein Attribut, das im Rezept vorkommt, soll die
+Disziplin dominieren.
+
 ---
 
 ## 2. Kartenlayout und Rundenstruktur
@@ -652,9 +664,11 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
    in Abschnitt 1.2 vorgeschlagene Sub-Skill-Aufteilung (SPÜRSINN nur zu 25 % Awareness; LOGIK/
    MENSCHENKENNTNIS/FINGERFERTIGKEIT mit je eigener Attributmischung) entspricht damit bereits
    Chris' Vorstellung — keine Konzeptänderung nötig, nur bei der Kalibrierung beibehalten.
-2. **Drei Rätselarten (Logik / Mechanik / Verhör) mit je einem Sub-Skill** — oder weniger (zwei)
-   oder mehr? Drei ist das Minimum, bei dem zwei Stars an verschiedenen Truhen glänzen können;
-   mehr als vier verdünnt jede Art auf drei Fundorte.
+2. ~~**Drei Rätselarten...**~~ **Teilweise von Chris entschieden (21.09.):** die Verteilung über
+   Rätselarten/Attribute muss gleichmäßig sein, kein Attribut darf die Disziplin dominieren (s.
+   Abschnitt 1.5). Offen bleibt nur noch die Anzahl selbst — drei (Logik/Mechanik/Verhör) ist das
+   Minimum, bei dem zwei Stars an verschiedenen Truhen glänzen können; mehr als vier verdünnt jede
+   Art auf drei Fundorte.
 3. **Sichtbarkeitsregel:** S-c (Akte-Erfolg, Tresor-Erfolg, Tresor-Fehlschlag) — oder nur der
    große Fund (S-b)? Und soll die Persönlichkeit über das Pokerface entscheiden (Schleicher
    jubelt nicht)?
