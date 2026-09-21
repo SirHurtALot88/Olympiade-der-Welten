@@ -167,14 +167,19 @@ Erfolgsformel (`hebeUebung()`). Die Namen folgen den sechs vorhandenen Slots:
 
 Zwei Dinge daran sind bewusst so und sollten gemessen, nicht geglaubt werden:
 
-- **Awareness trägt hier weniger, als Chris' Satz „hohe Awareness" nahelegt.** Die Matrix gibt
-  Awareness 5 von 100. Ein Sub-Skill, der Awareness mit 35 % führt und in einer Erfolgschance
-  sitzt, würde Awareness strukturell über die Matrix hinaus gewichten (Handbuch 1.3: „ein
-  Attribut in einer Erfolgschance-Rolle gewinnt strukturell mehr Einfluss") und die Pp-Abweichung
-  hochtreiben. Wenn Awareness das Finden-Attribut sein SOLL, muss die **Matrix** geändert werden
-  (`lib/player-generator/official-discipline-weights.ts`) — das ist Produktionscode mit Folgen für
-  Spielergenerator, Gehälter und Marktwerte, ein Präzedenzfall dafür ist
-  `football-matrix-entscheidung.md`. Frage 1 an Chris (Abschnitt 8).
+- **Chris' Entscheidung (21.09.), Frage 1 damit geschlossen: die Matrix bleibt unangetastet.**
+  Awareness bleibt bei Matrixgewicht 5 — kein Override wie bei Football
+  (`spiel-eignung-overrides.ts`). Chris' Satz „hohe Awareness" war kein Auftrag, Awareness zum
+  dominanten Attribut zu machen, sondern eine Beschreibung der SPÜREN-Phase: ein Spieler mit hoher
+  Awareness erkennt schneller/besser, wohin er als nächstes gehen sollte (welche Stufe lohnt sich),
+  ein anderer braucht dafür länger — kann dafür aber das Rätsel selbst schneller lösen. Damit ist
+  die bestehende Aufteilung genau richtig: Awareness wirkt nur in SPÜRSINN (Phase 1, „wohin gehe
+  ich") mit 25 %, nicht in den KNACKEN-Sub-Skills. Zusätzlich bestätigt: **verschiedene Truhen/
+  Hinweise sollen verschiedene Attribute für das Knacken selbst verlangen** — nicht nur
+  Intelligenz, sondern je nach Rätselart auch Stärke (power), Torment oder andere Matrix-Attribute.
+  Das ist bereits so vorgesehen (LOGIK/MENSCHENKENNTNIS/FINGERFERTIGKEIT mit unterschiedlichen
+  Attributmischungen, Tabelle oben) und muss in der Kalibrierung nur beibehalten werden — keine
+  Konzeptänderung nötig.
 - **Torment 17 ist das zweithöchste Gewicht** und sitzt heute vor allem in SPITZENMOMENT/WAGNIS.
   Im Konzept wird es die Verhör-Rätselart (Druck ausüben, Verhalten lesen — genau der Social-
   Read-Slot-Text) und ein Drittel des Spürsinns. Wer Torment lieber als „Stressresistenz" liest,
@@ -639,10 +644,14 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
 
 ## 8. Offene Fragen für Chris
 
-1. **Awareness in der Matrix.** Soll Awareness das Finden-Attribut sein? Dann muss
-   `official-discipline-weights.ts` geändert werden (Produktionscode: Spielergenerator, Gehälter,
-   Marktwerte; Präzedenzfall Football). Bleibt die Matrix, trägt Intelligence das Finden und
-   Awareness bleibt Beiwerk — das Konzept funktioniert so, sagt aber etwas anderes als sein Satz.
+1. ~~**Awareness in der Matrix.**~~ **Von Chris entschieden (21.09.): Matrix bleibt unangetastet.**
+   Awareness bleibt bei Matrixgewicht 5 und wirkt nur in der SPÜREN-Phase (schnelleres/besseres
+   Erkennen, wohin als nächstes zu gehen ist) — kein dominantes Erfolgs-Attribut. Zusätzlich
+   bestätigt: verschiedene Truhen/Rätselarten sollen für das KNACKEN selbst unterschiedliche
+   Matrix-Attribute verlangen (nicht nur Intelligenz — auch power/torment/etc., je nach Art). Die
+   in Abschnitt 1.2 vorgeschlagene Sub-Skill-Aufteilung (SPÜRSINN nur zu 25 % Awareness; LOGIK/
+   MENSCHENKENNTNIS/FINGERFERTIGKEIT mit je eigener Attributmischung) entspricht damit bereits
+   Chris' Vorstellung — keine Konzeptänderung nötig, nur bei der Kalibrierung beibehalten.
 2. **Drei Rätselarten (Logik / Mechanik / Verhör) mit je einem Sub-Skill** — oder weniger (zwei)
    oder mehr? Drei ist das Minimum, bei dem zwei Stars an verschiedenen Truhen glänzen können;
    mehr als vier verdünnt jede Art auf drei Fundorte.
@@ -679,7 +688,8 @@ Merge; jede Zahl mit der gemessenen Datei daneben.
   `WERTUNG_AUFTRITT` oder an einer der acht Geschwister-Bühnen — jede PR weist das bit-identisch
   nach.
 - Kein Asset-Download; Truhen, Lupe und Raum sind Primitive.
-- Keine Matrix-Änderung ohne Chris' Entscheidung (Frage 1).
+- Keine Matrix-Änderung — von Chris am 21.09. entschieden (Frage 1, s.o.): die Matrix bleibt, wie
+  sie ist.
 - Kein Produktionsanschluss vor der kaderfest genommenen Schranke (PR 5 zuletzt).
 
 ## Quellen (alle gelesen, nicht vermutet)
