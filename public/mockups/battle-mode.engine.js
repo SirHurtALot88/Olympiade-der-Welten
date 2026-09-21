@@ -2954,6 +2954,44 @@
     ctx.fillStyle="#e8e2d0";
     ctx.beginPath();ctx.arc(x,y,Math.max(0.7,1*s),0,Math.PI*2);ctx.fill();
   }
+
+  // ================== I-SPY: DIE LUPE AN DER HAND (PR 3, Konzept 5.3) ==================
+  // docs/design/i-spy-schatzsuche-konzept-21-09.md Abschnitt 5.3: "Ring + Griff, Glas mit
+  // Schimmer, nur am Teilnehmer in Phase `suchen`". Vierte Wiederverwendung von SCHACH_HAND
+  // nach TENNIS_HAND/FECHTEN_HAND/MIKRO_HAND (s. dortige Kommentare, alle wortgleich
+  // SCHACH_HAND) -- ein Detektiv, der eine Truhe untersucht, ist derselbe STEHENDE Koerper
+  // in Grundstellung wie Schachspieler/Redner, keine Laufpose, kein eigener Pixelscan noetig.
+  const LUPE_HAND=SCHACH_HAND;
+  // Zwei Phasen wie Schachuhr/Mikrofon -- "ruhend" (Lupe locker an der Hand, ausserhalb der
+  // `suchen`-Phase nie gezeichnet, s. Aufrufstelle) und "suchen" (angehoben vors Gesicht,
+  // pulsierendes Glas). `winkel` kippt die Lupe zur Blickrichtung wie MIKRO_PHASEN.winkel.
+  const LUPE_PHASEN={
+    ruhend: {winkel:0.20, hoehe:0},
+    suchen: {winkel:-0.45,hoehe:-5},
+  };
+  // x/y ist die Hand (LUPE_HAND), s die Groesse (Z), richtung 0..3 wie blickAus(), phase
+  // "ruhend"/"suchen" (unbekannt faellt auf "ruhend" zurueck, dasselbe Sicherheitsnetz wie
+  // jede andere Requisite dieser Tabelle). Das Glas pulsiert im Takt von `buehneT` (rein
+  // praesentational, kein rr()) -- Griff + Ring + ein heller Schimmerbogen, reine
+  // Canvas-Primitiven wie zeichneMikrofon direkt oberhalb.
+  function zeichneLupe(ctx,x,y,s,richtung,phase){
+    const p=LUPE_PHASEN[phase]||LUPE_PHASEN.ruhend;
+    const blick=richtung===3?1:richtung===1?-1:0;
+    const eff=blick||1;
+    const griffY=y+p.hoehe*s;
+    const puls=phase==="suchen"?1+0.08*Math.sin(buehneT*8):1;
+    ctx.save();ctx.translate(x,griffY);ctx.rotate(p.winkel*eff);
+    ctx.strokeStyle="#6b4a2e";ctx.lineWidth=Math.max(1,1.6*s);ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(7*s,7*s);ctx.stroke();
+    ctx.save();ctx.translate(7*s,7*s);ctx.scale(puls,puls);
+    ctx.fillStyle="rgba(200,225,255,.28)";ctx.strokeStyle="#e8e2d0";
+    ctx.lineWidth=Math.max(0.8,1.2*s);
+    ctx.beginPath();ctx.arc(0,0,4.6*s,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=Math.max(0.5,0.7*s);
+    ctx.beginPath();ctx.arc(-1.2*s,-1.2*s,1.6*s,Math.PI*1.1,Math.PI*1.7);ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+  }
   const DISZIPLIN_PROP={
     gewichtheben:{ hand:HEBEN_HAND,   phasen:HEBEN_PHASEN,  zeichne:zeichneHantel },
     takeshi:     { hand:TAKESHI_HAND, phasen:TAKESHI_PHASEN,zeichne:zeichneStartnummer },
@@ -2988,6 +3026,12 @@
     // Aufrufstelle in zeichneSprite) -- nur die beiden fruehen Zweige.
     kampfkunst:     { hand:SCHACH_HAND, phasen:FECHTEN_PHASEN, zeichne:zeichneDegen },
     schuetzenkunst: { hand:SCHACH_HAND, phasen:null,           zeichne:zeichneShowcaseBogen },
+    // VIERZEHNTER EINTRAG (PR 3, I-Spy-Buehnenbild/-Bewegung, 21.09.): die Lupe, s.
+    // LUPE_HAND/LUPE_PHASEN/zeichneLupe oben. Aufrufstelle wie bei den elf fruehen
+    // Eintraegen (istIspy()-Block unten bei zeichneSprite), zusaetzlich auf
+    // u.vizPhase==="suchen" gegated -- anders als Schachuhr/Schlaeger/Degen (die ganze
+    // Auftrittsdauer sichtbar) traegt ein Detektiv die Lupe nur, WAEHREND er sucht.
+    "i-spy":     { hand:LUPE_HAND,   phasen:LUPE_PHASEN,  zeichne:zeichneLupe },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
@@ -3636,6 +3680,15 @@
         const hpV=prop.hand[r0]||prop.hand[2];
         prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,u.vizFechtPhase||"engarde");
       }
+      // LUPE FUER VOLLBILD (PR 3, I-Spy, derselbe bekannte Vollbild-Fallstrick wie bei den
+      // vier Requisiten direkt oberhalb): nur waehrend u.vizPhase==="suchen" (s. Kommentar
+      // bei DISZIPLIN_PROP["i-spy"] oben) -- eine Vollbild-Kreatur im Kader durchsucht eine
+      // Truhe genauso wie jeder Standardkoerper.
+      if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
+        const prop=DISZIPLIN_PROP["i-spy"];
+        const hpV=prop.hand[r0]||prop.hand[2];
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,"suchen");
+      }
       // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST-WAFFE FUER VOLLBILD (A0.1, s. NAHKAMPF_WAFFEN/
       // zeichneShowcaseBogen/DISZIPLIN_PROP.kampfkunst-schuetzenkunst oben fuer die
       // vollstaendige Begruendung). Heute inert (kein vollbild-Eintrag traegt `waffe`, s.
@@ -4191,6 +4244,19 @@
       const prop=DISZIPLIN_PROP.fechten;
       const hp=prop.hand[r]||prop.hand[2];
       prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,u.vizFechtPhase||"engarde");
+    }
+    // LUPE (DISZIPLIN_PROP, PR 3, I-Spy-Buehnenbild/-Bewegung, Konzept 5.3) -- dasselbe
+    // Muster wie Schlaeger/Schachuhr/Hantel/Kufe/Degen oberhalb, mit EINER Ausnahme: die
+    // fuenf Requisiten oberhalb sind waehrend der GANZEN Auftrittsdauer sichtbar, die Lupe
+    // NUR waehrend u.vizPhase==="suchen" (stepSchatzsuche(), rein praesentational) -- ein
+    // Detektiv traegt sie nicht, waehrend er zur naechsten Truhe laeuft oder jubelt.
+    // `feldspiel` erzwingt hier `true`, weil zeichneSchatzsuche() (wie
+    // zeichneTennis()/zeichneFechten()) diesen Parameter fuer ihre eigenen Teilnehmer setzt;
+    // istIspy() prueft zusaetzlich istBuehne(disc)/buehneDisc, nicht nur diesen Parameter.
+    if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
+      const prop=DISZIPLIN_PROP["i-spy"];
+      const hp=prop.hand[r]||prop.hand[2];
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,"suchen");
     }
     // MIKROFON (PR S2, Gesang-Act, s. DISZIPLIN_PROP.showcase/zeichneMikrofon oben) -- ANDERS
     // als die fuenf Requisiten oberhalb (Hantel/Schachuhr/Kufe/Schlaeger/Degen) NICHT ueber
@@ -8174,6 +8240,11 @@
   // zeichneFechten() selbst nicht noetig, weil `art.fechten` (BUEHNE_ART.fechten) dort schon
   // exklusiv gated.
   const istFechten=()=>istBuehne(disc)&&buehneDisc==="fechten";
+  // I-SPY (PR 3, Buehnenbild/Bewegung/Lupe, docs/design/i-spy-schatzsuche-konzept-21-09.md
+  // Abschnitt 5.3), exakt dasselbe Muster wie istFechten()/istTennis() direkt darueber —
+  // gebraucht an der DISZIPLIN_PROP["i-spy"]-Aufrufstelle unten (Lupe an der Hand, nur
+  // waehrend u.vizPhase==="suchen", s. dort).
+  const istIspy=()=>istBuehne(disc)&&buehneDisc==="i-spy";
 
   // WAS EIN SPIELER WERT WAR — je Disziplin, nicht fuer alle dieselbe Zahl.
   //
@@ -14912,6 +14983,13 @@
     // die fuenf Zweige oberhalb. stepShowcase() setzt in dieser PR nur einmalig u.vizAct
     // (s. dort) -- keine Bewegung, kein sichtbarer Unterschied zum bisherigen No-Op.
     if(art.showcase && typeof stepShowcase==="function"){ stepShowcase(dt,art); return; }
+    // I-SPY (PR 3, Buehnenbild/Bewegung/Lupe, Konzept 5.2): dasselbe typeof-Waechterschutz-
+    // Muster wie die sechs Zweige oberhalb. stepSchatzsuche() liest ausschliesslich
+    // u.aktuell/u.runden[u.aktuell]/buehneAkt/u.lunge/u.id und schreibt ausschliesslich
+    // neue, praesentationale viz*-Felder (vizPhase/vizX/vizY/vizJubelT/...) -- Vertrag
+    // wortgleich zu stepFechten()/stepTennis(), s. Kommentar bei stepSchatzsuche() weiter
+    // unten.
+    if(art.schatzsuche && typeof stepSchatzsuche==="function"){ stepSchatzsuche(dt,art); return; }
   }
 
   // ================== EISKUNSTLAUF: KUER-BEWEGUNGSMASCHINE (stepKuer, Ziel 2) ==================
@@ -15951,6 +16029,129 @@
     return p==="ausholen"||p==="treffer"||p==="fehlschlag";
   }
 
+  // ================== I-SPY BEWEGT SICH (stepSchatzsuche, PR 3, Konzept 5.2) ==================
+  // docs/design/i-spy-schatzsuche-konzept-21-09.md Abschnitt 5.2. Angeschlossen ueber
+  // buehnenBewegung() oben, exklusiv auf `art.schatzsuche` gegated.
+  //
+  // HARTER VERTRAG WIE BEI stepFechten()/stepTennis() (Kommentar dort woertlich
+  // uebernommen): niemals rr(), niemals u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/
+  // u.lunge/buehneAkt/buehneZeiger/done anfassen — geschrieben werden AUSSCHLIESSLICH neue,
+  // praesentationale viz*-Felder. Alle Phasen lesen ausschliesslich u.aktuell/
+  // u.runden[u.aktuell]/buehneAkt/u.lunge/u.id-Hashes (Konzept 5.2, letzter Satz) —
+  // disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese Funktion mit jedem Frame
+  // mitlaufen lassen, ohne dass sich eine Rangtreue-Zahl bewegt.
+  //
+  // ZUSTAENDE (u.vizPhase, wie im Konzept benannt): "gehen" (0-35% der Zugzeit, Gleitflug
+  // zum Fundort, NAECHER()-Vorbild aus stepShowcase()/stepKuer() hier als lineare
+  // Interpolation, weil die Zugzeit mit 0,625s zu kurz fuer eine spuerbare Exponential-
+  // Naeherung ist), "suchen" (35% bis zur Sub-Skill-abhaengigen oberen Grenze — ein starker
+  // Knacker ist SICHTBAR frueher fertig, Konzept: "reine viz*-Arithmetik ... kein rr(),
+  // keine gemessene Zahl bewegt sich"), "ergebnis" (Rest der Zugzeit), "idle" (kein Fundort
+  // diesen Tick gewaehlt — der Teilnehmer bleibt stehen, kein Ausfallschritt ins Leere).
+  // Die "leicht gebeugte" Suchpose (Konzept: "Ausfallpose wie u.lunge") braucht KEIN neues
+  // Feld: stepBuehne() setzt u.lunge=0,5 bei jeder Enthuellung und baut es ueber 0,5s ab
+  // (":14767"/":14934" ff.) — bei einer 0,625s-Zugzeit ist u.lunge damit ueber fast die
+  // gesamte "suchen"-Phase hinweg noch >0, exakt das Fenster, das die Suchpose braucht,
+  // ohne dass diese Funktion u.lunge je SCHREIBT (verboten, s. Vertrag oben).
+  const ISPY_VIZ_GEHEN_ANTEIL=0.35;
+  const ISPY_VIZ_SUCHE_STARK_ENDE=0.60, ISPY_VIZ_SUCHE_SCHWACH_ENDE=0.80;
+  const ISPY_VIZ_STARK_SCHWELLE=60;
+  const ISPY_VIZ_JUBEL_T=0.35, ISPY_VIZ_KOPFSCHUETTEL_T=0.30;
+  // STARTPLATZ AM RAND, bevor der erste Fundort enthuellt ist (Konzept-Vertrag "solange
+  // vizX==null" wie bei stepKuer/stepShowcase) — Heim links, Gast rechts, genau die Seite,
+  // die `naeher` in ispySeiteTick() (":14680") schon fuer die Truhenwahl bevorzugt.
+  function ispyHeimatXY(u){
+    const seite=TEILNEHMER.filter(x=>x.side===u.side);
+    const i=Math.max(0,seite.indexOf(u));
+    const n=Math.max(1,seite.length-1);
+    return {x:u.side===0?W*0.045:W*0.955, y:H*0.20+(H*0.60)*(seite.length>1?i/n:0.5)};
+  }
+  function stepSchatzsuche(dt,art){
+    if(!TEILNEHMER.length)return;
+    // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild: stepFechten()s/stepTennis()s
+    // u.vizFechtAktuell-/u.vizSchlagAktuell-Vergleich). I-Spy hat kein Brett und keinen
+    // Ballwechsel-Partner — jeder Teilnehmer laeuft fuer sich, deshalb eine Schleife ueber
+    // ALLE Teilnehmer wie bei Tennis/Fechten, nicht nur ueber ein Paar.
+    for(const u of TEILNEHMER){
+      if(u.vizIspyAktuell==null)u.vizIspyAktuell=-1;
+      if(u.vizX==null){ const h=ispyHeimatXY(u); u.vizX=h.x; u.vizY=h.y; }
+      if(u.aktuell>=0 && u.aktuell!==u.vizIspyAktuell){
+        u.vizIspyAktuell=u.aktuell;
+        const r=u.runden[u.aktuell];
+        u.vizIspyVonX=u.vizX; u.vizIspyVonY=u.vizY;
+        if(r&&r.fundort!=null){
+          const ziel=ispyFundortXY(art.fundorte[r.fundort]);
+          u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
+          // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
+          // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
+          // (ISPY_RAETSEL_SUBSKILL[r.art], dieselbe Tabelle, die ispyBesterWeg() oben fuer
+          // die Erfolgschance liest) — reine viz*-Arithmetik, kein rr(), keine gemessene
+          // Zahl bewegt sich; die optische Antwort auf Chris' "loest es schneller" (1.3).
+          const skill=ISPY_RAETSEL_SUBSKILL[r.art];
+          u.vizIspySuchEnde=(skill&&u[skill]>=ISPY_VIZ_STARK_SCHWELLE)
+            ?ISPY_VIZ_SUCHE_STARK_ENDE:ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+          u.vizIspyErfolg=r.ereignis===art.erfolgWort;
+          u.vizIspyStufe=r.stufe||1;
+          // REAGIEREN (Konzept 5.2, "Tick-Beginn, wenn r.reaktion aus PR 2 gesetzt ist"):
+          // r.reaktion ist ein reines Lesefeld aus baueSchatzsuche() (PR 2, ":14654"/
+          // ":14661") — markiert einen Laeufer, der auf ein sichtbares gegnerisches
+          // Ereignis reagiert (R-2). zeichneSchatzsuche() liest dieses Feld waehrend der
+          // ganzen "gehen"-Phase fuer die gestrichelte Linie + das Ausrufezeichen.
+          u.vizIspyReaktion=!!r.reaktion;
+          u.vizPhase="gehen";
+        } else {
+          // KEIN ZIEL DIESEN TICK (Konzept-Rechner: "punkte:0, ereignis:art.failWort" ohne
+          // fundort, wenn keine Truhe frei/sichtbar war) — der Teilnehmer bleibt stehen.
+          u.vizIspyZielX=u.vizX; u.vizIspyZielY=u.vizY;
+          u.vizIspySuchEnde=ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+          u.vizIspyErfolg=false; u.vizIspyStufe=0; u.vizIspyReaktion=false;
+          u.vizPhase="idle";
+        }
+        u.vizIspyT=0;
+      }
+    }
+    // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch
+    // enthuellter Teilnehmer im SELBEN Frame schon eine (winzige) Fortschrittszahl bekommt
+    // statt einen Frame lang bei 0 zu haengen — dieselbe Reihenfolge wie
+    // stepFechten()/stepTennis().
+    const T=art.rundenDauer;
+    for(const u of TEILNEHMER){
+      u.vizIspyT=(u.vizIspyT||0)+dt;
+      const anteil=T>0?Math.min(1,u.vizIspyT/T):1;
+      if(u.vizPhase!=="idle"){
+        const suchEnde=u.vizIspySuchEnde||ISPY_VIZ_SUCHE_SCHWACH_ENDE;
+        if(anteil<ISPY_VIZ_GEHEN_ANTEIL){
+          u.vizPhase="gehen";
+          const g=ISPY_VIZ_GEHEN_ANTEIL>0?Math.min(1,anteil/ISPY_VIZ_GEHEN_ANTEIL):1;
+          u.vizX=u.vizIspyVonX+(u.vizIspyZielX-u.vizIspyVonX)*g;
+          u.vizY=u.vizIspyVonY+(u.vizIspyZielY-u.vizIspyVonY)*g;
+        } else if(anteil<suchEnde){
+          u.vizPhase="suchen"; u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
+        } else {
+          u.vizX=u.vizIspyZielX; u.vizY=u.vizIspyZielY;
+          if(u.vizPhase!=="ergebnis"){
+            u.vizPhase="ergebnis";
+            // EINMAL-AUSLOeSER beim Betreten von "ergebnis" (Vorbild: stepFechten()s
+            // vizFunkeT-Zuendung an der Phasen-Kante): Jubel-Huepfer bei Erfolg,
+            // Kopfschuetteln bei Fehlschlag. Der "+X"-Schweber selbst kommt bereits
+            // generisch aus stepBuehne()s schwebe()-Aufruf (unveraendert seit PR 1/2) —
+            // hier wird nur die KOeRPERREAKTION ausgeloest.
+            if(u.vizIspyErfolg)u.vizJubelT=ISPY_VIZ_JUBEL_T;
+            else u.vizIspyKopfschuettelT=ISPY_VIZ_KOPFSCHUETTEL_T;
+          }
+        }
+      }
+      if(u.vizJubelT>0)u.vizJubelT=Math.max(0,u.vizJubelT-dt);
+      if(u.vizIspyKopfschuettelT>0)u.vizIspyKopfschuettelT=Math.max(0,u.vizIspyKopfschuettelT-dt);
+      // ANTI-FREEZE (M1-Muster wie stepFechten()s vizFechtBounceT/stepTennis()s
+      // vizSchlagBounceT): laeuft IMMER, auch in "idle" — ein wartender/zielloser
+      // Teilnehmer wippt statt einzufrieren. `+u.id` phasenverschiebt jeden Teilnehmer
+      // gegen die anderen, damit nicht alle im Gleichtakt wippen.
+      u.vizIspyBounceT=(u.vizIspyBounceT||0)+dt;
+      u.vizIspyBob=Math.sin(u.vizIspyBounceT*5+u.id)*1.3;
+    }
+  }
+
   // ================== WETTESSEN BEWEGT SICH (stepWettessen, Opus-Plan Naechste-Drei- =========
   // Disziplinen 17-09, Abschnitt 3.2, D2.b) ====================================================
   // Wettessen ist laut Plan "die am besten vorbereitete der beiden konzeptleeren Buehnen":
@@ -16281,6 +16482,162 @@
     }
   }
 
+  // ================== I-SPY: ESCAPE-ROOM-BUEHNENBILD (PR 3, Konzept 5.1) ==================
+  // docs/design/i-spy-schatzsuche-konzept-21-09.md Abschnitt 5.1: "Escape-Room-Draufsicht:
+  // dunkler Holz-/Steinboden, Wandregale am Rand, warmes Lampenlicht als radiale Verlaeufe,
+  // die zwoelf Fundorte als gezeichnete Primitive (Truhe, Aktenschrank, Schreibtisch mit
+  // Tagebuch, Figur mit Sprechblase fuer 'Verhoer') — im Massstab von
+  // zeichneHantel()/FOLTER_GERAETE/zeichneStab(), OHNE Asset-Download (der Umgebungs-Proxy
+  // laesst keine neuen Dateien durch — nur Canvas-Primitive, kein new Image()/fetch() fuer
+  // Bilder)". `ispyFundortXY()` ist die EINE Umrechnung Fundort-Koordinate (0..1, aus
+  // BUEHNE_ART["i-spy"].fundorte) -> Bildschirm, von bodenSchatzsuche() (Moebel) UND
+  // stepSchatzsuche()/zeichneSchatzsuche() (Lauf-/Sucheziel) gemeinsam gelesen — dieselbe
+  // "eine Quelle statt zweier Literale"-Regel wie showcaseBuzzerPos()/posMap bei
+  // zeichneFechten() weiter oben.
+  function ispyFundortXY(f){
+    return {x:W*0.08+f.x*(W*0.84), y:H*0.18+f.y*(H*0.66)};
+  }
+  // WELCHES MOEBELSTUECK AN WELCHEM FUNDORT: die beiden Tuer-Fundorte (`bild:"tuer"`, s.
+  // BUEHNE_ART["i-spy"].fundorte-Kommentar "DIE TUER IST BILD") bekommen die Tuer; die
+  // beiden Tresore (stufe 3, "Mehrwege-Tresore") die grosse Truhe — ihre Sonderrolle
+  // (Fortschrittsbonus, Nebenweg, hoechster Punktwert) verdient das auffaelligste Moebel im
+  // Raum; die restlichen acht verteilen sich nach Raetselart: logik -> Schreibtisch mit
+  // Tagebuch, verhoer -> Figur mit Sprechblase, mechanik (ohne Tuer) -> Aktenschrank. Reine
+  // Ableitung aus den STATISCHEN Fundort-Daten (art.fundorte), kein rr().
+  function ispyMoebelArt(f){
+    if(f.bild==="tuer")return "tuer";
+    if(f.stufe===3)return "truhe";
+    if(f.art==="logik")return "schreibtisch";
+    if(f.art==="verhoer")return "verhoer";
+    return "aktenschrank";
+  }
+  // STERNE UEBER DEM FUNDORT (Konzept 5.1: "Stufe als Sterne ueber der Truhe (1-3), wie
+  // Takeshis fallenStufe") — wortgleiches Glyphen-Muster wie zeichneTakeshiRoute()s
+  // "★".repeat(st), kein Emoji, reiner Text-Glyph wie ueberall sonst im Motor.
+  function ispySterne(cx,cy,stufe){
+    ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
+  }
+  // FUeNF MOeBEL-PRIMITIVE, ~18-30px, im selben Massstab wie zeichneHantel()/FOLTER_GERAETE
+  // (s. Kopfkommentar dort: "zehn Geraete als einfache Primitive ZEICHNEN, im selben
+  // Massstab wie die vorhandenen Requisiten"). Jede Funktion arbeitet in einem bereits
+  // verschobenen Frame (Ursprung = Fundort-Mittelpunkt) — dasselbe FOLTER_GERAETE-Muster.
+  function ispyZeichneTruhe(c){
+    c.fillStyle="#5a3d22"; c.fillRect(-13,-8,26,14);
+    c.strokeStyle="#2c1f12"; c.lineWidth=1.2; c.strokeRect(-13,-8,26,14);
+    c.fillStyle="#7a5530"; c.beginPath();
+    c.moveTo(-13,-8); c.quadraticCurveTo(0,-20,13,-8); c.closePath(); c.fill();
+    c.strokeStyle="#2c1f12"; c.stroke();
+    c.fillStyle="#f2d75a"; c.beginPath(); c.arc(0,-1,2.4,0,Math.PI*2); c.fill();
+    c.strokeStyle="#8a6a3a"; c.lineWidth=1;
+    c.beginPath(); c.moveTo(-13,-2); c.lineTo(13,-2); c.stroke();
+  }
+  function ispyZeichneAktenschrank(c){
+    c.fillStyle="#57606e"; c.fillRect(-10,-20,20,20);
+    c.strokeStyle="#2c313a"; c.lineWidth=1; c.strokeRect(-10,-20,20,20);
+    for(let i=0;i<3;i++){
+      const dy=-16+i*6.2;
+      c.strokeStyle="#2c313a"; c.beginPath(); c.moveTo(-10,dy+5.4); c.lineTo(10,dy+5.4); c.stroke();
+      c.fillStyle="#8a93a3"; c.fillRect(-2.5,dy+1.6,5,1.6);
+    }
+  }
+  function ispyZeichneSchreibtisch(c){
+    c.fillStyle="#6b4a2e"; c.fillRect(-15,-3,30,7);
+    c.strokeStyle="#3a2a1a"; c.lineWidth=1; c.strokeRect(-15,-3,30,7);
+    c.fillRect(-13,4,3,7); c.fillRect(10,4,3,7);
+    // TAGEBUCH, aufgeschlagen, mittig auf der Tischplatte.
+    c.save(); c.translate(0,-3);
+    c.fillStyle="#e8e2d0"; c.beginPath();
+    c.moveTo(-7,0); c.lineTo(0,-2); c.lineTo(7,0); c.lineTo(7,3); c.lineTo(0,1); c.lineTo(-7,3);
+    c.closePath(); c.fill();
+    c.strokeStyle="#b9ae9c"; c.lineWidth=0.6; c.beginPath(); c.moveTo(0,-2); c.lineTo(0,1); c.stroke();
+    c.restore();
+  }
+  function ispyZeichneVerhoer(c){
+    // Kleine stehende Figur (Kopf + Rumpf, wie eine Miniatur des Standardkoerpers) plus
+    // Sprechblase mit "?" — die "Verhoer"-Fundort-Szene aus dem Konzept.
+    c.fillStyle="#caa06a"; c.beginPath(); c.arc(0,-14,3.2,0,Math.PI*2); c.fill();
+    c.fillStyle="#3a4a5a"; c.beginPath();
+    c.moveTo(-4,-2); c.lineTo(4,-2); c.lineTo(3,-10); c.lineTo(-3,-10); c.closePath(); c.fill();
+    c.fillStyle="#e8e2d0"; c.strokeStyle="#8a8578"; c.lineWidth=0.8;
+    c.beginPath(); c.ellipse(9,-19,7,5,0,0,Math.PI*2); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(4,-16); c.lineTo(2,-12); c.lineTo(6,-15); c.closePath(); c.fill(); c.stroke();
+    c.font="700 8px 'IBM Plex Mono',monospace"; c.fillStyle="#3a2a1a";
+    c.textAlign="center"; c.textBaseline="alphabetic"; c.fillText("?",9,-17);
+  }
+  function ispyZeichneTuer(c){
+    c.fillStyle="#3a2a1a"; c.fillRect(-9,-30,18,30);
+    c.strokeStyle="#1a1008"; c.lineWidth=1.4; c.strokeRect(-9,-30,18,30);
+    c.strokeStyle="#5a4028"; c.lineWidth=1; c.strokeRect(-6,-27,12,24);
+    c.fillStyle="#8a93a3"; c.beginPath(); c.arc(5,-15,1.6,0,Math.PI*2); c.fill();
+  }
+  const ISPY_MOEBEL={
+    truhe:       ispyZeichneTruhe,
+    aktenschrank:ispyZeichneAktenschrank,
+    schreibtisch:ispyZeichneSchreibtisch,
+    verhoer:     ispyZeichneVerhoer,
+    tuer:        ispyZeichneTuer,
+  };
+  // KEIN eigener Publikums-Loop (wie bodenWettessen() — TON_KATALOG["i-spy"] ist PR 4, s.
+  // Konzept 5.4/Bauplan "NICHT bauen fuer PR 3") — muss aber, wie jeder eigene Boden,
+  // saemtliche Loops der Buehnen VOR I-Spy abschalten, falls wir GERADE von einer von ihnen
+  // herkommen.
+  function bodenSchatzsuche(){
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+
+    const art=BB();
+    // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#241c14"); g.addColorStop(1,"#100c08");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // DIELEN, quer durchs Bild — derselbe "duenne helle Streifen"-Trick wie
+    // bodenWettessen()s karierter Tischdecke, hier als Holzdielen.
+    ctx.strokeStyle="rgba(0,0,0,.25)"; ctx.lineWidth=1;
+    for(let i=1;i<10;i++){
+      const dy=i*H/10; ctx.beginPath(); ctx.moveTo(0,dy); ctx.lineTo(W,dy); ctx.stroke();
+    }
+
+    // WANDREGALE AM RAND, oben und unten — eine dunkle Bandzone mit Buchruecken-Andeutung
+    // (dieselbe "Reihe kleiner Rechtecke"-Idee wie bodenShowcase()s Rampenlicht-LEDs).
+    [0,1].forEach(kante=>{
+      const y0=kante?H*0.90:0, bandH=H*0.10;
+      ctx.fillStyle="#1a130d"; ctx.fillRect(0,y0,W,bandH);
+      for(let i=0;i<24;i++){
+        const bx=(i+0.5)*W/24, bh=bandH*(0.5+((i*53)%7)/14);
+        const by=kante?y0+bandH-bh:y0;
+        ctx.fillStyle=["#5a3d22","#3a5040","#4a3550","#3a3a5a"][i%4];
+        ctx.fillRect(bx-3,by,6,bh);
+      }
+    });
+
+    // WARMES LAMPENLICHT als radiale Verlaeufe — unregelmaessig verteilt statt der drei
+    // symmetrischen Scheinwerferkegel aus bodenBuehne(), damit es nach Zimmer statt nach
+    // Buehne aussieht.
+    [[0.22,0.30],[0.72,0.22],[0.46,0.72],[0.90,0.68]].forEach(([lx,ly])=>{
+      const x=W*lx, y=H*ly;
+      const s=ctx.createRadialGradient(x,y,4,x,y,W*0.18);
+      s.addColorStop(0,"rgba(255,214,150,.16)"); s.addColorStop(1,"rgba(255,214,150,0)");
+      ctx.fillStyle=s; ctx.beginPath(); ctx.arc(x,y,W*0.18,0,Math.PI*2); ctx.fill();
+    });
+
+    // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
+    if(art.fundorte){
+      for(const f of art.fundorte){
+        const p=ispyFundortXY(f);
+        ctx.save(); ctx.translate(p.x,p.y);
+        ctx.fillStyle="rgba(0,0,0,.30)";
+        ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
+        (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
+        ctx.restore();
+        ispySterne(p.x,p.y-26,f.stufe);
+      }
+    }
+  }
+
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
   // Screenshot-Befund: "generischer dunkler Buehnenboden" fuer eine Sportart mit einer
   // sehr konkreten, jedem bekannten Kulisse. Wettkampfplattform, drei Kampfrichterlampen,
@@ -16444,7 +16801,7 @@
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): genau die weitere
     // else-if-Zeile, die der Kommentar oben ankuendigt -- s. bodenWettessen() oben.
-    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else bodenBuehne();
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else if(art.schatzsuche&&typeof bodenSchatzsuche==="function")bodenSchatzsuche(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -16486,6 +16843,14 @@
     // Nicht-Tennis/Nicht-Fechten/Nicht-Wettessen/Nicht-Showcase-Buehne (I-Spy) durchlaeuft
     // den generischen Zweig darunter weiterhin unveraendert.
     if(art.duett){ zeichneDuett(art); return; }
+    // I-SPY (PR 3, Buehnenbild/Bewegung/Lupe, Konzept 5): eigener Zweig, exklusiv auf
+    // `art.schatzsuche` gegated (s. BUEHNE_ART["i-spy"]) — dasselbe Muster wie die sechs
+    // Zweige oberhalb. Escape-Room-Fundorte (bodenSchatzsuche()) + Gehen/Suchen/Ergebnis-
+    // Bewegung + Lupe an der Hand, s. stepSchatzsuche()/zeichneSchatzsuche() weiter unten.
+    // Die verbleibende Nicht-Heben/Nicht-Schach/Nicht-Breaking/Nicht-Tennis/Nicht-Fechten/
+    // Nicht-Wettessen/Nicht-Showcase/Nicht-Duett-Buehne durchlaeuft weiterhin den
+    // generischen Zweig darunter unveraendert (heute: keine).
+    if(art.schatzsuche && typeof zeichneSchatzsuche==="function"){ zeichneSchatzsuche(art); return; }
     // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
     // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
     const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
@@ -16786,6 +17151,117 @@
     // — dieselbe Idee wie posVon() bei zeichneTennis(), nur ueber die hier gefuellte posMap
     // statt einer eigenen Formel, weil die Bahn-Positionen (anders als bei Tennis) je Brett
     // UND je Ausfall-/Parade-Phase schwanken.
+    for(const f of floats){
+      if(f._teilnehmer==null)continue;
+      const p=posMap.get(f._teilnehmer); if(!p)continue;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText(f.txt,p.x,p.y-34-((1-f.life)*20));
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ================== I-SPY: TEILNEHMER-BILD (PR 3, Konzept 5.2/5.3) ==================
+  // Exklusiv auf `art.schatzsuche` gegated (BUEHNE_ART["i-spy"]) — dasselbe Muster wie die
+  // sechs Zweige davor in zeichneBuehne(). Position kommt ausschliesslich aus
+  // stepSchatzsuche()s u.vizX/u.vizY (Fallback ispyHeimatXY(), solange stepSchatzsuche()
+  // noch nie gelaufen ist — derselbe "solange vizX==null"-Vertrag wie bei stepKuer/
+  // stepShowcase). `true` schaltet den istIspy()-Requisitenblock in zeichneSprite() frei
+  // (Lupe an der Hand, nur waehrend u.vizPhase==="suchen").
+  function zeichneSchatzsuche(art){
+    if(!TEILNEHMER.length)return;
+    const posMap=new Map();
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const c=side===0?css("--home"):css("--away");
+      g.forEach(u=>{
+        const heim=ispyHeimatXY(u);
+        const x=u.vizX!=null?u.vizX:heim.x, y=(u.vizY!=null?u.vizY:heim.y)+(u.vizIspyBob||0);
+        posMap.set(u.id,{x,y});
+
+        // REAGIEREN (Konzept 5.2): gestrichelte Linie vom Laeufer zum Fundort +
+        // Ausrufezeichen ueber dem Kopf, waehrend der "gehen"-Phase des Ticks, in dem
+        // r.reaktion gesetzt war (Vorbild: die Ansage-Linien der Arena, ":12683" ff., hier
+        // gestrichelt zum ZIEL statt eines Fokus-Rings um den Laeufer selbst).
+        if(u.vizPhase==="gehen"&&u.vizIspyReaktion){
+          ctx.save();
+          ctx.strokeStyle="rgba(242,215,90,.75)"; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
+          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(u.vizIspyZielX,u.vizIspyZielY); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font="800 13px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+          ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+          ctx.fillText("!",x,y-46);
+          ctx.restore();
+        }
+
+        // GROSSES LUPENSYMBOL UEBER DEM KOPF (Konzept 5.3: "Ring, Griff, Blinken im Takt
+        // von buehneAkt") — zusaetzlich zur kleinen Requisite an der Hand
+        // (DISZIPLIN_PROP["i-spy"], s. istIspy()-Aufrufstelle in zeichneSprite), nur
+        // waehrend "suchen".
+        if(u.vizPhase==="suchen"){
+          ctx.save();
+          ctx.globalAlpha=0.55+0.45*Math.abs(Math.sin(buehneAkt*20));
+          ctx.translate(x,y-52);
+          ctx.strokeStyle="#6b4a2e"; ctx.lineWidth=1.8; ctx.lineCap="round";
+          ctx.beginPath(); ctx.moveTo(-3,3); ctx.lineTo(3,9); ctx.stroke();
+          ctx.fillStyle="rgba(200,225,255,.30)"; ctx.strokeStyle="#e8e2d0"; ctx.lineWidth=1.4;
+          ctx.beginPath(); ctx.arc(-3,-2,6.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.globalAlpha=0.20; ctx.fillStyle=c;
+        ctx.beginPath(); ctx.ellipse(x,y+19,15,5,0,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=1;
+
+        // JUBEL/KOPFSCHUeTTELN (Konzept 5.2 "ergebnis"): kleiner Sprung nach oben bei
+        // Erfolg (u.vizJubelT), kleines seitliches Wackeln bei Fehlschlag
+        // (u.vizIspyKopfschuettelT) — reine Bildschirm-Verschiebung des Zeichenpunkts,
+        // die Sprite-Zeichnung selbst bleibt unangetastet.
+        let dx=0, dy2=0;
+        if(u.vizJubelT>0){
+          dy2=-Math.sin(Math.min(1,1-u.vizJubelT/ISPY_VIZ_JUBEL_T)*Math.PI)*10;
+        } else if(u.vizIspyKopfschuettelT>0){
+          dx=Math.sin(u.vizIspyKopfschuettelT*40)*3;
+        }
+        zeichneSprite(ctx,u,x+dx,y+dy2,true);
+
+        // ERGEBNIS AN DER TRUHE (Konzept 5.1: "leere Truhe mit offenem Deckel" / "eine
+        // angebrochene Truhe ... mit sichtbarem Riss und '+15%'-Anzeige"): ephemere
+        // Ueberlagerung genau an DIESES Teilnehmers eigenem Fundort, nur waehrend seiner
+        // "ergebnis"-Phase — liest ausschliesslich die eigenen, bereits enthuellten
+        // viz*-Felder (vizIspyErfolg/vizIspyStufe). Keine Rekonstruktion eines globalen
+        // Truhenstands: jede Seite spielt ohnehin ihre eigene, unabhaengige Truhenkopie
+        // (s. Kopfkommentar bei baueSchatzsuche(), "ARCHITEKTUR-ENTSCHEIDUNG").
+        if(u.vizPhase==="ergebnis"){
+          ctx.save(); ctx.translate(x,y-30);
+          if(u.vizIspyErfolg){
+            ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.6;
+            ctx.beginPath(); ctx.moveTo(-9,4); ctx.quadraticCurveTo(0,-10,9,4); ctx.stroke();
+          } else if(u.vizIspyStufe===3){
+            ctx.strokeStyle="rgba(255,90,60,.85)"; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(1,2); ctx.lineTo(-3,4); ctx.lineTo(4,10); ctx.stroke();
+            ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+            ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.fillText("+15%",0,18);
+          }
+          ctx.restore();
+        }
+
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        const schrift=(txt,dyN,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+          ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x+dx,y+dy2+66);
+      });
+    });
+
     for(const f of floats){
       if(f._teilnehmer==null)continue;
       const p=posMap.get(f._teilnehmer); if(!p)continue;
