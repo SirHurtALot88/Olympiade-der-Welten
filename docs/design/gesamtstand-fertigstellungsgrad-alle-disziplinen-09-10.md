@@ -1,3 +1,77 @@
+**Achtzehnter Nachtrag 21.09. — Tennis auf 88,75 % nachgezogen, PR "Tennis-Movement-Ton
+(M2+A4) + M3-Nachbuchung" (Branch `tennis-movement-ton-21-09`).** Grundlage:
+`docs/design/tennis-feinschliff-recherche-21-09.md` (reine Recherche, 21.09., derselbe Tag),
+die alle vier K/A/M-Achsen fuer Tennis einzeln gegen den Code gegengeprueft hat, nicht nur die
+zwei bewegten. **rho FRISCH nachgemessen, nicht behauptet:**
+
+```
+node scripts/miss-alle-disziplinen.mjs 24 tennis
+```
+
+→ **0,825** (Spannweite 0,210, Saison-rho 0,839, Spannweite 0,280) — bit-identisch zur
+Basislinie vom 14.09. (16.09.-Nachzug unten). Erwartungsgemaess: der PR ruehrt weder `rezept`
+noch `wert()` noch `BUEHNE_ART.tennis` an.
+
+**Konzept: 75→75, keine Bewegung.** K2 (eigene Mechanik ueber das Chassis hinaus) bleibt
+ausdruecklich offen — `BUEHNE_ART.tennis` traegt weiterhin `duell:true`, dieselbe geteilte
+Speed-Schach-Mechanik, kein eigener interaktiver Ballwechsel-Rechner. Genau die
+„Tennis-Praezedenz", die das Wettessen-K2 im siebzehnten Nachtrag oben selbst zitiert (Zeile
+30 der Recherche). Das ist bewusst **nicht** Teil dieses PRs (echte Mechanik-/Balance-Aenderung,
+Puffer nur 0,025 ueber dem Kaderrauschen 0,21 — s. Recherche Abschnitt 5).
+
+**Assets: 70→90 (A4 neu erfuellt, A1/A2/A3 unveraendert).**
+- **A4 (Ton): 0→20, erstmals erfuellt.** `TON_KATALOG` fuehrte bislang **gar keinen**
+  `tennis`-Schluessel (nicht nur einen ohne Aufrufer, wie vor dem jeweiligen Fix bei
+  Football/Time-Trial/Spurt/Fechten — der Schluessel fehlte komplett). Jetzt drei Ereignisse
+  (`aufschlag`/`ass`/`netz`), abgefeuert aus `stepTennis()`s Enthuellungs-Erkennung (nicht aus
+  `zeichneTennis()`, s. Begruendung im Code-Kommentar dort: `zeichneTennis()` laeuft jeden
+  Render-Frame, ein ungeschuetzter Aufruf dort haette den Ton ueber die gesamte Flugdauer
+  wiederholt abgefeuert). Kein `publikum`-Loop — dieselbe Begruendung wie bei Climbing (A4 ist
+  binaer, kein zusaetzliches Bookkeeping fuer diese PR noetig).
+- **A1/A2/A3: unveraendert, ausdruecklich nicht angefasst.** Die Recherche vermutet, A1 sei im
+  Code bereits hoeher erfuellt als die bisherige 70-%-Arithmetik unterstellt (`tennis.tsx`,
+  424 Z., bespoke Grand-Slam-Court) — das ist in dieser PR **nicht** nachgezogen, weil dafuer
+  eine eigene Bucharbeit-Neubewertung von A1 selbst noetig waere (nicht Teil des Auftrags), nur
+  die klar bau-relevante A4-Luecke wurde geschlossen.
+
+**Movement: 50→100 (M2 neu erfuellt + M3-Nachbuchung, M1/M4 unveraendert).**
+- **M2 (eigene Bewegungs-/Schrittlogik): 0→25, erstmals erfuellt.** `stepTennis()`, exakt nach
+  dem Vorbild von `stepFechten()` (":15252" ff., Ziel 10) — derselbe woertlich uebernommene
+  „harte Vertrag": niemals `rr()`/`u.summe`/`u.runden`/`u.aktuell`/`u.vorteil`/`u.zweikampf`/
+  `u.lunge`/`buehneAkt`/`buehneZeiger`/`done` schreiben, nur neue `viz*`-Felder
+  (`vizSchlagPhase`/`vizSchlagT`/`vizSchlagAktuell`/`vizSchlagBounceT`/`vizSchlagBob`). Vier
+  Phasen (`bereit`→`ausholen`→`treffer`/`fehlschlag`→`erholen`) ersetzen die bisherige lineare
+  Ableitung aus `u.lunge` (":16122" vorher: „1-schlaeger.lunge/0.5") in `zeichneTennis()`s
+  Ballwechsel-Fortschritt UND in den beiden Schlaeger-Posen-Aufrufstellen in `zeichneSprite()`
+  (":3477"/":3628", vorher `u.lunge>0`), plus einen Grundstellungs-Wipper
+  (`vizSchlagBounceT`/`vizSchlagBob`, Anti-Freeze wie `vizFechtBounceT`). rho bit-identisch
+  (s.o.) — `u.runden`/`u.aktuell` werden in `stepTennis()` nur gelesen, nie geschrieben.
+- **M3 (sichtbare Animation in der PRODUKTIVEN React-Buehne): 0→25, Nachbuchung, KEIN
+  Code-Change.** Die Tabelle fuehrte M3 seit jeher bei 0, obwohl
+  `app/foundation/discipline-stage/arena/disciplines/tennis.tsx` bereits seit Commit
+  `a7ce4bac` (vor dem 09.09.-Basisstand dieses Dokuments) eine eigene FX-Schicht traegt:
+  `fireShot()`/`ace()`/`netRoller()` mit eigenen SVG-Elementen und eigenen CSS-Keyframes
+  (`tfxBall`/`tfxPoof`/`tfxPop`, `tennis.tsx:294-301`) sowie ein eigener `rallyRef`-Ballwechsel
+  per Ping-Pong zwischen Fuehrer/Verfolger (`tennis.tsx:234-258`) — strukturell derselbe
+  Massstab, den dieses Dokument fuer Fechtens `lamps.tsx` bereits mit vollen M3-Punkten
+  honoriert (zwoelfter Nachtrag, Fechten-Zeile der grossen Tabelle weiter unten: „A1/M3 waren
+  ueber `lamps.tsx` ... bereits vorher voll und unberuehrt"). Anders als bei Fechten/Climbing/
+  Time-Trial stand bei Tennis nie
+  der Satz „ausdruecklich gegen die PRODUKTIVE Datei geprueft" — es sieht nach einer schlicht
+  nie durchgefuehrten Pruefung aus, nicht nach einem bewussten Befund (s. Recherche Abschnitt
+  3). Diese Zeile holt die Pruefung jetzt nach: `tennis.tsx` ist von PR
+  „Tennis-Movement-Ton" **nicht beruehrt** — die M3-Punktzahl war schon vorher verdient, nur
+  nie gebucht.
+- **M1/M4: unveraendert, ausdruecklich gegengeprueft.** `zeichneTennis()` (M1) und die
+  Ausholpose ueber `TENNIS_PHASEN`/`u.vizSchlagPhase` (M4, vorher `u.lunge>0`) bleiben bei
+  ihrer vollen Punktzahl, keine Bewegung.
+
+**Gameplay: 90→90, keine Bewegung** — reine Praesentation, wie oben belegt.
+
+**Gesamt: 71→88,75 % (rundet auf 89 %).** Assets 70→90, Movement 50→100, Konzept/Gameplay
+unveraendert. rho bit-identisch **0,825** (Recheck oben), Kader-Rauschen unveraendert bei
+0,210.
+
 **Siebzehnter Nachtrag 19.09. — Wettessen auf 72,5 % nachgezogen (PR #965), eigene Banketttafel
 statt generischem Podest.** Der sechzehnte Nachtrag (direkt darunter) hatte Wettessen unangetastet
 bei 46,25 % (Konzept 35/Assets 40/Gameplay 95/Movement 15) stehen lassen. Seither ist ein PR
@@ -1015,7 +1089,7 @@ oben. Die uebrigen neunzehn Zeilen sind gegenueber dem sechzehnten Nachtrag unve
 | 10 | Time-Trial | Bahn | 95 % | **100 %** | 92 % | 100 % | **97 %** | 0,825 | ja | **16.09.-Nachzug 2 (PR #952, 16.09.):** `ZF_BRUST`-Anker (nach einer Korrekturrunde von Kopf auf Brust umgebaut, gegen alle 17 Kaderfiguren verifiziert) + `zeichneZeitfahrWeste()` (magenta Renn-Nummernweste) — A3 erstmals erfuellt; vier `sfx("time-trial",…)`-Aufrufe in `stepZeitfahren()` (start/bergauf/zwischenzeit/ziel) — A4 erstmals erfuellt. Assets 55→100. rho bit-identisch **0,825**, Konzept/Gameplay/Movement unveraendert (Movement bereits beim Deckel) · **16.09.-Nachzug (PR #948, 16.09.):** `bodenZeitfahren()` (neue, exklusiv auf `zeitfahren` gegatete Zeichenfunktion in `bodenSpurt()`) zeichnet erstmals das Streckenprofil selbst — Terrain-Toenung mit Schraegschraffur je `gelaende`-Zone plus Huegelsilhouette ueber der Bahn — und schliesst damit die bisherige Hauptluecke „man sieht keinen Berg"; A2 erstmals voll erfuellt (Assets 50→55) und dieselbe Funktion erfuellt zugleich M1 (eigene Zeichenfunktion statt der generischen `bodenSpurtGerade()`, die die anderen vier Bahnen weiterhin nutzen), Movement 65→100. `u.vizNeigung` in `stepZeitfahren()` plus Vorlehnung/Aufrichtung in `zeichneSpurt()` verstaerken M2/M4, beide bereits vorher voll, keine neue Punktzahl. rho bit-identisch **0,825** (reine Praesentation, `gelaendeFaktor()`/`gelaendeZehrFaktor()` unangetastet), Gameplay bleibt 92 · **13.09.** Zwischenstand rechnet hochgerechnete Eigenzeit statt roher Strecke, alle Zeitanzeigen im Uhrenmassstab, `stepZeitfahren()` mit Laufzyklus/Erschoepfung/Rampe → Movement 50→65, Startrampe+Ausdauer-Leiste → Assets 45→50; rho 0,828→**0,825** (PR #908) · Arena-Spalte korrigiert |
 | 11 | Spurt | Bahn | 95 % | **100 %** | **97 %** | **100 %** | **98 %** | 0,894 | ja | **16.09.-Nachzug 2 (PR #952, 16.09.):** `DISZIPLIN_PROP.spurt` mit `SPURT_FUSS` (Wiederverwendung von `FUSS_EISKUNSTLAUF`) + `zeichneSpikes()` — A3 erstmals erfuellt; vier `sfx("spurt",…)`-Aufrufe in `stepHuerden()` (startschuss/huerde/riss/ziel) — A4 erstmals erfuellt; neues `u.vizHuerde`-Feld gibt eine Huerdenflug-Pose (Sprunghoehe + gestreckte Silhouette) in `zeichneSpurt()` — M4 von teilweise auf voll. Assets 55→100, Movement 85→100. rho bit-identisch **0,894**, Konzept/Gameplay unveraendert · **16.09.-Nachzug (PR #926, 14.09.):** Feldgroesse 4→6 behoben, rho 0,871→0,894 (≥0,85-Stufe) plus **G2 30 neu** — Spurt ist die 14. arena-resolved Disziplin, Gameplay 67→97. `stepHuerden()` (Teil B derselben PR) beendet die eingefrorene Sprite-Animation, Movement 60→85 |
 | 12 | Fechten | Buehne | 75 % | **100 %** | 90 % | **100 %** | **91 %** | 0,826 | ja | **16.09.-Nachzug 2 (PR #945/#946, 16.09.):** Rezeptkalibrierung (NERVEN/GRUNDLAGE/TECHNIK neu gewichtet) hebt rho 0,809→0,826, gleiche 0,80–0,85-Stufe, Gameplay bleibt 90 — Kopfkommentar bleibt „nicht finaler Entwurf" (`:12520`), Puffer (0,026) bleibt unter dem Kaderrauschen (0,203), K4 weiterhin offen, Konzept bleibt 75. `zeichneFechten()` (eigene Fechtbahnen je Brett, A2/M1 neu) + `stepFechten()` (eigene Zustandsmaschine engarde/ausfall/erholung/parade, M2 neu) + `sfx("fechten",…)` erstmals verdrahtet (A4 neu) + `FECHTEN_PHASEN`/`zeichneDegen()` als dauerhafte eigene Pose statt nur im Ausfallfenster (M4 voll) — Assets 55→100, Movement 35→100. A1/M3 waren ueber `lamps.tsx` (eine von drei Feldern mit eigener Token-Zeichnung, eigene Touché-FX) bereits vorher voll und unberuehrt |
-| 13 | Tennis | Buehne | 75 % | **70 %** | 90 % | **50 %** | **71 %** | 0,825 | ja | **16.09.-Nachzug (PR #929, 14.09.):** `zeichneTennis()` als eigener Buehnenzweig mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch |
+| 13 | Tennis | Buehne | 75 % | **90 %** | 90 % | **100 %** | **89 %** | 0,825 | ja | **21.09.-Nachzug (Achtzehnter Nachtrag ganz oben):** `stepTennis()` (eigene Zustandsmaschine bereit/ausholen/treffer-fehlschlag/erholen, exakt nach `stepFechten()`-Vorbild) — M2 erstmals erfuellt; `TON_KATALOG.tennis` (drei Ereignisse aufschlag/ass/netz) erstmals verdrahtet in `stepTennis()` — A4 erstmals erfuellt. Assets 70→90, Movement-Anteil daraus 50→75. Zusaetzlich M3-Nachbuchung (reine Dokumentationskorrektur, kein Code-Change): `tennis.tsx` traegt schon seit Commit `a7ce4bac` eine eigene FX-Schicht (`fireShot()`/`ace()`/`netRoller()`, eigene SVG/CSS-Keyframes), strukturell derselbe Massstab wie Fechtens `lamps.tsx` (dort voll gewertet) — nie explizit gegengeprueft, jetzt nachgeholt, Movement 75→100. rho bit-identisch **0,825** (reine Praesentation, Rezept/`wert()` unangetastet), Konzept/Gameplay unveraendert · **16.09.-Nachzug (PR #929, 14.09.):** `zeichneTennis()` als eigener Buehnenzweig mit Schlaeger an der Hand (`DISZIPLIN_PROP.tennis`, vorher `null`) und Ballwechsel-Flugbahn — Assets 40→70 (A2/A3 erstmals erfuellt), Movement 20→50 (M1/M4 erstmals erfuellt). Rezept/`wert()` unangetastet, rho bit-identisch |
 | 14 | Mini-DM | Arena | **75 %** | 60 % | 22 % | 60 % | **54 %** | 0,256 | nein | **16.09.-Nachzug (PR #927/#930, 14.09.):** fuenf von sechs offenen Spielplanfragen beantwortet (4-Team-Pods, Kadergroesse 1, echter Playwright-Aufrufer fuer den FFA-Motor) — Konzept 70→75 (K4-Teilfortschritt). Weiterhin nicht in `ARENA_RESOLVED_DISCIPLINE_IDS` verdrahtet, Gameplay haengt allein an rho (0,256, unveraendert) · **13.09.** der 4-Team-FFA hat NULL Produktionsaufrufer (PR #911, s. 3.5) |
 | 15 | Battlefield | Arena | 70 % | 60 % | 22 % | 60 % | **53 %** | 0,251 | nein | **14.09.** Reihenabstand 34,5→155,0 px, Commander bleibt in Reihe 2 → Movement 55→60 (PR #912). rho 0,387→0,251, Kaderrauschen 0,778 — gleiche G1-Stufe · **16.09. gegenkontrolliert:** unveraendert |
 | 16 | TDM | Arena | 55 % | 65 % | 22 % | 65 % | **52 %** | 0,165 | nein | **14.09.** Reihenabstand 20,4→81,3 px + zwei neue Zielneigungen (`speer`/`schild`) → Movement 60→65 (PR #912). rho 0,253→0,165, Kaderrauschen 0,272 — gleiche G1-Stufe · **16.09.-Nachzug:** PR #938 (15.09.) nimmt die Stufenaufstieg-Vorschau raus (auskommentiert, nicht geloescht) — reine Anzeigefunktion, war nie ein zaehlender Achsen-Baustein, keine Zahl bewegt sich |
@@ -1024,12 +1098,24 @@ oben. Die uebrigen neunzehn Zeilen sind gegenueber dem sechzehnten Nachtrag unve
 | 19 | Showcase | Buehne | **75 %** | **100 %** | 95 % | **95 %** | **91 %** | 0,892 | ja | **17.09.-Nachzug (PR #957/#959/#960/#961, 17.09.):** eigenes Flag `showcase:true` + `actVon()`-Act-Ableitung aus BAU-Bauplan/Klasse/Rasse/Traits (K2 neu) + eigenes Konzeptdokument (K3 neu) — Konzept 25→75 (K4 bewusst offen, Rezept unangetastet); `bodenShowcase()` (A2 neu), sechs Act-Requisiten (A3 neu), `TON_KATALOG.showcase` mit acht Ereignissen (A4 neu) — Assets 40→100 (A1 bereits vorher voll ueber `showcase.tsx`, unberuehrt); sechs eigene Act-Zeichenfunktionen (M1 neu) + `stepShowcase()`-Zustandsmaschine (M2 neu) + act-eigene Posen/FX (M4 neu) — Movement 20→95, **M3 bleibt bewusst teilweise** (`showcase.tsx`, der PRODUKTIVE React-Renderer, ist von keiner der vier PRs beruehrt — nur der geteilte `TokenChrome`/`useTokenGlide`-Bausatz, keine eigene Zusatzschicht). rho bit-identisch **0,892**, Gameplay unveraendert 95 (Rezept bewusst nicht angefasst) |
 | 20 | I-Spy | Buehne | 55 % | 40 % | 37 % | 20 % | **38 %** | 0,684 | nein | 10.09. Zufallswaffen-Bug geschlossen, Assets 30→40 |
 
-**Durchschnitt ueber alle zwanzig (19.09., nach dem siebzehnten Nachtrag): 82 %** (rechnerisch
-82,30 %, war 81 % (80,99 %) nach dem sechzehnten Nachtrag, 80 % nach dem fuenfzehnten Nachtrag,
-78 % nach dem vierzehnten Nachtrag, 76 % nach dem dreizehnten Nachtrag, 75 % nach dem zwoelften
-Nachtrag, 74 % nach dem elften Nachtrag, 72 % am 14.09. vor der Merge-Welle, 65 % am 10.09. vor der
-Feinschliff-/Football-Runde). Je Achse: **Konzept 82 % · Assets 86 % · Gameplay 77 % ·
-Movement 84 %.**
+**Durchschnitt ueber alle zwanzig (21.09., nach dem achtzehnten Nachtrag): 83 %** (rechnerisch
+83,17 %, war 82 % (82,30 %) nach dem siebzehnten Nachtrag, 81 % (80,99 %) nach dem sechzehnten
+Nachtrag, 80 % nach dem fuenfzehnten Nachtrag, 78 % nach dem vierzehnten Nachtrag, 76 % nach dem
+dreizehnten Nachtrag, 75 % nach dem zwoelften Nachtrag, 74 % nach dem elften Nachtrag, 72 % am
+14.09. vor der Merge-Welle, 65 % am 10.09. vor der Feinschliff-/Football-Runde). Je Achse:
+**Konzept 82 % · Assets 87 % · Gameplay 77 % · Movement 87 %.**
+
+*Die Bewegung seit dem siebzehnten Nachtrag (82 %→83 %) kommt ausschliesslich aus Tennis
+(71,25 %→88,75 %, s. achtzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind
+ziffernidentisch. Movement bewegt sich am staerksten (84,25 %→**86,75 %**, rundet auf 87 %, aus
+Tennis' M2-Sprung 0→25 UND der M3-Nachbuchung 0→25, zusammen +50 Punkte — die einzige Zeile
+dieses Nachtrags, in der eine Bucharbeitskorrektur ohne Code-Aenderung genauso viel beitraegt wie
+das echte Feature). Assets bewegt sich zweitstaerkst (86,25 %→**87,25 %**, rundet auf 87 %, aus
+Tennis' A4, +20 Punkte). Konzept und Gameplay bewegen sich nicht (82,0 % bzw. 76,7 % exakt,
+rundet weiter auf 77 %) — bei Tennis war es ausschliesslich die Assets-/Movement-Achse, K2 bleibt
+bewusst offen (s. achtzehnter Nachtrag). Wie beim sechzehnten Nachtrag (Climbing) und dem
+siebzehnten (Wettessen) bewegen sich diesmal nur zwei Achsen, nicht alle vier wie beim
+fuenfzehnten (Showcase).*
 
 *Die Bewegung seit dem sechzehnten Nachtrag (81 %→82 %) kommt ausschliesslich aus Wettessen
 (46,25 %→72,5 %, s. siebzehnter Nachtrag ganz oben), die uebrigen neunzehn Zeilen sind

@@ -3474,7 +3474,10 @@
       }
       if(feldspiel&&istTennis()&&!u.down){
         const prop=DISZIPLIN_PROP.tennis;
-        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,(u.lunge>0)?"schlag":"ruhend");
+        // M2 (Feinschliff 21-09): liest stepTennis()s vizSchlagPhase ueber tennisSchlagAktiv()
+        // statt u.lunge direkt (Vorbild: die Fechten-Zeile direkt darunter liest bereits
+        // vizFechtPhase, keine Ableitung aus u.lunge).
+        prop.zeichne(ctx,kopf.kopfX+7*Z,kopf.kopfY+5*Z,Z,r0,tennisSchlagAktiv(u)?"schlag":"ruhend");
       }
       if(feldspiel&&istFechten()&&!u.down){
         const prop=DISZIPLIN_PROP.fechten;
@@ -3625,7 +3628,8 @@
       if(feldspiel&&istTennis()&&!u.down){
         const prop=DISZIPLIN_PROP.tennis;
         const hpV=prop.hand[r0]||prop.hand[2];
-        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,(u.lunge>0)?"schlag":"ruhend");
+        // M2 (Feinschliff 21-09): dieselbe tennisSchlagAktiv()-Quelle wie im Normalpfad oben.
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,tennisSchlagAktiv(u)?"schlag":"ruhend");
       }
       if(feldspiel&&istFechten()&&!u.down){
         const prop=DISZIPLIN_PROP.fechten;
@@ -14373,6 +14377,11 @@
     if(art.heben && typeof stepHeben==="function"){ stepHeben(dt,art); return; }     // Ziel 1
     if(art.schach && typeof stepSchach==="function"){ stepSchach(dt,art); return; }  // Ziel 5
     if(art.fechten && typeof stepFechten==="function"){ stepFechten(dt,art); return; } // Ziel 10
+    // TENNIS (Feinschliff-Recherche 21-09, M2): dasselbe typeof-Waechter-Muster wie die vier
+    // Zweige oberhalb. stepTennis() liest u.aktuell/u.runden NUR (nie geschrieben) und setzt
+    // ausschliesslich neue, praesentationale viz*-Felder (vizSchlag*) -- Vertrag wortgleich zu
+    // stepFechten(), s. Kommentar bei stepTennis() weiter unten.
+    if(art.tennis && typeof stepTennis==="function"){ stepTennis(dt,art); return; }
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.b): dasselbe
     // typeof-Waechter-Muster wie die fuenf Zweige oberhalb. stepWettessen() liest den
     // failWort/erfolgWort-Ausgang jedes frisch enthuellten Durchgangs und schreibt
@@ -15320,6 +15329,108 @@
     return 0;
   }
 
+  // ================== TENNIS BEWEGT SICH (stepTennis, Feinschliff-Recherche 21-09, M2) ========
+  // Scorecard-Fund (docs/design/tennis-feinschliff-recherche-21-09.md Abschnitt 3): M2 (eigene
+  // Bewegungs-/Schrittlogik) stand offen, obwohl zeichneTennis() (:15962 ff., Feinschliff
+  // 14.09.) schon einen Ballwechsel zeichnet -- der Fortschritt kam bislang aus einer reinen
+  // Ableitung von u.lunge (":16011" alt: "1-schlaeger.lunge/0.5"), keiner echten Zustandsmaschine.
+  // Diese Funktion ist der Nachzug, exakt nach dem Vorbild von stepFechten() (":15252" oben,
+  // "Ziel 10") -- derselbe "harte Vertrag", woertlich uebernommen:
+  //
+  // HARTER VERTRAG WIE BEI stepFechten()/stepSchach()/stepCypher(): niemals rr(), niemals
+  // u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/u.lunge/buehneAkt/buehneZeiger/done
+  // anfassen -- geschrieben werden AUSSCHLIESSLICH neue, praesentationale viz*-Felder
+  // (vizSchlagPhase/vizSchlagT/vizSchlagAktuell/vizSchlagBounceT/vizSchlagBob). u.runden/
+  // u.aktuell werden NUR GELESEN, nie geschrieben -- exakt das Muster, das stepFechten() fuer
+  // dieselben zwei Felder nutzt. disziplinProbe()/miss-alle-disziplinen.mjs duerfen diese
+  // Funktion mit jedem Frame mitlaufen lassen, ohne dass sich eine Rangtreue-Zahl bewegt.
+  // Rezept/wert()/rundenN/failAbzug (BUEHNE_ART.tennis) sind in dieser PR nicht angefasst.
+  //
+  // VIER PHASEN STATT DER ZWEI BEI TENNIS_PHASEN (Vorbild: stepFechten()s vier Phasen ggue.
+  // den zwei ruhend/schlag-Requisitenposen): "bereit" (Default/nach Rueckkehr), "ausholen"
+  // (der Ball ist noch in der Hand, der Schlaeger schwingt aus -- erkannt wie bei
+  // stepFechten() ueber einen u.vizSchlagAktuell-Vergleich gegen u.aktuell), "treffer" bzw.
+  // "fehlschlag" (abhaengig von r.ereignis===art.erfolgWort, exakt das Feld, das
+  // zeichneTennis() heute schon liest, s. dort), "erholen" (der Ballwechsel ist entschieden,
+  // der Schlaeger kehrt in die Grundstellung zurueck). u.vizSchlagT ist die Phasenuhr
+  // (Vorbild u.vizFechtT). Die drei Zeitkonstanten summieren sich auf genau
+  // BUEHNE_ART.tennis.rundenDauer (60/(10*6*2)=0,5s) -- derselbe Gesamtrahmen, den der alte
+  // u.lunge-Ablauf schon abdeckte, nur jetzt in sichtbar unterschiedene Abschnitte zerlegt
+  // statt einer einzigen linearen Rampe.
+  //
+  // WARUM SFX() HIER UND NICHT IN zeichneTennis() (A4, Ton-Katalog TON_KATALOG.tennis unten):
+  // zeichneTennis() laeuft jeden Render-Frame -- ein sfx()-Aufruf direkt in dessen
+  // Treffer/Fehlschlag-Zweig ohne einen Einmal-Wächter wuerde den Ton bei jedem Frame der
+  // gesamten Flugdauer neu abfeuern (spuerbares Ton-Stottern). Die Erkennungs-Schleife hier
+  // laeuft dagegen garantiert nur EINMAL je frisch enthuelltem Zug (derselbe
+  // u.vizSchlagAktuell-Vergleich, der auch die Phase umschaltet) -- exakt das Muster, das
+  // stepFechten() fuer sfx("fechten","klingen"/"treffer"/"halt") bereits nutzt (:15274/:15280)
+  // und das stepCypher() fuer Breaking ebenso (sfx("breaking","hieb") direkt aus einer
+  // step*-Funktion, s. Kommentar dort). Alle drei Ereignisse (aufschlag/ass/netz) feuern damit
+  // exakt einmal pro Ballwechsel, im selben Frame, in dem der Zug enthuellt wird.
+  //
+  // ANTI-FREEZE (wie u.vizFechtBounceT bei stepFechten()): u.vizSchlagBounceT laeuft IMMER,
+  // auch ausserhalb eines aktiven Ballwechsels -- ein sehr kleiner, dauerhafter
+  // Grundstellungs-Wipper (zeichneTennis() liest ihn als vizSchlagBob), damit ein wartender
+  // Spieler nie als Standbild einfriert.
+  const TENNIS_AUSHOL_T=0.12, TENNIS_FLUG_T=0.26, TENNIS_ERHOL_T=0.12;
+  function stepTennis(dt,art){
+    if(!TEILNEHMER.length)return;
+    // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild: stepFechten()s u.vizFechtAktuell-Vergleich).
+    // Tennis laeuft wie Fechten OHNE Spotlight -- alle Bretter gleichzeitig -- deshalb hier
+    // eine Schleife ueber ALLE Teilnehmer statt nur ueber ein Brettpaar.
+    for(const u of TEILNEHMER){
+      if(u.brett==null)continue; // Sicherheitsnetz, sollte bei art.duell nie greifen.
+      if(u.vizSchlagAktuell==null)u.vizSchlagAktuell=-1;
+      if(u.aktuell>=0 && u.aktuell!==u.vizSchlagAktuell){
+        u.vizSchlagAktuell=u.aktuell;
+        u.vizSchlagPhase="ausholen"; u.vizSchlagT=0;
+        const r=u.runden[u.aktuell];
+        const treffer=!!r&&r.ereignis===art.erfolgWort;
+        // Alle drei Ereignisse feuern hier, im Enthuellungs-Frame -- derselbe Zeitpunkt, zu
+        // dem stepFechten() seine sfx()-Aufrufe abfeuert, obwohl die zugehoerige Ausfall-
+        // Animation dort ebenfalls erst danach ablaeuft (s. Vertrags-Kommentar oben).
+        sfx("tennis","aufschlag");
+        if(treffer)sfx("tennis","ass"); else sfx("tennis","netz");
+      }
+    }
+    // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch auf
+    // "ausholen" gesetzter Teilnehmer in DEMSELBEN Frame schon eine (winzige)
+    // Fortschrittszahl bekommt statt einen Frame lang bei 0 zu haengen -- dieselbe
+    // Reihenfolge wie bei stepFechten().
+    for(const u of TEILNEHMER){
+      if(u.brett==null)continue;
+      const phase=u.vizSchlagPhase;
+      if(phase==="ausholen"){
+        u.vizSchlagT=(u.vizSchlagT||0)+dt;
+        if(u.vizSchlagT>=TENNIS_AUSHOL_T){
+          const r=u.vizSchlagAktuell>=0?u.runden[u.vizSchlagAktuell]:null;
+          const treffer=!!r&&r.ereignis===art.erfolgWort;
+          u.vizSchlagPhase=treffer?"treffer":"fehlschlag"; u.vizSchlagT=0;
+        }
+      } else if(phase==="treffer"||phase==="fehlschlag"){
+        u.vizSchlagT=(u.vizSchlagT||0)+dt;
+        if(u.vizSchlagT>=TENNIS_FLUG_T){ u.vizSchlagPhase="erholen"; u.vizSchlagT=0; }
+      } else if(phase==="erholen"){
+        u.vizSchlagT=(u.vizSchlagT||0)+dt;
+        if(u.vizSchlagT>=TENNIS_ERHOL_T){ u.vizSchlagPhase="bereit"; u.vizSchlagT=0; }
+      }
+      // GRUNDSTELLUNGS-WIPPER (Anti-Freeze) -- laeuft immer, unabhaengig von der Phase oben;
+      // `+u.id` phasenverschiebt jeden Spieler gegen die anderen, damit nicht alle im
+      // Gleichtakt wippen (wortgleiches Muster zu stepFechten()s vizFechtBob).
+      u.vizSchlagBounceT=(u.vizSchlagBounceT||0)+dt;
+      u.vizSchlagBob=Math.sin(u.vizSchlagBounceT*6.2+u.id)*1.2;
+    }
+  }
+  // true waehrend der Schlaeger sichtbar aktiv ist (Ausholen bis zum Ende des Ballwechsels) --
+  // von zeichneTennis() fuer den Ballflug UND von zeichneSprite() fuer die Schlaeger-Pose
+  // (":3477"/":3628", ersetzt das dortige `u.lunge>0`) gelesen. Reine Ableitung aus
+  // u.vizSchlagPhase, kein weiterer Zustand.
+  function tennisSchlagAktiv(u){
+    const p=u.vizSchlagPhase;
+    return p==="ausholen"||p==="treffer"||p==="fehlschlag";
+  }
+
   // ================== WETTESSEN BEWEGT SICH (stepWettessen, Opus-Plan Naechste-Drei- =========
   // Disziplinen 17-09, Abschnitt 3.2, D2.b) ====================================================
   // Wettessen ist laut Plan "die am besten vorbereitete der beiden konzeptleeren Buehnen":
@@ -15964,21 +16075,25 @@
     const posVon=(u)=>{
       const g=TEILNEHMER.filter(x=>x.side===u.side);
       const i=g.indexOf(u);
-      return {x:90+(W-180)*(g.length>1?i/(g.length-1):0.5), y:u.side===0?H*0.32:H*0.66};
+      // +u.vizSchlagBob (M2, Feinschliff 21-09): derselbe additive Grundstellungs-Wipper wie
+      // zeichneFechten()s "laneY+(a.vizFechtBob||0)" (":16165") — reine Kosmetik, wirkt sich
+      // auf Ball-Start-/Zielpunkt genauso aus wie auf die Sprite-Position selbst.
+      return {x:90+(W-180)*(g.length>1?i/(g.length-1):0.5), y:(u.side===0?H*0.32:H*0.66)+(u.vizSchlagBob||0)};
     };
     [0,1].forEach(side=>{
       const g=TEILNEHMER.filter(u=>u.side===side);
-      const y=side===0?H*0.32:H*0.66;
+      const y0=side===0?H*0.32:H*0.66;
       g.forEach((u,i)=>{
         const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        const y=y0+(u.vizSchlagBob||0);
         ctx.globalAlpha=u.lunge>0?1:0.92;
         const c=side===0?css("--home"):css("--away");
         ctx.fillStyle=c;ctx.globalAlpha=0.20;
         ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
         ctx.globalAlpha=1;
         // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei
-        // (Schlaeger an der Hand) und waehlt bei u.lunge>0 die "shoot"-Ueberkopf-Pose statt
-        // eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach oben.
+        // (Schlaeger an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-
+        // Pose statt eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach oben.
         zeichneSprite(ctx,u,x,y,true);
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
@@ -16000,15 +16115,20 @@
     // BALLWECHSEL — genau EIN Ball zur Zeit: stepBuehne() (":13159") dequeued global immer
     // nur EINEN Teilnehmer je Tick (buehneQueue ist nicht je Brett getrennt), es gibt also
     // nie zwei gleichzeitig frisch enthuellte Zuege, fuer die zwei Baelle noetig waeren.
-    const schlaeger=TEILNEHMER.find(u=>u.lunge>0&&u.aktuell>=0);
+    // M2 (Feinschliff 21-09): Erkennung UND Fortschritt kommen jetzt aus stepTennis()s
+    // viz*-Feldern (tennisSchlagAktiv()/vizSchlagPhase/vizSchlagT) statt aus u.lunge direkt —
+    // s. Vertrags-/Timing-Kommentar bei stepTennis() oben. u.aktuell/u.runden werden hier wie
+    // zuvor nur gelesen (ueber vizSchlagAktuell, das u.aktuell im Enthuellungs-Frame spiegelt).
+    const schlaeger=TEILNEHMER.find(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
     if(schlaeger){
       const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
       if(gegner){
-        const r=schlaeger.runden[schlaeger.aktuell];
+        const r=schlaeger.runden[schlaeger.vizSchlagAktuell];
         const treffer=!!r&&r.ereignis===art.erfolgWort;
-        // Fortschritt AUS u.lunge selbst (0,5->0 ueber 0,5 reale Sekunden) — keine neue Uhr,
-        // kein neues Feld: 0 im Enthuellungs-Frame, 1 sobald der Marker ausgelaufen ist.
-        const u01=Math.min(1,Math.max(0,1-schlaeger.lunge/0.5));
+        // Fortschritt AUS stepTennis()s Zustandsmaschine: 0 waehrend "ausholen" (Ball noch in
+        // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer TENNIS_FLUG_T) — ersetzt
+        // die alte lineare Ableitung aus u.lunge (":16122" vorher: "1-schlaeger.lunge/0.5").
+        const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/TENNIS_FLUG_T));
         const von=posVon(schlaeger), nach=posVon(gegner);
         // Fehlschlag: der Ball erreicht den Gegner nie, sondern haelt auf halber Strecke
         // an — derselbe Ass/Netzroller-Gegensatz wie in tennis.tsx.
@@ -22443,6 +22563,24 @@
       lampe:    {synth:(vol)=>tonTon(vol,1800,0.15)},
       halt:     {synth:(vol)=>tonBuzzer(vol,0.2)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+    },
+    // TENNIS (Feinschliff-Recherche 21-09, A4): TON_KATALOG fuehrte bislang keinen
+    // tennis-Schluessel (gegengeprueft, s. Recherchedoku) — anders als Football/Time-Trial/
+    // Spurt/Fechten vor deren jeweiligem Fix stand hier nicht einmal ein Katalogeintrag ohne
+    // Aufrufer, der Schluessel fehlte komplett. Drei Ereignisse, dieselben Synth-Bausteine wie
+    // ueberall im Katalog, aus stepTennis()s Enthuellungs-Erkennung abgefeuert (s. dortiger
+    // Kommentar, warum dort und nicht in zeichneTennis()):
+    //  - aufschlag (tonKlick, kurz+hell): jeder frisch enthuellte Ballwechsel beginnt mit
+    //    einem Schlag-Ton, unabhaengig vom Ausgang.
+    //  - ass       (tonDoppelton): der Ballwechsel wird gewonnen (r.ereignis===erfolgWort).
+    //  - netz      (tonBuzzer): der Ballwechsel geht verloren (Netzroller/Fehlschlag).
+    // Kein `publikum`-Loop -- dieselbe Begruendung wie bei Climbing: A4 ist binaer (Katalog-
+    // eintrag vorhanden oder nicht), kein zusaetzliches Publikums-Bookkeeping (eigenes Flag,
+    // Start-/Stop-Paarung beim Betreten/Verlassen der Buehne) fuer diese PR noetig.
+    tennis:{
+      aufschlag: {synth:(vol)=>tonKlick(vol,2600,0.05)},
+      ass:       {synth:(vol)=>tonDoppelton(vol,700,1050,0.28)},
+      netz:      {synth:(vol)=>tonBuzzer(vol,0.2)}
     },
     // HOCKEY (Fable-Entscheidung E2, Abschnitt 2.4 Punkt 3, 10.09.): Assets 80 -> 100.
     // eisflaeche() hat mit der vollen Eis-/Bande-/Tor-Kulisse schon das Bild, aber laut
