@@ -150,10 +150,10 @@
   },
   "football": {
    "chassis": "feldspiel",
-   "spielMedian": 0.796,
-   "spielSpannweite": 0.142,
-   "saisonMedian": 0.888,
-   "saisonSpannweite": 0.098,
+   "spielMedian": 0.818,
+   "spielSpannweite": 0.124,
+   "saisonMedian": 0.874,
+   "saisonSpannweite": 0.084,
    "schranke": 0.05
   },
   "hockey": {
