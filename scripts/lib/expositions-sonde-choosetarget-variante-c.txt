@@ -1,0 +1,43 @@
+  const __rrZielZaehler=new Map();
+  function chooseTarget(u){
+    const foes=gegner(u);if(!foes.length)return null;
+    // A1.0-SONDE VARIANTE C (PM-Plan 20.09., Abschnitt 3.5): "Zielwahl gleichverteilt statt
+    // geometrisch (Round-Robin ueber die lebenden Gegner)" — die "Aussetzungs-Haelfte", die
+    // laut PM-Plan noch nie gemessen wurde. NUR die Zielwahl selbst wird ersetzt, NICHT die
+    // Prioritaetsstufen davor (Rueckzug/Durchbruch/Zielansage) und NICHT der reaktive
+    // Ruecken-Schlag (u.lastHit) — das sind Kommandos/Reflexe, kein additiver Geometrie-Score,
+    // und bleiben deshalb unveraendert Regelwerk. Ersetzt wird ALLES, was vorher ueber
+    // nearest()/bedrohungVon()/hp-reduce()/Positionsabstand (own/spitze/amKameraden,
+    // Offensivzwang, decken/flanke/zielP/ziel-Bloecke, der finale Ruecfall — s.
+    // scripts/lib/expositions-sonde-choosetarget-original.txt fuer den vollen Originaltext)
+    // eine Standardpraeferenz herstellte, durch einen deterministischen Rundlauf: jeder
+    // Kaempfer bekommt bei jedem Aufruf den naechsten Gegner aus einer festen, nach `id`
+    // sortierten Reihenfolge ueber die aktuell LEBENDEN Gegner (`gegner(u)` filtert `!x.down`
+    // bereits). Kein rr()-Verbrauch (bleibt fuer alle anderen Disziplinen unveraendert), rein
+    // deterministisch ueber einen Kaempfer-eigenen Zaehler (__rrZielZaehler, in build()
+    // zurueckgesetzt).
+    const __rrIndex=__rrZielZaehler.get(u.id)||0;
+    __rrZielZaehler.set(u.id,__rrIndex+1);
+    const __rrGeordnet=[...foes].sort((a,b)=>a.id-b.id);
+    const __rrZiel=__rrGeordnet[__rrIndex%__rrGeordnet.length];
+
+    // Wer sich zurueckzieht, sucht kein Ziel.
+    if(u.retreat>0)return null;
+
+    // DURCHBRUCH: wer entschlossen ist, laesst sich nicht umlenken. Er nimmt die Schlaege
+    // der Abfangenden in Kauf und geht zu dem, den er gemeint hat.
+    if(u.durch&&u.tgt&&!u.tgt.down)return u.tgt;
+
+    // ZIELANSAGE — ein BEFEHL, keine Geometrie-Neigung. Unveraendert vor allem anderen.
+    const flankeNochUnterwegs=u.ord==="flanke"&&
+      !(freigabe[u.side]&&(u.side===0?u.x>MID+180:u.x<MID-180));
+    const angesagt=flankeNochUnterwegs?null:kfZielFuer(u);
+    if(angesagt)return angesagt;
+
+    // Ein Angreifer im Ruecken schlaegt jede Absicht — reaktiv, keine additive Praeferenz.
+    if(u.lastHit&&!u.lastHit.down&&dist(u,u.lastHit)<130&&u.opp>=45)return u.lastHit;
+
+    // AB HIER einheitlich Rundlauf (vorher: Offensivzwang/decken/flanke/zielP/
+    // Persoenlichkeits-Grundneigung/Schluss-Ruecfall — alle additiv oder geometrisch).
+    return __rrZiel;
+  }
