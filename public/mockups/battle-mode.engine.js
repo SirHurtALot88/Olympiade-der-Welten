@@ -13170,23 +13170,146 @@
     "i-spy":{
       // MATRIX: intelligence 18, torment 17, spirit 13, will 12, charisma 9,
       // determination 8, speed 8, dexterity 8, awareness 5, health 2. Zehn Attribute mit
-      // Gewicht — die breiteste Matrix aller zwanzig Disziplinen.
-      label:"I-Spy", jeSeite:6, rundenN:6, rundenDauer:60/(6*6*2), duell:true,
+      // Gewicht — die breiteste Matrix aller zwanzig Disziplinen. KEIN power (BASIS_JE_DISC
+      // kennt es nicht) — gemessen laeuft es mit r=-0,539 gegen die I-Spy-Eignung (Gegencheck
+      // Abschnitt 0), deshalb liest KEIN Sub-Skill unten `power`.
+      //
+      // SCHATZSUCHE STATT SPEED-SCHACH-DUELL (PR 1, docs/design/
+      // i-spy-schatzsuche-konzept-21-09.md + i-spy-opus-gegencheck-21-09.md, Chris'
+      // Sprachnachricht 21.09.): I-Spy war die einzige Disziplin, die die 0,80-Schranke NICHT
+      // nahm (rho 0,684, data/generated/rangtreue-basislinie.json:119) — ein Speed-Schach mit
+      // anderen Zahlen (sechs Bernoulli-Wuerfe, zehn duenn gewichtete Attribute). `duell:true`
+      // faellt hier zugunsten von `schatzsuche:true` weg: Chris' Bild ist eine Schatzsuche nach
+      // Informationen (zwoelf Fundorte mit drei Stufen und drei Raetselarten), kein Duell Brett
+      // gegen Brett. Der Chassis-Dispatch faellt damit automatisch auf den bestehenden
+      // Auftritt-Pfad (WERTUNG_AUFTRITT/spieleBuehneAuftritt, s. dortige "GENERISCH ueber..."
+      // Kommentare) — kein neuer Einstiegspunkt.
+      //
+      // ACHT TICKS STATT SECHS DURCHGAENGE (Konzept 2.3): mehr, aber vor allem GESTUFTE
+      // Ereignisse — jeder Tick traegt eine SPUEREN-Entscheidung (welche Truhe?) UND eine
+      // KNACKEN-Entscheidung (gelingt sie?), statt eines einzigen Bernoulli-Wurfs mit festem
+      // Punktbetrag. `baueSchatzsuche()` (s.u., vor stepBuehne()) ist der dritte eigene
+      // Bühnen-Rechner (Vorbild `baueHebenDuelle()`): die zwoelf Fundorte sind EIN geteilter,
+      // veraenderlicher Zustand aller zwoelf Teilnehmer (Fortschritt/Leerung wirkt
+      // seitenneutral, 1.4), laesst sich also nicht je Teilnehmer fuer sich vorausrechnen.
+      // Anders als Heben KEHRT der Aufruf in bauBuehne() aber nicht zurueck — I-Spy braucht
+      // kein `.vorteil`/Duell-Paarungsergebnis, nur befuellte `runden[]`, und die bestehende
+      // Enthuellungs-Warteschlange (die generische REIHENFOLGE ganz am Ende von bauBuehne())
+      // funktioniert dafuer unveraendert, exakt wie fuer jede andere Auftritt-Buehne.
+      label:"I-Spy", jeSeite:6, rundenN:8, rundenDauer:60/(8*6*2), schatzsuche:true,
       failAbzug:0.55, failWort:"übersieht das Detail", erfolgWort:"entdeckt den Hinweis",
-      // NACHGEZOGEN: erste Messung stand bei 46,4 Pp. Intelligence sass in DREI Rollen
-      // (Grundlage, Spitzenmoment, Technik) — davon Technik eine Erfolgschance-Rolle —
-      // und las 30,1 % bei Matrixgewicht 18. Torment (der zweithoechste Wert, 17) und
-      // Speed (8) blieben dagegen zu schwach vertreten. Jetzt traegt Spitzenmoment
-      // Torment statt Intelligence, und Speed bekommt einen Platz in Nerven.
+      // SIEBEN SUB-SKILLS STATT DER GETEILTEN SIEBEN-ROLLEN-FORMEL (Konzept 1.2, Football-
+      // Praezedenzfall: eigene Sub-Skill-Namen statt GRUNDLAGE/TECHNIK/... — dort acht eigene,
+      // hier sieben nach den sechs vorhandenen Slots benannt). SPUERSINN entscheidet in
+      // baueSchatzsuche(), WELCHE Truhenstufen ein Spieler in einem Tick ueberhaupt sieht;
+      // LOGIK/MENSCHENKENNTNIS/FINGERFERTIGKEIT sind die drei Raetselarten (1.5); NERVEN
+      // entscheidet die Bearbeitungsreihenfolge, wenn mehrere Teilnehmer im selben Tick um
+      // dieselbe (durch F2 fuer alle attraktive) Truhe konkurrieren — der Teil von "Reihenfolge
+      // am Fundort" (3.3), der schon OHNE die Reaktionsmechanik aus PR 2 greift, weil die
+      // Fundorte ohnehin geteilter Zustand ueber alle zwoelf Teilnehmer sind; AUSDAUER ist der
+      // Konzentrationsverlust ueber die Ticks (Analogon zu `ermued` in der generischen
+      // Rundenformel oben). TEAMGEIST ist PR-2-Vorarbeit: ihr Reaktionswurf wird in
+      // baueSchatzsuche() JEDEN Tick gezogen und VERWORFEN (Bauplan 7.2: "Reaktionswurf wird
+      // trotzdem schon gezogen und verworfen, damit PR 2 den rr()-Verbrauch nicht
+      // verschiebt") — TEAMGEIST traegt in DIESER PR deshalb noch KEIN mechanisches Gewicht,
+      // das ist beabsichtigt, nicht vergessen.
+      //
+      // BUDGET-KALIBRIERUNG (Pflichtpruefung, CLAUDE.md) — DIESE ZAHLEN SIND NICHT DER
+      // KONZEPT-VORSCHLAG AUS 1.2, SONDERN DAS ERGEBNIS EINER MESSREIHE, wie die Aufgabe
+      // verlangt ("nach der Budget-Methode kalibrieren, nicht die Vorschlagszahlen ungeprueft
+      // uebernehmen"). Zwei Befunde trugen die Kalibrierung, beide gemessen mit
+      // `scripts/messe-arena-einfluss.mjs i-spy` (n=48 UND n=96) und
+      // `scripts/miss-alle-disziplinen.mjs 24 i-spy` gegeneinander:
+      //
+      //  1. AWARENESS IN SPUERSINN war wie im Gegencheck (Abschnitt 6.5-Nachtrag) vorhergesagt
+      //     der erste Pp-Kandidat — von den vorgeschlagenen 25 % auf 10 % gesenkt.
+      //  2. GROESSERER BEFUND, den das Konzept nicht vorhersah: TORMENT (Matrixgewicht 17,
+      //     zweithoechstes) korreliert auf dem 17-Spieler-Testkader nur mit r=+0,038 mit der
+      //     I-Spy-Eignung (Gegencheck Abschnitt 0) — praktisch UNKORRELIERT, obwohl es
+      //     matrixschwer ist. Ein Sub-Skill-Mix, der Torment sein volles Matrixgewicht gibt
+      //     (wie 1.2 es vorschlaegt: SPUERSINN 30 %, MENSCHENKENNTNIS 50 %), erfuellt zwar das
+      //     Budget, drueckt aber rho je Spiel spuerbar, weil er ein Zehntel des Ergebnisses an
+      //     ein Attribut haengt, das mit der GESAMT-Eignung dieses Kaders kaum etwas zu tun
+      //     hat. Umgekehrt greift INTELLIGENZ (r=+0,650, die staerkste Einzelkorrelation) UND
+      //     WILL (r=+0,627): SPUERSINN staerker auf Intelligenz zu legen (60 statt 45 %) und
+      //     LOGIK von Intelligenz weg auf Will/Determination zu verschieben (Intelligenz sitzt
+      //     dort schon ausreichend ueber SPUERSINN) hob rho je Spiel (Median ueber die
+      //     Kader-Familie) von 0,624 auf 0,707 bei gleichzeitig BESSERER Pp-Abweichung
+      //     (23,3/21,2 bei n=48/96 gegen budget-konforme, aber rho-schwaechere Alternativen).
+      //     Torment bleibt trotzdem MIT vollem Matrixpreis vertreten (17,7 %/-0,4 Pp
+      //     Abweichung) — nur eben nicht ueberproportional draufgesattelt.
+      //
+      // TEILPUNKTE BEI FEHLSCHLAG (ISPY_TEILPUNKTE_ANTEIL, s.u.) ist der zweite,
+      // groessere Kalibrierhebel — er wirkt auf die VERLAESSLICHKEIT (Ereignisrauschen bei nur
+      // acht Ticks), nicht auf die Validitaet/das Budget hier; Begruendung und Abtastung
+      // stehen bei der Konstante selbst.
+      //
+      // Isolationsnachweis: `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig, vor
+      // und nach dieser PR) — nur i-spy bewegt sich, die anderen neunzehn Zeilen sind
+      // bit-identisch (s. PR-Beschreibung).
       rezept:{
-        GRUNDLAGE:    {intelligence:40,spirit:30,will:30},
-        SPITZENMOMENT:{torment:55,determination:30,spirit:15},
-        TECHNIK:      {intelligence:40,awareness:35,dexterity:25},
-        PUBLIKUM:     {charisma:55,torment:45},
-        NERVEN:       {will:35,spirit:30,speed:20,determination:15},
-        AUSDAUER:     {spirit:40,will:35,health:25},
-        WAGNIS:       {torment:45,speed:30,dexterity:25}
-      }
+        SPUERSINN:        {intelligence:60,torment:30,awareness:10},
+        LOGIK:            {intelligence:22,will:48,determination:30},
+        MENSCHENKENNTNIS: {torment:22,charisma:40,spirit:38},
+        FINGERFERTIGKEIT: {dexterity:45,speed:35,torment:20},
+        NERVEN:           {will:25,awareness:20,determination:25,dexterity:20,speed:10},
+        TEAMGEIST:        {spirit:55,charisma:25,awareness:20},
+        AUSDAUER:         {spirit:50,health:30,speed:20}
+      },
+      // ZWOELF FUNDORTE (Konzept 2.1, KORRIGIERTES Layout aus dem Gegencheck Abschnitt 3.4/T5
+      // — nicht die Drittel-Anzahl-Fassung des ersten Entwurfs): Logik 5 (4x Notiz/Akte + EIN
+      // Tresor), Verhoer 3 (2x Akte + EIN Tresor), Mechanik 4 (2x Notiz + 2x Akte). Das
+      // verteilt die PUNKTMASSE (nicht die Fundort-ANZAHL) proportional zum Matrixanspruch
+      // jeder Raetselart (1.5: Logik 37,6 %, Verhoer 36,5 %, Mechanik 25,9 % — das
+      // Drittel-Anzahl-Layout traf stattdessen 22,6/38,7/38,7 % und gab beide Tresore an
+      // Mechanik+Verhoer, keinen an Logik, das schwerste Matrixattribut der Disziplin).
+      // Fuenf Spiegelpaare plus zwei Fundorte auf der Mittelachse (x=0.50, je gleich weit von
+      // Heim links/Gast rechts) — SPIEGELSYMMETRIE IST PFLICHT (`miss-arena-buehne-spiegel.mjs`
+      // muss Heim:Gast nahe 50:50 lesen), deshalb aendert `ispyAktiveFundorte()` (s.u.) bei
+      // kleinen Kadern nur GANZE Bloecke, nie eine Haelfte eines Spiegelpaars.
+      //
+      // MEHRWEGE-TRESORE (`neben`, Konzept 1.6 + Chris' asymmetrischer Nachtrag): die zwei
+      // Tresore (Stufe 3) haben je einen Nebenweg — Primaerweg (die native Raetselart dieser
+      // Truhe) zahlt den vollen Punktwert, der Nebenweg nur 65 % (Variante A "weniger Punkte",
+      // s. ISPY_NEBENWEG_PUNKTFAKTOR unten — Variante B, ein zusaetzlicher Chance-Abzug, blieb
+      // bewusst ungesetzt, um die KNACK-Formel nicht doppelt zu strafen; A allein reicht, um
+      // Chris' "die bringen dann nicht so viele Punkte" woertlich abzubilden). ZWEI
+      // VERSCHIEDENE Paarungen (nicht zweimal dieselbe): der Logik-Tresor bekommt
+      // FINGERFERTIGKEIT als Nebenweg, der Verhoer-Tresor LOGIK — die dritte moegliche Paarung
+      // (Fingerfertigkeit+Menschenkenntnis) bleibt fuer eine spaetere Runde offen. Feste
+      // Paarung je FUNDORT-POSITION (nicht per Saat neu gewuerfelt) — Frage aus Konzept
+      // Abschnitt 1.6/8 damit fuer PR 1 entschieden: Wiedererkennbarkeit vor Abwechslung, damit
+      // eine kaderfeste Messung dieselbe Mechanik ueber alle Saaten sieht.
+      //
+      // DIE TUER IST BILD, KEINE SPERRE (`bild:"tuer"`, Konzept 2.1 + Gegencheck Abschnitt 2 —
+      // beide Mechanik-Akten in den unteren Ecken, je eine nahe der eigenen Startseite): wer
+      // keinen guten FINGERFERTIGKEIT-Spieler hat, laesst diese Truhe liegen und verliert ihre
+      // Punkte — er verliert KEINEN Zug, und er blockiert niemanden. Genau das ist Chris'
+      // "Power"-Bild (uebersetzt in die matrixlegale Nachbarin FINGERFERTIGKEIT, da
+      // BASIS_JE_DISC["i-spy"] kein power kennt und power r=-0,539 gegen die Eignung liest),
+      // ohne die gemessen schaedliche Sperre (ein Gate wuerde ganzen Seiten Zuege durch die
+      // Schwaeche eines einzigen Mitspielers nehmen — dieselbe Fehlerklasse wie Takeshis
+      // `tackleNerven`, 0,937 -> 0,902, nur ueber die ganze Seite statt einen Zug). `bild` wird
+      // vom Motor in PR 1 nicht gelesen — reine Datenzeile fuer PR 3 (Bühnenbild).
+      fundorte:[
+        {x:0.12,y:0.30,art:"logik",   stufe:1},
+        {x:0.30,y:0.18,art:"logik",   stufe:2},
+        {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT"},
+        {x:0.70,y:0.18,art:"logik",   stufe:2},
+        {x:0.88,y:0.30,art:"logik",   stufe:1},
+        {x:0.20,y:0.62,art:"mechanik",stufe:1},
+        {x:0.38,y:0.80,art:"verhoer", stufe:2},
+        {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK"},
+        {x:0.62,y:0.80,art:"verhoer", stufe:2},
+        {x:0.80,y:0.62,art:"mechanik",stufe:1},
+        {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer"},
+        {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer"}
+      ],
+      // WERTUNGSTABELLE (nur Woerter, wie bei Wettessen/Speed-Schach — Spalten kommen
+      // unveraendert aus WERTUNG_AUFTRITT, s. Kommentar dort: "keine Aenderung an der
+      // geteilten Buehnen-Punkteformel").
+      wertungTabelle:{failKopf:"Übersehen",
+        fuss:"„Pkt\" sind die Punktwerte der geknackten Fundorte (10 Notiz / 25 Akte / 60 Tresor) plus Teilpunkte für angebrochene, nicht geknackte Truhen. „Übersehen\" zählt Ticks ohne vollen Fund. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
     },
 
     tennis:{
@@ -13476,11 +13599,20 @@
       // fuer sich ausrechnen — baueHebenDuelle() macht das unten, nachdem beide Seiten
       // stehen. Fuer die sechs anderen Buehnen-Disziplinen aendert sich hier nichts.
       if(art.heben){ TEILNEHMER.push(L); return; }
+      // SCHATZSUCHE (I-Spy, PR 1) GEHT HIER EBENFALLS NICHT DURCH, aus demselben Grund wie
+      // Heben direkt darueber: die zwoelf Fundorte sind EIN geteilter, veraenderlicher
+      // Zustand ueber alle zwoelf Teilnehmer beider Seiten (Fortschritt nach Fehlversuch
+      // wirkt seitenneutral, 1.4) — `baueSchatzsuche()` (vor stepBuehne()) rechnet das,
+      // NACHDEM beide Seiten stehen. Anders als Heben KEHRT dieser Zweig aber NICHT
+      // zurueck (s. Aufrufstelle unten) — der generische REIHENFOLGE-Warteschlangenbau ganz
+      // am Ende dieser Funktion gilt fuer I-Spy unveraendert.
+      if(art.schatzsuche){ TEILNEHMER.push(L); return; }
       // TREFFERSTAND (s. grosser Kommentar bei BUEHNE_ART.fechten oben, Option 2): reines
       // additives Anzeigefeld nach dem u.kuehneVersuche-Muster, nur fuer Fechten befuellt
-      // (art.fechten) — die sechs Geschwister-Buehnen (Schach/Tennis/I-Spy/Wettessen/
-      // Showcase/Eiskunstlauf/Breaking) durchlaufen genau denselben setz()-Zweig, bleiben
-      // aber ohne dieses Feld, weil es fuer sie nirgends gelesen wird.
+      // (art.fechten) — die fuenf verbleibenden Geschwister-Buehnen, die diesen generischen
+      // Zweig noch durchlaufen (Schach/Tennis/Wettessen/Showcase/Eiskunstlauf/Breaking; I-Spy
+      // seit PR 1 nicht mehr, s. `art.schatzsuche` oben), bleiben ohne dieses Feld, weil es
+      // fuer sie nirgends gelesen wird.
       if(art.fechten)L.treffer=0;
       // ACT-ABLEITUNG (PR S0, Talentshow-Konzept Abschnitt 3.2): actVon() braucht Klasse/
       // Rasse/Unterklassen/Traits/Attribute, die `p` traegt, `L` (der TEILNEHMER) bisher
@@ -13517,6 +13649,12 @@
     // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
     if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
+    // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
+    // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
+    // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
+    // stehenden Objekte; die generische REIHENFOLGE-Warteschlange ganz am Ende dieser
+    // Funktion baut die Enthuellungsreihenfolge daraus wie fuer jede andere Auftritt-Buehne.
+    if(art.schatzsuche){ baueSchatzsuche(art,mine,gegner); }
     if(art.duell){
       // UNTERZAHL-FIX (Produktivierungswelle 1, 06.09.): NICHT die aeussere `n`
       // (=art.jeSeite, eine feste Motor-Konstante, s. Kopfkommentar oben) als Brett-Zahl
@@ -14199,6 +14337,252 @@
                    +(gueltig?"gueltig":"ungueltig")+(kuehn?" (kühner Versuch)":"")});
       }
     }
+  }
+
+  // ================== SCHATZSUCHE: DER I-SPY-TICK-RECHNER (PR 1) ==================
+  // I-Spy-Konzept (docs/design/i-spy-schatzsuche-konzept-21-09.md) Abschnitt 1, 1.4, 1.5,
+  // 1.6, 2.1, 2.2, 3.4 + Opus-Gegencheck (docs/design/i-spy-opus-gegencheck-21-09.md)
+  // Abschnitt 2/3/3.6. Bauplan-PR 1 (Konzept 7.2): Grundmechanik + Rezept, OHNE
+  // Sichtbarkeit/Reaktion zwischen den Seiten (das ist PR 2) — der Reaktionswurf wird
+  // trotzdem JEDEN Tick gezogen und verworfen, damit PR 2 den rr()-Verbrauch nicht
+  // verschiebt (Handbuch-Falle 17: bedingte rr()-Aufrufe verschieben die Zufallsfolge
+  // zwischen Basis- und Hebungslauf von einflussVon() und erzeugen ein Pp-Messartefakt).
+
+  const ISPY_PUNKTWERT={1:10,2:25,3:60};
+  const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
+  // KNACKEN-FORMEL (Konzept 1.4): p = clamp(0,08; 0,95; 0,15 + K·0,011 − (Stufe−1)·0,22 +
+  // Fortschritt). Bei K=30/60/85 liefert das fuer Stufe 1/2/3 exakt die im Konzept
+  // nachgerechnete Tabelle (0,48/0,26/0,08 bzw. 0,95/0,86/0,645 vor Rundung).
+  const ISPY_KNACK_BASIS=0.15, ISPY_KNACK_K=0.011, ISPY_KNACK_STUFE_ABZUG=0.22;
+  const ISPY_KNACK_MIN=0.08, ISPY_KNACK_MAX=0.95;
+  // FORTSCHRITT STATT TOTALVERLUST (1.4): ein Fehlversuch bringt nie den vollen Punktwert,
+  // hinterlaesst aber +0,15 Knackchance an DERSELBEN Truhe (Deckel +0,30), seitenneutral —
+  // der naechste, der kommt, profitiert, egal von welcher Seite (Chris' "kann ich
+  // helfen"-Bild, Konzept 4.).
+  const ISPY_FORTSCHRITT_SCHRITT=0.15, ISPY_FORTSCHRITT_DECKEL=0.30;
+  // TEILPUNKTE (Konzept 1.4, dort als Reserve genannt: "wenn die Verlässlichkeit ohne sie
+  // nicht reicht"). Genau dieser Fall, gemessen: mit reinem Alles-oder-nichts (10/25/60
+  // gegen 0 bei Fehlschlag) lag rho je Spiel (Median ueber die Kader-Familie) bei 0,622 und
+  // die Kader-Spannweite bei 0,331 — acht Ticks mit einer derart hohen Fallhoehe je Ereignis
+  // sind zu wenige, um das Gluecksrauschen wegzumitteln (dieselbe Verlaesslichkeits-Logik,
+  // mit der CLAUDE.md die Hockey-Lehre begruendet, nur eine Stufe weiter: hier hilft nicht
+  // "mehr Ereignisse", sondern eine kleinere Fallhoehe je Ereignis). Ein kleiner
+  // Teilpunkte-Sockel bei Fehlschlag ("Spur gesichert") daempft das, ohne den Erfolg selbst
+  // (weiterhin voller Punktwert plus Truhe leer) oder die Erfolgschance zu aendern. Eine
+  // Abtastung von 0 bis 0,50 (Schritt 0,10) fand das Optimum bei 0,40 (danach faellt rho
+  // wieder leicht) — zusammen mit der Rezept-Kalibrierung oben landet das Endergebnis bei
+  // rho je Spiel (Median) 0,707, s. PR-Beschreibung fuer die vollstaendige Tabelle. Das ist
+  // deutlich mehr als das im Konzept nur beispielhaft genannte „z. B. 20 %", aber die
+  // Kalibrierung ist ausdruecklich als Suche gefordert (Aufgabe: "nach der Budget-Methode
+  // kalibrieren, nicht die Vorschlagszahlen ungeprueft uebernehmen"), nicht als Uebernahme
+  // des Beispiels.
+  const ISPY_TEILPUNKTE_ANTEIL=0.40;
+  // SPUEREN (1.3): sieht(1)=1 immer, sieht(2)/sieht(3) wachsen mit SPUERSINN. EIN rr()-Wurf
+  // je Teilnehmer je Tick entscheidet ueber ALLE drei Schwellen zugleich (fester
+  // rr()-Verbrauch, unabhaengig vom Ausgang) — weil sieht(3) im ganzen Wertebereich unter
+  // sieht(2) bleibt, impliziert "sieht Stufe 3" automatisch "sieht auch Stufe 2".
+  const ISPY_SIEHT2_BASIS=0.35, ISPY_SIEHT2_K=0.007, ISPY_SIEHT2_MAX=0.95;
+  const ISPY_SIEHT3_BASIS=0.10, ISPY_SIEHT3_K=0.008, ISPY_SIEHT3_MAX=0.90;
+  // NEBENWEG-ABWERTUNG (1.6, Chris' asymmetrischer Nachtrag 21.09.): Variante A ("weniger
+  // Punkte") — der Primaerweg zahlt den vollen Punktwert, der Nebenweg nur 65 %. Variante B
+  // (zusaetzlicher Chance-Abzug) bleibt bewusst ungesetzt, um die KNACK-Formel nicht doppelt
+  // zu strafen — A allein bildet Chris' "die bringen dann nicht so viele Punkte" woertlich ab.
+  const ISPY_NEBENWEG_PUNKTFAKTOR=0.65;
+  // AUSDAUER (1.2: "Konzentrationsverlust ueber die Ticks, wie `ermued` heute") — dieselbe
+  // Form wie die generische Rundenformel oben (`ermued=1-max(0,60-AUSDAUER)*K*Fortschritt`).
+  // K und der Boden sind hoeher/tiefer als die generische Rundenformel (0,0035/0,4), weil
+  // AUSDAUER sonst kaum eigenes Pp-Gewicht bekommt (Spirit/Health haben in den drei
+  // Raetselart-Sub-Skills sonst keinen Kanal) — s. Budget-Kalibrierung oben.
+  const ISPY_AUSDAUER_K=0.0200, ISPY_AUSDAUER_BODEN=0.40;
+  // NACHFUELLEN (2.2): eine geknackte Truhe ist einen Tick leer, dann liegt an derselben
+  // Position eine neue Truhe DERSELBEN ART mit der naechsten Stufe aus einer festen Folge —
+  // "die Folge steht im Raum, nicht im Wuerfel" (kein zusaetzlicher rr()-Verbrauch). Der
+  // Startpunkt in der Folge ist je Fundort-Position verschoben (Modulo Fundort-Index),
+  // damit nicht alle Truhen synchron dieselbe Stufe nachziehen.
+  const ISPY_NACHFUELL_FOLGE=[2,1,3,2,1,2];
+
+  // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
+  // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
+  // BEIDE Mittelachsen-Tresore (immer) plus so viele ganze Spiegelpaar-Bloecke, wie die
+  // groessere Seite Spieler stellt" (bei zwoelf Fundorten hoechstens alle fuenf Bloecke =
+  // das volle Zwoelfer-Layout). WELCHE Bloecke das sind, entscheidet eine kleine
+  // Optimierung: unter allen C(5,k)-Kombinationen gewinnt die, deren PUNKTMASSE-Anteile am
+  // naechsten am Matrixanspruch aus 1.5 (37,6/36,5/25,9 %) liegen. Nachgerechnet reproduziert
+  // das exakt die beiden im Gegencheck von Hand durchgerechneten Beispiele: k=2 (2 gegen 2)
+  // waehlt {Tresore, Notiz-Paar y=0,30, Tuer-Paar y=0,85} (42,1/31,6/26,3 %), k=4 (4 gegen 4)
+  // waehlt "alles ausser dem Notiz-Paar y=0,30" (37,9/37,9/24,1 %) — beide Zahlen stehen
+  // wortgleich im Gegencheck Abschnitt 3.4/3.6. Immer GANZE Spiegelpaare (nie eine Haelfte),
+  // damit der Spiegeltest bei jeder Kadergroesse strukturell symmetrisch bleibt.
+  const ISPY_MITTE_IDX=[2,7];
+  const ISPY_BLOECKE=[{idx:[0,4]},{idx:[5,9]},{idx:[1,3]},{idx:[6,8]},{idx:[10,11]}];
+  const ISPY_ZIEL_ANTEIL={logik:0.376,verhoer:0.365,mechanik:0.259};
+  function ispyPunktmasseAnteile(fundorte,idxSet){
+    const s={logik:0,verhoer:0,mechanik:0};
+    for(const i of idxSet){const f=fundorte[i]; s[f.art]+=ISPY_PUNKTWERT[f.stufe];}
+    const g=s.logik+s.verhoer+s.mechanik||1;
+    return {logik:s.logik/g,verhoer:s.verhoer/g,mechanik:s.mechanik/g};
+  }
+  function ispyAktiveFundorte(fundorte,jeSeiteMax){
+    const k=Math.max(0,Math.min(ISPY_BLOECKE.length,Math.round(jeSeiteMax)));
+    const kombis=(arr,n)=>{
+      if(n<=0)return [[]];
+      if(n>=arr.length)return [arr.slice()];
+      const [kopf,...rest]=arr;
+      return [...kombis(rest,n-1).map(c=>[kopf,...c]), ...kombis(rest,n)];
+    };
+    let beste=null, besteDev=Infinity;
+    for(const kombi of kombis(ISPY_BLOECKE,k)){
+      const idxSet=[...ISPY_MITTE_IDX, ...kombi.flatMap(b=>b.idx)];
+      const anteil=ispyPunktmasseAnteile(fundorte,idxSet);
+      const dev=Math.max(
+        Math.abs(anteil.logik-ISPY_ZIEL_ANTEIL.logik),
+        Math.abs(anteil.verhoer-ISPY_ZIEL_ANTEIL.verhoer),
+        Math.abs(anteil.mechanik-ISPY_ZIEL_ANTEIL.mechanik));
+      if(dev<besteDev){besteDev=dev; beste=idxSet;}
+    }
+    return beste.sort((a,b)=>a-b);
+  }
+
+  function ispyKnackChance(K,stufe,fortschritt){
+    return Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,
+      ISPY_KNACK_BASIS+K*ISPY_KNACK_K-(stufe-1)*ISPY_KNACK_STUFE_ABZUG+fortschritt));
+  }
+  // BESTER WEG AN DIESER TRUHE (1.6): primaer ist immer die native Raetselart (voller
+  // Punktwert); nur ein aktuell auf Stufe 3 stehender Fundort, dessen POSITION fest mit
+  // einem `neben`-Sub-Skill gepaart ist (s. Kommentar bei BUEHNE_ART["i-spy"].fundorte),
+  // hat zusaetzlich einen abgewerteten Nebenweg — positionsgebunden, nicht stufengebunden:
+  // eine per Nachfuellfolge voruebergehend auf Stufe 3 stehende NICHT-Tresor-Position bleibt
+  // einwegig. `max(EV)` waehlt automatisch den fuer DIESEN Spieler besseren Weg — durch den
+  // Punktabschlag gewinnt der Primaerweg bei aehnlichen Faehigkeiten von selbst
+  // ("Primaerweg schlaegt Nebenweg", ohne dass das eine zusaetzliche Regel braucht).
+  function ispyBesterWeg(u,truhe){
+    const primaerSkill=ISPY_RAETSEL_SUBSKILL[truhe.art];
+    const primaer={p:ispyKnackChance(u[primaerSkill],truhe.stufeAktuell,truhe.fortschritt), faktor:1};
+    if(truhe.stufeAktuell!==3||!truhe.neben)return primaer;
+    const neben={p:ispyKnackChance(u[truhe.neben],truhe.stufeAktuell,truhe.fortschritt), faktor:ISPY_NEBENWEG_PUNKTFAKTOR};
+    const punktwert=ISPY_PUNKTWERT[truhe.stufeAktuell];
+    return (neben.p*neben.faktor*punktwert)>(primaer.p*primaer.faktor*punktwert)?neben:primaer;
+  }
+
+  // EIGENE, VOLLSTAENDIG UNABHAENGIGE SCHATZSUCHE JE SEITE (Aufgabenstellung PR 1: "für PR 1
+  // reicht es, dass der Rechner pro Seite unabhängig läuft" — Sichtbarkeit/Reaktion ZWISCHEN
+  // den Seiten ist PR 2). Heim und Gast bekommen deshalb je eine EIGENE Kopie des Raums
+  // (eigene Truhen, eigener Fortschritt, eigene Leerung) statt eines einzigen, von beiden
+  // Seiten gemeinsam bespielten Pools — sonst haette (nachgemessen) die willkuerliche
+  // Zugriffsreihenfolge ueber ZWOELF Teilnehmer aus BEIDEN Teams mehr Gewicht auf das
+  // Ergebnis als der eigentliche Sub-Skill (rho brach auf 0,53 ein, deutlich unter die alte
+  // Duell-Fassung). Innerhalb EINER Seite bleibt die Truhen-Konkurrenz (NERVEN-Reihenfolge,
+  // "nicht besetzte Fundorte") bestehen — bei hoechstens sechs Teilnehmern je Seite ist ihr
+  // Effekt viel kleiner, weil deutlich weniger Teilnehmer um dieselben ein bis zwei
+  // hoechstwertigen Truhen konkurrieren.
+  function baueSchatzsucheSeite(art,teilnehmer){
+    const fundorte=art.fundorte;
+    const aktivIdx=ispyAktiveFundorte(fundorte,teilnehmer.length);
+    const truhen=aktivIdx.map(idx=>{
+      const f=fundorte[idx];
+      return {idx, art:f.art, neben:f.neben||null, stufeAktuell:f.stufe, fortschritt:0,
+        leer:false, folgePos:idx%ISPY_NACHFUELL_FOLGE.length, x:f.x};
+    });
+    // u.funde (Konzept Abschnitt 4): rein additives Anzeigefeld je Stufe, fliesst NIE in
+    // wert()/u.summe — exakt das u.kuehneVersuche-Muster von Gewichtheben.
+    for(const u of teilnehmer){ u.funde={1:0,2:0,3:0}; }
+
+    // TEAMKOLLEGEN TEILEN SICH DIE TRUHEN DIESER SEITE (gemessen die bessere Wahl: eine
+    // vollstaendig unabhaengige Truhen-Kopie je Teilnehmer wurde gegengemessen und gab
+    // SCHLECHTERE Werte, rho je Spiel median 0,55 gegen 0,62 hier — ohne die Konkurrenz um
+    // dieselben wenigen wertvollen Truhen verliert der Star seinen Vorteil, mehrfach als
+    // erster an die besten Ziele zu kommen, und das Ergebnis naehert sich reinem Wuerfeln
+    // je Teilnehmer an). Reihenfolge und Belegung unten loesen das, ohne Sichtbarkeit
+    // ZWISCHEN den Seiten zu brauchen.
+    for(let tick=0;tick<art.rundenN;tick++){
+      // REAKTIONSWURF DIESER SEITE (PR-2-Vorarbeit, s. Kopfkommentar oben): gezogen, aber
+      // in DIESER PR verworfen — kein Laeufer, keine Sichtbarkeit ZWISCHEN den Seiten, nur
+      // fester rr()-Verbrauch, damit PR 2 ihn nicht verschiebt (Handbuch-Falle 17).
+      rr();
+      // REIHENFOLGE NACH NERVEN (3.3): wer im selben Tick mit einem Teamkollegen um
+      // dieselbe (durch F2 fuer mehrere attraktive) Truhe konkurriert, kommt zuerst dran,
+      // wenn er mehr NERVEN hat — deterministisch, kein zusaetzlicher rr()-Wurf.
+      const reihenfolge=[...teilnehmer].sort((a,b)=>(b.NERVEN-a.NERVEN)||(a.id-b.id));
+      // NICHT BESETZTE FUNDORTE (1.3: "die Wahl unter den gesehenen, NICHT BESETZTEN
+      // Fundorten"): sobald ein Teilnehmer eine Truhe in DIESEM Tick anvisiert (gleich ob
+      // die Knacken-Phase gelingt oder scheitert), ist sie fuer den Rest des Ticks belegt —
+      // wie ein Spieler, der schon mit der Lupe davorsteht.
+      const belegt=new Set();
+      for(const u of reihenfolge){
+        // SPUEREN: ein rr()-Wurf ueber alle drei Schwellen zugleich (1.3).
+        const x=rr();
+        const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
+        const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
+        const sichtbar=(t)=>t.stufeAktuell===1||(t.stufeAktuell===2&&x<sieht2)||(t.stufeAktuell===3&&x<sieht3);
+        const kandidaten=truhen.filter(t=>!t.leer&&!belegt.has(t.idx)&&sichtbar(t));
+        // F2 "ERWARTUNGSWERT" (1.3): Punktwert*Knackchance ueber den jeweils besseren Weg
+        // (Mehrwege, 1.6), sortiert absteigend. Tie-Break: hoehere Chance im gewaehlten Weg
+        // (steht fuer "der Sub-Skill dieser Raetselart ist bei ihm am hoechsten"), danach
+        // Naehe zur eigenen Seite (deterministisch, kein rr()) — 1.3 letzter Absatz.
+        const bewertet=kandidaten.map(t=>{
+          const weg=ispyBesterWeg(u,t);
+          return {t, weg, ev:ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*weg.p,
+            naeher:(u.side===0?t.x:(1-t.x))};
+        }).sort((a,b)=>(b.ev-a.ev)||(b.weg.p-a.weg.p)||(a.naeher-b.naeher));
+        const wahl=bewertet[0]||null;
+        if(wahl)belegt.add(wahl.t.idx);
+        // KNACKEN: 2RN-Wuerfel (Mittel zweier rr()) — FESTER Verbrauch, auch ohne Ziel
+        // (Handbuch-Falle 17: der rr()-Verbrauch je Teilnehmer darf nicht vom Ausgang
+        // abhaengen, sonst verschiebt sich die Zufallsfolge zwischen zwei Messlaeufen).
+        const wurf=(rr()+rr())/2;
+        if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort}); continue; }
+        const ziel=wahl.t, zielWeg=wahl.weg;
+        const ermued=Math.max(ISPY_AUSDAUER_BODEN,
+          1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
+        const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,zielWeg.p*ermued));
+        if(wurf<chance){
+          const punkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor);
+          u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+          u.funde[ziel.stufeAktuell]=(u.funde[ziel.stufeAktuell]||0)+1;
+          ziel.leer=true;
+        } else {
+          ziel.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, ziel.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
+          const teilpunkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor*ISPY_TEILPUNKTE_ANTEIL);
+          u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        }
+      }
+      // NACHFUELLEN (2.2): jede in DIESEM Tick geknackte Truhe wird sofort danach wieder
+      // befuellt — sie bleibt damit GENAU EINEN Tick lang leer (leer waehrend des Ticks, in
+      // dem sie geknackt wurde, wieder da ab dem naechsten) — derselbe Art, naechste Stufe
+      // aus der festen Folge. `belegt`/`leer` sorgen im Tick selbst schon dafuer, dass
+      // niemand sie waehrend dieser einen leeren Runde antreffen kann.
+      for(const t of truhen){
+        if(t.leer){
+          t.stufeAktuell=ISPY_NACHFUELL_FOLGE[t.folgePos%ISPY_NACHFUELL_FOLGE.length];
+          t.folgePos++; t.fortschritt=0; t.leer=false;
+        }
+      }
+    }
+  }
+
+  function baueSchatzsuche(art,mine,gegner){
+    const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
+    const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
+    // REIHENFOLGE MINE-DANN-GEGNER, NICHT VERZAHNT: komplett sequenziell je Seite, wie die
+    // generische Rundenformel weiter oben (`mine.forEach((p,i)=>setz(p,0,i));
+    // gegner.forEach((o,i)=>setz(o,1,i));`) es fuer JEDE andere Auftritt-Buehne bereits
+    // komplett sequenziell je TEILNEHMER tut — nur eine Ebene groeber (je Seite statt je
+    // Teilnehmer).
+    //
+    // REIHENFOLGE GEGENGEMESSEN, NICHT GERATEN: mit Gegner zuerst liest der Spiegeltest
+    // (identischer Kader gegen sich selbst, `miss-arena-buehne-spiegel.mjs`, 2000 Laeufe)
+    // Heim:Gast 52,9:47,0 statt 54,9:45,1 mit dieser (Mine-zuerst-)Reihenfolge — beide Werte
+    // liegen innerhalb des 45:55-Korridors aus dem Konzept (2.1), Mine-zuerst naeher an der
+    // Mitte. ABER: Gegner-zuerst kostete die Budget-Pruefung deutlich mehr, als es dem
+    // Spiegeltest half — `messe-arena-einfluss.mjs i-spy` (n=48 UND 96) stieg von 23,3/21,2
+    // auf 27,9/27,0 Pp, ueber die 25-Pp-Schranke. Die Pp-Schranke ist eine harte Zahl ohne
+    // Toleranzband (CLAUDE.md: "Pflichtpruefung ... genauso verbindlich wie die
+    // rho-Schranke"), waehrend der Spiegeltest-Korridor ausdruecklich eine SPANNE ist und
+    // 54,9:45,1 sie erfuellt. Deshalb bleibt es bei Mine-zuerst — die Punktesummen selbst
+    // liegen in beiden Reihenfolgen nur ~0,8 % auseinander (Rauschen); der Sieg-ANTEIL
+    // reagiert empfindlicher, weil er nur zaehlt, wer knapp vorn liegt.
+    baueSchatzsucheSeite(art,mineT);
+    baueSchatzsucheSeite(art,gegnerT);
   }
 
   function stepBuehne(dt){
@@ -30772,7 +31156,8 @@
     // demselben Grund, der dort schon fuer spieleFeldspiel() galt (Kommentar oben): ein
     // bereits produktiver, getesteter Pfad bleibt unangefasst.
     //
-    // BUeHNEN-DUELL-CHASSIS FUER art.duell (Speed-Schach, I-Spy) -- STRUKTURELL DASSELBE
+    // BUeHNEN-DUELL-CHASSIS FUER art.duell (Speed-Schach, Tennis, Fechten -- I-Spy seit PR 1
+    // NICHT MEHR, s. `schatzsuche:true` bei BUEHNE_ART["i-spy"]) -- STRUKTURELL DASSELBE
     // Zweikampf-Chassis wie art.heben (Gewichtheben): beide bauen Zweikaempfe je Slot
     // (baueHebenDuelle() bedient historisch beide, s. WERTUNG_HEBEN/WERTUNG_DUELL-Weiche bei
     // `buehne:(art)=>...` weiter unten), beide fuellen TEILNEHMER mit `.side`/`.summe`. Der
@@ -30785,10 +31170,12 @@
     // dieser Einstiegspunkt hier, damit ein Arena-Duell dasselbe Ergebnis liefert wie das, was
     // ein Zuschauer live auf der Buehne sieht.
     //
-    // GENERISCH UEBER `art.duell`, NICHT AUF "speed-schach" HARDCODIERT: I-Spy (`duell:true`,
-    // s. BUEHNE_ART.["i-spy"]) laeuft hier automatisch mit, sobald es in
-    // ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_DUELL_DISCIPLINE_IDS steht -- keine
-    // weitere Kopie dieser Funktion.
+    // GENERISCH UEBER `art.duell`, NICHT AUF "speed-schach" HARDCODIERT: jede Disziplin mit
+    // `duell:true` laeuft hier automatisch mit, sobald sie in ARENA_RESOLVED_DISCIPLINE_IDS
+    // und ARENA_BUEHNE_DUELL_DISCIPLINE_IDS steht -- keine weitere Kopie dieser Funktion. I-Spy
+    // trug dieses Flag bis PR 1 (jetzt `schatzsuche:true`, s. BUEHNE_ART["i-spy"]) und lief
+    // deshalb frueher hier mit; es stand nie in den beiden genannten Mengen (Produktivierung
+    // war ohnehin gesperrt, rho unter der Schranke) und ist folgenlos herausgefallen.
     //
     // KEIN `gesamtKg`: ein Tiebreak bei Brettgleichstand ist hier nicht noetig, weil ein
     // Duell-Gleichstand (z.B. 3:3 der sechs Bretter) ein ECHTES, plausibles Unentschieden ist
