@@ -28484,20 +28484,7 @@
         if(u.vizUebergabeT>0 && u.vizUebergabeGeberId!=null){
           const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
           if(geber){
-            // DER STAB SCHWEBTE FREI (Chris' Meldung, s. PR-Beschreibung): `laeuferXY(geber)`
-            // fragt `ovalPunkt()`, und die stellt einen Geber, der gerade erst uebergeben hat
-            // (`geber.aktiv===false`, `geber.fertig` bleibt bis zum TEAM-Ziel null), genau wie
-            // einen noch gar nicht gestarteten Laeufer in die Wechselzonen-Warteschlange im
-            // Innenfeld (":26251", der Radius-/vx-Block) -- ein anderer Punkt als der, an dem
-            // die Uebergabe wirklich stattfand. Die Interpolation unten startete deshalb an
-            // dieser falschen Innenfeld-Position statt am echten Streckenpunkt, der Stab
-            // schien freizuschweben, bevor er beim Nehmer "ankam". Der WIRKLICHE Uebergabepunkt
-            // ist der Bahn-Punkt zu `geber.pos` (unveraendert seit dem Wechsel, s. stepSpurt
-            // "u.aktiv=false; u.pos=u.beinBis") auf seiner LAUFSPUR (`ovalSpurR`, dieselbe
-            // Formel wie ovalPunkt() fuer einen aktiven Laeufer nimmt, statt der
-            // Innenfeld-Sonderbehandlung fuer Wartende). Reine Zeichenkorrektur -- liest nur
-            // bestehende Felder, schreibt nichts, aendert nichts an wert()/rho.
-            const gp=bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
+            const gp=laeuferXY(geber);
             const gwartet=!geber.aktiv && geber.fertig==null;
             const gsk=gwartet?sk0*0.88:sk0;
             // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
