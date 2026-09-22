@@ -5904,6 +5904,69 @@
     ||6;
 
   // ===================================================================================
+  // BATTLEFIELD-DOMINATION: ein Kontrollpunkt-Sieg neben "alle Gegner liegen".
+  //
+  // Chris am 22.09., nach `docs/design/arena-mini-dm-tdm-battlefield-rollout-plan.md`
+  // (Abschnitt 3.2/4.2, Option 3 "Objective-Layer fuer Battlefield" — dort ausdruecklich
+  // nur als "Diskussionsgrundlage" eingestuft, "liegt ausserhalb dessen, was diese
+  // Recherche vorwegnehmen soll"): "battlefield wolltest du ja nen domination modus bauen
+  // den sehe ich noch nicht, aktuell normale kampfarena." Das hier ist die tatsaechliche
+  // Umsetzung — AUSSCHLIESSLICH fuer Battlefield. TDM und Mini-DM bleiben reines
+  // Deathmatch (ihre eigenen Matrix-Kommentare sagen das explizit, s. ARENA_ART oben);
+  // `beitragVon`, die von allen drei geteilte Wertformel, wird an keiner Stelle angefasst.
+  //
+  // EIN KONTROLLPUNKT, in der Mitte des Kampfplatzes (MID, H/2) — derselbe Punkt, um den
+  // sich beide Seiten laut bodenArena() ohnehin gruppieren (Steinring, Mittellinie).
+  // Vorbild Unity FPSSample CapturePoint.cs (Recherche Abschnitt 3.2): pro Tick wird
+  // ausgewertet, wie viele Kaempfer jeder Seite sich in seinem Radius befinden — keine
+  // harte Meter-Zone wie Basketballs zonenTiefe, sondern eine fortlaufende Naehe-Pruefung
+  // mit derselben dist()-Funktion, die der Kampf schon fuer Reichweite und Bindung
+  // benutzt (chooseTarget/bindAn). "Battlefield hat Reihen, keine Meter-Zonen" (Recherche
+  // Abschnitt 1.0) heisst hier: keine neue Positions-Einheit einfuehren, sondern denselben
+  // Pixel-Abstand messen wie ueberall sonst im Motor.
+  //
+  // RADIUS 230 deckt bei den Battlefield-Spaltenabstaenden (homeFor: MID vor 140/300/460)
+  // vor allem Reihe 0 ab — dort stehen seit dem Reihen-Fix vom 03.09. (SLOT_ZUSATZ.
+  // battlefield) ausgerechnet Siege Core und Morale Anchor, die "Fronten druecken" bzw.
+  // "Linien zusammenhalten". Spotter (Reihe 1) und Commander (Reihe 2) erreichen den
+  // Punkt nur, wenn die Formation tatsaechlich vorruckt (Offensivzwang nach 4,5 s, Sudden
+  // Death ab t=50, Endspiel) — folgerichtig: ein Fuehrungsoffizier haelt sich zurueck, bis
+  // er gebraucht wird, genau wie sein Slot-Text es beschreibt.
+  //
+  // BESITZ WECHSELT NUR, WENN GENAU EINE SEITE PRAeSENT IST (dasselbe Unity-Vorbild:
+  // Kontrollpunkte "kontern" sich gegenseitig, solange beide Seiten dort stehen — kein
+  // Fortschritt in beide Richtungen zugleich). Steht niemand am Punkt, haelt er seinen
+  // letzten Besitz statt auf neutral zurueckzufallen — ein verlassener Punkt bleibt erobert.
+  //
+  // PUNKTERATE UND SIEGLIMIT, fuer unser Tempo kalibriert, NICHT von Xonotics Standardwerten
+  // (1 Punkt/5 s) uebernommen — die sind fuer 15-Minuten-Runden gedacht, ein Battlefield-
+  // Kampf hier laeuft 60-95 Sekunden (s. t>95-Kampfende weiter unten). punkteZumSieg=150 bei
+  // punkteJeSekunde=6 heisst: 25 Sekunden ununterbrochener Alleinbesitz reichen zum Sieg —
+  // erreichbar INNERHALB EINES EINZELNEN SPIELS (CLAUDE.md: "das muss REALISTISCH innerhalb
+  // von einem Spiel ablaufen"), aber nicht so schnell, dass die erste Beruehrung schon
+  // entscheidet. Wird das Limit von keiner Seite erreicht, entscheidet nach Kampfende der
+  // Punktestand (s. finish()/dominationSieger unten) — der zweite, in Abschnitt 3 der
+  // Aufgabe verlangte Sieg-Weg.
+  //
+  // ROLLENBONUS, exklusiv fuer DIESE Punktwertung (Recherche Abschnitt 3.3: "ein
+  // rollenspezifischer Bonus im Beitrag [waere] naeher an der Fiktion" — hier umgesetzt,
+  // OHNE beitragVon anzufassen): Siege Core zaehlt beim EROBERN eines Punktes, der nicht
+  // schon der eigenen Seite gehoert, 1,6-fach — "drueckt Fronten mit Power und Torment"
+  // wird damit zum ersten Mal eine MECHANISCHE Eigenschaft, nicht nur ein Attributsprofil.
+  // Ein Commander-Bonus beim HALTEN ist bewusst NICHT umgesetzt: er steht in Reihe 2
+  // (MID∓460) und erreicht den Punkt kaum je, ohne die Formations-/Leinen-Logik zu aendern,
+  // die sich alle drei Arena-Disziplinen teilen — als Folgevorschlag im PR vermerkt (z.B.
+  // ein zweiter, rueckwaertiger Kontrollpunkt eigens fuer Reihe 2), nicht in dieser Runde
+  // umgesetzt.
+  const ARENA_DOMINATION={
+    battlefield:{
+      radius:230, kapZeit:5, punkteJeSekunde:6, punkteZumSieg:150,
+      rolleErobert:{siegecore:1.6}
+    }
+  };
+  const dominationVon=(d)=>ARENA_DOMINATION[d]||null;
+
+  // ===================================================================================
   // DAS BUeHNE-CHASSIS.
   //
   // Fuenf Disziplinen sind weder Rennen noch Kampf: Gewichtheben, Showcase,
@@ -21021,6 +21084,15 @@
   // Ist die Flanke schon losgelassen? Je Seite eine Entscheidung, nicht je Kopf.
   let freigabe=[false,false];
 
+  // DER KONTROLLPUNKT (s. ARENA_DOMINATION oben) — null ausser bei Battlefield, dort von
+  // build() gesetzt: {x,y,radius,kapZeit,punkteJeSekunde,punkteZumSieg,rolleErobert,
+  // besitz,fortschritt,erobertVon,punkte}. besitz ist 0/1/null (neutral), punkte ist
+  // [seite0,seite1]. Von MOTOREN[d].sichern()/zurueck() mitgefuehrt wie freigabe/pfeile —
+  // sonst wuerde eine laufende Messung (einflussVon &c., die build() zwischendurch fuer
+  // andere Disziplinen aufruft) den Kontrollpunkt einer gerade sichtbaren Battlefield-
+  // Partie unter der Hand vertauschen.
+  let KP=null;
+
   // Der Platz, den ein Kaempfer wirklich einnimmt. Das Icon ist 40 breit, der Lebensbalken
   // 44, darunter stehen Name und Befehl — deshalb quer mehr als hoch.
   const KOERPER_X=58, KOERPER_Y=70;
@@ -21157,6 +21229,17 @@
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    // KONTROLLPUNKT NEU AUFSETZEN (nur Battlefield, s. ARENA_DOMINATION) — VOR PLAN/id,
+    // damit ein Wechsel weg von Battlefield (disc jetzt tdm/mini-dm) KP wieder auf null
+    // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
+    // mitzuschleppen.
+    {
+      const kf=dominationVon(disc);
+      KP=kf?{x:MID,y:H/2,radius:kf.radius,kapZeit:kf.kapZeit,
+        punkteJeSekunde:kf.punkteJeSekunde,punkteZumSieg:kf.punkteZumSieg,
+        rolleErobert:kf.rolleErobert||{},
+        besitz:null,fortschritt:0,erobertVon:null,punkte:[0,0]}:null;
+    }
     PLAN=schlachtplan();
     let id=0;
 
@@ -21493,6 +21576,62 @@
   const eigene=u=>U.filter(x=>x.side===u.side&&!x.down);
   const alleLebenden=()=>U.filter(u=>!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+  // ===================================================================================
+  // DER KONTROLLPUNKT-TAKT (nur Battlefield, s. ARENA_DOMINATION oben) — eine Funktion,
+  // von stepSim() einmal je Bild aufgerufen, GENAU wie aktualisiereFuehrung() nebenan.
+  //
+  // 1. PRAeSENZ: fuer jeden lebenden Kaempfer im Radius zaehlt sein Gewicht (1, oder der
+  //    Siege-Core-Bonus beim Erobern) fuer seine Seite.
+  // 2. ZIEL: nur eine Seite praesent -> sie greift an (oder haelt, falls es schon ihr
+  //    Punkt ist). Beide praesent -> umkaempft, kein Fortschritt. Niemand da -> Punkt
+  //    haelt seinen letzten Besitz.
+  // 3. FORTSCHRITT laeuft nur beim EROBERN (Ziel != aktueller Besitz) — wer seinen eigenen
+  //    Punkt bewacht, braucht dafuer keinen Balken, nur Praesenz.
+  // 4. PUNKTE laufen, solange der Punkt jemandem gehoert — unabhaengig davon, ob gerade
+  //    jemand davorsteht (ein kurz verlassener Punkt zahlt weiter, wie in jedem Domination-
+  //    Vorbild).
+  function kpPraesenz(){
+    let s0=0,s1=0;
+    for(const u of U){
+      if(u.down||dist(u,KP)>KP.radius)continue;
+      const erobert=KP.besitz!==u.side;
+      const w=(erobert&&KP.rolleErobert[u.slot])||1;
+      if(u.side===0)s0+=w; else s1+=w;
+    }
+    return [s0,s1];
+  }
+  function kpTick(dt){
+    if(!KP)return;
+    const [s0,s1]=kpPraesenz();
+    const ziel=(s0>0&&s1===0)?0:(s1>0&&s0===0)?1:null;
+    if(ziel!=null&&ziel!==KP.besitz){
+      if(KP.erobertVon!==ziel){KP.erobertVon=ziel;KP.fortschritt=0;}
+      const staerke=ziel===0?s0:s1;
+      const vorher=KP.fortschritt;
+      KP.fortschritt=Math.min(1,KP.fortschritt+dt*staerke/KP.kapZeit);
+      if(vorher<1&&KP.fortschritt>=1){
+        KP.besitz=ziel;KP.fortschritt=0;KP.erobertVon=null;
+        feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true);
+      }
+    }
+    // ziel===KP.besitz (der eigene Punkt wird gehalten), ziel===null (umkaempft oder leer):
+    // kein Fortschritt in irgendeine Richtung — der Balken haelt seinen Stand.
+    if(KP.besitz!=null)KP.punkte[KP.besitz]+=KP.punkteJeSekunde*dt;
+  }
+  // WER GEWINNT — von finish() UND renderEndstand() gelesen, damit Feed-Meldung, Score-
+  // Anzeige und Endstand-Overlay denselben Sieger nennen. Elimination geht vor (der
+  // urspruengliche Sieg-Zustand bleibt der schnellere, offensichtlichere Weg), danach das
+  // Punktelimit, zuletzt — wenn die Zeit einfach ablief — der hoehere Punktestand.
+  function dominationSieger(){
+    if(!KP)return undefined; // "kein Domination-Kampf" — Aufrufer soll die alte Regel nehmen
+    if(live(0).length===0&&live(1).length>0)return 1;
+    if(live(1).length===0&&live(0).length>0)return 0;
+    if(KP.punkte[0]>=KP.punkteZumSieg&&KP.punkte[0]>KP.punkte[1])return 0;
+    if(KP.punkte[1]>=KP.punkteZumSieg&&KP.punkte[1]>KP.punkte[0])return 1;
+    if(KP.punkte[0]===KP.punkte[1])return null;
+    return KP.punkte[0]>KP.punkte[1]?0:1;
+  }
 
   // ===================================================================================
   // ZIELANSAGE / FOKUSFEUER — der eine Eingriff, den der Zuschauer im Kampf hat.
@@ -22694,6 +22833,15 @@
     // Elimination statt eines Abbruchs, sobald zufaellig Seite 0 oder 1 leer ist, waehrend 2/3
     // noch kaempfen.
     const lebendeSeiten=new Set(U.filter(u=>!u.down).map(u=>u.side));
+    // KONTROLLPUNKT-TAKT UND -SIEGLIMIT (nur Battlefield, KP===null sonst) — VOR der
+    // Elimination geprueft, aber ohne sie zu verdraengen: liegt eine Seite schon komplett,
+    // greift dieselbe Zeile darunter unveraendert, dominationSieger() liest den Elimination-
+    // Fall zuerst (s. dort) und finish() zeigt in dem Fall die gewohnte "liegt am Boden"-
+    // Meldung statt einer Punktemeldung.
+    if(KP){
+      kpTick(dt);
+      if(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)finish();
+    }
     if(lebendeSeiten.size<=1||t>95)finish();
     updateHud();
   }
@@ -23360,12 +23508,18 @@
     // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
     // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
     // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
-    document.getElementById("klsuffix").textContent="Punkte";
+    // BATTLEFIELD-DOMINATION: die grosse Score-Zahl zeigt Kontrollpunkt-Punkte statt
+    // Ausschaltungen, weil DAS jetzt der Sieg-Weg ist, den t/95s bzw. das Punktelimit
+    // auswerten (s. kpTick/dominationSieger) — aliveL/aliveR bleiben unveraendert die
+    // Ueberlebendenzahl, die weiterhin fuer den Elimination-Sieg zaehlt.
+    document.getElementById("klsuffix").textContent=KP?"Kontrollpunkte":"Punkte";
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
     // PUNKTE = ausgeschaltete Gegner. Bei 6 gegen 6 holt ein komplett siegreiches Team 6.
-    document.getElementById("score").textContent=(nR-live(1).length)+" : "+(nL-live(0).length);
+    document.getElementById("score").textContent=KP
+      ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
+      :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -24025,6 +24179,40 @@
       f.addColorStop(0,"rgba(255,214,140,.85)");f.addColorStop(1,"rgba(255,150,40,0)");
       ctx.fillStyle=f;ctx.beginPath();ctx.arc(x,y-4,16,0,6.283);ctx.fill();
     }
+  }
+
+  // DER KONTROLLPUNKT SELBST — nur gezeichnet, wenn KP!==null (Battlefield-Domination, s.
+  // ARENA_DOMINATION). Reine Canvas-Primitiven statt eines neuen Sprite-Blatts, wie
+  // bodenArena()s gezeichneter Rueckfall: ein Fahnenmast in der Besitzfarbe, eine
+  // Bodenscheibe (derselbe Farbcode wie die Team-Ellipse unter jedem Kaempfer, s. draw()),
+  // ein schwacher gestrichelter Ring als Praesenz-Radius (damit sichtbar bleibt, WARUM sich
+  // der Besitz gerade dreht) und — nur waehrend eine Seite tatsaechlich erobert — ein
+  // Fortschrittsring in der Farbe des Angreifers.
+  function zeichneKontrollpunkt(){
+    const homeC=css("--home"), awayC=css("--away");
+    const besitzFarbe=KP.besitz===0?homeC:KP.besitz===1?awayC:"rgba(255,255,255,.6)";
+    ctx.save();
+    ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.22;ctx.lineWidth=2;ctx.setLineDash([5,7]);
+    ctx.beginPath();ctx.arc(KP.x,KP.y,KP.radius,0,6.283);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=.28;ctx.fillStyle=besitzFarbe;
+    ctx.beginPath();ctx.ellipse(KP.x,KP.y+20,34,13,0,0,6.283);ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle="#3a2f22";ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(KP.x,KP.y+18);ctx.lineTo(KP.x,KP.y-46);ctx.stroke();
+    ctx.fillStyle=besitzFarbe;
+    ctx.beginPath();ctx.moveTo(KP.x,KP.y-46);ctx.lineTo(KP.x+26,KP.y-38);ctx.lineTo(KP.x,KP.y-30);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=1.5;ctx.stroke();
+    if(KP.erobertVon!=null&&KP.fortschritt>0){
+      const farbe=KP.erobertVon===0?homeC:awayC;
+      ctx.strokeStyle=farbe;ctx.lineWidth=5;ctx.lineCap="round";
+      ctx.beginPath();ctx.arc(KP.x,KP.y-8,22,-Math.PI/2,-Math.PI/2+6.283*KP.fortschritt);ctx.stroke();
+    }
+    ctx.restore();
+    ctx.font="bold 12px system-ui,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
+    const txt="Kontrollpunkt — "+(KP.besitz===0?VEREIN[0].name:KP.besitz===1?VEREIN[1].name:"neutral");
+    ctx.strokeText(txt,KP.x,KP.y+46);ctx.fillText(txt,KP.x,KP.y+46);
   }
 
   // ================== TAKESHI'S CASTLE: ZEHN FALLEN-BILDER ==================
@@ -28675,6 +28863,7 @@
     if(istBuehne(disc)){zeichneBuehne();return;}
     if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
+    if(KP)zeichneKontrollpunkt();
 
     // ZIELLINIEN. Ein duenner Strich von jedem Kaempfer zu dem, den er gerade meint.
     //
@@ -28939,6 +29128,21 @@
     if(done)return;done=true;running=false;
     document.getElementById("play").textContent="Vorbei";
     renderEndstand();
+    // BATTLEFIELD-DOMINATION (s. ARENA_DOMINATION/dominationSieger oben): eigene Feed-
+    // Meldung, die den tatsaechlichen Sieg-Weg benennt (Elimination, Punktelimit oder
+    // Zeitablauf) — TDM/Mini-DM/das alte Verhalten unten bleiben unberuehrt, weil KP dort
+    // immer null ist.
+    if(KP){
+      const sieger=dominationSieger();
+      const elimSieg=live(0).length===0||live(1).length===0;
+      const grund=elimSieg?"— der Gegner liegt komplett am Boden"
+        :(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)
+          ?"— Kontrollpunkt-Punktelimit erreicht ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")"
+          :"— nach Zeitablauf mehr Kontrollpunkt-Punkte ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")";
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true);
+      updateHud();
+      return;
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
     feed(0,(pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
@@ -30458,7 +30662,12 @@
   }
 
   function renderEndstand(){
-    const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
+    // BATTLEFIELD-DOMINATION: derselbe Sieger wie in finish()/feed() — sonst zeigte das
+    // Overlay nach einem Punktelimit-Sieg weiter den ueberlebenszahl-basierten Sieger, der
+    // bei einem Domination-Sieg mit ueberlebenden Kaempfern auf beiden Seiten oft ein
+    // ANDERES Team nennt als tatsaechlich gewonnen hat.
+    const sieger = KP ? dominationSieger()
+      : (live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null);
     document.getElementById("esieger").textContent =
       sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
     for(const seite of [0,1]){
@@ -30978,8 +31187,8 @@
   //                             ARENA_ART.tdm oben). Bleibt offen fuer eine naechste Runde.
   for(const ad of Object.keys(ARENA_ART)){
     MOTOREN[ad]={
-      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe}),
-      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;},
+      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe,KP}),
+      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;KP=a.KP;},
       vorher:()=>{disc=ad;},
       bau:(saat)=>{disc=ad; build(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
@@ -31967,6 +32176,23 @@
       const seiten=[fsPunkte[0],fsPunkte[1]];
       M.zurueck(g);
       return {disziplin:fd, seiten, boxscore};
+    },
+    // BATTLEFIELD-DOMINATION-PROBE: dasselbe "ein Spiel, ein Ergebnis"-Muster wie
+    // spieleFeldspiel() direkt darueber, hier fuer den Kontrollpunkt-Sieg (ARENA_DOMINATION).
+    // Liefert null fuer jede Disziplin ohne Domination-Konfiguration (aktuell alle ausser
+    // battlefield) -- reine Diagnose/Kalibrierung, kein Gameplay-Zugriff, keine Aenderung an
+    // MOTOREN[dId] noetig, weil KP bereits ueber sichern()/zurueck() mitgefuehrt wird (s. dort).
+    spieleArenaDomination:(dId,saat)=>{
+      const kf=dominationVon(dId); if(!kf)return null;
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const ergebnis={disziplin:dId, dauer:+t.toFixed(2),
+        punkte:KP.punkte.map(x=>+x.toFixed(1)), besitz:KP.besitz,
+        sieger:dominationSieger(), ueberlebende:[live(0).length,live(1).length]};
+      M.zurueck(g);
+      return ergebnis;
     },
     // GEWICHTHEBEN-PRODUKTIVIERUNG (S6, docs/design/gewichtheben-produktivierung.md): dasselbe
     // "ein Spiel, ein Ergebnis"-Muster wie spieleFeldspiel() direkt darueber, aber fuer die
