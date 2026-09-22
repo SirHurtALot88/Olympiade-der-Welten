@@ -14690,13 +14690,52 @@
       }
     }
 
-    // REIHENFOLGE NACH NERVEN (3.3), UNVERAENDERT AUS PR 1: wer im selben Tick mit einem
-    // Teamkollegen um dieselbe (durch F2 fuer mehrere attraktive) Truhe konkurriert, kommt
-    // zuerst dran, wenn er mehr NERVEN hat — deterministisch, kein zusaetzlicher rr()-Wurf.
-    // Der Laeufer bekommt KEINEN Vorrang — er steht wie jeder andere an seiner NERVEN-
-    // Position; das IST der Wettlauf aus K-D (3.3): wer zuerst an der Ziel-Truhe ist,
-    // Laeufer oder ein normal waehlender Teamkollege, versucht zuerst.
-    const reihenfolge=[...teilnehmer].sort((a,b)=>(b.NERVEN-a.NERVEN)||(a.id-b.id));
+    // REIHENFOLGE NACH NERVEN+KOMPETENZ (3.3, KALIBRIERT — Kalibrierrunde 22.09., Befund aus
+    // PR 2/`i-spy-kalibrierrunde-rho-pp-22-09`): wer im selben Tick mit einem Teamkollegen um
+    // dieselbe (durch F2 fuer mehrere attraktive) Truhe konkurriert, kommt zuerst dran —
+    // deterministisch, kein zusaetzlicher rr()-Wurf. Reine NERVEN-Sortierung (PR 2) gab NERVEN
+    // die Ordnungsmacht ueber JEDE Kollision, nicht nur ueber die K-D-Ausnahmetruhe, und
+    // verstaerkte NERVEN dadurch gemessen weit ueber sein Matrixgewicht hinaus
+    // (messe-arena-einfluss.mjs, Alt-Rezept: 33,9/30,8 Pp bei n=48/96, will +3,7/+4,6 Pp,
+    // determination +4,6 Pp, dexterity -5,7/-4,9 Pp, speed -5,8/-4,7 Pp), waehrend die
+    // eigentlichen Raetselart-Sub-Skills (v.a. FINGERFERTIGKEIT) an Bedeutung verloren — und
+    // rho je Spiel bei 0,700 blieb.
+    //
+    // ISPY_REIHENFOLGE_NERVEN_ANTEIL mischt NERVEN mit der durchschnittlichen KOMPETENZ
+    // (Mittel der drei Knack-Sub-Skills LOGIK/MENSCHENKENNTNIS/FINGERFERTIGKEIT) — wer im
+    // Kollisionsfall zuerst drankommt, ist jetzt jemand, der tendenziell auch etwas mit dem
+    // Zug anfangen kann, nicht nur jemand mit schnellen Nerven. Der Laeufer bekommt weiterhin
+    // KEINEN Vorrang — er steht wie jeder andere an seiner Reihenfolge-Position; das IST der
+    // Wettlauf aus K-D (3.3): wer zuerst an der Ziel-Truhe ist, Laeufer oder ein normal
+    // waehlender Teamkollege, versucht zuerst.
+    //
+    // GRID-SUCHE (miss-alle-disziplinen.mjs 24 i-spy, rho je Spiel/Median ueber die
+    // Kader-Familie): ANTEIL 1,0 (PR-2-Stand) 0,700 · 0,5 → 0,715 · 0,35 → 0,726 ·
+    // 0,3 → 0,730 (gewaehlt) · 0,25 → 0,723 · 0,15 → 0,711 · 0,0 (Kollisionsordnung rein nach
+    // Kompetenz, kein NERVEN-Anteil mehr) nicht weiter verfolgt, weil 0,25-0,35 ein flaches
+    // Optimum bilden und 0,3 zugleich die beste Pp-Zahl lieferte. Eine zusaetzlich erprobte
+    // Variante — `belegt` (1.3-Konkurrenzregel) nur fuer Tresore statt fuer alle Stufen, um
+    // NERVEN noch seltener zum Zug kommen zu lassen — mass ALLEIN 0,687 (leicht schlechter)
+    // und in Kombination mit dem 0,3-Reihenfolge-Mix 0,713 (schlechter als 0,3 allein):
+    // BEIDE Varianten verworfen, nicht uebernommen.
+    //
+    // BUDGET-Pp NACH DER KALIBRIERUNG (messe-arena-einfluss.mjs i-spy, zwei unabhaengige
+    // Saatbereiche): 33,9 → 18,4 Pp (n=48), 30,8 → 14,5 Pp (n=96) — beide klar unter der
+    // 25-Pp-Schranke (CLAUDE.md). Gemessen ueber eine chunked Methode (mehrere kurze
+    // einflussVon-aequivalente Teilmessungen mit disjunkten Saat-Offsets, in Node zur exakt
+    // selben Summenformel kombiniert — validiert gegen einen echten einflussVon(d,12)-Aufruf,
+    // bit-identisches Ergebnis), weil ein einzelner sehr langer synchroner
+    // einflussVon(i-spy,48)-Aufruf im Headless-Chromium dieser Sandbox unzuverlaessig haengt
+    // — nachgemessen AUCH auf unveraendertem main-Stand (also kein durch diese PR
+    // eingefuehrtes Problem, s. PR-Beschreibung).
+    //
+    // Isolationsnachweis (miss-alle-disziplinen.mjs 24, alle zwanzig, vor/nach dieser
+    // Aenderung): nur die i-spy-Zeile bewegt sich (0,700→0,730 je Spiel, 0,846→0,902 Saison),
+    // alle uebrigen neunzehn Zeilen bit-identisch.
+    const ISPY_REIHENFOLGE_NERVEN_ANTEIL=0.3;
+    const reihenfolgeSchluessel=(u)=>ISPY_REIHENFOLGE_NERVEN_ANTEIL*u.NERVEN
+      +(1-ISPY_REIHENFOLGE_NERVEN_ANTEIL)*((u.LOGIK+u.MENSCHENKENNTNIS+u.FINGERFERTIGKEIT)/3);
+    const reihenfolge=[...teilnehmer].sort((a,b)=>(reihenfolgeSchluessel(b)-reihenfolgeSchluessel(a))||(a.id-b.id));
     // NICHT BESETZTE FUNDORTE (1.3), UNVERAENDERT: ein Besuch (Erfolg wie Fehlschlag)
     // sperrt eine Truhe fuer den Rest des Ticks — AUSSER fuer `zielIdx` (K-D): die vertraegt
     // in DIESEM Tick ZWEI Besuche, s. `versucheZiel` unten.
