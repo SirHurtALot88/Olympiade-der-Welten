@@ -207,6 +207,34 @@
   .oly-battle-arena.oly-battle-arena .tbar.l s{background:var(--home)}.oly-battle-arena.oly-battle-arena .tbar.r s{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
   .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;height:auto;background:var(--pitch)}
+
+  /* MINI-DM 4-TEAM-FFA-Ergebnisansicht (Bugfix 22.09., s. battle-mode.html/-engine.js) —
+     vier Teams nebeneinander statt der Zwei-Seiten-.scoreline/.hpbars/.kaderleiste
+     darueber, die fuer genau diese Ansicht ausgeblendet werden. */
+  .oly-battle-arena.oly-battle-arena .minidmffa{padding:14px 18px;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+  .oly-battle-arena.oly-battle-arena .minidmffa .honest{display:block;margin:0 0 12px;max-width:74ch;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .mdffa-teams{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .oly-battle-arena.oly-battle-arena .mdffa-team{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-eck{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-name{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.02em;margin:3px 0}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte{font-family:"IBM Plex Mono",monospace;font-size:18px;font-weight:600;color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte em{display:block;font-style:normal;font-size:9px;color:var(--muted);font-weight:400}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-sieger{border-color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .mdffa-runden{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde h5{margin:0;padding:6px 9px;font-size:11.5px;border-bottom:1px solid var(--line);color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde table{width:100%;border-collapse:collapse;font:11px/1.4 ui-monospace,monospace}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde td{padding:3px 8px;border-bottom:1px solid var(--line-soft);color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde tr:last-child td{border-bottom:0}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-r1 td:first-child{color:var(--warn);font-weight:700}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-down td:first-child{text-decoration:line-through;opacity:.6}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand table{width:100%;border-collapse:collapse;font:11.5px/1.5 ui-monospace,monospace}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand th{text-align:right;padding:4px 8px;color:var(--faint);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand th:first-child{text-align:left}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand td{text-align:right;padding:5px 8px;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand td:first-child{text-align:left}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand tr.mdffa-r1 td{color:var(--warn);font-weight:700}
   /* Slot-Tafel */
   .oly-battle-arena.oly-battle-arena .slotzone{position:relative}
   .oly-battle-arena.oly-battle-arena .slotzone .zname{align-items:flex-start}
