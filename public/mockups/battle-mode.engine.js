@@ -14540,12 +14540,85 @@
   // AUSDAUER sonst kaum eigenes Pp-Gewicht bekommt (Spirit/Health haben in den drei
   // Raetselart-Sub-Skills sonst keinen Kanal) — s. Budget-Kalibrierung oben.
   const ISPY_AUSDAUER_K=0.0200, ISPY_AUSDAUER_BODEN=0.40;
-  // NACHFUELLEN (2.2): eine geknackte Truhe ist einen Tick leer, dann liegt an derselben
-  // Position eine neue Truhe DERSELBEN ART mit der naechsten Stufe aus einer festen Folge —
-  // "die Folge steht im Raum, nicht im Wuerfel" (kein zusaetzlicher rr()-Verbrauch). Der
-  // Startpunkt in der Folge ist je Fundort-Position verschoben (Modulo Fundort-Index),
-  // damit nicht alle Truhen synchron dieselbe Stufe nachziehen.
-  const ISPY_NACHFUELL_FOLGE=[2,1,3,2,1,2];
+  // NACHFUELLEN (2.2), ART-EIGEN (Opus-Gegencheck 2, 22.09., Abschnitt 3 — "die
+  // Nachfuellfolge hebelt die Kalibrierung aus"): eine geknackte Truhe ist einen Tick leer,
+  // dann liegt an derselben Position eine neue Truhe DERSELBEN ART mit der naechsten Stufe
+  // aus einer festen Folge — "die Folge steht im Raum, nicht im Wuerfel" (kein zusaetzlicher
+  // rr()-Verbrauch, wie bisher).
+  //
+  // BEFUND, DER DIESEN UMBAU AUSLOEST: bis hierher (PR 1-4 + Kalibrierrunde 22.09.) war die
+  // Folge EINE einzige, positionsindizierte Liste (`ISPY_NACHFUELL_FOLGE=[2,1,3,2,1,2]`,
+  // `folgePos=idx%6`) — artblind. Alle zwoelf Positionen liefen dieselbe geteilte Folge nur
+  // phasenverschoben ab, sodass JEDE Position, unabhaengig von ihrer Raetselart, irgendwann
+  // Stufe 3 zog. Der Logik-Tresor (idx 2) stand zufaellig auf einer Phase, die ihn sofort
+  // wieder zu einem Tresor machte; der Verhoer-Tresor (idx 7) auf einer, die ihn zu einer
+  // 10-Punkte-Notiz machte. Ergebnis: die kalibrierte Punktmassen-Verteilung (1.5: Logik
+  // 37,6 %/Verhoer 36,5 %/Mechanik 25,9 %) galt nur im Startzustand (Tick 0, dort ohnehin
+  // durch das Layout auf 41,9/35,5/22,6 % fixiert, s. Kommentar bei `fundorte` oben) und
+  // driftete bis Tick 7 auf 39,8/28,1/32,1 % (Gegencheck 2, Abschnitt 3.1) — tatsaechlich
+  // VERGEBEN wurden ueber ein ganzes Spiel 44,7/32,0/23,3 % gegen den Anspruch.
+  //
+  // FIX: jede Raetselart bekommt IHRE EIGENE Folge (`ISPY_NACHFUELL_FOLGE_BY_ART`), an ihre
+  // eigenen Positionen gebunden — eine Logik-Position bleibt ueber jeden Nachfuell-Zyklus
+  // eine Logik-Position (der Fundort-`art`-Wert aendert sich beim Nachfuellen nie, nur die
+  // Stufe). Jede Folge ist so gewaehlt, dass ihr LANGZEIT-MITTELWERT je Position die
+  // kalibrierte Punktmasse-Verteilung ab Tick 1 innerhalb von ±3 Pp haelt (nachgemessen mit
+  // `window.__arena.ispyNachfuellSonde`, s.u. bei `baueSchatzsuche`):
+  //     Logik    5 Positionen x Oe 23,33 Pkt = 116,7
+  //     Verhoer  3 Positionen x Oe 36,67 Pkt = 110,0
+  //     Mechanik 4 Positionen x Oe 20,00 Pkt =  80,0
+  //     -> 38,0 / 35,9 / 26,1 % im Langzeitmittel (Anspruch 37,6/36,5/25,9, alle drei < 1 Pp
+  //     Abweichung). Mechanik zieht — wie im Ausgangslayout, das dort ohnehin keinen Tresor
+  //     hat, s. `fundorte`-Kommentar oben — NIE Stufe 3; nur Logik und Verhoer behalten je
+  //     eine Tresorphase in ihrer Folge, die ABWECHSLUNG bleibt also erhalten (unterschied-
+  //     liche Stufen rotieren weiter), nur die Punktmasse ist jetzt an die Art gebunden statt
+  //     an den rohen Positions-Index.
+  //
+  // TICK 0 BLEIBT UNVERAENDERT bei 41,9/35,5/22,6 % — das ist der feste Startzustand aus dem
+  // `fundorte`-Array (Gegencheck 1, Abschnitt 3.4/T5, dort ausdruecklich als beste unter den
+  // Spiegelsymmetrie-Zwaengen erreichbare Naeherung an 37,6/36,5/25,9 dokumentiert, 4,3 Pp
+  // Abweichung "kostet 1,2 Pp Papier"). Dieser Umbau aendert daran nichts — er repariert nur
+  // die DRIFT ab Tick 1, die vorher on top kam.
+  //
+  // FRUEHER UEBERGANG (nachgemessen mit der Sonde, s.u.): jede Folge startet je Block/
+  // Singleton GENAU an dem Eintrag, der der URSPRUENGLICHEN Stufe dieser Position entspricht
+  // (`ISPY_NACHFUELL_START`) — NICHT, weil die Position dorthin "zurueckkehrt" (das waere die
+  // im Gegencheck gemessene, rho-neutrale "positionstreue" Reparatur, Abschnitt 3.3, die
+  // bewusst NICHT gewaehlt wurde), sondern als reine STARTBEDINGUNG: die ERSTE Truhe, die
+  // eine Gruppe nach ihrem allerersten Knacken zieht, liegt damit nah an ihrem alten Wert,
+  // und erst ab dem ZWEITEN Nachfuellen dieser Gruppe rotiert die Folge weiter durch die
+  // anderen Stufen. Ohne diesen Kniff (erste Fassung, Startphasen gleichmaessig ueber die
+  // Folge verteilt statt am Ursprungswert verankert) gab es einen sichtbaren Einbruch in den
+  // Ticks 1-2 (Logik bis 32,4 %, Mechanik bis 29,5 % bei n=200) — weil die schnell
+  // nachfuellenden Stufe-1-Positionen (hohe Knackchance) zufaellig alle auf denselben
+  // niedrigen Folge-Eintrag fielen, bevor die langsameren Tresor-Positionen ueberhaupt einmal
+  // nachgezogen hatten. Mit der Verankerung bleiben alle acht Ticks (0-7) innerhalb ±3 Pp um
+  // 37,6/36,5/25,9 (s. PR-Beschreibung fuer die volle Tick-Tabelle).
+  //
+  // SPIEGELPAAR-SYMMETRIE (Gegencheck 2, Abschnitt 3.2): der Startpunkt in der Folge
+  // (`ISPY_NACHFUELL_START`) haengt an der BLOCKZUGEHOERIGKEIT, nicht mehr am rohen Index —
+  // beide Haelften eines Spiegelpaars (z.B. idx 0 und idx 4, `ISPY_BLOECKE` unten) bekommen
+  // denselben Startpunkt und ziehen deshalb Zug fuer Zug IMMER dieselbe Stufe zur selben Zeit
+  // (vorher lief idx 0 auf Phase 0, idx 4 auf Phase 4 derselben Folge — vier von fuenf
+  // Spiegelpaaren liefen dadurch asymmetrisch nach). Nur zwischen verschiedenen BLOECKEN
+  // derselben Art bleibt die Phase verschoben (das war schon das Ziel des alten Kommentars:
+  // "damit nicht alle Truhen synchron dieselbe Stufe nachziehen").
+  const ISPY_NACHFUELL_FOLGE_LOGIK=[1,2,1,3,1,2];
+  const ISPY_NACHFUELL_FOLGE_VERHOER=[2,3,2,2,3,2];
+  const ISPY_NACHFUELL_FOLGE_MECHANIK=[2,1,2,2,1,2];
+  const ISPY_NACHFUELL_FOLGE_BY_ART={logik:ISPY_NACHFUELL_FOLGE_LOGIK,
+    verhoer:ISPY_NACHFUELL_FOLGE_VERHOER, mechanik:ISPY_NACHFUELL_FOLGE_MECHANIK};
+  // Startphase je Fundort-BLOCK (nicht je Position): beide Haelften eines Spiegelpaars
+  // teilen sich einen Eintrag (0/4, 1/3, 6/8, 5/9, 10/11), die beiden Mittelachsen-Tresore
+  // (idx 2/7, `ISPY_MITTE_IDX` unten) stehen fuer sich allein. Werte sind Indizes in die
+  // jeweils art-eigene Folge oben, je EINER pro Block/Singleton — gewaehlt, damit der ERSTE
+  // Folge-Eintrag jeder Gruppe ihrer URSPRUENGLICHEN Stufe entspricht (s. Kommentar
+  // "FRUEHER UEBERGANG" oben): Logik-Block{0,4} war Stufe 1 -> Start 0 (FOLGE[0]=1),
+  // Logik-Block{1,3} war Stufe 2 -> Start 1 (FOLGE[1]=2), Logik-Singleton{2} war Stufe 3 ->
+  // Start 2 (FOLGE[2]=3); Verhoer-Block{6,8} war Stufe 2 -> Start 0, Verhoer-Singleton{7}
+  // war Stufe 3 -> Start 1; Mechanik-Block{5,9} war Stufe 1 -> Start 0, Mechanik-Block{10,11}
+  // war Stufe 2 -> Start 1.
+  const ISPY_NACHFUELL_START={0:0,4:0, 1:1,3:1, 2:3, 6:0,8:0, 7:1, 5:1,9:1, 10:0,11:0};
 
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
@@ -14624,8 +14697,12 @@
     const aktivIdx=ispyAktiveFundorte(fundorte,teilnehmer.length);
     const truhen=aktivIdx.map(idx=>{
       const f=fundorte[idx];
+      // ART-EIGENE FOLGE (s. Kommentar bei ISPY_NACHFUELL_FOLGE_BY_ART oben): `folgePos`
+      // startet jetzt am block-gebundenen Startpunkt (ISPY_NACHFUELL_START), nicht mehr am
+      // rohen Fundort-Index — die Folge selbst waehlt sich `t.art` beim Nachfuellen unten.
+      const folgeLaenge=ISPY_NACHFUELL_FOLGE_BY_ART[f.art].length;
       return {idx, art:f.art, neben:f.neben||null, stufeAktuell:f.stufe, fortschritt:0,
-        leer:false, folgePos:idx%ISPY_NACHFUELL_FOLGE.length, x:f.x};
+        leer:false, folgePos:(ISPY_NACHFUELL_START[idx]||0)%folgeLaenge, x:f.x};
     });
     for(const u of teilnehmer){
       // u.funde (Konzept Abschnitt 4): rein additives Anzeigefeld je Stufe, fliesst NIE in
@@ -14818,17 +14895,25 @@
         merke(ziel,false);
       }
     }
-    // NACHFUELLEN (2.2), UNVERAENDERT AUS PR 1: jede in DIESEM Tick geknackte Truhe wird
-    // sofort danach wieder befuellt — sie bleibt damit GENAU EINEN Tick lang leer.
+    // NACHFUELLEN (2.2): jede in DIESEM Tick geknackte Truhe wird sofort danach wieder
+    // befuellt — sie bleibt damit GENAU EINEN Tick lang leer, wie seit PR 1. Nur WELCHE
+    // Stufe sie zieht, ist jetzt art-eigen (s. ISPY_NACHFUELL_FOLGE_BY_ART weiter oben).
     for(const t of truhen){
       if(t.leer){
-        t.stufeAktuell=ISPY_NACHFUELL_FOLGE[t.folgePos%ISPY_NACHFUELL_FOLGE.length];
+        // ART-EIGENE FOLGE (s. Kommentar bei ISPY_NACHFUELL_FOLGE_BY_ART oben): `t.art`
+        // aendert sich beim Nachfuellen nie, nur `t.stufeAktuell` — dieselbe Truhe zieht
+        // deshalb ueber das ganze Spiel ausschliesslich aus IHRER Art-Folge nach.
+        const folge=ISPY_NACHFUELL_FOLGE_BY_ART[t.art];
+        t.stufeAktuell=folge[t.folgePos%folge.length];
         t.folgePos++; t.fortschritt=0; t.leer=false;
       }
     }
     return ereignisseDiesesTicks;
   }
 
+  // Sonden-Haken fuer window.__arena.ispyNachfuellSonde (s. dort) — null im normalen Spiel,
+  // rein additiv, kein rr()-Verbrauch (s. Kommentar in der Tick-Schleife unten).
+  let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
@@ -14848,6 +14933,12 @@
     // Verzoegerung nichts, weil beide Seiten ausschliesslich aus dem VORHERIGEN Tick lesen.
     let sichtbarFuerMine=[], sichtbarFuerGegner=[];
     for(let tick=0;tick<art.rundenN;tick++){
+      // NACHFUELLFOLGE-SONDE (window.__arena.ispyNachfuellSonde, s.u.): reiner Lesehaken,
+      // ruehrt kein rr() und kein Gameplay an — nur wenn ISPY_NACHFUELL_SONDE gesetzt ist
+      // (die Sonde selbst schaltet ihn danach wieder ab), meldet er die STANDING-Punktmasse
+      // BEIDER Raeume VOR der Verarbeitung dieses Ticks (Tick 0 = Startzustand aus `fundorte`,
+      // wie in Gegencheck 2 Abschnitt 3.1 gemessen).
+      if(ISPY_NACHFUELL_SONDE)ISPY_NACHFUELL_SONDE(tick,mineRaum,gegnerRaum);
       const eigeneFuerGegner=ispySeiteTick(art,mineT,mineRaum,tick,sichtbarFuerMine,mineTeamgeist);
       const eigeneFuerMine=ispySeiteTick(art,gegnerT,gegnerRaum,tick,sichtbarFuerGegner,gegnerTeamgeist);
       sichtbarFuerMine=eigeneFuerMine;
@@ -32137,6 +32228,52 @@
       if(!p)return null;
       const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
       return actVon(u);
+    },
+    // NACHFUELLFOLGE-SONDE (Opus-Gegencheck 2, 22.09., Abschnitt 3.1 als Vorlage): reine
+    // Diagnose-Sonde nach demselben Prinzip wie showcaseActProbe direkt oberhalb — kein
+    // Rendering, kein eigener rr()-Verbrauch (der einzige Wurf-Verbrauch ist der ganz normale
+    // Spielverlauf selbst: M.bau() faehrt I-Spy synchron durch, s. bauBuehne()/
+    // baueSchatzsuche() oben). Sie haengt sich ueber ISPY_NACHFUELL_SONDE (s. dort) in die
+    // Tick-Schleife von baueSchatzsuche() und liest bei jedem Tick die STANDING-Punktmasse
+    // beider Raeume (Heim UND Gast, je eigene Kopie), BEVOR dieser Tick verarbeitet wird —
+    // Tick 0 ist damit exakt der Startzustand aus `fundorte`. n Spiele (Default 24, wie
+    // miss-alle-disziplinen.mjs), Default-Kader (SQUAD/OPP), Mittel ueber beide Seiten und
+    // alle Spiele je Tick. Rueckgabe: ein Eintrag je Tick mit den drei Anteilen in Prozent —
+    // direkt vergleichbar mit der Tabelle in Gegencheck 2 Abschnitt 3.1 (Ziel: Tick 1-7
+    // innerhalb ±3 Pp um 37,6/36,5/25,9; Tick 0 haengt am fixen Startlayout, s. Kommentar bei
+    // ISPY_NACHFUELL_FOLGE_BY_ART, und bleibt bei den layoutbedingten 41,9/35,5/22,6).
+    ispyNachfuellSonde:(n)=>{
+      const M=MOTOREN["i-spy"];
+      if(!M)return null;
+      const art=BUEHNE_ART["i-spy"];
+      const ticks=art.rundenN;
+      const summen=Array.from({length:ticks},()=>({logik:0,verhoer:0,mechanik:0,n:0}));
+      const anteil=(raum)=>{
+        const s={logik:0,verhoer:0,mechanik:0};
+        for(const t of raum){ if(t.leer)continue; s[t.art]+=ISPY_PUNKTWERT[t.stufeAktuell]; }
+        const g=s.logik+s.verhoer+s.mechanik||1;
+        return {logik:s.logik/g, verhoer:s.verhoer/g, mechanik:s.mechanik/g};
+      };
+      ISPY_NACHFUELL_SONDE=(tick,mineRaum,gegnerRaum)=>{
+        if(tick<0||tick>=ticks)return;
+        for(const raum of [mineRaum,gegnerRaum]){
+          const a=anteil(raum);
+          summen[tick].logik+=a.logik; summen[tick].verhoer+=a.verhoer;
+          summen[tick].mechanik+=a.mechanik; summen[tick].n++;
+        }
+      };
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      const anzahl=Math.max(1,Math.floor(Number(n)||24));
+      try{
+        for(let i=0;i<anzahl;i++){ zieheFormkarten(20260823+i*104729); M.bau(1337+i*7919); }
+      } finally {
+        ISPY_NACHFUELL_SONDE=null; M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      return summen.map((s,tick)=>({tick,
+        logik:Math.round((s.n?s.logik/s.n:0)*1000)/10,
+        verhoer:Math.round((s.n?s.verhoer/s.n:0)*1000)/10,
+        mechanik:Math.round((s.n?s.mechanik/s.n:0)*1000)/10}));
     },
     // A0.2 — DETERMINISTISCHER SONDEN-MODUS FUER SCREENSHOT-QA
     // (docs/design/deterministischer-sonden-modus-19-09.md, Opus-Synthese Echtzeit-vs-
