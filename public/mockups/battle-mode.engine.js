@@ -13336,6 +13336,12 @@
       // acht Ticks), nicht auf die Validitaet/das Budget hier; Begruendung und Abtastung
       // stehen bei der Konstante selbst.
       //
+      // KALIBRIERRUNDE 2 (22.09., PR-Beschreibung des Branches i-spy-kalibrierrunde-2-rho-22-09): DAS REZEPT
+      // OBEN blieb unangetastet (durchgemessen, aber kein Gewinn gefunden — s. Grid-Tabelle
+      // im PR-Text). Der Hebel, der rho tatsaechlich weiterbewegte, sass in der SPUEREN-Phase
+      // (ISPY_SIEHT2_*/ISPY_SIEHT3_*, s.u.) und in ISPY_TEILPUNKTE_ANTEIL — beide dort
+      // dokumentiert. rho je Spiel (Median): 0,730 → 0,778.
+      //
       // Isolationsnachweis: `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig, vor
       // und nach dieser PR) — nur i-spy bewegt sich, die anderen neunzehn Zeilen sind
       // bit-identisch (s. PR-Beschreibung).
@@ -14514,21 +14520,47 @@
   // mit der CLAUDE.md die Hockey-Lehre begruendet, nur eine Stufe weiter: hier hilft nicht
   // "mehr Ereignisse", sondern eine kleinere Fallhoehe je Ereignis). Ein kleiner
   // Teilpunkte-Sockel bei Fehlschlag ("Spur gesichert") daempft das, ohne den Erfolg selbst
-  // (weiterhin voller Punktwert plus Truhe leer) oder die Erfolgschance zu aendern. Eine
-  // Abtastung von 0 bis 0,50 (Schritt 0,10) fand das Optimum bei 0,40 (danach faellt rho
-  // wieder leicht) — zusammen mit der Rezept-Kalibrierung oben landet das Endergebnis bei
-  // rho je Spiel (Median) 0,707, s. PR-Beschreibung fuer die vollstaendige Tabelle. Das ist
-  // deutlich mehr als das im Konzept nur beispielhaft genannte „z. B. 20 %", aber die
-  // Kalibrierung ist ausdruecklich als Suche gefordert (Aufgabe: "nach der Budget-Methode
-  // kalibrieren, nicht die Vorschlagszahlen ungeprueft uebernehmen"), nicht als Uebernahme
-  // des Beispiels.
-  const ISPY_TEILPUNKTE_ANTEIL=0.40;
+  // (weiterhin voller Punktwert plus Truhe leer) oder die Erfolgschance zu aendern.
+  //
+  // KALIBRIERRUNDE 2 (22.09., PR-Beschreibung des Branches i-spy-kalibrierrunde-2-rho-22-09): 0,40 (Runde 1)
+  // war der Optimalwert GEGEN DAS DAMALIGE SPUEREN-RAUSCHEN (s.u.) — sobald SPUERSINN
+  // schaerfer stellt (ISPY_SIEHT2_K/ISPY_SIEHT3_K unten hochgesetzt), verschiebt sich das
+  // Optimum spuerbar nach oben: eine erneute Abtastung (0,30–0,60, Schritt 0,05) UNTER DER
+  // NEUEN SPUEREN-KALIBRIERUNG fand ihr flaches Optimum bei 0,50–0,55 (0,778 je Spiel bei
+  // beiden, 0,55 mit der kleineren Kader-Spannweite: 0,127 gegen 0,144) — höhere Teilpunkte
+  // daempfen die durch die schaerfere Tresor-Selektion zusaetzlich gestiegene Fallhoehen-
+  // Varianz wieder ab, ohne den Erfolg selbst zu veraendern. 0,60 fiel leicht ab (0,774).
+  const ISPY_TEILPUNKTE_ANTEIL=0.55;
   // SPUEREN (1.3): sieht(1)=1 immer, sieht(2)/sieht(3) wachsen mit SPUERSINN. EIN rr()-Wurf
   // je Teilnehmer je Tick entscheidet ueber ALLE drei Schwellen zugleich (fester
   // rr()-Verbrauch, unabhaengig vom Ausgang) — weil sieht(3) im ganzen Wertebereich unter
   // sieht(2) bleibt, impliziert "sieht Stufe 3" automatisch "sieht auch Stufe 2".
-  const ISPY_SIEHT2_BASIS=0.35, ISPY_SIEHT2_K=0.007, ISPY_SIEHT2_MAX=0.95;
-  const ISPY_SIEHT3_BASIS=0.10, ISPY_SIEHT3_K=0.008, ISPY_SIEHT3_MAX=0.90;
+  //
+  // KALIBRIERRUNDE 2 (22.09., PR-Beschreibung des Branches i-spy-kalibrierrunde-2-rho-22-09): DER GROESSTE
+  // EINZELBEFUND DIESER RUNDE. Runde 1 liess SPUERSINN nur flach in die Sichtbarkeit
+  // einlaufen (Basis 0,35/0,10, K 0,007/0,008) — ein schwacher UND ein starker SPUERSINN
+  // sahen fast dieselbe Truhenauswahl, F2 (1.3, Erwartungswert-Wahl) hatte darauf kaum
+  // Angriffsflaeche. Grid-Suche (miss-alle-disziplinen.mjs 24 i-spy, rho je Spiel/Median):
+  // ISPY_SIEHT3_K allein 0,008(Basis)→0,704 · 0,010→0,719 · 0,012→0,751 · 0,014→0,749 —
+  // schon EIN Parameter hob rho um +0,02. Kombiniert mit einer GESENKTEN Basis (ein
+  // SPUERSINN-loser Spieler sieht Akten/Tresore kaum noch von selbst, ein starker sehr wohl)
+  // ging es weiter: SIEHT2(0,25/0,009)+SIEHT3(0,02/0,011)→0,741 ·
+  // SIEHT2(0,20/0,010)+SIEHT3(0,00/0,013)→0,771 (bestes Paar) ·
+  // SIEHT2(0,15/0,011)+SIEHT3(0,00/0,013)→0,760 · SIEHT2(0,10/0,012)+SIEHT3(0,00/0,016)→0,764
+  // — 0,20/0,010/0,00/0,013 lag in einer erneuten Feinabtastung um diesen Punkt (±0,002 auf K,
+  // ±0,02 auf Basis) durchgehend vorn und wurde uebernommen. Mechanisch heisst das: ein
+  // SPUERSINN-90-Spieler sieht Stufe 3 in 90 % statt vormals 82 % der Ticks, ein
+  // SPUERSINN-20-Spieler in 26 % statt vormals 26 % (kaum veraendert) — die Sichtbarkeits-
+  // KURVE wurde steiler, nicht bloss verschoben, exakt Chris' "ein guter Spieler kann
+  // schneller einschaetzen, wo die staerkeren Truhen liegen" (Konzept-Kopfzitat).
+  //
+  // ZUSAMMEN MIT DER TEILPUNKTE-NACHFUEHRUNG OBEN (0,40→0,55): rho je Spiel (Median) 0,730
+  // (Runde-1-Stand) → 0,778 — die groesste Einzelverbesserung dieser Runde, s. PR-Beschreibung
+  // fuer die vollstaendige Grid-Tabelle (Layout/Nebenweg/Knack-Formel wurden ebenfalls
+  // durchgemessen, blieben aber am Runde-1-Optimum: jede getestete Abweichung war gleich gut
+  // oder schlechter).
+  const ISPY_SIEHT2_BASIS=0.20, ISPY_SIEHT2_K=0.010, ISPY_SIEHT2_MAX=0.95;
+  const ISPY_SIEHT3_BASIS=0.00, ISPY_SIEHT3_K=0.013, ISPY_SIEHT3_MAX=0.90;
   // NEBENWEG-ABWERTUNG (1.6, Chris' asymmetrischer Nachtrag 21.09.): Variante A ("weniger
   // Punkte") — der Primaerweg zahlt den vollen Punktwert, der Nebenweg nur 65 %. Variante B
   // (zusaetzlicher Chance-Abzug) bleibt bewusst ungesetzt, um die KNACK-Formel nicht doppelt
