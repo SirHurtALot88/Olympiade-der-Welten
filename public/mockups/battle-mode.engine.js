@@ -16811,20 +16811,69 @@
   // sehr konkreten, jedem bekannten Kulisse. Wettkampfplattform, drei Kampfrichterlampen,
   // Anzeigetafel (liest ausschliesslich letzterHebenZug, dieselbe Quelle wie die Textkarte
   // in zeichneHeben()), Kreide-/Magnesiakiste, Hantelstaender, Publikumssilhouetten.
+  //
+  // POLITUR-RUNDE 22.09. (Chris, dringend: "gewichtheben bitte dringend die arena bzw
+  // buehne verbessern und die darstellung optisch noch schoener gestalten" — kein
+  // Einzelfehler, allgemeine optische Aufwertung im Vergleich zu den spaeter gebauten
+  // Buehnen wie Fechten/Speed-Schach/Eiskunstlauf/Showcase, die alle ein eigenes
+  // Buehnenbild mit Requisiten/Scheinwerfern/Publikum bekommen haben). Sicht-QA-Befund am
+  // Screenshot: die 26 Publikums-Punkte (#1c1f27 auf #14171d-Grund) unterschieden sich
+  // kaum vom Hintergrund und lasen sich wie "verstreute graue Punkte", nicht wie ein
+  // Publikum; bodenHeben() hatte als einzige Buehne KEINEN Scheinwerferkegel (jede andere
+  // Buehne — bodenBuehne/bodenEis — traegt das gleiche Drei-Kegel-Muster); die Plattform
+  // war eine reine Flaeche ohne Wettkampf-Zierstreifen/Riffelung; der Hantelstaender ohne
+  // Quertraeger/Grundplatte war leicht mit einem Stuhl zu verwechseln. Alle vier Punkte
+  // rein optisch behoben, WIEDERVERWENDET wird dabei bewusst dasselbe Muster, das die
+  // anderen Buehnen schon zeigen (Drei-Kegel wie bodenBuehne()/bodenEis(), Rang-mit-Gang-
+  // Linien wie bodenBuehne()s Zuschauerblock) statt neuer Pixel-Art-Assets (s.
+  // public/sprites/ — dort gibt es keine wiederverwendbaren Publikums-/Scheinwerfer-
+  // Sprites, alle Buehnen-Kulissen sind reine Canvas-Primitiven, dasselbe Prinzip bleibt
+  // hier gewahrt). NICHTS an der Zweikampf-Logik/wert()/Wertung angefasst — reine
+  // Zeichenroutine, gegengemessen mit scripts/miss-alle-disziplinen.mjs (s. PR-Beschreibung).
   let hebenPublikumAn=false; // rein praesentational, s. bodenBuehne() oben fuer den Stop.
   function bodenHeben(){
     if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#14171d");g.addColorStop(1,"#0a0b0e");
+    g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    // Publikumssilhouetten im Dunkeln, oberer Rand.
-    ctx.fillStyle="#1c1f27";
-    for(let i=0;i<26;i++){
-      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4;
-      ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
-    }
-    // WETTKAMPFPLATTFORM: helles Quadrat mit Kante, mittig in der Bildebene der Heber.
+
+    // WETTKAMPFPLATTFORM-Geometrie vorgezogen — die Tribuene unten braucht platY, um genau
+    // bis an den Plattform-Schatten heranzureichen, ohne zu ueberlappen.
     const platY=H*0.40, platW=W*0.46, platH=H*0.40;
+
+    // TRIBUENE STATT VERSTREUTER PUNKTE: ein deutlich hellerer Rang-Block oben (dasselbe
+    // "Block mit Gang-Linien"-Muster wie bodenBuehne()s Zuschauerraum, hier oben statt
+    // unten, weil die Plattform hier mittig sitzt) mit ZWEI Sitzreihen aus Kopf+Rumpf statt
+    // anonymer Punkte — in einer kleinen Farbpalette fuer Vielfalt, deutlich heller als der
+    // Hintergrund, damit sie als Publikum lesbar bleiben. Die oberen ~35% der Tribuene
+    // bleiben leere Rueckwand, damit die Duellstand-Zeile aus zeichneHeben() (H*0.10/0.155)
+    // nicht mitten in Koepfen steht.
+    const tribueneH=H*0.34;
+    ctx.fillStyle="#20242e"; ctx.fillRect(0,0,W,tribueneH);
+    ctx.strokeStyle="rgba(255,255,255,.07)"; ctx.lineWidth=1;
+    for(let i=1;i<12;i++){ ctx.beginPath(); ctx.moveTo(i*W/12,0); ctx.lineTo(i*W/12,tribueneH); ctx.stroke(); }
+    const TRIB_FARBEN=["#6b7690","#8a7a63","#6f8878","#8a6b76","#5f7488"];
+    const zuschauerReihe=(rowY,n,r,phase)=>{
+      for(let i=0;i<n;i++){
+        const px=(i+0.5)*W/n, py=rowY+Math.sin(i*2.1+phase)*3;
+        ctx.fillStyle=TRIB_FARBEN[i%TRIB_FARBEN.length];
+        ctx.beginPath();ctx.ellipse(px,py+r*0.9,r*1.15,r*0.7,0,0,Math.PI*2);ctx.fill(); // Rumpf
+        ctx.fillStyle="#d9c3a0";
+        ctx.beginPath();ctx.arc(px,py,r*0.6,0,Math.PI*2);ctx.fill(); // Kopf
+      }
+    };
+    zuschauerReihe(tribueneH*0.60,26,6,0);
+    zuschauerReihe(tribueneH*0.92,32,7,1.4);
+    ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,tribueneH); ctx.lineTo(W,tribueneH); ctx.stroke();
+
+    // HALLENDACH: dunkler Traeger ganz oben mit drei Lampenpunkten — die Lichtquellen der
+    // Scheinwerferkegel direkt darunter.
+    ctx.fillStyle="#0c0e12"; ctx.fillRect(0,0,W,6);
+    [W*0.30,W*0.5,W*0.70].forEach(x=>{
+      ctx.fillStyle="#3a3f4c"; ctx.beginPath(); ctx.arc(x,6,3.5,0,Math.PI*2); ctx.fill();
+    });
+
     ctx.fillStyle="#3a3f4c";
     ctx.fillRect(W/2-platW/2-4,platY-4,platW+8,platH+8);
     const pg=ctx.createLinearGradient(0,platY,0,platY+platH);
@@ -16833,6 +16882,44 @@
     ctx.fillRect(W/2-platW/2,platY,platW,platH);
     ctx.strokeStyle="#8f8560";ctx.lineWidth=2;
     ctx.strokeRect(W/2-platW/2,platY,platW,platH);
+    // WETTKAMPF-ZIERSTREIFEN, wie die farbige Bordueré echter IWF-Plattformen, plus eine
+    // diagonale Riffelung (Gummimatte statt glatter Flaeche) — Materialtreue fuer die
+    // Plattform selbst, ergaenzend zur bereits vorhandenen IWF-Scheibenfarbstaffel an der
+    // Hantel (s. HEBEN_SCHEIBEN_STUFEN/IWF_FARBEN oben).
+    ctx.strokeStyle="rgba(192,57,43,.55)"; ctx.lineWidth=3;
+    ctx.strokeRect(W/2-platW/2+5,platY+5,platW-10,platH-10);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(W/2-platW/2,platY,platW,platH); ctx.clip();
+    ctx.strokeStyle="rgba(143,133,96,.30)"; ctx.lineWidth=1;
+    for(let i=-2;i<14;i++){
+      ctx.beginPath();
+      ctx.moveTo(W/2-platW/2+i*16, platY+platH);
+      ctx.lineTo(W/2-platW/2+i*16+platH, platY);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // SCHEINWERFERKEGEL AUF DIE PLATTFORM: drei Kegel von den Dachlampen, dasselbe Muster
+    // wie bodenBuehne()/bodenEis() (bislang hatte bodenHeben() als einzige Buehne keinen
+    // einzigen Lichtkegel) — neutral-kaltes Hallenlicht statt bodenBuehne()s warmem
+    // Theaterlicht, weil eine Wettkampfhalle keine Show ist. Alle drei laufen auf denselben
+    // Punkt auf der Plattform zusammen, dort wo Hantel und Heber stehen.
+    [W*0.30,W*0.5,W*0.70].forEach(x=>{
+      const s=ctx.createRadialGradient(x,6,4,x,platY+platH*0.35,W*0.22);
+      s.addColorStop(0,"rgba(224,234,248,.16)");s.addColorStop(1,"rgba(224,234,248,0)");
+      ctx.fillStyle=s;
+      ctx.beginPath();ctx.moveTo(x,6);ctx.lineTo(x-64,platY+platH*0.55);ctx.lineTo(x+64,platY+platH*0.55);
+      ctx.closePath();ctx.fill();
+    });
+    // Heller Lichtfleck DIREKT AUF der Plattform — der eigentliche "Kegel trifft die
+    // Hantel"-Effekt, additiv ueber die Matte gelegt, auf die Plattformflaeche geclippt.
+    ctx.save();
+    ctx.beginPath(); ctx.rect(W/2-platW/2,platY,platW,platH); ctx.clip();
+    const poolG=ctx.createRadialGradient(W/2,platY+platH*0.42,4,W/2,platY+platH*0.42,platW*0.36);
+    poolG.addColorStop(0,"rgba(255,250,235,.28)"); poolG.addColorStop(1,"rgba(255,250,235,0)");
+    ctx.fillStyle=poolG;
+    ctx.fillRect(W/2-platW/2,platY,platW,platH);
+    ctx.restore();
     // DREI KAMPFRICHTERLAMPEN ueber der Plattform — weiss/rot je nach zug.r.gueltig. Das
     // ist die IWF-Geste, die es heute nur als "✓ gültig"-Text gibt (bleibt zusaetzlich
     // bestehen, s. zeichneHeben() Textkarte).
@@ -16859,6 +16946,11 @@
     const tafelX=W-146, tafelY=64, tafelW=132, tafelH=54;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
+    // GOLDENER ZIERSTREIFEN oben, wie die goldene Bandenkante bei bodenEis() — dasselbe
+    // Akzent-Prinzip, hier auf die Anzeigetafel uebertragen, damit sie zur restlichen
+    // Buehnen-Goldakzentuierung passt statt als reine Graubox zu stehen.
+    ctx.strokeStyle="rgba(242,195,77,.75)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(tafelX,tafelY+1);ctx.lineTo(tafelX+tafelW,tafelY+1);ctx.stroke();
     ctx.textAlign="left";ctx.textBaseline="middle";
     ctx.font="700 11px 'Barlow Condensed',sans-serif";
     ctx.fillStyle="#f2c34d";
@@ -16870,15 +16962,22 @@
     // KREIDE-/MAGNESIAKISTE, unten links auf der Plattformkante.
     ctx.fillStyle="#e9e6de";ctx.fillRect(W*0.08,platY+platH-14,26,14);
     ctx.strokeStyle="#9a9788";ctx.lineWidth=1;ctx.strokeRect(W*0.08,platY+platH-14,26,14);
-    // HANTELSTAENDER am rechten Rand — zwei Saeulen mit je drei liegenden Scheiben.
+    // HANTELSTAENDER am rechten Rand — zwei Saeulen mit je drei liegenden Scheiben, jetzt MIT
+    // Quertraeger oben und Grundplatte unten (Chris' Sicht-QA-Notiz: die zwei blossen
+    // Staender-Stangen ohne Verbindung lasen sich wie ein einzelner Stuhl; ein Quertraeger
+    // plus Standflaeche macht daraus eindeutig ein Gewichtbaum-Gestell).
+    const staX=W*0.90, staTopY=platY+platH-40, staBotY=platY+platH-2;
+    ctx.fillStyle="#241f18"; ctx.fillRect(staX-6,staBotY,30,4);
     ctx.strokeStyle="#5c5346";ctx.lineWidth=3;
     for(const dx of [0,18]){
-      ctx.beginPath();ctx.moveTo(W*0.90+dx,platY+platH-2);ctx.lineTo(W*0.90+dx,platY+platH-40);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(staX+dx,staBotY);ctx.lineTo(staX+dx,staTopY);ctx.stroke();
     }
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(staX-4,staTopY);ctx.lineTo(staX+22,staTopY);ctx.stroke();
     ctx.fillStyle="#3a3227";
     for(const dy of [0,7,14]){
-      ctx.beginPath();ctx.ellipse(W*0.90+3,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.ellipse(W*0.90+15,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(staX+3,staTopY+dy,9,3,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(staX+15,staTopY+dy,9,3,0,0,Math.PI*2);ctx.fill();
     }
   }
 
