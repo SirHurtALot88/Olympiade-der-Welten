@@ -23145,6 +23145,52 @@
       const w=bahnRangliste();
       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
     }
+    // TIME-TRIAL: TEAMSIEG NACH ZEITSUMME, NICHT NACH RANGPUNKTEN (Chris' Praezisierung
+    // 22.09., s. BAHN_ART["time-trial"].wertung fuer das woertliche Zitat). GENAU DASSELBE
+    // MUSTER wie "etappe"/"burg" unten: `seiten` ist eine eigene Groesse, KEINE Ableitung
+    // aus den Rangpunkten — hier die SUMME der eigenen Laufzeiten (bahnZeit, dieselbe
+    // start-korrigierte Groesse, nach der auch bahnRangliste sortiert und an der
+    // MOTOREN["time-trial"].wert() rho misst), kleinste Summe gewinnt. Die PUNKTE je
+    // Laeufer bleiben unveraendert `w.punkte` — dieselben Rangpunkte wie im "rang"-Zweig
+    // oben, nur die Teamwertung daneben ist eine andere Rechnung auf denselben Rohdaten.
+    if(BA().wertung==="zeit"){
+      const w=bahnRangliste();
+      // EIGENE ZEIT je Laeufer: `bahnZeit(u)` fuer Fertige, sonst die HOCHGERECHNETE
+      // Gesamtzeit ueber sein bisheriges Mitteltempo (`bahnHochrechnung`, dieselbe
+      // "vorlaeufig, aber ehrlich"-Groesse, mit der schon der laufende Rang oben
+      // rechnet) — wer noch nicht von der Rampe ist (`pos<=0`), zeigt KEINE Information,
+      // nicht "unendlich langsam".
+      const eigeneZeit=(u)=>{
+        if(u.fertig!=null)return bahnZeit(u);
+        const h=bahnHochrechnung(u);
+        return Number.isFinite(h)?h:null;
+      };
+      // Summe je Seite — NULL, solange auch nur EIN Laeufer der Seite keine Information
+      // zeigt. Bei GESTAFFELTEM Start faehrt die GESAMTE Heimseite vor der GESAMTEN
+      // Gastseite los (s. bahnHochrechnung-Kommentar oben): eine Summe, die noch nicht
+      // gestartete Laeufer als "unendlich langsam" zaehlte, gaebe der zuerst startenden
+      // Seite ueber weite Strecken einen Schein-Vorsprung, der nur aus der Startreihen-
+      // folge kommt, nicht aus Tempo. Erst wenn BEIDE Seiten vollstaendig eine Schaetzung
+      // haben, ist der Vergleich ehrlich — bis dahin bleibt `seiten` [0,0] ("Kopf an
+      // Kopf", wie die Staffel es fuer denselben Fall zeigt).
+      const summeSeite=(s)=>{
+        let sum=0;
+        for(const u of LAEUFER){
+          if(u.seite!==s)continue;
+          const z=eigeneZeit(u);
+          if(z==null)return null;
+          sum+=z;
+        }
+        return sum;
+      };
+      const s0=summeSeite(0), s1=summeSeite(1);
+      const seiten=[0,0];
+      if(s0!=null&&s1!=null){
+        if(s0<s1)seiten[0]=1; else if(s1<s0)seiten[1]=1;
+      }
+      return {seiten, suffix:"nach Zeitsumme", punkte:w.punkte, gewertet:true,
+        zusatz:(s0!=null&&s1!=null)?fmtZielzeit(s0)+" gegen "+fmtZielzeit(s1):null};
+    }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
     // Laeufer kann dem Zieleinlauf widersprechen (gemessen, s. Plan Abschnitt 2.3), und
@@ -25190,14 +25236,20 @@
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
       kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
       tagesform:0.015,
-      // WERTUNG NACH RANG (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
-      // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND
-      // Climbing): alle Laeufer beider Seiten in EINER Rangliste nach Zielzeit, Platz 1
-      // bekommt N Punkte (N = Laeufer im Rennen), der Letzte einen — Teamstand ist die
-      // Summe. Nur Anzeige und Auswertung (s. bahnRangliste/bahnTeamstand), keine Zeile
-      // der Rennmechanik haengt daran. Gleichstand bleibt Unentschieden — kein
-      // Zeitsumme-Tiebreak (Chris' Rueckfrage 06.09.).
-      wertung:"rang",
+      // WERTUNG NACH ZEITSUMME, NUR HIER (Chris' Praezisierung 22.09., woertlich: "beim
+      // time trial gelten nicht die punkte wie zb beim spurt, sondern da werden wie bei
+      // tour de france oder so die zeiten aller im team addiert und das team hat dann
+      // gewonnen"). ERSETZT die 06.09.-Entscheidung unten (docs/design/time-trial-
+      // einzelzeitfahren-wertung-plan-05-09.md: "WERTUNG NACH RANG ... gilt fuer
+      // Time-Trial, Spurt UND Climbing") NUR fuer Time-Trial — Spurt und Climbing bleiben
+      // bei "rang" (s. dort, unveraendert). Der Teamsieg entscheidet ab jetzt die SUMME
+      // der eigenen Laufzeiten (bahnZeit, s. bahnTeamstand()-Zweig "zeit"), kleinste
+      // Summe gewinnt — genau die Mannschaftswertung im Radsport, die Chris meint. Die
+      // PUNKTE je Laeufer bleiben unveraendert die Rangpunkte aus bahnRangliste(): das
+      // ist die Groesse, an der rho gemessen wird (MOTOREN["time-trial"].wert() liest
+      // ohnehin direkt bahnZeit(u), nie bahnTeamstand() — nachgemessen unveraendert vor/
+      // nach dieser Aenderung, s. PR-Beschreibung).
+      wertung:"zeit",
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
@@ -28432,7 +28484,20 @@
         if(u.vizUebergabeT>0 && u.vizUebergabeGeberId!=null){
           const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
           if(geber){
-            const gp=laeuferXY(geber);
+            // DER STAB SCHWEBTE FREI (Chris' Meldung, s. PR-Beschreibung): `laeuferXY(geber)`
+            // fragt `ovalPunkt()`, und die stellt einen Geber, der gerade erst uebergeben hat
+            // (`geber.aktiv===false`, `geber.fertig` bleibt bis zum TEAM-Ziel null), genau wie
+            // einen noch gar nicht gestarteten Laeufer in die Wechselzonen-Warteschlange im
+            // Innenfeld (":26251", der Radius-/vx-Block) -- ein anderer Punkt als der, an dem
+            // die Uebergabe wirklich stattfand. Die Interpolation unten startete deshalb an
+            // dieser falschen Innenfeld-Position statt am echten Streckenpunkt, der Stab
+            // schien freizuschweben, bevor er beim Nehmer "ankam". Der WIRKLICHE Uebergabepunkt
+            // ist der Bahn-Punkt zu `geber.pos` (unveraendert seit dem Wechsel, s. stepSpurt
+            // "u.aktiv=false; u.pos=u.beinBis") auf seiner LAUFSPUR (`ovalSpurR`, dieselbe
+            // Formel wie ovalPunkt() fuer einen aktiven Laeufer nimmt, statt der
+            // Innenfeld-Sonderbehandlung fuer Wartende). Reine Zeichenkorrektur -- liest nur
+            // bestehende Felder, schreibt nichts, aendert nichts an wert()/rho.
+            const gp=bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
             const gwartet=!geber.aktiv && geber.fertig==null;
             const gsk=gwartet?sk0*0.88:sk0;
             // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
