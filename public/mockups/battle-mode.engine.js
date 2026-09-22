@@ -30397,7 +30397,18 @@
           .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
-                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"}}))
+                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+            // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
+            // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
+            // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
+            // bisher NUR als Zahl (`leiste.zusatz`, "26 %") -- die Puste-Leiste darunter
+            // ist eine andere Groesse (Ausdauer, nicht Position) und laesst sich nicht
+            // als Fortschritt lesen. `x.pos` ist bereits 0..1 entlang der Strecke/Wand
+            // (dieselbe Zahl, die `zusatz` oben in Prozent umrechnet) -- reiner
+            // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
+            // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
+            // EINEN Bahn-Zweig fuehrt.
+            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
@@ -30428,6 +30439,18 @@
         const f=el("s"); f.style.width=Math.max(0,Math.min(100,anteil*100))+"%";
         if(u.leiste&&u.leiste.art==="puste")f.className=u.leiste.leer?"leer":(anteil<0.2?"knapp":"");
         bar.appendChild(f); k.appendChild(bar);
+        // FORTSCHRITTSBALKEN, zweite Leiste, nur auf der Bahn (Chris' Fund 22.09., s.
+        // Kommentar an der Feldbelegung oben): eigene Zeile statt die Puste-Leiste zu
+        // ueberschreiben, damit beide Groessen -- Ausdauer UND Streckenanteil --
+        // gleichzeitig sichtbar bleiben. Reine Anzeige: liest nur `u.fortschritt`
+        // (oben aus `x.pos` abgeleitet), schreibt nichts zurueck.
+        if(u.fortschritt!=null){
+          const fbar=el("div","kbar fortschritt");
+          const ff=el("s"); ff.style.width=Math.max(0,Math.min(100,u.fortschritt*100))+"%";
+          fbar.appendChild(ff);
+          fbar.title="Fortschritt: "+Math.round(u.fortschritt*100)+" %";
+          k.appendChild(fbar);
+        }
         // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
         // Name der Groesse, die der Balken wirklich zeigt.
         k.title=u.n+(u.down?" — ausgeschieden"
