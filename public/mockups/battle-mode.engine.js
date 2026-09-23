@@ -26361,8 +26361,58 @@
         {von:0.80,bis:0.93,art:"kurve"}
       ],
       bergSkill:"ENDTEMPO", bergKosten:0.22, bergZehr:1.1,
+      // bergNebenSkill/-Anteil: s. Nebenweg-Kommentar an gelaendeFaktor() oben.
+      // 0,30 -> 0,40 (Pp-Fix, 23.09., vierter Kalibrierschritt, nach n=24/n=48-Bestaetigung
+      // von 38,0/34,6 Pp mit 0,30). Gemessen blieben Stamina (+9,8) und Dexterity/Awareness/
+      // Torment (-6,3/-6,2/-2,5) die groessten Restausschlaege — und WUCHT (torment40,
+      // dexterity32,awareness28) hat KEIN Stamina im Rezept, waehrend ENDTEMPO (das den
+      // restlichen bergSkill-Anteil traegt) Stamina fuehrt. Den Nebenweg-Anteil anzuheben
+      // verschiebt die Berg-Zone deshalb doppelt richtig: weniger Stamina-Gewicht, mehr
+      // Dexterity/Awareness/Torment-Gewicht, exakt die vier groessten Restausschlaege. 0,40
+      // haelt ENDTEMPO immer noch als klaren Primaerweg (60 %), nicht gleichauf.
+      bergNebenSkill:"WUCHT", bergNebenAnteil:0.40,
+      // GESPUER (Pp-Fix, 23.09., fuenfter Kalibrierschritt). Nach den ersten vier Schritten
+      // (kurveSkill->TECHNIK, WUCHT-Nebenweg am Berg, Speed/Stamina in ANTRITT/ENDTEMPO/
+      // STEHEN gesenkt, bergNebenAnteil 0,30->0,40) blieben Stamina (+9,8 Pp) und Speed
+      // (+5,3 Pp) die groessten Ueberzeichner, Dexterity (-6,3) und Awareness (-6,2) die
+      // groessten Loecher — TROTZ TECHNIK/WENDIGKEIT/WUCHT, weil alle drei nur an ihren
+      // Gelaendezonen wirken (Kurve 3x13%, Berg/Abfahrt je 2x12%/2x6% der Strecke, macht
+      // zusammen rund 45 %, nicht 100 %). Speed/Stamina dagegen sitzen ueber ANTRITT/
+      // ENDTEMPO/STEHEN auf der GANZEN Strecke.
+      // GESPUER schliesst genau diese Luecke: ein NEUER, zonen-UNABHAENGIGER Subskill
+      // (`rezept.GESPUER`, reines Dexterity/Awareness — kein Speed/Stamina/Intelligence-
+      // Beimix, damit er die beiden Loecher trifft, ohne Intelligence, das mit +2,2 Pp
+      // schon nah am Ziel liegt, weiter zu ueberzeichnen), der in tempoVon() UEBER DIE
+      // GESAMTE FAHRT wirkt — dasselbe Muster wie STEHEN in `mued` (dort schon
+      // streckenweit), nur jetzt fuer Dexterity/Awareness. `gespuerSkill`/`gespuerGrad`
+      // sind NUR fuer time-trial gesetzt; jede andere Bahn liest `BA().gespuerSkill`
+      // als `undefined` und bleibt in tempoVon() bit-identisch (Faktor exakt 1).
+      // Kein neuer Kanal in gelaendeFaktor/stepSpurt noetig — reiner Zusatzfaktor in
+      // tempoVon(), additiv zu Antritt/Endtempo/Mued/Leer/Nerv wie die anderen dort.
+      gespuerSkill:"GESPUER", gespuerGrad:0.00090,
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
-      kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
+      // KURVE LIEST TECHNIK STATT WENDIGKEIT (Pp-Fix, 23.09., Folgeauftrag zu PR #1013 /
+      // Anhang A der Recherche 06.09.: "TECHNIK bleibt dort ungenutzt ... ein offener
+      // Anschlusspunkt, kein Fehler dieser Runde"). Seit K5 hatte TECHNIK
+      // (intelligence:40,dexterity:34,awareness:26} — genau die drei Attribute, die die
+      // Matrix nach Dexterity am schwersten fuehrt) UEBERHAUPT KEINEN Kanal: sein einziger
+      // Leser war der Huerden-Sturz-Zweig, und Time-Trial fuehrt seit dem K5-Umbau
+      // `hindernisse:[]` (keine Stuerze mehr). Gemessen (messe-arena-einfluss.mjs
+      // time-trial 48): Dexterity 5,0 % (Matrix 25 — das mit Abstand groesste Loch),
+      // Awareness 2,6 % (Matrix 12), macht zusammen mit dem toten Intelligence-Anteil den
+      // groessten Teil der 68,7 Pp Abweichung aus, waehrend Speed/Stamina (in ANTRITT/
+      // ENDTEMPO/STEHEN ueberall dabei) mit +16,5/+16,6 ueberzeichnen. WENDIGKEIT deckte
+      // beide Gelaende-Kanaele (Kurve UND Abfahrt) allein ab, obwohl sein eigenes
+      // TECHNIK-Geschwister danebenstand und nichts tat.
+      // Die Kurve ("Linie" — TECHNIKs eigener `lang`-Name, s. unten) ist die technischere
+      // der beiden Gelaendearten (Zignoli 2021, "in der Kurve ist die Leistung null",
+      // docs/design/bahn-disziplinen-recherche-fable.md Abschnitt 3.2) und passt inhaltlich
+      // zu TECHNIK; die Abfahrt bleibt bei WENDIGKEIT ("Umsetzen" — die Line unter Tempo
+      // AUSFUEHREN). Reine Config-Zeile, `gelaendeFaktor()` selbst liest den Skill-Namen
+      // ohnehin generisch (`A.kurveSkill||"WENDIGKEIT"`) — keine Aenderung an
+      // tempoVon/gelaendeFaktor/stepSpurt, keine andere Bahn betroffen (kurveSkill/
+      // abfahrtSkill existieren nur in BAHN_ART["time-trial"]).
+      kurveSkill:"TECHNIK", kurveKosten:0.16,
       tagesform:0.015,
       // TEAMWERTUNG NACH ZEITSUMME, NICHT MEHR NACH RANGPUNKTEN (Chris, 22.09., woertlich:
       // "beim time trial gelten nicht die punkte wie zb beim spurt, sondern da werden wie
@@ -26387,16 +26437,35 @@
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
         // lagen. Ein Attribut, das ueberall mitzaehlt, gewinnt immer. Jetzt tragen Kopf
         // und Blick die Linie, und Dexterity haelt sie nur noch.
-        ANTRITT:    {speed:48,power:30,dexterity:22},
-        ENDTEMPO:   {speed:42,stamina:34,intelligence:24},
+        // SPEED/STAMINA-ANTEIL GESENKT (Pp-Fix, 23.09., dritter Kalibrierschritt). ANTRITT
+        // und ENDTEMPO tragen `grund` (tempoVon) UEBER DIE GESAMTE STRECKE, STEHEN die
+        // Ermuedung (mued) UND, ueber KRAFT_VON, die Reservengrenze — anders als TECHNIK/
+        // WENDIGKEIT/WUCHT, deren Wirkung auf ihre Gelaendezonen begrenzt bleibt (s.
+        // gelaendeFaktor). Speed/Stamina sassen bisher in ALLEN DREI streckenweiten Kanaelen
+        // (Speed in ANTRITT+ENDTEMPO, Stamina in ENDTEMPO+STEHEN) und ueberzeichneten deshalb
+        // strukturell, unabhaengig vom kurveSkill-Fix oben: gemessen (n=24 nach Fix) Speed
+        // 36,3 % (Matrix 22, +14,3), Stamina 30,5 % (Matrix 15, +15,5), waehrend Dexterity
+        // mit 5,7 % (Matrix 25) und Awareness mit 2,7 % (Matrix 12) trotz TECHNIK/WENDIGKEIT/
+        // WUCHT weiterhin das groesste Loch blieben, weil deren Zonen nur einen Teil der
+        // Strecke abdecken. Die drei Kanaele bekommen deshalb selbst einen Dexterity-/
+        // Awareness-Anteil auf Kosten von Speed/Stamina — moderat (Speed/Stamina bleiben
+        // jeweils der groesste oder zweitgroesste Posten), aber strecken- statt zonenweit,
+        // damit Dexterity/Awareness endlich ebenfalls die GANZE Fahrt lang zaehlen, nicht nur
+        // in 75 % ihrer Gelaendezonen.
+        ANTRITT:    {speed:40,power:28,dexterity:24,awareness:8},
+        ENDTEMPO:   {speed:32,stamina:26,intelligence:24,dexterity:18},
         TECHNIK:    {intelligence:40,dexterity:34,awareness:26},
         WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
-        STEHEN:     {stamina:46,intelligence:30,awareness:24},
+        STEHEN:     {stamina:34,intelligence:26,awareness:32,dexterity:8},
         WUCHT:      {torment:40,dexterity:32,awareness:28},
-        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20}
+        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20},
+        // GESPUER: reiner Dexterity/Awareness-Kanal, s. Kommentar bei `gespuerSkill` oben.
+        // Existiert nur in time-trial (achter Rezept-Eintrag) — spurtWerte() liest
+        // `for(const k in R)` generisch, jede andere Bahn bleibt bei ihren sieben Eintraegen.
+        GESPUER:    {dexterity:58,awareness:42}
       },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Renntempo",TECHNIK:"Linie",WENDIGKEIT:"Umsetzen",
-            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit"},
+            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit",GESPUER:"Gespür"},
       plaene:{
         gleich:  {label:"Gleichmaß",     tempo:0.93, sucht:0, ab:0.75,
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
@@ -28067,8 +28136,28 @@
     const A=BA();
     // STEIGUNG: kostet Tempo, abgefedert durch die Bergfaehigkeit (ENDTEMPO — "wer hinten
     // noch Reserven hat, holt am Berg etwas raus", genau Chris' Fiktion).
-    if(z.art==="steigung"){ const skill=skillLesen(u,A.bergSkill||"ENDTEMPO");
-      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100)); }
+    //
+    // NEBENWEG WUCHT (Pp-Fix, 23.09., zweiter Kalibrierschritt nach der kurveSkill-Aenderung
+    // oben). WUCHT (torment:40,dexterity:32,awareness:28) hatte in Time-Trial ueberhaupt
+    // keinen Kanal: sein einziger Leser war der Huerden-Sturz-Zweig in stepSpurt, und der
+    // laeuft nie, weil `hindernisse:[]` (K5) die Schleife auf null Durchlaeufe setzt — genau
+    // dieselbe Lehre wie bei TECHNIK oben, nur beim naechsten toten Sub-Skill. Torment liest
+    // dadurch seit K5 durchgaengig 0 %, wo die Matrix 3 sagt.
+    // Statt eines dritten, eigenen Gelaende-Zweigs (Time-Trial hat nur drei Zonenarten, s.
+    // BAHN_ART["time-trial"].gelaende) bekommt WUCHT hier einen NEBENWEG im BESTEHENDEN
+    // Steigungs-Kanal — dasselbe Primaer-/Nebenweg-Muster, das Chris am 21.09. fuer I-Spy
+    // eingefuehrt und ausdruecklich verallgemeinert hat ("auf genau diese Art und Weise
+    // kannst du auch Attribute in allen moeglichen Disziplinen nutzen"). ENDTEMPO bleibt der
+    // Primaerweg (volles Gewicht); WUCHT zieht als Nebenweg mit, moderat gewichtet
+    // (`bergNebenAnteil`, nur time-trial setzt sie) — wer den Huegel eher mit Kraft und
+    // Robustheit als mit Renntempo nimmt, kommt trotzdem etwas voran. Ohne `bergNebenSkill`
+    // (jede andere Bahn) bleibt die Zeile exakt die alte Formel, bit-identisch.
+    if(z.art==="steigung"){
+      const primaer=skillLesen(u,A.bergSkill||"ENDTEMPO");
+      const nebenName=A.bergNebenSkill, nebenAnteil=nebenName?(A.bergNebenAnteil??0):0;
+      const skill=nebenAnteil?primaer*(1-nebenAnteil)+skillLesen(u,nebenName)*nebenAnteil:primaer;
+      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100));
+    }
     // ABFAHRT: schenkt Tempo, mehr fuer wendige Laeufer — dieselbe Faehigkeit wie die
     // Kurve, weil eine Abfahrt technisch genau das ist: eine lange, offene Kurve.
     if(z.art==="abfahrt"){ const skill=skillLesen(u,A.abfahrtSkill||"WENDIGKEIT");
@@ -28125,12 +28214,18 @@
     const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
+    // GESPUER (Pp-Fix Time-Trial, 23.09.): streckenweiter Dexterity/Awareness-Kanal, s.
+    // Kommentar bei `gespuerSkill` in BAHN_ART["time-trial"]. Gated auf `BA().gespuerSkill`
+    // (nur time-trial setzt es) — jede andere Bahn liest hier `undefined`, `gespuer` bleibt
+    // exakt 1, diese Zeile also bit-identisch zu vorher.
+    const gespuerSkill=BA().gespuerSkill;
+    const gespuer=gespuerSkill?1-(100-skillLesen(u,gespuerSkill))*(BA().gespuerGrad??0):1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
            *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.
-           *gelaendeFaktor(u)*(u.formTag||1);
+           *gelaendeFaktor(u)*(u.formTag||1)*gespuer;
   }
 
   // ===================================================================================
@@ -32925,10 +33020,20 @@
   // gewinnt. Das erfasst besser werden UND andere aufhalten.
   const EINFLUSS_ATTR=["power","health","stamina","intelligence","awareness","determination",
                        "speed","dexterity","charisma","will","spirit","torment"];
-  function einflussVon(dId,n,plus){
+  // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
+  // default 0 -> bit-identisch zum bisherigen Aufruf. Verschiebt BEIDE Seed-Reihen
+  // (Formkarten und M.bau) um denselben Betrag, sodass ein zweiter Aufruf mit grossem,
+  // disjunktem Versatz (z.B. 10_000_000, weit ausserhalb von i*104729/i*7919 fuer
+  // realistische n) eine von der ersten Messung UNABHAENGIGE Saatreihe liefert, ohne die
+  // bestehende deterministische Referenzmessung (versatz=0) zu veraendern. Ersetzt die
+  // bisherige Handarbeit "mehrere kurze Teilmessungen mit disjunkten Offsets in Node
+  // kombinieren" (s. Kommentar bei ISPY_REIHENFOLGE_NERVEN_ANTEIL) durch einen einzigen,
+  // eingebauten Parameter — geprueft: einflussVon(d,n) und einflussVon(d,n,undefined,0)
+  // liefern dieselben Zahlen.
+  function einflussVon(dId,n,plus,saatVersatz){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
-    const hoehe=plus||15;
+    const hoehe=plus||15; const versatz=saatVersatz||0;
     const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
     if(M.vorher)M.vorher();
 
@@ -32936,8 +33041,8 @@
       ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
       const w={};
       for(let i=0;i<n;i++){
-        zieheFormkarten(20260823+i*104729);
-        M.bau(1337+i*7919);
+        zieheFormkarten(20260823+versatz+i*104729);
+        M.bau(1337+versatz+i*7919);
         M.lauf();
         const e=M.wert();
         for(const k in e)w[k]=(w[k]||0)+e[k]/n;
