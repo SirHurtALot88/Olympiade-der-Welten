@@ -69,6 +69,27 @@
       <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
+      <!-- MINI-DM 4-TEAM-FFA (Bugfix 22.09.): Mini-DM ist kein Zwei-Seiten-Kampf wie
+           TDM/Battlefield, sondern Chris' eigens beschlossenes Vier-Team-Free-for-All
+           (docs/design/mini-dm-4-team-ffa-recherche-06-09.md). Der klassische
+           .scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl/.untenraum-Rahmen darunter ist
+           fuer GENAU ZWEI Seiten gebaut (siehe deren eigene Kommentare zu css("--home")/
+           css("--away")) — ein echter, live animierter Vier-Ecken-Kampf mit eigenen Farben
+           je Team wuerde diesen Rahmen an vielen Stellen aufbrechen, s. PR-Beschreibung fuer
+           den vollen Befund. Diese Ansicht zeigt stattdessen das ECHTE, bereits gebaute
+           FFA-Ergebnis (spieleMiniDmFfaEvent — dieselbe Funktion, die auch
+           arena-headless-runner.ts fuer die zaehlende Simulation nutzt): vier Runden, eine
+           je Rolle, alle vier Teams nebeneinander, 2-1-0-0-Ligapunkte am Ende. renderReset()
+           blendet sie ein und den klassischen Rahmen aus, sobald disc==="mini-dm" ist. -->
+      <div class="minidmffa" id="minidmffa" hidden>
+        <p class="honest">Mini-DM läuft als 4-Team-Free-for-All: eine Ecke je Team, vier
+          Runden (eine je Rolle), am Ende 2-1-0-0-Ligapunkte für die Endplatzierung — echte
+          Simulation, dieselbe Funktion wie in der zählenden Messung. Noch keine
+          Live-Grafik mit vier gleichzeitig sichtbaren Ecken (Begründung: PR-Beschreibung).</p>
+        <div class="mdffa-teams" id="mdffaTeams"></div>
+        <div class="mdffa-runden" id="mdffaRunden"></div>
+        <div class="mdffa-endstand" id="mdffaEndstand"></div>
+      </div>
       <div class="scoreline">
         <div class="tname" id="tnameL">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
         <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small></div>

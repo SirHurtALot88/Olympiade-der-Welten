@@ -30906,10 +30906,27 @@
     // auf rr() oder Rangtreue.
     ispyRaumAn=false;
     build(gebuchteSaatFuerAktuelleDisziplin());
+    // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
+    // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
+    // (ARENA_ART["mini-dm"]) — das bleibt so, weil dieselbe Funktion auch die Pp-
+    // Abweichungs-Pflichtpruefung (einflussVon()/MOTOREN) speist. Fuer die Anzeige wird
+    // sein Ergebnis nur AUSGEBLENDET (nicht geloescht — renderKader()/draw() unten laufen
+    // unveraendert mit, ihr Output bleibt bloss unsichtbar), und stattdessen das echte
+    // FFA-Ereignis gezeigt. Der Toggle laeuft bei JEDEM reset() (auch beim Verlassen von
+    // Mini-DM), damit kein Panel vom vorigen Zustand sichtbar stehen bleibt.
+    const mdffaPanel=document.getElementById("minidmffa");
+    const istMdffa=disc==="mini-dm";
+    if(mdffaPanel)mdffaPanel.hidden=!istMdffa;
+    [".planzeile",".scoreline",".hpbars",".arenaraum",".kaderleiste",".ctrl",".untenraum"].forEach(sel=>{
+      const knoten=document.querySelector(sel);
+      if(knoten)knoten.style.display=istMdffa?"none":"";
+    });
+    if(istMdffa)renderMiniDmFfa();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
-    document.getElementById("arenaDisc").textContent=
-      (DISCS[disc]?DISCS[disc].label:disc)+" · "+
+    document.getElementById("arenaDisc").textContent=istMdffa
+      ?(DISCS[disc]?DISCS[disc].label:disc)+" · 4-Team-FFA"
+      :(DISCS[disc]?DISCS[disc].label:disc)+" · "+
       (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
                     :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
@@ -31438,6 +31455,154 @@
       }))
     };
   }
+
+  // ===================================================================================
+  // MINI-DM ALS 4-TEAM-FFA, INTERAKTIV (Bugfix 22.09.). Chris' Screenshot zeigte einen
+  // klassischen Zwei-Seiten-Kampf ("Vigilante Wranglers" 4 gegen "Armageddon Aftermath" 4,
+  // Sudden Death, K/T/B/CC/H/S/SCH/ERL/FF/IMP-Boxscore) — GENAU das generische
+  // Arena-Chassis von oben (ARENA_ART["mini-dm"], jeSeite:4), das TDM/Battlefield/Fechten
+  // sich teilen. `build()` faellt fuer disc==="mini-dm" auf genau dieses Chassis zurueck,
+  // weil `build()` bewusst UNVERAENDERT bleibt (s. Kommentar am Aufrufer unten): dieselbe
+  // Funktion speist auch MOTOREN["mini-dm"]/einflussVon() fuer die Pp-Abweichungs-Pflicht-
+  // pruefung (CLAUDE.md, "Eignungsmatrix ist gesperrt") — die darf diese Aenderung nicht
+  // einmal indirekt beruehren.
+  //
+  // Der bereits gebaute, echte Mechanismus (`spieleMiniDmFfaEvent`/`baueMiniDmFfaRunde`,
+  // s. deren Kopfkommentar) wird stattdessen HIER ans Publikum angeschlossen: vier Teams,
+  // eine Ecke je Team, vier Runden (eine je Rolle), 2-1-0-0-Ligapunkte. `reset()` ruft
+  // `renderMiniDmFfa()` fuer disc==="mini-dm" auf und blendet dafuer den klassischen
+  // Zwei-Seiten-Rahmen (.scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl/.untenraum) aus.
+  //
+  // BEWUSST KEINE LIVE-ANIMATION MIT VIER GLEICHZEITIG SICHTBAREN ECKEN. Das waere die
+  // naechstbessere Fassung, aber `draw()`/`feed()`/die Kopfzeile (.tname/.scoreline) und
+  // `renderEndstand()` sind an drei Stellen strukturell auf GENAU ZWEI Seiten gebaut, nicht
+  // nur eingefaerbt: `draw()` faerbt JEDE Seite ausser 0 pauschal in "--away"
+  // (`u.side===0?css("--home"):css("--away")`, s. dort) — Team 1/2/3 waeren also farblich
+  // ununterscheidbar; `feed()` sortiert jede Zeile binaer nach "h"/"a"
+  // (`side===0?"h":"a"`); die Kopfzeile/`.kaderleiste` haben genau ZWEI DOM-Slots (tnameL/
+  // tnameR, kaderL/kaderR) fuer genau zwei Team-Identitaeten. Das ist keine Kleinigkeit an
+  // einer Stelle, sondern dieselbe Zwei-Seiten-Annahme an mehreren, und sie durchzieht
+  // exakt das Chassis, das TDM/Battlefield produktiv UND gemessen nutzen (Pp-Abweichungs-
+  // Pflichtpruefung, s.o.) — hier querzubauen waere das Risiko, ein bereits scharf
+  // vermessenes Chassis fuer eine einzelne, noch nicht saisonaufgeloeste Disziplin (s.
+  // `lib/battle/arena-resolved-disciplines.ts`) versehentlich zu verschieben. Diese Ansicht
+  // zeigt deshalb das ECHTE Ergebnis (kein Wert erfunden, dieselbe Funktion wie in der
+  // zaehlenden Messung) als Boxscore/Endstand statt als Live-Animation. Ein echter
+  // Vier-Ecken-Live-Kampf bliebe ein separates, groesseres Vorhaben (neue Team-Farben statt
+  // --home/--away, eine N-seitige Kopfzeile/Kaderleiste, ein N-seitiger Endstand) — s.
+  // PR-Beschreibung fuer den vollen Befund.
+
+  // Vier Team-Eintraege {name,kader} fuer die FFA-Anzeige: bevorzugt die echten Kader, die
+  // `FoundationBattleArenaHost.tsx` ueber `window.__olyArenaKader.miniDmFfaTeams` hereinreicht
+  // (Heim, Gast plus zwei automatisch gezogene weitere Teams — s. dessen Kommentar). Ohne
+  // Spielstand (Standalone/`battle-mode.html` direkt geoeffnet, oder das Claude-Artefakt)
+  // gibt es keine vier echten Team-Kader — dann werden SQUAD/OPP (die beiden Mockup-Kader
+  // oben in dieser Datei) je hälftig auf vier benannte Beispiel-Ecken verteilt, klar als
+  // Beispiel beschriftet statt so zu tun, als waeren es vier echte Vereine.
+  function mdffaTeamEintraege(){
+    const echte=echterKader&&Array.isArray(echterKader.miniDmFfaTeams)?echterKader.miniDmFfaTeams:null;
+    if(echte&&echte.length===4&&echte.every(t=>t&&Array.isArray(t.kader)&&t.kader.length))
+      return echte.map(t=>({name:String(t.name||"Team"),kader:mitKit(t.kader)}));
+    const halb=(arr,label)=>{
+      const mitte=Math.max(1,Math.ceil(arr.length/2));
+      const a=arr.slice(0,mitte),b=arr.slice(mitte);
+      return [{name:label+" A (Beispiel)",kader:a},{name:label+" B (Beispiel)",kader:b.length?b:a}];
+    };
+    return [...halb(SQUAD,"Eigene"),...halb(OPP,"Gegner")];
+  }
+
+  // Rollen-Klartext (Frontliner/Finisher/Trick Fighter/Iron Guard) statt der internen Id —
+  // dieselbe Liste, aus der auch die normale Mini-DM-Aufstellung (Tab „Aufstellung") ihre
+  // Slot-Karten baut.
+  const mdffaRollenLabel=(slotId)=>{
+    const eintrag=(SLOTS_JE_DISC["mini-dm"]||[]).find(s2=>s2.id===slotId);
+    return eintrag?eintrag.label:slotId;
+  };
+
+  // Das laufende Ergebnis wird auf `disc`/den Team-Eintraegen zwischengespeichert, damit ein
+  // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
+  // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
+  function renderMiniDmFfa(){
+    const teamsBox=document.getElementById("mdffaTeams");
+    const rundenBox=document.getElementById("mdffaRunden");
+    const endstandBox=document.getElementById("mdffaEndstand");
+    if(!teamsBox||!rundenBox||!endstandBox)return;
+    const eintraege=mdffaTeamEintraege();
+    // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
+    // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
+    // Team-Paar/denselben Spieltag, unabhaengig davon, wie viele rr()-Zuege `build()`
+    // fuer die (hier ungenutzte) klassische Zwei-Seiten-Aufstellung schon verbraucht hat.
+    let ereignis;
+    try{
+      ereignis=spieleMiniDmFfaEvent(eintraege.map(t=>t.kader),normalisiereSaat(gebuchteSaatFuerAktuelleDisziplin()));
+    }catch(fehler){
+      teamsBox.textContent="";
+      rundenBox.innerHTML="<p class='muted'>Mini-DM-FFA konnte nicht simuliert werden: "+
+        (fehler&&fehler.message?fehler.message:String(fehler))+"</p>";
+      endstandBox.textContent="";
+      return;
+    }
+    const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
+    const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
+
+    // TEAM-KOPFZEILE: vier Karten, sortiert nach Event-Endplatz, Sieger optisch markiert.
+    teamsBox.textContent="";
+    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+      const erg=bySide(side);
+      const karte=el("div","mdffa-team"+(erg.eventPlatz===1?" mdffa-sieger":""));
+      karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
+      karte.appendChild(el("div","mdffa-name",eintraege[side].name));
+      const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
+      punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+      karte.appendChild(punkte);
+      teamsBox.appendChild(karte);
+    });
+
+    // VIER RUNDENTAFELN (eine je Rolle): Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest.
+    rundenBox.textContent="";
+    ereignis.runden.forEach(runde=>{
+      const box=el("div","mdffa-runde");
+      box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
+      const tbl=document.createElement("table");
+      const tbody=document.createElement("tbody");
+      runde.teams.slice().sort((a,b)=>a.rundenPlatz-b.rundenPlatz).forEach(t=>{
+        const tr=document.createElement("tr");
+        tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
+        const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
+        const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
+        const tdPunkte=el("td","n",t.rundenPunkte+" Pkt.");
+        const tdHp=el("td","n",(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP"));
+        tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      box.appendChild(tbl);
+      rundenBox.appendChild(box);
+    });
+
+    // ENDSTAND: alle vier Teams, Rundenpunkte-Summe, Beitrag-Summe, Ligapunkte.
+    endstandBox.textContent="";
+    const tbl=document.createElement("table");
+    const thead=document.createElement("thead");
+    const trh=document.createElement("tr");
+    ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
+    thead.appendChild(trh);tbl.appendChild(thead);
+    const tbody=document.createElement("tbody");
+    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+      const erg=bySide(side);
+      const tr=document.createElement("tr");
+      if(erg.eventPlatz===1)tr.className="mdffa-r1";
+      tr.appendChild(el("td",null,eintraege[side].name));
+      tr.appendChild(el("td",null,String(erg.eventPlatz)));
+      tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
+      tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
+      tr.appendChild(el("td",null,String(erg.ligaPunkte)));
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    endstandBox.appendChild(tbl);
+  }
+
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
   // Zeitfahren und die Wand. Kommt eine sechste Bahn dazu, reicht ein Eintrag in
