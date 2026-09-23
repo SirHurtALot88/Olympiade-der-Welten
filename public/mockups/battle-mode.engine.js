@@ -26084,6 +26084,25 @@
       // Dexterity/Awareness/Torment-Gewicht, exakt die vier groessten Restausschlaege. 0,40
       // haelt ENDTEMPO immer noch als klaren Primaerweg (60 %), nicht gleichauf.
       bergNebenSkill:"WUCHT", bergNebenAnteil:0.40,
+      // GESPUER (Pp-Fix, 23.09., fuenfter Kalibrierschritt). Nach den ersten vier Schritten
+      // (kurveSkill->TECHNIK, WUCHT-Nebenweg am Berg, Speed/Stamina in ANTRITT/ENDTEMPO/
+      // STEHEN gesenkt, bergNebenAnteil 0,30->0,40) blieben Stamina (+9,8 Pp) und Speed
+      // (+5,3 Pp) die groessten Ueberzeichner, Dexterity (-6,3) und Awareness (-6,2) die
+      // groessten Loecher — TROTZ TECHNIK/WENDIGKEIT/WUCHT, weil alle drei nur an ihren
+      // Gelaendezonen wirken (Kurve 3x13%, Berg/Abfahrt je 2x12%/2x6% der Strecke, macht
+      // zusammen rund 45 %, nicht 100 %). Speed/Stamina dagegen sitzen ueber ANTRITT/
+      // ENDTEMPO/STEHEN auf der GANZEN Strecke.
+      // GESPUER schliesst genau diese Luecke: ein NEUER, zonen-UNABHAENGIGER Subskill
+      // (`rezept.GESPUER`, reines Dexterity/Awareness — kein Speed/Stamina/Intelligence-
+      // Beimix, damit er die beiden Loecher trifft, ohne Intelligence, das mit +2,2 Pp
+      // schon nah am Ziel liegt, weiter zu ueberzeichnen), der in tempoVon() UEBER DIE
+      // GESAMTE FAHRT wirkt — dasselbe Muster wie STEHEN in `mued` (dort schon
+      // streckenweit), nur jetzt fuer Dexterity/Awareness. `gespuerSkill`/`gespuerGrad`
+      // sind NUR fuer time-trial gesetzt; jede andere Bahn liest `BA().gespuerSkill`
+      // als `undefined` und bleibt in tempoVon() bit-identisch (Faktor exakt 1).
+      // Kein neuer Kanal in gelaendeFaktor/stepSpurt noetig — reiner Zusatzfaktor in
+      // tempoVon(), additiv zu Antritt/Endtempo/Mued/Leer/Nerv wie die anderen dort.
+      gespuerSkill:"GESPUER", gespuerGrad:0.00090,
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
       // KURVE LIEST TECHNIK STATT WENDIGKEIT (Pp-Fix, 23.09., Folgeauftrag zu PR #1013 /
       // Anhang A der Recherche 06.09.: "TECHNIK bleibt dort ungenutzt ... ein offener
@@ -26152,10 +26171,14 @@
         WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
         STEHEN:     {stamina:34,intelligence:26,awareness:32,dexterity:8},
         WUCHT:      {torment:40,dexterity:32,awareness:28},
-        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20}
+        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20},
+        // GESPUER: reiner Dexterity/Awareness-Kanal, s. Kommentar bei `gespuerSkill` oben.
+        // Existiert nur in time-trial (achter Rezept-Eintrag) — spurtWerte() liest
+        // `for(const k in R)` generisch, jede andere Bahn bleibt bei ihren sieben Eintraegen.
+        GESPUER:    {dexterity:58,awareness:42}
       },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Renntempo",TECHNIK:"Linie",WENDIGKEIT:"Umsetzen",
-            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit"},
+            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit",GESPUER:"Gespür"},
       plaene:{
         gleich:  {label:"Gleichmaß",     tempo:0.93, sucht:0, ab:0.75,
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
@@ -27904,12 +27927,18 @@
     const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
+    // GESPUER (Pp-Fix Time-Trial, 23.09.): streckenweiter Dexterity/Awareness-Kanal, s.
+    // Kommentar bei `gespuerSkill` in BAHN_ART["time-trial"]. Gated auf `BA().gespuerSkill`
+    // (nur time-trial setzt es) — jede andere Bahn liest hier `undefined`, `gespuer` bleibt
+    // exakt 1, diese Zeile also bit-identisch zu vorher.
+    const gespuerSkill=BA().gespuerSkill;
+    const gespuer=gespuerSkill?1-(100-skillLesen(u,gespuerSkill))*(BA().gespuerGrad??0):1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
            *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.
-           *gelaendeFaktor(u)*(u.formTag||1);
+           *gelaendeFaktor(u)*(u.formTag||1)*gespuer;
   }
 
   // ===================================================================================
@@ -32704,10 +32733,20 @@
   // gewinnt. Das erfasst besser werden UND andere aufhalten.
   const EINFLUSS_ATTR=["power","health","stamina","intelligence","awareness","determination",
                        "speed","dexterity","charisma","will","spirit","torment"];
-  function einflussVon(dId,n,plus){
+  // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
+  // default 0 -> bit-identisch zum bisherigen Aufruf. Verschiebt BEIDE Seed-Reihen
+  // (Formkarten und M.bau) um denselben Betrag, sodass ein zweiter Aufruf mit grossem,
+  // disjunktem Versatz (z.B. 10_000_000, weit ausserhalb von i*104729/i*7919 fuer
+  // realistische n) eine von der ersten Messung UNABHAENGIGE Saatreihe liefert, ohne die
+  // bestehende deterministische Referenzmessung (versatz=0) zu veraendern. Ersetzt die
+  // bisherige Handarbeit "mehrere kurze Teilmessungen mit disjunkten Offsets in Node
+  // kombinieren" (s. Kommentar bei ISPY_REIHENFOLGE_NERVEN_ANTEIL) durch einen einzigen,
+  // eingebauten Parameter — geprueft: einflussVon(d,n) und einflussVon(d,n,undefined,0)
+  // liefern dieselben Zahlen.
+  function einflussVon(dId,n,plus,saatVersatz){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
-    const hoehe=plus||15;
+    const hoehe=plus||15; const versatz=saatVersatz||0;
     const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
     if(M.vorher)M.vorher();
 
@@ -32715,8 +32754,8 @@
       ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
       const w={};
       for(let i=0;i<n;i++){
-        zieheFormkarten(20260823+i*104729);
-        M.bau(1337+i*7919);
+        zieheFormkarten(20260823+versatz+i*104729);
+        M.bau(1337+versatz+i*7919);
         M.lauf();
         const e=M.wert();
         for(const k in e)w[k]=(w[k]||0)+e[k]/n;
