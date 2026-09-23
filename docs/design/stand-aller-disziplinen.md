@@ -1,5 +1,50 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Neunter Nachtrag 22.09. — Breaking wird zum Gauntlet (Chris' Vorgabe), Rangtreue neu
+kalibriert.** Chris, woertlich: „breaking point faend ich vermutlich besser wenn da spieler 1
+vs 1 kaempft und der sieger kaempft dann vs spieler 2 aus dem anderen team usw. so kann zb ein
+starker spieler auf slot 6 noch mal richtig aufholen und spieler 4 5 und 6 vom gegner besiegen.
+die HP nimmt er natuerlich mit in die folgerunde, geht also angeschlagen in die kaempfe rein,
+wer uebrig bleibt scored einen punkt." Ersetzt Breakings bisherigen WERTUNG_AUFTRITT-Ablauf
+(zwoelf unabhaengige Einzelauftritte, je acht feste Durchgaenge) durch eine echte Kette:
+Team-Slot 1 gegen Team-Slot 1 (feste Aufstellungsreihenfolge), der Sieger bleibt MIT seinem
+aktuellen HP-Stand im Ring und tritt gegen den naechsten Kaempfer des Verliererteams an, bis ein
+Team komplett aufgebraucht ist — `gauntlet:true` (`BUEHNE_ART.breaking`, `baueGauntlet()`,
+`public/mockups/battle-mode.engine.js`). Rezept/Attribut-Kanaele bleiben WOERTLICH unveraendert
+(dieselbe Ertragende-Formel wie im alten Block, nur oefter durchlaufen); die Eignungsmatrix wird
+nicht angefasst.
+
+**Kalibrierrunde, weil der erste Anlauf rho unter die Schranke druecken liess.** Bei
+`GAUNTLET_HP_MAX:100` fiel rho je Spiel kaderfest auf 0,707 (von 0,869 vorher), obwohl die
+Saisonzahl kaum bewegte (0,935 vs. 0,951) — nach `rho(Spiel)=rho(Saison)*Wurzel(Verlaesslichkeit)`
+ein reines Verlaesslichkeitsproblem: ein einzelnes Duell entschied nach durchschnittlich 6-8
+Zuegen, kurz genug, dass ein einziger ungluecklicher Fehlschlag einen eigentlich staerkeren
+Kaempfer aus der GESAMTEN Kette wirft (sein ganzer Beitrag zu `u.summe` bricht in diesem Moment
+ab) — ein Gambler's-Ruin-Effekt mit zu wenigen Schritten, kein Attribut-/Rezeptproblem. Hebel:
+`GAUNTLET_HP_MAX` (mehr Zuege je Duell, ohne Rezept/Formel zu beruehren) plus `rundenDauer`
+0,625→0,35 (haelt die Gesamtdauer unter dem 120-s-Messfenster, s. Motor-Kommentar). Gemessen
+(`miss-alle-disziplinen.mjs 24`, kaderfest): HP_MAX 100 → rho 0,707 (Spannweite 0,330, Saison
+0,935/0,413); HP_MAX 200 (rundenDauer noch 0,625) → 0,774 (0,306, 0,902/0,413); HP_MAX 400 +
+rundenDauer 0,35 → **0,820 (Spannweite 0,309, Saison 0,930, Spannweite 0,420) — bestanden**,
+wenn auch mit spuerbar hoeherer Spannweite als die alte Auftritt-Mechanik (0,114) — ein
+Gauntlet ist strukturell naeher an einem echten K.o.-Turnier (Oberraschungen sind Teil des
+Formats) als an zwoelf unabhaengigen Einzelbewertungen, und das zeigt sich hier ehrlich in der
+Zahl. Pp-Abweichung (`messe-arena-einfluss.mjs breaking`, Vorher-Messung n=12): 26,8 Pp (bereits
+vor dem Umbau knapp ueber der 25-Schranke, unveraendert von der Rezeptkalibrierung, die Torment
+in die Erfolgschance holte, s. Kommentar an `BUEHNE_ART.breaking` weiter unten) — eine
+Nachmessung nach dem Umbau lief in dieser Sandbox wegen extremer, sitzungsfremder
+Rechenlast (paralleler Agenten-Betrieb, `load average` zeitweise 40-75 auf vier Kernen) zweimal
+(n=12, dann n=6) je über 20 Minuten, ohne fertigzuwerden, und wurde beide Male abgebrochen; s.
+PR-Beschreibung für den vollen Verlauf und die Wiederholungsempfehlung. Rezept/Attribut-Kanäle
+sind dabei WOERTLICH unveraendert (`gauntletRunde()` ist eine reine Extraktion derselben Formel,
+s.o.) — strukturell spricht deshalb nichts fuer eine grosse Verschiebung, aber das ist eine
+Vermutung, keine Messung, bis die Nachmessung nachgeholt ist. Produktionsanbindung: Breaking
+wechselt von
+`ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` zu einer neuen `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS`/
+`spieleBuehneGauntlet()` (`lib/battle/arena-headless-runner.ts`) — der Seitenstand ist jetzt eine
+Ueberlebenden-Zaehlung (`u.raus`), nicht mehr eine Punktsumme, weil sonst ein Team mit mehr
+rohen Punkten trotz weniger Ueberlebender haette gewinnen koennen.
+
 **Achter Nachtrag 15.09. — Football: Anzeige/KI-Kauf auf die Spiel-Eignung umgestellt
 (Fable-Entscheidung E3, `docs/pm-briefings/fable-entscheidung-e1-e2-e3-basketball-hockey-
 football-10-09.md` Abschnitt 3), auf dem aktuellen `main`-Stand nachgebaut — dabei einen
@@ -216,7 +261,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Eiskunstlauf** | **Buehne** | **0,875** | 0,075 | 0,965 | 0,049 | **bestanden** |
 | **Takeshi's Castle** | **Bahn** | **0,883** | 0,071 | 0,951 | 0,042 | **bestanden — 13.09. `fallenKoennen`, vorher 0,861 / 0,116 / 0,930 / 0,056** |
 | Spurt | Bahn | 0,894 | 0,138 | 0,916 | 0,105 | bestanden |
-| **Breaking** | **Buehne** | **0,869** | 0,114 | 0,951 | 0,168 | **bestanden** |
+| **Breaking** | **Buehne** | **0,820** | 0,309 | 0,930 | 0,420 | **bestanden — 22.09. Gauntlet-Umbau, vorher 0,869/0,114/0,951/0,168, s.u.** |
 | Gewichtheben | Buehne | 0,854 | 0,209 | 0,923 | 0,273 | bestanden |
 | Wettessen | Buehne | 0,845 | 0,139 | 0,930 | 0,091 | bestanden |
 | Time-Trial | Bahn | 0,828 | 0,087 | 0,832 | 0,056 | bestanden |
