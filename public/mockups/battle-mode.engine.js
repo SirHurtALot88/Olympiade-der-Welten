@@ -26392,7 +26392,26 @@
       {id:"hind", kopf:hw.slice(0,4), titel:hw+"n erreicht", wert:z=>z.erreicht+"/"+H().length},
       {id:"sauber",kopf:"Saub", titel:"sauber genommen", top:true, wert:z=>z.sauber||null},
       {id:"durch", kopf:wucht.slice(0,5), titel:wucht, wert:z=>z.u.durchbruch||null},
-      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null}]:[]),
+      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null},
+      // HINDERNIS-TEMPO (Chris' Fund 22.09., woertlich: "da waere es cool wenn man noch
+      // sehen koennte wer zb die hindernisse am schnellsten genommen hat oder so weil das
+      // ja nicht unbedingt der ist der am schnellsten gelaufen ist"). Eigene, zusaetzliche
+      // Kennzahl NEBEN der Gesamtzeit (Spalte "Zeit" unten) statt an ihrer Stelle: die
+      // Durchschnittszeit, die NUR an den Stationen selbst verloren geht (Kraftzug/Sturz,
+      // bei Spurt/Takeshi zusaetzlich der Technik-/Wucht-Stopp `u.huerde`), nicht die Zeit
+      // auf der Strecke dazwischen. `u.hindernisZeit` ist reine, additive Buchhaltung (s.
+      // die drei Schreibstellen in stepSpurt oben) -- nie zurueckgelesen in tempoVon()/
+      // rr()/MOTOREN[d].wert() oder bahnRangliste(), also ohne jeden Einfluss auf Eignung
+      // oder Rang. `z.erreicht` (oben, live aus u.pos) ist der Nenner: ein sauber
+      // genommenes Hindernis zaehlt mit 0 Sekunden Kosten mit und zieht den Schnitt damit
+      // zu Recht nach unten -- genau der Fall, den Chris beschreibt, in dem ein insgesamt
+      // langsamerer Laeufer an den Hindernissen selbst die beste Zeit zeigt. `bahnRealSek`
+      // (derselbe Massstab wie die "Zeit"-Spalte) rechnet die Simulationssekunden in
+      // Zuschauzeit um, `bahnZeitText` formatiert gleich.
+      {id:"hindZeit", kopf:"Ø"+hw.slice(0,4), titel:"durchschnittliche Zeit an den "+hw.toLowerCase()+
+        "n selbst (Kraftzug/Sturz"+(art.hindernisTypen?"/Technik-Stopp":"")+") — unabhängig von der reinen Laufgeschwindigkeit, niedriger ist besser",
+        wert:z=>z.erreicht>0?+bahnRealSek((z.u.hindernisZeit||0)/z.erreicht).toFixed(2):null,
+        fmt:v=>bahnZeitText(v)}]:[]),
       ...(art.schatten?[{id:"sog",kopf:"Sog",titel:"Anteil im Windschatten",
         wert:z=>Math.round(z.u.schattenS/Math.max(0.1,z.u.schattenS+z.u.spitzeS)*100),fmt:v=>v+"%"}]:[]),
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
@@ -26427,7 +26446,9 @@
         farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
-      sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos), fuss:""};
+      sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos),
+      fuss:mitHindernissen?("„Ø"+hw.slice(0,4)+"\" ist die Zeit an den "+hw.toLowerCase()+
+        "n selbst, gemittelt über alle bisher erreichten — unabhängig von der Zeit auf der freien Strecke."):""};
   }
 
   // STAFFEL (`staffel:true`): nur einer je Team laeuft gleichzeitig — die anderen fuenf
@@ -27817,7 +27838,17 @@
             // von `fallenKoennen` allein (Recherche Abschnitt 4.2). Das Feld bleibt im
             // Motor und in BAHN_ART ungesetzt; ohne es ist der Faktor 1 (jede Bahn).
             const stFaktor=A.stufePreis?(A.stufePreis[(A.fallenStufe||{})[hTyp]]??1):1;
+            // HINDERNIS-ZEIT-BUCHHALTUNG (Chris' Fund 22.09.: "wer die hindernisse am
+            // schnellsten genommen hat oder so weil das ja nicht unbedingt der ist der am
+            // schnellsten gelaufen ist"). `u.hindernisZeit` summiert NUR den Zeitpreis, den
+            // DIESE Station kostet — reine Buchhaltung wie `u.fallen`/`u.durchbruch`/
+            // `u.gestolpert` daneben, nie zurueckgelesen in tempoVon()/rr()/MOTOREN[d].wert().
+            // Vorher (der Math.max-Zuweisung) statt nachher gemessen, weil `u.huerde` hier
+            // Sekunde fuer Sekunde herunterlaeuft (`if(u.huerde>0)u.huerde-=dt`, oben) und ein
+            // Lesen nach dem Rennen nur noch 0 zeigen wuerde.
+            const huerdeVor=u.huerde||0;
             u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
@@ -27857,6 +27888,9 @@
                 const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
                 const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
                 u.huerde+=preis; u.gedraengt=(u.gedraengt||0)+1; u.gedraengeZeit=(u.gedraengeZeit||0)+preis;
+                // Derselbe Bucher wie oben: das Gedraenge ist Teil des Zeitpreises DIESER
+                // Station, nicht der Laufstrecke dazwischen.
+                u.hindernisZeit=(u.hindernisZeit||0)+preis;
                 u.fallen[u.fallen.length-1].gedraenge=extra;
                 // SICHTBARES GEDRAENGE (docs/design/takeshi-animationen-hilfe-behinderung-
                 // recherche-06-09.md, Abschnitt 1.2/1.5): derselbe Ring, der im Kampf eine
@@ -27973,6 +28007,10 @@
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
+            // Derselbe Bucher wie oben: der Kraftzug kostet Zeit an DIESER Station (der
+            // Hauptkanal fuer Climbing, das kein `hindernisTypen`/`u.huerde` fuehrt, s.
+            // Kopfkommentar von stepClimbing).
+            u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
             u.durchbruch=(u.durchbruch||0)+1;
             if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
             schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
@@ -27995,6 +28033,9 @@
           // finden, den Griff neu setzen. Wer wendig ist, haengt kuerzer.
           if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
           if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
+          // Derselbe Bucher wie oben, jetzt mit dem endgueltigen (WENDIGKEIT-korrigierten)
+          // Stolper-Wert des Sturzes.
+          u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
           u.gestolpert++;
           if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
           // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
@@ -28283,7 +28324,21 @@
             feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
               +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
           } else {
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+            // ZEITSKALA-FIX (Chris' Fund 22.09., zwei Screenshots desselben Rennens: Ticker
+            // "14,8 s.", Endstand "2:22,4 min." fuer denselben Laeufer). Der Ticker schrieb
+            // hier `rennT` roh in SIMULATIONSSEKUNDEN, waehrend der Endstand (bahnRangliste()/
+            // die Wertungstabelle, `:26464` `fmt:fmtRealZielzeit`) laengst durch `bahnZeit()`
+            // + `bahnRealSek()`/`zeitFaktor()` UND `bahnZeitText()`s Minutenformat ging. Bei
+            // ZEIT_DEHNUNG.climbing=4,38 macht das den Faktor-~10-Unterschied zwischen "14,8 s"
+            // und "2:22,4 min" — kein Rundungsfehler, sondern zwei verschiedene Massstaebe auf
+            // demselben Bildschirm. Betrifft nach demselben Codepfad (dieser `else`-Zweig läuft
+            // fuer jede Bahn ohne `startAbstand` und ohne `BA().staffel`) auch Spurt und
+            // Takeshi's Castle — Staffel hat oben ihren eigenen, bereits korrekten Zweig
+            // (`fmtZielzeit(rennT)`, Zeile ~28268), Time-Trial den `if(BA().startAbstand)`-Zweig
+            // direkt darueber (schon vor dieser PR korrekt). `fmtZielzeit` ist dieselbe
+            // Funktion, die auch der Staffel-Zieleinlauf und die Wertungstabelle benutzen: EIN
+            // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
+            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".");
           }
         }
       }
@@ -29173,7 +29228,12 @@
       // und die Ziffern stehen ohnehin in der Wertungstabelle daneben. Auf der geraden
       // Bahn (Spurt, Staffel, ...) bleibt die Zeile, dort stehen die Fertigen einzeln
       // gestaffelt rechts neben der Ziellinie.
-      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+bahnZeit(u).toFixed(1)+" s"+
+      // ZEITSKALA-FIX (derselbe Fund wie beim Ticker oben, s. dortiger Kommentar): auch
+      // dieses Etikett am Zieleinlauf schrieb `bahnZeit(u)` roh in Simulationssekunden.
+      // `fmtZielzeit` liefert dieselbe gestreckte, minutenfaehige Zeit wie Ticker und
+      // Wertungstabelle — inklusive der Einheit, das frueher separat angehaengte " s" faellt
+      // deshalb weg.
+      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
         (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
