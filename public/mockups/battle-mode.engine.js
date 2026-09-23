@@ -14591,6 +14591,27 @@
   // sieht das aus wie jede andere Buehnen-Disziplin, unveraendert.
   const ISPY_REAKTION_BASIS=0.30, ISPY_REAKTION_TEAMGEIST_K=0.006;
 
+  // REAKTIONSKANAL-UMBAU (22.09., docs/design/i-spy-fable-reaktionskanal-22-09.md Abschnitt 6,
+  // Chris' Entscheidung: "Hinweis mit echtem Vorteil", Ausloeser bleibt Tresor+Akten/S-c wie
+  // oben, KEIN Filter auf Stufe 3). Der bisherige eigene Laeufer-Zweig (Spuerwurf gezogen und
+  // VERWORFEN, Ziel ohne eigene Sichtpruefung erzwungen -- der Bestgeeignete bekam einen
+  // geschenkten Zug, ausgeloest von fremder Hand) entfaellt ersatzlos. Der bestimmte Laeufer
+  // macht jetzt denselben Zug wie jeder andere (eigener Spuerwurf, EV-Wahl unter allen
+  // sichtbaren Truhen, F2) -- die EINZIGE Aenderung ist seine Sichtschwelle fuer die GENAU
+  // eine gemeldete Zieltruhe (`zielIdx`), die um ISPY_HINWEIS_BONUS erhoeht ist: ein Hinweis
+  // ("er wird alarmiert und findet sie wahrscheinlicher"), kein Freilos ("er bekommt sie
+  // garantiert") -- er kann scheitern, und seine eigene EV-Wahl kann eine andere Truhe
+  // bevorzugen, wenn die fuer ihn lohnender ist. `rr()`-Verbrauch je Teilnehmer je Tick bleibt
+  // exakt 1 (Spueren) + 2 (Knacken), identisch zum alten Laeufer-Zweig (Handbuch-Falle 17).
+  //
+  // DOSIS GEMESSEN, NICHT GERATEN (Fable, Abschnitt 5.1, Auslöser Tresor+Akten wie hier):
+  // Bonus 0 (nur K-D, kein Sichtvorteil) → +0,024 rho · 0,15 (GEWAEHLT) → +0,017 · 0,30 → +0,014
+  // · 1,0 (volle Sicht, Opus woertlich) → +0,011 -- monoton fallend mit der Dosis. Der alte
+  // Laeufer-Zweig (Zuteilung ohne Sichtwurf, auch zu Akten und nachgewachsenen Notizen) mass
+  // 0,730 gegen 0,741 fuer 0,15. Nicht erneut fragen, wenn die Zahl in ein paar Wochen wieder
+  // niedrig aussieht -- das IST die Obergrenze, die die Rangtreue bei diesem Ausloeser vertraegt.
+  const ISPY_HINWEIS_BONUS=0.15;
+
   const ISPY_PUNKTWERT={1:10,2:25,3:60};
   const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
   // KNACKEN-FORMEL (Konzept 1.4): p = clamp(0,08; 0,95; 0,15 + K·0,011 − (Stufe−1)·0,22 +
@@ -14949,43 +14970,22 @@
       // Reset VOR dem eigenen Zug: `_arbeitetTresor` beschreibt den Ausgang DIESES Ticks
       // (fuer die Laeufer-Auswahl im NAECHSTEN), nicht den des vorherigen.
       u._arbeitetTresor=false;
-      if(u===laeufer){
-        const t=truhen.find(x=>x.idx===zielIdx);
-        if(t&&!t.leer&&versucheZiel<2){
-          // SPUEREN-SLOT, FEST VERBRAUCHT (Handbuch-Falle 17): der Laeufer sucht nicht
-          // selbst — er eilt direkt zur Ziel-Truhe (R-2) — aber der rr()-Verbrauch je
-          // Teilnehmer bleibt exakt 1 (Spueren) + 2 (Knacken), wie bei jedem anderen Zug.
-          rr();
-          const weg=ispyBesterWeg(u,t);
-          const knackwurf=(rr()+rr())/2;
-          const ermued=Math.max(ISPY_AUSDAUER_BODEN,
-            1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
-          const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,weg.p*ermued));
-          versucheZiel++;
-          if(t.stufeAktuell===3)u._arbeitetTresor=true;
-          if(knackwurf<chance){
-            const punkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor);
-            u.runden.push({punkte, ereignis:art.erfolgWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
-            u.funde[t.stufeAktuell]=(u.funde[t.stufeAktuell]||0)+1;
-            t.leer=true; belegt.add(t.idx);
-            merke(t,true);
-          } else {
-            t.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, t.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
-            const teilpunkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*ISPY_TEILPUNKTE_ANTEIL);
-            u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
-            if(versucheZiel>=2)belegt.add(t.idx);
-            merke(t,false);
-          }
-          continue;
-        }
-        // Ziel schon weg (leer/ausgereizt) — die Reaktion kommt zu spaet, der Laeufer
-        // macht wie jeder andere seinen eigenen, normalen Zug (kein verlorener Zug: 3.3).
-      }
-      // NORMALER ZUG (PR 1, mit EINER Ausnahme: `frei()` toleriert `zielIdx` zweimal).
+      // NORMALER ZUG FUER ALLE (Reaktionskanal-Umbau 22.09., s. Kommentar bei
+      // ISPY_HINWEIS_BONUS): der fruehere eigene Laeufer-Zweig ist ersatzlos entfallen. Auch
+      // der bestimmte Laeufer wuerfelt hier seine eigene Sicht (`x`/`sieht2`/`sieht3`) und
+      // waehlt per EV (F2) unter allen Truhen, die er sieht -- die einzige Ausnahme ist der
+      // `+ISPY_HINWEIS_BONUS` auf seine Sichtschwelle fuer GENAU die gemeldete Zieltruhe
+      // (`zielIdx`), s. `sichtbarF` unten. `frei()` toleriert `zielIdx` weiterhin zweimal
+      // (K-D, PR 2, unveraendert) -- unabhaengig davon, ob der erste/zweite Versuch vom
+      // Laeufer oder einem normal waehlenden Teamkollegen kommt.
+      const istLaeufer=(u===laeufer);
       const x=rr();
       const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
       const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
-      const sichtbarF=(t)=>t.stufeAktuell===1||(t.stufeAktuell===2&&x<sieht2)||(t.stufeAktuell===3&&x<sieht3);
+      const hinweisBonus=(t)=>(istLaeufer&&t.idx===zielIdx)?ISPY_HINWEIS_BONUS:0;
+      const sichtbarF=(t)=>t.stufeAktuell===1
+        ||(t.stufeAktuell===2&&x<sieht2+hinweisBonus(t))
+        ||(t.stufeAktuell===3&&x<sieht3+hinweisBonus(t));
       const frei=(t)=>!belegt.has(t.idx)||(t.idx===zielIdx&&versucheZiel<2);
       const kandidaten=truhen.filter(t=>!t.leer&&frei(t)&&sichtbarF(t));
       const bewertet=kandidaten.map(t=>{
@@ -14994,12 +14994,21 @@
           naeher:(u.side===0?t.x:(1-t.x))};
       }).sort((a,b)=>(b.ev-a.ev)||(b.weg.p-a.weg.p)||(a.naeher-b.naeher));
       const wahl=bewertet[0]||null;
+      // r.hinweis (NEU, additiv, nur fuer ispyTickerZeile()/den Ticker): dieser Teilnehmer
+      // war in DIESEM Tick als Laeufer bestimmt -- unabhaengig davon, ob er der gemeldeten
+      // Truhe gefolgt ist. Fliesst NIE in wert()/u.summe (wie u.reaktionen).
+      // r.reaktion (bestehend aus PR 2, jetzt praeziser): WAHR nur, wenn er die gemeldete
+      // Zieltruhe TATSAECHLICH gewaehlt hat -- das haelt stepSchatzsuche() (gestrichelte
+      // Linie + Ausrufezeichen) und den alarm-Ton ehrlich (Fable, Abschnitt 6.3).
+      const folgtZiel=!!(wahl&&wahl.t.idx===zielIdx);
+      const rHinweis=istLaeufer||undefined;
+      const rReaktion=(istLaeufer&&folgtZiel)||undefined;
       if(wahl){
         if(wahl.t.idx===zielIdx){ versucheZiel++; if(versucheZiel>=2)belegt.add(wahl.t.idx); }
         else belegt.add(wahl.t.idx);
       }
       const wurf2=(rr()+rr())/2;
-      if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort}); continue; }
+      if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort, hinweis:rHinweis}); continue; }
       const ziel=wahl.t, zielWeg=wahl.weg;
       const ermued=Math.max(ISPY_AUSDAUER_BODEN,
         1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
@@ -15007,14 +15016,16 @@
       if(ziel.stufeAktuell===3)u._arbeitetTresor=true;
       if(wurf2<chance){
         const punkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor);
-        u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx,
+          reaktion:rReaktion, hinweis:rHinweis});
         u.funde[ziel.stufeAktuell]=(u.funde[ziel.stufeAktuell]||0)+1;
         ziel.leer=true;
         merke(ziel,true);
       } else {
         ziel.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, ziel.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
         const teilpunkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor*ISPY_TEILPUNKTE_ANTEIL);
-        u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx,
+          reaktion:rReaktion, hinweis:rHinweis});
         merke(ziel,false);
       }
     }
@@ -15090,17 +15101,27 @@
   // herbei" ist deshalb wahr, auch ohne den Vorgaenger beim Namen zu nennen.
   function ispyTickerZeile(u,r){
     const ereignis=r.ereignis;
+    // HINWEIS OHNE FOLGE (NEU, additiv, Reaktionskanal-Umbau 22.09., Fable Abschnitt 6.3):
+    // `r.hinweis` markiert jeden Teilnehmer, der in diesem Tick als Laeufer bestimmt war;
+    // `r.reaktion` (bestehend) ist nur dann WAHR, wenn er der gemeldeten Truhe auch wirklich
+    // gefolgt ist. Wer bestimmt wurde, aber etwas anderes tut (oder gar nichts mehr findet),
+    // bekommt hier eine eigene, ehrliche Zeile statt einer Linie zu einer Truhe, zu der er
+    // nicht geht -- Chris' "kann es verhauen", eine Stufe frueher als am Schloss.
     if(r.art==null){
       // KEIN ZIEL DIESEN TICK (baueSchatzsuche(): "punkte:0, ereignis:art.failWort" ohne
       // fundort/art/stufe, wenn keine Truhe frei/sichtbar war) — es gibt nichts zu
       // beschreiben ausser dem Fehlschlagwort selbst.
+      if(r.hinweis)return u.n+" hört den Jubel drüben — findet aber nichts mehr rechtzeitig ("+ereignis+").";
       return u.n+" — "+ereignis+" (kein Fund in Sicht).";
     }
     const artLabel=ISPY_ART_LABEL[r.art]||r.art;
     const stufe=r.stufe||1;
     const erfolg=ereignis===BUEHNE_ART["i-spy"].erfolgWort;
+    const hinweisOhneFolge=r.hinweis&&!r.reaktion;
     if(erfolg){
-      const praefix=r.reaktion?u.n+" eilt herbei und untersucht ":u.n+" untersucht ";
+      const praefix=r.reaktion?u.n+" eilt herbei und untersucht "
+        :hinweisOhneFolge?u.n+" hört den Jubel drüben, bleibt aber bei seiner eigenen Aufgabe und untersucht "
+        :u.n+" untersucht ";
       return praefix+(ISPY_STUFE_AKK[stufe]||"den Fund")+" ("+artLabel+", Stufe "+stufe+") — "
         +ereignis+"! +"+r.punkte;
     }
@@ -15108,7 +15129,9 @@
     // unabhaengig vom Deckel (ISPY_FORTSCHRITT_DECKEL) -- "+15%" ist deshalb immer richtig,
     // s. Kommentar bei den Konstanten oben. ISPY_STUFE_AN traegt die Praeposition schon
     // mit ("am Tresor" ist "an dem Tresor", nicht "an" + "dem Tresor" zusammengesetzt).
-    const praefix=r.reaktion?u.n+" eilt herbei, scheitert aber ":u.n+" scheitert ";
+    const praefix=r.reaktion?u.n+" eilt herbei, scheitert aber "
+      :hinweisOhneFolge?u.n+" hört den Jubel drüben, bleibt aber bei seiner eigenen Aufgabe — scheitert "
+      :u.n+" scheitert ";
     return praefix+(ISPY_STUFE_AN[stufe]||"am Fund")+" ("+artLabel+", Stufe "+stufe+") — "
       +ereignis+"; jetzt (weiter) angebrochen (+15% für den Nächsten). +"+r.punkte;
   }
@@ -32862,7 +32885,7 @@
         funde:{...u.funde}, reaktionen:u.reaktionen||0,
         // "runden" nur die additiven Anzeigefelder, keine internen _-Felder.
         runden:u.runden.map(r=>({punkte:r.punkte,ereignis:r.ereignis,art:r.art||null,
-          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion}))}));
+          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion,hinweis:!!r.hinweis}))}));
       M.zurueck(g);
       return {disziplin:"i-spy", teilnehmer:teiln};
     },
