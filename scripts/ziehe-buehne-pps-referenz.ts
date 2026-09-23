@@ -92,11 +92,23 @@ const DISZIPLINEN = {
     wertHerkunft: "MOTOREN.eiskunstlauf.wert() = u.summe, s. WERTUNG_AUFTRITT()",
     rezeptOrt: "BUEHNE_ART.eiskunstlauf.rezept, WERTUNG_AUFTRITT()",
   },
+  // GAUNTLET-UMBAU (22.09., PR #1015): `BUEHNE_ART.breaking` traegt seither `gauntlet:true`
+  // statt der generischen Auftritt-Schleife -- `chassis:"gauntlet"` HIER ist reine
+  // Dokumentation (s. Kommentar am `DISZIPLINEN`-Objekt oben, "NUR DIESE MENGE ENTSCHEIDET"),
+  // sonst wuerde `schreibeErgebnis()` unten faelschlich "spieleBuehneAuftritt" ins `hinweis`-
+  // Feld schreiben, obwohl `runArenaFixtures()` (arena-headless-runner.ts,
+  // `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS`) tatsaechlich `spieleBuehneGauntlet()` ruft. Der
+  // ROHE WERT bleibt unveraendert `u.summe` (baueGauntlet() fuehrt dieselbe Punktesumme wie
+  // vorher, nur ueber eine Kette statt fester Durchgaenge, s. dortiger Kommentar) -- deshalb
+  // bleibt `wertHerkunft` unveraendert bei `WERTUNG_AUFTRITT()` (die Tabellen-/Sortierfunktion
+  // liest u.summe fuer Auftritt UND Gauntlet gleichermassen). `rezeptOrt` nennt zusaetzlich
+  // `gauntletRunde()`/`baueGauntlet()`, wo die Sub-Skills (GRUNDLAGE/TECHNIK/...) tatsaechlich
+  // in Punkte/Erfolgschance/HP-Verlust uebersetzt werden.
   breaking: {
-    chassis: "auftritt",
+    chassis: "gauntlet",
     katalogStandardgroesse: 4,
     wertHerkunft: "MOTOREN.breaking.wert() = u.summe, s. WERTUNG_AUFTRITT()",
-    rezeptOrt: "BUEHNE_ART.breaking.rezept, WERTUNG_AUFTRITT()",
+    rezeptOrt: "BUEHNE_ART.breaking.rezept, gauntletRunde()/baueGauntlet()",
   },
   wettessen: {
     chassis: "auftritt",
@@ -354,7 +366,13 @@ function schreibeErgebnis(
 ) {
   const konfig = DISZIPLINEN[disziplin];
   const motorFunktion =
-    konfig.chassis === "bahn" ? "spieleBahn" : konfig.chassis === "duell" ? "spieleBuehneDuell" : "spieleBuehneAuftritt";
+    konfig.chassis === "bahn"
+      ? "spieleBahn"
+      : konfig.chassis === "duell"
+      ? "spieleBuehneDuell"
+      : konfig.chassis === "gauntlet"
+      ? "spieleBuehneGauntlet"
+      : "spieleBuehneAuftritt";
   const feldgroessen: Record<string, unknown> = {};
   for (const n of FELDGROESSEN) {
     const ergebnis = ergebnisseNachGroesse.get(n);

@@ -13278,14 +13278,63 @@
       // in den beiden nicht erfolgsgebundenen Rollen (SPITZENMOMENT, PUBLIKUM, WAGNIS)
       // und blieb bei 11,7 %. Jetzt traegt Torment auch die Erfolgschance mit, Dexterity
       // bleibt nur dort, wo die Matrix ihm ueberhaupt ein Gewicht gibt.
+      //
+      // GAUNTLET-KALIBRIERRUNDE (23.09., Review-Fund auf PR #1015): dieses Rezept ist eine
+      // WOERTLICHE Extraktion aus der alten Auftritt-Mechanik (s. gauntletRunde()-Kommentar
+      // oben) und trug deren vorbestehende Pp-Abweichung (26,8 Pp) unveraendert in den
+      // Gauntlet — dort gemessen 32,5 Pp (n=6, systematisch zu guenstig, s. CLAUDE.md/
+      // Handbuch 3.2: kleine Stichproben LESEN NIEDRIGER als der wahre Wert, nie hoeher).
+      // URSACHE, NACHGEDACHT VOM FORMELBAU HER (nicht nur vom Rezept): TECHNIK/NERVEN
+      // speisen `erfolg` in gauntletRunde() — und Erfolg entscheidet nicht nur ueber
+      // GAUNTLET_SCHADEN_ERFOLG/FAIL (10 vs. 24 HP), sondern damit auch, wie lange ein
+      // Ueberlebender im Ring bleibt und WIE VIELE eigene Zuege (also wie viel `u.summe`)
+      // er ueberhaupt noch sammelt — ein Attribut in TECHNIK/NERVEN wird also nicht nur
+      // ueber seinen Formel-Koeffizienten gehebelt, sondern zusaetzlich ueber die
+      // Ueberlebensdauer VERSTAERKT (exakt der Mechanismus, der oben schon Dexterity bei
+      // nur 2 Matrixpunkten auf 26,2 % trieb). Wille sass VOR dieser Runde in FUENF der
+      // sieben Kanaele (GRUNDLAGE, TECHNIK, NERVEN, SPITZENMOMENT, PUBLIKUM) — darunter
+      // BEIDE erfolgsgebundenen — und nahm sich dadurch einen Grossteil dieses Hebels,
+      // obwohl die Matrix ihm mit 28 nur den ERSTEN Platz gibt, nicht die alleinige Rolle.
+      // Torment (22) sass dagegen in KEINEM linearen, immer wirkenden Kanal (GRUNDLAGE) und
+      // Power/Determination (je 10) kamen praktisch nur in den am staerksten verduennten
+      // Kanaelen vor (SPITZENMOMENT/WAGNIS mit Faktor 0,35*(0,4+WAGNIS*0,006), s. Formel).
+      //
+      // NEUES REZEPT, PRINZIP STATT FEINJUSTAGE: jedes Attribut bekommt HOECHSTENS EINEN
+      // der beiden erfolgsgebundenen (verstaerkten) Kanaele TECHNIK/NERVEN, nie beide —
+      // Wille (28) und Torment (22), die beiden Matrix-Hoechstwerte, teilen sich die beiden
+      // Kanaele zwischen NERVEN und TECHNIK, statt dass Wille beide dominiert. GRUNDLAGE
+      // (immer wirkender Basiswert, Koeffizient 0,7) und PUBLIKUM (immer wirkender
+      // Festbonus, Koeffizient 0,12) bilden jetzt zusammen die "sichere", nicht durch
+      // Ueberlebensdauer verstaerkte Basis und sind zueinander proportional zur Matrix
+      // gesetzt (Wille:Torment:Health:Stamina 28:22:18:8 in GRUNDLAGE, 28:22 in PUBLIKUM).
+      // Power (10) bekommt in SPITZENMOMENT/WAGNIS jetzt sein eigenes Hauptgewicht statt
+      // Torments drittem/viertem Kanal, Determination (10) bekommt neben TECHNIK zusaetzlich
+      // AUSDAUER als zweiten, unverstaerkten Kanal. Dexterity (2) bleibt wie zuvor NUR in
+      // WAGNIS, dem am staerksten verduennten Kanal — genau die Lehre aus der vorigen Runde.
+      // ZWEITER SCHLIFF (23.09., Nachmessung n=4): erster Anlauf des neuen Rezepts (s.
+      // vorherige Fassung im Git-Verlauf) mass 26 Pp -- Torment las 30 % gegen ein
+      // Matrixgewicht von 22 (+8,0), Health 13,2 % gegen 18 (-4,8), Power 7,8 % gegen 10
+      // (-2,2). Torment aus GRUNDLAGE/PUBLIKUM/TECHNIK etwas zurueckgenommen, der frei
+      // werdende Anteil auf Health (GRUNDLAGE) und Power (TECHNIK zusaetzlich zu
+      // SPITZENMOMENT/WAGNIS) verteilt.
+      //
+      // DRITTER SCHLIFF (23.09., Nachmessung n=4): der zweite Anlauf (s. Git-Verlauf) mass
+      // 16,7 Pp (deutlich unter der 25er-Schranke) -- Power hatte jetzt ueberzogen (16,2 %
+      // gegen 10, +6,2), weil es in DREI Kanaelen (SPITZENMOMENT/TECHNIK/WAGNIS) zu stark
+      // vertreten war. Power in allen drei Kanaelen zurueckgenommen (zugunsten von Wille in
+      // SPITZENMOMENT, Determination in TECHNIK, Dexterity in WAGNIS), Stamina zusaetzlich
+      // ein Stueck GRUNDLAGE gegeben (war mit -2,4 die zweitgroesste verbleibende Luecke).
+      // `n=4` ist eine bewusst kleine Stichprobe fuer die Kalibrierung selbst (schnelle
+      // Iteration in dieser stark ausgelasteten Sandbox); die Abnahme-Pflichtzahl fuer die
+      // PR-Beschreibung kommt aus zwei groesseren, unabhaengigen Saatstaemmen.
       rezept:{
-        GRUNDLAGE:    {will:45,health:30,stamina:25},
-        SPITZENMOMENT:{torment:45,power:35,will:20},
-        TECHNIK:      {torment:35,determination:35,will:30},
-        PUBLIKUM:     {torment:50,will:50},
-        NERVEN:       {will:40,determination:30,health:30},
-        AUSDAUER:     {stamina:45,health:35,will:20},
-        WAGNIS:       {torment:50,power:30,dexterity:20}
+        GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
+        SPITZENMOMENT:{power:55,will:45},
+        TECHNIK:      {torment:50,power:15,determination:35},
+        PUBLIKUM:     {will:60,torment:40},
+        NERVEN:       {will:50,health:50},
+        AUSDAUER:     {stamina:65,determination:35},
+        WAGNIS:       {power:40,dexterity:60}
       }
     },
 
