@@ -1,5 +1,35 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Elfter Nachtrag 23.09. — Time-Trial: Pp-Abweichung auf Rezept-Ebene behoben.** TECHNIK/WUCHT
+standen seit dem K5-Hindernisse-Umbau (07.09., `hindernisse:[]`) bei 0 % gemessenem Einfluss —
+der Huerden-Sturz-Zweig in `stepSpurt()`, ihr einziger Leser, laeuft seither nie mehr, obwohl
+die gesperrte Matrix ihnen 25 Pp (Dexterity ueber TECHNIK) bzw. 3 Pp (Torment ueber WUCHT)
+zuweist. Baseline **68,7 Pp** (`messe-arena-einfluss.mjs time-trial 48`) — die hoechste aller
+zwanzig Disziplinen. Fuenf Kalibrierschritte, ausschliesslich im Rezept
+(`BAHN_ART["time-trial"]`, `public/mockups/battle-mode.engine.js`), Matrix unangetastet: (1)
+`kurveSkill` liest TECHNIK statt WENDIGKEIT (Kurve ist die technischere Gelaendeart), (2) WUCHT
+bekommt einen Nebenweg im Steigungs-Kanal (`bergNebenSkill`/`bergNebenAnteil`, Primaerweg bleibt
+ENDTEMPO — dasselbe Primaer-/Nebenweg-Muster, das Chris am 21.09. fuer I-Spy eingefuehrt und
+ausdruecklich fuers Gesamtprojekt verallgemeinert hat), (3) ANTRITT/ENDTEMPO/STEHEN verlieren
+Speed/Stamina-Anteile zugunsten von Dexterity/Awareness, (4) `bergNebenAnteil` 0,30→0,40, (5)
+neuer, streckenweiter (zonen-unabhaengiger) achter Rezept-Eintrag GESPUER
+({dexterity:58,awareness:42}) in einem neuen `tempoVon()`-Faktor, weil TECHNIK/WENDIGKEIT/WUCHT
+nur an den Gelaendezonen (~45 % der Strecke) wirken, Speed/Stamina ueber ANTRITT/ENDTEMPO/STEHEN
+aber die GANZE Strecke abdeckten.
+
+**Ergebnis, drei unabhaengige Saatstroeme:** 68,7 → 66,4/67,0 (Schritt 1 allein) → 38,0/34,6
+(Schritte 1-3) → 35,3 (Schritt 4, einfach gemessen) → **17,8/18,1/19,4 Pp** (voller Fix,
+`n=48`, PR-eigene Straenge plus ein dritter, unabhaengiger Reviewer-Strang) — klar unter der
+25er-Schranke. Groesster Restausschlag durchgaengig Stamina (+6,7 bis +7,4), vermutlich ueber
+die Ermuedungs-/Reservenlogik `KRAFT_VON`/`pusteRegen` (liest STEHEN+ROBUST, beide
+stamina-lastig) — nicht behoben, weil die Schranke bereits erreicht ist. Rangtreue
+(`miss-alle-disziplinen.mjs 24 time-trial`, kaderfest): **rho je Spiel 0,929, Saison 0,902**
+(vorher 0,828/0,832) — deutlich verbessert, kein Zielkonflikt. Isolationsmessung bestaetigt: die
+uebrigen drei Bahn-Chassis (spurt, staffel, takeshis-castle, climbing) bit-identisch
+unveraendert, da `kurveSkill`/`bergNebenSkill`/`bergNebenAnteil`/`gespuerSkill`/`gespuerGrad`
+ausschliesslich bei `time-trial` gesetzt sind. `data/generated/time-trial-pps-referenz.json`
+neu gezogen (nur Provenienz, Werte rein rangpunktebasiert unveraendert).
+
 **Zehnter Nachtrag 23.09. — Breaking-Gauntlet: Pp-Abweichung nachgezogen.** Fortsetzung des
 Neunten Nachtrags direkt darunter: die dort offene Nachmessung wurde jetzt geholt (`n=4`, zwei
 unabhaengige Saatstaemme — Standardseeds und der im Handbuch 3.2 dokumentierte Alternativseed
