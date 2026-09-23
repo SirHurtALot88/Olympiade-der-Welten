@@ -23259,6 +23259,30 @@
   // Abschnitt noch nicht gelaufen hat, hat keine Leistung (null): erst der Aktive, dann die
   // Wartenden nach Bein — vorlaeufig, wie die Streckensortierung der anderen Bahnen.
   function bahnLeistung(u){ return u.etappenZeit==null?null:-(u.etappenZeit)+u.wechselKonto; }
+  // LAUFENDER ETAPPEN-RANG WAEHREND DES RENNENS (Chris, 22.09.: "bei der staffel am besten
+  // noch die ranks anzeigen fuer alle die schon gelaufen sind"). Bis hierher stand der Rang
+  // eines Laeufers NUR im Endstand-Overlay (renderEndstandBahn, Spalte "Rang") — waehrend
+  // des Rennens zeigte die Wertungstabelle fuer einen fertigen Laeufer bloss "uebergeben"
+  // und die Kaderkachel seinen (fuer ihn bedeutungslosen) Streckenanteil. Wer von den
+  // schon gelaufenen Etappen die schnellste war, sah man erst nach zweieinhalb Minuten.
+  //
+  // Der Rang ist der Index in bahnRangliste().reihe — DIESELBE Sortierung nach
+  // bahnLeistung(), die auch das Endstand-Overlay und MOTOREN.staffel.wert() lesen. Weil
+  // bahnRangliste alle Laeufer MIT Leistung vor alle ohne stellt, ist der Index eines
+  // gelaufenen Laeufers zugleich sein Rang unter allen bisher gelaufenen beider Seiten;
+  // `von` sagt, wie viele das gerade sind (waechst mit jeder Uebergabe, am Ende zwoelf).
+  // Der Rang eines Gelaufenen aendert sich nur noch, wenn ein WEITERER fertig wird und sich
+  // vor ihn schiebt — seine eigene Leistung ist mit der Uebergabe abgeschlossen (beide
+  // Wechsel, an denen er beteiligt ist, sind dann verbucht, s. wechselKonto in stepSpurt).
+  // Reine Anzeige, einmal je Render aufgerufen (Map statt zwoelf Einzelsuchen): liest
+  // nur, schreibt nichts, aendert weder Sortierung noch Punkte — rho bleibt identisch
+  // (nachgemessen, s. PR-Beschreibung).
+  function staffelEtappenRaenge(){
+    const raenge=new Map(); let von=0;
+    if(!BA().staffel)return {raenge,von};
+    bahnRangliste().reihe.forEach((u,i)=>{ if(bahnLeistung(u)!=null){raenge.set(u.id,i+1); von++;} });
+    return {raenge,von};
+  }
   // EIGENE LAUFZEIT statt Zieluhrzeit (Zeitfahren, K5-Umsetzung 07.09., Recherche
   // Abschnitt 4.2). `u.fertig` ist die absolute Rennuhr-Zeit; mit gestaffeltem Start
   // (`u.startT`) misst sie nicht mehr die Leistung, sondern auch, wann jemand losfuhr.
@@ -26203,7 +26227,12 @@
   // verloren ging. `laufAnteil()` (oben) rechnet den Fortschritt im EIGENEN Abschnitt
   // bereits fuer die Kamera vor — hier wiederverwendet statt zweimal gebaut.
   function WERTUNG_STAFFEL(art){
-    const zeilen=()=>LAEUFER.map(u=>({n:u.n,side:u.seite,raus:false,eig:u.eig,u}));
+    // Rang je Zeile EINMAL je Render mitgeben (staffelEtappenRaenge oben), statt ihn in
+    // der Stand-Spalte fuer jede der zwoelf Zeilen neu aus bahnRangliste() zu suchen.
+    const zeilen=()=>{
+      const {raenge,von}=staffelEtappenRaenge();
+      return LAEUFER.map(u=>({n:u.n,side:u.seite,raus:false,eig:u.eig,u,rang:raenge.get(u.id)??null,gelaufen:von}));
+    };
     return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
       spalten:[
         {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
@@ -26223,10 +26252,17 @@
           farbe:v=>v==="leer"?"var(--crit)":null},
         {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
           wert:z=>z.u.fertig!=null?+bahnRealSek(z.u.fertig).toFixed(1):null, fmt:fmtRealZielzeit},
-        {id:"stand",kopf:"Stand", wert:z=>z.u.fertig!=null?"Ziel":z.u.durch?"übergeben":z.u.aktiv?"läuft":"wartet",
-          farbe:v=>v==="Ziel"?"var(--ok)":null},
+        // STAND = LAUFENDER RANG (22.09., s. staffelEtappenRaenge): wer seine Etappe hinter
+        // sich hat, steht hier nicht mehr als "uebergeben"/"Ziel", sondern mit seinem Rang
+        // unter allen bisher gelaufenen Laeufern beider Seiten — "Rang 2/7" heisst: zweit-
+        // schnellste von sieben bisher beendeten Etappen. Der Nenner waechst mit jeder
+        // Uebergabe; derselbe Rang steht am Ende im Endstand-Overlay. Rang 1 gruen, wie
+        // vorher "Ziel" — die eine Zeile, die man im Vorbeischauen sucht.
+        {id:"stand",kopf:"Stand", titel:"laufender Rang der Etappenleistung unter allen Läufern beider Teams, die ihre Etappe schon beendet haben (Rang / bisher gelaufen) — aktualisiert sich mit jeder weiteren Übergabe",
+          wert:z=>z.rang!=null?"Rang "+z.rang+"/"+z.gelaufen:z.u.aktiv?"läuft":"wartet",
+          farbe:v=>v.startsWith("Rang 1/")?"var(--ok)":null},
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich)."};
+      fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich). „Stand\" zeigt für jeden, der seine Etappe schon gelaufen ist, laufend seinen Rang unter allen bisher gelaufenen Läufern beider Teams — dieselbe Rangfolge, die am Ende im Endstand steht."};
   }
 
   // WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5, PM-Briefing
@@ -30677,6 +30713,9 @@
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
+    // Staffel: laufende Etappen-Raenge einmal je Aufruf (s. staffelEtappenRaenge), nicht
+    // je Kachel — fuer jede andere Disziplin eine leere Map, die unten nie gelesen wird.
+    const staffelRang=istBahn(disc)?staffelEtappenRaenge():{raenge:new Map(),von:0};
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
@@ -30707,10 +30746,19 @@
           // Bahn unter den Fuessen schon zeichnet (s. zeichneSpurt, "der Ersatz fuer den
           // Lebensbalken des Kampfes") — die Kachel zeigt jetzt dieselbe Groesse wie das
           // Feld, statt einer invertierten Fortschrittsanzeige.
+          // STAFFEL: RANG STATT STRECKENANTEIL (22.09., s. staffelEtappenRaenge). Der
+          // Streckenanteil eines Staffellaeufers ist nur fuer den AKTIVEN eine Aussage —
+          // ein Wartender steht bei seinem Startpunkt (z.B. "50 %", ohne einen Meter
+          // gelaufen zu sein), ein Fertiger bei seinem Uebergabepunkt. Jetzt: der
+          // laufende Rang fuer den Gelaufenen, der Anteil fuer den Aktiven, "wartet"
+          // fuer den Rest — dieselbe Zahl wie in der Stand-Spalte der Wertungstabelle.
           .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
-                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+                    zusatz:BA().staffel
+                      ? (staffelRang.raenge.has(x.id)?"Rang "+staffelRang.raenge.get(x.id)+"/"+staffelRang.von
+                         :x.aktiv?Math.round(x.pos*100)+" %":"wartet")
+                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
             // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
