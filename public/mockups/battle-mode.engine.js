@@ -14652,6 +14652,96 @@
   // war Stufe 2 -> Start 1.
   const ISPY_NACHFUELL_START={0:0,4:0, 1:1,3:1, 2:3, 6:0,8:0, 7:1, 5:1,9:1, 10:0,11:0};
 
+  // GEWICHTETER SPAWN-ORT-RANDOMIZER, REIN VISUELL (Chris 22.09.: "vor allem auch mit
+  // assets verschiedenen maps unterschiedlichen orten fuer die assets wo sie spawnen —
+  // gewichteter randomizer"; Bauauftrag mit "Nachbesserung" nach dem Opus-Gegencheck 2
+  // (docs/design/i-spy-opus-gegencheck-2-22-09.md, Abschnitt 5), der die LITERALE Fassung
+  // (eine gewuerfelte Zuordnung, WELCHER Fundort-INHALT an welcher Position liegt) klar
+  // verworfen hat: rho 0,730->0,680 (5/5 Paarungen schlechter), Budget-Pp 10,8->27,8,
+  // Spiegeltest 53,5:46,5->66,5:33,5. URSACHE (Gegencheck 2, Abschnitt 5.3): die Position
+  // ist in dieser Mechanik NICHT neutral — sie bestimmt ueber `idx` (ISPY_NACHFUELL_START/
+  // ISPY_BLOECKE/ISPY_MITTE_IDX oben) die Nachfuellphase UND den `naeher`-Tie-Break
+  // (":14993" ff., `t.x`). Jede Variante, die dem WUERFEL erlaubt, diese `idx`-gebundenen
+  // Groessen zu verschieben, verschiebt zwangslaeufig mit — genau das hat der Gegencheck
+  // gemessen.
+  //
+  // NACHBESSERUNG HIER: der Randomizer aendert AUSSCHLIESSLICH, WO ein Fundort GEZEICHNET
+  // wird (Bildschirmkoordinate fuer Moebel/Lauf-/Suchziel in bodenSchatzsuche()/
+  // stepSchatzsuche()) — NIE, welcher `idx` welche Raetselart/Stufe/Nebenweg/Block/
+  // Nachfuellfolge traegt (die art.fundorte-Eintraege selbst UND `truhe.x` aus
+  // ispyBaueRaum(), das der `naeher`-Tie-Break liest, bleiben BYTE-IDENTISCH zu vorher).
+  // Vier Kartenlayouts (Isometrien des Einheitsquadrats — Drehung erhaelt automatisch die
+  // Abstaende, also KEINE Ueberlappungs-Gefahr, ohne von Hand zwoelf neue Koordinaten zu
+  // entwerfen), gewichtet gezogen: Standard bleibt die haeufigste ("Wiedererkennbarkeit vor
+  // Abwechslung", Fundorte-Kommentar oben zur Nebenweg-Paarung), die drei anderen liefern
+  // sichtbar unterschiedliche "maps".
+  //
+  // FEHLVERSUCH, EHRLICH DOKUMENTIERT (erste Fassung dieser PR, per Sicht-QA gefunden, NICHT
+  // nur behauptet): eine erste Fassung nahm die zwei ACHSENSPIEGELUNGEN (x'=1-x / y'=1-y)
+  // statt Drehungen. `fundorte` oben ist aber selbst schon LINKS-RECHTS spiegelsymmetrisch
+  // gebaut (die fuenf ISPY_BLOECKE-Paare + SPIEGELSYMMETRIE-Pflicht, Fundorte-Kommentar oben)
+  // — jedes Element hat an seiner gespiegelten X-Position ein Element MIT IDENTISCHER
+  // Art/Stufe. Die Spiegelung x'=1-x vertauschte damit nur zwei optisch UNUNTERSCHEIDBARE
+  // Moebelstuecke miteinander — eine Sicht-QA-Serie (mehrere Saaten) zeigte buchstaeblich
+  // dasselbe Bild wie "standard". Nur y'=1-y aenderte sichtbar etwas (die Y-Baender sind NICHT
+  // symmetrisch: oben liegt ausschliesslich Logik, unten Verhoer/Mechanik) — von vier
+  // nominellen Varianten waren de facto nur ZWEI Bilder unterscheidbar. FIX: echte 90°-
+  // Drehungen um die Quadratmitte statt Achsenspiegelungen — eine Drehung vertauscht x- UND
+  // y-Rolle und bricht die Links-Rechts-Symmetrie garantiert, weil sie kein Element auf einen
+  // Zwilling MIT GLEICHEN X- UND Y-Nachbarn abbildet. Per Sicht-QA (vier Saaten, je eine
+  // Drehstufe) nachgewiesen: alle vier Kartenlayouts sind jetzt sichtbar verschieden.
+  //
+  // KEIN rr()-VERBRAUCH (Handbuch-Falle 17 im STRENGEREN Sinn: nicht nur FESTER Verbrauch,
+  // sondern GAR KEINER): die Wahl haengt NUR am aktuellen `seed`-Wert VOR jedem Wurf dieses
+  // Spiels (reines Lesen, kein rr()-Aufruf, der `seed` veraendern wuerde) — jeder folgende
+  // rr()-Zug (Reaktionswurf, Spuerwurf, Wettbewerb um Fundorte, ...) bleibt dadurch
+  // BYTE-IDENTISCH zum Ist-Stand. Genau das Muster, mit dem der Gegencheck (Abschnitt 5.6,
+  // Vorschlag 1: "drei Raumthemen ... rho-Wirkung exakt null, weil keine gemessene Zahl
+  // sich bewegt") die kosmetische Alternative beschrieben hat — hier fuer Positionen statt
+  // Farben angewandt.
+  //
+  // "EIGENER SAAT-ZWEIG JE SEITE": die Buehne zeichnet HEUTE (unveraendert seit PR 1,
+  // Kopfkommentar bei baueSchatzsuche() "ARCHITEKTUR-ENTSCHEIDUNG") EINEN gemeinsamen Raum
+  // fuer beide Seiten — Heim startet am linken, Gast am rechten Bildrand und beide laufen
+  // im SELBEN Koordinatensystem auf dieselben zwoelf Fundorte zu (bodenSchatzsuche() liest
+  // `art.fundorte` genau einmal, nicht einmal je Seite). Eine WIRKLICH unabhaengige
+  // Kartenwahl je Seite gaebe es nur mit zwei getrennt gezeichneten Raeumen (Split-Screen)
+  // — ein Umbau, den weder diese Aufgabe noch Chris' Zitat verlangt und der bei einem rein
+  // kosmetischen Feature ein unnoetiges Zusatzrisiko waere. Die Truhen-ZUSTAENDE bleiben wie
+  // gehabt vollstaendig unabhaengig je Seite (ispyBaueRaum() je Seite eigene Kopie); nur die
+  // eine gemeinsame Bildkulisse bekommt eine einzige, seed-eigene Kartenwahl.
+  const ISPY_LAYOUT_VARIANTEN=[
+    {name:"standard",    gewicht:40, transform:(f)=>({x:f.x,   y:f.y  })},
+    {name:"gedreht_90",  gewicht:25, transform:(f)=>({x:1-f.y, y:f.x  })},
+    {name:"gedreht_180", gewicht:20, transform:(f)=>({x:1-f.x, y:1-f.y})},
+    {name:"gedreht_270", gewicht:15, transform:(f)=>({x:f.y,   y:1-f.x})},
+  ];
+  // MISCHUNG STATT ROHWERT: `seed` ist an dieser Stelle im Spiel oft noch der ROHE, nicht
+  // gemischte Eingabewert (bei kleinen numerischen Saaten laeuft VOR baueSchatzsuche()
+  // fuer i-spy noch kein einziger rr()-Zug, normalisiereSaat() reicht Zahlen unveraendert
+  // durch, s. dortiger Kommentar) — zwei benachbarte Saaten (1, 2, 3, ...) wuerden ohne
+  // Mischung fast immer in denselben Gewichtseimer fallen. Ein lokaler Avalanche-Mix
+  // (MurmurHash3-Finalizer-Stil, dieselbe Technik wie normalisiereSaat()s FNV-1a fuer
+  // Text-Saaten, nur fuer Zahlen) verteilt das VOR der Gewichtswahl, OHNE `seed` selbst
+  // anzufassen (rein lokale Variable `h` — s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben,
+  // "KEIN rr()-VERBRAUCH").
+  function ispyMischeHash(x){
+    let h=(x>>>0);
+    h=Math.imul(h^(h>>>16),0x45d9f3b);
+    h=Math.imul(h^(h>>>16),0x45d9f3b);
+    return (h^(h>>>16))>>>0;
+  }
+  function ispyWaehleLayoutVariante(hashWert){
+    const summe=ISPY_LAYOUT_VARIANTEN.reduce((s,v)=>s+v.gewicht,0);
+    let r=(ispyMischeHash(hashWert)%10000)/10000*summe;
+    for(const v of ISPY_LAYOUT_VARIANTEN){ r-=v.gewicht; if(r<=0)return v; }
+    return ISPY_LAYOUT_VARIANTEN[ISPY_LAYOUT_VARIANTEN.length-1];
+  }
+  // Vom aktuellen `seed` VOR baueSchatzsuche() abgeleitet (reines Lesen, s. Kommentar oben)
+  // — je Spiel/Saat stabil, damit eine Sicht-QA denselben Seed reproduzierbar dieselbe
+  // Karte zeigt, aber zwischen Spielen/Saaten sichtbar wechselt.
+  let ISPY_VISUELLES_LAYOUT=null;
+
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
   // BEIDE Mittelachsen-Tresore (immer) plus so viele ganze Spiegelpaar-Bloecke, wie die
@@ -14947,6 +15037,13 @@
   // rein additiv, kein rr()-Verbrauch (s. Kommentar in der Tick-Schleife unten).
   let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
+    // SPAWN-ORT-RANDOMIZER (s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben): reines Lesen von
+    // `seed`, KEIN rr()-Aufruf — ispyBaueRaum() gleich darunter liest weiterhin
+    // ausschliesslich `art.fundorte` unveraendert, die Kartenwahl wirkt NUR auf die beiden
+    // Zeichen-Verbraucher (bodenSchatzsuche()/stepSchatzsuche()).
+    const layoutVariante=ispyWaehleLayoutVariante(seed);
+    ISPY_VISUELLES_LAYOUT=art.fundorte.map(f=>layoutVariante.transform(f));
+    if(window.__ISPY_LAYOUT_DEBUG)console.log("ISPY_LAYOUT_DEBUG",layoutVariante.name,seed);
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
     const mineRaum=ispyBaueRaum(art,mineT);
@@ -16304,7 +16401,12 @@
         const r=u.runden[u.aktuell];
         u.vizIspyVonX=u.vizX; u.vizIspyVonY=u.vizY;
         if(r&&r.fundort!=null){
-          const ziel=ispyFundortXY(art.fundorte[r.fundort]);
+          // GEZEICHNETES Laufziel aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
+          // ISPY_LAYOUT_VARIANTEN oben) statt art.fundorte direkt — dieselbe Karte, die
+          // bodenSchatzsuche() diesem Spiel schon zeichnet. r.fundort bleibt der
+          // MECHANISCHE Fundort-Index (ispySeiteTick()), unveraendert.
+          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[r.fundort])||art.fundorte[r.fundort];
+          const ziel=ispyFundortXY(vis);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
           // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
@@ -16884,16 +16986,21 @@
     });
 
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
+    // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
+    // ISPY_LAYOUT_VARIANTEN), falls baueSchatzsuche() diesem Spiel schon eine Karte
+    // zugewiesen hat — sonst (Sicht-QA vor dem ersten Tick) Fallback auf f.x/f.y selbst.
+    // ART/STUFE/BILD (Moebelwahl, Sterne) kommen UNVERAENDERT aus `f`.
     if(art.fundorte){
-      for(const f of art.fundorte){
-        const p=ispyFundortXY(f);
+      art.fundorte.forEach((f,idx)=>{
+        const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
+        const p=ispyFundortXY(vis);
         ctx.save(); ctx.translate(p.x,p.y);
         ctx.fillStyle="rgba(0,0,0,.30)";
         ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
         (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
         ctx.restore();
         ispySterne(p.x,p.y-26,f.stufe);
-      }
+      });
     }
   }
 
@@ -30789,6 +30896,10 @@
     // PR #879 fuer Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss
     // auf rr() oder Rangtreue.
     ispyRaumAn=false;
+    // Reiner Aufraeum-Reflex, kein Sicherheitsnetz: baueSchatzsuche() ueberschreibt
+    // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
+    // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
+    ISPY_VISUELLES_LAYOUT=null;
     build(gebuchteSaatFuerAktuelleDisziplin());
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
