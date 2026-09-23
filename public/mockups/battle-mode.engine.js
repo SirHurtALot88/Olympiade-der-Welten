@@ -13215,7 +13215,35 @@
       // Breaking-Throw (WDSF-/Olympia-Bewertung) besteht aus mehreren Bewertungsmomenten
       // (Einstieg, Power-Move, Freeze/Ausstieg) ueber typischerweise mehr als einen Durchgang
       // — rundenN:4 bildete kaum mehr als einen Move-Zyklus ab, rundenN:8 sind zwei.
-      label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.625,
+      // rundenDauer 0,625 -> 0,35 (22.09., Gauntlet-Kalibrierrunde): das 120-simulierte-
+      // Sekunden-Messfenster (MOTOREN.breaking.lauf()) begrenzt, wie viele Zuege insgesamt
+      // enthuellt werden koennen (120/rundenDauer) -- der Gauntlet braucht bei hoeherem
+      // GAUNTLET_HP_MAX (s.u.) spuerbar mehr Zuege als die alten, festen acht je Teilnehmer
+      // (bis zu elf Ausscheiden in einer Kette statt zwoelf unabhaengiger Achter-Auftritte).
+      // Ohne diese Senkung waere ein Teil der Kette im Extremfall (fast alle 12 Kaempfer
+      // ausgeschieden) nach 120 s noch nicht enthuellt gewesen -- u.summe haette dann nur den
+      // enthuellten Teil gezaehlt, ein stiller Messfehler statt einer echten Rezeptzahl.
+      label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.35,
+      // GAUNTLET STATT AUFTRITT (22.09., Chris' Sprachnachricht, woertlich): „breaking point
+      // faend ich vermutlich besser wenn da spieler 1 vs 1 kaempft und der sieger kaempft dann
+      // vs spieler 2 aus dem anderen team usw. so kann zb ein starker spieler auf slot 6 noch
+      // mal richtig aufholen und spieler 4 5 und 6 vom gegner besiegen. die HP nimmt er
+      // natuerlich mit in die folgerunde, geht also angeschlagen in die kaempfe rein, wer
+      // uebrig bleibt scored einen punkt." Ersetzt den bisherigen WERTUNG_AUFTRITT-Ablauf
+      // (zwoelf unabhaengige Einzelauftritte, je art.rundenN feste Durchgaenge, s. der
+      // generische Block in bauBuehne() unten) durch eine ECHTE Kette: Team-Slot 1 gegen
+      // Team-Slot 1 (feste Aufstellungsreihenfolge, s. `mine`/`gegner`), der Sieger bleibt MIT
+      // SEINEM AKTUELLEN HP-STAND im Ring (kein Reset) und tritt gegen den naechsten noch
+      // nicht angetretenen Kaempfer des VERLIERER-Teams an, bis ein Team komplett aufgebraucht
+      // ist. `gauntlet:true` ist die eine Weiche (baueGauntlet(), s. dort, analog zu
+      // `heben`/`schatzsuche` oben) -- rezept/failAbzug/erfolgWort/failWort bleiben WOERTLICH
+      // unveraendert, dieselbe Ertragende-Pruefung wie im generischen Auftritt-Block laeuft pro
+      // Zug weiter (gauntletRunde(), reine Extraktion), nur jetzt so oft, wie ein Teilnehmer
+      // tatsaechlich im Ring steht, statt einer festen Zahl. `u.summe` (die Zahl, die
+      // MOTOREN.breaking.wert() liest, also die Rangtreue misst) bleibt deshalb unveraendert
+      // "die Summe der eigenen Punkte" -- s. baueGauntlet()-Kommentar fuer die volle Herleitung
+      // und die Vorher/Nachher-Kalibrierung in der PR-Beschreibung.
+      gauntlet:true,
       // EIGENES BUEHNENBILD "BREAKING CYPHER" (Fable-Recherche
       // docs/design/breaking-folter-survival-visuelle-identitaet-recherche-08-09.md, Opus-
       // Synthese docs/pm-briefings/opus-synthese-eiskunstlauf-breaking-08-09.md, Umsetzung
@@ -13800,6 +13828,13 @@
       // zurueck (s. Aufrufstelle unten) — der generische REIHENFOLGE-Warteschlangenbau ganz
       // am Ende dieser Funktion gilt fuer I-Spy unveraendert.
       if(art.schatzsuche){ TEILNEHMER.push(L); return; }
+      // GAUNTLET (Breaking, 22.09.) GEHT HIER EBENFALLS NICHT DURCH, aus demselben Grund wie
+      // Heben zwei Zeilen oben: das Ergebnis entsteht paarweise (wie viele eigene Zuege ein
+      // Teilnehmer bekommt, haengt davon ab, wie lange er im Ring uebersteht) und laesst sich
+      // deshalb nicht je Teilnehmer fuer sich vorausrechnen. baueGauntlet() (s.u.) rechnet das,
+      // NACHDEM beide Seiten stehen -- L traegt zu diesem Zeitpunkt schon alle Sub-Skills
+      // (GRUNDLAGE/TECHNIK/... aus R2 oben), baueGauntlet() liest sie unveraendert.
+      if(art.gauntlet){ TEILNEHMER.push(L); return; }
       // TREFFERSTAND (s. grosser Kommentar bei BUEHNE_ART.fechten oben, Option 2): reines
       // additives Anzeigefeld nach dem u.kuehneVersuche-Muster, nur fuer Fechten befuellt
       // (art.fechten) — die fuenf verbleibenden Geschwister-Buehnen, die diesen generischen
@@ -13842,6 +13877,11 @@
     // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
     if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
+    // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
+    // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
+    // selbst (chronologische Kampf-Reihenfolge statt der generischen REIHENFOLGE ganz unten,
+    // die fuer unabhaengige Einzelauftritte gedacht ist).
+    if(art.gauntlet){ baueGauntlet(art,mine,gegner); return; }
     // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
     // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
     // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
@@ -15236,6 +15276,149 @@
   const ISPY_STUFE_AKK={1:"die Notiz",2:"die Akte",3:"den Tresor"};
   const ISPY_STUFE_AN={1:"an der Notiz",2:"an der Akte",3:"am Tresor"};
 
+  // ================== BREAKING WIRD ZUM GAUNTLET (22.09.) ==================
+  // s. Kommentar an BUEHNE_ART.breaking.gauntlet fuer Chris' Wortlaut und die Herleitung.
+  // Kein Attribut- oder Rezeptzuschnitt aendert sich hier -- die Eignungsmatrix bleibt
+  // gesperrt (CLAUDE.md), gauntletRunde() ist reine Extraktion der schon bestehenden
+  // Ertragende-Formel aus dem generischen art.rundenN-Block oben in bauBuehne().
+  // KALIBRIERRUNDE (22.09.) -- s. PR-Beschreibung fuer die vollstaendige Vorher/Nachher-
+  // Messreihe (miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs). Kurzfassung: HP_MAX 100
+  // liess ein Duell nach durchschnittlich 6-8 Zuegen enden -- kurz genug, dass ein einziger
+  // ungluecklicher Fehlschlag einen eigentlich staerkeren Kaempfer aus dem GESAMTEN Gauntlet
+  // wirft (sein ganzer Beitrag zu `u.summe` bricht in diesem Moment ab), ein Gambler's-Ruin-
+  // Effekt mit zu wenigen Schritten -- kein Fall fuer die gesperrte Eignungsmatrix, sondern
+  // fuer mehr Zuege je Duell (Reliabilitaets-Hebel, s. CLAUDE.md).
+  const GAUNTLET_HP_MAX=400;
+  // Haelt ein Ertragender stand, verliert er wenig HP; bricht er ein, viel -- dieselbe
+  // Erfolg/Fail-Ziehung wie die Punktevergabe, kein zweiter Zufallszug.
+  const GAUNTLET_SCHADEN_ERFOLG=10, GAUNTLET_SCHADEN_FAIL=24;
+  // Ermuedung deckelt sich nach GAUNTLET_ERMUED_ANSCHLAEGE EIGENEN Zuegen -- der generische
+  // Block oben nimmt dafuer `ri/(art.rundenN-1)`, das geht hier nicht: ein Ueberlebender
+  // sammelt ueber mehrere Duelle hinweg WEIT mehr als art.rundenN eigene Zuege (das ist der
+  // ganze Witz des Gauntlets), `art.rundenN-1` waere also nach dem allerersten Duell schon
+  // durchlaufen. Derselbe Skalenbereich wie vorher (rundenN:8 hiess "voll ermuedet bei Zug 7"),
+  // hier nur unabhaengig von art.rundenN benannt.
+  const GAUNTLET_ERMUED_ANSCHLAEGE=12;
+  // Sicherheitsnetz gegen eine rechnerisch praktisch ausgeschlossene Endlosschleife (erfolg
+  // ist immer auf [0.15,0.94] geklemmt, jeder Zug zieht also mit Sicherheit HP ab). Ueberschlag:
+  // elf Ausscheiden (beide Kader komplett aufgebraucht bis auf einen) bei HP_MAX 100 und
+  // realistischem Schaden je Zug (10..24) brauchen rund 60-100 Zuege -- 600 ist ein
+  // Vielfaches davon, nie ein reales Limit.
+  const GAUNTLET_MAX_ANSCHLAEGE=600;
+
+  // IDENTISCHE FORMEL wie der generische Auftritt-Block (bauBuehne(), s. `for(let ri=0;
+  // ri<art.rundenN;ri++)` weiter oben) -- nur der Rundenindex `ri` kommt hier aus der Laenge
+  // der bisher gesammelten EIGENEN Runden dieses Teilnehmers statt aus einer festen Schleife.
+  // TECHNIK/NERVEN bestimmen die Erfolgschance, GRUNDLAGE/SPITZENMOMENT/WAGNIS/PUBLIKUM die
+  // Punktzahl, art.failAbzug das Misslingen -- Zeichen fuer Zeichen dieselben Kanaele, also
+  // dieselbe Pp-Abweichung zur Matrix wie zuvor (s. PR-Beschreibung fuer die Nachmessung).
+  function gauntletRunde(L,ri,art){
+    const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*Math.min(1,ri/GAUNTLET_ERMUED_ANSCHLAEGE);
+    const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
+    const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+    let punkte,ereignis,haelt;
+    if(rr()<erfolg){
+      punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+      ereignis=art.erfolgWort; haelt=true;
+    } else {
+      punkte=basis*art.failAbzug;
+      ereignis=art.failWort; haelt=false;
+    }
+    punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+    return {punkte,ereignis,haelt};
+  }
+
+  // Baut die gesamte Kette VOR dem ersten Frame (wie jeder andere Buehnen-Baustein: bauen,
+  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind die feste Aufstellungsreihenfolge
+  // (Team-Slot 1..n, s. bauBuehne()) -- "Kampfreihenfolge: Team-Slots in fester Reihenfolge".
+  function baueGauntlet(art,mine,gegner){
+    const A=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
+    const B=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
+    for(const u of A.concat(B)){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.hpMax=GAUNTLET_HP_MAX; u.hp=GAUNTLET_HP_MAX; u.raus=false;
+      u.bout=0; u.gegnerN=null;
+    }
+    buehneQueue=[];
+    if(!A.length||!B.length)return; // Ein leeres Team: niemand tritt an -- leere Kette.
+    let ai=0, bi=0, x=A[0], y=B[0], bout=1;
+    x.bout=bout; y.bout=bout;
+    // WER ERTRAEGT ZUERST? Team Heim (x) eroeffnet als Peiniger -- dieselbe leichte, seed-
+    // neutrale Konvention wie der generische Block ("Heim vor Gast", s. `mine.forEach`/
+    // `gegner.forEach` oben). Danach eroeffnet nach jedem K.o. IMMER der frische Herausforderer
+    // als Ertragender: der Sieger behaelt die Peiniger-Rolle, mit der er gerade gewonnen hat,
+    // ins naechste Duell hinein -- sein Schwung setzt sich fort.
+    let ertragenderIstX=false;
+    for(let anschlag=0;anschlag<GAUNTLET_MAX_ANSCHLAEGE;anschlag++){
+      const ertragende=ertragenderIstX?x:y, peiniger=ertragenderIstX?y:x;
+      ertragende.gegnerN=peiniger.n; peiniger.gegnerN=ertragende.n;
+      const ri=ertragende.runden.length;
+      const r=gauntletRunde(ertragende,ri,art);
+      const hpVor=ertragende.hp;
+      ertragende.hp=Math.max(0,ertragende.hp-(r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL));
+      // `hpVor`/`hpNach`/`gegnerN`/`bout` reisen PRO RUNDE mit (nicht nur auf `u` selbst) --
+      // stepBuehne()/zeichneBreaking() enthuellen chronologisch und muessen fuer eine LAENGST
+      // vergangene Runde denselben Gegner/HP-Stand zeigen koennen, den diese Runde damals
+      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`.
+      ertragende.runden.push({punkte:r.punkte,ereignis:r.ereignis,
+        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax});
+      buehneQueue.push(ertragende);
+      if(ertragende.hp<=0){
+        ertragende.raus=true;
+        if(ertragende===y){
+          bi++;
+          if(bi>=B.length)break; // Team Gast komplett aufgebraucht -> Team Heim gewinnt.
+          y=B[bi]; bout++; x.bout=bout; y.bout=bout;
+          ertragenderIstX=false; // der frische Herausforderer ertraegt zuerst.
+        } else {
+          ai++;
+          if(ai>=A.length)break; // Team Heim komplett aufgebraucht -> Team Gast gewinnt.
+          x=A[ai]; bout++; x.bout=bout; y.bout=bout;
+          ertragenderIstX=true;
+        }
+      } else {
+        ertragenderIstX=!ertragenderIstX;
+      }
+    }
+  }
+
+  // TEXT-HP-BALKEN, EIN ORT FUER BEIDE VERWENDER (Ticker-Feed in stepBuehne() und die
+  // Seitentafel in zeichneBreaking()) -- dieselben zehn Bloecke, keine zweite Kopie.
+  function gauntletBalken(hp,max){
+    const teile=10, hpKlar=Math.max(0,hp);
+    const voll=Math.max(0,Math.min(teile,Math.round((hpKlar/(max||1))*teile)));
+    return "█".repeat(voll)+"░".repeat(teile-voll);
+  }
+  // HP-Stand EINES Teilnehmers, so wie er GERADE ENTHUELLT ist -- liest `hpNach` aus der
+  // zuletzt enthuellten eigenen Runde (baueGauntlet() fuehrt das je Runde mit, s. dortiger
+  // Kommentar), nicht `u.hp` selbst (das haelt schon den fertigen ENDSTAND der ganzen Kette).
+  // Vor der ersten eigenen Enthuellung (u.aktuell===-1, noch kein einziger Zug gezeigt) ist der
+  // Kaempfer unverletzt: voller HP-Stand.
+  function gauntletHpJetzt(u){
+    const r=u.aktuell>=0?u.runden[u.aktuell]:null;
+    if(r&&r.hpNach!=null)return r.hpNach;
+    return u.hpMax!=null?u.hpMax:GAUNTLET_HP_MAX;
+  }
+  // DIESELBE ENTHUELLUNGS-GRENZE, ZWEIMAL GEBRAUCHT: `u.bout`/`u.raus` stehen am Ende von
+  // baueGauntlet() bereits auf ihrem FERTIGEN Endwert (baueGauntlet() baut die ganze Kette
+  // VOR dem ersten Frame, s. dortiger Kommentar) -- ein Blick auf `u.bout` waehrend der
+  // laufenden Enthuellung zeigt deshalb, wie weit dieser Kaempfer bis zum ENDE der Simulation
+  // gekommen ist, nicht wie weit die ANZEIGE gerade ist (Review-Fund: die Seitentafel zeigte
+  // "Kampf 9", waehrend der Ticker fuer denselben Moment noch "Kampf 8" meldete -- ein
+  // waschechter Spoiler). `gauntletZugJetzt()` liest stattdessen nur den bereits enthuellten
+  // Zug (`u.runden[u.aktuell]`, exakt das, was der Ticker auch zeigt).
+  function gauntletZugJetzt(u){
+    return u.aktuell>=0?u.runden[u.aktuell]:null;
+  }
+  // "Raus" ERST, WENN DIE ENTHUELLUNG DEN K.O.-ZUG SELBST ERREICHT HAT -- `u.raus` (Endstand)
+  // waere sonst ein zweiter Spoiler derselben Art: ein Team staende im HUD schon beim allerersten
+  // Frame auf "0 Ueberlebende", obwohl der Ticker den entscheidenden Zug noch gar nicht gezeigt
+  // hat.
+  function gauntletRausJetzt(u){
+    const r=gauntletZugJetzt(u);
+    return !!(r&&r.hpNach<=0);
+  }
+
   function stepBuehne(dt){
     // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
     // `done` einmal gesetzt war -- buehnenBewegung() (rein praesentational, s. Vertrag dort)
@@ -15365,6 +15548,18 @@
         // erfolgWort/failWort -- dieselbe Zierde-statt-zweites-Ereigniswort-Regel wie beim
         // Showcase-Zweig direkt oberhalb.
         feed(u.side,ispyTickerZeile(u,r),versuchBig);
+      } else if(BB().gauntlet){
+        // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
+        // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner, HP-Balken (aus `r.hpNach`,
+        // NICHT aus dem inzwischen ueberholten `u.hp` -- s. baueGauntlet()-Kommentar) und die
+        // laufende Kampf-Nummer. Ein K.o. bekommt zusaetzlich eine eigene, immer big markierte
+        // Zeile -- derselbe "Abschluss ist immer big"-Grundsatz wie beim fertigen Zweikampf in
+        // Gewichtheben/Duell oben.
+        const hpJetzt=Math.max(0,r.hpNach);
+        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax+" "
+          +gauntletBalken(hpJetzt,r.hpMax)+" (Kampf "+r.bout+").",versuchBig||r.hpNach<=0);
+        if(r.hpNach<=0)
+          feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
       } else {
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       }
@@ -15947,6 +16142,18 @@
     const zi=Math.min(buehneQueue.length-1,Math.max(0,buehneZeiger-1));
     const ertraeger=buehneQueue[zi]||null;
     if(!ertraeger)return null;
+    // GAUNTLET (22.09.): buehneQueue traegt hier NICHT die generische "Heim dann Gast je
+    // Durchgang"-Paarung, sondern eine chronologische Kette, in der ein Ueberlebender ueber
+    // mehrere Duelle hinweg mehrfach hintereinander auftauchen kann (s. baueGauntlet()). Die
+    // Nachbar-Heuristik unten (`p=zi-(zi%2)`) wuerde an jedem Duellwechsel falsch raten, sobald
+    // die Zahl der vorangegangenen Zuege ungerade ist. Der ECHTE Gegner steht bereits auf der
+    // gerade enthuellten Runde selbst (`r.gegnerN`, je Zug mitgefuehrt) -- direkt gelesen statt
+    // erraten.
+    if(BB().gauntlet){
+      const r=ertraeger.aktuell>=0?ertraeger.runden[ertraeger.aktuell]:null;
+      const peiniger=(r&&r.gegnerN)?TEILNEHMER.find(x=>x.n===r.gegnerN&&x.side!==ertraeger.side)||null:null;
+      return {ertraeger,peiniger};
+    }
     const p=zi-(zi%2);
     const a=buehneQueue[p]||null, b=buehneQueue[p+1]||null;
     // Fallback ohne Partner (ungerade Queue, ungleiche Kaderstaerken): dann bleibt es beim
@@ -16704,6 +16911,10 @@
       ? "3 Perioden zu je 3 Gängen — Trefferstand läuft mit"
       : BB().duell
       ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
+      // GAUNTLET (Breaking, 22.09.): eigene Unterzeile statt des generischen
+      // "N Durchgaenge"-Texts, der hier (variable Zuganzahl je Ueberlebendem) nicht passt.
+      : BB().gauntlet
+      ? "Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand"
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
     // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
@@ -16714,7 +16925,13 @@
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
     document.getElementById("klsuffix").textContent="Punkte";
-    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
+    // GENERALISIERT (22.09.): `u.runden.length` statt der festen `BB().rundenN` -- fuer jede
+    // Nicht-Gauntlet-Disziplin ist das bit-identisch (`baueHebenDuelle()`/der generische
+    // Auftritt-/Duell-Block bauen IMMER exakt `art.rundenN` Runden je Teilnehmer, s. dortige
+    // Schleifen), fuer Gauntlet (Breaking) aber der einzig richtige Massstab: ein Teilnehmer
+    // ist "fertig", sobald ALLE seine EIGENEN, tatsaechlich gebauten Zuege enthuellt sind --
+    // egal ob er nach drei Zuegen ausschied oder nach zwanzig als Sieger dastand.
+    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
@@ -16724,20 +16941,46 @@
       // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
       // Gesamt-Kilogramm beider Mannschaften (der Tiebreak aus Plan 3.5), damit die
       // Tabelle nicht an jedem dritten Spieltag ein Remis bekommt.
-      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.duellGewonnen).length;
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.vorteil>0).length;
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.vorteil>0).length;
       document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
+    } else if(BB().gauntlet){
+      // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
+      // bleibt, scored einen Punkt" ist eine Ueberlebensfrage, keine Summenfrage. KEIN
+      // Spoiler: `gauntletRausJetzt()` liest nur den bereits enthuellten Zug, nicht das rohe
+      // `u.raus` (das steht am Ende von baueGauntlet() schon auf dem FERTIGEN Endstand der
+      // ganzen Kette -- ungegated wuerde die Anzeige das Endergebnis zeigen, bevor auch nur
+      // ein Ticker-Zug gelaufen ist, s. gauntletRausJetzt()-Kommentar).
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      document.getElementById("score").textContent=alive(0)+" : "+alive(1);
     } else {
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
       document.getElementById("score").textContent=summe(0)+" : "+summe(1);
     }
-    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
-    const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
-      return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
-    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
-    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    if(BB().gauntlet){
+      // GAUNTLET-HP-BALKEN: zeigt den HP-Anteil des GERADE AKTIVEN Kaempfers jeder Seite
+      // (cypherPaar(), s. dort) statt eines Punkte-Anteils -- die beiden Balken UEBER dem
+      // Ring sind damit dieselbe Information wie die Seitentafeln IM Ring, nur als
+      // Fortschrittsbalken statt als Zahl.
+      const paar=cypherPaar();
+      const frac=(seite)=>{
+        if(!paar)return 0;
+        const u=(paar.ertraeger&&paar.ertraeger.side===seite)?paar.ertraeger
+          :(paar.peiniger&&paar.peiniger.side===seite?paar.peiniger:null);
+        if(!u)return 0;
+        return Math.max(0,gauntletHpJetzt(u))/(u.hpMax||GAUNTLET_HP_MAX);
+      };
+      document.getElementById("thpL").style.width=(frac(0)*100)+"%";
+      document.getElementById("thpR").style.width=(frac(1)*100)+"%";
+    } else {
+      const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+      const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
+        return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+      document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+      document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    }
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
@@ -18993,11 +19236,42 @@
   function WERTUNG_AUFTRITT(art){
     const w=art.wertungTabelle||{};
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
-    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,r:bisher(u)}));
+    // GAUNTLET (22.09.): `raus` faerbt die Tabellenzeile (renderWertungTabelle()s
+    // ".raus"-Klasse, bisher von keiner WERTUNG_AUFTRITT-Disziplin genutzt) -- reveal-
+    // gegated ueber dieselbe `r`-Historie wie die vier Gauntlet-Spalten oben, kein Spoiler.
+    const zeilen=()=>TEILNEHMER.map(u=>{
+      const r=bisher(u);
+      return {n:u.n,side:u.side,raus:!!(art.gauntlet&&r.length&&r[r.length-1].hpNach<=0),eig:u.eig,u,r};
+    });
     return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>b.u.summe-a.u.summe,
       spalten:[
-        {id:"dg",   kopf:"Dg",   titel:"Durchgänge bisher", wert:z=>z.r.length+"/"+art.rundenN},
+        // GAUNTLET (Breaking, 22.09.): "X/art.rundenN" ergibt hier keinen Sinn mehr -- ein
+        // Ueberlebender sammelt ueber mehrere Duelle hinweg beliebig viele eigene Zuege (s.
+        // BUEHNE_ART.breaking.gauntlet-Kommentar), art.rundenN ist nur noch der Startwert der
+        // Folterbank-Eskalation. Die rohe Anzahl ohne Nenner ist hier ehrlicher.
+        {id:"dg",   kopf:"Dg",   titel:"eigene Züge bisher",
+          wert:z=>art.gauntlet?String(z.r.length):z.r.length+"/"+art.rundenN},
         {id:"pkt",  kopf:"Pkt",  top:true, titel:"Punkte gesamt", wert:z=>z.u.summe||null},
+        // GAUNTLET-SPALTEN: HP/Kampf/Gegner/Status machen die Kette auch in der Tabelle
+        // nachvollziehbar, nicht nur im Ticker/Buehnenbild -- dieselbe "Praesentation
+        // nachvollziehbar" Vorgabe. `art.gauntlet` ist der einzige aktuelle Nutzer, exakt
+        // das art.schatzsuche-Gate-Muster direkt unten. KEIN SPOILER: alle vier lesen
+        // ausschliesslich `z.r` (die bereits enthuellte Runden-Historie dieses Teilnehmers,
+        // s. `bisher()` oben) statt der rohen `u.bout`/`u.gegnerN`/`u.raus`-Felder, die am
+        // Ende des ganzen Baus schon den FERTIGEN Ausgang tragen -- exakt dasselbe Prinzip
+        // wie WERTUNG_HEBEN() mit `bestBisher()`/`paarFertig()` direkt unten.
+        ...(art.gauntlet?[
+          {id:"hp",   kopf:"HP",   titel:"aktueller HP-Stand (0 = ausgeschieden)",
+            wert:z=>Math.max(0,gauntletHpJetzt(z.u)), fmt:v=>v+"/"+GAUNTLET_HP_MAX,
+            farbe:v=>v<=0?"var(--crit)":null},
+          {id:"kampf",kopf:"Kampf", titel:"laufende Kampf-Nummer in der Kette",
+            wert:z=>z.r.length?z.r[z.r.length-1].bout:null},
+          {id:"gauntlet-gegner",kopf:"Gegner", titel:"aktueller/letzter Gegner in der Kette",
+            wert:z=>z.r.length?z.r[z.r.length-1].gegnerN:null},
+          {id:"status",kopf:"Status", titel:"noch im Ring oder schon ausgeschieden?",
+            wert:z=>z.r.length&&z.r[z.r.length-1].hpNach<=0?"raus":"im Ring",
+            farbe:v=>v==="raus"?"var(--crit)":"var(--ok)"}
+        ]:[]),
         {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.u.summe/z.r.length):null},
         {id:"best", kopf:"Best", top:true, titel:"bester Durchgang", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
         {id:"letzt",kopf:"Letzt", titel:"letzter Durchgang", wert:z=>z.r.length?z.r[z.r.length-1].punkte:null},
@@ -20070,7 +20344,10 @@
     // Element, an dem man die Disziplin auf einen Blick erkennt.
     const tafel=(u,rolle,links)=>{
       if(!u)return;
-      const bw=Math.min(190,W*0.20), bh=64;
+      // GAUNTLET (22.09.) braucht eine vierte Zeile (HP-Balken UND Punkte/Kampf-Nummer
+      // getrennt, s.u.) -- die Tafel waechst dafuer um 12px, statt die drei bestehenden
+      // Zeilen zu stauchen.
+      const bw=Math.min(190,W*0.20), bh=art.gauntlet?76:64;
       const bx=links?12:W-12-bw, by=cy-bh/2-18;
       ctx.fillStyle="rgba(10,6,14,.78)"; ctx.fillRect(bx,by,bw,bh);
       ctx.fillStyle=farbeVon(u); ctx.fillRect(bx,by,3,bh);
@@ -20085,7 +20362,25 @@
       ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#eef3fa";
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,bx+12,by+35);
       ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#9aa4b4";
-      ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
+      if(art.gauntlet){
+        // GAUNTLET (22.09.): "Durchgang X/rundenN" ergibt hier keinen Sinn mehr -- ein
+        // Ueberlebender sammelt ueber mehrere Duelle hinweg beliebig viele eigene Zuege (s.
+        // BUEHNE_ART.breaking.gauntlet-Kommentar). Die Seitentafel zeigt stattdessen den
+        // HP-Stand, wie er GERADE enthuellt ist (gauntletHpJetzt(), nicht der Endstand
+        // u.hp), plus die laufende Kampf-Nummer -- exakt die "Kette nachvollziehbar"-
+        // Vorgabe der Praesentation.
+        const hpJetzt=Math.max(0,gauntletHpJetzt(u)), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+        ctx.fillText("HP "+hpJetzt+"/"+hpMax+"  "+gauntletBalken(hpJetzt,hpMax),bx+12,by+50);
+        // KEIN SPOILER: `u.bout` ist am Ende von baueGauntlet() schon der FERTIGE Endwert
+        // (Review-Fund: die Tafel zeigte "Kampf 9", waehrend der Ticker fuer denselben
+        // Moment noch "Kampf 8" meldete) -- der bereits enthuellte Zug (gauntletZugJetzt())
+        // traegt die richtige, reveal-gegatete Kampf-Nummer; vor der allerersten eigenen
+        // Enthuellung (noch kein Zug gezeigt) ist "Kampf 1" der einzig plausible Anfangswert.
+        const zug=gauntletZugJetzt(u);
+        ctx.fillText(u.summe+" Pkt  ·  Kampf "+(zug?zug.bout:1),bx+12,by+61);
+      } else {
+        ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
+      }
     };
     if(ertraeger&&peiniger){
       const heim=ertraeger.side===0?ertraeger:peiniger;
@@ -21117,15 +21412,34 @@
       // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
       // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
       const k=el("div","plan");
-      k.appendChild(el("b",null,"Bewertung"));
-      k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
-        "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
-        "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
-      box.appendChild(k);
-      const apb=document.getElementById("arenaplan");
-      if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
-      const pl=document.querySelector(".planzeile b");
-      if(pl)pl.textContent="Bewertung";
+      // GAUNTLET (Breaking, 22.09.): kein fester Durchgangs-Takt mehr, s. BUEHNE_ART.
+      // breaking.gauntlet-Kommentar — eine Kette aus Einzelduellen statt gleichzeitiger
+      // Einzelauftritte. Der Rest der Funktion (Gegner-Aufstellungsliste unten) gilt
+      // unveraendert fuer jede Buehnen-Disziplin, deshalb hier KEIN `return`, nur ein
+      // anderer Text fuer denselben Plan-Kasten.
+      if(BB().gauntlet){
+        k.appendChild(el("b",null,"Gauntlet"));
+        k.appendChild(el("p",null,"Slot 1 gegen Slot 1, dann bleibt der Sieger MIT seinem "+
+          "aktuellen HP-Stand im Ring und trifft auf den nächsten Kämpfer des Verliererteams — "+
+          "so weiter, bis ein Team komplett aufgebraucht ist. Jeder Zug: "+BB().erfolgWort+
+          " oder "+BB().failWort+" — entschieden durch Technik und Nerven, wie viel HP das "+
+          "kostet, durch denselben Ausgang."));
+        box.appendChild(k);
+        const apb0=document.getElementById("arenaplan");
+        if(apb0)apb0.textContent="Gauntlet, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        const pl0=document.querySelector(".planzeile b");
+        if(pl0)pl0.textContent="Gauntlet";
+      } else {
+        k.appendChild(el("b",null,"Bewertung"));
+        k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
+          "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
+          "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
+        box.appendChild(k);
+        const apb=document.getElementById("arenaplan");
+        if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        const pl=document.querySelector(".planzeile b");
+        if(pl)pl.textContent="Bewertung";
+      }
     } else if(istBahn(disc)){
       // Auf der Bahn gibt es keinen Schlachtplan: jeder Laeufer bringt seinen eigenen
       // Rennplan mit, und der kommt aus dem Slot, auf dem er steht. Den Kampfplan hier
@@ -32964,11 +33278,15 @@
     // Wertungsbegriff, nur derselbe, den das Spiel dem Zuschauer laengst zeigt, jetzt auch fuer
     // die Arena ausgelesen.
     //
-    // GENERISCH UEBER "kein heben, kein duell", NICHT AUF "showcase" HARDCODIERT: jede der
-    // fuenf anderen Auftritt-Buehnen laeuft hier automatisch mit, sobald sie in
-    // ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS steht.
+    // GENERISCH UEBER "kein heben, kein duell, kein gauntlet", NICHT AUF "showcase"
+    // HARDCODIERT: jede der verbleibenden Auftritt-Buehnen laeuft hier automatisch mit,
+    // sobald sie in ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS
+    // steht. BREAKING NICHT MEHR HIER (22.09.): `gauntlet:true` schaltet den Seitenstand auf
+    // spieleBuehneGauntlet() um (s.u.) -- eine Summenwertung wuerde Chris' "wer uebrig
+    // bleibt scored einen Punkt" nicht abbilden, ein Team koennte mit weniger Ueberlebenden
+    // trotzdem die hoehere Punktsumme haben.
     spieleBuehneAuftritt:(bd,saat)=>{
-      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||BUEHNE_ART[bd].heben||BUEHNE_ART[bd].duell)return null;
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||BUEHNE_ART[bd].heben||BUEHNE_ART[bd].duell||BUEHNE_ART[bd].gauntlet)return null;
       const M=MOTOREN[bd]; if(!M)return null;
       const g=M.sichern(); if(M.vorher)M.vorher();
       M.bau(saat);
@@ -32978,6 +33296,35 @@
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0);
       const seiten=[summe(0),summe(1)];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
+    },
+    // BUeHNEN-GAUNTLET-CHASSIS FUER art.gauntlet (bisher nur Breaking, 22.09.) -- FUENFTES
+    // Buehnen-Chassis neben Heben/Duell/Auftritt/Schatzsuche (letztere laeuft technisch ueber
+    // spieleBuehneAuftritt(), s. dortiger Kommentar). Der Seitenstand ist hier weder eine
+    // Duell-/Brettzaehlung noch eine Punktsumme, sondern die Ueberlebenden-Zaehlung -- exakt
+    // Chris' "wer uebrig bleibt, scored einen Punkt". `u.raus` liest hier den FERTIGEN
+    // Endstand, den `M.lauf()` (oben) schon vollstaendig durchgerechnet hat -- anders als
+    // updateHudBuehne()s eigener BB().gauntlet-Zweig (der `gauntletRausJetzt()` braucht,
+    // weil dort waehrend der laufenden Enthuellung angezeigt wird, s. dortiger Spoiler-
+    // Kommentar) ist das hier der EINZIGE Blick auf das Ergebnis, nach Abschluss der ganzen
+    // Simulation -- kein zu frueher Blick moeglich.
+    //
+    // KEIN GLEICHSTAND MOEGLICH (anders als Speed-Schach/Tennis/Fechten): baueGauntlet()
+    // laeuft immer bis GENAU ein Team komplett aufgebraucht ist (oder beide Teams leer sind,
+    // ein praktisch ausgeschlossener Randfall) -- `seiten` ist deshalb entweder [>=1,0] oder
+    // [0,>=1], nie [0,0] bei echten Aufstellungen. Kein `gesamtKg`-Tiebreak noetig.
+    spieleBuehneGauntlet:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].gauntlet)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!u.raus).length;
+      const seiten=[alive(0),alive(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
