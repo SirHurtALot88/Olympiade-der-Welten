@@ -23329,8 +23329,20 @@
       return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
         punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
         zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
-        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit)
-          +(u.wechselKonto<0?" · "+fmtDauer(-u.wechselKonto)+" Wechsel":""),
+        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit),
+        // EIGENE SPALTE FUER DIE WECHSELDAUER (Chris' Meldung, s. PR-Beschreibung): vorher
+        // haengte zeitVon oben die Wechselzeit nur AN, und nur wenn `u.wechselKonto<0` war —
+        // in der Praxis fast immer wahr (jeder Wechsel kostet die Beteiligten Zeit, s.
+        // stepSpurt "u.wechselKonto-=verlust/2"), aber unauffaellig in derselben Zelle wie die
+        // Etappenzeit verklebt und beim kleinsten Rundungsfehler unsichtbar. Jetzt eine eigene,
+        // IMMER gefuellte Spalte je Laeufer: `wechselN` (Anzahl seiner Uebergaben, 0/1/2 — der
+        // Start- und der Schlusslaeufer haben nur eine, alle dazwischen zwei) sagt, ob er
+        // ueberhaupt an einem Wechsel beteiligt war, `-wechselKonto` seine Bilanz aus allen
+        // seinen Uebergaben in Sekunden (Chris' Wunsch: "damit man sieht wer da evtl.
+        // gestuerzt ist" — ein auffaellig hoher Wert ist der Hinweis). Reine Anzeige, liest nur
+        // die zwei bestehenden Felder, aendert nichts an bahnLeistung()/wert()/rho.
+        wechselVon:(u)=>u.wechselN?fmtDauer(Math.max(0,-u.wechselKonto)):"—",
+        wechselKopf:"Wechsel",
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
     // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
@@ -26377,7 +26389,17 @@
   const ovalAmZiel=(anteil)=>{const f=(((anteil%1)+1)%1); return f<0.25||f>0.75;};
   function ovalPunkt(u){
     const platz=rennFertig.indexOf(u);
-    const anteil=ovalAnteil(u);
+    // GESTUERZTER/STOLPERNDER LAEUFER BLEIBT AUCH OPTISCH STEHEN (Chris' Meldung, s.
+    // PR-Beschreibung). u.stolper ist bei der Staffel PHYSISCH (tempoVon() drosselt auf 35%
+    // Tempo, s. dort — u.pos kriecht also waehrend eines Wechsels/Patzers trotzdem weiter,
+    // genau das kostet ihn Zeit) UND zugleich schon heute das Signal fuer die "liegt"-Pose
+    // (`down:u.stolper>0` in zeichneSpurt) — nur die POSITION folgte bisher weiter der
+    // lebenden `u.pos`, die Figur "lag" also sichtbar und rutschte dabei ueber die Bahn.
+    // `u.vizStolperAnteil` (ausschliesslich von stepStaffel geschrieben, s. dort) haelt den
+    // Bahnpunkt beim Einsetzen des Stolperns fest; hier wird er nur GELESEN. Reine
+    // Zeichenkorrektur: u.pos selbst, etappenZeit, bahnLeistung()/bahnRangliste() und
+    // MOTOREN.staffel.wert() lesen `anteil` hier nicht mit und bleiben unveraendert.
+    const anteil=(u.stolper>0 && u.vizStolperAnteil!=null)?u.vizStolperAnteil:ovalAnteil(u);
     // SPUR: mechanisch gibt es zwei (u.bahnZ 0/1), gezeichnet werden sechs — die beiden
     // Mannschaften liegen auf den mittleren Spuren OVAL_SPUR0 und OVAL_SPUR0+1. u.bahnZ
     // wird waehrend eines Bahnwechsels weich interpoliert und ist dann gebrochen; das
@@ -27963,8 +27985,24 @@
       if(u.vizInitDone==null){
         u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
         u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true; u.vizSchritt=(u.id||0)*2.3;
+        u.vizStolperAnteil=null;
       }
       if(u.aktiv && u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
+      // ---- 0. STOLPERN/PATZER HAELT DIE FIGUR AUCH OPTISCH AN (Chris' Meldung, s.
+      // PR-Beschreibung). u.stolper>0 ist bei der Staffel ausschliesslich die Uebergabe
+      // (`naechster.stolper=verlust`, stepSpurt) — physisch bremst tempoVon() ihn auf 35%
+      // Tempo statt auf 0 (Absicht, s. Kommentar dort: "verloren geht rund zwei Drittel der
+      // Stolperdauer"), `u.pos` kriecht also weiter. Fuer die ZEICHNUNG haelt ovalPunkt()
+      // (":26241") die Figur stattdessen an genau dem Bahnpunkt fest, an dem das Stolpern
+      // einsetzte — `u.vizStolperAnteil` traegt diesen Punkt, ausschliesslich hier
+      // geschrieben, nur dort gelesen. Sobald u.stolper wieder auf 0 ist, wird der Punkt
+      // geloescht und die Zeichnung folgt wieder der lebenden Position. NUR praesentational:
+      // u.pos/u.v selbst, etappenZeit, bahnLeistung()/wert() sehen dieses Feld nie.
+      if(u.stolper>0){
+        if(u.vizStolperAnteil==null)u.vizStolperAnteil=ovalAnteil(u);
+      } else {
+        u.vizStolperAnteil=null;
+      }
       // ---- 1. ANLAUF, s. Kommentar oben. Nur wer der NAECHSTE in der Wartereihe ist (sein
       // Vordermann laeuft gerade), bekommt ein Zielwert>0; ein Laeufer, der noch zwei oder
       // mehr Abschnitte entfernt ist, der Startlaeufer (kein Vordermann) und wer selbst schon
@@ -28581,7 +28619,20 @@
         if(u.vizUebergabeT>0 && u.vizUebergabeGeberId!=null){
           const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
           if(geber){
-            const gp=laeuferXY(geber);
+            // DER STAB SCHWEBTE FREI (Chris' Meldung, s. PR-Beschreibung): `laeuferXY(geber)`
+            // fragt `ovalPunkt()`, und die stellt einen Geber, der gerade erst uebergeben hat
+            // (`geber.aktiv===false`, `geber.fertig` bleibt bis zum TEAM-Ziel null), genau wie
+            // einen noch gar nicht gestarteten Laeufer in die Wechselzonen-Warteschlange im
+            // Innenfeld (":26251", der Radius-/vx-Block) -- ein anderer Punkt als der, an dem
+            // die Uebergabe wirklich stattfand. Die Interpolation unten startete deshalb an
+            // dieser falschen Innenfeld-Position statt am echten Streckenpunkt, der Stab
+            // schien freizuschweben, bevor er beim Nehmer "ankam". Der WIRKLICHE Uebergabepunkt
+            // ist der Bahn-Punkt zu `geber.pos` (unveraendert seit dem Wechsel, s. stepSpurt
+            // "u.aktiv=false; u.pos=u.beinBis") auf seiner LAUFSPUR (`ovalSpurR`, dieselbe
+            // Formel wie ovalPunkt() fuer einen aktiven Laeufer nimmt, statt der
+            // Innenfeld-Sonderbehandlung fuer Wartende). Reine Zeichenkorrektur -- liest nur
+            // bestehende Felder, schreibt nichts, aendert nichts an wert()/rho.
+            const gp=bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
             const gwartet=!geber.aktiv && geber.fertig==null;
             const gsk=gwartet?sk0*0.88:sk0;
             // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
@@ -30713,7 +30764,13 @@
       box.textContent="";
       box.appendChild(el("h5",null,VEREIN[seite].name));
       const t=el("table"), kopf=el("tr");
-      for(const lab of ["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit","Punkte"])kopf.appendChild(el("th",null,lab));
+      // WECHSEL-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`, s. bahnTeamstand):
+      // fuer jede andere Bahn ist das Feld undefined, Kopf- und Datenzeile bleiben dann exakt
+      // die alten vier Spalten.
+      const kopfLabels=["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit"];
+      if(stand.wechselVon)kopfLabels.push(stand.wechselKopf||"Wechsel");
+      kopfLabels.push("Punkte");
+      for(const lab of kopfLabels)kopf.appendChild(el("th",null,lab));
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
       zeilen.forEach((u)=>{
@@ -30723,6 +30780,7 @@
         tr.appendChild(el("td",null,String(platzVon.get(u.id))));
         if(stand.zeitVon){
           tr.appendChild(el("td",null,stand.zeitVon(u)));
+          if(stand.wechselVon)tr.appendChild(el("td",null,stand.wechselVon(u)));
           tr.appendChild(el("td",null,fmtP(stand.punkte.get(u.id))));
           tb.appendChild(tr); return;
         }
