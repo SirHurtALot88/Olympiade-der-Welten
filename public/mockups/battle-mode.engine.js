@@ -13604,6 +13604,34 @@
   const BB=()=>BUEHNE_ART[buehneDisc]||BUEHNE_ART.gewichtheben;
   const istBuehne=(d)=>!!BUEHNE_ART[d];
 
+  // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
+  // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
+  // spieler den anderen immer weiter zurück drängen damit man auch optisch besseres
+  // feedback hat wer nun führt!"). EINE Funktion fuer alle Buehnen-Disziplinen, die zwei
+  // Duellanten Kopf an Kopf auf einer eigenen Bahn zeigen — Fechten (zeichneFechten() unten)
+  // und Speed-Schach (die zwei Spieler neben dem fokussierten Brett in zeichneSchach()
+  // unten) — statt sie in jeder der beiden eigenen Zeichenfunktionen einzeln nachzubauen:
+  // beide teilen dieselbe Geometrie-Konvention, dass die Heim-Seite (side 0) bei der
+  // KLEINEREN x-Koordinate steht und "nach rechts" fuer beide Seiten "in Richtung Gegner"
+  // bedeutet. Ein einziger additiver Versatz auf BEIDE x-Koordinaten reicht deshalb: bei
+  // positivem Vorteil (Heim fuehrt) wandert Heims x nach rechts (vor, Richtung Gegner) UND
+  // Gasts x ebenfalls nach rechts (zurueck, weil Gast schon rechts von Heim steht) —
+  // symmetrisch umgekehrt bei negativem Vorteil. Tennis teilt diese Kopf-an-Kopf-Bahn NICHT
+  // (zeichneTennis() zeigt zwei Team-Reihen ohne eigene Bahn je Paar, s. dortiger
+  // "wortgleich aus dem generischen Zweig"-Kommentar) und bleibt deshalb aussen vor — kein
+  // Bahn-Versatz ohne Bahn.
+  //
+  // REIN VISUELL: `v` ist der bereits vorhandene laufende Vorteil (dieselbe Zahl, die als
+  // "+X Vorteil" ohnehin angezeigt wird, bzw. die Bewertungsbalken-Zahl bei Schach) — diese
+  // Funktion LIEST ihn nur, schreibt nichts auf TEILNEHMER und aendert weder Sortierung noch
+  // wert()/rezept/rho (nachgemessen fuer fechten UND speed-schach mit
+  // scripts/miss-alle-disziplinen.mjs, s. PR-Beschreibung). `maxPx` begrenzt den Versatz,
+  // damit Namen/Sprites erkennbar bleiben und sich Nachbarbahnen/Nachbarelemente (Zugliste,
+  // Bewertungsbalken) nie ueberlappen — je Aufrufstelle so gewaehlt, dass selbst der volle
+  // Versatz plus die groesste ueberlagerte Animation (Fechten: Ausfallschritt) innerhalb der
+  // vorhandenen Geometrie bleibt, s. Kommentare an den beiden Aufrufstellen.
+  const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
+
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
@@ -14572,12 +14600,85 @@
   // AUSDAUER sonst kaum eigenes Pp-Gewicht bekommt (Spirit/Health haben in den drei
   // Raetselart-Sub-Skills sonst keinen Kanal) — s. Budget-Kalibrierung oben.
   const ISPY_AUSDAUER_K=0.0200, ISPY_AUSDAUER_BODEN=0.40;
-  // NACHFUELLEN (2.2): eine geknackte Truhe ist einen Tick leer, dann liegt an derselben
-  // Position eine neue Truhe DERSELBEN ART mit der naechsten Stufe aus einer festen Folge —
-  // "die Folge steht im Raum, nicht im Wuerfel" (kein zusaetzlicher rr()-Verbrauch). Der
-  // Startpunkt in der Folge ist je Fundort-Position verschoben (Modulo Fundort-Index),
-  // damit nicht alle Truhen synchron dieselbe Stufe nachziehen.
-  const ISPY_NACHFUELL_FOLGE=[2,1,3,2,1,2];
+  // NACHFUELLEN (2.2), ART-EIGEN (Opus-Gegencheck 2, 22.09., Abschnitt 3 — "die
+  // Nachfuellfolge hebelt die Kalibrierung aus"): eine geknackte Truhe ist einen Tick leer,
+  // dann liegt an derselben Position eine neue Truhe DERSELBEN ART mit der naechsten Stufe
+  // aus einer festen Folge — "die Folge steht im Raum, nicht im Wuerfel" (kein zusaetzlicher
+  // rr()-Verbrauch, wie bisher).
+  //
+  // BEFUND, DER DIESEN UMBAU AUSLOEST: bis hierher (PR 1-4 + Kalibrierrunde 22.09.) war die
+  // Folge EINE einzige, positionsindizierte Liste (`ISPY_NACHFUELL_FOLGE=[2,1,3,2,1,2]`,
+  // `folgePos=idx%6`) — artblind. Alle zwoelf Positionen liefen dieselbe geteilte Folge nur
+  // phasenverschoben ab, sodass JEDE Position, unabhaengig von ihrer Raetselart, irgendwann
+  // Stufe 3 zog. Der Logik-Tresor (idx 2) stand zufaellig auf einer Phase, die ihn sofort
+  // wieder zu einem Tresor machte; der Verhoer-Tresor (idx 7) auf einer, die ihn zu einer
+  // 10-Punkte-Notiz machte. Ergebnis: die kalibrierte Punktmassen-Verteilung (1.5: Logik
+  // 37,6 %/Verhoer 36,5 %/Mechanik 25,9 %) galt nur im Startzustand (Tick 0, dort ohnehin
+  // durch das Layout auf 41,9/35,5/22,6 % fixiert, s. Kommentar bei `fundorte` oben) und
+  // driftete bis Tick 7 auf 39,8/28,1/32,1 % (Gegencheck 2, Abschnitt 3.1) — tatsaechlich
+  // VERGEBEN wurden ueber ein ganzes Spiel 44,7/32,0/23,3 % gegen den Anspruch.
+  //
+  // FIX: jede Raetselart bekommt IHRE EIGENE Folge (`ISPY_NACHFUELL_FOLGE_BY_ART`), an ihre
+  // eigenen Positionen gebunden — eine Logik-Position bleibt ueber jeden Nachfuell-Zyklus
+  // eine Logik-Position (der Fundort-`art`-Wert aendert sich beim Nachfuellen nie, nur die
+  // Stufe). Jede Folge ist so gewaehlt, dass ihr LANGZEIT-MITTELWERT je Position die
+  // kalibrierte Punktmasse-Verteilung ab Tick 1 innerhalb von ±3 Pp haelt (nachgemessen mit
+  // `window.__arena.ispyNachfuellSonde`, s.u. bei `baueSchatzsuche`):
+  //     Logik    5 Positionen x Oe 23,33 Pkt = 116,7
+  //     Verhoer  3 Positionen x Oe 36,67 Pkt = 110,0
+  //     Mechanik 4 Positionen x Oe 20,00 Pkt =  80,0
+  //     -> 38,0 / 35,9 / 26,1 % im Langzeitmittel (Anspruch 37,6/36,5/25,9, alle drei < 1 Pp
+  //     Abweichung). Mechanik zieht — wie im Ausgangslayout, das dort ohnehin keinen Tresor
+  //     hat, s. `fundorte`-Kommentar oben — NIE Stufe 3; nur Logik und Verhoer behalten je
+  //     eine Tresorphase in ihrer Folge, die ABWECHSLUNG bleibt also erhalten (unterschied-
+  //     liche Stufen rotieren weiter), nur die Punktmasse ist jetzt an die Art gebunden statt
+  //     an den rohen Positions-Index.
+  //
+  // TICK 0 BLEIBT UNVERAENDERT bei 41,9/35,5/22,6 % — das ist der feste Startzustand aus dem
+  // `fundorte`-Array (Gegencheck 1, Abschnitt 3.4/T5, dort ausdruecklich als beste unter den
+  // Spiegelsymmetrie-Zwaengen erreichbare Naeherung an 37,6/36,5/25,9 dokumentiert, 4,3 Pp
+  // Abweichung "kostet 1,2 Pp Papier"). Dieser Umbau aendert daran nichts — er repariert nur
+  // die DRIFT ab Tick 1, die vorher on top kam.
+  //
+  // FRUEHER UEBERGANG (nachgemessen mit der Sonde, s.u.): jede Folge startet je Block/
+  // Singleton GENAU an dem Eintrag, der der URSPRUENGLICHEN Stufe dieser Position entspricht
+  // (`ISPY_NACHFUELL_START`) — NICHT, weil die Position dorthin "zurueckkehrt" (das waere die
+  // im Gegencheck gemessene, rho-neutrale "positionstreue" Reparatur, Abschnitt 3.3, die
+  // bewusst NICHT gewaehlt wurde), sondern als reine STARTBEDINGUNG: die ERSTE Truhe, die
+  // eine Gruppe nach ihrem allerersten Knacken zieht, liegt damit nah an ihrem alten Wert,
+  // und erst ab dem ZWEITEN Nachfuellen dieser Gruppe rotiert die Folge weiter durch die
+  // anderen Stufen. Ohne diesen Kniff (erste Fassung, Startphasen gleichmaessig ueber die
+  // Folge verteilt statt am Ursprungswert verankert) gab es einen sichtbaren Einbruch in den
+  // Ticks 1-2 (Logik bis 32,4 %, Mechanik bis 29,5 % bei n=200) — weil die schnell
+  // nachfuellenden Stufe-1-Positionen (hohe Knackchance) zufaellig alle auf denselben
+  // niedrigen Folge-Eintrag fielen, bevor die langsameren Tresor-Positionen ueberhaupt einmal
+  // nachgezogen hatten. Mit der Verankerung bleiben alle acht Ticks (0-7) innerhalb ±3 Pp um
+  // 37,6/36,5/25,9 (s. PR-Beschreibung fuer die volle Tick-Tabelle).
+  //
+  // SPIEGELPAAR-SYMMETRIE (Gegencheck 2, Abschnitt 3.2): der Startpunkt in der Folge
+  // (`ISPY_NACHFUELL_START`) haengt an der BLOCKZUGEHOERIGKEIT, nicht mehr am rohen Index —
+  // beide Haelften eines Spiegelpaars (z.B. idx 0 und idx 4, `ISPY_BLOECKE` unten) bekommen
+  // denselben Startpunkt und ziehen deshalb Zug fuer Zug IMMER dieselbe Stufe zur selben Zeit
+  // (vorher lief idx 0 auf Phase 0, idx 4 auf Phase 4 derselben Folge — vier von fuenf
+  // Spiegelpaaren liefen dadurch asymmetrisch nach). Nur zwischen verschiedenen BLOECKEN
+  // derselben Art bleibt die Phase verschoben (das war schon das Ziel des alten Kommentars:
+  // "damit nicht alle Truhen synchron dieselbe Stufe nachziehen").
+  const ISPY_NACHFUELL_FOLGE_LOGIK=[1,2,1,3,1,2];
+  const ISPY_NACHFUELL_FOLGE_VERHOER=[2,3,2,2,3,2];
+  const ISPY_NACHFUELL_FOLGE_MECHANIK=[2,1,2,2,1,2];
+  const ISPY_NACHFUELL_FOLGE_BY_ART={logik:ISPY_NACHFUELL_FOLGE_LOGIK,
+    verhoer:ISPY_NACHFUELL_FOLGE_VERHOER, mechanik:ISPY_NACHFUELL_FOLGE_MECHANIK};
+  // Startphase je Fundort-BLOCK (nicht je Position): beide Haelften eines Spiegelpaars
+  // teilen sich einen Eintrag (0/4, 1/3, 6/8, 5/9, 10/11), die beiden Mittelachsen-Tresore
+  // (idx 2/7, `ISPY_MITTE_IDX` unten) stehen fuer sich allein. Werte sind Indizes in die
+  // jeweils art-eigene Folge oben, je EINER pro Block/Singleton — gewaehlt, damit der ERSTE
+  // Folge-Eintrag jeder Gruppe ihrer URSPRUENGLICHEN Stufe entspricht (s. Kommentar
+  // "FRUEHER UEBERGANG" oben): Logik-Block{0,4} war Stufe 1 -> Start 0 (FOLGE[0]=1),
+  // Logik-Block{1,3} war Stufe 2 -> Start 1 (FOLGE[1]=2), Logik-Singleton{2} war Stufe 3 ->
+  // Start 2 (FOLGE[2]=3); Verhoer-Block{6,8} war Stufe 2 -> Start 0, Verhoer-Singleton{7}
+  // war Stufe 3 -> Start 1; Mechanik-Block{5,9} war Stufe 1 -> Start 0, Mechanik-Block{10,11}
+  // war Stufe 2 -> Start 1.
+  const ISPY_NACHFUELL_START={0:0,4:0, 1:1,3:1, 2:3, 6:0,8:0, 7:1, 5:1,9:1, 10:0,11:0};
 
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
@@ -14656,8 +14757,12 @@
     const aktivIdx=ispyAktiveFundorte(fundorte,teilnehmer.length);
     const truhen=aktivIdx.map(idx=>{
       const f=fundorte[idx];
+      // ART-EIGENE FOLGE (s. Kommentar bei ISPY_NACHFUELL_FOLGE_BY_ART oben): `folgePos`
+      // startet jetzt am block-gebundenen Startpunkt (ISPY_NACHFUELL_START), nicht mehr am
+      // rohen Fundort-Index — die Folge selbst waehlt sich `t.art` beim Nachfuellen unten.
+      const folgeLaenge=ISPY_NACHFUELL_FOLGE_BY_ART[f.art].length;
       return {idx, art:f.art, neben:f.neben||null, stufeAktuell:f.stufe, fortschritt:0,
-        leer:false, folgePos:idx%ISPY_NACHFUELL_FOLGE.length, x:f.x};
+        leer:false, folgePos:(ISPY_NACHFUELL_START[idx]||0)%folgeLaenge, x:f.x};
     });
     for(const u of teilnehmer){
       // u.funde (Konzept Abschnitt 4): rein additives Anzeigefeld je Stufe, fliesst NIE in
@@ -14850,17 +14955,25 @@
         merke(ziel,false);
       }
     }
-    // NACHFUELLEN (2.2), UNVERAENDERT AUS PR 1: jede in DIESEM Tick geknackte Truhe wird
-    // sofort danach wieder befuellt — sie bleibt damit GENAU EINEN Tick lang leer.
+    // NACHFUELLEN (2.2): jede in DIESEM Tick geknackte Truhe wird sofort danach wieder
+    // befuellt — sie bleibt damit GENAU EINEN Tick lang leer, wie seit PR 1. Nur WELCHE
+    // Stufe sie zieht, ist jetzt art-eigen (s. ISPY_NACHFUELL_FOLGE_BY_ART weiter oben).
     for(const t of truhen){
       if(t.leer){
-        t.stufeAktuell=ISPY_NACHFUELL_FOLGE[t.folgePos%ISPY_NACHFUELL_FOLGE.length];
+        // ART-EIGENE FOLGE (s. Kommentar bei ISPY_NACHFUELL_FOLGE_BY_ART oben): `t.art`
+        // aendert sich beim Nachfuellen nie, nur `t.stufeAktuell` — dieselbe Truhe zieht
+        // deshalb ueber das ganze Spiel ausschliesslich aus IHRER Art-Folge nach.
+        const folge=ISPY_NACHFUELL_FOLGE_BY_ART[t.art];
+        t.stufeAktuell=folge[t.folgePos%folge.length];
         t.folgePos++; t.fortschritt=0; t.leer=false;
       }
     }
     return ereignisseDiesesTicks;
   }
 
+  // Sonden-Haken fuer window.__arena.ispyNachfuellSonde (s. dort) — null im normalen Spiel,
+  // rein additiv, kein rr()-Verbrauch (s. Kommentar in der Tick-Schleife unten).
+  let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
@@ -14880,6 +14993,12 @@
     // Verzoegerung nichts, weil beide Seiten ausschliesslich aus dem VORHERIGEN Tick lesen.
     let sichtbarFuerMine=[], sichtbarFuerGegner=[];
     for(let tick=0;tick<art.rundenN;tick++){
+      // NACHFUELLFOLGE-SONDE (window.__arena.ispyNachfuellSonde, s.u.): reiner Lesehaken,
+      // ruehrt kein rr() und kein Gameplay an — nur wenn ISPY_NACHFUELL_SONDE gesetzt ist
+      // (die Sonde selbst schaltet ihn danach wieder ab), meldet er die STANDING-Punktmasse
+      // BEIDER Raeume VOR der Verarbeitung dieses Ticks (Tick 0 = Startzustand aus `fundorte`,
+      // wie in Gegencheck 2 Abschnitt 3.1 gemessen).
+      if(ISPY_NACHFUELL_SONDE)ISPY_NACHFUELL_SONDE(tick,mineRaum,gegnerRaum);
       const eigeneFuerGegner=ispySeiteTick(art,mineT,mineRaum,tick,sichtbarFuerMine,mineTeamgeist);
       const eigeneFuerMine=ispySeiteTick(art,gegnerT,gegnerRaum,tick,sichtbarFuerGegner,gegnerTeamgeist);
       sichtbarFuerMine=eigeneFuerMine;
@@ -17245,6 +17364,17 @@
     // En-garde-Linien 2 m von der Mitte auf einer 14 m langen Bahn (~14%), hier aufgerundet
     // fuer sichtbaren Abstand zwischen den Sprites.
     const gardeAbstand=bahnLen*0.15;
+    // TAUZIEH-VERSATZ (s. buehneTauziehVersatz()-Kommentar oben): hoechstens 30 % des
+    // En-garde-Abstands. Selbst im Extremfall (voller Versatz UND volle gleichzeitige
+    // Ausfallschritt-Auslenkung, FECHT_AUSFALL_PX=30) bleibt jeder Fechter auf seiner
+    // eigenen Bahnhaelfte — gardeAbstand*0.3+30 < gardeAbstand fuer jeden Bahnmassstab
+    // dieser Funktion (gardeAbstand=144 bei der Standard-Canvasbreite: 43+30=73<144),
+    // die beiden koennen sich also nie ueberschneiden. maxV mit Bodenwert 60 (dieselbe
+    // Konstante wie der Bewertungsbalken in zeichneSchach) statt eines rohen Max ueber
+    // TEILNEHMER, damit ein noch knapper Rueckstand am Spielbeginn (kleines |v|, kleines
+    // rohes Max) nicht sofort auf den vollen Versatz hochskaliert.
+    const vorteilVersatzPx=gardeAbstand*0.3;
+    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs((x.aktuell>=0&&x.verlauf)?x.verlauf[x.aktuell]:0)));
     const sk=Math.max(0.55,Math.min(1,1.12-0.09*(bretter-1)));
     const posMap=new Map();
     for(let i=0;i<bretter;i++){
@@ -17265,11 +17395,18 @@
       ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
       [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
       ctx.lineWidth=1;
-      // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade), plus der
-      // Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
+      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
+      // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
+      // ihn jetzt schon brauchen. Positiver Vorteil fuer a (Heim) schiebt BEIDE x-Koordinaten
+      // in dieselbe Richtung — a nach rechts, in Richtung b (vorruecken), UND b ebenfalls
+      // nach rechts, von a weg (zurueckweichen), weil b schon rechts von a steht.
+      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+      const zug=buehneTauziehVersatz(v,maxV,vorteilVersatzPx);
+      // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade) +/- Tauzieh-Versatz,
+      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
       const dxA=fechtVersatz(a), dxB=fechtVersatz(b);
-      const ax=baseX0+dxA, ay=laneY+(a.vizFechtBob||0);
-      const bx=baseX1-dxB, by=laneY+(b.vizFechtBob||0);
+      const ax=baseX0+dxA+zug, ay=laneY+(a.vizFechtBob||0);
+      const bx=baseX1-dxB+zug, by=laneY+(b.vizFechtBob||0);
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
@@ -17289,8 +17426,8 @@
       });
       // KOPFZEILE JE BAHN: Treffer/Vorteil/Gang — dieselben drei Zahlen wie im generischen
       // Zweig, nur als eine Zeile ueber statt drei Zeilen unter der Figur, weil bei sechs
-      // Bahnen kein Platz fuer den vollen generischen Block bleibt.
-      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+      // Bahnen kein Platz fuer den vollen generischen Block bleibt. `v` kommt jetzt von
+      // weiter oben (die Tauzieh-Positionen brauchen ihn schon vor dieser Stelle).
       ctx.font="700 10.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
       ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
       const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
@@ -19251,8 +19388,17 @@
     // Chris/Fable-Entscheidung, s. Plan A.3/A.6 Schritt 5; blickAus() laesst sie ueber
     // ihre Seite ohnehin schon einander zugewandt stehen: Seite 0 blickt rechts, Seite 1
     // links, genau zueinander).
+    // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): dieselbe
+    // Funktion, dieselben `v`/`maxV` wie der Bewertungsbalken zwei Zeilen ueber diesem
+    // Kommentar — ein fuehrender Spieler rueckt naeher ans Brett, der zurueckliegende weiter
+    // weg. 25px: die Zugliste beginnt bei bx+bw+34, Schwarz steht bei bx+bw+110 — selbst der
+    // volle Vorruecke-Versatz (-25) laesst 51px Luft zur Zugliste; Weiss (bx-110) hat zur
+    // Bewertungsbalken-Saeule (bx-42) bei vollem Versatz (+25) 43px Luft. Groesser waere an
+    // dieser Geometrie schon knapp, s. PR-Beschreibung.
+    const schachVersatzPx=25;
+    const zug=buehneTauziehVersatz(v,maxV,schachVersatzPx);
     const py=by+bw*0.55;
-    [[a,bx-110,"--home","Weiß"],[b,bx+bw+110,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
+    [[a,bx-110+zug,"--home","Weiß"],[b,bx+bw+110+zug,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
       const c=css(farbVar); ctx.fillStyle=c; ctx.globalAlpha=0.22; ctx.beginPath();ctx.ellipse(x,py+26,22,8,0,0,6.3);ctx.fill(); ctx.globalAlpha=1;
       // `true` (Ziel 5, A3) erzwingt dieselbe Weiche, die zeichneHeben() schon nutzt (s.
       // Kommentar dort): schaltet den istSchach()-Requisitenblock in zeichneSprite() frei
@@ -19300,7 +19446,10 @@
     for(const f of floats){
       if(f._teilnehmer!==a.id&&f._teilnehmer!==b.id)continue;
       ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.crit?css("--ok"):css("--ink"); ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
-      const x=f._teilnehmer===a.id?bx-110:bx+bw+110; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
+      // +zug: derselbe Tauzieh-Versatz wie bei den Spieler-Sprites oben, damit der
+      // Schwebetext ueber dem tatsaechlich gezeichneten Kopf schwebt statt an der alten,
+      // unverschobenen Stelle.
+      const x=(f._teilnehmer===a.id?bx-110:bx+bw+110)+zug; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
     }
   }
 
@@ -23204,8 +23353,20 @@
       return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
         punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
         zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
-        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit)
-          +(u.wechselKonto<0?" · "+fmtDauer(-u.wechselKonto)+" Wechsel":""),
+        zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit),
+        // EIGENE SPALTE FUER DIE WECHSELDAUER (Chris' Meldung, s. PR-Beschreibung): vorher
+        // haengte zeitVon oben die Wechselzeit nur AN, und nur wenn `u.wechselKonto<0` war —
+        // in der Praxis fast immer wahr (jeder Wechsel kostet die Beteiligten Zeit, s.
+        // stepSpurt "u.wechselKonto-=verlust/2"), aber unauffaellig in derselben Zelle wie die
+        // Etappenzeit verklebt und beim kleinsten Rundungsfehler unsichtbar. Jetzt eine eigene,
+        // IMMER gefuellte Spalte je Laeufer: `wechselN` (Anzahl seiner Uebergaben, 0/1/2 — der
+        // Start- und der Schlusslaeufer haben nur eine, alle dazwischen zwei) sagt, ob er
+        // ueberhaupt an einem Wechsel beteiligt war, `-wechselKonto` seine Bilanz aus allen
+        // seinen Uebergaben in Sekunden (Chris' Wunsch: "damit man sieht wer da evtl.
+        // gestuerzt ist" — ein auffaellig hoher Wert ist der Hinweis). Reine Anzeige, liest nur
+        // die zwei bestehenden Felder, aendert nichts an bahnLeistung()/wert()/rho.
+        wechselVon:(u)=>u.wechselN?fmtDauer(Math.max(0,-u.wechselKonto)):"—",
+        wechselKopf:"Wechsel",
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
     // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
@@ -26264,7 +26425,17 @@
   const ovalAmZiel=(anteil)=>{const f=(((anteil%1)+1)%1); return f<0.25||f>0.75;};
   function ovalPunkt(u){
     const platz=rennFertig.indexOf(u);
-    const anteil=ovalAnteil(u);
+    // GESTUERZTER/STOLPERNDER LAEUFER BLEIBT AUCH OPTISCH STEHEN (Chris' Meldung, s.
+    // PR-Beschreibung). u.stolper ist bei der Staffel PHYSISCH (tempoVon() drosselt auf 35%
+    // Tempo, s. dort — u.pos kriecht also waehrend eines Wechsels/Patzers trotzdem weiter,
+    // genau das kostet ihn Zeit) UND zugleich schon heute das Signal fuer die "liegt"-Pose
+    // (`down:u.stolper>0` in zeichneSpurt) — nur die POSITION folgte bisher weiter der
+    // lebenden `u.pos`, die Figur "lag" also sichtbar und rutschte dabei ueber die Bahn.
+    // `u.vizStolperAnteil` (ausschliesslich von stepStaffel geschrieben, s. dort) haelt den
+    // Bahnpunkt beim Einsetzen des Stolperns fest; hier wird er nur GELESEN. Reine
+    // Zeichenkorrektur: u.pos selbst, etappenZeit, bahnLeistung()/bahnRangliste() und
+    // MOTOREN.staffel.wert() lesen `anteil` hier nicht mit und bleiben unveraendert.
+    const anteil=(u.stolper>0 && u.vizStolperAnteil!=null)?u.vizStolperAnteil:ovalAnteil(u);
     // SPUR: mechanisch gibt es zwei (u.bahnZ 0/1), gezeichnet werden sechs — die beiden
     // Mannschaften liegen auf den mittleren Spuren OVAL_SPUR0 und OVAL_SPUR0+1. u.bahnZ
     // wird waehrend eines Bahnwechsels weich interpoliert und ist dann gebrochen; das
@@ -27850,8 +28021,24 @@
       if(u.vizInitDone==null){
         u.vizDurchGesehen=!!u.durch; u.vizUebergabeT=0; u.vizUebergabeGeberId=null;
         u.vizAnlauf=0; u.vizZielGesehen=false; u.vizInitDone=true; u.vizSchritt=(u.id||0)*2.3;
+        u.vizStolperAnteil=null;
       }
       if(u.aktiv && u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
+      // ---- 0. STOLPERN/PATZER HAELT DIE FIGUR AUCH OPTISCH AN (Chris' Meldung, s.
+      // PR-Beschreibung). u.stolper>0 ist bei der Staffel ausschliesslich die Uebergabe
+      // (`naechster.stolper=verlust`, stepSpurt) — physisch bremst tempoVon() ihn auf 35%
+      // Tempo statt auf 0 (Absicht, s. Kommentar dort: "verloren geht rund zwei Drittel der
+      // Stolperdauer"), `u.pos` kriecht also weiter. Fuer die ZEICHNUNG haelt ovalPunkt()
+      // (":26241") die Figur stattdessen an genau dem Bahnpunkt fest, an dem das Stolpern
+      // einsetzte — `u.vizStolperAnteil` traegt diesen Punkt, ausschliesslich hier
+      // geschrieben, nur dort gelesen. Sobald u.stolper wieder auf 0 ist, wird der Punkt
+      // geloescht und die Zeichnung folgt wieder der lebenden Position. NUR praesentational:
+      // u.pos/u.v selbst, etappenZeit, bahnLeistung()/wert() sehen dieses Feld nie.
+      if(u.stolper>0){
+        if(u.vizStolperAnteil==null)u.vizStolperAnteil=ovalAnteil(u);
+      } else {
+        u.vizStolperAnteil=null;
+      }
       // ---- 1. ANLAUF, s. Kommentar oben. Nur wer der NAECHSTE in der Wartereihe ist (sein
       // Vordermann laeuft gerade), bekommt ein Zielwert>0; ein Laeufer, der noch zwei oder
       // mehr Abschnitte entfernt ist, der Startlaeufer (kein Vordermann) und wer selbst schon
@@ -28468,7 +28655,20 @@
         if(u.vizUebergabeT>0 && u.vizUebergabeGeberId!=null){
           const geber=LAEUFER.find(o=>o.id===u.vizUebergabeGeberId);
           if(geber){
-            const gp=laeuferXY(geber);
+            // DER STAB SCHWEBTE FREI (Chris' Meldung, s. PR-Beschreibung): `laeuferXY(geber)`
+            // fragt `ovalPunkt()`, und die stellt einen Geber, der gerade erst uebergeben hat
+            // (`geber.aktiv===false`, `geber.fertig` bleibt bis zum TEAM-Ziel null), genau wie
+            // einen noch gar nicht gestarteten Laeufer in die Wechselzonen-Warteschlange im
+            // Innenfeld (":26251", der Radius-/vx-Block) -- ein anderer Punkt als der, an dem
+            // die Uebergabe wirklich stattfand. Die Interpolation unten startete deshalb an
+            // dieser falschen Innenfeld-Position statt am echten Streckenpunkt, der Stab
+            // schien freizuschweben, bevor er beim Nehmer "ankam". Der WIRKLICHE Uebergabepunkt
+            // ist der Bahn-Punkt zu `geber.pos` (unveraendert seit dem Wechsel, s. stepSpurt
+            // "u.aktiv=false; u.pos=u.beinBis") auf seiner LAUFSPUR (`ovalSpurR`, dieselbe
+            // Formel wie ovalPunkt() fuer einen aktiven Laeufer nimmt, statt der
+            // Innenfeld-Sonderbehandlung fuer Wartende). Reine Zeichenkorrektur -- liest nur
+            // bestehende Felder, schreibt nichts, aendert nichts an wert()/rho.
+            const gp=bahnPunkt(ovalAnteil(geber), ovalSpurR(OVAL_SPUR0+geber.bahnZ));
             const gwartet=!geber.aktiv && geber.fertig==null;
             const gsk=gwartet?sk0*0.88:sk0;
             // staffelBlickRichtung() statt der alten Inline-Formel (dieselbe Korrektur wie
@@ -30354,7 +30554,18 @@
                     zusatz:BA().staffel
                       ? (staffelRang.raenge.has(x.id)?"Rang "+staffelRang.raenge.get(x.id)+"/"+staffelRang.von
                          :x.aktiv?Math.round(x.pos*100)+" %":"wartet")
-                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"}}))
+                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+            // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
+            // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
+            // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
+            // bisher NUR als Zahl (`leiste.zusatz`, "26 %") -- die Puste-Leiste darunter
+            // ist eine andere Groesse (Ausdauer, nicht Position) und laesst sich nicht
+            // als Fortschritt lesen. `x.pos` ist bereits 0..1 entlang der Strecke/Wand
+            // (dieselbe Zahl, die `zusatz` oben in Prozent umrechnet) -- reiner
+            // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
+            // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
+            // EINEN Bahn-Zweig fuehrt.
+            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
@@ -30385,6 +30596,18 @@
         const f=el("s"); f.style.width=Math.max(0,Math.min(100,anteil*100))+"%";
         if(u.leiste&&u.leiste.art==="puste")f.className=u.leiste.leer?"leer":(anteil<0.2?"knapp":"");
         bar.appendChild(f); k.appendChild(bar);
+        // FORTSCHRITTSBALKEN, zweite Leiste, nur auf der Bahn (Chris' Fund 22.09., s.
+        // Kommentar an der Feldbelegung oben): eigene Zeile statt die Puste-Leiste zu
+        // ueberschreiben, damit beide Groessen -- Ausdauer UND Streckenanteil --
+        // gleichzeitig sichtbar bleiben. Reine Anzeige: liest nur `u.fortschritt`
+        // (oben aus `x.pos` abgeleitet), schreibt nichts zurueck.
+        if(u.fortschritt!=null){
+          const fbar=el("div","kbar fortschritt");
+          const ff=el("s"); ff.style.width=Math.max(0,Math.min(100,u.fortschritt*100))+"%";
+          fbar.appendChild(ff);
+          fbar.title="Fortschritt: "+Math.round(u.fortschritt*100)+" %";
+          k.appendChild(fbar);
+        }
         // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
         // Name der Groesse, die der Balken wirklich zeigt.
         k.title=u.n+(u.down?" — ausgeschieden"
@@ -30589,7 +30812,13 @@
       box.textContent="";
       box.appendChild(el("h5",null,VEREIN[seite].name));
       const t=el("table"), kopf=el("tr");
-      for(const lab of ["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit","Punkte"])kopf.appendChild(el("th",null,lab));
+      // WECHSEL-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`, s. bahnTeamstand):
+      // fuer jede andere Bahn ist das Feld undefined, Kopf- und Datenzeile bleiben dann exakt
+      // die alten vier Spalten.
+      const kopfLabels=["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit"];
+      if(stand.wechselVon)kopfLabels.push(stand.wechselKopf||"Wechsel");
+      kopfLabels.push("Punkte");
+      for(const lab of kopfLabels)kopf.appendChild(el("th",null,lab));
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
       zeilen.forEach((u)=>{
@@ -30599,6 +30828,7 @@
         tr.appendChild(el("td",null,String(platzVon.get(u.id))));
         if(stand.zeitVon){
           tr.appendChild(el("td",null,stand.zeitVon(u)));
+          if(stand.wechselVon)tr.appendChild(el("td",null,stand.wechselVon(u)));
           tr.appendChild(el("td",null,fmtP(stand.punkte.get(u.id))));
           tb.appendChild(tr); return;
         }
@@ -32217,6 +32447,52 @@
       if(!p)return null;
       const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
       return actVon(u);
+    },
+    // NACHFUELLFOLGE-SONDE (Opus-Gegencheck 2, 22.09., Abschnitt 3.1 als Vorlage): reine
+    // Diagnose-Sonde nach demselben Prinzip wie showcaseActProbe direkt oberhalb — kein
+    // Rendering, kein eigener rr()-Verbrauch (der einzige Wurf-Verbrauch ist der ganz normale
+    // Spielverlauf selbst: M.bau() faehrt I-Spy synchron durch, s. bauBuehne()/
+    // baueSchatzsuche() oben). Sie haengt sich ueber ISPY_NACHFUELL_SONDE (s. dort) in die
+    // Tick-Schleife von baueSchatzsuche() und liest bei jedem Tick die STANDING-Punktmasse
+    // beider Raeume (Heim UND Gast, je eigene Kopie), BEVOR dieser Tick verarbeitet wird —
+    // Tick 0 ist damit exakt der Startzustand aus `fundorte`. n Spiele (Default 24, wie
+    // miss-alle-disziplinen.mjs), Default-Kader (SQUAD/OPP), Mittel ueber beide Seiten und
+    // alle Spiele je Tick. Rueckgabe: ein Eintrag je Tick mit den drei Anteilen in Prozent —
+    // direkt vergleichbar mit der Tabelle in Gegencheck 2 Abschnitt 3.1 (Ziel: Tick 1-7
+    // innerhalb ±3 Pp um 37,6/36,5/25,9; Tick 0 haengt am fixen Startlayout, s. Kommentar bei
+    // ISPY_NACHFUELL_FOLGE_BY_ART, und bleibt bei den layoutbedingten 41,9/35,5/22,6).
+    ispyNachfuellSonde:(n)=>{
+      const M=MOTOREN["i-spy"];
+      if(!M)return null;
+      const art=BUEHNE_ART["i-spy"];
+      const ticks=art.rundenN;
+      const summen=Array.from({length:ticks},()=>({logik:0,verhoer:0,mechanik:0,n:0}));
+      const anteil=(raum)=>{
+        const s={logik:0,verhoer:0,mechanik:0};
+        for(const t of raum){ if(t.leer)continue; s[t.art]+=ISPY_PUNKTWERT[t.stufeAktuell]; }
+        const g=s.logik+s.verhoer+s.mechanik||1;
+        return {logik:s.logik/g, verhoer:s.verhoer/g, mechanik:s.mechanik/g};
+      };
+      ISPY_NACHFUELL_SONDE=(tick,mineRaum,gegnerRaum)=>{
+        if(tick<0||tick>=ticks)return;
+        for(const raum of [mineRaum,gegnerRaum]){
+          const a=anteil(raum);
+          summen[tick].logik+=a.logik; summen[tick].verhoer+=a.verhoer;
+          summen[tick].mechanik+=a.mechanik; summen[tick].n++;
+        }
+      };
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      const anzahl=Math.max(1,Math.floor(Number(n)||24));
+      try{
+        for(let i=0;i<anzahl;i++){ zieheFormkarten(20260823+i*104729); M.bau(1337+i*7919); }
+      } finally {
+        ISPY_NACHFUELL_SONDE=null; M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      return summen.map((s,tick)=>({tick,
+        logik:Math.round((s.n?s.logik/s.n:0)*1000)/10,
+        verhoer:Math.round((s.n?s.verhoer/s.n:0)*1000)/10,
+        mechanik:Math.round((s.n?s.mechanik/s.n:0)*1000)/10}));
     },
     // A0.2 — DETERMINISTISCHER SONDEN-MODUS FUER SCREENSHOT-QA
     // (docs/design/deterministischer-sonden-modus-19-09.md, Opus-Synthese Echtzeit-vs-
