@@ -23442,6 +23442,76 @@
       const w=bahnRangliste();
       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
     }
+    // TIME-TRIAL (22.09.): ZWEI Groessen, GENAU WIE BEI DER STAFFEL bewusst nicht eine
+    // (s. "etappe"-Kommentar direkt darunter fuer dasselbe Prinzip). Chris woertlich: "da
+    // werden wie bei tour de france oder so die zeiten aller im team addiert und das team
+    // hat dann gewonnen" — das TEAM-Ergebnis (`seiten`) ist die Summe der individuellen
+    // Zielzeiten, kleinste Summe gewinnt. Die PUNKTE JE LAEUFER bleiben unangetastet
+    // `bahnRangliste().punkte` (dieselbe Rangpunkte-Groesse wie bei "rang" oben, s.
+    // BAHN_ART["time-trial"].wertung-Kommentar) — daran haengt die Rangtreue-Messung, hier
+    // nur gelesen, nie veraendert.
+    //
+    // GEZAEHLT WIRD `bahnZeit(u)`, NICHT DER ROHE `u.fertig`-Zeitstempel. Time-Trial startet
+    // gestaffelt (`startAbstand`, s. dort) und die Startreihenfolge wechselt zwischen den
+    // Seiten (`idx*2+seite`, s. Kommentar bei `baueEinheit`/"STARTFOLGE JETZT IM WECHSEL") —
+    // bei sechs Laeufern je Seite bekaeme dadurch die zweite Seite systematisch
+    // 6*startAbstand=4,8 Sim-Sekunden MEHR Rampenzeit in eine rohe `u.fertig`-Summe
+    // eingerechnet als die erste, ein konstanter Buchhaltungs-Unterschied, keine echte
+    // Leistung — GENAU der Fehler, den `bahnRangliste()` fuer den Einzelvergleich schon
+    // vermeidet (s. deren Kommentar "38:40 nach 1:26", derselbe Rampen-Bias). `bahnZeit(u) =
+    // u.fertig-u.startT` zieht den individuellen Rampen-Offset ab und liefert die echte
+    // GEFAHRENE Zeit je Laeufer — exakt die Zahl, die eine Tour-de-France-Zeittabelle fuehrt
+    // (der Fahrer, der zuletzt von der Rampe rollt, bekommt keinen Nachteil dafuer).
+    //
+    // WAEHREND DES RENNENS EINE HOCHGERECHNETE FUEHRUNG, GENAU DIESELBE LEHRE WIE BEI DER
+    // STAFFEL (Chris 13.09.: "und dadurch dass es immer 0-0 steht weiss man aktuell gar
+    // nicht wer fuehrt", s. "etappe"-Kommentar oben): eine Team-Zeitsumme braucht
+    // eigentlich ALLE echten Zielzeiten — ohne eine Zwischenschaetzung stuende `seiten`
+    // hier ueber die GESAMTE Renndauer bei [0,0] und spraenge erst am Ziel auf das
+    // Endergebnis (nachgemessen mit scripts/probe-zeitfahren-anzeige.mjs VOR dieser
+    // Ergaenzung: 99 % der Messpunkte auf dem allerersten Wert, exakt das Bild, das die
+    // Staffel schon einmal gezeigt hat). Deshalb wird ein noch nicht fertiger Laeufer nicht
+    // einfach uebersprungen, sondern ueber `bahnHochrechnung(u)` — dieselbe Projektion,
+    // die `bahnRangliste()` fuer den Zwischenstand bei gestaffeltem Start schon nutzt
+    // ((rennT-startT)/pos, auf 1.0 hochgerechnet) — durch eine GESCHAETZTE Zielzeit
+    // ersetzt. Ein Laeufer noch auf der Rampe (`startT>rennT`) oder mit `pos<=0` liefert
+    // keine sinnvolle Schaetzung (Division potenziell durch 0/negativ) und laesst die
+    // Summe seiner Seite bewusst unvollstaendig — die Fuehrung erscheint dann erst, sobald
+    // JEDER Laeufer beider Seiten entweder faehrt oder im Ziel ist, nie aus einem
+    // Teilfeld. `gewertet` bleibt bis zum ECHTEN Zieleinlauf aller false: die Hochrechnung
+    // darf die Anzeige fuellen, aber nicht die Schluss-Phrase ("X gewinnt") vorwegnehmen.
+    if(BA().wertung==="zeit"){
+      const w=bahnRangliste();
+      const alleFertig=LAEUFER.length>0 && LAEUFER.every(u=>u.fertig!=null);
+      const geschaetzteZeit=(u)=>{
+        if(u.fertig!=null)return bahnZeit(u);
+        if((u.startT||0)>rennT||u.pos<=0)return null;
+        const h=bahnHochrechnung(u);
+        return isFinite(h)?h:null;
+      };
+      const summe=[0,0], voll=[0,0], seitenZahl=[0,0];
+      for(const u of LAEUFER){
+        seitenZahl[u.seite]++;
+        const z=geschaetzteZeit(u);
+        if(z==null)continue;
+        summe[u.seite]+=z; voll[u.seite]++;
+      }
+      const beideVollstaendig=seitenZahl[0]>0&&seitenZahl[1]>0
+        &&voll[0]===seitenZahl[0]&&voll[1]===seitenZahl[1];
+      const seiten=[0,0];
+      let zusatz=null;
+      if(beideVollstaendig){
+        if(summe[0]<summe[1])seiten[0]=1;
+        else if(summe[1]<summe[0])seiten[1]=1;
+        // Gleichstand bleibt [0,0] -- Unentschieden, dieselbe Regel wie beim frueheren
+        // Rangpunkte-Gleichstand (s. BAHN_ART["time-trial"].wertung-Kommentar) — gilt hier
+        // nur im ECHTEN Endstand (`alleFertig`), ein Hochrechnungs-Gleichstand waehrend des
+        // Rennens ist reiner Zufall zweier Schaetzungen und keine Aussage.
+        zusatz=fmtDauer(summe[0])+" gegen "+fmtDauer(summe[1]);
+      }
+      return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
+        punkte:w.punkte, gewertet:alleFertig, zusatz};
+    }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
     // Laeufer kann dem Zieleinlauf widersprechen (gemessen, s. Plan Abschnitt 2.3), und
@@ -25539,14 +25609,24 @@
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
       kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
       tagesform:0.015,
-      // WERTUNG NACH RANG (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
-      // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND
-      // Climbing): alle Laeufer beider Seiten in EINER Rangliste nach Zielzeit, Platz 1
-      // bekommt N Punkte (N = Laeufer im Rennen), der Letzte einen — Teamstand ist die
-      // Summe. Nur Anzeige und Auswertung (s. bahnRangliste/bahnTeamstand), keine Zeile
-      // der Rennmechanik haengt daran. Gleichstand bleibt Unentschieden — kein
-      // Zeitsumme-Tiebreak (Chris' Rueckfrage 06.09.).
-      wertung:"rang",
+      // TEAMWERTUNG NACH ZEITSUMME, NICHT MEHR NACH RANGPUNKTEN (Chris, 22.09., woertlich:
+      // "beim time trial gelten nicht die punkte wie zb beim spurt, sondern da werden wie
+      // bei tour de france oder so die zeiten aller im team addiert und das team hat dann
+      // gewonnen! und ich haette gedacht dass jeder spieler einzeln startet"). Der
+      // gestaffelte Einzelstart war bereits da (`startAbstand` oben, K5) — nur der
+      // TEAMSTAND folgte bis hierhin derselben Rangpunkte-Regel wie Spurt/Climbing
+      // (`wertung:"rang"`, docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md).
+      // Jetzt eigen: `wertung:"zeit"`, NUR fuer Time-Trial (Spurt und Climbing behalten
+      // "rang" unveraendert, s. dort) — bahnTeamstand() liest die neue Wertung ueber einen
+      // dritten Sonderzweig, analog zu "etappe" (Staffel) und "burg" (Takeshi's Castle).
+      //
+      // WAS SICH NICHT AENDERT: die PUNKTE JE LAEUFER (die Groesse, an der die Rangtreue
+      // gemessen wird, s. CLAUDE.md) bleiben exakt `bahnRangliste().punkte` — dieselben
+      // Rangpunkte wie vorher, unangetastet. Nur `seiten`, das TEAM-Ergebnis, wechselt von
+      // "Summe der Rangpunkte" auf "kleinste Summe der Zielzeiten gewinnt". Gleichstand
+      // bleibt weiter Unentschieden (unveraendert aus der 06.09.-Entscheidung, jetzt auf
+      // die Zeitsumme statt auf Rangpunkte angewandt).
+      wertung:"zeit",
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
