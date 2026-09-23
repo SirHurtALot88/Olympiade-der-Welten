@@ -13294,13 +13294,33 @@
       // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
       // eigene Wille, der den naechsten Bissen nimmt.
       //
-      // EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a):
-      // wettessen:true schaltet zeichneBuehne()/buehnenBewegung() auf zeichneWettessen()/
-      // stepWettessen() um — Banketttafel samt Tellerstapel und Magen-Meter statt der
-      // generischen Zwei-Reihen-Darstellung, s. dortige Kommentare. Dasselbe Muster wie
-      // BUEHNE_ART.fechten/.tennis/.showcase: rein deskriptiv, ohne Wirkung auf
-      // rezept/wert()/rundenN/failAbzug/failWort/erfolgWort.
-      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65, wettessen:true,
+      // EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a;
+      // umgebaut auf die "Coney-Island-Tafel" nach dem Opus-Gegencheck 23.09.,
+      // docs/design/wettessen-format-opus-gegencheck-23-09.md): wettessen:true schaltet
+      // zeichneBuehne()/buehnenBewegung() auf zeichneWettessen()/stepWettessen() um — eine
+      // lange Bankett-Tafel zum Publikum, Wendetafeln in Wuerstchen, eine laufende 10:00-Uhr
+      // und ein Kopf-an-Kopf-Spotlight-Band statt der generischen Zwei-Reihen-Darstellung,
+      // s. dortige Kommentare. Dasselbe Muster wie BUEHNE_ART.fechten/.tennis/.showcase:
+      // rein deskriptiv, ohne Wirkung auf rezept/wert()/rundenN/failAbzug/failWort/
+      // erfolgWort.
+      //
+      // rundenN 8 -> 10 (S4, EINZIGE Zahlenaenderung des Gegenchecks): hebt rho je Spiel in
+      // beiden gemessenen Saatstroemen (Abschnitt 3.4: 6v6 0,845->0,883 und 0,872->0,902,
+      // 4v4 0,794->0,819 und 0,797->0,822) und senkt die Pp-Abweichung von 13,8 auf 7,8
+      // (Abschnitt 3.3) -- der Spearman-Brown-Fall wie Eiskunstlauf/Breaking, weil Wettessen
+      // unabhaengige, vorab gewuerfelte Durchgaenge hat statt einer RNG-Kaskade wie Hockey.
+      // Zehn Durchgaenge sind zugleich das realistische Mass: zehn Minuten, ein Durchgang je
+      // Minute (Nathan's, s. Gegencheck Abschnitt 1.1).
+      //
+      // rundenDauer 60/rundenN=6: MIT S3 (buehneGruppenGroesse, s. bauBuehne()/stepBuehne())
+      // enthuellt ein Tick nicht mehr EINEN Esser, sondern eine GANZE Runde (alle Esser
+      // beider Seiten) -- die Gesamtlaenge des Auftritts haengt deshalb nur noch an rundenN,
+      // nicht mehr an jeSeite. 60 s ist derselbe Gesamtrahmen, auf den auch die anderen
+      // Duell-Buehnen normiert sind (BUEHNE_ART.tennis/."speed-schach"/.fechten/."i-spy":
+      // rundenDauer=60/(rundenN*jeSeite*2)) -- hier reicht die einfache Form, weil die
+      // Gruppierung den Faktor jeSeite*2 bereits aus der Rechnung nimmt. Eine Runde = eine
+      // Spielminute, sechs Sekunden Bildschirmzeit dafuer.
+      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -13315,8 +13335,14 @@
       // WERTUNG_AUFTRITT. "Pause" ist Chris' eigenes Wort fuer failWort.
       // Feld heisst `wertungTabelle` (nicht `wertung`), um mit PR #807s `BAHN_ART.*.wertung`
       // (String-Wertungsmodus fuer bahnTeamstand) nicht zu kollidieren, s. Review 06.09.
+      //
+      // FUSS UM DIE WUERSTCHEN-SPALTE ERGAeNZT (S2, Coney-Island-Tafel, 23.09.): "Durchgang"
+      // heisst nach S3/S4 dasselbe wie "Minute" (ein Durchgang je Minute, s.
+      // BUEHNE_ART.wettessen.rundenN/rundenDauer oben) -- der Fusstext nennt jetzt beide
+      // Worte, und die letzte Zeile erklaert die neue "Wü"-Spalte, die keine eigene Wertung
+      // ist (s. Kommentar bei WERTUNG_AUFTRITT()).
       wertungTabelle:{failKopf:"Pause",
-        fuss:"Jeder Durchgang bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (der Durchgang zählt dann nur 65 %). „Abfall\" vergleicht die späten Durchgänge mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
+        fuss:"Jeder Durchgang (eine Minute am Tisch) bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (die Minute zählt dann nur 65 %). „Abfall\" vergleicht die späten Minuten mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt. „Wü\" rechnet „Pkt\" nur in Würstchen um (Anzeige, keine eigene Wertung)."}
     },
 
     "speed-schach":{
@@ -13724,6 +13750,11 @@
   const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). >1 NUR bei art.wettessen
+  // (s. bauBuehne()/stepBuehne() unten) -- traegt die Anzahl Esser BEIDER Seiten in EINER
+  // Runde, also wie viele zusammenhaengende buehneQueue-Eintraege ein einziger Enthuellungs-
+  // Tick abdeckt. Bleibt 1 fuer jede andere Buehnen-Disziplin (unveraendertes Verhalten).
+  let buehneGruppenGroesse=1;
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
@@ -13749,6 +13780,7 @@
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    buehneGruppenGroesse=1;
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     schachMattGehoert=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
@@ -14062,6 +14094,16 @@
         if(i<gegner.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n));
       }
     }
+    // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09., docs/design/wettessen-
+    // format-opus-gegencheck-23-09.md Abschnitt 5, S3). Die Schleife oben legt Runde ri
+    // bereits als EIN zusammenhaengender Block aus mine.length+gegner.length Eintraegen ab
+    // (Runde 1 fuer alle, dann Runde 2, Seiten verzahnt) -- fuer ein gleichzeitiges
+    // Enthuellen muss stepBuehne() also nur wissen, wie GROSS dieser Block ist, nicht WELCHE
+    // Eintraege er enthaelt. `buehneGruppenGroesse` traegt genau das; stepBuehne() liest sie
+    // nur, wenn `art.wettessen` gesetzt ist (s. dortiger Kommentar) -- jede andere Buehnen-
+    // Disziplin bleibt bei 1 (Reset in bauBuehne() oben) und damit beim alten
+    // Ein-Teilnehmer-je-Tick-Verhalten.
+    if(art.wettessen)buehneGruppenGroesse=Math.max(1,mine.length+gegner.length);
   }
 
   // ================== GEWICHTHEBEN: DER HEBER-RUNDENRECHNER ==================
@@ -15430,6 +15472,24 @@
     for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     buehneAkt-=dt;
     if(buehneAkt<=0 && buehneZeiger<buehneQueue.length){
+      // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). `buehneGruppenGroesse`
+      // ist > 1 NUR bei art.wettessen (s. bauBuehne()) und traegt dort die Groesse EINER
+      // Runde (alle Esser beider Seiten) -- exakt der Block, den die generische REIHENFOLGE-
+      // Schleife dort schon zusammenhaengend ablegt. Statt EINEN Eintrag je Tick zu
+      // enthuellen, enthuellt dieser Zweig die GANZE Gruppe im selben Tick: jeder Esser
+      // bekommt seinen naechsten Durchgang im selben Frame, stepWettessen() (s. dort)
+      // erkennt das ueber u.aktuell und startet fuer jeden sein eigenes Kau-/Schling-Timing.
+      //
+      // RANGTREUE-NEUTRAL, UND ZWAR BEWEISBAR (derselbe Beweis wie beim Duett/Showcase oben):
+      // dieser Zweig aendert AUSSCHLIESSLICH, WIE VIELE bereits vollstaendig vorberechnete
+      // runden[]-Eintraege ein Tick enthuellt -- WELCHE Eintraege enthuellt werden und in
+      // welcher Reihenfolge bleibt exakt die generische REIHENFOLGE von oben, unveraendert.
+      // Der Koerper je Durchgang (inklusive `u.summe+=r.punkte`) bleibt Zeichen fuer Zeichen
+      // derselbe wie vorher, laeuft jetzt nur `gruppe`-mal statt einmal -- nur `buehneAkt`
+      // wird EINMAL je Gruppe statt je Einzelenthuellung zurueckgesetzt (s.u.).
+      const gruppe=(BB().wettessen&&buehneGruppenGroesse>1)
+        ?Math.min(buehneGruppenGroesse,buehneQueue.length-buehneZeiger):1;
+      for(let _wettGrp=0;_wettGrp<gruppe;_wettGrp++){
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
@@ -15563,6 +15623,7 @@
       } else {
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
       }
+      } // Ende der Gruppen-Schleife (S3, Wettessen) -- s. Kommentar oben.
       buehneAkt=BB().rundenDauer;
     }
     buehnenBewegung(dt);
@@ -17135,21 +17196,25 @@
   function showcasePublikumY(){ return H*0.98; }
 
   // ================== WETTESSEN: EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen ====
-  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // 17-09, Abschnitt 3.2, D2.a; umgebaut auf die "Coney-Island-Tafel" nach dem Opus- =========
+  // Gegencheck 23.09., docs/design/wettessen-format-opus-gegencheck-23-09.md, Abschnitt 5,
+  // S1) =========================================================================================
   // Vorbild fuer die Motive ist app/foundation/discipline-stage/arena/disciplines/platter.tsx
   // ("Banquet-Tafel frontal ... Tellerstapel waechst unter jedem Esser ... Magen-Meter unten
   // mit Gabel-Marker des Fuehrenden") -- NICHT 1:1 uebernommen (SVG vs. Canvas-Primitiven,
   // andere Aufloesung), sondern dieselbe visuelle Sprache im Massstab von
   // bodenHeben()/bodenShowcase() daneben. Ersetzt den generischen violetten
   // Drei-Scheinwerferkegel-Boden (bodenBuehne()) durch eine Bankett-Halle: warmes
-  // Kerzenlicht statt kaltem Buehnenlicht, eine lange karierte Tafel quer durch die
-  // Bildmitte — genau dort, wo die Zwei-Reihen-Aufstellung (Heim oben, Gast unten, s.
-  // zeichneWettessen()) die beiden Seiten ohnehin schon gegenueber positioniert.
+  // Kerzenlicht statt kaltem Buehnenlicht.
   //
-  // KEIN Publikums-Loop (D2.c, dieselbe Begruendung wie Climbing/Spurt/Time-Trial: Risiko
-  // ohne Punkte, A4 ist binaer) — muss aber, wie bodenShowcase() es vormacht, saemtliche
-  // Loops der Buehnen VOR Wettessen abschalten, falls wir GERADE von einer von ihnen
-  // herkommen.
+  // S1, ECHTES NATHAN'S-BILD STATT ZWEI REIHEN (Gegencheck Abschnitt 1.1/1.3): im echten
+  // Wettessen stehen ALLE Esser NEBENEINANDER an einem langen Tisch, mit dem Gesicht zum
+  // Publikum -- sie sitzen sich NICHT gegenueber. Die alte Fassung hatte hier zwei Reihen,
+  // die (wie bei jeder anderen Buehnen-Disziplin) einander an der Tafel gegenuebersassen; das
+  // ist genau die Abweichung, die der Gegencheck als "generisches Boxscore-Raster" benennt.
+  // Die Tafel laeuft deshalb jetzt WEITER UNTEN, direkt unter der EINEN Sitzreihe aus
+  // zeichneWettessen() (s. wettessenSitzplaetze() dort) -- Heim links, Gast rechts,
+  // Trikotfarbe plus Faehnchen am Platz statt zweier Bloecke, die sich anschauen.
   function bodenWettessen(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -17162,7 +17227,9 @@
     g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
 
-    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv).
+    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv) -- unveraendert; die
+    // 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3) haben eigene Zonen weiter unten im Bild,
+    // s. zeichneWettessenUhr()/zeichneWettessenBand().
     ctx.fillStyle="rgba(20,10,6,.75)";ctx.fillRect(W/2-130,4,260,26);
     ctx.strokeStyle="rgba(242,193,78,.7)";ctx.lineWidth=1;ctx.strokeRect(W/2-130,4,260,26);
     ctx.font="800 15px Georgia,serif";ctx.fillStyle="rgba(242,193,78,.85)";
@@ -17175,10 +17242,10 @@
       ctx.beginPath();ctx.moveTo(wx,32);ctx.lineTo(wx+7,42);ctx.lineTo(wx-7,42);ctx.closePath();ctx.fill();
     }
 
-    // LANGE BANKETTAFEL, karierte Tischdecke, quer durch die Bildmitte — dort, wo die
-    // beiden Reihen (Heim oben bei H*0.32, Gast unten bei H*0.66, s. zeichneWettessen())
-    // einander gegenuebersitzen.
-    const tafelY0=H*0.45, tafelY1=H*0.55, felder=28;
+    // LANGE BANKETTAFEL, karierte Tischdecke, quer durchs Bild -- jetzt UNTER der einzigen
+    // Sitzreihe (WETTESSEN_REIHE_Y in wettessenSitzplaetze(), s. dort), statt zwischen zwei
+    // einander gegenuebersitzenden Reihen wie vorher.
+    const tafelY0=H*0.665, tafelY1=H*0.755, felder=28;
     ctx.fillStyle="#5a2416";ctx.fillRect(0,tafelY0,W,tafelY1-tafelY0);
     ctx.fillStyle="rgba(242,237,226,.14)";
     for(let i=0;i<felder;i+=2)ctx.fillRect(i*W/felder,tafelY0,W/felder,tafelY1-tafelY0);
@@ -18016,56 +18083,154 @@
   }
 
   // ================== WETTESSEN: TEILNEHMER-BILD (Opus-Plan Naechste-Drei-Disziplinen ========
-  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // 17-09, Abschnitt 3.2, D2.a; umgebaut auf die "Coney-Island-Tafel" nach dem Opus- ==========
+  // Gegencheck 23.09., docs/design/wettessen-format-opus-gegencheck-23-09.md, Abschnitt 5) ====
   // Exklusiv auf `art.wettessen` gegated (BUEHNE_ART.wettessen) -- dasselbe Muster wie die
   // fuenf Zweige davor (Heben/Schach/Breaking/Tennis/Fechten) in zeichneBuehne(): eigener
   // Flag, eigene Funktion, kein Eingriff in den generischen Zweig, den I-Spy weiterhin
   // unveraendert durchlaeuft (Showcase hat inzwischen ebenfalls einen eigenen Zweig).
   //
-  // AUFGESETZT AUF DIE GENERISCHE ZWEI-REIHEN-GEOMETRIE (dieselbe Positionsformel wie der
-  // generische Zweig/zeichneTennis: `90+(W-180)*i/(g.length-1)`, Heim oben bei H*0.32, Gast
-  // unten bei H*0.66) statt eines vollstaendigen Layoutbruchs — die beiden Reihen sitzen
-  // sich an der Bankettafel (bodenWettessen()) ohnehin schon gegenueber, "frontal" kommt
-  // aus dem Boden, nicht aus einer neuen Koordinatenformel. Kein Feld wird hier gelesen,
-  // das nicht auch der generische Zweig schon liest (u.summe/u.aktuell/u.n/u.lunge).
+  // S1 -- EIN TISCH ZUM PUBLIKUM STATT ZWEI REIHEN (Gegencheck Abschnitt 5, S1): die alte
+  // Fassung baute auf der generischen Zwei-Reihen-Geometrie auf (Heim oben, Gast unten, wie
+  // bei Tennis/Fechten/Schach) -- Chris' eigener Befund war genau das: "generisches
+  // Boxscore-Raster". `wettessenSitzplaetze()` (s. dort) ersetzt das durch EINE Sitzreihe,
+  // Heim links / Gast rechts an derselben langen Tafel, mit leichter Staffelung fuer die bis
+  // zu zwoelf Plaetze (Abschnitt 5, S1: "bei 12 Plaetzen braucht es eine leichte
+  // Staffelung") und einem Team-Faehnchen je Platz zusaetzlich zur Trikotfarbe.
   //
-  // DREI BESPOKE ERGAeNZUNGEN aus platter.tsx, alle rein zeichnerisch:
+  // S2 -- WENDETAFEL, EINHEIT WUERSTCHEN (Abschnitt 5, S2): `wettessenWuerstchen()` ist eine
+  // REINE ANZEIGE-SKALA aus u.summe, kalibriert auf den echten Nathan's-Bereich (Median
+  // ~30-40, Spitzen ~55-65 Wuerstchen, s. Kommentar dort) -- DIE WERTUNG SELBST BLEIBT
+  // u.summe, PPs/Teamstand/rho lesen diese Funktion nirgends, exakt wie die Tafel-PR vom
+  // 17.09. es fuer die alte "Pkt"-Anzeige schon vormachte (rho blieb bit-identisch).
+  //
+  // S3 -- UHR UND KOPF-AN-KOPF-BAND (Abschnitt 5, S3): zeichneWettessenUhr()/
+  // zeichneWettessenBand() sind eigene Funktionen weiter unten, beide REIN LESEND auf
+  // TEILNEHMER/u.summe/u.aktuell/buehneAkt/buehneGruppenGroesse. Das "gleichzeitige Essen"
+  // selbst ist NICHT nur eine Anzeige-Illusion, sondern echt: `buehneGruppenGroesse`
+  // (bauBuehne()/stepBuehne(), s. dort) laesst bei Wettessen einen ganzen Runden-Block auf
+  // einmal enthuellen, wodurch `u.aktuell` fuer ALLE Teilnehmer synchron laeuft -- diese
+  // Funktion liest davon nur EINEN Teilnehmer, um die verbleibende Zeit abzuleiten.
+  //
+  // VIER BESPOKE ERGAeNZUNGEN aus platter.tsx, alle rein zeichnerisch:
   //   1. LATZ-SERVIETTE (rot-weiss gestreift) am Hals jedes Essers -- platter.tsx' Serviette,
   //      hier OHNE DISZIPLIN_PROP (kein Requisiten-Overlay, D2.d bewusst ausgelassen wegen
   //      moeglicher Kollision mit paralleler DISZIPLIN_PROP-Arbeit), direkt als eigenes
   //      Canvas-Primitiv oberhalb der Figur gezeichnet.
   //   2. TELLERSTAPEL unter jedem Esser -- waechst mit u.aktuell+1, genau der Zahl bereits
-  //      enthuellter Durchgaenge, die BUEHNE_ART.wettessen.rundenN:8 vorgibt.
+  //      enthuellter Durchgaenge (jetzt Minuten, s. BUEHNE_ART.wettessen.rundenN:10).
   //   3. MAGEN-METER mit Gabel-Marker des FUEHRENDEN (hoechstes u.summe ueber BEIDE Seiten)
   //      am unteren Bildrand, platter.tsx' "Magen-Meter unten mit Gabel-Marker des
-  //      Fuehrenden".
+  //      Fuehrenden" -- zeigt jetzt Minuten (S3), unveraendert in der Herleitung.
+  //   4. SPOTLIGHT auf die zwei Fuehrenden (S3, "das 1-gegen-1-Gefuehl, das Chris sucht,
+  //      ohne jemanden vom Tisch zu nehmen") -- ein warmer Lichtkegel ueber ihren Plaetzen,
+  //      alle uebrigen Plaetze bleiben im normalen Tafellicht statt komplett ausgeblendet.
   //
   // BEWEGUNG LIEST AUSSCHLIESSLICH stepWettessen()s viz*-Felder (vizEssPhase/vizEssT) fuer
   // einen kleinen Kau-/Schling-Wipper — kein neuer buehnenBewegung()-Zweig hier, kein
   // rr()-Aufruf.
+
+  // WUERSTCHEN-SKALA (S2): reine Anzeige-Skala, EINE Quelle statt zweier Literale (dasselbe
+  // Prinzip wie showcaseBuzzerPos()/ispyFundortXY() oben) -- zeichneWettessen() UND
+  // zeichneWettessenBand() muessen dieselbe Zahl zeigen. Kalibriert an
+  // window.__arena.disziplinProbe("wettessen",{n:12}) NACH der rundenN:10-Aenderung (S4):
+  // Median 716, Spanne 339-1061 Rohpunkte -- durch 18 geteilt liegt der Median bei 39,8 und
+  // die Spitzen bei ~59, der echte Nathan's-Bereich (Median 30-40, Spitzenwerte 55-70,
+  // Gegencheck Abschnitt 1.1). Gerundet auf ein HALBES Wuerstchen statt eines Achtels wie im
+  // echten Regelwerk -- fuer eine 9-11px-Anzeige ist das grob genug und trotzdem sichtbar
+  // "kein Punktestand mehr".
+  const WETTESSEN_WUERSTCHEN_SKALA=18;
+  function wettessenWuerstchen(summe){ return Math.round((summe/WETTESSEN_WUERSTCHEN_SKALA)*2)/2; }
+  function wettessenWuerstchenText(w){ return Number.isInteger(w)?String(w):w.toFixed(1).replace(".",","); }
+
+  // SITZPLAETZE (S1): EINE Quelle statt zweier Literale -- die Figuren-/Wendetafel-/
+  // Spotlight-Schleife in zeichneWettessen() UND der floats-Renderer am Ende der Funktion
+  // muessen dieselbe Koordinate treffen (dasselbe Prinzip wie ispyFundortXY()/
+  // showcaseBuzzerPos() oben). EIN TISCH: Heim links, Gast rechts derselben Reihe (statt
+  // Heim oben/Gast unten wie beim generischen Zweig) -- leichte Staffelung (abwechselnd
+  // WETTESSEN_ZIGZAG_Y tiefer) fuer die bis zu zwoelf Plaetze, exakt die "leichte
+  // Staffelung", die der Gegencheck fuer 12 Plaetze an einem Tisch vorschlaegt (Abschnitt 5,
+  // S1). REINE GEOMETRIE, liest nichts, das rr() zieht.
+  const WETTESSEN_REIHE_Y=0.575, WETTESSEN_ZIGZAG_Y=16;
+  function wettessenSitzplaetze(){
+    const y0=H*WETTESSEN_REIHE_Y, pos=new Map();
+    [0,1].forEach(seite=>{
+      const g=TEILNEHMER.filter(u=>u.side===seite);
+      const x0=seite===0?76:W/2+24, x1=seite===0?W/2-24:W-76;
+      g.forEach((u,i)=>{
+        const x=g.length>1?x0+(x1-x0)*i/(g.length-1):(x0+x1)/2;
+        pos.set(u.id,{x,y:y0+(i%2===0?0:WETTESSEN_ZIGZAG_Y)});
+      });
+    });
+    return pos;
+  }
+
+  // WENDETAFEL (S2): kleine "Kippziffernblatt"-Plakette hinter jedem Esser, Nathan's
+  // Zaehltafel-Bildmotiv (Gegencheck Abschnitt 1.1: "hinter jedem Esser eine eigene, gut
+  // sichtbare Zaehltafel") -- ein zweigeteiltes Rechteck (Trennlinie = Kipp-Falz) statt der
+  // reinen Textzeile, die vorher an dieser Stelle stand.
+  function zeichneWettessenTafel(x,y,text){
+    const b=46,h=19;
+    ctx.fillStyle="#1c1108";ctx.fillRect(x-b/2,y-h/2,b,h);
+    ctx.strokeStyle="rgba(242,193,78,.55)";ctx.lineWidth=1;ctx.strokeRect(x-b/2,y-h/2,b,h);
+    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y);ctx.lineTo(x+b/2,y);ctx.stroke();
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="700 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#f2ede2";
+    ctx.fillText(text,x,y-1);
+  }
+
   function zeichneWettessen(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    const sitz=wettessenSitzplaetze();
+
+    // KOPF AN KOPF: die zwei Fuehrenden ueber BEIDE Seiten -- dieselbe Sortierung wie
+    // WERTUNG_AUFTRITT (b.u.summe-a.u.summe), hier nur auf die ersten zwei gekappt. Traegt
+    // sowohl das Spotlight (unten) als auch das Band (zeichneWettessenBand()).
+    const rangfolge=[...TEILNEHMER].sort((a,b)=>b.summe-a.summe);
+    const erster=rangfolge[0]||null, zweiter=rangfolge[1]||null;
+    const spotIds=new Set([erster,zweiter].filter(Boolean).map(u=>u.id));
+
+    // SPOTLIGHT (S3), HINTER den Figuren gezeichnet: ein warmer Lichtkegel ueber den zwei
+    // Fuehrenden-Plaetzen -- "das 1-gegen-1-Gefuehl ... ohne jemanden vom Tisch zu nehmen"
+    // (Gegencheck Abschnitt 5, S3). Die uebrigen Plaetze werden weiter unten nur LEICHT
+    // abgedunkelt (0,82 statt 1 Alpha), nicht ausgeblendet -- am Tisch bleiben alle sichtbar.
+    for(const u of [erster,zweiter]){
+      if(!u)continue;
+      const p=sitz.get(u.id); if(!p)continue;
+      const beam=ctx.createRadialGradient(p.x,p.y-10,4,p.x,p.y-10,72);
+      beam.addColorStop(0,"rgba(255,232,180,.30)");beam.addColorStop(1,"rgba(255,232,180,0)");
+      ctx.fillStyle=beam;ctx.beginPath();ctx.arc(p.x,p.y-10,72,0,6.2832);ctx.fill();
+    }
+
     [0,1].forEach(side=>{
       const g=TEILNEHMER.filter(u=>u.side===side);
-      const y=side===0?H*0.32:H*0.66;
-      g.forEach((u,i)=>{
-        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-        ctx.globalAlpha=u.lunge>0?1:0.92;
+      g.forEach((u)=>{
+        const p=sitz.get(u.id); const x=p.x,y=p.y;
+        const gedimmt=spotIds.has(u.id)?1:0.82;
+        ctx.globalAlpha=(u.lunge>0?1:0.92)*gedimmt;
         const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.fillStyle=c;ctx.globalAlpha=0.20*gedimmt;
         ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=1;
+        ctx.globalAlpha=gedimmt;
+
+        // FAEHNCHEN AM PLATZ (S1): ein Team-Wimpel auf duennem Stab links neben dem Platz --
+        // die zweite, vom Trikot unabhaengige Art, ein Team an der langen Tafel zu erkennen
+        // ("Trikotfarbe UND ein Faehnchen am Platz", Gegencheck Abschnitt 5, S1).
+        ctx.strokeStyle="rgba(200,190,175,.6)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x-20,y+6);ctx.lineTo(x-20,y-24);ctx.stroke();
+        ctx.fillStyle=c;ctx.beginPath();
+        ctx.moveTo(x-20,y-24);ctx.lineTo(x-8,y-19);ctx.lineTo(x-20,y-14);ctx.closePath();ctx.fill();
 
         // TELLERSTAPEL, VOR der Figur gezeichnet (liegt hinter ihr auf dem Tisch) --
         // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
         // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
         const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
-        for(let p=0;p<teller;p++){
+        for(let pl=0;pl<teller;pl++){
           ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
-          ctx.globalAlpha=0.65+p*0.03;
-          ctx.beginPath();ctx.ellipse(x,y+22-p*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
+          ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
+          ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
         }
-        ctx.globalAlpha=1;
+        ctx.globalAlpha=gedimmt;
 
         zeichneSprite(ctx,u,x,y);
 
@@ -18089,6 +18254,7 @@
           ctx.restore();
         }
 
+        ctx.globalAlpha=1;
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
           ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
@@ -18096,14 +18262,23 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        const w=30,p=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+
+        // WENDETAFEL, EINHEIT WUERSTCHEN (S2) -- ersetzt das alte "412 Pkt". Reine
+        // Anzeige-Skala aus u.summe (wettessenWuerstchen(), s. dort), NICHT die Wertung
+        // selbst (die bleibt u.summe, PPs/Teamstand/rho unveraendert).
+        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wettessenWuerstchen(u.summe))+" Wü");
+
+        const w=30,pFuell=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+71,w*pFuell,3);
         ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        ctx.fillText("Min "+(u.aktuell+1)+"/"+art.rundenN,x,y+81);
       });
     });
+
+    // KOPF-AN-KOPF-BAND UND 10:00-UHR (S3) -- eigene Funktionen, s. dort.
+    zeichneWettessenBand(erster,zweiter);
+    zeichneWettessenUhr(art);
 
     // MAGEN-METER, unterer Bildrand, mit Gabel-Marker des Fuehrenden (platter.tsx' Magen-
     // Meter + Gabel-Marker) — der Fuehrende ist, ueber BEIDE Seiten hinweg, wer die meisten
@@ -18111,8 +18286,9 @@
     // per Definition das Maximum ueber alle u.summe, der Fuehrende TRAeGT also immer genau
     // diesen Wert — die Gabel stuende schon beim allerersten Biss am rechten Anschlag, statt
     // sich ueber den Auftritt hinweg zu fuellen. Stattdessen (leader.aktuell+1)/art.rundenN:
-    // wie viele der acht Durchgaenge der Fuehrende schon geschafft hat — ein "Magen"-Fuellstand,
-    // der ueber den Auftritt hinweg tatsaechlich waechst, unabhaengig vom Punktestand.
+    // wie viele der zehn Minuten der Fuehrende schon geschafft hat (S3: rundenN ist jetzt
+    // eine Minute je Durchgang) — ein "Magen"-Fuellstand, der ueber den Auftritt hinweg
+    // tatsaechlich waechst, unabhaengig vom Punktestand.
     const meterX0=90, meterX1=W-90, meterY=H-24;
     ctx.fillStyle="rgba(16,9,6,.55)";ctx.strokeStyle="rgba(242,193,78,.4)";ctx.lineWidth=0.8;
     ctx.fillRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
@@ -18141,15 +18317,68 @@
       ctx.textAlign="center";
       if(f._teilnehmer!=null){
         const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
-        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
-          const i=g.indexOf(u);
-          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
-          ctx.fillText(f.txt,x,y);
-        }
+        const p=u?sitz.get(u.id):null;
+        if(p)ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
       }
       ctx.globalAlpha=1;
     }
+  }
+
+  // KOPF-AN-KOPF-BAND (S3, Gegencheck Abschnitt 5): "oben, im Stil einer
+  // Sportuebertragung: die zwei Fuehrenden ueber beide Teams, gross, mit Portraet, Zahl und
+  // Abstand" -- Portraet ersetzt durch Name+Trikotfarbe (dieser Renderer zeichnet keine
+  // Gesichter), Zahl/Abstand in Wuerstchen (S2). Liest ausschliesslich u.summe/u.side/u.n,
+  // aendert nichts an ihnen.
+  function zeichneWettessenBand(erster,zweiter){
+    if(!erster||!zweiter)return; // Wettessen hat min. 2 je Seite; defensiv trotzdem.
+    const bandY0=H*0.115, bandY1=H*0.205, mitteY=(bandY0+bandY1)/2;
+    ctx.fillStyle="rgba(10,6,4,.68)";ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.strokeStyle="rgba(242,193,78,.5)";ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.75)";
+    ctx.textAlign="center";ctx.fillText("KOPF AN KOPF",W/2,bandY0-4);
+
+    const zeile=(u,links)=>{
+      const c=u.side===0?css("--home"):css("--away");
+      const tx=links?W*0.20:W*0.80;
+      ctx.textAlign=links?"left":"right";
+      ctx.font="700 12px 'Barlow Condensed',sans-serif";ctx.fillStyle=c;
+      ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
+      ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#dfe6ef";
+      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(u.summe))+" Würstchen",tx,mitteY+9);
+    };
+    zeile(erster,true); zeile(zweiter,false);
+
+    ctx.textAlign="center";
+    ctx.font="800 13px 'Barlow Condensed',sans-serif";ctx.fillStyle="#f2c14e";
+    ctx.fillText("VS",W/2,mitteY-2);
+    const abstand=wettessenWuerstchen(erster.summe)-wettessenWuerstchen(zweiter.summe);
+    ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.fillText(abstand<=0?"punktgleich":"+"+wettessenWuerstchenText(abstand),W/2,mitteY+12);
+  }
+
+  // 10:00-UHR (S3, Gegencheck Abschnitt 5): "eine grosse Countdown-Uhr ueber dem Tisch,
+  // jeder Durchgang ist eine Minute". Liest genau EINEN Teilnehmer, um die verstrichene Zeit
+  // abzuleiten -- das ist keine Vereinfachung, sondern eine Folge davon, dass
+  // `buehneGruppenGroesse` (bauBuehne()/stepBuehne(), s. dort) bei Wettessen einen ganzen
+  // Runden-Block auf einmal enthuellt: `u.aktuell` laeuft deshalb fuer ALLE Teilnehmer
+  // synchron, jeder von ihnen traegt also dieselbe "vergangene Minute" fuer den ganzen Tisch.
+  function zeichneWettessenUhr(art){
+    const irgendeiner=TEILNEHMER[0];
+    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
+    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done)
+      ?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):0;
+    const restSek=Math.max(0,art.rundenN*60-(minutenFertig*60+inLaufenderMinute*60));
+    const mm=Math.floor(restSek/60), ss=Math.floor(restSek%60);
+    const uhrY=H*0.275;
+    ctx.textAlign="center";
+    ctx.font="800 28px 'IBM Plex Mono',monospace";
+    ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.6)";ctx.lineJoin="round";
+    const text=mm+":"+(ss<10?"0":"")+ss;
+    ctx.strokeText(text,W/2,uhrY);
+    ctx.fillStyle=restSek<=60?"#e6432e":"#f2ede2";
+    ctx.fillText(text,W/2,uhrY);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.7)";
+    ctx.fillText("MINUTE "+Math.min(art.rundenN,minutenFertig+(done?0:1))+"/"+art.rundenN,W/2,uhrY+16);
   }
 
   // ================== SHOWCASE: TALENTSHOW-GERUEST (PR S0, Konzept 17.09.) ==================
@@ -19252,6 +19481,15 @@
         {id:"dg",   kopf:"Dg",   titel:"eigene Züge bisher",
           wert:z=>art.gauntlet?String(z.r.length):z.r.length+"/"+art.rundenN},
         {id:"pkt",  kopf:"Pkt",  top:true, titel:"Punkte gesamt", wert:z=>z.u.summe||null},
+        // WUERSTCHEN (S2, Coney-Island-Tafel, 23.09., docs/design/wettessen-format-opus-
+        // gegencheck-23-09.md Abschnitt 5): dieselbe reine Anzeige-Skala wie im Buehnenbild
+        // (wettessenWuerstchen()/wettessenWuerstchenText(), s. dort) -- NUR bei Wettessen.
+        // "Pkt" bleibt die Spalte, an der sich die Rangtreue misst; diese Spalte ist reine
+        // Zierde wie die I-Spy-Spalten direkt unten.
+        ...(art.wettessen?[
+          {id:"wuerstchen",kopf:"Wü", titel:"Würstchen (Anzeige-Skala aus „Pkt“, s. Fußnote)",
+            wert:z=>z.u.summe?wettessenWuerstchenText(wettessenWuerstchen(z.u.summe)):null}
+        ]:[]),
         // GAUNTLET-SPALTEN: HP/Kampf/Gegner/Status machen die Kette auch in der Tabelle
         // nachvollziehbar, nicht nur im Ticker/Buehnenbild -- dieselbe "Praesentation
         // nachvollziehbar" Vorgabe. `art.gauntlet` ist der einzige aktuelle Nutzer, exakt
