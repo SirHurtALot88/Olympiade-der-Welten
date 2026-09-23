@@ -26074,8 +26074,39 @@
         {von:0.80,bis:0.93,art:"kurve"}
       ],
       bergSkill:"ENDTEMPO", bergKosten:0.22, bergZehr:1.1,
+      // bergNebenSkill/-Anteil: s. Nebenweg-Kommentar an gelaendeFaktor() oben.
+      // 0,30 -> 0,40 (Pp-Fix, 23.09., vierter Kalibrierschritt, nach n=24/n=48-Bestaetigung
+      // von 38,0/34,6 Pp mit 0,30). Gemessen blieben Stamina (+9,8) und Dexterity/Awareness/
+      // Torment (-6,3/-6,2/-2,5) die groessten Restausschlaege — und WUCHT (torment40,
+      // dexterity32,awareness28) hat KEIN Stamina im Rezept, waehrend ENDTEMPO (das den
+      // restlichen bergSkill-Anteil traegt) Stamina fuehrt. Den Nebenweg-Anteil anzuheben
+      // verschiebt die Berg-Zone deshalb doppelt richtig: weniger Stamina-Gewicht, mehr
+      // Dexterity/Awareness/Torment-Gewicht, exakt die vier groessten Restausschlaege. 0,40
+      // haelt ENDTEMPO immer noch als klaren Primaerweg (60 %), nicht gleichauf.
+      bergNebenSkill:"WUCHT", bergNebenAnteil:0.40,
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
-      kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
+      // KURVE LIEST TECHNIK STATT WENDIGKEIT (Pp-Fix, 23.09., Folgeauftrag zu PR #1013 /
+      // Anhang A der Recherche 06.09.: "TECHNIK bleibt dort ungenutzt ... ein offener
+      // Anschlusspunkt, kein Fehler dieser Runde"). Seit K5 hatte TECHNIK
+      // (intelligence:40,dexterity:34,awareness:26} — genau die drei Attribute, die die
+      // Matrix nach Dexterity am schwersten fuehrt) UEBERHAUPT KEINEN Kanal: sein einziger
+      // Leser war der Huerden-Sturz-Zweig, und Time-Trial fuehrt seit dem K5-Umbau
+      // `hindernisse:[]` (keine Stuerze mehr). Gemessen (messe-arena-einfluss.mjs
+      // time-trial 48): Dexterity 5,0 % (Matrix 25 — das mit Abstand groesste Loch),
+      // Awareness 2,6 % (Matrix 12), macht zusammen mit dem toten Intelligence-Anteil den
+      // groessten Teil der 68,7 Pp Abweichung aus, waehrend Speed/Stamina (in ANTRITT/
+      // ENDTEMPO/STEHEN ueberall dabei) mit +16,5/+16,6 ueberzeichnen. WENDIGKEIT deckte
+      // beide Gelaende-Kanaele (Kurve UND Abfahrt) allein ab, obwohl sein eigenes
+      // TECHNIK-Geschwister danebenstand und nichts tat.
+      // Die Kurve ("Linie" — TECHNIKs eigener `lang`-Name, s. unten) ist die technischere
+      // der beiden Gelaendearten (Zignoli 2021, "in der Kurve ist die Leistung null",
+      // docs/design/bahn-disziplinen-recherche-fable.md Abschnitt 3.2) und passt inhaltlich
+      // zu TECHNIK; die Abfahrt bleibt bei WENDIGKEIT ("Umsetzen" — die Line unter Tempo
+      // AUSFUEHREN). Reine Config-Zeile, `gelaendeFaktor()` selbst liest den Skill-Namen
+      // ohnehin generisch (`A.kurveSkill||"WENDIGKEIT"`) — keine Aenderung an
+      // tempoVon/gelaendeFaktor/stepSpurt, keine andere Bahn betroffen (kurveSkill/
+      // abfahrtSkill existieren nur in BAHN_ART["time-trial"]).
+      kurveSkill:"TECHNIK", kurveKosten:0.16,
       tagesform:0.015,
       // TEAMWERTUNG NACH ZEITSUMME, NICHT MEHR NACH RANGPUNKTEN (Chris, 22.09., woertlich:
       // "beim time trial gelten nicht die punkte wie zb beim spurt, sondern da werden wie
@@ -26100,11 +26131,26 @@
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
         // lagen. Ein Attribut, das ueberall mitzaehlt, gewinnt immer. Jetzt tragen Kopf
         // und Blick die Linie, und Dexterity haelt sie nur noch.
-        ANTRITT:    {speed:48,power:30,dexterity:22},
-        ENDTEMPO:   {speed:42,stamina:34,intelligence:24},
+        // SPEED/STAMINA-ANTEIL GESENKT (Pp-Fix, 23.09., dritter Kalibrierschritt). ANTRITT
+        // und ENDTEMPO tragen `grund` (tempoVon) UEBER DIE GESAMTE STRECKE, STEHEN die
+        // Ermuedung (mued) UND, ueber KRAFT_VON, die Reservengrenze — anders als TECHNIK/
+        // WENDIGKEIT/WUCHT, deren Wirkung auf ihre Gelaendezonen begrenzt bleibt (s.
+        // gelaendeFaktor). Speed/Stamina sassen bisher in ALLEN DREI streckenweiten Kanaelen
+        // (Speed in ANTRITT+ENDTEMPO, Stamina in ENDTEMPO+STEHEN) und ueberzeichneten deshalb
+        // strukturell, unabhaengig vom kurveSkill-Fix oben: gemessen (n=24 nach Fix) Speed
+        // 36,3 % (Matrix 22, +14,3), Stamina 30,5 % (Matrix 15, +15,5), waehrend Dexterity
+        // mit 5,7 % (Matrix 25) und Awareness mit 2,7 % (Matrix 12) trotz TECHNIK/WENDIGKEIT/
+        // WUCHT weiterhin das groesste Loch blieben, weil deren Zonen nur einen Teil der
+        // Strecke abdecken. Die drei Kanaele bekommen deshalb selbst einen Dexterity-/
+        // Awareness-Anteil auf Kosten von Speed/Stamina — moderat (Speed/Stamina bleiben
+        // jeweils der groesste oder zweitgroesste Posten), aber strecken- statt zonenweit,
+        // damit Dexterity/Awareness endlich ebenfalls die GANZE Fahrt lang zaehlen, nicht nur
+        // in 75 % ihrer Gelaendezonen.
+        ANTRITT:    {speed:40,power:28,dexterity:24,awareness:8},
+        ENDTEMPO:   {speed:32,stamina:26,intelligence:24,dexterity:18},
         TECHNIK:    {intelligence:40,dexterity:34,awareness:26},
         WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
-        STEHEN:     {stamina:46,intelligence:30,awareness:24},
+        STEHEN:     {stamina:34,intelligence:26,awareness:32,dexterity:8},
         WUCHT:      {torment:40,dexterity:32,awareness:28},
         ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20}
       },
@@ -27780,8 +27826,28 @@
     const A=BA();
     // STEIGUNG: kostet Tempo, abgefedert durch die Bergfaehigkeit (ENDTEMPO — "wer hinten
     // noch Reserven hat, holt am Berg etwas raus", genau Chris' Fiktion).
-    if(z.art==="steigung"){ const skill=skillLesen(u,A.bergSkill||"ENDTEMPO");
-      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100)); }
+    //
+    // NEBENWEG WUCHT (Pp-Fix, 23.09., zweiter Kalibrierschritt nach der kurveSkill-Aenderung
+    // oben). WUCHT (torment:40,dexterity:32,awareness:28) hatte in Time-Trial ueberhaupt
+    // keinen Kanal: sein einziger Leser war der Huerden-Sturz-Zweig in stepSpurt, und der
+    // laeuft nie, weil `hindernisse:[]` (K5) die Schleife auf null Durchlaeufe setzt — genau
+    // dieselbe Lehre wie bei TECHNIK oben, nur beim naechsten toten Sub-Skill. Torment liest
+    // dadurch seit K5 durchgaengig 0 %, wo die Matrix 3 sagt.
+    // Statt eines dritten, eigenen Gelaende-Zweigs (Time-Trial hat nur drei Zonenarten, s.
+    // BAHN_ART["time-trial"].gelaende) bekommt WUCHT hier einen NEBENWEG im BESTEHENDEN
+    // Steigungs-Kanal — dasselbe Primaer-/Nebenweg-Muster, das Chris am 21.09. fuer I-Spy
+    // eingefuehrt und ausdruecklich verallgemeinert hat ("auf genau diese Art und Weise
+    // kannst du auch Attribute in allen moeglichen Disziplinen nutzen"). ENDTEMPO bleibt der
+    // Primaerweg (volles Gewicht); WUCHT zieht als Nebenweg mit, moderat gewichtet
+    // (`bergNebenAnteil`, nur time-trial setzt sie) — wer den Huegel eher mit Kraft und
+    // Robustheit als mit Renntempo nimmt, kommt trotzdem etwas voran. Ohne `bergNebenSkill`
+    // (jede andere Bahn) bleibt die Zeile exakt die alte Formel, bit-identisch.
+    if(z.art==="steigung"){
+      const primaer=skillLesen(u,A.bergSkill||"ENDTEMPO");
+      const nebenName=A.bergNebenSkill, nebenAnteil=nebenName?(A.bergNebenAnteil??0):0;
+      const skill=nebenAnteil?primaer*(1-nebenAnteil)+skillLesen(u,nebenName)*nebenAnteil:primaer;
+      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100));
+    }
     // ABFAHRT: schenkt Tempo, mehr fuer wendige Laeufer — dieselbe Faehigkeit wie die
     // Kurve, weil eine Abfahrt technisch genau das ist: eine lange, offene Kurve.
     if(z.art==="abfahrt"){ const skill=skillLesen(u,A.abfahrtSkill||"WENDIGKEIT");
