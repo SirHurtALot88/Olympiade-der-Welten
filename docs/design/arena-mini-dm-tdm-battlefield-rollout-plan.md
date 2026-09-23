@@ -1,5 +1,17 @@
 # Recherche: Mini-DM, TDM, Battlefield — Ist-Zustand, Assets, Zielwahl-Entscheidung (Fable)
 
+**UMSETZUNG 22.09.:** Abschnitt 3.2/4.2 Option 3 ("Objective-Layer für Battlefield", hier noch
+als "hoher Aufwand [...] liegt ausserhalb dessen, was diese Recherche vorwegnehmen soll"
+eingestuft) wurde auf Chris' ausdrücklichen Auftrag hin gebaut — Kontrollpunkt, Punkterate,
+Sieg durch Punktelimit oder Zeitablauf, Siege-Core-Rollenbonus beim Erobern. Siehe
+`ARENA_DOMINATION` in `public/mockups/battle-mode.engine.js` (Kommentarblock direkt über der
+Konstante trägt die volle Begründung inklusive Kalibrierung). Die Commander-Rolle bekommt
+bewusst KEINEN Halten-Bonus — sie steht in Reihe 2 und erreicht den Punkt kaum je, ohne die
+geteilte Formations-/Leinen-Logik anzufassen; als Folgevorschlag im PR vermerkt. rho je Spiel
+blieb bei der Umsetzung unverändert (0,392 vor UND nach der Änderung, kaderfeste Messung,
+5 Kader-Paarungen × 24 Spiele) — Battlefield fällt weiterhin durch (Schranke 0,80) und bleibt
+absichtlich ausserhalb von `ARENA_RESOLVED_DISCIPLINE_IDS`, s. PR-Beschreibung.
+
 Stand: Branch `claude/arena-drei-disziplinen-recherche`, abgezweigt von
 `origin/claude/sonde-alle-disziplinen` `c75072ff`. Alle Datei-/Zeilenangaben unten sind gegen
 genau diesen Stand geprüft. `engine.js` meint `public/mockups/battle-mode.engine.js`.
