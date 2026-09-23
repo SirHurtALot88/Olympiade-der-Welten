@@ -1,5 +1,34 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Zehnter Nachtrag 23.09. — Breaking-Gauntlet: Pp-Abweichung nachgezogen.** Fortsetzung des
+Neunten Nachtrags direkt darunter: die dort offene Nachmessung wurde jetzt geholt (`n=4`, zwei
+unabhaengige Saatstaemme — Standardseeds und der im Handbuch 3.2 dokumentierte Alternativseed
+`zieheFormkarten(20260824+i·15485863)/M.bau(4241+i·32452843)`, gegen eine unveraenderte Kopie
+des Motors gemessen, um die Produktionsdatei nicht anzufassen): **14,2 Pp / 15,7 Pp**, beide
+deutlich unter der 25er-Schranke aus CLAUDE.md. `n=4` ist bewusst klein (dieselbe
+Sandbox-Rechenlast wie im Neunten Nachtrag beschrieben liess n=12 und n=24 je nach >15 Minuten
+ohne Ergebnis abbrechen) und liest laut Handbuch 3.2 eher niedriger als der wahre Wert — bei
+einem Abstand von 9-11 Pp zur Schranke ist das Ergebnis trotzdem belastbar genug, um es nicht
+erneut auf eine grosse Messung zu vertagen.
+
+Der Fix sitzt ausschliesslich im Rezept (`BUEHNE_ART.breaking.rezept`,
+`public/mockups/battle-mode.engine.js`), NICHT in der Eignungsmatrix (bleibt gesperrt) und NICHT
+in `gauntletRunde()`s Koeffizienten. Ursache war, dass TECHNIK/NERVEN (die beiden
+erfolgschance-speisenden Kanaele) nicht nur ueber ihren Formel-Koeffizienten wirken, sondern
+zusaetzlich ueber die Ueberlebensdauer im Gauntlet verstaerkt werden — Wille sass vor dem Fix in
+FUENF der sieben Kanaele (darunter beiden erfolgsgebundenen) und nahm sich dadurch mehr als
+seinen Matrixanteil (28 von 100). Drei Kalibrierrunden (voller Kommentar an
+`BUEHNE_ART.breaking` im Code) verteilten die Kanaele neu: jedes Attribut sitzt jetzt in
+hoechstens einem der beiden erfolgsgebundenen Kanaele, GRUNDLAGE/PUBLIKUM (die immer wirkenden,
+nicht verstaerkten Kanaele) sind proportional zur Matrix gesetzt. Rangtreue nachgemessen
+(`miss-alle-disziplinen.mjs 24 breaking`, kaderfest): **rho je Spiel 0,833** (vorher 0,820 bei
+PR #1015) — innerhalb der dortigen Spannweite, also unveraendert im Rahmen des Kaderrauschens,
+die Schranke bleibt bestanden. `data/generated/breaking-pps-referenz.json` neu gezogen (die
+09.09.-Fassung war noch vom alten 8-Runden-Auftritt-Format vor dem Gauntlet-Umbau);
+`scripts/ziehe-buehne-pps-referenz.ts` nannte dabei faelschlich `spieleBuehneAuftritt` als
+aufgerufene Funktion (reine Dokumentations-Luecke seit dem Gauntlet-Umbau, `chassis`-Feld dort
+diente nur der Anzeige) — auf `spieleBuehneGauntlet` korrigiert.
+
 **Neunter Nachtrag 22.09. — Breaking wird zum Gauntlet (Chris' Vorgabe), Rangtreue neu
 kalibriert.** Chris, woertlich: „breaking point faend ich vermutlich besser wenn da spieler 1
 vs 1 kaempft und der sieger kaempft dann vs spieler 2 aus dem anderen team usw. so kann zb ein
@@ -261,7 +290,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | **Eiskunstlauf** | **Buehne** | **0,875** | 0,075 | 0,965 | 0,049 | **bestanden** |
 | **Takeshi's Castle** | **Bahn** | **0,883** | 0,071 | 0,951 | 0,042 | **bestanden — 13.09. `fallenKoennen`, vorher 0,861 / 0,116 / 0,930 / 0,056** |
 | Spurt | Bahn | 0,894 | 0,138 | 0,916 | 0,105 | bestanden |
-| **Breaking** | **Buehne** | **0,820** | 0,309 | 0,930 | 0,420 | **bestanden — 22.09. Gauntlet-Umbau, vorher 0,869/0,114/0,951/0,168, s.u.** |
+| **Breaking** | **Buehne** | **0,833** | 0,250 | 0,914 | 0,280 | **bestanden — 23.09. Pp-Kalibrierung (Rezept, s.u.), vorher 0,820/0,309/0,930/0,420 (22.09. Gauntlet-Umbau), davor 0,869/0,114/0,951/0,168** |
 | Gewichtheben | Buehne | 0,854 | 0,209 | 0,923 | 0,273 | bestanden |
 | Wettessen | Buehne | 0,845 | 0,139 | 0,930 | 0,091 | bestanden |
 | Time-Trial | Bahn | 0,828 | 0,087 | 0,832 | 0,056 | bestanden |
