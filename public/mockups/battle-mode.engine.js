@@ -13604,6 +13604,34 @@
   const BB=()=>BUEHNE_ART[buehneDisc]||BUEHNE_ART.gewichtheben;
   const istBuehne=(d)=>!!BUEHNE_ART[d];
 
+  // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
+  // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
+  // spieler den anderen immer weiter zurück drängen damit man auch optisch besseres
+  // feedback hat wer nun führt!"). EINE Funktion fuer alle Buehnen-Disziplinen, die zwei
+  // Duellanten Kopf an Kopf auf einer eigenen Bahn zeigen — Fechten (zeichneFechten() unten)
+  // und Speed-Schach (die zwei Spieler neben dem fokussierten Brett in zeichneSchach()
+  // unten) — statt sie in jeder der beiden eigenen Zeichenfunktionen einzeln nachzubauen:
+  // beide teilen dieselbe Geometrie-Konvention, dass die Heim-Seite (side 0) bei der
+  // KLEINEREN x-Koordinate steht und "nach rechts" fuer beide Seiten "in Richtung Gegner"
+  // bedeutet. Ein einziger additiver Versatz auf BEIDE x-Koordinaten reicht deshalb: bei
+  // positivem Vorteil (Heim fuehrt) wandert Heims x nach rechts (vor, Richtung Gegner) UND
+  // Gasts x ebenfalls nach rechts (zurueck, weil Gast schon rechts von Heim steht) —
+  // symmetrisch umgekehrt bei negativem Vorteil. Tennis teilt diese Kopf-an-Kopf-Bahn NICHT
+  // (zeichneTennis() zeigt zwei Team-Reihen ohne eigene Bahn je Paar, s. dortiger
+  // "wortgleich aus dem generischen Zweig"-Kommentar) und bleibt deshalb aussen vor — kein
+  // Bahn-Versatz ohne Bahn.
+  //
+  // REIN VISUELL: `v` ist der bereits vorhandene laufende Vorteil (dieselbe Zahl, die als
+  // "+X Vorteil" ohnehin angezeigt wird, bzw. die Bewertungsbalken-Zahl bei Schach) — diese
+  // Funktion LIEST ihn nur, schreibt nichts auf TEILNEHMER und aendert weder Sortierung noch
+  // wert()/rezept/rho (nachgemessen fuer fechten UND speed-schach mit
+  // scripts/miss-alle-disziplinen.mjs, s. PR-Beschreibung). `maxPx` begrenzt den Versatz,
+  // damit Namen/Sprites erkennbar bleiben und sich Nachbarbahnen/Nachbarelemente (Zugliste,
+  // Bewertungsbalken) nie ueberlappen — je Aufrufstelle so gewaehlt, dass selbst der volle
+  // Versatz plus die groesste ueberlagerte Animation (Fechten: Ausfallschritt) innerhalb der
+  // vorhandenen Geometrie bleibt, s. Kommentare an den beiden Aufrufstellen.
+  const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
+
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
@@ -17336,6 +17364,17 @@
     // En-garde-Linien 2 m von der Mitte auf einer 14 m langen Bahn (~14%), hier aufgerundet
     // fuer sichtbaren Abstand zwischen den Sprites.
     const gardeAbstand=bahnLen*0.15;
+    // TAUZIEH-VERSATZ (s. buehneTauziehVersatz()-Kommentar oben): hoechstens 30 % des
+    // En-garde-Abstands. Selbst im Extremfall (voller Versatz UND volle gleichzeitige
+    // Ausfallschritt-Auslenkung, FECHT_AUSFALL_PX=30) bleibt jeder Fechter auf seiner
+    // eigenen Bahnhaelfte — gardeAbstand*0.3+30 < gardeAbstand fuer jeden Bahnmassstab
+    // dieser Funktion (gardeAbstand=144 bei der Standard-Canvasbreite: 43+30=73<144),
+    // die beiden koennen sich also nie ueberschneiden. maxV mit Bodenwert 60 (dieselbe
+    // Konstante wie der Bewertungsbalken in zeichneSchach) statt eines rohen Max ueber
+    // TEILNEHMER, damit ein noch knapper Rueckstand am Spielbeginn (kleines |v|, kleines
+    // rohes Max) nicht sofort auf den vollen Versatz hochskaliert.
+    const vorteilVersatzPx=gardeAbstand*0.3;
+    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs((x.aktuell>=0&&x.verlauf)?x.verlauf[x.aktuell]:0)));
     const sk=Math.max(0.55,Math.min(1,1.12-0.09*(bretter-1)));
     const posMap=new Map();
     for(let i=0;i<bretter;i++){
@@ -17356,11 +17395,18 @@
       ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
       [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
       ctx.lineWidth=1;
-      // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade), plus der
-      // Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
+      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
+      // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
+      // ihn jetzt schon brauchen. Positiver Vorteil fuer a (Heim) schiebt BEIDE x-Koordinaten
+      // in dieselbe Richtung — a nach rechts, in Richtung b (vorruecken), UND b ebenfalls
+      // nach rechts, von a weg (zurueckweichen), weil b schon rechts von a steht.
+      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+      const zug=buehneTauziehVersatz(v,maxV,vorteilVersatzPx);
+      // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade) +/- Tauzieh-Versatz,
+      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
       const dxA=fechtVersatz(a), dxB=fechtVersatz(b);
-      const ax=baseX0+dxA, ay=laneY+(a.vizFechtBob||0);
-      const bx=baseX1-dxB, by=laneY+(b.vizFechtBob||0);
+      const ax=baseX0+dxA+zug, ay=laneY+(a.vizFechtBob||0);
+      const bx=baseX1-dxB+zug, by=laneY+(b.vizFechtBob||0);
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
@@ -17380,8 +17426,8 @@
       });
       // KOPFZEILE JE BAHN: Treffer/Vorteil/Gang — dieselben drei Zahlen wie im generischen
       // Zweig, nur als eine Zeile ueber statt drei Zeilen unter der Figur, weil bei sechs
-      // Bahnen kein Platz fuer den vollen generischen Block bleibt.
-      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
+      // Bahnen kein Platz fuer den vollen generischen Block bleibt. `v` kommt jetzt von
+      // weiter oben (die Tauzieh-Positionen brauchen ihn schon vor dieser Stelle).
       ctx.font="700 10.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
       ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
       const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
@@ -19342,8 +19388,17 @@
     // Chris/Fable-Entscheidung, s. Plan A.3/A.6 Schritt 5; blickAus() laesst sie ueber
     // ihre Seite ohnehin schon einander zugewandt stehen: Seite 0 blickt rechts, Seite 1
     // links, genau zueinander).
+    // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): dieselbe
+    // Funktion, dieselben `v`/`maxV` wie der Bewertungsbalken zwei Zeilen ueber diesem
+    // Kommentar — ein fuehrender Spieler rueckt naeher ans Brett, der zurueckliegende weiter
+    // weg. 25px: die Zugliste beginnt bei bx+bw+34, Schwarz steht bei bx+bw+110 — selbst der
+    // volle Vorruecke-Versatz (-25) laesst 51px Luft zur Zugliste; Weiss (bx-110) hat zur
+    // Bewertungsbalken-Saeule (bx-42) bei vollem Versatz (+25) 43px Luft. Groesser waere an
+    // dieser Geometrie schon knapp, s. PR-Beschreibung.
+    const schachVersatzPx=25;
+    const zug=buehneTauziehVersatz(v,maxV,schachVersatzPx);
     const py=by+bw*0.55;
-    [[a,bx-110,"--home","Weiß"],[b,bx+bw+110,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
+    [[a,bx-110+zug,"--home","Weiß"],[b,bx+bw+110+zug,"--away","Schwarz"]].forEach(([u,x,farbVar,farbe])=>{
       const c=css(farbVar); ctx.fillStyle=c; ctx.globalAlpha=0.22; ctx.beginPath();ctx.ellipse(x,py+26,22,8,0,0,6.3);ctx.fill(); ctx.globalAlpha=1;
       // `true` (Ziel 5, A3) erzwingt dieselbe Weiche, die zeichneHeben() schon nutzt (s.
       // Kommentar dort): schaltet den istSchach()-Requisitenblock in zeichneSprite() frei
@@ -19391,7 +19446,10 @@
     for(const f of floats){
       if(f._teilnehmer!==a.id&&f._teilnehmer!==b.id)continue;
       ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.crit?css("--ok"):css("--ink"); ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
-      const x=f._teilnehmer===a.id?bx-110:bx+bw+110; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
+      // +zug: derselbe Tauzieh-Versatz wie bei den Spieler-Sprites oben, damit der
+      // Schwebetext ueber dem tatsaechlich gezeichneten Kopf schwebt statt an der alten,
+      // unverschobenen Stelle.
+      const x=(f._teilnehmer===a.id?bx-110:bx+bw+110)+zug; ctx.fillText(f.txt,x,py-30-((1-f.life)*20)); ctx.globalAlpha=1;
     }
   }
 
