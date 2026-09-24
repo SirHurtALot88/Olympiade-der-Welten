@@ -25589,11 +25589,13 @@
     // auf das deskriptive Flag statt eine eigene ist*()-Funktion gegated (kein zweiter
     // Zustand noetig, `BA().zeitfahren` steht bereits seit PR 0.3 fest).
     if(BA().zeitfahren)return bodenZeitfahren();
-    // CLIMBING BEKOMMT EINE WAND STATT DER GRAUEN GERADEN BAHN (Opus-Plan Naechste-Drei-
-    // Disziplinen 17-09, Abschnitt 3.1, D1.a) — dieselbe Weiche wie zeitfahren zwei Zeilen
-    // darueber, nur auf `BAHN_ART.climbing.climbing` gegated (rein deskriptiv seit 14.09.,
-    // ohne Wirkung auf Rezept/Matrix/wert(), s. Kommentar dort). Kein neues Flag noetig.
-    if(BA().climbing)return bodenClimbing();
+    // CLIMBING BEKOMMT EINE ECHTE, VERTIKALE WAND (Climbing-Neubau PR 1, 24.09., ersetzt die
+    // additive Textur vom 17.09.) — dieselbe Weiche wie zeitfahren zwei Zeilen darueber, nur
+    // auf `BAHN_ART.climbing.climbing` gegated (rein deskriptiv seit 14.09., ohne Wirkung auf
+    // Rezept/Matrix/wert(), s. Kommentar dort). Kein neues Flag noetig; `bodenWand()` zeichnet
+    // komplett selbst (kein `bodenSpurtGerade()`-Aufruf mehr, s. dort) und ersetzt damit
+    // `bodenClimbing()`.
+    if(istWand())return bodenWand();
     return bodenSpurtGerade();
   }
 
@@ -25911,80 +25913,158 @@
     ctx.restore();
   }
 
-  // ================== CLIMBING: EINE WAND STATT EINER GRAUEN BAHN (bodenClimbing, ============
-  // ================== Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.1, D1.a) ========
-  // Climbing war die einzige der fuenf Bahn-Disziplinen ganz ohne eigenen Boden-Zweig: die
-  // Weiche in bodenSpurt() liess sie durch alle drei istRoute()/istOval()/zeitfahren-Zweige
-  // durchfallen, bis sie bei `bodenSpurtGerade()` landete -- demselben Zweig wie Spurt. Das
-  // Ergebnis war eine graue, flache Gerade mit denselben winzigen Griff-Punkten wie jedes
-  // andere Hindernis (BA().boden="#5d5a54", BA().baeume=false, s. Scorecard-Befund "Assets 40,
-  // die schlechteste Darstellung aller angeschlossenen Nicht-Buehnen-Disziplinen").
+  // ================== CLIMBING: EINE ECHTE WAND STATT EINER GERAUTEN BAHN (bodenWand, =======
+  // ================== Climbing-Neubau PR 1, 24.09., ersetzt bodenClimbing() vom 17.09.) =====
+  // Chris, 22.09., woertlich: "climbing ist total falsch geworden, das ist ja n hindernislauf
+  // soll aber echtes indoor klettern darstellen". `bodenClimbing()` (17.09.) hatte die Wand nur
+  // ALS TEXTUR unter eine unveraenderte HORIZONTALE Bahn gelegt (12 Spuren uebereinander, camX
+  // laeuft nach rechts) -- genau der Befund aus docs/design/climbing-neukonzept-22-09.md
+  // Abschnitt 0.3: "graue Wand mit Griffmarken -- additive Textur unter unveraenderter Bahn".
+  // `bodenWand()` dreht die Abbildung wirklich: zwoelf Routen NEBENEINANDER (wandX), jede
+  // Route steigt von UNTEN (Wandfuss, camY(0)) nach OBEN (Top-out, camY(1)) -- dieselbe
+  // istOval()/istRoute()-Weiche, die laeuferXY() schon fuehrt, jetzt um istWand() ergaenzt
+  // (s. dort). RHO-NEUTRAL: `u.pos`/`u.v`/`rr()`/`BAHN_ART.climbing.rezept` bleiben Wort fuer
+  // Wort unangetastet, es aendert sich ausschliesslich, WAS gezeichnet wird -- dieselbe
+  // Garantie wie bei jedem anderen `boden*()`.
   //
-  // GENAU DASSELBE MUSTER WIE bodenZeitfahren() OBEN: `bodenSpurtGerade()` zuerst aufrufen und
-  // das Eigene REIN ADDITIV aufsetzen, statt Hintergrund/Bahn/Zaun/Ziellinie/Huerden-Punkte ein
-  // zweites Mal zu zeichnen. Fuer die anderen vier Bahnen (Spurt/Staffel/Takeshi/Zeitfahren)
-  // aendert diese Funktion keine einzige Zeile -- sie wird fuer sie nie aufgerufen (Weiche in
-  // bodenSpurt() oben, `BA().climbing`).
-  //
-  // WAS AUFGESETZT WIRD, STEHT SCHON ALS DATEN DA (abgelesen, nicht erfunden, exakt wie beim
-  // Hoehenprofil oben):
-  //  1. UEBERHANG-SCHATTIERUNG, mit der Strecke zunehmend. BAHN_ART.climbing.steigung=0,85
-  //     ("die Wand wird nach oben steiler", s. Kommentar dort) liefert die STAERKE der
-  //     Verdunkelung von Start zu Ziel -- ZEHN gleich breite Baender ueber die volle Strecke
-  //     (dieselbe Bandtechnik wie die sieben `gelaende`-Zonen bei bodenZeitfahren, hier ohne
-  //     zonenspezifische Kanten, weil Climbing keine Zonen-Tabelle fuehrt), Deckkraft linear
-  //     von 0 am Start bis `steigung*ZW_UEBERHANG_MAX` am Ziel. Reiner Lesezugriff auf
-  //     `steigung` -- dieselbe Zahl, die tempoVon() fuer den Reserve-Verbrauch benutzt
-  //     (s. BAHN_ART.climbing-Kopfkommentar), hier nie geschrieben.
-  //  2. ZEHN GRIFFMARKEN an exakt `BAHN_ART.climbing.hindernisse` (dieselben zehn Positionen,
-  //     die HUERDEN_N() der Simulation liefert und die bodenSpurtGerade() bereits als winzige
-  //     Pro-Bahn-Punkte zeichnet, s. dortiger `wort==="Griff"`-Zweig) -- hier als groessere,
-  //     ueber die volle Wandhoehe sichtbare Kletter-Griffe, damit die Wand auch bei zwoelf
-  //     belegten Bahnen als WAND erkennbar bleibt, nicht nur als Punktreihe je Laeufer.
-  // Kein neues Bild noetig -- reine Vektorformen wie bodenZeitfahren() sie schon benutzt.
+  // WAS GEZEICHNET WIRD (Konzept Abschnitt 5.1/5.3, Gegencheck Abschnitt 3.6/5, "PR 1" -- nur
+  // was OHNE Mechanik-Aenderung sauber geht, Zonen/Balance/Zeitlimit-MECHANIK bleiben PR 2):
+  //  1. FELSWAND-HINTERGRUND UND UEBERHANG-SCHATTIERUNG, jetzt "nach oben dunkler" statt
+  //     "nach rechts dunkler" -- dieselbe Formel wie vorher (`steigung*ZW_UEBERHANG_MAX`),
+  //     nur an camY statt camX gespiegelt.
+  //  2. ZEHN GRIFFMARKEN an `BAHN_ART.climbing.hindernisse`, wie vorher, jetzt uebereinander
+  //     statt nebeneinander -- x-Streuung je Route ueber `bodenSaat`, wie im Original.
+  //  3. SICHERER AM WANDFUSS + SEIL DURCH DIE GEKLINKTEN EXEN (Gegencheck 3.6, "Chris' Wand
+  //     wird konsequenter Lead statt Boulder"): eine Strichfigur je Route, ein Seil vom
+  //     Sicherer durch die bereits erreichten der drei WAND_EXE_INDIZES-Griffe zum Kletterer.
+  //     Reiner Lesezugriff auf `u.pos` gegen die BESTEHENDEN `hindernisse`-Werte -- es gibt
+  //     noch KEIN `zonen`-Feld im Motor (das kommt erst mit PR 2), die drei Indizes sind ein
+  //     rein visueller Vorgriff auf die dort vorgeschlagenen 0,26/0,53/0,80 (3./6./9. Griff),
+  //     damit PR 2 dieselben drei Griffe uebernehmen kann, ohne dass sich am Bild etwas
+  //     verschiebt. Eine geklinkte Exe faerbt sichtbar um (Gegencheck-Wortlaut: "Eine geklinkte
+  //     Exe wechselt sichtbar die Farbe").
+  //  4. EIN LAYOUT FUER ALLE ZWOELF ROUTEN (Gegencheck 3.8/5, "ein Layout je Spiel, fuer alle
+  //     zwoelf Routen gleich, gemessen erst in PR 2"): `hindernisse` ist heute schon EINE
+  //     einzige, geteilte Liste fuer alle Routen -- nichts zu tun, keine drei Kurs-Varianten
+  //     vor der Kalibrierung.
+  //  5. COUNTDOWN-GRUNDGERUEST (Gegencheck 3.5/5, "Zeitlimit-MECHANIK erst PR 2"): eine
+  //     erkennbar inaktive Beschriftung, damit niemand eine echte Restzeit hineinliest, bevor
+  //     `BAHN_ART.climbing.zeitlimit` ueberhaupt existiert.
+  //  6. WORTWECHSEL "EXE" STATT "ZONE" (Gegencheck 3.6: "'Zone' ist Boulder-Vokabular"): NUR
+  //     an dieser neuen Wand-Zeichnung und in den ebenfalls neuen, rein kosmetischen Zeilen in
+  //     renderKader()/stepClimbing() unten -- der Motor fuehrte "Zone" nirgends fuer Climbing,
+  //     es gibt also nichts Bestehendes umzubenennen, nur die neuen Stellen von vornherein
+  //     richtig zu benennen.
+  // Kein Asset-Download (Konzept 9, "kein Asset-Download"): Sicherer, Seil und Exen sind
+  // Vektorformen wie der Rest der Bahn, kein neues Bild.
   const ZW_UEBERHANG_MAX=0.34;
-  function bodenClimbing(){
-    bodenSpurtGerade();
-    const oben=H*0.14, unten=H*0.94;
-    const steigung=BA().steigung??0.85;
-    // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Start (0) zu
-    // Ziel (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" wird so zu
-    // "die Wand wird nach rechts dunkler", exakt die Fahrtrichtung, in der die Kamera laeuft.
+  // Rein visuelle Exe-Positionen (s. Punkt 3 oben) -- Index in `hindernisse`, NICHT im Motor
+  // gesetzt. 2/5/8 von 0 sind der 3., 6. und 9. der zehn Griffe, deckungsgleich mit den fuer
+  // PR 2 vorgeschlagenen Zonen 0,26/0,53/0,80 (Konzept 2.1: hindernisse[2..8] liegen bei
+  // 0,26/0,53/0,80 exakt an diesen drei Indizes).
+  const WAND_EXE_INDIZES=[2,5,8];
+  function bodenWand(){
+    // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
+    // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    const n=BAHNEN_N(), steigung=BA().steigung??0.85;
+    const griffe=BA().hindernisse||[];
+
+    // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Wandfuss (0) zu
+    // Top-out (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" ist jetzt
+    // wortwoertlich "nach oben dunkler", exakt die Kletterrichtung.
     const UEBERHANG_BAENDER=10;
     for(let i=0;i<UEBERHANG_BAENDER;i++){
       const von=i/UEBERHANG_BAENDER, bis=(i+1)/UEBERHANG_BAENDER;
-      const x0=camX(von), x1=camX(bis);
-      if(x1<-20||x0>W+20)continue;
+      const y0=camY(bis), y1=camY(von);           // camY faellt, wenn posFrac steigt
+      if(y1<-20||y0>H+20)continue;
       const alpha=steigung*ZW_UEBERHANG_MAX*((i+1)/UEBERHANG_BAENDER);
       ctx.fillStyle="rgba(12,10,9,"+alpha.toFixed(3)+")";
-      ctx.fillRect(x0,oben,Math.max(1,x1-x0),unten-oben);
+      ctx.fillRect(0,y0,W,Math.max(1,y1-y0));
     }
-    // Ein paar Riss-/Kanten-Linien queruber die Wand, deterministisch aus derselben Saat
-    // wie die Boden-Koernung oben (bodenSaat) -- Struktur statt lackierter Flaeche, genau
-    // die Begruendung, mit der bodenSpurtGerade() seine eigene Koernung schon rechtfertigt.
+    // Riss-/Kantenlinien, dieselbe Koernung wie vorher (bodenSaat), nur um 90 Grad gedreht --
+    // die Wand steht jetzt, sie liegt nicht mehr.
     ctx.save();
-    ctx.beginPath();ctx.rect(0,oben,W,unten-oben);ctx.clip();
+    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
     for(let i=0;i<22;i++){
       const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
-      const x0=fx*(W+120)-60, y0=oben+fy*(unten-oben);
-      const ang=(bodenSaat(i+980)-0.5)*0.9-0.3;
+      const x0=fx*W, y0=fy*(H+120)-60;
+      const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
       ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
     }
     ctx.restore();
-    // ---- Schicht 2: die zehn Griffmarken, ueber die volle Wandhoehe statt nur je Bahn.
-    const griffe=BA().hindernisse||[];
-    griffe.forEach((posFrac,i)=>{
-      const x=camX(posFrac);
-      if(x<-24||x>W+24)return;
-      const gy=oben+(unten-oben)*(0.16+0.68*bodenSaat(i+1200));
-      ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
-      ctx.beginPath();ctx.ellipse(x,gy,9,6,0.35,0,6.283);ctx.fill();
-      ctx.fillStyle="rgba(255,255,255,.35)";
-      ctx.beginPath();ctx.ellipse(x-2,gy-2,3,1.8,0.35,0,6.283);ctx.fill();
-      ctx.fillStyle="#5c4326";
-      ctx.fillRect(x-1,gy,2,10);
-    });
+
+    // ---- Schicht 2: zwoelf schwache Spaltentrenner -- bei zwoelf belegten Routen soll die
+    // Bahnzugehoerigkeit trotz Kamera-Zoom lesbar bleiben (dasselbe Bild wie Fahrbahnlinien).
+    ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;
+    for(let i=0;i<=n;i++){
+      const x=wandX(i-0.5);
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+    }
+
+    // ---- Schicht 3: je Route Griffe, Sicherer, Seil und Exen.
+    const routeBreite=BA().routeBreite||30;
+    for(let bz=0;bz<n;bz++){
+      const x=wandX(bz);
+      // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x.
+      griffe.forEach((posFrac,i)=>{
+        const y=camY(posFrac);
+        if(y<-24||y>H+24)return;
+        const gx=x+(bodenSaat(i+1200+bz*37)-0.5)*2*routeBreite;
+        ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
+        ctx.beginPath();ctx.ellipse(gx,y,8,6,0.35,0,6.283);ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.35)";
+        ctx.beginPath();ctx.ellipse(gx-2,y-1,3,1.8,0.35,0,6.283);ctx.fill();
+      });
+
+      // SICHERER, eine Strichfigur am Wandfuss (Primitive, kein Asset, Gegencheck 3.6).
+      const sy=camY(0)+20;
+      ctx.fillStyle="#caa06a";ctx.beginPath();ctx.arc(x,sy-13,5,0,6.283);ctx.fill();
+      ctx.strokeStyle="#5b4636";ctx.lineWidth=3;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(x,sy-8);ctx.lineTo(x,sy+7);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
+
+      // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer -- "geklinkt" heisst
+      // rein visuell: der Kletterer hat den zugehoerigen Griff schon erreicht (u.pos >= dessen
+      // hindernisse-Anteil). Reiner Lesezugriff, keine neue Motor-Groesse.
+      const u=LAEUFER.find(l=>Math.round(l.bahnZ)===bz);
+      const hoehe=u?Math.max(0,Math.min(1,u.pos)):0;
+      const punkte=[{x,y:sy-3}];
+      WAND_EXE_INDIZES.forEach(idx=>{
+        const posFrac=griffe[idx]; if(posFrac==null||hoehe<posFrac)return;
+        punkte.push({x,y:camY(posFrac)});
+      });
+      if(u&&u.fertig==null)punkte.push({x,y:camY(hoehe)});
+      ctx.strokeStyle="rgba(230,225,210,.70)";ctx.lineWidth=1.6;
+      ctx.beginPath();ctx.moveTo(punkte[0].x,punkte[0].y);
+      for(let i=1;i<punkte.length;i++)ctx.lineTo(punkte[i].x,punkte[i].y);
+      ctx.stroke();
+
+      // EXEN: kleine Karabinerform, faerbt sichtbar um, sobald geklinkt (Gegencheck-Wortlaut).
+      WAND_EXE_INDIZES.forEach(idx=>{
+        const posFrac=griffe[idx]; if(posFrac==null)return;
+        const y=camY(posFrac); if(y<-20||y>H+20)return;
+        const geklinkt=hoehe>=posFrac;
+        ctx.strokeStyle=geklinkt?"#7fd858":"#9a9488";ctx.lineWidth=2;
+        ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.stroke();
+        if(geklinkt){ctx.fillStyle="rgba(127,216,88,.22)";ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.fill();}
+      });
+    }
+
+    // ---- Countdown-Grundgerüst (Punkt 5 oben): bewusst als inaktiv erkennbar beschriftet,
+    // solange `BAHN_ART.climbing.zeitlimit` noch nicht existiert (kommt mit PR 2). UNTEN
+    // RECHTS statt oben rechts (Screenshot-Gegenprobe 24.09.): oben rechts liegt bereits der
+    // Broadcast-Bug (`.bbug`, `top:8px;right:8px`, "Armageddon Aftermath"-Kasten) -- dort
+    // haette sich die Beschriftung mit der bestehenden DOM-Anzeige ueberlagert.
+    ctx.font="bold 12px system-ui,sans-serif";ctx.textAlign="right";ctx.textBaseline="alphabetic";
+    ctx.fillStyle="rgba(230,225,210,.50)";
+    ctx.fillText("ZEITLIMIT — aktiviert in PR 2",W-14,H-12);
+    ctx.textAlign="left";
   }
 
   // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
@@ -27291,6 +27371,35 @@
   // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
   const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
 
+  // ===================== DIE WAND (Climbing-Neubau PR 1, 24.09.) =====================
+  // Chris, 22.09., woertlich: "climbing ist total falsch geworden, das ist ja n
+  // hindernislauf soll aber echtes indoor klettern darstellen". Diese PR haengt kein neues
+  // Rezept und keine neue Wertung an -- rein die BILDSCHIRM-ABBILDUNG dreht sich um 90 Grad,
+  // exakt wie `laeuferXY()`s bestehende istOval()/istRoute()-Zweige es fuer Staffel/Takeshi
+  // schon vormachen (s. docs/design/climbing-neukonzept-22-09.md Abschnitt 5.2 und
+  // docs/design/climbing-opus-gegencheck-24-09.md Abschnitt 3.6/5). `u.pos` bleibt 0..1
+  // entlang der Route, `cam.zoom`/`cam.cx` bleiben dieselben zwei Zahlen, die kameraUpdate()
+  // schon fuer JEDE gerade Bahn pflegt (die Zoom-Formel dort haengt nur an posFrac-Minima/
+  // -Maxima, nie an einer Bildachse) -- camY() ist wortwoertlich camX(), nur mit H statt W
+  // und gespiegelt (0 = Wandfuss = UNTEN im Bild, 1 = Top-out = OBEN im Bild, weil Klettern
+  // nach oben geht, Bildschirm-Y aber nach unten waechst).
+  const camHoehe=()=>H-170;
+  function camViewV(){
+    const hoehe=camHoehe(), viewH=hoehe/cam.zoom;
+    const oben=Math.max(0,Math.min(hoehe-viewH,cam.cx*hoehe-viewH/2));
+    return {hoehe,viewH,oben};
+  }
+  // posFrac: Kletterhoehe 0..1 -> Bildschirm-Y unter der aktuellen Kamera.
+  const camY=(posFrac)=>{const v=camViewV(); return (H-90)-((posFrac*v.hoehe-v.oben)*cam.zoom);};
+  // istWand(): dieselbe Weiche wie istOval()/istRoute() (naechste Zeilen), nur auf das
+  // bestehende, seit 14.09. rein deskriptive `BAHN_ART.climbing.climbing`-Feld gegated --
+  // kein neues Feld noetig, jede andere Bahn liest hier `undefined`.
+  const istWand=()=>!!BA().climbing;
+  // Zwoelf Routen nebeneinander statt zwoelf Bahnen uebereinander: dieselbe Idee wie
+  // bahnY(b) (naechste Definitionen unten), nur quer -- Route b liegt bei ihrem eigenen
+  // Bildschirm-X, ueber die volle Breite verteilt.
+  const wandX=(b)=>{const links=W*0.12,rechts=W*0.90; return links+(rechts-links)*((b+0.5)/BAHNEN_N());};
+
   // ===================== DIE ROUTE DURCH MIDORIYAMA =====================
   // Chris am 06.09.: "bei takeshi haette ich mir so eine fortlaufende route gewuenscht
   // die nicht so arena maessig aussieht sondern so schlamm, dann irgendwelche hindernisse
@@ -27623,6 +27732,10 @@
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
     if(istOval())return ovalPunkt(u);
+    // WAND: Route b haengt fest bei wandX(b), die Hoehe ist camY(u.pos) -- kein platz-Bonus
+    // wie auf der geraden Bahn (dort draengen sich Fertige gemeinsam hinter der Ziellinie;
+    // an der Wand behaelt jede Route ihre eigene Spalte, auch nach dem Top-out).
+    if(istWand())return {x:wandX(u.bahnZ), y:camY(u.pos)};
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -27634,6 +27747,20 @@
     const v=platz>=0?(14+platz*8):0;            // Eingelaufene: hinter dem Tor im Burghof
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
+  // SCHWEBETEXT-POSITION UEBER DER FIGUR (Climbing-Neubau PR 1, 24.09., Konzept Abschnitt 5.2:
+  // "12 direkte camX(u.pos)- und 11 bahnY(u.bahnZ)-Aufrufe in schwebe()-Zeilen ... PR 1 zieht
+  // die uebrigen nach"). Vorher rechneten die schwebe()-Aufrufe unten (stolpert/bricht durch/
+  // eingebrochen/Rennplan-Ansage/...) ihre Bildschirmposition SELBST aus camX(u.pos)/
+  // bahnY(u.bahnZ) -- an einer Wand (oder auf Takeshis Route) stand die Sprechblase dadurch an
+  // der ALTEN horizontalen Bahn-Position, waehrend die Figur laengst woanders gezeichnet wurde.
+  // laeuferXY() kennt die Weiche (Oval/Wand/Route/Bahn) bereits an einer Stelle -- diese
+  // Funktion liest nur sie, dieselbe "eine Stelle statt sechs"-Idee wie am Kommentar direkt
+  // ueber laeuferXY(). Fuer Spurt/Staffel/Zeitfahren/Takeshi bit-identisch zur alten
+  // Direktrechnung dort, wo laeuferXY() ohnehin schon dieselbe Formel liefert (Bahn/Oval); auf
+  // Takeshis Route und an der Wand RUECKT die Blase jetzt zur tatsaechlichen Figur -- eine
+  // reine Anzeigekorrektur, kein rr()-Aufruf, keine neue Groesse, s. PR-Beschreibung fuer die
+  // Screenshot-Gegenprobe.
+  function laeuferSchwebeXY(u,dy){ const p=laeuferXY(u); return {x:p.x,y:p.y+(dy||0)}; }
   // ZEITFAHREN-EINZELKAMERA, Ausschnittsgroessen (Chris' Fund 13.09., s. kameraUpdate).
   // ZF_MIN_AUSSCHNITT 0,56 heisst: nie weniger als 56 % der Strecke im Bild (Zoom <= 1,8,
   // gegen die bisherigen 2,2). ZF_NACHBAR_FENSTER 0,30 zieht jeden Laeufer in den Kasten,
@@ -28470,7 +28597,7 @@
       }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
+        schwebe({...laeuferSchwebeXY(u,-20),txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
         feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
       // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
@@ -28481,7 +28608,7 @@
       else if(u.leer && BA().pusteFangen && u.reserve>=BA().pusteFangen*u.reserveMax){
         u.leer=false;
         u.gefangen=(u.gefangen||0)+1;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
+        schwebe({...laeuferSchwebeXY(u,-20),txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
         feed(u.seite,u.n+" fängt sich wieder — Puste zurück bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
@@ -28598,7 +28725,7 @@
                 // laeuferXY() kennt beide Faelle bereits (s. dort), camX/bahnY allein waere
                 // fuer die Route falsch platziert.
                 { const p=laeuferXY(u); effekt({typ:"welle",x:p.x,y:p.y,r:34,seite:u.seite,dauer:.5}); }
-                schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
                 // Ticker EINMAL je Falle und Pulk (ab `melden` Mitlaeufern). Je Laeufer
                 // gemeldet waren es 39 Zeilen in einem Rennen — das haette die Fallen
                 // aus dem Ticker gedraengt, statt sie zu wuerzen.
@@ -28693,7 +28820,7 @@
           const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
           if(rr()<=technik){                               // sauber drueber
             if(meldeTyp==="stark"){
-              schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
               melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
                 " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
             }
@@ -28709,7 +28836,7 @@
             u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
             u.durchbruch=(u.durchbruch||0)+1;
             if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
@@ -28768,7 +28895,7 @@
             // (steine/brueckenball/schlamm), "platsch" (bislang toter Katalogeintrag) passt
             // zum "im Wasser landen"-Charakter des Scheiterns.
             if(A.takeshi)sfx("takeshis-castle","platsch");
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
@@ -28778,7 +28905,7 @@
           // deshalb dieselbe A.takeshi-Gate wie bei "falle" -- sonst hoerte man den
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
-          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
+          schwebe({...laeuferSchwebeXY(u,-20),txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
           // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
           // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
           if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
@@ -28984,10 +29111,10 @@
           if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.");
           } else {
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
@@ -29348,6 +29475,11 @@
       if(u.vizSchritt==null){
         u.vizSchritt=(u.id||0)*2.3;
         u.vizGriffN=0; u.vizZugN=u.durchbruch||0; u.vizFehlgriffN=u.gestolpert||0; u.vizTopoutTon=false;
+        // EXE-ZAEHLER (Climbing-Neubau PR 1, 24.09.), init auf den Stand beim ersten Frame --
+        // dasselbe Zaehl-statt-Zustand-Muster wie vizGriffN direkt daneben. Rein
+        // praesentational: liest nur u.pos gegen WAND_EXE_INDIZES (bodenWand()s Vorgriff auf
+        // die PR-2-Zonen), schreibt nur das neue viz*-Feld, nie u.pos/rr()/tempoVon().
+        u.vizExeN=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
       }
       if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       // ---- GRIFF-TON (TON_KATALOG.climbing.griff), an der Kante "ein weiterer der zehn
@@ -29360,6 +29492,16 @@
       // Ausgangs-Zaehlern der Simulation.
       if((u.durchbruch||0)>u.vizZugN){ u.vizZugN=u.durchbruch; sfx("climbing","zug"); }
       if((u.gestolpert||0)>u.vizFehlgriffN){ u.vizFehlgriffN=u.gestolpert; sfx("climbing","fehlgriff"); }
+      // ---- EXE-TICKER ("Exe" statt "Zone", Gegencheck 3.6): nur ein Ticker-Text, kein Ton
+      // (kein neuer TON_KATALOG-Eintrag in dieser PR) -- meldet, wenn der Kletterer einen der
+      // drei vorgesehenen Exe-Griffe erreicht hat. Rein kosmetisch wie GRIFF-TON oben.
+      if(u.fertig==null){
+        const geklinkt=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
+        if(geklinkt>u.vizExeN){
+          u.vizExeN=geklinkt;
+          feed(u.seite,u.n+" klinkt die "+(geklinkt===1?"erste":geklinkt===2?"zweite":"dritte")+" Exe.");
+        }
+      }
       // ---- TOPOUT-TON (TON_KATALOG.climbing.topout), einmalig wie ueberall sonst.
       if(u.fertig!=null && !u.vizTopoutTon){ u.vizTopoutTon=true; sfx("climbing","topout"); }
     }
@@ -29644,6 +29786,12 @@
       // vier Richtungen und braucht dafuer nur vx/vy — hier die Tangente, auf 4 skaliert
       // (die Schwelle |vy|>2 in blickAus verlangt einen Betrag ueber 2).
       const tg=istRoute()&&u.stolper<=0?routeXY(u.pos):null;
+      // WAND: KLETTERT NACH OBEN STATT NACH RECHTS ZU LAUFEN (Climbing-Neubau PR 1, 24.09.).
+      // blickAus() kennt bereits eine "nach oben"-Richtung (vy<0, Rueckenansicht/LPC-Norden,
+      // s. dortiger Kommentar) -- genau das Bild eines Kletterers, der der Wand zugewandt
+      // nach oben steigt, statt seitwaerts zu laufen. Gilt nur, wenn `istWand()` wahr ist
+      // (also nur fuer Climbing); jede andere Bahn bleibt bei ihrem vx:4/vy:0-Standardblick.
+      const wandBlick=istWand()&&u.stolper<=0;
       // WARTENDE JOGGEN NICHT AUF DER STELLE (Fund aus der 05-09-Recherche, Teil 4:
       // vx:4 liess sie sichtbar laufen, obwohl sie stehen — vx:0 nutzt das schon
       // vorhandene idle-Blatt in zeichneSprite, kein neues Asset noetig).
@@ -29688,7 +29836,8 @@
         // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet -- AUSSER er ist der
         // Naechste in der Wechselzone und laut vizAnlauf schon am Anlaufen.
-        vx:u.stolper>0?0:(tg?tg.tx*4:((wartet&&!anlaufLaeuft)?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        vx:u.stolper>0?0:(tg?tg.tx*4:(wandBlick?0:((wartet&&!anlaufLaeuft)?0:4))),
+        vy:tg?tg.ty*4:(wandBlick?-4:0), side:u.seite,
         // SCHRITTPHASE AUS DEM EIGENEN TEMPO (Zeitfahren, Ziel 8, s. stepZeitfahren):
         // ausschliesslich stepZeitfahren schreibt u.vizSchritt, diese Zeichenfunktion
         // liest es nur. Fuer jede andere Bahn ist es undefined und zeichneSprite faellt
@@ -31145,7 +31294,7 @@
     // Laeufern muss man sehen, WER umgestellt hat, nicht nur DASS jemand. Wo genau er
     // neben dem Kopf landet, entscheidet zeichneSpurt (s. dort) — hier steht nur, an
     // wen er gehoert.
-    schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-56,txt:p.label.toUpperCase()+"!",
+    schwebe({...laeuferSchwebeXY(u,-56),txt:p.label.toUpperCase()+"!",
              life:1.35,ansage:true,_laeufer:u.id});
     feed(0,u.n+" bekommt "+p.label.toUpperCase()+" angesagt — bei "
       +Math.round(u.pos*100)+" % der Strecke.");
@@ -31721,9 +31870,18 @@
           .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
+                    // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
+                    // Abschnitt 3.6: "'Zone' ist Boulder-Vokabular"). Rein kosmetisch -- liest
+                    // nur x.pos gegen dieselben WAND_EXE_INDIZES, die bodenWand() zeichnet,
+                    // schreibt nichts zurueck. Keine andere Bahn ist betroffen.
                     zusatz:BA().staffel
                       ? (staffelRang.raenge.has(x.id)?"Rang "+staffelRang.raenge.get(x.id)+"/"+staffelRang.von
                          :x.aktiv?Math.round(x.pos*100)+" %":"wartet")
+                      : BA().climbing
+                        ? (x.fertig!=null?"Top-out"
+                           :Math.round(x.pos*100)+" % · Exe "
+                             +WAND_EXE_INDIZES.filter(idx=>x.pos>=(BA().hindernisse||[])[idx]).length
+                             +"/"+WAND_EXE_INDIZES.length)
                       : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
@@ -34632,6 +34790,79 @@
       return familie
         ? {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, varianten:ergebnis}
         : {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, spiele:ergebnis};
+    },
+    // WAND-SONDE (Climbing-Neubau PR 0, 24.09., Konzept climbing-neukonzept-22-09.md Abschnitt
+    // 6.4 Schritt 1 / Gegencheck climbing-opus-gegencheck-24-09.md Abschnitt 2.4: "PR 0 sollte
+    // daraus die wandProbe() machen, die das Konzept ohnehin vorsieht"). Reine Diagnose-Sonde
+    // nach demselben Prinzip wie showcaseActProbe/ispyNachfuellSonde oben -- kein Gameplay,
+    // kein zusaetzlicher rr()-Verbrauch (nur der normale Rennverlauf ueber
+    // MOTOREN.climbing.bau()/lauf(), derselbe Pfad, den disziplinProbe() direkt oberhalb
+    // nimmt). Liefert die Nulllinie, die PR 2 fuer Zeitlimit/Zonen/Balance braucht:
+    // Siegerzeit-Median und -Spannweite, wie weit das Feld hinter dem Sieger liegt (fuer die
+    // Top-out-Quote bei einem k-fachen Zeitlimit, s. Gegencheck 2.1/2.2), Stolperer/Kraftzuege
+    // je Kopf, Reserve am Ende. Kaderfest wie disziplinProbe: n Rennen, EIN SQUAD/OPP
+    // (Default-Kader), dieselbe Saatfolge.
+    wandProbe:(opt)=>{
+      const M=MOTOREN.climbing;
+      if(!M)return {fehler:"kein Motor fuer climbing angemeldet"};
+      const o=opt||{}, n=o.n||48, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      const rennen=[];
+      try{
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          M.bau(saat0+i*schritt);
+          M.lauf();
+          const laeufer=LAEUFER.map(u=>({n:u.n,fertig:u.fertig,pos:u.pos,
+            gestolpert:u.gestolpert||0, durchbruch:u.durchbruch||0, reserve:u.reserve}));
+          const angekommen=laeufer.filter(z=>z.fertig!=null);
+          const sieger=angekommen.length?Math.min(...angekommen.map(z=>z.fertig)):null;
+          rennen.push({sieger, laeufer});
+        }
+      } finally {
+        M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      const median=(arr)=>{ if(!arr.length)return null; const s=[...arr].sort((a,b)=>a-b);
+        return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2; };
+      const perzentil=(arr,p)=>{ if(!arr.length)return null; const s=[...arr].sort((a,b)=>a-b);
+        return s[Math.min(s.length-1,Math.max(0,Math.floor(p*(s.length-1))))]; };
+      const runden=(x,stellen)=>x==null?null:Math.round(x*Math.pow(10,stellen))/Math.pow(10,stellen);
+      const siegerzeiten=rennen.map(r=>r.sieger).filter(z=>z!=null);
+      const siegerzeitMedian=median(siegerzeiten);
+      // Zeit/Siegerzeit je Nicht-Sieger UND der Langsamste je Rennen (Gegencheck 2.1: beide
+      // Groessen zusammen sagen, wie weit das Feld hinter dem Sieger auseinanderliegt).
+      const ratios=[], langsamsteRatios=[];
+      for(const r of rennen){
+        if(r.sieger==null)continue;
+        const an=r.laeufer.filter(z=>z.fertig!=null);
+        for(const z of an)if(z.fertig!==r.sieger)ratios.push(z.fertig/r.sieger);
+        if(an.length)langsamsteRatios.push(Math.max(...an.map(z=>z.fertig))/r.sieger);
+      }
+      const alle=rennen.flatMap(r=>r.laeufer);
+      // Top-out-Quote bei einem FESTEN Limit von k * globalem Median-Siegerzeit (Gegencheck
+      // 2.1-Tabelle) -- derselbe Massstab wie dort, damit PR 2 das Zeitlimit an einem
+      // gemessenen Korridor eicht statt an einer geschaetzten Zahl.
+      const kListe=o.k||[1.10,1.15,1.20,1.25,1.30,1.40,1.60];
+      const topoutJeK={};
+      if(siegerzeitMedian!=null)for(const k of kListe){
+        const limit=k*siegerzeitMedian;
+        const treffer=alle.filter(z=>z.fertig!=null&&z.fertig<=limit).length;
+        topoutJeK[k]=runden(100*treffer/alle.length,1);
+      }
+      return {
+        disziplin:"climbing", spiele:n,
+        siegerzeitMedianSimS:runden(siegerzeitMedian,2),
+        siegerzeitSpanneSimS:siegerzeiten.length?[runden(Math.min(...siegerzeiten),2),runden(Math.max(...siegerzeiten),2)]:null,
+        zeitZuSiegerMedian:runden(median(ratios),3),
+        zeitZuSieger90:runden(perzentil(ratios,0.90),3),
+        langsamsterZuSiegerMedian:runden(median(langsamsteRatios),3),
+        langsamsterZuSiegerMax:langsamsteRatios.length?runden(Math.max(...langsamsteRatios),3):null,
+        stolpererJeKopf:runden(alle.reduce((s,z)=>s+z.gestolpert,0)/alle.length,2),
+        kraftzuegeJeKopf:runden(alle.reduce((s,z)=>s+z.durchbruch,0)/alle.length,2),
+        reserveAmEndeMedian:runden(median(alle.map(z=>z.reserve)),1),
+        topoutQuoteJeK:topoutJeK
+      };
     },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
