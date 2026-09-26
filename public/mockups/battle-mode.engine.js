@@ -11136,12 +11136,21 @@
     if(flug.hockey){ loeseHockeySchuss(flug,art); return; }
     const szDef=flug.zug?art.spielzuege[flug.zug]:null;
     if(flug.treffer){
+      // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): gemessen 35 von 354
+      // Ticker-Zeilen big, weil bisher JEDER Korb big war -- die Liste war das
+      // Spielprotokoll. `vorFuehrung` ist der Punktestand VOR diesem Korb, damit ein
+      // Fuehrungswechsel exakt wie auf der Bahn (bahnFuehrenderId) erkannt werden kann.
+      const vorFuehrung=Math.sign(fsPunkte[0]-fsPunkte[1]);
       schuetze.punkte+=flug.punkte; fsPunkte[schuetze.side]+=flug.punkte;
+      const nachFuehrung=Math.sign(fsPunkte[0]-fsPunkte[1]);
       schuetze.feldwuerfeTreffer++;
       if(flug.passgeber)flug.passgeber.assists++;
       const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
                        : schuetze.n+" trifft"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" mit einem Dunk":"")+" — +"+flug.punkte+".";
-      feed(schuetze.side,txt,true);
+      // Big nur bei: einem einstudierten Spielzug (szDef), einem Dunk, einem Dreier oder
+      // einem Fuehrungswechsel -- sonst false. Ersetzt "jeder Korb ist big" (Konzept
+      // Abschnitt 4.3, Nachzug 3).
+      feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung);
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
@@ -11157,7 +11166,9 @@
         const verteidiger=flug.blockKandidat;
         verteidiger.fouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
-        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!");
+        // AND-ONE ist selten und sofort verstaendlich -- immer big (Konzept Abschnitt 4.3,
+        // Nachzug 3).
+        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!",true);
         // Der Zusatz-Freiwurf laeuft jetzt sichtbar ab (Standphase) statt im Hintergrund;
         // der Ballwechsel danach passiert in beendeFreiwuerfe, nicht mehr hier.
         starteFreiwuerfe(schuetze,1,verteidiger,true);
@@ -13799,6 +13810,11 @@
   const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // FUEHRUNG IM BILD -- EISKUNSTLAUF (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a,
+  // umgesetzt 26.09.). Merkt sich nur, WELCHE Seite zuletzt fuehrte und SEIT WANN (in
+  // buehneT-Zeit), damit das Bandenlicht in bodenEis() beim Fuehrungswechsel kurz aufhellen
+  // kann statt abrupt umzuspringen -- rein zeichnerisch, kein Einfluss auf `wert()`/stepBuehne.
+  let eisBandeSide=null, eisBandeSeit=-999;
   // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). >1 NUR bei art.wettessen
   // (s. bauBuehne()/stepBuehne() unten) -- traegt die Anzahl Esser BEIDER Seiten in EINER
   // Runde, also wie viele zusammenhaengende buehneQueue-Eintraege ein einziger Enthuellungs-
@@ -15505,6 +15521,43 @@
   // waere sonst ein zweiter Spoiler derselben Art: ein Team staende im HUD schon beim allerersten
   // Frame auf "0 Ueberlebende", obwohl der Ticker den entscheidenden Zug noch gar nicht gezeigt
   // hat.
+  // "NEUE FUEHRUNG IM ZWISCHENSTAND" (Broadcast Runde 2, Vorschlag 1, 26.09.). Ersetzt die
+  // pauschale 60-Punkte-Schwelle (`r.punkte>=60`) fuer die Auftritt-Buehnen (Eiskunstlauf,
+  // Showcase, Wettessen): `vorherSumme` ist `u.summe` VOR diesem Durchgang (der Aufrufer
+  // liest sie vor der `u.summe+=r.punkte`-Zeile, s. dort), `nachSumme` danach. Big nur beim
+  // WECHSEL von "nicht fuehrend" zu "fuehrend oder gleichauf" -- ein Dauerfuehrer feuert
+  // damit nicht bei jedem weiteren Durchgang erneut. Dieselbe Groesse (`u.summe`), die auch
+  // zeichneEisStand()/WERTUNG_AUFTRITT lesen, kein neuer Wert, keine neue Formel.
+  function buehneWurdeFuehrend(u,vorherSumme,nachSumme,bester){
+    return vorherSumme<bester && nachSumme>=bester;
+  }
+  // BIG-ENTSCHEIDUNG FUER DIE AUFTRITT-BUEHNEN (Eiskunstlauf, Showcase, Wettessen; Broadcast
+  // Runde 2, Vorschlag 1.2, 26.09.). Ersetzt `r.punkte>=60` (Eiskunstlauf 52 von 146
+  // Durchgaengen, Showcase/Wettessen dieselbe Schwelle -- gemessen, s. Konzeptdokument
+  // Abschnitt 4.2/4.3): big nur bei drei echten Momenten statt einer Punktzahl.
+  //
+  // KORREKTUR NACH SICHTPRUEFUNG (26.09.): das Konzept schlug "big bei JEDEM Sturz" vor
+  // ("heute NIE big, obwohl es der einzige Moment ist, den jeder Zuschauer sofort sieht").
+  // Gemessen (Playwright, vier Saaten) liegt die STURZ-QUOTE dieser Erfolgsformel aber bei
+  // 57-71 % aller Durchgaenge (`erfolg=min(0.94,0.15+TECHNIK*0.0055+NERVEN*0.0035)` --
+  // TECHNIK/NERVEN 50 ergibt bereits nur 60 % Erfolgschance) -- ein Sturz ist hier also der
+  // NORMALFALL, nicht die Ausnahme. "Jeder Sturz big" haette Regel 8 ("Highlights sind
+  // seltene Momente") krachend verfehlt: in der Messung waeren 27-34 von 47 Ticker-Zeilen
+  // big geworden, mehr als die alte 60-Punkte-Schwelle je erzeugte. Ersatz, der die
+  // Sichtbarkeits-Absicht traegt, aber selten bleibt: ein Sturz ist nur big, wenn er DIE/DEN
+  // ZWISCHENSTAND-FUEHRENDEN trifft -- dasselbe Muster wie "Puste-Einbruch des Fuehrenden"
+  // bei der Bahn (s. dort). `bester` wird EINMAL berechnet und an alle drei Pruefungen
+  // durchgereicht, statt TEILNEHMER dreimal zu filtern.
+  //   1. DIE/DER FUEHRENDE STUERZT.
+  //   2. UEBERNIMMT DIE ZWISCHENFUEHRUNG -- buehneWurdeFuehrend(), s. dort.
+  //   3. LETZTES ELEMENT DES FUEHRENDEN -- der Abschluss des bislang besten Auftritts.
+  function buehneAuftrittBig(u,r,vorherSumme){
+    const bester=Math.max(0,...TEILNEHMER.filter(x=>x.id!==u.id&&x.aktuell>=0).map(x=>x.summe||0));
+    if(r.ereignis===BB().failWort)return vorherSumme>=bester;
+    if(buehneWurdeFuehrend(u,vorherSumme,u.summe,bester))return true;
+    if(u.aktuell+1>=BB().rundenN && (u.summe||0)>=bester)return true;
+    return false;
+  }
   function gauntletRausJetzt(u){
     const r=gauntletZugJetzt(u);
     return !!(r&&r.hpNach<=0);
@@ -15550,6 +15603,10 @@
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
       // der dreimal dasselbe leichte Gewicht hebt.
+      // FUEHRUNGSWECHSEL-ERKENNUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): die Summe VOR
+      // diesem Durchgang, fuer buehneWurdeFuehrend() unten (s. dort). Nur Ablesung, keine
+      // neue Zahl -- dieselbe `u.summe`, die gleich darunter unveraendert weiterlaeuft.
+      const vorherSumme=u.summe||0;
       if(!BB().heben)u.summe+=r.punkte;
       u.lunge=0.5;
       // BIG-FLAG (Nachtrag, s. docs/design/broadcast-praesentation-uebergreifend-recherche-
@@ -15602,6 +15659,14 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // FUEHRUNGSWECHSEL AM BRETT (Broadcast Runde 2, Vorschlag 1.2, 26.09.): ersetzt
+        // `r.punkte>=60` (Speed-Schach 61 von 134 Zeilen, fast jeder zweite Zug -- gemessen,
+        // Konzept Abschnitt 4.2) durch den Moment, den ein Zuschauer am Brett tatsaechlich
+        // sieht: das Vorzeichen des Vorteils kippt gegenueber dem letzten Zug DIESES
+        // Teilnehmers. "Brett entschieden" (unten) und die Fechten-Periode bleiben ohnehin
+        // schon immer big, unveraendert.
+        const vVorher=u.aktuell>0?u.verlauf[u.aktuell-1]:0;
+        const vorteilKipptBig=Math.sign(v)!==Math.sign(vVorher);
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
@@ -15612,7 +15677,7 @@
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
-          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",vorteilKipptBig);
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
@@ -15650,7 +15715,8 @@
         const ACT=SHOWCASE_ACTS.find(a=>a.id===u.vizAct);
         const zier=ACT?ACT.text[r.ereignis===BB().erfolgWort?"erfolg":"fail"]:null;
         feed(u.side,u.n+" — "+(ACT?ACT.label+": "+zier:r.ereignis)
-          +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+          +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
+          buehneAuftrittBig(u,r,vorherSumme));
       } else if(BB().schatzsuche){
         // TICKER-FEINSCHLIFF (PR 4, Konzept Abschnitt 4/7.2): ispyTickerZeile() baut das
         // Textmuster aus dem Konzept, s. Kommentar dort. `r.ereignis` bleibt UNVERAENDERT
@@ -15670,7 +15736,10 @@
         if(r.hpNach<=0)
           feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
       } else {
-        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+        // GILT FUER EISKUNSTLAUF (`duett`) UND WETTESSEN, die beiden verbleibenden
+        // Auftritt-Buehnen ohne eigenen Zweig oben -- s. buehneAuftrittBig()-Kommentar.
+        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
+          buehneAuftrittBig(u,r,vorherSumme));
       }
       } // Ende der Gruppen-Schleife (S3, Wettessen) -- s. Kommentar oben.
       buehneAkt=BB().rundenDauer;
@@ -17600,6 +17669,51 @@
     // Goldene Bandenkante — der eine Farbakzent, den der Plan ausdruecklich nennt.
     ctx.lineWidth=2;ctx.strokeStyle="rgba(214,172,54,.85)";eisRundweg(k,4);ctx.stroke();
 
+    // FUEHRUNG IM BILD (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a+2c, umgesetzt
+    // 26.09.). Chris woertlich: "da fehlt mir auf dem eis noch ein gefuehl dafuer fuer wen
+    // es gut laeuft und fuer wen weniger gut da kann man eigentlich nur links auf die
+    // grafik gucken". Beide Ebenen lesen ausschliesslich kuerEisFuehrung() -- dieselbe
+    // Sortierung wie die Zwischenstand-Tafel (zeichneEisStand), keine zweite Berechnung,
+    // kein neuer Wert, nichts geschrieben ausser den beiden rein zeichnerischen
+    // Modulvariablen eisBandeSide/eisBandeSeit (Crossfade-Zeitpunkt).
+    const fuehrung=kuerEisFuehrung();
+    if(fuehrung && fuehrung.side!=null){
+      // (a) BANDENLICHT: die Bande selbst leuchtet in der Farbe des fuehrenden Teams --
+      // dezent im Dauerzustand (30% Deckkraft), fuer 1,4s nach einem Fuehrungswechsel voll
+      // gesaettigt (Voreinstellung aus Abschnitt 9, Frage 2 des Konzepts: "permanent, aber
+      // dezent, beim Wechsel kurz voll"). Liegt zwischen der weissen Aussenkante (0px) und
+      // der goldenen Innenkante (4px), damit beide sichtbar bleiben.
+      if(eisBandeSide!==fuehrung.side){ eisBandeSide=fuehrung.side; eisBandeSeit=buehneT; }
+      const seitWechsel=buehneT-eisBandeSeit;
+      const voll=Math.max(0,Math.min(1,1-seitWechsel/1.4));
+      ctx.globalAlpha=0.30+0.65*voll;
+      ctx.lineWidth=4;
+      ctx.strokeStyle=fuehrung.side===0?css("--home"):css("--away");
+      eisRundweg(k,1.5);ctx.stroke();
+      ctx.globalAlpha=1;
+
+      // (c) VORSPRUNGSBALKEN: waagerechter Balken knapp innerhalb der oberen Bande, in der
+      // Mitte geteilt, der sich zur fuehrenden Seite hin fuellt -- Laenge aus der bisher
+      // enthuellten Punktdifferenz relativ zur bisher enthuellten Gesamtpunktzahl. Chris'
+      // "wer besiegt wen aktuell" als Teamfrage im Bild statt nur im Panel links. Liegt
+      // deutlich oberhalb der Kuerbahn (kuerBahn(): Sprite-Kopf ab H*0.26) und unterhalb der
+      // Zwischenstand-Tafel (vertikal um H*0.5 zentriert) -- keine Ueberlappung mit beiden.
+      const gesamt=fuehrung.heim+fuehrung.gast;
+      if(gesamt>0){
+        const anteil=Math.max(-1,Math.min(1,(fuehrung.heim-fuehrung.gast)/gesamt));
+        const bw=(k.r-k.l)*0.62, bx0=(k.l+k.r)/2-bw/2, by=k.o+16, bh=6, mitte=bx0+bw/2;
+        ctx.fillStyle="rgba(16,20,28,.68)"; ctx.fillRect(bx0,by,bw,bh);
+        ctx.strokeStyle="rgba(255,255,255,.20)"; ctx.lineWidth=1; ctx.strokeRect(bx0,by,bw,bh);
+        const fuell=(bw/2)*Math.abs(anteil);
+        // Heim fuellt nach LINKS, Gast nach RECHTS (Konzept 5.2c: "der sich nach links
+        // (Heim) oder rechts (Gast) fuellt").
+        ctx.fillStyle=anteil>=0?css("--home"):css("--away");
+        if(anteil>=0) ctx.fillRect(mitte-fuell,by+1,fuell,bh-2); else ctx.fillRect(mitte,by+1,fuell,bh-2);
+        ctx.strokeStyle="rgba(255,255,255,.4)"; ctx.beginPath();
+        ctx.moveTo(mitte,by); ctx.lineTo(mitte,by+bh); ctx.stroke();
+      }
+    }
+
     // Kampfgericht-Tisch, unterhalb der Bande am unteren Rand.
     ctx.fillStyle="#232838";ctx.fillRect(W*0.36,k.u+6,W*0.28,15);
     ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;ctx.strokeRect(W*0.36,k.u+6,W*0.28,15);
@@ -19104,6 +19218,35 @@
     }
     ctx.globalAlpha=1;
   }
+  // FUEHRUNG IM BILD -- GEMEINSAME SORTIERUNG (Broadcast Runde 2, Vorschlag 2, 26.09.).
+  // Exakt dieselbe Sortierregel, die zeichneEisStand() fuer die Zwischenstand-Tafel schon
+  // brauchte -- jetzt einmal herausgezogen, damit Bandenlicht/Vorsprungsbalken (bodenEis)
+  // und die Tafel selbst niemals unterschiedliche Fuehrende zeigen koennen. Reine
+  // Ableseung von `u.summe`/`side`, keine neue Formel.
+  function kuerZwischenstandZeilen(gruppen,aktiv){
+    const zeilen=gruppen.map((grp,i)=>({
+      grp, i, gelaufen:i<=aktiv,
+      pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
+      side:grp[0].side
+    }));
+    zeilen.sort((a,b)=>(a.gelaufen===b.gelaufen)?(a.gelaufen?b.pkt-a.pkt:a.i-b.i):(a.gelaufen?-1:1));
+    return zeilen;
+  }
+  // FUEHRENDE SEITE AUFS EIS UEBERSETZT (Vorschlag 2a/2c): Seite des Zwischenstand-
+  // Fuehrenden plus die bisher enthuellten Punktsummen je Team -- alles, was das
+  // Bandenlicht und der Vorsprungsbalken in bodenEis() brauchen. Ruft kuerStartliste()/
+  // kuerAktiveGruppe() selbst auf, weil bodenEis() (Boden, vor den Teilnehmern gezeichnet)
+  // anders als zeichneDuett() noch keine `gruppen`/`aktiv` zur Hand hat.
+  function kuerEisFuehrung(){
+    const gruppen=kuerStartliste();
+    if(!gruppen.length)return null;
+    const aktiv=kuerAktiveGruppe(gruppen);
+    const gelaufen=kuerZwischenstandZeilen(gruppen,aktiv).filter(z=>z.gelaufen);
+    if(!gelaufen.length)return null;
+    const heim=gelaufen.filter(z=>z.side===0).reduce((s,z)=>s+z.pkt,0);
+    const gast=gelaufen.filter(z=>z.side===1).reduce((s,z)=>s+z.pkt,0);
+    return {side:gelaufen[0].side, heim, gast};
+  }
   // ZWISCHENSTAND-TAFEL (13.09., Chris: "man hat gar keine indikation welche leute sich
   // gerade besser schlagen als andere"). Direkt nach dem Vorbild der Wertungsgrafik, die
   // in jeder ISU-Uebertragung oben links steht: sie "always lists the event leader at the
@@ -19147,13 +19290,10 @@
     // REIHENFOLGE DER TAFEL: wer schon gelaufen ist (oder gerade laeuft), steht nach
     // Punkten oben — der Fuehrende zuoberst, wie im Vorbild. Wer noch kommt, haengt in
     // Startreihenfolge darunter, mit der Startnummer statt einer Zahl. Das ist zugleich
-    // Ergebnisliste UND Startliste, genau wie die Anzeigetafel in der Halle.
-    const zeilen=gruppen.map((grp,i)=>({
-      grp, i, gelaufen:i<=aktiv,
-      pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
-      side:grp[0].side
-    }));
-    zeilen.sort((a,b)=>(a.gelaufen===b.gelaufen)?(a.gelaufen?b.pkt-a.pkt:a.i-b.i):(a.gelaufen?-1:1));
+    // Ergebnisliste UND Startliste, genau wie die Anzeigetafel in der Halle. Sortierung
+    // jetzt aus kuerZwischenstandZeilen() (s. oben) — dieselbe Formel wie zuvor, nur
+    // herausgezogen, damit Bandenlicht/Vorsprungsbalken sie mitbenutzen koennen.
+    const zeilen=kuerZwischenstandZeilen(gruppen,aktiv);
     let rang=0;
     zeilen.forEach((z,k)=>{
       const y=y0+kopfH+k*zeilH+zeilH*0.5;
@@ -24176,6 +24316,12 @@
     return {reihe,punkte,seiten};
   }
   let bahnEndeGemeldet=false;
+  // FUEHRUNGSWECHSEL (Broadcast-Praesentation Runde 2, Vorschlag 1, 22.09./26.09.): das
+  // Ereignis, das laut Konzept "jede Rennuebertragung als erstes zeigt" und das der Ticker
+  // bisher gar nicht kannte. Merkt sich nur die ID des zuletzt gemeldeten Fuehrenden --
+  // updateHudBahn() vergleicht sie jeden Frame gegen bahnRangliste().reihe[0] (dieselbe
+  // Rangliste wie HUD/Endstand) und meldet nur den WECHSEL, nie den Dauerzustand.
+  let bahnFuehrenderId=null, bahnFuehrenderSeit=-999;
 
   // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
   // liefern Rangpunkte (bahnRangliste); Staffel traegt "etappe", Takeshi's Castle "burg"
@@ -24372,6 +24518,24 @@
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
+    // FUEHRUNGSWECHSEL (Broadcast Runde 2, Vorschlag 1, 26.09.). Chris: "so live tv artige
+    // displays wie das bei rennen auch mal dargestellt wird" -- das Ereignis, das jede
+    // Rennuebertragung als erstes zeigt und das der Ticker bisher gar nicht kannte.
+    // `bahnRangliste()` ist dieselbe Rangliste, die HUD/Endstand/Kaderkacheln lesen: kein
+    // neuer Vergleich. Ein 2-Sekunden-Cooldown verhindert, dass zwei fast gleich schnelle
+    // Laeufer die Meldung zum Flackerprotokoll machen -- die Meldung selbst bleibt
+    // unveraendert, nur ihre Haeufigkeit wird gedaempft (dieselbe Absicht wie Regel 8,
+    // Abschnitt 2 des Konzepts).
+    if(!done){
+      const fuehrer=bahnRangliste().reihe[0];
+      if(fuehrer){
+        if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
+        else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
+          bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
+          feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+        }
+      }
+    }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
@@ -27901,6 +28065,7 @@
       bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
     }
     bahnEndeGemeldet=false;
+    bahnFuehrenderId=null; bahnFuehrenderSeit=-999;
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
@@ -28598,7 +28763,12 @@
       if(!u.leer && u.reserve<=0){
         u.leer=true;
         schwebe({...laeuferSchwebeXY(u,-20),txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
-        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+        // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): big nur, wenn der
+        // FUEHRENDE einbricht -- jeder andere Einbruch waere wieder Protokoll (heute
+        // ohnehin schon kein `true` hier, dieser Vergleich ist neu). `bahnRangliste()` ist
+        // dieselbe Rangliste, die HUD/Endstand lesen -- kein neuer Vergleich.
+        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.",
+          bahnRangliste().reihe[0]?.id===u.id);
       }
       // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
       // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
@@ -28896,8 +29066,11 @@
             // zum "im Wasser landen"-Charakter des Scheiterns.
             if(A.takeshi)sfx("takeshis-castle","platsch");
             schwebe({...laeuferSchwebeXY(u,-20),txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein Ausscheiden
+            // ist seltenes, sofort verstaendliches Bild-Ereignis -- immer big, wie Chris'
+            // Hockey-Vorbild (Tor immer big) es fuer diese Bahn-Disziplin vorschreibt.
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
-              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
+              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.",true);
             break;
           }
           // TON (Ziel 3, A4): Laeufer stuerzt (nicht ausgeschieden). Diese Zeile laeuft fuer
@@ -29022,8 +29195,11 @@
               { const po=laeuferXY(o), pu=laeuferXY(u);
                 effekt({typ:"hieb",x:po.x,y:po.y,ux:pu.x,uy:pu.y,seite:u.seite,schwer:true,dauer:.42}); }
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:TA.tackleFenster?"gerammt":"getackelt",life:1,crit:true,_laeufer:o.id});
+              // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein
+              // erfolgreicher Rempler ist der Moment, den jede Rennuebertragung zeigt --
+              // selten genug (Torment trug gemessen nur 2,2 % der Rennen), immer big.
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
-                                                :" räumt "+o.n+" von der Bahn."));
+                                                :" räumt "+o.n+" von der Bahn."),true);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
               feed(o.seite,o.n+" steckt den Rempler weg.");
@@ -29112,7 +29288,10 @@
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
             schwebe({...laeuferSchwebeXY(u,-20),txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.");
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): eine verpatzte
+            // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
+            // selten (nur bei `patzer`) und sofort verstaendlich.
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true);
           } else {
             schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
@@ -29129,7 +29308,10 @@
           u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
-          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".");
+          // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): der erste
+          // Zieleinlauf einer Seite ist bei der Staffel ein EINMALIGES Ereignis (die
+          // Mannschaft ist im Ziel, nicht ein Einzelner) -- immer big.
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".",true);
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
@@ -29144,8 +29326,11 @@
           // Rangliste, die das HUD und der Endstand lesen — eine Wahrheit statt zweier.
           if(BA().startAbstand){
             const rang=bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1;
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
+            // drei Ziel-Plaetze sind big -- sonst wird der Zieleinlauf wieder ein Protokoll
+            // (Doc-Vorgabe Abschnitt 4.3.1: "Einzel: nur Platz 1-3").
             feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
-              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3);
           } else {
             // ZEITSKALA-FIX (Chris' Fund 22.09., zwei Screenshots desselben Rennens: Ticker
             // "14,8 s.", Endstand "2:22,4 min." fuer denselben Laeufer). Der Ticker schrieb
@@ -29161,7 +29346,10 @@
             // direkt darueber (schon vor dieser PR korrekt). `fmtZielzeit` ist dieselbe
             // Funktion, die auch der Staffel-Zieleinlauf und die Wertungstabelle benutzen: EIN
             // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".");
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
+            // drei Ziel-Plaetze sind big, s. Kommentar am startAbstand-Zweig oben.
+            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".",
+              rennFertig.length<=3);
           }
         }
       }
@@ -32275,6 +32463,12 @@
     // (scripts/probe-eiskunstlauf-ton.mjs). Reiner Praesentationszustand, kein Einfluss auf
     // rr() oder Rangtreue.
     eiskunstlaufPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER DAS BANDENLICHT (Broadcast Runde 2, 26.09.): ohne diesen Reset
+    // koennte eisBandeSeit noch den buehneT-Wert des VORIGEN Eiskunstlauf-Spiels tragen; da
+    // buehneT bei jedem Spiel wieder bei 0 beginnt, wuerde die Crossfade-Berechnung in
+    // bodenEis() eine negative Differenz sehen und den Wechsel-Zustand faelschlich dauerhaft
+    // auf "voll" halten. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    eisBandeSide=null; eisBandeSeit=-999;
     // DASSELBE N1-MUSTER FUER SHOWCASE (PR S1, Konzept 17.09.): ohne diese Zeile haelt
     // bodenShowcase() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
     // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
