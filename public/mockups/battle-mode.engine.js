@@ -7515,7 +7515,14 @@
       // Entscheidungen am vierten Versuch, Two-Point-Versuche, Kneels, Seitenaus, und die
       // verbrauchte Simulationszeit (die Uhr laeuft nicht mehr 1:1 mit der Animation).
       snaps:0,endphaseSnaps:0,vierterGo:0,vierterFg:0,vierterPunt:0,zweiAtt:0,zweiMade:0,
-      kneels:0,seitenaus:0,simSek:0}:null;
+      kneels:0,seitenaus:0,simSek:0,
+      // CHANCEN-NORMIERUNG (Opus-Konsultation 26.09., Pp-Fix zu P1 "Uhr und Spielstand"):
+      // `snapsSide[side]` zaehlt NUR die echten Offense-Snaps JE TEAM (nicht Kneels, s.
+      // fkSnapGezaehlt), also die Chancen, die eine Seite ueberhaupt hatte, Boxscore-Masse
+      // aufzubauen. feldspielWert() liest das unten, um jeden Spieler auf die kalibrierte
+      // Referenz-Snapzahl (55, PR-Beschreibung "Snaps je Team 55,3") zu normieren — s. dort
+      // fuer das WARUM.
+      snapsSide:[0,0]}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -8557,9 +8564,66 @@
       // (0,12 -> 0,794; 0,20 -> 0,792; 0,35 -> 0,772), ist also robust und nicht
       // uebergefittet. `checks` ist football-seitig ausschliesslich der Solo-Tackle aus
       // vollziehFootballErgebnis (Zweige "lauf"/"komplett").
-      return u.punkte*1.0 + (u.passYards||0)/25 + (u.laufYards||0)/10 + (u.fangYards||0)/10
+      const roh=u.punkte*1.0 + (u.passYards||0)/25 + (u.laufYards||0)/10 + (u.fangYards||0)/10
         + u.assists*0.3 + u.bloecke*1.0 + u.steals*2.0 + u.rebounds*1.0 - u.verluste*2.0
         + (u.checks||0)*0.15;
+      // CHANCEN-NORMIERUNG (Opus-Konsultation 26.09., Pp-Fix-Versuch zu P1 "Uhr und
+      // Spielstand" — GEMESSEN WIRKUNGSLOS, s. Befund unten. Bleibt trotzdem stehen: sie
+      // ist fuer sich richtig (echte Chancen-Normierung statt roher Snapzahl, wie jede
+      // andere Feldspiel-Disziplin sie fuer Unterzahl auch faehrt) und schadet nachgemessen
+      // weder rho noch der Snapzahl-Kalibrierung — sie loest nur nicht das Problem, fuer
+      // das sie gedacht war.
+      //
+      // HYPOTHESE (Opus-Konsultation): P1 macht die Snapzahl je Team vom Spielverlauf
+      // abhaengig — eine Completion kostet ~42 NFL-Sekunden Uhrzeit, eine Incompletion ~6
+      // (s. fkUhrNachZug) —, ein starkes Passspiel laesst die eigene Uhr schneller laufen
+      // und die EIGENE Seite bekommt dadurch WENIGER eigene Snaps. Die rohe Fantasy-
+      // Punktesumme oben zaehlt ueber die tatsaechlich gespielten Snaps, nicht pro Chance —
+      // ein starker Passer wuerde so fuer seinen eigenen Erfolg bestraft.
+      //
+      // NACHGEMESSEN, NICHT BESTAETIGT (diese Runde, diag-pp.mjs, n=24, gleicher Seed,
+      // Normierung EIN/AUS): Abweichung zur Matrix 71,6 Pp (an) gegen 71,1 Pp (aus) —
+      // innerhalb der Lauf-zu-Lauf-Streuung, kein messbarer Unterschied. Der isolierte
+      // Effekt der Normierung auf die Pp-Zahl ist praktisch null. Bei n=96 (zwei
+      // Saatstaemme, VOR dieser Aenderung 62,2/59,3 gegen den Pp-Fix-Auftrag: 64,3/58,7
+      // MIT Normierung — keine Verbesserung, ein Strang sogar leicht schlechter, beides
+      // Rauschen in dieser Groessenordnung.
+      //
+      // WARUM DIE HYPOTHESE NICHT TRAEGT: einflussVon() vergleicht fuer JEDEN Spieler
+      // seinen eigenen wert() mit/ohne Attributhebung, GEMITTELT UEBER DIESELBEN n Spiele.
+      // Der Normierungsfaktor 55/teamSnaps ist auf Teamebene fuer alle zwoelf Spieler
+      // GLEICH und aendert sich durch die Hebung EINES Attributs bei EINEM Spieler kaum
+      // (Team-Snapzahl haengt am ganzen Spielverlauf, nicht an einem Boxscore-Posten) — er
+      // kuerzt sich im Vorher/Nachher-Vergleich fast vollstaendig heraus. Was tatsaechlich
+      // health/speed/torment ueber- und power/determination/awareness/stamina/will/spirit
+      // unter- bzw. NULL gewichtet (der Konzeptreview-Befund war 58,8 Pp schon VOR P1,
+      // docs/design/football-opus-konzeptreview-26-09.md Abschnitt Pp-Pflichtpruefung),
+      // ist ein Rezept-/Mechanik-Mismatch, der auf Spielerebene liegt, nicht ein
+      // Team-Chancen-Effekt — eine Team-Normierung kann ihn strukturell nicht heben. Die
+      // eigentliche Reparatur ist die in P2-P4 des Konzeptreviews skizzierte Rezeptrunde
+      // (eigene Kanaele fuer awareness/stamina/will/spirit statt der aktuellen Fantasy-
+      // Punkte-Formel, die diese sechs Attribute ueberhaupt nicht liest), keine
+      // Normierungskorrektur an dieser Stelle.
+      //
+      // Chancen-Normierung bleibt trotzdem drin: 55 ist die kalibrierte durchschnittliche
+      // Snapzahl je Team (PR-Beschreibung "Snaps je Team 55,3"); ein Team mit z.B. 48
+      // eigenen Snaps zaehlt seine Spieler mit 55/48, eines mit 62 mit 55/62. NUR die
+      // Wertung wird umgerechnet, nicht die Simulation — die tatsaechliche Snapzahl je
+      // Spiel bleibt exakt die aus P1 (55±1, s. scripts/miss-football-korridor.mjs) — und
+      // rho je Spiel bleibt bei n=48 ueber drei Saatstaemme im Mittel ~0,80, keine
+      // Verschlechterung gegen den Stand vor P1 (0,779).
+      //
+      // KEIN KNEEL, KEIN ZWEIPUNKT-VERSUCH im Nenner (s. fkSnapGezaehlt): beide sind keine
+      // Chance auf Boxscore-Masse und wuerden die Normierung nur verzerren, wenn eine
+      // fuehrende Seite in der Schlussphase mehrmals abkniet.
+      //
+      // Frueh im Spiel (oder wenn `fsFbLog` fehlt, z.B. ein Aufruf ausserhalb der Live-
+      // Simulation) ist `snapsSide` noch 0 oder sehr klein — dann bleibt die rohe Zahl
+      // stehen (Normierungsfaktor 1), statt durch 0 zu teilen oder eine Handvoll frueher
+      // Snaps auf 55 hochzuskalieren. Am Spielende (wo einflussVon()/`wert()` tatsaechlich
+      // lesen, s. MOTOREN[fd].wert nach M.lauf()) ist das nie der Fall.
+      const teamSnaps=fsFbLog?fsFbLog.snapsSide[u.side]:0;
+      return teamSnaps>4?roh*(55/teamSnaps):roh;
     }
     if((dId||feldspielDisc)==="hockey"){
       // DER TORWART WIRD WIE IM ECHTEN EISHOCKEY BEWERTET: ueber GSAA (goals saved above
@@ -9914,6 +9978,14 @@
   function fkSnapGezaehlt(s,fb){
     if(!fsFbLog)return;
     fsFbLog.snaps++;
+    // KEIN KNEEL: die Chancen-Normierung in feldspielWert() zaehlt nur echte Offense-Snaps
+    // (Pass/Lauf/FG/Punt) je Team. Ein Kneel ist keine Chance auf Boxscore-Masse — er
+    // belohnt und bestraft ohnehin niemanden (s. vollziehFootballErgebnis "kneel") und
+    // wuerde die Normierung nur kuenstlich verduennen, wenn eine Seite in der Schlussphase
+    // mehrere Kneels hintereinander abkniet. Zweipunkt-Versuche laufen ohnehin nie durch
+    // fkSnapGezaehlt (s. fkZusatzversuch: eigener loeseFootballZug-Aufruf ausserhalb von
+    // starteSnap/stepSnapPhase), zaehlen also schon heute nicht mit.
+    if(s.spielTyp!=="kneel")fsFbLog.snapsSide[fb.side]++;
     if(s.tempo!=="normal")fsFbLog.endphaseSnaps++;
     if(s.vierter==="go")fsFbLog.vierterGo++;
     else if(s.vierter==="fg")fsFbLog.vierterFg++;
