@@ -13820,6 +13820,12 @@
   // Kaderleiste vor; die ist bewusst nicht gebaut, also nimmt jetzt das Fokus-Brett
   // selbst den Loese-Klick.
   let schachFokus=0, schachPin=null, schachMiniRects=[], schachFokusRect=null;
+  // TENNIS/FECHTEN-NAHANSICHT (26.09., Audit-Empfehlung 3,
+  // docs/design/ui-bewegungs-audit-26-09.md): welches Brett gerade in der grossen
+  // Nahansicht steht -- dieselbe Rolle wie schachFokus oben, ueber duellFokusWaehlen()
+  // (s. dort, direkt vor zeichneTennis()). KEIN Pin: anders als Schach gibt es hier
+  // keinen Klick-Handler dafuer, das war nicht Teil des Auftrags.
+  let tennisFokus=0, fechtenFokus=0;
   // "matt"-Ton (Ziel 5, A4) darf nur EINMAL je Spiel feuern, sobald das Duell entschieden
   // ist (alleFertig && siegSeite!=null, s. zeichneSchach) — sonst spielt jeder weitere
   // Frame nach dem Sieg den Ton erneut ab. Reset hier statt in reset() (s. Kommentar dort
@@ -13831,6 +13837,7 @@
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
@@ -17794,66 +17801,142 @@
   // ":13167/:13182") statt einer eigenen Uhr — disziplinProbe()/miss-alle-disziplinen.mjs
   // lesen dadurch exakt dieselben Felder wie zuvor, die Rangtreue-Neutralitaet ist also
   // strukturell gegeben, nicht nur behauptet.
-  function zeichneTennis(art){
-    const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
-    const posVon=(u)=>{
-      const g=TEILNEHMER.filter(x=>x.side===u.side);
-      const i=g.indexOf(u);
-      // +u.vizSchlagBob (M2, Feinschliff 21-09): derselbe additive Grundstellungs-Wipper wie
-      // zeichneFechten()s "laneY+(a.vizFechtBob||0)" (":16165") — reine Kosmetik, wirkt sich
-      // auf Ball-Start-/Zielpunkt genauso aus wie auf die Sprite-Position selbst.
-      return {x:90+(W-180)*(g.length>1?i/(g.length-1):0.5), y:(u.side===0?H*0.32:H*0.66)+(u.vizSchlagBob||0)};
-    };
-    [0,1].forEach(side=>{
-      const g=TEILNEHMER.filter(u=>u.side===side);
-      const y0=side===0?H*0.32:H*0.66;
-      g.forEach((u,i)=>{
-        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-        const y=y0+(u.vizSchlagBob||0);
-        ctx.globalAlpha=u.lunge>0?1:0.92;
-        const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
-        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=1;
-        // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei
-        // (Schlaeger an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-
-        // Pose statt eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach oben.
-        zeichneSprite(ctx,u,x,y,true);
-        ctx.textAlign="center";ctx.textBaseline="middle";
-        const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
-          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
-        };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-        schrift((v>0?"+":"")+v+" Vorteil",56,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),9);
-        const w=30,mitte=x,halb=Math.min(w/2,(w/2)*Math.abs(v)/maxVorteil);
-        ctx.fillStyle=css("--line");ctx.fillRect(mitte-w/2,y+64,w,3);
-        ctx.fillStyle=v>=0?css("--ok"):css("--crit");
-        ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
-        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
-      });
+  // ================== NAHANSICHT-REGIE FUeR TENNIS/FECHTEN (26.09., Audit-Empfehlung 3,
+  // docs/design/ui-bewegungs-audit-26-09.md) ==================
+  // Speed-Schach zoomt seit der Produktivierung sichtbar auf EIN Brett (zeichneSchach()
+  // oben, Regie-Kommentar dort); Tennis und Fechten zeigten in 20 Playwright-Stichproben
+  // (Audit-Methode s. Dokument oben) NIE eine Nahansicht — nur die dauerhafte Sechs-Duelle-
+  // Miniaturuebersicht. Diese Funktion ist Tennis/Fechtens Gegenstueck zu zeichneSchach()s
+  // Regie-Block, als eigene Funktion statt zweimal inline dupliziert (zwei Aufrufstellen:
+  // zeichneTennis()/zeichneFechten() unten). GENAU DIESELBE 3-Sekunden-Uhr und "knappster
+  // laufender Vorstand"-Heuristik wie Schach — plus EINE Ergaenzung, die Schach nicht
+  // braucht: `aktivFn` laesst den Fokus SOFORT (noch VOR der naechsten 3s-Marke) auf ein
+  // Brett springen, auf dem gerade eine sichtbare Aktion laeuft (Ballwechsel/Ausfallschritt)
+  // — ein Schachzug hat keine so kurze, leicht zu verpassende Animation, ein Ballwechsel/
+  // Fechtgang schon. REIN PRAESENTATIONAL: liest ausschliesslich u.aktuell/u.verlauf/
+  // u.summe/u.side/u.brett (bereits vorhandene TEILNEHMER-Felder) und modulweite
+  // tennisFokus/fechtenFokus (reine Anzeige-Zustaende, s. Deklaration oben) — schreibt
+  // nichts auf TEILNEHMER, ruft nirgends rr()/stepBuehne() auf. disziplinProbe()/
+  // miss-alle-disziplinen.mjs rufen diese Zeichenfunktionen nie auf (derselbe Vertrag wie
+  // bei zeichneSchach(), s. Kommentar dort) — rho bleibt fuer tennis/fechten/speed-schach
+  // bit-identisch (nachgemessen, s. PR-Beschreibung).
+  function duellFokusWaehlen(bisher,bretter,paar,rundenN,aktivFn){
+    const fertig=(u)=>u.aktuell+1>=rundenN;
+    const gueltig=(b)=>{const [x,y]=paar(b); return !!x&&!!y;};
+    const alleFertig=Array.from({length:bretter},(_,b)=>b).every(b=>{
+      const [x,y]=paar(b); return !x||!y||(fertig(x)&&fertig(y));
     });
+    if(alleFertig){
+      let best=gueltig(bisher)?bisher:0,bs=-Infinity;
+      for(let b=0;b<bretter;b++){const [x]=paar(b); if(!x)continue; if(x.summe>bs){bs=x.summe;best=b;}}
+      return best;
+    }
+    if(aktivFn){
+      for(let b=0;b<bretter;b++){
+        const [a,c]=paar(b); if(!a||!c)continue;
+        if(aktivFn(a)||aktivFn(c))return b;
+      }
+    }
+    const fokus=gueltig(bisher)?bisher:0;
+    if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
+      let best=fokus,bv=Infinity;
+      for(let b=0;b<bretter;b++){
+        const [a]=paar(b); if(!a)continue;
+        const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
+        if(v<bv){bv=v;best=b;}
+      }
+      return best;
+    }
+    return fokus;
+  }
+  function zeichneTennis(art){
+    if(!TEILNEHMER.length)return;
+    const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
+    const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    tennisFokus=duellFokusWaehlen(tennisFokus,bretter,paar,art.rundenN,tennisSchlagAktiv);
+    const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
+    const posMap=new Map();
+
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    const [fa]=paar(tennisFokus);
+    ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
+      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.06);
+
+    // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
+    // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
+    // schaltet die dritte Textzeile (Vorteil) ab, damit die Mini-Chips nicht kollidieren.
+    const zeichneSpieler=(u,side,x,y,scale,voll)=>{
+      if(!u)return;
+      posMap.set(u.id,{x,y});
+      const c=side===0?css("--home"):css("--away");
+      ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale); ctx.translate(-x,-y);
+      ctx.fillStyle=c; ctx.globalAlpha=0.20;
+      ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.3); ctx.fill(); ctx.globalAlpha=1;
+      // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei (Schlaeger
+      // an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-Pose statt
+      // eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach/vorher.
+      zeichneSprite(ctx,u,x,y,true);
+      ctx.restore();
+      const schrift=(txt,dy,farbe,groesse)=>{
+        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=2.6;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy*scale);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy*scale);
+      };
+      schrift(u.n.length>15?u.n.slice(0,14)+"…":u.n,44,c,voll?12:8.5);
+      if(voll){
+        const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+        schrift((v>0?"+":"")+v+" Vorteil",58,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),10.5);
+      }
+    };
+
+    // GROSSE NAHANSICHT: die zwei Kontrahenten des Fokus-Platzes, deutlich groesser
+    // (NAH_SKALA) und mittig, statt in der bisherigen Reihe aus bis zu sechs Spielern —
+    // genau der Rang-2-Befund des Audits ("nie eine Nahansicht des aktiven Gefechts").
+    // NAH_SKALA/fyOben/fyUnten so gewaehlt, dass der Text UNTER dem oberen Spieler (Name +
+    // "Vorteil", bis zu +58*NAH_SKALA px tief) klar vor dem SICHTBAREN OBERRAND des unteren
+    // Spielers endet (dessen Kopf reicht bei dieser Sprite-Groesse ca. 30*NAH_SKALA px ueber
+    // fyUnten hinaus) — beim ersten Screenshot dieser PR (NAH_SKALA 1.55, fyOben/fyUnten
+    // 0.24/0.52) ueberlappten sie sichtbar ("Draco"-Vorteilstext lag im Kopf von
+    // "Greenkraut"). 1.4/0.23/0.56 laesst beiden Seiten ca. 20-30px Luft.
+    const NAH_SKALA=1.4, fx=W/2, fyOben=H*0.23, fyUnten=H*0.56;
+    const [gA,gB]=paar(tennisFokus);
+    zeichneSpieler(gA,0,fx,fyOben,NAH_SKALA,true);
+    zeichneSpieler(gB,1,fx,fyUnten,NAH_SKALA,true);
+
+    // DIE UeBRIGEN PLAeTZE KLEIN AM UNTEREN RAND — dieselbe Idee wie zeichneSchach()s
+    // Mini-Bretter: eine Reihe kompakter Chips statt eines zweiten grossen Duells.
+    const andere=[]; for(let b=0;b<bretter;b++){ if(b!==tennisFokus)andere.push(b); }
+    const MINI_SKALA=0.5, ry=H*0.84, spanne=W-160;
+    andere.forEach((b,k)=>{
+      const [ma,mb]=paar(b); if(!ma||!mb)return;
+      const rx=80+spanne*(andere.length>1?k/(andere.length-1):0.5);
+      // KEINE zusaetzliche "Platz N"-Beschriftung hier -- zeichneSpieler() zeichnet die
+      // (verkuerzten) Namen ohnehin schon unter jede Mini-Figur; eine zweite Zeile an
+      // fast derselben Stelle kollidierte mit dem Namen des unteren Spielers (Opus-Review-
+      // Fund am ersten Screenshot dieser PR).
+      zeichneSpieler(ma,0,rx-16,ry-9,MINI_SKALA,false);
+      zeichneSpieler(mb,1,rx+16,ry+9,MINI_SKALA,false);
+    });
+
     // BALLWECHSEL — genau EIN Ball zur Zeit: stepBuehne() (":13159") dequeued global immer
     // nur EINEN Teilnehmer je Tick (buehneQueue ist nicht je Brett getrennt), es gibt also
     // nie zwei gleichzeitig frisch enthuellte Zuege, fuer die zwei Baelle noetig waeren.
-    // M2 (Feinschliff 21-09): Erkennung UND Fortschritt kommen jetzt aus stepTennis()s
-    // viz*-Feldern (tennisSchlagAktiv()/vizSchlagPhase/vizSchlagT) statt aus u.lunge direkt —
-    // s. Vertrags-/Timing-Kommentar bei stepTennis() oben. u.aktuell/u.runden werden hier wie
-    // zuvor nur gelesen (ueber vizSchlagAktuell, das u.aktuell im Enthuellungs-Frame spiegelt).
+    // Positionen kommen jetzt aus `posMap` (oben von zeichneSpieler gefuellt), NICHT mehr aus
+    // einer eigenen posVon() — dieselben Koordinaten, ob der Ballwechsel auf dem Fokus-Platz
+    // oder einem Mini-Platz laeuft (aktivFn oben laesst den Fokus ohnehin meist sofort dorthin
+    // springen, aber ein Restrahmen bleibt fuer den Wechsel selbst).
     const schlaeger=TEILNEHMER.find(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
     if(schlaeger){
       const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
-      if(gegner){
+      const von=posMap.get(schlaeger.id), nach=gegner&&posMap.get(gegner.id);
+      if(gegner&&von&&nach){
         const r=schlaeger.runden[schlaeger.vizSchlagAktuell];
         const treffer=!!r&&r.ereignis===art.erfolgWort;
         // Fortschritt AUS stepTennis()s Zustandsmaschine: 0 waehrend "ausholen" (Ball noch in
         // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer TENNIS_FLUG_T) — ersetzt
         // die alte lineare Ableitung aus u.lunge (":16122" vorher: "1-schlaeger.lunge/0.5").
         const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/TENNIS_FLUG_T));
-        const von=posVon(schlaeger), nach=posVon(gegner);
         // Fehlschlag: der Ball erreicht den Gegner nie, sondern haelt auf halber Strecke
         // an — derselbe Ass/Netzroller-Gegensatz wie in tennis.tsx.
         const zielX=treffer?nach.x:(von.x+(nach.x-von.x)*0.5);
@@ -17870,8 +17953,8 @@
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";
       if(f._teilnehmer!=null){
-        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
-        if(u){const p=posVon(u);
+        const p=posMap.get(f._teilnehmer);
+        if(p){
           ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
         }
       }
@@ -17911,6 +17994,12 @@
     if(!TEILNEHMER.length)return;
     const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
     const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    // AKTIV = mitten in Ausfall/Erholung/Parade, oder der Funke eines gerade gesetzten
+    // Treffers ist noch sichtbar — alles ausser der ruhenden En-garde-Stellung. Fuettert
+    // duellFokusWaehlen()s aktivFn (s. Kommentar dort): ein Ausfallschritt ist kurz genug,
+    // dass die reine 3s-Uhr ihn oft verpassen wuerde.
+    const fechtenAktiv=(u)=>(u.vizFechtPhase&&u.vizFechtPhase!=="engarde")||((u.vizFunkeT||0)>0);
+    fechtenFokus=duellFokusWaehlen(fechtenFokus,bretter,paar,art.rundenN,fechtenAktiv);
     const xL=140, xR=W-140, mitte=(xL+xR)/2, bahnLen=xR-xL;
     // En-garde-Abstand ~15% der Bahnlaenge vom Zentrum je Seite — das FIE-Regelwerk setzt die
     // En-garde-Linien 2 m von der Mitte auf einer 14 m langen Bahn (~14%), hier aufgerundet
@@ -17927,26 +18016,39 @@
     // rohes Max) nicht sofort auf den vollen Versatz hochskaliert.
     const vorteilVersatzPx=gardeAbstand*0.3;
     const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs((x.aktuell>=0&&x.verlauf)?x.verlauf[x.aktuell]:0)));
-    const sk=Math.max(0.55,Math.min(1,1.12-0.09*(bretter-1)));
     const posMap=new Map();
-    for(let i=0;i<bretter;i++){
-      const [a,b]=paar(i); if(!a||!b)continue;
-      const laneY=H*(bretter>1?0.16+0.68*(i/(bretter-1)):0.48);
-      const baseX0=mitte-gardeAbstand, baseX1=mitte+gardeAbstand;
-      // BAHN: schmaler heller Streifen mit Mittellinie, zwei gelben En-garde-Linien und den
-      // beiden roten Grenzlinien am Bahnende — das FIE-Bild einer Fechtbahn, keine erfundene
-      // Form.
-      ctx.fillStyle="rgba(60,66,82,.9)"; ctx.fillRect(xL,laneY-15,bahnLen,30);
-      ctx.strokeStyle="rgba(230,232,240,.35)"; ctx.lineWidth=1.5;
-      ctx.strokeRect(xL,laneY-15,bahnLen,30);
-      ctx.strokeStyle="rgba(230,232,240,.55)";
-      ctx.beginPath(); ctx.moveTo(mitte,laneY-15); ctx.lineTo(mitte,laneY+15); ctx.stroke();
-      ctx.strokeStyle="rgba(226,195,77,.6)"; ctx.setLineDash([3,3]);
-      [baseX0,baseX1].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
-      ctx.setLineDash([]);
-      ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
-      [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
-      ctx.lineWidth=1;
+
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    if(bretter>1){
+      ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.06);
+    }
+
+    // EINE BAHN ZEICHNEN — `gross` waehlt zwischen der grossen Nahansicht des Fokus-
+    // Gefechts (volle Bahn, Kopfzeile, Klingenfunke) und einer kompakten Mini-Bahn fuer
+    // die uebrigen Gefechte (nur Figuren + Trefferstand, wie zeichneSchach()s Mini-Bretter).
+    // Ersetzt den alten, immer-alle-Bahnen-gleich-grossen Zweig (Rang-2-Befund des Audits:
+    // "sechs Duelle immer als Miniaturuebersicht, nie eine Nahansicht").
+    const zeichneBahn=(i,cx,cw,laneY,sk,gross)=>{
+      const [a,b]=paar(i); if(!a||!b)return;
+      const halbH=15*sk;
+      const baseX0=cx-cw, baseX1=cx+cw;
+      if(gross){
+        // BAHN: schmaler heller Streifen mit Mittellinie, zwei gelben En-garde-Linien und den
+        // beiden roten Grenzlinien am Bahnende — das FIE-Bild einer Fechtbahn, keine erfundene
+        // Form. Nur am Fokus-Gefecht — die Mini-Bahnen zeigen nur die Figuren selbst.
+        ctx.fillStyle="rgba(60,66,82,.9)"; ctx.fillRect(xL,laneY-halbH,bahnLen,halbH*2);
+        ctx.strokeStyle="rgba(230,232,240,.35)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(xL,laneY-halbH,bahnLen,halbH*2);
+        ctx.strokeStyle="rgba(230,232,240,.55)";
+        ctx.beginPath(); ctx.moveTo(mitte,laneY-halbH); ctx.lineTo(mitte,laneY+halbH); ctx.stroke();
+        ctx.strokeStyle="rgba(226,195,77,.6)"; ctx.setLineDash([3,3]);
+        [baseX0,baseX1].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-halbH); ctx.lineTo(gx,laneY+halbH); ctx.stroke(); });
+        ctx.setLineDash([]);
+        ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
+        [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-halbH); ctx.lineTo(gx,laneY+halbH); ctx.stroke(); });
+        ctx.lineWidth=1;
+      }
       // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
       // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
       // ihn jetzt schon brauchen. Positiver Vorteil fuer a (Heim) schiebt BEIDE x-Koordinaten
@@ -17955,10 +18057,13 @@
       const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
       const zug=buehneTauziehVersatz(v,maxV,vorteilVersatzPx);
       // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade) +/- Tauzieh-Versatz,
-      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
-      const dxA=fechtVersatz(a), dxB=fechtVersatz(b);
-      const ax=baseX0+dxA+zug, ay=laneY+(a.vizFechtBob||0);
-      const bx=baseX1-dxB+zug, by=laneY+(b.vizFechtBob||0);
+      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz. Mini-Bahnen
+      // (gross===false) lassen Ausfall/Tauzieh-Versatz weg (dxA/dxB/zug*0) — bei sk=0.42 wuerde
+      // der volle Ausschlag Nachbar-Chips beruehren, und die Bewegung ist ohnehin kaum zu
+      // erkennen, solange das Gefecht nicht im Fokus steht.
+      const dxA=gross?fechtVersatz(a):0, dxB=gross?fechtVersatz(b):0, zugEff=gross?zug:0;
+      const ax=baseX0+dxA+zugEff, ay=laneY+(gross?(a.vizFechtBob||0):0);
+      const bx=baseX1-dxB+zugEff, by=laneY+(gross?(b.vizFechtBob||0):0);
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
@@ -17970,44 +18075,68 @@
         // der Hand statt des alten Schwert-Overlays, s. FECHTEN_HAND-Kommentar oben).
         zeichneSprite(ctx,u,px,py,true);
         ctx.restore();
+        // NAMEN NUR AM FOKUS-GEFECHT — bei den engen Mini-Bahnen (miniCw=22) wuerden zwei
+        // Namenszuege nebeneinander kollidieren; die kombinierte "Bahn X · Treffer"-Zeile
+        // unten deckt die Mini-Gefechte ab (s. else-Zweig weiter unten).
+        if(!gross)return;
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.font="400 9px 'IBM Plex Mono',monospace";
-        ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+        ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
         ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
       });
-      // KOPFZEILE JE BAHN: Treffer/Vorteil/Gang — dieselben drei Zahlen wie im generischen
-      // Zweig, nur als eine Zeile ueber statt drei Zeilen unter der Figur, weil bei sechs
-      // Bahnen kein Platz fuer den vollen generischen Block bleibt. `v` kommt jetzt von
-      // weiter oben (die Tauzieh-Positionen brauchen ihn schon vor dieser Stelle).
-      ctx.font="700 10.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
-      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-      const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
-        +"  ·  Vorteil "+(v>0?"+":"")+v
-        +"  ·  Gang "+(Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN;
-      ctx.strokeText(kopf,mitte,laneY-24); ctx.fillText(kopf,mitte,laneY-24);
-      // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
-      // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
-      const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
-      if(funke>0){
-        const leben=funke/FECHT_FUNKE_T;
-        const fx=(ax+bx)/2, fy=(ay+by)/2;
-        ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
-        const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
-        grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
-        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(fx,fy,16,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4;
-        for(let s=0;s<5;s++){
-          const ang=(s/5)*Math.PI*2+funke*9;
-          ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
+      if(gross){
+        // KOPFZEILE: Treffer/Vorteil/Gang — nur am Fokus-Gefecht, wie beim vorherigen
+        // Verhalten je Bahn.
+        ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
+        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
+          +"  ·  Vorteil "+(v>0?"+":"")+v
+          +"  ·  Gang "+(Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN;
+        ctx.strokeText(kopf,cx,laneY-halbH-14); ctx.fillText(kopf,cx,laneY-halbH-14);
+        // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
+        // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
+        const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
+        if(funke>0){
+          const leben=funke/FECHT_FUNKE_T;
+          const fx=(ax+bx)/2, fy=(ay+by)/2;
+          ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
+          const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
+          grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
+          ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(fx,fy,16,0,Math.PI*2); ctx.fill();
+          ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4;
+          for(let s=0;s<5;s++){
+            const ang=(s/5)*Math.PI*2+funke*9;
+            ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
+          }
+          ctx.restore();
         }
-        ctx.restore();
+      } else {
+        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        ctx.fillText("Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0),cx,laneY-halbH-8);
       }
-    }
+    };
+
+    // GROSSE NAHANSICHT: das Fokus-Gefecht, mittig und deutlich groesser als zuvor (sk 1.3
+    // statt hoechstens 1.0/0.55) — der Rang-2-Befund des Audits ("nie eine Nahansicht des
+    // aktiven Gefechts, nur die Sechs-Bahnen-Uebersicht").
+    zeichneBahn(fechtenFokus,mitte,gardeAbstand,H*0.36,1.3,true);
+
+    // DIE UeBRIGEN GEFECHTE KLEIN AM UNTEREN RAND — kompakte Mini-Bahnen statt eines zweiten
+    // gleich grossen Streifens, dieselbe Idee wie zeichneSchach()s Mini-Bretter/zeichneTennis()s
+    // Mini-Chips oben. JEDE Mini-Bahn bekommt ihr EIGENES Zentrum (rx) und einen schmalen
+    // eigenen Fechter-Abstand (miniCw, fest statt gardeAbstand*Bahnlaenge) -- sonst wuerden
+    // alle Mini-Gefechte exakt uebereinander auf der grossen Bahnmitte landen.
+    const andere=[]; for(let i=0;i<bretter;i++){ if(i!==fechtenFokus)andere.push(i); }
+    const miniY=H*0.87, miniCw=22, spanne=W-160;
+    andere.forEach((i,k)=>{
+      const rx=80+spanne*(andere.length>1?k/(andere.length-1):0.5);
+      zeichneBahn(i, rx, miniCw, miniY, 0.42, false);
+    });
+
     // SCHWEBETEXTE ("+X"/"kommt zu spaet"/"setzt den Treffer", aus stepBuehne()s schwebe())
-    // — dieselbe Idee wie posVon() bei zeichneTennis(), nur ueber die hier gefuellte posMap
-    // statt einer eigenen Formel, weil die Bahn-Positionen (anders als bei Tennis) je Brett
-    // UND je Ausfall-/Parade-Phase schwanken.
+    // — ueber der gemeinsamen posMap (Fokus-Gefecht UND Mini-Gefechte), weil die Bahn-
+    // Positionen (anders als bei Tennis) je Brett UND je Ausfall-/Parade-Phase schwanken.
     for(const f of floats){
       if(f._teilnehmer==null)continue;
       const p=posMap.get(f._teilnehmer); if(!p)continue;
