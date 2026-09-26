@@ -22744,6 +22744,10 @@
     u.retreat=0; u.rtCd=0; u.tgt=null; u.lastHit=null; u.anteile=null;
     u.cd=0; u.lunge=0; u.dodge=0; u.leineHielt=false; u.bindAn=null; u.leer=0;
     u.mp=u.mpMax; u.sp=u.spMax;
+    // CAST-RESET (Review-Fund #22 zu PR #1028): ohne dies behaelt eine respawnte Einheit
+    // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
+    // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
+    u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
     feed(u.side,u.n+" ist zurueck im Kampf.");
   }
 
