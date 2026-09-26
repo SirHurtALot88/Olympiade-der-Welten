@@ -1,0 +1,40 @@
+{
+  "note": "bester fit wird nich immer korrekt angezeigt",
+  "view": "lineup",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=lineup&team=T-G&saveId=new-game-1785412846578-h0z7cl",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 OPR/133.0.0.0",
+  "viewport": {
+    "width": 2518,
+    "height": 1288
+  },
+  "clientTime": "2026-07-30T15:01:01.283Z",
+  "reporter": {
+    "username": "franky",
+    "displayName": "Franky",
+    "ownerId": "franky_remote_placeholder",
+    "source": "session"
+  },
+  "reportId": "bug-2026-07-30T15-01-02-061Z-vi7fg4",
+  "createdAt": "2026-07-30T15:01:02.061Z",
+  "page": {
+    "path": "/foundation",
+    "view": "lineup",
+    "tab": null,
+    "label": "Spieltag · Einsatzliste"
+  },
+  "game": {
+    "saveId": "new-game-1785412846578-h0z7cl",
+    "saveName": "Oly New Game Custom 30.7.2026, 14:00:46",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "T-G"
+    ]
+  }
+}

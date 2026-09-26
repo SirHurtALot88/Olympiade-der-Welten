@@ -1,0 +1,41 @@
+{
+  "note": "Bitte überprüfen, dass wenn z.B. nur 2 Spieler in einer 6er eingesetzt werden, dass diese Spieler auch weiter in ihrem Slot mit ihren Werten bleiben! Also wenn ich in 5 + 6 Slot die spieler einsetze, sollen sie auch dann starten auch wenn davor dann alle slots leer sind!",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T06:35:07.510Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T06-34-59-900Z-0889u3",
+  "createdAt": "2026-08-14T06:34:59.900Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 9,
+    "matchdayId": "matchday-9",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
