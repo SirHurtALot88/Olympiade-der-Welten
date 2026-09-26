@@ -6472,6 +6472,23 @@
       // Vergehen aus, sondern erzwingt einen Abschluss oder ein Klaeren.
       live:{perioden:3, periodenDauer:80, periodenPause:1.0, schussuhr:8,
             periodeWort:"Drittel"},
+      // ENDPHASE: TORWART RAUS / FUEHRUNGS-RIEGEL (Konzeptreview T1, 26.09., von Chris
+      // ausdruecklich bestaetigt: "Torwart kann in der Endphase rauskommen, wenn es knapp
+      // ist", s. docs/design/hockey-opus-konzeptreview-26-09.md Abschnitt "T1 — Die
+      // Endphase"). NUR HOCKEY HAT DIESES FELD — `hockeyEndphaseSeite()`/
+      // `aktualisiereHockeyEndphase()` lesen `FB().endphase` als Torwaechter und geben ohne
+      // dieses Feld sofort null/nichts zurueck, ohne FSTEAM oder fsPunkte ueberhaupt
+      // anzusehen. Basketball/Football/Gewichtheben bleiben dadurch GARANTIERT
+      // bit-identisch, nicht nur zufaellig unberuehrt.
+      //   tEndAnteil    Anteil der Spieldauer, ab dem die Endphase im letzten Drittel
+      //                 greift. Vorschlag aus dem Review: 10 % (24 s von 240 s) — die
+      //                 analytische Empfehlung (~6 von 60 Real-Minuten) auf unsere Uhr
+      //                 gebracht; die NHL-PRAXIS zieht eher bei ~5 s.
+      //   ruckstandMin/Max  nur ein Rueckstand von 1 oder 2 Toren loest die Endphase aus
+      //                 (Chris' eigene Formulierung: "wenn es knapp ist") — bei 3 oder mehr
+      //                 Toren Rueckstand bleibt der Torwart im Tor, genau wie in der Praxis
+      //                 kaum ein Team bei 3 Toren Rueckstand schon zieht.
+      endphase:{tEndAnteil:0.10, ruckstandMin:1, ruckstandMax:2},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Hockey-Plan PR 1,
       // Fortsetzung von #726, s. rezeptAus() weiter oben). Dort steht es zeichengleich
       // weiter, mitsamt dem Nachzieh-Kommentar zu TEAMGEIST. Zweite ausgelagerte
@@ -7894,7 +7911,7 @@
     // `aufDemEis` neben `!u.torwart`: wer auf der Strafbank sitzt, bekommt keinen Slot.
     // Dadurch faellt die Seite von selbst in die Unterzahl-Tabelle unten — es braucht
     // keinen zweiten Weg fuer "Ueberzahl", der bestehende traegt ihn schon.
-    const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
+    const sortiert=[...FSTEAM[seite]].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
     // UNTERZAHL BEKOMMT NICHT DIE BESTEN PLAETZE.
     //
     // Chris' Fund: „wenn ich 6x50er spieler einsetze haette ich 300 Punkte, selbst ein
@@ -7942,7 +7959,7 @@
     // Feld, und das IST die volle Besetzung. Ohne diesen Abzug haette jede vollstaendige
     // Hockey-Mannschaft als Unterzahl gegolten.
     const form=FORMATION();
-    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>u.torwart);
+    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>stehtImTor(u));
     const soll=Math.max(1,(FB().jeSeite||form.length)-(torwartDa?1:0));
     const plaetze=sortiert.length<soll?UNTERZAHL_PLAETZE[sortiert.length]:null;
     // ROLLENBASIERTE PLATZWAHL (Konzeptreview 26.09., L1/2.2 — s. BASKETBALL_ROLLE_SLOT
@@ -8207,7 +8224,7 @@
   function naechsteZumFreienPuck(seite,wieviele){
     const f=fsLive&&fsLive.ball?fsLive.ball.frei:null;
     if(!f)return [];
-    return FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+    return FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)&&!u.down)
       .sort((a,b)=>dist(a,f)-dist(b,f)).slice(0,wieviele);
   }
   // WIE VIELE GEHEN AUF DEN PUCK. Im Bild war die Eisflaeche zur Haelfte leer, waehrend
@@ -8228,7 +8245,7 @@
   // dieselbe Regel — eine Kopie waere die zweite Stelle, die beim naechsten Anfassen
   // vergessen wird.
   const liegtZurueck=(seite)=>fsPunkte[seite]<fsPunkte[1-seite];
-  const feldStaerke=(seite)=>FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)).length;
+  const feldStaerke=(seite)=>FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)).length;
   // Strafe verhaengen. Gibt true zurueck, wenn wirklich gepfiffen wurde.
   function verhaengeStrafe(taeter,opfer,grund){
     if(feldStaerke(taeter.side)<=HK_STRAFE_MIN_FELD)return false;
@@ -8249,6 +8266,77 @@
     // Offensivdruck-Rotation durch eine Strafe nicht stillschweigend zurueckfaellt.
     zuordneSlots(0,liegtZurueck(0)); zuordneSlots(1,liegtZurueck(1)); zuordneDeckung(true);
     return true;
+  }
+  // ============ ENDPHASE: TORWART RAUS / FUEHRUNGS-RIEGEL (Konzeptreview T1) ============
+  // docs/design/hockey-opus-konzeptreview-26-09.md, Abschnitt "T1 — Die Endphase", von Chris
+  // woertlich bestaetigt: "Torwart kann in der Endphase rauskommen, wenn es knapp ist". Der
+  // Vorschlag im Review nennt drei Bedingungen zusammen: letztes Drittel, Restzeit innerhalb
+  // `tEndAnteil` der Spieldauer, Rueckstand 1 oder 2 Tore — s. `FB().endphase`-Kommentar oben.
+  //
+  // KEIN SIEBTER SPIELER. Ein Hockey-Spieltag stellt sechs Spieler inklusive Torwart
+  // (`engine.js` DISZIPLIN_INFO.hockey `size:6`) — es gibt keine Bank fuer einen echten
+  // sechsten Feldspieler (H3 aus hockey-opus-review-nhl.md ist deshalb laut Konzeptreview
+  // Abschnitt 4 NICHT baubar). Der "sechste Feldspieler" hier ist der Torwart SELBST: er
+  // verlaesst das Tor und spielt mit seinen eigenen (vermutlich feldspielschwachen) Werten
+  // weiter, ueber genau dieselbe `zuordneSlots`-Zuteilung wie jeder andere Feldspieler.
+  //
+  // Reine Zustandsablesung, KEIN rr()-Aufruf: liefert die ZURUECKLIEGENDE Seite (0/1) oder
+  // null. `FB().endphase` ist der Torwaechter — ohne dieses Feld (jede Disziplin ausser
+  // Hockey) verlaesst die Funktion sofort die erste Zeile, ohne FSTEAM/fsPunkte zu lesen.
+  function hockeyEndphaseSeite(){
+    const cfg=FB().endphase;
+    if(!istHockey()||!cfg||!fsLive)return null;
+    const L=LIVE();
+    if(!L||fsLive.viertel<L.perioden)return null; // nur im LETZTEN Drittel
+    const dauer=L.perioden*L.periodenDauer;
+    if(fsT<dauer-dauer*cfg.tEndAnteil)return null;
+    for(const seite of [0,1]){
+      const rueckstand=fsPunkte[1-seite]-fsPunkte[seite];
+      if(rueckstand>=cfg.ruckstandMin&&rueckstand<=cfg.ruckstandMax)return seite;
+    }
+    return null;
+  }
+  // FUEHRT DEN WECHSEL AUS — nur beim UEBERGANG. Jeden Tick aufgerufen (billig: eine
+  // Handvoll Vergleiche in hockeyEndphaseSeite, kein rr()), aendert aber nur etwas, wenn
+  // sich die zurueckliegende Seite gegenueber dem vorigen Tick unterscheidet. Ein Torwart
+  // faehrt also GENAU EINMAL zur Bank — und, faellt der Rueckstand wieder aus dem 1-2-Tore-
+  // Fenster (Ausgleich oder ein weiteres Gegentor ins leere Tor), GENAU EINMAL zurueck.
+  function aktualisiereHockeyEndphase(){
+    if(!FB().endphase)return;
+    const seite=hockeyEndphaseSeite();
+    if(seite===fsLive.hockeyEndphase)return;
+    if(fsLive.hockeyEndphase!=null){
+      const alt=torwartRoh(fsLive.hockeyEndphase);
+      if(alt&&alt.imTor===false){
+        alt.imTor=true;
+        feed(fsLive.hockeyEndphase,alt.n+" kommt zurück ins Tor.");
+      }
+    }
+    fsLive.hockeyEndphase=seite;
+    if(seite!=null){
+      const tw=torwartRoh(seite);
+      if(tw&&tw.imTor!==false){
+        tw.imTor=false;
+        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.");
+        schwebe({x:0,y:0,txt:"TORWART RAUS",life:1.6,crit:true,_spieler:tw.id});
+      }
+    }
+    // Beide Seiten neu aufstellen — dieselbe Bauform wie bei einer Strafe (verhaengeStrafe
+    // oben): ein echtes, seltenes Ereignis, keine laufende Neuzuteilung wie bei
+    // starteViertelpause (dort gemessen schaedlich, s. Kommentar dort — der Unterschied:
+    // DORT folgt gleich danach ohnehin ballUebernehmen(), HIER nicht).
+    zuordneSlots(0,liegtZurueck(0)); zuordneSlots(1,liegtZurueck(1)); zuordneDeckung(true);
+  }
+  // OB `u` GERADE IN DER EIGENEN HAELFTE RIEGELN MUSS ("Klaeren an die Bande statt
+  // Konter"): nur die FUEHRENDE Seite, nur waehrend die Endphase laeuft, nur mit dem Puck
+  // in der EIGENEN Haelfte. In der gegnerischen Haelfte (z.B. nach einem Abpraller oder
+  // einem missglueckten Wechsel des Gegners) gilt die Sperre nicht — ein Spieler, der den
+  // Puck schon vorne hat, darf weiter aufs (moeglicherweise leere) gegnerische Tor ziehen;
+  // das ist die dramatische Pointe der Endphase, kein Bug.
+  function hockeyRiegelKlaert(u){
+    if(!istHockey()||!FB().endphase||fsLive.hockeyEndphase==null)return false;
+    if(u.side!==1-fsLive.hockeyEndphase)return false; // nur die FUEHRENDE Seite
+    return u.side===0 ? u.x<MID : u.x>MID; // eigene Haelfte
   }
   // LOSER PUCK ALS WETTLAUF, NICHT ALS STANDPLATZ (Chris woertlich, 02.09.: "Das muss
   // dann auf jeden fall angepasst und gefixt werden das kann nicht nur positionssache
@@ -8538,7 +8626,25 @@
   // Greift keine ECHTE Aufstellung, faellt bestimmeTorwaerter auf den besten PARADE-Wert
   // zurueck.
   const TORWART_SLOTS=new Set(["goaltender","goalie","torwart","netminder","keeper"]);
-  const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
+  // STEHT ER GERADE IM TOR? Zwei getrennte Felder, absichtlich nicht eins (Konzeptreview
+  // T1, docs/design/hockey-opus-konzeptreview-26-09.md Abschnitt "T1 — Die Endphase"):
+  // `u.torwart` ist die ROLLE/IDENTITAET fuers ganze Spiel — Wertformel (s. feldspielWert,
+  // "if(u.torwart)") und Boxscore (Paraden/Gegentore-Spalten) lesen NUR dieses Feld, damit
+  // ein in der Endphase gezogener Torwart am Spielende weiter als Torwart abgerechnet wird,
+  // mit den Paraden/Gegentoren, die er WAEHREND er im Tor stand, wirklich gehalten hat.
+  // `u.imTor` ist der MOMENTANE Zustand: true, solange er tatsaechlich zwischen den Pfosten
+  // steht, false in der Endphase, wenn er auf der Bank sitzt und ein Feldspieler an seiner
+  // Stelle mitspielt (hier: er selbst, s. aktualisiereHockeyEndphase — es gibt keine Bank
+  // mit einem siebten Spieler, s. CLAUDE.md/Konzeptreview Abschnitt 4 zu H3). Jede
+  // gameplay-relevante Stelle (Slot-Zuteilung, Deckung, Schussausgang, Bewegung) muss
+  // `stehtImTor()` lesen, keine Stelle darf direkt `u.torwart` fuer diese Frage lesen.
+  const stehtImTor=(u)=>!!(u.torwart&&u.imTor!==false);
+  const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>stehtImTor(u))||null;
+  // ROLLEN-IDENTITAET, UNABHAENGIG VOM MOMENTANEN STATUS — fuer aktualisiereHockeyEndphase,
+  // die den urspruenglichen Torwart auch dann wiederfinden muss, wenn er gerade (imTor=false)
+  // auf dem Eis als Feldspieler steht. `torwartVon` waere hier falsch: es liefert bei einem
+  // gezogenen Torwart bewusst null (leeres Tor, s. Kommentar dort).
+  const torwartRoh=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
   // GENAU EINER JE SEITE, AB DREI SPIELERN. Chris woertlich: "einer der spieler soll
   // natuerlich einen torwart slot haben und entsprechend im tor stehen! ausser im 2er
   // spiel da gibts nur verteiger und angreifer". Bei zwei Spielern steht das Tor also
@@ -8554,7 +8660,7 @@
   // durch, wie es der Kommentar hier schon immer versprach.
   function bestimmeTorwaerter(){
     for(const team of FSTEAM){
-      for(const u of team)u.torwart=false;
+      for(const u of team){u.torwart=false; u.imTor=true;}
       if(team.length<3)continue;
       let gewaehlt=team.find(u=>u.slotGesetzt&&u.slotId&&TORWART_SLOTS.has(u.slotId));
       if(!gewaehlt)for(const u of team)if(!gewaehlt||(u.PARADE||0)>(gewaehlt.PARADE||0))gewaehlt=u;
@@ -8593,7 +8699,7 @@
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
     if(istHockey()){
       const naechster=(seite)=>FSTEAM[seite]
-        .filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+        .filter(u=>!stehtImTor(u)&&aufDemEis(u)&&!u.down)
         .sort((a,b)=>dist(a,{x,y})-dist(b,{x,y}))[0]||null;
       const c0=naechster(0), c1=naechster(1);
       if(c0&&c1){
@@ -9443,6 +9549,10 @@
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
       beruehrungKette:[], beruehrungSeite:null,
+      // NUR HOCKEY (s. aktualisiereHockeyEndphase): die aktuell zurueckliegende Seite (0/1),
+      // deren Torwart gezogen ist, oder null, solange keine Endphase laeuft. Ein neues Spiel
+      // startet immer ohne — der Stand 0:0 kann die Bedingung ohnehin nie erfuellen.
+      hockeyEndphase:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
       football:null, snap:null};
@@ -9477,8 +9587,8 @@
       // Schuesse, stahl Pucks und verteilte 26 Bodychecks. Ein Torwart, der durchs Feld
       // checkt, ist kein Torwart. Er faellt auf BEIDEN Seiten der Zuteilung heraus: er
       // deckt niemanden, und niemand deckt ihn.
-      const verteidiger=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u)),
-            angreifer=FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const verteidiger=FSTEAM[1-seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)),
+            angreifer=FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u));
       // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
       // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
       // ohne diese Bereinigung griff sich ein neu bewertender Verteidiger regelmaessig
@@ -9720,7 +9830,7 @@
   function spielmacherLos(team){
     // Der Torwart eroeffnet keinen Angriff — er steht im Tor. Nur wenn er der einzige
     // Spieler waere, bekommt er den Puck (dann gibt es ohnehin keinen anderen).
-    const feld=team.filter(u=>!u.torwart&&aufDemEis(u));
+    const feld=team.filter(u=>!stehtImTor(u)&&aufDemEis(u));
     return gewichtetesLosNach(feld.length?feld:team,u=>losGewicht(u.AUFBAU));
   }
 
@@ -9770,7 +9880,7 @@
     // Mannschaft. Er bekommt den Puck jetzt nur noch so, wie ein Torwart ihn bekommt:
     // ueber einen Schuss, einen Abpraller oder einen losen Puck in seinem Torraum.
     if(istHockey()){
-      const feld=mitspieler.filter(m=>!m.torwart&&aufDemEis(m));
+      const feld=mitspieler.filter(m=>!stehtImTor(m)&&aufDemEis(m));
       // Nur ersetzen, wenn ueberhaupt ein Feldspieler uebrig bleibt: die Aufrufer geben
       // das Ergebnis ungeprueft an passeAb weiter, ein null liefe dort ins Leere. Bleibt
       // nur der Torwart, ist er tatsaechlich die letzte Anspielstation.
@@ -9876,7 +9986,17 @@
     // oder, wenn keiner da ist, an die Bande (Klaeren). Ohne diese Sperre wuerde er die
     // normale Abschluss-Entscheidung durchlaufen und irgendwann auf das GEGNERISCHE Tor
     // schiessen, mitsamt Laufweg dorthin.
-    if(u.torwart){
+    //
+    // FUEHRUNGS-RIEGEL IN DER ENDPHASE (Konzeptreview T1): dieselbe Klaer-Aktion, ausgeloest
+    // durch eine ZWEITE Bedingung statt der Torwart-Rolle. Gewinnt die FUEHRENDE Mannschaft
+    // den Puck in der Endphase in der EIGENEN Haelfte, baut sie keinen Angriff auf, sondern
+    // spielt ihn sicher weg — genau das "Point-Spieler tiefer, Klaeren an die Bande statt
+    // Konter" aus dem Review. In der GEGNERISCHEN Haelfte gilt diese Sperre NICHT: ein
+    // Spieler, der den Puck schon vorne hat (z.B. nach einem Abpraller oder einem
+    // gescheiterten Wechsel des Gegners), darf weiter aufs — moeglicherweise leere — Tor
+    // ziehen. Das ist bewusst dieselbe Code-Stelle wie der Torwart-Zweig, keine zweite,
+    // separat gepflegte Klaer-Logik.
+    if(stehtImTor(u)||hockeyRiegelKlaert(u)){
       const mitspieler=FSTEAM[u.side].filter(m=>m!==u);
       const ziel=mitspieler.length?offensterMitspieler(mitspieler,u):null;
       if(ziel){ passeAb(u,ziel); return; }
@@ -9908,7 +10028,7 @@
     // als "gedoppelt" und bekam den vollen doppelMalus von 0,26, obwohl gar kein zweiter
     // Feldspieler in der Naehe war. Der Torwart ist die Huerde, die die Schussaufloesung
     // ohnehin schon abbildet; ein zweites Mal als Bedraenger zaehlt er doppelt.
-    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!v.torwart&&dist(u,v)<BEDRAENGT_RADIUS);
+    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!stehtImTor(v)&&dist(u,v)<BEDRAENGT_RADIUS);
     const gedoppelt=naheVerteidiger.length>=2;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
     // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
@@ -10314,7 +10434,7 @@
     // Fuer die Doppeln-Abnahme (s. Bericht): dieselbe naheVerteidiger-Zaehlung wie in
     // entscheideBallaktion, hier am Schuetzen im Abwurfmoment (kann bei Spielzuegen/
     // Alley-Oop von der Person abweichen, die die Aktion ausgeloest hat).
-    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!v.torwart&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
+    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!stehtImTor(v)&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
     // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
@@ -10728,7 +10848,7 @@
     // verlassen. Gemessen fing er regelmaessig Paesse ab, die quer durch die eigene Zone
     // liefen.
     for(const v of FSTEAM[1-von.side]){
-      if(v.torwart)continue;
+      if(stehtImTor(v))continue;
       const d=distZuLinie(v,von,nach);
       if(d<minD){minD=d;waechter=v;}
     }
@@ -10859,8 +10979,8 @@
           // Ballwechsel dadurch von 87 auf 11 ein. Real bekommt die bestrafte Seite den
           // Puck ohnehin nicht: das Anspiel findet in ihrer Zone statt, und die Ueberzahl
           // hat den Aufbau. Der Spielmacher der gefoulten Mannschaft nimmt ihn auf.
-          const anspiel=spielmacherLos(FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)).length
-            ?FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)):FSTEAM[traeger.side]);
+          const anspiel=spielmacherLos(FSTEAM[traeger.side].filter(v=>!stehtImTor(v)&&aufDemEis(v)).length
+            ?FSTEAM[traeger.side].filter(v=>!stehtImTor(v)&&aufDemEis(v)):FSTEAM[traeger.side]);
           fsLive.ball.frei=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
           naechsterAngriff(traeger.side);
           ballUebernehmen(anspiel);
@@ -10962,7 +11082,7 @@
     const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
     // Der Torwart bricht nicht aus. Gemessen lief er sonst 19 s je Spiel als "Ausbrecher"
     // Richtung gegnerisches Tor, bei drei gegen drei sogar 80 s.
-    const kandidaten=team.filter(u=>!u.hatBall&&!u.torwart&&aufDemEis(u));
+    const kandidaten=team.filter(u=>!u.hatBall&&!stehtImTor(u)&&aufDemEis(u));
     if(!kandidaten.length||!gegner.length)return;
     let schnellsterGegner=gegner[0].LAUFTEMPO;
     for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
@@ -11331,7 +11451,7 @@
     // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
     // Die zwei Schnellsten je Seite — ohne den Torwart. Sonst nimmt er einem Feldspieler
     // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
-    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
+    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -11722,7 +11842,7 @@
       // STRAFBANK VOR ALLEM ANDEREN, aus demselben Grund wie der Torwart-Zweig: er hat
       // genau ein Ziel, und das ueberschreibt jede Angriffs- oder Verteidigungslogik.
       if(!aufDemEis(u)){ const z=strafbankZiel(u); zx=z.x; zy=z.y; tempoMul=1.3; }
-      else if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
+      else if(stehtImTor(u)){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
       if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
       // PUSTE AUFS TEMPO (Chris: „oder langsamer wird"). Dieselbe Bauform wie `leer`/`nerv`
       // in tempoVon auf der Bahn: ein Faktor, der bei vollem Vorrat exakt 1 ist und bei
@@ -11851,6 +11971,10 @@
       if(fsLive.phase==="snap")stepSnapPhase(dt);
       return;
     }
+    // ENDPHASE-CHECK (Konzeptreview T1): einmal je Tick, reine Zustandsablesung, kein
+    // rr()-Aufruf (s. hockeyEndphaseSeite). Ausserhalb von Hockey oder ohne FB().endphase
+    // verlaesst die Funktion sofort ihre erste Zeile.
+    if(istHockey())aktualisiereHockeyEndphase();
     const art=FB();
     fsLive.angriffSeit+=dt;
     for(const team of FSTEAM)for(const u of team){
@@ -11941,7 +12065,7 @@
               // "loser Puck im eigenen Torraum", s. offensterMitspieler) — aber er
               // startet keinen Wettlauf quer ueber das Eis.
               if(!aufDemEis(u))continue;   // von der Strafbank holt niemand einen Puck
-              if(u.torwart){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
+              if(stehtImTor(u)){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
               // Wer liegt, laeuft nicht: nach einem Bodycheck ist der Gestuerzte fuer
               // HK_STURZ Sekunden raus und taumelt danach mit HK_TAUMEL_TEMPO weiter.
               if(u.down)continue;
