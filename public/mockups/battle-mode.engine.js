@@ -22425,7 +22425,7 @@
       groesse:p.groesse??null,
       arch:archetyp.name,stunResist:archetyp.stunResist,knockbackResist:archetyp.knockbackResist,
       ord:ordung||"mitlinie",zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
-      hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+      hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,downBis:null,lunge:0,tgt:null,
       dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
       fern,...reichweiten(p.skills,fern),stun:0,
       skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
@@ -22584,6 +22584,60 @@
     z.y=Math.max(34,Math.min(H-34,z.y+dy/L*k));
   }
 
+  // ===================================================================================
+  // TDM-RESPAWN (Chris, 26.09., Format-Klarstellung zum Opus-Konzeptreview): "TDM hat kein
+  // Kill-Limit, es wird bis zum Ende von z.B. 6 Minuten gespielt, wer am Ende am meisten
+  // gescored hat, hat gewonnen." Ein Zeitlimit ohne Kill-Limit ergibt nur Sinn, wenn
+  // Gefallene zurueckkommen — sonst waere ein Team nach vollstaendiger Ausloeschung
+  // vorzeitig fertig, was Chris nicht sagt, und "am Ende am meisten gescored" waere
+  // identisch mit "hat ueberlebt", nie etwas anderes. Vorher war TDM (wie Mini-DM und
+  // Battlefield) reine Einmal-Eliminierung ohne Respawn (s. Konzeptreview Abschnitt 1.1:
+  // "Alle drei Disziplinen sind heute einmalige Eliminierung ohne Respawn") UND ohne
+  // Kill-Limit — die alte "TDM"-Zieldefinition war also schon vorher kein Kill-Limit-Modus
+  // (das hatte nur das Konzeptreview als MOEGLICHEN P3-Vorschlag genannt, nie umgesetzt),
+  // sondern schlicht ein Duell ohne Wiedereinstieg. Die Korrektur betrifft deshalb allein
+  // das Fehlen von Respawn.
+  //
+  // NUR TDM. Mini-DM bleibt Ein-Leben-FFA (Chris, 26.09.: "beim Mini-DM hat jeder Spieler
+  // nur ein Leben" — das war bereits der Ist-Zustand, hier nur bestaetigt, nicht veraendert)
+  // und Battlefield bleibt in dieser PR unangetastet (eigener, groesserer Umbau noetig, s.
+  // PR-Beschreibung und Konzeptreview Abschnitt 5, P3 — die "Tickets + zweiter Punkt"-Frage
+  // ist Chris' offene Frage 2 aus Abschnitt 6, noch nicht von ihm beantwortet).
+  //
+  // KURZE WARTEZEIT AM EIGENEN AUFSTELLUNGSPLATZ (`u.hx/u.hy`, von homeFor() beim Bau
+  // vergeben), volle Lebenspunkte, kurze Spawn-Unverwundbarkeit (dieselbe `invuln`-Pruefung,
+  // die nahschlag()/schrittPfeile() ohnehin schon respektieren) gegen sofortiges
+  // Spawn-Camping. 5 Sekunden bei einem Zeitlimit von 95 Sekunden erlaubt mehrere
+  // Respawn-Zyklen je Kaempfer, ohne den Kampf leerzuraeumen.
+  const TDM_RESPAWN_SEK=5, TDM_SPAWN_SCHUTZ_SEK=1.5;
+
+  function reviveUnit(u){
+    u.down=false; u.downBis=null;
+    u.hp=u.max;
+    u.x=u.hx; u.y=u.hy;
+    u.schild=0; u.schildT=0; u.schildVon=null;
+    u.stun=0; u.wurzel=0; u.invuln=TDM_SPAWN_SCHUTZ_SEK;
+    u.retreat=0; u.rtCd=0; u.tgt=null; u.lastHit=null; u.anteile=null;
+    u.cd=0; u.lunge=0; u.dodge=0; u.leineHielt=false; u.bindAn=null; u.leer=0;
+    u.mp=u.mpMax; u.sp=u.spMax;
+    feed(u.side,u.n+" ist zurueck im Kampf.");
+  }
+
+  // GEMEINSAME AUSSCHALTUNG fuer nahschlag() und den Pfeiltreffer in schrittPfeile() —
+  // vorher stand dieselbe Zeile (down setzen, tode/ko zaehlen, verteileKo, Feed-Meldung)
+  // zweimal im Code. Jetzt entscheidet eine Stelle, ob jemand fuer immer faellt
+  // (Mini-DM/Battlefield, unveraendertes Verhalten) oder in TDM respawnt.
+  function schalteAus(tg,von){
+    tg.st.tode++; von.st.ko++; verteileKo(tg,von);
+    tg.down=true;
+    if(disc==="tdm"){
+      tg.downBis=t+TDM_RESPAWN_SEK;
+      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+    } else {
+      feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
+    }
+  }
+
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
   // geschrieben, damit der Grundangriff und Paladin Slash nicht auseinanderlaufen.
   function nahschlag(u,tg,sk,mult,knock,label,sd){
@@ -22605,7 +22659,7 @@
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
-    if(tg.hp===0&&!tg.down){tg.down=true;tg.st.tode++;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));}
+    if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
   // EINE UHR FUER ALLE.
@@ -23212,7 +23266,7 @@
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,crit);
-        if(z.hp===0&&!z.down){z.down=true;z.st.tode++;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,z.n));}
+        if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
       }
@@ -23601,6 +23655,12 @@
       KFOKUS=null;
       if(gefallen)feed(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
     }
+    // TDM-RESPAWN (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): VOR der Kontakt- und
+    // Zielwahl-Berechnung weiter unten, damit ein frisch respawnter Kaempfer noch im selben
+    // Bild mitspielt statt eine Zeitscheibe zu verpassen. `downBis` ist ausserhalb von TDM
+    // nie gesetzt (schalteAus setzt es nur dort) — die Schleife ist fuer Mini-DM/Battlefield
+    // deshalb ein no-op, ohne extra Disziplin-Abfrage noetig.
+    for(const u of U)if(u.down&&u.downBis!=null&&t>=u.downBis)reviveUnit(u);
     const sd=t>50?1+(t-50)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
@@ -24063,7 +24123,13 @@
       kpTick(dt);
       if(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)finish();
     }
-    if(lebendeSeiten.size<=1||t>95)finish();
+    // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): eine Seite, die gerade
+    // komplett auf Respawn wartet, ist NICHT ausgeschieden wie in Mini-DM/Battlefield,
+    // sondern kommt zurueck — "lebendeSeiten.size<=1" waere hier nur eine Momentaufnahme
+    // zwischen zwei Toden, kein Spielende. Chris, 26.09.: "es wird bis zum Ende von z.B.
+    // 6 Minuten gespielt" — TDM endet deshalb ausschliesslich ueber die Zeit, Mini-DM und
+    // Battlefield weiterhin zusaetzlich per vollstaendiger Ausloeschung.
+    if((disc!=="tdm"&&lebendeSeiten.size<=1)||t>95)finish();
     updateHud();
   }
 
@@ -30883,6 +30949,20 @@
       updateHud();
       return;
     }
+    // TDM: KEIN KILL-LIMIT (Chris, 26.09.): "es wird bis zum Ende von z.B. 6 Minuten
+    // gespielt, wer am Ende am meisten gescored hat, hat gewonnen." Score ist die Summe
+    // der Ausschaltungen je Seite UEBER DAS GANZE SPIEL (u.st.ko, respawnfest — jeder
+    // Kaempfer sammelt ueber seine ganze Einsatzzeit, nicht nur bis zu seinem eigenen
+    // ersten Tod). Der Vergleich unten (nR-live(1).length) waere hier falsch: mit Respawn
+    // ist "aktuell lebend" am Spielende reiner Zufall (wer gerade respawnt), keine Summe
+    // mehr ueber das ganze Spiel.
+    if(disc==="tdm"){
+      const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
+      const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
+      feed(0,(scoreL>scoreR?VEREIN[0].name+" gewinnt ":scoreR>scoreL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      updateHud();
+      return;
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
     feed(0,(pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
@@ -32831,15 +32911,26 @@
       // Skill-Kennzahlen ueber die ganze Serie sammeln — ein einzelner Kampf ist ein Wurf.
       for(const k in MESS){const a=messSumme[k]||(messSumme[k]={n:0,ziele:0,eng:0,bereit:0});
         a.n+=MESS[k].n;a.ziele+=MESS[k].ziele;a.eng+=MESS[k].eng;a.bereit+=MESS[k].bereit;}
-      if(live(0).length>live(1).length)siege++;
-      // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
+      // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): "live(seite).length"
+      // ist am Spielende dort nur noch eine Momentaufnahme, wer GERADE respawnt — vorher war
+      // das bitgleich mit "Ausschaltungen" (niemand kam zurueck), jetzt nicht mehr. Score ist
+      // fuer TDM deshalb dieselbe Summe wie in finish() (u.st.ko je Seite), fuer Mini-DM/
+      // Battlefield unveraendert die Zahl ausgeschalteter Gegner ueber die Ueberlebenden.
       const nJe=jeSeiteVon(disc);
-      const e=(nJe-live(1).length)+":"+(nJe-live(0).length);
+      const punkteL=disc==="tdm"?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0):nJe-live(1).length;
+      const punkteR=disc==="tdm"?U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0):nJe-live(0).length;
+      if(punkteL>punkteR)siege++;
+      const e=punkteL+":"+punkteR;
       ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
       for(const u of feld){
         const s=summe[u.n]||(summe[u.n]={n:u.n,seite:u.side,eig:u.eig,dmg:0,heal:0,verh:0,tank:0,ko:0,leist:0,tod:0});
         s.dmg+=u.st.dmg;s.heal+=u.st.heal;s.verh+=u.st.verh;s.tank+=u.st.tank;s.ko+=u.st.koAnteil;
+        // `tod`/`totquote` bleibt "am Ende der Zeit gerade down" — fuer TDM unter Respawn ein
+        // schwaecheres Signal als vorher (kein permanentes Ausscheiden mehr, s. oben), aber
+        // nicht falsch: es zaehlt, wie oft der letzte Tod noch nicht respawnt war. Nicht
+        // umgestellt auf u.st.tode (Todesanzahl je Spiel), um diese Runde auf die Format-
+        // Korrektheit zu begrenzen, nicht auf eine neue Kennzahl.
         s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
       }
     }
