@@ -147,7 +147,9 @@ diesen Gegencheck einmal gemessen (`node scripts/messe-arena-einfluss.mjs eiskun
 | speed | 5,4 % | 10 | −4,6 |
 | **Abweichung** | **23,7 Pp** | | Ziel ≤ 25 |
 
-PP_NACHTRAG
+(Eine Nachmessung mit n=48 und für Showcase wurde gestartet, lief in dieser Runde aber nicht
+durch, weil sich mehrere Sessions die Maschine teilten. Sie ist der erste Schritt vor jedem
+Bauauftrag unten.)
 
 Das ist nur ein Saatstamm mit zwölf Läufen; das Skript selbst warnt, dass zwölf Läufe systematisch
 zu günstig messen (s. dortiger Kopfkommentar, Spurt 40,9 → 54,7 Pp von n=12 auf n=48). **Die
