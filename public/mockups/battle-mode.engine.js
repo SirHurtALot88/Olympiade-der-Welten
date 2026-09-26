@@ -24700,6 +24700,12 @@
         if(ha!==hb)return ha-hb;
         return b.pos-a.pos;                       // beide noch auf der Rampe: Startfolge
       }
+      // HOECHSTMARKE STATT AKTUELLER POSITION, NUR CLIMBING (Gegencheck 3.3, Aenderung 1):
+      // ein Abrutschen (A-2) senkt `u.pos`, nie `u.hoch` — der hoechste kontrollierte Griff
+      // zaehlt, wie im echten Lead (IFSC §9.1). Jede andere Bahn hat `u.hoch===u.pos`
+      // (monoton steigend, kein Abrutschen), die Gate haelt den Vergleich trotzdem explizit
+      // getrennt, statt sich auf diese Gleichheit zu verlassen.
+      if(BA().climbing)return (b.hoch??b.pos)-(a.hoch??a.pos);
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
@@ -27129,10 +27135,123 @@
       // Reserve, die hier ohnehin knapp ist. Der Haushalt liegt hoeher als im Sprint, weil
       // die Steigung ihn oben zusaetzlich zusammenzieht; mit dem Sprint-Wert war nach
       // zwoelf Laeufen jeder Einzelne leer.
-      technikBasis:0.25, technikSpanne:0.0062, wuchtBasis:0.14, wuchtSpanne:0.0092,
+      // BASISWERTE FUER DEN PR-2-GRIFF-BLOCK NACHGEZOGEN (26.09.): die alten Werte
+      // (0,25/0,14) stammten aus der Zeit, in der Climbing kein `hindernisTypen` fuehrte
+      // und `koennen`/`durch` deshalb IMMER die volle Eignung lasen (kein Mix auf eine
+      // schwache Einzelfaehigkeit). Mit fuenf spezialisierten Griffarten trifft ein
+      // Kletterer an zwei bis drei Griffen genau die Faehigkeit, in der er schwach ist —
+      // kaderfest gemessen lag die Abrutschquote bei den alten Basiswerten bei 3,7 je
+      // Rennen (Ziel 0,6-1,2, Gegencheck-Korridor 6.6). Angehoben auf ein Niveau, das den
+      // PRIMAERWEG zur Regel macht und Nebenwege/Abrutschen zur Ausnahme.
+      technikBasis:0.55, technikSpanne:0.0075, wuchtBasis:0.42, wuchtSpanne:0.0095,
       wendigErholt:0.0045,
       wuchtKraft:18, wuchtZeit:0.18, stolperGrund:0.42, stolperSpanne:0.5, stolperKraft:8,
       kraftBasis:310, kraftSpanne:3.1,
+      // ====================================================================================
+      // PR 2 (26.09., climbing-opus-gegencheck-24-09.md Abschnitt 5): GRIFFARTEN, ZONEN,
+      // ABRUTSCHEN, BALANCE, DUELLDRUCK, ZEITLIMIT, RAST. Alle Felder unten sind NEU und
+      // existieren nur bei Climbing — jede andere Bahn (Spurt/Staffel/Time-Trial/Takeshi)
+      // liest sie nicht und bleibt bit-identisch (Bahn-Konvention, s. CLAUDE.md).
+      //
+      // GRIFFARTEN (Gegencheck 3.7): fuenf Arten wie Takeshis `hindernisTypen`, aber
+      // Sloper/Volumen statt Tritt. `fallenKoennen` mischt das Koennen JEDER Griffart in
+      // den Primaerwurf (dasselbe Muster, das bei Takeshi rho hob, 0,861 -> 0,883) — der
+      // Wurf wird dadurch nicht lauter, sondern breiter: derselbe Mix aus fuenf Sub-Skills,
+      // die auch die Stoppzeit tragen. `fallenDurchbruch` bleibt UNGESETZT (Takeshi
+      // gemessen: 0,874 gegen 0,883 mit reiner WUCHT — kein Gewinn), der Kraftzug bleibt
+      // darum reine WUCHT.
+      fallenKoennen:0.50,
+      // DREI ROUTEN-LAYOUTS (Gegencheck 3.8): "Überhang"/"Platte"/"Dach" statt "Kante",
+      // dieselbe Multimenge an Griffarten (2 Leiste, 2 Sloper, 3 Henkel, 2 Zange, 1 Dyno)
+      // in anderer Reihenfolge, je Saat gewaehlt (Takeshis `kurse[]`-Muster, `bauSpurt()`
+      // liest es bereits generisch). Die drei Henkel-Slots (Index 2/5/8 = die `zonen`
+      // unten) bleiben in ALLEN drei Layouts STEHEN — nur die uebrigen sieben Slots werden
+      // gemischt. Die CRUX (Dyno/Zange) liegt in allen drei in der oberen Haelfte (Index
+      // 6/7/9, Position >=0,62): das sind genau die drei nicht-Henkel-Slots der oberen
+      // Haelfte, WUCHT x2 + ANTRITT x1 fuellt sie exakt, TECHNIK/WENDIGKEIT bleiben unten.
+      kurse:[
+        {name:"Überhang", typen:["TECHNIK","WENDIGKEIT","STEHEN","TECHNIK","WENDIGKEIT","STEHEN","WUCHT","ANTRITT","STEHEN","WUCHT"]},
+        {name:"Platte",   typen:["WENDIGKEIT","TECHNIK","STEHEN","WENDIGKEIT","TECHNIK","STEHEN","ANTRITT","WUCHT","STEHEN","WUCHT"]},
+        {name:"Dach",     typen:["TECHNIK","TECHNIK","STEHEN","WENDIGKEIT","WENDIGKEIT","STEHEN","WUCHT","WUCHT","STEHEN","ANTRITT"]}
+      ],
+      // Fallback/Default, falls `kurse` je uebersprungen wird (Sonden, die nicht ueber
+      // `bauSpurt()` laufen) — identisch zu "Dach", einem der drei Kurse oben.
+      hindernisTypen:["TECHNIK","TECHNIK","STEHEN","WENDIGKEIT","WENDIGKEIT","STEHEN","WUCHT","WUCHT","STEHEN","ANTRITT"],
+      // JEDER GRIFF KOSTET ZEIT (P6-Fix, Gegencheck 2.3/Konzept 0.1): bisher kostete ein
+      // gelungener Griff bei Climbing NICHTS (kein `hindernisTypen` gesetzt) — jetzt zahlt
+      // die Griffart-Skill-Mischung tatsaechlich Zeit, gedaempft durchs Koennen wie ueberall
+      // sonst (`1-0,8*Skill/100`).
+      huerdePreis:0.42,
+      // `pusteHindernis` FUER CLIMBING AKTIVIEREN (Gegencheck 3.3/Auftrag): das Feld
+      // existiert im Motor bereits (Takeshi nutzt es, `engine.js` Puste-Ausdauer-Runde,
+      // s. Griff-Block unten), war fuer Climbing aber nie gesetzt — Chris' eigener Massstab
+      // ("haengt von Art UND Schwierigkeit ab") gilt hier genauso: an einer Zange oder
+      // einem Sloper zahlt Muedigkeit voll (Kraft/Koerperspannung fehlt, wenn die Pumpe
+      // leer ist), an einem Henkel NULL (dort haelt man sich, Kraft ist nicht das Limit).
+      // Pump wird damit zur Hauptursache fuer Fehlgriffe/Abrutschen, wie im echten Lead
+      // (Gegencheck 1.3), und stamina (Matrix 26, das schwerste Gewicht) traegt den Sturz
+      // mit, nicht nur das Tempo.
+      pusteHindernis:{WUCHT:0.10, WENDIGKEIT:0.09, ANTRITT:0.03, TECHNIK:0.03, STEHEN:0},
+      // ECHTES `zonen`-FELD (Gegencheck-Auftrag: Motor-Feld statt nur visueller
+      // Vorgriff aus PR 1). Dieselben drei Positionen wie `WAND_EXE_INDIZES=[2,5,8]`
+      // (bodenWand()), hier als Werte statt Indizes, weil das Abrutschen unten eine
+      // Positions-, keine Index-Suche braucht. MUESSEN mit `WAND_EXE_INDIZES` UND mit den
+      // STEHEN-Slots aller drei `kurse[]` synchron bleiben.
+      zonen:[0.26,0.53,0.80],
+      // NEBENWEG 2: UMSETZEN (WENDIGKEIT, Gegencheck 3.7/Konzept 2.2/4). Dritter Weg durch
+      // einen Griff, NACH dem Kraftzug: kostet nur Zeit (keine Reserve), dafuer laenger.
+      // Entfaellt an Sloper-Griffen (dort ist WENDIGKEIT bereits der Primaerweg) — das
+      // regelt der Griff-Block selbst ueber `hTyp!=="WENDIGKEIT"`.
+      umsetzBasis:0.36, umsetzSpanne:0.0090, umsetzZeit:0.45,
+      // ABRUTSCHEN, A-2 "ZURUECK ZUR EXE" MIT DEN DREI AENDERUNGEN AUS GEGENCHECK 3.3:
+      //   1. Die HOECHSTMARKE zaehlt (`u.hoch`, s. stepSpurt/bahnRangliste/wert()), nicht
+      //      die aktuelle Position nach dem Sturz.
+      //   2. Balance wird GEDECKELT (min, nicht auf einen Wert gehoben) — ein Sturz
+      //      belohnt niemanden.
+      //   3. Kein Puste-Regen im Seil haengen — der Sturz setzt `u.huerde` NICHT, also
+      //      greift die volle Rast-Gutschrift (nur `u.huerde>0`) hier nicht.
+      // `abrutschROBUST` daempft Fallzeit UND Reservekosten wie Takeshis Nervenkosten
+      // (`max(0,45; 1-ROBUST*0,0045)`) — dieselbe Form, health/stamina/will/determination
+      // (ROBUST) bekommen damit ihren Kanal an der Wand.
+      abrutschZeit:0.90, abrutschROBUST:0.0045, abrutschBalanceDeckel:0.6,
+      // GLEICHGEWICHT ALS RESSOURCE (Gegencheck 2.4/3.3): passive Drains (Steigung, leere
+      // Puste) und ein kleiner Regen unter Plantempo. `balanceSteigungGrad` ist zugleich
+      // das Gate fuer den ganzen Balance-Block in stepSpurt — nur Climbing setzt es.
+      balanceSteigungGrad:0.012, balanceLeerGrad:0.03, balancePlanGrad:0.04,
+      // Balance-Abzuege an den Nebenwegen selbst (Kraftzug > Umsetzen, wie im Konzept) und
+      // der Koeffizient, mit dem niedrige Balance die Grifferfolgschance senkt
+      // (`balanceAbzug = balanceAbzugGrad*(1-balance)`, dieselbe Form wie `pusteAbzug`:
+      // verschiebt nur die Schwelle, nie Zahl/Reihenfolge der `rr()`-Wuerfe).
+      balanceKraftzug:0.10, balanceUmsetzen:0.05, balanceAbzugGrad:0.20,
+      // DUELLDRUCK (G-2, Gegencheck 3.1): Heim-Slot i gegen Gast-Slot i auf gespiegelten
+      // Routen (`Math.floor(bahnZ/2)` ist fuer beide Partner gleich, weil `bauSpurt()`
+      // Heim/Gast bereits abwechselnd auf die Bahnen setzt, i*2/i*2+1 — "wechselseitig" ist
+      // damit schon Konvention, keine neue Bahnvergabe noetig). KEIN Stoergriff/G-1 — der
+      // ist laut Gegencheck vollstaendig gestrichen. Schreibt AUSSCHLIESSLICH die eigene
+      // Balance des Betroffenen (Regel "kein Zug durch fremde Hand", s. CLAUDE.md); der
+      // Sturz faellt weiter aus dessen eigenem Wurf im Griff-Block.
+      // `druckQuelle` NACH DER MESS-ENTSCHEIDUNGSREGEL (Gegencheck 3.1) GESETZT: "duell"
+      // (rho 0,814/0,802 ueber beide Saatstroeme) lag beide Male innerhalb der halben
+      // Spannweite von "feld" (0,815/0,801, Spannweite 0,206/0,214) UND die eigene Spannweite
+      // (0,214/0,230) blieb unter 0,25 -- beide Bedingungen der Regel erfuellt, also "duell",
+      // das realistischere Bild (fester Gegner auf der gespiegelten Route statt "bester
+      // Nachbar im Feld"). Pp-Abweichung unveraendert (16,9 gegen 17,0 mit "feld").
+      druckQuelle:"duell", druckSchwelle:0.10, druckMax:0.6, druckGrad:0.02,
+      // ZEITLIMIT (Gegencheck 3.5/PR-0-Nulllinie): geeicht auf eine Top-out-Quote von
+      // 40-55 %, NICHT auf 1,6x Siegerzeit (das waere auf der Nulllinie 99,4 % Top-out
+      // gewesen, s. climbing-nulllinie-24-09.md). Kalibriert gegen das FERTIGE Rezept
+      // dieser PR (reduziertes pusteHindernis, druckQuelle:"feld", u.hoch-Wertung) ueber
+      // wandProbe({n:196,k:[...]}): Top-out 44,8 % bei k=1,33 (Siegerzeit-Median 12,18 Sim-s
+      // im Standardkader) -> 16,3 Sim-s, mitten im 40-55-%-Korridor. Das alte
+      // Konzeptlimit (1,6x) waere auf DIESEM Rezept ebenfalls zu lasch gewesen (s.
+      // PR-Beschreibung fuer die volle Tabelle).
+      zeitlimit:16.3,
+      // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11): `rastUnter` ist das vierte Feld im
+      // `planWechsel()`-Vertrag (s. dort) — an einer Henkel-Exe wird zusaetzlich gerastet,
+      // wenn die Reserve darunter faellt. `rastZeit` ist die zusaetzliche Stoppzeit, in der
+      // die normale Huerden-Rast-Gutschrift (`u.huerde>0`) greift.
+      rastZeit:1.2,
+      // ====================================================================================
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -27151,6 +27270,17 @@
       // einzige der fuenf Bahn-Disziplinen ganz ohne eigene Flagge in bahnBewegung() — nicht
       // einmal ein NO-OP-Zweig, sondern schlicht kein Treffer, s. dortiger Kommentar. Rein
       // deskriptiv, ohne Wirkung auf Rezept/Matrix/wert().
+      // MENGE AUS DER EIGNUNG (Takeshi-Muster, `bauSpurt()` skaliert alle Sub-Skills auf
+      // den MITTELWERT der Eignung, Relativabstaende zueinander bleiben erhalten). Vor PR 2
+      // brauchte Climbing das nicht: mit nur ZWEI gelesenen Sub-Skills (TECHNIK/WUCHT fuer
+      // jeden Griff gleich) war die Streuung klein. Mit fuenf spezialisierten Griffarten
+      // entscheidet ein einzelner schwacher Sub-Skill jetzt zwei bis drei von zehn Griffen
+      // -- ungebremst hat das kaderfest rho auf 0,66-0,67 gedrueckt (Verlaesslichkeit von
+      // ~0,94 auf ~0,69), OHNE dass Balance/G-2/Zeitlimit beteiligt waren (isoliert
+      // gemessen, PR-Beschreibung). `mengeAusEignung` bindet die acht Sub-Skills an
+      // dieselbe Eignung, die auch die Rangtreue misst — genau das Werkzeug, das Takeshi
+      // fuer denselben Fall (14 Fallen, sieben Sub-Skills) bereits nutzt.
+      mengeAusEignung:true,
       label:"Climbing", jeSeite:6, climbing:true,
       hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
@@ -27173,21 +27303,78 @@
         // ueberzeichnet. ANTRITT/ENDTEMPO/TECHNIK/WUCHT/WENDIGKEIT/ROBUST unveraendert —
         // ein einzelner, isolierter Hebel.
         ANTRITT:    {power:38,dexterity:32,speed:30},
-        ENDTEMPO:   {stamina:44,determination:31,speed:25},
+        // ENDTEMPO NEU GEWICHTET (Climbing-PR-2-Pp-Fix, 26.09.): `scripts/messe-arena-
+        // einfluss.mjs climbing 24` mass nach den PR-2-Griffarten/Balance/Zeitlimit-
+        // Aenderungen 41 Pp Abweichung -- stamina +12,9, speed +5,2 liefen weit ueber ihr
+        // Matrixgewicht (26/12), waehrend dexterity -5,4, awareness -4,6 und power -6,0 die
+        // groessten Loecher waren, TROTZ TECHNIK/WENDIGKEIT/WUCHT/ANTRITT, weil die nur an
+        // ihren jeweiligen 2-3 von 10 Griffen wirken -- ENDTEMPO dagegen traegt ueber die
+        // GANZE Kletterzeit (tempoVon()s `grund`, tempoSpanne 0,80) und ist damit der
+        // staerkste einzelne Hebel. Ein erster Versuch, einen neunten, zonen-unabhaengigen
+        // GESPUER-Kanal (Time-Trial-Muster) fuer dexterity/power/awareness danebenzusetzen,
+        // machte es MESSBAR SCHLIMMER (41 -> 47,7, power fiel auf 0 %): `mengeAusEignung`
+        // (s. dort) reskaliert ALLE Sub-Skills eines Laeufers auf denselben Mittelwert
+        // (`eigW`, aus der GESPERRTEN Matrix, s. CLAUDE.md) -- ein zusaetzlicher Kanal, der
+        // ein bereits kuenstlich angehobenes Attribut (`einflussVon`s `ATTR_HEBUNG`) weiter
+        // in Sub-Skills traegt, hebt NUR den Mittelwert (`m`) an, senkt darueber den
+        // Skalierungsfaktor `f=eigW/m` fuer ALLE acht Sub-Skills gleichermassen und frisst
+        // damit den eigenen Vorteil UND den der anderen Kanaele auf. Der wirksame Hebel ist
+        // deshalb, den STAERKSTEN bestehenden Kanal direkt umzuschichten, nicht einen
+        // zusaetzlichen schwachen Kanal daneben zu stellen: ENDTEMPO spiegelt jetzt die
+        // Matrix selbst (26/16/12/12/10/8/8/8 = 100), statt nur drei ueberrepraesentierte
+        // Attribute zu tragen.
+        // VIERTER SCHRITT: der Matrix-Spiegel allein (s. Kommentar oben) senkte stamina nur
+        // von 38,9 auf 38,3/36,1 % (Ziel 26) und liess determination unter ihr Ziel fallen
+        // (16,9 -> 12,4/12,5, Ziel 16) -- ENDTEMPO ist zwar der staerkste Kanal, aber
+        // stamina sitzt zusaetzlich in STEHEN/ROBUST (KRAFT_VON/pusteRegen, unveraendert
+        // gelassen, s. dortige Kommentare) und behaelt dadurch einen strukturellen Vorsprung.
+        // Zweite Umschichtung, WEITER in Richtung Matrix, aber stamina/health/speed weiter
+        // zugunsten von determination/power/awareness/dexterity gesenkt.
+        // FUENFTER SCHRITT: Schritt 4 (stamina18/determination20/dexterity14/power12/
+        // awareness10/speed10/will8/health8) senkte Pp auf 17,4 (n=24, erster Saatstrom) --
+        // aber der ZWEITE, unabhaengige Saatstrom (miss-climbing-zweiter-saatstamm.mjs,
+        // CLAUDE.md verlangt beide) fiel dabei auf rho 0,788 (unter die 0,80-Schranke, vorher
+        // 0,805). Stamina in der EINZIGEN durchgehend wirksamen Tempo-Quelle so weit zu
+        // kappen kostet also Rangtreue auf mindestens einem Saatstrom. Diese Fassung ist der
+        // Mittelweg zwischen Schritt 3 (Matrix-Spiegel, stamina26, rho 0,811/0,805, Pp 27)
+        // und Schritt 4 (stamina18, rho 0,811/0,788, Pp 17,4) -- rechnerisches Mittel beider.
+        ENDTEMPO:   {stamina:22,determination:18,dexterity:13,speed:11,power:10,awareness:9,health:9,will:8},
         TECHNIK:    {dexterity:44,awareness:33,power:23},
         WENDIGKEIT: {dexterity:45,speed:32,awareness:23},
-        STEHEN:     {stamina:24,will:32,health:34,determination:10},
+        // STEHEN NACHJUSTIERT (Climbing-PR-2-Pp-Fix, 26.09., zweiter Schritt): nach der
+        // ENDTEMPO-Umschichtung (s. dort) blieb stamina bei +12,3 stehen (41 -> 29,9 Pp),
+        // waehrend power (-4,0) und awareness (-4,1) die groessten Loecher waren. STEHEN ist
+        // der zweite starke, IMMER aktive Kanal: es traegt nicht nur den Henkel-Griff (30 %
+        // der Route), sondern ueber `KRAFT_VON()`/`pusteRegen` auch die Reserve-Obergrenze
+        // und -Regenrate — stamina wirkt hier also doppelt. will/health/determination
+        // unveraendert, nur stamina sinkt zugunsten von power/awareness.
+        STEHEN:     {stamina:12,will:32,health:34,determination:10,power:6,awareness:6},
         WUCHT:      {power:42,determination:28,health:30},
-        ROBUST:     {health:32,stamina:28,will:24,determination:16}
+        // ROBUST: ein dritter Rebalance-Versuch (stamina 28 -> 14, +power/+awareness) MASS
+        // SCHLECHTER (27 -> 32,4 Pp, power sogar 4,0 -> 1,9 %) statt besser -- innerhalb der
+        // Messtoleranz von n=24 nicht von Rauschen zu unterscheiden (Pp schwankte bei jedem
+        // der drei Schritte um mehrere Punkte), aber kein reproduzierter Gewinn. ROBUST bleibt
+        // deshalb bei den WERTEN AUS DER 16.09.-KALIBRIERUNG (s. Kommentar am Rezept-Objekt
+        // oben) UNVERAENDERT -- der wirksame Hebel dieser Runde waren ENDTEMPO (s. dort) und
+        // STEHEN (s. dort), nicht ROBUST.
+        ROBUST:     {health:32,stamina:28,will:24,determination:16},
+        // ACHTER SUB-SKILL (Gegencheck 2.4/3.3): der Kopf unter Druck, gestuetzt durch die
+        // Angstforschung am Klettern (Pijpers/Oudejans/Bakker 2005, s. Gegencheck 1.3).
+        // Kein neues Attribut — determination/will/awareness gehoerten der Matrix schon,
+        // sie bekommen hier nur ihren dritten bzw. zweiten Wand-Kanal.
+        GLEICHGEWICHT: {determination:40,will:30,awareness:30}
       },
       lang:{ANTRITT:"Zug",ENDTEMPO:"Ausdauertempo",TECHNIK:"Griff",WENDIGKEIT:"Umsetzen",
-            STEHEN:"Kraftausdauer",WUCHT:"Kraftzug",ROBUST:"Zähigkeit"},
+            STEHEN:"Kraftausdauer",WUCHT:"Kraftzug",ROBUST:"Zähigkeit",GLEICHGEWICHT:"Kopf"},
+      // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11, viertes Feld neben tempo/sucht/ab): ein
+      // Anteil der Reserve, UNTER dem an einer Henkel-Exe zusaetzlich gerastet wird, statt
+      // fester Booleans je Zone — "sparsam" rastet fast immer, "angriff" fast nie.
       plaene:{
-        sparsam: {label:"Sparsam",   tempo:0.86, sucht:0, ab:0.72,
+        sparsam: {label:"Sparsam",   tempo:0.86, sucht:0, ab:0.72, rastUnter:0.80,
                   text:"Klettert unter der Schwelle und hebt sich alles für die Steilstufe auf."},
-        stetig:  {label:"Stetig",    tempo:0.94, sucht:0, ab:0.66,
+        stetig:  {label:"Stetig",    tempo:0.94, sucht:0, ab:0.66, rastUnter:0.55,
                   text:"Gleichmäßiger Zug. Kommt an, ohne zu glänzen."},
-        angriff: {label:"Durchziehen",tempo:1.00, sucht:0, ab:0.55,
+        angriff: {label:"Durchziehen",tempo:1.00, sucht:0, ab:0.55, rastUnter:0.30,
                   text:"Zieht von unten durch. Oben wird es eng — wenn die Reserve reicht."}
       },
       planJeSlot:{routereader:"stetig", gripspecialist:"stetig", paceclimber:"sparsam",
@@ -28556,7 +28743,11 @@
         // Rennen aendert sich dadurch nicht: die Laufwerte kommen aus dem Rezept (R2),
         // nicht aus `eig`.
         eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
-        pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
+        // BALANCE/HOECHSTMARKE (Climbing-Neubau PR 2): harmlose Init-Felder fuer JEDE Bahn
+        // — nur Climbing liest/schreibt sie in stepSpurt weiter (`BA().balanceSteigungGrad`/
+        // `BA().climbing`), jede andere Bahn traegt sie nur ungenutzt mit.
+        pos:0, hoch:0, balance:1, umgesetzt:0, abgerutscht:0, rastCount:0,
+        v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
         plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
         bahnZ:bahn, wechselCd:0, wechsel:0,
@@ -28964,6 +29155,9 @@
     u.plan=planId;
     u.tempo=p.tempo; u.sucht=p.sucht; u.label=p.label; u.text=p.text;
     u.ab=schonAngegangen?Math.min(p.ab,u.pos):p.ab;
+    // VIERTES FELD (Gegencheck 3.11, nur Climbing setzt `rastUnter` je Plan): unveraendert
+    // `undefined` fuer jede andere Bahn, liest sich am Griff als "nie rasten".
+    u.rastUnter=p.rastUnter;
     u.ansagen=(u.ansagen||0)+1;
     u.ansageBei=rennT;               // nur fuer die Anzeige, s. zeichneSpurt
     return true;
@@ -29079,6 +29273,12 @@
       u.v=tempoVon(u);
       const vor=u.pos;
       u.pos+=u.v*dt/strecke;
+      // HOECHSTMARKE (Gegencheck 3.3, Aenderung 1): die Wertung liest fuer Climbing
+      // `u.hoch`, nicht `u.pos` (s. bahnRangliste()/MOTOREN.climbing.wert() unten) — ein
+      // Abrutschen (Griff-Block) senkt `u.pos`, nie `u.hoch`. Fuer jede andere Bahn ist
+      // `u.pos` monoton steigend, `u.hoch` also ohnehin identisch; die Zeile aendert dort
+      // nichts, bleibt aber ausdruecklich hinter `BA().climbing` gehalten.
+      if(BA().climbing)u.hoch=Math.max(u.hoch||0,u.pos);
 
       // ---- ZWISCHENZEITEN (Zeitfahren, Recherche Abschnitt 4.4). Reine Erfassung, kein
       // rr()-Aufruf, keine Rueckwirkung auf die Simulation — dieselbe Uebergangs-Pruefung
@@ -29173,6 +29373,46 @@
         feed(u.seite,u.n+" fängt sich wieder — Puste zurück bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
+      // ==================================================================================
+      // GLEICHGEWICHT UND DUELLDRUCK (Climbing-Neubau PR 2, Gegencheck 2.4/3.1/3.3). Beide
+      // Bloecke sind auf climbing-eigene Felder gegated (`balanceSteigungGrad`/
+      // `druckQuelle`), die KEINE andere Bahn setzt — Spurt/Staffel/Time-Trial/Takeshi
+      // lesen hier nichts und bleiben bit-identisch.
+      //
+      // PASSIVE BALANCE-DRAINS: die Steigung zehrt am Kopf wie an der Puste (mit der
+      // Hoehe waechst der Verbrauch), leere Puste macht zoegerlich (Pijpers 2005, s.
+      // Gegencheck 1.3), und wer unter seiner Plan-Schwelle bleibt, sammelt sich wieder —
+      // dieselbe `ueber`-Groesse, die auch den Reserve-Regen oben speist.
+      if(BA().balanceSteigungGrad){
+        u.balance=Math.max(0,Math.min(1,(u.balance??1)
+          -BA().balanceSteigungGrad*(BA().steigung||0)*u.pos*dt
+          -(u.leer?(BA().balanceLeerGrad??0)*dt:0)
+          +(!u.leer&&ueber<1?(BA().balancePlanGrad??0)*(1-ueber)*dt:0)));
+      }
+      // DUELLDRUCK (G-2, Gegencheck 3.1): "duell" ist der feste Gegner auf der gespiegelten
+      // Route (Heim-Slot i gegen Gast-Slot i, `Math.floor(bahnZ/2)` ist fuer beide gleich,
+      // weil die Bahnvergabe in bauSpurt() bereits abwechselnd H/G ist), "feld" ist der
+      // Vorsprung des Spitzenreiters unabhaengig von der Seite. Beide Fassungen schreiben
+      // NUR die eigene Balance des Betroffenen — kein `rr()`, kein Schreiben in ein fremdes
+      // `u.*`, der Sturz faellt weiter aus dem eigenen Wurf im Griff-Block (Regel "kein Zug
+      // durch fremde Hand", CLAUDE.md).
+      if(BA().druckQuelle){
+        let gegnerPos=null;
+        if(BA().druckQuelle==="duell"){
+          const partner=LAEUFER.find(o=>o!==u&&o.seite!==u.seite&&o.fertig==null
+            &&Math.floor(o.bahnZ/2)===Math.floor(u.bahnZ/2));
+          if(partner)gegnerPos=partner.pos;
+        } else {
+          for(const o of LAEUFER){ if(o!==u&&o.fertig==null&&(gegnerPos==null||o.pos>gegnerPos))gegnerPos=o.pos; }
+        }
+        if(gegnerPos!=null){
+          const vorsprung=Math.max(0,gegnerPos-u.pos);
+          const druck=Math.min(BA().druckMax??1,vorsprung/(BA().druckSchwelle??0.10));
+          if(druck>0)u.balance=Math.max(0,(u.balance??1)
+            -(BA().druckGrad??0.02)*druck*(1-0.8*(u.GLEICHGEWICHT||0)/100)*dt);
+        }
+      }
+
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
       // HUERDEN — ZWEI WEGE HINDURCH.
       //
@@ -29232,6 +29472,20 @@
             // Lesen nach dem Rennen nur noch 0 zeigen wuerde.
             const huerdeVor=u.huerde||0;
             u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            // RAST AN DER EXE (Gegencheck 3.11): eine PLAN-Schwelle statt fester Booleans
+            // je Zone — an einem Henkel (`hTyp==="STEHEN"`, das sind bei Climbing genau die
+            // drei `zonen`-Positionen) wird zusaetzlich gerastet, wenn die Reserve UNTER
+            // `u.rastUnter` faellt (`rastUnter` kommt aus dem Plan, s. planWechsel()/L-Init
+            // oben). Die zusaetzliche Zeit laeuft in `u.huerde` mit ein — dieselbe Stelle,
+            // an der die volle Puste-Gutschrift oben bereits greift (`u.huerde>0`). Nur
+            // Climbing setzt `rastUnter`; jede andere Bahn liest hier `undefined<Zahl`,
+            // also `false`, und bleibt unveraendert.
+            if(hTyp==="STEHEN" && u.rastUnter!=null && u.reserveMax>0 && u.reserve/u.reserveMax<u.rastUnter){
+              u.huerde=Math.max(u.huerde,(A.rastZeit??1.2));
+              u.rastCount=(u.rastCount||0)+1;
+              if(A.balanceSteigungGrad)u.balance=Math.min(1,(u.balance??1)+0.40*(0.5+(u.GLEICHGEWICHT||0)/200));
+              feed(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
+            }
             u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
@@ -29378,6 +29632,86 @@
             if(bahnKoennenGemeldet.has(key))return;
             bahnKoennenGemeldet.add(key); feed(u.seite,txt);
           };
+          if(A.umsetzBasis){
+            // ================================================================================
+            // CLIMBING-EIGENER GRIFF-BLOCK (PR 2, Gegencheck 3.3/3.7/4). Eigene Kopie statt
+            // eines dritten Zweigs im generischen Block — "eine Kopie, ein Faktor,
+            // vergleichen" (Projekt-Konvention). Gated EXKLUSIV auf `A.umsetzBasis`, das nur
+            // Climbing setzt: jede andere Bahn faellt in den `else`-Zweig unten, Zeichen fuer
+            // Zeichen der alte, ungeaenderte Code.
+            //
+            // PRIMAER-/NEBENWEG (Gegencheck 3.7/4, Konzept 4, "mehrere Wege zum Erfolg" aus
+            // CLAUDE.md): der Primaerweg ist die Griffart selbst (`koennen`, oben schon zur
+            // Griffart gemischt). Nebenweg 1 ist der Kraftzug (WUCHT) — entfaellt an der
+            // Zange, wo WUCHT bereits der Primaerweg ist. Nebenweg 2 ist das Umsetzen
+            // (WENDIGKEIT) — entfaellt am Sloper aus demselben Grund. Balance senkt JEDEN
+            // der drei Wuerfe gleich (`balanceAbzug`, dieselbe Form wie `pusteAbzug`:
+            // verschiebt nur die Schwelle, nie Zahl/Reihenfolge der `rr()`-Wuerfe).
+            const balanceAbzug=(A.balanceAbzugGrad??0)*(1-(u.balance??1));
+            const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug-balanceAbzug));
+            if(rr()<=technik){                             // PRIMAERWEG: sauber
+              if(meldeTyp==="stark"){
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+                melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                  " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
+              }
+              continue;
+            }
+            if(hTyp!=="WUCHT"){
+              const wucht=Math.min(0.92,Math.max(0.02,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090)-pusteAbzug-balanceAbzug));
+              if(rr()<=wucht){                             // NEBENWEG 1: Kraftzug
+                u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
+                u.stolper=A.wuchtZeit??0.12;
+                u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+                u.durchbruch=(u.durchbruch||0)+1;
+                if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
+                u.balance=Math.max(0,(u.balance??1)-(A.balanceKraftzug??0));
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"zieht durch",life:.8,crit:false,_laeufer:u.id});
+                feed(u.seite,u.n+" zieht den Kraftzug durch.");
+                continue;
+              }
+            }
+            if(hTyp!=="WENDIGKEIT"){
+              const umsetz=Math.min(0.92,Math.max(0.02,(A.umsetzBasis??0.10)+u.WENDIGKEIT*(A.umsetzSpanne??0.0080)-pusteAbzug-balanceAbzug));
+              if(rr()<=umsetz){                            // NEBENWEG 2: Umsetzen (NEU)
+                u.stolper=A.umsetzZeit??0.45;
+                u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+                u.umgesetzt=(u.umgesetzt||0)+1;
+                if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='umsetzen';
+                u.balance=Math.max(0,(u.balance??1)-(A.balanceUmsetzen??0));
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"setzt um",life:.8,crit:false,_laeufer:u.id});
+                feed(u.seite,u.n+" setzt den Fuß neu und findet die Linie wieder.");
+                continue;
+              }
+            }
+            // ABRUTSCHEN (A-2 "zurueck zur Exe", Gegencheck 3.3, drei Aenderungen):
+            //   1. Die HOECHSTMARKE zaehlt (u.hoch, s. stepSpurt oben/bahnRangliste()/
+            //      MOTOREN.climbing.wert() unten), nicht `u.pos` nach dem Sturz.
+            //   2. Balance wird GEDECKELT (min), nicht auf einen Wert GEHOBEN — ein Sturz
+            //      belohnt niemanden.
+            //   3. Kein Puste-Regen im Seil haengen: dieser Zweig setzt `u.huerde` NICHT,
+            //      also greift die volle Rast-Gutschrift (nur bei `u.huerde>0`) hier nie.
+            // Deckel "hoechstens ein Abschnitt" ist durch die Zonen-Abstaende (zwei bis drei
+            // Griffe) automatisch erfuellt, keine zusaetzliche Klemme noetig.
+            const zoneUnter=(A.zonen||[]).filter(z=>z<h).sort((x,y)=>y-x)[0] ?? 0;
+            u.pos=zoneUnter;
+            u.abgerutscht=(u.abgerutscht||0)+1;
+            if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
+            const robustFaktor=Math.max(0.45,1-u.ROBUST*(A.abrutschROBUST??0.0045));
+            u.stolper=(A.abrutschZeit??0.90)*robustFaktor;
+            if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
+            u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+            u.reserve=Math.max(0,u.reserve-(A.stolperKraft??8)*robustFaktor);
+            u.gestolpert++;
+            u.balance=Math.min(u.balance??1,A.abrutschBalanceDeckel??0.6);
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"rutscht ab",life:1.0,crit:true,_laeufer:u.id});
+            if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+              melde("schwach",u.n+" rutscht an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                " ab — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
+            } else {
+              feed(u.seite,u.n+" rutscht ab und fällt ins Seil bis zur letzten Exe zurück.");
+            }
+          } else {
           const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
           if(rr()<=technik){                               // sauber drueber
             if(meldeTyp==="stark"){
@@ -29477,6 +29811,7 @@
               " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
           } else {
             feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+          }
           }
         }
       }
@@ -29761,7 +30096,12 @@
     }
     kameraUpdate(dt);
     bahnBewegung(dt);
-    if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
+    // ZEITLIMIT (Gegencheck 3.5, nur Climbing setzt `BA().zeitlimit`): das Rennen endet wie
+    // ein Lead-Versuch, sobald die Uhr abgelaeuft ist, auch wenn noch nicht alle oben sind
+    // -- Nicht-Angekommene bleiben `fertig==null` und werden nach Hoehe geordnet
+    // (bahnRangliste()/wert(), s. dort). Jede andere Bahn liest hier `undefined>=rennT`,
+    // also `false`, und bleibt beim alten 60-Sekunden-Deckel.
+    if(rennFertig.length>=LAEUFER.length||rennT>60||(BA().zeitlimit&&rennT>=BA().zeitlimit))done=true;
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT FUER DIE BAHN (PR 0.3, Opus-Plan Zehn-Disziplinen 09-10,
@@ -33692,6 +34032,25 @@
           for(const u of LAEUFER)o[u.n]=burgwertung(u);
           return o;
         }
+        // CLIMBING: NICHT-ANGEKOMMENE NACH HOECHSTMARKE, NICHT NACH BAHNREIHENFOLGE
+        // (Gegencheck 2.3/3.4, Pflichtfix): mit einem Zeitlimit bleiben nach dem Ablauf
+        // Kletterer `fertig==null` uebrig, und die generische Zeile darunter setzt fuer
+        // sie ALLE dieselbe `99`, sodass die stabile Sortierung sie in `LAEUFER`-Reihenfolge
+        // (also Bahn-Reihenfolge) belaesst — genau das misst dann die Bahnvergabe statt der
+        // Hoehe (gemessen: 0,686 statt 0,830 bei 1,2x). `bahnRangliste()` (die echte
+        // Wertung im Spiel) ordnet Nicht-Angekommene schon richtig; dieser Zweig zieht
+        // dieselbe Regel fuer die Messfunktion nach: Zeit zuerst, darunter Hoechstmarke.
+        // NUR fuer Climbing (`BAHN_ART[bd].climbing`) — jede andere Bahn faellt in den
+        // `else`-Zweig, Zeichen fuer Zeichen die alte Zeile.
+        if(BAHN_ART[bd].climbing){
+          const cmp=(a,b)=>{
+            const fa=bahnZeit(a), fb=bahnZeit(b);
+            if(fa!=null&&fb!=null)return fa-fb;
+            if((fa!=null)!==(fb!=null))return fa!=null?-1:1;
+            return (b.hoch??b.pos)-(a.hoch??a.pos);
+          };
+          const o={}; [...LAEUFER].sort(cmp).forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
+        }
         // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
         // bahnRangliste (s. dort), hier fuer die Rangtreue-Messung selbst: `disziplinProbe`
         // liest `M.wert()`, nicht bahnRangliste. Fuer jede Bahn ausser Zeitfahren ist
@@ -35327,6 +35686,15 @@
         :istFeldspiel(dId)?FELDSPIEL_ART[dId]:ARENA_ART[dId];
       const altJeSeite=art&&art.jeSeite;
       if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
+      // DREI ROUTEN-LAYOUTS EINZELN MESSEN (Climbing-PR-2, Gegencheck 3.8: "gemessen in
+      // PR 2, ... Abnahme: rho ueber alle drei Layouts gemittelt UND je Layout ueber
+      // 0,80"). Ohne diese Option waehlt bau() den Kurs seed-gemischt (s. dort) — fuer die
+      // Einzelabnahme haelt `o.kursIndex` `art.kurse` waehrend der Probe auf GENAU einen
+      // Eintrag fest, exakt dasselbe Sichern/Wiederherstellen-Muster wie `o.jeSeite` oben.
+      // Jede Bahn ohne `kurse`-Feld (Spurt/Staffel/Zeitfahren) liest hier `art.kurse`
+      // als `undefined`, die Bedingung bleibt `false`, unveraendertes Verhalten.
+      const altKurse=art&&art.kurse;
+      if(o.kursIndex!=null&&art&&art.kurse)art.kurse=[art.kurse[o.kursIndex]];
       // NEU (Kaderfamilie, Projektueberwachung Abschnitt 1.3/3.1 A): `o.kaderFamilie` ist
       // optional. Ohne sie laeuft GENAU der Code, der hier schon immer stand — ein einziges
       // SQUAD/OPP, eine `spiele`-Liste, dieselbe Rueckgabeform wie vorher. Mit ihr wird die
@@ -35393,6 +35761,7 @@
         }
       } finally {
         M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
+        if(art&&o.kursIndex!=null)art.kurse=altKurse;
         if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}
       }
       const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
@@ -35424,8 +35793,10 @@
           zieheFormkarten(20260823+i*104729);
           M.bau(saat0+i*schritt);
           M.lauf();
-          const laeufer=LAEUFER.map(u=>({n:u.n,fertig:u.fertig,pos:u.pos,
-            gestolpert:u.gestolpert||0, durchbruch:u.durchbruch||0, reserve:u.reserve}));
+          const laeufer=LAEUFER.map(u=>({n:u.n,fertig:u.fertig,pos:u.pos,hoch:u.hoch??u.pos,
+            gestolpert:u.gestolpert||0, durchbruch:u.durchbruch||0, reserve:u.reserve,
+            abgerutscht:u.abgerutscht||0, umgesetzt:u.umgesetzt||0, rastCount:u.rastCount||0,
+            balance:u.balance}));
           const angekommen=laeufer.filter(z=>z.fertig!=null);
           const sieger=angekommen.length?Math.min(...angekommen.map(z=>z.fertig)):null;
           rennen.push({sieger, laeufer});
@@ -35471,7 +35842,14 @@
         stolpererJeKopf:runden(alle.reduce((s,z)=>s+z.gestolpert,0)/alle.length,2),
         kraftzuegeJeKopf:runden(alle.reduce((s,z)=>s+z.durchbruch,0)/alle.length,2),
         reserveAmEndeMedian:runden(median(alle.map(z=>z.reserve)),1),
-        topoutQuoteJeK:topoutJeK
+        topoutQuoteJeK:topoutJeK,
+        // PR 2 (26.09.): zusaetzliche Diagnose fuer Griffarten/Balance/Rast/Abrutschen —
+        // reine Anzeige, dieselbe Sonde, kein neuer rr()-Verbrauch.
+        abgerutschtJeKopf:runden(alle.reduce((s,z)=>s+z.abgerutscht,0)/alle.length,2),
+        umgesetztJeKopf:runden(alle.reduce((s,z)=>s+z.umgesetzt,0)/alle.length,2),
+        rastenJeKopf:runden(alle.reduce((s,z)=>s+z.rastCount,0)/alle.length,2),
+        balanceAmEndeMedian:runden(median(alle.map(z=>z.balance).filter(v=>v!=null)),3),
+        hoehAmEndeMedian:runden(median(alle.map(z=>z.hoch)),3)
       };
     },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
