@@ -27004,7 +27004,19 @@
       // zurueck (bodenSpurt). Andere Bahnen fuehren keine Liste und bleiben bit-identisch.
       hindernisBilder:["huerde","balken","wand","seil","wasser","mauer","heu"], feuerZiel:true,
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
-      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
+      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:212, kraftSpanne:1.0,
+      // ZEHR-HAUSHALT (SP-P1, Opus-Konzeptreview 26.09.): dieselbe Reparatur wie im
+      // Zeitfahren, s. ausfuehrlicher Kommentar an `zehrExp`/`kraftBasis` in stepSpurt bzw.
+      // time-trial. "Von vorn" gewann vorher 84 % der Rennen der Plan-Sonde (Anhang A des
+      // Reviews), obwohl im Ziel noch 41-48 % Puste uebrig blieben, egal welcher Plan.
+      // `kraftSpanne` 2.65 -> 1.0, denn STEHEN soll ueber Einbruch/Erholung mitentscheiden,
+      // ohne dass seine reine GROESSE (Kapazitaet) die Terrain-/Tempokanaele verdraengt.
+      // `zehrExponent`/`zehrKoeff`/`leerTempoBasis` schaerfen den Verbrauch bzw. den
+      // Einbruch, `kraftBasis` (oben) und `pusteFangen` (unten) machen die Reserve knapper
+      // und den Einbruch schwerer abzuschuetteln. Alle Werte gemessen (Plan-Sonde/Pp/rho,
+      // s. PR-Beschreibung): max. Plan-Anteil 41,7 % (Ziel <=60), Pp 14,6 (Ziel <=25), rho/
+      // Spiel 0,906 (Basislinie 0,903-0,907, Ziel >0,80).
+      zehrExponent:3, zehrKoeff:2.2, leerTempoBasis:0.50,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -27018,7 +27030,12 @@
       // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTEFANGEN 0,12 -> 0,16 (SP-P1, 26.09.): Fangen bei einem sichtbar hoeheren
+      // Vorrat, so dass ein Einbruch die Reservefrage nicht binnen Sekunden wieder aufloest
+      // (dieselbe Zahl-Logik wie bei time-trial, s. dortiger Kommentar; niedriger als dort
+      // gewaehlt, weil Spurt zusaetzlich rr()-Ereignisse hat und ein zu langer Einbruch
+      // sonst mit dem Rempler-/Stolper-Rauschen zusammen zu grosse Zeitausreisser gibt).
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.16,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
       // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
       // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
@@ -27036,7 +27053,17 @@
       // wuchtPreisFaktor fuer die drei Kraft-Stationen. Kaderfest (n=24): rho/Spiel 0,857 ->
       // 0,871, Spannweite 0,286 -> 0,236, Saison 0,905 -> 0,905, Einfluss-Abweichung zur
       // Matrix 38,9 -> 16,7 Pp. Bei playerCount 2 (das reale jeSeite im Spiel): 0,700 -> 0,825.
-      muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.00,
+      //
+      // HUERDEPREIS 1,00 -> 1,45 (SP-P1-Folgeschritt, 26.09.). Die schaerfere Puste-Bindung
+      // oben macht die Reserve zur Hauptvariable des Rennens und drueckte dabei den
+      // Hindernis-Kanal (TECHNIK/WENDIGKEIT/WUCHT, 36 % der Matrix ueber Dexterity/
+      // Awareness/Torment/Power) fast weg: Pp-Abweichung 36-49 trotz nachgezogenem
+      // STEHEN-Rezept (s. dort). Ein teureres Hindernis haelt den Hindernis-Kanal als
+      // GLEICHZEITIG grosse Zeitquelle neben der Reserve, statt dass die Reserve ihn
+      // verdraengt — gemessen sank die Pp-Abweichung damit auf 14,6 (n=24), rho/Spiel stieg
+      // sogar leicht (0,906 gegen Basis 0,903-0,907). Nur hier gesetzt; Climbing/Takeshi
+      // fuehren ihre eigenen `huerdePreis`-Werte unveraendert (0,80/0,42, s. dort).
+      muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.45,
       wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
@@ -27062,7 +27089,18 @@
         ENDTEMPO:   {speed:36,will:30,determination:22,stamina:12},
         TECHNIK:    {dexterity:52,awareness:30,determination:18},
         WENDIGKEIT: {dexterity:46,awareness:34,speed:20},
-        STEHEN:     {determination:44,will:32,health:24},
+        // STEHEN NACHGEZOGEN (SP-P1, 26.09., Folgeschritt zur Puste-Bindung oben). Solange
+        // die Reserve kaum band, war STEHEN mechanisch fast irrelevant — jetzt entscheidet
+        // sie ueber Einbruch und Erholung mit. Mit dem alten Mix (Determination 44/Will 32/
+        // Health 24) verdoppelte STEHEN aber genau die zwei Attribute, die ENDTEMPO schon
+        // traegt (Will 30, Determination 22): gemessen riss das die Pp-Abweichung auf 35-49
+        // (Ziel <=25), Determination/Will weit ueber ihr Matrixgewicht (15/14), Torment
+        // (Matrix 14) und Dexterity/Power blieben trotz WUCHT/TECHNIK/WENDIGKEIT im Minus.
+        // Torment/Health/Dexterity ersetzen Determination/Will hier — beide bleiben ueber
+        // ANTRITT/ENDTEMPO/TECHNIK ohnehin die groessten Kanaele der Bahn, "Stehvermoegen"
+        // passt inhaltlich mindestens so gut zu Schmerztoleranz (Torment) und Robustheit
+        // (Health) wie zu Willen.
+        STEHEN:     {torment:36,health:30,dexterity:20,will:14},
         WUCHT:      {torment:55,power:42,speed:3},
         ROBUST:     {health:28,torment:24,will:20,dexterity:18,awareness:10}
       },
@@ -27122,7 +27160,21 @@
       technikBasis:0.20, technikSpanne:0.0060, wuchtBasis:0.12, wuchtSpanne:0.0085,
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
-      kraftBasis:290, kraftSpanne:2.7,
+      // KRAFTBASIS 290 -> 170, KRAFTSPANNE 2.7 -> 1.0 (TT-P1, 26.09.: "Reserve knapper").
+      // Vorher blieb Attacke im Ziel im Schnitt bei 14 % Rest, Gleichmaß bei 17 % — die
+      // Reserve band nicht, ein Plan, der Kraft spart, sparte etwas, das niemand brauchte.
+      // Beide Zahlen sind gemessen (Plan-Sonde/Pp-Gegenprobe, s. PR-Beschreibung), nicht
+      // geschaetzt: 170 laesst Attacke real in die Reserve laufen; `kraftSpanne` ist bewusst
+      // KLEINER als vorher (2.7 -> 1.0), sonst haette die Reservegroesse selbst so stark an
+      // STEHEN/ROBUST gehaengt, dass die Pp-Abweichung ueber 25 gestiegen waere (gemessen:
+      // 32 Pp bei 2.7) — Stamina soll durchreichen, aber nicht die Terrain-/Tempo-Kanaele
+      // (Dexterity/Speed) verdraengen, die die Matrix schwerer gewichtet.
+      kraftBasis:170, kraftSpanne:1.0,
+      // ZEHR-EXPONENT/EINBRUCH (TT-P1, 26.09.): s. ausfuehrlicher Kommentar an `zehrExp` in
+      // stepSpurt und an `leerTempoBasis` in tempoVon. Nur hier und in BAHN_ART.spurt
+      // gesetzt; jede andere Bahn bleibt bit-identisch (Konvention, s. CLAUDE.md/Review
+      // Abschnitt 6.1).
+      zehrExponent:3, zehrKoeff:2.6, leerTempoBasis:0.50,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -27136,7 +27188,14 @@
       // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTEFANGEN 0,12 -> 0,30 (TT-P1, Opus-Konzeptreview 26.09., Abschnitt 1c: "Fangen
+      // erst bei 30 %" statt 12 %). Ein Eingebrochener soll die Reserveknappheit nicht
+      // binnen Sekunden wieder los sein — sonst ist der Einbruch nur ein kurzes Ruckeln,
+      // keine Entscheidung. `zehrExponent`/`leerTempoBasis` (unten) schaerfen den
+      // Verbrauch bzw. den Einbruch selbst, `kraftBasis` (oben, 290 -> s. dort) macht die
+      // Reserve insgesamt knapper. Alle vier NUR fuer time-trial gesetzt (Konvention: ein
+      // ungesetztes Feld ist wirkungslos), jede andere Bahn bleibt bit-identisch.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.30,
       // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
       // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
       // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
@@ -29256,7 +29315,10 @@
     // des Rennens, ohne dass ein Laeufer aus dem Bild faellt. Stehvermoegen federt ihn
     // zusaetzlich ab: wer zaeh ist, schleppt sich besser ins Ziel als einer, der es nicht
     // ist — genau das, wofuer der Wert da ist.
-    const leer=u.leer?(0.74+u.STEHEN*0.0012):1;
+    // EINBRUCH ALS EINBRUCH (TT-P1/SP-P1, Opus-Konzeptreview 26.09.): `leerTempoBasis`
+    // ersetzt die feste 0,74 nur dort, wo eine Bahn sie setzt (unten in time-trial/spurt) —
+    // jede andere Bahn liest hier weiter exakt 0,74, bit-identisch zu vorher.
+    const leer=u.leer?((BA().leerTempoBasis??0.74)+u.STEHEN*0.0012):1;
     // ANGESCHLAGEN. Wo es Nerven gibt, sind sie keine reine Schwelle: wer schon zweimal
     // im Wasser lag, geht die naechste Falle zaghafter an. Ohne das wirkte der Wille nur
     // im Moment des Ausscheidens — gemessen 8,9 % bei einem Matrixgewicht von 22.
@@ -29470,8 +29532,18 @@
       // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
       // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
+      //
+      // ZEHR-EXPONENT (TT-P1/SP-P1, Opus-Konzeptreview 26.09., Abschnitt 1c/2c: "Attacke
+      // muss ein Risiko sein"). Gemessen gewann Attacke im Zeitfahren 100 % der Rennen und
+      // "Von vorn" im Spurt 84 % — der Puste-Haushalt band nicht, weil der Mehrverbrauch
+      // aus 7 % mehr Tempo nur quadratisch stieg (+12 %), waehrend echter Luftwiderstand
+      // kubisch waechst (Real: 7 % mehr Tempo kostet rund 22 % mehr Leistung, Swain 1997).
+      // `zehrExponent` ist NUR in BAHN_ART["time-trial"]/`.spurt` gesetzt (unten); jede
+      // andere Bahn (Staffel, Takeshi, Climbing) liest hier `undefined` und faellt auf die
+      // ALTE Formel `ueber*ueber` zurueck — bit-identisch, keine andere Bahn betroffen.
       const ueber=Math.max(0.4,(laufAnteil(u)>=u.ab?1.0:u.tempo));
-      let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      const zehrExp=BA().zehrExponent, zehrTerm=zehrExp?Math.pow(ueber,zehrExp):ueber*ueber;
+      let zehr=(0.55+zehrTerm*(BA().zehrKoeff??1.9))*(u.imSchatten?SCHATTEN_SPAREN:1);
       // ZUG AN DER SPITZE (nur Staffel). WUCHT heisst dort ausdruecklich "Zug an der
       // Spitze" (s. BAHN_ART.staffel.lang) — hatte aber keinen einzigen Kanal: WUCHT ist
       // ueberall sonst der Rempler, und in der Staffel wird nicht gerempelt
