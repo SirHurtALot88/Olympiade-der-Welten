@@ -37,9 +37,14 @@ const w = await seite.evaluate((n) => {
   const x = window.__arena.feldspielProbe("football", { n, jeSeite: 6 });
   const summe = { punkte: 0, passAtt: 0, passComp: 0, passInt: 0, sacks: 0, rushAtt: 0,
     fumbles: 0, fumblesLost: 0, tds: 0, fgAtt: 0, fgMade: 0, punts: 0, passYards: 0,
-    laufYards: 0, fangYards: 0, verluste: 0, passerPgSum: 0, passerTgSum: 0, passerN: 0 };
-  const staende = [];
+    laufYards: 0, fangYards: 0, verluste: 0, passerPgSum: 0, passerTgSum: 0, passerN: 0,
+    // P1 "Uhr und Spielstand" (docs/design/football-opus-konzeptreview-26-09.md): fehlen die
+    // Zaehler im Motor (aelterer Stand), bleiben sie hier einfach 0.
+    snaps: 0, kneels: 0, vierterGo: 0, vierterFg: 0, vierterPunt: 0, zweiAtt: 0, zweiMade: 0,
+    endphaseSnaps: 0, seitenaus: 0 };
+  const staende = [], simSek = [];
   for (const s of x.spiele) {
+    if (s.football && s.football.simSek != null) simSek.push(s.football.simSek);
     summe.punkte += s.seiten[0] + s.seiten[1];
     staende.push(s.seiten.slice());
     if (s.football) for (const k in summe) if (k in s.football) summe[k] += s.football[k];
@@ -48,7 +53,7 @@ const w = await seite.evaluate((n) => {
       summe.fangYards += q.fangYards || 0; summe.verluste += q.verluste || 0;
     }
   }
-  return { summe, spiele: x.spiele.length, staende, fehlend: x.fehlend };
+  return { summe, spiele: x.spiele.length, staende, simSek, fehlend: x.fehlend };
 }, SPIELE);
 
 const n = w.spiele, jeTeam = (v) => v / n / 2;
@@ -70,6 +75,17 @@ console.log(zeile("Fumbles gesamt je Team", jeTeam(w.summe.fumbles).toFixed(2), 
 console.log(zeile("Field Goals gemacht/versucht je Team", `${jeTeam(w.summe.fgMade).toFixed(2)}/${jeTeam(w.summe.fgAtt).toFixed(2)}`, "~1,72/2,16 (Plan A.1)", ""));
 console.log(zeile("Field-Goal-Quote", (100 * w.summe.fgMade / Math.max(1, w.summe.fgAtt)).toFixed(1), "~85 (NFL 2024, alle Distanzen)", "%"));
 console.log(zeile("Punts je Team", jeTeam(w.summe.punts).toFixed(2), "~4 (Plan A.1, grobe Naeherung)", ""));
+// P1 "Uhr und Spielstand" (Konzeptreview 26.09.): Snapzahl muss bei ~55 je Team bleiben,
+// sonst verschiebt die neue Uhr die Ereigniszahl (CLAUDE.md: mehr Ereignisse helfen fast nie).
+const diffs = w.staende.map((s) => Math.abs(s[0] - s[1]));
+console.log(zeile("Snaps je Team (alle Zuege)", jeTeam(w.summe.snaps).toFixed(1), "55,5 vor P1 (unveraendert halten)", ""));
+console.log(zeile("4. Versuch Go/FG/Punt je Team", `${jeTeam(w.summe.vierterGo).toFixed(2)}/${jeTeam(w.summe.vierterFg).toFixed(2)}/${jeTeam(w.summe.vierterPunt).toFixed(2)}`, "NFL 2024 ~0,9 Go je Team", ""));
+console.log(zeile("2-Punkte versucht/gut je Team", `${jeTeam(w.summe.zweiAtt).toFixed(2)}/${jeTeam(w.summe.zweiMade).toFixed(2)}`, "NFL ~0,1-0,2 Versuche, ~45-50 % gut", ""));
+console.log(zeile("Kneels / Seitenaus je Team", `${jeTeam(w.summe.kneels).toFixed(2)}/${jeTeam(w.summe.seitenaus).toFixed(2)}`, "(nur Endphase)", ""));
+console.log(zeile("Endphase-Snaps je Team", jeTeam(w.summe.endphaseSnaps).toFixed(1), "(Two-/Four-Minute)", ""));
+if (w.simSek.length) console.log(zeile("Simulationszeit je Spiel s", `${(w.simSek.reduce((a, b) => a + b, 0) / w.simSek.length).toFixed(0)}/${Math.max(...w.simSek).toFixed(0)}`, "Mittel/Max; Tickdeckel der Sonden: Spieldauer 280 + 180 (standReserveVon)", ""));
+console.log(zeile("Unentschieden", (100 * diffs.filter((d) => d === 0).length / Math.max(1, n)).toFixed(1), "Review 0.4: 4,5", "%"));
+console.log(zeile("One-Score-Games (1-8 Punkte)", (100 * diffs.filter((d) => d >= 1 && d <= 8).length / Math.max(1, n)).toFixed(1), "Review 0.4: 41,5", "%"));
 const passerPgMittel = w.summe.passerPgSum / Math.max(1, w.summe.passerN);
 const passerTgMittel = w.summe.passerTgSum / Math.max(1, w.summe.passerN);
 const skillMittelGezogen = passerPgMittel * 0.0060 + passerTgMittel * 0.0020;
