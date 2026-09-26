@@ -17861,7 +17861,7 @@
     ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
     const [fa]=paar(tennisFokus);
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
-      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.06);
+      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.12);
 
     // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
     // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
@@ -18021,7 +18021,7 @@
     ctx.textAlign="center"; ctx.textBaseline="middle";
     if(bretter>1){
       ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
-      ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.06);
+      ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.12);
     }
 
     // EINE BAHN ZEICHNEN — `gross` waehlt zwischen der grossen Nahansicht des Fokus-
