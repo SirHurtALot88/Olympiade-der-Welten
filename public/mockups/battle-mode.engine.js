@@ -13924,6 +13924,14 @@
       // (Suche "TREFFERSTAND"), streng nach dem additiven `u.kuehneVersuche`-Muster
       // (Gewichtheben, s. baueHebenDuelle-Kommentar oben): keines von beiden fliesst in
       // u.summe/u.vorteil/u.verlauf oder MOTOREN[...].wert() ein.
+      //
+      // UEBERHOLT DURCH F1 (Opus-Konzeptreview Buehnen-Duell, 26.09., s. "F1 -- TREFFER SIND
+      // DER STAND"-Kommentar im `art.duell`-Paarungsblock oben in dieser Datei): der letzte
+      // Satz stimmt weiterhin fuer `u.summe`/`u.vorteil`/`u.verlauf`/`MOTOREN[...].wert()` --
+      // die bleiben reine Aktionsqualitaet und der Messwert fuer rho. Der Trefferstand
+      // ENTSCHEIDET seither aber, wer das Brett gewinnt (`gefechtSieg`), bei Gleichstand nach
+      // Los (`prioritaet`, die reale Degen-Zusatzminute) -- vorher entschied dort `vorteil`,
+      // der auffaelligste Einzelfehler des Reviews (Abschnitt 3.2 Punkt 1).
       label:"Fechten", jeSeite:6, rundenN:9, rundenDauer:60/(9*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
       // NACHKALIBRIERUNG (16.09., docs/design/fechten-rezeptkalibrierung-16-09.md) — die im
@@ -13973,7 +13981,22 @@
         PUBLIKUM:     {intelligence:50,health:50},
         AUSDAUER:     {speed:40,power:35,health:25},
         WAGNIS:       {speed:45,torment:30,power:25}
-      }
+      },
+      // WERTUNGSTABELLE (F1, Opus-Konzeptreview 26.09.): NUR die "Stand"-Spalte weicht vom
+      // WERTUNG_DUELL()-Default ab -- sie muss `gefechtSieg` lesen, nicht `verlauf[rundenN-1]`
+      // (`vorteil`), sonst zeigte die Tabelle einen anderen Sieger als der tatsaechliche
+      // Brettausgang (genau der Widerspruch, den dieser Fix behebt, s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Kein Remis mehr moeglich -- die Degen-Prioritaetsminute
+      // loest jeden Treffergleichstand auf -- darum kein "="-Fall mehr wie bei Speed-Schach/
+      // Tennis. Uebrige Spalten/Woerter bleiben die WERTUNG_DUELL()-Defaults, Zeichen fuer
+      // Zeichen wie Takeshi's Castle nur eine Spalte gegen die eigene tauscht (s. dessen
+      // wertungTabelle-Kommentar).
+      wertungTabelle:(basis,art)=>({...basis,
+        spalten:basis.spalten.map(s=>s.id!=="stand"?s:{...s,
+          titel:"Gefecht entschieden nach Trefferstand (+ Sieg, − Niederlage; bei "
+               +"Treffergleichstand entscheidet die Prioritaet aus der Degen-Zusatzminute)",
+          wert:z=>!z.fertig?"…":(z.u.gefechtSieg?"+":"−"),
+          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null})})
     }
   };
   let buehneDisc="gewichtheben";
@@ -14193,16 +14216,27 @@
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
         // WAGNIS wirkt jetzt in BEIDE Richtungen, s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben.
         const erfolg=buehneErfolgschance(L);
-        let punkte, ereignis;
-        if(rr()<erfolg){
+        let punkte, ereignis, knapp=false;
+        // GENAU EIN rr()-AUFRUF, WIE VORHER (E0, Buehne-Auftritt-Konzeptreview 26.09.,
+        // Abschnitt 2.4): der ohnehin gezogene Wert wird nur ZUSAETZLICH in `wurf` gehalten,
+        // damit ein Fehlschlag danach beschriftet werden kann, wie knapp er daneben lag.
+        // Erfolgschance, Punkte und rr()-Verbrauch bleiben bit-identisch zu vorher -- `knapp`
+        // ist ein reines Anzeige-Feld (s. KUER_KNAPP_ANTEIL oben), das ausserhalb des
+        // Eiskunstlauf-Feed-Zweigs unten (BB().duett) nirgends gelesen wird. Seit dem
+        // WAGNIS-Trade-off (26.09., s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben) nutzt auch `erfolg`
+        // selbst denselben `wurf` -- ein Fehlschlag bleibt "knapp", wie nah `wurf` an der jetzt
+        // WAGNIS-abhaengigen Erfolgschance lag.
+        const wurf=rr();
+        if(wurf<erfolg){
           punkte=basis+L.SPITZENMOMENT*0.35*buehneWagnisFaktor(L);
           ereignis=art.erfolgWort;
         } else {
           punkte=basis*art.failAbzug;
           ereignis=art.failWort;
+          knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
-        L.runden.push({punkte,ereignis});
+        L.runden.push({punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -14254,6 +14288,52 @@
         a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+        // F1 -- TREFFER SIND DER STAND (Opus-Konzeptreview Buehnen-Duell, 26.09., Abschnitt
+        // 3.3): der Kern-Befund des Reviews war, dass Fechten sich selbst widerspricht -- der
+        // ANGEZEIGTE Trefferstand ("Treffer 5:4") entschied nichts, das Gefecht gewann, wer
+        // `vorteil` (die interne Punktdifferenz) vorn hatte, und die zaehlte "kommt zu spaet"
+        // (`failWort`, kein Treffer) ueber `art.failAbzug` sogar mit. Nachgebildet traf das in
+        // 11,4 % aller Gefechte den Fechter mit WENIGER Treffern zum Sieger, in weiteren 17,4 %
+        // stand ein Treffergleichstand, den unsichtbare Punkte aufloesten. Im echten
+        // Degenfechten IST der Trefferstand das Ergebnis -- das gilt NUR fuer Fechten
+        // (`art.fechten`, dieselbe Weiche wie bei `L.treffer=0` oben): Speed-Schach und Tennis
+        // teilen sich diese Schleife unveraendert und bleiben bei `vorteil`.
+        //
+        // `vorteil`/`verlauf` selbst bleiben unangetastet -- sie bleiben die Aktionsqualitaet,
+        // der Messwert fuer rho ueber `MOTOREN[bd].wert()` (liest `u.summe`, nicht `vorteil`,
+        // s. dortiger Kommentar), und die Tauzieh-Anzeige auf der Bahn. Geaendert ist nur, WELCHE
+        // Groesse als Brettsieger zaehlt (`gefechtSieg`, gelesen von updateHudBuehne(),
+        // WERTUNG_DUELL(), stepBuehne() und spieleBuehneDuell()).
+        //
+        // TREFFER AUS DEN VOLLSTAENDIGEN `runden[]` GEZAEHLT, NICHT AUS `u.treffer`: an dieser
+        // Stelle (bauBuehne(), vor der Enthuellung) sind beide `runden[]`-Arrays bereits
+        // komplett fuer die ganze Bahn durchgerechnet (s. "ALLE DURCHGAENGE SOFORT
+        // DURCHRECHNEN"-Kommentar oben in `setz()`), `u.treffer` selbst steht dagegen noch auf 0
+        // -- es waechst erst live beim Enthuellen in stepBuehne() (TREFFERSTAND-Kommentar dort).
+        // Endstand ist in jedem Fall derselbe: `ta`/`tb` hier sind exakt die Zahl, auf die
+        // `u.treffer` am Ende der Enthuellung steht.
+        if(art.fechten){
+          const ta=a.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          const tb=b.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          // ECHTE DEGEN-ZUSATZREGEL bei Treffergleichstand (FIE-Prioritaetsminute, Review
+          // Abschnitt 3.2 Punkt 5): eine Zusatzminute, Prioritaet per Los, bei ausbleibendem
+          // Treffer gewinnt die Seite mit Prioritaet. Die Zusatzminute selbst wird hier nicht
+          // extra simuliert (keine weiteren Gaenge, keine weiteren Treffer moeglich) -- das Los
+          // FAELLT VORAB, EINMAL JE GEFECHT, wie der reale Muenzwurf vor der Zusatzminute, und
+          // entscheidet nur, wenn der Trefferstand danach immer noch gleich steht. `rr()` ruehrt
+          // damit die deterministische Formkarten-/Ereignis-Reihenfolge dieses Gefechts nicht an
+          // -- alle Punkte/Treffer beider Fechter stehen zu diesem Zeitpunkt schon fest.
+          const gleichstand=ta===tb;
+          const prioA=gleichstand?rr()<0.5:null;
+          a.gefechtSieg=ta>tb||(prioA===true);
+          b.gefechtSieg=tb>ta||(prioA===false);
+          // NUR BEI TATSAECHLICHEM TREFFERGLEICHSTAND gesetzt (sonst bliebe `prioA` `null` und
+          // beide Seiten straeflich auf `false` stehen) -- die Ticker-/Tabellen-Texte lesen
+          // dieses Feld, um "Sieg nach Prioritaet" nur zu zeigen, wenn es auch einen Losentscheid
+          // gab, nicht bei jedem gewoehnlichen Sieg nach mehr Treffern.
+          a.gefechtGleichstand=gleichstand; b.gefechtGleichstand=gleichstand;
+          a.prioritaet=prioA===true; b.prioritaet=prioA===false;
+        }
       }
     }
 
@@ -15949,9 +16029,19 @@
         // verloren oder remis ist — derselbe u.verlauf, den auch die Wertungstabelle
         // (renderWertungTabelle, Spalte "Stand") schon liest, hier nur zusaetzlich als
         // big-Ereignis gemeldet statt nur in einer Tabellenzelle.
-        if(u.aktuell+1>=BB().rundenN)
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "
-            +(v>0?"gewonnen":v<0?"verloren":"unentschieden")+" (Vorteil "+(v>0?"+":"")+v+").",true);
+        //
+        // FECHTEN LIEST `gefechtSieg`, NICHT `v`/`vorteil` (F1, 26.09.): der Trefferstand
+        // entscheidet, nicht die Punktdifferenz -- und bei Treffergleichstand faellt die Los-
+        // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
+        // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
+        // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        if(u.aktuell+1>=BB().rundenN){
+          const brettText=BB().fechten
+            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
+                           :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
+            :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+        }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
         // erfolgWort/failWort -- WERTUNG_AUFTRITT zaehlt Fehlschlaege ueber
@@ -15983,9 +16073,29 @@
           +gauntletBalken(hpJetzt,r.hpMax)+" (Kampf "+r.bout+").",versuchBig||r.hpNach<=0);
         if(r.hpNach<=0)
           feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
+      } else if(BB().duett){
+        // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
+        // 26.09., Abschnitt 2.4): reiner Textersatz -- `r.ereignis`/`r.punkte`/
+        // `buehneAuftrittBig()` bleiben exakt dieselben Werte wie im generischen else-Zweig
+        // unten (Wettessen), nur die BESCHRIFTUNG des Elements und eines Fehlschlags aendert
+        // sich. `r.knapp` kommt unveraendert aus demselben rr()-Wurf wie `r.ereignis`
+        // (bauBuehne(), s. dortiger Kommentar) -- kein zweiter Zufallszug, keine neue
+        // Erfolgschance. Sprungelemente unterscheiden Sturz (deutlich) von "unterdreht/Hand
+        // am Eis" (knapp); Pirouette/Schritte/Choreo heissen im Fehlschlag NIE "stürzt" (Review
+        // 2.3: ein Fehlschlag bei einer Pirouette ist kein Sturz).
+        const bb=BB(), element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        let ereignisText=r.ereignis;
+        if(r.ereignis===bb.failWort){
+          ereignisText=element.typ==="sprung"
+            ?(r.knapp?"unterdreht, Hand am Eis":bb.failWort)
+            :(element.typ==="pirouette"?"verliert die Zentrierung":"stolpert");
+        }
+        feed(u.side,u.n+" — "+element.name+" — "+ereignisText
+          +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
+          buehneAuftrittBig(u,r,vorherSumme));
       } else {
-        // GILT FUER EISKUNSTLAUF (`duett`) UND WETTESSEN, die beiden verbleibenden
-        // Auftritt-Buehnen ohne eigenen Zweig oben -- s. buehneAuftrittBig()-Kommentar.
+        // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
+        // oben -- s. buehneAuftrittBig()-Kommentar.
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
           buehneAuftrittBig(u,r,vorherSumme));
       }
@@ -16147,6 +16257,45 @@
     return {x:W*0.875, y:H*0.755};
   }
   const KUER_ELEMENT_DAUER=1.4, KUER_STURZ_DAUER=1.0;
+  // ================== E0: DER KUER-BAUPLAN (Buehne-Auftritt-Konzeptreview 26.09., Abschnitt
+  // 2.4) ==================
+  // ERSETZT DIE MODULO-BESCHRIFTUNG. Vorher war das "Element", das dem Zuschauer angezeigt
+  // wurde, nur `["pirouette","hebung","wurf"][u.aktuell%3]` (:16300 vor dieser PR) -- ein
+  // Zaehler-Rest, kein Kuerplan, und ohne echten Elementnamen im Feed. `art.rundenN:12` trifft
+  // laut Review schon die reale Groessenordnung einer Senioren-Kuer (sieben Sprungelemente,
+  // drei Pirouetten, eine Schrittfolge, eine Choreosequenz), nur die BESCHRIFTUNG bildete das
+  // bisher nicht ab. KUER_ELEMENTE ist deshalb ein fester Bauplan mit zwoelf Eintraegen, in
+  // genau dieser Zaehlung (7/3/1/1) und einer plausiblen Reihenfolge (Review-Beispiel: Sprung,
+  // Sprung, Pirouette, Sprung, Schritte, Sprung | Sprung, Pirouette, Sprung, Sprung, Choreo,
+  // Pirouette) -- REIN DEKORATIV: `typ`/`name` steuern nur die Beschriftung im Feed (unten,
+  // "EISKUNSTLAUF-ELEMENTNAME") und `pose` nur, welches u.vizPhase stepKuer() fuer dieses
+  // Element setzt (s. Aufrufstelle) -- "pirouette"/"wurf" sind dieselben zwei Zeichen-Posen
+  // wie vorher (Drehung bzw. Sprungbogen in zeichneDuett()), "schritte"/"choreo" sind neue
+  // Werte ohne eigene Sonderzeichnung (fallen auf die normale Gleitpose zurueck, passend zu
+  // Schrittfolge/Choreo, die im echten Sport kein einzelner Sprung-/Spinmoment sind). Nichts
+  // davon beeinflusst `rezept`/`rr()`/`punkte`/`ereignis` -- diese bleiben exakt der
+  // generische Durchgangs-Wurf aus bauBuehne() (s. dort), unveraendert.
+  const KUER_ELEMENTE=[
+    {typ:"sprung",    name:"Doppelaxel",           pose:"wurf"},
+    {typ:"sprung",    name:"Dreifachlutz",         pose:"wurf"},
+    {typ:"pirouette", name:"Standpirouette",       pose:"pirouette"},
+    {typ:"sprung",    name:"Dreifachflip",         pose:"wurf"},
+    {typ:"schritte",  name:"Schrittfolge",         pose:"schritte"},
+    {typ:"sprung",    name:"Dreifachrittberger",   pose:"wurf"},
+    {typ:"sprung",    name:"Dreifachtoeloop",      pose:"wurf"},
+    {typ:"pirouette", name:"Sitzpirouette",        pose:"pirouette"},
+    {typ:"sprung",    name:"Dreifachsalchow",      pose:"wurf"},
+    {typ:"sprung",    name:"Kombinationssprung",   pose:"wurf"},
+    {typ:"choreo",    name:"Choreosequenz",        pose:"choreo"},
+    {typ:"pirouette", name:"Kombinationspirouette",pose:"pirouette"}
+  ];
+  // STURZ VS. WACKLER (dieselbe Review, Abschnitt 2.4, E0 zweiter Teil): der Anteil der
+  // Fehlschlagzone (zwischen der Erfolgsschwelle `erfolg` und 1), der noch als "knapp
+  // daneben" (Wackler) statt "deutlich daneben" (Sturz) gilt -- s. bauBuehne()s Durchgangs-
+  // schleife, Kommentar dort. Kalibriert auf den in der Review genannten Zielsplit (aus
+  // vormals ~47% "stuerzt" werden rund 30% Wackler + 15% Stuerze); reiner Anzeigewert, geht
+  // in keine Punkteformel und keinen weiteren rr()-Aufruf ein.
+  const KUER_KNAPP_ANTEIL=0.65;
   // ================== DER STURZ-TELEPORT UND SEINE BEHEBUNG (13.09.) ==================
   // Chris, woertlich: "wenn caraktere fallen teleportieren sie sich dann weiter obwohl sie
   // ja am selben punkt bleiben muessten eigentlich."
@@ -16291,7 +16440,7 @@
         // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf seinen eigenen
         // Rueckfallplatz zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten
         // stepKuer()-Aufruf gibt es eine echte Position.
-        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
+        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizWackler=false; u.vizAktuell=-1;
         u.vizX=B.cx; u.vizY=B.cy; u.vizRi=0; u.vizNeu=true; u.vizAus=1; u.vizBahnT=0;
       }
       // ROLLE IN DER ROTATION. `vizGrp` (Startnummer der eigenen Gruppe, 0-basiert) und
@@ -16338,19 +16487,32 @@
         // also genau das, was warSturzVorAblauf auf dem Uhrenweg leistet.
         kuerPhaseEnde(u,u.vizSturz);
         if(u.aktuell+1>=art.rundenN){
-          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
+          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false; u.vizWackler=false;
         } else {
           const zug=u.runden[u.aktuell];
           const fehl=!!(zug&&zug.ereignis===art.failWort);
-          u.vizPhase=["pirouette","hebung","wurf"][u.aktuell%3];
+          // KUER-BAUPLAN (E0, s. KUER_ELEMENTE oben) STATT MODULO: dieselbe Idee wie vorher
+          // (drei Zeichen-Posen fuer alle zwoelf Elemente), nur jetzt aus einem festen Plan
+          // gelesen statt aus `u.aktuell%3` -- rein praesentational, kein rr()-Aufruf, keine
+          // Wirkung auf zug/ereignis/punkte.
+          const element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          u.vizPhase=element.pose;
           u.vizPhaseT=fehl?KUER_STURZ_DAUER:KUER_ELEMENT_DAUER;
           u.vizSturz=fehl;
+          // STURZ VS. WACKLER, NUR OPTISCH/AKUSTISCH (E0, zweiter Teil): `zug.knapp` kommt
+          // unveraendert aus bauBuehne() (derselbe rr()-Wurf, s. dort) -- u.vizWackler ist ein
+          // rein neues viz*-Feld (Vertrag oben: stepKuer() darf sowas schreiben), u.vizSturz
+          // bleibt bei JEDEM Fehlschlag true, weil die Halte-/Aufsteh-Choreo (unten, Sturz-
+          // Teleport-Fix) fuer beide Faelle dieselbe bleiben soll -- nur der Klang und die
+          // Kippung in zeichneDuett() unterscheiden sich (s. dort).
+          u.vizWackler=fehl&&!!zug.knapp;
           // Sprungansatz bei JEDEM neuen Element (Pirouette/Hebung/Wurf — das Motorbild
           // kennt keine feinere Unterscheidung, alle drei zaehlen hier als "Sprung"-Ansatz),
           // unabhaengig vom spaeteren Ausgang. Misslingt der Versuch, zusaetzlich sofort der
-          // Sturz-Klang — vizSturz ist in der Zeile darueber schon gesetzt.
+          // Sturz- bzw. Wackler-Klang — vizSturz/vizWackler sind in den Zeilen darueber schon
+          // gesetzt.
           sfx("eiskunstlauf","sprung");
-          if(fehl)sfx("eiskunstlauf","sturz");
+          if(fehl)sfx("eiskunstlauf",u.vizWackler?"wackler":"sturz");
         }
       }
       // warSturzVorAblauf: reiner Lesevergleich VOR dem Ablauf-Reset unten, damit "Landung"
@@ -17371,7 +17533,11 @@
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
+      // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
       document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
     } else if(BB().gauntlet){
       // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
@@ -19816,7 +19982,10 @@
       if(sturz){
         // Sturz: hurt-Pose (ueber u.vizSturz, s. zeichneSprite()) plus liegende Kippung —
         // NICHT u.down, das ist ein Kampf-Feld und wuerde in andere Zweige lecken.
-        ctx.translate(rx,ry); ctx.rotate(1.15); ctx.translate(-rx,-ry);
+        // WACKLER (E0): eine flachere Kippung statt der vollen liegenden Drehung -- derselbe
+        // Fehlschlag, aber "knapp daneben" (s. u.vizWackler/KUER_KNAPP_ANTEIL), rein optisch,
+        // keine andere Uhr/Dauer/Wertung.
+        ctx.translate(rx,ry); ctx.rotate(u.vizWackler?0.4:1.15); ctx.translate(-rx,-ry);
       } else if(phase==="pirouette"&&u.vizPhaseT>0){
         // Pirouette: Drehung auf der Stelle um den eigenen Fusspunkt.
         ctx.translate(rx,ry); ctx.rotate((buehneT*9+u.id)%6.2832); ctx.translate(-rx,-ry);
@@ -22789,6 +22958,10 @@
     u.retreat=0; u.rtCd=0; u.tgt=null; u.lastHit=null; u.anteile=null;
     u.cd=0; u.lunge=0; u.dodge=0; u.leineHielt=false; u.bindAn=null; u.leer=0;
     u.mp=u.mpMax; u.sp=u.spMax;
+    // CAST-RESET (Review-Fund #22 zu PR #1028): ohne dies behaelt eine respawnte Einheit
+    // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
+    // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
+    u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
     feed(u.side,u.n+" ist zurueck im Kampf.");
   }
 
@@ -25402,6 +25575,11 @@
       sprung:   {synth:(vol)=>tonSchlag(vol,320,900,0.22)},
       landung:  {synth:(vol)=>{ tonSchlag((vol??0.6)*0.7,600,140,0.12); tonKlick((vol??0.6)*0.8,2600,0.04); }},
       sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      // WACKLER (E0, Buehne-Auftritt-Konzeptreview 26.09., Abschnitt 2.4): derselbe
+      // Fehlschlag, aber "knapp daneben" statt "deutlich daneben" (s. KUER_KNAPP_ANTEIL/
+      // u.vizWackler) -- deutlich leiser/kuerzer als "sturz", kein Rauschen (kein Aufprall),
+      // rein akustische Unterscheidung ohne jede Wirkung auf Wertung/Erfolgschance.
+      wackler:  {synth:(vol)=>tonKlick((vol??0.6)*0.7,1800,0.06)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,450,0,true)}
     },
     breaking:{
@@ -32978,8 +33156,11 @@
     if(m)m.textContent=istBahn(disc)
       ? bahnTeamstand().seiten.join(" : ")
       : (istBuehne(disc)&&BB().duell)
-      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length+" : "+
-         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length)
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
+      // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
+      // Kader-Mittelzeile. Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length+" : "+
+         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length)
       : istBuehne(disc)
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
@@ -34887,7 +35068,13 @@
       const wert=M.wert();
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, Opus-Konzeptreview 26.09., s.
+      // "F1"-Kommentar bei `art.duell` in bauBuehne()): der Trefferstand entscheidet das Brett
+      // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
+      // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
+      // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
