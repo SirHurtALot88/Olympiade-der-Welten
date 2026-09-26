@@ -14153,16 +14153,24 @@
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
         const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
-        let punkte, ereignis;
-        if(rr()<erfolg){
+        let punkte, ereignis, knapp=false;
+        // GENAU EIN rr()-AUFRUF, WIE VORHER (E0, Buehne-Auftritt-Konzeptreview 26.09.,
+        // Abschnitt 2.4): der ohnehin gezogene Wert wird nur ZUSAETZLICH in `wurf` gehalten,
+        // damit ein Fehlschlag danach beschriftet werden kann, wie knapp er daneben lag.
+        // Erfolgschance, Punkte und rr()-Verbrauch bleiben bit-identisch zu vorher -- `knapp`
+        // ist ein reines Anzeige-Feld (s. KUER_KNAPP_ANTEIL oben), das ausserhalb des
+        // Eiskunstlauf-Feed-Zweigs unten (BB().duett) nirgends gelesen wird.
+        const wurf=rr();
+        if(wurf<erfolg){
           punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
           ereignis=art.erfolgWort;
         } else {
           punkte=basis*art.failAbzug;
           ereignis=art.failWort;
+          knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
-        L.runden.push({punkte,ereignis});
+        L.runden.push({punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -15938,9 +15946,29 @@
           +gauntletBalken(hpJetzt,r.hpMax)+" (Kampf "+r.bout+").",versuchBig||r.hpNach<=0);
         if(r.hpNach<=0)
           feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
+      } else if(BB().duett){
+        // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
+        // 26.09., Abschnitt 2.4): reiner Textersatz -- `r.ereignis`/`r.punkte`/
+        // `buehneAuftrittBig()` bleiben exakt dieselben Werte wie im generischen else-Zweig
+        // unten (Wettessen), nur die BESCHRIFTUNG des Elements und eines Fehlschlags aendert
+        // sich. `r.knapp` kommt unveraendert aus demselben rr()-Wurf wie `r.ereignis`
+        // (bauBuehne(), s. dortiger Kommentar) -- kein zweiter Zufallszug, keine neue
+        // Erfolgschance. Sprungelemente unterscheiden Sturz (deutlich) von "unterdreht/Hand
+        // am Eis" (knapp); Pirouette/Schritte/Choreo heissen im Fehlschlag NIE "stürzt" (Review
+        // 2.3: ein Fehlschlag bei einer Pirouette ist kein Sturz).
+        const bb=BB(), element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        let ereignisText=r.ereignis;
+        if(r.ereignis===bb.failWort){
+          ereignisText=element.typ==="sprung"
+            ?(r.knapp?"unterdreht, Hand am Eis":bb.failWort)
+            :(element.typ==="pirouette"?"verliert die Zentrierung":"stolpert");
+        }
+        feed(u.side,u.n+" — "+element.name+" — "+ereignisText
+          +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
+          buehneAuftrittBig(u,r,vorherSumme));
       } else {
-        // GILT FUER EISKUNSTLAUF (`duett`) UND WETTESSEN, die beiden verbleibenden
-        // Auftritt-Buehnen ohne eigenen Zweig oben -- s. buehneAuftrittBig()-Kommentar.
+        // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
+        // oben -- s. buehneAuftrittBig()-Kommentar.
         feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
           buehneAuftrittBig(u,r,vorherSumme));
       }
@@ -16102,6 +16130,45 @@
     return {x:W*0.875, y:H*0.755};
   }
   const KUER_ELEMENT_DAUER=1.4, KUER_STURZ_DAUER=1.0;
+  // ================== E0: DER KUER-BAUPLAN (Buehne-Auftritt-Konzeptreview 26.09., Abschnitt
+  // 2.4) ==================
+  // ERSETZT DIE MODULO-BESCHRIFTUNG. Vorher war das "Element", das dem Zuschauer angezeigt
+  // wurde, nur `["pirouette","hebung","wurf"][u.aktuell%3]` (:16300 vor dieser PR) -- ein
+  // Zaehler-Rest, kein Kuerplan, und ohne echten Elementnamen im Feed. `art.rundenN:12` trifft
+  // laut Review schon die reale Groessenordnung einer Senioren-Kuer (sieben Sprungelemente,
+  // drei Pirouetten, eine Schrittfolge, eine Choreosequenz), nur die BESCHRIFTUNG bildete das
+  // bisher nicht ab. KUER_ELEMENTE ist deshalb ein fester Bauplan mit zwoelf Eintraegen, in
+  // genau dieser Zaehlung (7/3/1/1) und einer plausiblen Reihenfolge (Review-Beispiel: Sprung,
+  // Sprung, Pirouette, Sprung, Schritte, Sprung | Sprung, Pirouette, Sprung, Sprung, Choreo,
+  // Pirouette) -- REIN DEKORATIV: `typ`/`name` steuern nur die Beschriftung im Feed (unten,
+  // "EISKUNSTLAUF-ELEMENTNAME") und `pose` nur, welches u.vizPhase stepKuer() fuer dieses
+  // Element setzt (s. Aufrufstelle) -- "pirouette"/"wurf" sind dieselben zwei Zeichen-Posen
+  // wie vorher (Drehung bzw. Sprungbogen in zeichneDuett()), "schritte"/"choreo" sind neue
+  // Werte ohne eigene Sonderzeichnung (fallen auf die normale Gleitpose zurueck, passend zu
+  // Schrittfolge/Choreo, die im echten Sport kein einzelner Sprung-/Spinmoment sind). Nichts
+  // davon beeinflusst `rezept`/`rr()`/`punkte`/`ereignis` -- diese bleiben exakt der
+  // generische Durchgangs-Wurf aus bauBuehne() (s. dort), unveraendert.
+  const KUER_ELEMENTE=[
+    {typ:"sprung",    name:"Doppelaxel",           pose:"wurf"},
+    {typ:"sprung",    name:"Dreifachlutz",         pose:"wurf"},
+    {typ:"pirouette", name:"Standpirouette",       pose:"pirouette"},
+    {typ:"sprung",    name:"Dreifachflip",         pose:"wurf"},
+    {typ:"schritte",  name:"Schrittfolge",         pose:"schritte"},
+    {typ:"sprung",    name:"Dreifachrittberger",   pose:"wurf"},
+    {typ:"sprung",    name:"Dreifachtoeloop",      pose:"wurf"},
+    {typ:"pirouette", name:"Sitzpirouette",        pose:"pirouette"},
+    {typ:"sprung",    name:"Dreifachsalchow",      pose:"wurf"},
+    {typ:"sprung",    name:"Kombinationssprung",   pose:"wurf"},
+    {typ:"choreo",    name:"Choreosequenz",        pose:"choreo"},
+    {typ:"pirouette", name:"Kombinationspirouette",pose:"pirouette"}
+  ];
+  // STURZ VS. WACKLER (dieselbe Review, Abschnitt 2.4, E0 zweiter Teil): der Anteil der
+  // Fehlschlagzone (zwischen der Erfolgsschwelle `erfolg` und 1), der noch als "knapp
+  // daneben" (Wackler) statt "deutlich daneben" (Sturz) gilt -- s. bauBuehne()s Durchgangs-
+  // schleife, Kommentar dort. Kalibriert auf den in der Review genannten Zielsplit (aus
+  // vormals ~47% "stuerzt" werden rund 30% Wackler + 15% Stuerze); reiner Anzeigewert, geht
+  // in keine Punkteformel und keinen weiteren rr()-Aufruf ein.
+  const KUER_KNAPP_ANTEIL=0.65;
   // ================== DER STURZ-TELEPORT UND SEINE BEHEBUNG (13.09.) ==================
   // Chris, woertlich: "wenn caraktere fallen teleportieren sie sich dann weiter obwohl sie
   // ja am selben punkt bleiben muessten eigentlich."
@@ -16246,7 +16313,7 @@
         // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf seinen eigenen
         // Rueckfallplatz zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten
         // stepKuer()-Aufruf gibt es eine echte Position.
-        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
+        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizWackler=false; u.vizAktuell=-1;
         u.vizX=B.cx; u.vizY=B.cy; u.vizRi=0; u.vizNeu=true; u.vizAus=1; u.vizBahnT=0;
       }
       // ROLLE IN DER ROTATION. `vizGrp` (Startnummer der eigenen Gruppe, 0-basiert) und
@@ -16293,19 +16360,32 @@
         // also genau das, was warSturzVorAblauf auf dem Uhrenweg leistet.
         kuerPhaseEnde(u,u.vizSturz);
         if(u.aktuell+1>=art.rundenN){
-          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
+          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false; u.vizWackler=false;
         } else {
           const zug=u.runden[u.aktuell];
           const fehl=!!(zug&&zug.ereignis===art.failWort);
-          u.vizPhase=["pirouette","hebung","wurf"][u.aktuell%3];
+          // KUER-BAUPLAN (E0, s. KUER_ELEMENTE oben) STATT MODULO: dieselbe Idee wie vorher
+          // (drei Zeichen-Posen fuer alle zwoelf Elemente), nur jetzt aus einem festen Plan
+          // gelesen statt aus `u.aktuell%3` -- rein praesentational, kein rr()-Aufruf, keine
+          // Wirkung auf zug/ereignis/punkte.
+          const element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          u.vizPhase=element.pose;
           u.vizPhaseT=fehl?KUER_STURZ_DAUER:KUER_ELEMENT_DAUER;
           u.vizSturz=fehl;
+          // STURZ VS. WACKLER, NUR OPTISCH/AKUSTISCH (E0, zweiter Teil): `zug.knapp` kommt
+          // unveraendert aus bauBuehne() (derselbe rr()-Wurf, s. dort) -- u.vizWackler ist ein
+          // rein neues viz*-Feld (Vertrag oben: stepKuer() darf sowas schreiben), u.vizSturz
+          // bleibt bei JEDEM Fehlschlag true, weil die Halte-/Aufsteh-Choreo (unten, Sturz-
+          // Teleport-Fix) fuer beide Faelle dieselbe bleiben soll -- nur der Klang und die
+          // Kippung in zeichneDuett() unterscheiden sich (s. dort).
+          u.vizWackler=fehl&&!!zug.knapp;
           // Sprungansatz bei JEDEM neuen Element (Pirouette/Hebung/Wurf — das Motorbild
           // kennt keine feinere Unterscheidung, alle drei zaehlen hier als "Sprung"-Ansatz),
           // unabhaengig vom spaeteren Ausgang. Misslingt der Versuch, zusaetzlich sofort der
-          // Sturz-Klang — vizSturz ist in der Zeile darueber schon gesetzt.
+          // Sturz- bzw. Wackler-Klang — vizSturz/vizWackler sind in den Zeilen darueber schon
+          // gesetzt.
           sfx("eiskunstlauf","sprung");
-          if(fehl)sfx("eiskunstlauf","sturz");
+          if(fehl)sfx("eiskunstlauf",u.vizWackler?"wackler":"sturz");
         }
       }
       // warSturzVorAblauf: reiner Lesevergleich VOR dem Ablauf-Reset unten, damit "Landung"
@@ -19771,7 +19851,10 @@
       if(sturz){
         // Sturz: hurt-Pose (ueber u.vizSturz, s. zeichneSprite()) plus liegende Kippung —
         // NICHT u.down, das ist ein Kampf-Feld und wuerde in andere Zweige lecken.
-        ctx.translate(rx,ry); ctx.rotate(1.15); ctx.translate(-rx,-ry);
+        // WACKLER (E0): eine flachere Kippung statt der vollen liegenden Drehung -- derselbe
+        // Fehlschlag, aber "knapp daneben" (s. u.vizWackler/KUER_KNAPP_ANTEIL), rein optisch,
+        // keine andere Uhr/Dauer/Wertung.
+        ctx.translate(rx,ry); ctx.rotate(u.vizWackler?0.4:1.15); ctx.translate(-rx,-ry);
       } else if(phase==="pirouette"&&u.vizPhaseT>0){
         // Pirouette: Drehung auf der Stelle um den eigenen Fusspunkt.
         ctx.translate(rx,ry); ctx.rotate((buehneT*9+u.id)%6.2832); ctx.translate(-rx,-ry);
@@ -25357,6 +25440,11 @@
       sprung:   {synth:(vol)=>tonSchlag(vol,320,900,0.22)},
       landung:  {synth:(vol)=>{ tonSchlag((vol??0.6)*0.7,600,140,0.12); tonKlick((vol??0.6)*0.8,2600,0.04); }},
       sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      // WACKLER (E0, Buehne-Auftritt-Konzeptreview 26.09., Abschnitt 2.4): derselbe
+      // Fehlschlag, aber "knapp daneben" statt "deutlich daneben" (s. KUER_KNAPP_ANTEIL/
+      // u.vizWackler) -- deutlich leiser/kuerzer als "sturz", kein Rauschen (kein Aufprall),
+      // rein akustische Unterscheidung ohne jede Wirkung auf Wertung/Erfolgschance.
+      wackler:  {synth:(vol)=>tonKlick((vol??0.6)*0.7,1800,0.06)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,450,0,true)}
     },
     breaking:{
