@@ -7360,6 +7360,25 @@
   // schon die im Dokument empfohlene Interpolation, keine eigene Messung.
   const BK_HAND_LINKS=[[24,46],[24,46],[24,46],[25,36],[22,45],[20,45],[23,45],[24,44],[24,44]];
   const BK_HAND_RECHTS=[[40,46],[40,46],[40,46],[38,36],[41,45],[43,45],[40,45],[40,44],[40,44]];
+  // NACHTRAG 26.09. (Ball-Pose-Fix, Bewegungs-Audit + Fable-Recherche Abschnitt 2.3, Weg
+  // A): die Handpunkte oben decken nur "links"/"rechts" (Profil) ab — "hinten"/"vorn"
+  // fielen bisher auf einen ungemessenen Festwert ([44,47], nie eigens vermessen, nur von
+  // HOCKEY_HAND uebernommen) zurueck, der Bild fuer Bild GLEICH blieb: der Ball klebte in
+  // diesen beiden Blickrichtungen sichtbar unbewegt am Rumpf statt mit dem Laufzyklus zu
+  // schwingen (Sichtbeleg: renderProbe-Serie im Scratchpad dieser Runde, Charakter "vorn"/
+  // "hinten" zeigte den Ball praktisch mittig ueber dem Torso ueberlappend, waehrend
+  // "links"/"rechts" mit den vermessenen Werten oben bereits sauber neben dem Koerper
+  // sitzt — s. PR-Beschreibung fuer die Vergleichsbilder). Per Pixelscan derselben
+  // Guertelband-Methode wie HOCKEY_HAND/BK_HAND_LINKS/-RECHTS neu vermessen
+  // (scripts/messe-basketball-dribbel-handpunkt.mjs, y-Band 28..54 statt 44..50, weil der
+  // Ausschlag bei Spalte 3 sonst abgeschnitten wird — derselbe Spalte-3-Ausschlag, den
+  // BK_HAND_LINKS/-RECHTS an dieser Stelle mit y=36 schon zeigen). In Front-/Ruecken-
+  // ansicht bewegt sich nur die X-Koordinate spuerbar (± 1 px, Spalte 3 macht die
+  // erwartete Ausnahme); Y bleibt bewusst ungenutzt wie bei BK_HAND_LINKS/-RECHTS auch
+  // (nur hp[0] geht unten in handOffX ein, s. dort) — der Baukasten-Torso in Front-/
+  // Ruecken-Projektion zeigt keinen zweiten, separat messbaren Hoehen-Freiheitsgrad.
+  const BK_HAND_HINTEN=[[48,38],[48,38],[48,38],[47,36],[48,38],[48,38],[48,39],[48,40],[48,39]];
+  const BK_HAND_VORN=[[48,38],[48,38],[48,38],[48,39],[48,38],[48,38],[48,39],[47,38],[48,39]];
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -7382,6 +7401,32 @@
     helpdefense:  {ABWEHR:3,  ZWEITCHANCE:2, SCHUSS_FERN:-1},
     clutchshot:   {SCHUSS_FERN:4, SCHUSS_NAH:-2},
     fastbreak:    {AUFBAU:2,  SCHUSS_NAH:2, ZWEITCHANCE:-2}
+  };
+  // ROLLE -> COURT-PLATZ (26.09., Konzeptreview-Fund L1/Abschnitt 2.2: "wo ein Spieler
+  // steht, entscheidet sein SCHUSS_NAH-Rang" statt seiner tatsaechlichen Rolle — Chris
+  // woertlich: "Ein Center ist viel mehr innen als ein Shooting Guard"). Bildet jede der
+  // sechs Rollen auf GENAU EINEN der sechs SLOTS-Plaetze ab (s. SLOTS oben: 0 Korbnaehe/
+  // Paint, 1 Top of Key/zentral, 2/3 Fluegelpaar, 4/5 Eckenpaar):
+  //   rimpressure  (Center/Power-Forward-artig, attackiert den Ring)      -> 0, Paint
+  //   floorgeneral (Point-Guard-artig, fuehrt Possessions)                -> 1, Top of Key
+  //   fastbreak    (Slasher/Umschaltspieler, SCHUSS_NAH-lastig)           -> 2, Fluegel
+  //   helpdefense  (Rotations-/Rebound-Verteidiger, kaum Fernwurf)        -> 3, Fluegel
+  //   perimeter    (Winkelspieler, SCHUSS_FERN-lastig)                    -> 4, Ecke
+  //   clutchshot   (reinster Distanzschuetze, hoechster SCHUSS_FERN-Bonus)-> 5, Ecke
+  // Reihenfolge der vier aeusseren Rollen (fastbreak/helpdefense/perimeter/clutchshot)
+  // folgt der Netto-Neigung aus BASKETBALL_POS_MOD (SCHUSS_NAH minus SCHUSS_FERN: +2/+1/
+  // -5/-6) — je naeher am Ring ein Sub-Skill-Profil liegt, desto naeher am Paint-Ende der
+  // vier verbleibenden Plaetze (Fluegel vor Ecke). Wing/Ecke sind sich radial fast gleich
+  // (150 gegen 145 px, s. SLOTS) — hier bleibt kein starker Unterschied, nur eine klare,
+  // dokumentierte statt zufaellige Zuordnung.
+  //
+  // NUR WIRKSAM, WENN DIE GANZE AUFSTELLUNG ECHTE ROLLEN TRAEGT (s. zuordneSlots): jeder
+  // Rueckfall (Kader ohne Aufstellung, Unterzahl, doppelt vergebene Rolle) bleibt exakt
+  // beim alten SCHUSS_NAH-Sortierverfahren. Insbesondere die kaderfeste Rangtreue-Sonde
+  // (miss-alle-disziplinen.mjs/feldspielProbe) setzt nie eine Aufstellung (`place` bleibt
+  // leer) — sie durchlaeuft diesen Zweig also nie und misst bit-identisch weiter.
+  const BASKETBALL_ROLLE_SLOT={
+    rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
@@ -7900,8 +7945,30 @@
     const torwartDa=istHockey()&&FSTEAM[seite].some(u=>u.torwart);
     const soll=Math.max(1,(FB().jeSeite||form.length)-(torwartDa?1:0));
     const plaetze=sortiert.length<soll?UNTERZAHL_PLAETZE[sortiert.length]:null;
+    // ROLLENBASIERTE PLATZWAHL (Konzeptreview 26.09., L1/2.2 — s. BASKETBALL_ROLLE_SLOT
+    // oben): bei VOLLER Besetzung (kein Unterzahl-Sonderfall) UND wenn JEDER Spieler eine
+    // vom Manager/der KI tatsaechlich GESETZTE, gueltige und PAARWEISE VERSCHIEDENE Rolle
+    // traegt, entscheidet die Rolle den Platz — nicht mehr SCHUSS_NAH. Ein Center
+    // (rimpressure) steht damit im Paint, ein Floor General am Top of Key, ein reiner
+    // Distanzschuetze (clutchshot) in der Ecke, gleich wie gut oder schlecht sein
+    // SCHUSS_NAH zufaellig ausfaellt — genau Chris' Fund: "wo ein Spieler steht,
+    // entscheidet sein SCHUSS_NAH-Rang" statt seiner Rolle.
+    //
+    // JEDER ABWEICHENDE FALL FAELLT AUF DAS ALTE VERFAHREN ZURUECK (Unterzahl, keine
+    // Aufstellung, doppelt vergebene Rolle, unbekannte Slot-Kennung) — insbesondere die
+    // kaderfeste Rangtreue-Sonde (miss-alle-disziplinen.mjs/feldspielProbe) setzt nie eine
+    // Aufstellung (place bleibt ueber die ganze Messung leer, jeder Spieler bekommt seine
+    // Rolle nur als Rundlauf-Ruecfall mit slotGesetzt=false, s. slotFuer/bauSpieler oben) —
+    // sie durchlaeuft diesen Zweig nie und misst damit bit-identisch zu vorher weiter.
+    const rollenSpielbar=feldspielDisc==="basketball"&&!plaetze&&sortiert.length>0
+      &&sortiert.every(u=>u.slotGesetzt&&BASKETBALL_ROLLE_SLOT[u.slotId]!=null)
+      &&(()=>{ const belegt=new Set();
+        for(const u of sortiert){ const s=BASKETBALL_ROLLE_SLOT[u.slotId];
+          if(belegt.has(s))return false; belegt.add(s); }
+        return true; })();
     sortiert.forEach((u,i)=>{
-      u.slotIdx = plaetze?plaetze[Math.min(plaetze.length-1,i)]
+      u.slotIdx = rollenSpielbar ? BASKETBALL_ROLLE_SLOT[u.slotId]
+                : plaetze?plaetze[Math.min(plaetze.length-1,i)]
                 : Math.min(form.length-1,i);
       u.slotSeit=0;
     });
@@ -12857,7 +12924,12 @@
           if(feldspielDisc==="basketball"||feldspielDisc==="football"){
             const rBlick=blickAus(traeger);
             const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
-            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
+            // Alle vier Blickrichtungen jetzt aus einer gemessenen Tabelle (Nachtrag
+            // 26.09., s. BK_HAND_HINTEN/-VORN oben) statt "links"/"rechts" gemessen und
+            // "hinten"/"vorn" auf einen nie eigens vermessenen Festwert zurueckfallen zu
+            // lassen.
+            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]
+                    :rBlick===0?BK_HAND_HINTEN[fSpalte]:BK_HAND_VORN[fSpalte];
             // bauSkala(b) (04.09., s. Kommentar bei zeichneSprite/bauSkala oben) fehlte hier
             // urspruenglich — ohne sie wuerde ein Ball bei einem Traeger mit eigenem
             // Skala-Flag leicht neben der (dann groesseren) Hand schweben. Heute inert fuer
