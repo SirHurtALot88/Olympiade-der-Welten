@@ -13921,6 +13921,14 @@
       // (Suche "TREFFERSTAND"), streng nach dem additiven `u.kuehneVersuche`-Muster
       // (Gewichtheben, s. baueHebenDuelle-Kommentar oben): keines von beiden fliesst in
       // u.summe/u.vorteil/u.verlauf oder MOTOREN[...].wert() ein.
+      //
+      // UEBERHOLT DURCH F1 (Opus-Konzeptreview Buehnen-Duell, 26.09., s. "F1 -- TREFFER SIND
+      // DER STAND"-Kommentar im `art.duell`-Paarungsblock oben in dieser Datei): der letzte
+      // Satz stimmt weiterhin fuer `u.summe`/`u.vorteil`/`u.verlauf`/`MOTOREN[...].wert()` --
+      // die bleiben reine Aktionsqualitaet und der Messwert fuer rho. Der Trefferstand
+      // ENTSCHEIDET seither aber, wer das Brett gewinnt (`gefechtSieg`), bei Gleichstand nach
+      // Los (`prioritaet`, die reale Degen-Zusatzminute) -- vorher entschied dort `vorteil`,
+      // der auffaelligste Einzelfehler des Reviews (Abschnitt 3.2 Punkt 1).
       label:"Fechten", jeSeite:6, rundenN:9, rundenDauer:60/(9*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
       // NACHKALIBRIERUNG (16.09., docs/design/fechten-rezeptkalibrierung-16-09.md) — die im
@@ -13970,7 +13978,22 @@
         PUBLIKUM:     {intelligence:50,health:50},
         AUSDAUER:     {speed:40,power:35,health:25},
         WAGNIS:       {speed:45,torment:30,power:25}
-      }
+      },
+      // WERTUNGSTABELLE (F1, Opus-Konzeptreview 26.09.): NUR die "Stand"-Spalte weicht vom
+      // WERTUNG_DUELL()-Default ab -- sie muss `gefechtSieg` lesen, nicht `verlauf[rundenN-1]`
+      // (`vorteil`), sonst zeigte die Tabelle einen anderen Sieger als der tatsaechliche
+      // Brettausgang (genau der Widerspruch, den dieser Fix behebt, s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Kein Remis mehr moeglich -- die Degen-Prioritaetsminute
+      // loest jeden Treffergleichstand auf -- darum kein "="-Fall mehr wie bei Speed-Schach/
+      // Tennis. Uebrige Spalten/Woerter bleiben die WERTUNG_DUELL()-Defaults, Zeichen fuer
+      // Zeichen wie Takeshi's Castle nur eine Spalte gegen die eigene tauscht (s. dessen
+      // wertungTabelle-Kommentar).
+      wertungTabelle:(basis,art)=>({...basis,
+        spalten:basis.spalten.map(s=>s.id!=="stand"?s:{...s,
+          titel:"Gefecht entschieden nach Trefferstand (+ Sieg, − Niederlage; bei "
+               +"Treffergleichstand entscheidet die Prioritaet aus der Degen-Zusatzminute)",
+          wert:z=>!z.fertig?"…":(z.u.gefechtSieg?"+":"−"),
+          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null})})
     }
   };
   let buehneDisc="gewichtheben";
@@ -14214,6 +14237,52 @@
         a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+        // F1 -- TREFFER SIND DER STAND (Opus-Konzeptreview Buehnen-Duell, 26.09., Abschnitt
+        // 3.3): der Kern-Befund des Reviews war, dass Fechten sich selbst widerspricht -- der
+        // ANGEZEIGTE Trefferstand ("Treffer 5:4") entschied nichts, das Gefecht gewann, wer
+        // `vorteil` (die interne Punktdifferenz) vorn hatte, und die zaehlte "kommt zu spaet"
+        // (`failWort`, kein Treffer) ueber `art.failAbzug` sogar mit. Nachgebildet traf das in
+        // 11,4 % aller Gefechte den Fechter mit WENIGER Treffern zum Sieger, in weiteren 17,4 %
+        // stand ein Treffergleichstand, den unsichtbare Punkte aufloesten. Im echten
+        // Degenfechten IST der Trefferstand das Ergebnis -- das gilt NUR fuer Fechten
+        // (`art.fechten`, dieselbe Weiche wie bei `L.treffer=0` oben): Speed-Schach und Tennis
+        // teilen sich diese Schleife unveraendert und bleiben bei `vorteil`.
+        //
+        // `vorteil`/`verlauf` selbst bleiben unangetastet -- sie bleiben die Aktionsqualitaet,
+        // der Messwert fuer rho ueber `MOTOREN[bd].wert()` (liest `u.summe`, nicht `vorteil`,
+        // s. dortiger Kommentar), und die Tauzieh-Anzeige auf der Bahn. Geaendert ist nur, WELCHE
+        // Groesse als Brettsieger zaehlt (`gefechtSieg`, gelesen von updateHudBuehne(),
+        // WERTUNG_DUELL(), stepBuehne() und spieleBuehneDuell()).
+        //
+        // TREFFER AUS DEN VOLLSTAENDIGEN `runden[]` GEZAEHLT, NICHT AUS `u.treffer`: an dieser
+        // Stelle (bauBuehne(), vor der Enthuellung) sind beide `runden[]`-Arrays bereits
+        // komplett fuer die ganze Bahn durchgerechnet (s. "ALLE DURCHGAENGE SOFORT
+        // DURCHRECHNEN"-Kommentar oben in `setz()`), `u.treffer` selbst steht dagegen noch auf 0
+        // -- es waechst erst live beim Enthuellen in stepBuehne() (TREFFERSTAND-Kommentar dort).
+        // Endstand ist in jedem Fall derselbe: `ta`/`tb` hier sind exakt die Zahl, auf die
+        // `u.treffer` am Ende der Enthuellung steht.
+        if(art.fechten){
+          const ta=a.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          const tb=b.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          // ECHTE DEGEN-ZUSATZREGEL bei Treffergleichstand (FIE-Prioritaetsminute, Review
+          // Abschnitt 3.2 Punkt 5): eine Zusatzminute, Prioritaet per Los, bei ausbleibendem
+          // Treffer gewinnt die Seite mit Prioritaet. Die Zusatzminute selbst wird hier nicht
+          // extra simuliert (keine weiteren Gaenge, keine weiteren Treffer moeglich) -- das Los
+          // FAELLT VORAB, EINMAL JE GEFECHT, wie der reale Muenzwurf vor der Zusatzminute, und
+          // entscheidet nur, wenn der Trefferstand danach immer noch gleich steht. `rr()` ruehrt
+          // damit die deterministische Formkarten-/Ereignis-Reihenfolge dieses Gefechts nicht an
+          // -- alle Punkte/Treffer beider Fechter stehen zu diesem Zeitpunkt schon fest.
+          const gleichstand=ta===tb;
+          const prioA=gleichstand?rr()<0.5:null;
+          a.gefechtSieg=ta>tb||(prioA===true);
+          b.gefechtSieg=tb>ta||(prioA===false);
+          // NUR BEI TATSAECHLICHEM TREFFERGLEICHSTAND gesetzt (sonst bliebe `prioA` `null` und
+          // beide Seiten straeflich auf `false` stehen) -- die Ticker-/Tabellen-Texte lesen
+          // dieses Feld, um "Sieg nach Prioritaet" nur zu zeigen, wenn es auch einen Losentscheid
+          // gab, nicht bei jedem gewoehnlichen Sieg nach mehr Treffern.
+          a.gefechtGleichstand=gleichstand; b.gefechtGleichstand=gleichstand;
+          a.prioritaet=prioA===true; b.prioritaet=prioA===false;
+        }
       }
     }
 
@@ -15904,9 +15973,19 @@
         // verloren oder remis ist — derselbe u.verlauf, den auch die Wertungstabelle
         // (renderWertungTabelle, Spalte "Stand") schon liest, hier nur zusaetzlich als
         // big-Ereignis gemeldet statt nur in einer Tabellenzelle.
-        if(u.aktuell+1>=BB().rundenN)
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "
-            +(v>0?"gewonnen":v<0?"verloren":"unentschieden")+" (Vorteil "+(v>0?"+":"")+v+").",true);
+        //
+        // FECHTEN LIEST `gefechtSieg`, NICHT `v`/`vorteil` (F1, 26.09.): der Trefferstand
+        // entscheidet, nicht die Punktdifferenz -- und bei Treffergleichstand faellt die Los-
+        // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
+        // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
+        // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        if(u.aktuell+1>=BB().rundenN){
+          const brettText=BB().fechten
+            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
+                           :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
+            :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+        }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
         // erfolgWort/failWort -- WERTUNG_AUFTRITT zaehlt Fehlschlaege ueber
@@ -17326,7 +17405,11 @@
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
+      // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
       document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
     } else if(BB().gauntlet){
       // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
@@ -32937,8 +33020,11 @@
     if(m)m.textContent=istBahn(disc)
       ? bahnTeamstand().seiten.join(" : ")
       : (istBuehne(disc)&&BB().duell)
-      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length+" : "+
-         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length)
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
+      // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
+      // Kader-Mittelzeile. Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length+" : "+
+         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length)
       : istBuehne(disc)
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
@@ -34846,7 +34932,13 @@
       const wert=M.wert();
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, Opus-Konzeptreview 26.09., s.
+      // "F1"-Kommentar bei `art.duell` in bauBuehne()): der Trefferstand entscheidet das Brett
+      // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
+      // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
+      // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
