@@ -5982,14 +5982,17 @@
   //   PUBLIKUM       ein Bonus, der immer kommt, ohne Risiko
   //   NERVEN         traegt zur Gelingchance bei, unter Wettkampfdruck
   //   AUSDAUER       wie wenig die spaeten Durchgaenge gegenueber den fruehen abfallen
-  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt
+  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt — und seit
+  //                  26.09. im generischen Auftritt-Block auch, wie OFT er misslingt
+  //                  (echter Trade-off, s. BUEHNE_WAGNIS_RISIKO vor bauBuehne())
   //
   // WIE EIN DURCHGANG BEWERTET WIRD — eine Formel fuer alle fuenf, die Zutaten kommen
   // aus der jeweiligen Matrix:
   //
   //   Basis    = 20 + GRUNDLAGE * 0,7, gedaempft durch Ermuedung (niedrige AUSDAUER
   //              kostet in spaeten Durchgaengen)
-  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt
+  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt; WAGNIS ueber 50
+  //              senkt die Chance, darunter hebt es sie (generischer Block, seit 26.09.)
   //   Gelingt  = Basis + SPITZENMOMENT-Bonus, skaliert mit WAGNIS
   //   Misslingt= Basis * failAbzug — bei Gewichtheben hart (0: ein verpatzter Versuch
   //              zaehlt nichts), bei den anderen weich (ein Patzer kostet, wirft aber
@@ -14045,6 +14048,42 @@
   // ob ueber reset() oder einen frischen setDisc().
   let schachMattGehoert=false;
 
+  // WAGNIS IST EIN WAGNIS (26.09., Befund B aus docs/design/buehne-auftritt-opus-konzeptreview-
+  // 26-09.md Abschnitt 1.3). Vorher stand WAGNIS im generischen Auftritt-Rechner unten in
+  // genau EINEM Term: als Multiplikator auf den Bonus BEI ERFOLG (0,4+WAGNIS*0,006). In der
+  // Erfolgschance stand es nicht — mehr Wagnis brachte also ausschliesslich mehr Punkte und
+  // nie einen Fehlschlag mehr (d erfolg/d WAGNIS = 0). Derselbe Fehler, den Gewichtheben am
+  // 06.09. mit HEBEN_WAGNIS_ANSAGE_FLEX behoben hat.
+  //
+  // Jetzt ein echter Trade-off, symmetrisch um den Mittelwert 50 (Muster `(u.ANSAGE-50)` im
+  // Heben): wer mehr wagt, trifft SELTENER (RISIKO senkt die Erfolgschance) und holt bei
+  // Gelingen MEHR (ERTRAG hebt den Spitzenmoment-Bonus steiler als vorher). Wer wenig wagt,
+  // spielt sicherer und kleiner. Bei WAGNIS 50 ist beides exakt der alte Wert (Chance
+  // unveraendert, Bonusfaktor 0,4+50*0,006 = 0,7) — ein durchschnittlicher Teilnehmer
+  // merkt nichts, die Erfolgsquoten verschieben sich nur an den Raendern.
+  //
+  // Die Staerke ist bewusst klein gehalten: RISIKO 0,0015 heisst bei WAGNIS 80 rund 4,5
+  // Prozentpunkte weniger Erfolg, bei WAGNIS 20 ebenso viel mehr (im Kader liegt WAGNIS
+  // zwischen etwa 5 und 99, also hoechstens rund 7 Prozentpunkte Verschiebung; die mittlere
+  // Erfolgsquote je Disziplin bewegt sich um weniger als einen Prozentpunkt). ERTRAG ist so
+  // gewaehlt, dass die ERWARTUNG je Durchgang mit WAGNIS weiterhin steigt (die
+  // Matrixattribute hinter WAGNIS sollen ihr Gewicht behalten, s. Pp-Abnahme in CLAUDE.md) —
+  // was sich aendert, ist die STREUUNG: der Mutige faellt oefter und glaenzt hoeher, und
+  // das Wagnis zahlt sich umso mehr aus, je sicherer seine TECHNIK/NERVEN sind.
+  // Kalibriert ueber ein Raster (RISIKO 0,0008-0,002, ERTRAG 0,009-0,018) gegen alle sechs
+  // Disziplinen, die diesen Block durchlaufen (Speed-Schach, Tennis, Fechten, Showcase,
+  // Eiskunstlauf, Wettessen): rho je Spiel kaderfest ueberall ueber 0,80, Pp gegenueber
+  // vorher bei fuenf von sechs gleich oder besser, s. PR-Beschreibung.
+  //
+  // NICHT betroffen: Gewichtheben (eigenes Risiko ueber HEBEN_WAGNIS_*), I-Spy (eigener
+  // Rechner), Breaking (gauntletRunde() fuehrt die alte Formel bewusst weiter, eigene
+  // Abnahme noetig, bevor sie mitzieht).
+  const BUEHNE_WAGNIS_RISIKO=0.0015; // je Punkt WAGNIS ueber 50: weniger Erfolgschance
+  const BUEHNE_WAGNIS_ERTRAG=0.014;  // je Punkt WAGNIS ueber 50: mehr Bonusfaktor (vorher 0,006)
+  const buehneErfolgschance=(L)=>Math.max(0.05,Math.min(0.94,
+    0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
+  const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
+
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
@@ -14152,10 +14191,11 @@
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
-        const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+        // WAGNIS wirkt jetzt in BEIDE Richtungen, s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben.
+        const erfolg=buehneErfolgschance(L);
         let punkte, ereignis;
         if(rr()<erfolg){
-          punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+          punkte=basis+L.SPITZENMOMENT*0.35*buehneWagnisFaktor(L);
           ereignis=art.erfolgWort;
         } else {
           punkte=basis*art.failAbzug;
@@ -15622,6 +15662,11 @@
   // TECHNIK/NERVEN bestimmen die Erfolgschance, GRUNDLAGE/SPITZENMOMENT/WAGNIS/PUBLIKUM die
   // Punktzahl, art.failAbzug das Misslingen -- Zeichen fuer Zeichen dieselben Kanaele, also
   // dieselbe Pp-Abweichung zur Matrix wie zuvor (s. PR-Beschreibung fuer die Nachmessung).
+  // AUSNAHME SEIT 26.09.: der generische Block rechnet WAGNIS jetzt als echten Trade-off
+  // (BUEHNE_WAGNIS_RISIKO/_ERTRAG, s. vor bauBuehne()). Breaking fuehrt hier BEWUSST noch die
+  // alte Formel (WAGNIS nur im Erfolgsbonus) — die Umstellung war auf die sechs Geschwister
+  // des generischen Blocks beschraenkt und abgenommen; Breaking braucht vor einem Nachziehen
+  // eine eigene rho-/Pp-Abnahme (Gauntlet-Kaskade: ein Fehlschlag kostet hier HP).
   function gauntletRunde(L,ri,art){
     const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*Math.min(1,ri/GAUNTLET_ERMUED_ANSCHLAEGE);
     const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
