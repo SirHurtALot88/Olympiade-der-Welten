@@ -850,3 +850,38 @@ Ohne Disziplinliste laufen alle zwanzig — das dauert rund elf Minuten (fuenf K
 je Disziplin, n=24). `scripts/pruefe-rangtreue-schranke.mjs` nutzt denselben Kern
 (`scripts/lib/rangtreue-messung.mjs`) fuer die CI-Schranke gegen die eingecheckte Basislinie
 (s. Abschnitt 2b fuer deren aktuellen Pflegezustand).
+
+## 7. I-Spy: P1-Prototyp "Spur statt Los" gescheitert, Ist-Stand bleibt (26.09.)
+
+`docs/design/i-spy-opus-konzeptreview-26-09.md` diagnostizierte das I-Spy-Plateau (rho je Spiel
+0,756, Saison 0,909, Zeile 331) als Konzept- statt Zahlenproblem und schlug als Hauptvorschlag P1
+"Spur statt Los" vor (eigene, personengebundene Spuren statt eines geteilten Zwoelf-Truhen-Pools,
+angesammelter Spuersinn statt Spuerwurf je Tick, eine echte Graben-oder-Knacken-Entscheidung, zwei
+Konten statt Teilpunkten) — mit einem PR-0-Abbruchkriterium, weil die eigene rho-Schaetzung
+(0,78–0,84) ausdruecklich ungemessen war.
+
+**Der Prototyp wurde gebaut (isolierte Worktree, nichts am Motor committet) und gemessen — er
+verfehlt alle drei Bedingungen des Abbruchkriteriums klar, nicht knapp:**
+
+| Kennzahl | Ziel (Abbruchkriterium) | Beste gemessene P1-Konfiguration |
+|---|---|---:|
+| rho je Spiel (Median, n=24) | ≥ 0,78 | 0,659–0,689 (acht Varianten getestet) |
+| Paarweise besser als Ist-Stand | ≥ 4 von 5 | **0 von 5** |
+| Star auf Rang 1 | ≥ 47,5 % | 38,3 % |
+
+Diagnose (Details, volle Messtabelle mit acht Varianten und Reproduktionsschritten:
+`docs/design/i-spy-p1-prototyp-befund-26-09.md`): die im Konzeptreview vorgeschlagene Art-Wahl
+("die Rätselart, deren Knack-Sub-Skill am höchsten ist") schneidet jeden Spieler auf nur drei der
+zehn Matrixattribute zusammen — ohne die geteilte Truhen-Ressource des Ist-Stands, die Spieler
+bisher inzidentell zu mehreren Rätselarten je Spiel zwang, fehlt der Kanal, der die breite
+`eig`-Summe stützt. Eine gemessene Abschwächung (Knackchance aus dem Mittel aller drei Sub-Skills
+statt dem Maximum) hob die Saison-Validität von 0,671 auf 0,776 — die groesste Einzelbewegung aller
+Stellschrauben — reicht aber nicht ueber die Schranke. Kein Bug: die Engine lief in allen acht
+Varianten fehlerfrei, das Verhalten ist monoton im Koennen; das Problem liegt in der Struktur.
+
+**Entscheidung: I-Spy bleibt beim Ist-Stand** (0,756/0,909, Zeile 331) — kein halbfertiger Umbau in
+`battle-mode.engine.js`. Naechstbeste Ideen (nicht umgesetzt, s. Befund-Dokument Abschnitt 5): P2
+"Mehrwege im Finden" auf dem BESTEHENDEN Kern (ohne die P1-Kernmechanik), eine P1-Variante mit
+deterministischer Rätselart-Rotation statt fixer Spezialisierung, oder Chris' Entscheidung zur
+"ehrlicheren Abnahme" aus `CLAUDE.md` (Ist-Stand erfuellt dort 3 von 4 Bedingungen, Star Rang1 nur
+2,5 Punkte unter der Schranke).
