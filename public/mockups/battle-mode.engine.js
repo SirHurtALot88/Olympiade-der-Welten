@@ -6123,7 +6123,55 @@
           // fgReichweite: Yards bis zum GEGNERISCHEN Ziel, ab denen ein Field Goal in
           // Betracht kommt (Kick-Distanz waere spot+17, s. loeseVierterVersuch) —
           // real reicht das bis ~55-58 Yard Kickdistanz, also ~38-41 Yard Spielstand.
-          fgReichweite:38, puntNetto:40, xpQuote:0.95}},
+          fgReichweite:38, puntNetto:40, xpQuote:0.95},
+        // UHR NACH AUSGANG (P1 "Uhr und Spielstand", docs/design/football-opus-konzeptreview-
+        // 26-09.md Abschnitt 5 P1.1, Befund F3). Bis hierher lief `fsT` mit der Animations-
+        // dauer jedes Snaps (0,9 s Formation + 0,8-1,6 s Zug + 0,6 s Nachlauf) — ein
+        // unvollstaendiger Pass kostete genauso viel Spielzeit wie ein Lauf, der Lauf hatte
+        // keinen Uhrwert und die hintere Mannschaft keine Moeglichkeit, Zeit zu sparen.
+        // Jetzt bucht jeder Snap ECHTE NFL-Sekunden, gerafft ueber fkUhrSkala() = Spieldauer/
+        // 3600 (280 s fuer 60 NFL-Minuten -> 1 NFL-Sekunde = 0,078 s unserer Uhr):
+        //   spiel   Dauer des Spielzugs selbst — die Uhr laeuft WAEHREND jedes Spielzugs.
+        //           Groessenordnung NFL: ~5-7 s von Snap bis Pfiff (Kneel ~2 s).
+        //   ablauf  Zeit zwischen zwei Snaps, wenn die Uhr NACH dem Spielzug weiterlaeuft
+        //           (Lauf/Completion im Feld, Sack). Normal ~36 s (40-s-Play-Clock, der
+        //           Quarterback snappt im Mittel ein paar Sekunden vorher), No-Huddle im
+        //           Two-Minute-Drill ~14 s, Four-Minute (Fuehrende verbrennen Zeit) die vollen
+        //           40 s. Nach einem unvollstaendigen Pass, einem Seitenaus, einem Score oder
+        //           einem Ballwechsel steht die Uhr bis zum naechsten Snap: ablauf = 0.
+        //   kickoff Nach einem Score gibt es keinen eigenen Kickoff-Snap (Touchback-Platz-
+        //           halter, s. beginneFootballSerie) — der Kick kostet trotzdem Spielzeit.
+        // KALIBRIERUNG: der Mittelwert je Snap (~6 + ~0,75 x 36 = ~33 NFL-s = ~2,6 s unserer
+        // Uhr) trifft fast genau die alte Animationsdauer je Snap. Die Snapzahl je Team bleibt
+        // damit bei ~55 (gemessen 55,3 gegen 55,5 vorher, scripts/miss-football-korridor.mjs
+        // 200, mit `faktor` unten) — CLAUDE.md: mehr Ereignisse helfen
+        // fast nie, P1 verschiebt Zeit ZWISCHEN Spielzugtypen, es verlaengert nichts.
+        //   faktor  KALIBRIERUNG, kein NFL-Wert: unser Spiel hat ~111 Snaps, die NFL ~130 in
+        //           derselben Stunde. Damit die Snapzahl je Team bei den bisherigen ~55
+        //           bleibt, kostet jeder Snap das 1,1-Fache seiner NFL-Zeit (gemessen: ohne
+        //           Faktor 61 Snaps je Team statt 55,5). Die Endphasen-Schwellen unten (2:00/
+        //           4:00) gelten dagegen unskaliert auf der angezeigten Uhr.
+        uhr:{spiel:{lauf:6, screen:5, kurz:5, mittel:6, tief:7, fg:5, punt:8, kneel:2},
+          ablauf:{normal:36, hurry:14, four:40}, kickoff:5, faktor:1.1},
+        // SITUATIONSSPIEL (P1.2-P1.4). Alle Schwellen in ECHTEN NFL-Sekunden Restzeit der
+        // laufenden Halbzeit (dieselbe Skala wie `uhr`):
+        //   twoMinute   letzte 2:00 jeder Halbzeit — die hintere oder gleichstehende Offense
+        //               (vor der Pause: jede Offense) spielt No-Huddle, wirft mehr und sucht
+        //               das Seitenaus, das die Uhr stoppt.
+        //   fourMinute  letzte 4:00 des Spiels — die FUEHRENDE Offense laeuft und laesst die
+        //               volle Play-Clock ablaufen; wer zwei Scores oder mehr hinten liegt,
+        //               geht schon hier ins Two-Minute-Tempo.
+        //   seitenaus   Anteil der Laeufe/Completions, die im Two-Minute-Tempo im Seitenaus
+        //               enden (die Offense zielt bewusst dorthin). Ausserhalb der Endphase
+        //               wird nicht gewuerfelt: laut NFL-Regel startet die Uhr nach einem
+        //               Seitenaus ausserhalb der letzten 2:00/5:00 ohnehin sofort wieder.
+        //   zweiPunkte  Rueckstand/Vorsprung NACH dem Touchdown (vor dem Zusatzversuch), bei
+        //               dem in der zweiten Halbzeit auf 2 Punkte gegangen wird — der
+        //               unstrittige Kern der klassischen Vermeil-Tabelle: -2 (gleicht aus),
+        //               -5 (Field Goal gleicht aus), -10 (TD+2 gleicht aus), +1 (Field Goal
+        //               reicht dem Gegner nicht mehr), +5 (TD+Extrapunkt reicht nicht mehr).
+        situation:{twoMinute:120, fourMinute:240, seitenaus:{komplett:0.55, lauf:0.30},
+          zweiPunkte:[-10,-5,-2,1,5]}},
       // VESTIGIAL, wie bei Basketball/Hockey (s. dortiger Kommentar bei zuegeJeSeite):
       // der Live-Motor liest diese vier Felder nirgends, nur die Infotext-/Laufzeit-
       // Schaetzung (engine.js ~10586/16031) noch. Unveraendert aus dem Vorab-Pfad stehen
@@ -6583,6 +6631,12 @@
   // zweite, unabhaengig gepflegte Zahl (genau daran ist die Viertel-Umstellung schon
   // einmal gescheitert, s. SPIELDAUER_BASKETBALL-Kommentar unten).
   const spieldauerVon=(id)=>{const L=liveVon(id); return L?L.perioden*L.periodenDauer:null;};
+  // SIMULATIONSRESERVE UEBER DIE SPIELDAUER HINAUS (Tickdeckel von MOTOREN.lauf und
+  // feldspielProbe): 60 s fuer Standphasen wie bisher; Football 180 s, weil seine Uhr seit
+  // P1 "Uhr und Spielstand" nach dem Ausgang des Spielzugs laeuft und nach Incompletions/
+  // im Two-Minute-Drill steht (s. fkUhrBuchen). Ein reiner Notdeckel — ein Spiel endet
+  // regulaer ueber `done`, lange bevor er greift.
+  const standReserveVon=(id)=>id==="football"?180:60;
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
@@ -7456,7 +7510,12 @@
     // fsFbLog-Mechanismus wie jede andere Kennzahl hier.
     fsFbLog=feldspielDisc==="football"?{passAtt:0,passComp:0,passInt:0,sacks:0,rushAtt:0,
       fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0,
-      passerPgSum:0,passerTgSum:0,passerN:0}:null;
+      passerPgSum:0,passerTgSum:0,passerN:0,
+      // P1 "Uhr und Spielstand" (scripts/miss-football-korridor.mjs): Snaps, Endphase-Snaps,
+      // Entscheidungen am vierten Versuch, Two-Point-Versuche, Kneels, Seitenaus, und die
+      // verbrauchte Simulationszeit (die Uhr laeuft nicht mehr 1:1 mit der Animation).
+      snaps:0,endphaseSnaps:0,vierterGo:0,vierterFg:0,vierterPunt:0,zweiAtt:0,zweiMade:0,
+      kneels:0,seitenaus:0,simSek:0}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -7729,7 +7788,11 @@
       return spieler.get(u.id); };
     for(const e of fsZuege.slice(0,fsZeiger)){
       if(e.art==="treffer"){
-        team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
+        team[e.seite]+=e.punkte;
+        // `nurTeam` (nur Footballs Extra-Punkt, s. fkZusatzversuch): zaehlt fuer den
+        // Mannschaftsstand, aber fuer keinen Spieler und nicht als Feldwurf.
+        if(e.nurTeam)continue;
+        s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++;
         // Zweite Vorlage (nur Hockey, s. loeseHockeySchuss/merkeBeruehrung) — sonst
         // zeigt die Live-Enthuellung eine Vorlage weniger als am Ende im Boxscore steht.
@@ -8856,35 +8919,157 @@
   // Rezept-Feinkalibrierung (Verhaeltnis 2:1 bzw. 1:1) — nur der Lauf/Pass-Schnitt selbst
   // reagiert neu auf `down`, damit der bereits gemessene Korridor (Yards/Attempt,
   // Completion-Quote) nicht durch eine zweite, unabhaengige Aenderung mitverschoben wird.
-  function waehlePlayCall(down,toGo){
+  // TEMPO (P1 "Uhr und Spielstand", s. fkTempo): ein dritter Parameter verschiebt NUR den
+  // Lauf/Pass-Schnitt, nie die Anzahl der Wuerfe — ohne Endphase (tempo "normal") ist jede
+  // Zeile unten zeichengleich zur bisherigen Rechnung (fkLaufAnteil gibt pLauf unveraendert
+  // zurueck). Die innere Aufteilung der Pass-Tiefen bleibt die kalibrierte.
+  function waehlePlayCall(down,toGo,tempo){
     const spaet=down>=3; // "Money Down": muss die Distanz wirklich schaffen
     if(toGo<=2){
-      const pLauf=spaet?0.80:0.68; // 3rd/4th&kurz real deutlich laufbetonter (s.o.)
+      const pLauf=fkLaufAnteil(spaet?0.80:0.68,tempo); // 3rd/4th&kurz real deutlich laufbetonter (s.o.)
       return rr()<pLauf?"lauf":"screen";
     }
     if(toGo<=6){
-      const pLauf=spaet?0.38:0.55, r=rr(); // interpoliert zwischen den beiden Ankern
+      const pLauf=fkLaufAnteil(spaet?0.38:0.55,tempo), r=rr(); // interpoliert zwischen den beiden Ankern
       if(r<pLauf)return "lauf";
       return (r-pLauf)<(1-pLauf)*(2/3)?"kurz":"mittel";
     }
     if(toGo<=11){
-      const pLauf=spaet?0.22:0.46, r=rr(); // interpoliert zwischen den beiden Ankern
+      const pLauf=fkLaufAnteil(spaet?0.22:0.46,tempo), r=rr(); // interpoliert zwischen den beiden Ankern
       if(r<pLauf)return "lauf";
       return (r-pLauf)<(1-pLauf)*(2/3)?"mittel":"tief";
     }
-    const pLauf=spaet?0.17:0.28, r=rr(); // 3rd/4th&lang: 17 % Lauf, thespax.com
+    const pLauf=fkLaufAnteil(spaet?0.17:0.28,tempo), r=rr(); // 3rd/4th&lang: 17 % Lauf, thespax.com
     if(r<pLauf)return "lauf";
     return (r-pLauf)<(1-pLauf)*0.5?"mittel":"tief";
+  }
+  // TWO-MINUTE: gut ein Drittel des ueblichen Laufanteils (ein Lauf im Feld laesst die Uhr
+  // weiterlaufen, das kann sich die hintere Mannschaft nicht leisten; ganz verschwindet er
+  // nicht, auch im echten Two-Minute-Drill gibt es den Draw gegen eine Prevent-Defense).
+  // FOUR-MINUTE: die Haelfte der Passzuege wird zum Lauf — die fuehrende Mannschaft will
+  // die Uhr am Laufen halten und kein unvollstaendiger Pass soll sie anhalten.
+  function fkLaufAnteil(pLauf,tempo){
+    if(tempo==="hurry")return pLauf*0.35;
+    if(tempo==="four")return pLauf+(1-pLauf)*0.5;
+    return pLauf;
   }
   // VIERTER VERSUCH: Field Goal in Reichweite, sonst bei kurzer Distanz (und nicht zu
   // nah an der eigenen Torlinie) ein Go-For-It-Versuch, sonst Punt. PLATZHALTER-Schwellen,
   // an der modernen NFL-Analytics-Tendenz zu mehr 4th-Down-Versuchen orientiert, aber
   // nicht aus einer Quelle nachgerechnet (Football-Plan nennt keine eigene Zahl dafuer).
-  function waehleVierterVersuch(spot,toGo){
-    const d=FB().live.downs;
-    if(spot<=d.fgReichweite)return "fg";
+  //
+  // NACH LAGE STATT STARR (P1.3, Konzeptreview 26.09. Befunde F4/F6, Vorbild 4th-Down-Bot:
+  // Spielstand, Uhr, Feld, Distanz). Vorher: Field Goal IMMER ab spot<=38 (auch auf 4th &
+  // Goal an der 1), Go nur bei toGo<=1, und niemand las Spielstand oder Uhr — wer im
+  // letzten Viertel 10 hinten lag, puntete auf 4th & 3; wer 4 hinten lag, kickte in der
+  // letzten Minute ein Field Goal. Keine rr()-Aufrufe: eine reine Trainerentscheidung.
+  //   1. Spaet (letzte 2:00) und hinten: Field Goal nur, wenn drei Punkte die Lage
+  //      verbessern (Rueckstand <= 3, in Reichweite), sonst immer Go — ein Punt oder ein
+  //      Field Goal, das nicht reicht, gibt das Spiel her.
+  //   2. Spaet (letzte 4:00) und vorn: konservativ — Field Goal in Reichweite (baut die
+  //      Fuehrung aus), sonst Punt; Go nur auf 4th & Inches in der gegnerischen Haelfte.
+  //   3. Sonst die Analytics-Grundtabelle, bewusst moderat: 4th & Goal <= 2 geht (statt
+  //      eines Chip-Shot-Field-Goals), 4th & 1 geht ausserhalb der eigenen 15, 4th & 2
+  //      zwischen der eigenen 40 und der Field-Goal-Reichweite. Zwischen 2:00 und 4:00
+  //      hinten und im letzten Viertel zwei Scores hinten: aggressiver (4th & <= 4 ab der
+  //      eigenen 30).
+  function waehleVierterVersuch(spot,toGo,side){
+    const d=FB().live.downs, sit=FB().live.situation;
+    const inReichweite=spot<=d.fgReichweite;
+    if(sit&&side!=null){
+      const diff=fsPunkte[side]-fsPunkte[1-side], rest=fkHalbRest(), zweite=fkZweiteHalbzeit();
+      if(zweite&&diff<0&&rest<=sit.twoMinute){
+        if(inReichweite&&diff>=-3)return "fg";
+        return "go";
+      }
+      if(zweite&&diff>0&&rest<=sit.fourMinute){
+        if(inReichweite)return "fg";
+        return (toGo<=1&&spot<=50)?"go":"punt";
+      }
+      if(spot<=toGo&&toGo<=2)return "go"; // 4th & Goal an der 1 oder 2
+      if(inReichweite)return "fg";
+      if(toGo<=1&&spot<85)return "go";
+      if(toGo<=2&&spot<=60)return "go";
+      const letztesViertel=fsLive.viertel>=LIVE().perioden;
+      if(toGo<=4&&spot<=70&&diff<0&&((zweite&&rest<=sit.fourMinute)||(letztesViertel&&diff<=-9)))return "go";
+      return "punt";
+    }
+    if(inReichweite)return "fg";
     if(toGo<=1&&spot<85)return "go";
     return "punt";
+  }
+
+  // ======================= FOOTBALL: UHR UND SPIELSTAND (P1) =======================
+  // docs/design/football-opus-konzeptreview-26-09.md Abschnitt 5 P1, nach dem Muster von
+  // Hockey T1 (254a56c5: Torwart raus/Fuehrungs-Riegel). Reine Trainer-/Uhrlogik, KEINE
+  // neuen Attributkanaele: wer einen Spielzug ausfuehrt, entscheidet weiter fkLos() in
+  // resolveLauf/resolvePass — P1 aendert nur, WELCHE Spielzuege gerufen werden und WIE
+  // VIEL Spielzeit sie kosten. Alles hier ist football-exklusiv (istFootball()-Aufrufer
+  // bzw. FB().live.uhr/.situation, die nur Football traegt).
+  //
+  // MESSUNG (26.09., kaderfest, live-save-Kaderfamilie, je vorher -> nachher):
+  //   rho je Spiel, n=24, Standardsaat:          0,818 -> 0,796 (Saison 0,874 -> 0,874)
+  //   rho je Spiel, n=48, drei Saatstaemme (15 Werte je Stand, Mittel): 0,779 -> 0,775 —
+  //     die 0,818 der Standardsaat war zum Teil Saatglueck (gleicher Motor, andere Saat:
+  //     0,789/0,791); der Unterschied liegt im Rauschen.
+  //   Pp-Abweichung (messe-arena-einfluss, zwei Saatstaemme), n=96: 59,0/48,3 -> 62,2/59,3;
+  //     n=48: 58,8/51,3 -> 69,6/64,4. Richtung in allen vier Paaren gleich (health rauf,
+  //     determination/power runter), Groesse +3 bis +13 Pp. Vermutete Ursache: die Uhr
+  //     laeuft nach einer Completion weiter, nach einer Incompletion nicht (ein besserer
+  //     Passer kostet sein Team Snaps), und die fuehrende Seite laeuft in der Endphase
+  //     (wer vorne liegt, bekommt Laufvolumen). Ablationen (ohne Endphase / milderer bzw.
+  //     gar kein Lauf/Pass-Schub) liessen sich im Messrauschen (+-10 Pp je Saatstamm bei
+  //     n=48) nicht trennen. Die Pp-Luecke selbst (Ziel <= 25) ist die offene P2-P4-Arbeit.
+  //
+  // 1 NFL-Sekunde in Sekunden unserer Uhr (280 s Spieldauer = 3600 NFL-Sekunden).
+  const fkUhrSkala=()=>(spieldauerVon(feldspielDisc)||SPIELDAUER_BASKETBALL)/3600;
+  // Kosten eines Snaps in Sekunden unserer Uhr je NFL-Sekunde: Skala mal Kalibrierfaktor
+  // (FB().live.uhr.faktor, s. dort). Die Endphasen-Schwellen lesen fkUhrSkala() ohne Faktor.
+  const fkKostenSkala=()=>fkUhrSkala()*(FB().live.uhr.faktor||1);
+  // Die Grenze, an der die GERADE laufende Periode endet.
+  const fkPeriodenGrenze=()=>fsLive.viertel*LIVE().periodenDauer;
+  const fkZweiteHalbzeit=()=>fsLive.viertel>LIVE().perioden/2;
+  // Restzeit der laufenden HALBZEIT in NFL-Sekunden — nur im zweiten bzw. vierten Viertel
+  // endlich (im ersten/dritten Viertel liegt noch mindestens ein ganzes Viertel davor).
+  function fkHalbRest(){
+    const L=LIVE();
+    if(fsLive.viertel!==L.perioden/2&&fsLive.viertel!==L.perioden)return Infinity;
+    return Math.max(0,fkPeriodenGrenze()-fsT)/fkUhrSkala();
+  }
+  // TEMPO DER OFFENSE `side` fuer den naechsten Snap:
+  //   "four"   zweite Halbzeit, letzte 4:00, in Fuehrung -> Uhr verbrennen.
+  //   "hurry"  letzte 2:00 einer Halbzeit und nicht in Fuehrung (vor der Pause: jede
+  //            Offense, beide wollen noch Punkte), oder letzte 4:00 mit zwei Scores
+  //            Rueckstand (>= 9 Punkte) -> Two-Minute-Drill.
+  //   "normal" sonst.
+  function fkTempo(side){
+    const sit=FB().live.situation;
+    if(!sit||!fsLive)return "normal";
+    const rest=fkHalbRest();
+    if(rest>sit.fourMinute)return "normal";
+    const diff=fsPunkte[side]-fsPunkte[1-side];
+    if(fkZweiteHalbzeit()){
+      if(diff>0)return "four";
+      if(rest<=sit.twoMinute||diff<=-9)return "hurry";
+      return "normal";
+    }
+    return rest<=sit.twoMinute?"hurry":"normal";
+  }
+  // PREVENT: die FUEHRENDE Defense gegen eine Offense im Two-Minute-Drill verteidigt tief
+  // (Nickel, s. starteSnap) und nimmt den tiefen Ball weg — was sie hergibt, ist der Raum
+  // darunter. Mechanisch: eine "fern"-Tiefe wird zu "mit" (resolvePass), ohne neuen Wurf.
+  // Der volle Prevent-Effekt (weniger Big Plays) kommt laut Review erst mit P2/P5.
+  const fkPrevent=(offSide)=>fkTempo(offSide)==="hurry"&&fkZweiteHalbzeit()&&fsPunkte[1-offSide]>fsPunkte[offSide];
+  // VICTORY FORMATION: fuehrend im letzten Viertel, und die verbleibenden Downs reichen, um
+  // die Uhr mit Kneels (Spielzug + volle Play-Clock) herunterzuknien — der Gegner hat keine
+  // Timeouts (der Motor kennt keine), bekommt den Ball also nie zurueck.
+  function fkKneelReicht(fb){
+    const u=FB().live.uhr, L=LIVE();
+    if(!u||fsLive.viertel<L.perioden||fsPunkte[fb.side]<=fsPunkte[1-fb.side])return false;
+    // Jeder Kneel vor dem vierten Versuch verbrennt Spielzug + volle Play-Clock; der auf dem
+    // vierten Versuch nur noch den Spielzug selbst — danach waere der Ball beim Gegner.
+    const f=u.faktor||1, jeKneel=(u.spiel.kneel+u.ablauf.four)*f;
+    return fkHalbRest()<=(fb.max-fb.down)*jeKneel+u.spiel.kneel*f;
   }
 
   // ROLLENWAHL JE ZUG — DYNAMISCH, NICHT FEST. Erstversuch war ein EINMAL je Spiel
@@ -9037,7 +9222,7 @@
   // Nutzt die generische lageBasisFuer/skillTeilFuer/steilerMake-Kette mit Footballs
   // EIGENEM kurve-Block (FB().kurve, s. FELDSPIEL_ART.football) — dieselben drei
   // Funktionen, die Basketball/Hockey fuer ihre Wurf-/Schusserfolgsquote nutzen.
-  function resolvePass(off,def,down,toGo,spielTyp){
+  function resolvePass(off,def,down,toGo,spielTyp,prevent){
     const passer=fkLos(off,"PASSGENAUIGKEIT");
     const rusher=fkLos(def,"ABWEHR_PASS");
     // Korridor-Refit-Messung, s. fsFbLog-Kopfkommentar in bauFeldspiel — EIN Zaehler je
@@ -9049,7 +9234,10 @@
     // nur 4,6-5,1 %.
     const pSack=Math.max(0.02,Math.min(0.20,0.07+(rusher.ABWEHR_PASS-passer.PASSSCHUTZ)*0.0018));
     if(rr()<pSack)return {typ:"sack",spieler:passer,verteidiger:rusher,yards:-Math.round(4+rr()*6)};
-    const tier=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
+    const tierGerufen=spielTyp==="screen"?"dunk":spielTyp==="tief"?"fern":waehleFootballTier(down,toGo);
+    // PREVENT (P1, s. fkPrevent): die tiefe Deckung nimmt den Deep Ball weg, der Wurf geht
+    // darunter. Kein zusaetzlicher Wurf — nur die bereits gezogene Tiefe wird umgelenkt.
+    const tier=(prevent&&tierGerufen==="fern")?"mit":tierGerufen;
     // DEGENERIERTE UNTERZAHL (die Sonde faehrt ausdruecklich auch 1v1/2v2, s. Hockey-
     // Kommentare oben): bleibt nach Abzug des Passers niemand mehr fuer den Zielspieler
     // uebrig, faengt er notgedrungen selbst — gewichtetesLos() auf ein leeres Array gibt
@@ -9116,12 +9304,21 @@
     return {typ:"fg",erfolg:rr()<chance,distanz:kickDistanz};
   }
   function resolvePunt(spot,netto){ return {typ:"punt",spot,yards:netto}; }
-  function loeseFootballZug(spielTyp,fb){
+  // KNEEL (P1, Victory Formation, s. fkKneelReicht): kein Los, kein Wurf — der Quarterback
+  // (der beste Passer, deterministisch statt gezogen: ein Kneel hat keinen Ausgang, der ein
+  // Attribut belohnen koennte) nimmt den Snap und geht auf ein Knie, -1 Yard, Uhr laeuft.
+  function resolveKneel(off){
+    let qb=off[0];
+    for(const u of off)if((u.PASSGENAUIGKEIT||0)>(qb.PASSGENAUIGKEIT||0))qb=u;
+    return {typ:"kneel",spieler:qb,yards:-1};
+  }
+  function loeseFootballZug(spielTyp,fb,prevent){
     const off=FSTEAM[fb.side], def=FSTEAM[1-fb.side];
     if(spielTyp==="fg")return resolveFieldgoal(fb.spot);
     if(spielTyp==="punt")return resolvePunt(fb.spot,fb.puntNetto);
+    if(spielTyp==="kneel")return resolveKneel(off);
     if(spielTyp==="lauf")return resolveLauf(off,def);
-    return resolvePass(off,def,fb.down,fb.toGo,spielTyp);
+    return resolvePass(off,def,fb.down,fb.toGo,spielTyp,prevent);
   }
 
   // VISUALISIERUNG DES ZUGS. Fuenf sichtbar unterschiedliche Ball-Bahnen statt einer
@@ -9131,7 +9328,7 @@
   // Amplitude je Tiefe), ein kurzes Zurueckzucken beim Sack, ein hoher Kick-Bogen fuer
   // Field Goal/Punt. `s.ergebnis` steht schon fest (gewuerfelt beim Snap-Ende), hier wird
   // nur ENTHUELLT — dasselbe Muster wie Basketballs Freiwurf (treffer steht vor dem Flug).
-  const FK_ZUG_DAUER={lauf:0.9,screen:0.8,kurz:0.9,mittel:1.1,tief:1.6,fg:1.3,punt:1.5};
+  const FK_ZUG_DAUER={lauf:0.9,screen:0.8,kurz:0.9,mittel:1.1,tief:1.6,fg:1.3,punt:1.5,kneel:0.7};
   function animiereFootballZug(s,phase){
     const fb=fsLive.football, erg=s.ergebnis;
     if(!fb){ return; } // Serie kann waehrend "nach" schon durch eine neue ersetzt sein
@@ -9155,6 +9352,10 @@
     }
     if(erg.typ==="sack"){
       fsBall={sichtbar:true,x:s.losX-s.zumFeld*12*Math.min(1,phase*2),y:H/2,traegerId:erg.spieler.id};
+      return;
+    }
+    if(erg.typ==="kneel"){ // P1: Snap, ein Schritt zurueck, aufs Knie
+      fsBall={sichtbar:true,x:s.losX-s.zumFeld*10*Math.min(1,phase*2),y:H/2,traegerId:erg.spieler.id};
       return;
     }
     // SICHTBARE WURFWEITE AUCH BEI UNVOLLSTAENDIG/INTERCEPTION (Fund dieser Runde,
@@ -9251,6 +9452,11 @@
     if(!fb||!erg)return null;
     const p=s.plaetze[u.id]; if(!p)return null;
     if(s.spielTyp==="fg"||s.spielTyp==="punt")return fkEngageZiel(u,s,phase); // Schutzformation, kein Ballfuehrer
+    if(erg.typ==="kneel"){
+      // P1: nur der Quarterback bewegt sich (zum Ball), alle anderen bleiben stehen.
+      if(u===erg.spieler)return {x:s.losX-s.zumFeld*10*Math.min(1,phase*2),y:H/2};
+      return p;
+    }
     if(erg.typ==="sack"){
       const zx=s.losX-s.zumFeld*12*Math.min(1,phase*2);
       if(u===erg.spieler)return {x:zx,y:H/2};
@@ -9287,7 +9493,7 @@
         traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined);
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
-      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feed(fb.side,"Extra-Punkt ist gut."); }
+      fkZusatzversuch(fb,traeger);
       if(fsFbLog)fsFbLog.tds++;
       fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
@@ -9302,6 +9508,48 @@
     if(fb.down>fb.max){
       feed(fb.side,"Turnover on Downs.");
       fkNaechsterSpot=100-neuerSpot; fsLive.football=null; naechsterAngriff(1-fb.side);
+    }
+  }
+  // ZUSATZVERSUCH NACH DEM TOUCHDOWN (P1.4, Konzeptreview F7: bisher pauschal Extra-Punkt
+  // 95 %). In der zweiten Halbzeit entscheidet der Spielstand NACH den sechs Punkten ueber
+  // die Two-Point-Conversion (FB().live.situation.zweiPunkte). Der Versuch ist genau das,
+  // was das Review vorschlaegt: ein normaler Spielzug mit toGo=2 an der gegnerischen 2 —
+  // derselbe waehlePlayCall (4th & 2: laufbetont) und dieselbe resolveLauf/resolvePass-
+  // Auflösung mit denselben fkLos-Akteuren, KEINE neue Formel. Gut ist er, wenn Lauf oder
+  // Completion die zwei Yards schafft. Ohne Animation (ein Zusatzversuch ist kein Down),
+  // ohne Yards im Boxscore (die NFL zaehlt sie auch nicht) — nur die zwei Punkte gehen an
+  // den, der den Ball in die Endzone bringt. Ohne Two-Point-Entscheidung: exakt der alte
+  // Extra-Punkt-Wurf.
+  //
+  // EXTRA-PUNKT JETZT AUCH IM ANGEZEIGTEN STAND (Fund bei der Sichtpruefung dieser Runde):
+  // Scoreboard und Broadcast-Bug zaehlen ueber fsBisher() die geloggten "treffer" — der
+  // Extra-Punkt landete nur in fsPunkte, nie im Log. Angezeigt stand es deshalb nach jedem
+  // Touchdown einen Punkt zu niedrig (6:6 statt 7:6), und die neue Four-Minute-Anzeige
+  // sah aus, als spiele ein Team bei Gleichstand auf Zeit. Der Eintrag traegt `nurTeam`:
+  // fsBisher() zaehlt ihn fuer die Mannschaft, schreibt ihn aber keinem Spieler gut (der
+  // Motor kennt keinen Kicker). Wirkt nur auf die Anzeige — feldspielWert (und damit die
+  // Rangtreue) liest u.punkte, nicht das Log. Kein zusaetzlicher rr()-Wurf.
+  function fkZusatzversuch(fb,traeger){
+    const sit=FB().live.situation, side=fb.side;
+    const diff=fsPunkte[side]-fsPunkte[1-side];
+    if(sit&&fkZweiteHalbzeit()&&sit.zweiPunkte.includes(diff)){
+      const typ=waehlePlayCall(4,2,"normal");
+      const erg=loeseFootballZug(typ,{side,down:4,toGo:2,spot:2,max:4,puntNetto:0},false);
+      const gut=(erg.typ==="lauf"||erg.typ==="komplett")&&erg.yards>=2;
+      if(fsFbLog){ fsFbLog.zweiAtt++; if(gut)fsFbLog.zweiMade++; }
+      if(gut){
+        const schuetze=erg.typ==="komplett"?erg.receiver:erg.spieler;
+        schuetze.punkte+=2; fsPunkte[side]+=2;
+        feed(side,"Two-Point-Conversion — "+schuetze.n+" bringt den Ball rein, zwei Punkte!",true);
+        logZug(side,"treffer",{spieler:schuetze,punkte:2});
+      } else feed(side,"Two-Point-Conversion scheitert.");
+      return;
+    }
+    if(rr()<FB().live.downs.xpQuote){
+      fsPunkte[side]+=1; feed(side,"Extra-Punkt ist gut.");
+      // `freiwurf:true` wie beim Basketball-Freiwurf: kein Feldversuch — jede Sonde, die
+      // "treffer" als Wurf/Schuss zaehlt, ueberspringt ihn damit schon heute.
+      if(traeger)logZug(side,"treffer",{spieler:traeger,punkte:1,nurTeam:true,freiwurf:true});
     }
   }
   function vollziehFootballErgebnis(erg,fb){
@@ -9330,6 +9578,14 @@
       if(fsFbLog)fsFbLog.punts++;
       fkNaechsterSpot=100-Math.max(1,fb.spot-erg.yards);
       fsLive.football=null; naechsterAngriff(1-fb.side);
+      return;
+    }
+    if(erg.typ==="kneel"){
+      // P1, Victory Formation (s. fkKneelReicht). Kein Boxscore-Eintrag: ein Kneel belohnt
+      // und bestraft niemanden, er laesst nur die Uhr laufen.
+      if(fsFbLog)fsFbLog.kneels++;
+      feed(fb.side,erg.spieler.n+" kniet ab — die Uhr läuft weiter.");
+      footballDownWeiter(fb,erg.yards);
       return;
     }
     if(erg.typ==="sack"){
@@ -9425,10 +9681,15 @@
   // Spielzeit, keine separate Pause.
   function starteSnap(){
     const fb=fsLive.football;
-    const vierter=fb.down===fb.max?waehleVierterVersuch(fb.spot,fb.toGo):null;
-    const spielTyp=vierter&&vierter!=="go"?vierter:waehlePlayCall(fb.down,fb.toGo);
+    // P1 "Uhr und Spielstand": Tempo (Two-/Four-Minute), Victory Formation und der vierte
+    // Versuch lesen jetzt Spielstand und Uhr (s. fkTempo/fkKneelReicht/waehleVierterVersuch).
+    const tempo=fkTempo(fb.side);
+    const kneel=fkKneelReicht(fb);
+    const vierter=!kneel&&fb.down===fb.max?waehleVierterVersuch(fb.spot,fb.toGo,fb.side):null;
+    const spielTyp=kneel?"kneel":vierter&&vierter!=="go"?vierter:waehlePlayCall(fb.down,fb.toGo,tempo);
+    const prevent=!kneel&&fkPrevent(fb.side);
     const formOff=waehleFormationOffense(fb.down,fb.toGo);
-    const formDef=(spielTyp==="fg"||spielTyp==="punt")?"basis":waehleFormationDefense(fb.down,fb.toGo);
+    const formDef=(spielTyp==="fg"||spielTyp==="punt"||spielTyp==="kneel")?"basis":prevent?"nickel":waehleFormationDefense(fb.down,fb.toGo);
     const losX=fkLosX(fb.side,fb.spot), zumFeld=fb.side===0?1:-1;
     const offTab=(spielTyp==="fg"||spielTyp==="punt")?SLOTS_FOOTBALL_OFF.weit:SLOTS_FOOTBALL_OFF[formOff];
     const defTab=SLOTS_FOOTBALL_DEF[formDef];
@@ -9442,7 +9703,8 @@
       plaetze[u.id]=fkClamp(losX+zumFeld*s.tiefe,H/2+s.breite);
     });
     fsLive.phase="snap";
-    fsLive.snap={stufe:"formation",t:0,spielTyp,formOff,formDef,losX,zumFeld,plaetze,ergebnis:null};
+    fsLive.snap={stufe:"formation",t:0,spielTyp,formOff,formDef,losX,zumFeld,plaetze,ergebnis:null,
+      tempo,prevent,vierter};
     // DIREKT AN DEN PLATZ, NICHT HINLAUFEN LASSEN. Chris' Zusatzauftrag (Visualpruefung
     // 03.09.): mit dem normalen bewegeSpielerLive-Lauftempo (~230px/s) erreichte niemand
     // die neue Formation, BEVOR der naechste Snap (alle ~2,4-3,2s) schon wieder eine ganz
@@ -9468,14 +9730,22 @@
     s.t+=dt;
     if(s.stufe==="formation"){
       fsBall={sichtbar:true,x:s.losX,y:H/2,traegerId:null};
-      if(s.t>=FK_SNAP_FORMATION){ s.ergebnis=loeseFootballZug(s.spielTyp,fb); s.stufe="zug"; s.t=0; }
+      if(s.t>=FK_SNAP_FORMATION){
+        s.ergebnis=loeseFootballZug(s.spielTyp,fb,s.prevent); s.stufe="zug"; s.t=0;
+        fkSnapGezaehlt(s,fb);
+      }
       return;
     }
     if(s.stufe==="zug"){
       const dauer=FK_ZUG_DAUER[s.spielTyp]||1.0;
       const phase=Math.min(1,s.t/dauer);
       animiereFootballZug(s,phase);
-      if(phase>=1){ vollziehFootballErgebnis(s.ergebnis,fb); s.stufe="nach"; s.t=0; }
+      if(phase>=1){
+        const punkteVorher=fsPunkte[0]+fsPunkte[1];
+        vollziehFootballErgebnis(s.ergebnis,fb);
+        fkUhrNachZug(s,fb,fsPunkte[0]+fsPunkte[1]>punkteVorher);
+        s.stufe="nach"; s.t=0;
+      }
       return;
     }
     if(s.t<FK_SNAP_NACH)return;
@@ -9493,10 +9763,161 @@
   function beginneFootballSerie(seite){
     const d=FB().live.downs;
     ballUebernehmen(spielmacherLos(FSTEAM[seite]));
+    // VIERTELWECHSEL MITTEN IM DRIVE (P1.5, s. fkPeriodenEnde): nach dem ersten und dritten
+    // Viertel geht die Serie an derselben Stelle mit demselben Down weiter — nur die
+    // Halbzeit beendet den Drive.
+    if(fsLive.fkFortsetzung){
+      fsLive.football=fsLive.fkFortsetzung; fsLive.fkFortsetzung=null;
+      feed(seite,"Seitenwechsel — der Drive geht weiter.");
+      starteSnap();
+      return;
+    }
     const spot=fkNaechsterSpot!=null?Math.max(1,Math.min(99,fkNaechsterSpot)):d.startSpot;
     fkNaechsterSpot=null;
-    fsLive.football={side:seite,down:1,toGo:Math.min(d.distanz,spot),max:d.max,spot,puntNetto:d.puntNetto};
+    fsLive.football={side:seite,down:1,toGo:Math.min(d.distanz,spot),max:d.max,spot,puntNetto:d.puntNetto,
+      // Drive-Zaehler fuer die Anzeige (P1.6, s. zeichneFootballLage): Startpunkt und Zahl
+      // der Spielzuege dieser Serie. Rein erzaehlend, von keiner Entscheidung gelesen.
+      driveStart:spot, driveZuege:0};
     starteSnap();
+  }
+
+  // ---- P1: Uhrbuchung, Periodenende, Zaehler ----
+  // UHRBUCHUNG JE TICK (ersetzt fuer Football das generische fsT+=dt, s. stepFeldspielLive).
+  // Waehrend des Spielzugs laeuft die Uhr mit der Spielzugdauer aus FB().live.uhr.spiel,
+  // gestreckt auf die Animationsdauer; zwischen zwei Snaps (Nachlauf + Formation) bucht sie
+  // den Ablauf, den fkUhrNachZug nach dem Ausgang festgelegt hat — 0, wenn die Uhr steht.
+  // Der Ablauf zwischen zwei Snaps haelt an der Periodengrenze an (die Uhr bleibt bei 0:00
+  // stehen, bevor der naechste Snap faellt); ein laufender Spielzug darf sie ueberschreiten
+  // und wird zu Ende gespielt (s. fkSpielzugLaeuft am Spielende).
+  function fkUhrBuchen(dt){
+    if(fsFbLog)fsFbLog.simSek+=dt;
+    const s=fsLive.snap, u=FB().live.uhr;
+    if(fsLive.phase!=="snap"||!s||!u){ fsT+=dt; return; }
+    if(s.stufe==="zug"){
+      fsT+=dt*(u.spiel[s.spielTyp]||6)*fkKostenSkala()/(FK_ZUG_DAUER[s.spielTyp]||1.0);
+      return;
+    }
+    const a=fsLive.fkUhr;
+    if(!a||a.offen<=0)return;
+    const b=Math.min(a.offen,dt*a.rate), grenze=fkPeriodenGrenze();
+    a.offen-=b;
+    if(fsT<grenze&&fsT+b>=grenze){ fsT=grenze; a.offen=0; return; }
+    fsT+=b;
+  }
+  // WIE VIEL UHR BIS ZUM NAECHSTEN SNAP (am Ende jedes Spielzugs, nach vollziehFootball-
+  // Ergebnis). Die Uhr LAEUFT weiter nach Lauf, Completion, Sack, Kneel und einem von der
+  // Offense selbst gesicherten Fumble — ausser im Two-Minute-Tempo endet der Zug im
+  // Seitenaus (situation.seitenaus). Sie STEHT nach einem unvollstaendigen Pass und nach
+  // jedem Ballwechsel; nach einem Score kostet der Kickoff seine Zeit.
+  function fkUhrNachZug(s,fb,gepunktet){
+    const u=FB().live.uhr, sit=FB().live.situation;
+    if(!u)return;
+    const skala=fkKostenSkala();
+    const weiter=fsLive.phase==="snap"&&fsLive.snap===s&&fsLive.football===fb;
+    if(!weiter){
+      const ablauf=gepunktet?u.kickoff*skala:0;
+      fsLive.fkUhr={offen:ablauf,rate:ablauf/FK_SNAP_FORMATION};
+      return;
+    }
+    fb.driveZuege=(fb.driveZuege||0)+1;
+    const typ=s.ergebnis.typ;
+    let laeuft=typ==="lauf"||typ==="komplett"||typ==="sack"||typ==="kneel"||typ==="fumble";
+    if(laeuft&&sit&&s.tempo==="hurry"&&(typ==="lauf"||typ==="komplett")&&rr()<sit.seitenaus[typ]){
+      laeuft=false;
+      if(fsFbLog)fsFbLog.seitenaus++;
+      feed(fb.side,"Ins Seitenaus — die Uhr steht.");
+    }
+    const ablauf=laeuft?u.ablauf[fkTempo(fb.side)]*skala:0;
+    fsLive.fkUhr={offen:ablauf,rate:ablauf/(FK_SNAP_NACH+FK_SNAP_FORMATION)};
+  }
+  // Ein Spielzug ist unterwegs: das Spielende wartet, bis er aufgeloest ist (P1.5/P6 "letzter
+  // Spielzug" — vorher schnitt die Schlusssirene mitten in den Zug).
+  const fkSpielzugLaeuft=()=>!!(fsLive&&fsLive.phase==="snap"&&fsLive.snap&&fsLive.snap.stufe==="zug");
+  // PERIODENENDE ZWISCHEN ZWEI SNAPS (P1.5). Vorher prueften nur Ballwechsel die Viertel-
+  // grenze (naechsterAngriff) — ein Drive lief deshalb ueber die Halbzeit hinweg weiter,
+  // und die Viertelpause fiel erst beim naechsten Ballwechsel, irgendwann spaeter. Jetzt:
+  //   - Viertel 1 und 3: Pause an der Grenze, danach geht derselbe Drive weiter.
+  //   - Halbzeit: der Drive ENDET, die zweite Halbzeit beginnt die Seite, die das Spiel
+  //     NICHT eroeffnet hat (fkHalbzeitSeite).
+  //   - Viertel 4: das generische Spielende (fsT>=Spieldauer) greift, sobald kein Spielzug
+  //     mehr unterwegs ist.
+  // Waehrend eines Spielzugs wird nie abgebrochen: der laufende Snap wird zu Ende gespielt.
+  function fkPeriodenEnde(){
+    const s=fsLive.snap, L=LIVE();
+    if(!FB().live.uhr||!s||s.stufe==="zug"||fsLive.viertel>=L.perioden)return false;
+    const grenze=fkPeriodenGrenze();
+    if(fsT<grenze)return false;
+    fsT=grenze; // ein zu Ende gespielter Zug ueber 0:00 hinaus kostet das neue Viertel nichts
+    const fb=fsLive.football;
+    fsLive.football=null;
+    if(fsLive.viertel===L.perioden/2){
+      if(fb)feed(fb.side,"Die Uhr ist abgelaufen — Halbzeit, der Drive endet.");
+      starteViertelpause(fb?fb.side:0);
+    } else {
+      fsLive.fkFortsetzung=fb;
+      starteViertelpause(fb?fb.side:0);
+    }
+    return true;
+  }
+  // HALBZEIT: wer eroeffnet die zweite Haelfte? Aufgerufen aus starteViertelpause (einzige
+  // Stelle, die jede Viertelpause durchlaeuft, egal ob sie ein Ballwechsel oder fkPerioden-
+  // Ende ausloest). Ausserhalb von Football gibt sie `naechsteSeite` unveraendert zurueck.
+  function fkHalbzeitSeite(zuEnde,naechsteSeite){
+    if(!istFootball()||!fsLive||!FB().live.uhr)return naechsteSeite;
+    fsLive.fkUhr=null; // die Uhr steht in jeder Pause, kein Restablauf ins naechste Viertel
+    if(zuEnde!==LIVE().perioden/2||fsLive.fkEroeffnung==null)return naechsteSeite;
+    fkNaechsterSpot=null; fsLive.fkFortsetzung=null;
+    return 1-fsLive.fkEroeffnung;
+  }
+  // DOWN UND DISTANZ SICHTBAR (P1.6, Konzeptreview: "Down und Distanz im HUD, Line of
+  // Scrimmage und First-Down-Marke im Feld, ein Drive-Zaehler" — seit dem Opus-Plan 6.2
+  // offen; vorher zeigte weder Feld noch HUD den Down). Wie im TV: blaue Line of Scrimmage,
+  // gelbe First-Down-Linie, darueber ein Band mit Viertel und Restzeit auf der NFL-Uhr,
+  // Down & Distanz, Feldposition, Drive und dem Tempo der Endphase. Rein zeichnend: liest
+  // nur Zustand (fkTempo wuerfelt nicht), schreibt nichts — Sonden rufen es nie auf.
+  function zeichneFootballLage(){
+    const fb=fsLive&&fsLive.football, L=LIVE();
+    if(!fb||done||!L||!FB().live.uhr)return;
+    const F=FIELD(), losX=fkLosX(fb.side,fb.spot);
+    ctx.save();
+    ctx.lineWidth=3;
+    ctx.strokeStyle="rgba(70,140,255,.85)";
+    ctx.beginPath();ctx.moveTo(losX,F.o);ctx.lineTo(losX,F.u);ctx.stroke();
+    if(fb.toGo<fb.spot){
+      const markeX=fkLosX(fb.side,fb.spot-fb.toGo);
+      ctx.strokeStyle="rgba(255,214,0,.9)";
+      ctx.beginPath();ctx.moveTo(markeX,F.o);ctx.lineTo(markeX,F.u);ctx.stroke();
+    }
+    const ord=["1st","2nd","3rd","4th"][fb.down-1]||(fb.down+"th");
+    const distanz=fb.toGo>=fb.spot?"Goal":String(fb.toGo);
+    const feld=fb.spot===50?"Mittellinie":fb.spot<50?"gegn. "+fb.spot:"eigene "+(100-fb.spot);
+    const rest=Math.max(0,fkPeriodenGrenze()-fsT)/fkUhrSkala();
+    const uhr=Math.floor(rest/60)+":"+String(Math.floor(rest%60)).padStart(2,"0");
+    const snap=fsLive.snap, tempo=fkTempo(fb.side);
+    const lage=snap&&snap.spielTyp==="kneel"?"VICTORY FORMATION"
+      :tempo==="hurry"?"TWO-MINUTE DRILL":tempo==="four"?"FOUR-MINUTE":"";
+    const gewinn=(fb.driveStart!=null?fb.driveStart:fb.spot)-fb.spot;
+    const teile=["Q"+fsLive.viertel+" "+uhr,(fb.side===0?"▶ ":"◀ ")+ord+" & "+distanz,feld,
+      "Drive "+(fb.driveZuege||0)+" Züge, "+gewinn+" Yds"];
+    if(lage)teile.push(lage);
+    const text=teile.join("  ·  ");
+    ctx.font="700 16px 'Barlow Condensed',sans-serif";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    const breite=ctx.measureText(text).width+28;
+    // UNTER dem Feld: oben in der Mitte sitzt schon der Broadcast-Bug (Stand + Uhr).
+    ctx.fillStyle="rgba(8,14,10,.78)";
+    ctx.fillRect(W/2-breite/2,H-38,breite,26);
+    ctx.fillStyle=lage?"#ffd600":"#f2f5f2";
+    ctx.fillText(text,W/2,H-25);
+    ctx.restore();
+  }
+  function fkSnapGezaehlt(s,fb){
+    if(!fsFbLog)return;
+    fsFbLog.snaps++;
+    if(s.tempo!=="normal")fsFbLog.endphaseSnaps++;
+    if(s.vierter==="go")fsFbLog.vierterGo++;
+    else if(s.vierter==="fg")fsFbLog.vierterFg++;
+    else if(s.vierter==="punt")fsFbLog.vierterPunt++;
   }
 
   function initFeldspielLive(art){
@@ -9555,7 +9976,11 @@
       hockeyEndphase:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
-      football:null, snap:null};
+      football:null, snap:null,
+      // NUR FOOTBALL, P1 "Uhr und Spielstand" (s. fkUhrBuchen/fkPeriodenEnde): offener
+      // Uhrablauf bis zum naechsten Snap, ein ueber einen Viertelwechsel fortgesetzter Drive,
+      // und die Seite, die das Spiel eroeffnet hat.
+      fkUhr:null, fkFortsetzung:null, fkEroeffnung:null};
     // VORGABE OHNE KLICK, VOR DEM ERSTEN BALLBESITZ (s. berechneFokusAuto oben): nur
     // Basketball fuellt fokusZielAuto ueberhaupt (die Funktion no-opt sonst), fuer jede
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
@@ -9566,7 +9991,10 @@
     // FOOTBALL STARTET NICHT UEBER ballUebernehmen()/spielmacherLos() — ein Empfangsteam
     // wird per Muenzwurf bestimmt, und beginneFootballSerie() setzt Down/Distance/Spot
     // sowie den ersten Snap selbst auf (s. dort). Basketball/Hockey/Tennis unveraendert.
-    if(istFootball()){ beginneFootballSerie(rr()<0.5?0:1); return; }
+    if(istFootball()){
+      const eroeffnet=rr()<0.5?0:1;
+      fsLive.fkEroeffnung=eroeffnet; // P1: die zweite Halbzeit eroeffnet die andere Seite
+      beginneFootballSerie(eroeffnet); return; }
     ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
   }
 
@@ -9736,6 +10164,7 @@
   // von stepBasketballLive).
   function starteViertelpause(naechsteSeite){
     const zuEnde=fsLive.viertel;
+    naechsteSeite=fkHalbzeitSeite(zuEnde,naechsteSeite); // nur Football, sonst unveraendert
     // "Viertel" stand hier fest, obwohl die Disziplin ihr eigenes Wort mitbringt — im
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
@@ -11945,8 +12374,11 @@
       }
       return;
     }
-    fsT+=dt;
-    if(fsT>=(spieldauerVon(feldspielDisc)||SPIELDAUER_BASKETBALL)){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
+    // FOOTBALL bucht die Uhr nach dem AUSGANG des Spielzugs (P1, s. fkUhrBuchen); alle anderen
+    // Disziplinen unveraendert fsT+=dt. Ein laufender Football-Spielzug wird vor der
+    // Schlusssirene noch zu Ende gespielt (fkSpielzugLaeuft).
+    if(istFootball())fkUhrBuchen(dt); else fsT+=dt;
+    if(fsT>=(spieldauerVon(feldspielDisc)||SPIELDAUER_BASKETBALL)&&!(istFootball()&&fkSpielzugLaeuft())){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
       // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
       // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
       // returnt vorher), das erneute Setzen aenderte also nie etwas.
@@ -11968,7 +12400,7 @@
     // fuer Football mit — nur der Rest von stepFeldspielLive wird uebersprungen.
     if(istFootball()){
       bewegeSpielerLive(dt);
-      if(fsLive.phase==="snap")stepSnapPhase(dt);
+      if(fsLive.phase==="snap"&&!fkPeriodenEnde())stepSnapPhase(dt);
       return;
     }
     // ENDPHASE-CHECK (Konzeptreview T1): einmal je Tick, reine Zustandsablesung, kein
@@ -12419,8 +12851,9 @@
     // (#klsuffix) nur fuer das austauschbare Schlusswort, das die Live-Spans nie
     // beruehrt. Nur die Bahn setzt hier "im Ziel"; alles andere bleibt bei "Punkte".
     document.getElementById("klsuffix").textContent="Punkte";
-    document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
-    document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
+    // `!e.nurTeam`: Footballs Extra-Punkt (s. fkZusatzversuch) ist kein Spielzug.
+    document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0&&!e.nurTeam).length);
+    document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1&&!e.nurTeam).length);
     // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
     const bisher=fsBisher().team;
     document.getElementById("score").textContent=bisher[0]+" : "+bisher[1];
@@ -12630,6 +13063,7 @@
         ctx.fillText(String(yardWert),x,H-50-18);
       }
       ctx.restore();
+      zeichneFootballLage();
       return;
     }
     if(feldspielDisc==="hockey"){ eisflaeche(); return; }
@@ -34124,7 +34558,13 @@
       // Je Disziplin abgeleitet, nicht mehr fest aus Basketballs Konstante: Hockey faehrt
       // 240 s, Basketball 360 s, die Vorab-Disziplinen so lange wie ihre Zuege dauern.
       // Die 60 s Reserve fuer Standphasen bleiben unveraendert.
-      lauf:()=>{const budget=(spieldauerVon(fd)||SPIELDAUER_BASKETBALL)+60;
+      // FOOTBALL mit groesserer Reserve (P1 "Uhr und Spielstand", s. fkUhrBuchen): die Uhr
+      // laeuft dort nicht mehr 1:1 mit der Animation, sie steht nach unvollstaendigen
+      // Paessen und im Two-Minute-Drill — gemessen braucht ein Spiel im Mittel 278 s, im
+      // Maximum 349 s Simulationszeit fuer 280 s Uhr (scripts/miss-football-korridor.mjs
+      // 200). Mit dem alten Deckel (+60) waere das laengste Spiel abgeschnitten worden,
+      // ohne Schlusssirene. Alle anderen Disziplinen unveraendert +60.
+      lauf:()=>{const budget=(spieldauerVon(fd)||SPIELDAUER_BASKETBALL)+standReserveVon(fd);
                 let g=0; while(!done&&g<budget){ stepFeldspiel(1/60); g+=1/60; }},
       namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
       wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
@@ -34427,7 +34867,7 @@
       // abgeleitet statt als zweite Zahl gepflegt, damit beide nicht auseinanderlaufen,
       // plus 60 s fuer die Standphasen. Er bleibt eine echte Notbremse gegen eine
       // Endlosschleife, liegt aber jetzt OBERHALB der Spieldauer statt darunter.
-      const tickDeckel=Math.ceil((dauer+60)*60);
+      const tickDeckel=Math.ceil((dauer+standReserveVon(id))*60); // Football: s. standReserveVon
       const altJeSeite=art.jeSeite;
       // Die Sub-Skills kommen aus dem REZEPT der Disziplin, nicht aus einer festen Liste.
       // Vorher standen Basketballs zehn hier ausgeschrieben; Hockey hat sieben, und der
