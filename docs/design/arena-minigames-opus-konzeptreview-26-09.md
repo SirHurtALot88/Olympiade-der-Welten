@@ -68,6 +68,11 @@ dass sie ohne Code-Archäologie wiederholbar ist.
    fünf Runden (vier TDM-Rezepte, zwei Zielwahl-Varianten, Tempo-Umkehr) haben an Reglern
    gedreht, obwohl die Ursache kategorial ist. Abschnitt 4 schlägt eine Stufen-Abnahme vor:
    Team-Ergebnis → Star und Paare → rho. Sie ersetzt rho nicht, sondern ordnet es ein.
+8. **Nebenbefund zur Messung: Der Messaufbau hat einen Heimvorteil.** Werden Heim und Gast
+   getauscht, gewinnt über beide Richtungen gemittelt die Heimseite in 67 % (Mini-DM), 59 % (TDM)
+   und 80 % (Battlefield) der Kämpfe. Die Ursache: Heim wird in `build()` nach Eignung auf die
+   Slots gestellt, Gast ohne Aufstellung nach Array-Reihenfolge. Das sollte vor jeder weiteren
+   Arena-Messung behoben werden (P0).
 
 ---
 
