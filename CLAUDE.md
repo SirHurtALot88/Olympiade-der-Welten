@@ -150,6 +150,17 @@ Ansatz ersetzt werden kann, statt Spieler ohne das eine geforderte Attribut komp
 Kein Auftrag, alle zwanzig Disziplinen deswegen anzufassen — nur ein Kriterium, das ab jetzt bei
 jeder ohnehin anstehenden Rezept- oder Mechanik-Runde mitgedacht werden soll.
 
+## Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen
+
+Chris am 13.09., wörtlich: „breaking NICHT breakdance ist sondern ein foltern!!!! […] einer
+schmerz zufügt der andere muss es aushalten dann ist wieder der andere dran bis einer aufgibt."
+Eine Breakdance-Recherche wurde damals schon einmal gefahren und verworfen
+(`docs/design/breaking-folter-zweikampf-praesentation-13-09.md` Abschnitt 0) — und ist am 26.09.
+einem Konzeptreview-Agenten trotzdem ein zweites Mal passiert, weil der Name „Breaking" ohne
+diesen Satz naheliegend nach Breakdance klingt. Jeder Agent, der an dieser Disziplin arbeitet,
+recherchiert Folter-/Survival-Formate (Slap-Fighting, Kendo-Kachinuki, K.o.-Teamformate), nicht
+Breakdance-Battles.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
