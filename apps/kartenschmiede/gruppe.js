@@ -150,7 +150,7 @@
     $("gNeu").addEventListener("click", neueGruppe);
     $("gListe").addEventListener("click", async e => {
       const b = e.target.closest("[data-g]"); if (!b) return;
-      aktiv = await lade(b.dataset.g); zeigeListe(); zeigeGruppe();
+      aktiv = await lade(b.dataset.g); if (aktiv) aktiv.mitglieder.forEach(aktualisiere); zeigeListe(); zeigeGruppe();
     });
     $("gMain").addEventListener("change", e => {
       if (!aktiv) return;
@@ -183,7 +183,7 @@
 
   window.KartenschmiedeGruppe = {
     async zeigen() {
-      if (!geladen) { geladen = true; verdrahten(); await liste(); if (gruppen[0]) aktiv = await lade(gruppen[0].id); }
+      if (!geladen) { geladen = true; verdrahten(); await liste(); if (gruppen[0]) aktiv = await lade(gruppen[0].id); if (aktiv) aktiv.mitglieder.forEach(aktualisiere); }
       zeigeListe(); zeigeGruppe();
     },
   };
