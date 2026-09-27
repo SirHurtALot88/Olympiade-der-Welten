@@ -14153,6 +14153,14 @@
   // fuer den Loop-N1-Fix): bauBuehne() laeuft garantiert bei JEDEM neuen Buehnen-Match,
   // ob ueber reset() oder einen frischen setDisc().
   let schachMattGehoert=false;
+  // ENDSTAND-OVERLAY-WAECHTER (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe
+  // Einmal-Melden-Muster wie `bahnEndeGemeldet` (s. dort) -- ohne diese Bremse wuerde
+  // updateHudBuehne() das #endstand-Overlay bei JEDEM Frame nach `done` erneut aufbauen
+  // und die Feed-/Callout-Zeile erneut feuern (buehnenBewegung() laeuft ja bewusst
+  // WEITER, s. stepBuehne()s "N-Fix"-Kommentar oben). Reset hier statt in reset(),
+  // aus demselben Grund wie schachMattGehoert direkt darueber: bauBuehne() laeuft
+  // garantiert bei jedem neuen Buehnen-Match.
+  let buehneEndeGemeldet=false;
 
   // WAGNIS IST EIN WAGNIS (26.09., Befund B aus docs/design/buehne-auftritt-opus-konzeptreview-
   // 26-09.md Abschnitt 1.3). Vorher stand WAGNIS im generischen Auftritt-Rechner unten in
@@ -14196,6 +14204,7 @@
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
+    buehneEndeGemeldet=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -17660,6 +17669,23 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // ENDSTAND-OVERLAY (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe Einmal-Muster wie
+    // updateHudBahn()s `if(done&&!bahnEndeGemeldet)`-Zweig (s. dort) -- Fechten, Tennis,
+    // Showcase, Eiskunstlauf, Wettessen, Gewichtheben, Breaking und I-Spy zeigten bislang
+    // GAR KEIN Endstand-Overlay (Opus-Review 27.09.: "das Spiel endet einfach lautlos,
+    // kein Sieger-Callout, kein Endstand-Overlay, der Score-Bug verschwindet einfach").
+    // REIN ADDITIV: `done` wird ausschliesslich von stepBuehne() gesetzt (unveraendert),
+    // dieser Zweig LIEST ihn nur, wie jeder andere HUD-Zweig hier auch. Speed-Schach
+    // (BB().schach) behaelt sein eigenes, laengst vorhandenes Sieg-Banner AUF dem Brett
+    // (zeichneSchach(), "SIEG — "+VEREIN[...].name) und bekommt dieses Overlay ZUSAETZLICH
+    // -- ein zweiter, deutlicherer Hinweis schadet nicht, verdraengt aber auch nichts.
+    if(done&&!buehneEndeGemeldet){
+      buehneEndeGemeldet=true;
+      const sieger=buehneSieger(), stand=buehneStand();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+        +stand.text+".",true);
+      renderEndstandBuehne();
+    }
   }
 
   function bodenBuehne(){
@@ -33664,6 +33690,85 @@
         tr.appendChild(el("td",null,stand.punkte?(stand.punkteVon?stand.punkteVon(u):fmtP(stand.punkte.get(u.id))):"—"));
         tb.appendChild(tr);
       });
+      t.appendChild(tb); box.appendChild(t);
+    }
+    renderHighlights();
+    document.getElementById("endstand").hidden=false;
+  }
+
+  // ENDSTAND-OVERLAY FUER DIE BUEHNE (Opus-Review 27.09.: acht der neun Buehnen-
+  // Disziplinen — Fechten, Tennis, Showcase, Eiskunstlauf, Wettessen, Gewichtheben,
+  // Breaking, I-Spy — endeten bis hierher lautlos: kein Sieger-Callout, kein
+  // Endstand-Overlay, der Score-Bug verschwand einfach mit dem letzten Frame. Nur
+  // Speed-Schach hatte ein eigenes Sieg-Banner (zeichneSchach(), "SIEG — "+Vereinsname,
+  // direkt AUF dem Brett gezeichnet) — das bleibt unveraendert bestehen, s. Kommentar bei
+  // updateHudBuehne()s Aufruf hier unten.
+  //
+  // DASSELBE OVERLAY-ELEMENT wie Kampf/Bahn (#endstand/#esieger/#etafelL/#etafelR, s.
+  // renderEndstand()/renderEndstandBahn() oben) -- rein additiv gefuellt, kein neues
+  // DOM-Stueck, keine neue CSS-Regel.
+  //
+  // BUEHNE HAT NEUN VERSCHIEDENE ERGEBNISFORMEN (Zweikampf-Duelle, Bretter, Ueberleben,
+  // Punktsumme) -- statt das hier ein neuntes Mal zu erfinden, liest diese Funktion
+  // GENAU DAS, WAS DIE ARENA SCHON ANZEIGT: `wertungVon(disc)` ist derselbe Renderer, den
+  // renderWertungTabelle() waehrend des GANZEN Spiels fuer die Live-Tabelle benutzt (s.
+  // WERTUNG_CHASSIS.buehne/WERTUNG_HEBEN/WERTUNG_DUELL/WERTUNG_AUFTRITT oben) -- er waehlt
+  // pro Disziplin schon die richtigen Spalten (Zug/Vort/Stand fuer Fechten/Tennis/I-Spy/
+  // Schach, Reiss/Stoss/Zwei fuer Gewichtheben, Dg/Pkt/Wuerstchen/HP/Kampf/... fuer
+  // Wettessen/Showcase/Eiskunstlauf/Breaking). Diese Funktion RECHNET NICHTS NEU, sie
+  // uebernimmt nur Kopf/Zeilen/Formatierung, die es fuer die Live-Tabelle ohnehin schon
+  // gibt -- derselbe Wiederverwendungs-Gedanke wie renderEndstand()s ESPALTEN.
+  function buehneStand(){
+    // DIESELBEN VIER VERGLEICHE, DIE updateHudBuehne() SCHON FUER #score BENUTZT (Zeilen
+    // direkt oberhalb dieser Funktion im selben Block) -- hier nur zusaetzlich fuer den
+    // Endstand-Banner gelesen, keine zweite Zaehlweise. Kaeme je eine fuenfte Buehnen-Form
+    // dazu, muesste sie an BEIDEN Stellen ergaenzt werden; bis dahin sind es exakt die vier
+    // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
+    const art=BB();
+    if(art.heben){
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.duell){
+      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+      const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.gauntlet){
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      const a=alive(0),b=alive(1); return {a,b,text:a+" : "+b};
+    }
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
+    const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
+  }
+  function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  function renderEndstandBuehne(){
+    const sieger=buehneSieger(), stand=buehneStand();
+    document.getElementById("esieger").textContent=
+      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    const w=wertungVon(disc);
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,w.namen));
+      w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      for(const z of zeilen){
+        const tr=el("tr",z.raus?"tot":null);
+        tr.appendChild(el("td",null,z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
       t.appendChild(tb); box.appendChild(t);
     }
     renderHighlights();
