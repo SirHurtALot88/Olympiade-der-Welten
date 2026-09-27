@@ -34067,6 +34067,16 @@
     // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
     // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
     else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
+    // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
+    // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
+    // unter JEDER Disziplin (Basketball, Fechten, Bahn, ...) Sinn-freien Text, weil dieses
+    // .notes-Element Teil des gemeinsamen Arena-Markups (#p2) ist und nie an `disc` gegated
+    // war. Reines Anzeige-Gating, dieselbe Stelle/derselbe Vertrag wie mdffaPanel zwei
+    // Zeilen oben (reset() laeuft garantiert bei jedem Disziplinwechsel) — Inhalt der
+    // Panels selbst bleibt fuer TDM unangetastet, kein Einfluss auf wert()/stepSim/rr().
+    const tdmNotes=document.getElementById("tdmEntwurfNotes");
+    if(tdmNotes)tdmNotes.hidden=disc!=="tdm";
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
