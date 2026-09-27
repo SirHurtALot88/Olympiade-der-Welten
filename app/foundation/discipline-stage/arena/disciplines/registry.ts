@@ -83,8 +83,9 @@ const DISCIPLINE_ID_FIELD_LOADERS: Record<string, FieldLoader> = {
   // stage (geteilt): Eiskunstlauf = Eis-Kür, Showcase = Theater-Bühne.
   eiskunstlauf: () => import("./eiskunst"),
   showcase: () => import("./showcase"),
-  // thermometer-Primitive überschrieben: Breaking Point = lila Survival-Cypher (nach innen
-  // zum SURVIVOR), NICHT das Schmerz-Thermometer.
+  // thermometer-Primitive überschrieben: Breaking Point = lila Folter-Gauntlet-Arena (nach
+  // innen zum SURVIVOR), NICHT das Schmerz-Thermometer und NICHT ein Breakdance-Battle (s.
+  // CLAUDE.md "Breaking ist Folter, nicht Breakdance").
   breaking: () => import("./breaking"),
 };
 
