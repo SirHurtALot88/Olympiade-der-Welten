@@ -14128,6 +14128,15 @@
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A): dasselbe Muster wie
+  // letzterHebenZug oben, nur fuer den Gauntlet. `letzterGauntletZug` haelt den zuletzt
+  // ENTHUELLTEN Anschlag fest (reveal-gegatet, s. Aufruf in stepBuehne unten) -- exakt das,
+  // was `gauntletZugJetzt()` je Teilnehmer schon einzeln liest, hier nur GLOBAL fuer die
+  // ganze Kette (die aktuelle Kampf-Nummer haengt an BEIDEN Seiten gemeinsam, nicht an
+  // einem Teilnehmer). `gauntletReihen` haelt die feste Kampfreihenfolge je Team
+  // ({0:[...],1:[...]}, Team-Slot-Reihenfolge aus baueGauntlet()) -- rein strukturell,
+  // keine Zufallszahl, dieselbe Kategorie wie u.duellNr beim Gewichtheben.
+  let letzterGauntletZug=null, gauntletReihen=null;
   // S-Schach (Buehnenbild Speed-Schach): welches Brett gerade im Fokus steht.
   // schachPin!=null haelt es fest (Klick auf ein Mini-Brett/den Kadernamen) und
   // schaltet die Regie-Automatik ab; schachMiniRects sind die zuletzt gezeichneten
@@ -14201,7 +14210,7 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
-    floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    floats.length=0; letzterHebenZug=null; letzterGauntletZug=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -15866,6 +15875,13 @@
       u.hpMax=GAUNTLET_HP_MAX; u.hp=GAUNTLET_HP_MAX; u.raus=false;
       u.bout=0; u.gegnerN=null;
     }
+    // KETTENLEISTE (B1): feste Kampfreihenfolge je Team, rein strukturell (kein rr()) --
+    // dieselbe Kategorie wie u.duellNr/u.rolle bei baueHebenDuelle(). `gauntletReihen` ist
+    // die Datenquelle der Kettenleiste in zeichneBreaking(); `u.gauntletIdx` bleibt zusaetzlich
+    // am Teilnehmer selbst, falls eine spaetere Anzeige den Platz eines einzelnen Kaempfers
+    // ohne Team-Scan braucht.
+    A.forEach((u,i)=>{u.gauntletIdx=i;}); B.forEach((u,i)=>{u.gauntletIdx=i;});
+    gauntletReihen={0:A,1:B};
     buehneQueue=[];
     if(!A.length||!B.length)return; // Ein leeres Team: niemand tritt an -- leere Kette.
     let ai=0, bi=0, x=A[0], y=B[0], bout=1;
@@ -16019,6 +16035,11 @@
       // dort) — auf dem transienten {u,r}-Container, nicht auf u/TEILNEHMER, s. Vertrag
       // bei buehnenBewegung. "ansage" (Ansage-Gong) feuert einmal pro enthuelltem Versuch.
       if(BB().heben){ letzterHebenZug={u,r,_tonPhase:"boden"}; sfx("gewichtheben","ansage"); }
+      // KETTENLEISTE (B1): derselbe Kniff wie letzterHebenZug direkt darueber, nur global
+      // (die Kampf-Nummer haengt an der ganzen Kette, nicht an einem einzelnen Teilnehmer) --
+      // reine Buchfuehrung, kein rr(), keine neue Zahl (r.bout steht schon seit baueGauntlet()
+      // auf dem Rundeneintrag, hier nur reveal-gegatet gemerkt).
+      if(BB().gauntlet){ letzterGauntletZug={u,r}; }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
@@ -16283,7 +16304,10 @@
   function buehnenBewegung(dt){
     const art=BB();
     if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
-    if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
+    // B2/B3 (Broadcast-Optik-Recherche 27.09.): stepGauntletHp() laeuft NUR fuer den
+    // Gauntlet (art.gauntlet) direkt nach stepCypher() mit -- dieselbe reine Anzeige-
+    // Buchfuehrung wie stepSchach()s Uhr, kein zweiter Dispatcher-Zweig noetig.
+    if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); if(art.gauntlet&&typeof stepGauntletHp==="function")stepGauntletHp(dt); return; } // Ziel 4
     // VORAB ANGELEGT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 7.1, Kollision
     // 1): drei spaetere Ziel-PRs (Gewichtheben, Speed-Schach, Fechten) haetten sonst alle
     // dieselbe Dispatcher-Zeile angefasst. Mit den drei Zweigen hier liefert jede dieser
@@ -16965,6 +16989,42 @@
   // kann, statt 0,15s ein zweites Mal als Literal zu tragen (das dort bisher veraltete
   // 0,35/0,3 waren -- Ringe rissen bei halber Deckkraft ab statt sauber auszublenden).
   const FREEZE_T=0.15, RUECKZUG_T=0.15;
+  // B2 (HP-Balken im Kampfspiel-Stil, Broadcast-Optik-Recherche 27.09., Klasse A): das
+  // NACHLAUFENDE SCHADENSSTUECK -- "der gerade verlorene Teil bleibt 0,4s hell und laeuft
+  // dann ab" (Doku B2). Dasselbe Vorbild wie u.vizUhrAnzeige bei stepSchach() (exponentielle
+  // Annaeherung statt eines schlagartigen Sprungs). Liest ausschliesslich
+  // gauntletHpJetzt(u) (schon reveal-gegatet), schreibt nur das neue viz*-Feld
+  // u.vizHpAnzeige -- kein rr(), keine Aenderung an u.hp/u.runden/u.aktuell/u.summe.
+  function stepGauntletHp(dt){
+    for(const u of TEILNEHMER){
+      if(u.gauntletIdx==null)continue;
+      const ziel=Math.max(0,gauntletHpJetzt(u));
+      if(u.vizHpAnzeige==null)u.vizHpAnzeige=ziel;
+      else u.vizHpAnzeige+=(ziel-u.vizHpAnzeige)*(1-Math.exp(-dt/0.4));
+    }
+    // B3: TON AN DER HERZSCHLAG-KANTE. `gauntletHerzPhase` laeuft 0..1 im Takt von
+    // gauntletHerzschlagBpm(ertraeger) und feuert bei jedem vollen Umlauf genau einmal
+    // sfx("breaking","herzschlag") -- derselbe Kanten-Trick wie ueberall sonst im Motor
+    // (huerdeAktiv-Kante bei stepSpurt, Phasenuebergaenge bei stepHeben/stepFechten): ein
+    // Ereignis pro Zyklus statt eines Tons je Frame.
+    const paar=cypherPaar(), ertraeger=paar?paar.ertraeger:null;
+    if(ertraeger){
+      const bpm=gauntletHerzschlagBpm(ertraeger);
+      const vor=gauntletHerzPhase;
+      gauntletHerzPhase=(gauntletHerzPhase+dt*bpm/60)%1;
+      if(gauntletHerzPhase<vor)sfx("breaking","herzschlag");
+    }
+  }
+  let gauntletHerzPhase=0;
+  // B3 (Herzschlag statt Beat, Broadcast-Optik-Recherche 27.09., Klasse A): Tempo aus HP --
+  // 70 BPM bei vollen HP bis 150 BPM kurz vor 0 (Doku B3). Liest ausschliesslich bereits
+  // enthuellten HP-Stand (gauntletHpJetzt(), reveal-gegatet), reine Ableitung, kein rr().
+  function gauntletHerzschlagBpm(u){
+    if(!u)return 100;
+    const hpMax=u.hpMax||GAUNTLET_HP_MAX;
+    const frac=hpMax>0?Math.max(0,Math.min(1,gauntletHpJetzt(u)/hpMax)):1;
+    return 150-80*frac;
+  }
   function stepCypher(dt,art){
     if(!TEILNEHMER.length)return;
     const rOut=Math.min(W*0.46,H*0.44);
@@ -18188,7 +18248,7 @@
     // ausserhalb des Canvas) statt darueber — sonst kollidieren beide Textbloecke, s.
     // Sicht-QA-Screenshot dieses PRs (docs/design/gewichtheben-nachher-10-09.png, erste
     // Fassung).
-    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=54;
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=80;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
     ctx.textAlign="left";ctx.textBaseline="middle";
@@ -18199,6 +18259,48 @@
     ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
     ctx.font="700 16px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
     ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
+    // NAECHSTE ANSAGE (H2.2, Broadcast-Optik-Recherche 27.09., Klasse A): "Nächster Versuch:
+    // Draco, 127 kg" — Taktik am Meldetisch (Doku 2.1, belegt). `buehneQueue[buehneZeiger]`
+    // ist genau der naechste Teilnehmer, der als naechstes dequeued wird (reine Ablesung,
+    // kein Schreiben) — sein naechster, noch nicht enthuellter Rundeneintrag traegt die
+    // ANGESAGTE Last, die im Wettkampf oeffentlich am Meldetisch steht, bevor der Versuch
+    // beginnt (kein Spoiler des ERGEBNISSES, nur der Last, genau wie beim laufenden Versuch
+    // oben).
+    //
+    // SPOILER-FALLE (H2.2 woertlich): ein Fehlversuch senkt die naechste Last des SELBEN
+    // Hebers um HEBEN_FEHL_REDUKTION — die naechste Ansage verriete also, ob der LAUFENDE
+    // Versuch misslingt, wenn sie schon waehrend dessen Animation erscheint. Deshalb NUR
+    // zeigen, wenn der laufende Versuch schon aufgeloest ist (u.vizPhase ist "hoch" oder
+    // "ablage", dieselbe Grenze wie bei der Versuchstafel H1) — das ist zugleich die echte
+    // Reihenfolge: die neue Ansage kommt nach dem Urteil.
+    if(zug){
+      const phaseJetzt=zug.u.vizPhase||hebePhase(zug.u);
+      if(phaseJetzt==="hoch"||phaseJetzt==="ablage"){
+        const naechsterU=buehneQueue[buehneZeiger];
+        const naechsteR=naechsterU?naechsterU.runden[naechsterU.aktuell+1]:null;
+        if(naechsterU&&naechsteR){
+          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#5f6675";
+          const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
+          const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
+          ctx.fillText("Nächster: "+naechsterName+", "+kgTxt,tafelX+10,tafelY+60);
+          // "ZIEHT NACH" (H2.3): der Motor kennt heute genau eine Ansage-Aenderung, die aus
+          // dem Duellstand selbst folgt — der reaktive Zuschlag im dritten Versuch
+          // (kuehnFlag/HEBEN_WAGNIS_MAX_KG, s. hebeUebung()). Sichtbar als kurzes gelbes
+          // "↑ +N kg" GEGENUEBER DEM EIGENEN vorigen Versuch derselben Uebung — reine
+          // Ansage-Information (kein Ergebnis), also kein weiterer Spoiler.
+          if(naechsteR.kuehn&&naechsterU.aktuell>=0){
+            const vorige=naechsterU.runden[naechsterU.aktuell];
+            if(vorige&&vorige.uebung===naechsteR.uebung){
+              const deltaKg=sinclairAnzeige(naechsteR.kg-vorige.kg,naechsterU.groesse);
+              if(deltaKg>0){
+                ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
+                ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+74);
+              }
+            }
+          }
+        }
+      }
+    }
     // KREIDE-/MAGNESIAKISTE, unten links auf der Plattformkante.
     ctx.fillStyle="#e9e6de";ctx.fillRect(W*0.08,platY+platH-14,26,14);
     ctx.strokeStyle="#9a9788";ctx.lineWidth=1;ctx.strokeRect(W*0.08,platY+platH-14,26,14);
@@ -20535,6 +20637,56 @@
     ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
 
+    // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
+    // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
+    // (Abschnitt 2.1) "aus einem Versuch ein Finale macht". Nur im Stossen, und nur sobald
+    // der Gegner seinen letzten Versuch gemacht hat ODER der aktive Heber selbst im dritten
+    // Versuch steht (Doku H2.1). Reine Ableitung aus bereits enthuellten Bestwerten
+    // (bestBisher(), dieselbe Spoiler-Grenze wie ueberall sonst auf dieser Buehne) — nichts
+    // Neues wird geschrieben, nur gelesen und gezeichnet.
+    //
+    // EINHEIT (H2.1-Warnung im Dokument woertlich): gerechnet wird in RAW kg, GENAU der
+    // Einheit, in der baueHebenDuelle() ueber a.zweikampf/b.zweikampf entscheidet — NICHT
+    // Sinclair-normiert, obwohl Sinclair ueberall sonst auf dieser Buehne angezeigt wird.
+    // Angezeigt wird das Ergebnis trotzdem ueber sinclairAnzeige(), wie jede andere Zahl
+    // hier — der Umrechnungsfaktor ist je Heber konstant (haengt nur an dessen `groesse`),
+    // die Umrechnung aendert also nichts an der WER-braucht-WAS-Aussage, nur an der
+    // Masseinheit, in der sie auf dem Bildschirm steht.
+    //
+    // Ausgelassen, wenn gerade der KUEHNER-VERSUCH-Badge (kuehnZeileY unten) an derselben
+    // Bildstelle steht: beide Einblendungen erzaehlen in der Praxis fast immer denselben
+    // Moment (die Aufholjagd im dritten Stossversuch), zwei Ueberschriften uebereinander
+    // waeren doppelt gemoppelt.
+    if(letzterHebenZug && !(letzterHebenZug.r&&letzterHebenZug.r.kuehn)){
+      const zu=letzterHebenZug.u, zr=letzterHebenZug.r;
+      if(zr && zr.uebung==="stossen" && zu.duellNr===aktivNr){
+        const gegner=zu===a?b:a;
+        const gegnerFertig=gegner.aktuell>=5; // alle sechs Versuche enthuellt
+        if(gegnerFertig||zr.versuch===3){
+          const eigenReissen=bestBisher(zu,"reissen"), eigenStossen=bestBisher(zu,"stossen");
+          const gegnerReissen=bestBisher(gegner,"reissen"), gegnerStossen=bestBisher(gegner,"stossen");
+          // Nullwertung auf einer Seite: der Zweikampf ist fuer sie schon entschieden (s.
+          // baueHebenDuelle-Kommentar "wer im Reissen genullt hat, steht bei 0") — die
+          // Bedarfszeile wuerde sonst eine Zahl behaupten, die der Motor gar nicht mehr
+          // werten kann.
+          if(eigenReissen>0 && gegnerReissen>0){
+            const eigenZw=eigenReissen+eigenStossen, gegnerZw=gegnerReissen+gegnerStossen;
+            const txt=(eigenZw>gegnerZw)
+              ? zu.n.split(" ")[0]+" führt, "+gegner.n.split(" ")[0]+" braucht "
+                +sinclairAnzeige(Math.round(eigenZw-gegnerReissen)+1,gegner.groesse)+" kg"
+              : zu.n.split(" ")[0]+" braucht "
+                +sinclairAnzeige(Math.round(gegnerZw-eigenReissen)+1,zu.groesse)
+                +" kg für den Duellsieg";
+            ctx.font="700 10.5px 'Barlow Condensed',sans-serif";
+            ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+            ctx.strokeText(txt,W/2,H*0.183);
+            ctx.fillStyle="#d6ac36";
+            ctx.fillText(txt,W/2,H*0.183);
+          }
+        }
+      }
+    }
+
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
     // Chris beschrieben hat ("immer 2 gleichzeitig").
     const y=H*0.46;
@@ -20579,6 +20731,72 @@
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
       schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),84,"#8a93a3",8.5);
+
+      // VERSUCHSTAFEL (H1, Broadcast-Optik-Recherche 27.09., Klasse A): 3+3 Kaestchen je
+      // Heber, Reissen und Stossen durch eine kleine Luecke getrennt — die IWF-Anzeigetafel,
+      // "das Bild, das jeder aus dem Fernsehen kennt" (Doku H1). Reine Anzeige: liest
+      // ausschliesslich u.runden[0..u.aktuell] (Spoiler-Regel, dieselbe Grenze wie
+      // bestBisher() oben) und u.vizPhase, schreibt nur Canvas-Pixel — kein rr(), kein
+      // Schreiben auf u. Position bei y+98, 14px unter der Zweikampf-Zeile (y+84) und weit
+      // vor der Warteschlangen-Zeile bei H*0.90 (Doku-Vorschlag H1: "dazwischen liegen rund
+      // 100 px").
+      {
+        const boxW=13,boxH=11,gapKlein=2,gapGross=9;
+        const gruppeW=3*boxW+2*gapKlein;
+        const tafelX0=x-(gruppeW*2+gapGross)/2, tafelY=y+98;
+        const istAktiverZug=letzterHebenZug&&letzterHebenZug.u===u;
+        const phaseJetzt=istAktiverZug?(u.vizPhase||hebePhase(u)):null;
+        // AUFGELOEST heisst: der Uebergang zug->hoch|ablage ist schon passiert — derselbe
+        // Zeitpunkt, in dem auch die drei Kampfrichterlampen in bodenHeben() umschlagen
+        // (Spoiler-Falle, H1: "Das Kästchen des laufenden Versuchs wird erst nach dem
+        // Übergang … eingefärbt, also im selben Moment wie die Lampen").
+        const aufgeloest=!istAktiverZug||phaseJetzt==="hoch"||phaseJetzt==="ablage";
+        // BESTES GUELTIGES KAESTCHEN je Uebung — nur unter den bereits enthuellten
+        // Versuchen (i<=u.aktuell), denn nur das zaehlt zum Zweikampf (bestBisher() zieht
+        // dieselbe Grenze).
+        const besteIdx={reissen:-1,stossen:-1}, besteKg={reissen:-1,stossen:-1};
+        for(let i=0;i<=Math.min(u.aktuell,5);i++){
+          const r0=u.runden[i]; if(!r0||!r0.gueltig)continue;
+          if(r0.kg>besteKg[r0.uebung]){besteKg[r0.uebung]=r0.kg;besteIdx[r0.uebung]=i;}
+        }
+        for(let i=0;i<6;i++){
+          const gruppe=i<3?0:1;
+          const bx=tafelX0+gruppe*(gruppeW+gapGross)+(i%3)*(boxW+gapKlein);
+          const r0=u.runden[i];
+          const laufend=istAktiverZug&&i===u.aktuell&&!aufgeloest;
+          const enthuellt=i<=u.aktuell&&!laufend;
+          ctx.lineWidth=1;
+          if(!enthuellt&&!laufend){
+            // LEER — "kommt noch" (H1).
+            ctx.fillStyle="rgba(255,255,255,.05)";ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="rgba(255,255,255,.22)";ctx.strokeRect(bx,tafelY,boxW,boxH);
+          } else if(laufend){
+            // GRAU MIT RAHMEN — der laufende Versuch. Das Ergebnis steht im Motor (r0.gueltig)
+            // zwar schon fest, wird aber erst mit den Lampen enthuellt; die angesagte Last
+            // selbst ist kein Spoiler (sie steht schon auf der Anzeigetafel/Textkarte).
+            ctx.fillStyle="#3a3d46";ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="#c7ccd6";ctx.lineWidth=1.4;ctx.strokeRect(bx,tafelY,boxW,boxH);
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
+            ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
+          } else {
+            // GRUEN/ROT — dieselben Farben wie die Kampfrichterlampen in bodenHeben().
+            ctx.fillStyle=r0.gueltig?"#f2ede0":"#c0392b";
+            ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="rgba(10,12,16,.5)";ctx.strokeRect(bx,tafelY,boxW,boxH);
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace";
+            ctx.fillStyle=r0.gueltig?"#1b1d22":"#f2ede0";
+            ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
+          }
+          const uebungHier=i<3?"reissen":"stossen";
+          if(besteIdx[uebungHier]===i){
+            // BESTES KAESTCHEN JE UEBUNG FETT GERAHMT — "denn nur das zählt zum Zweikampf" (H1).
+            ctx.lineWidth=2;ctx.strokeStyle="#f2d75a";
+            ctx.strokeRect(bx-1.5,tafelY-1.5,boxW+3,boxH+3);
+          }
+        }
+      }
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
@@ -21119,6 +21337,24 @@
   function zeichneBreaking(art){
     if(!TEILNEHMER.length)return;
     const cx=W/2, cy=H*0.54, rOut=Math.min(W*0.46,H*0.44), rIn=rOut*0.14, KY=0.82;
+    // `paar` wird hier vorgezogen (frueher erst kurz vor Rang 1 berechnet), weil B3
+    // (Herzschlag statt Beat, s.u.) den Ertragenden schon fuer den Kern-Puls braucht, der
+    // VOR Rang 1 gezeichnet wird -- dieselbe reine, seiteneffektfreie Funktion, nur einmal
+    // statt zweimal aufgerufen.
+    const paar=cypherPaar();
+    // B3 (Herzschlag statt Beat, Broadcast-Optik-Recherche 27.09., Klasse A): der feste
+    // 100-BPM-Takt (BREAKING_BPM, ein Breakdance-Ueberbleibsel, s. CLAUDE.md) wird fuer den
+    // GAUNTLET durch den Herzschlag DES ERTRAGENDEN ersetzt -- 70 BPM bei vollen HP, 150 BPM
+    // kurz vor 0 (gauntletHerzschlagBpm(), dieselbe Formel wie in stepGauntletHp() fuer den
+    // Ton). Ausserhalb des Gauntlets (falls je ein anderes Cypher-Chassis existiert) bleibt
+    // BREAKING_BPM unveraendert bestehen. Reine Anzeige: liest nur bereits enthuellten HP-
+    // Stand (gauntletHpJetzt(), reveal-gegatet), schreibt nichts.
+    const bpmJetzt=(art.gauntlet&&paar&&paar.ertraeger)?gauntletHerzschlagBpm(paar.ertraeger):BREAKING_BPM;
+    // BRUCHGEFAHR (B3): unter 30% HP zieht sich die Vignette zusammen, das Publikum wird im
+    // Ton leiser (Stille vor dem Bruch) und die Schrift auf der Tafel des Ertragenden wird
+    // rot -- die Uebersetzung von "wird er aufgeben?" in ein Koerpersignal.
+    const bruchgefahr=!!(art.gauntlet&&paar&&paar.ertraeger
+      &&Math.max(0,gauntletHpJetzt(paar.ertraeger))/(paar.ertraeger.hpMax||GAUNTLET_HP_MAX)<0.3);
 
     // A. Grundflaeche: vollflaechiger radialer Verlauf, 1:1 aus breaking.tsx's brkBg-Gradient
     // (Canvas createRadialGradient statt SVG radialGradient) -- UEBER bodenBuehne()s eigenem
@@ -21159,10 +21395,10 @@
 
     // Survivor-Kern (Zentrum) -- pulsierend ueber buehneT (bereits vorhandene Motor-Zeit,
     // kein neuer Zustand, dieselbe Idee wie zeichneHeben()s buehneAkt-getriebene Animation).
-    // AB JETZT AUF BREAKING_BPM GERASTERT (Ziel 4, Plan 7.4): eine 4-Schlag-Phrase bei
-    // 100 BPM = 2,4 s (vorher 2π/2,4 ≈ 2,62 s frei laufend) -- derselbe Takt, den
-    // stepCypher()s Wippen und der TON_KATALOG.breaking-Beat referenzieren.
-    const PULS_PERIODE=60/BREAKING_BPM*4;
+    // AUF EINE 4-SCHLAG-PHRASE GERASTERT (Ziel 4, Plan 7.4), seit B3 (27.09.) im Gauntlet
+    // nach `bpmJetzt` statt der festen BREAKING_BPM -- derselbe Takt, den die Druckachse
+    // (`takt` unten) und der Geraet-Schwung des Peinigers referenzieren.
+    const PULS_PERIODE=60/bpmJetzt*4;
     const puls=0.5+0.5*Math.sin(buehneT*2*Math.PI/PULS_PERIODE);
     const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rIn*2.4);
     glow.addColorStop(0,"rgba(214,150,255,"+(0.5*puls).toFixed(3)+")");
@@ -21215,7 +21451,7 @@
     // zeichneSprite() setzt fuer Effekt-/Partikelfiguren (EFFEKT_ARTEN) intern selbst
     // globalAlpha und stellt es auf 1 zurueck -- ein von aussen gesetztes Alpha ueberlebt das
     // nicht zuverlaessig. Eine Flaeche darueber schon.
-    const paar=cypherPaar();
+    // (`paar` steht bereits oben, vor dem Survivor-Kern-Puls, s. B3-Kommentar dort.)
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     // Fuehrer = Survivor: kleinster Radius, also die hoechste Summe -- derselbe Rang-1-
     // Begriff wie breaking.tsx:158 (t.rank===1).
@@ -21269,11 +21505,29 @@
     // Rand hin fast schwarz. Er dunkelt die zehn Zuschauer UND alles andere am Rand ab; die
     // beiden Duellanten werden danach gezeichnet und bleiben deshalb voll hell. Das ist der
     // gesamte "Fokus"-Mechanismus dieser Buehne -- ein Fill, kein Zustand.
-    const vig=ctx.createRadialGradient(cx,cy,rOut*0.30,cx,cy,rOut*1.25);
-    vig.addColorStop(0,"rgba(6,3,10,0)");
-    vig.addColorStop(0.55,"rgba(6,3,10,.42)");
-    vig.addColorStop(1,"rgba(6,3,10,.78)");
+    //
+    // BRUCHGEFAHR (B3, Broadcast-Optik-Recherche 27.09.): unter 30% HP zieht sich die
+    // Vignette sichtbar zusammen und faerbt sich rot -- die Uebersetzung von "wird er
+    // aufgeben?" in ein Koerpersignal, im selben Herzschlag-Takt wie der Survivor-Kern
+    // (`puls`, s.o.).
+    const vigInnenSkala=bruchgefahr?(0.30-0.09*(0.5+0.5*puls)):0.30;
+    const vig=ctx.createRadialGradient(cx,cy,rOut*vigInnenSkala,cx,cy,rOut*1.25);
+    if(bruchgefahr){
+      vig.addColorStop(0,"rgba(60,4,4,0)");
+      vig.addColorStop(0.55,"rgba(56,4,6,.52)");
+      vig.addColorStop(1,"rgba(20,2,4,.86)");
+    } else {
+      vig.addColorStop(0,"rgba(6,3,10,0)");
+      vig.addColorStop(0.55,"rgba(6,3,10,.42)");
+      vig.addColorStop(1,"rgba(6,3,10,.78)");
+    }
     ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+    if(bruchgefahr){
+      ctx.font="900 11px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+      ctx.globalAlpha=0.55+0.45*puls; ctx.fillStyle="#ff3b3b";
+      ctx.fillText("BRUCHGEFAHR",cx,H*0.78);
+      ctx.globalAlpha=1;
+    }
 
     // ---------- DIE FOLTERBANK: zehn Geraete, eskalierend ----------
     // Chris: „dass da so ein tisch ist mit 10 folterinstrumenten und die charaktere nutzen die
@@ -21326,7 +21580,7 @@
       if(a&&b){
         const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
         const ux=dx/len, uy=dy/len, nx=-uy, ny=ux;
-        const takt=0.45+0.55*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60));
+        const takt=0.45+0.55*Math.abs(Math.sin(buehneT*Math.PI*bpmJetzt/60));
         ctx.strokeStyle="#ff5a4a"; ctx.lineWidth=1.6; ctx.lineCap="round";
         ctx.globalAlpha=0.30*takt;
         ctx.beginPath(); ctx.moveTo(a.x+ux*22,a.y+uy*22); ctx.lineTo(b.x-ux*20,b.y-uy*20); ctx.stroke();
@@ -21424,7 +21678,7 @@
         const dir=u.side===0?1:-1;
         const zusetzen=ertraeger&&ertraeger.vizPhase==="throwdown";
         const schwung=zusetzen
-          ? -0.95+1.75*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60))
+          ? -0.95+1.75*Math.abs(Math.sin(buehneT*Math.PI*bpmJetzt/60))
           : -0.60;
         ctx.save();
         ctx.translate(x+dir*11,y+2);
@@ -21513,8 +21767,17 @@
         // HP-Stand, wie er GERADE enthuellt ist (gauntletHpJetzt(), nicht der Endstand
         // u.hp), plus die laufende Kampf-Nummer -- exakt die "Kette nachvollziehbar"-
         // Vorgabe der Praesentation.
+        // B2 (Broadcast-Optik-Recherche 27.09.): die ASCII-Bloecke sind durch die zwei
+        // gespiegelten HP-Balken ganz oben ersetzt (zeichneHpBalken() unten in dieser
+        // Funktion) -- die Zahl hier bleibt fuer die Barrierefreiheit stehen, nur ohne
+        // Blockzeichen (Doku B2: "dann aber ohne Blockzeichen").
         const hpJetzt=Math.max(0,gauntletHpJetzt(u)), hpMax=u.hpMax||GAUNTLET_HP_MAX;
-        ctx.fillText("HP "+hpJetzt+"/"+hpMax+"  "+gauntletBalken(hpJetzt,hpMax),bx+12,by+50);
+        // BRUCHGEFAHR (B3): die Schrift auf der Tafel DES ERTRAGENDEN wird rot, sobald er
+        // unter 30% HP steht (Doku B3) -- derselbe Schwellwert, der oben die Vignette und
+        // den Herzschlag treibt.
+        ctx.fillStyle=(rolle==="ertraegt"&&bruchgefahr)?"#ff5a4a":"#9aa4b4";
+        ctx.fillText("HP "+hpJetzt+"/"+hpMax,bx+12,by+50);
+        ctx.fillStyle="#9aa4b4";
         // KEIN SPOILER: `u.bout` ist am Ende von baueGauntlet() schon der FERTIGE Endwert
         // (Review-Fund: die Tafel zeigte "Kampf 9", waehrend der Ticker fuer denselben
         // Moment noch "Kampf 8" meldete) -- der bereits enthuellte Zug (gauntletZugJetzt())
@@ -21533,6 +21796,127 @@
       tafel(gast,gast===ertraeger?"ertraegt":"peinigt",false);
     } else if(ertraeger){
       tafel(ertraeger,"ertraegt",ertraeger.side===0);
+    }
+
+    // ================== KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A) ==================
+    // Chris' Kernidee vom 22.09., woertlich: "Sieger kaempft dann gegen Spieler 2 [...] HP
+    // nimmt er mit" -- und heute sieht man die Kette nirgends, nur das gerade laufende Paar
+    // auf den Seitentafeln oben. Am oberen Rand steht jetzt links die Heim-, rechts die
+    // Gast-Aufstellung in Kampfreihenfolge (`gauntletReihen`, s. baueGauntlet()), je Kaempfer
+    // ein Platz -- dasselbe Kachinuki-Tafelbild wie im echten Kendo.
+    //
+    // SPOILER-REGEL, GENAU WIE BEI DEN SEITENTAFELN OBEN: ausschliesslich ueber bereits
+    // enthuellte Felder gerechnet. `gauntletRausJetzt()` (reveal-gegatet) statt des am Ende
+    // von baueGauntlet() bereits FERTIGEN `u.raus`; `letzterGauntletZug` (reveal-gegatet,
+    // s. stepBuehne()) statt `u.bout`, das ebenfalls schon der Endwert ist; die lokalen
+    // ai/bi-Zaehler aus baueGauntlet() sind ausserhalb der Funktion ohnehin nicht sichtbar.
+    // Die SIEGESSERIE des Stehenden folgt aus derselben reveal-gegateten Zahl: seine eigene
+    // allererste enthuellte Runde traegt den Kampf, in dem er selbst eingestiegen ist
+    // (`u.runden[0].bout`); die Differenz zur aktuellen Kampf-Nummer ist genau die Zahl der
+    // Gegner, die er seitdem besiegt hat (jeder gewonnene Kampf erhoeht den globalen Zaehler
+    // um genau eins, s. baueGauntlet()).
+    if(art.gauntlet && gauntletReihen){
+      // FREIRAUM UEBER DEM BROADCAST-BUG (.bbug/.bbugcallout, HTML-Overlay, `top:8px`): bei
+      // der getesteten 1300px-Breite belegt er bis zu 10% der Leinwandhoehe, bei schmaleren
+      // Fenstern deutlich mehr (s. Kommentar bei kuerFlaeche() oben, dieselbe Messung).
+      // `.bahnhud` reserviert dafuer bereits 15% -- dieselbe Sicherheitsmarge hier fuer die
+      // Kettenleiste/HP-Balken, statt sie mit den Team-Karten zu ueberlagern (Sicht-QA
+      // 27.09.: ohne diesen Abstand liegen beide unter der Team-Karte).
+      const topY=H*0.155;
+      const aktuellerBout=letzterGauntletZug?letzterGauntletZug.r.bout:1;
+      let stehenderTxt={0:null,1:null}, stehend={0:null,1:null};
+      const zeichneKette=(side,linksbuendig)=>{
+        const reihe=gauntletReihen[side]||[];
+        const slotW=26,slotH=16,gap=3;
+        const gesamtB=reihe.length*slotW+Math.max(0,reihe.length-1)*gap;
+        const x0=linksbuendig?16:W-16-gesamtB, y0=topY+13;
+        reihe.forEach((u,i)=>{
+          const sx=x0+i*(slotW+gap);
+          const gebrochen=u.aktuell>=0&&gauntletRausJetzt(u);
+          const c=farbeVon(u);
+          ctx.lineWidth=1;
+          if(gebrochen){
+            // GEBROCHENE: grau und diagonal gestrichen, mit kleiner Kampfnummer (H1-Doku B1:
+            // "✗ K3") -- der Kampf, in dem genau dieser Anschlag sie zu Fall brachte.
+            ctx.globalAlpha=0.4; ctx.fillStyle="#3a3d46"; ctx.fillRect(sx,y0,slotW,slotH);
+            ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.strokeRect(sx,y0,slotW,slotH);
+            ctx.beginPath(); ctx.moveTo(sx+2,y0+2); ctx.lineTo(sx+slotW-2,y0+slotH-2); ctx.stroke();
+            ctx.globalAlpha=1;
+            const koBout=u.runden[u.aktuell].bout;
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+            ctx.textAlign="center"; ctx.textBaseline="middle";
+            ctx.fillText("✗K"+koBout,sx+slotW/2,y0+slotH/2);
+          } else if(u.aktuell<0){
+            // WARTENDE: volle Farbe, aber gedimmt.
+            ctx.globalAlpha=0.42; ctx.fillStyle=c; ctx.fillRect(sx,y0,slotW,slotH); ctx.globalAlpha=1;
+            ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.strokeRect(sx,y0,slotW,slotH);
+          } else {
+            // DER STEHENDE: Rahmen in Teamfarbe, darunter eine Mini-HP-Linie, daneben die
+            // Siegesserie (unten als Text unter der ganzen Reihe).
+            ctx.globalAlpha=0.30; ctx.fillStyle=c; ctx.fillRect(sx,y0,slotW,slotH); ctx.globalAlpha=1;
+            ctx.strokeStyle=c; ctx.lineWidth=2; ctx.strokeRect(sx,y0,slotW,slotH);
+            const hpJetzt=Math.max(0,gauntletHpJetzt(u)), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+            const hpFrac=hpMax>0?hpJetzt/hpMax:0;
+            ctx.fillStyle="rgba(255,255,255,.18)"; ctx.fillRect(sx+1,y0+slotH-3,slotW-2,2);
+            ctx.fillStyle=hpFrac<0.3?"#ff5a4a":c; ctx.fillRect(sx+1,y0+slotH-3,Math.max(0,(slotW-2)*hpFrac),2);
+            const eintrittsBout=u.runden[0]?u.runden[0].bout:aktuellerBout;
+            const serie=Math.max(0,aktuellerBout-eintrittsBout);
+            stehenderTxt[side]=(serie>0?serie+" in Folge":"steht")+" · "+u.n.split(" ")[0];
+            stehend[side]=u;
+          }
+        });
+      };
+      zeichneKette(0,true);
+      zeichneKette(1,false);
+      ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.textBaseline="alphabetic";
+      if(stehenderTxt[0]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="left"; ctx.fillText(stehenderTxt[0],16,topY+42); }
+      if(stehenderTxt[1]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="right"; ctx.fillText(stehenderTxt[1],W-16,topY+42); }
+      // MITTIG: Kampf-Nummer und Rennstand -- "Kampf 5", "noch 4:2 im Rennen", die Zahl, die
+      // beim Kachinuki die Tafel traegt (Doku B1).
+      const nochLinks=(gauntletReihen[0]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
+      const nochRechts=(gauntletReihen[1]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
+      ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("KAMPF "+aktuellerBout,W/2,topY+7);
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.fillText("noch "+nochLinks+" : "+nochRechts+" im Rennen",W/2,topY+19);
+      ctx.textBaseline="alphabetic";
+
+      // ================== B2: HP-BALKEN IM KAMPFSPIEL-STIL (Broadcast-Optik-Recherche
+      // 27.09., Klasse A) ==================
+      // Ersetzt die ASCII-Bloecke ("HP 212/400 █████░░░░░", gauntletBalken()) durch zwei
+      // GESPIEGELTE Balken ganz oben -- Heim links, verankert am linken Bildrand und nach
+      // innen (zur Mitte) schrumpfend; Gast rechts, spiegelbildlich am rechten Rand
+      // verankert. Der Unterschied zwischen 10 HP (standgehalten) und 24 HP (eingebrochen)
+      // wird damit sichtbar, ohne dass jemand eine Zahl liest (Doku B2).
+      //
+      // NACHLAUFENDES SCHADENSSTUECK: `u.vizHpAnzeige` naehert sich `gauntletHpJetzt(u)`
+      // exponentiell an (stepGauntletHp(), Vorbild u.vizUhrAnzeige bei stepSchach) statt
+      // sofort zu springen. Der Bereich zwischen dem noch nicht nachgezogenen alten Wert
+      // und dem neuen, echten Wert wird hell eingefaerbt -- der "gerade verlorene Teil", der
+      // kurz aufleuchtet und dann abläuft.
+      const balkenB=Math.min(220,W*0.19), balkenH=7, balkenY=topY;
+      const zeichneHpBalken=(u,linksbuendig)=>{
+        if(!u)return;
+        const c=farbeVon(u), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+        const trueFrac=hpMax>0?Math.max(0,Math.min(1,gauntletHpJetzt(u)/hpMax)):0;
+        const vizRoh=u.vizHpAnzeige!=null?u.vizHpAnzeige:gauntletHpJetzt(u);
+        const vizFrac=hpMax>0?Math.max(0,Math.min(1,vizRoh/hpMax)):0;
+        const grossFrac=Math.max(trueFrac,vizFrac);
+        const bx0=linksbuendig?16:W-16-balkenB;
+        ctx.fillStyle="rgba(10,6,14,.72)"; ctx.fillRect(bx0,balkenY,balkenB,balkenH);
+        const fuellen=(frac,farbe)=>{
+          const bw=balkenB*frac; if(bw<=0)return;
+          const fx=linksbuendig?bx0:bx0+balkenB-bw;
+          ctx.fillStyle=farbe; ctx.fillRect(fx,balkenY,bw,balkenH);
+        };
+        if(grossFrac>trueFrac+0.001)fuellen(grossFrac,"#f2ede0");
+        fuellen(trueFrac,trueFrac<0.3?"#ff5a4a":c);
+        ctx.strokeStyle="rgba(255,255,255,.28)"; ctx.lineWidth=1;
+        ctx.strokeRect(bx0+0.5,balkenY+0.5,balkenB-1,balkenH-1);
+      };
+      zeichneHpBalken(stehend[0],true);
+      zeichneHpBalken(stehend[1],false);
     }
   }
 
@@ -26046,7 +26430,16 @@
       beat:      {loop:true, synth:(vol)=>tonRauschen(vol,220,0,true)},
       freeze:    {synth:(vol)=>{ tonKlick(vol,2400,0.05); tonMetall((vol??0.6)*0.6,500,0.12); }},
       hieb:      {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
-      abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)}
+      abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)},
+      // HERZSCHLAG (B3, Broadcast-Optik-Recherche 27.09.): "lub-dub", leise -- getriggert
+      // von stepGauntletHp() an der Phasen-Kante, Tempo aus gauntletHerzschlagBpm(). Der
+      // zweite, leisere Schlag folgt ~110ms nach dem ersten (echte Systole/Diastole-
+      // Verzoegerung), ueber setTimeout statt einer zweiten WebAudio-Zeitplanung -- reine
+      // Kulisse, ohne AudioContext (Messlaeufe) ist sfx() ohnehin ein No-Op.
+      herzschlag:{synth:(vol)=>{
+        tonSchlag(vol,85,45,0.09);
+        setTimeout(()=>{try{tonSchlag((vol??0.6)*0.75,70,38,0.08);}catch(e){}},110);
+      }}
     },
     "takeshis-castle":{
       falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
