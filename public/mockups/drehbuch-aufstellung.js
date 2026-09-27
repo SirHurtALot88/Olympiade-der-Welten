@@ -302,6 +302,65 @@ function schrift(txt,x,y,farbe,groesse,gewicht,familie){
 }
 const ease=(p)=>p<0?0:p>1?1:(1-Math.cos(Math.PI*p))/2;
 
+// DUELLSTAND-ZEILEN-Y (Nachtrag 27.09., Review-Fund): der Kommentar unten stammte noch aus
+// der Zeit, als #bbugcallout fest bei top:8px stand -- seit dem #fokusbug/#bbugcallout-Fix
+// weiter unten (positioniereCallout()) ist DAS nicht mehr wahr, aber ein neues, echtes
+// Problem trat an seine Stelle: die Leinwand ist responsiv (canvas{width:100%;height:auto}),
+// ein fester CANVAS-Bruchteil wie H*0.15 wandert deshalb in ECHTEN Bildschirm-Pixeln mit der
+// Fensterbreite mit, waehrend #fokusbug/#bbugcallout (feste HTML-Overlays) ortsfest bleiben --
+// bei >=1280px Breite ueberholt die Zeile das Callout-Banner und liegt darunter (gemessen:
+// -12px bis -87px Rest-Overlap, je nachdem wie viele Zeilen der jeweilige Callout-Text
+// braucht). Deshalb hier dieselbe Messung wie bei positioniereCallout() in
+// battle-mode.engine.js: die tatsaechliche #fokusbug-Unterkante in echten Bildschirm-Pixeln,
+// umgerechnet in Canvas-Einheiten ueber das Skalierungsverhaeltnis der Leinwand.
+//
+// Die Callout-HOEHE dagegen raet hier NICHTS -- Ansage/Fazit-Texte sind ein-, zwei- ODER
+// dreizeilig (Text + optionale <em>-Zeile), 45 bis 72 gemessene Px je nach Laenge. Ein fester
+// Schaetzwert traf beim ersten Versuch (64px) genau NICHT den laengsten Text dieses
+// Drehbuchs und ueberlappte trotzdem noch. Stattdessen misst tiefsteCalloutHoehe() ALLE
+// Callout-Texte DIESES Drehbuchs einmal beim Start der Aufloesung (das Banner unsichtbar,
+// aber im Layout, s. dort) und liefert die tatsaechlich hoechste Zeile. Das Ergebnis wird
+// EINMAL pro Aufloesung berechnet und dann fest gehalten (standZeileYCache) -- nicht jeden
+// Frame neu, sonst wuerde die Zeile springen, je nachdem ob gerade ein Callout laeuft.
+function tiefsteCalloutHoehe(Z){
+  const banner=document.getElementById("bbugcallout");
+  if(!banner||!Z||!Z.callouts||!Z.callouts.length)return 0;
+  const vorherHidden=banner.hidden, vorherSichtbar=banner.style.visibility, vorherHtml=banner.innerHTML;
+  banner.hidden=false; banner.style.visibility="hidden";
+  let max=0;
+  Z.callouts.forEach((c)=>{
+    banner.textContent="";
+    banner.appendChild(document.createTextNode(c.txt));
+    if(c.caption){ const em=document.createElement("em"); em.textContent=c.caption; banner.appendChild(em); }
+    max=Math.max(max,banner.getBoundingClientRect().height);
+  });
+  banner.hidden=vorherHidden; banner.style.visibility=vorherSichtbar; banner.innerHTML=vorherHtml;
+  return max;
+}
+const STAND_FONT_PX=30; // dieselbe Zahl wie im ctx.font weiter unten -- eine Quelle statt zwei
+let standZeileYCache=null;
+function standZeileYZuruecksetzen(){ standZeileYCache=null; }
+function standZeileY(Z){
+  if(standZeileYCache!=null)return standZeileYCache;
+  const bug=document.getElementById("fokusbug");
+  if(!bug||bug.hidden)return H*0.15; // #fokusbug noch nicht gefuellt -- vorlaeufiger Wert, kein Cache
+  const cvRect=cv.getBoundingClientRect();
+  const scale=cvRect.width/W;
+  if(!scale)return H*0.15;
+  const bugUntenEcht=bug.getBoundingClientRect().bottom-cvRect.top;
+  // 8px Abstand vor dem Callout (wie positioniereCallout), die tatsaechlich hoechste
+  // Callout-Zeile dieses Drehbuchs (gemessen, nicht geraten), plus 8px Sicherheitsabstand
+  // danach, bevor die Textzeile beginnen darf.
+  const calloutHoehe=tiefsteCalloutHoehe(Z)||53; // Fallback: kuerzeste einzeilige Bannerhoehe
+  const echtErforderlich=bugUntenEcht+8+calloutHoehe+8;
+  // echtErforderlich/scale liefert die Canvas-Y, an der die Callout-Unterkante endet --
+  // ctx.textBaseline ist "middle" (s. zeichneBuehne), die Textzeile ragt also noch um die
+  // halbe Schriftgroesse UEBER diese Grundlinie hinaus. STAND_FONT_PX/2 addiert genau diese
+  // Reserve (in Canvas-Einheiten, nicht in echten Px -- die Schrift skaliert mit der Leinwand
+  // mit, der Puffer muss also mitskalieren, nicht in echten Px festgelegt sein).
+  return standZeileYCache=Math.max(H*0.10,echtErforderlich/scale+STAND_FONT_PX/2);
+}
+
 function zeichneBuehne(Z,uhr){
   ctx.clearRect(0,0,W,H);
   // Boden
@@ -316,15 +375,16 @@ function zeichneBuehne(Z,uhr){
   const idx=Z.duelle.indexOf(d);
   const stand=uhr>=d.fall?d.stand:(idx>0?Z.duelle[idx-1].stand:[0,0]);
 
-  // DUELLSTAND-ZEILE oben, wie in zeichneHeben — nur etwas tiefer (H*0.15 statt 0.10),
-  // weil das Callout-Banner (#bbugcallout, top:8px) sonst genau darauf liegt.
+  // DUELLSTAND-ZEILE oben, wie in zeichneHeben — nur etwas tiefer, damit sie das Callout-
+  // Banner nicht ueberlappt (s. standZeileY() oben fuer die Begruendung/Herleitung).
+  const standY=standZeileY(Z);
   ctx.textAlign="center";ctx.textBaseline="middle";
-  ctx.font="700 30px 'Barlow Condensed',sans-serif";
+  ctx.font="700 "+STAND_FONT_PX+"px 'Barlow Condensed',sans-serif";
   ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
   const standTxt=stand[0]+" : "+stand[1];
-  ctx.strokeText(standTxt,W/2,H*0.15); ctx.fillStyle="#f2e9d8"; ctx.fillText(standTxt,W/2,H*0.15);
+  ctx.strokeText(standTxt,W/2,standY); ctx.fillStyle="#f2e9d8"; ctx.fillText(standTxt,W/2,standY);
   ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-  ctx.fillText("Duell "+(idx+1)+" von "+Z.duelle.length+" · "+d.titel+" · "+d.a+" gegen "+d.b,W/2,H*0.205);
+  ctx.fillText("Duell "+(idx+1)+" von "+Z.duelle.length+" · "+d.titel+" · "+d.a+" gegen "+d.b,W/2,standY+H*0.055);
 
   // Figuren: Einmarsch, Schlag, Fall.
   const y=H*0.46;
@@ -404,13 +464,27 @@ function zeichneBuehne(Z,uhr){
 // ein Sprung auf der Zeitachse (setzeUhr) dasselbe Bild liefert wie das Abspielen.
 const CALLOUT_DAUER_MS=2600;
 let calloutAktiv=null;
+// CALLOUT-POSITION: dasselbe Muster wie positioniereCallout() in battle-mode.engine.js
+// (Nachtrag 27.09., Review-Fund "29 von 29 Callouts ueberlappen weiterhin"), nur bezogen
+// auf #fokusbug statt #bbug -- diese Seite hat ihre eigene, page-lokale Score-Box
+// (.db-fokusbug) statt des generischen Broadcast-Bugs. Reine Anzeigeposition
+// (getBoundingClientRect()), kein Einfluss auf das Drehbuch/die Zeitachse.
+function positioniereCallout(banner){
+  const bug=document.getElementById("fokusbug");
+  const bezug=banner.offsetParent;
+  if(!bug||bug.hidden||!bezug){ banner.style.top=""; return; }
+  const bugUnten=bug.getBoundingClientRect().bottom;
+  const bezugOben=bezug.getBoundingClientRect().top;
+  const abstand=8;
+  banner.style.top=Math.max(0,bugUnten-bezugOben+abstand)+"px";
+}
 function callout(txt,caption){
   const banner=document.getElementById("bbugcallout");
   if(!banner)return;
   banner.textContent="";
   banner.appendChild(document.createTextNode(txt));
   if(caption){ const em=document.createElement("em"); em.textContent=caption; banner.appendChild(em); }
-  banner.hidden=false; banner.classList.remove("zu"); void banner.offsetWidth; banner.classList.add("zu");
+  banner.hidden=false; positioniereCallout(banner); banner.classList.remove("zu"); void banner.offsetWidth; banner.classList.add("zu");
 }
 function calloutAus(){ const b=document.getElementById("bbugcallout"); if(!b)return; b.classList.remove("zu"); b.hidden=true; }
 function aktualisiereCallout(Z,uhr){
@@ -473,6 +547,7 @@ requestAnimationFrame(frame);
 
 function starteAufloesung(){
   D=baueDrehbuch(A); Z=baueZeitachse(D);
+  standZeileYZuruecksetzen(); // neue Aufloesung, neue Callout-Texte -- Cache neu berechnen
   document.getElementById("drehbuchSchluessel").textContent="Drehbuch-Schlüssel: "+D.schluessel;
   document.getElementById("feed").textContent=""; feedBis=0; uhr=0; laeuft=false;
   document.getElementById("endstand").hidden=true; document.getElementById("ehighlights").hidden=true;
@@ -576,5 +651,9 @@ window.__drehbuch={
   callouts:()=>Z?Z.callouts.map(c=>({t:c.t,txt:c.txt})):null,
   probeAlle:()=>Object.fromEntries(Object.keys(VORGABEN).map(k=>{const d=baueDrehbuch(kopie(VORGABEN[k])); return [k,{schluessel:d.schluessel,stand:d.stand,sieg:d.sieg,callouts:d.duelle.flatMap(x=>[x.ansage&&x.ansage.txt,x.fazit&&x.fazit.txt]).filter(Boolean)}];})),
   bilderGeladen:()=>!!ATLAS&&Object.values(BILDER).every(im=>im.complete&&im.naturalWidth>0),
+  // Nachtrag 27.09., Verifikation des Duellstand-Zeile/Callout-Ueberlapp-Fixes (s.
+  // standZeileY() oben): letzter berechneter Canvas-Y-Wert, damit Playwright ihn ohne
+  // Formel-Verdopplung direkt nachpruefen kann. Reine Lesefunktion.
+  standZeileY:()=>standZeileYCache!=null?standZeileYCache:standZeileY(Z),
 };
 })();

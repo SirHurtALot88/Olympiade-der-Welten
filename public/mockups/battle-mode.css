@@ -614,16 +614,22 @@
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
      dieselbe Overlay-Ebene wie der Bug, zentriert und nur ein paar Sekunden sichtbar.
-     TOP 60px statt 8px (Nachtrag 27.09., vier unabhaengige Opus-Ingame-Reviews desselben
-     Tages): beide lagen bei top:8px genau uebereinander, der Callout (spaeter im DOM, siegt
-     also im Stapel) verdeckte damit bei JEDEM Highlight-Ereignis den Bug darunter -- also
-     ausgerechnet in dem Moment, in dem der Zuschauer Punktestand und Uhr am dringendsten
-     sehen will (Tor, Fuehrungswechsel, grosser Treffer). Der Bug ist ca. 47 Anzeige-Pixel
-     hoch (s. Messung bei kuerFlaeche() in battle-mode.engine.js, dieselbe Zahl, mit der auch
-     .bahnhud weiter unten seinen Abstand begruendet) UND in festen px-Schriftgroessen
-     gesetzt, seine Hoehe bleibt also unabhaengig von der Fensterbreite konstant -- 60px feste
-     Distanz raeumt ihm damit bei jeder getesteten Groesse zuverlaessig Platz, ohne auf eine
-     Prozentangabe der responsiv skalierenden Leinwand angewiesen zu sein. */
+     TOP war zunaechst fest 60px statt 8px (Nachtrag 27.09., vier unabhaengige Opus-
+     Ingame-Reviews desselben Tages): beide lagen bei top:8px genau uebereinander, der
+     Callout (spaeter im DOM, siegt also im Stapel) verdeckte damit bei JEDEM Highlight-
+     Ereignis den Bug darunter. Eine feste Zahl reicht dafuer aber nicht: eine fuenfte,
+     unabhaengige Review (27.09.) mass bei schmalen Fensterbreiten (360-375px) weiterhin
+     Rest-Overlap bis -20px, weil .bbug/.bbugmitte dort selbst hoeher wird -- die
+     Team-Boxen (.seite) brechen um, sobald Name+Wert nicht mehr nebeneinander passen
+     (Fechten: 66,25px statt 39,25px). GENAU das Problem, fuer das .bahnhud weiter unten
+     schon auf Prozentangaben umgestiegen ist -- hier hilft eine Prozentangabe aber nicht,
+     weil die Bug-Hoehe nicht an der Leinwand haengt, sondern am Textinhalt (Teamnamen/
+     Werte), der sich Spiel fuer Spiel und Disziplin fuer Disziplin unterscheidet. Deshalb
+     TOP HIER NUR NOCH FALLBACK: positioniereCallout() in der Engine (bzw. dasselbe Muster
+     in drehbuch-aufstellung.js fuer #fokusbug) misst die tatsaechliche Bug-Unterkante per
+     getBoundingClientRect() bei JEDEM callout()-Aufruf und setzt banner.style.top passend
+     -- reine Anzeigeposition, kein Einfluss auf MESS/Wertung/RNG. Der Wert hier greift nur,
+     solange kein JS gelaufen ist (z.B. allererster Seitenaufbau, Element noch [hidden]). */
   .oly-battle-arena.oly-battle-arena .bbugcallout{position:absolute;top:60px;left:50%;
     transform:translate(-50%,-6px);max-width:min(88%,560px);
     background:rgba(15,19,26,.88);border:1px solid var(--warn);border-radius:8px;
