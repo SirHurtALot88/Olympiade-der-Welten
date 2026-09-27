@@ -22871,6 +22871,10 @@
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
+    // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
+    // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
+    ersteAusschaltungVergeben=false;
     // KONTROLLPUNKT NEU AUFSETZEN (nur Battlefield, s. ARENA_DOMINATION) — VOR PLAN/id,
     // damit ein Wechsel weg von Battlefield (disc jetzt tdm/mini-dm) KP wieder auf null
     // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
@@ -23052,15 +23056,81 @@
   // vorher stand dieselbe Zeile (down setzen, tode/ko zaehlen, verteileKo, Feed-Meldung)
   // zweimal im Code. Jetzt entscheidet eine Stelle, ob jemand fuer immer faellt
   // (Mini-DM/Battlefield, unveraendertes Verhalten) oder in TDM respawnt.
+  //
+  // "GROSS" IST NICHT MEHR JEDE AUSSCHALTUNG (Opus-Ingame-Review, 27.09.): mit dem
+  // TDM-Respawn (26.09., s. TDM_RESPAWN_SEK oben) faellt derselbe Kaempfer mehrfach in
+  // einem Spiel — gemessen 46 grosse Callouts in einem Spiel, weit ueber dem eigenen
+  // Zielband von 4-10 je Spiel (docs/design/broadcast-praesentation-runde-2-22-09.md
+  // Abschnitt 9, Frage 1). Etwa die Haelfte davon waren "X faellt"-Meldungen, jede
+  // einzelne davon big. Der Ticker-Text bleibt fuer JEDE Ausschaltung wie bisher stehen
+  // (nichts geht an Information verloren) — nur der grosse Banner/die HIGHLIGHTS-Liste
+  // bekommt jetzt eine echte Auswahl, angelehnt an das, was eine Kampf-Uebertragung
+  // tatsaechlich ausruft: der erste Blutzoll des Spiels, eine Ausschaltung, die die
+  // Fuehrung wechselt (Ausschaltungszahl der eigenen Seite gegen die des Gegners —
+  // dasselbe Feld, das auch kampfSieger() fuer TDM/Mini-DM vergleicht), eine schnelle
+  // Mehrfachausschaltung derselben Person, ODER — nur ausserhalb TDM, wo eine volle
+  // Ausloeschung sofort das Spiel beendet (s. stepSim,
+  // `(disc!=="tdm"&&lebendeSeiten.size<=1)||t>95`) — die spielentscheidende letzte
+  // Ausschaltung. Bei TDM respawnt die volle Ausloeschung einer Seite dagegen einfach
+  // weiter und ist damit ein Routine-Moment, kein Finale. Reine Anzeige-Auswahl:
+  // schalteAus() selbst (wer faellt, wann er respawnt, tode/ko-Zaehlung, verteileKo)
+  // ist unveraendert, es aendert sich nur das dritte Argument von feed().
+  const KAMPF_MEHRFACHKILL_FENSTER_SEK=8;
+  let ersteAusschaltungVergeben=false;
+  const seitenScore=(side)=>U.filter(u=>u.side===side).reduce((s,u)=>s+u.st.ko,0);
+
   function schalteAus(tg,von){
+    const scoreVonVorher=seitenScore(von.side), scoreTgVorher=seitenScore(tg.side);
     tg.st.tode++; von.st.ko++; verteileKo(tg,von);
     tg.down=true;
+
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+
+    // War die eigene Seite vor diesem Treffer im Rueckstand oder gleichauf, und fuehrt sie
+    // jetzt (oder zieht gleich)? Ein bereits fuehrendes Team, das den Vorsprung nur
+    // ausbaut, ist kein Wechsel und bleibt klein.
+    const fuehrungswechsel=scoreVonVorher<=scoreTgVorher && scoreVonVorher+1>scoreTgVorher;
+
+    // Derselbe Angreifer hat innerhalb des Fensters schon einmal ausgeschaltet.
+    const letzterKoT=von._letzterKoT;
+    von._letzterKoT=t;
+    const mehrfachkill=letzterKoT!=null && (t-letzterKoT)<=KAMPF_MEHRFACHKILL_FENSTER_SEK;
+
+    const entscheidend=disc!=="tdm" && live(tg.side).length===0;
+
+    const big=ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend;
+
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",big,waehleCaption(CAPTION_KO,tg.n));
     } else {
-      feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n));
     }
+  }
+
+  // GROSSER TREFFER STATT "HAT UEBERHAUPT EIN LABEL" (Opus-Ingame-Review, 27.09.): vorher war
+  // JEDER benannte Skill automatisch big, egal wie viel Schaden er machte — "Krolach —
+  // Trennschlag auf Greenkraut · 4" fuer vier Punkte war die eine Haelfte der gemessenen 46
+  // Callouts eines Spiels (die andere Haelfte war schalteAus() oben). GEMESSEN (Playwright,
+  // s. PR-Beschreibung): eine reine Prozentschwelle auf den Schaden allein reicht nicht — die
+  // Kampf-HP-Pools liegen bei 230-420, Einzelschlaege ueblicherweise bei 15-50, das ist so gut
+  // wie nie ein Viertel des Lebens. Der erste Versuch (`d>=0.25*max` oder `hp<=0.2*max` als
+  // reiner ZUSTAND) fing stattdessen etwas anderes ein: sobald ein Ziel einmal unter die
+  // Schwelle faellt, blieb JEDER weitere Chiphit auf es big, solange es nicht faellt oder
+  // geheilt wird — Fokusfeuer auf ein bereits angeschlagenes Ziel machte so aus einem
+  // einzigen Fast-Tod ein rundes Dutzend Callouts (19-23 statt der urspruenglich 4-10 im
+  // Zielband). Jetzt zaehlt nur der TREFFER, DER DIE SCHWELLE REISST — vorher drueber, jetzt
+  // drunter, aber noch nicht der Fall selbst (das meldet schalteAus() separat, mit seinen
+  // eigenen Kriterien) — dasselbe Uebergangs-Muster wie buehneWurdeFuehrend() oben. Der
+  // Burst-Zweig bleibt als Netz fuer echte Ausreisser (ein Schlag reisst ein Drittel des
+  // Lebens weg). Reiner Anzeige-Schwellwert — skillSchaden()/treffer()/d selbst bleiben
+  // unveraendert.
+  function grosserTreffer(hpVorher,hpNachher,d,max,crit){
+    if(crit)return true;
+    if(d>=0.35*max)return true;
+    const schwelle=0.15*max;
+    return hpVorher>schwelle && hpNachher>0 && hpNachher<=schwelle;
   }
 
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
@@ -23080,10 +23150,12 @@
     tg.lastHit=u;
     const crit=false;   // Krits kommen kuenftig aus dem Skill, nicht aus einem Spielerwert.
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
+    const hpVorher=tg.hp;
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
-    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
+    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
+      grosserTreffer(hpVorher,tg.hp,d,tg.max,crit));
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -23712,12 +23784,16 @@
       if(z){
         const crit=false;
         const roh=pf.roh*(crit?1.5:1);
+        const hpVorher=z.hp;
         const d=treffer(pf.von,z,roh,1);
         stossen(z,pf.x,pf.y,pf.knock);
         schwebe({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
+        // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
+        // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
+        // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
-          (fremd?" (danebengezielt)":"")+" · "+d,crit);
+          (fremd?" (danebengezielt)":"")+" · "+d,grosserTreffer(hpVorher,z.hp,d,z.max,crit));
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
