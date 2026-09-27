@@ -92,7 +92,16 @@
       </div>
       <div class="scoreline">
         <div class="tname" id="tnameL">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
-        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small></div>
+        <!-- KONTROLLPUNKT-NEBENZEILE (ARENA-ZEIT-FIX, 27.09.): Battlefields Sieg haengt laut
+             kampfSieger()/dominationSieger() zuerst an Ausschaltungen, das Kontrollpunkt-
+             Punktelimit greift nur, wenn niemand komplett am Boden liegt — beobachtet stand
+             der KP-Stand in einem Testspiel bis kurz vor Schluss bei 0:0, waehrend die
+             Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die grosse Zahl
+             (#score) zeigt seitdem fuer alle drei Kampf-Disziplinen dieselben Ausschaltungen;
+             diese kleine Zeile bleibt nur fuer Battlefield sichtbar (KP gesetzt, s.
+             updateHud()) und zeigt den Kontrollpunkt-Stand als Nebeninfo, nicht als Sieger-
+             Massstab. -->
+        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small><small id="kpzeile" style="display:none">Kontrollpunkte <span id="kpscore">0 : 0</span></small></div>
         <div class="tname r" id="tnameR">Armageddon Aftermath<em><span id="aliveR">6</span> im Kampf · A-A</em></div>
       </div>
       <div class="hpbars">
@@ -281,7 +290,13 @@
         </div>
       </div>
     </div>
-    <div class="notes">
+    <!-- TDM-ENTWICKLERPANELS (Opus-Review 27.09.): die drei Notizen hier unten dokumentieren
+         Nutzwert-Waechter, Verhaltensmodell und das provisorische Einheits-Kit — alles
+         TDM-spezifische Entwurfs-/Designdokumentation, die fuer die uebrigen neunzehn
+         Disziplinen keinen Sinn ergibt. `id` hier NUR zum Gaten in reset()
+         (battle-mode.engine.js, "TDM-ENTWICKLERPANELS NUR FUER TDM"); Inhalt bleibt
+         unangetastet fuer TDM. -->
+    <div class="notes" id="tdmEntwurfNotes">
       <div class="note">
         <h3>Nutzwert je Skill — der Wächter gegen zu starke Kits</h3>
         <p class="muted" style="font-size:12px;margin:0 0 8px">Aus den Wechselkursen ausgerechnet,

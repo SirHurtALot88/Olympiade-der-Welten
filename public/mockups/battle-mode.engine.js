@@ -5234,8 +5234,8 @@
   };
   const SLOTS_JE_DISC={
     "tdm":[
-      {id:"vanguard",label:"Vanguard",text:"Oeffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
-      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und haelt Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
+      {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
+      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und hält Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
       {id:"shotcaller",label:"Shotcaller",text:"Ordnet den Fight über Intelligence und Charisma.",gross:"charisma",klein:"intelligence",last:"power",mueh:"low",profil:{power:25.6,health:18.3,charisma:14.4,stamina:12.8,spirit:11,intelligence:8.7,determination:5.5,awareness:1.9,torment:1.9}},
       {id:"holdline",label:"Hold Line",text:"Stabilisiert knappe Phasen mit Health und Determination.",gross:"health",klein:"determination",last:"stamina",mueh:"medium",profil:{health:25.4,power:24.8,stamina:12.5,spirit:10.7,charisma:8.9,determination:8.7,intelligence:5.4,awareness:1.9,torment:1.9}},
       {id:"rallypoint",label:"Rally Point",text:"Hebt Team-Momentum über Spirit und Charisma.",gross:"spirit",klein:"charisma",last:"power",mueh:"low",profil:{power:24.7,health:17.7,spirit:17.3,charisma:13.4,stamina:12.4,determination:5.4,intelligence:5.4,awareness:1.9,torment:1.9}},
@@ -5243,44 +5243,44 @@
     ],
     "mini-dm":[
       {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:25.4,torment:20.6,power:19.4,stamina:13.8,will:12.1,dexterity:8.7}},
-      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
+      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
       {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:21.5,health:17.9,will:17.4,dexterity:14.4,power:14.4,stamina:14.4}},
       {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:24.5,stamina:22,health:19.4,power:16.3,will:14.3,dexterity:3.5}}
     ],
     "battlefield":[
-      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
       {id:"spotter",label:"Spotter",text:"Liest Lücken und Ziele über Awareness.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
     ],
     "gewichtheben":[
       {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
       {id:"safelift",label:"Safe Lift",text:"Sichert Punkte über Health und Determination.",gross:"health",klein:"determination",last:"power",mueh:"low",profil:{power:24.4,health:21.4,charisma:20.1,determination:15.4,will:6.2,speed:5.3,dexterity:5.3,stamina:1.8}},
       {id:"pressurelift",label:"Pressure Lift",text:"Geht aggressiv in schwere Versuche.",gross:"charisma",klein:"power",last:"health",mueh:"high",profil:{power:31.4,charisma:28.4,health:13,determination:9.8,will:5.8,speed:5,dexterity:5,stamina:1.8}},
-      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausfuehrung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
-      {id:"gripanchor",label:"Grip Anchor",text:"Haelt über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
-      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom grossen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
+      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausführung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
+      {id:"gripanchor",label:"Grip Anchor",text:"Hält über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
+      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom großen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
     ],
     "climbing":[
       {id:"routereader",label:"Route Reader",text:"Findet die Linie über Determination und Awareness.",gross:"determination",klein:"awareness",last:"stamina",mueh:"low",profil:{stamina:22.9,determination:21.4,awareness:11.4,speed:10.6,dexterity:10.6,health:8.9,power:7.1,will:7.1}},
-      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Zuege.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
-      {id:"paceclimber",label:"Pace Climber",text:"Haelt Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
+      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Züge.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
+      {id:"paceclimber",label:"Pace Climber",text:"Hält Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
       {id:"endurancewall",label:"Endurance Wall",text:"Klettert stabil über Stamina und Health.",gross:"stamina",klein:"health",last:"dexterity",mueh:"high",profil:{stamina:31.4,determination:13.7,health:13.4,speed:10.3,dexterity:10.3,power:6.9,awareness:6.9,will:6.9}},
-      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Zuege über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
+      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Züge über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
       {id:"summitpush",label:"Summit Push",text:"Zieht den Schluss über Determination und Will.",gross:"will",klein:"determination",last:"stamina",mueh:"high",profil:{stamina:24.3,determination:18.8,will:12.8,health:11.3,power:8.5,awareness:8.5,dexterity:8.1,speed:7.6}}
     ],
     "staffel":[
       {id:"startrunner",label:"Start Runner",text:"Bringt die Staffel mit Speed in Position.",gross:"speed",klein:"stamina",last:"awareness",mueh:"medium",profil:{speed:29.4,stamina:19.4,spirit:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"tempolink",label:"Tempo Link",text:"Haelt Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
+      {id:"tempolink",label:"Tempo Link",text:"Hält Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
       {id:"batontech",label:"Baton Tech",text:"Sichert Wechsel über Awareness und Dexterity.",gross:"awareness",klein:"dexterity",last:"stamina",mueh:"low",profil:{speed:21.3,awareness:17.3,stamina:14.2,spirit:14.2,dexterity:11.4,charisma:8.9,will:7.2,determination:3.6,health:1.9}},
       {id:"curverunner",label:"Curve Runner",text:"Braucht Speed und Will für schwierige Abschnitte.",gross:"speed",klein:"will",last:"dexterity",mueh:"medium",profil:{speed:29.4,stamina:13.9,spirit:13.9,will:11.4,awareness:10.4,charisma:8.7,dexterity:7,determination:3.5,health:1.8}},
       {id:"chaserunner",label:"Chase Runner",text:"Jagt Rückstände mit Spirit und Speed.",gross:"spirit",klein:"speed",last:"stamina",mueh:"high",profil:{speed:27.4,spirit:21.4,stamina:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"anchor",label:"Anchor",text:"Schliesst die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
+      {id:"anchor",label:"Anchor",text:"Schließt die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
     ],
     "time-trial":[
-      {id:"pacer",label:"Pacer",text:"Haelt die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"pacer",label:"Pacer",text:"Hält die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"linereader",label:"Line Reader",text:"Findet Sekunden über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"speed",mueh:"low",profil:{intelligence:23.4,dexterity:21.8,speed:19.2,awareness:15.4,stamina:13.1,power:4.4,torment:2.7}},
-      {id:"aerodrive",label:"Aero Drive",text:"Drueckt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"aerodrive",label:"Aero Drive",text:"Drückt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"splitcontrol",label:"Split Control",text:"Kontrolliert Zwischenzeiten über Intelligence.",gross:"intelligence",klein:"stamina",last:"dexterity",mueh:"low",profil:{intelligence:23.4,dexterity:21.6,speed:19,stamina:18.4,awareness:10.4,power:4.4,torment:2.7}},
       {id:"risksegment",label:"Risk Segment",text:"Nimmt Risiko über Dexterity und Torment.",gross:"dexterity",klein:"torment",last:"awareness",mueh:"high",profil:{dexterity:30.4,speed:19.9,intelligence:16.3,stamina:13.6,awareness:10.9,power:4.6,torment:4.5}},
       {id:"finishkick",label:"Finish Kick",text:"Holt den Schluss über Speed und Power.",gross:"stamina",klein:"awareness",last:"stamina",mueh:"high",profil:{speed:21.1,stamina:20,dexterity:17.4,awareness:15.3,intelligence:15.1,power:8.1,torment:3}}
@@ -5290,30 +5290,30 @@
       {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"awareness",last:"speed",mueh:"low",profil:{dexterity:17.3,speed:16.1,determination:13.4,will:12.5,torment:12.5,awareness:10.1,power:9,health:5.4,stamina:3.6}},
-      {id:"drivephase",label:"Drive Phase",text:"Drueckt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
+      {id:"drivephase",label:"Drive Phase",text:"Drückt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
       {id:"photofinish",label:"Photo Finish",text:"Braucht Nerven und Torment für den letzten Meter.",gross:"will",klein:"torment",last:"speed",mueh:"medium",profil:{will:17.5,torment:17.5,dexterity:12.9,determination:11.8,power:11.5,health:9.5,awareness:7.4,stamina:6.2,speed:5.9}}
     ],
     "tennis":[
       {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
-      {id:"return",label:"Return",text:"Liest Aufschlaege über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
-      {id:"rallycontrol",label:"Rally Control",text:"Haelt Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
+      {id:"return",label:"Return",text:"Liest Aufschläge über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
+      {id:"rallycontrol",label:"Rally Control",text:"Hält Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
       {id:"netpressure",label:"Net Pressure",text:"Greift über Dexterity und Speed an.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:19.8,awareness:18,dexterity:17.3,spirit:16.2,stamina:10.9,speed:8.7,determination:5.5,charisma:3.7}},
       {id:"matchiq",label:"Match IQ",text:"Gewinnt Muster über Intelligence und Determination.",gross:"intelligence",klein:"determination",last:"stamina",mueh:"low",profil:{intelligence:27.4,awareness:17.7,spirit:16,stamina:10.7,dexterity:10.7,determination:8.7,speed:5.4,charisma:3.6}},
       {id:"tiebreak",label:"Tiebreak Clutch",text:"Braucht Spirit und Awareness im Druckmoment.",gross:"spirit",klein:"stamina",last:"determination",mueh:"high",profil:{spirit:23.7,awareness:18.2,stamina:14.6,dexterity:13.2,intelligence:11.3,speed:6.4,determination:6.3,charisma:6.2}}
     ],
     "hockey":[
       {id:"powerforward",label:"Power Forward",text:"Geht dahin, wo es weh tut.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:21.2,health:19,spirit:10.7,speed:10.4,stamina:8.9,torment:8.8,awareness:6.3,determination:3.9,dexterity:3.9,will:3.9}},
-      {id:"defensivewall",label:"Defensive Wall",text:"Schliesst Raeume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
-      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und haelt den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
+      {id:"defensivewall",label:"Defensive Wall",text:"Schließt Räume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
+      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und hält den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
       {id:"playmaker",label:"Playmaker",text:"Verbindet Linien über Power und Awareness.",gross:"awareness",klein:"power",last:"health",mueh:"medium",profil:{power:19.4,health:14.3,spirit:11.3,speed:11,awareness:10.5,stamina:9.3,torment:9.3,determination:4.1,dexterity:4.1,will:4.1}},
       {id:"transition",label:"Transition Runner",text:"Dreht Tempo über Speed und Stamina.",gross:"speed",klein:"stamina",last:"power",mueh:"high",profil:{speed:17.5,power:14.3,health:14.1,stamina:13.8,spirit:11.1,torment:9.1,awareness:6.5,determination:4,dexterity:4,will:4}},
-      {id:"slotfinisher",label:"Slot Finisher",text:"Schliesst Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
+      {id:"slotfinisher",label:"Slot Finisher",text:"Schließt Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
     ],
     "showcase":[
-      {id:"stagelead",label:"Stage Lead",text:"Traegt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"stagelead",label:"Stage Lead",text:"Trägt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"crowdhook",label:"Crowd Hook",text:"Holt Publikum über Charisma und Showcase-Power.",gross:"charisma",klein:"power",last:"intelligence",mueh:"low",profil:{charisma:32.4,power:14.4,spirit:13.6,determination:11.9,intelligence:8.6,dexterity:7.7,speed:6.9,health:2.7,torment:1.8}},
       {id:"styletech",label:"Style Tech",text:"Belohnt saubere Details über Determination und Dexterity.",gross:"determination",klein:"dexterity",last:"charisma",mueh:"medium",profil:{charisma:23.8,determination:19.4,spirit:14.1,dexterity:12.4,power:9.7,intelligence:8.9,speed:7.1,health:2.7,torment:1.9}},
-      {id:"controlbeat",label:"Control Beat",text:"Fuehrt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
+      {id:"controlbeat",label:"Control Beat",text:"Führt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
       {id:"bigmoment",label:"Big Moment",text:"Lebt von Charisma und Spirit im Spotlight.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"finale",label:"Finale",text:"Setzt den Schlussakzent über Spirit.",gross:"speed",klein:"spirit",last:"power",mueh:"medium",profil:{charisma:17,spirit:15.1,power:13.5,speed:13.3,determination:11.8,intelligence:11.3,dexterity:10.6,health:4.6,torment:2.9}}
     ],
@@ -5324,11 +5324,11 @@
       {id:"calculation",label:"Calculation Core",text:"Rechnet Linien über Intelligence.",gross:"determination",klein:"intelligence",last:"awareness",mueh:"low",profil:{intelligence:22.5,determination:20.6,awareness:14.7,will:13.6,dexterity:10.1,speed:10,charisma:8.6}}
     ],
     "takeshis-castle":[
-      {id:"gatecrash",label:"Gate Crash",text:"Oeffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
+      {id:"gatecrash",label:"Gate Crash",text:"Öffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
       {id:"balancerun",label:"Balance Run",text:"Bleibt sauber über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"will",mueh:"medium",profil:{will:19.9,determination:16.3,intelligence:15.9,charisma:12.7,dexterity:8.7,awareness:7.3,torment:6.4,stamina:5.5,health:3.7,speed:3.7}},
       {id:"trapreader",label:"Trap Reader",text:"Liest Fallen über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"determination",mueh:"low",profil:{will:20,determination:16.4,intelligence:14.4,charisma:12.8,awareness:11.5,torment:6.4,stamina:5.5,dexterity:5.5,health:3.7,speed:3.7}},
-      {id:"ironwill",label:"Iron Will",text:"Beisst sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
-      {id:"chaosdodge",label:"Chaos Dodge",text:"Ueberlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
+      {id:"ironwill",label:"Iron Will",text:"Beißt sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
+      {id:"chaosdodge",label:"Chaos Dodge",text:"Überlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
@@ -5341,14 +5341,14 @@
     ],
     "wettessen":[
       {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
-      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kraefte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
-      {id:"ironstomach",label:"Iron Stomach",text:"Haelt Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kräfte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
+      {id:"ironstomach",label:"Iron Stomach",text:"Hält Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"tablefocus",label:"Table Focus",text:"Bleibt klar über Determination und Intelligence.",gross:"determination",klein:"intelligence",last:"health",mueh:"low",profil:{will:23,determination:21.4,health:19.4,stamina:19.4,intelligence:11.4,torment:5.4}},
       {id:"secondwind",label:"Second Wind",text:"Kommt über Will und Stamina zurück.",gross:"will",klein:"stamina",last:"health",mueh:"medium",profil:{will:31.4,stamina:25.4,health:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"finalbite",label:"Final Bite",text:"Zieht den Schluss über Determination und Torment.",gross:"determination",klein:"torment",last:"will",mueh:"high",profil:{will:27.8,determination:20.7,health:20.4,stamina:16.1,torment:10.1,intelligence:5}}
     ],
     "basketball":[
-      {id:"floorgeneral",label:"Floor General",text:"Fuehrt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
+      {id:"floorgeneral",label:"Floor General",text:"Führt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
       {id:"rimpressure",label:"Rim Pressure",text:"Attackiert den Korb über Awareness und Speed.",gross:"awareness",klein:"speed",last:"spirit",mueh:"high",profil:{awareness:19.4,spirit:19.4,intelligence:14.1,speed:13.4,charisma:9.7,dexterity:7.1,power:6.2,stamina:5.4,torment:5.4}},
       {id:"perimeter",label:"Perimeter",text:"Schafft Winkel über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"power",mueh:"medium",profil:{intelligence:21.4,spirit:19.4,awareness:12.4,dexterity:11.4,charisma:9.7,speed:8.9,power:6.2,stamina:5.4,torment:5.4}},
       {id:"helpdefense",label:"Help Defense",text:"Rotiert über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"speed",mueh:"medium",profil:{spirit:25.4,awareness:19.4,intelligence:13.7,charisma:9.5,speed:8.6,dexterity:6.9,power:6.1,stamina:5.2,torment:5.2}},
@@ -5361,11 +5361,11 @@
       {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
       {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
       {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"lockerleader",label:"Locker Leader",text:"Haelt die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
+      {id:"lockerleader",label:"Locker Leader",text:"Hält die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
     ],
     "eiskunstlauf":[
-      {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
-      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Spruenge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
+      {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
+      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Sprünge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
       {id:"spingrace",label:"Spin Grace",text:"Sammelt Stil über Charisma und Spirit.",gross:"charisma",klein:"spirit",last:"dexterity",mueh:"medium",profil:{charisma:33.4,spirit:19.4,dexterity:15.1,awareness:11.8,speed:8.4,intelligence:6.8,determination:5.1}},
       {id:"programflow",label:"Program Flow",text:"Verbindet Elemente über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{charisma:24.7,spirit:21.4,dexterity:15.9,awareness:12.4,intelligence:11.4,speed:8.9,determination:5.4}},
       {id:"crowdmoment",label:"Crowd Moment",text:"Hebt den Auftritt über Charisma.",gross:"charisma",klein:"awareness",last:"determination",mueh:"medium",profil:{charisma:33.4,awareness:17.4,dexterity:15.2,spirit:13.5,speed:8.5,intelligence:6.8,determination:5.2}},
@@ -5377,14 +5377,14 @@
       {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
       {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
       {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
-      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+      {id:"finaltouch",label:"Final Touch",text:"Schließt enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
     ],
     "i-spy":[
       {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
       {id:"patternlock",label:"Pattern Lock",text:"Verkettet Hinweise über Intelligence und Spirit.",gross:"intelligence",klein:"spirit",last:"speed",mueh:"low",profil:{intelligence:23.4,spirit:16.4,torment:14.7,will:10.4,charisma:7.8,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
       {id:"socialread",label:"Social Read",text:"Liest Verhalten über Torment und Charisma.",gross:"torment",klein:"charisma",last:"intelligence",mueh:"medium",profil:{torment:22.4,intelligence:15.8,charisma:12.4,spirit:11.4,will:10.5,determination:7.1,speed:7.1,dexterity:7.1,awareness:4.5,health:1.8}},
-      {id:"logicchain",label:"Logic Chain",text:"Baut Loesungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
-      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffaellig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
+      {id:"logicchain",label:"Logic Chain",text:"Baut Lösungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffällig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
       {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
@@ -11046,7 +11046,7 @@
       // Text zeichengleich die alte Zeile; `steckVis` bleibt dort ungesetzt (0) und
       // zeichneFeldspiel liest es nur bei Hockey.
       feed(decker.side,istHockey()
-        ?decker.n+" uebernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
+        ?decker.n+" übernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
         :decker.n+" erobert den Ball — "+wortStahl+".");
       if(istHockey()){
         decker.steckVis=HK_STEAL_VIS;
@@ -11960,7 +11960,7 @@
       // Ueberlebende") und passen nicht auf Basketballs Punktestand — deshalb hier keine
       // Weiterleitung dorthin, sondern eine eigene, einfache Ansage im Feed. Scoreboard
       // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
-      const sieger=fsPunkte[0]>fsPunkte[1]?"Vigilante Wranglers":fsPunkte[1]>fsPunkte[0]?"Armageddon Aftermath":null;
+      const sieger=fsPunkte[0]>fsPunkte[1]?VEREIN[0].name:fsPunkte[1]>fsPunkte[0]?VEREIN[1].name:null;
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
         +fsPunkte[0]+":"+fsPunkte[1]+".",true);
       return; }
@@ -12045,7 +12045,7 @@
         const beideSeiten=nah.some(u=>u.side===0)&&nah.some(u=>u.side===1);
         const duell=anBande&&beideSeiten;
         fsLive.reboundKampf={t:0,dauer:duell?HK_BANDENDUELL_DAUER:(nah.length>1?0.55:0.40),duell}; // PLATZHALTER
-        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kaempfen um den Puck!");
+        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kämpfen um den Puck!");
         else if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
@@ -13303,7 +13303,7 @@
       // sechs Duelle, also rund 112 s: laenger als die 60 s der anderen Buehnen, kuerzer
       // als Hockeys 240 s, und langsam genug, dass man eine Hantel sieht.
       label:"Gewichtheben", jeSeite:6, rundenN:6, rundenDauer:1.55, heben:true,
-      failAbzug:0, failWort:"ungueltig", erfolgWort:"gueltig",
+      failAbzug:0, failWort:"ungültig", erfolgWort:"gültig",
       // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
       // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
       // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
@@ -13356,7 +13356,7 @@
       // Rest (Wettessen, I-Spy) zu beruehren. Rezept/rundenN/rundenDauer/failAbzug bleiben
       // in dieser PR unangetastet (Abschnitt 4.1: rho 0,892 wird nicht angefasst).
       label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0, showcase:true,
-      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reißt das Publikum mit",
       // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Showcase 28,4/
       // 29,3 Pp, VERLETZT). ERSTER ANLAUF (jede Rolle einzeln auf ihre EIGENE Matrix-Proportion
       // nachgezogen, s. Git-Historie) verschlimmerte die Zahl auf 43,7 Pp bei n=6 -- derselbe
@@ -14077,7 +14077,7 @@
       wertungTabelle:(basis,art)=>({...basis,
         spalten:basis.spalten.map(s=>s.id!=="stand"?s:{...s,
           titel:"Gefecht entschieden nach Trefferstand (+ Sieg, − Niederlage; bei "
-               +"Treffergleichstand entscheidet die Prioritaet aus der Degen-Zusatzminute)",
+               +"Treffergleichstand entscheidet die Priorität aus der Degen-Zusatzminute)",
           wert:z=>!z.fertig?"…":(z.u.gefechtSieg?"+":"−"),
           farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null})})
     }
@@ -14153,6 +14153,14 @@
   // fuer den Loop-N1-Fix): bauBuehne() laeuft garantiert bei JEDEM neuen Buehnen-Match,
   // ob ueber reset() oder einen frischen setDisc().
   let schachMattGehoert=false;
+  // ENDSTAND-OVERLAY-WAECHTER (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe
+  // Einmal-Melden-Muster wie `bahnEndeGemeldet` (s. dort) -- ohne diese Bremse wuerde
+  // updateHudBuehne() das #endstand-Overlay bei JEDEM Frame nach `done` erneut aufbauen
+  // und die Feed-/Callout-Zeile erneut feuern (buehnenBewegung() laeuft ja bewusst
+  // WEITER, s. stepBuehne()s "N-Fix"-Kommentar oben). Reset hier statt in reset(),
+  // aus demselben Grund wie schachMattGehoert direkt darueber: bauBuehne() laeuft
+  // garantiert bei jedem neuen Buehnen-Match.
+  let buehneEndeGemeldet=false;
 
   // WAGNIS IST EIN WAGNIS (26.09., Befund B aus docs/design/buehne-auftritt-opus-konzeptreview-
   // 26-09.md Abschnitt 1.3). Vorher stand WAGNIS im generischen Auftritt-Rechner unten in
@@ -14196,6 +14204,7 @@
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
+    buehneEndeGemeldet=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -15079,8 +15088,8 @@
         }
         u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt,
           punkte:gueltig?kg:0,
-          ereignis:(uebung==="reissen"?"Reissen":"Stossen")+", "+(v+1)+". Versuch, "+kg+" kg — "
-                   +(gueltig?"gueltig":"ungueltig")+(kuehn?" (kühner Versuch)":"")});
+          ereignis:(uebung==="reissen"?"Reißen":"Stoßen")+", "+(v+1)+". Versuch, "+kg+" kg — "
+                   +(gueltig?"gültig":"ungültig")+(kuehn?" (kühner Versuch)":"")});
       }
     }
   }
@@ -16070,21 +16079,53 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
+        // Doppel-Feuer): vorher erst weiter unten und nur fuer Fechten berechnet
+        // (`fechtGegner`) -- die beiden Gates unten (Vorteil-kippt-Highlight,
+        // Brett-entschieden) brauchen denselben Gegner-Verweis aber fuer ALLE drei
+        // Duell-Disziplinen (Schach/Fechten/Tennis), nicht nur Fechten. `u.brett` gruppiert
+        // die Paare unveraendert seit bauBuehne() (s. dortiger Kommentar), reines Lesen.
+        const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
         // FUEHRUNGSWECHSEL AM BRETT (Broadcast Runde 2, Vorschlag 1.2, 26.09.): ersetzt
         // `r.punkte>=60` (Speed-Schach 61 von 134 Zeilen, fast jeder zweite Zug -- gemessen,
         // Konzept Abschnitt 4.2) durch den Moment, den ein Zuschauer am Brett tatsaechlich
         // sieht: das Vorzeichen des Vorteils kippt gegenueber dem letzten Zug DIESES
         // Teilnehmers. "Brett entschieden" (unten) und die Fechten-Periode bleiben ohnehin
         // schon immer big, unveraendert.
-        const vVorher=u.aktuell>0?u.verlauf[u.aktuell-1]:0;
-        const vorteilKipptBig=Math.sign(v)!==Math.sign(vVorher);
+        //
+        // ZWEI FIXES (27.09., Opus-Review-Fund, dieselbe Review wie die Gegen-Gate-Notiz bei
+        // "PERIODE BEENDET" unten):
+        //
+        // 1. ERSTER ZUG OHNE VORGAENGER (falscher Fuehrungswechsel): `u.aktuell>0?...:0`
+        // liess `vVorher` beim allerersten Zug (`u.aktuell===0`) auf 0 zurueckfallen -- JEDER
+        // von Null verschiedene erste Zug wurde dadurch als "Fuehrung kippt" gewertet, obwohl
+        // es noch gar keinen vorherigen Zustand gab, von dem aus sie haette kippen koennen (bis
+        // zu 12 Bretter x 2 Seiten = bis zu 24 falsche Highlights in den ersten Sekunden jedes
+        // Spiels). Der Vergleich braucht jetzt zwingend einen echten Vorgaenger: `u.aktuell>0`
+        // ist Teil der Bedingung selbst, nicht mehr nur ein Default-Wert dahinter.
+        //
+        // 2. DOPPEL-FEUER (einmal je Seite): `u.verlauf`/`gegner.verlauf` sind exakt gespiegelt
+        // (`b.verlauf=verlauf.map(v=>-v)`, s. bauBuehne()-Kommentar) -- ein echter
+        // Fuehrungswechsel kippt das Vorzeichen bei BEIDEN Seiten IMMER im selben Zug (Negation
+        // aendert nichts an der Kipp-Bedingung), und beide Seiten durchlaufen diesen Zweig fuer
+        // denselben Zug separat (REIHENFOLGE oben: `mine[i]` dann `gegner[i]`, Runde fuer
+        // Runde) -- ohne Gate markierte das jede Seite unabhaengig als big, macht aus einem
+        // Ereignis zwei Highlight-Zeilen. Gate: nur die Seite, deren Gegner DIESE Runde bereits
+        // enthuellt hat (`gegner.aktuell>=u.aktuell`), darf big setzen -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, exakt
+        // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
+        // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
+        // bleiben unberuehrt.
+        const vorteilKipptBig=u.aktuell>0
+          &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
+          &&(!gegner||gegner.aktuell>=u.aktuell);
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
-        const fechtGegner=BB().fechten?TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side):null;
+        const fechtGegner=BB().fechten?gegner:null;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
@@ -16095,16 +16136,40 @@
         // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
         // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
         // darunter schon "BRETT ENTSCHIEDEN".
-        if(BB().fechten&&u.side===0){
-          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
-          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
-          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
-          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
+        if(BB().fechten){
+          // NUR EINMAL JE BRETT/PERIODE (Review-Fund PR #928, 14.09.): jedes Brett hat genau
+          // eine Seite-0- und eine Seite-1-Haelfte, die unabhaengig durch dieselbe
+          // Enthuellungs-Warteschlange laufen -- ohne ein Gate feuerte der Beat zweimal pro
+          // Brett/Periode (einmal je Seitenperspektive, Sekundenbruchteile auseinander),
+          // inklusive doppeltem Callout-Banner.
+          //
+          // GEGEN-GATE STATT SEITE-0-GATE (Fix 27.09., Opus-Review): das alte `u.side===0`
+          // loeste zwar das Doppel-Feuer-Problem, feuerte dabei aber sofort nach dem Heim-Zug
+          // dieser Periode -- BEVOR der Gastfechter seinen eigenen Zug fuer dieselbe Periode
+          // geloggt hatte. Die Meldung las dadurch einen veralteten Trefferstand (Beispiel aus
+          // der Review: gemeldet "3:2", der wahre Stand in diesem Moment war schon 3:3, weil
+          // Krag'Zuls Aktion fuer diese Periode nur noch nicht durchgereicht war). Reine Lese-/
+          // Zeitpunkt-Korrektur, KEINE Aenderung an Zaehlweise/RNG: der Beat feuert jetzt erst,
+          // wenn der GEGNER diese Periodengrenze ebenfalls schon erreicht hat (`fechtGegner.
+          // aktuell` faengt genau das ein) -- das ist zugleich weiterhin das einzige der beiden
+          // Seiten-Ereignisse, das feuert (die zuerst ankommende Seite sieht das Gate noch
+          // geschlossen, nur die zweite sieht es offen), also weiterhin genau einmal je
+          // Brett/Periode, nur jetzt mit dem tatsaechlich vollstaendigen Trefferstand.
           const proPeriode=BB().rundenN/3;
           if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
             const periode=(u.aktuell+1)/proPeriode;
-            feed(u.side,"Periode "+periode+" beendet — "+u.n+" gegen "+u.gegnerN+
-              ": Vorteil "+(v>0?"+":"")+v+", Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)+".",true);
+            const gegnerFertig=fechtGegner&&(fechtGegner.aktuell+1)>=periode*proPeriode;
+            if(gegnerFertig){
+              // Anzeige stabil aus Sicht von Seite 0 aufgebaut, unabhaengig davon, welche
+              // Seite hier gerade als zweite ankam und den Beat damit ausgeloest hat --
+              // `seite0.verlauf[seite0.aktuell]` ist der eigene, schon fest geloggte
+              // Vorteilswert dieser Seite fuer GENAU diese Periodengrenze (nicht `v`, das nur
+              // fuer das gerade verarbeitete `u` gilt).
+              const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
+              const v0=seite0.verlauf[seite0.aktuell];
+              feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
+                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+            }
           }
         }
         // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
@@ -16118,12 +16183,25 @@
         // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
         // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
         // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        // NUR EINMAL JE BRETT (Fix 27.09., Opus-Review-Fund): dasselbe Doppel-Feuer-Problem
+        // wie bei "FUEHRUNGSWECHSEL AM BRETT" oben und beim Gegen-Gate von "PERIODE BEENDET"
+        // weiter unten -- beide Seiten desselben Bretts erreichen `u.aktuell+1>=rundenN`
+        // unabhaengig voneinander (einmal je Seite ihres eigenen letzten Zugs), ohne Gate
+        // feuerte "Brett entschieden" deshalb zweimal fuer dasselbe Brett (einmal aus Sicht
+        // des Siegers, einmal aus Sicht des Verlierers). Gate: nur die Seite, deren Gegner sein
+        // eigenes letztes Runden-Ende ebenfalls schon erreicht hat, feuert -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
+        // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
+        // `wert()`/`rr()` bleiben unberuehrt.
         if(u.aktuell+1>=BB().rundenN){
-          const brettText=BB().fechten
-            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
-                           :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
-            :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
+          if(brettGegnerFertig){
+            const brettText=BB().fechten
+              ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
+                             :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
+              :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          }
         }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
@@ -17660,6 +17738,23 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // ENDSTAND-OVERLAY (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe Einmal-Muster wie
+    // updateHudBahn()s `if(done&&!bahnEndeGemeldet)`-Zweig (s. dort) -- Fechten, Tennis,
+    // Showcase, Eiskunstlauf, Wettessen, Gewichtheben, Breaking und I-Spy zeigten bislang
+    // GAR KEIN Endstand-Overlay (Opus-Review 27.09.: "das Spiel endet einfach lautlos,
+    // kein Sieger-Callout, kein Endstand-Overlay, der Score-Bug verschwindet einfach").
+    // REIN ADDITIV: `done` wird ausschliesslich von stepBuehne() gesetzt (unveraendert),
+    // dieser Zweig LIEST ihn nur, wie jeder andere HUD-Zweig hier auch. Speed-Schach
+    // (BB().schach) behaelt sein eigenes, laengst vorhandenes Sieg-Banner AUF dem Brett
+    // (zeichneSchach(), "SIEG — "+VEREIN[...].name) und bekommt dieses Overlay ZUSAETZLICH
+    // -- ein zweiter, deutlicherer Hinweis schadet nicht, verdraengt aber auch nichts.
+    if(done&&!buehneEndeGemeldet){
+      buehneEndeGemeldet=true;
+      const sieger=buehneSieger(), stand=buehneStand();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+        +stand.text+".",true);
+      renderEndstandBuehne();
+    }
   }
 
   function bodenBuehne(){
@@ -19179,17 +19274,17 @@
   // NIRGENDS ausgewertet.
   const SHOWCASE_ACTS=[
     {id:"kampfkunst",    label:"Kampfkunst",     pose:"slash", waffe:"eigene",
-      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Raeuspern im Saal"}},
-    {id:"schuetzenkunst",label:"Schuetzenkunst", pose:"shoot", waffe:"eigene",
+      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Räuspern im Saal"}},
+    {id:"schuetzenkunst",label:"Schützenkunst", pose:"shoot", waffe:"eigene",
       text:{erfolg:"ein Trickschuss, der ins Schwarze trifft", fail:"der Schuss geht haarscharf am Ziel vorbei"}},
     {id:"zaubershow",    label:"Zaubershow",     pose:"shoot", waffe:null,
       text:{erfolg:"ein Funkenregen aus dem Nichts, das Publikum staunt", fail:"der Zauber verpufft mit einem traurigen Fauchen"}},
     {id:"gesang",        label:"Gesang",         pose:"walk",  waffe:null,
-      text:{erfolg:"eine Stimme, die den ganzen Saal traegt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
+      text:{erfolg:"eine Stimme, die den ganzen Saal trägt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
     {id:"kraftakt",      label:"Kraftakt",       pose:"slash", waffe:null,
-      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und faellt zu Boden"}},
+      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und fällt zu Boden"}},
     {id:"akrobatik",     label:"Akrobatik",      pose:"hop",   waffe:null,
-      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstoehnen aus dem Publikum"}}
+      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstöhnen aus dem Publikum"}}
   ];
 
   // SHOWCASE_ACT_PUNKTE / actVon(): dasselbe Muster wie PW/leitePers() weiter unten
@@ -19255,7 +19350,7 @@
     const add=(pts,label)=>{ if(!pts)return; for(const[k,v] of Object.entries(pts))sc[k]=(sc[k]||0)+v; warum.push(label); };
     if(b.waffe)add(SHOWCASE_ACT_PUNKTE.bauWaffe[b.waffe],"Waffe: "+b.waffe);
     if(b.vollbild)add(SHOWCASE_ACT_PUNKTE.bauVollbild[b.vollbild],"Vollbild: "+b.vollbild);
-    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Fluegel");
+    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Flügel");
     if(b.effekt)add(SHOWCASE_ACT_PUNKTE.bauEffekt,"Effekt: "+(b.effekt.typ||"?"));
     add(SHOWCASE_ACT_PUNKTE.klasse[u.c],"Klasse: "+u.c);
     (u.sub||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.sub[x],"Sub: "+x));
@@ -22448,13 +22543,13 @@
       // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
       const k=el("div","plan");
       k.appendChild(el("b",null,"Ballwechsel"));
-      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Zuege insgesamt, abwechselnd zwischen "+
+      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Züge insgesamt, abwechselnd zwischen "+
         "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
         "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
         "einen verpassten Abschluss aufsammelt."));
       box.appendChild(k);
       const apb2=document.getElementById("arenaplan");
-      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Zuege, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Züge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
       const pl2=document.querySelector(".planzeile b");
       if(pl2)pl2.textContent="Ballwechsel";
     } else if(istBuehne(disc)){
@@ -23053,7 +23148,7 @@
     // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
     // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
     u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
-    feed(u.side,u.n+" ist zurueck im Kampf.");
+    feed(u.side,u.n+" ist zurück im Kampf.");
   }
 
   // GEMEINSAME AUSSCHALTUNG fuer nahschlag() und den Pfeiltreffer in schrittPfeile() —
@@ -23146,7 +23241,20 @@
 
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",big,waehleCaption(CAPTION_KO,tg.n));
+      // ARENA-ZEIT-FIX (27.09., main): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
+      // Simulationssekunden (downBis/reviveUnit oben, unveraendert) — nur die ANGEZEIGTE
+      // Zahl im Feed-Text war bislang derselbe rohe Wert. Bei ZEIT_DEHNUNG.tdm=1,88 erlebt
+      // der Zuschauer die 5 Sim-Sekunden als rund 9 echte Sekunden (dieselbe Skalierung wie
+      // die Kopfzeilen-Uhr/der Ticker-Zeitstempel, s. updateHud()/feed()), die Textzahl
+      // stand also glatt daneben.
+      //
+      // HIGHLIGHT-DROSSELUNG (dieser PR): `big` ist hier nicht mehr immer `true`, sondern
+      // das Ergebnis von kampfGrossDrosseln() oben (Prioritaets-Bypass fuer erste/
+      // spielentscheidende Ausschaltung, sonst spielweiter 12s-Mindestabstand). Orthogonal
+      // zur Zeitskalierung: eine aendert die angezeigte Sekundenzahl, die andere ob es ein
+      // Banner gibt.
+      const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n));
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n));
     }
@@ -24219,6 +24327,15 @@
   // Leine damit um etwa 90 Pixel.
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
+  // KAMPF_SUDDEN_DEATH_T — ausgelagert (ARENA-ZEIT-FIX, 27.09.) aus den beiden Stellen, die
+  // vorher je eine eigene rohe "50" trugen (der Schadens-/Tempozuschlag hier unten und die
+  // Phasenanzeige in updateHud()). Bleibt eine reine Simulationssekunden-Schwelle, an der
+  // Spiellogik aendert sich nichts — neu ist nur, dass das HTML-Label ".hpbars .sd" (vorher
+  // fest "Sudden Death 0:50") jetzt denselben Wert mit `zeitFaktor()` skaliert, um die fuer
+  // die jeweils gewaehlte Disziplin tatsaechliche Uhrzeit zu zeigen: TDM (Faktor 1,88) rund
+  // 1:34, Battlefield (Faktor 5,00) rund 4:10 — vorher stand ueberall dieselbe Zahl.
+  const KAMPF_SUDDEN_DEATH_T=50;
+
   function stepSim(dt){
     if(istFeldspiel(disc))return stepFeldspiel(dt);
     if(istBuehne(disc))return stepBuehne(dt);
@@ -24243,7 +24360,7 @@
     // nie gesetzt (schalteAus setzt es nur dort) — die Schleife ist fuer Mini-DM/Battlefield
     // deshalb ein no-op, ohne extra Disziplin-Abfrage noetig.
     for(const u of U)if(u.down&&u.downBis!=null&&t>=u.downBis)reviveUnit(u);
-    const sd=t>50?1+(t-50)*0.06:1;
+    const sd=t>KAMPF_SUDDEN_DEATH_T?1+(t-KAMPF_SUDDEN_DEATH_T)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
     // hilft niemandem — das war der Gegner, der am Ende nur herumstand.
@@ -25352,7 +25469,12 @@
           return bonus>0 ? f1(stern+bonus)+" ("+f1(stern)+" Sterne + "+f1(bonus)+" Ziel)" : f1(stern+bonus);
         }};
     }
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09. (Opus-Review desselben Tages): `rennFertig` nimmt Ausgeschiedene beim
+    // Ausscheiden genauso auf wie echte Finisher beim Zieleinlauf (s. Kommentar an
+    // zielbonus() oben, ":26174", "Ausgeschiedene stehen zwar auch darin, zaehlen aber
+    // nicht mit"). "N im Ziel" zaehlte bisher ALLE Eintraege, also auch Ausgeschiedene —
+    // dieselbe `!x.raus`-Filterung wie dort und bei bahnRangliste() (":28393").
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
@@ -25377,7 +25499,9 @@
     // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
     // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
     // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09.: dasselbe `!x.raus`-Fehlen wie bei bahnTeamstand()s `imZiel` oben
+    // (":25225") — ohne den Filter zaehlte die Kopfzeile Ausgeschiedene mit.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
     // FUEHRUNGSWECHSEL (Broadcast Runde 2, Vorschlag 1, 26.09.). Chris: "so live tv artige
@@ -25462,13 +25586,27 @@
         ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
           +pL+":"+pR+" "+stand.suffix
         : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
-          +" (fuer diese Disziplin gibt es noch keine Wertung)",true,
+          +" (für diese Disziplin gibt es noch keine Wertung)",true,
         siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
-    const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
-      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
+    //
+    // BUGFIX 27.09. (Opus-Review desselben Tages, Staffel-Fortschrittsbalken): bei der
+    // Staffel laufen nie alle sechs zugleich — die fuenf, die gerade nicht dran sind,
+    // stehen fest auf ihrem Uebergabepunkt (`u.pos=u.beinBis`, s. stepSpurt ":30488").
+    // Der reine Durchschnitt aus allen sechs `u.pos` zog den Balken darum weit unter den
+    // echten Streckenanteil (z. B. 21/36 = 58 % statt tatsaechlich fertig). `u.pos` ist
+    // bei der Staffel bereits die Gesamtstrecke ueber ALLE Beine (0..1, je Bein-Grenzen
+    // `beinVon`/`beinBis`) — `gesamtfortschritt()` (":29697", schon fuer staffelZeitDelta()
+    // im Broadcast-HUD genutzt) liest genau diese Zahl vom aktiven Laeufer, oder 1, sobald
+    // das Team im Ziel ist. Fuer jede andere Bahn (kein `BA().staffel`) bleibt der alte
+    // Sechs-Durchschnitt (bei ihnen laufen ohnehin alle gleichzeitig) unveraendert.
+    const schnitt=(s)=>{
+      if(BA().staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     // BROADCAST-HUD DER STAFFEL (Recherche-Dokument Abschnitt 4): aktueller und
@@ -25544,16 +25682,25 @@
     // die feed() fuer den Ticker-Zeitstempel schon nutzt.
     const klSek=Math.floor(t*zeitFaktor());
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
+    document.getElementById("phase").textContent=done?"beendet":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
     // ohne Neuladen, also blieb z.B. "Basketball — Live-Spielstand" auch nach dem Zurueck-
-    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen —
-    // dieselbe dataset.origHtml-Vorlage wie in den anderen drei Updatern, hier aber als
-    // Rueckwaerts-Wiederherstellung statt als Ersetzung.
+    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen.
+    //
+    // ARENA-ZEIT-FIX (27.09.): vorher wurde hier ein einmal zwischengespeicherter Text
+    // ("Sudden Death 0:50" aus dem HTML) unveraendert zurueckgeschrieben — bei ZEIT_DEHNUNG
+    // tdm=1,88/battlefield=5,00 begann Sudden Death auf der echten Uhr aber bei rund 1:34
+    // bzw. 4:10, nie bei 0:50. Jetzt wird die Zahl bei jedem Aufruf neu aus
+    // KAMPF_SUDDEN_DEATH_T*zeitFaktor() gebaut, mit derselben m:ss-Umrechnung wie #clock
+    // zwei Zeilen darueber — fuer die gerade gewaehlte Kampf-Disziplin immer richtig, auch
+    // nach einem Disziplin-Wechsel.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd){ if(sd.dataset.orig===undefined)sd.dataset.orig=sd.textContent; sd.textContent=sd.dataset.orig; }
+    if(sd){
+      const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
+      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+    }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml;});
@@ -25561,11 +25708,26 @@
     // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
     // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
     // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
-    // BATTLEFIELD-DOMINATION: die grosse Score-Zahl zeigt Kontrollpunkt-Punkte statt
-    // Ausschaltungen, weil DAS jetzt der Sieg-Weg ist, den t/95s bzw. das Punktelimit
-    // auswerten (s. kpTick/dominationSieger) — aliveL/aliveR bleiben unveraendert die
-    // Ueberlebendenzahl, die weiterhin fuer den Elimination-Sieg zaehlt.
-    document.getElementById("klsuffix").textContent=KP?"Kontrollpunkte":"Punkte";
+    // BATTLEFIELD-DOMINATION, ANZEIGE UMGEDREHT (ARENA-ZEIT-FIX, 27.09.): die grosse
+    // Score-Zahl zeigte bislang Battlefields Kontrollpunkt-Punkte, weil das zunaechst nach
+    // dem "neuen" Sieg-Weg aussah — tatsaechlich entscheidet kampfSieger()/dominationSieger()
+    // aber ZUERST ueber Ausschaltungen (komplette Ausloeschung einer Seite) und erst danach
+    // ueber das KP-Punktelimit; in einem Testspiel stand der KP-Stand bis kurz vor Schluss
+    // bei 0:0, waehrend die Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die
+    // grosse Zahl zeigt jetzt fuer ALLE Kampf-Disziplinen (tdm/mini-dm/battlefield) dieselben
+    // Ausschaltungen, KP.punkte wandert in die kleine #kpzeile darunter (nur fuer Battlefield
+    // sichtbar). Reine Anzeige-Vertauschung: kampfSieger()/dominationSieger()/kpTick bleiben
+    // unveraendert, KP.punkte entscheidet den Sieg weiterhin genauso wie vorher.
+    document.getElementById("klsuffix").textContent="Punkte";
+    const kpzeile=document.getElementById("kpzeile");
+    if(kpzeile){
+      if(KP){
+        kpzeile.style.display="";
+        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+      } else {
+        kpzeile.style.display="none";
+      }
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
@@ -25575,13 +25737,14 @@
     // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
     // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
     // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
-    // schwanken. #bbug uebernimmt das automatisch: aktualisiereBbug() liest #score erst,
-    // NACHDEM diese Zeile geschrieben hat (Aufruf am Ende dieser Funktion).
-    document.getElementById("score").textContent=KP
-      ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
-      :disc==="tdm"
-        ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
-        :(nR-live(1).length)+" : "+(nL-live(0).length);
+    // schwanken. Battlefield hat keinen Respawn (bleibt bei schalteAus() unveraendert eine
+    // dauerhafte Ausschaltung wie Mini-DM), fuer Battlefield/Mini-DM bleibt die
+    // live()-Differenz deshalb weiterhin bitgleich mit der Ausschaltungssumme. #bbug
+    // uebernimmt das automatisch: aktualisiereBbug() liest #score erst, NACHDEM diese Zeile
+    // geschrieben hat (Aufruf am Ende dieser Funktion).
+    document.getElementById("score").textContent=disc==="tdm"
+      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
+      :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -28672,7 +28835,7 @@
         {id:"pus",  kopf:"Pus",  titel:"Puste am Spielende — ein disziplineigener Kraftvorrat aus AUSDAUER, NICHT die Saison-Fatigue",
           wert:z=>z.u.pusteMax?Math.round(z.u.puste/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
-        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollstaendig leer",
+        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollständig leer",
           wert:z=>z.u.pusteMax?Math.round(z.u.pusteMin/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
         {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
@@ -30749,8 +30912,16 @@
             // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
             // drei Ziel-Plaetze sind big, s. Kommentar am startAbstand-Zweig oben.
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".",
-              rennFertig.length<=3);
+            //
+            // BUGFIX 27.09. (Opus-Review desselben Tages, Takeshi's-Castle-Platzzaehlung):
+            // `rennFertig` nimmt Ausgeschiedene beim Ausscheiden (":30328", `rennFertig.push(u)`
+            // im nervenKosten-Zweig) genauso auf wie echte Finisher hier. `rennFertig.length`
+            // roh gerechnet zaehlte darum jeden vorher Ausgeschiedenen mit und meldete einen zu
+            // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
+            // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
+            const zielPlatz=rennFertig.filter(x=>!x.raus).length;
+            feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
+              zielPlatz<=3);
           }
         }
       }
@@ -31368,12 +31539,24 @@
       // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
       // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
       const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      // AUSGESCHIEDEN: GEDIMMT UND ENTSAETTIGT STATT WIE EIN AKTIVER LAEUFER (Opus-Review
+      // 27.09.). `u.raus` (exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt
+      // ":30329") blieb hier bisher ungeprueft -- ein Ausgeschiedener stand seither an
+      // seiner Ausscheide-Position bewegungslos, aber in vollen Farben und derselben
+      // Groesse wie jeder Laufende, ununterscheidbar von jemandem, der nur kurz stolpert.
+      // Dieselbe Dimm-Mechanik wie beim wartenden Staffel-Laeufer oben (`wartet`), nur
+      // deutlich staerker (0,4 statt 0,72) und mit `ctx.filter` zusaetzlich entsaettigt --
+      // reine Anzeige, liest nur das bestehende, schon von stepParcours gesetzte Feld
+      // (`u.vizZustand==="ausgeschieden"`, ":30872"), schreibt nichts, aendert nichts an
+      // wert()/rr()/rho.
+      const raus=!!u.raus;
       const sk=wartet?sk0*0.88:sk0;
-      ctx.globalAlpha=wartet?0.72:1;
+      const dimAlpha=raus?0.4:(wartet?0.72:1);
+      ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
       ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();
-      ctx.globalAlpha=wartet?0.72:1;
+      ctx.globalAlpha=dimAlpha;
       // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
       // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
@@ -31465,7 +31648,13 @@
       const huerdeHaltung=1-huerdeAusschlag*0.06;
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
+      // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
+      // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
+      // ihre eigene Dimmung ueber `dimAlpha` (oben).
+      if(raus)ctx.filter="grayscale(1) brightness(0.8)";
       zeichneSprite(ctx,parcSpriteArg,x,y);
+      if(raus)ctx.filter="none";
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -31660,6 +31849,16 @@
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
         ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
+        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
+      // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
+      // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
+      // unten -- bislang gar keine Zeile, nur die stumme, unbewegte Figur (jetzt immerhin
+      // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
+      // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
+      if(raus){
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
@@ -31983,6 +32182,23 @@
   // dort konkret vorgeschlagen. Reine DOM-Anzeige: liest nur den fertigen Text, schreibt
   // nichts in den Sim-Zustand zurueck.
   const CALLOUT_DAUER_MS=2600;
+  // CALLOUT-POSITION (Nachtrag 27.09., fuenfte Review desselben Fixes): eine feste
+  // px-Distanz zum Broadcast-Bug (#bbug) reicht nicht, weil der Bug bei schmalen
+  // Fensterbreiten selbst hoeher wird -- die Team-Boxen (.seite) brechen um, sobald
+  // Name+Wert nicht mehr nebeneinander passen (gemessen: Fechten 66,25px statt 39,25px
+  // bei >=480px). Statt eine zweite Zahl zu raten, wird die tatsaechliche Bug-Unterkante
+  // bei jedem Aufruf gemessen -- reine Anzeigeposition (getBoundingClientRect()), kein
+  // Einfluss auf MESS/Wertung/RNG. Faellt auf den CSS-Wert zurueck, wenn #bbug fehlt,
+  // gerade ausgeblendet ist (Einlauf/Spielende) oder keinen passenden Bezugsrahmen hat.
+  function positioniereCallout(banner){
+    const bug=document.getElementById("bbug");
+    const bezug=banner.offsetParent;
+    if(!bug||bug.hidden||!bezug){ banner.style.top=""; return; }
+    const bugUnten=bug.getBoundingClientRect().bottom;
+    const bezugOben=bezug.getBoundingClientRect().top;
+    const abstand=8;
+    banner.style.top=Math.max(0,bugUnten-bezugOben+abstand)+"px";
+  }
   function callout(txt,caption){
     if(stumm)return;
     const banner=document.getElementById("bbugcallout");
@@ -31995,6 +32211,7 @@
       banner.appendChild(em);
     }
     banner.hidden=false;
+    positioniereCallout(banner);
     banner.classList.remove("zu");
     // Reflow erzwingen: zwei big-Ereignisse kurz hintereinander sollen die Transition
     // beide sichtbar abspielen, statt an der schon aktiven opacity:1 haengen zu bleiben.
@@ -32048,7 +32265,14 @@
     // auf der Bahn/Buehne/im Feldspiel nie hochgezaehlt wird (die haben ihre eigenen
     // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
     // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
+    //
+    // ARENA-ZEIT-FIX (27.09.): fuer Kampf (tdm/mini-dm/battlefield, istKampf()) blieb hier
+    // bis eben der rohe Simulations-`t` stehen, waehrend updateHud() die Kopfzeilen-Uhr
+    // laengst `t*zeitFaktor()` zeigt (s. dort) — bei Battlefields ZEIT_DEHNUNG.battlefield=5,00
+    // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
+    // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
+    // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
+    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
@@ -32817,7 +33041,7 @@
       txt.appendChild(el("b",null,u.n));
       txt.appendChild(document.createTextNode(manuell
         ?" — die Hilfsverteidigung geht bevorzugt auf ihn."
-        :" — staerkster Gegenspieler, automatisch vorgegeben; anklicken uebernimmt die Wahl manuell."));
+        :" — stärkster Gegenspieler, automatisch vorgegeben; anklicken übernimmt die Wahl manuell."));
     } else {
       txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
     }
@@ -33058,7 +33282,7 @@
           chip.type="button"; chip.dataset.id=String(u.id);
           chip.appendChild(el("i",null,String(i+1)));
           chip.appendChild(document.createTextNode(u.n));
-          chip.title=u.n+" — Startnummer "+(i+1)+", faehrt bei "
+          chip.title=u.n+" — Startnummer "+(i+1)+", fährt bei "
             +bahnZeitText(bahnSpanneAnzeige(u.startT||0))+" los";
           roster.appendChild(chip);
         });
@@ -33491,7 +33715,16 @@
           // gelaufen zu sein), ein Fertiger bei seinem Uebergabepunkt. Jetzt: der
           // laufende Rang fuer den Gelaufenen, der Anteil fuer den Aktiven, "wartet"
           // fuer den Rest — dieselbe Zahl wie in der Stand-Spalte der Wertungstabelle.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          // BUGFIX 27.09. (Opus-Review desselben Tages, "tot"-Kachel beim Stolpern): `down`
+          // schaltete die Tot-Optik (":33386", `.kk.tot` -- grauer Hintergrund, Name
+          // durchgestrichen, s. battle-mode.css) ueber `x.stolper>0` frei -- ein rein
+          // VORUEBERGEHENDER Zustand (Huerdensturz/Klettersturz), den JEDE Bahn-Disziplin
+          // kennt, waehrend der Laeufer weiter aktiv im Rennen steht. Damit sah jeder kurz
+          // Stolpernde aus wie tot/ausgeschieden. `x.raus` (":30328f., exklusiv Takeshi's
+          // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
+          // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
+          // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
                     // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
@@ -33506,7 +33739,12 @@
                            :Math.round(x.pos*100)+" % · Exe "
                              +WAND_EXE_INDIZES.filter(idx=>x.pos>=(BA().hindernisse||[])[idx]).length
                              +"/"+WAND_EXE_INDIZES.length)
-                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+                      // BUGFIX 27.09.: Ausgeschieden (`x.raus`) ist NICHT dasselbe wie Ziel
+                      // erreicht -- beide haben `x.fertig!=null` (s. nervenKosten-Zweig,
+                      // ":30328", setzt beides zusammen), aber nur ein echter Finisher hat
+                      // die Ziellinie ueberquert. Ohne diese Unterscheidung meldete die
+                      // Kachel eines Ausgeschiedenen "Ziel", als waere er angekommen.
+                      : x.raus?"Raus":x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
             // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
@@ -33517,7 +33755,12 @@
             // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
             // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
             // EINEN Bahn-Zweig fuehrt.
-            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
+            // BUGFIX 27.09.: derselbe Ziel-vs-Raus-Fund wie bei `zusatz` direkt oben -- ein
+            // Ausgeschiedener (`x.raus`) bekam hier `fortschritt:1`, also einen VOLLEN Balken,
+            // obwohl er die Strecke nie zu Ende gelaufen ist. Fuer ihn zaehlt wie waehrend des
+            // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
+            // echter Finisher bekommt weiterhin den vollen Balken.
+            fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
@@ -33584,7 +33827,7 @@
           const gewaehlt=effektiverFokus(0)===u.id;
           if(gewaehlt)k.classList.add("fokus");
           k.title=u.n+(gewaehlt?(fsLive.fokusManuell?" — wird gedoppelt (klicken hebt den Fokus auf)"
-                                 :" — wird automatisch gedoppelt (staerkster Gegenspieler; anklicken uebernimmt manuell)")
+                                 :" — wird automatisch gedoppelt (stärkster Gegenspieler; anklicken übernimmt manuell)")
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
         // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
@@ -33814,6 +34057,85 @@
     document.getElementById("endstand").hidden=false;
   }
 
+  // ENDSTAND-OVERLAY FUER DIE BUEHNE (Opus-Review 27.09.: acht der neun Buehnen-
+  // Disziplinen — Fechten, Tennis, Showcase, Eiskunstlauf, Wettessen, Gewichtheben,
+  // Breaking, I-Spy — endeten bis hierher lautlos: kein Sieger-Callout, kein
+  // Endstand-Overlay, der Score-Bug verschwand einfach mit dem letzten Frame. Nur
+  // Speed-Schach hatte ein eigenes Sieg-Banner (zeichneSchach(), "SIEG — "+Vereinsname,
+  // direkt AUF dem Brett gezeichnet) — das bleibt unveraendert bestehen, s. Kommentar bei
+  // updateHudBuehne()s Aufruf hier unten.
+  //
+  // DASSELBE OVERLAY-ELEMENT wie Kampf/Bahn (#endstand/#esieger/#etafelL/#etafelR, s.
+  // renderEndstand()/renderEndstandBahn() oben) -- rein additiv gefuellt, kein neues
+  // DOM-Stueck, keine neue CSS-Regel.
+  //
+  // BUEHNE HAT NEUN VERSCHIEDENE ERGEBNISFORMEN (Zweikampf-Duelle, Bretter, Ueberleben,
+  // Punktsumme) -- statt das hier ein neuntes Mal zu erfinden, liest diese Funktion
+  // GENAU DAS, WAS DIE ARENA SCHON ANZEIGT: `wertungVon(disc)` ist derselbe Renderer, den
+  // renderWertungTabelle() waehrend des GANZEN Spiels fuer die Live-Tabelle benutzt (s.
+  // WERTUNG_CHASSIS.buehne/WERTUNG_HEBEN/WERTUNG_DUELL/WERTUNG_AUFTRITT oben) -- er waehlt
+  // pro Disziplin schon die richtigen Spalten (Zug/Vort/Stand fuer Fechten/Tennis/I-Spy/
+  // Schach, Reiss/Stoss/Zwei fuer Gewichtheben, Dg/Pkt/Wuerstchen/HP/Kampf/... fuer
+  // Wettessen/Showcase/Eiskunstlauf/Breaking). Diese Funktion RECHNET NICHTS NEU, sie
+  // uebernimmt nur Kopf/Zeilen/Formatierung, die es fuer die Live-Tabelle ohnehin schon
+  // gibt -- derselbe Wiederverwendungs-Gedanke wie renderEndstand()s ESPALTEN.
+  function buehneStand(){
+    // DIESELBEN VIER VERGLEICHE, DIE updateHudBuehne() SCHON FUER #score BENUTZT (Zeilen
+    // direkt oberhalb dieser Funktion im selben Block) -- hier nur zusaetzlich fuer den
+    // Endstand-Banner gelesen, keine zweite Zaehlweise. Kaeme je eine fuenfte Buehnen-Form
+    // dazu, muesste sie an BEIDEN Stellen ergaenzt werden; bis dahin sind es exakt die vier
+    // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
+    const art=BB();
+    if(art.heben){
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.duell){
+      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+      const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.gauntlet){
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      const a=alive(0),b=alive(1); return {a,b,text:a+" : "+b};
+    }
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
+    const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
+  }
+  function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  function renderEndstandBuehne(){
+    const sieger=buehneSieger(), stand=buehneStand();
+    document.getElementById("esieger").textContent=
+      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    const w=wertungVon(disc);
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,w.namen));
+      w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      for(const z of zeilen){
+        const tr=el("tr",z.raus?"tot":null);
+        tr.appendChild(el("td",null,z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    renderHighlights();
+    document.getElementById("endstand").hidden=false;
+  }
+
   // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
   // "die gebuchte Saat durch den Host reichen"): GEBUCHTE SAAT FUER DEN INTERAKTIVEN AUFBAU.
   // `echterKader.seedByDisciplineId` kommt vom Host (FoundationBattleArenaHost.tsx) — EXAKT der
@@ -33837,6 +34159,16 @@
     const saat=karte[disc];
     return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
   }
+
+  // LIVE-REVEAL-TIMER FUER MINI-DM (Bugfix 27.09., Opus-Review "kein Spoiler vor dem
+  // Anpfiff"): haelt den setTimeout-Handle der laufenden Rundenoffenbarung in
+  // renderMiniDmFfa() weiter unten. Deklariert HIER, vor `reset()` (das ihn beim Verlassen
+  // von Mini-DM abbricht) statt erst bei renderMiniDmFfa() selbst — `reset()` laeuft schon
+  // beim allerersten Seitenaufbau (s. Aufruf am Ende dieser Datei), lange bevor
+  // renderMiniDmFfa() definiert wird; eine `let`-Deklaration dort waere zu diesem Zeitpunkt
+  // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
+  // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
+  let mdffaOffenbarungsTimer=null;
 
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
@@ -33944,6 +34276,20 @@
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
     if(istMdffa)renderMiniDmFfa();
+    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
+    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
+    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
+    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
+    // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
+    // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
+    // unter JEDER Disziplin (Basketball, Fechten, Bahn, ...) Sinn-freien Text, weil dieses
+    // .notes-Element Teil des gemeinsamen Arena-Markups (#p2) ist und nie an `disc` gegated
+    // war. Reines Anzeige-Gating, dieselbe Stelle/derselbe Vertrag wie mdffaPanel zwei
+    // Zeilen oben (reset() laeuft garantiert bei jedem Disziplinwechsel) — Inhalt der
+    // Panels selbst bleibt fuer TDM unangetastet, kein Einfluss auf wert()/stepSim/rr().
+    const tdmNotes=document.getElementById("tdmEntwurfNotes");
+    if(tdmNotes)tdmNotes.hidden=disc!=="tdm";
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
@@ -34559,11 +34905,15 @@
   // Das laufende Ergebnis wird auf `disc`/den Team-Eintraegen zwischengespeichert, damit ein
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
+  //
+  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
+  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
     if(!teamsBox||!rundenBox||!endstandBox)return;
+    if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -34582,23 +34932,50 @@
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
-    // TEAM-KOPFZEILE: vier Karten, sortiert nach Event-Endplatz, Sieger optisch markiert.
+    // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
+    // spieleMiniDmFfaEvent() hat alle vier Runden UND den Endstand oben in einem einzigen,
+    // unveraenderten Aufruf berechnet, bevor auch nur eine Zeile DOM geschrieben wird. Was
+    // folgt, entscheidet nur noch WANN/WIE dieses bereits fertige Ergebnis auf den Schirm
+    // kommt: Runde fuer Runde statt in einem Rutsch, der Endstand erst als letzter Schritt
+    // statt als erster. Keine zweite Berechnung, kein zusaetzlicher rr()-Zug, keine
+    // Ruckwirkung auf `ereignis` selbst.
+    const traegheitsarm=(()=>{
+      try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
+      catch(e){return false;}
+    })();
+    const PAUSE_MS=traegheitsarm?0:900;
+    const ANLAUF_MS=traegheitsarm?0:500;
+
+    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
+    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
+    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
+    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
+    // erkennbar bleibt.
     teamsBox.textContent="";
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const karte=el("div","mdffa-team"+(erg.eventPlatz===1?" mdffa-sieger":""));
+    teamsBox.setAttribute("aria-live","polite");
+    const eckKarten=[0,1,2,3].map(side=>{
+      const karte=el("div","mdffa-team mdffa-c"+side+" mdffa-wartet");
       karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
       karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-      const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-      punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+      const punkte=el("div","mdffa-punkte","–");
+      punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
       teamsBox.appendChild(karte);
+      return karte;
     });
 
-    // VIER RUNDENTAFELN (eine je Rolle): Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest.
     rundenBox.textContent="";
-    ereignis.runden.forEach(runde=>{
-      const box=el("div","mdffa-runde");
+    rundenBox.setAttribute("aria-live","polite");
+    endstandBox.textContent="";
+
+    const laufendeSumme=[0,0,0,0];
+
+    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
+    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
+    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
+    // abschaltbar).
+    function schreibeRundentafel(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
@@ -34615,29 +34992,67 @@
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
-    });
+    }
 
-    // ENDSTAND: alle vier Teams, Rundenpunkte-Summe, Beitrag-Summe, Ligapunkte.
-    endstandBox.textContent="";
-    const tbl=document.createElement("table");
-    const thead=document.createElement("thead");
-    const trh=document.createElement("tr");
-    ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
-    thead.appendChild(trh);tbl.appendChild(thead);
-    const tbody=document.createElement("tbody");
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const tr=document.createElement("tr");
-      if(erg.eventPlatz===1)tr.className="mdffa-r1";
-      tr.appendChild(el("td",null,eintraege[side].name));
-      tr.appendChild(el("td",null,String(erg.eventPlatz)));
-      tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
-      tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
-      tr.appendChild(el("td",null,String(erg.ligaPunkte)));
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    endstandBox.appendChild(tbl);
+    function aktualisiereEckKarte(side,rundenNr){
+      const karte=eckKarten[side];
+      karte.classList.remove("mdffa-wartet");
+      const punkte=karte.querySelector(".mdffa-punkte");
+      punkte.textContent="";
+      punkte.appendChild(document.createTextNode(laufendeSumme[side]+" Pkt. bisher"));
+      punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
+    }
+
+    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
+    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
+    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
+    // deren Anfang.
+    function zeigeEndstand(){
+      teamsBox.textContent="";
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
+        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
+        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
+        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        karte.appendChild(punkte);
+        teamsBox.appendChild(karte);
+      });
+
+      endstandBox.textContent="";
+      const tbl=document.createElement("table");
+      const thead=document.createElement("thead");
+      const trh=document.createElement("tr");
+      ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
+      thead.appendChild(trh);tbl.appendChild(thead);
+      const tbody=document.createElement("tbody");
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const tr=document.createElement("tr");
+        if(erg.eventPlatz===1)tr.className="mdffa-r1";
+        tr.appendChild(el("td",null,eintraege[side].name));
+        tr.appendChild(el("td",null,String(erg.eventPlatz)));
+        tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
+        tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
+        tr.appendChild(el("td",null,String(erg.ligaPunkte)));
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      endstandBox.appendChild(tbl);
+      mdffaOffenbarungsTimer=null;
+    }
+
+    function naechsteRunde(i){
+      if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
+      const runde=ereignis.runden[i];
+      schreibeRundentafel(runde);
+      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+    }
+
+    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
   }
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
@@ -35353,6 +35768,13 @@
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
+    // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
+    // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
+    // -- Playwright kann so die Bannerposition bei jeder getesteten Fensterbreite/Disziplin
+    // sofort pruefen, statt Minuten Sim-Zeit abzuwarten, bis ein Highlight zufaellig faellt.
+    // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
+    // kein Einfluss auf MESS/Wertung/RNG.
+    calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
@@ -36491,7 +36913,7 @@
     // (Default-Kader), dieselbe Saatfolge.
     wandProbe:(opt)=>{
       const M=MOTOREN.climbing;
-      if(!M)return {fehler:"kein Motor fuer climbing angemeldet"};
+      if(!M)return {fehler:"kein Motor für climbing angemeldet"};
       const o=opt||{}, n=o.n||48, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();

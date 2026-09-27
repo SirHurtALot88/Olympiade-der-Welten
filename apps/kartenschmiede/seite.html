@@ -1,0 +1,795 @@
+<title>Kartenschmiede</title>
+<style>
+{{FONTS}}
+@property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+:root {
+  color-scheme: dark;
+  --bg: #15171b;
+  --bg2: #1d2026;
+  --line: #2e333b;
+  --ink: #ece4d3;
+  --dim: #a39c8e;
+  --brass: #cfa75e;
+  --brass-ink: #1b1509;
+  --t1: #a9aeb5; --t2: #7fd06a; --t3: #6fb0ff; --t4: #f2cf4a; --t5: #ff8a1f; --t6: #ff4a36;
+  --ui: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --disp: "Grenze", "Georgia", serif;
+  --prose: "Alegreya", "Georgia", serif;
+}
+html, body { background: var(--bg); }
+body { color: var(--ink); font-family: var(--prose); font-size: 17px; line-height: 1.5; padding-inline: 20px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 36px 64px; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--disp); font-weight: 700; line-height: 1.05; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(42px, 7vw, 76px); letter-spacing: .01em; }
+h2 { font-size: clamp(28px, 4vw, 38px); }
+h3 { font-size: 22px; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font-family: var(--ui); text-transform: uppercase; letter-spacing: .16em; font-size: 14px; color: var(--brass); font-weight: 600; }
+.lede { color: var(--dim); font-size: 19px; }
+header.top { display: grid; gap: 14px; }
+section { display: grid; gap: 20px; }
+.sec-head { display: grid; gap: 8px; }
+
+/* ---------- Stufen-Leiste ---------- */
+.ladder-scroll { overflow-x: auto; padding: 44px 6px 18px; margin-inline: -6px; }
+.ladder { display: grid; grid-template-columns: repeat(6, minmax(160px, 1fr)); gap: 18px; min-width: 1020px; }
+.rung { display: grid; gap: 12px; justify-items: center; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; font: inherit; }
+.rung .cw { width: 100%; }
+.rung-label { font-family: var(--ui); text-transform: uppercase; letter-spacing: .14em; font-size: 15px; font-weight: 700; display: flex; gap: 8px; align-items: baseline; }
+.rung-label small { color: var(--dim); font-weight: 500; letter-spacing: .06em; font-size: 13px; }
+.rung[aria-pressed="true"] .rung-label { text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 2px; }
+.rung:focus-visible { outline: 2px solid var(--brass); outline-offset: 8px; border-radius: 6px; }
+.rung:hover .card { translate: 0 -4px; }
+.card { transition: translate .25s ease; }
+
+/* ---------- Werkstatt ---------- */
+.shop { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 40px; align-items: start; }
+@media (max-width: 880px) { .shop { grid-template-columns: 1fr; } .stage-col { order: -1; } }
+form.editor { display: grid; gap: 22px; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+legend { font-family: var(--ui); text-transform: uppercase; letter-spacing: .14em; font-size: 13px; color: var(--brass); font-weight: 700; padding: 0; margin-bottom: 10px; }
+.row { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.row4 { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); }
+label.f { display: grid; gap: 4px; font-family: var(--ui); font-size: 14px; letter-spacing: .04em; color: var(--dim); min-width: 0; }
+input[type=text], input[type=number], textarea, select {
+  font: 500 16px/1.35 var(--ui); color: var(--ink); background: var(--bg2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; letter-spacing: .02em;
+}
+textarea { resize: vertical; min-height: 64px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+.hint { font-family: var(--ui); font-size: 13px; color: var(--dim); letter-spacing: .02em; }
+.hint code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ink); background: var(--bg2); padding: 1px 4px; border-radius: 3px; }
+.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tiers button { font: 700 14px var(--ui); letter-spacing: .06em; text-transform: uppercase; padding: 9px 2px; border-radius: 6px; cursor: pointer;
+  background: var(--bg2); color: var(--dim); border: 1px solid var(--line); }
+.tiers button[aria-pressed="true"] { color: var(--brass-ink); border-color: transparent; }
+.tiers button[data-t="1"][aria-pressed="true"] { background: var(--t1); }
+.tiers button[data-t="2"][aria-pressed="true"] { background: var(--t2); }
+.tiers button[data-t="3"][aria-pressed="true"] { background: var(--t3); }
+.tiers button[data-t="4"][aria-pressed="true"] { background: var(--t4); }
+.tiers button[data-t="5"][aria-pressed="true"] { background: var(--t5); }
+.tiers button[data-t="6"][aria-pressed="true"] { background: var(--t6); }
+.seg { display: inline-grid; grid-auto-flow: column; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: 600 14px var(--ui); letter-spacing: .06em; padding: 8px 14px; background: var(--bg2); color: var(--dim); border: 0; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+input[type=range] { width: 100%; accent-color: var(--brass); }
+.file { display: grid; gap: 6px; }
+label.check { display: flex; gap: 8px; align-items: center; font-family: var(--ui); font-size: 15px; color: var(--ink); cursor: pointer; }
+label.check input { width: 18px; height: 18px; accent-color: var(--brass); }
+.calc { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); font-family: var(--ui); }
+.calc .big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.calc .big b { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.calc .big span { color: var(--dim); font-size: 15px; }
+.calc .parts { color: var(--dim); font-size: 14px; font-variant-numeric: tabular-nums; }
+.calc .row-b { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btn.sm { padding: 7px 12px; font-size: 14px; }
+.build { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 40px; align-items: start; }
+@media (max-width: 880px) { .build { grid-template-columns: 1fr; } .b-side { order: -1; } }
+.b-controls { display: grid; gap: 18px; }
+.b-side { display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 880px) { .b-side { position: static; } }
+.b-card { padding: 10% 6% 2%; max-width: 340px; }
+.b-group { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.b-group h4 { margin: 0 0 4px; font-family: var(--ui); font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--brass); display: flex; gap: 10px; align-items: center; }
+.b-group h4 input { font: 700 17px var(--ui); letter-spacing: .03em; text-transform: none; background: transparent; border: 0; border-bottom: 1px dashed var(--line); border-radius: 0; padding: 2px 0; color: var(--ink); }
+.b-group h4 .x { margin-left: auto; font: 600 13px var(--ui); background: none; border: 0; color: var(--dim); cursor: pointer; text-decoration: underline; }
+.stp { display: grid; grid-template-columns: minmax(0, 1fr) 84px 76px 84px; align-items: center; gap: 8px; font-family: var(--ui); }
+.stp-l b { display: block; font-size: 16px; font-weight: 600; }
+.stp-l small { color: var(--dim); font-size: 13px; }
+.stp output { text-align: center; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stp button, .tgl { font: 700 15px var(--ui); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: baseline; justify-content: center; }
+.stp button:disabled, .tgl:disabled { opacity: .35; cursor: not-allowed; }
+.tgls { display: flex; flex-wrap: wrap; gap: 6px; }
+.tgl[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.cost { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--dim); }
+.cost.up { color: #ffb070; } .cost.down { color: #8fd18a; }
+.tgl[aria-pressed="true"] .cost { color: #2c6a28; }
+.meter { height: 12px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--brass), #ffd98a); }
+.sum-line { font-family: var(--ui); font-size: 18px; } .sum-line b { font-size: 24px; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .stp { grid-template-columns: minmax(0, 1fr) 70px 56px 70px; } }
+.dev { font-weight: 700; }
+.dev.ok { color: #8fd18a; } .dev.hi { color: #ff8a6a; } .dev.lo { color: #7fb8ff; }
+/* Formel & Bestiarium */
+.formula { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+@media (max-width: 880px) { .formula { grid-template-columns: 1fr; } }
+.eq { font-family: var(--ui); font-size: clamp(22px, 3vw, 30px); font-weight: 700; letter-spacing: .02em; padding: 18px 20px; border: 1px solid var(--brass); border-radius: 8px; color: var(--ink); line-height: 1.3; }
+.eq small { display: block; font-size: 15px; font-weight: 500; color: var(--dim); letter-spacing: .03em; margin-top: 6px; }
+.facts { display: grid; gap: 14px; }
+.facts h3 { font-size: 20px; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-family: var(--ui); font-size: 16px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
+td.num, th.num { text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--bg2); }
+.tier-dot { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); margin-right: 8px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-family: var(--ui); font-size: 16px; }
+.kv dt { color: var(--ink); font-weight: 600; } .kv dd { margin: 0; color: var(--dim); }
+.btn { font: 700 16px var(--ui); letter-spacing: .08em; text-transform: uppercase; padding: 11px 18px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--brass); background: var(--brass); color: var(--brass-ink); }
+.btn.ghost { background: transparent; color: var(--brass); }
+.btn:disabled { opacity: .5; cursor: progress; }
+
+.stage-col { display: grid; gap: 16px; justify-items: center; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 880px) { .stage-col { position: static; } }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+.stage { padding: 7% 7% 5%; width: 100%; max-width: 520px; perspective: 1400px; box-sizing: border-box; }
+.stage.land { max-width: 760px; }
+.stage .cw { transition: transform .12s ease-out; transform-style: preserve-3d; }
+.tier-note { font-family: var(--ui); font-size: 15px; color: var(--dim); letter-spacing: .03em; text-align: center; max-width: 46ch; }
+.tier-note b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Prompt ---------- */
+.forge { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; }
+@media (max-width: 880px) { .forge { grid-template-columns: 1fr; } }
+ol.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 10px; max-width: 60ch; }
+ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--brass); }
+.tools { display: grid; gap: 12px; }
+.tool { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tool b { font-family: var(--ui); font-size: 18px; letter-spacing: .03em; }
+.tool span { color: var(--dim); font-size: 16px; }
+@media (max-width: 520px) { .tool { grid-template-columns: 1fr; gap: 2px; } }
+#prompt { min-height: 300px; font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+.copyrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- Export-Dialog ---------- */
+.modal[hidden] { display: none; }
+.modal { position: fixed; inset: 0; background: rgba(8, 9, 11, .86); display: grid; place-items: center; padding: 20px; z-index: 50; }
+.modal-box { display: grid; gap: 14px; justify-items: center; max-width: 560px; width: 100%; }
+.modal-box img { max-height: 72vh; width: auto; border-radius: 8px; }
+.modal-box p { text-align: center; font-family: var(--ui); font-size: 16px; color: var(--dim); }
+
+/* =========================================================
+   KARTE — alle Maße in --u (1u = 1/100 Kartenbreite im Hochformat)
+   ========================================================= */
+.cw { container-type: inline-size; position: relative; }
+.card {
+  --u: 1cqw; --k: 1;
+  --frame: #3a3d41; --edge: rgba(255,255,255,.14); --acc: #b3b8bf; --acc2: #6c7178;
+  --plate: rgba(16,17,19,.82); --panel: 12,12,13; --ink-c: #ece6da; --sub: #b9b2a5;
+  position: relative; aspect-ratio: 5 / 7; border-radius: calc(var(--u) * 4.2); padding: calc(var(--u) * 2.4);
+  background: var(--frame); isolation: isolate; box-sizing: border-box; color: var(--ink-c);
+  font-family: var(--ui); line-height: 1.1; text-align: left;
+  box-shadow: 0 calc(var(--u)*2) calc(var(--u)*5) rgba(0,0,0,.55), inset 0 0 0 calc(var(--u)*.35) rgba(255,255,255,.08);
+}
+.card.land { aspect-ratio: 7 / 5; --u: .62cqw; }
+.face {
+  position: relative; height: 100%; border-radius: calc(var(--u) * 2.2); overflow: hidden; background: #0c0c0d;
+  display: grid; grid-template-rows: auto 1fr auto; grid-template-areas: "head" "gap" "panel";
+  box-shadow: 0 0 0 calc(var(--u)*.45) var(--edge);
+}
+.art { position: absolute; inset: 0; overflow: hidden; }
+.art img { width: 100%; height: 100%; object-fit: cover; object-position: var(--ax, 50%) var(--ay, 30%);
+  transform: scale(var(--zoom, 1)); transform-origin: var(--ax, 50%) var(--ay, 30%); display: block; max-width: none; }
+.art .noart { position: absolute; inset: 0; display: grid; place-items: center; color: var(--sub); font-size: calc(var(--u)*3.4); letter-spacing: .1em; text-transform: uppercase;
+  background: repeating-linear-gradient(135deg, #17181a 0 calc(var(--u)*2), #1c1d20 calc(var(--u)*2) calc(var(--u)*4)); }
+.vign { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 35%, transparent 55%, rgba(0,0,0,.55)); }
+
+.head { grid-area: head; position: relative; z-index: 3; padding: calc(var(--u)*2.6) calc(var(--u)*17) calc(var(--u)*3) calc(var(--u)*3.2);
+  background: linear-gradient(to bottom, var(--plate) 55%, transparent); display: grid; gap: calc(var(--u)*.9); }
+.name { font-family: var(--disp); font-weight: 800; font-size: calc(var(--u)*7.6*var(--k)); line-height: .92; text-transform: uppercase; letter-spacing: .01em;
+  text-shadow: 0 calc(var(--u)*.4) calc(var(--u)*1.2) rgba(0,0,0,.8); overflow-wrap: anywhere; }
+.subline { display: flex; align-items: center; gap: calc(var(--u)*1.6); font-size: calc(var(--u)*3*var(--k)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--acc); }
+.pips { display: inline-flex; gap: calc(var(--u)*.7); }
+.pip { width: calc(var(--u)*1.7); height: calc(var(--u)*1.7); transform: rotate(45deg); border: calc(var(--u)*.3) solid var(--acc); box-sizing: border-box; }
+.pip.on { background: var(--acc); }
+
+.badge { position: absolute; z-index: 7; top: calc(var(--u)*2); right: calc(var(--u)*2.2); min-width: calc(var(--u)*13); padding: calc(var(--u)*1.2) calc(var(--u)*1.4) calc(var(--u)*1.6);
+  box-sizing: border-box; background: var(--plate); border: calc(var(--u)*.35) solid var(--edge); display: grid; justify-items: center; gap: calc(var(--u)*.3); }
+.badge b { font-size: calc(var(--u)*7.4); font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+.badge span { font-size: calc(var(--u)*2.3); letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--sub); }
+.badge .crown { width: calc(var(--u)*5); height: calc(var(--u)*3.4); color: #3b2305; display: none; }
+
+.panel { grid-area: panel; position: relative; z-index: 3; display: grid; gap: calc(var(--u)*1.7*var(--k));
+  padding: calc(var(--u)*9) calc(var(--u)*3) calc(var(--u)*2.8);
+  background: linear-gradient(to bottom, rgba(var(--panel),0) 0, rgba(var(--panel),.82) calc(var(--u)*8), rgba(var(--panel),.94)); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u)*1); }
+.stat { display: grid; justify-items: center; gap: calc(var(--u)*.5); padding: calc(var(--u)*1.1) 0 calc(var(--u)*1.3);
+  background: rgba(255,255,255,.06); border-top: calc(var(--u)*.4) solid var(--acc2); }
+.stat span { font-size: calc(var(--u)*2.15*var(--k)); letter-spacing: .1em; text-transform: uppercase; color: var(--sub); font-weight: 600; white-space: nowrap; }
+.stat b { font-size: calc(var(--u)*5.6*var(--k)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+
+.block-t { font-size: calc(var(--u)*2.3*var(--k)); letter-spacing: .16em; text-transform: uppercase; color: var(--acc); font-weight: 700; display: flex; align-items: center; gap: calc(var(--u)*1.2); }
+.block-t::after { content: ""; flex: 1; height: calc(var(--u)*.25); background: linear-gradient(to right, var(--acc2), transparent); }
+.weps { display: grid; gap: calc(var(--u)*.9*var(--k)); }
+.wep { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: calc(var(--u)*1.8); padding: calc(var(--u)*1.1*var(--k)) calc(var(--u)*1.6);
+  background: rgba(255,255,255,.05); border-left: calc(var(--u)*.5) solid var(--acc2); }
+.wep svg { width: calc(var(--u)*4.6*var(--k)); height: calc(var(--u)*4.6*var(--k)); color: var(--acc); }
+.wep h4 { margin: 0; font-size: calc(var(--u)*3.7*var(--k)); font-weight: 800; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+.wep p { margin: calc(var(--u)*.4) 0 0; font-size: calc(var(--u)*2.8*var(--k)); color: var(--sub); font-weight: 500; letter-spacing: .03em; }
+.wep .tag { font-size: calc(var(--u)*2.1*var(--k)); letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: calc(var(--u)*.6) calc(var(--u)*1.1);
+  border: calc(var(--u)*.3) solid var(--acc2); color: var(--sub); }
+.chips { display: flex; flex-wrap: wrap; gap: calc(var(--u)*1); }
+.chip { display: inline-flex; align-items: center; gap: calc(var(--u)*.9); font-size: calc(var(--u)*2.9*var(--k)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: calc(var(--u)*.8) calc(var(--u)*1.6) calc(var(--u)*.8) calc(var(--u)*1.1); background: rgba(255,255,255,.07); border-radius: calc(var(--u)*.6); }
+.chip svg { width: calc(var(--u)*3.4*var(--k)); height: calc(var(--u)*3.4*var(--k)); color: var(--acc); }
+.boss { display: grid; gap: calc(var(--u)*.6); padding: calc(var(--u)*1.4) calc(var(--u)*1.8); border: calc(var(--u)*.3) solid var(--acc2); background: rgba(255,255,255,.04); }
+.boss h4 { margin: 0; font-size: calc(var(--u)*3.2*var(--k)); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--acc); display: flex; align-items: center; gap: calc(var(--u)*1); }
+.boss h4 svg { width: calc(var(--u)*3.6); height: calc(var(--u)*3.6); }
+.boss p { font-family: var(--prose); font-size: calc(var(--u)*2.8*var(--k)); line-height: 1.25; color: var(--ink-c); }
+.foot { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: calc(var(--u)*2); padding-top: calc(var(--u)*1.2); border-top: calc(var(--u)*.25) solid rgba(255,255,255,.1); }
+.foot .fac { display: flex; align-items: center; gap: calc(var(--u)*1); font-size: calc(var(--u)*2.6*var(--k)); letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--acc); }
+.foot .fac svg { width: calc(var(--u)*4.4*var(--k)); height: calc(var(--u)*4.4*var(--k)); }
+.foot q { font-family: var(--prose); font-style: italic; font-size: calc(var(--u)*2.7*var(--k)); line-height: 1.2; color: var(--sub); quotes: none; padding-left: calc(var(--u)*2); border-left: calc(var(--u)*.25) solid rgba(255,255,255,.14); }
+
+/* Querformat: Text links, Bild rechts */
+.land .face { grid-template-columns: 47% 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head gap" "panel gap"; }
+.land .face::before { content: ""; position: absolute; z-index: 2; inset: 0 auto 0 0; width: 47%; background: rgb(var(--panel)); }
+.land .art { left: 38%; -webkit-mask-image: linear-gradient(to right, transparent, #000 18%); mask-image: linear-gradient(to right, transparent, #000 18%); }
+.land .head { padding-right: calc(var(--u)*3); background: none; }
+.land .panel { padding-top: calc(var(--u)*1); background: none; align-content: start; }
+
+/* Ornamente (standardmäßig aus) */
+.corner, .crest, .foil, .sheen, .embers, .halo, .ribbon { display: none; }
+.corner { position: absolute; z-index: 6; width: calc(var(--u)*13); height: calc(var(--u)*13); color: var(--acc); pointer-events: none; }
+.corner.tl { top: calc(var(--u)*.6); left: calc(var(--u)*.6); }
+.corner.tr { top: calc(var(--u)*.6); right: calc(var(--u)*.6); transform: scaleX(-1); }
+.corner.bl { bottom: calc(var(--u)*.6); left: calc(var(--u)*.6); transform: scaleY(-1); }
+.corner.br { bottom: calc(var(--u)*.6); right: calc(var(--u)*.6); transform: scale(-1, -1); }
+.crest { position: absolute; z-index: 7; left: 50%; top: calc(var(--u)*-5.5); translate: -50% 0; pointer-events: none; }
+.foil { position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: color-dodge; opacity: .22;
+  background:
+    radial-gradient(circle at var(--mx, 30%) var(--my, 25%), rgba(255,255,255,.55), transparent 38%),
+    repeating-linear-gradient(115deg, #ff6f91 0%, #ffd36b 7%, #7dffb5 14%, #6fb7ff 21%, #d38bff 28%, #ff6f91 35%);
+  background-size: 100% 100%, 250% 250%; background-position: 0 0, var(--mx, 30%) var(--my, 25%); }
+.sheen { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.sheen::before { content: ""; position: absolute; top: -20%; bottom: -20%; width: 35%; left: -60%; transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); animation: sweep 6s ease-in-out infinite; }
+@keyframes sweep { 0%, 55% { left: -60%; } 85%, 100% { left: 130%; } }
+
+/* ---- Stufe 2: Selten (grün) ---- */
+.t2 { --frame: linear-gradient(160deg, #5d7a3e, #22301a 55%, #4f6a35); --edge: rgba(160,225,120,.4); --acc: #93d06a; --acc2: #5f9440;
+  --plate: rgba(12,20,9,.84); --panel: 10,15,8; }
+.t2 .face { box-shadow: 0 0 0 calc(var(--u)*.45) var(--edge), 0 0 0 calc(var(--u)*1.1) rgba(0,0,0,.5), 0 0 0 calc(var(--u)*1.45) rgba(160,225,120,.28); }
+.t2 .badge { clip-path: polygon(12% 0, 88% 0, 100% 12%, 100% 88%, 88% 100%, 12% 100%, 0 88%, 0 12%); }
+
+/* ---- Stufe 3: Magisch (blau) ---- */
+.t3 { --frame: linear-gradient(135deg, #8aa6c6 0%, #2d4868 22%, #a9c3e0 44%, #20354d 68%, #7593b5 100%); --edge: rgba(150,200,255,.5);
+  --acc: #86c0ff; --acc2: #3f76b8; --plate: rgba(8,14,24,.84); --panel: 8,12,19; }
+.t3 .face { box-shadow: 0 0 0 calc(var(--u)*.45) var(--edge), 0 0 0 calc(var(--u)*1.1) rgba(0,0,0,.5), 0 0 0 calc(var(--u)*1.45) rgba(150,200,255,.3); }
+.t3 .badge { clip-path: polygon(12% 0, 88% 0, 100% 12%, 100% 88%, 88% 100%, 12% 100%, 0 88%, 0 12%); }
+.t3 .corner { display: block; width: calc(var(--u)*10); height: calc(var(--u)*10); }
+.t3 .name { text-shadow: 0 0 calc(var(--u)*2) rgba(110,170,255,.4), 0 calc(var(--u)*.4) calc(var(--u)*1.2) rgba(0,0,0,.8); }
+
+/* ---- Stufe 4: Elite (gelb) ---- */
+.t4 { --frame: linear-gradient(135deg, #eed77e 0%, #6b5412 22%, #f7e8a8 44%, #4f3c0b 68%, #cdae4c 100%); --edge: rgba(250,220,120,.55);
+  --acc: #f2cf4a; --acc2: #a8871f; --plate: rgba(20,16,4,.84); --panel: 15,12,4; }
+.t4 .corner { display: block; }
+.t4 .badge, .t5 .badge { clip-path: polygon(0 0, 100% 0, 100% 74%, 50% 100%, 0 74%); padding-bottom: calc(var(--u)*4.4); border: 0;
+  background: linear-gradient(to bottom, var(--acc2), rgba(0,0,0,.85)); }
+.t4 .badge span, .t5 .badge span { color: var(--ink-c); }
+.t4 .name { text-shadow: 0 0 calc(var(--u)*2.2) rgba(250,210,90,.4), 0 calc(var(--u)*.4) calc(var(--u)*1.2) rgba(0,0,0,.8); }
+
+/* ---- Stufe 5: Legendär (orange) ---- */
+.t5 { --frame: linear-gradient(135deg, #ffb35c 0%, #6e2c05 22%, #ffd08c 44%, #4a1c03 68%, #e0782a 100%); --edge: rgba(255,160,70,.6);
+  --acc: #ff9a3c; --acc2: #d2601a; --plate: rgba(24,9,2,.86); --panel: 19,8,3;
+  box-shadow: 0 calc(var(--u)*2) calc(var(--u)*5) rgba(0,0,0,.55), 0 0 calc(var(--u)*6) rgba(255,128,0,.45); }
+.t5 .corner, .t5 .crest, .t5 .foil, .t5 .sheen { display: block; }
+.t5 .foil { opacity: .16; }
+.t5 .corner { width: calc(var(--u)*17); height: calc(var(--u)*17); }
+.t5 .name { color: #ff8a1f; text-shadow: 0 0 calc(var(--u)*2.6) rgba(255,110,0,.55), 0 calc(var(--u)*.4) calc(var(--u)*1.2) rgba(0,0,0,.9); }
+.t5 .stat, .t6 .stat { border-top: 0; background: linear-gradient(to bottom, rgba(255,255,255,.1), rgba(255,255,255,.03)); box-shadow: inset 0 0 0 calc(var(--u)*.3) var(--acc2); }
+
+/* ---- Stufe 6: Boss (rot) ---- */
+.t6 { --frame: linear-gradient(135deg, #ff7a55 0%, #5a0806 17%, #ffa184 35%, #8f1309 53%, #2a0303 74%, #db3b22 100%);
+  --edge: rgba(255,200,120,.8); --acc: #ff6a45; --acc2: #c2261a; --plate: rgba(22,4,3,.88); --panel: 17,4,3; --sub: #e0bfb2;
+  padding: calc(var(--u)*3); }
+.t6 .corner, .t6 .crest, .t6 .foil, .t6 .sheen, .t6 .embers, .t6 .halo, .t6 .ribbon { display: block; }
+.t6 .face { box-shadow: 0 0 0 calc(var(--u)*.5) var(--edge), 0 0 0 calc(var(--u)*1.2) rgba(30,0,0,.85), 0 0 0 calc(var(--u)*1.6) rgba(255,190,100,.65), inset 0 0 calc(var(--u)*7) rgba(255,40,20,.4); }
+.t6 .corner { width: calc(var(--u)*21); height: calc(var(--u)*21); color: #ffd27a; }
+.t6 .foil { opacity: .3; }
+.t6 .name { font-family: "Grenze Gotisch", var(--disp); text-transform: none; font-weight: 700; font-size: calc(var(--u)*9.4*var(--k)); line-height: .95; letter-spacing: 0;
+  color: #ff7a4a; background: linear-gradient(to bottom, #ffe9d6 8%, #ff7a3a 52%, #c4160c 95%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: none; filter: drop-shadow(0 calc(var(--u)*.4) calc(var(--u)*.6) rgba(0,0,0,.9)) drop-shadow(0 0 calc(var(--u)*2.6) rgba(255,50,20,.55)); }
+.t6 .head { padding-top: calc(var(--u)*6.4); padding-left: calc(var(--u)*6); }
+.land.t6 .head { padding-top: calc(var(--u)*8); }
+.t6 .badge { top: calc(var(--u)*1.2); background: linear-gradient(135deg, #ffe3a0, #c98a22 45%, #fff0c0 60%, #8a5a14); border: 0; color: #3a0906; padding-top: calc(var(--u)*1); padding-bottom: calc(var(--u)*5);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); }
+.t6 .badge span { color: #5a1208; }
+.t6 .badge .crown { display: block; }
+.t6 .boss { border: 0; background: linear-gradient(to right, rgba(255,70,40,.22), rgba(255,70,40,.04)); box-shadow: inset 0 0 0 calc(var(--u)*.35) var(--acc2); }
+.t6 .wep { border-left-color: var(--acc); }
+.t6 .panel { padding-bottom: calc(var(--u)*5.5); }
+.t6 .foot { padding-inline: calc(var(--u)*6); }
+.t5 .panel { padding-bottom: calc(var(--u)*4); }
+.t5 .foot { padding-inline: calc(var(--u)*3.5); }
+.t6 .halo { position: absolute; z-index: -1; inset: calc(var(--u)*-1.6); border-radius: calc(var(--u)*5.4); filter: blur(calc(var(--u)*2));
+  background: conic-gradient(from var(--ang), #ff2a12, #ff8a1f, transparent 22%, #ff3b1a 40%, transparent 55%, #ffb03a 72%, #c80f06 88%, #ff2a12); opacity: .9;
+  animation: spin 7s linear infinite; }
+@keyframes spin { to { --ang: 360deg; } }
+.ribbon { position: absolute; z-index: 8; left: 50%; top: calc(var(--u)*1.8); translate: -50% 0; padding: calc(var(--u)*.6) calc(var(--u)*4.2);
+  font-size: calc(var(--u)*2.5); font-weight: 800; letter-spacing: .34em; text-transform: uppercase; color: #ffd98a;
+  background: linear-gradient(#1c0302, #000); clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%); }
+.embers { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.embers i { position: absolute; bottom: -4%; width: calc(var(--u)*.9); height: calc(var(--u)*.9); border-radius: 50%;
+  background: radial-gradient(circle, #fff0c4, #ff5a1e 45%, transparent 70%); animation: rise var(--d, 6s) linear infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+@keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 70% { opacity: .8; } 100% { transform: translate(var(--dx, 2cqw), -150cqw); opacity: 0; } }
+
+.cw.snap .halo, .cw.snap .embers i, .cw.snap .sheen::before { animation: none; }
+.cw.snap .embers i { opacity: .9; }
+.cw.snap .foil { opacity: .1; }
+@media (prefers-reduced-motion: reduce) {
+  .halo, .embers i, .sheen::before { animation: none !important; }
+  .embers i { opacity: .8; }
+  .stage .cw, .card { transition: none; }
+}
+.seg3 { grid-template-columns: repeat(3, 1fr); display: grid; }
+.sim { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 40px; align-items: start; }
+@media (max-width: 880px) { .sim { grid-template-columns: 1fr; } }
+.sim-ctl { display: grid; gap: 14px; }
+.sim-out { display: grid; gap: 14px; font-family: var(--ui); }
+.bar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); font-weight: 800; font-size: 16px; }
+.bar span { display: grid; place-items: center; min-width: 0; overflow: hidden; white-space: nowrap; color: #14100a; }
+.bar .a { background: #d9b25f; } .bar .d { background: #4a4f58; color: var(--ink); } .bar .b { background: #7fb0e6; }
+.sim-legend { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 16px; }
+.sim-legend b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.verdict { font-family: var(--prose); font-size: 18px; max-width: 60ch; }
+.mine { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.mine-item { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); font-family: var(--ui); }
+.mine-item .th { width: 64px; height: 88px; border-radius: 6px; background: #0c0c0d center / cover no-repeat; border: 2px solid var(--line); }
+.mine-item b { font-size: 17px; display: block; }
+.mine-item small { color: var(--dim); font-size: 14px; }
+.mine-item .acts { display: flex; gap: 8px; margin-top: 6px; }
+.mine-empty { color: var(--dim); font-family: var(--ui); }
+.tabs { display: flex; gap: 6px; margin-top: 6px; border-bottom: 1px solid var(--line); }
+.tabs button { font: 700 18px var(--ui); letter-spacing: .08em; text-transform: uppercase; padding: 10px 18px; background: none; border: 0;
+  color: var(--dim); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brass); }
+.tabpanel { display: grid; gap: 56px; }
+.skill-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.skill-chip { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--ui); padding: 5px 6px 5px 10px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--line); color: var(--ink); }
+.skill-chip small { color: var(--dim); font-weight: 500; }
+.skill-chip button { border: 0; background: none; color: var(--dim); cursor: pointer; font: 700 16px var(--ui); padding: 0 4px; }
+.db { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 32px; align-items: start; }
+@media (max-width: 980px) { .db { grid-template-columns: 1fr; } }
+.db td { white-space: normal; vertical-align: top; }
+.db td.txt { min-width: 260px; color: var(--dim); font-family: var(--prose); font-size: 15px; }
+.db td .quelle { display: block; color: var(--dim); font-size: 13px; }
+.db-form { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+.db-form h3 { font-size: 20px; }
+fieldset.checks { display: flex; gap: 16px; flex-wrap: wrap; }
+fieldset.checks legend { margin-bottom: 6px; }
+.x-del { border: 0; background: none; color: var(--dim); text-decoration: underline; cursor: pointer; font: 600 14px var(--ui); }
+.gruppe { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 880px) { .gruppe { grid-template-columns: 1fr; } }
+.g-list { display: grid; gap: 10px; }
+.g-item { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); cursor: pointer; font-family: var(--ui); }
+.g-item[aria-current="true"] { border-color: var(--brass); }
+.g-item b { font-size: 17px; } .g-item small { color: var(--dim); font-size: 14px; }
+.g-main { display: grid; gap: 24px; }
+.g-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.g-head .f { min-width: 200px; flex: 1; }
+.g-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.g-stat { padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); font-family: var(--ui); }
+.g-stat span { display: block; color: var(--dim); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+.g-stat b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.g-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; }
+.g-member { display: grid; gap: 12px; align-content: start; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.g-member .cwrap { padding: 8% 6% 0; }
+.g-member .g-budget { font-family: var(--ui); font-size: 15px; }
+.g-member .g-budget b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.g-member .tgls .tgl { font-size: 14px; text-align: left; }
+.g-member .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.g-add { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.g-add .f { min-width: 240px; flex: 1; }
+.out-many { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-height: 72vh; overflow: auto; }
+.out-many img { width: 180px; height: auto; border-radius: 6px; }
+.print-area { display: none; }
+/* Zum Einpassen der Texte muss der Druckbereich kurz gerendert werden, außerhalb des Bildschirms */
+.print-area.bereit { display: flex; flex-wrap: wrap; gap: 4mm; position: fixed; left: -10000px; top: 0; width: 194mm; }
+.print-area.bereit .cw { width: 63mm; }
+@media print {
+  @page { size: A4; margin: 8mm; }
+  html, body { background: #fff !important; }
+  body > *:not(.print-area) { display: none !important; }
+  .print-area { display: flex !important; flex-wrap: wrap; gap: 4mm; position: static !important; width: auto !important; }
+  .print-area .cw { width: 63mm; break-inside: avoid; }
+  .print-area .card { box-shadow: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="c-bracket" viewBox="0 0 60 60"><path d="M3 44V14Q3 3 14 3h30" fill="none" stroke="currentColor" stroke-width="3.2"/><path d="M13 9l4 4-4 4-4-4z" fill="currentColor"/><path d="M9 26v10M26 9h10" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="c-filigree" viewBox="0 0 60 60"><path d="M3 56V16Q3 3 16 3h40" fill="none" stroke="currentColor" stroke-width="3"/><path d="M10 40c0-16 8-30 30-30" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 40c4-2 6-6 4-10M40 10c-2 4-6 6-10 4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4.6" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="#2a0e02"/></symbol>
+    <symbol id="c-crown" viewBox="0 0 60 60"><path d="M0 0l17 5L5 17z" fill="currentColor"/><path d="M4 58V18Q4 4 18 4h40" fill="none" stroke="currentColor" stroke-width="3.6"/><path d="M11 46c0-20 12-35 35-35" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 46c5-2 7-8 4-13M46 11c-2 5-8 7-13 4M17 32c3 3 8 3 10 0M32 17c3 3 3 8 0 10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="14" cy="14" r="5.4" fill="currentColor"/><circle cx="14" cy="14" r="2.6" fill="#b3200f"/></symbol>
+
+    <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4" fill="currentColor"/><circle cx="5.5" cy="10" r="2.1" fill="currentColor"/><circle cx="9.5" cy="6" r="2.1" fill="currentColor"/><circle cx="14.5" cy="6" r="2.1" fill="currentColor"/><circle cx="18.5" cy="10" r="2.1" fill="currentColor"/></symbol>
+    <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 2.5c-4.6 0-7.8 3.2-7.8 7.6 0 2.6 1.2 4.4 2.8 5.5V19h10v-3.4c1.6-1.1 2.8-2.9 2.8-5.5 0-4.4-3.2-7.6-7.8-7.6zM9.5 19v2.5M12 19v2.5M14.5 19v2.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="9" cy="11" r="1.9" fill="currentColor"/><circle cx="15" cy="11" r="1.9" fill="currentColor"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.5c.6 3.6 5.5 5.6 5.5 11a5.5 5.5 0 0 1-11 0c0-2.8 1.6-4.2 2.3-6.5 1.6 1.2 2.4 2.8 2.4 4.6 1.4-2.6 1.6-5.8.8-9.1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 9.5 10.5 4 20 4c0 9.5-5.5 15-15 15zM5 19l8.5-8.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.2 6.2 0 0 0 10 10z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sword" viewBox="0 0 24 24"><path d="M20 4l-10.5 10.5M20 4v4.5M20 4h-4.5M6.5 11.5l6 6M8.5 15.5L4 20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-boot" viewBox="0 0 24 24"><path d="M7.5 3h5.5v10h3.2c2.2 0 3.8 1.3 3.8 3.3V20H4v-3.8l3.5-3.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-wing" viewBox="0 0 24 24"><path d="M3 19c7 0 13-4.5 18-15-3.2 1.2-6.2 1.6-9 3.4.8-1.4 1-2.6 1-4-4 1.8-7.4 6-8.4 10.6.9-.6 1.8-.9 2.8-.9C5.5 14.5 3.8 16.6 3 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.2a4.2 4.2 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 12h6M12 9v6" stroke="currentColor" stroke-width="1.9"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.8l8 3v6.2c0 5-3.6 8.2-8 9.4-4.4-1.2-8-4.4-8-9.4V5.8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.8c3.2 4.6 6.2 7.8 6.2 12a6.2 6.2 0 0 1-12.4 0c0-4.2 3-7.4 6.2-12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="10" cy="15" r="1.4" fill="currentColor"/><circle cx="14" cy="12.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-rune" viewBox="0 0 24 24"><path d="M12 2.5l7.5 9.5-7.5 9.5L4.5 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 7v10M9 10l3 2.5 3-2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 16"><path d="M1.5 14.5L3 3l5 5 4-7 4 7 5-5 1.5 11.5z" fill="currentColor"/></symbol>
+    <symbol id="i-horns" viewBox="0 0 120 50"><path d="M47 40C30 38 12 28 4 4c10 14 26 20 42 20z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.6"/><path d="M73 40c17-2 35-12 43-36-10 14-26 20-42 20z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.6"/><path d="M60 10l15 17-15 19-15-19z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.8"/><path d="M60 17l8 10-8 11-8-11z" fill="#c21d12"/><path d="M60 17l8 10h-8z" fill="#ff6b52"/></symbol>
+    <symbol id="i-gem" viewBox="0 0 60 40"><path d="M4 22h18M38 22h18" stroke="#ffb35c" stroke-width="2.4"/><path d="M30 3l12 17-12 17-12-17z" fill="#3a1402" stroke="#ffb35c" stroke-width="2.4"/><path d="M30 10l7 10-7 10-7-10z" fill="#ff7a12"/><path d="M30 10l7 10h-7z" fill="#ffd9a0"/></symbol>
+    <linearGradient id="g-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2bd"/><stop offset=".5" stop-color="#e6ae45"/><stop offset="1" stop-color="#8a5a14"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Olympiade der Welten · Age of Fantasy Quest</div>
+    <h1>Kartenschmiede</h1>
+    <p class="lede">Artwork hochladen, Werte eintragen, fertig ist die Karte. Sechs Seltenheiten, eine Punkteformel: Die Stufe folgt den Punkten, die Punkte folgen den Werten, und ein Boss ist schon von Weitem als Boss zu erkennen.</p>
+    <nav class="tabs" role="tablist" aria-label="Bereiche">
+      <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Karten</button>
+      <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
+    </nav>
+  </header>
+
+  <div id="tabKarten" role="tabpanel" aria-labelledby="tab-karten" class="tabpanel">
+  <section aria-labelledby="h-ladder">
+    <div class="sec-head">
+      <h2 id="h-ladder">Dieselbe Einheit, sechs Seltenheiten</h2>
+      <p class="lede">Grau, grün, blau, gelb, orange, rot. Rahmen, Ornamente und Effekte steigen Stufe für Stufe. Klick auf eine Stufe übernimmt sie in die Werkstatt.</p>
+    </div>
+    <div class="ladder-scroll"><div class="ladder" id="ladder"></div></div>
+  </section>
+
+  <section aria-labelledby="h-shop">
+    <div class="sec-head">
+      <h2 id="h-shop">Werkstatt</h2>
+      <p class="lede">Artwork hochladen, Werte eintragen, Stufe wählen. Die Karte rechts aktualisiert sich sofort und lässt sich als PNG erzeugen.</p>
+    </div>
+    <div class="shop">
+      <form class="editor" id="editor" autocomplete="off">
+        <fieldset>
+          <legend>Vorlage</legend>
+          <label class="f">Beispiel laden
+            <select id="preset"></select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Artwork</legend>
+          <label class="f file">Bild hochladen (Artwork oder Foto der Mini)
+            <input type="file" id="artfile" accept="image/*">
+          </label>
+          <div class="row">
+            <label class="f">Ausschnitt horizontal <input type="range" id="ax" min="0" max="100"></label>
+            <label class="f">Ausschnitt vertikal <input type="range" id="ay" min="0" max="100"></label>
+          </div>
+          <label class="f">Zoom <input type="range" id="zoom" min="100" max="220"></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Seltenheit</legend>
+          <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
+          <label class="check"><input type="checkbox" id="autoTier"> Stufe folgt den Punkten</label>
+          <div class="hint" id="suggest"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Einheit</legend>
+          <label class="f">Name <input type="text" id="name"></label>
+          <div class="row">
+            <label class="f">Fraktion <input type="text" id="faction"></label>
+            <label class="f">Fraktionssymbol
+              <select id="ficon">
+                <option value="paw">Pfote</option><option value="skull">Schädel</option><option value="flame">Flamme</option>
+                <option value="sun">Sonne</option><option value="leaf">Blatt</option><option value="moon">Mond</option><option value="shield">Schild</option>
+              </select>
+            </label>
+          </div>
+          <div class="row4">
+            <label class="f">Punkte <input type="number" id="points" min="0" step="5"></label>
+            <label class="f">Modelle <input type="text" id="size"></label>
+            <label class="f">Qualität <input type="text" id="quality"></label>
+            <label class="f">Verteid. <input type="text" id="defense"></label>
+          </div>
+          <div class="row">
+            <label class="f">Zäh (je Modell) <input type="text" id="tough"></label>
+            <label class="f">Rolle
+              <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option><option value="companion">Gefährte</option></select>
+            </label>
+          </div>
+          <div class="calc" id="calc" aria-live="polite"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Waffen</legend>
+          <label class="f">Eine Waffe pro Zeile
+            <textarea id="weapons" rows="3"></textarea>
+          </label>
+          <div class="hint">Format: <code>Name | Reichweite | Attacken | Regeln</code>, zum Beispiel <code>Frostklauen | Nahkampf | A6 | DS(2), Reißend</code>. Attacken gelten je Modell.</div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Fähigkeiten</legend>
+          <label class="f">Passive, mit Komma getrennt <input type="text" id="passives"></label>
+          <div class="hint">Symbole und Punkte kommen automatisch: Langsam, Schnell, Furchtlos, Regeneration, Hinterhalt, Furcht(3), Wucht(3), Zauberer(2) und weitere.</div>
+          <div class="f">Fähigkeiten aus der Datenbank
+            <div class="skill-chips" id="skillChips"></div>
+            <select id="skillAdd" aria-label="Fähigkeit hinzufügen"></select>
+          </div>
+          <label class="f">Eigene Sonderregel, Name <input type="text" id="bossName"></label>
+          <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
+          <label class="f">Wie stark ist diese Sonderregel?
+            <select id="special">
+              <option value="0">Keine oder nur Flavour</option><option value="5">Klein, +5 %</option><option value="10">Mittel, +10 %</option>
+              <option value="20">Groß, +20 %</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Flavour</legend>
+          <label class="f">Zitat unten auf der Karte <textarea id="flavor" rows="2"></textarea></label>
+          <label class="f">Aussehen, für den Bild-Prompt <textarea id="look" rows="3"></textarea></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Karte als Text</legend>
+          <textarea id="cardJson" rows="4" placeholder="Vorschlag von Claude hier einfügen"></textarea>
+          <div class="copyrow">
+            <button type="button" class="btn ghost sm" id="jsonIn">Text übernehmen</button>
+            <button type="button" class="btn ghost sm" id="jsonOut">Aktuelle Karte als Text</button>
+          </div>
+          <p class="hint" id="jsonMsg" aria-live="polite">Für Kartenvorschläge aus dem Chat: Claude liefert Name, Werte, Lore und Fähigkeiten als Text, du fügst ihn hier ein. Neue Fähigkeiten landen dabei gleich in der Datenbank.</p>
+        </fieldset>
+      </form>
+
+      <div class="stage-col">
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="Format">
+            <button type="button" data-o="port" aria-pressed="true">Hochformat</button>
+            <button type="button" data-o="land" aria-pressed="false">Querformat</button>
+          </div>
+          <button type="button" class="btn" id="exportBtn">Als PNG erzeugen</button>
+          <button type="button" class="btn ghost" id="saveBtn" hidden>Speichern</button>
+        </div>
+        <p class="hint" id="saveMsg" aria-live="polite"></p>
+        <div class="stage" id="stage"></div>
+        <p class="tier-note" id="tierNote"></p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-mine" id="mineSec" hidden>
+    <div class="sec-head">
+      <h2 id="h-mine">Meine Karten</h2>
+      <p class="lede">Auf dem Olympiade-Server gespeichert, mit Artwork. Eine gemeinsame Sammlung für alle, die sich einloggen können, von jedem Gerät aus.</p>
+    </div>
+    <div class="mine" id="mine"></div>
+  </section>
+
+  <section aria-labelledby="h-build">
+    <div class="sec-head">
+      <h2 id="h-build">Baukasten</h2>
+      <p class="lede">Einheit aus Teilen zusammenstellen. Neben jedem Knopf steht, was der nächste Schritt kostet. Helden haben ein festes Budget, Gefährten und Gegner kosten, was sie kosten.</p>
+    </div>
+    <div class="build">
+      <div class="b-controls" id="bControls"></div>
+      <div class="b-side">
+        <div class="seg seg3" id="bRole" role="group" aria-label="Rolle">
+          <button type="button" data-r="hero" aria-pressed="false">Held</button>
+          <button type="button" data-r="companion" aria-pressed="false">Gefährte</button>
+          <button type="button" data-r="enemy" aria-pressed="true">Gegner</button>
+        </div>
+        <label class="f" id="bBudgetRow">Budget je Held <input type="number" id="bBudget" min="20" step="5"></label>
+        <div id="bSum"></div>
+        <div class="b-card" id="bCard"></div>
+        <div class="row-b" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="btn ghost sm" id="bNewHero">Neuer Held</button>
+          <button type="button" class="btn ghost sm" id="bNewEnemy">Neuer Gegner</button>
+          <button type="button" class="btn ghost sm" id="bElite">Elite-Version</button>
+        </div>
+        <p class="hint" id="bEliteMsg" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-db">
+    <div class="sec-head">
+      <h2 id="h-db">Fähigkeiten-Datenbank</h2>
+      <p class="lede">Skills, Auren und Sonderregeln mit festem Preis. Was hier steht, lässt sich auf jede Karte legen und kostet überall gleich viel. Helden-Skills kosten feste Punkte, Sonderregeln der Gegner einen Aufschlag in Prozent, der mit der Einheit mitwächst.</p>
+    </div>
+    <div class="db">
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Name</th><th>Art</th><th>Für</th><th class="num">Kosten</th><th>Regeltext</th><th></th></tr></thead>
+        <tbody id="dbRows"></tbody>
+      </table></div>
+      <form class="db-form" id="dbForm" autocomplete="off">
+        <h3>Neue Fähigkeit</h3>
+        <label class="f">Name <input type="text" id="dbName" required maxlength="80"></label>
+        <div class="row">
+          <label class="f">Art
+            <select id="dbArt"><option>Skill</option><option>Aura</option><option selected>Sonderregel</option><option>Passiv</option></select>
+          </label>
+          <label class="f">Stärke
+            <select id="dbStaerke"><option value="klein">Klein</option><option value="mittel" selected>Mittel</option><option value="gross">Groß</option><option value="elite">Elite</option></select>
+          </label>
+        </div>
+        <fieldset class="checks"><legend>Für</legend>
+          <label class="check"><input type="checkbox" id="dbHero" checked> Held</label>
+          <label class="check"><input type="checkbox" id="dbComp" checked> Gefährte</label>
+          <label class="check"><input type="checkbox" id="dbEnemy" checked> Gegner</label>
+        </fieldset>
+        <label class="f">Regeltext <textarea id="dbText" rows="3" maxlength="600"></textarea></label>
+        <p class="hint" id="dbPreis"></p>
+        <button type="submit" class="btn">In die Datenbank</button>
+        <p class="hint" id="dbMsg" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-sim">
+    <div class="sec-head">
+      <h2 id="h-sim">Duell-Simulator</h2>
+      <p class="lede">Zwei Einheiten, tausend Kämpfe mit echten Würfeln nach OPR-Regeln: Bewegen, Angreifen, Schießen, Zurückschlagen. So sieht man, ob gleiche Punkte auch gleiche Chancen bedeuten, gerade zwischen Fern- und Nahkampf.</p>
+    </div>
+    <div class="sim">
+      <div class="sim-ctl">
+        <div class="row">
+          <label class="f">Einheit A <select id="simA"></select></label>
+          <label class="f">Einheit B <select id="simB"></select></label>
+        </div>
+        <div class="row">
+          <label class="f">Startabstand
+            <select id="simDist"><option value="12">12"</option><option value="18">18"</option><option value="24" selected>24"</option><option value="30">30"</option></select>
+          </label>
+          <label class="f">Kämpfe
+            <select id="simN"><option value="1000" selected>1000</option><option value="5000">5000</option></select>
+          </label>
+        </div>
+        <label class="f">Gelände
+          <select id="simCover"><option value="0">Offener Tisch, keine Deckung</option><option value="0.5" selected>Mittel: jeder zweite Schuss trifft auf Deckung</option><option value="1">Viel: jedes Ziel steht in Deckung</option></select>
+        </label>
+        <div class="copyrow">
+          <button type="button" class="btn" id="simRun">Würfeln</button>
+          <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
+        </div>
+        <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
+      </div>
+      <div class="sim-out" id="simOut" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-formula">
+    <div class="sec-head">
+      <h2 id="h-formula">Schmiede-Formel</h2>
+      <p class="lede">Ein eigenes, einfaches Punktesystem auf OPR-Basis. Zwei Zahlen und ein Zuschlag: wie viel Schaden die Einheit macht, wie viel sie aushält, und was sie sonst noch kann. Jede neue Regel ist nur ein neuer Faktor in einer Liste.</p>
+    </div>
+    <div class="formula">
+      <div class="facts">
+        <div class="eq">Punkte = 13 × √(Kampfwert × Ausdauer) × (1 + Boni)<small>plus feste Zuschläge wie Zauberer, auf 5 gerundet</small></div>
+        <dl class="kv">
+          <dt>Kampfwert</dt><dd>je Waffe: Attacken × Trefferchance × Waffenregeln × Reichweite, dann alle Waffen addiert</dd>
+          <dt>Trefferchance</dt><dd>Qualität 2+ 0,83 · 3+ 0,67 · 4+ 0,5 · 5+ 0,33 · 6+ 0,17. Zuverlässig zählt wie 2+</dd>
+          <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Tödlich ×2 · Explosion(X) ×(1 + X/6)</dd>
+          <dt>Reichweite</dt><dd>Nahkampf ×1 · 6" ×0,68 · 12" ×0,8 · 18" ×0,9 · 24" ×1,0 · 30" ×1,1. Mit dem Duell-Simulator so abgestimmt, dass Fern- und Nahkampf bei gleichen Punkten gleich oft gewinnen</dd>
+          <dt>Ausdauer</dt><dd>Zäh × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
+          <dt>Boni</dt><dd>+5 % Geländeläufer, Späher, Tarnung, Fliegen, Furchtlos, Rasend, Held · +10 % Schnell, Hinterhalt, Wucht · +15 % Furcht · +20 % Ausweichen · +25 % Regeneration · −10 % Langsam · −15 % An Beschwörer gebunden</dd>
+          <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Quest-Held mit Skills +25</dd>
+          <dt>Begriffe</dt><dd>DS = Durchschlag (OPR: AP) · Reißend (Rending) · Explosion (Blast) · Tödlich (Deadly) · Zuverlässig (Reliable) · Wucht (Impact) · Furcht (Fear)</dd>
+        </dl>
+      </div>
+      <div class="facts">
+        <h3>Geeicht an deinen Daten</h3>
+        <p>Deine Tabelle enthält 80 offizielle Einheiten mit Punkten von 20 bis 3455. Die Formel trifft sie im Median auf <b>9 %</b> genau, 84 % liegen innerhalb von ±20 %. Die additive Tabelle aus „Punktelogiken“ liegt im Median 33 % daneben.</p>
+        <p>Der Grund: Stärke multipliziert sich. Wer doppelt so viel aushält, schlägt auch doppelt so lange zu. Eine Tabelle, die nur addiert, macht kleine Einheiten zu teuer und Monster viel zu billig.</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Offizielle Einheit</th><th class="num">OPR</th><th class="num">Formel</th><th class="num">Additiv</th></tr></thead>
+          <tbody class="static">
+            <tr><td>Chameleon</td><td class="num">60</td><td class="num">60</td><td class="num">85</td></tr>
+            <tr><td>Gator</td><td class="num">160</td><td class="num">175</td><td class="num">150</td></tr>
+            <tr><td>Dragon Lizard</td><td class="num">470</td><td class="num">365</td><td class="num">255</td></tr>
+            <tr><td>Triceratops</td><td class="num">935</td><td class="num">865</td><td class="num">525</td></tr>
+            <tr><td>Dread Titan</td><td class="num">2275</td><td class="num">2375</td><td class="num">710</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Normal und Elite</h3>
+        <p>Deine starken Versionen kosten etwa das Doppelte der normalen (Kristallwurm 55 → 115, Dornauge 65 → 120). Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
+        <h3>Gefährten freischalten</h3>
+        <p>Wer die Elite-Version einer Gegnerart besiegt, darf deren normale Version als Gefährten anwerben. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
+      </div>
+    </div>
+    <div class="sec-head" style="margin-top:12px">
+      <h3>Deine Einheiten nachgerechnet</h3>
+      <p class="hint" style="font-size:15px">Aus den Blättern „Selfmade“ und „Heroes“. Klick auf eine Zeile lädt die Karte in die Werkstatt. Blau heißt: bei dir teurer als die Formel, die Einheit ist also für ihre Punkte zu schwach. Rot heißt: zu billig.</p>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Einheit</th><th class="num">Deine Punkte</th><th class="num">Formel</th><th class="num">Abweichung</th><th>Stufe nach Formel</th></tr></thead>
+      <tbody id="bestiary"></tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="h-forge">
+    <div class="sec-head">
+      <h2 id="h-forge">Vom Miniaturfoto zum Artwork</h2>
+      <p class="lede">Die Bild-KI malt nur das Motiv. Rahmen, Werte und Text setzt die Kartenschmiede darüber. So bleibt jede Karte einheitlich, und die Regeln lassen sich später ändern, ohne neu zu generieren.</p>
+    </div>
+    <div class="forge">
+      <div style="display:grid;gap:22px;align-content:start">
+        <ol class="steps">
+          <li>Mini bei Tageslicht vor neutralem Hintergrund fotografieren, leicht von unten, ganze Figur im Bild.</li>
+          <li>Foto in die Bild-KI laden und den Prompt rechts mitschicken. Er kommt aus den Feldern der Werkstatt und passt Licht und Kamera an die Seltenheit an.</li>
+          <li>Das Ergebnis oben in der Werkstatt hochladen, Ausschnitt und Zoom einstellen.</li>
+          <li>Speichern oder „Als PNG erzeugen“ drücken.</li>
+        </ol>
+        <div class="tools">
+          <h3>Wo das geht</h3>
+          <div class="tool"><b>ChatGPT</b><span>Bildgenerierung mit Foto als Referenz. Folgt dem Prompt gut, verändert Details der Mini manchmal.</span></div>
+          <div class="tool"><b>Google Gemini</b><span>Bearbeitet ein hochgeladenes Foto sehr nah am Original. Gut, wenn Bemalung und Pose erhalten bleiben sollen.</span></div>
+          <div class="tool"><b>ComfyUI lokal</b><span>Flux Kontext oder SDXL auf dem eigenen Rechner, kostenlos und ohne Limit. Workflow und Skript liegen im Repo unter <code>apps/kartenschmiede/comfyui</code>.</span></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px;align-content:start">
+        <label class="f" for="prompt">Prompt für die aktuelle Karte (englisch, damit verstehen die Bild-KIs am meisten)</label>
+        <textarea id="prompt" readonly></textarea>
+        <div class="copyrow">
+          <button type="button" class="btn ghost" id="copyBtn">Prompt kopieren</button>
+          <span class="hint" id="copyMsg" aria-live="polite"></span>
+        </div>
+        <p class="hint">Der Stil ist fest eingestellt: fotorealistischer Dark-Fantasy-Filmstill mit einem leuchtenden Sci-Fi-Akzent, wie bei den Olympiade-Bildern. So wirken alle Karten wie aus einer Welt.</p>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div id="tabGruppe" role="tabpanel" aria-labelledby="tab-gruppe" class="tabpanel" hidden>
+    <section aria-labelledby="h-gruppe">
+      <div class="sec-head">
+        <h2 id="h-gruppe">Gruppe</h2>
+        <p class="lede">Deine Helden-Lineups. Je Held Fähigkeiten aus der Datenbank dazukaufen, bis das Budget voll ist. Die Karten ändern sich sofort mit und lassen sich gesammelt drucken oder als PNG speichern.</p>
+      </div>
+      <div class="gruppe">
+        <aside class="g-list">
+          <div class="copyrow"><button type="button" class="btn sm" id="gNeu">Neue Gruppe</button></div>
+          <div id="gListe"></div>
+        </aside>
+        <div class="g-main" id="gMain"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="print-area" id="printArea" aria-hidden="true"></div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box">
+    <img id="outImg" alt="Erzeugte Karte als PNG">
+    <div class="out-many" id="outMany"></div>
+    <p>Rechtsklick oder lange drücken, dann „Bild speichern“.</p>
+    <button type="button" class="btn" id="closeModal">Schließen</button>
+  </div>
+</div>
+
+{{SKRIPTE}}
