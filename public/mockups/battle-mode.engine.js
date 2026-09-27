@@ -5234,8 +5234,8 @@
   };
   const SLOTS_JE_DISC={
     "tdm":[
-      {id:"vanguard",label:"Vanguard",text:"Oeffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
-      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und haelt Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
+      {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
+      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und hält Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
       {id:"shotcaller",label:"Shotcaller",text:"Ordnet den Fight über Intelligence und Charisma.",gross:"charisma",klein:"intelligence",last:"power",mueh:"low",profil:{power:25.6,health:18.3,charisma:14.4,stamina:12.8,spirit:11,intelligence:8.7,determination:5.5,awareness:1.9,torment:1.9}},
       {id:"holdline",label:"Hold Line",text:"Stabilisiert knappe Phasen mit Health und Determination.",gross:"health",klein:"determination",last:"stamina",mueh:"medium",profil:{health:25.4,power:24.8,stamina:12.5,spirit:10.7,charisma:8.9,determination:8.7,intelligence:5.4,awareness:1.9,torment:1.9}},
       {id:"rallypoint",label:"Rally Point",text:"Hebt Team-Momentum über Spirit und Charisma.",gross:"spirit",klein:"charisma",last:"power",mueh:"low",profil:{power:24.7,health:17.7,spirit:17.3,charisma:13.4,stamina:12.4,determination:5.4,intelligence:5.4,awareness:1.9,torment:1.9}},
@@ -5243,44 +5243,44 @@
     ],
     "mini-dm":[
       {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:25.4,torment:20.6,power:19.4,stamina:13.8,will:12.1,dexterity:8.7}},
-      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
+      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
       {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:21.5,health:17.9,will:17.4,dexterity:14.4,power:14.4,stamina:14.4}},
       {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:24.5,stamina:22,health:19.4,power:16.3,will:14.3,dexterity:3.5}}
     ],
     "battlefield":[
-      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
       {id:"spotter",label:"Spotter",text:"Liest Lücken und Ziele über Awareness.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
     ],
     "gewichtheben":[
       {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
       {id:"safelift",label:"Safe Lift",text:"Sichert Punkte über Health und Determination.",gross:"health",klein:"determination",last:"power",mueh:"low",profil:{power:24.4,health:21.4,charisma:20.1,determination:15.4,will:6.2,speed:5.3,dexterity:5.3,stamina:1.8}},
       {id:"pressurelift",label:"Pressure Lift",text:"Geht aggressiv in schwere Versuche.",gross:"charisma",klein:"power",last:"health",mueh:"high",profil:{power:31.4,charisma:28.4,health:13,determination:9.8,will:5.8,speed:5,dexterity:5,stamina:1.8}},
-      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausfuehrung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
-      {id:"gripanchor",label:"Grip Anchor",text:"Haelt über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
-      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom grossen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
+      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausführung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
+      {id:"gripanchor",label:"Grip Anchor",text:"Hält über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
+      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom großen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
     ],
     "climbing":[
       {id:"routereader",label:"Route Reader",text:"Findet die Linie über Determination und Awareness.",gross:"determination",klein:"awareness",last:"stamina",mueh:"low",profil:{stamina:22.9,determination:21.4,awareness:11.4,speed:10.6,dexterity:10.6,health:8.9,power:7.1,will:7.1}},
-      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Zuege.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
-      {id:"paceclimber",label:"Pace Climber",text:"Haelt Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
+      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Züge.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
+      {id:"paceclimber",label:"Pace Climber",text:"Hält Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
       {id:"endurancewall",label:"Endurance Wall",text:"Klettert stabil über Stamina und Health.",gross:"stamina",klein:"health",last:"dexterity",mueh:"high",profil:{stamina:31.4,determination:13.7,health:13.4,speed:10.3,dexterity:10.3,power:6.9,awareness:6.9,will:6.9}},
-      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Zuege über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
+      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Züge über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
       {id:"summitpush",label:"Summit Push",text:"Zieht den Schluss über Determination und Will.",gross:"will",klein:"determination",last:"stamina",mueh:"high",profil:{stamina:24.3,determination:18.8,will:12.8,health:11.3,power:8.5,awareness:8.5,dexterity:8.1,speed:7.6}}
     ],
     "staffel":[
       {id:"startrunner",label:"Start Runner",text:"Bringt die Staffel mit Speed in Position.",gross:"speed",klein:"stamina",last:"awareness",mueh:"medium",profil:{speed:29.4,stamina:19.4,spirit:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"tempolink",label:"Tempo Link",text:"Haelt Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
+      {id:"tempolink",label:"Tempo Link",text:"Hält Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
       {id:"batontech",label:"Baton Tech",text:"Sichert Wechsel über Awareness und Dexterity.",gross:"awareness",klein:"dexterity",last:"stamina",mueh:"low",profil:{speed:21.3,awareness:17.3,stamina:14.2,spirit:14.2,dexterity:11.4,charisma:8.9,will:7.2,determination:3.6,health:1.9}},
       {id:"curverunner",label:"Curve Runner",text:"Braucht Speed und Will für schwierige Abschnitte.",gross:"speed",klein:"will",last:"dexterity",mueh:"medium",profil:{speed:29.4,stamina:13.9,spirit:13.9,will:11.4,awareness:10.4,charisma:8.7,dexterity:7,determination:3.5,health:1.8}},
       {id:"chaserunner",label:"Chase Runner",text:"Jagt Rückstände mit Spirit und Speed.",gross:"spirit",klein:"speed",last:"stamina",mueh:"high",profil:{speed:27.4,spirit:21.4,stamina:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"anchor",label:"Anchor",text:"Schliesst die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
+      {id:"anchor",label:"Anchor",text:"Schließt die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
     ],
     "time-trial":[
-      {id:"pacer",label:"Pacer",text:"Haelt die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"pacer",label:"Pacer",text:"Hält die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"linereader",label:"Line Reader",text:"Findet Sekunden über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"speed",mueh:"low",profil:{intelligence:23.4,dexterity:21.8,speed:19.2,awareness:15.4,stamina:13.1,power:4.4,torment:2.7}},
-      {id:"aerodrive",label:"Aero Drive",text:"Drueckt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"aerodrive",label:"Aero Drive",text:"Drückt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"splitcontrol",label:"Split Control",text:"Kontrolliert Zwischenzeiten über Intelligence.",gross:"intelligence",klein:"stamina",last:"dexterity",mueh:"low",profil:{intelligence:23.4,dexterity:21.6,speed:19,stamina:18.4,awareness:10.4,power:4.4,torment:2.7}},
       {id:"risksegment",label:"Risk Segment",text:"Nimmt Risiko über Dexterity und Torment.",gross:"dexterity",klein:"torment",last:"awareness",mueh:"high",profil:{dexterity:30.4,speed:19.9,intelligence:16.3,stamina:13.6,awareness:10.9,power:4.6,torment:4.5}},
       {id:"finishkick",label:"Finish Kick",text:"Holt den Schluss über Speed und Power.",gross:"stamina",klein:"awareness",last:"stamina",mueh:"high",profil:{speed:21.1,stamina:20,dexterity:17.4,awareness:15.3,intelligence:15.1,power:8.1,torment:3}}
@@ -5290,30 +5290,30 @@
       {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"awareness",last:"speed",mueh:"low",profil:{dexterity:17.3,speed:16.1,determination:13.4,will:12.5,torment:12.5,awareness:10.1,power:9,health:5.4,stamina:3.6}},
-      {id:"drivephase",label:"Drive Phase",text:"Drueckt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
+      {id:"drivephase",label:"Drive Phase",text:"Drückt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
       {id:"photofinish",label:"Photo Finish",text:"Braucht Nerven und Torment für den letzten Meter.",gross:"will",klein:"torment",last:"speed",mueh:"medium",profil:{will:17.5,torment:17.5,dexterity:12.9,determination:11.8,power:11.5,health:9.5,awareness:7.4,stamina:6.2,speed:5.9}}
     ],
     "tennis":[
       {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
-      {id:"return",label:"Return",text:"Liest Aufschlaege über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
-      {id:"rallycontrol",label:"Rally Control",text:"Haelt Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
+      {id:"return",label:"Return",text:"Liest Aufschläge über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
+      {id:"rallycontrol",label:"Rally Control",text:"Hält Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
       {id:"netpressure",label:"Net Pressure",text:"Greift über Dexterity und Speed an.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:19.8,awareness:18,dexterity:17.3,spirit:16.2,stamina:10.9,speed:8.7,determination:5.5,charisma:3.7}},
       {id:"matchiq",label:"Match IQ",text:"Gewinnt Muster über Intelligence und Determination.",gross:"intelligence",klein:"determination",last:"stamina",mueh:"low",profil:{intelligence:27.4,awareness:17.7,spirit:16,stamina:10.7,dexterity:10.7,determination:8.7,speed:5.4,charisma:3.6}},
       {id:"tiebreak",label:"Tiebreak Clutch",text:"Braucht Spirit und Awareness im Druckmoment.",gross:"spirit",klein:"stamina",last:"determination",mueh:"high",profil:{spirit:23.7,awareness:18.2,stamina:14.6,dexterity:13.2,intelligence:11.3,speed:6.4,determination:6.3,charisma:6.2}}
     ],
     "hockey":[
       {id:"powerforward",label:"Power Forward",text:"Geht dahin, wo es weh tut.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:21.2,health:19,spirit:10.7,speed:10.4,stamina:8.9,torment:8.8,awareness:6.3,determination:3.9,dexterity:3.9,will:3.9}},
-      {id:"defensivewall",label:"Defensive Wall",text:"Schliesst Raeume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
-      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und haelt den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
+      {id:"defensivewall",label:"Defensive Wall",text:"Schließt Räume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
+      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und hält den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
       {id:"playmaker",label:"Playmaker",text:"Verbindet Linien über Power und Awareness.",gross:"awareness",klein:"power",last:"health",mueh:"medium",profil:{power:19.4,health:14.3,spirit:11.3,speed:11,awareness:10.5,stamina:9.3,torment:9.3,determination:4.1,dexterity:4.1,will:4.1}},
       {id:"transition",label:"Transition Runner",text:"Dreht Tempo über Speed und Stamina.",gross:"speed",klein:"stamina",last:"power",mueh:"high",profil:{speed:17.5,power:14.3,health:14.1,stamina:13.8,spirit:11.1,torment:9.1,awareness:6.5,determination:4,dexterity:4,will:4}},
-      {id:"slotfinisher",label:"Slot Finisher",text:"Schliesst Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
+      {id:"slotfinisher",label:"Slot Finisher",text:"Schließt Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
     ],
     "showcase":[
-      {id:"stagelead",label:"Stage Lead",text:"Traegt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"stagelead",label:"Stage Lead",text:"Trägt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"crowdhook",label:"Crowd Hook",text:"Holt Publikum über Charisma und Showcase-Power.",gross:"charisma",klein:"power",last:"intelligence",mueh:"low",profil:{charisma:32.4,power:14.4,spirit:13.6,determination:11.9,intelligence:8.6,dexterity:7.7,speed:6.9,health:2.7,torment:1.8}},
       {id:"styletech",label:"Style Tech",text:"Belohnt saubere Details über Determination und Dexterity.",gross:"determination",klein:"dexterity",last:"charisma",mueh:"medium",profil:{charisma:23.8,determination:19.4,spirit:14.1,dexterity:12.4,power:9.7,intelligence:8.9,speed:7.1,health:2.7,torment:1.9}},
-      {id:"controlbeat",label:"Control Beat",text:"Fuehrt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
+      {id:"controlbeat",label:"Control Beat",text:"Führt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
       {id:"bigmoment",label:"Big Moment",text:"Lebt von Charisma und Spirit im Spotlight.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"finale",label:"Finale",text:"Setzt den Schlussakzent über Spirit.",gross:"speed",klein:"spirit",last:"power",mueh:"medium",profil:{charisma:17,spirit:15.1,power:13.5,speed:13.3,determination:11.8,intelligence:11.3,dexterity:10.6,health:4.6,torment:2.9}}
     ],
@@ -5324,11 +5324,11 @@
       {id:"calculation",label:"Calculation Core",text:"Rechnet Linien über Intelligence.",gross:"determination",klein:"intelligence",last:"awareness",mueh:"low",profil:{intelligence:22.5,determination:20.6,awareness:14.7,will:13.6,dexterity:10.1,speed:10,charisma:8.6}}
     ],
     "takeshis-castle":[
-      {id:"gatecrash",label:"Gate Crash",text:"Oeffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
+      {id:"gatecrash",label:"Gate Crash",text:"Öffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
       {id:"balancerun",label:"Balance Run",text:"Bleibt sauber über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"will",mueh:"medium",profil:{will:19.9,determination:16.3,intelligence:15.9,charisma:12.7,dexterity:8.7,awareness:7.3,torment:6.4,stamina:5.5,health:3.7,speed:3.7}},
       {id:"trapreader",label:"Trap Reader",text:"Liest Fallen über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"determination",mueh:"low",profil:{will:20,determination:16.4,intelligence:14.4,charisma:12.8,awareness:11.5,torment:6.4,stamina:5.5,dexterity:5.5,health:3.7,speed:3.7}},
-      {id:"ironwill",label:"Iron Will",text:"Beisst sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
-      {id:"chaosdodge",label:"Chaos Dodge",text:"Ueberlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
+      {id:"ironwill",label:"Iron Will",text:"Beißt sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
+      {id:"chaosdodge",label:"Chaos Dodge",text:"Überlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
@@ -5341,14 +5341,14 @@
     ],
     "wettessen":[
       {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
-      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kraefte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
-      {id:"ironstomach",label:"Iron Stomach",text:"Haelt Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kräfte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
+      {id:"ironstomach",label:"Iron Stomach",text:"Hält Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"tablefocus",label:"Table Focus",text:"Bleibt klar über Determination und Intelligence.",gross:"determination",klein:"intelligence",last:"health",mueh:"low",profil:{will:23,determination:21.4,health:19.4,stamina:19.4,intelligence:11.4,torment:5.4}},
       {id:"secondwind",label:"Second Wind",text:"Kommt über Will und Stamina zurück.",gross:"will",klein:"stamina",last:"health",mueh:"medium",profil:{will:31.4,stamina:25.4,health:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"finalbite",label:"Final Bite",text:"Zieht den Schluss über Determination und Torment.",gross:"determination",klein:"torment",last:"will",mueh:"high",profil:{will:27.8,determination:20.7,health:20.4,stamina:16.1,torment:10.1,intelligence:5}}
     ],
     "basketball":[
-      {id:"floorgeneral",label:"Floor General",text:"Fuehrt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
+      {id:"floorgeneral",label:"Floor General",text:"Führt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
       {id:"rimpressure",label:"Rim Pressure",text:"Attackiert den Korb über Awareness und Speed.",gross:"awareness",klein:"speed",last:"spirit",mueh:"high",profil:{awareness:19.4,spirit:19.4,intelligence:14.1,speed:13.4,charisma:9.7,dexterity:7.1,power:6.2,stamina:5.4,torment:5.4}},
       {id:"perimeter",label:"Perimeter",text:"Schafft Winkel über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"power",mueh:"medium",profil:{intelligence:21.4,spirit:19.4,awareness:12.4,dexterity:11.4,charisma:9.7,speed:8.9,power:6.2,stamina:5.4,torment:5.4}},
       {id:"helpdefense",label:"Help Defense",text:"Rotiert über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"speed",mueh:"medium",profil:{spirit:25.4,awareness:19.4,intelligence:13.7,charisma:9.5,speed:8.6,dexterity:6.9,power:6.1,stamina:5.2,torment:5.2}},
@@ -5361,11 +5361,11 @@
       {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
       {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
       {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"lockerleader",label:"Locker Leader",text:"Haelt die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
+      {id:"lockerleader",label:"Locker Leader",text:"Hält die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
     ],
     "eiskunstlauf":[
-      {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
-      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Spruenge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
+      {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
+      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Sprünge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
       {id:"spingrace",label:"Spin Grace",text:"Sammelt Stil über Charisma und Spirit.",gross:"charisma",klein:"spirit",last:"dexterity",mueh:"medium",profil:{charisma:33.4,spirit:19.4,dexterity:15.1,awareness:11.8,speed:8.4,intelligence:6.8,determination:5.1}},
       {id:"programflow",label:"Program Flow",text:"Verbindet Elemente über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{charisma:24.7,spirit:21.4,dexterity:15.9,awareness:12.4,intelligence:11.4,speed:8.9,determination:5.4}},
       {id:"crowdmoment",label:"Crowd Moment",text:"Hebt den Auftritt über Charisma.",gross:"charisma",klein:"awareness",last:"determination",mueh:"medium",profil:{charisma:33.4,awareness:17.4,dexterity:15.2,spirit:13.5,speed:8.5,intelligence:6.8,determination:5.2}},
@@ -5377,14 +5377,14 @@
       {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
       {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
       {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
-      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+      {id:"finaltouch",label:"Final Touch",text:"Schließt enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
     ],
     "i-spy":[
       {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
       {id:"patternlock",label:"Pattern Lock",text:"Verkettet Hinweise über Intelligence und Spirit.",gross:"intelligence",klein:"spirit",last:"speed",mueh:"low",profil:{intelligence:23.4,spirit:16.4,torment:14.7,will:10.4,charisma:7.8,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
       {id:"socialread",label:"Social Read",text:"Liest Verhalten über Torment und Charisma.",gross:"torment",klein:"charisma",last:"intelligence",mueh:"medium",profil:{torment:22.4,intelligence:15.8,charisma:12.4,spirit:11.4,will:10.5,determination:7.1,speed:7.1,dexterity:7.1,awareness:4.5,health:1.8}},
-      {id:"logicchain",label:"Logic Chain",text:"Baut Loesungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
-      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffaellig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
+      {id:"logicchain",label:"Logic Chain",text:"Baut Lösungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffällig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
       {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
@@ -11046,7 +11046,7 @@
       // Text zeichengleich die alte Zeile; `steckVis` bleibt dort ungesetzt (0) und
       // zeichneFeldspiel liest es nur bei Hockey.
       feed(decker.side,istHockey()
-        ?decker.n+" uebernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
+        ?decker.n+" übernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
         :decker.n+" erobert den Ball — "+wortStahl+".");
       if(istHockey()){
         decker.steckVis=HK_STEAL_VIS;
@@ -12045,7 +12045,7 @@
         const beideSeiten=nah.some(u=>u.side===0)&&nah.some(u=>u.side===1);
         const duell=anBande&&beideSeiten;
         fsLive.reboundKampf={t:0,dauer:duell?HK_BANDENDUELL_DAUER:(nah.length>1?0.55:0.40),duell}; // PLATZHALTER
-        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kaempfen um den Puck!");
+        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kämpfen um den Puck!");
         else if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
@@ -13303,7 +13303,7 @@
       // sechs Duelle, also rund 112 s: laenger als die 60 s der anderen Buehnen, kuerzer
       // als Hockeys 240 s, und langsam genug, dass man eine Hantel sieht.
       label:"Gewichtheben", jeSeite:6, rundenN:6, rundenDauer:1.55, heben:true,
-      failAbzug:0, failWort:"ungueltig", erfolgWort:"gueltig",
+      failAbzug:0, failWort:"ungültig", erfolgWort:"gültig",
       // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
       // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
       // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
@@ -13356,7 +13356,7 @@
       // Rest (Wettessen, I-Spy) zu beruehren. Rezept/rundenN/rundenDauer/failAbzug bleiben
       // in dieser PR unangetastet (Abschnitt 4.1: rho 0,892 wird nicht angefasst).
       label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0, showcase:true,
-      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reißt das Publikum mit",
       // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Showcase 28,4/
       // 29,3 Pp, VERLETZT). ERSTER ANLAUF (jede Rolle einzeln auf ihre EIGENE Matrix-Proportion
       // nachgezogen, s. Git-Historie) verschlimmerte die Zahl auf 43,7 Pp bei n=6 -- derselbe
@@ -14077,7 +14077,7 @@
       wertungTabelle:(basis,art)=>({...basis,
         spalten:basis.spalten.map(s=>s.id!=="stand"?s:{...s,
           titel:"Gefecht entschieden nach Trefferstand (+ Sieg, − Niederlage; bei "
-               +"Treffergleichstand entscheidet die Prioritaet aus der Degen-Zusatzminute)",
+               +"Treffergleichstand entscheidet die Priorität aus der Degen-Zusatzminute)",
           wert:z=>!z.fertig?"…":(z.u.gefechtSieg?"+":"−"),
           farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null})})
     }
@@ -15079,8 +15079,8 @@
         }
         u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt,
           punkte:gueltig?kg:0,
-          ereignis:(uebung==="reissen"?"Reissen":"Stossen")+", "+(v+1)+". Versuch, "+kg+" kg — "
-                   +(gueltig?"gueltig":"ungueltig")+(kuehn?" (kühner Versuch)":"")});
+          ereignis:(uebung==="reissen"?"Reißen":"Stoßen")+", "+(v+1)+". Versuch, "+kg+" kg — "
+                   +(gueltig?"gültig":"ungültig")+(kuehn?" (kühner Versuch)":"")});
       }
     }
   }
@@ -16120,8 +16120,8 @@
         // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
         if(u.aktuell+1>=BB().rundenN){
           const brettText=BB().fechten
-            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
-                           :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
+            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
+                           :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
             :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
           feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
         }
@@ -19179,17 +19179,17 @@
   // NIRGENDS ausgewertet.
   const SHOWCASE_ACTS=[
     {id:"kampfkunst",    label:"Kampfkunst",     pose:"slash", waffe:"eigene",
-      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Raeuspern im Saal"}},
-    {id:"schuetzenkunst",label:"Schuetzenkunst", pose:"shoot", waffe:"eigene",
+      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Räuspern im Saal"}},
+    {id:"schuetzenkunst",label:"Schützenkunst", pose:"shoot", waffe:"eigene",
       text:{erfolg:"ein Trickschuss, der ins Schwarze trifft", fail:"der Schuss geht haarscharf am Ziel vorbei"}},
     {id:"zaubershow",    label:"Zaubershow",     pose:"shoot", waffe:null,
       text:{erfolg:"ein Funkenregen aus dem Nichts, das Publikum staunt", fail:"der Zauber verpufft mit einem traurigen Fauchen"}},
     {id:"gesang",        label:"Gesang",         pose:"walk",  waffe:null,
-      text:{erfolg:"eine Stimme, die den ganzen Saal traegt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
+      text:{erfolg:"eine Stimme, die den ganzen Saal trägt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
     {id:"kraftakt",      label:"Kraftakt",       pose:"slash", waffe:null,
-      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und faellt zu Boden"}},
+      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und fällt zu Boden"}},
     {id:"akrobatik",     label:"Akrobatik",      pose:"hop",   waffe:null,
-      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstoehnen aus dem Publikum"}}
+      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstöhnen aus dem Publikum"}}
   ];
 
   // SHOWCASE_ACT_PUNKTE / actVon(): dasselbe Muster wie PW/leitePers() weiter unten
@@ -19255,7 +19255,7 @@
     const add=(pts,label)=>{ if(!pts)return; for(const[k,v] of Object.entries(pts))sc[k]=(sc[k]||0)+v; warum.push(label); };
     if(b.waffe)add(SHOWCASE_ACT_PUNKTE.bauWaffe[b.waffe],"Waffe: "+b.waffe);
     if(b.vollbild)add(SHOWCASE_ACT_PUNKTE.bauVollbild[b.vollbild],"Vollbild: "+b.vollbild);
-    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Fluegel");
+    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Flügel");
     if(b.effekt)add(SHOWCASE_ACT_PUNKTE.bauEffekt,"Effekt: "+(b.effekt.typ||"?"));
     add(SHOWCASE_ACT_PUNKTE.klasse[u.c],"Klasse: "+u.c);
     (u.sub||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.sub[x],"Sub: "+x));
@@ -22448,13 +22448,13 @@
       // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
       const k=el("div","plan");
       k.appendChild(el("b",null,"Ballwechsel"));
-      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Zuege insgesamt, abwechselnd zwischen "+
+      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Züge insgesamt, abwechselnd zwischen "+
         "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
         "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
         "einen verpassten Abschluss aufsammelt."));
       box.appendChild(k);
       const apb2=document.getElementById("arenaplan");
-      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Zuege, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Züge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
       const pl2=document.querySelector(".planzeile b");
       if(pl2)pl2.textContent="Ballwechsel";
     } else if(istBuehne(disc)){
@@ -23045,7 +23045,7 @@
     // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
     // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
     u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
-    feed(u.side,u.n+" ist zurueck im Kampf.");
+    feed(u.side,u.n+" ist zurück im Kampf.");
   }
 
   // GEMEINSAME AUSSCHALTUNG fuer nahschlag() und den Pfeiltreffer in schrittPfeile() —
@@ -23057,7 +23057,7 @@
     tg.down=true;
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" fällt — zurück in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
     }
@@ -25332,7 +25332,7 @@
         ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
           +pL+":"+pR+" "+stand.suffix
         : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
-          +" (fuer diese Disziplin gibt es noch keine Wertung)",true,
+          +" (für diese Disziplin gibt es noch keine Wertung)",true,
         siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
       renderEndstandBahn();
     }
@@ -28542,7 +28542,7 @@
         {id:"pus",  kopf:"Pus",  titel:"Puste am Spielende — ein disziplineigener Kraftvorrat aus AUSDAUER, NICHT die Saison-Fatigue",
           wert:z=>z.u.pusteMax?Math.round(z.u.puste/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
-        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollstaendig leer",
+        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollständig leer",
           wert:z=>z.u.pusteMax?Math.round(z.u.pusteMin/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
         {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
@@ -32673,7 +32673,7 @@
       txt.appendChild(el("b",null,u.n));
       txt.appendChild(document.createTextNode(manuell
         ?" — die Hilfsverteidigung geht bevorzugt auf ihn."
-        :" — staerkster Gegenspieler, automatisch vorgegeben; anklicken uebernimmt die Wahl manuell."));
+        :" — stärkster Gegenspieler, automatisch vorgegeben; anklicken übernimmt die Wahl manuell."));
     } else {
       txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
     }
@@ -32914,7 +32914,7 @@
           chip.type="button"; chip.dataset.id=String(u.id);
           chip.appendChild(el("i",null,String(i+1)));
           chip.appendChild(document.createTextNode(u.n));
-          chip.title=u.n+" — Startnummer "+(i+1)+", faehrt bei "
+          chip.title=u.n+" — Startnummer "+(i+1)+", fährt bei "
             +bahnZeitText(bahnSpanneAnzeige(u.startT||0))+" los";
           roster.appendChild(chip);
         });
@@ -33440,7 +33440,7 @@
           const gewaehlt=effektiverFokus(0)===u.id;
           if(gewaehlt)k.classList.add("fokus");
           k.title=u.n+(gewaehlt?(fsLive.fokusManuell?" — wird gedoppelt (klicken hebt den Fokus auf)"
-                                 :" — wird automatisch gedoppelt (staerkster Gegenspieler; anklicken uebernimmt manuell)")
+                                 :" — wird automatisch gedoppelt (stärkster Gegenspieler; anklicken übernimmt manuell)")
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
         // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
@@ -36347,7 +36347,7 @@
     // (Default-Kader), dieselbe Saatfolge.
     wandProbe:(opt)=>{
       const M=MOTOREN.climbing;
-      if(!M)return {fehler:"kein Motor fuer climbing angemeldet"};
+      if(!M)return {fehler:"kein Motor für climbing angemeldet"};
       const o=opt||{}, n=o.n||48, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();
