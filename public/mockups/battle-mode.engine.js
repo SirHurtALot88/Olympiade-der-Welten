@@ -16079,21 +16079,53 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
+        // Doppel-Feuer): vorher erst weiter unten und nur fuer Fechten berechnet
+        // (`fechtGegner`) -- die beiden Gates unten (Vorteil-kippt-Highlight,
+        // Brett-entschieden) brauchen denselben Gegner-Verweis aber fuer ALLE drei
+        // Duell-Disziplinen (Schach/Fechten/Tennis), nicht nur Fechten. `u.brett` gruppiert
+        // die Paare unveraendert seit bauBuehne() (s. dortiger Kommentar), reines Lesen.
+        const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
         // FUEHRUNGSWECHSEL AM BRETT (Broadcast Runde 2, Vorschlag 1.2, 26.09.): ersetzt
         // `r.punkte>=60` (Speed-Schach 61 von 134 Zeilen, fast jeder zweite Zug -- gemessen,
         // Konzept Abschnitt 4.2) durch den Moment, den ein Zuschauer am Brett tatsaechlich
         // sieht: das Vorzeichen des Vorteils kippt gegenueber dem letzten Zug DIESES
         // Teilnehmers. "Brett entschieden" (unten) und die Fechten-Periode bleiben ohnehin
         // schon immer big, unveraendert.
-        const vVorher=u.aktuell>0?u.verlauf[u.aktuell-1]:0;
-        const vorteilKipptBig=Math.sign(v)!==Math.sign(vVorher);
+        //
+        // ZWEI FIXES (27.09., Opus-Review-Fund, dieselbe Review wie die Gegen-Gate-Notiz bei
+        // "PERIODE BEENDET" unten):
+        //
+        // 1. ERSTER ZUG OHNE VORGAENGER (falscher Fuehrungswechsel): `u.aktuell>0?...:0`
+        // liess `vVorher` beim allerersten Zug (`u.aktuell===0`) auf 0 zurueckfallen -- JEDER
+        // von Null verschiedene erste Zug wurde dadurch als "Fuehrung kippt" gewertet, obwohl
+        // es noch gar keinen vorherigen Zustand gab, von dem aus sie haette kippen koennen (bis
+        // zu 12 Bretter x 2 Seiten = bis zu 24 falsche Highlights in den ersten Sekunden jedes
+        // Spiels). Der Vergleich braucht jetzt zwingend einen echten Vorgaenger: `u.aktuell>0`
+        // ist Teil der Bedingung selbst, nicht mehr nur ein Default-Wert dahinter.
+        //
+        // 2. DOPPEL-FEUER (einmal je Seite): `u.verlauf`/`gegner.verlauf` sind exakt gespiegelt
+        // (`b.verlauf=verlauf.map(v=>-v)`, s. bauBuehne()-Kommentar) -- ein echter
+        // Fuehrungswechsel kippt das Vorzeichen bei BEIDEN Seiten IMMER im selben Zug (Negation
+        // aendert nichts an der Kipp-Bedingung), und beide Seiten durchlaufen diesen Zweig fuer
+        // denselben Zug separat (REIHENFOLGE oben: `mine[i]` dann `gegner[i]`, Runde fuer
+        // Runde) -- ohne Gate markierte das jede Seite unabhaengig als big, macht aus einem
+        // Ereignis zwei Highlight-Zeilen. Gate: nur die Seite, deren Gegner DIESE Runde bereits
+        // enthuellt hat (`gegner.aktuell>=u.aktuell`), darf big setzen -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, exakt
+        // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
+        // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
+        // bleiben unberuehrt.
+        const vorteilKipptBig=u.aktuell>0
+          &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
+          &&(!gegner||gegner.aktuell>=u.aktuell);
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
-        const fechtGegner=BB().fechten?TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side):null;
+        const fechtGegner=BB().fechten?gegner:null;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
@@ -16151,12 +16183,25 @@
         // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
         // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
         // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        // NUR EINMAL JE BRETT (Fix 27.09., Opus-Review-Fund): dasselbe Doppel-Feuer-Problem
+        // wie bei "FUEHRUNGSWECHSEL AM BRETT" oben und beim Gegen-Gate von "PERIODE BEENDET"
+        // weiter unten -- beide Seiten desselben Bretts erreichen `u.aktuell+1>=rundenN`
+        // unabhaengig voneinander (einmal je Seite ihres eigenen letzten Zugs), ohne Gate
+        // feuerte "Brett entschieden" deshalb zweimal fuer dasselbe Brett (einmal aus Sicht
+        // des Siegers, einmal aus Sicht des Verlierers). Gate: nur die Seite, deren Gegner sein
+        // eigenes letztes Runden-Ende ebenfalls schon erreicht hat, feuert -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
+        // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
+        // `wert()`/`rr()` bleiben unberuehrt.
         if(u.aktuell+1>=BB().rundenN){
-          const brettText=BB().fechten
-            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
-                           :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
-            :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
+          if(brettGegnerFertig){
+            const brettText=BB().fechten
+              ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Prioritaet nach Treffergleichstand)":"")
+                             :"verloren"+(u.gefechtGleichstand?" (Prioritaet gegen ihn nach Treffergleichstand)":""))
+              :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          }
         }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
