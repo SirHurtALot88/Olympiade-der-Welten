@@ -824,6 +824,11 @@
 
   .oly-battle-arena.oly-battle-arena .notes{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media (max-width:840px){.oly-battle-arena.oly-battle-arena .notes{grid-template-columns:1fr}}
+  /* .notes ist per Klasse auf display:grid gesetzt — das schlaegt die niedrigere
+     Spezifitaet der [hidden]-UA-Regel, deshalb hier derselbe Ueberschreibungs-Kniff wie bei
+     .fokuszeile/.rennplanzeile/.ttfokus & Co. oben: #tdmEntwurfNotes (TDM-Entwicklerpanels,
+     Opus-Review 27.09.) muss bei jedem anderen Disziplin-hidden wirklich verschwinden. */
+  .oly-battle-arena.oly-battle-arena .notes[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:8px;padding:13px 15px}
   .oly-battle-arena.oly-battle-arena .note.off{border-left-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .note h3{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;
