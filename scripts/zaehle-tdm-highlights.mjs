@@ -1,9 +1,18 @@
 // Sichtpruefung fuer den TDM-Highlight-Fix (Opus-Ingame-Review, 27.09.): spielt mehrere TDM-
 // Spiele mit verschiedenen Saaten in einem echten Browser durch (Playwright, Server ueber HTTP,
 // nicht file://, wie die uebrigen screenshot-*.mjs-Sonden dieses Ordners) und zaehlt am Ende
-// jedes Spiels, wie viele Ticker-Zeilen `.big` waren (= grosser Callout/HIGHLIGHTS-Eintrag)
-// gegen die Gesamtzahl der Ticker-Zeilen. Kein Teil der rho-/Pp-Abnahme -- nur zum Ansehen,
-// analog zu screenshot-broadcast-hud.mjs.
+// jedes Spiels, wie viele grosse Highlights es WIRKLICH waren.
+//
+// NICHT ueber `#feed span.big` (Nachbesserung, 27.09., unabhaengige Review): der Ticker
+// deckelt sich selbst auf 140 Zeilen (`while(f.children.length>140)f.removeChild(...)`,
+// s. feed() in battle-mode.engine.js) -- bei einem langen TDM-Spiel sind laengst aeltere
+// big-Zeilen aus dem DOM-Fenster herausgerutscht. Diese Sonde zaehlte damit nur den
+// SCHWANZ des Spiels, nicht die echte Gesamtzahl (gemessen: 8 statt tatsaechlich rund 40).
+// Stattdessen wird `#ehighlights .ehzeile` gelesen -- der Endstand-Rueckblick
+// (renderHighlights() in battle-mode.engine.js), der aus HIGHLIGHTS[] gebaut wird, einem
+// Array, das ueber das ganze Spiel waechst und NIE gedeckelt wird.
+//
+// Kein Teil der rho-/Pp-Abnahme -- nur zum Ansehen, analog zu screenshot-broadcast-hud.mjs.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
@@ -78,12 +87,19 @@ try {
     const zeilen = await seite.evaluate(() => {
       const feed = document.getElementById("feed");
       const alle = [...feed.querySelectorAll("div")];
-      const texte = (sel) => alle.filter(d => d.querySelector(sel)).map(d => d.textContent);
-      const big = alle.filter(d => d.querySelector("span.big"));
+      // ECHTE, SPIELWEITE Highlight-Zahl: der Endstand-Rueckblick (#ehighlights), gebaut aus
+      // HIGHLIGHTS[] -- waechst ueber das ganze Spiel, wird nie gedeckelt (anders als der
+      // #feed-Ticker oben, der bei 140 Zeilen kappt).
+      const ehBox = document.getElementById("ehighlights");
+      const ehZeilen = ehBox ? [...ehBox.querySelectorAll(".ehzeile")] : [];
       return {
         gesamt: alle.length,
-        big: big.length,
-        bigTexte: big.map(d => d.textContent),
+        big: ehZeilen.length,
+        bigTexte: ehZeilen.map(d => d.textContent),
+        // Kontrollzahl: was im #feed-DOM-Fenster selbst noch als .big steht (kann kleiner
+        // sein als `big` oben, sobald der 140-Zeilen-Deckel greift -- genau der frueher
+        // falsch gemessene Wert).
+        bigImFeedFenster: alle.filter(d => d.querySelector("span.big")).length,
         // ein paar Beispiele fuer NICHT-big Ausschaltungen/Treffer, zur Kontrolle, dass der
         // Ticker sie weiterhin zeigt (nur kleiner, ohne Banner) statt sie zu verschlucken.
         routineFaelltBeispiele: alle
@@ -105,7 +121,8 @@ try {
 
 for (const r of ergebnisse) {
   console.log(`\n=== Saat ${r.saat} ===`);
-  console.log(`Ticker-Zeilen gesamt: ${r.gesamt}, davon big (grosser Callout): ${r.big}`);
+  console.log(`Ticker-Zeilen gesamt: ${r.gesamt}, ECHTE Highlights (#ehighlights, ungedeckelt): ${r.big}` +
+    ` (im #feed-DOM-Fenster am Ende noch sichtbar: ${r.bigImFeedFenster})`);
   console.log("big-Zeilen:");
   for (const t of r.bigTexte) console.log("  * " + t);
   console.log("Beispiele weiterhin im Ticker, aber NICHT big (Faellt/Ausgeschieden):");

@@ -22875,6 +22875,10 @@
     // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
     // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
     ersteAusschaltungVergeben=false;
+    // GROSS-COOLDOWN (s. kampfGrossDrosseln oben) gehoert zu GENAU diesem Spiel — ohne
+    // diesen Reset bliebe die letzte grosse Marke des vorigen Kampfes stehen und wuerde das
+    // naechste Spiel um bis zu KAMPF_GROSS_COOLDOWN_SEK verkuerzt anlaufen lassen.
+    letzterGrosserT=-Infinity;
     // KONTROLLPUNKT NEU AUFSETZEN (nur Battlefield, s. ARENA_DOMINATION) — VOR PLAN/id,
     // damit ein Wechsel weg von Battlefield (disc jetzt tdm/mini-dm) KP wieder auf null
     // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
@@ -23079,6 +23083,41 @@
   let ersteAusschaltungVergeben=false;
   const seitenScore=(side)=>U.filter(u=>u.side===side).reduce((s,u)=>s+u.st.ko,0);
 
+  // SPIELWEITER GROSS-COOLDOWN (Opus-Ingame-Review, Nachbesserung 27.09.): der obige
+  // Uebergangstest in grosserTreffer() UND die vier Kriterien hier in schalteAus() sind
+  // beide fuer sich sauber -- das eigentliche Problem ist TDMs Respawn (s. TDM_RESPAWN_SEK
+  // oben): JEDES neue Leben eines Kaempfers kann die 15%-Schwelle erneut genau einmal
+  // reissen und einen weiteren Fuehrungswechsel/Mehrfachkill ausloesen. Bei einem 12-Spieler-
+  // Match mit vielen Respawn-Zyklen in ~95s Spielzeit summierte sich das GEMESSEN (s.
+  // scripts/zaehle-tdm-highlights.mjs, ueber HIGHLIGHTS[]/#ehighlights statt den auf 140
+  // Zeilen gedeckelten #feed-DOM-Schnappschuss, der das vorher verschleiert hat) auf rund 40
+  // echte Highlights pro Spiel -- weit ueber dem Zielband 4-10
+  // (docs/design/broadcast-praesentation-runde-2-22-09.md). Pro-Ziel-Drosselung allein (die
+  // Uebergangslogik oben) loest das nicht, weil das Problem NICHT ein einzelnes Ziel ist,
+  // das mehrfach gemeldet wird, sondern viele VERSCHIEDENE Kaempfer, die nacheinander
+  // dieselbe Schwelle reissen.
+  //
+  // Deshalb ein zweiter, SPIELWEITER (nicht pro Ziel/pro Kaempfer) Mindestabstand zwischen
+  // zwei grossen Highlights: laeuft eines an, muss die naechste Sekundenmarke mindestens
+  // KAMPF_GROSS_COOLDOWN_SEK spaeter liegen, sonst faellt "big" fuer dieses eine Ereignis
+  // weg -- der Ticker-TEXT bleibt in jedem Fall stehen (s. feed()), nur Banner/HIGHLIGHTS-
+  // Eintrag entfallen. ZWEI Ereignistypen sind PRIORITAET und laufen am Cooldown vorbei,
+  // weil sie sich selbst von Natur aus nur ein einziges Mal pro Spiel ereignen koennen
+  // (kein Wiederholungsrisiko, also kein Grund, sie zu drosseln): der erste Blutzoll
+  // (ersteAusschaltung) und die spielentscheidende letzte Ausschaltung (entscheidend, nur
+  // ausserhalb TDM). Beide setzen den Cooldown trotzdem neu, damit nicht sofort danach noch
+  // ein zweites Ereignis durchrutscht. 12s bei einer 95s-Spielzeit ergibt rechnerisch
+  // hoechstens 8-9 Fenster, plus die beiden Prioritaets-Ausnahmen -- innerhalb des
+  // Zielbands, ueber mehrere Saaten nachgemessen (s. PR-Beschreibung).
+  const KAMPF_GROSS_COOLDOWN_SEK=12;
+  let letzterGrosserT=-Infinity;
+  function kampfGrossDrosseln(big,prioritaet){
+    if(!big)return false;
+    if(!prioritaet && (t-letzterGrosserT)<KAMPF_GROSS_COOLDOWN_SEK)return false;
+    letzterGrosserT=t;
+    return true;
+  }
+
   function schalteAus(tg,von){
     const scoreVonVorher=seitenScore(von.side), scoreTgVorher=seitenScore(tg.side);
     tg.st.tode++; von.st.ko++; verteileKo(tg,von);
@@ -23099,7 +23138,11 @@
 
     const entscheidend=disc!=="tdm" && live(tg.side).length===0;
 
-    const big=ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend;
+    // DROSSELUNG: ersteAusschaltung/entscheidend sind Prioritaet (je hoechstens einmal pro
+    // Spiel moeglich, s. kampfGrossDrosseln oben), fuehrungswechsel/mehrfachkill nicht --
+    // die koennen bei knappem Punktestand oder haeufigen Respawns beliebig oft auftreten.
+    const big=kampfGrossDrosseln(ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend,
+      ersteAusschaltung||entscheidend);
 
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
@@ -23155,7 +23198,7 @@
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
-      grosserTreffer(hpVorher,tg.hp,d,tg.max,crit));
+      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false));
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -23384,6 +23427,16 @@
       KP.fortschritt=Math.min(1,KP.fortschritt+dt*staerke/KP.kapZeit);
       if(vorher<1&&KP.fortschritt>=1){
         KP.besitz=ziel;KP.fortschritt=0;KP.erobertVon=null;
+        // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09.): probeweise auch hier durch
+        // kampfGrossDrosseln() geschickt und ueber die fuenf echten Kader-Paarungen aus
+        // data/generated/kaderfamilie-live-save.json nachgemessen -- eine Kontrollpunkt-
+        // Eroberung wechselt in diesen Spielen so gut wie nie mehrfach die Seite (anders als
+        // TDMs Respawn, der JEDEN Kaempfer beliebig oft wieder ins Spiel bringt). Das Ergebnis
+        // war im Schnitt SCHLECHTER (3,4 statt 4,0 echte Highlights/Spiel) und drueckte den
+        // ohnehin knappsten Fall (ein frueher 150:0-Stomp mit kaum Kampfhandlung) von 2 auf 1
+        // -- die Drosselung nahm dort das einzige zweite Ereignis weg, ohne irgendwo eine
+        // Flut zu verhindern, die es gar nicht gab. Deshalb bleibt diese Zeile UNVERAENDERT
+        // gegenueber dem Ausgangs-PR: immer big, wie zuvor.
         feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true);
       }
     }
@@ -23793,7 +23846,8 @@
         // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
         // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
-          (fremd?" (danebengezielt)":"")+" · "+d,grosserTreffer(hpVorher,z.hp,d,z.max,crit));
+          (fremd?" (danebengezielt)":"")+" · "+d,
+          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false));
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
