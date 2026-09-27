@@ -12439,7 +12439,10 @@
     if(feldspielDisc==="basketball"){
       const teile=[];
       const rest=basketballSchussuhrRest();
-      if(rest!=null)teile.push("⏱ "+fmtSchussuhr(rest));
+      // ROTFAERBUNG UNTER 5S (Nachtrag, Review-Fund 27.09.): der Bauplan verlangt fuer B1(a)
+      // ausdruecklich dieselbe Warnfarbe wie die Canvas-Ziffernbox (zeichneShotClock(), unten,
+      // `knapp=rest<5`) -- die erste Fassung dieser Zeile war reiner Text ohne Farblogik.
+      if(rest!=null)teile.push(rest<5?"<span class=\"knapp\">⏱ "+fmtSchussuhr(rest)+"</span>":"⏱ "+fmtSchussuhr(rest));
       if(fsLive.amBall!=null)teile.push("● "+(fsLive.amBall===0?"Heim":"Gast"));
       return teile.join(" · ");
     }
@@ -12527,7 +12530,11 @@
         if(restzeile){
           const zusatz=feldspielKontextZusatz();
           const klein=document.createElement("small");
-          klein.textContent=zusatz?restzeile+" · "+zusatz:restzeile;
+          // innerHTML statt textContent (Nachtrag 27.09.): feldspielKontextZusatz() kann fuer
+          // Basketball unter 5s einen <span class="knapp"> einstreuen (Rotfaerbung wie die
+          // Canvas-Ziffernbox, s. dort). restzeile/zusatz bestehen sonst nur aus festen Labels
+          // und Zahlen, nie aus Spieler-/Team-Text -- unbedenklich fuer innerHTML.
+          klein.innerHTML=zusatz?restzeile+" · "+zusatz:restzeile;
           mitte.appendChild(klein);
         }
       }

@@ -617,6 +617,10 @@
      Buehne bekommen gar kein <small>, .bbugmitte bleibt dort wie bisher eine einzeilige Box. */
   .oly-battle-arena.oly-battle-arena .bbugmitte small{display:block;color:#c3ccd8;
     font-weight:500;font-size:9.5px;letter-spacing:.01em;margin-top:1px;white-space:nowrap}
+  /* SHOT-CLOCK-WARNFARBE IN DER KONTEXTZEILE (Nachtrag 27.09., Review-Fund B1(a)): dieselbe
+     Warnfarbe/Klasse wie .ttstand .knapp -- die Canvas-Ziffernbox (zeichneShotClock()) faerbt
+     sich unter 5s bereits rot, die textuelle Kontextzeile tat es bisher nicht. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .knapp{color:var(--warn,#e0a341)}
   /* FUEHRUNGSWECHSEL-BLITZ (Runde 2, Vorschlag 3): kurzer Aufleuchter am Bug, 0,6 s, wenn
      die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
   .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
