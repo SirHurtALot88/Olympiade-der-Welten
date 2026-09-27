@@ -11164,6 +11164,13 @@
     // Richtung "zurueck ins Feld" vom angegriffenen Tor aus gesehen.
     const rein=torX>MID?-1:1;
     if(hk.ausgang==="tor"){
+      // H1 -- (PP)/(SH)-KENNUNG IM TICKER (Bauplan Abschnitt 5, Klasse A, Prio 1): VOR jeder
+      // Aenderung gelesen (die Strafzustaende, aus denen sie sich ergibt, aendern sich durch
+      // ein Tor selbst nicht) -- reine Lesung von hockeyPPInfo(), kein rr()-Aufruf, keine
+      // zweite Bedeutung fuer irgendeinen Zweig unten.
+      const ppVorTreffer=hockeyPPInfo();
+      const torKennung=ppVorTreffer&&ppVorTreffer.seite===schuetze.side?" (PP)"
+        :ppVorTreffer&&ppVorTreffer.seite===1-schuetze.side?" (SH)":"";
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
       // TON (Assets 80->100, TON_KATALOG.hockey.tor): dieselbe Stelle wie das "TOR!"-
       // Schwebetext/Feed weiter unten. Reine Praesentation, kein rr()-Aufruf.
@@ -11183,7 +11190,7 @@
       if(a1){a1.assists++; a1.assists1++;}
       if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
-      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true,
+      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!"+torKennung,true,
         waehleCaption(CAPTION_TOR,schuetze.n,a1?a1.n:null));
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
@@ -12356,6 +12363,104 @@
     fsLerpPositionen(dt);
   }
 
+  // BROADCAST-BUG-KONTEXTZEILE (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 3,
+  // Q1 -- Klasse A, reine Anzeige): Periode + Restzeit ABWAERTS (die einzige Konvention, die
+  // NBA/NHL/NFL alle drei teilen und die #clock heute verletzt, s. dortige Begruendung 3),
+  // dazu ein disziplineigener Zusatz. Liest ausschliesslich bereits vorhandenen Live-Zustand
+  // (fsLive/FSTEAM/fsZuege), ruft KEIN rr() und schreibt nichts in den Simulationszustand
+  // zurueck -- bit-identisch zu miss-alle-disziplinen.mjs vorher/nachher.
+  //
+  // UHR-SKALA (Frage 9.1 derselben Recherche, Voreinstellung uebernommen): Sim-Sekunden statt
+  // einer NFL-Hochrechnung, weil `fkUhrSkala()` (Football-P1, PR #1037) auf diesem Branch noch
+  // nicht existiert -- Football bekommt hier bewusst nur die im Bauplan vorgesehene
+  // "Kurzfassung", die echte NFL-Uhr kommt mit/nach #1037.
+  function feldspielRestzeitAbwaerts(){
+    const L=LIVE();
+    if(!L||!fsLive)return null;
+    // `fsLive.viertel` ist bereits die AKTUELLE Periodenzahl, 1-basiert (Startwert 1, s.
+    // fsLive-Initialisierung; starteViertelpause() zaehlt beim Wechsel selbst hoch) -- kein
+    // zweites +1 hier, sonst zeigt die Kontextzeile eine Periode zu frueh (fuenf Sekunden in
+    // Periode 1 stuenden sonst schon als "Q2" da).
+    const periodeNr=Math.min(fsLive.viertel,L.perioden);
+    // Waehrend der Viertel-/Drittelpause zeigt fsLive.viertel bereits die KOMMENDE Periode
+    // (s. starteViertelpause: `fsLive.viertel=zuEnde+1`), obwohl die Simulationsuhr noch auf
+    // dem alten Stand steht -- ohne diese Abfrage wuerde die Restzeit hier fuer einen
+    // Wimpernschlag fast eine ganze Periode weit "voll" anzeigen. 0:00 waehrend der Pause ist
+    // die ehrlichere Anzeige (die Pause selbst zeigt ohnehin ihr eigenes Countdown-Overlay).
+    const restSek=fsLive.viertelpause?0:Math.max(0,fsLive.viertel*L.periodenDauer-fsT);
+    const periodeLabel=(L.periodeWort==="Drittel")?(periodeNr+". Drittel"):("Q"+periodeNr);
+    return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(Math.floor(restSek%60)).padStart(2,"0");
+  }
+  // B1 -- SHOT-CLOCK (Basketball, A, Prio 1): `null` waehrend Freiwurf/Viertelpause/nach
+  // Spielende, sonst die Restzeit bis zum erzwungenen Abschluss. Dieselbe Formel treibt die
+  // Bug-Ziffer UND die kleine Box hinter dem Angriffskorb (zeichneShotClock unten) -- eine
+  // Quelle statt zwei.
+  function basketballSchussuhrRest(){
+    if(feldspielDisc!=="basketball"||!fsLive||done)return null;
+    if(fsLive.phase==="freiwurf"||fsLive.viertelpause)return null;
+    const voll=(LIVE()||{}).schussuhr||SCHUSSUHR_BASKETBALL;
+    return Math.max(0,voll-fsLive.angriffSeit);
+  }
+  const fmtSchussuhr=(rest)=>rest<5?rest.toFixed(1):String(Math.ceil(rest));
+  // H1 -- POWER-PLAY-UHR (Hockey, A, Prio 1 = Review-T0): welche Seite gerade in Ueberzahl
+  // spielt und wie lange noch, aus `u.strafeBis` je Team hergeleitet -- "Zustand.
+  // max(u.strafeBis) - fsT je Seite" laut Bauplan. Sitzen beide Teams gleichzeitig in
+  // Unterzahl (seltener Sonderfall bei sich ueberschneidenden Strafen), zeigt keine Seite
+  // einen Vorteil an, statt eine der beiden willkuerlich zu bevorzugen.
+  function hockeyPPInfo(){
+    if(!istHockey()||!fsLive)return null;
+    for(const seite of [0,1]){
+      const gegnerAktiv=FSTEAM[1-seite].filter(u=>u.strafeBis>fsT);
+      if(!gegnerAktiv.length)continue;
+      if(FSTEAM[seite].some(u=>u.strafeBis>fsT))continue;
+      return {seite, rest:Math.max(...gegnerAktiv.map(u=>u.strafeBis))-fsT, fuenfDrei:gegnerAktiv.length>=2};
+    }
+    return null;
+  }
+  // H2 -- SCHUESSE AUFS TOR (Hockey, A, Prio 1): "die naheliegende Summe saves+gegentore
+  // zaehlt Schuesse aufs LEERE Tor nicht" (Bauplan-Falle) -- deshalb aus dem Protokoll
+  // `fsZuege[0..fsZeiger]` gezaehlt, nicht aus den Torwartfeldern. Ein Torwart-"block"
+  // (Parade/Halten) zaehlt als Schuss aufs Tor, ein Feldspieler-"block" (Schussblock VOR dem
+  // Tor) nicht -- beide tragen denselben `art`-Namen, unterschieden ueber
+  // `verteidiger.torwart`. Reine Lesung des bereits geschriebenen Protokolls, kein rr().
+  function hockeySOG(seite){
+    if(!fsLive)return 0;
+    let n=0;
+    for(let i=0;i<fsZeiger;i++){
+      const z=fsZuege[i];
+      if(z.art==="treffer"&&z.seite===seite)n++;
+      else if(z.art==="block"&&z.verteidiger&&z.verteidiger.torwart&&z.spieler&&z.spieler.side===seite)n++;
+    }
+    return n;
+  }
+  // ZUSATZ JE DISZIPLIN, rechts an die Restzeit angehaengt (Bauplan-Tabelle Abschnitt 3).
+  function feldspielKontextZusatz(){
+    if(!fsLive)return "";
+    if(feldspielDisc==="basketball"){
+      const teile=[];
+      const rest=basketballSchussuhrRest();
+      if(rest!=null)teile.push("⏱ "+fmtSchussuhr(rest));
+      if(fsLive.amBall!=null)teile.push("● "+(fsLive.amBall===0?"Heim":"Gast"));
+      return teile.join(" · ");
+    }
+    if(istHockey()){
+      const teile=[];
+      const pp=hockeyPPInfo();
+      if(pp){
+        const rest=Math.max(0,pp.rest);
+        teile.push("PP "+(pp.seite===0?"Heim":"Gast")+" "+Math.floor(rest/60)+":"+String(Math.floor(rest%60)).padStart(2,"0")
+          +(pp.fuenfDrei?" · 5 GEGEN 3":""));
+      }
+      teile.push("SOG "+hockeySOG(0)+":"+hockeySOG(1));
+      return teile.join(" · ");
+    }
+    if(istFootball()&&fsLive.football){
+      const ORD=["1st","2nd","3rd","4th"];
+      const fb=fsLive.football;
+      return (fb.side===0?"▶":"◀")+" "+(ORD[fb.down-1]||fb.down+".")+" & "+fb.toGo;
+    }
+    return "";
+  }
   // BROADCAST-BUG: generisches HUD-Overlay ueber der Leinwand (Abschnitt 3 derselben
   // Recherche), aufgerufen am Ende von updateHud()/updateHudBahn()/updateHudBuehne()/
   // updateHudFeldspiel() -- also NACHDEM diese Funktionen #tnameL/#tnameR/#score/#clock
@@ -12365,6 +12470,13 @@
   // vier eigener, weil die zugrundeliegenden Elemente bei allen vieren dieselben sind.
   // Sichtbar nur waehrend des laufenden Spiels: weder waehrend des Einlaufs (die
   // #einlauf-Vollflaeche deckt den Bug ohnehin ab) noch nach Spielende.
+  //
+  // Q1-ERWEITERUNG (27.09.): Feldspiel bekommt zusaetzlich eine zweite Zeile unter Score/Uhr
+  // (Periode+Restzeit abwaerts, Ballbesitz/PP/SOG, s. feldspielKontextZusatz oben) sowie die
+  // Score-Ziffer der fuehrenden Seite in ihrer Teamfarbe plus einen kurzen Fuehrungswechsel-
+  // Blitz (`.wechsel`, 0,6 s) -- beides reine Lesung von #score/fsLive, kein neuer rr()-Pfad.
+  // Fuer alle anderen Chassis (Kampf/Bahn/Buehne) bleibt die Mitte unveraendert Score · Uhr.
+  let bbugLetzteFuehrung=null, bbugWechselTimer=null;
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
@@ -12386,8 +12498,39 @@
     if(bl)bl.innerHTML=zeile("tnameL");
     if(br)br.innerHTML=zeile("tnameR");
     if(mitte){
-      const teile=[txt("score"),txt("clock")].filter(Boolean);
-      mitte.textContent=teile.join(" · ");
+      const scoreTxt=txt("score"), istFs=istFeldspiel(disc);
+      let fuehrend=null;
+      if(istFs&&scoreTxt){
+        const m=scoreTxt.match(/^(\d+)\s*:\s*(\d+)$/);
+        if(m){const a=+m[1],b=+m[2]; fuehrend=a===b?null:(a>b?0:1);}
+      }
+      mitte.textContent="";
+      if(scoreTxt){
+        const scoreEl=document.createElement("b");
+        scoreEl.textContent=scoreTxt;
+        if(fuehrend!=null)scoreEl.style.color="var(--"+(fuehrend===0?"home":"away")+")";
+        mitte.appendChild(scoreEl);
+      }
+      const clockTxt=txt("clock");
+      if(clockTxt){
+        if(scoreTxt)mitte.appendChild(document.createTextNode(" · "));
+        mitte.appendChild(document.createTextNode(clockTxt));
+      }
+      if(istFs){
+        if(fuehrend!=null&&bbugLetzteFuehrung!=null&&fuehrend!==bbugLetzteFuehrung){
+          mitte.classList.add("wechsel");
+          clearTimeout(bbugWechselTimer);
+          bbugWechselTimer=setTimeout(()=>mitte.classList.remove("wechsel"),600);
+        }
+        bbugLetzteFuehrung=fuehrend;
+        const restzeile=feldspielRestzeitAbwaerts();
+        if(restzeile){
+          const zusatz=feldspielKontextZusatz();
+          const klein=document.createElement("small");
+          klein.textContent=zusatz?restzeile+" · "+zusatz:restzeile;
+          mitte.appendChild(klein);
+        }
+      }
     }
   }
 
@@ -12493,6 +12636,39 @@
   // hockeyPublikumAn unten explizit zurueck, sonst haelt die Flagge nach dem ersten
   // Reset "schon gestartet" und der Loop kommt im zweiten Hockey-Spiel nie wieder.
   let hockeyPublikumAn=false;
+  // H1 -- STRAFBANK-KASTEN (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 5,
+  // Klasse A, Prio 1): Name + Restzeit-Balken an genau der Stelle, an die ein bestrafter
+  // Spieler laengst faehrt (strafbankZiel(u), unveraendert) -- heute nur an der Figur selbst
+  // sichtbar, ohne jede Beschriftung. "Grund" (Bauplan-Wunschliste) bleibt bewusst aus: der
+  // Motor kennt heute genau einen Strafgrund (verhaengeStrafe() wird nur mit "Bandencheck"
+  // aufgerufen) und traegt ihn nirgends am Spieler -- ihn anzuzeigen bräuchte ein neues
+  // Datenfeld an u, eine zweite Reason-Kette am Torwart-Objekt vorbei. Name+Countdown+Balken
+  // sind die drei Teile, die schon aus u.strafeBis lesbar sind. Reine Zeichnung, kein rr().
+  function zeichneStrafbank(){
+    for(const seite of [0,1])for(const u of FSTEAM[seite]){
+      if(!(u.strafeBis>fsT))continue;
+      const z=strafbankZiel(u), rest=u.strafeBis-fsT, farbe=seite===0?css("--home"):css("--away");
+      // `strafbankZiel().y` liegt bei RINK().o-22=22 -- knapp ueber der Bande, ausserhalb des
+      // Eises, in demselben schmalen Streifen, in dem oben auch der Broadcast-Bug sitzt. Eine
+      // Box UEBER dieser Position (wie beim Namenslabel vz=-1) liefe ins Negative und damit aus
+      // der Leinwand heraus. Deshalb UNTERHALB, im selben Abstand (44px), den auch die
+      // gewoehnlichen Namenslabels benutzen (s. `schrift(...,44*vz,...)` in zeichneFeldspiel) --
+      // damit landet die Box sicher im sichtbaren Eis, unter dem Bug.
+      const bx=z.x, by=z.y+44;
+      ctx.save();
+      ctx.fillStyle="rgba(17,24,35,.84)";
+      ctx.fillRect(bx-32,by-17,64,34);
+      ctx.strokeStyle=farbe;ctx.lineWidth=1.5;ctx.strokeRect(bx-32,by-17,64,34);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillStyle="#fff";ctx.font="700 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillText(u.n.length>11?u.n.slice(0,10)+"…":u.n,bx,by-7);
+      ctx.fillStyle=rest<=3?"#e2685f":"#c3ccd8";ctx.font="700 11px 'IBM Plex Mono',monospace";
+      ctx.fillText(Math.ceil(rest)+"s",bx,by+5);
+      ctx.fillStyle="rgba(255,255,255,.18)";ctx.fillRect(bx-28,by+13,56,3);
+      ctx.fillStyle=farbe;ctx.fillRect(bx-28,by+13,56*Math.max(0,Math.min(1,rest/HK_STRAFE_DAUER)),3);
+      ctx.restore();
+    }
+  }
   function eisflaeche(){
     if(!hockeyPublikumAn){ tonLoopStart("hockey"); hockeyPublikumAn=true; }
     const k=RINK();
@@ -12555,6 +12731,28 @@
       ctx.lineTo(tx,mitte+(links?-34:34));
       ctx.closePath(); ctx.fill();
       zeichneTor(tx,mitte,links);
+    }
+    // H1 -- UEBERZAHL-UHR AUF DEM EIS (docs/design/broadcast-optik-feldspiel-27-09.md
+    // Abschnitt 5, Klasse A, Prio 1 = Review-T0; SMT-Vorbild "Power Play Clock"): eine
+    // halbtransparente Kreisuhr in der Angriffszone der Ueberzahl-Mannschaft, ablaufender
+    // Ring + Restsekunden. HIER gezeichnet -- nach der Flaeche/den Linien, VOR den Spielern
+    // (eisflaeche() laeuft komplett vor der Spieler-Schleife in zeichneFeldspiel), genau wie
+    // im Bauplan gefordert. Reine Lesung von hockeyPPInfo() (u.strafeBis/fsT), kein rr().
+    const pp=hockeyPPInfo();
+    if(pp){
+      const linksSeite=pp.seite===1;
+      const zx=linksSeite?torlinie(true)+breite*0.16:torlinie(false)-breite*0.16;
+      const frac=Math.max(0,Math.min(1,pp.rest/HK_STRAFE_DAUER));
+      const farbe=pp.seite===0?css("--home"):css("--away");
+      ctx.save();
+      ctx.globalAlpha=0.24; ctx.fillStyle=farbe;
+      ctx.beginPath(); ctx.arc(zx,mitte,30,0,6.3); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=5; ctx.strokeStyle=farbe;
+      ctx.beginPath(); ctx.arc(zx,mitte,30,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
+      ctx.fillStyle="#182028"; ctx.font="700 13px 'IBM Plex Mono',monospace";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(String(Math.ceil(pp.rest)),zx,mitte+1);
+      ctx.restore();
     }
   }
   // Das Tor in Draufsicht: zwei rote Pfosten, die Querlatte zur Bande hin, dazwischen das
@@ -12725,6 +12923,30 @@
       }
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
+    zeichneShotClock();
+  }
+  // B1 -- SHOT-CLOCK-ZIFFER AM ANGRIFFSKORB (docs/design/broadcast-optik-feldspiel-27-09.md
+  // Abschnitt 4, Klasse A, Prio 1): eine kleine Ziffernbox an der Grundlinie neben dem
+  // Korbtraeger des ANGREIFENDEN Korbs -- "der Blick muss nicht nach oben" (Bauplan-
+  // Begruendung, echte Hallen-Shot-Clocks haengen genauso an der Korbanlage). Dieselbe Zahl
+  // wie in der Bug-Kontextzeile (basketballSchussuhrRest), nur ein zweiter Anzeigeort;
+  // gezeichnet als Teil von bodenFeldspiel() -- also VOR den Spielfiguren, wie der Korb
+  // selbst. Reine Zeichnung, kein rr()-Aufruf, keine Rueckschreibung in den Simzustand.
+  function zeichneShotClock(){
+    const rest=basketballSchussuhrRest();
+    if(rest==null||fsLive.amBall==null)return;
+    const seite=fsLive.amBall, linksSeite=seite===1;
+    const gx=linksSeite?W*0.06:W*0.94, gy=H/2-58;
+    const txt=fmtSchussuhr(rest), knapp=rest<5;
+    ctx.save();
+    ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
+    ctx.fillRect(gx-19,gy-11,38,22);
+    ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
+    ctx.strokeRect(gx-19,gy-11,38,22);
+    ctx.fillStyle="#fff";ctx.font="700 12px 'IBM Plex Mono',monospace";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(txt,gx,gy+1);
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -13029,6 +13251,9 @@
       ctx.stroke();ctx.fill();
       ctx.restore();
     }
+    // H1 -- STRAFBANK-KASTEN (Bauplan Abschnitt 5, Klasse A, Prio 1): NACH den Spielern,
+    // damit die Box die zur Bande gefahrene Figur nicht verdeckt, sondern sie beschriftet.
+    if(istHockey())zeichneStrafbank();
     // Schiedsrichter NACH den Spielern, VOR dem Ball: beim Pfiff steht er dicht am
     // Foul-Ort und darf dort nicht hinter einer Figur verschwinden — der Ball wiederum
     // bleibt das oberste Element, wie bisher.

@@ -608,8 +608,19 @@
     white-space:normal}
   .oly-battle-arena.oly-battle-arena .bbugmitte{background:rgba(17,24,35,.82);
     border-radius:6px;padding:4px 11px;color:var(--warn);font-weight:700;font-size:12px;
-    white-space:nowrap;align-self:flex-start;flex:none}
+    white-space:nowrap;align-self:flex-start;flex:none;text-align:center;
+    transition:box-shadow .15s ease}
   .oly-battle-arena.oly-battle-arena .bbugmitte:empty{display:none}
+  /* Q1-KONTEXTZEILE (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 3): zweite,
+     kleinere Zeile unter Score/Uhr -- aktualisiereBbug() haengt dieses <small> nur bei den
+     drei Feldspielen ueberhaupt an (feldspielRestzeitAbwaerts/-KontextZusatz); Kampf/Bahn/
+     Buehne bekommen gar kein <small>, .bbugmitte bleibt dort wie bisher eine einzeilige Box. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small{display:block;color:#c3ccd8;
+    font-weight:500;font-size:9.5px;letter-spacing:.01em;margin-top:1px;white-space:nowrap}
+  /* FUEHRUNGSWECHSEL-BLITZ (Runde 2, Vorschlag 3): kurzer Aufleuchter am Bug, 0,6 s, wenn
+     die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
+  .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
+    0 0 14px 2px var(--warn)}
 
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
