@@ -32046,6 +32046,23 @@
   // dort konkret vorgeschlagen. Reine DOM-Anzeige: liest nur den fertigen Text, schreibt
   // nichts in den Sim-Zustand zurueck.
   const CALLOUT_DAUER_MS=2600;
+  // CALLOUT-POSITION (Nachtrag 27.09., fuenfte Review desselben Fixes): eine feste
+  // px-Distanz zum Broadcast-Bug (#bbug) reicht nicht, weil der Bug bei schmalen
+  // Fensterbreiten selbst hoeher wird -- die Team-Boxen (.seite) brechen um, sobald
+  // Name+Wert nicht mehr nebeneinander passen (gemessen: Fechten 66,25px statt 39,25px
+  // bei >=480px). Statt eine zweite Zahl zu raten, wird die tatsaechliche Bug-Unterkante
+  // bei jedem Aufruf gemessen -- reine Anzeigeposition (getBoundingClientRect()), kein
+  // Einfluss auf MESS/Wertung/RNG. Faellt auf den CSS-Wert zurueck, wenn #bbug fehlt,
+  // gerade ausgeblendet ist (Einlauf/Spielende) oder keinen passenden Bezugsrahmen hat.
+  function positioniereCallout(banner){
+    const bug=document.getElementById("bbug");
+    const bezug=banner.offsetParent;
+    if(!bug||bug.hidden||!bezug){ banner.style.top=""; return; }
+    const bugUnten=bug.getBoundingClientRect().bottom;
+    const bezugOben=bezug.getBoundingClientRect().top;
+    const abstand=8;
+    banner.style.top=Math.max(0,bugUnten-bezugOben+abstand)+"px";
+  }
   function callout(txt,caption){
     if(stumm)return;
     const banner=document.getElementById("bbugcallout");
@@ -32058,6 +32075,7 @@
       banner.appendChild(em);
     }
     banner.hidden=false;
+    positioniereCallout(banner);
     banner.classList.remove("zu");
     // Reflow erzwingen: zwei big-Ereignisse kurz hintereinander sollen die Transition
     // beide sichtbar abspielen, statt an der schon aktiven opacity:1 haengen zu bleiben.
@@ -35600,6 +35618,13 @@
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
+    // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
+    // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
+    // -- Playwright kann so die Bannerposition bei jeder getesteten Fensterbreite/Disziplin
+    // sofort pruefen, statt Minuten Sim-Zeit abzuwarten, bis ein Highlight zufaellig faellt.
+    // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
+    // kein Einfluss auf MESS/Wertung/RNG.
+    calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
