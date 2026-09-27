@@ -11960,7 +11960,7 @@
       // Ueberlebende") und passen nicht auf Basketballs Punktestand — deshalb hier keine
       // Weiterleitung dorthin, sondern eine eigene, einfache Ansage im Feed. Scoreboard
       // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
-      const sieger=fsPunkte[0]>fsPunkte[1]?"Vigilante Wranglers":fsPunkte[1]>fsPunkte[0]?"Armageddon Aftermath":null;
+      const sieger=fsPunkte[0]>fsPunkte[1]?VEREIN[0].name:fsPunkte[1]>fsPunkte[0]?VEREIN[1].name:null;
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
         +fsPunkte[0]+":"+fsPunkte[1]+".",true);
       return; }
@@ -14153,6 +14153,14 @@
   // fuer den Loop-N1-Fix): bauBuehne() laeuft garantiert bei JEDEM neuen Buehnen-Match,
   // ob ueber reset() oder einen frischen setDisc().
   let schachMattGehoert=false;
+  // ENDSTAND-OVERLAY-WAECHTER (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe
+  // Einmal-Melden-Muster wie `bahnEndeGemeldet` (s. dort) -- ohne diese Bremse wuerde
+  // updateHudBuehne() das #endstand-Overlay bei JEDEM Frame nach `done` erneut aufbauen
+  // und die Feed-/Callout-Zeile erneut feuern (buehnenBewegung() laeuft ja bewusst
+  // WEITER, s. stepBuehne()s "N-Fix"-Kommentar oben). Reset hier statt in reset(),
+  // aus demselben Grund wie schachMattGehoert direkt darueber: bauBuehne() laeuft
+  // garantiert bei jedem neuen Buehnen-Match.
+  let buehneEndeGemeldet=false;
 
   // WAGNIS IST EIN WAGNIS (26.09., Befund B aus docs/design/buehne-auftritt-opus-konzeptreview-
   // 26-09.md Abschnitt 1.3). Vorher stand WAGNIS im generischen Auftritt-Rechner unten in
@@ -14196,6 +14204,7 @@
     floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
+    buehneEndeGemeldet=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -16070,21 +16079,53 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
+        // Doppel-Feuer): vorher erst weiter unten und nur fuer Fechten berechnet
+        // (`fechtGegner`) -- die beiden Gates unten (Vorteil-kippt-Highlight,
+        // Brett-entschieden) brauchen denselben Gegner-Verweis aber fuer ALLE drei
+        // Duell-Disziplinen (Schach/Fechten/Tennis), nicht nur Fechten. `u.brett` gruppiert
+        // die Paare unveraendert seit bauBuehne() (s. dortiger Kommentar), reines Lesen.
+        const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
         // FUEHRUNGSWECHSEL AM BRETT (Broadcast Runde 2, Vorschlag 1.2, 26.09.): ersetzt
         // `r.punkte>=60` (Speed-Schach 61 von 134 Zeilen, fast jeder zweite Zug -- gemessen,
         // Konzept Abschnitt 4.2) durch den Moment, den ein Zuschauer am Brett tatsaechlich
         // sieht: das Vorzeichen des Vorteils kippt gegenueber dem letzten Zug DIESES
         // Teilnehmers. "Brett entschieden" (unten) und die Fechten-Periode bleiben ohnehin
         // schon immer big, unveraendert.
-        const vVorher=u.aktuell>0?u.verlauf[u.aktuell-1]:0;
-        const vorteilKipptBig=Math.sign(v)!==Math.sign(vVorher);
+        //
+        // ZWEI FIXES (27.09., Opus-Review-Fund, dieselbe Review wie die Gegen-Gate-Notiz bei
+        // "PERIODE BEENDET" unten):
+        //
+        // 1. ERSTER ZUG OHNE VORGAENGER (falscher Fuehrungswechsel): `u.aktuell>0?...:0`
+        // liess `vVorher` beim allerersten Zug (`u.aktuell===0`) auf 0 zurueckfallen -- JEDER
+        // von Null verschiedene erste Zug wurde dadurch als "Fuehrung kippt" gewertet, obwohl
+        // es noch gar keinen vorherigen Zustand gab, von dem aus sie haette kippen koennen (bis
+        // zu 12 Bretter x 2 Seiten = bis zu 24 falsche Highlights in den ersten Sekunden jedes
+        // Spiels). Der Vergleich braucht jetzt zwingend einen echten Vorgaenger: `u.aktuell>0`
+        // ist Teil der Bedingung selbst, nicht mehr nur ein Default-Wert dahinter.
+        //
+        // 2. DOPPEL-FEUER (einmal je Seite): `u.verlauf`/`gegner.verlauf` sind exakt gespiegelt
+        // (`b.verlauf=verlauf.map(v=>-v)`, s. bauBuehne()-Kommentar) -- ein echter
+        // Fuehrungswechsel kippt das Vorzeichen bei BEIDEN Seiten IMMER im selben Zug (Negation
+        // aendert nichts an der Kipp-Bedingung), und beide Seiten durchlaufen diesen Zweig fuer
+        // denselben Zug separat (REIHENFOLGE oben: `mine[i]` dann `gegner[i]`, Runde fuer
+        // Runde) -- ohne Gate markierte das jede Seite unabhaengig als big, macht aus einem
+        // Ereignis zwei Highlight-Zeilen. Gate: nur die Seite, deren Gegner DIESE Runde bereits
+        // enthuellt hat (`gegner.aktuell>=u.aktuell`), darf big setzen -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, exakt
+        // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
+        // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
+        // bleiben unberuehrt.
+        const vorteilKipptBig=u.aktuell>0
+          &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
+          &&(!gegner||gegner.aktuell>=u.aktuell);
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
-        const fechtGegner=BB().fechten?TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side):null;
+        const fechtGegner=BB().fechten?gegner:null;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
@@ -16095,16 +16136,40 @@
         // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
         // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
         // darunter schon "BRETT ENTSCHIEDEN".
-        if(BB().fechten&&u.side===0){
-          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
-          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
-          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
-          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
+        if(BB().fechten){
+          // NUR EINMAL JE BRETT/PERIODE (Review-Fund PR #928, 14.09.): jedes Brett hat genau
+          // eine Seite-0- und eine Seite-1-Haelfte, die unabhaengig durch dieselbe
+          // Enthuellungs-Warteschlange laufen -- ohne ein Gate feuerte der Beat zweimal pro
+          // Brett/Periode (einmal je Seitenperspektive, Sekundenbruchteile auseinander),
+          // inklusive doppeltem Callout-Banner.
+          //
+          // GEGEN-GATE STATT SEITE-0-GATE (Fix 27.09., Opus-Review): das alte `u.side===0`
+          // loeste zwar das Doppel-Feuer-Problem, feuerte dabei aber sofort nach dem Heim-Zug
+          // dieser Periode -- BEVOR der Gastfechter seinen eigenen Zug fuer dieselbe Periode
+          // geloggt hatte. Die Meldung las dadurch einen veralteten Trefferstand (Beispiel aus
+          // der Review: gemeldet "3:2", der wahre Stand in diesem Moment war schon 3:3, weil
+          // Krag'Zuls Aktion fuer diese Periode nur noch nicht durchgereicht war). Reine Lese-/
+          // Zeitpunkt-Korrektur, KEINE Aenderung an Zaehlweise/RNG: der Beat feuert jetzt erst,
+          // wenn der GEGNER diese Periodengrenze ebenfalls schon erreicht hat (`fechtGegner.
+          // aktuell` faengt genau das ein) -- das ist zugleich weiterhin das einzige der beiden
+          // Seiten-Ereignisse, das feuert (die zuerst ankommende Seite sieht das Gate noch
+          // geschlossen, nur die zweite sieht es offen), also weiterhin genau einmal je
+          // Brett/Periode, nur jetzt mit dem tatsaechlich vollstaendigen Trefferstand.
           const proPeriode=BB().rundenN/3;
           if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
             const periode=(u.aktuell+1)/proPeriode;
-            feed(u.side,"Periode "+periode+" beendet — "+u.n+" gegen "+u.gegnerN+
-              ": Vorteil "+(v>0?"+":"")+v+", Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)+".",true);
+            const gegnerFertig=fechtGegner&&(fechtGegner.aktuell+1)>=periode*proPeriode;
+            if(gegnerFertig){
+              // Anzeige stabil aus Sicht von Seite 0 aufgebaut, unabhaengig davon, welche
+              // Seite hier gerade als zweite ankam und den Beat damit ausgeloest hat --
+              // `seite0.verlauf[seite0.aktuell]` ist der eigene, schon fest geloggte
+              // Vorteilswert dieser Seite fuer GENAU diese Periodengrenze (nicht `v`, das nur
+              // fuer das gerade verarbeitete `u` gilt).
+              const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
+              const v0=seite0.verlauf[seite0.aktuell];
+              feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
+                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+            }
           }
         }
         // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
@@ -16118,12 +16183,25 @@
         // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
         // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
         // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        // NUR EINMAL JE BRETT (Fix 27.09., Opus-Review-Fund): dasselbe Doppel-Feuer-Problem
+        // wie bei "FUEHRUNGSWECHSEL AM BRETT" oben und beim Gegen-Gate von "PERIODE BEENDET"
+        // weiter unten -- beide Seiten desselben Bretts erreichen `u.aktuell+1>=rundenN`
+        // unabhaengig voneinander (einmal je Seite ihres eigenen letzten Zugs), ohne Gate
+        // feuerte "Brett entschieden" deshalb zweimal fuer dasselbe Brett (einmal aus Sicht
+        // des Siegers, einmal aus Sicht des Verlierers). Gate: nur die Seite, deren Gegner sein
+        // eigenes letztes Runden-Ende ebenfalls schon erreicht hat, feuert -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
+        // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
+        // `wert()`/`rr()` bleiben unberuehrt.
         if(u.aktuell+1>=BB().rundenN){
-          const brettText=BB().fechten
-            ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
-                           :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
-            :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
+          if(brettGegnerFertig){
+            const brettText=BB().fechten
+              ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
+                             :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
+              :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          }
         }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
@@ -17660,6 +17738,23 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // ENDSTAND-OVERLAY (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe Einmal-Muster wie
+    // updateHudBahn()s `if(done&&!bahnEndeGemeldet)`-Zweig (s. dort) -- Fechten, Tennis,
+    // Showcase, Eiskunstlauf, Wettessen, Gewichtheben, Breaking und I-Spy zeigten bislang
+    // GAR KEIN Endstand-Overlay (Opus-Review 27.09.: "das Spiel endet einfach lautlos,
+    // kein Sieger-Callout, kein Endstand-Overlay, der Score-Bug verschwindet einfach").
+    // REIN ADDITIV: `done` wird ausschliesslich von stepBuehne() gesetzt (unveraendert),
+    // dieser Zweig LIEST ihn nur, wie jeder andere HUD-Zweig hier auch. Speed-Schach
+    // (BB().schach) behaelt sein eigenes, laengst vorhandenes Sieg-Banner AUF dem Brett
+    // (zeichneSchach(), "SIEG — "+VEREIN[...].name) und bekommt dieses Overlay ZUSAETZLICH
+    // -- ein zweiter, deutlicherer Hinweis schadet nicht, verdraengt aber auch nichts.
+    if(done&&!buehneEndeGemeldet){
+      buehneEndeGemeldet=true;
+      const sieger=buehneSieger(), stand=buehneStand();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+        +stand.text+".",true);
+      renderEndstandBuehne();
+    }
   }
 
   function bodenBuehne(){
@@ -23057,7 +23152,14 @@
     tg.down=true;
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      feed(tg.side,tg.n+" fällt — zurück in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+      // ARENA-ZEIT-FIX (27.09.): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
+      // Simulationssekunden (downBis/reviveUnit oben, unveraendert) — nur die ANGEZEIGTE
+      // Zahl im Feed-Text war bislang derselbe rohe Wert. Bei ZEIT_DEHNUNG.tdm=1,88 erlebt
+      // der Zuschauer die 5 Sim-Sekunden als rund 9 echte Sekunden (dieselbe Skalierung wie
+      // die Kopfzeilen-Uhr/der Ticker-Zeitstempel, s. updateHud()/feed()), die Textzahl
+      // stand also glatt daneben.
+      const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",true,waehleCaption(CAPTION_KO,tg.n));
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
     }
@@ -24089,6 +24191,15 @@
   // Leine damit um etwa 90 Pixel.
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
+  // KAMPF_SUDDEN_DEATH_T — ausgelagert (ARENA-ZEIT-FIX, 27.09.) aus den beiden Stellen, die
+  // vorher je eine eigene rohe "50" trugen (der Schadens-/Tempozuschlag hier unten und die
+  // Phasenanzeige in updateHud()). Bleibt eine reine Simulationssekunden-Schwelle, an der
+  // Spiellogik aendert sich nichts — neu ist nur, dass das HTML-Label ".hpbars .sd" (vorher
+  // fest "Sudden Death 0:50") jetzt denselben Wert mit `zeitFaktor()` skaliert, um die fuer
+  // die jeweils gewaehlte Disziplin tatsaechliche Uhrzeit zu zeigen: TDM (Faktor 1,88) rund
+  // 1:34, Battlefield (Faktor 5,00) rund 4:10 — vorher stand ueberall dieselbe Zahl.
+  const KAMPF_SUDDEN_DEATH_T=50;
+
   function stepSim(dt){
     if(istFeldspiel(disc))return stepFeldspiel(dt);
     if(istBuehne(disc))return stepBuehne(dt);
@@ -24113,7 +24224,7 @@
     // nie gesetzt (schalteAus setzt es nur dort) — die Schleife ist fuer Mini-DM/Battlefield
     // deshalb ein no-op, ohne extra Disziplin-Abfrage noetig.
     for(const u of U)if(u.down&&u.downBis!=null&&t>=u.downBis)reviveUnit(u);
-    const sd=t>50?1+(t-50)*0.06:1;
+    const sd=t>KAMPF_SUDDEN_DEATH_T?1+(t-KAMPF_SUDDEN_DEATH_T)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
     // hilft niemandem — das war der Gegner, der am Ende nur herumstand.
@@ -25222,7 +25333,12 @@
           return bonus>0 ? f1(stern+bonus)+" ("+f1(stern)+" Sterne + "+f1(bonus)+" Ziel)" : f1(stern+bonus);
         }};
     }
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09. (Opus-Review desselben Tages): `rennFertig` nimmt Ausgeschiedene beim
+    // Ausscheiden genauso auf wie echte Finisher beim Zieleinlauf (s. Kommentar an
+    // zielbonus() oben, ":26174", "Ausgeschiedene stehen zwar auch darin, zaehlen aber
+    // nicht mit"). "N im Ziel" zaehlte bisher ALLE Eintraege, also auch Ausgeschiedene —
+    // dieselbe `!x.raus`-Filterung wie dort und bei bahnRangliste() (":28393").
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
@@ -25247,7 +25363,9 @@
     // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
     // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
     // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09.: dasselbe `!x.raus`-Fehlen wie bei bahnTeamstand()s `imZiel` oben
+    // (":25225") — ohne den Filter zaehlte die Kopfzeile Ausgeschiedene mit.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
     // FUEHRUNGSWECHSEL (Broadcast Runde 2, Vorschlag 1, 26.09.). Chris: "so live tv artige
@@ -25337,8 +25455,22 @@
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
-    const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
-      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
+    //
+    // BUGFIX 27.09. (Opus-Review desselben Tages, Staffel-Fortschrittsbalken): bei der
+    // Staffel laufen nie alle sechs zugleich — die fuenf, die gerade nicht dran sind,
+    // stehen fest auf ihrem Uebergabepunkt (`u.pos=u.beinBis`, s. stepSpurt ":30488").
+    // Der reine Durchschnitt aus allen sechs `u.pos` zog den Balken darum weit unter den
+    // echten Streckenanteil (z. B. 21/36 = 58 % statt tatsaechlich fertig). `u.pos` ist
+    // bei der Staffel bereits die Gesamtstrecke ueber ALLE Beine (0..1, je Bein-Grenzen
+    // `beinVon`/`beinBis`) — `gesamtfortschritt()` (":29697", schon fuer staffelZeitDelta()
+    // im Broadcast-HUD genutzt) liest genau diese Zahl vom aktiven Laeufer, oder 1, sobald
+    // das Team im Ziel ist. Fuer jede andere Bahn (kein `BA().staffel`) bleibt der alte
+    // Sechs-Durchschnitt (bei ihnen laufen ohnehin alle gleichzeitig) unveraendert.
+    const schnitt=(s)=>{
+      if(BA().staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     // BROADCAST-HUD DER STAFFEL (Recherche-Dokument Abschnitt 4): aktueller und
@@ -25414,16 +25546,25 @@
     // die feed() fuer den Ticker-Zeitstempel schon nutzt.
     const klSek=Math.floor(t*zeitFaktor());
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
+    document.getElementById("phase").textContent=done?"beendet":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
     // ohne Neuladen, also blieb z.B. "Basketball — Live-Spielstand" auch nach dem Zurueck-
-    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen —
-    // dieselbe dataset.origHtml-Vorlage wie in den anderen drei Updatern, hier aber als
-    // Rueckwaerts-Wiederherstellung statt als Ersetzung.
+    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen.
+    //
+    // ARENA-ZEIT-FIX (27.09.): vorher wurde hier ein einmal zwischengespeicherter Text
+    // ("Sudden Death 0:50" aus dem HTML) unveraendert zurueckgeschrieben — bei ZEIT_DEHNUNG
+    // tdm=1,88/battlefield=5,00 begann Sudden Death auf der echten Uhr aber bei rund 1:34
+    // bzw. 4:10, nie bei 0:50. Jetzt wird die Zahl bei jedem Aufruf neu aus
+    // KAMPF_SUDDEN_DEATH_T*zeitFaktor() gebaut, mit derselben m:ss-Umrechnung wie #clock
+    // zwei Zeilen darueber — fuer die gerade gewaehlte Kampf-Disziplin immer richtig, auch
+    // nach einem Disziplin-Wechsel.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd){ if(sd.dataset.orig===undefined)sd.dataset.orig=sd.textContent; sd.textContent=sd.dataset.orig; }
+    if(sd){
+      const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
+      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+    }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml;});
@@ -25431,11 +25572,26 @@
     // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
     // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
     // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
-    // BATTLEFIELD-DOMINATION: die grosse Score-Zahl zeigt Kontrollpunkt-Punkte statt
-    // Ausschaltungen, weil DAS jetzt der Sieg-Weg ist, den t/95s bzw. das Punktelimit
-    // auswerten (s. kpTick/dominationSieger) — aliveL/aliveR bleiben unveraendert die
-    // Ueberlebendenzahl, die weiterhin fuer den Elimination-Sieg zaehlt.
-    document.getElementById("klsuffix").textContent=KP?"Kontrollpunkte":"Punkte";
+    // BATTLEFIELD-DOMINATION, ANZEIGE UMGEDREHT (ARENA-ZEIT-FIX, 27.09.): die grosse
+    // Score-Zahl zeigte bislang Battlefields Kontrollpunkt-Punkte, weil das zunaechst nach
+    // dem "neuen" Sieg-Weg aussah — tatsaechlich entscheidet kampfSieger()/dominationSieger()
+    // aber ZUERST ueber Ausschaltungen (komplette Ausloeschung einer Seite) und erst danach
+    // ueber das KP-Punktelimit; in einem Testspiel stand der KP-Stand bis kurz vor Schluss
+    // bei 0:0, waehrend die Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die
+    // grosse Zahl zeigt jetzt fuer ALLE Kampf-Disziplinen (tdm/mini-dm/battlefield) dieselben
+    // Ausschaltungen, KP.punkte wandert in die kleine #kpzeile darunter (nur fuer Battlefield
+    // sichtbar). Reine Anzeige-Vertauschung: kampfSieger()/dominationSieger()/kpTick bleiben
+    // unveraendert, KP.punkte entscheidet den Sieg weiterhin genauso wie vorher.
+    document.getElementById("klsuffix").textContent="Punkte";
+    const kpzeile=document.getElementById("kpzeile");
+    if(kpzeile){
+      if(KP){
+        kpzeile.style.display="";
+        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+      } else {
+        kpzeile.style.display="none";
+      }
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
@@ -25445,13 +25601,14 @@
     // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
     // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
     // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
-    // schwanken. #bbug uebernimmt das automatisch: aktualisiereBbug() liest #score erst,
-    // NACHDEM diese Zeile geschrieben hat (Aufruf am Ende dieser Funktion).
-    document.getElementById("score").textContent=KP
-      ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
-      :disc==="tdm"
-        ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
-        :(nR-live(1).length)+" : "+(nL-live(0).length);
+    // schwanken. Battlefield hat keinen Respawn (bleibt bei schalteAus() unveraendert eine
+    // dauerhafte Ausschaltung wie Mini-DM), fuer Battlefield/Mini-DM bleibt die
+    // live()-Differenz deshalb weiterhin bitgleich mit der Ausschaltungssumme. #bbug
+    // uebernimmt das automatisch: aktualisiereBbug() liest #score erst, NACHDEM diese Zeile
+    // geschrieben hat (Aufruf am Ende dieser Funktion).
+    document.getElementById("score").textContent=disc==="tdm"
+      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
+      :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -30619,8 +30776,16 @@
             // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
             // drei Ziel-Plaetze sind big, s. Kommentar am startAbstand-Zweig oben.
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".",
-              rennFertig.length<=3);
+            //
+            // BUGFIX 27.09. (Opus-Review desselben Tages, Takeshi's-Castle-Platzzaehlung):
+            // `rennFertig` nimmt Ausgeschiedene beim Ausscheiden (":30328", `rennFertig.push(u)`
+            // im nervenKosten-Zweig) genauso auf wie echte Finisher hier. `rennFertig.length`
+            // roh gerechnet zaehlte darum jeden vorher Ausgeschiedenen mit und meldete einen zu
+            // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
+            // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
+            const zielPlatz=rennFertig.filter(x=>!x.raus).length;
+            feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
+              zielPlatz<=3);
           }
         }
       }
@@ -31238,12 +31403,24 @@
       // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
       // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
       const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      // AUSGESCHIEDEN: GEDIMMT UND ENTSAETTIGT STATT WIE EIN AKTIVER LAEUFER (Opus-Review
+      // 27.09.). `u.raus` (exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt
+      // ":30329") blieb hier bisher ungeprueft -- ein Ausgeschiedener stand seither an
+      // seiner Ausscheide-Position bewegungslos, aber in vollen Farben und derselben
+      // Groesse wie jeder Laufende, ununterscheidbar von jemandem, der nur kurz stolpert.
+      // Dieselbe Dimm-Mechanik wie beim wartenden Staffel-Laeufer oben (`wartet`), nur
+      // deutlich staerker (0,4 statt 0,72) und mit `ctx.filter` zusaetzlich entsaettigt --
+      // reine Anzeige, liest nur das bestehende, schon von stepParcours gesetzte Feld
+      // (`u.vizZustand==="ausgeschieden"`, ":30872"), schreibt nichts, aendert nichts an
+      // wert()/rr()/rho.
+      const raus=!!u.raus;
       const sk=wartet?sk0*0.88:sk0;
-      ctx.globalAlpha=wartet?0.72:1;
+      const dimAlpha=raus?0.4:(wartet?0.72:1);
+      ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
       ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();
-      ctx.globalAlpha=wartet?0.72:1;
+      ctx.globalAlpha=dimAlpha;
       // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
       // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
@@ -31335,7 +31512,13 @@
       const huerdeHaltung=1-huerdeAusschlag*0.06;
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
+      // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
+      // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
+      // ihre eigene Dimmung ueber `dimAlpha` (oben).
+      if(raus)ctx.filter="grayscale(1) brightness(0.8)";
       zeichneSprite(ctx,parcSpriteArg,x,y);
+      if(raus)ctx.filter="none";
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -31530,6 +31713,16 @@
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
         ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
+        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
+      // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
+      // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
+      // unten -- bislang gar keine Zeile, nur die stumme, unbewegte Figur (jetzt immerhin
+      // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
+      // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
+      if(raus){
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
@@ -31918,7 +32111,14 @@
     // auf der Bahn/Buehne/im Feldspiel nie hochgezaehlt wird (die haben ihre eigenen
     // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
     // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
+    //
+    // ARENA-ZEIT-FIX (27.09.): fuer Kampf (tdm/mini-dm/battlefield, istKampf()) blieb hier
+    // bis eben der rohe Simulations-`t` stehen, waehrend updateHud() die Kopfzeilen-Uhr
+    // laengst `t*zeitFaktor()` zeigt (s. dort) — bei Battlefields ZEIT_DEHNUNG.battlefield=5,00
+    // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
+    // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
+    // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
+    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
@@ -33347,7 +33547,16 @@
           // gelaufen zu sein), ein Fertiger bei seinem Uebergabepunkt. Jetzt: der
           // laufende Rang fuer den Gelaufenen, der Anteil fuer den Aktiven, "wartet"
           // fuer den Rest — dieselbe Zahl wie in der Stand-Spalte der Wertungstabelle.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          // BUGFIX 27.09. (Opus-Review desselben Tages, "tot"-Kachel beim Stolpern): `down`
+          // schaltete die Tot-Optik (":33386", `.kk.tot` -- grauer Hintergrund, Name
+          // durchgestrichen, s. battle-mode.css) ueber `x.stolper>0` frei -- ein rein
+          // VORUEBERGEHENDER Zustand (Huerdensturz/Klettersturz), den JEDE Bahn-Disziplin
+          // kennt, waehrend der Laeufer weiter aktiv im Rennen steht. Damit sah jeder kurz
+          // Stolpernde aus wie tot/ausgeschieden. `x.raus` (":30328f., exklusiv Takeshi's
+          // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
+          // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
+          // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
                     // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
@@ -33362,7 +33571,12 @@
                            :Math.round(x.pos*100)+" % · Exe "
                              +WAND_EXE_INDIZES.filter(idx=>x.pos>=(BA().hindernisse||[])[idx]).length
                              +"/"+WAND_EXE_INDIZES.length)
-                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+                      // BUGFIX 27.09.: Ausgeschieden (`x.raus`) ist NICHT dasselbe wie Ziel
+                      // erreicht -- beide haben `x.fertig!=null` (s. nervenKosten-Zweig,
+                      // ":30328", setzt beides zusammen), aber nur ein echter Finisher hat
+                      // die Ziellinie ueberquert. Ohne diese Unterscheidung meldete die
+                      // Kachel eines Ausgeschiedenen "Ziel", als waere er angekommen.
+                      : x.raus?"Raus":x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
             // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
@@ -33373,7 +33587,12 @@
             // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
             // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
             // EINEN Bahn-Zweig fuehrt.
-            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
+            // BUGFIX 27.09.: derselbe Ziel-vs-Raus-Fund wie bei `zusatz` direkt oben -- ein
+            // Ausgeschiedener (`x.raus`) bekam hier `fortschritt:1`, also einen VOLLEN Balken,
+            // obwohl er die Strecke nie zu Ende gelaufen ist. Fuer ihn zaehlt wie waehrend des
+            // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
+            // echter Finisher bekommt weiterhin den vollen Balken.
+            fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
@@ -33670,6 +33889,85 @@
     document.getElementById("endstand").hidden=false;
   }
 
+  // ENDSTAND-OVERLAY FUER DIE BUEHNE (Opus-Review 27.09.: acht der neun Buehnen-
+  // Disziplinen — Fechten, Tennis, Showcase, Eiskunstlauf, Wettessen, Gewichtheben,
+  // Breaking, I-Spy — endeten bis hierher lautlos: kein Sieger-Callout, kein
+  // Endstand-Overlay, der Score-Bug verschwand einfach mit dem letzten Frame. Nur
+  // Speed-Schach hatte ein eigenes Sieg-Banner (zeichneSchach(), "SIEG — "+Vereinsname,
+  // direkt AUF dem Brett gezeichnet) — das bleibt unveraendert bestehen, s. Kommentar bei
+  // updateHudBuehne()s Aufruf hier unten.
+  //
+  // DASSELBE OVERLAY-ELEMENT wie Kampf/Bahn (#endstand/#esieger/#etafelL/#etafelR, s.
+  // renderEndstand()/renderEndstandBahn() oben) -- rein additiv gefuellt, kein neues
+  // DOM-Stueck, keine neue CSS-Regel.
+  //
+  // BUEHNE HAT NEUN VERSCHIEDENE ERGEBNISFORMEN (Zweikampf-Duelle, Bretter, Ueberleben,
+  // Punktsumme) -- statt das hier ein neuntes Mal zu erfinden, liest diese Funktion
+  // GENAU DAS, WAS DIE ARENA SCHON ANZEIGT: `wertungVon(disc)` ist derselbe Renderer, den
+  // renderWertungTabelle() waehrend des GANZEN Spiels fuer die Live-Tabelle benutzt (s.
+  // WERTUNG_CHASSIS.buehne/WERTUNG_HEBEN/WERTUNG_DUELL/WERTUNG_AUFTRITT oben) -- er waehlt
+  // pro Disziplin schon die richtigen Spalten (Zug/Vort/Stand fuer Fechten/Tennis/I-Spy/
+  // Schach, Reiss/Stoss/Zwei fuer Gewichtheben, Dg/Pkt/Wuerstchen/HP/Kampf/... fuer
+  // Wettessen/Showcase/Eiskunstlauf/Breaking). Diese Funktion RECHNET NICHTS NEU, sie
+  // uebernimmt nur Kopf/Zeilen/Formatierung, die es fuer die Live-Tabelle ohnehin schon
+  // gibt -- derselbe Wiederverwendungs-Gedanke wie renderEndstand()s ESPALTEN.
+  function buehneStand(){
+    // DIESELBEN VIER VERGLEICHE, DIE updateHudBuehne() SCHON FUER #score BENUTZT (Zeilen
+    // direkt oberhalb dieser Funktion im selben Block) -- hier nur zusaetzlich fuer den
+    // Endstand-Banner gelesen, keine zweite Zaehlweise. Kaeme je eine fuenfte Buehnen-Form
+    // dazu, muesste sie an BEIDEN Stellen ergaenzt werden; bis dahin sind es exakt die vier
+    // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
+    const art=BB();
+    if(art.heben){
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.duell){
+      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+      const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.gauntlet){
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      const a=alive(0),b=alive(1); return {a,b,text:a+" : "+b};
+    }
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
+    const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
+  }
+  function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  function renderEndstandBuehne(){
+    const sieger=buehneSieger(), stand=buehneStand();
+    document.getElementById("esieger").textContent=
+      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    const w=wertungVon(disc);
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,w.namen));
+      w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      for(const z of zeilen){
+        const tr=el("tr",z.raus?"tot":null);
+        tr.appendChild(el("td",null,z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    renderHighlights();
+    document.getElementById("endstand").hidden=false;
+  }
+
   // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
   // "die gebuchte Saat durch den Host reichen"): GEBUCHTE SAAT FUER DEN INTERAKTIVEN AUFBAU.
   // `echterKader.seedByDisciplineId` kommt vom Host (FoundationBattleArenaHost.tsx) — EXAKT der
@@ -33693,6 +33991,16 @@
     const saat=karte[disc];
     return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
   }
+
+  // LIVE-REVEAL-TIMER FUER MINI-DM (Bugfix 27.09., Opus-Review "kein Spoiler vor dem
+  // Anpfiff"): haelt den setTimeout-Handle der laufenden Rundenoffenbarung in
+  // renderMiniDmFfa() weiter unten. Deklariert HIER, vor `reset()` (das ihn beim Verlassen
+  // von Mini-DM abbricht) statt erst bei renderMiniDmFfa() selbst — `reset()` laeuft schon
+  // beim allerersten Seitenaufbau (s. Aufruf am Ende dieser Datei), lange bevor
+  // renderMiniDmFfa() definiert wird; eine `let`-Deklaration dort waere zu diesem Zeitpunkt
+  // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
+  // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
+  let mdffaOffenbarungsTimer=null;
 
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
@@ -33800,6 +34108,20 @@
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
     if(istMdffa)renderMiniDmFfa();
+    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
+    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
+    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
+    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
+    // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
+    // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
+    // unter JEDER Disziplin (Basketball, Fechten, Bahn, ...) Sinn-freien Text, weil dieses
+    // .notes-Element Teil des gemeinsamen Arena-Markups (#p2) ist und nie an `disc` gegated
+    // war. Reines Anzeige-Gating, dieselbe Stelle/derselbe Vertrag wie mdffaPanel zwei
+    // Zeilen oben (reset() laeuft garantiert bei jedem Disziplinwechsel) — Inhalt der
+    // Panels selbst bleibt fuer TDM unangetastet, kein Einfluss auf wert()/stepSim/rr().
+    const tdmNotes=document.getElementById("tdmEntwurfNotes");
+    if(tdmNotes)tdmNotes.hidden=disc!=="tdm";
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
@@ -34415,11 +34737,15 @@
   // Das laufende Ergebnis wird auf `disc`/den Team-Eintraegen zwischengespeichert, damit ein
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
+  //
+  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
+  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
     if(!teamsBox||!rundenBox||!endstandBox)return;
+    if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -34438,23 +34764,50 @@
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
-    // TEAM-KOPFZEILE: vier Karten, sortiert nach Event-Endplatz, Sieger optisch markiert.
+    // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
+    // spieleMiniDmFfaEvent() hat alle vier Runden UND den Endstand oben in einem einzigen,
+    // unveraenderten Aufruf berechnet, bevor auch nur eine Zeile DOM geschrieben wird. Was
+    // folgt, entscheidet nur noch WANN/WIE dieses bereits fertige Ergebnis auf den Schirm
+    // kommt: Runde fuer Runde statt in einem Rutsch, der Endstand erst als letzter Schritt
+    // statt als erster. Keine zweite Berechnung, kein zusaetzlicher rr()-Zug, keine
+    // Ruckwirkung auf `ereignis` selbst.
+    const traegheitsarm=(()=>{
+      try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
+      catch(e){return false;}
+    })();
+    const PAUSE_MS=traegheitsarm?0:900;
+    const ANLAUF_MS=traegheitsarm?0:500;
+
+    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
+    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
+    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
+    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
+    // erkennbar bleibt.
     teamsBox.textContent="";
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const karte=el("div","mdffa-team"+(erg.eventPlatz===1?" mdffa-sieger":""));
+    teamsBox.setAttribute("aria-live","polite");
+    const eckKarten=[0,1,2,3].map(side=>{
+      const karte=el("div","mdffa-team mdffa-c"+side+" mdffa-wartet");
       karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
       karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-      const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-      punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+      const punkte=el("div","mdffa-punkte","–");
+      punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
       teamsBox.appendChild(karte);
+      return karte;
     });
 
-    // VIER RUNDENTAFELN (eine je Rolle): Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest.
     rundenBox.textContent="";
-    ereignis.runden.forEach(runde=>{
-      const box=el("div","mdffa-runde");
+    rundenBox.setAttribute("aria-live","polite");
+    endstandBox.textContent="";
+
+    const laufendeSumme=[0,0,0,0];
+
+    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
+    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
+    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
+    // abschaltbar).
+    function schreibeRundentafel(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
@@ -34471,29 +34824,67 @@
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
-    });
+    }
 
-    // ENDSTAND: alle vier Teams, Rundenpunkte-Summe, Beitrag-Summe, Ligapunkte.
-    endstandBox.textContent="";
-    const tbl=document.createElement("table");
-    const thead=document.createElement("thead");
-    const trh=document.createElement("tr");
-    ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
-    thead.appendChild(trh);tbl.appendChild(thead);
-    const tbody=document.createElement("tbody");
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const tr=document.createElement("tr");
-      if(erg.eventPlatz===1)tr.className="mdffa-r1";
-      tr.appendChild(el("td",null,eintraege[side].name));
-      tr.appendChild(el("td",null,String(erg.eventPlatz)));
-      tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
-      tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
-      tr.appendChild(el("td",null,String(erg.ligaPunkte)));
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    endstandBox.appendChild(tbl);
+    function aktualisiereEckKarte(side,rundenNr){
+      const karte=eckKarten[side];
+      karte.classList.remove("mdffa-wartet");
+      const punkte=karte.querySelector(".mdffa-punkte");
+      punkte.textContent="";
+      punkte.appendChild(document.createTextNode(laufendeSumme[side]+" Pkt. bisher"));
+      punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
+    }
+
+    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
+    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
+    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
+    // deren Anfang.
+    function zeigeEndstand(){
+      teamsBox.textContent="";
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
+        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
+        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
+        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        karte.appendChild(punkte);
+        teamsBox.appendChild(karte);
+      });
+
+      endstandBox.textContent="";
+      const tbl=document.createElement("table");
+      const thead=document.createElement("thead");
+      const trh=document.createElement("tr");
+      ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
+      thead.appendChild(trh);tbl.appendChild(thead);
+      const tbody=document.createElement("tbody");
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const tr=document.createElement("tr");
+        if(erg.eventPlatz===1)tr.className="mdffa-r1";
+        tr.appendChild(el("td",null,eintraege[side].name));
+        tr.appendChild(el("td",null,String(erg.eventPlatz)));
+        tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
+        tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
+        tr.appendChild(el("td",null,String(erg.ligaPunkte)));
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      endstandBox.appendChild(tbl);
+      mdffaOffenbarungsTimer=null;
+    }
+
+    function naechsteRunde(i){
+      if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
+      const runde=ereignis.runden[i];
+      schreibeRundentafel(runde);
+      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+    }
+
+    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
   }
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen

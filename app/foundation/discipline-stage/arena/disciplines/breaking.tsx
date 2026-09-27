@@ -1,5 +1,18 @@
 // =====================================================================================
-// breaking (Breaking Point · Survival-Cypher) — BESPOKE, ersetzt das Thermometer-Artwork.
+// breaking (Breaking Point · Gauntlet) — BESPOKE, ersetzt das Thermometer-Artwork.
+//
+// WICHTIG (s. CLAUDE.md "Breaking ist Folter, nicht Breakdance — nicht mehr nachfragen"):
+// Breaking ist ein Folter-/Survival-Zweikampf (Slap-Fighting/Kendo-Kachinuki-Vokabular),
+// KEIN Breakdance-Battle. Chris am 13.09., woertlich: „breaking NICHT breakdance ist sondern
+// ein foltern!!!! […] einer schmerz zufuegt der andere muss es aushalten dann ist wieder der
+// andere dran bis einer aufgibt." Diese Datei trug bis zum 27.09. trotzdem DJ-Pult, Boombox,
+// Lautsprechertuerme, eine "Battle-Bracket"-Leiste und den Titel "Survival-Cypher" — reine
+// Breakdance-Ikonografie, die der Motor (battle-mode.engine.js, zeichneBreaking()/
+// stepCypher()) nie hatte. Der Motor spricht seit dem Gauntlet-Umbau (22.09.) von PEINIGT/
+// ERTRAeGT, einer FOLTERBANK mit zehn eskalierenden Geraeten (FOLTER_GERAETE/folterStufe())
+// und nennt das Format schlicht "Gauntlet" (s. dortiger UI-Text "Gauntlet, X gegen X"). Der
+// 27.09.-Fix entfernt die Breakdance-Requisiten aus dieser Datei und uebernimmt stattdessen
+// den Motor-Wortschatz, statt eine eigene, abweichende Bildsprache zu erfinden.
 //
 // Konzept (Nutzer-Wunsch): lila Druck-Arena, in der alle Teams von außen NACH INNEN rücken.
 // Wer am wenigsten „bricht" (höchster Score = am längsten UNBROKEN), steht am nächsten am
@@ -12,14 +25,17 @@
 // 20→30): vier Ergänzungen, alle rein dekorativ — keine Änderung an `tokenPos`/`angOf`
 // (die Positions-/Score-Logik ist unverändert die Wahrheit des Hosts):
 //   1. Druck-Boden: ein Beton-Kreis mit Nahtlinien statt eines reinen Verlaufs.
-//   2. DJ-Pult/Boombox/Lautsprecher am Rand — die Kulisse, die die Disziplin benennt.
-//   3. Battle-Bracket-Leiste oben ("wer gegen wen, welche Runde") — Breaking ist ein
-//      K.-o.-Format, das bis hierhin nirgends sichtbar war. Paart benachbarte Ränge aus
-//      `sorted` (derselben Ladder-Reihenfolge, die der Host ohnehin führt) — eine
-//      Näherung an eine echte Turnierklammer ohne neue Datenquelle.
-//   4. Beat-Puls auf ein festes BPM-Raster (BREAKING_BPM, dieselbe Zahl wie
-//      battle-mode.engine.js's stepCypher()/zeichneBreaking() — s. Kommentar dort) statt
-//      einer frei gewählten Sekundenzahl.
+//   2. [27.09. ENTFERNT] DJ-Pult/Boombox/Lautsprecher am Rand — Breakdance-Requisite ohne
+//      Entsprechung im Motor. Ersetzt durch dieselbe FOLTERBANK-Sprache wie
+//      battle-mode.engine.js's zeichneBreaking(): eine kleine Geraete-/Stufen-Anzeige.
+//   3. [27.09. UMBENANNT] "Battle-Bracket-Leiste" (Paarung benachbarter Raenge, K.-o.-Format-
+//      Framing) → GAUNTLET-Stufenanzeige oben: zeigt "GAUNTLET" + "STUFE n/m" (dieselbe
+//      Eskalations-Idee wie folterStufe() im Motor), keine erfundene Turnierklammer mehr.
+//   4. [27.09. UMBENANNT] Druck-Puls auf ein festes Zeitraster (BREAKING_BPM, dieselbe Zahl
+//      wie battle-mode.engine.js's stepCypher()/zeichneBreaking() — s. Kommentar dort). Der
+//      Name BREAKING_BPM bleibt (Motor-Parität, s. dortiger Kommentar), gemeint ist aber ein
+//      Druck-/Belastungs-Puls, keine Musik — die alte Prosa sprach faelschlich von einem
+//      "Beat", das ist hier bewusst korrigiert.
 //   5. Etiketten-Kollision (Sicht-QA 10.09.: die vier Zonen-Etiketten standen mittig über
 //      dem Ring und kollidierten mit Tokens, weil `angOf`s 13er-Schritt auch exakt auf die
 //      12-Uhr-Achse fallen kann): Zonen-Etiketten jetzt NUR bei Hover über den Ring sichtbar
@@ -33,20 +49,22 @@
 import { useState, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { clamp } from "@/lib/foundation/foundation-number-utils";
-import { teamPrimaryColor } from "@/lib/foundation/team-colors";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
 // BREAKING_BPM (s. battle-mode.engine.js, direkt vor BUEHNE_ART): EINE Zahl, aus der
 // Bewegung (Motor-Wippen), Bild-Puls (hier UND der Motor-Kern-Puls) und Ton (TON_KATALOG.
-// breaking) dieselbe Zeitbasis ziehen. Zwei getrennte Laufzeiten (React hier, Canvas dort)
-// können dieselbe Konstante nur SPIEGELN, nicht TEILEN — deshalb hier noch einmal explizit
-// benannt statt eines "irgendwie ähnlichen" Werts.
+// breaking, reine Kampf-SFX — kein Musikstueck) dieselbe Zeitbasis ziehen. Zwei getrennte
+// Laufzeiten (React hier, Canvas dort) können dieselbe Konstante nur SPIEGELN, nicht TEILEN
+// — deshalb hier noch einmal explizit benannt statt eines "irgendwie ähnlichen" Werts. Der
+// Name BPM ist Motor-Parität (battle-mode.engine.js nennt die Konstante identisch), gemeint
+// ist ein Druck-/Belastungs-Puls wie ein beschleunigter Herzschlag unter Folter, kein
+// Tanz-Beat.
 const BREAKING_BPM = 100;
-const BEAT_S = 60 / BREAKING_BPM;
-// Druckwelle: eine 4-Schlag-Phrase (bei 100 BPM = 2,4s, vorher frei gewählte 2,6s).
-const PULSE_DUR = `${(BEAT_S * 4).toFixed(2)}s`;
-// Survivor-Kern-Ring: ein 2-Schlag-Atem (1,2s, vorher frei gewählte 1,6s).
-const CORE_BREATH_DUR = `${(BEAT_S * 2).toFixed(2)}s`;
+const PULS_S = 60 / BREAKING_BPM;
+// Druckwelle: eine 4-Takt-Phase (bei BREAKING_BPM=100 = 2,4s, vorher frei gewählte 2,6s).
+const PULSE_DUR = `${(PULS_S * 4).toFixed(2)}s`;
+// Survivor-Kern-Ring: eine 2-Takt-Atem-Phase (1,2s, vorher frei gewählte 1,6s).
+const CORE_BREATH_DUR = `${(PULS_S * 2).toFixed(2)}s`;
 
 export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -78,7 +96,7 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   // eine pro-Ring-Erklaerung.
   const [zonenHover, setZonenHover] = useState(false);
 
-  // ---- Cypher-Geometrie: außen = frisch gebrochen, Zentrum = Survivor ------------------
+  // ---- Gauntlet-Geometrie: außen = frisch gebrochen, Zentrum = Survivor ------------------
   const cx = W / 2;
   const cy = H / 2 + 8;
   const rOut = Math.min(W * 0.46, H * 0.44);
@@ -108,14 +126,12 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
     { f: 0.22, label: "MIND FORTRESS" },
   ];
 
-  // Battle-Bracket (Plan 7.3, Punkt 3): benachbarte Ränge aus `sorted` gepaart — Rang 1
-  // gegen Rang 2, Rang 3 gegen Rang 4, usw. Auf vier Paare begrenzt (grosse Felder blieben
-  // sonst unlesbar); ungerade Restgrösse (kein Partner mehr) wird einfach ausgelassen.
-  const bracketPaare: Array<[RT, RT]> = [];
-  for (let i = 0; i + 1 < sorted.length && bracketPaare.length < 4; i += 2) {
-    bracketPaare.push([sorted[i]!, sorted[i + 1]!]);
-  }
-  const rundeAnzeige = typeof round === "number" && typeof slotCount === "number" && slotCount > 0 ? `RUNDE ${Math.min(round + 1, slotCount)}/${slotCount}` : null;
+  // GAUNTLET-Stufenanzeige (27.09., ersetzt die Battle-Bracket-Paarung): kein erfundenes
+  // K.-o.-Klammer-Framing mehr, sondern dieselbe Eskalations-Idee wie battle-mode.engine.js's
+  // folterStufe() — Runde/Gesamtrunden → eine Stufenzahl, die mit fortschreitendem Spiel
+  // steigt. Der Motor selbst nennt das Format "Gauntlet" (s. dortiger UI-Text "Gauntlet, X
+  // gegen X"), deshalb hier derselbe Titel statt eines neu erfundenen Namens.
+  const stufenAnzeige = typeof round === "number" && typeof slotCount === "number" && slotCount > 0 ? `STUFE ${Math.min(round + 1, slotCount)}/${slotCount}` : null;
 
   return (
     <>
@@ -238,7 +254,8 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
       </text>
 
       {/* Druckwelle vom Zentrum (Survival-Puls) — Plan 7.3, Punkt 4: auf BREAKING_BPM
-          gerastert (4-Schlag-Phrase) statt einer frei gewaehlten Sekundenzahl. */}
+          gerastert (4-Takt-Phase) statt einer frei gewaehlten Sekundenzahl. Ein Belastungs-
+          Puls, kein Musik-Beat -- s. Funktionskopf. */}
       {!reducedMotion ? (
         <ellipse cx={cx} cy={cy} rx={rIn} ry={rIn * KY} fill="none" stroke="rgba(214,150,255,.5)" strokeWidth={2} pointerEvents="none">
           <animate attributeName="rx" values={`${rIn};${rOut}`} dur={PULSE_DUR} repeatCount="indefinite" />
@@ -247,53 +264,43 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
         </ellipse>
       ) : null}
 
-      {/* DJ-PULT / BOOMBOX / LAUTSPRECHER (Plan 7.3, Punkt 2) -- die Kulisse, die die
-          Disziplin benennt. Unten mittig (im Abstand unter dem Ring, W=1180/H=600 lassen
-          dort ~76px Luft), zwei Lautsprechertuerme symmetrisch daneben. Rein dekorativ,
-          keine Interaktion. */}
+      {/* FOLTERBANK-SILHOUETTE (27.09., ersetzt DJ-Pult/Boombox/Lautsprecher, s.
+          Funktionskopf): dieselbe Rand-Kulisse wie zuvor, aber aus dem Motor-Wortschatz
+          (FOLTER_GERAETE/FOLTERBANK in battle-mode.engine.js's zeichneBreaking()) statt aus
+          einem DJ-Setup. Eine schlichte Bank mit zwei Fessel-Ringen unten mittig, ein
+          Gluteisen darueber (FOLTER_GLUT-Farbe), zwei Feuerschalen symmetrisch daneben statt
+          Lautsprechertuermen. Rein dekorativ, keine Interaktion. */}
       <g pointerEvents="none" opacity={0.92}>
-        {/* DJ-Pult: Tisch + zwei Plattenteller + Mixer-Steg */}
-        <rect x={cx - 46} y={H - 54} width={92} height={30} rx={4} fill="#241a30" stroke="rgba(214,170,255,.35)" strokeWidth={1.2} />
-        <circle cx={cx - 24} cy={H - 39} r={10} fill="#120c18" stroke="rgba(214,170,255,.5)" strokeWidth={1.4} />
-        <circle cx={cx - 24} cy={H - 39} r={3} fill="#f2d75a" />
-        <circle cx={cx + 24} cy={H - 39} r={10} fill="#120c18" stroke="rgba(214,170,255,.5)" strokeWidth={1.4} />
-        <circle cx={cx + 24} cy={H - 39} r={3} fill="#f2d75a" />
-        <rect x={cx - 7} y={H - 46} width={14} height={16} rx={2} fill="#1a1220" stroke="rgba(214,170,255,.4)" strokeWidth={1} />
-        {/* Boombox obenauf, mittig */}
-        <rect x={cx - 17} y={H - 68} width={34} height={16} rx={3} fill="#2c2136" stroke="rgba(214,170,255,.4)" strokeWidth={1} />
-        <circle cx={cx - 9} cy={H - 60} r={4.5} fill="#120c18" />
-        <circle cx={cx + 9} cy={H - 60} r={4.5} fill="#120c18" />
-        {/* Lautsprechertuerme links/rechts */}
+        {/* Folterbank: Tischplatte + Stuetzbeine + zwei Fessel-Ringe */}
+        <rect x={cx - 46} y={H - 46} width={92} height={14} rx={3} fill="#241a1a" stroke="rgba(255,140,110,.35)" strokeWidth={1.2} />
+        <rect x={cx - 40} y={H - 32} width={6} height={22} fill="#241a1a" />
+        <rect x={cx + 34} y={H - 32} width={6} height={22} fill="#241a1a" />
+        <circle cx={cx - 24} cy={H - 39} r={6} fill="none" stroke="#aab4c4" strokeWidth={2.2} />
+        <circle cx={cx + 24} cy={H - 39} r={6} fill="none" stroke="#aab4c4" strokeWidth={2.2} />
+        {/* Gluteisen mittig ueber der Bank */}
+        <rect x={cx - 3} y={H - 62} width={6} height={17} rx={2} fill="#ff6a2a" opacity={0.85} />
+        {/* Feuerschalen links/rechts statt Lautsprechertuermen */}
         {[cx - 150, cx + 150].map((sx, i) => (
-          <g key={`speaker-${i}`}>
-            <rect x={sx - 15} y={H - 74} width={30} height={54} rx={3} fill="#241a30" stroke="rgba(214,170,255,.35)" strokeWidth={1.2} />
-            <circle cx={sx} cy={H - 58} r={9} fill="#120c18" stroke="rgba(214,170,255,.4)" strokeWidth={1} />
-            <circle cx={sx} cy={H - 34} r={6} fill="#120c18" stroke="rgba(214,170,255,.4)" strokeWidth={1} />
+          <g key={`brazier-${i}`}>
+            <rect x={sx - 3} y={H - 40} width={6} height={20} fill="#3a2a1e" />
+            <ellipse cx={sx} cy={H - 44} rx={9} ry={5} fill="#3a2a1e" stroke="rgba(255,140,110,.4)" strokeWidth={1} />
+            <ellipse cx={sx} cy={H - 47} rx={5} ry={4} fill="#ff6a2a" opacity={0.75} />
           </g>
         ))}
       </g>
 
-      {/* BATTLE-BRACKET-LEISTE (Plan 7.3, Punkt 3): "wer gegen wen, welche Runde" — Breaking
-          ist K.-o.-Format, das war bis hierhin nirgends sichtbar. Oben, ueber den Zonen. */}
-      {rundeAnzeige || bracketPaare.length ? (
+      {/* GAUNTLET-STUFENANZEIGE (27.09., ersetzt die Battle-Bracket-Leiste, s.
+          Funktionskopf): Titel + Eskalationsstufe statt einer erfundenen Turnierklammer.
+          "Gauntlet" ist der Name, den der Motor selbst fuer dieses Format benutzt
+          (battle-mode.engine.js, UI-Text "Gauntlet, X gegen X"). Oben, ueber den Zonen. */}
+      {stufenAnzeige ? (
         <g pointerEvents="none">
-          {rundeAnzeige ? (
-            <text x={cx} y={16} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={10} fontWeight={800} letterSpacing={1} fill="var(--nl-warn)">
-              {rundeAnzeige}
-            </text>
-          ) : null}
-          {bracketPaare.length ? (
-            <text x={cx} y={30} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={9} letterSpacing={0.3}>
-              {bracketPaare.map(([a, b], i) => (
-                <tspan key={`${a.code}-${b.code}`}>
-                  {i > 0 ? <tspan fill="rgba(214,170,255,.35)"> · </tspan> : null}
-                  <tspan fill={teamPrimaryColor(a.code)}>{a.code}</tspan>
-                  <tspan fill="rgba(214,170,255,.5)">–</tspan>
-                  <tspan fill={teamPrimaryColor(b.code)}>{b.code}</tspan>
-                </tspan>
-              ))}
-            </text>
-          ) : null}
+          <text x={cx} y={16} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={10} fontWeight={800} letterSpacing={1.5} fill="var(--nl-warn)">
+            GAUNTLET
+          </text>
+          <text x={cx} y={29} textAnchor="middle" fontFamily="ui-monospace, Menlo, monospace" fontSize={9} letterSpacing={0.6} fill="rgba(214,170,255,.6)">
+            {stufenAnzeige}
+          </text>
         </g>
       ) : null}
 
