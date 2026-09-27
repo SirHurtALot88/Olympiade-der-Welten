@@ -26747,6 +26747,23 @@
   // PR 2 vorgeschlagenen Zonen 0,26/0,53/0,80 (Konzept 2.1: hindernisse[2..8] liegen bei
   // 0,26/0,53/0,80 exakt an diesen drei Indizes).
   const WAND_EXE_INDIZES=[2,5,8];
+  // STURZ-ANIMATION (Bug 3, reine Anzeige, s. Kommentar bei `u.vizFallVon=u.pos` im
+  // ABRUTSCHEN-Zweig von stepSpurt): ohne diese Funktion springt der Kletterer im selben
+  // Frame auf seine Sicherungsposition, weil `zeichneWand`/`laeuferXY` bislang roh `u.pos`
+  // zeichneten. `u.vizFallVon`/`u.vizFallT` schreibt ausschliesslich der Motor-Frame des
+  // Sturzes, hier wird nur gelesen -- reiner Bildschirm-Versatz wie `u.vizAnlauf`/`vizRampe`
+  // bei Staffel/Spurt, `u.pos` selbst bleibt die ganze Zeit exakt der Motor-Wert.
+  // CLIMBING_STURZ_DAUER steht wie `ANSAGE_NACHLEUCHTEN` in ZUSCHAUER-Sekunden, daher die
+  // Umrechnung ueber `zeitFaktor()` (climbing=4.38) statt eines rohen rennT-Vergleichs.
+  const CLIMBING_STURZ_DAUER=0.45;
+  function climbAnzeigeAnteil(u){
+    const ziel=Math.max(0,Math.min(1,u.pos||0));
+    if(u.vizFallVon==null)return ziel;
+    const t=Math.min(1,Math.max(0,((rennT-(u.vizFallT||0))*zeitFaktor())/CLIMBING_STURZ_DAUER));
+    if(t>=1)return ziel;
+    const von=Math.max(0,Math.min(1,u.vizFallVon));
+    return von+(ziel-von)*(t*t);   // ease-in: ein Sturz beschleunigt statt konstant zu fallen
+  }
   function bodenWand(){
     // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
     // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
@@ -26794,15 +26811,41 @@
     const routeBreite=BA().routeBreite||30;
     for(let bz=0;bz<n;bz++){
       const x=wandX(bz);
-      // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x.
+      // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x. GRIFFART ALS
+      // FORM (Bug 3 / Recherche C3): PR 2 hat fuenf Griffarten mit eigenem Sub-Skill
+      // eingefuehrt (`HUERDEN_TYP(i)`), gezeichnet wurden bis hierhin zehn gleiche
+      // Ellipsen -- Chris' "man soll einen Unterschied sehen, ob jemand eine meistert"
+      // (13.09., s. CLAUDE.md) galt fuer die Wand nicht. `HUERDEN_TYP(i)`, NICHT
+      // `BA().hindernisTypen` direkt, sonst zeigt die Wand das Grundlayout statt des fuer
+      // dieses Spiel gewuerfelten Kurses (Ueberhang/Platte/Dach, s. `kurse` weiter oben).
       griffe.forEach((posFrac,i)=>{
         const y=camY(posFrac);
         if(y<-24||y>H+24)return;
         const gx=x+(bodenSaat(i+1200+bz*37)-0.5)*2*routeBreite;
+        const typ=HUERDEN_TYP(i);
         ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
-        ctx.beginPath();ctx.ellipse(gx,y,8,6,0.35,0,6.283);ctx.fill();
-        ctx.fillStyle="rgba(255,255,255,.35)";
-        ctx.beginPath();ctx.ellipse(gx-2,y-1,3,1.8,0.35,0,6.283);ctx.fill();
+        if(typ==="TECHNIK"){                          // Leiste: flaches Rechteck
+          ctx.fillRect(gx-7,y-1.5,14,3);
+        } else if(typ==="WENDIGKEIT"){                // Sloper: halbe Kugel mit Glanz
+          ctx.beginPath();ctx.arc(gx,y,7,Math.PI,0);ctx.closePath();ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.4)";
+          ctx.beginPath();ctx.ellipse(gx-2,y-2,2.2,1.4,0,0,6.283);ctx.fill();
+        } else if(typ==="WUCHT"){                     // Zange: hoher, schmaler Block
+          ctx.fillRect(gx-3.5,y-8,7,16);
+        } else if(typ==="ANTRITT"){                   // Dyno: zwei Griffe weit auseinander,
+                                                       // Sprunglinie dazwischen
+          ctx.beginPath();ctx.ellipse(gx-7,y,4,4,0,0,6.283);ctx.fill();
+          ctx.beginPath();ctx.ellipse(gx+7,y,4,4,0,0,6.283);ctx.fill();
+          ctx.strokeStyle="rgba(255,255,255,.45)";ctx.lineWidth=1;ctx.setLineDash([2,3]);
+          ctx.beginPath();ctx.moveTo(gx-4,y);ctx.lineTo(gx+4,y);ctx.stroke();
+          ctx.setLineDash([]);
+        } else {                                      // Henkel mit Exe (STEHEN, deckt sich
+                                                       // mit WAND_EXE_INDIZES): die
+                                                       // urspruengliche Ellipse
+          ctx.beginPath();ctx.ellipse(gx,y,8,6,0.35,0,6.283);ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.35)";
+          ctx.beginPath();ctx.ellipse(gx-2,y-1,3,1.8,0.35,0,6.283);ctx.fill();
+        }
       });
 
       // SICHERER, eine Strichfigur am Wandfuss (Primitive, kein Asset, Gegencheck 3.6).
@@ -26813,41 +26856,68 @@
       ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
 
-      // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer -- "geklinkt" heisst
-      // rein visuell: der Kletterer hat den zugehoerigen Griff schon erreicht (u.pos >= dessen
-      // hindernisse-Anteil). Reiner Lesezugriff, keine neue Motor-Groesse.
+      // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer. "Geklinkt" heisst
+      // BUG 2 (Broadcast-Optik-Recherche 27.09., C2): `u.hoch` (die Hoechstmarke, nach der
+      // tatsaechlich gewertet wird, s. stepSpurt/bahnRangliste()/MOTOREN.climbing.wert()),
+      // NICHT `u.pos`. Nach einem Sturz sinkt `u.pos` auf die Exe darunter (ABRUTSCHEN,
+      // stepSpurt) -- mit `u.pos` faerbten sich bereits geklinkte Exen dadurch wieder grau,
+      // obwohl der Kletterer sie laengst kontrolliert erreicht hatte. `u.hoch` faellt nie.
+      // Reiner Lesezugriff, keine neue Motor-Groesse.
       const u=LAEUFER.find(l=>Math.round(l.bahnZ)===bz);
-      const hoehe=u?Math.max(0,Math.min(1,u.pos)):0;
+      const hoch=u?Math.max(0,Math.min(1,(u.hoch??u.pos)||0)):0;
+      // Live-Segment des Seils zum Kletterer selbst: die ANGEZEIGTE Position, inklusive der
+      // Sturz-Animation aus Bug 3 (`climbAnzeigeAnteil`) -- sonst wuerde das Seil zur alten
+      // Live-Position im selben Frame springen, waehrend die Figur noch sichtbar faellt.
+      const live=u?climbAnzeigeAnteil(u):0;
       const punkte=[{x,y:sy-3}];
       WAND_EXE_INDIZES.forEach(idx=>{
-        const posFrac=griffe[idx]; if(posFrac==null||hoehe<posFrac)return;
+        const posFrac=griffe[idx]; if(posFrac==null||hoch<posFrac)return;
         punkte.push({x,y:camY(posFrac)});
       });
-      if(u&&u.fertig==null)punkte.push({x,y:camY(hoehe)});
+      if(u&&u.fertig==null)punkte.push({x,y:camY(live)});
       ctx.strokeStyle="rgba(230,225,210,.70)";ctx.lineWidth=1.6;
       ctx.beginPath();ctx.moveTo(punkte[0].x,punkte[0].y);
       for(let i=1;i<punkte.length;i++)ctx.lineTo(punkte[i].x,punkte[i].y);
       ctx.stroke();
 
-      // EXEN: kleine Karabinerform, faerbt sichtbar um, sobald geklinkt (Gegencheck-Wortlaut).
+      // EXEN: kleine Karabinerform, faerbt sichtbar um, sobald geklinkt (Gegencheck-Wortlaut) --
+      // und bleibt es, s. Bug-2-Kommentar oben (`hoch` statt `u.pos`).
       WAND_EXE_INDIZES.forEach(idx=>{
         const posFrac=griffe[idx]; if(posFrac==null)return;
         const y=camY(posFrac); if(y<-20||y>H+20)return;
-        const geklinkt=hoehe>=posFrac;
+        const geklinkt=hoch>=posFrac;
         ctx.strokeStyle=geklinkt?"#7fd858":"#9a9488";ctx.lineWidth=2;
         ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.stroke();
         if(geklinkt){ctx.fillStyle="rgba(127,216,88,.22)";ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.fill();}
       });
     }
 
-    // ---- Countdown-Grundgerüst (Punkt 5 oben): bewusst als inaktiv erkennbar beschriftet,
-    // solange `BAHN_ART.climbing.zeitlimit` noch nicht existiert (kommt mit PR 2). UNTEN
-    // RECHTS statt oben rechts (Screenshot-Gegenprobe 24.09.): oben rechts liegt bereits der
-    // Broadcast-Bug (`.bbug`, `top:8px;right:8px`, "Armageddon Aftermath"-Kasten) -- dort
-    // haette sich die Beschriftung mit der bestehenden DOM-Anzeige ueberlagert.
+    // ---- Countdown (Bug 1, Broadcast-Optik-Recherche 27.09., C1): der Platzhaltertext
+    // "ZEITLIMIT — aktiviert in PR 2" blieb stehen, obwohl PR 2 laengst gemergt ist und
+    // `BA().zeitlimit` (16,3 Simulationssekunden, s. Rezept weiter oben) das Rennen
+    // tatsaechlich beendet (`rennT>=BA().zeitlimit`, stepSpurt). Das war eine echte
+    // Falschinformation im Bild: der Zuschauer las "kein Zeitlimit", waehrend eines lief.
+    // Ersatz: ein echter Countdown in ZUSCHAUER-Sekunden (`zeitlimit*zeitFaktor()` ist
+    // dieselbe Umrechnung wie ueberall sonst bei Bahn-Disziplinen, s. `angezeigt` in
+    // updateHudBahn), die letzten zehn rot und pulsierend. UNTEN RECHTS bleibt (Screenshot-
+    // Gegenprobe 24.09.): oben rechts liegt bereits der Broadcast-Bug (`.bbug`,
+    // `top:8px;right:8px`, "Armageddon Aftermath"-Kasten).
     ctx.font="bold 12px system-ui,sans-serif";ctx.textAlign="right";ctx.textBaseline="alphabetic";
-    ctx.fillStyle="rgba(230,225,210,.50)";
-    ctx.fillText("ZEITLIMIT — aktiviert in PR 2",W-14,H-12);
+    const zl=BA().zeitlimit;
+    if(zl){
+      const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
+      const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
+      const knapp=restEcht<=10;
+      ctx.fillStyle=knapp
+        ?("rgba(224,90,74,"+(0.55+0.35*Math.abs(Math.sin(rennT*6))).toFixed(3)+")")
+        :"rgba(230,225,210,.65)";
+      ctx.fillText("ZEITLIMIT "+mm+":"+String(ss).padStart(2,"0"),W-14,H-12);
+    } else {
+      // Fallback, falls `zeitlimit` einmal fehlt (Sonden/Fallback-Rezepte): weiterhin klar
+      // als inaktiv erkennbar, statt eine Zeit zu behaupten, die es nicht gibt.
+      ctx.fillStyle="rgba(230,225,210,.50)";
+      ctx.fillText("ZEITLIMIT — kein Limit gesetzt",W-14,H-12);
+    }
     ctx.textAlign="left";
   }
 
@@ -28759,7 +28829,12 @@
     // WAND: Route b haengt fest bei wandX(b), die Hoehe ist camY(u.pos) -- kein platz-Bonus
     // wie auf der geraden Bahn (dort draengen sich Fertige gemeinsam hinter der Ziellinie;
     // an der Wand behaelt jede Route ihre eigene Spalte, auch nach dem Top-out).
-    if(istWand())return {x:wandX(u.bahnZ), y:camY(u.pos)};
+    // BUG 3 (Broadcast-Optik-Recherche 27.09.): `climbAnzeigeAnteil(u)` statt rohem `u.pos`
+    // -- sonst sprang der Kletterer nach einem Sturz im selben Frame auf seine
+    // Sicherungsposition (Teleport statt sichtbarer Bewegung). `u.pos` selbst bleibt der
+    // Motor-Wert, hier wird nur die gezeichnete Hoehe kurz interpoliert (s. Kommentar bei
+    // `climbAnzeigeAnteil`, bodenWand()).
+    if(istWand())return {x:wandX(u.bahnZ), y:camY(climbAnzeigeAnteil(u))};
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -29989,6 +30064,14 @@
             // Deckel "hoechstens ein Abschnitt" ist durch die Zonen-Abstaende (zwei bis drei
             // Griffe) automatisch erfuellt, keine zusaetzliche Klemme noetig.
             const zoneUnter=(A.zonen||[]).filter(z=>z<h).sort((x,y)=>y-x)[0] ?? 0;
+            // STURZ-ANIMATION (Bug 3, reine Anzeige): `u.pos` selbst springt weiterhin in
+            // diesem einen Frame auf `zoneUnter` -- daran haengt `wert()`/`bahnRangliste()`
+            // ueber `u.hoch`, das bleibt unangetastet. `vizFallVon`/`vizFallT` sind
+            // ausschliesslich fuer `climbAnzeigeAnteil()` (zeichneWand/laeuferXY, s. dort) --
+            // derselbe Zaehl-statt-Zustand-Trick wie `u.ansageBei=rennT` zwei Bildschirme
+            // weiter oben. Kein rr(), keine Rueckwirkung auf u.pos/u.hoch/tempoVon().
+            u.vizFallVon=u.pos;
+            u.vizFallT=rennT;
             u.pos=zoneUnter;
             u.abgerutscht=(u.abgerutscht||0)+1;
             if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
