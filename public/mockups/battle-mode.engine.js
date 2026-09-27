@@ -11960,7 +11960,7 @@
       // Ueberlebende") und passen nicht auf Basketballs Punktestand — deshalb hier keine
       // Weiterleitung dorthin, sondern eine eigene, einfache Ansage im Feed. Scoreboard
       // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
-      const sieger=fsPunkte[0]>fsPunkte[1]?"Vigilante Wranglers":fsPunkte[1]>fsPunkte[0]?"Armageddon Aftermath":null;
+      const sieger=fsPunkte[0]>fsPunkte[1]?VEREIN[0].name:fsPunkte[1]>fsPunkte[0]?VEREIN[1].name:null;
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
         +fsPunkte[0]+":"+fsPunkte[1]+".",true);
       return; }
