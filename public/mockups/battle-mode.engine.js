@@ -23057,7 +23057,14 @@
     tg.down=true;
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      feed(tg.side,tg.n+" faellt — zurueck in "+TDM_RESPAWN_SEK+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+      // ARENA-ZEIT-FIX (27.09.): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
+      // Simulationssekunden (downBis/reviveUnit oben, unveraendert) — nur die ANGEZEIGTE
+      // Zahl im Feed-Text war bislang derselbe rohe Wert. Bei ZEIT_DEHNUNG.tdm=1,88 erlebt
+      // der Zuschauer die 5 Sim-Sekunden als rund 9 echte Sekunden (dieselbe Skalierung wie
+      // die Kopfzeilen-Uhr/der Ticker-Zeitstempel, s. updateHud()/feed()), die Textzahl
+      // stand also glatt daneben.
+      const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
+      feed(tg.side,tg.n+" faellt — zurueck in "+respawnAnzeige+" s.",true,waehleCaption(CAPTION_KO,tg.n));
     } else {
       feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
     }
@@ -24089,6 +24096,15 @@
   // Leine damit um etwa 90 Pixel.
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
+  // KAMPF_SUDDEN_DEATH_T — ausgelagert (ARENA-ZEIT-FIX, 27.09.) aus den beiden Stellen, die
+  // vorher je eine eigene rohe "50" trugen (der Schadens-/Tempozuschlag hier unten und die
+  // Phasenanzeige in updateHud()). Bleibt eine reine Simulationssekunden-Schwelle, an der
+  // Spiellogik aendert sich nichts — neu ist nur, dass das HTML-Label ".hpbars .sd" (vorher
+  // fest "Sudden Death 0:50") jetzt denselben Wert mit `zeitFaktor()` skaliert, um die fuer
+  // die jeweils gewaehlte Disziplin tatsaechliche Uhrzeit zu zeigen: TDM (Faktor 1,88) rund
+  // 1:34, Battlefield (Faktor 5,00) rund 4:10 — vorher stand ueberall dieselbe Zahl.
+  const KAMPF_SUDDEN_DEATH_T=50;
+
   function stepSim(dt){
     if(istFeldspiel(disc))return stepFeldspiel(dt);
     if(istBuehne(disc))return stepBuehne(dt);
@@ -24113,7 +24129,7 @@
     // nie gesetzt (schalteAus setzt es nur dort) — die Schleife ist fuer Mini-DM/Battlefield
     // deshalb ein no-op, ohne extra Disziplin-Abfrage noetig.
     for(const u of U)if(u.down&&u.downBis!=null&&t>=u.downBis)reviveUnit(u);
-    const sd=t>50?1+(t-50)*0.06:1;
+    const sd=t>KAMPF_SUDDEN_DEATH_T?1+(t-KAMPF_SUDDEN_DEATH_T)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
     // hilft niemandem — das war der Gegner, der am Ende nur herumstand.
@@ -25414,16 +25430,25 @@
     // die feed() fuer den Ticker-Zeitstempel schon nutzt.
     const klSek=Math.floor(t*zeitFaktor());
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
+    document.getElementById("phase").textContent=done?"beendet":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
     // ohne Neuladen, also blieb z.B. "Basketball — Live-Spielstand" auch nach dem Zurueck-
-    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen —
-    // dieselbe dataset.origHtml-Vorlage wie in den anderen drei Updatern, hier aber als
-    // Rueckwaerts-Wiederherstellung statt als Ersetzung.
+    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen.
+    //
+    // ARENA-ZEIT-FIX (27.09.): vorher wurde hier ein einmal zwischengespeicherter Text
+    // ("Sudden Death 0:50" aus dem HTML) unveraendert zurueckgeschrieben — bei ZEIT_DEHNUNG
+    // tdm=1,88/battlefield=5,00 begann Sudden Death auf der echten Uhr aber bei rund 1:34
+    // bzw. 4:10, nie bei 0:50. Jetzt wird die Zahl bei jedem Aufruf neu aus
+    // KAMPF_SUDDEN_DEATH_T*zeitFaktor() gebaut, mit derselben m:ss-Umrechnung wie #clock
+    // zwei Zeilen darueber — fuer die gerade gewaehlte Kampf-Disziplin immer richtig, auch
+    // nach einem Disziplin-Wechsel.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd){ if(sd.dataset.orig===undefined)sd.dataset.orig=sd.textContent; sd.textContent=sd.dataset.orig; }
+    if(sd){
+      const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
+      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+    }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml;});
@@ -25431,11 +25456,26 @@
     // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
     // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
     // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
-    // BATTLEFIELD-DOMINATION: die grosse Score-Zahl zeigt Kontrollpunkt-Punkte statt
-    // Ausschaltungen, weil DAS jetzt der Sieg-Weg ist, den t/95s bzw. das Punktelimit
-    // auswerten (s. kpTick/dominationSieger) — aliveL/aliveR bleiben unveraendert die
-    // Ueberlebendenzahl, die weiterhin fuer den Elimination-Sieg zaehlt.
-    document.getElementById("klsuffix").textContent=KP?"Kontrollpunkte":"Punkte";
+    // BATTLEFIELD-DOMINATION, ANZEIGE UMGEDREHT (ARENA-ZEIT-FIX, 27.09.): die grosse
+    // Score-Zahl zeigte bislang Battlefields Kontrollpunkt-Punkte, weil das zunaechst nach
+    // dem "neuen" Sieg-Weg aussah — tatsaechlich entscheidet kampfSieger()/dominationSieger()
+    // aber ZUERST ueber Ausschaltungen (komplette Ausloeschung einer Seite) und erst danach
+    // ueber das KP-Punktelimit; in einem Testspiel stand der KP-Stand bis kurz vor Schluss
+    // bei 0:0, waehrend die Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die
+    // grosse Zahl zeigt jetzt fuer ALLE Kampf-Disziplinen (tdm/mini-dm/battlefield) dieselben
+    // Ausschaltungen, KP.punkte wandert in die kleine #kpzeile darunter (nur fuer Battlefield
+    // sichtbar). Reine Anzeige-Vertauschung: kampfSieger()/dominationSieger()/kpTick bleiben
+    // unveraendert, KP.punkte entscheidet den Sieg weiterhin genauso wie vorher.
+    document.getElementById("klsuffix").textContent="Punkte";
+    const kpzeile=document.getElementById("kpzeile");
+    if(kpzeile){
+      if(KP){
+        kpzeile.style.display="";
+        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+      } else {
+        kpzeile.style.display="none";
+      }
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
@@ -25445,13 +25485,14 @@
     // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
     // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
     // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
-    // schwanken. #bbug uebernimmt das automatisch: aktualisiereBbug() liest #score erst,
-    // NACHDEM diese Zeile geschrieben hat (Aufruf am Ende dieser Funktion).
-    document.getElementById("score").textContent=KP
-      ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
-      :disc==="tdm"
-        ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
-        :(nR-live(1).length)+" : "+(nL-live(0).length);
+    // schwanken. Battlefield hat keinen Respawn (bleibt bei schalteAus() unveraendert eine
+    // dauerhafte Ausschaltung wie Mini-DM), fuer Battlefield/Mini-DM bleibt die
+    // live()-Differenz deshalb weiterhin bitgleich mit der Ausschaltungssumme. #bbug
+    // uebernimmt das automatisch: aktualisiereBbug() liest #score erst, NACHDEM diese Zeile
+    // geschrieben hat (Aufruf am Ende dieser Funktion).
+    document.getElementById("score").textContent=disc==="tdm"
+      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
+      :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -31918,7 +31959,14 @@
     // auf der Bahn/Buehne/im Feldspiel nie hochgezaehlt wird (die haben ihre eigenen
     // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
     // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
+    //
+    // ARENA-ZEIT-FIX (27.09.): fuer Kampf (tdm/mini-dm/battlefield, istKampf()) blieb hier
+    // bis eben der rohe Simulations-`t` stehen, waehrend updateHud() die Kopfzeilen-Uhr
+    // laengst `t*zeitFaktor()` zeigt (s. dort) — bei Battlefields ZEIT_DEHNUNG.battlefield=5,00
+    // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
+    // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
+    // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
+    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
