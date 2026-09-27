@@ -157,6 +157,21 @@
             <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhRnextName"></span><span class="bheig" id="bhRnextEig"></span></div>
           </div>
         </div>
+        <!-- I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4). Die
+             Crystal-Maze-Zonenuhr: "Zug 6 / 8" und ein Balken, der innerhalb des Zugs
+             ablaeuft, im letzten Zug rot und pulsierend. Inhalt kommt aus
+             aktualisiereIspyHud() (battle-mode.engine.js), aufgerufen am Ende von
+             updateHudBuehne() -- [hidden] fuer jede Buehne ausser I-Spy. -->
+        <div class="ispyzuguhr" id="ispyZugUhr" hidden>
+          <span id="ispyZugText">Zug 1 / 8</span>
+          <div class="ispyzugbar"><s id="ispyZugBarFill"></s></div>
+        </div>
+        <!-- I-SPY SPLIT-TAFEL (I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4). Der
+             Speedrun-Split: Team-Punkte je bereits vollstaendig enthuelltem Zug und das
+             Delta zum Gegner im selben Zug, Gold fuer den besten Zug eines Teams. Noch
+             nicht enthuellte Zuege zeigen "·" statt einer Zahl (Spoiler-Schutz, s.
+             aktualisiereIspyHud()). -->
+        <div class="ispysplit" id="ispySplit" hidden></div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
