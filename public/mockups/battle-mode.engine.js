@@ -25262,7 +25262,12 @@
           return bonus>0 ? f1(stern+bonus)+" ("+f1(stern)+" Sterne + "+f1(bonus)+" Ziel)" : f1(stern+bonus);
         }};
     }
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09. (Opus-Review desselben Tages): `rennFertig` nimmt Ausgeschiedene beim
+    // Ausscheiden genauso auf wie echte Finisher beim Zieleinlauf (s. Kommentar an
+    // zielbonus() oben, ":26174", "Ausgeschiedene stehen zwar auch darin, zaehlen aber
+    // nicht mit"). "N im Ziel" zaehlte bisher ALLE Eintraege, also auch Ausgeschiedene —
+    // dieselbe `!x.raus`-Filterung wie dort und bei bahnRangliste() (":28393").
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
@@ -25287,7 +25292,9 @@
     // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
     // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
     // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09.: dasselbe `!x.raus`-Fehlen wie bei bahnTeamstand()s `imZiel` oben
+    // (":25225") — ohne den Filter zaehlte die Kopfzeile Ausgeschiedene mit.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
     // FUEHRUNGSWECHSEL (Broadcast Runde 2, Vorschlag 1, 26.09.). Chris: "so live tv artige
@@ -25377,8 +25384,22 @@
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
-    const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
-      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
+    //
+    // BUGFIX 27.09. (Opus-Review desselben Tages, Staffel-Fortschrittsbalken): bei der
+    // Staffel laufen nie alle sechs zugleich — die fuenf, die gerade nicht dran sind,
+    // stehen fest auf ihrem Uebergabepunkt (`u.pos=u.beinBis`, s. stepSpurt ":30488").
+    // Der reine Durchschnitt aus allen sechs `u.pos` zog den Balken darum weit unter den
+    // echten Streckenanteil (z. B. 21/36 = 58 % statt tatsaechlich fertig). `u.pos` ist
+    // bei der Staffel bereits die Gesamtstrecke ueber ALLE Beine (0..1, je Bein-Grenzen
+    // `beinVon`/`beinBis`) — `gesamtfortschritt()` (":29697", schon fuer staffelZeitDelta()
+    // im Broadcast-HUD genutzt) liest genau diese Zahl vom aktiven Laeufer, oder 1, sobald
+    // das Team im Ziel ist. Fuer jede andere Bahn (kein `BA().staffel`) bleibt der alte
+    // Sechs-Durchschnitt (bei ihnen laufen ohnehin alle gleichzeitig) unveraendert.
+    const schnitt=(s)=>{
+      if(BA().staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     // BROADCAST-HUD DER STAFFEL (Recherche-Dokument Abschnitt 4): aktueller und
@@ -30684,8 +30705,16 @@
             // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
             // drei Ziel-Plaetze sind big, s. Kommentar am startAbstand-Zweig oben.
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+fmtZielzeit(rennT)+".",
-              rennFertig.length<=3);
+            //
+            // BUGFIX 27.09. (Opus-Review desselben Tages, Takeshi's-Castle-Platzzaehlung):
+            // `rennFertig` nimmt Ausgeschiedene beim Ausscheiden (":30328", `rennFertig.push(u)`
+            // im nervenKosten-Zweig) genauso auf wie echte Finisher hier. `rennFertig.length`
+            // roh gerechnet zaehlte darum jeden vorher Ausgeschiedenen mit und meldete einen zu
+            // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
+            // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
+            const zielPlatz=rennFertig.filter(x=>!x.raus).length;
+            feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
+              zielPlatz<=3);
           }
         }
       }
@@ -31303,12 +31332,24 @@
       // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
       // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
       const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      // AUSGESCHIEDEN: GEDIMMT UND ENTSAETTIGT STATT WIE EIN AKTIVER LAEUFER (Opus-Review
+      // 27.09.). `u.raus` (exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt
+      // ":30329") blieb hier bisher ungeprueft -- ein Ausgeschiedener stand seither an
+      // seiner Ausscheide-Position bewegungslos, aber in vollen Farben und derselben
+      // Groesse wie jeder Laufende, ununterscheidbar von jemandem, der nur kurz stolpert.
+      // Dieselbe Dimm-Mechanik wie beim wartenden Staffel-Laeufer oben (`wartet`), nur
+      // deutlich staerker (0,4 statt 0,72) und mit `ctx.filter` zusaetzlich entsaettigt --
+      // reine Anzeige, liest nur das bestehende, schon von stepParcours gesetzte Feld
+      // (`u.vizZustand==="ausgeschieden"`, ":30872"), schreibt nichts, aendert nichts an
+      // wert()/rr()/rho.
+      const raus=!!u.raus;
       const sk=wartet?sk0*0.88:sk0;
-      ctx.globalAlpha=wartet?0.72:1;
+      const dimAlpha=raus?0.4:(wartet?0.72:1);
+      ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
       ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();
-      ctx.globalAlpha=wartet?0.72:1;
+      ctx.globalAlpha=dimAlpha;
       // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
       // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
@@ -31400,7 +31441,13 @@
       const huerdeHaltung=1-huerdeAusschlag*0.06;
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
+      // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
+      // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
+      // ihre eigene Dimmung ueber `dimAlpha` (oben).
+      if(raus)ctx.filter="grayscale(1) brightness(0.8)";
       zeichneSprite(ctx,parcSpriteArg,x,y);
+      if(raus)ctx.filter="none";
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -31595,6 +31642,16 @@
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
         ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
+        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
+      // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
+      // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
+      // unten -- bislang gar keine Zeile, nur die stumme, unbewegte Figur (jetzt immerhin
+      // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
+      // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
+      if(raus){
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
@@ -33419,7 +33476,16 @@
           // gelaufen zu sein), ein Fertiger bei seinem Uebergabepunkt. Jetzt: der
           // laufende Rang fuer den Gelaufenen, der Anteil fuer den Aktiven, "wartet"
           // fuer den Rest — dieselbe Zahl wie in der Stand-Spalte der Wertungstabelle.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          // BUGFIX 27.09. (Opus-Review desselben Tages, "tot"-Kachel beim Stolpern): `down`
+          // schaltete die Tot-Optik (":33386", `.kk.tot` -- grauer Hintergrund, Name
+          // durchgestrichen, s. battle-mode.css) ueber `x.stolper>0` frei -- ein rein
+          // VORUEBERGEHENDER Zustand (Huerdensturz/Klettersturz), den JEDE Bahn-Disziplin
+          // kennt, waehrend der Laeufer weiter aktiv im Rennen steht. Damit sah jeder kurz
+          // Stolpernde aus wie tot/ausgeschieden. `x.raus` (":30328f., exklusiv Takeshi's
+          // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
+          // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
+          // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
                     // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
@@ -33434,7 +33500,12 @@
                            :Math.round(x.pos*100)+" % · Exe "
                              +WAND_EXE_INDIZES.filter(idx=>x.pos>=(BA().hindernisse||[])[idx]).length
                              +"/"+WAND_EXE_INDIZES.length)
-                      : x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+                      // BUGFIX 27.09.: Ausgeschieden (`x.raus`) ist NICHT dasselbe wie Ziel
+                      // erreicht -- beide haben `x.fertig!=null` (s. nervenKosten-Zweig,
+                      // ":30328", setzt beides zusammen), aber nur ein echter Finisher hat
+                      // die Ziellinie ueberquert. Ohne diese Unterscheidung meldete die
+                      // Kachel eines Ausgeschiedenen "Ziel", als waere er angekommen.
+                      : x.raus?"Raus":x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
             // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
@@ -33445,7 +33516,12 @@
             // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
             // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
             // EINEN Bahn-Zweig fuehrt.
-            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
+            // BUGFIX 27.09.: derselbe Ziel-vs-Raus-Fund wie bei `zusatz` direkt oben -- ein
+            // Ausgeschiedener (`x.raus`) bekam hier `fortschritt:1`, also einen VOLLEN Balken,
+            // obwohl er die Strecke nie zu Ende gelaufen ist. Fuer ihn zaehlt wie waehrend des
+            // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
+            // echter Finisher bekommt weiterhin den vollen Balken.
+            fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
