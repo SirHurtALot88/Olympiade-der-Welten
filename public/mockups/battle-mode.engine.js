@@ -33718,6 +33718,16 @@
     return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
   }
 
+  // LIVE-REVEAL-TIMER FUER MINI-DM (Bugfix 27.09., Opus-Review "kein Spoiler vor dem
+  // Anpfiff"): haelt den setTimeout-Handle der laufenden Rundenoffenbarung in
+  // renderMiniDmFfa() weiter unten. Deklariert HIER, vor `reset()` (das ihn beim Verlassen
+  // von Mini-DM abbricht) statt erst bei renderMiniDmFfa() selbst — `reset()` laeuft schon
+  // beim allerersten Seitenaufbau (s. Aufruf am Ende dieser Datei), lange bevor
+  // renderMiniDmFfa() definiert wird; eine `let`-Deklaration dort waere zu diesem Zeitpunkt
+  // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
+  // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
+  let mdffaOffenbarungsTimer=null;
+
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
@@ -33824,6 +33834,10 @@
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
     if(istMdffa)renderMiniDmFfa();
+    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
+    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
+    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
+    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
@@ -34439,11 +34453,15 @@
   // Das laufende Ergebnis wird auf `disc`/den Team-Eintraegen zwischengespeichert, damit ein
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
+  //
+  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
+  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
     if(!teamsBox||!rundenBox||!endstandBox)return;
+    if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -34462,23 +34480,50 @@
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
-    // TEAM-KOPFZEILE: vier Karten, sortiert nach Event-Endplatz, Sieger optisch markiert.
+    // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
+    // spieleMiniDmFfaEvent() hat alle vier Runden UND den Endstand oben in einem einzigen,
+    // unveraenderten Aufruf berechnet, bevor auch nur eine Zeile DOM geschrieben wird. Was
+    // folgt, entscheidet nur noch WANN/WIE dieses bereits fertige Ergebnis auf den Schirm
+    // kommt: Runde fuer Runde statt in einem Rutsch, der Endstand erst als letzter Schritt
+    // statt als erster. Keine zweite Berechnung, kein zusaetzlicher rr()-Zug, keine
+    // Ruckwirkung auf `ereignis` selbst.
+    const traegheitsarm=(()=>{
+      try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
+      catch(e){return false;}
+    })();
+    const PAUSE_MS=traegheitsarm?0:900;
+    const ANLAUF_MS=traegheitsarm?0:500;
+
+    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
+    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
+    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
+    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
+    // erkennbar bleibt.
     teamsBox.textContent="";
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const karte=el("div","mdffa-team"+(erg.eventPlatz===1?" mdffa-sieger":""));
+    teamsBox.setAttribute("aria-live","polite");
+    const eckKarten=[0,1,2,3].map(side=>{
+      const karte=el("div","mdffa-team mdffa-c"+side+" mdffa-wartet");
       karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
       karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-      const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-      punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+      const punkte=el("div","mdffa-punkte","–");
+      punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
       teamsBox.appendChild(karte);
+      return karte;
     });
 
-    // VIER RUNDENTAFELN (eine je Rolle): Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest.
     rundenBox.textContent="";
-    ereignis.runden.forEach(runde=>{
-      const box=el("div","mdffa-runde");
+    rundenBox.setAttribute("aria-live","polite");
+    endstandBox.textContent="";
+
+    const laufendeSumme=[0,0,0,0];
+
+    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
+    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
+    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
+    // abschaltbar).
+    function schreibeRundentafel(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
@@ -34495,29 +34540,67 @@
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
-    });
+    }
 
-    // ENDSTAND: alle vier Teams, Rundenpunkte-Summe, Beitrag-Summe, Ligapunkte.
-    endstandBox.textContent="";
-    const tbl=document.createElement("table");
-    const thead=document.createElement("thead");
-    const trh=document.createElement("tr");
-    ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
-    thead.appendChild(trh);tbl.appendChild(thead);
-    const tbody=document.createElement("tbody");
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const tr=document.createElement("tr");
-      if(erg.eventPlatz===1)tr.className="mdffa-r1";
-      tr.appendChild(el("td",null,eintraege[side].name));
-      tr.appendChild(el("td",null,String(erg.eventPlatz)));
-      tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
-      tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
-      tr.appendChild(el("td",null,String(erg.ligaPunkte)));
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    endstandBox.appendChild(tbl);
+    function aktualisiereEckKarte(side,rundenNr){
+      const karte=eckKarten[side];
+      karte.classList.remove("mdffa-wartet");
+      const punkte=karte.querySelector(".mdffa-punkte");
+      punkte.textContent="";
+      punkte.appendChild(document.createTextNode(laufendeSumme[side]+" Pkt. bisher"));
+      punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
+    }
+
+    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
+    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
+    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
+    // deren Anfang.
+    function zeigeEndstand(){
+      teamsBox.textContent="";
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
+        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
+        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
+        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        karte.appendChild(punkte);
+        teamsBox.appendChild(karte);
+      });
+
+      endstandBox.textContent="";
+      const tbl=document.createElement("table");
+      const thead=document.createElement("thead");
+      const trh=document.createElement("tr");
+      ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
+      thead.appendChild(trh);tbl.appendChild(thead);
+      const tbody=document.createElement("tbody");
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const tr=document.createElement("tr");
+        if(erg.eventPlatz===1)tr.className="mdffa-r1";
+        tr.appendChild(el("td",null,eintraege[side].name));
+        tr.appendChild(el("td",null,String(erg.eventPlatz)));
+        tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
+        tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
+        tr.appendChild(el("td",null,String(erg.ligaPunkte)));
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      endstandBox.appendChild(tbl);
+      mdffaOffenbarungsTimer=null;
+    }
+
+    function naechsteRunde(i){
+      if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
+      const runde=ereignis.runden[i];
+      schreibeRundentafel(runde);
+      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+    }
+
+    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
   }
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
