@@ -13357,14 +13357,44 @@
       // in dieser PR unangetastet (Abschnitt 4.1: rho 0,892 wird nicht angefasst).
       label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0, showcase:true,
       failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Showcase 28,4/
+      // 29,3 Pp, VERLETZT). ERSTER ANLAUF (jede Rolle einzeln auf ihre EIGENE Matrix-Proportion
+      // nachgezogen, s. Git-Historie) verschlimmerte die Zahl auf 43,7 Pp bei n=6 -- derselbe
+      // Fehlertyp wie Tennis oben, nur staerker: Rollensondierung
+      // (`sondiere-feldspiel-subskills.mjs showcase 6`, orthogonales Rezept: GRUNDLAGE 40,1 %,
+      // TECHNIK 18,1 %, WAGNIS 9,7 %, SPITZENMOMENT 9,5 %, NERVEN 9,5 %, PUBLIKUM 8,8 %,
+      // AUSDAUER 4,3 % mechanisches Gewicht) zeigte: `determination` (Matrixgewicht nur 14, das
+      // DRITTSCHWERSTE Attribut) sass in VIER Rollen (GRUNDLAGE, TECHNIK mit 43 % Rollengewicht,
+      // NERVEN, AUSDAUER) und summierte sich weit ueber die Matrix (gemessen +12,3 Pp), ebenso
+      // charisma/spirit in je drei Rollen (+4,4/+5,1 Pp), waehrend power/intelligence/dexterity/
+      // speed/health je nur in ein bis zwei schwachen Rollen sassen (-5,1/-3,2/-5,7/-4,2/-3,0 Pp).
+      // GEAENDERT (Budget-Rechnung wie bei Tennis: Beitrag(Attribut) = Summe ueber Rollen von
+      // Rollengewicht x Rollenanteil, Zielsumme = Matrixgewicht): GRUNDLAGE (40,1 %, unangetastet)
+      // bleibt auf charisma47:spirit28:determination25 -- war bereits exakt matrix-proportional
+      // fuer die drei schwersten Attribute und deckt allein schon 18,9/11,2/10,0 der Matrixziele
+      // 27/16/14. TECHNIK (18,1 %) verliert determination KOMPLETT (der Hauptfund) und traegt
+      // jetzt NUR intelligence10:dexterity9 (53:47 normiert) -- deckt beide fast vollstaendig
+      // allein ab, vorher gar keine gemeinsame Heimat fuer dieses Paar. SPITZENMOMENT (9,5 %)
+      // verliert charisma (das GRUNDLAGE/PUBLIKUM schon uebersaettigen wuerden) und traegt jetzt
+      // power11:speed8 (58:42 normiert) -- ergaenzt WAGNIS fuer beide seltene Attribute. WAGNIS
+      // (torment2:power11:speed8 = 10:52:38, unangetastet -- war schon exakt matrix-proportional,
+      // s. GROESSTER-EINZELFUND-Historie unten). NERVEN (9,5 %) verliert intelligence (das
+      // TECHNIK jetzt exklusiv haelt) und traegt spirit16:determination14:health3 (49:42:9
+      // normiert) -- deckt den GRUNDLAGE-Rest fuer genau die zwei ueberdehnten Attribute plus
+      // etwas health. PUBLIKUM (reiner Festzuschlag, 8,8 %) verliert spirit (schon durch
+      // GRUNDLAGE/NERVEN gedeckt) und traegt charisma27:torment2:health3 (84:6:10 normiert) --
+      // liefert den GRUNDLAGE-Rest fuer charisma plus die zwei leichtesten Attribute einen
+      // zweiten, rauscharmen Kanal. AUSDAUER (spirit40:determination35:health25, unangetastet --
+      // dead-channel-nah, s. Fechten-Kommentar oben zu buehneErfolgschance) blieb wie vor dem
+      // ersten Anlauf.
       rezept:{
-        GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
-        SPITZENMOMENT:{charisma:45,power:30,speed:25},
-        TECHNIK:      {dexterity:40,intelligence:35,determination:25},
-        PUBLIKUM:     {charisma:50,spirit:50},
-        NERVEN:       {determination:40,spirit:35,intelligence:25},
-        AUSDAUER:     {spirit:40,determination:35,health:25},
-        WAGNIS:       {torment:45,power:30,speed:25}
+        GRUNDLAGE:    {charisma:47,spirit:28,determination:25},
+        TECHNIK:      {intelligence:53,dexterity:47},
+        WAGNIS:       {torment:10,power:52,speed:38},
+        SPITZENMOMENT:{power:58,speed:42},
+        NERVEN:       {spirit:49,determination:42,health:9},
+        PUBLIKUM:     {charisma:84,torment:6,health:10},
+        AUSDAUER:     {spirit:40,determination:35,health:25}
       }
     },
 
@@ -13871,13 +13901,45 @@
       // (CLAUDE.md) ist damit nicht erreicht — dafuer braeuchte es vermutlich echte
       // Sinkhorn-Kalibrierung, nicht nur eine Attribut-Umverteilung im bestehenden
       // Sieben-Rollen-Rezept.
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Tennis 53,9/
+      // 56,4 Pp, VERLETZT). ERSTER ANLAUF (stamina in GRUNDLAGE ergaenzt, SPITZENMOMENT/
+      // TECHNIK/WAGNIS/PUBLIKUM auf ihre EIGENE Matrix-Proportion nachgezogen) senkte n=6 nur
+      // auf 36,8 Pp -- deutlich besser, aber ueber der 25-Pp-Schranke. Rollensondierung
+      // (`sondiere-feldspiel-subskills.mjs tennis 6`, orthogonales Rezept) zeigte den
+      // eigentlichen Fehler: JEDE der vier schwersten Rollen (GRUNDLAGE 35,8 %, TECHNIK 18 %,
+      // SPITZENMOMENT 9,1 %, WAGNIS 11,5 % mechanisches Gewicht) trug intelligence UND
+      // awareness, jede fuer sich exakt matrix-proportional zu ihren eigenen zwei/drei
+      // Attributen -- aber die VIERFACHE Wiederholung derselben zwei schwersten Attribute ueber
+      // vier Rollen summierte sich zu weit ueber die Matrix (gemessen intelligence +9,1 Pp,
+      // awareness +8,4 Pp), waehrend dexterity/speed/determination/charisma, die nur in EINER
+      // oder gar keiner der schweren Rollen vorkamen, weit darunter blieben (-4,7/-4,5/-4,0/
+      // -3,1 Pp). Das ist ein anderer Fehlertyp als Fechtens fehlendes Attribut: hier war
+      // JEDES Attribut irgendwo vertreten, aber zu wenige Rollen TEILTEN sich die schwersten
+      // zwei Attribute ungleich. GEAENDERT (Budget-Rechnung: Beitrag(Attribut) = Summe ueber
+      // Rollen von Rollengewicht x Rollenanteil, Zielsumme = Matrixgewicht):
+      // GRUNDLAGE (35,8 %, unangetastet, war schon exakt matrix-proportional unter den vier
+      // schwersten Attributen) liefert allein intelligence 11,1/awareness 9,7/spirit 9,0/
+      // stamina 6,1 der Matrixziele 22/20/18/12 -- der Rest muss aus den uebrigen 64,2 %
+      // Rollengewicht kommen. TECHNIK (18 %) verliert intelligence/awareness komplett und
+      // traegt stattdessen ALLEIN dexterity12:speed6 (66:33 normiert -> dexterity:67,speed:33)
+      // -- liefert damit dexterity/speed praktisch exakt (12,06/5,94 gegen Ziel 12/6), vorher
+      // ueberhaupt nicht der Traeger dieser zwei Attribute. WAGNIS (11,5 %) traegt jetzt
+      // intelligence45:awareness40:spirit15 (moderat, deckt einen Teil des GRUNDLAGE-Rests).
+      // SPITZENMOMENT (9,1 %) wechselt von dexterity/speed (die jetzt TECHNIK exklusiv haelt)
+      // auf intelligence45:charisma30:determination25 -- bringt charisma (vorher nur in
+      // PUBLIKUM, staerkste Einzelluecke) neu in eine zweite Rolle ein. PUBLIKUM (reiner
+      // Festzuschlag, 8,9 %) wechselt von spirit/awareness auf charisma35:stamina35:spirit30
+      // -- traegt jetzt den zweiten charisma-Kanal und hilft stamina. NERVEN (44:40:16,
+      // unangetastet) und AUSDAUER (50:30:20, dead-channel-nah, unangetastet) blieben wie vor
+      // dem ersten Anlauf, weil beide schon nah an ihrer eigenen Matrix-Proportion lagen bzw.
+      // nachweislich kaum mechanisches Gewicht tragen.
       rezept:{
-        GRUNDLAGE:    {intelligence:37,awareness:33,spirit:30},
-        SPITZENMOMENT:{intelligence:45,dexterity:30,speed:25},
-        TECHNIK:      {intelligence:50,awareness:35,dexterity:15},
+        GRUNDLAGE:    {intelligence:31,awareness:27,spirit:25,stamina:17},
+        TECHNIK:      {dexterity:67,speed:33},
+        WAGNIS:       {intelligence:45,awareness:40,spirit:15},
+        SPITZENMOMENT:{intelligence:45,charisma:30,determination:25},
+        PUBLIKUM:     {charisma:35,stamina:35,spirit:30},
         NERVEN:       {awareness:44,spirit:40,determination:16},
-        WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
-        PUBLIKUM:     {spirit:52,awareness:43,charisma:5},
         AUSDAUER:     {stamina:50,determination:30,spirit:20}
       }
     },
@@ -13973,10 +14035,31 @@
       // Kaderrauschen (Spannweite 0,203). Das aspirative 0,85-Ziel (CLAUDE.md) ist damit nicht
       // erreicht; mehr steckt vermutlich nicht in einer reinen Attributverschiebung im
       // bestehenden Sieben-Rollen-Rezept, s. Dokument Abschnitt "Was offen bleibt".
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Fechten 40,6/
+      // 42,1 Pp, VERLETZT). Diagnose: `power` (Matrixgewicht 10) UND `speed` (Matrixgewicht 16,
+      // tatsaechlich das DRITTSCHWERSTE Attribut der Matrix) fehlten in GRUNDLAGE/TECHNIK, den
+      // beiden staerksten Rollen (58,3 % mechanisches Gewicht zusammen, s. Kommentar oben),
+      // komplett -- speed sass nur in SPITZENMOMENT/AUSDAUER, power nur in AUSDAUER (nachgewiesen
+      // fast toter Kanal, 1,9 % mechanisches Gewicht) und im schwachen WAGNIS. GRUNDLAGE/TECHNIK
+      // waren zwar EXAKT matrix-proportional *unter sich* (torment:dexterity:awareness =
+      // 42:33:25 = 25:20:15 normiert), aber genau dieser sonst so richtige Kanal blendet zwei
+      // schwere Attribute vollstaendig aus der einzigen wirklich deterministischen Rolle aus
+      // (GRUNDLAGE zaehlt JEDE Runde, unabhaengig vom Erfolgswurf).
+      // ERSTER ANLAUF (nur power ergaenzt, torment25:dexterity20:awareness15:power10 = 70
+      // normiert -> 36:29:21:14) meldete n=6 Abweichung auf 26,4 Pp (von 40,6/42,1) — power traf
+      // exakt (+0,1), aber speed blieb bei nur 8,1 % gegen Matrixgewicht 16 (-7,9), weil es
+      // weiterhin in keiner der beiden schwersten Rollen sass. NACHGEZOGEN: speed tritt
+      // GRUNDLAGE/TECHNIK ebenfalls bei, jetzt unter den FUeNF schwersten Attributen der ganzen
+      // Matrix (torment25:dexterity20:speed16:awareness15:power10 = 86 normiert -> 29:23:19:
+      // 17:12) statt nur vier -- torment/dexterity/awareness treten dafuer weiter zurueck.
+      // NERVEN/PUBLIKUM/AUSDAUER/WAGNIS weiterhin bewusst unangetastet -- PUBLIKUM wurde in der
+      // 16.09.-Kalibrierrunde bereits erschoepfend gegen Alternativen getestet (jede Aenderung
+      // dort schlechter als der Status quo, s. GEPRUEFT-UND-VERWORFEN-Kommentar oben), NERVEN
+      // traegt bereits eine bewusste Grid-Suchs-Kalibrierung.
       rezept:{
-        GRUNDLAGE:    {torment:42,dexterity:33,awareness:25},
+        GRUNDLAGE:    {torment:29,dexterity:23,speed:19,awareness:17,power:12},
         SPITZENMOMENT:{dexterity:40,speed:35,torment:25},
-        TECHNIK:      {torment:42,dexterity:33,awareness:25},
+        TECHNIK:      {torment:29,dexterity:23,speed:19,awareness:17,power:12},
         NERVEN:       {awareness:55,determination:20,health:25},
         PUBLIKUM:     {intelligence:50,health:50},
         AUSDAUER:     {speed:40,power:35,health:25},
