@@ -14247,8 +14247,14 @@
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      // Q3 (Broadcast-Optik-Dokument 27-09, Abschnitt 3, "Spieler-Kamera"): reines
+      // Anzeige-Metadatenfeld fuer die Bauchbinde -- der zugewiesene Slot ist bereits
+      // vorab bekannt (steht schon in der Aufstellung, bevor der Kampf beginnt) und
+      // fliesst hier nur als LESBARER Name statt als Id in TEILNEHMER, nirgends in
+      // wert()/rr()/eig/R2 oben.
+      const slotLabel=sl?((slotsVon(buehneDisc).find(s=>s.id===sl)||{}).label||null):null;
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
-        groesse:p.groesse??null, attr,
+        groesse:p.groesse??null, attr, vizSlotLabel:slotLabel,
         // DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen (Chris' Fund vom
         // 25.08., s. bauSpieler und aufschluesselung): `p.d` haelt nur "tdm" und "spurt"
         // vorberechnet. Fuer JEDE Buehnen-Disziplin fiel der Basiswert deshalb auf 0
@@ -17243,6 +17249,11 @@
   // Standbild einfriert, selbst wenn gerade kein Treffer/Fehlschlag enthuellt wird.
   const FECHT_AUSFALL_T=0.22, FECHT_ERHOL_T=0.24, FECHT_PARADE_T=0.28, FECHT_FUNKE_T=0.24;
   const FECHT_AUSFALL_PX=30, FECHT_PARADE_PX=11;
+  // F-B1 -- TREFFERLAMPEN (Broadcast-Optik-Dokument 27-09, Abschnitt 5, Prioritaet 1): 2,5 s
+  // Nachleuchten, genau das "Nachleuchten"-Prinzip aus Abschnitt 2.4 des Dokuments (ein
+  // Ereignis von 0,5 s hinterlaesst eine Spur, die laenger stehen bleibt als das Ereignis
+  // selbst).
+  const FECHT_LAMPE_T=2.5;
   function stepFechten(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild schachUhrWert()/vizSchachHalb-Vergleich bei
@@ -17257,6 +17268,11 @@
         u.vizFechtAktuell=u.aktuell;
         u.vizFechtPhase="ausfall"; u.vizFechtT=0;
         const r=u.runden[u.aktuell];
+        // F-B1 -- TREFFERLAMPE (s. FECHT_LAMPE_T-Kommentar oben): leuchtet auf der Seite
+        // dieses Fechters, unabhaengig vom Gegner (der eigene Erfolg zaehlt, auch wenn der
+        // Gegner denselben Gang ebenfalls trifft -- Doppeltreffer, Dokument-Tabelle
+        // Abschnitt 5: beide Lampen leuchten dann unabhaengig voneinander, eine je Seite).
+        if(r&&r.ereignis===art.erfolgWort)u.vizLampeT=FECHT_LAMPE_T;
         const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
         if(gegner){
           if(r&&r.ereignis===art.erfolgWort){
@@ -17284,6 +17300,7 @@
     for(const u of TEILNEHMER){
       if(u.brett==null)continue;
       if(u.vizFunkeT>0)u.vizFunkeT=Math.max(0,u.vizFunkeT-dt);
+      if(u.vizLampeT>0)u.vizLampeT=Math.max(0,u.vizLampeT-dt);
       const phase=u.vizFechtPhase;
       if(phase==="ausfall"){
         u.vizFechtT=(u.vizFechtT||0)+dt;
@@ -17827,6 +17844,75 @@
     const pultB=Math.min(W*0.30,220), pultX=W/2-pultB/2, pultY=H-26;
     return {x:pultX+pultB*(i+0.5)/3, y:pultY+10};
   }
+  // ================== T-B1 -- TENNISPLATZ (Broadcast-Optik-Dokument 27-09, Abschnitt 4,
+  // Prioritaet 1) ==================
+  // "Die Nahansicht stellt die Spieler oben/unten -- genau die Hauptkamera-Perspektive jeder
+  // Uebertragung. Ein Platz in Trapez-Perspektive dazwischen [...] Ohne diesen Schritt lesen
+  // sich alle anderen Tennis-Vorschlaege nicht." Reine Kulisse -- liest nichts aus
+  // TEILNEHMER, schreibt nichts, ruft nie rr() auf; dasselbe Wechsel-Fall-Bookkeeping wie
+  // bodenShowcase()/bodenWettessen() daneben, falls wir GERADE von einer
+  // Publikums-Loop-Buehne kommen. Belag fest Hartplatz blau (offene Frage 3 im Dokument,
+  // Voreinstellung Chris: "fest Hartplatz blau; Belag bleibt reine Optik").
+  function bodenTennis(){
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+    if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
+
+    // GRUNDFLAECHE: dunkler Umraum -- der Platz selbst (unten) traegt schon genug Farbe,
+    // anders als bodenBuehne()s neutrales violettes Podest braucht es hier keinen eigenen
+    // Scheinwerferkegel-Akzent.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#141826"); g.addColorStop(1,"#0a0c14");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
+    // eine echte Grundlinien-Uebertragung. topY/botY liegen knapp ausserhalb der Spieler-
+    // Positionen aus zeichneTennis() (fyOben=H*0.23/fyUnten=H*0.56), damit beide Kontrahenten
+    // sichtbar INNERHALB des Platzes stehen.
+    const topY=H*0.17, botY=H*0.615, netY=(topY+botY)/2;
+    const topHalfAus=W*0.145, botHalfAus=W*0.30;
+    const breiteBei=(y)=>topHalfAus+(botHalfAus-topHalfAus)*(y-topY)/(botY-topY);
+    const einzugAussen=0.86; // Einzel-Seitenlinie als Anteil der Aussenlinie (Doppelgasse)
+
+    // Gruener Auslauf, dann blauer Hartplatz obendrauf (US-Open-Palette).
+    ctx.fillStyle="#1c5c3a";
+    ctx.beginPath();
+    ctx.moveTo(W/2-breiteBei(topY)*1.4,topY-30); ctx.lineTo(W/2+breiteBei(topY)*1.4,topY-30);
+    ctx.lineTo(W/2+breiteBei(botY)*1.35,botY+34); ctx.lineTo(W/2-breiteBei(botY)*1.35,botY+34);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#2a5f8f";
+    ctx.beginPath();
+    ctx.moveTo(W/2-breiteBei(topY),topY); ctx.lineTo(W/2+breiteBei(topY),topY);
+    ctx.lineTo(W/2+breiteBei(botY),botY); ctx.lineTo(W/2-breiteBei(botY),botY);
+    ctx.closePath(); ctx.fill();
+
+    // WEISSE LINIEN: Aussenlinie (Doppel), Einzel-Seitenlinien, Aufschlaglinien,
+    // Mittelaufschlaglinie -- keine erfundene Form, das Standard-Tennisplatzbild.
+    const linie=(x0,y0,x1,y1)=>{ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();};
+    ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=2;
+    linie(W/2-breiteBei(topY),topY,W/2+breiteBei(topY),topY);
+    linie(W/2-breiteBei(botY),botY,W/2+breiteBei(botY),botY);
+    linie(W/2-breiteBei(topY),topY,W/2-breiteBei(botY),botY);
+    linie(W/2+breiteBei(topY),topY,W/2+breiteBei(botY),botY);
+    ctx.lineWidth=1.6;
+    linie(W/2-breiteBei(topY)*einzugAussen,topY,W/2-breiteBei(botY)*einzugAussen,botY);
+    linie(W/2+breiteBei(topY)*einzugAussen,topY,W/2+breiteBei(botY)*einzugAussen,botY);
+    const aufTopY=netY-(netY-topY)*0.62, aufBotY=netY+(botY-netY)*0.62;
+    linie(W/2-breiteBei(aufTopY)*einzugAussen,aufTopY,W/2+breiteBei(aufTopY)*einzugAussen,aufTopY);
+    linie(W/2-breiteBei(aufBotY)*einzugAussen,aufBotY,W/2+breiteBei(aufBotY)*einzugAussen,aufBotY);
+    linie(W/2,aufTopY,W/2,aufBotY);
+
+    // NETZ: dunkles Band mit heller Bandkante auf halber Hoehe, Pfosten an beiden Enden.
+    ctx.fillStyle="rgba(20,24,32,.85)";
+    ctx.fillRect(W/2-breiteBei(netY)*1.08,netY-5,breiteBei(netY)*2.16,10);
+    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=1.6;
+    linie(W/2-breiteBei(netY)*1.08,netY-5,W/2+breiteBei(netY)*1.08,netY-5);
+    ctx.fillStyle="#e8e2d0";
+    ctx.fillRect(W/2-breiteBei(netY)*1.1-3,netY-9,6,18);
+    ctx.fillRect(W/2+breiteBei(netY)*1.1-3,netY-9,6,18);
+  }
   function bodenShowcase(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -18346,7 +18432,7 @@
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): genau die weitere
     // else-if-Zeile, die der Kommentar oben ankuendigt -- s. bodenWettessen() oben.
-    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else if(art.schatzsuche&&typeof bodenSchatzsuche==="function")bodenSchatzsuche(); else bodenBuehne();
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else if(art.schatzsuche&&typeof bodenSchatzsuche==="function")bodenSchatzsuche(); else if(art.tennis&&typeof bodenTennis==="function")bodenTennis(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -18548,10 +18634,191 @@
     }
     return fokus;
   }
+
+  // ================== QUERSCHNITT: BROADCAST-OPTIK BUEHNEN-DUELL (27.09.), Abschnitt 3 ====
+  // docs/design/broadcast-optik-buehne-duell-27-09.md (Branch
+  // broadcast-buehne-duell-recherche-27-09), Q1-Q3 -- gemeinsame Bausteine fuer Speed-Schach/
+  // Fechten/Tennis. ALLE DREI SIND [Anzeige]: sie lesen ausschliesslich bereits enthuelltes
+  // (u.aktuell/u.verlauf[0..aktuell]/u.runden[0..aktuell]/u.treffer), schreiben nie auf
+  // summe/runden/aktuell/vorteil/verlauf/treffer/gefechtSieg/lunge/buehneAkt/buehneZeiger/
+  // done, rufen nie rr() -- exakt derselbe harte Vertrag wie stepSchach()/stepFechten()/
+  // stepTennis() (s. dortige Kommentare). miss-alle-disziplinen.mjs bleibt dadurch per
+  // Konstruktion bit-identisch (trotzdem vorher/nachher gemessen, s. PR-Beschreibung).
+
+  // Q1 -- VERLAUFSKURVE (Eval-Graph/Momentum-Linie, [Anzeige, klein]). `u.verlauf` traegt den
+  // Verlauf schon (der Bewertungsbalken in zeichneSchach()/zeichneFechten() liest daraus nur
+  // den letzten Wert) -- diese Funktion zeichnet ihn zusaetzlich als Flaechenlinie um die
+  // Nulllinie, Heimfarbe oberhalb, Gastfarbe unterhalb. Skalierung mit demselben Bodenwert 60
+  // wie die bestehenden Bewertungsbalken (`maxV`), NICHT aus `u.vorteil` (Abschnitt 1,
+  // Befund 1: `u.vorteil` ist der Endwert und damit ein Spoiler-Leck). Markiert
+  // Vorzeichenwechsel mit einem kleinen Punkt -- dieselbe Bedingung wie `vorteilKipptBig`
+  // (feed()-Kommentar weiter oben), hier ohne dessen Gegen-Gate: eine gezeichnete Kurve feuert
+  // kein feed()-Ereignis und kann sich deshalb nicht doppelt "abfeuern".
+  function zeichneVerlaufKurve(x,y,w,h,u){
+    if(!u||!u.verlauf||u.aktuell<0)return;
+    const n=u.aktuell+1;
+    const boden=60;
+    const maxV=Math.max(boden,...u.verlauf.slice(0,n).map(v=>Math.abs(v||0)));
+    const mitteY=y+h/2;
+    const px=(i)=>n<=1?x:x+w*i/(n-1);
+    const py=(v)=>mitteY-(h/2)*Math.max(-1,Math.min(1,(v||0)/maxV));
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+    ctx.strokeStyle="rgba(230,232,240,.22)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,mitteY); ctx.lineTo(x+w,mitteY); ctx.stroke();
+    const flaeche=(farbe,ueber)=>{
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x,ueber?y:mitteY,w,h/2); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(px(0),mitteY);
+      for(let i=0;i<n;i++)ctx.lineTo(px(i),py(u.verlauf[i]));
+      ctx.lineTo(px(n-1),mitteY); ctx.closePath();
+      ctx.fillStyle=farbe; ctx.globalAlpha=0.3; ctx.fill();
+      ctx.restore();
+    };
+    flaeche(css("--home"),true);
+    flaeche(css("--away"),false);
+    ctx.strokeStyle=css("--home"); ctx.lineWidth=1.4; ctx.beginPath();
+    for(let i=0;i<n;i++){ const px_=px(i),py_=py(u.verlauf[i]); if(i===0)ctx.moveTo(px_,py_); else ctx.lineTo(px_,py_); }
+    ctx.stroke();
+    for(let i=1;i<n;i++){
+      if(Math.sign(u.verlauf[i]||0)!==Math.sign(u.verlauf[i-1]||0)){
+        ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.arc(px(i),py(u.verlauf[i]),2.2,0,Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  // FECHTEN-VARIANTE (Dokument Abschnitt 3, Q1): eine Treffer-Treppe statt einer Vorteils-
+  // linie, weil seit F1 (26.09.) der Trefferstand das Ergebnis ist, nicht der Vorteil
+  // (`gefechtSieg` liest die Trefferdifferenz, s. Kommentar bei BUEHNE_ART.fechten). Reine
+  // Ableitung aus den bereits enthuellten `runden[]` (art.erfolgWort) -- genau das Muster,
+  // das der BUEHNE_ART.fechten-Kommentar fuer den ENDGUELTIGEN Trefferstand vorschreibt
+  // ("aus den vollstaendigen runden[] gezaehlt, nicht aus u.treffer"), hier fuer jeden
+  // Zwischenschritt wiederholt. Liest nie ueber a.aktuell/b.aktuell hinaus.
+  function zeichneTrefferTreppe(x,y,w,h,a,b,art){
+    if(!a||!b)return;
+    const n=Math.max(a.aktuell,b.aktuell)+1; if(n<=0)return;
+    const kumuliert=(u)=>{
+      let t=0; const arr=[0];
+      for(let i=0;i<n;i++){ if(i<=u.aktuell){ const r=u.runden[i]; if(r&&r.ereignis===art.erfolgWort)t++; } arr.push(t); }
+      return arr;
+    };
+    const ka=kumuliert(a), kb=kumuliert(b);
+    const maxT=Math.max(1,ka[ka.length-1],kb[kb.length-1]);
+    const px=(i)=>x+w*i/n;
+    const py=(t)=>y+h-(h*t/maxT);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+    const treppenlinie=(arr,farbe)=>{
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.6; ctx.beginPath();
+      for(let i=0;i<arr.length;i++){
+        const px_=px(i), py_=py(arr[i]);
+        if(i===0)ctx.moveTo(px_,py_); else ctx.lineTo(px_,py_);
+        if(i<arr.length-1)ctx.lineTo(px(i+1),py_);
+      }
+      ctx.stroke();
+    };
+    treppenlinie(ka,css("--home"));
+    treppenlinie(kb,css("--away"));
+    ctx.restore();
+  }
+
+  // Q2 -- MANNSCHAFTS-LEISTE ([Anzeige, klein]). Ersetzt die Luecke zwischen dem grossen
+  // Duellstand (z.B. "2 : 1" bei Speed-Schach) und den Mini-Brettern/-Bahnen/-Plaetzen
+  // darunter, die keinen Stand tragen (Tennis) oder ihn nur als Kleintext fuehren (Fechten) --
+  // Olympiade-Schach-/Davis-Cup-Tie-Tafel-Konvention (Dokument Abschnitt 2.1/3). `boxen` ist
+  // ein Array {fertig, text, farbVar, fokus}, das jede Zeichenfunktion selbst aus ihrem
+  // eigenen paar()/fertig() baut -- diese Funktion zeichnet nur, liest nichts selbst.
+  function zeichneMannschaftsLeiste(x,y,w,boxen,bh){
+    const n=boxen.length; if(!n)return;
+    bh=bh||20;
+    const gap=4, bw=Math.min(46,(w-(n-1)*gap)/n);
+    const startX=x-(bw*n+gap*(n-1))/2;
+    const fontPx=Math.max(8,Math.round(bh*0.52));
+    ctx.save();
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    boxen.forEach((b,i)=>{
+      const bx=startX+i*(bw+gap);
+      ctx.fillStyle=b.fertig?"rgba(255,255,255,.09)":"rgba(255,255,255,.04)";
+      ctx.fillRect(bx,y,bw,bh);
+      ctx.strokeStyle=b.fokus?"#f2d75a":"rgba(255,255,255,.2)";
+      ctx.lineWidth=b.fokus?2:1;
+      ctx.strokeRect(bx,y,bw,bh);
+      ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=b.farbVar?css(b.farbVar):"#c7ccd6";
+      ctx.fillText(b.text,bx+bw/2,y+bh/2+1);
+    });
+    ctx.restore();
+  }
+
+  // Q3 -- SPIELERKACHEL MIT PORTRAeT ALS "SPIELER-KAMERA" ([Anzeige, klein-mittel]). Die
+  // Arena kennt Portraets schon (portraet(), s. dort) -- die dort verwendete Fassung haengt
+  // ein <img> ins DOM, die animierte Buehne zeichnet aber auf Canvas. Eigener, von
+  // portraet() unabhaengiger Bild-Cache: einmal laden, danach nur noch drawImage() (Dokument
+  // Abschnitt 3, Q3: "kein DOM noetig"). Faellt auf das Kuerzel auf farbigem Grund zurueck,
+  // solange kein Bild geladen ist -- derselbe Rueckfall-Gedanke wie bei portraet() ("ein
+  // leerer grauer Kasten wuerde aussehen, als sei etwas kaputt").
+  const battlePortraitCache=new Map();
+  function battlePortraitBild(u){
+    let e=battlePortraitCache.get(u.n);
+    if(!e){
+      const im=new Image();
+      e={im,geladen:false,fehler:false};
+      im.onload=()=>{e.geladen=true;};
+      im.onerror=()=>{e.fehler=true;};
+      im.src="/portraits/"+kennungVon(u.n)+".jpg";
+      battlePortraitCache.set(u.n,e);
+    }
+    return e;
+  }
+  // x/y ist die Mitte der Kachel, groesse die Kantenlaenge in px.
+  function zeichneSpielerKachel(u,x,y,groesse,farbVar){
+    const e=battlePortraitBild(u);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x-groesse/2,y-groesse/2,groesse,groesse); ctx.clip();
+    if(e.geladen&&!e.fehler){
+      ctx.drawImage(e.im,x-groesse/2,y-groesse/2,groesse,groesse);
+    } else {
+      ctx.fillStyle=css(farbVar||"--home"); ctx.fillRect(x-groesse/2,y-groesse/2,groesse,groesse);
+      ctx.fillStyle="rgba(8,10,14,.5)"; ctx.fillRect(x-groesse/2,y-groesse/2,groesse,groesse);
+      ctx.font="700 "+Math.round(groesse*0.38)+"px 'Barlow Condensed',sans-serif";
+      ctx.fillStyle="#f2e9d8"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(u.n.slice(0,2).toUpperCase(),x,y+1);
+    }
+    ctx.restore();
+    ctx.strokeStyle="rgba(230,232,240,.4)"; ctx.lineWidth=1.4;
+    ctx.strokeRect(x-groesse/2,y-groesse/2,groesse,groesse);
+  }
+  // BAUCHBINDE beim Fokuswechsel (Dokument Abschnitt 3, Q3: "Beim Fokuswechsel einmal 2s
+  // eine Bauchbinde: Name, Slot-Rolle, Bilanz bis hier"). Modulzustand der Regie (kein
+  // TEILNEHMER-Feld, genau wie schachFokus/tennisFokus/fechtenFokus selbst) -- `board`
+  // haelt fest, welches Brett/welche Bahn/welchen Platz diese Funktion zuletzt gezeigt hat;
+  // wechselt er, startet der 2s-Timer neu. Zeigt den Heim-Teilnehmer des neuen Fokus.
+  // "Bilanz" zaehlt REIN LESEND aus runden[0..u.aktuell] (Abschnitt 1: nie darueber hinaus).
+  const battleBauchbinde={board:null,bis:0};
+  function zeichneBauchbinde(board,u,art,x,y,w){
+    if(!u)return;
+    if(battleBauchbinde.board!==board){ battleBauchbinde.board=board; battleBauchbinde.bis=buehneT+2; }
+    if(buehneT>battleBauchbinde.bis)return;
+    let stark=0,ges=0;
+    for(let i=0;i<=u.aktuell;i++){ const r=u.runden[i]; if(!r)continue; ges++; if(r.ereignis===art.erfolgWort)stark++; }
+    const zeile1=u.n+(u.vizSlotLabel?" · "+u.vizSlotLabel:"");
+    const zeile2=ges>0?(stark+" von "+ges+" stark"):"";
+    ctx.save();
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const bh=zeile2?30:20;
+    ctx.fillStyle="rgba(8,10,14,.72)"; ctx.fillRect(x-w/2,y-bh/2,w,bh);
+    ctx.strokeStyle="rgba(230,232,240,.3)"; ctx.lineWidth=1; ctx.strokeRect(x-w/2,y-bh/2,w,bh);
+    ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
+    ctx.fillText(zeile1,x,zeile2?y-6:y);
+    if(zeile2){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3"; ctx.fillText(zeile2,x,y+8); }
+    ctx.restore();
+  }
+
   function zeichneTennis(art){
     if(!TEILNEHMER.length)return;
     const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
     const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const fertig=(u)=>u.aktuell+1>=art.rundenN;
     tennisFokus=duellFokusWaehlen(tennisFokus,bretter,paar,art.rundenN,tennisSchlagAktiv);
     const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
     const posMap=new Map();
@@ -18561,6 +18828,23 @@
     const [fa]=paar(tennisFokus);
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.12);
+
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
+    // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
+    // in Teamfarbe (Fechten, Tennis)" -- ein echter Punktestand existiert erst mit T1+T2 aus
+    // dem Konzeptreview, s. T-B5 im Dokument).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===tennisFokus};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig){
+        const wert=pa.vorteil||0;
+        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus};
+      }
+      const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus};
+    });
+    zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
 
     // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
     // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
@@ -18586,6 +18870,10 @@
       if(voll){
         const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
         schrift((v>0?"+":"")+v+" Vorteil",58,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),10.5);
+        // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // "Neben ... Namen (Tennis)" -- seitlich auf Sprite-Hoehe, weit genug ausserhalb der
+        // Schattenellipse (rx=16*scale<=22.4), damit sie nie den Schlaeger/Ball ueberdeckt.
+        zeichneSpielerKachel(u,x-70,y,26,side===0?"--home":"--away");
       }
     };
 
@@ -18602,6 +18890,12 @@
     const [gA,gB]=paar(tennisFokus);
     zeichneSpieler(gA,0,fx,fyOben,NAH_SKALA,true);
     zeichneSpieler(gB,1,fx,fyUnten,NAH_SKALA,true);
+
+    // Q1 -- VERLAUFSKURVE unter dem unteren Spieler (Broadcast-Optik-Dokument 27-09,
+    // Abschnitt 3): der Vorteilsverlauf des Heim-Spielers dieses Platzes, dieselbe Zahl, die
+    // gerade als "+X Vorteil" ueber ihr steht. Unter der Namen-/Vorteilszeile (58*NAH_SKALA
+    // tief) und deutlich vor der Mini-Reihe (ry=H*0.84).
+    if(gA)zeichneVerlaufKurve(fx-90,fyUnten+58*NAH_SKALA+12,180,22,gA);
 
     // DIE UeBRIGEN PLAeTZE KLEIN AM UNTEREN RAND — dieselbe Idee wie zeichneSchach()s
     // Mini-Bretter: eine Reihe kompakter Chips statt eines zweiten grossen Duells.
@@ -18646,6 +18940,9 @@
         ctx.beginPath();ctx.arc(bx,by,4,0,Math.PI*2);ctx.fill();ctx.stroke();
       }
     }
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Spieler des neu fokussierten Platzes (Broadcast-Optik-Dokument Abschnitt 3).
+    zeichneBauchbinde("tennis-"+tennisFokus,gA,art,W/2,H-16,260);
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
@@ -18693,6 +18990,7 @@
     if(!TEILNEHMER.length)return;
     const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
     const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const fertig=(u)=>u.aktuell+1>=art.rundenN;
     // AKTIV = mitten in Ausfall/Erholung/Parade, oder der Funke eines gerade gesetzten
     // Treffers ist noch sichtbar — alles ausser der ruhenden En-garde-Stellung. Fuettert
     // duellFokusWaehlen()s aktivFn (s. Kommentar dort): ein Ausfallschritt ist kurz genug,
@@ -18723,6 +19021,19 @@
       ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.12);
     }
 
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
+    // Trefferstand ("4:3"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen in
+    // Teamfarbe" statt 1/½/0, weil Fechten keine Unentschieden kennt -- gefechtSieg
+    // entscheidet immer eindeutig, s. BUEHNE_ART.fechten-Kommentar).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===fechtenFokus};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig)return {fertig:true,text:"✓",farbVar:pa.gefechtSieg?"--home":"--away",fokus:i===fechtenFokus};
+      return {fertig:false,text:(pa.treffer||0)+":"+(pb.treffer||0),farbVar:null,fokus:i===fechtenFokus};
+    });
+    zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
+
     // EINE BAHN ZEICHNEN — `gross` waehlt zwischen der grossen Nahansicht des Fokus-
     // Gefechts (volle Bahn, Kopfzeile, Klingenfunke) und einer kompakten Mini-Bahn fuer
     // die uebrigen Gefechte (nur Figuren + Trefferstand, wie zeichneSchach()s Mini-Bretter).
@@ -18747,6 +19058,27 @@
         ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
         [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-halbH); ctx.lineTo(gx,laneY+halbH); ctx.stroke(); });
         ctx.lineWidth=1;
+        // F-B1 -- TREFFERLAMPEN (Broadcast-Optik-Dokument 27-09, Abschnitt 5, Prioritaet 1):
+        // liest ausschliesslich a.vizLampeT/b.vizLampeT (stepFechten() setzt sie beim frisch
+        // enthuellten Erfolg, 2,5 s Nachleuchten), zeichnet nur. ECHTE FARBEN (Q4/offene
+        // Frage 1, Voreinstellung Chris): rot links (Heim steht immer links), gruen rechts --
+        // unabhaengig von --home/--away, weil die Lampe an einem festen Bahnende haengt, nie
+        // an einer Figur. Gleiche Zeile wie die Kopfzeile (laneY-halbH-14), aber an den
+        // aeussersten Bahnenden -- die Kopfzeile ist zentriert und reicht nicht annaehernd so
+        // weit nach aussen.
+        const lampY=laneY-halbH-14;
+        const lampeAn=(t)=>(t||0)>0;
+        ctx.beginPath(); ctx.arc(xL+14,lampY,6,0,Math.PI*2);
+        ctx.fillStyle=lampeAn(a.vizLampeT)?"#e0463c":"rgba(224,70,60,.16)"; ctx.fill();
+        ctx.strokeStyle="rgba(230,232,240,.4)"; ctx.lineWidth=1; ctx.stroke();
+        ctx.beginPath(); ctx.arc(xR-14,lampY,6,0,Math.PI*2);
+        ctx.fillStyle=lampeAn(b.vizLampeT)?"#3fb56a":"rgba(63,181,106,.16)"; ctx.fill();
+        ctx.stroke();
+        if(lampeAn(a.vizLampeT)&&lampeAn(b.vizLampeT)){
+          ctx.font="800 12px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+          ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.textAlign="center";
+          ctx.strokeText("DOPPELTREFFER",cx,laneY-halbH-30); ctx.fillText("DOPPELTREFFER",cx,laneY-halbH-30);
+        }
       }
       // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
       // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
@@ -18783,6 +19115,10 @@
         ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
         ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
+        // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3), unterhalb der
+        // Trefferlampen-/Kopfzeile-Reihe (laneY-halbH-14).
+        zeichneSpielerKachel(u,px,py-70,22,farbVar);
       });
       if(gross){
         // KOPFZEILE: Treffer/Vorteil/Gang — nur am Fokus-Gefecht, wie beim vorherigen
@@ -18810,9 +19146,21 @@
           }
           ctx.restore();
         }
+        // Q1 -- TREFFER-TREPPE unter der Bahn (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // die Fechten-Variante der Verlaufskurve, weil seit F1 der Trefferstand das Ergebnis
+        // ist, nicht der Vorteil.
+        zeichneTrefferTreppe(xL,laneY+halbH+8,bahnLen,20,a,b,art);
       } else {
         ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
-        ctx.fillText("Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0),cx,laneY-halbH-8);
+        const bahnTxt="Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0);
+        ctx.fillText(bahnTxt,cx,laneY-halbH-8);
+        // F-B1 MINI-LAMPE (Dokument Abschnitt 5): "wo passiert gerade was" der uebrigen
+        // Bahnen auf einen Blick, ohne die kompakte Zeile zu sprengen.
+        if((a.vizLampeT||0)>0||(b.vizLampeT||0)>0){
+          const tw=ctx.measureText(bahnTxt).width;
+          ctx.beginPath(); ctx.arc(cx+tw/2+7,laneY-halbH-10,2,0,Math.PI*2);
+          ctx.fillStyle=(a.vizLampeT||0)>0?"#e0463c":"#3fb56a"; ctx.fill();
+        }
       }
     };
 
@@ -18832,6 +19180,11 @@
       const rx=80+spanne*(andere.length>1?k/(andere.length-1):0.5);
       zeichneBahn(i, rx, miniCw, miniY, 0.42, false);
     });
+
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Fechter des neu fokussierten Gefechts (Broadcast-Optik-Dokument Abschnitt 3).
+    const [fechtenFokusHeim]=paar(fechtenFokus);
+    zeichneBauchbinde("fechten-"+fechtenFokus,fechtenFokusHeim,art,W/2,H-16,260);
 
     // SCHWEBETEXTE ("+X"/"kommt zu spaet"/"setzt den Treffer", aus stepBuehne()s schwebe())
     // — ueber der gemeinsamen posMap (Fokus-Gefecht UND Mini-Gefechte), weil die Bahn-
@@ -20977,6 +21330,37 @@
     ctx.strokeStyle="#000"; ctx.lineWidth=1; ctx.strokeRect(bx-42,by,12,bw);
     ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
 
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4, S-B5): ein
+    // Kaestchen je Brett, Olympiade-Schach-Konvention "1 / ½ / 0". `fertig(x)&&fertig(y)`
+    // (Dokument Abschnitt 3, Q2) -- erst dann ist das Brettergebnis kein Spoiler mehr;
+    // laufend zeigt sie den Vorteil des Heim-Spielers dieses Bretts, exakt derselbe Wert,
+    // der im Reihenbild schon als "+X Vorteil" unter der Figur steht. UNTER dem Brett statt
+    // in der Kopfzeile (Opus-Review-Fund dieser PR): die Kopfzeile hat zwischen der grossen
+    // Duellstand-Zahl und den Schachuhren keinen Platz mehr uebrig. Direkt unter dem Brett
+    // (by+bw), NOCH VOR den Tischbeinen (die erst bei by+bw+16 einsetzen und ohnehin nur an
+    // den beiden aeusseren Raendern liegen, nicht in der Mitte) bis kurz vor den
+    // Mini-Brettern (deren Kachel bei ry-kw/2 beginnt, ry=H*0.80, NICHT bei H*0.80 selbst --
+    // ry ist ihre MITTE, ein zweiter Opus-Review-Fund dieser PR: die erste Fassung nahm
+    // H*0.80 faelschlich als Kachel-Oberkante und liess Q1 in die Mini-Bretter hineinlaufen).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===fb};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig){
+        const wert=pa.vorteil||0;
+        return {fertig:true,text:wert>0?"1":wert<0?"0":"½",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===fb};
+      }
+      const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===fb};
+    });
+    zeichneMannschaftsLeiste(W/2,by+bw+4,Math.min(bw+80,bretter*46),leisteBoxen,14);
+
+    // Q1 -- VERLAUFSKURVE unter dem Brett (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4,
+    // S-B3): macht aus dem Balken oben (Zustand) eine Geschichte (Verlauf) -- derselbe `a`,
+    // Breite des Bretts, direkt unter der Mannschafts-Leiste, endet klar vor der
+    // Mini-Bretter-Oberkante (H*0.80-24).
+    zeichneVerlaufKurve(bx,by+bw+21,bw,26,a);
+
     // SCHACHUHREN ueber dem Brett: 3:00 Blitz, ein starker Zug kostet 8 s, ein
     // verpatzter 20 s — wer am Zug ist, hat die helle Uhr. `uhr()` selbst ist unveraendert
     // (jetzt schachUhrWert(), s. stepSchach()-Kommentar) — die ANZEIGE liest bevorzugt
@@ -20989,10 +21373,23 @@
     const amZug=(halb%2===0)?a:b;
     [[a,bx+bw*0.25],[b,bx+bw*0.75]].forEach(([u,x])=>{
       const dran=u===amZug;
-      ctx.fillStyle=dran?"#f2e9d8":"#2a2233"; ctx.fillRect(x-34,by-38,68,22);
-      ctx.strokeStyle="#000"; ctx.strokeRect(x-34,by-38,68,22);
-      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3";
-      ctx.fillText(mmss(u.vizUhrAnzeige!=null?u.vizUhrAnzeige:uhr(u)),x,by-27);
+      const rest=u.vizUhrAnzeige!=null?u.vizUhrAnzeige:uhr(u);
+      // S-B1 -- ZEITNOT-WARNFARBE (Broadcast-Optik-Dokument 27-09, Abschnitt 4, Prioritaet 1):
+      // liest ausschliesslich `rest` (dieselbe bereits vorhandene Uhr-Anzeige wie vorher),
+      // schreibt nichts -- reine Farbentscheidung nach Lichess-Vorbild (Dokument-Tabelle:
+      // <60s Gelb-Rand, <30s Rot mit weissen Ziffern, <10s rot blinkend mit 2 Hz). `buehneT`
+      // ist dieselbe bereits vorhandene, rein praesentationale Zeitbasis, die auch die
+      // 3s-Fokus-Regie oben nutzt -- kein neuer Zustand, kein rr()-Aufruf.
+      const rot=rest<30, gelb=!rot&&rest<60, kritisch=rest<10;
+      const blinkAn=!kritisch||Math.floor(buehneT*4)%2===0;
+      ctx.fillStyle=rot?(blinkAn?"#3a1414":"#160707"):(dran?"#f2e9d8":"#2a2233");
+      ctx.fillRect(x-34,by-38,68,22);
+      ctx.strokeStyle=rot?(blinkAn?"#ff6b5c":"#7a2620"):(gelb?"#e6c34d":"#000");
+      ctx.lineWidth=rot?2.2:(gelb?1.8:1);
+      ctx.strokeRect(x-34,by-38,68,22);
+      ctx.font="700 14px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=rot?(blinkAn?"#fff":"#e0463c"):(dran?"#111":"#8a93a3");
+      ctx.fillText(mmss(rest),x,by-27);
     });
 
     // DIE ZWEI SPIELER am Tisch (Sitz-Animation ist bewusst nicht Teil dieser Runde —
@@ -21018,7 +21415,14 @@
       zeichneSprite(ctx,u,x,py,true);
       const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
       schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5);
+      // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+      // in Hoehe des Figuren-Schattens (py+26), nach aussen versetzt (weg vom Brett) --
+      // ausserhalb der Schattenellipse (rx=22) und weit vor Bewertungsbalken/Zugliste.
+      zeichneSpielerKachel(u,u===a?x-46:x+46,py+26,24,farbVar);
     });
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Spieler des neu fokussierten Bretts (Broadcast-Optik-Dokument Abschnitt 3).
+    zeichneBauchbinde("schach-"+fb,a,art,W/2,H-16,260);
 
     // ZUGLISTE rechts vom Brett — die letzten acht Halbzuege.
     ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
