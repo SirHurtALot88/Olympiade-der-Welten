@@ -12365,6 +12365,23 @@
   // vier eigener, weil die zugrundeliegenden Elemente bei allen vieren dieselben sind.
   // Sichtbar nur waehrend des laufenden Spiels: weder waehrend des Einlaufs (die
   // #einlauf-Vollflaeche deckt den Bug ohnehin ab) noch nach Spielende.
+  // KOPFLEISTE MIT LEBENS-PIPS UND UEBERZAHL (K2, Broadcast-Optik-Recherche 27.09.,
+  // Abschnitt 3): der Score-Bug bekommt je Seite eine Reihe Pips, einen je Kaempfer --
+  // voll in Teamfarbe = lebt, grau = liegt (Mini-DM/Battlefield: dauerhaft ausgeschieden,
+  // kein Respawn), grau mit Punkt = wartet auf Respawn (nur TDM, s. downBis). Dazu in der
+  // Mitte, wenn die Zahl der Lebenden ungleich ist, die Ueberzahl-Kennung "4 : 3" in der
+  // Farbe der Seite mit mehr Lebenden -- die CS-Scorebar-Konvention. Nachgemessen im
+  // Konzeptreview wirkt Ueberzahl im Eliminationsformat quadratisch (Lanchester,
+  // arena-minigames-opus-konzeptreview-26-09.md 2.6); heute sieht man sie nur, wenn man
+  // die Figuren auf der Leinwand selbst abzaehlt.
+  // KLASSE A: liest ausschliesslich u.side/u.down/u.downBis und live(), die
+  // schalteAus()/reviveUnit() ohnehin fuer die Wertung fuehren, schreibt nichts zurueck.
+  // Nur fuer die drei Kampf-Disziplinen (istKampfDisc) -- Feldspiel/Buehne/Bahn haben
+  // eigene Chassis/Arrays, U/live() waeren dort bedeutungslos oder stammten vom zuletzt
+  // gebauten Kampf (dieselbe Ausschluss-Logik, die renderReset() fuer die Mini-DM-FFA-
+  // Umschaltung schon benutzt: !istFeldspiel&&!istBuehne&&!istBahn). Fuer Mini-DM (die
+  // klassische .scoreline/.arenaraum bleibt dort ohnehin per CSS ausgeblendet, s.
+  // renderReset()) wird zwar noch gerechnet, aber nichts sichtbar.
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
@@ -12381,13 +12398,33 @@
       return html;
     };
     const txt=(id)=>{const e=document.getElementById(id);return e?e.textContent.trim():"";};
+    const istKampfDisc=!istFeldspiel(disc)&&!istBuehne(disc)&&!istBahn(disc);
+    const pipsHtml=(side)=>{
+      if(!istKampfDisc)return "";
+      const g=U.filter(u=>u.side===side);
+      if(!g.length)return "";
+      const punkte=g.map(u=>{
+        if(!u.down)return "<i class=\"pip an\"></i>";
+        if(disc==="tdm"&&u.downBis!=null)return "<i class=\"pip wartet\"></i>";
+        return "<i class=\"pip aus\"></i>";
+      }).join("");
+      return "<span class=\"pips\">"+punkte+"</span>";
+    };
     const bl=document.getElementById("bbugL"),br=document.getElementById("bbugR"),
       mitte=document.getElementById("bbugMitte");
-    if(bl)bl.innerHTML=zeile("tnameL");
-    if(br)br.innerHTML=zeile("tnameR");
+    if(bl)bl.innerHTML=zeile("tnameL")+pipsHtml(0);
+    if(br)br.innerHTML=zeile("tnameR")+pipsHtml(1);
     if(mitte){
       const teile=[txt("score"),txt("clock")].filter(Boolean);
-      mitte.textContent=teile.join(" · ");
+      let ueberzahl="";
+      if(istKampfDisc){
+        const nL=live(0).length,nR=live(1).length;
+        if(nL!==nR){
+          const seite=nL>nR?"l":"r";
+          ueberzahl="<small class=\"ueberzahl "+seite+"\">"+Math.max(nL,nR)+" : "+Math.min(nL,nR)+"</small>";
+        }
+      }
+      mitte.innerHTML=teile.join(" · ")+ueberzahl;
     }
   }
 
@@ -17452,6 +17489,11 @@
   // STARTPLATZ AM RAND, bevor der erste Fundort enthuellt ist (Konzept-Vertrag "solange
   // vizX==null" wie bei stepKuer/stepShowcase) — Heim links, Gast rechts, genau die Seite,
   // die `naeher` in ispySeiteTick() (":14680") schon fuer die Truhenwahl bevorzugt.
+  // AUSSENRAND DER EIGENEN HAELFTE (I1, Split-Screen, Broadcast-Optik-Recherche 27.09.):
+  // x=0,045/0,955 lagen schon VOR dem Split ganz am linken/rechten Bildrand -- nach dem
+  // Split ist das automatisch der Aussenrand GENAU der eigenen Haelfte (Heim-Fundorte
+  // 4-46 %, Gast-Fundorte 54-96 %, s. ispyFundortXY()), ohne dass diese Funktion selbst
+  // etwas anders rechnen muesste. Keine Aenderung noetig, nur der Beleg dafuer.
   function ispyHeimatXY(u){
     const seite=TEILNEHMER.filter(x=>x.side===u.side);
     const i=Math.max(0,seite.indexOf(u));
@@ -17477,7 +17519,10 @@
           // bodenSchatzsuche() diesem Spiel schon zeichnet. r.fundort bleibt der
           // MECHANISCHE Fundort-Index (ispySeiteTick()), unveraendert.
           const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[r.fundort])||art.fundorte[r.fundort];
-          const ziel=ispyFundortXY(vis);
+          // SPLIT-SCREEN (I1): `u.side` waehlt die eigene Haelfte -- der Laeufer zielt auf
+          // seine EIGENE Truhe im EIGENEN Raum (s. ispyFundortXY()-Kommentar), nie auf die
+          // des Gegners.
+          const ziel=ispyFundortXY(vis,u.side);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
           // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
@@ -17645,6 +17690,77 @@
     }
   }
 
+  // I-SPY ZUG-UHR + SPLIT-TAFEL (I2/I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4).
+  // KLASSE A: liest ausschliesslich buehneZeiger/buehneAkt/BB()/TEILNEHMER[].runden — genau
+  // die Warteschlangen-Zustaende, die die generische Enthuellung (stepBuehne(), s. dort)
+  // ohnehin fuehrt — und schreibt nur in DOM sowie in das eine Praesentations-Flag
+  // ispyLetzterZugAlarmiert. Kein rr(), kein neuer Zustand in u.runden/u.summe/u.aktuell.
+  //
+  // ZUG-FORTSCHRITT AUS DER WARTESCHLANGE HERGELEITET: die generische Reihenfolge fuer
+  // Nicht-Duell-Buehnen (s. bauBuehne()-Kommentar "REIHENFOLGE. Rundenweise abwechselnd wie
+  // eine Setzliste") legt Durchgang 1 fuer ALLE Teilnehmer beider Seiten ab, dann Durchgang
+  // 2 — ein "Zug" ist deshalb genau ein Block von (Seite-0-Anzahl + Seite-1-Anzahl)
+  // aufeinanderfolgenden Warteschlangen-Eintraegen. `perRunde` ist diese Blockgroesse,
+  // `buehneZeiger` (nur GELESEN) zaehlt bereits enthuellte Eintraege insgesamt durch —
+  // `Math.floor(buehneZeiger/perRunde)` ist damit die Zahl der VOLLSTAENDIG enthuellten
+  // Zuege, `buehneAkt/art.rundenDauer` der Bruchteil, den die Uhr gerade im laufenden
+  // Eintrag zurueckgelegt hat (stepBuehne() zaehlt `buehneAkt` von `rundenDauer` auf 0
+  // herunter, s. dort).
+  //
+  // SPLIT-TAFEL OHNE SPOILER: eine Spalte zeigt eine Zahl erst, wenn `rundenFertig` sie
+  // erreicht hat, also ALLE zwoelf Teilnehmer beider Seiten diesen Zug schon enthuellt
+  // haben — dieselbe Spoiler-Regel wie ispyTickerZeile()/WERTUNG_CHASSIS ("liest nur
+  // u.runden[0..u.aktuell]"). Die laufende Gesamtsumme steht bereits im Score (#score,
+  // s. updateHudBuehne() oben) — eine "gesamt"-Spalte hier waere dieselbe Zahl zweimal.
+  function aktualisiereIspyHud(){
+    const zuguhr=document.getElementById("ispyZugUhr"), split=document.getElementById("ispySplit");
+    if(!zuguhr||!split)return;
+    const art=BB();
+    if(!art.schatzsuche){ zuguhr.hidden=true; split.hidden=true; return; }
+    const n0=TEILNEHMER.filter(u=>u.side===0).length, n1=TEILNEHMER.filter(u=>u.side===1).length;
+    const perRunde=n0+n1;
+    if(perRunde<=0||!art.rundenN){ zuguhr.hidden=true; split.hidden=true; return; }
+    zuguhr.hidden=false; split.hidden=false;
+    const rundenFertig=Math.max(0,Math.min(art.rundenN,Math.floor(buehneZeiger/perRunde)));
+    const inRunde=buehneZeiger-rundenFertig*perRunde;
+    const laufAnteil=art.rundenDauer>0?Math.max(0,Math.min(1,1-(buehneAkt/art.rundenDauer))):0;
+    const zugFortschritt=done?1:Math.min(1,(inRunde+laufAnteil)/perRunde);
+    const aktuelleRunde=Math.min(art.rundenN-1,rundenFertig);
+    const zugNr=done?art.rundenN:aktuelleRunde+1;
+    const zugText=document.getElementById("ispyZugText");
+    if(zugText)zugText.textContent="Zug "+zugNr+" / "+art.rundenN;
+    const zugBar=document.getElementById("ispyZugBarFill");
+    if(zugBar)zugBar.style.width=(zugFortschritt*100)+"%";
+    const letzterZug=!done&&aktuelleRunde>=art.rundenN-1;
+    zuguhr.classList.toggle("letzter",letzterZug);
+    if(letzterZug&&!ispyLetzterZugAlarmiert){ ispyLetzterZugAlarmiert=true; sfx("i-spy","alarm"); }
+
+    const summeRunde=(seite,ri)=>TEILNEHMER.filter(u=>u.side===seite)
+      .reduce((s,u)=>s+((u.runden[ri]&&u.runden[ri].punkte)||0),0);
+    const werte=[];
+    for(let ri=0;ri<rundenFertig;ri++)werte.push({l:summeRunde(0,ri),r:summeRunde(1,ri)});
+    const besteL=werte.length?Math.max(...werte.map(w=>w.l)):-1;
+    const besteR=werte.length?Math.max(...werte.map(w=>w.r)):-1;
+    let html="";
+    for(let ri=0;ri<art.rundenN;ri++){
+      if(ri<werte.length){
+        const w=werte[ri], delta=w.l-w.r;
+        const goldL=(w.l===besteL&&besteL>0)?" isp-gold":"";
+        const goldR=(w.r===besteR&&besteR>0)?" isp-gold":"";
+        const deltaKlasse=delta>0?"vorn":delta<0?"hinten":"";
+        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-punkte l"+goldL+"\">"+w.l+"</span>"
+          +"<span class=\"isp-punkte r"+goldR+"\">"+w.r+"</span>"
+          +"<span class=\"isp-delta "+deltaKlasse+"\">"+(delta>0?"+":"")+delta+"</span></div>";
+      } else {
+        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-punkte\">·</span><span class=\"isp-punkte\">·</span>"
+          +"<span class=\"isp-delta\">·</span></div>";
+      }
+    }
+    split.innerHTML=html;
+  }
+
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
@@ -17738,6 +17854,7 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    aktualisiereIspyHud();
     // ENDSTAND-OVERLAY (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe Einmal-Muster wie
     // updateHudBahn()s `if(done&&!bahnEndeGemeldet)`-Zweig (s. dort) -- Fechten, Tennis,
     // Showcase, Eiskunstlauf, Wettessen, Gewichtheben, Breaking und I-Spy zeigten bislang
@@ -17983,8 +18100,20 @@
   // stepSchatzsuche()/zeichneSchatzsuche() (Lauf-/Sucheziel) gemeinsam gelesen — dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie showcaseBuzzerPos()/posMap bei
   // zeichneFechten() weiter oben.
-  function ispyFundortXY(f){
-    return {x:W*0.08+f.x*(W*0.84), y:H*0.18+f.y*(H*0.66)};
+  //
+  // SPLIT-SCREEN (I1, Broadcast-Optik-Recherche 27.09., Abschnitt 4): `baueSchatzsuche()`
+  // rechnet seit PR 1 zwei VOELLIG GETRENNTE Raeume (mineRaum/gegnerRaum, s. dortiger
+  // Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG") -- gezeichnet wurde bislang aber EIN Raum,
+  // in dem beide Teams zu denselben zwoelf Moebeln liefen (I0-Befund: "das Bild behauptet
+  // eine Konkurrenz um dieselbe Truhe, die es mechanisch nicht gibt"). `side` bildet
+  // dieselbe normierte Fundort-Koordinate jetzt auf die HAELFTE der Leinwand ab, die zu
+  // GENAU DER Seite gehoert (0..1 -> 4-46 % fuer Heim, 54-96 % fuer Gast, dieselbe Formel
+  // wie im Recherche-Dokument Abschnitt 4/I1 vorgeschlagen) -- die Luecke bei 46-54 % ist
+  // der Trennsteg (s. bodenSchatzsuche()). REIN GEOMETRISCH: `f`/`art.fundorte` selbst
+  // bleiben unangetastet, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
+  function ispyFundortXY(f,side){
+    const xBasis=side===1?W*0.54:W*0.04;
+    return {x:xBasis+f.x*(W*0.42), y:H*0.18+f.y*(H*0.66)};
   }
   // WELCHES MOEBELSTUECK AN WELCHEM FUNDORT: die beiden Tuer-Fundorte (`bild:"tuer"`, s.
   // BUEHNE_ART["i-spy"].fundorte-Kommentar "DIE TUER IST BILD") bekommen die Tuer; die
@@ -18077,6 +18206,13 @@
   // showcasePublikumAn -- reines Praesentations-Bookkeeping, s. reset() (N1-Fix) fuer den
   // Rueckstell-Zwang beim naechsten I-Spy-Spiel derselben Session.
   let ispyRaumAn=false;
+  // ZUG-UHR-ALARM (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): dasselbe N1-Muster
+  // wie ispyRaumAn direkt darueber -- ohne den Reset (s. renderReset()) wuerde der Alarmton
+  // beim zweiten I-Spy-Spiel derselben Sitzung nie wieder feuern, weil das Flag noch auf
+  // "schon alarmiert" vom vorigen Spiel stuende. Reines Praesentations-Bookkeeping, kein
+  // Einfluss auf rr()/wert()/Rangtreue -- aktualisiereIspyHud() (s.u.) ist reines Lesen von
+  // buehneZeiger/buehneAkt/TEILNEHMER, schreibt ausser diesem einen Flag nichts zurueck.
+  let ispyLetzterZugAlarmiert=false;
   function bodenSchatzsuche(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -18119,23 +18255,79 @@
       ctx.fillStyle=s; ctx.beginPath(); ctx.arc(x,y,W*0.18,0,Math.PI*2); ctx.fill();
     });
 
+    // TRENNSTEG (I1, Split-Screen, Broadcast-Optik-Recherche 27.09., Abschnitt 3/I1):
+    // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
+    // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
+    // steht nie mit einem Fundort oder einer Figur in Konflikt.
+    const stegX0=W*0.465, stegX1=W*0.535;
+    ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
+    ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
+
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
     // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), falls baueSchatzsuche() diesem Spiel schon eine Karte
     // zugewiesen hat — sonst (Sicht-QA vor dem ersten Tick) Fallback auf f.x/f.y selbst.
-    // ART/STUFE/BILD (Moebelwahl, Sterne) kommen UNVERAENDERT aus `f`.
+    // ART/BILD (Moebelwahl) kommen UNVERAENDERT aus `f`.
+    //
+    // JE SEITE EINMAL (I1): vorher EIN gemeinsam gezeichneter Raum fuer beide Teams (I0-
+    // Befund) -- jetzt exakt dieselben zwoelf Moebel zweimal, einmal in JEDER Haelfte
+    // (`ispyFundortXY(vis,seite)`), dieselbe Karte (ISPY_VISUELLES_LAYOUT ist EINMAL je
+    // Spiel gewuerfelt, nicht je Seite) fair fuer beide.
+    //
+    // TRUHENZUSTAND JE RAUM (I1, "der zweite Gewinn"): `ispyRaumZustand(seite)` liest NUR
+    // die fuer DIESE Seite bereits enthuellten `u.runden[]` (Spoiler-Regel wie
+    // ispyTickerZeile()) und liefert je Fundort-Index die zuletzt gesehene Stufe/den
+    // zuletzt gesehenen Ausgang -- `ispySterne()` zeigt diese Stufe statt der Startstufe
+    // aus `f.stufe`, eine erfolgreich geknackte Truhe wird sichtbar gedimmt (statt wie
+    // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
+    // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
+    // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
     if(art.fundorte){
-      art.fundorte.forEach((f,idx)=>{
-        const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
-        const p=ispyFundortXY(vis);
-        ctx.save(); ctx.translate(p.x,p.y);
-        ctx.fillStyle="rgba(0,0,0,.30)";
-        ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
-        (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
-        ctx.restore();
-        ispySterne(p.x,p.y-26,f.stufe);
+      [0,1].forEach(seite=>{
+        const zustand=ispyRaumZustand(seite);
+        art.fundorte.forEach((f,idx)=>{
+          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
+          const p=ispyFundortXY(vis,seite);
+          const z=zustand.get(idx);
+          const stufeAnzeige=z?z.stufe:f.stufe;
+          ctx.save(); ctx.translate(p.x,p.y);
+          ctx.fillStyle="rgba(0,0,0,.30)";
+          ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
+          if(z&&z.offen)ctx.globalAlpha=0.5;
+          (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
+          ctx.globalAlpha=1;
+          ctx.restore();
+          ispySterne(p.x,p.y-26,stufeAnzeige);
+          if(z&&!z.offen){
+            ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,120,90,.9)";
+            ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+            ctx.fillText("angebrochen",p.x,p.y+21);
+          }
+        });
       });
     }
+  }
+  // TRUHENZUSTAND EINER EINZELNEN SEITE (I1, s. bodenSchatzsuche()-Kommentar oben): fuer
+  // jeden Fundort-Index der zuletzt (hoechster Zug-Index) enthuellte Zug DIESER Seite, der
+  // diesen Fundort getroffen hat -- `ri<=u.aktuell` ist exakt die Spoiler-Grenze, die
+  // ispyTickerZeile()/WERTUNG_CHASSIS auch sonst einhalten. `art==null`-Zuege (kein Ziel
+  // diesen Tick) haben kein `r.fundort` und werden dabei uebersprungen. Reiner Leser,
+  // schreibt nichts auf `u`/`t`/`u.runden` zurueck.
+  function ispyRaumZustand(seite){
+    const zustand=new Map();
+    const art=BB();
+    for(const u of TEILNEHMER){
+      if(u.side!==seite||!u.runden)continue;
+      const bisAktuell=Math.min(u.aktuell,u.runden.length-1);
+      for(let ri=0;ri<=bisAktuell;ri++){
+        const r=u.runden[ri];
+        if(!r||r.fundort==null)continue;
+        const bisher=zustand.get(r.fundort);
+        if(!bisher||bisher.ri<ri)zustand.set(r.fundort,{ri,stufe:r.stufe,offen:r.ereignis===art.erfolgWort});
+      }
+    }
+    return zustand;
   }
 
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
@@ -32193,11 +32385,25 @@
   function positioniereCallout(banner){
     const bug=document.getElementById("bbug");
     const bezug=banner.offsetParent;
-    if(!bug||bug.hidden||!bezug){ banner.style.top=""; return; }
-    const bugUnten=bug.getBoundingClientRect().bottom;
+    if(!bezug){ banner.style.top=""; return; }
+    let unten=(bug&&!bug.hidden)?bug.getBoundingClientRect().bottom:null;
+    // ISPY-ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09.): sitzt zentriert in derselben
+    // Kopfzone wie dieser Callout (top:15%, #bbug top:8px) -- ohne diese Erweiterung
+    // ueberlappte ein I-Spy-Callout ("X entdeckt den Hinweis") die Zug-Uhr, weil die
+    // Messung bisher nur #bbug kannte (Sichtpruefung 27.09., Playwright: "Zug 4 / 8"
+    // lag unter dem Callout-Text). Genau derselbe Fund/dieselbe Loesung wie beim
+    // urspruenglichen #bbug/#bbugcallout-Overlap oben, nur fuer ein zweites Kopf-Overlay.
+    // [hidden] fuer jede Buehne ausser I-Spy (s. aktualisiereIspyHud()), also ohne
+    // Wirkung auf jede andere Disziplin.
+    const ispyUhr=document.getElementById("ispyZugUhr");
+    if(ispyUhr&&!ispyUhr.hidden){
+      const ispyUnten=ispyUhr.getBoundingClientRect().bottom;
+      unten=unten==null?ispyUnten:Math.max(unten,ispyUnten);
+    }
+    if(unten==null){ banner.style.top=""; return; }
     const bezugOben=bezug.getBoundingClientRect().top;
     const abstand=8;
-    banner.style.top=Math.max(0,bugUnten-bezugOben+abstand)+"px";
+    banner.style.top=Math.max(0,unten-bezugOben+abstand)+"px";
   }
   function callout(txt,caption){
     if(stumm)return;
@@ -34255,6 +34461,9 @@
     // PR #879 fuer Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss
     // auf rr() oder Rangtreue.
     ispyRaumAn=false;
+    // DASSELBE N1-MUSTER FUER DEN ZUG-UHR-ALARM (I2, s. ispyLetzterZugAlarmiert-Deklaration
+    // oben): ohne diesen Reset bliebe der letzte Zug ab dem zweiten I-Spy-Spiel stumm.
+    ispyLetzterZugAlarmiert=false;
     // Reiner Aufraeum-Reflex, kein Sicherheitsnetz: baueSchatzsuche() ueberschreibt
     // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
