@@ -22966,6 +22966,14 @@
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
+    // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
+    // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
+    ersteAusschaltungVergeben=false;
+    // GROSS-COOLDOWN (s. kampfGrossDrosseln oben) gehoert zu GENAU diesem Spiel — ohne
+    // diesen Reset bliebe die letzte grosse Marke des vorigen Kampfes stehen und wuerde das
+    // naechste Spiel um bis zu KAMPF_GROSS_COOLDOWN_SEK verkuerzt anlaufen lassen.
+    letzterGrosserT=-Infinity;
     // KONTROLLPUNKT NEU AUFSETZEN (nur Battlefield, s. ARENA_DOMINATION) — VOR PLAN/id,
     // damit ein Wechsel weg von Battlefield (disc jetzt tdm/mini-dm) KP wieder auf null
     // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
@@ -23147,22 +23155,133 @@
   // vorher stand dieselbe Zeile (down setzen, tode/ko zaehlen, verteileKo, Feed-Meldung)
   // zweimal im Code. Jetzt entscheidet eine Stelle, ob jemand fuer immer faellt
   // (Mini-DM/Battlefield, unveraendertes Verhalten) oder in TDM respawnt.
+  //
+  // "GROSS" IST NICHT MEHR JEDE AUSSCHALTUNG (Opus-Ingame-Review, 27.09.): mit dem
+  // TDM-Respawn (26.09., s. TDM_RESPAWN_SEK oben) faellt derselbe Kaempfer mehrfach in
+  // einem Spiel — gemessen 46 grosse Callouts in einem Spiel, weit ueber dem eigenen
+  // Zielband von 4-10 je Spiel (docs/design/broadcast-praesentation-runde-2-22-09.md
+  // Abschnitt 9, Frage 1). Etwa die Haelfte davon waren "X faellt"-Meldungen, jede
+  // einzelne davon big. Der Ticker-Text bleibt fuer JEDE Ausschaltung wie bisher stehen
+  // (nichts geht an Information verloren) — nur der grosse Banner/die HIGHLIGHTS-Liste
+  // bekommt jetzt eine echte Auswahl, angelehnt an das, was eine Kampf-Uebertragung
+  // tatsaechlich ausruft: der erste Blutzoll des Spiels, eine Ausschaltung, die die
+  // Fuehrung wechselt (Ausschaltungszahl der eigenen Seite gegen die des Gegners —
+  // dasselbe Feld, das auch kampfSieger() fuer TDM/Mini-DM vergleicht), eine schnelle
+  // Mehrfachausschaltung derselben Person, ODER — nur ausserhalb TDM, wo eine volle
+  // Ausloeschung sofort das Spiel beendet (s. stepSim,
+  // `(disc!=="tdm"&&lebendeSeiten.size<=1)||t>95`) — die spielentscheidende letzte
+  // Ausschaltung. Bei TDM respawnt die volle Ausloeschung einer Seite dagegen einfach
+  // weiter und ist damit ein Routine-Moment, kein Finale. Reine Anzeige-Auswahl:
+  // schalteAus() selbst (wer faellt, wann er respawnt, tode/ko-Zaehlung, verteileKo)
+  // ist unveraendert, es aendert sich nur das dritte Argument von feed().
+  const KAMPF_MEHRFACHKILL_FENSTER_SEK=8;
+  let ersteAusschaltungVergeben=false;
+  const seitenScore=(side)=>U.filter(u=>u.side===side).reduce((s,u)=>s+u.st.ko,0);
+
+  // SPIELWEITER GROSS-COOLDOWN (Opus-Ingame-Review, Nachbesserung 27.09.): der obige
+  // Uebergangstest in grosserTreffer() UND die vier Kriterien hier in schalteAus() sind
+  // beide fuer sich sauber -- das eigentliche Problem ist TDMs Respawn (s. TDM_RESPAWN_SEK
+  // oben): JEDES neue Leben eines Kaempfers kann die 15%-Schwelle erneut genau einmal
+  // reissen und einen weiteren Fuehrungswechsel/Mehrfachkill ausloesen. Bei einem 12-Spieler-
+  // Match mit vielen Respawn-Zyklen in ~95s Spielzeit summierte sich das GEMESSEN (s.
+  // scripts/zaehle-tdm-highlights.mjs, ueber HIGHLIGHTS[]/#ehighlights statt den auf 140
+  // Zeilen gedeckelten #feed-DOM-Schnappschuss, der das vorher verschleiert hat) auf rund 40
+  // echte Highlights pro Spiel -- weit ueber dem Zielband 4-10
+  // (docs/design/broadcast-praesentation-runde-2-22-09.md). Pro-Ziel-Drosselung allein (die
+  // Uebergangslogik oben) loest das nicht, weil das Problem NICHT ein einzelnes Ziel ist,
+  // das mehrfach gemeldet wird, sondern viele VERSCHIEDENE Kaempfer, die nacheinander
+  // dieselbe Schwelle reissen.
+  //
+  // Deshalb ein zweiter, SPIELWEITER (nicht pro Ziel/pro Kaempfer) Mindestabstand zwischen
+  // zwei grossen Highlights: laeuft eines an, muss die naechste Sekundenmarke mindestens
+  // KAMPF_GROSS_COOLDOWN_SEK spaeter liegen, sonst faellt "big" fuer dieses eine Ereignis
+  // weg -- der Ticker-TEXT bleibt in jedem Fall stehen (s. feed()), nur Banner/HIGHLIGHTS-
+  // Eintrag entfallen. ZWEI Ereignistypen sind PRIORITAET und laufen am Cooldown vorbei,
+  // weil sie sich selbst von Natur aus nur ein einziges Mal pro Spiel ereignen koennen
+  // (kein Wiederholungsrisiko, also kein Grund, sie zu drosseln): der erste Blutzoll
+  // (ersteAusschaltung) und die spielentscheidende letzte Ausschaltung (entscheidend, nur
+  // ausserhalb TDM). Beide setzen den Cooldown trotzdem neu, damit nicht sofort danach noch
+  // ein zweites Ereignis durchrutscht. 12s bei einer 95s-Spielzeit ergibt rechnerisch
+  // hoechstens 8-9 Fenster, plus die beiden Prioritaets-Ausnahmen -- innerhalb des
+  // Zielbands, ueber mehrere Saaten nachgemessen (s. PR-Beschreibung).
+  const KAMPF_GROSS_COOLDOWN_SEK=12;
+  let letzterGrosserT=-Infinity;
+  function kampfGrossDrosseln(big,prioritaet){
+    if(!big)return false;
+    if(!prioritaet && (t-letzterGrosserT)<KAMPF_GROSS_COOLDOWN_SEK)return false;
+    letzterGrosserT=t;
+    return true;
+  }
+
   function schalteAus(tg,von){
+    const scoreVonVorher=seitenScore(von.side), scoreTgVorher=seitenScore(tg.side);
     tg.st.tode++; von.st.ko++; verteileKo(tg,von);
     tg.down=true;
+
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+
+    // War die eigene Seite vor diesem Treffer im Rueckstand oder gleichauf, und fuehrt sie
+    // jetzt (oder zieht gleich)? Ein bereits fuehrendes Team, das den Vorsprung nur
+    // ausbaut, ist kein Wechsel und bleibt klein.
+    const fuehrungswechsel=scoreVonVorher<=scoreTgVorher && scoreVonVorher+1>scoreTgVorher;
+
+    // Derselbe Angreifer hat innerhalb des Fensters schon einmal ausgeschaltet.
+    const letzterKoT=von._letzterKoT;
+    von._letzterKoT=t;
+    const mehrfachkill=letzterKoT!=null && (t-letzterKoT)<=KAMPF_MEHRFACHKILL_FENSTER_SEK;
+
+    const entscheidend=disc!=="tdm" && live(tg.side).length===0;
+
+    // DROSSELUNG: ersteAusschaltung/entscheidend sind Prioritaet (je hoechstens einmal pro
+    // Spiel moeglich, s. kampfGrossDrosseln oben), fuehrungswechsel/mehrfachkill nicht --
+    // die koennen bei knappem Punktestand oder haeufigen Respawns beliebig oft auftreten.
+    const big=kampfGrossDrosseln(ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend,
+      ersteAusschaltung||entscheidend);
+
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
-      // ARENA-ZEIT-FIX (27.09.): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
+      // ARENA-ZEIT-FIX (27.09., main): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
       // Simulationssekunden (downBis/reviveUnit oben, unveraendert) — nur die ANGEZEIGTE
       // Zahl im Feed-Text war bislang derselbe rohe Wert. Bei ZEIT_DEHNUNG.tdm=1,88 erlebt
       // der Zuschauer die 5 Sim-Sekunden als rund 9 echte Sekunden (dieselbe Skalierung wie
       // die Kopfzeilen-Uhr/der Ticker-Zeitstempel, s. updateHud()/feed()), die Textzahl
       // stand also glatt daneben.
+      //
+      // HIGHLIGHT-DROSSELUNG (dieser PR): `big` ist hier nicht mehr immer `true`, sondern
+      // das Ergebnis von kampfGrossDrosseln() oben (Prioritaets-Bypass fuer erste/
+      // spielentscheidende Ausschaltung, sonst spielweiter 12s-Mindestabstand). Orthogonal
+      // zur Zeitskalierung: eine aendert die angezeigte Sekundenzahl, die andere ob es ein
+      // Banner gibt.
       const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
-      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",true,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n));
     } else {
-      feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n));
     }
+  }
+
+  // GROSSER TREFFER STATT "HAT UEBERHAUPT EIN LABEL" (Opus-Ingame-Review, 27.09.): vorher war
+  // JEDER benannte Skill automatisch big, egal wie viel Schaden er machte — "Krolach —
+  // Trennschlag auf Greenkraut · 4" fuer vier Punkte war die eine Haelfte der gemessenen 46
+  // Callouts eines Spiels (die andere Haelfte war schalteAus() oben). GEMESSEN (Playwright,
+  // s. PR-Beschreibung): eine reine Prozentschwelle auf den Schaden allein reicht nicht — die
+  // Kampf-HP-Pools liegen bei 230-420, Einzelschlaege ueblicherweise bei 15-50, das ist so gut
+  // wie nie ein Viertel des Lebens. Der erste Versuch (`d>=0.25*max` oder `hp<=0.2*max` als
+  // reiner ZUSTAND) fing stattdessen etwas anderes ein: sobald ein Ziel einmal unter die
+  // Schwelle faellt, blieb JEDER weitere Chiphit auf es big, solange es nicht faellt oder
+  // geheilt wird — Fokusfeuer auf ein bereits angeschlagenes Ziel machte so aus einem
+  // einzigen Fast-Tod ein rundes Dutzend Callouts (19-23 statt der urspruenglich 4-10 im
+  // Zielband). Jetzt zaehlt nur der TREFFER, DER DIE SCHWELLE REISST — vorher drueber, jetzt
+  // drunter, aber noch nicht der Fall selbst (das meldet schalteAus() separat, mit seinen
+  // eigenen Kriterien) — dasselbe Uebergangs-Muster wie buehneWurdeFuehrend() oben. Der
+  // Burst-Zweig bleibt als Netz fuer echte Ausreisser (ein Schlag reisst ein Drittel des
+  // Lebens weg). Reiner Anzeige-Schwellwert — skillSchaden()/treffer()/d selbst bleiben
+  // unveraendert.
+  function grosserTreffer(hpVorher,hpNachher,d,max,crit){
+    if(crit)return true;
+    if(d>=0.35*max)return true;
+    const schwelle=0.15*max;
+    return hpVorher>schwelle && hpNachher>0 && hpNachher<=schwelle;
   }
 
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
@@ -23182,10 +23301,12 @@
     tg.lastHit=u;
     const crit=false;   // Krits kommen kuenftig aus dem Skill, nicht aus einem Spielerwert.
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
+    const hpVorher=tg.hp;
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
-    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
+    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
+      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false));
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -23414,6 +23535,16 @@
       KP.fortschritt=Math.min(1,KP.fortschritt+dt*staerke/KP.kapZeit);
       if(vorher<1&&KP.fortschritt>=1){
         KP.besitz=ziel;KP.fortschritt=0;KP.erobertVon=null;
+        // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09.): probeweise auch hier durch
+        // kampfGrossDrosseln() geschickt und ueber die fuenf echten Kader-Paarungen aus
+        // data/generated/kaderfamilie-live-save.json nachgemessen -- eine Kontrollpunkt-
+        // Eroberung wechselt in diesen Spielen so gut wie nie mehrfach die Seite (anders als
+        // TDMs Respawn, der JEDEN Kaempfer beliebig oft wieder ins Spiel bringt). Das Ergebnis
+        // war im Schnitt SCHLECHTER (3,4 statt 4,0 echte Highlights/Spiel) und drueckte den
+        // ohnehin knappsten Fall (ein frueher 150:0-Stomp mit kaum Kampfhandlung) von 2 auf 1
+        // -- die Drosselung nahm dort das einzige zweite Ereignis weg, ohne irgendwo eine
+        // Flut zu verhindern, die es gar nicht gab. Deshalb bleibt diese Zeile UNVERAENDERT
+        // gegenueber dem Ausgangs-PR: immer big, wie zuvor.
         feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true);
       }
     }
@@ -23814,12 +23945,17 @@
       if(z){
         const crit=false;
         const roh=pf.roh*(crit?1.5:1);
+        const hpVorher=z.hp;
         const d=treffer(pf.von,z,roh,1);
         stossen(z,pf.x,pf.y,pf.knock);
         schwebe({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
+        // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
+        // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
+        // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
-          (fremd?" (danebengezielt)":"")+" · "+d,crit);
+          (fremd?" (danebengezielt)":"")+" · "+d,
+          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false));
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
@@ -32173,6 +32309,14 @@
           ?"— Kontrollpunkt-Punktelimit erreicht ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")"
           :"— nach Zeitablauf mehr Kontrollpunkt-Punkte ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")";
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true);
+      // OFF-BY-ONE-FIX (Messmethoden-Review, 27.09.): renderEndstand()/renderHighlights()
+      // oben hat den #ehighlights-Snapshot schon VOR dieser Sieg-Zeile gebaut, die per
+      // feed(...,true) immer ungedrosselt (big=true) durchlaeuft. Die Sieg-Zeile landet
+      // damit zwar im #feed-Ticker und in HIGHLIGHTS[], aber nicht mehr im bereits
+      // gerenderten Snapshot -- ein zweiter, idempotenter Aufruf holt sie nach, ohne die
+      // Reihenfolge von renderEndstand() (Sieger-Text/Tabellen, unabhaengig von dieser
+      // feed()-Zeile) anzutasten.
+      renderHighlights();
       updateHud();
       return;
     }
@@ -32188,6 +32332,9 @@
       const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
       const sieger=kampfSieger();
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Sieg-Zeile-fehlt-
+      // im-Snapshot-Luecke, hier fuer TDM.
+      renderHighlights();
       updateHud();
       return;
     }
@@ -32195,6 +32342,9 @@
     const pL=nR-live(1).length, pR=nL-live(0).length;
     const sieger=kampfSieger();
     feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Luecke fuer den
+    // generischen Elimination-Zweig (Battlefield ohne Kontrollpunkte, u.a.).
+    renderHighlights();
     updateHud();
   }
 
