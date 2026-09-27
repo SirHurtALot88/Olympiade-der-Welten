@@ -16095,16 +16095,40 @@
         // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
         // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
         // darunter schon "BRETT ENTSCHIEDEN".
-        if(BB().fechten&&u.side===0){
-          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
-          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
-          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
-          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
+        if(BB().fechten){
+          // NUR EINMAL JE BRETT/PERIODE (Review-Fund PR #928, 14.09.): jedes Brett hat genau
+          // eine Seite-0- und eine Seite-1-Haelfte, die unabhaengig durch dieselbe
+          // Enthuellungs-Warteschlange laufen -- ohne ein Gate feuerte der Beat zweimal pro
+          // Brett/Periode (einmal je Seitenperspektive, Sekundenbruchteile auseinander),
+          // inklusive doppeltem Callout-Banner.
+          //
+          // GEGEN-GATE STATT SEITE-0-GATE (Fix 27.09., Opus-Review): das alte `u.side===0`
+          // loeste zwar das Doppel-Feuer-Problem, feuerte dabei aber sofort nach dem Heim-Zug
+          // dieser Periode -- BEVOR der Gastfechter seinen eigenen Zug fuer dieselbe Periode
+          // geloggt hatte. Die Meldung las dadurch einen veralteten Trefferstand (Beispiel aus
+          // der Review: gemeldet "3:2", der wahre Stand in diesem Moment war schon 3:3, weil
+          // Krag'Zuls Aktion fuer diese Periode nur noch nicht durchgereicht war). Reine Lese-/
+          // Zeitpunkt-Korrektur, KEINE Aenderung an Zaehlweise/RNG: der Beat feuert jetzt erst,
+          // wenn der GEGNER diese Periodengrenze ebenfalls schon erreicht hat (`fechtGegner.
+          // aktuell` faengt genau das ein) -- das ist zugleich weiterhin das einzige der beiden
+          // Seiten-Ereignisse, das feuert (die zuerst ankommende Seite sieht das Gate noch
+          // geschlossen, nur die zweite sieht es offen), also weiterhin genau einmal je
+          // Brett/Periode, nur jetzt mit dem tatsaechlich vollstaendigen Trefferstand.
           const proPeriode=BB().rundenN/3;
           if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
             const periode=(u.aktuell+1)/proPeriode;
-            feed(u.side,"Periode "+periode+" beendet — "+u.n+" gegen "+u.gegnerN+
-              ": Vorteil "+(v>0?"+":"")+v+", Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)+".",true);
+            const gegnerFertig=fechtGegner&&(fechtGegner.aktuell+1)>=periode*proPeriode;
+            if(gegnerFertig){
+              // Anzeige stabil aus Sicht von Seite 0 aufgebaut, unabhaengig davon, welche
+              // Seite hier gerade als zweite ankam und den Beat damit ausgeloest hat --
+              // `seite0.verlauf[seite0.aktuell]` ist der eigene, schon fest geloggte
+              // Vorteilswert dieser Seite fuer GENAU diese Periodengrenze (nicht `v`, das nur
+              // fuer das gerade verarbeitete `u` gilt).
+              const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
+              const v0=seite0.verlauf[seite0.aktuell];
+              feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
+                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+            }
           }
         }
         // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
