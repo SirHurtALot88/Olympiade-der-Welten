@@ -1,7 +1,7 @@
-// Sichtpruefung fuer den TDM-Highlight-Fix (Opus-Ingame-Review, 27.09.): spielt mehrere TDM-
-// Spiele mit verschiedenen Saaten in einem echten Browser durch (Playwright, Server ueber HTTP,
-// nicht file://, wie die uebrigen screenshot-*.mjs-Sonden dieses Ordners) und zaehlt am Ende
-// jedes Spiels, wie viele grosse Highlights es WIRKLICH waren.
+// Sichtpruefung fuer den TDM-Highlight-Fix (Opus-Ingame-Review, 27.09.): spielt TDM-Spiele in
+// einem echten Browser durch (Playwright, Server ueber HTTP, nicht file://, wie die uebrigen
+// screenshot-*.mjs-Sonden dieses Ordners) und zaehlt am Ende jedes Spiels, wie viele grosse
+// Highlights es WIRKLICH waren.
 //
 // NICHT ueber `#feed span.big` (Nachbesserung, 27.09., unabhaengige Review): der Ticker
 // deckelt sich selbst auf 140 Zeilen (`while(f.children.length>140)f.removeChild(...)`,
@@ -12,17 +12,35 @@
 // (renderHighlights() in battle-mode.engine.js), der aus HIGHLIGHTS[] gebaut wird, einem
 // Array, das ueber das ganze Spiel waechst und NIE gedeckelt wird.
 //
+// ECHTE KADER STATT WILLKUERLICHER SAATEN (Off-by-One-Nachbesserung, 27.09.): vorher lief
+// dies ueber drei feste Saaten mit der eingebauten Ersatzaufstellung (SQUAD/OPP) -- kein
+// Bezug zu einer echten Liga-Paarung. Jetzt werden die fuenf echten Team-Paarungen aus
+// data/generated/kaderfamilie-live-save.json gespielt (dieselbe Kader-Familie, die auch
+// miss-star-paartreue.mjs/miss-alle-disziplinen.mjs verwenden), ueber window.__olyArenaKader
+// als {heim,gast,meta} eingespeist -- exakt der Weg, den auch der echte Host
+// (FoundationBattleArenaHost.tsx) nimmt (s. "BRUECKE ZUR ECHTEN APP" in
+// battle-mode.engine.js). Das ist derselbe Off-by-One-Fund, der den #ehighlights-Snapshot
+// betraf: die WAHRE Zahl liegt in jedem der zuvor gemessenen 10 Spiele um genau 1 hoeher als
+// vorher gemessen (TDM 8,2 statt 7,2 im Schnitt) -- diese Sonde misst jetzt nach dem Fix in
+// finish() (renderHighlights()-Nachtrag nach der Sieg-feed()-Zeile) auf denselben echten
+// Paarungen neu.
+//
 // Kein Teil der rho-/Pp-Abnahme -- nur zum Ansehen, analog zu screenshot-broadcast-hud.mjs.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
 const OUT_DIR = process.argv[3] || path.join(WURZEL, "tmp-ux-audit");
-const SAATEN = (process.argv[2] || "1337,4242,90210").split(",").map(s => s.trim());
+const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE
+  || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
+const KADERFAMILIE = JSON.parse(readFileSync(KADERFAMILIE_PFAD, "utf8"));
+const VARIANTEN = process.argv[2]
+  ? KADERFAMILIE.varianten.filter(v => process.argv[2].split(",").map(s => s.trim()).includes(v.label))
+  : KADERFAMILIE.varianten;
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png", ".json": "application/json", ".css": "text/css" };
@@ -56,18 +74,22 @@ let browser;
 const ergebnisse = [];
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  for (const saat of SAATEN) {
+  for (const variante of VARIANTEN) {
     const seite = await browser.newPage({ viewport: { width: 1300, height: 760 } });
     const fehler = [];
     seite.on("pageerror", (e) => fehler.push(String(e)));
     seite.on("console", (m) => { if (m.type() === "error") fehler.push("console: " + m.text()); });
     // VOR jedem Laden gesetzt (addInitScript laeuft vor jedem Skript der Seite, auch vor dem
-    // top-level await, das window.__olyArenaKader liest) -- macht setDisc("tdm") deterministisch
-    // auf DIESER Saat statt immer auf der Ersatzsaat 1337.
-    const saatZahl = Number(saat);
-    await seite.addInitScript((s) => {
-      window.__olyArenaKader = { seedByDisciplineId: { tdm: s } };
-    }, Number.isFinite(saatZahl) ? saatZahl : saat);
+    // top-level await, das window.__olyArenaKader liest) -- speist die ECHTE Paarung genau so
+    // ein, wie es FoundationBattleArenaHost.tsx im echten Spiel tut (s. "BRUECKE ZUR ECHTEN
+    // APP" in battle-mode.engine.js): {heim,gast} ersetzen SQUAD/OPP komplett, meta traegt nur
+    // die Teamnamen fuer die Anzeige.
+    await seite.addInitScript((v) => {
+      window.__olyArenaKader = {
+        heim: v.heim, gast: v.gast,
+        meta: { heimName: v.heimName, gastName: v.gastName },
+      };
+    }, variante);
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
 
@@ -111,7 +133,7 @@ try {
       };
     });
 
-    ergebnisse.push({ saat, ...zeilen, fehler });
+    ergebnisse.push({ paarung: variante.heimName + " – " + variante.gastName, ...zeilen, fehler });
     await seite.close();
   }
 } finally {
@@ -120,7 +142,7 @@ try {
 }
 
 for (const r of ergebnisse) {
-  console.log(`\n=== Saat ${r.saat} ===`);
+  console.log(`\n=== ${r.paarung} ===`);
   console.log(`Ticker-Zeilen gesamt: ${r.gesamt}, ECHTE Highlights (#ehighlights, ungedeckelt): ${r.big}` +
     ` (im #feed-DOM-Fenster am Ende noch sichtbar: ${r.bigImFeedFenster})`);
   console.log("big-Zeilen:");

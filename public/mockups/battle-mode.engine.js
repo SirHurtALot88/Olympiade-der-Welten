@@ -32085,6 +32085,14 @@
           ?"— Kontrollpunkt-Punktelimit erreicht ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")"
           :"— nach Zeitablauf mehr Kontrollpunkt-Punkte ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")";
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true);
+      // OFF-BY-ONE-FIX (Messmethoden-Review, 27.09.): renderEndstand()/renderHighlights()
+      // oben hat den #ehighlights-Snapshot schon VOR dieser Sieg-Zeile gebaut, die per
+      // feed(...,true) immer ungedrosselt (big=true) durchlaeuft. Die Sieg-Zeile landet
+      // damit zwar im #feed-Ticker und in HIGHLIGHTS[], aber nicht mehr im bereits
+      // gerenderten Snapshot -- ein zweiter, idempotenter Aufruf holt sie nach, ohne die
+      // Reihenfolge von renderEndstand() (Sieger-Text/Tabellen, unabhaengig von dieser
+      // feed()-Zeile) anzutasten.
+      renderHighlights();
       updateHud();
       return;
     }
@@ -32100,6 +32108,9 @@
       const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
       const sieger=kampfSieger();
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Sieg-Zeile-fehlt-
+      // im-Snapshot-Luecke, hier fuer TDM.
+      renderHighlights();
       updateHud();
       return;
     }
@@ -32107,6 +32118,9 @@
     const pL=nR-live(1).length, pR=nL-live(0).length;
     const sieger=kampfSieger();
     feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Luecke fuer den
+    // generischen Elimination-Zweig (Battlefield ohne Kontrollpunkte, u.a.).
+    renderHighlights();
     updateHud();
   }
 
