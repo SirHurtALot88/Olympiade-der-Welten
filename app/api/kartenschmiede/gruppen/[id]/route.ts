@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { eintragRouten } from "@/lib/kartenschmiede/routen";
 
-const routen = eintragRouten("karten");
+const routen = eintragRouten("gruppen");
 export const GET = routen.GET;
 export const PUT = routen.PUT;
 export const DELETE = routen.DELETE;

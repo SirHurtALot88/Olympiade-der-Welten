@@ -56,7 +56,9 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("vendor", "html-to-image.js").toString("utf8")),
     skript(`window.KARTENSCHMIEDE_BILDER=${JSON.stringify(bilder)};window.KARTENSCHMIEDE_SERVER=${modus === "server"};`),
     skript(lies("regeln.js").toString("utf8")),
+    skript(lies("faehigkeiten.js").toString("utf8")),
     skript(lies("app.js").toString("utf8")),
+    skript(lies("gruppe.js").toString("utf8")),
   ].join("\n");
 
   const seite = vorlage.replace("{{FONTS}}", () => schriften).replace("{{SKRIPTE}}", () => skripte);

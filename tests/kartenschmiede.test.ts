@@ -6,7 +6,18 @@ import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { baueKartenschmiedeSeite } from "@/lib/kartenschmiede/seite";
-import { istGueltigeKartenId, ladeKarte, listeKarten, loescheKarte, speichereKarte } from "@/lib/kartenschmiede/karten-store";
+import {
+  istGueltigeKartenId,
+  ladeEintrag,
+  ladeFaehigkeiten,
+  ladeKarte,
+  listeGruppen,
+  listeKarten,
+  loescheKarte,
+  speichereEintrag,
+  speichereFaehigkeiten,
+  speichereKarte,
+} from "@/lib/kartenschmiede/karten-store";
 
 type Einheit = Record<string, string>;
 type Regeln = {
@@ -16,7 +27,10 @@ type Regeln = {
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
 };
-const R = createRequire(import.meta.url)("../apps/kartenschmiede/regeln.js") as Regeln;
+const laden = createRequire(import.meta.url);
+const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
+type Faehigkeit = { id: string; name: string; text: string; kosten: { typ: string; wert: number } };
+const F = laden("../apps/kartenschmiede/faehigkeiten.js") as { GRUNDBESTAND: Faehigkeit[] };
 
 const einheit = (q: number, d: number, t: number, weapons: string, passives = "", size = "1"): Einheit =>
   ({ quality: `${q}+`, defense: `${d}+`, tough: String(t), weapons, passives, size });
@@ -43,9 +57,21 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     expect([0, 40, 45, 75, 105, 165, 224, 225, 900].map(R.stufeFuerPunkte)).toEqual([1, 1, 2, 3, 4, 5, 5, 6, 6]);
   });
 
-  it("gibt Helden 25 Punkte für ihre Quest-Skills dazu", () => {
+  it("rechnet Fähigkeiten aus der Datenbank ein: Skills fest, Sonderregeln in Prozent", () => {
     const basis = einheit(4, 5, 5, "Klingen | Nahkampf | A4 | Reißend");
-    expect(R.punkte({ ...basis, role: "hero" }).roh - R.punkte(basis).roh).toBeCloseTo(25);
+    const skill = F.GRUNDBESTAND.find(f => f.id === "schattenschritt")!;
+    const regel = F.GRUNDBESTAND.find(f => f.id === "strahlende-aura")!;
+    expect(R.punkte({ ...basis, skills: [skill] } as never).roh - R.punkte(basis).roh).toBeCloseTo(10);
+    expect(R.punkte({ ...basis, skills: [regel] } as never).roh / R.punkte(basis).roh).toBeCloseTo(1.2);
+  });
+
+  it("hat im Grundbestand nur eindeutige IDs mit gültigen Kosten", () => {
+    const ids = F.GRUNDBESTAND.map(f => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const f of F.GRUNDBESTAND) {
+      expect(["fest", "prozent"]).toContain(f.kosten.typ);
+      expect(f.text.length).toBeGreaterThan(10);
+    }
   });
 });
 
@@ -91,6 +117,25 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(ladeKarte("gemeinsam", id)).toMatchObject({ name: "Kristallwurm", id });
     expect(loescheKarte("gemeinsam", id)).toBe(true);
     expect(listeKarten("gemeinsam")).toEqual([]);
+  });
+
+  it("speichert Gruppen getrennt von Karten", () => {
+    speichereEintrag("gemeinsam", "gruppen", "gruppe-1234abcd", { name: "Die Vier", mitglieder: [{ name: "Schurke" }, { name: "Krieger" }] }, null, "Franky");
+    expect(listeGruppen("gemeinsam")).toMatchObject([{ id: "gruppe-1234abcd", name: "Die Vier", mitglieder: 2, gespeichertVon: "Franky" }]);
+    expect(listeKarten("gemeinsam")).toEqual([]);
+    expect(ladeEintrag("gemeinsam", "gruppen", "gruppe-1234abcd")).toMatchObject({ name: "Die Vier" });
+  });
+
+  it("prüft eigene Fähigkeiten beim Speichern und stört die Kartenliste nicht", () => {
+    const gespeichert = speichereFaehigkeiten("gemeinsam", [
+      { id: "frostatem", name: "Frostatem", art: "Sonderregel", fuer: ["enemy"], kosten: { typ: "prozent", wert: 10 }, text: "Kegel 6\", 1 Treffer." },
+      { id: "../boese", name: "x" },
+      { id: "ohne-name" },
+    ]);
+    expect(gespeichert.map(f => f.id)).toEqual(["frostatem"]);
+    expect(ladeFaehigkeiten("gemeinsam")[0]).toMatchObject({ name: "Frostatem", kosten: { typ: "prozent", wert: 10 } });
+    speichereKarte("gemeinsam", "karte-abcdef12", { name: "Test" }, null);
+    expect(listeKarten("gemeinsam").map(k => k.id)).toEqual(["karte-abcdef12"]);
   });
 
   it("lässt keine Pfade als Karten-ID durch", () => {

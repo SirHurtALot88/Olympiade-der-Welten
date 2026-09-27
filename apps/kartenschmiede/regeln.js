@@ -89,7 +89,12 @@
       const wu = p.match(/^(?:wucht|impact)\s*\((\d+)\)$/i); if (wu) K += +wu[1] * 0.5 * n;
       const z = p.match(/^(?:zauberer|caster)\s*\((\d)\)$/i); if (z) fest += 20 + 15 * (+z[1] - 1);
     }
-    if (s.role === "hero") fest += 25; else b += (+s.special || 0) / 100;
+    // Fähigkeiten aus der Datenbank: feste Punkte (Skills, Auren) oder Aufschlag in Prozent (Sonderregeln)
+    for (const k of Array.isArray(s.skills) ? s.skills : []) {
+      const wert = +(k && k.kosten && k.kosten.wert) || 0;
+      if (k && k.kosten && k.kosten.typ === "fest") fest += wert; else b += wert / 100;
+    }
+    b += (+s.special || 0) / 100;
     const A = T * n * 6 / (D - 1);
     const roh = 13 * Math.sqrt(K * A) * (1 + b) + fest;
     return { pts: Math.max(5, 5 * Math.round(roh / 5)), roh, K, A, b, fest };
