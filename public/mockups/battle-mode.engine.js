@@ -23249,6 +23249,33 @@
     if(KP.punkte[0]===KP.punkte[1])return null;
     return KP.punkte[0]>KP.punkte[1]?0:1;
   }
+  // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
+  // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
+  // `live(1).length` als Sieger-Vergleich: bei TDM UNTER RESPAWN ist "aktuell lebend" am
+  // Spielende nur noch eine Momentaufnahme, wer GERADE respawnt (s. Kommentar bei
+  // finish()) — das konnte der Ticker-Zeile aus finish() widersprechen, die schon vorher
+  // korrekt die Summe der Ausschaltungen (u.st.ko) nahm. Diese Funktion buendelt beide
+  // Faelle an einer Stelle:
+  //   - Battlefield/Domination (KP gesetzt): dominationSieger() -- Elimination, dann
+  //     Punktelimit, dann hoeherer Punktestand.
+  //   - TDM (Respawn): Summe der Ausschaltungen je Seite UEBER DAS GANZE SPIEL (u.st.ko).
+  //   - Alles andere (Mini-DM/klassische Einmal-Eliminierung ohne Respawn, s.
+  //     schalteAus/reviveUnit oben): "aktuell lebend" ist am Spielende weiterhin bitgleich
+  //     mit "Ausschaltungen" — die alte Regel bleibt hier unveraendert richtig.
+  // Reine Anzeigekorrektur: liest nur bereits berechnete u.st.ko/live(), aendert an
+  // wert()/stepSim()/rr()/beitragVon() nichts.
+  function kampfSieger(){
+    const dom=dominationSieger();
+    if(dom!==undefined)return dom;
+    if(disc==="tdm"){
+      const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
+      const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
+      return scoreL===scoreR?null:(scoreL>scoreR?0:1);
+    }
+    const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
+    const pL=nR-live(1).length, pR=nL-live(0).length;
+    return pL===pR?null:(pL>pR?0:1);
+  }
 
   // ===================================================================================
   // ZIELANSAGE / FOKUSFEUER — der eine Eingriff, den der Zuschauer im Kampf hat.
@@ -25298,7 +25325,12 @@
   function updateHud(){
     // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
     // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
-    document.getElementById("clock").textContent="0:"+String(Math.floor(t*zeitFaktor())).padStart(2,"0");
+    // MINUTENUMBRUCH (TDM-HUD-Fix, 27.09.): vorher immer "0:"+Sekunden ohne Ueberlauf —
+    // TDM laeuft seit dem Respawn-Umbau regulaer bis t>95, bei ZEIT_DEHNUNG.tdm 1,88 stand
+    // hier "0:178", bei Battlefield (Faktor 5,00) bis "0:475". Dieselbe m:ss-Umrechnung,
+    // die feed() fuer den Ticker-Zeitstempel schon nutzt.
+    const klSek=Math.floor(t*zeitFaktor());
+    document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
@@ -25325,9 +25357,18 @@
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
     // PUNKTE = ausgeschaltete Gegner. Bei 6 gegen 6 holt ein komplett siegreiches Team 6.
+    // TDM-HUD-FIX (27.09.): `(nR-live(1).length)` zaehlt nur die GERADE Gefallenen — unter
+    // Respawn faellt das nach jedem Respawn wieder auf 0 zurueck, der Score sank sichtbar.
+    // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
+    // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
+    // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
+    // schwanken. #bbug uebernimmt das automatisch: aktualisiereBbug() liest #score erst,
+    // NACHDEM diese Zeile geschrieben hat (Aufruf am Ende dieser Funktion).
     document.getElementById("score").textContent=KP
       ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
-      :(nR-live(1).length)+" : "+(nL-live(0).length);
+      :disc==="tdm"
+        ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
+        :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -31741,7 +31782,7 @@
     // Zeitablauf) — TDM/Mini-DM/das alte Verhalten unten bleiben unberuehrt, weil KP dort
     // immer null ist.
     if(KP){
-      const sieger=dominationSieger();
+      const sieger=kampfSieger();
       const elimSieg=live(0).length===0||live(1).length===0;
       const grund=elimSieg?"— der Gegner liegt komplett am Boden"
         :(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)
@@ -31761,13 +31802,15 @@
     if(disc==="tdm"){
       const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
       const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
-      feed(0,(scoreL>scoreR?VEREIN[0].name+" gewinnt ":scoreR>scoreL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      const sieger=kampfSieger();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
       updateHud();
       return;
     }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
-    feed(0,(pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    const sieger=kampfSieger();
+    feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
     updateHud();
   }
 
@@ -33335,8 +33378,12 @@
     // Overlay nach einem Punktelimit-Sieg weiter den ueberlebenszahl-basierten Sieger, der
     // bei einem Domination-Sieg mit ueberlebenden Kaempfern auf beiden Seiten oft ein
     // ANDERES Team nennt als tatsaechlich gewonnen hat.
-    const sieger = KP ? dominationSieger()
-      : (live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null);
+    // TDM-HUD-FIX (27.09.): vorher hier ein eigener, dritter Vergleich (`live(0).length` vs
+    // `live(1).length`) statt dominationSieger()/dem TDM-Ausschaltungs-Vergleich aus
+    // finish() — bei TDM unter Respawn eine reine Momentaufnahme, wer GERADE respawnt, die
+    // dem Ticker-Sieger widersprechen konnte. kampfSieger() buendelt jetzt alle drei
+    // Faelle (Domination/TDM/klassische Elimination) an einer Stelle.
+    const sieger = kampfSieger();
     document.getElementById("esieger").textContent =
       sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
     for(const seite of [0,1]){
@@ -33724,7 +33771,11 @@
       const nJe=jeSeiteVon(disc);
       const punkteL=disc==="tdm"?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0):nJe-live(1).length;
       const punkteR=disc==="tdm"?U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0):nJe-live(0).length;
-      if(punkteL>punkteR)siege++;
+      // TDM-HUD-FIX (27.09.): Sieg-Zaehlung ueber dieselbe kampfSieger()-Funktion wie
+      // finish()/renderEndstand(), statt einem eigenen dritten `punkteL>punkteR`-Vergleich.
+      // disc ist hier immer "tdm" (einziger Aufrufer: serie()/serieVon("tdm",...)), also
+      // bitgleich zum bisherigen Vergleich — nur an einer statt drei Stellen gepflegt.
+      if(kampfSieger()===0)siege++;
       const e=punkteL+":"+punkteR;
       ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
