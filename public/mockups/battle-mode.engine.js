@@ -24937,6 +24937,13 @@
   // updateHudBahn() vergleicht sie jeden Frame gegen bahnRangliste().reihe[0] (dieselbe
   // Rangliste wie HUD/Endstand) und meldet nur den WECHSEL, nie den Dauerzustand.
   let bahnFuehrenderId=null, bahnFuehrenderSeit=-999;
+  // STAFFEL FUEHRT EIGENE FUEHRUNGS-QUELLE (Bugfix 27.09., s. broadcast-optik-bahn-27-09.md
+  // Abschnitt 0.1): `bahnRangliste()` sortiert die Staffel nach `bahnLeistung` (der
+  // ETAPPENZEIT), das ist "wer laeuft gerade am schnellsten", nicht "wer fuehrt insgesamt" —
+  // und stand im Widerspruch zu `#bhDelta`, das denselben Moment aus `staffelZeitDelta()`
+  // zeigt (dem kumulierten Zeitrueckstand, s. dort). Eigene Seiten-Variable statt
+  // `bahnFuehrenderId`, weil die Staffel-Fuehrung ein TEAM ist, keine Person.
+  let staffelFuehrendeSeite=null;
 
   // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
   // liefern Rangpunkte (bahnRangliste); Staffel traegt "etappe", Takeshi's Castle "burg"
@@ -25141,13 +25148,49 @@
     // Laeufer die Meldung zum Flackerprotokoll machen -- die Meldung selbst bleibt
     // unveraendert, nur ihre Haeufigkeit wird gedaempft (dieselbe Absicht wie Regel 8,
     // Abschnitt 2 des Konzepts).
+    // BUGFIX 27.09. (broadcast-optik-bahn-27-09.md Abschnitt 0.1, reine Anzeige, keine
+    // Wertungsaenderung): Staffel und Takeshi's Castle bekommen HIER eine je eigene
+    // Fuehrungs-Quelle statt der gemeinsamen `bahnRangliste().reihe[0]`-Heuristik unten.
+    // Jede Bahn bleibt fuer sich, keine gemeinsame Ersatzformel fuer beide.
     if(!done){
-      const fuehrer=bahnRangliste().reihe[0];
-      if(fuehrer){
-        if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
-        else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
-          bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
-          feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+      if(BA().staffel){
+        // STAFFEL: `bahnRangliste()` sortiert nach `bahnLeistung` (Etappenzeit) — das ist
+        // die schnellste AKTUELLE Etappe, nicht das insgesamt fuehrende Team, und konnte
+        // deshalb dem `#bhDelta`-Feld direkt darunter widersprechen, das denselben Moment
+        // aus `staffelZeitDelta()` zeigt. Fuehrung kommt jetzt aus genau dieser Funktion —
+        // demselben kumulierten Zeitrueckstand, den `#bhDelta` ohnehin anzeigt.
+        const d=staffelZeitDelta();
+        if(!d.unklar){
+          if(staffelFuehrendeSeite==null){ staffelFuehrendeSeite=d.seite; }
+          else if(d.seite!==staffelFuehrendeSeite && (rennT-bahnFuehrenderSeit)>2){
+            staffelFuehrendeSeite=d.seite; bahnFuehrenderSeit=rennT;
+            feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true);
+          }
+        }
+      } else if(BA().takeshi){
+        // TAKESHI'S CASTLE: `bahnRangliste()` sortiert jeden mit gesetztem `u.fertig` nach
+        // vorn — auch Ausgeschiedene, die `u.fertig=90+...` bekommen (Nerven-Zweig in
+        // stepSpurt). Scheidet jemand vor dem ersten Zieleinlauf aus, konnte der Ticker so
+        // faelschlich "X uebernimmt die Fuehrung" direkt nach "X scheidet aus" melden.
+        // Fuehrung kommt jetzt aus den echten Burgpunkten (`burgwertung()`, dieselbe Zahl,
+        // die MOTOREN["takeshis-castle"].wert() vergibt), unabhaengig von `fertig`.
+        let fuehrer=null,beste=-Infinity;
+        for(const u of LAEUFER){ const w=burgwertung(u); if(w>beste){beste=w;fuehrer=u;} }
+        if(fuehrer){
+          if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
+          else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
+            bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+          }
+        }
+      } else {
+        const fuehrer=bahnRangliste().reihe[0];
+        if(fuehrer){
+          if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
+          else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
+            bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+          }
         }
       }
     }
@@ -28925,7 +28968,7 @@
       bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
     }
     bahnEndeGemeldet=false;
-    bahnFuehrenderId=null; bahnFuehrenderSeit=-999;
+    bahnFuehrenderId=null; bahnFuehrenderSeit=-999; staffelFuehrendeSeite=null;
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
