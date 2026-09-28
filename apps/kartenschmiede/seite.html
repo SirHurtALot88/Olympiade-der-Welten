@@ -163,6 +163,70 @@ ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--bra
 #prompt { min-height: 300px; font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; }
 .copyrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
+/* ---------- Erstellen: kompakt ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.create-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+.create-bar select { width: auto; max-width: 300px; }
+@media (min-width: 881px) { .create-bar .seg { margin-left: auto; } }
+@media (min-width: 881px) { .shop { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 32px; } }
+form.editor { display: grid; gap: 18px; columns: auto; }
+.form-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px 26px; align-items: start; }
+.form-cols[hidden], #bauModus[hidden] { display: none; }
+#bauModus { display: grid; gap: 12px; }
+.kopf { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.row3 { display: grid; gap: 10px; grid-template-columns: 1.4fr 1.2fr .8fr; }
+@media (max-width: 620px) { .row3 { grid-template-columns: 1fr; } }
+.fac-sel { display: flex; gap: 8px; align-items: center; }
+.fac-sel select { flex: 1; min-width: 0; }
+.fac-sel .fac-preview span { display: none; }
+.fac-sel .fac-preview svg { width: 26px; height: 26px; color: var(--brass); }
+details.mehr { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+details.mehr[open] { display: grid; gap: 10px; padding-bottom: 12px; }
+details.mehr summary { cursor: pointer; font: 600 14px var(--ui); letter-spacing: .05em; color: var(--dim); }
+details.mehr summary:hover { color: var(--brass); }
+.info { cursor: help; color: var(--brass); font-size: 13px; margin-left: 4px; }
+.stage-col { gap: 10px; }
+.stage-col .tiers { width: 100%; max-width: 420px; }
+.stage-col .tiers button { font-size: 12px; padding: 6px 2px; }
+#prompt { min-height: 160px; font-size: 13px; }
+.el-wahl { align-items: center; }
+.el-wahl .tgl { padding: 4px 6px; }
+
+/* ---------- Elemente: farbige Abzeichen ---------- */
+.elem { display: inline-grid; place-items: center; width: 1.35em; height: 1.35em; border-radius: 50%; vertical-align: middle; flex: none;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--el) 50%, #fff) 0%, var(--el) 48%, color-mix(in srgb, var(--el) 55%, #000) 100%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 6px color-mix(in srgb, var(--el) 55%, transparent); }
+.elem > svg { width: 68% !important; height: 68% !important; color: #17110a !important; }
+.tagzeile .elem, .werte .elem, .tagleiste .elem, .chip-f .elem { width: 20px; height: 20px; }
+.el-tabelle .el-name { display: inline-flex; gap: 8px; align-items: center; }
+.el-tabelle .elem { width: 24px; height: 24px; }
+.el-tabelle tbody tr { cursor: default; }
+.el-regeln { display: grid; gap: 10px; max-width: 80ch; margin-top: 18px; color: var(--dim); }
+.el-regeln b { color: var(--ink); }
+
+/* ---------- Fertige Charaktere ---------- */
+.liste-kopf { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+.liste-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.liste-filter input, .liste-filter select { width: auto; }
+table.charaktere td { vertical-align: top; white-space: normal; font-size: 15px; }
+table.charaktere th[data-sort] { cursor: pointer; user-select: none; }
+table.charaktere th[data-sort]:hover { color: var(--brass); }
+table.charaktere tbody tr { cursor: default; }
+.th-bild { width: 44px; height: 60px; border-radius: 4px; border: 2px solid; background: #0c0c0d center 25% / cover no-repeat; }
+.name-z b { display: block; font-size: 16px; }
+.name-z small { display: inline-flex; gap: 5px; align-items: center; color: var(--dim); font-size: 13px; }
+.name-z small svg { width: 15px; height: 15px; color: var(--brass); }
+.name-z small .elem { width: 16px; height: 16px; }
+.waffen-z .w, .faeh-z .s { display: flex; gap: 5px; align-items: center; white-space: nowrap; cursor: help; }
+.waffen-z svg { width: 14px; height: 14px; color: var(--brass); }
+.waffen-z .elem { width: 16px; height: 16px; }
+.waffen-z small, .faeh-z small { color: var(--dim); font-size: 13px; }
+.faeh-z .tico svg { width: 14px; height: 14px; color: var(--brass); }
+.faeh-z .tico .elem { width: 16px; height: 16px; }
+.acts-z { white-space: nowrap; }
+.acts-z .btn { margin: 0 4px 4px 0; }
+.forge-1 { grid-template-columns: 1fr; max-width: 900px; }
+
 /* ---------- Export-Dialog ---------- */
 .modal[hidden] { display: none; }
 .modal { position: fixed; inset: 0; background: rgba(8, 9, 11, .86); display: grid; place-items: center; padding: 20px; z-index: 50; }
@@ -242,6 +306,7 @@ ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--bra
 .boss p { font-family: var(--prose); font-size: calc(var(--u)*2.8*var(--k)); line-height: 1.25; color: var(--ink-c); }
 .foot { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: calc(var(--u)*2); padding-top: calc(var(--u)*1.2); border-top: calc(var(--u)*.25) solid rgba(255,255,255,.1); }
 .foot .fac { display: flex; align-items: center; gap: calc(var(--u)*1); font-size: calc(var(--u)*2.6*var(--k)); letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--acc); }
+.foot .fac .praeg { display: inline-flex; opacity: .8; }
 .foot .fac svg { width: calc(var(--u)*4.4*var(--k)); height: calc(var(--u)*4.4*var(--k)); }
 .foot q { font-family: var(--prose); font-style: italic; font-size: calc(var(--u)*2.7*var(--k)); line-height: 1.2; color: var(--sub); quotes: none; padding-left: calc(var(--u)*2); border-left: calc(var(--u)*.25) solid rgba(255,255,255,.14); }
 
@@ -373,7 +438,15 @@ section[aria-labelledby] { scroll-margin-top: 60px; }
 .tabs button { font: 700 18px var(--ui); letter-spacing: .08em; text-transform: uppercase; padding: 10px 18px; background: none; border: 0;
   color: var(--dim); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brass); }
-.tabpanel { display: grid; gap: 56px; }
+.tabpanel { display: grid; gap: 56px; grid-template-columns: minmax(0, 1fr); }
+.tabpanel[hidden] { display: none; }
+.tabpanel > section, .tabpanel > section > * { min-width: 0; }
+@media (max-width: 560px) { .tabs { overflow-x: auto; } .tabs button { font-size: 15px; padding: 10px 10px; } }
+.chips-f { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagleiste { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.tagleiste .chip-f { padding: 4px 7px; font-size: 13px; }
+.skill-chip.konflikt { border-color: #c0392b; color: #ff8a7a; }
+.gesperrt-hinweis { color: var(--dim); font: 500 13px var(--ui); }
 .skill-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .skill-chip { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--ui); padding: 5px 6px 5px 10px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--line); color: var(--ink); }
 .skill-chip small { color: var(--dim); font-weight: 500; }
@@ -430,6 +503,9 @@ fieldset.checks legend { margin-bottom: 6px; }
 .tico { display: inline-flex; gap: 3px; vertical-align: -2px; margin-right: 4px; }
 .tico svg { width: 15px; height: 15px; color: var(--brass); }
 .card .tico svg { width: calc(var(--u)*2.9); height: calc(var(--u)*2.9); color: var(--acc); }
+.tico .elem { width: 18px; height: 18px; }
+.card .tico .elem, .card .wep p .elem { width: calc(var(--u)*3.2); height: calc(var(--u)*3.2); margin-right: calc(var(--u)*.6); }
+.card .foot .praeg .elem { width: calc(var(--u)*4); height: calc(var(--u)*4); }
 .card .tico { gap: calc(var(--u)*.4); margin-right: calc(var(--u)*.6); vertical-align: calc(var(--u)*-.4); }
 .tip { position: fixed; z-index: 100; max-width: 340px; padding: 10px 12px; border-radius: 8px; background: #0b0c0f; border: 1px solid var(--brass);
   color: var(--ink); font: 400 15px/1.4 var(--prose); pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
@@ -528,172 +604,168 @@ fieldset.checks legend { margin-bottom: 6px; }
     <h1>Kartenschmiede</h1>
     <p class="lede">Artwork hochladen, Werte eintragen, fertig ist die Karte. Sechs Seltenheiten, eine Punkteformel: Die Stufe folgt den Punkten, die Punkte folgen den Werten, und ein Boss ist schon von Weitem als Boss zu erkennen.</p>
     <nav class="tabs" role="tablist" aria-label="Bereiche">
-      <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Generator</button>
+      <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Erstellen</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
       <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
+      <button type="button" role="tab" id="tab-regeln" data-tab="regeln" aria-selected="false" aria-controls="tabRegeln">Regeln</button>
     </nav>
   </header>
 
   <div id="tabKarten" role="tabpanel" aria-labelledby="tab-karten" class="tabpanel">
-  <nav class="subnav" aria-label="Abschnitte">
-    <a href="#h-shop">Werkstatt</a><a href="#h-build">Baukasten</a><a href="#h-sim">Simulator</a><a href="#h-formula">Formel</a><a href="#h-forge">Artwork</a><a href="#h-ladder">Stufen</a>
-  </nav>
-  <section aria-labelledby="h-ladder">
-    <div class="sec-head">
-      <h2 id="h-ladder">Dieselbe Einheit, sechs Seltenheiten</h2>
-      <p class="lede">Grau, grün, blau, gelb, orange, rot. Rahmen, Ornamente und Effekte steigen Stufe für Stufe. Klick auf eine Stufe übernimmt sie in die Werkstatt.</p>
-    </div>
-    <div class="ladder-scroll"><div class="ladder" id="ladder"></div></div>
-  </section>
-
-  <section aria-labelledby="h-shop">
-    <div class="sec-head">
-      <h2 id="h-shop">Werkstatt</h2>
-      <p class="lede">Artwork hochladen, Werte eintragen, Stufe wählen. Die Karte rechts aktualisiert sich sofort und lässt sich als PNG erzeugen.</p>
+  <section aria-labelledby="h-shop" class="create">
+    <h2 id="h-shop" class="sr-only">Charakter erstellen</h2>
+    <div class="create-bar">
+      <select id="preset" aria-label="Vorlage laden"></select>
+      <button type="button" class="btn ghost sm" id="bNewHero">+ Held</button>
+      <button type="button" class="btn ghost sm" id="bNewEnemy">+ Gegner</button>
+      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, Zäh +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
+      <div class="seg" id="modus" role="group" aria-label="Bearbeiten mit">
+        <button type="button" data-m="form" aria-pressed="true" data-tip="Alle Werte als Felder: schnell für fertige Einheiten und Vorschläge aus dem Chat.">Formular</button>
+        <button type="button" data-m="bau" aria-pressed="false" data-tip="Werte mit + und −, neben jedem Knopf steht, was er kostet. Helden haben ein festes Budget.">Baukasten</button>
+      </div>
+      <span class="hint" id="bEliteMsg" aria-live="polite"></span>
     </div>
     <div class="shop">
       <form class="editor" id="editor" autocomplete="off">
-        <fieldset>
-          <legend>Vorlage</legend>
-          <label class="f">Beispiel laden
-            <select id="preset"></select>
-          </label>
-        </fieldset>
-
-        <fieldset>
-          <legend>Artwork</legend>
-          <label class="f file">Bild hochladen (Artwork oder Foto der Mini)
-            <input type="file" id="artfile" accept="image/*">
-          </label>
-          <div class="row">
-            <label class="f">Ausschnitt horizontal <input type="range" id="ax" min="0" max="100"></label>
-            <label class="f">Ausschnitt vertikal <input type="range" id="ay" min="0" max="100"></label>
-          </div>
-          <label class="f">Zoom <input type="range" id="zoom" min="100" max="220"></label>
-        </fieldset>
-
-        <fieldset>
-          <legend>Seltenheit</legend>
-          <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
-          <label class="check"><input type="checkbox" id="autoTier"> Stufe folgt den Punkten</label>
-          <div class="hint" id="suggest"></div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Einheit</legend>
-          <label class="f">Name <input type="text" id="name"></label>
-          <div class="row">
-            <label class="f">Fraktion <select id="faction"></select></label>
-            <div class="f">Symbol <span class="fac-preview" id="facIcon"></span></div>
-          </div>
-          <div class="row4">
-            <label class="f">Punkte <input type="number" id="points" readonly tabindex="-1" title="Rechnet die Formel automatisch aus"></label>
-            <label class="f">Modelle <input type="text" id="size"></label>
-            <label class="f">Qualität <input type="text" id="quality"></label>
-            <label class="f">Verteid. <input type="text" id="defense"></label>
-          </div>
-          <div class="row">
-            <label class="f">Zäh (je Modell) <input type="text" id="tough"></label>
+        <fieldset class="kopf">
+          <div class="row3">
+            <label class="f">Name <input type="text" id="name"></label>
+            <label class="f">Fraktion <span class="fac-sel"><span class="fac-preview" id="facIcon"></span><select id="faction"></select></span></label>
             <label class="f">Rolle
               <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option><option value="companion">Gefährte</option></select>
             </label>
           </div>
-          <div class="calc" id="calc" aria-live="polite"></div>
+          <div class="f">Prägung <span class="chips-f" id="praegung"></span></div>
         </fieldset>
 
-        <fieldset>
-          <legend>Waffen</legend>
-          <label class="f">Eine Waffe pro Zeile
-            <textarea id="weapons" rows="3"></textarea>
-          </label>
-          <select id="weaponAdd" aria-label="Waffe aus der Datenbank hinzufügen"></select>
-          <div class="hint">Format: <code>Name | Reichweite | Attacken | Regeln</code>, zum Beispiel <code>Frostklauen | Nahkampf | A6 | DS(2), Reißend</code>. Attacken gelten je Modell.</div>
-        </fieldset>
+        <div id="formModus" class="form-cols">
+          <fieldset>
+            <legend>Werte</legend>
+            <div class="row4">
+              <label class="f">Modelle <input type="text" id="size"></label>
+              <label class="f">Qualität <input type="text" id="quality"></label>
+              <label class="f">Verteid. <input type="text" id="defense"></label>
+              <label class="f">Zäh <input type="text" id="tough" title="Zäh je Modell"></label>
+            </div>
+            <div class="calc" id="calc" aria-live="polite"></div>
+          </fieldset>
 
-        <fieldset>
-          <legend>Fähigkeiten</legend>
-          <label class="f">Passive, mit Komma getrennt <input type="text" id="passives"></label>
-          <div class="hint">Symbole und Punkte kommen automatisch: Langsam, Schnell, Furchtlos, Regeneration, Hinterhalt, Furcht(3), Wucht(3), Zauberer(2) und weitere.</div>
-          <div class="f">Fähigkeiten, Zauber und Gegenstände aus der Datenbank
+          <fieldset>
+            <legend>Waffen <span class="info" data-tip="Eine Waffe pro Zeile: Name | Reichweite | Attacken | Regeln. Beispiel: Frostklauen | Nahkampf | A6 | DS(2), Reißend, Frost. Attacken gelten je Modell. Ein Element bei den Regeln (Feuer, Frost, Gift, Natur, Licht, Schatten, Magie, Energie) macht die Waffe elementar.">ⓘ</span></legend>
+            <textarea id="weapons" rows="3" aria-label="Waffen, eine pro Zeile"></textarea>
+            <select id="weaponAdd" aria-label="Waffe aus der Datenbank hinzufügen"></select>
+          </fieldset>
+
+          <fieldset>
+            <legend>Fähigkeiten</legend>
+            <label class="f"><span>Passive, mit Komma <span class="info" data-tip="Symbole und Punkte kommen automatisch: Langsam, Schnell, Furchtlos, Regeneration, Hinterhalt, Furcht(3), Wucht(3), Zauberer(2) und weitere.">ⓘ</span></span><input type="text" id="passives"></label>
             <div class="skill-chips" id="skillChips"></div>
             <div class="picker" id="skillPicker"></div>
-          </div>
-          <label class="f">Eigene Sonderregel, Name <input type="text" id="bossName"></label>
-          <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
-          <label class="f">Wie stark ist diese Sonderregel?
-            <select id="special">
-              <option value="0">Keine oder nur Flavour</option><option value="5">Klein, +5 %</option><option value="10">Mittel, +10 %</option>
-              <option value="20">Groß, +20 %</option>
-            </select>
-          </label>
-        </fieldset>
+            <details class="mehr">
+              <summary>Eigene Sonderregel</summary>
+              <label class="f">Name <input type="text" id="bossName"></label>
+              <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
+              <label class="f">Stärke
+                <select id="special">
+                  <option value="0">Keine oder nur Flavour</option><option value="5">Klein, +5 %</option><option value="10">Mittel, +10 %</option>
+                  <option value="20">Groß, +20 %</option>
+                </select>
+              </label>
+            </details>
+          </fieldset>
+        </div>
 
-        <fieldset>
-          <legend>Flavour</legend>
-          <label class="f">Zitat unten auf der Karte <textarea id="flavor" rows="2"></textarea></label>
-          <label class="f">Aussehen, für den Bild-Prompt <textarea id="look" rows="3"></textarea></label>
-        </fieldset>
+        <div id="bauModus" hidden>
+          <label class="f" id="bBudgetRow">Budget je Held <input type="number" id="bBudget" min="20" step="5"></label>
+          <div id="bSum"></div>
+          <div class="b-controls" id="bControls"></div>
+        </div>
 
-        <fieldset>
-          <legend>Karte als Text</legend>
-          <textarea id="cardJson" rows="4" placeholder="Vorschlag von Claude hier einfügen"></textarea>
-          <div class="copyrow">
-            <button type="button" class="btn ghost sm" id="jsonIn">Text übernehmen</button>
-            <button type="button" class="btn ghost sm" id="jsonOut">Aktuelle Karte als Text</button>
-          </div>
-          <p class="hint" id="jsonMsg" aria-live="polite">Für Kartenvorschläge aus dem Chat: Claude liefert Name, Werte, Lore und Fähigkeiten als Text, du fügst ihn hier ein. Neue Fähigkeiten landen dabei gleich in der Datenbank.</p>
-        </fieldset>
+        <div class="form-cols">
+          <fieldset>
+            <legend>Artwork</legend>
+            <label class="f file">Bild hochladen <input type="file" id="artfile" accept="image/*"></label>
+            <details class="mehr">
+              <summary>Ausschnitt und Zoom</summary>
+              <div class="row">
+                <label class="f">Horizontal <input type="range" id="ax" min="0" max="100"></label>
+                <label class="f">Vertikal <input type="range" id="ay" min="0" max="100"></label>
+              </div>
+              <label class="f">Zoom <input type="range" id="zoom" min="100" max="220"></label>
+            </details>
+            <details class="mehr">
+              <summary>Bild-Prompt für die KI</summary>
+              <label class="f">Aussehen (fließt in den Prompt) <textarea id="look" rows="2"></textarea></label>
+              <textarea id="prompt" readonly aria-label="Prompt für die aktuelle Karte"></textarea>
+              <div class="copyrow"><button type="button" class="btn ghost sm" id="copyBtn">Prompt kopieren</button><span class="hint" id="copyMsg" aria-live="polite"></span></div>
+            </details>
+          </fieldset>
+          <fieldset>
+            <legend>Flavour</legend>
+            <label class="f">Zitat unten auf der Karte <textarea id="flavor" rows="2"></textarea></label>
+            <details class="mehr">
+              <summary>Karte als Text</summary>
+              <textarea id="cardJson" rows="4" placeholder="Vorschlag von Claude hier einfügen"></textarea>
+              <div class="copyrow">
+                <button type="button" class="btn ghost sm" id="jsonIn">Text übernehmen</button>
+                <button type="button" class="btn ghost sm" id="jsonOut">Aktuelle Karte als Text</button>
+              </div>
+              <p class="hint" id="jsonMsg" aria-live="polite">Claude liefert Name, Werte, Lore und Fähigkeiten als Text, du fügst ihn hier ein. Neue Fähigkeiten landen gleich in der Datenbank.</p>
+            </details>
+          </fieldset>
+        </div>
       </form>
 
       <div class="stage-col">
         <div class="toolbar">
           <div class="seg" role="group" aria-label="Format">
-            <button type="button" data-o="port" aria-pressed="true">Hochformat</button>
-            <button type="button" data-o="land" aria-pressed="false">Querformat</button>
+            <button type="button" data-o="port" aria-pressed="true">Hoch</button>
+            <button type="button" data-o="land" aria-pressed="false">Quer</button>
           </div>
-          <button type="button" class="btn" id="exportBtn">Als PNG erzeugen</button>
-          <button type="button" class="btn ghost" id="saveBtn" hidden>Speichern</button>
+          <button type="button" class="btn sm" id="exportBtn">PNG</button>
+          <button type="button" class="btn ghost sm" id="saveBtn" hidden>Speichern</button>
         </div>
+        <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
+        <label class="check"><input type="checkbox" id="autoTier"> Stufe folgt den Punkten <span class="info" id="suggest" data-tip="">ⓘ</span></label>
         <p class="hint" id="saveMsg" aria-live="polite"></p>
         <div class="stage" id="stage"></div>
-        <p class="tier-note" id="tierNote"></p>
         <p class="tier-note fit-note" id="fitNote" aria-live="polite"></p>
+        <p class="tier-note" id="tierNote"></p>
       </div>
     </div>
   </section>
 
-  <section aria-labelledby="h-mine" id="mineSec" hidden>
-    <div class="sec-head">
-      <h2 id="h-mine">Meine Karten</h2>
-      <p class="lede">Auf dem Olympiade-Server gespeichert, mit Artwork. Eine gemeinsame Sammlung für alle, die sich einloggen können, von jedem Gerät aus.</p>
-    </div>
-    <div class="mine" id="mine"></div>
-  </section>
-
-  <section aria-labelledby="h-build">
-    <div class="sec-head">
-      <h2 id="h-build">Baukasten</h2>
-      <p class="lede">Einheit aus Teilen zusammenstellen. Neben jedem Knopf steht, was der nächste Schritt kostet. Helden haben ein festes Budget, Gefährten und Gegner kosten, was sie kosten.</p>
-    </div>
-    <div class="build">
-      <div class="b-controls" id="bControls"></div>
-      <div class="b-side">
-        <div class="seg seg3" id="bRole" role="group" aria-label="Rolle">
-          <button type="button" data-r="hero" aria-pressed="false">Held</button>
-          <button type="button" data-r="companion" aria-pressed="false">Gefährte</button>
-          <button type="button" data-r="enemy" aria-pressed="true">Gegner</button>
-        </div>
-        <label class="f" id="bBudgetRow">Budget je Held <input type="number" id="bBudget" min="20" step="5"></label>
-        <div id="bSum"></div>
-        <div class="b-card" id="bCard"></div>
-        <div class="row-b" style="display:flex;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn ghost sm" id="bNewHero">Neuer Held</button>
-          <button type="button" class="btn ghost sm" id="bNewEnemy">Neuer Gegner</button>
-          <button type="button" class="btn ghost sm" id="bElite">Elite-Version</button>
-        </div>
-        <p class="hint" id="bEliteMsg" aria-live="polite"></p>
+  <section aria-labelledby="h-liste">
+    <div class="liste-kopf">
+      <h2 id="h-liste">Fertige Charaktere</h2>
+      <div class="liste-filter">
+        <input type="search" id="lSuche" placeholder="Suchen" aria-label="Charaktere suchen">
+        <select id="lRolle" aria-label="Rolle"><option value="">Alle Rollen</option><option value="hero">Helden</option><option value="companion">Gefährten</option><option value="enemy">Gegner</option></select>
+        <select id="lQuelle" aria-label="Quelle"><option value="">Vorlagen und gespeicherte</option><option value="vorlage">Nur Vorlagen</option><option value="server">Nur gespeicherte</option></select>
       </div>
     </div>
+    <div class="tbl-wrap"><table class="charaktere" id="charaktere"></table></div>
+    <p class="hint" id="lInfo"></p>
+  </section>
+  </div>
+
+  <div id="tabRegeln" role="tabpanel" aria-labelledby="tab-regeln" class="tabpanel" hidden>
+  <nav class="subnav" aria-label="Abschnitte">
+    <a href="#h-elemente">Elemente</a><a href="#h-ladder">Stufen</a><a href="#h-sim">Simulator</a><a href="#h-formula">Formel</a><a href="#h-forge">Artwork</a>
+  </nav>
+  <section aria-labelledby="h-elemente">
+    <div class="sec-head">
+      <h2 id="h-elemente">Prägung und Elemente</h2>
+      <p class="lede">Acht Elemente, vier Gegensatzpaare. Die Prägung sagt, was eine Einheit ist, das Element einer Waffe, womit sie trifft.</p>
+    </div>
+    <div class="elemente" id="elemente"></div>
+  </section>
+  <section aria-labelledby="h-ladder">
+    <div class="sec-head">
+      <h2 id="h-ladder">Dieselbe Einheit, sechs Seltenheiten</h2>
+      <p class="lede">Grau, grün, blau, gelb, orange, rot. Rahmen, Ornamente und Effekte steigen Stufe für Stufe. Die aktuelle Karte in allen sechs Stufen. Ein Klick übernimmt die Stufe.</p>
+    </div>
+    <div class="ladder-scroll"><div class="ladder" id="ladder"></div></div>
   </section>
 
   <section aria-labelledby="h-sim">
@@ -739,11 +811,12 @@ fieldset.checks legend { margin-bottom: 6px; }
         <dl class="kv">
           <dt>Kampfwert</dt><dd>je Waffe: Attacken × Trefferchance × Waffenregeln × Reichweite, dann alle Waffen addiert</dd>
           <dt>Trefferchance</dt><dd>Qualität 2+ 0,83 · 3+ 0,67 · 4+ 0,5 · 5+ 0,33 · 6+ 0,17. Zuverlässig zählt wie 2+</dd>
-          <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Tödlich ×2 · Explosion(X) ×(1 + X/6)</dd>
+          <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Zerfleischen ×1,15 · Zersetzen ×1,35 · Stoß ×1,1 · Tödlich ×2 · Explosion(X) ×(1 + X/6) · Präzise ×1,25 · Indirekt ×1,15 · Zielsuchend ×1,05 · Überhitzen ×0,85 · Elemente ×1 (kosten nichts)</dd>
           <dt>Reichweite</dt><dd>Nahkampf ×1 · 6" ×0,68 · 12" ×0,8 · 18" ×0,9 · 24" ×1,0 · 30" ×1,1. Mit dem Duell-Simulator so abgestimmt, dass Fern- und Nahkampf bei gleichen Punkten gleich oft gewinnen</dd>
           <dt>Ausdauer</dt><dd>Zäh × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
           <dt>Boni</dt><dd>+5 % Geländeläufer, Späher, Tarnung, Fliegen, Furchtlos, Rasend, Held · +10 % Schnell, Hinterhalt, Wucht · +15 % Furcht · +20 % Ausweichen · +25 % Regeneration · −10 % Langsam · −15 % An Beschwörer gebunden</dd>
-          <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Quest-Held mit Skills +25</dd>
+          <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Skills, Zauber und Gegenstände aus der Datenbank mit ihren festen Punkten</dd>
+          <dt>Prozent</dt><dd>Sonderregeln der Gegner aus der Datenbank als Aufschlag auf die Boni</dd>
           <dt>Begriffe</dt><dd>DS = Durchschlag (OPR: AP) · Reißend (Rending) · Explosion (Blast) · Tödlich (Deadly) · Zuverlässig (Reliable) · Wucht (Impact) · Furcht (Fear)</dd>
         </dl>
       </div>
@@ -774,12 +847,12 @@ fieldset.checks legend { margin-bottom: 6px; }
       <h2 id="h-forge">Vom Miniaturfoto zum Artwork</h2>
       <p class="lede">Die Bild-KI malt nur das Motiv. Rahmen, Werte und Text setzt die Kartenschmiede darüber. So bleibt jede Karte einheitlich, und die Regeln lassen sich später ändern, ohne neu zu generieren.</p>
     </div>
-    <div class="forge">
+    <div class="forge forge-1">
       <div style="display:grid;gap:22px;align-content:start">
         <ol class="steps">
           <li>Mini bei Tageslicht vor neutralem Hintergrund fotografieren, leicht von unten, ganze Figur im Bild.</li>
-          <li>Foto in die Bild-KI laden und den Prompt rechts mitschicken. Er kommt aus den Feldern der Werkstatt und passt Licht und Kamera an die Seltenheit an.</li>
-          <li>Das Ergebnis oben in der Werkstatt hochladen, Ausschnitt und Zoom einstellen.</li>
+          <li>Foto in die Bild-KI laden und den Bild-Prompt aus „Erstellen“ (Abschnitt Artwork) mitschicken. Er kommt aus den Feldern der Karte und passt Licht und Kamera an die Seltenheit an.</li>
+          <li>Das Ergebnis in „Erstellen“ hochladen, Ausschnitt und Zoom einstellen.</li>
           <li>Speichern oder „Als PNG erzeugen“ drücken.</li>
         </ol>
         <div class="tools">
@@ -788,15 +861,6 @@ fieldset.checks legend { margin-bottom: 6px; }
           <div class="tool"><b>Google Gemini</b><span>Bearbeitet ein hochgeladenes Foto sehr nah am Original. Gut, wenn Bemalung und Pose erhalten bleiben sollen.</span></div>
           <div class="tool"><b>ComfyUI lokal</b><span>Flux Kontext oder SDXL auf dem eigenen Rechner, kostenlos und ohne Limit. Workflow und Skript liegen im Repo unter <code>apps/kartenschmiede/comfyui</code>.</span></div>
         </div>
-      </div>
-      <div style="display:grid;gap:12px;align-content:start">
-        <label class="f" for="prompt">Prompt für die aktuelle Karte (englisch, damit verstehen die Bild-KIs am meisten)</label>
-        <textarea id="prompt" readonly></textarea>
-        <div class="copyrow">
-          <button type="button" class="btn ghost" id="copyBtn">Prompt kopieren</button>
-          <span class="hint" id="copyMsg" aria-live="polite"></span>
-        </div>
-        <p class="hint">Der Stil ist fest eingestellt: fotorealistischer Dark-Fantasy-Filmstill mit einem leuchtenden Sci-Fi-Akzent, wie bei den Olympiade-Bildern. So wirken alle Karten wie aus einer Welt.</p>
       </div>
     </div>
   </section>

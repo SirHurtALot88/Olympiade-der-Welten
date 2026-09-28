@@ -12,6 +12,7 @@ Läuft in der App unter **`/kartenschmiede`** (hinter demselben Login wie das Sp
 | `datenbank.js` | Reiter „Datenbank“: Suche, Typ- und Tag-Filter, Generator, eigene Einträge |
 | `app.js` | Reiter „Karten“: Werkstatt, Baukasten, Fähigkeiten-Datenbank, Simulator, Speichern, Karte als Text |
 | `gruppe.js` | Reiter „Gruppe“: Helden-Lineups mit Budget, Fähigkeiten je Mitglied, Wellengröße, Druck |
+| `charaktere.js` | Tabelle „Fertige Charaktere“ unter dem Erstellen: Vorlagen und gespeicherte Karten, sortier- und filterbar |
 | `assets/`, `fonts/` | Beispielbilder aus Chris' Einheiten-Tabelle, Schriften (SIL OFL, über Fontsource) |
 | `vendor/html-to-image.js` | PNG-Export (MIT, Version 1.11.11) |
 | `comfyui/` | Workflows und Skript, um aus einem Mini-Foto lokal ein Artwork zu machen |

@@ -111,6 +111,8 @@
     const angebote = KS.alleFaehigkeiten().filter(f => f.fuer.includes(k.role || "enemy"));
     const knopf = f => {
       const an = skills.some(s => s.id === f.id);
+      const kf = !an && KS.konfliktVon(f, k);
+      if (kf) return `<button type="button" class="tgl" disabled data-tip="${esc(`<b>${esc(f.name)}</b>${esc(KS.konfliktText(kf))}`)}">${KS.tagIcons(f.tags, false)}${esc(f.name)} 🔒</button>`;
       const probe = { ...k, skills: an ? skills.filter(s => s.id !== f.id) : skills.concat(KS.skillKopie(f)) };
       const d = Math.round(punkteVon(probe).roh - roh);
       const zuTeuer = held && !an && d > rest;
@@ -122,7 +124,8 @@
       ${held ? `<div class="meter" role="img" aria-label="${Math.round(roh)} von ${aktiv.budget} Punkten"><i style="width:${anteil}%"></i></div>
         <div class="g-budget"><b>${Math.round(roh)}</b> von ${aktiv.budget} Punkten · <b>${rest}</b> übrig</div>`
         : `<div class="g-budget"><b>${k.points}</b> Punkte · ${ROLLEN[k.role || "enemy"]} · ${STUFEN[k.tier || 1]}</div>`}
-      <div class="tgls">${angebote.map(knopf).join("")}</div>
+      ${KS.tagLeiste("gruppe" + i, angebote, zeigeGruppe)}
+      <div class="tgls">${angebote.filter(f => skills.some(s => s.id === f.id) || KS.filterPasst("gruppe" + i, f)).map(knopf).join("")}</div>
       <div class="acts"><button type="button" class="btn ghost sm" data-oeffnen="${i}">In Werkstatt öffnen</button><button type="button" class="btn ghost sm" data-raus="${i}">Entfernen</button></div>
     </div>`;
   }

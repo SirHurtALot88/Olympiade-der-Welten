@@ -61,6 +61,7 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("app.js").toString("utf8")),
     skript(lies("gruppe.js").toString("utf8")),
     skript(lies("datenbank.js").toString("utf8")),
+    skript(lies("charaktere.js").toString("utf8")),
   ].join("\n");
 
   const seite = vorlage.replace("{{FONTS}}", () => schriften).replace("{{SKRIPTE}}", () => skripte);

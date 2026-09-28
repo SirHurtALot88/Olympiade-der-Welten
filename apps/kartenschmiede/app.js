@@ -28,15 +28,15 @@
   const basis = { size: "1", role: "enemy", skills: [], bossName: "", bossText: "", special: "0", ax: 50, ay: 40, zoom: 100, flavor: "", look: "", art: "" };
   const VORLAGEN = [
     { key: "frostfang", label: "Frostfang · Boss (Werwolf-Mini, Beispiel)", eigen: false, d: { ...basis,
-      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", quality: "3+", defense: "4+", tough: "12",
-      weapons: "Frostklauen | Nahkampf | A6 | DS(2), Reißend\nEisnacht-Heulen | 12\" | A1 | Explosion(3), Zuverlässig",
+      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", praegung: ["frost"], quality: "3+", defense: "4+", tough: "12",
+      weapons: "Frostklauen | Nahkampf | A6 | DS(2), Reißend, Frost\nEisnacht-Heulen | 12\" | A1 | Explosion(3), Zuverlässig, Frost",
       passives: "Schnell, Furchtlos, Regeneration", skills: sk("gebrochene-ketten"),
       flavor: "Die Kette hielt drei Winter. Im vierten hielt sie nichts mehr.",
       look: "a hulking werewolf with pale ice-blue fur on its back and shoulders, dark slate-blue skin, bone-white claws and fangs, broken iron shackles and chains hanging from its wrists, howling on frozen, snow-dusted ground",
       art: "werwolf", ax: 45, ay: 20 } },
     { key: "frostklauen", label: "Frostklauen-Pirscher (Werwolf-Mini)", eigen: true, d: { ...basis,
       name: "Frostklauen-Pirscher", faction: "Urwild", quality: "3+", defense: "5+", tough: "5",
-      weapons: "Frostklauen | Nahkampf | A4 | Reißend", passives: "Rasend, Hinterhalt, Geländeläufer",
+      praegung: ["frost"], weapons: "Frostklauen | Nahkampf | A4 | Reißend, Frost", passives: "Rasend, Hinterhalt, Geländeläufer",
       flavor: "Man hört die Ketten, bevor man die Klauen sieht.",
       look: "a lean, hunched werewolf with pale ice-blue fur, dark slate-blue skin, bone-white claws, broken chains on its wrists, stalking through snow",
       art: "werwolf", ax: 45, ay: 20 } },
@@ -121,8 +121,10 @@
   ];
   const symbolFuer = s => (SYMBOLE.find(([re]) => re.test(s)) || [0, "rune"])[1];
   // Tag-Symbole: auf der Karte und in Listen statt ausgeschriebener Schlagworte, Name per Hover
+  // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
+  const tagIco = t => TAG[t] && TAG[t].element ? `<span class="elem" style="--el:${TAG[t].farbe}">${ico(TAG[t].icon)}</span>` : TAG[t] ? ico(TAG[t].icon) : "";
   const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
-    ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${ico(TAG[t].icon)}</span>` : ico(TAG[t].icon)).join("")}</span>` : "";
+    ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${tagIco(t)}</span>` : tagIco(t)).join("")}</span>` : "";
   const tipText = f => `<b>${esc(f.name)}</b>${esc(f.text || "")}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
 
   let state = {};
@@ -173,13 +175,13 @@
             ${waffen.length ? `<div class="weps"><div class="block-t">Waffen</div>${waffen.map(w => {
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
-              const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${esc(t)}</span>` : esc(t); };
+              const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${r.element && TAG[r.element] ? tagIco(r.element) : ""}${esc(t)}</span>` : esc(t); };
               const unter = [nah ? "" : esc(w.reichweite + '"'), "A" + w.a].concat(regeln.split(",").map(t => t.trim()).filter(Boolean).map(mitTip)).filter(Boolean).join(", ");
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
             ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
-            <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
+            <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${tagIco(t)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
         <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
@@ -222,7 +224,6 @@
 
   function zeigeRechnung() {
     const c = R.punkte(state);
-    $("points").value = c.pts;
     $("calc").innerHTML = `
       <div class="big"><b>${c.pts}</b><span>Punkte · Stufe ${STUFEN[R.stufeFuerPunkte(c.pts)]}</span></div>
       <div class="parts">Kampfwert ${zahl(c.K, 2)} · Ausdauer ${zahl(c.A)} · Boni ${c.b >= 0 ? "+" : ""}${Math.round(c.b * 100)} %${c.fest ? ` · fest +${c.fest}` : ""}</div>`;
@@ -280,7 +281,7 @@
       $("fitNote").textContent = ueberlauf ? "Zu viel Text für die Karte: Der untere Teil wird abgeschnitten. Kürze Regeltexte oder nimm eine Fähigkeit weg."
         : kleinste < 0.8 ? `Viel Text: Die Schrift ist auf ${Math.round(kleinste * 100)} % verkleinert, damit alles passt. Beim Druck bleibt es lesbar bis etwa 70 %.` : "";
     });
-    $("suggest").textContent = `${state.points || 0} Punkte ergeben: ${STUFEN[R.stufeFuerPunkte(+state.points || 0)]}. Staffel: ${R.GRENZEN_TEXT.slice(1).join(" · ")}.`;
+    $("suggest").dataset.tip = `${state.points || 0} Punkte ergeben: ${STUFEN[R.stufeFuerPunkte(+state.points || 0)]}. Staffel: ${R.GRENZEN_TEXT.slice(1).join(" · ")}.`;
     $("tierNote").innerHTML = NOTIZEN[state.tier];
     $("prompt").value = prompt();
     zeigeSkills();
@@ -318,8 +319,8 @@
   function modellAus(s) {
     const waffen = R.leseWaffen(s.weapons).map(w => ({
       name: w.name, reichweite: w.reichweite, a: w.a || 1, ds: w.ds, reissend: w.reissend, gift: w.gift,
-      explosion: w.explosion, toedlich: w.toedlich, zuverlaessig: w.zuverlaessig,
-      rest: R.leseListe(w.regeln).filter(x => x !== "–" && !/^(DS|AP)\s*\(\d\)$|reißend|reissend|rending|gift|poison|bane|explosion|blast|tödlich|toedlich|deadly|zuverlässig|zuverlaessig|reliable/i.test(x)),
+      explosion: w.explosion, toedlich: w.toedlich, zuverlaessig: w.zuverlaessig, element: w.element && w.element !== "gift" ? w.element : null,
+      rest: R.leseListe(w.regeln).filter(x => x !== "–" && !R.elementAus(x) && !/^(DS|AP)\s*\(\d\)$|reißend|reissend|rending|gift|poison|bane|explosion|blast|tödlich|toedlich|deadly|zuverlässig|zuverlaessig|reliable/i.test(x)),
     }));
     const faeh = new Set(), rest = [];
     R.leseListe(s.passives).forEach(p => { const k = faehSchluessel(p); if (k) faeh.add(k); else rest.push(p); });
@@ -333,7 +334,7 @@
     s.quality = m.q + "+"; s.defense = m.d + "+"; s.tough = String(m.t); s.size = String(m.n);
     s.weapons = m.waffen.map(w => {
       const regeln = [w.ds && `DS(${w.ds})`, w.reissend && "Reißend", w.gift && "Gift", w.explosion && `Explosion(${w.explosion})`,
-        w.toedlich && `Tödlich(${w.toedlich})`, w.zuverlaessig && "Zuverlässig", ...(w.rest || [])].filter(Boolean).join(", ");
+        w.toedlich && `Tödlich(${w.toedlich})`, w.zuverlaessig && "Zuverlässig", ...(w.rest || []), w.element && R.ELEMENT[w.element].wort].filter(Boolean).join(", ");
       return `${w.name} | ${w.reichweite ? w.reichweite + '"' : "Nahkampf"} | A${w.a} | ${regeln}`;
     }).join("\n");
     s.passives = [...FAEH.filter(([k]) => m.faeh.has(k)).map(([, n]) => n), ...m.rest].join(", ");
@@ -382,6 +383,8 @@
         ${stufe(`w${i}ds`, "Durchschlag", "DS(" + w.ds + ")", x => x.waffen[i].ds > 0 ? (x.waffen[i].ds--, true) : false, x => x.waffen[i].ds < 4 ? (x.waffen[i].ds++, true) : false)}</div>
         <div class="tgls">${schalter("reissend", "Reißend", 1)}${schalter("gift", "Gift", 1)}${schalter("explosion", "Explosion(3)", 3)}
           ${schalter("toedlich", "Tödlich(3)", 3)}${schalter("zuverlaessig", "Zuverlässig", 1)}</div>
+        <div class="tgls el-wahl"><span class="hint">Element</span>${R.ELEMENTE.filter(e => e.id !== "gift").map(e =>
+          `<button type="button" class="tgl" data-act="w${i}el:${e.id}" aria-pressed="${w.element === e.id}" data-tip="${esc(`<b>${e.wort}</b>` + R.regelnVon(e.wort)[0].text)}">${tagIco(e.id)}</button>`).join("")}</div>
       </div>`;
     });
     const neu = kostet(m, x => { x.waffen.push({ name: "Neue Waffe", reichweite: 0, a: 1, ds: 0, rest: [] }); });
@@ -390,8 +393,11 @@
       const an = m.faeh.has(k); const d = kostet(m, x => { if (an) x.faeh.delete(k); else x.faeh.add(k); });
       return `<button type="button" class="tgl" data-act="ab:${k}" aria-pressed="${an}" ${!an && !geht(d) ? "disabled" : ""}>${n}${preis(d)}</button>`;
     }).join("")}</div>${m.rest.length ? `<p class="hint">Eigene Regeln bleiben erhalten: ${esc(m.rest.join(", "))}</p>` : ""}</div>`;
-    html += `<div class="b-group"><h4>Aus der Datenbank</h4><div class="tgls">${alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle)).map(f => {
+    const bAngebot = alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle));
+    html += `<div class="b-group"><h4>Aus der Datenbank</h4>${tagLeiste("baukasten", bAngebot, baukasten)}<div class="tgls">${bAngebot.filter(f => m.skills.some(k => k.id === f.id) || filterPasst("baukasten", f)).map(f => {
       const an = m.skills.some(k => k.id === f.id);
+      const kf = !an && konfliktVon(f, state);
+      if (kf) return `<button type="button" class="tgl" disabled data-tip="${esc(`<b>${esc(f.name)}</b>${esc(konfliktText(kf))}`)}">${tagIcons(f.tags, false)}${esc(f.name)} 🔒</button>`;
       const d = kostet(m, x => { x.skills = an ? x.skills.filter(k => k.id !== f.id) : x.skills.concat(skillKopie(f)); });
       return `<button type="button" class="tgl" data-act="sk:${esc(f.id)}" aria-pressed="${an}" data-tip="${esc(tipText(f))}" ${!an && !geht(d) ? "disabled" : ""}>${tagIcons(f.tags, false)}${esc(f.name)}${preis(d)}</button>`;
     }).join("")}</div></div>`;
@@ -413,8 +419,6 @@
           ? "Gefährten zählen zu den Gruppenpunkten. Freigeschaltet, wenn die Gruppe die Elite-Version dieser Gegnerart besiegt hat. Keine Power, keine Skills, keine XP, höchstens einer je Held."
           : "Gegner haben kein Limit. Jede Verbesserung kostet umso mehr, je stärker die Einheit schon ist: Angriff wird teurer, wenn sie viel aushält, und umgekehrt."}</p>`;
     }
-    $("bCard").innerHTML = renderCard(state, state.tier, {});
-    requestAnimationFrame(() => passeAn($("bCard")));
   }
   function modellUebernehmen() { schreibeModell(bModell, state); insFormular(); alles(); }
   function aktion(act) {
@@ -439,6 +443,7 @@
       else if (k === "r") { const i = REICHWEITEN.indexOf(w.reichweite); w.reichweite = REICHWEITEN[Math.max(0, Math.min(REICHWEITEN.length - 1, i + (dir === "+" ? 1 : -1)))]; }
       else if (k === "del") m.waffen.splice(+mm[1], 1);
       else if (k === "explosion" || k === "toedlich") w[k] = w[k] ? 0 : 3;
+      else if (k === "el") w.element = w.element === dir ? null : dir;
       else w[k] = !w[k];
     }
     modellUebernehmen();
@@ -514,20 +519,17 @@
       img.src = src;
     });
   }
+  // Gespeicherte Karten vom Server; die Tabelle „Fertige Charaktere“ (charaktere.js) zeigt sie zusammen mit den Vorlagen
+  let serverKarten = null;
   async function meineKarten() {
-    const box = $("mine");
     try {
       const r = await fetch(API, { credentials: "same-origin" });
       if (!r.ok) throw new Error(r.status);
-      const { karten } = await r.json();
-      box.innerHTML = karten.length ? karten.map(k => `
-        <div class="mine-item"><div class="th" style="border-color:var(--t${k.tier || 1});${k.vorschau ? `background-image:url('${k.vorschau}')` : ""}"></div>
-          <div><b>${esc(k.name)}</b><small>${k.points} P. · ${STUFEN[k.tier || 1]}${k.role && k.role !== "enemy" ? " · " + ROLLEN[k.role] : ""}${k.gespeichertVon ? " · von " + esc(k.gespeichertVon) : ""}</small>
-          <div class="acts"><button type="button" class="btn ghost sm" data-load="${esc(k.id)}">Laden</button><button type="button" class="btn ghost sm" data-del="${esc(k.id)}">Löschen</button></div></div></div>`).join("")
-        : `<p class="mine-empty">Noch keine Karten gespeichert. Oben in der Werkstatt auf „Speichern“ drücken.</p>`;
+      serverKarten = (await r.json()).karten || [];
     } catch {
-      box.innerHTML = `<p class="mine-empty">Die gespeicherten Karten ließen sich nicht laden. Bist du noch eingeloggt?</p>`;
+      serverKarten = null;
     }
+    if (window.KartenschmiedeCharaktere) window.KartenschmiedeCharaktere.zeigen();
   }
   async function speichern() {
     const msg = $("saveMsg");
@@ -550,7 +552,7 @@
     const { karte } = await r.json();
     state = Object.assign({ orient: "port", autoTier: true }, karte);
     bModell = null; insFormular(); alles();
-    $("h-shop").scrollIntoView({ behavior: "smooth" });
+    reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" });
   }
   async function loescheKarte(id, knopf) {
     if (knopf.dataset.sicher !== "1") { knopf.dataset.sicher = "1"; knopf.textContent = "Wirklich löschen?"; return; }
@@ -581,38 +583,73 @@
     requestAnimationFrame(() => window.print());
   }
 
+  // ---------- Tag-Filter und Prägung (gemeinsam für Werkstatt, Baukasten, Gruppe) ----------
+  // Jede Liste hat ihren eigenen Filter; ein Klick auf einen Tag zeichnet die Liste über ihren Rückruf neu.
+  const FILTER = {}, NEU_ZEICHNEN = {};
+  const filterVon = schluessel => FILTER[schluessel] || (FILTER[schluessel] = { tags: new Set(), typ: "" });
+  const TYP_KURZ = [["faehigkeit", "Fähigkeiten"], ["zauber", "Zauber"], ["gegenstand", "Gegenstände"]];
+  function tagLeiste(schluessel, eintraege, neuZeichnen) {
+    NEU_ZEICHNEN[schluessel] = neuZeichnen;
+    const f = filterVon(schluessel);
+    const tags = KAT.TAGS.filter(t => eintraege.some(e => (e.tags || []).includes(t.id)));
+    const typen = TYP_KURZ.filter(([id]) => eintraege.some(e => e.typ === id));
+    return `<div class="tagleiste" data-leiste="${schluessel}">${typen.length > 1 ? typen.map(([id, n]) => `<button type="button" class="chip-f" data-ftyp="${id}" aria-pressed="${f.typ === id}">${n}</button>`).join("") : ""}${tags.map(t =>
+      `<button type="button" class="chip-f" data-ftag="${t.id}" aria-pressed="${f.tags.has(t.id)}" data-tip="${esc(t.name)}">${tagIco(t.id)}</button>`).join("")}${f.tags.size || f.typ ? `<button type="button" class="chip-f" data-freset="1">× Filter</button>` : ""}</div>`;
+  }
+  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || e.typ === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".tagleiste button"); if (!b) return;
+    const schluessel = b.closest(".tagleiste").dataset.leiste, f = filterVon(schluessel);
+    if (b.dataset.ftag) { if (f.tags.has(b.dataset.ftag)) f.tags.delete(b.dataset.ftag); else f.tags.add(b.dataset.ftag); }
+    else if (b.dataset.ftyp) f.typ = f.typ === b.dataset.ftyp ? "" : b.dataset.ftyp;
+    else { f.tags.clear(); f.typ = ""; }
+    if (NEU_ZEICHNEN[schluessel]) NEU_ZEICHNEN[schluessel]();
+  });
+  const praegungVon = s => Array.isArray(s && s.praegung) ? s.praegung : [];
+  const konfliktVon = (f, s) => KAT.konflikt(f, praegungVon(s));
+  const konfliktText = k => `Gesperrt: Die Prägung ${TAG[k.praegung].name} verträgt keine ${TAG[k.tag].name}-Einträge.`;
+  const praegTip = t => { const e = R.ELEMENT[t]; return e ? `<b>Prägung ${e.name}</b>Gesperrt: alle ${R.ELEMENT[e.gegen].name}-Einträge. Resistent gegen ${e.name}-Angriffe, verwundbar durch ${R.ELEMENT[e.gegen].name}-Angriffe.` : ""; };
+  function zeigePraegung() {
+    const an = praegungVon(state);
+    $("praegung").innerHTML = KAT.PRAEGUNGEN.filter(t => TAG[t]).map(t => `<button type="button" class="chip-f" data-praeg="${t}" aria-pressed="${an.includes(t)}" data-tip="${esc(praegTip(t))}">${tagIco(t)}${esc(TAG[t].name)}</button>`).join("");
+  }
+
   // ---------- Fähigkeiten: Werkstatt, Datenbank, eigene Einträge ----------
   // Auswahl in der Werkstatt: Liste mit Suche und Tag-Filter, Beschreibung per Hover
-  let pickerSuche = "", pickerTag = "";
+  let pickerSuche = "";
   function zeigeSkills() {
     const rolle = state.role || "enemy";
     const skills = Array.isArray(state.skills) ? state.skills : [];
-    $("skillChips").innerHTML = skills.length ? skills.map(k => `<span class="skill-chip" data-tip="${esc(tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`).join("")
+    zeigePraegung();
+    $("skillChips").innerHTML = skills.length ? skills.map(k => { const kf = konfliktVon(k, state); return `<span class="skill-chip${kf ? " konflikt" : ""}" data-tip="${esc(kf ? `<b>${esc(k.name)}</b>${esc(konfliktText(kf))}` : tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`; }).join("")
       : `<span class="hint">Noch keine.</span>`;
     const q = pickerSuche.toLowerCase();
-    const frei = alleFaehigkeiten().filter(f => f.fuer.includes(rolle) && !skills.some(k => k.id === f.id)
-      && (!pickerTag || (f.tags || []).includes(pickerTag)) && (!q || (f.name + " " + f.text).toLowerCase().includes(q)));
-    const genutzteTags = [...new Set(alleFaehigkeiten().flatMap(f => f.tags || []))].filter(t => TAG[t]);
+    const fuerRolle = alleFaehigkeiten().filter(f => f.fuer.includes(rolle));
+    const kandidaten = fuerRolle.filter(f => !skills.some(k => k.id === f.id) && filterPasst("werkstatt", f) && (!q || (f.name + " " + f.text).toLowerCase().includes(q)));
+    const frei = kandidaten.filter(f => !konfliktVon(f, state));
+    const gesperrt = kandidaten.length - frei.length;
     const kopf = $("skillPicker").querySelector(".picker-head");
     if (!kopf) {
-      $("skillPicker").innerHTML = `<div class="picker-head"><input type="search" id="pickerSuche" placeholder="Fähigkeit suchen" aria-label="Fähigkeit suchen"><select id="pickerTag" aria-label="Nach Tag filtern"></select></div><div class="picker-list" id="pickerListe"></div>`;
+      $("skillPicker").innerHTML = `<div class="picker-head"><input type="search" id="pickerSuche" placeholder="Fähigkeit suchen" aria-label="Fähigkeit suchen"></div><div id="pickerTags"></div><div class="picker-list" id="pickerListe"></div>`;
       $("pickerSuche").addEventListener("input", e => { pickerSuche = e.target.value; zeigeSkills(); });
-      $("pickerTag").addEventListener("change", e => { pickerTag = e.target.value; zeigeSkills(); });
     }
-    $("pickerTag").innerHTML = `<option value="">Alle Tags</option>` + genutzteTags.map(t => `<option value="${t}" ${t === pickerTag ? "selected" : ""}>${esc(TAG[t].name)}</option>`).join("");
+    $("pickerTags").innerHTML = tagLeiste("werkstatt", fuerRolle, zeigeSkills);
     $("pickerListe").innerHTML = frei.map(f => `<button type="button" class="picker-item" data-add="${esc(f.id)}" data-tip="${esc(tipText(f))}">
         <span>${tagIcons(f.tags, false)}${esc(f.name)} <small>${esc(f.art)}</small></span><small>${kostenText(f.kosten)}</small></button>`).join("")
       || `<p class="hint">Nichts gefunden.</p>`;
+    if (gesperrt) $("pickerListe").insertAdjacentHTML("beforeend", `<p class="gesperrt-hinweis">${gesperrt} weitere durch die Prägung gesperrt.</p>`);
     // Waffen aus der Datenbank
     $("weaponAdd").innerHTML = `<option value="">Waffe aus der Datenbank hinzufügen …</option>` + alleEintraege().filter(e => e.typ === "waffe")
       .map(e => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.text || e.waffe)}</option>`).join("");
   }
   // Eintrag aus der Datenbank auf die aktuelle Karte legen
   function aufKarte(f) {
+    if (f.typ !== "fraktion" && konfliktVon(f, state)) return false;
     if (f.typ === "waffe") state.weapons = [state.weapons, f.waffe].filter(x => x && x.trim()).join("\n");
     else if (f.typ === "fraktion") state.faction = f.name;
     else if (!(state.skills || []).some(k => k.id === f.id)) state.skills = (state.skills || []).concat(skillKopie(f));
     bModell = null; insFormular(); alles(); simOptionen();
+    return true;
   }
 
   const API_F = "/api/kartenschmiede/faehigkeiten";
@@ -650,7 +687,7 @@
   function karteAlsText() {
     const { upload, ...rest } = state;
     const aus = {};
-    ["name", "faction", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
+    ["name", "faction", "praegung", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
     if (upload) aus.art = "(eigenes Artwork, nicht im Text)";
     return JSON.stringify(aus, null, 2);
   }
@@ -670,6 +707,7 @@
     if (d.art && IMG[d.art]) state.art = d.art;
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
+    state.praegung = Array.isArray(d.praegung) ? d.praegung.filter(t => KAT.PRAEGUNGEN.includes(t)) : [];
     bModell = null; insFormular(); alles();
     msg.textContent = `Übernommen: ${state.name}.${neu.length ? ` Neu in der Datenbank: ${neu.join(", ")}.` : ""} Das Artwork bleibt, bis du ein neues hochlädst.`;
   }
@@ -741,7 +779,6 @@
   });
   $("bControls").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (b && !b.disabled) aktion(b.dataset.act); });
   $("bControls").addEventListener("change", e => { if (e.target.classList.contains("wname")) { bModell.waffen[+e.target.dataset.w].name = e.target.value || "Waffe"; modellUebernehmen(); } });
-  $("bRole").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; bModell.rolle = b.dataset.r; modellUebernehmen(); });
   $("bBudget").addEventListener("change", e => { bModell.budget = Math.max(20, +e.target.value || 100); modellUebernehmen(); });
   $("bNewHero").addEventListener("click", () => frisch("hero"));
   $("bNewEnemy").addEventListener("click", () => frisch("enemy"));
@@ -750,12 +787,8 @@
   $("simFair").textContent = "Balance-Test: Fern gegen Nah";
   $("simFair").addEventListener("click", balance);
   if (SERVER) {
-    $("saveBtn").hidden = false; $("mineSec").hidden = false;
+    $("saveBtn").hidden = false;
     $("saveBtn").addEventListener("click", speichern);
-    $("mine").addEventListener("click", e => {
-      const l = e.target.closest("[data-load]"), d = e.target.closest("[data-del]");
-      if (l) ladeKarte(l.dataset.load); if (d) loescheKarte(d.dataset.del, d);
-    });
     meineKarten();
   }
 
@@ -765,7 +798,18 @@
     state.skills = (state.skills || []).filter(k => k.id !== b.dataset.skillWeg); bModell = null; alles();
   });
   $("weaponAdd").addEventListener("change", e => { const f = findeFaehigkeit(e.target.value); if (f) aufKarte(f); e.target.value = ""; });
-  $("faction").addEventListener("change", e => { state.faction = e.target.value; alles(); });
+  $("faction").addEventListener("change", e => {
+    state.faction = e.target.value;
+    const fr = fraktionVon(state.faction);
+    if (fr && fr.praegung && fr.praegung.length && !praegungVon(state).length) state.praegung = fr.praegung.slice();
+    alles();
+  });
+  $("praegung").addEventListener("click", e => {
+    const b = e.target.closest("[data-praeg]"); if (!b) return;
+    const an = praegungVon(state), t = b.dataset.praeg;
+    state.praegung = an.includes(t) ? an.filter(x => x !== t) : an.concat(t);
+    bModell = null; alles();
+  });
 
   // Tooltip: überall, wo data-tip steht (Fähigkeiten, Tags, Einträge)
   const tip = $("tip");
@@ -783,10 +827,41 @@
   document.addEventListener("scroll", () => { tip.hidden = true; }, true);
   $("jsonIn").addEventListener("click", textUebernehmen);
   $("jsonOut").addEventListener("click", () => { $("cardJson").value = karteAlsText(); $("jsonMsg").textContent = "Das ist die aktuelle Karte als Text, ohne das Artwork."; });
+  // Bearbeiten mit Formular oder Baukasten: dieselbe Karte, zwei Ansichten
+  let modus = "form";
+  try { modus = localStorage.getItem("kartenschmiede-modus") === "bau" ? "bau" : "form"; } catch { /* egal */ }
+  function zeigeModus() {
+    $("formModus").hidden = modus !== "form"; $("bauModus").hidden = modus !== "bau";
+    document.querySelectorAll("#modus button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === modus)));
+    if (modus === "bau") { bModell = null; baukasten(); }
+  }
+  $("modus").addEventListener("click", e => {
+    const b = e.target.closest("button[data-m]"); if (!b) return;
+    modus = b.dataset.m; try { localStorage.setItem("kartenschmiede-modus", modus); } catch { /* egal */ }
+    zeigeModus();
+  });
+  zeigeModus();
+
+  // Reiter „Regeln“: Tabelle der Elemente
+  function zeigeElemente() {
+    $("elemente").innerHTML = `<div class="tbl-wrap"><table class="el-tabelle">
+      <thead><tr><th>Element</th><th>Gegenteil</th><th>Prägung sperrt</th><th>Resistent gegen</th><th>Verwundbar durch</th><th>Waffenwort</th></tr></thead>
+      <tbody class="static">${R.ELEMENTE.map(e => { const g = R.ELEMENT[e.gegen]; return `<tr>
+        <td><span class="el-name">${tagIco(e.id)}${esc(e.name)}</span></td><td><span class="el-name">${tagIco(g.id)}${esc(g.name)}</span></td>
+        <td>alle ${esc(g.name)}-Einträge</td><td>${esc(e.name)}-Angriffe (+1 Verteidigung)</td><td>${esc(g.name)}-Angriffe (−1 Verteidigung)</td><td><code>${esc(e.wort)}</code></td></tr>`; }).join("")}</tbody>
+    </table></div>
+    <div class="el-regeln">
+      <p><b>Prägung</b> – was eine Einheit ihrem Wesen nach ist. Sie sperrt alle Fähigkeiten, Zauber, Gegenstände und Waffen mit dem Gegen-Element: Ein Feuerelementar lernt keine Frostzauber, eine Sci-Fi-Einheit keine Magie. Die Fraktion schlägt eine Prägung vor (Dämonen Feuer, Frostvolk Frost, Untote Schatten, Elfen Natur, Urwild Gift).</p>
+      <p><b>Element einer Waffe</b> – ein Wort bei den Regeln, zum Beispiel <code>Frostklauen | Nahkampf | A4 | Reißend, Frost</code>. Trifft die Waffe eine Einheit derselben Prägung, würfelt das Ziel seine Verteidigung mit +1, bei der Gegen-Prägung mit −1. Alle anderen Ziele: keine Änderung.</p>
+      <p><b>Punkte</b> – Elemente kosten nichts: Mal nützen sie, mal schaden sie. Der Duell-Simulator würfelt sie mit.</p>
+    </div>`;
+  }
+
   // Reiter
   const reiter = name => {
     document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-    $("tabKarten").hidden = name !== "karten"; $("tabGruppe").hidden = name !== "gruppe"; $("tabDb").hidden = name !== "db";
+    $("tabKarten").hidden = name !== "karten"; $("tabGruppe").hidden = name !== "gruppe"; $("tabDb").hidden = name !== "db"; $("tabRegeln").hidden = name !== "regeln";
+    if (name === "regeln") { zeigeElemente(); passeAn($("ladder")); }
     if (name === "gruppe" && window.KartenschmiedeGruppe) window.KartenschmiedeGruppe.zeigen();
     if (name === "db" && window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.zeigen();
     try { history.replaceState(null, "", "#" + name); } catch { /* egal */ }
@@ -795,13 +870,16 @@
 
   // Schnittstelle für den Reiter „Gruppe“ (gruppe.js)
   window.KS = {
+    tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon, tagIco, ladeKarte, loescheKarte,
+    serverKarten: () => serverKarten,
+    vorlageLaden: key => { vorlage(key); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     R, IMG, SERVER, STUFEN, ROLLEN, TAG, KAT, esc, ico, renderCard, passeAn, alleFaehigkeiten, alleEintraege, findeFaehigkeit, skillKopie, kostenText,
     tagIcons, tipText, iconFuer, VORLAGEN, nimmAuf, sichereEigene, aufKarte,
     eigeneIds: () => new Set(eigene.map(e => e.id)),
     async loescheEigenen(id) { eigene = eigene.filter(f => f.id !== id); await sichereEigene(); alles(); },
     nachAenderung() { insFormular(); alles(); simOptionen(); },
     zeigeReiter: name => reiter(name),
-    oeffneInWerkstatt(karte) { state = Object.assign({ orient: "port", autoTier: true }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").scrollIntoView({ behavior: "smooth" }); },
+    oeffneInWerkstatt(karte) { state = Object.assign({ orient: "port", autoTier: true }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
     zeigePngs, drucken,
   };
@@ -812,4 +890,5 @@
   ladeEigene().then(() => { insFormular(); alles(); if (window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.neu(); });
   if (location.hash === "#gruppe") reiter("gruppe");
   if (location.hash === "#db") reiter("db");
+  if (location.hash === "#regeln") reiter("regeln");
 })();

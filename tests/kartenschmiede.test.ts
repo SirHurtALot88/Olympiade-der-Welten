@@ -25,6 +25,8 @@ type Regeln = {
   stufeFuerPunkte(p: number): number;
   leseWaffe(z: string): { reichweite: number; a: number; ds: number; reissend: boolean; explosion: number; regeln: string };
   regelnVon(regeln: string): Array<{ name: string; text: string }>;
+  elementAus(regeln: string): string | null;
+  elementWirkung(element: string | null, praegung: string[]): number;
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
 };
@@ -33,8 +35,10 @@ const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
 type Faehigkeit = { id: string; typ: string; name: string; text: string; tags: string[]; waffe?: string; kosten: { typ: string; wert: number } };
 const F = laden("../apps/kartenschmiede/katalog.js") as {
   GRUNDBESTAND: Faehigkeit[];
-  FRAKTIONEN: Array<{ id: string; name: string; icon: string }>;
+  FRAKTIONEN: Array<{ id: string; name: string; icon: string; praegung: string[] }>;
   TAGS: Array<{ id: string; icon: string }>;
+  PRAEGUNGEN: string[];
+  konflikt(e: { tags: string[] }, praegung: string[]): { praegung: string; tag: string } | null;
 };
 type Eintrag = { typ: string; name: string; tags: string[]; waffe?: string; text: string; kosten: { typ: string; wert: number } };
 const G = laden("../apps/kartenschmiede/generator.js") as {
@@ -88,6 +92,26 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     }
   });
 
+  it("sperrt Einträge, die der Prägung widersprechen", () => {
+    const frostlanze = F.GRUNDBESTAND.find(f => f.id === "frostlanze")!;
+    const feuerball = F.GRUNDBESTAND.find(f => f.id === "feuerball")!;
+    expect(F.konflikt(frostlanze, ["feuer"])).toEqual({ praegung: "feuer", tag: "frost" });
+    expect(F.konflikt(feuerball, ["feuer"])).toBeNull();
+    expect(F.konflikt(F.GRUNDBESTAND.find(f => f.id === "heilendes-licht")!, ["schatten"])).not.toBeNull();
+    expect(F.konflikt(frostlanze, [])).toBeNull();
+    const tags = new Set(F.TAGS.map(t => t.id));
+    for (const p of F.PRAEGUNGEN) expect(tags).toContain(p);
+    for (const fr of F.FRAKTIONEN) for (const p of fr.praegung) expect(F.PRAEGUNGEN).toContain(p);
+  });
+
+  it("kennt vier Gegensatzpaare, auch Natur ↔ Gift und Sci-Fi ↔ Magie", () => {
+    expect(F.konflikt({ tags: ["gift"] }, ["natur"])).not.toBeNull();
+    expect(F.konflikt({ tags: ["magie"] }, ["technik"])).not.toBeNull();
+    expect(F.konflikt({ tags: ["technik"] }, ["magie"])).not.toBeNull();
+    // Psi-Kräfte sind Technik, keine Magie: eine Sci-Fi-Einheit darf sie nehmen
+    for (const f of F.GRUNDBESTAND.filter(x => x.tags.includes("technik"))) expect(f.tags, f.name).not.toContain("magie");
+  });
+
   it("gibt jeder Fraktion genau ein eigenes Symbol", () => {
     const symbole = F.FRAKTIONEN.map(f => f.icon);
     expect(new Set(symbole).size).toBe(symbole.length);
@@ -135,6 +159,23 @@ describe("Kartenschmiede – Generator", () => {
     expect(G.waffenPreis(R, "Gewehr | 24\" | A1 | Überhitzen")).toBeLessThan(basis);
   });
 
+  it("liest Elemente aus der Waffenzeile und wirkt über die Prägung des Ziels", () => {
+    expect(R.elementAus("DS(1), Feuer")).toBe("feuer");
+    expect(R.elementAus("Energie")).toBe("technik");
+    expect(R.elementAus("DS(1)")).toBeNull();
+    expect(R.elementWirkung("feuer", ["feuer"])).toBe(1);
+    expect(R.elementWirkung("feuer", ["frost"])).toBe(-1);
+    expect(R.elementWirkung("feuer", ["licht"])).toBe(0);
+    // Elemente kosten nichts
+    expect(G.waffenPreis(R, "Klinge | Nahkampf | A2 | Feuer")).toBe(G.waffenPreis(R, "Klinge | Nahkampf | A2 |"));
+    // Im Simulator gewinnt die Feuerklinge gegen einen Frost-Gegner öfter als gegen einen Feuer-Gegner
+    const angreifer = einheit(4, 5, 5, "Flammenklinge | Nahkampf | A3 | Feuer");
+    const ziel = (p: string) => ({ ...einheit(4, 4, 5, "Klauen | Nahkampf | A3 |"), praegung: [p] } as unknown as Einheit);
+    const gegenFrost = R.simuliere(angreifer, ziel("frost"), { kaempfe: 2000, seed: 3 }).a;
+    const gegenFeuer = R.simuliere(angreifer, ziel("feuer"), { kaempfe: 2000, seed: 3 }).a;
+    expect(gegenFrost).toBeGreaterThan(gegenFeuer + 0.1);
+  });
+
   it("bepreist Sonderregeln für Gegner in Prozent", () => {
     expect(G.generiere(R, "faehigkeit", { stufe: 4, seed: 5, rolle: "enemy" }).kosten.typ).toBe("prozent");
   });
@@ -173,12 +214,17 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(kopf).toContain("@font-face");
     expect(rumpf).toContain("window.KARTENSCHMIEDE_SERVER=true");
     expect(rumpf).toContain("Kartenschmiede");
+    expect(rumpf).toContain("KartenschmiedeCharaktere");
+    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente"]) expect(rumpf).toContain(`id="${id}"`);
   });
 
   it("speichert, listet, lädt und löscht Karten", () => {
     const id = "karte-1234abcd";
-    speichereKarte("gemeinsam", id, { name: "Kristallwurm", points: 55, tier: 2, role: "enemy" }, "data:image/jpeg;base64,AAAA", "Chris");
-    expect(listeKarten("gemeinsam")).toMatchObject([{ id, name: "Kristallwurm", points: 55, tier: 2, gespeichertVon: "Chris" }]);
+    speichereKarte("gemeinsam", id, { name: "Kristallwurm", points: 55, tier: 2, role: "enemy", praegung: ["feuer"], quality: "4+",
+      weapons: "Biss | Nahkampf | A3 | Feuer", upload: "data:image/png;base64,GROSS" }, "data:image/jpeg;base64,AAAA", "Chris");
+    expect(listeKarten("gemeinsam")).toMatchObject([{ id, name: "Kristallwurm", points: 55, tier: 2, gespeichertVon: "Chris",
+      werte: { praegung: ["feuer"], quality: "4+", weapons: "Biss | Nahkampf | A3 | Feuer" } }]);
+    expect(JSON.stringify(listeKarten("gemeinsam"))).not.toContain("GROSS");
     expect(ladeKarte("gemeinsam", id)).toMatchObject({ name: "Kristallwurm", id });
     expect(loescheKarte("gemeinsam", id)).toBe(true);
     expect(listeKarten("gemeinsam")).toEqual([]);
