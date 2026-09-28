@@ -8349,7 +8349,11 @@
       const tw=torwartRoh(seite);
       if(tw&&tw.imTor!==false){
         tw.imTor=false;
-        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.");
+        // H4 (Bauplan Abschnitt 5): "im Ticker einmal '... nimmt den Torwart raus' als
+        // big" -- bisher lief diese Zeile ohne big-Flag, obwohl es laut Bauplan "der
+        // dramatischste Moment [ist], den Hockey jetzt hat". Nur das dritte Argument
+        // aendert sich (kein neuer Text, kein neuer Zweig).
+        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.",true);
         schwebe({x:0,y:0,txt:"TORWART RAUS",life:1.6,crit:true,_spieler:tw.id});
       }
     }
@@ -11377,6 +11381,19 @@
       // einem Fuehrungswechsel -- sonst false. Ersetzt "jeder Korb ist big" (Konzept
       // Abschnitt 4.3, Nachzug 3).
       feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung);
+      // B2 -- "LAUF"-GRAFIK (A, Prio 2, Bauplan Abschnitt 4): Feed-Meldung GENAU EINMAL
+      // beim Ueberschreiten der 8-Punkte-Schwelle des EIGENEN fortlaufenden Laufs, bzw.
+      // GENAU EINMAL, wenn dieser Korb einen laufenden GEGNERISCHEN Lauf (>=8) beendet.
+      // `basketballLaufRoh()` liest fsZuege[0..fsZeiger) -- VOR logZug() unten steht dieser
+      // Korb dort also noch nicht drin, genau die "vorher"-Ansicht, die die Schwellen-
+      // Erkennung braucht (dasselbe Vor/Nach-Muster wie vorFuehrung/nachFuehrung oben).
+      const vorLauf=basketballLaufRoh();
+      if(vorLauf&&vorLauf.seite===schuetze.side){
+        if(vorLauf.punkte<8&&vorLauf.punkte+flug.punkte>=8)
+          feed(schuetze.side,(vorLauf.punkte+flug.punkte)+":0-Lauf "+(schuetze.side===0?"Heim":"Gast")+"!",true);
+      } else if(vorLauf&&vorLauf.seite!==schuetze.side&&vorLauf.punkte>=8){
+        feed(schuetze.side,"Lauf beendet — "+vorLauf.punkte+":0.",true);
+      }
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
@@ -12462,6 +12479,28 @@
     }
     return n;
   }
+  // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, docs/design/broadcast-optik-feldspiel-27-09.md
+  // Abschnitt 4): wie viele Punkte eine Seite gerade IN FOLGE erzielt hat, ohne dass der
+  // Gegner dazwischen getroffen hat. Reine Lesung von `fsZuege[0..fsZeiger]` (Bauplan-
+  // Zustand: "Aus dem Protokoll fsZuege[0..fsZeiger] (Punkte je Seite in Folge)"), kein
+  // rr(), keine Rueckschreibung. `basketballLaufRoh` liefert den rohen Lauf unabhaengig von
+  // der Anzeigeschwelle (fuer den Feed-Trigger in loeseFlugAuf, der die 8-Punkte-Grenze
+  // selbst prueft); `basketballLaufInfo` ist die HUD-Fassung ab 8 Punkten (Bauplan: "sobald
+  // eine Seite >= 8 Punkte ohne Gegenpunkte erzielt").
+  function basketballLaufRoh(){
+    if(feldspielDisc!=="basketball")return null;
+    let seite=null, punkte=0;
+    for(let i=0;i<fsZeiger;i++){
+      const e=fsZuege[i];
+      if(e.art!=="treffer")continue;
+      if(seite===e.seite)punkte+=e.punkte; else { seite=e.seite; punkte=e.punkte; }
+    }
+    return seite==null?null:{seite,punkte};
+  }
+  function basketballLaufInfo(){
+    const roh=basketballLaufRoh();
+    return roh&&roh.punkte>=8?roh:null;
+  }
   // ZUSATZ JE DISZIPLIN, rechts an die Restzeit angehaengt (Bauplan-Tabelle Abschnitt 3).
   function feldspielKontextZusatz(){
     if(!fsLive)return "";
@@ -12484,6 +12523,13 @@
           +(pp.fuenfDrei?" · 5 GEGEN 3":""));
       }
       teile.push("SOG "+hockeySOG(0)+":"+hockeySOG(1));
+      // H4 -- "TORWART RAUS" IN DER KONTEXTZEILE (A, Prio 2, Bauplan Abschnitt 5): T1
+      // (hockeyEndphaseSeite/aktualisiereHockeyEndphase) ist gemergt, `fsLive.hockeyEndphase`
+      // traegt die zurueckliegende Seite schon -- "sichtbar ist heute nur, dass eine Figur
+      // zur Bank faehrt" (Bauplan-Befund). Reine Lesung desselben Felds, in Teamfarbe der
+      // Seite, die den Torwart gezogen hat.
+      if(fsLive.hockeyEndphase!=null)
+        teile.push("<span class=\"torwartraus "+(fsLive.hockeyEndphase===0?"l":"r")+"\">TORWART RAUS</span>");
       return teile.join(" · ");
     }
     if(istFootball()&&fsLive.football){
@@ -12530,13 +12576,30 @@
   // MERGE (27.09.): Q1 (istFs) und K2 (istKampfDisc) schliessen sich gegenseitig aus --
   // ein Chassis ist nie beides -- deshalb haengen beide Zweige unten dieselbe DOM-Node
   // (mitte) unabhaengig voneinander per appendChild an, keiner ueberschreibt den anderen.
-  let bbugLetzteFuehrung=null, bbugWechselTimer=null;
+  // H3 -- TORLICHT (Hockey, A, Prio 2, Bauplan Abschnitt 5): "rote Lampe hinter dem
+  // getroffenen Tor, 1,5s pulsierend, plus Bandenblitz in Teamfarbe des Schuetzen" --
+  // reiner Wandzeit-Timer (jetztMs(), dasselbe Muster wie bbugWechselTimer oben/unten:
+  // ein Fuehrungswechsel-Blitz laeuft schon genauso ueber Wandzeit statt Sim-Ticks), KEIN
+  // Simulationszustand. `hkTorlichtGesehen` merkt sich, wie viele fsZuege-Eintraege diese
+  // Anzeige schon ausgewertet hat -- gelesen und geschrieben AUSSCHLIESSLICH im Zeichenpfad
+  // (eisflaeche(), unten), nie in stepSim/loeseHockeySchuss. Ein Spielneustart mit kuerzerem
+  // Protokoll (fsZeiger < hkTorlichtGesehen) setzt den Zaehler von selbst zurueck, ohne an
+  // jede der bestehenden fsZuege=[]-Reset-Stellen einen weiteren Reset anhaengen zu muessen.
+  let bbugLetzteFuehrung=null, bbugWechselTimer=null,
+    hkTorlichtSeite=null, hkTorlichtBisMs=0, hkTorlichtGesehen=0;
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
     const einlauf=document.getElementById("einlauf");
     bug.hidden=!!(einlauf&&!einlauf.hidden)||!!done;
-    if(bug.hidden)return;
+    if(bug.hidden){
+      // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
+      // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
+      // Endstand-Bildschirm hinein stehen lassen.
+      const laufWeg=document.getElementById("bbugLauf");
+      if(laufWeg)laufWeg.hidden=true;
+      return;
+    }
     const zeile=(tnameId)=>{
       const wrap=document.getElementById(tnameId);
       if(!wrap)return "";
@@ -12631,6 +12694,18 @@
             "KP "+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])));
           mitte.appendChild(kpz);
         }
+      }
+    }
+    // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, Bauplan Abschnitt 4): eigenes Band unter
+    // dem Bug, reine Lesung von basketballLaufInfo() (die ihrerseits nur fsZuege liest,
+    // kein rr()). Sichtbar nur waehrend eine Seite gerade >= 8 Punkte in Folge erzielt.
+    const laufEl=document.getElementById("bbugLauf");
+    if(laufEl){
+      const lauf=feldspielDisc==="basketball"?basketballLaufInfo():null;
+      laufEl.hidden=!lauf;
+      if(lauf){
+        laufEl.className="bbuglauf "+(lauf.seite===0?"l":"r");
+        laufEl.textContent=lauf.punkte+":0-LAUF "+(lauf.seite===0?"HEIM":"GAST");
       }
     }
   }
@@ -12832,6 +12907,43 @@
       ctx.lineTo(tx,mitte+(links?-34:34));
       ctx.closePath(); ctx.fill();
       zeichneTor(tx,mitte,links);
+      // H4 -- LEERES TOR MIT PULSIERENDEM TORRAUM-RAND (A, Prio 2, Bauplan Abschnitt 5):
+      // sichtbar machen, WELCHES Tor gerade leer ist -- bislang zeigte nur die zur Bank
+      // fahrende Figur das an. Reine Lesung von fsLive.hockeyEndphase (T1, bereits
+      // gemergt), kein rr(), kein Schreiben. Wandzeit-Puls wie beim Torlicht unten.
+      if(fsLive.hockeyEndphase===seite){
+        const puls=0.35+0.35*Math.sin(jetztMs()/140);
+        ctx.save();
+        ctx.globalAlpha=puls; ctx.strokeStyle="#ffd23f"; ctx.lineWidth=4;
+        ctx.beginPath();
+        ctx.arc(tx,mitte,38,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:1.5*Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // H3 -- TORLICHT (A, Prio 2, Bauplan Abschnitt 5): "rote Lampe hinter dem getroffenen
+    // Tor, 1,5s pulsierend, plus Bandenblitz in Teamfarbe des Schuetzen". Erkennung ueber
+    // neue fsZuege-Eintraege seit dem letzten Zeichnen (s. hkTorlicht*-Deklaration weiter
+    // oben) -- reine Lesung, ausschliesslich Wandzeit (jetztMs()), kein rr().
+    if(fsZeiger<hkTorlichtGesehen)hkTorlichtGesehen=0; // neues Spiel, kuerzeres Protokoll
+    for(let i=hkTorlichtGesehen;i<fsZeiger;i++){
+      if(fsZuege[i].art==="treffer"){ hkTorlichtSeite=fsZuege[i].seite; hkTorlichtBisMs=jetztMs()+1500; }
+    }
+    hkTorlichtGesehen=fsZeiger;
+    if(hkTorlichtSeite!=null&&jetztMs()<hkTorlichtBisMs){
+      const tlX=korbXVon(hkTorlichtSeite), tlLinks=tlX<MID;
+      const lampeX=tlLinks?tlX-TOR_TIEFE-10:tlX+TOR_TIEFE+10;
+      const puls=0.55+0.45*Math.sin(jetztMs()/90);
+      ctx.save();
+      ctx.globalAlpha=puls; ctx.fillStyle="#ff2d2d";
+      ctx.beginPath(); ctx.arc(lampeX,mitte,9,0,6.3); ctx.fill();
+      ctx.globalAlpha=puls*0.5;
+      ctx.beginPath(); ctx.arc(lampeX,mitte,16,0,6.3); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha=puls*0.6; ctx.strokeStyle=css(hkTorlichtSeite===0?"--home":"--away");
+      ctx.lineWidth=10; eisRundweg(k,0); ctx.stroke();
+      ctx.restore();
     }
     // H1 -- UEBERZAHL-UHR AUF DEM EIS (docs/design/broadcast-optik-feldspiel-27-09.md
     // Abschnitt 5, Klasse A, Prio 1 = Review-T0; SMT-Vorbild "Power Play Clock"): eine
@@ -13428,6 +13540,24 @@
         }
         ctx.restore();
       } else if(istHockey()){
+        // H5 -- PUCK-SCHWEIF BEIM SCHLAGSCHUSS (A, Prio 3, docs/design/broadcast-optik-
+        // feldspiel-27-09.md Abschnitt 5, FoxTrax-Zitat, "sparsam"): nur waehrend der
+        // Puck FLIEGT (keine traegerId) und nur beim Schlagschuss (schuetze.schussArt,
+        // von wirf() gesetzt) -- ein kurzer Schweif in Flugrichtung, blau, bei
+        // tier==="fern" rot. Bewusst KEINE km/h-Zahl (Bauplan: "die Flugdauer ist eine
+        // Konstante ... eine erfundene Zahl, die nach Leistung aussieht"). Reine
+        // Zeichnung, liest nur fsLive.ball.flug/schuetze.schussArt, kein rr().
+        const flugAn=fsLive.ball.flug;
+        if(flugAn&&flugAn.schuetze&&flugAn.schuetze.schussArt==="schlag"){
+          const laenge=18, richtung=Math.atan2(flugAn.nach.y-flugAn.von.y,flugAn.nach.x-flugAn.von.x);
+          ctx.save();
+          ctx.strokeStyle=flugAn.fern?"rgba(214,58,58,.55)":"rgba(58,120,214,.55)";
+          ctx.lineWidth=3; ctx.lineCap="round";
+          ctx.beginPath(); ctx.moveTo(bx,by-6);
+          ctx.lineTo(bx-Math.cos(richtung)*laenge,by-Math.sin(richtung)*laenge-6);
+          ctx.stroke();
+          ctx.restore();
+        }
         // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
         // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
         // geprellt wird. Ein Puck liegt auf dem Eis. Die leichte Ellipse (breiter als
