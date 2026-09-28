@@ -21,58 +21,58 @@
   const basis = { size: "1", role: "enemy", skills: [], bossName: "", bossText: "", special: "0", ax: 50, ay: 40, zoom: 100, flavor: "", look: "", art: "" };
   const VORLAGEN = [
     { key: "frostfang", label: "Frostfang · Boss (Werwolf-Mini, Beispiel)", eigen: false, d: { ...basis,
-      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", ficon: "moon", points: 280, quality: "3+", defense: "4+", tough: "12",
+      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", ficon: "moon", altPunkte: 280, quality: "3+", defense: "4+", tough: "12",
       weapons: "Frostklauen | Nahkampf | A6 | DS(2), Reißend\nEisnacht-Heulen | 12\" | A1 | Explosion(3), Zuverlässig",
       passives: "Schnell, Furchtlos, Regeneration", skills: sk("gebrochene-ketten"),
       flavor: "Die Kette hielt drei Winter. Im vierten hielt sie nichts mehr.",
       look: "a hulking werewolf with pale ice-blue fur on its back and shoulders, dark slate-blue skin, bone-white claws and fangs, broken iron shackles and chains hanging from its wrists, howling on frozen, snow-dusted ground",
       art: "werwolf", ax: 45, ay: 20 } },
     { key: "frostklauen", label: "Frostklauen-Pirscher (Werwolf-Mini)", eigen: true, d: { ...basis,
-      name: "Frostklauen-Pirscher", faction: "Urwild", ficon: "paw", points: 90, quality: "3+", defense: "5+", tough: "5",
+      name: "Frostklauen-Pirscher", faction: "Urwild", ficon: "paw", altPunkte: 90, quality: "3+", defense: "5+", tough: "5",
       weapons: "Frostklauen | Nahkampf | A4 | Reißend", passives: "Rasend, Hinterhalt, Geländeläufer",
       flavor: "Man hört die Ketten, bevor man die Klauen sieht.",
       look: "a lean, hunched werewolf with pale ice-blue fur, dark slate-blue skin, bone-white claws, broken chains on its wrists, stalking through snow",
       art: "werwolf", ax: 45, ay: 20 } },
-    { key: "kristallwurm", label: "Kristallwurm", eigen: true, d: { ...basis, name: "Kristallwurm", faction: "Dämonen", ficon: "flame", points: 55, quality: "5+", defense: "4+", tough: "3",
+    { key: "kristallwurm", label: "Kristallwurm", eigen: true, d: { ...basis, name: "Kristallwurm", faction: "Dämonen", ficon: "flame", altPunkte: 55, quality: "5+", defense: "4+", tough: "3",
       weapons: "Kristallbiss | Nahkampf | A3 | Reißend\nSplitterspucke | 18\" | A1 | DS(1), Explosion(2)", passives: "An Beschwörer gebunden",
       flavor: "Aus der Tiefe gerufen, lebende Waffen aus Fleisch und Kristall.",
       look: "a huge segmented worm with a glowing red rune on its head, a gaping maw of teeth, spitting violet crystal shards", art: "einheit1" } },
-    { key: "kristallwurm-elite", label: "Kristallwurm-Elite", eigen: true, d: { ...basis, name: "Kristallwurm-Elite", faction: "Dämonen", ficon: "flame", points: 115, quality: "4+", defense: "4+", tough: "5",
+    { key: "kristallwurm-elite", label: "Kristallwurm-Elite", eigen: true, d: { ...basis, name: "Kristallwurm-Elite", faction: "Dämonen", ficon: "flame", altPunkte: 115, quality: "4+", defense: "4+", tough: "5",
       weapons: "Kristallbiss | Nahkampf | A4 | Reißend\nSplitterspucke | 18\" | A2 | DS(1), Explosion(2)", passives: "Geländeläufer, An Beschwörer gebunden", skills: sk("kristallsplitter"),
       look: "a huge segmented worm armoured with violet crystal spikes, glowing red rune on its head, spitting crystal shards", art: "einheit2" } },
-    { key: "dornauge", label: "Dornauge", eigen: true, d: { ...basis, name: "Dornauge", faction: "Dämonen", ficon: "flame", points: 65, quality: "5+", defense: "4+", tough: "3",
+    { key: "dornauge", label: "Dornauge", eigen: true, d: { ...basis, name: "Dornauge", faction: "Dämonen", ficon: "flame", altPunkte: 65, quality: "5+", defense: "4+", tough: "3",
       weapons: "Rasierklauen | Nahkampf | A3 | Reißend\nDornenstoß | Nahkampf | A2 | DS(1), Explosion(3)", passives: "",
       flavor: "Ein Geschwür aus Kristall und Dornen, das alles anstarrt.",
       look: "a spiky crystalline creature made of one giant staring eye, violet thorns and clawed legs, erupting from rocky ground", art: "einheit3" } },
-    { key: "dornauge-alpha", label: "Dornauge-Alpha", eigen: true, d: { ...basis, name: "Dornauge-Alpha", faction: "Dämonen", ficon: "flame", points: 120, quality: "4+", defense: "4+", tough: "5",
+    { key: "dornauge-alpha", label: "Dornauge-Alpha", eigen: true, d: { ...basis, name: "Dornauge-Alpha", faction: "Dämonen", ficon: "flame", altPunkte: 120, quality: "4+", defense: "4+", tough: "5",
       weapons: "Rasierklauen | Nahkampf | A4 | Reißend\nGiftnadeln | 12\" | A3 | Gift\nDornenstoß | Nahkampf | A2 | DS(1), Explosion(3)", passives: "Geländeläufer",
       look: "a larger spiky crystalline creature with one giant eye, violet and green thorns, firing poison needles", art: "einheit4" } },
-    { key: "giftmade", label: "Giftmade", eigen: true, d: { ...basis, name: "Giftmade", faction: "Urwild", ficon: "paw", points: 30, quality: "5+", defense: "6+", tough: "3",
+    { key: "giftmade", label: "Giftmade", eigen: true, d: { ...basis, name: "Giftmade", faction: "Urwild", ficon: "paw", altPunkte: 30, quality: "5+", defense: "6+", tough: "3",
       weapons: "Ätzender Biss | Nahkampf | A2 | Gift\nGiftspeichel | 12\" | A2 | Gift", passives: "Langsam",
       flavor: "Ein Parasit, geboren aus Schlamm und Hunger.", look: "a pale yellow-green grub with two curved horns, vomiting a jet of glowing green venom", art: "einheit5" } },
-    { key: "saeurelauerer", label: "Säurelauerer", eigen: true, d: { ...basis, name: "Säurelauerer", faction: "Urwild", ficon: "paw", points: 70, quality: "4+", defense: "5+", tough: "3",
+    { key: "saeurelauerer", label: "Säurelauerer", eigen: true, d: { ...basis, name: "Säurelauerer", faction: "Urwild", ficon: "paw", altPunkte: 70, quality: "4+", defense: "5+", tough: "3",
       weapons: "Giftspeichel | 12\" | A3 | Gift", passives: "Langsam, Hinterhalt", skills: sk("saeureblut"),
       look: "a bloated horned grub with a huge toothed maw, spraying acid", art: "einheit6" } },
-    { key: "sporenhuelle", label: "Sporenhülle", eigen: true, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", points: 55, quality: "5+", defense: "4+", tough: "4",
+    { key: "sporenhuelle", label: "Sporenhülle", eigen: true, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", altPunkte: 55, quality: "5+", defense: "4+", tough: "4",
       weapons: "Sporenstoß | 9\" | A2 | Gift", passives: "Langsam, Furchtlos",
       flavor: "Die Sporen fressen, das Fleisch fault, doch sie fällt nie.",
       look: "a bloated, moss-green fungal brute with mushroom caps growing from its head and shoulders, a dark brown beard, glowing toxic-green spores dripping from its mouth and belly, iron chains on its back",
       art: "einheit7", ay: 30 } },
-    { key: "sporenhuelle-mini", label: "Sporenhülle (Foto der Mini)", eigen: false, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", points: 55, quality: "5+", defense: "4+", tough: "4",
+    { key: "sporenhuelle-mini", label: "Sporenhülle (Foto der Mini)", eigen: false, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", altPunkte: 55, quality: "5+", defense: "4+", tough: "4",
       weapons: "Sporenstoß | 9\" | A2 | Gift", passives: "Langsam, Furchtlos",
       flavor: "Die Sporen fressen, das Fleisch fault, doch sie fällt nie.",
       look: "a bloated, moss-green fungal brute with mushroom caps growing from its head and shoulders, a dark brown beard, glowing toxic-green spores dripping from its mouth and belly, iron chains on its back",
       art: "sporenhuelle", ay: 25 } },
-    { key: "seuchenbringer", label: "Myzel-Seuchenbringer", eigen: true, d: { ...basis, name: "Myzel-Seuchenbringer", faction: "Urwild", ficon: "paw", points: 130, quality: "4+", defense: "3+", tough: "6",
+    { key: "seuchenbringer", label: "Myzel-Seuchenbringer", eigen: true, d: { ...basis, name: "Myzel-Seuchenbringer", faction: "Urwild", ficon: "paw", altPunkte: 130, quality: "4+", defense: "3+", tough: "6",
       weapons: "Dornenklauen | Nahkampf | A3 | DS(1), Reißend\nDornenstoß | 6\" | A2 | DS(1), Explosion(3)", passives: "Langsam, Furchtlos", skills: sk("strahlende-aura"),
       look: "a hulking fungal brute covered in mushroom caps and spines, glowing yellow-green belly, radioactive spores", art: "einheit8", ay: 30 } },
-    { key: "schurke", label: "Held: Schurke", eigen: true, d: { ...basis, role: "hero", name: "Schurke", faction: "Helden", ficon: "shield", points: 100, quality: "4+", defense: "5+", tough: "5",
+    { key: "schurke", label: "Held: Schurke", eigen: true, d: { ...basis, role: "hero", name: "Schurke", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "5+", tough: "5",
       weapons: "Krummklingen | Nahkampf | A4 | Reißend\nWurfmesser | 6\" | A1 |", passives: "Tarnung", skills: sk("schattenschritt", "schwachstelle") } },
-    { key: "krieger", label: "Held: Krieger", eigen: true, d: { ...basis, role: "hero", name: "Krieger", faction: "Helden", ficon: "shield", points: 100, quality: "4+", defense: "3+", tough: "7",
+    { key: "krieger", label: "Held: Krieger", eigen: true, d: { ...basis, role: "hero", name: "Krieger", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "3+", tough: "7",
       weapons: "Schwert und Schild | Nahkampf | A3 |\nSchildstoß | Nahkampf | A1 |", passives: "Furchtlos", skills: sk("reihe-halten", "schildstoss") } },
-    { key: "waldlaeufer", label: "Held: Waldläufer", eigen: true, d: { ...basis, role: "hero", name: "Waldläufer", faction: "Helden", ficon: "shield", points: 100, quality: "4+", defense: "5+", tough: "5",
+    { key: "waldlaeufer", label: "Held: Waldläufer", eigen: true, d: { ...basis, role: "hero", name: "Waldläufer", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "5+", tough: "5",
       weapons: "Jagdbogen | 18\" | A3 |\nJagdmesser | Nahkampf | A2 |", passives: "Späher", skills: sk("beute-markieren", "schlingenfalle") } },
-    { key: "kleriker", label: "Held: Kleriker", eigen: true, d: { ...basis, role: "hero", name: "Kleriker", faction: "Helden", ficon: "shield", points: 100, quality: "4+", defense: "4+", tough: "5",
+    { key: "kleriker", label: "Held: Kleriker", eigen: true, d: { ...basis, role: "hero", name: "Kleriker", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "4+", tough: "5",
       weapons: "Geweihter Speer | Nahkampf | A2 | DS(1)\nHeiliger Blitz | 12\" | A2 |", passives: "Gleiten", skills: sk("wunden-heilen", "strahlender-schutz") } },
   ];
 
@@ -122,6 +122,7 @@
   // ---------- Karte ----------
   function renderCard(s, tier, opts = {}) {
     const land = opts.land;
+    const punkte = R.punkte(s).pts;
     const waffen = R.leseWaffen(s.weapons);
     const passiv = R.leseListe(s.passives);
     const src = s.art === "upload" ? s.upload : IMG[s.art];
@@ -169,7 +170,7 @@
             <div class="foot"><span class="fac">${ico(s.ficon || "paw")}${esc(s.faction)}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
-        <div class="badge">${sym("i-crown", "crown")}<b>${esc(s.points)}</b><span>Punkte</span></div>
+        <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
         ${tier >= 3 ? ["tl", "tr", "bl", "br"].map(c => sym(tier === 6 ? "c-crown" : tier === 5 ? "c-filigree" : "c-bracket", "corner " + c)).join("") : ""}
         ${tier === 6 ? sym("i-horns", "crest", "width:34%;height:auto;top:calc(var(--u)*-7)")
           : tier === 5 ? sym("i-gem", "crest", "width:18%;height:auto;top:calc(var(--u)*-4.6)") : ""}
@@ -187,7 +188,7 @@
   }
 
   // ---------- Formular ----------
-  const FELDER = ["name", "faction", "ficon", "points", "size", "quality", "defense", "tough", "role", "weapons", "passives", "bossName", "bossText", "special", "flavor", "look", "ax", "ay", "zoom"];
+  const FELDER = ["name", "faction", "ficon", "size", "quality", "defense", "tough", "role", "weapons", "passives", "bossName", "bossText", "special", "flavor", "look", "ax", "ay", "zoom"];
   function insFormular() {
     FELDER.forEach(f => { const el = $(f); if (el) el.value = state[f] ?? ""; });
     if (!["0", "5", "10", "20"].includes(String(state.special))) $("special").value = "0";
@@ -198,23 +199,18 @@
   }
 
   function zeigeRechnung() {
-    const c = R.punkte(state), p = +state.points || 0;
-    const abw = p ? (p - c.pts) / c.pts : 0;
-    const cls = Math.abs(abw) <= .15 ? "ok" : abw > 0 ? "lo" : "hi";
+    const c = R.punkte(state);
+    $("points").value = c.pts;
     $("calc").innerHTML = `
-      <div class="big"><b>${c.pts}</b><span>Punkte nach Formel · Stufe ${STUFEN[R.stufeFuerPunkte(c.pts)]}</span></div>
-      <div class="parts">Kampfwert ${zahl(c.K, 2)} · Ausdauer ${zahl(c.A)} · Boni ${c.b >= 0 ? "+" : ""}${Math.round(c.b * 100)} %${c.fest ? ` · fest +${c.fest}` : ""}</div>
-      <div class="row-b">${p && p !== c.pts ? `<span class="dev ${cls}">Eingetragen ${p}, ${abw > 0 ? "+" : ""}${Math.round(abw * 100)} %</span>` : `<span class="dev ok">Punkte passen zur Formel</span>`}
-      ${p !== c.pts ? `<button type="button" class="btn ghost sm" id="applyPts">Formelwert übernehmen</button>` : ""}</div>`;
-    const b = $("applyPts");
-    if (b) b.addEventListener("click", () => { state.points = c.pts; bModell = null; insFormular(); alles(); });
+      <div class="big"><b>${c.pts}</b><span>Punkte · Stufe ${STUFEN[R.stufeFuerPunkte(c.pts)]}</span></div>
+      <div class="parts">Kampfwert ${zahl(c.K, 2)} · Ausdauer ${zahl(c.A)} · Boni ${c.b >= 0 ? "+" : ""}${Math.round(c.b * 100)} %${c.fest ? ` · fest +${c.fest}` : ""}</div>`;
   }
 
   function bestiarium() {
     $("bestiary").innerHTML = VORLAGEN.filter(v => v.eigen).map(v => {
-      const c = R.punkte(v.d), abw = (v.d.points - c.pts) / c.pts, t = R.stufeFuerPunkte(c.pts);
+      const c = R.punkte(v.d), abw = (v.d.altPunkte - c.pts) / c.pts, t = R.stufeFuerPunkte(c.pts);
       const cls = Math.abs(abw) <= .15 ? "ok" : abw > 0 ? "lo" : "hi";
-      return `<tr data-key="${v.key}" tabindex="0"><td>${esc(v.d.name)}</td><td class="num">${v.d.points}</td><td class="num">${c.pts}</td>
+      return `<tr data-key="${v.key}" tabindex="0"><td>${esc(v.d.name)}</td><td class="num">${v.d.altPunkte}</td><td class="num">${c.pts}</td>
         <td class="num"><span class="dev ${cls}">${abw > 0 ? "+" : ""}${Math.round(abw * 100)} %</span></td>
         <td><span class="tier-dot" style="background:var(--t${t})"></span>${STUFEN[t]}</td></tr>`;
     }).join("");
@@ -252,6 +248,7 @@
   }
 
   function alles() {
+    state.points = R.punkte(state).pts;
     if (state.autoTier !== false) state.tier = R.stufeFuerPunkte(+state.points || 0);
     state.tier = Math.min(6, Math.max(1, state.tier || 1));
     document.querySelectorAll("#tiers button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.t === state.tier)));
@@ -278,6 +275,7 @@
   function vorlage(key) {
     const v = VORLAGEN.find(x => x.key === key) || VORLAGEN[0];
     state = Object.assign({ orient: state.orient || "port", upload: null, autoTier: true }, JSON.parse(JSON.stringify(v.d)));
+    delete state.altPunkte;
     $("preset").value = v.key;
     bModell = null;
     insFormular(); alles();
@@ -331,6 +329,8 @@
   const rohVon = m => R.punkte(schreibeModell(m, {})).roh;
   const kostet = (m, fn) => { const n = kopie(m); if (fn(n) === false) return null; return Math.round(rohVon(n) - rohVon(m)); };
   const preis = d => d === null ? "" : `<span class="cost ${d > 0 ? "up" : d < 0 ? "down" : ""}">${d > 0 ? "+" : ""}${d}</span>`;
+  // In den −/+-Knöpfen steht das Vorzeichen schon auf dem Knopf, dort nur den Betrag zeigen
+  const betrag = d => d === null ? "" : `<span class="cost ${d > 0 ? "up" : d < 0 ? "down" : ""}">${Math.abs(d)}</span>`;
 
   let bModell = null;
   function baukasten() {
@@ -341,16 +341,16 @@
     const stufe = (id, label, wert, runter, rauf, hinweis = "") => {
       const dm = kostet(m, runter), dp = kostet(m, rauf);
       return `<div class="stp"><div class="stp-l"><b>${label}</b>${hinweis ? `<small>${hinweis}</small>` : ""}</div>
-        <button type="button" data-act="${id}:-" ${dm === null ? "disabled" : ""} aria-label="${label} verringern">−${preis(dm)}</button>
+        <div class="stp-c"><button type="button" data-act="${id}:-" ${dm === null ? "disabled" : ""} aria-label="${label} verringern">−${betrag(dm)}</button>
         <output>${wert}</output>
-        <button type="button" data-act="${id}:+" ${dp === null || !geht(dp) ? "disabled" : ""} aria-label="${label} erhöhen">+${preis(dp)}</button></div>`;
+        <button type="button" data-act="${id}:+" ${dp === null || !geht(dp) ? "disabled" : ""} aria-label="${label} erhöhen">+${betrag(dp)}</button></div></div>`;
     };
-    let html = `<div class="b-group"><h4>Grundwerte</h4>
+    let html = `<div class="b-group"><h4>Grundwerte</h4><div class="stp-grid">
       ${stufe("q", "Qualität", m.q + "+", x => x.q < 6 ? (x.q++, true) : false, x => x.q > 2 ? (x.q--, true) : false, "trifft auf diesen Wurf")}
       ${stufe("d", "Verteidigung", m.d + "+", x => x.d < 6 ? (x.d++, true) : false, x => x.d > 2 ? (x.d--, true) : false, "rettet auf diesen Wurf")}
       ${stufe("t", "Zäh", m.t, x => x.t > 1 ? (x.t--, true) : false, x => x.t < 72 ? (x.t++, true) : false, "Lebenspunkte je Modell")}
       ${held ? "" : stufe("n", "Modelle", m.n, x => x.n > 1 ? (x.n--, true) : false, x => x.n < 10 ? (x.n++, true) : false, "Größe der Einheit")}
-    </div>`;
+    </div></div>`;
     m.waffen.forEach((w, i) => {
       const schalter = (k, label, wert) => {
         const d = kostet(m, x => { x.waffen[i][k] = x.waffen[i][k] ? 0 : wert; });
@@ -358,11 +358,11 @@
       };
       html += `<div class="b-group"><h4><input type="text" class="wname" data-w="${i}" value="${esc(w.name)}" aria-label="Name der Waffe ${i + 1}">
         ${m.waffen.length > 1 ? `<button type="button" class="x" data-act="w${i}del">entfernen</button>` : ""}</h4>
-        ${stufe(`w${i}a`, "Attacken", "A" + w.a, x => x.waffen[i].a > 1 ? (x.waffen[i].a--, true) : false, x => x.waffen[i].a < 36 ? (x.waffen[i].a++, true) : false)}
+        <div class="stp-grid">${stufe(`w${i}a`, "Attacken", "A" + w.a, x => x.waffen[i].a > 1 ? (x.waffen[i].a--, true) : false, x => x.waffen[i].a < 36 ? (x.waffen[i].a++, true) : false)}
         ${stufe(`w${i}r`, "Reichweite", w.reichweite ? w.reichweite + '"' : "Nahkampf",
           x => { const k = REICHWEITEN.indexOf(x.waffen[i].reichweite); if (k <= 0) return false; x.waffen[i].reichweite = REICHWEITEN[k - 1]; },
           x => { const k = REICHWEITEN.indexOf(x.waffen[i].reichweite); if (k < 0 || k >= REICHWEITEN.length - 1) return false; x.waffen[i].reichweite = REICHWEITEN[k + 1]; })}
-        ${stufe(`w${i}ds`, "Durchschlag", "DS(" + w.ds + ")", x => x.waffen[i].ds > 0 ? (x.waffen[i].ds--, true) : false, x => x.waffen[i].ds < 4 ? (x.waffen[i].ds++, true) : false)}
+        ${stufe(`w${i}ds`, "Durchschlag", "DS(" + w.ds + ")", x => x.waffen[i].ds > 0 ? (x.waffen[i].ds--, true) : false, x => x.waffen[i].ds < 4 ? (x.waffen[i].ds++, true) : false)}</div>
         <div class="tgls">${schalter("reissend", "Reißend", 1)}${schalter("gift", "Gift", 1)}${schalter("explosion", "Explosion(3)", 3)}
           ${schalter("toedlich", "Tödlich(3)", 3)}${schalter("zuverlaessig", "Zuverlässig", 1)}</div>
       </div>`;
@@ -550,7 +550,7 @@
     for (const k of karten) {
       const halter = document.createElement("div");
       halter.style.cssText = "position:fixed;left:-10000px;top:0;width:600px;padding:60px 30px 30px;background:transparent";
-      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(+k.points || 0), { snap: true });
+      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true });
       document.body.appendChild(halter); passeAn(halter);
       try { await document.fonts.ready; bilder.push(await htmlToImage.toPng(halter, { pixelRatio: 2, style: { position: "static", left: "0", top: "0" } })); }
       catch { /* eine Karte überspringen */ } finally { halter.remove(); }
@@ -559,7 +559,7 @@
   }
   function drucken(karten) {
     const bereich = $("printArea");
-    bereich.innerHTML = karten.map(k => renderCard(k, k.tier || R.stufeFuerPunkte(+k.points || 0), { snap: true })).join("");
+    bereich.innerHTML = karten.map(k => renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true })).join("");
     bereich.classList.add("bereit");
     passeAn(bereich);
     requestAnimationFrame(() => window.print());
@@ -620,7 +620,7 @@
   function karteAlsText() {
     const { upload, ...rest } = state;
     const aus = {};
-    ["name", "faction", "ficon", "role", "points", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
+    ["name", "faction", "ficon", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
     if (upload) aus.art = "(eigenes Artwork, nicht im Text)";
     return JSON.stringify(aus, null, 2);
   }
@@ -640,7 +640,6 @@
     if (d.art && IMG[d.art]) state.art = d.art;
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
-    if (!d.points) state.points = R.punkte(state).pts;
     bModell = null; insFormular(); alles(); zeigeDatenbank();
     msg.textContent = `Übernommen: ${state.name}.${neu.length ? ` Neu in der Datenbank: ${neu.join(", ")}.` : ""} Das Artwork bleibt, bis du ein neues hochlädst.`;
   }
@@ -659,7 +658,7 @@
   $("editor").addEventListener("input", e => {
     const id = e.target.id;
     if (!FELDER.includes(id)) return;
-    state[id] = ["points", "ax", "ay", "zoom"].includes(id) ? +e.target.value : e.target.value;
+    state[id] = ["ax", "ay", "zoom"].includes(id) ? +e.target.value : e.target.value;
     if (["quality", "defense", "tough", "size", "weapons", "passives", "special", "role"].includes(id)) bModell = null;
     clearTimeout(takt); takt = setTimeout(() => { alles(); simOptionen(); }, 60);
   });

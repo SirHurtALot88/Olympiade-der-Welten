@@ -606,6 +606,22 @@
   .oly-battle-arena.oly-battle-arena .bbug .seite b{color:#fff;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bbug .seite small{display:block;color:#c3ccd8;font-size:9px;
     white-space:normal}
+  /* LEBENS-PIPS (K2, Broadcast-Optik-Recherche 27.09., Abschnitt 3): eine CS-Scorebar-
+     Reihe je Seite, ein Punkt je Kaempfer -- die dritte Zeile im Score-Bug, unter Name
+     und Zusatzzeile (dasselbe display:block-Zeilenmuster wie ".seite small" darueber,
+     durchbricht das white-space:nowrap der Elternbox wie dort schon). "an" = lebt, in
+     Teamfarbe (per .seite.l/.seite.r unten); "aus" = liegt dauerhaft (Mini-DM/Battlefield,
+     kein Respawn), leer/gedimmt; "wartet" = TDM-Respawn, grau mit hellem Ring statt voll
+     dunkel, damit "kommt zurueck" von "raus" unterscheidbar bleibt, ohne eine echte Uhr
+     zu zeichnen (das leistet der Killfeed-Respawn-Zaehler, K1, spaeter). */
+  .oly-battle-arena.oly-battle-arena .bbug .pips{display:block;white-space:normal;
+    overflow:visible;line-height:1;margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .bbug .pip{display:inline-block;width:6px;height:6px;
+    border-radius:50%;margin:0 3px 2px 0;background:rgba(255,255,255,.16)}
+  .oly-battle-arena.oly-battle-arena .bbug .seite.l .pip.an{background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbug .seite.r .pip.an{background:var(--away)}
+  .oly-battle-arena.oly-battle-arena .bbug .pip.wartet{background:rgba(255,255,255,.16);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
   .oly-battle-arena.oly-battle-arena .bbugmitte{background:rgba(17,24,35,.82);
     border-radius:6px;padding:4px 11px;color:var(--warn);font-weight:700;font-size:12px;
     white-space:nowrap;align-self:flex-start;flex:none;text-align:center;
@@ -625,6 +641,13 @@
      die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
   .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
     0 0 14px 2px var(--warn)}
+  /* UEBERZAHL-KENNUNG (K2): "4 : 3" in der Farbe der Seite mit mehr Lebenden, nur wenn
+     die Zahlen ungleich sind (aktualisiereBbug() haengt <small> nur dann ueberhaupt an).
+     Eigene Zeile unter Score/Uhr, dasselbe display:block-Muster wie oben. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl{display:block;font-size:10px;
+    font-weight:700;margin-top:2px;color:#c3ccd8}
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.r{color:var(--away)}
 
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
@@ -725,6 +748,51 @@
   .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-away{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
+
+  /* I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): die Crystal-Maze-
+     Zonenuhr, mittig oben in derselben 15%-Zeile wie .bahnhud (beide Panels sind
+     wechselseitig ausschliessend -- Bahn und I-Spy sind nie gleichzeitig aktiv). KEIN
+     eigener z-index, aus demselben Grund wie bei .bahnhud direkt darueber dokumentiert:
+     die Dokumentreihenfolge (vor .einlauf/.endstand/.viertelpause) laesst diese drei
+     Vollflaechen-Overlays korrekt darueberliegen. */
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr{position:absolute;top:15%;left:50%;
+    transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
+    gap:4px;pointer-events:none;font-family:"IBM Plex Mono",monospace;
+    background:rgba(10,13,18,.78);border:1px solid rgba(255,255,255,.18);
+    border-radius:7px;padding:5px 16px}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr span{color:#fff;font-size:11px;
+    font-weight:700;letter-spacing:.03em;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .ispyzugbar{width:150px;height:4px;border-radius:2px;
+    background:rgba(255,255,255,.16);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .ispyzugbar s{display:block;height:100%;width:0;
+    background:var(--warn);border-radius:2px;text-decoration:none}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr.letzter span{color:#ff7b72}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr.letzter .ispyzugbar s{background:#ff7b72;
+    animation:ispyZugPuls .9s ease-in-out infinite}
+  @keyframes ispyZugPuls{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* I-SPY SPLIT-TAFEL (I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4): der Speedrun-
+     Split, am unteren Rand der Leinwand -- acht schmale Spalten, eine je Zug. Noch nicht
+     enthuellte Zuege zeigen "·" (Spoiler-Schutz, s. aktualisiereIspyHud()). */
+  .oly-battle-arena.oly-battle-arena .ispysplit{position:absolute;left:2.2%;right:2.2%;
+    bottom:2%;display:flex;gap:2px;background:rgba(10,13,18,.8);
+    border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 6px;
+    pointer-events:none;font-family:"IBM Plex Mono",monospace}
+  .oly-battle-arena.oly-battle-arena .ispysplit[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ispysplit:empty{display:none}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-col{flex:1;min-width:0;
+    text-align:center;display:flex;flex-direction:column;gap:1px;line-height:1.25}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-zug{font-size:7.5px;color:#93a1b3;
+    letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte{font-size:10px;font-weight:700;
+    color:#5c6773}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.r{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.isp-gold{color:#e8c07a}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta{font-size:8px;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta.vorn{color:#7ee787}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta.hinten{color:#ff7b72}
 
   /* Einlauf vor dem Anpfiff */
   .oly-battle-arena.oly-battle-arena .arenaraum{position:relative}
