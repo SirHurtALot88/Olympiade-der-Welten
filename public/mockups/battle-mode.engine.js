@@ -13451,6 +13451,9 @@
   // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
   // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
   const BREAKING_BPM=100;
+  // B5 (Broadcast-Optik-Recherche 27.09.): Dauer des "GEBROCHEN"-Stempels in Buehnenzeit
+  // (buehneT-Domaene, also real ablaufend, keine Enthuellungs-Pause, s. zeichneBreaking()).
+  const BRUCH_STEMPEL_DAUER=0.8;
 
   // ================== DIE FOLTERBANK: ZEHN GERAETE, DIE IMMER SCHLIMMER WERDEN ==================
   // Chris am 13.09., woertlich: „evtl müssen wir dafür assets suchen wo die instrumente immer
@@ -13566,6 +13569,17 @@
     const n=Math.max(1,(rundenN|0)-1);
     return Math.max(0,Math.min(FOLTER_GERAETE.length-1,Math.round((runde|0)*(FOLTER_GERAETE.length-1)/n)));
   };
+  // B4.2 (Broadcast-Optik-Recherche 27.09., Klasse A): QUAL-SKALA IM HOT-ONES-STIL. Zehn
+  // FIKTIVE, steigende Zahlen (Doku B4.2: "etwa 'Qual 1.200 ... 2.000.000'"), eine je
+  // FOLTER_GERAETE-Stufe -- die Leiter wird damit zur Zahl, die man vorher sieht, statt
+  // nur "Stufe n/10" zu lesen. AUSDRUECKLICH KEINE SCHADENSZAHL (Doku-Wortlaut: "sollte die
+  // Qual-Zahl keine Schadenszahl behaupten, also kein '+8%' auf der Tafel") -- der Schaden
+  // je Geraet ist bis zu Breaking-Review P4 fuer alle zehn Stufen identisch
+  // (GAUNTLET_SCHADEN_ERFOLG/FAIL), diese Zahlen fliessen in KEINE Formel ein, rein
+  // dekorativ, grob am realen Scoville-Sprung von Mild bis Carolina Reaper orientiert.
+  const QUAL_ZAHLEN=[1200,2500,6000,15000,40000,100000,250000,600000,1200000,2000000];
+  const qualAnzeige=(n)=>n>=1000000?(n/1000000).toFixed(1).replace(".0","")+" Mio":
+    n>=1000?Math.round(n/1000)+" Tsd":String(n);
 
   const BUEHNE_ART={
     gewichtheben:{
@@ -14424,6 +14438,20 @@
   // ({0:[...],1:[...]}, Team-Slot-Reihenfolge aus baueGauntlet()) -- rein strukturell,
   // keine Zufallszahl, dieselbe Kategorie wie u.duellNr beim Gewichtheben.
   let letzterGauntletZug=null, gauntletReihen=null;
+  // B5 (Broadcast-Optik-Recherche 27.09., Klasse A): DER MOMENT „GEBROCHEN". Anders als
+  // `letzterGauntletZug` (jeder Anschlag, ueberschrieben beim naechsten Anschlag desselben
+  // oder eines neuen Bouts) haelt `letzterGauntletBruch` NUR den zuletzt enthuellten K.O.-
+  // Anschlag fest, zusammen mit dem Buehnen-Zeitstempel `bruchT` -- ohne das wuerde der
+  // Stempel schon 0,35s spaeter (der naechste Anschlag des naechsten Bouts) wieder
+  // verschwinden, bevor er ueberhaupt zu lesen war. Reine Lese-/Merk-Struktur, kein rr(),
+  // gesetzt nur reveal-gegatet in stepBuehne (s. dort), gelesen nur in zeichneBreaking().
+  let letzterGauntletBruch=null;
+  // B6 (Broadcast-Optik-Recherche 27.09., Klasse A): STANDZEIT. Buehnen-Zeitstempel, an dem
+  // der aktuell laufende Bout (r.bout) zum ersten Mal enthuellt wurde -- "wie lange steht
+  // dieser Kampf schon" (Doku: "Standzeit in Zuschauerzeit seit Beginn des Kampfes", nach
+  // Survivor-Vorbild). Reveal-gegatet wie `letzterGauntletBruch`: gesetzt nur, wenn sich
+  // `r.bout` gegenueber dem zuletzt enthuellten Zug aendert (s. stepBuehne).
+  let gauntletBoutStartT=null;
   // S-Schach (Buehnenbild Speed-Schach): welches Brett gerade im Fokus steht.
   // schachPin!=null haelt es fest (Klick auf ein Mini-Brett/den Kadernamen) und
   // schaltet die Regie-Automatik ab; schachMiniRects sind die zuletzt gezeichneten
@@ -14497,7 +14525,7 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
-    floats.length=0; letzterHebenZug=null; letzterGauntletZug=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    floats.length=0; letzterHebenZug=null; letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -16246,6 +16274,28 @@
   function gauntletZugJetzt(u){
     return u.aktuell>=0?u.runden[u.aktuell]:null;
   }
+  // B4.1 (Broadcast-Optik-Recherche 27.09., Klasse A): DIE FOLTERSTUFE GEHOERT ZUM
+  // LAUFENDEN KAMPF, NICHT ZUR KARRIERE. `folterStufe(runde,rundenN)` bekam bisher
+  // `u.aktuell` (den eigenen Zugzaehler UEBER ALLE ueberstandenen Kaempfe hinweg, s.
+  // baueGauntlet()-Kommentar: ein Ueberlebender "sammelt ueber mehrere Duelle hinweg
+  // beliebig viele eigene Zuege") — ein Veteran, der schon acht eigene Zuege hinter sich
+  // hat, klebte damit vom ALLERERSTEN Anschlag seines naechsten Kampfes an beim
+  // Vorschlaghammer (Doku B4.1: "Heute klebt ein Veteran ab Zug 8 am Hammer"), obwohl die
+  // Eskalation "es wird immer schlimmer" fuer DIESEN Kampf gerade erst beginnt.
+  // `gauntletZugImBout(u,idx)` zaehlt stattdessen nur die eigenen Runden INNERHALB DES
+  // BOUTS, zu dem `u.runden[idx]` gehoert (0-basiert) — reiner Lesezugriff auf `r.bout`
+  // (das jede Runde seit baueGauntlet() schon traegt, s. dortiger Kommentar), kein neues
+  // Feld, kein rr(). `bout` waechst innerhalb von `u.runden` monoton (jede Elimination
+  // erhoeht den globalen Zaehler um genau eins, nie zurueck), Eintraege desselben Bouts
+  // liegen deshalb immer als EIN zusammenhaengender Block am Ende bis `idx` — ein
+  // Rueckwaertslauf bis zum Blockanfang reicht, keine zweite Datenstruktur noetig.
+  function gauntletZugImBout(u,idx){
+    if(idx<0||!u.runden[idx])return 0;
+    const bout=u.runden[idx].bout;
+    let n=0;
+    for(let j=idx;j>=0&&u.runden[j]&&u.runden[j].bout===bout;j--)n++;
+    return n-1; // 0-basiert, wie folterStufe() es fuer `runde` erwartet
+  }
   // "Raus" ERST, WENN DIE ENTHUELLUNG DEN K.O.-ZUG SELBST ERREICHT HAT -- `u.raus` (Endstand)
   // waere sonst ein zweiter Spoiler derselben Art: ein Team staende im HUD schon beim allerersten
   // Frame auf "0 Ueberlebende", obwohl der Ticker den entscheidenden Zug noch gar nicht gezeigt
@@ -16332,7 +16382,17 @@
       // (die Kampf-Nummer haengt an der ganzen Kette, nicht an einem einzelnen Teilnehmer) --
       // reine Buchfuehrung, kein rr(), keine neue Zahl (r.bout steht schon seit baueGauntlet()
       // auf dem Rundeneintrag, hier nur reveal-gegatet gemerkt).
-      if(BB().gauntlet){ letzterGauntletZug={u,r}; }
+      if(BB().gauntlet){
+        // B6: NEUER BOUT ENTHUELLT (r.bout weicht vom zuletzt gezeigten ab, oder es ist der
+        // allererste Zug ueberhaupt) -- der Standzeit-Zaehler faengt neu an.
+        if(!letzterGauntletZug||letzterGauntletZug.r.bout!==r.bout)gauntletBoutStartT=buehneT;
+        letzterGauntletZug={u,r};
+        // B5 (Broadcast-Optik-Recherche 27.09., Klasse A): DER MOMENT „GEBROCHEN", nur bei
+        // diesem einen Anschlag gemerkt (s. `letzterGauntletBruch`-Kommentar oben), mit dem
+        // AKTUELLEN Buehnen-Zeitstempel -- zeichneBreaking() blendet daraus einen kurzen,
+        // real ablaufenden Stempel ein (keine Pause der Enthuellung, reine Ueberlagerung).
+        if(r.hpNach<=0)letzterGauntletBruch={u,r,bruchT:buehneT};
+      }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
@@ -18845,9 +18905,31 @@
     g.addColorStop(0,"#14171d");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     // Publikumssilhouetten im Dunkeln, oberer Rand.
+    //
+    // H3 (Broadcast-Optik-Recherche 27.09., Klasse A): PUBLIKUM REAGIERT AUF DIE PHASE
+    // (Doku Abschnitt 4: "Silhouetten wippen im Takt" beim Antritt, stehen still beim Zug,
+    // springen einmal beim gueltigen Versuch). Liest ausschliesslich `zug.u.vizPhase`
+    // (stepHeben(), bereits reveal-/phasengegatet, dieselbe Quelle wie die Kampfrichter-
+    // lampen/Textkarte weiter unten in dieser Funktion) und `zug.u.vizPhaseT` (derselbe
+    // Phasen-eigene Timer, den stepHeben() ohnehin fuehrt -- kein neues Feld noetig).
+    // `zug.r.gueltig` ist zu diesem Zeitpunkt bereits enthuellt (dieselbe Zahl, die die
+    // Lampen/H1-Kaestchen weiter unten faerben), also kein Spoiler.
+    const hebenZug=letzterHebenZug;
+    const hebenPhase=hebenZug?hebenZug.u.vizPhase:null;
+    // ANTRITT: Klatschrhythmus im Bild -- eine gemeinsame, schnelle Wippbewegung alle
+    // Silhouetten, synchron zum "klatschen"-Ton (s. Trigger in zeichneHeben()).
+    const klatschWippe=hebenPhase==="antritt"?Math.abs(Math.sin(buehneT*2*Math.PI*4.2))*2.2:0;
+    // HOCH (gueltiger Versuch): ein einmaliger, abklingender Sprung genau beim Betreten der
+    // Phase -- `vizPhaseT` startet bei 0 und waechst, exakt das Fenster, das gebraucht wird.
+    const hebenSprung=(hebenPhase==="hoch")
+      ?Math.max(0,Math.sin(Math.min(1,(hebenZug.u.vizPhaseT||0)/0.30)*Math.PI))*5:0;
+    // ABLAGE nach einem ECHTEN Fehlversuch (nicht nach einer erfolgreichen Haltephase):
+    // ein kurzes, abklingendes Absacken -- das "Raunen" im Bild.
+    const hebenDroop=(hebenPhase==="ablage"&&hebenZug&&!hebenZug.r.gueltig)
+      ?Math.max(0,1-(hebenZug.u.vizPhaseT||0)/0.35)*3:0;
     ctx.fillStyle="#1c1f27";
     for(let i=0;i<26;i++){
-      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4;
+      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4-klatschWippe-hebenSprung+hebenDroop;
       ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
     }
     // WETTKAMPFPLATTFORM: helles Quadrat mit Kante, mittig in der Bildebene der Heber.
@@ -22084,9 +22166,31 @@
     if(zug){
       const jetzt=zug.u.vizPhase||hebePhase(zug.u);
       if(jetzt!==zug._tonPhase){
-        if(jetzt==="hoch"&&zug._tonPhase==="zug"){ sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch"); }
-        if(jetzt==="ablage"&&zug._tonPhase==="zug"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
+        if(jetzt==="hoch"&&zug._tonPhase==="zug"){
+          sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch");
+          // H3 (Broadcast-Optik-Recherche 27.09.): AUSBRUCH, zusaetzlich zum bestehenden
+          // "gueltig"-Doppelton -- das Publikum, nicht nur die Anzeigetafel, feiert den
+          // Erfolg (Doku: "Ausbruch: tonRauschen-Anschwellen").
+          sfx("gewichtheben","ausbruch");
+        }
+        if(jetzt==="ablage"&&zug._tonPhase==="zug"){
+          sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall");
+          // H3: RAUNEN bei einem ECHTEN Fehlversuch (derselbe Direktsprung zug->ablage, der
+          // oben schon den Fehlversuch von einer normalen Ablage nach "hoch" unterscheidet)
+          // -- "tiefes, kurzes Rauschen" (Doku), zusaetzlich zum bestehenden Buzzer.
+          sfx("gewichtheben","raunen");
+        }
         if(jetzt==="abwurf"&&zug._tonPhase!=="abwurf"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
+        // H3: KLATSCHRHYTHMUS beim Antritt (Doku: "Klatschrhythmus, der schneller wird").
+        // Drei Klicks mit enger werdendem Abstand (220/150/100ms) ueber setTimeout, exakt
+        // dasselbe Schema wie das lub-dub des Herzschlags bei TON_KATALOG.breaking.
+        // herzschlag (s. dort) -- ein einziger sfx()-Aufruf am Phasenwechsel selbst plus
+        // zwei verzoegerte Nachzuegler, kein neuer Dauer-Loop, kein rr().
+        if(jetzt==="antritt"&&zug._tonPhase!=="antritt"){
+          sfx("gewichtheben","klatschen");
+          setTimeout(()=>{try{sfx("gewichtheben","klatschen",0.5);}catch(e){}},220);
+          setTimeout(()=>{try{sfx("gewichtheben","klatschen",0.6);}catch(e){}},370);
+        }
         zug._tonPhase=jetzt;
       }
     }
@@ -22858,7 +22962,14 @@
     // Stufe = Durchgang des gerade Ertragenden (s. folterStufe oben). Die Leiter ist immer
     // vollstaendig zu sehen: was schon dran war, ist ausgegraut; was noch kommt, steht dunkel
     // bereit. Genau das macht „es wird immer schlimmer" ueberhaupt sichtbar.
-    const stufe=paar&&paar.ertraeger?folterStufe(paar.ertraeger.aktuell,art.rundenN):0;
+    //
+    // B4.1 (Broadcast-Optik-Recherche 27.09., Klasse A): `gauntletZugImBout()` statt
+    // `paar.ertraeger.aktuell` -- die Stufe gehoert zum LAUFENDEN KAMPF, s. Kommentar dort.
+    // Bei art.rundenN=8 erreicht ein Kampf, der laenger als acht eigene Zuege dauert, damit
+    // wieder den Hammer (statt schon beim ersten Anschlag des naechsten Kampfes dort zu
+    // kleben) -- exakt dieselbe Skalierung wie zuvor, nur pro Kampf statt pro Karriere.
+    const stufe=paar&&paar.ertraeger
+      ?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0;
     const geraet=FOLTER_GERAETE[stufe];
     const tischB=Math.min(W*0.84,920), tischX=cx-tischB/2, tischY=H-24;
     const fachB=tischB/FOLTER_GERAETE.length;
@@ -22873,6 +22984,12 @@
         // des Peinigers (unten gezeichnet), nicht auf dem Tisch.
         ctx.setLineDash([3,3]); ctx.strokeStyle="rgba(242,215,90,.9)"; ctx.lineWidth=1.3;
         ctx.strokeRect(fx-fachB*0.36,fy-12,fachB*0.72,24); ctx.setLineDash([]);
+        // B4.2: die aktive Stufe traegt ihre Qual-Zahl GROSS (Doku B4.2), im Tisch selbst
+        // (goldene Schrift auf dem dunklen Holz), statt sie mit den uebrigen neun kleinen
+        // Zahlen zu verwechseln.
+        ctx.font="800 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
         continue;
       }
       ctx.save();
@@ -22883,10 +23000,20 @@
       ctx.translate(fx-fachB*0.32,fy); ctx.scale(0.95,0.95);
       FOLTER_GERAETE[i].zeichne(ctx);
       ctx.restore();
+      // B4.2 (Broadcast-Optik-Recherche 27.09., Klasse A): QUAL-ZAHL je Geraet, klein, im
+      // Tischbrett selbst -- "die Leiter wird damit zur Zahl, die man vorher sieht" (Doku).
+      // Ausdruecklich KEINE Schadenszahl/kein "+X%" (Doku-Wortlaut), rein die aufsteigende
+      // Reihe aus QUAL_ZAHLEN, in derselben Grau-/Hell-Staffelung wie das Geraet daneben.
+      ctx.save();
+      ctx.globalAlpha=i<stufe?0.22:0.55;
+      ctx.font="600 6px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
+      ctx.restore();
     }
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.font="800 10px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
-    ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length,cx,tischY-30);
+    ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length+"  ·  QUAL "+qualAnzeige(QUAL_ZAHLEN[stufe]),cx,tischY-30);
     ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(214,170,255,.6)";
     ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
 
@@ -23066,7 +23193,7 @@
       // GAUNTLET (22.09.) braucht eine vierte Zeile (HP-Balken UND Punkte/Kampf-Nummer
       // getrennt, s.u.) -- die Tafel waechst dafuer um 12px, statt die drei bestehenden
       // Zeilen zu stauchen.
-      const bw=Math.min(190,W*0.20), bh=art.gauntlet?76:64;
+      const bw=Math.min(190,W*0.20), bh=art.gauntlet?86:64;
       const bx=links?12:W-12-bw, by=cy-bh/2-18;
       ctx.fillStyle="rgba(10,6,14,.78)"; ctx.fillRect(bx,by,bw,bh);
       ctx.fillStyle=farbeVon(u); ctx.fillRect(bx,by,3,bh);
@@ -23106,6 +23233,18 @@
         // Enthuellung (noch kein Zug gezeigt) ist "Kampf 1" der einzig plausible Anfangswert.
         const zug=gauntletZugJetzt(u);
         ctx.fillText(u.summe+" Pkt  ·  Kampf "+(zug?zug.bout:1),bx+12,by+61);
+        // B6 (Broadcast-Optik-Recherche 27.09., Klasse A): STANDZEIT UND ANSCHLAGZAEHLER,
+        // nur auf der Tafel des gerade Ertragenden (Doku: "Auf der Tafel des Ertragenden").
+        // `gauntletZugImBout()` (s. B4.1-Kommentar oben) zaehlt die eigenen Anschlaege
+        // dieses Bouts, `gauntletBoutStartT` ist der Buehnen-Zeitstempel des Bout-Beginns
+        // (s. Setzstelle in stepBuehne) -- beide reveal-gegatet, kein Spoiler.
+        if(rolle==="ertraegt"){
+          const anschlagN=gauntletZugImBout(u,u.aktuell)+1;
+          const standSek=Math.max(0,buehneT-(gauntletBoutStartT??buehneT));
+          const mm=Math.floor(standSek/60), ss=Math.floor(standSek%60);
+          ctx.fillStyle="#9aa4b4";
+          ctx.fillText("Anschlag "+anschlagN+" · Standzeit "+mm+":"+String(ss).padStart(2,"0"),bx+12,by+72);
+        }
       } else {
         ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
       }
@@ -23238,6 +23377,42 @@
       };
       zeichneHpBalken(stehend[0],true);
       zeichneHpBalken(stehend[1],false);
+    }
+
+    // ================== B5: DER MOMENT „GEBROCHEN" (Broadcast-Optik-Recherche 27.09.,
+    // Klasse A, "nur Standbild/Stempel, kein C-Pause-Umbau") ==================
+    // Doku B5 schlaegt drei Schritte vor: Standbild+Stempel, Zeitlupe des letzten
+    // Anschlags (dasselbe Bild-im-Bild-Bauteil wie H5/C6, in dieser Runde bewusst NICHT
+    // gebaut, s. PR-Beschreibung) und eine "Wand der Gebrochenen" (dieselbe Information wie
+    // B1s Kettenleiste oben, laut Doku selbst "nur als Bild" -- hier nicht verdoppelt).
+    // Gebaut ist Schritt 1: ein kurzer, ECHT (in Buehnenzeit) ABLAUFENDER Stempel ueber dem
+    // ganzen Bild -- KEINE Pause der Enthuellung (`buehneAkt`/`buehneZeiger` laufen
+    // unveraendert weiter, die naechste Runde enthuellt puenktlich), nur eine zusaetzliche
+    // Ueberlagerung, die von selbst ausblendet. `letzterGauntletBruch` ist reveal-gegatet
+    // (s. Setzstelle in stepBuehne), also kein Spoiler.
+    if(art.gauntlet && letzterGauntletBruch){
+      const seit=buehneT-letzterGauntletBruch.bruchT;
+      if(seit>=0 && seit<BRUCH_STEMPEL_DAUER){
+        const p=1-seit/BRUCH_STEMPEL_DAUER; // 1 -> 0, linear ausblendend
+        ctx.save();
+        // Entsaettigung/Verdunklung des ganzen Bildes -- das "Standbild"-Gefuehl, ohne den
+        // Takt tatsaechlich anzuhalten.
+        ctx.fillStyle="rgba(8,3,5,"+(0.40*p).toFixed(3)+")";
+        ctx.fillRect(0,0,W,H);
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.save();
+        ctx.translate(cx,cy); ctx.rotate(-0.07);
+        ctx.font="900 34px 'Barlow Condensed',sans-serif";
+        ctx.globalAlpha=Math.min(1,p*1.8);
+        ctx.lineWidth=4; ctx.strokeStyle="rgba(8,4,4,.88)"; ctx.lineJoin="round";
+        ctx.strokeText("GEBROCHEN",0,0);
+        ctx.fillStyle="#ff3b3b"; ctx.fillText("GEBROCHEN",0,0);
+        ctx.restore();
+        ctx.globalAlpha=Math.min(1,p*1.8);
+        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.fillText(letzterGauntletBruch.u.n+" scheidet aus",cx,cy+30);
+        ctx.restore();
+      }
     }
   }
 
@@ -27868,7 +28043,24 @@
       gueltig:       {synth:(vol)=>tonDoppelton(vol,660,990,0.3)},
       ungueltig:     {synth:(vol)=>tonBuzzer(vol,0.35)},
       scheiben_fall: {synth:(vol)=>{ tonMetall((vol??0.6)*0.85,600,0.3); tonRauschen((vol??0.6)*0.6,280,0.4,false); }},
-      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)},
+      // H3 (Broadcast-Optik-Recherche 27.09., Klasse A): PUBLIKUM ALS TONSPUR DES VERSUCHS
+      // (Doku Abschnitt 4, "die Tonspur macht aus drei Sekunden ein Ereignis"). Drei neue
+      // Ereignisse aus genau den vier Phasen, die stepHeben() ohnehin schon durchlaeuft
+      // (boden/antritt/zug/hoch|ablage, s. dortiger Kommentar) -- kein sechster
+      // Ton-Baustein, dieselben fuenf Primitive wie ueberall im Katalog:
+      //  - klatschen: kurzer, heller Klick beim Uebergang boden->antritt (der Heber tritt
+      //    an) -- der Rhythmus entsteht aus MEHREREN, ENGER WERDENDEN Klicks (s. Aufrufer
+      //    in stepBuehne), nicht aus einem einzelnen Ton.
+      //  - ausbruch: Rauschen-Anschwellen, ZUSAETZLICH zum bestehenden "gueltig"-Doppelton
+      //    beim Uebergang zug->hoch -- das Publikum, nicht nur die Anzeigetafel, reagiert.
+      //  - raunen: tiefes, kurzes Rauschen, ZUSAETZLICH zum bestehenden "ungueltig"-Buzzer
+      //    beim direkten Uebergang zug->ablage (der echte Fehlversuch, s. Doku-Warnung zur
+      //    Spoiler-Falle bei H2.2 -- derselbe Direktsprung, den zeichneHeben() dafuer schon
+      //    auswertet).
+      klatschen: {synth:(vol)=>tonKlick(vol,2800,0.05)},
+      ausbruch:  {synth:(vol)=>tonRauschen(vol,900,0.55,false)},
+      raunen:    {synth:(vol)=>tonRauschen((vol??0.6)*0.7,220,0.4,false)}
     },
     eiskunstlauf:{
       kufe:     {synth:(vol)=>tonKlick(vol,3200,0.05)},
@@ -29136,6 +29328,9 @@
   // CLIMBING_STURZ_DAUER steht wie `ANSAGE_NACHLEUCHTEN` in ZUSCHAUER-Sekunden, daher die
   // Umrechnung ueber `zeitFaktor()` (climbing=4.38) statt eines rohen rennT-Vergleichs.
   const CLIMBING_STURZ_DAUER=0.45;
+  // C5 (Broadcast-Optik-Recherche 27.09.): wie lange eine Exe-Split-Einblendung sichtbar
+  // bleibt, in BUEHNENZEIT (`rennT`-Domaene, wie `zeitlimit` oben) -- Doku C5: "2 s lang".
+  const EXE_SPLIT_DAUER=2.0;
   function climbAnzeigeAnteil(u){
     const ziel=Math.max(0,Math.min(1,u.pos||0));
     if(u.vizFallVon==null)return ziel;
@@ -29269,6 +29464,89 @@
         ctx.strokeStyle=geklinkt?"#7fd858":"#9a9488";ctx.lineWidth=2;
         ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.stroke();
         if(geklinkt){ctx.fillStyle="rgba(127,216,88,.22)";ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.fill();}
+      });
+
+      // ================== C4b: TOP-LAMPE (Broadcast-Optik-Recherche 27.09., Klasse A)
+      // ==================
+      // "eine Lampe wie das Zeit-Pad beim Speed": leuchtet in Teamfarbe, sobald diese Route
+      // getoppt hat, daneben die bereits enthuellte Zielzeit -- `u.fertig` ist ein reiner
+      // Lesezugriff (derselbe Zeitstempel, den bahnZeit()/bahnRangliste() fuer den Endstand
+      // benutzen), keine neue Motor-Groesse. FESTE BILDSCHIRMHOEHE (`H*0.10`), NICHT am
+      // Sicherer (`sy=camY(0)+20`): die Kamera folgt den Kletterern nach oben (`camY()`
+      // haengt an `camViewV()`), sy waere also fast immer laengst aus dem Bild gescrollt,
+      // genau in dem Moment, in dem ein Top-out ueberhaupt erst passiert (Sicht-QA-Fund,
+      // s. PR-Beschreibung) -- eine Lampe, die niemand je sieht, waere keine Lampe.
+      const lampX=x, lampY=H*0.10, getoppt=!!(u&&u.fertig!=null);
+      const farbeSeite=u?(u.seite===0?css("--home"):css("--away")):"#7fd858";
+      ctx.beginPath();ctx.arc(lampX,lampY,5,0,6.283);
+      ctx.fillStyle=getoppt?farbeSeite:"#2a2e22"; ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=1; ctx.stroke();
+      if(getoppt){
+        ctx.save();
+        ctx.globalAlpha=0.30+0.25*Math.abs(Math.sin(buehneT*4));
+        ctx.fillStyle=farbeSeite;
+        ctx.beginPath();ctx.arc(lampX,lampY,9,0,6.283);ctx.fill();
+        ctx.restore();
+        const zielTxt=bahnZeitText(bahnSpanneAnzeige(bahnZeit(u)));
+        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeSeite;
+        ctx.textAlign="center"; ctx.fillText("TOP "+zielTxt,lampX,lampY-11);
+      }
+    }
+
+    // ================== C4a: DUELL-BAND (Broadcast-Optik-Recherche 27.09., Klasse A)
+    // ==================
+    // Sechs Paare (`Math.floor(bahnZ/2)`, dieselbe Paarbildung wie `druckQuelle:"duell"`,
+    // s. BAHN_ART.climbing-Kommentar) klettern auf gespiegelten Routen -- das ist laengst
+    // Rock-Master-/Speed-Bildsprache, nur bisher nicht gezeigt. Ein Kaestchen zwischen den
+    // beiden Routen eines Paars zeigt den Vorsprung des Fuehrenden IN GRIFFEN der
+    // Hoechstmarke (`u.hoch`, dieselbe spoilerfreie Groesse wie beim Seil/den Exen oben),
+    // in dessen Teamfarbe, grau bei Gleichstand. Eigener Durchlauf NACH dem Pro-Route-Block
+    // oben, weil er BEIDE Routen eines Paars gleichzeitig braucht.
+    // FESTE BILDSCHIRMHOEHE (`H*0.145`), NICHT am Sicherer (`camY(0)+50`): derselbe
+    // Scroll-Befund wie bei der Top-Lampe (s. Kommentar dort) -- gegen Ende eines engen
+    // Rennens, wenn das Band am meisten erzaehlt, waere `camY(0)` laengst nach oben aus dem
+    // Bild gewandert. Unter der Top-Lampen-Reihe (`H*0.10`), damit sich beide nicht
+    // ueberlappen.
+    const bandY=H*0.145;
+    for(let p=0;p<Math.floor(n/2);p++){
+      const bzA=p*2, bzB=p*2+1;
+      const a=LAEUFER.find(l=>Math.round(l.bahnZ)===bzA);
+      const b=LAEUFER.find(l=>Math.round(l.bahnZ)===bzB);
+      if(!a||!b)continue;
+      const xA=wandX(bzA), xB=wandX(bzB), midX=(xA+xB)/2;
+      const griffZahl=(hochVal)=>griffe.filter(pos=>hochVal>=pos).length;
+      const gA=griffZahl(Math.max(0,Math.min(1,(a.hoch??a.pos)||0)));
+      const gB=griffZahl(Math.max(0,Math.min(1,(b.hoch??b.pos)||0)));
+      const diff=gA-gB;
+      const fuehrtA=diff>0, fuehrtB=diff<0;
+      const farbe=fuehrtA?(a.seite===0?css("--home"):css("--away"))
+        :fuehrtB?(b.seite===0?css("--home"):css("--away")):"rgba(230,225,210,.55)";
+      ctx.fillStyle="rgba(10,8,6,.62)"; ctx.fillRect(midX-17,bandY-9,34,18);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.3; ctx.strokeRect(midX-17,bandY-9,34,18);
+      ctx.font="800 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbe;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(diff===0?"=":(diff>0?"+":"")+diff,midX,bandY+1);
+
+      // C5 (Broadcast-Optik-Recherche 27.09., Klasse A): EXE-SPLITS. Sobald der ZWEITE
+      // Partner eines Paars eine der drei WAND_EXE_INDIZES-Exen zum ersten Mal klinkt
+      // (`vizExeT[k]` bei BEIDEN gesetzt, s. stepClimbing()), erscheint fuer
+      // EXE_SPLIT_DAUER Buehnensekunden eine Delta-Einblendung neben dieser Exe, in
+      // Teamfarbe des Schnelleren -- "Exe 2 · +1,4 s" (Doku). `bahnSpanneAnzeige()`
+      // rechnet dieselbe Sim->Zuschauer-Umrechnung, die jede andere Bahnzeit auf dieser
+      // Buehne schon benutzt (s. bahnZeitText-Kommentar oben).
+      WAND_EXE_INDIZES.forEach((idx,k)=>{
+        const posFrac=griffe[idx]; if(posFrac==null)return;
+        const tA=a.vizExeT&&a.vizExeT[k], tB=b.vizExeT&&b.vizExeT[k];
+        if(tA==null||tB==null)return;
+        const zweiterT=Math.max(tA,tB);
+        if(rennT-zweiterT>=EXE_SPLIT_DAUER)return; // laengst wieder ausgeblendet
+        const y=camY(posFrac); if(y<-20||y>H+20)return;
+        const deltaSim=Math.abs(tA-tB);
+        const deltaTxt=bahnZeitText(bahnSpanneAnzeige(deltaSim));
+        const schnellerFarbe=(tA<tB?a:b).seite===0?css("--home"):css("--away");
+        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=schnellerFarbe;
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText("Exe "+(k+1)+" · +"+deltaTxt,midX,y-14);
       });
     }
 
@@ -33190,6 +33468,12 @@
         // praesentational: liest nur u.pos gegen WAND_EXE_INDIZES (bodenWand()s Vorgriff auf
         // die PR-2-Zonen), schreibt nur das neue viz*-Feld, nie u.pos/rr()/tempoVon().
         u.vizExeN=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
+        // C5 (Broadcast-Optik-Recherche 27.09., Klasse A): EXE-SPLITS. `vizExeT[k]` haelt
+        // den Buehnen-Zeitpunkt (`rennT`, dieselbe Groesse, die auch bahnZeit()/Zwischen-
+        // zeiten benutzen) fest, an dem diese Route ihre (k+1)-te Exe zum ERSTEN Mal
+        // geklinkt hat -- ausschliesslich fuer den Vergleich gegen den Duellpartner in
+        // bodenWand() (s. dort). Kein neuer rr(), kein Einfluss auf wert()/tempoVon().
+        u.vizExeT=[];
       }
       if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       // ---- GRIFF-TON (TON_KATALOG.climbing.griff), an der Kante "ein weiterer der zehn
@@ -33208,6 +33492,10 @@
       if(u.fertig==null){
         const geklinkt=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
         if(geklinkt>u.vizExeN){
+          // C5: Zeitstempel fuer jede NEU erreichte Exe (kann bei einem grossen Zeitschritt
+          // mehr als eine auf einmal sein) -- derselbe rennT-Zeitpunkt, aus dem auch
+          // bahnZeit()/die Zwischenzeiten der anderen Bahnen ihre Differenzen bilden.
+          for(let k=u.vizExeN;k<geklinkt;k++)u.vizExeT[k]=rennT;
           u.vizExeN=geklinkt;
           feed(u.seite,u.n+" klinkt die "+(geklinkt===1?"erste":geklinkt===2?"zweite":"dritte")+" Exe.");
         }
@@ -33671,6 +33959,32 @@
           u.huerde>0?"huerde":"laufen");
       }
       ctx.restore();
+      // ================== C6.2: BALANCE-RING (Broadcast-Optik-Recherche 27.09., Klasse A)
+      // ==================
+      // Konzept 5.3 (Climbing-Neubau, nicht gebaut) und Doku C6.2: "man sieht nicht, dass
+      // jemand wackelt" -- `u.balance` (0..1, stepSpurt() senkt sie durch Steigung/leere
+      // Puste/Kraftzug/Umsetzen, s. BAHN_ART.climbing.balanceSteigungGrad-Kommentar) wirkt
+      // laengst auf den Duelldruck und die Grifferfolgschance, war aber nirgends abzulesen.
+      // Reiner Lesezugriff auf ein bestehendes Motor-Feld, schreibt nichts, kein rr() --
+      // derselbe Vertrag wie jede andere Zeichnung in dieser Funktion. Nur fuer Climbing
+      // (`istWand()`) und nur, solange geklettert wird (kein Ring auf einer bereits
+      // ausgestiegenen oder fertigen Figur, die ohnehin nicht mehr wackelt).
+      if(istWand() && u.fertig==null && u.stolper<=0){
+        const bal=u.balance??1;
+        ctx.save();
+        ctx.globalAlpha=0.85;
+        ctx.lineWidth=2;
+        // Ab 0,6 gelb, unter 0,4 rot und leicht zitternd (Doku: "ab 0,6 gelb, unter 0,4 rot
+        // und zitternd") -- darueber ein ruhiger, kaum sichtbarer Ring, damit das Bild bei
+        // guter Balance nicht unnoetig unruhig wird.
+        const wackelt=bal<0.4;
+        const jx=wackelt?Math.sin(buehneT*30+u.id)*1.6:0;
+        ctx.strokeStyle=bal<0.4?"#ff5a4a":bal<0.6?"#f2d75a":"rgba(255,255,255,.30)";
+        ctx.beginPath();
+        ctx.arc(x+jx,y+2,15*sk,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0.06,bal));
+        ctx.stroke();
+        ctx.restore();
+      }
       // DER STAB (A3/M-Ziel 6, DISZIPLIN_PROP.staffel/zeichneStab, s. dort): nur der
       // AKTUELLE Traeger zeigt ihn -- im Normalfall der gerade Laufende, waehrend der
       // 0,55-Sekunden-Uebergabe-Animation (stepStaffel, s. dort) eine Zwischenposition
