@@ -28766,6 +28766,12 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // s. aktualisiereTdmNotizen() weiter unten: updateHud() ist TDMs eigener Kampf-Tick
+    // (stepSim ruft sie bei jedem simulierten Schritt), deshalb hier zusaetzlich zu
+    // reset()/dem Play-Knopf gegated -- rein defensiv, falls `running` je auf einem
+    // anderen Weg als den beiden bekannten wechselt. Fuer jede Nicht-TDM-Disziplin ist
+    // der Aufruf ein No-Op (disc!=="tdm" gilt dort ohnehin schon).
+    aktualisiereTdmNotizen();
   }
 
   // ===================================================================================
@@ -37976,6 +37982,20 @@
   // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
   let mdffaOffenbarungsTimer=null;
 
+  // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
+  // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
+  // sind interne Balance-/Entwurfsdokumentation, keine Zuschauer-Grafik -- sie duerfen
+  // deshalb nie UEBER/UNTER einem live laufenden Kampf stehen. Gate: Disziplin TDM UND
+  // nicht `running` (derselbe Zustand, den play()/loop()/finish() unten fuehren) --
+  // also sichtbar vor dem Anpfiff, waehrend einer Pause und nach Spielende, unsichtbar
+  // genau waehrend der Kampf tatsaechlich laeuft. Aufgerufen von reset() (Disziplinwechsel/
+  // Neustart), vom Play/Pause-Knopf und von finish() (ueber updateHud() am Ende jedes
+  // finish()-Zweigs) -- reines Anzeige-Gating, keine Beruehrung von running/stepSim/rr().
+  function aktualisiereTdmNotizen(){
+    const tdmNotes=document.getElementById("tdmEntwurfNotes");
+    if(tdmNotes)tdmNotes.hidden=disc!=="tdm"||running;
+  }
+
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
@@ -38123,8 +38143,16 @@
     // war. Reines Anzeige-Gating, dieselbe Stelle/derselbe Vertrag wie mdffaPanel zwei
     // Zeilen oben (reset() laeuft garantiert bei jedem Disziplinwechsel) — Inhalt der
     // Panels selbst bleibt fuer TDM unangetastet, kein Einfluss auf wert()/stepSim/rr().
-    const tdmNotes=document.getElementById("tdmEntwurfNotes");
-    if(tdmNotes)tdmNotes.hidden=disc!=="tdm";
+    //
+    // ZWEITER FUND, KRITISCHER AUDIT (Phase 5, 28.09.): "nur fuer TDM" reichte nicht --
+    // die Panels standen dauerhaft unter der Arena, AUCH WAEHREND ein TDM-Kampf lief.
+    // Interne Entwickler-/Balance-Doku direkt unter dem Live-Bild bricht die Broadcast-
+    // Illusion fuer eine Kern-Arena-Disziplin. aktualisiereTdmNotizen() gated deshalb
+    // zusaetzlich auf `running` (dieselbe Variable, die play()/loop()/finish() schon
+    // fuehren, s. dort): sichtbar VOR dem Anpfiff, WAEHREND Pause und NACH Spielende,
+    // unsichtbar nur waehrend eines tatsaechlich laufenden Kampfes. Reines Anzeige-
+    // Gating, keine Aenderung an running/stepSim/rr() selbst.
+    aktualisiereTdmNotizen();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
@@ -38159,6 +38187,12 @@
     zeigeEinlauf(false);
     running=!running;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
+    // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
+    // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
+    // laeuft (die Kampfschleife ruft updateHud() nur, waehrend running gerade true ist) --
+    // ohne diesen Aufruf bliebe die Sichtbarkeit der TDM-Entwicklerpanels bis zum
+    // naechsten Kampf-Tick auf dem alten Stand haengen.
+    aktualisiereTdmNotizen();
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
     // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }

@@ -209,7 +209,22 @@
   .oly-battle-arena.oly-battle-arena .tbar s{display:block;height:100%;border-radius:4px;transition:width .2s linear}
   .oly-battle-arena.oly-battle-arena .tbar.l s{background:var(--home)}.oly-battle-arena.oly-battle-arena .tbar.r s{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
-  .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;height:auto;background:var(--pitch)}
+  /* LEINWANDSKALIERUNG (Phase 5, 28.09., kritischer Audit): width:100%;height:auto war
+     schon seit dem 17.09. da (#956) und laesst den Browser die Bild-Hoehe aus dem
+     intrinsischen Seitenverhaeltnis der Leinwand (width/height-ATTRIBUTE im Markup,
+     1240x470, s. battle-mode.html #cv) ableiten -- nachgemessen (Playwright, 1024/1400/
+     1920px, Hockey/TDM/Basketball/Fechten, volle Seite UND reine Ueberlauf-Pruefung
+     per scrollWidth===clientWidth) blieb das bei jeder getesteten Breite ueberlauf- und
+     kappungsfrei, die Leinwand skaliert glatt von 1258px (1400/1920px, gedeckelt durch
+     .wrap max-width:1300px) auf 966px (1024px) herunter. `max-width:100%` und ein
+     EXPLIZITES `aspect-ratio` kommen trotzdem dazu, als zweite, von der Attribut-
+     Root-Inferenz UNABHAENGIGE Sicherung derselben Zahl -- falls die Leinwand je in
+     einen schmaleren Flex-/Grid-Kontext wandert, in dem ein Vorfahre `min-width:auto`
+     mitbringt, oder eine Embedding-Umgebung die width/height-Attribute anders liest als
+     hier gemessen. Das Verhaeltnis MUSS mit #cv width="1240" height="470" in
+     battle-mode.html mitwachsen, sonst verzerrt die Leinwand. */
+  .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;max-width:100%;
+    height:auto;aspect-ratio:1240/470;background:var(--pitch)}
 
   /* MINI-DM 4-TEAM-FFA-Ergebnisansicht (Bugfix 22.09., s. battle-mode.html/-engine.js) —
      vier Teams nebeneinander statt der Zwei-Seiten-.scoreline/.hpbars/.kaderleiste
