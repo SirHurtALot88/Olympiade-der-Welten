@@ -35558,6 +35558,22 @@
       }
     }
     let kfMarke=null;
+    // KOLLISIONSVERMEIDUNG NAME/STATUS (Audit-Fund Phase 5, 28.09.): in dichten TDM-
+    // Clustern lagen Name- und Statuszeile mehrerer Figuren deckungsgleich uebereinander,
+    // weil beide immer am selben festen dy unter dem Fusspunkt haengen (s. schrift() weiter
+    // unten) — im Beleg-Screenshot "mit der Linie" doppelt uebereinander, "Blessed Shield"
+    // ueber "Krolach"/"Johanna". Grund: die Entzerrung im Tick garantiert nur dx>=58 ODER
+    // dy>=70 zwischen zwei Figuren (s. Kommentar an den Ziellinien oben) — bei knappem dx
+    // und fast gleichem dy (z.B. Nebeneinander in derselben Reihe) bleibt genug Ueberlapp
+    // fuer einen 14-Zeichen-Namen bei 9,5 px (~80 px breit, zentriert). Reine Anzeige, kein
+    // rr()/wert()/stepSim-Bezug: `labelPositionen` sammelt nur die schon in DIESEM Frame
+    // gezeichneten Fusspunkte, und jede weitere Figur, die einem davon zu nahe kommt,
+    // staffelt ihre eigene Beschriftung um eine Zeilenhoehe tiefer — einfacher Index-
+    // Versatz statt echter Kraeftesimulation, wie von der Audit selbst vorgeschlagen.
+    // Frei stehende Figuren (der Normalfall) bekommen Versatz 0 und damit exakt dieselbe
+    // Position wie vorher.
+    const LABEL_KLUSTER_DX=80,LABEL_KLUSTER_DY=30,LABEL_ZEILENHOEHE=10;
+    const labelPositionen=[];
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
       let x=u.x,y=u.y;
@@ -35569,6 +35585,11 @@
       // hier gezeichnet laege der Ring unter den spaeter gemalten Figuren und der Pfeil
       // ueber dem Kopf verschwaende hinter dem naechsten Sprite.
       if(kfZ&&u===kfZ)kfMarke={x,y};
+      let labelVersatz=0;
+      for(const p of labelPositionen){
+        if(Math.abs(x-p.x)<LABEL_KLUSTER_DX&&Math.abs(y-p.y)<LABEL_KLUSTER_DY)labelVersatz++;
+      }
+      labelPositionen.push({x,y});
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
@@ -35615,12 +35636,14 @@
       };
       // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
       // einem Gedraenge aus zehn Beschriftungen war vorher nicht auf einen Blick zu sehen,
-      // welcher Name zu welcher Seite gehoert.
-      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,c,9.5);
+      // welcher Name zu welcher Seite gehoert. +labelVersatz*LABEL_ZEILENHOEHE staffelt
+      // Name UND Status ALS BLOCK nach unten, wenn diese Figur einer schon gezeichneten zu
+      // nahe steht (s. Kommentar an labelPositionen oben) — sonst (Normalfall) +0.
+      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44+labelVersatz*LABEL_ZEILENHOEHE,c,9.5);
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
-      schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),55,
-        u.heiler?css("--ok"):"#a9b6c6",8.5);
+      schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),
+        55+labelVersatz*LABEL_ZEILENHOEHE,u.heiler?css("--ok"):"#a9b6c6",8.5);
       ctx.globalAlpha=1;
     }
     // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
@@ -35662,22 +35685,58 @@
       ctx.beginPath();ctx.arc(pf.x,pf.y,2.4,0,6.3);ctx.fill();
     }
     zeichneEffekte(1/60);
+    // KOLLISIONSVERMEIDUNG FUER SCHWEBETEXTE (Audit-Fund Phase 5, 28.09., zweite Haelfte
+    // desselben Befunds wie labelPositionen oben): loesen mehrere Kaempfer im selben
+    // Cluster fast gleichzeitig einen Skill/Treffer aus, spawnen ihre Schwebetexte (z.B.
+    // "Blessed Shield" ueber "Krolach") an fast derselben Stelle UND steigen danach mit
+    // exakt demselben Tempo auf (stepFloats() zieht alle floats[] gleich schnell nach
+    // oben) — sie bleiben deshalb dauerhaft deckungsgleich statt sich zu trennen, anders
+    // als bei den Namen/Status-Labels ist hier also auch spaeter keine Selbstkorrektur zu
+    // erwarten. Ein fester Abstand reichte nicht: "Blessed Shield"/"Heavy Dash" (700 16px,
+    // teils ueber 120 px breit) ueberlappten bei Kickoff trotzdem noch, weil ihre
+    // Ankerpunkte (u.x der jeweiligen Einheit) weiter auseinanderlagen als ein pauschaler
+    // Klumpen-Radius, aber naeher als die halbe Textbreite beider Woerter zusammen. Deshalb
+    // hier die ECHTE gezeichnete Breite messen (ctx.measureText, ohnehin fuer zentrierten
+    // Text noetig) und zwei Schweber als Kollision zaehlen, wenn ihre Boxen sich in x
+    // ueberlappen UND sie auf (fast) gleicher Hoehe stehen. Reiner Anzeige-Nudge fuer den
+    // Aufruf von fillText/strokeText — floats[].x/y/life selbst (und damit stepFloats())
+    // bleiben unberuehrt, der Versatz wird bei jedem Frame neu berechnet. Frei stehende
+    // Schweber (Normalfall) bekommen Versatz 0 und damit exakt dieselbe Position wie vorher.
+    const FLOAT_DY_TOL=16,FLOAT_ZEILENHOEHE=15,FLOAT_SICHERHEIT=6;
+    const floatPositionen=[]; // {x,fy,halbBreite} — fy ist die bereits versetzte Endposition
+    ctx.textAlign="center";
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       // `ansage` ist der Ruf im Moment der Zielansage — eigene Groesse und die Fokusfarbe,
       // damit er sich von Schaden (--crit), Heilung (--ok) und Skill-Namen (--home)
       // unterscheidet. Zusaetzlich mit dunklem Rand, weil er ueber einer Figur steht und
       // nicht ueber leerem Boden.
+      ctx.font=f.ansage?"800 22px 'Barlow Condensed',sans-serif"
+        :(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
+      const halbBreite=ctx.measureText(f.txt).width/2+FLOAT_SICHERHEIT;
+      // Gegen die BEREITS VERSETZTEN Positionen pruefen, nicht gegen die rohen Spawn-
+      // Punkte: ein einzelner fester Schritt nach dem rohen Abstand haette einen Schweber
+      // manchmal genau auf einen anderen draufgeschoben statt daneben (zwei Woerter mit
+      // ~15 px rohem Hoehenunterschied — zufaellig fast FLOAT_ZEILENHOEHE — landeten nach
+      // EINEM Schritt exakt uebereinander statt getrennt). Deshalb hier hochzaehlen, bis
+      // die naechste Zeile wirklich frei ist.
+      let floatVersatz=0,fy=f.y,frei=false;
+      while(!frei){
+        frei=true;
+        for(const p of floatPositionen){
+          if(Math.abs(fy-p.fy)<FLOAT_DY_TOL&&Math.abs(f.x-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+        }
+        if(!frei){floatVersatz++;fy=f.y-floatVersatz*FLOAT_ZEILENHOEHE;}
+      }
+      floatPositionen.push({x:f.x,fy,halbBreite});
       if(f.ansage){
-        ctx.font="800 22px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
         ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-        ctx.strokeText(f.txt,f.x,f.y);
-        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+        ctx.strokeText(f.txt,f.x,fy);
+        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
         continue;
       }
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
-      ctx.font=(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
-      ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+      ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
   }
 
