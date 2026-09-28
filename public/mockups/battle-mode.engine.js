@@ -17771,6 +17771,30 @@
         // Animation dort ebenfalls erst danach ablaeuft (s. Vertrags-Kommentar oben).
         sfx("tennis","aufschlag");
         if(treffer)sfx("tennis","ass"); else sfx("tennis","netz");
+        // T-B2 -- NETZ ODER AUS STATT IMMER "HALBE STRECKE" (Broadcast-Optik-Dokument 27-09,
+        // Abschnitt 6, Prioritaet 2): "Die Wahl ueber einen Hash aus u.id und Durchgang --
+        // NICHT rr(), sonst verschiebt sich der Zufallsstrom der Messung." `kuerHash()`
+        // ist genau diese bereits vorhandene, deterministische Sinus-Hash-Funktion
+        // (s. dortiger Kommentar) -- hier mit `u.aktuell` gesalzen, damit jeder Ballwechsel
+        // desselben Spielers einen eigenen, aber reproduzierbaren Ausgang bekommt.
+        // `vizFlugFrac` ist der Zielpunkt als Anteil der Strecke von `von` nach `nach`
+        // (zeichneTennis() liest ihn fuer den LIVE-Flug UND fuer die nachleuchtende
+        // Aufsprungmarke -- eine einzige Quelle statt zweier Ad-hoc-Berechnungen):
+        // 1 = trifft den Gegner (treffer), 0.5 = haelt am Netz (Fehlschlag "Netz"), 1.12 =
+        // fliegt knapp hinter den Gegner hinaus (Fehlschlag "Aus").
+        if(treffer){ u.vizFlugMode="treffer"; u.vizFlugFrac=1; u.vizFlugKipp=false; }
+        else if(kuerHash(u.id,u.aktuell)<0.45){ u.vizFlugMode="netz"; u.vizFlugFrac=0.5; u.vizFlugKipp=false; }
+        else {
+          u.vizFlugMode="aus"; u.vizFlugFrac=1.12;
+          // T-B2 -- HAWK-EYE-INSET NUR BEI EINEM "AUS", DAS DAS VORZEICHEN DES VORTEILS
+          // KIPPT (Dokument: "derselbe seltene Moment wie vorteilKipptBig") -- dieselbe
+          // Bedingung wie der Fuehrungswechsel-Highlight in stepBuehne()s feed()-Kommentar
+          // (":16443" ff.), hier rein aus dem bereits enthuellten `verlauf`-Paar dieses
+          // Ballwechsels abgeleitet.
+          const vN=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+          const vP=(u.aktuell>0&&u.verlauf)?u.verlauf[u.aktuell-1]:0;
+          u.vizFlugKipp=u.aktuell>0&&Math.sign(vN)!==Math.sign(vP);
+        }
       }
     }
     // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch auf
@@ -17789,11 +17813,19 @@
         }
       } else if(phase==="treffer"||phase==="fehlschlag"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
-        if(u.vizSchlagT>=TENNIS_FLUG_T){ u.vizSchlagPhase="erholen"; u.vizSchlagT=0; }
+        if(u.vizSchlagT>=TENNIS_FLUG_T){
+          u.vizSchlagPhase="erholen"; u.vizSchlagT=0;
+          // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und
+          // verblasst" -- gesetzt genau am Ende des Flugs (derselbe Zeitpunkt, an dem der
+          // Ball in zeichneTennis() verschwindet), liest `vizFlugMode`/`vizFlugFrac` von
+          // oben weiter, bis dieser Timer abgelaufen ist.
+          u.vizBallMarkT=2.5;
+        }
       } else if(phase==="erholen"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
         if(u.vizSchlagT>=TENNIS_ERHOL_T){ u.vizSchlagPhase="bereit"; u.vizSchlagT=0; }
       }
+      if(u.vizBallMarkT>0)u.vizBallMarkT=Math.max(0,u.vizBallMarkT-dt);
       // GRUNDSTELLUNGS-WIPPER (Anti-Freeze) -- laeuft immer, unabhaengig von der Phase oben;
       // `+u.id` phasenverschiebt jeden Spieler gegen die anderen, damit nicht alle im
       // Gleichtakt wippen (wortgleiches Muster zu stepFechten()s vizFechtBob).
@@ -19570,26 +19602,90 @@
     // einer eigenen posVon() — dieselben Koordinaten, ob der Ballwechsel auf dem Fokus-Platz
     // oder einem Mini-Platz laeuft (aktivFn oben laesst den Fokus ohnehin meist sofort dorthin
     // springen, aber ein Restrahmen bleibt fuer den Wechsel selbst).
+    // T-B2 -- ZIELPUNKT aus stepTennis()s `vizFlugMode`/`vizFlugFrac` (s. dortiger
+    // Kommentar): 1 = trifft den Gegner, 0.5 = haelt am Netz, 1.12 = fliegt knapp hinter
+    // den Gegner hinaus ("Aus"). `flugPunkt()` ist reine Ableitung aus u01 -- dieselbe
+    // Funktion liefert hier den LIVE-Ball UND (bei kleineren u01) die Hawk-Eye-Spur, ohne
+    // einen eigenen Ringpuffer/Zustand.
+    const flugPunkt=(von,nach,frac,u01)=>{
+      const zielX=von.x+(nach.x-von.x)*frac, zielY=von.y+(nach.y-von.y)*frac;
+      return {x:von.x+(zielX-von.x)*u01, y:von.y+(zielY-von.y)*u01-Math.sin(Math.min(1,u01)*Math.PI)*22};
+    };
     const schlaeger=TEILNEHMER.find(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
     if(schlaeger){
       const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
       const von=posMap.get(schlaeger.id), nach=gegner&&posMap.get(gegner.id);
       if(gegner&&von&&nach){
-        const r=schlaeger.runden[schlaeger.vizSchlagAktuell];
-        const treffer=!!r&&r.ereignis===art.erfolgWort;
         // Fortschritt AUS stepTennis()s Zustandsmaschine: 0 waehrend "ausholen" (Ball noch in
         // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer TENNIS_FLUG_T) — ersetzt
         // die alte lineare Ableitung aus u.lunge (":16122" vorher: "1-schlaeger.lunge/0.5").
         const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/TENNIS_FLUG_T));
-        // Fehlschlag: der Ball erreicht den Gegner nie, sondern haelt auf halber Strecke
-        // an — derselbe Ass/Netzroller-Gegensatz wie in tennis.tsx.
-        const zielX=treffer?nach.x:(von.x+(nach.x-von.x)*0.5);
-        const zielY=treffer?nach.y:(von.y+(nach.y-von.y)*0.5);
-        const bx=von.x+(zielX-von.x)*u01;
-        const by=von.y+(zielY-von.y)*u01-Math.sin(u01*Math.PI)*22; // Flugbogen
+        const frac=schlaeger.vizFlugFrac??1;
+        // HAWK-EYE-SPUR (Dokument Abschnitt 6): "die letzten ~8 Ballpositionen als
+        // verblassende gelbe Punkte" -- sechs nachlaufende Punkte, aus derselben
+        // `flugPunkt()`-Funktion bei kleineren u01-Werten, kein eigener Zustand.
+        if(u01>0){
+          for(let k=6;k>=1;k--){
+            const u01k=u01-k*0.045; if(u01k<=0)continue;
+            const p=flugPunkt(von,nach,frac,u01k);
+            ctx.globalAlpha=(1-k/7)*0.5; ctx.fillStyle="#f0ff7a";
+            ctx.beginPath(); ctx.arc(p.x,p.y,2.4,0,Math.PI*2); ctx.fill();
+          }
+          ctx.globalAlpha=1;
+        }
+        const ballPos=flugPunkt(von,nach,frac,u01);
         ctx.fillStyle="#f0ff7a"; ctx.strokeStyle="#b8d426"; ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(bx,by,4,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.arc(ballPos.x,ballPos.y,4,0,Math.PI*2);ctx.fill();ctx.stroke();
       }
+    }
+    // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und verblasst" --
+    // JEDER Teilnehmer mit einem noch laufenden `vizBallMarkT` (stepTennis() setzt ihn beim
+    // Flugende, s. dortiger Kommentar), unabhaengig davon, ob sein Ballwechsel gerade der
+    // fokussierte ist -- ein spaeterer Ballwechsel auf einem ANDEREN Platz darf die Marke
+    // des vorherigen nicht verschlucken. "Treffer" neutral (Hawk-Eye-Gelb), "Netz"/"Aus"
+    // in den echten Farben (Q4, zweite Ausnahme von der Teamfarben-Regel neben den
+    // Fechtlampen: IN/OUT haengt an einem festen Punkt am Boden, nie an einer Figur).
+    for(const u of TEILNEHMER){
+      if(!(u.vizBallMarkT>0))continue;
+      const gegner=TEILNEHMER.find(x=>x.side!==u.side&&x.brett===u.brett);
+      const von=posMap.get(u.id), nach=gegner&&posMap.get(gegner.id);
+      if(!von||!nach)continue;
+      const frac=u.vizFlugFrac??1;
+      const mp={x:von.x+(nach.x-von.x)*frac,y:von.y+(nach.y-von.y)*frac};
+      const leben=Math.max(0,Math.min(1,u.vizBallMarkT/2.5));
+      const farbe=u.vizFlugMode==="netz"?"#c7ccd6":u.vizFlugMode==="aus"?"#e0463c":"#f0ff7a";
+      ctx.save(); ctx.globalAlpha=leben*0.85;
+      ctx.fillStyle=farbe; ctx.beginPath(); ctx.ellipse(mp.x,mp.y+4,7,3,0,0,Math.PI*2); ctx.fill();
+      if(u.vizFlugMode==="netz"||u.vizFlugMode==="aus"){
+        ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
+        ctx.lineWidth=2; ctx.strokeStyle="rgba(8,10,14,.85)";
+        const wort=u.vizFlugMode==="netz"?"NETZ":"AUS";
+        ctx.strokeText(wort,mp.x,mp.y-8); ctx.fillText(wort,mp.x,mp.y-8);
+      }
+      ctx.restore();
+    }
+    // T-B2 -- HAWK-EYE-INSET bei einem knappen "Aus" (Dokument Abschnitt 6): "nur bei
+    // Fehlschlaegen, die das Vorzeichen des Vorteils kippen ... sonst wird es wieder ein
+    // Protokoll" — `vizFlugKipp` kommt aus genau dieser Bedingung (stepTennis()-Kommentar).
+    // Vereinfachung ggue. dem Dokument-Vorschlag ("Ausschnitt 3x vergroessert"): eine feste
+    // Einblendung statt einer echten Zoom-Kamera, gleiche Aussage (IN/OUT-Farbe, "OUT"),
+    // weniger neuer Zustand.
+    const kippAus=TEILNEHMER.find(u=>u.vizFlugMode==="aus"&&u.vizFlugKipp&&u.vizBallMarkT>0);
+    if(kippAus){
+      const leben=Math.max(0,Math.min(1,kippAus.vizBallMarkT/2.5));
+      // UNTER dem Team-Namens-Kaestchen oben rechts (DOM `#bbug`/Score-Bug-Bereich, s.
+      // Abschnitt 1 der Doku-Tabelle "Score-Bug `#bbug`") -- ein erster Screenshot dieser
+      // PR zeigte das Inset direkt darunter versteckt (Opus-Review-Fund).
+      const ibw=132,ibh=40, ix=W-ibw-16, iy=58;
+      ctx.save(); ctx.globalAlpha=leben;
+      ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(ix,iy,ibw,ibh);
+      ctx.strokeStyle="#e0463c"; ctx.lineWidth=1.4; ctx.strokeRect(ix,iy,ibw,ibh);
+      ctx.textAlign="center";
+      ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.fillText("HAWK-EYE",ix+ibw/2,iy+13);
+      ctx.font="800 18px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e0463c";
+      ctx.fillText("OUT",ix+ibw/2,iy+30);
+      ctx.restore();
     }
     // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
     // den Heim-Spieler des neu fokussierten Platzes (Broadcast-Optik-Dokument Abschnitt 3).
@@ -19658,12 +19754,16 @@
     // Ausfallschritt-Auslenkung, FECHT_AUSFALL_PX=30) bleibt jeder Fechter auf seiner
     // eigenen Bahnhaelfte — gardeAbstand*0.3+30 < gardeAbstand fuer jeden Bahnmassstab
     // dieser Funktion (gardeAbstand=144 bei der Standard-Canvasbreite: 43+30=73<144),
-    // die beiden koennen sich also nie ueberschneiden. maxV mit Bodenwert 60 (dieselbe
-    // Konstante wie der Bewertungsbalken in zeichneSchach) statt eines rohen Max ueber
-    // TEILNEHMER, damit ein noch knapper Rueckstand am Spielbeginn (kleines |v|, kleines
-    // rohes Max) nicht sofort auf den vollen Versatz hochskaliert.
+    // die beiden koennen sich also nie ueberschneiden.
+    // F-B2 -- TAUZIEH AUF TREFFERDIFFERENZ (Broadcast-Optik-Dokument 27-09, Abschnitt 5,
+    // Prioritaet 2): vorher lief der Versatz auf `vorteil`, obwohl seit F1 (26.09.) der
+    // Trefferstand das Ergebnis ist (`gefechtSieg`) -- derselbe Widerspruch, den F1 im
+    // Ergebnis behoben hat, stand im Bild noch offen (ein Fechter mit WENIGER Treffern
+    // konnte trotzdem sichtbar vorruecken). Bodenwert 5 statt eines berechneten Max
+    // (Dokument-Vorschlag woertlich: "buehneTauziehVersatz(treffer_a - treffer_b, 5, …)")
+    // -- ein Treffervorsprung von 5 (mehr als die Haelfte der neun Gaenge) zeigt bereits
+    // den vollen Versatz.
     const vorteilVersatzPx=gardeAbstand*0.3;
-    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs((x.aktuell>=0&&x.verlauf)?x.verlauf[x.aktuell]:0)));
     const posMap=new Map();
 
     ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -19731,13 +19831,13 @@
           ctx.strokeText("DOPPELTREFFER",cx,laneY-halbH-30); ctx.fillText("DOPPELTREFFER",cx,laneY-halbH-30);
         }
       }
-      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
-      // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
-      // ihn jetzt schon brauchen. Positiver Vorteil fuer a (Heim) schiebt BEIDE x-Koordinaten
+      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben) -- seit F-B2
+      // auf die Trefferdifferenz umgestellt (s. Kommentar bei `vorteilVersatzPx` oben), NICHT
+      // mehr auf `vorteil`. Positive Trefferdifferenz fuer a (Heim) schiebt BEIDE x-Koordinaten
       // in dieselbe Richtung — a nach rechts, in Richtung b (vorruecken), UND b ebenfalls
       // nach rechts, von a weg (zurueckweichen), weil b schon rechts von a steht.
-      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
-      const zug=buehneTauziehVersatz(v,maxV,vorteilVersatzPx);
+      const tDiff=(a.treffer||0)-(b.treffer||0);
+      const zug=buehneTauziehVersatz(tDiff,5,vorteilVersatzPx);
       // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade) +/- Tauzieh-Versatz,
       // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz. Mini-Bahnen
       // (gross===false) lassen Ausfall/Tauzieh-Versatz weg (dxA/dxB/zug*0) — bei sk=0.42 wuerde
@@ -19772,14 +19872,50 @@
         zeichneSpielerKachel(u,px,py-70,22,farbVar);
       });
       if(gross){
-        // KOPFZEILE: Treffer/Vorteil/Gang — nur am Fokus-Gefecht, wie beim vorherigen
-        // Verhalten je Bahn.
+        // F-B2 -- FIE-ANZEIGETAFEL statt "Treffer/Vorteil/Gang" (Broadcast-Optik-Dokument
+        // 27-09, Abschnitt 5, Prioritaet 2): "die Tafel, die ueber jeder echten Bahn
+        // haengt". Trefferzahlen gross in Lampenfarbe -- echte Farben (Q4/offene Frage 1,
+        // Voreinstellung Chris), dieselben Hex-Werte wie die Trefferlampen oben, weil beide
+        // an derselben festen Bahnseite haengen, nie an einer Figur. "Vorteil" verschwindet
+        // aus dem Bild (Dokument: "er bleibt Messwert (rho) ... im Bild konkurriert er
+        // nicht mehr mit dem Trefferstand") -- `v`/`u.vorteil` bleiben unangetastet, nur
+        // diese Anzeige aendert sich.
+        const gangJetzt=Math.max(a.aktuell,b.aktuell)+1;
+        // PERIODE + GEFECHTSUHR: dieselbe Dreiteilung wie der Ticker-Beat in stepBuehne()
+        // ("PERIODE BEENDET", proPeriode=rundenN/3=3 bei Fechten). Die Uhr zaehlt NICHT aus
+        // echter Zeit, sondern aus dem Enthuellungsfortschritt DIESES Brettes herunter --
+        // dieselbe "erzaehlende, keine entscheidende Uhr" wie die Schachuhr, hier bewusst
+        // OHNE Zehntel/Zwischenwerte (Dokument-Text), damit niemand sie fuer eine Wertung
+        // haelt: ein neuer Wert nur, wenn ein neuer Gang enthuellt wird, kein rr(), kein
+        // dt-getriebener Zustand.
+        const proPeriode=Math.max(1,Math.round(art.rundenN/3));
+        const periode=Math.min(3,Math.ceil(gangJetzt/proPeriode));
+        const gangInPeriode=gangJetzt-(periode-1)*proPeriode;
+        const uhrRest=Math.max(0,180-Math.round((gangInPeriode/proPeriode)*180));
+        const uhrTxt=Math.floor(uhrRest/60)+":"+String(uhrRest%60).padStart(2,"0");
+        // PRIORITAETS-LAMPE "P": NUR wenn `gefechtGleichstand` UND beide Fechter ihren
+        // letzten Gang enthuellt haben (Abschnitt 1, Befund 2 des Dokuments: `prioritaet`
+        // steht schon beim Bau fest, ist vor dem letzten Gang also ein Spoiler-Leck).
+        const beideFertig=fertig(a)&&fertig(b);
+        const prioA=beideFertig&&a.gefechtGleichstand&&a.prioritaet;
+        const prioB=beideFertig&&b.gefechtGleichstand&&b.prioritaet;
+        const tafelY=laneY-halbH-14;
+        const segA=(prioA?"[P] ":"")+(a.treffer||0);
+        const segMid="  ·  "+periode+". PERIODE  "+uhrTxt+"  ·  Gang "+gangJetzt+"/"+art.rundenN+"  ·  ";
+        const segB=(b.treffer||0)+(prioB?" [P]":"");
+        ctx.font="800 15px 'Barlow Condensed',sans-serif";
+        const wA=ctx.measureText(segA).width, wB=ctx.measureText(segB).width;
+        ctx.font="700 12px 'Barlow Condensed',sans-serif";
+        const wMid=ctx.measureText(segMid).width;
+        let tsx=cx-(wA+wMid+wB)/2;
+        ctx.textAlign="left"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e0463c";
+        ctx.strokeText(segA,tsx,tafelY); ctx.fillText(segA,tsx,tafelY); tsx+=wA;
         ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
-        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-        const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
-          +"  ·  Vorteil "+(v>0?"+":"")+v
-          +"  ·  Gang "+(Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN;
-        ctx.strokeText(kopf,cx,laneY-halbH-14); ctx.fillText(kopf,cx,laneY-halbH-14);
+        ctx.strokeText(segMid,tsx,tafelY); ctx.fillText(segMid,tsx,tafelY); tsx+=wMid;
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#3fb56a";
+        ctx.strokeText(segB,tsx,tafelY); ctx.fillText(segB,tsx,tafelY);
+        ctx.textAlign="center";
         // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
         // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
         const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
@@ -22331,13 +22467,34 @@
       for(let b=0;b<bretter;b++){const [x]=paar(b); if(!x)continue; if(x.summe>bs){bs=x.summe;best=b;}}
       schachFokus=best;
     } else if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
-      let best=schachFokus,bv=Infinity;
+      // S-B2 -- REGIE SPRINGT ZUR ZEITNOT (Broadcast-Optik-Dokument 27-09, Abschnitt 4,
+      // Prioritaet 2): "Jede Blitz-Regie schneidet auf das Brett mit der knappsten Uhr."
+      // VOR der Wahl "knappster laufender Vorteil" zuerst ein noch laufendes Brett, auf
+      // dem eine Uhr unter der S-B1-Schwelle (<30s, dieselbe Konstante wie die
+      // Zeitnot-Warnfarbe an der Uhr selbst) steht. `schachUhrWert()` ist reine
+      // Ableitung aus bereits enthuellten `runden[]` (kein neuer Zustand, kein rr()) --
+      // exakt dieselbe Funktion, die die Uhr-Anzeige selbst benutzt, hier nur fuer ALLE
+      // Bretter statt nur des aktuellen Fokus-Bretts ausgewertet (stepSchach() pflegt
+      // u.vizUhrAnzeige nur fuer das jeweils fokussierte Brett, s. dortiger Kommentar --
+      // die rohe Formel bleibt dagegen fuer jedes Brett jederzeit berechenbar). Erstes
+      // Brett in Reihenfolge gewinnt (kein weiteres Tiebreak-Kriterium noetig, Zeitnot ist
+      // laut Dokument-Tabelle selten genug, dass zwei gleichzeitig kaum vorkommen).
+      let zeitnotBrett=null;
       for(let b=0;b<bretter;b++){
-        const [a]=paar(b); if(!a)continue;
-        const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
-        if(v<bv){bv=v;best=b;}
+        const [x,y]=paar(b); if(!x||!y||(fertig(x)&&fertig(y)))continue;
+        if(schachUhrWert(x,art)<30||schachUhrWert(y,art)<30){ zeitnotBrett=b; break; }
       }
-      schachFokus=best;
+      if(zeitnotBrett!=null){
+        schachFokus=zeitnotBrett;
+      } else {
+        let best=schachFokus,bv=Infinity;
+        for(let b=0;b<bretter;b++){
+          const [a]=paar(b); if(!a)continue;
+          const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
+          if(v<bv){bv=v;best=b;}
+        }
+        schachFokus=best;
+      }
     }
     const fb=schachFokus, [a,b]=paar(fb); if(!a||!b)return;
     const partie=SCHACH_PARTIEN[fb%SCHACH_PARTIEN.length];
@@ -22438,10 +22595,22 @@
     // Feed steht.
     const letzterZieher=(halb%2===1)?a:b; const rr_=letzterZieher.runden[letzterZieher.aktuell];
     if(letzter&&rr_){
-      const gut=rr_.ereignis===art.erfolgWort; ctx.font="800 16px 'Barlow Condensed',sans-serif";
+      const gut=rr_.ereignis===art.erfolgWort;
+      // S-B4 -- ??/!! BEIM KIPP-ZUG STATT IMMER ?!/! (Broadcast-Optik-Dokument 27-09,
+      // Abschnitt 4, Prioritaet 2): dieselbe Bedingung wie `vorteilKipptBig` im
+      // feed()-Kommentar von stepBuehne() (":16443" ff.), hier rein aus dem bereits
+      // enthuellten `verlauf`-Paar dieses Zuges abgeleitet -- kein neuer Zustand, kein
+      // rr(). Konvention (Dokument-Tabelle Abschnitt 4): `??` ist der Patzer, der die
+      // Partie dreht, `!!` der starke Zug, der sie zurueckdreht; alle anderen Zuege
+      // behalten `!`/`?!`.
+      const vNach=(letzterZieher.aktuell>=0&&letzterZieher.verlauf)?letzterZieher.verlauf[letzterZieher.aktuell]:0;
+      const vVor=(letzterZieher.aktuell>0&&letzterZieher.verlauf)?letzterZieher.verlauf[letzterZieher.aktuell-1]:0;
+      const kipptBig=letzterZieher.aktuell>0&&Math.sign(vNach)!==Math.sign(vVor);
+      const symbol=kipptBig?(gut?"!!":"??"):(gut?"!":"?!");
+      ctx.font="800 16px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=gut?css("--ok"):css("--crit"); ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=3;
       const tx=bx+letzter.x1*q+q-2, ty=by+letzter.y1*q+4;
-      ctx.strokeText(gut?"!":"?!",tx,ty); ctx.fillText(gut?"!":"?!",tx,ty);
+      ctx.strokeText(symbol,tx,ty); ctx.fillText(symbol,tx,ty);
       // TON (A4, Ziel 5): Figurenklack (oder Schlagklack bei einem Schlagzug,
       // `letzter.schlag` steht schon in schachStellung()) plus der Druck auf die
       // Schachuhr, an derselben Stelle, wo die !/?!-Annotation dasselbe Ereignis liest.
@@ -22453,6 +22622,11 @@
         letzterZieher._tonHalb=halb;
         sfx("speed-schach",letzter.schlag?"schlag":"zug");
         sfx("speed-schach","uhr");
+        // S-B4 -- BLITZ-ZEITSTEMPEL: `buehneT` ist dieselbe bereits vorhandene, rein
+        // praesentationale Zeitbasis, die auch die 3s-Fokus-Regie nutzt. Nur beim ERSTEN
+        // Zeichnen dieses Halbzugs gesetzt (derselbe `_tonHalb`-Guard) -- ein spaeterer
+        // Regie-Ruecksprung auf dieses Brett loest den Blitz nicht erneut aus.
+        if(kipptBig)letzterZieher.vizKippFlashSeit=buehneT;
       }
     }
 
@@ -22463,6 +22637,15 @@
     const anteil=0.5+0.5*Math.max(-1,Math.min(1,v/maxV));
     ctx.fillStyle="#1a1a1a"; ctx.fillRect(bx-42,by,12,bw); ctx.fillStyle="#f4f0e8"; ctx.fillRect(bx-42,by+bw*(1-anteil),12,bw*anteil);
     ctx.strokeStyle="#000"; ctx.lineWidth=1; ctx.strokeRect(bx-42,by,12,bw);
+    // S-B4 -- WEISSER BLITZ auf dem Balken, 0,4s nach einem Kipp-Zug (Zeitstempel oben) --
+    // rein zeitbasiert aus `buehneT`, kein weiterer Zustand, keine Wertung beruehrt.
+    if(letzterZieher.vizKippFlashSeit!=null){
+      const seit=buehneT-letzterZieher.vizKippFlashSeit;
+      if(seit>=0&&seit<0.4){
+        ctx.save(); ctx.globalAlpha=1-(seit/0.4); ctx.fillStyle="#fff";
+        ctx.fillRect(bx-42,by,12,bw); ctx.restore();
+      }
+    }
     ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4, S-B5): ein
@@ -22565,9 +22748,16 @@
     for(let i=von;i<halb;i++){
       const z=partie.zuege[i]; if(!z)break;   // rundenN*2 == 20 Halbzuege je Partie; laeuft
       // rundenN je hoeher, endet die Zugliste hier still statt an z.slice() zu werfen.
-      const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
-      const gut=r&&r.ereignis===art.erfolgWort; ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
-      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+(gut?" !":" ?!"),bx+bw+34,by+10+(i-von)*13);
+      const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const idx=Math.floor(i/2); const r=zieher.runden[idx];
+      const gut=r&&r.ereignis===art.erfolgWort;
+      // S-B4 -- dieselben ??/!!-Zeichen wie die Zielfeld-Annotation oben, aus demselben
+      // `verlauf`-Vorzeichenvergleich, hier je Zeile der Zugliste wiederholt.
+      const zvN=(idx>=0&&zieher.verlauf)?zieher.verlauf[idx]:0;
+      const zvV=(idx>0&&zieher.verlauf)?zieher.verlauf[idx-1]:0;
+      const zKipptBig=idx>0&&Math.sign(zvN)!==Math.sign(zvV);
+      const zSymbol=zKipptBig?(gut?"!!":"??"):(gut?"!":"?!");
+      ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
+      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+" "+zSymbol,bx+bw+34,by+10+(i-von)*13);
     }
     ctx.textAlign="center";
 
