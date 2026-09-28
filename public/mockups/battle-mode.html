@@ -124,7 +124,7 @@
              waehrend des laufenden Spiels (weder vor dem Anpfiff noch nach Spielende).
              s. docs/design/broadcast-praesentation-uebergreifend-recherche-06-09.md
              Abschnitt 3. -->
-        <div class="bbug" id="bbug" hidden>
+        <div class="bbug hud-in" id="bbug" hidden>
           <div class="seite l" id="bbugL"></div>
           <div class="bbugmitte" id="bbugMitte"></div>
           <div class="seite r" id="bbugR"></div>
@@ -139,7 +139,7 @@
              eine Seite gerade >= 8 Punkte in Folge erzielt (basketballLaufInfo() in der
              Engine, reine Lesung von fsZuege). Gefuellt/ein-/ausgeblendet in
              aktualisiereBbug(), keine eigene Zeichenschleife. -->
-        <div class="bbuglauf" id="bbugLauf" hidden></div>
+        <div class="bbuglauf hud-in" id="bbugLauf" hidden></div>
         <!-- BROADCAST-HUD DER STAFFEL (Recherche 06.09., docs/design/staffel-oval-
              broadcast-hud-recherche-06-09.md Abschnitt 4). Zeigt aktuellen und
              naechsten Laeufer je Seite mit ihrer festen Eignung, dazu das live
@@ -152,7 +152,7 @@
              Uhr, hier geht es um laeuferspezifische Werte (Eignung, Wechsel-Delta) --
              beide sind gleichzeitig sichtbar, ohne sich zu ueberschneiden (Bug oben
              links/rechts schmal, dieses Panel darunter volle Breite). -->
-        <div class="bahnhud" id="bahnHud" hidden>
+        <div class="bahnhud hud-in" id="bahnHud" hidden>
           <div class="bhside bhL">
             <div class="bhrow"><span class="bhtag">Aktuell</span><span class="bhname" id="bhLcurName"></span><span class="bheig" id="bhLcurEig"></span></div>
             <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhLnextName"></span><span class="bheig" id="bhLnextEig"></span></div>
@@ -168,7 +168,7 @@
              ablaeuft, im letzten Zug rot und pulsierend. Inhalt kommt aus
              aktualisiereIspyHud() (battle-mode.engine.js), aufgerufen am Ende von
              updateHudBuehne() -- [hidden] fuer jede Buehne ausser I-Spy. -->
-        <div class="ispyzuguhr" id="ispyZugUhr" hidden>
+        <div class="ispyzuguhr hud-in" id="ispyZugUhr" hidden>
           <span id="ispyZugText">Zug 1 / 8</span>
           <div class="ispyzugbar"><s id="ispyZugBarFill"></s></div>
         </div>
@@ -177,7 +177,7 @@
              Delta zum Gegner im selben Zug, Gold fuer den besten Zug eines Teams. Noch
              nicht enthuellte Zuege zeigen "·" statt einer Zahl (Spoiler-Schutz, s.
              aktualisiereIspyHud()). -->
-        <div class="ispysplit" id="ispySplit" hidden></div>
+        <div class="ispysplit hud-in" id="ispySplit" hidden></div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
@@ -244,7 +244,7 @@
            der Preis der Ansage und muss deshalb sichtbar sein, nicht nur spuerbar), rechts
            der eigene Aufheben-Knopf. Der Basketball-Knopf daneben bleibt unberuehrt; beide
            blenden sich gegenseitig aus, je nachdem welche Disziplin laeuft. -->
-      <div class="fokuszeile" id="fokuszeile" hidden>
+      <div class="fokuszeile hud-in" id="fokuszeile" hidden>
         <span class="ansageuhr" id="ansageuhr" hidden title="Sperre bis zur nächsten Zielansage"><b id="ansageuhrzahl"></b></span>
         <span id="fokustext"></span>
         <button class="btn g" id="fokusweg" type="button">Fokus aufheben</button>
@@ -256,7 +256,7 @@
            Grund direkt unter der Kaderleiste — dort liegen die Namen, ueber die man
            auswaehlt. Die Knopfreihe fuellt die Engine aus BAHN_ART, weil jede Bahn
            ihre eigenen drei Plaene mit eigenen Namen hat. -->
-      <div class="rennplanzeile" id="rennplanzeile" hidden>
+      <div class="rennplanzeile hud-in" id="rennplanzeile" hidden>
         <span id="rennplantext"></span>
         <span class="rpknoepfe" id="rennplanknoepfe"></span>
         <button class="btn g" id="rennplanzu" type="button" hidden>Schließen</button>
@@ -266,7 +266,7 @@
            Zwischenzeiten mit Diff zur Bestzeit im Feld. Chris' Auftrag woertlich: "man
            alle spieler einzeln sieht wie sie auf einer strecke fahren ... eingebettet die
            zeiten der anderen ... mit so 2 chrono zwischenzeiten". -->
-      <div class="ttfokus" id="ttfokus" hidden>
+      <div class="ttfokus hud-in" id="ttfokus" hidden>
         <div class="ttkopf">
           <b id="ttname">—</b><span id="ttplan"></span>
           <span class="ttnav">
