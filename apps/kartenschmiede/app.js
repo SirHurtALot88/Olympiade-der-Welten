@@ -173,8 +173,9 @@
             ${waffen.length ? `<div class="weps"><div class="block-t">Waffen</div>${waffen.map(w => {
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
-              const unter = [nah ? "" : w.reichweite + '"', "A" + w.a, regeln].filter(Boolean).join(", ");
-              return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${esc(unter)}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
+              const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${esc(t)}</span>` : esc(t); };
+              const unter = [nah ? "" : esc(w.reichweite + '"'), "A" + w.a].concat(regeln.split(",").map(t => t.trim()).filter(Boolean).map(mitTip)).filter(Boolean).join(", ");
+              return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
             ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}

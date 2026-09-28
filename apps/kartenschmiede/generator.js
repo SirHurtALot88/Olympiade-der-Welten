@@ -31,7 +31,29 @@
     lang: ["bogen", "armbrust", "büchse", "werfer", "lanze"],
   };
 
+  // Sci-Fi: technische Namen und eigene Regeln (Schwerpunkt „Sci-Fi“)
+  const VORSILBEN_SF = {
+    gift: ["Säure", "Toxin", "Nano"], explosion: ["Granat", "Raketen", "Nova"], reissend: ["Ketten", "Splitter", "Vibro"],
+    toedlich: ["Schienen", "Vernichtungs", "Singularitäts"], ds: ["Plasma", "Fusions", "Graviton"], zuverlaessig: ["Smart", "Radar", "Leit"],
+    ueberhitzen: ["Plasma", "Überlast", "Fusions"], zielsuchend: ["Leit", "Such", "Radar"], schlicht: ["Laser", "Puls", "Photonen", "Ionen"],
+  };
+  const NOMEN_SF = {
+    nah: ["klinge", "schwert", "faust", "axt", "stab"],
+    kurz: ["pistole", "werfer", "karabiner"],
+    lang: ["gewehr", "kanone", "werfer", "büchse"],
+  };
+  const REGEL_TEXT = { reissend: "Reißend", gift: "Gift", explosion: "Explosion(3)", toedlich: "Tödlich(3)", zuverlaessig: "Zuverlässig",
+    praezise: "Präzise", indirekt: "Indirekt", zielsuchend: "Zielsuchend", ueberhitzen: "Überhitzen" };
+
+  const FLAIR = {
+    fantasy: { nah: ["Geschmiedet in einer Nacht ohne Mond.", "Die Schneide erinnert sich an jedes Blut.", "Schwer in der Hand, leicht im Urteil."],
+      fern: ["Jeder Schuss ein leises Gebet.", "Aus der Waffenkammer einer gefallenen Festung.", "Trifft, bevor der Feind ihn hört."] },
+    sf: { nah: ["Summt leise, wenn Energie durch die Schneide fließt.", "Militärstandard, einmal modifiziert.", "Die Klinge glüht noch vom letzten Einsatz."],
+      fern: ["Zieloptik mit Restlichtverstärker.", "Frisch aus der Waffenkammer der Flotte.", "Das Magazin summt, wenn es sich lädt."] },
+  };
+
   function waffe(R, opt = {}) {
+    const sf = opt.tag === "technik";
     const r = rng(opt.seed || Date.now());
     const stufe = Math.min(6, Math.max(1, opt.stufe || 3));
     const art = opt.art || (r() < 0.5 ? "nah" : "fern");
@@ -45,25 +67,29 @@
       const moeglich = ["reissend", "gift", art === "fern" ? "explosion" : "reissend"];
       if (stufe >= 3) moeglich.push("zuverlaessig");
       if (stufe >= 4) moeglich.push("toedlich");
+      if (stufe >= 2) moeglich.push("praezise");
+      if (art === "fern" && stufe >= 3) moeglich.push("indirekt");
+      if (sf) moeglich.push("ueberhitzen", art === "fern" ? "zielsuchend" : "reissend");
       const anzahl = Math.min(stufe - 1, Math.floor(r() * 3));
       for (let k = 0; k < anzahl; k++) { const x = wahl(r, moeglich); if (!regeln.includes(x)) regeln.push(x); }
-      const text = [ds && `DS(${ds})`, regeln.includes("reissend") && "Reißend", regeln.includes("gift") && "Gift",
-        regeln.includes("explosion") && "Explosion(3)", regeln.includes("toedlich") && "Tödlich(3)", regeln.includes("zuverlaessig") && "Zuverlässig"].filter(Boolean).join(", ");
+      const text = [ds && `DS(${ds})`].concat(Object.keys(REGEL_TEXT).filter(x => regeln.includes(x)).map(x => REGEL_TEXT[x])).filter(Boolean).join(", ");
       const probe = `X | ${reichweite ? reichweite + '"' : "Nahkampf"} | A${a} | ${text}`;
       const preis = waffenPreis(R, probe);
       if (Math.abs(preis - ziel) <= Math.max(3, ziel * 0.3)) kandidaten.push({ reichweite, a, ds, regeln, text, preis });
     }
     const k = kandidaten.length ? wahl(r, kandidaten) : { reichweite: art === "nah" ? 0 : 12, a: stufe, ds: 0, regeln: [], text: "", preis: 0 };
-    const merkmal = k.regeln.find(x => VORSILBEN[x]) || (k.ds >= 2 ? "ds" : "schlicht");
-    const nomen = wahl(r, k.reichweite === 0 ? NOMEN.nah : k.reichweite <= 12 ? NOMEN.kurz : NOMEN.lang);
-    const name = gross(wahl(r, VORSILBEN[merkmal]) + nomen);
+    const V = sf ? VORSILBEN_SF : VORSILBEN, N = sf ? NOMEN_SF : NOMEN;
+    const merkmal = k.regeln.find(x => V[x]) || (k.ds >= 2 ? "ds" : "schlicht");
+    const nomen = wahl(r, k.reichweite === 0 ? N.nah : k.reichweite <= 12 ? N.kurz : N.lang);
+    const name = gross(wahl(r, V[merkmal]) + nomen);
     const zeile = `${name} | ${k.reichweite ? k.reichweite + '"' : "Nahkampf"} | A${k.a} | ${k.text}`;
     const tags = [k.reichweite ? "fernkampf" : "nahkampf"];
     if (k.regeln.includes("explosion")) tags.push("flaeche");
     if (k.regeln.includes("gift")) tags.push("gift");
+    if (sf) tags.push("technik");
     const preis = waffenPreis(R, zeile);
     return { typ: "waffe", name, art: k.reichweite ? "Fernkampf" : "Nahkampf", fuer: ["hero", "companion", "enemy"], tags, waffe: zeile,
-      kosten: { typ: "fest", wert: preis }, text: [k.reichweite ? k.reichweite + '"' : "Nahkampf", "A" + k.a, k.text].filter(Boolean).join(", "), quelle: "Generator" };
+      kosten: { typ: "fest", wert: preis }, text: wahl(r, FLAIR[sf ? "sf" : "fantasy"][k.reichweite ? "fern" : "nah"]), quelle: "Generator" };
   }
 
   // ---------- Wirkungen für Fähigkeiten, Zauber und Gegenstände ----------
@@ -109,11 +135,20 @@
     { text: "Ignoriert Deckung beim Schießen.", basis: 8, tags: ["fernkampf"], vor: ["Durchblick", "Geister", "Spür"], nomen: ["brille", "rune", "zielgerät"] },
   ];
 
+  const SF_NAMEN = {
+    schaden: ["Plasmastoß", "Ionenschlag", "Photonenlanze"], feuer: ["Thermitladung", "Brandsalve", "Fusionsglut"],
+    frost: ["Kryoschock", "Stasisstrahl", "Kälteladung"], betaeubung: ["Neuralschock", "EMP-Puls", "Schockfeld"],
+    gift: ["Toxinwolke", "Nanoschwarm", "Säurenebel"], furcht: ["Psi-Schrei", "Schreckprojektor"], stoss: ["Gravitonstoß", "Repulsorwelle"],
+    schwaechung: ["Störsignal", "Zielstörung", "Virenangriff"], heilung: ["Nanoheilung", "Medidrohne", "Reparaturschwarm"],
+    schutz: ["Kraftfeld", "Deflektorschild", "Panzerplatten"], staerkung: ["Kampfstimulans", "Zielsuchsystem", "Taktiknetz"],
+    sprung: ["Sprungdüse", "Phasensprung", "Teleporter"], tarnung: ["Tarnfeld", "Holoschleier"], beschwoerung: ["Kampfdrohne", "Drohnenstart"],
+  };
+
   function baueWirkung(r, typ, opt) {
     const stufe = Math.min(6, Math.max(1, opt.stufe || 3));
     const gegner = opt.rolle === "enemy";
     const nutzungen = typ === "faehigkeit" ? (gegner ? NUTZUNG.sonderregel : NUTZUNG.faehigkeit) : NUTZUNG[typ];
-    const passend = WIRKUNGEN.filter(w => !opt.tag || w.tags.includes(opt.tag) || opt.tag === "flaeche" || opt.tag === "einmalig" || opt.tag === "aura" || opt.tag === "reaktion" || opt.tag === "magie");
+    const passend = WIRKUNGEN.filter(w => !opt.tag || w.tags.includes(opt.tag) || opt.tag === "flaeche" || opt.tag === "einmalig" || opt.tag === "aura" || opt.tag === "reaktion" || opt.tag === "magie" || opt.tag === "technik");
     const ziel = ZIEL_BUDGET[stufe];
     let beste = null;
     for (let i = 0; i < 400; i++) {
@@ -131,25 +166,28 @@
       if (abstand <= ziel * 0.15) break;
     }
     const { wk, nu, zi, rw, roh } = beste;
+    const sf = opt.tag === "technik";
     const zielText = zi.t.replace("{rw}", rw.z + "\"");
-    const satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`;
-    const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" ? "magie" : null].filter(Boolean))];
-    return { wk, nu, roh, satz, tags, gegner };
+    let satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`;
+    if (sf) satz = satz.replace("einen Geistwolf", "eine Kampfdrohne").replace("A2 Nahkampf) in 3\" herbei, der", "Laser 12\" A1) in 3\" herbei, die").replace(/^Zauber/, "Psi");
+    const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" ? "magie" : null, sf ? "technik" : null].filter(Boolean))];
+    const namen = sf && SF_NAMEN[wk.id] ? SF_NAMEN[wk.id] : wk.namen;
+    return { wk, nu, roh, satz, tags, gegner, namen, sf };
   }
 
   function faehigkeit(opt = {}) {
     const r = rng(opt.seed || Date.now());
-    const { wk, roh, satz, tags, gegner } = baueWirkung(r, "faehigkeit", opt);
+    const { roh, satz, tags, gegner, namen } = baueWirkung(r, "faehigkeit", opt);
     const fest = auf5(roh);
     // Sonderregeln der Gegner als Aufschlag in Prozent, bezogen auf eine Einheit von etwa 80 Punkten
     const kosten = gegner ? { typ: "prozent", wert: auf5(roh * 100 / 80) } : { typ: "fest", wert: fest };
-    return { typ: "faehigkeit", name: wahl(r, wk.namen), art: gegner ? "Sonderregel" : "Skill",
+    return { typ: "faehigkeit", name: wahl(r, namen), art: gegner ? "Sonderregel" : "Skill",
       fuer: gegner ? ["enemy", "companion"] : ["hero"], tags, kosten, text: satz, quelle: "Generator" };
   }
   function zauber(opt = {}) {
     const r = rng(opt.seed || Date.now());
-    const { wk, roh, satz, tags } = baueWirkung(r, "zauber", { ...opt, rolle: "hero" });
-    return { typ: "zauber", name: wahl(r, wk.namen), art: "Zauber", fuer: ["hero", "companion", "enemy"], tags,
+    const { roh, satz, tags, namen, sf } = baueWirkung(r, "zauber", { ...opt, rolle: "hero" });
+    return { typ: "zauber", name: wahl(r, namen), art: sf ? "Psi-Kraft" : "Zauber", fuer: ["hero", "companion", "enemy"], tags,
       kosten: { typ: "fest", wert: auf5(roh) }, text: satz, quelle: "Generator" };
   }
   function gegenstand(opt = {}) {
@@ -164,10 +202,11 @@
       return { typ: "gegenstand", name: gross(wahl(r, a.vor) + wahl(r, a.nomen)), art: "Ausrüstung", fuer: ["hero", "companion"],
         tags: [...new Set([...a.tags, ...(zweite ? zweite.tags : [])])], kosten: { typ: "fest", wert }, text: zweite ? `${a.text} ${zweite.text}` : a.text, quelle: "Generator" };
     }
-    const { wk, nu, roh, satz, tags } = baueWirkung(r, "gegenstand", { ...opt, rolle: "hero" });
-    const art = nu.art || "Artefakt";
-    const nomen = art === "Trank" ? wahl(r, ["Trank", "Phiole", "Injektor"]) : wahl(r, ["Schriftrolle", "Rune", "Talisman", "Granate", "Zepter"]);
-    return { typ: "gegenstand", name: `${nomen}: ${wahl(r, wk.namen)}`, art, fuer: ["hero", "companion"], tags,
+    const { nu, roh, satz, tags, namen, sf } = baueWirkung(r, "gegenstand", { ...opt, rolle: "hero" });
+    const art = sf ? (nu.art === "Trank" ? "Verbrauchsgut" : "Gerät") : nu.art || "Artefakt";
+    const nomen = sf ? (nu.art === "Trank" ? wahl(r, ["Injektor", "Stimpack", "Ampulle"]) : wahl(r, ["Modul", "Granate", "Chip", "Projektor"]))
+      : art === "Trank" ? wahl(r, ["Trank", "Phiole", "Injektor"]) : wahl(r, ["Schriftrolle", "Rune", "Talisman", "Granate", "Zepter"]);
+    return { typ: "gegenstand", name: `${nomen}: ${wahl(r, namen)}`, art, fuer: ["hero", "companion"], tags,
       kosten: { typ: "fest", wert: auf5(roh) }, text: satz, quelle: "Generator" };
   }
 
