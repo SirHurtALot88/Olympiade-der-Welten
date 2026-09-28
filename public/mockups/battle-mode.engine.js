@@ -2969,12 +2969,24 @@
     ruhend: {winkel:0.20, hoehe:0},
     suchen: {winkel:-0.45,hoehe:-5},
   };
+  // HEISS/KALT ALS FUNDSTUFE, NICHT ALS ERFUNDENE NAEHE (I4, Broadcast-Optik-Recherche
+  // 27.09., Abschnitt 4/I4): "die Mechanik kennt keine Naehe zur Loesung" -- eine echte
+  // heiss/kalt-Anzeige waere Theater (derselbe Fehler wie I0). Was ehrlich geht: die Farbe
+  // der FUNDSTUFE, die der Spuersinn dieses Zuges tatsaechlich gesehen hat (`r.stufe`,
+  // stepSchatzsuche() liest das bereits unveraendert in `u.vizIspyStufe`, s. dort) -- kalt
+  // (blau) fuer eine Notiz, warm (orange) fuer eine Akte, heiss (rot, mit zusaetzlichem
+  // Gluehen) fuer einen Tresor. Reine Farbwahl auf einem bereits gelesenen Feld, keine neue
+  // Formel, kein rr().
+  const LUPE_HITZE_GLAS={1:"rgba(200,225,255,.28)",2:"rgba(255,196,130,.32)",3:"rgba(255,120,90,.40)"};
+  const LUPE_HITZE_RAND={1:"#e8e2d0",2:"#f2d29a",3:"#ffb199"};
   // x/y ist die Hand (LUPE_HAND), s die Groesse (Z), richtung 0..3 wie blickAus(), phase
   // "ruhend"/"suchen" (unbekannt faellt auf "ruhend" zurueck, dasselbe Sicherheitsnetz wie
-  // jede andere Requisite dieser Tabelle). Das Glas pulsiert im Takt von `buehneT` (rein
-  // praesentational, kein rr()) -- Griff + Ring + ein heller Schimmerbogen, reine
-  // Canvas-Primitiven wie zeichneMikrofon direkt oberhalb.
-  function zeichneLupe(ctx,x,y,s,richtung,phase){
+  // jede andere Requisite dieser Tabelle). `stufe` (1/2/3, optional -- jede andere
+  // DISZIPLIN_PROP.zeichne-Funktion hat dieses siebte Argument nicht und ignoriert es
+  // einfach, JS-ueblich) faerbt das Glas nach I4 oben. Das Glas pulsiert im Takt von
+  // `buehneT` (rein praesentational, kein rr()) -- Griff + Ring + ein heller Schimmerbogen,
+  // reine Canvas-Primitiven wie zeichneMikrofon direkt oberhalb.
+  function zeichneLupe(ctx,x,y,s,richtung,phase,stufe){
     const p=LUPE_PHASEN[phase]||LUPE_PHASEN.ruhend;
     const blick=richtung===3?1:richtung===1?-1:0;
     const eff=blick||1;
@@ -2984,7 +2996,15 @@
     ctx.strokeStyle="#6b4a2e";ctx.lineWidth=Math.max(1,1.6*s);ctx.lineCap="round";
     ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(7*s,7*s);ctx.stroke();
     ctx.save();ctx.translate(7*s,7*s);ctx.scale(puls,puls);
-    ctx.fillStyle="rgba(200,225,255,.28)";ctx.strokeStyle="#e8e2d0";
+    // TRESOR-GLUEHEN (Stufe 3): ein weicher Schein HINTER dem Glas, bevor das Glas selbst
+    // gezeichnet wird -- "diese Figur hat den Tresor gesehen" (I4).
+    if(stufe===3){
+      const glut=ctx.createRadialGradient(0,0,1,0,0,7*s);
+      glut.addColorStop(0,"rgba(255,110,60,.55)"); glut.addColorStop(1,"rgba(255,110,60,0)");
+      ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(0,0,7*s,0,Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle=LUPE_HITZE_GLAS[stufe]||LUPE_HITZE_GLAS[1];
+    ctx.strokeStyle=LUPE_HITZE_RAND[stufe]||LUPE_HITZE_RAND[1];
     ctx.lineWidth=Math.max(0.8,1.2*s);
     ctx.beginPath();ctx.arc(0,0,4.6*s,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=Math.max(0.5,0.7*s);
@@ -3687,7 +3707,9 @@
       if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
         const prop=DISZIPLIN_PROP["i-spy"];
         const hpV=prop.hand[r0]||prop.hand[2];
-        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,"suchen");
+        // I4: siebtes Argument (Fundstufe) -- nur zeichneLupe() liest es, jede andere
+        // zeichne()-Funktion dieser Tabelle hat fuenf/sechs Parameter und ignoriert es.
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,"suchen",u.vizIspyStufe);
       }
       // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST-WAFFE FUER VOLLBILD (A0.1, s. NAHKAMPF_WAFFEN/
       // zeichneShowcaseBogen/DISZIPLIN_PROP.kampfkunst-schuetzenkunst oben fuer die
@@ -4262,7 +4284,8 @@
     if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
       const prop=DISZIPLIN_PROP["i-spy"];
       const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,"suchen");
+      // I4: siebtes Argument (Fundstufe), s. Kommentar an der Vollbild-Aufrufstelle oben.
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,"suchen",u.vizIspyStufe);
     }
     // MIKROFON (PR S2, Gesang-Act, s. DISZIPLIN_PROP.showcase/zeichneMikrofon oben) -- ANDERS
     // als die fuenf Requisiten oberhalb (Hantel/Schachuhr/Kufe/Schlaeger/Degen) NICHT ueber
@@ -12650,6 +12673,27 @@
           ueb.textContent=Math.max(nL,nR)+" : "+Math.min(nL,nR);
           mitte.appendChild(ueb);
         }
+        // K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09.,
+        // Abschnitt 3/K6, P3, nur Battlefield). Bewusst KLEIN: die Domination entscheidet
+        // laut Konzeptreview 0 von 120 gemessenen Spielen (Leitplanke 0.1 Punkt 5) -- eine
+        // grosse Grafik wuerde dem Punkt eine Bedeutung vortaeuschen, die er nicht hat.
+        // #kpzeile/#kpscore (ARENA-ZEIT-FIX, weiter unten in updateHud()) zeigen KP.punkte
+        // bereits unter der Kopfzeile; das hier ist dieselbe Zahl, nur zusaetzlich im
+        // Broadcast-Bug, mit Besitzer-Farbpunkt und Eroberungsring (dieselben Felder wie
+        // zeichneKontrollpunkt() auf der Leinwand: KP.besitz/.punkte/.fortschritt/
+        // .erobertVon). Reine Anzeige, kein Ruecklesen.
+        if(disc==="battlefield"&&KP){
+          const kpz=document.createElement("small");
+          kpz.className="kpbug";
+          const punkt=document.createElement("i");
+          punkt.className="kpbugpunkt"+(KP.besitz!=null?" "+(KP.besitz===0?"l":"r"):"");
+          if(KP.erobertVon!=null)
+            punkt.style.setProperty("--anteil",Math.round(KP.fortschritt*100)+"%");
+          kpz.appendChild(punkt);
+          kpz.appendChild(document.createTextNode(
+            "KP "+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])));
+          mitte.appendChild(kpz);
+        }
       }
     }
     // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, Bauplan Abschnitt 4): eigenes Band unter
@@ -16450,6 +16494,13 @@
       // wird EINMAL je Gruppe statt je Einzelenthuellung zurueckgesetzt (s.u.).
       const gruppe=(BB().wettessen&&buehneGruppenGroesse>1)
         ?Math.min(buehneGruppenGroesse,buehneQueue.length-buehneZeiger):1;
+      // W-B5 (Minutenbilanz, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+      // sammelt die Esser OHNE Big-Moment dieses Ticks (typischerweise eine ganze Minute,
+      // s. Kommentar oben) statt sie einzeln in den Ticker zu schreiben -- die EINE
+      // zusammenfassende Zeile entsteht NACH der Gruppen-Schleife (s. dort). Fuer jede
+      // andere Buehne bleibt dieses Array immer leer (der einzige Push-Ort ist der
+      // "GILT FUER WETTESSEN"-Zweig unten), also ohne jede Wirkung.
+      const wettBuendel=[];
       for(let _wettGrp=0;_wettGrp<gruppe;_wettGrp++){
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
@@ -16675,7 +16726,23 @@
         // Textmuster aus dem Konzept, s. Kommentar dort. `r.ereignis` bleibt UNVERAENDERT
         // erfolgWort/failWort -- dieselbe Zierde-statt-zweites-Ereigniswort-Regel wie beim
         // Showcase-Zweig direkt oberhalb.
-        feed(u.side,ispyTickerZeile(u,r),versuchBig);
+        //
+        // I6 -- HIGHLIGHT-DOSIS (Broadcast-Optik-Recherche 27.09., Abschnitt 4/I6): `big`
+        // blieb bislang nur der geknackte Tresor (`versuchBig`, `r.punkte>=60`, Runde 2 mass
+        // dafuer bereits ~7 je Spiel -- "im Rahmen der heutigen 7 je Spiel, also schon gut
+        // dosiert"). Zusaetzlich jetzt der FUEHRUNGSWECHSEL (dieselbe Groesse wie I5s
+        // Trennsteg/Raumrahmen, `u.summe` je Seite): `vorherSeite` zieht `r.punkte` wieder
+        // von der Seite ab, die gerade enthuellt, `nachherSeite` liest den bereits
+        // aktualisierten Zustand (u.summe+=r.punkte lief oben schon) -- ein echter Wechsel
+        // (nicht bloss "erstmals gepunktet", `vorherSeite`/`nachherSeite` muessen beide
+        // eine Seite nennen) markiert die Zeile big. Deckt automatisch auch "der letzte Zug
+        // aendert noch die Fuehrung" ab, weil diese Pruefung auf JEDER enthuellten Runde
+        // laeuft, auch der letzten. Kein rr(), keine neue Formel -- nur eine weitere
+        // Bedingung fuer dasselbe `big`-Flag, das feed() ohnehin schon entgegennimmt.
+        const vorherSeite=ispyFuehrungMit(u.side===0?-r.punkte:0,u.side===1?-r.punkte:0);
+        const nachherSeite=ispyFuehrungMit(0,0);
+        const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
+        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel);
       } else if(BB().gauntlet){
         // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
         // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner, HP-Balken (aus `r.hpNach`,
@@ -16705,16 +16772,54 @@
             ?(r.knapp?"unterdreht, Hand am Eis":bb.failWort)
             :(element.typ==="pirouette"?"verliert die Zentrierung":"stolpert");
         }
+        const duettBig=buehneAuftrittBig(u,r,vorherSumme);
+        // E-B4, AUSWAHL SCHRITT 1 (Broadcast-Optik Buehne-Auftritt 27.09.): "das Element, an
+        // dem buehneAuftrittBig() fuer dieses Paar gefeuert hat" -- woertlich derselbe Wert,
+        // der auch die Ticker-Zeile hier als big markiert, nur zusaetzlich auf dem Partner
+        // gemerkt (kuerBerechneReplay() unten liest es beim Rollenwechsel in "kiss"). Feuert
+        // die Regel mehrfach fuer dasselbe Paar, gewinnt das LETZTE Element -- deterministisch,
+        // kein rr().
+        if(duettBig)u.vizBigIdx=u.aktuell;
         feed(u.side,u.n+" — "+element.name+" — "+ereignisText
           +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
-          buehneAuftrittBig(u,r,vorherSumme));
+          duettBig);
       } else {
         // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
         // oben -- s. buehneAuftrittBig()-Kommentar.
-        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneAuftrittBig(u,r,vorherSumme));
+        //
+        // W-B5: ein Big-Moment (Fuehrungswechsel, Fuehrender pausiert, letzte Minute des
+        // Fuehrenden -- buehneAuftrittBig(), UNVERAENDERT dieselbe Bedingung wie vorher)
+        // bekommt weiterhin SEINE EIGENE Zeile, genau wie bisher. Alles andere sammelt sich
+        // nur in wettBuendel -- HIGHLIGHTS/Callout haengen ausschliesslich an dieser
+        // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
+        const wettBig=buehneAuftrittBig(u,r,vorherSumme);
+        if(wettBig){
+          feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true);
+        } else {
+          wettBuendel.push({u,r});
+        }
       }
       } // Ende der Gruppen-Schleife (S3, Wettessen) -- s. Kommentar oben.
+      // W-B5, ZUSAMMENFASSUNG: EINE Ticker-Zeile fuer alle in diesem Tick gesammelten Esser
+      // (typischerweise eine ganze Minute) statt bis zu zwoelf einzelner. Fuehrer/Zweiter
+      // ueber ALLE Esser dieses Ticks (das sind bei Wettessen ohnehin alle, s.
+      // buehneGruppenGroesse-Kommentar oben) -- reine Ablesung bereits geschriebener
+      // u.summe/runden[]-Werte, kein rr(), keine Wirkung auf Wertung/HIGHLIGHTS/Callout.
+      if(wettBuendel.length){
+        const minute=Math.min(BB().rundenN, wettBuendel[0].u.aktuell+1);
+        const sortiert=wettBuendel.slice().sort((a,b)=>(b.u.summe||0)-(a.u.summe||0));
+        const fuehrer=sortiert[0].u, zweiter=sortiert[1]?sortiert[1].u:null;
+        const fWu=wettessenWuerstchen(fuehrer.summe);
+        const tempo=wettessenTempo(fuehrer,fuehrer.aktuell);
+        let text="Minute "+minute+": "+(fuehrer.n.split(" ")[0]||fuehrer.n)+" führt mit "
+          +wettessenWuerstchenText(fWu)+" Wü";
+        if(zweiter){
+          const diff=fWu-wettessenWuerstchen(zweiter.summe);
+          if(diff>0.001)text+=" (+"+wettessenWuerstchenText(diff)+" auf "+(zweiter.n.split(" ")[0]||zweiter.n)+")";
+        }
+        if(tempo!=null)text+=", Tempo "+wettessenWuerstchenText(tempo)+"/min";
+        feed(fuehrer.side,text+".");
+      }
       buehneAkt=BB().rundenDauer;
     }
     buehnenBewegung(dt);
@@ -17041,6 +17146,62 @@
   //   "gleiten"     -> STILL   (schon abgeschlossen; die Wache gegen ein zweites Feuern,
   //                             wenn beide Wege denselben Uebergang sehen)
   //
+  // E-B4, AUSWAHL + ZEITFENSTER (Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+  // waehlt EINMAL je Paar, beim Uebergang in die Rolle "kiss" (Aufrufstelle in stepKuer()
+  // Durchgang 2), welches Element als Zeitlupen-Wiederholung laeuft, und schneidet aus den
+  // Ringpuffern BEIDER Partner (vizReplayBuf, s. Durchgang 3) genau das Zeitfenster dieses
+  // Elements aus. Alles Gelesene ist zu diesem Zeitpunkt bereits enthuellt (das Paar hat
+  // seine Kuer komplett durchlaufen) -- kein rr(), keine neue Zufallsentscheidung, reine
+  // Ableitung aus bereits geschriebenen runden[]/vizReplayBuf-Eintraegen.
+  //
+  // REIHENFOLGE WIE IM PAPIER (Abschnitt 2.2, "E-B4"), MIT EINER VEREINFACHUNG: Schritt 1
+  // ("Fuehrender stuerzt / Fuehrung uebernommen") liest hier u.vizBigIdx -- denselben Wert,
+  // den buehneAuftrittBig() ohnehin schon live fuer die Ticker-Zeile markiert (s. dortige
+  // Aufrufstelle), statt ihn ein zweites Mal ueber eine eigene, zeitgenaue Kopie der
+  // Fuehrungsermittlung ueber alle Paare hinweg zu rekonstruieren. Schritt 2 (Sturz mit dem
+  // groessten Punktverlust) und Schritt 3 (Element mit den meisten Punkten) bleiben
+  // woertlich die im Papier beschriebene Rangfolge.
+  function kuerBerechneReplay(grp){
+    let owner=null, idx=-1;
+    for(const u of grp){ if(u.vizBigIdx!=null){ owner=u; idx=u.vizBigIdx; break; } }
+    if(owner==null){
+      let bestSturz=null;
+      for(const u of grp){
+        (u.runden||[]).forEach((r,i)=>{
+          const el=KUER_ELEMENTE[i]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          if(r&&r.ereignis===BB().failWort&&!r.knapp&&el.typ==="sprung"){
+            if(!bestSturz||r.punkte<bestSturz.r.punkte)bestSturz={u,idx:i,r};
+          }
+        });
+      }
+      if(bestSturz){ owner=bestSturz.u; idx=bestSturz.idx; }
+    }
+    if(owner==null){
+      let best=null;
+      for(const u of grp){
+        (u.runden||[]).forEach((r,i)=>{ if(r&&(!best||r.punkte>best.r.punkte))best={u,idx:i,r}; });
+      }
+      if(best){ owner=best.u; idx=best.idx; }
+    }
+    if(owner==null||idx<0||!owner.vizReplayBuf)return null;
+    // FENSTER: alle bereits aufgezeichneten Frames DIESES Partners mit demselben Elementindex
+    // (der Ringpuffer traegt idx je Frame, s. Durchgang 3) -- Anfang/Ende dieses Elements in
+    // buehneT. Beide Partner teilen dieselbe buehneT-Achse (Durchgang 2 oben), das Fenster
+    // gilt deshalb fuer BEIDE gleichermassen, auch wenn ihre eigenen u.aktuell-Zaehler nicht
+    // exakt gleich schnell voranschreiten.
+    const fenster=owner.vizReplayBuf.filter(f=>f.idx===idx);
+    if(!fenster.length)return null;
+    const tStart=fenster[0].bt, tEnd=fenster[fenster.length-1].bt;
+    if(tEnd<=tStart)return null;
+    const frames=grp.map(u=>(u.vizReplayBuf||[]).filter(f=>f.bt>=tStart&&f.bt<=tEnd));
+    if(frames.some(fr=>!fr.length))return null;
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const fr of frames)for(const f of fr){
+      if(f.x<minX)minX=f.x; if(f.x>maxX)maxX=f.x; if(f.y<minY)minY=f.y; if(f.y>maxY)maxY=f.y;
+    }
+    const element=KUER_ELEMENTE[idx]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+    return {tStart,tEnd,frames,label:element.kuerzel,bbox:{minX,maxX,minY,maxY}};
+  }
   // Reine Praesentation wie alles hier: schreibt nur auf u.vizPhase, ruft kein rr().
   function kuerPhaseEnde(u,warSturz){
     if(u.vizPhase==null||u.vizPhase==="gleiten"||u.vizPhase==="schlusspose")return;
@@ -17136,6 +17297,19 @@
           // Teleport-Fix) fuer beide Faelle dieselbe bleiben soll -- nur der Klang und die
           // Kippung in zeichneDuett() unterscheiden sich (s. dort).
           u.vizWackler=fehl&&!!zug.knapp;
+          // E-B5 (Sturzmarke, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A): an
+          // der Stelle eines ECHTEN Sturzes (nicht Wackler, nur Sprungelemente -- dieselbe
+          // Bedingung wie die rote statt bernsteinfarbene Elementkasten-Farbe in
+          // zeichneEisStand(), s. dort) bleibt eine kleine Kratzmarke auf dem Eis liegen, bis
+          // das Programm dieses Paares vorbei ist (gezeichnet nur, solange u.vizRolle==="kuer"
+          // gilt, s. zeichneDuett()) -- "man sieht auf einen Blick, wie viele Stuerze dieses
+          // Paar hatte". u.vizX/u.vizY tragen hier noch die Position VOR diesem Element (die
+          // Bewegung fuer dieses Bild laeuft erst in Durchgang 3 unten) -- fuer eine rein
+          // dekorative Markierung reicht diese eine Frame Naeherung. Reines neues viz*-Feld
+          // (Vertrag: stepKuer() darf das), KEIN rr(), KEINE Wirkung auf u.summe/Wertung.
+          if(fehl&&!zug.knapp&&element.typ==="sprung"){
+            (u.vizEisMarken=u.vizEisMarken||[]).push({x:u.vizX,y:(u.vizY||0)+16});
+          }
           // Sprungansatz bei JEDEM neuen Element (Pirouette/Hebung/Wurf — das Motorbild
           // kennt keine feinere Unterscheidung, alle drei zaehlen hier als "Sprung"-Ansatz),
           // unabhaengig vom spaeteren Ausgang. Misslingt der Versuch, zusaetzlich sofort der
@@ -17210,6 +17384,13 @@
       if(grp[0].vizRolle==="kiss"){
         const t=grp[0].vizKissT||0;
         if(t>=3 && t-dt<3) sfx("eiskunstlauf","plakette");
+        // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL berechnet, beim allerersten
+        // Bild in der Rolle "kiss" (grp[0].vizReplayClip ist dann noch nie gesetzt worden --
+        // TEILNEHMER sind je Spiel frische Objekte, s. N1-Reset-Konvention dieser Datei,
+        // ein Rueckfall auf `undefined` braucht deshalb keinen eigenen reset()-Eintrag).
+        // Danach bleibt der Clip fuer die ganze Kiss-&-Cry-Dauer unveraendert stehen --
+        // zeichneKuerReplay() liest ihn nur, schreibt ihn nie.
+        if(grp[0].vizReplayClip===undefined)grp[0].vizReplayClip=kuerBerechneReplay(grp)||null;
       }
     }
 
@@ -17290,6 +17471,27 @@
         }
       } else if(u.vizSpur.length){
         u.vizSpur.length=0;
+      }
+
+      // E-B4 (Zeitlupen-Wiederholung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2,
+      // Klasse A): Ringpuffer JE PARTNER der zuletzt gelaufenen KUER-Frames -- Position,
+      // Elementindex und alles, was zeichneKuerReplay() unten braucht, um denselben
+      // Zeichenpfad (Sturz-/Pirouetten-Rotation, Wurfbogen) wie hier eben nachzustellen.
+      // NUR waehrend rolle==="kuer" aufgezeichnet (wie u.vizSpur direkt darueber), gedeckelt
+      // auf 800 Eintraege (~13s bei 60 fps -- die ganze Kuer eines Paares dauert rund 10,2s,
+      // s. kuerZwischenstandZeilen()-Kommentar "12x2x0,425s"). Reine Aufzeichnung wie
+      // u.vizSpur: KEIN rr(), KEINE Wirkung auf u.summe/Wertung. `buehneT` steht hier fuer
+      // die Auswahl des Zeitfensters (kuerBerechneReplay() unten filtert danach) -- NICHT
+      // die globale Sprite-Animationsuhr `t` (die bleibt auf der ganzen Buehne bei 0
+      // eingefroren, nachgeprueft: stepSim() springt fuer jede Buehnen-Disziplin VOR
+      // `t+=dt` aus der Funktion, s. Kommentar dort und bei feed()s `anzeigeT` --
+      // zeichneKuerReplay() muss `t` deshalb NICHT verstellen, um die Gliedmassenanimation
+      // "langsamer" zu machen, sie ist bei jeder Kuer ohnehin ein Standbild je Figur).
+      if(rolle==="kuer"){
+        const buf=(u.vizReplayBuf=u.vizReplayBuf||[]);
+        buf.push({bt:buehneT, idx:u.aktuell, x:u.vizX, y:u.vizY,
+          phase:u.vizPhase, phaseT:u.vizPhaseT, sturz:u.vizSturz, wackler:u.vizWackler, ri:u.vizRi});
+        if(buf.length>800)buf.shift();
       }
     }
   }
@@ -18451,6 +18653,12 @@
   // Bandenlicht-Muster wie eisBandeSide/-Seit oben, nur fuer den Vorhangsaum -- merkt sich
   // nur, welche Seite zuletzt fuehrte und seit wann, fuer die Ueberblendung beim Wechsel.
   let showcaseSaumSide=null, showcaseSaumSeit=-999;
+  // GOLDENER BUZZER (S-B5, Broadcast-Optik Buehne-Auftritt 27.09.): "hoechstens einmal je
+  // Spiel" -- dieselbe modulweite Einmal-Sperre wie eisBandeSide & Co. direkt darueber,
+  // MUSS deshalb in reset() auf false zurueckgesetzt werden (N1-Fix-Konvention dieser
+  // Datei), sonst haette das zweite Showcase-Spiel einer Session nie wieder einen goldenen
+  // Buzzer, weil die Sperre noch vom vorigen Spiel stuende.
+  let showcaseGoldVergeben=false;
   // BUZZER-POSITIONEN: eigene Funktion statt Literale an zwei Stellen (bodenShowcase()
   // zeichnet das Pult, zeichneShowcase() zuendet die Reaktion darauf) -- dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie posMap bei zeichneFechten().
@@ -18839,6 +19047,34 @@
   // showcasePublikumAn -- reines Praesentations-Bookkeeping, s. reset() (N1-Fix) fuer den
   // Rueckstell-Zwang beim naechsten I-Spy-Spiel derselben Session.
   let ispyRaumAn=false;
+  // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): dieselbe
+  // Ablesung wie kuerEisFuehrung() (Eiskunstlauf)/showcaseFuehrung() -- Summe der bereits
+  // enthuellten Punkte je Seite (`u.summe`, von stepBuehne() fuer ALLE Buehnen-Disziplinen
+  // gleich gefuehrt, s. dortiges `u.summe+=r.punkte`), null solange niemand gepunktet hat.
+  // Reine Ableseung, kein rr(), keine neue Formel -- genutzt vom Trennsteg-Tauzieh-Marker
+  // und dem Raumrahmen in bodenSchatzsuche() unten.
+  function ispyFuehrung(){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0);
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0);
+    if(heim===0&&gast===0)return null;
+    return {side:heim>=gast?0:1, heim, gast};
+  }
+  // FUEHRUNGSSEITE MIT NACHTRAEGLICHEM DELTA (I6, Broadcast-Optik-Recherche 27.09.,
+  // Abschnitt 4/I6): dieselbe Ablesung wie ispyFuehrung(), aber mit `heimDelta`/`gastDelta`
+  // auf die aktuellen Summen aufaddiert -- nur um in stepBuehne() (s. dortiger
+  // schatzsuche-Zweig) die Seite VOR einer einzelnen, gerade enthuellten Runde zu lesen
+  // (Aufrufer zieht dort `r.punkte` wieder ab), ohne eine zweite Kopie der Summenbildung zu
+  // brauchen. Reine Ableseung, kein rr(), keine neue Formel.
+  function ispyFuehrungMit(heimDelta,gastDelta){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0)+heimDelta;
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0)+gastDelta;
+    if(heim===0&&gast===0)return null;
+    return heim>=gast?0:1;
+  }
+  // TRENNSTEG-FUEHRUNGSANZEIGE (I5): dasselbe Bandenlicht-Muster wie eisBandeSide/-Seit
+  // bzw. showcaseSaumSide/-Seit -- merkt sich, welche Seite zuletzt fuehrte und seit wann,
+  // fuer die kurze Ueberblendung beim Wechsel. N1-Reset s. reset() unten.
+  let ispySaumSide=null, ispySaumSeit=-999;
   // ZUG-UHR-ALARM (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): dasselbe N1-Muster
   // wie ispyRaumAn direkt darueber -- ohne den Reset (s. renderReset()) wuerde der Alarmton
   // beim zweiten I-Spy-Spiel derselben Sitzung nie wieder feuern, weil das Flag noch auf
@@ -18894,8 +19130,40 @@
     // steht nie mit einem Fundort oder einer Figur in Konflikt.
     const stegX0=W*0.465, stegX1=W*0.535;
     ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
-    ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
+
+    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): "der
+    // Trennsteg zwischen den Raeumen ist der Tauzieh-Balken. Er verschiebt sich zur Seite
+    // des Fuehrenden ... Der Rahmen des fuehrenden Raums leuchtet dezent in Teamfarbe, beim
+    // Fuehrungswechsel kurz voll." Dieselbe Crossfade-Mechanik wie showcaseFuehrung()/
+    // bodenEis() (1,4 s Ueberblendung ab dem Wechsel).
+    const fuehrung=ispyFuehrung();
+    if(fuehrung){
+      if(ispySaumSide!==fuehrung.side){ ispySaumSide=fuehrung.side; ispySaumSeit=buehneT; }
+      const voll=Math.max(0,Math.min(1,1-(buehneT-ispySaumSeit)/1.4));
+      const farbe=fuehrung.side===0?css("--home"):css("--away");
+      const gesamt=fuehrung.heim+fuehrung.gast;
+      const verhaeltnis=gesamt>0?Math.abs(fuehrung.heim-fuehrung.gast)/gesamt:0;
+      // TAUZIEH-MARKER: bleibt INNERHALB von stegX0..stegX1 (70% der halben Stegbreite als
+      // maximaler Ausschlag) -- greift damit nie in die Fundort-Haelften ein, deren
+      // Geometrie (ispyFundortXY()) fuer I1 bereits per Screenshot geprueft ist und hier
+      // nicht angefasst wird.
+      const mitteSteg=(stegX0+stegX1)/2, spanne=(stegX1-stegX0)/2*0.7;
+      const markerX=mitteSteg+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
+      ctx.strokeStyle=farbe; ctx.globalAlpha=0.55+0.45*voll; ctx.lineWidth=2+voll*2;
+      ctx.beginPath(); ctx.moveTo(markerX,0); ctx.lineTo(markerX,H); ctx.stroke();
+      ctx.globalAlpha=1;
+      // RAUMRAHMEN: die Haelfte des Fuehrenden bekommt einen duennen Rand in Teamfarbe --
+      // Chris' "ohne Stats sehen, wer fuehrt" (wortgleiches Muster wie der Showcase-
+      // Vorhangsaum/das Eis-Bandenlicht), dezent ausser kurz nach einem Wechsel.
+      const rahmenX0=fuehrung.side===0?4:stegX1+4, rahmenX1=fuehrung.side===0?stegX0-4:W-4;
+      ctx.strokeStyle=farbe; ctx.globalAlpha=0.16+0.34*voll; ctx.lineWidth=2+voll*2;
+      ctx.strokeRect(rahmenX0,4,Math.max(0,rahmenX1-rahmenX0),H-8);
+      ctx.globalAlpha=1;
+    } else {
+      // NEUTRAL, solange niemand gepunktet hat -- dieselbe goldene Mittellinie wie vor I5.
+      ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
+    }
 
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
     // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
@@ -18924,6 +19192,20 @@
           const p=ispyFundortXY(vis,seite);
           const z=zustand.get(idx);
           const stufeAnzeige=z?z.stufe:f.stufe;
+          // ANGEBROCHENE TRUHEN GLUEHEN NACH (I4, Broadcast-Optik-Recherche 27.09.,
+          // Abschnitt 4/I4): waechst mit `z.fehlserie` (ispyRaumZustand() oben), gedeckelt
+          // wie die Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT: nur zwei Schritte
+          // zaehlen) -- "heiss" im Wortsinn, stimmt mit dem Motor ueberein statt eine
+          // erfundene Naehe vorzuspielen (s. I4-Kommentar bei zeichneLupe). Hinter dem
+          // Moebelstueck gezeichnet, reiner additiver Radial-Schein, keine neue Formel.
+          if(z&&!z.offen&&z.fehlserie>0){
+            const stufen=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
+            const glutStaerke=Math.min(z.fehlserie,stufen)/stufen;
+            const glut=ctx.createRadialGradient(p.x,p.y-6,2,p.x,p.y-6,22);
+            glut.addColorStop(0,"rgba(255,110,60,"+(0.10+0.22*glutStaerke).toFixed(2)+")");
+            glut.addColorStop(1,"rgba(255,110,60,0)");
+            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(p.x,p.y-6,22,0,Math.PI*2); ctx.fill();
+          }
           ctx.save(); ctx.translate(p.x,p.y);
           ctx.fillStyle="rgba(0,0,0,.30)";
           ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
@@ -18947,6 +19229,16 @@
   // ispyTickerZeile()/WERTUNG_CHASSIS auch sonst einhalten. `art==null`-Zuege (kein Ziel
   // diesen Tick) haben kein `r.fundort` und werden dabei uebersprungen. Reiner Leser,
   // schreibt nichts auf `u`/`t`/`u.runden` zurueck.
+  // FEHLSERIE (I4, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I4 "angebrochene Truhen
+  // gluehen nach"): wie viele ENTHUELLTE Fehlschlaege in Folge zuletzt an diesem Fundort
+  // standen -- dieselbe Groesse, die ISPY_FORTSCHRITT_SCHRITT/-DECKEL mechanisch am Fundort
+  // selbst fuehren (t.fortschritt, s. Kommentar dort), hier NUR aus den bereits enthuellten
+  // `u.runden[]` zurueckgerechnet (Spoiler-Regel wie ueberall in dieser Funktion). Ein
+  // Erfolg setzt die Serie auf 0 zurueck (die Truhe ist danach neu/nachgefuellt und traegt
+  // keinen alten Fortschritt mehr). `ri<bisher.ri`-Reihenfolge ist dieselbe Naeherung wie
+  // beim Rest dieser Funktion (mehrere Detektive derselben Seite vergleichen ihre eigenen
+  // Zugindizes, nicht eine globale Tick-Uhr) -- fuer eine rein kosmetische Gluteinstufung
+  // (I4: gedeckelt bei ISPY_FORTSCHRITT_DECKEL, also ohnehin nur 0/1/2 Stufen) reicht das.
   function ispyRaumZustand(seite){
     const zustand=new Map();
     const art=BB();
@@ -18957,7 +19249,11 @@
         const r=u.runden[ri];
         if(!r||r.fundort==null)continue;
         const bisher=zustand.get(r.fundort);
-        if(!bisher||bisher.ri<ri)zustand.set(r.fundort,{ri,stufe:r.stufe,offen:r.ereignis===art.erfolgWort});
+        if(!bisher||bisher.ri<ri){
+          const offen=r.ereignis===art.erfolgWort;
+          const fehlserie=offen?0:((bisher&&!bisher.offen)?bisher.fehlserie+1:1);
+          zustand.set(r.fundort,{ri,stufe:r.stufe,offen,fehlserie});
+        }
       }
     }
     return zustand;
@@ -20468,6 +20764,27 @@
         ctx.font="700 7.5px 'Barlow Condensed',sans-serif";
         ctx.fillStyle=trend<0?"#5fd38a":"#e0645f";
         ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+24);
+      } else {
+        // W-B4 (Hochrechnung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+        // "auf Kurs fuer N" -- dieselbe on-pace-Erzaehlung wie bei ESPN ("30 nach drei
+        // Minuten"), NUR gezeigt, wenn es (noch) keinen nennenswerten Tempo-Trend gibt
+        // (|Trend|<1 Wuerstchen) -- sonst stuenden zwei Zeilen uebereinander im selben,
+        // knappen Bandbereich. `erster` ist bereits der Fuehrende (Aufrufer sortiert danach,
+        // s. zeichneWettessen()). Erst ab abgeschlossener erster Minute, sonst waere die
+        // Hochrechnung nur Rauschen aus einem einzigen Zwischenwert.
+        //
+        // BEWUSST WEGGELASSEN: der zweite Teil des Papiers (Abschnitt 4.2, "Tempo-Geist"
+        // als zweiter Marker im Magen-Meter). Der Meter-Fuellstand ist dort NICHT der
+        // Punktestand, sondern der Anteil der schon absolvierten Minuten
+        // ((leader.aktuell+1)/art.rundenN, s. Kommentar an der Meter-Stelle) -- ein
+        // punktebasierter "wo wuerde er am Ende stehen"-Marker auf einer Zeitachse waere
+        // eine andere Groesse auf derselben Skala und damit irrefuehrend statt informativ.
+        const minutenFertig=Math.max(0,erster.aktuell+1);
+        if(minutenFertig>0){
+          const aufKurs=Math.round(wettessenWuerstchen(erster.summe)/minutenFertig*art.rundenN);
+          ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa6b6";
+          ctx.fillText((erster.n.split(" ")[0]||"?")+" auf Kurs für "+aufKurs,W/2,mitteY+24);
+        }
       }
     }
   }
@@ -21019,6 +21336,38 @@
           u.vizMeterPunkte=r.punkte; u.vizMeterSeit=buehneT;
           if(bestVor>-Infinity && r.punkte>bestVor) u.vizGoldBlitzSeit=buehneT;
         }
+        // S-B4 (Urteilsmoment mit Jury-Stuehlen, Broadcast-Optik Buehne-Auftritt 27.09.,
+        // Prio 2, Klasse A, Variante A/Ueberblendung wie vom Papier empfohlen): an der Kante
+        // "letzter Durchgang dieses Acts gerade enthuellt" merkt sich der Act den Zeitpunkt
+        // fuer die gut 1,5s lange Jury-Stuhl-Sequenz (u.vizUrteilSeit, s. zeichneShowcase())
+        // und der Trommelwirbel faellt EINMAL. Laeuft als Ueberblendung, WAEHREND der
+        // naechste Act ohnehin schon hereingleitet (NAECHER() oben, tau 0,45s) -- der
+        // Enthuellungstakt (buehneAkt) wird NICHT angefasst, anders als Variante B im Papier.
+        if(u.aktuell+1>=art.rundenN){
+          u.vizUrteilSeit=buehneT;
+          sfx("showcase","trommel");
+          // S-B5 (Goldener Buzzer als Bildereignis, Prio 2, Klasse A): hoechstens EINMAL je
+          // Spiel (showcaseGoldVergeben, N1-Reset s. reset()), fuer den ERSTEN Act, der (a)
+          // ALLE seine Durchgaenge fehlerfrei steht UND (b) mit seiner Endsumme JEDEN bereits
+          // fertigen Act uebertrifft, fruehestens ab dem vierten fertig gewordenen Act --
+          // woertlich die Regel aus dem Papier (Abschnitt 3.2, S-B5). Ein spaeterer Act kann
+          // den Gold-Act rechnerisch noch ueberholen (die Regel bewertet nur den Stand zum
+          // jeweiligen Enthuellungszeitpunkt, genau wie im Original nie vorab bekannt) --
+          // KEIN Punktbonus (das waere Review S4, Klasse C), reines Bildereignis.
+          if(!showcaseGoldVergeben){
+            const fehlerfrei=(u.runden||[]).every(x=>x&&x.ereignis===art.erfolgWort);
+            const vorherigeFertige=TEILNEHMER.filter(x=>x!==u&&x.runden&&(x.aktuell+1)>=x.runden.length);
+            if(fehlerfrei && vorherigeFertige.length>=3){
+              const bester=Math.max(0,...vorherigeFertige.map(x=>x.summe||0));
+              if((u.summe||0)>bester){
+                showcaseGoldVergeben=true;
+                u.vizGoldBuzzer=true; u.vizGoldBuzzerSeit=buehneT;
+                sfx("showcase","goldbuzzer");
+                feed(u.side,"GOLDENER BUZZER — "+u.n+"!",true);
+              }
+            }
+          }
+        }
       }
       const ziel=showcaseZielPos(u,aktiver);
       if(u.vizX==null){
@@ -21255,6 +21604,92 @@
         }
       }
     }
+
+    // S-B4 (Urteilsmoment mit Jury-Stuehlen, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2,
+    // Klasse A, Variante A/Ueberblendung): der zuletzt fertig gewordene Act traegt seinen
+    // Urteilszeitpunkt in u.vizUrteilSeit (s. stepShowcase()) -- gesucht wird der JUENGSTE,
+    // damit zwei schnell aufeinanderfolgende Urteile sich nicht ueberlagern. Unabhaengig von
+    // `aktiver`: die Sequenz zeigt den Act, der GERADE fertig wurde, nicht den, der schon
+    // hereingleitet.
+    (function zeichneShowcaseUrteil(){
+      let u=null;
+      for(const x of TEILNEHMER)if(x.vizUrteilSeit!=null&&(!u||x.vizUrteilSeit>u.vizUrteilSeit))u=x;
+      if(!u)return;
+      const seit=buehneT-u.vizUrteilSeit;
+      if(seit<0||seit>1.5)return;
+      const alpha=seit<1.3?1:Math.max(0,1-(seit-1.3)/0.2);
+      ctx.save(); ctx.globalAlpha=alpha;
+      ctx.fillStyle="rgba(4,2,8,.55)"; ctx.fillRect(0,0,W,H);
+      // RANG UNTER ALLEN FERTIGEN ACTS (inklusive u selbst, das ist zu diesem Zeitpunkt
+      // bereits fertig) bestimmt die Stuhlzahl: oberes Drittel drei, Mitte zwei, unteres
+      // Drittel einer, ganz letzter keiner -- woertlich die Regel aus dem Papier.
+      const fertige=showcaseFertige();
+      const n=Math.max(1,fertige.length);
+      const rang=1+fertige.filter(x=>x!==u&&(x.summe||0)>(u.summe||0)).length;
+      const stuehle=rang<=Math.ceil(n/3)?3:(rang<=Math.ceil(2*n/3)?2:(rang>=n?0:1));
+      const anzX=W/2, anzY=H*0.32;
+      for(let i=0;i<3;i++){
+        const p=Math.max(0,Math.min(1,(seit-i*0.25)/0.25));
+        const dreht=i<stuehle && p>0;
+        const px=anzX+(i-1)*56;
+        ctx.save(); ctx.translate(px,anzY);
+        // HALBDREHUNG ALS UEBERGANG (0<=p<1), DANACH UNGESPIEGELT STEHEN BLEIBEN: cos(p*PI)
+        // laeuft von 1 (unbewegt) nach -1 (Ruecken zur Kamera) -- bei p===1 waere die
+        // Ellipse selbst zwar wieder rund (Skalierung -1 auf einer Ellipse sieht man ihr
+        // nicht an), der "JA"-TEXT darin aber WUERDE gespiegelt gezeichnet, wenn die
+        // Transformation ueber den fertigen Zustand hinaus stehen bliebe (nachgemessen im
+        // Playwright-Bild: aus "JA" wurde ein gespiegeltes, kaum lesbares Glyph). Deshalb
+        // gilt die Skalierung nur WAEHREND des Uebergangs, der fertig gedrehte Stuhl (p>=1)
+        // steht wieder ungespiegelt da.
+        if(dreht&&p<1)ctx.scale(Math.cos(p*Math.PI),1);
+        ctx.fillStyle="#3a2a44"; ctx.beginPath(); ctx.ellipse(0,0,17,23,0,0,6.2832); ctx.fill();
+        ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.4; ctx.stroke();
+        if(dreht&&p>=1){
+          ctx.fillStyle="#f6c750"; ctx.font="700 9px 'Barlow Condensed',sans-serif";
+          ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("JA",0,0);
+        }
+        ctx.restore();
+      }
+      if(seit>=0.9){
+        const c=u.side===0?css("--home"):css("--away");
+        ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle=c;
+        ctx.fillText("PLATZ "+rang+" · "+(u.summe||0)+" Pkt",W/2,anzY+58);
+      }
+      ctx.restore();
+    })();
+
+    // S-B5 (Goldener Buzzer als Bildereignis, Broadcast-Optik Buehne-Auftritt 27.09., Prio
+    // 2, Klasse A): reines Bildereignis -- der mittlere Pult-Knopf wird gold, goldenes Licht
+    // flutet die Buehne, Konfetti aus Canvas-Rechtecken mit Farbhash aus u.id (cypherHash(),
+    // wie ueberall sonst in dieser Datei statt eines zweiten rr()-Zugs). Der Callout-Banner
+    // laeuft bereits ueber feed(...,true) in stepShowcase(), hier nur das Buehnenbild.
+    (function zeichneShowcaseGold(){
+      let u=null;
+      for(const x of TEILNEHMER)if(x.vizGoldBuzzerSeit!=null&&(!u||x.vizGoldBuzzerSeit>u.vizGoldBuzzerSeit))u=x;
+      if(!u)return;
+      const seit=buehneT-u.vizGoldBuzzerSeit;
+      if(seit<0||seit>2.2)return;
+      const alpha=seit<1.6?1:Math.max(0,1-(seit-1.6)/0.6);
+      ctx.save();
+      ctx.globalAlpha=alpha*0.5;
+      const gl=ctx.createRadialGradient(W/2,H*0.4,10,W/2,H*0.4,W*0.6);
+      gl.addColorStop(0,"rgba(255,215,110,.6)"); gl.addColorStop(1,"rgba(255,215,110,0)");
+      ctx.fillStyle=gl; ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=alpha;
+      const bp=showcaseBuzzerPos(1);
+      ctx.fillStyle="#f6c750"; ctx.beginPath(); ctx.arc(bp.x,bp.y,10,0,6.2832); ctx.fill();
+      ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4; ctx.stroke();
+      for(let i=0;i<24;i++){
+        const h=cypherHash(u.id,i);
+        const cx=(h%97)/97*W, cy=((seit*(60+h%40))%H+((h>>3)%40));
+        ctx.fillStyle=(h%3===0)?"#f6c750":((h%3===1)?"#ff9a3c":"#fff6d0");
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(((h>>5)%628)/100);
+        ctx.fillRect(-2.5,-4,5,8);
+        ctx.restore();
+      }
+      ctx.restore();
+    })();
 
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
@@ -21600,6 +22035,21 @@
         ctx.beginPath(); ctx.ellipse(px,py+19,16,6,0,0,6.2832); ctx.fill();
         ctx.globalAlpha=1;
       }
+      // E-B5 (Sturzmarke, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A): zwei
+      // gekreuzte, graue Striche an jeder bereits aufgezeichneten Sturzstelle DIESES Paares
+      // (u.vizEisMarken, s. stepKuer()) -- bleiben liegen, solange die Rolle "kuer" gilt
+      // (Programmende = Rollenwechsel), unter dem Sprite gezeichnet wie die Kufenspur direkt
+      // darueber. Reine Ablesung eines bereits geschriebenen viz*-Feldes, kein rr().
+      if(u.vizEisMarken&&u.vizEisMarken.length){
+        ctx.globalAlpha=0.3; ctx.strokeStyle="#9aa6b6"; ctx.lineWidth=1.4;
+        for(const m of u.vizEisMarken){
+          ctx.beginPath();
+          ctx.moveTo(m.x-5,m.y-5); ctx.lineTo(m.x+5,m.y+5);
+          ctx.moveTo(m.x+5,m.y-5); ctx.lineTo(m.x-5,m.y+5);
+          ctx.stroke();
+        }
+        ctx.globalAlpha=1;
+      }
       // ELEMENT-/STURZ-DARSTELLUNG (M4, Abschnitt 5.4): reine Zeichen-Transformationen aus
       // u.vizPhase/u.vizPhaseT/u.vizSturz — stepKuer() liefert nur den Zustand, gezeichnet
       // wird ausschliesslich hier.
@@ -21780,6 +22230,99 @@
       ctx.fillText(f.txt,pos.x+(traeger&&traeger.vizVersatz?traeger.vizVersatz*22:0),fy);
       ctx.globalAlpha=1;
     }
+    // E-B4 (Zeitlupen-Wiederholung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse
+    // A): NACH allen echten Zeichnungen dieses Bildes aufgerufen -- die kleine "ruhige"
+    // Darstellung der Kiss-&-Cry-Gruppe (rolle!=="kuer"-Zweig oben) ist damit schon fertig
+    // gemalt, bevor zeichneKuerReplay() gleich KURZFRISTIG einige ihrer viz*-Felder
+    // ueberschreibt (und wiederherstellt), um dieselbe Figur ein zweites Mal, historisch,
+    // im PIP-Kasten zu zeigen.
+    zeichneKuerReplay(art,gruppen,aktiv);
+  }
+
+  // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.), BILD-IM-BILD: spielt den in
+  // kuerBerechneReplay() ausgeschnittenen Clip mit 0,4-facher Geschwindigkeit ab, waehrend
+  // das Paar im Kiss & Cry sitzt (grp[0].vizReplayClip, s. stepKuer() Durchgang 2). 0,4-fache
+  // Geschwindigkeit heisst: ein Sekunde Original-Zeit braucht 1/0,4=2,5 Sekunden Wanduhr, s.
+  // `sourceT` unten -- fuer ein 1,4s-Element (KUER_ELEMENT_DAUER) also 3,5s, bequem innerhalb
+  // der rund 10s Kiss-&-Cry-Zeit (12x2x0,425s). KEIN Vollbild (das naechste Paar laeuft
+  // schon), KEIN rr(), KEINE Wirkung auf u.summe/Wertung -- reine Wiederholung bereits
+  // geschriebener Ringpuffer-Frames.
+  //
+  // WARUM `t` (die globale Sprite-Animationsuhr) HIER NICHT VERSTELLT WERDEN MUSS: s.
+  // ausfuehrlicher Kommentar bei der Ringpuffer-Aufzeichnung in stepKuer() Durchgang 3 --
+  // `t` bleibt auf der gesamten Buehne bei 0 eingefroren (stepSim() gibt fuer jede
+  // Buehnen-Disziplin VOR der Zeile `t+=dt` zurueck), zeichneSprite()s Gliedmassenanimation
+  // ist deshalb schon im LIVE-Bild ein Standbild je Figur -- eine Zeitlupen-Verzerrung, vor
+  // der das Papier warnt, gibt es hier nicht zu beheben.
+  function zeichneKuerReplay(art,gruppen,aktiv){
+    const gi=gruppen.findIndex(g=>g&&g[0]&&g[0].vizRolle==="kiss");
+    if(gi<0)return;
+    const grp=gruppen[gi];
+    const clip=grp[0]&&grp[0].vizReplayClip;
+    if(!clip)return;
+    const kissT=grp[0].vizKissT||0;
+    // EINBLENDEN ueber die ersten 0,3s (Regel 7, "Wechsel signalisieren") statt eines harten
+    // Auftauchens -- dieselbe Blendzeit wie die 0,4s-Zeilen-Slide-Animation bei E-B3.
+    const einblend=Math.min(1,kissT/0.3);
+    if(einblend<=0)return;
+    const sourceT=Math.min(clip.tEnd,clip.tStart+kissT*0.4);
+
+    // LAGE (Playwright-Bild gegen Bug/Team-Boxen/Vorsprungsbalken/Startbereich geprueft,
+    // s. Abnahme-Abschnitt 7 des Papiers): rechts oben kollidierte eine 30%x22%-Kachel bei
+    // H*0.06 mit der Team-Namens-Box UND dem Vorsprungsbalken (beide oberhalb der
+    // Kuerbahn, s. dessen Kommentar "Sprite-Kopf ab H*0.26"). Kleiner und tiefer angesetzt,
+    // klar UNTER beiden -- die verbleibende Ueberlappung mit der Startbereich-Spalte (kleine
+    // "wer kommt noch"-Symbole) ist die einzig verbliebene, und laut Papier ("kein
+    // Vollbild, weil das naechste Paar schon laeuft") ohnehin bewusst in Kauf genommen: ein
+    // PIP deckt IMMER etwas ab, hier die am wenigsten wichtige Flaeche.
+    const bw=Math.min(W*0.22,180), bh=H*0.20, bx=W-bw-10, by=H*0.234;
+    ctx.save();
+    ctx.globalAlpha=einblend;
+    ctx.beginPath(); ctx.rect(bx,by,bw,bh); ctx.clip();
+    ctx.fillStyle="rgba(8,12,18,.92)"; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle="rgba(210,230,245,.06)"; ctx.fillRect(bx,by+bh*0.58,bw,bh*0.42);
+
+    const {minX,maxX,minY,maxY}=clip.bbox;
+    const spanX=Math.max(24,maxX-minX), spanY=Math.max(24,maxY-minY), pad=16;
+    const scale=Math.min((bw-2*pad)/spanX,(bh-2*pad)/spanY,1.6);
+    const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+    const boxCx=bx+bw/2, boxCy=by+bh/2+4;
+
+    for(let pi=0;pi<clip.frames.length;pi++){
+      const u=grp[pi]; if(!u)continue;
+      const frames=clip.frames[pi]; if(!frames.length)continue;
+      // Letzter aufgezeichneter Frame <= sourceT (Deckel: nach Clip-Ende bleibt die
+      // Endpose stehen statt zu verschwinden).
+      let f=frames[frames.length-1];
+      for(let k=0;k<frames.length;k++){ if(frames[k].bt<=sourceT)f=frames[k]; else break; }
+      // KURZFRISTIGE UEBERSCHREIBUNG, SOFORT WIEDERHERGESTELLT: zeichneSprite() liest Pose/
+      // Sturz eines Teilnehmers ausschliesslich von `u` selbst, es gibt keinen Parameter
+      // dafuer. JS ist synchron -- kein anderer Zeichenaufruf in diesem Frame sieht die
+      // Verstellung, weil save/restore hier ohne jeden await zwischen den Zeilen liegen.
+      const save={sturz:u.vizSturz,wackler:u.vizWackler,phase:u.vizPhase,phaseT:u.vizPhaseT,lunge:u.lunge};
+      u.vizSturz=f.sturz; u.vizWackler=f.wackler; u.vizPhase=f.phase; u.vizPhaseT=f.phaseT; u.lunge=0;
+      let rx=f.x, ry=f.y;
+      ctx.save();
+      ctx.translate(boxCx,boxCy); ctx.scale(scale,scale); ctx.translate(-cx,-cy);
+      if(f.sturz){ ctx.translate(rx,ry); ctx.rotate(f.wackler?0.4:1.15); ctx.translate(-rx,-ry); }
+      else if(f.phase==="pirouette"&&f.phaseT>0){ ctx.translate(rx,ry); ctx.rotate((f.bt*9+u.id)%6.2832); ctx.translate(-rx,-ry); }
+      else if(f.phase==="wurf"&&f.phaseT>0){
+        const p=Math.min(1,1-f.phaseT/KUER_ELEMENT_DAUER), ri=f.ri||0;
+        rx=f.x+Math.cos(ri)*40*p; ry=f.y+Math.sin(ri)*40*p-Math.sin(Math.min(1,p)*Math.PI)*16;
+      }
+      zeichneSprite(ctx,u,rx,ry,true);
+      ctx.restore();
+      u.vizSturz=save.sturz; u.vizWackler=save.wackler; u.vizPhase=save.phase; u.vizPhaseT=save.phaseT; u.lunge=save.lunge;
+    }
+    ctx.restore();
+
+    ctx.globalAlpha=einblend;
+    ctx.strokeStyle="rgba(214,172,54,.7)"; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh);
+    ctx.fillStyle="rgba(10,8,4,.85)"; ctx.fillRect(bx,by-14,bw,14);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+    ctx.fillText("WIEDERHOLUNG · "+clip.label,bx+bw/2,by-7);
+    ctx.globalAlpha=1;
   }
 
   // ================== GEWICHTHEBEN: EIGENES BUEHNENBILD (Plan S2) ==================
@@ -25048,6 +25591,36 @@
     return true;
   }
 
+  // SZENE-DES-SPIELS-PRIORITAET (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3):
+  // die Recherche gibt "Clutch > Dreifach-K.o. > Lifesaver > Wende > Doppel-K.o. > First
+  // Blood" vor. Clutch und Lifesaver brauchen beide eine neue Sim-Zustandsverfolgung (wer
+  // stand VOR dem entscheidenden Treffer in Unterzahl; ein Heilschlag, der ein Ziel unter
+  // 20% Leben rettet) -- Klasse S, nicht Teil dieser Runde (s. PR-Beschreibung). Doppel-/
+  // Dreifach-K.o. fallen technisch beide auf dasselbe `mehrfachkill`-Flag (schalteAus() zaehlt
+  // nicht, WIEVIELE es waren, nur DASS der Angreifer innerhalb des Fensters schon einmal traf)
+  // -- eine Praezisierung waere Mehraufwand ohne neuen Erkenntniswert fuer eine Textzeile.
+  // Von den VIER tatsaechlich gemessenen Momentarten bleibt die Reihenfolge der Recherche
+  // erhalten (Mehrfachkill vor Wende vor First Blood); "entscheidend" (die spielbeendende
+  // letzte Ausschaltung ausserhalb TDM) steht an erster Stelle, weil sie das Spiel selbst
+  // entscheidet -- dramatischer als jede Momentart, die die Recherche kennt, aber in ihrer
+  // Tabelle fehlt, weil TDMs Respawn sie dort unmoeglich macht.
+  const KAMPF_KIND_PRIORITAET=["entscheidend","mehrfachkill","fuehrungswechsel","ersteAusschaltung"];
+  const kampfKoKind=(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung)=>
+    entscheidend?"entscheidend":mehrfachkill?"mehrfachkill":fuehrungswechsel?"fuehrungswechsel"
+      :ersteAusschaltung?"ersteAusschaltung":null;
+  // AUSWAHL SELBST (K5 Stufe 1): HIGHLIGHTS liegt bereits in Entstehungsreihenfolge vor
+  // (feed() haengt nur an, s. dort) -- "bei Gleichstand der fruehere" (Recherche, Abschnitt
+  // 3/K5) ist damit automatisch erfuellt: find() liefert je Prioritaetsstufe den ersten
+  // (also fruehesten) Treffer. Reiner Leser von HIGHLIGHTS/kind, kein rr(), kein neuer
+  // Zustand -- wird nur im Endstand aufgerufen (renderEndstand(), s.u.), nie im stummen Pfad.
+  function waehleSzeneDesSpiels(){
+    for(const kind of KAMPF_KIND_PRIORITAET){
+      const treffer=HIGHLIGHTS.find(h=>h.kind===kind);
+      if(treffer)return treffer;
+    }
+    return null;
+  }
+
   function schalteAus(tg,von){
     const scoreVonVorher=seitenScore(von.side), scoreTgVorher=seitenScore(tg.side);
     tg.st.tode++; von.st.ko++; verteileKo(tg,von);
@@ -25073,6 +25646,14 @@
     // die koennen bei knappem Punktestand oder haeufigen Respawns beliebig oft auftreten.
     const big=kampfGrossDrosseln(ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend,
       ersteAusschaltung||entscheidend);
+    // KIND (K5, Broadcast-Optik-Recherche 27.09., Abschnitt 3/K5 Stufe 1 "Szene des
+    // Spiels"): welche der vier hier gemessenen Momentarten dieses EINE Ereignis traegt,
+    // nach genau der Prioritaet, die die Recherche fuer die Szenen-Auswahl vorgibt (Clutch/
+    // Lifesaver fehlen -- beide brauchen neue Sim-Zustandsverfolgung, Klasse S, nicht Teil
+    // dieser Runde). Reines Anzeige-Etikett fuer HIGHLIGHTS/waehleSzeneDesSpiels() unten --
+    // `big` selbst (ob ueberhaupt ein Banner/Highlight entsteht) bleibt unveraendert von
+    // kampfGrossDrosseln() bestimmt.
+    const kind=kampfKoKind(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung);
 
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
@@ -25089,9 +25670,9 @@
       // zur Zeitskalierung: eine aendert die angezeigte Sekundenzahl, die andere ob es ein
       // Banner gibt.
       const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
-      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind);
     } else {
-      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n));
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind);
     }
   }
 
@@ -28188,7 +28769,16 @@
         osc.start(t0); osc.stop(t0+d+0.05);
       }},
       stampf:   {synth:(vol)=>tonSchlag(vol,180,55,0.3)},
-      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)},
+      // TROMMELWIRBEL (S-B4, Broadcast-Optik Buehne-Auftritt 27.09.): der Urteilsmoment nach
+      // dem letzten Durchgang eines Acts -- ein kurzes, tiefes Rauschen statt des hellen
+      // Applaus-/Buzzer-Rauschens oben, derselbe tonRauschen()-Baustein mit tieferer
+      // Mittenfrequenz und laengerer Dauer.
+      trommel:  {synth:(vol)=>tonRauschen(vol,220,0.5,false)},
+      // GOLDENER BUZZER (S-B5): ein hell aufsteigender Doppelton wie "plakette" bei
+      // Eiskunstlauf (derselbe positive-Reveal-Bauplan), nur eine Terz hoeher fuer die
+      // Sonderstellung dieses seltenen Ereignisses (hoechstens einmal je Spiel).
+      goldbuzzer:{synth:(vol)=>tonDoppelton(vol,900,1350,0.35)}
     },
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.c): vier
     // Ereignisse an genau den Kanten, die stepWettessen() ohnehin sieht (s. dort), dieselben
@@ -34411,8 +35001,16 @@
     (s)=>s+" — geschafft, das Rennen ist entschieden!",
     (s)=>"Zielband durch — "+s+".",
   ];
+  // BESCHRIFTUNG JE MOMENTART (K5 Stufe 1) fuer renderSzeneDesSpiels() unten -- dieselben
+  // vier Kinds wie KAMPF_KIND_PRIORITAET/kampfKoKind bei kampfGrossDrosseln().
+  const KAMPF_KIND_LABEL={
+    entscheidend:"Spielentscheidend",
+    mehrfachkill:"Mehrfachausschaltung",
+    fuehrungswechsel:"Führungswechsel",
+    ersteAusschaltung:"First Blood",
+  };
 
-  function feed(side,txt,big,caption){
+  function feed(side,txt,big,caption,kind){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -34444,7 +35042,13 @@
     // Aufrufs -- big selbst entscheidet nach wie vor NUR ueber die CSS-Klasse oben, hier
     // kommt keine zweite Bedeutung dazu.
     if(big){
-      HIGHLIGHTS.push({side,txt,t:anzeigeT});
+      // KIND (K5, Broadcast-Optik-Recherche 27.09., Abschnitt 3/K5 Stufe 1): welche
+      // Momentart dieses Ereignis traegt -- nur ein optionales Anzeige-Etikett fuer
+      // waehleSzeneDesSpiels() (s.u.), kein Einfluss auf big/HIGHLIGHTS-Aufnahme selbst
+      // (die entscheidet ausschliesslich kampfGrossDrosseln() beim Aufrufer). Jeder
+      // andere feed()-Aufruf (Bahn/Feldspiel/Buehne) laesst kind einfach weg -- die
+      // Szene-Auswahl findet dort dann nichts und bleibt leer.
+      HIGHLIGHTS.push({side,txt,t:anzeigeT,kind});
       callout(txt,caption);
     }
   }
@@ -35828,6 +36432,27 @@
     return {wert:punkte,max:maxP,wort:istHockey()?"Tore":"Punkte",zusatz:String(punkte)};
   }
 
+  // K4 -- "SELTENE FAEHIGKEIT" (Broadcast-Optik-Recherche 27.09., Abschnitt 3/K4, Overwatch-
+  // League-Muster "Ult-Ladung"): der Skill aus `u.skills` mit der LAENGSTEN Abklingzeit --
+  // das trifft fuer alle drei Kits genau die eine Faehigkeit mit echtem taktischem Gewicht
+  // (Archer: Barrage 12s; Matriarch: Blessed Shield/"Segen" 12s; Fighter: Battering Ram
+  // 12s), nie den Grundangriff (0,3-0,35s) oder die Ausweichrolle (3-5s). Die "_schwer"-
+  // Varianten (slash_schwer/fslash_schwer, s. SCHEMA-Zusammenfuehrung oben) tragen ihre
+  // Abklingzeit nur unter `.tor.cd`, nicht unter dem hier gelesenen alten Top-Level-`.cd` --
+  // sie fallen deshalb aus dieser Auswahl heraus, was gewollt ist: ein aufgeladener
+  // Schlag ist kein "seltenes" Ult, sondern eine Variante des Grundangriffs. Reiner
+  // Lesezugriff auf SKILLS (unveraendert), kein rr().
+  function kampfSeltenSkillId(u){
+    if(!u.skills||!u.skills.length)return null;
+    let best=null;
+    for(const id of u.skills){
+      const sk=SKILLS[id];
+      if(!sk||!sk.cd)continue;
+      if(!best||sk.cd>SKILLS[best].cd)best=id;
+    }
+    return best;
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -35959,6 +36584,59 @@
           fbar.title="Fortschritt: "+Math.round(u.fortschritt*100)+" %";
           k.appendChild(fbar);
         }
+        // K4 -- SPECTATOR-KARTEN JE KAEMPFER (Broadcast-Optik-Recherche 27.09., Abschnitt
+        // 3/K4; Chris' Voreinstellung zu Frage 2: Umbau der Kaderkacheln statt eigener
+        // Randspalten auf der Leinwand, die bei sechs gegen sechs zu eng wuerden).
+        // Overwatch-League-Muster: Mana-/Ausdauerbalken (bisher nur 2px unter der Figur auf
+        // der Leinwand, kaum lesbar), die "seltene Faehigkeit" mit Abklingring (Ult-Ladung),
+        // K/T/B klein, Status (Respawn-Uhr TDM / "Raus" sonst statt des generischen "tot").
+        // AUSDRUECKLICH NICHT gezeigt: Beitrag/beitragVon() als Balken oder Rang -- die
+        // Spalte "Leist" in der Wertungstabelle bleibt die einzige Stelle, an der der
+        // Beitrag gegen die Eignung steht (Leitplanke 0.1 Punkt 1/2, K4-Abschnitt
+        // woertlich: "Eine Karte, die 'Beitrag 1340' gross zeigt, wuerde dem rollenblinden
+        // Massstab eine Buehne geben"). Reine Anzeige -- liest nur u.mp/u.sp/u.cds/u.st/
+        // u.downBis, schreibt nichts zurueck.
+        if(istKampf(disc)){
+          if(u.mpMax>0){
+            const mbar=el("div","kbar ressource mana");
+            const mf=el("s"); mf.style.width=Math.max(0,Math.min(100,u.mp/u.mpMax*100))+"%";
+            mbar.appendChild(mf); mbar.title="Mana "+Math.round(u.mp)+"/"+Math.round(u.mpMax);
+            k.appendChild(mbar);
+          }
+          if(u.spMax>0){
+            const sbar=el("div","kbar ressource ausdauer");
+            const sf=el("s"); sf.style.width=Math.max(0,Math.min(100,u.sp/u.spMax*100))+"%";
+            sbar.appendChild(sf); sbar.title="Ausdauer "+Math.round(u.sp)+"/"+Math.round(u.spMax);
+            k.appendChild(sbar);
+          }
+          const zeile2=el("div","kkzeile2");
+          const seltenId=kampfSeltenSkillId(u);
+          if(seltenId){
+            const sk=SKILLS[seltenId], rest=u.cds[seltenId]||0;
+            const bereitAnteil=Math.max(0,Math.min(1,1-rest/sk.cd));
+            const ring=el("div","kfaehig"+(rest<=0?" bereit":""));
+            ring.style.setProperty("--anteil",Math.round(bereitAnteil*100)+"%");
+            ring.title=(sk.name||seltenId)+(rest>0?" — bereit in "+rest.toFixed(1)+" s":" — bereit");
+            zeile2.appendChild(ring);
+          }
+          const ktb=el("div","kktb");
+          ktb.title="Ausschaltungen / Tode / Beihilfe";
+          ktb.appendChild(el("span",null,"K "+Math.round(u.st.ko||0)));
+          ktb.appendChild(el("span",null,"T "+Math.round(u.st.tode||0)));
+          ktb.appendChild(el("span",null,"B "+Math.round(u.st.beihilfe||0)));
+          zeile2.appendChild(ktb);
+          k.appendChild(zeile2);
+          // STATUS: TDM respawnt (die generische ".kk.tot"-Optik allein liest das wie ein
+          // endgueltiges Ausscheiden) -- Mini-DM/Battlefield bleiben bei "Raus", denn dort
+          // IST eine Ausschaltung endgueltig.
+          if(u.down){
+            const status=el("div","kkstatus");
+            status.textContent=(disc==="tdm"&&u.downBis!=null)
+              ? "Respawn "+Math.max(0,Math.round((u.downBis-t)*zeitFaktor()))+" s"
+              : "Raus";
+            k.appendChild(status);
+          }
+        }
         // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
         // Name der Groesse, die der Balken wirklich zeigt.
         k.title=u.n+(u.down?" — ausgeschieden"
@@ -36064,6 +36742,28 @@
   // Stellen aufgerufen, die #endstand ueberhaupt zeigen (Kampf/renderEndstand, Bahn/
   // renderEndstandBahn) -- Feldspiel und Buehne zeigen heute kein Endstand-Overlay,
   // s. Kommentar bei stepFeldspielLive/stepBuehne, das bleibt unveraendert.
+  // SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3): EIN
+  // Moment aus den vier gemessenen Momentarten, ausgewaehlt nach waehleSzeneDesSpiels()
+  // oben -- Overwatchs "Play of the Game"-Prinzip: "nicht an Sieg oder Gesamtwert
+  // gebunden" (Leitplanke 0.1 Punkt 1 und Abschnitt 3/K5 der Recherche woertlich), also
+  // auch fuer die Verlierer-Seite moeglich, wenn ihr Ereignis oben in der Prioritaet steht.
+  // Nur fuer Kampf aufgerufen (renderEndstand(), s.u.) -- renderEndstandBahn() teilt sich
+  // zwar #ehighlights/HIGHLIGHTS mit dem Kampf, aber Bahn-Ereignisse tragen nie ein `kind`
+  // (feed() dort ruft ohne den fuenften Parameter), waehleSzeneDesSpiels() faende dort also
+  // ohnehin nichts -- die Box bleibt fuer Bahn-Spiele hidden.
+  function renderSzeneDesSpiels(){
+    const box=document.getElementById("eszene");
+    if(!box)return;
+    const szene=waehleSzeneDesSpiels();
+    if(!szene){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false; box.textContent="";
+    box.appendChild(el("h5",null,"Szene des Spiels"));
+    const zeile=el("div","ehzeile "+(szene.side===0?"h":"a"));
+    zeile.appendChild(el("span","eht",KAMPF_KIND_LABEL[szene.kind]||""));
+    zeile.appendChild(el("span",null,szene.txt));
+    box.appendChild(zeile);
+  }
+
   function renderHighlights(){
     const box=document.getElementById("ehighlights");
     if(!box)return;
@@ -36138,6 +36838,7 @@
       }
       t.appendChild(tb); box.appendChild(t);
     }
+    renderSzeneDesSpiels();
     renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
@@ -36415,6 +37116,12 @@
     // showcaseSaumSeit koennte sonst noch den buehneT-Wert des VORIGEN Showcase-Spiels
     // tragen. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     showcaseSaumSide=null; showcaseSaumSeit=-999;
+    // DASSELBE N1-MUSTER FUER DEN GOLDENEN BUZZER (S-B5, Broadcast-Optik Buehne-Auftritt
+    // 27.09.): ohne diese Zeile bliebe die "hoechstens einmal je Spiel"-Sperre vom VORIGEN
+    // Showcase-Spiel dauerhaft gesetzt, und kein zweites Spiel derselben Session koennte je
+    // wieder einen goldenen Buzzer vergeben. Reiner Praesentationszustand, kein Einfluss auf
+    // rr() oder Rangtreue.
+    showcaseGoldVergeben=false;
     // DASSELBE N1-MUSTER FUER DIE WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik 27.09.):
     // wettessenEndeSeit koennte sonst noch den buehneT-Wert des VORIGEN Wettessen-Spiels
     // tragen und die Jubelpose faelschlich unterdruecken/dauerhaft zeigen.
@@ -36428,6 +37135,12 @@
     // DASSELBE N1-MUSTER FUER DEN ZUG-UHR-ALARM (I2, s. ispyLetzterZugAlarmiert-Deklaration
     // oben): ohne diesen Reset bliebe der letzte Zug ab dem zweiten I-Spy-Spiel stumm.
     ispyLetzterZugAlarmiert=false;
+    // DASSELBE N1-MUSTER FUER DIE I-SPY-TRENNSTEG-FUEHRUNG (I5, Broadcast-Optik-Recherche
+    // 27.09.): ispySaumSeit koennte sonst noch den buehneT-Wert des VORIGEN I-Spy-Spiels
+    // tragen -- derselbe Fehler, den PR #883/showcaseSaumSeit/eisBandeSeit oben schon
+    // gemessen behoben haben. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue.
+    ispySaumSide=null; ispySaumSeit=-999;
     // Reiner Aufraeum-Reflex, kein Sicherheitsnetz: baueSchatzsuche() ueberschreibt
     // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
