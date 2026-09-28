@@ -542,6 +542,13 @@
   .oly-battle-arena.oly-battle-arena .ttstand .gut{color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .ttstand .knapp{color:var(--warn,#e0a341)}
   .oly-battle-arena.oly-battle-arena .ttstand .schlecht{color:var(--crit)}
+  /* TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3). Eine Zeile, dieselbe Typo wie .ttstand,
+     nur in der Signalfarbe hervorgehoben -- erscheint erst, wenn eine Seite komplett im
+     Ziel ist (s. bahnZeitFuerSieg()). */
+  .oly-battle-arena.oly-battle-arena .ttteamsieg{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+    color:var(--warn,#e0a341)}
+  .oly-battle-arena.oly-battle-arena .ttteamsieg[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ttteamsieg.chancenlos{color:var(--crit)}
   /* HOEHENPROFIL: eine flache Leiste, farbige Baender je Gelaendezone, ein Marker fuer die
      Position des fokussierten Laeufers, zwei Striche fuer die Checkpoints. Bewusst kein
      Canvas/SVG-Nachbau eines echten Hoehenprofils (die Recherche nennt das explizit ein
@@ -799,6 +806,11 @@
   .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-away{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
+  /* ST-3: BEIN-/RUNDENZEILE (broadcast-optik-bahn-27-09.md Abschnitt 4.3). Dritte Zeile im
+     mittleren Delta-Feld statt einer dritten Zeile je Seite (Runde 2, Vorschlag 3 warnt
+     davor). Klein und gedaempft -- Kontextzeile, kein neuer Schwerpunkt. */
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbein{display:block;margin-top:3px;font-size:9.5px;
+    font-family:"IBM Plex Mono",monospace;font-weight:400;letter-spacing:.02em;color:#93a1b3}
 
   /* I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): die Crystal-Maze-
      Zonenuhr, mittig oben in derselben 15%-Zeile wie .bahnhud (beide Panels sind
