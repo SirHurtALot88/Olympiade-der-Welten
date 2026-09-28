@@ -26941,6 +26941,53 @@
     }
     return bester?{u:bester,zeit:beste}:null;
   }
+  // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2, uebersetzt
+  // ins Zeitfahren"). Rekonstruiert, wo der Hot-Seat-Halter nach `te` Sekunden GEFAHRENER
+  // Zeit war -- stueckweise linear aus den Stuetzpunkten (0,0), (zz[0],ZZ1-Anteil),
+  // (zz[1],ZZ2-Anteil), (Zielzeit,1), also GENAU den Punkten, die `BA().zwischenzeiten`
+  // ohnehin als Streckenanteile fuehrt. Reiner Lesezugriff auf `hs.u.zz`/`hs.zeit`, die
+  // `stepSpurt` fuer das Panel laengst schreibt -- kein neues Feld, kein rr()-Aufruf.
+  // `te` ausserhalb [0,hs.zeit] wird gekappt: vor dem Start steht der Geist am Start, nach
+  // dessen Zieleinlauf am Ziel ("ohne einen ersten Finisher gibt es keinen Geist" gilt schon
+  // eine Ebene hoeher, s. Aufrufstelle in zeichneSpurt).
+  function bahnGeistPosition(hs,te){
+    const cps=BA().zwischenzeiten||[];
+    const pkt=[[0,0]];
+    cps.forEach((frac,ci)=>{ if(hs.u.zz&&hs.u.zz[ci]!=null)pkt.push([hs.u.zz[ci],frac]); });
+    pkt.push([hs.zeit,1]);
+    if(te<=pkt[0][0])return pkt[0][1];
+    for(let i=1;i<pkt.length;i++){
+      if(te<=pkt[i][0]){
+        const [t0,p0]=pkt[i-1],[t1,p1]=pkt[i];
+        const frac=(t1-t0)>0?(te-t0)/(t1-t0):0;
+        return p0+(p1-p0)*frac;
+      }
+    }
+    return 1;
+  }
+  // TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3, SMT-Vorbild "time to take the yellow
+  // jersey"). Reine Arithmetik aus genau den Feldern, die bahnTeamstand()s "zeit"-Zweig fuer
+  // die Hochrechnung ohnehin liest (u.fertig/bahnZeit/u.seite) -- eine eigene, rein lesende
+  // Kopie statt eines Rueckgabewerts an bahnTeamstand() selbst, damit die WERTUNGS-Funktion
+  // unangetastet bleibt. Nur `wertung:"zeit"` (Time-Trial) hat ueberhaupt eine Team-
+  // Zeitsumme, fuer die diese Ansage Sinn ergibt.
+  function bahnZeitFuerSieg(){
+    if(BA().wertung!=="zeit")return null;
+    const summe=[0,0], voll=[0,0], seitenZahl=[0,0];
+    for(const u of LAEUFER){
+      seitenZahl[u.seite]++;
+      if(u.fertig!=null){ summe[u.seite]+=bahnZeit(u); voll[u.seite]++; }
+    }
+    for(const s of [0,1]){
+      const g=1-s;
+      if(seitenZahl[s]>0 && seitenZahl[s]===voll[s] && voll[g]<seitenZahl[g]){
+        const nochOffen=seitenZahl[g]-voll[g];
+        const bedarf=(summe[s]-summe[g])/nochOffen;
+        return {seite:g,nochOffen,bedarf,chancenlos:bedarf<=0};
+      }
+    }
+    return null;
+  }
   // HOCHRECHNUNG FUER DEN, DER NOCH FAEHRT (Chris' Fund 13.09.). Der vorlaeufige Stand
   // sortierte die noch Laufenden nach `b.pos-a.pos`, also nach ROHER STRECKE. Bei einem
   // Massenstart ist das richtig — dort sind alle gleich lange unterwegs, mehr Strecke
@@ -27041,6 +27088,24 @@
   // einen Beinwechsel am Wechsel dieser ID erkennt. `staffelWechselAnzeige` ist die aktuell
   // laufende Tafel an der Wechselzone.
   let staffelAktivVorher=[null,null], staffelWechselAnzeige=null;
+  // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3). Ringpuffer aus
+  // {t (echte Sekunden), delta, seite} -- ein Punkt je Frame, in updateHudBahn() gefuellt,
+  // von bauSpurt() geleert. Reine Anzeige: liest nur staffelZeitDelta(), das die Simulation
+  // ohnehin schon fuer #bhDelta berechnet, schreibt nichts zurueck.
+  let staffelVerlauf=[];
+  // Dieselben Zeitpunkte, an denen IRGENDEIN Wechsel stattfand (beide Seiten gemeinsam) --
+  // fuer die "Beingrenzen"-Striche im Verlauf. Ein Team-Ergebnis-Graph hat nur eine
+  // Zeitachse, die beiden Seiten wechseln aber zu unterschiedlichen Realzeiten; die
+  // Striche markieren deshalb JEDEN Wechsel, nicht "Bein n beider Seiten gleichzeitig".
+  let staffelBeinMarken=[];
+  // ST-5: ANKER-EINBLENDUNG (Abschnitt 4.3), je Seite hoechstens einmal pro Rennen --
+  // ausgeloest, sobald der neu aktive Laeufer dieser Seite das letzte Bein laeuft.
+  let staffelAnkerGezeigt=[false,false];
+  // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, Klasse A*: die drei Zaehler werden in
+  // stepSpurt an den bestehenden sauber/durchbruch/sturz-Ausgaengen mitgezaehlt, s. dort).
+  // Ein Eintrag je Hindernis-Index, {sauber,durch,sturz} -- reiner Anzeige-Zaehler, den
+  // weder tempoVon() noch rr() noch wert() je lesen.
+  let spurtStationStats=[];
 
   // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
   // liefern Rangpunkte (bahnRangliste); Staffel traegt "etappe", Takeshi's Castle "burg"
@@ -27271,6 +27336,12 @@
             feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true);
           }
         }
+        // ST-4: FUEHRUNGSVERLAUF (Abschnitt 4.3). Ein Punkt je Frame, exakt wie im Konzept
+        // vorgeschlagen ("ein Anzeige-Puffer [rennT, delta, seite], je Frame in
+        // updateHudBahn gefuellt") -- dieselbe Groesse, die #bhDelta darunter ohnehin zeigt,
+        // hier nur zusaetzlich gesammelt. Kein Deckel: ein Rennen dauert Sekunden, kein
+        // Speicherproblem, und bauSpurt() leert den Puffer vor jedem neuen Rennen.
+        staffelVerlauf.push({t:rennT*zeitFaktor(), delta:d.unklar?0:d.delta, seite:d.unklar?null:d.seite});
         // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3,
         // "das Gegenstueck zu TT-1"). Ein Beinwechsel wird daran erkannt, dass sich der
         // AKTIVE Laeufer einer Seite aendert -- dasselbe Muster, das `#bahnHud` fuer
@@ -27296,6 +27367,23 @@
                 verlust, verpatzt:verlust!=null&&verlust>WECHSEL_MAX,
                 bis:rennT+3/zeitFaktor()
               };
+              // ST-4: "Beingrenzen"-Strich fuer den Verlauf -- jeder echte Wechsel, egal auf
+              // welcher Seite, markiert einen Knick in der Kurve.
+              staffelBeinMarken.push(rennT*zeitFaktor());
+              // ST-5: ANKER-EINBLENDUNG (Abschnitt 4.3). Der neu aktive Laeufer laeuft das
+              // LETZTE Bein (0-indiziert, jeSeite-1) -- einmal je Seite ein Lower Third mit
+              // ihm, seinem Gegenueber und dem aktuellen Rueckstand. Ueber callout() DIREKT,
+              // nicht ueber feed()/big ("nicht fett im Ticker", Abschnitt 4.3) -- reiner
+              // Lesezugriff auf Felder, die #bahnHud ohnehin schon zeigt.
+              if(!staffelAnkerGezeigt[seite] && akt.bein===(BA().jeSeite||6)-1){
+                staffelAnkerGezeigt[seite]=true;
+                const gegner=LAEUFER.find(o=>o.seite===1-seite&&o.aktiv);
+                let lage="";
+                if(!d.unklar&&d.delta>0.005)lage=d.seite===seite
+                  ?(" · Vorsprung "+fmtDauer(d.delta)):(" · Rückstand "+fmtDauer(d.delta));
+                callout("SCHLUSSLÄUFER · "+akt.n+" (Eig "+Math.round(akt.eig)+")"
+                  +(gegner?" gegen "+gegner.n+" (Eig "+Math.round(gegner.eig)+")":"")+lage);
+              }
             }
           }
           staffelAktivVorher[seite]=aktId;
@@ -27482,25 +27570,36 @@
           deltaEl.classList.remove("bh-home","bh-away");
           const balken=(anteil,klasse)=>'<span class="bhbar"><i class="'+klasse
             +'" style="width:'+Math.round(Math.max(3,Math.min(100,anteil*100)))+'%"></i></span>';
+          // ST-3: BEIN-/RUNDENZEILE (Abschnitt 4.3, "Bein 4/6 · Runde 2/3"). Runde 2
+          // (Vorschlag 3) warnte ausdruecklich vor einer dritten HUD-Zeile JE SEITE --
+          // deshalb hier im mittleren Delta-Feld statt in .bhside. Fuehrender Fortschritt
+          // (welche Seite weiter ist) bestimmt, wessen Bein gezaehlt wird; nach Zieleinlauf
+          // einer Seite bleibt ihr letztes Bein stehen (gesamtfortschritt()==1).
+          const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
+          const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
+          const beinN=BA().jeSeite||6, jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
+          const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
+          const beinZeile='<small class="bhbein">Bein '+beinNr+'/'+beinN+' · Runde '
+            +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
             // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
             // hier nur final statt interpoliert. Keine zwei Wahrheiten.
             const sieger=stand.seiten[0]>stand.seiten[1]?0:stand.seiten[1]>stand.seiten[0]?1:null;
             deltaEl.innerHTML='<b>'+(sieger==null?"Ziel":(VEREIN[sieger].name+" gewinnt"))+'</b>'
-              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>';
+              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>'+beinZeile;
             if(sieger!=null)deltaEl.classList.add(sieger===0?"bh-home":"bh-away");
           } else {
             const d=staffelZeitDelta();
             if(d.unklar||d.delta<=0){
-              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>';
+              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>'+beinZeile;
             } else {
               // Balkenlaenge relativ zu 5 realen Sekunden: darueber ist es ohnehin eine
               // klare Fuehrung, darunter macht jede Zehntelsekunde noch sichtbar etwas aus.
               const real=bahnRealSek(d.delta);
               deltaEl.innerHTML='<b>'+(d.seite===0?VEREIN[0].name:VEREIN[1].name)+' führt</b>'
                 +'<span class="bhsub">+'+bahnZeitText(real)+'</span>'
-                +balken(real/5,d.seite===0?"bh-home":"bh-away");
+                +balken(real/5,d.seite===0?"bh-home":"bh-away")+beinZeile;
               deltaEl.classList.add(d.seite===0?"bh-home":"bh-away");
             }
           }
@@ -28890,9 +28989,22 @@
       if(BA().spurt && BA().hindernisNamen && BA().hindernisNamen[i]){
         const CIRCLED=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"];
         const stLabel=(CIRCLED[i]||(i+1)+".")+" "+BA().hindernisNamen[i];
+        // Um 9px angehoben (vorher oben-4), damit SP-2s Statistikzeile direkt darunter
+        // Platz hat, ohne den Namen zu ueberdecken.
         ctx.font=(cam.zoom>=2?"700 8px":"700 10px")+" 'IBM Plex Mono',monospace";
         ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-        ctx.strokeText(stLabel,x,oben-4); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,oben-4);
+        ctx.strokeText(stLabel,x,oben-13); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,oben-13);
+        // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, "der Primaer-/Nebenweg der CLAUDE.md-
+        // Leitlinie im Bild"). "✓" ist der TECHNIK-Primaerweg, "⚡" der WUCHT-Nebenweg, "✗"
+        // der Sturz -- reiner Lesezugriff auf spurtStationStats, das stepSpurt an den drei
+        // bestehenden Ausgaengen mitzaehlt (s. dort), schreibt nichts, kein rr()-Aufruf.
+        const st=spurtStationStats[i];
+        if(st&&(st.sauber||st.durch||st.sturz)){
+          const stTxt=st.sauber+" ✓ · "+st.durch+" ⚡ · "+st.sturz+" ✗";
+          ctx.font=(cam.zoom>=2?"400 7px":"400 8.5px")+" 'IBM Plex Mono',monospace";
+          ctx.lineWidth=2.4;
+          ctx.strokeText(stTxt,x,oben-4); ctx.fillStyle="#b7c0cf"; ctx.fillText(stTxt,x,oben-4);
+        }
       }
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
@@ -29404,6 +29516,41 @@
     ctx.fillStyle="rgba(255,255,255,.85)";
     ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
     ctx.fillText("ZIEL",OVAL_CX,yI+11);
+
+    // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3, Chris' "ohne Stats sehen, wer wen
+    // besiegt" fuer die Staffel). Die groesste leere Flaeche des Bildes (Abschnitt 4.1) wird
+    // zu einer flachen Linie: x-Achse die Rennzeit, y-Achse das Delta aus
+    // staffelZeitDelta() (oben Heim, unten Gast) -- ein Fuehrungswechsel ist sichtbar das
+    // Kreuzen der Mittellinie, ein verpatzter Wechsel ein Knick (die "Game Flow"-Grafik aus
+    // NBA-Uebertragungen, Sehgewohnheit). `staffelVerlauf`/`staffelBeinMarken` sind reine
+    // Anzeige-Puffer, von updateHudBahn() gefuellt -- diese Zeichnung liest sie nur.
+    if(staffelVerlauf.length>1){
+      const maxT=staffelVerlauf[staffelVerlauf.length-1].t||1;
+      const gx0=OVAL_CX-Math.min(110,rInnen*0.80), gx1=OVAL_CX+Math.min(110,rInnen*0.80);
+      const gyMid=OVAL_CY, gyHalf=Math.min(34,rInnen*OVAL_STAUCH*0.55);
+      const gxOf=(tm)=>gx0+Math.min(1,Math.max(0,tm/maxT))*(gx1-gx0);
+      const gyOf=(delta,seite)=>{
+        const signed=seite===0?delta:seite===1?-delta:0;
+        return gyMid-Math.max(-1,Math.min(1,signed/5))*gyHalf;      // dieselbe 5-s-Skala wie #bhDelta
+      };
+      ctx.save();
+      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(gx0,gyMid); ctx.lineTo(gx1,gyMid); ctx.stroke();
+      // SENKRECHTE STRICHE FUER DIE BEINGRENZEN (Abschnitt 4.3) -- jeder echte Wechsel,
+      // egal welcher Seite, s. Kommentar an `staffelBeinMarken` oben.
+      ctx.strokeStyle="rgba(255,225,120,.35)"; ctx.lineWidth=1;
+      for(const tm of staffelBeinMarken){
+        const x=gxOf(tm);
+        ctx.beginPath(); ctx.moveTo(x,gyMid-gyHalf); ctx.lineTo(x,gyMid+gyHalf); ctx.stroke();
+      }
+      ctx.lineWidth=2.2;
+      for(let i=1;i<staffelVerlauf.length;i++){
+        const a=staffelVerlauf[i-1], b=staffelVerlauf[i];
+        ctx.strokeStyle=b.seite===0?"#f2a03d":b.seite===1?"#45b0c9":"rgba(255,255,255,.4)";
+        ctx.beginPath(); ctx.moveTo(gxOf(a.t),gyOf(a.delta,a.seite)); ctx.lineTo(gxOf(b.t),gyOf(b.delta,b.seite)); ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   // ===================================================================================
@@ -31402,6 +31549,11 @@
     bahnHotSeatId=null; bahnZzGemeldet=new Set();
     bahnFalleGemeldet=new Set(); bahnFalleAnzeige=null;
     staffelAktivVorher=[null,null]; staffelWechselAnzeige=null;
+    // PRIO-2 BROADCAST-OPTIK (27.09., Abschnitt 4.3/3.3): dieselbe Rueckstell-Stelle wie
+    // die Prio-1-Variablen direkt darueber -- keine dieser Anzeigen darf vom vorigen
+    // Rennen wissen.
+    staffelVerlauf=[]; staffelBeinMarken=[]; staffelAnkerGezeigt=[false,false];
+    spurtStationStats=(BA().hindernisse||[]).map(()=>({sauber:0,durch:0,sturz:0}));
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
@@ -32319,6 +32471,9 @@
                 if(extra>=(G.melden??1) && !bahnGedraengeGemeldet.has(hi)){
                   bahnGedraengeGemeldet.add(hi);
                   feed(u.seite,"Gedränge an "+(A.hindernisWort||"Hürde")+" "+(hi+1)+" — "+(andere+1)+" Mann an einer Stelle, "+u.n+" mittendrin.");
+                  // TK-4 (Abschnitt 5.3, CAPTION_GEDRAENGE): direkter callout(), der Ticker
+                  // (die Zeile direkt darueber) bleibt unveraendert Play-by-Play.
+                  callout("Gedränge!",waehleCaption(CAPTION_GEDRAENGE));
                 }
               }
             }
@@ -32497,6 +32652,11 @@
           } else {
           const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
           if(rr()<=technik){                               // sauber drueber
+            // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, Klasse A*). Nur Spurt fuehrt
+            // `hindernisNamen`/eine Stationsanzeige -- Takeshi zaehlt hier zwar mit (der
+            // Zweig ist derselbe fuer beide Bahnen), zeichnet die Zahl aber nirgends, s.
+            // bodenSpurtGerade(). Reiner Anzeige-Zaehler, kein rr()-Aufruf, kein Ruecklesen.
+            if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sauber++;
             if(meldeTyp==="stark"){
               schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
               melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
@@ -32514,6 +32674,8 @@
             u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
             u.durchbruch=(u.durchbruch||0)+1;
             if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
+            // SP-2: derselbe Zaehler wie oben, nur der WUCHT-Nebenweg ("⚡").
+            if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).durch++;
             schwebe({...laeuferSchwebeXY(u,-20),txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" nimmt "+(wortAkk||(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort))+" mit Gewalt.");
             continue;
@@ -32539,6 +32701,8 @@
           u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
           u.gestolpert++;
           if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
+          // SP-2: dritter Zaehler ("✗"), s. beide Stellen oben.
+          if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sturz++;
           // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
           //
           // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
@@ -32577,8 +32741,13 @@
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein Ausscheiden
             // ist seltenes, sofort verstaendliches Bild-Ereignis -- immer big, wie Chris'
             // Hockey-Vorbild (Tor immer big) es fuer diese Bahn-Disziplin vorschreibt.
+            // TK-4 (Abschnitt 5.3): eine CAPTION_AUSSCHEIDEN-Zeile, der Banner 400 ms NACH
+            // diesem Schwebetext ("die Pointe folgt dem Platscher, nicht davor", Craig
+            // Charles' Muster) -- die Ticker-Zeile selbst bleibt sofort und unveraendert,
+            // nur der Callout wartet (s. feed()s neuer fuenfter Parameter).
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
-              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.",true);
+              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.",true,
+              waehleCaption(CAPTION_AUSSCHEIDEN,u.n),400);
             break;
           }
           // TON (Ziel 3, A4): Laeufer stuerzt (nicht ausgeschieden). Diese Zeile laeuft fuer
@@ -32587,6 +32756,16 @@
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({...laeuferSchwebeXY(u,-20),txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
+          // TK-4 (Abschnitt 5.3, "CAPTION_STURZ_SCHWER, nur fuer einen Sturz an einer
+          // Drei-Sterne-Falle, damit es selten bleibt") plus dieselbe Mechanik fuer Spurts
+          // Wassergraben ("Dieselbe Mechanik traegt im Spurt CAPTION_STURZ fuer das
+          // Wasser"). Direkter callout()-Aufruf statt ueber feed()/big: der Ticker bleibt
+          // Play-by-Play (unveraendert), die Caption ist reine Color-Ebene daneben.
+          if(A.takeshi && (A.fallenStufe||{})[hTyp]===3){
+            callout(u.n+" stürzt schwer!",waehleCaption(CAPTION_STURZ_SCHWER,u.n));
+          } else if(A.spurt && (A.hindernisBilder||[])[meldeStation]==="wasser"){
+            callout(u.n+" stolpert!",waehleCaption(CAPTION_STURZ_WASSER,u.n));
+          }
           // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
           // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
           if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
@@ -33888,6 +34067,33 @@
       }
       ctx.font="400 9.5px 'IBM Plex Mono',monospace";
     }
+    // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2,
+    // uebersetzt ins Zeitfahren"). Auf der Spur des FOKUSSIERTEN Fahrers erscheint eine
+    // senkrechte, halbtransparente Goldlinie dort, wo der Hot-Seat-Halter nach derselben
+    // GEFAHRENEN Zeit war (bahnGeistPosition(), rein lesend). "Ohne einen ersten Finisher
+    // gibt es keinen Geist" (Abschnitt 2.3): bahnHotSeat() liefert erst nach dem ersten
+    // Zieleinlauf ueberhaupt etwas. Der Fokussierte selbst braucht keinen Geist auf sich
+    // selbst -- exklusiv Time-Trial (`istRoute()`/`istOval()` sind hier ohnehin nie wahr).
+    if(BA().startAbstand && bahnFokus!=null){
+      const fok=LAEUFER.find(o=>o.id===bahnFokus);
+      const hs=bahnHotSeat();
+      if(fok && fok.fertig==null && hs && hs.u.id!==fok.id){
+        const te=Math.max(0,rennT-(fok.startT||0));
+        const frac=bahnGeistPosition(hs,te);
+        const gx=camX(frac), gy=bahnY(fok.bahnZ);
+        if(gx>-20&&gx<W+20){
+          ctx.save(); ctx.globalAlpha=0.75;
+          ctx.strokeStyle="#f2d75a"; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx,gy+20); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx-4,gy-30); ctx.lineTo(gx+4,gy-30); ctx.closePath(); ctx.fill();
+          ctx.textAlign="center"; ctx.font="700 8px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
+          ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
+          ctx.restore(); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        }
+      }
+    }
     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
     // Im Pulk (die Kamera zoomt bis 3,4x heran) malen die spaeter gezeichneten Sprites
     // sonst ueber die Marke des frueher gezeichneten Laeufers, und ausgerechnet im
@@ -33947,6 +34153,78 @@
       ctx.fillText(f.txt,fx,fy);
       ctx.globalAlpha=1;
     }
+    zeichneStreckenband();
+  }
+
+  // G-2: STRECKENBAND / COURSE STRIP (Abschnitt 7, "groesster Einzelnutzen ueber vier
+  // Bahnen"). Ein schmaler Ueberblicksstreifen, der IMMER die ganze Strecke zeigt -- eine
+  // eigene, lineare Positionsabbildung (`bandX`), unabhaengig von Kamera-Zoom/-Schwenk
+  // (bewusst NICHT camX/camY, die genau daran haengen). Voreinstellung Abschnitt 9.4:
+  // unten im Zeitfahren (oben steht dort schon das Hoehenprofil-Panel neben der Leinwand),
+  // oben in den anderen drei (bei Takeshi ist unten ohnehin das Burgpunkte-Band). Reine
+  // Anzeige, zuletzt gezeichnet (also immer oben auf dem Bild) -- liest nur Felder, die die
+  // Simulation ohnehin fuehrt (u.pos/u.fertig/u.raus/BA().hindernisse/gesamtfortschritt),
+  // schreibt nichts, ruft nie rr().
+  function zeichneStreckenband(){
+    const A=BA();
+    const unten=!!A.startAbstand;                  // Zeitfahren: Band unten, sonst oben
+    const rand=26, bx0=rand, bx1=W-rand, by=unten?H-13:13;
+    const bandX=(frac)=>bx0+Math.max(0,Math.min(1,frac))*(bx1-bx0);
+    ctx.save();
+    ctx.fillStyle="rgba(8,10,14,.55)";
+    ctx.fillRect(bx0-6,by-7,(bx1-bx0)+12,14);
+    ctx.strokeStyle="rgba(255,255,255,.30)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(bx0,by); ctx.lineTo(bx1,by); ctx.stroke();
+    if(A.staffel){
+      // TEAM-FORTSCHRITT STATT EINZEL-LAEUFER (Abschnitt 7: "die Punkte zeigen den
+      // Teamfortschritt (gesamtfortschritt(seite)), nicht den einzelnen Laeufer").
+      const n=A.jeSeite||6;
+      ctx.strokeStyle="rgba(255,225,120,.5)"; ctx.lineWidth=1;
+      for(let i=1;i<n;i++){ const x=bandX(i/n); ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
+      for(const seite of [0,1]){
+        const x=bandX(gesamtfortschritt(seite));
+        ctx.beginPath(); ctx.arc(x,by,4.5,0,6.283);
+        ctx.fillStyle=seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineWidth=1; ctx.stroke();
+      }
+    } else {
+      // STATIONEN/FALLEN/ZWISCHENZEITEN ALS STRICHE -- dieselbe Streckenliste, die die
+      // Bahn selbst schon fuehrt (BA().hindernisse; Time-Trial zusaetzlich seine ZZ).
+      for(const frac of (A.hindernisse||[])){
+        const x=bandX(frac);
+        ctx.strokeStyle=A.takeshi?"rgba(220,190,120,.65)":"rgba(255,255,255,.45)"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x,by-5); ctx.lineTo(x,by+5); ctx.stroke();
+      }
+      for(const frac of (A.zwischenzeiten||[])){
+        const x=bandX(frac);
+        ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke();
+      }
+      { const x=bandX(1); ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
+      // LAEUFER-PUNKTE. `u.pos` ist bei allen vier Bahnen dieselbe 0..1-Streckengroesse
+      // (auch auf Takeshis Route und im Zeitfahren, s. bahnHochrechnung()/bahnRangliste()),
+      // deshalb genuegt EINE Formel statt einer Fallunterscheidung je Bahn-Art.
+      // DER FUEHRENDE TRAEGT EINEN RING (Runde 2, Regel 6: Marker am Akteur) -- dieselbe ID,
+      // die der Ticker fuer den Fuehrungswechsel schon fuehrt (bahnHotSeatId/
+      // bahnFuehrenderId, s. updateHudBahn G-1), hier nur zusaetzlich sichtbar.
+      const leaderId=A.startAbstand?bahnHotSeatId:bahnFuehrenderId;
+      for(const u of LAEUFER){
+        const x=bandX(Math.min(1,Math.max(0,u.pos)));
+        // AUSGESCHIEDEN BLEIBT ALS GRAUES ✗ AN SEINER STELLE STEHEN (Abschnitt 7: "so sieht
+        // man auch im Band, WO das Feld zerlegt wurde") -- exklusiv Takeshi, jede andere
+        // Bahn kennt kein `u.raus`.
+        if(A.takeshi&&u.raus){
+          ctx.fillStyle="#8795A9"; ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+          ctx.fillText("✕",x,by+3); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+          continue;
+        }
+        ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
+        ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        if(u.id===leaderId){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.6; ctx.stroke(); }
+      }
+    }
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -34281,8 +34559,40 @@
     (s)=>s+" — geschafft, das Rennen ist entschieden!",
     (s)=>"Zielband durch — "+s+".",
   ];
+  // TK-4: KOMMENTAR-CAPTIONS IM MXC-STIL (broadcast-optik-bahn-27-09.md Abschnitt 5.3).
+  // "Der Ticker ist Play-by-Play (bleibt, wie er ist), die Caption im Callout ist Color" --
+  // dieselbe waehleCaption()-Rundlauf-Mechanik wie oben, drei neue Listen fuer Takeshi's
+  // Castle plus eine vierte fuer denselben Sturz-Moment im Spurt ("Dieselbe Mechanik traegt
+  // im Spurt CAPTION_STURZ fuer das Wasser"). Reine Textbausteine, kein rr()-Aufruf, keine
+  // neue Ereigniserkennung -- ausgeloest an genau den Stellen in stepSpurt, die den
+  // jeweiligen Schwebetext ohnehin schon setzen (s. dortige Kommentare). Nennt niemanden
+  // wegen Herkunft/Aussehen, nur wegen des Missgeschicks (Chris' Voreinstellung, Abschnitt 9.3).
+  const CAPTION_AUSSCHEIDEN=[
+    (s)=>"Und ab ins Wasser — "+s+" ist raus!",
+    (s)=>"Das war's mit den Nerven, "+s+".",
+    (s)=>"Zurück zum Sammelplatz mit dir, "+s+"!",
+  ];
+  const CAPTION_STURZ_SCHWER=[
+    (s)=>s+" liegt flach — das tat weh.",
+    (s)=>"Autsch! "+s+" hat es hart erwischt.",
+  ];
+  const CAPTION_GEDRAENGE=[
+    ()=>"Fünf Mann an einer Tür — das wird eng!",
+    ()=>"Da drängelt sich das halbe Feld auf einmal!",
+  ];
+  const CAPTION_STURZ_WASSER=[
+    (s)=>s+" nimmt ein Bad im Wassergraben!",
+    (s)=>"Platsch — "+s+" landet im Wasser.",
+  ];
 
-  function feed(side,txt,big,caption){
+  // TK-4: der Callout soll "0,4 s NACH dem Schwebetext 'ausgeschieden' erscheinen, nicht
+  // gleichzeitig" (die Pointe folgt dem Platscher, wie bei Craig Charles) -- ein optionaler
+  // fuenfter Parameter statt eines eigenen Verzoegerungs-Parameters an callout() selbst: die
+  // Ticker-Zeile (und die HIGHLIGHTS-Buchung, fuer den Endstand-Rueckblick) bleiben sofort,
+  // nur der Banner selbst wartet einen echten DOM-Timer ab -- keine Sim-Zeit, exakt wie im
+  // Konzept gefordert. Jeder bestehende Aufruf laesst den Parameter weg (undefined -> 0,
+  // also sofort wie bisher), bit-identisch fuer alle anderen ~40 feed()-Aufrufstellen.
+  function feed(side,txt,big,caption,verzoegerungMs){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -34315,7 +34625,8 @@
     // kommt keine zweite Bedeutung dazu.
     if(big){
       HIGHLIGHTS.push({side,txt,t:anzeigeT});
-      callout(txt,caption);
+      if(verzoegerungMs)setTimeout(()=>callout(txt,caption),verzoegerungMs);
+      else callout(txt,caption);
     }
   }
 
@@ -35400,6 +35711,23 @@
           " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %"));
         standEl.appendChild(res);
       } else standEl.textContent="—";
+    }
+    // TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3). Reine Arithmetik aus
+    // bahnZeitFuerSieg() (s. dort) -- erscheint erst, sobald eine Seite komplett im Ziel
+    // ist, damit keine Hochrechnung als Ansage steht (dieselbe Regel wie `gewertet` in
+    // bahnTeamstand).
+    const tsEl=document.getElementById("ttteamsieg");
+    if(tsEl){
+      const zfs=(!done)?bahnZeitFuerSieg():null;
+      if(!zfs){ tsEl.hidden=true; tsEl.classList.remove("chancenlos"); }
+      else {
+        tsEl.hidden=false;
+        tsEl.classList.toggle("chancenlos",zfs.chancenlos);
+        tsEl.textContent=zfs.chancenlos
+          ? VEREIN[zfs.seite].name+" kann den Teamsieg rechnerisch nicht mehr holen."
+          : VEREIN[zfs.seite].name+" braucht für die letzten "+zfs.nochOffen
+            +" im Schnitt unter "+bahnZeitText(bahnSpanneAnzeige(zfs.bedarf));
+      }
     }
     const autoBtn=document.getElementById("ttauto");
     if(autoBtn){ autoBtn.classList.toggle("an",bahnFokusAuto);
