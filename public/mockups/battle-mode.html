@@ -195,6 +195,13 @@
             <div class="etafel" id="etafelL"></div>
             <div class="etafel" id="etafelR"></div>
           </div>
+          <!-- SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3):
+               EIN Moment aus den Hoehepunkten, ausgewaehlt nach Momentart statt nach Sieg/
+               Gesamtwert (Overwatchs "Play of the Game"-Prinzip) -- renderSzeneDesSpiels()
+               in battle-mode.engine.js. Nur fuer Kampf befuellt (renderEndstand()); bleibt
+               fuer Bahn-Spiele (renderEndstandBahn()) leer und hidden, weil Bahn-Ereignisse
+               nie ein `kind` tragen. -->
+          <div class="eszene" id="eszene" hidden></div>
           <!-- HOEHEPUNKTE. Text-Rueckblick auf alle big-Ereignisse dieses Spiels (HIGHLIGHTS[],
                gefuellt aus feed()) -- bewusst eine Textliste, kein Bild-Replay, s. Abschnitt 4.3
                derselben Recherche. Nur befuellt/sichtbar, wo dieses Endstand-Overlay ueberhaupt

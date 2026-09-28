@@ -422,6 +422,31 @@
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}
+  /* K4 -- SPECTATOR-KARTEN JE KAEMPFER (Broadcast-Optik-Recherche 27.09., Abschnitt 3/K4):
+     Mana-/Ausdauerbalken als zusaetzliche duenne Leisten unter der Lebensanzeige, eigene
+     Farben statt der gruenen HP-/Puste-Ampel, damit alle drei Ressourcen auf einen Blick
+     unterscheidbar bleiben (dasselbe "eine Farbe je Groesse"-Prinzip wie .kbar.fortschritt
+     direkt oberhalb). Nur fuer Kampf gerendert (renderKader()), height:3px haelt die Kachel
+     schmal wie beim Fortschrittsbalken der Bahn. */
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource{height:3px;margin-top:2px}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource.mana s{background:#6ea8e8}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource.ausdauer s{background:#e2a83f}
+  /* SELTENE FAEHIGKEIT MIT ABKLINGRING (K4, Overwatchs "Ult-Ladung"): ein kleiner Ring,
+     der sich per conic-gradient ueber --anteil (0-100%, per style.setProperty gesetzt,
+     s. renderKader()) fuellt -- dieselbe Fokusfarbe wie die Zielansage/das Fokus-Doppeln
+     (--fokus), --ok (gruen) sobald die Faehigkeit bereit ist. */
+  .oly-battle-arena.oly-battle-arena .kk .kfaehig{width:10px;height:10px;border-radius:50%;
+    flex:none;background:conic-gradient(var(--fokus) var(--anteil,0%),var(--line) 0)}
+  .oly-battle-arena.oly-battle-arena .kk .kfaehig.bereit{background:var(--ok)}
+  /* K/T/B KLEIN (K4): dieselben drei Zahlen wie die ESPALTEN-Spalten K/T/B in der
+     Wertungstabelle, hier zusaetzlich direkt an der Figur -- "der Kommentator kann ueber
+     jeden sprechen, ohne das Bild zu wechseln" (Recherche, Abschnitt 2.1). */
+  .oly-battle-arena.oly-battle-arena .kk .kkzeile2{display:flex;align-items:center;gap:5px;margin-top:2px}
+  .oly-battle-arena.oly-battle-arena .kk .kktb{display:flex;gap:5px;margin-left:auto;
+    font:600 8px/1 var(--mono,ui-monospace,monospace);color:var(--faint)}
+  /* STATUS (K4): Respawn-Uhr (TDM) statt des generischen "tot", "Raus" sonst. */
+  .oly-battle-arena.oly-battle-arena .kk .kkstatus{font:600 8.5px/1.3 ui-monospace,monospace;
+    color:var(--faint);margin-top:1px}
   /* FOKUS-DOPPELN. --fokus ist das CSS-Gegenstueck zu FOKUS_FARBE in battle-mode.engine.js
      (Ring und Pfeil auf der Leinwand) — beide muessen denselben Ton tragen, damit die
      Kachel in der Kaderleiste und die Markierung auf dem Feld als EIN Zustand lesbar
@@ -648,6 +673,19 @@
     font-weight:700;margin-top:2px;color:#c3ccd8}
   .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.l{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.r{color:var(--away)}
+  /* K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09., Abschnitt
+     3/K6, nur Battlefield). Bewusst unauffaellig: eigene Zeile, kleine Schrift, ein
+     Farbpunkt statt einer grossen Grafik (Leitplanke 0.1 Punkt 5 -- die Domination
+     entscheidet laut Konzeptreview kein Spiel). Der Punkt fuellt sich per conic-gradient
+     ueber --anteil waehrend einer laufenden Eroberung (KP.erobertVon!=null, s.
+     aktualisiereBbug()), sonst ist er einfarbig (Besitzer-Teamfarbe oder neutral). */
+  .oly-battle-arena.oly-battle-arena .bbugmitte .kpbug{display:flex;align-items:center;
+    gap:4px;font-size:9.5px;margin-top:2px;color:#c3ccd8}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt{width:7px;height:7px;border-radius:50%;
+    display:inline-block;background:conic-gradient(currentColor var(--anteil,100%),
+    rgba(255,255,255,.25) 0);color:#8b98aa}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt.r{color:var(--away)}
 
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
@@ -679,6 +717,19 @@
   .oly-battle-arena.oly-battle-arena .bbugcallout em{display:block;font-style:normal;
     font-size:.78em;font-weight:500;color:#c3ccd8;letter-spacing:0;margin-top:2px;
     text-transform:none}
+
+  /* SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09.): dieselbe Zeilen-Optik
+     wie .ehighlights direkt darunter, aber als eigene, hervorgehobene Karte (--warn-Rahmen,
+     wie .esieger) -- EIN Moment, keine Liste, deshalb kein eigenes scrollbares .ehlist. */
+  .oly-battle-arena.oly-battle-arena .eszene{width:100%;background:var(--surface);
+    border:1px solid var(--warn);border-radius:8px;padding:10px 14px}
+  .oly-battle-arena.oly-battle-arena .eszene[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .eszene h5{margin:0 0 6px;font-size:12px;color:var(--warn);
+    text-transform:uppercase;letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile{font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht{color:var(--faint);flex:none;margin-right:9px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile.h{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile.a{color:var(--away)}
 
   /* HOEHEPUNKTE im Endstand-Overlay: dieselbe Textlisten-Optik wie .feed, nur ohne
      Zeitstempel-Scrollen -- ein fertiger Rueckblick statt eines laufenden Tickers. */
