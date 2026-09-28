@@ -29,8 +29,17 @@ type Regeln = {
 };
 const laden = createRequire(import.meta.url);
 const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
-type Faehigkeit = { id: string; name: string; text: string; kosten: { typ: string; wert: number } };
-const F = laden("../apps/kartenschmiede/faehigkeiten.js") as { GRUNDBESTAND: Faehigkeit[] };
+type Faehigkeit = { id: string; typ: string; name: string; text: string; tags: string[]; waffe?: string; kosten: { typ: string; wert: number } };
+const F = laden("../apps/kartenschmiede/katalog.js") as {
+  GRUNDBESTAND: Faehigkeit[];
+  FRAKTIONEN: Array<{ id: string; name: string; icon: string }>;
+  TAGS: Array<{ id: string; icon: string }>;
+};
+type Eintrag = { typ: string; name: string; tags: string[]; waffe?: string; text: string; kosten: { typ: string; wert: number } };
+const G = laden("../apps/kartenschmiede/generator.js") as {
+  generiere(r: Regeln, typ: string, o: Record<string, unknown>): Eintrag;
+  waffenPreis(r: Regeln, zeile: string): number;
+};
 
 const einheit = (q: number, d: number, t: number, weapons: string, passives = "", size = "1"): Einheit =>
   ({ quality: `${q}+`, defense: `${d}+`, tough: String(t), weapons, passives, size });
@@ -65,13 +74,49 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     expect(R.punkte({ ...basis, skills: [regel] } as never).roh / R.punkte(basis).roh).toBeCloseTo(1.2);
   });
 
-  it("hat im Grundbestand nur eindeutige IDs mit gültigen Kosten", () => {
-    const ids = F.GRUNDBESTAND.map(f => f.id);
+  it("hat im Katalog nur eindeutige IDs, gültige Kosten und bekannte Tags", () => {
+    const ids = [...F.GRUNDBESTAND, ...F.FRAKTIONEN].map(f => f.id);
     expect(new Set(ids).size).toBe(ids.length);
+    const tags = new Set(F.TAGS.map(t => t.id));
     for (const f of F.GRUNDBESTAND) {
+      expect(["faehigkeit", "zauber", "gegenstand", "waffe"]).toContain(f.typ);
       expect(["fest", "prozent"]).toContain(f.kosten.typ);
       expect(f.text.length).toBeGreaterThan(10);
+      for (const t of f.tags) expect(tags).toContain(t);
+      if (f.typ === "waffe") expect(R.leseWaffe(f.waffe!).a).toBeGreaterThan(0);
     }
+  });
+
+  it("gibt jeder Fraktion genau ein eigenes Symbol", () => {
+    const symbole = F.FRAKTIONEN.map(f => f.icon);
+    expect(new Set(symbole).size).toBe(symbole.length);
+  });
+});
+
+describe("Kartenschmiede – Generator", () => {
+  it("würfelt Waffen, deren Preis mit der Seltenheit steigt", () => {
+    const mittel = (stufe: number) => {
+      const preise = Array.from({ length: 12 }, (_, i) => G.waffenPreis(R, G.generiere(R, "waffe", { stufe, seed: i + 1 }).waffe!));
+      return preise.reduce((a, b) => a + b, 0) / preise.length;
+    };
+    expect(mittel(5)).toBeGreaterThan(mittel(2) * 1.8);
+  });
+
+  it("liefert für jeden Typ einen vollständigen, bepreisten Eintrag", () => {
+    for (const typ of ["waffe", "gegenstand", "faehigkeit", "zauber"]) {
+      for (const stufe of [1, 3, 6]) {
+        const e = G.generiere(R, typ, { stufe, seed: stufe * 11 + typ.length, rolle: "hero" });
+        expect(e.typ).toBe(typ);
+        expect(e.name.length).toBeGreaterThan(2);
+        expect(e.text.length).toBeGreaterThan(5);
+        expect(e.tags.length).toBeGreaterThan(0);
+        if (typ !== "waffe") expect(e.kosten.wert).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("bepreist Sonderregeln für Gegner in Prozent", () => {
+    expect(G.generiere(R, "faehigkeit", { stufe: 4, seed: 5, rolle: "enemy" }).kosten.typ).toBe("prozent");
   });
 });
 
@@ -134,6 +179,14 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     ]);
     expect(gespeichert.map(f => f.id)).toEqual(["frostatem"]);
     expect(ladeFaehigkeiten("gemeinsam")[0]).toMatchObject({ name: "Frostatem", kosten: { typ: "prozent", wert: 10 } });
+    const mehr = speichereFaehigkeiten("gemeinsam", [
+      { id: "blutaxt", typ: "waffe", name: "Blutaxt", waffe: "Blutaxt | Nahkampf | A3 | Reißend", tags: ["nahkampf", "../x"], kosten: { typ: "fest", wert: 0 } },
+      { id: "nachtgoblins", typ: "fraktion", name: "Nachtgoblins", icon: "spiral" },
+      { id: "komisch", typ: "unsinn", name: "Komisch", text: "x" },
+    ]);
+    expect(mehr[0]).toMatchObject({ typ: "waffe", waffe: "Blutaxt | Nahkampf | A3 | Reißend", tags: ["nahkampf"] });
+    expect(mehr[1]).toMatchObject({ typ: "fraktion", icon: "spiral" });
+    expect(mehr[2].typ).toBe("faehigkeit");
     speichereKarte("gemeinsam", "karte-abcdef12", { name: "Test" }, null);
     expect(listeKarten("gemeinsam").map(k => k.id)).toEqual(["karte-abcdef12"]);
   });

@@ -122,10 +122,25 @@ export function loescheEintrag(sammlung: string, art: Art, id: string): boolean 
   return true;
 }
 
-// ---------- Eigene Fähigkeiten: eine Liste je Sammlung ----------
-export type Faehigkeit = { id: string; name: string; art: string; fuer: string[]; kosten: { typ: "fest" | "prozent"; wert: number }; text: string; quelle: string };
+// ---------- Eigene Katalog-Einträge (Fähigkeiten, Zauber, Gegenstände, Waffen, Fraktionen): eine Liste je Sammlung ----------
+export type Faehigkeit = {
+  id: string;
+  typ: string;
+  name: string;
+  art: string;
+  fuer: string[];
+  tags: string[];
+  kosten: { typ: "fest" | "prozent"; wert: number };
+  text: string;
+  quelle: string;
+  waffe?: string;
+  icon?: string;
+};
 
 const faehigkeitenDatei = (sammlung: string) => path.join(ordnerVon(sammlung, "karten"), "_faehigkeiten.json");
+const TYPEN = ["faehigkeit", "zauber", "gegenstand", "waffe", "fraktion"];
+const slugListe = (wert: unknown, max: number) =>
+  Array.isArray(wert) ? wert.map(String).filter(x => /^[a-z0-9-]{2,30}$/.test(x)).slice(0, max) : [];
 
 function pruefeFaehigkeit(roh: unknown): Faehigkeit | null {
   if (!roh || typeof roh !== "object") return null;
@@ -133,11 +148,24 @@ function pruefeFaehigkeit(roh: unknown): Faehigkeit | null {
   const kosten = (f.kosten ?? {}) as Record<string, unknown>;
   const id = text(f.id, 64);
   if (!/^[a-z0-9-]{2,64}$/.test(id) || !text(f.name)) return null;
-  const typ = kosten.typ === "fest" ? "fest" : "prozent";
-  const wert = Math.max(-50, Math.min(200, Number(kosten.wert) || 0));
+  const typ = TYPEN.includes(String(f.typ)) ? String(f.typ) : "faehigkeit";
+  const kostenTyp = kosten.typ === "fest" ? "fest" : "prozent";
+  const wert = Math.max(-50, Math.min(500, Number(kosten.wert) || 0));
   const fuer = Array.isArray(f.fuer) ? f.fuer.filter((r): r is string => ["hero", "companion", "enemy"].includes(String(r))) : [];
-  return { id, name: text(f.name, 80), art: text(f.art, 30) || "Sonderregel", fuer: fuer.length ? fuer : ["hero", "companion", "enemy"],
-    kosten: { typ, wert }, text: text(f.text, 600), quelle: text(f.quelle, 40) || "eigen" };
+  const eintrag: Faehigkeit = {
+    id,
+    typ,
+    name: text(f.name, 80),
+    art: text(f.art, 30) || "Sonderregel",
+    fuer: fuer.length ? fuer : ["hero", "companion", "enemy"],
+    tags: slugListe(f.tags, 8),
+    kosten: { typ: kostenTyp, wert },
+    text: text(f.text, 600),
+    quelle: text(f.quelle, 40) || "eigen",
+  };
+  if (typ === "waffe") eintrag.waffe = text(f.waffe, 200);
+  if (typ === "fraktion") eintrag.icon = /^[a-z-]{2,20}$/.test(String(f.icon)) ? String(f.icon) : "rune";
+  return eintrag;
 }
 
 export function ladeFaehigkeiten(sammlung: string): Faehigkeit[] {
@@ -152,7 +180,7 @@ export function ladeFaehigkeiten(sammlung: string): Faehigkeit[] {
 }
 
 export function speichereFaehigkeiten(sammlung: string, liste: unknown): Faehigkeit[] {
-  if (!Array.isArray(liste) || liste.length > 500) throw new Error("liste_ungueltig");
+  if (!Array.isArray(liste) || liste.length > 2000) throw new Error("liste_ungueltig");
   const sauber = liste.map(pruefeFaehigkeit).filter((x): x is Faehigkeit => x !== null);
   schreibeAtomar(faehigkeitenDatei(sammlung), JSON.stringify(sauber, null, 1));
   return sauber;

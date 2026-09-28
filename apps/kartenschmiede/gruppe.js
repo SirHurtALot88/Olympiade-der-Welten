@@ -114,7 +114,7 @@
       const probe = { ...k, skills: an ? skills.filter(s => s.id !== f.id) : skills.concat(KS.skillKopie(f)) };
       const d = Math.round(punkteVon(probe).roh - roh);
       const zuTeuer = held && !an && d > rest;
-      return `<button type="button" class="tgl" data-i="${i}" data-skill="${esc(f.id)}" aria-pressed="${an}" title="${esc(f.text)}" ${zuTeuer ? "disabled" : ""}>${esc(f.name)}<span class="cost ${d > 0 ? "up" : "down"}">${d > 0 ? "+" : ""}${d}</span></button>`;
+      return `<button type="button" class="tgl" data-i="${i}" data-skill="${esc(f.id)}" aria-pressed="${an}" data-tip="${esc(KS.tipText(f))}" ${zuTeuer ? "disabled" : ""}>${KS.tagIcons(f.tags, false)}${esc(f.name)}<span class="cost ${d > 0 ? "up" : "down"}">${d > 0 ? "+" : ""}${d}</span></button>`;
     };
     const anteil = Math.max(0, Math.min(100, roh / aktiv.budget * 100));
     return `<div class="g-member">

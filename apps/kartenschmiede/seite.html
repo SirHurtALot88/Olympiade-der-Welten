@@ -53,8 +53,8 @@ fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width
 legend { font-family: var(--ui); text-transform: uppercase; letter-spacing: .14em; font-size: 13px; color: var(--brass); font-weight: 700; padding: 0; margin-bottom: 10px; }
 .row { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
 .row4 { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); }
-label.f { display: grid; gap: 4px; font-family: var(--ui); font-size: 14px; letter-spacing: .04em; color: var(--dim); min-width: 0; }
-input[type=text], input[type=number], textarea, select {
+label.f, div.f { display: grid; gap: 4px; font-family: var(--ui); font-size: 14px; letter-spacing: .04em; color: var(--dim); min-width: 0; }
+input[type=text], input[type=number], input[type=search], textarea, select {
   font: 500 16px/1.35 var(--ui); color: var(--ink); background: var(--bg2); border: 1px solid var(--line);
   border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; letter-spacing: .02em;
 }
@@ -425,6 +425,53 @@ fieldset.checks legend { margin-bottom: 6px; }
   .print-area .card { box-shadow: none; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.fac-preview { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; font-family: var(--ui); font-size: 16px; color: var(--ink); }
+.fac-preview svg { width: 26px; height: 26px; color: var(--brass); }
+.tico { display: inline-flex; gap: 3px; vertical-align: -2px; margin-right: 4px; }
+.tico svg { width: 15px; height: 15px; color: var(--brass); }
+.card .tico svg { width: calc(var(--u)*2.9); height: calc(var(--u)*2.9); color: var(--acc); }
+.card .tico { gap: calc(var(--u)*.4); margin-right: calc(var(--u)*.6); vertical-align: calc(var(--u)*-.4); }
+.tip { position: fixed; z-index: 100; max-width: 340px; padding: 10px 12px; border-radius: 8px; background: #0b0c0f; border: 1px solid var(--brass);
+  color: var(--ink); font: 400 15px/1.4 var(--prose); pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.tip b { font-family: var(--ui); font-weight: 700; letter-spacing: .02em; display: block; margin-bottom: 2px; }
+.tip small { font-family: var(--ui); color: var(--dim); display: block; margin-top: 4px; }
+.picker { display: grid; gap: 8px; }
+.picker-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.picker-head input { flex: 1; min-width: 160px; }
+.picker-list { display: grid; gap: 4px; max-height: 260px; overflow: auto; padding-right: 4px; }
+.picker-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; text-align: left; padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg2); color: var(--ink); cursor: pointer; font: 600 15px var(--ui); }
+.picker-item:hover, .picker-item:focus-visible { border-color: var(--brass); }
+.picker-item small { color: var(--dim); font-weight: 500; }
+.chipset { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-f { display: inline-flex; align-items: center; gap: 6px; font: 600 14px var(--ui); padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg2); color: var(--dim); cursor: pointer; }
+.chip-f svg { width: 15px; height: 15px; }
+.chip-f[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.dbx { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 900px) { .dbx { grid-template-columns: 1fr; } }
+.dbx-filter { display: grid; gap: 16px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 900px) { .dbx-filter { position: static; } }
+.dbx-main { display: grid; gap: 24px; }
+.dbx-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; align-items: start; }
+.gen { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--brass); border-radius: 8px; background: var(--bg2); }
+.gen h3 { font-size: 20px; }
+.dbx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.eintrag { display: grid; gap: 8px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.eintrag.neu { border-color: var(--brass); }
+.eintrag-kopf { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+.eintrag-kopf .typ-ico svg { width: 26px; height: 26px; color: var(--brass); }
+.eintrag-kopf b { font: 700 17px var(--ui); letter-spacing: .02em; display: block; }
+.eintrag-kopf small { color: var(--dim); font: 500 13px var(--ui); letter-spacing: .06em; text-transform: uppercase; }
+.eintrag-kopf .preis { font: 800 18px var(--ui); color: var(--brass); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.eintrag p { margin: 0; color: var(--dim); font-size: 15px; line-height: 1.4; }
+.eintrag .tagzeile { display: flex; flex-wrap: wrap; gap: 6px; }
+.eintrag .tagzeile span { display: inline-flex; gap: 4px; align-items: center; font: 600 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.eintrag .tagzeile svg { width: 14px; height: 14px; color: var(--brass); }
+.eintrag .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.eintrag .thumb { width: 100%; aspect-ratio: 5 / 3; border-radius: 6px; background: #0c0c0d center 25% / cover no-repeat; }
+.fit-note { color: #ffb070; }
+.fit-note:empty { display: none; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -447,6 +494,18 @@ fieldset.checks legend { margin-bottom: 6px; }
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.8l8 3v6.2c0 5-3.6 8.2-8 9.4-4.4-1.2-8-4.4-8-9.4V5.8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.8c3.2 4.6 6.2 7.8 6.2 12a6.2 6.2 0 0 1-12.4 0c0-4.2 3-7.4 6.2-12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="10" cy="15" r="1.4" fill="currentColor"/><circle cx="14" cy="12.5" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-burst" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-spiral" viewBox="0 0 24 24"><path d="M12 12c0-1.2 1.6-1.6 2.3-.6.9 1.3-.1 3.1-1.7 3.3-2.2.3-3.8-1.8-3.3-3.9.6-2.7 3.7-4 6.2-3 3.1 1.3 4 5.2 2.4 7.9-1.9 3.2-6.3 3.9-9.3 1.9C4.8 15.4 4.2 10 7 6.8 9.9 3.5 15 3.4 18.4 5.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-rings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4" fill="currentColor"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="9.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2.4"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5M5.5 11.5L12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v15M5.5 12.5L12 19l6.5-6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2.5v19M3.8 7.2l16.4 9.6M3.8 16.8l16.4-9.6M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-portal" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="6.5" ry="9" fill="none" stroke="currentColor" stroke-width="1.9"/><ellipse cx="12" cy="12" rx="3" ry="4.8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1.5 8 8.5-11h-6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="M4 7.5l4-4 7 7-4 4zM11.5 11l8.5 8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-axe" viewBox="0 0 24 24"><path d="M9 21L19 5M14 6c2.5-2.5 6-2 7 .5-1 3-3.5 4.5-6.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-fang" viewBox="0 0 24 24"><path d="M4 5h16c-1 6-3.5 11-5.5 14-.8-3-1.6-5-2.5-5s-1.7 2-2.5 5C7.5 16 5 11 4 5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-potion" viewBox="0 0 24 24"><path d="M9.5 3h5M10.5 3v5L5.5 17a3 3 0 0 0 2.7 4.3h7.6a3 3 0 0 0 2.7-4.3L13.5 8V3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M7.4 15h9.2" stroke="currentColor" stroke-width="1.7"/></symbol>
     <symbol id="i-rune" viewBox="0 0 24 24"><path d="M12 2.5l7.5 9.5-7.5 9.5L4.5 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 7v10M9 10l3 2.5 3-2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
     <symbol id="i-crown" viewBox="0 0 24 16"><path d="M1.5 14.5L3 3l5 5 4-7 4 7 5-5 1.5 11.5z" fill="currentColor"/></symbol>
     <symbol id="i-horns" viewBox="0 0 120 50"><path d="M47 40C30 38 12 28 4 4c10 14 26 20 42 20z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.6"/><path d="M73 40c17-2 35-12 43-36-10 14-26 20-42 20z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.6"/><path d="M60 10l15 17-15 19-15-19z" fill="url(#g-gold)" stroke="#3b2305" stroke-width="1.8"/><path d="M60 17l8 10-8 11-8-11z" fill="#c21d12"/><path d="M60 17l8 10h-8z" fill="#ff6b52"/></symbol>
@@ -461,14 +520,15 @@ fieldset.checks legend { margin-bottom: 6px; }
     <h1>Kartenschmiede</h1>
     <p class="lede">Artwork hochladen, Werte eintragen, fertig ist die Karte. Sechs Seltenheiten, eine Punkteformel: Die Stufe folgt den Punkten, die Punkte folgen den Werten, und ein Boss ist schon von Weitem als Boss zu erkennen.</p>
     <nav class="tabs" role="tablist" aria-label="Bereiche">
-      <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Karten</button>
+      <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Generator</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
+      <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
     </nav>
   </header>
 
   <div id="tabKarten" role="tabpanel" aria-labelledby="tab-karten" class="tabpanel">
   <nav class="subnav" aria-label="Abschnitte">
-    <a href="#h-shop">Werkstatt</a><a href="#h-build">Baukasten</a><a href="#h-db">Fähigkeiten</a><a href="#h-sim">Simulator</a><a href="#h-formula">Formel</a><a href="#h-forge">Artwork</a><a href="#h-ladder">Stufen</a>
+    <a href="#h-shop">Werkstatt</a><a href="#h-build">Baukasten</a><a href="#h-sim">Simulator</a><a href="#h-formula">Formel</a><a href="#h-forge">Artwork</a><a href="#h-ladder">Stufen</a>
   </nav>
   <section aria-labelledby="h-ladder">
     <div class="sec-head">
@@ -515,13 +575,8 @@ fieldset.checks legend { margin-bottom: 6px; }
           <legend>Einheit</legend>
           <label class="f">Name <input type="text" id="name"></label>
           <div class="row">
-            <label class="f">Fraktion <input type="text" id="faction"></label>
-            <label class="f">Fraktionssymbol
-              <select id="ficon">
-                <option value="paw">Pfote</option><option value="skull">Schädel</option><option value="flame">Flamme</option>
-                <option value="sun">Sonne</option><option value="leaf">Blatt</option><option value="moon">Mond</option><option value="shield">Schild</option>
-              </select>
-            </label>
+            <label class="f">Fraktion <select id="faction"></select></label>
+            <div class="f">Symbol <span class="fac-preview" id="facIcon"></span></div>
           </div>
           <div class="row4">
             <label class="f">Punkte <input type="number" id="points" readonly tabindex="-1" title="Rechnet die Formel automatisch aus"></label>
@@ -543,6 +598,7 @@ fieldset.checks legend { margin-bottom: 6px; }
           <label class="f">Eine Waffe pro Zeile
             <textarea id="weapons" rows="3"></textarea>
           </label>
+          <select id="weaponAdd" aria-label="Waffe aus der Datenbank hinzufügen"></select>
           <div class="hint">Format: <code>Name | Reichweite | Attacken | Regeln</code>, zum Beispiel <code>Frostklauen | Nahkampf | A6 | DS(2), Reißend</code>. Attacken gelten je Modell.</div>
         </fieldset>
 
@@ -550,9 +606,9 @@ fieldset.checks legend { margin-bottom: 6px; }
           <legend>Fähigkeiten</legend>
           <label class="f">Passive, mit Komma getrennt <input type="text" id="passives"></label>
           <div class="hint">Symbole und Punkte kommen automatisch: Langsam, Schnell, Furchtlos, Regeneration, Hinterhalt, Furcht(3), Wucht(3), Zauberer(2) und weitere.</div>
-          <div class="f">Fähigkeiten aus der Datenbank
+          <div class="f">Fähigkeiten, Zauber und Gegenstände aus der Datenbank
             <div class="skill-chips" id="skillChips"></div>
-            <select id="skillAdd" aria-label="Fähigkeit hinzufügen"></select>
+            <div class="picker" id="skillPicker"></div>
           </div>
           <label class="f">Eigene Sonderregel, Name <input type="text" id="bossName"></label>
           <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
@@ -593,6 +649,7 @@ fieldset.checks legend { margin-bottom: 6px; }
         <p class="hint" id="saveMsg" aria-live="polite"></p>
         <div class="stage" id="stage"></div>
         <p class="tier-note" id="tierNote"></p>
+        <p class="tier-note fit-note" id="fitNote" aria-live="polite"></p>
       </div>
     </div>
   </section>
@@ -628,40 +685,6 @@ fieldset.checks legend { margin-bottom: 6px; }
         </div>
         <p class="hint" id="bEliteMsg" aria-live="polite"></p>
       </div>
-    </div>
-  </section>
-
-  <section aria-labelledby="h-db">
-    <div class="sec-head">
-      <h2 id="h-db">Fähigkeiten-Datenbank</h2>
-      <p class="lede">Skills, Auren und Sonderregeln mit festem Preis. Was hier steht, lässt sich auf jede Karte legen und kostet überall gleich viel. Helden-Skills kosten feste Punkte, Sonderregeln der Gegner einen Aufschlag in Prozent, der mit der Einheit mitwächst.</p>
-    </div>
-    <div class="db">
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Name</th><th>Art</th><th>Für</th><th class="num">Kosten</th><th>Regeltext</th><th></th></tr></thead>
-        <tbody id="dbRows"></tbody>
-      </table></div>
-      <form class="db-form" id="dbForm" autocomplete="off">
-        <h3>Neue Fähigkeit</h3>
-        <label class="f">Name <input type="text" id="dbName" required maxlength="80"></label>
-        <div class="row">
-          <label class="f">Art
-            <select id="dbArt"><option>Skill</option><option>Aura</option><option selected>Sonderregel</option><option>Passiv</option></select>
-          </label>
-          <label class="f">Stärke
-            <select id="dbStaerke"><option value="klein">Klein</option><option value="mittel" selected>Mittel</option><option value="gross">Groß</option><option value="elite">Elite</option></select>
-          </label>
-        </div>
-        <fieldset class="checks"><legend>Für</legend>
-          <label class="check"><input type="checkbox" id="dbHero" checked> Held</label>
-          <label class="check"><input type="checkbox" id="dbComp" checked> Gefährte</label>
-          <label class="check"><input type="checkbox" id="dbEnemy" checked> Gegner</label>
-        </fieldset>
-        <label class="f">Regeltext <textarea id="dbText" rows="3" maxlength="600"></textarea></label>
-        <p class="hint" id="dbPreis"></p>
-        <button type="submit" class="btn">In die Datenbank</button>
-        <p class="hint" id="dbMsg" aria-live="polite"></p>
-      </form>
     </div>
   </section>
 
@@ -731,19 +754,11 @@ fieldset.checks legend { margin-bottom: 6px; }
           </tbody>
         </table></div>
         <h3>Normal und Elite</h3>
-        <p>Deine starken Versionen kosten etwa das Doppelte der normalen (Kristallwurm 55 → 115, Dornauge 65 → 120). Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
+        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
         <p>Wer die Elite-Version einer Gegnerart besiegt, darf deren normale Version als Gefährten anwerben. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>
     </div>
-    <div class="sec-head" style="margin-top:12px">
-      <h3>Deine Einheiten nachgerechnet</h3>
-      <p class="hint" style="font-size:15px">Aus den Blättern „Selfmade“ und „Heroes“. Klick auf eine Zeile lädt die Karte in die Werkstatt, dort gilt immer der Formelwert. Blau heißt: in deiner alten Tabelle teurer als die Formel, die Einheit war also für ihre Punkte zu schwach. Rot heißt: zu billig.</p>
-    </div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Einheit</th><th class="num">Alt (Tabelle)</th><th class="num">Formel</th><th class="num">Abweichung</th><th>Stufe nach Formel</th></tr></thead>
-      <tbody id="bestiary"></tbody>
-    </table></div>
   </section>
 
   <section aria-labelledby="h-forge">
@@ -794,9 +809,82 @@ fieldset.checks legend { margin-bottom: 6px; }
       </div>
     </section>
   </div>
+
+  <div id="tabDb" role="tabpanel" aria-labelledby="tab-db" class="tabpanel" hidden>
+    <section aria-labelledby="h-db">
+      <div class="sec-head">
+        <h2 id="h-db">Datenbank</h2>
+        <p class="lede">Einheiten, Fähigkeiten, Zauber, Gegenstände, Waffen und Fraktionen an einem Ort. Alles hat einen festen Preis nach der Schmiede-Formel und lässt sich mit einem Klick auf die Karte in der Werkstatt legen.</p>
+      </div>
+      <div class="dbx">
+        <aside class="dbx-filter">
+          <label class="f">Suchen <input type="search" id="dbSuche" placeholder="Name oder Regeltext"></label>
+          <div class="f">Typ <div class="chipset" id="dbTypen"></div></div>
+          <div class="f">Tags <div class="chipset" id="dbTags"></div></div>
+          <div class="f">Für <div class="chipset" id="dbRollen"></div></div>
+          <p class="hint" id="dbAnzahl"></p>
+        </aside>
+        <div class="dbx-main">
+          <div class="dbx-tools">
+            <form class="gen" id="genForm" autocomplete="off">
+              <h3>Generator</h3>
+              <div class="row">
+                <label class="f">Was
+                  <select id="genTyp"><option value="waffe">Waffe</option><option value="gegenstand">Gegenstand</option><option value="faehigkeit">Fähigkeit</option><option value="zauber">Zauber</option></select>
+                </label>
+                <label class="f">Seltenheit <select id="genStufe"></select></label>
+              </div>
+              <div class="row">
+                <label class="f">Für
+                  <select id="genRolle"><option value="hero">Held</option><option value="enemy">Gegner</option></select>
+                </label>
+                <label class="f">Schwerpunkt <select id="genTag"></select></label>
+              </div>
+              <div class="row" id="genArtRow">
+                <label class="f">Waffenart
+                  <select id="genArt"><option value="">Egal</option><option value="nah">Nahkampf</option><option value="fern">Fernkampf</option></select>
+                </label>
+              </div>
+              <div class="copyrow"><button type="submit" class="btn">Würfeln</button></div>
+              <div id="genOut"></div>
+            </form>
+            <form class="db-form" id="dbForm" autocomplete="off">
+              <h3>Selbst anlegen</h3>
+              <label class="f">Name <input type="text" id="dbName" required maxlength="80"></label>
+              <div class="row">
+                <label class="f">Typ
+                  <select id="dbTyp"><option value="faehigkeit">Fähigkeit</option><option value="zauber">Zauber</option><option value="gegenstand">Gegenstand</option><option value="waffe">Waffe</option><option value="fraktion">Fraktion</option></select>
+                </label>
+                <label class="f" id="dbStaerkeRow">Stärke
+                  <select id="dbStaerke"><option value="klein">Klein</option><option value="mittel" selected>Mittel</option><option value="gross">Groß</option><option value="elite">Elite</option></select>
+                </label>
+              </div>
+              <label class="f" id="dbArtRow">Art
+                <select id="dbArt"><option>Skill</option><option>Aura</option><option selected>Sonderregel</option><option>Passiv</option><option>Trank</option><option>Ausrüstung</option></select>
+              </label>
+              <label class="f" id="dbWaffeRow" hidden>Waffenzeile <input type="text" id="dbWaffe" placeholder="Name | 12&quot; | A3 | DS(1), Gift"></label>
+              <label class="f" id="dbIconRow" hidden>Symbol <select id="dbIcon"></select></label>
+              <fieldset class="checks" id="dbFuerRow"><legend>Für</legend>
+                <label class="check"><input type="checkbox" id="dbHero" checked> Held</label>
+                <label class="check"><input type="checkbox" id="dbComp" checked> Gefährte</label>
+                <label class="check"><input type="checkbox" id="dbEnemy" checked> Gegner</label>
+              </fieldset>
+              <div class="f">Tags <div class="chipset" id="dbFormTags"></div></div>
+              <label class="f">Regeltext <textarea id="dbText" rows="3" maxlength="600"></textarea></label>
+              <p class="hint" id="dbPreis"></p>
+              <button type="submit" class="btn">In die Datenbank</button>
+              <p class="hint" id="dbMsg" aria-live="polite"></p>
+            </form>
+          </div>
+          <div class="dbx-grid" id="dbGrid"></div>
+        </div>
+      </div>
+    </section>
+  </div>
 </div>
 
 <div class="print-area" id="printArea" aria-hidden="true"></div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
 
 <div class="modal" id="modal" hidden>
   <div class="modal-box">
