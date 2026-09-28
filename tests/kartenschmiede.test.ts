@@ -23,7 +23,8 @@ type Einheit = Record<string, string>;
 type Regeln = {
   punkte(s: Einheit): { pts: number; roh: number };
   stufeFuerPunkte(p: number): number;
-  leseWaffe(z: string): { reichweite: number; a: number; ds: number; reissend: boolean; explosion: number };
+  leseWaffe(z: string): { reichweite: number; a: number; ds: number; reissend: boolean; explosion: number; regeln: string };
+  regelnVon(regeln: string): Array<{ name: string; text: string }>;
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
 };
@@ -113,6 +114,25 @@ describe("Kartenschmiede – Generator", () => {
         if (typ !== "waffe") expect(e.kosten.wert).toBeGreaterThan(0);
       }
     }
+  });
+
+  it("würfelt mit Schwerpunkt Sci-Fi technische Einträge", () => {
+    for (const typ of ["waffe", "gegenstand", "faehigkeit", "zauber"]) {
+      const e = G.generiere(R, typ, { stufe: 4, seed: 7, rolle: "hero", tag: "technik" });
+      expect(e.tags).toContain("technik");
+      expect(e.text.length).toBeGreaterThan(5);
+    }
+  });
+
+  it("erklärt jede Regel der Standardwaffen und bepreist die neuen Regeln", () => {
+    for (const f of F.GRUNDBESTAND.filter(x => x.typ === "waffe")) {
+      const regeln = R.leseWaffe(f.waffe!).regeln.split(",").map(t => t.trim()).filter(Boolean);
+      for (const t of regeln) expect(R.regelnVon(t).length, `${f.name}: ${t}`).toBe(1);
+    }
+    const basis = G.waffenPreis(R, "Gewehr | 24\" | A1 |");
+    expect(G.waffenPreis(R, "Gewehr | 24\" | A1 | Präzise")).toBeGreaterThan(basis);
+    expect(G.waffenPreis(R, "Gewehr | 24\" | A1 | Indirekt")).toBeGreaterThan(basis);
+    expect(G.waffenPreis(R, "Gewehr | 24\" | A1 | Überhitzen")).toBeLessThan(basis);
   });
 
   it("bepreist Sonderregeln für Gegner in Prozent", () => {

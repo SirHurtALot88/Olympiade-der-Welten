@@ -23,7 +23,31 @@
     zersetzen: /zersetz|disintegrate/i,
     stoss: /\bstoß|\bstoss|thrust/i,
     rasend: /rasend|furious/i,
+    indirekt: /indirekt|indirect/i,
+    zielsuchend: /zielsuchend|lock-?on/i,
+    praezise: /präzise|praezise|precise/i,
+    ueberhitzen: /überhitz|ueberhitz|overheat/i,
   };
+  // Waffenregeln mit Erklärung für die Tooltips auf der Karte und in der Datenbank. [Muster, Name, Symbol, Text]
+  const WAFFENREGELN = [
+    [/\b(?:DS|AP)\s*\((\d)\)/i, "Durchschlag", "down", "DS(X): Das Ziel bekommt −X auf seine Verteidigungswürfe."],
+    [W.reissend, "Reißend", "fang", "Jede gewürfelte 6 auf Treffer zählt wie DS(4) und hebt Regeneration auf."],
+    [W.gift, "Gift", "drop", "Das Ziel muss gewürfelte 6en bei der Verteidigung wiederholen."],
+    [W.explosion, "Explosion", "burst", "Explosion(X): Jeder Treffer wird zu X Treffern, verteilt auf alle Modelle in 3\" um das Ziel."],
+    [W.toedlich, "Tödlich", "skull", "Tödlich(X): Jede Wunde zählt X-fach, bleibt aber bei einem Modell."],
+    [W.zuverlaessig, "Zuverlässig", "target", "Trifft immer auf 2+, egal wie gut die Einheit ist."],
+    [W.zerfleischen, "Zerfleischen", "fang", "Das Ziel muss gelungene Verteidigungswürfe von 6 wiederholen."],
+    [W.zersetzen, "Zersetzen", "burst", "Zersetzt Rüstung und Fleisch: −1 auf Verteidigung, und Regeneration wirkt nicht."],
+    [W.stoss, "Stoß", "up", "Beim Angreifen +1 auf Treffer und DS(+1)."],
+    [W.indirekt, "Indirekt", "portal", "Darf Ziele ohne Sichtlinie beschießen. −1 auf Treffer, wenn sich der Schütze bewegt hat."],
+    [W.zielsuchend, "Zielsuchend", "eye", "Ignoriert alle Abzüge auf Treffer, etwa durch Deckung oder Ausweichen."],
+    [W.praezise, "Präzise", "target", "+1 auf Treffer."],
+    [W.ueberhitzen, "Überhitzen", "flame", "Für jede gewürfelte 1 auf Treffer erleidet der Schütze selbst 1 Treffer."],
+  ];
+  const regelnVon = regeln => WAFFENREGELN.filter(([re]) => re.test(regeln || "")).map(([re, name, icon, text]) => {
+    const m = String(regeln).match(re);
+    return { name: m && m[1] ? `${name}(${m[1]})` : name, icon, text };
+  });
   const istNahkampf = r => !r || /nahkampf|melee/i.test(r);
 
   function leseWaffe(zeile) {
@@ -38,6 +62,8 @@
       explosion: ex ? +ex[1] : 0, toedlich: td ? +td[1] : 0,
       zuverlaessig: W.zuverlaessig.test(regeln), zerfleischen: W.zerfleischen.test(regeln),
       zersetzen: W.zersetzen.test(regeln), stoss: W.stoss.test(regeln),
+      indirekt: W.indirekt.test(regeln), zielsuchend: W.zielsuchend.test(regeln),
+      praezise: W.praezise.test(regeln), ueberhitzen: W.ueberhitzen.test(regeln),
     };
   }
   const leseWaffen = text => String(text || "").split("\n").map(l => l.trim()).filter(Boolean).map(leseWaffe);
@@ -54,6 +80,10 @@
     if (w.stoss) m *= 1.1;
     if (w.toedlich) m *= 2;
     if (w.explosion) m *= 1 + w.explosion / 6;
+    if (w.indirekt) m *= 1.15;
+    if (w.zielsuchend) m *= 1.05;
+    if (w.praezise) m *= 1.25;
+    if (w.ueberhitzen) m *= 0.85;
     return m;
   }
   // Per Duell-Simulator abgestimmt: Bei gleichen Punkten und mittlerem Gelände gewinnen Schützen etwa jeden
@@ -244,7 +274,7 @@
       jeReichweite: Object.fromEntries(Object.entries(jeReichweite).map(([k, v]) => [k, mittel(v)])) };
   }
 
-  const Regeln = { STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, leseListe, waffenFaktor,
+  const Regeln = { STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, leseListe, waffenFaktor,
     reichweitenFaktor, FAEHIGKEITEN, punkte, simuliere, einheitAus, balanceTest };
   if (typeof module !== "undefined" && module.exports) module.exports = Regeln;
   else root.Regeln = Regeln;
