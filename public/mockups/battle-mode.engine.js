@@ -3859,6 +3859,12 @@
     // jede andere Figur/Disziplin bleibt u.vizPose immer `undefined`, diese Zeile also ohne
     // jede Wirkung (bit-identisch).
     else if(u.vizPose==="walk")ani="walk";
+    // WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik Buehne-Auftritt 27.09.): "Haende hoch"
+    // fuer alle Esser, sobald das Spiel endet -- dasselbe u.vizPose-Prinzip wie bei
+    // Showcase direkt darueber, aber UNABHAENGIG von u.lunge>0 (das Spiel steht bereits,
+    // u.lunge waere hier laengst abgeklungen). Nur von stepWettessen() gesetzt, s. dort;
+    // fuer jede andere Disziplin bleibt u.vizJubel immer `undefined`.
+    else if(u.vizJubel)ani="shoot";
     else if(u.lunge>0)ani=feldspiel?"shoot":((bogen||feuerwaffe||u.vizPose==="shoot")?"shoot":"slash");
     else if(Math.abs(u.vx||0)+Math.abs(u.vy||0)<3)ani="walk";
     const n=ANIBILDER[ani];
@@ -14157,6 +14163,11 @@
   // buehneT-Zeit), damit das Bandenlicht in bodenEis() beim Fuehrungswechsel kurz aufhellen
   // kann statt abrupt umzuspringen -- rein zeichnerisch, kein Einfluss auf `wert()`/stepBuehne.
   let eisBandeSide=null, eisBandeSeit=-999;
+  // EIS-HALO (E-B2, Broadcast-Optik Buehne-Auftritt 27.09., Runde-2-Vorschlag 2b): merkt sich
+  // nur, ob das aktive Paar zuletzt UEBER oder UNTER der L/C-Referenz lag und seit wann, damit
+  // der Halo am Kufenpunkt beim Ueberqueren kurz aufblinkt statt hart umzuspringen --
+  // dasselbe Muster wie eisBandeSide/-Seit direkt darueber, rein zeichnerisch.
+  let kuerHaloUeber=null, kuerHaloSeit=-999;
   // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). >1 NUR bei art.wettessen
   // (s. bauBuehne()/stepBuehne() unten) -- traegt die Anzahl Esser BEIDER Seiten in EINER
   // Runde, also wie viele zusammenhaengende buehneQueue-Eintraege ein einziger Enthuellungs-
@@ -16085,6 +16096,16 @@
       const versuchBig=BB().heben?((r.gueltig&&r.versuch===3)||r.kuehn):(r.punkte>=60);
       if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
         crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
+      else if(BB().duett){
+        // E-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das Kuerzel des GERADE ENTHUELLTEN
+        // Elements steht klein vor dem Punkte-Schweber ("3Lz +71"/"3Lz< +40"), <=unterdreht,
+        // F=echter Sturz -- nur fuer Sprungelemente unterschieden (Pirouette/Schritte/Choreo
+        // heissen im Fehlschlag nie "stuerzt", s. Feed-Zweig unten). Reiner Textzusatz auf
+        // demselben Schweber, kein neuer rr()-Zug, keine neue Anzeige.
+        const elS=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        const symS=(r.ereignis===BB().failWort&&elS.typ==="sprung")?(r.knapp?"<":"F"):"";
+        schwebe({x:0,y:0,txt:elS.kuerzel+symS+" +"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+      }
       else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
       // KUEHNER VERSUCH — eigener, staerkerer Pop zusaetzlich zum kg-Schweber oben, GENAU
       // fuer den Ausgang (Punktesieg xor Verletzung), nie beides. Beide sind rein optisch:
@@ -16479,19 +16500,23 @@
   // Schrittfolge/Choreo, die im echten Sport kein einzelner Sprung-/Spinmoment sind). Nichts
   // davon beeinflusst `rezept`/`rr()`/`punkte`/`ereignis` -- diese bleiben exakt der
   // generische Durchgangs-Wurf aus bauBuehne() (s. dort), unveraendert.
+  // KUERZEL (Broadcast-Optik Buehne-Auftritt 27.09., E-B1): die ISU-Kurzschreibweise je
+  // Element, wie sie der technische Kampfrichter ausruft -- REIN DEKORATIV wie `name`/`pose`
+  // oben, geht in keine Formel/kein rr() ein. Wird auf dem Eis ueber dem Punkte-Schweber und
+  // in der Elementkasten-Legende gelesen (s. dortige Kommentare).
   const KUER_ELEMENTE=[
-    {typ:"sprung",    name:"Doppelaxel",           pose:"wurf"},
-    {typ:"sprung",    name:"Dreifachlutz",         pose:"wurf"},
-    {typ:"pirouette", name:"Standpirouette",       pose:"pirouette"},
-    {typ:"sprung",    name:"Dreifachflip",         pose:"wurf"},
-    {typ:"schritte",  name:"Schrittfolge",         pose:"schritte"},
-    {typ:"sprung",    name:"Dreifachrittberger",   pose:"wurf"},
-    {typ:"sprung",    name:"Dreifachtoeloop",      pose:"wurf"},
-    {typ:"pirouette", name:"Sitzpirouette",        pose:"pirouette"},
-    {typ:"sprung",    name:"Dreifachsalchow",      pose:"wurf"},
-    {typ:"sprung",    name:"Kombinationssprung",   pose:"wurf"},
-    {typ:"choreo",    name:"Choreosequenz",        pose:"choreo"},
-    {typ:"pirouette", name:"Kombinationspirouette",pose:"pirouette"}
+    {typ:"sprung",    name:"Doppelaxel",           pose:"wurf",      kuerzel:"2A"},
+    {typ:"sprung",    name:"Dreifachlutz",         pose:"wurf",      kuerzel:"3Lz"},
+    {typ:"pirouette", name:"Standpirouette",       pose:"pirouette", kuerzel:"SSp"},
+    {typ:"sprung",    name:"Dreifachflip",         pose:"wurf",      kuerzel:"3F"},
+    {typ:"schritte",  name:"Schrittfolge",         pose:"schritte",  kuerzel:"StSq"},
+    {typ:"sprung",    name:"Dreifachrittberger",   pose:"wurf",      kuerzel:"3Lo"},
+    {typ:"sprung",    name:"Dreifachtoeloop",      pose:"wurf",      kuerzel:"3T"},
+    {typ:"pirouette", name:"Sitzpirouette",        pose:"pirouette", kuerzel:"SSp"},
+    {typ:"sprung",    name:"Dreifachsalchow",      pose:"wurf",      kuerzel:"3S"},
+    {typ:"sprung",    name:"Kombinationssprung",   pose:"wurf",      kuerzel:"3Lz+2T"},
+    {typ:"choreo",    name:"Choreosequenz",        pose:"choreo",    kuerzel:"ChSq"},
+    {typ:"pirouette", name:"Kombinationspirouette",pose:"pirouette", kuerzel:"CCoSp"}
   ];
   // STURZ VS. WACKLER (dieselbe Review, Abschnitt 2.4, E0 zweiter Teil): der Anteil der
   // Fehlschlagzone (zwischen der Erfolgsschwelle `erfolg` und 1), der noch als "knapp
@@ -16662,6 +16687,14 @@
       // AUSBLENDEN statt Verschwinden: eine Figur, die von einem Bild aufs naechste weg
       // ist, liest sich als Fehler. 0,8 s Ueberblendung, rein zeichnerisch.
       u.vizAus=u.vizRolle==="weg"?Math.max(0,(u.vizAus??1)-dt/0.8):1;
+      // KISS-&-CRY-UHR (E-B3, Broadcast-Optik Buehne-Auftritt 27.09.): wie lange sitzt
+      // dieses Paar schon im Kiss & Cry -- steuert die drei Enthuellungsstufen ("WERTUNG
+      // FOLGT" -> Gesamt/Stuerze -> PLATZ-Plakette) in zeichneDuett(). Reiner neuer viz*-
+      // Wert aus einem Rollenwechsel-Kantentreffer, kein rr(), keine Wirkung auf u.summe.
+      if(u.vizRolle==="kiss"){
+        u.vizKissT=u.vizRolleVorher==="kiss"?(u.vizKissT||0)+dt:0;
+      }
+      u.vizRolleVorher=u.vizRolle;
 
       // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4, uebernommen aus PR #903):
       // TON_KATALOG.eiskunstlauf steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/
@@ -16777,6 +16810,14 @@
       const laeuft=grp[0].vizRolle==="kuer" && !grp.every(x=>x.vizHalt);
       const neu=(grp[0].vizBahnT||0)+(laeuft?dt:0);
       for(const x of grp)x.vizBahnT=neu;
+      // E-B3: PLAKETTEN-KLANG AN DER 3s-KANTE, EINMAL JE PAAR (nicht je Partner -- beide
+      // teilen dieselbe vizKissT-Uhr, s. oben). Eigener Katalogeintrag "plakette" (s.
+      // TON_KATALOG.eiskunstlauf) -- "publikum" ist dort ein Loop-Eintrag und wuerde ueber
+      // sfx() stumm bleiben (sfx() lehnt eintrag.loop ausdruecklich ab).
+      if(grp[0].vizRolle==="kiss"){
+        const t=grp[0].vizKissT||0;
+        if(t>=3 && t-dt<3) sfx("eiskunstlauf","plakette");
+      }
     }
 
     // ---- DURCHGANG 3: Zielpunkt und Bewegung ----------------------------------------
@@ -17668,6 +17709,11 @@
   // darunter.
   const WETT_GREIF_T=0.10, WETT_SCHLING_T=0.16, WETT_KAU_T=0.16,
         WETT_PAUSE_T=0.12, WETT_PAUSE_FAIL_T=0.30;
+  // SCHLUSSHUPE UND JUBELPOSE (W-B3, Broadcast-Optik Buehne-Auftritt 27.09.): merkt sich,
+  // SEIT WANN `done` gilt (buehneT-Zeit) -- reiner Zeichenzustand, kein Einfluss auf
+  // Wertung/Reihenfolge. `done` selbst wird ausschliesslich von stepBuehne() gesetzt und
+  // hier nur gelesen.
+  let wettessenEndeSeit=null;
   function stepWettessen(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild vizFechtAktuell bei stepFechten oben):
@@ -17704,6 +17750,18 @@
       }
       // "warten" laeuft ohne eigene Uhr weiter, bis die naechste Enthuellung "greifen" neu
       // ausloest — kein weiterer Zweig noetig.
+    }
+    // SCHLUSSHUPE UND "HAeNDE HOCH" (W-B3): reiner Kantentreffer auf `done` (von
+    // stepBuehne() gesetzt, hier nur GELESEN). Eine Sekunde lang die Jubelpose fuer ALLE --
+    // u.vizJubel ist ein neues, generisches viz*-Feld, das zeichneSprite() nur dann liest
+    // (dasselbe u.vizPose-Muster wie bei Showcase), sonst bleibt es ueberall `undefined`.
+    if(done){
+      if(wettessenEndeSeit==null){ wettessenEndeSeit=buehneT; sfx("wettessen","hupe"); }
+      const jubeln=buehneT-wettessenEndeSeit<1;
+      for(const u of TEILNEHMER)u.vizJubel=jubeln;
+    } else if(wettessenEndeSeit!=null){
+      wettessenEndeSeit=null;
+      for(const u of TEILNEHMER)u.vizJubel=false;
     }
   }
 
@@ -17842,6 +17900,12 @@
       // ein Ticker-Zug gelaufen ist, s. gauntletRausJetzt()-Kommentar).
       const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
       document.getElementById("score").textContent=alive(0)+" : "+alive(1);
+    } else if(BB().wettessen){
+      // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.), KONSISTENZ: derselbe stetig
+      // hochzaehlende Wert wie an Tafel/Band, statt des springenden Minutenendstands --
+      // sonst zeigt der Bug schon den Minutenendstand, waehrend die Tafeln noch zaehlen.
+      const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+wettessenAnzeigeSumme(u),0);
+      document.getElementById("score").textContent=Math.round(summe(0))+" : "+Math.round(summe(1));
     } else {
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
       document.getElementById("score").textContent=summe(0)+" : "+summe(1);
@@ -17954,12 +18018,52 @@
   // (PR S3) ein sicherer No-Op (Funktionskopf `if(!katalog)return`, :20981), das
   // Flaggen-Bookkeeping ist trotzdem schon jetzt richtig verdrahtet, s. reset() (N1-Fix).
   let showcasePublikumAn=false;
+  // VORHANGSAUM-FUEHRUNG (S-B3, Broadcast-Optik Buehne-Auftritt 27.09.): dasselbe
+  // Bandenlicht-Muster wie eisBandeSide/-Seit oben, nur fuer den Vorhangsaum -- merkt sich
+  // nur, welche Seite zuletzt fuehrte und seit wann, fuer die Ueberblendung beim Wechsel.
+  let showcaseSaumSide=null, showcaseSaumSeit=-999;
   // BUZZER-POSITIONEN: eigene Funktion statt Literale an zwei Stellen (bodenShowcase()
   // zeichnet das Pult, zeichneShowcase() zuendet die Reaktion darauf) -- dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie posMap bei zeichneFechten().
   function showcaseBuzzerPos(i){
     const pultB=Math.min(W*0.30,220), pultX=W/2-pultB/2, pultY=H-26;
     return {x:pultX+pultB*(i+0.5)/3, y:pultY+10};
+  }
+  // FERTIGE ACTS (S-B3, Broadcast-Optik Buehne-Auftritt 27.09.): wer seinen ganzen Auftritt
+  // schon enthuellt hat -- dieselbe Bedingung, die updateHudBuehne() fuer "fertig" ueberall
+  // sonst nutzt (`u.aktuell+1>=u.runden.length`). Reine Ablesung, kein rr().
+  function showcaseFertige(){
+    return TEILNEHMER.filter(u=>u.aktuell+1>=u.runden.length);
+  }
+  // TOP 3 BISHER (S-B3): nur FERTIGE Acts, absteigend nach u.summe -- ein noch laufender
+  // oder kommender Act taucht hier nicht auf (Spoiler-Regel), er bekommt in
+  // zeichneShowcaseTop3() stattdessen eine eigene "laeuft"-Zeile.
+  function showcaseTop3(){
+    return showcaseFertige().slice().sort((a,b)=>(b.summe||0)-(a.summe||0)).slice(0,3);
+  }
+  // VORHANGSAUM-FUEHRUNG (S-B3): welche Seite hat gerade die hoehere bislang enthuellte
+  // Summe -- dieselbe Ablesung wie kuerEisFuehrung() fuer Eiskunstlauf, hier ueber ALLE
+  // Teilnehmer (nicht nur fertige), weil u.summe ohnehin nur bereits enthuellte Durchgaenge
+  // traegt. null, solange noch niemand einen Punkt enthuellt hat.
+  function showcaseFuehrung(){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0);
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0);
+    if(heim===0&&gast===0)return null;
+    return heim>=gast?0:1;
+  }
+  // SPANNE ALLER BISHER ENTHUELLTEN DURCHGAENGE (S-B2, Applaus-Meter): min/max ueber
+  // runden[0..aktuell] JEDES Teilnehmers -- dieselbe Spoiler-Regel wie ueberall (nur bereits
+  // enthuellte Eintraege), kein rr(), keine neue Formel.
+  function showcaseDurchgangsSpanne(){
+    let min=Infinity, max=-Infinity, n=0;
+    for(const u of TEILNEHMER){
+      if(!u.runden)continue;
+      for(let i=0;i<=u.aktuell;i++){
+        const r=u.runden[i]; if(!r)continue;
+        if(r.punkte<min)min=r.punkte; if(r.punkte>max)max=r.punkte; n++;
+      }
+    }
+    return n?{min,max}:null;
   }
   // ================== T-B1 -- TENNISPLATZ (Broadcast-Optik-Dokument 27-09, Abschnitt 4,
   // Prioritaet 1) ==================
@@ -18059,8 +18163,22 @@
         ctx.closePath();ctx.fill();
       }
     });
-    ctx.strokeStyle="rgba(246,199,80,.5)";ctx.lineWidth=2;
+    // S-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): der Vorhangsaum uebernimmt die Farbe
+    // des Teams mit der hoeheren bislang enthuellten Summe -- dasselbe Bandenlicht-Muster
+    // wie bodenEis() (dezent, beim Fuehrungswechsel kurz voll gesaettigt), Chris'
+    // "ohne Stats sehen, wer fuehrt" jetzt auch fuer Showcase. Solange niemand gepunktet
+    // hat, bleibt die alte, neutrale Goldlinie stehen.
+    const fuehrungSide=showcaseFuehrung();
+    if(fuehrungSide!=null){
+      if(showcaseSaumSide!==fuehrungSide){ showcaseSaumSide=fuehrungSide; showcaseSaumSeit=buehneT; }
+      const voll=Math.max(0,Math.min(1,1-(buehneT-showcaseSaumSeit)/1.4));
+      ctx.strokeStyle=fuehrungSide===0?css("--home"):css("--away");
+      ctx.globalAlpha=0.5+0.5*voll; ctx.lineWidth=2+voll*1.5;
+    } else {
+      ctx.strokeStyle="rgba(246,199,80,.5)";ctx.lineWidth=2;
+    }
     ctx.beginPath();ctx.moveTo(0,vorhangH+2);ctx.lineTo(W,vorhangH+2);ctx.stroke();
+    ctx.globalAlpha=1;
 
     // RAMPENLICHT: eine Reihe warmer Lichtkegel am Buehnenrand -- showcase.tsx' Footlights
     // (dort 13 LEDs im SVG-Massstab, hier 11 im Canvas-Massstab). VOR dem Publikum gezeichnet,
@@ -19564,6 +19682,42 @@
   const WETTESSEN_WUERSTCHEN_SKALA=18;
   function wettessenWuerstchen(summe){ return Math.round((summe/WETTESSEN_WUERSTCHEN_SKALA)*2)/2; }
   function wettessenWuerstchenText(w){ return Number.isInteger(w)?String(w):w.toFixed(1).replace(".",","); }
+  // ANZEIGE-SUMME (W-B1, Broadcast-Optik Buehne-Auftritt 27.09.): `u.summe` springt bei
+  // Wettessen einmal je Minute um den GANZEN Minutenwert (buehneGruppenGroesse enthuellt
+  // die ganze Gruppe auf einmal, s. Kommentar bei stepBuehne()). Diese Funktion zaehlt die
+  // laufende Minute stattdessen STETIG hoch, mit genau dem Fortschritt `f`, den
+  // zeichneWettessenUhr() ohnehin schon rechnet (1-buehneAkt/rundenDauer) -- KEINE neue Uhr,
+  // KEIN neuer Rundenwert. Die Wertung selbst (u.summe/PPs/Teamstand/rho) liest diese
+  // Funktion nirgends, exakt wie wettessenWuerstchen() es fuer die alte "Pkt"-Anzeige schon
+  // vormachte.
+  function wettessenAnzeigeSumme(u){
+    if(!u.runden||u.aktuell<0)return 0;
+    if(done)return u.summe;
+    const aktuelleRunde=u.runden[u.aktuell];
+    if(!aktuelleRunde)return u.summe;
+    const vorher=u.summe-aktuelleRunde.punkte;
+    const art=BB();
+    const f=(buehneGruppenGroesse>1)?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):1;
+    return vorher+aktuelleRunde.punkte*f;
+  }
+  // TEMPO JE MINUTE (W-B2): der Punktewert EINER einzelnen Minute durch dieselbe Skala
+  // geteilt wie die kumulierte Summe -- dimensional konsistent, weil die Skala linear ist
+  // (Summe ueber zehn Minuten / 18 = Summe der Einzelminuten / 18). Reine Ablesung aus
+  // runden[idx], kein rr().
+  function wettessenTempo(u,idx){
+    if(idx<0||!u.runden||!u.runden[idx])return null;
+    return wettessenWuerstchen(u.runden[idx].punkte);
+  }
+  // RESTZEIT (W-B3): EINE Quelle statt zweier Kopien -- zeichneWettessenUhr() UND
+  // zeichneWettessenBand() (fuer die Schlussminuten-Umschaltung) muessen dieselbe Zahl
+  // sehen. Woertlich dieselbe Formel wie bisher in zeichneWettessenUhr(), nur benannt.
+  function wettessenRestSek(art){
+    const irgendeiner=TEILNEHMER[0];
+    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
+    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done)
+      ?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):0;
+    return Math.max(0,art.rundenN*60-(minutenFertig*60+inLaufenderMinute*60));
+  }
 
   // SITZPLAETZE (S1): EINE Quelle statt zweier Literale -- die Figuren-/Wendetafel-/
   // Spotlight-Schleife in zeichneWettessen() UND der floats-Renderer am Ende der Funktion
@@ -19591,13 +19745,17 @@
   // Zaehltafel-Bildmotiv (Gegencheck Abschnitt 1.1: "hinter jedem Esser eine eigene, gut
   // sichtbare Zaehltafel") -- ein zweigeteiltes Rechteck (Trennlinie = Kipp-Falz) statt der
   // reinen Textzeile, die vorher an dieser Stelle stand.
-  function zeichneWettessenTafel(x,y,text){
+  function zeichneWettessenTafel(x,y,text,betont){
     const b=46,h=19;
     ctx.fillStyle="#1c1108";ctx.fillRect(x-b/2,y-h/2,b,h);
-    ctx.strokeStyle="rgba(242,193,78,.55)";ctx.lineWidth=1;ctx.strokeRect(x-b/2,y-h/2,b,h);
+    // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): `betont` markiert den Moment, in dem
+    // die Tafel gerade um ein halbes Wuerstchen umklappt -- ein kurzer Aufhellblitz statt
+    // eines harten Zahlensprungs, s. Aufrufstelle (zeichneWettessen()).
+    ctx.strokeStyle=betont?"rgba(242,193,78,.95)":"rgba(242,193,78,.55)";
+    ctx.lineWidth=betont?1.6:1;ctx.strokeRect(x-b/2,y-h/2,b,h);
     ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y);ctx.lineTo(x+b/2,y);ctx.stroke();
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="700 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#f2ede2";
+    ctx.font="700 "+(betont?11:10)+"px 'IBM Plex Mono',monospace";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
     ctx.fillText(text,x,y-1);
   }
 
@@ -19688,18 +19846,50 @@
         // WENDETAFEL, EINHEIT WUERSTCHEN (S2) -- ersetzt das alte "412 Pkt". Reine
         // Anzeige-Skala aus u.summe (wettessenWuerstchen(), s. dort), NICHT die Wertung
         // selbst (die bleibt u.summe, PPs/Teamstand/rho unveraendert).
-        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wettessenWuerstchen(u.summe))+" Wü");
+        // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): zaehlt jetzt STETIG hoch statt
+        // einmal je Minute zu springen (wettessenAnzeigeSumme(), s. dort). `betont` markiert
+        // den Moment, in dem der gerundete Anzeigewert um ein halbes Wuerstchen umklappt --
+        // ein kurzer Klick + Aufhellblitz statt eines stillen Zahlensprungs.
+        const wuJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(u));
+        if(u.vizWuLetzte!==wuJetzt){
+          if(u.vizWuLetzte!=null) sfx("wettessen","klapp");
+          u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
+        }
+        const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
+        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wuJetzt)+" Wü",betontWu);
 
         const w=30,pFuell=Math.min(1,u.summe/maxSumme);
         ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
         ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+71,w*pFuell,3);
         ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
         ctx.fillText("Min "+(u.aktuell+1)+"/"+art.rundenN,x,y+81);
+
+        // W-B2 (Tempo je Esser): Wuerstchen der zuletzt ABGESCHLOSSENEN Minute, mit einem
+        // kleinen Dreieck gegen die Minute davor (Vektor-Primitiv statt Emoji-Pfeil, wie
+        // ueberall sonst in diesem Renderer). Erst sichtbar, sobald eine Minute steht.
+        const tempoJetzt=wettessenTempo(u,u.aktuell), tempoVor=wettessenTempo(u,u.aktuell-1);
+        if(tempoJetzt!=null){
+          let farbeT="#8a93a3", hoch=null;
+          if(tempoVor!=null&&Math.abs(tempoJetzt-tempoVor)>0.001){
+            hoch=tempoJetzt>tempoVor; farbeT=hoch?"#5fd38a":"#e0645f";
+          }
+          ctx.textAlign="left"; ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeT;
+          const txtT=wettessenWuerstchenText(tempoJetzt)+"/min";
+          ctx.fillText(txtT,x-16,y+91);
+          if(hoch!=null){
+            const tx=x-16+ctx.measureText(txtT).width+6, ty=y+91;
+            ctx.fillStyle=farbeT; ctx.beginPath();
+            if(hoch){ ctx.moveTo(tx,ty-3); ctx.lineTo(tx-3,ty+2); ctx.lineTo(tx+3,ty+2); }
+            else { ctx.moveTo(tx,ty+3); ctx.lineTo(tx-3,ty-2); ctx.lineTo(tx+3,ty-2); }
+            ctx.closePath(); ctx.fill();
+          }
+          ctx.textAlign="center";
+        }
       });
     });
 
     // KOPF-AN-KOPF-BAND UND 10:00-UHR (S3) -- eigene Funktionen, s. dort.
-    zeichneWettessenBand(erster,zweiter);
+    zeichneWettessenBand(erster,zweiter,art);
     zeichneWettessenUhr(art);
 
     // MAGEN-METER, unterer Bildrand, mit Gabel-Marker des Fuehrenden (platter.tsx' Magen-
@@ -19751,13 +19941,20 @@
   // Abstand" -- Portraet ersetzt durch Name+Trikotfarbe (dieser Renderer zeichnet keine
   // Gesichter), Zahl/Abstand in Wuerstchen (S2). Liest ausschliesslich u.summe/u.side/u.n,
   // aendert nichts an ihnen.
-  function zeichneWettessenBand(erster,zweiter){
+  function zeichneWettessenBand(erster,zweiter,art){
     if(!erster||!zweiter)return; // Wettessen hat min. 2 je Seite; defensiv trotzdem.
+    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): letzte Minute -- Band faerbt sich um
+    // und wechselt Kopfzeile/Titel, dieselbe Restzeit-Quelle wie die Uhr (wettessenRestSek).
+    const restSek=art?wettessenRestSek(art):null;
+    const letzteMinute=restSek!=null&&restSek<=60&&!done;
     const bandY0=H*0.115, bandY1=H*0.205, mitteY=(bandY0+bandY1)/2;
-    ctx.fillStyle="rgba(10,6,4,.68)";ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
-    ctx.strokeStyle="rgba(242,193,78,.5)";ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
-    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.75)";
-    ctx.textAlign="center";ctx.fillText("KOPF AN KOPF",W/2,bandY0-4);
+    ctx.fillStyle=letzteMinute?"rgba(60,10,8,.72)":"rgba(10,6,4,.68)";
+    ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.strokeStyle=letzteMinute?"rgba(230,67,46,.7)":"rgba(242,193,78,.5)";
+    ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";
+    ctx.fillStyle=letzteMinute?"rgba(255,150,130,.9)":"rgba(242,193,78,.75)";
+    ctx.textAlign="center";ctx.fillText(letzteMinute?"LETZTE MINUTE":"KOPF AN KOPF",W/2,bandY0-4);
 
     const zeile=(u,links)=>{
       const c=u.side===0?css("--home"):css("--away");
@@ -19766,16 +19963,42 @@
       ctx.font="700 12px 'Barlow Condensed',sans-serif";ctx.fillStyle=c;
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
       ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#dfe6ef";
-      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(u.summe))+" Würstchen",tx,mitteY+9);
+      // W-B1: dieselbe stetig hochzaehlende Anzeige wie an der Wendetafel, statt des
+      // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort).
+      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" Würstchen",tx,mitteY+9);
     };
     zeile(erster,true); zeile(zweiter,false);
 
     ctx.textAlign="center";
     ctx.font="800 13px 'Barlow Condensed',sans-serif";ctx.fillStyle="#f2c14e";
     ctx.fillText("VS",W/2,mitteY-2);
-    const abstand=wettessenWuerstchen(erster.summe)-wettessenWuerstchen(zweiter.summe);
+    const abstandJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(erster))-wettessenWuerstchen(wettessenAnzeigeSumme(zweiter));
     ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-    ctx.fillText(abstand<=0?"punktgleich":"+"+wettessenWuerstchenText(abstand),W/2,mitteY+12);
+    ctx.fillText(abstandJetzt<=0?"punktgleich":"+"+wettessenWuerstchenText(abstandJetzt),W/2,mitteY+12);
+
+    if(letzteMinute){
+      // W-B3: "braucht +X" gegen den STAND VOR DER LETZTEN MINUTE -- gerechnet vor deren
+      // Enthuellung, damit die Zahl waehrend der laufenden letzten Minute nicht mitspoilert
+      // (s. Broadcast-Optik-Papier Abschnitt 2.2/4.3).
+      const vorLetzter=(u)=>(u.aktuell>=art.rundenN-1&&u.runden[art.rundenN-1])
+        ?(u.summe-u.runden[art.rundenN-1].punkte):u.summe;
+      const luecke=wettessenWuerstchen(vorLetzter(erster))-wettessenWuerstchen(vorLetzter(zweiter));
+      if(luecke>0){
+        ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#ff9a7a";
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+" braucht +"+wettessenWuerstchenText(luecke),W/2,mitteY+24);
+      }
+    } else {
+      // W-B2: TEMPO-TREND -- Abstand VOR der zuletzt enthuellten Minute gegen den Abstand
+      // JETZT, mindestens ein Wuerstchen Veraenderung, sonst bleibt die Zeile leer.
+      const vorMinute=(u)=>(u.aktuell>=0&&u.runden[u.aktuell])?(u.summe-u.runden[u.aktuell].punkte):u.summe;
+      const abstandVorher=wettessenWuerstchen(vorMinute(erster))-wettessenWuerstchen(vorMinute(zweiter));
+      const trend=abstandJetzt-abstandVorher;
+      if(Math.abs(trend)>=1){
+        ctx.font="700 7.5px 'Barlow Condensed',sans-serif";
+        ctx.fillStyle=trend<0?"#5fd38a":"#e0645f";
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+24);
+      }
+    }
   }
 
   // 10:00-UHR (S3, Gegencheck Abschnitt 5): "eine grosse Countdown-Uhr ueber dem Tisch,
@@ -19787,11 +20010,15 @@
   function zeichneWettessenUhr(art){
     const irgendeiner=TEILNEHMER[0];
     const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
-    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done)
-      ?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):0;
-    const restSek=Math.max(0,art.rundenN*60-(minutenFertig*60+inLaufenderMinute*60));
+    const restSek=wettessenRestSek(art);
     const mm=Math.floor(restSek/60), ss=Math.floor(restSek%60);
     const uhrY=H*0.275;
+    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): roter Ring in den letzten zehn
+    // Sekunden -- reine Anzeige aus restSek, das die Uhr ohnehin schon rechnet.
+    if(restSek<=10&&restSek>0){
+      ctx.strokeStyle="rgba(230,67,46,.85)";ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(W/2,uhrY-8,26,0,6.2832);ctx.stroke();
+    }
     ctx.textAlign="center";
     ctx.font="800 28px 'IBM Plex Mono',monospace";
     ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.6)";ctx.lineJoin="round";
@@ -19801,6 +20028,22 @@
     ctx.fillText(text,W/2,uhrY);
     ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.7)";
     ctx.fillText("MINUTE "+Math.min(art.rundenN,minutenFertig+(done?0:1))+"/"+art.rundenN,W/2,uhrY+16);
+
+    // GROSSER COUNTDOWN 10..1 IN DER BILDMITTE (W-B3): eigener Puls je Sekunde, rein aus
+    // restSek abgeleitet, kein neuer Wert, kein rr().
+    if(restSek<=10&&restSek>0){
+      const restGanz=Math.ceil(restSek-0.001);
+      const bruch=restSek-Math.floor(restSek);
+      const puls=1+0.22*Math.sin(bruch*Math.PI);
+      ctx.save();
+      ctx.translate(W/2,H*0.46);ctx.scale(puls,puls);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="900 52px 'Barlow Condensed',sans-serif";
+      ctx.lineWidth=4;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.lineJoin="round";
+      ctx.strokeText(String(restGanz),0,0);
+      ctx.fillStyle="#e6432e";ctx.fillText(String(restGanz),0,0);
+      ctx.restore();
+    }
   }
 
   // ================== SHOWCASE: TALENTSHOW-GERUEST (PR S0, Konzept 17.09.) ==================
@@ -20213,6 +20456,9 @@
         // ist deshalb nie noetig. vizShowcaseTonAktuell haelt den zuletzt VERTONTEN
         // Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
         u.vizAuftrittTon=false; u.vizShowcaseTonAktuell=-1;
+        // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): Zaehler fuer die X-Wand dieses
+        // Acts, s. Kante "frisch enthuellt" unten.
+        u.vizXWand=0; u.vizXFlutSeit=null;
       }
       // ACT-UEBERSCHREIBUNGEN (PR S2, Konzept Abschnitt 4.3/5): NUR am gerade aktiven
       // Performer gesetzt, sonst immer `undefined`/`false` -- exakt der Vertrag "u.vizWaffe =
@@ -20277,7 +20523,30 @@
         const r=u.runden[u.aktuell];
         if(r){
           if(r.ereignis===art.erfolgWort)sfx("showcase","applaus");
-          else if(r.ereignis===art.failWort)sfx("showcase","buzzer");
+          else if(r.ereignis===art.failWort){
+            sfx("showcase","buzzer");
+            // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das n-te X DIESES Acts zuendet
+            // Buzzer n dauerhaft (s. zeichneShowcase()) -- ein reiner Zaehler auf bereits
+            // enthuellte Fehlschlaege, kein cypherHash mehr noetig. Beim dritten X flutet
+            // die Rueckwand kurz rot (u.vizXFlutSeit, ein Frame lang gesetzt).
+            u.vizXWand=(u.vizXWand||0)+1;
+            if(u.vizXWand===3){ u.vizXFlutSeit=buehneT; sfx("showcase","buzzer"); }
+          }
+        }
+        // S-B2 (Applaus-Meter, Tagesbestwert): der bisherige Bestwert VOR diesem Durchgang
+        // (ohne den gerade enthuellten Wert), damit ein neuer Rekord an dieser Kante genau
+        // einmal einen Gold-Blitz ausloest. Reine Ablesung ueber alle TEILNEHMER, kein rr().
+        if(r){
+          let bestVor=-Infinity;
+          for(const x of TEILNEHMER){
+            if(!x.runden)continue;
+            for(let i=0;i<=x.aktuell;i++){
+              if(x===u&&i===u.aktuell)continue;
+              const r2=x.runden[i]; if(r2&&r2.punkte>bestVor)bestVor=r2.punkte;
+            }
+          }
+          u.vizMeterPunkte=r.punkte; u.vizMeterSeit=buehneT;
+          if(bestVor>-Infinity && r.punkte>bestVor) u.vizGoldBlitzSeit=buehneT;
         }
       }
       const ziel=showcaseZielPos(u,aktiver);
@@ -20303,6 +20572,9 @@
       ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.strokeText(txt,x,y);ctx.fillStyle=farbe;ctx.fillText(txt,x,y);
     };
+    // S-B2 (Applaus-Meter): EINMAL je Bild berechnet, Applaus-Ring UND Meter teilen sich
+    // dieselbe Spanne.
+    const spanne=showcaseDurchgangsSpanne();
 
     // ---------- BACKSTAGE: alle ausser dem Aktiven, klein + spaeter abgedunkelt ----------
     for(const u of TEILNEHMER){
@@ -20328,6 +20600,57 @@
     vig.addColorStop(0.6,"rgba(6,3,10,.40)");
     vig.addColorStop(1,"rgba(6,3,10,.74)");
     ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+
+    // S-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): "Top 3 bisher"-Tafel oben links, im
+    // Stil von zeichneEisStand() -- NACH der Vignette gezeichnet, damit sie wie ein
+    // HUD-Panel lesbar bleibt statt vom Verlauf abgedunkelt zu werden. Nur FERTIGE Acts
+    // (Spoiler-Regel), plus eine Zeile fuer den gerade Auftretenden mit seinem
+    // hypothetischen Rang, bräche er jetzt ab.
+    (function zeichneShowcaseTop3(){
+      const top3=showcaseTop3();
+      if(!top3.length&&!aktiver)return;
+      const pad=8, zeilH=15, kopfH=15;
+      const rows=top3.length+(aktiver?1:0);
+      const br=W*0.19, hoeh=kopfH+rows*zeilH+pad, x0=W*0.015, y0=H*0.185;
+      const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+        ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
+      ctx.globalAlpha=0.86; ctx.fillStyle="#1a1024"; rund(x0,y0,br,hoeh,7); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=1; ctx.strokeStyle="rgba(246,199,80,.5)"; rund(x0,y0,br,hoeh,7); ctx.stroke();
+      ctx.textAlign="left"; ctx.textBaseline="middle";
+      ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750";
+      ctx.fillText("TOP 3 BISHER",x0+pad,y0+kopfH*0.6);
+      let k=0;
+      top3.forEach((u,i)=>{
+        const y=y0+kopfH+k*zeilH+zeilH*0.5; k++;
+        ctx.fillStyle=u.side===0?css("--home"):css("--away");
+        ctx.fillRect(x0+pad,y-5,2.5,10);
+        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=i===0?"#f2d75a":"#c7cedb";
+        ctx.fillText(String(i+1)+".",x0+pad+7,y);
+        const namen=u.n.split(" ")[0]||"?";
+        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.fillText(namen.length>13?namen.slice(0,12)+"…":namen,x0+pad+22,y);
+        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#dfe6ef";
+        ctx.fillText(String(u.summe||0),x0+br-pad,y);
+        ctx.textAlign="left";
+      });
+      if(aktiver){
+        const y=y0+kopfH+k*zeilH+zeilH*0.5;
+        ctx.fillStyle=aktiver.side===0?css("--home"):css("--away");
+        ctx.fillRect(x0+pad,y-5,2.5,10);
+        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d6ac36";
+        ctx.fillText("läuft",x0+pad+7,y);
+        const namen=aktiver.n.split(" ")[0]||"?";
+        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.fillText(namen.length>9?namen.slice(0,8)+"…":namen,x0+pad+34,y);
+        // Hypothetischer Rang, bräche der Auftritt jetzt ab -- nur gegen bereits FERTIGE
+        // Acts verglichen, kein Spoiler ueber noch kommende Acts.
+        const fertige=showcaseFertige();
+        const rang=1+fertige.filter(x=>x!==aktiver&&(x.summe||0)>(aktiver.summe||0)).length;
+        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.fillText((aktiver.summe||0)+" (#"+rang+")",x0+br-pad,y);
+        ctx.textAlign="left";
+      }
+    })();
 
     // ---------- DER AKTIVE: volle Groesse im Rampenlicht ----------
     if(aktiver){
@@ -20371,7 +20694,7 @@
       ctx.textAlign="center";
       ctx.fillText((aktiver.aktuell+1)+"/"+art.rundenN,x,y+92);
 
-      // ---------- BUZZER/APPLAUS-REAKTION (Konzept Punkt 4) ----------
+      // ---------- BUZZER/APPLAUS-REAKTION (Konzept Punkt 4, erweitert S-B1/S-B2) ----------
       // u.lunge als Uhr, exakt dasselbe Muster wie der Tennis-Ball (zeichneTennis()-
       // Kommentar ":15108-15110": 0,5 im Enthuellungs-Frame -> 0 nach 0,5 realen Sekunden,
       // keine neue Uhr, kein neues Feld). Liest nur u.runden[u.aktuell]/art.erfolgWort/
@@ -20379,28 +20702,85 @@
       if(aktiver.lunge>0 && aktiver.aktuell>=0){
         const r=aktiver.runden[aktiver.aktuell];
         const fortschritt=Math.min(1,Math.max(0,1-aktiver.lunge/0.5));
-        if(r&&r.ereignis===art.failWort){
-          // Buzzer, deterministisch per cypherHash (kein rr()) auf einen der drei
-          // Pult-Knoepfe verteilt, leuchtet rot auf und blendet aus.
-          const bi=cypherHash(aktiver.id,aktiver.aktuell)%3;
-          const bp=showcaseBuzzerPos(bi);
-          const leben=1-fortschritt;
-          ctx.save();ctx.globalAlpha=leben;ctx.globalCompositeOperation="lighter";
-          const gl=ctx.createRadialGradient(bp.x,bp.y,0,bp.x,bp.y,20);
-          gl.addColorStop(0,"#ff5a4a");gl.addColorStop(1,"rgba(255,90,74,0)");
-          ctx.fillStyle=gl;ctx.beginPath();ctx.arc(bp.x,bp.y,20,0,6.2832);ctx.fill();
-          ctx.restore();
-          ctx.globalAlpha=leben;ctx.fillStyle="#ff5a4a";
-          ctx.beginPath();ctx.arc(bp.x,bp.y,9,0,6.2832);ctx.fill();
+        if(r&&r.ereignis===art.erfolgWort){
+          // S-B2: Applaus-Ring bekommt eine STAERKE -- Radius und Ringzahl aus demselben
+          // Ausschlag wie das Applaus-Meter (spanne), statt einem einzelnen 0,5s-Ring fuer
+          // jeden Erfolg gleichermassen.
+          const anteil=(spanne&&spanne.max>spanne.min)
+            ?Math.max(0,Math.min(1,(r.punkte-spanne.min)/(spanne.max-spanne.min))):0.5;
+          const ringe=1+Math.round(anteil*2);
+          for(let ri=0;ri<ringe;ri++){
+            const f2=Math.min(1,fortschritt+ri*0.12);
+            const ry=showcasePublikumY()-f2*H*0.30;
+            ctx.save();ctx.globalAlpha=(1-f2)*0.8*(1-ri*0.15);
+            ctx.strokeStyle="#f6c750";ctx.lineWidth=2;
+            ctx.beginPath();ctx.arc(x,ry,10+(12+anteil*20)*f2,0,6.2832);ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+      // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): X-WAND UND PERMANENTE BUZZER --
+      // ersetzt den alten 0,5s-Zufallsblitz (cypherHash) durch einen dauerhaften Stand:
+      // u.vizXWand zaehlt NUR bereits enthuellte Fehlschlaege DIESES Acts (s. stepShowcase()),
+      // bleibt sichtbar bis der Act abtritt.
+      const xWand=aktiver.vizXWand||0;
+      for(let bi=0;bi<3;bi++){
+        const bp=showcaseBuzzerPos(bi), an=bi<xWand;
+        ctx.globalAlpha=an?1:0.4;
+        ctx.fillStyle=an?"#ff5a4a":"#3a2a44";
+        ctx.beginPath();ctx.arc(bp.x,bp.y,9,0,6.2832);ctx.fill();
+        if(an){
+          ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=1;ctx.stroke();
+          // Grosses, duennes rotes X an der Rueckwand ueber dem Knopf (unter dem Vorhang).
+          ctx.font="800 15px 'Barlow Condensed',sans-serif";ctx.fillStyle="#ff5a4a";
+          ctx.textAlign="center";ctx.textBaseline="middle";
+          ctx.fillText("X",bp.x,H*0.205);
+        }
+        ctx.globalAlpha=1;
+      }
+      // Drittes X: 0,6s roter Flutstoss ueber die Rueckwand -- einmaliger Kantentreffer aus
+      // vizXFlutSeit (s. stepShowcase()). Die Nummer LAEUFT WEITER (kein Abbruch, das waere
+      // Klasse C, Review S4).
+      if(aktiver.vizXFlutSeit!=null){
+        const seitX=buehneT-aktiver.vizXFlutSeit;
+        if(seitX<0.6){
+          ctx.globalAlpha=(1-seitX/0.6)*0.5;
+          ctx.fillStyle="#ff2d2d";
+          ctx.fillRect(0,0,W,H*0.16);
           ctx.globalAlpha=1;
-        } else if(r&&r.ereignis===art.erfolgWort){
-          // Applaus-Ring, der aus dem Publikum aufsteigt -- startet auf Publikumshoehe,
-          // waechst und steigt Richtung Buehnenmitte, blendet dabei aus.
-          const ry=showcasePublikumY()-fortschritt*H*0.30;
-          ctx.save();ctx.globalAlpha=(1-fortschritt)*0.8;
-          ctx.strokeStyle="#f6c750";ctx.lineWidth=2;
-          ctx.beginPath();ctx.arc(x,ry,10+fortschritt*26,0,6.2832);ctx.stroke();
-          ctx.restore();
+        }
+      }
+      // S-B2: APPLAUS-METER, senkrecht rechts zwischen Vorhang und Backstage-Spalte, mit
+      // Tagesbestwert-Marke -- reine Anzeige aus bereits enthuellten r.punkte.
+      if(spanne && spanne.max>spanne.min){
+        const mx0=W*0.955, my0=H*0.30, my1=H*0.80, mw=9;
+        ctx.fillStyle="rgba(16,20,28,.7)"; ctx.fillRect(mx0-mw/2,my0,mw,my1-my0);
+        ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1; ctx.strokeRect(mx0-mw/2,my0,mw,my1-my0);
+        let bester=null;
+        for(const u2 of TEILNEHMER)if(u2.vizMeterSeit!=null&&(!bester||u2.vizMeterSeit>bester.vizMeterSeit))bester=u2;
+        if(bester){
+          const seitM=buehneT-bester.vizMeterSeit;
+          if(seitM<1.5){
+            const anteilM=Math.max(0,Math.min(1,(bester.vizMeterPunkte-spanne.min)/(spanne.max-spanne.min)));
+            const fh=(my1-my0)*anteilM;
+            ctx.globalAlpha=0.35+0.55*(1-seitM/1.5);
+            ctx.fillStyle=bester.side===0?css("--home"):css("--away");
+            ctx.fillRect(mx0-mw/2+1,my1-fh,mw-2,fh);
+            ctx.globalAlpha=1;
+          }
+        }
+        ctx.strokeStyle="#f6c750"; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(mx0-mw/2-4,my0); ctx.lineTo(mx0+mw/2+4,my0); ctx.stroke();
+        ctx.font="700 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750"; ctx.textAlign="center";
+        ctx.fillText("TAGESBEST",mx0,my0-6);
+        if(bester&&bester.vizGoldBlitzSeit!=null){
+          const seitB=buehneT-bester.vizGoldBlitzSeit;
+          if(seitB<0.8){
+            ctx.globalAlpha=1-seitB/0.8;
+            ctx.strokeStyle="#f6c750"; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.arc(mx0,my0,14+seitB*20,0,6.2832); ctx.stroke();
+            ctx.globalAlpha=1;
+          }
         }
       }
     }
@@ -20506,6 +20886,28 @@
     const gast=gelaufen.filter(z=>z.side===1).reduce((s,z)=>s+z.pkt,0);
     return {side:gelaufen[0].side, heim, gast};
   }
+  // L/C-VERGLEICH BEIM GLEICHEN ELEMENTSTAND (Broadcast-Optik Buehne-Auftritt 27.09., E-B2):
+  // "liegt der Laeufer gerade ueber oder unter dem Fuehrenden" -- die NBC-Ecke, die die
+  // Zwischenstand-Tafel bislang nicht beantwortet. FUEHRENDER (L) ist das bislang beste
+  // VOLLSTAENDIG GELAUFENE Paar (nicht das gerade aktive -- sonst vergliche sich ein Paar mit
+  // sich selbst), CURRENT (C) das gerade laufende Paar, BEIDE auf demselben Elementstand `k`
+  // (das MINIMUM der beiden u.aktuell im aktiven Paar -- ein Partner, der schneller vorankam,
+  // wird damit nicht ueber seinen EIGENEN Stand hinaus gelesen, dieselbe Spoiler-Regel wie bei
+  // den Elementkaesten). Rein additiv aus runden[].punkte, keine neue Formel, kein rr().
+  function kuerLC(){
+    const gruppen=kuerStartliste();
+    if(!gruppen.length)return null;
+    const aktiv=kuerAktiveGruppe(gruppen);
+    const zeilen=kuerZwischenstandZeilen(gruppen,aktiv);
+    const fertige=zeilen.filter(z=>z.gelaufen&&z.i!==aktiv);
+    if(!fertige.length)return null; // "vor der ersten fertigen Gruppe gibt es keine Referenz"
+    const grpAktiv=gruppen[aktiv]||[];
+    if(!grpAktiv.length)return null;
+    const k=Math.min(...grpAktiv.map(u=>u.aktuell));
+    if(k<0)return null;
+    const summeBisK=(grp)=>grp.reduce((s,u)=>s+u.runden.slice(0,k+1).reduce((s2,r)=>s2+(r?r.punkte:0),0),0);
+    return {l:summeBisK(fertige[0].grp), c:summeBisK(grpAktiv)};
+  }
   // ZWISCHENSTAND-TAFEL (13.09., Chris: "man hat gar keine indikation welche leute sich
   // gerade besser schlagen als andere"). Direkt nach dem Vorbild der Wertungsgrafik, die
   // in jeder ISU-Uebertragung oben links steht: sie "always lists the event leader at the
@@ -20524,15 +20926,33 @@
   // SPOILER-REGEL (wie bei WERTUNG_AUFTRITT, s. dort): gelesen wird ausschliesslich
   // `runden[0..aktuell]`, also nur, was bereits aufgedeckt ist. Ein noch nicht gelaufenes
   // Paar zeigt seine Startnummer, keine Punktzahl.
+  // ZEILEN-ANIMATION (E-B3, dritte Stufe): wenn eine Zeile ihren Platz in der sortierten
+  // Tafel wechselt, gleitet sie in 0,4s auf ihre neue Y-Position statt hart zu springen --
+  // das F1-Signal "Position gewechselt". Reiner Zeichenzustand (Modulvariable, wie
+  // eisBandeSide/-Seit oben), keine Wirkung auf Wertung/Reihenfolge selbst.
+  const kuerZeilenAnim=new Map();
+  function kuerZeilenY(key,zielY){
+    let rec=kuerZeilenAnim.get(key);
+    if(!rec){ rec={y:zielY,ziel:zielY,seit:buehneT-1}; kuerZeilenAnim.set(key,rec); return zielY; }
+    if(rec.ziel!==zielY){ rec.von=rec.y; rec.ziel=zielY; rec.seit=buehneT; }
+    const p=Math.max(0,Math.min(1,(buehneT-rec.seit)/0.4));
+    rec.y=rec.von!=null?rec.von+(rec.ziel-rec.von)*p:zielY;
+    return rec.y;
+  }
   function zeichneEisStand(art,gruppen,aktiv){
     if(!gruppen.length)return;
     const pad=8, zeilH=19, kopfH=19, kastenH=28;
+    // L/C-ZEILE (E-B2): braucht eine eigene Kopfzeilenhoehe, nur wenn kuerLC() etwas liefert
+    // (vor der ersten fertigen Gruppe gibt es keine Referenz, s. dort) -- kopfHeff schiebt
+    // ALLES Folgende (Trennlinie/Zeilen/Elementkaesten) unveraendert nach unten, ohne jede
+    // Stelle unten einzeln anzufassen.
+    const lc=kuerLC(), lcH=lc?12:0, kopfHeff=kopfH+lcH;
     // Breite/Lage so gewaehlt, dass die Tafel und die Kuerbahn sich nicht beruehren: die
     // Tafel endet bei W*0.29, der am weitesten links moegliche Laeufer steht bei
     // W*0.54-W*0.168-34px ≈ W*0.345, sein Etikett (30 px Versatz, ~28 px halbe Breite)
     // beginnt bei ~W*0.298. Zehn Pixel Luft, im Playwright-Bild nachgeprueft.
     const br=W*0.205, x0=W*0.085;
-    const hoeh=kopfH+gruppen.length*zeilH+kastenH+pad;
+    const hoeh=kopfHeff+gruppen.length*zeilH+kastenH+pad;
     const y0=H*0.50-hoeh/2;
     const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
       ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
@@ -20543,8 +20963,14 @@
     ctx.fillText("ZWISCHENSTAND",x0+pad,y0+kopfH*0.55);
     ctx.textAlign="right"; ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
     ctx.fillText("Paar "+(aktiv+1)+"/"+gruppen.length,x0+br-pad,y0+kopfH*0.55);
+    if(lc){
+      const delta=lc.c-lc.l;
+      ctx.textAlign="left"; ctx.font="600 8px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=delta>=0?"#5fd38a":"#9aa6b6";
+      ctx.fillText("L "+lc.l+" · C "+lc.c+" ("+(delta>=0?"+":"")+delta+")",x0+pad,y0+kopfH+lcH*0.5);
+    }
     ctx.strokeStyle="rgba(255,255,255,.12)"; ctx.beginPath();
-    ctx.moveTo(x0+pad,y0+kopfH); ctx.lineTo(x0+br-pad,y0+kopfH); ctx.stroke();
+    ctx.moveTo(x0+pad,y0+kopfHeff); ctx.lineTo(x0+br-pad,y0+kopfHeff); ctx.stroke();
 
     // REIHENFOLGE DER TAFEL: wer schon gelaufen ist (oder gerade laeuft), steht nach
     // Punkten oben — der Fuehrende zuoberst, wie im Vorbild. Wer noch kommt, haengt in
@@ -20555,7 +20981,8 @@
     const zeilen=kuerZwischenstandZeilen(gruppen,aktiv);
     let rang=0;
     zeilen.forEach((z,k)=>{
-      const y=y0+kopfH+k*zeilH+zeilH*0.5;
+      const zielY=y0+kopfHeff+k*zeilH+zeilH*0.5;
+      const y=kuerZeilenY(z.grp.map(u=>u.id).join(","),zielY);
       const laeuft=z.i===aktiv;
       if(laeuft){
         ctx.globalAlpha=0.22; ctx.fillStyle="#d6ac36";
@@ -20590,15 +21017,26 @@
     // danach bleibt grau. Der Vorname davor sagt, welche Reihe zu wem gehoert.
     const grp=gruppen[aktiv]||[];
     const n=art.rundenN, bx=x0+pad+13, bw=(br-pad-13-pad-(n-1)*1.6)/n;
-    const by=y0+kopfH+gruppen.length*zeilH+3;
+    const by=y0+kopfHeff+gruppen.length*zeilH+3;
     grp.slice(0,2).forEach((u,j)=>{
       const zy=by+j*7;
       ctx.textAlign="left"; ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
       ctx.fillText((u.n.split(" ")[0]||"?").slice(0,1),x0+pad,zy+2.5);
       for(let r=0;r<n;r++){
         const z=r<=u.aktuell?u.runden[r]:null;
-        ctx.fillStyle=!z?"rgba(255,255,255,.10)"
-          :(z.ereignis===art.failWort?"rgba(216,84,84,.92)":"rgba(70,200,120,.92)");
+        // E-B1 (Broadcast-Optik 27.09.): DRITTE FARBE fuer "knapp daneben" (unterdreht/
+        // Hand am Eis) -- r.knapp liegt seit #1034 vor, wurde hier bisher nur nicht
+        // gelesen. Pirouette/Schritte/Choreo heissen im Fehlschlag NIE "stuerzt" (Review
+        // 2.3), zeigen also IMMER die Bernsteinfarbe statt Rot, unabhaengig von r.knapp --
+        // nur ein Sprung-Fehlschlag OHNE r.knapp bleibt echtes Rot.
+        const elB=KUER_ELEMENTE[r]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        let farbe="rgba(255,255,255,.10)";
+        if(z){
+          if(z.ereignis!==art.failWort)farbe="rgba(70,200,120,.92)";
+          else if(elB.typ!=="sprung"||z.knapp)farbe="rgba(214,172,54,.92)";
+          else farbe="rgba(216,84,84,.92)";
+        }
+        ctx.fillStyle=farbe;
         ctx.fillRect(bx+r*(bw+1.6),zy,bw,5);
       }
     });
@@ -20610,6 +21048,10 @@
   function zeichneDuett(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const posMap=new Map();
+    // E-B2 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL je Bild berechnet, nicht je
+    // Laeufer -- beide Partner desselben Paares teilen sich denselben L/C-Vergleich, s.
+    // kuerLC()/Eis-Halo unten.
+    const lc=kuerLC();
     // STARTLISTE UND SPOTLIGHT: dieselbe Quelle wie stepKuer() (kuerStartliste()/
     // kuerAktiveGruppe(), s. dort) — die Zeichnung bildet keine zweite Gruppenliste mehr,
     // sonst koennten Bewegung und Bild auf verschiedene Paare zeigen.
@@ -20723,6 +21165,21 @@
         if(u.lunge>0&&zug&&zug.ereignis===art.erfolgWort) zeichneEisstaub(rx,ry+16,u.id);
         else if(phase==="pirouette"&&u.vizPhaseT>0) zeichneEisstaub(rx,ry+16,u.id+7);
       }
+      // EIS-HALO (E-B2, Runde 2 Vorschlag 2b): am Kufenpunkt, gross und teamfarben, solange
+      // das laufende Paar UEBER der L/C-Referenz liegt, klein und grau darunter -- blinkt
+      // beim Ueberqueren kurz auf (Regel 7, "Wechsel signalisieren"). Nur fuers gerade
+      // laufende Paar (rolle==="kuer", s. Aufrufstelle oben), lc ist EINMAL je Bild
+      // berechnet und fuer beide Partner identisch.
+      if(lc){
+        const ueber=lc.c>=lc.l;
+        if(kuerHaloUeber!==ueber){ kuerHaloUeber=ueber; kuerHaloSeit=buehneT; }
+        const puls=Math.max(0,1-(buehneT-kuerHaloSeit)/0.6);
+        const rad=(ueber?14:7)+puls*8;
+        ctx.globalAlpha=(ueber?0.35:0.16)+puls*0.4;
+        ctx.fillStyle=ueber?c:"#96a0af";
+        ctx.beginPath(); ctx.ellipse(rx,ry+16,rad,rad*0.42,0,0,6.2832); ctx.fill();
+        ctx.globalAlpha=1;
+      }
       posMap.set(u.id,{x:rx,y:ry});
       // ETIKETTEN (5.3): an vizY gehaengt, nahe am unteren Bandenrand nach oben geklappt —
       // die Sicht-QA zeigte hier "schneidet in die Podestkante". Die neue kuerBahn() endet
@@ -20783,16 +21240,45 @@
         const lx=Math.min(...pos.map(p=>p.x))-16, ly=pos.reduce((s,p)=>s+p.y,0)/pos.length;
         ctx.strokeText(t,lx,ly); ctx.fillText(t,lx,ly);
       } else {
+        // E-B3 (Broadcast-Optik Buehne-Auftritt 27.09.), SCHWACHE FASSUNG (Empfehlung des
+        // Papiers, Abschnitt 2.2: "erst die schwache Fassung ohne Zurueckhalten"). `u.summe`
+        // bleibt die ganze Zeit live sichtbar (Etikett/Tafel/Balken/Bug) -- der Kiss & Cry
+        // liefert NICHTS Neues an Zahlen, sondern INSZENIERT drei Stufen aus vizKissT:
+        //   0,0-1,2s "WERTUNG FOLGT ..." (pulsierender Monitor)
+        //   1,2-3,0s Gesamt + Stuerze n (nur Klasse A: keine Elemente/Ausstrahlungs-
+        //            Aufschluesselung, die haette ein neues r.pub-Feld gebraucht, A')
+        //   ab 3,0s  Plakette "PLATZ n" in Teamfarbe (Klang s. Durchgang 2 oben)
         const pkt=grp.reduce((s,u)=>s+(u.summe||0),0);
-        const mw=64, my=oben-34;
+        const t=grp[0].vizKissT||0;
+        const mw=90, mh=t<1.2?20:(t<3?28:24), my=oben-34;
         ctx.globalAlpha=0.9; ctx.fillStyle="#10141c";
-        ctx.fillRect(mx-mw/2,my-9,mw,20); ctx.globalAlpha=1;
+        ctx.fillRect(mx-mw/2,my-mh/2,mw,mh); ctx.globalAlpha=1;
         ctx.strokeStyle="rgba(214,172,54,.6)"; ctx.lineWidth=1;
-        ctx.strokeRect(mx-mw/2,my-9,mw,20);
-        ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
-        ctx.fillText("KISS & CRY",mx,my-3);
-        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
-        ctx.fillText(String(pkt),mx,my+6);
+        ctx.strokeRect(mx-mw/2,my-mh/2,mw,mh);
+        if(t<1.2){
+          const puls=0.55+0.45*Math.abs(Math.sin(buehneT*6));
+          ctx.globalAlpha=puls;
+          ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d6ac36";
+          ctx.fillText("WERTUNG FOLGT …",mx,my);
+          ctx.globalAlpha=1;
+        } else if(t<3){
+          const stuerze=grp.reduce((s,u)=>s+u.runden.filter((r,idx)=>r&&r.ereignis===art.failWort&&!r.knapp
+            &&(KUER_ELEMENTE[idx]||KUER_ELEMENTE[KUER_ELEMENTE.length-1]).typ==="sprung").length,0);
+          ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
+          ctx.fillText("GESAMT",mx,my-8);
+          ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+          ctx.fillText(String(pkt),mx,my+2);
+          ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d08a8a";
+          ctx.fillText("Stürze "+stuerze,mx,my+12);
+        } else {
+          const zeilenK=kuerZwischenstandZeilen(gruppen,aktiv).filter(z=>z.gelaufen);
+          const platz=zeilenK.findIndex(z=>z.i===gi)+1;
+          const farbeP=grp[0].side===0?css("--home"):css("--away");
+          ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
+          ctx.fillText("GESAMT "+pkt,mx,my-9);
+          ctx.font="700 13px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbeP;
+          ctx.fillText(platz>0?"PLATZ "+platz:"–",mx,my+4);
+        }
       }
     });
     for(const f of floats){
@@ -26771,6 +27257,10 @@
       // u.vizWackler) -- deutlich leiser/kuerzer als "sturz", kein Rauschen (kein Aufprall),
       // rein akustische Unterscheidung ohne jede Wirkung auf Wertung/Erfolgschance.
       wackler:  {synth:(vol)=>tonKlick((vol??0.6)*0.7,1800,0.06)},
+      // PLAKETTE (E-B3, Broadcast-Optik Buehne-Auftritt 27.09.): der Kiss-&-Cry-Moment, in
+      // dem die Rang-Plakette erscheint -- derselbe aufsteigende Doppelton wie ueberall im
+      // Katalog fuer einen positiven Reveal (vgl. "ziel"/"ass"/"topout").
+      plakette: {synth:(vol)=>tonDoppelton(vol,700,1050,0.3)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,450,0,true)}
     },
     breaking:{
@@ -26956,7 +27446,13 @@
       biss:      {synth:(vol)=>tonKlick(vol,1900,0.05)},
       schlingen: {synth:(vol)=>tonDoppelton(vol,520,760,0.22)},
       pause:     {synth:(vol)=>tonBuzzer(vol,0.3)},
-      gong:      {synth:(vol)=>tonMetall(vol,260,0.55)}
+      gong:      {synth:(vol)=>tonMetall(vol,260,0.55)},
+      // KLAPP (W-B1, Broadcast-Optik Buehne-Auftritt 27.09.): der leise Klick, mit dem die
+      // Wendetafel bei jedem halben Wuerstchen umklappt (s. zeichneWettessen()).
+      klapp:     {synth:(vol)=>tonKlick((vol??0.6)*0.5,2100,0.03)},
+      // HUPE (W-B3): die Schlusshupe bei 0:00 -- derselbe Tempp+Metall-Bauplan wie
+      // hockey.tor fuer einen tiefen, kurzen Signalton.
+      hupe:      {synth:(vol)=>{ tonTon(vol,320,0.5); tonMetall((vol??0.6)*0.6,500,0.4); }}
     },
     // I-SPY (PR 4, Ton und Politur, docs/design/i-spy-schatzsuche-konzept-21-09.md
     // Abschnitt 5.4): sechs Ereignisse, dieselben fuenf Grundbausteine wie ueberall im
@@ -35142,11 +35638,25 @@
     // bodenEis() eine negative Differenz sehen und den Wechsel-Zustand faelschlich dauerhaft
     // auf "voll" halten. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     eisBandeSide=null; eisBandeSeit=-999;
+    // DASSELBE N1-MUSTER FUER DEN EIS-HALO (E-B2, Broadcast-Optik 27.09.) UND DIE
+    // KISS-&-CRY-ZEILENANIMATION (E-B3): kuerHaloSeit/kuerZeilenAnim koennten sonst noch
+    // buehneT-Werte des VORIGEN Eiskunstlauf-Spiels tragen. Reiner Praesentationszustand,
+    // kein Einfluss auf rr() oder Rangtreue.
+    kuerHaloUeber=null; kuerHaloSeit=-999;
+    kuerZeilenAnim.clear();
     // DASSELBE N1-MUSTER FUER SHOWCASE (PR S1, Konzept 17.09.): ohne diese Zeile haelt
     // bodenShowcase() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
     // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     showcasePublikumAn=false;
+    // DASSELBE N1-MUSTER FUER DEN SHOWCASE-VORHANGSAUM (S-B3, Broadcast-Optik 27.09.):
+    // showcaseSaumSeit koennte sonst noch den buehneT-Wert des VORIGEN Showcase-Spiels
+    // tragen. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    showcaseSaumSide=null; showcaseSaumSeit=-999;
+    // DASSELBE N1-MUSTER FUER DIE WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik 27.09.):
+    // wettessenEndeSeit koennte sonst noch den buehneT-Wert des VORIGEN Wettessen-Spiels
+    // tragen und die Jubelpose faelschlich unterdruecken/dauerhaft zeigen.
+    wettessenEndeSeit=null;
     // DASSELBE N1-MUSTER FUER I-SPY (PR 4, Ton und Politur): ohne diese Zeile haelt
     // bodenSchatzsuche() die Flagge fuer "schon gestartet" und der Publikums-/Raum-Loop
     // kaeme ab dem zweiten I-Spy-Spiel der Session nie wieder -- derselbe Fehler, den
