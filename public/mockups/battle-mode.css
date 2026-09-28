@@ -624,8 +624,23 @@
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
   .oly-battle-arena.oly-battle-arena .bbugmitte{background:rgba(17,24,35,.82);
     border-radius:6px;padding:4px 11px;color:var(--warn);font-weight:700;font-size:12px;
-    white-space:nowrap;align-self:flex-start;flex:none;text-align:center}
+    white-space:nowrap;align-self:flex-start;flex:none;text-align:center;
+    transition:box-shadow .15s ease}
   .oly-battle-arena.oly-battle-arena .bbugmitte:empty{display:none}
+  /* Q1-KONTEXTZEILE (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 3): zweite,
+     kleinere Zeile unter Score/Uhr -- aktualisiereBbug() haengt dieses <small> nur bei den
+     drei Feldspielen ueberhaupt an (feldspielRestzeitAbwaerts/-KontextZusatz); Kampf/Bahn/
+     Buehne bekommen gar kein <small>, .bbugmitte bleibt dort wie bisher eine einzeilige Box. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small{display:block;color:#c3ccd8;
+    font-weight:500;font-size:9.5px;letter-spacing:.01em;margin-top:1px;white-space:nowrap}
+  /* SHOT-CLOCK-WARNFARBE IN DER KONTEXTZEILE (Nachtrag 27.09., Review-Fund B1(a)): dieselbe
+     Warnfarbe/Klasse wie .ttstand .knapp -- die Canvas-Ziffernbox (zeichneShotClock()) faerbt
+     sich unter 5s bereits rot, die textuelle Kontextzeile tat es bisher nicht. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .knapp{color:var(--warn,#e0a341)}
+  /* FUEHRUNGSWECHSEL-BLITZ (Runde 2, Vorschlag 3): kurzer Aufleuchter am Bug, 0,6 s, wenn
+     die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
+  .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
+    0 0 14px 2px var(--warn)}
   /* UEBERZAHL-KENNUNG (K2): "4 : 3" in der Farbe der Seite mit mehr Lebenden, nur wenn
      die Zahlen ungleich sind (aktualisiereBbug() haengt <small> nur dann ueberhaupt an).
      Eigene Zeile unter Score/Uhr, dasselbe display:block-Muster wie oben. */
