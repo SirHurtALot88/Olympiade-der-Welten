@@ -170,7 +170,8 @@
     const zielText = zi.t.replace("{rw}", rw.z + "\"");
     let satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`;
     if (sf) satz = satz.replace("einen Geistwolf", "eine Kampfdrohne").replace("A2 Nahkampf) in 3\" herbei, der", "Laser 12\" A1) in 3\" herbei, die").replace(/^Zauber/, "Psi");
-    const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" ? "magie" : null, sf ? "technik" : null].filter(Boolean))];
+    // Sci-Fi und Magie schließen sich aus: Psi-Kräfte sind Technik, keine Magie
+    const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" && !sf ? "magie" : null, sf ? "technik" : null].filter(Boolean))].filter(t => !sf || t !== "magie");
     const namen = sf && SF_NAMEN[wk.id] ? SF_NAMEN[wk.id] : wk.namen;
     return { wk, nu, roh, satz, tags, gegner, namen, sf };
   }

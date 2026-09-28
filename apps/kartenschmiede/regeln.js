@@ -28,6 +28,36 @@
     praezise: /präzise|praezise|precise/i,
     ueberhitzen: /überhitz|ueberhitz|overheat/i,
   };
+  // ---------- Elemente ----------
+  // Acht Elemente in vier Gegensatzpaaren. Die Prägung einer Einheit sagt, was sie ist, das Element einer Waffe,
+  // womit sie trifft. Gleiches Element: das Ziel ist resistent (+1 auf Verteidigung). Gegen-Element: verwundbar (−1).
+  // Farben für die Symbole auf Karte und Seite. Neue Paare hier eintragen, der Rest liest sie von hier.
+  const ELEMENTE = [
+    { id: "feuer", name: "Feuer", wort: "Feuer", farbe: "#ff6a2b", gegen: "frost" },
+    { id: "frost", name: "Frost", wort: "Frost", farbe: "#7fd3ff", gegen: "feuer" },
+    { id: "natur", name: "Natur", wort: "Natur", farbe: "#5cc16a", gegen: "gift" },
+    { id: "gift", name: "Gift", wort: "Gift", farbe: "#c3e83a", gegen: "natur" },
+    { id: "licht", name: "Licht", wort: "Licht", farbe: "#ffd95a", gegen: "schatten" },
+    { id: "schatten", name: "Schatten", wort: "Schatten", farbe: "#a27cf0", gegen: "licht" },
+    { id: "magie", name: "Magie", wort: "Magie", farbe: "#e46ad8", gegen: "technik" },
+    { id: "technik", name: "Sci-Fi", wort: "Energie", farbe: "#2fe0cf", gegen: "magie" },
+  ];
+  const ELEMENT = Object.fromEntries(ELEMENTE.map(e => [e.id, e]));
+  // Element einer Waffenzeile aus den Regeln lesen (ein Wort wie „Feuer“ oder „Energie“), sonst null
+  function elementAus(regeln) {
+    const worte = String(regeln || "").split(",").map(x => x.trim().toLowerCase());
+    const e = ELEMENTE.find(x => worte.includes(x.wort.toLowerCase()) || worte.includes(x.name.toLowerCase()) || (x.id === "magie" && worte.includes("magisch")));
+    return e ? e.id : null;
+  }
+  // +1 resistent, −1 verwundbar, 0 neutral – aus Sicht des Ziels
+  function elementWirkung(element, praegung) {
+    if (!element || !Array.isArray(praegung)) return 0;
+    let w = 0;
+    if (praegung.includes(element)) w += 1;
+    if (praegung.includes(ELEMENT[element].gegen)) w -= 1;
+    return w;
+  }
+
   // Waffenregeln mit Erklärung für die Tooltips auf der Karte und in der Datenbank. [Muster, Name, Symbol, Text]
   const WAFFENREGELN = [
     [/\b(?:DS|AP)\s*\((\d)\)/i, "Durchschlag", "down", "DS(X): Das Ziel bekommt −X auf seine Verteidigungswürfe."],
@@ -44,10 +74,21 @@
     [W.praezise, "Präzise", "target", "+1 auf Treffer."],
     [W.ueberhitzen, "Überhitzen", "flame", "Für jede gewürfelte 1 auf Treffer erleidet der Schütze selbst 1 Treffer."],
   ];
-  const regelnVon = regeln => WAFFENREGELN.filter(([re]) => re.test(regeln || "")).map(([re, name, icon, text]) => {
-    const m = String(regeln).match(re);
-    return { name: m && m[1] ? `${name}(${m[1]})` : name, icon, text };
-  });
+  const ELEMENT_TEXT = e => `Element ${e.name}: Ein Ziel mit Prägung ${e.name} ist resistent (+1 auf Verteidigung), ein Ziel mit Prägung ${ELEMENT[e.gegen].name} verwundbar (−1 auf Verteidigung). Das Element kostet keine Punkte.`;
+  const regelnVon = regeln => {
+    const liste = WAFFENREGELN.filter(([re]) => re.test(regeln || "")).map(([re, name, icon, text]) => {
+      const m = String(regeln).match(re);
+      return { name: m && m[1] ? `${name}(${m[1]})` : name, icon, text };
+    });
+    const el = elementAus(regeln);
+    if (el) {
+      const e = ELEMENT[el], gift = liste.find(r => r.name === "Gift");
+      if (gift) gift.text += " " + ELEMENT_TEXT(e);
+      else liste.push({ name: e.wort, icon: null, element: el, text: ELEMENT_TEXT(e) });
+    }
+    if (liste.find(r => r.name === "Gift")) liste.find(r => r.name === "Gift").element = "gift";
+    return liste;
+  };
   const istNahkampf = r => !r || /nahkampf|melee/i.test(r);
 
   function leseWaffe(zeile) {
@@ -64,6 +105,7 @@
       zersetzen: W.zersetzen.test(regeln), stoss: W.stoss.test(regeln),
       indirekt: W.indirekt.test(regeln), zielsuchend: W.zielsuchend.test(regeln),
       praezise: W.praezise.test(regeln), ueberhitzen: W.ueberhitzen.test(regeln),
+      element: elementAus(regeln),
     };
   }
   const leseWaffen = text => String(text || "").split("\n").map(l => l.trim()).filter(Boolean).map(leseWaffe);
@@ -142,6 +184,7 @@
       schnell: hat(passiv, /^(schnell|fast|fliegen|flying)$/i), langsam: hat(passiv, /^(langsam|slow)$/i),
       rasend: hat(passiv, /rasend|furious/i), ausweichen: hat(passiv, /ausweich|evasive/i),
       tarnung: hat(passiv, /tarnung|stealth/i), regeneration: hat(passiv, /regenerat/i),
+      praegung: Array.isArray(s.praegung) ? s.praegung : [],
       hinterhalt: hat(passiv, /hinterhalt|ambush/i), wucht: zahlIn(passiv, /^(?:wucht|impact)\s*\((\d+)\)$/i),
     };
   }
@@ -187,7 +230,7 @@
         for (const sechs of treffer) {
           if (!lebend(ziel)) break;
           const ds = sechs && w.reissend ? Math.max(w.ds, 4) : w.ds;
-          const bedarf = ziel.d + ds + (schuss && inDeckung ? -1 : 0);
+          const bedarf = ziel.d + ds + (schuss && inDeckung ? -1 : 0) - elementWirkung(w.element, ziel.praegung);
           let x = w6(rnd);
           if (w.gift && x === 6) x = w6(rnd);
           if (x !== 1 && x >= bedarf) continue;
@@ -274,7 +317,7 @@
       jeReichweite: Object.fromEntries(Object.entries(jeReichweite).map(([k, v]) => [k, mittel(v)])) };
   }
 
-  const Regeln = { STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, leseListe, waffenFaktor,
+  const Regeln = { STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
     reichweitenFaktor, FAEHIGKEITEN, punkte, simuliere, einheitAus, balanceTest };
   if (typeof module !== "undefined" && module.exports) module.exports = Regeln;
   else root.Regeln = Regeln;

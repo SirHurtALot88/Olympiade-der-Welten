@@ -21,7 +21,29 @@ export type KartenEintrag = {
   gespeichertVon: string | null;
   vorschau: string | null;
   updatedAt: string;
+  /** Werte für die Tabelle „Fertige Charaktere“, ohne Artwork */
+  werte: KartenWerte;
 };
+export type KartenWerte = {
+  faction: string; praegung: string[]; size: string; quality: string; defense: string; tough: string;
+  weapons: string; passives: string; skills: Array<{ id: string; name: string; text: string; tags: string[]; art: string; kosten: unknown }>;
+};
+
+function werteVon(inhalt: Record<string, unknown>): KartenWerte {
+  const liste = (w: unknown) => (Array.isArray(w) ? w : []);
+  return {
+    faction: text(inhalt.faction, 80),
+    praegung: liste(inhalt.praegung).filter((x): x is string => typeof x === "string").slice(0, 8),
+    size: text(String(inhalt.size ?? ""), 10), quality: text(String(inhalt.quality ?? ""), 10),
+    defense: text(String(inhalt.defense ?? ""), 10), tough: text(String(inhalt.tough ?? ""), 10),
+    weapons: text(inhalt.weapons, 1000), passives: text(inhalt.passives, 400),
+    skills: liste(inhalt.skills).slice(0, 20).map((k) => {
+      const f = (k ?? {}) as Record<string, unknown>;
+      return { id: text(f.id, 80), name: text(f.name, 80), text: text(f.text, 600), art: text(f.art, 40),
+        tags: liste(f.tags).filter((x): x is string => typeof x === "string").slice(0, 8), kosten: f.kosten ?? null };
+    }),
+  };
+}
 
 export type GruppenEintrag = { id: string; name: string; mitglieder: number; gespeichertVon: string | null; updatedAt: string };
 
@@ -82,6 +104,7 @@ export function listeKarten(sammlung: string): KartenEintrag[] {
     gespeichertVon: daten.gespeichertVon ?? null,
     vorschau: daten.vorschau ?? null,
     updatedAt: daten.updatedAt,
+    werte: werteVon(daten.inhalt),
   }));
 }
 
