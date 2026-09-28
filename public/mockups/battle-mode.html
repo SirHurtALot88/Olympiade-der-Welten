@@ -134,6 +134,12 @@
              (s. Abschnitt 4 derselben Recherche). Blendet sich automatisch nach ein paar
              Sekunden wieder aus (s. callout() in der Engine). -->
         <div class="bbugcallout" id="bbugcallout" hidden></div>
+        <!-- B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, docs/design/broadcast-optik-
+             feldspiel-27-09.md Abschnitt 4): Band unter dem Bug, sichtbar nur waehrend
+             eine Seite gerade >= 8 Punkte in Folge erzielt (basketballLaufInfo() in der
+             Engine, reine Lesung von fsZuege). Gefuellt/ein-/ausgeblendet in
+             aktualisiereBbug(), keine eigene Zeichenschleife. -->
+        <div class="bbuglauf" id="bbugLauf" hidden></div>
         <!-- BROADCAST-HUD DER STAFFEL (Recherche 06.09., docs/design/staffel-oval-
              broadcast-hud-recherche-06-09.md Abschnitt 4). Zeigt aktuellen und
              naechsten Laeufer je Seite mit ihrer festen Eignung, dazu das live

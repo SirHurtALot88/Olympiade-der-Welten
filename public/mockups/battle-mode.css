@@ -648,6 +648,23 @@
     font-weight:700;margin-top:2px;color:#c3ccd8}
   .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.l{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.r{color:var(--away)}
+  /* H4 -- "TORWART RAUS"-KENNUNG (Hockey, A, Prio 2): Text in feldspielKontextZusatz()
+     eingestreut (innerHTML, wie .knapp), Teamfarbe der Seite, die den Torwart gezogen
+     hat -- l/r spiegelt dieselbe Home/Away-Zuordnung wie .ueberzahl oben. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus{font-weight:700}
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.r{color:var(--away)}
+
+  /* B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2): eigenes Band UNTER dem Bug (nicht Teil
+     von .bbugmitte, s. Bauplan "Band unter dem Bug"), sichtbar nur ab 8 Punkten in Folge
+     (aktualisiereBbug() setzt/entfernt [hidden] und die Home/Away-Klasse). */
+  .oly-battle-arena.oly-battle-arena .bbuglauf{position:absolute;top:52px;left:50%;
+    transform:translateX(-50%);background:rgba(17,24,35,.85);border-radius:6px;
+    padding:3px 12px;font:700 12px 'Barlow Condensed',sans-serif;letter-spacing:.04em;
+    color:#fff;white-space:nowrap;z-index:3}
+  .oly-battle-arena.oly-battle-arena .bbuglauf[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .bbuglauf.l{box-shadow:0 0 0 2px var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbuglauf.r{box-shadow:0 0 0 2px var(--away)}
 
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
