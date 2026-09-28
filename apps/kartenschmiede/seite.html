@@ -242,6 +242,7 @@ ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--bra
 .boss p { font-family: var(--prose); font-size: calc(var(--u)*2.8*var(--k)); line-height: 1.25; color: var(--ink-c); }
 .foot { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: calc(var(--u)*2); padding-top: calc(var(--u)*1.2); border-top: calc(var(--u)*.25) solid rgba(255,255,255,.1); }
 .foot .fac { display: flex; align-items: center; gap: calc(var(--u)*1); font-size: calc(var(--u)*2.6*var(--k)); letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--acc); }
+.foot .fac .praeg { display: inline-flex; opacity: .8; }
 .foot .fac svg { width: calc(var(--u)*4.4*var(--k)); height: calc(var(--u)*4.4*var(--k)); }
 .foot q { font-family: var(--prose); font-style: italic; font-size: calc(var(--u)*2.7*var(--k)); line-height: 1.2; color: var(--sub); quotes: none; padding-left: calc(var(--u)*2); border-left: calc(var(--u)*.25) solid rgba(255,255,255,.14); }
 
@@ -374,6 +375,11 @@ section[aria-labelledby] { scroll-margin-top: 60px; }
   color: var(--dim); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--brass); }
 .tabpanel { display: grid; gap: 56px; }
+.chips-f { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagleiste { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.tagleiste .chip-f { padding: 4px 7px; font-size: 13px; }
+.skill-chip.konflikt { border-color: #c0392b; color: #ff8a7a; }
+.gesperrt-hinweis { color: var(--dim); font: 500 13px var(--ui); }
 .skill-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .skill-chip { display: inline-flex; align-items: center; gap: 8px; font: 600 15px var(--ui); padding: 5px 6px 5px 10px; border-radius: 6px; background: var(--bg2); border: 1px solid var(--line); color: var(--ink); }
 .skill-chip small { color: var(--dim); font-weight: 500; }
@@ -585,6 +591,9 @@ fieldset.checks legend { margin-bottom: 6px; }
           <div class="row">
             <label class="f">Fraktion <select id="faction"></select></label>
             <div class="f">Symbol <span class="fac-preview" id="facIcon"></span></div>
+          </div>
+          <div class="f">Prägung <small class="hint" data-tip="Was die Einheit ihrem Wesen nach ist. Gegensätzliche Einträge sind für sie gesperrt: Feuer ↔ Frost, Licht ↔ Schatten. Ein Feuerelementar lernt also keine Frostzauber.">(was ist sie? ⓘ)</small>
+            <div class="chips-f" id="praegung"></div>
           </div>
           <div class="row4">
             <label class="f">Punkte <input type="number" id="points" readonly tabindex="-1" title="Rechnet die Formel automatisch aus"></label>

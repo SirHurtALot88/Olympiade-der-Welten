@@ -32,10 +32,26 @@
     { id: "tarnung", name: "Tarnung", icon: "eye" },
     { id: "einmalig", name: "Einmalig", icon: "potion" },
     { id: "technik", name: "Sci-Fi", icon: "cog" },
+    { id: "licht", name: "Licht", icon: "sun" },
+    { id: "schatten", name: "Schatten", icon: "moon" },
   ];
 
+  // Prägung einer Einheit: was sie ihrem Wesen nach ist (ein Feuerelementar ist „Feuer“). Einträge mit dem
+  // Gegenteil sind für sie gesperrt – ein Feuerelementar lernt keine Frostzauber. Neue Paare einfach hier ergänzen.
+  const PRAEGUNGEN = ["feuer", "frost", "licht", "schatten", "gift", "magie", "technik"];
+  const GEGENSAETZE = [["feuer", "frost"], ["licht", "schatten"]];
+  const gegenteilVon = tag => GEGENSAETZE.flatMap(([a, b]) => tag === a ? [b] : tag === b ? [a] : []);
+  // Liefert den ersten Widerspruch zwischen Eintrag und Prägung, sonst null
+  function konflikt(eintrag, praegung) {
+    for (const p of Array.isArray(praegung) ? praegung : []) {
+      const gegen = gegenteilVon(p).find(g => (eintrag.tags || []).includes(g));
+      if (gegen) return { praegung: p, tag: gegen };
+    }
+    return null;
+  }
+
   // Fraktionen: Name und Symbol gehören fest zusammen
-  const fr = (id, name, icon, text) => ({ id, typ: "fraktion", name, icon, text, tags: [], fuer: ["hero", "companion", "enemy"], kosten: { typ: "fest", wert: 0 }, quelle: "Standard" });
+  const fr = (id, name, icon, text, praegung = []) => ({ id, typ: "fraktion", name, icon, text, praegung, tags: [], fuer: ["hero", "companion", "enemy"], kosten: { typ: "fest", wert: 0 }, quelle: "Standard" });
   const FRAKTIONEN = [
     fr("helden", "Helden", "sun", "Die Gruppe der Spieler, egal welchen Volkes."),
     fr("menschen", "Menschen", "shield", "Königreiche, Söldner und Ritterorden."),
@@ -43,12 +59,12 @@
     fr("dunkelelfen", "Dunkelelfen", "eye", "Korsaren, Hexen und Schattenklingen."),
     fr("zwerge", "Zwerge", "hammer", "Bergfesten, Runenschmiede und Maschinen."),
     fr("orks", "Orks", "axe", "Kriegsbanden, Rohe Kraft und Blechpanzer."),
-    fr("untote", "Untote", "skull", "Skelette, Geister und Nekromanten."),
-    fr("daemonen", "Dämonen", "flame", "Beschworene Wesen aus Kristall und Feuer."),
+    fr("untote", "Untote", "skull", "Skelette, Geister und Nekromanten.", ["schatten"]),
+    fr("daemonen", "Dämonen", "flame", "Beschworene Wesen aus Kristall und Feuer.", ["feuer"]),
     fr("urwild", "Urwild", "paw", "Parasiten, Pilzwesen und Bestien der Wildnis."),
     fr("saurier", "Saurier", "fang", "Echsenkrieger und urzeitliche Riesen."),
     fr("wilde-jagd", "Wilde Jagd", "moon", "Werwölfe und Jäger, die mit dem Mond kommen."),
-    fr("frostvolk", "Frostvolk", "snow", "Eisriesen und Wanderer des ewigen Winters."),
+    fr("frostvolk", "Frostvolk", "snow", "Eisriesen und Wanderer des ewigen Winters.", ["frost"]),
   ];
 
   const f = (id, typ, name, art, fuer, tags, kostenTyp, wert, text, quelle = "Quest") =>
@@ -59,10 +75,10 @@
 
   const GRUNDBESTAND = [
     // Skills der Quest-Helden (Blatt „Abilities“ in Chris' Tabelle). Probe auf den Wert des Skills, bei Fehlschlag 1 Power.
-    f("schattenschritt", "faehigkeit", "Schattenschritt", "Skill", HELD, ["bewegung", "tarnung"], "fest", 10, "Skill, 1 Power: Bis zu 4\" bewegen. Endet die Bewegung in Deckung oder außer Sicht, +1 Verteidigung gegen Beschuss bis zur nächsten Aktivierung."),
+    f("schattenschritt", "faehigkeit", "Schattenschritt", "Skill", HELD, ["bewegung", "tarnung", "schatten"], "fest", 10, "Skill, 1 Power: Bis zu 4\" bewegen. Endet die Bewegung in Deckung oder außer Sicht, +1 Verteidigung gegen Beschuss bis zur nächsten Aktivierung."),
     f("schwachstelle", "faehigkeit", "Schwachstelle", "Skill", HELD, ["nahkampf", "staerkung"], "fest", 10, "Skill, 1 Power: Einen Feind in 1\" wählen. Eigene Nahkampfangriffe gegen ihn erhalten DS(1) bis zum Ende der Aktivierung."),
-    f("wunden-heilen", "faehigkeit", "Wunden heilen", "Skill", HELD, ["heilung"], "fest", 15, "Skill, 1 Power: Ein Verbündeter in 6\" heilt W3 Wunden."),
-    f("strahlender-schutz", "faehigkeit", "Strahlender Schutz", "Skill", HELD, ["schutz"], "fest", 10, "Skill, 1 Power: Ein Verbündeter in 6\" erhält +1 Verteidigung gegen den nächsten Angriff vor der nächsten Aktivierung."),
+    f("wunden-heilen", "faehigkeit", "Wunden heilen", "Skill", HELD, ["heilung", "licht"], "fest", 15, "Skill, 1 Power: Ein Verbündeter in 6\" heilt W3 Wunden."),
+    f("strahlender-schutz", "faehigkeit", "Strahlender Schutz", "Skill", HELD, ["schutz", "licht"], "fest", 10, "Skill, 1 Power: Ein Verbündeter in 6\" erhält +1 Verteidigung gegen den nächsten Angriff vor der nächsten Aktivierung."),
     f("beute-markieren", "faehigkeit", "Beute markieren", "Skill", HELD, ["fernkampf", "staerkung"], "fest", 10, "Skill, 1 Power: Einen sichtbaren Feind in 18\" wählen. Der nächste verbündete Angriff gegen ihn erhält +1 auf Treffer."),
     f("schlingenfalle", "faehigkeit", "Schlingenfalle", "Skill", HELD, ["betaeubung"], "fest", 5, "Skill, 1 Power: Einen Fallenmarker in 3\" legen. Der erste Feind, der sich in 1\" bewegt, erhält 1 Treffer und ist bei 4+ beeinträchtigt. Dann Marker entfernen."),
     f("reihe-halten", "faehigkeit", "Die Reihe halten", "Skill", HELD, ["schutz", "aura"], "fest", 10, "Skill, 1 Power: Bis zur nächsten Aktivierung erhalten Feinde in 3\" −1 auf Treffer gegen andere Verbündete."),
@@ -76,7 +92,7 @@
     // Sonderregeln von Chris' eigenen Gegnern (Blatt „Selfmade“)
     f("kristallsplitter", "faehigkeit", "Kristallsplitter", "Sonderregel", GEGNER, ["reaktion"], "prozent", 5, "Erleidet dieses Modell eine Wunde, erleidet der Angreifer bei einer 6 ebenfalls 1 Schaden.", "Selfmade"),
     f("saeureblut", "faehigkeit", "Säureblut", "Sonderregel", GEGNER, ["reaktion", "gift"], "prozent", 5, "Erleidet dieses Modell eine Wunde, erhält der Angreifer bei 5+ einen Treffer.", "Selfmade"),
-    f("strahlende-aura", "faehigkeit", "Strahlende Aura", "Sonderregel", GEGNER, ["aura", "flaeche"], "prozent", 20, "Feinde innerhalb von 6\" erleiden am Ende jeder Runde einen automatischen Treffer mit DS(1).", "Selfmade"),
+    f("strahlende-aura", "faehigkeit", "Strahlende Aura", "Sonderregel", GEGNER, ["aura", "flaeche", "licht"], "prozent", 20, "Feinde innerhalb von 6\" erleiden am Ende jeder Runde einen automatischen Treffer mit DS(1).", "Selfmade"),
     f("gebrochene-ketten", "faehigkeit", "Gebrochene Ketten", "Sonderregel", GEGNER, ["einmalig", "staerkung"], "prozent", 10, "Einmal pro Spiel: Fällt das Modell unter die Hälfte seiner Lebenspunkte, aktiviert es sofort ein weiteres Mal.", "Selfmade"),
     f("sporenwolke", "faehigkeit", "Sporenwolke", "Sonderregel", GEGNER, ["gift", "flaeche", "reaktion"], "prozent", 10, "Stirbt dieses Modell, erhalten alle Einheiten in 3\" je 1 Treffer mit Gift.", "Vorschlag"),
     f("blutrausch", "faehigkeit", "Blutrausch", "Sonderregel", GEGNER, ["nahkampf", "staerkung"], "prozent", 10, "Sobald das Modell höchstens die Hälfte seiner Lebenspunkte hat, erhält jede Nahkampfwaffe +1 Attacke.", "Vorschlag"),
@@ -87,9 +103,9 @@
     // Zauber: nur für Modelle mit Zauberer(X). Wurf auf den angegebenen Wert, bei Fehlschlag verpufft der Zauber.
     f("feuerball", "zauber", "Feuerball", "Zauber", ALLE, ["feuer", "flaeche", "fernkampf", "magie"], "fest", 15, "Zauber (4+): Alle Einheiten in 3\" um einen Punkt in 18\" erleiden W3 Treffer."),
     f("frostlanze", "zauber", "Frostlanze", "Zauber", ALLE, ["frost", "fernkampf", "schwaechung", "magie"], "fest", 10, "Zauber (4+): Ein Feind in 12\" erleidet 2 Treffer mit DS(1) und bewegt sich bis zu seiner nächsten Aktivierung nur halb so weit."),
-    f("heilendes-licht", "zauber", "Heilendes Licht", "Zauber", FREUNDE, ["heilung", "magie"], "fest", 10, "Zauber (4+): Ein Verbündeter in 12\" heilt W3 Wunden."),
-    f("schutzkreis", "zauber", "Schutzkreis", "Zauber", ALLE, ["schutz", "aura", "magie"], "fest", 15, "Zauber (5+): Alle Verbündeten in 6\" erhalten +1 Verteidigung bis zur nächsten Runde."),
-    f("laehmungsfluch", "zauber", "Lähmungsfluch", "Zauber", ALLE, ["betaeubung", "magie"], "fest", 15, "Zauber (5+): Ein Feind in 12\" ist betäubt und darf sich bei seiner nächsten Aktivierung nur bewegen."),
+    f("heilendes-licht", "zauber", "Heilendes Licht", "Zauber", FREUNDE, ["heilung", "magie", "licht"], "fest", 10, "Zauber (4+): Ein Verbündeter in 12\" heilt W3 Wunden."),
+    f("schutzkreis", "zauber", "Schutzkreis", "Zauber", ALLE, ["schutz", "aura", "magie", "licht"], "fest", 15, "Zauber (5+): Alle Verbündeten in 6\" erhalten +1 Verteidigung bis zur nächsten Runde."),
+    f("laehmungsfluch", "zauber", "Lähmungsfluch", "Zauber", ALLE, ["betaeubung", "magie", "schatten"], "fest", 15, "Zauber (5+): Ein Feind in 12\" ist betäubt und darf sich bei seiner nächsten Aktivierung nur bewegen."),
     f("geistwolf", "zauber", "Geistwolf", "Zauber", ALLE, ["beschwoerung", "magie"], "fest", 20, "Zauber (5+): Einen Geistwolf (Qualität 4+, Verteidigung 5+, Zäh 3, A2 Nahkampf) in 3\" aufstellen. Er bleibt bis zum Ende des Spiels."),
 
     // Gegenstände: Tränke und Bomben aus dem Quest-Kampagnenbuch (Wirkung hier als Vorschlag), dazu Ausrüstung
@@ -115,7 +131,7 @@
     w("lanze", "Lanze", "Lanze | Nahkampf | A2 | Stoß", ["nahkampf", "bewegung"], "Entfaltet ihre Wucht erst im Ansturm.", "Fantasy"),
     w("zwillingsdolche", "Zwillingsdolche", "Zwillingsdolche | Nahkampf | A4 |", ["nahkampf", "tarnung"], "Schnelle Stiche aus dem Schatten.", "Fantasy"),
     w("flammenklinge", "Flammenklinge", "Flammenklinge | Nahkampf | A2 | DS(1), Reißend", ["nahkampf", "feuer", "magie"], "Eine Runenklinge, die in der Scheide glimmt.", "Fantasy"),
-    w("seelensense", "Seelensense", "Seelensense | Nahkampf | A2 | Tödlich(3)", ["nahkampf", "furcht"], "Wen sie streift, dem folgt die Seele nach.", "Fantasy"),
+    w("seelensense", "Seelensense", "Seelensense | Nahkampf | A2 | Tödlich(3)", ["nahkampf", "furcht", "schatten"], "Wen sie streift, dem folgt die Seele nach.", "Fantasy"),
     w("dornenpeitsche", "Dornenpeitsche", "Dornenpeitsche | Nahkampf | A4 | Zerfleischen", ["nahkampf", "gift"], "Reißt Wunden, die nicht heilen wollen.", "Fantasy"),
     w("armbrust", "Armbrust", "Armbrust | 24\" | A1 | DS(1)", ["fernkampf"], "Durchschlägt ein Kettenhemd auf zwanzig Schritt.", "Fantasy"),
     w("elfenbogen", "Elfenbogen", "Elfenbogen | 30\" | A1 | Präzise", ["fernkampf"], "Aus Silberholz, trifft, wohin der Blick fällt.", "Fantasy"),
@@ -157,10 +173,10 @@
     f("hacken", "faehigkeit", "System hacken", "Skill", HELD, ["betaeubung", "technik"], "fest", 10, "Skill, 1 Power: Ein mechanischer Feind oder eine Drohne in 12\" ist bei 4+ bis zur nächsten Aktivierung betäubt.", "Sci-Fi"),
 
     // Sonderregeln der Gegner: Fantasy
-    f("wiederkehr", "faehigkeit", "Wiederkehr", "Sonderregel", GEGNER, ["heilung", "furcht"], "prozent", 20, "Stirbt das Modell, steht es bei 5+ am Ende der Runde mit 1 Lebenspunkt wieder auf.", "Fantasy"),
+    f("wiederkehr", "faehigkeit", "Wiederkehr", "Sonderregel", GEGNER, ["heilung", "furcht", "schatten"], "prozent", 20, "Stirbt das Modell, steht es bei 5+ am Ende der Runde mit 1 Lebenspunkt wieder auf.", "Fantasy"),
     f("rudeljaeger", "faehigkeit", "Rudeljäger", "Sonderregel", GEGNER, ["nahkampf", "staerkung"], "prozent", 10, "+1 Attacke je Nahkampfwaffe, wenn ein weiteres Modell derselben Fraktion dasselbe Ziel angreift.", "Fantasy"),
     f("steinhaut", "faehigkeit", "Steinhaut", "Sonderregel", GEGNER, ["schutz"], "prozent", 20, "Ignoriert Reißend und DS(1).", "Fantasy"),
-    f("lebensentzug", "faehigkeit", "Lebensentzug", "Sonderregel", GEGNER, ["heilung", "nahkampf"], "prozent", 10, "Einmal pro Runde: Verursacht das Modell im Nahkampf eine Wunde, heilt es 1 Wunde.", "Fantasy"),
+    f("lebensentzug", "faehigkeit", "Lebensentzug", "Sonderregel", GEGNER, ["heilung", "nahkampf", "schatten"], "prozent", 10, "Einmal pro Runde: Verursacht das Modell im Nahkampf eine Wunde, heilt es 1 Wunde.", "Fantasy"),
     f("netzwerfer", "faehigkeit", "Netze spinnen", "Sonderregel", GEGNER, ["betaeubung", "fernkampf"], "prozent", 10, "Einmal pro Runde: Ein Feind in 9\" bewegt sich bei 4+ bis zu seiner nächsten Aktivierung nur halb so weit.", "Fantasy"),
     // Sonderregeln der Gegner: Sci-Fi
     f("nanoregeneration", "faehigkeit", "Nanoregeneration", "Sonderregel", GEGNER, ["heilung", "technik"], "prozent", 20, "Zu Beginn jeder Aktivierung heilt das Modell 1 Wunde.", "Sci-Fi"),
@@ -173,8 +189,8 @@
     f("kettenblitz", "zauber", "Kettenblitz", "Zauber", ALLE, ["fernkampf", "flaeche", "magie"], "fest", 15, "Zauber (5+): Ein Feind in 18\" erleidet 2 Treffer, jeder weitere Feind in 3\" um ihn 1 Treffer.", "Fantasy"),
     f("wurzelgriff", "zauber", "Wurzelgriff", "Zauber", ALLE, ["betaeubung", "schwaechung", "magie"], "fest", 10, "Zauber (4+): Ein Feind in 12\" darf sich bei seiner nächsten Aktivierung nicht bewegen.", "Fantasy"),
     f("unsichtbarkeit", "zauber", "Unsichtbarkeit", "Zauber", FREUNDE, ["tarnung", "schutz", "magie"], "fest", 10, "Zauber (4+): Ein Verbündeter in 6\" kann bis zur nächsten Runde nicht aus mehr als 12\" beschossen werden.", "Fantasy"),
-    f("totenerweckung", "zauber", "Totenerweckung", "Zauber", ALLE, ["beschwoerung", "magie", "furcht"], "fest", 15, "Zauber (5+): Ein Skelett (Qualität 5+, Verteidigung 5+, Zäh 1, A1 Nahkampf) in 3\" aufstellen.", "Fantasy"),
-    f("blutpakt", "zauber", "Blutpakt", "Zauber", ALLE, ["staerkung", "magie"], "fest", 10, "Zauber (4+): Der Zauberer erleidet 1 Wunde. Ein Verbündeter in 6\" erhält bis Rundenende +1 Attacke je Waffe.", "Fantasy"),
+    f("totenerweckung", "zauber", "Totenerweckung", "Zauber", ALLE, ["beschwoerung", "magie", "furcht", "schatten"], "fest", 15, "Zauber (5+): Ein Skelett (Qualität 5+, Verteidigung 5+, Zäh 1, A1 Nahkampf) in 3\" aufstellen.", "Fantasy"),
+    f("blutpakt", "zauber", "Blutpakt", "Zauber", ALLE, ["staerkung", "magie", "schatten"], "fest", 10, "Zauber (4+): Der Zauberer erleidet 1 Wunde. Ein Verbündeter in 6\" erhält bis Rundenende +1 Attacke je Waffe.", "Fantasy"),
     // Zauber: Sci-Fi (Psi-Kräfte)
     f("psiblitz", "zauber", "Psi-Blitz", "Psi-Kraft", ALLE, ["fernkampf", "magie", "technik"], "fest", 10, "Psi (4+): Ein Feind in 18\" erleidet 2 Treffer mit DS(2).", "Sci-Fi"),
     f("gedankenkontrolle", "zauber", "Gedankenkontrolle", "Psi-Kraft", ALLE, ["schwaechung", "magie", "technik"], "fest", 20, "Psi (5+): Ein Feind in 12\" greift bei seiner nächsten Aktivierung ein Ziel deiner Wahl an, falls möglich.", "Sci-Fi"),
@@ -220,7 +236,7 @@
     return t;
   }
 
-  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, tagsFuerWaffe };
+  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
   if (typeof module !== "undefined" && module.exports) module.exports = Katalog;
   else root.Katalog = Katalog;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -179,7 +179,7 @@
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
             ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
-            <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
+            <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${ico(TAG[t].icon)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
         <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
@@ -390,8 +390,11 @@
       const an = m.faeh.has(k); const d = kostet(m, x => { if (an) x.faeh.delete(k); else x.faeh.add(k); });
       return `<button type="button" class="tgl" data-act="ab:${k}" aria-pressed="${an}" ${!an && !geht(d) ? "disabled" : ""}>${n}${preis(d)}</button>`;
     }).join("")}</div>${m.rest.length ? `<p class="hint">Eigene Regeln bleiben erhalten: ${esc(m.rest.join(", "))}</p>` : ""}</div>`;
-    html += `<div class="b-group"><h4>Aus der Datenbank</h4><div class="tgls">${alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle)).map(f => {
+    const bAngebot = alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle));
+    html += `<div class="b-group"><h4>Aus der Datenbank</h4>${tagLeiste("baukasten", bAngebot, baukasten)}<div class="tgls">${bAngebot.filter(f => m.skills.some(k => k.id === f.id) || filterPasst("baukasten", f)).map(f => {
       const an = m.skills.some(k => k.id === f.id);
+      const kf = !an && konfliktVon(f, state);
+      if (kf) return `<button type="button" class="tgl" disabled data-tip="${esc(`<b>${esc(f.name)}</b>${esc(konfliktText(kf))}`)}">${tagIcons(f.tags, false)}${esc(f.name)} 🔒</button>`;
       const d = kostet(m, x => { x.skills = an ? x.skills.filter(k => k.id !== f.id) : x.skills.concat(skillKopie(f)); });
       return `<button type="button" class="tgl" data-act="sk:${esc(f.id)}" aria-pressed="${an}" data-tip="${esc(tipText(f))}" ${!an && !geht(d) ? "disabled" : ""}>${tagIcons(f.tags, false)}${esc(f.name)}${preis(d)}</button>`;
     }).join("")}</div></div>`;
@@ -581,38 +584,72 @@
     requestAnimationFrame(() => window.print());
   }
 
+  // ---------- Tag-Filter und Prägung (gemeinsam für Werkstatt, Baukasten, Gruppe) ----------
+  // Jede Liste hat ihren eigenen Filter; ein Klick auf einen Tag zeichnet die Liste über ihren Rückruf neu.
+  const FILTER = {}, NEU_ZEICHNEN = {};
+  const filterVon = schluessel => FILTER[schluessel] || (FILTER[schluessel] = { tags: new Set(), typ: "" });
+  const TYP_KURZ = [["faehigkeit", "Fähigkeiten"], ["zauber", "Zauber"], ["gegenstand", "Gegenstände"]];
+  function tagLeiste(schluessel, eintraege, neuZeichnen) {
+    NEU_ZEICHNEN[schluessel] = neuZeichnen;
+    const f = filterVon(schluessel);
+    const tags = KAT.TAGS.filter(t => eintraege.some(e => (e.tags || []).includes(t.id)));
+    const typen = TYP_KURZ.filter(([id]) => eintraege.some(e => e.typ === id));
+    return `<div class="tagleiste" data-leiste="${schluessel}">${typen.length > 1 ? typen.map(([id, n]) => `<button type="button" class="chip-f" data-ftyp="${id}" aria-pressed="${f.typ === id}">${n}</button>`).join("") : ""}${tags.map(t =>
+      `<button type="button" class="chip-f" data-ftag="${t.id}" aria-pressed="${f.tags.has(t.id)}" data-tip="${esc(t.name)}">${ico(t.icon)}</button>`).join("")}${f.tags.size || f.typ ? `<button type="button" class="chip-f" data-freset="1">× Filter</button>` : ""}</div>`;
+  }
+  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || e.typ === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".tagleiste button"); if (!b) return;
+    const schluessel = b.closest(".tagleiste").dataset.leiste, f = filterVon(schluessel);
+    if (b.dataset.ftag) { if (f.tags.has(b.dataset.ftag)) f.tags.delete(b.dataset.ftag); else f.tags.add(b.dataset.ftag); }
+    else if (b.dataset.ftyp) f.typ = f.typ === b.dataset.ftyp ? "" : b.dataset.ftyp;
+    else { f.tags.clear(); f.typ = ""; }
+    if (NEU_ZEICHNEN[schluessel]) NEU_ZEICHNEN[schluessel]();
+  });
+  const praegungVon = s => Array.isArray(s && s.praegung) ? s.praegung : [];
+  const konfliktVon = (f, s) => KAT.konflikt(f, praegungVon(s));
+  const konfliktText = k => `Gesperrt: Die Prägung ${TAG[k.praegung].name} verträgt keine ${TAG[k.tag].name}-Einträge.`;
+  function zeigePraegung() {
+    const an = praegungVon(state);
+    $("praegung").innerHTML = KAT.PRAEGUNGEN.filter(t => TAG[t]).map(t => `<button type="button" class="chip-f" data-praeg="${t}" aria-pressed="${an.includes(t)}">${ico(TAG[t].icon)}${esc(TAG[t].name)}</button>`).join("");
+  }
+
   // ---------- Fähigkeiten: Werkstatt, Datenbank, eigene Einträge ----------
   // Auswahl in der Werkstatt: Liste mit Suche und Tag-Filter, Beschreibung per Hover
-  let pickerSuche = "", pickerTag = "";
+  let pickerSuche = "";
   function zeigeSkills() {
     const rolle = state.role || "enemy";
     const skills = Array.isArray(state.skills) ? state.skills : [];
-    $("skillChips").innerHTML = skills.length ? skills.map(k => `<span class="skill-chip" data-tip="${esc(tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`).join("")
+    zeigePraegung();
+    $("skillChips").innerHTML = skills.length ? skills.map(k => { const kf = konfliktVon(k, state); return `<span class="skill-chip${kf ? " konflikt" : ""}" data-tip="${esc(kf ? `<b>${esc(k.name)}</b>${esc(konfliktText(kf))}` : tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`; }).join("")
       : `<span class="hint">Noch keine.</span>`;
     const q = pickerSuche.toLowerCase();
-    const frei = alleFaehigkeiten().filter(f => f.fuer.includes(rolle) && !skills.some(k => k.id === f.id)
-      && (!pickerTag || (f.tags || []).includes(pickerTag)) && (!q || (f.name + " " + f.text).toLowerCase().includes(q)));
-    const genutzteTags = [...new Set(alleFaehigkeiten().flatMap(f => f.tags || []))].filter(t => TAG[t]);
+    const fuerRolle = alleFaehigkeiten().filter(f => f.fuer.includes(rolle));
+    const kandidaten = fuerRolle.filter(f => !skills.some(k => k.id === f.id) && filterPasst("werkstatt", f) && (!q || (f.name + " " + f.text).toLowerCase().includes(q)));
+    const frei = kandidaten.filter(f => !konfliktVon(f, state));
+    const gesperrt = kandidaten.length - frei.length;
     const kopf = $("skillPicker").querySelector(".picker-head");
     if (!kopf) {
-      $("skillPicker").innerHTML = `<div class="picker-head"><input type="search" id="pickerSuche" placeholder="Fähigkeit suchen" aria-label="Fähigkeit suchen"><select id="pickerTag" aria-label="Nach Tag filtern"></select></div><div class="picker-list" id="pickerListe"></div>`;
+      $("skillPicker").innerHTML = `<div class="picker-head"><input type="search" id="pickerSuche" placeholder="Fähigkeit suchen" aria-label="Fähigkeit suchen"></div><div id="pickerTags"></div><div class="picker-list" id="pickerListe"></div>`;
       $("pickerSuche").addEventListener("input", e => { pickerSuche = e.target.value; zeigeSkills(); });
-      $("pickerTag").addEventListener("change", e => { pickerTag = e.target.value; zeigeSkills(); });
     }
-    $("pickerTag").innerHTML = `<option value="">Alle Tags</option>` + genutzteTags.map(t => `<option value="${t}" ${t === pickerTag ? "selected" : ""}>${esc(TAG[t].name)}</option>`).join("");
+    $("pickerTags").innerHTML = tagLeiste("werkstatt", fuerRolle, zeigeSkills);
     $("pickerListe").innerHTML = frei.map(f => `<button type="button" class="picker-item" data-add="${esc(f.id)}" data-tip="${esc(tipText(f))}">
         <span>${tagIcons(f.tags, false)}${esc(f.name)} <small>${esc(f.art)}</small></span><small>${kostenText(f.kosten)}</small></button>`).join("")
       || `<p class="hint">Nichts gefunden.</p>`;
+    if (gesperrt) $("pickerListe").insertAdjacentHTML("beforeend", `<p class="gesperrt-hinweis">${gesperrt} weitere durch die Prägung gesperrt.</p>`);
     // Waffen aus der Datenbank
     $("weaponAdd").innerHTML = `<option value="">Waffe aus der Datenbank hinzufügen …</option>` + alleEintraege().filter(e => e.typ === "waffe")
       .map(e => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.text || e.waffe)}</option>`).join("");
   }
   // Eintrag aus der Datenbank auf die aktuelle Karte legen
   function aufKarte(f) {
+    if (f.typ !== "fraktion" && konfliktVon(f, state)) return false;
     if (f.typ === "waffe") state.weapons = [state.weapons, f.waffe].filter(x => x && x.trim()).join("\n");
     else if (f.typ === "fraktion") state.faction = f.name;
     else if (!(state.skills || []).some(k => k.id === f.id)) state.skills = (state.skills || []).concat(skillKopie(f));
     bModell = null; insFormular(); alles(); simOptionen();
+    return true;
   }
 
   const API_F = "/api/kartenschmiede/faehigkeiten";
@@ -650,7 +687,7 @@
   function karteAlsText() {
     const { upload, ...rest } = state;
     const aus = {};
-    ["name", "faction", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
+    ["name", "faction", "praegung", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
     if (upload) aus.art = "(eigenes Artwork, nicht im Text)";
     return JSON.stringify(aus, null, 2);
   }
@@ -670,6 +707,7 @@
     if (d.art && IMG[d.art]) state.art = d.art;
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
+    state.praegung = Array.isArray(d.praegung) ? d.praegung.filter(t => KAT.PRAEGUNGEN.includes(t)) : [];
     bModell = null; insFormular(); alles();
     msg.textContent = `Übernommen: ${state.name}.${neu.length ? ` Neu in der Datenbank: ${neu.join(", ")}.` : ""} Das Artwork bleibt, bis du ein neues hochlädst.`;
   }
@@ -765,7 +803,18 @@
     state.skills = (state.skills || []).filter(k => k.id !== b.dataset.skillWeg); bModell = null; alles();
   });
   $("weaponAdd").addEventListener("change", e => { const f = findeFaehigkeit(e.target.value); if (f) aufKarte(f); e.target.value = ""; });
-  $("faction").addEventListener("change", e => { state.faction = e.target.value; alles(); });
+  $("faction").addEventListener("change", e => {
+    state.faction = e.target.value;
+    const fr = fraktionVon(state.faction);
+    if (fr && fr.praegung && fr.praegung.length && !praegungVon(state).length) state.praegung = fr.praegung.slice();
+    alles();
+  });
+  $("praegung").addEventListener("click", e => {
+    const b = e.target.closest("[data-praeg]"); if (!b) return;
+    const an = praegungVon(state), t = b.dataset.praeg;
+    state.praegung = an.includes(t) ? an.filter(x => x !== t) : an.concat(t);
+    bModell = null; alles();
+  });
 
   // Tooltip: überall, wo data-tip steht (Fähigkeiten, Tags, Einträge)
   const tip = $("tip");
@@ -795,6 +844,7 @@
 
   // Schnittstelle für den Reiter „Gruppe“ (gruppe.js)
   window.KS = {
+    tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon,
     R, IMG, SERVER, STUFEN, ROLLEN, TAG, KAT, esc, ico, renderCard, passeAn, alleFaehigkeiten, alleEintraege, findeFaehigkeit, skillKopie, kostenText,
     tagIcons, tipText, iconFuer, VORLAGEN, nimmAuf, sichereEigene, aufKarte,
     eigeneIds: () => new Set(eigene.map(e => e.id)),

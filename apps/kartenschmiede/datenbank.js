@@ -191,7 +191,8 @@
     $("genOut").addEventListener("click", async e => {
       if (!vorschlag) return;
       if (e.target.closest("[data-neu-wuerfeln]")) wuerfeln();
-      else if (e.target.closest("[data-vorschlag-karte]")) { KS.aufKarte(vorschlag); $("genOut").insertAdjacentHTML("beforeend", `<p class="hint">✓ Auf »${esc(karteName())}« in der Werkstatt.</p>`); }
+      else if (e.target.closest("[data-vorschlag-karte]")) { const kf = KS.konfliktVon(vorschlag, KS.aktuelleKarte());
+        $("genOut").insertAdjacentHTML("beforeend", kf ? `<p class="hint">${esc(KS.konfliktText(kf))}</p>` : (KS.aufKarte(vorschlag), `<p class="hint">✓ Auf »${esc(karteName())}« in der Werkstatt.</p>`)); }
       else if (e.target.closest("[data-aufnehmen]")) {
         const ohneId = { ...vorschlag };
         delete ohneId.id;
@@ -215,7 +216,11 @@
         }
       } else if (k) {
         const f = KS.findeFaehigkeit(k.dataset.karte);
-        if (f) { KS.aufKarte(f); k.textContent = "✓ Auf der Karte"; k.disabled = true; }
+        if (f) {
+          const kf = KS.konfliktVon(f, KS.aktuelleKarte());
+          if (!kf && KS.aufKarte(f)) { k.textContent = "✓ Auf der Karte"; k.disabled = true; }
+          else if (kf) { k.textContent = "🔒 Gesperrt"; k.disabled = true; k.dataset.tip = KS.konfliktText(kf); }
+        }
       } else if (l) {
         if (l.dataset.sicher !== "1") { l.dataset.sicher = "1"; l.textContent = "Wirklich löschen?"; return; }
         await KS.loescheEigenen(l.dataset.loeschen); alles();

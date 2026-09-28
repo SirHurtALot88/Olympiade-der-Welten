@@ -33,8 +33,10 @@ const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
 type Faehigkeit = { id: string; typ: string; name: string; text: string; tags: string[]; waffe?: string; kosten: { typ: string; wert: number } };
 const F = laden("../apps/kartenschmiede/katalog.js") as {
   GRUNDBESTAND: Faehigkeit[];
-  FRAKTIONEN: Array<{ id: string; name: string; icon: string }>;
+  FRAKTIONEN: Array<{ id: string; name: string; icon: string; praegung: string[] }>;
   TAGS: Array<{ id: string; icon: string }>;
+  PRAEGUNGEN: string[];
+  konflikt(e: { tags: string[] }, praegung: string[]): { praegung: string; tag: string } | null;
 };
 type Eintrag = { typ: string; name: string; tags: string[]; waffe?: string; text: string; kosten: { typ: string; wert: number } };
 const G = laden("../apps/kartenschmiede/generator.js") as {
@@ -86,6 +88,18 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
       for (const t of f.tags) expect(tags).toContain(t);
       if (f.typ === "waffe") expect(R.leseWaffe(f.waffe!).a).toBeGreaterThan(0);
     }
+  });
+
+  it("sperrt Einträge, die der Prägung widersprechen", () => {
+    const frostlanze = F.GRUNDBESTAND.find(f => f.id === "frostlanze")!;
+    const feuerball = F.GRUNDBESTAND.find(f => f.id === "feuerball")!;
+    expect(F.konflikt(frostlanze, ["feuer"])).toEqual({ praegung: "feuer", tag: "frost" });
+    expect(F.konflikt(feuerball, ["feuer"])).toBeNull();
+    expect(F.konflikt(F.GRUNDBESTAND.find(f => f.id === "heilendes-licht")!, ["schatten"])).not.toBeNull();
+    expect(F.konflikt(frostlanze, [])).toBeNull();
+    const tags = new Set(F.TAGS.map(t => t.id));
+    for (const p of F.PRAEGUNGEN) expect(tags).toContain(p);
+    for (const fr of F.FRAKTIONEN) for (const p of fr.praegung) expect(F.PRAEGUNGEN).toContain(p);
   });
 
   it("gibt jeder Fraktion genau ein eigenes Symbol", () => {
