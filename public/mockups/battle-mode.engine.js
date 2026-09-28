@@ -30371,6 +30371,49 @@
     const n=BAHNEN_N(), steigung=BA().steigung??0.85;
     const griffe=BA().hindernisse||[];
 
+    // ================== FERNE FELSKULISSE, PARALLAX (Broadcast-Optik Phase 5,
+    // Climbing-Audit-Fund 28.09., Klasse A) ==================
+    // Der Opus-Audit stellte Climbing direkt neben Breaking und fand die Wand "Punkte auf
+    // Linien vor leerem Hintergrund" -- keine Tiefe, kein Gefuehl fuer Hoehe. Drei
+    // Bergsilhouetten-Baender HINTER der eigentlichen Wand beheben das mit dem klassischen
+    // Parallax-Trick: je weiter weg, desto langsamer scrollt die Schicht relativ zum
+    // tatsaechlichen Klettertempo -- genau das Signal, das dem Auge "das ist weit weg, ich
+    // steige daran vorbei" sagt, statt einer mitlaufenden Tapete.
+    //
+    // `scrollPx` ist derselbe Weltversatz in Bildschirm-Pixeln, den camY() fuer Griffe/
+    // Kletterer bei RATE 1 (voller Geschwindigkeit) ohnehin schon anwendet (`oben*zoom`,
+    // s. camY()-Definition oben) -- hier nur je Schicht gedaempft (0,25/0,4/0,6) und, weil
+    // dieser Versatz ueber ein ganzes Rennen die Bildhoehe um ein Vielfaches uebersteigen
+    // kann, GEKACHELT (Modulo TILE), damit die Kulisse nie ausgeht, egal wie weit die
+    // Kamera schon gewandert ist. Reine additive Bildschicht vor jeder anderen Zeichnung
+    // dieser Funktion -- kein Leser von `scrollPx`/den Kachel-Werten sitzt in
+    // stepSpurt/tempoVon/MOTOREN.climbing.wert(), derselbe Vertrag wie jede andere
+    // boden*()-Zeichnung.
+    {
+      const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE=220;
+      const SCHICHTEN=[[0.60,"rgba(28,25,23,.50)",0.30],[0.40,"rgba(37,32,29,.60)",0.20],
+                        [0.25,"rgba(49,43,39,.72)",0.12]];
+      SCHICHTEN.forEach(([rate,farbe,amp],si)=>{
+        const off=((scrollPx*rate)%TILE+TILE)%TILE;
+        ctx.fillStyle=farbe;
+        const reihen=Math.ceil(H/TILE)+2;
+        for(let row=-1;row<reihen;row++){
+          const baseY=row*TILE-off;
+          if(baseY>H||baseY+TILE<0)continue;
+          ctx.beginPath();
+          ctx.moveTo(0,baseY+TILE);
+          const SCHRITTE=9;
+          for(let k=0;k<=SCHRITTE;k++){
+            const x=k*W/SCHRITTE;
+            const zack=bodenSaat(si*401+row*97+k*13)*TILE*amp;
+            ctx.lineTo(x,baseY+TILE*0.4+zack);
+          }
+          ctx.lineTo(W,baseY+TILE);
+          ctx.closePath(); ctx.fill();
+        }
+      });
+    }
+
     // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Wandfuss (0) zu
     // Top-out (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" ist jetzt
     // wortwoertlich "nach oben dunkler", exakt die Kletterrichtung.
@@ -30384,15 +30427,25 @@
       ctx.fillRect(0,y0,W,Math.max(1,y1-y0));
     }
     // Riss-/Kantenlinien, dieselbe Koernung wie vorher (bodenSaat), nur um 90 Grad gedreht --
-    // die Wand steht jetzt, sie liegt nicht mehr.
+    // die Wand steht jetzt, sie liegt nicht mehr. SCROLLT JETZT MIT (Climbing-Audit-Fund
+    // 28.09.): vorher waren x0/y0 reine Bildschirm-Bruchteile, unabhaengig von Kamera-Zoom
+    // oder -Schwenk -- die Risse standen still, waehrend die Wand darunter fuhr, was die
+    // Textur wie eine aufgeklebte Folie statt wie die Wand selbst aussehen liess. Derselbe
+    // `scrollPx`-Trick wie bei der Felskulisse oben, aber RATE 1 (volles Tempo, wie die
+    // Griffe/Kletterer selbst) -- die Risse sind Teil der Wandoberflaeche, nicht des
+    // Hintergrunds, muessen also mit ihr mitlaufen. TILE_RISS deutlich groesser als H, damit
+    // beim Kacheln nicht dieselben 22 Risse im selben Bildausschnitt doppelt auftauchen.
     ctx.save();
     ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
-    for(let i=0;i<22;i++){
-      const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
-      const x0=fx*W, y0=fy*(H+120)-60;
-      const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
-      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
+    {
+      const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE_RISS=H+240;
+      for(let i=0;i<22;i++){
+        const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
+        const x0=fx*W, y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
+        const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
+      }
     }
     ctx.restore();
 
@@ -30572,31 +30625,47 @@
       });
     }
 
-    // ---- Countdown (Bug 1, Broadcast-Optik-Recherche 27.09., C1): der Platzhaltertext
-    // "ZEITLIMIT — aktiviert in PR 2" blieb stehen, obwohl PR 2 laengst gemergt ist und
-    // `BA().zeitlimit` (16,3 Simulationssekunden, s. Rezept weiter oben) das Rennen
-    // tatsaechlich beendet (`rennT>=BA().zeitlimit`, stepSpurt). Das war eine echte
-    // Falschinformation im Bild: der Zuschauer las "kein Zeitlimit", waehrend eines lief.
-    // Ersatz: ein echter Countdown in ZUSCHAUER-Sekunden (`zeitlimit*zeitFaktor()` ist
-    // dieselbe Umrechnung wie ueberall sonst bei Bahn-Disziplinen, s. `angezeigt` in
-    // updateHudBahn), die letzten zehn rot und pulsierend. UNTEN RECHTS bleibt (Screenshot-
-    // Gegenprobe 24.09.): oben rechts liegt bereits der Broadcast-Bug (`.bbug`,
-    // `top:8px;right:8px`, "Armageddon Aftermath"-Kasten).
-    ctx.font="bold 12px system-ui,sans-serif";ctx.textAlign="right";ctx.textBaseline="alphabetic";
-    const zl=BA().zeitlimit;
-    if(zl){
-      const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
-      const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
-      const knapp=restEcht<=10;
-      ctx.fillStyle=knapp
-        ?("rgba(224,90,74,"+(0.55+0.35*Math.abs(Math.sin(rennT*6))).toFixed(3)+")")
-        :"rgba(230,225,210,.65)";
-      ctx.fillText("ZEITLIMIT "+mm+":"+String(ss).padStart(2,"0"),W-14,H-12);
-    } else {
-      // Fallback, falls `zeitlimit` einmal fehlt (Sonden/Fallback-Rezepte): weiterhin klar
-      // als inaktiv erkennbar, statt eine Zeit zu behaupten, die es nicht gibt.
-      ctx.fillStyle="rgba(230,225,210,.50)";
-      ctx.fillText("ZEITLIMIT — kein Limit gesetzt",W-14,H-12);
+    // ---- Countdown (Bug 1, Broadcast-Optik-Recherche 27.09., C1; UEBERARBEITET
+    // Climbing-Audit-Fund, Broadcast-Optik Phase 5, 28.09., Klasse A): der Opus-Audit
+    // verglich Climbing direkt mit dem Nachbarn Breaking und fand die bisherige Fassung --
+    // 12px System-UI, kein Rahmen, 65 % Deckkraft, unten rechts -- "eine kaum sichtbare
+    // Ecknotiz", waehrend Breaking "wie echte TV-Grafik" liest. Ersetzt durch dieselbe
+    // Kastenform, die die Basketball-Wurfuhr (zeichneShotClock(), s. dort) fuer denselben
+    // Anwendungsfall -- eine ablaufende Uhr, die der Zuschauer im Blick behalten soll --
+    // im selben Paket schon zeigt: gefuellte Box mit Rahmen, fette Ziffern, rot und
+    // pulsierend sobald es knapp wird, statt reinem Text auf der Felswand. Position bleibt
+    // unten rechts (dort steht bei Climbing nichts im Weg, s. PR-Beschreibung/Screenshot-
+    // Gegenprobe) -- rein die GROESSE und die Box machen aus der Notiz eine Anzeige.
+    {
+      const zl=BA().zeitlimit;
+      const boxW=104, boxH=36, bx=W-14-boxW, by=H-14-boxH;
+      ctx.save();
+      ctx.textAlign="center";ctx.textBaseline="alphabetic";
+      if(zl){
+        const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
+        const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
+        const knapp=restEcht<=10;
+        ctx.fillStyle=knapp
+          ?("rgba(198,42,48,"+(0.75+0.25*Math.abs(Math.sin(rennT*6))).toFixed(3)+")")
+          :"rgba(17,24,35,.82)";
+        ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)"; ctx.lineWidth=1.4;
+        ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,255,255,.78)";
+        ctx.fillText("ZEITLIMIT",bx+boxW/2,by+12);
+        ctx.font="800 19px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#fff";
+        ctx.fillText(mm+":"+String(ss).padStart(2,"0"),bx+boxW/2,by+31);
+      } else {
+        // Fallback, falls `zeitlimit` einmal fehlt (Sonden/Fallback-Rezepte): weiterhin klar
+        // als inaktiv erkennbar, statt eine Zeit zu behaupten, die es nicht gibt.
+        ctx.fillStyle="rgba(17,24,35,.6)"; ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1; ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.6)";
+        ctx.fillText("ZEITLIMIT",bx+boxW/2,by+16);
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.5)";
+        ctx.fillText("kein Limit",bx+boxW/2,by+29);
+      }
+      ctx.restore();
     }
     ctx.textAlign="left";
   }
@@ -32601,6 +32670,52 @@
     // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
     // schwenken oder heranzuzoomen. `ovalPunkt()` liest `cam` ohnehin nie.
     if(istOval())return;
+    // ================== WAND: HEADROOM STATT HARTEM SCHNITT (Broadcast-Optik Phase 5,
+    // Climbing-Audit-Fund 28.09., Klasse A) ==================
+    // Der Opus-Audit verglich Climbing direkt mit dem Nachbarn Breaking und fand die
+    // Kletterer "am oberen Rand des Bildes abgeschnitten". Nachgemessen, nicht vermutet: der
+    // generische Zweig unten (der bis hierhin auch fuer die Wand lief) speist zielCx/
+    // zielZoom NUR aus `aktiv=LAEUFER.filter(u=>u.fertig==null)` -- ein Kletterer, der
+    // toppt, faellt in genau dem Moment aus dieser Menge heraus, in dem er am hoechsten
+    // steht. Bleiben andere Routen weiter unten aktiv, zentriert der generische Zweig die
+    // Kamera auf DIE, das Bildfenster rutscht nach unten, und der bereits getoppte
+    // Kletterer (der weiter an seiner Position `u.pos=1` gezeichnet wird, s. laeuferXY())
+    // steht ploetzlich OBERHALB des Kamerafensters -- camY() kennt dafuer keine Grenze nach
+    // oben, das Bild schneidet ihn hart ab. Zusaetzlich liess derselbe Zweig nur 0,10
+    // Gesamt-Polster symmetrisch um die Mitte -- zu wenig Luft fuer eine nach oben
+    // greifende Figur plus Schwebetext (s. `laeuferSchwebeXY`-Kommentar oben), selbst wenn
+    // sie im Fenster bleibt.
+    //
+    // Behoben mit einer eigenen, climbing-only Kamera (bewusst NICHT der generische Zweig
+    // unten geaendert -- der bedient Spurt/Zeitfahren/Takeshi unveraendert weiter, keine
+    // Nebenwirkung fuer andere Bahnen):
+    //  1. ALLE LAEUFER statt nur der Aktiven -- ein getoppter Kletterer bleibt Teil der
+    //     Kamera-Spanne, bis buchstaeblich jeder fertig ist (dann faellt ohnehin niemand
+    //     mehr aus der Menge heraus). Reiner Lesezugriff auf `u.pos`, dieselbe Groesse, die
+    //     laeuferXY() fuer die Position ohnehin schon liest -- kein neues Feld, kein rr().
+    //  2. ASYMMETRISCHES POLSTER statt eines symmetrischen: mehr Luft UEBER dem hoechsten
+    //     Kletterer (WAND_KOPF_LUFT) als UNTER dem niedrigsten (WAND_FUSS_LUFT) -- eine
+    //     Figur reicht nach oben zum naechsten Griff, nicht nach unten, und am Wandfuss
+    //     steht ohnehin schon der Sicherer mit seinem eigenen festen Rand (s. `sy` in
+    //     bodenWand()).
+    // `u.pos`/`camY`/`cam.zoom`/`cam.cx` bleiben exakt dieselben Groessen, die die Wand
+    // ohnehin schon zeichnet -- rein die Eingabe fuer ihre Zielwerte aendert sich. Kein
+    // Leser von `cam` sitzt in stepSpurt/tempoVon/MOTOREN.climbing.wert(), also rho-neutral
+    // vor jeder Messung (s. PR-Beschreibung fuer die miss-alle-disziplinen.mjs-Gegenprobe).
+    if(istWand()){
+      if(!LAEUFER.length)return;
+      let minP=LAEUFER[0].pos,maxP=LAEUFER[0].pos;
+      for(const u of LAEUFER){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
+      const WAND_KOPF_LUFT=0.085, WAND_FUSS_LUFT=0.04;
+      const von=Math.max(0,minP-WAND_FUSS_LUFT), bis=Math.min(1,maxP+WAND_KOPF_LUFT);
+      const spanne=Math.max(0.05,bis-von);
+      const zielZoom=Math.max(1,Math.min(3.4,1/spanne));
+      const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
+      const t=Math.min(1,dt*1.8);
+      cam.zoom+=(zielZoom-cam.zoom)*t;
+      cam.cx+=(zielCx-cam.cx)*t;
+      return;
+    }
     // EINZELKAMERA (Zeitfahren-Fokus, Recherche Abschnitt 4.3): zoomt eng auf GENAU einen
     // Laeufer, wie ein Kamerawagen, der neben ihm herfaehrt — statt der Bounding-Box aller
     // noch Laufenden darunter. Gated hinter `BA().startAbstand` (nur Time-Trial setzt es)
