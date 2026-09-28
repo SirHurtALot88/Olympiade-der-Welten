@@ -1,4 +1,4 @@
-/* Kartenschmiede – Katalog: Tags, Fraktionen und der Grundbestand der Datenbank.
+/* Kartenschmiede – Katalog: Tags, Fraktionen und der Standardbestand der Datenbank.
    Einträge haben einen Typ: faehigkeit, zauber, gegenstand, waffe oder fraktion.
    Kosten:
      kosten.typ "fest"    → Punkte obendrauf (Skills, Auren, Zauber, Gegenstände); Stufen nach Chris' „Punktelogiken“:
@@ -31,10 +31,11 @@
     { id: "reaktion", name: "Reaktion", icon: "bolt" },
     { id: "tarnung", name: "Tarnung", icon: "eye" },
     { id: "einmalig", name: "Einmalig", icon: "potion" },
+    { id: "technik", name: "Sci-Fi", icon: "cog" },
   ];
 
   // Fraktionen: Name und Symbol gehören fest zusammen
-  const fr = (id, name, icon, text) => ({ id, typ: "fraktion", name, icon, text, tags: [], fuer: ["hero", "companion", "enemy"], kosten: { typ: "fest", wert: 0 }, quelle: "Grundbestand" });
+  const fr = (id, name, icon, text) => ({ id, typ: "fraktion", name, icon, text, tags: [], fuer: ["hero", "companion", "enemy"], kosten: { typ: "fest", wert: 0 }, quelle: "Standard" });
   const FRAKTIONEN = [
     fr("helden", "Helden", "sun", "Die Gruppe der Spieler, egal welchen Volkes."),
     fr("menschen", "Menschen", "shield", "Königreiche, Söldner und Ritterorden."),
@@ -52,8 +53,8 @@
 
   const f = (id, typ, name, art, fuer, tags, kostenTyp, wert, text, quelle = "Quest") =>
     ({ id, typ, name, art, fuer, tags, kosten: { typ: kostenTyp, wert }, text, quelle });
-  const w = (id, name, zeile, tags, text) => ({ id, typ: "waffe", name, art: /Nahkampf/.test(zeile) ? "Nahkampf" : "Fernkampf",
-    fuer: ["hero", "companion", "enemy"], tags, waffe: zeile, kosten: { typ: "fest", wert: 0 }, text, quelle: "Grundbestand" });
+  const w = (id, name, zeile, tags, text, quelle = "Standard") => ({ id, typ: "waffe", name, art: /Nahkampf/.test(zeile) ? "Nahkampf" : "Fernkampf",
+    fuer: ["hero", "companion", "enemy"], tags, waffe: zeile, kosten: { typ: "fest", wert: 0 }, text, quelle });
   const HELD = ["hero"], ALLE = ["hero", "companion", "enemy"], GEGNER = ["enemy", "companion"], FREUNDE = ["hero", "companion"];
 
   const GRUNDBESTAND = [
@@ -106,6 +107,94 @@
     w("giftspeichel", "Giftspeichel", "Giftspeichel | 12\" | A3 | Gift", ["fernkampf", "gift"], "Ätzender Strahl aus dem Rachen."),
     w("splitterwerfer", "Splitterwerfer", "Splitterwerfer | 18\" | A2 | DS(1), Explosion(3)", ["fernkampf", "flaeche"], "Schleudert Kristallsplitter, die beim Aufprall zerbersten."),
     w("jagdbogen", "Jagdbogen", "Jagdbogen | 24\" | A2 |", ["fernkampf"], "Langer Bogen der Waldläufer."),
+
+    // ---------- Fantasy-Erweiterung (angelehnt an die Waffen und Sonderregeln aus Age of Fantasy) ----------
+    w("langschwert", "Langschwert", "Langschwert | Nahkampf | A2 |", ["nahkampf"], "Die Waffe jedes Ritters und Söldners.", "Fantasy"),
+    w("zweihaender", "Zweihänder", "Zweihänder | Nahkampf | A3 | DS(1)", ["nahkampf"], "Langsam gezogen, schnell bereut.", "Fantasy"),
+    w("kriegshammer", "Kriegshammer", "Kriegshammer | Nahkampf | A2 | DS(2)", ["nahkampf"], "Zertrümmert Plattenpanzer samt Inhalt.", "Fantasy"),
+    w("lanze", "Lanze", "Lanze | Nahkampf | A2 | Stoß", ["nahkampf", "bewegung"], "Entfaltet ihre Wucht erst im Ansturm.", "Fantasy"),
+    w("zwillingsdolche", "Zwillingsdolche", "Zwillingsdolche | Nahkampf | A4 |", ["nahkampf", "tarnung"], "Schnelle Stiche aus dem Schatten.", "Fantasy"),
+    w("flammenklinge", "Flammenklinge", "Flammenklinge | Nahkampf | A2 | DS(1), Reißend", ["nahkampf", "feuer", "magie"], "Eine Runenklinge, die in der Scheide glimmt.", "Fantasy"),
+    w("seelensense", "Seelensense", "Seelensense | Nahkampf | A2 | Tödlich(3)", ["nahkampf", "furcht"], "Wen sie streift, dem folgt die Seele nach.", "Fantasy"),
+    w("dornenpeitsche", "Dornenpeitsche", "Dornenpeitsche | Nahkampf | A4 | Zerfleischen", ["nahkampf", "gift"], "Reißt Wunden, die nicht heilen wollen.", "Fantasy"),
+    w("armbrust", "Armbrust", "Armbrust | 24\" | A1 | DS(1)", ["fernkampf"], "Durchschlägt ein Kettenhemd auf zwanzig Schritt.", "Fantasy"),
+    w("elfenbogen", "Elfenbogen", "Elfenbogen | 30\" | A1 | Präzise", ["fernkampf"], "Aus Silberholz, trifft, wohin der Blick fällt.", "Fantasy"),
+    w("wurfaexte", "Wurfäxte", "Wurfäxte | 6\" | A2 |", ["fernkampf", "nahkampf"], "Erst geworfen, dann nachgesetzt.", "Fantasy"),
+    w("wurfspeer", "Wurfspeer", "Wurfspeer | 12\" | A1 | DS(1)", ["fernkampf"], "Leicht, schnell und tödlich genau.", "Fantasy"),
+    w("blitzstab", "Blitzstab", "Blitzstab | 18\" | A2 | DS(1)", ["fernkampf", "magie"], "Ein Stab, der nach Gewitter riecht.", "Fantasy"),
+    w("drachenatem", "Drachenatem", "Drachenatem | 12\" | A1 | Explosion(6), Zuverlässig", ["fernkampf", "feuer", "flaeche"], "Ein Feuerstoß, dem niemand ausweicht.", "Fantasy"),
+    w("steinschleuder", "Steinschleuder", "Steinschleuder | 36\" | A1 | DS(1), Explosion(3), Indirekt", ["fernkampf", "flaeche"], "Belagerungswaffe, feuert über Mauern hinweg.", "Fantasy"),
+
+    // ---------- Sci-Fi-Erweiterung (angelehnt an die Waffen aus Grimdark Future) ----------
+    w("laserpistole", "Laserpistole", "Laserpistole | 12\" | A1 |", ["fernkampf", "technik"], "Handlich, zuverlässig, überall zu haben.", "Sci-Fi"),
+    w("lasergewehr", "Lasergewehr", "Lasergewehr | 24\" | A1 |", ["fernkampf", "technik"], "Standardwaffe jeder Söldnertruppe.", "Sci-Fi"),
+    w("sturmgewehr", "Sturmgewehr", "Sturmgewehr | 24\" | A3 |", ["fernkampf", "technik"], "Viel Blei, wenig Feinheit.", "Sci-Fi"),
+    w("pulsgewehr", "Pulsgewehr", "Pulsgewehr | 30\" | A1 | DS(1)", ["fernkampf", "technik"], "Verschießt gebündelte Energiepakete.", "Sci-Fi"),
+    w("plasmagewehr", "Plasmagewehr", "Plasmagewehr | 24\" | A1 | DS(3), Überhitzen", ["fernkampf", "feuer", "technik"], "Schmilzt Panzerung – und manchmal den Schützen.", "Sci-Fi"),
+    w("flammenwerfer", "Flammenwerfer", "Flammenwerfer | 9\" | A1 | Explosion(3), Zuverlässig", ["fernkampf", "feuer", "flaeche", "technik"], "Räumt Gräben und Gänge.", "Sci-Fi"),
+    w("kryowerfer", "Kryowerfer", "Kryowerfer | 12\" | A2 | DS(1)", ["fernkampf", "frost", "technik"], "Friert Gelenke und Servos ein.", "Sci-Fi"),
+    w("granatwerfer", "Granatwerfer", "Granatwerfer | 24\" | A1 | Explosion(3), Indirekt", ["fernkampf", "flaeche", "technik"], "Hinter der Deckung ist man nicht sicher.", "Sci-Fi"),
+    w("raketenwerfer", "Raketenwerfer", "Raketenwerfer | 30\" | A1 | DS(2), Explosion(3), Zielsuchend", ["fernkampf", "flaeche", "technik"], "Findet sein Ziel auch hinter Rauch.", "Sci-Fi"),
+    w("scharfschuetzengewehr", "Scharfschützengewehr", "Scharfschützengewehr | 36\" | A1 | DS(1), Präzise", ["fernkampf", "tarnung", "technik"], "Ein Schuss, ein Name weniger.", "Sci-Fi"),
+    w("schienenkanone", "Schienenkanone", "Schienenkanone | 36\" | A1 | DS(4), Tödlich(3)", ["fernkampf", "technik"], "Magnetisch beschleunigter Bolzen, der Panzer knackt.", "Sci-Fi"),
+    w("kettenschwert", "Kettenschwert", "Kettenschwert | Nahkampf | A3 | Reißend", ["nahkampf", "technik"], "Kreischende Zähne aus Stahl.", "Sci-Fi"),
+    w("energieschwert", "Energieschwert", "Energieschwert | Nahkampf | A2 | DS(2)", ["nahkampf", "technik"], "Ein Feld aus Energie schneidet durch jede Rüstung.", "Sci-Fi"),
+    w("energiefaust", "Energiefaust", "Energiefaust | Nahkampf | A2 | DS(4)", ["nahkampf", "technik"], "Langsam, aber was sie trifft, bleibt liegen.", "Sci-Fi"),
+    w("monoklinge", "Monomolekularklinge", "Monomolekularklinge | Nahkampf | A2 | Zersetzen", ["nahkampf", "technik"], "Eine Schneide, dünner als ein Atom.", "Sci-Fi"),
+    w("schockstab", "Schockstab", "Schockstab | Nahkampf | A2 | Stoß", ["nahkampf", "betaeubung", "technik"], "Elektrischer Schlag, der Muskeln lähmt.", "Sci-Fi"),
+
+    // Fähigkeiten der Helden: Fantasy
+    f("wirbelwind", "faehigkeit", "Wirbelwind", "Skill", HELD, ["nahkampf", "flaeche"], "fest", 15, "Skill, 1 Power: Jeder Feind in 1\" erleidet 1 Treffer mit DS(1).", "Fantasy"),
+    f("schlachtruf", "faehigkeit", "Schlachtruf", "Skill", HELD, ["aura", "staerkung", "nahkampf"], "fest", 10, "Skill, 1 Power: Verbündete in 6\" erhalten bis zum Ende der Runde +1 auf Nahkampftreffer.", "Fantasy"),
+    f("gezielter-schuss", "faehigkeit", "Gezielter Schuss", "Skill", HELD, ["fernkampf", "staerkung"], "fest", 10, "Skill, 1 Power: Der nächste Fernkampfangriff dieser Aktivierung erhält Präzise und DS(+1).", "Fantasy"),
+    f("ausweichrolle", "faehigkeit", "Ausweichrolle", "Skill", HELD, ["bewegung", "reaktion"], "fest", 5, "Skill, 1 Power, als Reaktion: Nach einem Nahkampfangriff gegen diesen Helden bis zu 3\" wegbewegen.", "Fantasy"),
+    f("tiergefaehrte", "faehigkeit", "Ruf der Wildnis", "Skill", HELD, ["beschwoerung"], "fest", 15, "Skill, 2 Power: Einen Wolf (Qualität 4+, Verteidigung 5+, Zäh 2, A2 Nahkampf) in 3\" aufstellen. Höchstens einer zugleich.", "Fantasy"),
+    // Fähigkeiten der Helden: Sci-Fi
+    f("tarnfeld", "faehigkeit", "Tarnfeld", "Skill", HELD, ["tarnung", "schutz", "technik"], "fest", 10, "Skill, 1 Power: Bis zur nächsten Aktivierung −1 auf Treffer gegen diesen Helden.", "Sci-Fi"),
+    f("zielerfassung", "faehigkeit", "Zielerfassung", "Skill", HELD, ["fernkampf", "staerkung", "technik"], "fest", 10, "Skill, 1 Power: Einen Feind in 24\" markieren. Fernkampfangriffe gegen ihn erhalten bis Rundenende Zielsuchend.", "Sci-Fi"),
+    f("kampfdrohne", "faehigkeit", "Kampfdrohne", "Skill", HELD, ["beschwoerung", "fernkampf", "technik"], "fest", 15, "Skill, 2 Power: Eine Kampfdrohne (Qualität 4+, Verteidigung 5+, Zäh 1, Fliegen, Laser 12\" A1) in 3\" aufstellen. Höchstens eine zugleich.", "Sci-Fi"),
+    f("ueberladung", "faehigkeit", "Überladung", "Skill", HELD, ["staerkung", "technik"], "fest", 5, "Skill, 1 Power: Eine Fernkampfwaffe erhält für einen Angriff +1 Attacke und Überhitzen.", "Sci-Fi"),
+    f("hacken", "faehigkeit", "System hacken", "Skill", HELD, ["betaeubung", "technik"], "fest", 10, "Skill, 1 Power: Ein mechanischer Feind oder eine Drohne in 12\" ist bei 4+ bis zur nächsten Aktivierung betäubt.", "Sci-Fi"),
+
+    // Sonderregeln der Gegner: Fantasy
+    f("wiederkehr", "faehigkeit", "Wiederkehr", "Sonderregel", GEGNER, ["heilung", "furcht"], "prozent", 20, "Stirbt das Modell, steht es bei 5+ am Ende der Runde mit 1 Lebenspunkt wieder auf.", "Fantasy"),
+    f("rudeljaeger", "faehigkeit", "Rudeljäger", "Sonderregel", GEGNER, ["nahkampf", "staerkung"], "prozent", 10, "+1 Attacke je Nahkampfwaffe, wenn ein weiteres Modell derselben Fraktion dasselbe Ziel angreift.", "Fantasy"),
+    f("steinhaut", "faehigkeit", "Steinhaut", "Sonderregel", GEGNER, ["schutz"], "prozent", 20, "Ignoriert Reißend und DS(1).", "Fantasy"),
+    f("lebensentzug", "faehigkeit", "Lebensentzug", "Sonderregel", GEGNER, ["heilung", "nahkampf"], "prozent", 10, "Einmal pro Runde: Verursacht das Modell im Nahkampf eine Wunde, heilt es 1 Wunde.", "Fantasy"),
+    f("netzwerfer", "faehigkeit", "Netze spinnen", "Sonderregel", GEGNER, ["betaeubung", "fernkampf"], "prozent", 10, "Einmal pro Runde: Ein Feind in 9\" bewegt sich bei 4+ bis zu seiner nächsten Aktivierung nur halb so weit.", "Fantasy"),
+    // Sonderregeln der Gegner: Sci-Fi
+    f("nanoregeneration", "faehigkeit", "Nanoregeneration", "Sonderregel", GEGNER, ["heilung", "technik"], "prozent", 20, "Zu Beginn jeder Aktivierung heilt das Modell 1 Wunde.", "Sci-Fi"),
+    f("selbstzerstoerung", "faehigkeit", "Selbstzerstörung", "Sonderregel", GEGNER, ["flaeche", "reaktion", "technik"], "prozent", 5, "Stirbt das Modell, erleidet jede Einheit in 3\" 1 Treffer mit DS(2).", "Sci-Fi"),
+    f("energieschild-gegner", "faehigkeit", "Schildgenerator", "Sonderregel", GEGNER, ["schutz", "aura", "technik"], "prozent", 20, "Verbündete in 6\" erhalten +1 Verteidigung gegen Beschuss.", "Sci-Fi"),
+    f("zielsystem", "faehigkeit", "Zielsystem", "Sonderregel", GEGNER, ["fernkampf", "technik"], "prozent", 10, "Alle Fernkampfwaffen des Modells sind Zielsuchend.", "Sci-Fi"),
+    f("schwarmintelligenz", "faehigkeit", "Schwarmintelligenz", "Sonderregel", GEGNER, ["aura", "staerkung", "technik"], "prozent", 10, "Solange ein weiteres Modell derselben Fraktion in 6\" steht: Furchtlos und +1 auf Treffer.", "Sci-Fi"),
+
+    // Zauber: Fantasy
+    f("kettenblitz", "zauber", "Kettenblitz", "Zauber", ALLE, ["fernkampf", "flaeche", "magie"], "fest", 15, "Zauber (5+): Ein Feind in 18\" erleidet 2 Treffer, jeder weitere Feind in 3\" um ihn 1 Treffer.", "Fantasy"),
+    f("wurzelgriff", "zauber", "Wurzelgriff", "Zauber", ALLE, ["betaeubung", "schwaechung", "magie"], "fest", 10, "Zauber (4+): Ein Feind in 12\" darf sich bei seiner nächsten Aktivierung nicht bewegen.", "Fantasy"),
+    f("unsichtbarkeit", "zauber", "Unsichtbarkeit", "Zauber", FREUNDE, ["tarnung", "schutz", "magie"], "fest", 10, "Zauber (4+): Ein Verbündeter in 6\" kann bis zur nächsten Runde nicht aus mehr als 12\" beschossen werden.", "Fantasy"),
+    f("totenerweckung", "zauber", "Totenerweckung", "Zauber", ALLE, ["beschwoerung", "magie", "furcht"], "fest", 15, "Zauber (5+): Ein Skelett (Qualität 5+, Verteidigung 5+, Zäh 1, A1 Nahkampf) in 3\" aufstellen.", "Fantasy"),
+    f("blutpakt", "zauber", "Blutpakt", "Zauber", ALLE, ["staerkung", "magie"], "fest", 10, "Zauber (4+): Der Zauberer erleidet 1 Wunde. Ein Verbündeter in 6\" erhält bis Rundenende +1 Attacke je Waffe.", "Fantasy"),
+    // Zauber: Sci-Fi (Psi-Kräfte)
+    f("psiblitz", "zauber", "Psi-Blitz", "Psi-Kraft", ALLE, ["fernkampf", "magie", "technik"], "fest", 10, "Psi (4+): Ein Feind in 18\" erleidet 2 Treffer mit DS(2).", "Sci-Fi"),
+    f("gedankenkontrolle", "zauber", "Gedankenkontrolle", "Psi-Kraft", ALLE, ["schwaechung", "magie", "technik"], "fest", 20, "Psi (5+): Ein Feind in 12\" greift bei seiner nächsten Aktivierung ein Ziel deiner Wahl an, falls möglich.", "Sci-Fi"),
+    f("telekinese", "zauber", "Telekinetischer Stoß", "Psi-Kraft", ALLE, ["bewegung", "magie", "technik"], "fest", 10, "Psi (4+): Ein Modell in 12\" wird bis zu 6\" in beliebige Richtung versetzt.", "Sci-Fi"),
+    f("stasisfeld", "zauber", "Stasisfeld", "Psi-Kraft", ALLE, ["betaeubung", "flaeche", "magie", "technik"], "fest", 15, "Psi (5+): Alle Einheiten in 3\" um einen Punkt in 12\" sind bis zu ihrer nächsten Aktivierung betäubt.", "Sci-Fi"),
+
+    // Gegenstände: Fantasy
+    f("rauchbombe", "gegenstand", "Rauchbombe", "Bombe", FREUNDE, ["tarnung", "einmalig"], "fest", 5, "Einmal: Bis zur nächsten Runde kann der Held nicht beschossen werden.", "Fantasy"),
+    f("wurfnetz", "gegenstand", "Wurfnetz", "Ausrüstung", FREUNDE, ["betaeubung", "einmalig"], "fest", 5, "Einmal: Ein Feind in 6\" darf sich bei seiner nächsten Aktivierung nicht bewegen.", "Fantasy"),
+    f("feuertopf", "gegenstand", "Feuertopf", "Bombe", FREUNDE, ["feuer", "flaeche", "einmalig"], "fest", 10, "Einmal: Alle Einheiten in 3\" um einen Punkt in 9\" erleiden W3 Treffer.", "Fantasy"),
+    f("amulett-abwehr", "gegenstand", "Amulett der Abwehr", "Ausrüstung", FREUNDE, ["schutz", "magie"], "fest", 15, "Einmal pro Runde: Eine Wunde bei 5+ ignorieren.", "Fantasy"),
+    f("plattenruestung", "gegenstand", "Plattenrüstung", "Ausrüstung", FREUNDE, ["schutz"], "fest", 10, "+1 Verteidigung, dafür 1\" weniger Bewegung.", "Fantasy"),
+    f("ring-regeneration", "gegenstand", "Ring der Erneuerung", "Ausrüstung", FREUNDE, ["heilung", "magie"], "fest", 15, "Zu Beginn jeder Aktivierung bei 5+ 1 Wunde heilen.", "Fantasy"),
+    // Gegenstände: Sci-Fi
+    f("medi-injektor", "gegenstand", "Medi-Injektor", "Verbrauchsgut", FREUNDE, ["heilung", "einmalig", "technik"], "fest", 5, "Einmal: Als freie Aktion W3+1 Wunden heilen, auch bei einem Verbündeten in 1\".", "Sci-Fi"),
+    f("stimpack", "gegenstand", "Stimpack", "Verbrauchsgut", FREUNDE, ["staerkung", "einmalig", "technik"], "fest", 5, "Einmal: Bis Rundenende Schnell und +1 Attacke je Nahkampfwaffe.", "Sci-Fi"),
+    f("emp-granate", "gegenstand", "EMP-Granate", "Granate", FREUNDE, ["betaeubung", "flaeche", "einmalig", "technik"], "fest", 10, "Einmal: Alle Maschinen und Drohnen in 3\" um einen Punkt in 9\" sind bei 3+ betäubt, alle anderen bei 5+.", "Sci-Fi"),
+    f("energieschild", "gegenstand", "Energieschild", "Ausrüstung", FREUNDE, ["schutz", "technik"], "fest", 10, "Einmal pro Runde: Einen Treffer mit DS ignorieren.", "Sci-Fi"),
+    f("sprungmodul", "gegenstand", "Sprungmodul", "Ausrüstung", FREUNDE, ["bewegung", "technik"], "fest", 10, "Einmal pro Runde: statt zu gehen bis 12\" springen, auch über Gelände und Feinde.", "Sci-Fi"),
+    f("scanner-visier", "gegenstand", "Scanner-Visier", "Ausrüstung", FREUNDE, ["fernkampf", "technik"], "fest", 5, "Feinde mit Tarnung verlieren ihren Vorteil gegen diesen Helden.", "Sci-Fi"),
   ];
 
   const STAERKEN = [

@@ -50,23 +50,46 @@
   }
 
   // ---------- Anzeige ----------
-  const preisVon = e => e.typ === "einheit" ? `${e.kosten.wert} P.` : e.typ === "fraktion" ? "" : e.typ === "waffe" ? `≈ ${G.waffenPreis(R, e.waffe)} P.` : KS.kostenText(e.kosten);
+  const preisVon = e => e.typ === "einheit" ? `${e.kosten.wert} P.` : e.typ === "fraktion" ? "" : e.typ === "waffe" ? `${G.waffenPreis(R, e.waffe)} P.` : KS.kostenText(e.kosten);
+  const PREIS_TIP = {
+    waffe: "Fester Preis der Waffe, gemessen an einem Standard-Helden (Qualität 4+, Verteidigung 5+, Zäh 5). Auf der Karte zählt die Waffe mit der Qualität der Einheit: Wer besser trifft, zahlt etwas mehr.",
+    fest: "Feste Punkte, die auf die Karte obendrauf kommen.",
+    prozent: "Aufschlag auf die Punkte der Einheit – je stärker die Einheit, desto teurer die Regel.",
+    einheit: "Punkte nach der Schmiede-Formel.",
+  };
+  const preisTip = e => PREIS_TIP[e.typ === "waffe" || e.typ === "einheit" ? e.typ : e.kosten && e.kosten.typ] || "";
   const symbolVon = e => e.typ === "einheit" ? KS.iconFuer(e.karte || {}) : e.typ === "fraktion" ? e.icon : e.typ === "waffe" ? (/Nahkampf/.test(e.waffe || "") ? "sword" : "target") : TYP_ICON[e.typ] || "rune";
+  const kopfTip = e => [typName(e.typ), e.art && e.art !== typName(e.typ) ? e.art : ""].filter(Boolean).join(" · ");
+  // Werte einer Waffe als Symbole mit Erklärung beim Hovern
+  function waffenWerte(zeile) {
+    const w = R.leseWaffe(zeile || "");
+    const chip = (icon, text, tip) => `<span data-tip="${esc(tip)}">${ico(icon)}${esc(text)}</span>`;
+    return `<div class="werte">${[
+      w.reichweite ? chip("target", `${w.reichweite}"`, `<b>Fernkampf</b>Reichweite ${w.reichweite} Zoll.`) : chip("sword", "Nahkampf", "<b>Nahkampf</b>Greift nur Feinde in Kontakt an."),
+      chip("dice", `A${w.a}`, `<b>Attacken</b>${w.a} Würfel pro Modell. Jeder Würfel trifft auf die Qualität der Einheit oder besser.`),
+    ].concat(R.regelnVon(w.regeln).map(r => chip(r.icon, r.name, `<b>${r.name}</b>${r.text}`))).join("")}</div>`;
+  }
+  const karteName = () => { const k = KS.aktuelleKarte(); return k.name || "die Karte"; };
+  const knopfTip = e => e.typ === "fraktion" ? `Setzt die Fraktion der Karte, die gerade in der Werkstatt offen ist (»${karteName()}«).`
+    : e.typ === "waffe" ? `Fügt die Waffe der Karte hinzu, die gerade in der Werkstatt offen ist (»${karteName()}«). Die Punkte rechnen sich neu.`
+    : `Fügt ${typName(e.typ) === "Zauber" ? "den Zauber" : "den Eintrag"} der Karte hinzu, die gerade in der Werkstatt offen ist (»${karteName()}«). Die Punkte rechnen sich neu.`;
   function kachel(e, opts = {}) {
     const eigen = KS.eigeneIds().has(e.id);
     const tags = (e.tags || []).filter(t => TAG[t]);
-    const aktion = e.typ === "einheit" ? `<button type="button" class="btn ghost sm" data-oeffnen="${esc(e.id)}">In Werkstatt öffnen</button>`
-      : e.typ === "fraktion" ? `<button type="button" class="btn ghost sm" data-karte="${esc(e.id)}">Für die Karte wählen</button>`
-      : `<button type="button" class="btn ghost sm" data-karte="${esc(e.id)}">Auf die Karte legen</button>`;
+    const aktion = e.typ === "einheit" ? `<button type="button" class="btn ghost sm" data-oeffnen="${esc(e.id)}" data-tip="Lädt die Einheit in die Werkstatt (Reiter Generator).">In Werkstatt öffnen</button>`
+      : `<button type="button" class="btn ghost sm" data-karte="${esc(e.id)}" data-tip="${esc(knopfTip(e))}">${e.typ === "fraktion" ? "Als Fraktion setzen" : "+ Zur Karte"}</button>`;
+    const quelle = eigen ? "Eigener Eintrag" : e.quelle && e.quelle !== "Standard" ? e.quelle : "";
+    const unter = [e.typ === "einheit" ? e.art : "", e.stufe ? STUFEN[e.stufe] : "", quelle].filter(Boolean).join(" · ");
     return `<article class="eintrag${opts.neu ? " neu" : ""}">
       ${e.bild ? `<div class="thumb" style="background-image:url('${e.bild}')"></div>` : ""}
-      <div class="eintrag-kopf"><span class="typ-ico">${ico(symbolVon(e))}</span>
-        <div><b>${esc(e.name)}</b><small>${esc([typName(e.typ), e.art !== typName(e.typ) ? e.art : "", e.stufe ? STUFEN[e.stufe] : "", e.quelle].filter(Boolean).join(" · "))}</small></div>
-        <span class="preis" ${e.typ === "waffe" ? `data-tip="Was die Waffe an einem Standard-Helden kostet (Qualität 4+, Verteidigung 5+, Zäh 5). Auf der Karte rechnet die Formel sie mit den echten Werten."` : ""}>${preisVon(e)}</span></div>
-      ${tags.length ? `<div class="tagzeile">${tags.map(t => `<span>${ico(TAG[t].icon)}${esc(TAG[t].name)}</span>`).join("")}</div>` : ""}
+      <div class="eintrag-kopf"><span class="typ-ico" data-tip="${esc(kopfTip(e))}">${ico(symbolVon(e))}</span>
+        <div><b>${esc(e.name)}</b>${unter ? `<small>${esc(unter)}</small>` : ""}</div>
+        <span class="preis" data-tip="${esc(preisTip(e))}">${preisVon(e)}</span></div>
+      ${e.typ === "waffe" ? waffenWerte(e.waffe) : ""}
+      ${tags.length ? `<div class="tagzeile">${tags.map(t => `<span data-tip="${esc(TAG[t].name)}">${ico(TAG[t].icon)}</span>`).join("")}</div>` : ""}
       ${e.text ? `<p>${esc(e.text)}</p>` : ""}
-      ${e.fuer && e.typ !== "fraktion" && e.typ !== "einheit" ? `<p><small>Für: ${e.fuer.map(r => ROLLEN[r]).join(", ")}</small></p>` : ""}
-      ${opts.neu ? `<div class="acts"><button type="button" class="btn sm" data-aufnehmen="1">In die Datenbank</button><button type="button" class="btn ghost sm" data-vorschlag-karte="1">Auf die Karte legen</button><button type="button" class="btn ghost sm" data-neu-wuerfeln="1">Neu würfeln</button></div>`
+      ${e.fuer && e.typ !== "fraktion" && e.typ !== "einheit" && e.fuer.length < 3 ? `<p><small>Nur für: ${e.fuer.map(r => ROLLEN[r]).join(", ")}</small></p>` : ""}
+      ${opts.neu ? `<div class="acts"><button type="button" class="btn sm" data-aufnehmen="1">In die Datenbank</button><button type="button" class="btn ghost sm" data-vorschlag-karte="1" data-tip="${esc(knopfTip(e))}">+ Zur Karte</button><button type="button" class="btn ghost sm" data-neu-wuerfeln="1">Neu würfeln</button></div>`
         : `<div class="acts">${aktion}${eigen ? `<button type="button" class="btn ghost sm" data-loeschen="${esc(e.id)}">Löschen</button>` : ""}</div>`}
     </article>`;
   }
@@ -122,7 +145,7 @@
     if (typ === "fraktion") { $("dbPreis").textContent = "Fraktionen kosten nichts, sie legen das Symbol auf der Karte fest."; return; }
     if (typ === "waffe") {
       const zeile = $("dbWaffe").value.trim();
-      $("dbPreis").textContent = zeile ? `An einem Standard-Helden kostet diese Waffe etwa ${G.waffenPreis(R, zeile)} Punkte. Auf der Karte rechnet die Formel mit den echten Werten.` : "Format: Name | Reichweite | Attacken | Regeln";
+      $("dbPreis").textContent = zeile ? `Fester Preis: ${G.waffenPreis(R, zeile)} Punkte (gemessen an einem Standard-Helden).` : "Format: Name | Reichweite | Attacken | Regeln";
       return;
     }
     const k = kostenAusFormular();
@@ -168,7 +191,7 @@
     $("genOut").addEventListener("click", async e => {
       if (!vorschlag) return;
       if (e.target.closest("[data-neu-wuerfeln]")) wuerfeln();
-      else if (e.target.closest("[data-vorschlag-karte]")) { KS.aufKarte(vorschlag); $("genOut").insertAdjacentHTML("beforeend", `<p class="hint">Liegt auf der Karte in der Werkstatt.</p>`); }
+      else if (e.target.closest("[data-vorschlag-karte]")) { KS.aufKarte(vorschlag); $("genOut").insertAdjacentHTML("beforeend", `<p class="hint">✓ Auf »${esc(karteName())}« in der Werkstatt.</p>`); }
       else if (e.target.closest("[data-aufnehmen]")) {
         const ohneId = { ...vorschlag };
         delete ohneId.id;
@@ -192,7 +215,7 @@
         }
       } else if (k) {
         const f = KS.findeFaehigkeit(k.dataset.karte);
-        if (f) { KS.aufKarte(f); k.textContent = "Liegt auf der Karte"; k.disabled = true; }
+        if (f) { KS.aufKarte(f); k.textContent = "✓ Auf der Karte"; k.disabled = true; }
       } else if (l) {
         if (l.dataset.sicher !== "1") { l.dataset.sicher = "1"; l.textContent = "Wirklich löschen?"; return; }
         await KS.loescheEigenen(l.dataset.loeschen); alles();
