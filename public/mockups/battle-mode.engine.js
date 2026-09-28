@@ -37598,6 +37598,19 @@
     box.appendChild(zeile);
   }
 
+  // SIEGER-FAERBUNG AM ESIEGER-KAESTCHEN (Broadcast-Optik-Nachaudit 28.09., Befund 1/4:
+  // die Endstand-Sieger-Zeile trug bisher keine Teamfarbe). Reiner Styling-Hook --
+  // setzt nur eine CSS-Klasse auf den in jedem Aufrufer (renderEndstand/-Bahn/-Buehne)
+  // schon fertig berechneten Sieger (0=Heim/1=Gast/null=kein eindeutiger Sieger),
+  // berechnet selbst nichts. .esieger.sieg-h/.sieg-a lassen das Kaestchen in
+  // battle-mode.css in Heim-/Gastfarbe aufleuchten; keine Klasse bleibt die alte
+  // neutrale --warn-Faerbung (Unentschieden/noch keine Wertung).
+  function setzeEsiegerKlasse(sieger){
+    const e=document.getElementById("esieger");
+    if(!e)return;
+    e.className="esieger"+(sieger===0?" sieg-h":sieger===1?" sieg-a":"");
+  }
+
   function renderHighlights(){
     const box=document.getElementById("ehighlights");
     if(!box)return;
@@ -37629,6 +37642,7 @@
     const sieger = kampfSieger();
     document.getElementById("esieger").textContent =
       sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
+    setzeEsiegerKlasse(sieger);
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -37697,6 +37711,7 @@
         +" — "+pL+" : "+pR+" "+stand.suffix
       : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung")
       +(stand.zusatz?" ("+stand.zusatz+")":"");
+    setzeEsiegerKlasse(stand.gewertet&&pL!==pR?(pL>pR?0:1):null);
     // ZEILENFOLGE NACH PUNKTEN, wo es Punkte gibt (Prototyp 06.09.): bei "rang" ist das
     // dieselbe Folge wie die Rangliste (Platz 1 hat die meisten Punkte), bei Takeshi
     // stehen die Sterne nicht zwingend in Zielreihenfolge — der Endstand ordnet nach dem,
@@ -37798,6 +37813,7 @@
     const sieger=buehneSieger(), stand=buehneStand();
     document.getElementById("esieger").textContent=
       (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    setzeEsiegerKlasse(sieger);
     const w=wertungVon(disc);
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
