@@ -35572,8 +35572,26 @@
     // Versatz statt echter Kraeftesimulation, wie von der Audit selbst vorgeschlagen.
     // Frei stehende Figuren (der Normalfall) bekommen Versatz 0 und damit exakt dieselbe
     // Position wie vorher.
-    const LABEL_KLUSTER_DX=80,LABEL_KLUSTER_DY=30,LABEL_ZEILENHOEHE=10;
+    const LABEL_KLUSTER_DX=80,LABEL_KLUSTER_DY=30,LABEL_ZEILENHOEHE=10,LABEL_TEXT_SICHERHEIT=4;
     const labelPositionen=[];
+    // NACHTRAG (Review-Fund, 28.09., zweiter Durchgang): `labelPositionen` oben loest nur
+    // Name/Status GEGEN Name/Status — es sagt nichts ueber die tatsaechlich gezeichnete
+    // Textbreite. Die Schwebetexte weiter unten (`floatPositionen`) pruefen zwar mit echter
+    // `ctx.measureText`-Breite gegen ANDERE Schweber, aber gegen KEINE Beschriftung — die
+    // beiden Systeme waren bisher gegenseitig blind, obwohl Beschriftung und Schweber am
+    // selben Fusspunkt haengen koennen (Beleg: Name "Krag'Zul" bei x=777.1 ueberlappte
+    // Schaden "-27" bei x=751.8, gemessener Abstand -9.4px; Status "MIT DER LINIE" ueber
+    // "+Schild 50"). `labelSchwebeBoxen` sammelt deshalb die ECHTE gezeichnete Box jeder
+    // Name- und Statuszeile (Fusspunkt-x, tatsaechliche Zeilen-y, per ctx.measureText
+    // gemessene Halbbreite) — gefuellt UNTEN, wenn schrift() ohnehin schon misst, damit hier
+    // keine zweite Formel fuer dieselbe Breite entsteht. Die Schweberschleife weiter unten
+    // liest dieses Array zusaetzlich zu floatPositionen. Nur EINE Richtung: Schweber weichen
+    // Beschriftungen aus, nicht umgekehrt — Beschriftungen sind der Anker (sie stehen fast
+    // immer fuer viele Frames am selben Platz), Schweber sind das transiente Element
+    // (stepFloats() zieht sie jeden Frame weiter nach oben). Liesse man Beschriftungen
+    // umgekehrt vor Schwebern ausweichen, wuerde der Anker bei jedem neuen Skill-Text
+    // zittern statt ruhig zu stehen.
+    const labelSchwebeBoxen=[];
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
       let x=u.x,y=u.y;
@@ -35628,22 +35646,32 @@
       // Beschriftung mit dunklem Rand. Auf dem alten, hellen Untergrund reichte graue
       // Schrift; auf Sand und Rasen verschwand sie. Ein Rand kostet nichts und macht sie
       // auf jedem Boden lesbar — sonst waere der schoenere Boden ein Rueckschritt.
+      // Gibt die halbe gemessene Breite (+ Sicherheitsabstand) zurueck, damit der Aufrufer
+      // sie in `labelSchwebeBoxen` fuer die Schweber-Kollisionspruefung ablegen kann (s.
+      // Kommentar an labelSchwebeBoxen oben) — misst dieselbe Zeichenoperation, die ohnehin
+      // schon laeuft, keine zweite Text-Vermessung.
       const schrift=(txt,dy,farbe,groesse)=>{
         ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);
         ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        return ctx.measureText(txt).width/2+LABEL_TEXT_SICHERHEIT;
       };
       // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
       // einem Gedraenge aus zehn Beschriftungen war vorher nicht auf einen Blick zu sehen,
       // welcher Name zu welcher Seite gehoert. +labelVersatz*LABEL_ZEILENHOEHE staffelt
       // Name UND Status ALS BLOCK nach unten, wenn diese Figur einer schon gezeichneten zu
       // nahe steht (s. Kommentar an labelPositionen oben) — sonst (Normalfall) +0.
-      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44+labelVersatz*LABEL_ZEILENHOEHE,c,9.5);
+      const nameDy=44+labelVersatz*LABEL_ZEILENHOEHE;
+      const nameTxt=u.n.length>14?u.n.slice(0,13)+"…":u.n;
+      const nameHalb=schrift(nameTxt,nameDy,c,9.5);
+      labelSchwebeBoxen.push({x,y:y+nameDy,halbBreite:nameHalb});
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
-      schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),
-        55+labelVersatz*LABEL_ZEILENHOEHE,u.heiler?css("--ok"):"#a9b6c6",8.5);
+      const statusDy=55+labelVersatz*LABEL_ZEILENHOEHE;
+      const statusTxt=u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():"");
+      const statusHalb=schrift(statusTxt,statusDy,u.heiler?css("--ok"):"#a9b6c6",8.5);
+      if(statusTxt)labelSchwebeBoxen.push({x,y:y+statusDy,halbBreite:statusHalb});
       ctx.globalAlpha=1;
     }
     // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
@@ -35725,6 +35753,17 @@
         frei=true;
         for(const p of floatPositionen){
           if(Math.abs(fy-p.fy)<FLOAT_DY_TOL&&Math.abs(f.x-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+        }
+        // Review-Fund (28.09., zweiter Durchgang, s. Kommentar an labelSchwebeBoxen oben):
+        // zusaetzlich gegen die schon gezeichneten Name/Status-Boxen pruefen, nicht nur
+        // gegen andere Schweber — sonst bleibt der Fund von damals (Schweber ueber Name/
+        // Status) bestehen, nur der Schweber-vs-Schweber-Fall waere geloest. Beschriftungen
+        // stehen zu diesem Zeitpunkt im Frame schon fest (die U-Schleife hat laengst
+        // durchlaufen), also ist labelSchwebeBoxen bereits vollstaendig.
+        if(frei){
+          for(const p of labelSchwebeBoxen){
+            if(Math.abs(fy-p.y)<FLOAT_DY_TOL&&Math.abs(f.x-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+          }
         }
         if(!frei){floatVersatz++;fy=f.y-floatVersatz*FLOAT_ZEILENHOEHE;}
       }
