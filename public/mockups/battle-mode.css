@@ -636,13 +636,27 @@
      gleich welches Umgebungs-Theme greift. Reines Presentation-CSS: renderEndstand()/
      renderEndstandBahn()/renderEndstandBuehne() in battle-mode.engine.js sind
      unangetastet, nur um eine Klasse auf #esieger erweitert (sieg-h/sieg-a/sieg-u,
-     s. dort) fuer die Sieger-Einfaerbung direkt unten. */
+     s. dort) fuer die Sieger-Einfaerbung direkt unten.
+     KORREKTUR (Review 28.09., Befund "haertet Fallback-Hex statt Indirektion"): die
+     Flaechen-/Linien-/Text-Tokens hier standen zuerst als reine Fallback-Hex, nicht als
+     var(--nl-*, Fallback) wie im [data-theme="dark"]-Block oben. Eingebettet im
+     Foundation-Shell (.is-new-look setzt echte --nl-panel/--nl-line/--nl-mut/...,
+     s. app/globals.css) loesten .endstand und die restliche dunkle Arena damit zwei
+     LEICHT verschiedene Farbtoene auf -- derselbe Bruch, nur kleiner. Jetzt token-fuer-
+     token dieselbe var(--nl-*, Fallback)-Kette wie oben, damit .endstand im Shell exakt
+     dieselben Werte aufloest wie jedes andere dunkle Arena-Element. --home/--away/--ok/
+     --crit bleiben bewusst eigene, plaine Hexwerte -- genau wie im [data-theme="dark"]-
+     Block oben, der fuer diese Tokens ebenfalls keine --nl-Indirektion nutzt.
+     --shadow fehlte hier komplett und fiel dadurch auf den AMBIENTEN (hellen) Schatten-
+     wert zurueck, sichtbar an #esieger -- kaum wahrnehmbar, genau im Standalone-/
+     Hell-Schema-Fall, den dieser Umbau eigentlich beheben sollte. Jetzt ebenfalls
+     gepinnt, identisch zum [data-theme="dark"]-Block oben. */
   .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;display:flex;flex-direction:column;
     gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center;
-    --ground:#0B1018;--surface:#141C28;--surface-2:#1C2534;--sunk:#0E1621;
-    --line:#2A3546;--line-soft:#212B3B;--ink:#E7EDF6;--muted:#8795A9;--faint:#6A778A;
+    --ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);
+    --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040;
     background:var(--ground);color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .endstand[hidden]{display:none}
   /* SIEGER-ZEILE: Kaestchen statt blossem Fliesstext, mit einem kurzen Scale-in beim
