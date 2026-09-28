@@ -7,72 +7,79 @@
   const SERVER = window.KARTENSCHMIEDE_SERVER === true;
   const STUFEN = R.STUFEN;
   const ROLLEN = { enemy: "Gegner", hero: "Held", companion: "Gefährte" };
-  const GRUND = (window.Faehigkeiten && window.Faehigkeiten.GRUNDBESTAND) || [];
-  const STAERKEN = (window.Faehigkeiten && window.Faehigkeiten.STAERKEN) || [];
-  // Eigene Fähigkeiten: auf dem Server gemeinsam, sonst nur in diesem Browser
+  const KAT = window.Katalog;
+  const GRUND = KAT.GRUNDBESTAND.concat(KAT.FRAKTIONEN);
+  const TAG = Object.fromEntries(KAT.TAGS.map(t => [t.id, t]));
+  // Eigene Einträge: auf dem Server gemeinsam, sonst nur in diesem Browser
   let eigene = [];
-  const alleFaehigkeiten = () => { const ids = new Set(eigene.map(e => e.id)); return GRUND.filter(g => !ids.has(g.id)).concat(eigene); };
-  const findeFaehigkeit = id => alleFaehigkeiten().find(f => f.id === id);
-  const skillKopie = f => ({ id: f.id, name: f.name, art: f.art, text: f.text, kosten: { ...f.kosten } });
+  const alleEintraege = () => { const ids = new Set(eigene.map(e => e.id)); return GRUND.filter(g => !ids.has(g.id)).concat(eigene); };
+  // Was sich als Textblock auf eine Karte legen lässt
+  const AUF_KARTE = ["faehigkeit", "zauber", "gegenstand"];
+  const alleFaehigkeiten = () => alleEintraege().filter(e => AUF_KARTE.includes(e.typ || "faehigkeit"));
+  const findeFaehigkeit = id => alleEintraege().find(f => f.id === id);
+  const skillKopie = f => ({ id: f.id, typ: f.typ || "faehigkeit", name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten } });
   const sk = (...ids) => ids.map(id => GRUND.find(g => g.id === id)).filter(Boolean).map(skillKopie);
   const kostenText = k => k.typ === "fest" ? `${k.wert} P.` : `${k.wert > 0 ? "+" : ""}${k.wert} %`;
+  const fraktionen = () => alleEintraege().filter(e => e.typ === "fraktion");
+  const fraktionVon = name => fraktionen().find(f => f.name.toLowerCase() === String(name || "").trim().toLowerCase());
+  const iconFuer = s => (fraktionVon(s.faction) || {}).icon || s.ficon || "rune";
 
   // ---------- Vorlagen: Chris' Einheiten aus „Age_of_Fantasy_Quest.xlsx“, Punkte wie dort eingetragen ----------
   const basis = { size: "1", role: "enemy", skills: [], bossName: "", bossText: "", special: "0", ax: 50, ay: 40, zoom: 100, flavor: "", look: "", art: "" };
   const VORLAGEN = [
     { key: "frostfang", label: "Frostfang · Boss (Werwolf-Mini, Beispiel)", eigen: false, d: { ...basis,
-      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", ficon: "moon", altPunkte: 280, quality: "3+", defense: "4+", tough: "12",
+      name: "Frostfang der Kettenbrecher", faction: "Wilde Jagd", quality: "3+", defense: "4+", tough: "12",
       weapons: "Frostklauen | Nahkampf | A6 | DS(2), Reißend\nEisnacht-Heulen | 12\" | A1 | Explosion(3), Zuverlässig",
       passives: "Schnell, Furchtlos, Regeneration", skills: sk("gebrochene-ketten"),
       flavor: "Die Kette hielt drei Winter. Im vierten hielt sie nichts mehr.",
       look: "a hulking werewolf with pale ice-blue fur on its back and shoulders, dark slate-blue skin, bone-white claws and fangs, broken iron shackles and chains hanging from its wrists, howling on frozen, snow-dusted ground",
       art: "werwolf", ax: 45, ay: 20 } },
     { key: "frostklauen", label: "Frostklauen-Pirscher (Werwolf-Mini)", eigen: true, d: { ...basis,
-      name: "Frostklauen-Pirscher", faction: "Urwild", ficon: "paw", altPunkte: 90, quality: "3+", defense: "5+", tough: "5",
+      name: "Frostklauen-Pirscher", faction: "Urwild", quality: "3+", defense: "5+", tough: "5",
       weapons: "Frostklauen | Nahkampf | A4 | Reißend", passives: "Rasend, Hinterhalt, Geländeläufer",
       flavor: "Man hört die Ketten, bevor man die Klauen sieht.",
       look: "a lean, hunched werewolf with pale ice-blue fur, dark slate-blue skin, bone-white claws, broken chains on its wrists, stalking through snow",
       art: "werwolf", ax: 45, ay: 20 } },
-    { key: "kristallwurm", label: "Kristallwurm", eigen: true, d: { ...basis, name: "Kristallwurm", faction: "Dämonen", ficon: "flame", altPunkte: 55, quality: "5+", defense: "4+", tough: "3",
+    { key: "kristallwurm", label: "Kristallwurm", eigen: true, d: { ...basis, name: "Kristallwurm", faction: "Dämonen", quality: "5+", defense: "4+", tough: "3",
       weapons: "Kristallbiss | Nahkampf | A3 | Reißend\nSplitterspucke | 18\" | A1 | DS(1), Explosion(2)", passives: "An Beschwörer gebunden",
       flavor: "Aus der Tiefe gerufen, lebende Waffen aus Fleisch und Kristall.",
       look: "a huge segmented worm with a glowing red rune on its head, a gaping maw of teeth, spitting violet crystal shards", art: "einheit1" } },
-    { key: "kristallwurm-elite", label: "Kristallwurm-Elite", eigen: true, d: { ...basis, name: "Kristallwurm-Elite", faction: "Dämonen", ficon: "flame", altPunkte: 115, quality: "4+", defense: "4+", tough: "5",
+    { key: "kristallwurm-elite", label: "Kristallwurm-Elite", eigen: true, d: { ...basis, name: "Kristallwurm-Elite", faction: "Dämonen", quality: "4+", defense: "4+", tough: "5",
       weapons: "Kristallbiss | Nahkampf | A4 | Reißend\nSplitterspucke | 18\" | A2 | DS(1), Explosion(2)", passives: "Geländeläufer, An Beschwörer gebunden", skills: sk("kristallsplitter"),
       look: "a huge segmented worm armoured with violet crystal spikes, glowing red rune on its head, spitting crystal shards", art: "einheit2" } },
-    { key: "dornauge", label: "Dornauge", eigen: true, d: { ...basis, name: "Dornauge", faction: "Dämonen", ficon: "flame", altPunkte: 65, quality: "5+", defense: "4+", tough: "3",
+    { key: "dornauge", label: "Dornauge", eigen: true, d: { ...basis, name: "Dornauge", faction: "Dämonen", quality: "5+", defense: "4+", tough: "3",
       weapons: "Rasierklauen | Nahkampf | A3 | Reißend\nDornenstoß | Nahkampf | A2 | DS(1), Explosion(3)", passives: "",
       flavor: "Ein Geschwür aus Kristall und Dornen, das alles anstarrt.",
       look: "a spiky crystalline creature made of one giant staring eye, violet thorns and clawed legs, erupting from rocky ground", art: "einheit3" } },
-    { key: "dornauge-alpha", label: "Dornauge-Alpha", eigen: true, d: { ...basis, name: "Dornauge-Alpha", faction: "Dämonen", ficon: "flame", altPunkte: 120, quality: "4+", defense: "4+", tough: "5",
+    { key: "dornauge-alpha", label: "Dornauge-Alpha", eigen: true, d: { ...basis, name: "Dornauge-Alpha", faction: "Dämonen", quality: "4+", defense: "4+", tough: "5",
       weapons: "Rasierklauen | Nahkampf | A4 | Reißend\nGiftnadeln | 12\" | A3 | Gift\nDornenstoß | Nahkampf | A2 | DS(1), Explosion(3)", passives: "Geländeläufer",
       look: "a larger spiky crystalline creature with one giant eye, violet and green thorns, firing poison needles", art: "einheit4" } },
-    { key: "giftmade", label: "Giftmade", eigen: true, d: { ...basis, name: "Giftmade", faction: "Urwild", ficon: "paw", altPunkte: 30, quality: "5+", defense: "6+", tough: "3",
+    { key: "giftmade", label: "Giftmade", eigen: true, d: { ...basis, name: "Giftmade", faction: "Urwild", quality: "5+", defense: "6+", tough: "3",
       weapons: "Ätzender Biss | Nahkampf | A2 | Gift\nGiftspeichel | 12\" | A2 | Gift", passives: "Langsam",
       flavor: "Ein Parasit, geboren aus Schlamm und Hunger.", look: "a pale yellow-green grub with two curved horns, vomiting a jet of glowing green venom", art: "einheit5" } },
-    { key: "saeurelauerer", label: "Säurelauerer", eigen: true, d: { ...basis, name: "Säurelauerer", faction: "Urwild", ficon: "paw", altPunkte: 70, quality: "4+", defense: "5+", tough: "3",
+    { key: "saeurelauerer", label: "Säurelauerer", eigen: true, d: { ...basis, name: "Säurelauerer", faction: "Urwild", quality: "4+", defense: "5+", tough: "3",
       weapons: "Giftspeichel | 12\" | A3 | Gift", passives: "Langsam, Hinterhalt", skills: sk("saeureblut"),
       look: "a bloated horned grub with a huge toothed maw, spraying acid", art: "einheit6" } },
-    { key: "sporenhuelle", label: "Sporenhülle", eigen: true, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", altPunkte: 55, quality: "5+", defense: "4+", tough: "4",
+    { key: "sporenhuelle", label: "Sporenhülle", eigen: true, d: { ...basis, name: "Sporenhülle", faction: "Urwild", quality: "5+", defense: "4+", tough: "4",
       weapons: "Sporenstoß | 9\" | A2 | Gift", passives: "Langsam, Furchtlos",
       flavor: "Die Sporen fressen, das Fleisch fault, doch sie fällt nie.",
       look: "a bloated, moss-green fungal brute with mushroom caps growing from its head and shoulders, a dark brown beard, glowing toxic-green spores dripping from its mouth and belly, iron chains on its back",
       art: "einheit7", ay: 30 } },
-    { key: "sporenhuelle-mini", label: "Sporenhülle (Foto der Mini)", eigen: false, d: { ...basis, name: "Sporenhülle", faction: "Urwild", ficon: "paw", altPunkte: 55, quality: "5+", defense: "4+", tough: "4",
+    { key: "sporenhuelle-mini", label: "Sporenhülle (Foto der Mini)", eigen: false, d: { ...basis, name: "Sporenhülle", faction: "Urwild", quality: "5+", defense: "4+", tough: "4",
       weapons: "Sporenstoß | 9\" | A2 | Gift", passives: "Langsam, Furchtlos",
       flavor: "Die Sporen fressen, das Fleisch fault, doch sie fällt nie.",
       look: "a bloated, moss-green fungal brute with mushroom caps growing from its head and shoulders, a dark brown beard, glowing toxic-green spores dripping from its mouth and belly, iron chains on its back",
       art: "sporenhuelle", ay: 25 } },
-    { key: "seuchenbringer", label: "Myzel-Seuchenbringer", eigen: true, d: { ...basis, name: "Myzel-Seuchenbringer", faction: "Urwild", ficon: "paw", altPunkte: 130, quality: "4+", defense: "3+", tough: "6",
+    { key: "seuchenbringer", label: "Myzel-Seuchenbringer", eigen: true, d: { ...basis, name: "Myzel-Seuchenbringer", faction: "Urwild", quality: "4+", defense: "3+", tough: "6",
       weapons: "Dornenklauen | Nahkampf | A3 | DS(1), Reißend\nDornenstoß | 6\" | A2 | DS(1), Explosion(3)", passives: "Langsam, Furchtlos", skills: sk("strahlende-aura"),
       look: "a hulking fungal brute covered in mushroom caps and spines, glowing yellow-green belly, radioactive spores", art: "einheit8", ay: 30 } },
-    { key: "schurke", label: "Held: Schurke", eigen: true, d: { ...basis, role: "hero", name: "Schurke", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "5+", tough: "5",
+    { key: "schurke", label: "Held: Schurke", eigen: true, d: { ...basis, role: "hero", name: "Schurke", faction: "Helden", quality: "4+", defense: "5+", tough: "5",
       weapons: "Krummklingen | Nahkampf | A4 | Reißend\nWurfmesser | 6\" | A1 |", passives: "Tarnung", skills: sk("schattenschritt", "schwachstelle") } },
-    { key: "krieger", label: "Held: Krieger", eigen: true, d: { ...basis, role: "hero", name: "Krieger", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "3+", tough: "7",
+    { key: "krieger", label: "Held: Krieger", eigen: true, d: { ...basis, role: "hero", name: "Krieger", faction: "Helden", quality: "4+", defense: "3+", tough: "7",
       weapons: "Schwert und Schild | Nahkampf | A3 |\nSchildstoß | Nahkampf | A1 |", passives: "Furchtlos", skills: sk("reihe-halten", "schildstoss") } },
-    { key: "waldlaeufer", label: "Held: Waldläufer", eigen: true, d: { ...basis, role: "hero", name: "Waldläufer", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "5+", tough: "5",
+    { key: "waldlaeufer", label: "Held: Waldläufer", eigen: true, d: { ...basis, role: "hero", name: "Waldläufer", faction: "Helden", quality: "4+", defense: "5+", tough: "5",
       weapons: "Jagdbogen | 18\" | A3 |\nJagdmesser | Nahkampf | A2 |", passives: "Späher", skills: sk("beute-markieren", "schlingenfalle") } },
-    { key: "kleriker", label: "Held: Kleriker", eigen: true, d: { ...basis, role: "hero", name: "Kleriker", faction: "Helden", ficon: "shield", altPunkte: 100, quality: "4+", defense: "4+", tough: "5",
+    { key: "kleriker", label: "Held: Kleriker", eigen: true, d: { ...basis, role: "hero", name: "Kleriker", faction: "Helden", quality: "4+", defense: "4+", tough: "5",
       weapons: "Geweihter Speer | Nahkampf | A2 | DS(1)\nHeiliger Blitz | 12\" | A2 |", passives: "Gleiten", skills: sk("wunden-heilen", "strahlender-schutz") } },
   ];
 
@@ -113,6 +120,10 @@
     [/held|hero|schild|shield|rüstung/i, "shield"], [/feuer|fire|brand|rasend/i, "flame"],
   ];
   const symbolFuer = s => (SYMBOLE.find(([re]) => re.test(s)) || [0, "rune"])[1];
+  // Tag-Symbole: auf der Karte und in Listen statt ausgeschriebener Schlagworte, Name per Hover
+  const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
+    ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${ico(TAG[t].icon)}</span>` : ico(TAG[t].icon)).join("")}</span>` : "";
+  const tipText = f => `<b>${esc(f.name)}</b>${esc(f.text || "")}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
 
   let state = {};
   const SPEICHER = "kartenschmiede-v3";
@@ -166,8 +177,8 @@
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${esc(unter)}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
-            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p><b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
-            <div class="foot"><span class="fac">${ico(s.ficon || "paw")}${esc(s.faction)}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
+            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
+            <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
         <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
@@ -179,17 +190,27 @@
   }
   // Text schrumpfen, bis alles auf die Karte passt
   function passeAn(root) {
+    let kleinste = 1, ueberlauf = false;
     root.querySelectorAll(".card").forEach(card => {
       const face = card.querySelector(".face");
       let k = 1;
       card.style.setProperty("--k", k);
       while (k > 0.62 && face.scrollHeight > face.clientHeight + 1) { k -= 0.04; card.style.setProperty("--k", k.toFixed(2)); }
+      kleinste = Math.min(kleinste, k);
+      if (face.scrollHeight > face.clientHeight + 1) ueberlauf = true;
     });
+    return { kleinste, ueberlauf };
   }
 
   // ---------- Formular ----------
-  const FELDER = ["name", "faction", "ficon", "size", "quality", "defense", "tough", "role", "weapons", "passives", "bossName", "bossText", "special", "flavor", "look", "ax", "ay", "zoom"];
+  const FELDER = ["name", "faction", "size", "quality", "defense", "tough", "role", "weapons", "passives", "bossName", "bossText", "special", "flavor", "look", "ax", "ay", "zoom"];
+  function fraktionsAuswahl() {
+    const namen = fraktionen().map(f => f.name);
+    const extra = state.faction && !fraktionVon(state.faction) ? [state.faction] : [];
+    $("faction").innerHTML = [...namen, ...extra].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  }
   function insFormular() {
+    fraktionsAuswahl();
     FELDER.forEach(f => { const el = $(f); if (el) el.value = state[f] ?? ""; });
     if (!["0", "5", "10", "20"].includes(String(state.special))) $("special").value = "0";
     if (!state.role) $("role").value = "enemy";
@@ -204,16 +225,6 @@
     $("calc").innerHTML = `
       <div class="big"><b>${c.pts}</b><span>Punkte · Stufe ${STUFEN[R.stufeFuerPunkte(c.pts)]}</span></div>
       <div class="parts">Kampfwert ${zahl(c.K, 2)} · Ausdauer ${zahl(c.A)} · Boni ${c.b >= 0 ? "+" : ""}${Math.round(c.b * 100)} %${c.fest ? ` · fest +${c.fest}` : ""}</div>`;
-  }
-
-  function bestiarium() {
-    $("bestiary").innerHTML = VORLAGEN.filter(v => v.eigen).map(v => {
-      const c = R.punkte(v.d), abw = (v.d.altPunkte - c.pts) / c.pts, t = R.stufeFuerPunkte(c.pts);
-      const cls = Math.abs(abw) <= .15 ? "ok" : abw > 0 ? "lo" : "hi";
-      return `<tr data-key="${v.key}" tabindex="0"><td>${esc(v.d.name)}</td><td class="num">${v.d.altPunkte}</td><td class="num">${c.pts}</td>
-        <td class="num"><span class="dev ${cls}">${abw > 0 ? "+" : ""}${Math.round(abw * 100)} %</span></td>
-        <td><span class="tier-dot" style="background:var(--t${t})"></span>${STUFEN[t]}</td></tr>`;
-    }).join("");
   }
 
   function prompt() {
@@ -262,7 +273,12 @@
         ${renderCard(state, t, {})}
         <span class="rung-label" style="color:var(--t${t})">${STUFEN[t]}<small>${R.GRENZEN_TEXT[t]} P.</small></span>
       </button>`).join("");
-    requestAnimationFrame(() => { passeAn(stage); passeAn($("ladder")); });
+    $("facIcon").innerHTML = `${ico(iconFuer(state))}<span>${esc(state.faction || "")}</span>`;
+    requestAnimationFrame(() => {
+      const { kleinste, ueberlauf } = passeAn(stage); passeAn($("ladder"));
+      $("fitNote").textContent = ueberlauf ? "Zu viel Text für die Karte: Der untere Teil wird abgeschnitten. Kürze Regeltexte oder nimm eine Fähigkeit weg."
+        : kleinste < 0.8 ? `Viel Text: Die Schrift ist auf ${Math.round(kleinste * 100)} % verkleinert, damit alles passt. Beim Druck bleibt es lesbar bis etwa 70 %.` : "";
+    });
     $("suggest").textContent = `${state.points || 0} Punkte ergeben: ${STUFEN[R.stufeFuerPunkte(+state.points || 0)]}. Staffel: ${R.GRENZEN_TEXT.slice(1).join(" · ")}.`;
     $("tierNote").innerHTML = NOTIZEN[state.tier];
     $("prompt").value = prompt();
@@ -373,10 +389,10 @@
       const an = m.faeh.has(k); const d = kostet(m, x => { if (an) x.faeh.delete(k); else x.faeh.add(k); });
       return `<button type="button" class="tgl" data-act="ab:${k}" aria-pressed="${an}" ${!an && !geht(d) ? "disabled" : ""}>${n}${preis(d)}</button>`;
     }).join("")}</div>${m.rest.length ? `<p class="hint">Eigene Regeln bleiben erhalten: ${esc(m.rest.join(", "))}</p>` : ""}</div>`;
-    html += `<div class="b-group"><h4>Aus der Fähigkeiten-Datenbank</h4><div class="tgls">${alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle)).map(f => {
+    html += `<div class="b-group"><h4>Aus der Datenbank</h4><div class="tgls">${alleFaehigkeiten().filter(f => f.fuer.includes(m.rolle)).map(f => {
       const an = m.skills.some(k => k.id === f.id);
       const d = kostet(m, x => { x.skills = an ? x.skills.filter(k => k.id !== f.id) : x.skills.concat(skillKopie(f)); });
-      return `<button type="button" class="tgl" data-act="sk:${esc(f.id)}" aria-pressed="${an}" title="${esc(f.text)}" ${!an && !geht(d) ? "disabled" : ""}>${esc(f.name)}${preis(d)}</button>`;
+      return `<button type="button" class="tgl" data-act="sk:${esc(f.id)}" aria-pressed="${an}" data-tip="${esc(tipText(f))}" ${!an && !geht(d) ? "disabled" : ""}>${tagIcons(f.tags, false)}${esc(f.name)}${preis(d)}</button>`;
     }).join("")}</div></div>`;
     $("bControls").innerHTML = html;
 
@@ -427,8 +443,7 @@
     modellUebernehmen();
   }
   function frisch(rolle) {
-    state = Object.assign({}, state, { id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction,
-      ficon: rolle === "hero" ? "shield" : state.ficon, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
+    state = Object.assign({}, state, { id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
     bModell = { rolle, budget: +state.budget || 100, q: 5, d: 6, t: rolle === "hero" ? 3 : 1, n: 1,
       waffen: [{ name: "Handwaffe", reichweite: 0, a: 1, ds: 0, rest: [] }], faeh: new Set(), rest: [], special: "0", skills: [] };
     modellUebernehmen();
@@ -566,28 +581,39 @@
   }
 
   // ---------- Fähigkeiten: Werkstatt, Datenbank, eigene Einträge ----------
+  // Auswahl in der Werkstatt: Liste mit Suche und Tag-Filter, Beschreibung per Hover
+  let pickerSuche = "", pickerTag = "";
   function zeigeSkills() {
     const rolle = state.role || "enemy";
     const skills = Array.isArray(state.skills) ? state.skills : [];
-    $("skillChips").innerHTML = skills.length ? skills.map(k => `<span class="skill-chip" title="${esc(k.text)}">${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`).join("")
+    $("skillChips").innerHTML = skills.length ? skills.map(k => `<span class="skill-chip" data-tip="${esc(tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`).join("")
       : `<span class="hint">Noch keine.</span>`;
-    const frei = alleFaehigkeiten().filter(f => f.fuer.includes(rolle) && !skills.some(k => k.id === f.id));
-    $("skillAdd").innerHTML = `<option value="">Fähigkeit hinzufügen …</option>` + frei.map(f => `<option value="${esc(f.id)}">${esc(f.name)} · ${esc(f.art)} · ${kostenText(f.kosten)}</option>`).join("");
+    const q = pickerSuche.toLowerCase();
+    const frei = alleFaehigkeiten().filter(f => f.fuer.includes(rolle) && !skills.some(k => k.id === f.id)
+      && (!pickerTag || (f.tags || []).includes(pickerTag)) && (!q || (f.name + " " + f.text).toLowerCase().includes(q)));
+    const genutzteTags = [...new Set(alleFaehigkeiten().flatMap(f => f.tags || []))].filter(t => TAG[t]);
+    const kopf = $("skillPicker").querySelector(".picker-head");
+    if (!kopf) {
+      $("skillPicker").innerHTML = `<div class="picker-head"><input type="search" id="pickerSuche" placeholder="Fähigkeit suchen" aria-label="Fähigkeit suchen"><select id="pickerTag" aria-label="Nach Tag filtern"></select></div><div class="picker-list" id="pickerListe"></div>`;
+      $("pickerSuche").addEventListener("input", e => { pickerSuche = e.target.value; zeigeSkills(); });
+      $("pickerTag").addEventListener("change", e => { pickerTag = e.target.value; zeigeSkills(); });
+    }
+    $("pickerTag").innerHTML = `<option value="">Alle Tags</option>` + genutzteTags.map(t => `<option value="${t}" ${t === pickerTag ? "selected" : ""}>${esc(TAG[t].name)}</option>`).join("");
+    $("pickerListe").innerHTML = frei.map(f => `<button type="button" class="picker-item" data-add="${esc(f.id)}" data-tip="${esc(tipText(f))}">
+        <span>${tagIcons(f.tags, false)}${esc(f.name)} <small>${esc(f.art)}</small></span><small>${kostenText(f.kosten)}</small></button>`).join("")
+      || `<p class="hint">Nichts gefunden.</p>`;
+    // Waffen aus der Datenbank
+    $("weaponAdd").innerHTML = `<option value="">Waffe aus der Datenbank hinzufügen …</option>` + alleEintraege().filter(e => e.typ === "waffe")
+      .map(e => `<option value="${esc(e.id)}">${esc(e.name)} · ${esc(e.text || e.waffe)}</option>`).join("");
   }
-  function zeigeDatenbank() {
-    const rollen = r => r.map(x => ROLLEN[x]).join(", ");
-    const eigeneIds = new Set(eigene.map(e => e.id));
-    $("dbRows").innerHTML = alleFaehigkeiten().map(f => `<tr><td><b>${esc(f.name)}</b><span class="quelle">${esc(f.quelle || "")}</span></td><td>${esc(f.art)}</td><td>${rollen(f.fuer)}</td>
-      <td class="num">${kostenText(f.kosten)}</td><td class="txt">${esc(f.text)}</td>
-      <td>${eigeneIds.has(f.id) ? `<button type="button" class="x-del" data-db-weg="${esc(f.id)}">löschen</button>` : ""}</td></tr>`).join("");
-    dbPreis();
+  // Eintrag aus der Datenbank auf die aktuelle Karte legen
+  function aufKarte(f) {
+    if (f.typ === "waffe") state.weapons = [state.weapons, f.waffe].filter(x => x && x.trim()).join("\n");
+    else if (f.typ === "fraktion") state.faction = f.name;
+    else if (!(state.skills || []).some(k => k.id === f.id)) state.skills = (state.skills || []).concat(skillKopie(f));
+    bModell = null; insFormular(); alles(); simOptionen();
   }
-  function dbPreis() {
-    const st = STAERKEN.find(s => s.id === $("dbStaerke").value) || STAERKEN[1];
-    const fest = ["Skill", "Aura"].includes($("dbArt").value);
-    $("dbPreis").textContent = fest ? `Kostet fest ${st.fest} Punkte (wie Chris' Punktelogik: klein 5, mittel 10, groß 15, elite 20).`
-      : `Kostet ${st.prozent} % Aufschlag auf die Formel, wächst also mit der Einheit.`;
-  }
+
   const API_F = "/api/kartenschmiede/faehigkeiten";
   async function ladeEigene() {
     if (SERVER) {
@@ -608,9 +634,12 @@
   const slug = s => String(s).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "faehigkeit";
   async function nimmAuf(f) {
     let id = slug(f.id || f.name);
-    while (GRUND.some(g => g.id === id) && !(f.id && f.id === id && eigene.some(e => e.id === id))) id += "-2";
-    const eintrag = { id, name: f.name, art: f.art || "Sonderregel", fuer: f.fuer && f.fuer.length ? f.fuer : ["hero", "companion", "enemy"],
-      kosten: { typ: f.kosten && f.kosten.typ === "fest" ? "fest" : "prozent", wert: +(f.kosten && f.kosten.wert) || 0 }, text: f.text || "", quelle: f.quelle || "eigen" };
+    while (GRUND.some(g => g.id === id) || (eigene.some(e => e.id === id) && f.id !== id)) id += "-2";
+    const eintrag = { id, typ: f.typ || "faehigkeit", name: f.name, art: f.art || "Sonderregel", fuer: f.fuer && f.fuer.length ? f.fuer : ["hero", "companion", "enemy"],
+      tags: (f.tags || []).filter(t => TAG[t]), kosten: { typ: f.kosten && f.kosten.typ === "fest" ? "fest" : "prozent", wert: +(f.kosten && f.kosten.wert) || 0 },
+      text: f.text || "", quelle: f.quelle || "eigen" };
+    if (eintrag.typ === "waffe") eintrag.waffe = f.waffe || "";
+    if (eintrag.typ === "fraktion") eintrag.icon = f.icon || "rune";
     eigene = eigene.filter(e => e.id !== id).concat(eintrag);
     await sichereEigene();
     return eintrag;
@@ -620,7 +649,7 @@
   function karteAlsText() {
     const { upload, ...rest } = state;
     const aus = {};
-    ["name", "faction", "ficon", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
+    ["name", "faction", "role", "size", "quality", "defense", "tough", "weapons", "passives", "skills", "bossName", "bossText", "special", "flavor", "look"].forEach(k => { if (rest[k] !== undefined && rest[k] !== "") aus[k] = rest[k]; });
     if (upload) aus.art = "(eigenes Artwork, nicht im Text)";
     return JSON.stringify(aus, null, 2);
   }
@@ -640,7 +669,7 @@
     if (d.art && IMG[d.art]) state.art = d.art;
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
-    bModell = null; insFormular(); alles(); zeigeDatenbank();
+    bModell = null; insFormular(); alles();
     msg.textContent = `Übernommen: ${state.name}.${neu.length ? ` Neu in der Datenbank: ${neu.join(", ")}.` : ""} Das Artwork bleibt, bis du ein neues hochlädst.`;
   }
 
@@ -709,8 +738,6 @@
     navigator.clipboard.writeText(t.value).then(() => { $("copyMsg").textContent = "Kopiert."; },
       () => { t.focus(); t.select(); $("copyMsg").textContent = "Text ist markiert, jetzt mit Strg+C kopieren."; });
   });
-  $("bestiary").addEventListener("click", e => { const tr = e.target.closest("tr"); if (tr) { vorlage(tr.dataset.key); $("h-shop").scrollIntoView({ behavior: "smooth" }); } });
-  $("bestiary").addEventListener("keydown", e => { const tr = e.target.closest("tr"); if (tr && e.key === "Enter") vorlage(tr.dataset.key); });
   $("bControls").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (b && !b.disabled) aktion(b.dataset.act); });
   $("bControls").addEventListener("change", e => { if (e.target.classList.contains("wname")) { bModell.waffen[+e.target.dataset.w].name = e.target.value || "Waffe"; modellUebernehmen(); } });
   $("bRole").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; bModell.rolle = b.dataset.r; modellUebernehmen(); });
@@ -731,57 +758,57 @@
     meineKarten();
   }
 
-  $("skillAdd").addEventListener("change", e => {
-    const f = findeFaehigkeit(e.target.value); if (!f) return;
-    state.skills = (state.skills || []).concat(skillKopie(f)); bModell = null; alles();
-  });
+  $("skillPicker").addEventListener("click", e => { const b = e.target.closest("[data-add]"); if (b) { const f = findeFaehigkeit(b.dataset.add); if (f) aufKarte(f); } });
   $("skillChips").addEventListener("click", e => {
     const b = e.target.closest("[data-skill-weg]"); if (!b) return;
     state.skills = (state.skills || []).filter(k => k.id !== b.dataset.skillWeg); bModell = null; alles();
   });
-  $("dbArt").addEventListener("change", dbPreis);
-  $("dbStaerke").addEventListener("change", dbPreis);
-  $("dbForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const st = STAERKEN.find(s => s.id === $("dbStaerke").value) || STAERKEN[1];
-    const fest = ["Skill", "Aura"].includes($("dbArt").value);
-    const fuer = [["dbHero", "hero"], ["dbComp", "companion"], ["dbEnemy", "enemy"]].filter(([id]) => $(id).checked).map(([, r]) => r);
-    try {
-      const f = await nimmAuf({ name: $("dbName").value.trim(), art: $("dbArt").value, fuer, text: $("dbText").value.trim(),
-        kosten: { typ: fest ? "fest" : "prozent", wert: fest ? st.fest : st.prozent } });
-      $("dbMsg").textContent = `${f.name} ist jetzt in der Datenbank.`; $("dbName").value = ""; $("dbText").value = "";
-      zeigeDatenbank(); alles();
-    } catch (err) { $("dbMsg").textContent = `Das hat nicht geklappt: ${err.message}.`; }
-  });
-  $("dbRows").addEventListener("click", async e => {
-    const b = e.target.closest("[data-db-weg]"); if (!b) return;
-    if (b.dataset.sicher !== "1") { b.dataset.sicher = "1"; b.textContent = "wirklich?"; return; }
-    eigene = eigene.filter(f => f.id !== b.dataset.dbWeg); await sichereEigene(); zeigeDatenbank(); alles();
-  });
+  $("weaponAdd").addEventListener("change", e => { const f = findeFaehigkeit(e.target.value); if (f) aufKarte(f); e.target.value = ""; });
+  $("faction").addEventListener("change", e => { state.faction = e.target.value; alles(); });
+
+  // Tooltip: überall, wo data-tip steht (Fähigkeiten, Tags, Einträge)
+  const tip = $("tip");
+  const zeigeTip = (el, x, y) => {
+    tip.innerHTML = el.dataset.tip.includes("<b>") ? el.dataset.tip : esc(el.dataset.tip);
+    tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(window.innerWidth - r.width - 8, x + 14) + "px";
+    tip.style.top = (y + 18 + r.height > window.innerHeight ? y - r.height - 12 : y + 18) + "px";
+  };
+  document.addEventListener("mouseover", e => { const el = e.target.closest("[data-tip]"); if (el) zeigeTip(el, e.clientX, e.clientY); else tip.hidden = true; });
+  document.addEventListener("mousemove", e => { if (!tip.hidden) { const el = e.target.closest("[data-tip]"); if (el) zeigeTip(el, e.clientX, e.clientY); } });
+  document.addEventListener("focusin", e => { const el = e.target.closest("[data-tip]"); if (el) { const r = el.getBoundingClientRect(); zeigeTip(el, r.left, r.bottom); } });
+  document.addEventListener("focusout", () => { tip.hidden = true; });
+  document.addEventListener("scroll", () => { tip.hidden = true; }, true);
   $("jsonIn").addEventListener("click", textUebernehmen);
   $("jsonOut").addEventListener("click", () => { $("cardJson").value = karteAlsText(); $("jsonMsg").textContent = "Das ist die aktuelle Karte als Text, ohne das Artwork."; });
   // Reiter
   const reiter = name => {
     document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-    $("tabKarten").hidden = name !== "karten"; $("tabGruppe").hidden = name !== "gruppe";
+    $("tabKarten").hidden = name !== "karten"; $("tabGruppe").hidden = name !== "gruppe"; $("tabDb").hidden = name !== "db";
     if (name === "gruppe" && window.KartenschmiedeGruppe) window.KartenschmiedeGruppe.zeigen();
-    try { history.replaceState(null, "", name === "gruppe" ? "#gruppe" : "#karten"); } catch { /* egal */ }
+    if (name === "db" && window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.zeigen();
+    try { history.replaceState(null, "", "#" + name); } catch { /* egal */ }
   };
   document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => reiter(b.dataset.tab)));
 
   // Schnittstelle für den Reiter „Gruppe“ (gruppe.js)
   window.KS = {
-    R, IMG, SERVER, STUFEN, ROLLEN, esc, renderCard, passeAn, alleFaehigkeiten, skillKopie, kostenText, VORLAGEN,
+    R, IMG, SERVER, STUFEN, ROLLEN, TAG, KAT, esc, ico, renderCard, passeAn, alleFaehigkeiten, alleEintraege, findeFaehigkeit, skillKopie, kostenText,
+    tagIcons, tipText, iconFuer, VORLAGEN, nimmAuf, sichereEigene, aufKarte,
+    eigeneIds: () => new Set(eigene.map(e => e.id)),
+    async loescheEigenen(id) { eigene = eigene.filter(f => f.id !== id); await sichereEigene(); alles(); },
+    nachAenderung() { insFormular(); alles(); simOptionen(); },
+    zeigeReiter: name => reiter(name),
     oeffneInWerkstatt(karte) { state = Object.assign({ orient: "port", autoTier: true }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
     zeigePngs, drucken,
   };
 
-  bestiarium();
   const gemerkt = lade();
   if (gemerkt && gemerkt.name !== undefined) { state = gemerkt; insFormular(); alles(); } else vorlage("frostfang");
   simOptionen();
-  zeigeDatenbank();
-  ladeEigene().then(() => { zeigeDatenbank(); alles(); });
+  ladeEigene().then(() => { insFormular(); alles(); if (window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.neu(); });
   if (location.hash === "#gruppe") reiter("gruppe");
+  if (location.hash === "#db") reiter("db");
 })();

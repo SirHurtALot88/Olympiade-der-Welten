@@ -7,7 +7,9 @@ Läuft in der App unter **`/kartenschmiede`** (hinter demselben Login wie das Sp
 |---|---|
 | `seite.html` | Aufbau und Aussehen der Seite, sechs Seltenheitsrahmen |
 | `regeln.js` | Seltenheiten, Schmiede-Formel (Punkte) und Duell-Simulator, ohne DOM, getestet in `tests/kartenschmiede.test.ts` |
-| `faehigkeiten.js` | Grundbestand der Fähigkeiten-Datenbank mit festen Kosten; eigene Einträge liegen auf dem Server |
+| `katalog.js` | Tags, Fraktionen und Grundbestand der Datenbank (Fähigkeiten, Zauber, Gegenstände, Waffen); eigene Einträge liegen auf dem Server |
+| `generator.js` | Würfelt Waffen, Gegenstände, Fähigkeiten und Zauber passend zur Seltenheit, bepreist nach der Formel |
+| `datenbank.js` | Reiter „Datenbank“: Suche, Typ- und Tag-Filter, Generator, eigene Einträge |
 | `app.js` | Reiter „Karten“: Werkstatt, Baukasten, Fähigkeiten-Datenbank, Simulator, Speichern, Karte als Text |
 | `gruppe.js` | Reiter „Gruppe“: Helden-Lineups mit Budget, Fähigkeiten je Mitglied, Wellengröße, Druck |
 | `assets/`, `fonts/` | Beispielbilder aus Chris' Einheiten-Tabelle, Schriften (SIL OFL, über Fontsource) |
