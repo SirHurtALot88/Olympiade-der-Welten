@@ -5,7 +5,14 @@ Spieltag übernommen werden, dass der Spieler in der Simulation etwas besser per
 stark - ich würde da irgendwas sehen von 5-8% Verbesserung pro Trait der durch den Mutator getroffen
 wird."
 
-Dieses Dokument ist **reines Konzept**: kein Produktionscode, keine Motoränderung. Was gemessen ist,
+> **Stand nach der Umsetzung (29.09., später am Tag):** Chris hat die offenen Fragen beantwortet
+> (Abschnitt 10), die Umsetzung weicht an drei Stellen bewusst vom Vorschlag unten ab: **Ersetzen
+> statt Ergänzen** (V1, die 0,3 PP entfallen), **flacher Attributbonus statt Prozentfaktor**
+> (+3,5 auf jedes der zwölf Attribute je Treffer) und **nur Battle-Modus, nur simulierte
+> Disziplinen** (Manager-Modus unverändert). Was gebaut und gemessen ist, steht in Abschnitt 11.
+> Die Abschnitte 1–9 bleiben als Herleitung stehen.
+
+Dieses Dokument war **reines Konzept**: kein Produktionscode, keine Motoränderung. Was gemessen ist,
 steht mit Datei/Zeile oder Messweg daneben. Was ein Vorschlag ist, ist als solcher markiert.
 `engine.js` meint `public/mockups/battle-mode.engine.js` (Stand `main`, Commit `ebb3b99a`).
 
@@ -595,3 +602,205 @@ haben eine begründete Empfehlung und können mit ihr starten.
   Spielplan aber den echten Wurf. Nach Schritt 3 stimmen beide überein.
 - Die PP-Zahlen in 1.5 stammen aus Manager-Spielständen bis 23.08. (neuere Stände waren im Abbild
   nicht vorhanden). Die Größenordnung ist robust, die Nachkommastellen sind es nicht.
+
+---
+
+## 10. Chris' Entscheidungen (29.09.)
+
+Die drei zwingenden Fragen aus Abschnitt 8, Chris' Antworten wörtlich:
+
+| # | Frage | Antwort | Folge für die Umsetzung |
+|---|---|---|---|
+| 1 | Ersetzen die 5–8 % die 0,3 PP? | „ja genau das soll das ersetzen, deswegen soll der spieler quasi von seinen stats 5-8% besser werden wo ich mir erhoffe, dass das auf 0,3 PPs raus laufen könnte. da müsste man ggf. aber mal schauen wie sich das auf schwache und wie auf starke spieler auswirkt. vllt müsste es auch ein flat stat boost sein, das sollst du prüfen und einbauen" | **V1 „Ersetzen"**: kein `+6 Score`, keine `+0,3 PP` mehr, wo die Arena simuliert. Zielgröße: der organische Effekt soll im Mittel ≈ 0,3 PP bringen. Prozentual gegen flach ist zu prüfen (Abschnitt 11.1). |
+| 2 | 5–8 % von was? | „vom Skillwert bzw jedem Attribut" | **Eingang**, und zwar auf **alle zwölf** Attribute (nicht nur die matrixgewichteten wie in 3.2 vorgeschlagen). |
+| 7 | Auch im Manager-Modus? | „nein" | Manager-Modus behält `+6`/`+0,3` unverändert. Im Battle-Modus gilt das neue System nur, wo die Arena-Engine das Ergebnis tatsächlich simuliert (`ARENA_RESOLVED_DISCIPLINE_IDS`, 15 Disziplinen). TDM, Mini-DM, Battlefield, Football und I-Spy laufen auch im Battle-Modus über den PPS-Pfad **ohne** Simulation (Abschnitt 2) — dort gibt es nichts, worin ein Attributbonus wirken könnte, sie behalten deshalb das alte System. |
+
+Fragen 3–6 und 8 erledigen sich damit: ein Wert für alle Disziplinen (5), linear in der
+Trefferzahl (4), „negative" Traits wirken weiter als Bonus (6, Stand 23.08. unverändert).
+
+---
+
+## 11. Finale Umsetzung
+
+### 11.1 Prozentual oder flach? — entschieden an echten Kadern
+
+**Datenbasis.** Attribute: die 328 eingesetzten Kaderspieler des neuesten Spielstands im
+Live-Abbild (`new-game-1787123325719-swnjlk`, 3936 Attributwerte). Wirkung: neue Sonde
+`window.__arena.mutatorGegenfaktus()` + `scripts/miss-mutator-wirkung.ts` — dieselbe Saat,
+derselbe Kader, einmal ohne jeden Mutator und einmal mit einem Treffer für **genau einen**
+Spieler, reihum für jeden Teilnehmer; gespielt über dieselben Einstiege wie der produktive
+Headless-Lauf, umgerechnet über dieselbe Funktion, die die Saison bucht
+(`computeIndividualBoxscorePpsFromFixtureResults`). Live-Kaderfamilie (5 Paarungen), 6 Spiele je
+Paarung, **360 gepaarte Treffer je Disziplin und Regel**, alle 15 arena-aufgelösten Disziplinen.
+
+**Was die Attributverteilung sagt** (Live-Kader):
+
+| Größe | Wert |
+|---|---|
+| Attributwerte P10 / Median / P90 | 8,9 / 45,8 / 83 |
+| Anteil Attribute ≥ 95 / ≥ 99 | 1,3 % / 0,2 % |
+| Eignung je Disziplin, Mittel über die 15: P10 / Median / P90 | 15,9 / 38,3 / 60,7 |
+| 6,5 % auf die Eignung: P10 / Median / P90 | +1,0 / +2,5 / +3,9 Punkte (starker Spieler bekommt das **3,8-Fache**) |
+| Mutator-Traits je Spieler Ø / P(0, 1, 2 Treffer) | 3,47 / 81,5 %, 17,7 %, 0,8 % |
+
+Die Obergrenze 99 ist praktisch kein Thema: nur 2,2 % der Attributwerte gingen bei 6,5 % über 99,
+bei +3,5 flach ≈ 1 % (+3: 0,8 %, +4: 1,2 %). Das eigentliche Problem des Prozentbonus ist nicht der Headroom, sondern dass er
+die absoluten Punkte nach Stärke staffelt.
+
+**Was die Simulation daraus macht** (PP-Zugewinn des getroffenen Spielers je Treffer, Mittel über
+die 15 Disziplinen, jede gleich gewichtet; Drittel = Eignung in der Disziplin):
+
+| Regel | Ø ΔPP | schwaches Drittel | mittleres | starkes Drittel | stark ÷ schwach |
+|---|---:|---:|---:|---:|---:|
+| flach +3 | 0,256 | 0,152 | — | 0,334 | 2,2× |
+| flach +4 | 0,355 | 0,215 | — | 0,474 | 2,2× |
+| prozentual 6,5 % (14 Disziplinen, Breaking ohne) | 0,309 | 0,143 | — | 0,453 | 3,2× |
+| zum Vergleich: die abgelösten 0,3 PP | 0,300 | 0,300 | 0,300 | 0,300 | 1,0× |
+
+Je Disziplin (ΔPP Spieler, flach +3 / flach +4 / 6,5 %): Basketball 0,33/0,53/0,41 · Hockey
+0,19/0,23/0,21 · Gewichtheben 0,22/0,31/0,25 · Speed-Schach 0,26/0,35/0,33 · Tennis 0,23/0,31/0,27 ·
+Fechten 0,20/0,26/0,24 · Showcase 0,23/0,32/0,28 · Eiskunstlauf 0,26/0,36/0,32 · Wettessen
+0,23/0,32/0,28 · Breaking 0,21/0,28/— · Staffel 0,29/0,40/0,35 · Takeshi's Castle 0,20/0,34/0,24 ·
+Time-Trial 0,27/0,34/0,33 · Spurt 0,37/0,54/0,43 · Climbing 0,36/0,46/0,38. Rohdaten inkl. flach
++2/+6 und 5/8 % entstehen mit `npx tsx scripts/miss-mutator-wirkung.ts --n=6 --regeln=…`.
+
+**Entscheidung: flach, +3,5 Punkte auf jedes der zwölf Attribute je Treffer.**
+
+1. **Chris' Zahl stimmt — als Mittelwert.** 6,5 % bringen im Mittel 0,31 PP, also genau die 0,3,
+   die er sich erhofft hat. Das Problem ist die Verteilung.
+2. **Prozentual staffelt nach Stärke.** Bei gleichem Mittelwert bekommt das starke Drittel mit
+   Prozent das 3,2-Fache des schwachen, flach das 2,2-Fache (Speed-Schach: 0,09 → 0,60 prozentual
+   gegen 0,11 → 0,41 flach +3). Die abgelösten 0,3 PP waren für jeden gleich. Flach bleibt dem am
+   nächsten und ist das, was „nicht zu stark" bei den Stärksten heißt.
+3. **Warum auch flach die Starken noch bevorzugt:** die Impact-Kurve der Arena-PP
+   (`ppsAusArenaImpact`, `(I/I_krass)^γ` mit γ > 1) ist konvex — derselbe Zugewinn an Boxscore ist
+   für einen Spieler hoch auf der Kurve mehr PP wert. Das liegt an der PP-Umrechnung, nicht am
+   Mutator, und betrifft jeden Leistungszuwachs gleich (Form, Slot, Attribute). Hockey ist die
+   Ausnahme in die andere Richtung (dort profitieren Schwache mehr, weil Starke schon nahe am
+   Kurvendeckel liegen).
+4. **Höhe:** zwischen +3 (0,256) und +4 (0,355) linear interpoliert liegen 0,30 PP bei ≈ +3,45;
+   gewählt ist **+3,5**. Das sind 7,6 % des Median-Attributs (45,8) bzw. 9,1 % der Median-Eignung
+   (38,3) — am oberen Rand von Chris' Korridor, weil flache Punkte bei Schwachen relativ mehr
+   bedeuten. Zwei Treffer (0,8 % der Einsätze) geben linear +7.
+
+### 11.2 Was gebaut ist
+
+**Engine (`public/mockups/battle-mode.engine.js`)**
+
+- `MUTATOR_ORGANISCH={art:"flach", jeTreffer:3.5}` — gespiegelt in
+  `lib/battle/battle-mutator-organisch.ts`, Gleichheitstest in `tests/battle-mutator-organisch.test.ts`.
+- `mutatorTreffer(p)`: Trefferzahl wie `countTraitHits()` (alle positiven und negativen Traits,
+  klein geschrieben, dedupliziert).
+- **Injektionspunkt:** `gehoben(p)` — die eine Stelle, an der alle vier Chassis Rohattribute lesen —
+  gibt jetzt `mitMutator(hebungRoh(p), h)` zurück: alle zwölf Attribute `+3,5·h`, nach dem
+  Messhebel `ATTR_HEBUNG`, vor Slot-/Form-Aufschlag und vor jedem Rezept. Kein Deckel bei 99/100
+  (effektive Attribute dürfen wie bei `mitAufschlag` darüber, die 1–99-Klemme der Rezeptwerte in
+  `mische()` bleibt).
+- **Eignung:** `eigMutator(p,d)` (= gewichtete Attributsumme mit minus ohne Bonus, flach exakt
+  `3,5·h`) geht **genau dort** in `eig` ein, wo auch der Pp-Hebel `eigHebung()` eingeht: Kampf
+  (`baueEinheit`, über `aufEignung()` in die Kampfwerte), Bahn (`eig`, Staffel- und Takeshi-Menge).
+  Feldspiel und Bühne führen `eigHebung` nicht in `eig` (dort ist `eig` nur Fokusziel/Reihenfolge),
+  also auch den Mutator nicht. Damit erreicht der Mutator **exakt die Kanäle, die `einflussVon()`
+  misst**.
+- **Kampf:** der alte `+tr.netto`-Weg (+6 auf die zwei Slot-Fokus-Attribute) ist ersetzt, nicht
+  ergänzt — sonst hätte der Kampf doppelt gebucht, weil `gehoben()` von allen vier Chassis geteilt
+  wird.
+- **Wurf:** `__olyArenaKader.mutatoren` (echter Spieltagswurf) hat Vorrang; `zieheMutatoren` zieht
+  jetzt wie die Produktion **2 verschiedene aus 36** (obere LCG-Bits), nur noch für Mockup und
+  Messungen ohne Wurf. Der interaktive Host reicht `mutatorenByDisciplineId` (denselben Wurf wie
+  Resolve und Spielplan); eine Disziplin, die an diesem Spieltag nicht gespielt wird, bekommt dort
+  keinen Mutator.
+- **Messwerkzeuge:** `disziplinProbe(d,{mutatoren:"je-spiel"|"aus"|"fest"})` (Standard „je-spiel",
+  rho gegen `eigOhneMutator`), `einflussVon(d,n,plus,versatz,"je-lauf"|"aus"|"fest")` (Standard
+  „je-lauf": Lauf i zieht seinen Wurf aus einer Saat, die nur von i abhängt — Grund- und jeder
+  Hebungslauf sehen denselben Wurf, gepaart), `mutatorGegenfaktus()`, `mutatorRegel()`.
+  Schalter in den Skripten: `miss-alle-disziplinen.mjs --mutatoren=…`,
+  `messe-arena-einfluss.mjs --mutatoren=… --saat-versatz=N`.
+- **Anzeige:** Traitzeile und Aufschlüsselung zeigen „+3,5 auf jedes Attribut je Treffer" statt
+  „+6", die Kopfchips färben je Trait nach Polarität (seit „2 aus 36" können beide positiv sein).
+
+**Produktion (TS)**
+
+- Transport: `arena-matchday-resolve-service.ts` berechnet den Wurf je arena-aufgelöster Disziplin
+  aus **denselben** geladenen Contexts, aus denen der Resolve würfelt
+  (`resolveMatchdayMutatorTraitsForDiscipline`), → `runBattleModeArenaMatchday({matchdayMutatorTraits})`
+  (Rückfall ohne Angabe: aus dem Spielplan, `resolveMutatorTraitsFromSchedule`) →
+  `runArenaFixtures({mutatoren})` → `__olyArenaKader.mutatoren` (Init-Script **und**
+  Neu-Einhängen ab Fixture 2). Ohne Angabe schickt der Runner `[]` — nie den engine-eigenen
+  Ersatzwurf (Referenzziehungen, Tests, Mini-DM-Pods bleiben mutatorfrei).
+- Doppelbuchung: `legacy-matchday-resolve-engine.ts` wendet `toBattleArenaOrganicMutatorResult()`
+  an, wenn **Battle-Save und Arena-Override für genau dieses Team in genau dieser Disziplin**
+  vorliegen: `+6`, `+0,3` und Seiten-Summe auf 0, Slot-Ausweise auf 0, Trefferzahl bleibt.
+  Manager-Modus, die fünf nicht simulierten Battle-Disziplinen und ein Team, dessen Arena-Lauf
+  ausgefallen ist (PPS-Rückfall ohne Simulation), behalten `+6`/`+0,3`.
+- Neues optionales Feld `mutatorHits` (Score-Eintrag → Preview → `PlayerDisciplinePerformanceRecord`),
+  damit die Spielplan-Mutatorspalte Arena-Treffer ohne flachen Bonus weiter zählt
+  (`spielplan-mutator-summary.ts`, Rückfall `Bonus/6` für ältere Zeilen).
+
+### 11.3 Abnahme
+
+**Bitgleichheit ohne Treffer.** Mit `mutatoren:"aus"` liefert die neue Engine in Feldspiel, Bühne
+und Bahn **bitgleich** dieselben Zahlen wie `main` (geprüft: `disziplinProbe` für Basketball,
+Gewichtheben, Tennis, Showcase, Breaking, Staffel, Takeshi, Climbing per Hash; `einflussVon` für
+Spurt n=6 identische Ausgabe, 14,9 Pp). Jede Abweichung unten kommt also allein vom Mutator. Für
+Nicht-Kampf-Disziplinen ist „aus" damit die Vorher-Zahl; für den Kampf (dort ist der alte
+`+tr.netto`-Weg ersetzt) ist die Vorher-Zahl die echte `main`-Engine.
+
+#### rho je Einzelspiel (`miss-alle-disziplinen.mjs 24`, kaderfest, Live-Kaderfamilie)
+
+Vorher = `main` (Healthy/Renegade fest, wirkte nur im Kampf); nachher = neue Engine, Standard
+„je-spiel" (jedes Spiel zieht seinen Wurf wie im Spiel, rho gegen `eigOhneMutator`).
+
+| Disziplin (arena-aufgelöst fett) | vorher | nachher | Δ |
+|---|---:|---:|---:|
+| **Time-Trial** | 0,929 | 0,923 | −0,006 |
+| **Speed-Schach** | 0,906 | 0,898 | −0,008 |
+| **Spurt** | 0,906 | 0,880 | −0,026 |
+| **Staffel** | 0,899 | 0,898 | −0,001 |
+| **Eiskunstlauf** | 0,878 | 0,866 | −0,012 |
+| **Takeshi's Castle** | 0,874 | 0,871 | −0,003 |
+| **Wettessen** | 0,872 | 0,866 | −0,006 |
+| **Showcase** | 0,845 | 0,835 | −0,010 |
+| **Gewichtheben** | 0,843 | 0,836 | −0,007 |
+| **Breaking** | 0,833 | 0,808 | −0,025 |
+| **Fechten** | 0,832 | 0,860 | +0,028 |
+| **Tennis** | 0,827 | 0,813 | −0,014 |
+| Football | 0,818 | 0,814 | −0,004 |
+| **Climbing** | 0,814 | **0,791** | −0,023 |
+| **Basketball** | 0,769 | 0,756 | −0,013 |
+| I-Spy | 0,756 | 0,750 | −0,006 |
+| **Hockey** (nur Feldspieler) | 0,686 (0,725) | 0,640 (0,676) | −0,046 (−0,049) |
+| TDM | 0,306 | 0,404 | +0,098 |
+| Battlefield | 0,392 | 0,399 | +0,007 |
+| Mini-DM | 0,394 | 0,321 | −0,073 |
+
+**Der Einzelsatz täuscht — nachgemessen, wie viel davon Mutator ist.** Ein Treffer ändert die
+Attribute eines Spielers und damit den gesamten Zufallsverlauf des Spiels; ein Vorher/Nachher an
+einem einzigen Saatsatz vergleicht deshalb zwei verschiedene Realisierungen. Zwei getrennte Proben:
+
+1. **Andere Mutator-Ströme, gleiche Spiele** (`disziplinProbe({mutatorSaat})`, 4 Ströme, +3,5):
+   Climbing 0,791/0,800/0,803/0,794 (Mittel 0,797), Breaking 0,808/0,818/0,818/0,808 (0,813),
+   Spurt 0,880/0,877/0,910/0,898 (0,891), Tennis 0,813/0,814/0,827/0,831 (0,821).
+2. **Gepaart über sechs Spiel-Saatsätze** (`saat0` = 1337, 91337 … 491337), Climbing:
+   ohne Mutator 0,814/0,807/**0,799**/0,809/0,815/0,804 (Mittel **0,808**) — Climbing liegt also
+   schon ohne Mutator auf der Schranke, ein Saatsatz darunter. Mit +3,5: Mittel **0,801**,
+   gepaartes Δ **−0,007**; mit +2,5 ebenso 0,801 / −0,007.
+
+**Befund:** der systematische Mutator-Effekt auf rho liegt bei Climbing bei −0,007 und hängt
+zwischen +2,5 und +3,5 nicht messbar von der Höhe ab — ein kleinerer Bonus würde rho nicht retten,
+nur den PP-Wert senken. Alle arena-aufgelösten Disziplinen, die vorher bestanden, bestehen im
+Mittel über Ströme bzw. Saatsätze weiter; **Climbing landet mit 0,801 genau auf der Schranke**,
+und am Standard-Saatsatz der nächtlichen Prüfung (`pruefe-rangtreue-schranke.mjs`) mit 0,791
+darunter. Einen Bonus danach auszusuchen, welcher Zufallszug an diesem einen Saatsatz über 0,80
+landet (+2,5 träfe dort zufällig 0,806), wäre Messkosmetik und ist deshalb nicht gemacht.
+Hockey (−0,046) war schon vorher durchgefallen und ist die rauschstärkste Feldspiel-Disziplin
+(Spannweite 0,22); Kampf (TDM/Battlefield/Mini-DM) ist nicht arena-aufgelöst, dort wirkt in der
+Wertung weiter `+6`/`+0,3`, die Engine-Zahlen schwanken mit Spannweiten 0,67–0,93.
+
+#### Pp-Abweichung
+
+PP_PLATZHALTER
+
+### 11.4 Was offen bleibt
+
+OFFEN_PLATZHALTER
