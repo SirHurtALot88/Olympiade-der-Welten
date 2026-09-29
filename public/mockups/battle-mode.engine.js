@@ -2969,12 +2969,24 @@
     ruhend: {winkel:0.20, hoehe:0},
     suchen: {winkel:-0.45,hoehe:-5},
   };
+  // HEISS/KALT ALS FUNDSTUFE, NICHT ALS ERFUNDENE NAEHE (I4, Broadcast-Optik-Recherche
+  // 27.09., Abschnitt 4/I4): "die Mechanik kennt keine Naehe zur Loesung" -- eine echte
+  // heiss/kalt-Anzeige waere Theater (derselbe Fehler wie I0). Was ehrlich geht: die Farbe
+  // der FUNDSTUFE, die der Spuersinn dieses Zuges tatsaechlich gesehen hat (`r.stufe`,
+  // stepSchatzsuche() liest das bereits unveraendert in `u.vizIspyStufe`, s. dort) -- kalt
+  // (blau) fuer eine Notiz, warm (orange) fuer eine Akte, heiss (rot, mit zusaetzlichem
+  // Gluehen) fuer einen Tresor. Reine Farbwahl auf einem bereits gelesenen Feld, keine neue
+  // Formel, kein rr().
+  const LUPE_HITZE_GLAS={1:"rgba(200,225,255,.28)",2:"rgba(255,196,130,.32)",3:"rgba(255,120,90,.40)"};
+  const LUPE_HITZE_RAND={1:"#e8e2d0",2:"#f2d29a",3:"#ffb199"};
   // x/y ist die Hand (LUPE_HAND), s die Groesse (Z), richtung 0..3 wie blickAus(), phase
   // "ruhend"/"suchen" (unbekannt faellt auf "ruhend" zurueck, dasselbe Sicherheitsnetz wie
-  // jede andere Requisite dieser Tabelle). Das Glas pulsiert im Takt von `buehneT` (rein
-  // praesentational, kein rr()) -- Griff + Ring + ein heller Schimmerbogen, reine
-  // Canvas-Primitiven wie zeichneMikrofon direkt oberhalb.
-  function zeichneLupe(ctx,x,y,s,richtung,phase){
+  // jede andere Requisite dieser Tabelle). `stufe` (1/2/3, optional -- jede andere
+  // DISZIPLIN_PROP.zeichne-Funktion hat dieses siebte Argument nicht und ignoriert es
+  // einfach, JS-ueblich) faerbt das Glas nach I4 oben. Das Glas pulsiert im Takt von
+  // `buehneT` (rein praesentational, kein rr()) -- Griff + Ring + ein heller Schimmerbogen,
+  // reine Canvas-Primitiven wie zeichneMikrofon direkt oberhalb.
+  function zeichneLupe(ctx,x,y,s,richtung,phase,stufe){
     const p=LUPE_PHASEN[phase]||LUPE_PHASEN.ruhend;
     const blick=richtung===3?1:richtung===1?-1:0;
     const eff=blick||1;
@@ -2984,7 +2996,15 @@
     ctx.strokeStyle="#6b4a2e";ctx.lineWidth=Math.max(1,1.6*s);ctx.lineCap="round";
     ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(7*s,7*s);ctx.stroke();
     ctx.save();ctx.translate(7*s,7*s);ctx.scale(puls,puls);
-    ctx.fillStyle="rgba(200,225,255,.28)";ctx.strokeStyle="#e8e2d0";
+    // TRESOR-GLUEHEN (Stufe 3): ein weicher Schein HINTER dem Glas, bevor das Glas selbst
+    // gezeichnet wird -- "diese Figur hat den Tresor gesehen" (I4).
+    if(stufe===3){
+      const glut=ctx.createRadialGradient(0,0,1,0,0,7*s);
+      glut.addColorStop(0,"rgba(255,110,60,.55)"); glut.addColorStop(1,"rgba(255,110,60,0)");
+      ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(0,0,7*s,0,Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle=LUPE_HITZE_GLAS[stufe]||LUPE_HITZE_GLAS[1];
+    ctx.strokeStyle=LUPE_HITZE_RAND[stufe]||LUPE_HITZE_RAND[1];
     ctx.lineWidth=Math.max(0.8,1.2*s);
     ctx.beginPath();ctx.arc(0,0,4.6*s,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=Math.max(0.5,0.7*s);
@@ -3687,7 +3707,9 @@
       if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
         const prop=DISZIPLIN_PROP["i-spy"];
         const hpV=prop.hand[r0]||prop.hand[2];
-        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,"suchen");
+        // I4: siebtes Argument (Fundstufe) -- nur zeichneLupe() liest es, jede andere
+        // zeichne()-Funktion dieser Tabelle hat fuenf/sechs Parameter und ignoriert es.
+        prop.zeichne(ctx,x-32*Z+hpV.x*Z,y-46*Z+hpV.y*Z,Z,r0,"suchen",u.vizIspyStufe);
       }
       // SHOWCASE-KAMPFKUNST/-SCHUETZENKUNST-WAFFE FUER VOLLBILD (A0.1, s. NAHKAMPF_WAFFEN/
       // zeichneShowcaseBogen/DISZIPLIN_PROP.kampfkunst-schuetzenkunst oben fuer die
@@ -3859,6 +3881,12 @@
     // jede andere Figur/Disziplin bleibt u.vizPose immer `undefined`, diese Zeile also ohne
     // jede Wirkung (bit-identisch).
     else if(u.vizPose==="walk")ani="walk";
+    // WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik Buehne-Auftritt 27.09.): "Haende hoch"
+    // fuer alle Esser, sobald das Spiel endet -- dasselbe u.vizPose-Prinzip wie bei
+    // Showcase direkt darueber, aber UNABHAENGIG von u.lunge>0 (das Spiel steht bereits,
+    // u.lunge waere hier laengst abgeklungen). Nur von stepWettessen() gesetzt, s. dort;
+    // fuer jede andere Disziplin bleibt u.vizJubel immer `undefined`.
+    else if(u.vizJubel)ani="shoot";
     else if(u.lunge>0)ani=feldspiel?"shoot":((bogen||feuerwaffe||u.vizPose==="shoot")?"shoot":"slash");
     else if(Math.abs(u.vx||0)+Math.abs(u.vy||0)<3)ani="walk";
     const n=ANIBILDER[ani];
@@ -4256,7 +4284,8 @@
     if(feldspiel&&istIspy()&&!u.down&&u.vizPhase==="suchen"){
       const prop=DISZIPLIN_PROP["i-spy"];
       const hp=prop.hand[r]||prop.hand[2];
-      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,"suchen");
+      // I4: siebtes Argument (Fundstufe), s. Kommentar an der Vollbild-Aufrufstelle oben.
+      prop.zeichne(ctx,x-32*Z+hp.x*Z,y-46*Z+hp.y*Z,Z,r,"suchen",u.vizIspyStufe);
     }
     // MIKROFON (PR S2, Gesang-Act, s. DISZIPLIN_PROP.showcase/zeichneMikrofon oben) -- ANDERS
     // als die fuenf Requisiten oberhalb (Hantel/Schachuhr/Kufe/Schlaeger/Degen) NICHT ueber
@@ -5234,8 +5263,8 @@
   };
   const SLOTS_JE_DISC={
     "tdm":[
-      {id:"vanguard",label:"Vanguard",text:"Oeffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
-      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und haelt Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
+      {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
+      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und hält Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
       {id:"shotcaller",label:"Shotcaller",text:"Ordnet den Fight über Intelligence und Charisma.",gross:"charisma",klein:"intelligence",last:"power",mueh:"low",profil:{power:25.6,health:18.3,charisma:14.4,stamina:12.8,spirit:11,intelligence:8.7,determination:5.5,awareness:1.9,torment:1.9}},
       {id:"holdline",label:"Hold Line",text:"Stabilisiert knappe Phasen mit Health und Determination.",gross:"health",klein:"determination",last:"stamina",mueh:"medium",profil:{health:25.4,power:24.8,stamina:12.5,spirit:10.7,charisma:8.9,determination:8.7,intelligence:5.4,awareness:1.9,torment:1.9}},
       {id:"rallypoint",label:"Rally Point",text:"Hebt Team-Momentum über Spirit und Charisma.",gross:"spirit",klein:"charisma",last:"power",mueh:"low",profil:{power:24.7,health:17.7,spirit:17.3,charisma:13.4,stamina:12.4,determination:5.4,intelligence:5.4,awareness:1.9,torment:1.9}},
@@ -5243,44 +5272,44 @@
     ],
     "mini-dm":[
       {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:25.4,torment:20.6,power:19.4,stamina:13.8,will:12.1,dexterity:8.7}},
-      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
+      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
       {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:21.5,health:17.9,will:17.4,dexterity:14.4,power:14.4,stamina:14.4}},
       {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:24.5,stamina:22,health:19.4,power:16.3,will:14.3,dexterity:3.5}}
     ],
     "battlefield":[
-      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
       {id:"spotter",label:"Spotter",text:"Liest Lücken und Ziele über Awareness.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
     ],
     "gewichtheben":[
       {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
       {id:"safelift",label:"Safe Lift",text:"Sichert Punkte über Health und Determination.",gross:"health",klein:"determination",last:"power",mueh:"low",profil:{power:24.4,health:21.4,charisma:20.1,determination:15.4,will:6.2,speed:5.3,dexterity:5.3,stamina:1.8}},
       {id:"pressurelift",label:"Pressure Lift",text:"Geht aggressiv in schwere Versuche.",gross:"charisma",klein:"power",last:"health",mueh:"high",profil:{power:31.4,charisma:28.4,health:13,determination:9.8,will:5.8,speed:5,dexterity:5,stamina:1.8}},
-      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausfuehrung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
-      {id:"gripanchor",label:"Grip Anchor",text:"Haelt über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
-      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom grossen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
+      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausführung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
+      {id:"gripanchor",label:"Grip Anchor",text:"Hält über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
+      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom großen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
     ],
     "climbing":[
       {id:"routereader",label:"Route Reader",text:"Findet die Linie über Determination und Awareness.",gross:"determination",klein:"awareness",last:"stamina",mueh:"low",profil:{stamina:22.9,determination:21.4,awareness:11.4,speed:10.6,dexterity:10.6,health:8.9,power:7.1,will:7.1}},
-      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Zuege.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
-      {id:"paceclimber",label:"Pace Climber",text:"Haelt Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
+      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Züge.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
+      {id:"paceclimber",label:"Pace Climber",text:"Hält Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
       {id:"endurancewall",label:"Endurance Wall",text:"Klettert stabil über Stamina und Health.",gross:"stamina",klein:"health",last:"dexterity",mueh:"high",profil:{stamina:31.4,determination:13.7,health:13.4,speed:10.3,dexterity:10.3,power:6.9,awareness:6.9,will:6.9}},
-      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Zuege über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
+      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Züge über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
       {id:"summitpush",label:"Summit Push",text:"Zieht den Schluss über Determination und Will.",gross:"will",klein:"determination",last:"stamina",mueh:"high",profil:{stamina:24.3,determination:18.8,will:12.8,health:11.3,power:8.5,awareness:8.5,dexterity:8.1,speed:7.6}}
     ],
     "staffel":[
       {id:"startrunner",label:"Start Runner",text:"Bringt die Staffel mit Speed in Position.",gross:"speed",klein:"stamina",last:"awareness",mueh:"medium",profil:{speed:29.4,stamina:19.4,spirit:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"tempolink",label:"Tempo Link",text:"Haelt Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
+      {id:"tempolink",label:"Tempo Link",text:"Hält Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
       {id:"batontech",label:"Baton Tech",text:"Sichert Wechsel über Awareness und Dexterity.",gross:"awareness",klein:"dexterity",last:"stamina",mueh:"low",profil:{speed:21.3,awareness:17.3,stamina:14.2,spirit:14.2,dexterity:11.4,charisma:8.9,will:7.2,determination:3.6,health:1.9}},
       {id:"curverunner",label:"Curve Runner",text:"Braucht Speed und Will für schwierige Abschnitte.",gross:"speed",klein:"will",last:"dexterity",mueh:"medium",profil:{speed:29.4,stamina:13.9,spirit:13.9,will:11.4,awareness:10.4,charisma:8.7,dexterity:7,determination:3.5,health:1.8}},
       {id:"chaserunner",label:"Chase Runner",text:"Jagt Rückstände mit Spirit und Speed.",gross:"spirit",klein:"speed",last:"stamina",mueh:"high",profil:{speed:27.4,spirit:21.4,stamina:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
-      {id:"anchor",label:"Anchor",text:"Schliesst die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
+      {id:"anchor",label:"Anchor",text:"Schließt die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
     ],
     "time-trial":[
-      {id:"pacer",label:"Pacer",text:"Haelt die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"pacer",label:"Pacer",text:"Hält die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"linereader",label:"Line Reader",text:"Findet Sekunden über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"speed",mueh:"low",profil:{intelligence:23.4,dexterity:21.8,speed:19.2,awareness:15.4,stamina:13.1,power:4.4,torment:2.7}},
-      {id:"aerodrive",label:"Aero Drive",text:"Drueckt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"aerodrive",label:"Aero Drive",text:"Drückt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
       {id:"splitcontrol",label:"Split Control",text:"Kontrolliert Zwischenzeiten über Intelligence.",gross:"intelligence",klein:"stamina",last:"dexterity",mueh:"low",profil:{intelligence:23.4,dexterity:21.6,speed:19,stamina:18.4,awareness:10.4,power:4.4,torment:2.7}},
       {id:"risksegment",label:"Risk Segment",text:"Nimmt Risiko über Dexterity und Torment.",gross:"dexterity",klein:"torment",last:"awareness",mueh:"high",profil:{dexterity:30.4,speed:19.9,intelligence:16.3,stamina:13.6,awareness:10.9,power:4.6,torment:4.5}},
       {id:"finishkick",label:"Finish Kick",text:"Holt den Schluss über Speed und Power.",gross:"stamina",klein:"awareness",last:"stamina",mueh:"high",profil:{speed:21.1,stamina:20,dexterity:17.4,awareness:15.3,intelligence:15.1,power:8.1,torment:3}}
@@ -5290,30 +5319,30 @@
       {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
       {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"awareness",last:"speed",mueh:"low",profil:{dexterity:17.3,speed:16.1,determination:13.4,will:12.5,torment:12.5,awareness:10.1,power:9,health:5.4,stamina:3.6}},
-      {id:"drivephase",label:"Drive Phase",text:"Drueckt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
+      {id:"drivephase",label:"Drive Phase",text:"Drückt die Mitte über Determination und Power.",gross:"determination",klein:"power",last:"stamina",mueh:"medium",profil:{determination:20.4,speed:15.8,power:13.4,will:12.3,torment:12.3,dexterity:10.6,awareness:6.2,health:5.3,stamina:3.6}},
       {id:"photofinish",label:"Photo Finish",text:"Braucht Nerven und Torment für den letzten Meter.",gross:"will",klein:"torment",last:"speed",mueh:"medium",profil:{will:17.5,torment:17.5,dexterity:12.9,determination:11.8,power:11.5,health:9.5,awareness:7.4,stamina:6.2,speed:5.9}}
     ],
     "tennis":[
       {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
-      {id:"return",label:"Return",text:"Liest Aufschlaege über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
-      {id:"rallycontrol",label:"Rally Control",text:"Haelt Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
+      {id:"return",label:"Return",text:"Liest Aufschläge über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
+      {id:"rallycontrol",label:"Rally Control",text:"Hält Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
       {id:"netpressure",label:"Net Pressure",text:"Greift über Dexterity und Speed an.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:19.8,awareness:18,dexterity:17.3,spirit:16.2,stamina:10.9,speed:8.7,determination:5.5,charisma:3.7}},
       {id:"matchiq",label:"Match IQ",text:"Gewinnt Muster über Intelligence und Determination.",gross:"intelligence",klein:"determination",last:"stamina",mueh:"low",profil:{intelligence:27.4,awareness:17.7,spirit:16,stamina:10.7,dexterity:10.7,determination:8.7,speed:5.4,charisma:3.6}},
       {id:"tiebreak",label:"Tiebreak Clutch",text:"Braucht Spirit und Awareness im Druckmoment.",gross:"spirit",klein:"stamina",last:"determination",mueh:"high",profil:{spirit:23.7,awareness:18.2,stamina:14.6,dexterity:13.2,intelligence:11.3,speed:6.4,determination:6.3,charisma:6.2}}
     ],
     "hockey":[
       {id:"powerforward",label:"Power Forward",text:"Geht dahin, wo es weh tut.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:21.2,health:19,spirit:10.7,speed:10.4,stamina:8.9,torment:8.8,awareness:6.3,determination:3.9,dexterity:3.9,will:3.9}},
-      {id:"defensivewall",label:"Defensive Wall",text:"Schliesst Raeume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
-      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und haelt den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
+      {id:"defensivewall",label:"Defensive Wall",text:"Schließt Räume über Health und Spirit.",gross:"spirit",klein:"health",last:"speed",mueh:"medium",profil:{health:20.8,spirit:16,power:14,speed:10.6,stamina:9,torment:9,awareness:6.4,determination:4,dexterity:4,will:4}},
+      {id:"goaltender",label:"Goaltender",text:"Steht im Tor und hält den Kasten sauber über Health und Awareness.",gross:"health",klein:"awareness",last:"dexterity",mueh:"low",profil:{health:26,power:18,speed:12,awareness:12,spirit:12,stamina:10,torment:10,determination:4,dexterity:4,will:4}},
       {id:"playmaker",label:"Playmaker",text:"Verbindet Linien über Power und Awareness.",gross:"awareness",klein:"power",last:"health",mueh:"medium",profil:{power:19.4,health:14.3,spirit:11.3,speed:11,awareness:10.5,stamina:9.3,torment:9.3,determination:4.1,dexterity:4.1,will:4.1}},
       {id:"transition",label:"Transition Runner",text:"Dreht Tempo über Speed und Stamina.",gross:"speed",klein:"stamina",last:"power",mueh:"high",profil:{speed:17.5,power:14.3,health:14.1,stamina:13.8,spirit:11.1,torment:9.1,awareness:6.5,determination:4,dexterity:4,will:4}},
-      {id:"slotfinisher",label:"Slot Finisher",text:"Schliesst Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
+      {id:"slotfinisher",label:"Slot Finisher",text:"Schließt Chancen über Power und Torment.",gross:"torment",klein:"power",last:"health",mueh:"medium",profil:{power:21.2,health:13.9,torment:13.8,spirit:10.9,speed:10.6,stamina:9,awareness:6.4,determination:4,dexterity:4,will:4}}
     ],
     "showcase":[
-      {id:"stagelead",label:"Stage Lead",text:"Traegt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"stagelead",label:"Stage Lead",text:"Trägt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"crowdhook",label:"Crowd Hook",text:"Holt Publikum über Charisma und Showcase-Power.",gross:"charisma",klein:"power",last:"intelligence",mueh:"low",profil:{charisma:32.4,power:14.4,spirit:13.6,determination:11.9,intelligence:8.6,dexterity:7.7,speed:6.9,health:2.7,torment:1.8}},
       {id:"styletech",label:"Style Tech",text:"Belohnt saubere Details über Determination und Dexterity.",gross:"determination",klein:"dexterity",last:"charisma",mueh:"medium",profil:{charisma:23.8,determination:19.4,spirit:14.1,dexterity:12.4,power:9.7,intelligence:8.9,speed:7.1,health:2.7,torment:1.9}},
-      {id:"controlbeat",label:"Control Beat",text:"Fuehrt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
+      {id:"controlbeat",label:"Control Beat",text:"Führt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
       {id:"bigmoment",label:"Big Moment",text:"Lebt von Charisma und Spirit im Spotlight.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
       {id:"finale",label:"Finale",text:"Setzt den Schlussakzent über Spirit.",gross:"speed",klein:"spirit",last:"power",mueh:"medium",profil:{charisma:17,spirit:15.1,power:13.5,speed:13.3,determination:11.8,intelligence:11.3,dexterity:10.6,health:4.6,torment:2.9}}
     ],
@@ -5324,11 +5353,11 @@
       {id:"calculation",label:"Calculation Core",text:"Rechnet Linien über Intelligence.",gross:"determination",klein:"intelligence",last:"awareness",mueh:"low",profil:{intelligence:22.5,determination:20.6,awareness:14.7,will:13.6,dexterity:10.1,speed:10,charisma:8.6}}
     ],
     "takeshis-castle":[
-      {id:"gatecrash",label:"Gate Crash",text:"Oeffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
+      {id:"gatecrash",label:"Gate Crash",text:"Öffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
       {id:"balancerun",label:"Balance Run",text:"Bleibt sauber über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"will",mueh:"medium",profil:{will:19.9,determination:16.3,intelligence:15.9,charisma:12.7,dexterity:8.7,awareness:7.3,torment:6.4,stamina:5.5,health:3.7,speed:3.7}},
       {id:"trapreader",label:"Trap Reader",text:"Liest Fallen über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"determination",mueh:"low",profil:{will:20,determination:16.4,intelligence:14.4,charisma:12.8,awareness:11.5,torment:6.4,stamina:5.5,dexterity:5.5,health:3.7,speed:3.7}},
-      {id:"ironwill",label:"Iron Will",text:"Beisst sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
-      {id:"chaosdodge",label:"Chaos Dodge",text:"Ueberlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
+      {id:"ironwill",label:"Iron Will",text:"Beißt sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
+      {id:"chaosdodge",label:"Chaos Dodge",text:"Überlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
       {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
     ],
     "breaking":[
@@ -5341,14 +5370,14 @@
     ],
     "wettessen":[
       {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
-      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kraefte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
-      {id:"ironstomach",label:"Iron Stomach",text:"Haelt Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kräfte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
+      {id:"ironstomach",label:"Iron Stomach",text:"Hält Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"tablefocus",label:"Table Focus",text:"Bleibt klar über Determination und Intelligence.",gross:"determination",klein:"intelligence",last:"health",mueh:"low",profil:{will:23,determination:21.4,health:19.4,stamina:19.4,intelligence:11.4,torment:5.4}},
       {id:"secondwind",label:"Second Wind",text:"Kommt über Will und Stamina zurück.",gross:"will",klein:"stamina",last:"health",mueh:"medium",profil:{will:31.4,stamina:25.4,health:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
       {id:"finalbite",label:"Final Bite",text:"Zieht den Schluss über Determination und Torment.",gross:"determination",klein:"torment",last:"will",mueh:"high",profil:{will:27.8,determination:20.7,health:20.4,stamina:16.1,torment:10.1,intelligence:5}}
     ],
     "basketball":[
-      {id:"floorgeneral",label:"Floor General",text:"Fuehrt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
+      {id:"floorgeneral",label:"Floor General",text:"Führt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
       {id:"rimpressure",label:"Rim Pressure",text:"Attackiert den Korb über Awareness und Speed.",gross:"awareness",klein:"speed",last:"spirit",mueh:"high",profil:{awareness:19.4,spirit:19.4,intelligence:14.1,speed:13.4,charisma:9.7,dexterity:7.1,power:6.2,stamina:5.4,torment:5.4}},
       {id:"perimeter",label:"Perimeter",text:"Schafft Winkel über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"power",mueh:"medium",profil:{intelligence:21.4,spirit:19.4,awareness:12.4,dexterity:11.4,charisma:9.7,speed:8.9,power:6.2,stamina:5.4,torment:5.4}},
       {id:"helpdefense",label:"Help Defense",text:"Rotiert über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"speed",mueh:"medium",profil:{spirit:25.4,awareness:19.4,intelligence:13.7,charisma:9.5,speed:8.6,dexterity:6.9,power:6.1,stamina:5.2,torment:5.2}},
@@ -5361,11 +5390,11 @@
       {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
       {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
       {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"lockerleader",label:"Locker Leader",text:"Haelt die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
+      {id:"lockerleader",label:"Locker Leader",text:"Hält die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
     ],
     "eiskunstlauf":[
-      {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
-      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Spruenge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
+      {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
+      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Sprünge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
       {id:"spingrace",label:"Spin Grace",text:"Sammelt Stil über Charisma und Spirit.",gross:"charisma",klein:"spirit",last:"dexterity",mueh:"medium",profil:{charisma:33.4,spirit:19.4,dexterity:15.1,awareness:11.8,speed:8.4,intelligence:6.8,determination:5.1}},
       {id:"programflow",label:"Program Flow",text:"Verbindet Elemente über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{charisma:24.7,spirit:21.4,dexterity:15.9,awareness:12.4,intelligence:11.4,speed:8.9,determination:5.4}},
       {id:"crowdmoment",label:"Crowd Moment",text:"Hebt den Auftritt über Charisma.",gross:"charisma",klein:"awareness",last:"determination",mueh:"medium",profil:{charisma:33.4,awareness:17.4,dexterity:15.2,spirit:13.5,speed:8.5,intelligence:6.8,determination:5.2}},
@@ -5377,14 +5406,14 @@
       {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
       {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
       {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
-      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+      {id:"finaltouch",label:"Final Touch",text:"Schließt enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
     ],
     "i-spy":[
       {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
       {id:"patternlock",label:"Pattern Lock",text:"Verkettet Hinweise über Intelligence und Spirit.",gross:"intelligence",klein:"spirit",last:"speed",mueh:"low",profil:{intelligence:23.4,spirit:16.4,torment:14.7,will:10.4,charisma:7.8,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
       {id:"socialread",label:"Social Read",text:"Liest Verhalten über Torment und Charisma.",gross:"torment",klein:"charisma",last:"intelligence",mueh:"medium",profil:{torment:22.4,intelligence:15.8,charisma:12.4,spirit:11.4,will:10.5,determination:7.1,speed:7.1,dexterity:7.1,awareness:4.5,health:1.8}},
-      {id:"logicchain",label:"Logic Chain",text:"Baut Loesungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
-      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffaellig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
+      {id:"logicchain",label:"Logic Chain",text:"Baut Lösungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffällig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
       {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
@@ -5982,14 +6011,17 @@
   //   PUBLIKUM       ein Bonus, der immer kommt, ohne Risiko
   //   NERVEN         traegt zur Gelingchance bei, unter Wettkampfdruck
   //   AUSDAUER       wie wenig die spaeten Durchgaenge gegenueber den fruehen abfallen
-  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt
+  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt — und seit
+  //                  26.09. im generischen Auftritt-Block auch, wie OFT er misslingt
+  //                  (echter Trade-off, s. BUEHNE_WAGNIS_RISIKO vor bauBuehne())
   //
   // WIE EIN DURCHGANG BEWERTET WIRD — eine Formel fuer alle fuenf, die Zutaten kommen
   // aus der jeweiligen Matrix:
   //
   //   Basis    = 20 + GRUNDLAGE * 0,7, gedaempft durch Ermuedung (niedrige AUSDAUER
   //              kostet in spaeten Durchgaengen)
-  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt
+  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt; WAGNIS ueber 50
+  //              senkt die Chance, darunter hebt es sie (generischer Block, seit 26.09.)
   //   Gelingt  = Basis + SPITZENMOMENT-Bonus, skaliert mit WAGNIS
   //   Misslingt= Basis * failAbzug — bei Gewichtheben hart (0: ein verpatzter Versuch
   //              zaehlt nichts), bei den anderen weich (ein Patzer kostet, wirft aber
@@ -6472,6 +6504,23 @@
       // Vergehen aus, sondern erzwingt einen Abschluss oder ein Klaeren.
       live:{perioden:3, periodenDauer:80, periodenPause:1.0, schussuhr:8,
             periodeWort:"Drittel"},
+      // ENDPHASE: TORWART RAUS / FUEHRUNGS-RIEGEL (Konzeptreview T1, 26.09., von Chris
+      // ausdruecklich bestaetigt: "Torwart kann in der Endphase rauskommen, wenn es knapp
+      // ist", s. docs/design/hockey-opus-konzeptreview-26-09.md Abschnitt "T1 — Die
+      // Endphase"). NUR HOCKEY HAT DIESES FELD — `hockeyEndphaseSeite()`/
+      // `aktualisiereHockeyEndphase()` lesen `FB().endphase` als Torwaechter und geben ohne
+      // dieses Feld sofort null/nichts zurueck, ohne FSTEAM oder fsPunkte ueberhaupt
+      // anzusehen. Basketball/Football/Gewichtheben bleiben dadurch GARANTIERT
+      // bit-identisch, nicht nur zufaellig unberuehrt.
+      //   tEndAnteil    Anteil der Spieldauer, ab dem die Endphase im letzten Drittel
+      //                 greift. Vorschlag aus dem Review: 10 % (24 s von 240 s) — die
+      //                 analytische Empfehlung (~6 von 60 Real-Minuten) auf unsere Uhr
+      //                 gebracht; die NHL-PRAXIS zieht eher bei ~5 s.
+      //   ruckstandMin/Max  nur ein Rueckstand von 1 oder 2 Toren loest die Endphase aus
+      //                 (Chris' eigene Formulierung: "wenn es knapp ist") — bei 3 oder mehr
+      //                 Toren Rueckstand bleibt der Torwart im Tor, genau wie in der Praxis
+      //                 kaum ein Team bei 3 Toren Rueckstand schon zieht.
+      endphase:{tEndAnteil:0.10, ruckstandMin:1, ruckstandMax:2},
       // REZEPT: ausgelagert nach public/mockups/battle-mode.rezepte.js (Hockey-Plan PR 1,
       // Fortsetzung von #726, s. rezeptAus() weiter oben). Dort steht es zeichengleich
       // weiter, mitsamt dem Nachzieh-Kommentar zu TEAMGEIST. Zweite ausgelagerte
@@ -7360,6 +7409,25 @@
   // schon die im Dokument empfohlene Interpolation, keine eigene Messung.
   const BK_HAND_LINKS=[[24,46],[24,46],[24,46],[25,36],[22,45],[20,45],[23,45],[24,44],[24,44]];
   const BK_HAND_RECHTS=[[40,46],[40,46],[40,46],[38,36],[41,45],[43,45],[40,45],[40,44],[40,44]];
+  // NACHTRAG 26.09. (Ball-Pose-Fix, Bewegungs-Audit + Fable-Recherche Abschnitt 2.3, Weg
+  // A): die Handpunkte oben decken nur "links"/"rechts" (Profil) ab — "hinten"/"vorn"
+  // fielen bisher auf einen ungemessenen Festwert ([44,47], nie eigens vermessen, nur von
+  // HOCKEY_HAND uebernommen) zurueck, der Bild fuer Bild GLEICH blieb: der Ball klebte in
+  // diesen beiden Blickrichtungen sichtbar unbewegt am Rumpf statt mit dem Laufzyklus zu
+  // schwingen (Sichtbeleg: renderProbe-Serie im Scratchpad dieser Runde, Charakter "vorn"/
+  // "hinten" zeigte den Ball praktisch mittig ueber dem Torso ueberlappend, waehrend
+  // "links"/"rechts" mit den vermessenen Werten oben bereits sauber neben dem Koerper
+  // sitzt — s. PR-Beschreibung fuer die Vergleichsbilder). Per Pixelscan derselben
+  // Guertelband-Methode wie HOCKEY_HAND/BK_HAND_LINKS/-RECHTS neu vermessen
+  // (scripts/messe-basketball-dribbel-handpunkt.mjs, y-Band 28..54 statt 44..50, weil der
+  // Ausschlag bei Spalte 3 sonst abgeschnitten wird — derselbe Spalte-3-Ausschlag, den
+  // BK_HAND_LINKS/-RECHTS an dieser Stelle mit y=36 schon zeigen). In Front-/Ruecken-
+  // ansicht bewegt sich nur die X-Koordinate spuerbar (± 1 px, Spalte 3 macht die
+  // erwartete Ausnahme); Y bleibt bewusst ungenutzt wie bei BK_HAND_LINKS/-RECHTS auch
+  // (nur hp[0] geht unten in handOffX ein, s. dort) — der Baukasten-Torso in Front-/
+  // Ruecken-Projektion zeigt keinen zweiten, separat messbaren Hoehen-Freiheitsgrad.
+  const BK_HAND_HINTEN=[[48,38],[48,38],[48,38],[47,36],[48,38],[48,38],[48,39],[48,40],[48,39]];
+  const BK_HAND_VORN=[[48,38],[48,38],[48,38],[48,39],[48,38],[48,38],[48,39],[47,38],[48,39]];
 
   // AUFGABE 3 (Chris' Wunsch: "Positionen unterschiedliche Gewichtungen ... eine
   // Scoring-Maschine oder ein Rebound-Monster bauen, wenn der richtige Spieler da
@@ -7382,6 +7450,32 @@
     helpdefense:  {ABWEHR:3,  ZWEITCHANCE:2, SCHUSS_FERN:-1},
     clutchshot:   {SCHUSS_FERN:4, SCHUSS_NAH:-2},
     fastbreak:    {AUFBAU:2,  SCHUSS_NAH:2, ZWEITCHANCE:-2}
+  };
+  // ROLLE -> COURT-PLATZ (26.09., Konzeptreview-Fund L1/Abschnitt 2.2: "wo ein Spieler
+  // steht, entscheidet sein SCHUSS_NAH-Rang" statt seiner tatsaechlichen Rolle — Chris
+  // woertlich: "Ein Center ist viel mehr innen als ein Shooting Guard"). Bildet jede der
+  // sechs Rollen auf GENAU EINEN der sechs SLOTS-Plaetze ab (s. SLOTS oben: 0 Korbnaehe/
+  // Paint, 1 Top of Key/zentral, 2/3 Fluegelpaar, 4/5 Eckenpaar):
+  //   rimpressure  (Center/Power-Forward-artig, attackiert den Ring)      -> 0, Paint
+  //   floorgeneral (Point-Guard-artig, fuehrt Possessions)                -> 1, Top of Key
+  //   fastbreak    (Slasher/Umschaltspieler, SCHUSS_NAH-lastig)           -> 2, Fluegel
+  //   helpdefense  (Rotations-/Rebound-Verteidiger, kaum Fernwurf)        -> 3, Fluegel
+  //   perimeter    (Winkelspieler, SCHUSS_FERN-lastig)                    -> 4, Ecke
+  //   clutchshot   (reinster Distanzschuetze, hoechster SCHUSS_FERN-Bonus)-> 5, Ecke
+  // Reihenfolge der vier aeusseren Rollen (fastbreak/helpdefense/perimeter/clutchshot)
+  // folgt der Netto-Neigung aus BASKETBALL_POS_MOD (SCHUSS_NAH minus SCHUSS_FERN: +2/+1/
+  // -5/-6) — je naeher am Ring ein Sub-Skill-Profil liegt, desto naeher am Paint-Ende der
+  // vier verbleibenden Plaetze (Fluegel vor Ecke). Wing/Ecke sind sich radial fast gleich
+  // (150 gegen 145 px, s. SLOTS) — hier bleibt kein starker Unterschied, nur eine klare,
+  // dokumentierte statt zufaellige Zuordnung.
+  //
+  // NUR WIRKSAM, WENN DIE GANZE AUFSTELLUNG ECHTE ROLLEN TRAEGT (s. zuordneSlots): jeder
+  // Rueckfall (Kader ohne Aufstellung, Unterzahl, doppelt vergebene Rolle) bleibt exakt
+  // beim alten SCHUSS_NAH-Sortierverfahren. Insbesondere die kaderfeste Rangtreue-Sonde
+  // (miss-alle-disziplinen.mjs/feldspielProbe) setzt nie eine Aufstellung (`place` bleibt
+  // leer) — sie durchlaeuft diesen Zweig also nie und misst bit-identisch weiter.
+  const BASKETBALL_ROLLE_SLOT={
+    rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
@@ -7849,7 +7943,7 @@
     // `aufDemEis` neben `!u.torwart`: wer auf der Strafbank sitzt, bekommt keinen Slot.
     // Dadurch faellt die Seite von selbst in die Unterzahl-Tabelle unten — es braucht
     // keinen zweiten Weg fuer "Ueberzahl", der bestehende traegt ihn schon.
-    const sortiert=[...FSTEAM[seite]].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
+    const sortiert=[...FSTEAM[seite]].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>slotSchluessel(b)-slotSchluessel(a));
     // UNTERZAHL BEKOMMT NICHT DIE BESTEN PLAETZE.
     //
     // Chris' Fund: „wenn ich 6x50er spieler einsetze haette ich 300 Punkte, selbst ein
@@ -7897,11 +7991,33 @@
     // Feld, und das IST die volle Besetzung. Ohne diesen Abzug haette jede vollstaendige
     // Hockey-Mannschaft als Unterzahl gegolten.
     const form=FORMATION();
-    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>u.torwart);
+    const torwartDa=istHockey()&&FSTEAM[seite].some(u=>stehtImTor(u));
     const soll=Math.max(1,(FB().jeSeite||form.length)-(torwartDa?1:0));
     const plaetze=sortiert.length<soll?UNTERZAHL_PLAETZE[sortiert.length]:null;
+    // ROLLENBASIERTE PLATZWAHL (Konzeptreview 26.09., L1/2.2 — s. BASKETBALL_ROLLE_SLOT
+    // oben): bei VOLLER Besetzung (kein Unterzahl-Sonderfall) UND wenn JEDER Spieler eine
+    // vom Manager/der KI tatsaechlich GESETZTE, gueltige und PAARWEISE VERSCHIEDENE Rolle
+    // traegt, entscheidet die Rolle den Platz — nicht mehr SCHUSS_NAH. Ein Center
+    // (rimpressure) steht damit im Paint, ein Floor General am Top of Key, ein reiner
+    // Distanzschuetze (clutchshot) in der Ecke, gleich wie gut oder schlecht sein
+    // SCHUSS_NAH zufaellig ausfaellt — genau Chris' Fund: "wo ein Spieler steht,
+    // entscheidet sein SCHUSS_NAH-Rang" statt seiner Rolle.
+    //
+    // JEDER ABWEICHENDE FALL FAELLT AUF DAS ALTE VERFAHREN ZURUECK (Unterzahl, keine
+    // Aufstellung, doppelt vergebene Rolle, unbekannte Slot-Kennung) — insbesondere die
+    // kaderfeste Rangtreue-Sonde (miss-alle-disziplinen.mjs/feldspielProbe) setzt nie eine
+    // Aufstellung (place bleibt ueber die ganze Messung leer, jeder Spieler bekommt seine
+    // Rolle nur als Rundlauf-Ruecfall mit slotGesetzt=false, s. slotFuer/bauSpieler oben) —
+    // sie durchlaeuft diesen Zweig nie und misst damit bit-identisch zu vorher weiter.
+    const rollenSpielbar=feldspielDisc==="basketball"&&!plaetze&&sortiert.length>0
+      &&sortiert.every(u=>u.slotGesetzt&&BASKETBALL_ROLLE_SLOT[u.slotId]!=null)
+      &&(()=>{ const belegt=new Set();
+        for(const u of sortiert){ const s=BASKETBALL_ROLLE_SLOT[u.slotId];
+          if(belegt.has(s))return false; belegt.add(s); }
+        return true; })();
     sortiert.forEach((u,i)=>{
-      u.slotIdx = plaetze?plaetze[Math.min(plaetze.length-1,i)]
+      u.slotIdx = rollenSpielbar ? BASKETBALL_ROLLE_SLOT[u.slotId]
+                : plaetze?plaetze[Math.min(plaetze.length-1,i)]
                 : Math.min(form.length-1,i);
       u.slotSeit=0;
     });
@@ -8140,7 +8256,7 @@
   function naechsteZumFreienPuck(seite,wieviele){
     const f=fsLive&&fsLive.ball?fsLive.ball.frei:null;
     if(!f)return [];
-    return FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+    return FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)&&!u.down)
       .sort((a,b)=>dist(a,f)-dist(b,f)).slice(0,wieviele);
   }
   // WIE VIELE GEHEN AUF DEN PUCK. Im Bild war die Eisflaeche zur Haelfte leer, waehrend
@@ -8161,7 +8277,7 @@
   // dieselbe Regel — eine Kopie waere die zweite Stelle, die beim naechsten Anfassen
   // vergessen wird.
   const liegtZurueck=(seite)=>fsPunkte[seite]<fsPunkte[1-seite];
-  const feldStaerke=(seite)=>FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u)).length;
+  const feldStaerke=(seite)=>FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)).length;
   // Strafe verhaengen. Gibt true zurueck, wenn wirklich gepfiffen wurde.
   function verhaengeStrafe(taeter,opfer,grund){
     if(feldStaerke(taeter.side)<=HK_STRAFE_MIN_FELD)return false;
@@ -8182,6 +8298,81 @@
     // Offensivdruck-Rotation durch eine Strafe nicht stillschweigend zurueckfaellt.
     zuordneSlots(0,liegtZurueck(0)); zuordneSlots(1,liegtZurueck(1)); zuordneDeckung(true);
     return true;
+  }
+  // ============ ENDPHASE: TORWART RAUS / FUEHRUNGS-RIEGEL (Konzeptreview T1) ============
+  // docs/design/hockey-opus-konzeptreview-26-09.md, Abschnitt "T1 — Die Endphase", von Chris
+  // woertlich bestaetigt: "Torwart kann in der Endphase rauskommen, wenn es knapp ist". Der
+  // Vorschlag im Review nennt drei Bedingungen zusammen: letztes Drittel, Restzeit innerhalb
+  // `tEndAnteil` der Spieldauer, Rueckstand 1 oder 2 Tore — s. `FB().endphase`-Kommentar oben.
+  //
+  // KEIN SIEBTER SPIELER. Ein Hockey-Spieltag stellt sechs Spieler inklusive Torwart
+  // (`engine.js` DISZIPLIN_INFO.hockey `size:6`) — es gibt keine Bank fuer einen echten
+  // sechsten Feldspieler (H3 aus hockey-opus-review-nhl.md ist deshalb laut Konzeptreview
+  // Abschnitt 4 NICHT baubar). Der "sechste Feldspieler" hier ist der Torwart SELBST: er
+  // verlaesst das Tor und spielt mit seinen eigenen (vermutlich feldspielschwachen) Werten
+  // weiter, ueber genau dieselbe `zuordneSlots`-Zuteilung wie jeder andere Feldspieler.
+  //
+  // Reine Zustandsablesung, KEIN rr()-Aufruf: liefert die ZURUECKLIEGENDE Seite (0/1) oder
+  // null. `FB().endphase` ist der Torwaechter — ohne dieses Feld (jede Disziplin ausser
+  // Hockey) verlaesst die Funktion sofort die erste Zeile, ohne FSTEAM/fsPunkte zu lesen.
+  function hockeyEndphaseSeite(){
+    const cfg=FB().endphase;
+    if(!istHockey()||!cfg||!fsLive)return null;
+    const L=LIVE();
+    if(!L||fsLive.viertel<L.perioden)return null; // nur im LETZTEN Drittel
+    const dauer=L.perioden*L.periodenDauer;
+    if(fsT<dauer-dauer*cfg.tEndAnteil)return null;
+    for(const seite of [0,1]){
+      const rueckstand=fsPunkte[1-seite]-fsPunkte[seite];
+      if(rueckstand>=cfg.ruckstandMin&&rueckstand<=cfg.ruckstandMax)return seite;
+    }
+    return null;
+  }
+  // FUEHRT DEN WECHSEL AUS — nur beim UEBERGANG. Jeden Tick aufgerufen (billig: eine
+  // Handvoll Vergleiche in hockeyEndphaseSeite, kein rr()), aendert aber nur etwas, wenn
+  // sich die zurueckliegende Seite gegenueber dem vorigen Tick unterscheidet. Ein Torwart
+  // faehrt also GENAU EINMAL zur Bank — und, faellt der Rueckstand wieder aus dem 1-2-Tore-
+  // Fenster (Ausgleich oder ein weiteres Gegentor ins leere Tor), GENAU EINMAL zurueck.
+  function aktualisiereHockeyEndphase(){
+    if(!FB().endphase)return;
+    const seite=hockeyEndphaseSeite();
+    if(seite===fsLive.hockeyEndphase)return;
+    if(fsLive.hockeyEndphase!=null){
+      const alt=torwartRoh(fsLive.hockeyEndphase);
+      if(alt&&alt.imTor===false){
+        alt.imTor=true;
+        feed(fsLive.hockeyEndphase,alt.n+" kommt zurück ins Tor.");
+      }
+    }
+    fsLive.hockeyEndphase=seite;
+    if(seite!=null){
+      const tw=torwartRoh(seite);
+      if(tw&&tw.imTor!==false){
+        tw.imTor=false;
+        // H4 (Bauplan Abschnitt 5): "im Ticker einmal '... nimmt den Torwart raus' als
+        // big" -- bisher lief diese Zeile ohne big-Flag, obwohl es laut Bauplan "der
+        // dramatischste Moment [ist], den Hockey jetzt hat". Nur das dritte Argument
+        // aendert sich (kein neuer Text, kein neuer Zweig).
+        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.",true);
+        schwebe({x:0,y:0,txt:"TORWART RAUS",life:1.6,crit:true,_spieler:tw.id});
+      }
+    }
+    // Beide Seiten neu aufstellen — dieselbe Bauform wie bei einer Strafe (verhaengeStrafe
+    // oben): ein echtes, seltenes Ereignis, keine laufende Neuzuteilung wie bei
+    // starteViertelpause (dort gemessen schaedlich, s. Kommentar dort — der Unterschied:
+    // DORT folgt gleich danach ohnehin ballUebernehmen(), HIER nicht).
+    zuordneSlots(0,liegtZurueck(0)); zuordneSlots(1,liegtZurueck(1)); zuordneDeckung(true);
+  }
+  // OB `u` GERADE IN DER EIGENEN HAELFTE RIEGELN MUSS ("Klaeren an die Bande statt
+  // Konter"): nur die FUEHRENDE Seite, nur waehrend die Endphase laeuft, nur mit dem Puck
+  // in der EIGENEN Haelfte. In der gegnerischen Haelfte (z.B. nach einem Abpraller oder
+  // einem missglueckten Wechsel des Gegners) gilt die Sperre nicht — ein Spieler, der den
+  // Puck schon vorne hat, darf weiter aufs (moeglicherweise leere) gegnerische Tor ziehen;
+  // das ist die dramatische Pointe der Endphase, kein Bug.
+  function hockeyRiegelKlaert(u){
+    if(!istHockey()||!FB().endphase||fsLive.hockeyEndphase==null)return false;
+    if(u.side!==1-fsLive.hockeyEndphase)return false; // nur die FUEHRENDE Seite
+    return u.side===0 ? u.x<MID : u.x>MID; // eigene Haelfte
   }
   // LOSER PUCK ALS WETTLAUF, NICHT ALS STANDPLATZ (Chris woertlich, 02.09.: "Das muss
   // dann auf jeden fall angepasst und gefixt werden das kann nicht nur positionssache
@@ -8471,7 +8662,25 @@
   // Greift keine ECHTE Aufstellung, faellt bestimmeTorwaerter auf den besten PARADE-Wert
   // zurueck.
   const TORWART_SLOTS=new Set(["goaltender","goalie","torwart","netminder","keeper"]);
-  const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
+  // STEHT ER GERADE IM TOR? Zwei getrennte Felder, absichtlich nicht eins (Konzeptreview
+  // T1, docs/design/hockey-opus-konzeptreview-26-09.md Abschnitt "T1 — Die Endphase"):
+  // `u.torwart` ist die ROLLE/IDENTITAET fuers ganze Spiel — Wertformel (s. feldspielWert,
+  // "if(u.torwart)") und Boxscore (Paraden/Gegentore-Spalten) lesen NUR dieses Feld, damit
+  // ein in der Endphase gezogener Torwart am Spielende weiter als Torwart abgerechnet wird,
+  // mit den Paraden/Gegentoren, die er WAEHREND er im Tor stand, wirklich gehalten hat.
+  // `u.imTor` ist der MOMENTANE Zustand: true, solange er tatsaechlich zwischen den Pfosten
+  // steht, false in der Endphase, wenn er auf der Bank sitzt und ein Feldspieler an seiner
+  // Stelle mitspielt (hier: er selbst, s. aktualisiereHockeyEndphase — es gibt keine Bank
+  // mit einem siebten Spieler, s. CLAUDE.md/Konzeptreview Abschnitt 4 zu H3). Jede
+  // gameplay-relevante Stelle (Slot-Zuteilung, Deckung, Schussausgang, Bewegung) muss
+  // `stehtImTor()` lesen, keine Stelle darf direkt `u.torwart` fuer diese Frage lesen.
+  const stehtImTor=(u)=>!!(u.torwart&&u.imTor!==false);
+  const torwartVon=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>stehtImTor(u))||null;
+  // ROLLEN-IDENTITAET, UNABHAENGIG VOM MOMENTANEN STATUS — fuer aktualisiereHockeyEndphase,
+  // die den urspruenglichen Torwart auch dann wiederfinden muss, wenn er gerade (imTor=false)
+  // auf dem Eis als Feldspieler steht. `torwartVon` waere hier falsch: es liefert bei einem
+  // gezogenen Torwart bewusst null (leeres Tor, s. Kommentar dort).
+  const torwartRoh=(seite)=>FSTEAM[seite]&&FSTEAM[seite].find(u=>u.torwart)||null;
   // GENAU EINER JE SEITE, AB DREI SPIELERN. Chris woertlich: "einer der spieler soll
   // natuerlich einen torwart slot haben und entsprechend im tor stehen! ausser im 2er
   // spiel da gibts nur verteiger und angreifer". Bei zwei Spielern steht das Tor also
@@ -8487,7 +8696,7 @@
   // durch, wie es der Kommentar hier schon immer versprach.
   function bestimmeTorwaerter(){
     for(const team of FSTEAM){
-      for(const u of team)u.torwart=false;
+      for(const u of team){u.torwart=false; u.imTor=true;}
       if(team.length<3)continue;
       let gewaehlt=team.find(u=>u.slotGesetzt&&u.slotId&&TORWART_SLOTS.has(u.slotId));
       if(!gewaehlt)for(const u of team)if(!gewaehlt||(u.PARADE||0)>(gewaehlt.PARADE||0))gewaehlt=u;
@@ -8526,7 +8735,7 @@
     for(const team of FSTEAM)for(const u of team)u.hatBall=false;
     if(istHockey()){
       const naechster=(seite)=>FSTEAM[seite]
-        .filter(u=>!u.torwart&&aufDemEis(u)&&!u.down)
+        .filter(u=>!stehtImTor(u)&&aufDemEis(u)&&!u.down)
         .sort((a,b)=>dist(a,{x,y})-dist(b,{x,y}))[0]||null;
       const c0=naechster(0), c1=naechster(1);
       if(c0&&c1){
@@ -9376,6 +9585,10 @@
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
       beruehrungKette:[], beruehrungSeite:null,
+      // NUR HOCKEY (s. aktualisiereHockeyEndphase): die aktuell zurueckliegende Seite (0/1),
+      // deren Torwart gezogen ist, oder null, solange keine Endphase laeuft. Ein neues Spiel
+      // startet immer ohne — der Stand 0:0 kann die Bedingung ohnehin nie erfuellen.
+      hockeyEndphase:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
       // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
       football:null, snap:null};
@@ -9410,8 +9623,8 @@
       // Schuesse, stahl Pucks und verteilte 26 Bodychecks. Ein Torwart, der durchs Feld
       // checkt, ist kein Torwart. Er faellt auf BEIDEN Seiten der Zuteilung heraus: er
       // deckt niemanden, und niemand deckt ihn.
-      const verteidiger=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u)),
-            angreifer=FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const verteidiger=FSTEAM[1-seite].filter(u=>!stehtImTor(u)&&aufDemEis(u)),
+            angreifer=FSTEAM[seite].filter(u=>!stehtImTor(u)&&aufDemEis(u));
       // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
       // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
       // ohne diese Bereinigung griff sich ein neu bewertender Verteidiger regelmaessig
@@ -9653,7 +9866,7 @@
   function spielmacherLos(team){
     // Der Torwart eroeffnet keinen Angriff — er steht im Tor. Nur wenn er der einzige
     // Spieler waere, bekommt er den Puck (dann gibt es ohnehin keinen anderen).
-    const feld=team.filter(u=>!u.torwart&&aufDemEis(u));
+    const feld=team.filter(u=>!stehtImTor(u)&&aufDemEis(u));
     return gewichtetesLosNach(feld.length?feld:team,u=>losGewicht(u.AUFBAU));
   }
 
@@ -9703,7 +9916,7 @@
     // Mannschaft. Er bekommt den Puck jetzt nur noch so, wie ein Torwart ihn bekommt:
     // ueber einen Schuss, einen Abpraller oder einen losen Puck in seinem Torraum.
     if(istHockey()){
-      const feld=mitspieler.filter(m=>!m.torwart&&aufDemEis(m));
+      const feld=mitspieler.filter(m=>!stehtImTor(m)&&aufDemEis(m));
       // Nur ersetzen, wenn ueberhaupt ein Feldspieler uebrig bleibt: die Aufrufer geben
       // das Ergebnis ungeprueft an passeAb weiter, ein null liefe dort ins Leere. Bleibt
       // nur der Torwart, ist er tatsaechlich die letzte Anspielstation.
@@ -9809,7 +10022,17 @@
     // oder, wenn keiner da ist, an die Bande (Klaeren). Ohne diese Sperre wuerde er die
     // normale Abschluss-Entscheidung durchlaufen und irgendwann auf das GEGNERISCHE Tor
     // schiessen, mitsamt Laufweg dorthin.
-    if(u.torwart){
+    //
+    // FUEHRUNGS-RIEGEL IN DER ENDPHASE (Konzeptreview T1): dieselbe Klaer-Aktion, ausgeloest
+    // durch eine ZWEITE Bedingung statt der Torwart-Rolle. Gewinnt die FUEHRENDE Mannschaft
+    // den Puck in der Endphase in der EIGENEN Haelfte, baut sie keinen Angriff auf, sondern
+    // spielt ihn sicher weg — genau das "Point-Spieler tiefer, Klaeren an die Bande statt
+    // Konter" aus dem Review. In der GEGNERISCHEN Haelfte gilt diese Sperre NICHT: ein
+    // Spieler, der den Puck schon vorne hat (z.B. nach einem Abpraller oder einem
+    // gescheiterten Wechsel des Gegners), darf weiter aufs — moeglicherweise leere — Tor
+    // ziehen. Das ist bewusst dieselbe Code-Stelle wie der Torwart-Zweig, keine zweite,
+    // separat gepflegte Klaer-Logik.
+    if(stehtImTor(u)||hockeyRiegelKlaert(u)){
       const mitspieler=FSTEAM[u.side].filter(m=>m!==u);
       const ziel=mitspieler.length?offensterMitspieler(mitspieler,u):null;
       if(ziel){ passeAb(u,ziel); return; }
@@ -9841,7 +10064,7 @@
     // als "gedoppelt" und bekam den vollen doppelMalus von 0,26, obwohl gar kein zweiter
     // Feldspieler in der Naehe war. Der Torwart ist die Huerde, die die Schussaufloesung
     // ohnehin schon abbildet; ein zweites Mal als Bedraenger zaehlt er doppelt.
-    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!v.torwart&&dist(u,v)<BEDRAENGT_RADIUS);
+    const naheVerteidiger=FSTEAM[1-u.side].filter(v=>!stehtImTor(v)&&dist(u,v)<BEDRAENGT_RADIUS);
     const gedoppelt=naheVerteidiger.length>=2;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
     // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
@@ -10247,7 +10470,7 @@
     // Fuer die Doppeln-Abnahme (s. Bericht): dieselbe naheVerteidiger-Zaehlung wie in
     // entscheideBallaktion, hier am Schuetzen im Abwurfmoment (kann bei Spielzuegen/
     // Alley-Oop von der Person abweichen, die die Aktion ausgeloest hat).
-    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!v.torwart&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
+    const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!stehtImTor(v)&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
     // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
@@ -10661,7 +10884,7 @@
     // verlassen. Gemessen fing er regelmaessig Paesse ab, die quer durch die eigene Zone
     // liefen.
     for(const v of FSTEAM[1-von.side]){
-      if(v.torwart)continue;
+      if(stehtImTor(v))continue;
       const d=distZuLinie(v,von,nach);
       if(d<minD){minD=d;waechter=v;}
     }
@@ -10792,8 +11015,8 @@
           // Ballwechsel dadurch von 87 auf 11 ein. Real bekommt die bestrafte Seite den
           // Puck ohnehin nicht: das Anspiel findet in ihrer Zone statt, und die Ueberzahl
           // hat den Aufbau. Der Spielmacher der gefoulten Mannschaft nimmt ihn auf.
-          const anspiel=spielmacherLos(FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)).length
-            ?FSTEAM[traeger.side].filter(v=>!v.torwart&&aufDemEis(v)):FSTEAM[traeger.side]);
+          const anspiel=spielmacherLos(FSTEAM[traeger.side].filter(v=>!stehtImTor(v)&&aufDemEis(v)).length
+            ?FSTEAM[traeger.side].filter(v=>!stehtImTor(v)&&aufDemEis(v)):FSTEAM[traeger.side]);
           fsLive.ball.frei=null; fsLive.ball.flug=null; fsLive.reboundKampf=null;
           naechsterAngriff(traeger.side);
           ballUebernehmen(anspiel);
@@ -10856,7 +11079,7 @@
       // Text zeichengleich die alte Zeile; `steckVis` bleibt dort ungesetzt (0) und
       // zeichneFeldspiel liest es nur bei Hockey.
       feed(decker.side,istHockey()
-        ?decker.n+" uebernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
+        ?decker.n+" übernimmt den Puck von "+traeger.n+" — "+wortStahl+"."
         :decker.n+" erobert den Ball — "+wortStahl+".");
       if(istHockey()){
         decker.steckVis=HK_STEAL_VIS;
@@ -10895,7 +11118,7 @@
     const team=FSTEAM[seite], gegner=FSTEAM[1-seite];
     // Der Torwart bricht nicht aus. Gemessen lief er sonst 19 s je Spiel als "Ausbrecher"
     // Richtung gegnerisches Tor, bei drei gegen drei sogar 80 s.
-    const kandidaten=team.filter(u=>!u.hatBall&&!u.torwart&&aufDemEis(u));
+    const kandidaten=team.filter(u=>!u.hatBall&&!stehtImTor(u)&&aufDemEis(u));
     if(!kandidaten.length||!gegner.length)return;
     let schnellsterGegner=gegner[0].LAUFTEMPO;
     for(const g of gegner)if(g.LAUFTEMPO>schnellsterGegner)schnellsterGegner=g.LAUFTEMPO;
@@ -10974,6 +11197,13 @@
     // Richtung "zurueck ins Feld" vom angegriffenen Tor aus gesehen.
     const rein=torX>MID?-1:1;
     if(hk.ausgang==="tor"){
+      // H1 -- (PP)/(SH)-KENNUNG IM TICKER (Bauplan Abschnitt 5, Klasse A, Prio 1): VOR jeder
+      // Aenderung gelesen (die Strafzustaende, aus denen sie sich ergibt, aendern sich durch
+      // ein Tor selbst nicht) -- reine Lesung von hockeyPPInfo(), kein rr()-Aufruf, keine
+      // zweite Bedeutung fuer irgendeinen Zweig unten.
+      const ppVorTreffer=hockeyPPInfo();
+      const torKennung=ppVorTreffer&&ppVorTreffer.seite===schuetze.side?" (PP)"
+        :ppVorTreffer&&ppVorTreffer.seite===1-schuetze.side?" (SH)":"";
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1; schuetze.feldwuerfeTreffer++;
       // TON (Assets 80->100, TON_KATALOG.hockey.tor): dieselbe Stelle wie das "TOR!"-
       // Schwebetext/Feed weiter unten. Reine Praesentation, kein rr()-Aufruf.
@@ -10993,7 +11223,7 @@
       if(a1){a1.assists++; a1.assists1++;}
       if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
-      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!",true,
+      feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!"+torKennung,true,
         waehleCaption(CAPTION_TOR,schuetze.n,a1?a1.n:null));
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
@@ -11136,12 +11366,34 @@
     if(flug.hockey){ loeseHockeySchuss(flug,art); return; }
     const szDef=flug.zug?art.spielzuege[flug.zug]:null;
     if(flug.treffer){
+      // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): gemessen 35 von 354
+      // Ticker-Zeilen big, weil bisher JEDER Korb big war -- die Liste war das
+      // Spielprotokoll. `vorFuehrung` ist der Punktestand VOR diesem Korb, damit ein
+      // Fuehrungswechsel exakt wie auf der Bahn (bahnFuehrenderId) erkannt werden kann.
+      const vorFuehrung=Math.sign(fsPunkte[0]-fsPunkte[1]);
       schuetze.punkte+=flug.punkte; fsPunkte[schuetze.side]+=flug.punkte;
+      const nachFuehrung=Math.sign(fsPunkte[0]-fsPunkte[1]);
       schuetze.feldwuerfeTreffer++;
       if(flug.passgeber)flug.passgeber.assists++;
       const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
                        : schuetze.n+" trifft"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" mit einem Dunk":"")+" — +"+flug.punkte+".";
-      feed(schuetze.side,txt,true);
+      // Big nur bei: einem einstudierten Spielzug (szDef), einem Dunk, einem Dreier oder
+      // einem Fuehrungswechsel -- sonst false. Ersetzt "jeder Korb ist big" (Konzept
+      // Abschnitt 4.3, Nachzug 3).
+      feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung);
+      // B2 -- "LAUF"-GRAFIK (A, Prio 2, Bauplan Abschnitt 4): Feed-Meldung GENAU EINMAL
+      // beim Ueberschreiten der 8-Punkte-Schwelle des EIGENEN fortlaufenden Laufs, bzw.
+      // GENAU EINMAL, wenn dieser Korb einen laufenden GEGNERISCHEN Lauf (>=8) beendet.
+      // `basketballLaufRoh()` liest fsZuege[0..fsZeiger) -- VOR logZug() unten steht dieser
+      // Korb dort also noch nicht drin, genau die "vorher"-Ansicht, die die Schwellen-
+      // Erkennung braucht (dasselbe Vor/Nach-Muster wie vorFuehrung/nachFuehrung oben).
+      const vorLauf=basketballLaufRoh();
+      if(vorLauf&&vorLauf.seite===schuetze.side){
+        if(vorLauf.punkte<8&&vorLauf.punkte+flug.punkte>=8)
+          feed(schuetze.side,(vorLauf.punkte+flug.punkte)+":0-Lauf "+(schuetze.side===0?"Heim":"Gast")+"!",true);
+      } else if(vorLauf&&vorLauf.seite!==schuetze.side&&vorLauf.punkte>=8){
+        feed(schuetze.side,"Lauf beendet — "+vorLauf.punkte+":0.",true);
+      }
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf,gedoppeltBeiWurf:flug.gedoppeltBeiWurf});
@@ -11157,7 +11409,9 @@
         const verteidiger=flug.blockKandidat;
         verteidiger.fouls++;
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
-        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!");
+        // AND-ONE ist selten und sofort verstaendlich -- immer big (Konzept Abschnitt 4.3,
+        // Nachzug 3).
+        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!",true);
         // Der Zusatz-Freiwurf laeuft jetzt sichtbar ab (Standphase) statt im Hintergrund;
         // der Ballwechsel danach passiert in beendeFreiwuerfe, nicht mehr hier.
         starteFreiwuerfe(schuetze,1,verteidiger,true);
@@ -11253,7 +11507,7 @@
     // s. Rezept) je Seite — einmal je Tick sortiert, kein rr(), keine neue Zufallsquelle.
     // Die zwei Schnellsten je Seite — ohne den Torwart. Sonst nimmt er einem Feldspieler
     // den Sprintbonus weg, ohne ihn je zu brauchen: er verlaesst seinen Torraum nicht.
-    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!u.torwart&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
+    const SPRINTER=FSTEAM.map(t=>[...t].filter(u=>!stehtImTor(u)&&aufDemEis(u)).sort((a,b)=>b.LAUFTEMPO-a.LAUFTEMPO).slice(0,2));
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
     // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
@@ -11644,7 +11898,7 @@
       // STRAFBANK VOR ALLEM ANDEREN, aus demselben Grund wie der Torwart-Zweig: er hat
       // genau ein Ziel, und das ueberschreibt jede Angriffs- oder Verteidigungslogik.
       if(!aufDemEis(u)){ const z=strafbankZiel(u); zx=z.x; zy=z.y; tempoMul=1.3; }
-      else if(u.torwart){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
+      else if(stehtImTor(u)){ const z=torwartZiel(u); zx=z.x; zy=z.y; tempoMul=1.15; }
       if(u.taumeltBis>fsT)tempoMul*=HK_TAUMEL_TEMPO;
       // PUSTE AUFS TEMPO (Chris: „oder langsamer wird"). Dieselbe Bauform wie `leer`/`nerv`
       // in tempoVon auf der Bahn: ein Faktor, der bei vollem Vorrat exakt 1 ist und bei
@@ -11759,7 +12013,7 @@
       // Ueberlebende") und passen nicht auf Basketballs Punktestand — deshalb hier keine
       // Weiterleitung dorthin, sondern eine eigene, einfache Ansage im Feed. Scoreboard
       // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
-      const sieger=fsPunkte[0]>fsPunkte[1]?"Vigilante Wranglers":fsPunkte[1]>fsPunkte[0]?"Armageddon Aftermath":null;
+      const sieger=fsPunkte[0]>fsPunkte[1]?VEREIN[0].name:fsPunkte[1]>fsPunkte[0]?VEREIN[1].name:null;
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
         +fsPunkte[0]+":"+fsPunkte[1]+".",true);
       return; }
@@ -11773,6 +12027,10 @@
       if(fsLive.phase==="snap")stepSnapPhase(dt);
       return;
     }
+    // ENDPHASE-CHECK (Konzeptreview T1): einmal je Tick, reine Zustandsablesung, kein
+    // rr()-Aufruf (s. hockeyEndphaseSeite). Ausserhalb von Hockey oder ohne FB().endphase
+    // verlaesst die Funktion sofort ihre erste Zeile.
+    if(istHockey())aktualisiereHockeyEndphase();
     const art=FB();
     fsLive.angriffSeit+=dt;
     for(const team of FSTEAM)for(const u of team){
@@ -11840,7 +12098,7 @@
         const beideSeiten=nah.some(u=>u.side===0)&&nah.some(u=>u.side===1);
         const duell=anBande&&beideSeiten;
         fsLive.reboundKampf={t:0,dauer:duell?HK_BANDENDUELL_DAUER:(nah.length>1?0.55:0.40),duell}; // PLATZHALTER
-        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kaempfen um den Puck!");
+        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kämpfen um den Puck!");
         else if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
@@ -11863,7 +12121,7 @@
               // "loser Puck im eigenen Torraum", s. offensterMitspieler) — aber er
               // startet keinen Wettlauf quer ueber das Eis.
               if(!aufDemEis(u))continue;   // von der Strafbank holt niemand einen Puck
-              if(u.torwart){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
+              if(stehtImTor(u)){ if(weg<=0){ ankunft.set(u,0); erreichbar.push(u); } continue; }
               // Wer liegt, laeuft nicht: nach einem Bodycheck ist der Gestuerzte fuer
               // HK_STURZ Sekunden raus und taumelt danach mit HK_TAUMEL_TEMPO weiter.
               if(u.down)continue;
@@ -12151,6 +12409,136 @@
     fsLerpPositionen(dt);
   }
 
+  // BROADCAST-BUG-KONTEXTZEILE (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 3,
+  // Q1 -- Klasse A, reine Anzeige): Periode + Restzeit ABWAERTS (die einzige Konvention, die
+  // NBA/NHL/NFL alle drei teilen und die #clock heute verletzt, s. dortige Begruendung 3),
+  // dazu ein disziplineigener Zusatz. Liest ausschliesslich bereits vorhandenen Live-Zustand
+  // (fsLive/FSTEAM/fsZuege), ruft KEIN rr() und schreibt nichts in den Simulationszustand
+  // zurueck -- bit-identisch zu miss-alle-disziplinen.mjs vorher/nachher.
+  //
+  // UHR-SKALA (Frage 9.1 derselben Recherche, Voreinstellung uebernommen): Sim-Sekunden statt
+  // einer NFL-Hochrechnung, weil `fkUhrSkala()` (Football-P1, PR #1037) auf diesem Branch noch
+  // nicht existiert -- Football bekommt hier bewusst nur die im Bauplan vorgesehene
+  // "Kurzfassung", die echte NFL-Uhr kommt mit/nach #1037.
+  function feldspielRestzeitAbwaerts(){
+    const L=LIVE();
+    if(!L||!fsLive)return null;
+    // `fsLive.viertel` ist bereits die AKTUELLE Periodenzahl, 1-basiert (Startwert 1, s.
+    // fsLive-Initialisierung; starteViertelpause() zaehlt beim Wechsel selbst hoch) -- kein
+    // zweites +1 hier, sonst zeigt die Kontextzeile eine Periode zu frueh (fuenf Sekunden in
+    // Periode 1 stuenden sonst schon als "Q2" da).
+    const periodeNr=Math.min(fsLive.viertel,L.perioden);
+    // Waehrend der Viertel-/Drittelpause zeigt fsLive.viertel bereits die KOMMENDE Periode
+    // (s. starteViertelpause: `fsLive.viertel=zuEnde+1`), obwohl die Simulationsuhr noch auf
+    // dem alten Stand steht -- ohne diese Abfrage wuerde die Restzeit hier fuer einen
+    // Wimpernschlag fast eine ganze Periode weit "voll" anzeigen. 0:00 waehrend der Pause ist
+    // die ehrlichere Anzeige (die Pause selbst zeigt ohnehin ihr eigenes Countdown-Overlay).
+    const restSek=fsLive.viertelpause?0:Math.max(0,fsLive.viertel*L.periodenDauer-fsT);
+    const periodeLabel=(L.periodeWort==="Drittel")?(periodeNr+". Drittel"):("Q"+periodeNr);
+    return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(Math.floor(restSek%60)).padStart(2,"0");
+  }
+  // B1 -- SHOT-CLOCK (Basketball, A, Prio 1): `null` waehrend Freiwurf/Viertelpause/nach
+  // Spielende, sonst die Restzeit bis zum erzwungenen Abschluss. Dieselbe Formel treibt die
+  // Bug-Ziffer UND die kleine Box hinter dem Angriffskorb (zeichneShotClock unten) -- eine
+  // Quelle statt zwei.
+  function basketballSchussuhrRest(){
+    if(feldspielDisc!=="basketball"||!fsLive||done)return null;
+    if(fsLive.phase==="freiwurf"||fsLive.viertelpause)return null;
+    const voll=(LIVE()||{}).schussuhr||SCHUSSUHR_BASKETBALL;
+    return Math.max(0,voll-fsLive.angriffSeit);
+  }
+  const fmtSchussuhr=(rest)=>rest<5?rest.toFixed(1):String(Math.ceil(rest));
+  // H1 -- POWER-PLAY-UHR (Hockey, A, Prio 1 = Review-T0): welche Seite gerade in Ueberzahl
+  // spielt und wie lange noch, aus `u.strafeBis` je Team hergeleitet -- "Zustand.
+  // max(u.strafeBis) - fsT je Seite" laut Bauplan. Sitzen beide Teams gleichzeitig in
+  // Unterzahl (seltener Sonderfall bei sich ueberschneidenden Strafen), zeigt keine Seite
+  // einen Vorteil an, statt eine der beiden willkuerlich zu bevorzugen.
+  function hockeyPPInfo(){
+    if(!istHockey()||!fsLive)return null;
+    for(const seite of [0,1]){
+      const gegnerAktiv=FSTEAM[1-seite].filter(u=>u.strafeBis>fsT);
+      if(!gegnerAktiv.length)continue;
+      if(FSTEAM[seite].some(u=>u.strafeBis>fsT))continue;
+      return {seite, rest:Math.max(...gegnerAktiv.map(u=>u.strafeBis))-fsT, fuenfDrei:gegnerAktiv.length>=2};
+    }
+    return null;
+  }
+  // H2 -- SCHUESSE AUFS TOR (Hockey, A, Prio 1): "die naheliegende Summe saves+gegentore
+  // zaehlt Schuesse aufs LEERE Tor nicht" (Bauplan-Falle) -- deshalb aus dem Protokoll
+  // `fsZuege[0..fsZeiger]` gezaehlt, nicht aus den Torwartfeldern. Ein Torwart-"block"
+  // (Parade/Halten) zaehlt als Schuss aufs Tor, ein Feldspieler-"block" (Schussblock VOR dem
+  // Tor) nicht -- beide tragen denselben `art`-Namen, unterschieden ueber
+  // `verteidiger.torwart`. Reine Lesung des bereits geschriebenen Protokolls, kein rr().
+  function hockeySOG(seite){
+    if(!fsLive)return 0;
+    let n=0;
+    for(let i=0;i<fsZeiger;i++){
+      const z=fsZuege[i];
+      if(z.art==="treffer"&&z.seite===seite)n++;
+      else if(z.art==="block"&&z.verteidiger&&z.verteidiger.torwart&&z.spieler&&z.spieler.side===seite)n++;
+    }
+    return n;
+  }
+  // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, docs/design/broadcast-optik-feldspiel-27-09.md
+  // Abschnitt 4): wie viele Punkte eine Seite gerade IN FOLGE erzielt hat, ohne dass der
+  // Gegner dazwischen getroffen hat. Reine Lesung von `fsZuege[0..fsZeiger]` (Bauplan-
+  // Zustand: "Aus dem Protokoll fsZuege[0..fsZeiger] (Punkte je Seite in Folge)"), kein
+  // rr(), keine Rueckschreibung. `basketballLaufRoh` liefert den rohen Lauf unabhaengig von
+  // der Anzeigeschwelle (fuer den Feed-Trigger in loeseFlugAuf, der die 8-Punkte-Grenze
+  // selbst prueft); `basketballLaufInfo` ist die HUD-Fassung ab 8 Punkten (Bauplan: "sobald
+  // eine Seite >= 8 Punkte ohne Gegenpunkte erzielt").
+  function basketballLaufRoh(){
+    if(feldspielDisc!=="basketball")return null;
+    let seite=null, punkte=0;
+    for(let i=0;i<fsZeiger;i++){
+      const e=fsZuege[i];
+      if(e.art!=="treffer")continue;
+      if(seite===e.seite)punkte+=e.punkte; else { seite=e.seite; punkte=e.punkte; }
+    }
+    return seite==null?null:{seite,punkte};
+  }
+  function basketballLaufInfo(){
+    const roh=basketballLaufRoh();
+    return roh&&roh.punkte>=8?roh:null;
+  }
+  // ZUSATZ JE DISZIPLIN, rechts an die Restzeit angehaengt (Bauplan-Tabelle Abschnitt 3).
+  function feldspielKontextZusatz(){
+    if(!fsLive)return "";
+    if(feldspielDisc==="basketball"){
+      const teile=[];
+      const rest=basketballSchussuhrRest();
+      // ROTFAERBUNG UNTER 5S (Nachtrag, Review-Fund 27.09.): der Bauplan verlangt fuer B1(a)
+      // ausdruecklich dieselbe Warnfarbe wie die Canvas-Ziffernbox (zeichneShotClock(), unten,
+      // `knapp=rest<5`) -- die erste Fassung dieser Zeile war reiner Text ohne Farblogik.
+      if(rest!=null)teile.push(rest<5?"<span class=\"knapp\">⏱ "+fmtSchussuhr(rest)+"</span>":"⏱ "+fmtSchussuhr(rest));
+      if(fsLive.amBall!=null)teile.push("● "+(fsLive.amBall===0?"Heim":"Gast"));
+      return teile.join(" · ");
+    }
+    if(istHockey()){
+      const teile=[];
+      const pp=hockeyPPInfo();
+      if(pp){
+        const rest=Math.max(0,pp.rest);
+        teile.push("PP "+(pp.seite===0?"Heim":"Gast")+" "+Math.floor(rest/60)+":"+String(Math.floor(rest%60)).padStart(2,"0")
+          +(pp.fuenfDrei?" · 5 GEGEN 3":""));
+      }
+      teile.push("SOG "+hockeySOG(0)+":"+hockeySOG(1));
+      // H4 -- "TORWART RAUS" IN DER KONTEXTZEILE (A, Prio 2, Bauplan Abschnitt 5): T1
+      // (hockeyEndphaseSeite/aktualisiereHockeyEndphase) ist gemergt, `fsLive.hockeyEndphase`
+      // traegt die zurueckliegende Seite schon -- "sichtbar ist heute nur, dass eine Figur
+      // zur Bank faehrt" (Bauplan-Befund). Reine Lesung desselben Felds, in Teamfarbe der
+      // Seite, die den Torwart gezogen hat.
+      if(fsLive.hockeyEndphase!=null)
+        teile.push("<span class=\"torwartraus "+(fsLive.hockeyEndphase===0?"l":"r")+"\">TORWART RAUS</span>");
+      return teile.join(" · ");
+    }
+    if(istFootball()&&fsLive.football){
+      const ORD=["1st","2nd","3rd","4th"];
+      const fb=fsLive.football;
+      return (fb.side===0?"▶":"◀")+" "+(ORD[fb.down-1]||fb.down+".")+" & "+fb.toGo;
+    }
+    return "";
+  }
   // BROADCAST-BUG: generisches HUD-Overlay ueber der Leinwand (Abschnitt 3 derselben
   // Recherche), aufgerufen am Ende von updateHud()/updateHudBahn()/updateHudBuehne()/
   // updateHudFeldspiel() -- also NACHDEM diese Funktionen #tnameL/#tnameR/#score/#clock
@@ -12160,12 +12548,58 @@
   // vier eigener, weil die zugrundeliegenden Elemente bei allen vieren dieselben sind.
   // Sichtbar nur waehrend des laufenden Spiels: weder waehrend des Einlaufs (die
   // #einlauf-Vollflaeche deckt den Bug ohnehin ab) noch nach Spielende.
+  //
+  // Q1-ERWEITERUNG (27.09.): Feldspiel bekommt zusaetzlich eine zweite Zeile unter Score/Uhr
+  // (Periode+Restzeit abwaerts, Ballbesitz/PP/SOG, s. feldspielKontextZusatz oben) sowie die
+  // Score-Ziffer der fuehrenden Seite in ihrer Teamfarbe plus einen kurzen Fuehrungswechsel-
+  // Blitz (`.wechsel`, 0,6 s) -- beides reine Lesung von #score/fsLive, kein neuer rr()-Pfad.
+  // Fuer alle anderen Chassis (Kampf/Bahn/Buehne) bleibt die Mitte unveraendert Score · Uhr.
+  //
+  // KOPFLEISTE MIT LEBENS-PIPS UND UEBERZAHL (K2, Broadcast-Optik-Recherche 27.09.,
+  // Abschnitt 3): der Score-Bug bekommt je Seite eine Reihe Pips, einen je Kaempfer --
+  // voll in Teamfarbe = lebt, grau = liegt (Mini-DM/Battlefield: dauerhaft ausgeschieden,
+  // kein Respawn), grau mit Punkt = wartet auf Respawn (nur TDM, s. downBis). Dazu in der
+  // Mitte, wenn die Zahl der Lebenden ungleich ist, die Ueberzahl-Kennung "4 : 3" in der
+  // Farbe der Seite mit mehr Lebenden -- die CS-Scorebar-Konvention. Nachgemessen im
+  // Konzeptreview wirkt Ueberzahl im Eliminationsformat quadratisch (Lanchester,
+  // arena-minigames-opus-konzeptreview-26-09.md 2.6); heute sieht man sie nur, wenn man
+  // die Figuren auf der Leinwand selbst abzaehlt.
+  // KLASSE A: liest ausschliesslich u.side/u.down/u.downBis und live(), die
+  // schalteAus()/reviveUnit() ohnehin fuer die Wertung fuehren, schreibt nichts zurueck.
+  // Nur fuer die drei Kampf-Disziplinen (istKampfDisc) -- Feldspiel/Buehne/Bahn haben
+  // eigene Chassis/Arrays, U/live() waeren dort bedeutungslos oder stammten vom zuletzt
+  // gebauten Kampf (dieselbe Ausschluss-Logik, die renderReset() fuer die Mini-DM-FFA-
+  // Umschaltung schon benutzt: !istFeldspiel&&!istBuehne&&!istBahn). Fuer Mini-DM (die
+  // klassische .scoreline/.arenaraum bleibt dort ohnehin per CSS ausgeblendet, s.
+  // renderReset()) wird zwar noch gerechnet, aber nichts sichtbar.
+  //
+  // MERGE (27.09.): Q1 (istFs) und K2 (istKampfDisc) schliessen sich gegenseitig aus --
+  // ein Chassis ist nie beides -- deshalb haengen beide Zweige unten dieselbe DOM-Node
+  // (mitte) unabhaengig voneinander per appendChild an, keiner ueberschreibt den anderen.
+  // H3 -- TORLICHT (Hockey, A, Prio 2, Bauplan Abschnitt 5): "rote Lampe hinter dem
+  // getroffenen Tor, 1,5s pulsierend, plus Bandenblitz in Teamfarbe des Schuetzen" --
+  // reiner Wandzeit-Timer (jetztMs(), dasselbe Muster wie bbugWechselTimer oben/unten:
+  // ein Fuehrungswechsel-Blitz laeuft schon genauso ueber Wandzeit statt Sim-Ticks), KEIN
+  // Simulationszustand. `hkTorlichtGesehen` merkt sich, wie viele fsZuege-Eintraege diese
+  // Anzeige schon ausgewertet hat -- gelesen und geschrieben AUSSCHLIESSLICH im Zeichenpfad
+  // (eisflaeche(), unten), nie in stepSim/loeseHockeySchuss. Ein Spielneustart mit kuerzerem
+  // Protokoll (fsZeiger < hkTorlichtGesehen) setzt den Zaehler von selbst zurueck, ohne an
+  // jede der bestehenden fsZuege=[]-Reset-Stellen einen weiteren Reset anhaengen zu muessen.
+  let bbugLetzteFuehrung=null, bbugWechselTimer=null,
+    hkTorlichtSeite=null, hkTorlichtBisMs=0, hkTorlichtGesehen=0;
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
     const einlauf=document.getElementById("einlauf");
     bug.hidden=!!(einlauf&&!einlauf.hidden)||!!done;
-    if(bug.hidden)return;
+    if(bug.hidden){
+      // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
+      // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
+      // Endstand-Bildschirm hinein stehen lassen.
+      const laufWeg=document.getElementById("bbugLauf");
+      if(laufWeg)laufWeg.hidden=true;
+      return;
+    }
     const zeile=(tnameId)=>{
       const wrap=document.getElementById(tnameId);
       if(!wrap)return "";
@@ -12176,13 +12610,103 @@
       return html;
     };
     const txt=(id)=>{const e=document.getElementById(id);return e?e.textContent.trim():"";};
+    const istKampfDisc=!istFeldspiel(disc)&&!istBuehne(disc)&&!istBahn(disc);
+    const pipsHtml=(side)=>{
+      if(!istKampfDisc)return "";
+      const g=U.filter(u=>u.side===side);
+      if(!g.length)return "";
+      const punkte=g.map(u=>{
+        if(!u.down)return "<i class=\"pip an\"></i>";
+        if(disc==="tdm"&&u.downBis!=null)return "<i class=\"pip wartet\"></i>";
+        return "<i class=\"pip aus\"></i>";
+      }).join("");
+      return "<span class=\"pips\">"+punkte+"</span>";
+    };
     const bl=document.getElementById("bbugL"),br=document.getElementById("bbugR"),
       mitte=document.getElementById("bbugMitte");
-    if(bl)bl.innerHTML=zeile("tnameL");
-    if(br)br.innerHTML=zeile("tnameR");
+    if(bl)bl.innerHTML=zeile("tnameL")+pipsHtml(0);
+    if(br)br.innerHTML=zeile("tnameR")+pipsHtml(1);
     if(mitte){
-      const teile=[txt("score"),txt("clock")].filter(Boolean);
-      mitte.textContent=teile.join(" · ");
+      const scoreTxt=txt("score"), istFs=istFeldspiel(disc);
+      let fuehrend=null;
+      if(istFs&&scoreTxt){
+        const m=scoreTxt.match(/^(\d+)\s*:\s*(\d+)$/);
+        if(m){const a=+m[1],b=+m[2]; fuehrend=a===b?null:(a>b?0:1);}
+      }
+      mitte.textContent="";
+      if(scoreTxt){
+        const scoreEl=document.createElement("b");
+        scoreEl.textContent=scoreTxt;
+        if(fuehrend!=null)scoreEl.style.color="var(--"+(fuehrend===0?"home":"away")+")";
+        mitte.appendChild(scoreEl);
+      }
+      const clockTxt=txt("clock");
+      if(clockTxt){
+        if(scoreTxt)mitte.appendChild(document.createTextNode(" · "));
+        mitte.appendChild(document.createTextNode(clockTxt));
+      }
+      if(istFs){
+        if(fuehrend!=null&&bbugLetzteFuehrung!=null&&fuehrend!==bbugLetzteFuehrung){
+          mitte.classList.add("wechsel");
+          clearTimeout(bbugWechselTimer);
+          bbugWechselTimer=setTimeout(()=>mitte.classList.remove("wechsel"),600);
+        }
+        bbugLetzteFuehrung=fuehrend;
+        const restzeile=feldspielRestzeitAbwaerts();
+        if(restzeile){
+          const zusatz=feldspielKontextZusatz();
+          const klein=document.createElement("small");
+          // innerHTML statt textContent (Nachtrag 27.09.): feldspielKontextZusatz() kann fuer
+          // Basketball unter 5s einen <span class="knapp"> einstreuen (Rotfaerbung wie die
+          // Canvas-Ziffernbox, s. dort). restzeile/zusatz bestehen sonst nur aus festen Labels
+          // und Zahlen, nie aus Spieler-/Team-Text -- unbedenklich fuer innerHTML.
+          klein.innerHTML=zusatz?restzeile+" · "+zusatz:restzeile;
+          mitte.appendChild(klein);
+        }
+      }
+      if(istKampfDisc){
+        const nL=live(0).length,nR=live(1).length;
+        if(nL!==nR){
+          const seite=nL>nR?"l":"r";
+          const ueb=document.createElement("small");
+          ueb.className="ueberzahl "+seite;
+          ueb.textContent=Math.max(nL,nR)+" : "+Math.min(nL,nR);
+          mitte.appendChild(ueb);
+        }
+        // K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09.,
+        // Abschnitt 3/K6, P3, nur Battlefield). Bewusst KLEIN: die Domination entscheidet
+        // laut Konzeptreview 0 von 120 gemessenen Spielen (Leitplanke 0.1 Punkt 5) -- eine
+        // grosse Grafik wuerde dem Punkt eine Bedeutung vortaeuschen, die er nicht hat.
+        // #kpzeile/#kpscore (ARENA-ZEIT-FIX, weiter unten in updateHud()) zeigen KP.punkte
+        // bereits unter der Kopfzeile; das hier ist dieselbe Zahl, nur zusaetzlich im
+        // Broadcast-Bug, mit Besitzer-Farbpunkt und Eroberungsring (dieselben Felder wie
+        // zeichneKontrollpunkt() auf der Leinwand: KP.besitz/.punkte/.fortschritt/
+        // .erobertVon). Reine Anzeige, kein Ruecklesen.
+        if(disc==="battlefield"&&KP){
+          const kpz=document.createElement("small");
+          kpz.className="kpbug";
+          const punkt=document.createElement("i");
+          punkt.className="kpbugpunkt"+(KP.besitz!=null?" "+(KP.besitz===0?"l":"r"):"");
+          if(KP.erobertVon!=null)
+            punkt.style.setProperty("--anteil",Math.round(KP.fortschritt*100)+"%");
+          kpz.appendChild(punkt);
+          kpz.appendChild(document.createTextNode(
+            "KP "+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])));
+          mitte.appendChild(kpz);
+        }
+      }
+    }
+    // B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, Bauplan Abschnitt 4): eigenes Band unter
+    // dem Bug, reine Lesung von basketballLaufInfo() (die ihrerseits nur fsZuege liest,
+    // kein rr()). Sichtbar nur waehrend eine Seite gerade >= 8 Punkte in Folge erzielt.
+    const laufEl=document.getElementById("bbugLauf");
+    if(laufEl){
+      const lauf=feldspielDisc==="basketball"?basketballLaufInfo():null;
+      laufEl.hidden=!lauf;
+      if(lauf){
+        laufEl.className="bbuglauf "+(lauf.seite===0?"l":"r");
+        laufEl.textContent=lauf.punkte+":0-LAUF "+(lauf.seite===0?"HEIM":"GAST");
+      }
     }
   }
 
@@ -12288,6 +12812,39 @@
   // hockeyPublikumAn unten explizit zurueck, sonst haelt die Flagge nach dem ersten
   // Reset "schon gestartet" und der Loop kommt im zweiten Hockey-Spiel nie wieder.
   let hockeyPublikumAn=false;
+  // H1 -- STRAFBANK-KASTEN (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 5,
+  // Klasse A, Prio 1): Name + Restzeit-Balken an genau der Stelle, an die ein bestrafter
+  // Spieler laengst faehrt (strafbankZiel(u), unveraendert) -- heute nur an der Figur selbst
+  // sichtbar, ohne jede Beschriftung. "Grund" (Bauplan-Wunschliste) bleibt bewusst aus: der
+  // Motor kennt heute genau einen Strafgrund (verhaengeStrafe() wird nur mit "Bandencheck"
+  // aufgerufen) und traegt ihn nirgends am Spieler -- ihn anzuzeigen bräuchte ein neues
+  // Datenfeld an u, eine zweite Reason-Kette am Torwart-Objekt vorbei. Name+Countdown+Balken
+  // sind die drei Teile, die schon aus u.strafeBis lesbar sind. Reine Zeichnung, kein rr().
+  function zeichneStrafbank(){
+    for(const seite of [0,1])for(const u of FSTEAM[seite]){
+      if(!(u.strafeBis>fsT))continue;
+      const z=strafbankZiel(u), rest=u.strafeBis-fsT, farbe=seite===0?css("--home"):css("--away");
+      // `strafbankZiel().y` liegt bei RINK().o-22=22 -- knapp ueber der Bande, ausserhalb des
+      // Eises, in demselben schmalen Streifen, in dem oben auch der Broadcast-Bug sitzt. Eine
+      // Box UEBER dieser Position (wie beim Namenslabel vz=-1) liefe ins Negative und damit aus
+      // der Leinwand heraus. Deshalb UNTERHALB, im selben Abstand (44px), den auch die
+      // gewoehnlichen Namenslabels benutzen (s. `schrift(...,44*vz,...)` in zeichneFeldspiel) --
+      // damit landet die Box sicher im sichtbaren Eis, unter dem Bug.
+      const bx=z.x, by=z.y+44;
+      ctx.save();
+      ctx.fillStyle="rgba(17,24,35,.84)";
+      ctx.fillRect(bx-32,by-17,64,34);
+      ctx.strokeStyle=farbe;ctx.lineWidth=1.5;ctx.strokeRect(bx-32,by-17,64,34);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillStyle="#fff";ctx.font="700 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillText(u.n.length>11?u.n.slice(0,10)+"…":u.n,bx,by-7);
+      ctx.fillStyle=rest<=3?"#e2685f":"#c3ccd8";ctx.font="700 11px 'IBM Plex Mono',monospace";
+      ctx.fillText(Math.ceil(rest)+"s",bx,by+5);
+      ctx.fillStyle="rgba(255,255,255,.18)";ctx.fillRect(bx-28,by+13,56,3);
+      ctx.fillStyle=farbe;ctx.fillRect(bx-28,by+13,56*Math.max(0,Math.min(1,rest/HK_STRAFE_DAUER)),3);
+      ctx.restore();
+    }
+  }
   function eisflaeche(){
     if(!hockeyPublikumAn){ tonLoopStart("hockey"); hockeyPublikumAn=true; }
     const k=RINK();
@@ -12350,6 +12907,65 @@
       ctx.lineTo(tx,mitte+(links?-34:34));
       ctx.closePath(); ctx.fill();
       zeichneTor(tx,mitte,links);
+      // H4 -- LEERES TOR MIT PULSIERENDEM TORRAUM-RAND (A, Prio 2, Bauplan Abschnitt 5):
+      // sichtbar machen, WELCHES Tor gerade leer ist -- bislang zeigte nur die zur Bank
+      // fahrende Figur das an. Reine Lesung von fsLive.hockeyEndphase (T1, bereits
+      // gemergt), kein rr(), kein Schreiben. Wandzeit-Puls wie beim Torlicht unten.
+      if(fsLive.hockeyEndphase===seite){
+        const puls=0.35+0.35*Math.sin(jetztMs()/140);
+        ctx.save();
+        ctx.globalAlpha=puls; ctx.strokeStyle="#ffd23f"; ctx.lineWidth=4;
+        ctx.beginPath();
+        ctx.arc(tx,mitte,38,links?-Math.PI/2:Math.PI/2,links?Math.PI/2:1.5*Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // H3 -- TORLICHT (A, Prio 2, Bauplan Abschnitt 5): "rote Lampe hinter dem getroffenen
+    // Tor, 1,5s pulsierend, plus Bandenblitz in Teamfarbe des Schuetzen". Erkennung ueber
+    // neue fsZuege-Eintraege seit dem letzten Zeichnen (s. hkTorlicht*-Deklaration weiter
+    // oben) -- reine Lesung, ausschliesslich Wandzeit (jetztMs()), kein rr().
+    if(fsZeiger<hkTorlichtGesehen)hkTorlichtGesehen=0; // neues Spiel, kuerzeres Protokoll
+    for(let i=hkTorlichtGesehen;i<fsZeiger;i++){
+      if(fsZuege[i].art==="treffer"){ hkTorlichtSeite=fsZuege[i].seite; hkTorlichtBisMs=jetztMs()+1500; }
+    }
+    hkTorlichtGesehen=fsZeiger;
+    if(hkTorlichtSeite!=null&&jetztMs()<hkTorlichtBisMs){
+      const tlX=korbXVon(hkTorlichtSeite), tlLinks=tlX<MID;
+      const lampeX=tlLinks?tlX-TOR_TIEFE-10:tlX+TOR_TIEFE+10;
+      const puls=0.55+0.45*Math.sin(jetztMs()/90);
+      ctx.save();
+      ctx.globalAlpha=puls; ctx.fillStyle="#ff2d2d";
+      ctx.beginPath(); ctx.arc(lampeX,mitte,9,0,6.3); ctx.fill();
+      ctx.globalAlpha=puls*0.5;
+      ctx.beginPath(); ctx.arc(lampeX,mitte,16,0,6.3); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha=puls*0.6; ctx.strokeStyle=css(hkTorlichtSeite===0?"--home":"--away");
+      ctx.lineWidth=10; eisRundweg(k,0); ctx.stroke();
+      ctx.restore();
+    }
+    // H1 -- UEBERZAHL-UHR AUF DEM EIS (docs/design/broadcast-optik-feldspiel-27-09.md
+    // Abschnitt 5, Klasse A, Prio 1 = Review-T0; SMT-Vorbild "Power Play Clock"): eine
+    // halbtransparente Kreisuhr in der Angriffszone der Ueberzahl-Mannschaft, ablaufender
+    // Ring + Restsekunden. HIER gezeichnet -- nach der Flaeche/den Linien, VOR den Spielern
+    // (eisflaeche() laeuft komplett vor der Spieler-Schleife in zeichneFeldspiel), genau wie
+    // im Bauplan gefordert. Reine Lesung von hockeyPPInfo() (u.strafeBis/fsT), kein rr().
+    const pp=hockeyPPInfo();
+    if(pp){
+      const linksSeite=pp.seite===1;
+      const zx=linksSeite?torlinie(true)+breite*0.16:torlinie(false)-breite*0.16;
+      const frac=Math.max(0,Math.min(1,pp.rest/HK_STRAFE_DAUER));
+      const farbe=pp.seite===0?css("--home"):css("--away");
+      ctx.save();
+      ctx.globalAlpha=0.24; ctx.fillStyle=farbe;
+      ctx.beginPath(); ctx.arc(zx,mitte,30,0,6.3); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=5; ctx.strokeStyle=farbe;
+      ctx.beginPath(); ctx.arc(zx,mitte,30,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
+      ctx.fillStyle="#182028"; ctx.font="700 13px 'IBM Plex Mono',monospace";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(String(Math.ceil(pp.rest)),zx,mitte+1);
+      ctx.restore();
     }
   }
   // Das Tor in Draufsicht: zwei rote Pfosten, die Querlatte zur Bande hin, dazwischen das
@@ -12520,6 +13136,30 @@
       }
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
+    zeichneShotClock();
+  }
+  // B1 -- SHOT-CLOCK-ZIFFER AM ANGRIFFSKORB (docs/design/broadcast-optik-feldspiel-27-09.md
+  // Abschnitt 4, Klasse A, Prio 1): eine kleine Ziffernbox an der Grundlinie neben dem
+  // Korbtraeger des ANGREIFENDEN Korbs -- "der Blick muss nicht nach oben" (Bauplan-
+  // Begruendung, echte Hallen-Shot-Clocks haengen genauso an der Korbanlage). Dieselbe Zahl
+  // wie in der Bug-Kontextzeile (basketballSchussuhrRest), nur ein zweiter Anzeigeort;
+  // gezeichnet als Teil von bodenFeldspiel() -- also VOR den Spielfiguren, wie der Korb
+  // selbst. Reine Zeichnung, kein rr()-Aufruf, keine Rueckschreibung in den Simzustand.
+  function zeichneShotClock(){
+    const rest=basketballSchussuhrRest();
+    if(rest==null||fsLive.amBall==null)return;
+    const seite=fsLive.amBall, linksSeite=seite===1;
+    const gx=linksSeite?W*0.06:W*0.94, gy=H/2-58;
+    const txt=fmtSchussuhr(rest), knapp=rest<5;
+    ctx.save();
+    ctx.fillStyle=knapp?"rgba(198,42,48,.9)":"rgba(17,24,35,.8)";
+    ctx.fillRect(gx-19,gy-11,38,22);
+    ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
+    ctx.strokeRect(gx-19,gy-11,38,22);
+    ctx.fillStyle="#fff";ctx.font="700 12px 'IBM Plex Mono',monospace";
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(txt,gx,gy+1);
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -12824,6 +13464,9 @@
       ctx.stroke();ctx.fill();
       ctx.restore();
     }
+    // H1 -- STRAFBANK-KASTEN (Bauplan Abschnitt 5, Klasse A, Prio 1): NACH den Spielern,
+    // damit die Box die zur Bande gefahrene Figur nicht verdeckt, sondern sie beschriftet.
+    if(istHockey())zeichneStrafbank();
     // Schiedsrichter NACH den Spielern, VOR dem Ball: beim Pfiff steht er dicht am
     // Foul-Ort und darf dort nicht hinter einer Figur verschwinden — der Ball wiederum
     // bleibt das oberste Element, wie bisher.
@@ -12857,7 +13500,12 @@
           if(feldspielDisc==="basketball"||feldspielDisc==="football"){
             const rBlick=blickAus(traeger);
             const fSpalte=Math.floor((t*7+traeger.id)%ANIBILDER.walk);
-            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]:[44,47];
+            // Alle vier Blickrichtungen jetzt aus einer gemessenen Tabelle (Nachtrag
+            // 26.09., s. BK_HAND_HINTEN/-VORN oben) statt "links"/"rechts" gemessen und
+            // "hinten"/"vorn" auf einen nie eigens vermessenen Festwert zurueckfallen zu
+            // lassen.
+            const hp=rBlick===1?BK_HAND_LINKS[fSpalte]:rBlick===3?BK_HAND_RECHTS[fSpalte]
+                    :rBlick===0?BK_HAND_HINTEN[fSpalte]:BK_HAND_VORN[fSpalte];
             // bauSkala(b) (04.09., s. Kommentar bei zeichneSprite/bauSkala oben) fehlte hier
             // urspruenglich — ohne sie wuerde ein Ball bei einem Traeger mit eigenem
             // Skala-Flag leicht neben der (dann groesseren) Hand schweben. Heute inert fuer
@@ -12892,6 +13540,24 @@
         }
         ctx.restore();
       } else if(istHockey()){
+        // H5 -- PUCK-SCHWEIF BEIM SCHLAGSCHUSS (A, Prio 3, docs/design/broadcast-optik-
+        // feldspiel-27-09.md Abschnitt 5, FoxTrax-Zitat, "sparsam"): nur waehrend der
+        // Puck FLIEGT (keine traegerId) und nur beim Schlagschuss (schuetze.schussArt,
+        // von wirf() gesetzt) -- ein kurzer Schweif in Flugrichtung, blau, bei
+        // tier==="fern" rot. Bewusst KEINE km/h-Zahl (Bauplan: "die Flugdauer ist eine
+        // Konstante ... eine erfundene Zahl, die nach Leistung aussieht"). Reine
+        // Zeichnung, liest nur fsLive.ball.flug/schuetze.schussArt, kein rr().
+        const flugAn=fsLive.ball.flug;
+        if(flugAn&&flugAn.schuetze&&flugAn.schuetze.schussArt==="schlag"){
+          const laenge=18, richtung=Math.atan2(flugAn.nach.y-flugAn.von.y,flugAn.nach.x-flugAn.von.x);
+          ctx.save();
+          ctx.strokeStyle=flugAn.fern?"rgba(214,58,58,.55)":"rgba(58,120,214,.55)";
+          ctx.lineWidth=3; ctx.lineCap="round";
+          ctx.beginPath(); ctx.moveTo(bx,by-6);
+          ctx.lineTo(bx-Math.cos(richtung)*laenge,by-Math.sin(richtung)*laenge-6);
+          ctx.stroke();
+          ctx.restore();
+        }
         // DER PUCK. Eine flache schwarze Scheibe, tief am Eis statt auf Ballhoehe: der
         // Basketball wird 26 bis 35 px ueber dem Fuss gezeichnet, weil er getragen und
         // geprellt wird. Ein Puck liegt auf dem Eis. Die leichte Ellipse (breiter als
@@ -12959,6 +13625,9 @@
   // synchron wirken oder eben nicht. 100 BPM ist ein typisches Breaking-/Boom-Bap-Tempo
   // (60/100 = 0,6 s je Schlag). Rein praesentational: fliesst in keine Formel ein.
   const BREAKING_BPM=100;
+  // B5 (Broadcast-Optik-Recherche 27.09.): Dauer des "GEBROCHEN"-Stempels in Buehnenzeit
+  // (buehneT-Domaene, also real ablaufend, keine Enthuellungs-Pause, s. zeichneBreaking()).
+  const BRUCH_STEMPEL_DAUER=0.8;
 
   // ================== DIE FOLTERBANK: ZEHN GERAETE, DIE IMMER SCHLIMMER WERDEN ==================
   // Chris am 13.09., woertlich: „evtl müssen wir dafür assets suchen wo die instrumente immer
@@ -13074,6 +13743,17 @@
     const n=Math.max(1,(rundenN|0)-1);
     return Math.max(0,Math.min(FOLTER_GERAETE.length-1,Math.round((runde|0)*(FOLTER_GERAETE.length-1)/n)));
   };
+  // B4.2 (Broadcast-Optik-Recherche 27.09., Klasse A): QUAL-SKALA IM HOT-ONES-STIL. Zehn
+  // FIKTIVE, steigende Zahlen (Doku B4.2: "etwa 'Qual 1.200 ... 2.000.000'"), eine je
+  // FOLTER_GERAETE-Stufe -- die Leiter wird damit zur Zahl, die man vorher sieht, statt
+  // nur "Stufe n/10" zu lesen. AUSDRUECKLICH KEINE SCHADENSZAHL (Doku-Wortlaut: "sollte die
+  // Qual-Zahl keine Schadenszahl behaupten, also kein '+8%' auf der Tafel") -- der Schaden
+  // je Geraet ist bis zu Breaking-Review P4 fuer alle zehn Stufen identisch
+  // (GAUNTLET_SCHADEN_ERFOLG/FAIL), diese Zahlen fliessen in KEINE Formel ein, rein
+  // dekorativ, grob am realen Scoville-Sprung von Mild bis Carolina Reaper orientiert.
+  const QUAL_ZAHLEN=[1200,2500,6000,15000,40000,100000,250000,600000,1200000,2000000];
+  const qualAnzeige=(n)=>n>=1000000?(n/1000000).toFixed(1).replace(".0","")+" Mio":
+    n>=1000?Math.round(n/1000)+" Tsd":String(n);
 
   const BUEHNE_ART={
     gewichtheben:{
@@ -13093,7 +13773,7 @@
       // sechs Duelle, also rund 112 s: laenger als die 60 s der anderen Buehnen, kuerzer
       // als Hockeys 240 s, und langsam genug, dass man eine Hantel sieht.
       label:"Gewichtheben", jeSeite:6, rundenN:6, rundenDauer:1.55, heben:true,
-      failAbzug:0, failWort:"ungueltig", erfolgWort:"gueltig",
+      failAbzug:0, failWort:"ungültig", erfolgWort:"gültig",
       // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
       // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
       // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
@@ -13146,15 +13826,45 @@
       // Rest (Wettessen, I-Spy) zu beruehren. Rezept/rundenN/rundenDauer/failAbzug bleiben
       // in dieser PR unangetastet (Abschnitt 4.1: rho 0,892 wird nicht angefasst).
       label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0, showcase:true,
-      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reißt das Publikum mit",
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Showcase 28,4/
+      // 29,3 Pp, VERLETZT). ERSTER ANLAUF (jede Rolle einzeln auf ihre EIGENE Matrix-Proportion
+      // nachgezogen, s. Git-Historie) verschlimmerte die Zahl auf 43,7 Pp bei n=6 -- derselbe
+      // Fehlertyp wie Tennis oben, nur staerker: Rollensondierung
+      // (`sondiere-feldspiel-subskills.mjs showcase 6`, orthogonales Rezept: GRUNDLAGE 40,1 %,
+      // TECHNIK 18,1 %, WAGNIS 9,7 %, SPITZENMOMENT 9,5 %, NERVEN 9,5 %, PUBLIKUM 8,8 %,
+      // AUSDAUER 4,3 % mechanisches Gewicht) zeigte: `determination` (Matrixgewicht nur 14, das
+      // DRITTSCHWERSTE Attribut) sass in VIER Rollen (GRUNDLAGE, TECHNIK mit 43 % Rollengewicht,
+      // NERVEN, AUSDAUER) und summierte sich weit ueber die Matrix (gemessen +12,3 Pp), ebenso
+      // charisma/spirit in je drei Rollen (+4,4/+5,1 Pp), waehrend power/intelligence/dexterity/
+      // speed/health je nur in ein bis zwei schwachen Rollen sassen (-5,1/-3,2/-5,7/-4,2/-3,0 Pp).
+      // GEAENDERT (Budget-Rechnung wie bei Tennis: Beitrag(Attribut) = Summe ueber Rollen von
+      // Rollengewicht x Rollenanteil, Zielsumme = Matrixgewicht): GRUNDLAGE (40,1 %, unangetastet)
+      // bleibt auf charisma47:spirit28:determination25 -- war bereits exakt matrix-proportional
+      // fuer die drei schwersten Attribute und deckt allein schon 18,9/11,2/10,0 der Matrixziele
+      // 27/16/14. TECHNIK (18,1 %) verliert determination KOMPLETT (der Hauptfund) und traegt
+      // jetzt NUR intelligence10:dexterity9 (53:47 normiert) -- deckt beide fast vollstaendig
+      // allein ab, vorher gar keine gemeinsame Heimat fuer dieses Paar. SPITZENMOMENT (9,5 %)
+      // verliert charisma (das GRUNDLAGE/PUBLIKUM schon uebersaettigen wuerden) und traegt jetzt
+      // power11:speed8 (58:42 normiert) -- ergaenzt WAGNIS fuer beide seltene Attribute. WAGNIS
+      // (torment2:power11:speed8 = 10:52:38, unangetastet -- war schon exakt matrix-proportional,
+      // s. GROESSTER-EINZELFUND-Historie unten). NERVEN (9,5 %) verliert intelligence (das
+      // TECHNIK jetzt exklusiv haelt) und traegt spirit16:determination14:health3 (49:42:9
+      // normiert) -- deckt den GRUNDLAGE-Rest fuer genau die zwei ueberdehnten Attribute plus
+      // etwas health. PUBLIKUM (reiner Festzuschlag, 8,8 %) verliert spirit (schon durch
+      // GRUNDLAGE/NERVEN gedeckt) und traegt charisma27:torment2:health3 (84:6:10 normiert) --
+      // liefert den GRUNDLAGE-Rest fuer charisma plus die zwei leichtesten Attribute einen
+      // zweiten, rauscharmen Kanal. AUSDAUER (spirit40:determination35:health25, unangetastet --
+      // dead-channel-nah, s. Fechten-Kommentar oben zu buehneErfolgschance) blieb wie vor dem
+      // ersten Anlauf.
       rezept:{
-        GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
-        SPITZENMOMENT:{charisma:45,power:30,speed:25},
-        TECHNIK:      {dexterity:40,intelligence:35,determination:25},
-        PUBLIKUM:     {charisma:50,spirit:50},
-        NERVEN:       {determination:40,spirit:35,intelligence:25},
-        AUSDAUER:     {spirit:40,determination:35,health:25},
-        WAGNIS:       {torment:45,power:30,speed:25}
+        GRUNDLAGE:    {charisma:47,spirit:28,determination:25},
+        TECHNIK:      {intelligence:53,dexterity:47},
+        WAGNIS:       {torment:10,power:52,speed:38},
+        SPITZENMOMENT:{power:58,speed:42},
+        NERVEN:       {spirit:49,determination:42,health:9},
+        PUBLIKUM:     {charisma:84,torment:6,health:10},
+        AUSDAUER:     {spirit:40,determination:35,health:25}
       }
     },
 
@@ -13215,7 +13925,35 @@
       // Breaking-Throw (WDSF-/Olympia-Bewertung) besteht aus mehreren Bewertungsmomenten
       // (Einstieg, Power-Move, Freeze/Ausstieg) ueber typischerweise mehr als einen Durchgang
       // — rundenN:4 bildete kaum mehr als einen Move-Zyklus ab, rundenN:8 sind zwei.
-      label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.625,
+      // rundenDauer 0,625 -> 0,35 (22.09., Gauntlet-Kalibrierrunde): das 120-simulierte-
+      // Sekunden-Messfenster (MOTOREN.breaking.lauf()) begrenzt, wie viele Zuege insgesamt
+      // enthuellt werden koennen (120/rundenDauer) -- der Gauntlet braucht bei hoeherem
+      // GAUNTLET_HP_MAX (s.u.) spuerbar mehr Zuege als die alten, festen acht je Teilnehmer
+      // (bis zu elf Ausscheiden in einer Kette statt zwoelf unabhaengiger Achter-Auftritte).
+      // Ohne diese Senkung waere ein Teil der Kette im Extremfall (fast alle 12 Kaempfer
+      // ausgeschieden) nach 120 s noch nicht enthuellt gewesen -- u.summe haette dann nur den
+      // enthuellten Teil gezaehlt, ein stiller Messfehler statt einer echten Rezeptzahl.
+      label:"Breaking", jeSeite:6, rundenN:8, rundenDauer:0.35,
+      // GAUNTLET STATT AUFTRITT (22.09., Chris' Sprachnachricht, woertlich): „breaking point
+      // faend ich vermutlich besser wenn da spieler 1 vs 1 kaempft und der sieger kaempft dann
+      // vs spieler 2 aus dem anderen team usw. so kann zb ein starker spieler auf slot 6 noch
+      // mal richtig aufholen und spieler 4 5 und 6 vom gegner besiegen. die HP nimmt er
+      // natuerlich mit in die folgerunde, geht also angeschlagen in die kaempfe rein, wer
+      // uebrig bleibt scored einen punkt." Ersetzt den bisherigen WERTUNG_AUFTRITT-Ablauf
+      // (zwoelf unabhaengige Einzelauftritte, je art.rundenN feste Durchgaenge, s. der
+      // generische Block in bauBuehne() unten) durch eine ECHTE Kette: Team-Slot 1 gegen
+      // Team-Slot 1 (feste Aufstellungsreihenfolge, s. `mine`/`gegner`), der Sieger bleibt MIT
+      // SEINEM AKTUELLEN HP-STAND im Ring (kein Reset) und tritt gegen den naechsten noch
+      // nicht angetretenen Kaempfer des VERLIERER-Teams an, bis ein Team komplett aufgebraucht
+      // ist. `gauntlet:true` ist die eine Weiche (baueGauntlet(), s. dort, analog zu
+      // `heben`/`schatzsuche` oben) -- rezept/failAbzug/erfolgWort/failWort bleiben WOERTLICH
+      // unveraendert, dieselbe Ertragende-Pruefung wie im generischen Auftritt-Block laeuft pro
+      // Zug weiter (gauntletRunde(), reine Extraktion), nur jetzt so oft, wie ein Teilnehmer
+      // tatsaechlich im Ring steht, statt einer festen Zahl. `u.summe` (die Zahl, die
+      // MOTOREN.breaking.wert() liest, also die Rangtreue misst) bleibt deshalb unveraendert
+      // "die Summe der eigenen Punkte" -- s. baueGauntlet()-Kommentar fuer die volle Herleitung
+      // und die Vorher/Nachher-Kalibrierung in der PR-Beschreibung.
+      gauntlet:true,
       // EIGENES BUEHNENBILD "BREAKING CYPHER" (Fable-Recherche
       // docs/design/breaking-folter-survival-visuelle-identitaet-recherche-08-09.md, Opus-
       // Synthese docs/pm-briefings/opus-synthese-eiskunstlauf-breaking-08-09.md, Umsetzung
@@ -13250,14 +13988,63 @@
       // in den beiden nicht erfolgsgebundenen Rollen (SPITZENMOMENT, PUBLIKUM, WAGNIS)
       // und blieb bei 11,7 %. Jetzt traegt Torment auch die Erfolgschance mit, Dexterity
       // bleibt nur dort, wo die Matrix ihm ueberhaupt ein Gewicht gibt.
+      //
+      // GAUNTLET-KALIBRIERRUNDE (23.09., Review-Fund auf PR #1015): dieses Rezept ist eine
+      // WOERTLICHE Extraktion aus der alten Auftritt-Mechanik (s. gauntletRunde()-Kommentar
+      // oben) und trug deren vorbestehende Pp-Abweichung (26,8 Pp) unveraendert in den
+      // Gauntlet — dort gemessen 32,5 Pp (n=6, systematisch zu guenstig, s. CLAUDE.md/
+      // Handbuch 3.2: kleine Stichproben LESEN NIEDRIGER als der wahre Wert, nie hoeher).
+      // URSACHE, NACHGEDACHT VOM FORMELBAU HER (nicht nur vom Rezept): TECHNIK/NERVEN
+      // speisen `erfolg` in gauntletRunde() — und Erfolg entscheidet nicht nur ueber
+      // GAUNTLET_SCHADEN_ERFOLG/FAIL (10 vs. 24 HP), sondern damit auch, wie lange ein
+      // Ueberlebender im Ring bleibt und WIE VIELE eigene Zuege (also wie viel `u.summe`)
+      // er ueberhaupt noch sammelt — ein Attribut in TECHNIK/NERVEN wird also nicht nur
+      // ueber seinen Formel-Koeffizienten gehebelt, sondern zusaetzlich ueber die
+      // Ueberlebensdauer VERSTAERKT (exakt der Mechanismus, der oben schon Dexterity bei
+      // nur 2 Matrixpunkten auf 26,2 % trieb). Wille sass VOR dieser Runde in FUENF der
+      // sieben Kanaele (GRUNDLAGE, TECHNIK, NERVEN, SPITZENMOMENT, PUBLIKUM) — darunter
+      // BEIDE erfolgsgebundenen — und nahm sich dadurch einen Grossteil dieses Hebels,
+      // obwohl die Matrix ihm mit 28 nur den ERSTEN Platz gibt, nicht die alleinige Rolle.
+      // Torment (22) sass dagegen in KEINEM linearen, immer wirkenden Kanal (GRUNDLAGE) und
+      // Power/Determination (je 10) kamen praktisch nur in den am staerksten verduennten
+      // Kanaelen vor (SPITZENMOMENT/WAGNIS mit Faktor 0,35*(0,4+WAGNIS*0,006), s. Formel).
+      //
+      // NEUES REZEPT, PRINZIP STATT FEINJUSTAGE: jedes Attribut bekommt HOECHSTENS EINEN
+      // der beiden erfolgsgebundenen (verstaerkten) Kanaele TECHNIK/NERVEN, nie beide —
+      // Wille (28) und Torment (22), die beiden Matrix-Hoechstwerte, teilen sich die beiden
+      // Kanaele zwischen NERVEN und TECHNIK, statt dass Wille beide dominiert. GRUNDLAGE
+      // (immer wirkender Basiswert, Koeffizient 0,7) und PUBLIKUM (immer wirkender
+      // Festbonus, Koeffizient 0,12) bilden jetzt zusammen die "sichere", nicht durch
+      // Ueberlebensdauer verstaerkte Basis und sind zueinander proportional zur Matrix
+      // gesetzt (Wille:Torment:Health:Stamina 28:22:18:8 in GRUNDLAGE, 28:22 in PUBLIKUM).
+      // Power (10) bekommt in SPITZENMOMENT/WAGNIS jetzt sein eigenes Hauptgewicht statt
+      // Torments drittem/viertem Kanal, Determination (10) bekommt neben TECHNIK zusaetzlich
+      // AUSDAUER als zweiten, unverstaerkten Kanal. Dexterity (2) bleibt wie zuvor NUR in
+      // WAGNIS, dem am staerksten verduennten Kanal — genau die Lehre aus der vorigen Runde.
+      // ZWEITER SCHLIFF (23.09., Nachmessung n=4): erster Anlauf des neuen Rezepts (s.
+      // vorherige Fassung im Git-Verlauf) mass 26 Pp -- Torment las 30 % gegen ein
+      // Matrixgewicht von 22 (+8,0), Health 13,2 % gegen 18 (-4,8), Power 7,8 % gegen 10
+      // (-2,2). Torment aus GRUNDLAGE/PUBLIKUM/TECHNIK etwas zurueckgenommen, der frei
+      // werdende Anteil auf Health (GRUNDLAGE) und Power (TECHNIK zusaetzlich zu
+      // SPITZENMOMENT/WAGNIS) verteilt.
+      //
+      // DRITTER SCHLIFF (23.09., Nachmessung n=4): der zweite Anlauf (s. Git-Verlauf) mass
+      // 16,7 Pp (deutlich unter der 25er-Schranke) -- Power hatte jetzt ueberzogen (16,2 %
+      // gegen 10, +6,2), weil es in DREI Kanaelen (SPITZENMOMENT/TECHNIK/WAGNIS) zu stark
+      // vertreten war. Power in allen drei Kanaelen zurueckgenommen (zugunsten von Wille in
+      // SPITZENMOMENT, Determination in TECHNIK, Dexterity in WAGNIS), Stamina zusaetzlich
+      // ein Stueck GRUNDLAGE gegeben (war mit -2,4 die zweitgroesste verbleibende Luecke).
+      // `n=4` ist eine bewusst kleine Stichprobe fuer die Kalibrierung selbst (schnelle
+      // Iteration in dieser stark ausgelasteten Sandbox); die Abnahme-Pflichtzahl fuer die
+      // PR-Beschreibung kommt aus zwei groesseren, unabhaengigen Saatstaemmen.
       rezept:{
-        GRUNDLAGE:    {will:45,health:30,stamina:25},
-        SPITZENMOMENT:{torment:45,power:35,will:20},
-        TECHNIK:      {torment:35,determination:35,will:30},
-        PUBLIKUM:     {torment:50,will:50},
-        NERVEN:       {will:40,determination:30,health:30},
-        AUSDAUER:     {stamina:45,health:35,will:20},
-        WAGNIS:       {torment:50,power:30,dexterity:20}
+        GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
+        SPITZENMOMENT:{power:55,will:45},
+        TECHNIK:      {torment:50,power:15,determination:35},
+        PUBLIKUM:     {will:60,torment:40},
+        NERVEN:       {will:50,health:50},
+        AUSDAUER:     {stamina:65,determination:35},
+        WAGNIS:       {power:40,dexterity:60}
       }
     },
 
@@ -13266,13 +14053,33 @@
       // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
       // eigene Wille, der den naechsten Bissen nimmt.
       //
-      // EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a):
-      // wettessen:true schaltet zeichneBuehne()/buehnenBewegung() auf zeichneWettessen()/
-      // stepWettessen() um — Banketttafel samt Tellerstapel und Magen-Meter statt der
-      // generischen Zwei-Reihen-Darstellung, s. dortige Kommentare. Dasselbe Muster wie
-      // BUEHNE_ART.fechten/.tennis/.showcase: rein deskriptiv, ohne Wirkung auf
-      // rezept/wert()/rundenN/failAbzug/failWort/erfolgWort.
-      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65, wettessen:true,
+      // EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.a;
+      // umgebaut auf die "Coney-Island-Tafel" nach dem Opus-Gegencheck 23.09.,
+      // docs/design/wettessen-format-opus-gegencheck-23-09.md): wettessen:true schaltet
+      // zeichneBuehne()/buehnenBewegung() auf zeichneWettessen()/stepWettessen() um — eine
+      // lange Bankett-Tafel zum Publikum, Wendetafeln in Wuerstchen, eine laufende 10:00-Uhr
+      // und ein Kopf-an-Kopf-Spotlight-Band statt der generischen Zwei-Reihen-Darstellung,
+      // s. dortige Kommentare. Dasselbe Muster wie BUEHNE_ART.fechten/.tennis/.showcase:
+      // rein deskriptiv, ohne Wirkung auf rezept/wert()/rundenN/failAbzug/failWort/
+      // erfolgWort.
+      //
+      // rundenN 8 -> 10 (S4, EINZIGE Zahlenaenderung des Gegenchecks): hebt rho je Spiel in
+      // beiden gemessenen Saatstroemen (Abschnitt 3.4: 6v6 0,845->0,883 und 0,872->0,902,
+      // 4v4 0,794->0,819 und 0,797->0,822) und senkt die Pp-Abweichung von 13,8 auf 7,8
+      // (Abschnitt 3.3) -- der Spearman-Brown-Fall wie Eiskunstlauf/Breaking, weil Wettessen
+      // unabhaengige, vorab gewuerfelte Durchgaenge hat statt einer RNG-Kaskade wie Hockey.
+      // Zehn Durchgaenge sind zugleich das realistische Mass: zehn Minuten, ein Durchgang je
+      // Minute (Nathan's, s. Gegencheck Abschnitt 1.1).
+      //
+      // rundenDauer 60/rundenN=6: MIT S3 (buehneGruppenGroesse, s. bauBuehne()/stepBuehne())
+      // enthuellt ein Tick nicht mehr EINEN Esser, sondern eine GANZE Runde (alle Esser
+      // beider Seiten) -- die Gesamtlaenge des Auftritts haengt deshalb nur noch an rundenN,
+      // nicht mehr an jeSeite. 60 s ist derselbe Gesamtrahmen, auf den auch die anderen
+      // Duell-Buehnen normiert sind (BUEHNE_ART.tennis/."speed-schach"/.fechten/."i-spy":
+      // rundenDauer=60/(rundenN*jeSeite*2)) -- hier reicht die einfache Form, weil die
+      // Gruppierung den Faktor jeSeite*2 bereits aus der Rechnung nimmt. Eine Runde = eine
+      // Spielminute, sechs Sekunden Bildschirmzeit dafuer.
+      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -13287,8 +14094,14 @@
       // WERTUNG_AUFTRITT. "Pause" ist Chris' eigenes Wort fuer failWort.
       // Feld heisst `wertungTabelle` (nicht `wertung`), um mit PR #807s `BAHN_ART.*.wertung`
       // (String-Wertungsmodus fuer bahnTeamstand) nicht zu kollidieren, s. Review 06.09.
+      //
+      // FUSS UM DIE WUERSTCHEN-SPALTE ERGAeNZT (S2, Coney-Island-Tafel, 23.09.): "Durchgang"
+      // heisst nach S3/S4 dasselbe wie "Minute" (ein Durchgang je Minute, s.
+      // BUEHNE_ART.wettessen.rundenN/rundenDauer oben) -- der Fusstext nennt jetzt beide
+      // Worte, und die letzte Zeile erklaert die neue "Wü"-Spalte, die keine eigene Wertung
+      // ist (s. Kommentar bei WERTUNG_AUFTRITT()).
       wertungTabelle:{failKopf:"Pause",
-        fuss:"Jeder Durchgang bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (der Durchgang zählt dann nur 65 %). „Abfall\" vergleicht die späten Durchgänge mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."}
+        fuss:"Jeder Durchgang (eine Minute am Tisch) bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (die Minute zählt dann nur 65 %). „Abfall\" vergleicht die späten Minuten mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt. „Wü\" rechnet „Pkt\" nur in Würstchen um (Anzeige, keine eigene Wertung)."}
     },
 
     "speed-schach":{
@@ -13558,13 +14371,45 @@
       // (CLAUDE.md) ist damit nicht erreicht — dafuer braeuchte es vermutlich echte
       // Sinkhorn-Kalibrierung, nicht nur eine Attribut-Umverteilung im bestehenden
       // Sieben-Rollen-Rezept.
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Tennis 53,9/
+      // 56,4 Pp, VERLETZT). ERSTER ANLAUF (stamina in GRUNDLAGE ergaenzt, SPITZENMOMENT/
+      // TECHNIK/WAGNIS/PUBLIKUM auf ihre EIGENE Matrix-Proportion nachgezogen) senkte n=6 nur
+      // auf 36,8 Pp -- deutlich besser, aber ueber der 25-Pp-Schranke. Rollensondierung
+      // (`sondiere-feldspiel-subskills.mjs tennis 6`, orthogonales Rezept) zeigte den
+      // eigentlichen Fehler: JEDE der vier schwersten Rollen (GRUNDLAGE 35,8 %, TECHNIK 18 %,
+      // SPITZENMOMENT 9,1 %, WAGNIS 11,5 % mechanisches Gewicht) trug intelligence UND
+      // awareness, jede fuer sich exakt matrix-proportional zu ihren eigenen zwei/drei
+      // Attributen -- aber die VIERFACHE Wiederholung derselben zwei schwersten Attribute ueber
+      // vier Rollen summierte sich zu weit ueber die Matrix (gemessen intelligence +9,1 Pp,
+      // awareness +8,4 Pp), waehrend dexterity/speed/determination/charisma, die nur in EINER
+      // oder gar keiner der schweren Rollen vorkamen, weit darunter blieben (-4,7/-4,5/-4,0/
+      // -3,1 Pp). Das ist ein anderer Fehlertyp als Fechtens fehlendes Attribut: hier war
+      // JEDES Attribut irgendwo vertreten, aber zu wenige Rollen TEILTEN sich die schwersten
+      // zwei Attribute ungleich. GEAENDERT (Budget-Rechnung: Beitrag(Attribut) = Summe ueber
+      // Rollen von Rollengewicht x Rollenanteil, Zielsumme = Matrixgewicht):
+      // GRUNDLAGE (35,8 %, unangetastet, war schon exakt matrix-proportional unter den vier
+      // schwersten Attributen) liefert allein intelligence 11,1/awareness 9,7/spirit 9,0/
+      // stamina 6,1 der Matrixziele 22/20/18/12 -- der Rest muss aus den uebrigen 64,2 %
+      // Rollengewicht kommen. TECHNIK (18 %) verliert intelligence/awareness komplett und
+      // traegt stattdessen ALLEIN dexterity12:speed6 (66:33 normiert -> dexterity:67,speed:33)
+      // -- liefert damit dexterity/speed praktisch exakt (12,06/5,94 gegen Ziel 12/6), vorher
+      // ueberhaupt nicht der Traeger dieser zwei Attribute. WAGNIS (11,5 %) traegt jetzt
+      // intelligence45:awareness40:spirit15 (moderat, deckt einen Teil des GRUNDLAGE-Rests).
+      // SPITZENMOMENT (9,1 %) wechselt von dexterity/speed (die jetzt TECHNIK exklusiv haelt)
+      // auf intelligence45:charisma30:determination25 -- bringt charisma (vorher nur in
+      // PUBLIKUM, staerkste Einzelluecke) neu in eine zweite Rolle ein. PUBLIKUM (reiner
+      // Festzuschlag, 8,9 %) wechselt von spirit/awareness auf charisma35:stamina35:spirit30
+      // -- traegt jetzt den zweiten charisma-Kanal und hilft stamina. NERVEN (44:40:16,
+      // unangetastet) und AUSDAUER (50:30:20, dead-channel-nah, unangetastet) blieben wie vor
+      // dem ersten Anlauf, weil beide schon nah an ihrer eigenen Matrix-Proportion lagen bzw.
+      // nachweislich kaum mechanisches Gewicht tragen.
       rezept:{
-        GRUNDLAGE:    {intelligence:37,awareness:33,spirit:30},
-        SPITZENMOMENT:{intelligence:45,dexterity:30,speed:25},
-        TECHNIK:      {intelligence:50,awareness:35,dexterity:15},
+        GRUNDLAGE:    {intelligence:31,awareness:27,spirit:25,stamina:17},
+        TECHNIK:      {dexterity:67,speed:33},
+        WAGNIS:       {intelligence:45,awareness:40,spirit:15},
+        SPITZENMOMENT:{intelligence:45,charisma:30,determination:25},
+        PUBLIKUM:     {charisma:35,stamina:35,spirit:30},
         NERVEN:       {awareness:44,spirit:40,determination:16},
-        WAGNIS:       {intelligence:35,awareness:35,dexterity:30},
-        PUBLIKUM:     {spirit:52,awareness:43,charisma:5},
         AUSDAUER:     {stamina:50,determination:30,spirit:20}
       }
     },
@@ -13611,6 +14456,14 @@
       // (Suche "TREFFERSTAND"), streng nach dem additiven `u.kuehneVersuche`-Muster
       // (Gewichtheben, s. baueHebenDuelle-Kommentar oben): keines von beiden fliesst in
       // u.summe/u.vorteil/u.verlauf oder MOTOREN[...].wert() ein.
+      //
+      // UEBERHOLT DURCH F1 (Opus-Konzeptreview Buehnen-Duell, 26.09., s. "F1 -- TREFFER SIND
+      // DER STAND"-Kommentar im `art.duell`-Paarungsblock oben in dieser Datei): der letzte
+      // Satz stimmt weiterhin fuer `u.summe`/`u.vorteil`/`u.verlauf`/`MOTOREN[...].wert()` --
+      // die bleiben reine Aktionsqualitaet und der Messwert fuer rho. Der Trefferstand
+      // ENTSCHEIDET seither aber, wer das Brett gewinnt (`gefechtSieg`), bei Gleichstand nach
+      // Los (`prioritaet`, die reale Degen-Zusatzminute) -- vorher entschied dort `vorteil`,
+      // der auffaelligste Einzelfehler des Reviews (Abschnitt 3.2 Punkt 1).
       label:"Fechten", jeSeite:6, rundenN:9, rundenDauer:60/(9*6*2), duell:true, fechten:true,
       failAbzug:0.55, failWort:"kommt zu spät", erfolgWort:"setzt den Treffer",
       // NACHKALIBRIERUNG (16.09., docs/design/fechten-rezeptkalibrierung-16-09.md) — die im
@@ -13652,15 +14505,51 @@
       // Kaderrauschen (Spannweite 0,203). Das aspirative 0,85-Ziel (CLAUDE.md) ist damit nicht
       // erreicht; mehr steckt vermutlich nicht in einer reinen Attributverschiebung im
       // bestehenden Sieben-Rollen-Rezept, s. Dokument Abschnitt "Was offen bleibt".
+      // PP-FIX 27.09. (docs/design/stand-aller-disziplinen.md, Scorecard 26.09.: Fechten 40,6/
+      // 42,1 Pp, VERLETZT). Diagnose: `power` (Matrixgewicht 10) UND `speed` (Matrixgewicht 16,
+      // tatsaechlich das DRITTSCHWERSTE Attribut der Matrix) fehlten in GRUNDLAGE/TECHNIK, den
+      // beiden staerksten Rollen (58,3 % mechanisches Gewicht zusammen, s. Kommentar oben),
+      // komplett -- speed sass nur in SPITZENMOMENT/AUSDAUER, power nur in AUSDAUER (nachgewiesen
+      // fast toter Kanal, 1,9 % mechanisches Gewicht) und im schwachen WAGNIS. GRUNDLAGE/TECHNIK
+      // waren zwar EXAKT matrix-proportional *unter sich* (torment:dexterity:awareness =
+      // 42:33:25 = 25:20:15 normiert), aber genau dieser sonst so richtige Kanal blendet zwei
+      // schwere Attribute vollstaendig aus der einzigen wirklich deterministischen Rolle aus
+      // (GRUNDLAGE zaehlt JEDE Runde, unabhaengig vom Erfolgswurf).
+      // ERSTER ANLAUF (nur power ergaenzt, torment25:dexterity20:awareness15:power10 = 70
+      // normiert -> 36:29:21:14) meldete n=6 Abweichung auf 26,4 Pp (von 40,6/42,1) — power traf
+      // exakt (+0,1), aber speed blieb bei nur 8,1 % gegen Matrixgewicht 16 (-7,9), weil es
+      // weiterhin in keiner der beiden schwersten Rollen sass. NACHGEZOGEN: speed tritt
+      // GRUNDLAGE/TECHNIK ebenfalls bei, jetzt unter den FUeNF schwersten Attributen der ganzen
+      // Matrix (torment25:dexterity20:speed16:awareness15:power10 = 86 normiert -> 29:23:19:
+      // 17:12) statt nur vier -- torment/dexterity/awareness treten dafuer weiter zurueck.
+      // NERVEN/PUBLIKUM/AUSDAUER/WAGNIS weiterhin bewusst unangetastet -- PUBLIKUM wurde in der
+      // 16.09.-Kalibrierrunde bereits erschoepfend gegen Alternativen getestet (jede Aenderung
+      // dort schlechter als der Status quo, s. GEPRUEFT-UND-VERWORFEN-Kommentar oben), NERVEN
+      // traegt bereits eine bewusste Grid-Suchs-Kalibrierung.
       rezept:{
-        GRUNDLAGE:    {torment:42,dexterity:33,awareness:25},
+        GRUNDLAGE:    {torment:29,dexterity:23,speed:19,awareness:17,power:12},
         SPITZENMOMENT:{dexterity:40,speed:35,torment:25},
-        TECHNIK:      {torment:42,dexterity:33,awareness:25},
+        TECHNIK:      {torment:29,dexterity:23,speed:19,awareness:17,power:12},
         NERVEN:       {awareness:55,determination:20,health:25},
         PUBLIKUM:     {intelligence:50,health:50},
         AUSDAUER:     {speed:40,power:35,health:25},
         WAGNIS:       {speed:45,torment:30,power:25}
-      }
+      },
+      // WERTUNGSTABELLE (F1, Opus-Konzeptreview 26.09.): NUR die "Stand"-Spalte weicht vom
+      // WERTUNG_DUELL()-Default ab -- sie muss `gefechtSieg` lesen, nicht `verlauf[rundenN-1]`
+      // (`vorteil`), sonst zeigte die Tabelle einen anderen Sieger als der tatsaechliche
+      // Brettausgang (genau der Widerspruch, den dieser Fix behebt, s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Kein Remis mehr moeglich -- die Degen-Prioritaetsminute
+      // loest jeden Treffergleichstand auf -- darum kein "="-Fall mehr wie bei Speed-Schach/
+      // Tennis. Uebrige Spalten/Woerter bleiben die WERTUNG_DUELL()-Defaults, Zeichen fuer
+      // Zeichen wie Takeshi's Castle nur eine Spalte gegen die eigene tauscht (s. dessen
+      // wertungTabelle-Kommentar).
+      wertungTabelle:(basis,art)=>({...basis,
+        spalten:basis.spalten.map(s=>s.id!=="stand"?s:{...s,
+          titel:"Gefecht entschieden nach Trefferstand (+ Sieg, − Niederlage; bei "
+               +"Treffergleichstand entscheidet die Priorität aus der Degen-Zusatzminute)",
+          wert:z=>!z.fertig?"…":(z.u.gefechtSieg?"+":"−"),
+          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null})})
     }
   };
   let buehneDisc="gewichtheben";
@@ -13696,9 +14585,47 @@
   const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // FUEHRUNG IM BILD -- EISKUNSTLAUF (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a,
+  // umgesetzt 26.09.). Merkt sich nur, WELCHE Seite zuletzt fuehrte und SEIT WANN (in
+  // buehneT-Zeit), damit das Bandenlicht in bodenEis() beim Fuehrungswechsel kurz aufhellen
+  // kann statt abrupt umzuspringen -- rein zeichnerisch, kein Einfluss auf `wert()`/stepBuehne.
+  let eisBandeSide=null, eisBandeSeit=-999;
+  // EIS-HALO (E-B2, Broadcast-Optik Buehne-Auftritt 27.09., Runde-2-Vorschlag 2b): merkt sich
+  // nur, ob das aktive Paar zuletzt UEBER oder UNTER der L/C-Referenz lag und seit wann, damit
+  // der Halo am Kufenpunkt beim Ueberqueren kurz aufblinkt statt hart umzuspringen --
+  // dasselbe Muster wie eisBandeSide/-Seit direkt darueber, rein zeichnerisch.
+  let kuerHaloUeber=null, kuerHaloSeit=-999;
+  // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). >1 NUR bei art.wettessen
+  // (s. bauBuehne()/stepBuehne() unten) -- traegt die Anzahl Esser BEIDER Seiten in EINER
+  // Runde, also wie viele zusammenhaengende buehneQueue-Eintraege ein einziger Enthuellungs-
+  // Tick abdeckt. Bleibt 1 fuer jede andere Buehnen-Disziplin (unveraendertes Verhalten).
+  let buehneGruppenGroesse=1;
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A): dasselbe Muster wie
+  // letzterHebenZug oben, nur fuer den Gauntlet. `letzterGauntletZug` haelt den zuletzt
+  // ENTHUELLTEN Anschlag fest (reveal-gegatet, s. Aufruf in stepBuehne unten) -- exakt das,
+  // was `gauntletZugJetzt()` je Teilnehmer schon einzeln liest, hier nur GLOBAL fuer die
+  // ganze Kette (die aktuelle Kampf-Nummer haengt an BEIDEN Seiten gemeinsam, nicht an
+  // einem Teilnehmer). `gauntletReihen` haelt die feste Kampfreihenfolge je Team
+  // ({0:[...],1:[...]}, Team-Slot-Reihenfolge aus baueGauntlet()) -- rein strukturell,
+  // keine Zufallszahl, dieselbe Kategorie wie u.duellNr beim Gewichtheben.
+  let letzterGauntletZug=null, gauntletReihen=null;
+  // B5 (Broadcast-Optik-Recherche 27.09., Klasse A): DER MOMENT „GEBROCHEN". Anders als
+  // `letzterGauntletZug` (jeder Anschlag, ueberschrieben beim naechsten Anschlag desselben
+  // oder eines neuen Bouts) haelt `letzterGauntletBruch` NUR den zuletzt enthuellten K.O.-
+  // Anschlag fest, zusammen mit dem Buehnen-Zeitstempel `bruchT` -- ohne das wuerde der
+  // Stempel schon 0,35s spaeter (der naechste Anschlag des naechsten Bouts) wieder
+  // verschwinden, bevor er ueberhaupt zu lesen war. Reine Lese-/Merk-Struktur, kein rr(),
+  // gesetzt nur reveal-gegatet in stepBuehne (s. dort), gelesen nur in zeichneBreaking().
+  let letzterGauntletBruch=null;
+  // B6 (Broadcast-Optik-Recherche 27.09., Klasse A): STANDZEIT. Buehnen-Zeitstempel, an dem
+  // der aktuell laufende Bout (r.bout) zum ersten Mal enthuellt wurde -- "wie lange steht
+  // dieser Kampf schon" (Doku: "Standzeit in Zuschauerzeit seit Beginn des Kampfes", nach
+  // Survivor-Vorbild). Reveal-gegatet wie `letzterGauntletBruch`: gesetzt nur, wenn sich
+  // `r.bout` gegenueber dem zuletzt enthuellten Zug aendert (s. stepBuehne).
+  let gauntletBoutStartT=null;
   // S-Schach (Buehnenbild Speed-Schach): welches Brett gerade im Fokus steht.
   // schachPin!=null haelt es fest (Klick auf ein Mini-Brett/den Kadernamen) und
   // schaltet die Regie-Automatik ab; schachMiniRects sind die zuletzt gezeichneten
@@ -13712,17 +14639,70 @@
   // Kaderleiste vor; die ist bewusst nicht gebaut, also nimmt jetzt das Fokus-Brett
   // selbst den Loese-Klick.
   let schachFokus=0, schachPin=null, schachMiniRects=[], schachFokusRect=null;
+  // TENNIS/FECHTEN-NAHANSICHT (26.09., Audit-Empfehlung 3,
+  // docs/design/ui-bewegungs-audit-26-09.md): welches Brett gerade in der grossen
+  // Nahansicht steht -- dieselbe Rolle wie schachFokus oben, ueber duellFokusWaehlen()
+  // (s. dort, direkt vor zeichneTennis()). KEIN Pin: anders als Schach gibt es hier
+  // keinen Klick-Handler dafuer, das war nicht Teil des Auftrags.
+  let tennisFokus=0, fechtenFokus=0;
   // "matt"-Ton (Ziel 5, A4) darf nur EINMAL je Spiel feuern, sobald das Duell entschieden
   // ist (alleFertig && siegSeite!=null, s. zeichneSchach) — sonst spielt jeder weitere
   // Frame nach dem Sieg den Ton erneut ab. Reset hier statt in reset() (s. Kommentar dort
   // fuer den Loop-N1-Fix): bauBuehne() laeuft garantiert bei JEDEM neuen Buehnen-Match,
   // ob ueber reset() oder einen frischen setDisc().
   let schachMattGehoert=false;
+  // ENDSTAND-OVERLAY-WAECHTER (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe
+  // Einmal-Melden-Muster wie `bahnEndeGemeldet` (s. dort) -- ohne diese Bremse wuerde
+  // updateHudBuehne() das #endstand-Overlay bei JEDEM Frame nach `done` erneut aufbauen
+  // und die Feed-/Callout-Zeile erneut feuern (buehnenBewegung() laeuft ja bewusst
+  // WEITER, s. stepBuehne()s "N-Fix"-Kommentar oben). Reset hier statt in reset(),
+  // aus demselben Grund wie schachMattGehoert direkt darueber: bauBuehne() laeuft
+  // garantiert bei jedem neuen Buehnen-Match.
+  let buehneEndeGemeldet=false;
+
+  // WAGNIS IST EIN WAGNIS (26.09., Befund B aus docs/design/buehne-auftritt-opus-konzeptreview-
+  // 26-09.md Abschnitt 1.3). Vorher stand WAGNIS im generischen Auftritt-Rechner unten in
+  // genau EINEM Term: als Multiplikator auf den Bonus BEI ERFOLG (0,4+WAGNIS*0,006). In der
+  // Erfolgschance stand es nicht — mehr Wagnis brachte also ausschliesslich mehr Punkte und
+  // nie einen Fehlschlag mehr (d erfolg/d WAGNIS = 0). Derselbe Fehler, den Gewichtheben am
+  // 06.09. mit HEBEN_WAGNIS_ANSAGE_FLEX behoben hat.
+  //
+  // Jetzt ein echter Trade-off, symmetrisch um den Mittelwert 50 (Muster `(u.ANSAGE-50)` im
+  // Heben): wer mehr wagt, trifft SELTENER (RISIKO senkt die Erfolgschance) und holt bei
+  // Gelingen MEHR (ERTRAG hebt den Spitzenmoment-Bonus steiler als vorher). Wer wenig wagt,
+  // spielt sicherer und kleiner. Bei WAGNIS 50 ist beides exakt der alte Wert (Chance
+  // unveraendert, Bonusfaktor 0,4+50*0,006 = 0,7) — ein durchschnittlicher Teilnehmer
+  // merkt nichts, die Erfolgsquoten verschieben sich nur an den Raendern.
+  //
+  // Die Staerke ist bewusst klein gehalten: RISIKO 0,0015 heisst bei WAGNIS 80 rund 4,5
+  // Prozentpunkte weniger Erfolg, bei WAGNIS 20 ebenso viel mehr (im Kader liegt WAGNIS
+  // zwischen etwa 5 und 99, also hoechstens rund 7 Prozentpunkte Verschiebung; die mittlere
+  // Erfolgsquote je Disziplin bewegt sich um weniger als einen Prozentpunkt). ERTRAG ist so
+  // gewaehlt, dass die ERWARTUNG je Durchgang mit WAGNIS weiterhin steigt (die
+  // Matrixattribute hinter WAGNIS sollen ihr Gewicht behalten, s. Pp-Abnahme in CLAUDE.md) —
+  // was sich aendert, ist die STREUUNG: der Mutige faellt oefter und glaenzt hoeher, und
+  // das Wagnis zahlt sich umso mehr aus, je sicherer seine TECHNIK/NERVEN sind.
+  // Kalibriert ueber ein Raster (RISIKO 0,0008-0,002, ERTRAG 0,009-0,018) gegen alle sechs
+  // Disziplinen, die diesen Block durchlaufen (Speed-Schach, Tennis, Fechten, Showcase,
+  // Eiskunstlauf, Wettessen): rho je Spiel kaderfest ueberall ueber 0,80, Pp gegenueber
+  // vorher bei fuenf von sechs gleich oder besser, s. PR-Beschreibung.
+  //
+  // NICHT betroffen: Gewichtheben (eigenes Risiko ueber HEBEN_WAGNIS_*), I-Spy (eigener
+  // Rechner), Breaking (gauntletRunde() fuehrt die alte Formel bewusst weiter, eigene
+  // Abnahme noetig, bevor sie mitzieht).
+  const BUEHNE_WAGNIS_RISIKO=0.0015; // je Punkt WAGNIS ueber 50: weniger Erfolgschance
+  const BUEHNE_WAGNIS_ERTRAG=0.014;  // je Punkt WAGNIS ueber 50: mehr Bonusfaktor (vorher 0,006)
+  const buehneErfolgschance=(L)=>Math.max(0.05,Math.min(0.94,
+    0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
+  const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
 
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
-    floats.length=0; letzterHebenZug=null; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    buehneGruppenGroesse=1;
+    floats.length=0; letzterHebenZug=null; letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
+    buehneEndeGemeldet=false;
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -13765,8 +14745,14 @@
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      // Q3 (Broadcast-Optik-Dokument 27-09, Abschnitt 3, "Spieler-Kamera"): reines
+      // Anzeige-Metadatenfeld fuer die Bauchbinde -- der zugewiesene Slot ist bereits
+      // vorab bekannt (steht schon in der Aufstellung, bevor der Kampf beginnt) und
+      // fliesst hier nur als LESBARER Name statt als Id in TEILNEHMER, nirgends in
+      // wert()/rr()/eig/R2 oben.
+      const slotLabel=sl?((slotsVon(buehneDisc).find(s=>s.id===sl)||{}).label||null):null;
       const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
-        groesse:p.groesse??null, attr,
+        groesse:p.groesse??null, attr, vizSlotLabel:slotLabel,
         // DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen (Chris' Fund vom
         // 25.08., s. bauSpieler und aufschluesselung): `p.d` haelt nur "tdm" und "spurt"
         // vorberechnet. Fuer JEDE Buehnen-Disziplin fiel der Basiswert deshalb auf 0
@@ -13800,6 +14786,13 @@
       // zurueck (s. Aufrufstelle unten) — der generische REIHENFOLGE-Warteschlangenbau ganz
       // am Ende dieser Funktion gilt fuer I-Spy unveraendert.
       if(art.schatzsuche){ TEILNEHMER.push(L); return; }
+      // GAUNTLET (Breaking, 22.09.) GEHT HIER EBENFALLS NICHT DURCH, aus demselben Grund wie
+      // Heben zwei Zeilen oben: das Ergebnis entsteht paarweise (wie viele eigene Zuege ein
+      // Teilnehmer bekommt, haengt davon ab, wie lange er im Ring uebersteht) und laesst sich
+      // deshalb nicht je Teilnehmer fuer sich vorausrechnen. baueGauntlet() (s.u.) rechnet das,
+      // NACHDEM beide Seiten stehen -- L traegt zu diesem Zeitpunkt schon alle Sub-Skills
+      // (GRUNDLAGE/TECHNIK/... aus R2 oben), baueGauntlet() liest sie unveraendert.
+      if(art.gauntlet){ TEILNEHMER.push(L); return; }
       // TREFFERSTAND (s. grosser Kommentar bei BUEHNE_ART.fechten oben, Option 2): reines
       // additives Anzeigefeld nach dem u.kuehneVersuche-Muster, nur fuer Fechten befuellt
       // (art.fechten) — die fuenf verbleibenden Geschwister-Buehnen, die diesen generischen
@@ -13817,17 +14810,29 @@
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
-        const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
-        let punkte, ereignis;
-        if(rr()<erfolg){
-          punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+        // WAGNIS wirkt jetzt in BEIDE Richtungen, s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben.
+        const erfolg=buehneErfolgschance(L);
+        let punkte, ereignis, knapp=false;
+        // GENAU EIN rr()-AUFRUF, WIE VORHER (E0, Buehne-Auftritt-Konzeptreview 26.09.,
+        // Abschnitt 2.4): der ohnehin gezogene Wert wird nur ZUSAETZLICH in `wurf` gehalten,
+        // damit ein Fehlschlag danach beschriftet werden kann, wie knapp er daneben lag.
+        // Erfolgschance, Punkte und rr()-Verbrauch bleiben bit-identisch zu vorher -- `knapp`
+        // ist ein reines Anzeige-Feld (s. KUER_KNAPP_ANTEIL oben), das ausserhalb des
+        // Eiskunstlauf-Feed-Zweigs unten (BB().duett) nirgends gelesen wird. Seit dem
+        // WAGNIS-Trade-off (26.09., s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben) nutzt auch `erfolg`
+        // selbst denselben `wurf` -- ein Fehlschlag bleibt "knapp", wie nah `wurf` an der jetzt
+        // WAGNIS-abhaengigen Erfolgschance lag.
+        const wurf=rr();
+        if(wurf<erfolg){
+          punkte=basis+L.SPITZENMOMENT*0.35*buehneWagnisFaktor(L);
           ereignis=art.erfolgWort;
         } else {
           punkte=basis*art.failAbzug;
           ereignis=art.failWort;
+          knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
-        L.runden.push({punkte,ereignis});
+        L.runden.push({punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -13842,6 +14847,11 @@
     // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
     if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
+    // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
+    // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
+    // selbst (chronologische Kampf-Reihenfolge statt der generischen REIHENFOLGE ganz unten,
+    // die fuer unabhaengige Einzelauftritte gedacht ist).
+    if(art.gauntlet){ baueGauntlet(art,mine,gegner); return; }
     // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
     // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
     // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
@@ -13874,6 +14884,52 @@
         a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+        // F1 -- TREFFER SIND DER STAND (Opus-Konzeptreview Buehnen-Duell, 26.09., Abschnitt
+        // 3.3): der Kern-Befund des Reviews war, dass Fechten sich selbst widerspricht -- der
+        // ANGEZEIGTE Trefferstand ("Treffer 5:4") entschied nichts, das Gefecht gewann, wer
+        // `vorteil` (die interne Punktdifferenz) vorn hatte, und die zaehlte "kommt zu spaet"
+        // (`failWort`, kein Treffer) ueber `art.failAbzug` sogar mit. Nachgebildet traf das in
+        // 11,4 % aller Gefechte den Fechter mit WENIGER Treffern zum Sieger, in weiteren 17,4 %
+        // stand ein Treffergleichstand, den unsichtbare Punkte aufloesten. Im echten
+        // Degenfechten IST der Trefferstand das Ergebnis -- das gilt NUR fuer Fechten
+        // (`art.fechten`, dieselbe Weiche wie bei `L.treffer=0` oben): Speed-Schach und Tennis
+        // teilen sich diese Schleife unveraendert und bleiben bei `vorteil`.
+        //
+        // `vorteil`/`verlauf` selbst bleiben unangetastet -- sie bleiben die Aktionsqualitaet,
+        // der Messwert fuer rho ueber `MOTOREN[bd].wert()` (liest `u.summe`, nicht `vorteil`,
+        // s. dortiger Kommentar), und die Tauzieh-Anzeige auf der Bahn. Geaendert ist nur, WELCHE
+        // Groesse als Brettsieger zaehlt (`gefechtSieg`, gelesen von updateHudBuehne(),
+        // WERTUNG_DUELL(), stepBuehne() und spieleBuehneDuell()).
+        //
+        // TREFFER AUS DEN VOLLSTAENDIGEN `runden[]` GEZAEHLT, NICHT AUS `u.treffer`: an dieser
+        // Stelle (bauBuehne(), vor der Enthuellung) sind beide `runden[]`-Arrays bereits
+        // komplett fuer die ganze Bahn durchgerechnet (s. "ALLE DURCHGAENGE SOFORT
+        // DURCHRECHNEN"-Kommentar oben in `setz()`), `u.treffer` selbst steht dagegen noch auf 0
+        // -- es waechst erst live beim Enthuellen in stepBuehne() (TREFFERSTAND-Kommentar dort).
+        // Endstand ist in jedem Fall derselbe: `ta`/`tb` hier sind exakt die Zahl, auf die
+        // `u.treffer` am Ende der Enthuellung steht.
+        if(art.fechten){
+          const ta=a.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          const tb=b.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          // ECHTE DEGEN-ZUSATZREGEL bei Treffergleichstand (FIE-Prioritaetsminute, Review
+          // Abschnitt 3.2 Punkt 5): eine Zusatzminute, Prioritaet per Los, bei ausbleibendem
+          // Treffer gewinnt die Seite mit Prioritaet. Die Zusatzminute selbst wird hier nicht
+          // extra simuliert (keine weiteren Gaenge, keine weiteren Treffer moeglich) -- das Los
+          // FAELLT VORAB, EINMAL JE GEFECHT, wie der reale Muenzwurf vor der Zusatzminute, und
+          // entscheidet nur, wenn der Trefferstand danach immer noch gleich steht. `rr()` ruehrt
+          // damit die deterministische Formkarten-/Ereignis-Reihenfolge dieses Gefechts nicht an
+          // -- alle Punkte/Treffer beider Fechter stehen zu diesem Zeitpunkt schon fest.
+          const gleichstand=ta===tb;
+          const prioA=gleichstand?rr()<0.5:null;
+          a.gefechtSieg=ta>tb||(prioA===true);
+          b.gefechtSieg=tb>ta||(prioA===false);
+          // NUR BEI TATSAECHLICHEM TREFFERGLEICHSTAND gesetzt (sonst bliebe `prioA` `null` und
+          // beide Seiten straeflich auf `false` stehen) -- die Ticker-/Tabellen-Texte lesen
+          // dieses Feld, um "Sieg nach Prioritaet" nur zu zeigen, wenn es auch einen Losentscheid
+          // gab, nicht bei jedem gewoehnlichen Sieg nach mehr Treffern.
+          a.gefechtGleichstand=gleichstand; b.gefechtGleichstand=gleichstand;
+          a.prioritaet=prioA===true; b.prioritaet=prioA===false;
+        }
       }
     }
 
@@ -14022,6 +15078,16 @@
         if(i<gegner.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n));
       }
     }
+    // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09., docs/design/wettessen-
+    // format-opus-gegencheck-23-09.md Abschnitt 5, S3). Die Schleife oben legt Runde ri
+    // bereits als EIN zusammenhaengender Block aus mine.length+gegner.length Eintraegen ab
+    // (Runde 1 fuer alle, dann Runde 2, Seiten verzahnt) -- fuer ein gleichzeitiges
+    // Enthuellen muss stepBuehne() also nur wissen, wie GROSS dieser Block ist, nicht WELCHE
+    // Eintraege er enthaelt. `buehneGruppenGroesse` traegt genau das; stepBuehne() liest sie
+    // nur, wenn `art.wettessen` gesetzt ist (s. dortiger Kommentar) -- jede andere Buehnen-
+    // Disziplin bleibt bei 1 (Reset in bauBuehne() oben) und damit beim alten
+    // Ein-Teilnehmer-je-Tick-Verhalten.
+    if(art.wettessen)buehneGruppenGroesse=Math.max(1,mine.length+gegner.length);
   }
 
   // ================== GEWICHTHEBEN: DER HEBER-RUNDENRECHNER ==================
@@ -14526,8 +15592,8 @@
         }
         u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt,
           punkte:gueltig?kg:0,
-          ereignis:(uebung==="reissen"?"Reissen":"Stossen")+", "+(v+1)+". Versuch, "+kg+" kg — "
-                   +(gueltig?"gueltig":"ungueltig")+(kuehn?" (kühner Versuch)":"")});
+          ereignis:(uebung==="reissen"?"Reißen":"Stoßen")+", "+(v+1)+". Versuch, "+kg+" kg — "
+                   +(gueltig?"gültig":"ungültig")+(kuehn?" (kühner Versuch)":"")});
       }
     }
   }
@@ -14590,6 +15656,27 @@
   // `wert()`, `disziplinProbe()` lesen weiterhin nur `u.runden[]`/`u.summe` — fuer sie
   // sieht das aus wie jede andere Buehnen-Disziplin, unveraendert.
   const ISPY_REAKTION_BASIS=0.30, ISPY_REAKTION_TEAMGEIST_K=0.006;
+
+  // REAKTIONSKANAL-UMBAU (22.09., docs/design/i-spy-fable-reaktionskanal-22-09.md Abschnitt 6,
+  // Chris' Entscheidung: "Hinweis mit echtem Vorteil", Ausloeser bleibt Tresor+Akten/S-c wie
+  // oben, KEIN Filter auf Stufe 3). Der bisherige eigene Laeufer-Zweig (Spuerwurf gezogen und
+  // VERWORFEN, Ziel ohne eigene Sichtpruefung erzwungen -- der Bestgeeignete bekam einen
+  // geschenkten Zug, ausgeloest von fremder Hand) entfaellt ersatzlos. Der bestimmte Laeufer
+  // macht jetzt denselben Zug wie jeder andere (eigener Spuerwurf, EV-Wahl unter allen
+  // sichtbaren Truhen, F2) -- die EINZIGE Aenderung ist seine Sichtschwelle fuer die GENAU
+  // eine gemeldete Zieltruhe (`zielIdx`), die um ISPY_HINWEIS_BONUS erhoeht ist: ein Hinweis
+  // ("er wird alarmiert und findet sie wahrscheinlicher"), kein Freilos ("er bekommt sie
+  // garantiert") -- er kann scheitern, und seine eigene EV-Wahl kann eine andere Truhe
+  // bevorzugen, wenn die fuer ihn lohnender ist. `rr()`-Verbrauch je Teilnehmer je Tick bleibt
+  // exakt 1 (Spueren) + 2 (Knacken), identisch zum alten Laeufer-Zweig (Handbuch-Falle 17).
+  //
+  // DOSIS GEMESSEN, NICHT GERATEN (Fable, Abschnitt 5.1, Auslöser Tresor+Akten wie hier):
+  // Bonus 0 (nur K-D, kein Sichtvorteil) → +0,024 rho · 0,15 (GEWAEHLT) → +0,017 · 0,30 → +0,014
+  // · 1,0 (volle Sicht, Opus woertlich) → +0,011 -- monoton fallend mit der Dosis. Der alte
+  // Laeufer-Zweig (Zuteilung ohne Sichtwurf, auch zu Akten und nachgewachsenen Notizen) mass
+  // 0,730 gegen 0,741 fuer 0,15. Nicht erneut fragen, wenn die Zahl in ein paar Wochen wieder
+  // niedrig aussieht -- das IST die Obergrenze, die die Rangtreue bei diesem Ausloeser vertraegt.
+  const ISPY_HINWEIS_BONUS=0.15;
 
   const ISPY_PUNKTWERT={1:10,2:25,3:60};
   const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
@@ -14742,6 +15829,96 @@
   // war Stufe 3 -> Start 1; Mechanik-Block{5,9} war Stufe 1 -> Start 0, Mechanik-Block{10,11}
   // war Stufe 2 -> Start 1.
   const ISPY_NACHFUELL_START={0:0,4:0, 1:1,3:1, 2:3, 6:0,8:0, 7:1, 5:1,9:1, 10:0,11:0};
+
+  // GEWICHTETER SPAWN-ORT-RANDOMIZER, REIN VISUELL (Chris 22.09.: "vor allem auch mit
+  // assets verschiedenen maps unterschiedlichen orten fuer die assets wo sie spawnen —
+  // gewichteter randomizer"; Bauauftrag mit "Nachbesserung" nach dem Opus-Gegencheck 2
+  // (docs/design/i-spy-opus-gegencheck-2-22-09.md, Abschnitt 5), der die LITERALE Fassung
+  // (eine gewuerfelte Zuordnung, WELCHER Fundort-INHALT an welcher Position liegt) klar
+  // verworfen hat: rho 0,730->0,680 (5/5 Paarungen schlechter), Budget-Pp 10,8->27,8,
+  // Spiegeltest 53,5:46,5->66,5:33,5. URSACHE (Gegencheck 2, Abschnitt 5.3): die Position
+  // ist in dieser Mechanik NICHT neutral — sie bestimmt ueber `idx` (ISPY_NACHFUELL_START/
+  // ISPY_BLOECKE/ISPY_MITTE_IDX oben) die Nachfuellphase UND den `naeher`-Tie-Break
+  // (":14993" ff., `t.x`). Jede Variante, die dem WUERFEL erlaubt, diese `idx`-gebundenen
+  // Groessen zu verschieben, verschiebt zwangslaeufig mit — genau das hat der Gegencheck
+  // gemessen.
+  //
+  // NACHBESSERUNG HIER: der Randomizer aendert AUSSCHLIESSLICH, WO ein Fundort GEZEICHNET
+  // wird (Bildschirmkoordinate fuer Moebel/Lauf-/Suchziel in bodenSchatzsuche()/
+  // stepSchatzsuche()) — NIE, welcher `idx` welche Raetselart/Stufe/Nebenweg/Block/
+  // Nachfuellfolge traegt (die art.fundorte-Eintraege selbst UND `truhe.x` aus
+  // ispyBaueRaum(), das der `naeher`-Tie-Break liest, bleiben BYTE-IDENTISCH zu vorher).
+  // Vier Kartenlayouts (Isometrien des Einheitsquadrats — Drehung erhaelt automatisch die
+  // Abstaende, also KEINE Ueberlappungs-Gefahr, ohne von Hand zwoelf neue Koordinaten zu
+  // entwerfen), gewichtet gezogen: Standard bleibt die haeufigste ("Wiedererkennbarkeit vor
+  // Abwechslung", Fundorte-Kommentar oben zur Nebenweg-Paarung), die drei anderen liefern
+  // sichtbar unterschiedliche "maps".
+  //
+  // FEHLVERSUCH, EHRLICH DOKUMENTIERT (erste Fassung dieser PR, per Sicht-QA gefunden, NICHT
+  // nur behauptet): eine erste Fassung nahm die zwei ACHSENSPIEGELUNGEN (x'=1-x / y'=1-y)
+  // statt Drehungen. `fundorte` oben ist aber selbst schon LINKS-RECHTS spiegelsymmetrisch
+  // gebaut (die fuenf ISPY_BLOECKE-Paare + SPIEGELSYMMETRIE-Pflicht, Fundorte-Kommentar oben)
+  // — jedes Element hat an seiner gespiegelten X-Position ein Element MIT IDENTISCHER
+  // Art/Stufe. Die Spiegelung x'=1-x vertauschte damit nur zwei optisch UNUNTERSCHEIDBARE
+  // Moebelstuecke miteinander — eine Sicht-QA-Serie (mehrere Saaten) zeigte buchstaeblich
+  // dasselbe Bild wie "standard". Nur y'=1-y aenderte sichtbar etwas (die Y-Baender sind NICHT
+  // symmetrisch: oben liegt ausschliesslich Logik, unten Verhoer/Mechanik) — von vier
+  // nominellen Varianten waren de facto nur ZWEI Bilder unterscheidbar. FIX: echte 90°-
+  // Drehungen um die Quadratmitte statt Achsenspiegelungen — eine Drehung vertauscht x- UND
+  // y-Rolle und bricht die Links-Rechts-Symmetrie garantiert, weil sie kein Element auf einen
+  // Zwilling MIT GLEICHEN X- UND Y-Nachbarn abbildet. Per Sicht-QA (vier Saaten, je eine
+  // Drehstufe) nachgewiesen: alle vier Kartenlayouts sind jetzt sichtbar verschieden.
+  //
+  // KEIN rr()-VERBRAUCH (Handbuch-Falle 17 im STRENGEREN Sinn: nicht nur FESTER Verbrauch,
+  // sondern GAR KEINER): die Wahl haengt NUR am aktuellen `seed`-Wert VOR jedem Wurf dieses
+  // Spiels (reines Lesen, kein rr()-Aufruf, der `seed` veraendern wuerde) — jeder folgende
+  // rr()-Zug (Reaktionswurf, Spuerwurf, Wettbewerb um Fundorte, ...) bleibt dadurch
+  // BYTE-IDENTISCH zum Ist-Stand. Genau das Muster, mit dem der Gegencheck (Abschnitt 5.6,
+  // Vorschlag 1: "drei Raumthemen ... rho-Wirkung exakt null, weil keine gemessene Zahl
+  // sich bewegt") die kosmetische Alternative beschrieben hat — hier fuer Positionen statt
+  // Farben angewandt.
+  //
+  // "EIGENER SAAT-ZWEIG JE SEITE": die Buehne zeichnet HEUTE (unveraendert seit PR 1,
+  // Kopfkommentar bei baueSchatzsuche() "ARCHITEKTUR-ENTSCHEIDUNG") EINEN gemeinsamen Raum
+  // fuer beide Seiten — Heim startet am linken, Gast am rechten Bildrand und beide laufen
+  // im SELBEN Koordinatensystem auf dieselben zwoelf Fundorte zu (bodenSchatzsuche() liest
+  // `art.fundorte` genau einmal, nicht einmal je Seite). Eine WIRKLICH unabhaengige
+  // Kartenwahl je Seite gaebe es nur mit zwei getrennt gezeichneten Raeumen (Split-Screen)
+  // — ein Umbau, den weder diese Aufgabe noch Chris' Zitat verlangt und der bei einem rein
+  // kosmetischen Feature ein unnoetiges Zusatzrisiko waere. Die Truhen-ZUSTAENDE bleiben wie
+  // gehabt vollstaendig unabhaengig je Seite (ispyBaueRaum() je Seite eigene Kopie); nur die
+  // eine gemeinsame Bildkulisse bekommt eine einzige, seed-eigene Kartenwahl.
+  const ISPY_LAYOUT_VARIANTEN=[
+    {name:"standard",    gewicht:40, transform:(f)=>({x:f.x,   y:f.y  })},
+    {name:"gedreht_90",  gewicht:25, transform:(f)=>({x:1-f.y, y:f.x  })},
+    {name:"gedreht_180", gewicht:20, transform:(f)=>({x:1-f.x, y:1-f.y})},
+    {name:"gedreht_270", gewicht:15, transform:(f)=>({x:f.y,   y:1-f.x})},
+  ];
+  // MISCHUNG STATT ROHWERT: `seed` ist an dieser Stelle im Spiel oft noch der ROHE, nicht
+  // gemischte Eingabewert (bei kleinen numerischen Saaten laeuft VOR baueSchatzsuche()
+  // fuer i-spy noch kein einziger rr()-Zug, normalisiereSaat() reicht Zahlen unveraendert
+  // durch, s. dortiger Kommentar) — zwei benachbarte Saaten (1, 2, 3, ...) wuerden ohne
+  // Mischung fast immer in denselben Gewichtseimer fallen. Ein lokaler Avalanche-Mix
+  // (MurmurHash3-Finalizer-Stil, dieselbe Technik wie normalisiereSaat()s FNV-1a fuer
+  // Text-Saaten, nur fuer Zahlen) verteilt das VOR der Gewichtswahl, OHNE `seed` selbst
+  // anzufassen (rein lokale Variable `h` — s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben,
+  // "KEIN rr()-VERBRAUCH").
+  function ispyMischeHash(x){
+    let h=(x>>>0);
+    h=Math.imul(h^(h>>>16),0x45d9f3b);
+    h=Math.imul(h^(h>>>16),0x45d9f3b);
+    return (h^(h>>>16))>>>0;
+  }
+  function ispyWaehleLayoutVariante(hashWert){
+    const summe=ISPY_LAYOUT_VARIANTEN.reduce((s,v)=>s+v.gewicht,0);
+    let r=(ispyMischeHash(hashWert)%10000)/10000*summe;
+    for(const v of ISPY_LAYOUT_VARIANTEN){ r-=v.gewicht; if(r<=0)return v; }
+    return ISPY_LAYOUT_VARIANTEN[ISPY_LAYOUT_VARIANTEN.length-1];
+  }
+  // Vom aktuellen `seed` VOR baueSchatzsuche() abgeleitet (reines Lesen, s. Kommentar oben)
+  // — je Spiel/Saat stabil, damit eine Sicht-QA denselben Seed reproduzierbar dieselbe
+  // Karte zeigt, aber zwischen Spielen/Saaten sichtbar wechselt.
+  let ISPY_VISUELLES_LAYOUT=null;
 
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
@@ -14949,43 +16126,22 @@
       // Reset VOR dem eigenen Zug: `_arbeitetTresor` beschreibt den Ausgang DIESES Ticks
       // (fuer die Laeufer-Auswahl im NAECHSTEN), nicht den des vorherigen.
       u._arbeitetTresor=false;
-      if(u===laeufer){
-        const t=truhen.find(x=>x.idx===zielIdx);
-        if(t&&!t.leer&&versucheZiel<2){
-          // SPUEREN-SLOT, FEST VERBRAUCHT (Handbuch-Falle 17): der Laeufer sucht nicht
-          // selbst — er eilt direkt zur Ziel-Truhe (R-2) — aber der rr()-Verbrauch je
-          // Teilnehmer bleibt exakt 1 (Spueren) + 2 (Knacken), wie bei jedem anderen Zug.
-          rr();
-          const weg=ispyBesterWeg(u,t);
-          const knackwurf=(rr()+rr())/2;
-          const ermued=Math.max(ISPY_AUSDAUER_BODEN,
-            1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
-          const chance=Math.max(ISPY_KNACK_MIN,Math.min(ISPY_KNACK_MAX,weg.p*ermued));
-          versucheZiel++;
-          if(t.stufeAktuell===3)u._arbeitetTresor=true;
-          if(knackwurf<chance){
-            const punkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor);
-            u.runden.push({punkte, ereignis:art.erfolgWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
-            u.funde[t.stufeAktuell]=(u.funde[t.stufeAktuell]||0)+1;
-            t.leer=true; belegt.add(t.idx);
-            merke(t,true);
-          } else {
-            t.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, t.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
-            const teilpunkte=Math.round(ISPY_PUNKTWERT[t.stufeAktuell]*weg.faktor*ISPY_TEILPUNKTE_ANTEIL);
-            u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:t.art, stufe:t.stufeAktuell, fundort:t.idx, reaktion:true});
-            if(versucheZiel>=2)belegt.add(t.idx);
-            merke(t,false);
-          }
-          continue;
-        }
-        // Ziel schon weg (leer/ausgereizt) — die Reaktion kommt zu spaet, der Laeufer
-        // macht wie jeder andere seinen eigenen, normalen Zug (kein verlorener Zug: 3.3).
-      }
-      // NORMALER ZUG (PR 1, mit EINER Ausnahme: `frei()` toleriert `zielIdx` zweimal).
+      // NORMALER ZUG FUER ALLE (Reaktionskanal-Umbau 22.09., s. Kommentar bei
+      // ISPY_HINWEIS_BONUS): der fruehere eigene Laeufer-Zweig ist ersatzlos entfallen. Auch
+      // der bestimmte Laeufer wuerfelt hier seine eigene Sicht (`x`/`sieht2`/`sieht3`) und
+      // waehlt per EV (F2) unter allen Truhen, die er sieht -- die einzige Ausnahme ist der
+      // `+ISPY_HINWEIS_BONUS` auf seine Sichtschwelle fuer GENAU die gemeldete Zieltruhe
+      // (`zielIdx`), s. `sichtbarF` unten. `frei()` toleriert `zielIdx` weiterhin zweimal
+      // (K-D, PR 2, unveraendert) -- unabhaengig davon, ob der erste/zweite Versuch vom
+      // Laeufer oder einem normal waehlenden Teamkollegen kommt.
+      const istLaeufer=(u===laeufer);
       const x=rr();
       const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
       const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
-      const sichtbarF=(t)=>t.stufeAktuell===1||(t.stufeAktuell===2&&x<sieht2)||(t.stufeAktuell===3&&x<sieht3);
+      const hinweisBonus=(t)=>(istLaeufer&&t.idx===zielIdx)?ISPY_HINWEIS_BONUS:0;
+      const sichtbarF=(t)=>t.stufeAktuell===1
+        ||(t.stufeAktuell===2&&x<sieht2+hinweisBonus(t))
+        ||(t.stufeAktuell===3&&x<sieht3+hinweisBonus(t));
       const frei=(t)=>!belegt.has(t.idx)||(t.idx===zielIdx&&versucheZiel<2);
       const kandidaten=truhen.filter(t=>!t.leer&&frei(t)&&sichtbarF(t));
       const bewertet=kandidaten.map(t=>{
@@ -14994,12 +16150,21 @@
           naeher:(u.side===0?t.x:(1-t.x))};
       }).sort((a,b)=>(b.ev-a.ev)||(b.weg.p-a.weg.p)||(a.naeher-b.naeher));
       const wahl=bewertet[0]||null;
+      // r.hinweis (NEU, additiv, nur fuer ispyTickerZeile()/den Ticker): dieser Teilnehmer
+      // war in DIESEM Tick als Laeufer bestimmt -- unabhaengig davon, ob er der gemeldeten
+      // Truhe gefolgt ist. Fliesst NIE in wert()/u.summe (wie u.reaktionen).
+      // r.reaktion (bestehend aus PR 2, jetzt praeziser): WAHR nur, wenn er die gemeldete
+      // Zieltruhe TATSAECHLICH gewaehlt hat -- das haelt stepSchatzsuche() (gestrichelte
+      // Linie + Ausrufezeichen) und den alarm-Ton ehrlich (Fable, Abschnitt 6.3).
+      const folgtZiel=!!(wahl&&wahl.t.idx===zielIdx);
+      const rHinweis=istLaeufer||undefined;
+      const rReaktion=(istLaeufer&&folgtZiel)||undefined;
       if(wahl){
         if(wahl.t.idx===zielIdx){ versucheZiel++; if(versucheZiel>=2)belegt.add(wahl.t.idx); }
         else belegt.add(wahl.t.idx);
       }
       const wurf2=(rr()+rr())/2;
-      if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort}); continue; }
+      if(!wahl){ u.runden.push({punkte:0, ereignis:art.failWort, hinweis:rHinweis}); continue; }
       const ziel=wahl.t, zielWeg=wahl.weg;
       const ermued=Math.max(ISPY_AUSDAUER_BODEN,
         1-Math.max(0,60-u.AUSDAUER)*ISPY_AUSDAUER_K*(tick/Math.max(1,art.rundenN-1)));
@@ -15007,14 +16172,16 @@
       if(ziel.stufeAktuell===3)u._arbeitetTresor=true;
       if(wurf2<chance){
         const punkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor);
-        u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        u.runden.push({punkte, ereignis:art.erfolgWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx,
+          reaktion:rReaktion, hinweis:rHinweis});
         u.funde[ziel.stufeAktuell]=(u.funde[ziel.stufeAktuell]||0)+1;
         ziel.leer=true;
         merke(ziel,true);
       } else {
         ziel.fortschritt=Math.min(ISPY_FORTSCHRITT_DECKEL, ziel.fortschritt+ISPY_FORTSCHRITT_SCHRITT);
         const teilpunkte=Math.round(ISPY_PUNKTWERT[ziel.stufeAktuell]*zielWeg.faktor*ISPY_TEILPUNKTE_ANTEIL);
-        u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx});
+        u.runden.push({punkte:teilpunkte, ereignis:art.failWort, art:ziel.art, stufe:ziel.stufeAktuell, fundort:ziel.idx,
+          reaktion:rReaktion, hinweis:rHinweis});
         merke(ziel,false);
       }
     }
@@ -15038,6 +16205,13 @@
   // rein additiv, kein rr()-Verbrauch (s. Kommentar in der Tick-Schleife unten).
   let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
+    // SPAWN-ORT-RANDOMIZER (s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben): reines Lesen von
+    // `seed`, KEIN rr()-Aufruf — ispyBaueRaum() gleich darunter liest weiterhin
+    // ausschliesslich `art.fundorte` unveraendert, die Kartenwahl wirkt NUR auf die beiden
+    // Zeichen-Verbraucher (bodenSchatzsuche()/stepSchatzsuche()).
+    const layoutVariante=ispyWaehleLayoutVariante(seed);
+    ISPY_VISUELLES_LAYOUT=art.fundorte.map(f=>layoutVariante.transform(f));
+    if(window.__ISPY_LAYOUT_DEBUG)console.log("ISPY_LAYOUT_DEBUG",layoutVariante.name,seed);
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
     const mineRaum=ispyBaueRaum(art,mineT);
@@ -15090,17 +16264,27 @@
   // herbei" ist deshalb wahr, auch ohne den Vorgaenger beim Namen zu nennen.
   function ispyTickerZeile(u,r){
     const ereignis=r.ereignis;
+    // HINWEIS OHNE FOLGE (NEU, additiv, Reaktionskanal-Umbau 22.09., Fable Abschnitt 6.3):
+    // `r.hinweis` markiert jeden Teilnehmer, der in diesem Tick als Laeufer bestimmt war;
+    // `r.reaktion` (bestehend) ist nur dann WAHR, wenn er der gemeldeten Truhe auch wirklich
+    // gefolgt ist. Wer bestimmt wurde, aber etwas anderes tut (oder gar nichts mehr findet),
+    // bekommt hier eine eigene, ehrliche Zeile statt einer Linie zu einer Truhe, zu der er
+    // nicht geht -- Chris' "kann es verhauen", eine Stufe frueher als am Schloss.
     if(r.art==null){
       // KEIN ZIEL DIESEN TICK (baueSchatzsuche(): "punkte:0, ereignis:art.failWort" ohne
       // fundort/art/stufe, wenn keine Truhe frei/sichtbar war) — es gibt nichts zu
       // beschreiben ausser dem Fehlschlagwort selbst.
+      if(r.hinweis)return u.n+" hört den Jubel drüben — findet aber nichts mehr rechtzeitig ("+ereignis+").";
       return u.n+" — "+ereignis+" (kein Fund in Sicht).";
     }
     const artLabel=ISPY_ART_LABEL[r.art]||r.art;
     const stufe=r.stufe||1;
     const erfolg=ereignis===BUEHNE_ART["i-spy"].erfolgWort;
+    const hinweisOhneFolge=r.hinweis&&!r.reaktion;
     if(erfolg){
-      const praefix=r.reaktion?u.n+" eilt herbei und untersucht ":u.n+" untersucht ";
+      const praefix=r.reaktion?u.n+" eilt herbei und untersucht "
+        :hinweisOhneFolge?u.n+" hört den Jubel drüben, bleibt aber bei seiner eigenen Aufgabe und untersucht "
+        :u.n+" untersucht ";
       return praefix+(ISPY_STUFE_AKK[stufe]||"den Fund")+" ("+artLabel+", Stufe "+stufe+") — "
         +ereignis+"! +"+r.punkte;
     }
@@ -15108,13 +16292,229 @@
     // unabhaengig vom Deckel (ISPY_FORTSCHRITT_DECKEL) -- "+15%" ist deshalb immer richtig,
     // s. Kommentar bei den Konstanten oben. ISPY_STUFE_AN traegt die Praeposition schon
     // mit ("am Tresor" ist "an dem Tresor", nicht "an" + "dem Tresor" zusammengesetzt).
-    const praefix=r.reaktion?u.n+" eilt herbei, scheitert aber ":u.n+" scheitert ";
+    const praefix=r.reaktion?u.n+" eilt herbei, scheitert aber "
+      :hinweisOhneFolge?u.n+" hört den Jubel drüben, bleibt aber bei seiner eigenen Aufgabe — scheitert "
+      :u.n+" scheitert ";
     return praefix+(ISPY_STUFE_AN[stufe]||"am Fund")+" ("+artLabel+", Stufe "+stufe+") — "
       +ereignis+"; jetzt (weiter) angebrochen (+15% für den Nächsten). +"+r.punkte;
   }
   const ISPY_ART_LABEL={logik:"Logik",verhoer:"Verhör",mechanik:"Mechanik"};
   const ISPY_STUFE_AKK={1:"die Notiz",2:"die Akte",3:"den Tresor"};
   const ISPY_STUFE_AN={1:"an der Notiz",2:"an der Akte",3:"am Tresor"};
+
+  // ================== BREAKING WIRD ZUM GAUNTLET (22.09.) ==================
+  // s. Kommentar an BUEHNE_ART.breaking.gauntlet fuer Chris' Wortlaut und die Herleitung.
+  // Kein Attribut- oder Rezeptzuschnitt aendert sich hier -- die Eignungsmatrix bleibt
+  // gesperrt (CLAUDE.md), gauntletRunde() ist reine Extraktion der schon bestehenden
+  // Ertragende-Formel aus dem generischen art.rundenN-Block oben in bauBuehne().
+  // KALIBRIERRUNDE (22.09.) -- s. PR-Beschreibung fuer die vollstaendige Vorher/Nachher-
+  // Messreihe (miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs). Kurzfassung: HP_MAX 100
+  // liess ein Duell nach durchschnittlich 6-8 Zuegen enden -- kurz genug, dass ein einziger
+  // ungluecklicher Fehlschlag einen eigentlich staerkeren Kaempfer aus dem GESAMTEN Gauntlet
+  // wirft (sein ganzer Beitrag zu `u.summe` bricht in diesem Moment ab), ein Gambler's-Ruin-
+  // Effekt mit zu wenigen Schritten -- kein Fall fuer die gesperrte Eignungsmatrix, sondern
+  // fuer mehr Zuege je Duell (Reliabilitaets-Hebel, s. CLAUDE.md).
+  const GAUNTLET_HP_MAX=400;
+  // Haelt ein Ertragender stand, verliert er wenig HP; bricht er ein, viel -- dieselbe
+  // Erfolg/Fail-Ziehung wie die Punktevergabe, kein zweiter Zufallszug.
+  const GAUNTLET_SCHADEN_ERFOLG=10, GAUNTLET_SCHADEN_FAIL=24;
+  // Ermuedung deckelt sich nach GAUNTLET_ERMUED_ANSCHLAEGE EIGENEN Zuegen -- der generische
+  // Block oben nimmt dafuer `ri/(art.rundenN-1)`, das geht hier nicht: ein Ueberlebender
+  // sammelt ueber mehrere Duelle hinweg WEIT mehr als art.rundenN eigene Zuege (das ist der
+  // ganze Witz des Gauntlets), `art.rundenN-1` waere also nach dem allerersten Duell schon
+  // durchlaufen. Derselbe Skalenbereich wie vorher (rundenN:8 hiess "voll ermuedet bei Zug 7"),
+  // hier nur unabhaengig von art.rundenN benannt.
+  const GAUNTLET_ERMUED_ANSCHLAEGE=12;
+  // Sicherheitsnetz gegen eine rechnerisch praktisch ausgeschlossene Endlosschleife (erfolg
+  // ist immer auf [0.15,0.94] geklemmt, jeder Zug zieht also mit Sicherheit HP ab). Ueberschlag:
+  // elf Ausscheiden (beide Kader komplett aufgebraucht bis auf einen) bei HP_MAX 100 und
+  // realistischem Schaden je Zug (10..24) brauchen rund 60-100 Zuege -- 600 ist ein
+  // Vielfaches davon, nie ein reales Limit.
+  const GAUNTLET_MAX_ANSCHLAEGE=600;
+
+  // IDENTISCHE FORMEL wie der generische Auftritt-Block (bauBuehne(), s. `for(let ri=0;
+  // ri<art.rundenN;ri++)` weiter oben) -- nur der Rundenindex `ri` kommt hier aus der Laenge
+  // der bisher gesammelten EIGENEN Runden dieses Teilnehmers statt aus einer festen Schleife.
+  // TECHNIK/NERVEN bestimmen die Erfolgschance, GRUNDLAGE/SPITZENMOMENT/WAGNIS/PUBLIKUM die
+  // Punktzahl, art.failAbzug das Misslingen -- Zeichen fuer Zeichen dieselben Kanaele, also
+  // dieselbe Pp-Abweichung zur Matrix wie zuvor (s. PR-Beschreibung fuer die Nachmessung).
+  // AUSNAHME SEIT 26.09.: der generische Block rechnet WAGNIS jetzt als echten Trade-off
+  // (BUEHNE_WAGNIS_RISIKO/_ERTRAG, s. vor bauBuehne()). Breaking fuehrt hier BEWUSST noch die
+  // alte Formel (WAGNIS nur im Erfolgsbonus) — die Umstellung war auf die sechs Geschwister
+  // des generischen Blocks beschraenkt und abgenommen; Breaking braucht vor einem Nachziehen
+  // eine eigene rho-/Pp-Abnahme (Gauntlet-Kaskade: ein Fehlschlag kostet hier HP).
+  function gauntletRunde(L,ri,art){
+    const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*Math.min(1,ri/GAUNTLET_ERMUED_ANSCHLAEGE);
+    const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
+    const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+    let punkte,ereignis,haelt;
+    if(rr()<erfolg){
+      punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+      ereignis=art.erfolgWort; haelt=true;
+    } else {
+      punkte=basis*art.failAbzug;
+      ereignis=art.failWort; haelt=false;
+    }
+    punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+    return {punkte,ereignis,haelt};
+  }
+
+  // Baut die gesamte Kette VOR dem ersten Frame (wie jeder andere Buehnen-Baustein: bauen,
+  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind die feste Aufstellungsreihenfolge
+  // (Team-Slot 1..n, s. bauBuehne()) -- "Kampfreihenfolge: Team-Slots in fester Reihenfolge".
+  function baueGauntlet(art,mine,gegner){
+    const A=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
+    const B=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
+    for(const u of A.concat(B)){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.hpMax=GAUNTLET_HP_MAX; u.hp=GAUNTLET_HP_MAX; u.raus=false;
+      u.bout=0; u.gegnerN=null;
+    }
+    // KETTENLEISTE (B1): feste Kampfreihenfolge je Team, rein strukturell (kein rr()) --
+    // dieselbe Kategorie wie u.duellNr/u.rolle bei baueHebenDuelle(). `gauntletReihen` ist
+    // die Datenquelle der Kettenleiste in zeichneBreaking(); `u.gauntletIdx` bleibt zusaetzlich
+    // am Teilnehmer selbst, falls eine spaetere Anzeige den Platz eines einzelnen Kaempfers
+    // ohne Team-Scan braucht.
+    A.forEach((u,i)=>{u.gauntletIdx=i;}); B.forEach((u,i)=>{u.gauntletIdx=i;});
+    gauntletReihen={0:A,1:B};
+    buehneQueue=[];
+    if(!A.length||!B.length)return; // Ein leeres Team: niemand tritt an -- leere Kette.
+    let ai=0, bi=0, x=A[0], y=B[0], bout=1;
+    x.bout=bout; y.bout=bout;
+    // WER ERTRAEGT ZUERST? Team Heim (x) eroeffnet als Peiniger -- dieselbe leichte, seed-
+    // neutrale Konvention wie der generische Block ("Heim vor Gast", s. `mine.forEach`/
+    // `gegner.forEach` oben). Danach eroeffnet nach jedem K.o. IMMER der frische Herausforderer
+    // als Ertragender: der Sieger behaelt die Peiniger-Rolle, mit der er gerade gewonnen hat,
+    // ins naechste Duell hinein -- sein Schwung setzt sich fort.
+    let ertragenderIstX=false;
+    for(let anschlag=0;anschlag<GAUNTLET_MAX_ANSCHLAEGE;anschlag++){
+      const ertragende=ertragenderIstX?x:y, peiniger=ertragenderIstX?y:x;
+      ertragende.gegnerN=peiniger.n; peiniger.gegnerN=ertragende.n;
+      const ri=ertragende.runden.length;
+      const r=gauntletRunde(ertragende,ri,art);
+      const hpVor=ertragende.hp;
+      ertragende.hp=Math.max(0,ertragende.hp-(r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL));
+      // `hpVor`/`hpNach`/`gegnerN`/`bout` reisen PRO RUNDE mit (nicht nur auf `u` selbst) --
+      // stepBuehne()/zeichneBreaking() enthuellen chronologisch und muessen fuer eine LAENGST
+      // vergangene Runde denselben Gegner/HP-Stand zeigen koennen, den diese Runde damals
+      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`.
+      ertragende.runden.push({punkte:r.punkte,ereignis:r.ereignis,
+        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax});
+      buehneQueue.push(ertragende);
+      if(ertragende.hp<=0){
+        ertragende.raus=true;
+        if(ertragende===y){
+          bi++;
+          if(bi>=B.length)break; // Team Gast komplett aufgebraucht -> Team Heim gewinnt.
+          y=B[bi]; bout++; x.bout=bout; y.bout=bout;
+          ertragenderIstX=false; // der frische Herausforderer ertraegt zuerst.
+        } else {
+          ai++;
+          if(ai>=A.length)break; // Team Heim komplett aufgebraucht -> Team Gast gewinnt.
+          x=A[ai]; bout++; x.bout=bout; y.bout=bout;
+          ertragenderIstX=true;
+        }
+      } else {
+        ertragenderIstX=!ertragenderIstX;
+      }
+    }
+  }
+
+  // TEXT-HP-BALKEN, EIN ORT FUER BEIDE VERWENDER (Ticker-Feed in stepBuehne() und die
+  // Seitentafel in zeichneBreaking()) -- dieselben zehn Bloecke, keine zweite Kopie.
+  function gauntletBalken(hp,max){
+    const teile=10, hpKlar=Math.max(0,hp);
+    const voll=Math.max(0,Math.min(teile,Math.round((hpKlar/(max||1))*teile)));
+    return "█".repeat(voll)+"░".repeat(teile-voll);
+  }
+  // HP-Stand EINES Teilnehmers, so wie er GERADE ENTHUELLT ist -- liest `hpNach` aus der
+  // zuletzt enthuellten eigenen Runde (baueGauntlet() fuehrt das je Runde mit, s. dortiger
+  // Kommentar), nicht `u.hp` selbst (das haelt schon den fertigen ENDSTAND der ganzen Kette).
+  // Vor der ersten eigenen Enthuellung (u.aktuell===-1, noch kein einziger Zug gezeigt) ist der
+  // Kaempfer unverletzt: voller HP-Stand.
+  function gauntletHpJetzt(u){
+    const r=u.aktuell>=0?u.runden[u.aktuell]:null;
+    if(r&&r.hpNach!=null)return r.hpNach;
+    return u.hpMax!=null?u.hpMax:GAUNTLET_HP_MAX;
+  }
+  // DIESELBE ENTHUELLUNGS-GRENZE, ZWEIMAL GEBRAUCHT: `u.bout`/`u.raus` stehen am Ende von
+  // baueGauntlet() bereits auf ihrem FERTIGEN Endwert (baueGauntlet() baut die ganze Kette
+  // VOR dem ersten Frame, s. dortiger Kommentar) -- ein Blick auf `u.bout` waehrend der
+  // laufenden Enthuellung zeigt deshalb, wie weit dieser Kaempfer bis zum ENDE der Simulation
+  // gekommen ist, nicht wie weit die ANZEIGE gerade ist (Review-Fund: die Seitentafel zeigte
+  // "Kampf 9", waehrend der Ticker fuer denselben Moment noch "Kampf 8" meldete -- ein
+  // waschechter Spoiler). `gauntletZugJetzt()` liest stattdessen nur den bereits enthuellten
+  // Zug (`u.runden[u.aktuell]`, exakt das, was der Ticker auch zeigt).
+  function gauntletZugJetzt(u){
+    return u.aktuell>=0?u.runden[u.aktuell]:null;
+  }
+  // B4.1 (Broadcast-Optik-Recherche 27.09., Klasse A): DIE FOLTERSTUFE GEHOERT ZUM
+  // LAUFENDEN KAMPF, NICHT ZUR KARRIERE. `folterStufe(runde,rundenN)` bekam bisher
+  // `u.aktuell` (den eigenen Zugzaehler UEBER ALLE ueberstandenen Kaempfe hinweg, s.
+  // baueGauntlet()-Kommentar: ein Ueberlebender "sammelt ueber mehrere Duelle hinweg
+  // beliebig viele eigene Zuege") — ein Veteran, der schon acht eigene Zuege hinter sich
+  // hat, klebte damit vom ALLERERSTEN Anschlag seines naechsten Kampfes an beim
+  // Vorschlaghammer (Doku B4.1: "Heute klebt ein Veteran ab Zug 8 am Hammer"), obwohl die
+  // Eskalation "es wird immer schlimmer" fuer DIESEN Kampf gerade erst beginnt.
+  // `gauntletZugImBout(u,idx)` zaehlt stattdessen nur die eigenen Runden INNERHALB DES
+  // BOUTS, zu dem `u.runden[idx]` gehoert (0-basiert) — reiner Lesezugriff auf `r.bout`
+  // (das jede Runde seit baueGauntlet() schon traegt, s. dortiger Kommentar), kein neues
+  // Feld, kein rr(). `bout` waechst innerhalb von `u.runden` monoton (jede Elimination
+  // erhoeht den globalen Zaehler um genau eins, nie zurueck), Eintraege desselben Bouts
+  // liegen deshalb immer als EIN zusammenhaengender Block am Ende bis `idx` — ein
+  // Rueckwaertslauf bis zum Blockanfang reicht, keine zweite Datenstruktur noetig.
+  function gauntletZugImBout(u,idx){
+    if(idx<0||!u.runden[idx])return 0;
+    const bout=u.runden[idx].bout;
+    let n=0;
+    for(let j=idx;j>=0&&u.runden[j]&&u.runden[j].bout===bout;j--)n++;
+    return n-1; // 0-basiert, wie folterStufe() es fuer `runde` erwartet
+  }
+  // "Raus" ERST, WENN DIE ENTHUELLUNG DEN K.O.-ZUG SELBST ERREICHT HAT -- `u.raus` (Endstand)
+  // waere sonst ein zweiter Spoiler derselben Art: ein Team staende im HUD schon beim allerersten
+  // Frame auf "0 Ueberlebende", obwohl der Ticker den entscheidenden Zug noch gar nicht gezeigt
+  // hat.
+  // "NEUE FUEHRUNG IM ZWISCHENSTAND" (Broadcast Runde 2, Vorschlag 1, 26.09.). Ersetzt die
+  // pauschale 60-Punkte-Schwelle (`r.punkte>=60`) fuer die Auftritt-Buehnen (Eiskunstlauf,
+  // Showcase, Wettessen): `vorherSumme` ist `u.summe` VOR diesem Durchgang (der Aufrufer
+  // liest sie vor der `u.summe+=r.punkte`-Zeile, s. dort), `nachSumme` danach. Big nur beim
+  // WECHSEL von "nicht fuehrend" zu "fuehrend oder gleichauf" -- ein Dauerfuehrer feuert
+  // damit nicht bei jedem weiteren Durchgang erneut. Dieselbe Groesse (`u.summe`), die auch
+  // zeichneEisStand()/WERTUNG_AUFTRITT lesen, kein neuer Wert, keine neue Formel.
+  function buehneWurdeFuehrend(u,vorherSumme,nachSumme,bester){
+    return vorherSumme<bester && nachSumme>=bester;
+  }
+  // BIG-ENTSCHEIDUNG FUER DIE AUFTRITT-BUEHNEN (Eiskunstlauf, Showcase, Wettessen; Broadcast
+  // Runde 2, Vorschlag 1.2, 26.09.). Ersetzt `r.punkte>=60` (Eiskunstlauf 52 von 146
+  // Durchgaengen, Showcase/Wettessen dieselbe Schwelle -- gemessen, s. Konzeptdokument
+  // Abschnitt 4.2/4.3): big nur bei drei echten Momenten statt einer Punktzahl.
+  //
+  // KORREKTUR NACH SICHTPRUEFUNG (26.09.): das Konzept schlug "big bei JEDEM Sturz" vor
+  // ("heute NIE big, obwohl es der einzige Moment ist, den jeder Zuschauer sofort sieht").
+  // Gemessen (Playwright, vier Saaten) liegt die STURZ-QUOTE dieser Erfolgsformel aber bei
+  // 57-71 % aller Durchgaenge (`erfolg=min(0.94,0.15+TECHNIK*0.0055+NERVEN*0.0035)` --
+  // TECHNIK/NERVEN 50 ergibt bereits nur 60 % Erfolgschance) -- ein Sturz ist hier also der
+  // NORMALFALL, nicht die Ausnahme. "Jeder Sturz big" haette Regel 8 ("Highlights sind
+  // seltene Momente") krachend verfehlt: in der Messung waeren 27-34 von 47 Ticker-Zeilen
+  // big geworden, mehr als die alte 60-Punkte-Schwelle je erzeugte. Ersatz, der die
+  // Sichtbarkeits-Absicht traegt, aber selten bleibt: ein Sturz ist nur big, wenn er DIE/DEN
+  // ZWISCHENSTAND-FUEHRENDEN trifft -- dasselbe Muster wie "Puste-Einbruch des Fuehrenden"
+  // bei der Bahn (s. dort). `bester` wird EINMAL berechnet und an alle drei Pruefungen
+  // durchgereicht, statt TEILNEHMER dreimal zu filtern.
+  //   1. DIE/DER FUEHRENDE STUERZT.
+  //   2. UEBERNIMMT DIE ZWISCHENFUEHRUNG -- buehneWurdeFuehrend(), s. dort.
+  //   3. LETZTES ELEMENT DES FUEHRENDEN -- der Abschluss des bislang besten Auftritts.
+  function buehneAuftrittBig(u,r,vorherSumme){
+    const bester=Math.max(0,...TEILNEHMER.filter(x=>x.id!==u.id&&x.aktuell>=0).map(x=>x.summe||0));
+    if(r.ereignis===BB().failWort)return vorherSumme>=bester;
+    if(buehneWurdeFuehrend(u,vorherSumme,u.summe,bester))return true;
+    if(u.aktuell+1>=BB().rundenN && (u.summe||0)>=bester)return true;
+    return false;
+  }
+  function gauntletRausJetzt(u){
+    const r=gauntletZugJetzt(u);
+    return !!(r&&r.hpNach<=0);
+  }
 
   function stepBuehne(dt){
     // N-Fix (PR 0.4 #1, Opus-Plan 3.4): frueher stieg stepBuehne() hier komplett aus, sobald
@@ -15127,6 +16527,31 @@
     for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     buehneAkt-=dt;
     if(buehneAkt<=0 && buehneZeiger<buehneQueue.length){
+      // WETTESSEN: ALLE GLEICHZEITIG (Coney-Island-Tafel, S3, 23.09.). `buehneGruppenGroesse`
+      // ist > 1 NUR bei art.wettessen (s. bauBuehne()) und traegt dort die Groesse EINER
+      // Runde (alle Esser beider Seiten) -- exakt der Block, den die generische REIHENFOLGE-
+      // Schleife dort schon zusammenhaengend ablegt. Statt EINEN Eintrag je Tick zu
+      // enthuellen, enthuellt dieser Zweig die GANZE Gruppe im selben Tick: jeder Esser
+      // bekommt seinen naechsten Durchgang im selben Frame, stepWettessen() (s. dort)
+      // erkennt das ueber u.aktuell und startet fuer jeden sein eigenes Kau-/Schling-Timing.
+      //
+      // RANGTREUE-NEUTRAL, UND ZWAR BEWEISBAR (derselbe Beweis wie beim Duett/Showcase oben):
+      // dieser Zweig aendert AUSSCHLIESSLICH, WIE VIELE bereits vollstaendig vorberechnete
+      // runden[]-Eintraege ein Tick enthuellt -- WELCHE Eintraege enthuellt werden und in
+      // welcher Reihenfolge bleibt exakt die generische REIHENFOLGE von oben, unveraendert.
+      // Der Koerper je Durchgang (inklusive `u.summe+=r.punkte`) bleibt Zeichen fuer Zeichen
+      // derselbe wie vorher, laeuft jetzt nur `gruppe`-mal statt einmal -- nur `buehneAkt`
+      // wird EINMAL je Gruppe statt je Einzelenthuellung zurueckgesetzt (s.u.).
+      const gruppe=(BB().wettessen&&buehneGruppenGroesse>1)
+        ?Math.min(buehneGruppenGroesse,buehneQueue.length-buehneZeiger):1;
+      // W-B5 (Minutenbilanz, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+      // sammelt die Esser OHNE Big-Moment dieses Ticks (typischerweise eine ganze Minute,
+      // s. Kommentar oben) statt sie einzeln in den Ticker zu schreiben -- die EINE
+      // zusammenfassende Zeile entsteht NACH der Gruppen-Schleife (s. dort). Fuer jede
+      // andere Buehne bleibt dieses Array immer leer (der einzige Push-Ort ist der
+      // "GILT FUER WETTESSEN"-Zweig unten), also ohne jede Wirkung.
+      const wettBuendel=[];
+      for(let _wettGrp=0;_wettGrp<gruppe;_wettGrp++){
       const u=buehneQueue[buehneZeiger++];
       u.aktuell++;
       const r=u.runden[u.aktuell];
@@ -15134,10 +16559,29 @@
       // dort) — auf dem transienten {u,r}-Container, nicht auf u/TEILNEHMER, s. Vertrag
       // bei buehnenBewegung. "ansage" (Ansage-Gong) feuert einmal pro enthuelltem Versuch.
       if(BB().heben){ letzterHebenZug={u,r,_tonPhase:"boden"}; sfx("gewichtheben","ansage"); }
+      // KETTENLEISTE (B1): derselbe Kniff wie letzterHebenZug direkt darueber, nur global
+      // (die Kampf-Nummer haengt an der ganzen Kette, nicht an einem einzelnen Teilnehmer) --
+      // reine Buchfuehrung, kein rr(), keine neue Zahl (r.bout steht schon seit baueGauntlet()
+      // auf dem Rundeneintrag, hier nur reveal-gegatet gemerkt).
+      if(BB().gauntlet){
+        // B6: NEUER BOUT ENTHUELLT (r.bout weicht vom zuletzt gezeigten ab, oder es ist der
+        // allererste Zug ueberhaupt) -- der Standzeit-Zaehler faengt neu an.
+        if(!letzterGauntletZug||letzterGauntletZug.r.bout!==r.bout)gauntletBoutStartT=buehneT;
+        letzterGauntletZug={u,r};
+        // B5 (Broadcast-Optik-Recherche 27.09., Klasse A): DER MOMENT „GEBROCHEN", nur bei
+        // diesem einen Anschlag gemerkt (s. `letzterGauntletBruch`-Kommentar oben), mit dem
+        // AKTUELLEN Buehnen-Zeitstempel -- zeichneBreaking() blendet daraus einen kurzen,
+        // real ablaufenden Stempel ein (keine Pause der Enthuellung, reine Ueberlagerung).
+        if(r.hpNach<=0)letzterGauntletBruch={u,r,bruchT:buehneT};
+      }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
       // waere eine Zahl, die es im Sport nicht gibt, und sie wuerde einen Heber belohnen,
       // der dreimal dasselbe leichte Gewicht hebt.
+      // FUEHRUNGSWECHSEL-ERKENNUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): die Summe VOR
+      // diesem Durchgang, fuer buehneWurdeFuehrend() unten (s. dort). Nur Ablesung, keine
+      // neue Zahl -- dieselbe `u.summe`, die gleich darunter unveraendert weiterlaeuft.
+      const vorherSumme=u.summe||0;
       if(!BB().heben)u.summe+=r.punkte;
       u.lunge=0.5;
       // BIG-FLAG (Nachtrag, s. docs/design/broadcast-praesentation-uebergreifend-recherche-
@@ -15153,6 +16597,16 @@
       const versuchBig=BB().heben?((r.gueltig&&r.versuch===3)||r.kuehn):(r.punkte>=60);
       if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
         crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
+      else if(BB().duett){
+        // E-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das Kuerzel des GERADE ENTHUELLTEN
+        // Elements steht klein vor dem Punkte-Schweber ("3Lz +71"/"3Lz< +40"), <=unterdreht,
+        // F=echter Sturz -- nur fuer Sprungelemente unterschieden (Pirouette/Schritte/Choreo
+        // heissen im Fehlschlag nie "stuerzt", s. Feed-Zweig unten). Reiner Textzusatz auf
+        // demselben Schweber, kein neuer rr()-Zug, keine neue Anzeige.
+        const elS=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        const symS=(r.ereignis===BB().failWort&&elS.typ==="sprung")?(r.knapp?"<":"F"):"";
+        schwebe({x:0,y:0,txt:elS.kuerzel+symS+" +"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+      }
       else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
       // KUEHNER VERSUCH — eigener, staerkerer Pop zusaetzlich zum kg-Schweber oben, GENAU
       // fuer den Ausgang (Punktesieg xor Verletzung), nie beides. Beide sind rein optisch:
@@ -15190,33 +16644,97 @@
             :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
+        // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
+        // Doppel-Feuer): vorher erst weiter unten und nur fuer Fechten berechnet
+        // (`fechtGegner`) -- die beiden Gates unten (Vorteil-kippt-Highlight,
+        // Brett-entschieden) brauchen denselben Gegner-Verweis aber fuer ALLE drei
+        // Duell-Disziplinen (Schach/Fechten/Tennis), nicht nur Fechten. `u.brett` gruppiert
+        // die Paare unveraendert seit bauBuehne() (s. dortiger Kommentar), reines Lesen.
+        const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
+        // FUEHRUNGSWECHSEL AM BRETT (Broadcast Runde 2, Vorschlag 1.2, 26.09.): ersetzt
+        // `r.punkte>=60` (Speed-Schach 61 von 134 Zeilen, fast jeder zweite Zug -- gemessen,
+        // Konzept Abschnitt 4.2) durch den Moment, den ein Zuschauer am Brett tatsaechlich
+        // sieht: das Vorzeichen des Vorteils kippt gegenueber dem letzten Zug DIESES
+        // Teilnehmers. "Brett entschieden" (unten) und die Fechten-Periode bleiben ohnehin
+        // schon immer big, unveraendert.
+        //
+        // ZWEI FIXES (27.09., Opus-Review-Fund, dieselbe Review wie die Gegen-Gate-Notiz bei
+        // "PERIODE BEENDET" unten):
+        //
+        // 1. ERSTER ZUG OHNE VORGAENGER (falscher Fuehrungswechsel): `u.aktuell>0?...:0`
+        // liess `vVorher` beim allerersten Zug (`u.aktuell===0`) auf 0 zurueckfallen -- JEDER
+        // von Null verschiedene erste Zug wurde dadurch als "Fuehrung kippt" gewertet, obwohl
+        // es noch gar keinen vorherigen Zustand gab, von dem aus sie haette kippen koennen (bis
+        // zu 12 Bretter x 2 Seiten = bis zu 24 falsche Highlights in den ersten Sekunden jedes
+        // Spiels). Der Vergleich braucht jetzt zwingend einen echten Vorgaenger: `u.aktuell>0`
+        // ist Teil der Bedingung selbst, nicht mehr nur ein Default-Wert dahinter.
+        //
+        // 2. DOPPEL-FEUER (einmal je Seite): `u.verlauf`/`gegner.verlauf` sind exakt gespiegelt
+        // (`b.verlauf=verlauf.map(v=>-v)`, s. bauBuehne()-Kommentar) -- ein echter
+        // Fuehrungswechsel kippt das Vorzeichen bei BEIDEN Seiten IMMER im selben Zug (Negation
+        // aendert nichts an der Kipp-Bedingung), und beide Seiten durchlaufen diesen Zweig fuer
+        // denselben Zug separat (REIHENFOLGE oben: `mine[i]` dann `gegner[i]`, Runde fuer
+        // Runde) -- ohne Gate markierte das jede Seite unabhaengig als big, macht aus einem
+        // Ereignis zwei Highlight-Zeilen. Gate: nur die Seite, deren Gegner DIESE Runde bereits
+        // enthuellt hat (`gegner.aktuell>=u.aktuell`), darf big setzen -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, exakt
+        // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
+        // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
+        // bleiben unberuehrt.
+        const vorteilKipptBig=u.aktuell>0
+          &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
+          &&(!gegner||gegner.aktuell>=u.aktuell);
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
-        const fechtGegner=BB().fechten?TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side):null;
+        const fechtGegner=BB().fechten?gegner:null;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
-          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",vorteilKipptBig);
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
         // in der Enthuellung/im Feed — `wert()`/`rezept`/die Erfolgskurve oben lesen das
         // nicht. Die letzte Periode bekommt keinen eigenen Beat, dafuer gibt es direkt
         // darunter schon "BRETT ENTSCHIEDEN".
-        if(BB().fechten&&u.side===0){
-          // NUR SEITE 0 (Review-Fund PR #928, 14.09.): jedes Brett hat genau eine Seite-0-
-          // und eine Seite-1-Haelfte, die unabhaengig durch dieselbe Enthuellungs-Warteschlange
-          // laufen -- ohne dieses Gate feuerte der Beat zweimal pro Brett/Periode (einmal je
-          // Seitenperspektive, Sekundenbruchteile auseinander), inklusive doppeltem Callout-Banner.
+        if(BB().fechten){
+          // NUR EINMAL JE BRETT/PERIODE (Review-Fund PR #928, 14.09.): jedes Brett hat genau
+          // eine Seite-0- und eine Seite-1-Haelfte, die unabhaengig durch dieselbe
+          // Enthuellungs-Warteschlange laufen -- ohne ein Gate feuerte der Beat zweimal pro
+          // Brett/Periode (einmal je Seitenperspektive, Sekundenbruchteile auseinander),
+          // inklusive doppeltem Callout-Banner.
+          //
+          // GEGEN-GATE STATT SEITE-0-GATE (Fix 27.09., Opus-Review): das alte `u.side===0`
+          // loeste zwar das Doppel-Feuer-Problem, feuerte dabei aber sofort nach dem Heim-Zug
+          // dieser Periode -- BEVOR der Gastfechter seinen eigenen Zug fuer dieselbe Periode
+          // geloggt hatte. Die Meldung las dadurch einen veralteten Trefferstand (Beispiel aus
+          // der Review: gemeldet "3:2", der wahre Stand in diesem Moment war schon 3:3, weil
+          // Krag'Zuls Aktion fuer diese Periode nur noch nicht durchgereicht war). Reine Lese-/
+          // Zeitpunkt-Korrektur, KEINE Aenderung an Zaehlweise/RNG: der Beat feuert jetzt erst,
+          // wenn der GEGNER diese Periodengrenze ebenfalls schon erreicht hat (`fechtGegner.
+          // aktuell` faengt genau das ein) -- das ist zugleich weiterhin das einzige der beiden
+          // Seiten-Ereignisse, das feuert (die zuerst ankommende Seite sieht das Gate noch
+          // geschlossen, nur die zweite sieht es offen), also weiterhin genau einmal je
+          // Brett/Periode, nur jetzt mit dem tatsaechlich vollstaendigen Trefferstand.
           const proPeriode=BB().rundenN/3;
           if((u.aktuell+1)%proPeriode===0&&u.aktuell+1<BB().rundenN){
             const periode=(u.aktuell+1)/proPeriode;
-            feed(u.side,"Periode "+periode+" beendet — "+u.n+" gegen "+u.gegnerN+
-              ": Vorteil "+(v>0?"+":"")+v+", Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)+".",true);
+            const gegnerFertig=fechtGegner&&(fechtGegner.aktuell+1)>=periode*proPeriode;
+            if(gegnerFertig){
+              // Anzeige stabil aus Sicht von Seite 0 aufgebaut, unabhaengig davon, welche
+              // Seite hier gerade als zweite ankam und den Beat damit ausgeloest hat --
+              // `seite0.verlauf[seite0.aktuell]` ist der eigene, schon fest geloggte
+              // Vorteilswert dieser Seite fuer GENAU diese Periodengrenze (nicht `v`, das nur
+              // fuer das gerade verarbeitete `u` gilt).
+              const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
+              const v0=seite0.verlauf[seite0.aktuell];
+              feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
+                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+            }
           }
         }
         // BRETT ENTSCHIEDEN (Nachtrag, "Matt/Sieg im Schach" aus Abschnitt 4.1): am Ende
@@ -15224,9 +16742,32 @@
         // verloren oder remis ist — derselbe u.verlauf, den auch die Wertungstabelle
         // (renderWertungTabelle, Spalte "Stand") schon liest, hier nur zusaetzlich als
         // big-Ereignis gemeldet statt nur in einer Tabellenzelle.
-        if(u.aktuell+1>=BB().rundenN)
-          feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "
-            +(v>0?"gewonnen":v<0?"verloren":"unentschieden")+" (Vorteil "+(v>0?"+":"")+v+").",true);
+        //
+        // FECHTEN LIEST `gefechtSieg`, NICHT `v`/`vorteil` (F1, 26.09.): der Trefferstand
+        // entscheidet, nicht die Punktdifferenz -- und bei Treffergleichstand faellt die Los-
+        // Prioritaet (der `gefechtSieg`-Kommentar bei `art.duell` in bauBuehne()), nie ein
+        // echtes Unentschieden. `WERTUNG_DUELL(art)`s "Stand"-Spalte bekommt dieselbe Ausnahme
+        // ueber Fechtens eigenes `wertungTabelle` unten, damit Ticker und Tabelle uebereinstimmen.
+        // NUR EINMAL JE BRETT (Fix 27.09., Opus-Review-Fund): dasselbe Doppel-Feuer-Problem
+        // wie bei "FUEHRUNGSWECHSEL AM BRETT" oben und beim Gegen-Gate von "PERIODE BEENDET"
+        // weiter unten -- beide Seiten desselben Bretts erreichen `u.aktuell+1>=rundenN`
+        // unabhaengig voneinander (einmal je Seite ihres eigenen letzten Zugs), ohne Gate
+        // feuerte "Brett entschieden" deshalb zweimal fuer dasselbe Brett (einmal aus Sicht
+        // des Siegers, einmal aus Sicht des Verlierers). Gate: nur die Seite, deren Gegner sein
+        // eigenes letztes Runden-Ende ebenfalls schon erreicht hat, feuert -- die zuerst
+        // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
+        // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
+        // `wert()`/`rr()` bleiben unberuehrt.
+        if(u.aktuell+1>=BB().rundenN){
+          const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
+          if(brettGegnerFertig){
+            const brettText=BB().fechten
+              ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
+                             :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
+              :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
+            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+          }
+        }
       } else if(BB().showcase&&u.vizAct){
         // ACT-ZIERDE IM FEED (Konzept Abschnitt 4.2): `r.ereignis` bleibt UNVERAENDERT
         // erfolgWort/failWort -- WERTUNG_AUFTRITT zaehlt Fehlschlaege ueber
@@ -15238,15 +16779,106 @@
         const ACT=SHOWCASE_ACTS.find(a=>a.id===u.vizAct);
         const zier=ACT?ACT.text[r.ereignis===BB().erfolgWort?"erfolg":"fail"]:null;
         feed(u.side,u.n+" — "+(ACT?ACT.label+": "+zier:r.ereignis)
-          +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+          +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
+          buehneAuftrittBig(u,r,vorherSumme));
       } else if(BB().schatzsuche){
         // TICKER-FEINSCHLIFF (PR 4, Konzept Abschnitt 4/7.2): ispyTickerZeile() baut das
         // Textmuster aus dem Konzept, s. Kommentar dort. `r.ereignis` bleibt UNVERAENDERT
         // erfolgWort/failWort -- dieselbe Zierde-statt-zweites-Ereigniswort-Regel wie beim
         // Showcase-Zweig direkt oberhalb.
-        feed(u.side,ispyTickerZeile(u,r),versuchBig);
+        //
+        // I6 -- HIGHLIGHT-DOSIS (Broadcast-Optik-Recherche 27.09., Abschnitt 4/I6): `big`
+        // blieb bislang nur der geknackte Tresor (`versuchBig`, `r.punkte>=60`, Runde 2 mass
+        // dafuer bereits ~7 je Spiel -- "im Rahmen der heutigen 7 je Spiel, also schon gut
+        // dosiert"). Zusaetzlich jetzt der FUEHRUNGSWECHSEL (dieselbe Groesse wie I5s
+        // Trennsteg/Raumrahmen, `u.summe` je Seite): `vorherSeite` zieht `r.punkte` wieder
+        // von der Seite ab, die gerade enthuellt, `nachherSeite` liest den bereits
+        // aktualisierten Zustand (u.summe+=r.punkte lief oben schon) -- ein echter Wechsel
+        // (nicht bloss "erstmals gepunktet", `vorherSeite`/`nachherSeite` muessen beide
+        // eine Seite nennen) markiert die Zeile big. Deckt automatisch auch "der letzte Zug
+        // aendert noch die Fuehrung" ab, weil diese Pruefung auf JEDER enthuellten Runde
+        // laeuft, auch der letzten. Kein rr(), keine neue Formel -- nur eine weitere
+        // Bedingung fuer dasselbe `big`-Flag, das feed() ohnehin schon entgegennimmt.
+        const vorherSeite=ispyFuehrungMit(u.side===0?-r.punkte:0,u.side===1?-r.punkte:0);
+        const nachherSeite=ispyFuehrungMit(0,0);
+        const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
+        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel);
+      } else if(BB().gauntlet){
+        // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
+        // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner, HP-Balken (aus `r.hpNach`,
+        // NICHT aus dem inzwischen ueberholten `u.hp` -- s. baueGauntlet()-Kommentar) und die
+        // laufende Kampf-Nummer. Ein K.o. bekommt zusaetzlich eine eigene, immer big markierte
+        // Zeile -- derselbe "Abschluss ist immer big"-Grundsatz wie beim fertigen Zweikampf in
+        // Gewichtheben/Duell oben.
+        const hpJetzt=Math.max(0,r.hpNach);
+        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax+" "
+          +gauntletBalken(hpJetzt,r.hpMax)+" (Kampf "+r.bout+").",versuchBig||r.hpNach<=0);
+        if(r.hpNach<=0)
+          feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
+      } else if(BB().duett){
+        // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
+        // 26.09., Abschnitt 2.4): reiner Textersatz -- `r.ereignis`/`r.punkte`/
+        // `buehneAuftrittBig()` bleiben exakt dieselben Werte wie im generischen else-Zweig
+        // unten (Wettessen), nur die BESCHRIFTUNG des Elements und eines Fehlschlags aendert
+        // sich. `r.knapp` kommt unveraendert aus demselben rr()-Wurf wie `r.ereignis`
+        // (bauBuehne(), s. dortiger Kommentar) -- kein zweiter Zufallszug, keine neue
+        // Erfolgschance. Sprungelemente unterscheiden Sturz (deutlich) von "unterdreht/Hand
+        // am Eis" (knapp); Pirouette/Schritte/Choreo heissen im Fehlschlag NIE "stürzt" (Review
+        // 2.3: ein Fehlschlag bei einer Pirouette ist kein Sturz).
+        const bb=BB(), element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        let ereignisText=r.ereignis;
+        if(r.ereignis===bb.failWort){
+          ereignisText=element.typ==="sprung"
+            ?(r.knapp?"unterdreht, Hand am Eis":bb.failWort)
+            :(element.typ==="pirouette"?"verliert die Zentrierung":"stolpert");
+        }
+        const duettBig=buehneAuftrittBig(u,r,vorherSumme);
+        // E-B4, AUSWAHL SCHRITT 1 (Broadcast-Optik Buehne-Auftritt 27.09.): "das Element, an
+        // dem buehneAuftrittBig() fuer dieses Paar gefeuert hat" -- woertlich derselbe Wert,
+        // der auch die Ticker-Zeile hier als big markiert, nur zusaetzlich auf dem Partner
+        // gemerkt (kuerBerechneReplay() unten liest es beim Rollenwechsel in "kiss"). Feuert
+        // die Regel mehrfach fuer dasselbe Paar, gewinnt das LETZTE Element -- deterministisch,
+        // kein rr().
+        if(duettBig)u.vizBigIdx=u.aktuell;
+        feed(u.side,u.n+" — "+element.name+" — "+ereignisText
+          +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
+          duettBig);
       } else {
-        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",versuchBig);
+        // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
+        // oben -- s. buehneAuftrittBig()-Kommentar.
+        //
+        // W-B5: ein Big-Moment (Fuehrungswechsel, Fuehrender pausiert, letzte Minute des
+        // Fuehrenden -- buehneAuftrittBig(), UNVERAENDERT dieselbe Bedingung wie vorher)
+        // bekommt weiterhin SEINE EIGENE Zeile, genau wie bisher. Alles andere sammelt sich
+        // nur in wettBuendel -- HIGHLIGHTS/Callout haengen ausschliesslich an dieser
+        // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
+        const wettBig=buehneAuftrittBig(u,r,vorherSumme);
+        if(wettBig){
+          feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true);
+        } else {
+          wettBuendel.push({u,r});
+        }
+      }
+      } // Ende der Gruppen-Schleife (S3, Wettessen) -- s. Kommentar oben.
+      // W-B5, ZUSAMMENFASSUNG: EINE Ticker-Zeile fuer alle in diesem Tick gesammelten Esser
+      // (typischerweise eine ganze Minute) statt bis zu zwoelf einzelner. Fuehrer/Zweiter
+      // ueber ALLE Esser dieses Ticks (das sind bei Wettessen ohnehin alle, s.
+      // buehneGruppenGroesse-Kommentar oben) -- reine Ablesung bereits geschriebener
+      // u.summe/runden[]-Werte, kein rr(), keine Wirkung auf Wertung/HIGHLIGHTS/Callout.
+      if(wettBuendel.length){
+        const minute=Math.min(BB().rundenN, wettBuendel[0].u.aktuell+1);
+        const sortiert=wettBuendel.slice().sort((a,b)=>(b.u.summe||0)-(a.u.summe||0));
+        const fuehrer=sortiert[0].u, zweiter=sortiert[1]?sortiert[1].u:null;
+        const fWu=wettessenWuerstchen(fuehrer.summe);
+        const tempo=wettessenTempo(fuehrer,fuehrer.aktuell);
+        let text="Minute "+minute+": "+(fuehrer.n.split(" ")[0]||fuehrer.n)+" führt mit "
+          +wettessenWuerstchenText(fWu)+" Wü";
+        if(zweiter){
+          const diff=fWu-wettessenWuerstchen(zweiter.summe);
+          if(diff>0.001)text+=" (+"+wettessenWuerstchenText(diff)+" auf "+(zweiter.n.split(" ")[0]||zweiter.n)+")";
+        }
+        if(tempo!=null)text+=", Tempo "+wettessenWuerstchenText(tempo)+"/min";
+        feed(fuehrer.side,text+".");
       }
       buehneAkt=BB().rundenDauer;
     }
@@ -15270,7 +16902,10 @@
   function buehnenBewegung(dt){
     const art=BB();
     if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
-    if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); return; } // Ziel 4
+    // B2/B3 (Broadcast-Optik-Recherche 27.09.): stepGauntletHp() laeuft NUR fuer den
+    // Gauntlet (art.gauntlet) direkt nach stepCypher() mit -- dieselbe reine Anzeige-
+    // Buchfuehrung wie stepSchach()s Uhr, kein zweiter Dispatcher-Zweig noetig.
+    if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); if(art.gauntlet&&typeof stepGauntletHp==="function")stepGauntletHp(dt); return; } // Ziel 4
     // VORAB ANGELEGT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 7.1, Kollision
     // 1): drei spaetere Ziel-PRs (Gewichtheben, Speed-Schach, Fechten) haetten sonst alle
     // dieselbe Dispatcher-Zeile angefasst. Mit den drei Zweigen hier liefert jede dieser
@@ -15405,6 +17040,49 @@
     return {x:W*0.875, y:H*0.755};
   }
   const KUER_ELEMENT_DAUER=1.4, KUER_STURZ_DAUER=1.0;
+  // ================== E0: DER KUER-BAUPLAN (Buehne-Auftritt-Konzeptreview 26.09., Abschnitt
+  // 2.4) ==================
+  // ERSETZT DIE MODULO-BESCHRIFTUNG. Vorher war das "Element", das dem Zuschauer angezeigt
+  // wurde, nur `["pirouette","hebung","wurf"][u.aktuell%3]` (:16300 vor dieser PR) -- ein
+  // Zaehler-Rest, kein Kuerplan, und ohne echten Elementnamen im Feed. `art.rundenN:12` trifft
+  // laut Review schon die reale Groessenordnung einer Senioren-Kuer (sieben Sprungelemente,
+  // drei Pirouetten, eine Schrittfolge, eine Choreosequenz), nur die BESCHRIFTUNG bildete das
+  // bisher nicht ab. KUER_ELEMENTE ist deshalb ein fester Bauplan mit zwoelf Eintraegen, in
+  // genau dieser Zaehlung (7/3/1/1) und einer plausiblen Reihenfolge (Review-Beispiel: Sprung,
+  // Sprung, Pirouette, Sprung, Schritte, Sprung | Sprung, Pirouette, Sprung, Sprung, Choreo,
+  // Pirouette) -- REIN DEKORATIV: `typ`/`name` steuern nur die Beschriftung im Feed (unten,
+  // "EISKUNSTLAUF-ELEMENTNAME") und `pose` nur, welches u.vizPhase stepKuer() fuer dieses
+  // Element setzt (s. Aufrufstelle) -- "pirouette"/"wurf" sind dieselben zwei Zeichen-Posen
+  // wie vorher (Drehung bzw. Sprungbogen in zeichneDuett()), "schritte"/"choreo" sind neue
+  // Werte ohne eigene Sonderzeichnung (fallen auf die normale Gleitpose zurueck, passend zu
+  // Schrittfolge/Choreo, die im echten Sport kein einzelner Sprung-/Spinmoment sind). Nichts
+  // davon beeinflusst `rezept`/`rr()`/`punkte`/`ereignis` -- diese bleiben exakt der
+  // generische Durchgangs-Wurf aus bauBuehne() (s. dort), unveraendert.
+  // KUERZEL (Broadcast-Optik Buehne-Auftritt 27.09., E-B1): die ISU-Kurzschreibweise je
+  // Element, wie sie der technische Kampfrichter ausruft -- REIN DEKORATIV wie `name`/`pose`
+  // oben, geht in keine Formel/kein rr() ein. Wird auf dem Eis ueber dem Punkte-Schweber und
+  // in der Elementkasten-Legende gelesen (s. dortige Kommentare).
+  const KUER_ELEMENTE=[
+    {typ:"sprung",    name:"Doppelaxel",           pose:"wurf",      kuerzel:"2A"},
+    {typ:"sprung",    name:"Dreifachlutz",         pose:"wurf",      kuerzel:"3Lz"},
+    {typ:"pirouette", name:"Standpirouette",       pose:"pirouette", kuerzel:"SSp"},
+    {typ:"sprung",    name:"Dreifachflip",         pose:"wurf",      kuerzel:"3F"},
+    {typ:"schritte",  name:"Schrittfolge",         pose:"schritte",  kuerzel:"StSq"},
+    {typ:"sprung",    name:"Dreifachrittberger",   pose:"wurf",      kuerzel:"3Lo"},
+    {typ:"sprung",    name:"Dreifachtoeloop",      pose:"wurf",      kuerzel:"3T"},
+    {typ:"pirouette", name:"Sitzpirouette",        pose:"pirouette", kuerzel:"SSp"},
+    {typ:"sprung",    name:"Dreifachsalchow",      pose:"wurf",      kuerzel:"3S"},
+    {typ:"sprung",    name:"Kombinationssprung",   pose:"wurf",      kuerzel:"3Lz+2T"},
+    {typ:"choreo",    name:"Choreosequenz",        pose:"choreo",    kuerzel:"ChSq"},
+    {typ:"pirouette", name:"Kombinationspirouette",pose:"pirouette", kuerzel:"CCoSp"}
+  ];
+  // STURZ VS. WACKLER (dieselbe Review, Abschnitt 2.4, E0 zweiter Teil): der Anteil der
+  // Fehlschlagzone (zwischen der Erfolgsschwelle `erfolg` und 1), der noch als "knapp
+  // daneben" (Wackler) statt "deutlich daneben" (Sturz) gilt -- s. bauBuehne()s Durchgangs-
+  // schleife, Kommentar dort. Kalibriert auf den in der Review genannten Zielsplit (aus
+  // vormals ~47% "stuerzt" werden rund 30% Wackler + 15% Stuerze); reiner Anzeigewert, geht
+  // in keine Punkteformel und keinen weiteren rr()-Aufruf ein.
+  const KUER_KNAPP_ANTEIL=0.65;
   // ================== DER STURZ-TELEPORT UND SEINE BEHEBUNG (13.09.) ==================
   // Chris, woertlich: "wenn caraktere fallen teleportieren sie sich dann weiter obwohl sie
   // ja am selben punkt bleiben muessten eigentlich."
@@ -15528,6 +17206,62 @@
   //   "gleiten"     -> STILL   (schon abgeschlossen; die Wache gegen ein zweites Feuern,
   //                             wenn beide Wege denselben Uebergang sehen)
   //
+  // E-B4, AUSWAHL + ZEITFENSTER (Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+  // waehlt EINMAL je Paar, beim Uebergang in die Rolle "kiss" (Aufrufstelle in stepKuer()
+  // Durchgang 2), welches Element als Zeitlupen-Wiederholung laeuft, und schneidet aus den
+  // Ringpuffern BEIDER Partner (vizReplayBuf, s. Durchgang 3) genau das Zeitfenster dieses
+  // Elements aus. Alles Gelesene ist zu diesem Zeitpunkt bereits enthuellt (das Paar hat
+  // seine Kuer komplett durchlaufen) -- kein rr(), keine neue Zufallsentscheidung, reine
+  // Ableitung aus bereits geschriebenen runden[]/vizReplayBuf-Eintraegen.
+  //
+  // REIHENFOLGE WIE IM PAPIER (Abschnitt 2.2, "E-B4"), MIT EINER VEREINFACHUNG: Schritt 1
+  // ("Fuehrender stuerzt / Fuehrung uebernommen") liest hier u.vizBigIdx -- denselben Wert,
+  // den buehneAuftrittBig() ohnehin schon live fuer die Ticker-Zeile markiert (s. dortige
+  // Aufrufstelle), statt ihn ein zweites Mal ueber eine eigene, zeitgenaue Kopie der
+  // Fuehrungsermittlung ueber alle Paare hinweg zu rekonstruieren. Schritt 2 (Sturz mit dem
+  // groessten Punktverlust) und Schritt 3 (Element mit den meisten Punkten) bleiben
+  // woertlich die im Papier beschriebene Rangfolge.
+  function kuerBerechneReplay(grp){
+    let owner=null, idx=-1;
+    for(const u of grp){ if(u.vizBigIdx!=null){ owner=u; idx=u.vizBigIdx; break; } }
+    if(owner==null){
+      let bestSturz=null;
+      for(const u of grp){
+        (u.runden||[]).forEach((r,i)=>{
+          const el=KUER_ELEMENTE[i]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          if(r&&r.ereignis===BB().failWort&&!r.knapp&&el.typ==="sprung"){
+            if(!bestSturz||r.punkte<bestSturz.r.punkte)bestSturz={u,idx:i,r};
+          }
+        });
+      }
+      if(bestSturz){ owner=bestSturz.u; idx=bestSturz.idx; }
+    }
+    if(owner==null){
+      let best=null;
+      for(const u of grp){
+        (u.runden||[]).forEach((r,i)=>{ if(r&&(!best||r.punkte>best.r.punkte))best={u,idx:i,r}; });
+      }
+      if(best){ owner=best.u; idx=best.idx; }
+    }
+    if(owner==null||idx<0||!owner.vizReplayBuf)return null;
+    // FENSTER: alle bereits aufgezeichneten Frames DIESES Partners mit demselben Elementindex
+    // (der Ringpuffer traegt idx je Frame, s. Durchgang 3) -- Anfang/Ende dieses Elements in
+    // buehneT. Beide Partner teilen dieselbe buehneT-Achse (Durchgang 2 oben), das Fenster
+    // gilt deshalb fuer BEIDE gleichermassen, auch wenn ihre eigenen u.aktuell-Zaehler nicht
+    // exakt gleich schnell voranschreiten.
+    const fenster=owner.vizReplayBuf.filter(f=>f.idx===idx);
+    if(!fenster.length)return null;
+    const tStart=fenster[0].bt, tEnd=fenster[fenster.length-1].bt;
+    if(tEnd<=tStart)return null;
+    const frames=grp.map(u=>(u.vizReplayBuf||[]).filter(f=>f.bt>=tStart&&f.bt<=tEnd));
+    if(frames.some(fr=>!fr.length))return null;
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for(const fr of frames)for(const f of fr){
+      if(f.x<minX)minX=f.x; if(f.x>maxX)maxX=f.x; if(f.y<minY)minY=f.y; if(f.y>maxY)maxY=f.y;
+    }
+    const element=KUER_ELEMENTE[idx]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+    return {tStart,tEnd,frames,label:element.kuerzel,bbox:{minX,maxX,minY,maxY}};
+  }
   // Reine Praesentation wie alles hier: schreibt nur auf u.vizPhase, ruft kein rr().
   function kuerPhaseEnde(u,warSturz){
     if(u.vizPhase==null||u.vizPhase==="gleiten"||u.vizPhase==="schlusspose")return;
@@ -15549,7 +17283,7 @@
         // Erstinitialisierung. zeichneDuett() faellt bis hierhin auf seinen eigenen
         // Rueckfallplatz zurueck (5.3-Vertrag: "solange vizX==null") — ab dem ersten
         // stepKuer()-Aufruf gibt es eine echte Position.
-        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizAktuell=-1;
+        u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizWackler=false; u.vizAktuell=-1;
         u.vizX=B.cx; u.vizY=B.cy; u.vizRi=0; u.vizNeu=true; u.vizAus=1; u.vizBahnT=0;
       }
       // ROLLE IN DER ROTATION. `vizGrp` (Startnummer der eigenen Gruppe, 0-basiert) und
@@ -15567,6 +17301,14 @@
       // AUSBLENDEN statt Verschwinden: eine Figur, die von einem Bild aufs naechste weg
       // ist, liest sich als Fehler. 0,8 s Ueberblendung, rein zeichnerisch.
       u.vizAus=u.vizRolle==="weg"?Math.max(0,(u.vizAus??1)-dt/0.8):1;
+      // KISS-&-CRY-UHR (E-B3, Broadcast-Optik Buehne-Auftritt 27.09.): wie lange sitzt
+      // dieses Paar schon im Kiss & Cry -- steuert die drei Enthuellungsstufen ("WERTUNG
+      // FOLGT" -> Gesamt/Stuerze -> PLATZ-Plakette) in zeichneDuett(). Reiner neuer viz*-
+      // Wert aus einem Rollenwechsel-Kantentreffer, kein rr(), keine Wirkung auf u.summe.
+      if(u.vizRolle==="kiss"){
+        u.vizKissT=u.vizRolleVorher==="kiss"?(u.vizKissT||0)+dt:0;
+      }
+      u.vizRolleVorher=u.vizRolle;
 
       // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4, uebernommen aus PR #903):
       // TON_KATALOG.eiskunstlauf steht seit PR 0.1 vollstaendig (kufe/sprung/landung/sturz/
@@ -15596,19 +17338,45 @@
         // also genau das, was warSturzVorAblauf auf dem Uhrenweg leistet.
         kuerPhaseEnde(u,u.vizSturz);
         if(u.aktuell+1>=art.rundenN){
-          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false;
+          u.vizPhase="schlusspose"; u.vizPhaseT=0; u.vizSturz=false; u.vizWackler=false;
         } else {
           const zug=u.runden[u.aktuell];
           const fehl=!!(zug&&zug.ereignis===art.failWort);
-          u.vizPhase=["pirouette","hebung","wurf"][u.aktuell%3];
+          // KUER-BAUPLAN (E0, s. KUER_ELEMENTE oben) STATT MODULO: dieselbe Idee wie vorher
+          // (drei Zeichen-Posen fuer alle zwoelf Elemente), nur jetzt aus einem festen Plan
+          // gelesen statt aus `u.aktuell%3` -- rein praesentational, kein rr()-Aufruf, keine
+          // Wirkung auf zug/ereignis/punkte.
+          const element=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          u.vizPhase=element.pose;
           u.vizPhaseT=fehl?KUER_STURZ_DAUER:KUER_ELEMENT_DAUER;
           u.vizSturz=fehl;
+          // STURZ VS. WACKLER, NUR OPTISCH/AKUSTISCH (E0, zweiter Teil): `zug.knapp` kommt
+          // unveraendert aus bauBuehne() (derselbe rr()-Wurf, s. dort) -- u.vizWackler ist ein
+          // rein neues viz*-Feld (Vertrag oben: stepKuer() darf sowas schreiben), u.vizSturz
+          // bleibt bei JEDEM Fehlschlag true, weil die Halte-/Aufsteh-Choreo (unten, Sturz-
+          // Teleport-Fix) fuer beide Faelle dieselbe bleiben soll -- nur der Klang und die
+          // Kippung in zeichneDuett() unterscheiden sich (s. dort).
+          u.vizWackler=fehl&&!!zug.knapp;
+          // E-B5 (Sturzmarke, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A): an
+          // der Stelle eines ECHTEN Sturzes (nicht Wackler, nur Sprungelemente -- dieselbe
+          // Bedingung wie die rote statt bernsteinfarbene Elementkasten-Farbe in
+          // zeichneEisStand(), s. dort) bleibt eine kleine Kratzmarke auf dem Eis liegen, bis
+          // das Programm dieses Paares vorbei ist (gezeichnet nur, solange u.vizRolle==="kuer"
+          // gilt, s. zeichneDuett()) -- "man sieht auf einen Blick, wie viele Stuerze dieses
+          // Paar hatte". u.vizX/u.vizY tragen hier noch die Position VOR diesem Element (die
+          // Bewegung fuer dieses Bild laeuft erst in Durchgang 3 unten) -- fuer eine rein
+          // dekorative Markierung reicht diese eine Frame Naeherung. Reines neues viz*-Feld
+          // (Vertrag: stepKuer() darf das), KEIN rr(), KEINE Wirkung auf u.summe/Wertung.
+          if(fehl&&!zug.knapp&&element.typ==="sprung"){
+            (u.vizEisMarken=u.vizEisMarken||[]).push({x:u.vizX,y:(u.vizY||0)+16});
+          }
           // Sprungansatz bei JEDEM neuen Element (Pirouette/Hebung/Wurf — das Motorbild
           // kennt keine feinere Unterscheidung, alle drei zaehlen hier als "Sprung"-Ansatz),
           // unabhaengig vom spaeteren Ausgang. Misslingt der Versuch, zusaetzlich sofort der
-          // Sturz-Klang — vizSturz ist in der Zeile darueber schon gesetzt.
+          // Sturz- bzw. Wackler-Klang — vizSturz/vizWackler sind in den Zeilen darueber schon
+          // gesetzt.
           sfx("eiskunstlauf","sprung");
-          if(fehl)sfx("eiskunstlauf","sturz");
+          if(fehl)sfx("eiskunstlauf",u.vizWackler?"wackler":"sturz");
         }
       }
       // warSturzVorAblauf: reiner Lesevergleich VOR dem Ablauf-Reset unten, damit "Landung"
@@ -15669,6 +17437,21 @@
       const laeuft=grp[0].vizRolle==="kuer" && !grp.every(x=>x.vizHalt);
       const neu=(grp[0].vizBahnT||0)+(laeuft?dt:0);
       for(const x of grp)x.vizBahnT=neu;
+      // E-B3: PLAKETTEN-KLANG AN DER 3s-KANTE, EINMAL JE PAAR (nicht je Partner -- beide
+      // teilen dieselbe vizKissT-Uhr, s. oben). Eigener Katalogeintrag "plakette" (s.
+      // TON_KATALOG.eiskunstlauf) -- "publikum" ist dort ein Loop-Eintrag und wuerde ueber
+      // sfx() stumm bleiben (sfx() lehnt eintrag.loop ausdruecklich ab).
+      if(grp[0].vizRolle==="kiss"){
+        const t=grp[0].vizKissT||0;
+        if(t>=3 && t-dt<3) sfx("eiskunstlauf","plakette");
+        // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL berechnet, beim allerersten
+        // Bild in der Rolle "kiss" (grp[0].vizReplayClip ist dann noch nie gesetzt worden --
+        // TEILNEHMER sind je Spiel frische Objekte, s. N1-Reset-Konvention dieser Datei,
+        // ein Rueckfall auf `undefined` braucht deshalb keinen eigenen reset()-Eintrag).
+        // Danach bleibt der Clip fuer die ganze Kiss-&-Cry-Dauer unveraendert stehen --
+        // zeichneKuerReplay() liest ihn nur, schreibt ihn nie.
+        if(grp[0].vizReplayClip===undefined)grp[0].vizReplayClip=kuerBerechneReplay(grp)||null;
+      }
     }
 
     // ---- DURCHGANG 3: Zielpunkt und Bewegung ----------------------------------------
@@ -15749,6 +17532,27 @@
       } else if(u.vizSpur.length){
         u.vizSpur.length=0;
       }
+
+      // E-B4 (Zeitlupen-Wiederholung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2,
+      // Klasse A): Ringpuffer JE PARTNER der zuletzt gelaufenen KUER-Frames -- Position,
+      // Elementindex und alles, was zeichneKuerReplay() unten braucht, um denselben
+      // Zeichenpfad (Sturz-/Pirouetten-Rotation, Wurfbogen) wie hier eben nachzustellen.
+      // NUR waehrend rolle==="kuer" aufgezeichnet (wie u.vizSpur direkt darueber), gedeckelt
+      // auf 800 Eintraege (~13s bei 60 fps -- die ganze Kuer eines Paares dauert rund 10,2s,
+      // s. kuerZwischenstandZeilen()-Kommentar "12x2x0,425s"). Reine Aufzeichnung wie
+      // u.vizSpur: KEIN rr(), KEINE Wirkung auf u.summe/Wertung. `buehneT` steht hier fuer
+      // die Auswahl des Zeitfensters (kuerBerechneReplay() unten filtert danach) -- NICHT
+      // die globale Sprite-Animationsuhr `t` (die bleibt auf der ganzen Buehne bei 0
+      // eingefroren, nachgeprueft: stepSim() springt fuer jede Buehnen-Disziplin VOR
+      // `t+=dt` aus der Funktion, s. Kommentar dort und bei feed()s `anzeigeT` --
+      // zeichneKuerReplay() muss `t` deshalb NICHT verstellen, um die Gliedmassenanimation
+      // "langsamer" zu machen, sie ist bei jeder Kuer ohnehin ein Standbild je Figur).
+      if(rolle==="kuer"){
+        const buf=(u.vizReplayBuf=u.vizReplayBuf||[]);
+        buf.push({bt:buehneT, idx:u.aktuell, x:u.vizX, y:u.vizY,
+          phase:u.vizPhase, phaseT:u.vizPhaseT, sturz:u.vizSturz, wackler:u.vizWackler, ri:u.vizRi});
+        if(buf.length>800)buf.shift();
+      }
     }
   }
 
@@ -15827,6 +17631,18 @@
     const zi=Math.min(buehneQueue.length-1,Math.max(0,buehneZeiger-1));
     const ertraeger=buehneQueue[zi]||null;
     if(!ertraeger)return null;
+    // GAUNTLET (22.09.): buehneQueue traegt hier NICHT die generische "Heim dann Gast je
+    // Durchgang"-Paarung, sondern eine chronologische Kette, in der ein Ueberlebender ueber
+    // mehrere Duelle hinweg mehrfach hintereinander auftauchen kann (s. baueGauntlet()). Die
+    // Nachbar-Heuristik unten (`p=zi-(zi%2)`) wuerde an jedem Duellwechsel falsch raten, sobald
+    // die Zahl der vorangegangenen Zuege ungerade ist. Der ECHTE Gegner steht bereits auf der
+    // gerade enthuellten Runde selbst (`r.gegnerN`, je Zug mitgefuehrt) -- direkt gelesen statt
+    // erraten.
+    if(BB().gauntlet){
+      const r=ertraeger.aktuell>=0?ertraeger.runden[ertraeger.aktuell]:null;
+      const peiniger=(r&&r.gegnerN)?TEILNEHMER.find(x=>x.n===r.gegnerN&&x.side!==ertraeger.side)||null:null;
+      return {ertraeger,peiniger};
+    }
     const p=zi-(zi%2);
     const a=buehneQueue[p]||null, b=buehneQueue[p+1]||null;
     // Fallback ohne Partner (ungerade Queue, ungleiche Kaderstaerken): dann bleibt es beim
@@ -15888,6 +17704,42 @@
   // kann, statt 0,15s ein zweites Mal als Literal zu tragen (das dort bisher veraltete
   // 0,35/0,3 waren -- Ringe rissen bei halber Deckkraft ab statt sauber auszublenden).
   const FREEZE_T=0.15, RUECKZUG_T=0.15;
+  // B2 (HP-Balken im Kampfspiel-Stil, Broadcast-Optik-Recherche 27.09., Klasse A): das
+  // NACHLAUFENDE SCHADENSSTUECK -- "der gerade verlorene Teil bleibt 0,4s hell und laeuft
+  // dann ab" (Doku B2). Dasselbe Vorbild wie u.vizUhrAnzeige bei stepSchach() (exponentielle
+  // Annaeherung statt eines schlagartigen Sprungs). Liest ausschliesslich
+  // gauntletHpJetzt(u) (schon reveal-gegatet), schreibt nur das neue viz*-Feld
+  // u.vizHpAnzeige -- kein rr(), keine Aenderung an u.hp/u.runden/u.aktuell/u.summe.
+  function stepGauntletHp(dt){
+    for(const u of TEILNEHMER){
+      if(u.gauntletIdx==null)continue;
+      const ziel=Math.max(0,gauntletHpJetzt(u));
+      if(u.vizHpAnzeige==null)u.vizHpAnzeige=ziel;
+      else u.vizHpAnzeige+=(ziel-u.vizHpAnzeige)*(1-Math.exp(-dt/0.4));
+    }
+    // B3: TON AN DER HERZSCHLAG-KANTE. `gauntletHerzPhase` laeuft 0..1 im Takt von
+    // gauntletHerzschlagBpm(ertraeger) und feuert bei jedem vollen Umlauf genau einmal
+    // sfx("breaking","herzschlag") -- derselbe Kanten-Trick wie ueberall sonst im Motor
+    // (huerdeAktiv-Kante bei stepSpurt, Phasenuebergaenge bei stepHeben/stepFechten): ein
+    // Ereignis pro Zyklus statt eines Tons je Frame.
+    const paar=cypherPaar(), ertraeger=paar?paar.ertraeger:null;
+    if(ertraeger){
+      const bpm=gauntletHerzschlagBpm(ertraeger);
+      const vor=gauntletHerzPhase;
+      gauntletHerzPhase=(gauntletHerzPhase+dt*bpm/60)%1;
+      if(gauntletHerzPhase<vor)sfx("breaking","herzschlag");
+    }
+  }
+  let gauntletHerzPhase=0;
+  // B3 (Herzschlag statt Beat, Broadcast-Optik-Recherche 27.09., Klasse A): Tempo aus HP --
+  // 70 BPM bei vollen HP bis 150 BPM kurz vor 0 (Doku B3). Liest ausschliesslich bereits
+  // enthuellten HP-Stand (gauntletHpJetzt(), reveal-gegatet), reine Ableitung, kein rr().
+  function gauntletHerzschlagBpm(u){
+    if(!u)return 100;
+    const hpMax=u.hpMax||GAUNTLET_HP_MAX;
+    const frac=hpMax>0?Math.max(0,Math.min(1,gauntletHpJetzt(u)/hpMax)):1;
+    return 150-80*frac;
+  }
   function stepCypher(dt,art){
     if(!TEILNEHMER.length)return;
     const rOut=Math.min(W*0.46,H*0.44);
@@ -16166,6 +18018,11 @@
   // Standbild einfriert, selbst wenn gerade kein Treffer/Fehlschlag enthuellt wird.
   const FECHT_AUSFALL_T=0.22, FECHT_ERHOL_T=0.24, FECHT_PARADE_T=0.28, FECHT_FUNKE_T=0.24;
   const FECHT_AUSFALL_PX=30, FECHT_PARADE_PX=11;
+  // F-B1 -- TREFFERLAMPEN (Broadcast-Optik-Dokument 27-09, Abschnitt 5, Prioritaet 1): 2,5 s
+  // Nachleuchten, genau das "Nachleuchten"-Prinzip aus Abschnitt 2.4 des Dokuments (ein
+  // Ereignis von 0,5 s hinterlaesst eine Spur, die laenger stehen bleibt als das Ereignis
+  // selbst).
+  const FECHT_LAMPE_T=2.5;
   function stepFechten(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild schachUhrWert()/vizSchachHalb-Vergleich bei
@@ -16180,6 +18037,11 @@
         u.vizFechtAktuell=u.aktuell;
         u.vizFechtPhase="ausfall"; u.vizFechtT=0;
         const r=u.runden[u.aktuell];
+        // F-B1 -- TREFFERLAMPE (s. FECHT_LAMPE_T-Kommentar oben): leuchtet auf der Seite
+        // dieses Fechters, unabhaengig vom Gegner (der eigene Erfolg zaehlt, auch wenn der
+        // Gegner denselben Gang ebenfalls trifft -- Doppeltreffer, Dokument-Tabelle
+        // Abschnitt 5: beide Lampen leuchten dann unabhaengig voneinander, eine je Seite).
+        if(r&&r.ereignis===art.erfolgWort)u.vizLampeT=FECHT_LAMPE_T;
         const gegner=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
         if(gegner){
           if(r&&r.ereignis===art.erfolgWort){
@@ -16207,6 +18069,7 @@
     for(const u of TEILNEHMER){
       if(u.brett==null)continue;
       if(u.vizFunkeT>0)u.vizFunkeT=Math.max(0,u.vizFunkeT-dt);
+      if(u.vizLampeT>0)u.vizLampeT=Math.max(0,u.vizLampeT-dt);
       const phase=u.vizFechtPhase;
       if(phase==="ausfall"){
         u.vizFechtT=(u.vizFechtT||0)+dt;
@@ -16300,6 +18163,30 @@
         // Animation dort ebenfalls erst danach ablaeuft (s. Vertrags-Kommentar oben).
         sfx("tennis","aufschlag");
         if(treffer)sfx("tennis","ass"); else sfx("tennis","netz");
+        // T-B2 -- NETZ ODER AUS STATT IMMER "HALBE STRECKE" (Broadcast-Optik-Dokument 27-09,
+        // Abschnitt 6, Prioritaet 2): "Die Wahl ueber einen Hash aus u.id und Durchgang --
+        // NICHT rr(), sonst verschiebt sich der Zufallsstrom der Messung." `kuerHash()`
+        // ist genau diese bereits vorhandene, deterministische Sinus-Hash-Funktion
+        // (s. dortiger Kommentar) -- hier mit `u.aktuell` gesalzen, damit jeder Ballwechsel
+        // desselben Spielers einen eigenen, aber reproduzierbaren Ausgang bekommt.
+        // `vizFlugFrac` ist der Zielpunkt als Anteil der Strecke von `von` nach `nach`
+        // (zeichneTennis() liest ihn fuer den LIVE-Flug UND fuer die nachleuchtende
+        // Aufsprungmarke -- eine einzige Quelle statt zweier Ad-hoc-Berechnungen):
+        // 1 = trifft den Gegner (treffer), 0.5 = haelt am Netz (Fehlschlag "Netz"), 1.12 =
+        // fliegt knapp hinter den Gegner hinaus (Fehlschlag "Aus").
+        if(treffer){ u.vizFlugMode="treffer"; u.vizFlugFrac=1; u.vizFlugKipp=false; }
+        else if(kuerHash(u.id,u.aktuell)<0.45){ u.vizFlugMode="netz"; u.vizFlugFrac=0.5; u.vizFlugKipp=false; }
+        else {
+          u.vizFlugMode="aus"; u.vizFlugFrac=1.12;
+          // T-B2 -- HAWK-EYE-INSET NUR BEI EINEM "AUS", DAS DAS VORZEICHEN DES VORTEILS
+          // KIPPT (Dokument: "derselbe seltene Moment wie vorteilKipptBig") -- dieselbe
+          // Bedingung wie der Fuehrungswechsel-Highlight in stepBuehne()s feed()-Kommentar
+          // (":16443" ff.), hier rein aus dem bereits enthuellten `verlauf`-Paar dieses
+          // Ballwechsels abgeleitet.
+          const vN=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+          const vP=(u.aktuell>0&&u.verlauf)?u.verlauf[u.aktuell-1]:0;
+          u.vizFlugKipp=u.aktuell>0&&Math.sign(vN)!==Math.sign(vP);
+        }
       }
     }
     // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch auf
@@ -16318,11 +18205,19 @@
         }
       } else if(phase==="treffer"||phase==="fehlschlag"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
-        if(u.vizSchlagT>=TENNIS_FLUG_T){ u.vizSchlagPhase="erholen"; u.vizSchlagT=0; }
+        if(u.vizSchlagT>=TENNIS_FLUG_T){
+          u.vizSchlagPhase="erholen"; u.vizSchlagT=0;
+          // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und
+          // verblasst" -- gesetzt genau am Ende des Flugs (derselbe Zeitpunkt, an dem der
+          // Ball in zeichneTennis() verschwindet), liest `vizFlugMode`/`vizFlugFrac` von
+          // oben weiter, bis dieser Timer abgelaufen ist.
+          u.vizBallMarkT=2.5;
+        }
       } else if(phase==="erholen"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
         if(u.vizSchlagT>=TENNIS_ERHOL_T){ u.vizSchlagPhase="bereit"; u.vizSchlagT=0; }
       }
+      if(u.vizBallMarkT>0)u.vizBallMarkT=Math.max(0,u.vizBallMarkT-dt);
       // GRUNDSTELLUNGS-WIPPER (Anti-Freeze) -- laeuft immer, unabhaengig von der Phase oben;
       // `+u.id` phasenverschiebt jeden Spieler gegen die anderen, damit nicht alle im
       // Gleichtakt wippen (wortgleiches Muster zu stepFechten()s vizFechtBob).
@@ -16375,6 +18270,11 @@
   // STARTPLATZ AM RAND, bevor der erste Fundort enthuellt ist (Konzept-Vertrag "solange
   // vizX==null" wie bei stepKuer/stepShowcase) — Heim links, Gast rechts, genau die Seite,
   // die `naeher` in ispySeiteTick() (":14680") schon fuer die Truhenwahl bevorzugt.
+  // AUSSENRAND DER EIGENEN HAELFTE (I1, Split-Screen, Broadcast-Optik-Recherche 27.09.):
+  // x=0,045/0,955 lagen schon VOR dem Split ganz am linken/rechten Bildrand -- nach dem
+  // Split ist das automatisch der Aussenrand GENAU der eigenen Haelfte (Heim-Fundorte
+  // 4-46 %, Gast-Fundorte 54-96 %, s. ispyFundortXY()), ohne dass diese Funktion selbst
+  // etwas anders rechnen muesste. Keine Aenderung noetig, nur der Beleg dafuer.
   function ispyHeimatXY(u){
     const seite=TEILNEHMER.filter(x=>x.side===u.side);
     const i=Math.max(0,seite.indexOf(u));
@@ -16395,7 +18295,15 @@
         const r=u.runden[u.aktuell];
         u.vizIspyVonX=u.vizX; u.vizIspyVonY=u.vizY;
         if(r&&r.fundort!=null){
-          const ziel=ispyFundortXY(art.fundorte[r.fundort]);
+          // GEZEICHNETES Laufziel aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
+          // ISPY_LAYOUT_VARIANTEN oben) statt art.fundorte direkt — dieselbe Karte, die
+          // bodenSchatzsuche() diesem Spiel schon zeichnet. r.fundort bleibt der
+          // MECHANISCHE Fundort-Index (ispySeiteTick()), unveraendert.
+          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[r.fundort])||art.fundorte[r.fundort];
+          // SPLIT-SCREEN (I1): `u.side` waehlt die eigene Haelfte -- der Laeufer zielt auf
+          // seine EIGENE Truhe im EIGENEN Raum (s. ispyFundortXY()-Kommentar), nie auf die
+          // des Gegners.
+          const ziel=ispyFundortXY(vis,u.side);
           u.vizIspyZielX=ziel.x; u.vizIspyZielY=ziel.y;
           // STARKER KNACKER WIRD FRUEHER FERTIG (Konzept 5.2): die obere Grenze der
           // "suchen"-Phase kommt aus dem Sub-Skill, der DIESEN Fund entschieden hat
@@ -16524,6 +18432,11 @@
   // darunter.
   const WETT_GREIF_T=0.10, WETT_SCHLING_T=0.16, WETT_KAU_T=0.16,
         WETT_PAUSE_T=0.12, WETT_PAUSE_FAIL_T=0.30;
+  // SCHLUSSHUPE UND JUBELPOSE (W-B3, Broadcast-Optik Buehne-Auftritt 27.09.): merkt sich,
+  // SEIT WANN `done` gilt (buehneT-Zeit) -- reiner Zeichenzustand, kein Einfluss auf
+  // Wertung/Reihenfolge. `done` selbst wird ausschliesslich von stepBuehne() gesetzt und
+  // hier nur gelesen.
+  let wettessenEndeSeit=null;
   function stepWettessen(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild vizFechtAktuell bei stepFechten oben):
@@ -16561,6 +18474,89 @@
       // "warten" laeuft ohne eigene Uhr weiter, bis die naechste Enthuellung "greifen" neu
       // ausloest — kein weiterer Zweig noetig.
     }
+    // SCHLUSSHUPE UND "HAeNDE HOCH" (W-B3): reiner Kantentreffer auf `done` (von
+    // stepBuehne() gesetzt, hier nur GELESEN). Eine Sekunde lang die Jubelpose fuer ALLE --
+    // u.vizJubel ist ein neues, generisches viz*-Feld, das zeichneSprite() nur dann liest
+    // (dasselbe u.vizPose-Muster wie bei Showcase), sonst bleibt es ueberall `undefined`.
+    if(done){
+      if(wettessenEndeSeit==null){ wettessenEndeSeit=buehneT; sfx("wettessen","hupe"); }
+      const jubeln=buehneT-wettessenEndeSeit<1;
+      for(const u of TEILNEHMER)u.vizJubel=jubeln;
+    } else if(wettessenEndeSeit!=null){
+      wettessenEndeSeit=null;
+      for(const u of TEILNEHMER)u.vizJubel=false;
+    }
+  }
+
+  // I-SPY ZUG-UHR + SPLIT-TAFEL (I2/I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4).
+  // KLASSE A: liest ausschliesslich buehneZeiger/buehneAkt/BB()/TEILNEHMER[].runden — genau
+  // die Warteschlangen-Zustaende, die die generische Enthuellung (stepBuehne(), s. dort)
+  // ohnehin fuehrt — und schreibt nur in DOM sowie in das eine Praesentations-Flag
+  // ispyLetzterZugAlarmiert. Kein rr(), kein neuer Zustand in u.runden/u.summe/u.aktuell.
+  //
+  // ZUG-FORTSCHRITT AUS DER WARTESCHLANGE HERGELEITET: die generische Reihenfolge fuer
+  // Nicht-Duell-Buehnen (s. bauBuehne()-Kommentar "REIHENFOLGE. Rundenweise abwechselnd wie
+  // eine Setzliste") legt Durchgang 1 fuer ALLE Teilnehmer beider Seiten ab, dann Durchgang
+  // 2 — ein "Zug" ist deshalb genau ein Block von (Seite-0-Anzahl + Seite-1-Anzahl)
+  // aufeinanderfolgenden Warteschlangen-Eintraegen. `perRunde` ist diese Blockgroesse,
+  // `buehneZeiger` (nur GELESEN) zaehlt bereits enthuellte Eintraege insgesamt durch —
+  // `Math.floor(buehneZeiger/perRunde)` ist damit die Zahl der VOLLSTAENDIG enthuellten
+  // Zuege, `buehneAkt/art.rundenDauer` der Bruchteil, den die Uhr gerade im laufenden
+  // Eintrag zurueckgelegt hat (stepBuehne() zaehlt `buehneAkt` von `rundenDauer` auf 0
+  // herunter, s. dort).
+  //
+  // SPLIT-TAFEL OHNE SPOILER: eine Spalte zeigt eine Zahl erst, wenn `rundenFertig` sie
+  // erreicht hat, also ALLE zwoelf Teilnehmer beider Seiten diesen Zug schon enthuellt
+  // haben — dieselbe Spoiler-Regel wie ispyTickerZeile()/WERTUNG_CHASSIS ("liest nur
+  // u.runden[0..u.aktuell]"). Die laufende Gesamtsumme steht bereits im Score (#score,
+  // s. updateHudBuehne() oben) — eine "gesamt"-Spalte hier waere dieselbe Zahl zweimal.
+  function aktualisiereIspyHud(){
+    const zuguhr=document.getElementById("ispyZugUhr"), split=document.getElementById("ispySplit");
+    if(!zuguhr||!split)return;
+    const art=BB();
+    if(!art.schatzsuche){ zuguhr.hidden=true; split.hidden=true; return; }
+    const n0=TEILNEHMER.filter(u=>u.side===0).length, n1=TEILNEHMER.filter(u=>u.side===1).length;
+    const perRunde=n0+n1;
+    if(perRunde<=0||!art.rundenN){ zuguhr.hidden=true; split.hidden=true; return; }
+    zuguhr.hidden=false; split.hidden=false;
+    const rundenFertig=Math.max(0,Math.min(art.rundenN,Math.floor(buehneZeiger/perRunde)));
+    const inRunde=buehneZeiger-rundenFertig*perRunde;
+    const laufAnteil=art.rundenDauer>0?Math.max(0,Math.min(1,1-(buehneAkt/art.rundenDauer))):0;
+    const zugFortschritt=done?1:Math.min(1,(inRunde+laufAnteil)/perRunde);
+    const aktuelleRunde=Math.min(art.rundenN-1,rundenFertig);
+    const zugNr=done?art.rundenN:aktuelleRunde+1;
+    const zugText=document.getElementById("ispyZugText");
+    if(zugText)zugText.textContent="Zug "+zugNr+" / "+art.rundenN;
+    const zugBar=document.getElementById("ispyZugBarFill");
+    if(zugBar)zugBar.style.width=(zugFortschritt*100)+"%";
+    const letzterZug=!done&&aktuelleRunde>=art.rundenN-1;
+    zuguhr.classList.toggle("letzter",letzterZug);
+    if(letzterZug&&!ispyLetzterZugAlarmiert){ ispyLetzterZugAlarmiert=true; sfx("i-spy","alarm"); }
+
+    const summeRunde=(seite,ri)=>TEILNEHMER.filter(u=>u.side===seite)
+      .reduce((s,u)=>s+((u.runden[ri]&&u.runden[ri].punkte)||0),0);
+    const werte=[];
+    for(let ri=0;ri<rundenFertig;ri++)werte.push({l:summeRunde(0,ri),r:summeRunde(1,ri)});
+    const besteL=werte.length?Math.max(...werte.map(w=>w.l)):-1;
+    const besteR=werte.length?Math.max(...werte.map(w=>w.r)):-1;
+    let html="";
+    for(let ri=0;ri<art.rundenN;ri++){
+      if(ri<werte.length){
+        const w=werte[ri], delta=w.l-w.r;
+        const goldL=(w.l===besteL&&besteL>0)?" isp-gold":"";
+        const goldR=(w.r===besteR&&besteR>0)?" isp-gold":"";
+        const deltaKlasse=delta>0?"vorn":delta<0?"hinten":"";
+        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-punkte l"+goldL+"\">"+w.l+"</span>"
+          +"<span class=\"isp-punkte r"+goldR+"\">"+w.r+"</span>"
+          +"<span class=\"isp-delta "+deltaKlasse+"\">"+(delta>0?"+":"")+delta+"</span></div>";
+      } else {
+        html+="<div class=\"isp-col\"><span class=\"isp-zug\">"+(ri+1)+"</span>"
+          +"<span class=\"isp-punkte\">·</span><span class=\"isp-punkte\">·</span>"
+          +"<span class=\"isp-delta\">·</span></div>";
+      }
+    }
+    split.innerHTML=html;
   }
 
   function updateHudBuehne(){
@@ -16579,6 +18575,10 @@
       ? "3 Perioden zu je 3 Gängen — Trefferstand läuft mit"
       : BB().duell
       ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
+      // GAUNTLET (Breaking, 22.09.): eigene Unterzeile statt des generischen
+      // "N Durchgaenge"-Texts, der hier (variable Zuganzahl je Ueberlebendem) nicht passt.
+      : BB().gauntlet
+      ? "Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand"
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
     // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
@@ -16589,7 +18589,13 @@
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
     document.getElementById("klsuffix").textContent="Punkte";
-    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
+    // GENERALISIERT (22.09.): `u.runden.length` statt der festen `BB().rundenN` -- fuer jede
+    // Nicht-Gauntlet-Disziplin ist das bit-identisch (`baueHebenDuelle()`/der generische
+    // Auftritt-/Duell-Block bauen IMMER exakt `art.rundenN` Runden je Teilnehmer, s. dortige
+    // Schleifen), fuer Gauntlet (Breaking) aber der einzig richtige Massstab: ein Teilnehmer
+    // ist "fertig", sobald ALLE seine EIGENEN, tatsaechlich gebauten Zuege enthuellt sind --
+    // egal ob er nach drei Zuegen ausschied oder nach zwanzig als Sieger dastand.
+    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
@@ -16599,23 +18605,77 @@
       // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
       // Gesamt-Kilogramm beider Mannschaften (der Tiebreak aus Plan 3.5), damit die
       // Tabelle nicht an jedem dritten Spieltag ein Remis bekommt.
-      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.duellGewonnen).length;
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
+      // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
+      // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
       document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
+    } else if(BB().gauntlet){
+      // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
+      // bleibt, scored einen Punkt" ist eine Ueberlebensfrage, keine Summenfrage. KEIN
+      // Spoiler: `gauntletRausJetzt()` liest nur den bereits enthuellten Zug, nicht das rohe
+      // `u.raus` (das steht am Ende von baueGauntlet() schon auf dem FERTIGEN Endstand der
+      // ganzen Kette -- ungegated wuerde die Anzeige das Endergebnis zeigen, bevor auch nur
+      // ein Ticker-Zug gelaufen ist, s. gauntletRausJetzt()-Kommentar).
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      document.getElementById("score").textContent=alive(0)+" : "+alive(1);
+    } else if(BB().wettessen){
+      // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.), KONSISTENZ: derselbe stetig
+      // hochzaehlende Wert wie an Tafel/Band, statt des springenden Minutenendstands --
+      // sonst zeigt der Bug schon den Minutenendstand, waehrend die Tafeln noch zaehlen.
+      const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+wettessenAnzeigeSumme(u),0);
+      document.getElementById("score").textContent=Math.round(summe(0))+" : "+Math.round(summe(1));
     } else {
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
       document.getElementById("score").textContent=summe(0)+" : "+summe(1);
     }
-    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
-    const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
-      return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
-    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
-    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    if(BB().gauntlet){
+      // GAUNTLET-HP-BALKEN: zeigt den HP-Anteil des GERADE AKTIVEN Kaempfers jeder Seite
+      // (cypherPaar(), s. dort) statt eines Punkte-Anteils -- die beiden Balken UEBER dem
+      // Ring sind damit dieselbe Information wie die Seitentafeln IM Ring, nur als
+      // Fortschrittsbalken statt als Zahl.
+      const paar=cypherPaar();
+      const frac=(seite)=>{
+        if(!paar)return 0;
+        const u=(paar.ertraeger&&paar.ertraeger.side===seite)?paar.ertraeger
+          :(paar.peiniger&&paar.peiniger.side===seite?paar.peiniger:null);
+        if(!u)return 0;
+        return Math.max(0,gauntletHpJetzt(u))/(u.hpMax||GAUNTLET_HP_MAX);
+      };
+      document.getElementById("thpL").style.width=(frac(0)*100)+"%";
+      document.getElementById("thpR").style.width=(frac(1)*100)+"%";
+    } else {
+      const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+      const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
+        return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+      document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+      document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    }
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    aktualisiereIspyHud();
+    // ENDSTAND-OVERLAY (Buehnen-Endstand-Nachtrag, 27.09.): dasselbe Einmal-Muster wie
+    // updateHudBahn()s `if(done&&!bahnEndeGemeldet)`-Zweig (s. dort) -- Fechten, Tennis,
+    // Showcase, Eiskunstlauf, Wettessen, Gewichtheben, Breaking und I-Spy zeigten bislang
+    // GAR KEIN Endstand-Overlay (Opus-Review 27.09.: "das Spiel endet einfach lautlos,
+    // kein Sieger-Callout, kein Endstand-Overlay, der Score-Bug verschwindet einfach").
+    // REIN ADDITIV: `done` wird ausschliesslich von stepBuehne() gesetzt (unveraendert),
+    // dieser Zweig LIEST ihn nur, wie jeder andere HUD-Zweig hier auch. Speed-Schach
+    // (BB().schach) behaelt sein eigenes, laengst vorhandenes Sieg-Banner AUF dem Brett
+    // (zeichneSchach(), "SIEG — "+VEREIN[...].name) und bekommt dieses Overlay ZUSAETZLICH
+    // -- ein zweiter, deutlicherer Hinweis schadet nicht, verdraengt aber auch nichts.
+    if(done&&!buehneEndeGemeldet){
+      buehneEndeGemeldet=true;
+      const sieger=buehneSieger(), stand=buehneStand();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
+        +stand.text+".",true);
+      renderEndstandBuehne();
+    }
   }
 
   function bodenBuehne(){
@@ -16681,12 +18741,127 @@
   // (PR S3) ein sicherer No-Op (Funktionskopf `if(!katalog)return`, :20981), das
   // Flaggen-Bookkeeping ist trotzdem schon jetzt richtig verdrahtet, s. reset() (N1-Fix).
   let showcasePublikumAn=false;
+  // VORHANGSAUM-FUEHRUNG (S-B3, Broadcast-Optik Buehne-Auftritt 27.09.): dasselbe
+  // Bandenlicht-Muster wie eisBandeSide/-Seit oben, nur fuer den Vorhangsaum -- merkt sich
+  // nur, welche Seite zuletzt fuehrte und seit wann, fuer die Ueberblendung beim Wechsel.
+  let showcaseSaumSide=null, showcaseSaumSeit=-999;
+  // GOLDENER BUZZER (S-B5, Broadcast-Optik Buehne-Auftritt 27.09.): "hoechstens einmal je
+  // Spiel" -- dieselbe modulweite Einmal-Sperre wie eisBandeSide & Co. direkt darueber,
+  // MUSS deshalb in reset() auf false zurueckgesetzt werden (N1-Fix-Konvention dieser
+  // Datei), sonst haette das zweite Showcase-Spiel einer Session nie wieder einen goldenen
+  // Buzzer, weil die Sperre noch vom vorigen Spiel stuende.
+  let showcaseGoldVergeben=false;
   // BUZZER-POSITIONEN: eigene Funktion statt Literale an zwei Stellen (bodenShowcase()
   // zeichnet das Pult, zeichneShowcase() zuendet die Reaktion darauf) -- dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie posMap bei zeichneFechten().
   function showcaseBuzzerPos(i){
     const pultB=Math.min(W*0.30,220), pultX=W/2-pultB/2, pultY=H-26;
     return {x:pultX+pultB*(i+0.5)/3, y:pultY+10};
+  }
+  // FERTIGE ACTS (S-B3, Broadcast-Optik Buehne-Auftritt 27.09.): wer seinen ganzen Auftritt
+  // schon enthuellt hat -- dieselbe Bedingung, die updateHudBuehne() fuer "fertig" ueberall
+  // sonst nutzt (`u.aktuell+1>=u.runden.length`). Reine Ablesung, kein rr().
+  function showcaseFertige(){
+    return TEILNEHMER.filter(u=>u.aktuell+1>=u.runden.length);
+  }
+  // TOP 3 BISHER (S-B3): nur FERTIGE Acts, absteigend nach u.summe -- ein noch laufender
+  // oder kommender Act taucht hier nicht auf (Spoiler-Regel), er bekommt in
+  // zeichneShowcaseTop3() stattdessen eine eigene "laeuft"-Zeile.
+  function showcaseTop3(){
+    return showcaseFertige().slice().sort((a,b)=>(b.summe||0)-(a.summe||0)).slice(0,3);
+  }
+  // VORHANGSAUM-FUEHRUNG (S-B3): welche Seite hat gerade die hoehere bislang enthuellte
+  // Summe -- dieselbe Ablesung wie kuerEisFuehrung() fuer Eiskunstlauf, hier ueber ALLE
+  // Teilnehmer (nicht nur fertige), weil u.summe ohnehin nur bereits enthuellte Durchgaenge
+  // traegt. null, solange noch niemand einen Punkt enthuellt hat.
+  function showcaseFuehrung(){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0);
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0);
+    if(heim===0&&gast===0)return null;
+    return heim>=gast?0:1;
+  }
+  // SPANNE ALLER BISHER ENTHUELLTEN DURCHGAENGE (S-B2, Applaus-Meter): min/max ueber
+  // runden[0..aktuell] JEDES Teilnehmers -- dieselbe Spoiler-Regel wie ueberall (nur bereits
+  // enthuellte Eintraege), kein rr(), keine neue Formel.
+  function showcaseDurchgangsSpanne(){
+    let min=Infinity, max=-Infinity, n=0;
+    for(const u of TEILNEHMER){
+      if(!u.runden)continue;
+      for(let i=0;i<=u.aktuell;i++){
+        const r=u.runden[i]; if(!r)continue;
+        if(r.punkte<min)min=r.punkte; if(r.punkte>max)max=r.punkte; n++;
+      }
+    }
+    return n?{min,max}:null;
+  }
+  // ================== T-B1 -- TENNISPLATZ (Broadcast-Optik-Dokument 27-09, Abschnitt 4,
+  // Prioritaet 1) ==================
+  // "Die Nahansicht stellt die Spieler oben/unten -- genau die Hauptkamera-Perspektive jeder
+  // Uebertragung. Ein Platz in Trapez-Perspektive dazwischen [...] Ohne diesen Schritt lesen
+  // sich alle anderen Tennis-Vorschlaege nicht." Reine Kulisse -- liest nichts aus
+  // TEILNEHMER, schreibt nichts, ruft nie rr() auf; dasselbe Wechsel-Fall-Bookkeeping wie
+  // bodenShowcase()/bodenWettessen() daneben, falls wir GERADE von einer
+  // Publikums-Loop-Buehne kommen. Belag fest Hartplatz blau (offene Frage 3 im Dokument,
+  // Voreinstellung Chris: "fest Hartplatz blau; Belag bleibt reine Optik").
+  function bodenTennis(){
+    if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
+    if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
+    if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
+    if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
+    if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
+
+    // GRUNDFLAECHE: dunkler Umraum -- der Platz selbst (unten) traegt schon genug Farbe,
+    // anders als bodenBuehne()s neutrales violettes Podest braucht es hier keinen eigenen
+    // Scheinwerferkegel-Akzent.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#141826"); g.addColorStop(1,"#0a0c14");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
+    // eine echte Grundlinien-Uebertragung. topY/botY liegen knapp ausserhalb der Spieler-
+    // Positionen aus zeichneTennis() (fyOben=H*0.23/fyUnten=H*0.56), damit beide Kontrahenten
+    // sichtbar INNERHALB des Platzes stehen.
+    const topY=H*0.17, botY=H*0.615, netY=(topY+botY)/2;
+    const topHalfAus=W*0.145, botHalfAus=W*0.30;
+    const breiteBei=(y)=>topHalfAus+(botHalfAus-topHalfAus)*(y-topY)/(botY-topY);
+    const einzugAussen=0.86; // Einzel-Seitenlinie als Anteil der Aussenlinie (Doppelgasse)
+
+    // Gruener Auslauf, dann blauer Hartplatz obendrauf (US-Open-Palette).
+    ctx.fillStyle="#1c5c3a";
+    ctx.beginPath();
+    ctx.moveTo(W/2-breiteBei(topY)*1.4,topY-30); ctx.lineTo(W/2+breiteBei(topY)*1.4,topY-30);
+    ctx.lineTo(W/2+breiteBei(botY)*1.35,botY+34); ctx.lineTo(W/2-breiteBei(botY)*1.35,botY+34);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#2a5f8f";
+    ctx.beginPath();
+    ctx.moveTo(W/2-breiteBei(topY),topY); ctx.lineTo(W/2+breiteBei(topY),topY);
+    ctx.lineTo(W/2+breiteBei(botY),botY); ctx.lineTo(W/2-breiteBei(botY),botY);
+    ctx.closePath(); ctx.fill();
+
+    // WEISSE LINIEN: Aussenlinie (Doppel), Einzel-Seitenlinien, Aufschlaglinien,
+    // Mittelaufschlaglinie -- keine erfundene Form, das Standard-Tennisplatzbild.
+    const linie=(x0,y0,x1,y1)=>{ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();};
+    ctx.strokeStyle="rgba(255,255,255,.92)"; ctx.lineWidth=2;
+    linie(W/2-breiteBei(topY),topY,W/2+breiteBei(topY),topY);
+    linie(W/2-breiteBei(botY),botY,W/2+breiteBei(botY),botY);
+    linie(W/2-breiteBei(topY),topY,W/2-breiteBei(botY),botY);
+    linie(W/2+breiteBei(topY),topY,W/2+breiteBei(botY),botY);
+    ctx.lineWidth=1.6;
+    linie(W/2-breiteBei(topY)*einzugAussen,topY,W/2-breiteBei(botY)*einzugAussen,botY);
+    linie(W/2+breiteBei(topY)*einzugAussen,topY,W/2+breiteBei(botY)*einzugAussen,botY);
+    const aufTopY=netY-(netY-topY)*0.62, aufBotY=netY+(botY-netY)*0.62;
+    linie(W/2-breiteBei(aufTopY)*einzugAussen,aufTopY,W/2+breiteBei(aufTopY)*einzugAussen,aufTopY);
+    linie(W/2-breiteBei(aufBotY)*einzugAussen,aufBotY,W/2+breiteBei(aufBotY)*einzugAussen,aufBotY);
+    linie(W/2,aufTopY,W/2,aufBotY);
+
+    // NETZ: dunkles Band mit heller Bandkante auf halber Hoehe, Pfosten an beiden Enden.
+    ctx.fillStyle="rgba(20,24,32,.85)";
+    ctx.fillRect(W/2-breiteBei(netY)*1.08,netY-5,breiteBei(netY)*2.16,10);
+    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=1.6;
+    linie(W/2-breiteBei(netY)*1.08,netY-5,W/2+breiteBei(netY)*1.08,netY-5);
+    ctx.fillStyle="#e8e2d0";
+    ctx.fillRect(W/2-breiteBei(netY)*1.1-3,netY-9,6,18);
+    ctx.fillRect(W/2+breiteBei(netY)*1.1-3,netY-9,6,18);
   }
   function bodenShowcase(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
@@ -16717,8 +18892,22 @@
         ctx.closePath();ctx.fill();
       }
     });
-    ctx.strokeStyle="rgba(246,199,80,.5)";ctx.lineWidth=2;
+    // S-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): der Vorhangsaum uebernimmt die Farbe
+    // des Teams mit der hoeheren bislang enthuellten Summe -- dasselbe Bandenlicht-Muster
+    // wie bodenEis() (dezent, beim Fuehrungswechsel kurz voll gesaettigt), Chris'
+    // "ohne Stats sehen, wer fuehrt" jetzt auch fuer Showcase. Solange niemand gepunktet
+    // hat, bleibt die alte, neutrale Goldlinie stehen.
+    const fuehrungSide=showcaseFuehrung();
+    if(fuehrungSide!=null){
+      if(showcaseSaumSide!==fuehrungSide){ showcaseSaumSide=fuehrungSide; showcaseSaumSeit=buehneT; }
+      const voll=Math.max(0,Math.min(1,1-(buehneT-showcaseSaumSeit)/1.4));
+      ctx.strokeStyle=fuehrungSide===0?css("--home"):css("--away");
+      ctx.globalAlpha=0.5+0.5*voll; ctx.lineWidth=2+voll*1.5;
+    } else {
+      ctx.strokeStyle="rgba(246,199,80,.5)";ctx.lineWidth=2;
+    }
     ctx.beginPath();ctx.moveTo(0,vorhangH+2);ctx.lineTo(W,vorhangH+2);ctx.stroke();
+    ctx.globalAlpha=1;
 
     // RAMPENLICHT: eine Reihe warmer Lichtkegel am Buehnenrand -- showcase.tsx' Footlights
     // (dort 13 LEDs im SVG-Massstab, hier 11 im Canvas-Massstab). VOR dem Publikum gezeichnet,
@@ -16767,21 +18956,25 @@
   function showcasePublikumY(){ return H*0.98; }
 
   // ================== WETTESSEN: EIGENES BUEHNENBILD (Opus-Plan Naechste-Drei-Disziplinen ====
-  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // 17-09, Abschnitt 3.2, D2.a; umgebaut auf die "Coney-Island-Tafel" nach dem Opus- =========
+  // Gegencheck 23.09., docs/design/wettessen-format-opus-gegencheck-23-09.md, Abschnitt 5,
+  // S1) =========================================================================================
   // Vorbild fuer die Motive ist app/foundation/discipline-stage/arena/disciplines/platter.tsx
   // ("Banquet-Tafel frontal ... Tellerstapel waechst unter jedem Esser ... Magen-Meter unten
   // mit Gabel-Marker des Fuehrenden") -- NICHT 1:1 uebernommen (SVG vs. Canvas-Primitiven,
   // andere Aufloesung), sondern dieselbe visuelle Sprache im Massstab von
   // bodenHeben()/bodenShowcase() daneben. Ersetzt den generischen violetten
   // Drei-Scheinwerferkegel-Boden (bodenBuehne()) durch eine Bankett-Halle: warmes
-  // Kerzenlicht statt kaltem Buehnenlicht, eine lange karierte Tafel quer durch die
-  // Bildmitte — genau dort, wo die Zwei-Reihen-Aufstellung (Heim oben, Gast unten, s.
-  // zeichneWettessen()) die beiden Seiten ohnehin schon gegenueber positioniert.
+  // Kerzenlicht statt kaltem Buehnenlicht.
   //
-  // KEIN Publikums-Loop (D2.c, dieselbe Begruendung wie Climbing/Spurt/Time-Trial: Risiko
-  // ohne Punkte, A4 ist binaer) — muss aber, wie bodenShowcase() es vormacht, saemtliche
-  // Loops der Buehnen VOR Wettessen abschalten, falls wir GERADE von einer von ihnen
-  // herkommen.
+  // S1, ECHTES NATHAN'S-BILD STATT ZWEI REIHEN (Gegencheck Abschnitt 1.1/1.3): im echten
+  // Wettessen stehen ALLE Esser NEBENEINANDER an einem langen Tisch, mit dem Gesicht zum
+  // Publikum -- sie sitzen sich NICHT gegenueber. Die alte Fassung hatte hier zwei Reihen,
+  // die (wie bei jeder anderen Buehnen-Disziplin) einander an der Tafel gegenuebersassen; das
+  // ist genau die Abweichung, die der Gegencheck als "generisches Boxscore-Raster" benennt.
+  // Die Tafel laeuft deshalb jetzt WEITER UNTEN, direkt unter der EINEN Sitzreihe aus
+  // zeichneWettessen() (s. wettessenSitzplaetze() dort) -- Heim links, Gast rechts,
+  // Trikotfarbe plus Faehnchen am Platz statt zweier Bloecke, die sich anschauen.
   function bodenWettessen(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -16794,7 +18987,9 @@
     g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
 
-    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv).
+    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv) -- unveraendert; die
+    // 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3) haben eigene Zonen weiter unten im Bild,
+    // s. zeichneWettessenUhr()/zeichneWettessenBand().
     ctx.fillStyle="rgba(20,10,6,.75)";ctx.fillRect(W/2-130,4,260,26);
     ctx.strokeStyle="rgba(242,193,78,.7)";ctx.lineWidth=1;ctx.strokeRect(W/2-130,4,260,26);
     ctx.font="800 15px Georgia,serif";ctx.fillStyle="rgba(242,193,78,.85)";
@@ -16807,10 +19002,10 @@
       ctx.beginPath();ctx.moveTo(wx,32);ctx.lineTo(wx+7,42);ctx.lineTo(wx-7,42);ctx.closePath();ctx.fill();
     }
 
-    // LANGE BANKETTAFEL, karierte Tischdecke, quer durch die Bildmitte — dort, wo die
-    // beiden Reihen (Heim oben bei H*0.32, Gast unten bei H*0.66, s. zeichneWettessen())
-    // einander gegenuebersitzen.
-    const tafelY0=H*0.45, tafelY1=H*0.55, felder=28;
+    // LANGE BANKETTAFEL, karierte Tischdecke, quer durchs Bild -- jetzt UNTER der einzigen
+    // Sitzreihe (WETTESSEN_REIHE_Y in wettessenSitzplaetze(), s. dort), statt zwischen zwei
+    // einander gegenuebersitzenden Reihen wie vorher.
+    const tafelY0=H*0.665, tafelY1=H*0.755, felder=28;
     ctx.fillStyle="#5a2416";ctx.fillRect(0,tafelY0,W,tafelY1-tafelY0);
     ctx.fillStyle="rgba(242,237,226,.14)";
     for(let i=0;i<felder;i+=2)ctx.fillRect(i*W/felder,tafelY0,W/felder,tafelY1-tafelY0);
@@ -16838,8 +19033,20 @@
   // stepSchatzsuche()/zeichneSchatzsuche() (Lauf-/Sucheziel) gemeinsam gelesen — dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie showcaseBuzzerPos()/posMap bei
   // zeichneFechten() weiter oben.
-  function ispyFundortXY(f){
-    return {x:W*0.08+f.x*(W*0.84), y:H*0.18+f.y*(H*0.66)};
+  //
+  // SPLIT-SCREEN (I1, Broadcast-Optik-Recherche 27.09., Abschnitt 4): `baueSchatzsuche()`
+  // rechnet seit PR 1 zwei VOELLIG GETRENNTE Raeume (mineRaum/gegnerRaum, s. dortiger
+  // Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG") -- gezeichnet wurde bislang aber EIN Raum,
+  // in dem beide Teams zu denselben zwoelf Moebeln liefen (I0-Befund: "das Bild behauptet
+  // eine Konkurrenz um dieselbe Truhe, die es mechanisch nicht gibt"). `side` bildet
+  // dieselbe normierte Fundort-Koordinate jetzt auf die HAELFTE der Leinwand ab, die zu
+  // GENAU DER Seite gehoert (0..1 -> 4-46 % fuer Heim, 54-96 % fuer Gast, dieselbe Formel
+  // wie im Recherche-Dokument Abschnitt 4/I1 vorgeschlagen) -- die Luecke bei 46-54 % ist
+  // der Trennsteg (s. bodenSchatzsuche()). REIN GEOMETRISCH: `f`/`art.fundorte` selbst
+  // bleiben unangetastet, kein Einfluss auf ispyBesterWeg()/ispySeiteTick()/wert().
+  function ispyFundortXY(f,side){
+    const xBasis=side===1?W*0.54:W*0.04;
+    return {x:xBasis+f.x*(W*0.42), y:H*0.18+f.y*(H*0.66)};
   }
   // WELCHES MOEBELSTUECK AN WELCHEM FUNDORT: die beiden Tuer-Fundorte (`bild:"tuer"`, s.
   // BUEHNE_ART["i-spy"].fundorte-Kommentar "DIE TUER IST BILD") bekommen die Tuer; die
@@ -16932,6 +19139,41 @@
   // showcasePublikumAn -- reines Praesentations-Bookkeeping, s. reset() (N1-Fix) fuer den
   // Rueckstell-Zwang beim naechsten I-Spy-Spiel derselben Session.
   let ispyRaumAn=false;
+  // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): dieselbe
+  // Ablesung wie kuerEisFuehrung() (Eiskunstlauf)/showcaseFuehrung() -- Summe der bereits
+  // enthuellten Punkte je Seite (`u.summe`, von stepBuehne() fuer ALLE Buehnen-Disziplinen
+  // gleich gefuehrt, s. dortiges `u.summe+=r.punkte`), null solange niemand gepunktet hat.
+  // Reine Ableseung, kein rr(), keine neue Formel -- genutzt vom Trennsteg-Tauzieh-Marker
+  // und dem Raumrahmen in bodenSchatzsuche() unten.
+  function ispyFuehrung(){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0);
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0);
+    if(heim===0&&gast===0)return null;
+    return {side:heim>=gast?0:1, heim, gast};
+  }
+  // FUEHRUNGSSEITE MIT NACHTRAEGLICHEM DELTA (I6, Broadcast-Optik-Recherche 27.09.,
+  // Abschnitt 4/I6): dieselbe Ablesung wie ispyFuehrung(), aber mit `heimDelta`/`gastDelta`
+  // auf die aktuellen Summen aufaddiert -- nur um in stepBuehne() (s. dortiger
+  // schatzsuche-Zweig) die Seite VOR einer einzelnen, gerade enthuellten Runde zu lesen
+  // (Aufrufer zieht dort `r.punkte` wieder ab), ohne eine zweite Kopie der Summenbildung zu
+  // brauchen. Reine Ableseung, kein rr(), keine neue Formel.
+  function ispyFuehrungMit(heimDelta,gastDelta){
+    const heim=TEILNEHMER.filter(u=>u.side===0).reduce((s,u)=>s+(u.summe||0),0)+heimDelta;
+    const gast=TEILNEHMER.filter(u=>u.side===1).reduce((s,u)=>s+(u.summe||0),0)+gastDelta;
+    if(heim===0&&gast===0)return null;
+    return heim>=gast?0:1;
+  }
+  // TRENNSTEG-FUEHRUNGSANZEIGE (I5): dasselbe Bandenlicht-Muster wie eisBandeSide/-Seit
+  // bzw. showcaseSaumSide/-Seit -- merkt sich, welche Seite zuletzt fuehrte und seit wann,
+  // fuer die kurze Ueberblendung beim Wechsel. N1-Reset s. reset() unten.
+  let ispySaumSide=null, ispySaumSeit=-999;
+  // ZUG-UHR-ALARM (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): dasselbe N1-Muster
+  // wie ispyRaumAn direkt darueber -- ohne den Reset (s. renderReset()) wuerde der Alarmton
+  // beim zweiten I-Spy-Spiel derselben Sitzung nie wieder feuern, weil das Flag noch auf
+  // "schon alarmiert" vom vorigen Spiel stuende. Reines Praesentations-Bookkeeping, kein
+  // Einfluss auf rr()/wert()/Rangtreue -- aktualisiereIspyHud() (s.u.) ist reines Lesen von
+  // buehneZeiger/buehneAkt/TEILNEHMER, schreibt ausser diesem einen Flag nichts zurueck.
+  let ispyLetzterZugAlarmiert=false;
   function bodenSchatzsuche(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -16974,18 +19216,139 @@
       ctx.fillStyle=s; ctx.beginPath(); ctx.arc(x,y,W*0.18,0,Math.PI*2); ctx.fill();
     });
 
+    // TRENNSTEG (I1, Split-Screen, Broadcast-Optik-Recherche 27.09., Abschnitt 3/I1):
+    // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
+    // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
+    // steht nie mit einem Fundort oder einer Figur in Konflikt.
+    const stegX0=W*0.465, stegX1=W*0.535;
+    ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
+
+    // FUEHRUNG IM BILD (I5, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I5): "der
+    // Trennsteg zwischen den Raeumen ist der Tauzieh-Balken. Er verschiebt sich zur Seite
+    // des Fuehrenden ... Der Rahmen des fuehrenden Raums leuchtet dezent in Teamfarbe, beim
+    // Fuehrungswechsel kurz voll." Dieselbe Crossfade-Mechanik wie showcaseFuehrung()/
+    // bodenEis() (1,4 s Ueberblendung ab dem Wechsel).
+    const fuehrung=ispyFuehrung();
+    if(fuehrung){
+      if(ispySaumSide!==fuehrung.side){ ispySaumSide=fuehrung.side; ispySaumSeit=buehneT; }
+      const voll=Math.max(0,Math.min(1,1-(buehneT-ispySaumSeit)/1.4));
+      const farbe=fuehrung.side===0?css("--home"):css("--away");
+      const gesamt=fuehrung.heim+fuehrung.gast;
+      const verhaeltnis=gesamt>0?Math.abs(fuehrung.heim-fuehrung.gast)/gesamt:0;
+      // TAUZIEH-MARKER: bleibt INNERHALB von stegX0..stegX1 (70% der halben Stegbreite als
+      // maximaler Ausschlag) -- greift damit nie in die Fundort-Haelften ein, deren
+      // Geometrie (ispyFundortXY()) fuer I1 bereits per Screenshot geprueft ist und hier
+      // nicht angefasst wird.
+      const mitteSteg=(stegX0+stegX1)/2, spanne=(stegX1-stegX0)/2*0.7;
+      const markerX=mitteSteg+(fuehrung.side===0?-1:1)*spanne*Math.min(1,verhaeltnis*3);
+      ctx.strokeStyle=farbe; ctx.globalAlpha=0.55+0.45*voll; ctx.lineWidth=2+voll*2;
+      ctx.beginPath(); ctx.moveTo(markerX,0); ctx.lineTo(markerX,H); ctx.stroke();
+      ctx.globalAlpha=1;
+      // RAUMRAHMEN: die Haelfte des Fuehrenden bekommt einen duennen Rand in Teamfarbe --
+      // Chris' "ohne Stats sehen, wer fuehrt" (wortgleiches Muster wie der Showcase-
+      // Vorhangsaum/das Eis-Bandenlicht), dezent ausser kurz nach einem Wechsel.
+      const rahmenX0=fuehrung.side===0?4:stegX1+4, rahmenX1=fuehrung.side===0?stegX0-4:W-4;
+      ctx.strokeStyle=farbe; ctx.globalAlpha=0.16+0.34*voll; ctx.lineWidth=2+voll*2;
+      ctx.strokeRect(rahmenX0,4,Math.max(0,rahmenX1-rahmenX0),H-8);
+      ctx.globalAlpha=1;
+    } else {
+      // NEUTRAL, solange niemand gepunktet hat -- dieselbe goldene Mittellinie wie vor I5.
+      ctx.strokeStyle="rgba(255,214,150,.20)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(W*0.5,0); ctx.lineTo(W*0.5,H); ctx.stroke();
+    }
+
     // ZWOELF FUNDORTE, aus BUEHNE_ART["i-spy"].fundorte — reine Referenzdaten, kein rr().
+    // GEZEICHNET wird an der Koordinate aus ISPY_VISUELLES_LAYOUT (s. Kommentar bei
+    // ISPY_LAYOUT_VARIANTEN), falls baueSchatzsuche() diesem Spiel schon eine Karte
+    // zugewiesen hat — sonst (Sicht-QA vor dem ersten Tick) Fallback auf f.x/f.y selbst.
+    // ART/BILD (Moebelwahl) kommen UNVERAENDERT aus `f`.
+    //
+    // JE SEITE EINMAL (I1): vorher EIN gemeinsam gezeichneter Raum fuer beide Teams (I0-
+    // Befund) -- jetzt exakt dieselben zwoelf Moebel zweimal, einmal in JEDER Haelfte
+    // (`ispyFundortXY(vis,seite)`), dieselbe Karte (ISPY_VISUELLES_LAYOUT ist EINMAL je
+    // Spiel gewuerfelt, nicht je Seite) fair fuer beide.
+    //
+    // TRUHENZUSTAND JE RAUM (I1, "der zweite Gewinn"): `ispyRaumZustand(seite)` liest NUR
+    // die fuer DIESE Seite bereits enthuellten `u.runden[]` (Spoiler-Regel wie
+    // ispyTickerZeile()) und liefert je Fundort-Index die zuletzt gesehene Stufe/den
+    // zuletzt gesehenen Ausgang -- `ispySterne()` zeigt diese Stufe statt der Startstufe
+    // aus `f.stufe`, eine erfolgreich geknackte Truhe wird sichtbar gedimmt (statt wie
+    // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
+    // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
+    // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
     if(art.fundorte){
-      for(const f of art.fundorte){
-        const p=ispyFundortXY(f);
-        ctx.save(); ctx.translate(p.x,p.y);
-        ctx.fillStyle="rgba(0,0,0,.30)";
-        ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
-        (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
-        ctx.restore();
-        ispySterne(p.x,p.y-26,f.stufe);
+      [0,1].forEach(seite=>{
+        const zustand=ispyRaumZustand(seite);
+        art.fundorte.forEach((f,idx)=>{
+          const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
+          const p=ispyFundortXY(vis,seite);
+          const z=zustand.get(idx);
+          const stufeAnzeige=z?z.stufe:f.stufe;
+          // ANGEBROCHENE TRUHEN GLUEHEN NACH (I4, Broadcast-Optik-Recherche 27.09.,
+          // Abschnitt 4/I4): waechst mit `z.fehlserie` (ispyRaumZustand() oben), gedeckelt
+          // wie die Mechanik selbst (ISPY_FORTSCHRITT_DECKEL/-SCHRITT: nur zwei Schritte
+          // zaehlen) -- "heiss" im Wortsinn, stimmt mit dem Motor ueberein statt eine
+          // erfundene Naehe vorzuspielen (s. I4-Kommentar bei zeichneLupe). Hinter dem
+          // Moebelstueck gezeichnet, reiner additiver Radial-Schein, keine neue Formel.
+          if(z&&!z.offen&&z.fehlserie>0){
+            const stufen=ISPY_FORTSCHRITT_DECKEL/ISPY_FORTSCHRITT_SCHRITT;
+            const glutStaerke=Math.min(z.fehlserie,stufen)/stufen;
+            const glut=ctx.createRadialGradient(p.x,p.y-6,2,p.x,p.y-6,22);
+            glut.addColorStop(0,"rgba(255,110,60,"+(0.10+0.22*glutStaerke).toFixed(2)+")");
+            glut.addColorStop(1,"rgba(255,110,60,0)");
+            ctx.fillStyle=glut; ctx.beginPath(); ctx.arc(p.x,p.y-6,22,0,Math.PI*2); ctx.fill();
+          }
+          ctx.save(); ctx.translate(p.x,p.y);
+          ctx.fillStyle="rgba(0,0,0,.30)";
+          ctx.beginPath(); ctx.ellipse(0,10,15,5,0,0,Math.PI*2); ctx.fill();
+          if(z&&z.offen)ctx.globalAlpha=0.5;
+          (ISPY_MOEBEL[ispyMoebelArt(f)]||ispyZeichneTruhe)(ctx);
+          ctx.globalAlpha=1;
+          ctx.restore();
+          ispySterne(p.x,p.y-26,stufeAnzeige);
+          if(z&&!z.offen){
+            ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,120,90,.9)";
+            ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+            ctx.fillText("angebrochen",p.x,p.y+21);
+          }
+        });
+      });
+    }
+  }
+  // TRUHENZUSTAND EINER EINZELNEN SEITE (I1, s. bodenSchatzsuche()-Kommentar oben): fuer
+  // jeden Fundort-Index der zuletzt (hoechster Zug-Index) enthuellte Zug DIESER Seite, der
+  // diesen Fundort getroffen hat -- `ri<=u.aktuell` ist exakt die Spoiler-Grenze, die
+  // ispyTickerZeile()/WERTUNG_CHASSIS auch sonst einhalten. `art==null`-Zuege (kein Ziel
+  // diesen Tick) haben kein `r.fundort` und werden dabei uebersprungen. Reiner Leser,
+  // schreibt nichts auf `u`/`t`/`u.runden` zurueck.
+  // FEHLSERIE (I4, Broadcast-Optik-Recherche 27.09., Abschnitt 4/I4 "angebrochene Truhen
+  // gluehen nach"): wie viele ENTHUELLTE Fehlschlaege in Folge zuletzt an diesem Fundort
+  // standen -- dieselbe Groesse, die ISPY_FORTSCHRITT_SCHRITT/-DECKEL mechanisch am Fundort
+  // selbst fuehren (t.fortschritt, s. Kommentar dort), hier NUR aus den bereits enthuellten
+  // `u.runden[]` zurueckgerechnet (Spoiler-Regel wie ueberall in dieser Funktion). Ein
+  // Erfolg setzt die Serie auf 0 zurueck (die Truhe ist danach neu/nachgefuellt und traegt
+  // keinen alten Fortschritt mehr). `ri<bisher.ri`-Reihenfolge ist dieselbe Naeherung wie
+  // beim Rest dieser Funktion (mehrere Detektive derselben Seite vergleichen ihre eigenen
+  // Zugindizes, nicht eine globale Tick-Uhr) -- fuer eine rein kosmetische Gluteinstufung
+  // (I4: gedeckelt bei ISPY_FORTSCHRITT_DECKEL, also ohnehin nur 0/1/2 Stufen) reicht das.
+  function ispyRaumZustand(seite){
+    const zustand=new Map();
+    const art=BB();
+    for(const u of TEILNEHMER){
+      if(u.side!==seite||!u.runden)continue;
+      const bisAktuell=Math.min(u.aktuell,u.runden.length-1);
+      for(let ri=0;ri<=bisAktuell;ri++){
+        const r=u.runden[ri];
+        if(!r||r.fundort==null)continue;
+        const bisher=zustand.get(r.fundort);
+        if(!bisher||bisher.ri<ri){
+          const offen=r.ereignis===art.erfolgWort;
+          const fehlserie=offen?0:((bisher&&!bisher.offen)?bisher.fehlserie+1:1);
+          zustand.set(r.fundort,{ri,stufe:r.stufe,offen,fehlserie});
+        }
       }
     }
+    return zustand;
   }
 
   // EIGENE HEBEBUEHNE (Ziel 1, 10.09.) statt des Allzweck-Podests oben — Chris' Sicht-QA-
@@ -17000,9 +19363,31 @@
     g.addColorStop(0,"#14171d");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     // Publikumssilhouetten im Dunkeln, oberer Rand.
+    //
+    // H3 (Broadcast-Optik-Recherche 27.09., Klasse A): PUBLIKUM REAGIERT AUF DIE PHASE
+    // (Doku Abschnitt 4: "Silhouetten wippen im Takt" beim Antritt, stehen still beim Zug,
+    // springen einmal beim gueltigen Versuch). Liest ausschliesslich `zug.u.vizPhase`
+    // (stepHeben(), bereits reveal-/phasengegatet, dieselbe Quelle wie die Kampfrichter-
+    // lampen/Textkarte weiter unten in dieser Funktion) und `zug.u.vizPhaseT` (derselbe
+    // Phasen-eigene Timer, den stepHeben() ohnehin fuehrt -- kein neues Feld noetig).
+    // `zug.r.gueltig` ist zu diesem Zeitpunkt bereits enthuellt (dieselbe Zahl, die die
+    // Lampen/H1-Kaestchen weiter unten faerben), also kein Spoiler.
+    const hebenZug=letzterHebenZug;
+    const hebenPhase=hebenZug?hebenZug.u.vizPhase:null;
+    // ANTRITT: Klatschrhythmus im Bild -- eine gemeinsame, schnelle Wippbewegung alle
+    // Silhouetten, synchron zum "klatschen"-Ton (s. Trigger in zeichneHeben()).
+    const klatschWippe=hebenPhase==="antritt"?Math.abs(Math.sin(buehneT*2*Math.PI*4.2))*2.2:0;
+    // HOCH (gueltiger Versuch): ein einmaliger, abklingender Sprung genau beim Betreten der
+    // Phase -- `vizPhaseT` startet bei 0 und waechst, exakt das Fenster, das gebraucht wird.
+    const hebenSprung=(hebenPhase==="hoch")
+      ?Math.max(0,Math.sin(Math.min(1,(hebenZug.u.vizPhaseT||0)/0.30)*Math.PI))*5:0;
+    // ABLAGE nach einem ECHTEN Fehlversuch (nicht nach einer erfolgreichen Haltephase):
+    // ein kurzes, abklingendes Absacken -- das "Raunen" im Bild.
+    const hebenDroop=(hebenPhase==="ablage"&&hebenZug&&!hebenZug.r.gueltig)
+      ?Math.max(0,1-(hebenZug.u.vizPhaseT||0)/0.35)*3:0;
     ctx.fillStyle="#1c1f27";
     for(let i=0;i<26;i++){
-      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4;
+      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4-klatschWippe-hebenSprung+hebenDroop;
       ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
     }
     // WETTKAMPFPLATTFORM: helles Quadrat mit Kante, mittig in der Bildebene der Heber.
@@ -17038,7 +19423,7 @@
     // ausserhalb des Canvas) statt darueber — sonst kollidieren beide Textbloecke, s.
     // Sicht-QA-Screenshot dieses PRs (docs/design/gewichtheben-nachher-10-09.png, erste
     // Fassung).
-    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=54;
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=80;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
     ctx.textAlign="left";ctx.textBaseline="middle";
@@ -17049,6 +19434,48 @@
     ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
     ctx.font="700 16px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
     ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
+    // NAECHSTE ANSAGE (H2.2, Broadcast-Optik-Recherche 27.09., Klasse A): "Nächster Versuch:
+    // Draco, 127 kg" — Taktik am Meldetisch (Doku 2.1, belegt). `buehneQueue[buehneZeiger]`
+    // ist genau der naechste Teilnehmer, der als naechstes dequeued wird (reine Ablesung,
+    // kein Schreiben) — sein naechster, noch nicht enthuellter Rundeneintrag traegt die
+    // ANGESAGTE Last, die im Wettkampf oeffentlich am Meldetisch steht, bevor der Versuch
+    // beginnt (kein Spoiler des ERGEBNISSES, nur der Last, genau wie beim laufenden Versuch
+    // oben).
+    //
+    // SPOILER-FALLE (H2.2 woertlich): ein Fehlversuch senkt die naechste Last des SELBEN
+    // Hebers um HEBEN_FEHL_REDUKTION — die naechste Ansage verriete also, ob der LAUFENDE
+    // Versuch misslingt, wenn sie schon waehrend dessen Animation erscheint. Deshalb NUR
+    // zeigen, wenn der laufende Versuch schon aufgeloest ist (u.vizPhase ist "hoch" oder
+    // "ablage", dieselbe Grenze wie bei der Versuchstafel H1) — das ist zugleich die echte
+    // Reihenfolge: die neue Ansage kommt nach dem Urteil.
+    if(zug){
+      const phaseJetzt=zug.u.vizPhase||hebePhase(zug.u);
+      if(phaseJetzt==="hoch"||phaseJetzt==="ablage"){
+        const naechsterU=buehneQueue[buehneZeiger];
+        const naechsteR=naechsterU?naechsterU.runden[naechsterU.aktuell+1]:null;
+        if(naechsterU&&naechsteR){
+          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#5f6675";
+          const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
+          const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
+          ctx.fillText("Nächster: "+naechsterName+", "+kgTxt,tafelX+10,tafelY+60);
+          // "ZIEHT NACH" (H2.3): der Motor kennt heute genau eine Ansage-Aenderung, die aus
+          // dem Duellstand selbst folgt — der reaktive Zuschlag im dritten Versuch
+          // (kuehnFlag/HEBEN_WAGNIS_MAX_KG, s. hebeUebung()). Sichtbar als kurzes gelbes
+          // "↑ +N kg" GEGENUEBER DEM EIGENEN vorigen Versuch derselben Uebung — reine
+          // Ansage-Information (kein Ergebnis), also kein weiterer Spoiler.
+          if(naechsteR.kuehn&&naechsterU.aktuell>=0){
+            const vorige=naechsterU.runden[naechsterU.aktuell];
+            if(vorige&&vorige.uebung===naechsteR.uebung){
+              const deltaKg=sinclairAnzeige(naechsteR.kg-vorige.kg,naechsterU.groesse);
+              if(deltaKg>0){
+                ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
+                ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+74);
+              }
+            }
+          }
+        }
+      }
+    }
     // KREIDE-/MAGNESIAKISTE, unten links auf der Plattformkante.
     ctx.fillStyle="#e9e6de";ctx.fillRect(W*0.08,platY+platH-14,26,14);
     ctx.strokeStyle="#9a9788";ctx.lineWidth=1;ctx.strokeRect(W*0.08,platY+platH-14,26,14);
@@ -17111,6 +19538,51 @@
     // Goldene Bandenkante — der eine Farbakzent, den der Plan ausdruecklich nennt.
     ctx.lineWidth=2;ctx.strokeStyle="rgba(214,172,54,.85)";eisRundweg(k,4);ctx.stroke();
 
+    // FUEHRUNG IM BILD (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a+2c, umgesetzt
+    // 26.09.). Chris woertlich: "da fehlt mir auf dem eis noch ein gefuehl dafuer fuer wen
+    // es gut laeuft und fuer wen weniger gut da kann man eigentlich nur links auf die
+    // grafik gucken". Beide Ebenen lesen ausschliesslich kuerEisFuehrung() -- dieselbe
+    // Sortierung wie die Zwischenstand-Tafel (zeichneEisStand), keine zweite Berechnung,
+    // kein neuer Wert, nichts geschrieben ausser den beiden rein zeichnerischen
+    // Modulvariablen eisBandeSide/eisBandeSeit (Crossfade-Zeitpunkt).
+    const fuehrung=kuerEisFuehrung();
+    if(fuehrung && fuehrung.side!=null){
+      // (a) BANDENLICHT: die Bande selbst leuchtet in der Farbe des fuehrenden Teams --
+      // dezent im Dauerzustand (30% Deckkraft), fuer 1,4s nach einem Fuehrungswechsel voll
+      // gesaettigt (Voreinstellung aus Abschnitt 9, Frage 2 des Konzepts: "permanent, aber
+      // dezent, beim Wechsel kurz voll"). Liegt zwischen der weissen Aussenkante (0px) und
+      // der goldenen Innenkante (4px), damit beide sichtbar bleiben.
+      if(eisBandeSide!==fuehrung.side){ eisBandeSide=fuehrung.side; eisBandeSeit=buehneT; }
+      const seitWechsel=buehneT-eisBandeSeit;
+      const voll=Math.max(0,Math.min(1,1-seitWechsel/1.4));
+      ctx.globalAlpha=0.30+0.65*voll;
+      ctx.lineWidth=4;
+      ctx.strokeStyle=fuehrung.side===0?css("--home"):css("--away");
+      eisRundweg(k,1.5);ctx.stroke();
+      ctx.globalAlpha=1;
+
+      // (c) VORSPRUNGSBALKEN: waagerechter Balken knapp innerhalb der oberen Bande, in der
+      // Mitte geteilt, der sich zur fuehrenden Seite hin fuellt -- Laenge aus der bisher
+      // enthuellten Punktdifferenz relativ zur bisher enthuellten Gesamtpunktzahl. Chris'
+      // "wer besiegt wen aktuell" als Teamfrage im Bild statt nur im Panel links. Liegt
+      // deutlich oberhalb der Kuerbahn (kuerBahn(): Sprite-Kopf ab H*0.26) und unterhalb der
+      // Zwischenstand-Tafel (vertikal um H*0.5 zentriert) -- keine Ueberlappung mit beiden.
+      const gesamt=fuehrung.heim+fuehrung.gast;
+      if(gesamt>0){
+        const anteil=Math.max(-1,Math.min(1,(fuehrung.heim-fuehrung.gast)/gesamt));
+        const bw=(k.r-k.l)*0.62, bx0=(k.l+k.r)/2-bw/2, by=k.o+16, bh=6, mitte=bx0+bw/2;
+        ctx.fillStyle="rgba(16,20,28,.68)"; ctx.fillRect(bx0,by,bw,bh);
+        ctx.strokeStyle="rgba(255,255,255,.20)"; ctx.lineWidth=1; ctx.strokeRect(bx0,by,bw,bh);
+        const fuell=(bw/2)*Math.abs(anteil);
+        // Heim fuellt nach LINKS, Gast nach RECHTS (Konzept 5.2c: "der sich nach links
+        // (Heim) oder rechts (Gast) fuellt").
+        ctx.fillStyle=anteil>=0?css("--home"):css("--away");
+        if(anteil>=0) ctx.fillRect(mitte-fuell,by+1,fuell,bh-2); else ctx.fillRect(mitte,by+1,fuell,bh-2);
+        ctx.strokeStyle="rgba(255,255,255,.4)"; ctx.beginPath();
+        ctx.moveTo(mitte,by); ctx.lineTo(mitte,by+bh); ctx.stroke();
+      }
+    }
+
     // Kampfgericht-Tisch, unterhalb der Bande am unteren Rand.
     ctx.fillStyle="#232838";ctx.fillRect(W*0.36,k.u+6,W*0.28,15);
     ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=1;ctx.strokeRect(W*0.36,k.u+6,W*0.28,15);
@@ -17151,7 +19623,7 @@
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): genau die weitere
     // else-if-Zeile, die der Kommentar oben ankuendigt -- s. bodenWettessen() oben.
-    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else if(art.schatzsuche&&typeof bodenSchatzsuche==="function")bodenSchatzsuche(); else bodenBuehne();
+    if(art.heben)bodenHeben(); else if(art.duett)bodenEis(); else if(art.showcase&&typeof bodenShowcase==="function")bodenShowcase(); else if(art.wettessen&&typeof bodenWettessen==="function")bodenWettessen(); else if(art.schatzsuche&&typeof bodenSchatzsuche==="function")bodenSchatzsuche(); else if(art.tennis&&typeof bodenTennis==="function")bodenTennis(); else bodenBuehne();
     // GEWICHTHEBEN BEKOMMT EIN EIGENES BUEHNENBILD (Plan Schritt S2, Abschnitt 7): zwei
     // Heber mittig statt zwoelf Teilnehmer in zwei Reihen — echtes Gewichtheben zeigt nie
     // mehr als ein Duell gleichzeitig auf der Plattform. Die anderen sechs Buehnen-
@@ -17305,84 +19777,435 @@
   // ":13167/:13182") statt einer eigenen Uhr — disziplinProbe()/miss-alle-disziplinen.mjs
   // lesen dadurch exakt dieselben Felder wie zuvor, die Rangtreue-Neutralitaet ist also
   // strukturell gegeben, nicht nur behauptet.
-  function zeichneTennis(art){
-    const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
-    const posVon=(u)=>{
-      const g=TEILNEHMER.filter(x=>x.side===u.side);
-      const i=g.indexOf(u);
-      // +u.vizSchlagBob (M2, Feinschliff 21-09): derselbe additive Grundstellungs-Wipper wie
-      // zeichneFechten()s "laneY+(a.vizFechtBob||0)" (":16165") — reine Kosmetik, wirkt sich
-      // auf Ball-Start-/Zielpunkt genauso aus wie auf die Sprite-Position selbst.
-      return {x:90+(W-180)*(g.length>1?i/(g.length-1):0.5), y:(u.side===0?H*0.32:H*0.66)+(u.vizSchlagBob||0)};
-    };
-    [0,1].forEach(side=>{
-      const g=TEILNEHMER.filter(u=>u.side===side);
-      const y0=side===0?H*0.32:H*0.66;
-      g.forEach((u,i)=>{
-        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-        const y=y0+(u.vizSchlagBob||0);
-        ctx.globalAlpha=u.lunge>0?1:0.92;
-        const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
-        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=1;
-        // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei
-        // (Schlaeger an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-
-        // Pose statt eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach oben.
-        zeichneSprite(ctx,u,x,y,true);
-        ctx.textAlign="center";ctx.textBaseline="middle";
-        const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
-          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
-        };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-        schrift((v>0?"+":"")+v+" Vorteil",56,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),9);
-        const w=30,mitte=x,halb=Math.min(w/2,(w/2)*Math.abs(v)/maxVorteil);
-        ctx.fillStyle=css("--line");ctx.fillRect(mitte-w/2,y+64,w,3);
-        ctx.fillStyle=v>=0?css("--ok"):css("--crit");
-        ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
-        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
-      });
+  // ================== NAHANSICHT-REGIE FUeR TENNIS/FECHTEN (26.09., Audit-Empfehlung 3,
+  // docs/design/ui-bewegungs-audit-26-09.md) ==================
+  // Speed-Schach zoomt seit der Produktivierung sichtbar auf EIN Brett (zeichneSchach()
+  // oben, Regie-Kommentar dort); Tennis und Fechten zeigten in 20 Playwright-Stichproben
+  // (Audit-Methode s. Dokument oben) NIE eine Nahansicht — nur die dauerhafte Sechs-Duelle-
+  // Miniaturuebersicht. Diese Funktion ist Tennis/Fechtens Gegenstueck zu zeichneSchach()s
+  // Regie-Block, als eigene Funktion statt zweimal inline dupliziert (zwei Aufrufstellen:
+  // zeichneTennis()/zeichneFechten() unten). GENAU DIESELBE 3-Sekunden-Uhr und "knappster
+  // laufender Vorstand"-Heuristik wie Schach — plus EINE Ergaenzung, die Schach nicht
+  // braucht: `aktivFn` laesst den Fokus SOFORT (noch VOR der naechsten 3s-Marke) auf ein
+  // Brett springen, auf dem gerade eine sichtbare Aktion laeuft (Ballwechsel/Ausfallschritt)
+  // — ein Schachzug hat keine so kurze, leicht zu verpassende Animation, ein Ballwechsel/
+  // Fechtgang schon. REIN PRAESENTATIONAL: liest ausschliesslich u.aktuell/u.verlauf/
+  // u.summe/u.side/u.brett (bereits vorhandene TEILNEHMER-Felder) und modulweite
+  // tennisFokus/fechtenFokus (reine Anzeige-Zustaende, s. Deklaration oben) — schreibt
+  // nichts auf TEILNEHMER, ruft nirgends rr()/stepBuehne() auf. disziplinProbe()/
+  // miss-alle-disziplinen.mjs rufen diese Zeichenfunktionen nie auf (derselbe Vertrag wie
+  // bei zeichneSchach(), s. Kommentar dort) — rho bleibt fuer tennis/fechten/speed-schach
+  // bit-identisch (nachgemessen, s. PR-Beschreibung).
+  function duellFokusWaehlen(bisher,bretter,paar,rundenN,aktivFn){
+    const fertig=(u)=>u.aktuell+1>=rundenN;
+    const gueltig=(b)=>{const [x,y]=paar(b); return !!x&&!!y;};
+    const alleFertig=Array.from({length:bretter},(_,b)=>b).every(b=>{
+      const [x,y]=paar(b); return !x||!y||(fertig(x)&&fertig(y));
     });
+    if(alleFertig){
+      let best=gueltig(bisher)?bisher:0,bs=-Infinity;
+      for(let b=0;b<bretter;b++){const [x]=paar(b); if(!x)continue; if(x.summe>bs){bs=x.summe;best=b;}}
+      return best;
+    }
+    if(aktivFn){
+      for(let b=0;b<bretter;b++){
+        const [a,c]=paar(b); if(!a||!c)continue;
+        if(aktivFn(a)||aktivFn(c))return b;
+      }
+    }
+    const fokus=gueltig(bisher)?bisher:0;
+    if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
+      let best=fokus,bv=Infinity;
+      for(let b=0;b<bretter;b++){
+        const [a]=paar(b); if(!a)continue;
+        const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
+        if(v<bv){bv=v;best=b;}
+      }
+      return best;
+    }
+    return fokus;
+  }
+
+  // ================== QUERSCHNITT: BROADCAST-OPTIK BUEHNEN-DUELL (27.09.), Abschnitt 3 ====
+  // docs/design/broadcast-optik-buehne-duell-27-09.md (Branch
+  // broadcast-buehne-duell-recherche-27-09), Q1-Q3 -- gemeinsame Bausteine fuer Speed-Schach/
+  // Fechten/Tennis. ALLE DREI SIND [Anzeige]: sie lesen ausschliesslich bereits enthuelltes
+  // (u.aktuell/u.verlauf[0..aktuell]/u.runden[0..aktuell]/u.treffer), schreiben nie auf
+  // summe/runden/aktuell/vorteil/verlauf/treffer/gefechtSieg/lunge/buehneAkt/buehneZeiger/
+  // done, rufen nie rr() -- exakt derselbe harte Vertrag wie stepSchach()/stepFechten()/
+  // stepTennis() (s. dortige Kommentare). miss-alle-disziplinen.mjs bleibt dadurch per
+  // Konstruktion bit-identisch (trotzdem vorher/nachher gemessen, s. PR-Beschreibung).
+
+  // Q1 -- VERLAUFSKURVE (Eval-Graph/Momentum-Linie, [Anzeige, klein]). `u.verlauf` traegt den
+  // Verlauf schon (der Bewertungsbalken in zeichneSchach()/zeichneFechten() liest daraus nur
+  // den letzten Wert) -- diese Funktion zeichnet ihn zusaetzlich als Flaechenlinie um die
+  // Nulllinie, Heimfarbe oberhalb, Gastfarbe unterhalb. Skalierung mit demselben Bodenwert 60
+  // wie die bestehenden Bewertungsbalken (`maxV`), NICHT aus `u.vorteil` (Abschnitt 1,
+  // Befund 1: `u.vorteil` ist der Endwert und damit ein Spoiler-Leck). Markiert
+  // Vorzeichenwechsel mit einem kleinen Punkt -- dieselbe Bedingung wie `vorteilKipptBig`
+  // (feed()-Kommentar weiter oben), hier ohne dessen Gegen-Gate: eine gezeichnete Kurve feuert
+  // kein feed()-Ereignis und kann sich deshalb nicht doppelt "abfeuern".
+  function zeichneVerlaufKurve(x,y,w,h,u){
+    if(!u||!u.verlauf||u.aktuell<0)return;
+    const n=u.aktuell+1;
+    const boden=60;
+    const maxV=Math.max(boden,...u.verlauf.slice(0,n).map(v=>Math.abs(v||0)));
+    const mitteY=y+h/2;
+    const px=(i)=>n<=1?x:x+w*i/(n-1);
+    const py=(v)=>mitteY-(h/2)*Math.max(-1,Math.min(1,(v||0)/maxV));
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+    ctx.strokeStyle="rgba(230,232,240,.22)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,mitteY); ctx.lineTo(x+w,mitteY); ctx.stroke();
+    const flaeche=(farbe,ueber)=>{
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x,ueber?y:mitteY,w,h/2); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(px(0),mitteY);
+      for(let i=0;i<n;i++)ctx.lineTo(px(i),py(u.verlauf[i]));
+      ctx.lineTo(px(n-1),mitteY); ctx.closePath();
+      ctx.fillStyle=farbe; ctx.globalAlpha=0.3; ctx.fill();
+      ctx.restore();
+    };
+    flaeche(css("--home"),true);
+    flaeche(css("--away"),false);
+    ctx.strokeStyle=css("--home"); ctx.lineWidth=1.4; ctx.beginPath();
+    for(let i=0;i<n;i++){ const px_=px(i),py_=py(u.verlauf[i]); if(i===0)ctx.moveTo(px_,py_); else ctx.lineTo(px_,py_); }
+    ctx.stroke();
+    for(let i=1;i<n;i++){
+      if(Math.sign(u.verlauf[i]||0)!==Math.sign(u.verlauf[i-1]||0)){
+        ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.arc(px(i),py(u.verlauf[i]),2.2,0,Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  // FECHTEN-VARIANTE (Dokument Abschnitt 3, Q1): eine Treffer-Treppe statt einer Vorteils-
+  // linie, weil seit F1 (26.09.) der Trefferstand das Ergebnis ist, nicht der Vorteil
+  // (`gefechtSieg` liest die Trefferdifferenz, s. Kommentar bei BUEHNE_ART.fechten). Reine
+  // Ableitung aus den bereits enthuellten `runden[]` (art.erfolgWort) -- genau das Muster,
+  // das der BUEHNE_ART.fechten-Kommentar fuer den ENDGUELTIGEN Trefferstand vorschreibt
+  // ("aus den vollstaendigen runden[] gezaehlt, nicht aus u.treffer"), hier fuer jeden
+  // Zwischenschritt wiederholt. Liest nie ueber a.aktuell/b.aktuell hinaus.
+  function zeichneTrefferTreppe(x,y,w,h,a,b,art){
+    if(!a||!b)return;
+    const n=Math.max(a.aktuell,b.aktuell)+1; if(n<=0)return;
+    const kumuliert=(u)=>{
+      let t=0; const arr=[0];
+      for(let i=0;i<n;i++){ if(i<=u.aktuell){ const r=u.runden[i]; if(r&&r.ereignis===art.erfolgWort)t++; } arr.push(t); }
+      return arr;
+    };
+    const ka=kumuliert(a), kb=kumuliert(b);
+    const maxT=Math.max(1,ka[ka.length-1],kb[kb.length-1]);
+    const px=(i)=>x+w*i/n;
+    const py=(t)=>y+h-(h*t/maxT);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+    const treppenlinie=(arr,farbe)=>{
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.6; ctx.beginPath();
+      for(let i=0;i<arr.length;i++){
+        const px_=px(i), py_=py(arr[i]);
+        if(i===0)ctx.moveTo(px_,py_); else ctx.lineTo(px_,py_);
+        if(i<arr.length-1)ctx.lineTo(px(i+1),py_);
+      }
+      ctx.stroke();
+    };
+    treppenlinie(ka,css("--home"));
+    treppenlinie(kb,css("--away"));
+    ctx.restore();
+  }
+
+  // Q2 -- MANNSCHAFTS-LEISTE ([Anzeige, klein]). Ersetzt die Luecke zwischen dem grossen
+  // Duellstand (z.B. "2 : 1" bei Speed-Schach) und den Mini-Brettern/-Bahnen/-Plaetzen
+  // darunter, die keinen Stand tragen (Tennis) oder ihn nur als Kleintext fuehren (Fechten) --
+  // Olympiade-Schach-/Davis-Cup-Tie-Tafel-Konvention (Dokument Abschnitt 2.1/3). `boxen` ist
+  // ein Array {fertig, text, farbVar, fokus}, das jede Zeichenfunktion selbst aus ihrem
+  // eigenen paar()/fertig() baut -- diese Funktion zeichnet nur, liest nichts selbst.
+  function zeichneMannschaftsLeiste(x,y,w,boxen,bh){
+    const n=boxen.length; if(!n)return;
+    bh=bh||20;
+    const gap=4, bw=Math.min(46,(w-(n-1)*gap)/n);
+    const startX=x-(bw*n+gap*(n-1))/2;
+    const fontPx=Math.max(8,Math.round(bh*0.52));
+    ctx.save();
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    boxen.forEach((b,i)=>{
+      const bx=startX+i*(bw+gap);
+      ctx.fillStyle=b.fertig?"rgba(255,255,255,.09)":"rgba(255,255,255,.04)";
+      ctx.fillRect(bx,y,bw,bh);
+      ctx.strokeStyle=b.fokus?"#f2d75a":"rgba(255,255,255,.2)";
+      ctx.lineWidth=b.fokus?2:1;
+      ctx.strokeRect(bx,y,bw,bh);
+      ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=b.farbVar?css(b.farbVar):"#c7ccd6";
+      ctx.fillText(b.text,bx+bw/2,y+bh/2+1);
+    });
+    ctx.restore();
+  }
+
+  // Q3 -- SPIELERKACHEL MIT PORTRAeT ALS "SPIELER-KAMERA" ([Anzeige, klein-mittel]). Die
+  // Arena kennt Portraets schon (portraet(), s. dort) -- die dort verwendete Fassung haengt
+  // ein <img> ins DOM, die animierte Buehne zeichnet aber auf Canvas. Eigener, von
+  // portraet() unabhaengiger Bild-Cache: einmal laden, danach nur noch drawImage() (Dokument
+  // Abschnitt 3, Q3: "kein DOM noetig"). Faellt auf das Kuerzel auf farbigem Grund zurueck,
+  // solange kein Bild geladen ist -- derselbe Rueckfall-Gedanke wie bei portraet() ("ein
+  // leerer grauer Kasten wuerde aussehen, als sei etwas kaputt").
+  const battlePortraitCache=new Map();
+  function battlePortraitBild(u){
+    let e=battlePortraitCache.get(u.n);
+    if(!e){
+      const im=new Image();
+      e={im,geladen:false,fehler:false};
+      im.onload=()=>{e.geladen=true;};
+      im.onerror=()=>{e.fehler=true;};
+      im.src="/portraits/"+kennungVon(u.n)+".jpg";
+      battlePortraitCache.set(u.n,e);
+    }
+    return e;
+  }
+  // x/y ist die Mitte der Kachel, groesse die Kantenlaenge in px.
+  function zeichneSpielerKachel(u,x,y,groesse,farbVar){
+    const e=battlePortraitBild(u);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x-groesse/2,y-groesse/2,groesse,groesse); ctx.clip();
+    if(e.geladen&&!e.fehler){
+      ctx.drawImage(e.im,x-groesse/2,y-groesse/2,groesse,groesse);
+    } else {
+      ctx.fillStyle=css(farbVar||"--home"); ctx.fillRect(x-groesse/2,y-groesse/2,groesse,groesse);
+      ctx.fillStyle="rgba(8,10,14,.5)"; ctx.fillRect(x-groesse/2,y-groesse/2,groesse,groesse);
+      ctx.font="700 "+Math.round(groesse*0.38)+"px 'Barlow Condensed',sans-serif";
+      ctx.fillStyle="#f2e9d8"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(u.n.slice(0,2).toUpperCase(),x,y+1);
+    }
+    ctx.restore();
+    ctx.strokeStyle="rgba(230,232,240,.4)"; ctx.lineWidth=1.4;
+    ctx.strokeRect(x-groesse/2,y-groesse/2,groesse,groesse);
+  }
+  // BAUCHBINDE beim Fokuswechsel (Dokument Abschnitt 3, Q3: "Beim Fokuswechsel einmal 2s
+  // eine Bauchbinde: Name, Slot-Rolle, Bilanz bis hier"). Modulzustand der Regie (kein
+  // TEILNEHMER-Feld, genau wie schachFokus/tennisFokus/fechtenFokus selbst) -- `board`
+  // haelt fest, welches Brett/welche Bahn/welchen Platz diese Funktion zuletzt gezeigt hat;
+  // wechselt er, startet der 2s-Timer neu. Zeigt den Heim-Teilnehmer des neuen Fokus.
+  // "Bilanz" zaehlt REIN LESEND aus runden[0..u.aktuell] (Abschnitt 1: nie darueber hinaus).
+  const battleBauchbinde={board:null,bis:0};
+  function zeichneBauchbinde(board,u,art,x,y,w){
+    if(!u)return;
+    if(battleBauchbinde.board!==board){ battleBauchbinde.board=board; battleBauchbinde.bis=buehneT+2; }
+    if(buehneT>battleBauchbinde.bis)return;
+    let stark=0,ges=0;
+    for(let i=0;i<=u.aktuell;i++){ const r=u.runden[i]; if(!r)continue; ges++; if(r.ereignis===art.erfolgWort)stark++; }
+    const zeile1=u.n+(u.vizSlotLabel?" · "+u.vizSlotLabel:"");
+    const zeile2=ges>0?(stark+" von "+ges+" stark"):"";
+    ctx.save();
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const bh=zeile2?30:20;
+    ctx.fillStyle="rgba(8,10,14,.72)"; ctx.fillRect(x-w/2,y-bh/2,w,bh);
+    ctx.strokeStyle="rgba(230,232,240,.3)"; ctx.lineWidth=1; ctx.strokeRect(x-w/2,y-bh/2,w,bh);
+    ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
+    ctx.fillText(zeile1,x,zeile2?y-6:y);
+    if(zeile2){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3"; ctx.fillText(zeile2,x,y+8); }
+    ctx.restore();
+  }
+
+  function zeichneTennis(art){
+    if(!TEILNEHMER.length)return;
+    const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
+    const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const fertig=(u)=>u.aktuell+1>=art.rundenN;
+    tennisFokus=duellFokusWaehlen(tennisFokus,bretter,paar,art.rundenN,tennisSchlagAktiv);
+    const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
+    const posMap=new Map();
+
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    const [fa]=paar(tennisFokus);
+    ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
+      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.12);
+
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
+    // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
+    // in Teamfarbe (Fechten, Tennis)" -- ein echter Punktestand existiert erst mit T1+T2 aus
+    // dem Konzeptreview, s. T-B5 im Dokument).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===tennisFokus};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig){
+        const wert=pa.vorteil||0;
+        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus};
+      }
+      const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus};
+    });
+    zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
+
+    // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
+    // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
+    // schaltet die dritte Textzeile (Vorteil) ab, damit die Mini-Chips nicht kollidieren.
+    const zeichneSpieler=(u,side,x,y,scale,voll)=>{
+      if(!u)return;
+      posMap.set(u.id,{x,y});
+      const c=side===0?css("--home"):css("--away");
+      ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale); ctx.translate(-x,-y);
+      ctx.fillStyle=c; ctx.globalAlpha=0.20;
+      ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.3); ctx.fill(); ctx.globalAlpha=1;
+      // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei (Schlaeger
+      // an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-Pose statt
+      // eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach/vorher.
+      zeichneSprite(ctx,u,x,y,true);
+      ctx.restore();
+      const schrift=(txt,dy,farbe,groesse)=>{
+        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.lineWidth=2.6;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+        ctx.strokeText(txt,x,y+dy*scale);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy*scale);
+      };
+      schrift(u.n.length>15?u.n.slice(0,14)+"…":u.n,44,c,voll?12:8.5);
+      if(voll){
+        const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+        schrift((v>0?"+":"")+v+" Vorteil",58,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),10.5);
+        // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // "Neben ... Namen (Tennis)" -- seitlich auf Sprite-Hoehe, weit genug ausserhalb der
+        // Schattenellipse (rx=16*scale<=22.4), damit sie nie den Schlaeger/Ball ueberdeckt.
+        zeichneSpielerKachel(u,x-70,y,26,side===0?"--home":"--away");
+      }
+    };
+
+    // GROSSE NAHANSICHT: die zwei Kontrahenten des Fokus-Platzes, deutlich groesser
+    // (NAH_SKALA) und mittig, statt in der bisherigen Reihe aus bis zu sechs Spielern —
+    // genau der Rang-2-Befund des Audits ("nie eine Nahansicht des aktiven Gefechts").
+    // NAH_SKALA/fyOben/fyUnten so gewaehlt, dass der Text UNTER dem oberen Spieler (Name +
+    // "Vorteil", bis zu +58*NAH_SKALA px tief) klar vor dem SICHTBAREN OBERRAND des unteren
+    // Spielers endet (dessen Kopf reicht bei dieser Sprite-Groesse ca. 30*NAH_SKALA px ueber
+    // fyUnten hinaus) — beim ersten Screenshot dieser PR (NAH_SKALA 1.55, fyOben/fyUnten
+    // 0.24/0.52) ueberlappten sie sichtbar ("Draco"-Vorteilstext lag im Kopf von
+    // "Greenkraut"). 1.4/0.23/0.56 laesst beiden Seiten ca. 20-30px Luft.
+    const NAH_SKALA=1.4, fx=W/2, fyOben=H*0.23, fyUnten=H*0.56;
+    const [gA,gB]=paar(tennisFokus);
+    zeichneSpieler(gA,0,fx,fyOben,NAH_SKALA,true);
+    zeichneSpieler(gB,1,fx,fyUnten,NAH_SKALA,true);
+
+    // Q1 -- VERLAUFSKURVE unter dem unteren Spieler (Broadcast-Optik-Dokument 27-09,
+    // Abschnitt 3): der Vorteilsverlauf des Heim-Spielers dieses Platzes, dieselbe Zahl, die
+    // gerade als "+X Vorteil" ueber ihr steht. Unter der Namen-/Vorteilszeile (58*NAH_SKALA
+    // tief) und deutlich vor der Mini-Reihe (ry=H*0.84).
+    if(gA)zeichneVerlaufKurve(fx-90,fyUnten+58*NAH_SKALA+12,180,22,gA);
+
+    // DIE UeBRIGEN PLAeTZE KLEIN AM UNTEREN RAND — dieselbe Idee wie zeichneSchach()s
+    // Mini-Bretter: eine Reihe kompakter Chips statt eines zweiten grossen Duells.
+    const andere=[]; for(let b=0;b<bretter;b++){ if(b!==tennisFokus)andere.push(b); }
+    const MINI_SKALA=0.5, ry=H*0.84, spanne=W-160;
+    andere.forEach((b,k)=>{
+      const [ma,mb]=paar(b); if(!ma||!mb)return;
+      const rx=80+spanne*(andere.length>1?k/(andere.length-1):0.5);
+      // KEINE zusaetzliche "Platz N"-Beschriftung hier -- zeichneSpieler() zeichnet die
+      // (verkuerzten) Namen ohnehin schon unter jede Mini-Figur; eine zweite Zeile an
+      // fast derselben Stelle kollidierte mit dem Namen des unteren Spielers (Opus-Review-
+      // Fund am ersten Screenshot dieser PR).
+      zeichneSpieler(ma,0,rx-16,ry-9,MINI_SKALA,false);
+      zeichneSpieler(mb,1,rx+16,ry+9,MINI_SKALA,false);
+    });
+
     // BALLWECHSEL — genau EIN Ball zur Zeit: stepBuehne() (":13159") dequeued global immer
     // nur EINEN Teilnehmer je Tick (buehneQueue ist nicht je Brett getrennt), es gibt also
     // nie zwei gleichzeitig frisch enthuellte Zuege, fuer die zwei Baelle noetig waeren.
-    // M2 (Feinschliff 21-09): Erkennung UND Fortschritt kommen jetzt aus stepTennis()s
-    // viz*-Feldern (tennisSchlagAktiv()/vizSchlagPhase/vizSchlagT) statt aus u.lunge direkt —
-    // s. Vertrags-/Timing-Kommentar bei stepTennis() oben. u.aktuell/u.runden werden hier wie
-    // zuvor nur gelesen (ueber vizSchlagAktuell, das u.aktuell im Enthuellungs-Frame spiegelt).
+    // Positionen kommen jetzt aus `posMap` (oben von zeichneSpieler gefuellt), NICHT mehr aus
+    // einer eigenen posVon() — dieselben Koordinaten, ob der Ballwechsel auf dem Fokus-Platz
+    // oder einem Mini-Platz laeuft (aktivFn oben laesst den Fokus ohnehin meist sofort dorthin
+    // springen, aber ein Restrahmen bleibt fuer den Wechsel selbst).
+    // T-B2 -- ZIELPUNKT aus stepTennis()s `vizFlugMode`/`vizFlugFrac` (s. dortiger
+    // Kommentar): 1 = trifft den Gegner, 0.5 = haelt am Netz, 1.12 = fliegt knapp hinter
+    // den Gegner hinaus ("Aus"). `flugPunkt()` ist reine Ableitung aus u01 -- dieselbe
+    // Funktion liefert hier den LIVE-Ball UND (bei kleineren u01) die Hawk-Eye-Spur, ohne
+    // einen eigenen Ringpuffer/Zustand.
+    const flugPunkt=(von,nach,frac,u01)=>{
+      const zielX=von.x+(nach.x-von.x)*frac, zielY=von.y+(nach.y-von.y)*frac;
+      return {x:von.x+(zielX-von.x)*u01, y:von.y+(zielY-von.y)*u01-Math.sin(Math.min(1,u01)*Math.PI)*22};
+    };
     const schlaeger=TEILNEHMER.find(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
     if(schlaeger){
       const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
-      if(gegner){
-        const r=schlaeger.runden[schlaeger.vizSchlagAktuell];
-        const treffer=!!r&&r.ereignis===art.erfolgWort;
+      const von=posMap.get(schlaeger.id), nach=gegner&&posMap.get(gegner.id);
+      if(gegner&&von&&nach){
         // Fortschritt AUS stepTennis()s Zustandsmaschine: 0 waehrend "ausholen" (Ball noch in
         // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer TENNIS_FLUG_T) — ersetzt
         // die alte lineare Ableitung aus u.lunge (":16122" vorher: "1-schlaeger.lunge/0.5").
         const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/TENNIS_FLUG_T));
-        const von=posVon(schlaeger), nach=posVon(gegner);
-        // Fehlschlag: der Ball erreicht den Gegner nie, sondern haelt auf halber Strecke
-        // an — derselbe Ass/Netzroller-Gegensatz wie in tennis.tsx.
-        const zielX=treffer?nach.x:(von.x+(nach.x-von.x)*0.5);
-        const zielY=treffer?nach.y:(von.y+(nach.y-von.y)*0.5);
-        const bx=von.x+(zielX-von.x)*u01;
-        const by=von.y+(zielY-von.y)*u01-Math.sin(u01*Math.PI)*22; // Flugbogen
+        const frac=schlaeger.vizFlugFrac??1;
+        // HAWK-EYE-SPUR (Dokument Abschnitt 6): "die letzten ~8 Ballpositionen als
+        // verblassende gelbe Punkte" -- sechs nachlaufende Punkte, aus derselben
+        // `flugPunkt()`-Funktion bei kleineren u01-Werten, kein eigener Zustand.
+        if(u01>0){
+          for(let k=6;k>=1;k--){
+            const u01k=u01-k*0.045; if(u01k<=0)continue;
+            const p=flugPunkt(von,nach,frac,u01k);
+            ctx.globalAlpha=(1-k/7)*0.5; ctx.fillStyle="#f0ff7a";
+            ctx.beginPath(); ctx.arc(p.x,p.y,2.4,0,Math.PI*2); ctx.fill();
+          }
+          ctx.globalAlpha=1;
+        }
+        const ballPos=flugPunkt(von,nach,frac,u01);
         ctx.fillStyle="#f0ff7a"; ctx.strokeStyle="#b8d426"; ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(bx,by,4,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.arc(ballPos.x,ballPos.y,4,0,Math.PI*2);ctx.fill();ctx.stroke();
       }
     }
+    // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und verblasst" --
+    // JEDER Teilnehmer mit einem noch laufenden `vizBallMarkT` (stepTennis() setzt ihn beim
+    // Flugende, s. dortiger Kommentar), unabhaengig davon, ob sein Ballwechsel gerade der
+    // fokussierte ist -- ein spaeterer Ballwechsel auf einem ANDEREN Platz darf die Marke
+    // des vorherigen nicht verschlucken. "Treffer" neutral (Hawk-Eye-Gelb), "Netz"/"Aus"
+    // in den echten Farben (Q4, zweite Ausnahme von der Teamfarben-Regel neben den
+    // Fechtlampen: IN/OUT haengt an einem festen Punkt am Boden, nie an einer Figur).
+    for(const u of TEILNEHMER){
+      if(!(u.vizBallMarkT>0))continue;
+      const gegner=TEILNEHMER.find(x=>x.side!==u.side&&x.brett===u.brett);
+      const von=posMap.get(u.id), nach=gegner&&posMap.get(gegner.id);
+      if(!von||!nach)continue;
+      const frac=u.vizFlugFrac??1;
+      const mp={x:von.x+(nach.x-von.x)*frac,y:von.y+(nach.y-von.y)*frac};
+      const leben=Math.max(0,Math.min(1,u.vizBallMarkT/2.5));
+      const farbe=u.vizFlugMode==="netz"?"#c7ccd6":u.vizFlugMode==="aus"?"#e0463c":"#f0ff7a";
+      ctx.save(); ctx.globalAlpha=leben*0.85;
+      ctx.fillStyle=farbe; ctx.beginPath(); ctx.ellipse(mp.x,mp.y+4,7,3,0,0,Math.PI*2); ctx.fill();
+      if(u.vizFlugMode==="netz"||u.vizFlugMode==="aus"){
+        ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
+        ctx.lineWidth=2; ctx.strokeStyle="rgba(8,10,14,.85)";
+        const wort=u.vizFlugMode==="netz"?"NETZ":"AUS";
+        ctx.strokeText(wort,mp.x,mp.y-8); ctx.fillText(wort,mp.x,mp.y-8);
+      }
+      ctx.restore();
+    }
+    // T-B2 -- HAWK-EYE-INSET bei einem knappen "Aus" (Dokument Abschnitt 6): "nur bei
+    // Fehlschlaegen, die das Vorzeichen des Vorteils kippen ... sonst wird es wieder ein
+    // Protokoll" — `vizFlugKipp` kommt aus genau dieser Bedingung (stepTennis()-Kommentar).
+    // Vereinfachung ggue. dem Dokument-Vorschlag ("Ausschnitt 3x vergroessert"): eine feste
+    // Einblendung statt einer echten Zoom-Kamera, gleiche Aussage (IN/OUT-Farbe, "OUT"),
+    // weniger neuer Zustand.
+    const kippAus=TEILNEHMER.find(u=>u.vizFlugMode==="aus"&&u.vizFlugKipp&&u.vizBallMarkT>0);
+    if(kippAus){
+      const leben=Math.max(0,Math.min(1,kippAus.vizBallMarkT/2.5));
+      // UNTER dem Team-Namens-Kaestchen oben rechts (DOM `#bbug`/Score-Bug-Bereich, s.
+      // Abschnitt 1 der Doku-Tabelle "Score-Bug `#bbug`") -- ein erster Screenshot dieser
+      // PR zeigte das Inset direkt darunter versteckt (Opus-Review-Fund).
+      const ibw=132,ibh=40, ix=W-ibw-16, iy=58;
+      ctx.save(); ctx.globalAlpha=leben;
+      ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(ix,iy,ibw,ibh);
+      ctx.strokeStyle="#e0463c"; ctx.lineWidth=1.4; ctx.strokeRect(ix,iy,ibw,ibh);
+      ctx.textAlign="center";
+      ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.fillText("HAWK-EYE",ix+ibw/2,iy+13);
+      ctx.font="800 18px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e0463c";
+      ctx.fillText("OUT",ix+ibw/2,iy+30);
+      ctx.restore();
+    }
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Spieler des neu fokussierten Platzes (Broadcast-Optik-Dokument Abschnitt 3).
+    zeichneBauchbinde("tennis-"+tennisFokus,gA,art,W/2,H-16,260);
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
       ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";
       if(f._teilnehmer!=null){
-        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
-        if(u){const p=posVon(u);
+        const p=posMap.get(f._teilnehmer);
+        if(p){
           ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
         }
       }
@@ -17422,6 +20245,13 @@
     if(!TEILNEHMER.length)return;
     const bretter=Math.max(1,...TEILNEHMER.map(u=>(u.brett??0)+1));
     const paar=(b)=>[TEILNEHMER.find(u=>u.side===0&&u.brett===b),TEILNEHMER.find(u=>u.side===1&&u.brett===b)];
+    const fertig=(u)=>u.aktuell+1>=art.rundenN;
+    // AKTIV = mitten in Ausfall/Erholung/Parade, oder der Funke eines gerade gesetzten
+    // Treffers ist noch sichtbar — alles ausser der ruhenden En-garde-Stellung. Fuettert
+    // duellFokusWaehlen()s aktivFn (s. Kommentar dort): ein Ausfallschritt ist kurz genug,
+    // dass die reine 3s-Uhr ihn oft verpassen wuerde.
+    const fechtenAktiv=(u)=>(u.vizFechtPhase&&u.vizFechtPhase!=="engarde")||((u.vizFunkeT||0)>0);
+    fechtenFokus=duellFokusWaehlen(fechtenFokus,bretter,paar,art.rundenN,fechtenAktiv);
     const xL=140, xR=W-140, mitte=(xL+xR)/2, bahnLen=xR-xL;
     // En-garde-Abstand ~15% der Bahnlaenge vom Zentrum je Seite — das FIE-Regelwerk setzt die
     // En-garde-Linien 2 m von der Mitte auf einer 14 m langen Bahn (~14%), hier aufgerundet
@@ -17432,44 +20262,98 @@
     // Ausfallschritt-Auslenkung, FECHT_AUSFALL_PX=30) bleibt jeder Fechter auf seiner
     // eigenen Bahnhaelfte — gardeAbstand*0.3+30 < gardeAbstand fuer jeden Bahnmassstab
     // dieser Funktion (gardeAbstand=144 bei der Standard-Canvasbreite: 43+30=73<144),
-    // die beiden koennen sich also nie ueberschneiden. maxV mit Bodenwert 60 (dieselbe
-    // Konstante wie der Bewertungsbalken in zeichneSchach) statt eines rohen Max ueber
-    // TEILNEHMER, damit ein noch knapper Rueckstand am Spielbeginn (kleines |v|, kleines
-    // rohes Max) nicht sofort auf den vollen Versatz hochskaliert.
+    // die beiden koennen sich also nie ueberschneiden.
+    // F-B2 -- TAUZIEH AUF TREFFERDIFFERENZ (Broadcast-Optik-Dokument 27-09, Abschnitt 5,
+    // Prioritaet 2): vorher lief der Versatz auf `vorteil`, obwohl seit F1 (26.09.) der
+    // Trefferstand das Ergebnis ist (`gefechtSieg`) -- derselbe Widerspruch, den F1 im
+    // Ergebnis behoben hat, stand im Bild noch offen (ein Fechter mit WENIGER Treffern
+    // konnte trotzdem sichtbar vorruecken). Bodenwert 5 statt eines berechneten Max
+    // (Dokument-Vorschlag woertlich: "buehneTauziehVersatz(treffer_a - treffer_b, 5, …)")
+    // -- ein Treffervorsprung von 5 (mehr als die Haelfte der neun Gaenge) zeigt bereits
+    // den vollen Versatz.
     const vorteilVersatzPx=gardeAbstand*0.3;
-    const maxV=Math.max(60,...TEILNEHMER.map(x=>Math.abs((x.aktuell>=0&&x.verlauf)?x.verlauf[x.aktuell]:0)));
-    const sk=Math.max(0.55,Math.min(1,1.12-0.09*(bretter-1)));
     const posMap=new Map();
-    for(let i=0;i<bretter;i++){
-      const [a,b]=paar(i); if(!a||!b)continue;
-      const laneY=H*(bretter>1?0.16+0.68*(i/(bretter-1)):0.48);
-      const baseX0=mitte-gardeAbstand, baseX1=mitte+gardeAbstand;
-      // BAHN: schmaler heller Streifen mit Mittellinie, zwei gelben En-garde-Linien und den
-      // beiden roten Grenzlinien am Bahnende — das FIE-Bild einer Fechtbahn, keine erfundene
-      // Form.
-      ctx.fillStyle="rgba(60,66,82,.9)"; ctx.fillRect(xL,laneY-15,bahnLen,30);
-      ctx.strokeStyle="rgba(230,232,240,.35)"; ctx.lineWidth=1.5;
-      ctx.strokeRect(xL,laneY-15,bahnLen,30);
-      ctx.strokeStyle="rgba(230,232,240,.55)";
-      ctx.beginPath(); ctx.moveTo(mitte,laneY-15); ctx.lineTo(mitte,laneY+15); ctx.stroke();
-      ctx.strokeStyle="rgba(226,195,77,.6)"; ctx.setLineDash([3,3]);
-      [baseX0,baseX1].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
-      ctx.setLineDash([]);
-      ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
-      [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-15); ctx.lineTo(gx,laneY+15); ctx.stroke(); });
-      ctx.lineWidth=1;
-      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben): `v` vorab
-      // gelesen (frueher erst bei der Kopfzeile weiter unten berechnet), weil die Positionen
-      // ihn jetzt schon brauchen. Positiver Vorteil fuer a (Heim) schiebt BEIDE x-Koordinaten
+
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    if(bretter>1){
+      ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.12);
+    }
+
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
+    // Trefferstand ("4:3"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen in
+    // Teamfarbe" statt 1/½/0, weil Fechten keine Unentschieden kennt -- gefechtSieg
+    // entscheidet immer eindeutig, s. BUEHNE_ART.fechten-Kommentar).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===fechtenFokus};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig)return {fertig:true,text:"✓",farbVar:pa.gefechtSieg?"--home":"--away",fokus:i===fechtenFokus};
+      return {fertig:false,text:(pa.treffer||0)+":"+(pb.treffer||0),farbVar:null,fokus:i===fechtenFokus};
+    });
+    zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
+
+    // EINE BAHN ZEICHNEN — `gross` waehlt zwischen der grossen Nahansicht des Fokus-
+    // Gefechts (volle Bahn, Kopfzeile, Klingenfunke) und einer kompakten Mini-Bahn fuer
+    // die uebrigen Gefechte (nur Figuren + Trefferstand, wie zeichneSchach()s Mini-Bretter).
+    // Ersetzt den alten, immer-alle-Bahnen-gleich-grossen Zweig (Rang-2-Befund des Audits:
+    // "sechs Duelle immer als Miniaturuebersicht, nie eine Nahansicht").
+    const zeichneBahn=(i,cx,cw,laneY,sk,gross)=>{
+      const [a,b]=paar(i); if(!a||!b)return;
+      const halbH=15*sk;
+      const baseX0=cx-cw, baseX1=cx+cw;
+      if(gross){
+        // BAHN: schmaler heller Streifen mit Mittellinie, zwei gelben En-garde-Linien und den
+        // beiden roten Grenzlinien am Bahnende — das FIE-Bild einer Fechtbahn, keine erfundene
+        // Form. Nur am Fokus-Gefecht — die Mini-Bahnen zeigen nur die Figuren selbst.
+        ctx.fillStyle="rgba(60,66,82,.9)"; ctx.fillRect(xL,laneY-halbH,bahnLen,halbH*2);
+        ctx.strokeStyle="rgba(230,232,240,.35)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(xL,laneY-halbH,bahnLen,halbH*2);
+        ctx.strokeStyle="rgba(230,232,240,.55)";
+        ctx.beginPath(); ctx.moveTo(mitte,laneY-halbH); ctx.lineTo(mitte,laneY+halbH); ctx.stroke();
+        ctx.strokeStyle="rgba(226,195,77,.6)"; ctx.setLineDash([3,3]);
+        [baseX0,baseX1].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-halbH); ctx.lineTo(gx,laneY+halbH); ctx.stroke(); });
+        ctx.setLineDash([]);
+        ctx.strokeStyle="rgba(196,60,50,.75)"; ctx.lineWidth=2.5;
+        [xL,xR].forEach(gx=>{ ctx.beginPath(); ctx.moveTo(gx,laneY-halbH); ctx.lineTo(gx,laneY+halbH); ctx.stroke(); });
+        ctx.lineWidth=1;
+        // F-B1 -- TREFFERLAMPEN (Broadcast-Optik-Dokument 27-09, Abschnitt 5, Prioritaet 1):
+        // liest ausschliesslich a.vizLampeT/b.vizLampeT (stepFechten() setzt sie beim frisch
+        // enthuellten Erfolg, 2,5 s Nachleuchten), zeichnet nur. ECHTE FARBEN (Q4/offene
+        // Frage 1, Voreinstellung Chris): rot links (Heim steht immer links), gruen rechts --
+        // unabhaengig von --home/--away, weil die Lampe an einem festen Bahnende haengt, nie
+        // an einer Figur. Gleiche Zeile wie die Kopfzeile (laneY-halbH-14), aber an den
+        // aeussersten Bahnenden -- die Kopfzeile ist zentriert und reicht nicht annaehernd so
+        // weit nach aussen.
+        const lampY=laneY-halbH-14;
+        const lampeAn=(t)=>(t||0)>0;
+        ctx.beginPath(); ctx.arc(xL+14,lampY,6,0,Math.PI*2);
+        ctx.fillStyle=lampeAn(a.vizLampeT)?"#e0463c":"rgba(224,70,60,.16)"; ctx.fill();
+        ctx.strokeStyle="rgba(230,232,240,.4)"; ctx.lineWidth=1; ctx.stroke();
+        ctx.beginPath(); ctx.arc(xR-14,lampY,6,0,Math.PI*2);
+        ctx.fillStyle=lampeAn(b.vizLampeT)?"#3fb56a":"rgba(63,181,106,.16)"; ctx.fill();
+        ctx.stroke();
+        if(lampeAn(a.vizLampeT)&&lampeAn(b.vizLampeT)){
+          ctx.font="800 12px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+          ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.textAlign="center";
+          ctx.strokeText("DOPPELTREFFER",cx,laneY-halbH-30); ctx.fillText("DOPPELTREFFER",cx,laneY-halbH-30);
+        }
+      }
+      // TAUZIEH-VERSATZ (Chris, 22.09., s. buehneTauziehVersatz()-Kommentar oben) -- seit F-B2
+      // auf die Trefferdifferenz umgestellt (s. Kommentar bei `vorteilVersatzPx` oben), NICHT
+      // mehr auf `vorteil`. Positive Trefferdifferenz fuer a (Heim) schiebt BEIDE x-Koordinaten
       // in dieselbe Richtung — a nach rechts, in Richtung b (vorruecken), UND b ebenfalls
       // nach rechts, von a weg (zurueckweichen), weil b schon rechts von a steht.
-      const v=(a.aktuell>=0&&a.verlauf)?a.verlauf[a.aktuell]:0;
-      const zug=buehneTauziehVersatz(v,maxV,vorteilVersatzPx);
+      const tDiff=(a.treffer||0)-(b.treffer||0);
+      const zug=buehneTauziehVersatz(tDiff,5,vorteilVersatzPx);
       // FECHTER-POSITIONEN: Grundstand +/- fechtVersatz() (Ausfall/Parade) +/- Tauzieh-Versatz,
-      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz.
-      const dxA=fechtVersatz(a), dxB=fechtVersatz(b);
-      const ax=baseX0+dxA+zug, ay=laneY+(a.vizFechtBob||0);
-      const bx=baseX1-dxB+zug, by=laneY+(b.vizFechtBob||0);
+      // plus der Grundstellungs-Wipper aus stepFechten() fuer den y-Versatz. Mini-Bahnen
+      // (gross===false) lassen Ausfall/Tauzieh-Versatz weg (dxA/dxB/zug*0) — bei sk=0.42 wuerde
+      // der volle Ausschlag Nachbar-Chips beruehren, und die Bewegung ist ohnehin kaum zu
+      // erkennen, solange das Gefecht nicht im Fokus steht.
+      const dxA=gross?fechtVersatz(a):0, dxB=gross?fechtVersatz(b):0, zugEff=gross?zug:0;
+      const ax=baseX0+dxA+zugEff, ay=laneY+(gross?(a.vizFechtBob||0):0);
+      const bx=baseX1-dxB+zugEff, by=laneY+(gross?(b.vizFechtBob||0):0);
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
@@ -17481,44 +20365,125 @@
         // der Hand statt des alten Schwert-Overlays, s. FECHTEN_HAND-Kommentar oben).
         zeichneSprite(ctx,u,px,py,true);
         ctx.restore();
+        // NAMEN NUR AM FOKUS-GEFECHT — bei den engen Mini-Bahnen (miniCw=22) wuerden zwei
+        // Namenszuege nebeneinander kollidieren; die kombinierte "Bahn X · Treffer"-Zeile
+        // unten deckt die Mini-Gefechte ab (s. else-Zweig weiter unten).
+        if(!gross)return;
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.font="400 9px 'IBM Plex Mono',monospace";
-        ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
+        ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
         ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
+        // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3), unterhalb der
+        // Trefferlampen-/Kopfzeile-Reihe (laneY-halbH-14).
+        zeichneSpielerKachel(u,px,py-70,22,farbVar);
       });
-      // KOPFZEILE JE BAHN: Treffer/Vorteil/Gang — dieselben drei Zahlen wie im generischen
-      // Zweig, nur als eine Zeile ueber statt drei Zeilen unter der Figur, weil bei sechs
-      // Bahnen kein Platz fuer den vollen generischen Block bleibt. `v` kommt jetzt von
-      // weiter oben (die Tauzieh-Positionen brauchen ihn schon vor dieser Stelle).
-      ctx.font="700 10.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
-      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-      const kopf="Treffer "+(a.treffer||0)+":"+(b.treffer||0)
-        +"  ·  Vorteil "+(v>0?"+":"")+v
-        +"  ·  Gang "+(Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN;
-      ctx.strokeText(kopf,mitte,laneY-24); ctx.fillText(kopf,mitte,laneY-24);
-      // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
-      // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
-      const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
-      if(funke>0){
-        const leben=funke/FECHT_FUNKE_T;
-        const fx=(ax+bx)/2, fy=(ay+by)/2;
-        ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
-        const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
-        grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
-        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(fx,fy,16,0,Math.PI*2); ctx.fill();
-        ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4;
-        for(let s=0;s<5;s++){
-          const ang=(s/5)*Math.PI*2+funke*9;
-          ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
+      if(gross){
+        // F-B2 -- FIE-ANZEIGETAFEL statt "Treffer/Vorteil/Gang" (Broadcast-Optik-Dokument
+        // 27-09, Abschnitt 5, Prioritaet 2): "die Tafel, die ueber jeder echten Bahn
+        // haengt". Trefferzahlen gross in Lampenfarbe -- echte Farben (Q4/offene Frage 1,
+        // Voreinstellung Chris), dieselben Hex-Werte wie die Trefferlampen oben, weil beide
+        // an derselben festen Bahnseite haengen, nie an einer Figur. "Vorteil" verschwindet
+        // aus dem Bild (Dokument: "er bleibt Messwert (rho) ... im Bild konkurriert er
+        // nicht mehr mit dem Trefferstand") -- `v`/`u.vorteil` bleiben unangetastet, nur
+        // diese Anzeige aendert sich.
+        const gangJetzt=Math.max(a.aktuell,b.aktuell)+1;
+        // PERIODE + GEFECHTSUHR: dieselbe Dreiteilung wie der Ticker-Beat in stepBuehne()
+        // ("PERIODE BEENDET", proPeriode=rundenN/3=3 bei Fechten). Die Uhr zaehlt NICHT aus
+        // echter Zeit, sondern aus dem Enthuellungsfortschritt DIESES Brettes herunter --
+        // dieselbe "erzaehlende, keine entscheidende Uhr" wie die Schachuhr, hier bewusst
+        // OHNE Zehntel/Zwischenwerte (Dokument-Text), damit niemand sie fuer eine Wertung
+        // haelt: ein neuer Wert nur, wenn ein neuer Gang enthuellt wird, kein rr(), kein
+        // dt-getriebener Zustand.
+        const proPeriode=Math.max(1,Math.round(art.rundenN/3));
+        const periode=Math.min(3,Math.ceil(gangJetzt/proPeriode));
+        const gangInPeriode=gangJetzt-(periode-1)*proPeriode;
+        const uhrRest=Math.max(0,180-Math.round((gangInPeriode/proPeriode)*180));
+        const uhrTxt=Math.floor(uhrRest/60)+":"+String(uhrRest%60).padStart(2,"0");
+        // PRIORITAETS-LAMPE "P": NUR wenn `gefechtGleichstand` UND beide Fechter ihren
+        // letzten Gang enthuellt haben (Abschnitt 1, Befund 2 des Dokuments: `prioritaet`
+        // steht schon beim Bau fest, ist vor dem letzten Gang also ein Spoiler-Leck).
+        const beideFertig=fertig(a)&&fertig(b);
+        const prioA=beideFertig&&a.gefechtGleichstand&&a.prioritaet;
+        const prioB=beideFertig&&b.gefechtGleichstand&&b.prioritaet;
+        const tafelY=laneY-halbH-14;
+        const segA=(prioA?"[P] ":"")+(a.treffer||0);
+        const segMid="  ·  "+periode+". PERIODE  "+uhrTxt+"  ·  Gang "+gangJetzt+"/"+art.rundenN+"  ·  ";
+        const segB=(b.treffer||0)+(prioB?" [P]":"");
+        ctx.font="800 15px 'Barlow Condensed',sans-serif";
+        const wA=ctx.measureText(segA).width, wB=ctx.measureText(segB).width;
+        ctx.font="700 12px 'Barlow Condensed',sans-serif";
+        const wMid=ctx.measureText(segMid).width;
+        let tsx=cx-(wA+wMid+wB)/2;
+        ctx.textAlign="left"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e0463c";
+        ctx.strokeText(segA,tsx,tafelY); ctx.fillText(segA,tsx,tafelY); tsx+=wA;
+        ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
+        ctx.strokeText(segMid,tsx,tafelY); ctx.fillText(segMid,tsx,tafelY); tsx+=wMid;
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#3fb56a";
+        ctx.strokeText(segB,tsx,tafelY); ctx.fillText(segB,tsx,tafelY);
+        ctx.textAlign="center";
+        // KLINGENKONTAKT-FUNKE (Auftrag Punkt 1, Treffer-Fall): stepFechten() setzt vizFunkeT
+        // auf BEIDEN Beteiligten gleichzeitig — genau EINE Zeichnung am Beruehrungspunkt reicht.
+        const funke=Math.max(a.vizFunkeT||0,b.vizFunkeT||0);
+        if(funke>0){
+          const leben=funke/FECHT_FUNKE_T;
+          const fx=(ax+bx)/2, fy=(ay+by)/2;
+          ctx.save(); ctx.globalAlpha=leben; ctx.globalCompositeOperation="lighter";
+          const grad=ctx.createRadialGradient(fx,fy,0,fx,fy,16);
+          grad.addColorStop(0,"#fff6d0"); grad.addColorStop(0.5,"#f2c94c"); grad.addColorStop(1,"rgba(242,201,76,0)");
+          ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(fx,fy,16,0,Math.PI*2); ctx.fill();
+          ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4;
+          for(let s=0;s<5;s++){
+            const ang=(s/5)*Math.PI*2+funke*9;
+            ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+Math.cos(ang)*10*leben,fy+Math.sin(ang)*10*leben); ctx.stroke();
+          }
+          ctx.restore();
         }
-        ctx.restore();
+        // Q1 -- TREFFER-TREPPE unter der Bahn (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+        // die Fechten-Variante der Verlaufskurve, weil seit F1 der Trefferstand das Ergebnis
+        // ist, nicht der Vorteil.
+        zeichneTrefferTreppe(xL,laneY+halbH+8,bahnLen,20,a,b,art);
+      } else {
+        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        const bahnTxt="Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0);
+        ctx.fillText(bahnTxt,cx,laneY-halbH-8);
+        // F-B1 MINI-LAMPE (Dokument Abschnitt 5): "wo passiert gerade was" der uebrigen
+        // Bahnen auf einen Blick, ohne die kompakte Zeile zu sprengen.
+        if((a.vizLampeT||0)>0||(b.vizLampeT||0)>0){
+          const tw=ctx.measureText(bahnTxt).width;
+          ctx.beginPath(); ctx.arc(cx+tw/2+7,laneY-halbH-10,2,0,Math.PI*2);
+          ctx.fillStyle=(a.vizLampeT||0)>0?"#e0463c":"#3fb56a"; ctx.fill();
+        }
       }
-    }
+    };
+
+    // GROSSE NAHANSICHT: das Fokus-Gefecht, mittig und deutlich groesser als zuvor (sk 1.3
+    // statt hoechstens 1.0/0.55) — der Rang-2-Befund des Audits ("nie eine Nahansicht des
+    // aktiven Gefechts, nur die Sechs-Bahnen-Uebersicht").
+    zeichneBahn(fechtenFokus,mitte,gardeAbstand,H*0.36,1.3,true);
+
+    // DIE UeBRIGEN GEFECHTE KLEIN AM UNTEREN RAND — kompakte Mini-Bahnen statt eines zweiten
+    // gleich grossen Streifens, dieselbe Idee wie zeichneSchach()s Mini-Bretter/zeichneTennis()s
+    // Mini-Chips oben. JEDE Mini-Bahn bekommt ihr EIGENES Zentrum (rx) und einen schmalen
+    // eigenen Fechter-Abstand (miniCw, fest statt gardeAbstand*Bahnlaenge) -- sonst wuerden
+    // alle Mini-Gefechte exakt uebereinander auf der grossen Bahnmitte landen.
+    const andere=[]; for(let i=0;i<bretter;i++){ if(i!==fechtenFokus)andere.push(i); }
+    const miniY=H*0.87, miniCw=22, spanne=W-160;
+    andere.forEach((i,k)=>{
+      const rx=80+spanne*(andere.length>1?k/(andere.length-1):0.5);
+      zeichneBahn(i, rx, miniCw, miniY, 0.42, false);
+    });
+
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Fechter des neu fokussierten Gefechts (Broadcast-Optik-Dokument Abschnitt 3).
+    const [fechtenFokusHeim]=paar(fechtenFokus);
+    zeichneBauchbinde("fechten-"+fechtenFokus,fechtenFokusHeim,art,W/2,H-16,260);
+
     // SCHWEBETEXTE ("+X"/"kommt zu spaet"/"setzt den Treffer", aus stepBuehne()s schwebe())
-    // — dieselbe Idee wie posVon() bei zeichneTennis(), nur ueber die hier gefuellte posMap
-    // statt einer eigenen Formel, weil die Bahn-Positionen (anders als bei Tennis) je Brett
-    // UND je Ausfall-/Parade-Phase schwanken.
+    // — ueber der gemeinsamen posMap (Fokus-Gefecht UND Mini-Gefechte), weil die Bahn-
+    // Positionen (anders als bei Tennis) je Brett UND je Ausfall-/Parade-Phase schwanken.
     for(const f of floats){
       if(f._teilnehmer==null)continue;
       const p=posMap.get(f._teilnehmer); if(!p)continue;
@@ -17643,56 +20608,194 @@
   }
 
   // ================== WETTESSEN: TEILNEHMER-BILD (Opus-Plan Naechste-Drei-Disziplinen ========
-  // 17-09, Abschnitt 3.2, D2.a) =================================================================
+  // 17-09, Abschnitt 3.2, D2.a; umgebaut auf die "Coney-Island-Tafel" nach dem Opus- ==========
+  // Gegencheck 23.09., docs/design/wettessen-format-opus-gegencheck-23-09.md, Abschnitt 5) ====
   // Exklusiv auf `art.wettessen` gegated (BUEHNE_ART.wettessen) -- dasselbe Muster wie die
   // fuenf Zweige davor (Heben/Schach/Breaking/Tennis/Fechten) in zeichneBuehne(): eigener
   // Flag, eigene Funktion, kein Eingriff in den generischen Zweig, den I-Spy weiterhin
   // unveraendert durchlaeuft (Showcase hat inzwischen ebenfalls einen eigenen Zweig).
   //
-  // AUFGESETZT AUF DIE GENERISCHE ZWEI-REIHEN-GEOMETRIE (dieselbe Positionsformel wie der
-  // generische Zweig/zeichneTennis: `90+(W-180)*i/(g.length-1)`, Heim oben bei H*0.32, Gast
-  // unten bei H*0.66) statt eines vollstaendigen Layoutbruchs — die beiden Reihen sitzen
-  // sich an der Bankettafel (bodenWettessen()) ohnehin schon gegenueber, "frontal" kommt
-  // aus dem Boden, nicht aus einer neuen Koordinatenformel. Kein Feld wird hier gelesen,
-  // das nicht auch der generische Zweig schon liest (u.summe/u.aktuell/u.n/u.lunge).
+  // S1 -- EIN TISCH ZUM PUBLIKUM STATT ZWEI REIHEN (Gegencheck Abschnitt 5, S1): die alte
+  // Fassung baute auf der generischen Zwei-Reihen-Geometrie auf (Heim oben, Gast unten, wie
+  // bei Tennis/Fechten/Schach) -- Chris' eigener Befund war genau das: "generisches
+  // Boxscore-Raster". `wettessenSitzplaetze()` (s. dort) ersetzt das durch EINE Sitzreihe,
+  // Heim links / Gast rechts an derselben langen Tafel, mit leichter Staffelung fuer die bis
+  // zu zwoelf Plaetze (Abschnitt 5, S1: "bei 12 Plaetzen braucht es eine leichte
+  // Staffelung") und einem Team-Faehnchen je Platz zusaetzlich zur Trikotfarbe.
   //
-  // DREI BESPOKE ERGAeNZUNGEN aus platter.tsx, alle rein zeichnerisch:
+  // S2 -- WENDETAFEL, EINHEIT WUERSTCHEN (Abschnitt 5, S2): `wettessenWuerstchen()` ist eine
+  // REINE ANZEIGE-SKALA aus u.summe, kalibriert auf den echten Nathan's-Bereich (Median
+  // ~30-40, Spitzen ~55-65 Wuerstchen, s. Kommentar dort) -- DIE WERTUNG SELBST BLEIBT
+  // u.summe, PPs/Teamstand/rho lesen diese Funktion nirgends, exakt wie die Tafel-PR vom
+  // 17.09. es fuer die alte "Pkt"-Anzeige schon vormachte (rho blieb bit-identisch).
+  //
+  // S3 -- UHR UND KOPF-AN-KOPF-BAND (Abschnitt 5, S3): zeichneWettessenUhr()/
+  // zeichneWettessenBand() sind eigene Funktionen weiter unten, beide REIN LESEND auf
+  // TEILNEHMER/u.summe/u.aktuell/buehneAkt/buehneGruppenGroesse. Das "gleichzeitige Essen"
+  // selbst ist NICHT nur eine Anzeige-Illusion, sondern echt: `buehneGruppenGroesse`
+  // (bauBuehne()/stepBuehne(), s. dort) laesst bei Wettessen einen ganzen Runden-Block auf
+  // einmal enthuellen, wodurch `u.aktuell` fuer ALLE Teilnehmer synchron laeuft -- diese
+  // Funktion liest davon nur EINEN Teilnehmer, um die verbleibende Zeit abzuleiten.
+  //
+  // VIER BESPOKE ERGAeNZUNGEN aus platter.tsx, alle rein zeichnerisch:
   //   1. LATZ-SERVIETTE (rot-weiss gestreift) am Hals jedes Essers -- platter.tsx' Serviette,
   //      hier OHNE DISZIPLIN_PROP (kein Requisiten-Overlay, D2.d bewusst ausgelassen wegen
   //      moeglicher Kollision mit paralleler DISZIPLIN_PROP-Arbeit), direkt als eigenes
   //      Canvas-Primitiv oberhalb der Figur gezeichnet.
   //   2. TELLERSTAPEL unter jedem Esser -- waechst mit u.aktuell+1, genau der Zahl bereits
-  //      enthuellter Durchgaenge, die BUEHNE_ART.wettessen.rundenN:8 vorgibt.
+  //      enthuellter Durchgaenge (jetzt Minuten, s. BUEHNE_ART.wettessen.rundenN:10).
   //   3. MAGEN-METER mit Gabel-Marker des FUEHRENDEN (hoechstes u.summe ueber BEIDE Seiten)
   //      am unteren Bildrand, platter.tsx' "Magen-Meter unten mit Gabel-Marker des
-  //      Fuehrenden".
+  //      Fuehrenden" -- zeigt jetzt Minuten (S3), unveraendert in der Herleitung.
+  //   4. SPOTLIGHT auf die zwei Fuehrenden (S3, "das 1-gegen-1-Gefuehl, das Chris sucht,
+  //      ohne jemanden vom Tisch zu nehmen") -- ein warmer Lichtkegel ueber ihren Plaetzen,
+  //      alle uebrigen Plaetze bleiben im normalen Tafellicht statt komplett ausgeblendet.
   //
   // BEWEGUNG LIEST AUSSCHLIESSLICH stepWettessen()s viz*-Felder (vizEssPhase/vizEssT) fuer
   // einen kleinen Kau-/Schling-Wipper — kein neuer buehnenBewegung()-Zweig hier, kein
   // rr()-Aufruf.
+
+  // WUERSTCHEN-SKALA (S2): reine Anzeige-Skala, EINE Quelle statt zweier Literale (dasselbe
+  // Prinzip wie showcaseBuzzerPos()/ispyFundortXY() oben) -- zeichneWettessen() UND
+  // zeichneWettessenBand() muessen dieselbe Zahl zeigen. Kalibriert an
+  // window.__arena.disziplinProbe("wettessen",{n:12}) NACH der rundenN:10-Aenderung (S4):
+  // Median 716, Spanne 339-1061 Rohpunkte -- durch 18 geteilt liegt der Median bei 39,8 und
+  // die Spitzen bei ~59, der echte Nathan's-Bereich (Median 30-40, Spitzenwerte 55-70,
+  // Gegencheck Abschnitt 1.1). Gerundet auf ein HALBES Wuerstchen statt eines Achtels wie im
+  // echten Regelwerk -- fuer eine 9-11px-Anzeige ist das grob genug und trotzdem sichtbar
+  // "kein Punktestand mehr".
+  const WETTESSEN_WUERSTCHEN_SKALA=18;
+  function wettessenWuerstchen(summe){ return Math.round((summe/WETTESSEN_WUERSTCHEN_SKALA)*2)/2; }
+  function wettessenWuerstchenText(w){ return Number.isInteger(w)?String(w):w.toFixed(1).replace(".",","); }
+  // ANZEIGE-SUMME (W-B1, Broadcast-Optik Buehne-Auftritt 27.09.): `u.summe` springt bei
+  // Wettessen einmal je Minute um den GANZEN Minutenwert (buehneGruppenGroesse enthuellt
+  // die ganze Gruppe auf einmal, s. Kommentar bei stepBuehne()). Diese Funktion zaehlt die
+  // laufende Minute stattdessen STETIG hoch, mit genau dem Fortschritt `f`, den
+  // zeichneWettessenUhr() ohnehin schon rechnet (1-buehneAkt/rundenDauer) -- KEINE neue Uhr,
+  // KEIN neuer Rundenwert. Die Wertung selbst (u.summe/PPs/Teamstand/rho) liest diese
+  // Funktion nirgends, exakt wie wettessenWuerstchen() es fuer die alte "Pkt"-Anzeige schon
+  // vormachte.
+  function wettessenAnzeigeSumme(u){
+    if(!u.runden||u.aktuell<0)return 0;
+    if(done)return u.summe;
+    const aktuelleRunde=u.runden[u.aktuell];
+    if(!aktuelleRunde)return u.summe;
+    const vorher=u.summe-aktuelleRunde.punkte;
+    const art=BB();
+    const f=(buehneGruppenGroesse>1)?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):1;
+    return vorher+aktuelleRunde.punkte*f;
+  }
+  // TEMPO JE MINUTE (W-B2): der Punktewert EINER einzelnen Minute durch dieselbe Skala
+  // geteilt wie die kumulierte Summe -- dimensional konsistent, weil die Skala linear ist
+  // (Summe ueber zehn Minuten / 18 = Summe der Einzelminuten / 18). Reine Ablesung aus
+  // runden[idx], kein rr().
+  function wettessenTempo(u,idx){
+    if(idx<0||!u.runden||!u.runden[idx])return null;
+    return wettessenWuerstchen(u.runden[idx].punkte);
+  }
+  // RESTZEIT (W-B3): EINE Quelle statt zweier Kopien -- zeichneWettessenUhr() UND
+  // zeichneWettessenBand() (fuer die Schlussminuten-Umschaltung) muessen dieselbe Zahl
+  // sehen. Woertlich dieselbe Formel wie bisher in zeichneWettessenUhr(), nur benannt.
+  function wettessenRestSek(art){
+    const irgendeiner=TEILNEHMER[0];
+    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
+    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done)
+      ?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):0;
+    return Math.max(0,art.rundenN*60-(minutenFertig*60+inLaufenderMinute*60));
+  }
+
+  // SITZPLAETZE (S1): EINE Quelle statt zweier Literale -- die Figuren-/Wendetafel-/
+  // Spotlight-Schleife in zeichneWettessen() UND der floats-Renderer am Ende der Funktion
+  // muessen dieselbe Koordinate treffen (dasselbe Prinzip wie ispyFundortXY()/
+  // showcaseBuzzerPos() oben). EIN TISCH: Heim links, Gast rechts derselben Reihe (statt
+  // Heim oben/Gast unten wie beim generischen Zweig) -- leichte Staffelung (abwechselnd
+  // WETTESSEN_ZIGZAG_Y tiefer) fuer die bis zu zwoelf Plaetze, exakt die "leichte
+  // Staffelung", die der Gegencheck fuer 12 Plaetze an einem Tisch vorschlaegt (Abschnitt 5,
+  // S1). REINE GEOMETRIE, liest nichts, das rr() zieht.
+  const WETTESSEN_REIHE_Y=0.575, WETTESSEN_ZIGZAG_Y=16;
+  function wettessenSitzplaetze(){
+    const y0=H*WETTESSEN_REIHE_Y, pos=new Map();
+    [0,1].forEach(seite=>{
+      const g=TEILNEHMER.filter(u=>u.side===seite);
+      const x0=seite===0?76:W/2+24, x1=seite===0?W/2-24:W-76;
+      g.forEach((u,i)=>{
+        const x=g.length>1?x0+(x1-x0)*i/(g.length-1):(x0+x1)/2;
+        pos.set(u.id,{x,y:y0+(i%2===0?0:WETTESSEN_ZIGZAG_Y)});
+      });
+    });
+    return pos;
+  }
+
+  // WENDETAFEL (S2): kleine "Kippziffernblatt"-Plakette hinter jedem Esser, Nathan's
+  // Zaehltafel-Bildmotiv (Gegencheck Abschnitt 1.1: "hinter jedem Esser eine eigene, gut
+  // sichtbare Zaehltafel") -- ein zweigeteiltes Rechteck (Trennlinie = Kipp-Falz) statt der
+  // reinen Textzeile, die vorher an dieser Stelle stand.
+  function zeichneWettessenTafel(x,y,text,betont){
+    const b=46,h=19;
+    ctx.fillStyle="#1c1108";ctx.fillRect(x-b/2,y-h/2,b,h);
+    // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): `betont` markiert den Moment, in dem
+    // die Tafel gerade um ein halbes Wuerstchen umklappt -- ein kurzer Aufhellblitz statt
+    // eines harten Zahlensprungs, s. Aufrufstelle (zeichneWettessen()).
+    ctx.strokeStyle=betont?"rgba(242,193,78,.95)":"rgba(242,193,78,.55)";
+    ctx.lineWidth=betont?1.6:1;ctx.strokeRect(x-b/2,y-h/2,b,h);
+    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y);ctx.lineTo(x+b/2,y);ctx.stroke();
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="700 "+(betont?11:10)+"px 'IBM Plex Mono',monospace";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
+    ctx.fillText(text,x,y-1);
+  }
+
   function zeichneWettessen(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    const sitz=wettessenSitzplaetze();
+
+    // KOPF AN KOPF: die zwei Fuehrenden ueber BEIDE Seiten -- dieselbe Sortierung wie
+    // WERTUNG_AUFTRITT (b.u.summe-a.u.summe), hier nur auf die ersten zwei gekappt. Traegt
+    // sowohl das Spotlight (unten) als auch das Band (zeichneWettessenBand()).
+    const rangfolge=[...TEILNEHMER].sort((a,b)=>b.summe-a.summe);
+    const erster=rangfolge[0]||null, zweiter=rangfolge[1]||null;
+    const spotIds=new Set([erster,zweiter].filter(Boolean).map(u=>u.id));
+
+    // SPOTLIGHT (S3), HINTER den Figuren gezeichnet: ein warmer Lichtkegel ueber den zwei
+    // Fuehrenden-Plaetzen -- "das 1-gegen-1-Gefuehl ... ohne jemanden vom Tisch zu nehmen"
+    // (Gegencheck Abschnitt 5, S3). Die uebrigen Plaetze werden weiter unten nur LEICHT
+    // abgedunkelt (0,82 statt 1 Alpha), nicht ausgeblendet -- am Tisch bleiben alle sichtbar.
+    for(const u of [erster,zweiter]){
+      if(!u)continue;
+      const p=sitz.get(u.id); if(!p)continue;
+      const beam=ctx.createRadialGradient(p.x,p.y-10,4,p.x,p.y-10,72);
+      beam.addColorStop(0,"rgba(255,232,180,.30)");beam.addColorStop(1,"rgba(255,232,180,0)");
+      ctx.fillStyle=beam;ctx.beginPath();ctx.arc(p.x,p.y-10,72,0,6.2832);ctx.fill();
+    }
+
     [0,1].forEach(side=>{
       const g=TEILNEHMER.filter(u=>u.side===side);
-      const y=side===0?H*0.32:H*0.66;
-      g.forEach((u,i)=>{
-        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-        ctx.globalAlpha=u.lunge>0?1:0.92;
+      g.forEach((u)=>{
+        const p=sitz.get(u.id); const x=p.x,y=p.y;
+        const gedimmt=spotIds.has(u.id)?1:0.82;
+        ctx.globalAlpha=(u.lunge>0?1:0.92)*gedimmt;
         const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.fillStyle=c;ctx.globalAlpha=0.20*gedimmt;
         ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=1;
+        ctx.globalAlpha=gedimmt;
+
+        // FAEHNCHEN AM PLATZ (S1): ein Team-Wimpel auf duennem Stab links neben dem Platz --
+        // die zweite, vom Trikot unabhaengige Art, ein Team an der langen Tafel zu erkennen
+        // ("Trikotfarbe UND ein Faehnchen am Platz", Gegencheck Abschnitt 5, S1).
+        ctx.strokeStyle="rgba(200,190,175,.6)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x-20,y+6);ctx.lineTo(x-20,y-24);ctx.stroke();
+        ctx.fillStyle=c;ctx.beginPath();
+        ctx.moveTo(x-20,y-24);ctx.lineTo(x-8,y-19);ctx.lineTo(x-20,y-14);ctx.closePath();ctx.fill();
 
         // TELLERSTAPEL, VOR der Figur gezeichnet (liegt hinter ihr auf dem Tisch) --
         // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
         // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
         const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
-        for(let p=0;p<teller;p++){
+        for(let pl=0;pl<teller;pl++){
           ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
-          ctx.globalAlpha=0.65+p*0.03;
-          ctx.beginPath();ctx.ellipse(x,y+22-p*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
+          ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
+          ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
         }
-        ctx.globalAlpha=1;
+        ctx.globalAlpha=gedimmt;
 
         zeichneSprite(ctx,u,x,y);
 
@@ -17716,6 +20819,7 @@
           ctx.restore();
         }
 
+        ctx.globalAlpha=1;
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
           ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
@@ -17723,14 +20827,55 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        const w=30,p=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+
+        // WENDETAFEL, EINHEIT WUERSTCHEN (S2) -- ersetzt das alte "412 Pkt". Reine
+        // Anzeige-Skala aus u.summe (wettessenWuerstchen(), s. dort), NICHT die Wertung
+        // selbst (die bleibt u.summe, PPs/Teamstand/rho unveraendert).
+        // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): zaehlt jetzt STETIG hoch statt
+        // einmal je Minute zu springen (wettessenAnzeigeSumme(), s. dort). `betont` markiert
+        // den Moment, in dem der gerundete Anzeigewert um ein halbes Wuerstchen umklappt --
+        // ein kurzer Klick + Aufhellblitz statt eines stillen Zahlensprungs.
+        const wuJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(u));
+        if(u.vizWuLetzte!==wuJetzt){
+          if(u.vizWuLetzte!=null) sfx("wettessen","klapp");
+          u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
+        }
+        const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
+        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wuJetzt)+" Wü",betontWu);
+
+        const w=30,pFuell=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+71,w*pFuell,3);
         ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        ctx.fillText("Min "+(u.aktuell+1)+"/"+art.rundenN,x,y+81);
+
+        // W-B2 (Tempo je Esser): Wuerstchen der zuletzt ABGESCHLOSSENEN Minute, mit einem
+        // kleinen Dreieck gegen die Minute davor (Vektor-Primitiv statt Emoji-Pfeil, wie
+        // ueberall sonst in diesem Renderer). Erst sichtbar, sobald eine Minute steht.
+        const tempoJetzt=wettessenTempo(u,u.aktuell), tempoVor=wettessenTempo(u,u.aktuell-1);
+        if(tempoJetzt!=null){
+          let farbeT="#8a93a3", hoch=null;
+          if(tempoVor!=null&&Math.abs(tempoJetzt-tempoVor)>0.001){
+            hoch=tempoJetzt>tempoVor; farbeT=hoch?"#5fd38a":"#e0645f";
+          }
+          ctx.textAlign="left"; ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeT;
+          const txtT=wettessenWuerstchenText(tempoJetzt)+"/min";
+          ctx.fillText(txtT,x-16,y+91);
+          if(hoch!=null){
+            const tx=x-16+ctx.measureText(txtT).width+6, ty=y+91;
+            ctx.fillStyle=farbeT; ctx.beginPath();
+            if(hoch){ ctx.moveTo(tx,ty-3); ctx.lineTo(tx-3,ty+2); ctx.lineTo(tx+3,ty+2); }
+            else { ctx.moveTo(tx,ty+3); ctx.lineTo(tx-3,ty-2); ctx.lineTo(tx+3,ty-2); }
+            ctx.closePath(); ctx.fill();
+          }
+          ctx.textAlign="center";
+        }
       });
     });
+
+    // KOPF-AN-KOPF-BAND UND 10:00-UHR (S3) -- eigene Funktionen, s. dort.
+    zeichneWettessenBand(erster,zweiter,art);
+    zeichneWettessenUhr(art);
 
     // MAGEN-METER, unterer Bildrand, mit Gabel-Marker des Fuehrenden (platter.tsx' Magen-
     // Meter + Gabel-Marker) — der Fuehrende ist, ueber BEIDE Seiten hinweg, wer die meisten
@@ -17738,8 +20883,9 @@
     // per Definition das Maximum ueber alle u.summe, der Fuehrende TRAeGT also immer genau
     // diesen Wert — die Gabel stuende schon beim allerersten Biss am rechten Anschlag, statt
     // sich ueber den Auftritt hinweg zu fuellen. Stattdessen (leader.aktuell+1)/art.rundenN:
-    // wie viele der acht Durchgaenge der Fuehrende schon geschafft hat — ein "Magen"-Fuellstand,
-    // der ueber den Auftritt hinweg tatsaechlich waechst, unabhaengig vom Punktestand.
+    // wie viele der zehn Minuten der Fuehrende schon geschafft hat (S3: rundenN ist jetzt
+    // eine Minute je Durchgang) — ein "Magen"-Fuellstand, der ueber den Auftritt hinweg
+    // tatsaechlich waechst, unabhaengig vom Punktestand.
     const meterX0=90, meterX1=W-90, meterY=H-24;
     ctx.fillStyle="rgba(16,9,6,.55)";ctx.strokeStyle="rgba(242,193,78,.4)";ctx.lineWidth=0.8;
     ctx.fillRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
@@ -17768,14 +20914,141 @@
       ctx.textAlign="center";
       if(f._teilnehmer!=null){
         const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
-        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
-          const i=g.indexOf(u);
-          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
-          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
-          ctx.fillText(f.txt,x,y);
-        }
+        const p=u?sitz.get(u.id):null;
+        if(p)ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
       }
       ctx.globalAlpha=1;
+    }
+  }
+
+  // KOPF-AN-KOPF-BAND (S3, Gegencheck Abschnitt 5): "oben, im Stil einer
+  // Sportuebertragung: die zwei Fuehrenden ueber beide Teams, gross, mit Portraet, Zahl und
+  // Abstand" -- Portraet ersetzt durch Name+Trikotfarbe (dieser Renderer zeichnet keine
+  // Gesichter), Zahl/Abstand in Wuerstchen (S2). Liest ausschliesslich u.summe/u.side/u.n,
+  // aendert nichts an ihnen.
+  function zeichneWettessenBand(erster,zweiter,art){
+    if(!erster||!zweiter)return; // Wettessen hat min. 2 je Seite; defensiv trotzdem.
+    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): letzte Minute -- Band faerbt sich um
+    // und wechselt Kopfzeile/Titel, dieselbe Restzeit-Quelle wie die Uhr (wettessenRestSek).
+    const restSek=art?wettessenRestSek(art):null;
+    const letzteMinute=restSek!=null&&restSek<=60&&!done;
+    const bandY0=H*0.115, bandY1=H*0.205, mitteY=(bandY0+bandY1)/2;
+    ctx.fillStyle=letzteMinute?"rgba(60,10,8,.72)":"rgba(10,6,4,.68)";
+    ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.strokeStyle=letzteMinute?"rgba(230,67,46,.7)":"rgba(242,193,78,.5)";
+    ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";
+    ctx.fillStyle=letzteMinute?"rgba(255,150,130,.9)":"rgba(242,193,78,.75)";
+    ctx.textAlign="center";ctx.fillText(letzteMinute?"LETZTE MINUTE":"KOPF AN KOPF",W/2,bandY0-4);
+
+    const zeile=(u,links)=>{
+      const c=u.side===0?css("--home"):css("--away");
+      const tx=links?W*0.20:W*0.80;
+      ctx.textAlign=links?"left":"right";
+      ctx.font="700 12px 'Barlow Condensed',sans-serif";ctx.fillStyle=c;
+      ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
+      ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#dfe6ef";
+      // W-B1: dieselbe stetig hochzaehlende Anzeige wie an der Wendetafel, statt des
+      // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort).
+      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" Würstchen",tx,mitteY+9);
+    };
+    zeile(erster,true); zeile(zweiter,false);
+
+    ctx.textAlign="center";
+    ctx.font="800 13px 'Barlow Condensed',sans-serif";ctx.fillStyle="#f2c14e";
+    ctx.fillText("VS",W/2,mitteY-2);
+    const abstandJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(erster))-wettessenWuerstchen(wettessenAnzeigeSumme(zweiter));
+    ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.fillText(abstandJetzt<=0?"punktgleich":"+"+wettessenWuerstchenText(abstandJetzt),W/2,mitteY+12);
+
+    if(letzteMinute){
+      // W-B3: "braucht +X" gegen den STAND VOR DER LETZTEN MINUTE -- gerechnet vor deren
+      // Enthuellung, damit die Zahl waehrend der laufenden letzten Minute nicht mitspoilert
+      // (s. Broadcast-Optik-Papier Abschnitt 2.2/4.3).
+      const vorLetzter=(u)=>(u.aktuell>=art.rundenN-1&&u.runden[art.rundenN-1])
+        ?(u.summe-u.runden[art.rundenN-1].punkte):u.summe;
+      const luecke=wettessenWuerstchen(vorLetzter(erster))-wettessenWuerstchen(vorLetzter(zweiter));
+      if(luecke>0){
+        ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#ff9a7a";
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+" braucht +"+wettessenWuerstchenText(luecke),W/2,mitteY+24);
+      }
+    } else {
+      // W-B2: TEMPO-TREND -- Abstand VOR der zuletzt enthuellten Minute gegen den Abstand
+      // JETZT, mindestens ein Wuerstchen Veraenderung, sonst bleibt die Zeile leer.
+      const vorMinute=(u)=>(u.aktuell>=0&&u.runden[u.aktuell])?(u.summe-u.runden[u.aktuell].punkte):u.summe;
+      const abstandVorher=wettessenWuerstchen(vorMinute(erster))-wettessenWuerstchen(vorMinute(zweiter));
+      const trend=abstandJetzt-abstandVorher;
+      if(Math.abs(trend)>=1){
+        ctx.font="700 7.5px 'Barlow Condensed',sans-serif";
+        ctx.fillStyle=trend<0?"#5fd38a":"#e0645f";
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+24);
+      } else {
+        // W-B4 (Hochrechnung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
+        // "auf Kurs fuer N" -- dieselbe on-pace-Erzaehlung wie bei ESPN ("30 nach drei
+        // Minuten"), NUR gezeigt, wenn es (noch) keinen nennenswerten Tempo-Trend gibt
+        // (|Trend|<1 Wuerstchen) -- sonst stuenden zwei Zeilen uebereinander im selben,
+        // knappen Bandbereich. `erster` ist bereits der Fuehrende (Aufrufer sortiert danach,
+        // s. zeichneWettessen()). Erst ab abgeschlossener erster Minute, sonst waere die
+        // Hochrechnung nur Rauschen aus einem einzigen Zwischenwert.
+        //
+        // BEWUSST WEGGELASSEN: der zweite Teil des Papiers (Abschnitt 4.2, "Tempo-Geist"
+        // als zweiter Marker im Magen-Meter). Der Meter-Fuellstand ist dort NICHT der
+        // Punktestand, sondern der Anteil der schon absolvierten Minuten
+        // ((leader.aktuell+1)/art.rundenN, s. Kommentar an der Meter-Stelle) -- ein
+        // punktebasierter "wo wuerde er am Ende stehen"-Marker auf einer Zeitachse waere
+        // eine andere Groesse auf derselben Skala und damit irrefuehrend statt informativ.
+        const minutenFertig=Math.max(0,erster.aktuell+1);
+        if(minutenFertig>0){
+          const aufKurs=Math.round(wettessenWuerstchen(erster.summe)/minutenFertig*art.rundenN);
+          ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa6b6";
+          ctx.fillText((erster.n.split(" ")[0]||"?")+" auf Kurs für "+aufKurs,W/2,mitteY+24);
+        }
+      }
+    }
+  }
+
+  // 10:00-UHR (S3, Gegencheck Abschnitt 5): "eine grosse Countdown-Uhr ueber dem Tisch,
+  // jeder Durchgang ist eine Minute". Liest genau EINEN Teilnehmer, um die verstrichene Zeit
+  // abzuleiten -- das ist keine Vereinfachung, sondern eine Folge davon, dass
+  // `buehneGruppenGroesse` (bauBuehne()/stepBuehne(), s. dort) bei Wettessen einen ganzen
+  // Runden-Block auf einmal enthuellt: `u.aktuell` laeuft deshalb fuer ALLE Teilnehmer
+  // synchron, jeder von ihnen traegt also dieselbe "vergangene Minute" fuer den ganzen Tisch.
+  function zeichneWettessenUhr(art){
+    const irgendeiner=TEILNEHMER[0];
+    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
+    const restSek=wettessenRestSek(art);
+    const mm=Math.floor(restSek/60), ss=Math.floor(restSek%60);
+    const uhrY=H*0.275;
+    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): roter Ring in den letzten zehn
+    // Sekunden -- reine Anzeige aus restSek, das die Uhr ohnehin schon rechnet.
+    if(restSek<=10&&restSek>0){
+      ctx.strokeStyle="rgba(230,67,46,.85)";ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(W/2,uhrY-8,26,0,6.2832);ctx.stroke();
+    }
+    ctx.textAlign="center";
+    ctx.font="800 28px 'IBM Plex Mono',monospace";
+    ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.6)";ctx.lineJoin="round";
+    const text=mm+":"+(ss<10?"0":"")+ss;
+    ctx.strokeText(text,W/2,uhrY);
+    ctx.fillStyle=restSek<=60?"#e6432e":"#f2ede2";
+    ctx.fillText(text,W/2,uhrY);
+    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.7)";
+    ctx.fillText("MINUTE "+Math.min(art.rundenN,minutenFertig+(done?0:1))+"/"+art.rundenN,W/2,uhrY+16);
+
+    // GROSSER COUNTDOWN 10..1 IN DER BILDMITTE (W-B3): eigener Puls je Sekunde, rein aus
+    // restSek abgeleitet, kein neuer Wert, kein rr().
+    if(restSek<=10&&restSek>0){
+      const restGanz=Math.ceil(restSek-0.001);
+      const bruch=restSek-Math.floor(restSek);
+      const puls=1+0.22*Math.sin(bruch*Math.PI);
+      ctx.save();
+      ctx.translate(W/2,H*0.46);ctx.scale(puls,puls);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="900 52px 'Barlow Condensed',sans-serif";
+      ctx.lineWidth=4;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.lineJoin="round";
+      ctx.strokeText(String(restGanz),0,0);
+      ctx.fillStyle="#e6432e";ctx.fillText(String(restGanz),0,0);
+      ctx.restore();
     }
   }
 
@@ -17795,17 +21068,17 @@
   // NIRGENDS ausgewertet.
   const SHOWCASE_ACTS=[
     {id:"kampfkunst",    label:"Kampfkunst",     pose:"slash", waffe:"eigene",
-      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Raeuspern im Saal"}},
-    {id:"schuetzenkunst",label:"Schuetzenkunst", pose:"shoot", waffe:"eigene",
+      text:{erfolg:"die Klinge singt, das Publikum tobt", fail:"der Hieb geht daneben, verlegenes Räuspern im Saal"}},
+    {id:"schuetzenkunst",label:"Schützenkunst", pose:"shoot", waffe:"eigene",
       text:{erfolg:"ein Trickschuss, der ins Schwarze trifft", fail:"der Schuss geht haarscharf am Ziel vorbei"}},
     {id:"zaubershow",    label:"Zaubershow",     pose:"shoot", waffe:null,
       text:{erfolg:"ein Funkenregen aus dem Nichts, das Publikum staunt", fail:"der Zauber verpufft mit einem traurigen Fauchen"}},
     {id:"gesang",        label:"Gesang",         pose:"walk",  waffe:null,
-      text:{erfolg:"eine Stimme, die den ganzen Saal traegt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
+      text:{erfolg:"eine Stimme, die den ganzen Saal trägt", fail:"die Stimme kippt weg, ein Buzzer leuchtet auf"}},
     {id:"kraftakt",      label:"Kraftakt",       pose:"slash", waffe:null,
-      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und faellt zu Boden"}},
+      text:{erfolg:"der Fels zerbirst unter dem Griff, das Publikum johlt", fail:"der Fels bleibt ganz und fällt zu Boden"}},
     {id:"akrobatik",     label:"Akrobatik",      pose:"hop",   waffe:null,
-      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstoehnen aus dem Publikum"}}
+      text:{erfolg:"ein Salto, butterweich gelandet", fail:"ein Sturz, kurzes Aufstöhnen aus dem Publikum"}}
   ];
 
   // SHOWCASE_ACT_PUNKTE / actVon(): dasselbe Muster wie PW/leitePers() weiter unten
@@ -17871,7 +21144,7 @@
     const add=(pts,label)=>{ if(!pts)return; for(const[k,v] of Object.entries(pts))sc[k]=(sc[k]||0)+v; warum.push(label); };
     if(b.waffe)add(SHOWCASE_ACT_PUNKTE.bauWaffe[b.waffe],"Waffe: "+b.waffe);
     if(b.vollbild)add(SHOWCASE_ACT_PUNKTE.bauVollbild[b.vollbild],"Vollbild: "+b.vollbild);
-    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Fluegel");
+    if(b.fluegel)add(SHOWCASE_ACT_PUNKTE.bauFluegel,"Flügel");
     if(b.effekt)add(SHOWCASE_ACT_PUNKTE.bauEffekt,"Effekt: "+(b.effekt.typ||"?"));
     add(SHOWCASE_ACT_PUNKTE.klasse[u.c],"Klasse: "+u.c);
     (u.sub||[]).forEach(x=>add(SHOWCASE_ACT_PUNKTE.sub[x],"Sub: "+x));
@@ -18189,6 +21462,9 @@
         // ist deshalb nie noetig. vizShowcaseTonAktuell haelt den zuletzt VERTONTEN
         // Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
         u.vizAuftrittTon=false; u.vizShowcaseTonAktuell=-1;
+        // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): Zaehler fuer die X-Wand dieses
+        // Acts, s. Kante "frisch enthuellt" unten.
+        u.vizXWand=0; u.vizXFlutSeit=null;
       }
       // ACT-UEBERSCHREIBUNGEN (PR S2, Konzept Abschnitt 4.3/5): NUR am gerade aktiven
       // Performer gesetzt, sonst immer `undefined`/`false` -- exakt der Vertrag "u.vizWaffe =
@@ -18253,7 +21529,62 @@
         const r=u.runden[u.aktuell];
         if(r){
           if(r.ereignis===art.erfolgWort)sfx("showcase","applaus");
-          else if(r.ereignis===art.failWort)sfx("showcase","buzzer");
+          else if(r.ereignis===art.failWort){
+            sfx("showcase","buzzer");
+            // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das n-te X DIESES Acts zuendet
+            // Buzzer n dauerhaft (s. zeichneShowcase()) -- ein reiner Zaehler auf bereits
+            // enthuellte Fehlschlaege, kein cypherHash mehr noetig. Beim dritten X flutet
+            // die Rueckwand kurz rot (u.vizXFlutSeit, ein Frame lang gesetzt).
+            u.vizXWand=(u.vizXWand||0)+1;
+            if(u.vizXWand===3){ u.vizXFlutSeit=buehneT; sfx("showcase","buzzer"); }
+          }
+        }
+        // S-B2 (Applaus-Meter, Tagesbestwert): der bisherige Bestwert VOR diesem Durchgang
+        // (ohne den gerade enthuellten Wert), damit ein neuer Rekord an dieser Kante genau
+        // einmal einen Gold-Blitz ausloest. Reine Ablesung ueber alle TEILNEHMER, kein rr().
+        if(r){
+          let bestVor=-Infinity;
+          for(const x of TEILNEHMER){
+            if(!x.runden)continue;
+            for(let i=0;i<=x.aktuell;i++){
+              if(x===u&&i===u.aktuell)continue;
+              const r2=x.runden[i]; if(r2&&r2.punkte>bestVor)bestVor=r2.punkte;
+            }
+          }
+          u.vizMeterPunkte=r.punkte; u.vizMeterSeit=buehneT;
+          if(bestVor>-Infinity && r.punkte>bestVor) u.vizGoldBlitzSeit=buehneT;
+        }
+        // S-B4 (Urteilsmoment mit Jury-Stuehlen, Broadcast-Optik Buehne-Auftritt 27.09.,
+        // Prio 2, Klasse A, Variante A/Ueberblendung wie vom Papier empfohlen): an der Kante
+        // "letzter Durchgang dieses Acts gerade enthuellt" merkt sich der Act den Zeitpunkt
+        // fuer die gut 1,5s lange Jury-Stuhl-Sequenz (u.vizUrteilSeit, s. zeichneShowcase())
+        // und der Trommelwirbel faellt EINMAL. Laeuft als Ueberblendung, WAEHREND der
+        // naechste Act ohnehin schon hereingleitet (NAECHER() oben, tau 0,45s) -- der
+        // Enthuellungstakt (buehneAkt) wird NICHT angefasst, anders als Variante B im Papier.
+        if(u.aktuell+1>=art.rundenN){
+          u.vizUrteilSeit=buehneT;
+          sfx("showcase","trommel");
+          // S-B5 (Goldener Buzzer als Bildereignis, Prio 2, Klasse A): hoechstens EINMAL je
+          // Spiel (showcaseGoldVergeben, N1-Reset s. reset()), fuer den ERSTEN Act, der (a)
+          // ALLE seine Durchgaenge fehlerfrei steht UND (b) mit seiner Endsumme JEDEN bereits
+          // fertigen Act uebertrifft, fruehestens ab dem vierten fertig gewordenen Act --
+          // woertlich die Regel aus dem Papier (Abschnitt 3.2, S-B5). Ein spaeterer Act kann
+          // den Gold-Act rechnerisch noch ueberholen (die Regel bewertet nur den Stand zum
+          // jeweiligen Enthuellungszeitpunkt, genau wie im Original nie vorab bekannt) --
+          // KEIN Punktbonus (das waere Review S4, Klasse C), reines Bildereignis.
+          if(!showcaseGoldVergeben){
+            const fehlerfrei=(u.runden||[]).every(x=>x&&x.ereignis===art.erfolgWort);
+            const vorherigeFertige=TEILNEHMER.filter(x=>x!==u&&x.runden&&(x.aktuell+1)>=x.runden.length);
+            if(fehlerfrei && vorherigeFertige.length>=3){
+              const bester=Math.max(0,...vorherigeFertige.map(x=>x.summe||0));
+              if((u.summe||0)>bester){
+                showcaseGoldVergeben=true;
+                u.vizGoldBuzzer=true; u.vizGoldBuzzerSeit=buehneT;
+                sfx("showcase","goldbuzzer");
+                feed(u.side,"GOLDENER BUZZER — "+u.n+"!",true);
+              }
+            }
+          }
         }
       }
       const ziel=showcaseZielPos(u,aktiver);
@@ -18279,6 +21610,9 @@
       ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.strokeText(txt,x,y);ctx.fillStyle=farbe;ctx.fillText(txt,x,y);
     };
+    // S-B2 (Applaus-Meter): EINMAL je Bild berechnet, Applaus-Ring UND Meter teilen sich
+    // dieselbe Spanne.
+    const spanne=showcaseDurchgangsSpanne();
 
     // ---------- BACKSTAGE: alle ausser dem Aktiven, klein + spaeter abgedunkelt ----------
     for(const u of TEILNEHMER){
@@ -18304,6 +21638,57 @@
     vig.addColorStop(0.6,"rgba(6,3,10,.40)");
     vig.addColorStop(1,"rgba(6,3,10,.74)");
     ctx.fillStyle=vig;ctx.fillRect(0,0,W,H);
+
+    // S-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): "Top 3 bisher"-Tafel oben links, im
+    // Stil von zeichneEisStand() -- NACH der Vignette gezeichnet, damit sie wie ein
+    // HUD-Panel lesbar bleibt statt vom Verlauf abgedunkelt zu werden. Nur FERTIGE Acts
+    // (Spoiler-Regel), plus eine Zeile fuer den gerade Auftretenden mit seinem
+    // hypothetischen Rang, bräche er jetzt ab.
+    (function zeichneShowcaseTop3(){
+      const top3=showcaseTop3();
+      if(!top3.length&&!aktiver)return;
+      const pad=8, zeilH=15, kopfH=15;
+      const rows=top3.length+(aktiver?1:0);
+      const br=W*0.19, hoeh=kopfH+rows*zeilH+pad, x0=W*0.015, y0=H*0.185;
+      const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+        ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
+      ctx.globalAlpha=0.86; ctx.fillStyle="#1a1024"; rund(x0,y0,br,hoeh,7); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=1; ctx.strokeStyle="rgba(246,199,80,.5)"; rund(x0,y0,br,hoeh,7); ctx.stroke();
+      ctx.textAlign="left"; ctx.textBaseline="middle";
+      ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750";
+      ctx.fillText("TOP 3 BISHER",x0+pad,y0+kopfH*0.6);
+      let k=0;
+      top3.forEach((u,i)=>{
+        const y=y0+kopfH+k*zeilH+zeilH*0.5; k++;
+        ctx.fillStyle=u.side===0?css("--home"):css("--away");
+        ctx.fillRect(x0+pad,y-5,2.5,10);
+        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=i===0?"#f2d75a":"#c7cedb";
+        ctx.fillText(String(i+1)+".",x0+pad+7,y);
+        const namen=u.n.split(" ")[0]||"?";
+        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.fillText(namen.length>13?namen.slice(0,12)+"…":namen,x0+pad+22,y);
+        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#dfe6ef";
+        ctx.fillText(String(u.summe||0),x0+br-pad,y);
+        ctx.textAlign="left";
+      });
+      if(aktiver){
+        const y=y0+kopfH+k*zeilH+zeilH*0.5;
+        ctx.fillStyle=aktiver.side===0?css("--home"):css("--away");
+        ctx.fillRect(x0+pad,y-5,2.5,10);
+        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d6ac36";
+        ctx.fillText("läuft",x0+pad+7,y);
+        const namen=aktiver.n.split(" ")[0]||"?";
+        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.fillText(namen.length>9?namen.slice(0,8)+"…":namen,x0+pad+34,y);
+        // Hypothetischer Rang, bräche der Auftritt jetzt ab -- nur gegen bereits FERTIGE
+        // Acts verglichen, kein Spoiler ueber noch kommende Acts.
+        const fertige=showcaseFertige();
+        const rang=1+fertige.filter(x=>x!==aktiver&&(x.summe||0)>(aktiver.summe||0)).length;
+        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.fillText((aktiver.summe||0)+" (#"+rang+")",x0+br-pad,y);
+        ctx.textAlign="left";
+      }
+    })();
 
     // ---------- DER AKTIVE: volle Groesse im Rampenlicht ----------
     if(aktiver){
@@ -18347,7 +21732,7 @@
       ctx.textAlign="center";
       ctx.fillText((aktiver.aktuell+1)+"/"+art.rundenN,x,y+92);
 
-      // ---------- BUZZER/APPLAUS-REAKTION (Konzept Punkt 4) ----------
+      // ---------- BUZZER/APPLAUS-REAKTION (Konzept Punkt 4, erweitert S-B1/S-B2) ----------
       // u.lunge als Uhr, exakt dasselbe Muster wie der Tennis-Ball (zeichneTennis()-
       // Kommentar ":15108-15110": 0,5 im Enthuellungs-Frame -> 0 nach 0,5 realen Sekunden,
       // keine neue Uhr, kein neues Feld). Liest nur u.runden[u.aktuell]/art.erfolgWort/
@@ -18355,31 +21740,174 @@
       if(aktiver.lunge>0 && aktiver.aktuell>=0){
         const r=aktiver.runden[aktiver.aktuell];
         const fortschritt=Math.min(1,Math.max(0,1-aktiver.lunge/0.5));
-        if(r&&r.ereignis===art.failWort){
-          // Buzzer, deterministisch per cypherHash (kein rr()) auf einen der drei
-          // Pult-Knoepfe verteilt, leuchtet rot auf und blendet aus.
-          const bi=cypherHash(aktiver.id,aktiver.aktuell)%3;
-          const bp=showcaseBuzzerPos(bi);
-          const leben=1-fortschritt;
-          ctx.save();ctx.globalAlpha=leben;ctx.globalCompositeOperation="lighter";
-          const gl=ctx.createRadialGradient(bp.x,bp.y,0,bp.x,bp.y,20);
-          gl.addColorStop(0,"#ff5a4a");gl.addColorStop(1,"rgba(255,90,74,0)");
-          ctx.fillStyle=gl;ctx.beginPath();ctx.arc(bp.x,bp.y,20,0,6.2832);ctx.fill();
-          ctx.restore();
-          ctx.globalAlpha=leben;ctx.fillStyle="#ff5a4a";
-          ctx.beginPath();ctx.arc(bp.x,bp.y,9,0,6.2832);ctx.fill();
+        if(r&&r.ereignis===art.erfolgWort){
+          // S-B2: Applaus-Ring bekommt eine STAERKE -- Radius und Ringzahl aus demselben
+          // Ausschlag wie das Applaus-Meter (spanne), statt einem einzelnen 0,5s-Ring fuer
+          // jeden Erfolg gleichermassen.
+          const anteil=(spanne&&spanne.max>spanne.min)
+            ?Math.max(0,Math.min(1,(r.punkte-spanne.min)/(spanne.max-spanne.min))):0.5;
+          const ringe=1+Math.round(anteil*2);
+          for(let ri=0;ri<ringe;ri++){
+            const f2=Math.min(1,fortschritt+ri*0.12);
+            const ry=showcasePublikumY()-f2*H*0.30;
+            ctx.save();ctx.globalAlpha=(1-f2)*0.8*(1-ri*0.15);
+            ctx.strokeStyle="#f6c750";ctx.lineWidth=2;
+            ctx.beginPath();ctx.arc(x,ry,10+(12+anteil*20)*f2,0,6.2832);ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+      // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): X-WAND UND PERMANENTE BUZZER --
+      // ersetzt den alten 0,5s-Zufallsblitz (cypherHash) durch einen dauerhaften Stand:
+      // u.vizXWand zaehlt NUR bereits enthuellte Fehlschlaege DIESES Acts (s. stepShowcase()),
+      // bleibt sichtbar bis der Act abtritt.
+      const xWand=aktiver.vizXWand||0;
+      for(let bi=0;bi<3;bi++){
+        const bp=showcaseBuzzerPos(bi), an=bi<xWand;
+        ctx.globalAlpha=an?1:0.4;
+        ctx.fillStyle=an?"#ff5a4a":"#3a2a44";
+        ctx.beginPath();ctx.arc(bp.x,bp.y,9,0,6.2832);ctx.fill();
+        if(an){
+          ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=1;ctx.stroke();
+          // Grosses, duennes rotes X an der Rueckwand ueber dem Knopf (unter dem Vorhang).
+          ctx.font="800 15px 'Barlow Condensed',sans-serif";ctx.fillStyle="#ff5a4a";
+          ctx.textAlign="center";ctx.textBaseline="middle";
+          ctx.fillText("X",bp.x,H*0.205);
+        }
+        ctx.globalAlpha=1;
+      }
+      // Drittes X: 0,6s roter Flutstoss ueber die Rueckwand -- einmaliger Kantentreffer aus
+      // vizXFlutSeit (s. stepShowcase()). Die Nummer LAEUFT WEITER (kein Abbruch, das waere
+      // Klasse C, Review S4).
+      if(aktiver.vizXFlutSeit!=null){
+        const seitX=buehneT-aktiver.vizXFlutSeit;
+        if(seitX<0.6){
+          ctx.globalAlpha=(1-seitX/0.6)*0.5;
+          ctx.fillStyle="#ff2d2d";
+          ctx.fillRect(0,0,W,H*0.16);
           ctx.globalAlpha=1;
-        } else if(r&&r.ereignis===art.erfolgWort){
-          // Applaus-Ring, der aus dem Publikum aufsteigt -- startet auf Publikumshoehe,
-          // waechst und steigt Richtung Buehnenmitte, blendet dabei aus.
-          const ry=showcasePublikumY()-fortschritt*H*0.30;
-          ctx.save();ctx.globalAlpha=(1-fortschritt)*0.8;
-          ctx.strokeStyle="#f6c750";ctx.lineWidth=2;
-          ctx.beginPath();ctx.arc(x,ry,10+fortschritt*26,0,6.2832);ctx.stroke();
-          ctx.restore();
+        }
+      }
+      // S-B2: APPLAUS-METER, senkrecht rechts zwischen Vorhang und Backstage-Spalte, mit
+      // Tagesbestwert-Marke -- reine Anzeige aus bereits enthuellten r.punkte.
+      if(spanne && spanne.max>spanne.min){
+        const mx0=W*0.955, my0=H*0.30, my1=H*0.80, mw=9;
+        ctx.fillStyle="rgba(16,20,28,.7)"; ctx.fillRect(mx0-mw/2,my0,mw,my1-my0);
+        ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1; ctx.strokeRect(mx0-mw/2,my0,mw,my1-my0);
+        let bester=null;
+        for(const u2 of TEILNEHMER)if(u2.vizMeterSeit!=null&&(!bester||u2.vizMeterSeit>bester.vizMeterSeit))bester=u2;
+        if(bester){
+          const seitM=buehneT-bester.vizMeterSeit;
+          if(seitM<1.5){
+            const anteilM=Math.max(0,Math.min(1,(bester.vizMeterPunkte-spanne.min)/(spanne.max-spanne.min)));
+            const fh=(my1-my0)*anteilM;
+            ctx.globalAlpha=0.35+0.55*(1-seitM/1.5);
+            ctx.fillStyle=bester.side===0?css("--home"):css("--away");
+            ctx.fillRect(mx0-mw/2+1,my1-fh,mw-2,fh);
+            ctx.globalAlpha=1;
+          }
+        }
+        ctx.strokeStyle="#f6c750"; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(mx0-mw/2-4,my0); ctx.lineTo(mx0+mw/2+4,my0); ctx.stroke();
+        ctx.font="700 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750"; ctx.textAlign="center";
+        ctx.fillText("TAGESBEST",mx0,my0-6);
+        if(bester&&bester.vizGoldBlitzSeit!=null){
+          const seitB=buehneT-bester.vizGoldBlitzSeit;
+          if(seitB<0.8){
+            ctx.globalAlpha=1-seitB/0.8;
+            ctx.strokeStyle="#f6c750"; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.arc(mx0,my0,14+seitB*20,0,6.2832); ctx.stroke();
+            ctx.globalAlpha=1;
+          }
         }
       }
     }
+
+    // S-B4 (Urteilsmoment mit Jury-Stuehlen, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2,
+    // Klasse A, Variante A/Ueberblendung): der zuletzt fertig gewordene Act traegt seinen
+    // Urteilszeitpunkt in u.vizUrteilSeit (s. stepShowcase()) -- gesucht wird der JUENGSTE,
+    // damit zwei schnell aufeinanderfolgende Urteile sich nicht ueberlagern. Unabhaengig von
+    // `aktiver`: die Sequenz zeigt den Act, der GERADE fertig wurde, nicht den, der schon
+    // hereingleitet.
+    (function zeichneShowcaseUrteil(){
+      let u=null;
+      for(const x of TEILNEHMER)if(x.vizUrteilSeit!=null&&(!u||x.vizUrteilSeit>u.vizUrteilSeit))u=x;
+      if(!u)return;
+      const seit=buehneT-u.vizUrteilSeit;
+      if(seit<0||seit>1.5)return;
+      const alpha=seit<1.3?1:Math.max(0,1-(seit-1.3)/0.2);
+      ctx.save(); ctx.globalAlpha=alpha;
+      ctx.fillStyle="rgba(4,2,8,.55)"; ctx.fillRect(0,0,W,H);
+      // RANG UNTER ALLEN FERTIGEN ACTS (inklusive u selbst, das ist zu diesem Zeitpunkt
+      // bereits fertig) bestimmt die Stuhlzahl: oberes Drittel drei, Mitte zwei, unteres
+      // Drittel einer, ganz letzter keiner -- woertlich die Regel aus dem Papier.
+      const fertige=showcaseFertige();
+      const n=Math.max(1,fertige.length);
+      const rang=1+fertige.filter(x=>x!==u&&(x.summe||0)>(u.summe||0)).length;
+      const stuehle=rang<=Math.ceil(n/3)?3:(rang<=Math.ceil(2*n/3)?2:(rang>=n?0:1));
+      const anzX=W/2, anzY=H*0.32;
+      for(let i=0;i<3;i++){
+        const p=Math.max(0,Math.min(1,(seit-i*0.25)/0.25));
+        const dreht=i<stuehle && p>0;
+        const px=anzX+(i-1)*56;
+        ctx.save(); ctx.translate(px,anzY);
+        // HALBDREHUNG ALS UEBERGANG (0<=p<1), DANACH UNGESPIEGELT STEHEN BLEIBEN: cos(p*PI)
+        // laeuft von 1 (unbewegt) nach -1 (Ruecken zur Kamera) -- bei p===1 waere die
+        // Ellipse selbst zwar wieder rund (Skalierung -1 auf einer Ellipse sieht man ihr
+        // nicht an), der "JA"-TEXT darin aber WUERDE gespiegelt gezeichnet, wenn die
+        // Transformation ueber den fertigen Zustand hinaus stehen bliebe (nachgemessen im
+        // Playwright-Bild: aus "JA" wurde ein gespiegeltes, kaum lesbares Glyph). Deshalb
+        // gilt die Skalierung nur WAEHREND des Uebergangs, der fertig gedrehte Stuhl (p>=1)
+        // steht wieder ungespiegelt da.
+        if(dreht&&p<1)ctx.scale(Math.cos(p*Math.PI),1);
+        ctx.fillStyle="#3a2a44"; ctx.beginPath(); ctx.ellipse(0,0,17,23,0,0,6.2832); ctx.fill();
+        ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.4; ctx.stroke();
+        if(dreht&&p>=1){
+          ctx.fillStyle="#f6c750"; ctx.font="700 9px 'Barlow Condensed',sans-serif";
+          ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("JA",0,0);
+        }
+        ctx.restore();
+      }
+      if(seit>=0.9){
+        const c=u.side===0?css("--home"):css("--away");
+        ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+        ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle=c;
+        ctx.fillText("PLATZ "+rang+" · "+(u.summe||0)+" Pkt",W/2,anzY+58);
+      }
+      ctx.restore();
+    })();
+
+    // S-B5 (Goldener Buzzer als Bildereignis, Broadcast-Optik Buehne-Auftritt 27.09., Prio
+    // 2, Klasse A): reines Bildereignis -- der mittlere Pult-Knopf wird gold, goldenes Licht
+    // flutet die Buehne, Konfetti aus Canvas-Rechtecken mit Farbhash aus u.id (cypherHash(),
+    // wie ueberall sonst in dieser Datei statt eines zweiten rr()-Zugs). Der Callout-Banner
+    // laeuft bereits ueber feed(...,true) in stepShowcase(), hier nur das Buehnenbild.
+    (function zeichneShowcaseGold(){
+      let u=null;
+      for(const x of TEILNEHMER)if(x.vizGoldBuzzerSeit!=null&&(!u||x.vizGoldBuzzerSeit>u.vizGoldBuzzerSeit))u=x;
+      if(!u)return;
+      const seit=buehneT-u.vizGoldBuzzerSeit;
+      if(seit<0||seit>2.2)return;
+      const alpha=seit<1.6?1:Math.max(0,1-(seit-1.6)/0.6);
+      ctx.save();
+      ctx.globalAlpha=alpha*0.5;
+      const gl=ctx.createRadialGradient(W/2,H*0.4,10,W/2,H*0.4,W*0.6);
+      gl.addColorStop(0,"rgba(255,215,110,.6)"); gl.addColorStop(1,"rgba(255,215,110,0)");
+      ctx.fillStyle=gl; ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=alpha;
+      const bp=showcaseBuzzerPos(1);
+      ctx.fillStyle="#f6c750"; ctx.beginPath(); ctx.arc(bp.x,bp.y,10,0,6.2832); ctx.fill();
+      ctx.strokeStyle="#fff6d0"; ctx.lineWidth=1.4; ctx.stroke();
+      for(let i=0;i<24;i++){
+        const h=cypherHash(u.id,i);
+        const cx=(h%97)/97*W, cy=((seit*(60+h%40))%H+((h>>3)%40));
+        ctx.fillStyle=(h%3===0)?"#f6c750":((h%3===1)?"#ff9a3c":"#fff6d0");
+        ctx.save(); ctx.translate(cx,cy); ctx.rotate(((h>>5)%628)/100);
+        ctx.fillRect(-2.5,-4,5,8);
+        ctx.restore();
+      }
+      ctx.restore();
+    })();
 
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
@@ -18453,6 +21981,57 @@
     }
     ctx.globalAlpha=1;
   }
+  // FUEHRUNG IM BILD -- GEMEINSAME SORTIERUNG (Broadcast Runde 2, Vorschlag 2, 26.09.).
+  // Exakt dieselbe Sortierregel, die zeichneEisStand() fuer die Zwischenstand-Tafel schon
+  // brauchte -- jetzt einmal herausgezogen, damit Bandenlicht/Vorsprungsbalken (bodenEis)
+  // und die Tafel selbst niemals unterschiedliche Fuehrende zeigen koennen. Reine
+  // Ableseung von `u.summe`/`side`, keine neue Formel.
+  function kuerZwischenstandZeilen(gruppen,aktiv){
+    const zeilen=gruppen.map((grp,i)=>({
+      grp, i, gelaufen:i<=aktiv,
+      pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
+      side:grp[0].side
+    }));
+    zeilen.sort((a,b)=>(a.gelaufen===b.gelaufen)?(a.gelaufen?b.pkt-a.pkt:a.i-b.i):(a.gelaufen?-1:1));
+    return zeilen;
+  }
+  // FUEHRENDE SEITE AUFS EIS UEBERSETZT (Vorschlag 2a/2c): Seite des Zwischenstand-
+  // Fuehrenden plus die bisher enthuellten Punktsummen je Team -- alles, was das
+  // Bandenlicht und der Vorsprungsbalken in bodenEis() brauchen. Ruft kuerStartliste()/
+  // kuerAktiveGruppe() selbst auf, weil bodenEis() (Boden, vor den Teilnehmern gezeichnet)
+  // anders als zeichneDuett() noch keine `gruppen`/`aktiv` zur Hand hat.
+  function kuerEisFuehrung(){
+    const gruppen=kuerStartliste();
+    if(!gruppen.length)return null;
+    const aktiv=kuerAktiveGruppe(gruppen);
+    const gelaufen=kuerZwischenstandZeilen(gruppen,aktiv).filter(z=>z.gelaufen);
+    if(!gelaufen.length)return null;
+    const heim=gelaufen.filter(z=>z.side===0).reduce((s,z)=>s+z.pkt,0);
+    const gast=gelaufen.filter(z=>z.side===1).reduce((s,z)=>s+z.pkt,0);
+    return {side:gelaufen[0].side, heim, gast};
+  }
+  // L/C-VERGLEICH BEIM GLEICHEN ELEMENTSTAND (Broadcast-Optik Buehne-Auftritt 27.09., E-B2):
+  // "liegt der Laeufer gerade ueber oder unter dem Fuehrenden" -- die NBC-Ecke, die die
+  // Zwischenstand-Tafel bislang nicht beantwortet. FUEHRENDER (L) ist das bislang beste
+  // VOLLSTAENDIG GELAUFENE Paar (nicht das gerade aktive -- sonst vergliche sich ein Paar mit
+  // sich selbst), CURRENT (C) das gerade laufende Paar, BEIDE auf demselben Elementstand `k`
+  // (das MINIMUM der beiden u.aktuell im aktiven Paar -- ein Partner, der schneller vorankam,
+  // wird damit nicht ueber seinen EIGENEN Stand hinaus gelesen, dieselbe Spoiler-Regel wie bei
+  // den Elementkaesten). Rein additiv aus runden[].punkte, keine neue Formel, kein rr().
+  function kuerLC(){
+    const gruppen=kuerStartliste();
+    if(!gruppen.length)return null;
+    const aktiv=kuerAktiveGruppe(gruppen);
+    const zeilen=kuerZwischenstandZeilen(gruppen,aktiv);
+    const fertige=zeilen.filter(z=>z.gelaufen&&z.i!==aktiv);
+    if(!fertige.length)return null; // "vor der ersten fertigen Gruppe gibt es keine Referenz"
+    const grpAktiv=gruppen[aktiv]||[];
+    if(!grpAktiv.length)return null;
+    const k=Math.min(...grpAktiv.map(u=>u.aktuell));
+    if(k<0)return null;
+    const summeBisK=(grp)=>grp.reduce((s,u)=>s+u.runden.slice(0,k+1).reduce((s2,r)=>s2+(r?r.punkte:0),0),0);
+    return {l:summeBisK(fertige[0].grp), c:summeBisK(grpAktiv)};
+  }
   // ZWISCHENSTAND-TAFEL (13.09., Chris: "man hat gar keine indikation welche leute sich
   // gerade besser schlagen als andere"). Direkt nach dem Vorbild der Wertungsgrafik, die
   // in jeder ISU-Uebertragung oben links steht: sie "always lists the event leader at the
@@ -18471,15 +22050,33 @@
   // SPOILER-REGEL (wie bei WERTUNG_AUFTRITT, s. dort): gelesen wird ausschliesslich
   // `runden[0..aktuell]`, also nur, was bereits aufgedeckt ist. Ein noch nicht gelaufenes
   // Paar zeigt seine Startnummer, keine Punktzahl.
+  // ZEILEN-ANIMATION (E-B3, dritte Stufe): wenn eine Zeile ihren Platz in der sortierten
+  // Tafel wechselt, gleitet sie in 0,4s auf ihre neue Y-Position statt hart zu springen --
+  // das F1-Signal "Position gewechselt". Reiner Zeichenzustand (Modulvariable, wie
+  // eisBandeSide/-Seit oben), keine Wirkung auf Wertung/Reihenfolge selbst.
+  const kuerZeilenAnim=new Map();
+  function kuerZeilenY(key,zielY){
+    let rec=kuerZeilenAnim.get(key);
+    if(!rec){ rec={y:zielY,ziel:zielY,seit:buehneT-1}; kuerZeilenAnim.set(key,rec); return zielY; }
+    if(rec.ziel!==zielY){ rec.von=rec.y; rec.ziel=zielY; rec.seit=buehneT; }
+    const p=Math.max(0,Math.min(1,(buehneT-rec.seit)/0.4));
+    rec.y=rec.von!=null?rec.von+(rec.ziel-rec.von)*p:zielY;
+    return rec.y;
+  }
   function zeichneEisStand(art,gruppen,aktiv){
     if(!gruppen.length)return;
     const pad=8, zeilH=19, kopfH=19, kastenH=28;
+    // L/C-ZEILE (E-B2): braucht eine eigene Kopfzeilenhoehe, nur wenn kuerLC() etwas liefert
+    // (vor der ersten fertigen Gruppe gibt es keine Referenz, s. dort) -- kopfHeff schiebt
+    // ALLES Folgende (Trennlinie/Zeilen/Elementkaesten) unveraendert nach unten, ohne jede
+    // Stelle unten einzeln anzufassen.
+    const lc=kuerLC(), lcH=lc?12:0, kopfHeff=kopfH+lcH;
     // Breite/Lage so gewaehlt, dass die Tafel und die Kuerbahn sich nicht beruehren: die
     // Tafel endet bei W*0.29, der am weitesten links moegliche Laeufer steht bei
     // W*0.54-W*0.168-34px ≈ W*0.345, sein Etikett (30 px Versatz, ~28 px halbe Breite)
     // beginnt bei ~W*0.298. Zehn Pixel Luft, im Playwright-Bild nachgeprueft.
     const br=W*0.205, x0=W*0.085;
-    const hoeh=kopfH+gruppen.length*zeilH+kastenH+pad;
+    const hoeh=kopfHeff+gruppen.length*zeilH+kastenH+pad;
     const y0=H*0.50-hoeh/2;
     const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
       ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
@@ -18490,22 +22087,26 @@
     ctx.fillText("ZWISCHENSTAND",x0+pad,y0+kopfH*0.55);
     ctx.textAlign="right"; ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
     ctx.fillText("Paar "+(aktiv+1)+"/"+gruppen.length,x0+br-pad,y0+kopfH*0.55);
+    if(lc){
+      const delta=lc.c-lc.l;
+      ctx.textAlign="left"; ctx.font="600 8px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=delta>=0?"#5fd38a":"#9aa6b6";
+      ctx.fillText("L "+lc.l+" · C "+lc.c+" ("+(delta>=0?"+":"")+delta+")",x0+pad,y0+kopfH+lcH*0.5);
+    }
     ctx.strokeStyle="rgba(255,255,255,.12)"; ctx.beginPath();
-    ctx.moveTo(x0+pad,y0+kopfH); ctx.lineTo(x0+br-pad,y0+kopfH); ctx.stroke();
+    ctx.moveTo(x0+pad,y0+kopfHeff); ctx.lineTo(x0+br-pad,y0+kopfHeff); ctx.stroke();
 
     // REIHENFOLGE DER TAFEL: wer schon gelaufen ist (oder gerade laeuft), steht nach
     // Punkten oben — der Fuehrende zuoberst, wie im Vorbild. Wer noch kommt, haengt in
     // Startreihenfolge darunter, mit der Startnummer statt einer Zahl. Das ist zugleich
-    // Ergebnisliste UND Startliste, genau wie die Anzeigetafel in der Halle.
-    const zeilen=gruppen.map((grp,i)=>({
-      grp, i, gelaufen:i<=aktiv,
-      pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
-      side:grp[0].side
-    }));
-    zeilen.sort((a,b)=>(a.gelaufen===b.gelaufen)?(a.gelaufen?b.pkt-a.pkt:a.i-b.i):(a.gelaufen?-1:1));
+    // Ergebnisliste UND Startliste, genau wie die Anzeigetafel in der Halle. Sortierung
+    // jetzt aus kuerZwischenstandZeilen() (s. oben) — dieselbe Formel wie zuvor, nur
+    // herausgezogen, damit Bandenlicht/Vorsprungsbalken sie mitbenutzen koennen.
+    const zeilen=kuerZwischenstandZeilen(gruppen,aktiv);
     let rang=0;
     zeilen.forEach((z,k)=>{
-      const y=y0+kopfH+k*zeilH+zeilH*0.5;
+      const zielY=y0+kopfHeff+k*zeilH+zeilH*0.5;
+      const y=kuerZeilenY(z.grp.map(u=>u.id).join(","),zielY);
       const laeuft=z.i===aktiv;
       if(laeuft){
         ctx.globalAlpha=0.22; ctx.fillStyle="#d6ac36";
@@ -18540,15 +22141,26 @@
     // danach bleibt grau. Der Vorname davor sagt, welche Reihe zu wem gehoert.
     const grp=gruppen[aktiv]||[];
     const n=art.rundenN, bx=x0+pad+13, bw=(br-pad-13-pad-(n-1)*1.6)/n;
-    const by=y0+kopfH+gruppen.length*zeilH+3;
+    const by=y0+kopfHeff+gruppen.length*zeilH+3;
     grp.slice(0,2).forEach((u,j)=>{
       const zy=by+j*7;
       ctx.textAlign="left"; ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
       ctx.fillText((u.n.split(" ")[0]||"?").slice(0,1),x0+pad,zy+2.5);
       for(let r=0;r<n;r++){
         const z=r<=u.aktuell?u.runden[r]:null;
-        ctx.fillStyle=!z?"rgba(255,255,255,.10)"
-          :(z.ereignis===art.failWort?"rgba(216,84,84,.92)":"rgba(70,200,120,.92)");
+        // E-B1 (Broadcast-Optik 27.09.): DRITTE FARBE fuer "knapp daneben" (unterdreht/
+        // Hand am Eis) -- r.knapp liegt seit #1034 vor, wurde hier bisher nur nicht
+        // gelesen. Pirouette/Schritte/Choreo heissen im Fehlschlag NIE "stuerzt" (Review
+        // 2.3), zeigen also IMMER die Bernsteinfarbe statt Rot, unabhaengig von r.knapp --
+        // nur ein Sprung-Fehlschlag OHNE r.knapp bleibt echtes Rot.
+        const elB=KUER_ELEMENTE[r]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+        let farbe="rgba(255,255,255,.10)";
+        if(z){
+          if(z.ereignis!==art.failWort)farbe="rgba(70,200,120,.92)";
+          else if(elB.typ!=="sprung"||z.knapp)farbe="rgba(214,172,54,.92)";
+          else farbe="rgba(216,84,84,.92)";
+        }
+        ctx.fillStyle=farbe;
         ctx.fillRect(bx+r*(bw+1.6),zy,bw,5);
       }
     });
@@ -18560,6 +22172,10 @@
   function zeichneDuett(art){
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const posMap=new Map();
+    // E-B2 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL je Bild berechnet, nicht je
+    // Laeufer -- beide Partner desselben Paares teilen sich denselben L/C-Vergleich, s.
+    // kuerLC()/Eis-Halo unten.
+    const lc=kuerLC();
     // STARTLISTE UND SPOTLIGHT: dieselbe Quelle wie stepKuer() (kuerStartliste()/
     // kuerAktiveGruppe(), s. dort) — die Zeichnung bildet keine zweite Gruppenliste mehr,
     // sonst koennten Bewegung und Bild auf verschiedene Paare zeigen.
@@ -18637,6 +22253,21 @@
         ctx.beginPath(); ctx.ellipse(px,py+19,16,6,0,0,6.2832); ctx.fill();
         ctx.globalAlpha=1;
       }
+      // E-B5 (Sturzmarke, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A): zwei
+      // gekreuzte, graue Striche an jeder bereits aufgezeichneten Sturzstelle DIESES Paares
+      // (u.vizEisMarken, s. stepKuer()) -- bleiben liegen, solange die Rolle "kuer" gilt
+      // (Programmende = Rollenwechsel), unter dem Sprite gezeichnet wie die Kufenspur direkt
+      // darueber. Reine Ablesung eines bereits geschriebenen viz*-Feldes, kein rr().
+      if(u.vizEisMarken&&u.vizEisMarken.length){
+        ctx.globalAlpha=0.3; ctx.strokeStyle="#9aa6b6"; ctx.lineWidth=1.4;
+        for(const m of u.vizEisMarken){
+          ctx.beginPath();
+          ctx.moveTo(m.x-5,m.y-5); ctx.lineTo(m.x+5,m.y+5);
+          ctx.moveTo(m.x+5,m.y-5); ctx.lineTo(m.x-5,m.y+5);
+          ctx.stroke();
+        }
+        ctx.globalAlpha=1;
+      }
       // ELEMENT-/STURZ-DARSTELLUNG (M4, Abschnitt 5.4): reine Zeichen-Transformationen aus
       // u.vizPhase/u.vizPhaseT/u.vizSturz — stepKuer() liefert nur den Zustand, gezeichnet
       // wird ausschliesslich hier.
@@ -18655,7 +22286,10 @@
       if(sturz){
         // Sturz: hurt-Pose (ueber u.vizSturz, s. zeichneSprite()) plus liegende Kippung —
         // NICHT u.down, das ist ein Kampf-Feld und wuerde in andere Zweige lecken.
-        ctx.translate(rx,ry); ctx.rotate(1.15); ctx.translate(-rx,-ry);
+        // WACKLER (E0): eine flachere Kippung statt der vollen liegenden Drehung -- derselbe
+        // Fehlschlag, aber "knapp daneben" (s. u.vizWackler/KUER_KNAPP_ANTEIL), rein optisch,
+        // keine andere Uhr/Dauer/Wertung.
+        ctx.translate(rx,ry); ctx.rotate(u.vizWackler?0.4:1.15); ctx.translate(-rx,-ry);
       } else if(phase==="pirouette"&&u.vizPhaseT>0){
         // Pirouette: Drehung auf der Stelle um den eigenen Fusspunkt.
         ctx.translate(rx,ry); ctx.rotate((buehneT*9+u.id)%6.2832); ctx.translate(-rx,-ry);
@@ -18669,6 +22303,21 @@
         const zug=u.aktuell>=0?u.runden[u.aktuell]:null;
         if(u.lunge>0&&zug&&zug.ereignis===art.erfolgWort) zeichneEisstaub(rx,ry+16,u.id);
         else if(phase==="pirouette"&&u.vizPhaseT>0) zeichneEisstaub(rx,ry+16,u.id+7);
+      }
+      // EIS-HALO (E-B2, Runde 2 Vorschlag 2b): am Kufenpunkt, gross und teamfarben, solange
+      // das laufende Paar UEBER der L/C-Referenz liegt, klein und grau darunter -- blinkt
+      // beim Ueberqueren kurz auf (Regel 7, "Wechsel signalisieren"). Nur fuers gerade
+      // laufende Paar (rolle==="kuer", s. Aufrufstelle oben), lc ist EINMAL je Bild
+      // berechnet und fuer beide Partner identisch.
+      if(lc){
+        const ueber=lc.c>=lc.l;
+        if(kuerHaloUeber!==ueber){ kuerHaloUeber=ueber; kuerHaloSeit=buehneT; }
+        const puls=Math.max(0,1-(buehneT-kuerHaloSeit)/0.6);
+        const rad=(ueber?14:7)+puls*8;
+        ctx.globalAlpha=(ueber?0.35:0.16)+puls*0.4;
+        ctx.fillStyle=ueber?c:"#96a0af";
+        ctx.beginPath(); ctx.ellipse(rx,ry+16,rad,rad*0.42,0,0,6.2832); ctx.fill();
+        ctx.globalAlpha=1;
       }
       posMap.set(u.id,{x:rx,y:ry});
       // ETIKETTEN (5.3): an vizY gehaengt, nahe am unteren Bandenrand nach oben geklappt —
@@ -18730,16 +22379,45 @@
         const lx=Math.min(...pos.map(p=>p.x))-16, ly=pos.reduce((s,p)=>s+p.y,0)/pos.length;
         ctx.strokeText(t,lx,ly); ctx.fillText(t,lx,ly);
       } else {
+        // E-B3 (Broadcast-Optik Buehne-Auftritt 27.09.), SCHWACHE FASSUNG (Empfehlung des
+        // Papiers, Abschnitt 2.2: "erst die schwache Fassung ohne Zurueckhalten"). `u.summe`
+        // bleibt die ganze Zeit live sichtbar (Etikett/Tafel/Balken/Bug) -- der Kiss & Cry
+        // liefert NICHTS Neues an Zahlen, sondern INSZENIERT drei Stufen aus vizKissT:
+        //   0,0-1,2s "WERTUNG FOLGT ..." (pulsierender Monitor)
+        //   1,2-3,0s Gesamt + Stuerze n (nur Klasse A: keine Elemente/Ausstrahlungs-
+        //            Aufschluesselung, die haette ein neues r.pub-Feld gebraucht, A')
+        //   ab 3,0s  Plakette "PLATZ n" in Teamfarbe (Klang s. Durchgang 2 oben)
         const pkt=grp.reduce((s,u)=>s+(u.summe||0),0);
-        const mw=64, my=oben-34;
+        const t=grp[0].vizKissT||0;
+        const mw=90, mh=t<1.2?20:(t<3?28:24), my=oben-34;
         ctx.globalAlpha=0.9; ctx.fillStyle="#10141c";
-        ctx.fillRect(mx-mw/2,my-9,mw,20); ctx.globalAlpha=1;
+        ctx.fillRect(mx-mw/2,my-mh/2,mw,mh); ctx.globalAlpha=1;
         ctx.strokeStyle="rgba(214,172,54,.6)"; ctx.lineWidth=1;
-        ctx.strokeRect(mx-mw/2,my-9,mw,20);
-        ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
-        ctx.fillText("KISS & CRY",mx,my-3);
-        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
-        ctx.fillText(String(pkt),mx,my+6);
+        ctx.strokeRect(mx-mw/2,my-mh/2,mw,mh);
+        if(t<1.2){
+          const puls=0.55+0.45*Math.abs(Math.sin(buehneT*6));
+          ctx.globalAlpha=puls;
+          ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d6ac36";
+          ctx.fillText("WERTUNG FOLGT …",mx,my);
+          ctx.globalAlpha=1;
+        } else if(t<3){
+          const stuerze=grp.reduce((s,u)=>s+u.runden.filter((r,idx)=>r&&r.ereignis===art.failWort&&!r.knapp
+            &&(KUER_ELEMENTE[idx]||KUER_ELEMENTE[KUER_ELEMENTE.length-1]).typ==="sprung").length,0);
+          ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
+          ctx.fillText("GESAMT",mx,my-8);
+          ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+          ctx.fillText(String(pkt),mx,my+2);
+          ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d08a8a";
+          ctx.fillText("Stürze "+stuerze,mx,my+12);
+        } else {
+          const zeilenK=kuerZwischenstandZeilen(gruppen,aktiv).filter(z=>z.gelaufen);
+          const platz=zeilenK.findIndex(z=>z.i===gi)+1;
+          const farbeP=grp[0].side===0?css("--home"):css("--away");
+          ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
+          ctx.fillText("GESAMT "+pkt,mx,my-9);
+          ctx.font="700 13px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbeP;
+          ctx.fillText(platz>0?"PLATZ "+platz:"–",mx,my+4);
+        }
       }
     });
     for(const f of floats){
@@ -18770,6 +22448,99 @@
       ctx.fillText(f.txt,pos.x+(traeger&&traeger.vizVersatz?traeger.vizVersatz*22:0),fy);
       ctx.globalAlpha=1;
     }
+    // E-B4 (Zeitlupen-Wiederholung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse
+    // A): NACH allen echten Zeichnungen dieses Bildes aufgerufen -- die kleine "ruhige"
+    // Darstellung der Kiss-&-Cry-Gruppe (rolle!=="kuer"-Zweig oben) ist damit schon fertig
+    // gemalt, bevor zeichneKuerReplay() gleich KURZFRISTIG einige ihrer viz*-Felder
+    // ueberschreibt (und wiederherstellt), um dieselbe Figur ein zweites Mal, historisch,
+    // im PIP-Kasten zu zeigen.
+    zeichneKuerReplay(art,gruppen,aktiv);
+  }
+
+  // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.), BILD-IM-BILD: spielt den in
+  // kuerBerechneReplay() ausgeschnittenen Clip mit 0,4-facher Geschwindigkeit ab, waehrend
+  // das Paar im Kiss & Cry sitzt (grp[0].vizReplayClip, s. stepKuer() Durchgang 2). 0,4-fache
+  // Geschwindigkeit heisst: ein Sekunde Original-Zeit braucht 1/0,4=2,5 Sekunden Wanduhr, s.
+  // `sourceT` unten -- fuer ein 1,4s-Element (KUER_ELEMENT_DAUER) also 3,5s, bequem innerhalb
+  // der rund 10s Kiss-&-Cry-Zeit (12x2x0,425s). KEIN Vollbild (das naechste Paar laeuft
+  // schon), KEIN rr(), KEINE Wirkung auf u.summe/Wertung -- reine Wiederholung bereits
+  // geschriebener Ringpuffer-Frames.
+  //
+  // WARUM `t` (die globale Sprite-Animationsuhr) HIER NICHT VERSTELLT WERDEN MUSS: s.
+  // ausfuehrlicher Kommentar bei der Ringpuffer-Aufzeichnung in stepKuer() Durchgang 3 --
+  // `t` bleibt auf der gesamten Buehne bei 0 eingefroren (stepSim() gibt fuer jede
+  // Buehnen-Disziplin VOR der Zeile `t+=dt` zurueck), zeichneSprite()s Gliedmassenanimation
+  // ist deshalb schon im LIVE-Bild ein Standbild je Figur -- eine Zeitlupen-Verzerrung, vor
+  // der das Papier warnt, gibt es hier nicht zu beheben.
+  function zeichneKuerReplay(art,gruppen,aktiv){
+    const gi=gruppen.findIndex(g=>g&&g[0]&&g[0].vizRolle==="kiss");
+    if(gi<0)return;
+    const grp=gruppen[gi];
+    const clip=grp[0]&&grp[0].vizReplayClip;
+    if(!clip)return;
+    const kissT=grp[0].vizKissT||0;
+    // EINBLENDEN ueber die ersten 0,3s (Regel 7, "Wechsel signalisieren") statt eines harten
+    // Auftauchens -- dieselbe Blendzeit wie die 0,4s-Zeilen-Slide-Animation bei E-B3.
+    const einblend=Math.min(1,kissT/0.3);
+    if(einblend<=0)return;
+    const sourceT=Math.min(clip.tEnd,clip.tStart+kissT*0.4);
+
+    // LAGE (Playwright-Bild gegen Bug/Team-Boxen/Vorsprungsbalken/Startbereich geprueft,
+    // s. Abnahme-Abschnitt 7 des Papiers): rechts oben kollidierte eine 30%x22%-Kachel bei
+    // H*0.06 mit der Team-Namens-Box UND dem Vorsprungsbalken (beide oberhalb der
+    // Kuerbahn, s. dessen Kommentar "Sprite-Kopf ab H*0.26"). Kleiner und tiefer angesetzt,
+    // klar UNTER beiden -- die verbleibende Ueberlappung mit der Startbereich-Spalte (kleine
+    // "wer kommt noch"-Symbole) ist die einzig verbliebene, und laut Papier ("kein
+    // Vollbild, weil das naechste Paar schon laeuft") ohnehin bewusst in Kauf genommen: ein
+    // PIP deckt IMMER etwas ab, hier die am wenigsten wichtige Flaeche.
+    const bw=Math.min(W*0.22,180), bh=H*0.20, bx=W-bw-10, by=H*0.234;
+    ctx.save();
+    ctx.globalAlpha=einblend;
+    ctx.beginPath(); ctx.rect(bx,by,bw,bh); ctx.clip();
+    ctx.fillStyle="rgba(8,12,18,.92)"; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle="rgba(210,230,245,.06)"; ctx.fillRect(bx,by+bh*0.58,bw,bh*0.42);
+
+    const {minX,maxX,minY,maxY}=clip.bbox;
+    const spanX=Math.max(24,maxX-minX), spanY=Math.max(24,maxY-minY), pad=16;
+    const scale=Math.min((bw-2*pad)/spanX,(bh-2*pad)/spanY,1.6);
+    const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+    const boxCx=bx+bw/2, boxCy=by+bh/2+4;
+
+    for(let pi=0;pi<clip.frames.length;pi++){
+      const u=grp[pi]; if(!u)continue;
+      const frames=clip.frames[pi]; if(!frames.length)continue;
+      // Letzter aufgezeichneter Frame <= sourceT (Deckel: nach Clip-Ende bleibt die
+      // Endpose stehen statt zu verschwinden).
+      let f=frames[frames.length-1];
+      for(let k=0;k<frames.length;k++){ if(frames[k].bt<=sourceT)f=frames[k]; else break; }
+      // KURZFRISTIGE UEBERSCHREIBUNG, SOFORT WIEDERHERGESTELLT: zeichneSprite() liest Pose/
+      // Sturz eines Teilnehmers ausschliesslich von `u` selbst, es gibt keinen Parameter
+      // dafuer. JS ist synchron -- kein anderer Zeichenaufruf in diesem Frame sieht die
+      // Verstellung, weil save/restore hier ohne jeden await zwischen den Zeilen liegen.
+      const save={sturz:u.vizSturz,wackler:u.vizWackler,phase:u.vizPhase,phaseT:u.vizPhaseT,lunge:u.lunge};
+      u.vizSturz=f.sturz; u.vizWackler=f.wackler; u.vizPhase=f.phase; u.vizPhaseT=f.phaseT; u.lunge=0;
+      let rx=f.x, ry=f.y;
+      ctx.save();
+      ctx.translate(boxCx,boxCy); ctx.scale(scale,scale); ctx.translate(-cx,-cy);
+      if(f.sturz){ ctx.translate(rx,ry); ctx.rotate(f.wackler?0.4:1.15); ctx.translate(-rx,-ry); }
+      else if(f.phase==="pirouette"&&f.phaseT>0){ ctx.translate(rx,ry); ctx.rotate((f.bt*9+u.id)%6.2832); ctx.translate(-rx,-ry); }
+      else if(f.phase==="wurf"&&f.phaseT>0){
+        const p=Math.min(1,1-f.phaseT/KUER_ELEMENT_DAUER), ri=f.ri||0;
+        rx=f.x+Math.cos(ri)*40*p; ry=f.y+Math.sin(ri)*40*p-Math.sin(Math.min(1,p)*Math.PI)*16;
+      }
+      zeichneSprite(ctx,u,rx,ry,true);
+      ctx.restore();
+      u.vizSturz=save.sturz; u.vizWackler=save.wackler; u.vizPhase=save.phase; u.vizPhaseT=save.phaseT; u.lunge=save.lunge;
+    }
+    ctx.restore();
+
+    ctx.globalAlpha=einblend;
+    ctx.strokeStyle="rgba(214,172,54,.7)"; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh);
+    ctx.fillStyle="rgba(10,8,4,.85)"; ctx.fillRect(bx,by-14,bw,14);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+    ctx.fillText("WIEDERHOLUNG · "+clip.label,bx+bw/2,by-7);
+    ctx.globalAlpha=1;
   }
 
   // ================== GEWICHTHEBEN: EIGENES BUEHNENBILD (Plan S2) ==================
@@ -18863,11 +22634,51 @@
   function WERTUNG_AUFTRITT(art){
     const w=art.wertungTabelle||{};
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
-    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,r:bisher(u)}));
+    // GAUNTLET (22.09.): `raus` faerbt die Tabellenzeile (renderWertungTabelle()s
+    // ".raus"-Klasse, bisher von keiner WERTUNG_AUFTRITT-Disziplin genutzt) -- reveal-
+    // gegated ueber dieselbe `r`-Historie wie die vier Gauntlet-Spalten oben, kein Spoiler.
+    const zeilen=()=>TEILNEHMER.map(u=>{
+      const r=bisher(u);
+      return {n:u.n,side:u.side,raus:!!(art.gauntlet&&r.length&&r[r.length-1].hpNach<=0),eig:u.eig,u,r};
+    });
     return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>b.u.summe-a.u.summe,
       spalten:[
-        {id:"dg",   kopf:"Dg",   titel:"Durchgänge bisher", wert:z=>z.r.length+"/"+art.rundenN},
+        // GAUNTLET (Breaking, 22.09.): "X/art.rundenN" ergibt hier keinen Sinn mehr -- ein
+        // Ueberlebender sammelt ueber mehrere Duelle hinweg beliebig viele eigene Zuege (s.
+        // BUEHNE_ART.breaking.gauntlet-Kommentar), art.rundenN ist nur noch der Startwert der
+        // Folterbank-Eskalation. Die rohe Anzahl ohne Nenner ist hier ehrlicher.
+        {id:"dg",   kopf:"Dg",   titel:"eigene Züge bisher",
+          wert:z=>art.gauntlet?String(z.r.length):z.r.length+"/"+art.rundenN},
         {id:"pkt",  kopf:"Pkt",  top:true, titel:"Punkte gesamt", wert:z=>z.u.summe||null},
+        // WUERSTCHEN (S2, Coney-Island-Tafel, 23.09., docs/design/wettessen-format-opus-
+        // gegencheck-23-09.md Abschnitt 5): dieselbe reine Anzeige-Skala wie im Buehnenbild
+        // (wettessenWuerstchen()/wettessenWuerstchenText(), s. dort) -- NUR bei Wettessen.
+        // "Pkt" bleibt die Spalte, an der sich die Rangtreue misst; diese Spalte ist reine
+        // Zierde wie die I-Spy-Spalten direkt unten.
+        ...(art.wettessen?[
+          {id:"wuerstchen",kopf:"Wü", titel:"Würstchen (Anzeige-Skala aus „Pkt“, s. Fußnote)",
+            wert:z=>z.u.summe?wettessenWuerstchenText(wettessenWuerstchen(z.u.summe)):null}
+        ]:[]),
+        // GAUNTLET-SPALTEN: HP/Kampf/Gegner/Status machen die Kette auch in der Tabelle
+        // nachvollziehbar, nicht nur im Ticker/Buehnenbild -- dieselbe "Praesentation
+        // nachvollziehbar" Vorgabe. `art.gauntlet` ist der einzige aktuelle Nutzer, exakt
+        // das art.schatzsuche-Gate-Muster direkt unten. KEIN SPOILER: alle vier lesen
+        // ausschliesslich `z.r` (die bereits enthuellte Runden-Historie dieses Teilnehmers,
+        // s. `bisher()` oben) statt der rohen `u.bout`/`u.gegnerN`/`u.raus`-Felder, die am
+        // Ende des ganzen Baus schon den FERTIGEN Ausgang tragen -- exakt dasselbe Prinzip
+        // wie WERTUNG_HEBEN() mit `bestBisher()`/`paarFertig()` direkt unten.
+        ...(art.gauntlet?[
+          {id:"hp",   kopf:"HP",   titel:"aktueller HP-Stand (0 = ausgeschieden)",
+            wert:z=>Math.max(0,gauntletHpJetzt(z.u)), fmt:v=>v+"/"+GAUNTLET_HP_MAX,
+            farbe:v=>v<=0?"var(--crit)":null},
+          {id:"kampf",kopf:"Kampf", titel:"laufende Kampf-Nummer in der Kette",
+            wert:z=>z.r.length?z.r[z.r.length-1].bout:null},
+          {id:"gauntlet-gegner",kopf:"Gegner", titel:"aktueller/letzter Gegner in der Kette",
+            wert:z=>z.r.length?z.r[z.r.length-1].gegnerN:null},
+          {id:"status",kopf:"Status", titel:"noch im Ring oder schon ausgeschieden?",
+            wert:z=>z.r.length&&z.r[z.r.length-1].hpNach<=0?"raus":"im Ring",
+            farbe:v=>v==="raus"?"var(--crit)":"var(--ok)"}
+        ]:[]),
         {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.u.summe/z.r.length):null},
         {id:"best", kopf:"Best", top:true, titel:"bester Durchgang", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
         {id:"letzt",kopf:"Letzt", titel:"letzter Durchgang", wert:z=>z.r.length?z.r[z.r.length-1].punkte:null},
@@ -18987,6 +22798,56 @@
     ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
 
+    // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
+    // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
+    // (Abschnitt 2.1) "aus einem Versuch ein Finale macht". Nur im Stossen, und nur sobald
+    // der Gegner seinen letzten Versuch gemacht hat ODER der aktive Heber selbst im dritten
+    // Versuch steht (Doku H2.1). Reine Ableitung aus bereits enthuellten Bestwerten
+    // (bestBisher(), dieselbe Spoiler-Grenze wie ueberall sonst auf dieser Buehne) — nichts
+    // Neues wird geschrieben, nur gelesen und gezeichnet.
+    //
+    // EINHEIT (H2.1-Warnung im Dokument woertlich): gerechnet wird in RAW kg, GENAU der
+    // Einheit, in der baueHebenDuelle() ueber a.zweikampf/b.zweikampf entscheidet — NICHT
+    // Sinclair-normiert, obwohl Sinclair ueberall sonst auf dieser Buehne angezeigt wird.
+    // Angezeigt wird das Ergebnis trotzdem ueber sinclairAnzeige(), wie jede andere Zahl
+    // hier — der Umrechnungsfaktor ist je Heber konstant (haengt nur an dessen `groesse`),
+    // die Umrechnung aendert also nichts an der WER-braucht-WAS-Aussage, nur an der
+    // Masseinheit, in der sie auf dem Bildschirm steht.
+    //
+    // Ausgelassen, wenn gerade der KUEHNER-VERSUCH-Badge (kuehnZeileY unten) an derselben
+    // Bildstelle steht: beide Einblendungen erzaehlen in der Praxis fast immer denselben
+    // Moment (die Aufholjagd im dritten Stossversuch), zwei Ueberschriften uebereinander
+    // waeren doppelt gemoppelt.
+    if(letzterHebenZug && !(letzterHebenZug.r&&letzterHebenZug.r.kuehn)){
+      const zu=letzterHebenZug.u, zr=letzterHebenZug.r;
+      if(zr && zr.uebung==="stossen" && zu.duellNr===aktivNr){
+        const gegner=zu===a?b:a;
+        const gegnerFertig=gegner.aktuell>=5; // alle sechs Versuche enthuellt
+        if(gegnerFertig||zr.versuch===3){
+          const eigenReissen=bestBisher(zu,"reissen"), eigenStossen=bestBisher(zu,"stossen");
+          const gegnerReissen=bestBisher(gegner,"reissen"), gegnerStossen=bestBisher(gegner,"stossen");
+          // Nullwertung auf einer Seite: der Zweikampf ist fuer sie schon entschieden (s.
+          // baueHebenDuelle-Kommentar "wer im Reissen genullt hat, steht bei 0") — die
+          // Bedarfszeile wuerde sonst eine Zahl behaupten, die der Motor gar nicht mehr
+          // werten kann.
+          if(eigenReissen>0 && gegnerReissen>0){
+            const eigenZw=eigenReissen+eigenStossen, gegnerZw=gegnerReissen+gegnerStossen;
+            const txt=(eigenZw>gegnerZw)
+              ? zu.n.split(" ")[0]+" führt, "+gegner.n.split(" ")[0]+" braucht "
+                +sinclairAnzeige(Math.round(eigenZw-gegnerReissen)+1,gegner.groesse)+" kg"
+              : zu.n.split(" ")[0]+" braucht "
+                +sinclairAnzeige(Math.round(gegnerZw-eigenReissen)+1,zu.groesse)
+                +" kg für den Duellsieg";
+            ctx.font="700 10.5px 'Barlow Condensed',sans-serif";
+            ctx.lineWidth=2.5;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+            ctx.strokeText(txt,W/2,H*0.183);
+            ctx.fillStyle="#d6ac36";
+            ctx.fillText(txt,W/2,H*0.183);
+          }
+        }
+      }
+    }
+
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
     // Chris beschrieben hat ("immer 2 gleichzeitig").
     const y=H*0.46;
@@ -19031,6 +22892,72 @@
       // GESAMTLAST KLEIN — der laufende Zweikampf (bestes Reissen plus bestes Stossen,
       // nur was schon enthuellt ist), auf der Groesse angezeigt statt Sinclair-normiert.
       schrift("Zweikampf "+(zwSoFar>0?sinclairAnzeige(zwSoFar,u.groesse)+" kg":"—"),84,"#8a93a3",8.5);
+
+      // VERSUCHSTAFEL (H1, Broadcast-Optik-Recherche 27.09., Klasse A): 3+3 Kaestchen je
+      // Heber, Reissen und Stossen durch eine kleine Luecke getrennt — die IWF-Anzeigetafel,
+      // "das Bild, das jeder aus dem Fernsehen kennt" (Doku H1). Reine Anzeige: liest
+      // ausschliesslich u.runden[0..u.aktuell] (Spoiler-Regel, dieselbe Grenze wie
+      // bestBisher() oben) und u.vizPhase, schreibt nur Canvas-Pixel — kein rr(), kein
+      // Schreiben auf u. Position bei y+98, 14px unter der Zweikampf-Zeile (y+84) und weit
+      // vor der Warteschlangen-Zeile bei H*0.90 (Doku-Vorschlag H1: "dazwischen liegen rund
+      // 100 px").
+      {
+        const boxW=13,boxH=11,gapKlein=2,gapGross=9;
+        const gruppeW=3*boxW+2*gapKlein;
+        const tafelX0=x-(gruppeW*2+gapGross)/2, tafelY=y+98;
+        const istAktiverZug=letzterHebenZug&&letzterHebenZug.u===u;
+        const phaseJetzt=istAktiverZug?(u.vizPhase||hebePhase(u)):null;
+        // AUFGELOEST heisst: der Uebergang zug->hoch|ablage ist schon passiert — derselbe
+        // Zeitpunkt, in dem auch die drei Kampfrichterlampen in bodenHeben() umschlagen
+        // (Spoiler-Falle, H1: "Das Kästchen des laufenden Versuchs wird erst nach dem
+        // Übergang … eingefärbt, also im selben Moment wie die Lampen").
+        const aufgeloest=!istAktiverZug||phaseJetzt==="hoch"||phaseJetzt==="ablage";
+        // BESTES GUELTIGES KAESTCHEN je Uebung — nur unter den bereits enthuellten
+        // Versuchen (i<=u.aktuell), denn nur das zaehlt zum Zweikampf (bestBisher() zieht
+        // dieselbe Grenze).
+        const besteIdx={reissen:-1,stossen:-1}, besteKg={reissen:-1,stossen:-1};
+        for(let i=0;i<=Math.min(u.aktuell,5);i++){
+          const r0=u.runden[i]; if(!r0||!r0.gueltig)continue;
+          if(r0.kg>besteKg[r0.uebung]){besteKg[r0.uebung]=r0.kg;besteIdx[r0.uebung]=i;}
+        }
+        for(let i=0;i<6;i++){
+          const gruppe=i<3?0:1;
+          const bx=tafelX0+gruppe*(gruppeW+gapGross)+(i%3)*(boxW+gapKlein);
+          const r0=u.runden[i];
+          const laufend=istAktiverZug&&i===u.aktuell&&!aufgeloest;
+          const enthuellt=i<=u.aktuell&&!laufend;
+          ctx.lineWidth=1;
+          if(!enthuellt&&!laufend){
+            // LEER — "kommt noch" (H1).
+            ctx.fillStyle="rgba(255,255,255,.05)";ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="rgba(255,255,255,.22)";ctx.strokeRect(bx,tafelY,boxW,boxH);
+          } else if(laufend){
+            // GRAU MIT RAHMEN — der laufende Versuch. Das Ergebnis steht im Motor (r0.gueltig)
+            // zwar schon fest, wird aber erst mit den Lampen enthuellt; die angesagte Last
+            // selbst ist kein Spoiler (sie steht schon auf der Anzeigetafel/Textkarte).
+            ctx.fillStyle="#3a3d46";ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="#c7ccd6";ctx.lineWidth=1.4;ctx.strokeRect(bx,tafelY,boxW,boxH);
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
+            ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
+          } else {
+            // GRUEN/ROT — dieselben Farben wie die Kampfrichterlampen in bodenHeben().
+            ctx.fillStyle=r0.gueltig?"#f2ede0":"#c0392b";
+            ctx.fillRect(bx,tafelY,boxW,boxH);
+            ctx.strokeStyle="rgba(10,12,16,.5)";ctx.strokeRect(bx,tafelY,boxW,boxH);
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace";
+            ctx.fillStyle=r0.gueltig?"#1b1d22":"#f2ede0";
+            ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
+          }
+          const uebungHier=i<3?"reissen":"stossen";
+          if(besteIdx[uebungHier]===i){
+            // BESTES KAESTCHEN JE UEBUNG FETT GERAHMT — "denn nur das zählt zum Zweikampf" (H1).
+            ctx.lineWidth=2;ctx.strokeStyle="#f2d75a";
+            ctx.strokeRect(bx-1.5,tafelY-1.5,boxW+3,boxH+3);
+          }
+        }
+      }
     });
 
     // TON BEI PHASENUEBERGANG (A4, 4.4): gueltig/stange_hoch beim Uebergang zug->hoch,
@@ -19048,9 +22975,31 @@
     if(zug){
       const jetzt=zug.u.vizPhase||hebePhase(zug.u);
       if(jetzt!==zug._tonPhase){
-        if(jetzt==="hoch"&&zug._tonPhase==="zug"){ sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch"); }
-        if(jetzt==="ablage"&&zug._tonPhase==="zug"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
+        if(jetzt==="hoch"&&zug._tonPhase==="zug"){
+          sfx("gewichtheben","gueltig"); sfx("gewichtheben","stange_hoch");
+          // H3 (Broadcast-Optik-Recherche 27.09.): AUSBRUCH, zusaetzlich zum bestehenden
+          // "gueltig"-Doppelton -- das Publikum, nicht nur die Anzeigetafel, feiert den
+          // Erfolg (Doku: "Ausbruch: tonRauschen-Anschwellen").
+          sfx("gewichtheben","ausbruch");
+        }
+        if(jetzt==="ablage"&&zug._tonPhase==="zug"){
+          sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall");
+          // H3: RAUNEN bei einem ECHTEN Fehlversuch (derselbe Direktsprung zug->ablage, der
+          // oben schon den Fehlversuch von einer normalen Ablage nach "hoch" unterscheidet)
+          // -- "tiefes, kurzes Rauschen" (Doku), zusaetzlich zum bestehenden Buzzer.
+          sfx("gewichtheben","raunen");
+        }
         if(jetzt==="abwurf"&&zug._tonPhase!=="abwurf"){ sfx("gewichtheben","ungueltig"); sfx("gewichtheben","scheiben_fall"); }
+        // H3: KLATSCHRHYTHMUS beim Antritt (Doku: "Klatschrhythmus, der schneller wird").
+        // Drei Klicks mit enger werdendem Abstand (220/150/100ms) ueber setTimeout, exakt
+        // dasselbe Schema wie das lub-dub des Herzschlags bei TON_KATALOG.breaking.
+        // herzschlag (s. dort) -- ein einziger sfx()-Aufruf am Phasenwechsel selbst plus
+        // zwei verzoegerte Nachzuegler, kein neuer Dauer-Loop, kein rr().
+        if(jetzt==="antritt"&&zug._tonPhase!=="antritt"){
+          sfx("gewichtheben","klatschen");
+          setTimeout(()=>{try{sfx("gewichtheben","klatschen",0.5);}catch(e){}},220);
+          setTimeout(()=>{try{sfx("gewichtheben","klatschen",0.6);}catch(e){}},370);
+        }
         zug._tonPhase=jetzt;
       }
     }
@@ -19295,13 +23244,34 @@
       for(let b=0;b<bretter;b++){const [x]=paar(b); if(!x)continue; if(x.summe>bs){bs=x.summe;best=b;}}
       schachFokus=best;
     } else if(Math.floor(buehneT/3)!==Math.floor((buehneT-1/60)/3)||buehneT<1/30){
-      let best=schachFokus,bv=Infinity;
+      // S-B2 -- REGIE SPRINGT ZUR ZEITNOT (Broadcast-Optik-Dokument 27-09, Abschnitt 4,
+      // Prioritaet 2): "Jede Blitz-Regie schneidet auf das Brett mit der knappsten Uhr."
+      // VOR der Wahl "knappster laufender Vorteil" zuerst ein noch laufendes Brett, auf
+      // dem eine Uhr unter der S-B1-Schwelle (<30s, dieselbe Konstante wie die
+      // Zeitnot-Warnfarbe an der Uhr selbst) steht. `schachUhrWert()` ist reine
+      // Ableitung aus bereits enthuellten `runden[]` (kein neuer Zustand, kein rr()) --
+      // exakt dieselbe Funktion, die die Uhr-Anzeige selbst benutzt, hier nur fuer ALLE
+      // Bretter statt nur des aktuellen Fokus-Bretts ausgewertet (stepSchach() pflegt
+      // u.vizUhrAnzeige nur fuer das jeweils fokussierte Brett, s. dortiger Kommentar --
+      // die rohe Formel bleibt dagegen fuer jedes Brett jederzeit berechenbar). Erstes
+      // Brett in Reihenfolge gewinnt (kein weiteres Tiebreak-Kriterium noetig, Zeitnot ist
+      // laut Dokument-Tabelle selten genug, dass zwei gleichzeitig kaum vorkommen).
+      let zeitnotBrett=null;
       for(let b=0;b<bretter;b++){
-        const [a]=paar(b); if(!a)continue;
-        const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
-        if(v<bv){bv=v;best=b;}
+        const [x,y]=paar(b); if(!x||!y||(fertig(x)&&fertig(y)))continue;
+        if(schachUhrWert(x,art)<30||schachUhrWert(y,art)<30){ zeitnotBrett=b; break; }
       }
-      schachFokus=best;
+      if(zeitnotBrett!=null){
+        schachFokus=zeitnotBrett;
+      } else {
+        let best=schachFokus,bv=Infinity;
+        for(let b=0;b<bretter;b++){
+          const [a]=paar(b); if(!a)continue;
+          const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
+          if(v<bv){bv=v;best=b;}
+        }
+        schachFokus=best;
+      }
     }
     const fb=schachFokus, [a,b]=paar(fb); if(!a||!b)return;
     const partie=SCHACH_PARTIEN[fb%SCHACH_PARTIEN.length];
@@ -19402,10 +23372,22 @@
     // Feed steht.
     const letzterZieher=(halb%2===1)?a:b; const rr_=letzterZieher.runden[letzterZieher.aktuell];
     if(letzter&&rr_){
-      const gut=rr_.ereignis===art.erfolgWort; ctx.font="800 16px 'Barlow Condensed',sans-serif";
+      const gut=rr_.ereignis===art.erfolgWort;
+      // S-B4 -- ??/!! BEIM KIPP-ZUG STATT IMMER ?!/! (Broadcast-Optik-Dokument 27-09,
+      // Abschnitt 4, Prioritaet 2): dieselbe Bedingung wie `vorteilKipptBig` im
+      // feed()-Kommentar von stepBuehne() (":16443" ff.), hier rein aus dem bereits
+      // enthuellten `verlauf`-Paar dieses Zuges abgeleitet -- kein neuer Zustand, kein
+      // rr(). Konvention (Dokument-Tabelle Abschnitt 4): `??` ist der Patzer, der die
+      // Partie dreht, `!!` der starke Zug, der sie zurueckdreht; alle anderen Zuege
+      // behalten `!`/`?!`.
+      const vNach=(letzterZieher.aktuell>=0&&letzterZieher.verlauf)?letzterZieher.verlauf[letzterZieher.aktuell]:0;
+      const vVor=(letzterZieher.aktuell>0&&letzterZieher.verlauf)?letzterZieher.verlauf[letzterZieher.aktuell-1]:0;
+      const kipptBig=letzterZieher.aktuell>0&&Math.sign(vNach)!==Math.sign(vVor);
+      const symbol=kipptBig?(gut?"!!":"??"):(gut?"!":"?!");
+      ctx.font="800 16px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=gut?css("--ok"):css("--crit"); ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=3;
       const tx=bx+letzter.x1*q+q-2, ty=by+letzter.y1*q+4;
-      ctx.strokeText(gut?"!":"?!",tx,ty); ctx.fillText(gut?"!":"?!",tx,ty);
+      ctx.strokeText(symbol,tx,ty); ctx.fillText(symbol,tx,ty);
       // TON (A4, Ziel 5): Figurenklack (oder Schlagklack bei einem Schlagzug,
       // `letzter.schlag` steht schon in schachStellung()) plus der Druck auf die
       // Schachuhr, an derselben Stelle, wo die !/?!-Annotation dasselbe Ereignis liest.
@@ -19417,6 +23399,11 @@
         letzterZieher._tonHalb=halb;
         sfx("speed-schach",letzter.schlag?"schlag":"zug");
         sfx("speed-schach","uhr");
+        // S-B4 -- BLITZ-ZEITSTEMPEL: `buehneT` ist dieselbe bereits vorhandene, rein
+        // praesentationale Zeitbasis, die auch die 3s-Fokus-Regie nutzt. Nur beim ERSTEN
+        // Zeichnen dieses Halbzugs gesetzt (derselbe `_tonHalb`-Guard) -- ein spaeterer
+        // Regie-Ruecksprung auf dieses Brett loest den Blitz nicht erneut aus.
+        if(kipptBig)letzterZieher.vizKippFlashSeit=buehneT;
       }
     }
 
@@ -19427,7 +23414,47 @@
     const anteil=0.5+0.5*Math.max(-1,Math.min(1,v/maxV));
     ctx.fillStyle="#1a1a1a"; ctx.fillRect(bx-42,by,12,bw); ctx.fillStyle="#f4f0e8"; ctx.fillRect(bx-42,by+bw*(1-anteil),12,bw*anteil);
     ctx.strokeStyle="#000"; ctx.lineWidth=1; ctx.strokeRect(bx-42,by,12,bw);
+    // S-B4 -- WEISSER BLITZ auf dem Balken, 0,4s nach einem Kipp-Zug (Zeitstempel oben) --
+    // rein zeitbasiert aus `buehneT`, kein weiterer Zustand, keine Wertung beruehrt.
+    if(letzterZieher.vizKippFlashSeit!=null){
+      const seit=buehneT-letzterZieher.vizKippFlashSeit;
+      if(seit>=0&&seit<0.4){
+        ctx.save(); ctx.globalAlpha=1-(seit/0.4); ctx.fillStyle="#fff";
+        ctx.fillRect(bx-42,by,12,bw); ctx.restore();
+      }
+    }
     ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
+
+    // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4, S-B5): ein
+    // Kaestchen je Brett, Olympiade-Schach-Konvention "1 / ½ / 0". `fertig(x)&&fertig(y)`
+    // (Dokument Abschnitt 3, Q2) -- erst dann ist das Brettergebnis kein Spoiler mehr;
+    // laufend zeigt sie den Vorteil des Heim-Spielers dieses Bretts, exakt derselbe Wert,
+    // der im Reihenbild schon als "+X Vorteil" unter der Figur steht. UNTER dem Brett statt
+    // in der Kopfzeile (Opus-Review-Fund dieser PR): die Kopfzeile hat zwischen der grossen
+    // Duellstand-Zahl und den Schachuhren keinen Platz mehr uebrig. Direkt unter dem Brett
+    // (by+bw), NOCH VOR den Tischbeinen (die erst bei by+bw+16 einsetzen und ohnehin nur an
+    // den beiden aeusseren Raendern liegen, nicht in der Mitte) bis kurz vor den
+    // Mini-Brettern (deren Kachel bei ry-kw/2 beginnt, ry=H*0.80, NICHT bei H*0.80 selbst --
+    // ry ist ihre MITTE, ein zweiter Opus-Review-Fund dieser PR: die erste Fassung nahm
+    // H*0.80 faelschlich als Kachel-Oberkante und liess Q1 in die Mini-Bretter hineinlaufen).
+    const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
+      const [pa,pb]=paar(i);
+      if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===fb};
+      const brettFertig=fertig(pa)&&fertig(pb);
+      if(brettFertig){
+        const wert=pa.vorteil||0;
+        return {fertig:true,text:wert>0?"1":wert<0?"0":"½",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===fb};
+      }
+      const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===fb};
+    });
+    zeichneMannschaftsLeiste(W/2,by+bw+4,Math.min(bw+80,bretter*46),leisteBoxen,14);
+
+    // Q1 -- VERLAUFSKURVE unter dem Brett (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4,
+    // S-B3): macht aus dem Balken oben (Zustand) eine Geschichte (Verlauf) -- derselbe `a`,
+    // Breite des Bretts, direkt unter der Mannschafts-Leiste, endet klar vor der
+    // Mini-Bretter-Oberkante (H*0.80-24).
+    zeichneVerlaufKurve(bx,by+bw+21,bw,26,a);
 
     // SCHACHUHREN ueber dem Brett: 3:00 Blitz, ein starker Zug kostet 8 s, ein
     // verpatzter 20 s — wer am Zug ist, hat die helle Uhr. `uhr()` selbst ist unveraendert
@@ -19441,10 +23468,23 @@
     const amZug=(halb%2===0)?a:b;
     [[a,bx+bw*0.25],[b,bx+bw*0.75]].forEach(([u,x])=>{
       const dran=u===amZug;
-      ctx.fillStyle=dran?"#f2e9d8":"#2a2233"; ctx.fillRect(x-34,by-38,68,22);
-      ctx.strokeStyle="#000"; ctx.strokeRect(x-34,by-38,68,22);
-      ctx.font="700 14px 'IBM Plex Mono',monospace"; ctx.fillStyle=dran?"#111":"#8a93a3";
-      ctx.fillText(mmss(u.vizUhrAnzeige!=null?u.vizUhrAnzeige:uhr(u)),x,by-27);
+      const rest=u.vizUhrAnzeige!=null?u.vizUhrAnzeige:uhr(u);
+      // S-B1 -- ZEITNOT-WARNFARBE (Broadcast-Optik-Dokument 27-09, Abschnitt 4, Prioritaet 1):
+      // liest ausschliesslich `rest` (dieselbe bereits vorhandene Uhr-Anzeige wie vorher),
+      // schreibt nichts -- reine Farbentscheidung nach Lichess-Vorbild (Dokument-Tabelle:
+      // <60s Gelb-Rand, <30s Rot mit weissen Ziffern, <10s rot blinkend mit 2 Hz). `buehneT`
+      // ist dieselbe bereits vorhandene, rein praesentationale Zeitbasis, die auch die
+      // 3s-Fokus-Regie oben nutzt -- kein neuer Zustand, kein rr()-Aufruf.
+      const rot=rest<30, gelb=!rot&&rest<60, kritisch=rest<10;
+      const blinkAn=!kritisch||Math.floor(buehneT*4)%2===0;
+      ctx.fillStyle=rot?(blinkAn?"#3a1414":"#160707"):(dran?"#f2e9d8":"#2a2233");
+      ctx.fillRect(x-34,by-38,68,22);
+      ctx.strokeStyle=rot?(blinkAn?"#ff6b5c":"#7a2620"):(gelb?"#e6c34d":"#000");
+      ctx.lineWidth=rot?2.2:(gelb?1.8:1);
+      ctx.strokeRect(x-34,by-38,68,22);
+      ctx.font="700 14px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=rot?(blinkAn?"#fff":"#e0463c"):(dran?"#111":"#8a93a3");
+      ctx.fillText(mmss(rest),x,by-27);
     });
 
     // DIE ZWEI SPIELER am Tisch (Sitz-Animation ist bewusst nicht Teil dieser Runde —
@@ -19470,7 +23510,14 @@
       zeichneSprite(ctx,u,x,py,true);
       const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
       schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5);
+      // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
+      // in Hoehe des Figuren-Schattens (py+26), nach aussen versetzt (weg vom Brett) --
+      // ausserhalb der Schattenellipse (rx=22) und weit vor Bewertungsbalken/Zugliste.
+      zeichneSpielerKachel(u,u===a?x-46:x+46,py+26,24,farbVar);
     });
+    // Q3 -- BAUCHBINDE beim Fokuswechsel: unten im Bild wie ein echtes Lower-Third, zeigt
+    // den Heim-Spieler des neu fokussierten Bretts (Broadcast-Optik-Dokument Abschnitt 3).
+    zeichneBauchbinde("schach-"+fb,a,art,W/2,H-16,260);
 
     // ZUGLISTE rechts vom Brett — die letzten acht Halbzuege.
     ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
@@ -19478,9 +23525,16 @@
     for(let i=von;i<halb;i++){
       const z=partie.zuege[i]; if(!z)break;   // rundenN*2 == 20 Halbzuege je Partie; laeuft
       // rundenN je hoeher, endet die Zugliste hier still statt an z.slice() zu werfen.
-      const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const r=zieher.runden[Math.floor(i/2)];
-      const gut=r&&r.ereignis===art.erfolgWort; ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
-      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+(gut?" !":" ?!"),bx+bw+34,by+10+(i-von)*13);
+      const zeile=Math.floor(i/2); const zieher=i%2===0?a:b; const idx=Math.floor(i/2); const r=zieher.runden[idx];
+      const gut=r&&r.ereignis===art.erfolgWort;
+      // S-B4 -- dieselben ??/!!-Zeichen wie die Zielfeld-Annotation oben, aus demselben
+      // `verlauf`-Vorzeichenvergleich, hier je Zeile der Zugliste wiederholt.
+      const zvN=(idx>=0&&zieher.verlauf)?zieher.verlauf[idx]:0;
+      const zvV=(idx>0&&zieher.verlauf)?zieher.verlauf[idx-1]:0;
+      const zKipptBig=idx>0&&Math.sign(zvN)!==Math.sign(zvV);
+      const zSymbol=zKipptBig?(gut?"!!":"??"):(gut?"!":"?!");
+      ctx.fillStyle=i===halb-1?"#f2e9d8":"#8a93a3";
+      ctx.fillText((i%2===0?(zeile+1)+". ":"   …")+z.slice(0,2)+"–"+z.slice(2)+" "+zSymbol,bx+bw+34,by+10+(i-von)*13);
     }
     ctx.textAlign="center";
 
@@ -19571,6 +23625,24 @@
   function zeichneBreaking(art){
     if(!TEILNEHMER.length)return;
     const cx=W/2, cy=H*0.54, rOut=Math.min(W*0.46,H*0.44), rIn=rOut*0.14, KY=0.82;
+    // `paar` wird hier vorgezogen (frueher erst kurz vor Rang 1 berechnet), weil B3
+    // (Herzschlag statt Beat, s.u.) den Ertragenden schon fuer den Kern-Puls braucht, der
+    // VOR Rang 1 gezeichnet wird -- dieselbe reine, seiteneffektfreie Funktion, nur einmal
+    // statt zweimal aufgerufen.
+    const paar=cypherPaar();
+    // B3 (Herzschlag statt Beat, Broadcast-Optik-Recherche 27.09., Klasse A): der feste
+    // 100-BPM-Takt (BREAKING_BPM, ein Breakdance-Ueberbleibsel, s. CLAUDE.md) wird fuer den
+    // GAUNTLET durch den Herzschlag DES ERTRAGENDEN ersetzt -- 70 BPM bei vollen HP, 150 BPM
+    // kurz vor 0 (gauntletHerzschlagBpm(), dieselbe Formel wie in stepGauntletHp() fuer den
+    // Ton). Ausserhalb des Gauntlets (falls je ein anderes Cypher-Chassis existiert) bleibt
+    // BREAKING_BPM unveraendert bestehen. Reine Anzeige: liest nur bereits enthuellten HP-
+    // Stand (gauntletHpJetzt(), reveal-gegatet), schreibt nichts.
+    const bpmJetzt=(art.gauntlet&&paar&&paar.ertraeger)?gauntletHerzschlagBpm(paar.ertraeger):BREAKING_BPM;
+    // BRUCHGEFAHR (B3): unter 30% HP zieht sich die Vignette zusammen, das Publikum wird im
+    // Ton leiser (Stille vor dem Bruch) und die Schrift auf der Tafel des Ertragenden wird
+    // rot -- die Uebersetzung von "wird er aufgeben?" in ein Koerpersignal.
+    const bruchgefahr=!!(art.gauntlet&&paar&&paar.ertraeger
+      &&Math.max(0,gauntletHpJetzt(paar.ertraeger))/(paar.ertraeger.hpMax||GAUNTLET_HP_MAX)<0.3);
 
     // A. Grundflaeche: vollflaechiger radialer Verlauf, 1:1 aus breaking.tsx's brkBg-Gradient
     // (Canvas createRadialGradient statt SVG radialGradient) -- UEBER bodenBuehne()s eigenem
@@ -19611,10 +23683,10 @@
 
     // Survivor-Kern (Zentrum) -- pulsierend ueber buehneT (bereits vorhandene Motor-Zeit,
     // kein neuer Zustand, dieselbe Idee wie zeichneHeben()s buehneAkt-getriebene Animation).
-    // AB JETZT AUF BREAKING_BPM GERASTERT (Ziel 4, Plan 7.4): eine 4-Schlag-Phrase bei
-    // 100 BPM = 2,4 s (vorher 2π/2,4 ≈ 2,62 s frei laufend) -- derselbe Takt, den
-    // stepCypher()s Wippen und der TON_KATALOG.breaking-Beat referenzieren.
-    const PULS_PERIODE=60/BREAKING_BPM*4;
+    // AUF EINE 4-SCHLAG-PHRASE GERASTERT (Ziel 4, Plan 7.4), seit B3 (27.09.) im Gauntlet
+    // nach `bpmJetzt` statt der festen BREAKING_BPM -- derselbe Takt, den die Druckachse
+    // (`takt` unten) und der Geraet-Schwung des Peinigers referenzieren.
+    const PULS_PERIODE=60/bpmJetzt*4;
     const puls=0.5+0.5*Math.sin(buehneT*2*Math.PI/PULS_PERIODE);
     const glow=ctx.createRadialGradient(cx,cy,0,cx,cy,rIn*2.4);
     glow.addColorStop(0,"rgba(214,150,255,"+(0.5*puls).toFixed(3)+")");
@@ -19667,7 +23739,7 @@
     // zeichneSprite() setzt fuer Effekt-/Partikelfiguren (EFFEKT_ARTEN) intern selbst
     // globalAlpha und stellt es auf 1 zurueck -- ein von aussen gesetztes Alpha ueberlebt das
     // nicht zuverlaessig. Eine Flaeche darueber schon.
-    const paar=cypherPaar();
+    // (`paar` steht bereits oben, vor dem Survivor-Kern-Puls, s. B3-Kommentar dort.)
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     // Fuehrer = Survivor: kleinster Radius, also die hoechste Summe -- derselbe Rang-1-
     // Begriff wie breaking.tsx:158 (t.rank===1).
@@ -19721,11 +23793,29 @@
     // Rand hin fast schwarz. Er dunkelt die zehn Zuschauer UND alles andere am Rand ab; die
     // beiden Duellanten werden danach gezeichnet und bleiben deshalb voll hell. Das ist der
     // gesamte "Fokus"-Mechanismus dieser Buehne -- ein Fill, kein Zustand.
-    const vig=ctx.createRadialGradient(cx,cy,rOut*0.30,cx,cy,rOut*1.25);
-    vig.addColorStop(0,"rgba(6,3,10,0)");
-    vig.addColorStop(0.55,"rgba(6,3,10,.42)");
-    vig.addColorStop(1,"rgba(6,3,10,.78)");
+    //
+    // BRUCHGEFAHR (B3, Broadcast-Optik-Recherche 27.09.): unter 30% HP zieht sich die
+    // Vignette sichtbar zusammen und faerbt sich rot -- die Uebersetzung von "wird er
+    // aufgeben?" in ein Koerpersignal, im selben Herzschlag-Takt wie der Survivor-Kern
+    // (`puls`, s.o.).
+    const vigInnenSkala=bruchgefahr?(0.30-0.09*(0.5+0.5*puls)):0.30;
+    const vig=ctx.createRadialGradient(cx,cy,rOut*vigInnenSkala,cx,cy,rOut*1.25);
+    if(bruchgefahr){
+      vig.addColorStop(0,"rgba(60,4,4,0)");
+      vig.addColorStop(0.55,"rgba(56,4,6,.52)");
+      vig.addColorStop(1,"rgba(20,2,4,.86)");
+    } else {
+      vig.addColorStop(0,"rgba(6,3,10,0)");
+      vig.addColorStop(0.55,"rgba(6,3,10,.42)");
+      vig.addColorStop(1,"rgba(6,3,10,.78)");
+    }
     ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+    if(bruchgefahr){
+      ctx.font="900 11px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+      ctx.globalAlpha=0.55+0.45*puls; ctx.fillStyle="#ff3b3b";
+      ctx.fillText("BRUCHGEFAHR",cx,H*0.78);
+      ctx.globalAlpha=1;
+    }
 
     // ---------- DIE FOLTERBANK: zehn Geraete, eskalierend ----------
     // Chris: „dass da so ein tisch ist mit 10 folterinstrumenten und die charaktere nutzen die
@@ -19735,7 +23825,14 @@
     // Stufe = Durchgang des gerade Ertragenden (s. folterStufe oben). Die Leiter ist immer
     // vollstaendig zu sehen: was schon dran war, ist ausgegraut; was noch kommt, steht dunkel
     // bereit. Genau das macht „es wird immer schlimmer" ueberhaupt sichtbar.
-    const stufe=paar&&paar.ertraeger?folterStufe(paar.ertraeger.aktuell,art.rundenN):0;
+    //
+    // B4.1 (Broadcast-Optik-Recherche 27.09., Klasse A): `gauntletZugImBout()` statt
+    // `paar.ertraeger.aktuell` -- die Stufe gehoert zum LAUFENDEN KAMPF, s. Kommentar dort.
+    // Bei art.rundenN=8 erreicht ein Kampf, der laenger als acht eigene Zuege dauert, damit
+    // wieder den Hammer (statt schon beim ersten Anschlag des naechsten Kampfes dort zu
+    // kleben) -- exakt dieselbe Skalierung wie zuvor, nur pro Kampf statt pro Karriere.
+    const stufe=paar&&paar.ertraeger
+      ?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0;
     const geraet=FOLTER_GERAETE[stufe];
     const tischB=Math.min(W*0.84,920), tischX=cx-tischB/2, tischY=H-24;
     const fachB=tischB/FOLTER_GERAETE.length;
@@ -19750,6 +23847,12 @@
         // des Peinigers (unten gezeichnet), nicht auf dem Tisch.
         ctx.setLineDash([3,3]); ctx.strokeStyle="rgba(242,215,90,.9)"; ctx.lineWidth=1.3;
         ctx.strokeRect(fx-fachB*0.36,fy-12,fachB*0.72,24); ctx.setLineDash([]);
+        // B4.2: die aktive Stufe traegt ihre Qual-Zahl GROSS (Doku B4.2), im Tisch selbst
+        // (goldene Schrift auf dem dunklen Holz), statt sie mit den uebrigen neun kleinen
+        // Zahlen zu verwechseln.
+        ctx.font="800 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
         continue;
       }
       ctx.save();
@@ -19760,10 +23863,20 @@
       ctx.translate(fx-fachB*0.32,fy); ctx.scale(0.95,0.95);
       FOLTER_GERAETE[i].zeichne(ctx);
       ctx.restore();
+      // B4.2 (Broadcast-Optik-Recherche 27.09., Klasse A): QUAL-ZAHL je Geraet, klein, im
+      // Tischbrett selbst -- "die Leiter wird damit zur Zahl, die man vorher sieht" (Doku).
+      // Ausdruecklich KEINE Schadenszahl/kein "+X%" (Doku-Wortlaut), rein die aufsteigende
+      // Reihe aus QUAL_ZAHLEN, in derselben Grau-/Hell-Staffelung wie das Geraet daneben.
+      ctx.save();
+      ctx.globalAlpha=i<stufe?0.22:0.55;
+      ctx.font="600 6px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
+      ctx.restore();
     }
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.font="800 10px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
-    ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length,cx,tischY-30);
+    ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length+"  ·  QUAL "+qualAnzeige(QUAL_ZAHLEN[stufe]),cx,tischY-30);
     ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(214,170,255,.6)";
     ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
 
@@ -19778,7 +23891,7 @@
       if(a&&b){
         const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
         const ux=dx/len, uy=dy/len, nx=-uy, ny=ux;
-        const takt=0.45+0.55*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60));
+        const takt=0.45+0.55*Math.abs(Math.sin(buehneT*Math.PI*bpmJetzt/60));
         ctx.strokeStyle="#ff5a4a"; ctx.lineWidth=1.6; ctx.lineCap="round";
         ctx.globalAlpha=0.30*takt;
         ctx.beginPath(); ctx.moveTo(a.x+ux*22,a.y+uy*22); ctx.lineTo(b.x-ux*20,b.y-uy*20); ctx.stroke();
@@ -19876,7 +23989,7 @@
         const dir=u.side===0?1:-1;
         const zusetzen=ertraeger&&ertraeger.vizPhase==="throwdown";
         const schwung=zusetzen
-          ? -0.95+1.75*Math.abs(Math.sin(buehneT*Math.PI*BREAKING_BPM/60))
+          ? -0.95+1.75*Math.abs(Math.sin(buehneT*Math.PI*bpmJetzt/60))
           : -0.60;
         ctx.save();
         ctx.translate(x+dir*11,y+2);
@@ -19940,7 +24053,10 @@
     // Element, an dem man die Disziplin auf einen Blick erkennt.
     const tafel=(u,rolle,links)=>{
       if(!u)return;
-      const bw=Math.min(190,W*0.20), bh=64;
+      // GAUNTLET (22.09.) braucht eine vierte Zeile (HP-Balken UND Punkte/Kampf-Nummer
+      // getrennt, s.u.) -- die Tafel waechst dafuer um 12px, statt die drei bestehenden
+      // Zeilen zu stauchen.
+      const bw=Math.min(190,W*0.20), bh=art.gauntlet?86:64;
       const bx=links?12:W-12-bw, by=cy-bh/2-18;
       ctx.fillStyle="rgba(10,6,14,.78)"; ctx.fillRect(bx,by,bw,bh);
       ctx.fillStyle=farbeVon(u); ctx.fillRect(bx,by,3,bh);
@@ -19955,7 +24071,46 @@
       ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#eef3fa";
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,bx+12,by+35);
       ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#9aa4b4";
-      ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
+      if(art.gauntlet){
+        // GAUNTLET (22.09.): "Durchgang X/rundenN" ergibt hier keinen Sinn mehr -- ein
+        // Ueberlebender sammelt ueber mehrere Duelle hinweg beliebig viele eigene Zuege (s.
+        // BUEHNE_ART.breaking.gauntlet-Kommentar). Die Seitentafel zeigt stattdessen den
+        // HP-Stand, wie er GERADE enthuellt ist (gauntletHpJetzt(), nicht der Endstand
+        // u.hp), plus die laufende Kampf-Nummer -- exakt die "Kette nachvollziehbar"-
+        // Vorgabe der Praesentation.
+        // B2 (Broadcast-Optik-Recherche 27.09.): die ASCII-Bloecke sind durch die zwei
+        // gespiegelten HP-Balken ganz oben ersetzt (zeichneHpBalken() unten in dieser
+        // Funktion) -- die Zahl hier bleibt fuer die Barrierefreiheit stehen, nur ohne
+        // Blockzeichen (Doku B2: "dann aber ohne Blockzeichen").
+        const hpJetzt=Math.max(0,gauntletHpJetzt(u)), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+        // BRUCHGEFAHR (B3): die Schrift auf der Tafel DES ERTRAGENDEN wird rot, sobald er
+        // unter 30% HP steht (Doku B3) -- derselbe Schwellwert, der oben die Vignette und
+        // den Herzschlag treibt.
+        ctx.fillStyle=(rolle==="ertraegt"&&bruchgefahr)?"#ff5a4a":"#9aa4b4";
+        ctx.fillText("HP "+hpJetzt+"/"+hpMax,bx+12,by+50);
+        ctx.fillStyle="#9aa4b4";
+        // KEIN SPOILER: `u.bout` ist am Ende von baueGauntlet() schon der FERTIGE Endwert
+        // (Review-Fund: die Tafel zeigte "Kampf 9", waehrend der Ticker fuer denselben
+        // Moment noch "Kampf 8" meldete) -- der bereits enthuellte Zug (gauntletZugJetzt())
+        // traegt die richtige, reveal-gegatete Kampf-Nummer; vor der allerersten eigenen
+        // Enthuellung (noch kein Zug gezeigt) ist "Kampf 1" der einzig plausible Anfangswert.
+        const zug=gauntletZugJetzt(u);
+        ctx.fillText(u.summe+" Pkt  ·  Kampf "+(zug?zug.bout:1),bx+12,by+61);
+        // B6 (Broadcast-Optik-Recherche 27.09., Klasse A): STANDZEIT UND ANSCHLAGZAEHLER,
+        // nur auf der Tafel des gerade Ertragenden (Doku: "Auf der Tafel des Ertragenden").
+        // `gauntletZugImBout()` (s. B4.1-Kommentar oben) zaehlt die eigenen Anschlaege
+        // dieses Bouts, `gauntletBoutStartT` ist der Buehnen-Zeitstempel des Bout-Beginns
+        // (s. Setzstelle in stepBuehne) -- beide reveal-gegatet, kein Spoiler.
+        if(rolle==="ertraegt"){
+          const anschlagN=gauntletZugImBout(u,u.aktuell)+1;
+          const standSek=Math.max(0,buehneT-(gauntletBoutStartT??buehneT));
+          const mm=Math.floor(standSek/60), ss=Math.floor(standSek%60);
+          ctx.fillStyle="#9aa4b4";
+          ctx.fillText("Anschlag "+anschlagN+" · Standzeit "+mm+":"+String(ss).padStart(2,"0"),bx+12,by+72);
+        }
+      } else {
+        ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
+      }
     };
     if(ertraeger&&peiniger){
       const heim=ertraeger.side===0?ertraeger:peiniger;
@@ -19964,6 +24119,163 @@
       tafel(gast,gast===ertraeger?"ertraegt":"peinigt",false);
     } else if(ertraeger){
       tafel(ertraeger,"ertraegt",ertraeger.side===0);
+    }
+
+    // ================== KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A) ==================
+    // Chris' Kernidee vom 22.09., woertlich: "Sieger kaempft dann gegen Spieler 2 [...] HP
+    // nimmt er mit" -- und heute sieht man die Kette nirgends, nur das gerade laufende Paar
+    // auf den Seitentafeln oben. Am oberen Rand steht jetzt links die Heim-, rechts die
+    // Gast-Aufstellung in Kampfreihenfolge (`gauntletReihen`, s. baueGauntlet()), je Kaempfer
+    // ein Platz -- dasselbe Kachinuki-Tafelbild wie im echten Kendo.
+    //
+    // SPOILER-REGEL, GENAU WIE BEI DEN SEITENTAFELN OBEN: ausschliesslich ueber bereits
+    // enthuellte Felder gerechnet. `gauntletRausJetzt()` (reveal-gegatet) statt des am Ende
+    // von baueGauntlet() bereits FERTIGEN `u.raus`; `letzterGauntletZug` (reveal-gegatet,
+    // s. stepBuehne()) statt `u.bout`, das ebenfalls schon der Endwert ist; die lokalen
+    // ai/bi-Zaehler aus baueGauntlet() sind ausserhalb der Funktion ohnehin nicht sichtbar.
+    // Die SIEGESSERIE des Stehenden folgt aus derselben reveal-gegateten Zahl: seine eigene
+    // allererste enthuellte Runde traegt den Kampf, in dem er selbst eingestiegen ist
+    // (`u.runden[0].bout`); die Differenz zur aktuellen Kampf-Nummer ist genau die Zahl der
+    // Gegner, die er seitdem besiegt hat (jeder gewonnene Kampf erhoeht den globalen Zaehler
+    // um genau eins, s. baueGauntlet()).
+    if(art.gauntlet && gauntletReihen){
+      // FREIRAUM UEBER DEM BROADCAST-BUG (.bbug/.bbugcallout, HTML-Overlay, `top:8px`): bei
+      // der getesteten 1300px-Breite belegt er bis zu 10% der Leinwandhoehe, bei schmaleren
+      // Fenstern deutlich mehr (s. Kommentar bei kuerFlaeche() oben, dieselbe Messung).
+      // `.bahnhud` reserviert dafuer bereits 15% -- dieselbe Sicherheitsmarge hier fuer die
+      // Kettenleiste/HP-Balken, statt sie mit den Team-Karten zu ueberlagern (Sicht-QA
+      // 27.09.: ohne diesen Abstand liegen beide unter der Team-Karte).
+      const topY=H*0.155;
+      const aktuellerBout=letzterGauntletZug?letzterGauntletZug.r.bout:1;
+      let stehenderTxt={0:null,1:null}, stehend={0:null,1:null};
+      const zeichneKette=(side,linksbuendig)=>{
+        const reihe=gauntletReihen[side]||[];
+        const slotW=26,slotH=16,gap=3;
+        const gesamtB=reihe.length*slotW+Math.max(0,reihe.length-1)*gap;
+        const x0=linksbuendig?16:W-16-gesamtB, y0=topY+13;
+        reihe.forEach((u,i)=>{
+          const sx=x0+i*(slotW+gap);
+          const gebrochen=u.aktuell>=0&&gauntletRausJetzt(u);
+          const c=farbeVon(u);
+          ctx.lineWidth=1;
+          if(gebrochen){
+            // GEBROCHENE: grau und diagonal gestrichen, mit kleiner Kampfnummer (H1-Doku B1:
+            // "✗ K3") -- der Kampf, in dem genau dieser Anschlag sie zu Fall brachte.
+            ctx.globalAlpha=0.4; ctx.fillStyle="#3a3d46"; ctx.fillRect(sx,y0,slotW,slotH);
+            ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.strokeRect(sx,y0,slotW,slotH);
+            ctx.beginPath(); ctx.moveTo(sx+2,y0+2); ctx.lineTo(sx+slotW-2,y0+slotH-2); ctx.stroke();
+            ctx.globalAlpha=1;
+            const koBout=u.runden[u.aktuell].bout;
+            ctx.font="700 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+            ctx.textAlign="center"; ctx.textBaseline="middle";
+            ctx.fillText("✗K"+koBout,sx+slotW/2,y0+slotH/2);
+          } else if(u.aktuell<0){
+            // WARTENDE: volle Farbe, aber gedimmt.
+            ctx.globalAlpha=0.42; ctx.fillStyle=c; ctx.fillRect(sx,y0,slotW,slotH); ctx.globalAlpha=1;
+            ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.strokeRect(sx,y0,slotW,slotH);
+          } else {
+            // DER STEHENDE: Rahmen in Teamfarbe, darunter eine Mini-HP-Linie, daneben die
+            // Siegesserie (unten als Text unter der ganzen Reihe).
+            ctx.globalAlpha=0.30; ctx.fillStyle=c; ctx.fillRect(sx,y0,slotW,slotH); ctx.globalAlpha=1;
+            ctx.strokeStyle=c; ctx.lineWidth=2; ctx.strokeRect(sx,y0,slotW,slotH);
+            const hpJetzt=Math.max(0,gauntletHpJetzt(u)), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+            const hpFrac=hpMax>0?hpJetzt/hpMax:0;
+            ctx.fillStyle="rgba(255,255,255,.18)"; ctx.fillRect(sx+1,y0+slotH-3,slotW-2,2);
+            ctx.fillStyle=hpFrac<0.3?"#ff5a4a":c; ctx.fillRect(sx+1,y0+slotH-3,Math.max(0,(slotW-2)*hpFrac),2);
+            const eintrittsBout=u.runden[0]?u.runden[0].bout:aktuellerBout;
+            const serie=Math.max(0,aktuellerBout-eintrittsBout);
+            stehenderTxt[side]=(serie>0?serie+" in Folge":"steht")+" · "+u.n.split(" ")[0];
+            stehend[side]=u;
+          }
+        });
+      };
+      zeichneKette(0,true);
+      zeichneKette(1,false);
+      ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.textBaseline="alphabetic";
+      if(stehenderTxt[0]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="left"; ctx.fillText(stehenderTxt[0],16,topY+42); }
+      if(stehenderTxt[1]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="right"; ctx.fillText(stehenderTxt[1],W-16,topY+42); }
+      // MITTIG: Kampf-Nummer und Rennstand -- "Kampf 5", "noch 4:2 im Rennen", die Zahl, die
+      // beim Kachinuki die Tafel traegt (Doku B1).
+      const nochLinks=(gauntletReihen[0]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
+      const nochRechts=(gauntletReihen[1]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
+      ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("KAMPF "+aktuellerBout,W/2,topY+7);
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.fillText("noch "+nochLinks+" : "+nochRechts+" im Rennen",W/2,topY+19);
+      ctx.textBaseline="alphabetic";
+
+      // ================== B2: HP-BALKEN IM KAMPFSPIEL-STIL (Broadcast-Optik-Recherche
+      // 27.09., Klasse A) ==================
+      // Ersetzt die ASCII-Bloecke ("HP 212/400 █████░░░░░", gauntletBalken()) durch zwei
+      // GESPIEGELTE Balken ganz oben -- Heim links, verankert am linken Bildrand und nach
+      // innen (zur Mitte) schrumpfend; Gast rechts, spiegelbildlich am rechten Rand
+      // verankert. Der Unterschied zwischen 10 HP (standgehalten) und 24 HP (eingebrochen)
+      // wird damit sichtbar, ohne dass jemand eine Zahl liest (Doku B2).
+      //
+      // NACHLAUFENDES SCHADENSSTUECK: `u.vizHpAnzeige` naehert sich `gauntletHpJetzt(u)`
+      // exponentiell an (stepGauntletHp(), Vorbild u.vizUhrAnzeige bei stepSchach) statt
+      // sofort zu springen. Der Bereich zwischen dem noch nicht nachgezogenen alten Wert
+      // und dem neuen, echten Wert wird hell eingefaerbt -- der "gerade verlorene Teil", der
+      // kurz aufleuchtet und dann abläuft.
+      const balkenB=Math.min(220,W*0.19), balkenH=7, balkenY=topY;
+      const zeichneHpBalken=(u,linksbuendig)=>{
+        if(!u)return;
+        const c=farbeVon(u), hpMax=u.hpMax||GAUNTLET_HP_MAX;
+        const trueFrac=hpMax>0?Math.max(0,Math.min(1,gauntletHpJetzt(u)/hpMax)):0;
+        const vizRoh=u.vizHpAnzeige!=null?u.vizHpAnzeige:gauntletHpJetzt(u);
+        const vizFrac=hpMax>0?Math.max(0,Math.min(1,vizRoh/hpMax)):0;
+        const grossFrac=Math.max(trueFrac,vizFrac);
+        const bx0=linksbuendig?16:W-16-balkenB;
+        ctx.fillStyle="rgba(10,6,14,.72)"; ctx.fillRect(bx0,balkenY,balkenB,balkenH);
+        const fuellen=(frac,farbe)=>{
+          const bw=balkenB*frac; if(bw<=0)return;
+          const fx=linksbuendig?bx0:bx0+balkenB-bw;
+          ctx.fillStyle=farbe; ctx.fillRect(fx,balkenY,bw,balkenH);
+        };
+        if(grossFrac>trueFrac+0.001)fuellen(grossFrac,"#f2ede0");
+        fuellen(trueFrac,trueFrac<0.3?"#ff5a4a":c);
+        ctx.strokeStyle="rgba(255,255,255,.28)"; ctx.lineWidth=1;
+        ctx.strokeRect(bx0+0.5,balkenY+0.5,balkenB-1,balkenH-1);
+      };
+      zeichneHpBalken(stehend[0],true);
+      zeichneHpBalken(stehend[1],false);
+    }
+
+    // ================== B5: DER MOMENT „GEBROCHEN" (Broadcast-Optik-Recherche 27.09.,
+    // Klasse A, "nur Standbild/Stempel, kein C-Pause-Umbau") ==================
+    // Doku B5 schlaegt drei Schritte vor: Standbild+Stempel, Zeitlupe des letzten
+    // Anschlags (dasselbe Bild-im-Bild-Bauteil wie H5/C6, in dieser Runde bewusst NICHT
+    // gebaut, s. PR-Beschreibung) und eine "Wand der Gebrochenen" (dieselbe Information wie
+    // B1s Kettenleiste oben, laut Doku selbst "nur als Bild" -- hier nicht verdoppelt).
+    // Gebaut ist Schritt 1: ein kurzer, ECHT (in Buehnenzeit) ABLAUFENDER Stempel ueber dem
+    // ganzen Bild -- KEINE Pause der Enthuellung (`buehneAkt`/`buehneZeiger` laufen
+    // unveraendert weiter, die naechste Runde enthuellt puenktlich), nur eine zusaetzliche
+    // Ueberlagerung, die von selbst ausblendet. `letzterGauntletBruch` ist reveal-gegatet
+    // (s. Setzstelle in stepBuehne), also kein Spoiler.
+    if(art.gauntlet && letzterGauntletBruch){
+      const seit=buehneT-letzterGauntletBruch.bruchT;
+      if(seit>=0 && seit<BRUCH_STEMPEL_DAUER){
+        const p=1-seit/BRUCH_STEMPEL_DAUER; // 1 -> 0, linear ausblendend
+        ctx.save();
+        // Entsaettigung/Verdunklung des ganzen Bildes -- das "Standbild"-Gefuehl, ohne den
+        // Takt tatsaechlich anzuhalten.
+        ctx.fillStyle="rgba(8,3,5,"+(0.40*p).toFixed(3)+")";
+        ctx.fillRect(0,0,W,H);
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.save();
+        ctx.translate(cx,cy); ctx.rotate(-0.07);
+        ctx.font="900 34px 'Barlow Condensed',sans-serif";
+        ctx.globalAlpha=Math.min(1,p*1.8);
+        ctx.lineWidth=4; ctx.strokeStyle="rgba(8,4,4,.88)"; ctx.lineJoin="round";
+        ctx.strokeText("GEBROCHEN",0,0);
+        ctx.fillStyle="#ff3b3b"; ctx.fillText("GEBROCHEN",0,0);
+        ctx.restore();
+        ctx.globalAlpha=Math.min(1,p*1.8);
+        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.fillText(letzterGauntletBruch.u.n+" scheidet aus",cx,cy+30);
+        ctx.restore();
+      }
     }
   }
 
@@ -20974,28 +25286,47 @@
       // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
       const k=el("div","plan");
       k.appendChild(el("b",null,"Ballwechsel"));
-      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Zuege insgesamt, abwechselnd zwischen "+
+      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Züge insgesamt, abwechselnd zwischen "+
         "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
         "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
         "einen verpassten Abschluss aufsammelt."));
       box.appendChild(k);
       const apb2=document.getElementById("arenaplan");
-      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Zuege, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Züge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
       const pl2=document.querySelector(".planzeile b");
       if(pl2)pl2.textContent="Ballwechsel";
     } else if(istBuehne(disc)){
       // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
       // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
       const k=el("div","plan");
-      k.appendChild(el("b",null,"Bewertung"));
-      k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
-        "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
-        "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
-      box.appendChild(k);
-      const apb=document.getElementById("arenaplan");
-      if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
-      const pl=document.querySelector(".planzeile b");
-      if(pl)pl.textContent="Bewertung";
+      // GAUNTLET (Breaking, 22.09.): kein fester Durchgangs-Takt mehr, s. BUEHNE_ART.
+      // breaking.gauntlet-Kommentar — eine Kette aus Einzelduellen statt gleichzeitiger
+      // Einzelauftritte. Der Rest der Funktion (Gegner-Aufstellungsliste unten) gilt
+      // unveraendert fuer jede Buehnen-Disziplin, deshalb hier KEIN `return`, nur ein
+      // anderer Text fuer denselben Plan-Kasten.
+      if(BB().gauntlet){
+        k.appendChild(el("b",null,"Gauntlet"));
+        k.appendChild(el("p",null,"Slot 1 gegen Slot 1, dann bleibt der Sieger MIT seinem "+
+          "aktuellen HP-Stand im Ring und trifft auf den nächsten Kämpfer des Verliererteams — "+
+          "so weiter, bis ein Team komplett aufgebraucht ist. Jeder Zug: "+BB().erfolgWort+
+          " oder "+BB().failWort+" — entschieden durch Technik und Nerven, wie viel HP das "+
+          "kostet, durch denselben Ausgang."));
+        box.appendChild(k);
+        const apb0=document.getElementById("arenaplan");
+        if(apb0)apb0.textContent="Gauntlet, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        const pl0=document.querySelector(".planzeile b");
+        if(pl0)pl0.textContent="Gauntlet";
+      } else {
+        k.appendChild(el("b",null,"Bewertung"));
+        k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
+          "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
+          "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
+        box.appendChild(k);
+        const apb=document.getElementById("arenaplan");
+        if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        const pl=document.querySelector(".planzeile b");
+        if(pl)pl.textContent="Bewertung";
+      }
     } else if(istBahn(disc)){
       // Auf der Bahn gibt es keinen Schlachtplan: jeder Laeufer bringt seinen eigenen
       // Rennplan mit, und der kommt aus dem Slot, auf dem er steht. Den Kampfplan hier
@@ -21353,7 +25684,7 @@
       groesse:p.groesse??null,
       arch:archetyp.name,stunResist:archetyp.stunResist,knockbackResist:archetyp.knockbackResist,
       ord:ordung||"mitlinie",zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
-      hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+      hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,downBis:null,lunge:0,tgt:null,
       dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
       fern,...reichweiten(p.skills,fern),stun:0,
       skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
@@ -21378,6 +25709,14 @@
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
+    // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
+    // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
+    // fuer immer "schon vergeben", und kein spaeteres Spiel haette je wieder ein First Blood.
+    ersteAusschaltungVergeben=false;
+    // GROSS-COOLDOWN (s. kampfGrossDrosseln oben) gehoert zu GENAU diesem Spiel — ohne
+    // diesen Reset bliebe die letzte grosse Marke des vorigen Kampfes stehen und wuerde das
+    // naechste Spiel um bis zu KAMPF_GROSS_COOLDOWN_SEK verkuerzt anlaufen lassen.
+    letzterGrosserT=-Infinity;
     // KONTROLLPUNKT NEU AUFSETZEN (nur Battlefield, s. ARENA_DOMINATION) — VOR PLAN/id,
     // damit ein Wechsel weg von Battlefield (disc jetzt tdm/mini-dm) KP wieder auf null
     // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
@@ -21512,6 +25851,220 @@
     z.y=Math.max(34,Math.min(H-34,z.y+dy/L*k));
   }
 
+  // ===================================================================================
+  // TDM-RESPAWN (Chris, 26.09., Format-Klarstellung zum Opus-Konzeptreview): "TDM hat kein
+  // Kill-Limit, es wird bis zum Ende von z.B. 6 Minuten gespielt, wer am Ende am meisten
+  // gescored hat, hat gewonnen." Ein Zeitlimit ohne Kill-Limit ergibt nur Sinn, wenn
+  // Gefallene zurueckkommen — sonst waere ein Team nach vollstaendiger Ausloeschung
+  // vorzeitig fertig, was Chris nicht sagt, und "am Ende am meisten gescored" waere
+  // identisch mit "hat ueberlebt", nie etwas anderes. Vorher war TDM (wie Mini-DM und
+  // Battlefield) reine Einmal-Eliminierung ohne Respawn (s. Konzeptreview Abschnitt 1.1:
+  // "Alle drei Disziplinen sind heute einmalige Eliminierung ohne Respawn") UND ohne
+  // Kill-Limit — die alte "TDM"-Zieldefinition war also schon vorher kein Kill-Limit-Modus
+  // (das hatte nur das Konzeptreview als MOEGLICHEN P3-Vorschlag genannt, nie umgesetzt),
+  // sondern schlicht ein Duell ohne Wiedereinstieg. Die Korrektur betrifft deshalb allein
+  // das Fehlen von Respawn.
+  //
+  // NUR TDM. Mini-DM bleibt Ein-Leben-FFA (Chris, 26.09.: "beim Mini-DM hat jeder Spieler
+  // nur ein Leben" — das war bereits der Ist-Zustand, hier nur bestaetigt, nicht veraendert)
+  // und Battlefield bleibt in dieser PR unangetastet (eigener, groesserer Umbau noetig, s.
+  // PR-Beschreibung und Konzeptreview Abschnitt 5, P3 — die "Tickets + zweiter Punkt"-Frage
+  // ist Chris' offene Frage 2 aus Abschnitt 6, noch nicht von ihm beantwortet).
+  //
+  // KURZE WARTEZEIT AM EIGENEN AUFSTELLUNGSPLATZ (`u.hx/u.hy`, von homeFor() beim Bau
+  // vergeben), volle Lebenspunkte, kurze Spawn-Unverwundbarkeit (dieselbe `invuln`-Pruefung,
+  // die nahschlag()/schrittPfeile() ohnehin schon respektieren) gegen sofortiges
+  // Spawn-Camping. 5 Sekunden bei einem Zeitlimit von 95 Sekunden erlaubt mehrere
+  // Respawn-Zyklen je Kaempfer, ohne den Kampf leerzuraeumen.
+  const TDM_RESPAWN_SEK=5, TDM_SPAWN_SCHUTZ_SEK=1.5;
+
+  function reviveUnit(u){
+    u.down=false; u.downBis=null;
+    u.hp=u.max;
+    u.x=u.hx; u.y=u.hy;
+    u.schild=0; u.schildT=0; u.schildVon=null;
+    u.stun=0; u.wurzel=0; u.invuln=TDM_SPAWN_SCHUTZ_SEK;
+    u.retreat=0; u.rtCd=0; u.tgt=null; u.lastHit=null; u.anteile=null;
+    u.cd=0; u.lunge=0; u.dodge=0; u.leineHielt=false; u.bindAn=null; u.leer=0;
+    u.mp=u.mpMax; u.sp=u.spMax;
+    // CAST-RESET (Review-Fund #22 zu PR #1028): ohne dies behaelt eine respawnte Einheit
+    // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
+    // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
+    u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
+    feed(u.side,u.n+" ist zurück im Kampf.");
+  }
+
+  // GEMEINSAME AUSSCHALTUNG fuer nahschlag() und den Pfeiltreffer in schrittPfeile() —
+  // vorher stand dieselbe Zeile (down setzen, tode/ko zaehlen, verteileKo, Feed-Meldung)
+  // zweimal im Code. Jetzt entscheidet eine Stelle, ob jemand fuer immer faellt
+  // (Mini-DM/Battlefield, unveraendertes Verhalten) oder in TDM respawnt.
+  //
+  // "GROSS" IST NICHT MEHR JEDE AUSSCHALTUNG (Opus-Ingame-Review, 27.09.): mit dem
+  // TDM-Respawn (26.09., s. TDM_RESPAWN_SEK oben) faellt derselbe Kaempfer mehrfach in
+  // einem Spiel — gemessen 46 grosse Callouts in einem Spiel, weit ueber dem eigenen
+  // Zielband von 4-10 je Spiel (docs/design/broadcast-praesentation-runde-2-22-09.md
+  // Abschnitt 9, Frage 1). Etwa die Haelfte davon waren "X faellt"-Meldungen, jede
+  // einzelne davon big. Der Ticker-Text bleibt fuer JEDE Ausschaltung wie bisher stehen
+  // (nichts geht an Information verloren) — nur der grosse Banner/die HIGHLIGHTS-Liste
+  // bekommt jetzt eine echte Auswahl, angelehnt an das, was eine Kampf-Uebertragung
+  // tatsaechlich ausruft: der erste Blutzoll des Spiels, eine Ausschaltung, die die
+  // Fuehrung wechselt (Ausschaltungszahl der eigenen Seite gegen die des Gegners —
+  // dasselbe Feld, das auch kampfSieger() fuer TDM/Mini-DM vergleicht), eine schnelle
+  // Mehrfachausschaltung derselben Person, ODER — nur ausserhalb TDM, wo eine volle
+  // Ausloeschung sofort das Spiel beendet (s. stepSim,
+  // `(disc!=="tdm"&&lebendeSeiten.size<=1)||t>95`) — die spielentscheidende letzte
+  // Ausschaltung. Bei TDM respawnt die volle Ausloeschung einer Seite dagegen einfach
+  // weiter und ist damit ein Routine-Moment, kein Finale. Reine Anzeige-Auswahl:
+  // schalteAus() selbst (wer faellt, wann er respawnt, tode/ko-Zaehlung, verteileKo)
+  // ist unveraendert, es aendert sich nur das dritte Argument von feed().
+  const KAMPF_MEHRFACHKILL_FENSTER_SEK=8;
+  let ersteAusschaltungVergeben=false;
+  const seitenScore=(side)=>U.filter(u=>u.side===side).reduce((s,u)=>s+u.st.ko,0);
+
+  // SPIELWEITER GROSS-COOLDOWN (Opus-Ingame-Review, Nachbesserung 27.09.): der obige
+  // Uebergangstest in grosserTreffer() UND die vier Kriterien hier in schalteAus() sind
+  // beide fuer sich sauber -- das eigentliche Problem ist TDMs Respawn (s. TDM_RESPAWN_SEK
+  // oben): JEDES neue Leben eines Kaempfers kann die 15%-Schwelle erneut genau einmal
+  // reissen und einen weiteren Fuehrungswechsel/Mehrfachkill ausloesen. Bei einem 12-Spieler-
+  // Match mit vielen Respawn-Zyklen in ~95s Spielzeit summierte sich das GEMESSEN (s.
+  // scripts/zaehle-tdm-highlights.mjs, ueber HIGHLIGHTS[]/#ehighlights statt den auf 140
+  // Zeilen gedeckelten #feed-DOM-Schnappschuss, der das vorher verschleiert hat) auf rund 40
+  // echte Highlights pro Spiel -- weit ueber dem Zielband 4-10
+  // (docs/design/broadcast-praesentation-runde-2-22-09.md). Pro-Ziel-Drosselung allein (die
+  // Uebergangslogik oben) loest das nicht, weil das Problem NICHT ein einzelnes Ziel ist,
+  // das mehrfach gemeldet wird, sondern viele VERSCHIEDENE Kaempfer, die nacheinander
+  // dieselbe Schwelle reissen.
+  //
+  // Deshalb ein zweiter, SPIELWEITER (nicht pro Ziel/pro Kaempfer) Mindestabstand zwischen
+  // zwei grossen Highlights: laeuft eines an, muss die naechste Sekundenmarke mindestens
+  // KAMPF_GROSS_COOLDOWN_SEK spaeter liegen, sonst faellt "big" fuer dieses eine Ereignis
+  // weg -- der Ticker-TEXT bleibt in jedem Fall stehen (s. feed()), nur Banner/HIGHLIGHTS-
+  // Eintrag entfallen. ZWEI Ereignistypen sind PRIORITAET und laufen am Cooldown vorbei,
+  // weil sie sich selbst von Natur aus nur ein einziges Mal pro Spiel ereignen koennen
+  // (kein Wiederholungsrisiko, also kein Grund, sie zu drosseln): der erste Blutzoll
+  // (ersteAusschaltung) und die spielentscheidende letzte Ausschaltung (entscheidend, nur
+  // ausserhalb TDM). Beide setzen den Cooldown trotzdem neu, damit nicht sofort danach noch
+  // ein zweites Ereignis durchrutscht. 12s bei einer 95s-Spielzeit ergibt rechnerisch
+  // hoechstens 8-9 Fenster, plus die beiden Prioritaets-Ausnahmen -- innerhalb des
+  // Zielbands, ueber mehrere Saaten nachgemessen (s. PR-Beschreibung).
+  const KAMPF_GROSS_COOLDOWN_SEK=12;
+  let letzterGrosserT=-Infinity;
+  function kampfGrossDrosseln(big,prioritaet){
+    if(!big)return false;
+    if(!prioritaet && (t-letzterGrosserT)<KAMPF_GROSS_COOLDOWN_SEK)return false;
+    letzterGrosserT=t;
+    return true;
+  }
+
+  // SZENE-DES-SPIELS-PRIORITAET (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3):
+  // die Recherche gibt "Clutch > Dreifach-K.o. > Lifesaver > Wende > Doppel-K.o. > First
+  // Blood" vor. Clutch und Lifesaver brauchen beide eine neue Sim-Zustandsverfolgung (wer
+  // stand VOR dem entscheidenden Treffer in Unterzahl; ein Heilschlag, der ein Ziel unter
+  // 20% Leben rettet) -- Klasse S, nicht Teil dieser Runde (s. PR-Beschreibung). Doppel-/
+  // Dreifach-K.o. fallen technisch beide auf dasselbe `mehrfachkill`-Flag (schalteAus() zaehlt
+  // nicht, WIEVIELE es waren, nur DASS der Angreifer innerhalb des Fensters schon einmal traf)
+  // -- eine Praezisierung waere Mehraufwand ohne neuen Erkenntniswert fuer eine Textzeile.
+  // Von den VIER tatsaechlich gemessenen Momentarten bleibt die Reihenfolge der Recherche
+  // erhalten (Mehrfachkill vor Wende vor First Blood); "entscheidend" (die spielbeendende
+  // letzte Ausschaltung ausserhalb TDM) steht an erster Stelle, weil sie das Spiel selbst
+  // entscheidet -- dramatischer als jede Momentart, die die Recherche kennt, aber in ihrer
+  // Tabelle fehlt, weil TDMs Respawn sie dort unmoeglich macht.
+  const KAMPF_KIND_PRIORITAET=["entscheidend","mehrfachkill","fuehrungswechsel","ersteAusschaltung"];
+  const kampfKoKind=(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung)=>
+    entscheidend?"entscheidend":mehrfachkill?"mehrfachkill":fuehrungswechsel?"fuehrungswechsel"
+      :ersteAusschaltung?"ersteAusschaltung":null;
+  // AUSWAHL SELBST (K5 Stufe 1): HIGHLIGHTS liegt bereits in Entstehungsreihenfolge vor
+  // (feed() haengt nur an, s. dort) -- "bei Gleichstand der fruehere" (Recherche, Abschnitt
+  // 3/K5) ist damit automatisch erfuellt: find() liefert je Prioritaetsstufe den ersten
+  // (also fruehesten) Treffer. Reiner Leser von HIGHLIGHTS/kind, kein rr(), kein neuer
+  // Zustand -- wird nur im Endstand aufgerufen (renderEndstand(), s.u.), nie im stummen Pfad.
+  function waehleSzeneDesSpiels(){
+    for(const kind of KAMPF_KIND_PRIORITAET){
+      const treffer=HIGHLIGHTS.find(h=>h.kind===kind);
+      if(treffer)return treffer;
+    }
+    return null;
+  }
+
+  function schalteAus(tg,von){
+    const scoreVonVorher=seitenScore(von.side), scoreTgVorher=seitenScore(tg.side);
+    tg.st.tode++; von.st.ko++; verteileKo(tg,von);
+    tg.down=true;
+
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+
+    // War die eigene Seite vor diesem Treffer im Rueckstand oder gleichauf, und fuehrt sie
+    // jetzt (oder zieht gleich)? Ein bereits fuehrendes Team, das den Vorsprung nur
+    // ausbaut, ist kein Wechsel und bleibt klein.
+    const fuehrungswechsel=scoreVonVorher<=scoreTgVorher && scoreVonVorher+1>scoreTgVorher;
+
+    // Derselbe Angreifer hat innerhalb des Fensters schon einmal ausgeschaltet.
+    const letzterKoT=von._letzterKoT;
+    von._letzterKoT=t;
+    const mehrfachkill=letzterKoT!=null && (t-letzterKoT)<=KAMPF_MEHRFACHKILL_FENSTER_SEK;
+
+    const entscheidend=disc!=="tdm" && live(tg.side).length===0;
+
+    // DROSSELUNG: ersteAusschaltung/entscheidend sind Prioritaet (je hoechstens einmal pro
+    // Spiel moeglich, s. kampfGrossDrosseln oben), fuehrungswechsel/mehrfachkill nicht --
+    // die koennen bei knappem Punktestand oder haeufigen Respawns beliebig oft auftreten.
+    const big=kampfGrossDrosseln(ersteAusschaltung||fuehrungswechsel||mehrfachkill||entscheidend,
+      ersteAusschaltung||entscheidend);
+    // KIND (K5, Broadcast-Optik-Recherche 27.09., Abschnitt 3/K5 Stufe 1 "Szene des
+    // Spiels"): welche der vier hier gemessenen Momentarten dieses EINE Ereignis traegt,
+    // nach genau der Prioritaet, die die Recherche fuer die Szenen-Auswahl vorgibt (Clutch/
+    // Lifesaver fehlen -- beide brauchen neue Sim-Zustandsverfolgung, Klasse S, nicht Teil
+    // dieser Runde). Reines Anzeige-Etikett fuer HIGHLIGHTS/waehleSzeneDesSpiels() unten --
+    // `big` selbst (ob ueberhaupt ein Banner/Highlight entsteht) bleibt unveraendert von
+    // kampfGrossDrosseln() bestimmt.
+    const kind=kampfKoKind(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung);
+
+    if(disc==="tdm"){
+      tg.downBis=t+TDM_RESPAWN_SEK;
+      // ARENA-ZEIT-FIX (27.09., main): der Respawn-TIMER bleibt `TDM_RESPAWN_SEK` in
+      // Simulationssekunden (downBis/reviveUnit oben, unveraendert) — nur die ANGEZEIGTE
+      // Zahl im Feed-Text war bislang derselbe rohe Wert. Bei ZEIT_DEHNUNG.tdm=1,88 erlebt
+      // der Zuschauer die 5 Sim-Sekunden als rund 9 echte Sekunden (dieselbe Skalierung wie
+      // die Kopfzeilen-Uhr/der Ticker-Zeitstempel, s. updateHud()/feed()), die Textzahl
+      // stand also glatt daneben.
+      //
+      // HIGHLIGHT-DROSSELUNG (dieser PR): `big` ist hier nicht mehr immer `true`, sondern
+      // das Ergebnis von kampfGrossDrosseln() oben (Prioritaets-Bypass fuer erste/
+      // spielentscheidende Ausschaltung, sonst spielweiter 12s-Mindestabstand). Orthogonal
+      // zur Zeitskalierung: eine aendert die angezeigte Sekundenzahl, die andere ob es ein
+      // Banner gibt.
+      const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind);
+    } else {
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind);
+    }
+  }
+
+  // GROSSER TREFFER STATT "HAT UEBERHAUPT EIN LABEL" (Opus-Ingame-Review, 27.09.): vorher war
+  // JEDER benannte Skill automatisch big, egal wie viel Schaden er machte — "Krolach —
+  // Trennschlag auf Greenkraut · 4" fuer vier Punkte war die eine Haelfte der gemessenen 46
+  // Callouts eines Spiels (die andere Haelfte war schalteAus() oben). GEMESSEN (Playwright,
+  // s. PR-Beschreibung): eine reine Prozentschwelle auf den Schaden allein reicht nicht — die
+  // Kampf-HP-Pools liegen bei 230-420, Einzelschlaege ueblicherweise bei 15-50, das ist so gut
+  // wie nie ein Viertel des Lebens. Der erste Versuch (`d>=0.25*max` oder `hp<=0.2*max` als
+  // reiner ZUSTAND) fing stattdessen etwas anderes ein: sobald ein Ziel einmal unter die
+  // Schwelle faellt, blieb JEDER weitere Chiphit auf es big, solange es nicht faellt oder
+  // geheilt wird — Fokusfeuer auf ein bereits angeschlagenes Ziel machte so aus einem
+  // einzigen Fast-Tod ein rundes Dutzend Callouts (19-23 statt der urspruenglich 4-10 im
+  // Zielband). Jetzt zaehlt nur der TREFFER, DER DIE SCHWELLE REISST — vorher drueber, jetzt
+  // drunter, aber noch nicht der Fall selbst (das meldet schalteAus() separat, mit seinen
+  // eigenen Kriterien) — dasselbe Uebergangs-Muster wie buehneWurdeFuehrend() oben. Der
+  // Burst-Zweig bleibt als Netz fuer echte Ausreisser (ein Schlag reisst ein Drittel des
+  // Lebens weg). Reiner Anzeige-Schwellwert — skillSchaden()/treffer()/d selbst bleiben
+  // unveraendert.
+  function grosserTreffer(hpVorher,hpNachher,d,max,crit){
+    if(crit)return true;
+    if(d>=0.35*max)return true;
+    const schwelle=0.15*max;
+    return hpVorher>schwelle && hpNachher>0 && hpNachher<=schwelle;
+  }
+
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
   // geschrieben, damit der Grundangriff und Paladin Slash nicht auseinanderlaufen.
   function nahschlag(u,tg,sk,mult,knock,label,sd){
@@ -21529,11 +26082,13 @@
     tg.lastHit=u;
     const crit=false;   // Krits kommen kuenftig aus dem Skill, nicht aus einem Spielerwert.
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
+    const hpVorher=tg.hp;
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
-    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
-    if(tg.hp===0&&!tg.down){tg.down=true;tg.st.tode++;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,tg.n));}
+    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
+      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false));
+    if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
   // EINE UHR FUER ALLE.
@@ -21761,6 +26316,16 @@
       KP.fortschritt=Math.min(1,KP.fortschritt+dt*staerke/KP.kapZeit);
       if(vorher<1&&KP.fortschritt>=1){
         KP.besitz=ziel;KP.fortschritt=0;KP.erobertVon=null;
+        // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09.): probeweise auch hier durch
+        // kampfGrossDrosseln() geschickt und ueber die fuenf echten Kader-Paarungen aus
+        // data/generated/kaderfamilie-live-save.json nachgemessen -- eine Kontrollpunkt-
+        // Eroberung wechselt in diesen Spielen so gut wie nie mehrfach die Seite (anders als
+        // TDMs Respawn, der JEDEN Kaempfer beliebig oft wieder ins Spiel bringt). Das Ergebnis
+        // war im Schnitt SCHLECHTER (3,4 statt 4,0 echte Highlights/Spiel) und drueckte den
+        // ohnehin knappsten Fall (ein frueher 150:0-Stomp mit kaum Kampfhandlung) von 2 auf 1
+        // -- die Drosselung nahm dort das einzige zweite Ereignis weg, ohne irgendwo eine
+        // Flut zu verhindern, die es gar nicht gab. Deshalb bleibt diese Zeile UNVERAENDERT
+        // gegenueber dem Ausgangs-PR: immer big, wie zuvor.
         feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true);
       }
     }
@@ -21780,6 +26345,33 @@
     if(KP.punkte[1]>=KP.punkteZumSieg&&KP.punkte[1]>KP.punkte[0])return 1;
     if(KP.punkte[0]===KP.punkte[1])return null;
     return KP.punkte[0]>KP.punkte[1]?0:1;
+  }
+  // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
+  // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
+  // `live(1).length` als Sieger-Vergleich: bei TDM UNTER RESPAWN ist "aktuell lebend" am
+  // Spielende nur noch eine Momentaufnahme, wer GERADE respawnt (s. Kommentar bei
+  // finish()) — das konnte der Ticker-Zeile aus finish() widersprechen, die schon vorher
+  // korrekt die Summe der Ausschaltungen (u.st.ko) nahm. Diese Funktion buendelt beide
+  // Faelle an einer Stelle:
+  //   - Battlefield/Domination (KP gesetzt): dominationSieger() -- Elimination, dann
+  //     Punktelimit, dann hoeherer Punktestand.
+  //   - TDM (Respawn): Summe der Ausschaltungen je Seite UEBER DAS GANZE SPIEL (u.st.ko).
+  //   - Alles andere (Mini-DM/klassische Einmal-Eliminierung ohne Respawn, s.
+  //     schalteAus/reviveUnit oben): "aktuell lebend" ist am Spielende weiterhin bitgleich
+  //     mit "Ausschaltungen" — die alte Regel bleibt hier unveraendert richtig.
+  // Reine Anzeigekorrektur: liest nur bereits berechnete u.st.ko/live(), aendert an
+  // wert()/stepSim()/rr()/beitragVon() nichts.
+  function kampfSieger(){
+    const dom=dominationSieger();
+    if(dom!==undefined)return dom;
+    if(disc==="tdm"){
+      const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
+      const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
+      return scoreL===scoreR?null:(scoreL>scoreR?0:1);
+    }
+    const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
+    const pL=nR-live(1).length, pR=nL-live(0).length;
+    return pL===pR?null:(pL>pR?0:1);
   }
 
   // ===================================================================================
@@ -22134,13 +26726,18 @@
       if(z){
         const crit=false;
         const roh=pf.roh*(crit?1.5:1);
+        const hpVorher=z.hp;
         const d=treffer(pf.von,z,roh,1);
         stossen(z,pf.x,pf.y,pf.knock);
         schwebe({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
+        // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
+        // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
+        // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
-          (fremd?" (danebengezielt)":"")+" · "+d,crit);
-        if(z.hp===0&&!z.down){z.down=true;z.st.tode++;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true,waehleCaption(CAPTION_KO,z.n));}
+          (fremd?" (danebengezielt)":"")+" · "+d,
+          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false));
+        if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
       }
@@ -22511,6 +27108,15 @@
   // Leine damit um etwa 90 Pixel.
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
+  // KAMPF_SUDDEN_DEATH_T — ausgelagert (ARENA-ZEIT-FIX, 27.09.) aus den beiden Stellen, die
+  // vorher je eine eigene rohe "50" trugen (der Schadens-/Tempozuschlag hier unten und die
+  // Phasenanzeige in updateHud()). Bleibt eine reine Simulationssekunden-Schwelle, an der
+  // Spiellogik aendert sich nichts — neu ist nur, dass das HTML-Label ".hpbars .sd" (vorher
+  // fest "Sudden Death 0:50") jetzt denselben Wert mit `zeitFaktor()` skaliert, um die fuer
+  // die jeweils gewaehlte Disziplin tatsaechliche Uhrzeit zu zeigen: TDM (Faktor 1,88) rund
+  // 1:34, Battlefield (Faktor 5,00) rund 4:10 — vorher stand ueberall dieselbe Zahl.
+  const KAMPF_SUDDEN_DEATH_T=50;
+
   function stepSim(dt){
     if(istFeldspiel(disc))return stepFeldspiel(dt);
     if(istBuehne(disc))return stepBuehne(dt);
@@ -22529,7 +27135,13 @@
       KFOKUS=null;
       if(gefallen)feed(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
     }
-    const sd=t>50?1+(t-50)*0.06:1;
+    // TDM-RESPAWN (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): VOR der Kontakt- und
+    // Zielwahl-Berechnung weiter unten, damit ein frisch respawnter Kaempfer noch im selben
+    // Bild mitspielt statt eine Zeitscheibe zu verpassen. `downBis` ist ausserhalb von TDM
+    // nie gesetzt (schalteAus setzt es nur dort) — die Schleife ist fuer Mini-DM/Battlefield
+    // deshalb ein no-op, ohne extra Disziplin-Abfrage noetig.
+    for(const u of U)if(u.down&&u.downBis!=null&&t>=u.downBis)reviveUnit(u);
+    const sd=t>KAMPF_SUDDEN_DEATH_T?1+(t-KAMPF_SUDDEN_DEATH_T)*0.06:1;
     // ENDSPIEL: sobald eine Seite hoechstens noch zwei Leute hat, ist Deckung halten
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
     // hilft niemandem — das war der Gegner, der am Ende nur herumstand.
@@ -22991,7 +27603,13 @@
       kpTick(dt);
       if(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)finish();
     }
-    if(lebendeSeiten.size<=1||t>95)finish();
+    // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): eine Seite, die gerade
+    // komplett auf Respawn wartet, ist NICHT ausgeschieden wie in Mini-DM/Battlefield,
+    // sondern kommt zurueck — "lebendeSeiten.size<=1" waere hier nur eine Momentaufnahme
+    // zwischen zwei Toden, kein Spielende. Chris, 26.09.: "es wird bis zum Ende von z.B.
+    // 6 Minuten gespielt" — TDM endet deshalb ausschliesslich ueber die Zeit, Mini-DM und
+    // Battlefield weiterhin zusaetzlich per vollstaendiger Ausloeschung.
+    if((disc!=="tdm"&&lebendeSeiten.size<=1)||t>95)finish();
     updateHud();
   }
 
@@ -23259,6 +27877,30 @@
   // Abschnitt noch nicht gelaufen hat, hat keine Leistung (null): erst der Aktive, dann die
   // Wartenden nach Bein — vorlaeufig, wie die Streckensortierung der anderen Bahnen.
   function bahnLeistung(u){ return u.etappenZeit==null?null:-(u.etappenZeit)+u.wechselKonto; }
+  // LAUFENDER ETAPPEN-RANG WAEHREND DES RENNENS (Chris, 22.09.: "bei der staffel am besten
+  // noch die ranks anzeigen fuer alle die schon gelaufen sind"). Bis hierher stand der Rang
+  // eines Laeufers NUR im Endstand-Overlay (renderEndstandBahn, Spalte "Rang") — waehrend
+  // des Rennens zeigte die Wertungstabelle fuer einen fertigen Laeufer bloss "uebergeben"
+  // und die Kaderkachel seinen (fuer ihn bedeutungslosen) Streckenanteil. Wer von den
+  // schon gelaufenen Etappen die schnellste war, sah man erst nach zweieinhalb Minuten.
+  //
+  // Der Rang ist der Index in bahnRangliste().reihe — DIESELBE Sortierung nach
+  // bahnLeistung(), die auch das Endstand-Overlay und MOTOREN.staffel.wert() lesen. Weil
+  // bahnRangliste alle Laeufer MIT Leistung vor alle ohne stellt, ist der Index eines
+  // gelaufenen Laeufers zugleich sein Rang unter allen bisher gelaufenen beider Seiten;
+  // `von` sagt, wie viele das gerade sind (waechst mit jeder Uebergabe, am Ende zwoelf).
+  // Der Rang eines Gelaufenen aendert sich nur noch, wenn ein WEITERER fertig wird und sich
+  // vor ihn schiebt — seine eigene Leistung ist mit der Uebergabe abgeschlossen (beide
+  // Wechsel, an denen er beteiligt ist, sind dann verbucht, s. wechselKonto in stepSpurt).
+  // Reine Anzeige, einmal je Render aufgerufen (Map statt zwoelf Einzelsuchen): liest
+  // nur, schreibt nichts, aendert weder Sortierung noch Punkte — rho bleibt identisch
+  // (nachgemessen, s. PR-Beschreibung).
+  function staffelEtappenRaenge(){
+    const raenge=new Map(); let von=0;
+    if(!BA().staffel)return {raenge,von};
+    bahnRangliste().reihe.forEach((u,i)=>{ if(bahnLeistung(u)!=null){raenge.set(u.id,i+1); von++;} });
+    return {raenge,von};
+  }
   // EIGENE LAUFZEIT statt Zieluhrzeit (Zeitfahren, K5-Umsetzung 07.09., Recherche
   // Abschnitt 4.2). `u.fertig` ist die absolute Rennuhr-Zeit; mit gestaffeltem Start
   // (`u.startT`) misst sie nicht mehr die Leistung, sondern auch, wann jemand losfuhr.
@@ -23360,6 +28002,68 @@
     }
     return best;
   }
+  // HOT SEAT (Broadcast-Optik-Recherche 27.09., Abschnitt 2.3 TT-2, Abschnitt 0.1 G-1):
+  // der Bestzeithalter unter den ECHT im Ziel angekommenen Fahrern -- keine Hochrechnung,
+  // das ist genau der Punkt (Inner Ring 2013, s. Dokument: "the single production idea of
+  // the last decade"). Reine Ableitung aus `bahnZeit()`/`u.fertig`, die die Wertung
+  // (bahnRangliste/MOTOREN["time-trial"].wert) ohnehin schon liest -- kein rr()-Aufruf,
+  // kein neues Feld in der Simulation.
+  function bahnHotSeat(){
+    let bester=null, beste=Infinity;
+    for(const u of LAEUFER){
+      if(u.fertig==null)continue;
+      const z=bahnZeit(u);
+      if(z<beste){beste=z;bester=u;}
+    }
+    return bester?{u:bester,zeit:beste}:null;
+  }
+  // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2, uebersetzt
+  // ins Zeitfahren"). Rekonstruiert, wo der Hot-Seat-Halter nach `te` Sekunden GEFAHRENER
+  // Zeit war -- stueckweise linear aus den Stuetzpunkten (0,0), (zz[0],ZZ1-Anteil),
+  // (zz[1],ZZ2-Anteil), (Zielzeit,1), also GENAU den Punkten, die `BA().zwischenzeiten`
+  // ohnehin als Streckenanteile fuehrt. Reiner Lesezugriff auf `hs.u.zz`/`hs.zeit`, die
+  // `stepSpurt` fuer das Panel laengst schreibt -- kein neues Feld, kein rr()-Aufruf.
+  // `te` ausserhalb [0,hs.zeit] wird gekappt: vor dem Start steht der Geist am Start, nach
+  // dessen Zieleinlauf am Ziel ("ohne einen ersten Finisher gibt es keinen Geist" gilt schon
+  // eine Ebene hoeher, s. Aufrufstelle in zeichneSpurt).
+  function bahnGeistPosition(hs,te){
+    const cps=BA().zwischenzeiten||[];
+    const pkt=[[0,0]];
+    cps.forEach((frac,ci)=>{ if(hs.u.zz&&hs.u.zz[ci]!=null)pkt.push([hs.u.zz[ci],frac]); });
+    pkt.push([hs.zeit,1]);
+    if(te<=pkt[0][0])return pkt[0][1];
+    for(let i=1;i<pkt.length;i++){
+      if(te<=pkt[i][0]){
+        const [t0,p0]=pkt[i-1],[t1,p1]=pkt[i];
+        const frac=(t1-t0)>0?(te-t0)/(t1-t0):0;
+        return p0+(p1-p0)*frac;
+      }
+    }
+    return 1;
+  }
+  // TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3, SMT-Vorbild "time to take the yellow
+  // jersey"). Reine Arithmetik aus genau den Feldern, die bahnTeamstand()s "zeit"-Zweig fuer
+  // die Hochrechnung ohnehin liest (u.fertig/bahnZeit/u.seite) -- eine eigene, rein lesende
+  // Kopie statt eines Rueckgabewerts an bahnTeamstand() selbst, damit die WERTUNGS-Funktion
+  // unangetastet bleibt. Nur `wertung:"zeit"` (Time-Trial) hat ueberhaupt eine Team-
+  // Zeitsumme, fuer die diese Ansage Sinn ergibt.
+  function bahnZeitFuerSieg(){
+    if(BA().wertung!=="zeit")return null;
+    const summe=[0,0], voll=[0,0], seitenZahl=[0,0];
+    for(const u of LAEUFER){
+      seitenZahl[u.seite]++;
+      if(u.fertig!=null){ summe[u.seite]+=bahnZeit(u); voll[u.seite]++; }
+    }
+    for(const s of [0,1]){
+      const g=1-s;
+      if(seitenZahl[s]>0 && seitenZahl[s]===voll[s] && voll[g]<seitenZahl[g]){
+        const nochOffen=seitenZahl[g]-voll[g];
+        const bedarf=(summe[s]-summe[g])/nochOffen;
+        return {seite:g,nochOffen,bedarf,chancenlos:bedarf<=0};
+      }
+    }
+    return null;
+  }
   // HOCHRECHNUNG FUER DEN, DER NOCH FAEHRT (Chris' Fund 13.09.). Der vorlaeufige Stand
   // sortierte die noch Laufenden nach `b.pos-a.pos`, also nach ROHER STRECKE. Bei einem
   // Massenstart ist das richtig — dort sind alle gleich lange unterwegs, mehr Strecke
@@ -23414,6 +28118,12 @@
         if(ha!==hb)return ha-hb;
         return b.pos-a.pos;                       // beide noch auf der Rampe: Startfolge
       }
+      // HOECHSTMARKE STATT AKTUELLER POSITION, NUR CLIMBING (Gegencheck 3.3, Aenderung 1):
+      // ein Abrutschen (A-2) senkt `u.pos`, nie `u.hoch` — der hoechste kontrollierte Griff
+      // zaehlt, wie im echten Lead (IFSC §9.1). Jede andere Bahn hat `u.hoch===u.pos`
+      // (monoton steigend, kein Abrutschen), die Gate haelt den Vergleich trotzdem explizit
+      // getrennt, statt sich auf diese Gleichheit zu verlassen.
+      if(BA().climbing)return (b.hoch??b.pos)-(a.hoch??a.pos);
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
@@ -23421,6 +28131,57 @@
     return {reihe,punkte,seiten};
   }
   let bahnEndeGemeldet=false;
+  // FUEHRUNGSWECHSEL (Broadcast-Praesentation Runde 2, Vorschlag 1, 22.09./26.09.): das
+  // Ereignis, das laut Konzept "jede Rennuebertragung als erstes zeigt" und das der Ticker
+  // bisher gar nicht kannte. Merkt sich nur die ID des zuletzt gemeldeten Fuehrenden --
+  // updateHudBahn() vergleicht sie jeden Frame gegen bahnRangliste().reihe[0] (dieselbe
+  // Rangliste wie HUD/Endstand) und meldet nur den WECHSEL, nie den Dauerzustand.
+  let bahnFuehrenderId=null, bahnFuehrenderSeit=-999;
+  // STAFFEL FUEHRT EIGENE FUEHRUNGS-QUELLE (Bugfix 27.09., s. broadcast-optik-bahn-27-09.md
+  // Abschnitt 0.1): `bahnRangliste()` sortiert die Staffel nach `bahnLeistung` (der
+  // ETAPPENZEIT), das ist "wer laeuft gerade am schnellsten", nicht "wer fuehrt insgesamt" —
+  // und stand im Widerspruch zu `#bhDelta`, das denselben Moment aus `staffelZeitDelta()`
+  // zeigt (dem kumulierten Zeitrueckstand, s. dort). Eigene Seiten-Variable statt
+  // `bahnFuehrenderId`, weil die Staffel-Fuehrung ein TEAM ist, keine Person.
+  let staffelFuehrendeSeite=null;
+  // HOT SEAT (Broadcast-Optik-Recherche 27.09., TT-2/G-1 fuer Time-Trial, Abschnitt 0.1/2.3):
+  // dieselbe Merk-ID-Idee wie `bahnFuehrenderId` oben, aber eine eigene Variable, weil der
+  // Hot Seat NUR aus echten Zielzeiten entsteht (bahnHotSeat(), s. dort) und nie aus der
+  // Hochrechnung, die `bahnFuehrenderId` fuer Spurt/Climbing weiter nutzt.
+  let bahnHotSeatId=null;
+  // TT-1: ZWISCHENZEIT-TAFELN (Abschnitt 2.3). Haelt fest, welche "Laeufer|Checkpoint"-Paare
+  // schon eine Tafel bekommen haben, damit `updateHudBahn()` jeden ZZ-Durchgang genau einmal
+  // meldet. Liest nur `u.zz[]`, das `stepSpurt` fuer eine andere Anzeige (Panel, Ticker-
+  // Bestand) ohnehin schon fuehrt -- diese Anzeige schreibt nichts in den Sim-Schritt zurueck.
+  let bahnZzGemeldet=new Set();
+  // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). Haelt fest, welche Fallen-Indizes ihren
+  // Namensschild-Einblender schon hatten (einmal je Falle, ausgeloest vom ERSTEN Laeufer,
+  // der sie erreicht) und die aktuell laufende Einblendung ({i, bis}).
+  let bahnFalleGemeldet=new Set(), bahnFalleAnzeige=null;
+  // ST-2: STAND NACH JEDEM WECHSEL (Abschnitt 4.3). `staffelAktivVorher[seite]` merkt sich
+  // die ID des zuletzt aktiven Laeufers je Seite -- genau das Muster, das `#bahnHud` fuer
+  // "aktueller Laeufer" ohnehin jeden Frame abfragt (s. dort) --, damit `updateHudBahn()`
+  // einen Beinwechsel am Wechsel dieser ID erkennt. `staffelWechselAnzeige` ist die aktuell
+  // laufende Tafel an der Wechselzone.
+  let staffelAktivVorher=[null,null], staffelWechselAnzeige=null;
+  // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3). Ringpuffer aus
+  // {t (echte Sekunden), delta, seite} -- ein Punkt je Frame, in updateHudBahn() gefuellt,
+  // von bauSpurt() geleert. Reine Anzeige: liest nur staffelZeitDelta(), das die Simulation
+  // ohnehin schon fuer #bhDelta berechnet, schreibt nichts zurueck.
+  let staffelVerlauf=[];
+  // Dieselben Zeitpunkte, an denen IRGENDEIN Wechsel stattfand (beide Seiten gemeinsam) --
+  // fuer die "Beingrenzen"-Striche im Verlauf. Ein Team-Ergebnis-Graph hat nur eine
+  // Zeitachse, die beiden Seiten wechseln aber zu unterschiedlichen Realzeiten; die
+  // Striche markieren deshalb JEDEN Wechsel, nicht "Bein n beider Seiten gleichzeitig".
+  let staffelBeinMarken=[];
+  // ST-5: ANKER-EINBLENDUNG (Abschnitt 4.3), je Seite hoechstens einmal pro Rennen --
+  // ausgeloest, sobald der neu aktive Laeufer dieser Seite das letzte Bein laeuft.
+  let staffelAnkerGezeigt=[false,false];
+  // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, Klasse A*: die drei Zaehler werden in
+  // stepSpurt an den bestehenden sauber/durchbruch/sturz-Ausgaengen mitgezaehlt, s. dort).
+  // Ein Eintrag je Hindernis-Index, {sauber,durch,sturz} -- reiner Anzeige-Zaehler, den
+  // weder tempoVon() noch rr() noch wert() je lesen.
+  let spurtStationStats=[];
 
   // TEAMSTAND DER BAHN, GENERISCH. Time-Trial/Spurt/Climbing tragen `wertung:"rang"` und
   // liefern Rangpunkte (bahnRangliste); Staffel traegt "etappe", Takeshi's Castle "burg"
@@ -23441,6 +28202,76 @@
     if(BA().wertung==="rang"){
       const w=bahnRangliste();
       return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
+    }
+    // TIME-TRIAL (22.09.): ZWEI Groessen, GENAU WIE BEI DER STAFFEL bewusst nicht eine
+    // (s. "etappe"-Kommentar direkt darunter fuer dasselbe Prinzip). Chris woertlich: "da
+    // werden wie bei tour de france oder so die zeiten aller im team addiert und das team
+    // hat dann gewonnen" — das TEAM-Ergebnis (`seiten`) ist die Summe der individuellen
+    // Zielzeiten, kleinste Summe gewinnt. Die PUNKTE JE LAEUFER bleiben unangetastet
+    // `bahnRangliste().punkte` (dieselbe Rangpunkte-Groesse wie bei "rang" oben, s.
+    // BAHN_ART["time-trial"].wertung-Kommentar) — daran haengt die Rangtreue-Messung, hier
+    // nur gelesen, nie veraendert.
+    //
+    // GEZAEHLT WIRD `bahnZeit(u)`, NICHT DER ROHE `u.fertig`-Zeitstempel. Time-Trial startet
+    // gestaffelt (`startAbstand`, s. dort) und die Startreihenfolge wechselt zwischen den
+    // Seiten (`idx*2+seite`, s. Kommentar bei `baueEinheit`/"STARTFOLGE JETZT IM WECHSEL") —
+    // bei sechs Laeufern je Seite bekaeme dadurch die zweite Seite systematisch
+    // 6*startAbstand=4,8 Sim-Sekunden MEHR Rampenzeit in eine rohe `u.fertig`-Summe
+    // eingerechnet als die erste, ein konstanter Buchhaltungs-Unterschied, keine echte
+    // Leistung — GENAU der Fehler, den `bahnRangliste()` fuer den Einzelvergleich schon
+    // vermeidet (s. deren Kommentar "38:40 nach 1:26", derselbe Rampen-Bias). `bahnZeit(u) =
+    // u.fertig-u.startT` zieht den individuellen Rampen-Offset ab und liefert die echte
+    // GEFAHRENE Zeit je Laeufer — exakt die Zahl, die eine Tour-de-France-Zeittabelle fuehrt
+    // (der Fahrer, der zuletzt von der Rampe rollt, bekommt keinen Nachteil dafuer).
+    //
+    // WAEHREND DES RENNENS EINE HOCHGERECHNETE FUEHRUNG, GENAU DIESELBE LEHRE WIE BEI DER
+    // STAFFEL (Chris 13.09.: "und dadurch dass es immer 0-0 steht weiss man aktuell gar
+    // nicht wer fuehrt", s. "etappe"-Kommentar oben): eine Team-Zeitsumme braucht
+    // eigentlich ALLE echten Zielzeiten — ohne eine Zwischenschaetzung stuende `seiten`
+    // hier ueber die GESAMTE Renndauer bei [0,0] und spraenge erst am Ziel auf das
+    // Endergebnis (nachgemessen mit scripts/probe-zeitfahren-anzeige.mjs VOR dieser
+    // Ergaenzung: 99 % der Messpunkte auf dem allerersten Wert, exakt das Bild, das die
+    // Staffel schon einmal gezeigt hat). Deshalb wird ein noch nicht fertiger Laeufer nicht
+    // einfach uebersprungen, sondern ueber `bahnHochrechnung(u)` — dieselbe Projektion,
+    // die `bahnRangliste()` fuer den Zwischenstand bei gestaffeltem Start schon nutzt
+    // ((rennT-startT)/pos, auf 1.0 hochgerechnet) — durch eine GESCHAETZTE Zielzeit
+    // ersetzt. Ein Laeufer noch auf der Rampe (`startT>rennT`) oder mit `pos<=0` liefert
+    // keine sinnvolle Schaetzung (Division potenziell durch 0/negativ) und laesst die
+    // Summe seiner Seite bewusst unvollstaendig — die Fuehrung erscheint dann erst, sobald
+    // JEDER Laeufer beider Seiten entweder faehrt oder im Ziel ist, nie aus einem
+    // Teilfeld. `gewertet` bleibt bis zum ECHTEN Zieleinlauf aller false: die Hochrechnung
+    // darf die Anzeige fuellen, aber nicht die Schluss-Phrase ("X gewinnt") vorwegnehmen.
+    if(BA().wertung==="zeit"){
+      const w=bahnRangliste();
+      const alleFertig=LAEUFER.length>0 && LAEUFER.every(u=>u.fertig!=null);
+      const geschaetzteZeit=(u)=>{
+        if(u.fertig!=null)return bahnZeit(u);
+        if((u.startT||0)>rennT||u.pos<=0)return null;
+        const h=bahnHochrechnung(u);
+        return isFinite(h)?h:null;
+      };
+      const summe=[0,0], voll=[0,0], seitenZahl=[0,0];
+      for(const u of LAEUFER){
+        seitenZahl[u.seite]++;
+        const z=geschaetzteZeit(u);
+        if(z==null)continue;
+        summe[u.seite]+=z; voll[u.seite]++;
+      }
+      const beideVollstaendig=seitenZahl[0]>0&&seitenZahl[1]>0
+        &&voll[0]===seitenZahl[0]&&voll[1]===seitenZahl[1];
+      const seiten=[0,0];
+      let zusatz=null;
+      if(beideVollstaendig){
+        if(summe[0]<summe[1])seiten[0]=1;
+        else if(summe[1]<summe[0])seiten[1]=1;
+        // Gleichstand bleibt [0,0] -- Unentschieden, dieselbe Regel wie beim frueheren
+        // Rangpunkte-Gleichstand (s. BAHN_ART["time-trial"].wertung-Kommentar) — gilt hier
+        // nur im ECHTEN Endstand (`alleFertig`), ein Hochrechnungs-Gleichstand waehrend des
+        // Rennens ist reiner Zufall zweier Schaetzungen und keine Aussage.
+        zusatz=fmtDauer(summe[0])+" gegen "+fmtDauer(summe[1]);
+      }
+      return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
+        punkte:w.punkte, gewertet:alleFertig, zusatz};
     }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
@@ -23519,7 +28350,12 @@
           return bonus>0 ? f1(stern+bonus)+" ("+f1(stern)+" Sterne + "+f1(bonus)+" Ziel)" : f1(stern+bonus);
         }};
     }
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09. (Opus-Review desselben Tages): `rennFertig` nimmt Ausgeschiedene beim
+    // Ausscheiden genauso auf wie echte Finisher beim Zieleinlauf (s. Kommentar an
+    // zielbonus() oben, ":26174", "Ausgeschiedene stehen zwar auch darin, zaehlen aber
+    // nicht mit"). "N im Ziel" zaehlte bisher ALLE Eintraege, also auch Ausgeschiedene —
+    // dieselbe `!x.raus`-Filterung wie dort und bei bahnRangliste() (":28393").
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
@@ -23544,9 +28380,188 @@
     // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
     // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
     // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
-    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    // BUGFIX 27.09.: dasselbe `!x.raus`-Fehlen wie bei bahnTeamstand()s `imZiel` oben
+    // (":25225") — ohne den Filter zaehlte die Kopfzeile Ausgeschiedene mit.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
+    // FUEHRUNGSWECHSEL (Broadcast Runde 2, Vorschlag 1, 26.09.). Chris: "so live tv artige
+    // displays wie das bei rennen auch mal dargestellt wird" -- das Ereignis, das jede
+    // Rennuebertragung als erstes zeigt und das der Ticker bisher gar nicht kannte.
+    // `bahnRangliste()` ist dieselbe Rangliste, die HUD/Endstand/Kaderkacheln lesen: kein
+    // neuer Vergleich. Ein 2-Sekunden-Cooldown verhindert, dass zwei fast gleich schnelle
+    // Laeufer die Meldung zum Flackerprotokoll machen -- die Meldung selbst bleibt
+    // unveraendert, nur ihre Haeufigkeit wird gedaempft (dieselbe Absicht wie Regel 8,
+    // Abschnitt 2 des Konzepts).
+    // BUGFIX 27.09. (broadcast-optik-bahn-27-09.md Abschnitt 0.1, reine Anzeige, keine
+    // Wertungsaenderung): Staffel und Takeshi's Castle bekommen HIER eine je eigene
+    // Fuehrungs-Quelle statt der gemeinsamen `bahnRangliste().reihe[0]`-Heuristik unten.
+    // Jede Bahn bleibt fuer sich, keine gemeinsame Ersatzformel fuer beide.
+    if(!done){
+      if(BA().staffel){
+        // STAFFEL: `bahnRangliste()` sortiert nach `bahnLeistung` (Etappenzeit) — das ist
+        // die schnellste AKTUELLE Etappe, nicht das insgesamt fuehrende Team, und konnte
+        // deshalb dem `#bhDelta`-Feld direkt darunter widersprechen, das denselben Moment
+        // aus `staffelZeitDelta()` zeigt. Fuehrung kommt jetzt aus genau dieser Funktion —
+        // demselben kumulierten Zeitrueckstand, den `#bhDelta` ohnehin anzeigt.
+        const d=staffelZeitDelta();
+        if(!d.unklar){
+          if(staffelFuehrendeSeite==null){ staffelFuehrendeSeite=d.seite; }
+          else if(d.seite!==staffelFuehrendeSeite && (rennT-bahnFuehrenderSeit)>2){
+            staffelFuehrendeSeite=d.seite; bahnFuehrenderSeit=rennT;
+            feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true);
+          }
+        }
+        // ST-4: FUEHRUNGSVERLAUF (Abschnitt 4.3). Ein Punkt je Frame, exakt wie im Konzept
+        // vorgeschlagen ("ein Anzeige-Puffer [rennT, delta, seite], je Frame in
+        // updateHudBahn gefuellt") -- dieselbe Groesse, die #bhDelta darunter ohnehin zeigt,
+        // hier nur zusaetzlich gesammelt. Kein Deckel: ein Rennen dauert Sekunden, kein
+        // Speicherproblem, und bauSpurt() leert den Puffer vor jedem neuen Rennen.
+        staffelVerlauf.push({t:rennT*zeitFaktor(), delta:d.unklar?0:d.delta, seite:d.unklar?null:d.seite});
+        // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3,
+        // "das Gegenstueck zu TT-1"). Ein Beinwechsel wird daran erkannt, dass sich der
+        // AKTIVE Laeufer einer Seite aendert -- dasselbe Muster, das `#bahnHud` fuer
+        // "aktueller Laeufer" ohnehin jeden Frame abfragt (aktivU, s. dort). Reiner
+        // Lesezugriff auf u.aktiv/u.bein/wechselKonto, die `stepSpurt` fuer die Simulation
+        // laengst fuehrt -- diese Anzeige schreibt nichts in den Sim-Schritt zurueck.
+        for(const seite of [0,1]){
+          const akt=LAEUFER.find(o=>o.seite===seite&&o.aktiv);
+          const aktId=akt?akt.id:null;
+          if(staffelAktivVorher[seite]!=null && aktId!==staffelAktivVorher[seite]){
+            const alt=LAEUFER.find(o=>o.id===staffelAktivVorher[seite]);
+            if(alt){
+              // WECHSELQUALITAET AUS `wechselKonto` DES ANNEHMENDEN (nicht des Gebenden):
+              // jeder Laeufer wird hoechstens einmal aktiv, indem er den Stab ANNIMMT (der
+              // Startlaeufer ist von Anfang an aktiv, ohne je zu uebernehmen) -- `akt`
+              // ist also gerade FRISCH aktiv geworden und sein `wechselKonto` traegt exakt
+              // die Haelfte des Verlusts DIESES einen Wechsels, keine spaetere Ueberlagerung
+              // (s. stepSpurt "u.wechselKonto-=verlust/2; naechster.wechselKonto-=verlust/2").
+              const verlust=akt?Math.max(0,-2*akt.wechselKonto):null;
+              staffelWechselAnzeige={
+                seite, bein:(alt.bein??0)+1,
+                fSeite:d.unklar?null:d.seite, fDelta:d.unklar?null:d.delta,
+                verlust, verpatzt:verlust!=null&&verlust>WECHSEL_MAX,
+                bis:rennT+3/zeitFaktor()
+              };
+              // ST-4: "Beingrenzen"-Strich fuer den Verlauf -- jeder echte Wechsel, egal auf
+              // welcher Seite, markiert einen Knick in der Kurve.
+              staffelBeinMarken.push(rennT*zeitFaktor());
+              // ST-5: ANKER-EINBLENDUNG (Abschnitt 4.3). Der neu aktive Laeufer laeuft das
+              // LETZTE Bein (0-indiziert, jeSeite-1) -- einmal je Seite ein Lower Third mit
+              // ihm, seinem Gegenueber und dem aktuellen Rueckstand. Ueber callout() DIREKT,
+              // nicht ueber feed()/big ("nicht fett im Ticker", Abschnitt 4.3) -- reiner
+              // Lesezugriff auf Felder, die #bahnHud ohnehin schon zeigt.
+              if(!staffelAnkerGezeigt[seite] && akt.bein===(BA().jeSeite||6)-1){
+                staffelAnkerGezeigt[seite]=true;
+                const gegner=LAEUFER.find(o=>o.seite===1-seite&&o.aktiv);
+                let lage="";
+                if(!d.unklar&&d.delta>0.005)lage=d.seite===seite
+                  ?(" · Vorsprung "+fmtDauer(d.delta)):(" · Rückstand "+fmtDauer(d.delta));
+                callout("SCHLUSSLÄUFER · "+akt.n+" (Eig "+Math.round(akt.eig)+")"
+                  +(gegner?" gegen "+gegner.n+" (Eig "+Math.round(gegner.eig)+")":"")+lage);
+              }
+            }
+          }
+          staffelAktivVorher[seite]=aktId;
+        }
+      } else if(BA().takeshi){
+        // TAKESHI'S CASTLE: `bahnRangliste()` sortiert jeden mit gesetztem `u.fertig` nach
+        // vorn — auch Ausgeschiedene, die `u.fertig=90+...` bekommen (Nerven-Zweig in
+        // stepSpurt). Scheidet jemand vor dem ersten Zieleinlauf aus, konnte der Ticker so
+        // faelschlich "X uebernimmt die Fuehrung" direkt nach "X scheidet aus" melden.
+        // Fuehrung kommt jetzt aus den echten Burgpunkten (`burgwertung()`, dieselbe Zahl,
+        // die MOTOREN["takeshis-castle"].wert() vergibt), unabhaengig von `fertig`.
+        let fuehrer=null,beste=-Infinity;
+        for(const u of LAEUFER){ const w=burgwertung(u); if(w>beste){beste=w;fuehrer=u;} }
+        if(fuehrer){
+          if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
+          else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
+            bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+          }
+        }
+        // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). Sobald (mindestens) ein Laeufer eine
+        // Falle abgeschlossen hat -- `u.fallen.length` waechst genau dann um eins, s.
+        // stepSpurt "u.fallen=u.fallen||[]; u.fallen.push(...)" --, zeigt bodenTakeshiRoute()
+        // 2,5 echte Sekunden lang ihren Namen, ihre Sternezahl und ihren Primaerweg-Sub-
+        // Skill (die Verbindung von Matrix-Eignung zu Bild, CLAUDE.md). Je Falle hoechstens
+        // einmal, ausgeloest vom ERSTEN Laeufer -- reiner Lesezugriff auf `u.fallen`, das
+        // `stepSpurt` fuer `burgpunkte()` ohnehin fuehrt.
+        if(bahnFalleAnzeige==null||rennT>=bahnFalleAnzeige.bis){
+          const N=(BA().hindernisse||[]).length;
+          for(let i=0;i<N;i++){
+            if(bahnFalleGemeldet.has(i))continue;
+            if(LAEUFER.some(u=>u.fallen&&u.fallen.length>i)){
+              bahnFalleGemeldet.add(i);
+              bahnFalleAnzeige={i,bis:rennT+2.5/zeitFaktor()};
+              break;
+            }
+          }
+        }
+      } else if(BA().startAbstand){
+        // TIME-TRIAL: G-1s dritter, schwaecherer Fall (Abschnitt 0.1). Die alte Quelle war
+        // `bahnRangliste()`, und die sortiert einen noch Fahrenden nach der HOCHRECHNUNG
+        // (`bahnHochrechnung`, s. dort) -- ein Fahrer "uebernimmt die Fuehrung" schon nach
+        // wenigen Prozent der Strecke. "So spricht keine Zeitfahr-Uebertragung" (Dokument,
+        // Abschnitt 0.1). Fuehrung kommt jetzt aus dem HOT SEAT (TT-2): nur ECHTE
+        // Zielzeiten zaehlen, kein Cooldown noetig, weil ein Hot-Seat-Wechsel ohnehin nur
+        // bei einer neuen Bestzeit stattfindet.
+        const hs=bahnHotSeat();
+        if(hs){
+          if(bahnHotSeatId==null){ bahnHotSeatId=hs.u.id; }
+          else if(hs.u.id!==bahnHotSeatId){
+            const alt=LAEUFER.find(x=>x.id===bahnHotSeatId);
+            const diff=alt?bahnZeit(alt)-hs.zeit:null;
+            bahnHotSeatId=hs.u.id;
+            feed(hs.u.seite,hs.u.n+" verdrängt "+(alt?alt.n:"?")+" vom Hot Seat"+
+              (diff!=null&&diff>0?" — −"+fmtDauer(diff):"")+".",true);
+          }
+        }
+      } else {
+        const fuehrer=bahnRangliste().reihe[0];
+        if(fuehrer){
+          if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
+          else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
+            bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+          }
+        }
+      }
+    }
+    // TT-1: ZWISCHENZEIT-TAFELN (Abschnitt 2.3). Ueberfaehrt ein Fahrer eine Zwischenzeit,
+    // bekommt er ab dem naechsten Frame fuer 3 echte Sekunden eine Tafel ueber dem Kopf
+    // (s. zeichneSpurt, `u.vizZzFlash`) und eine Ticker-Zeile -- fett nur bei neuer
+    // Bestzeit an diesem Punkt (Highlight-Dosis, Abschnitt 8). Reiner Lesezugriff auf
+    // `u.zz[]`, das `stepSpurt` fuer das Zeitfahren-Panel ohnehin schreibt
+    // ("if(BA().zwischenzeiten)", s. dort); diese Anzeige schreibt nichts in den Sim-
+    // Schritt zurueck, nur das rein kosmetische `u.vizZzFlash`-Feld auf demselben Objekt.
+    if(BA().zwischenzeiten){
+      BA().zwischenzeiten.forEach((cp,ci)=>{
+        for(const u of LAEUFER){
+          if(!(u.zz&&u.zz[ci]!=null))continue;
+          const key=u.id+"|"+ci;
+          if(bahnZzGemeldet.has(key))continue;
+          bahnZzGemeldet.add(key);
+          // "VOR DEM UEBERFAHREN" (Abschnitt 2.3): Vergleich mit der Bestzeit ALLER
+          // ANDEREN an diesem Punkt -- bahnBesteZeit(ci) selbst wuerde den eigenen, gerade
+          // erst gesetzten Wert mitzaehlen.
+          let bestVorher=null,rang=1;
+          for(const o of LAEUFER){
+            if(o===u)continue;
+            const v=o.zz&&o.zz[ci];
+            if(v==null)continue;
+            if(bestVorher==null||v<bestVorher)bestVorher=v;
+            if(v<u.zz[ci])rang++;
+          }
+          const neueBest=bestVorher==null||u.zz[ci]<bestVorher;
+          const delta=bestVorher==null?0:u.zz[ci]-bestVorher;
+          u.vizZzFlash={ci,rang,neueBest,delta,bis:rennT+3/zeitFaktor()};
+          feed(u.seite,u.n+" an ZZ"+(ci+1)+": "+(neueBest?"Bestzeit":(rang+"."))+
+            (bestVorher!=null?" · "+(neueBest?"−":"+")+fmtDauer(Math.abs(delta)):""),
+            neueBest);
+        }
+      });
+    }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
@@ -23575,13 +28590,27 @@
         ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
           +pL+":"+pR+" "+stand.suffix
         : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
-          +" (fuer diese Disziplin gibt es noch keine Wertung)",true,
+          +" (für diese Disziplin gibt es noch keine Wertung)",true,
         siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
-    const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
-      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
+    //
+    // BUGFIX 27.09. (Opus-Review desselben Tages, Staffel-Fortschrittsbalken): bei der
+    // Staffel laufen nie alle sechs zugleich — die fuenf, die gerade nicht dran sind,
+    // stehen fest auf ihrem Uebergabepunkt (`u.pos=u.beinBis`, s. stepSpurt ":30488").
+    // Der reine Durchschnitt aus allen sechs `u.pos` zog den Balken darum weit unter den
+    // echten Streckenanteil (z. B. 21/36 = 58 % statt tatsaechlich fertig). `u.pos` ist
+    // bei der Staffel bereits die Gesamtstrecke ueber ALLE Beine (0..1, je Bein-Grenzen
+    // `beinVon`/`beinBis`) — `gesamtfortschritt()` (":29697", schon fuer staffelZeitDelta()
+    // im Broadcast-HUD genutzt) liest genau diese Zahl vom aktiven Laeufer, oder 1, sobald
+    // das Team im Ziel ist. Fuer jede andere Bahn (kein `BA().staffel`) bleibt der alte
+    // Sechs-Durchschnitt (bei ihnen laufen ohnehin alle gleichzeitig) unveraendert.
+    const schnitt=(s)=>{
+      if(BA().staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
     document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
     document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     // BROADCAST-HUD DER STAFFEL (Recherche-Dokument Abschnitt 4): aktueller und
@@ -23617,25 +28646,36 @@
           deltaEl.classList.remove("bh-home","bh-away");
           const balken=(anteil,klasse)=>'<span class="bhbar"><i class="'+klasse
             +'" style="width:'+Math.round(Math.max(3,Math.min(100,anteil*100)))+'%"></i></span>';
+          // ST-3: BEIN-/RUNDENZEILE (Abschnitt 4.3, "Bein 4/6 · Runde 2/3"). Runde 2
+          // (Vorschlag 3) warnte ausdruecklich vor einer dritten HUD-Zeile JE SEITE --
+          // deshalb hier im mittleren Delta-Feld statt in .bhside. Fuehrender Fortschritt
+          // (welche Seite weiter ist) bestimmt, wessen Bein gezaehlt wird; nach Zieleinlauf
+          // einer Seite bleibt ihr letztes Bein stehen (gesamtfortschritt()==1).
+          const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
+          const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
+          const beinN=BA().jeSeite||6, jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
+          const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
+          const beinZeile='<small class="bhbein">Bein '+beinNr+'/'+beinN+' · Runde '
+            +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
             // (bahnTeamstand().zusatz, "2:34.2 gegen 2:19.8") — dieselbe Messung,
             // hier nur final statt interpoliert. Keine zwei Wahrheiten.
             const sieger=stand.seiten[0]>stand.seiten[1]?0:stand.seiten[1]>stand.seiten[0]?1:null;
             deltaEl.innerHTML='<b>'+(sieger==null?"Ziel":(VEREIN[sieger].name+" gewinnt"))+'</b>'
-              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>';
+              +'<span class="bhsub">'+(stand.zusatz||"—")+'</span>'+beinZeile;
             if(sieger!=null)deltaEl.classList.add(sieger===0?"bh-home":"bh-away");
           } else {
             const d=staffelZeitDelta();
             if(d.unklar||d.delta<=0){
-              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>';
+              deltaEl.innerHTML='<b>Kopf an Kopf</b><span class="bhsub">noch kein Abstand</span>'+beinZeile;
             } else {
               // Balkenlaenge relativ zu 5 realen Sekunden: darueber ist es ohnehin eine
               // klare Fuehrung, darunter macht jede Zehntelsekunde noch sichtbar etwas aus.
               const real=bahnRealSek(d.delta);
               deltaEl.innerHTML='<b>'+(d.seite===0?VEREIN[0].name:VEREIN[1].name)+' führt</b>'
                 +'<span class="bhsub">+'+bahnZeitText(real)+'</span>'
-                +balken(real/5,d.seite===0?"bh-home":"bh-away");
+                +balken(real/5,d.seite===0?"bh-home":"bh-away")+beinZeile;
               deltaEl.classList.add(d.seite===0?"bh-home":"bh-away");
             }
           }
@@ -23651,17 +28691,31 @@
   function updateHud(){
     // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
     // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
-    document.getElementById("clock").textContent="0:"+String(Math.floor(t*zeitFaktor())).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
+    // MINUTENUMBRUCH (TDM-HUD-Fix, 27.09.): vorher immer "0:"+Sekunden ohne Ueberlauf —
+    // TDM laeuft seit dem Respawn-Umbau regulaer bis t>95, bei ZEIT_DEHNUNG.tdm 1,88 stand
+    // hier "0:178", bei Battlefield (Faktor 5,00) bis "0:475". Dieselbe m:ss-Umrechnung,
+    // die feed() fuer den Ticker-Zeitstempel schon nutzt.
+    const klSek=Math.floor(t*zeitFaktor());
+    document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
     // ohne Neuladen, also blieb z.B. "Basketball — Live-Spielstand" auch nach dem Zurueck-
-    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen —
-    // dieselbe dataset.origHtml-Vorlage wie in den anderen drei Updatern, hier aber als
-    // Rueckwaerts-Wiederherstellung statt als Ersetzung.
+    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen.
+    //
+    // ARENA-ZEIT-FIX (27.09.): vorher wurde hier ein einmal zwischengespeicherter Text
+    // ("Sudden Death 0:50" aus dem HTML) unveraendert zurueckgeschrieben — bei ZEIT_DEHNUNG
+    // tdm=1,88/battlefield=5,00 begann Sudden Death auf der echten Uhr aber bei rund 1:34
+    // bzw. 4:10, nie bei 0:50. Jetzt wird die Zahl bei jedem Aufruf neu aus
+    // KAMPF_SUDDEN_DEATH_T*zeitFaktor() gebaut, mit derselben m:ss-Umrechnung wie #clock
+    // zwei Zeilen darueber — fuer die gerade gewaehlte Kampf-Disziplin immer richtig, auch
+    // nach einem Disziplin-Wechsel.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd){ if(sd.dataset.orig===undefined)sd.dataset.orig=sd.textContent; sd.textContent=sd.dataset.orig; }
+    if(sd){
+      const sdSek=Math.round(KAMPF_SUDDEN_DEATH_T*zeitFaktor());
+      sd.textContent="Sudden Death "+Math.floor(sdSek/60)+":"+String(sdSek%60).padStart(2,"0");
+    }
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml;});
@@ -23669,17 +28723,42 @@
     // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
     // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
     // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
-    // BATTLEFIELD-DOMINATION: die grosse Score-Zahl zeigt Kontrollpunkt-Punkte statt
-    // Ausschaltungen, weil DAS jetzt der Sieg-Weg ist, den t/95s bzw. das Punktelimit
-    // auswerten (s. kpTick/dominationSieger) — aliveL/aliveR bleiben unveraendert die
-    // Ueberlebendenzahl, die weiterhin fuer den Elimination-Sieg zaehlt.
-    document.getElementById("klsuffix").textContent=KP?"Kontrollpunkte":"Punkte";
+    // BATTLEFIELD-DOMINATION, ANZEIGE UMGEDREHT (ARENA-ZEIT-FIX, 27.09.): die grosse
+    // Score-Zahl zeigte bislang Battlefields Kontrollpunkt-Punkte, weil das zunaechst nach
+    // dem "neuen" Sieg-Weg aussah — tatsaechlich entscheidet kampfSieger()/dominationSieger()
+    // aber ZUERST ueber Ausschaltungen (komplette Ausloeschung einer Seite) und erst danach
+    // ueber das KP-Punktelimit; in einem Testspiel stand der KP-Stand bis kurz vor Schluss
+    // bei 0:0, waehrend die Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die
+    // grosse Zahl zeigt jetzt fuer ALLE Kampf-Disziplinen (tdm/mini-dm/battlefield) dieselben
+    // Ausschaltungen, KP.punkte wandert in die kleine #kpzeile darunter (nur fuer Battlefield
+    // sichtbar). Reine Anzeige-Vertauschung: kampfSieger()/dominationSieger()/kpTick bleiben
+    // unveraendert, KP.punkte entscheidet den Sieg weiterhin genauso wie vorher.
+    document.getElementById("klsuffix").textContent="Punkte";
+    const kpzeile=document.getElementById("kpzeile");
+    if(kpzeile){
+      if(KP){
+        kpzeile.style.display="";
+        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+      } else {
+        kpzeile.style.display="none";
+      }
+    }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
     // PUNKTE = ausgeschaltete Gegner. Bei 6 gegen 6 holt ein komplett siegreiches Team 6.
-    document.getElementById("score").textContent=KP
-      ?Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1])
+    // TDM-HUD-FIX (27.09.): `(nR-live(1).length)` zaehlt nur die GERADE Gefallenen — unter
+    // Respawn faellt das nach jedem Respawn wieder auf 0 zurueck, der Score sank sichtbar.
+    // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
+    // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
+    // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
+    // schwanken. Battlefield hat keinen Respawn (bleibt bei schalteAus() unveraendert eine
+    // dauerhafte Ausschaltung wie Mini-DM), fuer Battlefield/Mini-DM bleibt die
+    // live()-Differenz deshalb weiterhin bitgleich mit der Ausschaltungssumme. #bbug
+    // uebernimmt das automatisch: aktualisiereBbug() liest #score erst, NACHDEM diese Zeile
+    // geschrieben hat (Aufruf am Ende dieser Funktion).
+    document.getElementById("score").textContent=disc==="tdm"
+      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
       :(nR-live(1).length)+" : "+(nL-live(0).length);
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
@@ -23687,6 +28766,12 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // s. aktualisiereTdmNotizen() weiter unten: updateHud() ist TDMs eigener Kampf-Tick
+    // (stepSim ruft sie bei jedem simulierten Schritt), deshalb hier zusaetzlich zu
+    // reset()/dem Play-Knopf gegated -- rein defensiv, falls `running` je auf einem
+    // anderen Weg als den beiden bekannten wechselt. Fuer jede Nicht-TDM-Disziplin ist
+    // der Aufruf ein No-Op (disc!=="tdm" gilt dort ohnehin schon).
+    aktualisiereTdmNotizen();
   }
 
   // ===================================================================================
@@ -23964,20 +29049,55 @@
       gueltig:       {synth:(vol)=>tonDoppelton(vol,660,990,0.3)},
       ungueltig:     {synth:(vol)=>tonBuzzer(vol,0.35)},
       scheiben_fall: {synth:(vol)=>{ tonMetall((vol??0.6)*0.85,600,0.3); tonRauschen((vol??0.6)*0.6,280,0.4,false); }},
-      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+      publikum:      {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)},
+      // H3 (Broadcast-Optik-Recherche 27.09., Klasse A): PUBLIKUM ALS TONSPUR DES VERSUCHS
+      // (Doku Abschnitt 4, "die Tonspur macht aus drei Sekunden ein Ereignis"). Drei neue
+      // Ereignisse aus genau den vier Phasen, die stepHeben() ohnehin schon durchlaeuft
+      // (boden/antritt/zug/hoch|ablage, s. dortiger Kommentar) -- kein sechster
+      // Ton-Baustein, dieselben fuenf Primitive wie ueberall im Katalog:
+      //  - klatschen: kurzer, heller Klick beim Uebergang boden->antritt (der Heber tritt
+      //    an) -- der Rhythmus entsteht aus MEHREREN, ENGER WERDENDEN Klicks (s. Aufrufer
+      //    in stepBuehne), nicht aus einem einzelnen Ton.
+      //  - ausbruch: Rauschen-Anschwellen, ZUSAETZLICH zum bestehenden "gueltig"-Doppelton
+      //    beim Uebergang zug->hoch -- das Publikum, nicht nur die Anzeigetafel, reagiert.
+      //  - raunen: tiefes, kurzes Rauschen, ZUSAETZLICH zum bestehenden "ungueltig"-Buzzer
+      //    beim direkten Uebergang zug->ablage (der echte Fehlversuch, s. Doku-Warnung zur
+      //    Spoiler-Falle bei H2.2 -- derselbe Direktsprung, den zeichneHeben() dafuer schon
+      //    auswertet).
+      klatschen: {synth:(vol)=>tonKlick(vol,2800,0.05)},
+      ausbruch:  {synth:(vol)=>tonRauschen(vol,900,0.55,false)},
+      raunen:    {synth:(vol)=>tonRauschen((vol??0.6)*0.7,220,0.4,false)}
     },
     eiskunstlauf:{
       kufe:     {synth:(vol)=>tonKlick(vol,3200,0.05)},
       sprung:   {synth:(vol)=>tonSchlag(vol,320,900,0.22)},
       landung:  {synth:(vol)=>{ tonSchlag((vol??0.6)*0.7,600,140,0.12); tonKlick((vol??0.6)*0.8,2600,0.04); }},
       sturz:    {synth:(vol)=>{ tonSchlag((vol??0.6)*0.8,260,60,0.3); tonRauschen((vol??0.6)*0.5,700,0.3,false); }},
+      // WACKLER (E0, Buehne-Auftritt-Konzeptreview 26.09., Abschnitt 2.4): derselbe
+      // Fehlschlag, aber "knapp daneben" statt "deutlich daneben" (s. KUER_KNAPP_ANTEIL/
+      // u.vizWackler) -- deutlich leiser/kuerzer als "sturz", kein Rauschen (kein Aufprall),
+      // rein akustische Unterscheidung ohne jede Wirkung auf Wertung/Erfolgschance.
+      wackler:  {synth:(vol)=>tonKlick((vol??0.6)*0.7,1800,0.06)},
+      // PLAKETTE (E-B3, Broadcast-Optik Buehne-Auftritt 27.09.): der Kiss-&-Cry-Moment, in
+      // dem die Rang-Plakette erscheint -- derselbe aufsteigende Doppelton wie ueberall im
+      // Katalog fuer einen positiven Reveal (vgl. "ziel"/"ass"/"topout").
+      plakette: {synth:(vol)=>tonDoppelton(vol,700,1050,0.3)},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,450,0,true)}
     },
     breaking:{
       beat:      {loop:true, synth:(vol)=>tonRauschen(vol,220,0,true)},
       freeze:    {synth:(vol)=>{ tonKlick(vol,2400,0.05); tonMetall((vol??0.6)*0.6,500,0.12); }},
       hieb:      {synth:(vol)=>tonRauschen(vol,1600,0.4,false)},
-      abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)}
+      abbruch:   {synth:(vol)=>tonSchlag(vol,150,40,0.28)},
+      // HERZSCHLAG (B3, Broadcast-Optik-Recherche 27.09.): "lub-dub", leise -- getriggert
+      // von stepGauntletHp() an der Phasen-Kante, Tempo aus gauntletHerzschlagBpm(). Der
+      // zweite, leisere Schlag folgt ~110ms nach dem ersten (echte Systole/Diastole-
+      // Verzoegerung), ueber setTimeout statt einer zweiten WebAudio-Zeitplanung -- reine
+      // Kulisse, ohne AudioContext (Messlaeufe) ist sfx() ohnehin ein No-Op.
+      herzschlag:{synth:(vol)=>{
+        tonSchlag(vol,85,45,0.09);
+        setTimeout(()=>{try{tonSchlag((vol??0.6)*0.75,70,38,0.08);}catch(e){}},110);
+      }}
     },
     "takeshis-castle":{
       falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
@@ -24136,7 +29256,16 @@
         osc.start(t0); osc.stop(t0+d+0.05);
       }},
       stampf:   {synth:(vol)=>tonSchlag(vol,180,55,0.3)},
-      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)}
+      publikum: {loop:true, synth:(vol)=>tonRauschen(vol,500,0,true)},
+      // TROMMELWIRBEL (S-B4, Broadcast-Optik Buehne-Auftritt 27.09.): der Urteilsmoment nach
+      // dem letzten Durchgang eines Acts -- ein kurzes, tiefes Rauschen statt des hellen
+      // Applaus-/Buzzer-Rauschens oben, derselbe tonRauschen()-Baustein mit tieferer
+      // Mittenfrequenz und laengerer Dauer.
+      trommel:  {synth:(vol)=>tonRauschen(vol,220,0.5,false)},
+      // GOLDENER BUZZER (S-B5): ein hell aufsteigender Doppelton wie "plakette" bei
+      // Eiskunstlauf (derselbe positive-Reveal-Bauplan), nur eine Terz hoeher fuer die
+      // Sonderstellung dieses seltenen Ereignisses (hoechstens einmal je Spiel).
+      goldbuzzer:{synth:(vol)=>tonDoppelton(vol,900,1350,0.35)}
     },
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.2, D2.c): vier
     // Ereignisse an genau den Kanten, die stepWettessen() ohnehin sieht (s. dort), dieselben
@@ -24156,7 +29285,13 @@
       biss:      {synth:(vol)=>tonKlick(vol,1900,0.05)},
       schlingen: {synth:(vol)=>tonDoppelton(vol,520,760,0.22)},
       pause:     {synth:(vol)=>tonBuzzer(vol,0.3)},
-      gong:      {synth:(vol)=>tonMetall(vol,260,0.55)}
+      gong:      {synth:(vol)=>tonMetall(vol,260,0.55)},
+      // KLAPP (W-B1, Broadcast-Optik Buehne-Auftritt 27.09.): der leise Klick, mit dem die
+      // Wendetafel bei jedem halben Wuerstchen umklappt (s. zeichneWettessen()).
+      klapp:     {synth:(vol)=>tonKlick((vol??0.6)*0.5,2100,0.03)},
+      // HUPE (W-B3): die Schlusshupe bei 0:00 -- derselbe Tempp+Metall-Bauplan wie
+      // hockey.tor fuer einen tiefen, kurzen Signalton.
+      hupe:      {synth:(vol)=>{ tonTon(vol,320,0.5); tonMetall((vol??0.6)*0.6,500,0.4); }}
     },
     // I-SPY (PR 4, Ton und Politur, docs/design/i-spy-schatzsuche-konzept-21-09.md
     // Abschnitt 5.4): sechs Ereignisse, dieselben fuenf Grundbausteine wie ueberall im
@@ -24717,6 +29852,14 @@
       ctx.fillStyle="#e8d8a8"; ctx.beginPath(); ctx.moveTo(px-2,py-18); ctx.lineTo(px+12,py-14); ctx.lineTo(px-2,py-9); ctx.closePath(); ctx.fill();
       ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
       ctx.fillText("★".repeat(st),px-2,py-20);
+      // TK-1: FALLEN-NAMENSSCHILD AM WEGPFAHL (broadcast-optik-bahn-27-09.md Abschnitt 5.3):
+      // "ab Zoom 1,5x lesbar". Reine Anzeige -- BA().fallenName ist eine Datenzeile, kein
+      // Simulationsfeld; fallenLook(i)/HUERDEN_TYP(i) sind bestehende, reine Lesefunktionen.
+      if(cam.zoom>=1.5){
+        const name=(BA().fallenName||{})[fallenLook(i)];
+        if(name){ ctx.font="600 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e6e0d2";
+          ctx.fillText(name,px-2,py-28); }
+      }
     });
     // Baeume zuletzt (ueber Route und Fallen), nach y sortiert wie eine Tiefenreihe.
     for(const b of wald_){ if(!baeume.length)break; const im=aBild[baeume[b.i%baeume.length]];
@@ -24727,6 +29870,47 @@
     // Das Band liegt UNTEN, nicht oben wie auf der geraden Bahn: die Burg steht auf der
     // Karte oben rechts, und ein Band ueber dem oberen Rand haette genau ihr Tor verdeckt.
     const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
+    // TK-2: "NOCH IM RENNEN"-ZAEHLER (Abschnitt 5.3, "die Kernzahl der Sendung, das Feld
+    // schrumpft"). Eigenes Band ueber der Burgpunkte-Zeile, damit keins der beiden
+    // ueberfuellt. Reine Anzeige -- liest nur u.raus/u.fertig/u.seite, die stepSpurt fuer
+    // die Wertung (rennFertig/burgwertung) ohnehin fuehrt.
+    {
+      const nochN=LAEUFER.filter(u=>u.fertig==null).length;
+      ctx.fillStyle="rgba(8,10,14,.55)"; ctx.fillRect(W/2-230,H-92,460,34);
+      ctx.font="700 15px 'Barlow Condensed',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+      const nochTxt="noch "+nochN+" im Rennen";
+      ctx.strokeText(nochTxt,W/2,H-78); ctx.fillStyle="#f2e9d8"; ctx.fillText(nochTxt,W/2,H-78);
+      const piktoY=H-64;
+      // WEISS = im Rennen, GOLD = im Ziel, GRAU DURCHGESTRICHEN = ausgeschieden (u.raus
+      // ist exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt).
+      [0,1].forEach(seite=>{
+        const g=LAEUFER.filter(u=>u.seite===seite);
+        g.forEach((u,k)=>{
+          const px=seite===0?(W/2-220+k*13):(W/2+220-k*13);
+          const farbe=u.raus?"#5c6270":(u.fertig!=null?"#f2d75a":"#e8e8e8");
+          ctx.beginPath(); ctx.arc(px,piktoY,4,0,6.283); ctx.fillStyle=farbe; ctx.fill();
+          if(u.raus){ ctx.strokeStyle="#232733"; ctx.lineWidth=1.3;
+            ctx.beginPath(); ctx.moveTo(px-4,piktoY-4); ctx.lineTo(px+4,piktoY+4); ctx.stroke(); }
+        });
+      });
+      ctx.textBaseline="alphabetic";
+    }
+    // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). `bahnFalleAnzeige` wird ausschliesslich in
+    // updateHudBahn() gesetzt/erkannt (s. dort); diese Zeichnung liest sie nur.
+    if(bahnFalleAnzeige && rennT<bahnFalleAnzeige.bis){
+      const fi=bahnFalleAnzeige.i, look=fallenLook(fi), typ=HUERDEN_TYP(fi);
+      const name=((BA().fallenName||{})[look]||look).toUpperCase();
+      const st=(BA().fallenStufe||{})[typ]||1;
+      const txt="FALLE "+(fi+1)+"/"+(BA().hindernisse||[]).length+" · "+name+
+        " · "+"★".repeat(st)+" · "+((BA().lang||{})[typ]||typ);
+      ctx.font="700 15px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
+      const tw=ctx.measureText(txt).width;
+      ctx.fillStyle="rgba(8,10,14,.72)"; ctx.fillRect(W/2-tw/2-18,H-134,tw+36,26);
+      ctx.strokeStyle="rgba(242,215,90,.7)"; ctx.lineWidth=1; ctx.strokeRect(W/2-tw/2-17.5,H-133.5,tw+35,25);
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.strokeText(txt,W/2,H-116);
+      ctx.fillStyle="#f2e9d8"; ctx.fillText(txt,W/2,H-116);
+    }
     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'Barlow Condensed',sans-serif";
     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
@@ -24764,11 +29948,13 @@
     // auf das deskriptive Flag statt eine eigene ist*()-Funktion gegated (kein zweiter
     // Zustand noetig, `BA().zeitfahren` steht bereits seit PR 0.3 fest).
     if(BA().zeitfahren)return bodenZeitfahren();
-    // CLIMBING BEKOMMT EINE WAND STATT DER GRAUEN GERADEN BAHN (Opus-Plan Naechste-Drei-
-    // Disziplinen 17-09, Abschnitt 3.1, D1.a) — dieselbe Weiche wie zeitfahren zwei Zeilen
-    // darueber, nur auf `BAHN_ART.climbing.climbing` gegated (rein deskriptiv seit 14.09.,
-    // ohne Wirkung auf Rezept/Matrix/wert(), s. Kommentar dort). Kein neues Flag noetig.
-    if(BA().climbing)return bodenClimbing();
+    // CLIMBING BEKOMMT EINE ECHTE, VERTIKALE WAND (Climbing-Neubau PR 1, 24.09., ersetzt die
+    // additive Textur vom 17.09.) — dieselbe Weiche wie zeitfahren zwei Zeilen darueber, nur
+    // auf `BAHN_ART.climbing.climbing` gegated (rein deskriptiv seit 14.09., ohne Wirkung auf
+    // Rezept/Matrix/wert(), s. Kommentar dort). Kein neues Flag noetig; `bodenWand()` zeichnet
+    // komplett selbst (kein `bodenSpurtGerade()`-Aufruf mehr, s. dort) und ersetzt damit
+    // `bodenClimbing()`.
+    if(istWand())return bodenWand();
     return bodenSpurtGerade();
   }
 
@@ -24903,6 +30089,31 @@
       const key=bilder&&bilder[i]?"hind_"+bilder[i]:null;
       const wasser=(key==="hind_wasser"||key==="hind_balken")&&aDa("hind_wasser_l")&&aDa("hind_wasser_r");
       const kachel=key&&key!=="hind_wasser"&&aDa(key)?aBild[key]:null;
+      // SP-1: STATIONSNAMEN AUF DER BAHN (broadcast-optik-bahn-27-09.md Abschnitt 3.3):
+      // "über jeder Station ein kleines Schild ... ab Zoom 2x kleiner, damit es im Pulk
+      // nicht die Namen verdeckt". Nur Spurt fuehrt `hindernisNamen`; jede andere Bahn
+      // (Staffel/Climbing, Takeshi zeichnet oben schon `continue`) laesst die Zeile aus.
+      // Reine Anzeige -- liest nur BA(), schreibt nichts.
+      if(BA().spurt && BA().hindernisNamen && BA().hindernisNamen[i]){
+        const CIRCLED=["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⑩"];
+        const stLabel=(CIRCLED[i]||(i+1)+".")+" "+BA().hindernisNamen[i];
+        // Um 9px angehoben (vorher oben-4), damit SP-2s Statistikzeile direkt darunter
+        // Platz hat, ohne den Namen zu ueberdecken.
+        ctx.font=(cam.zoom>=2?"700 8px":"700 10px")+" 'IBM Plex Mono',monospace";
+        ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        ctx.strokeText(stLabel,x,oben-13); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,oben-13);
+        // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, "der Primaer-/Nebenweg der CLAUDE.md-
+        // Leitlinie im Bild"). "✓" ist der TECHNIK-Primaerweg, "⚡" der WUCHT-Nebenweg, "✗"
+        // der Sturz -- reiner Lesezugriff auf spurtStationStats, das stepSpurt an den drei
+        // bestehenden Ausgaengen mitzaehlt (s. dort), schreibt nichts, kein rr()-Aufruf.
+        const st=spurtStationStats[i];
+        if(st&&(st.sauber||st.durch||st.sturz)){
+          const stTxt=st.sauber+" ✓ · "+st.durch+" ⚡ · "+st.sturz+" ✗";
+          ctx.font=(cam.zoom>=2?"400 7px":"400 8.5px")+" 'IBM Plex Mono',monospace";
+          ctx.lineWidth=2.4;
+          ctx.strokeText(stTxt,x,oben-4); ctx.fillStyle="#b7c0cf"; ctx.fillText(stTxt,x,oben-4);
+        }
+      }
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
         if(BA().takeshi){ zeichneFalleTakeshi(i,x,y,b); continue; }
@@ -25086,80 +30297,383 @@
     ctx.restore();
   }
 
-  // ================== CLIMBING: EINE WAND STATT EINER GRAUEN BAHN (bodenClimbing, ============
-  // ================== Opus-Plan Naechste-Drei-Disziplinen 17-09, Abschnitt 3.1, D1.a) ========
-  // Climbing war die einzige der fuenf Bahn-Disziplinen ganz ohne eigenen Boden-Zweig: die
-  // Weiche in bodenSpurt() liess sie durch alle drei istRoute()/istOval()/zeitfahren-Zweige
-  // durchfallen, bis sie bei `bodenSpurtGerade()` landete -- demselben Zweig wie Spurt. Das
-  // Ergebnis war eine graue, flache Gerade mit denselben winzigen Griff-Punkten wie jedes
-  // andere Hindernis (BA().boden="#5d5a54", BA().baeume=false, s. Scorecard-Befund "Assets 40,
-  // die schlechteste Darstellung aller angeschlossenen Nicht-Buehnen-Disziplinen").
+  // ================== CLIMBING: EINE ECHTE WAND STATT EINER GERAUTEN BAHN (bodenWand, =======
+  // ================== Climbing-Neubau PR 1, 24.09., ersetzt bodenClimbing() vom 17.09.) =====
+  // Chris, 22.09., woertlich: "climbing ist total falsch geworden, das ist ja n hindernislauf
+  // soll aber echtes indoor klettern darstellen". `bodenClimbing()` (17.09.) hatte die Wand nur
+  // ALS TEXTUR unter eine unveraenderte HORIZONTALE Bahn gelegt (12 Spuren uebereinander, camX
+  // laeuft nach rechts) -- genau der Befund aus docs/design/climbing-neukonzept-22-09.md
+  // Abschnitt 0.3: "graue Wand mit Griffmarken -- additive Textur unter unveraenderter Bahn".
+  // `bodenWand()` dreht die Abbildung wirklich: zwoelf Routen NEBENEINANDER (wandX), jede
+  // Route steigt von UNTEN (Wandfuss, camY(0)) nach OBEN (Top-out, camY(1)) -- dieselbe
+  // istOval()/istRoute()-Weiche, die laeuferXY() schon fuehrt, jetzt um istWand() ergaenzt
+  // (s. dort). RHO-NEUTRAL: `u.pos`/`u.v`/`rr()`/`BAHN_ART.climbing.rezept` bleiben Wort fuer
+  // Wort unangetastet, es aendert sich ausschliesslich, WAS gezeichnet wird -- dieselbe
+  // Garantie wie bei jedem anderen `boden*()`.
   //
-  // GENAU DASSELBE MUSTER WIE bodenZeitfahren() OBEN: `bodenSpurtGerade()` zuerst aufrufen und
-  // das Eigene REIN ADDITIV aufsetzen, statt Hintergrund/Bahn/Zaun/Ziellinie/Huerden-Punkte ein
-  // zweites Mal zu zeichnen. Fuer die anderen vier Bahnen (Spurt/Staffel/Takeshi/Zeitfahren)
-  // aendert diese Funktion keine einzige Zeile -- sie wird fuer sie nie aufgerufen (Weiche in
-  // bodenSpurt() oben, `BA().climbing`).
-  //
-  // WAS AUFGESETZT WIRD, STEHT SCHON ALS DATEN DA (abgelesen, nicht erfunden, exakt wie beim
-  // Hoehenprofil oben):
-  //  1. UEBERHANG-SCHATTIERUNG, mit der Strecke zunehmend. BAHN_ART.climbing.steigung=0,85
-  //     ("die Wand wird nach oben steiler", s. Kommentar dort) liefert die STAERKE der
-  //     Verdunkelung von Start zu Ziel -- ZEHN gleich breite Baender ueber die volle Strecke
-  //     (dieselbe Bandtechnik wie die sieben `gelaende`-Zonen bei bodenZeitfahren, hier ohne
-  //     zonenspezifische Kanten, weil Climbing keine Zonen-Tabelle fuehrt), Deckkraft linear
-  //     von 0 am Start bis `steigung*ZW_UEBERHANG_MAX` am Ziel. Reiner Lesezugriff auf
-  //     `steigung` -- dieselbe Zahl, die tempoVon() fuer den Reserve-Verbrauch benutzt
-  //     (s. BAHN_ART.climbing-Kopfkommentar), hier nie geschrieben.
-  //  2. ZEHN GRIFFMARKEN an exakt `BAHN_ART.climbing.hindernisse` (dieselben zehn Positionen,
-  //     die HUERDEN_N() der Simulation liefert und die bodenSpurtGerade() bereits als winzige
-  //     Pro-Bahn-Punkte zeichnet, s. dortiger `wort==="Griff"`-Zweig) -- hier als groessere,
-  //     ueber die volle Wandhoehe sichtbare Kletter-Griffe, damit die Wand auch bei zwoelf
-  //     belegten Bahnen als WAND erkennbar bleibt, nicht nur als Punktreihe je Laeufer.
-  // Kein neues Bild noetig -- reine Vektorformen wie bodenZeitfahren() sie schon benutzt.
+  // WAS GEZEICHNET WIRD (Konzept Abschnitt 5.1/5.3, Gegencheck Abschnitt 3.6/5, "PR 1" -- nur
+  // was OHNE Mechanik-Aenderung sauber geht, Zonen/Balance/Zeitlimit-MECHANIK bleiben PR 2):
+  //  1. FELSWAND-HINTERGRUND UND UEBERHANG-SCHATTIERUNG, jetzt "nach oben dunkler" statt
+  //     "nach rechts dunkler" -- dieselbe Formel wie vorher (`steigung*ZW_UEBERHANG_MAX`),
+  //     nur an camY statt camX gespiegelt.
+  //  2. ZEHN GRIFFMARKEN an `BAHN_ART.climbing.hindernisse`, wie vorher, jetzt uebereinander
+  //     statt nebeneinander -- x-Streuung je Route ueber `bodenSaat`, wie im Original.
+  //  3. SICHERER AM WANDFUSS + SEIL DURCH DIE GEKLINKTEN EXEN (Gegencheck 3.6, "Chris' Wand
+  //     wird konsequenter Lead statt Boulder"): eine Strichfigur je Route, ein Seil vom
+  //     Sicherer durch die bereits erreichten der drei WAND_EXE_INDIZES-Griffe zum Kletterer.
+  //     Reiner Lesezugriff auf `u.pos` gegen die BESTEHENDEN `hindernisse`-Werte -- es gibt
+  //     noch KEIN `zonen`-Feld im Motor (das kommt erst mit PR 2), die drei Indizes sind ein
+  //     rein visueller Vorgriff auf die dort vorgeschlagenen 0,26/0,53/0,80 (3./6./9. Griff),
+  //     damit PR 2 dieselben drei Griffe uebernehmen kann, ohne dass sich am Bild etwas
+  //     verschiebt. Eine geklinkte Exe faerbt sichtbar um (Gegencheck-Wortlaut: "Eine geklinkte
+  //     Exe wechselt sichtbar die Farbe").
+  //  4. EIN LAYOUT FUER ALLE ZWOELF ROUTEN (Gegencheck 3.8/5, "ein Layout je Spiel, fuer alle
+  //     zwoelf Routen gleich, gemessen erst in PR 2"): `hindernisse` ist heute schon EINE
+  //     einzige, geteilte Liste fuer alle Routen -- nichts zu tun, keine drei Kurs-Varianten
+  //     vor der Kalibrierung.
+  //  5. COUNTDOWN-GRUNDGERUEST (Gegencheck 3.5/5, "Zeitlimit-MECHANIK erst PR 2"): eine
+  //     erkennbar inaktive Beschriftung, damit niemand eine echte Restzeit hineinliest, bevor
+  //     `BAHN_ART.climbing.zeitlimit` ueberhaupt existiert.
+  //  6. WORTWECHSEL "EXE" STATT "ZONE" (Gegencheck 3.6: "'Zone' ist Boulder-Vokabular"): NUR
+  //     an dieser neuen Wand-Zeichnung und in den ebenfalls neuen, rein kosmetischen Zeilen in
+  //     renderKader()/stepClimbing() unten -- der Motor fuehrte "Zone" nirgends fuer Climbing,
+  //     es gibt also nichts Bestehendes umzubenennen, nur die neuen Stellen von vornherein
+  //     richtig zu benennen.
+  // Kein Asset-Download (Konzept 9, "kein Asset-Download"): Sicherer, Seil und Exen sind
+  // Vektorformen wie der Rest der Bahn, kein neues Bild.
   const ZW_UEBERHANG_MAX=0.34;
-  function bodenClimbing(){
-    bodenSpurtGerade();
-    const oben=H*0.14, unten=H*0.94;
-    const steigung=BA().steigung??0.85;
-    // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Start (0) zu
-    // Ziel (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" wird so zu
-    // "die Wand wird nach rechts dunkler", exakt die Fahrtrichtung, in der die Kamera laeuft.
+  // Rein visuelle Exe-Positionen (s. Punkt 3 oben) -- Index in `hindernisse`, NICHT im Motor
+  // gesetzt. 2/5/8 von 0 sind der 3., 6. und 9. der zehn Griffe, deckungsgleich mit den fuer
+  // PR 2 vorgeschlagenen Zonen 0,26/0,53/0,80 (Konzept 2.1: hindernisse[2..8] liegen bei
+  // 0,26/0,53/0,80 exakt an diesen drei Indizes).
+  const WAND_EXE_INDIZES=[2,5,8];
+  // STURZ-ANIMATION (Bug 3, reine Anzeige, s. Kommentar bei `u.vizFallVon=u.pos` im
+  // ABRUTSCHEN-Zweig von stepSpurt): ohne diese Funktion springt der Kletterer im selben
+  // Frame auf seine Sicherungsposition, weil `zeichneWand`/`laeuferXY` bislang roh `u.pos`
+  // zeichneten. `u.vizFallVon`/`u.vizFallT` schreibt ausschliesslich der Motor-Frame des
+  // Sturzes, hier wird nur gelesen -- reiner Bildschirm-Versatz wie `u.vizAnlauf`/`vizRampe`
+  // bei Staffel/Spurt, `u.pos` selbst bleibt die ganze Zeit exakt der Motor-Wert.
+  // CLIMBING_STURZ_DAUER steht wie `ANSAGE_NACHLEUCHTEN` in ZUSCHAUER-Sekunden, daher die
+  // Umrechnung ueber `zeitFaktor()` (climbing=4.38) statt eines rohen rennT-Vergleichs.
+  const CLIMBING_STURZ_DAUER=0.45;
+  // C5 (Broadcast-Optik-Recherche 27.09.): wie lange eine Exe-Split-Einblendung sichtbar
+  // bleibt, in BUEHNENZEIT (`rennT`-Domaene, wie `zeitlimit` oben) -- Doku C5: "2 s lang".
+  const EXE_SPLIT_DAUER=2.0;
+  function climbAnzeigeAnteil(u){
+    const ziel=Math.max(0,Math.min(1,u.pos||0));
+    if(u.vizFallVon==null)return ziel;
+    const t=Math.min(1,Math.max(0,((rennT-(u.vizFallT||0))*zeitFaktor())/CLIMBING_STURZ_DAUER));
+    if(t>=1)return ziel;
+    const von=Math.max(0,Math.min(1,u.vizFallVon));
+    return von+(ziel-von)*(t*t);   // ease-in: ein Sturz beschleunigt statt konstant zu fallen
+  }
+  function bodenWand(){
+    // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
+    // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    const n=BAHNEN_N(), steigung=BA().steigung??0.85;
+    const griffe=BA().hindernisse||[];
+
+    // ================== FERNE FELSKULISSE, PARALLAX (Broadcast-Optik Phase 5,
+    // Climbing-Audit-Fund 28.09., Klasse A) ==================
+    // Der Opus-Audit stellte Climbing direkt neben Breaking und fand die Wand "Punkte auf
+    // Linien vor leerem Hintergrund" -- keine Tiefe, kein Gefuehl fuer Hoehe. Drei
+    // Bergsilhouetten-Baender HINTER der eigentlichen Wand beheben das mit dem klassischen
+    // Parallax-Trick: je weiter weg, desto langsamer scrollt die Schicht relativ zum
+    // tatsaechlichen Klettertempo -- genau das Signal, das dem Auge "das ist weit weg, ich
+    // steige daran vorbei" sagt, statt einer mitlaufenden Tapete.
+    //
+    // `scrollPx` ist derselbe Weltversatz in Bildschirm-Pixeln, den camY() fuer Griffe/
+    // Kletterer bei RATE 1 (voller Geschwindigkeit) ohnehin schon anwendet (`oben*zoom`,
+    // s. camY()-Definition oben) -- hier nur je Schicht gedaempft (0,25/0,4/0,6) und, weil
+    // dieser Versatz ueber ein ganzes Rennen die Bildhoehe um ein Vielfaches uebersteigen
+    // kann, GEKACHELT (Modulo TILE), damit die Kulisse nie ausgeht, egal wie weit die
+    // Kamera schon gewandert ist. Reine additive Bildschicht vor jeder anderen Zeichnung
+    // dieser Funktion -- kein Leser von `scrollPx`/den Kachel-Werten sitzt in
+    // stepSpurt/tempoVon/MOTOREN.climbing.wert(), derselbe Vertrag wie jede andere
+    // boden*()-Zeichnung.
+    {
+      const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE=220;
+      const SCHICHTEN=[[0.60,"rgba(28,25,23,.50)",0.30],[0.40,"rgba(37,32,29,.60)",0.20],
+                        [0.25,"rgba(49,43,39,.72)",0.12]];
+      SCHICHTEN.forEach(([rate,farbe,amp],si)=>{
+        const off=((scrollPx*rate)%TILE+TILE)%TILE;
+        ctx.fillStyle=farbe;
+        const reihen=Math.ceil(H/TILE)+2;
+        for(let row=-1;row<reihen;row++){
+          const baseY=row*TILE-off;
+          if(baseY>H||baseY+TILE<0)continue;
+          ctx.beginPath();
+          ctx.moveTo(0,baseY+TILE);
+          const SCHRITTE=9;
+          for(let k=0;k<=SCHRITTE;k++){
+            const x=k*W/SCHRITTE;
+            const zack=bodenSaat(si*401+row*97+k*13)*TILE*amp;
+            ctx.lineTo(x,baseY+TILE*0.4+zack);
+          }
+          ctx.lineTo(W,baseY+TILE);
+          ctx.closePath(); ctx.fill();
+        }
+      });
+    }
+
+    // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Wandfuss (0) zu
+    // Top-out (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" ist jetzt
+    // wortwoertlich "nach oben dunkler", exakt die Kletterrichtung.
     const UEBERHANG_BAENDER=10;
     for(let i=0;i<UEBERHANG_BAENDER;i++){
       const von=i/UEBERHANG_BAENDER, bis=(i+1)/UEBERHANG_BAENDER;
-      const x0=camX(von), x1=camX(bis);
-      if(x1<-20||x0>W+20)continue;
+      const y0=camY(bis), y1=camY(von);           // camY faellt, wenn posFrac steigt
+      if(y1<-20||y0>H+20)continue;
       const alpha=steigung*ZW_UEBERHANG_MAX*((i+1)/UEBERHANG_BAENDER);
       ctx.fillStyle="rgba(12,10,9,"+alpha.toFixed(3)+")";
-      ctx.fillRect(x0,oben,Math.max(1,x1-x0),unten-oben);
+      ctx.fillRect(0,y0,W,Math.max(1,y1-y0));
     }
-    // Ein paar Riss-/Kanten-Linien queruber die Wand, deterministisch aus derselben Saat
-    // wie die Boden-Koernung oben (bodenSaat) -- Struktur statt lackierter Flaeche, genau
-    // die Begruendung, mit der bodenSpurtGerade() seine eigene Koernung schon rechtfertigt.
+    // Riss-/Kantenlinien, dieselbe Koernung wie vorher (bodenSaat), nur um 90 Grad gedreht --
+    // die Wand steht jetzt, sie liegt nicht mehr. SCROLLT JETZT MIT (Climbing-Audit-Fund
+    // 28.09.): vorher waren x0/y0 reine Bildschirm-Bruchteile, unabhaengig von Kamera-Zoom
+    // oder -Schwenk -- die Risse standen still, waehrend die Wand darunter fuhr, was die
+    // Textur wie eine aufgeklebte Folie statt wie die Wand selbst aussehen liess. Derselbe
+    // `scrollPx`-Trick wie bei der Felskulisse oben, aber RATE 1 (volles Tempo, wie die
+    // Griffe/Kletterer selbst) -- die Risse sind Teil der Wandoberflaeche, nicht des
+    // Hintergrunds, muessen also mit ihr mitlaufen. TILE_RISS deutlich groesser als H, damit
+    // beim Kacheln nicht dieselben 22 Risse im selben Bildausschnitt doppelt auftauchen.
     ctx.save();
-    ctx.beginPath();ctx.rect(0,oben,W,unten-oben);ctx.clip();
+    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
-    for(let i=0;i<22;i++){
-      const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
-      const x0=fx*(W+120)-60, y0=oben+fy*(unten-oben);
-      const ang=(bodenSaat(i+980)-0.5)*0.9-0.3;
-      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
+    {
+      const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE_RISS=H+240;
+      for(let i=0;i<22;i++){
+        const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
+        const x0=fx*W, y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
+        const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
+      }
     }
     ctx.restore();
-    // ---- Schicht 2: die zehn Griffmarken, ueber die volle Wandhoehe statt nur je Bahn.
-    const griffe=BA().hindernisse||[];
-    griffe.forEach((posFrac,i)=>{
-      const x=camX(posFrac);
-      if(x<-24||x>W+24)return;
-      const gy=oben+(unten-oben)*(0.16+0.68*bodenSaat(i+1200));
-      ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
-      ctx.beginPath();ctx.ellipse(x,gy,9,6,0.35,0,6.283);ctx.fill();
-      ctx.fillStyle="rgba(255,255,255,.35)";
-      ctx.beginPath();ctx.ellipse(x-2,gy-2,3,1.8,0.35,0,6.283);ctx.fill();
-      ctx.fillStyle="#5c4326";
-      ctx.fillRect(x-1,gy,2,10);
-    });
+
+    // ---- Schicht 2: zwoelf schwache Spaltentrenner -- bei zwoelf belegten Routen soll die
+    // Bahnzugehoerigkeit trotz Kamera-Zoom lesbar bleiben (dasselbe Bild wie Fahrbahnlinien).
+    ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;
+    for(let i=0;i<=n;i++){
+      const x=wandX(i-0.5);
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+    }
+
+    // ---- Schicht 3: je Route Griffe, Sicherer, Seil und Exen.
+    const routeBreite=BA().routeBreite||30;
+    for(let bz=0;bz<n;bz++){
+      const x=wandX(bz);
+      // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x. GRIFFART ALS
+      // FORM (Bug 3 / Recherche C3): PR 2 hat fuenf Griffarten mit eigenem Sub-Skill
+      // eingefuehrt (`HUERDEN_TYP(i)`), gezeichnet wurden bis hierhin zehn gleiche
+      // Ellipsen -- Chris' "man soll einen Unterschied sehen, ob jemand eine meistert"
+      // (13.09., s. CLAUDE.md) galt fuer die Wand nicht. `HUERDEN_TYP(i)`, NICHT
+      // `BA().hindernisTypen` direkt, sonst zeigt die Wand das Grundlayout statt des fuer
+      // dieses Spiel gewuerfelten Kurses (Ueberhang/Platte/Dach, s. `kurse` weiter oben).
+      griffe.forEach((posFrac,i)=>{
+        const y=camY(posFrac);
+        if(y<-24||y>H+24)return;
+        const gx=x+(bodenSaat(i+1200+bz*37)-0.5)*2*routeBreite;
+        const typ=HUERDEN_TYP(i);
+        ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
+        if(typ==="TECHNIK"){                          // Leiste: flaches Rechteck
+          ctx.fillRect(gx-7,y-1.5,14,3);
+        } else if(typ==="WENDIGKEIT"){                // Sloper: halbe Kugel mit Glanz
+          ctx.beginPath();ctx.arc(gx,y,7,Math.PI,0);ctx.closePath();ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.4)";
+          ctx.beginPath();ctx.ellipse(gx-2,y-2,2.2,1.4,0,0,6.283);ctx.fill();
+        } else if(typ==="WUCHT"){                     // Zange: hoher, schmaler Block
+          ctx.fillRect(gx-3.5,y-8,7,16);
+        } else if(typ==="ANTRITT"){                   // Dyno: zwei Griffe weit auseinander,
+                                                       // Sprunglinie dazwischen
+          ctx.beginPath();ctx.ellipse(gx-7,y,4,4,0,0,6.283);ctx.fill();
+          ctx.beginPath();ctx.ellipse(gx+7,y,4,4,0,0,6.283);ctx.fill();
+          ctx.strokeStyle="rgba(255,255,255,.45)";ctx.lineWidth=1;ctx.setLineDash([2,3]);
+          ctx.beginPath();ctx.moveTo(gx-4,y);ctx.lineTo(gx+4,y);ctx.stroke();
+          ctx.setLineDash([]);
+        } else {                                      // Henkel mit Exe (STEHEN, deckt sich
+                                                       // mit WAND_EXE_INDIZES): die
+                                                       // urspruengliche Ellipse
+          ctx.beginPath();ctx.ellipse(gx,y,8,6,0.35,0,6.283);ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.35)";
+          ctx.beginPath();ctx.ellipse(gx-2,y-1,3,1.8,0.35,0,6.283);ctx.fill();
+        }
+      });
+
+      // SICHERER, eine Strichfigur am Wandfuss (Primitive, kein Asset, Gegencheck 3.6).
+      const sy=camY(0)+20;
+      ctx.fillStyle="#caa06a";ctx.beginPath();ctx.arc(x,sy-13,5,0,6.283);ctx.fill();
+      ctx.strokeStyle="#5b4636";ctx.lineWidth=3;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(x,sy-8);ctx.lineTo(x,sy+7);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
+
+      // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer. "Geklinkt" heisst
+      // BUG 2 (Broadcast-Optik-Recherche 27.09., C2): `u.hoch` (die Hoechstmarke, nach der
+      // tatsaechlich gewertet wird, s. stepSpurt/bahnRangliste()/MOTOREN.climbing.wert()),
+      // NICHT `u.pos`. Nach einem Sturz sinkt `u.pos` auf die Exe darunter (ABRUTSCHEN,
+      // stepSpurt) -- mit `u.pos` faerbten sich bereits geklinkte Exen dadurch wieder grau,
+      // obwohl der Kletterer sie laengst kontrolliert erreicht hatte. `u.hoch` faellt nie.
+      // Reiner Lesezugriff, keine neue Motor-Groesse.
+      const u=LAEUFER.find(l=>Math.round(l.bahnZ)===bz);
+      const hoch=u?Math.max(0,Math.min(1,(u.hoch??u.pos)||0)):0;
+      // Live-Segment des Seils zum Kletterer selbst: die ANGEZEIGTE Position, inklusive der
+      // Sturz-Animation aus Bug 3 (`climbAnzeigeAnteil`) -- sonst wuerde das Seil zur alten
+      // Live-Position im selben Frame springen, waehrend die Figur noch sichtbar faellt.
+      const live=u?climbAnzeigeAnteil(u):0;
+      const punkte=[{x,y:sy-3}];
+      WAND_EXE_INDIZES.forEach(idx=>{
+        const posFrac=griffe[idx]; if(posFrac==null||hoch<posFrac)return;
+        punkte.push({x,y:camY(posFrac)});
+      });
+      if(u&&u.fertig==null)punkte.push({x,y:camY(live)});
+      ctx.strokeStyle="rgba(230,225,210,.70)";ctx.lineWidth=1.6;
+      ctx.beginPath();ctx.moveTo(punkte[0].x,punkte[0].y);
+      for(let i=1;i<punkte.length;i++)ctx.lineTo(punkte[i].x,punkte[i].y);
+      ctx.stroke();
+
+      // EXEN: kleine Karabinerform, faerbt sichtbar um, sobald geklinkt (Gegencheck-Wortlaut) --
+      // und bleibt es, s. Bug-2-Kommentar oben (`hoch` statt `u.pos`).
+      WAND_EXE_INDIZES.forEach(idx=>{
+        const posFrac=griffe[idx]; if(posFrac==null)return;
+        const y=camY(posFrac); if(y<-20||y>H+20)return;
+        const geklinkt=hoch>=posFrac;
+        ctx.strokeStyle=geklinkt?"#7fd858":"#9a9488";ctx.lineWidth=2;
+        ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.stroke();
+        if(geklinkt){ctx.fillStyle="rgba(127,216,88,.22)";ctx.beginPath();ctx.ellipse(x,y,4,6,0,0,6.283);ctx.fill();}
+      });
+
+      // ================== C4b: TOP-LAMPE (Broadcast-Optik-Recherche 27.09., Klasse A)
+      // ==================
+      // "eine Lampe wie das Zeit-Pad beim Speed": leuchtet in Teamfarbe, sobald diese Route
+      // getoppt hat, daneben die bereits enthuellte Zielzeit -- `u.fertig` ist ein reiner
+      // Lesezugriff (derselbe Zeitstempel, den bahnZeit()/bahnRangliste() fuer den Endstand
+      // benutzen), keine neue Motor-Groesse. FESTE BILDSCHIRMHOEHE (`H*0.10`), NICHT am
+      // Sicherer (`sy=camY(0)+20`): die Kamera folgt den Kletterern nach oben (`camY()`
+      // haengt an `camViewV()`), sy waere also fast immer laengst aus dem Bild gescrollt,
+      // genau in dem Moment, in dem ein Top-out ueberhaupt erst passiert (Sicht-QA-Fund,
+      // s. PR-Beschreibung) -- eine Lampe, die niemand je sieht, waere keine Lampe.
+      const lampX=x, lampY=H*0.10, getoppt=!!(u&&u.fertig!=null);
+      const farbeSeite=u?(u.seite===0?css("--home"):css("--away")):"#7fd858";
+      ctx.beginPath();ctx.arc(lampX,lampY,5,0,6.283);
+      ctx.fillStyle=getoppt?farbeSeite:"#2a2e22"; ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=1; ctx.stroke();
+      if(getoppt){
+        ctx.save();
+        ctx.globalAlpha=0.30+0.25*Math.abs(Math.sin(buehneT*4));
+        ctx.fillStyle=farbeSeite;
+        ctx.beginPath();ctx.arc(lampX,lampY,9,0,6.283);ctx.fill();
+        ctx.restore();
+        const zielTxt=bahnZeitText(bahnSpanneAnzeige(bahnZeit(u)));
+        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeSeite;
+        ctx.textAlign="center"; ctx.fillText("TOP "+zielTxt,lampX,lampY-11);
+      }
+    }
+
+    // ================== C4a: DUELL-BAND (Broadcast-Optik-Recherche 27.09., Klasse A)
+    // ==================
+    // Sechs Paare (`Math.floor(bahnZ/2)`, dieselbe Paarbildung wie `druckQuelle:"duell"`,
+    // s. BAHN_ART.climbing-Kommentar) klettern auf gespiegelten Routen -- das ist laengst
+    // Rock-Master-/Speed-Bildsprache, nur bisher nicht gezeigt. Ein Kaestchen zwischen den
+    // beiden Routen eines Paars zeigt den Vorsprung des Fuehrenden IN GRIFFEN der
+    // Hoechstmarke (`u.hoch`, dieselbe spoilerfreie Groesse wie beim Seil/den Exen oben),
+    // in dessen Teamfarbe, grau bei Gleichstand. Eigener Durchlauf NACH dem Pro-Route-Block
+    // oben, weil er BEIDE Routen eines Paars gleichzeitig braucht.
+    // FESTE BILDSCHIRMHOEHE (`H*0.145`), NICHT am Sicherer (`camY(0)+50`): derselbe
+    // Scroll-Befund wie bei der Top-Lampe (s. Kommentar dort) -- gegen Ende eines engen
+    // Rennens, wenn das Band am meisten erzaehlt, waere `camY(0)` laengst nach oben aus dem
+    // Bild gewandert. Unter der Top-Lampen-Reihe (`H*0.10`), damit sich beide nicht
+    // ueberlappen.
+    const bandY=H*0.145;
+    for(let p=0;p<Math.floor(n/2);p++){
+      const bzA=p*2, bzB=p*2+1;
+      const a=LAEUFER.find(l=>Math.round(l.bahnZ)===bzA);
+      const b=LAEUFER.find(l=>Math.round(l.bahnZ)===bzB);
+      if(!a||!b)continue;
+      const xA=wandX(bzA), xB=wandX(bzB), midX=(xA+xB)/2;
+      const griffZahl=(hochVal)=>griffe.filter(pos=>hochVal>=pos).length;
+      const gA=griffZahl(Math.max(0,Math.min(1,(a.hoch??a.pos)||0)));
+      const gB=griffZahl(Math.max(0,Math.min(1,(b.hoch??b.pos)||0)));
+      const diff=gA-gB;
+      const fuehrtA=diff>0, fuehrtB=diff<0;
+      const farbe=fuehrtA?(a.seite===0?css("--home"):css("--away"))
+        :fuehrtB?(b.seite===0?css("--home"):css("--away")):"rgba(230,225,210,.55)";
+      ctx.fillStyle="rgba(10,8,6,.62)"; ctx.fillRect(midX-17,bandY-9,34,18);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.3; ctx.strokeRect(midX-17,bandY-9,34,18);
+      ctx.font="800 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbe;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(diff===0?"=":(diff>0?"+":"")+diff,midX,bandY+1);
+
+      // C5 (Broadcast-Optik-Recherche 27.09., Klasse A): EXE-SPLITS. Sobald der ZWEITE
+      // Partner eines Paars eine der drei WAND_EXE_INDIZES-Exen zum ersten Mal klinkt
+      // (`vizExeT[k]` bei BEIDEN gesetzt, s. stepClimbing()), erscheint fuer
+      // EXE_SPLIT_DAUER Buehnensekunden eine Delta-Einblendung neben dieser Exe, in
+      // Teamfarbe des Schnelleren -- "Exe 2 · +1,4 s" (Doku). `bahnSpanneAnzeige()`
+      // rechnet dieselbe Sim->Zuschauer-Umrechnung, die jede andere Bahnzeit auf dieser
+      // Buehne schon benutzt (s. bahnZeitText-Kommentar oben).
+      WAND_EXE_INDIZES.forEach((idx,k)=>{
+        const posFrac=griffe[idx]; if(posFrac==null)return;
+        const tA=a.vizExeT&&a.vizExeT[k], tB=b.vizExeT&&b.vizExeT[k];
+        if(tA==null||tB==null)return;
+        const zweiterT=Math.max(tA,tB);
+        if(rennT-zweiterT>=EXE_SPLIT_DAUER)return; // laengst wieder ausgeblendet
+        const y=camY(posFrac); if(y<-20||y>H+20)return;
+        const deltaSim=Math.abs(tA-tB);
+        const deltaTxt=bahnZeitText(bahnSpanneAnzeige(deltaSim));
+        const schnellerFarbe=(tA<tB?a:b).seite===0?css("--home"):css("--away");
+        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=schnellerFarbe;
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText("Exe "+(k+1)+" · +"+deltaTxt,midX,y-14);
+      });
+    }
+
+    // ---- Countdown (Bug 1, Broadcast-Optik-Recherche 27.09., C1; UEBERARBEITET
+    // Climbing-Audit-Fund, Broadcast-Optik Phase 5, 28.09., Klasse A): der Opus-Audit
+    // verglich Climbing direkt mit dem Nachbarn Breaking und fand die bisherige Fassung --
+    // 12px System-UI, kein Rahmen, 65 % Deckkraft, unten rechts -- "eine kaum sichtbare
+    // Ecknotiz", waehrend Breaking "wie echte TV-Grafik" liest. Ersetzt durch dieselbe
+    // Kastenform, die die Basketball-Wurfuhr (zeichneShotClock(), s. dort) fuer denselben
+    // Anwendungsfall -- eine ablaufende Uhr, die der Zuschauer im Blick behalten soll --
+    // im selben Paket schon zeigt: gefuellte Box mit Rahmen, fette Ziffern, rot und
+    // pulsierend sobald es knapp wird, statt reinem Text auf der Felswand. Position bleibt
+    // unten rechts (dort steht bei Climbing nichts im Weg, s. PR-Beschreibung/Screenshot-
+    // Gegenprobe) -- rein die GROESSE und die Box machen aus der Notiz eine Anzeige.
+    {
+      const zl=BA().zeitlimit;
+      const boxW=104, boxH=36, bx=W-14-boxW, by=H-14-boxH;
+      ctx.save();
+      ctx.textAlign="center";ctx.textBaseline="alphabetic";
+      if(zl){
+        const restEcht=Math.max(0,zl-rennT)*zeitFaktor();
+        const mm=Math.floor(restEcht/60), ss=Math.floor(restEcht%60);
+        const knapp=restEcht<=10;
+        ctx.fillStyle=knapp
+          ?("rgba(198,42,48,"+(0.75+0.25*Math.abs(Math.sin(rennT*6))).toFixed(3)+")")
+          :"rgba(17,24,35,.82)";
+        ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)"; ctx.lineWidth=1.4;
+        ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,255,255,.78)";
+        ctx.fillText("ZEITLIMIT",bx+boxW/2,by+12);
+        ctx.font="800 19px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#fff";
+        ctx.fillText(mm+":"+String(ss).padStart(2,"0"),bx+boxW/2,by+31);
+      } else {
+        // Fallback, falls `zeitlimit` einmal fehlt (Sonden/Fallback-Rezepte): weiterhin klar
+        // als inaktiv erkennbar, statt eine Zeit zu behaupten, die es nicht gibt.
+        ctx.fillStyle="rgba(17,24,35,.6)"; ctx.fillRect(bx,by,boxW,boxH);
+        ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1; ctx.strokeRect(bx,by,boxW,boxH);
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.6)";
+        ctx.fillText("ZEITLIMIT",bx+boxW/2,by+16);
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.5)";
+        ctx.fillText("kein Limit",bx+boxW/2,by+29);
+      }
+      ctx.restore();
+    }
+    ctx.textAlign="left";
   }
 
   // BODEN DER STAFFELBAHN. Stadionform statt Ellipse, s. die ausfuehrliche Herleitung
@@ -25265,6 +30779,41 @@
     ctx.fillStyle="rgba(255,255,255,.85)";
     ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
     ctx.fillText("ZIEL",OVAL_CX,yI+11);
+
+    // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3, Chris' "ohne Stats sehen, wer wen
+    // besiegt" fuer die Staffel). Die groesste leere Flaeche des Bildes (Abschnitt 4.1) wird
+    // zu einer flachen Linie: x-Achse die Rennzeit, y-Achse das Delta aus
+    // staffelZeitDelta() (oben Heim, unten Gast) -- ein Fuehrungswechsel ist sichtbar das
+    // Kreuzen der Mittellinie, ein verpatzter Wechsel ein Knick (die "Game Flow"-Grafik aus
+    // NBA-Uebertragungen, Sehgewohnheit). `staffelVerlauf`/`staffelBeinMarken` sind reine
+    // Anzeige-Puffer, von updateHudBahn() gefuellt -- diese Zeichnung liest sie nur.
+    if(staffelVerlauf.length>1){
+      const maxT=staffelVerlauf[staffelVerlauf.length-1].t||1;
+      const gx0=OVAL_CX-Math.min(110,rInnen*0.80), gx1=OVAL_CX+Math.min(110,rInnen*0.80);
+      const gyMid=OVAL_CY, gyHalf=Math.min(34,rInnen*OVAL_STAUCH*0.55);
+      const gxOf=(tm)=>gx0+Math.min(1,Math.max(0,tm/maxT))*(gx1-gx0);
+      const gyOf=(delta,seite)=>{
+        const signed=seite===0?delta:seite===1?-delta:0;
+        return gyMid-Math.max(-1,Math.min(1,signed/5))*gyHalf;      // dieselbe 5-s-Skala wie #bhDelta
+      };
+      ctx.save();
+      ctx.strokeStyle="rgba(255,255,255,.35)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(gx0,gyMid); ctx.lineTo(gx1,gyMid); ctx.stroke();
+      // SENKRECHTE STRICHE FUER DIE BEINGRENZEN (Abschnitt 4.3) -- jeder echte Wechsel,
+      // egal welcher Seite, s. Kommentar an `staffelBeinMarken` oben.
+      ctx.strokeStyle="rgba(255,225,120,.35)"; ctx.lineWidth=1;
+      for(const tm of staffelBeinMarken){
+        const x=gxOf(tm);
+        ctx.beginPath(); ctx.moveTo(x,gyMid-gyHalf); ctx.lineTo(x,gyMid+gyHalf); ctx.stroke();
+      }
+      ctx.lineWidth=2.2;
+      for(let i=1;i<staffelVerlauf.length;i++){
+        const a=staffelVerlauf[i-1], b=staffelVerlauf[i];
+        ctx.strokeStyle=b.seite===0?"#f2a03d":b.seite===1?"#45b0c9":"rgba(255,255,255,.4)";
+        ctx.beginPath(); ctx.moveTo(gxOf(a.t),gyOf(a.delta,a.seite)); ctx.lineTo(gxOf(b.t),gyOf(b.delta,b.seite)); ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   // ===================================================================================
@@ -25362,8 +30911,28 @@
       // Planke darueber. Fehlt eine Kachel, faellt genau diese Station auf die alten Pfosten
       // zurueck (bodenSpurt). Andere Bahnen fuehren keine Liste und bleiben bit-identisch.
       hindernisBilder:["huerde","balken","wand","seil","wasser","mauer","heu"], feuerZiel:true,
+      // SP-1: STATIONSNAMEN (broadcast-optik-bahn-27-09.md Abschnitt 3.3, uebernommen aus
+      // dem Plan 05.09. §4.4, dort nie gebaut). `hindernisNamen` sind die Grossbuchstaben-
+      // Schilder auf der Bahn (bodenSpurtGerade), `hindernisWorte` derselbe Name im
+      // Akkusativ fuer den Ticker ("reißt die Palisade"/"nimmt das Seil mit Gewalt") --
+      // Index i ist dieselbe Station wie in `hindernisBilder`/`hindernisTypen`. Reine
+      // Datenzeilen, keine Wirkung auf stepSpurt/rr()/wert().
+      hindernisNamen:["HÜRDE","BALKEN","PALISADE","SEIL","WASSERGRABEN","MAUER","STROHBALLEN"],
+      hindernisWorte:["die Hürde","den Balken","die Palisade","das Seil","den Wassergraben","die Mauer","den Strohballen"],
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
-      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65,
+      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:212, kraftSpanne:1.0,
+      // ZEHR-HAUSHALT (SP-P1, Opus-Konzeptreview 26.09.): dieselbe Reparatur wie im
+      // Zeitfahren, s. ausfuehrlicher Kommentar an `zehrExp`/`kraftBasis` in stepSpurt bzw.
+      // time-trial. "Von vorn" gewann vorher 84 % der Rennen der Plan-Sonde (Anhang A des
+      // Reviews), obwohl im Ziel noch 41-48 % Puste uebrig blieben, egal welcher Plan.
+      // `kraftSpanne` 2.65 -> 1.0, denn STEHEN soll ueber Einbruch/Erholung mitentscheiden,
+      // ohne dass seine reine GROESSE (Kapazitaet) die Terrain-/Tempokanaele verdraengt.
+      // `zehrExponent`/`zehrKoeff`/`leerTempoBasis` schaerfen den Verbrauch bzw. den
+      // Einbruch, `kraftBasis` (oben) und `pusteFangen` (unten) machen die Reserve knapper
+      // und den Einbruch schwerer abzuschuetteln. Alle Werte gemessen (Plan-Sonde/Pp/rho,
+      // s. PR-Beschreibung): max. Plan-Anteil 41,7 % (Ziel <=60), Pp 14,6 (Ziel <=25), rho/
+      // Spiel 0,906 (Basislinie 0,903-0,907, Ziel >0,80).
+      zehrExponent:3, zehrKoeff:2.2, leerTempoBasis:0.50,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -25377,7 +30946,12 @@
       // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTEFANGEN 0,12 -> 0,16 (SP-P1, 26.09.): Fangen bei einem sichtbar hoeheren
+      // Vorrat, so dass ein Einbruch die Reservefrage nicht binnen Sekunden wieder aufloest
+      // (dieselbe Zahl-Logik wie bei time-trial, s. dortiger Kommentar; niedriger als dort
+      // gewaehlt, weil Spurt zusaetzlich rr()-Ereignisse hat und ein zu langer Einbruch
+      // sonst mit dem Rempler-/Stolper-Rauschen zusammen zu grosse Zeitausreisser gibt).
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.16,
       // HINDERNISLAUF STATT ERMUEDUNGSSPRINT (Fable-Recherche 05.09.2026,
       // docs/design/spurt-modellierung-recherche-05-09.md, Prototyp P6). Gemessen trugen
       // Wille/Entschlossenheit 54 %, waehrend die drei "Hindernis"-Attribute (Dexterity,
@@ -25395,7 +30969,17 @@
       // wuchtPreisFaktor fuer die drei Kraft-Stationen. Kaderfest (n=24): rho/Spiel 0,857 ->
       // 0,871, Spannweite 0,286 -> 0,236, Saison 0,905 -> 0,905, Einfluss-Abweichung zur
       // Matrix 38,9 -> 16,7 Pp. Bei playerCount 2 (das reale jeSeite im Spiel): 0,700 -> 0,825.
-      muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.00,
+      //
+      // HUERDEPREIS 1,00 -> 1,45 (SP-P1-Folgeschritt, 26.09.). Die schaerfere Puste-Bindung
+      // oben macht die Reserve zur Hauptvariable des Rennens und drueckte dabei den
+      // Hindernis-Kanal (TECHNIK/WENDIGKEIT/WUCHT, 36 % der Matrix ueber Dexterity/
+      // Awareness/Torment/Power) fast weg: Pp-Abweichung 36-49 trotz nachgezogenem
+      // STEHEN-Rezept (s. dort). Ein teureres Hindernis haelt den Hindernis-Kanal als
+      // GLEICHZEITIG grosse Zeitquelle neben der Reserve, statt dass die Reserve ihn
+      // verdraengt — gemessen sank die Pp-Abweichung damit auf 14,6 (n=24), rho/Spiel stieg
+      // sogar leicht (0,906 gegen Basis 0,903-0,907). Nur hier gesetzt; Climbing/Takeshi
+      // fuehren ihre eigenen `huerdePreis`-Werte unveraendert (0,80/0,42, s. dort).
+      muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.45,
       wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
@@ -25421,7 +31005,18 @@
         ENDTEMPO:   {speed:36,will:30,determination:22,stamina:12},
         TECHNIK:    {dexterity:52,awareness:30,determination:18},
         WENDIGKEIT: {dexterity:46,awareness:34,speed:20},
-        STEHEN:     {determination:44,will:32,health:24},
+        // STEHEN NACHGEZOGEN (SP-P1, 26.09., Folgeschritt zur Puste-Bindung oben). Solange
+        // die Reserve kaum band, war STEHEN mechanisch fast irrelevant — jetzt entscheidet
+        // sie ueber Einbruch und Erholung mit. Mit dem alten Mix (Determination 44/Will 32/
+        // Health 24) verdoppelte STEHEN aber genau die zwei Attribute, die ENDTEMPO schon
+        // traegt (Will 30, Determination 22): gemessen riss das die Pp-Abweichung auf 35-49
+        // (Ziel <=25), Determination/Will weit ueber ihr Matrixgewicht (15/14), Torment
+        // (Matrix 14) und Dexterity/Power blieben trotz WUCHT/TECHNIK/WENDIGKEIT im Minus.
+        // Torment/Health/Dexterity ersetzen Determination/Will hier — beide bleiben ueber
+        // ANTRITT/ENDTEMPO/TECHNIK ohnehin die groessten Kanaele der Bahn, "Stehvermoegen"
+        // passt inhaltlich mindestens so gut zu Schmerztoleranz (Torment) und Robustheit
+        // (Health) wie zu Willen.
+        STEHEN:     {torment:36,health:30,dexterity:20,will:14},
         WUCHT:      {torment:55,power:42,speed:3},
         ROBUST:     {health:28,torment:24,will:20,dexterity:18,awareness:10}
       },
@@ -25481,7 +31076,21 @@
       technikBasis:0.20, technikSpanne:0.0060, wuchtBasis:0.12, wuchtSpanne:0.0085,
       wendigErholt:0.0050,
       wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
-      kraftBasis:290, kraftSpanne:2.7,
+      // KRAFTBASIS 290 -> 170, KRAFTSPANNE 2.7 -> 1.0 (TT-P1, 26.09.: "Reserve knapper").
+      // Vorher blieb Attacke im Ziel im Schnitt bei 14 % Rest, Gleichmaß bei 17 % — die
+      // Reserve band nicht, ein Plan, der Kraft spart, sparte etwas, das niemand brauchte.
+      // Beide Zahlen sind gemessen (Plan-Sonde/Pp-Gegenprobe, s. PR-Beschreibung), nicht
+      // geschaetzt: 170 laesst Attacke real in die Reserve laufen; `kraftSpanne` ist bewusst
+      // KLEINER als vorher (2.7 -> 1.0), sonst haette die Reservegroesse selbst so stark an
+      // STEHEN/ROBUST gehaengt, dass die Pp-Abweichung ueber 25 gestiegen waere (gemessen:
+      // 32 Pp bei 2.7) — Stamina soll durchreichen, aber nicht die Terrain-/Tempo-Kanaele
+      // (Dexterity/Speed) verdraengen, die die Matrix schwerer gewichtet.
+      kraftBasis:170, kraftSpanne:1.0,
+      // ZEHR-EXPONENT/EINBRUCH (TT-P1, 26.09.): s. ausfuehrlicher Kommentar an `zehrExp` in
+      // stepSpurt und an `leerTempoBasis` in tempoVon. Nur hier und in BAHN_ART.spurt
+      // gesetzt; jede andere Bahn bleibt bit-identisch (Konvention, s. CLAUDE.md/Review
+      // Abschnitt 6.1).
+      zehrExponent:3, zehrKoeff:2.6, leerTempoBasis:0.50,
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -25495,7 +31104,14 @@
       // Flackern auf, vor dem der Kommentar an der Fang-Zeile warnt (2,3 Erholungen je
       // Laeufer). 6,0/0,12 liefert genau eine Verschnaufpause je betroffenem Laeufer bei
       // Takeshi und 1,2 beim Klettern. Nachgewiesen mit scripts/miss-bahn-puste.mjs.
-      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // PUSTEFANGEN 0,12 -> 0,30 (TT-P1, Opus-Konzeptreview 26.09., Abschnitt 1c: "Fangen
+      // erst bei 30 %" statt 12 %). Ein Eingebrochener soll die Reserveknappheit nicht
+      // binnen Sekunden wieder los sein — sonst ist der Einbruch nur ein kurzes Ruckeln,
+      // keine Entscheidung. `zehrExponent`/`leerTempoBasis` (unten) schaerfen den
+      // Verbrauch bzw. den Einbruch selbst, `kraftBasis` (oben, 290 -> s. dort) macht die
+      // Reserve insgesamt knapper. Alle vier NUR fuer time-trial gesetzt (Konvention: ein
+      // ungesetztes Feld ist wirkungslos), jede andere Bahn bleibt bit-identisch.
+      pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.30,
       // `zeitfahren:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10,
       // Abschnitt 3.3), aus demselben Grund wie `spurt:true` oben: bahnBewegung() braucht
       // eine eigene Schranke fuer Time-Trial. `startAbstand` waere als Weiche verfuegbar
@@ -25536,32 +31152,111 @@
         {von:0.80,bis:0.93,art:"kurve"}
       ],
       bergSkill:"ENDTEMPO", bergKosten:0.22, bergZehr:1.1,
+      // bergNebenSkill/-Anteil: s. Nebenweg-Kommentar an gelaendeFaktor() oben.
+      // 0,30 -> 0,40 (Pp-Fix, 23.09., vierter Kalibrierschritt, nach n=24/n=48-Bestaetigung
+      // von 38,0/34,6 Pp mit 0,30). Gemessen blieben Stamina (+9,8) und Dexterity/Awareness/
+      // Torment (-6,3/-6,2/-2,5) die groessten Restausschlaege — und WUCHT (torment40,
+      // dexterity32,awareness28) hat KEIN Stamina im Rezept, waehrend ENDTEMPO (das den
+      // restlichen bergSkill-Anteil traegt) Stamina fuehrt. Den Nebenweg-Anteil anzuheben
+      // verschiebt die Berg-Zone deshalb doppelt richtig: weniger Stamina-Gewicht, mehr
+      // Dexterity/Awareness/Torment-Gewicht, exakt die vier groessten Restausschlaege. 0,40
+      // haelt ENDTEMPO immer noch als klaren Primaerweg (60 %), nicht gleichauf.
+      bergNebenSkill:"WUCHT", bergNebenAnteil:0.40,
+      // GESPUER (Pp-Fix, 23.09., fuenfter Kalibrierschritt). Nach den ersten vier Schritten
+      // (kurveSkill->TECHNIK, WUCHT-Nebenweg am Berg, Speed/Stamina in ANTRITT/ENDTEMPO/
+      // STEHEN gesenkt, bergNebenAnteil 0,30->0,40) blieben Stamina (+9,8 Pp) und Speed
+      // (+5,3 Pp) die groessten Ueberzeichner, Dexterity (-6,3) und Awareness (-6,2) die
+      // groessten Loecher — TROTZ TECHNIK/WENDIGKEIT/WUCHT, weil alle drei nur an ihren
+      // Gelaendezonen wirken (Kurve 3x13%, Berg/Abfahrt je 2x12%/2x6% der Strecke, macht
+      // zusammen rund 45 %, nicht 100 %). Speed/Stamina dagegen sitzen ueber ANTRITT/
+      // ENDTEMPO/STEHEN auf der GANZEN Strecke.
+      // GESPUER schliesst genau diese Luecke: ein NEUER, zonen-UNABHAENGIGER Subskill
+      // (`rezept.GESPUER`, reines Dexterity/Awareness — kein Speed/Stamina/Intelligence-
+      // Beimix, damit er die beiden Loecher trifft, ohne Intelligence, das mit +2,2 Pp
+      // schon nah am Ziel liegt, weiter zu ueberzeichnen), der in tempoVon() UEBER DIE
+      // GESAMTE FAHRT wirkt — dasselbe Muster wie STEHEN in `mued` (dort schon
+      // streckenweit), nur jetzt fuer Dexterity/Awareness. `gespuerSkill`/`gespuerGrad`
+      // sind NUR fuer time-trial gesetzt; jede andere Bahn liest `BA().gespuerSkill`
+      // als `undefined` und bleibt in tempoVon() bit-identisch (Faktor exakt 1).
+      // Kein neuer Kanal in gelaendeFaktor/stepSpurt noetig — reiner Zusatzfaktor in
+      // tempoVon(), additiv zu Antritt/Endtempo/Mued/Leer/Nerv wie die anderen dort.
+      gespuerSkill:"GESPUER", gespuerGrad:0.00090,
       abfahrtSkill:"WENDIGKEIT", abfahrtBonus:0.08,
-      kurveSkill:"WENDIGKEIT", kurveKosten:0.16,
+      // KURVE LIEST TECHNIK STATT WENDIGKEIT (Pp-Fix, 23.09., Folgeauftrag zu PR #1013 /
+      // Anhang A der Recherche 06.09.: "TECHNIK bleibt dort ungenutzt ... ein offener
+      // Anschlusspunkt, kein Fehler dieser Runde"). Seit K5 hatte TECHNIK
+      // (intelligence:40,dexterity:34,awareness:26} — genau die drei Attribute, die die
+      // Matrix nach Dexterity am schwersten fuehrt) UEBERHAUPT KEINEN Kanal: sein einziger
+      // Leser war der Huerden-Sturz-Zweig, und Time-Trial fuehrt seit dem K5-Umbau
+      // `hindernisse:[]` (keine Stuerze mehr). Gemessen (messe-arena-einfluss.mjs
+      // time-trial 48): Dexterity 5,0 % (Matrix 25 — das mit Abstand groesste Loch),
+      // Awareness 2,6 % (Matrix 12), macht zusammen mit dem toten Intelligence-Anteil den
+      // groessten Teil der 68,7 Pp Abweichung aus, waehrend Speed/Stamina (in ANTRITT/
+      // ENDTEMPO/STEHEN ueberall dabei) mit +16,5/+16,6 ueberzeichnen. WENDIGKEIT deckte
+      // beide Gelaende-Kanaele (Kurve UND Abfahrt) allein ab, obwohl sein eigenes
+      // TECHNIK-Geschwister danebenstand und nichts tat.
+      // Die Kurve ("Linie" — TECHNIKs eigener `lang`-Name, s. unten) ist die technischere
+      // der beiden Gelaendearten (Zignoli 2021, "in der Kurve ist die Leistung null",
+      // docs/design/bahn-disziplinen-recherche-fable.md Abschnitt 3.2) und passt inhaltlich
+      // zu TECHNIK; die Abfahrt bleibt bei WENDIGKEIT ("Umsetzen" — die Line unter Tempo
+      // AUSFUEHREN). Reine Config-Zeile, `gelaendeFaktor()` selbst liest den Skill-Namen
+      // ohnehin generisch (`A.kurveSkill||"WENDIGKEIT"`) — keine Aenderung an
+      // tempoVon/gelaendeFaktor/stepSpurt, keine andere Bahn betroffen (kurveSkill/
+      // abfahrtSkill existieren nur in BAHN_ART["time-trial"]).
+      kurveSkill:"TECHNIK", kurveKosten:0.16,
       tagesform:0.015,
-      // WERTUNG NACH RANG (Chris' Fund 05.09., docs/design/time-trial-einzelzeitfahren-
-      // wertung-plan-05-09.md; Entscheidung 06.09.: gilt fuer Time-Trial, Spurt UND
-      // Climbing): alle Laeufer beider Seiten in EINER Rangliste nach Zielzeit, Platz 1
-      // bekommt N Punkte (N = Laeufer im Rennen), der Letzte einen — Teamstand ist die
-      // Summe. Nur Anzeige und Auswertung (s. bahnRangliste/bahnTeamstand), keine Zeile
-      // der Rennmechanik haengt daran. Gleichstand bleibt Unentschieden — kein
-      // Zeitsumme-Tiebreak (Chris' Rueckfrage 06.09.).
-      wertung:"rang",
+      // TEAMWERTUNG NACH ZEITSUMME, NICHT MEHR NACH RANGPUNKTEN (Chris, 22.09., woertlich:
+      // "beim time trial gelten nicht die punkte wie zb beim spurt, sondern da werden wie
+      // bei tour de france oder so die zeiten aller im team addiert und das team hat dann
+      // gewonnen! und ich haette gedacht dass jeder spieler einzeln startet"). Der
+      // gestaffelte Einzelstart war bereits da (`startAbstand` oben, K5) — nur der
+      // TEAMSTAND folgte bis hierhin derselben Rangpunkte-Regel wie Spurt/Climbing
+      // (`wertung:"rang"`, docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md).
+      // Jetzt eigen: `wertung:"zeit"`, NUR fuer Time-Trial (Spurt und Climbing behalten
+      // "rang" unveraendert, s. dort) — bahnTeamstand() liest die neue Wertung ueber einen
+      // dritten Sonderzweig, analog zu "etappe" (Staffel) und "burg" (Takeshi's Castle).
+      //
+      // WAS SICH NICHT AENDERT: die PUNKTE JE LAEUFER (die Groesse, an der die Rangtreue
+      // gemessen wird, s. CLAUDE.md) bleiben exakt `bahnRangliste().punkte` — dieselben
+      // Rangpunkte wie vorher, unangetastet. Nur `seiten`, das TEAM-Ergebnis, wechselt von
+      // "Summe der Rangpunkte" auf "kleinste Summe der Zielzeiten gewinnt". Gleichstand
+      // bleibt weiter Unentschieden (unveraendert aus der 06.09.-Entscheidung, jetzt auf
+      // die Zeitsumme statt auf Rangpunkte angewandt).
+      wertung:"zeit",
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
         // lagen. Ein Attribut, das ueberall mitzaehlt, gewinnt immer. Jetzt tragen Kopf
         // und Blick die Linie, und Dexterity haelt sie nur noch.
-        ANTRITT:    {speed:48,power:30,dexterity:22},
-        ENDTEMPO:   {speed:42,stamina:34,intelligence:24},
+        // SPEED/STAMINA-ANTEIL GESENKT (Pp-Fix, 23.09., dritter Kalibrierschritt). ANTRITT
+        // und ENDTEMPO tragen `grund` (tempoVon) UEBER DIE GESAMTE STRECKE, STEHEN die
+        // Ermuedung (mued) UND, ueber KRAFT_VON, die Reservengrenze — anders als TECHNIK/
+        // WENDIGKEIT/WUCHT, deren Wirkung auf ihre Gelaendezonen begrenzt bleibt (s.
+        // gelaendeFaktor). Speed/Stamina sassen bisher in ALLEN DREI streckenweiten Kanaelen
+        // (Speed in ANTRITT+ENDTEMPO, Stamina in ENDTEMPO+STEHEN) und ueberzeichneten deshalb
+        // strukturell, unabhaengig vom kurveSkill-Fix oben: gemessen (n=24 nach Fix) Speed
+        // 36,3 % (Matrix 22, +14,3), Stamina 30,5 % (Matrix 15, +15,5), waehrend Dexterity
+        // mit 5,7 % (Matrix 25) und Awareness mit 2,7 % (Matrix 12) trotz TECHNIK/WENDIGKEIT/
+        // WUCHT weiterhin das groesste Loch blieben, weil deren Zonen nur einen Teil der
+        // Strecke abdecken. Die drei Kanaele bekommen deshalb selbst einen Dexterity-/
+        // Awareness-Anteil auf Kosten von Speed/Stamina — moderat (Speed/Stamina bleiben
+        // jeweils der groesste oder zweitgroesste Posten), aber strecken- statt zonenweit,
+        // damit Dexterity/Awareness endlich ebenfalls die GANZE Fahrt lang zaehlen, nicht nur
+        // in 75 % ihrer Gelaendezonen.
+        ANTRITT:    {speed:40,power:28,dexterity:24,awareness:8},
+        ENDTEMPO:   {speed:32,stamina:26,intelligence:24,dexterity:18},
         TECHNIK:    {intelligence:40,dexterity:34,awareness:26},
         WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
-        STEHEN:     {stamina:46,intelligence:30,awareness:24},
+        STEHEN:     {stamina:34,intelligence:26,awareness:32,dexterity:8},
         WUCHT:      {torment:40,dexterity:32,awareness:28},
-        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20}
+        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20},
+        // GESPUER: reiner Dexterity/Awareness-Kanal, s. Kommentar bei `gespuerSkill` oben.
+        // Existiert nur in time-trial (achter Rezept-Eintrag) — spurtWerte() liest
+        // `for(const k in R)` generisch, jede andere Bahn bleibt bei ihren sieben Eintraegen.
+        GESPUER:    {dexterity:58,awareness:42}
       },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Renntempo",TECHNIK:"Linie",WENDIGKEIT:"Umsetzen",
-            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit"},
+            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit",GESPUER:"Gespür"},
       plaene:{
         gleich:  {label:"Gleichmaß",     tempo:0.93, sucht:0, ab:0.75,
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
@@ -25590,10 +31285,123 @@
       // Reserve, die hier ohnehin knapp ist. Der Haushalt liegt hoeher als im Sprint, weil
       // die Steigung ihn oben zusaetzlich zusammenzieht; mit dem Sprint-Wert war nach
       // zwoelf Laeufen jeder Einzelne leer.
-      technikBasis:0.25, technikSpanne:0.0062, wuchtBasis:0.14, wuchtSpanne:0.0092,
+      // BASISWERTE FUER DEN PR-2-GRIFF-BLOCK NACHGEZOGEN (26.09.): die alten Werte
+      // (0,25/0,14) stammten aus der Zeit, in der Climbing kein `hindernisTypen` fuehrte
+      // und `koennen`/`durch` deshalb IMMER die volle Eignung lasen (kein Mix auf eine
+      // schwache Einzelfaehigkeit). Mit fuenf spezialisierten Griffarten trifft ein
+      // Kletterer an zwei bis drei Griffen genau die Faehigkeit, in der er schwach ist —
+      // kaderfest gemessen lag die Abrutschquote bei den alten Basiswerten bei 3,7 je
+      // Rennen (Ziel 0,6-1,2, Gegencheck-Korridor 6.6). Angehoben auf ein Niveau, das den
+      // PRIMAERWEG zur Regel macht und Nebenwege/Abrutschen zur Ausnahme.
+      technikBasis:0.55, technikSpanne:0.0075, wuchtBasis:0.42, wuchtSpanne:0.0095,
       wendigErholt:0.0045,
       wuchtKraft:18, wuchtZeit:0.18, stolperGrund:0.42, stolperSpanne:0.5, stolperKraft:8,
       kraftBasis:310, kraftSpanne:3.1,
+      // ====================================================================================
+      // PR 2 (26.09., climbing-opus-gegencheck-24-09.md Abschnitt 5): GRIFFARTEN, ZONEN,
+      // ABRUTSCHEN, BALANCE, DUELLDRUCK, ZEITLIMIT, RAST. Alle Felder unten sind NEU und
+      // existieren nur bei Climbing — jede andere Bahn (Spurt/Staffel/Time-Trial/Takeshi)
+      // liest sie nicht und bleibt bit-identisch (Bahn-Konvention, s. CLAUDE.md).
+      //
+      // GRIFFARTEN (Gegencheck 3.7): fuenf Arten wie Takeshis `hindernisTypen`, aber
+      // Sloper/Volumen statt Tritt. `fallenKoennen` mischt das Koennen JEDER Griffart in
+      // den Primaerwurf (dasselbe Muster, das bei Takeshi rho hob, 0,861 -> 0,883) — der
+      // Wurf wird dadurch nicht lauter, sondern breiter: derselbe Mix aus fuenf Sub-Skills,
+      // die auch die Stoppzeit tragen. `fallenDurchbruch` bleibt UNGESETZT (Takeshi
+      // gemessen: 0,874 gegen 0,883 mit reiner WUCHT — kein Gewinn), der Kraftzug bleibt
+      // darum reine WUCHT.
+      fallenKoennen:0.50,
+      // DREI ROUTEN-LAYOUTS (Gegencheck 3.8): "Überhang"/"Platte"/"Dach" statt "Kante",
+      // dieselbe Multimenge an Griffarten (2 Leiste, 2 Sloper, 3 Henkel, 2 Zange, 1 Dyno)
+      // in anderer Reihenfolge, je Saat gewaehlt (Takeshis `kurse[]`-Muster, `bauSpurt()`
+      // liest es bereits generisch). Die drei Henkel-Slots (Index 2/5/8 = die `zonen`
+      // unten) bleiben in ALLEN drei Layouts STEHEN — nur die uebrigen sieben Slots werden
+      // gemischt. Die CRUX (Dyno/Zange) liegt in allen drei in der oberen Haelfte (Index
+      // 6/7/9, Position >=0,62): das sind genau die drei nicht-Henkel-Slots der oberen
+      // Haelfte, WUCHT x2 + ANTRITT x1 fuellt sie exakt, TECHNIK/WENDIGKEIT bleiben unten.
+      kurse:[
+        {name:"Überhang", typen:["TECHNIK","WENDIGKEIT","STEHEN","TECHNIK","WENDIGKEIT","STEHEN","WUCHT","ANTRITT","STEHEN","WUCHT"]},
+        {name:"Platte",   typen:["WENDIGKEIT","TECHNIK","STEHEN","WENDIGKEIT","TECHNIK","STEHEN","ANTRITT","WUCHT","STEHEN","WUCHT"]},
+        {name:"Dach",     typen:["TECHNIK","TECHNIK","STEHEN","WENDIGKEIT","WENDIGKEIT","STEHEN","WUCHT","WUCHT","STEHEN","ANTRITT"]}
+      ],
+      // Fallback/Default, falls `kurse` je uebersprungen wird (Sonden, die nicht ueber
+      // `bauSpurt()` laufen) — identisch zu "Dach", einem der drei Kurse oben.
+      hindernisTypen:["TECHNIK","TECHNIK","STEHEN","WENDIGKEIT","WENDIGKEIT","STEHEN","WUCHT","WUCHT","STEHEN","ANTRITT"],
+      // JEDER GRIFF KOSTET ZEIT (P6-Fix, Gegencheck 2.3/Konzept 0.1): bisher kostete ein
+      // gelungener Griff bei Climbing NICHTS (kein `hindernisTypen` gesetzt) — jetzt zahlt
+      // die Griffart-Skill-Mischung tatsaechlich Zeit, gedaempft durchs Koennen wie ueberall
+      // sonst (`1-0,8*Skill/100`).
+      huerdePreis:0.42,
+      // `pusteHindernis` FUER CLIMBING AKTIVIEREN (Gegencheck 3.3/Auftrag): das Feld
+      // existiert im Motor bereits (Takeshi nutzt es, `engine.js` Puste-Ausdauer-Runde,
+      // s. Griff-Block unten), war fuer Climbing aber nie gesetzt — Chris' eigener Massstab
+      // ("haengt von Art UND Schwierigkeit ab") gilt hier genauso: an einer Zange oder
+      // einem Sloper zahlt Muedigkeit voll (Kraft/Koerperspannung fehlt, wenn die Pumpe
+      // leer ist), an einem Henkel NULL (dort haelt man sich, Kraft ist nicht das Limit).
+      // Pump wird damit zur Hauptursache fuer Fehlgriffe/Abrutschen, wie im echten Lead
+      // (Gegencheck 1.3), und stamina (Matrix 26, das schwerste Gewicht) traegt den Sturz
+      // mit, nicht nur das Tempo.
+      pusteHindernis:{WUCHT:0.10, WENDIGKEIT:0.09, ANTRITT:0.03, TECHNIK:0.03, STEHEN:0},
+      // ECHTES `zonen`-FELD (Gegencheck-Auftrag: Motor-Feld statt nur visueller
+      // Vorgriff aus PR 1). Dieselben drei Positionen wie `WAND_EXE_INDIZES=[2,5,8]`
+      // (bodenWand()), hier als Werte statt Indizes, weil das Abrutschen unten eine
+      // Positions-, keine Index-Suche braucht. MUESSEN mit `WAND_EXE_INDIZES` UND mit den
+      // STEHEN-Slots aller drei `kurse[]` synchron bleiben.
+      zonen:[0.26,0.53,0.80],
+      // NEBENWEG 2: UMSETZEN (WENDIGKEIT, Gegencheck 3.7/Konzept 2.2/4). Dritter Weg durch
+      // einen Griff, NACH dem Kraftzug: kostet nur Zeit (keine Reserve), dafuer laenger.
+      // Entfaellt an Sloper-Griffen (dort ist WENDIGKEIT bereits der Primaerweg) — das
+      // regelt der Griff-Block selbst ueber `hTyp!=="WENDIGKEIT"`.
+      umsetzBasis:0.36, umsetzSpanne:0.0090, umsetzZeit:0.45,
+      // ABRUTSCHEN, A-2 "ZURUECK ZUR EXE" MIT DEN DREI AENDERUNGEN AUS GEGENCHECK 3.3:
+      //   1. Die HOECHSTMARKE zaehlt (`u.hoch`, s. stepSpurt/bahnRangliste/wert()), nicht
+      //      die aktuelle Position nach dem Sturz.
+      //   2. Balance wird GEDECKELT (min, nicht auf einen Wert gehoben) — ein Sturz
+      //      belohnt niemanden.
+      //   3. Kein Puste-Regen im Seil haengen — der Sturz setzt `u.huerde` NICHT, also
+      //      greift die volle Rast-Gutschrift (nur `u.huerde>0`) hier nicht.
+      // `abrutschROBUST` daempft Fallzeit UND Reservekosten wie Takeshis Nervenkosten
+      // (`max(0,45; 1-ROBUST*0,0045)`) — dieselbe Form, health/stamina/will/determination
+      // (ROBUST) bekommen damit ihren Kanal an der Wand.
+      abrutschZeit:0.90, abrutschROBUST:0.0045, abrutschBalanceDeckel:0.6,
+      // GLEICHGEWICHT ALS RESSOURCE (Gegencheck 2.4/3.3): passive Drains (Steigung, leere
+      // Puste) und ein kleiner Regen unter Plantempo. `balanceSteigungGrad` ist zugleich
+      // das Gate fuer den ganzen Balance-Block in stepSpurt — nur Climbing setzt es.
+      balanceSteigungGrad:0.012, balanceLeerGrad:0.03, balancePlanGrad:0.04,
+      // Balance-Abzuege an den Nebenwegen selbst (Kraftzug > Umsetzen, wie im Konzept) und
+      // der Koeffizient, mit dem niedrige Balance die Grifferfolgschance senkt
+      // (`balanceAbzug = balanceAbzugGrad*(1-balance)`, dieselbe Form wie `pusteAbzug`:
+      // verschiebt nur die Schwelle, nie Zahl/Reihenfolge der `rr()`-Wuerfe).
+      balanceKraftzug:0.10, balanceUmsetzen:0.05, balanceAbzugGrad:0.20,
+      // DUELLDRUCK (G-2, Gegencheck 3.1): Heim-Slot i gegen Gast-Slot i auf gespiegelten
+      // Routen (`Math.floor(bahnZ/2)` ist fuer beide Partner gleich, weil `bauSpurt()`
+      // Heim/Gast bereits abwechselnd auf die Bahnen setzt, i*2/i*2+1 — "wechselseitig" ist
+      // damit schon Konvention, keine neue Bahnvergabe noetig). KEIN Stoergriff/G-1 — der
+      // ist laut Gegencheck vollstaendig gestrichen. Schreibt AUSSCHLIESSLICH die eigene
+      // Balance des Betroffenen (Regel "kein Zug durch fremde Hand", s. CLAUDE.md); der
+      // Sturz faellt weiter aus dessen eigenem Wurf im Griff-Block.
+      // `druckQuelle` NACH DER MESS-ENTSCHEIDUNGSREGEL (Gegencheck 3.1) GESETZT: "duell"
+      // (rho 0,814/0,802 ueber beide Saatstroeme) lag beide Male innerhalb der halben
+      // Spannweite von "feld" (0,815/0,801, Spannweite 0,206/0,214) UND die eigene Spannweite
+      // (0,214/0,230) blieb unter 0,25 -- beide Bedingungen der Regel erfuellt, also "duell",
+      // das realistischere Bild (fester Gegner auf der gespiegelten Route statt "bester
+      // Nachbar im Feld"). Pp-Abweichung unveraendert (16,9 gegen 17,0 mit "feld").
+      druckQuelle:"duell", druckSchwelle:0.10, druckMax:0.6, druckGrad:0.02,
+      // ZEITLIMIT (Gegencheck 3.5/PR-0-Nulllinie): geeicht auf eine Top-out-Quote von
+      // 40-55 %, NICHT auf 1,6x Siegerzeit (das waere auf der Nulllinie 99,4 % Top-out
+      // gewesen, s. climbing-nulllinie-24-09.md). Kalibriert gegen das FERTIGE Rezept
+      // dieser PR (reduziertes pusteHindernis, druckQuelle:"feld", u.hoch-Wertung) ueber
+      // wandProbe({n:196,k:[...]}): Top-out 44,8 % bei k=1,33 (Siegerzeit-Median 12,18 Sim-s
+      // im Standardkader) -> 16,3 Sim-s, mitten im 40-55-%-Korridor. Das alte
+      // Konzeptlimit (1,6x) waere auf DIESEM Rezept ebenfalls zu lasch gewesen (s.
+      // PR-Beschreibung fuer die volle Tabelle).
+      zeitlimit:16.3,
+      // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11): `rastUnter` ist das vierte Feld im
+      // `planWechsel()`-Vertrag (s. dort) — an einer Henkel-Exe wird zusaetzlich gerastet,
+      // wenn die Reserve darunter faellt. `rastZeit` ist die zusaetzliche Stoppzeit, in der
+      // die normale Huerden-Rast-Gutschrift (`u.huerde>0`) greift.
+      rastZeit:1.2,
+      // ====================================================================================
       // PUSTE-ERHOLUNG (13.09., Chris: "man laedt in pausen etwas auf oder wenn man weniger
       // rennt", "manche laufen aus und muessen kurz regenerieren, manche schaffen den
       // kompletten Spieltag"). Die vier Zahlen liest stepSpurt; ihre Bedeutung steht dort
@@ -25612,6 +31420,17 @@
       // einzige der fuenf Bahn-Disziplinen ganz ohne eigene Flagge in bahnBewegung() — nicht
       // einmal ein NO-OP-Zweig, sondern schlicht kein Treffer, s. dortiger Kommentar. Rein
       // deskriptiv, ohne Wirkung auf Rezept/Matrix/wert().
+      // MENGE AUS DER EIGNUNG (Takeshi-Muster, `bauSpurt()` skaliert alle Sub-Skills auf
+      // den MITTELWERT der Eignung, Relativabstaende zueinander bleiben erhalten). Vor PR 2
+      // brauchte Climbing das nicht: mit nur ZWEI gelesenen Sub-Skills (TECHNIK/WUCHT fuer
+      // jeden Griff gleich) war die Streuung klein. Mit fuenf spezialisierten Griffarten
+      // entscheidet ein einzelner schwacher Sub-Skill jetzt zwei bis drei von zehn Griffen
+      // -- ungebremst hat das kaderfest rho auf 0,66-0,67 gedrueckt (Verlaesslichkeit von
+      // ~0,94 auf ~0,69), OHNE dass Balance/G-2/Zeitlimit beteiligt waren (isoliert
+      // gemessen, PR-Beschreibung). `mengeAusEignung` bindet die acht Sub-Skills an
+      // dieselbe Eignung, die auch die Rangtreue misst — genau das Werkzeug, das Takeshi
+      // fuer denselben Fall (14 Fallen, sieben Sub-Skills) bereits nutzt.
+      mengeAusEignung:true,
       label:"Climbing", jeSeite:6, climbing:true,
       hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
       hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
@@ -25634,21 +31453,78 @@
         // ueberzeichnet. ANTRITT/ENDTEMPO/TECHNIK/WUCHT/WENDIGKEIT/ROBUST unveraendert —
         // ein einzelner, isolierter Hebel.
         ANTRITT:    {power:38,dexterity:32,speed:30},
-        ENDTEMPO:   {stamina:44,determination:31,speed:25},
+        // ENDTEMPO NEU GEWICHTET (Climbing-PR-2-Pp-Fix, 26.09.): `scripts/messe-arena-
+        // einfluss.mjs climbing 24` mass nach den PR-2-Griffarten/Balance/Zeitlimit-
+        // Aenderungen 41 Pp Abweichung -- stamina +12,9, speed +5,2 liefen weit ueber ihr
+        // Matrixgewicht (26/12), waehrend dexterity -5,4, awareness -4,6 und power -6,0 die
+        // groessten Loecher waren, TROTZ TECHNIK/WENDIGKEIT/WUCHT/ANTRITT, weil die nur an
+        // ihren jeweiligen 2-3 von 10 Griffen wirken -- ENDTEMPO dagegen traegt ueber die
+        // GANZE Kletterzeit (tempoVon()s `grund`, tempoSpanne 0,80) und ist damit der
+        // staerkste einzelne Hebel. Ein erster Versuch, einen neunten, zonen-unabhaengigen
+        // GESPUER-Kanal (Time-Trial-Muster) fuer dexterity/power/awareness danebenzusetzen,
+        // machte es MESSBAR SCHLIMMER (41 -> 47,7, power fiel auf 0 %): `mengeAusEignung`
+        // (s. dort) reskaliert ALLE Sub-Skills eines Laeufers auf denselben Mittelwert
+        // (`eigW`, aus der GESPERRTEN Matrix, s. CLAUDE.md) -- ein zusaetzlicher Kanal, der
+        // ein bereits kuenstlich angehobenes Attribut (`einflussVon`s `ATTR_HEBUNG`) weiter
+        // in Sub-Skills traegt, hebt NUR den Mittelwert (`m`) an, senkt darueber den
+        // Skalierungsfaktor `f=eigW/m` fuer ALLE acht Sub-Skills gleichermassen und frisst
+        // damit den eigenen Vorteil UND den der anderen Kanaele auf. Der wirksame Hebel ist
+        // deshalb, den STAERKSTEN bestehenden Kanal direkt umzuschichten, nicht einen
+        // zusaetzlichen schwachen Kanal daneben zu stellen: ENDTEMPO spiegelt jetzt die
+        // Matrix selbst (26/16/12/12/10/8/8/8 = 100), statt nur drei ueberrepraesentierte
+        // Attribute zu tragen.
+        // VIERTER SCHRITT: der Matrix-Spiegel allein (s. Kommentar oben) senkte stamina nur
+        // von 38,9 auf 38,3/36,1 % (Ziel 26) und liess determination unter ihr Ziel fallen
+        // (16,9 -> 12,4/12,5, Ziel 16) -- ENDTEMPO ist zwar der staerkste Kanal, aber
+        // stamina sitzt zusaetzlich in STEHEN/ROBUST (KRAFT_VON/pusteRegen, unveraendert
+        // gelassen, s. dortige Kommentare) und behaelt dadurch einen strukturellen Vorsprung.
+        // Zweite Umschichtung, WEITER in Richtung Matrix, aber stamina/health/speed weiter
+        // zugunsten von determination/power/awareness/dexterity gesenkt.
+        // FUENFTER SCHRITT: Schritt 4 (stamina18/determination20/dexterity14/power12/
+        // awareness10/speed10/will8/health8) senkte Pp auf 17,4 (n=24, erster Saatstrom) --
+        // aber der ZWEITE, unabhaengige Saatstrom (miss-climbing-zweiter-saatstamm.mjs,
+        // CLAUDE.md verlangt beide) fiel dabei auf rho 0,788 (unter die 0,80-Schranke, vorher
+        // 0,805). Stamina in der EINZIGEN durchgehend wirksamen Tempo-Quelle so weit zu
+        // kappen kostet also Rangtreue auf mindestens einem Saatstrom. Diese Fassung ist der
+        // Mittelweg zwischen Schritt 3 (Matrix-Spiegel, stamina26, rho 0,811/0,805, Pp 27)
+        // und Schritt 4 (stamina18, rho 0,811/0,788, Pp 17,4) -- rechnerisches Mittel beider.
+        ENDTEMPO:   {stamina:22,determination:18,dexterity:13,speed:11,power:10,awareness:9,health:9,will:8},
         TECHNIK:    {dexterity:44,awareness:33,power:23},
         WENDIGKEIT: {dexterity:45,speed:32,awareness:23},
-        STEHEN:     {stamina:24,will:32,health:34,determination:10},
+        // STEHEN NACHJUSTIERT (Climbing-PR-2-Pp-Fix, 26.09., zweiter Schritt): nach der
+        // ENDTEMPO-Umschichtung (s. dort) blieb stamina bei +12,3 stehen (41 -> 29,9 Pp),
+        // waehrend power (-4,0) und awareness (-4,1) die groessten Loecher waren. STEHEN ist
+        // der zweite starke, IMMER aktive Kanal: es traegt nicht nur den Henkel-Griff (30 %
+        // der Route), sondern ueber `KRAFT_VON()`/`pusteRegen` auch die Reserve-Obergrenze
+        // und -Regenrate — stamina wirkt hier also doppelt. will/health/determination
+        // unveraendert, nur stamina sinkt zugunsten von power/awareness.
+        STEHEN:     {stamina:12,will:32,health:34,determination:10,power:6,awareness:6},
         WUCHT:      {power:42,determination:28,health:30},
-        ROBUST:     {health:32,stamina:28,will:24,determination:16}
+        // ROBUST: ein dritter Rebalance-Versuch (stamina 28 -> 14, +power/+awareness) MASS
+        // SCHLECHTER (27 -> 32,4 Pp, power sogar 4,0 -> 1,9 %) statt besser -- innerhalb der
+        // Messtoleranz von n=24 nicht von Rauschen zu unterscheiden (Pp schwankte bei jedem
+        // der drei Schritte um mehrere Punkte), aber kein reproduzierter Gewinn. ROBUST bleibt
+        // deshalb bei den WERTEN AUS DER 16.09.-KALIBRIERUNG (s. Kommentar am Rezept-Objekt
+        // oben) UNVERAENDERT -- der wirksame Hebel dieser Runde waren ENDTEMPO (s. dort) und
+        // STEHEN (s. dort), nicht ROBUST.
+        ROBUST:     {health:32,stamina:28,will:24,determination:16},
+        // ACHTER SUB-SKILL (Gegencheck 2.4/3.3): der Kopf unter Druck, gestuetzt durch die
+        // Angstforschung am Klettern (Pijpers/Oudejans/Bakker 2005, s. Gegencheck 1.3).
+        // Kein neues Attribut — determination/will/awareness gehoerten der Matrix schon,
+        // sie bekommen hier nur ihren dritten bzw. zweiten Wand-Kanal.
+        GLEICHGEWICHT: {determination:40,will:30,awareness:30}
       },
       lang:{ANTRITT:"Zug",ENDTEMPO:"Ausdauertempo",TECHNIK:"Griff",WENDIGKEIT:"Umsetzen",
-            STEHEN:"Kraftausdauer",WUCHT:"Kraftzug",ROBUST:"Zähigkeit"},
+            STEHEN:"Kraftausdauer",WUCHT:"Kraftzug",ROBUST:"Zähigkeit",GLEICHGEWICHT:"Kopf"},
+      // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11, viertes Feld neben tempo/sucht/ab): ein
+      // Anteil der Reserve, UNTER dem an einer Henkel-Exe zusaetzlich gerastet wird, statt
+      // fester Booleans je Zone — "sparsam" rastet fast immer, "angriff" fast nie.
       plaene:{
-        sparsam: {label:"Sparsam",   tempo:0.86, sucht:0, ab:0.72,
+        sparsam: {label:"Sparsam",   tempo:0.86, sucht:0, ab:0.72, rastUnter:0.80,
                   text:"Klettert unter der Schwelle und hebt sich alles für die Steilstufe auf."},
-        stetig:  {label:"Stetig",    tempo:0.94, sucht:0, ab:0.66,
+        stetig:  {label:"Stetig",    tempo:0.94, sucht:0, ab:0.66, rastUnter:0.55,
                   text:"Gleichmäßiger Zug. Kommt an, ohne zu glänzen."},
-        angriff: {label:"Durchziehen",tempo:1.00, sucht:0, ab:0.55,
+        angriff: {label:"Durchziehen",tempo:1.00, sucht:0, ab:0.55, rastUnter:0.30,
                   text:"Zieht von unten durch. Oben wird es eng — wenn die Reserve reicht."}
       },
       planJeSlot:{routereader:"stetig", gripspecialist:"stetig", paceclimber:"sparsam",
@@ -25864,6 +31740,13 @@
       tuempel:[[0.08,0.36,46,18],[0.30,0.14,52,18]],
       fallenBild:{TECHNIK:["labyrinth","eis"],WENDIGKEIT:["steine","walzen"],WUCHT:["tuer","seilwand"],STEHEN:["brueckenball","schlamm"],ROBUST:["raeder","spitzen"]},
       fallenStufe:{TECHNIK:2,WENDIGKEIT:1,WUCHT:3,STEHEN:2,ROBUST:3},
+      // TK-1: FALLEN-NAMENSSCHILD (broadcast-optik-bahn-27-09.md Abschnitt 5.3, Tabelle).
+      // Eigene, an die Show angelehnte deutsche Namen je Bild -- keine woertlich
+      // uebernommenen Markennamen (Chris' Voreinstellung, Abschnitt 9, Frage 2). Reine
+      // Datenzeile fuer den Wegpfahl/das Lower-Third, keine Wirkung auf burgpunkte()/wert().
+      fallenName:{labyrinth:"Wabenlabyrinth",eis:"Rutschhang",steine:"Springende Steine",
+        walzen:"Walzenlauf",tuer:"Klopf-Klopf-Türen",seilwand:"Seilwand",
+        brueckenball:"Brückenball",schlamm:"Schlammgrube",raeder:"Riesenräder",spitzen:"Stachelgasse"},
       // WER DIESE FALLE MEISTERT — Chris 13.09. (docs/design/takeshi-hindernis-vs-
       // strecke-recherche-13-09.md):
       //
@@ -26158,7 +32041,26 @@
       {id:"hind", kopf:hw.slice(0,4), titel:hw+"n erreicht", wert:z=>z.erreicht+"/"+H().length},
       {id:"sauber",kopf:"Saub", titel:"sauber genommen", top:true, wert:z=>z.sauber||null},
       {id:"durch", kopf:wucht.slice(0,5), titel:wucht, wert:z=>z.u.durchbruch||null},
-      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null}]:[]),
+      {id:"sturz", kopf:"Sturz", wert:z=>z.u.gestolpert||null},
+      // HINDERNIS-TEMPO (Chris' Fund 22.09., woertlich: "da waere es cool wenn man noch
+      // sehen koennte wer zb die hindernisse am schnellsten genommen hat oder so weil das
+      // ja nicht unbedingt der ist der am schnellsten gelaufen ist"). Eigene, zusaetzliche
+      // Kennzahl NEBEN der Gesamtzeit (Spalte "Zeit" unten) statt an ihrer Stelle: die
+      // Durchschnittszeit, die NUR an den Stationen selbst verloren geht (Kraftzug/Sturz,
+      // bei Spurt/Takeshi zusaetzlich der Technik-/Wucht-Stopp `u.huerde`), nicht die Zeit
+      // auf der Strecke dazwischen. `u.hindernisZeit` ist reine, additive Buchhaltung (s.
+      // die drei Schreibstellen in stepSpurt oben) -- nie zurueckgelesen in tempoVon()/
+      // rr()/MOTOREN[d].wert() oder bahnRangliste(), also ohne jeden Einfluss auf Eignung
+      // oder Rang. `z.erreicht` (oben, live aus u.pos) ist der Nenner: ein sauber
+      // genommenes Hindernis zaehlt mit 0 Sekunden Kosten mit und zieht den Schnitt damit
+      // zu Recht nach unten -- genau der Fall, den Chris beschreibt, in dem ein insgesamt
+      // langsamerer Laeufer an den Hindernissen selbst die beste Zeit zeigt. `bahnRealSek`
+      // (derselbe Massstab wie die "Zeit"-Spalte) rechnet die Simulationssekunden in
+      // Zuschauzeit um, `bahnZeitText` formatiert gleich.
+      {id:"hindZeit", kopf:"Ø"+hw.slice(0,4), titel:"durchschnittliche Zeit an den "+hw.toLowerCase()+
+        "n selbst (Kraftzug/Sturz"+(art.hindernisTypen?"/Technik-Stopp":"")+") — unabhängig von der reinen Laufgeschwindigkeit, niedriger ist besser",
+        wert:z=>z.erreicht>0?+bahnRealSek((z.u.hindernisZeit||0)/z.erreicht).toFixed(2):null,
+        fmt:v=>bahnZeitText(v)}]:[]),
       ...(art.schatten?[{id:"sog",kopf:"Sog",titel:"Anteil im Windschatten",
         wert:z=>Math.round(z.u.schattenS/Math.max(0.1,z.u.schattenS+z.u.spitzeS)*100),fmt:v=>v+"%"}]:[]),
       ...(art.tackle?[{id:"rempl",kopf:"Rempl",titel:"gerempelt / eingesteckt",
@@ -26193,7 +32095,9 @@
         farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
-      sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos), fuss:""};
+      sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos),
+      fuss:mitHindernissen?("„Ø"+hw.slice(0,4)+"\" ist die Zeit an den "+hw.toLowerCase()+
+        "n selbst, gemittelt über alle bisher erreichten — unabhängig von der Zeit auf der freien Strecke."):""};
   }
 
   // STAFFEL (`staffel:true`): nur einer je Team laeuft gleichzeitig — die anderen fuenf
@@ -26203,7 +32107,12 @@
   // verloren ging. `laufAnteil()` (oben) rechnet den Fortschritt im EIGENEN Abschnitt
   // bereits fuer die Kamera vor — hier wiederverwendet statt zweimal gebaut.
   function WERTUNG_STAFFEL(art){
-    const zeilen=()=>LAEUFER.map(u=>({n:u.n,side:u.seite,raus:false,eig:u.eig,u}));
+    // Rang je Zeile EINMAL je Render mitgeben (staffelEtappenRaenge oben), statt ihn in
+    // der Stand-Spalte fuer jede der zwoelf Zeilen neu aus bahnRangliste() zu suchen.
+    const zeilen=()=>{
+      const {raenge,von}=staffelEtappenRaenge();
+      return LAEUFER.map(u=>({n:u.n,side:u.seite,raus:false,eig:u.eig,u,rang:raenge.get(u.id)??null,gelaufen:von}));
+    };
     return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
       spalten:[
         {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
@@ -26223,10 +32132,17 @@
           farbe:v=>v==="leer"?"var(--crit)":null},
         {id:"team", kopf:"Team", titel:"Team-Zielzeit (alle Läufer gleich)",
           wert:z=>z.u.fertig!=null?+bahnRealSek(z.u.fertig).toFixed(1):null, fmt:fmtRealZielzeit},
-        {id:"stand",kopf:"Stand", wert:z=>z.u.fertig!=null?"Ziel":z.u.durch?"übergeben":z.u.aktiv?"läuft":"wartet",
-          farbe:v=>v==="Ziel"?"var(--ok)":null},
+        // STAND = LAUFENDER RANG (22.09., s. staffelEtappenRaenge): wer seine Etappe hinter
+        // sich hat, steht hier nicht mehr als "uebergeben"/"Ziel", sondern mit seinem Rang
+        // unter allen bisher gelaufenen Laeufern beider Seiten — "Rang 2/7" heisst: zweit-
+        // schnellste von sieben bisher beendeten Etappen. Der Nenner waechst mit jeder
+        // Uebergabe; derselbe Rang steht am Ende im Endstand-Overlay. Rang 1 gruen, wie
+        // vorher "Ziel" — die eine Zeile, die man im Vorbeischauen sucht.
+        {id:"stand",kopf:"Stand", titel:"laufender Rang der Etappenleistung unter allen Läufern beider Teams, die ihre Etappe schon beendet haben (Rang / bisher gelaufen) — aktualisiert sich mit jeder weiteren Übergabe",
+          wert:z=>z.rang!=null?"Rang "+z.rang+"/"+z.gelaufen:z.u.aktiv?"läuft":"wartet",
+          farbe:v=>v.startsWith("Rang 1/")?"var(--ok)":null},
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich)."};
+      fuss:"„Etappe\" ist die Zeit für den eigenen Abschnitt, „Verl\" die dabei durch Übergaben verlorene Zeit. „Team\" ist die gemeinsame Zielzeit der ganzen Mannschaft (für alle sechs gleich). „Stand\" zeigt für jeden, der seine Etappe schon gelaufen ist, laufend seinen Rang unter allen bisher gelaufenen Läufern beider Teams — dieselbe Rangfolge, die am Ende im Endstand steht."};
   }
 
   // WELLE 2 (wertungstabelle-je-disziplin-plan-05-09.md Abschnitt 5, PM-Briefing
@@ -26264,7 +32180,7 @@
         {id:"pus",  kopf:"Pus",  titel:"Puste am Spielende — ein disziplineigener Kraftvorrat aus AUSDAUER, NICHT die Saison-Fatigue",
           wert:z=>z.u.pusteMax?Math.round(z.u.puste/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
-        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollstaendig leer",
+        {id:"tief", kopf:"Tief", titel:"tiefster Puste-Stand des Spiels — wer hier bei 0 steht, war einmal vollständig leer",
           wert:z=>z.u.pusteMax?Math.round(z.u.pusteMin/z.u.pusteMax*100):null, fmt:v=>v+"%",
           farbe:v=>v<=0?"var(--crit)":v<20?"var(--warn)":null},
         {id:"abpr", kopf:"Abpr", titel:"gewonnene lose Pucks nach einem Abpraller", wert:z=>z.u.rebounds||null},
@@ -26353,6 +32269,35 @@
   }
   // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
   const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
+
+  // ===================== DIE WAND (Climbing-Neubau PR 1, 24.09.) =====================
+  // Chris, 22.09., woertlich: "climbing ist total falsch geworden, das ist ja n
+  // hindernislauf soll aber echtes indoor klettern darstellen". Diese PR haengt kein neues
+  // Rezept und keine neue Wertung an -- rein die BILDSCHIRM-ABBILDUNG dreht sich um 90 Grad,
+  // exakt wie `laeuferXY()`s bestehende istOval()/istRoute()-Zweige es fuer Staffel/Takeshi
+  // schon vormachen (s. docs/design/climbing-neukonzept-22-09.md Abschnitt 5.2 und
+  // docs/design/climbing-opus-gegencheck-24-09.md Abschnitt 3.6/5). `u.pos` bleibt 0..1
+  // entlang der Route, `cam.zoom`/`cam.cx` bleiben dieselben zwei Zahlen, die kameraUpdate()
+  // schon fuer JEDE gerade Bahn pflegt (die Zoom-Formel dort haengt nur an posFrac-Minima/
+  // -Maxima, nie an einer Bildachse) -- camY() ist wortwoertlich camX(), nur mit H statt W
+  // und gespiegelt (0 = Wandfuss = UNTEN im Bild, 1 = Top-out = OBEN im Bild, weil Klettern
+  // nach oben geht, Bildschirm-Y aber nach unten waechst).
+  const camHoehe=()=>H-170;
+  function camViewV(){
+    const hoehe=camHoehe(), viewH=hoehe/cam.zoom;
+    const oben=Math.max(0,Math.min(hoehe-viewH,cam.cx*hoehe-viewH/2));
+    return {hoehe,viewH,oben};
+  }
+  // posFrac: Kletterhoehe 0..1 -> Bildschirm-Y unter der aktuellen Kamera.
+  const camY=(posFrac)=>{const v=camViewV(); return (H-90)-((posFrac*v.hoehe-v.oben)*cam.zoom);};
+  // istWand(): dieselbe Weiche wie istOval()/istRoute() (naechste Zeilen), nur auf das
+  // bestehende, seit 14.09. rein deskriptive `BAHN_ART.climbing.climbing`-Feld gegated --
+  // kein neues Feld noetig, jede andere Bahn liest hier `undefined`.
+  const istWand=()=>!!BA().climbing;
+  // Zwoelf Routen nebeneinander statt zwoelf Bahnen uebereinander: dieselbe Idee wie
+  // bahnY(b) (naechste Definitionen unten), nur quer -- Route b liegt bei ihrem eigenen
+  // Bildschirm-X, ueber die volle Breite verteilt.
+  const wandX=(b)=>{const links=W*0.12,rechts=W*0.90; return links+(rechts-links)*((b+0.5)/BAHNEN_N());};
 
   // ===================== DIE ROUTE DURCH MIDORIYAMA =====================
   // Chris am 06.09.: "bei takeshi haette ich mir so eine fortlaufende route gewuenscht
@@ -26686,6 +32631,15 @@
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
     if(istOval())return ovalPunkt(u);
+    // WAND: Route b haengt fest bei wandX(b), die Hoehe ist camY(u.pos) -- kein platz-Bonus
+    // wie auf der geraden Bahn (dort draengen sich Fertige gemeinsam hinter der Ziellinie;
+    // an der Wand behaelt jede Route ihre eigene Spalte, auch nach dem Top-out).
+    // BUG 3 (Broadcast-Optik-Recherche 27.09.): `climbAnzeigeAnteil(u)` statt rohem `u.pos`
+    // -- sonst sprang der Kletterer nach einem Sturz im selben Frame auf seine
+    // Sicherungsposition (Teleport statt sichtbarer Bewegung). `u.pos` selbst bleibt der
+    // Motor-Wert, hier wird nur die gezeichnete Hoehe kurz interpoliert (s. Kommentar bei
+    // `climbAnzeigeAnteil`, bodenWand()).
+    if(istWand())return {x:wandX(u.bahnZ), y:camY(climbAnzeigeAnteil(u))};
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -26697,6 +32651,20 @@
     const v=platz>=0?(14+platz*8):0;            // Eingelaufene: hinter dem Tor im Burghof
     return weltZuSchirm(r.x+r.nx*q+r.tx*v, r.y+r.ny*q+r.ty*v);
   }
+  // SCHWEBETEXT-POSITION UEBER DER FIGUR (Climbing-Neubau PR 1, 24.09., Konzept Abschnitt 5.2:
+  // "12 direkte camX(u.pos)- und 11 bahnY(u.bahnZ)-Aufrufe in schwebe()-Zeilen ... PR 1 zieht
+  // die uebrigen nach"). Vorher rechneten die schwebe()-Aufrufe unten (stolpert/bricht durch/
+  // eingebrochen/Rennplan-Ansage/...) ihre Bildschirmposition SELBST aus camX(u.pos)/
+  // bahnY(u.bahnZ) -- an einer Wand (oder auf Takeshis Route) stand die Sprechblase dadurch an
+  // der ALTEN horizontalen Bahn-Position, waehrend die Figur laengst woanders gezeichnet wurde.
+  // laeuferXY() kennt die Weiche (Oval/Wand/Route/Bahn) bereits an einer Stelle -- diese
+  // Funktion liest nur sie, dieselbe "eine Stelle statt sechs"-Idee wie am Kommentar direkt
+  // ueber laeuferXY(). Fuer Spurt/Staffel/Zeitfahren/Takeshi bit-identisch zur alten
+  // Direktrechnung dort, wo laeuferXY() ohnehin schon dieselbe Formel liefert (Bahn/Oval); auf
+  // Takeshis Route und an der Wand RUECKT die Blase jetzt zur tatsaechlichen Figur -- eine
+  // reine Anzeigekorrektur, kein rr()-Aufruf, keine neue Groesse, s. PR-Beschreibung fuer die
+  // Screenshot-Gegenprobe.
+  function laeuferSchwebeXY(u,dy){ const p=laeuferXY(u); return {x:p.x,y:p.y+(dy||0)}; }
   // ZEITFAHREN-EINZELKAMERA, Ausschnittsgroessen (Chris' Fund 13.09., s. kameraUpdate).
   // ZF_MIN_AUSSCHNITT 0,56 heisst: nie weniger als 56 % der Strecke im Bild (Zoom <= 1,8,
   // gegen die bisherigen 2,2). ZF_NACHBAR_FENSTER 0,30 zieht jeden Laeufer in den Kasten,
@@ -26708,6 +32676,52 @@
     // Dokuments — das Oval ist genau darauf ausgelegt), es gibt nichts zu
     // schwenken oder heranzuzoomen. `ovalPunkt()` liest `cam` ohnehin nie.
     if(istOval())return;
+    // ================== WAND: HEADROOM STATT HARTEM SCHNITT (Broadcast-Optik Phase 5,
+    // Climbing-Audit-Fund 28.09., Klasse A) ==================
+    // Der Opus-Audit verglich Climbing direkt mit dem Nachbarn Breaking und fand die
+    // Kletterer "am oberen Rand des Bildes abgeschnitten". Nachgemessen, nicht vermutet: der
+    // generische Zweig unten (der bis hierhin auch fuer die Wand lief) speist zielCx/
+    // zielZoom NUR aus `aktiv=LAEUFER.filter(u=>u.fertig==null)` -- ein Kletterer, der
+    // toppt, faellt in genau dem Moment aus dieser Menge heraus, in dem er am hoechsten
+    // steht. Bleiben andere Routen weiter unten aktiv, zentriert der generische Zweig die
+    // Kamera auf DIE, das Bildfenster rutscht nach unten, und der bereits getoppte
+    // Kletterer (der weiter an seiner Position `u.pos=1` gezeichnet wird, s. laeuferXY())
+    // steht ploetzlich OBERHALB des Kamerafensters -- camY() kennt dafuer keine Grenze nach
+    // oben, das Bild schneidet ihn hart ab. Zusaetzlich liess derselbe Zweig nur 0,10
+    // Gesamt-Polster symmetrisch um die Mitte -- zu wenig Luft fuer eine nach oben
+    // greifende Figur plus Schwebetext (s. `laeuferSchwebeXY`-Kommentar oben), selbst wenn
+    // sie im Fenster bleibt.
+    //
+    // Behoben mit einer eigenen, climbing-only Kamera (bewusst NICHT der generische Zweig
+    // unten geaendert -- der bedient Spurt/Zeitfahren/Takeshi unveraendert weiter, keine
+    // Nebenwirkung fuer andere Bahnen):
+    //  1. ALLE LAEUFER statt nur der Aktiven -- ein getoppter Kletterer bleibt Teil der
+    //     Kamera-Spanne, bis buchstaeblich jeder fertig ist (dann faellt ohnehin niemand
+    //     mehr aus der Menge heraus). Reiner Lesezugriff auf `u.pos`, dieselbe Groesse, die
+    //     laeuferXY() fuer die Position ohnehin schon liest -- kein neues Feld, kein rr().
+    //  2. ASYMMETRISCHES POLSTER statt eines symmetrischen: mehr Luft UEBER dem hoechsten
+    //     Kletterer (WAND_KOPF_LUFT) als UNTER dem niedrigsten (WAND_FUSS_LUFT) -- eine
+    //     Figur reicht nach oben zum naechsten Griff, nicht nach unten, und am Wandfuss
+    //     steht ohnehin schon der Sicherer mit seinem eigenen festen Rand (s. `sy` in
+    //     bodenWand()).
+    // `u.pos`/`camY`/`cam.zoom`/`cam.cx` bleiben exakt dieselben Groessen, die die Wand
+    // ohnehin schon zeichnet -- rein die Eingabe fuer ihre Zielwerte aendert sich. Kein
+    // Leser von `cam` sitzt in stepSpurt/tempoVon/MOTOREN.climbing.wert(), also rho-neutral
+    // vor jeder Messung (s. PR-Beschreibung fuer die miss-alle-disziplinen.mjs-Gegenprobe).
+    if(istWand()){
+      if(!LAEUFER.length)return;
+      let minP=LAEUFER[0].pos,maxP=LAEUFER[0].pos;
+      for(const u of LAEUFER){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
+      const WAND_KOPF_LUFT=0.085, WAND_FUSS_LUFT=0.04;
+      const von=Math.max(0,minP-WAND_FUSS_LUFT), bis=Math.min(1,maxP+WAND_KOPF_LUFT);
+      const spanne=Math.max(0.05,bis-von);
+      const zielZoom=Math.max(1,Math.min(3.4,1/spanne));
+      const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
+      const t=Math.min(1,dt*1.8);
+      cam.zoom+=(zielZoom-cam.zoom)*t;
+      cam.cx+=(zielCx-cam.cx)*t;
+      return;
+    }
     // EINZELKAMERA (Zeitfahren-Fokus, Recherche Abschnitt 4.3): zoomt eng auf GENAU einen
     // Laeufer, wie ein Kamerawagen, der neben ihm herfaehrt — statt der Bounding-Box aller
     // noch Laufenden darunter. Gated hinter `BA().startAbstand` (nur Time-Trial setzt es)
@@ -26837,6 +32851,18 @@
       bahnFallenTypen=kurs.typen; bahnKursName=kurs.name; bahnKursChaos=kurs.chaos??null;
     }
     bahnEndeGemeldet=false;
+    bahnFuehrenderId=null; bahnFuehrenderSeit=-999; staffelFuehrendeSeite=null;
+    // BROADCAST-OPTIK 27.09. (G-1/TT-1/TT-2/ST-2/TK-1): dieselbe Rueckstell-Stelle wie die
+    // Fuehrungswechsel-Variablen oben -- jede dieser Anzeigen darf beim naechsten Rennen
+    // nicht mehr vom vorigen wissen.
+    bahnHotSeatId=null; bahnZzGemeldet=new Set();
+    bahnFalleGemeldet=new Set(); bahnFalleAnzeige=null;
+    staffelAktivVorher=[null,null]; staffelWechselAnzeige=null;
+    // PRIO-2 BROADCAST-OPTIK (27.09., Abschnitt 4.3/3.3): dieselbe Rueckstell-Stelle wie
+    // die Prio-1-Variablen direkt darueber -- keine dieser Anzeigen darf vom vorigen
+    // Rennen wissen.
+    staffelVerlauf=[]; staffelBeinMarken=[]; staffelAnkerGezeigt=[false,false];
+    spurtStationStats=(BA().hindernisse||[]).map(()=>({sauber:0,durch:0,sturz:0}));
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
@@ -26936,7 +32962,11 @@
         // Rennen aendert sich dadurch nicht: die Laufwerte kommen aus dem Rezept (R2),
         // nicht aus `eig`.
         eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
-        pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
+        // BALANCE/HOECHSTMARKE (Climbing-Neubau PR 2): harmlose Init-Felder fuer JEDE Bahn
+        // — nur Climbing liest/schreibt sie in stepSpurt weiter (`BA().balanceSteigungGrad`/
+        // `BA().climbing`), jede andere Bahn traegt sie nur ungenutzt mit.
+        pos:0, hoch:0, balance:1, umgesetzt:0, abgerutscht:0, rastCount:0,
+        v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
         plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
         bahnZ:bahn, wechselCd:0, wechsel:0,
@@ -27199,8 +33229,28 @@
     const A=BA();
     // STEIGUNG: kostet Tempo, abgefedert durch die Bergfaehigkeit (ENDTEMPO — "wer hinten
     // noch Reserven hat, holt am Berg etwas raus", genau Chris' Fiktion).
-    if(z.art==="steigung"){ const skill=skillLesen(u,A.bergSkill||"ENDTEMPO");
-      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100)); }
+    //
+    // NEBENWEG WUCHT (Pp-Fix, 23.09., zweiter Kalibrierschritt nach der kurveSkill-Aenderung
+    // oben). WUCHT (torment:40,dexterity:32,awareness:28) hatte in Time-Trial ueberhaupt
+    // keinen Kanal: sein einziger Leser war der Huerden-Sturz-Zweig in stepSpurt, und der
+    // laeuft nie, weil `hindernisse:[]` (K5) die Schleife auf null Durchlaeufe setzt — genau
+    // dieselbe Lehre wie bei TECHNIK oben, nur beim naechsten toten Sub-Skill. Torment liest
+    // dadurch seit K5 durchgaengig 0 %, wo die Matrix 3 sagt.
+    // Statt eines dritten, eigenen Gelaende-Zweigs (Time-Trial hat nur drei Zonenarten, s.
+    // BAHN_ART["time-trial"].gelaende) bekommt WUCHT hier einen NEBENWEG im BESTEHENDEN
+    // Steigungs-Kanal — dasselbe Primaer-/Nebenweg-Muster, das Chris am 21.09. fuer I-Spy
+    // eingefuehrt und ausdruecklich verallgemeinert hat ("auf genau diese Art und Weise
+    // kannst du auch Attribute in allen moeglichen Disziplinen nutzen"). ENDTEMPO bleibt der
+    // Primaerweg (volles Gewicht); WUCHT zieht als Nebenweg mit, moderat gewichtet
+    // (`bergNebenAnteil`, nur time-trial setzt sie) — wer den Huegel eher mit Kraft und
+    // Robustheit als mit Renntempo nimmt, kommt trotzdem etwas voran. Ohne `bergNebenSkill`
+    // (jede andere Bahn) bleibt die Zeile exakt die alte Formel, bit-identisch.
+    if(z.art==="steigung"){
+      const primaer=skillLesen(u,A.bergSkill||"ENDTEMPO");
+      const nebenName=A.bergNebenSkill, nebenAnteil=nebenName?(A.bergNebenAnteil??0):0;
+      const skill=nebenAnteil?primaer*(1-nebenAnteil)+skillLesen(u,nebenName)*nebenAnteil:primaer;
+      return 1-Math.max(0,(A.bergKosten??0.16)*z.staerke*(1-skill/100));
+    }
     // ABFAHRT: schenkt Tempo, mehr fuer wendige Laeufer — dieselbe Faehigkeit wie die
     // Kurve, weil eine Abfahrt technisch genau das ist: eine lange, offene Kurve.
     if(z.art==="abfahrt"){ const skill=skillLesen(u,A.abfahrtSkill||"WENDIGKEIT");
@@ -27250,19 +33300,28 @@
     // des Rennens, ohne dass ein Laeufer aus dem Bild faellt. Stehvermoegen federt ihn
     // zusaetzlich ab: wer zaeh ist, schleppt sich besser ins Ziel als einer, der es nicht
     // ist — genau das, wofuer der Wert da ist.
-    const leer=u.leer?(0.74+u.STEHEN*0.0012):1;
+    // EINBRUCH ALS EINBRUCH (TT-P1/SP-P1, Opus-Konzeptreview 26.09.): `leerTempoBasis`
+    // ersetzt die feste 0,74 nur dort, wo eine Bahn sie setzt (unten in time-trial/spurt) —
+    // jede andere Bahn liest hier weiter exakt 0,74, bit-identisch zu vorher.
+    const leer=u.leer?((BA().leerTempoBasis??0.74)+u.STEHEN*0.0012):1;
     // ANGESCHLAGEN. Wo es Nerven gibt, sind sie keine reine Schwelle: wer schon zweimal
     // im Wasser lag, geht die naechste Falle zaghafter an. Ohne das wirkte der Wille nur
     // im Moment des Ausscheidens — gemessen 8,9 % bei einem Matrixgewicht von 22.
     const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
+    // GESPUER (Pp-Fix Time-Trial, 23.09.): streckenweiter Dexterity/Awareness-Kanal, s.
+    // Kommentar bei `gespuerSkill` in BAHN_ART["time-trial"]. Gated auf `BA().gespuerSkill`
+    // (nur time-trial setzt es) — jede andere Bahn liest hier `undefined`, `gespuer` bleibt
+    // exakt 1, diese Zeile also bit-identisch zu vorher.
+    const gespuerSkill=BA().gespuerSkill;
+    const gespuer=gespuerSkill?1-(100-skillLesen(u,gespuerSkill))*(BA().gespuerGrad??0):1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
            *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.
-           *gelaendeFaktor(u)*(u.formTag||1);
+           *gelaendeFaktor(u)*(u.formTag||1)*gespuer;
   }
 
   // ===================================================================================
@@ -27318,6 +33377,9 @@
     u.plan=planId;
     u.tempo=p.tempo; u.sucht=p.sucht; u.label=p.label; u.text=p.text;
     u.ab=schonAngegangen?Math.min(p.ab,u.pos):p.ab;
+    // VIERTES FELD (Gegencheck 3.11, nur Climbing setzt `rastUnter` je Plan): unveraendert
+    // `undefined` fuer jede andere Bahn, liest sich am Griff als "nie rasten".
+    u.rastUnter=p.rastUnter;
     u.ansagen=(u.ansagen||0)+1;
     u.ansageBei=rennT;               // nur fuer die Anzeige, s. zeichneSpurt
     return true;
@@ -27433,6 +33495,12 @@
       u.v=tempoVon(u);
       const vor=u.pos;
       u.pos+=u.v*dt/strecke;
+      // HOECHSTMARKE (Gegencheck 3.3, Aenderung 1): die Wertung liest fuer Climbing
+      // `u.hoch`, nicht `u.pos` (s. bahnRangliste()/MOTOREN.climbing.wert() unten) — ein
+      // Abrutschen (Griff-Block) senkt `u.pos`, nie `u.hoch`. Fuer jede andere Bahn ist
+      // `u.pos` monoton steigend, `u.hoch` also ohnehin identisch; die Zeile aendert dort
+      // nichts, bleibt aber ausdruecklich hinter `BA().climbing` gehalten.
+      if(BA().climbing)u.hoch=Math.max(u.hoch||0,u.pos);
 
       // ---- ZWISCHENZEITEN (Zeitfahren, Recherche Abschnitt 4.4). Reine Erfassung, kein
       // rr()-Aufruf, keine Rueckwirkung auf die Simulation — dieselbe Uebergangs-Pruefung
@@ -27449,8 +33517,18 @@
       // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
       // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
+      //
+      // ZEHR-EXPONENT (TT-P1/SP-P1, Opus-Konzeptreview 26.09., Abschnitt 1c/2c: "Attacke
+      // muss ein Risiko sein"). Gemessen gewann Attacke im Zeitfahren 100 % der Rennen und
+      // "Von vorn" im Spurt 84 % — der Puste-Haushalt band nicht, weil der Mehrverbrauch
+      // aus 7 % mehr Tempo nur quadratisch stieg (+12 %), waehrend echter Luftwiderstand
+      // kubisch waechst (Real: 7 % mehr Tempo kostet rund 22 % mehr Leistung, Swain 1997).
+      // `zehrExponent` ist NUR in BAHN_ART["time-trial"]/`.spurt` gesetzt (unten); jede
+      // andere Bahn (Staffel, Takeshi, Climbing) liest hier `undefined` und faellt auf die
+      // ALTE Formel `ueber*ueber` zurueck — bit-identisch, keine andere Bahn betroffen.
       const ueber=Math.max(0.4,(laufAnteil(u)>=u.ab?1.0:u.tempo));
-      let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      const zehrExp=BA().zehrExponent, zehrTerm=zehrExp?Math.pow(ueber,zehrExp):ueber*ueber;
+      let zehr=(0.55+zehrTerm*(BA().zehrKoeff??1.9))*(u.imSchatten?SCHATTEN_SPAREN:1);
       // ZUG AN DER SPITZE (nur Staffel). WUCHT heisst dort ausdruecklich "Zug an der
       // Spitze" (s. BAHN_ART.staffel.lang) — hatte aber keinen einzigen Kanal: WUCHT ist
       // ueberall sonst der Rempler, und in der Staffel wird nicht gerempelt
@@ -27507,8 +33585,13 @@
       }
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
-        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+        schwebe({...laeuferSchwebeXY(u,-20),txt:"eingebrochen",life:1.2,crit:true,_laeufer:u.id});
+        // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): big nur, wenn der
+        // FUEHRENDE einbricht -- jeder andere Einbruch waere wieder Protokoll (heute
+        // ohnehin schon kein `true` hier, dieser Vergleich ist neu). `bahnRangliste()` ist
+        // dieselbe Rangliste, die HUD/Endstand lesen -- kein neuer Vergleich.
+        feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.",
+          bahnRangliste().reihe[0]?.id===u.id);
       }
       // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
       // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
@@ -27518,8 +33601,48 @@
       else if(u.leer && BA().pusteFangen && u.reserve>=BA().pusteFangen*u.reserveMax){
         u.leer=false;
         u.gefangen=(u.gefangen||0)+1;
-        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
+        schwebe({...laeuferSchwebeXY(u,-20),txt:"fängt sich",life:1.0,crit:false,_laeufer:u.id});
         feed(u.seite,u.n+" fängt sich wieder — Puste zurück bei "+Math.round(u.pos*100)+" % der Strecke.");
+      }
+
+      // ==================================================================================
+      // GLEICHGEWICHT UND DUELLDRUCK (Climbing-Neubau PR 2, Gegencheck 2.4/3.1/3.3). Beide
+      // Bloecke sind auf climbing-eigene Felder gegated (`balanceSteigungGrad`/
+      // `druckQuelle`), die KEINE andere Bahn setzt — Spurt/Staffel/Time-Trial/Takeshi
+      // lesen hier nichts und bleiben bit-identisch.
+      //
+      // PASSIVE BALANCE-DRAINS: die Steigung zehrt am Kopf wie an der Puste (mit der
+      // Hoehe waechst der Verbrauch), leere Puste macht zoegerlich (Pijpers 2005, s.
+      // Gegencheck 1.3), und wer unter seiner Plan-Schwelle bleibt, sammelt sich wieder —
+      // dieselbe `ueber`-Groesse, die auch den Reserve-Regen oben speist.
+      if(BA().balanceSteigungGrad){
+        u.balance=Math.max(0,Math.min(1,(u.balance??1)
+          -BA().balanceSteigungGrad*(BA().steigung||0)*u.pos*dt
+          -(u.leer?(BA().balanceLeerGrad??0)*dt:0)
+          +(!u.leer&&ueber<1?(BA().balancePlanGrad??0)*(1-ueber)*dt:0)));
+      }
+      // DUELLDRUCK (G-2, Gegencheck 3.1): "duell" ist der feste Gegner auf der gespiegelten
+      // Route (Heim-Slot i gegen Gast-Slot i, `Math.floor(bahnZ/2)` ist fuer beide gleich,
+      // weil die Bahnvergabe in bauSpurt() bereits abwechselnd H/G ist), "feld" ist der
+      // Vorsprung des Spitzenreiters unabhaengig von der Seite. Beide Fassungen schreiben
+      // NUR die eigene Balance des Betroffenen — kein `rr()`, kein Schreiben in ein fremdes
+      // `u.*`, der Sturz faellt weiter aus dem eigenen Wurf im Griff-Block (Regel "kein Zug
+      // durch fremde Hand", CLAUDE.md).
+      if(BA().druckQuelle){
+        let gegnerPos=null;
+        if(BA().druckQuelle==="duell"){
+          const partner=LAEUFER.find(o=>o!==u&&o.seite!==u.seite&&o.fertig==null
+            &&Math.floor(o.bahnZ/2)===Math.floor(u.bahnZ/2));
+          if(partner)gegnerPos=partner.pos;
+        } else {
+          for(const o of LAEUFER){ if(o!==u&&o.fertig==null&&(gegnerPos==null||o.pos>gegnerPos))gegnerPos=o.pos; }
+        }
+        if(gegnerPos!=null){
+          const vorsprung=Math.max(0,gegnerPos-u.pos);
+          const druck=Math.min(BA().druckMax??1,vorsprung/(BA().druckSchwelle??0.10));
+          if(druck>0)u.balance=Math.max(0,(u.balance??1)
+            -(BA().druckGrad??0.02)*druck*(1-0.8*(u.GLEICHGEWICHT||0)/100)*dt);
+        }
       }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
@@ -27571,7 +33694,31 @@
             // von `fallenKoennen` allein (Recherche Abschnitt 4.2). Das Feld bleibt im
             // Motor und in BAHN_ART ungesetzt; ohne es ist der Faktor 1 (jede Bahn).
             const stFaktor=A.stufePreis?(A.stufePreis[(A.fallenStufe||{})[hTyp]]??1):1;
+            // HINDERNIS-ZEIT-BUCHHALTUNG (Chris' Fund 22.09.: "wer die hindernisse am
+            // schnellsten genommen hat oder so weil das ja nicht unbedingt der ist der am
+            // schnellsten gelaufen ist"). `u.hindernisZeit` summiert NUR den Zeitpreis, den
+            // DIESE Station kostet — reine Buchhaltung wie `u.fallen`/`u.durchbruch`/
+            // `u.gestolpert` daneben, nie zurueckgelesen in tempoVon()/rr()/MOTOREN[d].wert().
+            // Vorher (der Math.max-Zuweisung) statt nachher gemessen, weil `u.huerde` hier
+            // Sekunde fuer Sekunde herunterlaeuft (`if(u.huerde>0)u.huerde-=dt`, oben) und ein
+            // Lesen nach dem Rennen nur noch 0 zeigen wuerde.
+            const huerdeVor=u.huerde||0;
             u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            // RAST AN DER EXE (Gegencheck 3.11): eine PLAN-Schwelle statt fester Booleans
+            // je Zone — an einem Henkel (`hTyp==="STEHEN"`, das sind bei Climbing genau die
+            // drei `zonen`-Positionen) wird zusaetzlich gerastet, wenn die Reserve UNTER
+            // `u.rastUnter` faellt (`rastUnter` kommt aus dem Plan, s. planWechsel()/L-Init
+            // oben). Die zusaetzliche Zeit laeuft in `u.huerde` mit ein — dieselbe Stelle,
+            // an der die volle Puste-Gutschrift oben bereits greift (`u.huerde>0`). Nur
+            // Climbing setzt `rastUnter`; jede andere Bahn liest hier `undefined<Zahl`,
+            // also `false`, und bleibt unveraendert.
+            if(hTyp==="STEHEN" && u.rastUnter!=null && u.reserveMax>0 && u.reserve/u.reserveMax<u.rastUnter){
+              u.huerde=Math.max(u.huerde,(A.rastZeit??1.2));
+              u.rastCount=(u.rastCount||0)+1;
+              if(A.balanceSteigungGrad)u.balance=Math.min(1,(u.balance??1)+0.40*(0.5+(u.GLEICHGEWICHT||0)/200));
+              feed(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
+            }
+            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
@@ -27611,6 +33758,9 @@
                 const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
                 const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
                 u.huerde+=preis; u.gedraengt=(u.gedraengt||0)+1; u.gedraengeZeit=(u.gedraengeZeit||0)+preis;
+                // Derselbe Bucher wie oben: das Gedraenge ist Teil des Zeitpreises DIESER
+                // Station, nicht der Laufstrecke dazwischen.
+                u.hindernisZeit=(u.hindernisZeit||0)+preis;
                 u.fallen[u.fallen.length-1].gedraenge=extra;
                 // SICHTBARES GEDRAENGE (docs/design/takeshi-animationen-hilfe-behinderung-
                 // recherche-06-09.md, Abschnitt 1.2/1.5): derselbe Ring, der im Kampf eine
@@ -27622,7 +33772,7 @@
                 // laeuferXY() kennt beide Faelle bereits (s. dort), camX/bahnY allein waere
                 // fuer die Route falsch platziert.
                 { const p=laeuferXY(u); effekt({typ:"welle",x:p.x,y:p.y,r:34,seite:u.seite,dauer:.5}); }
-                schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"im Gedränge",life:.8,crit:false,_laeufer:u.id});
                 // Ticker EINMAL je Falle und Pulk (ab `melden` Mitlaeufern). Je Laeufer
                 // gemeldet waren es 39 Zeilen in einem Rennen — das haette die Fallen
                 // aus dem Ticker gedraengt, statt sie zu wuerzen.
@@ -27630,6 +33780,9 @@
                 if(extra>=(G.melden??1) && !bahnGedraengeGemeldet.has(hi)){
                   bahnGedraengeGemeldet.add(hi);
                   feed(u.seite,"Gedränge an "+(A.hindernisWort||"Hürde")+" "+(hi+1)+" — "+(andere+1)+" Mann an einer Stelle, "+u.n+" mittendrin.");
+                  // TK-4 (Abschnitt 5.3, CAPTION_GEDRAENGE): direkter callout(), der Ticker
+                  // (die Zeile direkt darueber) bleibt unveraendert Play-by-Play.
+                  callout("Gedränge!",waehleCaption(CAPTION_GEDRAENGE));
                 }
               }
             }
@@ -27709,15 +33862,112 @@
             return null;
           })():null;
           const meldeStation=HUERDEN_N().indexOf(h);
+          // SP-1: STATIONSNAME IM AKKUSATIV (Abschnitt 3.3), nur wenn die Disziplin eine
+          // Namensliste fuehrt (heute nur Spurt) -- jede andere Bahn (Staffel/Climbing/
+          // Takeshi) bleibt bei ihrem generischen `hindernisWort` unveraendert.
+          const wortAkk=(A.hindernisWorte||[])[meldeStation];
           const melde=(art2,txt)=>{
             const key=meldeStation+"|"+art2;
             if(bahnKoennenGemeldet.has(key))return;
             bahnKoennenGemeldet.add(key); feed(u.seite,txt);
           };
+          if(A.umsetzBasis){
+            // ================================================================================
+            // CLIMBING-EIGENER GRIFF-BLOCK (PR 2, Gegencheck 3.3/3.7/4). Eigene Kopie statt
+            // eines dritten Zweigs im generischen Block — "eine Kopie, ein Faktor,
+            // vergleichen" (Projekt-Konvention). Gated EXKLUSIV auf `A.umsetzBasis`, das nur
+            // Climbing setzt: jede andere Bahn faellt in den `else`-Zweig unten, Zeichen fuer
+            // Zeichen der alte, ungeaenderte Code.
+            //
+            // PRIMAER-/NEBENWEG (Gegencheck 3.7/4, Konzept 4, "mehrere Wege zum Erfolg" aus
+            // CLAUDE.md): der Primaerweg ist die Griffart selbst (`koennen`, oben schon zur
+            // Griffart gemischt). Nebenweg 1 ist der Kraftzug (WUCHT) — entfaellt an der
+            // Zange, wo WUCHT bereits der Primaerweg ist. Nebenweg 2 ist das Umsetzen
+            // (WENDIGKEIT) — entfaellt am Sloper aus demselben Grund. Balance senkt JEDEN
+            // der drei Wuerfe gleich (`balanceAbzug`, dieselbe Form wie `pusteAbzug`:
+            // verschiebt nur die Schwelle, nie Zahl/Reihenfolge der `rr()`-Wuerfe).
+            const balanceAbzug=(A.balanceAbzugGrad??0)*(1-(u.balance??1));
+            const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug-balanceAbzug));
+            if(rr()<=technik){                             // PRIMAERWEG: sauber
+              if(meldeTyp==="stark"){
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+                melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                  " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
+              }
+              continue;
+            }
+            if(hTyp!=="WUCHT"){
+              const wucht=Math.min(0.92,Math.max(0.02,(A.wuchtBasis??0.10)+durch*(A.wuchtSpanne??0.0090)-pusteAbzug-balanceAbzug));
+              if(rr()<=wucht){                             // NEBENWEG 1: Kraftzug
+                u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
+                u.stolper=A.wuchtZeit??0.12;
+                u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+                u.durchbruch=(u.durchbruch||0)+1;
+                if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
+                u.balance=Math.max(0,(u.balance??1)-(A.balanceKraftzug??0));
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"zieht durch",life:.8,crit:false,_laeufer:u.id});
+                feed(u.seite,u.n+" zieht den Kraftzug durch.");
+                continue;
+              }
+            }
+            if(hTyp!=="WENDIGKEIT"){
+              const umsetz=Math.min(0.92,Math.max(0.02,(A.umsetzBasis??0.10)+u.WENDIGKEIT*(A.umsetzSpanne??0.0080)-pusteAbzug-balanceAbzug));
+              if(rr()<=umsetz){                            // NEBENWEG 2: Umsetzen (NEU)
+                u.stolper=A.umsetzZeit??0.45;
+                u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+                u.umgesetzt=(u.umgesetzt||0)+1;
+                if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='umsetzen';
+                u.balance=Math.max(0,(u.balance??1)-(A.balanceUmsetzen??0));
+                schwebe({...laeuferSchwebeXY(u,-20),txt:"setzt um",life:.8,crit:false,_laeufer:u.id});
+                feed(u.seite,u.n+" setzt den Fuß neu und findet die Linie wieder.");
+                continue;
+              }
+            }
+            // ABRUTSCHEN (A-2 "zurueck zur Exe", Gegencheck 3.3, drei Aenderungen):
+            //   1. Die HOECHSTMARKE zaehlt (u.hoch, s. stepSpurt oben/bahnRangliste()/
+            //      MOTOREN.climbing.wert() unten), nicht `u.pos` nach dem Sturz.
+            //   2. Balance wird GEDECKELT (min), nicht auf einen Wert GEHOBEN — ein Sturz
+            //      belohnt niemanden.
+            //   3. Kein Puste-Regen im Seil haengen: dieser Zweig setzt `u.huerde` NICHT,
+            //      also greift die volle Rast-Gutschrift (nur bei `u.huerde>0`) hier nie.
+            // Deckel "hoechstens ein Abschnitt" ist durch die Zonen-Abstaende (zwei bis drei
+            // Griffe) automatisch erfuellt, keine zusaetzliche Klemme noetig.
+            const zoneUnter=(A.zonen||[]).filter(z=>z<h).sort((x,y)=>y-x)[0] ?? 0;
+            // STURZ-ANIMATION (Bug 3, reine Anzeige): `u.pos` selbst springt weiterhin in
+            // diesem einen Frame auf `zoneUnter` -- daran haengt `wert()`/`bahnRangliste()`
+            // ueber `u.hoch`, das bleibt unangetastet. `vizFallVon`/`vizFallT` sind
+            // ausschliesslich fuer `climbAnzeigeAnteil()` (zeichneWand/laeuferXY, s. dort) --
+            // derselbe Zaehl-statt-Zustand-Trick wie `u.ansageBei=rennT` zwei Bildschirme
+            // weiter oben. Kein rr(), keine Rueckwirkung auf u.pos/u.hoch/tempoVon().
+            u.vizFallVon=u.pos;
+            u.vizFallT=rennT;
+            u.pos=zoneUnter;
+            u.abgerutscht=(u.abgerutscht||0)+1;
+            if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
+            const robustFaktor=Math.max(0.45,1-u.ROBUST*(A.abrutschROBUST??0.0045));
+            u.stolper=(A.abrutschZeit??0.90)*robustFaktor;
+            if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
+            u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
+            u.reserve=Math.max(0,u.reserve-(A.stolperKraft??8)*robustFaktor);
+            u.gestolpert++;
+            u.balance=Math.min(u.balance??1,A.abrutschBalanceDeckel??0.6);
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"rutscht ab",life:1.0,crit:true,_laeufer:u.id});
+            if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+              melde("schwach",u.n+" rutscht an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
+                " ab — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
+            } else {
+              feed(u.seite,u.n+" rutscht ab und fällt ins Seil bis zur letzten Exe zurück.");
+            }
+          } else {
           const technik=Math.min(0.97,Math.max(0.02,(A.technikBasis??0.35)+koennen*(A.technikSpanne??0.0065)-pusteAbzug));
           if(rr()<=technik){                               // sauber drueber
+            // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, Klasse A*). Nur Spurt fuehrt
+            // `hindernisNamen`/eine Stationsanzeige -- Takeshi zaehlt hier zwar mit (der
+            // Zweig ist derselbe fuer beide Bahnen), zeichnet die Zahl aber nirgends, s.
+            // bodenSpurtGerade(). Reiner Anzeige-Zaehler, kein rr()-Aufruf, kein Ruecklesen.
+            if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sauber++;
             if(meldeTyp==="stark"){
-              schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
               melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
                 " — "+((A.lang||{})[hTyp]||hTyp)+" ist seine Stärke.");
             }
@@ -27727,10 +33977,16 @@
           if(rr()<=wucht){                                 // durchgebrochen
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
+            // Derselbe Bucher wie oben: der Kraftzug kostet Zeit an DIESER Station (der
+            // Hauptkanal fuer Climbing, das kein `hindernisTypen`/`u.huerde` fuehrt, s.
+            // Kopfkommentar von stepClimbing).
+            u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
             u.durchbruch=(u.durchbruch||0)+1;
             if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
+            // SP-2: derselbe Zaehler wie oben, nur der WUCHT-Nebenweg ("⚡").
+            if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).durch++;
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
+            feed(u.seite,u.n+" nimmt "+(wortAkk||(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort))+" mit Gewalt.");
             continue;
           }
           // WIE LANGE ER LIEGT, haengt an demselben Koennen wie das Gelingen — mit
@@ -27749,8 +34005,13 @@
           // finden, den Griff neu setzen. Wer wendig ist, haengt kuerzer.
           if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
           if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
+          // Derselbe Bucher wie oben, jetzt mit dem endgueltigen (WENDIGKEIT-korrigierten)
+          // Stolper-Wert des Sturzes.
+          u.hindernisZeit=(u.hindernisZeit||0)+u.stolper;
           u.gestolpert++;
           if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='sturz';
+          // SP-2: dritter Zaehler ("✗"), s. beide Stellen oben.
+          if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sturz++;
           // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
           //
           // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
@@ -27785,9 +34046,17 @@
             // (steine/brueckenball/schlamm), "platsch" (bislang toter Katalogeintrag) passt
             // zum "im Wasser landen"-Charakter des Scheiterns.
             if(A.takeshi)sfx("takeshis-castle","platsch");
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"ausgeschieden",life:1.4,crit:true,_laeufer:u.id});
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein Ausscheiden
+            // ist seltenes, sofort verstaendliches Bild-Ereignis -- immer big, wie Chris'
+            // Hockey-Vorbild (Tor immer big) es fuer diese Bahn-Disziplin vorschreibt.
+            // TK-4 (Abschnitt 5.3): eine CAPTION_AUSSCHEIDEN-Zeile, der Banner 400 ms NACH
+            // diesem Schwebetext ("die Pointe folgt dem Platscher, nicht davor", Craig
+            // Charles' Muster) -- die Ticker-Zeile selbst bleibt sofort und unveraendert,
+            // nur der Callout wartet (s. feed()s sechster Parameter, nach K5s `kind`).
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
-              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
+              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.",true,
+              waehleCaption(CAPTION_AUSSCHEIDEN,u.n),undefined,400);
             break;
           }
           // TON (Ziel 3, A4): Laeufer stuerzt (nicht ausgeschieden). Diese Zeile laeuft fuer
@@ -27795,14 +34064,25 @@
           // deshalb dieselbe A.takeshi-Gate wie bei "falle" -- sonst hoerte man den
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
-          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
+          schwebe({...laeuferSchwebeXY(u,-20),txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
+          // TK-4 (Abschnitt 5.3, "CAPTION_STURZ_SCHWER, nur fuer einen Sturz an einer
+          // Drei-Sterne-Falle, damit es selten bleibt") plus dieselbe Mechanik fuer Spurts
+          // Wassergraben ("Dieselbe Mechanik traegt im Spurt CAPTION_STURZ fuer das
+          // Wasser"). Direkter callout()-Aufruf statt ueber feed()/big: der Ticker bleibt
+          // Play-by-Play (unveraendert), die Caption ist reine Color-Ebene daneben.
+          if(A.takeshi && (A.fallenStufe||{})[hTyp]===3){
+            callout(u.n+" stürzt schwer!",waehleCaption(CAPTION_STURZ_SCHWER,u.n));
+          } else if(A.spurt && (A.hindernisBilder||[])[meldeStation]==="wasser"){
+            callout(u.n+" stolpert!",waehleCaption(CAPTION_STURZ_WASSER,u.n));
+          }
           // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
           // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
           if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
             melde("schwach",u.n+" liegt an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
               " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
           } else {
-            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
+            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt "+(wortAkk||("die "+BA().hindernisWort))+"."));
+          }
           }
         }
       }
@@ -27912,8 +34192,11 @@
               { const po=laeuferXY(o), pu=laeuferXY(u);
                 effekt({typ:"hieb",x:po.x,y:po.y,ux:pu.x,uy:pu.y,seite:u.seite,schwer:true,dauer:.42}); }
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:TA.tackleFenster?"gerammt":"getackelt",life:1,crit:true,_laeufer:o.id});
+              // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein
+              // erfolgreicher Rempler ist der Moment, den jede Rennuebertragung zeigt --
+              // selten genug (Torment trug gemessen nur 2,2 % der Rennen), immer big.
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
-                                                :" räumt "+o.n+" von der Bahn."));
+                                                :" räumt "+o.n+" von der Bahn."),true);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
               feed(o.seite,o.n+" steckt den Rempler weg.");
@@ -28001,10 +34284,13 @@
           if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.");
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"Wechsel verpatzt",life:1.2,crit:true,_laeufer:u.id});
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): eine verpatzte
+            // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
+            // selten (nur bei `patzer`) und sofort verstaendlich.
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true);
           } else {
-            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
@@ -28019,7 +34305,10 @@
           u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
-          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".");
+          // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): der erste
+          // Zieleinlauf einer Seite ist bei der Staffel ein EINMALIGES Ereignis (die
+          // Mannschaft ist im Ziel, nicht ein Einzelner) -- immer big.
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".",true);
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
@@ -28034,10 +34323,38 @@
           // Rangliste, die das HUD und der Endstand lesen — eine Wahrheit statt zweier.
           if(BA().startAbstand){
             const rang=bahnRangliste().reihe.findIndex(x=>x.id===u.id)+1;
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
+            // drei Ziel-Plaetze sind big -- sonst wird der Zieleinlauf wieder ein Protokoll
+            // (Doc-Vorgabe Abschnitt 4.3.1: "Einzel: nur Platz 1-3").
             feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
-              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".");
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3);
           } else {
-            feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+            // ZEITSKALA-FIX (Chris' Fund 22.09., zwei Screenshots desselben Rennens: Ticker
+            // "14,8 s.", Endstand "2:22,4 min." fuer denselben Laeufer). Der Ticker schrieb
+            // hier `rennT` roh in SIMULATIONSSEKUNDEN, waehrend der Endstand (bahnRangliste()/
+            // die Wertungstabelle, `:26464` `fmt:fmtRealZielzeit`) laengst durch `bahnZeit()`
+            // + `bahnRealSek()`/`zeitFaktor()` UND `bahnZeitText()`s Minutenformat ging. Bei
+            // ZEIT_DEHNUNG.climbing=4,38 macht das den Faktor-~10-Unterschied zwischen "14,8 s"
+            // und "2:22,4 min" — kein Rundungsfehler, sondern zwei verschiedene Massstaebe auf
+            // demselben Bildschirm. Betrifft nach demselben Codepfad (dieser `else`-Zweig läuft
+            // fuer jede Bahn ohne `startAbstand` und ohne `BA().staffel`) auch Spurt und
+            // Takeshi's Castle — Staffel hat oben ihren eigenen, bereits korrekten Zweig
+            // (`fmtZielzeit(rennT)`, Zeile ~28268), Time-Trial den `if(BA().startAbstand)`-Zweig
+            // direkt darueber (schon vor dieser PR korrekt). `fmtZielzeit` ist dieselbe
+            // Funktion, die auch der Staffel-Zieleinlauf und die Wertungstabelle benutzen: EIN
+            // Massstab, EIN Format, fuer alle fuenf Bahn-Disziplinen.
+            // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
+            // drei Ziel-Plaetze sind big, s. Kommentar am startAbstand-Zweig oben.
+            //
+            // BUGFIX 27.09. (Opus-Review desselben Tages, Takeshi's-Castle-Platzzaehlung):
+            // `rennFertig` nimmt Ausgeschiedene beim Ausscheiden (":30328", `rennFertig.push(u)`
+            // im nervenKosten-Zweig) genauso auf wie echte Finisher hier. `rennFertig.length`
+            // roh gerechnet zaehlte darum jeden vorher Ausgeschiedenen mit und meldete einen zu
+            // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
+            // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
+            const zielPlatz=rennFertig.filter(x=>!x.raus).length;
+            feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
+              zielPlatz<=3);
           }
         }
       }
@@ -28058,7 +34375,12 @@
     }
     kameraUpdate(dt);
     bahnBewegung(dt);
-    if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
+    // ZEITLIMIT (Gegencheck 3.5, nur Climbing setzt `BA().zeitlimit`): das Rennen endet wie
+    // ein Lead-Versuch, sobald die Uhr abgelaeuft ist, auch wenn noch nicht alle oben sind
+    // -- Nicht-Angekommene bleiben `fertig==null` und werden nach Hoehe geordnet
+    // (bahnRangliste()/wert(), s. dort). Jede andere Bahn liest hier `undefined>=rennT`,
+    // also `false`, und bleibt beim alten 60-Sekunden-Deckel.
+    if(rennFertig.length>=LAEUFER.length||rennT>60||(BA().zeitlimit&&rennT>=BA().zeitlimit))done=true;
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT FUER DIE BAHN (PR 0.3, Opus-Plan Zehn-Disziplinen 09-10,
@@ -28351,6 +34673,17 @@
       if(u.vizSchritt==null){
         u.vizSchritt=(u.id||0)*2.3;
         u.vizGriffN=0; u.vizZugN=u.durchbruch||0; u.vizFehlgriffN=u.gestolpert||0; u.vizTopoutTon=false;
+        // EXE-ZAEHLER (Climbing-Neubau PR 1, 24.09.), init auf den Stand beim ersten Frame --
+        // dasselbe Zaehl-statt-Zustand-Muster wie vizGriffN direkt daneben. Rein
+        // praesentational: liest nur u.pos gegen WAND_EXE_INDIZES (bodenWand()s Vorgriff auf
+        // die PR-2-Zonen), schreibt nur das neue viz*-Feld, nie u.pos/rr()/tempoVon().
+        u.vizExeN=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
+        // C5 (Broadcast-Optik-Recherche 27.09., Klasse A): EXE-SPLITS. `vizExeT[k]` haelt
+        // den Buehnen-Zeitpunkt (`rennT`, dieselbe Groesse, die auch bahnZeit()/Zwischen-
+        // zeiten benutzen) fest, an dem diese Route ihre (k+1)-te Exe zum ERSTEN Mal
+        // geklinkt hat -- ausschliesslich fuer den Vergleich gegen den Duellpartner in
+        // bodenWand() (s. dort). Kein neuer rr(), kein Einfluss auf wert()/tempoVon().
+        u.vizExeT=[];
       }
       if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/BAHN_SCHRITT_PX;
       // ---- GRIFF-TON (TON_KATALOG.climbing.griff), an der Kante "ein weiterer der zehn
@@ -28363,6 +34696,20 @@
       // Ausgangs-Zaehlern der Simulation.
       if((u.durchbruch||0)>u.vizZugN){ u.vizZugN=u.durchbruch; sfx("climbing","zug"); }
       if((u.gestolpert||0)>u.vizFehlgriffN){ u.vizFehlgriffN=u.gestolpert; sfx("climbing","fehlgriff"); }
+      // ---- EXE-TICKER ("Exe" statt "Zone", Gegencheck 3.6): nur ein Ticker-Text, kein Ton
+      // (kein neuer TON_KATALOG-Eintrag in dieser PR) -- meldet, wenn der Kletterer einen der
+      // drei vorgesehenen Exe-Griffe erreicht hat. Rein kosmetisch wie GRIFF-TON oben.
+      if(u.fertig==null){
+        const geklinkt=WAND_EXE_INDIZES.filter(idx=>u.pos>=(BA().hindernisse||[])[idx]).length;
+        if(geklinkt>u.vizExeN){
+          // C5: Zeitstempel fuer jede NEU erreichte Exe (kann bei einem grossen Zeitschritt
+          // mehr als eine auf einmal sein) -- derselbe rennT-Zeitpunkt, aus dem auch
+          // bahnZeit()/die Zwischenzeiten der anderen Bahnen ihre Differenzen bilden.
+          for(let k=u.vizExeN;k<geklinkt;k++)u.vizExeT[k]=rennT;
+          u.vizExeN=geklinkt;
+          feed(u.seite,u.n+" klinkt die "+(geklinkt===1?"erste":geklinkt===2?"zweite":"dritte")+" Exe.");
+        }
+      }
       // ---- TOPOUT-TON (TON_KATALOG.climbing.topout), einmalig wie ueberall sonst.
       if(u.fertig!=null && !u.vizTopoutTon){ u.vizTopoutTon=true; sfx("climbing","topout"); }
     }
@@ -28630,23 +34977,52 @@
     const sk0=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
     for(const u of reihe){
       const platz=rennFertig.indexOf(u);
-      const {x,y}=laeuferXY(u);
+      let {x,y}=laeuferXY(u);
+      // TT-2: HOT SEAT (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Der aktuelle
+      // Bestzeithalter bekommt eine eigene, erhoehte Stelle -- ein Podest -- statt in der
+      // Ziel-Warteschlange unterzugehen. Reine Positions-Verschiebung fuer DIESE Zeichnung;
+      // `rennFertig`/`laeuferXY()`/`bahnRangliste()` bleiben unberuehrt, `platz` (seine
+      // Reihenfolge in der Warteschlange) zaehlt normal weiter mit.
+      const hotSeat=BA().startAbstand&&u.fertig!=null&&u.id===bahnHotSeatId;
+      if(hotSeat){
+        y-=34;
+        ctx.fillStyle="rgba(40,30,10,.55)"; ctx.fillRect(x-16,y+38,32,6);
+        ctx.fillStyle="rgba(120,90,30,.8)"; ctx.fillRect(x-11,y+32,22,8);
+      }
       // AN DER ZIELLINIE WARTEND (nur Staffel, Abschnitt 3 des Recherche-Dokuments):
       // etwas kleiner und gedimmt, damit auf einen Blick klar ist, wer GERADE
       // laeuft — ihre Eignung bleibt trotzdem lesbar (Namenszeile/HUD unveraendert).
       const wartet=BA().staffel && !u.aktiv && u.fertig==null;
+      // AUSGESCHIEDEN: GEDIMMT UND ENTSAETTIGT STATT WIE EIN AKTIVER LAEUFER (Opus-Review
+      // 27.09.). `u.raus` (exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt
+      // ":30329") blieb hier bisher ungeprueft -- ein Ausgeschiedener stand seither an
+      // seiner Ausscheide-Position bewegungslos, aber in vollen Farben und derselben
+      // Groesse wie jeder Laufende, ununterscheidbar von jemandem, der nur kurz stolpert.
+      // Dieselbe Dimm-Mechanik wie beim wartenden Staffel-Laeufer oben (`wartet`), nur
+      // deutlich staerker (0,4 statt 0,72) und mit `ctx.filter` zusaetzlich entsaettigt --
+      // reine Anzeige, liest nur das bestehende, schon von stepParcours gesetzte Feld
+      // (`u.vizZustand==="ausgeschieden"`, ":30872"), schreibt nichts, aendert nichts an
+      // wert()/rr()/rho.
+      const raus=!!u.raus;
       const sk=wartet?sk0*0.88:sk0;
-      ctx.globalAlpha=wartet?0.72:1;
+      const dimAlpha=raus?0.4:(wartet?0.72:1);
+      ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
       ctx.beginPath();ctx.ellipse(x,y+16,14*sk,5*sk,0,0,6.283);ctx.fill();
-      ctx.globalAlpha=wartet?0.72:1;
+      ctx.globalAlpha=dimAlpha;
       // BLICKRICHTUNG AUS DER TANGENTE (Plan 6.2). Auf der geraden Bahn schaut jeder nach
       // rechts (vx:4) — das ist dort auch die Laufrichtung. Auf der Route dreht der Weg;
       // wer auf dem Abstieg zum See seitwaerts laeuft, sieht falsch aus. blickAus() kennt
       // vier Richtungen und braucht dafuer nur vx/vy — hier die Tangente, auf 4 skaliert
       // (die Schwelle |vy|>2 in blickAus verlangt einen Betrag ueber 2).
       const tg=istRoute()&&u.stolper<=0?routeXY(u.pos):null;
+      // WAND: KLETTERT NACH OBEN STATT NACH RECHTS ZU LAUFEN (Climbing-Neubau PR 1, 24.09.).
+      // blickAus() kennt bereits eine "nach oben"-Richtung (vy<0, Rueckenansicht/LPC-Norden,
+      // s. dortiger Kommentar) -- genau das Bild eines Kletterers, der der Wand zugewandt
+      // nach oben steigt, statt seitwaerts zu laufen. Gilt nur, wenn `istWand()` wahr ist
+      // (also nur fuer Climbing); jede andere Bahn bleibt bei ihrem vx:4/vy:0-Standardblick.
+      const wandBlick=istWand()&&u.stolper<=0;
       // WARTENDE JOGGEN NICHT AUF DER STELLE (Fund aus der 05-09-Recherche, Teil 4:
       // vx:4 liess sie sichtbar laufen, obwohl sie stehen — vx:0 nutzt das schon
       // vorhandene idle-Blatt in zeichneSprite, kein neues Asset noetig).
@@ -28691,7 +35067,8 @@
         // WARTENDE JOGGEN NICHT AUF DER STELLE (Staffel-Oval, s. Kommentar oben):
         // vx:0 statt der sonst ueberall geltenden 4, wenn u wartet -- AUSSER er ist der
         // Naechste in der Wechselzone und laut vizAnlauf schon am Anlaufen.
-        vx:u.stolper>0?0:(tg?tg.tx*4:((wartet&&!anlaufLaeuft)?0:4)), vy:tg?tg.ty*4:0, side:u.seite,
+        vx:u.stolper>0?0:(tg?tg.tx*4:(wandBlick?0:((wartet&&!anlaufLaeuft)?0:4))),
+        vy:tg?tg.ty*4:(wandBlick?-4:0), side:u.seite,
         // SCHRITTPHASE AUS DEM EIGENEN TEMPO (Zeitfahren, Ziel 8, s. stepZeitfahren):
         // ausschliesslich stepZeitfahren schreibt u.vizSchritt, diese Zeichenfunktion
         // liest es nur. Fuer jede andere Bahn ist es undefined und zeichneSprite faellt
@@ -28725,7 +35102,13 @@
       const huerdeHaltung=1-huerdeAusschlag*0.06;
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
+      // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
+      // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
+      // ihre eigene Dimmung ueber `dimAlpha` (oben).
+      if(raus)ctx.filter="grayscale(1) brightness(0.8)";
       zeichneSprite(ctx,parcSpriteArg,x,y);
+      if(raus)ctx.filter="none";
       // STARTNUMMERNBAND (DISZIPLIN_PROP.takeshi, PR 0.2-Format, A3 20→25/Assets 95→100 --
       // separater Bonus, s. PR-Beschreibung, nicht Teil der Movement-Rechnung oben). Nur
       // waehrend der Laeufer aktiv im Rennen ist (`u.fertig==null`) -- Ziel/Ausscheiden zeigen
@@ -28786,6 +35169,32 @@
           u.huerde>0?"huerde":"laufen");
       }
       ctx.restore();
+      // ================== C6.2: BALANCE-RING (Broadcast-Optik-Recherche 27.09., Klasse A)
+      // ==================
+      // Konzept 5.3 (Climbing-Neubau, nicht gebaut) und Doku C6.2: "man sieht nicht, dass
+      // jemand wackelt" -- `u.balance` (0..1, stepSpurt() senkt sie durch Steigung/leere
+      // Puste/Kraftzug/Umsetzen, s. BAHN_ART.climbing.balanceSteigungGrad-Kommentar) wirkt
+      // laengst auf den Duelldruck und die Grifferfolgschance, war aber nirgends abzulesen.
+      // Reiner Lesezugriff auf ein bestehendes Motor-Feld, schreibt nichts, kein rr() --
+      // derselbe Vertrag wie jede andere Zeichnung in dieser Funktion. Nur fuer Climbing
+      // (`istWand()`) und nur, solange geklettert wird (kein Ring auf einer bereits
+      // ausgestiegenen oder fertigen Figur, die ohnehin nicht mehr wackelt).
+      if(istWand() && u.fertig==null && u.stolper<=0){
+        const bal=u.balance??1;
+        ctx.save();
+        ctx.globalAlpha=0.85;
+        ctx.lineWidth=2;
+        // Ab 0,6 gelb, unter 0,4 rot und leicht zitternd (Doku: "ab 0,6 gelb, unter 0,4 rot
+        // und zitternd") -- darueber ein ruhiger, kaum sichtbarer Ring, damit das Bild bei
+        // guter Balance nicht unnoetig unruhig wird.
+        const wackelt=bal<0.4;
+        const jx=wackelt?Math.sin(buehneT*30+u.id)*1.6:0;
+        ctx.strokeStyle=bal<0.4?"#ff5a4a":bal<0.6?"#f2d75a":"rgba(255,255,255,.30)";
+        ctx.beginPath();
+        ctx.arc(x+jx,y+2,15*sk,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0.06,bal));
+        ctx.stroke();
+        ctx.restore();
+      }
       // DER STAB (A3/M-Ziel 6, DISZIPLIN_PROP.staffel/zeichneStab, s. dort): nur der
       // AKTUELLE Traeger zeigt ihn -- im Normalfall der gerade Laufende, waehrend der
       // 0,55-Sekunden-Uebergabe-Animation (stepStaffel, s. dort) eine Zwischenposition
@@ -28878,6 +35287,20 @@
           ctx.fillStyle="rgba(255,255,255,.45)";
           ctx.fillRect(x-bw/2+bw*0.2,y+20,1,bh);
         }
+        // TK-3: NERVEN SICHTBAR (broadcast-optik-bahn-27-09.md Abschnitt 5.3, "heute kommt
+        // 'ausgeschieden' ohne Vorwarnung"). Eine zweite, schmale Leiste in Lila unter der
+        // Puste -- reiner Lesezugriff auf u.nerven/u.nervenMax, dieselben Felder, die
+        // tempoVon() und das Ausscheiden in stepSpurt laengst nutzen ("if(BA().nervenKosten
+        // && u.nerven<=0)"), hier nur gezeichnet. Pulsiert unter 25 %, damit ein
+        // bevorstehendes Ausscheiden ANGEKUENDIGT wird, statt aus dem Nichts zu kommen.
+        if(BA().nervenKosten && u.nervenMax){
+          const nb=Math.max(0,u.nerven/u.nervenMax);
+          const vorAlpha=ctx.globalAlpha;
+          if(nb<0.25)ctx.globalAlpha=vorAlpha*(0.55+0.45*Math.sin(rennT*10));
+          ctx.fillStyle="rgba(8,10,14,.55)"; ctx.fillRect(x-bw/2,y+26,bw,3);
+          ctx.fillStyle="#9b6fd6"; ctx.fillRect(x-bw/2,y+26,bw*nb,3);
+          ctx.globalAlpha=vorAlpha;
+        }
       }
       // STARTRAMPE (Chris' Fund 13.09., Punkt 1: "zum start laufen nicht alle gleichzeitig
       // los"). Der Einzelstart ist richtig und gewollt — er war nur nicht angesagt. Wer
@@ -28889,6 +35312,21 @@
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
         ctx.strokeText(txt,x,y-19); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19);
+        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
+      // TT-1: ZWISCHENZEIT-TAFEL (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Reine
+      // Anzeige: `u.vizZzFlash` wird ausschliesslich in updateHudBahn() gesetzt (s. dort),
+      // niemals in stepSpurt/stepZeitfahren -- ohne jede Rueckwirkung auf tempoVon()/rr()/
+      // wert(). Dieselbe Bildschirmraum-Ankerung (y-19) wie der "Start in"-Countdown und
+      // die Burgpunkte-/"Raus"-Zeile, die an dieser Stelle nur fuer andere Bahnen zeichnen.
+      if(u.vizZzFlash && rennT<u.vizZzFlash.bis){
+        const fz=u.vizZzFlash;
+        const txt="ZZ"+(fz.ci+1)+" · "+(fz.neueBest?"BESTZEIT":(fz.rang+"."))+
+          (fz.delta?(" · "+(fz.neueBest?"−":"+")+fmtDauer(Math.abs(fz.delta))):"");
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+        ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+        ctx.strokeText(txt,x,y-19);
+        ctx.fillStyle=fz.neueBest?"#f2d75a":"#c0504a"; ctx.fillText(txt,x,y-19);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       ctx.textAlign="center";
@@ -28922,16 +35360,85 @@
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
+      // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
+      // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
+      // unten -- bislang gar keine Zeile, nur die stumme, unbewegte Figur (jetzt immerhin
+      // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
+      // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
+      if(raus){
+        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
+        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
       // Finisher waeren zwoelf Zeilen "Platz n · Zeit · ★" uebereinander auf dem Pflaster,
       // und die Ziffern stehen ohnehin in der Wertungstabelle daneben. Auf der geraden
       // Bahn (Spurt, Staffel, ...) bleibt die Zeile, dort stehen die Fertigen einzeln
       // gestaffelt rechts neben der Ziellinie.
-      if(u.fertig!=null&&!istRoute()){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+bahnZeit(u).toFixed(1)+" s"+
+      // ZEITSKALA-FIX (derselbe Fund wie beim Ticker oben, s. dortiger Kommentar): auch
+      // dieses Etikett am Zieleinlauf schrieb `bahnZeit(u)` roh in Simulationssekunden.
+      // `fmtZielzeit` liefert dieselbe gestreckte, minutenfaehige Zeit wie Ticker und
+      // Wertungstabelle — inklusive der Einheit, das frueher separat angehaengte " s" faellt
+      // deshalb weg.
+      // TT-2: HOT SEAT statt "Platz n" (Abschnitt 2.3) -- "ein Schild 'HOT SEAT' und seine
+      // Zeit". `hotSeat` (oben, dieselbe Bedingung wie beim Podest) gilt exklusiv Time-
+      // Trial; jede andere Bahn bleibt bei ihrer alten "Platz n"-Zeile.
+      if(u.fertig!=null&&!istRoute()){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
+        :"Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
         (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
-        ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
+        ctx.strokeText(pt,x,y-19);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,y-19);}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
+    // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3, "das
+    // Gegenstueck zu TT-1"). Die Tafel haengt an der Position, an der der GEBENDE Laeufer
+    // gerade steht -- `u.pos=u.beinBis` seit dem Wechsel (stepSpurt), also exakt die
+    // Wechselzone, an der er den Stab abgegeben hat. `staffelWechselAnzeige` wird
+    // ausschliesslich in updateHudBahn() gesetzt/erkannt (s. dort); diese Zeichnung liest
+    // sie nur.
+    if(BA().staffel && staffelWechselAnzeige && rennT<staffelWechselAnzeige.bis){
+      const sw=staffelWechselAnzeige;
+      const geber=LAEUFER.find(o=>o.seite===sw.seite&&o.bein===sw.bein-1);
+      const swp=geber?laeuferXY(geber):{x:W/2,y:H*0.5};
+      const farbe=sw.fSeite==null?"#dfe4ee":(sw.fSeite===0?"#f2a03d":"#45b0c9");
+      const zeile1="NACH BEIN "+sw.bein+(sw.fSeite==null?"":" · "+VEREIN[sw.fSeite].name+" +"+fmtDauer(sw.fDelta));
+      const zeile2=sw.verlust==null?null:(sw.verpatzt?"VERPATZT +"+fmtDauer(sw.verlust):"Wechsel "+fmtDauer(sw.verlust));
+      ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
+      ctx.font="700 11px 'Barlow Condensed',sans-serif";
+      ctx.strokeText(zeile1,swp.x,swp.y-56); ctx.fillStyle=farbe; ctx.fillText(zeile1,swp.x,swp.y-56);
+      if(zeile2){
+        ctx.font="600 9px 'IBM Plex Mono',monospace";
+        ctx.strokeText(zeile2,swp.x,swp.y-44);
+        ctx.fillStyle=sw.verpatzt?"#e0685f":"#8795A9"; ctx.fillText(zeile2,swp.x,swp.y-44);
+      }
+      ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+    }
+    // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2,
+    // uebersetzt ins Zeitfahren"). Auf der Spur des FOKUSSIERTEN Fahrers erscheint eine
+    // senkrechte, halbtransparente Goldlinie dort, wo der Hot-Seat-Halter nach derselben
+    // GEFAHRENEN Zeit war (bahnGeistPosition(), rein lesend). "Ohne einen ersten Finisher
+    // gibt es keinen Geist" (Abschnitt 2.3): bahnHotSeat() liefert erst nach dem ersten
+    // Zieleinlauf ueberhaupt etwas. Der Fokussierte selbst braucht keinen Geist auf sich
+    // selbst -- exklusiv Time-Trial (`istRoute()`/`istOval()` sind hier ohnehin nie wahr).
+    if(BA().startAbstand && bahnFokus!=null){
+      const fok=LAEUFER.find(o=>o.id===bahnFokus);
+      const hs=bahnHotSeat();
+      if(fok && fok.fertig==null && hs && hs.u.id!==fok.id){
+        const te=Math.max(0,rennT-(fok.startT||0));
+        const frac=bahnGeistPosition(hs,te);
+        const gx=camX(frac), gy=bahnY(fok.bahnZ);
+        if(gx>-20&&gx<W+20){
+          ctx.save(); ctx.globalAlpha=0.75;
+          ctx.strokeStyle="#f2d75a"; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx,gy+20); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx-4,gy-30); ctx.lineTo(gx+4,gy-30); ctx.closePath(); ctx.fill();
+          ctx.textAlign="center"; ctx.font="700 8px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
+          ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
+          ctx.restore(); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        }
+      }
+    }
     // AUSGEWAEHLT FUER EINE ANSAGE — und zwar ZULETZT gezeichnet, ueber allen Figuren.
     // Im Pulk (die Kamera zoomt bis 3,4x heran) malen die spaeter gezeichneten Sprites
     // sonst ueber die Marke des frueher gezeichneten Laeufers, und ausgerechnet im
@@ -28991,6 +35498,78 @@
       ctx.fillText(f.txt,fx,fy);
       ctx.globalAlpha=1;
     }
+    zeichneStreckenband();
+  }
+
+  // G-2: STRECKENBAND / COURSE STRIP (Abschnitt 7, "groesster Einzelnutzen ueber vier
+  // Bahnen"). Ein schmaler Ueberblicksstreifen, der IMMER die ganze Strecke zeigt -- eine
+  // eigene, lineare Positionsabbildung (`bandX`), unabhaengig von Kamera-Zoom/-Schwenk
+  // (bewusst NICHT camX/camY, die genau daran haengen). Voreinstellung Abschnitt 9.4:
+  // unten im Zeitfahren (oben steht dort schon das Hoehenprofil-Panel neben der Leinwand),
+  // oben in den anderen drei (bei Takeshi ist unten ohnehin das Burgpunkte-Band). Reine
+  // Anzeige, zuletzt gezeichnet (also immer oben auf dem Bild) -- liest nur Felder, die die
+  // Simulation ohnehin fuehrt (u.pos/u.fertig/u.raus/BA().hindernisse/gesamtfortschritt),
+  // schreibt nichts, ruft nie rr().
+  function zeichneStreckenband(){
+    const A=BA();
+    const unten=!!A.startAbstand;                  // Zeitfahren: Band unten, sonst oben
+    const rand=26, bx0=rand, bx1=W-rand, by=unten?H-13:13;
+    const bandX=(frac)=>bx0+Math.max(0,Math.min(1,frac))*(bx1-bx0);
+    ctx.save();
+    ctx.fillStyle="rgba(8,10,14,.55)";
+    ctx.fillRect(bx0-6,by-7,(bx1-bx0)+12,14);
+    ctx.strokeStyle="rgba(255,255,255,.30)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(bx0,by); ctx.lineTo(bx1,by); ctx.stroke();
+    if(A.staffel){
+      // TEAM-FORTSCHRITT STATT EINZEL-LAEUFER (Abschnitt 7: "die Punkte zeigen den
+      // Teamfortschritt (gesamtfortschritt(seite)), nicht den einzelnen Laeufer").
+      const n=A.jeSeite||6;
+      ctx.strokeStyle="rgba(255,225,120,.5)"; ctx.lineWidth=1;
+      for(let i=1;i<n;i++){ const x=bandX(i/n); ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
+      for(const seite of [0,1]){
+        const x=bandX(gesamtfortschritt(seite));
+        ctx.beginPath(); ctx.arc(x,by,4.5,0,6.283);
+        ctx.fillStyle=seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineWidth=1; ctx.stroke();
+      }
+    } else {
+      // STATIONEN/FALLEN/ZWISCHENZEITEN ALS STRICHE -- dieselbe Streckenliste, die die
+      // Bahn selbst schon fuehrt (BA().hindernisse; Time-Trial zusaetzlich seine ZZ).
+      for(const frac of (A.hindernisse||[])){
+        const x=bandX(frac);
+        ctx.strokeStyle=A.takeshi?"rgba(220,190,120,.65)":"rgba(255,255,255,.45)"; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x,by-5); ctx.lineTo(x,by+5); ctx.stroke();
+      }
+      for(const frac of (A.zwischenzeiten||[])){
+        const x=bandX(frac);
+        ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke();
+      }
+      { const x=bandX(1); ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
+      // LAEUFER-PUNKTE. `u.pos` ist bei allen vier Bahnen dieselbe 0..1-Streckengroesse
+      // (auch auf Takeshis Route und im Zeitfahren, s. bahnHochrechnung()/bahnRangliste()),
+      // deshalb genuegt EINE Formel statt einer Fallunterscheidung je Bahn-Art.
+      // DER FUEHRENDE TRAEGT EINEN RING (Runde 2, Regel 6: Marker am Akteur) -- dieselbe ID,
+      // die der Ticker fuer den Fuehrungswechsel schon fuehrt (bahnHotSeatId/
+      // bahnFuehrenderId, s. updateHudBahn G-1), hier nur zusaetzlich sichtbar.
+      const leaderId=A.startAbstand?bahnHotSeatId:bahnFuehrenderId;
+      for(const u of LAEUFER){
+        const x=bandX(Math.min(1,Math.max(0,u.pos)));
+        // AUSGESCHIEDEN BLEIBT ALS GRAUES ✗ AN SEINER STELLE STEHEN (Abschnitt 7: "so sieht
+        // man auch im Band, WO das Feld zerlegt wurde") -- exklusiv Takeshi, jede andere
+        // Bahn kennt kein `u.raus`.
+        if(A.takeshi&&u.raus){
+          ctx.fillStyle="#8795A9"; ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+          ctx.fillText("✕",x,by+3); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+          continue;
+        }
+        ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
+        ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        if(u.id===leaderId){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.6; ctx.stroke(); }
+      }
+    }
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -29100,6 +35679,40 @@
       }
     }
     let kfMarke=null;
+    // KOLLISIONSVERMEIDUNG NAME/STATUS (Audit-Fund Phase 5, 28.09.): in dichten TDM-
+    // Clustern lagen Name- und Statuszeile mehrerer Figuren deckungsgleich uebereinander,
+    // weil beide immer am selben festen dy unter dem Fusspunkt haengen (s. schrift() weiter
+    // unten) — im Beleg-Screenshot "mit der Linie" doppelt uebereinander, "Blessed Shield"
+    // ueber "Krolach"/"Johanna". Grund: die Entzerrung im Tick garantiert nur dx>=58 ODER
+    // dy>=70 zwischen zwei Figuren (s. Kommentar an den Ziellinien oben) — bei knappem dx
+    // und fast gleichem dy (z.B. Nebeneinander in derselben Reihe) bleibt genug Ueberlapp
+    // fuer einen 14-Zeichen-Namen bei 9,5 px (~80 px breit, zentriert). Reine Anzeige, kein
+    // rr()/wert()/stepSim-Bezug: `labelPositionen` sammelt nur die schon in DIESEM Frame
+    // gezeichneten Fusspunkte, und jede weitere Figur, die einem davon zu nahe kommt,
+    // staffelt ihre eigene Beschriftung um eine Zeilenhoehe tiefer — einfacher Index-
+    // Versatz statt echter Kraeftesimulation, wie von der Audit selbst vorgeschlagen.
+    // Frei stehende Figuren (der Normalfall) bekommen Versatz 0 und damit exakt dieselbe
+    // Position wie vorher.
+    const LABEL_KLUSTER_DX=80,LABEL_KLUSTER_DY=30,LABEL_ZEILENHOEHE=10,LABEL_TEXT_SICHERHEIT=4;
+    const labelPositionen=[];
+    // NACHTRAG (Review-Fund, 28.09., zweiter Durchgang): `labelPositionen` oben loest nur
+    // Name/Status GEGEN Name/Status — es sagt nichts ueber die tatsaechlich gezeichnete
+    // Textbreite. Die Schwebetexte weiter unten (`floatPositionen`) pruefen zwar mit echter
+    // `ctx.measureText`-Breite gegen ANDERE Schweber, aber gegen KEINE Beschriftung — die
+    // beiden Systeme waren bisher gegenseitig blind, obwohl Beschriftung und Schweber am
+    // selben Fusspunkt haengen koennen (Beleg: Name "Krag'Zul" bei x=777.1 ueberlappte
+    // Schaden "-27" bei x=751.8, gemessener Abstand -9.4px; Status "MIT DER LINIE" ueber
+    // "+Schild 50"). `labelSchwebeBoxen` sammelt deshalb die ECHTE gezeichnete Box jeder
+    // Name- und Statuszeile (Fusspunkt-x, tatsaechliche Zeilen-y, per ctx.measureText
+    // gemessene Halbbreite) — gefuellt UNTEN, wenn schrift() ohnehin schon misst, damit hier
+    // keine zweite Formel fuer dieselbe Breite entsteht. Die Schweberschleife weiter unten
+    // liest dieses Array zusaetzlich zu floatPositionen. Nur EINE Richtung: Schweber weichen
+    // Beschriftungen aus, nicht umgekehrt — Beschriftungen sind der Anker (sie stehen fast
+    // immer fuer viele Frames am selben Platz), Schweber sind das transiente Element
+    // (stepFloats() zieht sie jeden Frame weiter nach oben). Liesse man Beschriftungen
+    // umgekehrt vor Schwebern ausweichen, wuerde der Anker bei jedem neuen Skill-Text
+    // zittern statt ruhig zu stehen.
+    const labelSchwebeBoxen=[];
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
       let x=u.x,y=u.y;
@@ -29111,6 +35724,11 @@
       // hier gezeichnet laege der Ring unter den spaeter gemalten Figuren und der Pfeil
       // ueber dem Kopf verschwaende hinter dem naechsten Sprite.
       if(kfZ&&u===kfZ)kfMarke={x,y};
+      let labelVersatz=0;
+      for(const p of labelPositionen){
+        if(Math.abs(x-p.x)<LABEL_KLUSTER_DX&&Math.abs(y-p.y)<LABEL_KLUSTER_DY)labelVersatz++;
+      }
+      labelPositionen.push({x,y});
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
@@ -29149,20 +35767,32 @@
       // Beschriftung mit dunklem Rand. Auf dem alten, hellen Untergrund reichte graue
       // Schrift; auf Sand und Rasen verschwand sie. Ein Rand kostet nichts und macht sie
       // auf jedem Boden lesbar — sonst waere der schoenere Boden ein Rueckschritt.
+      // Gibt die halbe gemessene Breite (+ Sicherheitsabstand) zurueck, damit der Aufrufer
+      // sie in `labelSchwebeBoxen` fuer die Schweber-Kollisionspruefung ablegen kann (s.
+      // Kommentar an labelSchwebeBoxen oben) — misst dieselbe Zeichenoperation, die ohnehin
+      // schon laeuft, keine zweite Text-Vermessung.
       const schrift=(txt,dy,farbe,groesse)=>{
         ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);
         ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        return ctx.measureText(txt).width/2+LABEL_TEXT_SICHERHEIT;
       };
       // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
       // einem Gedraenge aus zehn Beschriftungen war vorher nicht auf einen Blick zu sehen,
-      // welcher Name zu welcher Seite gehoert.
-      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,c,9.5);
+      // welcher Name zu welcher Seite gehoert. +labelVersatz*LABEL_ZEILENHOEHE staffelt
+      // Name UND Status ALS BLOCK nach unten, wenn diese Figur einer schon gezeichneten zu
+      // nahe steht (s. Kommentar an labelPositionen oben) — sonst (Normalfall) +0.
+      const nameDy=44+labelVersatz*LABEL_ZEILENHOEHE;
+      const nameTxt=u.n.length>14?u.n.slice(0,13)+"…":u.n;
+      const nameHalb=schrift(nameTxt,nameDy,c,9.5);
+      labelSchwebeBoxen.push({x,y:y+nameDy,halbBreite:nameHalb});
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
-      schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),55,
-        u.heiler?css("--ok"):"#a9b6c6",8.5);
+      const statusDy=55+labelVersatz*LABEL_ZEILENHOEHE;
+      const statusTxt=u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():"");
+      const statusHalb=schrift(statusTxt,statusDy,u.heiler?css("--ok"):"#a9b6c6",8.5);
+      if(statusTxt)labelSchwebeBoxen.push({x,y:y+statusDy,halbBreite:statusHalb});
       ctx.globalAlpha=1;
     }
     // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
@@ -29204,22 +35834,69 @@
       ctx.beginPath();ctx.arc(pf.x,pf.y,2.4,0,6.3);ctx.fill();
     }
     zeichneEffekte(1/60);
+    // KOLLISIONSVERMEIDUNG FUER SCHWEBETEXTE (Audit-Fund Phase 5, 28.09., zweite Haelfte
+    // desselben Befunds wie labelPositionen oben): loesen mehrere Kaempfer im selben
+    // Cluster fast gleichzeitig einen Skill/Treffer aus, spawnen ihre Schwebetexte (z.B.
+    // "Blessed Shield" ueber "Krolach") an fast derselben Stelle UND steigen danach mit
+    // exakt demselben Tempo auf (stepFloats() zieht alle floats[] gleich schnell nach
+    // oben) — sie bleiben deshalb dauerhaft deckungsgleich statt sich zu trennen, anders
+    // als bei den Namen/Status-Labels ist hier also auch spaeter keine Selbstkorrektur zu
+    // erwarten. Ein fester Abstand reichte nicht: "Blessed Shield"/"Heavy Dash" (700 16px,
+    // teils ueber 120 px breit) ueberlappten bei Kickoff trotzdem noch, weil ihre
+    // Ankerpunkte (u.x der jeweiligen Einheit) weiter auseinanderlagen als ein pauschaler
+    // Klumpen-Radius, aber naeher als die halbe Textbreite beider Woerter zusammen. Deshalb
+    // hier die ECHTE gezeichnete Breite messen (ctx.measureText, ohnehin fuer zentrierten
+    // Text noetig) und zwei Schweber als Kollision zaehlen, wenn ihre Boxen sich in x
+    // ueberlappen UND sie auf (fast) gleicher Hoehe stehen. Reiner Anzeige-Nudge fuer den
+    // Aufruf von fillText/strokeText — floats[].x/y/life selbst (und damit stepFloats())
+    // bleiben unberuehrt, der Versatz wird bei jedem Frame neu berechnet. Frei stehende
+    // Schweber (Normalfall) bekommen Versatz 0 und damit exakt dieselbe Position wie vorher.
+    const FLOAT_DY_TOL=16,FLOAT_ZEILENHOEHE=15,FLOAT_SICHERHEIT=6;
+    const floatPositionen=[]; // {x,fy,halbBreite} — fy ist die bereits versetzte Endposition
+    ctx.textAlign="center";
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       // `ansage` ist der Ruf im Moment der Zielansage — eigene Groesse und die Fokusfarbe,
       // damit er sich von Schaden (--crit), Heilung (--ok) und Skill-Namen (--home)
       // unterscheidet. Zusaetzlich mit dunklem Rand, weil er ueber einer Figur steht und
       // nicht ueber leerem Boden.
+      ctx.font=f.ansage?"800 22px 'Barlow Condensed',sans-serif"
+        :(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
+      const halbBreite=ctx.measureText(f.txt).width/2+FLOAT_SICHERHEIT;
+      // Gegen die BEREITS VERSETZTEN Positionen pruefen, nicht gegen die rohen Spawn-
+      // Punkte: ein einzelner fester Schritt nach dem rohen Abstand haette einen Schweber
+      // manchmal genau auf einen anderen draufgeschoben statt daneben (zwei Woerter mit
+      // ~15 px rohem Hoehenunterschied — zufaellig fast FLOAT_ZEILENHOEHE — landeten nach
+      // EINEM Schritt exakt uebereinander statt getrennt). Deshalb hier hochzaehlen, bis
+      // die naechste Zeile wirklich frei ist.
+      let floatVersatz=0,fy=f.y,frei=false;
+      while(!frei){
+        frei=true;
+        for(const p of floatPositionen){
+          if(Math.abs(fy-p.fy)<FLOAT_DY_TOL&&Math.abs(f.x-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+        }
+        // Review-Fund (28.09., zweiter Durchgang, s. Kommentar an labelSchwebeBoxen oben):
+        // zusaetzlich gegen die schon gezeichneten Name/Status-Boxen pruefen, nicht nur
+        // gegen andere Schweber — sonst bleibt der Fund von damals (Schweber ueber Name/
+        // Status) bestehen, nur der Schweber-vs-Schweber-Fall waere geloest. Beschriftungen
+        // stehen zu diesem Zeitpunkt im Frame schon fest (die U-Schleife hat laengst
+        // durchlaufen), also ist labelSchwebeBoxen bereits vollstaendig.
+        if(frei){
+          for(const p of labelSchwebeBoxen){
+            if(Math.abs(fy-p.y)<FLOAT_DY_TOL&&Math.abs(f.x-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+          }
+        }
+        if(!frei){floatVersatz++;fy=f.y-floatVersatz*FLOAT_ZEILENHOEHE;}
+      }
+      floatPositionen.push({x:f.x,fy,halbBreite});
       if(f.ansage){
-        ctx.font="800 22px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
         ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-        ctx.strokeText(f.txt,f.x,f.y);
-        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+        ctx.strokeText(f.txt,f.x,fy);
+        ctx.fillStyle=FOKUS_FARBE;ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
         continue;
       }
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
-      ctx.font=(f.skill?"700 16px":f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
-      ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+      ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
   }
 
@@ -29238,6 +35915,37 @@
   // dort konkret vorgeschlagen. Reine DOM-Anzeige: liest nur den fertigen Text, schreibt
   // nichts in den Sim-Zustand zurueck.
   const CALLOUT_DAUER_MS=2600;
+  // CALLOUT-POSITION (Nachtrag 27.09., fuenfte Review desselben Fixes): eine feste
+  // px-Distanz zum Broadcast-Bug (#bbug) reicht nicht, weil der Bug bei schmalen
+  // Fensterbreiten selbst hoeher wird -- die Team-Boxen (.seite) brechen um, sobald
+  // Name+Wert nicht mehr nebeneinander passen (gemessen: Fechten 66,25px statt 39,25px
+  // bei >=480px). Statt eine zweite Zahl zu raten, wird die tatsaechliche Bug-Unterkante
+  // bei jedem Aufruf gemessen -- reine Anzeigeposition (getBoundingClientRect()), kein
+  // Einfluss auf MESS/Wertung/RNG. Faellt auf den CSS-Wert zurueck, wenn #bbug fehlt,
+  // gerade ausgeblendet ist (Einlauf/Spielende) oder keinen passenden Bezugsrahmen hat.
+  function positioniereCallout(banner){
+    const bug=document.getElementById("bbug");
+    const bezug=banner.offsetParent;
+    if(!bezug){ banner.style.top=""; return; }
+    let unten=(bug&&!bug.hidden)?bug.getBoundingClientRect().bottom:null;
+    // ISPY-ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09.): sitzt zentriert in derselben
+    // Kopfzone wie dieser Callout (top:15%, #bbug top:8px) -- ohne diese Erweiterung
+    // ueberlappte ein I-Spy-Callout ("X entdeckt den Hinweis") die Zug-Uhr, weil die
+    // Messung bisher nur #bbug kannte (Sichtpruefung 27.09., Playwright: "Zug 4 / 8"
+    // lag unter dem Callout-Text). Genau derselbe Fund/dieselbe Loesung wie beim
+    // urspruenglichen #bbug/#bbugcallout-Overlap oben, nur fuer ein zweites Kopf-Overlay.
+    // [hidden] fuer jede Buehne ausser I-Spy (s. aktualisiereIspyHud()), also ohne
+    // Wirkung auf jede andere Disziplin.
+    const ispyUhr=document.getElementById("ispyZugUhr");
+    if(ispyUhr&&!ispyUhr.hidden){
+      const ispyUnten=ispyUhr.getBoundingClientRect().bottom;
+      unten=unten==null?ispyUnten:Math.max(unten,ispyUnten);
+    }
+    if(unten==null){ banner.style.top=""; return; }
+    const bezugOben=bezug.getBoundingClientRect().top;
+    const abstand=8;
+    banner.style.top=Math.max(0,unten-bezugOben+abstand)+"px";
+  }
   function callout(txt,caption){
     if(stumm)return;
     const banner=document.getElementById("bbugcallout");
@@ -29250,6 +35958,7 @@
       banner.appendChild(em);
     }
     banner.hidden=false;
+    positioniereCallout(banner);
     banner.classList.remove("zu");
     // Reflow erzwingen: zwei big-Ereignisse kurz hintereinander sollen die Transition
     // beide sichtbar abspielen, statt an der schon aktiven opacity:1 haengen zu bleiben.
@@ -29293,8 +36002,50 @@
     (s)=>s+" — geschafft, das Rennen ist entschieden!",
     (s)=>"Zielband durch — "+s+".",
   ];
+  // TK-4: KOMMENTAR-CAPTIONS IM MXC-STIL (broadcast-optik-bahn-27-09.md Abschnitt 5.3).
+  // "Der Ticker ist Play-by-Play (bleibt, wie er ist), die Caption im Callout ist Color" --
+  // dieselbe waehleCaption()-Rundlauf-Mechanik wie oben, drei neue Listen fuer Takeshi's
+  // Castle plus eine vierte fuer denselben Sturz-Moment im Spurt ("Dieselbe Mechanik traegt
+  // im Spurt CAPTION_STURZ fuer das Wasser"). Reine Textbausteine, kein rr()-Aufruf, keine
+  // neue Ereigniserkennung -- ausgeloest an genau den Stellen in stepSpurt, die den
+  // jeweiligen Schwebetext ohnehin schon setzen (s. dortige Kommentare). Nennt niemanden
+  // wegen Herkunft/Aussehen, nur wegen des Missgeschicks (Chris' Voreinstellung, Abschnitt 9.3).
+  const CAPTION_AUSSCHEIDEN=[
+    (s)=>"Und ab ins Wasser — "+s+" ist raus!",
+    (s)=>"Das war's mit den Nerven, "+s+".",
+    (s)=>"Zurück zum Sammelplatz mit dir, "+s+"!",
+  ];
+  const CAPTION_STURZ_SCHWER=[
+    (s)=>s+" liegt flach — das tat weh.",
+    (s)=>"Autsch! "+s+" hat es hart erwischt.",
+  ];
+  const CAPTION_GEDRAENGE=[
+    ()=>"Fünf Mann an einer Tür — das wird eng!",
+    ()=>"Da drängelt sich das halbe Feld auf einmal!",
+  ];
+  const CAPTION_STURZ_WASSER=[
+    (s)=>s+" nimmt ein Bad im Wassergraben!",
+    (s)=>"Platsch — "+s+" landet im Wasser.",
+  ];
 
-  function feed(side,txt,big,caption){
+  // BESCHRIFTUNG JE MOMENTART (K5 Stufe 1) fuer renderSzeneDesSpiels() unten -- dieselben
+  // vier Kinds wie KAMPF_KIND_PRIORITAET/kampfKoKind bei kampfGrossDrosseln().
+  const KAMPF_KIND_LABEL={
+    entscheidend:"Spielentscheidend",
+    mehrfachkill:"Mehrfachausschaltung",
+    fuehrungswechsel:"Führungswechsel",
+    ersteAusschaltung:"First Blood",
+  };
+
+  // TK-4: der Callout soll "0,4 s NACH dem Schwebetext 'ausgeschieden' erscheinen, nicht
+  // gleichzeitig" (die Pointe folgt dem Platscher, wie bei Craig Charles) -- ein optionaler
+  // sechster Parameter (nach K5s `kind`) statt eines eigenen Verzoegerungs-Parameters an
+  // callout() selbst: die Ticker-Zeile (und die HIGHLIGHTS-Buchung, fuer den
+  // Endstand-Rueckblick) bleiben sofort, nur der Banner selbst wartet einen echten DOM-Timer
+  // ab -- keine Sim-Zeit, exakt wie im Konzept gefordert. Jeder bestehende Aufruf laesst den
+  // Parameter weg (undefined -> 0, also sofort wie bisher), bit-identisch fuer alle anderen
+  // ~40 feed()-Aufrufstellen.
+  function feed(side,txt,big,caption,kind,verzoegerungMs){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -29303,7 +36054,14 @@
     // auf der Bahn/Buehne/im Feldspiel nie hochgezaehlt wird (die haben ihre eigenen
     // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
     // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
+    //
+    // ARENA-ZEIT-FIX (27.09.): fuer Kampf (tdm/mini-dm/battlefield, istKampf()) blieb hier
+    // bis eben der rohe Simulations-`t` stehen, waehrend updateHud() die Kopfzeilen-Uhr
+    // laengst `t*zeitFaktor()` zeigt (s. dort) — bei Battlefields ZEIT_DEHNUNG.battlefield=5,00
+    // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
+    // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
+    // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
+    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
@@ -29319,8 +36077,15 @@
     // Aufrufs -- big selbst entscheidet nach wie vor NUR ueber die CSS-Klasse oben, hier
     // kommt keine zweite Bedeutung dazu.
     if(big){
-      HIGHLIGHTS.push({side,txt,t:anzeigeT});
-      callout(txt,caption);
+      // KIND (K5, Broadcast-Optik-Recherche 27.09., Abschnitt 3/K5 Stufe 1): welche
+      // Momentart dieses Ereignis traegt -- nur ein optionales Anzeige-Etikett fuer
+      // waehleSzeneDesSpiels() (s.u.), kein Einfluss auf big/HIGHLIGHTS-Aufnahme selbst
+      // (die entscheidet ausschliesslich kampfGrossDrosseln() beim Aufrufer). Jeder
+      // andere feed()-Aufruf (Bahn/Feldspiel/Buehne) laesst kind einfach weg -- die
+      // Szene-Auswahl findet dort dann nichts und bleibt leer.
+      HIGHLIGHTS.push({side,txt,t:anzeigeT,kind});
+      if(verzoegerungMs)setTimeout(()=>callout(txt,caption),verzoegerungMs);
+      else callout(txt,caption);
     }
   }
 
@@ -29333,19 +36098,49 @@
     // Zeitablauf) — TDM/Mini-DM/das alte Verhalten unten bleiben unberuehrt, weil KP dort
     // immer null ist.
     if(KP){
-      const sieger=dominationSieger();
+      const sieger=kampfSieger();
       const elimSieg=live(0).length===0||live(1).length===0;
       const grund=elimSieg?"— der Gegner liegt komplett am Boden"
         :(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)
           ?"— Kontrollpunkt-Punktelimit erreicht ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")"
           :"— nach Zeitablauf mehr Kontrollpunkt-Punkte ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")";
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true);
+      // OFF-BY-ONE-FIX (Messmethoden-Review, 27.09.): renderEndstand()/renderHighlights()
+      // oben hat den #ehighlights-Snapshot schon VOR dieser Sieg-Zeile gebaut, die per
+      // feed(...,true) immer ungedrosselt (big=true) durchlaeuft. Die Sieg-Zeile landet
+      // damit zwar im #feed-Ticker und in HIGHLIGHTS[], aber nicht mehr im bereits
+      // gerenderten Snapshot -- ein zweiter, idempotenter Aufruf holt sie nach, ohne die
+      // Reihenfolge von renderEndstand() (Sieger-Text/Tabellen, unabhaengig von dieser
+      // feed()-Zeile) anzutasten.
+      renderHighlights();
+      updateHud();
+      return;
+    }
+    // TDM: KEIN KILL-LIMIT (Chris, 26.09.): "es wird bis zum Ende von z.B. 6 Minuten
+    // gespielt, wer am Ende am meisten gescored hat, hat gewonnen." Score ist die Summe
+    // der Ausschaltungen je Seite UEBER DAS GANZE SPIEL (u.st.ko, respawnfest — jeder
+    // Kaempfer sammelt ueber seine ganze Einsatzzeit, nicht nur bis zu seinem eigenen
+    // ersten Tod). Der Vergleich unten (nR-live(1).length) waere hier falsch: mit Respawn
+    // ist "aktuell lebend" am Spielende reiner Zufall (wer gerade respawnt), keine Summe
+    // mehr ueber das ganze Spiel.
+    if(disc==="tdm"){
+      const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
+      const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
+      const sieger=kampfSieger();
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Sieg-Zeile-fehlt-
+      // im-Snapshot-Luecke, hier fuer TDM.
+      renderHighlights();
       updateHud();
       return;
     }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
-    feed(0,(pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    const sieger=kampfSieger();
+    feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Luecke fuer den
+    // generischen Elimination-Zweig (Battlefield ohne Kontrollpunkte, u.a.).
+    renderHighlights();
     updateHud();
   }
 
@@ -30042,7 +36837,7 @@
       txt.appendChild(el("b",null,u.n));
       txt.appendChild(document.createTextNode(manuell
         ?" — die Hilfsverteidigung geht bevorzugt auf ihn."
-        :" — staerkster Gegenspieler, automatisch vorgegeben; anklicken uebernimmt die Wahl manuell."));
+        :" — stärkster Gegenspieler, automatisch vorgegeben; anklicken übernimmt die Wahl manuell."));
     } else {
       txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
     }
@@ -30143,7 +36938,7 @@
     // Laeufern muss man sehen, WER umgestellt hat, nicht nur DASS jemand. Wo genau er
     // neben dem Kopf landet, entscheidet zeichneSpurt (s. dort) — hier steht nur, an
     // wen er gehoert.
-    schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-56,txt:p.label.toUpperCase()+"!",
+    schwebe({...laeuferSchwebeXY(u,-56),txt:p.label.toUpperCase()+"!",
              life:1.35,ansage:true,_laeufer:u.id});
     feed(0,u.n+" bekommt "+p.label.toUpperCase()+" angesagt — bei "
       +Math.round(u.pos*100)+" % der Strecke.");
@@ -30283,7 +37078,7 @@
           chip.type="button"; chip.dataset.id=String(u.id);
           chip.appendChild(el("i",null,String(i+1)));
           chip.appendChild(document.createTextNode(u.n));
-          chip.title=u.n+" — Startnummer "+(i+1)+", faehrt bei "
+          chip.title=u.n+" — Startnummer "+(i+1)+", fährt bei "
             +bahnZeitText(bahnSpanneAnzeige(u.startT||0))+" los";
           roster.appendChild(chip);
         });
@@ -30375,6 +37170,23 @@
           " · Puste "+(u.leer?"leer":Math.round(anteil*100)+" %"));
         standEl.appendChild(res);
       } else standEl.textContent="—";
+    }
+    // TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3). Reine Arithmetik aus
+    // bahnZeitFuerSieg() (s. dort) -- erscheint erst, sobald eine Seite komplett im Ziel
+    // ist, damit keine Hochrechnung als Ansage steht (dieselbe Regel wie `gewertet` in
+    // bahnTeamstand).
+    const tsEl=document.getElementById("ttteamsieg");
+    if(tsEl){
+      const zfs=(!done)?bahnZeitFuerSieg():null;
+      if(!zfs){ tsEl.hidden=true; tsEl.classList.remove("chancenlos"); }
+      else {
+        tsEl.hidden=false;
+        tsEl.classList.toggle("chancenlos",zfs.chancenlos);
+        tsEl.textContent=zfs.chancenlos
+          ? VEREIN[zfs.seite].name+" kann den Teamsieg rechnerisch nicht mehr holen."
+          : VEREIN[zfs.seite].name+" braucht für die letzten "+zfs.nochOffen
+            +" im Schnitt unter "+bahnZeitText(bahnSpanneAnzeige(zfs.bedarf));
+      }
     }
     const autoBtn=document.getElementById("ttauto");
     if(autoBtn){ autoBtn.classList.toggle("an",bahnFokusAuto);
@@ -30673,10 +37485,34 @@
     return {wert:punkte,max:maxP,wort:istHockey()?"Tore":"Punkte",zusatz:String(punkte)};
   }
 
+  // K4 -- "SELTENE FAEHIGKEIT" (Broadcast-Optik-Recherche 27.09., Abschnitt 3/K4, Overwatch-
+  // League-Muster "Ult-Ladung"): der Skill aus `u.skills` mit der LAENGSTEN Abklingzeit --
+  // das trifft fuer alle drei Kits genau die eine Faehigkeit mit echtem taktischem Gewicht
+  // (Archer: Barrage 12s; Matriarch: Blessed Shield/"Segen" 12s; Fighter: Battering Ram
+  // 12s), nie den Grundangriff (0,3-0,35s) oder die Ausweichrolle (3-5s). Die "_schwer"-
+  // Varianten (slash_schwer/fslash_schwer, s. SCHEMA-Zusammenfuehrung oben) tragen ihre
+  // Abklingzeit nur unter `.tor.cd`, nicht unter dem hier gelesenen alten Top-Level-`.cd` --
+  // sie fallen deshalb aus dieser Auswahl heraus, was gewollt ist: ein aufgeladener
+  // Schlag ist kein "seltenes" Ult, sondern eine Variante des Grundangriffs. Reiner
+  // Lesezugriff auf SKILLS (unveraendert), kein rr().
+  function kampfSeltenSkillId(u){
+    if(!u.skills||!u.skills.length)return null;
+    let best=null;
+    for(const id of u.skills){
+      const sk=SKILLS[id];
+      if(!sk||!sk.cd)continue;
+      if(!best||sk.cd>SKILLS[best].cd)best=id;
+    }
+    return best;
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
+    // Staffel: laufende Etappen-Raenge einmal je Aufruf (s. staffelEtappenRaenge), nicht
+    // je Kachel — fuer jede andere Disziplin eine leere Map, die unten nie gelesen wird.
+    const staffelRang=istBahn(disc)?staffelEtappenRaenge():{raenge:new Map(),von:0};
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
@@ -30707,10 +37543,42 @@
           // Bahn unter den Fuessen schon zeichnet (s. zeichneSpurt, "der Ersatz fuer den
           // Lebensbalken des Kampfes") — die Kachel zeigt jetzt dieselbe Groesse wie das
           // Feld, statt einer invertierten Fortschrittsanzeige.
-          .map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          // STAFFEL: RANG STATT STRECKENANTEIL (22.09., s. staffelEtappenRaenge). Der
+          // Streckenanteil eines Staffellaeufers ist nur fuer den AKTIVEN eine Aussage —
+          // ein Wartender steht bei seinem Startpunkt (z.B. "50 %", ohne einen Meter
+          // gelaufen zu sein), ein Fertiger bei seinem Uebergabepunkt. Jetzt: der
+          // laufende Rang fuer den Gelaufenen, der Anteil fuer den Aktiven, "wartet"
+          // fuer den Rest — dieselbe Zahl wie in der Stand-Spalte der Wertungstabelle.
+          // BUGFIX 27.09. (Opus-Review desselben Tages, "tot"-Kachel beim Stolpern): `down`
+          // schaltete die Tot-Optik (":33386", `.kk.tot` -- grauer Hintergrund, Name
+          // durchgestrichen, s. battle-mode.css) ueber `x.stolper>0` frei -- ein rein
+          // VORUEBERGEHENDER Zustand (Huerdensturz/Klettersturz), den JEDE Bahn-Disziplin
+          // kennt, waehrend der Laeufer weiter aktiv im Rennen steht. Damit sah jeder kurz
+          // Stolpernde aus wie tot/ausgeschieden. `x.raus` (":30328f., exklusiv Takeshi's
+          // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
+          // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
+          // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
-                    zusatz:x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
+                    // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
+                    // Abschnitt 3.6: "'Zone' ist Boulder-Vokabular"). Rein kosmetisch -- liest
+                    // nur x.pos gegen dieselben WAND_EXE_INDIZES, die bodenWand() zeichnet,
+                    // schreibt nichts zurueck. Keine andere Bahn ist betroffen.
+                    zusatz:BA().staffel
+                      ? (staffelRang.raenge.has(x.id)?"Rang "+staffelRang.raenge.get(x.id)+"/"+staffelRang.von
+                         :x.aktiv?Math.round(x.pos*100)+" %":"wartet")
+                      : BA().climbing
+                        ? (x.fertig!=null?"Top-out"
+                           :Math.round(x.pos*100)+" % · Exe "
+                             +WAND_EXE_INDIZES.filter(idx=>x.pos>=(BA().hindernisse||[])[idx]).length
+                             +"/"+WAND_EXE_INDIZES.length)
+                      // BUGFIX 27.09.: Ausgeschieden (`x.raus`) ist NICHT dasselbe wie Ziel
+                      // erreicht -- beide haben `x.fertig!=null` (s. nervenKosten-Zweig,
+                      // ":30328", setzt beides zusammen), aber nur ein echter Finisher hat
+                      // die Ziellinie ueberquert. Ohne diese Unterscheidung meldete die
+                      // Kachel eines Ausgeschiedenen "Ziel", als waere er angekommen.
+                      : x.raus?"Raus":x.fertig!=null?"Ziel":Math.round(x.pos*100)+" %"},
             // FORTSCHRITTSBALKEN (Chris' Fund 22.09., woertlich am Climbing-Screenshot:
             // "bei den hindernissen bräuchte man einen fortschrittsbalken oder sowas um
             // zu sehen wer wei schnell voran schreitet"). Die Kachel zeigte die Strecke
@@ -30721,7 +37589,12 @@
             // Lesezugriff, keine neue Groesse. Gilt fuer alle fuenf Bahn-Disziplinen
             // gleich (generisch statt nur fuer Climbing), weil renderKader ohnehin nur
             // EINEN Bahn-Zweig fuehrt.
-            fortschritt:x.fertig!=null?1:Math.max(0,Math.min(1,x.pos))}))
+            // BUGFIX 27.09.: derselbe Ziel-vs-Raus-Fund wie bei `zusatz` direkt oben -- ein
+            // Ausgeschiedener (`x.raus`) bekam hier `fortschritt:1`, also einen VOLLEN Balken,
+            // obwohl er die Strecke nie zu Ende gelaufen ist. Fuer ihn zaehlt wie waehrend des
+            // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
+            // echter Finisher bekommt weiterhin den vollen Balken.
+            fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
           leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
@@ -30764,6 +37637,59 @@
           fbar.title="Fortschritt: "+Math.round(u.fortschritt*100)+" %";
           k.appendChild(fbar);
         }
+        // K4 -- SPECTATOR-KARTEN JE KAEMPFER (Broadcast-Optik-Recherche 27.09., Abschnitt
+        // 3/K4; Chris' Voreinstellung zu Frage 2: Umbau der Kaderkacheln statt eigener
+        // Randspalten auf der Leinwand, die bei sechs gegen sechs zu eng wuerden).
+        // Overwatch-League-Muster: Mana-/Ausdauerbalken (bisher nur 2px unter der Figur auf
+        // der Leinwand, kaum lesbar), die "seltene Faehigkeit" mit Abklingring (Ult-Ladung),
+        // K/T/B klein, Status (Respawn-Uhr TDM / "Raus" sonst statt des generischen "tot").
+        // AUSDRUECKLICH NICHT gezeigt: Beitrag/beitragVon() als Balken oder Rang -- die
+        // Spalte "Leist" in der Wertungstabelle bleibt die einzige Stelle, an der der
+        // Beitrag gegen die Eignung steht (Leitplanke 0.1 Punkt 1/2, K4-Abschnitt
+        // woertlich: "Eine Karte, die 'Beitrag 1340' gross zeigt, wuerde dem rollenblinden
+        // Massstab eine Buehne geben"). Reine Anzeige -- liest nur u.mp/u.sp/u.cds/u.st/
+        // u.downBis, schreibt nichts zurueck.
+        if(istKampf(disc)){
+          if(u.mpMax>0){
+            const mbar=el("div","kbar ressource mana");
+            const mf=el("s"); mf.style.width=Math.max(0,Math.min(100,u.mp/u.mpMax*100))+"%";
+            mbar.appendChild(mf); mbar.title="Mana "+Math.round(u.mp)+"/"+Math.round(u.mpMax);
+            k.appendChild(mbar);
+          }
+          if(u.spMax>0){
+            const sbar=el("div","kbar ressource ausdauer");
+            const sf=el("s"); sf.style.width=Math.max(0,Math.min(100,u.sp/u.spMax*100))+"%";
+            sbar.appendChild(sf); sbar.title="Ausdauer "+Math.round(u.sp)+"/"+Math.round(u.spMax);
+            k.appendChild(sbar);
+          }
+          const zeile2=el("div","kkzeile2");
+          const seltenId=kampfSeltenSkillId(u);
+          if(seltenId){
+            const sk=SKILLS[seltenId], rest=u.cds[seltenId]||0;
+            const bereitAnteil=Math.max(0,Math.min(1,1-rest/sk.cd));
+            const ring=el("div","kfaehig"+(rest<=0?" bereit":""));
+            ring.style.setProperty("--anteil",Math.round(bereitAnteil*100)+"%");
+            ring.title=(sk.name||seltenId)+(rest>0?" — bereit in "+rest.toFixed(1)+" s":" — bereit");
+            zeile2.appendChild(ring);
+          }
+          const ktb=el("div","kktb");
+          ktb.title="Ausschaltungen / Tode / Beihilfe";
+          ktb.appendChild(el("span",null,"K "+Math.round(u.st.ko||0)));
+          ktb.appendChild(el("span",null,"T "+Math.round(u.st.tode||0)));
+          ktb.appendChild(el("span",null,"B "+Math.round(u.st.beihilfe||0)));
+          zeile2.appendChild(ktb);
+          k.appendChild(zeile2);
+          // STATUS: TDM respawnt (die generische ".kk.tot"-Optik allein liest das wie ein
+          // endgueltiges Ausscheiden) -- Mini-DM/Battlefield bleiben bei "Raus", denn dort
+          // IST eine Ausschaltung endgueltig.
+          if(u.down){
+            const status=el("div","kkstatus");
+            status.textContent=(disc==="tdm"&&u.downBis!=null)
+              ? "Respawn "+Math.max(0,Math.round((u.downBis-t)*zeitFaktor()))+" s"
+              : "Raus";
+            k.appendChild(status);
+          }
+        }
         // EHRLICHER TOOLTIP: "Leben" nur noch dort, wo es Leben gibt (Kampf). Sonst der
         // Name der Groesse, die der Balken wirklich zeigt.
         k.title=u.n+(u.down?" — ausgeschieden"
@@ -30788,7 +37714,7 @@
           const gewaehlt=effektiverFokus(0)===u.id;
           if(gewaehlt)k.classList.add("fokus");
           k.title=u.n+(gewaehlt?(fsLive.fokusManuell?" — wird gedoppelt (klicken hebt den Fokus auf)"
-                                 :" — wird automatisch gedoppelt (staerkster Gegenspieler; anklicken uebernimmt manuell)")
+                                 :" — wird automatisch gedoppelt (stärkster Gegenspieler; anklicken übernimmt manuell)")
                                :" — anklicken: Hilfsverteidigung doppelt ihn bevorzugt");
         }
         // RENNPLAN-ANSAGE: dieselbe Rolle wie die Kaderleiste beim Fokus-Doppeln, nur
@@ -30828,8 +37754,11 @@
     if(m)m.textContent=istBahn(disc)
       ? bahnTeamstand().seiten.join(" : ")
       : (istBuehne(disc)&&BB().duell)
-      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length+" : "+
-         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length)
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
+      // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
+      // Kader-Mittelzeile. Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length+" : "+
+         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length)
       : istBuehne(disc)
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
@@ -30866,6 +37795,41 @@
   // Stellen aufgerufen, die #endstand ueberhaupt zeigen (Kampf/renderEndstand, Bahn/
   // renderEndstandBahn) -- Feldspiel und Buehne zeigen heute kein Endstand-Overlay,
   // s. Kommentar bei stepFeldspielLive/stepBuehne, das bleibt unveraendert.
+  // SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3): EIN
+  // Moment aus den vier gemessenen Momentarten, ausgewaehlt nach waehleSzeneDesSpiels()
+  // oben -- Overwatchs "Play of the Game"-Prinzip: "nicht an Sieg oder Gesamtwert
+  // gebunden" (Leitplanke 0.1 Punkt 1 und Abschnitt 3/K5 der Recherche woertlich), also
+  // auch fuer die Verlierer-Seite moeglich, wenn ihr Ereignis oben in der Prioritaet steht.
+  // Nur fuer Kampf aufgerufen (renderEndstand(), s.u.) -- renderEndstandBahn() teilt sich
+  // zwar #ehighlights/HIGHLIGHTS mit dem Kampf, aber Bahn-Ereignisse tragen nie ein `kind`
+  // (feed() dort ruft ohne den fuenften Parameter), waehleSzeneDesSpiels() faende dort also
+  // ohnehin nichts -- die Box bleibt fuer Bahn-Spiele hidden.
+  function renderSzeneDesSpiels(){
+    const box=document.getElementById("eszene");
+    if(!box)return;
+    const szene=waehleSzeneDesSpiels();
+    if(!szene){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false; box.textContent="";
+    box.appendChild(el("h5",null,"Szene des Spiels"));
+    const zeile=el("div","ehzeile "+(szene.side===0?"h":"a"));
+    zeile.appendChild(el("span","eht",KAMPF_KIND_LABEL[szene.kind]||""));
+    zeile.appendChild(el("span",null,szene.txt));
+    box.appendChild(zeile);
+  }
+
+  // SIEGER-FAERBUNG AM ESIEGER-KAESTCHEN (Broadcast-Optik-Nachaudit 28.09., Befund 1/4:
+  // die Endstand-Sieger-Zeile trug bisher keine Teamfarbe). Reiner Styling-Hook --
+  // setzt nur eine CSS-Klasse auf den in jedem Aufrufer (renderEndstand/-Bahn/-Buehne)
+  // schon fertig berechneten Sieger (0=Heim/1=Gast/null=kein eindeutiger Sieger),
+  // berechnet selbst nichts. .esieger.sieg-h/.sieg-a lassen das Kaestchen in
+  // battle-mode.css in Heim-/Gastfarbe aufleuchten; keine Klasse bleibt die alte
+  // neutrale --warn-Faerbung (Unentschieden/noch keine Wertung).
+  function setzeEsiegerKlasse(sieger){
+    const e=document.getElementById("esieger");
+    if(!e)return;
+    e.className="esieger"+(sieger===0?" sieg-h":sieger===1?" sieg-a":"");
+  }
+
   function renderHighlights(){
     const box=document.getElementById("ehighlights");
     if(!box)return;
@@ -30889,10 +37853,15 @@
     // Overlay nach einem Punktelimit-Sieg weiter den ueberlebenszahl-basierten Sieger, der
     // bei einem Domination-Sieg mit ueberlebenden Kaempfern auf beiden Seiten oft ein
     // ANDERES Team nennt als tatsaechlich gewonnen hat.
-    const sieger = KP ? dominationSieger()
-      : (live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null);
+    // TDM-HUD-FIX (27.09.): vorher hier ein eigener, dritter Vergleich (`live(0).length` vs
+    // `live(1).length`) statt dominationSieger()/dem TDM-Ausschaltungs-Vergleich aus
+    // finish() — bei TDM unter Respawn eine reine Momentaufnahme, wer GERADE respawnt, die
+    // dem Ticker-Sieger widersprechen konnte. kampfSieger() buendelt jetzt alle drei
+    // Faelle (Domination/TDM/klassische Elimination) an einer Stelle.
+    const sieger = kampfSieger();
     document.getElementById("esieger").textContent =
       sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
+    setzeEsiegerKlasse(sieger);
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -30936,6 +37905,7 @@
       }
       t.appendChild(tb); box.appendChild(t);
     }
+    renderSzeneDesSpiels();
     renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
@@ -30960,6 +37930,7 @@
         +" — "+pL+" : "+pR+" "+stand.suffix
       : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung")
       +(stand.zusatz?" ("+stand.zusatz+")":"");
+    setzeEsiegerKlasse(stand.gewertet&&pL!==pR?(pL>pR?0:1):null);
     // ZEILENFOLGE NACH PUNKTEN, wo es Punkte gibt (Prototyp 06.09.): bei "rang" ist das
     // dieselbe Folge wie die Rangliste (Platz 1 hat die meisten Punkte), bei Takeshi
     // stehen die Sterne nicht zwingend in Zielreihenfolge — der Endstand ordnet nach dem,
@@ -31011,6 +37982,86 @@
     document.getElementById("endstand").hidden=false;
   }
 
+  // ENDSTAND-OVERLAY FUER DIE BUEHNE (Opus-Review 27.09.: acht der neun Buehnen-
+  // Disziplinen — Fechten, Tennis, Showcase, Eiskunstlauf, Wettessen, Gewichtheben,
+  // Breaking, I-Spy — endeten bis hierher lautlos: kein Sieger-Callout, kein
+  // Endstand-Overlay, der Score-Bug verschwand einfach mit dem letzten Frame. Nur
+  // Speed-Schach hatte ein eigenes Sieg-Banner (zeichneSchach(), "SIEG — "+Vereinsname,
+  // direkt AUF dem Brett gezeichnet) — das bleibt unveraendert bestehen, s. Kommentar bei
+  // updateHudBuehne()s Aufruf hier unten.
+  //
+  // DASSELBE OVERLAY-ELEMENT wie Kampf/Bahn (#endstand/#esieger/#etafelL/#etafelR, s.
+  // renderEndstand()/renderEndstandBahn() oben) -- rein additiv gefuellt, kein neues
+  // DOM-Stueck, keine neue CSS-Regel.
+  //
+  // BUEHNE HAT NEUN VERSCHIEDENE ERGEBNISFORMEN (Zweikampf-Duelle, Bretter, Ueberleben,
+  // Punktsumme) -- statt das hier ein neuntes Mal zu erfinden, liest diese Funktion
+  // GENAU DAS, WAS DIE ARENA SCHON ANZEIGT: `wertungVon(disc)` ist derselbe Renderer, den
+  // renderWertungTabelle() waehrend des GANZEN Spiels fuer die Live-Tabelle benutzt (s.
+  // WERTUNG_CHASSIS.buehne/WERTUNG_HEBEN/WERTUNG_DUELL/WERTUNG_AUFTRITT oben) -- er waehlt
+  // pro Disziplin schon die richtigen Spalten (Zug/Vort/Stand fuer Fechten/Tennis/I-Spy/
+  // Schach, Reiss/Stoss/Zwei fuer Gewichtheben, Dg/Pkt/Wuerstchen/HP/Kampf/... fuer
+  // Wettessen/Showcase/Eiskunstlauf/Breaking). Diese Funktion RECHNET NICHTS NEU, sie
+  // uebernimmt nur Kopf/Zeilen/Formatierung, die es fuer die Live-Tabelle ohnehin schon
+  // gibt -- derselbe Wiederverwendungs-Gedanke wie renderEndstand()s ESPALTEN.
+  function buehneStand(){
+    // DIESELBEN VIER VERGLEICHE, DIE updateHudBuehne() SCHON FUER #score BENUTZT (Zeilen
+    // direkt oberhalb dieser Funktion im selben Block) -- hier nur zusaetzlich fuer den
+    // Endstand-Banner gelesen, keine zweite Zaehlweise. Kaeme je eine fuenfte Buehnen-Form
+    // dazu, muesste sie an BEIDEN Stellen ergaenzt werden; bis dahin sind es exakt die vier
+    // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
+    const art=BB();
+    if(art.heben){
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.duell){
+      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+      const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
+    }
+    if(art.gauntlet){
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!gauntletRausJetzt(u)).length;
+      const a=alive(0),b=alive(1); return {a,b,text:a+" : "+b};
+    }
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
+    const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
+  }
+  function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  function renderEndstandBuehne(){
+    const sieger=buehneSieger(), stand=buehneStand();
+    document.getElementById("esieger").textContent=
+      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    setzeEsiegerKlasse(sieger);
+    const w=wertungVon(disc);
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,w.namen));
+      w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      for(const z of zeilen){
+        const tr=el("tr",z.raus?"tot":null);
+        tr.appendChild(el("td",null,z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    renderHighlights();
+    document.getElementById("endstand").hidden=false;
+  }
+
   // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
   // "die gebuchte Saat durch den Host reichen"): GEBUCHTE SAAT FUER DEN INTERAKTIVEN AUFBAU.
   // `echterKader.seedByDisciplineId` kommt vom Host (FoundationBattleArenaHost.tsx) — EXAKT der
@@ -31033,6 +38084,30 @@
     if(!karte||typeof karte!=="object")return undefined;
     const saat=karte[disc];
     return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
+  }
+
+  // LIVE-REVEAL-TIMER FUER MINI-DM (Bugfix 27.09., Opus-Review "kein Spoiler vor dem
+  // Anpfiff"): haelt den setTimeout-Handle der laufenden Rundenoffenbarung in
+  // renderMiniDmFfa() weiter unten. Deklariert HIER, vor `reset()` (das ihn beim Verlassen
+  // von Mini-DM abbricht) statt erst bei renderMiniDmFfa() selbst — `reset()` laeuft schon
+  // beim allerersten Seitenaufbau (s. Aufruf am Ende dieser Datei), lange bevor
+  // renderMiniDmFfa() definiert wird; eine `let`-Deklaration dort waere zu diesem Zeitpunkt
+  // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
+  // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
+  let mdffaOffenbarungsTimer=null;
+
+  // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
+  // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
+  // sind interne Balance-/Entwurfsdokumentation, keine Zuschauer-Grafik -- sie duerfen
+  // deshalb nie UEBER/UNTER einem live laufenden Kampf stehen. Gate: Disziplin TDM UND
+  // nicht `running` (derselbe Zustand, den play()/loop()/finish() unten fuehren) --
+  // also sichtbar vor dem Anpfiff, waehrend einer Pause und nach Spielende, unsichtbar
+  // genau waehrend der Kampf tatsaechlich laeuft. Aufgerufen von reset() (Disziplinwechsel/
+  // Neustart), vom Play/Pause-Knopf und von finish() (ueber updateHud() am Ende jedes
+  // finish()-Zweigs) -- reines Anzeige-Gating, keine Beruehrung von running/stepSim/rr().
+  function aktualisiereTdmNotizen(){
+    const tdmNotes=document.getElementById("tdmEntwurfNotes");
+    if(tdmNotes)tdmNotes.hidden=disc!=="tdm"||running;
   }
 
   function reset(){
@@ -31103,17 +38178,56 @@
     // (scripts/probe-eiskunstlauf-ton.mjs). Reiner Praesentationszustand, kein Einfluss auf
     // rr() oder Rangtreue.
     eiskunstlaufPublikumAn=false;
+    // DASSELBE N1-MUSTER FUER DAS BANDENLICHT (Broadcast Runde 2, 26.09.): ohne diesen Reset
+    // koennte eisBandeSeit noch den buehneT-Wert des VORIGEN Eiskunstlauf-Spiels tragen; da
+    // buehneT bei jedem Spiel wieder bei 0 beginnt, wuerde die Crossfade-Berechnung in
+    // bodenEis() eine negative Differenz sehen und den Wechsel-Zustand faelschlich dauerhaft
+    // auf "voll" halten. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    eisBandeSide=null; eisBandeSeit=-999;
+    // DASSELBE N1-MUSTER FUER DEN EIS-HALO (E-B2, Broadcast-Optik 27.09.) UND DIE
+    // KISS-&-CRY-ZEILENANIMATION (E-B3): kuerHaloSeit/kuerZeilenAnim koennten sonst noch
+    // buehneT-Werte des VORIGEN Eiskunstlauf-Spiels tragen. Reiner Praesentationszustand,
+    // kein Einfluss auf rr() oder Rangtreue.
+    kuerHaloUeber=null; kuerHaloSeit=-999;
+    kuerZeilenAnim.clear();
     // DASSELBE N1-MUSTER FUER SHOWCASE (PR S1, Konzept 17.09.): ohne diese Zeile haelt
     // bodenShowcase() die Flagge fuer "schon gestartet" und der Publikums-Loop kaeme ab dem
     // zweiten Showcase-Spiel nie wieder -- derselbe Fehler, den PR #879 fuer Gewichtheben
     // behoben hat. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
     showcasePublikumAn=false;
+    // DASSELBE N1-MUSTER FUER DEN SHOWCASE-VORHANGSAUM (S-B3, Broadcast-Optik 27.09.):
+    // showcaseSaumSeit koennte sonst noch den buehneT-Wert des VORIGEN Showcase-Spiels
+    // tragen. Reiner Praesentationszustand, kein Einfluss auf rr() oder Rangtreue.
+    showcaseSaumSide=null; showcaseSaumSeit=-999;
+    // DASSELBE N1-MUSTER FUER DEN GOLDENEN BUZZER (S-B5, Broadcast-Optik Buehne-Auftritt
+    // 27.09.): ohne diese Zeile bliebe die "hoechstens einmal je Spiel"-Sperre vom VORIGEN
+    // Showcase-Spiel dauerhaft gesetzt, und kein zweites Spiel derselben Session koennte je
+    // wieder einen goldenen Buzzer vergeben. Reiner Praesentationszustand, kein Einfluss auf
+    // rr() oder Rangtreue.
+    showcaseGoldVergeben=false;
+    // DASSELBE N1-MUSTER FUER DIE WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik 27.09.):
+    // wettessenEndeSeit koennte sonst noch den buehneT-Wert des VORIGEN Wettessen-Spiels
+    // tragen und die Jubelpose faelschlich unterdruecken/dauerhaft zeigen.
+    wettessenEndeSeit=null;
     // DASSELBE N1-MUSTER FUER I-SPY (PR 4, Ton und Politur): ohne diese Zeile haelt
     // bodenSchatzsuche() die Flagge fuer "schon gestartet" und der Publikums-/Raum-Loop
     // kaeme ab dem zweiten I-Spy-Spiel der Session nie wieder -- derselbe Fehler, den
     // PR #879 fuer Gewichtheben behoben hat. Reiner Praesentationszustand, kein Einfluss
     // auf rr() oder Rangtreue.
     ispyRaumAn=false;
+    // DASSELBE N1-MUSTER FUER DEN ZUG-UHR-ALARM (I2, s. ispyLetzterZugAlarmiert-Deklaration
+    // oben): ohne diesen Reset bliebe der letzte Zug ab dem zweiten I-Spy-Spiel stumm.
+    ispyLetzterZugAlarmiert=false;
+    // DASSELBE N1-MUSTER FUER DIE I-SPY-TRENNSTEG-FUEHRUNG (I5, Broadcast-Optik-Recherche
+    // 27.09.): ispySaumSeit koennte sonst noch den buehneT-Wert des VORIGEN I-Spy-Spiels
+    // tragen -- derselbe Fehler, den PR #883/showcaseSaumSeit/eisBandeSeit oben schon
+    // gemessen behoben haben. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue.
+    ispySaumSide=null; ispySaumSeit=-999;
+    // Reiner Aufraeum-Reflex, kein Sicherheitsnetz: baueSchatzsuche() ueberschreibt
+    // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
+    // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
+    ISPY_VISUELLES_LAYOUT=null;
     build(gebuchteSaatFuerAktuelleDisziplin());
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
@@ -31131,6 +38245,28 @@
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
     if(istMdffa)renderMiniDmFfa();
+    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
+    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
+    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
+    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
+    // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
+    // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
+    // unter JEDER Disziplin (Basketball, Fechten, Bahn, ...) Sinn-freien Text, weil dieses
+    // .notes-Element Teil des gemeinsamen Arena-Markups (#p2) ist und nie an `disc` gegated
+    // war. Reines Anzeige-Gating, dieselbe Stelle/derselbe Vertrag wie mdffaPanel zwei
+    // Zeilen oben (reset() laeuft garantiert bei jedem Disziplinwechsel) — Inhalt der
+    // Panels selbst bleibt fuer TDM unangetastet, kein Einfluss auf wert()/stepSim/rr().
+    //
+    // ZWEITER FUND, KRITISCHER AUDIT (Phase 5, 28.09.): "nur fuer TDM" reichte nicht --
+    // die Panels standen dauerhaft unter der Arena, AUCH WAEHREND ein TDM-Kampf lief.
+    // Interne Entwickler-/Balance-Doku direkt unter dem Live-Bild bricht die Broadcast-
+    // Illusion fuer eine Kern-Arena-Disziplin. aktualisiereTdmNotizen() gated deshalb
+    // zusaetzlich auf `running` (dieselbe Variable, die play()/loop()/finish() schon
+    // fuehren, s. dort): sichtbar VOR dem Anpfiff, WAEHREND Pause und NACH Spielende,
+    // unsichtbar nur waehrend eines tatsaechlich laufenden Kampfes. Reines Anzeige-
+    // Gating, keine Aenderung an running/stepSim/rr() selbst.
+    aktualisiereTdmNotizen();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
@@ -31165,6 +38301,12 @@
     zeigeEinlauf(false);
     running=!running;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
+    // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
+    // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
+    // laeuft (die Kampfschleife ruft updateHud() nur, waehrend running gerade true ist) --
+    // ohne diesen Aufruf bliebe die Sichtbarkeit der TDM-Entwicklerpanels bis zum
+    // naechsten Kampf-Tick auf dem alten Stand haengen.
+    aktualisiereTdmNotizen();
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
     // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
@@ -31260,15 +38402,30 @@
       // Skill-Kennzahlen ueber die ganze Serie sammeln — ein einzelner Kampf ist ein Wurf.
       for(const k in MESS){const a=messSumme[k]||(messSumme[k]={n:0,ziele:0,eng:0,bereit:0});
         a.n+=MESS[k].n;a.ziele+=MESS[k].ziele;a.eng+=MESS[k].eng;a.bereit+=MESS[k].bereit;}
-      if(live(0).length>live(1).length)siege++;
-      // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
+      // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): "live(seite).length"
+      // ist am Spielende dort nur noch eine Momentaufnahme, wer GERADE respawnt — vorher war
+      // das bitgleich mit "Ausschaltungen" (niemand kam zurueck), jetzt nicht mehr. Score ist
+      // fuer TDM deshalb dieselbe Summe wie in finish() (u.st.ko je Seite), fuer Mini-DM/
+      // Battlefield unveraendert die Zahl ausgeschalteter Gegner ueber die Ueberlebenden.
       const nJe=jeSeiteVon(disc);
-      const e=(nJe-live(1).length)+":"+(nJe-live(0).length);
+      const punkteL=disc==="tdm"?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0):nJe-live(1).length;
+      const punkteR=disc==="tdm"?U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0):nJe-live(0).length;
+      // TDM-HUD-FIX (27.09.): Sieg-Zaehlung ueber dieselbe kampfSieger()-Funktion wie
+      // finish()/renderEndstand(), statt einem eigenen dritten `punkteL>punkteR`-Vergleich.
+      // disc ist hier immer "tdm" (einziger Aufrufer: serie()/serieVon("tdm",...)), also
+      // bitgleich zum bisherigen Vergleich — nur an einer statt drei Stellen gepflegt.
+      if(kampfSieger()===0)siege++;
+      const e=punkteL+":"+punkteR;
       ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
       for(const u of feld){
         const s=summe[u.n]||(summe[u.n]={n:u.n,seite:u.side,eig:u.eig,dmg:0,heal:0,verh:0,tank:0,ko:0,leist:0,tod:0});
         s.dmg+=u.st.dmg;s.heal+=u.st.heal;s.verh+=u.st.verh;s.tank+=u.st.tank;s.ko+=u.st.koAnteil;
+        // `tod`/`totquote` bleibt "am Ende der Zeit gerade down" — fuer TDM unter Respawn ein
+        // schwaecheres Signal als vorher (kein permanentes Ausscheiden mehr, s. oben), aber
+        // nicht falsch: es zaehlt, wie oft der letzte Tod noch nicht respawnt war. Nicht
+        // umgestellt auf u.st.tode (Todesanzahl je Spiel), um diese Runde auf die Format-
+        // Korrektheit zu begrenzen, nicht auf eine neue Kennzahl.
         s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
       }
     }
@@ -31731,11 +38888,15 @@
   // Das laufende Ergebnis wird auf `disc`/den Team-Eintraegen zwischengespeichert, damit ein
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
+  //
+  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
+  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
     if(!teamsBox||!rundenBox||!endstandBox)return;
+    if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -31754,23 +38915,50 @@
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
-    // TEAM-KOPFZEILE: vier Karten, sortiert nach Event-Endplatz, Sieger optisch markiert.
+    // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
+    // spieleMiniDmFfaEvent() hat alle vier Runden UND den Endstand oben in einem einzigen,
+    // unveraenderten Aufruf berechnet, bevor auch nur eine Zeile DOM geschrieben wird. Was
+    // folgt, entscheidet nur noch WANN/WIE dieses bereits fertige Ergebnis auf den Schirm
+    // kommt: Runde fuer Runde statt in einem Rutsch, der Endstand erst als letzter Schritt
+    // statt als erster. Keine zweite Berechnung, kein zusaetzlicher rr()-Zug, keine
+    // Ruckwirkung auf `ereignis` selbst.
+    const traegheitsarm=(()=>{
+      try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
+      catch(e){return false;}
+    })();
+    const PAUSE_MS=traegheitsarm?0:900;
+    const ANLAUF_MS=traegheitsarm?0:500;
+
+    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
+    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
+    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
+    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
+    // erkennbar bleibt.
     teamsBox.textContent="";
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const karte=el("div","mdffa-team"+(erg.eventPlatz===1?" mdffa-sieger":""));
+    teamsBox.setAttribute("aria-live","polite");
+    const eckKarten=[0,1,2,3].map(side=>{
+      const karte=el("div","mdffa-team mdffa-c"+side+" mdffa-wartet");
       karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
       karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-      const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-      punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+      const punkte=el("div","mdffa-punkte","–");
+      punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
       teamsBox.appendChild(karte);
+      return karte;
     });
 
-    // VIER RUNDENTAFELN (eine je Rolle): Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest.
     rundenBox.textContent="";
-    ereignis.runden.forEach(runde=>{
-      const box=el("div","mdffa-runde");
+    rundenBox.setAttribute("aria-live","polite");
+    endstandBox.textContent="";
+
+    const laufendeSumme=[0,0,0,0];
+
+    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
+    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
+    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
+    // abschaltbar).
+    function schreibeRundentafel(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
@@ -31787,29 +38975,67 @@
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
-    });
+    }
 
-    // ENDSTAND: alle vier Teams, Rundenpunkte-Summe, Beitrag-Summe, Ligapunkte.
-    endstandBox.textContent="";
-    const tbl=document.createElement("table");
-    const thead=document.createElement("thead");
-    const trh=document.createElement("tr");
-    ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
-    thead.appendChild(trh);tbl.appendChild(thead);
-    const tbody=document.createElement("tbody");
-    [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-      const erg=bySide(side);
-      const tr=document.createElement("tr");
-      if(erg.eventPlatz===1)tr.className="mdffa-r1";
-      tr.appendChild(el("td",null,eintraege[side].name));
-      tr.appendChild(el("td",null,String(erg.eventPlatz)));
-      tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
-      tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
-      tr.appendChild(el("td",null,String(erg.ligaPunkte)));
-      tbody.appendChild(tr);
-    });
-    tbl.appendChild(tbody);
-    endstandBox.appendChild(tbl);
+    function aktualisiereEckKarte(side,rundenNr){
+      const karte=eckKarten[side];
+      karte.classList.remove("mdffa-wartet");
+      const punkte=karte.querySelector(".mdffa-punkte");
+      punkte.textContent="";
+      punkte.appendChild(document.createTextNode(laufendeSumme[side]+" Pkt. bisher"));
+      punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
+    }
+
+    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
+    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
+    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
+    // deren Anfang.
+    function zeigeEndstand(){
+      teamsBox.textContent="";
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
+        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
+        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
+        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        karte.appendChild(punkte);
+        teamsBox.appendChild(karte);
+      });
+
+      endstandBox.textContent="";
+      const tbl=document.createElement("table");
+      const thead=document.createElement("thead");
+      const trh=document.createElement("tr");
+      ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
+      thead.appendChild(trh);tbl.appendChild(thead);
+      const tbody=document.createElement("tbody");
+      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+        const erg=bySide(side);
+        const tr=document.createElement("tr");
+        if(erg.eventPlatz===1)tr.className="mdffa-r1";
+        tr.appendChild(el("td",null,eintraege[side].name));
+        tr.appendChild(el("td",null,String(erg.eventPlatz)));
+        tr.appendChild(el("td",null,String(erg.rundenPunkteSumme)));
+        tr.appendChild(el("td",null,erg.beitragSumme.toLocaleString("de-DE")));
+        tr.appendChild(el("td",null,String(erg.ligaPunkte)));
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      endstandBox.appendChild(tbl);
+      mdffaOffenbarungsTimer=null;
+    }
+
+    function naechsteRunde(i){
+      if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
+      const runde=ereignis.runden[i];
+      schreibeRundentafel(runde);
+      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+    }
+
+    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
   }
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
@@ -31905,6 +39131,25 @@
           const o={};
           for(const u of LAEUFER)o[u.n]=burgwertung(u);
           return o;
+        }
+        // CLIMBING: NICHT-ANGEKOMMENE NACH HOECHSTMARKE, NICHT NACH BAHNREIHENFOLGE
+        // (Gegencheck 2.3/3.4, Pflichtfix): mit einem Zeitlimit bleiben nach dem Ablauf
+        // Kletterer `fertig==null` uebrig, und die generische Zeile darunter setzt fuer
+        // sie ALLE dieselbe `99`, sodass die stabile Sortierung sie in `LAEUFER`-Reihenfolge
+        // (also Bahn-Reihenfolge) belaesst — genau das misst dann die Bahnvergabe statt der
+        // Hoehe (gemessen: 0,686 statt 0,830 bei 1,2x). `bahnRangliste()` (die echte
+        // Wertung im Spiel) ordnet Nicht-Angekommene schon richtig; dieser Zweig zieht
+        // dieselbe Regel fuer die Messfunktion nach: Zeit zuerst, darunter Hoechstmarke.
+        // NUR fuer Climbing (`BAHN_ART[bd].climbing`) — jede andere Bahn faellt in den
+        // `else`-Zweig, Zeichen fuer Zeichen die alte Zeile.
+        if(BAHN_ART[bd].climbing){
+          const cmp=(a,b)=>{
+            const fa=bahnZeit(a), fb=bahnZeit(b);
+            if(fa!=null&&fb!=null)return fa-fb;
+            if((fa!=null)!==(fb!=null))return fa!=null?-1:1;
+            return (b.hoch??b.pos)-(a.hoch??a.pos);
+          };
+          const o={}; [...LAEUFER].sort(cmp).forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
         }
         // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
         // bahnRangliste (s. dort), hier fuer die Rangtreue-Messung selbst: `disziplinProbe`
@@ -32002,10 +39247,20 @@
   // gewinnt. Das erfasst besser werden UND andere aufhalten.
   const EINFLUSS_ATTR=["power","health","stamina","intelligence","awareness","determination",
                        "speed","dexterity","charisma","will","spirit","torment"];
-  function einflussVon(dId,n,plus){
+  // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
+  // default 0 -> bit-identisch zum bisherigen Aufruf. Verschiebt BEIDE Seed-Reihen
+  // (Formkarten und M.bau) um denselben Betrag, sodass ein zweiter Aufruf mit grossem,
+  // disjunktem Versatz (z.B. 10_000_000, weit ausserhalb von i*104729/i*7919 fuer
+  // realistische n) eine von der ersten Messung UNABHAENGIGE Saatreihe liefert, ohne die
+  // bestehende deterministische Referenzmessung (versatz=0) zu veraendern. Ersetzt die
+  // bisherige Handarbeit "mehrere kurze Teilmessungen mit disjunkten Offsets in Node
+  // kombinieren" (s. Kommentar bei ISPY_REIHENFOLGE_NERVEN_ANTEIL) durch einen einzigen,
+  // eingebauten Parameter — geprueft: einflussVon(d,n) und einflussVon(d,n,undefined,0)
+  // liefern dieselben Zahlen.
+  function einflussVon(dId,n,plus,saatVersatz){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
-    const hoehe=plus||15;
+    const hoehe=plus||15; const versatz=saatVersatz||0;
     const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
     if(M.vorher)M.vorher();
 
@@ -32013,8 +39268,8 @@
       ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
       const w={};
       for(let i=0;i<n;i++){
-        zieheFormkarten(20260823+i*104729);
-        M.bau(1337+i*7919);
+        zieheFormkarten(20260823+versatz+i*104729);
+        M.bau(1337+versatz+i*7919);
         M.lauf();
         const e=M.wert();
         for(const k in e)w[k]=(w[k]||0)+e[k]/n;
@@ -32496,6 +39751,13 @@
 
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
+    // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
+    // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
+    // -- Playwright kann so die Bannerposition bei jeder getesteten Fensterbreite/Disziplin
+    // sofort pruefen, statt Minuten Sim-Zeit abzuwarten, bis ein Highlight zufaellig faellt.
+    // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
+    // kein Einfluss auf MESS/Wertung/RNG.
+    calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
@@ -32687,7 +39949,13 @@
       const wert=M.wert();
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.vorteil>0).length;
+      // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, Opus-Konzeptreview 26.09., s.
+      // "F1"-Kommentar bei `art.duell` in bauBuehne()): der Trefferstand entscheidet das Brett
+      // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
+      // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
+      // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+      const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
@@ -32702,11 +39970,15 @@
     // Wertungsbegriff, nur derselbe, den das Spiel dem Zuschauer laengst zeigt, jetzt auch fuer
     // die Arena ausgelesen.
     //
-    // GENERISCH UEBER "kein heben, kein duell", NICHT AUF "showcase" HARDCODIERT: jede der
-    // fuenf anderen Auftritt-Buehnen laeuft hier automatisch mit, sobald sie in
-    // ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS steht.
+    // GENERISCH UEBER "kein heben, kein duell, kein gauntlet", NICHT AUF "showcase"
+    // HARDCODIERT: jede der verbleibenden Auftritt-Buehnen laeuft hier automatisch mit,
+    // sobald sie in ARENA_RESOLVED_DISCIPLINE_IDS und ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS
+    // steht. BREAKING NICHT MEHR HIER (22.09.): `gauntlet:true` schaltet den Seitenstand auf
+    // spieleBuehneGauntlet() um (s.u.) -- eine Summenwertung wuerde Chris' "wer uebrig
+    // bleibt scored einen Punkt" nicht abbilden, ein Team koennte mit weniger Ueberlebenden
+    // trotzdem die hoehere Punktsumme haben.
     spieleBuehneAuftritt:(bd,saat)=>{
-      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||BUEHNE_ART[bd].heben||BUEHNE_ART[bd].duell)return null;
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||BUEHNE_ART[bd].heben||BUEHNE_ART[bd].duell||BUEHNE_ART[bd].gauntlet)return null;
       const M=MOTOREN[bd]; if(!M)return null;
       const g=M.sichern(); if(M.vorher)M.vorher();
       M.bau(saat);
@@ -32716,6 +39988,35 @@
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0);
       const seiten=[summe(0),summe(1)];
+      M.zurueck(g);
+      return {disziplin:bd, seiten, boxscore};
+    },
+    // BUeHNEN-GAUNTLET-CHASSIS FUER art.gauntlet (bisher nur Breaking, 22.09.) -- FUENFTES
+    // Buehnen-Chassis neben Heben/Duell/Auftritt/Schatzsuche (letztere laeuft technisch ueber
+    // spieleBuehneAuftritt(), s. dortiger Kommentar). Der Seitenstand ist hier weder eine
+    // Duell-/Brettzaehlung noch eine Punktsumme, sondern die Ueberlebenden-Zaehlung -- exakt
+    // Chris' "wer uebrig bleibt, scored einen Punkt". `u.raus` liest hier den FERTIGEN
+    // Endstand, den `M.lauf()` (oben) schon vollstaendig durchgerechnet hat -- anders als
+    // updateHudBuehne()s eigener BB().gauntlet-Zweig (der `gauntletRausJetzt()` braucht,
+    // weil dort waehrend der laufenden Enthuellung angezeigt wird, s. dortiger Spoiler-
+    // Kommentar) ist das hier der EINZIGE Blick auf das Ergebnis, nach Abschluss der ganzen
+    // Simulation -- kein zu frueher Blick moeglich.
+    //
+    // KEIN GLEICHSTAND MOEGLICH (anders als Speed-Schach/Tennis/Fechten): baueGauntlet()
+    // laeuft immer bis GENAU ein Team komplett aufgebraucht ist (oder beide Teams leer sind,
+    // ein praktisch ausgeschlossener Randfall) -- `seiten` ist deshalb entweder [>=1,0] oder
+    // [0,>=1], nie [0,0] bei echten Aufstellungen. Kein `gesamtKg`-Tiebreak noetig.
+    spieleBuehneGauntlet:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].gauntlet)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const wert=M.wert();
+      const namen=M.namen();
+      const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!u.raus).length;
+      const seiten=[alive(0),alive(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
@@ -32734,7 +40035,7 @@
         funde:{...u.funde}, reaktionen:u.reaktionen||0,
         // "runden" nur die additiven Anzeigefelder, keine internen _-Felder.
         runden:u.runden.map(r=>({punkte:r.punkte,ereignis:r.ereignis,art:r.art||null,
-          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion}))}));
+          stufe:r.stufe||null,fundort:r.fundort??null,reaktion:!!r.reaktion,hinweis:!!r.hinweis}))}));
       M.zurueck(g);
       return {disziplin:"i-spy", teilnehmer:teiln};
     },
@@ -33498,6 +40799,15 @@
         :istFeldspiel(dId)?FELDSPIEL_ART[dId]:ARENA_ART[dId];
       const altJeSeite=art&&art.jeSeite;
       if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
+      // DREI ROUTEN-LAYOUTS EINZELN MESSEN (Climbing-PR-2, Gegencheck 3.8: "gemessen in
+      // PR 2, ... Abnahme: rho ueber alle drei Layouts gemittelt UND je Layout ueber
+      // 0,80"). Ohne diese Option waehlt bau() den Kurs seed-gemischt (s. dort) — fuer die
+      // Einzelabnahme haelt `o.kursIndex` `art.kurse` waehrend der Probe auf GENAU einen
+      // Eintrag fest, exakt dasselbe Sichern/Wiederherstellen-Muster wie `o.jeSeite` oben.
+      // Jede Bahn ohne `kurse`-Feld (Spurt/Staffel/Zeitfahren) liest hier `art.kurse`
+      // als `undefined`, die Bedingung bleibt `false`, unveraendertes Verhalten.
+      const altKurse=art&&art.kurse;
+      if(o.kursIndex!=null&&art&&art.kurse)art.kurse=[art.kurse[o.kursIndex]];
       // NEU (Kaderfamilie, Projektueberwachung Abschnitt 1.3/3.1 A): `o.kaderFamilie` ist
       // optional. Ohne sie laeuft GENAU der Code, der hier schon immer stand — ein einziges
       // SQUAD/OPP, eine `spiele`-Liste, dieselbe Rueckgabeform wie vorher. Mit ihr wird die
@@ -33564,6 +40874,7 @@
         }
       } finally {
         M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
+        if(art&&o.kursIndex!=null)art.kurse=altKurse;
         if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}
       }
       const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
@@ -33571,6 +40882,88 @@
       return familie
         ? {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, varianten:ergebnis}
         : {disziplin:dId, chassis, jeSeite:(art&&art.jeSeite)||null, spiele:ergebnis};
+    },
+    // WAND-SONDE (Climbing-Neubau PR 0, 24.09., Konzept climbing-neukonzept-22-09.md Abschnitt
+    // 6.4 Schritt 1 / Gegencheck climbing-opus-gegencheck-24-09.md Abschnitt 2.4: "PR 0 sollte
+    // daraus die wandProbe() machen, die das Konzept ohnehin vorsieht"). Reine Diagnose-Sonde
+    // nach demselben Prinzip wie showcaseActProbe/ispyNachfuellSonde oben -- kein Gameplay,
+    // kein zusaetzlicher rr()-Verbrauch (nur der normale Rennverlauf ueber
+    // MOTOREN.climbing.bau()/lauf(), derselbe Pfad, den disziplinProbe() direkt oberhalb
+    // nimmt). Liefert die Nulllinie, die PR 2 fuer Zeitlimit/Zonen/Balance braucht:
+    // Siegerzeit-Median und -Spannweite, wie weit das Feld hinter dem Sieger liegt (fuer die
+    // Top-out-Quote bei einem k-fachen Zeitlimit, s. Gegencheck 2.1/2.2), Stolperer/Kraftzuege
+    // je Kopf, Reserve am Ende. Kaderfest wie disziplinProbe: n Rennen, EIN SQUAD/OPP
+    // (Default-Kader), dieselbe Saatfolge.
+    wandProbe:(opt)=>{
+      const M=MOTOREN.climbing;
+      if(!M)return {fehler:"kein Motor für climbing angemeldet"};
+      const o=opt||{}, n=o.n||48, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const gesichert=M.sichern();
+      if(M.vorher)M.vorher();
+      const rennen=[];
+      try{
+        for(let i=0;i<n;i++){
+          zieheFormkarten(20260823+i*104729);
+          M.bau(saat0+i*schritt);
+          M.lauf();
+          const laeufer=LAEUFER.map(u=>({n:u.n,fertig:u.fertig,pos:u.pos,hoch:u.hoch??u.pos,
+            gestolpert:u.gestolpert||0, durchbruch:u.durchbruch||0, reserve:u.reserve,
+            abgerutscht:u.abgerutscht||0, umgesetzt:u.umgesetzt||0, rastCount:u.rastCount||0,
+            balance:u.balance}));
+          const angekommen=laeufer.filter(z=>z.fertig!=null);
+          const sieger=angekommen.length?Math.min(...angekommen.map(z=>z.fertig)):null;
+          rennen.push({sieger, laeufer});
+        }
+      } finally {
+        M.zurueck(gesichert); zieheFormkarten(20260823);
+      }
+      const median=(arr)=>{ if(!arr.length)return null; const s=[...arr].sort((a,b)=>a-b);
+        return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2; };
+      const perzentil=(arr,p)=>{ if(!arr.length)return null; const s=[...arr].sort((a,b)=>a-b);
+        return s[Math.min(s.length-1,Math.max(0,Math.floor(p*(s.length-1))))]; };
+      const runden=(x,stellen)=>x==null?null:Math.round(x*Math.pow(10,stellen))/Math.pow(10,stellen);
+      const siegerzeiten=rennen.map(r=>r.sieger).filter(z=>z!=null);
+      const siegerzeitMedian=median(siegerzeiten);
+      // Zeit/Siegerzeit je Nicht-Sieger UND der Langsamste je Rennen (Gegencheck 2.1: beide
+      // Groessen zusammen sagen, wie weit das Feld hinter dem Sieger auseinanderliegt).
+      const ratios=[], langsamsteRatios=[];
+      for(const r of rennen){
+        if(r.sieger==null)continue;
+        const an=r.laeufer.filter(z=>z.fertig!=null);
+        for(const z of an)if(z.fertig!==r.sieger)ratios.push(z.fertig/r.sieger);
+        if(an.length)langsamsteRatios.push(Math.max(...an.map(z=>z.fertig))/r.sieger);
+      }
+      const alle=rennen.flatMap(r=>r.laeufer);
+      // Top-out-Quote bei einem FESTEN Limit von k * globalem Median-Siegerzeit (Gegencheck
+      // 2.1-Tabelle) -- derselbe Massstab wie dort, damit PR 2 das Zeitlimit an einem
+      // gemessenen Korridor eicht statt an einer geschaetzten Zahl.
+      const kListe=o.k||[1.10,1.15,1.20,1.25,1.30,1.40,1.60];
+      const topoutJeK={};
+      if(siegerzeitMedian!=null)for(const k of kListe){
+        const limit=k*siegerzeitMedian;
+        const treffer=alle.filter(z=>z.fertig!=null&&z.fertig<=limit).length;
+        topoutJeK[k]=runden(100*treffer/alle.length,1);
+      }
+      return {
+        disziplin:"climbing", spiele:n,
+        siegerzeitMedianSimS:runden(siegerzeitMedian,2),
+        siegerzeitSpanneSimS:siegerzeiten.length?[runden(Math.min(...siegerzeiten),2),runden(Math.max(...siegerzeiten),2)]:null,
+        zeitZuSiegerMedian:runden(median(ratios),3),
+        zeitZuSieger90:runden(perzentil(ratios,0.90),3),
+        langsamsterZuSiegerMedian:runden(median(langsamsteRatios),3),
+        langsamsterZuSiegerMax:langsamsteRatios.length?runden(Math.max(...langsamsteRatios),3):null,
+        stolpererJeKopf:runden(alle.reduce((s,z)=>s+z.gestolpert,0)/alle.length,2),
+        kraftzuegeJeKopf:runden(alle.reduce((s,z)=>s+z.durchbruch,0)/alle.length,2),
+        reserveAmEndeMedian:runden(median(alle.map(z=>z.reserve)),1),
+        topoutQuoteJeK:topoutJeK,
+        // PR 2 (26.09.): zusaetzliche Diagnose fuer Griffarten/Balance/Rast/Abrutschen —
+        // reine Anzeige, dieselbe Sonde, kein neuer rr()-Verbrauch.
+        abgerutschtJeKopf:runden(alle.reduce((s,z)=>s+z.abgerutscht,0)/alle.length,2),
+        umgesetztJeKopf:runden(alle.reduce((s,z)=>s+z.umgesetzt,0)/alle.length,2),
+        rastenJeKopf:runden(alle.reduce((s,z)=>s+z.rastCount,0)/alle.length,2),
+        balanceAmEndeMedian:runden(median(alle.map(z=>z.balance).filter(v=>v!=null)),3),
+        hoehAmEndeMedian:runden(median(alle.map(z=>z.hoch)),3)
+      };
     },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,

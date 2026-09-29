@@ -154,12 +154,30 @@ export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
  * noch `.duell`, `spieleBuehneAuftritt()` ist damit der richtige und einzige Einstiegspunkt.
  * Die Namensaehnlichkeit `duett`/`duell` ist die eine Falle dieser Welle; sie ist hier
  * ausdruecklich benannt, damit ein kuenftiger Leser sie nicht fuer einen Copy-Paste-Fehler haelt.
+ *
+ * BREAKING WIEDER RAUS (22.09., Gauntlet-Umbau): `BUEHNE_ART.breaking` traegt jetzt
+ * `gauntlet:true` (Chris' Vorgabe -- Slot 1 gegen Slot 1, der Sieger bleibt mit seinem
+ * aktuellen HP-Stand im Ring, s. `public/mockups/battle-mode.engine.js`). Eine Summenwertung
+ * (was `spieleBuehneAuftritt()` liefert) bildet "wer uebrig bleibt scored einen Punkt" nicht
+ * ab -- ein Team koennte mit weniger Ueberlebenden trotzdem die hoehere Punktsumme haben.
+ * Breaking laeuft deshalb ab hier ueber `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS`/
+ * `spieleBuehneGauntlet()` (s.u.), das einzige Chassis, das ueber ein `.gauntlet`-Flag geht.
  */
 export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "showcase",
   "eiskunstlauf",
-  "breaking",
   "wettessen",
+]);
+
+/**
+ * FUENFTE BUeHNEN-CHASSIS-MENGE (22.09., Gauntlet-Umbau): fuer `BUEHNE_ART[d].gauntlet` --
+ * bisher nur Breaking. `window.__arena.spieleBuehneGauntlet()` liest den Seitenstand als
+ * Ueberlebenden-Zaehlung (`u.raus`), nicht als Punktsumme oder Duell-/Brettzaehlung -- ein
+ * eigenes, viertes Muster neben Heben/Duell/Auftritt, s. Kommentar am Motor-Einstiegspunkt
+ * selbst (battle-mode.engine.js) fuer die volle Herleitung.
+ */
+export const ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "breaking",
 ]);
 
 /**
@@ -425,9 +443,9 @@ async function simuliereFixturesImBrowser(payload: {
   disziplin: string;
   // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
   // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` /
-  // `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche entscheidet, keine Disziplins-ID-Kenntnis
-  // im Browser-Code selbst.
-  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn";
+  // `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS` / `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche
+  // entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
+  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn";
   timeoutMs: number;
 }): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
@@ -436,6 +454,7 @@ async function simuliereFixturesImBrowser(payload: {
       spieleBuehneHeben: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneDuell: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneAuftritt: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBuehneGauntlet: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBahn: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
     };
     __olyArenaKader?: unknown;
@@ -488,6 +507,8 @@ async function simuliereFixturesImBrowser(payload: {
         ? fenster.__arena.spieleBuehneDuell(payload.disziplin, fixture.seed)
         : payload.chassis === "buehneAuftritt"
         ? fenster.__arena.spieleBuehneAuftritt(payload.disziplin, fixture.seed)
+        : payload.chassis === "buehneGauntlet"
+        ? fenster.__arena.spieleBuehneGauntlet(payload.disziplin, fixture.seed)
         : payload.chassis === "bahn"
         ? fenster.__arena.spieleBahn(payload.disziplin, fixture.seed)
         : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
@@ -564,7 +585,7 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
+    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
       disziplin,
     )
       ? "buehneHeben"
@@ -572,6 +593,8 @@ export async function runArenaFixtures(
       ? "buehneDuell"
       : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
       ? "buehneAuftritt"
+      : ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS.has(disziplin)
+      ? "buehneGauntlet"
       : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
       ? "bahn"
       : "feldspiel";
@@ -600,6 +623,8 @@ export async function runArenaFixtures(
         ? "spieleBuehneDuell"
         : chassis === "buehneAuftritt"
         ? "spieleBuehneAuftritt"
+        : chassis === "buehneGauntlet"
+        ? "spieleBuehneGauntlet"
         : chassis === "bahn"
         ? "spieleBahn"
         : "spieleFeldspiel";

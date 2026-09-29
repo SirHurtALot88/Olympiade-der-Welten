@@ -1,7 +1,8 @@
   .oly-battle-arena.oly-battle-arena{--ground:#F2F5F9;--surface:#FFF;--surface-2:#E9EEF5;--sunk:#DFE6EF;--pitch:#E4EAF2;
     --line:#CFD8E4;--line-soft:#E3E9F1;--ink:#111823;--muted:#5A6678;--faint:#8B98AA;
     --home:#B26A12;--home-bg:#F2A03D26;--away:#15707F;--away-bg:#45B0C926;
-    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--wucht:#D2562A;--puste-knapp:#B5761F;--fortschritt:#2C6FB0;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
+    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--wucht:#D2562A;--puste-knapp:#B5761F;--fortschritt:#2C6FB0;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d;
+    --mdffa-c0:#B26A12;--mdffa-c1:#15707F;--mdffa-c2:#5C8A2E;--mdffa-c3:#8A4FA8}
   /* Die dunklen Flaechen-Tokens zeigen mit var(--nl-*, Rueckfall) auf die Design-Tokens
      der App (app/globals.css, .is-new-look): eingebettet uebernimmt der Entwurf damit
      EXAKT die Flaechen, Linien und Textfarben des Foundation-Shells — inklusive der
@@ -13,11 +14,34 @@
     --ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--fortschritt:#5AA9E6;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--fortschritt:#5AA9E6;--shadow:0 1px 2px #00000050,0 10px 32px #00000040;
+    --mdffa-c0:#F2A03D;--mdffa-c1:#45B0C9;--mdffa-c2:#8FCB5C;--mdffa-c3:#C58CE0}}
   .oly-battle-arena.oly-battle-arena[data-theme="dark"]{--ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);--pitch:var(--nl-bg-2,#0D141E);
     --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
     --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
-    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--fortschritt:#5AA9E6;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--wucht:#FF8A4C;--puste-knapp:#E0A03A;--fortschritt:#5AA9E6;--shadow:0 1px 2px #00000050,0 10px 32px #00000040;
+    --mdffa-c0:#F2A03D;--mdffa-c1:#45B0C9;--mdffa-c2:#8FCB5C;--mdffa-c3:#C58CE0}
+
+  /* HUD-EINBLENDUNG (Broadcast-Optik-Nachaudit 28.09., Befund "fast nichts animiert"):
+     EIN gemeinsamer Einschwebe-Effekt fuer HUD-Elemente, die bisher nur per [hidden]
+     hart an-/ausgeblendet wurden (Score-Bug, I-Spy-Zug-Uhr, Split-Tafel, Bahn-HUD,
+     Fokus-/Rennplan-Zeile, Zeitfahren-Fokus, Lauf-Band). Bewusst EIN Utility statt
+     einer eigenen Animation je Element -- dieselbe kurze, gedaempfte Geste ueberall,
+     150ms statt einer auffaelligen Bewegung. Wird als zusaetzliche Klasse im Markup
+     gesetzt (battle-mode.html); die vorhandene [hidden]-Logik in der Engine bleibt
+     unveraendert -- der Uebergang display:none -> sichtbar startet die Animation von
+     selbst neu, ohne dass ein Zeichenpfad etwas davon wissen muss. Die globale
+     prefers-reduced-motion-Regel ganz unten in dieser Datei deckt auch diese
+     Animation ab (animation:none!important auf allen Nachfahren). */
+  /* translate/scale als EIGENE Eigenschaften statt eines transform-Shorthands: mehrere
+     Ziele (.bbuglauf, .ispyzuguhr) zentrieren sich bereits ueber ein eigenes
+     transform:translateX(-50%) -- ein hier per transform:none endender Keyframe wuerde
+     genau dieses Zentrieren am Ende jeder Einblendung wieder aufheben. translate/scale
+     komponieren MIT einem vorhandenen transform (Reihenfolge laut Spec: translate ->
+     rotate -> scale -> transform), bleiben also unabhaengig von jeder bestehenden
+     Positionierung. */
+  @keyframes hudIn{from{opacity:0;translate:0 -6px;scale:.96}to{opacity:1;translate:0 0;scale:1}}
+  .oly-battle-arena.oly-battle-arena .hud-in{animation:hudIn 150ms ease-out both}
 
   /* EINBETTUNGS-MODUS (.im-spiel, gesetzt vom Host in FoundationBattleArenaHost.tsx).
      Der Entwurf sitzt dann nativ zwischen den Panels des Foundation-Shells:
@@ -196,9 +220,15 @@
 
   .oly-battle-arena.oly-battle-arena .scoreline{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;padding:12px 18px;
     background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
-  .oly-battle-arena.oly-battle-arena .tname{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .tname{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+    color:var(--home)}
   .oly-battle-arena.oly-battle-arena .tname em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.11em;color:var(--muted)}
-  .oly-battle-arena.oly-battle-arena .tname.r{text-align:right}
+  /* TEAMFARBE IN DER SCORELINE (Broadcast-Optik-Nachaudit 28.09., Befund 4): --home/--away
+     waren schon in Aufstellung und Wertungstabelle verdrahtet (.wteamlabel), aber nicht in
+     der prominentesten Kopfzeile -- den beiden Teamnamen ueber der Leinwand. tnameL traegt
+     nur "tname" (Heim), tnameR zusaetzlich "r" (Gast) -- dieselbe L/R=Heim/Gast-Zuordnung
+     wie ueberall sonst (.wteamlabel, .feed .h/.a, #kaderL/#kaderR). */
+  .oly-battle-arena.oly-battle-arena .tname.r{text-align:right;color:var(--away)}
   .oly-battle-arena.oly-battle-arena .clock{font-family:"Barlow Condensed",sans-serif;font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;text-align:center}
   .oly-battle-arena.oly-battle-arena .clock small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);font-weight:400;letter-spacing:.1em;margin-top:3px}
   .oly-battle-arena.oly-battle-arena .hpbars{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:0 18px 11px;background:var(--surface-2);align-items:center}
@@ -206,7 +236,22 @@
   .oly-battle-arena.oly-battle-arena .tbar s{display:block;height:100%;border-radius:4px;transition:width .2s linear}
   .oly-battle-arena.oly-battle-arena .tbar.l s{background:var(--home)}.oly-battle-arena.oly-battle-arena .tbar.r s{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
-  .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;height:auto;background:var(--pitch)}
+  /* LEINWANDSKALIERUNG (Phase 5, 28.09., kritischer Audit): width:100%;height:auto war
+     schon seit dem 17.09. da (#956) und laesst den Browser die Bild-Hoehe aus dem
+     intrinsischen Seitenverhaeltnis der Leinwand (width/height-ATTRIBUTE im Markup,
+     1240x470, s. battle-mode.html #cv) ableiten -- nachgemessen (Playwright, 1024/1400/
+     1920px, Hockey/TDM/Basketball/Fechten, volle Seite UND reine Ueberlauf-Pruefung
+     per scrollWidth===clientWidth) blieb das bei jeder getesteten Breite ueberlauf- und
+     kappungsfrei, die Leinwand skaliert glatt von 1258px (1400/1920px, gedeckelt durch
+     .wrap max-width:1300px) auf 966px (1024px) herunter. `max-width:100%` und ein
+     EXPLIZITES `aspect-ratio` kommen trotzdem dazu, als zweite, von der Attribut-
+     Root-Inferenz UNABHAENGIGE Sicherung derselben Zahl -- falls die Leinwand je in
+     einen schmaleren Flex-/Grid-Kontext wandert, in dem ein Vorfahre `min-width:auto`
+     mitbringt, oder eine Embedding-Umgebung die width/height-Attribute anders liest als
+     hier gemessen. Das Verhaeltnis MUSS mit #cv width="1240" height="470" in
+     battle-mode.html mitwachsen, sonst verzerrt die Leinwand. */
+  .oly-battle-arena.oly-battle-arena canvas{display:block;width:100%;max-width:100%;
+    height:auto;aspect-ratio:1240/470;background:var(--pitch)}
 
   /* MINI-DM 4-TEAM-FFA-Ergebnisansicht (Bugfix 22.09., s. battle-mode.html/-engine.js) —
      vier Teams nebeneinander statt der Zwei-Seiten-.scoreline/.hpbars/.kaderleiste
@@ -220,6 +265,21 @@
   .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte{font-family:"IBM Plex Mono",monospace;font-size:18px;font-weight:600;color:var(--warn)}
   .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte em{display:block;font-style:normal;font-size:9px;color:var(--muted);font-weight:400}
   .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-sieger{border-color:var(--warn)}
+  /* LIVE-REVEAL (Bugfix 27.09.): jede Ecke behaelt ueber Runden UND Endstand hinweg
+     dieselbe Farbe (mdffa-c0..3 = Ecke/side, nicht Rang) — so bleibt "welche Ecke bin ich"
+     erkennbar, auch wenn sich die Reihenfolge beim finalen Endstand nach Platz sortiert.
+     Reine Praesentation, keine neue Berechnung. */
+  .oly-battle-arena.oly-battle-arena .mdffa-team{border-top:3px solid var(--mdffa-c0);transition:opacity 220ms ease,transform 220ms ease}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c0{border-top-color:var(--mdffa-c0)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c1{border-top-color:var(--mdffa-c1)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c2{border-top-color:var(--mdffa-c2)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c3{border-top-color:var(--mdffa-c3)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-wartet .mdffa-punkte{color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde.mdffa-runde-neu{animation:mdffaFadeIn 420ms ease both}
+  @keyframes mdffaFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @media (prefers-reduced-motion:reduce){
+    .oly-battle-arena.oly-battle-arena .mdffa-runde.mdffa-runde-neu{animation:none}
+  }
   .oly-battle-arena.oly-battle-arena .mdffa-runden{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px}
   .oly-battle-arena.oly-battle-arena .mdffa-runde{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .oly-battle-arena.oly-battle-arena .mdffa-runde h5{margin:0;padding:6px 9px;font-size:11.5px;border-bottom:1px solid var(--line);color:var(--ink)}
@@ -353,7 +413,12 @@
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
   .oly-battle-arena.oly-battle-arena .kseite{display:flex;gap:6px;flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .kseite.r{justify-content:flex-end}
-  .oly-battle-arena.oly-battle-arena .kmitte{font:700 14px/1 ui-monospace,monospace;color:var(--ink);white-space:nowrap}
+  /* KONTRASTKORREKTUR (Broadcast-Optik-Nachaudit 28.09., Befund 3): 14px/var(--ink) las
+     sich in der dunklen Kaderleiste ("6:6" bei TDM) klein und wenig hervorgehoben --
+     hier nur Groesse/Gewicht/Helligkeit angehoben und tabular-nums ergaenzt, sonst
+     unveraendert (kein neues Element, keine neue Farbe). */
+  .oly-battle-arena.oly-battle-arena .kmitte{font:800 20px/1 ui-monospace,monospace;
+    font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:86px;padding:4px 5px;border-radius:6px;
     background:var(--surface);border:1px solid var(--line)}
   /* SPRITE IN DER KACHEL (30.08., Chris: "bei den health Bars unten noch jeweils das
@@ -404,6 +469,31 @@
   .oly-battle-arena.oly-battle-arena .kk.tot{opacity:.45;border-style:dashed}
   .oly-battle-arena.oly-battle-arena .kk.tot b{text-decoration:line-through}
   .oly-battle-arena.oly-battle-arena .kk.tot .kbar s{background:var(--crit)}
+  /* K4 -- SPECTATOR-KARTEN JE KAEMPFER (Broadcast-Optik-Recherche 27.09., Abschnitt 3/K4):
+     Mana-/Ausdauerbalken als zusaetzliche duenne Leisten unter der Lebensanzeige, eigene
+     Farben statt der gruenen HP-/Puste-Ampel, damit alle drei Ressourcen auf einen Blick
+     unterscheidbar bleiben (dasselbe "eine Farbe je Groesse"-Prinzip wie .kbar.fortschritt
+     direkt oberhalb). Nur fuer Kampf gerendert (renderKader()), height:3px haelt die Kachel
+     schmal wie beim Fortschrittsbalken der Bahn. */
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource{height:3px;margin-top:2px}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource.mana s{background:#6ea8e8}
+  .oly-battle-arena.oly-battle-arena .kk .kbar.ressource.ausdauer s{background:#e2a83f}
+  /* SELTENE FAEHIGKEIT MIT ABKLINGRING (K4, Overwatchs "Ult-Ladung"): ein kleiner Ring,
+     der sich per conic-gradient ueber --anteil (0-100%, per style.setProperty gesetzt,
+     s. renderKader()) fuellt -- dieselbe Fokusfarbe wie die Zielansage/das Fokus-Doppeln
+     (--fokus), --ok (gruen) sobald die Faehigkeit bereit ist. */
+  .oly-battle-arena.oly-battle-arena .kk .kfaehig{width:10px;height:10px;border-radius:50%;
+    flex:none;background:conic-gradient(var(--fokus) var(--anteil,0%),var(--line) 0)}
+  .oly-battle-arena.oly-battle-arena .kk .kfaehig.bereit{background:var(--ok)}
+  /* K/T/B KLEIN (K4): dieselben drei Zahlen wie die ESPALTEN-Spalten K/T/B in der
+     Wertungstabelle, hier zusaetzlich direkt an der Figur -- "der Kommentator kann ueber
+     jeden sprechen, ohne das Bild zu wechseln" (Recherche, Abschnitt 2.1). */
+  .oly-battle-arena.oly-battle-arena .kk .kkzeile2{display:flex;align-items:center;gap:5px;margin-top:2px}
+  .oly-battle-arena.oly-battle-arena .kk .kktb{display:flex;gap:5px;margin-left:auto;
+    font:600 8px/1 var(--mono,ui-monospace,monospace);color:var(--faint)}
+  /* STATUS (K4): Respawn-Uhr (TDM) statt des generischen "tot", "Raus" sonst. */
+  .oly-battle-arena.oly-battle-arena .kk .kkstatus{font:600 8.5px/1.3 ui-monospace,monospace;
+    color:var(--faint);margin-top:1px}
   /* FOKUS-DOPPELN. --fokus ist das CSS-Gegenstueck zu FOKUS_FARBE in battle-mode.engine.js
      (Ring und Pfeil auf der Leinwand) — beide muessen denselben Ton tragen, damit die
      Kachel in der Kaderleiste und die Markierung auf dem Feld als EIN Zustand lesbar
@@ -499,6 +589,13 @@
   .oly-battle-arena.oly-battle-arena .ttstand .gut{color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .ttstand .knapp{color:var(--warn,#e0a341)}
   .oly-battle-arena.oly-battle-arena .ttstand .schlecht{color:var(--crit)}
+  /* TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3). Eine Zeile, dieselbe Typo wie .ttstand,
+     nur in der Signalfarbe hervorgehoben -- erscheint erst, wenn eine Seite komplett im
+     Ziel ist (s. bahnZeitFuerSieg()). */
+  .oly-battle-arena.oly-battle-arena .ttteamsieg{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+    color:var(--warn,#e0a341)}
+  .oly-battle-arena.oly-battle-arena .ttteamsieg[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ttteamsieg.chancenlos{color:var(--crit)}
   /* HOEHENPROFIL: eine flache Leiste, farbige Baender je Gelaendezone, ein Marker fuer die
      Position des fokussierten Laeufers, zwei Striche fuer die Checkpoints. Bewusst kein
      Canvas/SVG-Nachbau eines echten Hoehenprofils (die Recherche nennt das explizit ein
@@ -540,13 +637,72 @@
   .oly-battle-arena.oly-battle-arena .ansageuhr::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sunk)}
   .oly-battle-arena.oly-battle-arena .ansageuhr b{position:absolute;inset:0;z-index:1;display:flex;align-items:center;
     justify-content:center;font:700 9px/1 var(--mono,ui-monospace,monospace);color:var(--fokus)}
-  /* Endstand */
-  .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
-    gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}
+  /* Endstand (Broadcast-Optik-Nachaudit 28.09., Befund 1: "bricht die ganze Illusion").
+     VORHER: .endstand malte nur mit den AMBIENTEN --surface/--ink/... -- in jedem
+     Kontext ohne erzwungenes data-theme="dark" (jeder Standalone-Aufruf dieser Datei,
+     jeder Browser mit hellem OS-Farbschema) blieb der Bildschirm nach dem Spiel damit
+     creme/weiss, obwohl die Arena selbst waehrend des Spiels ueber Canvas UND fest
+     dunkle Overlays (.einlauf, .viertelpause, .bbug & Co., s. deren rgba(16..)-Werte
+     oben) durchgehend dunkel wirkt -- genau der Bruch, den der Spieler sieht. NACHHER:
+     .endstand PINNT dieselben Tokennamen, die die Arena schon durchgehend benutzt
+     (--surface/--ink/--home/--away/...), auf ihre dunklen Werte (identisch zum
+     [data-theme="dark"]-Block oben) -- der Bildschirm bleibt also IMMER in der
+     Nacht-Broadcast-Optik, die der Spieler gerade elf Minuten lang gesehen hat, ganz
+     gleich welches Umgebungs-Theme greift. Reines Presentation-CSS: renderEndstand()/
+     renderEndstandBahn()/renderEndstandBuehne() in battle-mode.engine.js sind
+     unangetastet, nur um eine Klasse auf #esieger erweitert (sieg-h/sieg-a/sieg-u,
+     s. dort) fuer die Sieger-Einfaerbung direkt unten.
+     KORREKTUR (Review 28.09., Befund "haertet Fallback-Hex statt Indirektion"): die
+     Flaechen-/Linien-/Text-Tokens hier standen zuerst als reine Fallback-Hex, nicht als
+     var(--nl-*, Fallback) wie im [data-theme="dark"]-Block oben. Eingebettet im
+     Foundation-Shell (.is-new-look setzt echte --nl-panel/--nl-line/--nl-mut/...,
+     s. app/globals.css) loesten .endstand und die restliche dunkle Arena damit zwei
+     LEICHT verschiedene Farbtoene auf -- derselbe Bruch, nur kleiner. Jetzt token-fuer-
+     token dieselbe var(--nl-*, Fallback)-Kette wie oben, damit .endstand im Shell exakt
+     dieselben Werte aufloest wie jedes andere dunkle Arena-Element. --home/--away/--ok/
+     --crit bleiben bewusst eigene, plaine Hexwerte -- genau wie im [data-theme="dark"]-
+     Block oben, der fuer diese Tokens ebenfalls keine --nl-Indirektion nutzt.
+     --shadow fehlte hier komplett und fiel dadurch auf den AMBIENTEN (hellen) Schatten-
+     wert zurueck, sichtbar an #esieger -- kaum wahrnehmbar, genau im Standalone-/
+     Hell-Schema-Fall, den dieser Umbau eigentlich beheben sollte. Jetzt ebenfalls
+     gepinnt, identisch zum [data-theme="dark"]-Block oben. */
+  .oly-battle-arena.oly-battle-arena .endstand{position:absolute;inset:0;display:flex;flex-direction:column;
+    gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center;
+    --ground:var(--nl-bg,#0B1018);--surface:var(--nl-panel,#141C28);--surface-2:#1C2534;--sunk:var(--nl-panel-2,#0E1621);
+    --line:var(--nl-line,#2A3546);--line-soft:#212B3B;--ink:var(--nl-ink,#E7EDF6);--muted:var(--nl-mut,#8795A9);--faint:var(--nl-mut-2,#6A778A);
+    --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040;
+    background:var(--ground);color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .endstand[hidden]{display:none}
-  .oly-battle-arena.oly-battle-arena .esieger{font:700 clamp(15px,2.4vw,26px)/1.2 system-ui,sans-serif;color:var(--warn);text-align:center}
+  /* SIEGER-ZEILE: Kaestchen statt blossem Fliesstext, mit einem kurzen Scale-in beim
+     Erscheinen (dasselbe hudIn-Timing-Gefuehl wie die HUD-Einblendung oben, hier aber
+     eigens benannt, weil die Bewegung -- Skalierung statt Verschiebung -- zum "Pokal
+     geht hoch"-Moment passt). sieg-h/sieg-a faerben Rahmen/Verlauf in der Farbe des
+     Gewinnerteams (dieselbe L=Heim/R=Gast-Zuordnung wie ueberall sonst); ohne eine der
+     beiden Klassen (Unentschieden) bleibt es die alte neutrale --warn-Faerbung. */
+  .oly-battle-arena.oly-battle-arena .esieger{font:700 clamp(16px,2.6vw,28px)/1.2 "Barlow Condensed",sans-serif;
+    letter-spacing:.02em;text-transform:uppercase;color:var(--warn);text-align:center;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:10px 26px;box-shadow:var(--shadow);
+    animation:esiegerIn .32s cubic-bezier(.22,.9,.32,1.2) both}
+  .oly-battle-arena.oly-battle-arena .esieger.sieg-h{color:var(--home);border-color:var(--home);
+    background:linear-gradient(135deg,color-mix(in srgb,var(--home) 28%,var(--surface)),var(--surface) 72%);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--home) 45%,transparent),0 12px 32px -10px color-mix(in srgb,var(--home) 60%,transparent)}
+  .oly-battle-arena.oly-battle-arena .esieger.sieg-a{color:var(--away);border-color:var(--away);
+    background:linear-gradient(135deg,color-mix(in srgb,var(--away) 28%,var(--surface)),var(--surface) 72%);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--away) 45%,transparent),0 12px 32px -10px color-mix(in srgb,var(--away) 60%,transparent)}
+  @keyframes esiegerIn{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:scale(1)}}
   .oly-battle-arena.oly-battle-arena .etafeln{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,1.6vw,18px);width:100%}
-  .oly-battle-arena.oly-battle-arena .etafel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:auto}
+  .oly-battle-arena.oly-battle-arena .etafel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:auto;
+    border-top:3px solid var(--line)}
+  /* TEAMFARBE AN DEN TAFELUEBERSCHRIFTEN (Befund 4): etafelL ist immer Heim, etafelR
+     immer Gast (renderEndstand()/-Bahn()/-Buehne() rufen VEREIN[0]/[1] in dieser
+     Reihenfolge in die beiden festen IDs) -- dieselbe Zuordnung wie .wteamlabel und
+     #kaderL/#kaderR. ID-Selektor noetig, weil .etafel selbst seitenneutral bleibt. */
+  .oly-battle-arena.oly-battle-arena #etafelL{border-top-color:var(--home)}
+  .oly-battle-arena.oly-battle-arena #etafelR{border-top-color:var(--away)}
+  .oly-battle-arena.oly-battle-arena #etafelL h5{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena #etafelR h5{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .etafel h5{margin:0;padding:7px 10px;font-size:12px;color:var(--ink);border-bottom:1px solid var(--line)}
   .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 ui-monospace,monospace}
   .oly-battle-arena.oly-battle-arena .etafel th{padding:4px 5px;text-align:right;color:var(--faint);font-size:9px;font-weight:600;
@@ -588,15 +744,109 @@
   .oly-battle-arena.oly-battle-arena .bbug .seite b{color:#fff;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bbug .seite small{display:block;color:#c3ccd8;font-size:9px;
     white-space:normal}
+  /* LEBENS-PIPS (K2, Broadcast-Optik-Recherche 27.09., Abschnitt 3): eine CS-Scorebar-
+     Reihe je Seite, ein Punkt je Kaempfer -- die dritte Zeile im Score-Bug, unter Name
+     und Zusatzzeile (dasselbe display:block-Zeilenmuster wie ".seite small" darueber,
+     durchbricht das white-space:nowrap der Elternbox wie dort schon). "an" = lebt, in
+     Teamfarbe (per .seite.l/.seite.r unten); "aus" = liegt dauerhaft (Mini-DM/Battlefield,
+     kein Respawn), leer/gedimmt; "wartet" = TDM-Respawn, grau mit hellem Ring statt voll
+     dunkel, damit "kommt zurueck" von "raus" unterscheidbar bleibt, ohne eine echte Uhr
+     zu zeichnen (das leistet der Killfeed-Respawn-Zaehler, K1, spaeter). */
+  .oly-battle-arena.oly-battle-arena .bbug .pips{display:block;white-space:normal;
+    overflow:visible;line-height:1;margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .bbug .pip{display:inline-block;width:6px;height:6px;
+    border-radius:50%;margin:0 3px 2px 0;background:rgba(255,255,255,.16)}
+  .oly-battle-arena.oly-battle-arena .bbug .seite.l .pip.an{background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbug .seite.r .pip.an{background:var(--away)}
+  .oly-battle-arena.oly-battle-arena .bbug .pip.wartet{background:rgba(255,255,255,.16);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
   .oly-battle-arena.oly-battle-arena .bbugmitte{background:rgba(17,24,35,.82);
-    border-radius:6px;padding:4px 11px;color:var(--warn);font-weight:700;font-size:12px;
-    white-space:nowrap;align-self:flex-start;flex:none}
+    border-radius:6px;padding:4px 13px;color:var(--warn);font-weight:700;
+    font-size:clamp(13px,1.35vw,18px);font-variant-numeric:tabular-nums;
+    white-space:nowrap;align-self:flex-start;flex:none;text-align:center;
+    transition:box-shadow .15s ease}
   .oly-battle-arena.oly-battle-arena .bbugmitte:empty{display:none}
+  /* KONTRASTKORREKTUR SCORE/UHR (Broadcast-Optik-Nachaudit 28.09., Befund 3): der
+     generische Score-Bug las sich bei 1920px wie zwei flache Farbbalken ohne lesbaren
+     Text -- fester 12px-Text blieb bei jeder Leinwandbreite gleich klein. Score UND
+     Uhr sitzen als reiner Text/<b> direkt in .bbugmitte (s. aktualisiereBbug()), die
+     clamp()-Groesse oben skaliert bereits beide mit; hier zusaetzlich die Score-Zahl
+     (das <b>) etwas kraeftiger als die Uhr daneben, wie an einer echten Anzeigetafel. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte b{font-size:1.15em;font-weight:800;
+    font-variant-numeric:tabular-nums}
+  /* Q1-KONTEXTZEILE (docs/design/broadcast-optik-feldspiel-27-09.md Abschnitt 3): zweite,
+     kleinere Zeile unter Score/Uhr -- aktualisiereBbug() haengt dieses <small> nur bei den
+     drei Feldspielen ueberhaupt an (feldspielRestzeitAbwaerts/-KontextZusatz); Kampf/Bahn/
+     Buehne bekommen gar kein <small>, .bbugmitte bleibt dort wie bisher eine einzeilige Box. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small{display:block;color:#c3ccd8;
+    font-weight:500;font-size:9.5px;letter-spacing:.01em;margin-top:1px;white-space:nowrap}
+  /* SHOT-CLOCK-WARNFARBE IN DER KONTEXTZEILE (Nachtrag 27.09., Review-Fund B1(a)): dieselbe
+     Warnfarbe/Klasse wie .ttstand .knapp -- die Canvas-Ziffernbox (zeichneShotClock()) faerbt
+     sich unter 5s bereits rot, die textuelle Kontextzeile tat es bisher nicht. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .knapp{color:var(--warn,#e0a341)}
+  /* FUEHRUNGSWECHSEL-BLITZ (Runde 2, Vorschlag 3): kurzer Aufleuchter am Bug, 0,6 s, wenn
+     die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
+  .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
+    0 0 14px 2px var(--warn)}
+  /* UEBERZAHL-KENNUNG (K2): "4 : 3" in der Farbe der Seite mit mehr Lebenden, nur wenn
+     die Zahlen ungleich sind (aktualisiereBbug() haengt <small> nur dann ueberhaupt an).
+     Eigene Zeile unter Score/Uhr, dasselbe display:block-Muster wie oben. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl{display:block;font-size:10px;
+    font-weight:700;margin-top:2px;color:#c3ccd8}
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbugmitte .ueberzahl.r{color:var(--away)}
+  /* H4 -- "TORWART RAUS"-KENNUNG (Hockey, A, Prio 2): Text in feldspielKontextZusatz()
+     eingestreut (innerHTML, wie .knapp), Teamfarbe der Seite, die den Torwart gezogen
+     hat -- l/r spiegelt dieselbe Home/Away-Zuordnung wie .ueberzahl oben. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus{font-weight:700}
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.r{color:var(--away)}
+
+  /* B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2): eigenes Band UNTER dem Bug (nicht Teil
+     von .bbugmitte, s. Bauplan "Band unter dem Bug"), sichtbar nur ab 8 Punkten in Folge
+     (aktualisiereBbug() setzt/entfernt [hidden] und die Home/Away-Klasse). */
+  .oly-battle-arena.oly-battle-arena .bbuglauf{position:absolute;top:52px;left:50%;
+    transform:translateX(-50%);background:rgba(17,24,35,.85);border-radius:6px;
+    padding:3px 12px;font:700 12px 'Barlow Condensed',sans-serif;letter-spacing:.04em;
+    color:#fff;white-space:nowrap;z-index:3}
+  .oly-battle-arena.oly-battle-arena .bbuglauf[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .bbuglauf.l{box-shadow:0 0 0 2px var(--home)}
+  .oly-battle-arena.oly-battle-arena .bbuglauf.r{box-shadow:0 0 0 2px var(--away)}
+
+  /* K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09., Abschnitt
+     3/K6, nur Battlefield). Bewusst unauffaellig: eigene Zeile, kleine Schrift, ein
+     Farbpunkt statt einer grossen Grafik (Leitplanke 0.1 Punkt 5 -- die Domination
+     entscheidet laut Konzeptreview kein Spiel). Der Punkt fuellt sich per conic-gradient
+     ueber --anteil waehrend einer laufenden Eroberung (KP.erobertVon!=null, s.
+     aktualisiereBbug()), sonst ist er einfarbig (Besitzer-Teamfarbe oder neutral). */
+  .oly-battle-arena.oly-battle-arena .bbugmitte .kpbug{display:flex;align-items:center;
+    gap:4px;font-size:9.5px;margin-top:2px;color:#c3ccd8}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt{width:7px;height:7px;border-radius:50%;
+    display:inline-block;background:conic-gradient(currentColor var(--anteil,100%),
+    rgba(255,255,255,.25) 0);color:#8b98aa}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .kpbugpunkt.r{color:var(--away)}
 
   /* CALLOUT: kurzes Highlight-Banner fuer ein big-Ereignis aus feed() (Abschnitt 4.3/4.4
      derselben Recherche). Faehrt per CSS-Transition ein/aus (s. callout() in der Engine);
-     dieselbe Overlay-Ebene wie der Bug, aber zentriert und nur ein paar Sekunden sichtbar. */
-  .oly-battle-arena.oly-battle-arena .bbugcallout{position:absolute;top:8px;left:50%;
+     dieselbe Overlay-Ebene wie der Bug, zentriert und nur ein paar Sekunden sichtbar.
+     TOP war zunaechst fest 60px statt 8px (Nachtrag 27.09., vier unabhaengige Opus-
+     Ingame-Reviews desselben Tages): beide lagen bei top:8px genau uebereinander, der
+     Callout (spaeter im DOM, siegt also im Stapel) verdeckte damit bei JEDEM Highlight-
+     Ereignis den Bug darunter. Eine feste Zahl reicht dafuer aber nicht: eine fuenfte,
+     unabhaengige Review (27.09.) mass bei schmalen Fensterbreiten (360-375px) weiterhin
+     Rest-Overlap bis -20px, weil .bbug/.bbugmitte dort selbst hoeher wird -- die
+     Team-Boxen (.seite) brechen um, sobald Name+Wert nicht mehr nebeneinander passen
+     (Fechten: 66,25px statt 39,25px). GENAU das Problem, fuer das .bahnhud weiter unten
+     schon auf Prozentangaben umgestiegen ist -- hier hilft eine Prozentangabe aber nicht,
+     weil die Bug-Hoehe nicht an der Leinwand haengt, sondern am Textinhalt (Teamnamen/
+     Werte), der sich Spiel fuer Spiel und Disziplin fuer Disziplin unterscheidet. Deshalb
+     TOP HIER NUR NOCH FALLBACK: positioniereCallout() in der Engine (bzw. dasselbe Muster
+     in drehbuch-aufstellung.js fuer #fokusbug) misst die tatsaechliche Bug-Unterkante per
+     getBoundingClientRect() bei JEDEM callout()-Aufruf und setzt banner.style.top passend
+     -- reine Anzeigeposition, kein Einfluss auf MESS/Wertung/RNG. Der Wert hier greift nur,
+     solange kein JS gelaufen ist (z.B. allererster Seitenaufbau, Element noch [hidden]). */
+  .oly-battle-arena.oly-battle-arena .bbugcallout{position:absolute;top:60px;left:50%;
     transform:translate(-50%,-6px);max-width:min(88%,560px);
     background:rgba(15,19,26,.88);border:1px solid var(--warn);border-radius:8px;
     padding:7px 18px;color:#fff;font:700 clamp(11px,1.7vw,15px)/1.3 "Barlow Condensed",sans-serif;
@@ -608,14 +858,42 @@
     font-size:.78em;font-weight:500;color:#c3ccd8;letter-spacing:0;margin-top:2px;
     text-transform:none}
 
-  /* HOEHEPUNKTE im Endstand-Overlay: dieselbe Textlisten-Optik wie .feed, nur ohne
-     Zeitstempel-Scrollen -- ein fertiger Rueckblick statt eines laufenden Tickers. */
+  /* SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09.): dieselbe Zeilen-Optik
+     wie .ehighlights direkt darunter, aber als eigene, hervorgehobene Karte (--warn-Rahmen,
+     wie .esieger) -- EIN Moment, keine Liste, deshalb kein eigenes scrollbares .ehlist. */
+  .oly-battle-arena.oly-battle-arena .eszene{width:100%;background:var(--surface);
+    border:1px solid var(--warn);border-radius:8px;padding:10px 14px}
+  .oly-battle-arena.oly-battle-arena .eszene[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .eszene h5{margin:0 0 6px;font-size:12px;color:var(--warn);
+    text-transform:uppercase;letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile{font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht{color:var(--faint);flex:none;margin-right:9px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile.h{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile.a{color:var(--away)}
+
+  /* HOEHEPUNKTE im Endstand-Overlay (Broadcast-Optik-Nachaudit 28.09., Befund 1: "ein
+     ganz normaler Textabsatz" statt eigener Optik). VORHER eine gestapelte Textliste
+     ohne jede Kartenoptik -- .ehzeile/.eht/.h/.a unten bleiben dieselben Klassen (und
+     bleiben unveraendert fuer .eszene direkt oberhalb, s. dort), NUR innerhalb von
+     .ehighlights wird daraus jetzt eine umbrechende Reihe eigenstaendiger Chips: Pille
+     mit Zeitstempel-Badge, Randfarbe je Seite (dieselbe L=Heim/R=Gast-Zuordnung wie
+     ueberall). Reines Markup-unveraendertes Re-Styling -- renderHighlights() haengt
+     weiter nur .ehzeile-Divs mit .h/.a an denselben Container. */
   .oly-battle-arena.oly-battle-arena .ehighlights{width:100%;background:var(--surface);
     border:1px solid var(--line);border-radius:8px;padding:10px 14px}
   .oly-battle-arena.oly-battle-arena .ehighlights[hidden]{display:none}
-  .oly-battle-arena.oly-battle-arena .ehighlights h5{margin:0 0 6px;font-size:12px;color:var(--ink)}
-  .oly-battle-arena.oly-battle-arena .ehlist{display:flex;flex-direction:column;gap:3px;
-    font-family:"IBM Plex Mono",monospace;font-size:11px;max-height:140px;overflow-y:auto}
+  .oly-battle-arena.oly-battle-arena .ehighlights h5{margin:0 0 8px;font-size:12px;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .ehlist{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;max-height:172px;overflow-y:auto;padding:1px}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile{display:flex;align-items:center;gap:7px;
+    max-width:100%;background:var(--surface-2);border:1px solid var(--line-soft);
+    border-radius:999px;padding:4px 12px 4px 4px;line-height:1.3}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile .eht{flex:none;background:var(--sunk);
+    color:var(--faint);border-radius:999px;padding:2px 8px;font-size:9.5px}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h{border-color:color-mix(in srgb,var(--home) 45%,var(--line-soft))}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h .eht{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a{border-color:color-mix(in srgb,var(--away) 45%,var(--line-soft))}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a .eht{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .ehzeile{display:flex;gap:9px}
   .oly-battle-arena.oly-battle-arena .ehzeile .eht{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .ehzeile.h{color:var(--home)}
@@ -676,6 +954,56 @@
   .oly-battle-arena.oly-battle-arena .bhdelta .bhbar i.bh-away{background:var(--away)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-home{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bhdelta.bh-away{color:var(--away)}
+  /* ST-3: BEIN-/RUNDENZEILE (broadcast-optik-bahn-27-09.md Abschnitt 4.3). Dritte Zeile im
+     mittleren Delta-Feld statt einer dritten Zeile je Seite (Runde 2, Vorschlag 3 warnt
+     davor). Klein und gedaempft -- Kontextzeile, kein neuer Schwerpunkt. */
+  .oly-battle-arena.oly-battle-arena .bhdelta .bhbein{display:block;margin-top:3px;font-size:9.5px;
+    font-family:"IBM Plex Mono",monospace;font-weight:400;letter-spacing:.02em;color:#93a1b3}
+
+  /* I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): die Crystal-Maze-
+     Zonenuhr, mittig oben in derselben 15%-Zeile wie .bahnhud (beide Panels sind
+     wechselseitig ausschliessend -- Bahn und I-Spy sind nie gleichzeitig aktiv). KEIN
+     eigener z-index, aus demselben Grund wie bei .bahnhud direkt darueber dokumentiert:
+     die Dokumentreihenfolge (vor .einlauf/.endstand/.viertelpause) laesst diese drei
+     Vollflaechen-Overlays korrekt darueberliegen. */
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr{position:absolute;top:15%;left:50%;
+    transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
+    gap:4px;pointer-events:none;font-family:"IBM Plex Mono",monospace;
+    background:rgba(10,13,18,.78);border:1px solid rgba(255,255,255,.18);
+    border-radius:7px;padding:5px 16px}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr span{color:#fff;font-size:11px;
+    font-weight:700;letter-spacing:.03em;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .ispyzugbar{width:150px;height:4px;border-radius:2px;
+    background:rgba(255,255,255,.16);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .ispyzugbar s{display:block;height:100%;width:0;
+    background:var(--warn);border-radius:2px;text-decoration:none}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr.letzter span{color:#ff7b72}
+  .oly-battle-arena.oly-battle-arena .ispyzuguhr.letzter .ispyzugbar s{background:#ff7b72;
+    animation:ispyZugPuls .9s ease-in-out infinite}
+  @keyframes ispyZugPuls{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* I-SPY SPLIT-TAFEL (I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4): der Speedrun-
+     Split, am unteren Rand der Leinwand -- acht schmale Spalten, eine je Zug. Noch nicht
+     enthuellte Zuege zeigen "·" (Spoiler-Schutz, s. aktualisiereIspyHud()). */
+  .oly-battle-arena.oly-battle-arena .ispysplit{position:absolute;left:2.2%;right:2.2%;
+    bottom:2%;display:flex;gap:2px;background:rgba(10,13,18,.8);
+    border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 6px;
+    pointer-events:none;font-family:"IBM Plex Mono",monospace}
+  .oly-battle-arena.oly-battle-arena .ispysplit[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .ispysplit:empty{display:none}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-col{flex:1;min-width:0;
+    text-align:center;display:flex;flex-direction:column;gap:1px;line-height:1.25}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-zug{font-size:7.5px;color:#93a1b3;
+    letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte{font-size:10px;font-weight:700;
+    color:#5c6773}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.l{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.r{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-punkte.isp-gold{color:#e8c07a}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta{font-size:8px;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta.vorn{color:#7ee787}
+  .oly-battle-arena.oly-battle-arena .ispysplit .isp-delta.hinten{color:#ff7b72}
 
   /* Einlauf vor dem Anpfiff */
   .oly-battle-arena.oly-battle-arena .arenaraum{position:relative}
@@ -806,6 +1134,11 @@
 
   .oly-battle-arena.oly-battle-arena .notes{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media (max-width:840px){.oly-battle-arena.oly-battle-arena .notes{grid-template-columns:1fr}}
+  /* .notes ist per Klasse auf display:grid gesetzt — das schlaegt die niedrigere
+     Spezifitaet der [hidden]-UA-Regel, deshalb hier derselbe Ueberschreibungs-Kniff wie bei
+     .fokuszeile/.rennplanzeile/.ttfokus & Co. oben: #tdmEntwurfNotes (TDM-Entwicklerpanels,
+     Opus-Review 27.09.) muss bei jedem anderen Disziplin-hidden wirklich verschwinden. */
+  .oly-battle-arena.oly-battle-arena .notes[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:8px;padding:13px 15px}
   .oly-battle-arena.oly-battle-arena .note.off{border-left-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .note h3{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;

@@ -1,9 +1,9 @@
 {
  "disziplin": "time-trial",
- "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) DES ROHEN BUEHNEN-WERTS (bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn() in public/mockups/battle-mode.engine.js), JE FELDGROESSE getrennt gezogen -- gebaut von scripts/ziehe-buehne-pps-referenz.ts gegen echte Liga-Kader (buildArenaTeam()) ueber runArenaFixtures()/spieleBahn(). Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. KATALOG-STANDARDGROESSE IST 4, NICHT 6 (Discipline.playerCount in lib/data/dataAdapter.ts; BUEHNE_ART[d].jeSeite im Motor ist 6, das ist die MOTOR-Feldgroesse und der falsche Wert dafuer) -- nur der Fallback fuer eine nicht ermittelbare Feldgroesse, s. Skript-Kopfkommentar. KLEINERE STICHPROBE ALS BASKETBALLS REFERENZ (60 statt 300+ Fixtures je Feldgroesse) -- unveraendert dieselbe Zeitbudget-Entscheidung wie in Produktivierungswelle 1 (06.09.2026), keine methodische. Neu ziehen nach jeder Aenderung, die den rohen Wert verschiebt (BAHN_ART[\"time-trial\"], stepSpurt()/bauSpurt(), Kadergenerierung/Attributniveau der Liga).",
- "gezogenAm": "2026-09-10T10:26:19.501Z",
- "motorSha1": "bbd08be6c590d00305002fcccf70773eae4bd0d4",
- "repoCommit": "c56fffd76c0ec814e27d8d6211a3cbaae1243ebd",
+ "hinweis": "iMittel (Median) und iKrass (99,5.-Perzentil) DES ROHEN BUEHNEN-WERTS (bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn() in public/mockups/battle-mode.engine.js), JE FELDGROESSE getrennt gezogen -- gebaut von scripts/ziehe-buehne-pps-referenz.ts gegen echte Liga-Kader (buildArenaTeam()) ueber runArenaFixtures()/spieleBahn(). Gelesen von computeIndividualBoxscorePpsFromFixtureResults() in lib/resolve/battle-mode-arena-team-points.ts. KATALOG-STANDARDGROESSE IST 4, NICHT 6 (Discipline.playerCount in lib/data/dataAdapter.ts; BUEHNE_ART[d].jeSeite/BAHN_ART[d].jeSeite im Motor ist 6, das ist die MOTOR-Feldgroesse und der falsche Wert dafuer) -- nur der Fallback fuer eine nicht ermittelbare Feldgroesse, s. Skript-Kopfkommentar. KLEINERE STICHPROBE ALS BASKETBALLS REFERENZ (60 statt 300+ Fixtures je Feldgroesse) -- unveraendert dieselbe Zeitbudget-Entscheidung wie in Produktivierungswelle 1 (06.09.2026), keine methodische. Neu ziehen nach jeder Aenderung, die den rohen Wert verschiebt (BAHN_ART[\"time-trial\"], stepSpurt()/bauSpurt(), Kadergenerierung/Attributniveau der Liga).",
+ "gezogenAm": "2026-09-23T11:50:23.828Z",
+ "motorSha1": "f87e627800743aad6209bfa2144644f2aab56869",
+ "repoCommit": "6d668f9169bf5787ab4935a9594809f86661c69a",
  "quelle": {
   "saveId": "new-game-1787123325719-swnjlk",
   "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
