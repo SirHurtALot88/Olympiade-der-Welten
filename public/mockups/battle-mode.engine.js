@@ -41024,6 +41024,9 @@
       // Mutator weicht absichtlich von der Eignung ab, die Abnahme soll das sehen, nicht
       // wegrechnen.
       const mutatorModus=o.mutatoren||"je-spiel";
+      // `o.mutatorSaat`: Versatz fuer einen unabhaengigen Mutator-Saatstrom (Standard 0) — trennt
+      // Mutator-Ziehungsrauschen von einer echten Wirkung, ohne Formkarten/Bau-Saaten zu aendern.
+      const mutatorSaat=o.mutatorSaat||0;
       const mutatorenVorher=MUTATOREN;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();
@@ -41056,7 +41059,7 @@
         const spiele=[];
         for(let i=0;i<n;i++){
           zieheFormkarten(20260823+i*104729);
-          if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);
+          if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+mutatorSaat+i*15485863);
           else if(mutatorModus==="aus")MUTATOREN=[];
           M.bau(saat0+i*schritt);
           M.lauf();
