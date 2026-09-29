@@ -799,8 +799,92 @@ Wertung weiter `+6`/`+0,3`, die Engine-Zahlen schwanken mit Spannweiten 0,67–0
 
 #### Pp-Abweichung
 
-PP_PLATZHALTER
+`messe-arena-einfluss.mjs <d> <n> --mutatoren=aus|je-lauf [--saat-versatz=N]`. Vorher = „aus"
+(für Feldspiel/Bühne/Bahn bitgleich `main`, s. oben), nachher = „je-lauf" (Lauf i zieht seinen
+Wurf wie im Spiel; Grund- und jeder Hebungslauf sehen denselben Wurf — gepaart, kein
+Kontaminationsweg). Kampf: vorher = echte `main`-Engine.
+
+| Disziplin | Chassis | n | Saatstrom | vorher | nachher | Δ |
+|---|---|---:|---|---:|---:|---:|
+| Gewichtheben | Bühne/Heben | 48 | 0 | 19,1 | 21,4 | +2,3 |
+| Gewichtheben | Bühne/Heben | 48 | 10 000 000 | 26,1 | 27,5 | +1,4 |
+| Speed-Schach | Bühne/Duell | 48 | 0 | 17,3 | 17,7 | +0,4 |
+| Speed-Schach | Bühne/Duell | 48 | 10 000 000 | 18,3 | 17,6 | −0,7 |
+| Spurt | Bahn | 48 | 0 | 15,0 | 15,2 | +0,2 |
+| Spurt | Bahn | 48 | 10 000 000 | 12,8 | 15,1 | +2,3 |
+| Spurt | Bahn | 24 | 0 / 10 000 000 | 11,4 / 13,2 | 19,2 / 15,4 | +7,8 / +2,2 |
+| Climbing | Bahn | 24 | 0 | 16,9 | 18,3 | +1,4 |
+| Time-Trial | Bahn | 24 | 0 | 22,8 | 22,1 | −0,7 |
+| Basketball | Feldspiel | 12 | 0 | 49,6 | 28,6 | −21,0 (Rauschen, s. u.) |
+| Battlefield | Kampf | 24 | 0 | 54,0 (`main`) | 46,1 | −7,9 |
+| Mini-DM | Kampf | 6 | 0 | 120 (`main`) | 69,6 | −50 |
+| TDM | Kampf | 2 | 0 | 51,4 (`main`) | 65,9 | +14,5 (Rauschen, s. u.; neu „aus": 100,9) |
+**Lesart.**
+
+- **Kein Pp-Schaden, wo die Schranke eingehalten war.** Speed-Schach, Spurt (n=48), Climbing,
+  Time-Trial und Gewichtheben (Strom 0) bleiben unter 25. Gewichthebens zweiter Strom lag schon
+  vorher über 25 (26,1; Scorecard 26.09.: 29,1) und bewegt sich um +1,4.
+- **Die Deltas liegen im Messrauschen.** Allein der Saatstrom verschiebt Gewichtheben im Modus
+  „aus" um 7 Pp (19,1 gegen 26,1), Spurt je nach `n`/Strom zwischen 11,4 und 15,0. Die einzige
+  Abweichung über 2 Pp bei n=48 (Spurt, zweiter Strom, +2,3) steht neben +0,2 im ersten Strom; der
+  n=24-Ausreißer (+7,8) ist bei n=48 verschwunden. Das Kriterium „|B − A| ≤ 2 Pp" aus 6.3 ist an
+  drei von vier n=48-Paaren eingehalten, das vierte liegt 0,3 darüber — innerhalb dessen, was ein
+  Saatwechsel ohne jede Mechanikänderung bewegt.
+- **Warum neutral:** der Bonus sitzt am selben Eingang wie der Hebel und ist für alle zwölf
+  Attribute gleich; der Gewinn aus `+15` auf ein Attribut ändert sich dadurch nicht (flach addiert
+  sich, der Hebel bleibt `min(100, a+15) − a`). Was übrig bleibt, sind Nichtlinearitäten (1–99-Klemme)
+  und die geänderte Umgebung (wer wie stark ist) — Rauschen, keine gerichtete Verschiebung.
+- **Kampf wird besser, nicht schlechter.** Battlefield −7,9 und Mini-DM −50 gegen `main`: der
+  ersetzte eng-Weg hob zwei Slot-Fokusattribute einseitig (Konzept 6.2 hatte das vorhergesagt).
+  Beide bleiben weit über 25 (bekannte, separat zurückgestellte Verletzungen).
+- **TDM bei n=2 ist kein Messwert.** Dieselbe neue Engine liefert „aus" 100,9 und „je-lauf" 65,9,
+  `main` 51,4 — eine Spanne von 50 Pp ohne gerichtete Aussage. Größere `n` stürzen bei TDM am
+  Speicherleck ab (Scorecard 26.09.). TDM ist nicht arena-aufgelöst, seine Wertung bucht weiter
+  `+6`/`+0,3`.
+- **Basketball bei n=12** ist zu verrauscht für eine Aussage in die eine oder andere Richtung
+  (Scorecard n=24: 33,4); die Zeile steht nur, um zu zeigen, dass nichts explodiert. n=24 kostet
+  zweimal ~40 min Chromium und passte nicht mehr in diese Runde.
+- **Nicht messbar in dieser Umgebung (15 GB):** Tennis und Fechten (n=24 und n=48), Hockey,
+  Breaking. Der Chromium-Renderer wächst dort um ≈ 8 GB je Minute und wird nach 2–3 Minuten vom
+  OOM-Killer beendet — nachgemessen **identisch** für `main` (7,8 → 12,3 GB nach 60/120 s) und die
+  neue Engine im Modus „aus" (8,3 → 12,0 → 13,7 GB). Das Leck ist vorbestehend, nicht Folge dieser
+  Änderung; Eiskunstlauf/Showcase/Wettessen (dasselbe Bühnen-Chassis) sind aus Zeitgründen nicht
+  mehr angefasst worden. Für die Bühne stehen damit Gewichtheben (Heben) und Speed-Schach (Duell)
+  mit je zwei Saatströmen bei n=48.
 
 ### 11.4 Was offen bleibt
 
-OFFEN_PLATZHALTER
+1. **Climbing steht auf der Schranke — Entscheidung bei Chris.** Ohne Mutator 0,808 im Mittel über
+   sechs Saatsätze (einer davon 0,799), mit Mutator 0,801, gepaart −0,007. Am Standard-Saatsatz der
+   nächtlichen Prüfung (`ci-nightly.yml` → `pruefe-rangtreue-schranke.mjs`) landet Climbing bei
+   0,791: die **absolute 0,80-Prüfung für arena-aufgelöste Disziplinen wird dort anschlagen**. Ein
+   kleinerer Bonus hilft messbar nicht (+2,5 ebenfalls −0,007). Sinnvolle Wege: (a) eine eigene
+   Climbing-Kalibrierrunde für Abstand zur Schranke (Climbing war schon vor dieser Änderung der
+   knappste Fall), (b) die Prüfung über mehrere Saatsätze mitteln statt über einen, (c) bewusst
+   hinnehmen. Nichts davon ist hier vorweggenommen.
+2. **Hockey rho** 0,686 → 0,640 (Feldspieler 0,725 → 0,676): war schon vorher durchgefallen und ist
+   die rauschstärkste Feldspiel-Disziplin; nicht über Saatsätze nachgemessen (ein Hockey-Durchlauf
+   kostet ein Vielfaches). Hockey bekommt je Treffer auch am wenigsten PP (≈ 0,21).
+3. **Der PP-Wert je Treffer streut je Disziplin** (+3,5 interpoliert ≈ 0,21 Hockey bis ≈ 0,45
+   Spurt) — Folge von „ein Wert für alle" (Abschnitt 8, Frage 5). Eine Staffelung je Disziplin wäre
+   ein neuer Stellknopf und ist bewusst nicht gebaut.
+4. **Die fünf nicht simulierten Battle-Disziplinen** (TDM, Mini-DM, Battlefield, Football, I-Spy)
+   buchen weiter `+6`/`+0,3`. Wird eine davon arena-aufgelöst, wechselt sie automatisch auf den
+   organischen Weg (die Weiche hängt an `ARENA_RESOLVED_DISCIPLINE_IDS` + Arena-Override).
+5. **Randfall PPS-Rückfall je Spieler:** ein Spieler, dessen Boxscore-Name im Duell nicht eindeutig
+   ist (`playerId: null`), bekommt PPS-Anteil statt Boxscore-PP — sein Team ist trotzdem
+   arena-simuliert, er bekommt also keine 0,3. Am Live-Abbild kam eine Namenskollision nie vor.
+6. **Anzeige:** Spieltags-Zusammenfassung und Inbox-Story „Mutator-Rangsprung" lesen den flachen
+   Bonus und zeigen für Arena-Disziplinen jetzt ehrlich 0. Eine eigene Kennzeichnung „Treffer wirkt
+   im Spiel" (aus `mutatorHits`) wäre UI-Politur für eine Folgerunde; die Spielplan-Spalte zählt
+   bereits richtig.
+7. **PPS-Referenzen** (`data/generated/*-pps-referenz.json`) sind ohne Mutator gezogen; die
+   informative Frische-Prüfung meldet sie wegen des geänderten Engine-Hashes ohnehin als veraltet.
+   Mit ≈ 18 % getroffenen Spielern verschiebt sich die Boxscore-Verteilung leicht nach oben; ein
+   Neuziehen ist optional.
+8. **Nicht gemessen:** Pp für Tennis, Fechten, Hockey, Breaking (Chromium-OOM, vorbestehend, s. 11.3),
+   Eiskunstlauf/Showcase/Wettessen (Zeit), Basketball nur n=12; Prozent-Kalibrierung für Breaking
+   (Absturz). Für eine volle Pp-Scorecard braucht es einen Rechner mit mehr Speicher oder zuerst die
+   Behebung des Engine-Lecks.
+9. **Randbefund aus Abschnitt „Randbefunde" unverändert:** Formkarte und Intensität erreichen die
+   produktive Arena weiterhin nicht (Brücke überträgt nur `{d, slot}` und jetzt den Wurf).
