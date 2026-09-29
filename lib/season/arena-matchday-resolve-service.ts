@@ -7,6 +7,7 @@ import {
   LegacyMatchdayResultApplyService,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS, runBattleModeArenaMatchday } from "@/lib/resolve/battle-mode-arena-team-points";
+import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { runArenaFixtures } from "@/lib/battle/arena-headless-runner";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
@@ -98,7 +99,11 @@ export type ArenaMatchdayApplyKickoffResult =
  */
 function determineArenaDisciplineContexts(
   contextResults: ReturnType<typeof loadAllLocalLegacyLineupContexts>,
-): { contexts: LegacyLineupLoadedContext[]; arenaDisciplineIds: string[] } {
+): {
+  contexts: LegacyLineupLoadedContext[];
+  arenaDisciplineIds: string[];
+  mutatorTraitsByDisciplineId: Map<string, string[]>;
+} {
   const contexts = contextResults.flatMap((result) => (result.ok ? [result.context] : []));
   const kandidaten = new Set<string>();
   for (const context of contexts) {
@@ -107,7 +112,28 @@ function determineArenaDisciplineContexts(
     if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1)) kandidaten.add(d1);
     if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
   }
-  return { contexts, arenaDisciplineIds: [...kandidaten] };
+  // MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der Spieltagswurf je
+  // arena-aufgeloester Disziplin — aus GENAU DEN Feldern, aus denen `buildLegacyMatchdayResolvePreview()`
+  // spaeter wuerfelt (`contexts[0]`: saveId/seasonId/matchdayId + contextMeta.d1/d2DisciplineId).
+  // So sieht die Simulation denselben Wurf wie Resolve und Spielplan, nicht einen zweiten.
+  const mutatorTraitsByDisciplineId = new Map<string, string[]>();
+  const basis = contexts[0];
+  if (basis) {
+    for (const disciplineId of kandidaten) {
+      mutatorTraitsByDisciplineId.set(
+        disciplineId,
+        resolveMatchdayMutatorTraitsForDiscipline({
+          saveId: basis.saveId,
+          seasonId: basis.seasonId,
+          matchdayId: basis.matchdayId,
+          d1DisciplineId: basis.contextMeta.d1DisciplineId,
+          d2DisciplineId: basis.contextMeta.d2DisciplineId,
+          disciplineId,
+        }) ?? [],
+      );
+    }
+  }
+  return { contexts, arenaDisciplineIds: [...kandidaten], mutatorTraitsByDisciplineId };
 }
 
 function schreibeArenaMatchdayResolveStatus(
@@ -146,6 +172,8 @@ async function fuehreArenaMatchdayApplyAus(input: {
    * bricht vorher ab, wenn keine arena-aufgeloeste Disziplin an diesem Spieltag gespielt wird).
    */
   arenaDisciplineIds: string[];
+  /** MUTATOR ORGANISCH (29.09.): Spieltagswurf je Disziplin, s. `determineArenaDisciplineContexts()`. */
+  mutatorTraitsByDisciplineId: Map<string, string[]>;
   runArenaFixturesImpl?: typeof runArenaFixtures;
 }): Promise<void> {
   const { persistence, saveId, seasonId, matchdayId, logPrefix, arenaDisciplineIds } = input;
@@ -174,6 +202,7 @@ async function fuehreArenaMatchdayApplyAus(input: {
         matchdayId,
         disciplineId: disziplinId,
         runArenaFixturesImpl: input.runArenaFixturesImpl,
+        matchdayMutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
       });
       arenaTeamPointsByDisciplineId.set(disziplinId, overridesByTeamId);
       arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, individualBoxscorePpsByPlayerId);
@@ -278,7 +307,7 @@ export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput)
 
   const seasonId = input.seasonId ?? current.gameState.season.id;
   const contextResults = loadAllLocalLegacyLineupContexts({ saveId, seasonId, matchdayId }, persistence);
-  const { arenaDisciplineIds } = determineArenaDisciplineContexts(contextResults);
+  const { arenaDisciplineIds, mutatorTraitsByDisciplineId } = determineArenaDisciplineContexts(contextResults);
   if (arenaDisciplineIds.length === 0) {
     return { applicable: false };
   }
@@ -301,6 +330,7 @@ export function kickoffArenaMatchdayApply(input: ArenaMatchdayApplyKickoffInput)
     allowIncompleteOverride: input.allowIncompleteOverride ?? false,
     logPrefix,
     arenaDisciplineIds,
+    mutatorTraitsByDisciplineId,
     runArenaFixturesImpl: input.runArenaFixturesImpl,
   }).catch((error) => {
     console.error(`${logPrefix} Arena-Matchday-Resolve: unerwarteter Fehler ausserhalb des try/catch:`, error);

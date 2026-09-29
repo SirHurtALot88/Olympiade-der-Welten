@@ -36,6 +36,8 @@ export type PlayerPerformancePreview = {
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
+  /** MUTATOR ORGANISCH (29.09.): Trefferzahl 0/1/2, s. `LegacyScoredEntry.mutatorHits`. */
+  mutatorHits?: number | null;
   formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
   /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
   intensityShare?: number | null;
@@ -144,6 +146,7 @@ export type DisciplineTeamResolvePreview = {
     captainBonus: number | null;
     mutatorBonus?: number | null;
     mutatorPpsBonus?: number | null;
+    mutatorHits?: number | null;
     formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
     /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
     intensityShare?: number | null;

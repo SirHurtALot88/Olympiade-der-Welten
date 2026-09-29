@@ -26,6 +26,18 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
+// Additive Schalter (29.09., MUTATOR ORGANISCH), in beliebiger Position, ohne sie unveraendertes
+// Verhalten der Positionsargumente:
+//   --mutatoren=je-lauf|aus|fest  wie die Mutator-Traits waehrend der Messung stehen (einflussVon,
+//                                 battle-mode.engine.js; Standard der Engine: "je-lauf", gepaart)
+//   --saat-versatz=N              zweiter, unabhaengiger Saatstrom (z.B. 10000000), wie im Handbuch
+//                                 fuer die Pp-Abnahme gefordert
+const schalter = process.argv.slice(2).filter((a) => a.startsWith("--"));
+const positionen = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const schalterWert = (name) => schalter.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+const MUTATOR_MODUS = schalterWert("mutatoren") ?? null;
+const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
+process.argv = [process.argv[0], process.argv[1], ...positionen];
 const disziplin = process.argv[2] || "spurt";
 // WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
 //
@@ -75,14 +87,18 @@ if (!motoren.includes(disziplin)) {
 }
 
 const start = Date.now();
-const e = await seite.evaluate(([d, n]) => window.__arena.einflussVon(d, n), [disziplin, laeufe]);
+const e = await seite.evaluate(
+  ([d, n, versatz, modus]) => window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined),
+  [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS],
+);
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
 
 // Der gemessene Pfad gehoert in die Ausgabe, nicht nur in den Aufruf: wer eine Zahl aus
 // diesem Skript in einen Plan oder PR schreibt, muss belegen koennen, WELCHE Datei sie
 // erzeugt hat. Genau das fehlte, als das Skript still den Haupt-Checkout mass (s. oben).
 console.log(`Gemessene Datei: ${pfad}`);
-console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`);
+console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`
+  + (e.mutatorModus ? `, Mutatoren ${e.mutatorModus}` : "") + (SAAT_VERSATZ ? `, Saatversatz ${SAAT_VERSATZ}` : ""));
 console.log(`Abweichung zur Matrix: ${e.abweichungPp} Pp\n`);
 console.log("Attribut          Anteil   Matrix   Differenz");
 const matrix = await seite.evaluate((d) => window.__arena.matrix(d), disziplin);
