@@ -299,7 +299,11 @@
       </div>
       <div class="untenraum">
         <div class="feed" id="feed"></div>
-        <div class="wertung">
+        <!-- id="wertungBox" (Broadcast-Optik-Audit, Punkt 9, 28.09.): reiner CSS-Hook fuer
+             die Disziplin-Akzentfarbe (--wakzent, s. battle-mode.css). renderWertungTabelle()
+             setzt data-disc darauf, sobald sich die Disziplin aendert -- Spalten/Sortierung/
+             Zeilenquellen bleiben unberuehrt, das ist ausschliesslich Anzeige. -->
+        <div class="wertung" id="wertungBox">
           <div class="wtitel">Wertung <em>laufend</em></div>
           <!-- ZWEI BLOECKE STATT EINER GEMEINSAMEN TABELLE (Chris' Fund, 29.08.): bei
                zwoelf gemischt sortierten Zeilen musste man erst die Team-Farbe der

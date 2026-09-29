@@ -27825,6 +27825,13 @@
         w.spalten.forEach((s,i)=>{const th=el("th","n",s.kopf); th.id="wth"+i+suf; if(s.titel)th.title=s.titel; tr.appendChild(th);});
       }
       const fuss=document.getElementById("wfuss"); if(fuss)fuss.textContent=w.fuss||"";
+      // Broadcast-Optik-Audit, Punkt 9 (28.09.): eigene, dezente Akzentfarbe je Disziplin in
+      // GENAU dieser Tabelle -- reiner Anzeige-Hook, laeuft nur hier im ohnehin billigen
+      // "Disziplin/Spalten haben sich geaendert"-Zweig, nicht bei jedem Frame. Das Attribut
+      // triggert ausschliesslich CSS (.wertung[data-disc="..."]{--wakzent:...}, s.
+      // battle-mode.css) -- keine Spalten-/Sortier-/Zeilenlogik liest es.
+      const wbox=document.getElementById("wertungBox");
+      if(wbox)wbox.dataset.disc=disc;
       wertungKopfStand=stand;
     }
     const zeilen=w.zeilen();
