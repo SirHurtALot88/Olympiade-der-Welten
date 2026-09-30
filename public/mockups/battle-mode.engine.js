@@ -14815,6 +14815,16 @@
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
+    // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln oben) -- derselbe Grund
+    // wie beim Kampf-Cooldown: ohne Reset wuerde die letzte Marke eines fruehen Spiels dieser
+    // Sitzung das naechste Spiel bis zu BUEHNE_BAHN_GROSS_COOLDOWN_SEK verkuerzt anlaufen
+    // lassen. Das Fechten-Sammelbanner (s. fechtPeriodenFlush) gehoert ebenso zu GENAU diesem
+    // Spiel -- eine ueberlebende Instanz koennte sonst mitten im naechsten Spiel verspaetet
+    // feuern.
+    letzterBuehneBahnGrossT=-Infinity;
+    if(fechtPeriodenQuietT){clearTimeout(fechtPeriodenQuietT);fechtPeriodenQuietT=null;}
+    if(fechtPeriodenMaxT){clearTimeout(fechtPeriodenMaxT);fechtPeriodenMaxT=null;}
+    fechtPeriodenBuendel=[];
     // `feldspielDisc` NICHT auf einem STALE Wert aus einem fruehen Feldspiel-Match belassen.
     // zeichneHeben() ruft zeichneSprite(...,true) — dieselbe Weiche, die istHockey()/
     // istFootball() (beide lesen `feldspielDisc`, s. dort) fuer Schlaeger-/Ausruestungs-
@@ -16532,12 +16542,21 @@
     }
   }
 
-  // TEXT-HP-BALKEN, EIN ORT FUER BEIDE VERWENDER (Ticker-Feed in stepBuehne() und die
-  // Seitentafel in zeichneBreaking()) -- dieselben zehn Bloecke, keine zweite Kopie.
-  function gauntletBalken(hp,max){
-    const teile=10, hpKlar=Math.max(0,hp);
-    const voll=Math.max(0,Math.min(teile,Math.round((hpKlar/(max||1))*teile)));
-    return "█".repeat(voll)+"░".repeat(teile-voll);
+  // GAUNTLET-STUFENWECHSEL (Audit-Punkt 7, Abschnitt 3.4: "big nur noch fuer ... Stufenwechsel
+  // [neues Foltergeraet/neue Eskalationsstufe]"). Zwei HP-Schwellen (die Haelfte, dann ein
+  // Fuenftel der HP) markieren, wann sich das Kraeftemessen dieses EINEN Ertragenden sichtbar
+  // dreht -- dieselbe Schwellenwert-UEBERSCHREITUNG wie grosserTreffer() im Kampf (dort
+  // Prozent des Lebens, hier derselbe Gedanke fuer den Gauntlet), keine neue Zufallsziehung:
+  // `hpVor`/`hpNach` liegen an der Aufrufstelle ohnehin schon vor (dasselbe Rundenobjekt `r`,
+  // das baueGauntlet() fuer den Ticker fuehrt). `hpNach<=0` (Aufgabe/Elimination) ist bewusst
+  // AUSGENOMMEN -- die hat bereits ihre eigene, immer sichtbare Zeile direkt darunter.
+  const GAUNTLET_STUFEN=[0.5,0.2];
+  function gauntletStufenwechsel(hpVor,hpNach,hpMax){
+    if(hpNach<=0)return false;
+    return GAUNTLET_STUFEN.some(f=>{
+      const schwelle=f*hpMax;
+      return hpVor>schwelle && hpNach<=schwelle;
+    });
   }
   // HP-Stand EINES Teilnehmers, so wie er GERADE ENTHUELLT ist -- liest `hpNach` aus der
   // zuletzt enthuellten eigenen Runde (baueGauntlet() fuehrt das je Runde mit, s. dortiger
@@ -16803,10 +16822,19 @@
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
         const fechtGegner=BB().fechten?gegner:null;
+        // BANNER-DOSIS (Audit-Punkt 7, Abschnitt 3.4): vorteilKipptBig() allein war schon
+        // selektiv (nur echte Fuehrungswechsel, keine 60-Punkte-Schwelle), lag bei Fechten
+        // gemessen aber trotzdem bei 40 % Banner-Sichtzeit / 19 Texten (Messanhang 6.1) --
+        // ueber alle 12 Teilnehmer (6 Bahnen) hinweg kippt der Vorteil oft genug, dass die
+        // Bahn-uebergreifende Drossel (s. buehneBahnGrossDrosseln oben) denselben Zielband-
+        // Effekt wie im Kampf braucht. Gilt genauso fuer Tennis/Schach (derselbe Code-Pfad),
+        // nicht nur Fechten. Kein Prioritaets-Bypass: ein gekippter Vorteil ist ein
+        // Routine-Ereignis, kein Wendepunkt wie ein entschiedenes Brett (s. dort).
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · Vorteil "+(v>0?"+":"")+v
           +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
-          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",vorteilKipptBig);
+          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",
+          buehneBahnGrossDrosseln(vorteilKipptBig,false));
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
@@ -16844,8 +16872,19 @@
               // fuer das gerade verarbeitete `u` gilt).
               const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
               const v0=seite0.verlauf[seite0.aktuell];
-              feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
-                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+              // SAMMELBANNER STATT EINZELFEUER (Audit-Punkt 7, Abschnitt 3.4: "zum
+              // Periodenende feuern bis zu sechs Banner im selben Tick — nur das letzte ist
+              // ueberhaupt sichtbar"). s. fechtPeriodenAnstossen()/fechtPeriodenFlush() oben
+              // fuer die volle Begruendung. Im stummen Messpfad (miss-alle-disziplinen.mjs)
+              // bricht feed() ohnehin sofort ab (`if(stumm)return;`) -- dort direkt und
+              // einzeln wie vor dieser PR aufrufen, damit kein echter Timer ueber das Ende
+              // eines stummen Laufs hinaus ueberlebt.
+              if(stumm){
+                feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
+                  ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+              } else {
+                fechtPeriodenAnstossen({periode,seite0,seite1,v0},BB().jeSeite);
+              }
             }
           }
         }
@@ -16877,7 +16916,13 @@
               ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
                              :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
               :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
-            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+            // WENDEPUNKT, NIE UNTERDRUECKT (Audit-Punkt 7): ein entschiedenes Brett ist ein
+            // Sieg/Niederlage-Moment fuer diese Bahn, kein Routine-Ereignis -- Prioritaets-
+            // Bypass wie First Blood/entscheidend im Kampf, setzt den gemeinsamen Cooldown
+            // trotzdem neu (s. buehneBahnGrossDrosseln), damit nicht sofort danach ein
+            // Routine-Vorteilskipper hinterherrutscht.
+            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",
+              buehneBahnGrossDrosseln(true,true));
           }
         }
       } else if(BB().showcase&&u.vizAct){
@@ -16917,16 +16962,34 @@
         feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel);
       } else if(BB().gauntlet){
         // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
-        // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner, HP-Balken (aus `r.hpNach`,
-        // NICHT aus dem inzwischen ueberholten `u.hp` -- s. baueGauntlet()-Kommentar) und die
-        // laufende Kampf-Nummer. Ein K.o. bekommt zusaetzlich eine eigene, immer big markierte
-        // Zeile -- derselbe "Abschluss ist immer big"-Grundsatz wie beim fertigen Zweikampf in
-        // Gewichtheben/Duell oben.
+        // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner und den HP-Stand (aus
+        // `r.hpNach`, NICHT aus dem inzwischen ueberholten `u.hp` -- s. baueGauntlet()-
+        // Kommentar) und die laufende Kampf-Nummer. Ein K.o. bekommt zusaetzlich eine eigene,
+        // immer big markierte Zeile -- derselbe "Abschluss ist immer big"-Grundsatz wie beim
+        // fertigen Zweikampf in Gewichtheben/Duell oben.
+        //
+        // BANNER-DOSIS + KEIN TEXTBALKEN MEHR (Audit-Punkt 7, Abschnitt 3.4/Messanhang 6.1,
+        // Belegbild 14): `versuchBig` (=`r.punkte>=60`) machte hier praktisch JEDES "haelt
+        // stand" big -- gemessen 195 verschiedene Bannertexte, 92 % Sendezeit sichtbar. `big`
+        // ist jetzt nur noch, was das Publikum wirklich als Wendepunkt sieht: Aufgabe
+        // (Elimination, eigene Zeile unten, IMMER sichtbar, s. Prioritaets-Bypass) oder
+        // Stufenwechsel (gauntletStufenwechsel() unten, HP-Schwelle ueberschritten -- eine
+        // "neue Eskalationsstufe" fuer GENAU diesen Ertragenden). Kein Rekord-Konzept fuer
+        // Breaking im Motor vorhanden (keine hoechste-Serie-o.ae.-Groesse wird gefuehrt) --
+        // anders als bei Kampf/Fechten faellt diese dritte Ausnahme hier deshalb ehrlich weg,
+        // statt eine neue Simulationszahl nur fuer eine Banner-Bedingung zu erfinden.
+        // Ausserdem entfaellt `gauntletBalken()` (die "██████░░░░"-Bloecke) aus dem
+        // Banner-/Ticker-Text -- ein Textbalken gehoert nicht in eine Broadcast-Grafik (Audit-
+        // Nebenbefund), die nackte HP-Zahl traegt dieselbe Information. Die kompakte
+        // Farbleiste in zeichneBreaking() (B2, "Ersetzt die ASCII-Bloecke ... durch zwei
+        // GESPIEGELTE Balken") zeigt den HP-Stand ohnehin schon grafisch.
         const hpJetzt=Math.max(0,r.hpNach);
-        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax+" "
-          +gauntletBalken(hpJetzt,r.hpMax)+" (Kampf "+r.bout+").",versuchBig||r.hpNach<=0);
+        const stufenwechsel=gauntletStufenwechsel(r.hpVor,r.hpNach,r.hpMax);
+        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
+          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false));
         if(r.hpNach<=0)
-          feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",true);
+          feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
+            buehneBahnGrossDrosseln(true,true));
       } else if(BB().duett){
         // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
         // 26.09., Abschnitt 2.4): reiner Textersatz -- `r.ereignis`/`r.punkte`/
@@ -26080,6 +26143,104 @@
     return true;
   }
 
+  // BUEHNE/BAHN-DROSSEL, VERALLGEMEINERT AUS kampfGrossDrosseln (F1-Broadcast-Audit Runde 2
+  // 30.09., Abschnitt 3.4/Prioritaet-1-Punkt-7 "Banner-Dosis fuer alle Chassis"): der Kampf
+  // hatte mit kampfGrossDrosseln() bereits einen spielweiten Mindestabstand zwischen grossen
+  // Bannern (haelt TDM bei ~7 Bannern/Spiel, laut Audit "vernuenftig dosiert") -- Buehne
+  // (Gauntlet/Duell/Schach/Fechten/Tennis) und Bahn hatten dagegen KEINE gemeinsame Drossel,
+  // nur vereinzelte Ereignis-eigene Bedingungen (buehneAuftrittBig() etc., die unangetastet
+  // bleiben). Exakt dieselbe Bauart wie kampfGrossDrosseln (Cooldown + Prioritaets-Bypass fuer
+  // echte Wendepunkte, die NIE unterdrueckt werden sollen) -- nur an der jeweils richtigen
+  // "echten" (Zuschau-)Uhr gemessen: buehneT laeuft laut feed()s anzeigeT-Formel bereits
+  // unskaliert in Zuschauzeit, rennT braucht dort wie t bei Kampf ein zusaetzliches
+  // `*zeitFaktor()`. istBuehne(disc)/istBahn(disc) schliessen sich gegenseitig aus (nur eine
+  // Disziplinkategorie laeuft je Spiel), ein gemeinsamer Merker genuegt deshalb fuer beide.
+  // Reine Anzeige-Buchhaltung (Klasse A*, wie im Auftrag vorgesehen): kein rr()-Aufruf, keine
+  // Beruehrung von wert()/rezept/TEILNEHMER/LAEUFER -- HIGHLIGHTS/#bbugcallout sind die
+  // einzigen Empfaenger von `big`, dieselbe Garantie wie bei kampfGrossDrosseln.
+  const BUEHNE_BAHN_GROSS_COOLDOWN_SEK=12;
+  let letzterBuehneBahnGrossT=-Infinity;
+  function buehneBahnGrossDrosseln(big,prioritaet){
+    if(!big)return false;
+    const jetzt=istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():0;
+    if(!prioritaet && (jetzt-letzterBuehneBahnGrossT)<BUEHNE_BAHN_GROSS_COOLDOWN_SEK)return false;
+    letzterBuehneBahnGrossT=jetzt;
+    return true;
+  }
+
+  // FECHTEN-SAMMELBANNER FUER DAS PERIODENENDE (Audit-Punkt 7, Abschnitt 3.4: "zum
+  // Periodenende feuern bis zu sechs Banner im selben Tick (eins je Bahn) — nur das letzte
+  // ist ueberhaupt sichtbar"). URSACHE (bauBuehne()s REIHENFOLGE-Warteschlange, "Durchgang 1
+  // fuer alle, dann Durchgang 2"): alle 12 Teilnehmer (art.jeSeite Bahnen x 2 Seiten) legen
+  // ihre Runde `ri` HINTEREINANDER vor, bevor Runde `ri+1` beginnt -- am Rundenindex, der eine
+  // Periode abschliesst, feuert deshalb JEDE der bis zu sechs Bahnen ihr eigenes
+  // "Periode beendet"-Banner innerhalb weniger, dicht aufeinanderfolgender Enthuellungen --
+  // callout() ERSETZT den sichtbaren Banner-Text sofort (s. dort), die ersten fuenf sind also
+  // gesehen praktisch nie, nur der Ticker haelt sie fest.
+  //
+  // LOESUNG: statt sofort zu feed()en, sammelt ein Puffer alle Periodenende-Ereignisse dieser
+  // EINEN Periode, und ein einziges, zusammenfassendes feed(...,true) ersetzt die einzelnen
+  // Aufrufe. GEZAEHLT, NICHT GESTOPPT: `art.jeSeite` (die feste Bahnenzahl, die bauBuehne()
+  // fuer Fechten anlegt) sagt genau, wie viele Bahnen JEDE Periode abschliessen MUESSEN --
+  // sobald der Puffer diese Zahl erreicht, ist die Periode fuer alle Bahnen fertig und wird
+  // SOFORT geleert, ganz ohne auf eine Pause im Enthuellungstempo zu warten. Ein erster
+  // Entwurf wartete stattdessen auf eine kurze ECHTE Pause zwischen zwei Ankuenften (Timer,
+  // erneut gestartet bei jedem neuen Eintrag) -- gemessen (Audit-Punkt-7-PR, Dichte-Sonde)
+  // war das nicht robust: bei einem einzelnen langsamen Testlauf lagen die Ankuenfte aller
+  // sechs Bahnen 3-6 echte Sekunden statt der ueblichen ~1 s auseinander (Browser/System
+  // gerade langsamer als sonst), das feste Pausenfenster lief dabei ab, BEVOR die naechste
+  // Bahn ankam, und alle sechs feuerten wieder einzeln. Die Bahnenzahl selbst haengt dagegen
+  // an gar keiner Uhr, ob echt oder simuliert -- deshalb der Wechsel.
+  // ZWEI ECHTE (DOM-)TIMER BLEIBEN ALS SICHERHEITSNETZ, nicht als Haupt-Mechanismus: ein
+  // "Ruhe"-Timer (neu gestartet bei jedem Eintrag) und ein "Maximal"-Timer (nur beim ersten
+  // Eintrag gestartet) fangen den Sonderfall ab, dass aus irgendeinem Grund NIE alle
+  // `jeSeite` Bahnen in diesem Fenster ankommen (z.B. eine kuenftige Rezeptaenderung mit
+  // ungleicher Bahnenzahl) -- ohne sie bliebe ein unvollstaendiger Puffer sonst fuer immer
+  // stumm liegen. Reine Anzeige-Buchhaltung: TEILNEHMER/u.summe/wert()/rr() bleiben
+  // unberuehrt, nur WANN/WIE der bereits vorher berechnete Text als EIN Banner erscheint,
+  // aendert sich.
+  //
+  // NIE IM STUMMEN MESSPFAD (miss-alle-disziplinen.mjs/disziplinProbe()): feed() selbst bricht
+  // dort ohnehin sofort ab (s. `if(stumm)return;`), ein waehrend eines stummen Laufs
+  // gestarteter echter setTimeout koennte aber NACH dem Lauf -- in einem spaeteren, echten
+  // Spiel derselben Seite -- verspaetet feuern. Der stumme Pfad ruft feed() deshalb weiterhin
+  // direkt und einzeln auf, exakt wie vor dieser PR (bit-identisches Verhalten fuer die
+  // Rangtreue-/Pp-Messung).
+  const FECHT_PERIODEN_RUHE_MS=6000, FECHT_PERIODEN_MAX_MS=20000;
+  let fechtPeriodenBuendel=[], fechtPeriodenQuietT=null, fechtPeriodenMaxT=null;
+  function fechtPeriodenAnstossen(eintrag,erwarteteBahnen){
+    fechtPeriodenBuendel.push(eintrag);
+    if(erwarteteBahnen && fechtPeriodenBuendel.length>=erwarteteBahnen){
+      fechtPeriodenFlush();
+      return;
+    }
+    if(fechtPeriodenQuietT)clearTimeout(fechtPeriodenQuietT);
+    fechtPeriodenQuietT=setTimeout(fechtPeriodenFlush,FECHT_PERIODEN_RUHE_MS);
+    if(!fechtPeriodenMaxT)fechtPeriodenMaxT=setTimeout(fechtPeriodenFlush,FECHT_PERIODEN_MAX_MS);
+  }
+  function fechtPeriodenFlush(){
+    if(fechtPeriodenQuietT){clearTimeout(fechtPeriodenQuietT);fechtPeriodenQuietT=null;}
+    if(fechtPeriodenMaxT){clearTimeout(fechtPeriodenMaxT);fechtPeriodenMaxT=null;}
+    const buendel=fechtPeriodenBuendel; fechtPeriodenBuendel=[];
+    if(!buendel.length)return;
+    if(buendel.length===1){
+      // GENAU EIN Bahn-Abschluss in diesem Fenster: woertlich derselbe Text wie vor dieser
+      // PR, nur um einen kurzen Sammel-Zeitversatz verzoegert.
+      const x=buendel[0];
+      feed(0,"Periode "+x.periode+" beendet — "+x.seite0.n+" gegen "+x.seite1.n+
+        ": Vorteil "+(x.v0>0?"+":"")+x.v0+", Treffer "+x.seite0.treffer+":"+(x.seite1.treffer||0)+".",true);
+    } else {
+      // MEHRERE Bahnen im selben Fenster: EIN Sammelbanner statt N verlorener Einzelbanner
+      // (Audit-Beispiel: "Periodenende: 3 Bahnen entschieden"), mit einer kurzen
+      // Ergebniszeile je Bahn statt der vollen Vorteils-/Zug-Details.
+      const gleichePeriode=buendel.every(x=>x.periode===buendel[0].periode);
+      const kurz=buendel.map(x=>x.seite0.n.split(" ")[0]+" "+x.seite0.treffer+":"+(x.seite1.treffer||0)
+        +" "+x.seite1.n.split(" ")[0]).join(", ");
+      feed(0,(gleichePeriode?"Periode "+buendel[0].periode+" beendet":"Periodenende")
+        +" — "+buendel.length+" Bahnen entschieden: "+kurz+".",true);
+    }
+  }
+
   // SZENE-DES-SPIELS-PRIORITAET (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3):
   // die Recherche gibt "Clutch > Dreifach-K.o. > Lifesaver > Wende > Doppel-K.o. > First
   // Blood" vor. Clutch und Lifesaver brauchen beide eine neue Sim-Zustandsverfolgung (wer
@@ -32931,6 +33092,8 @@
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
     fortschrittVerlauf={0:[],1:[]};
+    // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln, Kommentar bei bauBuehne()).
+    letzterBuehneBahnGrossT=-Infinity;
     // DREI BENANNTE KURSE JE SAAT (Takeshi's Castle, B.4 des Plans, Chris' Entscheidung
     // 05.09.: fest verdrahtet, nicht hinter einem Debug-Flag). Obere Bits des LCG
     // (`(s0>>>8)/16777216`) wie zieheFormkarten seit dessen Fix — die untersten Bits
@@ -33916,9 +34079,12 @@
                 if(extra>=(G.melden??1) && !bahnGedraengeGemeldet.has(hi)){
                   bahnGedraengeGemeldet.add(hi);
                   feed(u.seite,"Gedränge an "+(A.hindernisWort||"Hürde")+" "+(hi+1)+" — "+(andere+1)+" Mann an einer Stelle, "+u.n+" mittendrin.");
-                  // TK-4 (Abschnitt 5.3, CAPTION_GEDRAENGE): direkter callout(), der Ticker
-                  // (die Zeile direkt darueber) bleibt unveraendert Play-by-Play.
-                  callout("Gedränge!",waehleCaption(CAPTION_GEDRAENGE));
+                  // ENTFERNT (Audit-Punkt 7, Abschnitt 3.4): TK-4 hatte hier einen eigenen,
+                  // ungedrosselten callout()-Banner ("Gedränge!") -- `gedraenge` ist exklusiv
+                  // Takeshis eigene BAHN_ART-Konfiguration (Spurt setzt sie nie), und ein
+                  // Gedraenge ist kein Ausscheiden/Zieleinlauf/Fuehrungswechsel. Die
+                  // Ticker-Zeile direkt darueber (Play-by-Play) und der Schwebetext/die
+                  // Welle am Laeufer bleiben unveraendert -- nur der eigene Banner faellt weg.
                 }
               }
             }
@@ -34201,14 +34367,18 @@
           // Takeshi-Sturzton auch im Spurt.
           if(A.takeshi)sfx("takeshis-castle","sturz");
           schwebe({...laeuferSchwebeXY(u,-20),txt:"stolpert",life:.9,crit:false,_laeufer:u.id});
-          // TK-4 (Abschnitt 5.3, "CAPTION_STURZ_SCHWER, nur fuer einen Sturz an einer
-          // Drei-Sterne-Falle, damit es selten bleibt") plus dieselbe Mechanik fuer Spurts
-          // Wassergraben ("Dieselbe Mechanik traegt im Spurt CAPTION_STURZ fuer das
-          // Wasser"). Direkter callout()-Aufruf statt ueber feed()/big: der Ticker bleibt
-          // Play-by-Play (unveraendert), die Caption ist reine Color-Ebene daneben.
-          if(A.takeshi && (A.fallenStufe||{})[hTyp]===3){
-            callout(u.n+" stürzt schwer!",waehleCaption(CAPTION_STURZ_SCHWER,u.n));
-          } else if(A.spurt && (A.hindernisBilder||[])[meldeStation]==="wasser"){
+          // TK-4 (Abschnitt 5.3) hatte hier einen eigenen "stuerzt schwer!"-Banner NUR fuer
+          // einen Sturz an einer Drei-Sterne-Falle ("damit es selten bleibt") -- direkt ueber
+          // callout(), also OHNE Drossel/Cooldown jeder Art. Gemessen (Audit-Punkt 7,
+          // Messanhang 6.1) blieb es nicht selten: 31 verschiedene Banner in 69 s, 82 %
+          // Sendezeit, "fast alle 'stuerzt schwer' mit nur wechselnder Pointe" -- ein Sturz ist
+          // in Takeshi der Normalfall, keine Ausnahme (dieselbe Erkenntnis wie bei
+          // buehneAuftrittBig()s Sturzquoten-Kommentar oben). ENTFERNT: `big` gilt fuer
+          // Takeshi jetzt nur noch fuer Ausscheiden/Zieleinlauf/Fuehrungswechsel (Audit-
+          // Punkt 7, Abschnitt 3.4) -- alle drei haben bereits eigene, davon unabhaengige
+          // Bannerzeilen weiter unten/oben. Die Spurt-Wassergraben-Caption (anderes Chassis,
+          // eigene, deutlich seltenere Bedingung) bleibt unveraendert.
+          if(A.spurt && (A.hindernisBilder||[])[meldeStation]==="wasser"){
             callout(u.n+" stolpert!",waehleCaption(CAPTION_STURZ_WASSER,u.n));
           }
           // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
@@ -34331,8 +34501,14 @@
               // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): ein
               // erfolgreicher Rempler ist der Moment, den jede Rennuebertragung zeigt --
               // selten genug (Torment trug gemessen nur 2,2 % der Rennen), immer big.
+              //
+              // AUSSER IN TAKESHI (Audit-Punkt 7, Abschnitt 3.4): dort sind es gemessen 5,4
+              // Treffer je Rennen (s. BAHN_ART["takeshis-castle"]-Kommentar), macht "rammt ...
+              // um" zu einem der haeufigsten Bannertexte -- kein Ausscheiden/Zieleinlauf/
+              // Fuehrungswechsel, also nicht mehr big. Spurt (deutlich seltener, "selten genug"
+              // trifft dort weiter zu) bleibt unveraendert.
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
-                                                :" räumt "+o.n+" von der Bahn."),true);
+                                                :" räumt "+o.n+" von der Bahn."),!TA.takeshi);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
               feed(o.seite,o.n+" steckt den Rempler weg.");
@@ -36150,14 +36326,6 @@
     (s)=>"Und ab ins Wasser — "+s+" ist raus!",
     (s)=>"Das war's mit den Nerven, "+s+".",
     (s)=>"Zurück zum Sammelplatz mit dir, "+s+"!",
-  ];
-  const CAPTION_STURZ_SCHWER=[
-    (s)=>s+" liegt flach — das tat weh.",
-    (s)=>"Autsch! "+s+" hat es hart erwischt.",
-  ];
-  const CAPTION_GEDRAENGE=[
-    ()=>"Fünf Mann an einer Tür — das wird eng!",
-    ()=>"Da drängelt sich das halbe Feld auf einmal!",
   ];
   const CAPTION_STURZ_WASSER=[
     (s)=>s+" nimmt ein Bad im Wassergraben!",
