@@ -2598,7 +2598,7 @@
     ctx.beginPath();
     if(ctx.roundRect)ctx.roundRect(-4*s,-3*s,8*s,6*s,1.3*s); else ctx.rect(-4*s,-3*s,8*s,6*s);
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle="#241d09"; ctx.font=Math.max(5,5*s).toFixed(1)+"px 'IBM Plex Mono',monospace";
+    ctx.fillStyle="#241d09"; ctx.font=Math.max(5,5*s).toFixed(1)+"px 'Barlow Condensed',sans-serif";
     ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText(String(nummer??""),0,0.4*s);
     ctx.restore();
@@ -12842,7 +12842,10 @@
   function updateHudFeldspiel(){
     document.getElementById("clock").textContent=
       Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // "BEREIT" VOR DEM ANPFIFF (Broadcast-Audit Runde 2, Punkt 12, 30.09.): vorher stand
+    // hier schon "läuft", bevor überhaupt ein einziger Frame simuliert wurde — `running`
+    // wird erst durch den Play-Klick wahr (s. dortiger Listener).
+    document.getElementById("phase").textContent=done?"beendet":(running?"läuft":"bereit");
     // Fable-Playtest (25.08.): der Play-Button blieb nach Spielende auf "Pause" stehen,
     // weil nur ein Klick seinen Text setzt (Zeile ~8417) — anders als im Kampf, wo
     // finish() ihn beim automatischen Ende auf "Vorbei" umstellt.
@@ -12858,9 +12861,22 @@
     // nichts mehr zu ersetzen. dataset.origHtml haelt die Vorlage fest, damit jeder
     // Aufruf — auch nach einem Discipline-Wechsel hin und zurueck — vom selben
     // Ausgangstext startet statt vom Ergebnis des letzten Wechsels.
+    // OHNE "N SPIELZÜGE" (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `fsZuege` ist eine
+    // interne Zaehlgroesse der Simulation, keine Sendungsinformation — die alte Fassung
+    // ersetzte hier pauschal "im Kampf" durch "Spielzüge" und zeigte so z.B. "V-W · 24
+    // Spielzüge" unter dem Teamnamen. Die Unterzeile faellt fuers Feldspiel jetzt ganz
+    // weg, es bleibt nur das Vereinskuerzel (wie es die andere Haelfte des Textes ohnehin
+    // schon war). Zwei Faelle, weil das Kuerzel bei L VOR und bei R NACH dem
+    // Zaehler/"im Kampf" steht (s. battle-mode.html #tnameL/#tnameR).
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
-      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"Spielzüge");});
+      e.innerHTML=e.dataset.origHtml
+        .replace(/\s*·\s*<span id="alive[LR]">\d+<\/span>\s*im Kampf/,"")
+        .replace(/<span id="alive[LR]">\d+<\/span>\s*im Kampf\s*·\s*/,"");});
+    // Die Live-Zaehlung selbst laeuft unveraendert weiter (Sonden/andere Chassis lesen
+    // #aliveL/#aliveR), sie steht nur nicht mehr in der Feldspiel-Sendungsanzeige: die
+    // Spans existieren nach dem Ersetzen oben nicht mehr im DOM, deshalb hier ein
+    // Null-Guard statt eines direkten Zugriffs.
     // Fable-Fund (Runde 2, 25.08.): die vorige Fassung ersetzte HIER das komplette
     // innerHTML von ".clock small" — dem WRAPPER, der die Live-Spans #clock/#phase
     // selbst enthaelt. Jeder Frame zerstoerte damit genau die Knoten, die zwei Zeilen
@@ -12870,8 +12886,12 @@
     // (#klsuffix) nur fuer das austauschbare Schlusswort, das die Live-Spans nie
     // beruehrt. Nur die Bahn setzt hier "im Ziel"; alles andere bleibt bei "Punkte".
     document.getElementById("klsuffix").textContent="Punkte";
-    document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
-    document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
+    // Null-Guard: die #aliveL/#aliveR-Spans stehen fuers Feldspiel seit Punkt 12 oben
+    // nicht mehr im DOM (die Zeile, die sie enthielt, faellt dort ganz weg) — die
+    // Zaehlung selbst laeuft unveraendert mit, nur ohne Sendungsanzeige.
+    const aliveL=document.getElementById("aliveL"), aliveR=document.getElementById("aliveR");
+    if(aliveL)aliveL.textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
+    if(aliveR)aliveR.textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
     // GEPRUEFT, F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 1: hier stand bis dahin
     // `fsBisher().team` -- eine Nachzaehlung aus dem Enthuellungs-Log `fsZuege` (noch aus
     // der Zeit des "vorab durchgerechneten" Modells, das seit Footballs Live-Migration
@@ -12996,9 +13016,9 @@
       ctx.fillRect(bx-32,by-17,64,34);
       ctx.strokeStyle=farbe;ctx.lineWidth=1.5;ctx.strokeRect(bx-32,by-17,64,34);
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillStyle="#fff";ctx.font="700 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillStyle="#fff";ctx.font="700 8.5px 'Barlow Condensed',sans-serif";
       ctx.fillText(u.n.length>11?u.n.slice(0,10)+"…":u.n,bx,by-7);
-      ctx.fillStyle=rest<=3?"#e2685f":"#c3ccd8";ctx.font="700 11px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=rest<=3?"#e2685f":"#c3ccd8";ctx.font="700 11px 'Barlow Condensed',sans-serif";
       ctx.fillText(Math.ceil(rest)+"s",bx,by+5);
       ctx.fillStyle="rgba(255,255,255,.18)";ctx.fillRect(bx-28,by+13,56,3);
       ctx.fillStyle=farbe;ctx.fillRect(bx-28,by+13,56*Math.max(0,Math.min(1,rest/HK_STRAFE_DAUER)),3);
@@ -13122,7 +13142,7 @@
       ctx.beginPath(); ctx.arc(zx,mitte,30,0,6.3); ctx.fill();
       ctx.globalAlpha=1; ctx.lineWidth=5; ctx.strokeStyle=farbe;
       ctx.beginPath(); ctx.arc(zx,mitte,30,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
-      ctx.fillStyle="#182028"; ctx.font="700 13px 'IBM Plex Mono',monospace";
+      ctx.fillStyle="#182028"; ctx.font="700 13px 'Barlow Condensed',sans-serif";
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(String(Math.ceil(pp.rest)),zx,mitte+1);
       ctx.restore();
@@ -13316,7 +13336,7 @@
     ctx.fillRect(gx-19,gy-11,38,22);
     ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)";ctx.lineWidth=1;
     ctx.strokeRect(gx-19,gy-11,38,22);
-    ctx.fillStyle="#fff";ctx.font="700 12px 'IBM Plex Mono',monospace";
+    ctx.fillStyle="#fff";ctx.font="700 12px 'Barlow Condensed',sans-serif";
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.fillText(txt,gx,gy+1);
     ctx.restore();
@@ -13576,7 +13596,7 @@
         }
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
           ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
@@ -18844,7 +18864,12 @@
   function updateHudBuehne(){
     document.getElementById("clock").textContent=
       Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // "BEREIT" VOR DEM AUFTAKT + "VORBEI" NACH SPIELENDE (Broadcast-Audit Runde 2, Punkt
+    // 12, 30.09.): die Buehne bekam bisher weder das eine noch das andere — der
+    // Play-Knopf blieb nach dem Ende auf "Pause"/"Weiter" stehen (nur Kampf/Feldspiel
+    // hatten diesen Umstieg schon, s. deren updateHud()/updateHudFeldspiel()).
+    document.getElementById("phase").textContent=done?"beendet":(running?"läuft":"bereit");
+    if(done)document.getElementById("play").textContent="Vorbei";
     // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
     // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
     const sd=document.querySelector(".hpbars .sd");
@@ -19235,7 +19260,7 @@
       ctx.fillStyle="#3a2a44";ctx.beginPath();ctx.arc(p.x,p.y,9,0,6.2832);ctx.fill();
       ctx.strokeStyle="rgba(255,255,255,.18)";ctx.lineWidth=1;ctx.stroke();
     }
-    ctx.font="800 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(255,95,168,.65)";
+    ctx.font="800 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="rgba(255,95,168,.65)";
     ctx.textAlign="center";
     ctx.fillText("JURY",W/2,pultY-6);
 
@@ -19367,7 +19392,7 @@
   // Takeshis fallenStufe") — wortgleiches Glyphen-Muster wie zeichneTakeshiRoute()s
   // "★".repeat(st), kein Emoji, reiner Text-Glyph wie ueberall sonst im Motor.
   function ispySterne(cx,cy,stufe){
-    ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+    ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
   }
@@ -19415,7 +19440,7 @@
     c.fillStyle="#e8e2d0"; c.strokeStyle="#8a8578"; c.lineWidth=0.8;
     c.beginPath(); c.ellipse(9,-19,7,5,0,0,Math.PI*2); c.fill(); c.stroke();
     c.beginPath(); c.moveTo(4,-16); c.lineTo(2,-12); c.lineTo(6,-15); c.closePath(); c.fill(); c.stroke();
-    c.font="700 8px 'IBM Plex Mono',monospace"; c.fillStyle="#3a2a1a";
+    c.font="700 8px 'Barlow Condensed',sans-serif"; c.fillStyle="#3a2a1a";
     c.textAlign="center"; c.textBaseline="alphabetic"; c.fillText("?",9,-17);
   }
   function ispyZeichneTuer(c){
@@ -19608,7 +19633,7 @@
           ctx.restore();
           ispySterne(p.x,p.y-26,stufeAnzeige);
           if(z&&!z.offen){
-            ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,120,90,.9)";
+            ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(255,120,90,.9)";
             ctx.textAlign="center"; ctx.textBaseline="alphabetic";
             ctx.fillText("angebrochen",p.x,p.y+21);
           }
@@ -19731,9 +19756,9 @@
     ctx.font="700 11px 'Barlow Condensed',sans-serif";
     ctx.fillStyle="#f2c34d";
     ctx.fillText(zug?(zug.r.uebung==="reissen"?"REISSEN":"STOSSEN"):"—",tafelX+10,tafelY+16);
-    ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#c7ccd6";
+    ctx.font="400 9px 'Barlow Condensed',sans-serif";ctx.fillStyle="#c7ccd6";
     ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
-    ctx.font="700 16px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
+    ctx.font="700 16px 'Barlow Condensed',sans-serif";ctx.fillStyle="#e8e2d0";
     ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
     // NAECHSTE ANSAGE (H2.2, Broadcast-Optik-Recherche 27.09., Klasse A): "Nächster Versuch:
     // Draco, 127 kg" — Taktik am Meldetisch (Doku 2.1, belegt). `buehneQueue[buehneZeiger]`
@@ -19755,7 +19780,7 @@
         const naechsterU=buehneQueue[buehneZeiger];
         const naechsteR=naechsterU?naechsterU.runden[naechsterU.aktuell+1]:null;
         if(naechsterU&&naechsteR){
-          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#5f6675";
+          ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#5f6675";
           const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
           const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
           ctx.fillText("Nächster: "+naechsterName+", "+kgTxt,tafelX+10,tafelY+60);
@@ -19769,7 +19794,7 @@
             if(vorige&&vorige.uebung===naechsteR.uebung){
               const deltaKg=sinclairAnzeige(naechsteR.kg-vorige.kg,naechsterU.groesse);
               if(deltaKg>0){
-                ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
+                ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#d6ac36";
                 ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+74);
               }
             }
@@ -19991,7 +20016,7 @@
         zeichneSprite(ctx,u,x,y);
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
           ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
@@ -20009,7 +20034,7 @@
           ctx.fillStyle=css("--line");ctx.fillRect(mitte-w/2,y+64,w,3);
           ctx.fillStyle=v>=0?css("--ok"):css("--crit");
           ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
-          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+          ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
           ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
           // TREFFERSTAND (Option 2, s. BUEHNE_ART.fechten-Kommentar): eigene, kleine
           // Zeile neben der Vorteils-Anzeige — Zierde, kein zweiter Wertungsmassstab
@@ -20027,7 +20052,7 @@
           ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
           ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
           // Fortschritt: wie viele Durchgaenge schon enthuellt
-          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+          ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
           ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
         }
       });
@@ -20235,7 +20260,7 @@
       ctx.strokeStyle=b.fokus?"#f2d75a":"rgba(255,255,255,.2)";
       ctx.lineWidth=b.fokus?2:1;
       ctx.strokeRect(bx,y,bw,bh);
-      ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'IBM Plex Mono',monospace";
+      ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=b.farbVar?css(b.farbVar):"#c7ccd6";
       ctx.fillText(b.text,bx+bw/2,y+bh/2+1);
     });
@@ -20302,7 +20327,7 @@
     ctx.strokeStyle="rgba(230,232,240,.3)"; ctx.lineWidth=1; ctx.strokeRect(x-w/2,y-bh/2,w,bh);
     ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2e9d8";
     ctx.fillText(zeile1,x,zeile2?y-6:y);
-    if(zeile2){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3"; ctx.fillText(zeile2,x,y+8); }
+    if(zeile2){ ctx.font="400 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3"; ctx.fillText(zeile2,x,y+8); }
     ctx.restore();
   }
 
@@ -20316,7 +20341,7 @@
     const posMap=new Map();
 
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.font="400 11px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
     const [fa]=paar(tennisFokus);
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.12);
@@ -20354,7 +20379,7 @@
       zeichneSprite(ctx,u,x,y,true);
       ctx.restore();
       const schrift=(txt,dy,farbe,groesse)=>{
-        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=2.6;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy*scale);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy*scale);
       };
@@ -20492,7 +20517,7 @@
       ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(ix,iy,ibw,ibh);
       ctx.strokeStyle="#e0463c"; ctx.lineWidth=1.4; ctx.strokeRect(ix,iy,ibw,ibh);
       ctx.textAlign="center";
-      ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
       ctx.fillText("HAWK-EYE",ix+ibw/2,iy+13);
       ctx.font="800 18px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e0463c";
       ctx.fillText("OUT",ix+ibw/2,iy+30);
@@ -20579,7 +20604,7 @@
 
     ctx.textAlign="center"; ctx.textBaseline="middle";
     if(bretter>1){
-      ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+      ctx.font="400 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
       ctx.fillText("Bahn "+(fechtenFokus+1)+" von "+bretter,W/2,H*0.12);
     }
 
@@ -20673,7 +20698,7 @@
         // unten deckt die Mini-Gefechte ab (s. else-Zweig weiter unten).
         if(!gross)return;
         ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.font="400 9px 'IBM Plex Mono',monospace";
+        ctx.font="400 9px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
         ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
@@ -20749,7 +20774,7 @@
         // ist, nicht der Vorteil.
         zeichneTrefferTreppe(xL,laneY+halbH+8,bahnLen,20,a,b,art);
       } else {
-        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        ctx.font="400 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
         const bahnTxt="Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0);
         ctx.fillText(bahnTxt,cx,laneY-halbH-8);
         // F-B1 MINI-LAMPE (Dokument Abschnitt 5): "wo passiert gerade was" der uebrigen
@@ -20878,7 +20903,7 @@
           } else if(u.vizIspyStufe===3){
             ctx.strokeStyle="rgba(255,90,60,.85)"; ctx.lineWidth=2;
             ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(1,2); ctx.lineTo(-3,4); ctx.lineTo(4,10); ctx.stroke();
-            ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+            ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
             ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.fillText("+15%",0,18);
           }
           ctx.restore();
@@ -20886,13 +20911,13 @@
 
         ctx.textAlign="center"; ctx.textBaseline="middle";
         const schrift=(txt,dyN,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
           ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
           ctx.strokeText(txt,x+dx,y+dy2+dyN); ctx.fillStyle=farbe; ctx.fillText(txt,x+dx,y+dy2+dyN);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
         schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        ctx.font="400 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x+dx,y+dy2+66);
       });
@@ -21043,7 +21068,7 @@
     ctx.lineWidth=betont?1.6:1;ctx.strokeRect(x-b/2,y-h/2,b,h);
     ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y);ctx.lineTo(x+b/2,y);ctx.stroke();
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="700 "+(betont?11:10)+"px 'IBM Plex Mono',monospace";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
+    ctx.font="700 "+(betont?11:10)+"px 'Barlow Condensed',sans-serif";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
     ctx.fillText(text,x,y-1);
   }
 
@@ -21125,7 +21150,7 @@
         ctx.globalAlpha=1;
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
           ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
@@ -21149,7 +21174,7 @@
         const w=30,pFuell=Math.min(1,u.summe/maxSumme);
         ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
         ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+71,w*pFuell,3);
-        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
         ctx.fillText("Min "+(u.aktuell+1)+"/"+art.rundenN,x,y+81);
 
         // W-B2 (Tempo je Esser): Wuerstchen der zuletzt ABGESCHLOSSENEN Minute, mit einem
@@ -21161,7 +21186,7 @@
           if(tempoVor!=null&&Math.abs(tempoJetzt-tempoVor)>0.001){
             hoch=tempoJetzt>tempoVor; farbeT=hoch?"#5fd38a":"#e0645f";
           }
-          ctx.textAlign="left"; ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeT;
+          ctx.textAlign="left"; ctx.font="400 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbeT;
           const txtT=wettessenWuerstchenText(tempoJetzt)+"/min";
           ctx.fillText(txtT,x-16,y+91);
           if(hoch!=null){
@@ -21193,7 +21218,7 @@
     ctx.fillStyle="rgba(16,9,6,.55)";ctx.strokeStyle="rgba(242,193,78,.4)";ctx.lineWidth=0.8;
     ctx.fillRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
     ctx.strokeRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
-    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.75)";
+    ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="rgba(242,193,78,.75)";
     ctx.textAlign="left";ctx.fillText("MAGEN-METER",meterX0-4,meterY-15);
     ctx.fillStyle="rgba(0,0,0,.5)";ctx.fillRect(meterX0,meterY-3,meterX1-meterX0,6);
     const leader=TEILNEHMER.reduce((best,u)=>(!best||u.summe>best.summe)?u:best,null);
@@ -21240,7 +21265,7 @@
     ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
     ctx.strokeStyle=letzteMinute?"rgba(230,67,46,.7)":"rgba(242,193,78,.5)";
     ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
-    ctx.font="700 8px 'IBM Plex Mono',monospace";
+    ctx.font="700 8px 'Barlow Condensed',sans-serif";
     ctx.fillStyle=letzteMinute?"rgba(255,150,130,.9)":"rgba(242,193,78,.75)";
     ctx.textAlign="center";ctx.fillText(letzteMinute?"LETZTE MINUTE":"KOPF AN KOPF",W/2,bandY0-4);
 
@@ -21250,7 +21275,7 @@
       ctx.textAlign=links?"left":"right";
       ctx.font="700 12px 'Barlow Condensed',sans-serif";ctx.fillStyle=c;
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
-      ctx.font="400 9px 'IBM Plex Mono',monospace";ctx.fillStyle="#dfe6ef";
+      ctx.font="400 9px 'Barlow Condensed',sans-serif";ctx.fillStyle="#dfe6ef";
       // W-B1: dieselbe stetig hochzaehlende Anzeige wie an der Wendetafel, statt des
       // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort).
       ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" Würstchen",tx,mitteY+9);
@@ -21261,7 +21286,7 @@
     ctx.font="800 13px 'Barlow Condensed',sans-serif";ctx.fillStyle="#f2c14e";
     ctx.fillText("VS",W/2,mitteY-2);
     const abstandJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(erster))-wettessenWuerstchen(wettessenAnzeigeSumme(zweiter));
-    ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
     ctx.fillText(abstandJetzt<=0?"punktgleich":"+"+wettessenWuerstchenText(abstandJetzt),W/2,mitteY+12);
 
     if(letzteMinute){
@@ -21272,7 +21297,12 @@
         ?(u.summe-u.runden[art.rundenN-1].punkte):u.summe;
       const luecke=wettessenWuerstchen(vorLetzter(erster))-wettessenWuerstchen(vorLetzter(zweiter));
       if(luecke>0){
-        ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#ff9a7a";
+        // MIKROTEXT-FUND (Broadcast-Audit Runde 2, Punkt 24, 30.09.): 8px lag unter der
+        // 9px-Lesbarkeitsschwelle -- alle drei Varianten dieser Zeile ("braucht +X"/"holt
+        // auf"/"fällt zurück"/"auf Kurs für X" weiter unten) teilen sich dieselbe Position
+        // (mitteY+24) und stehen deshalb auf 10px vereinheitlicht, sonst wuerde ein
+        // Zeilenwechsel zwischen den Varianten die Schriftgroesse sichtbar springen lassen.
+        ctx.font="700 10px 'Barlow Condensed',sans-serif";ctx.fillStyle="#ff9a7a";
         ctx.fillText((zweiter.n.split(" ")[0]||"?")+" braucht +"+wettessenWuerstchenText(luecke),W/2,mitteY+24);
       }
     } else {
@@ -21282,7 +21312,7 @@
       const abstandVorher=wettessenWuerstchen(vorMinute(erster))-wettessenWuerstchen(vorMinute(zweiter));
       const trend=abstandJetzt-abstandVorher;
       if(Math.abs(trend)>=1){
-        ctx.font="700 7.5px 'Barlow Condensed',sans-serif";
+        ctx.font="700 10px 'Barlow Condensed',sans-serif";
         ctx.fillStyle=trend<0?"#5fd38a":"#e0645f";
         ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+24);
       } else {
@@ -21303,7 +21333,7 @@
         const minutenFertig=Math.max(0,erster.aktuell+1);
         if(minutenFertig>0){
           const aufKurs=Math.round(wettessenWuerstchen(erster.summe)/minutenFertig*art.rundenN);
-          ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa6b6";
+          ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa6b6";
           ctx.fillText((erster.n.split(" ")[0]||"?")+" auf Kurs für "+aufKurs,W/2,mitteY+24);
         }
       }
@@ -21329,13 +21359,13 @@
       ctx.beginPath();ctx.arc(W/2,uhrY-8,26,0,6.2832);ctx.stroke();
     }
     ctx.textAlign="center";
-    ctx.font="800 28px 'IBM Plex Mono',monospace";
+    ctx.font="800 28px 'Barlow Condensed',sans-serif";
     ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.6)";ctx.lineJoin="round";
     const text=mm+":"+(ss<10?"0":"")+ss;
     ctx.strokeText(text,W/2,uhrY);
     ctx.fillStyle=restSek<=60?"#e6432e":"#f2ede2";
     ctx.fillText(text,W/2,uhrY);
-    ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="rgba(242,193,78,.7)";
+    ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="rgba(242,193,78,.7)";
     ctx.fillText("MINUTE "+Math.min(art.rundenN,minutenFertig+(done?0:1))+"/"+art.rundenN,W/2,uhrY+16);
 
     // GROSSER COUNTDOWN 10..1 IN DER BILDMITTE (W-B3): eigener Puls je Sekunde, rein aus
@@ -21908,7 +21938,7 @@
     const aktiver=showcaseAktiver();
     const farbeVon=(u)=>u.side===0?css("--home"):css("--away");
     const schriftAn=(txt,x,y,farbe,groesse,gewicht)=>{
-      ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
+      ctx.font=(gewicht||"400")+" "+groesse+"px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.strokeText(txt,x,y);ctx.fillStyle=farbe;ctx.fillText(txt,x,y);
@@ -21965,12 +21995,12 @@
         const y=y0+kopfH+k*zeilH+zeilH*0.5; k++;
         ctx.fillStyle=u.side===0?css("--home"):css("--away");
         ctx.fillRect(x0+pad,y-5,2.5,10);
-        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=i===0?"#f2d75a":"#c7cedb";
+        ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle=i===0?"#f2d75a":"#c7cedb";
         ctx.fillText(String(i+1)+".",x0+pad+7,y);
         const namen=u.n.split(" ")[0]||"?";
-        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.font="400 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e7edf6";
         ctx.fillText(namen.length>13?namen.slice(0,12)+"…":namen,x0+pad+22,y);
-        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#dfe6ef";
+        ctx.textAlign="right"; ctx.font="600 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#dfe6ef";
         ctx.fillText(String(u.summe||0),x0+br-pad,y);
         ctx.textAlign="left";
       });
@@ -21978,16 +22008,16 @@
         const y=y0+kopfH+k*zeilH+zeilH*0.5;
         ctx.fillStyle=aktiver.side===0?css("--home"):css("--away");
         ctx.fillRect(x0+pad,y-5,2.5,10);
-        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d6ac36";
+        ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d6ac36";
         ctx.fillText("läuft",x0+pad+7,y);
         const namen=aktiver.n.split(" ")[0]||"?";
-        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
+        ctx.font="400 7.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e7edf6";
         ctx.fillText(namen.length>9?namen.slice(0,8)+"…":namen,x0+pad+34,y);
         // Hypothetischer Rang, bräche der Auftritt jetzt ab -- nur gegen bereits FERTIGE
         // Acts verglichen, kein Spoiler ueber noch kommende Acts.
         const fertige=showcaseFertige();
         const rang=1+fertige.filter(x=>x!==aktiver&&(x.summe||0)>(aktiver.summe||0)).length;
-        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.textAlign="right"; ctx.font="600 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
         ctx.fillText((aktiver.summe||0)+" (#"+rang+")",x0+br-pad,y);
         ctx.textAlign="left";
       }
@@ -22031,7 +22061,7 @@
       const w=30,pr=Math.min(1,aktiver.summe/maxSumme);
       ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+80,w,3);
       ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+80,w*pr,3);
-      ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.font="400 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
       ctx.textAlign="center";
       ctx.fillText((aktiver.aktuell+1)+"/"+art.rundenN,x,y+92);
 
@@ -22388,11 +22418,11 @@
     ctx.textBaseline="middle"; ctx.textAlign="left";
     ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d6ac36";
     ctx.fillText("ZWISCHENSTAND",x0+pad,y0+kopfH*0.55);
-    ctx.textAlign="right"; ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+    ctx.textAlign="right"; ctx.font="400 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
     ctx.fillText("Paar "+(aktiv+1)+"/"+gruppen.length,x0+br-pad,y0+kopfH*0.55);
     if(lc){
       const delta=lc.c-lc.l;
-      ctx.textAlign="left"; ctx.font="600 8px 'IBM Plex Mono',monospace";
+      ctx.textAlign="left"; ctx.font="600 8px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=delta>=0?"#5fd38a":"#9aa6b6";
       ctx.fillText("L "+lc.l+" · C "+lc.c+" ("+(delta>=0?"+":"")+delta+")",x0+pad,y0+kopfH+lcH*0.5);
     }
@@ -22417,16 +22447,16 @@
       }
       ctx.fillStyle=z.side===0?css("--home"):css("--away");
       ctx.fillRect(x0+pad,y-5,2.5,10);
-      ctx.textAlign="left"; ctx.font="400 9px 'IBM Plex Mono',monospace";
+      ctx.textAlign="left"; ctx.font="400 9px 'Barlow Condensed',sans-serif";
       if(z.gelaufen){ rang++; ctx.fillStyle=rang===1?"#f2d75a":"#c7cedb"; ctx.fillText(String(rang)+".",x0+pad+7,y); }
       else { ctx.fillStyle="#6d7686"; ctx.fillText("–",x0+pad+7,y); }
       const namen=z.grp.map(u=>u.n.split(" ")[0]).join(" & ");
       ctx.fillStyle=z.gelaufen?"#e7edf6":"#7f8899";
       ctx.fillText(namen.length>21?namen.slice(0,20)+"…":namen,x0+pad+22,y);
       ctx.textAlign="right";
-      if(z.gelaufen){ ctx.fillStyle=laeuft?"#f2d75a":"#dfe6ef"; ctx.font="600 10px 'IBM Plex Mono',monospace";
+      if(z.gelaufen){ ctx.fillStyle=laeuft?"#f2d75a":"#dfe6ef"; ctx.font="600 10px 'Barlow Condensed',sans-serif";
         ctx.fillText(String(z.pkt),x0+br-pad,y); }
-      else { ctx.fillStyle="#6d7686"; ctx.font="400 8px 'IBM Plex Mono',monospace";
+      else { ctx.fillStyle="#6d7686"; ctx.font="400 8px 'Barlow Condensed',sans-serif";
         ctx.fillText("Start "+(z.i+1),x0+br-pad,y); }
     });
 
@@ -22447,7 +22477,7 @@
     const by=y0+kopfHeff+gruppen.length*zeilH+3;
     grp.slice(0,2).forEach((u,j)=>{
       const zy=by+j*7;
-      ctx.textAlign="left"; ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
+      ctx.textAlign="left"; ctx.font="400 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#6d7686";
       ctx.fillText((u.n.split(" ")[0]||"?").slice(0,1),x0+pad,zy+2.5);
       for(let r=0;r<n;r++){
         const z=r<=u.aktuell?u.runden[r]:null;
@@ -22468,7 +22498,7 @@
       }
     });
     const bisWo=grp.length?Math.max(...grp.map(u=>u.aktuell)):-1;
-    ctx.textAlign="left"; ctx.font="400 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#6d7686";
+    ctx.textAlign="left"; ctx.font="400 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#6d7686";
     ctx.fillText("Elemente "+Math.max(0,bisWo+1)+"/"+n,x0+pad,by+grp.slice(0,2).length*7+7);
   }
 
@@ -22498,7 +22528,7 @@
     };
     const schriftAn=(x,y,txt,dy,farbe,groesse)=>{
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+      ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
     };
@@ -22645,7 +22675,7 @@
         schriftAn(lx,py,u.n.split(" ")[0],dyName,c,8.5);
         schriftAn(lx,py,String(u.summe)+" Pkt",dyPkt,"#dfe6ef",8.5);
         punktsaeule(lx,py+dyBar,u,26);
-        ctx.font="400 7.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.font="400 7.5px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
         ctx.textAlign="center";
         ctx.fillText((u.aktuell+1)+"/"+art.rundenN,lx,py+dyProg);
       }
@@ -22708,9 +22738,9 @@
             &&(KUER_ELEMENTE[idx]||KUER_ELEMENTE[KUER_ELEMENTE.length-1]).typ==="sprung").length,0);
           ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#8a93a3";
           ctx.fillText("GESAMT",mx,my-8);
-          ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+          ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
           ctx.fillText(String(pkt),mx,my+2);
-          ctx.font="400 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d08a8a";
+          ctx.font="400 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#d08a8a";
           ctx.fillText("Stürze "+stuerze,mx,my+12);
         } else {
           const zeilenK=kuerZwischenstandZeilen(gruppen,aktiv).filter(z=>z.gelaufen);
@@ -22841,7 +22871,10 @@
     ctx.strokeStyle="rgba(214,172,54,.7)"; ctx.lineWidth=1.5; ctx.strokeRect(bx,by,bw,bh);
     ctx.fillStyle="rgba(10,8,4,.85)"; ctx.fillRect(bx,by-14,bw,14);
     ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
+    // MIKROTEXT-FUND (Broadcast-Audit Runde 2, Punkt 24, 30.09.): 8px lag unter der
+    // 9px-Lesbarkeitsschwelle -- der 14px hohe Kopfstreifen direkt darueber traegt 10px
+    // problemlos.
+    ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
     ctx.fillText("WIEDERHOLUNG · "+clip.label,bx+bw/2,by-7);
     ctx.globalAlpha=1;
   }
@@ -23113,7 +23146,7 @@
     // der Bug bleibt die einzige Instanz dieser Zahl, die Buehne zeigt darunter nur noch die
     // Duell-/Rollen-Zeile, die der Bug NICHT tragen kann.
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+    ctx.font="400 11px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
 
     // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
@@ -23195,7 +23228,7 @@
       // etwas. Die Hantel haengt jetzt an der Hand, s. HEBEN_HAND-Aufruf in zeichneSprite.
       zeichneSprite(ctx,u,x,y,true);
       const schrift=(txt,dy,farbe,groesse,gewicht)=>{
-        ctx.font=(gewicht||"400")+" "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.font=(gewicht||"400")+" "+groesse+"px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
@@ -23255,7 +23288,13 @@
             // selbst ist kein Spoiler (sie steht schon auf der Anzeigetafel/Textkarte).
             ctx.fillStyle="#3a3d46";ctx.fillRect(bx,tafelY,boxW,boxH);
             ctx.strokeStyle="#c7ccd6";ctx.lineWidth=1.4;ctx.strokeRect(bx,tafelY,boxW,boxH);
-            ctx.font="700 6.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#e8e2d0";
+            // MIKROTEXT-FUND (Broadcast-Audit Runde 2, Punkt 24, 30.09.): 6.5px lag deutlich
+            // unter der 9px-Schwelle. Das Kaestchen selbst ist mit 13x11px fest (IWF-
+            // Anzeigetafel-Optik, s. Kommentar oben) zu klein fuer 10-11px Text, ohne die
+            // Tafel zu verbreitern (Audit Punkt 26, ragt schon rechts aus dem Canvas --
+            // nicht Teil dieses Auftrags, also nicht noch vergroessert); 8px ist das Maximum,
+            // das in der Box noch nicht abschneidet.
+            ctx.font="700 8px 'Barlow Condensed',sans-serif";ctx.fillStyle="#e8e2d0";
             ctx.textAlign="center";ctx.textBaseline="middle";
             ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
           } else {
@@ -23263,7 +23302,7 @@
             ctx.fillStyle=r0.gueltig?"#f2ede0":"#c0392b";
             ctx.fillRect(bx,tafelY,boxW,boxH);
             ctx.strokeStyle="rgba(10,12,16,.5)";ctx.strokeRect(bx,tafelY,boxW,boxH);
-            ctx.font="700 6.5px 'IBM Plex Mono',monospace";
+            ctx.font="700 8px 'Barlow Condensed',sans-serif";
             ctx.fillStyle=r0.gueltig?"#1b1d22":"#f2ede0";
             ctx.textAlign="center";ctx.textBaseline="middle";
             ctx.fillText(String(sinclairAnzeige(r0.kg,u.groesse)),bx+boxW/2,tafelY+boxH/2+0.5);
@@ -23361,7 +23400,7 @@
       // Nullwertungsdrama soll man auch ohne Farbsehen erkennen.
       ctx.font="700 15px 'Barlow Condensed',sans-serif";
       ctx.fillText((gueltig?"✓ ":"✗ ")+(gueltig?"gültig":"ungültig"),bx,textY+34);
-      ctx.font="400 10px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.font="400 10px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
       ctx.fillText((zug.r.uebung==="reissen"?"Reißen":"Stoßen")+", "+zug.r.versuch+". Versuch",bx,textY+48);
       // KUEHNER VERSUCH — eigenes Badge OBERHALB der kg-Zahl, NUR die visuelle Anzeige
       // (kein Effekt auf u.summe/u.zweikampf, s. HEBEN_WAGNIS_MAX_KG-Kommentar oben). Gold
@@ -23385,7 +23424,7 @@
         ctx.fillText(kuehnTxt,bx,kuehnZeileY);
       }
     } else {
-      ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+      ctx.font="400 11px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
       ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
     }
 
@@ -23406,10 +23445,10 @@
     const ry=H*0.90, spanne=W-120;
     paare.forEach((p,i)=>{
       const rx=60+spanne*(paare.length>1?i/(paare.length-1):0.5);
-      ctx.font="400 8.5px 'IBM Plex Mono',monospace";
+      ctx.font="400 8.5px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=p.fertig?"#8a93a3":"#c7ccd6";
       ctx.fillText((p.d+1)+". "+p.pa.n.split(" ")[0]+" – "+p.pb.n.split(" ")[0],rx,ry);
-      ctx.font="400 8px 'IBM Plex Mono',monospace";
+      ctx.font="400 8px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=p.fertig?css(p.pa.duellGewonnen?"--home":"--away"):"#5f6675";
       ctx.fillText(p.status,rx,ry+11);
     });
@@ -23636,7 +23675,7 @@
       const siegTxt=(siegSeite!=null?"SIEG — "+VEREIN[siegSeite].name:"UNENTSCHIEDEN")+" ("+gew(0)+":"+gew(1)+")";
       ctx.strokeText(siegTxt,W/2,H*0.125); ctx.fillText(siegTxt,W/2,H*0.125);
     } else {
-      ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
+      ctx.font="400 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
       ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
         +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":""),W/2,H*0.125);
     }
@@ -23745,7 +23784,7 @@
         ctx.fillRect(bx-42,by,12,bw); ctx.restore();
       }
     }
-    ctx.font="600 10px 'IBM Plex Mono',monospace"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
+    ctx.font="600 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle=v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"); ctx.fillText((v>0?"+":"")+v,bx-36,by-10);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3/4, S-B5): ein
     // Kaestchen je Brett, Olympiade-Schach-Konvention "1 / ½ / 0". `fertig(x)&&fertig(y)`
@@ -23804,7 +23843,7 @@
       ctx.strokeStyle=rot?(blinkAn?"#ff6b5c":"#7a2620"):(gelb?"#e6c34d":"#000");
       ctx.lineWidth=rot?2.2:(gelb?1.8:1);
       ctx.strokeRect(x-34,by-38,68,22);
-      ctx.font="700 14px 'IBM Plex Mono',monospace";
+      ctx.font="700 14px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=rot?(blinkAn?"#fff":"#e0463c"):(dran?"#111":"#8a93a3");
       ctx.fillText(mmss(rest),x,by-27);
     });
@@ -23830,7 +23869,7 @@
       // (die Schachuhr an der Hand, DISZIPLIN_PROP["speed-schach"]) und waehlt bei
       // u.lunge>0 die "shoot"-Ueberkopf-Pose statt eines Schwert-/Bogen-Schwungs.
       zeichneSprite(ctx,u,x,py,true);
-      const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'IBM Plex Mono',monospace";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
+      const schrift=(txt,dy,f,g)=>{ctx.font="400 "+g+"px 'Barlow Condensed',sans-serif";ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(txt,x,py+dy);ctx.fillStyle=f;ctx.fillText(txt,x,py+dy);};
       schrift(u.n.length>16?u.n.slice(0,15)+"…":u.n,58,c,11); schrift(farbe+" · "+u.summe+" Pkt",72,"#8a93a3",8.5);
       // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
       // in Hoehe des Figuren-Schattens (py+26), nach aussen versetzt (weg vom Brett) --
@@ -23842,7 +23881,7 @@
     zeichneBauchbinde("schach-"+fb,a,art,W/2,H-16,260);
 
     // ZUGLISTE rechts vom Brett — die letzten acht Halbzuege.
-    ctx.textAlign="left"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+    ctx.textAlign="left"; ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
     const von=Math.max(0,halb-8);
     for(let i=von;i<halb;i++){
       const z=partie.zuege[i]; if(!z)break;   // rundenN*2 == 20 Halbzuege je Partie; laeuft
@@ -23874,7 +23913,7 @@
       zeichneSchachBrett(rx-kw/2,ry-kw/2,kq,KB,kl,false);
       if(i===schachPin){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=2; ctx.strokeRect(rx-kw/2-3,ry-kw/2-3,kw+6,kw+6); }
       const kv=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
-      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.font="400 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#c7ccd6";
       ctx.fillText("Brett "+(i+1)+" · "+pa.n.split(" ")[0]+" – "+pb.n.split(" ")[0],rx,ry+kw/2+10);
       ctx.fillStyle=kv>0?css("--ok"):(kv<0?css("--crit"):"#8a93a3"); ctx.fillText((kv>0?"+":"")+kv+" · Zug "+(Math.max(pa.aktuell,pb.aktuell)+1)+"/"+art.rundenN,rx,ry+kw/2+21);
       const bwk=kw, halb2=Math.min(bwk/2,(bwk/2)*Math.abs(kv)/maxV); ctx.fillStyle=css("--line"); ctx.fillRect(rx-bwk/2,ry+kw/2+26,bwk,3);
@@ -23983,7 +24022,7 @@
       ctx.setLineDash([4,8]); ctx.strokeStyle="rgba(214,150,255,.16)"; ctx.lineWidth=1.2;
       ctx.beginPath(); ctx.ellipse(cx,cy,rr,rr*KY,0,0,6.2832); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.textAlign="center"; ctx.font="800 8px 'IBM Plex Mono',monospace";
+      ctx.textAlign="center"; ctx.font="800 8px 'Barlow Condensed',sans-serif";
       ctx.fillStyle="rgba(214,170,255,.5)";
       ctx.fillText(label,cx,cy-rr*KY-3);
     }
@@ -24019,7 +24058,7 @@
     ctx.globalAlpha=0.5+0.5*puls;
     ctx.beginPath(); ctx.ellipse(cx,cy,rIn,rIn*KY,0,0,6.2832); ctx.stroke();
     ctx.globalAlpha=1; ctx.setLineDash([]);
-    ctx.font="900 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a"; ctx.textAlign="center";
+    ctx.font="900 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a"; ctx.textAlign="center";
     ctx.fillText("SURVIVOR · UNBROKEN",cx,cy-rIn*KY-8);
 
     // Feld-Wasserzeichen, wie breaking.tsx:142-146.
@@ -24133,7 +24172,7 @@
     }
     ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
     if(bruchgefahr){
-      ctx.font="900 11px 'IBM Plex Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+      ctx.font="900 11px 'Barlow Condensed',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
       ctx.globalAlpha=0.55+0.45*puls; ctx.fillStyle="#ff3b3b";
       ctx.fillText("BRUCHGEFAHR",cx,H*0.78);
       ctx.globalAlpha=1;
@@ -24172,7 +24211,7 @@
         // B4.2: die aktive Stufe traegt ihre Qual-Zahl GROSS (Doku B4.2), im Tisch selbst
         // (goldene Schrift auf dem dunklen Holz), statt sie mit den uebrigen neun kleinen
         // Zahlen zu verwechseln.
-        ctx.font="800 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.font="800 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
         continue;
@@ -24191,15 +24230,15 @@
       // Reihe aus QUAL_ZAHLEN, in derselben Grau-/Hell-Staffelung wie das Geraet daneben.
       ctx.save();
       ctx.globalAlpha=i<stufe?0.22:0.55;
-      ctx.font="600 6px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.font="600 6px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#c7ccd6";
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(qualAnzeige(QUAL_ZAHLEN[i]),fx,tischY+4.5);
       ctx.restore();
     }
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.font="800 10px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+    ctx.font="800 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
     ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length+"  ·  QUAL "+qualAnzeige(QUAL_ZAHLEN[stufe]),cx,tischY-30);
-    ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(214,170,255,.6)";
+    ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(214,170,255,.6)";
     ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
 
     // ---------- RANG 2: die beiden, um die es gerade geht ----------
@@ -24350,7 +24389,7 @@
       // Anlauf nur dafuer gesorgt, dass sich die Schilder der beiden Duellanten ueberlappten.
       ctx.textAlign="center"; ctx.textBaseline="middle";
       const schrift=(txt,dy,farbe,groesse,fett)=>{
-        ctx.font=(fett?"700 ":"400 ")+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.font=(fett?"700 ":"400 ")+groesse+"px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=3.5; ctx.strokeStyle="rgba(8,10,14,.92)"; ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy); ctx.fillStyle=farbe; ctx.fillText(txt,x,y+dy);
       };
@@ -24385,14 +24424,14 @@
       ctx.strokeStyle=rolle==="ertraegt"?"rgba(242,215,90,.55)":"rgba(255,90,74,.5)";
       ctx.lineWidth=1; ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
       ctx.textAlign="left"; ctx.textBaseline="alphabetic";
-      ctx.font="800 9px 'IBM Plex Mono',monospace";
+      ctx.font="800 9px 'Barlow Condensed',sans-serif";
       ctx.fillStyle=rolle==="ertraegt"?"#f2d75a":"#ff7a66";
       // Dasselbe Wort wie am Sprite-Schild (s. schrift(...) oben): Seitentafel und Figur
       // beschriften dieselbe Rolle im selben Bild, also duerfen sie nicht zweierlei sagen.
       ctx.fillText(rolle==="ertraegt"?"ERTRÄGT":"PEINIGT",bx+12,by+17);
       ctx.font="800 15px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#eef3fa";
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,bx+12,by+35);
-      ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#9aa4b4";
+      ctx.font="400 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#9aa4b4";
       if(art.gauntlet){
         // GAUNTLET (22.09.): "Durchgang X/rundenN" ergibt hier keinen Sinn mehr -- ein
         // Ueberlebender sammelt ueber mehrere Duelle hinweg beliebig viele eigene Zuege (s.
@@ -24488,7 +24527,7 @@
             ctx.beginPath(); ctx.moveTo(sx+2,y0+2); ctx.lineTo(sx+slotW-2,y0+slotH-2); ctx.stroke();
             ctx.globalAlpha=1;
             const koBout=u.runden[u.aktuell].bout;
-            ctx.font="700 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+            ctx.font="700 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#c7ccd6";
             ctx.textAlign="center"; ctx.textBaseline="middle";
             ctx.fillText("✗K"+koBout,sx+slotW/2,y0+slotH/2);
           } else if(u.aktuell<0){
@@ -24513,7 +24552,7 @@
       };
       zeichneKette(0,true);
       zeichneKette(1,false);
-      ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.textBaseline="alphabetic";
+      ctx.font="700 7.5px 'Barlow Condensed',sans-serif"; ctx.textBaseline="alphabetic";
       if(stehenderTxt[0]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="left"; ctx.fillText(stehenderTxt[0],16,topY+42); }
       if(stehenderTxt[1]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="right"; ctx.fillText(stehenderTxt[1],W-16,topY+42); }
       // MITTIG: Kampf-Nummer und Ueberlebensstand -- "Kampf 5", "noch 4:2 im Ring", die Zahl,
@@ -24526,7 +24565,7 @@
       ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText("KAMPF "+aktuellerBout,W/2,topY+7);
-      ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
+      ctx.font="400 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#c7ccd6";
       ctx.fillText("noch "+nochLinks+" : "+nochRechts+" im Ring",W/2,topY+19);
       ctx.textBaseline="alphabetic";
 
@@ -24597,7 +24636,7 @@
         ctx.fillStyle="#ff3b3b"; ctx.fillText("GEBROCHEN",0,0);
         ctx.restore();
         ctx.globalAlpha=Math.min(1,p*1.8);
-        ctx.font="700 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
         ctx.fillText(letzterGauntletBruch.u.n+" scheidet aus",cx,cy+30);
         ctx.restore();
       }
@@ -25611,17 +25650,27 @@
     if(istFeldspiel(disc)){
       // Kein Schlachtplan: hier zaehlt, wer am Ball ist. Statt einer Taktik zeigt sich
       // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
+      //
+      // OHNE "BALLWECHSEL"/"ZÜGE" (Broadcast-Audit Runde 2, Punkt 12, 30.09.): beide
+      // Woerter kommen aus den Duell-Chassis (Tennis zaehlt Ballwechsel, Schach/Fechten
+      // Züge) und behaupten fuers Feldspiel ein Format, das es dort nicht gibt — hier
+      // laeuft ein durchgehendes Spiel, keine abgezaehlte Zug-Folge. `zuegeJeSeite*2` ist
+      // weiterhin die interne Aktionszahl der Simulation, taucht aber nicht mehr als
+      // Sendungstext auf.
       const k=el("div","plan");
-      k.appendChild(el("b",null,"Ballwechsel"));
-      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Züge insgesamt, abwechselnd zwischen "+
+      k.appendChild(el("b",null,"Spielaufbau"));
+      k.appendChild(el("p",null,"Fortlaufendes Spiel, Ballbesitz wechselt zwischen "+
         "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
         "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
         "einen verpassten Abschluss aufsammelt."));
       box.appendChild(k);
       const apb2=document.getElementById("arenaplan");
-      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Züge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      // Volltext als Tooltip (Punkt 15, s. .planzeile #arenaplan in battle-mode.css): die
+      // Zeile selbst ist per CSS einzeilig mit Abschneiden, hier gibt es ohnehin nichts
+      // zu kuerzen.
+      if(apb2){apb2.textContent=jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+"."; apb2.title=apb2.textContent;}
       const pl2=document.querySelector(".planzeile b");
-      if(pl2)pl2.textContent="Ballwechsel";
+      if(pl2)pl2.textContent="Spielaufbau";
     } else if(istBuehne(disc)){
       // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
       // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
@@ -25640,7 +25689,7 @@
           "kostet, durch denselben Ausgang."));
         box.appendChild(k);
         const apb0=document.getElementById("arenaplan");
-        if(apb0)apb0.textContent="Gauntlet, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        if(apb0){apb0.textContent="Gauntlet, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+"."; apb0.title=apb0.textContent;}
         const pl0=document.querySelector(".planzeile b");
         if(pl0)pl0.textContent="Gauntlet";
       } else {
@@ -25650,7 +25699,7 @@
           "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
         box.appendChild(k);
         const apb=document.getElementById("arenaplan");
-        if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+        if(apb){apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+"."; apb.title=apb.textContent;}
         const pl=document.querySelector(".planzeile b");
         if(pl)pl.textContent="Bewertung";
       }
@@ -25668,8 +25717,9 @@
         +" — jeder Läufer bringt den Plan seines Slots mit."));
       box.appendChild(k);
       const apb=document.getElementById("arenaplan");
-      if(apb)apb.textContent=Object.entries(zaehl)
+      if(apb){apb.textContent=Object.entries(zaehl)
         .map(([pid,n])=>n+"× "+art.plaene[pid].label+" — "+art.plaene[pid].text).join("  ·  ");
+        apb.title=apb.textContent;}
       const pl=document.querySelector(".planzeile b");
       if(pl)pl.textContent="Rennpläne";
     } else if(PLAN){
@@ -25712,7 +25762,7 @@
     });
     if(!istBahn(disc)&&!istBuehne(disc)&&!istFeldspiel(disc)){
       const ap=document.getElementById("arenaplan");
-      if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
+      if(ap){ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:""; ap.title=ap.textContent;}
       const pl=document.querySelector(".planzeile b");
       if(pl)pl.textContent="Plan der KI";
     }
@@ -28258,7 +28308,11 @@
         const tr=document.getElementById("wkopf"+(suf?"R":"L")); if(!tr)continue;
         tr.textContent="";
         const thN=el("th",null,w.namen); thN.id="wthN"+suf; tr.appendChild(thN);
-        w.spalten.forEach((s,i)=>{const th=el("th","n",s.kopf); th.id="wth"+i+suf; if(s.titel)th.title=s.titel; tr.appendChild(th);});
+        // data-col (Broadcast-Audit Runde 2, Punkt 15, 30.09.): erlaubt der CSS unten,
+        // "Leist"/"Eig" NUR in dieser Live-Tabelle auszublenden, ohne Spaltenlogik/-index
+        // anzufassen — der Endstand (renderEndstandBuehne/-Bahn/-Feldspiel) baut seine
+        // eigene #etafelL/#etafelR-Tabelle aus denselben `w.spalten` und bleibt unberuehrt.
+        w.spalten.forEach((s,i)=>{const th=el("th","n",s.kopf); th.id="wth"+i+suf; th.dataset.col=s.id; if(s.titel)th.title=s.titel; tr.appendChild(th);});
       }
       const fuss=document.getElementById("wfuss"); if(fuss)fuss.textContent=w.fuss||"";
       // Broadcast-Optik-Audit, Punkt 9 (28.09.): eigene, dezente Akzentfarbe je Disziplin in
@@ -28282,6 +28336,7 @@
         for(const s of w.spalten){
           const v=s.wert(z);
           const td=el("td","n"+(s.top&&typeof v==="number"&&v>0&&v>=best[s.id]?" top":""));
+          td.dataset.col=s.id;
           td.textContent=v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v));
           if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
           if(s.titel)td.title=s.titel;
@@ -28775,7 +28830,12 @@
       const punkte=new Map(), seiten=[0,0];
       for(const u of LAEUFER){const p=burgwertung(u); punkte.set(u.id,p); seiten[u.seite]+=p;}
       const r1=(v)=>Math.round(v*10)/10;
-      const f1=(v)=>v.toFixed(1).replace(/\.0$/,"");
+      // DEUTSCHES KOMMA STATT PUNKT (Broadcast-Audit Runde 2, Punkt 12, 30.09.): Burgpunkte
+      // sind die einzige Bahn-Wertung mit Nachkommastelle — `toFixed(1)` liefert ".", jede
+      // andere Zahl in der Sendung ("54,7 s") steht mit ",". Erst die ".0"-Kuerzung, dann
+      // das verbleibende "." ersetzen (eine ganze Zahl wie "6" hat nach der Kuerzung keins
+      // mehr, bei der die Ersetzung sonst ins Leere liefe).
+      const f1=(v)=>v.toFixed(1).replace(/\.0$/,"").replace(".",",");
       return {seiten:[r1(seiten[0]),r1(seiten[1])], suffix:"Burgpunkte", punkte, gewertet:true,
         fmt:f1,
         // AUFSCHLUESSELUNG IM ENDSTAND (Chris 06.09., woertlich: "dann wenn man nach
@@ -28809,7 +28869,12 @@
     const angezeigt=rennT*zeitFaktor();
     document.getElementById("clock").textContent=
       Math.floor(angezeigt/60)+":"+String(Math.floor(angezeigt%60)).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // "BEREIT" VOR DEM START + "VORBEI" NACH SPIELENDE (Broadcast-Audit Runde 2, Punkt
+    // 12, 30.09.): dieselbe Ergaenzung wie bei updateHudBuehne() — Kampf/Feldspiel hatten
+    // den Umstieg auf "Vorbei" schon, Bahn/Buehne blieben nach dem Ende auf
+    // "Pause"/"Weiter" haengen.
+    document.getElementById("phase").textContent=done?"beendet":(running?"läuft":"bereit");
+    if(done)document.getElementById("play").textContent="Vorbei";
     // Die Beschriftungen der Kampfanzeige stimmen auf der Bahn nicht: es gibt kein Sudden
     // Death, niemand ist "im Kampf", und die Punkte sind Zieleinlaeufe.
     const sd=document.querySelector(".hpbars .sd");
@@ -29021,8 +29086,13 @@
     document.getElementById("klsuffix").textContent=
       stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
       +(stand.gewertet&&!done?" · vorläufig":"");
+    // DEUTSCHES KOMMA AUCH HIER (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `stand.seiten`
+    // sind bei Takeshi (Burgpunkte) Dezimalwerte — ohne `stand.fmt` haette der rohe
+    // Zahlenwert per String-Verkettung einen Punkt gezeigt ("40.1 : 22.7"), waehrend
+    // `f1`/`fmt` (s. bahnTeamstand()) schon fuer genau diesen Fall mit Komma formatiert.
+    const fmtSeite=(v)=>stand.fmt?stand.fmt(v):v;
     document.getElementById("score").textContent=
-      stand.seiten[0]+(rangSpiel?" · ":" : ")+stand.seiten[1];
+      fmtSeite(stand.seiten[0])+(rangSpiel?" · ":" : ")+fmtSeite(stand.seiten[1]);
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
@@ -29031,8 +29101,8 @@
       const siegerName=pL>pR?VEREIN[0].name:pR>pL?VEREIN[1].name:null;
       feed(0,stand.gewertet
         ? (pL>pR?VEREIN[0].name+" gewinnt ":pR>pL?VEREIN[1].name+" gewinnt ":"Unentschieden ")
-          +pL+":"+pR+" "+stand.suffix
-        : "Rennen beendet — "+pL+":"+pR+" "+stand.suffix
+          +fmtSeite(pL)+":"+fmtSeite(pR)+" "+stand.suffix
+        : "Rennen beendet — "+fmtSeite(pL)+":"+fmtSeite(pR)+" "+stand.suffix
           +" (für diese Disziplin gibt es noch keine Wertung)",true,
         siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
       renderEndstandBahn();
@@ -29140,7 +29210,9 @@
     // die feed() fuer den Ticker-Zeitstempel schon nutzt.
     const klSek=Math.floor(t*zeitFaktor());
     document.getElementById("clock").textContent=Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0");
-    document.getElementById("phase").textContent=done?"beendet":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
+    // "BEREIT" VOR DEM ANPFIFF (Broadcast-Audit Runde 2, Punkt 12, 30.09.): dieselbe
+    // Ergaenzung wie in den anderen drei updateHud*()-Funktionen.
+    document.getElementById("phase").textContent=done?"beendet":!running?"bereit":(t>KAMPF_SUDDEN_DEATH_T?"Sudden Death":"läuft");
     // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
     // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
     // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
@@ -30293,14 +30365,14 @@
       const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
       ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);
       ctx.fillStyle="#e8d8a8"; ctx.beginPath(); ctx.moveTo(px-2,py-18); ctx.lineTo(px+12,py-14); ctx.lineTo(px-2,py-9); ctx.closePath(); ctx.fill();
-      ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
+      ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.textAlign="left"; ctx.fillStyle="#f2d75a";
       ctx.fillText("★".repeat(st),px-2,py-20);
       // TK-1: FALLEN-NAMENSSCHILD AM WEGPFAHL (broadcast-optik-bahn-27-09.md Abschnitt 5.3):
       // "ab Zoom 1,5x lesbar". Reine Anzeige -- BA().fallenName ist eine Datenzeile, kein
       // Simulationsfeld; fallenLook(i)/HUERDEN_TYP(i) sind bestehende, reine Lesefunktionen.
       if(cam.zoom>=1.5){
         const name=(BA().fallenName||{})[fallenLook(i)];
-        if(name){ ctx.font="600 6.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e6e0d2";
+        if(name){ ctx.font="600 6.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#e6e0d2";
           ctx.fillText(name,px-2,py-28); }
       }
     });
@@ -30357,14 +30429,14 @@
     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'Barlow Condensed',sans-serif";
     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-    const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1);
+    const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
     ctx.strokeText(bpTxt,W/2,H-35); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,H-35);
-    ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.lineWidth=3;
+    ctx.font="400 9px 'Barlow Condensed',sans-serif"; ctx.lineWidth=3;
     const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
       +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
     ctx.strokeText(leg,W/2,H-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,H-16);
     ctx.textBaseline="alphabetic";
-    if(cam.zoom>1.08){ ctx.font="400 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+    if(cam.zoom>1.08){ ctx.font="400 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="left";
       ctx.fillStyle="rgba(255,255,255,.55)"; ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,16); }
   }
 
@@ -30503,7 +30575,7 @@
       const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.font="700 22px 'Barlow Condensed',sans-serif";
-      const bpTxt="Burgpunkte  "+bp(0).toFixed(1)+" : "+bp(1).toFixed(1); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+      const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",","); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
       // WAS DIE STERNE SIND — und zwar die Formel, die wirklich laeuft (W4, s. burgpunkte()
       // und MOTOREN["takeshis-castle"].wert): je Falle 1-3 Sterne nach Schwierigkeit, davon
       // haelt der passende Sub-Skill einen Anteil; ein Sturz kostet die halbe Falle; wer ins
@@ -30511,7 +30583,7 @@
       // durchgebrochen = halbe, gestuerzt = keine") beschrieb W2b aus Anhang A des Plans —
       // die Anzeige-Variante, die NICHT gebaut wurde: durchbrechen kostet in W4 gar nichts,
       // und ein Sturz kann den Beitrag einer Falle negativ machen.
-      ctx.font="400 9px 'IBM Plex Mono',monospace";
+      ctx.font="400 9px 'Barlow Condensed',sans-serif";
       const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
         +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
       ctx.lineWidth=3; ctx.strokeText(leg,W/2,oben-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,oben-16);
@@ -30542,7 +30614,7 @@
         const stLabel=(CIRCLED[i]||(i+1)+".")+" "+BA().hindernisNamen[i];
         // Um 9px angehoben (vorher oben-4), damit SP-2s Statistikzeile direkt darunter
         // Platz hat, ohne den Namen zu ueberdecken.
-        ctx.font=(cam.zoom>=2?"700 8px":"700 10px")+" 'IBM Plex Mono',monospace";
+        ctx.font=(cam.zoom>=2?"700 8px":"700 10px")+" 'Barlow Condensed',sans-serif";
         ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         ctx.strokeText(stLabel,x,oben-13); ctx.fillStyle="#dfe4ee"; ctx.fillText(stLabel,x,oben-13);
         // SP-2: STATIONSSTATISTIK (Abschnitt 3.3, "der Primaer-/Nebenweg der CLAUDE.md-
@@ -30552,7 +30624,7 @@
         const st=spurtStationStats[i];
         if(st&&(st.sauber||st.durch||st.sturz)){
           const stTxt=st.sauber+" ✓ · "+st.durch+" ⚡ · "+st.sturz+" ✗";
-          ctx.font=(cam.zoom>=2?"400 7px":"400 8.5px")+" 'IBM Plex Mono',monospace";
+          ctx.font=(cam.zoom>=2?"400 7px":"400 8.5px")+" 'Barlow Condensed',sans-serif";
           ctx.lineWidth=2.4;
           ctx.strokeText(stTxt,x,oben-4); ctx.fillStyle="#b7c0cf"; ctx.fillText(stTxt,x,oben-4);
         }
@@ -30626,7 +30698,7 @@
     // Zoomstufe als kleiner, fester HUD-Hinweis — nur wenn die Kamera ueberhaupt
     // herangezoomt hat, sonst waere er staendig sichtbares Rauschen.
     if(cam.zoom>1.08){
-      ctx.font="400 9px 'IBM Plex Mono',monospace";
+      ctx.font="400 9px 'Barlow Condensed',sans-serif";
       ctx.textAlign="left";
       ctx.fillStyle="rgba(255,255,255,.55)";
       ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10);
@@ -31012,7 +31084,7 @@
         ctx.beginPath();ctx.arc(lampX,lampY,9,0,6.283);ctx.fill();
         ctx.restore();
         const zielTxt=bahnZeitText(bahnSpanneAnzeige(bahnZeit(u)));
-        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle=farbeSeite;
+        ctx.font="700 7px 'Barlow Condensed',sans-serif"; ctx.fillStyle=farbeSeite;
         ctx.textAlign="center"; ctx.fillText("TOP "+zielTxt,lampX,lampY-11);
       }
     }
@@ -31068,7 +31140,7 @@
         const deltaSim=Math.abs(tA-tB);
         const deltaTxt=bahnZeitText(bahnSpanneAnzeige(deltaSim));
         const schnellerFarbe=(tA<tB?a:b).seite===0?css("--home"):css("--away");
-        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=schnellerFarbe;
+        ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.fillStyle=schnellerFarbe;
         ctx.textAlign="center"; ctx.textBaseline="middle";
         ctx.fillText("Exe "+(k+1)+" · +"+deltaTxt,midX,y-14);
       });
@@ -31100,7 +31172,7 @@
         ctx.fillRect(bx,by,boxW,boxH);
         ctx.strokeStyle=knapp?"#fff":"rgba(255,255,255,.4)"; ctx.lineWidth=1.4;
         ctx.strokeRect(bx,by,boxW,boxH);
-        ctx.font="700 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(255,255,255,.78)";
+        ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(255,255,255,.78)";
         ctx.fillText("ZEITLIMIT",bx+boxW/2,by+12);
         ctx.font="800 19px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#fff";
         ctx.fillText(mm+":"+String(ss).padStart(2,"0"),bx+boxW/2,by+31);
@@ -31109,9 +31181,9 @@
         // als inaktiv erkennbar, statt eine Zeit zu behaupten, die es nicht gibt.
         ctx.fillStyle="rgba(17,24,35,.6)"; ctx.fillRect(bx,by,boxW,boxH);
         ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1; ctx.strokeRect(bx,by,boxW,boxH);
-        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.6)";
+        ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(230,225,210,.6)";
         ctx.fillText("ZEITLIMIT",bx+boxW/2,by+16);
-        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="rgba(230,225,210,.5)";
+        ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.fillStyle="rgba(230,225,210,.5)";
         ctx.fillText("kein Limit",bx+boxW/2,by+29);
       }
       ctx.restore();
@@ -31220,7 +31292,7 @@
       ctx.fillRect(OVAL_CX-3.5,yA+i*kh,7,kh+0.5);
     }
     ctx.fillStyle="rgba(255,255,255,.85)";
-    ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+    ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
     ctx.fillText("ZIEL",OVAL_CX,yI+11);
 
     // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3, Chris' "ohne Stats sehen, wer wen
@@ -32528,14 +32600,18 @@
       // "Stand" zeigte auf der Bahn den ZIELEINLAUF ("Ziel 3"). Bei gestaffeltem Start ist
       // das nicht der Rang (wer frueher losfaehrt, kommt frueher an) — dort steht deshalb
       // der Rang aus bahnRangliste, dieselbe Quelle wie HUD und Endstand.
+      // "NICHT IM ZIEL" STATT "LÄUFT"/"FÄHRT" NACH SPIELENDE (Broadcast-Audit Runde 2,
+      // Punkt 12, 30.09.): wer bei Schlusspfiff (`done`) weder im Ziel noch ausgeschieden
+      // ist, hat das Zeitlimit erreicht — die Tabelle zeigte ihn bis dahin unveraendert
+      // weiter "faehrt"/"laeuft", als liefe das Rennen noch.
       {id:"stand",kopf:"Stand", wert:z=>{
         if(z.u.raus)return "raus";
         if(BA().startAbstand){
-          if(z.u.fertig==null)return (z.u.startT||0)>rennT?"Rampe":"fährt";
+          if(z.u.fertig==null)return done?"nicht im Ziel":((z.u.startT||0)>rennT?"Rampe":"fährt");
           return "Rang "+(bahnRangliste().reihe.findIndex(x=>x.id===z.u.id)+1);
         }
-        return z.platz?"Ziel "+z.platz:"läuft";},
-        farbe:v=>v==="raus"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
+        return z.platz?"Ziel "+z.platz:(done?"nicht im Ziel":"läuft");},
+        farbe:v=>v==="raus"||v==="nicht im Ziel"?"var(--crit)":(v.startsWith&&(v.startsWith("Ziel")||v.startsWith("Rang")))?"var(--ok)":null},
       {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}];
     return {namen:"Läufer", zeilen, spalten,
       sortierung:(a,b)=>((bahnZeit(a.u)??99)-(bahnZeit(b.u)??99))||(b.u.pos-a.u.pos),
@@ -35771,11 +35847,11 @@
       // ZUSCHAUsekunden (s. bahnSpanneAnzeige). `u.vizRampe` schreibt ausschliesslich
       // stepZeitfahren; jede andere Bahn laesst es undefined und diese Zeile aus.
       if(u.vizRampe>0){
-        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+        ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
         ctx.strokeText(txt,x,y-19); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19);
-        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       }
       // TT-1: ZWISCHENZEIT-TAFEL (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Reine
       // Anzeige: `u.vizZzFlash` wird ausschliesslich in updateHudBahn() gesetzt (s. dort),
@@ -35786,14 +35862,14 @@
         const fz=u.vizZzFlash;
         const txt="ZZ"+(fz.ci+1)+" · "+(fz.neueBest?"BESTZEIT":(fz.rang+"."))+
           (fz.delta?(" · "+(fz.neueBest?"−":"+")+fmtDauer(Math.abs(fz.delta))):"");
-        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+        ctx.font="700 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         ctx.strokeText(txt,x,y-19);
         ctx.fillStyle=fz.neueBest?"#f2d75a":"#c0504a"; ctx.fillText(txt,x,y-19);
-        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       }
       ctx.textAlign="center";
-      ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
@@ -35806,22 +35882,22 @@
       // man in einem Feld aus zwoelf Laeufern SIEHT, welcher gerade umgestellt hat.
       if(u.fertig==null){
         const frisch=u.ansageBei!=null&&(rennT-u.ansageBei)<ANSAGE_NACHLEUCHTEN;
-        ctx.font=(frisch?"700 9px":"400 8px")+" 'IBM Plex Mono',monospace";
+        ctx.font=(frisch?"700 9px":"400 8px")+" 'Barlow Condensed',sans-serif";
         const pl=((BA().plaene)[u.plan]||{}).label||"";
         const zus=frisch?" ◂ neu":(u.leer?" · leer":(u.imSchatten?" · Sog":""));
         ctx.strokeText(pl+zus,x,y-40);
         ctx.fillStyle=frisch?ANSAGE_FARBE:(u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9"));
         ctx.fillText(pl+zus,x,y-40);
-        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       }
       // BURGPUNKTE AM LAEUFER (Teil B.6 des Plans): laufend waehrend des Rennens neben
       // der Figur, im Ziel zusammen mit Platz und Zeit — dieselbe Zahl, die jetzt auch
       // MOTOREN["takeshis-castle"].wert() liest (s. dort).
       if(BA().takeshi&&u.fertig==null){
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
-        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
-        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        ctx.textAlign="center"; ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       }
       // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
       // Ausgeschiedenen -- anders als fuer einen Finisher, s. Kommentar am Platz-Etikett
@@ -35829,9 +35905,9 @@
       // gedimmt/entsaettigt, s. oben). Eigener, kurzer Hinweis statt des Burgpunkte-Labels
       // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
       if(raus){
-        ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
+        ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="left";
         ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
-        ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+        ctx.textAlign="center"; ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
       // Finisher waeren zwoelf Zeilen "Platz n · Zeit · ★" uebereinander auf dem Pflaster,
@@ -35869,11 +35945,11 @@
       ctx.font="700 11px 'Barlow Condensed',sans-serif";
       ctx.strokeText(zeile1,swp.x,swp.y-56); ctx.fillStyle=farbe; ctx.fillText(zeile1,swp.x,swp.y-56);
       if(zeile2){
-        ctx.font="600 9px 'IBM Plex Mono',monospace";
+        ctx.font="600 9px 'Barlow Condensed',sans-serif";
         ctx.strokeText(zeile2,swp.x,swp.y-44);
         ctx.fillStyle=sw.verpatzt?"#e0685f":"#8795A9"; ctx.fillText(zeile2,swp.x,swp.y-44);
       }
-      ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
     }
     // TT-3: GEISTERFAHRER (Abschnitt 2.3, "die Schwimm-Weltrekordlinie aus Runde 2,
     // uebersetzt ins Zeitfahren"). Auf der Spur des FOKUSSIERTEN Fahrers erscheint eine
@@ -35895,10 +35971,10 @@
           ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx,gy+20); ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle="#f2d75a"; ctx.beginPath(); ctx.moveTo(gx,gy-24); ctx.lineTo(gx-4,gy-30); ctx.lineTo(gx+4,gy-30); ctx.closePath(); ctx.fill();
-          ctx.textAlign="center"; ctx.font="700 8px 'IBM Plex Mono',monospace";
+          ctx.textAlign="center"; ctx.font="700 8px 'Barlow Condensed',sans-serif";
           ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
           ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
-          ctx.restore(); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+          ctx.restore(); ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
         }
       }
     }
@@ -36023,8 +36099,8 @@
         // man auch im Band, WO das Feld zerlegt wurde") -- exklusiv Takeshi, jede andere
         // Bahn kennt kein `u.raus`.
         if(A.takeshi&&u.raus){
-          ctx.fillStyle="#8795A9"; ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
-          ctx.fillText("✕",x,by+3); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+          ctx.fillStyle="#8795A9"; ctx.font="700 8px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
+          ctx.fillText("✕",x,by+3); ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
           continue;
         }
         ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
@@ -36235,7 +36311,7 @@
       // Kommentar an labelSchwebeBoxen oben) — misst dieselbe Zeichenoperation, die ohnehin
       // schon laeuft, keine zweite Text-Vermessung.
       const schrift=(txt,dy,farbe,groesse)=>{
-        ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+        ctx.font="400 "+groesse+"px 'Barlow Condensed',sans-serif";
         ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
         ctx.strokeText(txt,x,y+dy);
         ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
@@ -37287,15 +37363,20 @@
     const txt=document.getElementById("fokustext");
     if(!txt)return; // Opus-Review-Fund (30.08.): gleicher Null-Guard wie bei `zeile` oben
     txt.textContent="";
+    // GEKUERZT, VOLLTEXT ALS TOOLTIP (Broadcast-Audit Runde 2, Punkt 15, 30.09.): die
+    // Bedienhinweiszeile stand vorher als voller Satz dauerhaft im Bild, groesser als die
+    // Tabellenschrift. Der Name/Zustand bleibt sichtbar, die Bedienungsanleitung wandert
+    // in `title` (native Tooltip bei Hover).
     if(u){
       txt.appendChild(el("i","fmarke"));
       txt.appendChild(document.createTextNode(manuell?"Fokus-Doppeln auf ":"Automatisches Fokus-Doppeln auf "));
       txt.appendChild(el("b",null,u.n));
-      txt.appendChild(document.createTextNode(manuell
-        ?" — die Hilfsverteidigung geht bevorzugt auf ihn."
-        :" — stärkster Gegenspieler, automatisch vorgegeben; anklicken übernimmt die Wahl manuell."));
+      txt.title=manuell
+        ?"Die Hilfsverteidigung geht bevorzugt auf ihn. Anklicken hebt die Ansage auf."
+        :"Stärkster Gegenspieler, automatisch vorgegeben; anklicken übernimmt die Wahl manuell.";
     } else {
-      txt.appendChild(document.createTextNode("Kein Fokus. Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen."));
+      txt.appendChild(document.createTextNode("Kein Fokus"));
+      txt.title="Gegnerischen Spieler auf dem Feld oder in der Kaderleiste anklicken, um ihn doppeln zu lassen.";
     }
     const weg=document.getElementById("fokusweg");
     if(weg)weg.hidden=!u;
@@ -37422,10 +37503,11 @@
     // Aus Textknoten zusammengesetzt statt per innerHTML: die Namen kommen aus dem
     // Spielstand und duerfen nie als Markup ankommen (dieselbe Regel wie bei der
     // Fokuszeile daneben).
-    txt.textContent=""; knoepfe.textContent="";
+    // GEKUERZT, VOLLTEXT ALS TOOLTIP (Broadcast-Audit Runde 2, Punkt 15, 30.09.).
+    txt.textContent=""; txt.title=""; knoepfe.textContent="";
     if(!u){
-      txt.appendChild(document.createTextNode(
-        "Rennplan-Ansage — eigenen Läufer auf der Bahn oder in der Kaderleiste anklicken."));
+      txt.appendChild(document.createTextNode("Rennplan-Ansage"));
+      txt.title="Eigenen Läufer auf der Bahn oder in der Kaderleiste anklicken.";
       if(zu)zu.hidden=true;
       return;
     }
@@ -37837,18 +37919,24 @@
     if(!txt)return;
     // Aus Textknoten zusammengesetzt statt innerHTML: der Name kommt aus dem Spielstand
     // und darf nie als Markup ankommen.
-    txt.textContent="";
+    // GEKUERZT, VOLLTEXT ALS TOOLTIP (Broadcast-Audit Runde 2, Punkt 15, 30.09.): die
+    // Regel-Erklaerung ("Wer sich dafür aus einem Nahkampf löst …" bzw. die
+    // Bedienanleitung im leeren Zustand) wandert in `title`.
+    txt.textContent=""; txt.title="";
     if(z){
       const folgen=U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length;
       txt.appendChild(el("i","fmarke"));
       txt.appendChild(document.createTextNode("Zielansage auf "));
       txt.appendChild(el("b",null,z.n));
-      txt.appendChild(document.createTextNode(" — "+folgen+" von "+live(0).length+
-        " folgen dem Ruf. Wer sich dafür aus einem Nahkampf löst, kassiert den Trennschlag."));
+      txt.appendChild(document.createTextNode(" — "+folgen+" von "+live(0).length+" folgen"));
+      txt.title="Wer sich dafür aus einem Nahkampf löst, kassiert den Trennschlag.";
     } else {
       txt.appendChild(document.createTextNode(KFOKUS_CD>0
-        ? "Keine Ansage. Die nächste ist in "+Math.ceil(KFOKUS_CD)+" s wieder möglich."
-        : "Keine Ansage. Gegner auf dem Feld oder in der Kaderleiste anklicken — die Eigenen nehmen ihn dann bevorzugt aufs Korn."));
+        ? "Keine Ansage — "+Math.ceil(KFOKUS_CD)+" s"
+        : "Keine Ansage"));
+      txt.title=KFOKUS_CD>0
+        ? "Die nächste Ansage ist in "+Math.ceil(KFOKUS_CD)+" s wieder möglich."
+        : "Gegner auf dem Feld oder in der Kaderleiste anklicken — die Eigenen nehmen ihn dann bevorzugt aufs Korn.";
     }
     if(weg)weg.hidden=!z;
     if(uhr){
@@ -38218,7 +38306,10 @@
     }
     const m=document.getElementById("kmitte");
     if(m)m.textContent=istBahn(disc)
-      ? bahnTeamstand().seiten.join(" : ")
+      // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `.join(" : ")` rief
+      // bei Takeshi (Burgpunkte, Dezimalwerte) den rohen JS-Zahlenstring mit Punkt auf
+      // ("40.1 : 22.7") statt des Komma-Formats, das `bahnTeamstand().fmt` dafuer schon hat.
+      ? (()=>{const st=bahnTeamstand(); return st.seiten.map(v=>st.fmt?st.fmt(v):v).join(" : ");})()
       : (istBuehne(disc)&&BB().duell)
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
       // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
@@ -38421,10 +38512,14 @@
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
+    // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, 30.09.): dieselbe Formatierung
+    // wie in updateHudBahn() — ohne sie zeigte die Sieger-Zeile bei Takeshi rohe
+    // Dezimalwerte mit Punkt.
+    const fmtSeite=(v)=>stand.fmt?stand.fmt(v):v;
     document.getElementById("esieger").textContent=(stand.gewertet
       ? (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
-        +" — "+pL+" : "+pR+" "+stand.suffix
-      : "Rennen beendet — "+pL+" : "+pR+" "+stand.suffix+" · noch keine Wertung")
+        +" — "+fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix
+      : "Rennen beendet — "+fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix+" · noch keine Wertung")
       +(stand.zusatz?" ("+stand.zusatz+")":"");
     setzeEsiegerKlasse(stand.gewertet&&pL!==pR?(pL>pR?0:1):null);
     // ZEILENFOLGE NACH PUNKTEN, wo es Punkte gibt (Prototyp 06.09.): bei "rang" ist das
@@ -38845,14 +38940,26 @@
     // Gating, keine Aenderung an running/stepSim/rr() selbst.
     aktualisiereTdmNotizen();
     document.getElementById("feed").textContent="";
-    document.getElementById("play").textContent="Kampf starten";
+    // STARTKNOPF JE CHASSIS (Broadcast-Audit Runde 2, Punkt 12, 30.09.): vorher ueberall
+    // "Kampf starten", auch dort, wo niemand kaempft (Wettessen, Schach, Eiskunstlauf …).
+    // Nur die drei echten Kampf-Disziplinen (tdm/mini-dm/battlefield) behalten den Namen,
+    // der bei ihnen stimmt.
+    document.getElementById("play").textContent=
+      istFeldspiel(disc)?"Anpfiff"
+      :istBahn(disc)?"Start"
+      :istBuehne(disc)?"Auftakt"
+      :"Kampf starten";
     document.getElementById("arenaDisc").textContent=istMdffa
       ?(DISCS[disc]?DISCS[disc].label:disc)+" · 4-Team-FFA"
       :(DISCS[disc]?DISCS[disc].label:disc)+" · "+
       (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
                     :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
-    feed(0,"Aufstellung steht. Befehle sind gesetzt.");
+    // OHNE "BEFEHLE" (Broadcast-Audit Runde 2, Punkt 12): die alte Zeile "Befehle sind
+    // gesetzt" unterstellte allen zwanzig Disziplinen ein Kommandosystem, das nur die
+    // drei Kampf-Disziplinen wirklich haben — bei Wettessen, Schach & Co. gibt es keine
+    // Befehle, nur eine Aufstellung.
+    feed(0,"Aufstellung steht.");
     istBahn(disc)?updateHudBahn():istBuehne(disc)?updateHudBuehne()
       :istFeldspiel(disc)?updateHudFeldspiel():updateHud();
     draw();renderKader();
