@@ -2,7 +2,14 @@
 <title>Battle Mode Taktikbrett</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- Gewichte 800/900 dazu (Broadcast-Audit Runde 2, Punkt 24, 30.09.): der Canvas
+     zeichnet an vielen Stellen "800"/"900" fuer Wucht-/Crit-/Sieger-Text -- vorher nur
+     bei IBM Plex Mono (400/500/600 geladen, 700/800/900 im Canvas ohnehin schon ein
+     stiller Fallback) unbemerkt, weil Canvas-Text nie fehlschlaegt, nur ein anderes
+     Gewicht als angefordert zeigt. Jetzt, wo derselbe Canvas-Text auf Barlow Condensed
+     umgestellt ist (s. dortige `ctx.font`-Aufrufe), sonst derselbe stille Unterschied
+     nur in der Schrift, die auch die Chrome ausserhalb des Canvas traegt. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="battle-mode.css">
 
 <div class="oly-battle-arena">
@@ -335,7 +342,13 @@
               <div class="tbl-wrap"><table class="wtbl"><thead><tr id="wkopfR"></tr></thead><tbody id="wbodyR"></tbody></table></div>
             </div>
           </div>
-          <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          <!-- EINKLAPPBAR (Broadcast-Audit Runde 2, Punkt 15, 30.09.): die Spalten-
+               Fussnote stand vorher dauerhaft ausgeschrieben unter der Live-Tabelle.
+               renderWertungTabelle() setzt weiterhin nur #wfuss.textContent — das
+               <details>-Element drumherum aendert daran nichts. -->
+          <details class="wfussbox"><summary>Spalten-Erklärung</summary>
+            <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          </details>
         </div>
       </div>
     </div>
