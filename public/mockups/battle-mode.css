@@ -55,6 +55,16 @@
   .oly-battle-arena.oly-battle-arena.im-spiel h1,
   .oly-battle-arena.oly-battle-arena.im-spiel #ledeKader{display:none}
   .oly-battle-arena.oly-battle-arena.im-spiel .tabs{margin-top:4px}
+  /* ENTWICKLERTEXT RAUS DEM SENDUNGSBILD (Broadcast-Audit Runde 2, Punkt 15, 30.09.;
+     Review-Nachtrag 30.09.): "Simulation deterministisch — gleiche Aufstellung, gleicher
+     Verlauf" ist eine Aussage ueber die Engine, keine Sendungsinformation — im
+     Standalone-Mockup (ohne .im-spiel) bleibt sie sichtbar, im Spiel selbst (.im-spiel,
+     s. Host oben) nicht. NUR IN #p2 (Arena): ".fbar .honest" gibt es auch im
+     Aufstellungs-Tab (#p1, "Spieler anklicken, dann Reihe anklicken") und im
+     Spielerprofil-Tab (#p3, "Laufbahn-Zahlen sind Beispiele …") — echte, im
+     Produktionsmodus laut FoundationBattleArenaHost.tsx weiter aktive Bedienhinweise,
+     die eine ungezielte Regel mitloescht. Der erste Entwurf traf alle drei Tabs. */
+  .oly-battle-arena.oly-battle-arena.im-spiel #p2 .fbar .honest{display:none}
 
   /* Die drei Reiter-Abschnitte heissen .panel — im Foundation-Shell traegt dieselbe
      Klasse Karten-Styling (Verlauf, Radius 24, Schatten, Einschwebe-Animation), das
@@ -208,6 +218,13 @@
   .oly-battle-arena.oly-battle-arena .planzeile{display:flex;gap:10px;align-items:baseline;padding:7px 12px;
     border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--muted,#93A2B8);line-height:1.5}
   .oly-battle-arena.oly-battle-arena .planzeile b{color:var(--warn,#E2A84A);white-space:nowrap;letter-spacing:.02em}
+  /* AUF EINE ZEILE GEKUERZT (Broadcast-Audit Runde 2, Punkt 15, 30.09.): "Plan der KI"/
+     "Rennpläne" liefen bei laengerem Text (z.B. mehreren Bahn-Rennplaenen mit "·"
+     aneinandergereiht) auf eine zweite Zeile um und wurden so zum Fliesstext-Absatz.
+     Erzwungen einzeilig mit Abschneiden statt Umbruch; der volle Text bleibt als
+     natives Tooltip (`title`, s. renderOpp()) beim Hover erreichbar. */
+  .oly-battle-arena.oly-battle-arena .planzeile #arenaplan{overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .oly-battle-arena.oly-battle-arena .prozente{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 2px}
   .oly-battle-arena.oly-battle-arena .prozente .pz{display:flex;flex-direction:column;gap:1px;background:var(--surface-2);
     border:1px solid var(--line-soft,#232B38);border-radius:5px;padding:3px 6px;cursor:help;font-style:normal}
@@ -505,8 +522,8 @@
   .oly-battle-arena.oly-battle-arena .kk.fokus{border-color:var(--fokus);box-shadow:0 0 0 2px color-mix(in srgb,var(--fokus) 45%,transparent)}
   .oly-battle-arena.oly-battle-arena .kk.fokus b{color:var(--fokus)}
   .oly-battle-arena.oly-battle-arena .fokuszeile{display:flex;gap:10px;align-items:center;justify-content:flex-end;
-    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
-    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+    padding:5px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 10px/1.3 var(--sans,inherit);color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .fokuszeile[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .fokuszeile b{color:var(--fokus)}
   .oly-battle-arena.oly-battle-arena .fokuszeile .fmarke{display:inline-block;width:9px;height:9px;border-radius:50%;
@@ -527,8 +544,8 @@
     box-shadow:0 0 0 2px color-mix(in srgb,var(--ansage) 45%,transparent)}
   .oly-battle-arena.oly-battle-arena .kk.rennplan-ansage b{color:var(--ansage)}
   .oly-battle-arena.oly-battle-arena .rennplanzeile{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-    padding:6px 10px;background:var(--sunk);border-top:1px solid var(--line);
-    font:600 11px/1.3 var(--sans,inherit);color:var(--muted)}
+    padding:5px 10px;background:var(--sunk);border-top:1px solid var(--line);
+    font:600 10px/1.3 var(--sans,inherit);color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .rennplanzeile[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .rennplanzeile b{color:var(--ansage)}
   .oly-battle-arena.oly-battle-arena .rennplanzeile .amarke{display:inline-block;width:9px;height:9px;border-radius:50%;
@@ -1176,8 +1193,27 @@
   .oly-battle-arena.oly-battle-arena .wtbl tr.gegner td:first-child{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .wtbl tr.raus{opacity:.45}
   .oly-battle-arena.oly-battle-arena .wtbl td.top{color:var(--ink);font-weight:600}
-  .oly-battle-arena.oly-battle-arena .wfuss{margin-top:7px;font-size:10.5px;color:var(--muted);line-height:1.45}
+  .oly-battle-arena.oly-battle-arena .wfuss{margin-top:4px;font-size:10.5px;color:var(--muted);line-height:1.45}
   .oly-battle-arena.oly-battle-arena .wfuss strong{color:var(--ink)}
+  /* EINKLAPPBARE FUSSNOTE (Broadcast-Audit Runde 2, Punkt 15, 30.09.): zu statt eines
+     dauerhaft ausgeschriebenen Absatzes nur eine (i)-Zeile, die sich per <summary>
+     oeffnet — geschlossener Default, kein eigener JS-Zustand noetig. */
+  .oly-battle-arena.oly-battle-arena .wfussbox{margin-top:7px}
+  .oly-battle-arena.oly-battle-arena .wfussbox summary{font-size:10.5px;color:var(--faint);
+    cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px;user-select:none}
+  .oly-battle-arena.oly-battle-arena .wfussbox summary::-webkit-details-marker{display:none}
+  .oly-battle-arena.oly-battle-arena .wfussbox summary::before{content:"ⓘ";font-size:11px}
+  .oly-battle-arena.oly-battle-arena .wfussbox[open] summary{color:var(--muted);margin-bottom:2px}
+  /* LEIST/EIG NUR LIVE AUSGEBLENDET (Broadcast-Audit Runde 2, Punkt 15, 30.09.): beides
+     ist Entwicklerinformation waehrend des laufenden Spiels (Leistung ist erst nach dem
+     Spiel aussagekraeftig, Eignung ist die interne Erwartung). Betrifft NUR #wertungBox
+     (.wertung, die Live-Tabelle unter dem Canvas) -- der Endstand baut seine eigene
+     #etafelL/#etafelR-Tabelle (renderEndstand/-Buehne/-Bahn/-Feldspiel) und behaelt
+     beide Spalten, wie Punkt 15 es verlangt. */
+  .oly-battle-arena.oly-battle-arena .wertung th[data-col="leist"],
+  .oly-battle-arena.oly-battle-arena .wertung th[data-col="eig"],
+  .oly-battle-arena.oly-battle-arena .wertung td[data-col="leist"],
+  .oly-battle-arena.oly-battle-arena .wertung td[data-col="eig"]{display:none}
   /* DISZIPLIN-AKZENTFARBE (Broadcast-Optik-Audit, Punkt 9, 28.09., erweitert Runde 2,
      Punkt 25, 30.09.): Chris' Befund war, dass die laufende Wertung bei allen zwanzig
      Disziplinen optisch identisch aussieht -- nur die Spaltenkoepfe wechseln (Fechten =
