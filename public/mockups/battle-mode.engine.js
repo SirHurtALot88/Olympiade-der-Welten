@@ -38447,32 +38447,50 @@
   // DREI SCHRITTE, ALLE REINE FILTERUNG UEBER VORHANDENE HIGHLIGHTS[]-EINTRAEGE, KEIN
   // NEUER SIM-ZUSTAND:
   // 1) "0:00 uebernimmt die Fuehrung" ist die Startaufstellung, keine echte Fuehrung --
-  //    raus, in jedem Chassis.
+  //    raus, in jedem Chassis. `h.t` ist `anzeigeT` (rennT*zeitFaktor(), ein Float) --
+  //    "0:00" ist nur die AUF DIE SEKUNDE GERUNDETE Anzeige (Math.floor beim Rendern), der
+  //    gespeicherte Wert liegt praktisch nie exakt bei 0. Re-Review-Fund (30.09., live auf
+  //    Spurt/Climbing reproduziert): eine strikte `h.t===0`-Pruefung traf deshalb NIE, die
+  //    Zeile blieb ungefiltert stehen. `h.t<1` faengt jeden Wert, der als "0:00" angezeigt
+  //    wird, ohne ein spaeteres, echtes Ereignis in der ersten Sekunde zu verlieren --
+  //    "uebernimmt die Fuehrung" aus der Startaufstellung ist ohnehin nur bei t=0 moeglich.
   // 2) Wortgleiche Routine-Ereignisse (derselbe Text bis auf Zahlen) hoechstens zweimal
   //    zeigen -- der Rest ist Wiederholung, kein neuer Hoehepunkt. Eine Signatur ohne
   //    Ziffern faengt genau die drei Audit-Beispiele: "Gram — stolpert" x10, "Krolach —
   //    schlingt durch (107 Punkte, Durchgang 4/10)" x4, "3. Versuch ... gültig" wird bei
   //    unterschiedlicher Versuchsnummer NICHT zusammengefasst (die Zahl "3." ist Teil der
   //    Signatur-Ziffern, aber der Rest des Satzes bleibt gleich) -- bewusst grosszuegig:
-  //    lieber zwei Belege zu viel als ein echter Wendepunkt zu wenig.
+  //    lieber zwei Belege zu viel als ein echter Wendepunkt zu wenig. BEHALTEN WERDEN DIE
+  //    LETZTEN ZWEI Vorkommen je Signatur, nicht die ersten (Re-Review-Fund 30.09., live auf
+  //    Wettessen reproduziert: ein chronologisches `n<=2` beim Vorwaertszaehlen behielt die
+  //    FRUEHESTEN zwei Durchgaenge und warf die beiden Schlussrunden-Ereignisse weg --
+  //    genau umgekehrt zum Ziel "die spaeteren, entscheidenden Momente zeigen"). Deshalb
+  //    rueckwaerts durch die chronologische Liste zaehlen und die am Ende getroffene Auswahl
+  //    wieder in Original-Reihenfolge filtern.
   // 3) Deckel bei acht Chips (Punkt 11 nennt "6-8"): die SPAETESTEN Ereignisse gewinnen,
   //    nicht die fruehesten -- genau umgekehrt zur alten chronologischen Liste, die von den
   //    ersten Sekunden zugestopft wurde, waehrend der Spielausgang unten haengen blieb. Wo
   //    das immer noch kuerzt, zeigt ein SICHTBARER Hinweis "+N weitere", statt still
-  //    abzuschneiden (Auftrag: "statt stillschweigend abzuschneiden").
+  //    abzuschneiden (Auftrag: "statt stillschweigend abzuschneiden") -- der Zaehler dahinter
+  //    zaehlt JEDEN wirklich verworfenen Eintrag (Dedup-Schritt 2 UND Deckel-Schritt 3
+  //    zusammen), nicht nur den Deckel allein (derselbe Re-Review-Fund: sonst verschwinden
+  //    per Dedup verworfene Ereignisse spurlos, ohne dass der Hinweis sie mitzaehlt).
   function kuratiereHighlights(liste){
-    let gefiltert=liste.filter(h=>!(h.t===0&&/übernimmt die Führung/.test(h.txt)));
+    let gefiltert=liste.filter(h=>!(h.t<1&&/übernimmt die Führung/.test(h.txt)));
     const zaehlerJeSignatur=new Map();
-    gefiltert=gefiltert.filter(h=>{
-      const sig=h.txt.replace(/\d+([.,]\d+)?/g,"#");
+    const behalten=new Array(gefiltert.length).fill(false);
+    for(let i=gefiltert.length-1;i>=0;i--){
+      const sig=gefiltert[i].txt.replace(/\d+([.,]\d+)?/g,"#");
       const n=(zaehlerJeSignatur.get(sig)||0)+1;
       zaehlerJeSignatur.set(sig,n);
-      return n<=2;
-    });
+      if(n<=2)behalten[i]=true;
+    }
+    const dedupVerworfen=behalten.filter(b=>!b).length;
+    gefiltert=gefiltert.filter((h,i)=>behalten[i]);
     const MAX_CHIPS=8;
     const abgeschnitten=gefiltert.length>MAX_CHIPS;
     const sichtbar=abgeschnitten?gefiltert.slice(-MAX_CHIPS):gefiltert;
-    return {sichtbar,verborgen:gefiltert.length-sichtbar.length};
+    return {sichtbar,verborgen:dedupVerworfen+(gefiltert.length-sichtbar.length)};
   }
   function renderHighlights(){
     const box=document.getElementById("ehighlights");
