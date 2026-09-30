@@ -19363,10 +19363,12 @@
     return arg;
   }
   // TEAMBANK fuer Disziplinen ohne sichtbares Publikum. liste: TEILNEHMER-Objekte; rect:
-  // {x0,x1,fussY}; skala ~0,6; extraDy: zusaetzlicher Versatz (z.B. das Klatschen beim Antritt
-  // des eigenen Hebers). Muster exakt wie der Breaking-Zuschauerring (Fussschatten-Ellipse,
-  // Skalierung um den Fusspunkt). zeichneSprite() OHNE viertes Argument -- mit feldspiel=true
-  // haenge bei Gewichtheben an jeder Bankfigur eine Hantel.
+  // {x0,x1,fussY}; skala kommt vom Aufrufer (Gewichtheben: HEBEN_BANK_SKALA=0,8 -- 0,62 aus
+  // dem Konzept war auf der ~0,77-fach verkleinerten Leinwand kaum zu erkennen); extraDy:
+  // zusaetzlicher Versatz (z.B. das Klatschen beim Antritt des eigenen Hebers). Muster exakt
+  // wie der Breaking-Zuschauerring (Fussschatten-Ellipse, Skalierung um den Fusspunkt).
+  // zeichneSprite() OHNE viertes Argument -- mit feldspiel=true haenge bei Gewichtheben an
+  // jeder Bankfigur eine Hantel.
   function zeichneTeambank(liste,seite,rect,skala,extraDy){
     const c=seite===0?FEIER_FARBE.home:FEIER_FARBE.away;
     liste.forEach((u,i)=>{
@@ -19375,8 +19377,8 @@
       ctx.fillStyle=c; ctx.globalAlpha=0.18;
       ctx.beginPath(); ctx.ellipse(x,fussY,11,4,0,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
       // Der Huepfer in BILDSCHIRM-Pixeln (vor der Skalierung), damit die Amplituden aus
-      // TEAM_FEIER_STUFEN auch bei Skala 0,62 so hoch ausfallen wie angegeben; der Schatten
-      // bleibt am Boden -- genau das macht den Sprung lesbar.
+      // TEAM_FEIER_STUFEN unabhaengig von `skala` so hoch ausfallen wie angegeben; der
+      // Schatten bleibt am Boden -- genau das macht den Sprung lesbar.
       ctx.save();
       ctx.translate(x,fussY+dy); ctx.scale(skala,skala); ctx.translate(-x,-fussY);
       zeichneSprite(ctx,teamFeierSpriteArg(u,h),x,fussY-19); // 19 = Fuss-Versatz wie in zeichneBreaking
