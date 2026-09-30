@@ -66,6 +66,16 @@
 
   <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
     <div class="frame">
+      <!-- ARENAHAUPT (Broadcast-Audit Runde 2, Punkt 16, 30.09.): reine Gruppierungs-Huelle
+           um alles, was bisher als lose Geschwister-Kette VOR .untenraum stand (Kopfzeile,
+           Scoreline, Leinwand, Kaderleiste, Bedienzeile) -- keine der IDs darin aendert sich,
+           kein Skript liest ihre bisherige Geschwister-Position, s. Grep-Beleg in der
+           PR-Beschreibung. Der einzige Zweck ist, dass battle-mode.css ab einer Mindestbreite
+           EIN Element (statt zehn einzelner Geschwister) einer Grid-Spalte zuweisen kann,
+           damit .untenraum (Ticker+Tabelle) DANEBEN statt darunter steht -- s.
+           .oly-battle-arena .frame Kommentar dort. Unterhalb 900px bleibt die Kette exakt so
+           gestapelt wie vorher (kein Grid, .arenaHaupt zeichnet sich nicht ab). -->
+      <div class="arenaHaupt">
       <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
@@ -298,6 +308,7 @@
         <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
           style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">
       </div>
+      </div><!-- /.arenaHaupt -->
       <div class="untenraum">
         <div class="feed" id="feed"></div>
         <!-- id="wertungBox" (Broadcast-Optik-Audit, Punkt 9, 28.09.): reiner CSS-Hook fuer

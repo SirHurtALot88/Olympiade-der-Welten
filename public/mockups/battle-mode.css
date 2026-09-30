@@ -770,8 +770,25 @@
     border-radius:6px;padding:4px 13px;color:var(--warn);font-weight:700;
     font-size:clamp(13px,1.35vw,18px);font-variant-numeric:tabular-nums;
     white-space:nowrap;align-self:flex-start;flex:none;text-align:center;
-    transition:box-shadow .15s ease}
+    /* WERTUNGS-AKZENT AM SCORE-BUG (Broadcast-Audit Runde 2, Punkt 25, 30.09.): derselbe
+       `--wakzent` wie an der Wertungstabelle (s. Kommentar dort), hier als 2px-Rahmen am
+       auffaelligsten Element des Bildes -- der Score-Bug steht die ganze Sendezeit ueber
+       der Leinwand. `transparent` ausserhalb der Arena (kein #p2-Vorfahre mit data-disc,
+       z.B. im Standalone-Entwurf vor dem ersten Frame) statt eines sichtbaren Default-Randes. */
+    border:2px solid var(--wakzent, transparent);
+    transition:box-shadow .15s ease,border-color .15s ease}
   .oly-battle-arena.oly-battle-arena .bbugmitte:empty{display:none}
+  /* EISKUNSTLAUF-BUG-MITTELKASTEN IM HELLEN THEME (Broadcast-Audit Runde 2, Punkt 27,
+     30.09.): der Audit vermutete eine fehlende `[data-theme="light"]`-Regel, die nur
+     diesem einen Kasten den Hintergrund verweigert. Die Regel oben (`.bbugmitte{background:
+     rgba(...)}`) gilt zwar unbedingt, ohne Theme-Gate, und Nachmessen (Playwright, helles
+     UND per `[data-theme="light"]` erzwungenes Theme, HEAD wie in dieser PR, ueber ein
+     ganzes Eiskunstlauf-Spiel alle 2s abgetastet) fand die Box durchgehend mit Hintergrund
+     -- der genaue Reproduktionsschritt blieb offen. Diese explizite Regel ist deshalb eine
+     Absicherung, keine Korrektur eines nachgewiesenen Bugs: sie macht den Hintergrund im
+     hellen Theme unabhaengig von der Grundregel oben nochmal ausdruecklich fest, damit eine
+     `[data-theme="light"]`-Regel für GENAU diesen Kasten existiert, wie der Audit es verlangt. */
+  .oly-battle-arena.oly-battle-arena[data-theme="light"] .bbugmitte{background:rgba(17,24,35,.82)}
   /* KONTRASTKORREKTUR SCORE/UHR (Broadcast-Optik-Nachaudit 28.09., Befund 3): der
      generische Score-Bug las sich bei 1920px wie zwei flache Farbbalken ohne lesbaren
      Text -- fester 12px-Text blieb bei jeder Leinwandbreite gleich klein. Score UND
@@ -1036,7 +1053,15 @@
   .oly-battle-arena.oly-battle-arena .eteam .eplatzdiszi{margin:1px 0 0;font-size:clamp(9px,1.05vw,12px);color:#7fb8cf}
   .oly-battle-arena.oly-battle-arena .eteam .eplatzdiszi b{color:#7fb8cf}
   .oly-battle-arena.oly-battle-arena .egegen{text-align:center;color:#93a1b3}
-  .oly-battle-arena.oly-battle-arena .egegen b{display:block;font-size:clamp(13px,1.9vw,22px);color:#eef3f9;letter-spacing:.06em}
+  .oly-battle-arena.oly-battle-arena .egegen b{display:block;font-size:clamp(13px,1.9vw,22px);color:#eef3f9;letter-spacing:.06em;
+    /* WERTUNGS-AKZENT IM EINLAUF (Broadcast-Audit Runde 2, Punkt 25, 30.09.): derselbe
+       `--wakzent` wie an Wertungstabelle/Score-Bug (s. Kommentar dort), hier als
+       Unterstreichung unter dem Disziplinnamen -- der erste Moment jeder Sendung, in dem
+       die Disziplinfarbe auffallen kann. `width:max-content`+`margin:0 auto` haelt den
+       Strich so breit wie den Namen selbst (statt der vollen Spaltenbreite), `em` bleibt
+       dank unveraendertem `display:block` auf der naechsten Zeile. */
+    width:max-content;max-width:100%;margin:0 auto 4px;padding:0 2px 3px;
+    border-bottom:3px solid var(--wakzent, transparent)}
   .oly-battle-arena.oly-battle-arena .egegen em{font-style:normal;font-size:clamp(9px,1.05vw,12px)}
   .oly-battle-arena.oly-battle-arena .eaufstellung{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,2vw,24px)}
   .oly-battle-arena.oly-battle-arena .eliste{display:flex;flex-direction:column;gap:3px}
@@ -1083,6 +1108,29 @@
      Team schon. */
   .oly-battle-arena.oly-battle-arena .untenraum{display:grid;grid-template-columns:340px 1fr;border-top:1px solid var(--line-soft)}
   @media (max-width:960px){.oly-battle-arena.oly-battle-arena .untenraum{grid-template-columns:1fr}}
+  /* KOMPAKTES SENDUNGSLAYOUT (Broadcast-Audit Runde 2, Punkt 16, 30.09.): das Arena-Panel
+     (Canvas+Bug+Kaderleiste in .arenaHaupt, davor/danach Kopf- und Bedienzeile) mass laut
+     DOM-Sonde je Disziplin 1098-1320px, bei nur 900px Viewporthoehe -- Ticker/Tabelle standen
+     IMMER darunter, nie neben Canvas+Kaderleiste sichtbar. `.arenaHaupt` (reine
+     Gruppierungs-Huelle, s. battle-mode.html) und `.untenraum` sind BEIDE direkte Kinder von
+     `.frame`; ab genug Breite legt ein zweispaltiges Grid sie NEBENEINANDER statt
+     untereinander, ohne die DOM-Reihenfolge oder eine einzige ID zu aendern. Zwei zusaetzliche
+     Effekte helfen mit: die Leinwand skaliert responsiv (canvas{width:100%}, `#cv`
+     1240x470-Seitenverhaeltnis) und wird in der schmaleren linken Spalte automatisch NIEDRIGER
+     -- misst nach dieser Aenderung erneut per DOM-Sonde (s. PR-Beschreibung fuer die Zahlen je
+     Disziplin). Unter 960px (schmales Fenster/Handy) bleibt die alte, gestapelte Reihenfolge
+     unveraendert (kein Grid greift), exakt wie beim .untenraum-Umbruch direkt darueber. */
+  @media (min-width:960px){
+    .oly-battle-arena.oly-battle-arena #p2 .frame{display:grid;grid-template-columns:minmax(0,1fr) 320px;align-items:start;column-gap:0}
+    .oly-battle-arena.oly-battle-arena #p2 .frame>.arenaHaupt{min-width:0}
+    /* Ueberschreibt die 340px/1fr-Zweispaltigkeit von .untenraum: in der 320px-Seitenspalte
+       ist dafuer kein Platz, Ticker und Tabelle stapeln sich hier stattdessen UNTEREINANDER
+       (dieselbe Umschaltung wie die <960px-Regel oben, nur aus einem anderen Grund). Die
+       hoehere Selektor-Spezifitaet (`#p2 .frame>`) gewinnt unabhaengig von der Regel-
+       Reihenfolge gegen die generische `.untenraum`-Regel weiter oben. */
+    .oly-battle-arena.oly-battle-arena #p2 .frame>.untenraum{grid-template-columns:1fr;
+      border-top:0;border-left:1px solid var(--line-soft)}
+  }
   .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
   .oly-battle-arena.oly-battle-arena .wertung{border-left:1px solid var(--line-soft);padding:9px 14px;height:210px;overflow-y:auto;display:flex;flex-direction:column;
     border-top:3px solid var(--wakzent, transparent)}
@@ -1100,6 +1148,28 @@
      rechten). overflow-x:auto haelt jede Tabelle in ihrer eigenen Spalte, mit
      eigenem horizontalen Scrollbalken statt Bluten in den Nachbarblock. */
   .oly-battle-arena.oly-battle-arena .wteam .tbl-wrap{overflow-x:auto}
+  /* SICHTBARER SCROLL-HINWEIS (Broadcast-Audit Runde 2, Punkt 20, 30.09.): `.tbl-wrap` konnte
+     schon immer horizontal scrollen (overflow-x:auto, s. Kommentar oben), aber nichts zeigte
+     das an -- bei vierzehn Spalten (Breaking) und den drei nachgezogenen Takeshi-Spalten
+     (s. WERTUNG_AUFTRITT/BAHN_ART.takeshi-Kommentare in battle-mode.engine.js) wirkte das
+     abgeschnittene Tabellenende wie ein Layoutfehler statt wie eine Einladung zu scrollen
+     (Audit Bild 14, DOM-Tabelle 6.3: 72px/25px horizontaler Ueberhang). Reines CSS, kein
+     JS-Overflow-Check noetig: der klassische Vier-Schicht-"Scroll-Schatten"-Trick (zwei
+     rechtsseitige Farbverlaeufe uebereinander, einer `background-attachment:local` (wandert
+     MIT dem Tabelleninhalt und deckt den zweiten Schatten ab, sobald man ganz nach rechts
+     gescrollt hat), der andere `scroll` (bleibt am rechten Rand des SICHTBAREN Ausschnitts
+     stehen) -- der Schatten ist also von selbst weg, sobald nichts mehr zu scrollen bleibt,
+     und erscheint von selbst wieder, sobald eine Spalte den sichtbaren Rand ueberragt. Reine
+     Anzeige: liest/aendert keine Spalte, Sortierung oder Zahl, nur `background-image` auf dem
+     ohnehin schon `overflow-x:auto`-Element. */
+  .oly-battle-arena.oly-battle-arena .wteam .tbl-wrap{
+    background-image:
+      linear-gradient(to left,var(--surface),var(--surface) 60%,transparent),
+      linear-gradient(to left,rgba(0,0,0,.4),transparent);
+    background-repeat:no-repeat;
+    background-size:26px 100%,14px 100%;
+    background-position:100% 0,100% 0;
+    background-attachment:local,scroll}
   .oly-battle-arena.oly-battle-arena .wteam{display:flex;flex-direction:column;min-width:0;overflow:hidden}
   .oly-battle-arena.oly-battle-arena .wteam:first-child{border-right:1px solid var(--line-soft);padding-right:16px}
   .oly-battle-arena.oly-battle-arena .wteamlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
@@ -1120,15 +1190,24 @@
   .oly-battle-arena.oly-battle-arena .wtbl td.top{color:var(--ink);font-weight:600}
   .oly-battle-arena.oly-battle-arena .wfuss{margin-top:7px;font-size:10.5px;color:var(--muted);line-height:1.45}
   .oly-battle-arena.oly-battle-arena .wfuss strong{color:var(--ink)}
-  /* DISZIPLIN-AKZENTFARBE DER WERTUNGSTABELLE (Broadcast-Optik-Audit, Punkt 9, 28.09.):
-     Chris' Befund war, dass die laufende Wertung bei allen zwanzig Disziplinen optisch
-     identisch aussieht -- nur die Spaltenkoepfe wechseln (Fechten = Hockey = Wettessen).
-     `--wakzent` ist EIN Custom-Property, das renderWertungTabelle() (battle-mode.engine.js)
-     ueber `#wertungBox`s data-disc-Attribut hereinreicht -- reiner Anzeige-Hook, keine
-     Spalten-/Sortier-/Zeilenlogik liest ihn. Angewendet wird er bewusst DEZENT (dichte
-     Broadcast-Tabelle, kein Farbfeuerwerk): ein 3px-Streifen oben an .wertung, der untere
-     Rahmen der th-Kopfzellen (s. .wtbl th oben) und die "laufend"-Klammer in .wtitel (s.
-     oben) -- kein Fluten der ganzen Tabelle.
+  /* DISZIPLIN-AKZENTFARBE (Broadcast-Optik-Audit, Punkt 9, 28.09., erweitert Runde 2,
+     Punkt 25, 30.09.): Chris' Befund war, dass die laufende Wertung bei allen zwanzig
+     Disziplinen optisch identisch aussieht -- nur die Spaltenkoepfe wechseln (Fechten =
+     Hockey = Wettessen). `--wakzent` ist EIN Custom-Property, das renderWertungTabelle()
+     (battle-mode.engine.js) ueber das data-disc-Attribut des ARENA-PANELS (`#p2`)
+     hereinreicht -- reiner Anzeige-Hook, keine Spalten-/Sortier-/Zeilenlogik liest ihn.
+     Weil `--wakzent` auf `#p2` selbst definiert wird, VERERBT es sich an jeden Nachfahren,
+     der es konsumiert: `.wertung` (Streifen oben, unterer Rahmen der th-Kopfzellen, die
+     "laufend"-Klammer in .wtitel, alle drei s. unten) genauso wie `#bbugMitte` (Score-Bug-
+     Rand) und `#edisz` (Einlauf-Disziplinname) weiter unten in dieser Datei -- Runde-2-
+     Befund war "korrekt gebaut, aber unsichtbar", ein einzelner 3px-Streifen an einer
+     Tabelle unten im Bild fiel beim Zuschauen nicht auf. DIESELBE Farbzuordnung wie am
+     28.09., keine neue Farblogik, nur eine hoehere Reichweite (Selektor `#p2[data-disc=...]`
+     statt `.wertung[data-disc=...]`) UND zwei weitere, auffaelligere Verbraucher. Angewendet
+     wird er weiterhin bewusst DEZENT (dichte Broadcast-Tabelle, kein Farbfeuerwerk): ein
+     3px-Streifen oben an .wertung, der untere Rahmen der th-Kopfzellen (s. .wtbl th oben),
+     die "laufend"-Klammer in .wtitel, ein 2px-Rahmen am Score-Bug und eine Unterstreichung
+     am Einlauf-Disziplinnamen -- kein Fluten der ganzen Flaeche.
      FARBWAHL: an der schon etablierten Boden-/Requisiten-Optik der jeweiligen Disziplin
      orientiert (bodenArena/bodenFeldspiel/bodenBuehne/bodenSpurt & ihre Spezialfaelle
      bodenHeben/bodenEis/bodenShowcase/bodenWettessen in battle-mode.engine.js) und danach
@@ -1145,72 +1224,72 @@
      hier UND im @media(dark)- UND im [data-theme="dark"]-Block unten einen eigenen, in
      beiden Themes gegen --surface kontrastreichen Wert (WCAG-Kontrast >=2.3:1 geprueft,
      die meisten deutlich darueber) -- s. CLAUDE.md, "JEDER neue Akzentfarbtoken...". */
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="tdm"]{--wakzent:#956437}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="mini-dm"]{--wakzent:#3E7A89}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="battlefield"]{--wakzent:#646F34}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="spurt"]{--wakzent:#954837}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="time-trial"]{--wakzent:#64346F}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="climbing"]{--wakzent:#897B3E}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="takeshis-castle"]{--wakzent:#953795}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="staffel"]{--wakzent:#5D1422}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="fechten"]{--wakzent:#37954A}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="gewichtheben"]{--wakzent:#953764}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="showcase"]{--wakzent:#893E7B}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="eiskunstlauf"]{--wakzent:#379595}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="breaking"]{--wakzent:#813737}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="wettessen"]{--wakzent:#959537}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="basketball"]{--wakzent:#317D31}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="football"]{--wakzent:#376095}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="hockey"]{--wakzent:#34586F}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="tennis"]{--wakzent:#603795}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="speed-schach"]{--wakzent:#31317D}
-  .oly-battle-arena.oly-battle-arena .wertung[data-disc="i-spy"]{--wakzent:#609537}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="tdm"]{--wakzent:#956437}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="mini-dm"]{--wakzent:#3E7A89}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="battlefield"]{--wakzent:#646F34}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="spurt"]{--wakzent:#954837}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="time-trial"]{--wakzent:#64346F}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="climbing"]{--wakzent:#897B3E}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="takeshis-castle"]{--wakzent:#953795}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="staffel"]{--wakzent:#5D1422}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="fechten"]{--wakzent:#37954A}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="gewichtheben"]{--wakzent:#953764}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="showcase"]{--wakzent:#893E7B}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="eiskunstlauf"]{--wakzent:#379595}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="breaking"]{--wakzent:#813737}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="wettessen"]{--wakzent:#959537}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="basketball"]{--wakzent:#317D31}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="football"]{--wakzent:#376095}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="hockey"]{--wakzent:#34586F}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="tennis"]{--wakzent:#603795}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="speed-schach"]{--wakzent:#31317D}
+  .oly-battle-arena.oly-battle-arena #p2[data-disc="i-spy"]{--wakzent:#609537}
   /* Dieselben zwanzig, angehoben fuer dunklen Grund -- exakt dieselbe S/L-Anhebung, die
      --home/--away/--ok/--crit/... oben im [data-theme="dark"]-Block schon bekommen (heller
      und etwas satter, damit sie gegen das dunkle --surface genauso tragen wie im Hellen
      gegen Weiss). Beide Dark-Wege (Betriebssystem-Praeferenz UND das vom Foundation-Shell
      erzwungene [data-theme="dark"]) bekommen dieselben Werte, wie es die drei bestehenden
      Faerbestellen oben im Kopf der Datei schon vormachen. */
-  @media (prefers-color-scheme:dark){.oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="tdm"]{--wakzent:#CF9C6E}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="mini-dm"]{--wakzent:#6CB4C6}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="battlefield"]{--wakzent:#ABBC5C}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="spurt"]{--wakzent:#CF7F6E}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="time-trial"]{--wakzent:#AB5CBC}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="climbing"]{--wakzent:#C6B56C}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="takeshis-castle"]{--wakzent:#CF6ECF}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="staffel"]{--wakzent:#C76B7D}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="fechten"]{--wakzent:#6ECF81}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="gewichtheben"]{--wakzent:#CF6E9C}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="showcase"]{--wakzent:#C66CB5}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="eiskunstlauf"]{--wakzent:#6ECFCF}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="breaking"]{--wakzent:#C56363}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="wettessen"]{--wakzent:#CFCF6E}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="basketball"]{--wakzent:#5DC65D}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="football"]{--wakzent:#6E98CF}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="hockey"]{--wakzent:#5C97BC}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="tennis"]{--wakzent:#986ECF}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="speed-schach"]{--wakzent:#5D5DC6}
-    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) .wertung[data-disc="i-spy"]{--wakzent:#98CF6E}}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="tdm"]{--wakzent:#CF9C6E}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="mini-dm"]{--wakzent:#6CB4C6}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="battlefield"]{--wakzent:#ABBC5C}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="spurt"]{--wakzent:#CF7F6E}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="time-trial"]{--wakzent:#AB5CBC}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="climbing"]{--wakzent:#C6B56C}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="takeshis-castle"]{--wakzent:#CF6ECF}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="staffel"]{--wakzent:#C76B7D}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="fechten"]{--wakzent:#6ECF81}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="gewichtheben"]{--wakzent:#CF6E9C}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="showcase"]{--wakzent:#C66CB5}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="eiskunstlauf"]{--wakzent:#6ECFCF}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="breaking"]{--wakzent:#C56363}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="wettessen"]{--wakzent:#CFCF6E}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="basketball"]{--wakzent:#5DC65D}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="football"]{--wakzent:#6E98CF}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="hockey"]{--wakzent:#5C97BC}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="tennis"]{--wakzent:#986ECF}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="speed-schach"]{--wakzent:#5D5DC6}
-  .oly-battle-arena.oly-battle-arena[data-theme="dark"] .wertung[data-disc="i-spy"]{--wakzent:#98CF6E}
+  @media (prefers-color-scheme:dark){.oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="tdm"]{--wakzent:#CF9C6E}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="mini-dm"]{--wakzent:#6CB4C6}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="battlefield"]{--wakzent:#ABBC5C}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="spurt"]{--wakzent:#CF7F6E}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="time-trial"]{--wakzent:#AB5CBC}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="climbing"]{--wakzent:#C6B56C}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="takeshis-castle"]{--wakzent:#CF6ECF}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="staffel"]{--wakzent:#C76B7D}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="fechten"]{--wakzent:#6ECF81}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="gewichtheben"]{--wakzent:#CF6E9C}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="showcase"]{--wakzent:#C66CB5}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="eiskunstlauf"]{--wakzent:#6ECFCF}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="breaking"]{--wakzent:#C56363}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="wettessen"]{--wakzent:#CFCF6E}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="basketball"]{--wakzent:#5DC65D}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="football"]{--wakzent:#6E98CF}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="hockey"]{--wakzent:#5C97BC}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="tennis"]{--wakzent:#986ECF}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="speed-schach"]{--wakzent:#5D5DC6}
+    .oly-battle-arena.oly-battle-arena:not([data-theme="light"]) #p2[data-disc="i-spy"]{--wakzent:#98CF6E}}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="tdm"]{--wakzent:#CF9C6E}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="mini-dm"]{--wakzent:#6CB4C6}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="battlefield"]{--wakzent:#ABBC5C}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="spurt"]{--wakzent:#CF7F6E}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="time-trial"]{--wakzent:#AB5CBC}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="climbing"]{--wakzent:#C6B56C}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="takeshis-castle"]{--wakzent:#CF6ECF}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="staffel"]{--wakzent:#C76B7D}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="fechten"]{--wakzent:#6ECF81}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="gewichtheben"]{--wakzent:#CF6E9C}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="showcase"]{--wakzent:#C66CB5}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="eiskunstlauf"]{--wakzent:#6ECFCF}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="breaking"]{--wakzent:#C56363}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="wettessen"]{--wakzent:#CFCF6E}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="basketball"]{--wakzent:#5DC65D}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="football"]{--wakzent:#6E98CF}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="hockey"]{--wakzent:#5C97BC}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="tennis"]{--wakzent:#986ECF}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="speed-schach"]{--wakzent:#5D5DC6}
+  .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="i-spy"]{--wakzent:#98CF6E}
   .oly-battle-arena.oly-battle-arena .feed div{display:flex;gap:9px}
   .oly-battle-arena.oly-battle-arena .feed .tk{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .feed .h{color:var(--home)}.oly-battle-arena.oly-battle-arena .feed .a{color:var(--away)}.oly-battle-arena.oly-battle-arena .feed .big{color:var(--ink);font-weight:500}
