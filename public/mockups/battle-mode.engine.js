@@ -19117,7 +19117,11 @@
       // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
       // Gesamt-Kilogramm beider Mannschaften (der Tiebreak aus Plan 3.5), damit die
       // Tabelle nicht an jedem dritten Spieltag ein Remis bekommt.
-      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      // ERST WENN BEIDE FERTIG SIND UND DAS URTEIL GEZEIGT IST (Konzept team-publikum-
+      // feiermomente Abschnitt 5, Nebenfund 1, s. hebenDuellEntschieden()) -- vorher zaehlte
+      // das Duell schon beim eigenen letzten Versuch des Siegers und lief der Lampe (und der
+      // Team-Feier) voraus.
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen&&hebenDuellEntschieden(u,true)).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
       // Ausgelagert in buehneDuellStandText() (Review-Fund PR #1083): dieselbe Funktion
@@ -39628,7 +39632,10 @@
     // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
     const art=BB();
     if(art.heben){
-      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
+      // Beide Duellanten fertig (hebenDuellEntschieden(), Konzept team-publikum-feiermomente
+      // Abschnitt 5) -- nach `done` ohnehin fuer jedes Duell erfuellt, der Endstand bleibt
+      // also derselbe; die Live-Anzeige in updateHudBuehne() wartet zusaetzlich auf die Lampe.
+      const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen&&hebenDuellEntschieden(u,false)).length;
       const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
     }
     if(art.duell){
