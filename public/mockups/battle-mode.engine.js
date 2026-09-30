@@ -35894,7 +35894,12 @@
       // der Figur, im Ziel zusammen mit Platz und Zeit — dieselbe Zahl, die jetzt auch
       // MOTOREN["takeshis-castle"].wert() liest (s. dort).
       if(BA().takeshi&&u.fertig==null){
-        const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
+        // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, Review-Nachtrag 30.09.):
+        // dieselbe Luecke wie beim f1()-Formatierer in bahnTeamstand() -- `.replace(/\.0$/,"")`
+        // kuerzt nur eine ueberfluessige ".0" bei Ganzzahlen, ersetzt den verbleibenden
+        // Punkt bei jedem Nicht-Ganzzahlwert aber nicht. Das lief laufend neben jeder
+        // Figur mit, war deshalb die am haeufigsten sichtbare der sechs Fundstellen.
+        const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"").replace(".",",");
         ctx.font="600 9px 'Barlow Condensed',sans-serif"; ctx.textAlign="left";
         ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
         ctx.textAlign="center"; ctx.font="400 9.5px 'Barlow Condensed',sans-serif";
@@ -35924,7 +35929,9 @@
       // Trial; jede andere Bahn bleibt bei ihrer alten "Platz n"-Zeile.
       if(u.fertig!=null&&!istRoute()){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
         :"Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
-        (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
+        // DEUTSCHES KOMMA (s. Kommentar am Burgpunkte-Etikett oben, dasselbe Muster hier
+        // am Zieleinlauf-Etikett).
+        (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,"").replace(".",","):"");
         ctx.strokeText(pt,x,y-19);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,y-19);}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.

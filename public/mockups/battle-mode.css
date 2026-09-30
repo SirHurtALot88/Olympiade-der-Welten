@@ -55,11 +55,16 @@
   .oly-battle-arena.oly-battle-arena.im-spiel h1,
   .oly-battle-arena.oly-battle-arena.im-spiel #ledeKader{display:none}
   .oly-battle-arena.oly-battle-arena.im-spiel .tabs{margin-top:4px}
-  /* ENTWICKLERTEXT RAUS DEM SENDUNGSBILD (Broadcast-Audit Runde 2, Punkt 15, 30.09.):
-     "Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf" ist eine
-     Aussage ueber die Engine, keine Sendungsinformation — im Standalone-Mockup (ohne
-     .im-spiel) bleibt sie sichtbar, im Spiel selbst (.im-spiel, s. Host oben) nicht. */
-  .oly-battle-arena.oly-battle-arena.im-spiel .fbar .honest{display:none}
+  /* ENTWICKLERTEXT RAUS DEM SENDUNGSBILD (Broadcast-Audit Runde 2, Punkt 15, 30.09.;
+     Review-Nachtrag 30.09.): "Simulation deterministisch — gleiche Aufstellung, gleicher
+     Verlauf" ist eine Aussage ueber die Engine, keine Sendungsinformation — im
+     Standalone-Mockup (ohne .im-spiel) bleibt sie sichtbar, im Spiel selbst (.im-spiel,
+     s. Host oben) nicht. NUR IN #p2 (Arena): ".fbar .honest" gibt es auch im
+     Aufstellungs-Tab (#p1, "Spieler anklicken, dann Reihe anklicken") und im
+     Spielerprofil-Tab (#p3, "Laufbahn-Zahlen sind Beispiele …") — echte, im
+     Produktionsmodus laut FoundationBattleArenaHost.tsx weiter aktive Bedienhinweise,
+     die eine ungezielte Regel mitloescht. Der erste Entwurf traf alle drei Tabs. */
+  .oly-battle-arena.oly-battle-arena.im-spiel #p2 .fbar .honest{display:none}
 
   /* Die drei Reiter-Abschnitte heissen .panel — im Foundation-Shell traegt dieselbe
      Klasse Karten-Styling (Verlauf, Radius 24, Schatten, Einschwebe-Animation), das
