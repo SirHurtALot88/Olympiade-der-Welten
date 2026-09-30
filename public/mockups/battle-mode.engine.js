@@ -18884,6 +18884,35 @@
     split.innerHTML=html;
   }
 
+  // EIN STAND, EINE FUNKTION (Review-Fund PR #1083, 30.09.): `#score`/der Score-Bug
+  // (updateHudBuehne() unten) und `#kmitte` (renderKader(), s. dort) zeigten fuer Fechten/
+  // Tennis/Speed-Schach VOR dieser Auslagerung zwei verschiedene Zahlen, sobald das Match
+  // noch lief -- `#score` schon die laufende Vorteils-Summe (Punkt 18, s. Kommentar unten),
+  // `#kmitte` weiterhin nur die abgeschlossenen Brettsiege (blieb bis kurz vor Schluss bei
+  // "0 : 0", genau der "Ein Stand pro Bildschirm"-Widerspruch, den PR #1082 fuer die anderen
+  // Chassis erst behoben hatte). EINE Funktion statt zwei Kopien derselben Logik, damit beide
+  // Stellen zwangslaeufig dieselbe Zahl lesen.
+  function buehneDuellStandText(){
+    // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
+    // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
+    // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+    const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+    const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+    // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
+    // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
+    // alle Bretter laufen parallel im selben Takt: fast keins ist fertig, bis fast alle es
+    // gleichzeitig kurz vor Schluss werden (Messanhang 6.3: "0 : 0" von Start bis Ende).
+    // `u.verlauf[u.aktuell]` ist dieselbe LAUFENDE Vorteilszahl, die die Canvas-Karte jedes
+    // Spielers schon zeigt ("+12 Vorteil", Kommentar ":20001" -- ausdruecklich NICHT
+    // `u.vorteil`, das der ENDWERT der ganzen Partie ist und "das Ergebnis verraet, bevor
+    // auch nur ein Zug gezeigt wurde"), also derselbe kein-Spoiler-Wert. Ihre Summe je Seite
+    // bewegt sich mit jedem enthuellten Zug, statt bis kurz vor Schluss auf 0 zu stehen. Der
+    // ECHTE Endstand (sobald `done`) bleibt unveraendert bei den Brettsiegen.
+    if(done)return bretter(0)+" : "+bretter(1);
+    const laufendVorteil=(u)=>(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+laufendVorteil(u),0);
+    return summe(0)+" : "+summe(1);
+  }
   function updateHudBuehne(){
     // UHR-ANGLEICHUNG (Broadcast-Audit Runde 2, Punkt 10, 30.09.): bislang stand hier rohes
     // `buehneT` (Simulationssekunden) -- Kampf/Bahn zeigen seit dem Arena-Zeit-Fix (27.09.)
@@ -18973,28 +19002,10 @@
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&u.duellGewonnen).length;
       document.getElementById("score").textContent=duelle(0)+" : "+duelle(1);
     } else if(BB().duell){
-      // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
-      // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
-      // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-      const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
-      // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
-      // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
-      // alle Bretter laufen parallel im selben Takt: fast keins ist fertig, bis fast alle es
-      // gleichzeitig kurz vor Schluss werden (Messanhang 6.3: "0 : 0" von Start bis Ende).
-      // `u.verlauf[u.aktuell]` ist dieselbe LAUFENDE Vorteilszahl, die die Canvas-Karte jedes
-      // Spielers schon zeigt ("+12 Vorteil", Kommentar ":20001" -- ausdruecklich NICHT
-      // `u.vorteil`, das der ENDWERT der ganzen Partie ist und "das Ergebnis verraet, bevor
-      // auch nur ein Zug gezeigt wurde"), also derselbe kein-Spoiler-Wert. Ihre Summe je Seite
-      // bewegt sich mit jedem enthuellten Zug, statt bis kurz vor Schluss auf 0 zu stehen. Der
-      // ECHTE Endstand (sobald `done`) bleibt unveraendert bei den Brettsiegen.
-      if(done){
-        document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
-      } else {
-        const laufendVorteil=(u)=>(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-        const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+laufendVorteil(u),0);
-        document.getElementById("score").textContent=summe(0)+" : "+summe(1);
-      }
+      // Ausgelagert in buehneDuellStandText() (Review-Fund PR #1083): dieselbe Funktion
+      // fuellt jetzt auch renderKader()s #kmitte, damit beide Stellen zwangslaeufig densel-
+      // ben Wert zeigen (s. dortigen Kommentar).
+      document.getElementById("score").textContent=buehneDuellStandText();
     } else if(BB().gauntlet){
       // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
       // bleibt, scored einen Punkt" ist eine Ueberlebensfrage, keine Summenfrage. KEIN
@@ -38452,8 +38463,12 @@
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
       // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
       // Kader-Mittelzeile. Speed-Schach/Tennis bleiben bei `vorteil>0`.
-      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length+" : "+
-         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length)
+      // EIN STAND, EINE FUNKTION (Review-Fund PR #1083, 30.09.): stand hier bisher fest bei
+      // den abgeschlossenen Brettsiegen, waehrend #score/der Bug (updateHudBuehne(), Punkt 18)
+      // waehrend des laufenden Matches schon die Vorteils-Summe zeigte -- zwei verschiedene
+      // Zahlen auf einem Bildschirm ("-63 : 63" im Bug gegen "0 : 0" in der Kaderleiste,
+      // Review-Fund). buehneDuellStandText() ist jetzt die einzige Quelle fuer beide Stellen.
+      ? buehneDuellStandText()
       // F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 3 -- EIN STAND, EINDEUTIG BESCHRIFTET:
       // dieser Zweig (Heben/Gauntlet/Wettessen/generische Auftritt-Buehne) zeigte bisher
       // ausnahmslos die Summe aus `x.summe` -- bei Heben/Breaking eine ANDERE Groesse als
