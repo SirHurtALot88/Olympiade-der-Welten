@@ -1,3 +1,13 @@
+  /* RaniraSeason (Chris, 30.09.: "nutz nur den Font, den ich fuer alles vorgegeben
+     hatte"): dieselbe lokale Schrift, die app/globals.css global auf Body/
+     Foundation-Shell setzt (docs/pm-briefings/SPIELBAR-STATUS.md Zeile 34). Eingebettet
+     im Foundation-Shell ist das @font-face dort schon geladen -- diese zweite
+     Deklaration ist fuer den Standalone-Fall (Datei direkt geoeffnet, Claude-Artefakt),
+     wo app/globals.css nicht existiert. Nur EIN Schnitt vorhanden (700 italic); jede
+     hier verwendete font-family:"RaniraSeason" faellt fuer jedes andere angeforderte
+     Gewicht/Neigung automatisch auf diesen einen Schnitt zurueck. */
+  @font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");
+    font-style:italic;font-weight:700;font-display:swap}
   .oly-battle-arena.oly-battle-arena{--ground:#F2F5F9;--surface:#FFF;--surface-2:#E9EEF5;--sunk:#DFE6EF;--pitch:#E4EAF2;
     --line:#CFD8E4;--line-soft:#E3E9F1;--ink:#111823;--muted:#5A6678;--faint:#8B98AA;
     --home:#B26A12;--home-bg:#F2A03D26;--away:#15707F;--away-bg:#45B0C926;
@@ -83,18 +93,18 @@
      Viewport-Media-Queries brachen zu spaet um: drei Spalten liefen rechts aus dem
      Bild. Die Media-Queries stehen weiter unten als Rueckfall fuer Browser ohne
      Container-Queries; wo beide greifen, gewinnt einfach die restriktivere Spaltenzahl. */
-  .oly-battle-arena.oly-battle-arena{margin:0;background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
+  .oly-battle-arena.oly-battle-arena{margin:0;background:var(--ground);color:var(--ink);font-family:"RaniraSeason",Georgia,"Times New Roman",serif;
     font-style:normal;font-weight:400;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
     container-type:inline-size;container-name:oly-arena}
   .oly-battle-arena.oly-battle-arena .wrap{max-width:1300px;margin:0 auto;padding:36px 20px 80px}
-  .oly-battle-arena.oly-battle-arena .kicker{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-  .oly-battle-arena.oly-battle-arena h1{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:700;font-size:clamp(34px,5.2vw,54px);
+  .oly-battle-arena.oly-battle-arena .kicker{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena h1{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-weight:700;font-size:clamp(34px,5.2vw,54px);
     line-height:.98;margin:8px 0 12px;text-transform:uppercase;color:var(--ink);font-style:normal}
   .oly-battle-arena.oly-battle-arena .lede{max-width:64ch;color:var(--muted);margin:0 0 8px}
   .oly-battle-arena.oly-battle-arena .lede strong{color:var(--ink);font-weight:600}
 
   .oly-battle-arena.oly-battle-arena .tabs{display:flex;gap:2px;margin:28px 0 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .oly-battle-arena.oly-battle-arena .tab{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.04em;
+  .oly-battle-arena.oly-battle-arena .tab{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:19px;font-weight:600;letter-spacing:.04em;
     text-transform:uppercase;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
     padding:9px 18px;cursor:pointer;margin-bottom:-1px;border-radius:7px 7px 0 0;font-style:normal;
     transition:color .15s ease,background-color .15s ease,border-color .15s ease}
@@ -107,7 +117,7 @@
 
   .oly-battle-arena.oly-battle-arena .frame{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .fbar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line-soft);
-    background:var(--surface-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.09em;
+    background:var(--surface-2);font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:10.5px;letter-spacing:.09em;
     text-transform:uppercase;color:var(--muted);flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .fbar .sep{color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .honest{margin-left:auto;color:var(--faint);text-transform:none;letter-spacing:0;font-size:10px}
@@ -115,7 +125,7 @@
   /* color/font-style stehen hier ausdruecklich: .foundation-shell .panel h2 setzt beides
      mit gleicher Spezifitaet — dieses Stylesheet wird nach globals.css eingehaengt und
      gewinnt das Unentschieden nur fuer Eigenschaften, die es selbst deklariert. */
-  .oly-battle-arena.oly-battle-arena h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:16px;letter-spacing:.07em;
+  .oly-battle-arena.oly-battle-arena h2{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-weight:600;font-size:16px;letter-spacing:.07em;
     text-transform:uppercase;margin:0 0 3px;color:var(--ink);font-style:normal}
   .oly-battle-arena.oly-battle-arena .sub{font-size:12px;color:var(--muted);margin:0 0 12px}
 
@@ -126,14 +136,14 @@
   @media (max-width:1120px){.oly-battle-arena.oly-battle-arena .bl{border-left:0;border-top:1px solid var(--line-soft)}}
 
   .oly-battle-arena.oly-battle-arena .dbar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-  .oly-battle-arena.oly-battle-arena .dchip{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.03em;
+  .oly-battle-arena.oly-battle-arena .dchip{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:15px;font-weight:600;letter-spacing:.03em;
     text-transform:uppercase;padding:6px 12px;border-radius:6px;cursor:pointer;background:var(--surface-2);
     border:1px solid var(--line);color:var(--muted);font-style:normal;
     transition:color .15s ease,background-color .15s ease,border-color .15s ease}
   .oly-battle-arena.oly-battle-arena .dchip:hover{color:var(--ink);border-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .dchip:focus-visible{outline:2px solid var(--home);outline-offset:2px}
   .oly-battle-arena.oly-battle-arena .dchip[aria-pressed="true"]{background:var(--home-bg);border-color:var(--home);color:var(--ink)}
-  .oly-battle-arena.oly-battle-arena .dchip em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);margin-left:5px}
+  .oly-battle-arena.oly-battle-arena .dchip em{font-style:normal;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:10px;color:var(--faint);margin-left:5px}
 
   .oly-battle-arena.oly-battle-arena .plist{max-height:560px;overflow-y:auto;margin:0 -4px;padding:0 4px}
   .oly-battle-arena.oly-battle-arena .prow{display:grid;grid-template-columns:42px 1fr 46px 46px;gap:8px;align-items:center;padding:5px 7px;
@@ -147,49 +157,49 @@
      Kuerzel sichtbar statt einer leeren Flaeche. */
   .oly-battle-arena.oly-battle-arena .pico{position:relative;width:42px;height:52px;border-radius:6px;display:grid;place-items:center;
     background:var(--surface-2);overflow:hidden;
-    color:var(--muted);font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px}
+    color:var(--muted);font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-weight:700;font-size:13px}
   .oly-battle-arena.oly-battle-arena .figurklein{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);
     image-rendering:pixelated;pointer-events:none}
   .oly-battle-arena.oly-battle-arena .prow.sel .pico{background:var(--home);color:#0B1018}
   .oly-battle-arena.oly-battle-arena .pnm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25}
-  .oly-battle-arena.oly-battle-arena .pnm span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
-  .oly-battle-arena.oly-battle-arena .eg{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums;
+  .oly-battle-arena.oly-battle-arena .pnm span{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .eg{text-align:center;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:12px;font-variant-numeric:tabular-nums;
     padding:2px 0;border-radius:4px;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .eg.best{background:var(--home-bg);color:var(--ink);font-weight:600}
   .oly-battle-arena.oly-battle-arena .eghead{display:grid;grid-template-columns:28px 1fr 46px 46px;gap:7px;padding:0 7px 5px;
-    font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
   .oly-battle-arena.oly-battle-arena .eghead span:nth-child(3), .oly-battle-arena.oly-battle-arena .eghead span:nth-child(4){text-align:center}
 
   .oly-battle-arena.oly-battle-arena .pitch{background:var(--pitch);border-radius:9px;border:1px solid var(--line);padding:10px;display:grid;
     grid-template-columns:1fr 1fr 1fr;gap:8px;min-height:300px}
   .oly-battle-arena.oly-battle-arena .zone{border:1px dashed var(--line);border-radius:7px;padding:8px;display:flex;flex-direction:column;gap:6px}
   .oly-battle-arena.oly-battle-arena .zone.hot{border-color:var(--home);border-style:solid;background:var(--home-bg)}
-  .oly-battle-arena.oly-battle-arena .zname{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  .oly-battle-arena.oly-battle-arena .zname{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
     color:var(--faint);display:flex;justify-content:space-between}
   .oly-battle-arena.oly-battle-arena .unit{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:6px;padding:6px 7px}
   .oly-battle-arena.oly-battle-arena .unit b{display:block;font-size:12px;font-weight:600}
-  .oly-battle-arena.oly-battle-arena .unit span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);display:block;margin-top:1px}
-  .oly-battle-arena.oly-battle-arena .unit select{width:100%;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;
+  .oly-battle-arena.oly-battle-arena .unit span{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;color:var(--muted);display:block;margin-top:1px}
+  .oly-battle-arena.oly-battle-arena .unit select{width:100%;margin-top:5px;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;
     background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:2px 3px;
     cursor:pointer;transition:border-color .15s ease}
   .oly-battle-arena.oly-battle-arena .unit select:hover{border-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .unit select:focus-visible{outline:2px solid var(--home);outline-offset:1px}
   .oly-battle-arena.oly-battle-arena .bwrap{margin-top:5px;display:flex;flex-direction:column;gap:3px}
   .oly-battle-arena.oly-battle-arena .srow{display:grid;grid-template-columns:58px 1fr;gap:4px;align-items:center}
-  .oly-battle-arena.oly-battle-arena .srow b{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.04em;color:var(--faint);font-weight:500}
+  .oly-battle-arena.oly-battle-arena .srow b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8px;letter-spacing:.04em;color:var(--faint);font-weight:500}
   .oly-battle-arena.oly-battle-arena .srow select{margin-top:0!important;font-size:9px!important}
   .oly-battle-arena.oly-battle-arena .srow u{display:none}
   .oly-battle-arena.oly-battle-arena .brow{display:grid;grid-template-columns:30px 1fr 20px;gap:4px;align-items:center}
-  .oly-battle-arena.oly-battle-arena .brow b{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.05em;color:var(--faint);font-weight:500}
+  .oly-battle-arena.oly-battle-arena .brow b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8px;letter-spacing:.05em;color:var(--faint);font-weight:500}
   .oly-battle-arena.oly-battle-arena .brow i{display:block;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .brow i s{display:block;height:100%;background:var(--home);border-radius:2px}
-  .oly-battle-arena.oly-battle-arena .brow u{text-decoration:none;font-family:"IBM Plex Mono",monospace;font-size:8.5px;text-align:right;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .brow u{text-decoration:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8.5px;text-align:right;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .skillwrap{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
   .oly-battle-arena.oly-battle-arena .skillchip{display:flex;align-items:center;gap:4px;padding:2px 5px;border-radius:4px;cursor:help;
     background:var(--sunk);border:1px solid var(--line);transition:border-color .13s ease}
   .oly-battle-arena.oly-battle-arena .skillchip:hover{border-color:var(--faint)}
-  .oly-battle-arena.oly-battle-arena .skillchip i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8.5px;color:var(--ink)}
-  .oly-battle-arena.oly-battle-arena .skillchip s{text-decoration:none;font-family:"IBM Plex Mono",monospace;font-size:7.5px;color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .skillchip i{font-style:normal;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8.5px;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .skillchip s{text-decoration:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:7.5px;color:var(--away)}
   .oly-battle-arena.oly-battle-arena .heilbadge{margin-top:4px!important;color:var(--ok)!important;font-size:8.5px!important;cursor:help;
     display:block;letter-spacing:.04em}
   .oly-battle-arena.oly-battle-arena .neig{margin-top:4px!important;color:var(--home)!important;font-size:9px!important}
@@ -200,14 +210,14 @@
 
   .oly-battle-arena.oly-battle-arena .tipbox{position:absolute;z-index:50;max-width:320px;background:var(--surface);border:1px solid var(--home);
     border-radius:8px;padding:11px 13px;box-shadow:var(--shadow);pointer-events:none}
-  .oly-battle-arena.oly-battle-arena .tipbox b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:.03em;
+  .oly-battle-arena.oly-battle-arena .tipbox b{display:block;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:15px;letter-spacing:.03em;
     color:var(--home);text-transform:uppercase;margin-bottom:5px}
   .oly-battle-arena.oly-battle-arena .tipbox p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .persline{display:flex;align-items:center;gap:6px;margin-top:5px;padding:4px 6px;border-radius:5px;
     background:var(--home-bg);cursor:help}
-  .oly-battle-arena.oly-battle-arena .persline b{font-family:"Barlow Condensed",sans-serif;font-size:13px!important;letter-spacing:.03em;
+  .oly-battle-arena.oly-battle-arena .persline b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:13px!important;letter-spacing:.03em;
     text-transform:uppercase;color:var(--home)!important;display:inline!important}
-  .oly-battle-arena.oly-battle-arena .persline em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8.5px;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .persline em{font-style:normal;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8.5px;color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .hint{display:flex;gap:8px;padding:8px 11px;border-radius:7px;background:var(--sunk);font-size:12.5px;color:var(--muted);margin-top:10px}
   .oly-battle-arena.oly-battle-arena .hint b{color:var(--ink);font-weight:600}
 
@@ -232,27 +242,27 @@
   .oly-battle-arena.oly-battle-arena .prozente .pz s{text-decoration:none;font-size:12px;font-weight:600;color:var(--ink,#E6ECF5);font-variant-numeric:tabular-nums}
   .oly-battle-arena.oly-battle-arena .oppline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
   .oly-battle-arena.oly-battle-arena .oppline:last-child{border-bottom:0}
-  .oly-battle-arena.oly-battle-arena .oppline small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
-  .oly-battle-arena.oly-battle-arena .rng{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--away);white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .oppline small{display:block;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .rng{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:10.5px;color:var(--away);white-space:nowrap}
 
   .oly-battle-arena.oly-battle-arena .scoreline{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;padding:12px 18px;
     background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
-  .oly-battle-arena.oly-battle-arena .tname{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+  .oly-battle-arena.oly-battle-arena .tname{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:19px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
     color:var(--home)}
-  .oly-battle-arena.oly-battle-arena .tname em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.11em;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .tname em{display:block;font-style:normal;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;letter-spacing:.11em;color:var(--muted)}
   /* TEAMFARBE IN DER SCORELINE (Broadcast-Optik-Nachaudit 28.09., Befund 4): --home/--away
      waren schon in Aufstellung und Wertungstabelle verdrahtet (.wteamlabel), aber nicht in
      der prominentesten Kopfzeile -- den beiden Teamnamen ueber der Leinwand. tnameL traegt
      nur "tname" (Heim), tnameR zusaetzlich "r" (Gast) -- dieselbe L/R=Heim/Gast-Zuordnung
      wie ueberall sonst (.wteamlabel, .feed .h/.a, #kaderL/#kaderR). */
   .oly-battle-arena.oly-battle-arena .tname.r{text-align:right;color:var(--away)}
-  .oly-battle-arena.oly-battle-arena .clock{font-family:"Barlow Condensed",sans-serif;font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;text-align:center}
-  .oly-battle-arena.oly-battle-arena .clock small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);font-weight:400;letter-spacing:.1em;margin-top:3px}
+  .oly-battle-arena.oly-battle-arena .clock{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;text-align:center}
+  .oly-battle-arena.oly-battle-arena .clock small{display:block;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9.5px;color:var(--muted);font-weight:400;letter-spacing:.1em;margin-top:3px}
   .oly-battle-arena.oly-battle-arena .hpbars{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:0 18px 11px;background:var(--surface-2);align-items:center}
   .oly-battle-arena.oly-battle-arena .tbar{height:7px;border-radius:4px;background:var(--sunk);overflow:hidden}
   .oly-battle-arena.oly-battle-arena .tbar s{display:block;height:100%;border-radius:4px;transition:width .2s linear}
   .oly-battle-arena.oly-battle-arena .tbar.l s{background:var(--home)}.oly-battle-arena.oly-battle-arena .tbar.r s{background:var(--away)}
-  .oly-battle-arena.oly-battle-arena .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
+  .oly-battle-arena.oly-battle-arena .sd{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;color:var(--faint);letter-spacing:.08em}
   /* LEINWANDSKALIERUNG (Phase 5, 28.09., kritischer Audit): width:100%;height:auto war
      schon seit dem 17.09. da (#956) und laesst den Browser die Bild-Hoehe aus dem
      intrinsischen Seitenverhaeltnis der Leinwand (width/height-ATTRIBUTE im Markup,
@@ -277,9 +287,9 @@
   .oly-battle-arena.oly-battle-arena .minidmffa .honest{display:block;margin:0 0 12px;max-width:74ch;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .mdffa-teams{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
   .oly-battle-arena.oly-battle-arena .mdffa-team{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center}
-  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-eck{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-name{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.02em;margin:3px 0}
-  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte{font-family:"IBM Plex Mono",monospace;font-size:18px;font-weight:600;color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-eck{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-name{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:15px;font-weight:600;letter-spacing:.02em;margin:3px 0}
+  .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:18px;font-weight:600;color:var(--warn)}
   .oly-battle-arena.oly-battle-arena .mdffa-team .mdffa-punkte em{display:block;font-style:normal;font-size:9px;color:var(--muted);font-weight:400}
   .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-sieger{border-color:var(--warn)}
   /* LIVE-REVEAL (Bugfix 27.09.): jede Ecke behaelt ueber Runden UND Endstand hinweg
@@ -300,13 +310,13 @@
   .oly-battle-arena.oly-battle-arena .mdffa-runden{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px}
   .oly-battle-arena.oly-battle-arena .mdffa-runde{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .oly-battle-arena.oly-battle-arena .mdffa-runde h5{margin:0;padding:6px 9px;font-size:11.5px;border-bottom:1px solid var(--line);color:var(--ink)}
-  .oly-battle-arena.oly-battle-arena .mdffa-runde table{width:100%;border-collapse:collapse;font:11px/1.4 ui-monospace,monospace}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde table{width:100%;border-collapse:collapse;font:11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .mdffa-runde td{padding:3px 8px;border-bottom:1px solid var(--line-soft);color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .mdffa-runde td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .mdffa-runde tr:last-child td{border-bottom:0}
   .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-r1 td:first-child{color:var(--warn);font-weight:700}
   .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-down td:first-child{text-decoration:line-through;opacity:.6}
-  .oly-battle-arena.oly-battle-arena .mdffa-endstand table{width:100%;border-collapse:collapse;font:11.5px/1.5 ui-monospace,monospace}
+  .oly-battle-arena.oly-battle-arena .mdffa-endstand table{width:100%;border-collapse:collapse;font:11.5px/1.5 "RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .mdffa-endstand th{text-align:right;padding:4px 8px;color:var(--faint);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--line)}
   .oly-battle-arena.oly-battle-arena .mdffa-endstand th:first-child{text-align:left}
   .oly-battle-arena.oly-battle-arena .mdffa-endstand td{text-align:right;padding:5px 8px;color:var(--ink);border-bottom:1px solid var(--line-soft)}
@@ -320,7 +330,7 @@
   .oly-battle-arena.oly-battle-arena .slotzone .zname b{display:block;font-size:13px;color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .slotfokus{display:block;font-style:normal;font-size:9.5px;color:var(--muted);letter-spacing:.02em;margin-top:1px}
   .oly-battle-arena.oly-battle-arena .slottext{margin:0 0 6px;font-size:10px;color:var(--muted);line-height:1.45}
-  .oly-battle-arena.oly-battle-arena .passmarke{font:600 10px/1 ui-monospace,monospace;padding:3px 6px;border-radius:5px;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .passmarke{font:600 10px/1 "RaniraSeason",Georgia,"Times New Roman",serif;padding:3px 6px;border-radius:5px;white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .passmarke.perfekt {background:color-mix(in srgb,var(--away) 16%,transparent);color:var(--away)}
   .oly-battle-arena.oly-battle-arena .passmarke.gut     {background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .passmarke.okay    {background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
@@ -337,9 +347,9 @@
     transition:background-color .13s ease,border-color .13s ease}
   .oly-battle-arena.oly-battle-arena .slotvorschlag:hover{background:var(--sunk);border-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .slotvorschlag:focus-visible{outline:2px solid var(--home);outline-offset:1px}
-  .oly-battle-arena.oly-battle-arena .slotvorschlag .vlabel{font:600 9px/1 ui-monospace,monospace;color:var(--faint);text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .slotvorschlag .vlabel{font:600 9px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--faint);text-transform:uppercase}
   .oly-battle-arena.oly-battle-arena .slotvorschlag b{color:var(--ink)}
-  .oly-battle-arena.oly-battle-arena .slotvorschlag s{text-decoration:none;color:var(--warn);font:600 11px/1 ui-monospace,monospace;margin-left:auto}
+  .oly-battle-arena.oly-battle-arena .slotvorschlag s{text-decoration:none;color:var(--warn);font:600 11px/1 "RaniraSeason",Georgia,"Times New Roman",serif;margin-left:auto}
 
   .oly-battle-arena.oly-battle-arena .zone.fokus{outline:2px solid var(--warn);outline-offset:-3px}
   .oly-battle-arena.oly-battle-arena .fokuskopf{display:flex;align-items:center;gap:8px;padding:5px 7px;margin-bottom:5px;
@@ -350,7 +360,7 @@
     transition:color .13s ease,border-color .13s ease}
   .oly-battle-arena.oly-battle-arena .fokuszu:hover{color:var(--ink);border-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .fokuszu:focus-visible{outline:2px solid var(--home);outline-offset:1px}
-  .oly-battle-arena.oly-battle-arena .fmark{font:600 10px/1 ui-monospace,monospace;padding:3px 5px;border-radius:4px;white-space:nowrap}
+  .oly-battle-arena.oly-battle-arena .fmark{font:600 10px/1 "RaniraSeason",Georgia,"Times New Roman",serif;padding:3px 5px;border-radius:4px;white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .fmark.perfekt {background:color-mix(in srgb,var(--away) 16%,transparent);color:var(--away)}
   .oly-battle-arena.oly-battle-arena .fmark.gut     {background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .fmark.okay    {background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
@@ -360,7 +370,7 @@
     border-radius:6px;background:var(--surface-2);font-size:11px;flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .spaehzeile b{color:var(--ink);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .spaehzeile input{flex:1;min-width:70px}
-  .oly-battle-arena.oly-battle-arena .spaehzeile s{text-decoration:none;font:600 11px/1 ui-monospace,monospace;color:var(--warn);min-width:34px;text-align:right}
+  .oly-battle-arena.oly-battle-arena .spaehzeile s{text-decoration:none;font:600 11px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--warn);min-width:34px;text-align:right}
   .oly-battle-arena.oly-battle-arena .spaehzeile em{font-style:normal;color:var(--faint);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .plan.verdeckt b{color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .rng.band{color:var(--faint);font-style:italic}
@@ -378,11 +388,11 @@
   .oly-battle-arena.oly-battle-arena .tchip{padding:2px 6px;border-radius:4px;font-weight:600}
   .oly-battle-arena.oly-battle-arena .tchip.auf{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .tchip.ab {background:color-mix(in srgb,var(--crit) 16%,transparent);color:var(--crit)}
-  .oly-battle-arena.oly-battle-arena .twohin{margin-left:auto;color:var(--faint);font:600 10px/1.4 ui-monospace,monospace;cursor:help}
+  .oly-battle-arena.oly-battle-arena .twohin{margin-left:auto;color:var(--faint);font:600 10px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;cursor:help}
   .oly-battle-arena.oly-battle-arena .tleer{color:var(--faint);font-style:italic}
 
   .oly-battle-arena.oly-battle-arena .emutator{display:flex;gap:4px;justify-content:center;margin-top:6px}
-  .oly-battle-arena.oly-battle-arena .formkarte{position:absolute;left:-3px;top:-4px;font:700 8px/1 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .formkarte{position:absolute;left:-3px;top:-4px;font:700 8px/1 "RaniraSeason",Georgia,"Times New Roman",serif;
     padding:1px 3px;border-radius:3px;font-style:normal;color:#0d1119}
   .oly-battle-arena.oly-battle-arena .formkarte.rot{background:#e07a6a}.oly-battle-arena.oly-battle-arena .formkarte.gruen{background:#7fd396}
   .oly-battle-arena.oly-battle-arena .formkarte.blau{background:#7ec2ff}.oly-battle-arena.oly-battle-arena .formkarte.gelb{background:#e0c46a}
@@ -396,7 +406,7 @@
     font-size:11px;cursor:pointer;transition:color .13s ease,border-color .13s ease}
   .oly-battle-arena.oly-battle-arena .stufe:hover{color:var(--ink);border-color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .stufe:focus-visible{outline:2px solid var(--warn);outline-offset:1px}
-  .oly-battle-arena.oly-battle-arena .stufe s{text-decoration:none;font:600 10px/1 ui-monospace,monospace;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .stufe s{text-decoration:none;font:600 10px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--faint)}
   .oly-battle-arena.oly-battle-arena .stufe.an{border-color:var(--warn);color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .stufe.an s{color:var(--warn)}
 
@@ -404,7 +414,7 @@
   .oly-battle-arena.oly-battle-arena .apart{display:flex;flex-direction:column;gap:1px;padding:3px 6px;border-radius:5px;
     background:var(--surface-2);font-style:normal}
   .oly-battle-arena.oly-battle-arena .apart b{font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600}
-  .oly-battle-arena.oly-battle-arena .apart s{text-decoration:none;font:600 11px/1 ui-monospace,monospace;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .apart s{text-decoration:none;font:600 11px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .apart.plus s{color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .apart.minus s{color:var(--crit)}
   .oly-battle-arena.oly-battle-arena .apart.summe{background:transparent;border:1px solid var(--warn);margin-left:auto}
@@ -421,7 +431,7 @@
     justify-content:center;background:var(--surface-2);border:1px solid var(--line);
     background-size:cover;background-position:center top}
   .oly-battle-arena.oly-battle-arena .portraet.hat{border-color:var(--warn)}
-  .oly-battle-arena.oly-battle-arena .pkuerzel{font:700 15px/1 ui-monospace,monospace;color:var(--faint);letter-spacing:.04em}
+  .oly-battle-arena.oly-battle-arena .pkuerzel{font:700 15px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--faint);letter-spacing:.04em}
   .oly-battle-arena.oly-battle-arena .figur{width:44px;height:52px;image-rendering:pixelated;flex:none}
 
   .oly-battle-arena.oly-battle-arena .lc .ohne{color:var(--crit);font-style:italic}
@@ -434,7 +444,7 @@
      sich in der dunklen Kaderleiste ("6:6" bei TDM) klein und wenig hervorgehoben --
      hier nur Groesse/Gewicht/Helligkeit angehoben und tabular-nums ergaenzt, sonst
      unveraendert (kein neues Element, keine neue Farbe). */
-  .oly-battle-arena.oly-battle-arena .kmitte{font:800 20px/1 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .kmitte{font:800 20px/1 "RaniraSeason",Georgia,"Times New Roman",serif;
     font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .kk{display:flex;flex-direction:column;gap:3px;min-width:86px;padding:4px 5px;border-radius:6px;
     background:var(--surface);border:1px solid var(--line)}
@@ -469,7 +479,7 @@
      Bahn, Punktestand im Feldspiel/auf der Buehne), seit die Leiste die Puste zeigt.
      <i> statt <span>, damit kein bestehender Selektor darauf zielt. */
   .oly-battle-arena.oly-battle-arena .kk .kkzahl{margin-left:auto;flex:none;font-style:normal;
-    font:600 9px/1.4 var(--mono,ui-monospace,monospace);color:var(--faint);white-space:nowrap}
+    font:600 9px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--faint);white-space:nowrap}
   /* PUSTE-LEISTE: dieselbe Ampel wie der Balken unter den Fuessen auf der Bahn/dem Feld
      (zeichneSpurt/zeichneFeldspiel) — gruen, orange unter einem Fuenftel, rot bei leer.
      Eine Leiste, drei Chassis, eine Farbsprache. */
@@ -507,9 +517,9 @@
      jeden sprechen, ohne das Bild zu wechseln" (Recherche, Abschnitt 2.1). */
   .oly-battle-arena.oly-battle-arena .kk .kkzeile2{display:flex;align-items:center;gap:5px;margin-top:2px}
   .oly-battle-arena.oly-battle-arena .kk .kktb{display:flex;gap:5px;margin-left:auto;
-    font:600 8px/1 var(--mono,ui-monospace,monospace);color:var(--faint)}
+    font:600 8px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--faint)}
   /* STATUS (K4): Respawn-Uhr (TDM) statt des generischen "tot", "Raus" sonst. */
-  .oly-battle-arena.oly-battle-arena .kk .kkstatus{font:600 8.5px/1.3 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .kk .kkstatus{font:600 8.5px/1.3 "RaniraSeason",Georgia,"Times New Roman",serif;
     color:var(--faint);margin-top:1px}
   /* FOKUS-DOPPELN. --fokus ist das CSS-Gegenstueck zu FOKUS_FARBE in battle-mode.engine.js
      (Ring und Pfeil auf der Leinwand) — beide muessen denselben Ton tragen, damit die
@@ -584,7 +594,7 @@
   .oly-battle-arena.oly-battle-arena .ttroster{display:flex;gap:4px;flex-wrap:wrap}
   .oly-battle-arena.oly-battle-arena .ttchip{border:1px solid var(--line);background:var(--surface);
     color:var(--muted);border-radius:5px;padding:2px 7px;cursor:pointer;
-    font:600 10px/1.4 var(--mono,ui-monospace,monospace);white-space:nowrap}
+    font:600 10px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .ttchip:hover{color:var(--ink);border-color:var(--tt)}
   .oly-battle-arena.oly-battle-arena .ttchip.heim{border-left:3px solid var(--home)}
   .oly-battle-arena.oly-battle-arena .ttchip.gast{border-left:3px solid var(--away)}
@@ -600,7 +610,7 @@
   .oly-battle-arena.oly-battle-arena .ttchip.an i{background:color-mix(in srgb,var(--tt) 28%,transparent);
     color:var(--tt)}
   /* LIVE-STAND: Rang, Rueckstand, Reserve (Chris' Fund 13.09., Punkte 4 und 6). */
-  .oly-battle-arena.oly-battle-arena .ttstand{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+  .oly-battle-arena.oly-battle-arena .ttstand{font:600 11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;
     color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .ttstand b{color:var(--tt);font-weight:700}
   .oly-battle-arena.oly-battle-arena .ttstand .gut{color:var(--ok)}
@@ -609,7 +619,7 @@
   /* TT-4: "ZEIT FUER DEN TEAMSIEG" (Abschnitt 2.3). Eine Zeile, dieselbe Typo wie .ttstand,
      nur in der Signalfarbe hervorgehoben -- erscheint erst, wenn eine Seite komplett im
      Ziel ist (s. bahnZeitFuerSieg()). */
-  .oly-battle-arena.oly-battle-arena .ttteamsieg{font:600 11px/1.4 var(--mono,ui-monospace,monospace);
+  .oly-battle-arena.oly-battle-arena .ttteamsieg{font:600 11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;
     color:var(--warn,#e0a341)}
   .oly-battle-arena.oly-battle-arena .ttteamsieg[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .ttteamsieg.chancenlos{color:var(--crit)}
@@ -628,12 +638,12 @@
   .oly-battle-arena.oly-battle-arena .ttcp{position:absolute;top:-3px;bottom:-3px;width:2px;
     background:var(--ink);opacity:.55}
   .oly-battle-arena.oly-battle-arena .ttcp b{position:absolute;top:-15px;left:50%;transform:translateX(-50%);
-    font:700 8.5px/1 var(--mono,ui-monospace,monospace);color:var(--muted);white-space:nowrap}
+    font:700 8.5px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--muted);white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .ttmarker{position:absolute;top:-6px;width:0;height:0;
     border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--tt);
     transform:translateX(-5px);transition:left .12s linear}
   .oly-battle-arena.oly-battle-arena .ttsplits{display:flex;gap:14px;flex-wrap:wrap;
-    font:600 11px/1.4 var(--mono,ui-monospace,monospace);color:var(--muted)}
+    font:600 11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .ttsplits b{color:var(--ink);font-weight:700}
   .oly-battle-arena.oly-battle-arena .ttsplits .gut{color:var(--ok)}
   .oly-battle-arena.oly-battle-arena .ttsplits .schlecht{color:var(--crit)}
@@ -653,7 +663,7 @@
   .oly-battle-arena.oly-battle-arena .ansageuhr[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .ansageuhr::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sunk)}
   .oly-battle-arena.oly-battle-arena .ansageuhr b{position:absolute;inset:0;z-index:1;display:flex;align-items:center;
-    justify-content:center;font:700 9px/1 var(--mono,ui-monospace,monospace);color:var(--fokus)}
+    justify-content:center;font:700 9px/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:var(--fokus)}
   /* Endstand (Broadcast-Optik-Nachaudit 28.09., Befund 1: "bricht die ganze Illusion").
      VORHER: .endstand malte nur mit den AMBIENTEN --surface/--ink/... -- in jedem
      Kontext ohne erzwungenes data-theme="dark" (jeder Standalone-Aufruf dieser Datei,
@@ -697,7 +707,7 @@
      geht hoch"-Moment passt). sieg-h/sieg-a faerben Rahmen/Verlauf in der Farbe des
      Gewinnerteams (dieselbe L=Heim/R=Gast-Zuordnung wie ueberall sonst); ohne eine der
      beiden Klassen (Unentschieden) bleibt es die alte neutrale --warn-Faerbung. */
-  .oly-battle-arena.oly-battle-arena .esieger{font:700 clamp(16px,2.6vw,28px)/1.2 "Barlow Condensed",sans-serif;
+  .oly-battle-arena.oly-battle-arena .esieger{font:700 clamp(16px,2.6vw,28px)/1.2 "RaniraSeason",Georgia,"Times New Roman",serif;
     letter-spacing:.02em;text-transform:uppercase;color:var(--warn);text-align:center;
     background:var(--surface);border:1px solid var(--line);border-radius:12px;
     padding:10px 26px;box-shadow:var(--shadow);
@@ -721,7 +731,7 @@
   .oly-battle-arena.oly-battle-arena #etafelL h5{color:var(--home)}
   .oly-battle-arena.oly-battle-arena #etafelR h5{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .etafel h5{margin:0;padding:7px 10px;font-size:12px;color:var(--ink);border-bottom:1px solid var(--line)}
-  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 ui-monospace,monospace}
+  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .etafel th{padding:4px 5px;text-align:right;color:var(--faint);font-size:9px;font-weight:600;
     text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel th:first-child, .oly-battle-arena.oly-battle-arena .etafel td:first-child{text-align:left}
@@ -742,10 +752,10 @@
   .oly-battle-arena.oly-battle-arena .viertelpause{position:absolute;inset:0;background:rgba(16,20,26,.94);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
   .oly-battle-arena.oly-battle-arena .viertelpause[hidden]{display:none}
-  .oly-battle-arena.oly-battle-arena .viertelpause b{font:700 clamp(20px,3.4vw,34px)/1.1 "Barlow Condensed",sans-serif;
+  .oly-battle-arena.oly-battle-arena .viertelpause b{font:700 clamp(20px,3.4vw,34px)/1.1 "RaniraSeason",Georgia,"Times New Roman",serif;
     text-transform:uppercase;letter-spacing:.06em;color:#eef3f9}
-  .oly-battle-arena.oly-battle-arena .viertelpause span{font:500 clamp(11px,1.5vw,15px)/1.4 system-ui,sans-serif;color:#93a1b3}
-  .oly-battle-arena.oly-battle-arena .viertelpause em{font:700 clamp(28px,5vw,48px)/1 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .viertelpause span{font:500 clamp(11px,1.5vw,15px)/1.4 "RaniraSeason",Georgia,"Times New Roman",serif;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .viertelpause em{font:700 clamp(28px,5vw,48px)/1 "RaniraSeason",Georgia,"Times New Roman",serif;
     font-style:normal;color:var(--warn)}
 
   /* BROADCAST-BUG: persistentes HUD-Overlay waehrend des laufenden Spiels (Recherche
@@ -755,7 +765,7 @@
      Klickbares zeigt und keine Maus-Interaktion auf der Leinwand blockieren darf. */
   .oly-battle-arena.oly-battle-arena .bbug{position:absolute;top:8px;left:8px;right:8px;
     display:flex;justify-content:space-between;align-items:flex-start;gap:8px;
-    pointer-events:none;font-family:"IBM Plex Mono",monospace}
+    pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .bbug[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .bbug .seite{background:rgba(17,24,35,.72);
     border-radius:6px;padding:4px 9px;border:1px solid rgba(255,255,255,.14);
@@ -847,7 +857,7 @@
      (aktualisiereBbug() setzt/entfernt [hidden] und die Home/Away-Klasse). */
   .oly-battle-arena.oly-battle-arena .bbuglauf{position:absolute;top:52px;left:50%;
     transform:translateX(-50%);background:rgba(17,24,35,.85);border-radius:6px;
-    padding:3px 12px;font:700 12px 'Barlow Condensed',sans-serif;letter-spacing:.04em;
+    padding:3px 12px;font:700 12px 'RaniraSeason',Georgia,'Times New Roman',serif;letter-spacing:.04em;
     color:#fff;white-space:nowrap;z-index:3}
   .oly-battle-arena.oly-battle-arena .bbuglauf[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .bbuglauf.l{box-shadow:0 0 0 2px var(--home)}
@@ -889,7 +899,7 @@
   .oly-battle-arena.oly-battle-arena .bbugcallout{position:absolute;top:60px;left:50%;
     transform:translate(-50%,-6px);max-width:min(88%,560px);
     background:rgba(15,19,26,.88);border:1px solid var(--warn);border-radius:8px;
-    padding:7px 18px;color:#fff;font:700 clamp(11px,1.7vw,15px)/1.3 "Barlow Condensed",sans-serif;
+    padding:7px 18px;color:#fff;font:700 clamp(11px,1.7vw,15px)/1.3 "RaniraSeason",Georgia,"Times New Roman",serif;
     text-align:center;letter-spacing:.02em;pointer-events:none;
     opacity:0;transition:opacity .35s ease,transform .35s ease}
   .oly-battle-arena.oly-battle-arena .bbugcallout.zu{opacity:1;transform:translate(-50%,0)}
@@ -906,8 +916,8 @@
   .oly-battle-arena.oly-battle-arena .eszene[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .eszene h5{margin:0 0 6px;font-size:12px;color:var(--warn);
     text-transform:uppercase;letter-spacing:.04em}
-  .oly-battle-arena.oly-battle-arena .eszene .ehzeile{font-family:"IBM Plex Mono",monospace;font-size:11.5px}
-  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht{color:var(--faint);flex:none;margin-right:9px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11.5px}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht{color:var(--faint);flex:none;margin-right:9px;font-variant-numeric:tabular-nums}
   .oly-battle-arena.oly-battle-arena .eszene .ehzeile.h{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .eszene .ehzeile.a{color:var(--away)}
 
@@ -924,7 +934,7 @@
   .oly-battle-arena.oly-battle-arena .ehighlights[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .ehighlights h5{margin:0 0 8px;font-size:12px;color:var(--ink)}
   .oly-battle-arena.oly-battle-arena .ehlist{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;
-    font-family:"IBM Plex Mono",monospace;font-size:11px;max-height:172px;overflow-y:auto;padding:1px}
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;max-height:172px;overflow-y:auto;padding:1px}
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile{display:flex;align-items:center;gap:7px;
     max-width:100%;background:var(--surface-2);border:1px solid var(--line-soft);
     border-radius:999px;padding:4px 12px 4px 4px;line-height:1.3}
@@ -969,7 +979,7 @@
   .oly-battle-arena.oly-battle-arena .bahnhud[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .bhside{flex:1;min-width:0;background:rgba(10,13,18,.72);
     border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:4px 10px;
-    font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.55;color:#e7edf6}
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;line-height:1.55;color:#e7edf6}
   .oly-battle-arena.oly-battle-arena .bhside.bhL{border-left:3px solid var(--home)}
   .oly-battle-arena.oly-battle-arena .bhside.bhR{border-right:3px solid var(--away);text-align:right}
   .oly-battle-arena.oly-battle-arena .bhrow{display:flex;gap:6px;align-items:baseline;white-space:nowrap;overflow:hidden}
@@ -985,7 +995,7 @@
      Balken, wie ihn eine Uebertragung einblendet, und deutlich groesser. Gegenstueck in
      battle-mode.engine.js: updateHudBahn(), Abschnitt "DAS FUEHRUNGSFELD". */
   .oly-battle-arena.oly-battle-arena .bhdelta{flex:none;align-self:center;min-width:196px;text-align:center;
-    font-family:"Barlow Condensed",sans-serif;letter-spacing:.02em;
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif;letter-spacing:.02em;
     background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.22);border-radius:8px;
     padding:4px 12px 6px;color:#e7edf6;line-height:1.12}
   .oly-battle-arena.oly-battle-arena .bhdelta b{display:block;font-weight:700;font-size:16px}
@@ -1004,7 +1014,7 @@
      mittleren Delta-Feld statt einer dritten Zeile je Seite (Runde 2, Vorschlag 3 warnt
      davor). Klein und gedaempft -- Kontextzeile, kein neuer Schwerpunkt. */
   .oly-battle-arena.oly-battle-arena .bhdelta .bhbein{display:block;margin-top:3px;font-size:9.5px;
-    font-family:"IBM Plex Mono",monospace;font-weight:400;letter-spacing:.02em;color:#93a1b3}
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-weight:400;letter-spacing:.02em;color:#93a1b3}
 
   /* I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4): die Crystal-Maze-
      Zonenuhr, mittig oben in derselben 15%-Zeile wie .bahnhud (beide Panels sind
@@ -1014,7 +1024,7 @@
      Vollflaechen-Overlays korrekt darueberliegen. */
   .oly-battle-arena.oly-battle-arena .ispyzuguhr{position:absolute;top:15%;left:50%;
     transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
-    gap:4px;pointer-events:none;font-family:"IBM Plex Mono",monospace;
+    gap:4px;pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;
     background:rgba(10,13,18,.78);border:1px solid rgba(255,255,255,.18);
     border-radius:7px;padding:5px 16px}
   .oly-battle-arena.oly-battle-arena .ispyzuguhr[hidden]{display:none}
@@ -1035,7 +1045,7 @@
   .oly-battle-arena.oly-battle-arena .ispysplit{position:absolute;left:2.2%;right:2.2%;
     bottom:2%;display:flex;gap:2px;background:rgba(10,13,18,.8);
     border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 6px;
-    pointer-events:none;font-family:"IBM Plex Mono",monospace}
+    pointer-events:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif}
   .oly-battle-arena.oly-battle-arena .ispysplit[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .ispysplit:empty{display:none}
   .oly-battle-arena.oly-battle-arena .ispysplit .isp-col{flex:1;min-width:0;
@@ -1063,7 +1073,7 @@
   .oly-battle-arena.oly-battle-arena .ewappenbild{width:clamp(48px,7vw,84px);height:clamp(48px,7vw,84px);border-radius:12px;
     object-fit:cover;background:#222831;border:1px solid #39424f;flex:none}
   .oly-battle-arena.oly-battle-arena .ewappenbild.mono{display:flex;align-items:center;justify-content:center;
-    font:700 clamp(15px,2.4vw,28px)/1 ui-monospace,monospace;color:#c9d4e2;letter-spacing:.04em}
+    font:700 clamp(15px,2.4vw,28px)/1 "RaniraSeason",Georgia,"Times New Roman",serif;color:#c9d4e2;letter-spacing:.04em}
   .oly-battle-arena.oly-battle-arena .eteam h4{margin:0;font-size:clamp(13px,1.7vw,21px);color:#eef3f9}
   .oly-battle-arena.oly-battle-arena .eteam .eplatz{margin:2px 0 0;font-size:clamp(10px,1.15vw,13px);color:#93a1b3}
   .oly-battle-arena.oly-battle-arena .eteam .eplatz b{color:#e8c07a}
@@ -1087,10 +1097,10 @@
     font-size:clamp(9px,1.05vw,12.5px)}
   .oly-battle-arena.oly-battle-arena .eliste.r .ezeile{direction:rtl}
   .oly-battle-arena.oly-battle-arena .eliste.r .ezeile>*{direction:ltr}
-  .oly-battle-arena.oly-battle-arena .ezeile .erolle{color:#7f8c9e;font:600 clamp(8px,.9vw,10px)/1.6 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .ezeile .erolle{color:#7f8c9e;font:600 clamp(8px,.9vw,10px)/1.6 "RaniraSeason",Georgia,"Times New Roman",serif;
     text-transform:uppercase;letter-spacing:.05em}
   .oly-battle-arena.oly-battle-arena .ezeile .ename{color:#e6edf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .oly-battle-arena.oly-battle-arena .ezeile .ewert{color:#e8c07a;font:600 clamp(9px,1.05vw,12.5px)/1 ui-monospace,monospace;
+  .oly-battle-arena.oly-battle-arena .ezeile .ewert{color:#e8c07a;font:600 clamp(9px,1.05vw,12.5px)/1 "RaniraSeason",Georgia,"Times New Roman",serif;
     display:inline-flex;align-items:baseline;gap:4px}
   .oly-battle-arena.oly-battle-arena .ezeile.stern{background:#232c22;box-shadow:inset 0 0 0 1px #3c5238}
   /* Chris' Fund (25.08.): der Einlauf zeigte nur die fertig verrechnete Endzahl, nicht den
@@ -1110,7 +1120,7 @@
   .oly-battle-arena.oly-battle-arena .edelta.heat-8{background:#355f9d;color:#f7fbff}
 
   .oly-battle-arena.oly-battle-arena .ctrl{display:flex;gap:8px;align-items:center;padding:11px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
-  .oly-battle-arena.oly-battle-arena .btn{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  .oly-battle-arena.oly-battle-arena .btn{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
     background:var(--home);color:#0B1018;border:0;border-radius:6px;padding:7px 17px;cursor:pointer;font-style:normal;
     transition:filter .15s ease,background-color .15s ease,border-color .15s ease,transform .08s ease}
   .oly-battle-arena.oly-battle-arena .btn:hover{filter:brightness(1.09)}
@@ -1148,7 +1158,7 @@
     .oly-battle-arena.oly-battle-arena #p2 .frame>.untenraum{grid-template-columns:1fr;
       border-top:0;border-left:1px solid var(--line-soft)}
   }
-  .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
+  .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
   .oly-battle-arena.oly-battle-arena .wertung{border-left:1px solid var(--line-soft);padding:9px 14px;height:210px;overflow-y:auto;display:flex;flex-direction:column;
     border-top:3px solid var(--wakzent, transparent)}
   /* Kein flex:1/min-height:0 hier (Chris' Fund, 29.08.): das gab .wsplit eine vom
@@ -1189,18 +1199,18 @@
     background-attachment:local,scroll}
   .oly-battle-arena.oly-battle-arena .wteam{display:flex;flex-direction:column;min-width:0;overflow:hidden}
   .oly-battle-arena.oly-battle-arena .wteam:first-child{border-right:1px solid var(--line-soft);padding-right:16px}
-  .oly-battle-arena.oly-battle-arena .wteamlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+  .oly-battle-arena.oly-battle-arena .wteamlabel{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
   .oly-battle-arena.oly-battle-arena .wteam:first-child .wteamlabel{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .wteam:last-child .wteamlabel{color:var(--away)}
   @media (max-width:960px){.oly-battle-arena.oly-battle-arena .wertung{border-left:0;border-top:1px solid var(--line-soft)}}
-  .oly-battle-arena.oly-battle-arena .wtitel{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
-  .oly-battle-arena.oly-battle-arena .wtitel em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--wakzent, var(--faint));letter-spacing:.1em;margin-left:6px}
+  .oly-battle-arena.oly-battle-arena .wtitel{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:14px;letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+  .oly-battle-arena.oly-battle-arena .wtitel em{font-style:normal;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;color:var(--wakzent, var(--faint));letter-spacing:.1em;margin-left:6px}
   .oly-battle-arena.oly-battle-arena .wtbl{width:100%;border-collapse:collapse;font-size:10.5px}
-  .oly-battle-arena.oly-battle-arena .wtbl th{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.04em;text-transform:uppercase;
+  .oly-battle-arena.oly-battle-arena .wtbl th{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:8px;letter-spacing:.04em;text-transform:uppercase;
     color:var(--faint);font-weight:500;text-align:left;padding:0 3px 4px 0;position:sticky;top:0;background:var(--surface);
     border-bottom:2px solid var(--wakzent, var(--line-soft))}
   .oly-battle-arena.oly-battle-arena .wtbl td{padding:3px 3px 3px 0;border-bottom:1px solid var(--line-soft);white-space:nowrap}
-  .oly-battle-arena.oly-battle-arena .wtbl td.n, .oly-battle-arena.oly-battle-arena .wtbl th.n{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  .oly-battle-arena.oly-battle-arena .wtbl td.n, .oly-battle-arena.oly-battle-arena .wtbl th.n{text-align:right;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-variant-numeric:tabular-nums}
   .oly-battle-arena.oly-battle-arena .wtbl tr.eigen td:first-child{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .wtbl tr.gegner td:first-child{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .wtbl tr.raus{opacity:.45}
@@ -1327,29 +1337,29 @@
   .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="speed-schach"]{--wakzent:#5D5DC6}
   .oly-battle-arena.oly-battle-arena[data-theme="dark"] #p2[data-disc="i-spy"]{--wakzent:#98CF6E}
   .oly-battle-arena.oly-battle-arena .feed div{display:flex;gap:9px}
-  .oly-battle-arena.oly-battle-arena .feed .tk{color:var(--faint);flex:none}
+  .oly-battle-arena.oly-battle-arena .feed .tk{color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
   .oly-battle-arena.oly-battle-arena .feed .h{color:var(--home)}.oly-battle-arena.oly-battle-arena .feed .a{color:var(--away)}.oly-battle-arena.oly-battle-arena .feed .big{color:var(--ink);font-weight:500}
 
   .oly-battle-arena.oly-battle-arena .prof{display:grid;grid-template-columns:1fr 1fr;align-items:start}
   @media (max-width:860px){.oly-battle-arena.oly-battle-arena .prof{grid-template-columns:1fr}}
   .oly-battle-arena.oly-battle-arena .bigstat{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .bigstat:last-child{border-bottom:0}
-  .oly-battle-arena.oly-battle-arena .bigstat b{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);letter-spacing:.08em;width:34px}
-  .oly-battle-arena.oly-battle-arena .bigstat u{text-decoration:none;font-family:"Barlow Condensed",sans-serif;font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .oly-battle-arena.oly-battle-arena .bigstat b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;color:var(--muted);letter-spacing:.08em;width:34px}
+  .oly-battle-arena.oly-battle-arena .bigstat u{text-decoration:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
   .oly-battle-arena.oly-battle-arena .bigstat span{font-size:11.5px;color:var(--muted);text-align:right}
   .oly-battle-arena.oly-battle-arena .kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .kv:last-child{border-bottom:0}
-  .oly-battle-arena.oly-battle-arena .kv b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+  .oly-battle-arena.oly-battle-arena .kv b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-variant-numeric:tabular-nums;font-weight:500}
   .oly-battle-arena.oly-battle-arena .kv span{color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .gh{display:flex;align-items:baseline;gap:9px;margin:15px 0 7px}
-  .oly-battle-arena.oly-battle-arena .gh b{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase}
-  .oly-battle-arena.oly-battle-arena .gh span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .gh b{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .gh span{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:10.5px;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .gh hr{flex:1;border:0;border-top:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .lvlup{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
   @media (max-width:700px){.oly-battle-arena.oly-battle-arena .lvlup{grid-template-columns:repeat(2,1fr)}}
   .oly-battle-arena.oly-battle-arena .lc{border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;background:var(--surface-2)}
-  .oly-battle-arena.oly-battle-arena .lc b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.05em;text-transform:uppercase}
-  .oly-battle-arena.oly-battle-arena .lc u{display:block;text-decoration:none;font-family:"Barlow Condensed",sans-serif;font-size:23px;font-weight:700;color:var(--home);margin:2px 0}
+  .oly-battle-arena.oly-battle-arena .lc b{display:block;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:14px;letter-spacing:.05em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .lc u{display:block;text-decoration:none;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:23px;font-weight:700;color:var(--home);margin:2px 0}
   .oly-battle-arena.oly-battle-arena .lc span{font-size:10.5px;color:var(--muted)}
 
   .oly-battle-arena.oly-battle-arena .notes{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -1361,7 +1371,7 @@
   .oly-battle-arena.oly-battle-arena .notes[hidden]{display:none}
   .oly-battle-arena.oly-battle-arena .note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:8px;padding:13px 15px}
   .oly-battle-arena.oly-battle-arena .note.off{border-left-color:var(--faint)}
-  .oly-battle-arena.oly-battle-arena .note h3{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;
+  .oly-battle-arena.oly-battle-arena .note h3{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:14px;letter-spacing:.07em;
     text-transform:uppercase;margin:0 0 7px;color:var(--ink);font-style:normal;font-weight:600}
   .oly-battle-arena.oly-battle-arena .note ul{margin:0;padding-left:16px;font-size:13.5px;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .note li{margin-bottom:5px}

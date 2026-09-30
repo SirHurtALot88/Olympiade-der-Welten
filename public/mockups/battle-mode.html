@@ -1,15 +1,15 @@
 <meta charset="utf-8">
 <title>Battle Mode Taktikbrett</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Gewichte 800/900 dazu (Broadcast-Audit Runde 2, Punkt 24, 30.09.): der Canvas
-     zeichnet an vielen Stellen "800"/"900" fuer Wucht-/Crit-/Sieger-Text -- vorher nur
-     bei IBM Plex Mono (400/500/600 geladen, 700/800/900 im Canvas ohnehin schon ein
-     stiller Fallback) unbemerkt, weil Canvas-Text nie fehlschlaegt, nur ein anderes
-     Gewicht als angefordert zeigt. Jetzt, wo derselbe Canvas-Text auf Barlow Condensed
-     umgestellt ist (s. dortige `ctx.font`-Aufrufe), sonst derselbe stille Unterschied
-     nur in der Schrift, die auch die Chrome ausserhalb des Canvas traegt. -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- NUR NOCH RaniraSeason (Chris, 30.09.: "nutz nur den Font, den ich fuer alles
+     vorgegeben hatte" -- gemeint ist die Schrift, die schon app/globals.css global auf
+     Body/Foundation-Shell setzt, s. docs/pm-briefings/SPIELBAR-STATUS.md Zeile 34).
+     Kein Google-Fonts-Link mehr noetig: RaniraSeason ist eine lokale OTF-Datei, das
+     @font-face liegt in battle-mode.css. Vorher trug die Chrome IBM Plex Mono/Sans, der
+     Canvas seit Punkt 24 Barlow Condensed -- jetzt EIN Font ueberall, s.
+     font-vereinheitlichung-raniraseason-30-09. RaniraSeason hat nur EINEN Schnitt
+     (700 italic, s. @font-face); jede andere angeforderte Staerke/Neigung faellt auf
+     genau diesen einen Schnitt zurueck, wie es app/globals.css fuer den Rest der App
+     schon tut. -->
 <link rel="stylesheet" href="battle-mode.css">
 
 <div class="oly-battle-arena">
