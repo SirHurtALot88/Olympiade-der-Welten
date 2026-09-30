@@ -13725,7 +13725,7 @@
     if(knaeuelVersteckt>0&&namensAnkerXY){
       const txt="+"+knaeuelVersteckt+" weitere";
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.font="700 9px 'IBM Plex Mono',monospace";
+      ctx.font="700 9px 'Barlow Condensed',sans-serif";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.strokeText(txt,namensAnkerXY.x,namensAnkerXY.y+58);
       ctx.fillStyle="#c7d0dd";ctx.fillText(txt,namensAnkerXY.x,namensAnkerXY.y+58);
@@ -23330,7 +23330,8 @@
   // 0.38/0.62 bleiben zwischen den beiden Stangenenden (563 und 677) noch 114px Luft. Bei
   // 0.42/0.58 (Abstand 198px) waeren es nur noch 14px, zwei grosse Heber wuerden ihre
   // Scheiben kreuzen. Die Namens-/Zweikampfzeilen darunter sind schmaler als die Hantel
-  // (16 Zeichen IBM Plex Mono 11px = ~106px, also ~53px je Seite) und deshalb nicht
+  // (16 Zeichen Barlow Condensed 11px ist schmaler als die vorher hier zitierten ~106px
+  // fuer IBM Plex Mono, s. font-vereinheitlichung-barlow-condensed-30-09) und deshalb nicht
   // die bindende Schranke.
   const HEBEN_SPALTE=[0.38,0.62];
   function zeichneHeben(art){
@@ -23369,7 +23370,7 @@
       const restEcht=Math.max(0,buehneAkt*zeitFaktor());
       const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
       const uhrY=H*0.27;
-      ctx.font="700 9.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
+      ctx.font="700 9.5px 'Barlow Condensed',sans-serif";ctx.fillStyle="#d6ac36";
       ctx.fillText("Nächster Versuch in "+restEcht.toFixed(1).replace(".",",")+" s",W/2,uhrY);
       const barW=150,barH=5,barX=W/2-barW/2,barY=uhrY+11;
       ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(barX,barY,barW,barH);

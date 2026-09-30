@@ -2,14 +2,14 @@
 <title>Battle Mode Taktikbrett</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Gewichte 800/900 dazu (Broadcast-Audit Runde 2, Punkt 24, 30.09.): der Canvas
-     zeichnet an vielen Stellen "800"/"900" fuer Wucht-/Crit-/Sieger-Text -- vorher nur
-     bei IBM Plex Mono (400/500/600 geladen, 700/800/900 im Canvas ohnehin schon ein
-     stiller Fallback) unbemerkt, weil Canvas-Text nie fehlschlaegt, nur ein anderes
-     Gewicht als angefordert zeigt. Jetzt, wo derselbe Canvas-Text auf Barlow Condensed
-     umgestellt ist (s. dortige `ctx.font`-Aufrufe), sonst derselbe stille Unterschied
-     nur in der Schrift, die auch die Chrome ausserhalb des Canvas traegt. -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- NUR NOCH Barlow Condensed (Chris, 30.09.: "nutz nur den Font, den ich fuer alles
+     vorgegeben hatte"): IBM Plex Mono/Sans trugen bisher noch die DOM-Chrome (Labels,
+     Tabellen, Ticker) und zwei uebersehene Canvas-Stellen, waehrend Barlow Condensed
+     schon Ueberschriften/Tabs und seit Punkt 24 den Grossteil des Canvas-Texts trug --
+     jetzt EIN Font ueberall, s. font-vereinheitlichung-barlow-condensed-30-09. Gewichte
+     400-900 geladen: 400 traegt Fliesstext/Tabellenwerte (vorher IBM Plex Mono/Sans
+     400), 800/900 weiterhin fuer Wucht-/Crit-/Sieger-Text (Punkt 24). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&display=swap">
 <link rel="stylesheet" href="battle-mode.css">
 
 <div class="oly-battle-arena">
