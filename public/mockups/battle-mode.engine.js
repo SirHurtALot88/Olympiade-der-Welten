@@ -19858,7 +19858,10 @@
     // ausserhalb des Canvas) statt darueber — sonst kollidieren beide Textbloecke, s.
     // Sicht-QA-Screenshot dieses PRs (docs/design/gewichtheben-nachher-10-09.png, erste
     // Fassung).
-    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=80;
+    // TAFELHOEHE (Broadcast-Audit Runde 2, 30.09., Punkt 26): 80 -> 98px, weil die
+    // "Naechster"-Zeile unten jetzt zweizeilig ist (s. dort) -- ohne die zusaetzlichen
+    // 18px liefe die "zieht nach"-Zeile aus dem Kasten.
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
     ctx.textAlign="left";ctx.textBaseline="middle";
@@ -19889,10 +19892,17 @@
         const naechsterU=buehneQueue[buehneZeiger];
         const naechsteR=naechsterU?naechsterU.runden[naechsterU.aktuell+1]:null;
         if(naechsterU&&naechsteR){
+          // ZEILENUMBRUCH (Broadcast-Audit Runde 2, 30.09., Punkt 26): "Nächster: Lava
+          // Golem, 247 kg" ragte bei langen Namen rechts aus dem Canvas -- die Zeile lief
+          // ungebrochen und ungeprueft ueber die Tafelbreite (132px) UND teils ueber den
+          // Canvasrand (W) selbst hinaus. Fix: Label und "Name, kg" auf zwei Zeilen, wie
+          // die Audit-Empfehlung es vorschlaegt -- keine neue Information, nur Umbruch.
           ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#5f6675";
           const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
           const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
-          ctx.fillText("Nächster: "+naechsterName+", "+kgTxt,tafelX+10,tafelY+60);
+          ctx.fillText("Nächster:",tafelX+10,tafelY+58);
+          ctx.fillStyle="#c7ccd6";
+          ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69);
           // "ZIEHT NACH" (H2.3): der Motor kennt heute genau eine Ansage-Aenderung, die aus
           // dem Duellstand selbst folgt — der reaktive Zuschlag im dritten Versuch
           // (kuehnFlag/HEBEN_WAGNIS_MAX_KG, s. hebeUebung()). Sichtbar als kurzes gelbes
@@ -19904,7 +19914,7 @@
               const deltaKg=sinclairAnzeige(naechsteR.kg-vorige.kg,naechsterU.groesse);
               if(deltaKg>0){
                 ctx.font="700 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
-                ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+74);
+                ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+91);
               }
             }
           }
@@ -20794,7 +20804,35 @@
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
-        ctx.save(); ctx.translate(px,py); ctx.scale(sk,sk); ctx.translate(-px,-py);
+        // KOPF-KACHEL-KOLLISION BEI VOLLBILD-KREATUREN (Review-Fund, 30.09., zu Punkt 23):
+        // die Spielerkachel (zeichneSpielerKachel() unten, fest bei py-70, Radius 11 ->
+        // Kachel-Unterkante bei py-59) hat KEINEN Spielraum nach oben — ihre Oberkante
+        // (py-81) liegt in der UNVERAENDERTEN Basis-Geometrie nur 0-2px unter der
+        // Mannschafts-Leiste darueber (H*0.145, Hoehe 20 -> Unterkante ~88px bei H=470;
+        // Kachel-Oberkante bei laneY=H*0.36 ~88.2px). Die Kachel kann also nicht weiter
+        // ausweichen; die erste PR-Fassung hatte diesen Abstand mit der Kachel-MITTE statt
+        // der Kachel-OBERKANTE gerechnet und kam faelschlich auf ~11px "Luft".
+        //
+        // Die einzige verbleibende Stellschraube ist deshalb die Figur selbst. Fuer
+        // `b.vollbild`-Kreaturen (Lava Golem/Krolach/Krag'Zul/Vorrak/Tidesprinter, alle
+        // golem_walk.png o.ae.) reicht das Blatt nativ bis Zelle 0 (Kopf-/Hornspitze, s.
+        // Kommentar am `ctx.drawImage(...,y-46*Z,...)`-Aufruf im b.vollbild-Zweig weiter
+        // oben) -- die Kopf-Oberkante landet also im schlechtesten Fall (z.B. waehrend
+        // eines Ausfallschritts) bei `py-46*Z*sk`, deterministisch nachgestellt per
+        // `window.__arena.sondenLauf()` und Screenshot: bei sk=1.45 beruehrt Lava Golems
+        // Horn sichtbar die Kachel, bei sk=1.3 (dem bisherigen, bereits als sicher
+        // erprobten Wert) bestand noch ein klarer Spalt. Reiher-Mech (Seraph-11, `b.
+        // reiherMech`) bleibt aussen vor: sein Scheitel sitzt nur bei Zelle 27, also 19
+        // statt 46 Zellen ueber dem Anker (s. Kommentar bei `zeichneReiherMech` oben) --
+        // dieselbe Groessenordnung wie ein Standardkoerper, kein Kollisionsrisiko.
+        //
+        // `skEff` deckelt deshalb NUR `b.vollbild`-Kreaturen auf den bisherigen Wert --
+        // fuer jede ANDERE Kreatur (heutiger UND kuenftiger Kader) bleibt es exakt `sk`,
+        // keine Regression fuer normal grosse Fechter. Betrifft Skalierung UND den
+        // Namenszug darunter (`py+42*skEff` statt `py+42*sk`), damit Name und Figur
+        // zusammen skalieren; die Kachel-Position selbst (`py-70`) bleibt unangetastet.
+        const skEff=(BAU[u.n]||BAU_STD).vollbild?Math.min(sk,1.3):sk;
+        ctx.save(); ctx.translate(px,py); ctx.scale(skEff,skEff); ctx.translate(-px,-py);
         ctx.fillStyle=c; ctx.globalAlpha=0.2;
         ctx.beginPath(); ctx.ellipse(px,py+19,15,5,0,0,Math.PI*2); ctx.fill();
         ctx.globalAlpha=1;
@@ -20810,10 +20848,10 @@
         ctx.font="400 9px 'IBM Plex Mono',monospace";
         ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
-        ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
+        ctx.strokeText(name,px,py+42*skEff); ctx.fillStyle=c; ctx.fillText(name,px,py+42*skEff);
         // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
-        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3), unterhalb der
-        // Trefferlampen-/Kopfzeile-Reihe (laneY-halbH-14).
+        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3, s. Kommentar
+        // oben zu `skEff`), unterhalb der Mannschafts-Leiste.
         zeichneSpielerKachel(u,px,py-70,22,farbVar);
       });
       if(gross){
@@ -20883,7 +20921,10 @@
         // ist, nicht der Vorteil.
         zeichneTrefferTreppe(xL,laneY+halbH+8,bahnLen,20,a,b,art);
       } else {
-        ctx.font="400 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#8a93a3";
+        // LESBARKEIT DER NEBENBAHNEN (Broadcast-Audit Runde 2, 30.09., Punkt 23, Abschnitt
+        // 3.5: "Nebenbahnen winzig, Trefferstand kaum lesbar") -- 1.5px groessere Schrift,
+        // hellerer Ton (naeher an --ink als am gedaempften --faint-Grau), reine Anzeige.
+        ctx.font="600 9.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7cedb";
         const bahnTxt="Bahn "+(i+1)+" · "+(a.treffer||0)+":"+(b.treffer||0);
         ctx.fillText(bahnTxt,cx,laneY-halbH-8);
         // F-B1 MINI-LAMPE (Dokument Abschnitt 5): "wo passiert gerade was" der uebrigen
@@ -20896,10 +20937,18 @@
       }
     };
 
-    // GROSSE NAHANSICHT: das Fokus-Gefecht, mittig und deutlich groesser als zuvor (sk 1.3
-    // statt hoechstens 1.0/0.55) — der Rang-2-Befund des Audits ("nie eine Nahansicht des
-    // aktiven Gefechts, nur die Sechs-Bahnen-Uebersicht").
-    zeichneBahn(fechtenFokus,mitte,gardeAbstand,H*0.36,1.3,true);
+    // GROSSE NAHANSICHT: das Fokus-Gefecht, deutlich groesser als zuvor (Broadcast-Audit
+    // Runde 2, 30.09., Punkt 23, Abschnitt 3.5: "obere Canvas-Haelfte leer") -- sk 1.45
+    // statt 1.3 (Rang-2-Befund des ersten Audits war bereits "sk 1.3 statt hoechstens
+    // 1.0/0.55", jetzt noch etwas deutlicher). `laneY` bleibt bei H*0.36: die Mannschafts-
+    // Leiste (H*0.145, Hoehe 20, Unterkante ~88px bei H=470) und die Kachel-OBERKANTE am
+    // Fokusgefecht (laneY=H*0.36, ~88.2px) liegen im bestehenden Layout nur 0-2px auseinander
+    // -- die Kachel kann nicht weiter ausweichen, ein Hochziehen von `laneY` wuerde sie in
+    // die Leiste schieben. Die Stellschraube ist deshalb die Figur selbst: `b.vollbild`-
+    // Kreaturen werden ueber `skEff` auf sk=1.3 gedeckelt, s. Kollisionsrechnung dort.
+    // Reine Zeichenmasse, `gross`-Zweig liest nur a/b.treffer/aktuell/vizLampeT/vizFunkeT --
+    // kein neuer Zustand.
+    zeichneBahn(fechtenFokus,mitte,gardeAbstand,H*0.36,1.45,true);
 
     // DIE UeBRIGEN GEFECHTE KLEIN AM UNTEREN RAND — kompakte Mini-Bahnen statt eines zweiten
     // gleich grossen Streifens, dieselbe Idee wie zeichneSchach()s Mini-Bretter/zeichneTennis()s
@@ -22084,44 +22133,48 @@
     (function zeichneShowcaseTop3(){
       const top3=showcaseTop3();
       if(!top3.length&&!aktiver)return;
-      const pad=8, zeilH=15, kopfH=15;
+      // LESBARKEIT (Broadcast-Audit Runde 2, 30.09., Punkt 23, Abschnitt 3.5): "Jury/Top-3-
+      // Tafel schwer lesbar" -- Schrift ~1px groesser je Zeile, Box entsprechend breiter/
+      // hoeher, Flaeche/Rahmen kontrastreicher. Reine Groessen-/Farbwerte, keine neue
+      // Zeile, keine neue Information.
+      const pad=9, zeilH=17, kopfH=17;
       const rows=top3.length+(aktiver?1:0);
-      const br=W*0.19, hoeh=kopfH+rows*zeilH+pad, x0=W*0.015, y0=H*0.185;
+      const br=W*0.215, hoeh=kopfH+rows*zeilH+pad, x0=W*0.015, y0=H*0.185;
       const rund=(x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
         ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
-      ctx.globalAlpha=0.86; ctx.fillStyle="#1a1024"; rund(x0,y0,br,hoeh,7); ctx.fill();
-      ctx.globalAlpha=1; ctx.lineWidth=1; ctx.strokeStyle="rgba(246,199,80,.5)"; rund(x0,y0,br,hoeh,7); ctx.stroke();
+      ctx.globalAlpha=0.92; ctx.fillStyle="#1a1024"; rund(x0,y0,br,hoeh,7); ctx.fill();
+      ctx.globalAlpha=1; ctx.lineWidth=1.3; ctx.strokeStyle="rgba(246,199,80,.7)"; rund(x0,y0,br,hoeh,7); ctx.stroke();
       ctx.textAlign="left"; ctx.textBaseline="middle";
-      ctx.font="700 8.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750";
+      ctx.font="700 9.5px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f6c750";
       ctx.fillText("TOP 3 BISHER",x0+pad,y0+kopfH*0.6);
       let k=0;
       top3.forEach((u,i)=>{
         const y=y0+kopfH+k*zeilH+zeilH*0.5; k++;
         ctx.fillStyle=u.side===0?css("--home"):css("--away");
-        ctx.fillRect(x0+pad,y-5,2.5,10);
-        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle=i===0?"#f2d75a":"#c7cedb";
-        ctx.fillText(String(i+1)+".",x0+pad+7,y);
+        ctx.fillRect(x0+pad,y-5.5,2.5,11);
+        ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.fillStyle=i===0?"#f2d75a":"#dfe3ec";
+        ctx.fillText(String(i+1)+".",x0+pad+8,y);
         const namen=u.n.split(" ")[0]||"?";
-        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
-        ctx.fillText(namen.length>13?namen.slice(0,12)+"…":namen,x0+pad+22,y);
-        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#dfe6ef";
+        ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f3f6fb";
+        ctx.fillText(namen.length>13?namen.slice(0,12)+"…":namen,x0+pad+25,y);
+        ctx.textAlign="right"; ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#eef2f8";
         ctx.fillText(String(u.summe||0),x0+br-pad,y);
         ctx.textAlign="left";
       });
       if(aktiver){
         const y=y0+kopfH+k*zeilH+zeilH*0.5;
         ctx.fillStyle=aktiver.side===0?css("--home"):css("--away");
-        ctx.fillRect(x0+pad,y-5,2.5,10);
-        ctx.font="700 7px 'IBM Plex Mono',monospace"; ctx.fillStyle="#d6ac36";
-        ctx.fillText("läuft",x0+pad+7,y);
+        ctx.fillRect(x0+pad,y-5.5,2.5,11);
+        ctx.font="700 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e5c15a";
+        ctx.fillText("läuft",x0+pad+8,y);
         const namen=aktiver.n.split(" ")[0]||"?";
-        ctx.font="400 7.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#e7edf6";
-        ctx.fillText(namen.length>9?namen.slice(0,8)+"…":namen,x0+pad+34,y);
+        ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f3f6fb";
+        ctx.fillText(namen.length>9?namen.slice(0,8)+"…":namen,x0+pad+37,y);
         // Hypothetischer Rang, bräche der Auftritt jetzt ab -- nur gegen bereits FERTIGE
         // Acts verglichen, kein Spoiler ueber noch kommende Acts.
         const fertige=showcaseFertige();
         const rang=1+fertige.filter(x=>x!==aktiver&&(x.summe||0)>(aktiver.summe||0)).length;
-        ctx.textAlign="right"; ctx.font="600 8px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
+        ctx.textAlign="right"; ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.fillStyle="#f2d75a";
         ctx.fillText((aktiver.summe||0)+" (#"+rang+")",x0+br-pad,y);
         ctx.textAlign="left";
       }
@@ -22135,13 +22188,32 @@
       licht.addColorStop(0,"rgba(255,232,150,.30)");
       licht.addColorStop(1,"rgba(255,232,150,0)");
       ctx.fillStyle=licht;ctx.beginPath();ctx.ellipse(x,y+8,70,48,0,0,6.2832);ctx.fill();
+      // BUEHNE FUELLEN (Broadcast-Audit Runde 2, 30.09., Punkt 23, Abschnitt 3.5/5,
+      // Bild 19 "winzige Figur auf dunkler Buehne"): der Aktive stand bislang in derselben
+      // Groesse da wie jede Backstage-Silhouette (showcaseZielPos() gibt ihm scale:1, exakt
+      // wie ein gewoehnlicher Kampf-Sprite) -- auf der leeren, dunklen Buehnenflaeche wirkte
+      // das winzig. `aktivSkala` vergroessert NUR die Zeichnung (Schatten/Figur), gepivotet
+      // EXAKT auf den Fusspunkt (x,y+19) -- derselbe Fuss-Offset, den auch der Schatten
+      // jeder anderen Buehnenfigur benutzt (s. z.B. zeichneBuehne() oben: "ellipse(x,y+19,...)").
+      // Weil Schatten UND Figur INNERHALB derselben Transformation an genau diesem Pivot
+      // gezeichnet werden, bleiben die Fuesse exakt am Fleck (Pivot bewegt sich unter jeder
+      // Skalierung nicht) und wachsen nur ihre Radien/die Figur selbst mit -- kein Abdriften
+      // wie bei einer Naeherungsformel. Das Spotlicht (oben, y+8) bleibt bewusst unskaliert:
+      // atmosphaerische Buehnenbeleuchtung, kein Teil der Figur. Name/Schild/Punkte/
+      // Fortschritt unten bleiben an ihren angestammten `y`-Versaetzen (nicht mitskaliert) --
+      // reiner Zeichenmassstab, liest/schreibt keinen TEILNEHMER-Zustand, rr()/wert()
+      // unberuehrt.
+      const aktivSkala=1.5, fussY=y+19;
+      ctx.save();
+      ctx.translate(x,fussY);ctx.scale(aktivSkala,aktivSkala);ctx.translate(-x,-fussY);
       ctx.fillStyle=c;ctx.globalAlpha=0.22;
-      ctx.beginPath();ctx.ellipse(x,y+19,17,6,0,0,6.2832);ctx.fill();
+      ctx.beginPath();ctx.ellipse(x,fussY,17,6,0,0,6.2832);ctx.fill();
       ctx.globalAlpha=1;
       // PR S2 (Talentshow-Konzept, Abschnitt 5): zeichneShowcaseAct() ersetzt den blossen
       // zeichneSprite()-Aufruf -- sie zeichnet die Figur selbst (ggf. mit Kraftakt-/
       // Akrobatik-Transform) UND die act-eigene Zusatzschicht (Requisite/Funken/Noten/...).
       zeichneShowcaseAct(aktiver,x,y,art);
+      ctx.restore();
       const name=aktiver.n.length>13?aktiver.n.slice(0,12)+"…":aktiver.n;
       schriftAn(name,x,y+44,c,10.5,"700");
 
@@ -28447,8 +28519,20 @@
       // Broadcast-Optik-Audit, Punkt 9 (28.09.): eigene, dezente Akzentfarbe je Disziplin in
       // GENAU dieser Tabelle -- reiner Anzeige-Hook, laeuft nur hier im ohnehin billigen
       // "Disziplin/Spalten haben sich geaendert"-Zweig, nicht bei jedem Frame. Das Attribut
-      // triggert ausschliesslich CSS (.wertung[data-disc="..."]{--wakzent:...}, s.
+      // triggert ausschliesslich CSS (`#p2[data-disc="..."]{--wakzent:...}`, s.
       // battle-mode.css) -- keine Spalten-/Sortier-/Zeilenlogik liest es.
+      //
+      // AKZENT SPUERBARER (Broadcast-Audit Runde 2, 30.09., Punkt 25): "korrekt gebaut, aber
+      // unsichtbar" -- ein 3px-Streifen an EINER Tabelle unten im Bild fiel beim Zuschauen
+      // nicht auf. `data-disc` wandert deshalb jetzt aufs ARENA-PANEL (#p2), den gemeinsamen
+      // Vorfahren von Score-Bug (#bbugMitte), Einlauf-Disziplinname (#edisz) UND der
+      // Wertungstabelle (#wertungBox bleibt zusaetzlich gesetzt, falls irgendwo noch direkt
+      // darauf gelesen wird) -- `--wakzent` selbst bleibt EIN Custom-Property mit EINER
+      // Farbzuordnung (dieselben Hex-Werte wie bisher), es vererbt sich nur jetzt von einer
+      // hoeheren Stelle im DOM an alle drei Verbraucher, statt an genau einem definiert zu
+      // sein. Keine neue Farblogik, nur eine hoehere Reichweite derselben.
+      const p2=document.getElementById("p2");
+      if(p2)p2.dataset.disc=disc;
       const wbox=document.getElementById("wertungBox");
       if(wbox)wbox.dataset.disc=disc;
       wertungKopfStand=stand;
