@@ -6730,6 +6730,10 @@
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
+  // ENDSTAND-OVERLAY-WAECHTER FUERS FELDSPIEL (Broadcast-Audit Runde 2, Punkt 4, 30.09.):
+  // dasselbe Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` weiter unten
+  // in dieser Datei -- s. Kommentar bei deren Reset in bauFeldspiel()/updateHudFeldspiel().
+  let fsEndeGemeldet=false;
   // NUR FOOTBALL — SPIEL-WEITER KORRIDOR-MITSCHNITT (Rezept-Feinkalibrierung, s.
   // docs/design/football-rezept-kalibrierung.md und scripts/miss-football-korridor.mjs).
   // Weder Yards/Completions/Sacks NOCH Field-Goals lassen sich vollstaendig aus den
@@ -7591,6 +7595,13 @@
   };
   function bauFeldspiel(saat){
     seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    // ENDSTAND-OVERLAY-WAECHTER (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe
+    // Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` (s. dort) -- ohne
+    // diese Bremse wuerde updateHudFeldspiel() das #endstand-Overlay bei JEDEM Frame nach
+    // `done` erneut aufbauen. Reset hier statt in reset(), aus demselben Grund wie
+    // buehneEndeGemeldet/bahnEndeGemeldet: bauFeldspiel() laeuft garantiert bei jedem
+    // neuen Feldspiel-Match.
+    fsEndeGemeldet=false;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
     // passerPgSum/passerTgSum/passerN NEU (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt
     // 6.1): messen den TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer statt
@@ -12879,6 +12890,20 @@
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
+    // ENDSTAND-OVERLAY (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe Einmal-Melden-
+    // Muster wie updateHudBuehne()s `if(done&&!buehneEndeGemeldet)`/updateHudBahn()s
+    // `if(done&&!bahnEndeGemeldet)` (s. dort) -- Hockey/Basketball/Football zeigten bislang
+    // GAR KEIN Endstand-Overlay (Audit-Fund: "Hockey, Basketball und Football hoeren bei
+    // der Schlusssirene mitten im Bild auf ... kein Sieger-Banner, kein Boxscore-Overlay").
+    // REIN ADDITIV: `done` wird ausschliesslich von stepFeldspielLive() gesetzt
+    // (unveraendert), dieser Zweig LIEST ihn nur, exakt wie beim Kampf/Buehne/Bahn. Die
+    // Schlusssirene-Feed-Zeile selbst steht bereits in stepFeldspielLive() (unveraendert,
+    // feuert genau einmal beim `done=true`-Uebergang) -- dieser Zweig ergaenzt nur das
+    // Overlay, das bislang dazu fehlte.
+    if(done&&!fsEndeGemeldet){
+      fsEndeGemeldet=true;
+      renderEndstandFeldspiel();
+    }
   }
 
   // Basketball bekommt einen echten Platz — zwei Koerbe, Zonen, Dreierlinien. Die
@@ -37433,7 +37458,17 @@
   // teilen laesst, ist die Klick-Geometrie — die steht deshalb unten in leinwandTreffer()
   // und wird von hier benutzt. Die Basketball-Fassung bleibt trotzdem unangetastet: sie
   // ist frisch vermessen (s. #685), und ein Umbau haette diese Abnahme wieder aufgemacht.
-  const ansageMoeglich=()=>istKampf(disc)&&U.length>0;
+  // MINI-DM AUSGENOMMEN (Broadcast-Audit Runde 2, Punkt 8, 30.09.): `disc==="mini-dm"`
+  // durchlaeuft `build()` unveraendert ueber dasselbe Zwei-Seiten-Kampf-Chassis wie TDM/
+  // Battlefield (s. Kopfkommentar bei renderMiniDmFfa()), U ist also auch dort gefuellt --
+  // `istKampf(disc)&&U.length>0` liess die Zielansage-Zeile deshalb bislang AUCH ueber der
+  // Mini-DM-FFA-Ansicht erscheinen, mit dem Text "Gegner auf dem Feld ... anklicken", obwohl
+  // Mini-DM kein Feld zeigt (.arenaraum/.kaderleiste/.ctrl sind fuer disc==="mini-dm" per
+  // reset() ausgeblendet, s. dort) -- Audit-Fund: "die Kampf-Hilfszeile ... obwohl es kein
+  // Feld gibt". `#fokuszeile` selbst haengt nicht unter einem der dort ausgeblendeten
+  // Container (eigenes Geschwister-Element), wird also nicht mitversteckt; der Fix sitzt
+  // deshalb hier an der Quelle statt an einer weiteren CSS-Ausnahme.
+  const ansageMoeglich=()=>istKampf(disc)&&disc!=="mini-dm"&&U.length>0;
   // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
   // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
   // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
@@ -38167,6 +38202,75 @@
   function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
   function renderEndstandBuehne(){
     const sieger=buehneSieger(), stand=buehneStand();
+    document.getElementById("esieger").textContent=
+      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+    setzeEsiegerKlasse(sieger);
+    const w=wertungVon(disc);
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,w.namen));
+      w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      for(const z of zeilen){
+        const tr=el("tr",z.raus?"tot":null);
+        tr.appendChild(el("td",null,z.n));
+        for(const s of w.spalten){
+          const v=s.wert(z);
+          const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
+          if(s.farbe&&v!=null){const f=s.farbe(v); if(f){td.style.color=f; td.style.fontWeight="600";}}
+          if(s.titel)td.title=s.titel;
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    renderHighlights();
+    document.getElementById("endstand").hidden=false;
+  }
+
+  // ENDSTAND-OVERLAY FUERS FELDSPIEL (Broadcast-Audit Runde 2, Punkt 4, 30.09.): Hockey,
+  // Basketball und Football hoerten bislang bei der Schlusssirene mitten im Bild auf --
+  // kein Sieger-Banner, kein Boxscore-Overlay, keine Hoehepunkte (Bilder 08/09 des Audits).
+  // Der Code kommentierte das bisher explizit als Absicht ("finish()/renderEndstand() sind
+  // Kampf-spezifisch ... deshalb hier keine Weiterleitung", stepFeldspielLive) -- seit
+  // Phase 5 gibt es aber genau das generische Overlay, das Buehne und Bahn laengst nutzen
+  // (renderEndstandBuehne()/renderEndstandBahn() direkt oberhalb).
+  //
+  // DASSELBE OVERLAY-ELEMENT wie Kampf/Bahn/Buehne (#endstand/#esieger/#etafelL/#etafelR),
+  // rein additiv gefuellt, keine neue DOM-Struktur, keine neue CSS-Regel.
+  //
+  // BOXSCORE NICHT NEU ERFUNDEN, SONDERN UEBERNOMMEN: `wertungVon(disc)` ist derselbe
+  // Renderer, den renderWertungTabelle() waehrend des GANZEN Spiels fuer die laufende
+  // Wertungstabelle benutzt (WERTUNG_CHASSIS.feldspiel bzw. die football-/hockey-eigenen
+  // wertungTabelle-Ersetzungen, s. dort) -- er waehlt pro Feldspiel-Disziplin schon die
+  // richtigen Spalten (Pkt/Reb/Ast/... fuer Basketball, die football-/hockey-eigenen
+  // Spalten fuer die anderen beiden). Diese Funktion RECHNET NICHTS NEU, sie uebernimmt nur
+  // Kopf/Zeilen/Formatierung -- derselbe Wiederverwendungs-Gedanke wie bei
+  // renderEndstandBuehne() zwei Funktionen oberhalb, sogar derselbe Funktionskoerper (nur
+  // Sieger/Stand kommen hier aus fsStand() statt buehneStand()).
+  //
+  // SIEGER/STAND AUS `fsBisher().team`, NICHT AUS `fsPunkte`: `fsBisher().team` ist exakt
+  // die Zahl, die die Scoreline waehrend des GESAMTEN Spiels schon zeigt (s.
+  // updateHudFeldspiel() oben, "Enthuellter Spielstand, nicht das vorab durchgerechnete
+  // Endergebnis"). Fuer Basketball/Hockey ist das ohnehin identisch mit `fsPunkte` (jeder
+  // Treffer aktualisiert beide zusammen); nur Football fuehrt Extra-Punkte/Two-Point-
+  // Conversions bislang ausschliesslich in `fsPunkte` und nicht in `fsZuege` (separater,
+  // schon bekannter Befund, Audit-Punkt 1 -- "welche Zahl zaehlt" ist dort offen und bleibt
+  // hier unangetastet). Dieser Endstand zeigt deshalb bewusst dieselbe Zahl, die der
+  // Zuschauer die ganze Sendung ueber schon gesehen hat, statt eine DRITTE einzufuehren.
+  function fsStand(){
+    const bisher=fsBisher().team;
+    return {a:bisher[0], b:bisher[1], text:bisher[0]+" : "+bisher[1]};
+  }
+  function fsSieger(){ const {a,b}=fsStand(); return a===b?null:(a>b?0:1); }
+  function renderEndstandFeldspiel(){
+    const sieger=fsSieger(), stand=fsStand();
     document.getElementById("esieger").textContent=
       (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
     setzeEsiegerKlasse(sieger);
