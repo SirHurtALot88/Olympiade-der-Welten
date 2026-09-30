@@ -16895,7 +16895,14 @@
         // diesem einen Anschlag gemerkt (s. `letzterGauntletBruch`-Kommentar oben), mit dem
         // AKTUELLEN Buehnen-Zeitstempel -- zeichneBreaking() blendet daraus einen kurzen,
         // real ablaufenden Stempel ein (keine Pause der Enthuellung, reine Ueberlagerung).
-        if(r.hpNach<=0)letzterGauntletBruch={u,r,bruchT:buehneT};
+        if(r.hpNach<=0){
+          letzterGauntletBruch={u,r,bruchT:buehneT};
+          // TEAM-FEIER (Konzept team-publikum-feiermomente 3.2, Klasse A*): `u` ist der, der
+          // bricht -- die GEGENSEITE feiert, im selben Frame, in dem der "GEBROCHEN"-Stempel
+          // erscheint. teamFeierAusloesen() kehrt bei `stumm` sofort zurueck und schreibt nur
+          // `teamFeiern` (Anzeige-Zustand), kein rr(), keine Wertung.
+          teamFeierAusloesen(1-u.side,"gross",null,{funken:true});
+        }
       }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
       // Reissen plus bestes Stossen, s. baueHebenDuelle) — die Summe der sechs Versuche
@@ -24675,23 +24682,32 @@
     const farbeVon=(u)=>u.side===0?css("--home"):css("--away");
 
     // ---------- RANG 1: die zehn Zuschauer am Ring ----------
+    // TEAM-FEIER (Konzept team-publikum-feiermomente 3.2): die Zuschauer der Seite, deren
+    // Gegner gerade gebrochen ist, huepfen (teamFeierHaltung().dy, in Bildschirm-Pixeln vor der
+    // 0,72-Skalierung); die Gegenseite sackt kurz ein (h.sackt steckt schon in h.dy). Ohne
+    // laufende Feier ist h.dy===0 und h.pose===false -- dann wird Zeichen fuer Zeichen derselbe
+    // Aufruf mit demselben echten `u` gemacht wie vorher. Die Pose geht nur ueber den
+    // Stellvertreter (teamFeierSpriteArg), nie ueber ein Feld an `u`. Die hier huepfenden
+    // Figuren bleiben bewusst UNTER der Vignette (der Ring tritt zurueck, die Mitte bleibt vorn).
+    teamFeierFarbenLesen();
     for(const u of TEILNEHMER){
       if(istDuellant(u,paar))continue;
       const o=orte.get(u); if(!o)continue;
       const fussY=o.y+19;
+      const h=teamFeierHaltung(u);
       ctx.fillStyle=farbeVon(u); ctx.globalAlpha=0.16;
       ctx.beginPath(); ctx.ellipse(o.x,fussY,11,4,0,0,6.2832); ctx.fill();
       ctx.globalAlpha=1;
       ctx.save();
-      ctx.translate(o.x,fussY); ctx.scale(0.72,0.72); ctx.translate(-o.x,-fussY);
-      zeichneSprite(ctx,u,o.x,o.y);
+      ctx.translate(o.x,fussY+h.dy); ctx.scale(0.72,0.72); ctx.translate(-o.x,-fussY);
+      zeichneSprite(ctx,(h.pose&&TEAM_FEIER_JUBEL_BILD!=null)?teamFeierSpriteArg(u,h,true):u,o.x,o.y);
       ctx.restore();
       // Die Krone gehoert dem Punktbesten, auch wenn der gerade nur zusieht. Ohne diesen Zweig
       // verschwaende sie in jedem Frame, in dem der Fuehrende nicht zufaellig im Paar steht --
       // und das ist der Normalfall (zwei von zwoelf).
       if(u===fuehrer){
         ctx.font="13px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-        ctx.fillText("👑",o.x,o.y-28);
+        ctx.fillText("👑",o.x,o.y-28+h.dy);
       }
     }
 
@@ -25151,6 +25167,12 @@
       zeichneHpBalken(stehend[0],true);
       zeichneHpBalken(stehend[1],false);
     }
+
+    // TEAM-FEIER-EFFEKTE (Konzept team-publikum-feiermomente 3.2): NACH der Vignette (sonst
+    // dunkelte sie den Funkenregen ab), aber VOR dem "GEBROCHEN"-Stempel direkt darunter, damit
+    // dessen Schrift obenauf lesbar bleibt. Ursprung: die Ring-Haelfte der feiernden Seite
+    // (Heim links, 100-260 Grad; Gast rechts, -80-80 Grad, s. `hemis` oben).
+    teamFeierEffekte(s=>({x:cx+(s===0?-1:1)*rOut*0.78,y:cy+rOut*KY*0.25}));
 
     // ================== B5: DER MOMENT „GEBROCHEN" (Broadcast-Optik-Recherche 27.09.,
     // Klasse A, "nur Standbild/Stempel, kein C-Pause-Umbau") ==================
