@@ -12793,7 +12793,13 @@
           const seite=nL>nR?"l":"r";
           const ueb=document.createElement("small");
           ueb.className="ueberzahl "+seite;
-          ueb.textContent=Math.max(nL,nR)+" : "+Math.min(nL,nR);
+          // F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 3: stand bisher als "groesser :
+          // kleiner" (Math.max/Math.min) -- gegenlaeufig zur Kaderleiste direkt darunter
+          // (renderKader()s kmitte, "Lebende "+live(0).length+" : "+live(1).length), die
+          // schon immer in Seitenreihenfolge zaehlt. Jetzt dieselbe Reihenfolge UND
+          // dasselbe Label wie dort: wer vorn liegt, sagt weiterhin die Farbe (Klasse
+          // "l"/"r" unten), nicht mehr die Ziffernreihenfolge.
+          ueb.textContent="Lebende "+nL+" : "+nR;
           mitte.appendChild(ueb);
         }
         // K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09.,
@@ -12866,8 +12872,25 @@
     document.getElementById("klsuffix").textContent="Punkte";
     document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
     document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
-    // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
-    const bisher=fsBisher().team;
+    // GEPRUEFT, F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 1: hier stand bis dahin
+    // `fsBisher().team` -- eine Nachzaehlung aus dem Enthuellungs-Log `fsZuege` (noch aus
+    // der Zeit des "vorab durchgerechneten" Modells, das seit Footballs Live-Migration
+    // (03.09.) fuer KEIN Feldspiel-Chassis mehr existiert, s. fsBisher()-Kommentar). Football
+    // haengt fuer jeden erfolgreichen Extra-Punkt zwar `fsPunkte` hoch (footballDownWeiter(),
+    // "if(rr()<...xpQuote){ fsPunkte[...]+=1 ..."), ruft dafuer aber NIE logZug() auf -- die
+    // TD-6-Punkte werden geloggt, der separate XP-Punkt nicht. `fsBisher().team` blieb dadurch
+    // je erfolgreichem Extra-Punkt einen Punkt hinter dem echten Ergebnis zurueck (9:6 statt
+    // 10:7), waehrend Ticker/Viertel-Callouts/finish() (Z. ~9890/9967/12130) schon immer
+    // `fsPunkte` direkt lasen -- daher der Widerspruch im Audit.
+    // GEKLAERT VOR DEM FIX (Auftrag verlangt das ausdruecklich): `fsPunkte` ist die EINZIGE
+    // Groesse, die window.__arena.spieleFeldspiel() nach aussen gibt (weiter unten, "seiten:
+    // [fsPunkte[0],fsPunkte[1]]") -- die Wertung/PPS-Ableitung in
+    // lib/resolve/battle-mode-arena-team-points.ts liest diesen Rueckgabewert, NIE fsBisher()
+    // oder fsZuege. Beide Anzeigequellen sind also reine Anzeige, und `fsPunkte` ist die
+    // vollstaendigere -- reine Anzeige-Vereinheitlichung (Klasse A), keine Wertungsfrage:
+    // fsZuege/logZug bleiben unangetastet, damit boxscore-/rho-Messungen, die den
+    // Enthuellungs-Log lesen (z.B. fuer Vorlagen/Feldwuerfe), bit-identisch bleiben.
+    const bisher=fsPunkte;
     document.getElementById("score").textContent=bisher[0]+" : "+bisher[1];
     const maxPkt=Math.max(1,bisher[0],bisher[1]);
     document.getElementById("thpL").style.width=(bisher[0]/maxPkt*100)+"%";
@@ -19202,13 +19225,13 @@
     g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
 
-    // NEON-SCHILD "WETTESSEN" oben (platter.tsx' Neon-Schild-Motiv) -- unveraendert; die
-    // 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3) haben eigene Zonen weiter unten im Bild,
-    // s. zeichneWettessenUhr()/zeichneWettessenBand().
-    ctx.fillStyle="rgba(20,10,6,.75)";ctx.fillRect(W/2-130,4,260,26);
-    ctx.strokeStyle="rgba(242,193,78,.7)";ctx.lineWidth=1;ctx.strokeRect(W/2-130,4,260,26);
-    ctx.font="800 15px Georgia,serif";ctx.fillStyle="rgba(242,193,78,.85)";
-    ctx.textAlign="center";ctx.fillText("W E T T E S S E N",W/2,22);
+    // NEON-SCHILD "WETTESSEN" ENTFERNT (F1-Broadcast-Audit Runde 2, 30.09., Punkt 6, Bild
+    // 11, "wettessen zwei uhren zwei staende"): stand bei y:4-30, exakt unter dem HTML-
+    // Score-Bug (.bbug, top:8px), der Stand+Uhr fuer JEDE Disziplin ohnehin schon zeigt --
+    // und die Disziplin selbst steht bereits dauerhaft in der Fbar oben (#arenaDisc), auch
+    // wenn dieses Schild verschwindet. Die 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3)
+    // haben eigene Zonen weiter unten im Bild, s. zeichneWettessenUhr()/
+    // zeichneWettessenBand() -- unveraendert.
 
     // WIMPELKETTE, dieselbe Idee wie platter.tsx' Banner-Band.
     ctx.fillStyle="rgba(230,210,180,.35)";
@@ -23019,16 +23042,14 @@
     const b=TEILNEHMER.find(u=>u.side===1&&u.duellNr===aktivNr);
     if(!a||!b)return;
 
-    // GROSSE DUELLSTAND-ZEILE — dieselbe Zahl wie im DOM-Score (#score), hier zusaetzlich
-    // auf der Buehne selbst, weil das Auge beim Gewichtheben auf dem Podest bleibt, nicht
-    // am Seitenrand des HUDs.
-    const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=art.rundenN&&u.duellGewonnen).length;
+    // GROSSE DUELLSTAND-ZEILE ENTFERNT (F1-Broadcast-Audit Runde 2, 30.09., Punkt 6):
+    // stand bei H*0.10 -- genau dort, wo der HTML-Score-Bug (.bbug, top:8px) ohnehin schon
+    // dieselbe Zahl zeigt ("dieselbe Zahl wie im DOM-Score (#score)", s. Kommentar, der hier
+    // stand). Zwei uebereinanderliegende Ebenen mit identischem Inhalt sind keine zweite
+    // Information, nur eine Kollision (Bild 04, "gewichtheben bug ueber canvas stand") --
+    // der Bug bleibt die einzige Instanz dieser Zahl, die Buehne zeigt darunter nur noch die
+    // Duell-/Rollen-Zeile, die der Bug NICHT tragen kann.
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="700 30px 'Barlow Condensed',sans-serif";
-    ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-    const standTxt=duelle(0)+" : "+duelle(1);
-    ctx.strokeText(standTxt,W/2,H*0.10);
-    ctx.fillStyle="#f2e9d8";ctx.fillText(standTxt,W/2,H*0.10);
     ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
 
@@ -23512,11 +23533,15 @@
     const halb=(a.aktuell+1)+(b.aktuell+1);
     const {B,letzter}=schachStellung(partie,halb);
 
-    // DUELLSTAND gross wie beim Heben: gewonnene Bretter je Seite.
+    // DUELLSTAND gross wie beim Heben: gewonnene Bretter je Seite. Die Zahl selbst wird NICHT
+    // mehr hier oben gezeichnet (F1-Broadcast-Audit Runde 2, 30.09., Punkt 6, Bild 20,
+    // "speed-schach bug ueber canvas"): bei H*0.075 stand sie exakt unter dem HTML-Score-Bug
+    // (.bbug, top:8px), der dieselbe "bretter(0):bretter(1)"-Zahl bereits zeigt
+    // (updateHudBuehne()s BB().duell-Zweig) -- zwei identische Zahlen uebereinander. `gew()`
+    // bleibt als reine Ableitung stehen: die Sieger-Kennung unten (SIEG-Rahmen/-Text) braucht
+    // sie weiterhin.
     const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&(s===0?x.vorteil>0:y.vorteil>0))n++;}return n;};
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="700 30px 'Barlow Condensed',sans-serif"; ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-    const st=gew(0)+" : "+gew(1); ctx.strokeText(st,W/2,H*0.075); ctx.fillStyle="#f2e9d8"; ctx.fillText(st,W/2,H*0.075);
     // Opus-Review-Fund (06.09.): dass die Regie gerade ABGESCHALTET ist, war nirgends zu
     // sehen — der gelbe Rahmen unten wird nur an Mini-Brettern gezeichnet, und das
     // gepinnte Brett ist nie eines. Ohne Hinweis sieht ein stehender Fokus aus wie eine
@@ -38031,12 +38056,42 @@
       // Kader-Mittelzeile. Speed-Schach/Tennis bleiben bei `vorteil>0`.
       ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length+" : "+
          TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&(BB().fechten?x.gefechtSieg:x.vorteil>0)).length)
+      // F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 3 -- EIN STAND, EINDEUTIG BESCHRIFTET:
+      // dieser Zweig (Heben/Gauntlet/Wettessen/generische Auftritt-Buehne) zeigte bisher
+      // ausnahmslos die Summe aus `x.summe` -- bei Heben/Breaking eine ANDERE Groesse als
+      // der Bug/die Scoreline direkt darueber (#score, updateHudBuehne()): Heben zaehlt dort
+      // GEWONNENE DUELLE, Breaking (Gauntlet) VERBLIEBENE Kaempfer, waehrend hier Kilogramm
+      // bzw. Folter-/Auftrittspunkte standen -- zwei unbeschriftete "a:b" verschiedener
+      // Bedeutung nebeneinander. Wettessen zeigte zusaetzlich noch die ROHE, nicht auf den
+      // Minutenendstand geglaettete Summe und lief der Scoreline damit voraus (Befund
+      // "Kaderleiste laeuft der Scoreline voraus"). Gewichtheben/Breaking bekommen deshalb ein
+      // kurzes Praefix (gleiche Konvention wie "KP 12:8" im Battlefield-Bug, s.
+      // aktualisiereBbug()); Wettessen liest `wettessenAnzeigeSumme()` -- dieselbe geglaettete
+      // Funktion, die #score/den Bug schon fuettert (updateHudBuehne()) -- statt der rohen
+      // Summe, also dieselbe Zahl an beiden Stellen statt eines dritten Labels. Reine
+      // Ableitung aus bereits vorhandenem Zustand, kein rr(), kein neuer Simulationswert.
       : istBuehne(disc)
-      ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
-         Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+      ? (BB().wettessen
+        ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0)))
+        : BB().heben
+        ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+        : BB().gauntlet
+        ? ("PKT "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+        : (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0))))
       : istFeldspiel(disc)
-      ? (fsStand.team[0]+" : "+fsStand.team[1])
-      : (live(0).length+" : "+live(1).length);
+      // Football-Fix (Punkt 1, s. updateHudFeldspiel()-Kommentar): dieselbe Quelle wie die
+      // Scoreline -- `fsPunkte` statt des um die Extra-Punkte hinterherhinkenden
+      // `fsStand.team` (= fsBisher().team).
+      ? (fsPunkte[0]+" : "+fsPunkte[1])
+      // LEBENDE, jetzt explizit beschriftet UND in Seitenreihenfolge (Punkt 3): dieselbe
+      // Zahl, dieselbe Reihenfolge wie die "Ueberzahl"-Zeile im Bug (aktualisiereBbug()) --
+      // vorher standen hier zwei unbeschriftete "a:b" mit vertauschter Reihenfolge
+      // nebeneinander (Bug: groesser:kleiner: Kaderleiste: Seite 0:Seite 1).
+      : ("Lebende "+live(0).length+" : "+live(1).length);
     // EINE Zeile unter der Kaderleiste, zwei Mechaniken: Fokus-Doppeln im Basketball,
     // Zielansage im Kampf. Sie schliessen sich gegenseitig aus (eine Disziplin ist immer
     // nur das eine), deshalb schreibt hier immer genau eine der beiden Fassungen — und die
