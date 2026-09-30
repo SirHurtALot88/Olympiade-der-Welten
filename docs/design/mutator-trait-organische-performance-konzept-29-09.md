@@ -854,14 +854,33 @@ Kontaminationsweg). Kampf: vorher = echte `main`-Engine.
 
 ### 11.4 Was offen bleibt
 
-1. **Climbing steht auf der Schranke — Entscheidung bei Chris.** Ohne Mutator 0,808 im Mittel über
-   sechs Saatsätze (einer davon 0,799), mit Mutator 0,801, gepaart −0,007. Am Standard-Saatsatz der
-   nächtlichen Prüfung (`ci-nightly.yml` → `pruefe-rangtreue-schranke.mjs`) landet Climbing bei
-   0,791: die **absolute 0,80-Prüfung für arena-aufgelöste Disziplinen wird dort anschlagen**. Ein
-   kleinerer Bonus hilft messbar nicht (+2,5 ebenfalls −0,007). Sinnvolle Wege: (a) eine eigene
-   Climbing-Kalibrierrunde für Abstand zur Schranke (Climbing war schon vor dieser Änderung der
-   knappste Fall), (b) die Prüfung über mehrere Saatsätze mitteln statt über einen, (c) bewusst
-   hinnehmen. Nichts davon ist hier vorweggenommen.
+1. **Die nächtliche Rho-Prüfung reißt nach diesem Merge bei DREI Disziplinen, nicht nur bei
+   Climbing — Entscheidung bei Chris.** Das unabhängige Review (Runde 2) hat den vollständigen
+   `ci:rangtreue-schranke`-Lauf (`ci-nightly.yml` → `pruefe-rangtreue-schranke.mjs`) auf dem
+   PR-Stand selbst ausgeführt statt nur die Climbing-Zeile zu übernehmen — er schlägt fehl:
+
+   | Disziplin | Basislinie (16.09.) | PR-Stand | Rückgang | Schranke | Verstoß |
+   |---|---:|---:|---:|---:|---|
+   | Climbing | 0,834 | 0,791 | −0,043 | 0,80 absolut | absolute Schranke gerissen |
+   | Showcase | 0,892 | 0,835 | −0,057 | 0,050 relativ | relative Schranke gerissen |
+   | Breaking | 0,869 | 0,808 | −0,061 | 0,050 relativ | relative Schranke gerissen |
+
+   Gepaart über sechs Spiel-Saatsätze (eigene Messung, Reviewer):
+
+   | Disziplin | ohne Mutator (Mittel) | mit Mutator (Mittel) | gepaartes Δ | Einordnung |
+   |---|---:|---:|---:|---|
+   | Climbing | 0,808 | 0,801 | −0,007 | größtenteils Saat-Rauschen einer ohnehin knappen Disziplin |
+   | Showcase | 0,842 | 0,839 | −0,002 | der Bruch zur Basislinie kommt vor allem aus Drift, die `main` schon hat (0,845 gegen 0,892) |
+   | Breaking | 0,826 | 0,811 | **−0,015** | doppelter Climbing-Effekt, im PR-Text nicht gepaart gemessen; ein Saatsatz bei 0,796 |
+
+   Ein kleinerer Bonus hilft bei Climbing messbar nicht (+2,5 ergibt ebenfalls −0,007). Main
+   (24a8e1e1) ist in CI Nightly #308 grün — die drei Brüche entstehen also durch diesen PR, auch
+   wenn Climbing/Showcase überwiegend vorbestehendes Rauschen einer knappen Disziplin sind und nur
+   Breaking einen eigenständigen, doppelt so großen systematischen Effekt zeigt. Sinnvolle Wege:
+   (a) eine eigene Kalibrierrunde für alle drei Disziplinen (Climbing/Showcase/Breaking waren schon
+   vor dieser Änderung die knappsten Fälle), (b) die Prüfung über mehrere Saatsätze mitteln statt
+   über einen, (c) bewusst hinnehmen. Nichts davon ist hier vorweggenommen — die Rho-Schranke
+   gehört nicht zu den vier PR-Pflichtchecks und wird erst nach dem Merge im nächtlichen Lauf rot.
 2. **Hockey rho** 0,686 → 0,640 (Feldspieler 0,725 → 0,676): war schon vorher durchgefallen und ist
    die rauschstärkste Feldspiel-Disziplin; nicht über Saatsätze nachgemessen (ein Hockey-Durchlauf
    kostet ein Vielfaches). Hockey bekommt je Treffer auch am wenigsten PP (≈ 0,21).
