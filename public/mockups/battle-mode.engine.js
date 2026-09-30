@@ -20807,9 +20807,11 @@
     // Runde 2, 30.09., Punkt 23, Abschnitt 3.5: "obere Canvas-Haelfte leer") -- sk 1.45
     // statt 1.3 (Rang-2-Befund des ersten Audits war bereits "sk 1.3 statt hoechstens
     // 1.0/0.55", jetzt noch etwas deutlicher). `laneY` bleibt bei H*0.36: die Mannschafts-
-    // Leiste (H*0.145, Hoehe 20) und die Spielerkachel am Fokusgefecht (py-70, Radius 11)
-    // liegen im bestehenden Layout nur ~11px auseinander -- ein Hochziehen von `laneY`
-    // wuerde die Kachel in die Leiste schieben, s. Kollisionsrechnung in der PR-Beschreibung.
+    // Leiste (H*0.145, Hoehe 20, Unterkante ~88px bei H=470) und die Kachel-OBERKANTE am
+    // Fokusgefecht (laneY=H*0.36, ~88.2px) liegen im bestehenden Layout nur 0-2px auseinander
+    // -- die Kachel kann nicht weiter ausweichen, ein Hochziehen von `laneY` wuerde sie in
+    // die Leiste schieben. Die Stellschraube ist deshalb die Figur selbst: `b.vollbild`-
+    // Kreaturen werden ueber `skEff` auf sk=1.3 gedeckelt, s. Kollisionsrechnung dort.
     // Reine Zeichenmasse, `gross`-Zweig liest nur a/b.treffer/aktuell/vizLampeT/vizFunkeT --
     // kein neuer Zustand.
     zeichneBahn(fechtenFokus,mitte,gardeAbstand,H*0.36,1.45,true);
