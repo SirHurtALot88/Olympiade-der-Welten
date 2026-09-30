@@ -20670,7 +20670,35 @@
       posMap.set(a.id,{x:ax,y:ay}); posMap.set(b.id,{x:bx,y:by});
       [[a,ax,ay,"--home"],[b,bx,by,"--away"]].forEach(([u,px,py,farbVar])=>{
         const c=css(farbVar);
-        ctx.save(); ctx.translate(px,py); ctx.scale(sk,sk); ctx.translate(-px,-py);
+        // KOPF-KACHEL-KOLLISION BEI VOLLBILD-KREATUREN (Review-Fund, 30.09., zu Punkt 23):
+        // die Spielerkachel (zeichneSpielerKachel() unten, fest bei py-70, Radius 11 ->
+        // Kachel-Unterkante bei py-59) hat KEINEN Spielraum nach oben — ihre Oberkante
+        // (py-81) liegt in der UNVERAENDERTEN Basis-Geometrie nur 0-2px unter der
+        // Mannschafts-Leiste darueber (H*0.145, Hoehe 20 -> Unterkante ~88px bei H=470;
+        // Kachel-Oberkante bei laneY=H*0.36 ~88.2px). Die Kachel kann also nicht weiter
+        // ausweichen; die erste PR-Fassung hatte diesen Abstand mit der Kachel-MITTE statt
+        // der Kachel-OBERKANTE gerechnet und kam faelschlich auf ~11px "Luft".
+        //
+        // Die einzige verbleibende Stellschraube ist deshalb die Figur selbst. Fuer
+        // `b.vollbild`-Kreaturen (Lava Golem/Krolach/Krag'Zul/Vorrak/Tidesprinter, alle
+        // golem_walk.png o.ae.) reicht das Blatt nativ bis Zelle 0 (Kopf-/Hornspitze, s.
+        // Kommentar am `ctx.drawImage(...,y-46*Z,...)`-Aufruf im b.vollbild-Zweig weiter
+        // oben) -- die Kopf-Oberkante landet also im schlechtesten Fall (z.B. waehrend
+        // eines Ausfallschritts) bei `py-46*Z*sk`, deterministisch nachgestellt per
+        // `window.__arena.sondenLauf()` und Screenshot: bei sk=1.45 beruehrt Lava Golems
+        // Horn sichtbar die Kachel, bei sk=1.3 (dem bisherigen, bereits als sicher
+        // erprobten Wert) bestand noch ein klarer Spalt. Reiher-Mech (Seraph-11, `b.
+        // reiherMech`) bleibt aussen vor: sein Scheitel sitzt nur bei Zelle 27, also 19
+        // statt 46 Zellen ueber dem Anker (s. Kommentar bei `zeichneReiherMech` oben) --
+        // dieselbe Groessenordnung wie ein Standardkoerper, kein Kollisionsrisiko.
+        //
+        // `skEff` deckelt deshalb NUR `b.vollbild`-Kreaturen auf den bisherigen Wert --
+        // fuer jede ANDERE Kreatur (heutiger UND kuenftiger Kader) bleibt es exakt `sk`,
+        // keine Regression fuer normal grosse Fechter. Betrifft Skalierung UND den
+        // Namenszug darunter (`py+42*skEff` statt `py+42*sk`), damit Name und Figur
+        // zusammen skalieren; die Kachel-Position selbst (`py-70`) bleibt unangetastet.
+        const skEff=(BAU[u.n]||BAU_STD).vollbild?Math.min(sk,1.3):sk;
+        ctx.save(); ctx.translate(px,py); ctx.scale(skEff,skEff); ctx.translate(-px,-py);
         ctx.fillStyle=c; ctx.globalAlpha=0.2;
         ctx.beginPath(); ctx.ellipse(px,py+19,15,5,0,0,Math.PI*2); ctx.fill();
         ctx.globalAlpha=1;
@@ -20686,10 +20714,10 @@
         ctx.font="400 9px 'IBM Plex Mono',monospace";
         ctx.lineWidth=2.2; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
         const name=u.n.length>13?u.n.slice(0,12)+"…":u.n;
-        ctx.strokeText(name,px,py+42*sk); ctx.fillStyle=c; ctx.fillText(name,px,py+42*sk);
+        ctx.strokeText(name,px,py+42*skEff); ctx.fillStyle=c; ctx.fillText(name,px,py+42*skEff);
         // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
-        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3), unterhalb der
-        // Trefferlampen-/Kopfzeile-Reihe (laneY-halbH-14).
+        // ueber dem Fechter, weit genug ueber dem skalierten Kopf (sk=1.3, s. Kommentar
+        // oben zu `skEff`), unterhalb der Mannschafts-Leiste.
         zeichneSpielerKachel(u,px,py-70,22,farbVar);
       });
       if(gross){
