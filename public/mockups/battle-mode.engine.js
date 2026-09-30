@@ -18297,6 +18297,10 @@
           const r=u.aktuell>=0?u.runden[u.aktuell]:null;
           u.vizPhase=(r&&r.gueltig)?"hoch":"ablage"; // ungueltig: kein Ueberkopf-Halt
           u.vizPhaseT=0;
+          // TEAM-FEIER AM LAMPEN-MOMENT (Konzept team-publikum-feiermomente 3.1): genau hier
+          // schalten Kampfrichterlampen, Versuchstafel und Ton um -- NICHT an der Enthuellung in
+          // stepBuehne() (Spoiler-Regel H1/H2.2). Liest nur, schreibt nur `teamFeiern`.
+          hebenFeierAmUrteil(u,r);
         }
       } else if(u.vizPhase==="hoch"){
         if(u.vizPhaseT>=HEBEN_HOCH_T*dauer){ u.vizPhase="ablage"; u.vizPhaseT=0; }
@@ -18304,6 +18308,52 @@
         if(u.vizPhaseT>=HEBEN_ABLAGE_T*dauer){ u.vizPhase="boden"; u.vizPhaseT=0; }
       }
     }
+  }
+
+  // DUELL ENTSCHIEDEN? (Konzept team-publikum-feiermomente Abschnitt 5, Nebenfund 1, und 3.1.)
+  // Ein Gewichtheben-Duell zaehlt erst, wenn BEIDE Duellanten alle Versuche enthuellt haben --
+  // frueher reichte `u.aktuell+1>=u.runden.length&&u.duellGewonnen` am Sieger allein, und das
+  // griff schon bei dessen EIGENEM sechsten Versuch: ging er in Runde 6 zuerst (leichtere Last),
+  // stand das 1:0 im Bug, bevor der Gegner seinen letzten Versuch ueberhaupt hatte.
+  // `nachLampe` (nur fuer die Live-Anzeige): zusaetzlich muss das Urteil des letzten Versuchs
+  // schon GEZEIGT sein (vizPhase nicht mehr antritt/zug, derselbe Moment wie Lampen/
+  // Versuchstafel/Team-Feier) -- sonst verriete der Bug beim Enthuellen, ob der laufende
+  // Versuch glueckt. Nach `done` gilt nur die Enthuellung (dann steht ohnehin das Endstand-
+  // Overlay, und buehneStand() muss dort den vollstaendigen Stand liefern). Reine Anzeige:
+  // liest nur u.aktuell/u.runden/u.vizPhase/done, schreibt nichts.
+  function hebenGegner(u){ return TEILNEHMER.find(x=>x.duellNr===u.duellNr&&x.side!==u.side)||null; }
+  function hebenDuellEntschieden(u,nachLampe){
+    if(!u||u.aktuell+1<u.runden.length)return false;
+    const g=hebenGegner(u);
+    if(!g||g.aktuell+1<g.runden.length)return false;
+    if(nachLampe&&!done){
+      const offen=x=>x.vizPhase==="antritt"||x.vizPhase==="zug";
+      if(offen(u)||offen(g))return false;
+    }
+    return true;
+  }
+  // TEAM-FEIER-ADAPTER GEWICHTHEBEN (Konzept 3.1), aufgerufen aus stepHeben() am Uebergang
+  // zug -> hoch|ablage. Reines Lesen (r.gueltig/r.kuehn/r.punktesieg/u.duellGewonnen sind in
+  // diesem Moment enthuellt und sichtbar), schreibt nur ueber teamFeierAusloesen() in
+  // `teamFeiern`. Bei `stumm` sofort zurueck (stepHeben laeuft ueber buehnenBewegung() auch im
+  // Messpfad mit).
+  //   Duell entschieden (beide fertig, Gegner-Urteil schon gezeigt) -> gross fuer den Sieger
+  //   Kuehner Versuch geglueckt (Punktesieg)                        -> mittel fuer u.side
+  //   Gueltiger Versuch                                             -> klein fuer u.side
+  // Die Stufe "finale" (Spiel entschieden) entfaellt in Phase 1, s. Modulkopf teamFeiern.
+  function hebenFeierAmUrteil(u,r){
+    if(stumm||!r)return;
+    if(hebenDuellEntschieden(u,true)){
+      const g=hebenGegner(u);
+      const sieger=u.duellGewonnen?u.side:(g&&g.duellGewonnen?g.side:null);
+      // Anker: der Duell-Sieger auf der Plattform (seine Spalte HEBEN_SPALTE, Hoehe knapp ueber
+      // dem Fusspunkt H*0.46). Das Konzept schlug die Plattformmitte vor; im Screenshot las sich
+      // ein Konfettiwurf ZWISCHEN den beiden Hebern aber wie "irgendwas explodiert", ueber dem
+      // Sieger dagegen eindeutig als "sein Team feiert ihn".
+      if(sieger!=null){ teamFeierAusloesen(sieger,"gross",{x:W*HEBEN_SPALTE[sieger],y:H*0.46}); return; }
+    }
+    if(r.kuehn&&r.punktesieg)teamFeierAusloesen(u.side,"mittel",null);
+    else if(r.gueltig)teamFeierAusloesen(u.side,"klein",null);
   }
 
   // ================== ZIEL 5: SPEED-SCHACH BEWEGT SICH (stepSchach) ==================
@@ -23583,6 +23633,26 @@
     ctx.font="400 11px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
 
+    // TEAM-PUBLIKUM (Konzept team-publikum-feiermomente 3.1): die zehn Heber, die gerade NICHT
+    // auf der Plattform stehen, sitzen als Teambank links (Heim) bzw. rechts (Gast) neben der
+    // Plattform und feiern mit (teamFeierHaltung(), Ausloeser hebenFeierAmUrteil() in
+    // stepHeben()). Vor den beiden aktiven Hebern gezeichnet. KLATSCHEN beim Antritt des
+    // eigenen Hebers: dieselbe Wippe wie die Publikumssilhouetten in bodenHeben()
+    // (klatschWippe), nur auf die Bank der Seite von letzterHebenZug.u -- damit bewegt sich bei
+    // JEDEM der 72 Versuche etwas Menschliches im Bild. Reine Anzeige, liest nur
+    // TEILNEHMER/letzterHebenZug/buehneT.
+    teamFeierFarbenLesen();
+    {
+      const klatschSeite=(letzterHebenZug&&letzterHebenZug.u.vizPhase==="antritt")?letzterHebenZug.u.side:null;
+      const klatsch=klatschSeite!=null?-Math.abs(Math.sin(buehneT*2*Math.PI*4.2))*2.2:0;
+      [0,1].forEach(s=>{
+        // nach duellNr, symmetrisch: das fruehere Duell steht jeweils naeher an der Plattform
+        const bank=TEILNEHMER.filter(u=>u.side===s&&u.duellNr!==aktivNr)
+          .sort((p,q)=>(s===0?-1:1)*((p.duellNr??0)-(q.duellNr??0)));
+        zeichneTeambank(bank,s,hebenBankRect(s),HEBEN_BANK_SKALA,s===klatschSeite?klatsch:0);
+      });
+    }
+
     // TOTE STRECKEN FUELLEN (Broadcast-Audit Runde 2, Punkt 19, 30.09.): Gewichtheben steht
     // laut Messung 95 % der Sendezeit als Standbild, bis zu 30 s am Stueck ohne sichtbare
     // Aenderung (Tabelle 6.2) -- im echten Fernsehen laeuft in dieser Zeit die Versuchsuhr,
@@ -23912,7 +23982,19 @@
       ctx.fillStyle=p.fertig?css(p.pa.duellGewonnen?"--home":"--away"):"#5f6675";
       ctx.fillText(p.status,rx,ry+11);
     });
+    // TEAM-FEIER-EFFEKTE (Konzept 3.1/2.4) als letzte Ebene: Konfetti/Blitz einer Feier ohne
+    // eigenen Anker steigen ueber der Bank der feiernden Seite auf.
+    teamFeierEffekte(s=>{ const r=hebenBankRect(s); return {x:(r.x0+r.x1)/2,y:r.fussY-24}; });
   }
+  // TEAMBANK-GEOMETRIE (Konzept 3.1, per Screenshot nachjustiert): links/rechts neben der
+  // Plattform (W/2+-0,23W, also x 335-905), unter der Anzeigetafel oben rechts (y 64-162,
+  // bodenHeben()) und ueber der Duell-Textzeile bei H*0.90. Fusslinie H*0.70 (=329) statt der
+  // im Konzept vorgeschlagenen H*0.74 (=348): dort stand die Gastbank mitten im Hantelstaender
+  // (W*0.90, y 336-376) und die Heimbank auf der Kreidekiste (W*0.08, y 362-376). Skala 0,8
+  // statt 0,62: bei der im Spiel ~0,77-fach verkleinerten Leinwand waren die Figuren sonst kaum
+  // als Menschen und ihr Huepfer kaum als Bewegung zu erkennen.
+  const HEBEN_BANK_SKALA=0.8;
+  function hebenBankRect(s){ return s===0?{x0:34,x1:302,fussY:H*0.70}:{x0:W-302,x1:W-34,fussY:H*0.70}; }
 
   // ================== SPEED-SCHACH: EIGENES BUEHNENBILD (Fable-Plan 05.09., Teil A) ==================
   // Ein Fokus-Brett gross in der Mitte, beide Spieler daneben, zwei Schachuhren, ein
