@@ -113,9 +113,12 @@ Chris (Review 6.2), keine beantwortet.
 - Staffel: keine variablen Beinlängen (K5 gestrichen), kein Konstanz-Stat, KI-Reihenfolge bleibt.
 - Zeitfahren: Einzelstart 0,8 s, Teamwertung Zeitsumme (Chris 22.09.).
 - Bit-Identität per Konvention: jedes neue Feld in `BAHN_ART` ist ungesetzt wirkungslos.
-- Kadergrößen: die Saisonlogik würfelt 2–6 je Seite und lässt die Basiszahl aus — Spurt läuft
-  3/4/5/6, Staffel 2/4/5/6, Takeshi 2/3/5/6 (`staffel-offene-fragen…` 1.5). Jede Mechanik muss
-  bei allen vorkommenden Größen bestehen.
+- Kadergrößen: die Saisonlogik würfelt heute **gleichverteilt 2–6 je Seite**
+  (`buildSeasonPlayerCount`, `lib/season/season-discipline-schedule.ts:117`; innerhalb einer
+  Kategorie mit fünf Disziplinen als ausgeglichene Ziehung 2/3/4/5/6, `:166 ff.`). Die ältere
+  Regel „die Basiszahl wird nie gespielt" (`staffel-offene-fragen…` 1.5, 05.09.) gilt nicht mehr.
+  Jede Mechanik muss bei **zwei bis sechs** je Seite bestehen — bei zwei je Seite über Star in
+  Top 2 und Paartreue statt über nacktes rho (`spurt-offene-fragen…` Frage 5).
 
 ### 0.5 Wie ich Ideen klassifiziere
 
@@ -405,9 +408,9 @@ Positionen. Der Sprinterkurs verschiebt real Gewicht zu Speed; Pp muss **gemitte
 Kurse** ≤ 25 bleiben, und kein Einzelkurs darf so weit kippen, dass ein Spieltag die Matrix
 verrät (Vorschlag als Korridor: je Kurs ≤ 35, gemittelt ≤ 25). ANTRITT ist auf 3,2 s ab Start
 fest — beim Ninja-Kurs kommt die erste Station bei 8 % noch **in** der Antrittsphase; das ist
-gewollt (der Turner braucht keinen Antritt), aber zu messen. Bei drei je Seite (die kleinste
-Größe, die der Saisonplan für Spurt würfelt) muss jede Variante die Star/Paartreue-Abnahme aus
-`spurt-offene-fragen…` Frage 5 halten.
+gewollt (der Turner braucht keinen Antritt), aber zu messen. Bei zwei je Seite (vier Läufer,
+die kleinste Größe, die der Saisonplan würfelt) muss jede Variante die Star/Paartreue-Abnahme
+aus `spurt-offene-fragen…` Frage 5 halten.
 
 **Aufwand:** mittel. Konfiguration plus der Kurs-Mechanismus aus Takeshi (`bahnFallenTypen`,
 `bahnKursName`, `engine.js:32858`), verallgemeinert auf Positionen; Pp je Kurs und gemittelt;
@@ -520,11 +523,11 @@ für die Pläne ist.
 
 ### 4.3 Hinweis zu ST-P2: Beinprofile müssen für zwei bis sechs je Seite definiert sein
 
-Die Staffel läuft 2/4/5/6 je Seite, nie 3 (0.4). „Bein 1 aus dem Block, Kurve/Gerade im
+Die Staffel läuft mit zwei bis sechs je Seite (0.4). „Bein 1 aus dem Block, Kurve/Gerade im
 Wechsel, Bein 6 Anker" ist für sechs gedacht. Vorschlag für die Regel, damit ST-P2 nicht an
-der Zweierstaffel scheitert: **erstes Bein immer Block, letztes immer Anker, dazwischen Kurve
-und Gerade abwechselnd, beginnend mit Kurve** — bei zwei je Seite also Block + Anker, ohne
-Kurvenbein. Das Maß „gegen den Gegner auf demselben Bein" ist bei allen Größen definiert, weil
+der Zweier- oder Dreierstaffel scheitert: **erstes Bein immer Block, letztes immer Anker,
+dazwischen Kurve und Gerade abwechselnd, beginnend mit Kurve** — bei zwei je Seite also Block +
+Anker ohne Kurvenbein, bei drei Block + Kurve + Anker. Das Maß „gegen den Gegner auf demselben Bein" ist bei allen Größen definiert, weil
 beide Seiten gleich viele Beine haben. Keine Idee, nur ein Stolperstein, der sonst in der
 Umsetzungsrunde auftaucht.
 
@@ -587,7 +590,8 @@ nativer Weg, ein schlechter gestellter Nebenweg, monotone Politik.
 (Charisma) bleibt Nebenweg — passt zur Hypothese aus 5.1, ist aber zu messen.
 
 **Aufwand:** mittel. Ein Fallenzweig mit Versuchszähler, zwei Fallen im `kurse[]`-Muster markiert,
-Bild und Ticker („zweite Tür — Massivholz", „dritte Tür — Papier!"), kaderfest bei 2/3/5/6.
+Bild und Ticker („zweite Tür — Massivholz", „dritte Tür — Papier!"), kaderfest bei zwei bis
+sechs je Seite.
 
 ### 5.3 Typisierter Nebenweg statt Universal-Wucht: `fallenDurchbruch` für Pp nachmessen (Klasse B, klein)
 
