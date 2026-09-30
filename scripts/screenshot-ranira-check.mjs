@@ -4,9 +4,9 @@ import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 
-const WURZEL = "/tmp/wt-font-ranira";
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
-const OUT_DIR = process.argv[2] || "/tmp/ranira-check-out";
+const OUT_DIR = process.argv[2] || path.join(WURZEL, "tmp-ux-audit", "ranira-check");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".png": "image/png", ".json": "application/json", ".css": "text/css", ".otf": "font/otf" };
 
