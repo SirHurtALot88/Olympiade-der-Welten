@@ -26753,9 +26753,15 @@
       // zur Zeitskalierung: eine aendert die angezeigte Sekundenzahl, die andere ob es ein
       // Banner gibt.
       const respawnAnzeige=Math.round(TDM_RESPAWN_SEK*zeitFaktor());
-      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind);
+      // AKTEUR = von.n (Punkt 11, s. feed()-Kommentar oben): schalteAus(tg,von) kennt hier
+      // schon beide Seiten des Treffers -- vorher landete in HIGHLIGHTS/der "Szene des
+      // Spiels" nur tg.n (das OPFER), obwohl die Momentart (Mehrfachausschaltung/First
+      // Blood/spielentscheidend) die Leistung des ANGREIFERS auszeichnet (Audit-Beispiel:
+      // "Mehrfachausschaltung — Rhyx'Tal fällt" nannte den Getroffenen, nie den Treffer-
+      // geber). Der Ticker-Text selbst bleibt unangetastet.
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n);
     } else {
-      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind);
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n);
     }
   }
 
@@ -28975,7 +28981,13 @@
   function bahnTeamstand(){
     if(BA().wertung==="rang"){
       const w=bahnRangliste();
-      return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true};
+      // BANNERZUSATZ (Punkt 17, 30.09.): NUR fuer den Sieger-Banner-Text unten in
+      // renderEndstandBahn() -- ein zusaetzliches Feld neben `zusatz` (das bleibt
+      // unangetastet fuer die laufende HUD-Unterzeile, s. deren eigener Aufruf), damit der
+      // Banner GENAU EINEN sprechenden Zusatz bekommt, ohne die Live-Anzeige zu beruehren.
+      const diff=Math.round(Math.abs(w.seiten[0]-w.seiten[1])*10)/10;
+      return {seiten:w.seiten, suffix:"Punkte nach Rang", punkte:w.punkte, gewertet:true,
+        bannerZusatz:diff>0?"mit "+diff+" Punkten Vorsprung":null};
     }
     // TIME-TRIAL (22.09.): ZWEI Groessen, GENAU WIE BEI DER STAFFEL bewusst nicht eine
     // (s. "etappe"-Kommentar direkt darunter fuer dasselbe Prinzip). Chris woertlich: "da
@@ -29052,8 +29064,12 @@
         delta=Math.abs(summe[0]-summe[1]);
         deltaSeite=summe[0]<summe[1]?0:summe[1]<summe[0]?1:null;
       }
+      // BANNERZUSATZ (Punkt 17): EIN Vorsprungswert statt der zwei Rohsummen oben (die
+      // fuer die Live-Unterzeile bleiben, s. Kommentar am "rang"-Zweig) -- behebt genau das
+      // Audit-Beispiel "0 : 1 NACH ZEITSUMME (7:02,2 MIN GEGEN 5:21,4 MIN)".
+      const bannerZusatz=beideVollstaendig?"mit "+fmtDauer(Math.abs(summe[0]-summe[1]))+" Vorsprung":null;
       return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
-        punkte:w.punkte, gewertet:alleFertig, zusatz, delta, deltaSeite};
+        punkte:w.punkte, gewertet:alleFertig, zusatz, bannerZusatz, delta, deltaSeite};
     }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
@@ -29090,6 +29106,9 @@
       return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
         punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
         zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
+        // BANNERZUSATZ (Punkt 17): derselbe Gedanke wie beim Zeitfahren oben -- EIN
+        // Vorsprungswert statt zweier Zielzeiten fuer den Sieger-Banner.
+        bannerZusatz:z[0]!=null&&z[1]!=null?"mit "+fmtZielzeit(Math.abs(z[0]-z[1]))+" Vorsprung":null,
         zeitVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit),
         // EIGENE SPALTE FUER DIE WECHSELDAUER (Chris' Meldung, s. PR-Beschreibung): vorher
         // haengte zeitVon oben die Wechselzeit nur AN, und nur wenn `u.wechselKonto<0` war —
@@ -29120,8 +29139,11 @@
       // das verbleibende "." ersetzen (eine ganze Zahl wie "6" hat nach der Kuerzung keins
       // mehr, bei der die Ersetzung sonst ins Leere liefe).
       const f1=(v)=>v.toFixed(1).replace(/\.0$/,"").replace(".",",");
+      const diff=r1(Math.abs(seiten[0]-seiten[1]));
       return {seiten:[r1(seiten[0]),r1(seiten[1])], suffix:"Burgpunkte", punkte, gewertet:true,
         fmt:f1,
+        // BANNERZUSATZ (Punkt 17): derselbe Vorsprungsgedanke wie oben, hier in Burgpunkten.
+        bannerZusatz:diff>0?"mit "+f1(diff)+" Punkten Vorsprung":null,
         // AUFSCHLUESSELUNG IM ENDSTAND (Chris 06.09., woertlich: "dann wenn man nach
         // burgpunkten geht muessten die in der wertung auch stehen damit man weiss wie
         // sich das zusammen setzt! also auch im end screen"). burgwertung() bleibt EINE
@@ -37050,7 +37072,14 @@
   // ab -- keine Sim-Zeit, exakt wie im Konzept gefordert. Jeder bestehende Aufruf laesst den
   // Parameter weg (undefined -> 0, also sofort wie bisher), bit-identisch fuer alle anderen
   // ~40 feed()-Aufrufstellen.
-  function feed(side,txt,big,caption,kind,verzoegerungMs){
+  // AKTEUR (Broadcast-Audit Runde 2, Punkt 11, 30.09.): optionaler siebter Parameter, NUR
+  // fuer die "Szene des Spiels" (waehleSzeneDesSpiels()/renderSzeneDesSpiels() unten) --
+  // der Ticker-/Callout-Text `txt` selbst bleibt unveraendert (der bisherige Wortlaut ist
+  // an keiner anderen Stelle falsch, nur die Szene-Box nannte bislang NIE, wer den
+  // Treffer gesetzt hat, s. Kommentar bei schalteAus()). Reine Zusatzbeschriftung, kein
+  // neuer Sim-Zustand, kein rr()-Aufruf -- jeder bestehende feed()-Aufruf laesst den
+  // Parameter weg (undefined), bit-identisch fuer alle ~40 anderen Aufrufstellen.
+  function feed(side,txt,big,caption,kind,verzoegerungMs,akteur){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -37088,7 +37117,7 @@
       // (die entscheidet ausschliesslich kampfGrossDrosseln() beim Aufrufer). Jeder
       // andere feed()-Aufruf (Bahn/Feldspiel/Buehne) laesst kind einfach weg -- die
       // Szene-Auswahl findet dort dann nichts und bleibt leer.
-      HIGHLIGHTS.push({side,txt,t:anzeigeT,kind});
+      HIGHLIGHTS.push({side,txt,t:anzeigeT,kind,akteur});
       if(verzoegerungMs)setTimeout(()=>callout(txt,caption),verzoegerungMs);
       else callout(txt,caption);
     }
@@ -38876,29 +38905,62 @@
   // HOEHEPUNKTE-RUECKBLICK: Text-Liste aller big-Ereignisse dieses Spiels (HIGHLIGHTS[],
   // gefuellt in feed()), gerendert wie eine kurze, fertige Ticker-Kopie im Endstand-Overlay
   // -- ausdruecklich KEIN Bild-Replay (Abschnitt 4.3 derselben Recherche haelt das fuer
-  // unverhaeltnismaessig teuer gegenueber dem Informationsgewinn). Nur an den beiden
-  // Stellen aufgerufen, die #endstand ueberhaupt zeigen (Kampf/renderEndstand, Bahn/
-  // renderEndstandBahn) -- Feldspiel und Buehne zeigen heute kein Endstand-Overlay,
-  // s. Kommentar bei stepFeldspielLive/stepBuehne, das bleibt unveraendert.
+  // unverhaeltnismaessig teuer gegenueber dem Informationsgewinn). Aufgerufen von allen
+  // VIER Endstand-Renderern (Kampf/Bahn/Buehne/Feldspiel, s.u.) -- Buehne und Feldspiel
+  // hatten diese Box zum Zeitpunkt des K5-Kommentars unten noch nicht, seit den jeweiligen
+  // Endstand-Nachtraegen (27.09./30.09.) aber schon.
+  //
+  // SZENE DES SPIELS FUER BUEHNE/BAHN/FELDSPIEL (Broadcast-Audit Runde 2, Punkt 11,
+  // 30.09.): dieselbe Idee wie waehleSzeneDesSpiels() oben, aber OHNE die vier Kampf-
+  // eigenen `kind`-Etiketten -- die anderen drei Chassis taggen ihre feed()-Aufrufe nicht
+  // danach, und eine eigene, elfte Momentart-Klassifikation je der zwoelf sehr
+  // verschiedenen Bahn-/Buehnen-/Feldspiel-Disziplinen waere kein Anzeige-Fund mehr,
+  // sondern eine neue Erkennungslogik. Stattdessen liest diese Funktion NUR, was ohnehin
+  // in HIGHLIGHTS[] steht: der letzte kuratierte big-Moment VOR der abschliessenden Sieg-/
+  // Endstand-Zeile (die jeder Chassis-`finish()`/`renderEndstandBahn()`-Zweig als
+  // allerletztes, immer ungedrosseltes `feed(...,true)` anhaengt, s. dort) -- nach der
+  // Banner-Dosierung (Broadcast-Audit Prio 1 #7, 30.09., PR #1081) ist das fast immer ein
+  // echter Wendepunkt (Brett/Bahn entschieden, Stufenwechsel, Fuehrungswechsel,
+  // Zieleinlauf), weil die Dosierung genau solche Ereignisse absichtlich selten und damit
+  // bedeutsam macht. Kein neues Tracking, kein rr()-Aufruf -- reiner Leser von HIGHLIGHTS.
+  function waehleSzeneDesSpielsGenerisch(){
+    for(let i=HIGHLIGHTS.length-1;i>=0;i--){
+      const h=HIGHLIGHTS[i];
+      // die generische Sieg-/Endstand-Zeile jedes Chassis enthaelt immer "gewinnt " oder
+      // "Unentschieden " (s. die feed(0,...)-Aufrufe in finish()/renderEndstandBahn()) --
+      // das ist der Banner-Text selbst, keine "Szene", darum ausgeklammert.
+      if(/gewinnt |Unentschieden /.test(h.txt))continue;
+      return h;
+    }
+    return null;
+  }
   // SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3): EIN
   // Moment aus den vier gemessenen Momentarten, ausgewaehlt nach waehleSzeneDesSpiels()
   // oben -- Overwatchs "Play of the Game"-Prinzip: "nicht an Sieg oder Gesamtwert
   // gebunden" (Leitplanke 0.1 Punkt 1 und Abschnitt 3/K5 der Recherche woertlich), also
   // auch fuer die Verlierer-Seite moeglich, wenn ihr Ereignis oben in der Prioritaet steht.
-  // Nur fuer Kampf aufgerufen (renderEndstand(), s.u.) -- renderEndstandBahn() teilt sich
-  // zwar #ehighlights/HIGHLIGHTS mit dem Kampf, aber Bahn-Ereignisse tragen nie ein `kind`
-  // (feed() dort ruft ohne den fuenften Parameter), waehleSzeneDesSpiels() faende dort also
-  // ohnehin nichts -- die Box bleibt fuer Bahn-Spiele hidden.
+  // Fuer Kampf zuerst die vier `kind`-Momentarten, sonst (kein Treffer, oder Bahn/Buehne/
+  // Feldspiel, deren Ereignisse nie ein `kind` tragen) die generische Auswahl oben.
+  //
+  // AKTEUR-FORMULIERUNG (Punkt 11, 30.09.): der reine feed()-Text beschreibt bei den vier
+  // Kampf-Momentarten bislang nur das OPFER ("Rhyx'Tal fällt — zurück in 9 s"), nie den
+  // TAETER -- die Szene-Box nannte also "Mehrfachausschaltung" ueber einer Zeile, die den
+  // GETROFFENEN nennt, nicht den, der getroffen hat (Audit Bild 02). `szene.akteur`
+  // (schalteAus() uebergibt jetzt von.n, s. dort) wird deshalb, wenn vorhanden, VOR den
+  // eigentlichen Text gestellt -- der Ticker/die Hoehepunkte-Liste selbst bleiben
+  // unveraendert, nur diese eine hervorgehobene Zeile liest sich jetzt aus Sicht des
+  // Handelnden.
   function renderSzeneDesSpiels(){
     const box=document.getElementById("eszene");
     if(!box)return;
-    const szene=waehleSzeneDesSpiels();
+    const szene=waehleSzeneDesSpiels()||waehleSzeneDesSpielsGenerisch();
     if(!szene){ box.hidden=true; box.textContent=""; return; }
     box.hidden=false; box.textContent="";
     box.appendChild(el("h5",null,"Szene des Spiels"));
     const zeile=el("div","ehzeile "+(szene.side===0?"h":"a"));
-    zeile.appendChild(el("span","eht",KAMPF_KIND_LABEL[szene.kind]||""));
-    zeile.appendChild(el("span",null,szene.txt));
+    const label=KAMPF_KIND_LABEL[szene.kind]||"";
+    if(label)zeile.appendChild(el("span","eht",label));
+    zeile.appendChild(el("span",null,szene.akteur?szene.akteur+" — "+szene.txt:szene.txt));
     box.appendChild(zeile);
   }
 
@@ -38915,15 +38977,120 @@
     e.className="esieger"+(sieger===0?" sieg-h":sieger===1?" sieg-a":"");
   }
 
+  // SIEGER-BANNER, EINHEITLICH UEBER ALLE CHASSIS (Broadcast-Audit Runde 2, Punkt 17,
+  // 30.09.): vorher formulierte jedes der vier renderEndstand*()-Overlays den Banner-Text
+  // selbst und uneinheitlich -- TDM/Battlefield/Mini-DM ganz ohne Stand ("Rhyx'Tal-Clan
+  // gewinnt", Audit Bild 02), die Bahn mit zwei redundanten Klammerwerten ("0 : 1 NACH
+  // ZEITSUMME (7:02,2 MIN GEGEN 5:21,4 MIN)", Bild 07/Abschnitt 3.1). EIN gemeinsamer
+  // Bauplan fuer alle: TEAM + "SIEGER" + der Stand in der disziplineigenen Einheit + GENAU
+  // EIN sprechender Zusatz -- reine Textzusammensetzung aus Werten, die jeder Aufrufer
+  // ohnehin schon berechnet (sieger/standText/zusatz), keine neue Wertung, kein neuer
+  // Vergleich.
+  function siegerBannerText(sieger,standText,zusatz){
+    const kopf=sieger===null?"UNENTSCHIEDEN":VEREIN[sieger].name.toUpperCase()+" SIEGER";
+    return kopf+" — "+standText+(zusatz?" · "+zusatz:"");
+  }
+
+  // MVP-KENNZAHL JE WERTUNGSTABELLE (Punkt 28, Audit Runde 2): dieselbe Spaltenliste, die
+  // die laufende Wertungstabelle (renderWertungTabelle(), s. dort "top:true") und die
+  // Endstand-Boxscores ohnehin schon zeigen -- kein neuer Wert, nur eine Auswahl, WELCHE
+  // Spalte "die wichtigste" ist. Bevorzugt eine echte Kompositspalte ("imp"/"zwei"/"pkt",
+  // je nachdem was die Tabelle fuehrt -- exakt der Wert, den MOTOREN[disc].wert()/
+  // impactVon() fuer die Rangtreue-Messung benutzt), sonst die erste hervorgehobene
+  // (top:true) Spalte, sonst die erste ueberhaupt. Reiner Leser von w.spalten/w.zeilen(),
+  // kein rr()-Aufruf, keine zweite Formel.
+  function mvpSpalteId(w){
+    const ids=w.spalten.map(s=>s.id);
+    for(const kandidat of ["imp","zwei","pkt"])if(ids.includes(kandidat))return kandidat;
+    const top=w.spalten.find(s=>s.top);
+    return top?top.id:ids[0];
+  }
+  function ermittleMvp(w,zeilen){
+    if(!zeilen.length)return null;
+    const spalte=w.spalten.find(s=>s.id===mvpSpalteId(w));
+    if(!spalte)return null;
+    let bester=null,besterWert=-Infinity;
+    for(const z of zeilen){
+      const v=+spalte.wert(z)||0;
+      if(v>besterWert){besterWert=v;bester=z;}
+    }
+    return bester;
+  }
+  // SPIELER-DES-SPIELS-STERN (Punkt 28): ein Badge vor dem Namen, dieselbe Markierung in
+  // allen vier Endstand-Tabellen (s. renderEndstand/-Bahn/-Buehne/-Feldspiel unten).
+  function mvpStern(titel){
+    const s=el("span","mvpstern","★");
+    s.title=titel||"Spieler des Spiels";
+    return s;
+  }
+
+  // HOEHEPUNKTE KURATIEREN (Broadcast-Audit Runde 2, Punkt 11, 30.09.): HIGHLIGHTS[]
+  // waechst chronologisch und ungefiltert -- Eiskunstlauf listet zehnmal Grams Fehler,
+  // Wettessen zehnmal "schlingt durch", Gewichtheben Routine-Versuche ("3. Versuch ...
+  // gültig"), Climbing/Spurt/Takeshi beginnen mit der bedeutungslosen Zeile "0:00
+  // übernimmt die Führung" (Audit-Abschnitt 3.4, Bild 16). Weil die Liste chronologisch
+  // ist, fuellen im Eiskunstlauf schon die ersten zwei Paare (Zeitstempel 0:00-0:09) den
+  // sichtbaren Teil -- der spaetere, entscheidende Teil bleibt unsichtbar (Overlay hat laut
+  // DOM-Sonde 14-205px verborgenen Scroll-Ueberhang, ohne jeden Hinweis darauf).
+  //
+  // DREI SCHRITTE, ALLE REINE FILTERUNG UEBER VORHANDENE HIGHLIGHTS[]-EINTRAEGE, KEIN
+  // NEUER SIM-ZUSTAND:
+  // 1) "0:00 uebernimmt die Fuehrung" ist die Startaufstellung, keine echte Fuehrung --
+  //    raus, in jedem Chassis. `h.t` ist `anzeigeT` (rennT*zeitFaktor(), ein Float) --
+  //    "0:00" ist nur die AUF DIE SEKUNDE GERUNDETE Anzeige (Math.floor beim Rendern), der
+  //    gespeicherte Wert liegt praktisch nie exakt bei 0. Re-Review-Fund (30.09., live auf
+  //    Spurt/Climbing reproduziert): eine strikte `h.t===0`-Pruefung traf deshalb NIE, die
+  //    Zeile blieb ungefiltert stehen. `h.t<1` faengt jeden Wert, der als "0:00" angezeigt
+  //    wird, ohne ein spaeteres, echtes Ereignis in der ersten Sekunde zu verlieren --
+  //    "uebernimmt die Fuehrung" aus der Startaufstellung ist ohnehin nur bei t=0 moeglich.
+  // 2) Wortgleiche Routine-Ereignisse (derselbe Text bis auf Zahlen) hoechstens zweimal
+  //    zeigen -- der Rest ist Wiederholung, kein neuer Hoehepunkt. Eine Signatur ohne
+  //    Ziffern faengt genau die drei Audit-Beispiele: "Gram — stolpert" x10, "Krolach —
+  //    schlingt durch (107 Punkte, Durchgang 4/10)" x4, "3. Versuch ... gültig" wird bei
+  //    unterschiedlicher Versuchsnummer NICHT zusammengefasst (die Zahl "3." ist Teil der
+  //    Signatur-Ziffern, aber der Rest des Satzes bleibt gleich) -- bewusst grosszuegig:
+  //    lieber zwei Belege zu viel als ein echter Wendepunkt zu wenig. BEHALTEN WERDEN DIE
+  //    LETZTEN ZWEI Vorkommen je Signatur, nicht die ersten (Re-Review-Fund 30.09., live auf
+  //    Wettessen reproduziert: ein chronologisches `n<=2` beim Vorwaertszaehlen behielt die
+  //    FRUEHESTEN zwei Durchgaenge und warf die beiden Schlussrunden-Ereignisse weg --
+  //    genau umgekehrt zum Ziel "die spaeteren, entscheidenden Momente zeigen"). Deshalb
+  //    rueckwaerts durch die chronologische Liste zaehlen und die am Ende getroffene Auswahl
+  //    wieder in Original-Reihenfolge filtern.
+  // 3) Deckel bei acht Chips (Punkt 11 nennt "6-8"): die SPAETESTEN Ereignisse gewinnen,
+  //    nicht die fruehesten -- genau umgekehrt zur alten chronologischen Liste, die von den
+  //    ersten Sekunden zugestopft wurde, waehrend der Spielausgang unten haengen blieb. Wo
+  //    das immer noch kuerzt, zeigt ein SICHTBARER Hinweis "+N weitere", statt still
+  //    abzuschneiden (Auftrag: "statt stillschweigend abzuschneiden") -- der Zaehler dahinter
+  //    zaehlt JEDEN wirklich verworfenen Eintrag (Dedup-Schritt 2 UND Deckel-Schritt 3
+  //    zusammen), nicht nur den Deckel allein (derselbe Re-Review-Fund: sonst verschwinden
+  //    per Dedup verworfene Ereignisse spurlos, ohne dass der Hinweis sie mitzaehlt).
+  function kuratiereHighlights(liste){
+    let gefiltert=liste.filter(h=>!(h.t<1&&/übernimmt die Führung/.test(h.txt)));
+    const zaehlerJeSignatur=new Map();
+    const behalten=new Array(gefiltert.length).fill(false);
+    for(let i=gefiltert.length-1;i>=0;i--){
+      const sig=gefiltert[i].txt.replace(/\d+([.,]\d+)?/g,"#");
+      const n=(zaehlerJeSignatur.get(sig)||0)+1;
+      zaehlerJeSignatur.set(sig,n);
+      if(n<=2)behalten[i]=true;
+    }
+    const dedupVerworfen=behalten.filter(b=>!b).length;
+    gefiltert=gefiltert.filter((h,i)=>behalten[i]);
+    const MAX_CHIPS=8;
+    const abgeschnitten=gefiltert.length>MAX_CHIPS;
+    const sichtbar=abgeschnitten?gefiltert.slice(-MAX_CHIPS):gefiltert;
+    return {sichtbar,verborgen:dedupVerworfen+(gefiltert.length-sichtbar.length)};
+  }
   function renderHighlights(){
     const box=document.getElementById("ehighlights");
     if(!box)return;
-    if(!HIGHLIGHTS.length){ box.hidden=true; box.textContent=""; return; }
+    const {sichtbar,verborgen}=kuratiereHighlights(HIGHLIGHTS);
+    if(!sichtbar.length){ box.hidden=true; box.textContent=""; return; }
     box.hidden=false;
     box.textContent="";
     box.appendChild(el("h5",null,"Höhepunkte"));
     const liste=el("div","ehlist");
-    for(const h of HIGHLIGHTS){
+    for(const h of sichtbar){
       const zeile=el("div","ehzeile "+(h.side===0?"h":"a"));
       zeile.appendChild(el("span","eht",
         Math.floor(h.t/60)+":"+String(Math.floor(h.t%60)).padStart(2,"0")));
@@ -38931,6 +39098,7 @@
       liste.appendChild(zeile);
     }
     box.appendChild(liste);
+    if(verborgen>0)box.appendChild(el("div","ehmehr","+"+verborgen+" weitere Momente dieses Spiels"));
   }
 
   function renderEndstand(){
@@ -38944,9 +39112,31 @@
     // dem Ticker-Sieger widersprechen konnte. kampfSieger() buendelt jetzt alle drei
     // Faelle (Domination/TDM/klassische Elimination) an einer Stelle.
     const sieger = kampfSieger();
-    document.getElementById("esieger").textContent =
-      sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
+    // SIEGER-BANNER-STAND (Punkt 17): dieselben drei Zweige wie finish() (KP/tdm/klassische
+    // Elimination), hier nur zusaetzlich fuer den Banner gelesen -- finish() haengt seine
+    // eigene, gleich lautende Sieg-Feed-Zeile ohnehin erst NACH diesem Aufruf an (s. dessen
+    // Kommentar "OFF-BY-ONE-FIX"), diese Funktion darf also nicht auf sie warten. Alle drei
+    // Werte (KP.punkte, ko-Summen, Ueberlebenspunkte) liest finish() an genau dieser Stelle
+    // schon fuer denselben Zweck; keine zweite Zaehlweise, nur zweimal gelesen.
+    let standText,zusatz;
+    if(KP){
+      standText=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+      zusatz="Kontrollpunkte";
+    } else if(disc==="tdm"){
+      const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
+      const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
+      standText=scoreL+" : "+scoreR;
+      zusatz="Ausschaltungen";
+    } else {
+      const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
+      standText=(nR-live(1).length)+" : "+(nL-live(0).length);
+      zusatz="Disziplinpunkte";
+    }
+    document.getElementById("esieger").textContent=siegerBannerText(sieger,standText,zusatz);
     setzeEsiegerKlasse(sieger);
+    // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, nach demselben Impact-Wert,
+    // der die Zeilen gleich darunter je Seite ohnehin schon sortiert -- kein neuer Wert.
+    const mvpUnit=U.length?U.map(u=>({u,imp:impactVon(u)})).reduce((a,b)=>b.imp>a.imp?b:a):null;
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -38959,8 +39149,17 @@
       const tb=el("tbody");
       const reihen=U.filter(u=>u.side===seite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
       for(const {u,imp} of reihen){
-        const tr=el("tr",u.down?"tot":null);
-        tr.appendChild(el("td",null,u.n));
+        // DURCHSTREICH-BUG (Punkt 28): `u.down` ist bei TDM ein TRANSIENTER Respawn-Status
+        // (s. TDM_RESPAWN_SEK/reviveUnit oben) -- ein Kaempfer, der im Moment des Abpfiffs
+        // gerade am Boden lag, respawnt nie mehr (die Simulation steht), bleibt also fuer
+        // immer "down", obwohl er ueber das GANZE Spiel z.B. zehn Ausschaltungen sammelte.
+        // Das Endstand-Overlay zeigt die ECHTEN, finalen Boxscore-Werte (imp/u.st.*, s.
+        // unten) — die Durchstreichung darf dem nicht widersprechen. Ausserhalb TDM (kein
+        // Respawn) bleibt `u.down` dagegen ein ECHTES, permanentes Ausscheiden.
+        const tr=el("tr",(disc!=="tdm"&&u.down)?"tot":null);
+        const nameZelle=el("td",null,u.n);
+        if(mvpUnit&&u===mvpUnit.u)nameZelle.insertBefore(mvpStern("Spieler des Spiels — "+imp+" Impact"),nameZelle.firstChild);
+        tr.appendChild(nameZelle);
         for(const [lab,f] of ESPALTEN){
           const v=u.st[f];
           // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
@@ -39010,16 +39209,25 @@
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
+    // SIEGER-BANNER (Punkt 17): nur EIN gemeinsamer Bauplan (s. siegerBannerText()), wenn
+    // das Rennen schon gewertet ist -- der "noch keine Wertung"-Zwischenstand (praktisch
+    // nie im fertigen Endstand, s. `imZiel`-Zweig in bahnTeamstand()) bleibt sein eigener,
+    // ausdruecklich NICHT als "SIEGER" formulierter Satz, weil noch niemand feststeht.
     // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, 30.09.): dieselbe Formatierung
     // wie in updateHudBahn() — ohne sie zeigte die Sieger-Zeile bei Takeshi rohe
     // Dezimalwerte mit Punkt.
     const fmtSeite=(v)=>stand.fmt?stand.fmt(v):v;
-    document.getElementById("esieger").textContent=(stand.gewertet
-      ? (pL===pR?"Unentschieden":(pL>pR?VEREIN[0].name:VEREIN[1].name)+" gewinnt")
-        +" — "+fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix
-      : "Rennen beendet — "+fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix+" · noch keine Wertung")
-      +(stand.zusatz?" ("+stand.zusatz+")":"");
-    setzeEsiegerKlasse(stand.gewertet&&pL!==pR?(pL>pR?0:1):null);
+    if(stand.gewertet){
+      const sieger=pL===pR?null:(pL>pR?0:1);
+      document.getElementById("esieger").textContent=
+        siegerBannerText(sieger,fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix,stand.bannerZusatz);
+      setzeEsiegerKlasse(sieger);
+    } else {
+      document.getElementById("esieger").textContent=
+        "Rennen beendet — "+fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix+" · noch keine Wertung"
+        +(stand.zusatz?" ("+stand.zusatz+")":"");
+      setzeEsiegerKlasse(null);
+    }
     // ZEILENFOLGE NACH PUNKTEN, wo es Punkte gibt (Prototyp 06.09.): bei "rang" ist das
     // dieselbe Folge wie die Rangliste (Platz 1 hat die meisten Punkte), bei Takeshi
     // stehen die Sterne nicht zwingend in Zielreihenfolge — der Endstand ordnet nach dem,
@@ -39028,6 +39236,10 @@
     const platzVon=new Map(rang.reihe.map((u,i)=>[u.id,i+1]));
     const zeilen=stand.punkte?[...rang.reihe].sort((a,b)=>stand.punkte.get(b.id)-stand.punkte.get(a.id)):rang.reihe;
     const fmtP=stand.fmt||((v)=>String(v));
+    // SPIELER DES SPIELS (Punkt 28): der erste Eintrag von `zeilen` ist bereits, WAS AUCH
+    // IMMER dieses Rennen wertet (Rangpunkte, Burgpunkte, oder mangels Wertung schlicht die
+    // Zielreihenfolge) — kein zweiter Vergleich, nur derselbe Kopf der schon sortierten Liste.
+    const mvpLaeufer=zeilen.length?zeilen[0]:null;
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -39045,7 +39257,9 @@
       zeilen.forEach((u)=>{
         if(u.seite!==seite)return;
         const tr=el("tr",u.raus?"tot":null);
-        tr.appendChild(el("td",null,u.n));
+        const nameZelle=el("td",null,u.n);
+        if(mvpLaeufer&&u===mvpLaeufer)nameZelle.insertBefore(mvpStern("Spieler des Spiels"),nameZelle.firstChild);
+        tr.appendChild(nameZelle);
         tr.appendChild(el("td",null,String(platzVon.get(u.id))));
         if(stand.zeitVon){
           tr.appendChild(el("td",null,stand.zeitVon(u)));
@@ -39067,6 +39281,7 @@
       });
       t.appendChild(tb); box.appendChild(t);
     }
+    renderSzeneDesSpiels();
     renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
@@ -39117,12 +39332,25 @@
     const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
   }
   function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  // EINHEIT DES STANDS (Punkt 17): welches Wort die beiden Zahlen aus buehneStand()
+  // meinen -- dieselben vier Zweige, dieselben `art.*`-Flags, die buehneStand() zwei
+  // Funktionen oberhalb schon kennt. Reiner Textbaustein fuer den Sieger-Banner.
+  function buehneEinheitLabel(art){
+    if(art.heben)return "Duelle";
+    if(art.duell)return art.tennis?"Plätze":art.fechten?"Bahnen":"Bretter";
+    if(art.gauntlet)return "Verbliebene";
+    return "Punkte";
+  }
   function renderEndstandBuehne(){
     const sieger=buehneSieger(), stand=buehneStand();
     document.getElementById("esieger").textContent=
-      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+      siegerBannerText(sieger,stand.text,buehneEinheitLabel(BB()));
     setzeEsiegerKlasse(sieger);
     const w=wertungVon(disc);
+    const alleZeilen=w.zeilen();
+    // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, ueber dieselbe
+    // Kompositspalte, die die Tabelle unten je Zeile ohnehin schon liest (s. ermittleMvp()).
+    const mvp=ermittleMvp(w,alleZeilen);
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -39132,10 +39360,12 @@
       w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
-      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      const zeilen=alleZeilen.filter(z=>z.side===seite).sort(w.sortierung);
       for(const z of zeilen){
         const tr=el("tr",z.raus?"tot":null);
-        tr.appendChild(el("td",null,z.n));
+        const nameZelle=el("td",null,z.n);
+        if(mvp&&z===mvp)nameZelle.insertBefore(mvpStern("Spieler des Spiels"),nameZelle.firstChild);
+        tr.appendChild(nameZelle);
         for(const s of w.spalten){
           const v=s.wert(z);
           const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
@@ -39147,6 +39377,7 @@
       }
       t.appendChild(tb); box.appendChild(t);
     }
+    renderSzeneDesSpiels();
     renderHighlights();
     document.getElementById("endstand").hidden=false;
   }
@@ -39186,12 +39417,19 @@
     return {a:bisher[0], b:bisher[1], text:bisher[0]+" : "+bisher[1]};
   }
   function fsSieger(){ const {a,b}=fsStand(); return a===b?null:(a>b?0:1); }
+  // EINHEIT DES STANDS (Punkt 17): Hockey zaehlt Tore, Basketball/Football Punkte --
+  // dieselben Disziplin-Flags, die der Rest der Feldspiel-Logik ohnehin schon liest.
+  function fsEinheitLabel(){ return istHockey()?"Tore":"Punkte"; }
   function renderEndstandFeldspiel(){
     const sieger=fsSieger(), stand=fsStand();
     document.getElementById("esieger").textContent=
-      (sieger===null?"Unentschieden":VEREIN[sieger].name+" gewinnt")+" — "+stand.text;
+      siegerBannerText(sieger,stand.text,fsEinheitLabel());
     setzeEsiegerKlasse(sieger);
     const w=wertungVon(disc);
+    const alleZeilen=w.zeilen();
+    // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, ueber dieselbe
+    // Kompositspalte, die die Tabelle unten je Zeile ohnehin schon liest (s. ermittleMvp()).
+    const mvp=ermittleMvp(w,alleZeilen);
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
@@ -39201,10 +39439,12 @@
       w.spalten.forEach(s=>{const th=el("th",null,s.kopf); if(s.titel)th.title=s.titel; kopf.appendChild(th);});
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
-      const zeilen=w.zeilen().filter(z=>z.side===seite).sort(w.sortierung);
+      const zeilen=alleZeilen.filter(z=>z.side===seite).sort(w.sortierung);
       for(const z of zeilen){
         const tr=el("tr",z.raus?"tot":null);
-        tr.appendChild(el("td",null,z.n));
+        const nameZelle=el("td",null,z.n);
+        if(mvp&&z===mvp)nameZelle.insertBefore(mvpStern("Spieler des Spiels"),nameZelle.firstChild);
+        tr.appendChild(nameZelle);
         for(const s of w.spalten){
           const v=s.wert(z);
           const td=el("td",null,v==null?"—":(s.fmt?s.fmt(v):(typeof v==="number"?String(Math.round(v)):v)));
@@ -39216,6 +39456,7 @@
       }
       t.appendChild(tb); box.appendChild(t);
     }
+    renderSzeneDesSpiels();
     renderHighlights();
     document.getElementById("endstand").hidden=false;
   }

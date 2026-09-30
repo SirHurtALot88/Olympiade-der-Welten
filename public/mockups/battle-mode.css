@@ -729,6 +729,12 @@
   .oly-battle-arena.oly-battle-arena .etafel td.imp{color:var(--warn);font-weight:700}
   .oly-battle-arena.oly-battle-arena .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
   .oly-battle-arena.oly-battle-arena .etafel td.leer{color:var(--faint)}
+  /* SPIELER DES SPIELS (Broadcast-Audit Runde 2, Punkt 28, 30.09.): ein kleiner Stern vor
+     dem Namen der oder des Besten im Endstand -- derselbe Boxscore, nur ein zusaetzliches
+     Anzeige-Etikett (s. mvpStern()/ermittleMvp() in battle-mode.engine.js). Faerbung wie
+     die uebrigen Auszeichnungen dieser Tafel (.mdffa-punkte, .planzeile b) in --warn, damit
+     kein neuer Akzentton dazukommt. */
+  .oly-battle-arena.oly-battle-arena .mvpstern{color:var(--warn);margin-right:4px;cursor:help}
 
   /* Viertelpause (nur Basketball) — dieselbe dunkle Vollflaeche wie .einlauf, aber
      zentriert statt zweispaltig: eine Pause hat keine Aufstellung zu zeigen, nur einen
@@ -932,6 +938,12 @@
   .oly-battle-arena.oly-battle-arena .ehzeile .eht{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .ehzeile.h{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .ehzeile.a{color:var(--away)}
+  /* HINWEIS AUF GEKUERZTE HOEHEPUNKTE (Punkt 11, 30.09.): renderHighlights() deckelt auf
+     hoechstens acht Chips (s. kuratiereHighlights()) -- wo das noch kuerzt, steht diese
+     Zeile SICHTBAR darunter, statt still abzuschneiden ("statt stillschweigend
+     abzuschneiden", Audit-Auftrag). Eigene Zeile unter .ehlist, kein Scroll-Versteck. */
+  .oly-battle-arena.oly-battle-arena .ehmehr{margin-top:6px;font-size:10.5px;color:var(--faint);
+    text-align:center}
 
   /* BROADCAST-HUD DER STAFFEL (Recherche 06.09., Abschnitt 4.3): zwei Seitenboxen
      links/rechts, das Delta mittig — dieselbe Anordnung wie eine echte
