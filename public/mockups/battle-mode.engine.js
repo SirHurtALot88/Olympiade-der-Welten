@@ -19190,6 +19190,234 @@
   // den Rueckstell-Zwang beim naechsten Speed-Schach-Spiel.
   let schachPublikumAn=false;
 
+  // ================== TEAM-FEIER: PUBLIKUM UND FEIERMOMENTE (Baukasten, Phase 1, 30.09.) ==================
+  // docs/design/team-publikum-feiermomente-konzept-30-09.md, Abschnitt 2.1-2.5. Chris' Idee:
+  // die ungenutzten Teammitglieder stehen als Publikum im Bild und feiern mit (Huepfer,
+  // Konfetti in Teamfarbe, bei grossen Momenten Lichtblitz und Bildwackeln). EIN Baukasten,
+  // duenne Adapter je Disziplin -- jede Disziplin liefert nur, WER Publikum ist und WO der
+  // Ausloeser faellt. Phase 1: Gewichtheben (hebenFeierAmUrteil/zeichneHeben) und Breaking
+  // (stepBuehne-Bruch/zeichneBreaking).
+  //
+  // HARTER VERTRAG (Klasse A/A*, Konzept Abschnitt 4): REINE ANZEIGE. Kein rr(), kein
+  // Math.random(), kein Schreibzugriff auf u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/
+  // u.lunge/u.pos/u.v/buehneAkt/buehneZeiger/done -- und ueberhaupt auf kein Feld an `u` (die
+  // Jubelpose geht ueber ein Stellvertreter-Objekt an zeichneSprite(), s. teamFeierSpriteArg).
+  // teamFeierAusloesen() kehrt bei `stumm` SOFORT zurueck (stepSimStumm/disziplinProbe/
+  // einflussVon setzen es fuer jede Rangtreue-/Pp-Messung) -- der Messpfad sieht dieses Modul
+  // gar nicht, `teamFeiern` bleibt dort leer, und jede Zeichen-/Haltungsfunktion unten ist
+  // bei leerer Liste ein No-Op (Huepfer 0, keine Effekte, kein Wackeln).
+  //
+  // UHR = jetztMs() (Befund B3): buehneT friert bei `done` ein und ist ueber ZEIT_DEHNUNG
+  // gedehnt; jetztMs() zaehlt echte Millisekunden und ist im Sonden-Modus an sondenSimMs
+  // gekoppelt (pixelstabil, s. pruefe-sonden-modus-determinismus.mjs). Streuung
+  // ausschliesslich ueber cypherHash().
+  //
+  // BEWUSST NICHT GEBAUT (Konzept 2.6): der Endstand-Nachlauf. Er verschiebt den Ablauf um
+  // 3,5s (vergleichbar Klasse T) und braucht vorher Chris' Zustimmung. Die Stufe "finale"
+  // samt Feuerwerk steht im Baukasten bereit, hat in Phase 1 aber KEINEN Ausloeser -- ohne
+  // Nachlauf deckt das Endstand-Overlay die Buehne im selben Frame zu (Befund B4). Sichtbar
+  // machen laesst sie sich nur ueber window.__arena.teamFeierProbe() (Screenshot-Sonde).
+  let teamFeiern=[];            // hoechstens 4 Eintraege {seite,stufe,seitMs,nr,anker,funken}
+  let teamFeierNr=0;            // Saat fuer cypherHash, deterministisch je Spiel (reset())
+  const TEAM_FEIER_STUFEN={
+    klein: {dauer:600,  hops:1,amp:6, pose:false,konfetti:0, blitz:false,wackel:0,feuerwerk:0},
+    mittel:{dauer:1200, hops:2,amp:9, pose:true, konfetti:16,blitz:false,wackel:0,feuerwerk:0},
+    gross: {dauer:2400, hops:3,amp:12,pose:true, konfetti:40,blitz:true, wackel:3,feuerwerk:0},
+    finale:{dauer:3500, hops:4,amp:12,pose:true, konfetti:60,blitz:true, wackel:4,feuerwerk:3}
+  };
+  const TEAM_FEIER_RANG=["klein","mittel","gross","finale"];
+  // Teamfarben EINMAL pro Frame (Befund B5: css() ruft getComputedStyle bei jedem Aufruf) --
+  // teamFeierFarbenLesen() steht am Anfang jeder Chassis-Zeichenfunktion, die das Modul nutzt.
+  // Die Vorgaben sind nur der Rueckfall vor dem allerersten Frame (= die dunklen Tokens aus
+  // battle-mode.css).
+  let FEIER_FARBE={home:"#F2A03D",away:"#45B0C9"};
+  function teamFeierFarbenLesen(){
+    FEIER_FARBE={home:css("--home")||FEIER_FARBE.home,away:css("--away")||FEIER_FARBE.away};
+  }
+  // Teamfarbe mit Alpha als rgba(...) -- fuer Verlaeufe, die zur SELBEN Farbe transparent
+  // auslaufen sollen (ein Stop auf "rgba(0,0,0,0)" zoege sonst einen dunklen Saum). Kennt
+  // #rgb/#rrggbb (die Form, in der battle-mode.css die Tokens fuehrt); alles andere faellt
+  // auf die Farbe selbst zurueck.
+  function feierRgba(c,a){
+    const m=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c||"");
+    if(!m)return c;
+    let h=m[1]; if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    const n=parseInt(h,16);
+    return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+Math.max(0,Math.min(1,a)).toFixed(3)+")";
+  }
+  // anker: Bildschirmpunkt {x,y} (Konfetti-/Blitz-Ursprung) oder null (dann der Rueckfall der
+  // Disziplin, s. `ankerVonSeite` in teamFeierEffekte()). opt.funken: Breaking-Tonalitaet
+  // (Teamfarbe + Gold als Funkenregen statt Papierkonfetti, Konzept 3.2).
+  function teamFeierAusloesen(seite,stufe,anker,opt){
+    if(stumm)return;                                   // Messpfad: nie
+    if(seite!==0&&seite!==1)return;                     // Remis/unklar: keine Feier
+    if(!TEAM_FEIER_STUFEN[stufe])return;
+    const jetzt=jetztMs();
+    // DOSIS: eine laufende, gleich starke oder staerkere Feier derselben Seite wird nicht
+    // ueberschrieben, eine schwaechere wird ersetzt. Verhindert Doppelfeuer im selben Moment.
+    const rang=s=>TEAM_FEIER_RANG.indexOf(s);
+    const laufend=teamFeiern.find(f=>f.seite===seite&&jetzt-f.seitMs>=0&&jetzt-f.seitMs<TEAM_FEIER_STUFEN[f.stufe].dauer);
+    if(laufend&&rang(laufend.stufe)>=rang(stufe))return;
+    teamFeiern=teamFeiern.filter(f=>f!==laufend);
+    teamFeiern.push({seite,stufe,seitMs:jetzt,nr:++teamFeierNr,anker:anker||null,funken:!!(opt&&opt.funken)});
+    if(teamFeiern.length>4)teamFeiern.shift();
+  }
+  // HALTUNG einer Publikumsfigur: {dy,pose,sackt}. dy<0 = Huepfer (Bildschirm-Pixel), die
+  // Gegenseite einer grossen Feier "raunt" und sackt kurz ein (sackt>0, vgl. hebenDroop in
+  // bodenHeben()). Befund B1: die Sprite-Uhr `t` laeuft auf der Buehne nie -- Bewegung kommt
+  // deshalb als ZEICHEN-VERSATZ, nicht ueber die Gehanimation, und wirkt so auf alle drei
+  // Zeichenpfade (LPC, b.reiherMech, b.vollbild; Befund B2).
+  function teamFeierHaltung(u){
+    let dy=0,pose=false,sackt=0;
+    if(!teamFeiern.length)return {dy,pose,sackt};
+    const jetzt=jetztMs();
+    for(const f of teamFeiern){
+      const S=TEAM_FEIER_STUFEN[f.stufe], alter=jetzt-f.seitMs;
+      if(alter<0||alter>S.dauer)continue;
+      if(f.seite===u.side||f.seite===u.seite){
+        // leichter Phasenversatz je Figur, sonst huepft der Block wie EIN Brett
+        const versatz=(cypherHash(u.id|0,f.nr)%100)/100*0.18;
+        const p=Math.max(0,Math.min(1,alter/S.dauer-versatz));
+        const ausklingen=1-Math.max(0,(p-0.75)/0.25);
+        dy=Math.min(dy,-Math.abs(Math.sin(p*Math.PI*S.hops))*S.amp*ausklingen);
+        pose=pose||(S.pose&&p>0&&p<0.85);
+      } else if(f.stufe==="gross"||f.stufe==="finale"){
+        sackt=Math.max(sackt,3*Math.max(0,1-alter/700));
+      }
+    }
+    return {dy:dy+sackt,pose,sackt};
+  }
+  // JUBELPOSE (Konzept 2.2, Pose-Vorbehalt): `vizJubel` waehlt in zeichneSprite() das
+  // "shoot"-Blatt (13 Bilder, urspruenglich ein Bogenschuss); `vizAniPhase=k/13` haelt
+  // Bild k fest. Wirkt nur bei LPC-Figuren (Befund B2), Vollbild-Kreaturen huepfen nur.
+  // null = Pose weggelassen (Konzept-Rueckfall "der Huepfer allein traegt").
+  const TEAM_FEIER_JUBEL_BILD=null;
+  // STELLVERTRETER statt des echten `u` (Muster parcSpriteArg in zeichneSpurt()): kein
+  // Zeichenaufruf hinterlaesst ein Feld am Teilnehmer. lunge/down/vx/vy neutral, damit die
+  // Bankfigur still steht und nicht die Ausfall-/Sturzpose des echten Zustands zeigt.
+  // nurPose=true (Breaking-Ring): alle echten Felder bleiben, nur die Pose kommt dazu.
+  function teamFeierSpriteArg(u,h,nurPose){
+    const arg=nurPose?{...u}:{...u,lunge:0,down:false,vx:0,vy:0};
+    if(h&&h.pose&&TEAM_FEIER_JUBEL_BILD!=null){ arg.vizJubel=true; arg.vizAniPhase=TEAM_FEIER_JUBEL_BILD/13; }
+    return arg;
+  }
+  // TEAMBANK fuer Disziplinen ohne sichtbares Publikum. liste: TEILNEHMER-Objekte; rect:
+  // {x0,x1,fussY}; skala ~0,6; extraDy: zusaetzlicher Versatz (z.B. das Klatschen beim Antritt
+  // des eigenen Hebers). Muster exakt wie der Breaking-Zuschauerring (Fussschatten-Ellipse,
+  // Skalierung um den Fusspunkt). zeichneSprite() OHNE viertes Argument -- mit feldspiel=true
+  // haenge bei Gewichtheben an jeder Bankfigur eine Hantel.
+  function zeichneTeambank(liste,seite,rect,skala,extraDy){
+    const c=seite===0?FEIER_FARBE.home:FEIER_FARBE.away;
+    liste.forEach((u,i)=>{
+      const x=rect.x0+(rect.x1-rect.x0)*(liste.length>1?i/(liste.length-1):0.5);
+      const h=teamFeierHaltung(u), fussY=rect.fussY, dy=h.dy+(extraDy||0);
+      ctx.fillStyle=c; ctx.globalAlpha=0.18;
+      ctx.beginPath(); ctx.ellipse(x,fussY,11,4,0,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
+      // Der Huepfer in BILDSCHIRM-Pixeln (vor der Skalierung), damit die Amplituden aus
+      // TEAM_FEIER_STUFEN auch bei Skala 0,62 so hoch ausfallen wie angegeben; der Schatten
+      // bleibt am Boden -- genau das macht den Sprung lesbar.
+      ctx.save();
+      ctx.translate(x,fussY+dy); ctx.scale(skala,skala); ctx.translate(-x,-fussY);
+      zeichneSprite(ctx,teamFeierSpriteArg(u,h),x,fussY-19); // 19 = Fuss-Versatz wie in zeichneBreaking
+      ctx.restore();
+    });
+  }
+  // EFFEKTE (Konzept 2.4): Lichtblitz (gross/finale), Konfetti bzw. Funken (ab mittel),
+  // Feuerwerk (nur finale). Am ENDE der Chassis-Zeichenfunktion aufrufen. ankerVonSeite(s)
+  // liefert den Ursprung, wenn die Feier ohne eigenen Anker ausgeloest wurde.
+  function teamFeierEffekte(ankerVonSeite){
+    if(!teamFeiern.length)return;
+    const jetzt=jetztMs();
+    for(const f of teamFeiern){
+      const S=TEAM_FEIER_STUFEN[f.stufe], alter=jetzt-f.seitMs;
+      if(alter<0||alter>S.dauer)continue;
+      const c=f.seite===0?FEIER_FARBE.home:FEIER_FARBE.away;
+      const a=f.anker||(ankerVonSeite&&ankerVonSeite(f.seite))||{x:f.seite===0?W*0.25:W*0.75,y:H*0.6};
+      const tau=alter/1000;
+      ctx.save();
+      // LICHTBLITZ: radialer Verlauf in Teamfarbe vom Anker, Alpha 0,35 -> 0 ueber 500ms
+      // (Vorbild Gold-Buzzer-Verlauf in bodenShowcase(), nur in Teamfarbe).
+      if(S.blitz&&alter<500){
+        const al=0.35*(1-alter/500);
+        const g=ctx.createRadialGradient(a.x,a.y,0,a.x,a.y,Math.max(W,H)*0.45);
+        g.addColorStop(0,feierRgba(c,al)); g.addColorStop(1,feierRgba(c,0));
+        ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      }
+      // KONFETTI/FUNKEN: aus dem Anker nach oben geworfen, dann fallend (keine Assets).
+      // Ab 70 % der Dauer ausblenden. Wurf etwas kraeftiger als im Konzept (vx +-160 statt
+      // +-140, vy 220-380 statt 180-320 px/s): mit den Konzeptwerten stieg der Wurf nur 30-100px
+      // und las sich im Screenshot als kleiner Klumpen statt als "Konfetti steigt auf".
+      const ausblend=Math.max(0,Math.min(1,(1-alter/S.dauer)/0.30));
+      const grav=520;
+      for(let i=0;i<S.konfetti;i++){
+        const hh=cypherHash(f.nr*7919+f.seite,i);
+        const vx=(hh%321)-160, vy=220+((hh>>>9)%161);
+        const x=a.x+vx*tau, y=a.y-vy*tau+0.5*grav*tau*tau;
+        if(y>H+12||x<-12||x>W+12)continue;
+        const wahl=(hh>>>17)%100;
+        if(f.funken){
+          // BREAKING: Funkenregen in Teamfarbe + Gold (#f2d75a, die Survivor-Farbe aus
+          // zeichneBreaking) -- kurze Striche entlang der Flugrichtung, kein bunter Schnipsel.
+          ctx.globalAlpha=ausblend;
+          ctx.strokeStyle=wahl<60?c:"#f2d75a"; ctx.lineWidth=1.6; ctx.lineCap="round";
+          const vyJetzt=-vy+grav*tau, k=0.028;
+          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-vx*k,y-vyJetzt*k); ctx.stroke();
+        } else {
+          // 65 % Teamfarbe, 20 % hellere Toenung (Teamfarbe mit Alpha 0,6), 15 % Creme --
+          // es soll nach TEAMjubel aussehen, nicht nach Zufallskonfetti.
+          ctx.globalAlpha=ausblend*(wahl>=65&&wahl<85?0.6:1);
+          ctx.fillStyle=wahl<85?c:"#fff6d0";
+          const rot=((hh>>>5)%628)/100+tau*(hh%7);
+          ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+          ctx.scale(Math.cos(tau*9+(hh%13)),1);            // Flattern: Schnipsel kippt um die Laengsachse
+          ctx.fillRect(-2.5,-4,5,8);
+          ctx.restore();
+        }
+      }
+      ctx.globalAlpha=1;
+      // FEUERWERK (nur finale): S.feuerwerk Bursts, versetzt um 0/350/700ms, im oberen
+      // Bilddrittel ueber der Siegerseite. Je Burst 28 Punkte radial, erst weiss (120ms), dann
+      // Teamfarbe, Ausblenden ueber 1,2s.
+      for(let b=0;b<S.feuerwerk;b++){
+        const bAlter=alter-b*350; if(bAlter<0||bAlter>1200)continue;
+        const bt=bAlter/1000, hb=cypherHash(f.nr*104729+b,f.seite);
+        const bx=Math.max(W*0.12,Math.min(W*0.88,a.x+((hb%240)-120)));
+        const by=H*(0.12+((hb>>>8)%19)/100);
+        const rMax=150+(hb%60);
+        ctx.globalAlpha=Math.max(0,1-bAlter/1200);
+        ctx.fillStyle=bAlter<120?"#ffffff":c;
+        for(let i=0;i<28;i++){
+          const w=i/28*6.2832, r=bt*rMax;
+          const px=bx+Math.cos(w)*r, py=by+Math.sin(w)*r+0.5*260*bt*bt;
+          ctx.beginPath(); ctx.arc(px,py,2,0,6.2832); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+  }
+  // BILDWACKELN (Konzept 2.5) bei laufender gross/finale-Feier, abklingend ueber 350ms. Kein
+  // Math.random. Das HTML-Bug wackelt nicht mit (DOM) -- gewollt, der Score bleibt lesbar.
+  function teamFeierWackeln(){
+    if(!teamFeiern.length)return null;
+    const jetzt=jetztMs(); let dx=0,dy=0,an=false;
+    for(const f of teamFeiern){
+      const S=TEAM_FEIER_STUFEN[f.stufe]; if(!S.wackel)continue;
+      const alter=jetzt-f.seitMs; if(alter<0||alter>350)continue;
+      const abkling=Math.max(0,1-alter/350);
+      dx+=S.wackel*Math.sin(alter*0.09)*abkling; dy+=S.wackel*Math.sin(alter*0.13)*abkling; an=true;
+    }
+    return an?{dx,dy}:null;
+  }
+  // Umschlag fuer die drei frueh aussteigenden Chassis-Zweige in draw(): OHNE laufende
+  // Wackel-Feier ruft er die Zeichenfunktion unveraendert direkt auf (kein save/restore, also
+  // Zeichen fuer Zeichen derselbe Canvas-Zustand wie vorher), nur MIT Wackeln wird sie in
+  // save/translate/restore gefasst.
+  function mitTeamFeierWackeln(zeichne){
+    const wk=teamFeierWackeln();
+    if(!wk){ zeichne(); return; }
+    ctx.save(); ctx.translate(wk.dx,wk.dy); zeichne(); ctx.restore();
+  }
+
   // ================== SHOWCASE: EIGENES BUEHNENBILD (PR S1, Konzept 17.09.) ==================
   // docs/design/showcase-talentshow-konzept-17-09.md, Abschnitt 3.3/5, "PR S1 — Buehnenbild
   // und Rampenlicht". Vorbild fuer die Motive (roter Vorhang, LED-Hype-Wall/Rampenlicht,
@@ -36662,9 +36890,11 @@
 
   function draw(){
     ctx.clearRect(0,0,W,H);
-    if(istFeldspiel(disc)){zeichneFeldspiel();return;}
-    if(istBuehne(disc)){zeichneBuehne();return;}
-    if(istBahn(disc)){zeichneSpurt();return;}
+    // TEAM-FEIER-WACKELN (Konzept team-publikum-feiermomente 2.5): mitTeamFeierWackeln() ruft
+    // die Chassis-Zeichnung ohne laufende grosse Feier unveraendert direkt auf, s. dort.
+    if(istFeldspiel(disc)){mitTeamFeierWackeln(zeichneFeldspiel);return;}
+    if(istBuehne(disc)){mitTeamFeierWackeln(zeichneBuehne);return;}
+    if(istBahn(disc)){mitTeamFeierWackeln(zeichneSpurt);return;}
     zeichneBoden();
     if(KP)zeichneKontrollpunkt();
 
@@ -39638,6 +39868,11 @@
     // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
     ISPY_VISUELLES_LAYOUT=null;
+    // DASSELBE N1-MUSTER FUER DIE TEAM-FEIER (Konzept team-publikum-feiermomente 2.1): ohne
+    // diese Zeile liefe eine Feier des VORIGEN Spiels im neuen weiter (bzw. stuende mit einem
+    // seitMs aus der alten Sonden-Uhr in der Liste), und die cypherHash-Saat teamFeierNr waere
+    // nicht je Spiel deterministisch. Reiner Praesentationszustand, kein Einfluss auf rr().
+    teamFeiern=[]; teamFeierNr=0;
     mutatorenFuerAktuelleDisziplin();
     build(gebuchteSaatFuerAktuelleDisziplin());
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
@@ -41191,6 +41426,12 @@
     // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
     // kein Einfluss auf MESS/Wertung/RNG.
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
+    // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
+    // aus -- dasselbe Prinzip wie calloutProbe darueber. Noetig vor allem fuer die Stufe
+    // "finale", die in Phase 1 bewusst keinen organischen Ausloeser hat (Endstand-Nachlauf 2.6
+    // wartet auf Chris' Zustimmung). Reine Anzeige: teamFeierAusloesen() schreibt nur
+    // `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin ein No-Op).
+    teamFeierProbe:(seite,stufe)=>{ teamFeierAusloesen(seite===1?1:0,stufe||"gross",null); return teamFeiern.length; },
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
