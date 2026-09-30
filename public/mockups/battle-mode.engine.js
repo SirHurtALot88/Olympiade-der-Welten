@@ -14668,6 +14668,44 @@
   const BB=()=>BUEHNE_ART[buehneDisc]||BUEHNE_ART.gewichtheben;
   const istBuehne=(d)=>!!BUEHNE_ART[d];
 
+  // VOKABULAR-BEREINIGUNG (30.09., docs/design/f1-broadcast-audit-runde-2-30-09.md
+  // Abschnitt 3.3/Prio-1-Punkt-5): Tennis und Fechten teilten sich bisher hartcodiert
+  // Schach-Vokabular ("Brett"/"Zug"/"Vorteil") mit Speed-Schach, obwohl die jeweils
+  // eigenen Canvas-Zeichenfunktionen (zeichneTennis/zeichneFechten) schon länger
+  // "Platz"/"Ballwechsel" bzw. "Bahn"/"Gang" schreiben. EINE Stelle für alle drei
+  // Duell-Disziplinen (WERTUNG_DUELL() und der Ticker-/Callout-Zweig in stepBuehne())
+  // statt drei Kopien — reiner Textbaustein, liest nur `art.tennis`/`art.fechten`
+  // (bereits vorhandene Flags), keine neue Simulationslogik, kein `rr()`.
+  //
+  // FECHTEN BEKOMMT ZUSAeTZLICH EINEN ANDEREN WERT, NICHT NUR EIN ANDERES WORT: seit F1
+  // (26.09., "TREFFER SIND DER STAND") entscheidet dort der Trefferstand, nicht der
+  // laufende Vorteil (`v`/`u.verlauf`) — die alte Anzeige zeigte deshalb reale Fälle wie
+  // "Brett 3 verloren (Vorteil +124)", ein Widerspruch, den kein Zuschauer auflösen kann.
+  // `vort`/`vortTitel` bleiben deshalb bei Fechten Worte, aber WERTUNG_DUELL() liest für
+  // Fechten den Trefferunterschied (eigene Treffer minus Treffer des Gegners), nicht
+  // `verlauf` — exakt der Wert, den Ticker/Callout unten ebenfalls zeigen. Tennis ändert
+  // NUR das Wort, nicht die Zahl (dort gibt es keinen solchen Widerspruch, s. Auftrag).
+  function duellWorte(art){
+    if(art.tennis)return {
+      brett:"Platz", zug:"Ballwechsel", vort:"Punkt",
+      zugTitel:"gespielte Ballwechsel",
+      vortTitel:"laufender Punktvorsprung gegen den Gegner auf diesem Platz",
+      fuss:"„Pkt\" sind die eigenen Punkte aus den Ballwechseln (das Maß der Rangtreue), „Punkt\" ist der laufende Punktvorsprung auf diesem Platz gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Ballwechsel entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
+    };
+    if(art.fechten)return {
+      brett:"Bahn", zug:"Gang", vort:"Treffer",
+      zugTitel:"gefochtene Gänge",
+      vortTitel:"Trefferstand gegen den Gegner auf dieser Bahn (eigene Treffer minus Treffer des Gegners)",
+      fuss:"„Pkt\" sind die eigenen Punkte aus den Gängen (das Maß der Rangtreue), „Treffer\" ist der Trefferstand auf dieser Bahn gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Gang entschieden: + Sieg, − Niederlage (kein Remis — die Degen-Priorität löst jeden Treffergleichstand auf). „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
+    };
+    return {
+      brett:"Brett", zug:"Zug", vort:"Vorteil",
+      zugTitel:"gespielte Züge",
+      vortTitel:"laufender Vorteil gegen den Gegner in dieser Zeile",
+      fuss:"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
+    };
+  }
+
   // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
   // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
   // spieler den anderen immer weiter zurück drängen damit man auch optisch besseres
@@ -16803,10 +16841,20 @@
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
         const fechtGegner=BB().fechten?gegner:null;
+        // VOKABULAR JE DUELL-ART (30.09., duellWorte()-Kommentar oben): Schach/Tennis
+        // zeigen weiterhin den laufenden Wert aus `v`/`u.verlauf`, nur das Wort wechselt
+        // ("Vorteil" vs. "Punkt"). Fechten zeigt an dieser Stelle GAR KEIN "Vorteil" mehr
+        // (weder Wort noch Zahl) — nur noch den Trefferstand, der dort seit F1 (26.09.)
+        // ohnehin allein zaehlt; vorher stand "Vorteil +12 · Treffer 3:2" nebeneinander,
+        // obwohl der Vorteilswert fuer Fechten keine Anzeigegroesse ist (s. Auftrag).
+        // `v`/`u.verlauf`/`wert()`/`rr()` bleiben unberuehrt, nur die ANZEIGE wechselt.
+        const worte=duellWorte(BB());
+        const statText=BB().fechten
+          ?worte.vort+" "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)
+          :worte.vort+" "+(v>0?"+":"")+v;
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
-          " · Vorteil "+(v>0?"+":"")+v
-          +(BB().fechten?" · Treffer "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0):"")
-          +" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").",vorteilKipptBig);
+          " · "+statText
+          +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",vorteilKipptBig);
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
@@ -16839,13 +16887,16 @@
             if(gegnerFertig){
               // Anzeige stabil aus Sicht von Seite 0 aufgebaut, unabhaengig davon, welche
               // Seite hier gerade als zweite ankam und den Beat damit ausgeloest hat --
-              // `seite0.verlauf[seite0.aktuell]` ist der eigene, schon fest geloggte
-              // Vorteilswert dieser Seite fuer GENAU diese Periodengrenze (nicht `v`, das nur
-              // fuer das gerade verarbeitete `u` gilt).
+              // `seite0.treffer`/`seite1.treffer` sind die eigenen, schon fest geloggten
+              // Trefferstaende dieser Seiten fuer GENAU diese Periodengrenze (nicht die
+              // gerade verarbeitete `u`/`fechtGegner`-Zuordnung, die je nach Seite wechselt).
               const seite0=u.side===0?u:fechtGegner, seite1=u.side===0?fechtGegner:u;
-              const v0=seite0.verlauf[seite0.aktuell];
+              // KEIN "Vorteil" MEHR IN DIESER ZEILE (30.09., s. duellWorte()-Kommentar
+              // oben): `v0` blieb bis hierher unbenutzt fuer die Anzeige -- Fechten zeigt
+              // in der Periodenmeldung nur noch den Trefferstand, denselben Wert, den auch
+              // die "BRETT ENTSCHIEDEN"-Meldung und die Wertungstabelle jetzt zeigen.
               feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
-                ": Vorteil "+(v0>0?"+":"")+v0+", Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+                ": Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
             }
           }
         }
@@ -16877,7 +16928,15 @@
               ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
                              :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
               :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
-            feed(u.side,u.n+": Brett "+((u.brett??0)+1)+" "+brettText+" (Vorteil "+(v>0?"+":"")+v+").",true);
+            // KEIN "(Vorteil +v)" MEHR BEI FECHTEN (30.09.): genau der Widerspruch aus dem
+            // Audit ("Brett 3 verloren (Vorteil +124)") -- `v`/`u.verlauf` sind fuer
+            // Fechten seit F1 nicht mehr der Massstab, den `brettText` gerade gelesen hat
+            // (`u.gefechtSieg`), die Anzeige zeigt hier deshalb den Trefferstand statt v.
+            // Schach/Tennis bleiben bei `v`, nur das Wort wechselt (`worte`, s. oben).
+            const statEnde=BB().fechten
+              ?worte.vort+" "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)
+              :worte.vort+" "+(v>0?"+":"")+v;
+            feed(u.side,u.n+": "+worte.brett+" "+((u.brett??0)+1)+" "+brettText+" ("+statEnde+").",true);
           }
         }
       } else if(BB().showcase&&u.vizAct){
@@ -18686,7 +18745,13 @@
       // "Reißen und Stoßen" direkt darueber — nur Text, keine eigene Uhr.
       ? "3 Perioden zu je 3 Gängen — Trefferstand läuft mit"
       : BB().duell
-      ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
+      // TENNIS SPRICHT KEIN SCHACH MEHR (30.09.): dieselbe generische Zeile schrieb
+      // bisher "Züge je Brett — Vorteil läuft mit" auch fuer Tennis, obwohl Tennis
+      // schon laengst eigene Woerter hat (zeichneTennis()s "Platz"/"Ballwechsel").
+      // Speed-Schach bleibt bei der unveraenderten Original-Zeile.
+      ? (BB().tennis
+        ? BB().rundenN+" Ballwechsel je Platz — Punkt läuft mit"
+        : BB().rundenN+" Züge je Brett — Vorteil läuft mit")
       // GAUNTLET (Breaking, 22.09.): eigene Unterzeile statt des generischen
       // "N Durchgaenge"-Texts, der hier (variable Zuganzahl je Ueberlebendem) nicht passt.
       : BB().gauntlet
@@ -18695,9 +18760,22 @@
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
     // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
     // ersetzt oder Text eines anderen Modus stehen laesst.
+    //
+    // "AUFGETRETEN" NUR BEI DISZIPLINEN, DIE WIRKLICH NACHEINANDER AUFTRETEN (30.09.,
+    // docs/design/f1-broadcast-audit-runde-2-30-09.md Prio-2-Punkt-11): Wettessen, Tennis,
+    // Speed-Schach, Fechten und I-Spy treten alle GLEICHZEITIG an (mehrere Tische/Plaetze/
+    // Bretter/Bahnen/Fundorte parallel), "aufgetreten" behauptet einen Einzelauftritt, den es
+    // dort nicht gibt (s. Auftrag). Gewichtheben/Showcase/Eiskunstlauf/Breaking bleiben bei
+    // "aufgetreten" — dort enthuellt/performt tatsaechlich einer nach dem anderen.
+    const auftrittsWort=BB().wettessen?"am Tisch"
+      :BB().tennis?"auf dem Platz"
+      :BB().schach?"an den Brettern"
+      :BB().fechten?"an der Bahn"
+      :BB().schatzsuche?"an den Fundorten"
+      :"aufgetreten";
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
-      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"aufgetreten");});
+      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,auftrittsWort);});
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
     document.getElementById("klsuffix").textContent="Punkte";
@@ -20172,7 +20250,9 @@
       schrift(u.n.length>15?u.n.slice(0,14)+"…":u.n,44,c,voll?12:8.5);
       if(voll){
         const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
-        schrift((v>0?"+":"")+v+" Vorteil",58,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),10.5);
+        // TENNIS SPRICHT KEIN SCHACH MEHR (30.09.): "Vorteil" -> "Punkt" (s.
+        // duellWorte()-Kommentar, ":14669") -- dieselbe Zahl `v`, nur das Wort wechselt.
+        schrift((v>0?"+":"")+v+" Punkt",58,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),10.5);
         // Q3 -- SPIELERKACHEL/"SPIELER-KAMERA" (Broadcast-Optik-Dokument 27-09, Abschnitt 3):
         // "Neben ... Namen (Tennis)" -- seitlich auf Sprite-Hoehe, weit genug ausserhalb der
         // Schattenellipse (rx=16*scale<=22.4), damit sie nie den Schlaeger/Ball ueberdeckt.
@@ -22718,27 +22798,44 @@
   // so dieselbe Paarung auf einer Zeile nebeneinander.
   function WERTUNG_DUELL(art){
     const w=art.wertungTabelle||{};
+    // VOKABULAR JE DUELL-ART (30.09., duellWorte()-Kommentar oben, ":14669"): ersetzt die
+    // vorher hartcodierten Schach-Woerter ("Brett"/"Zug"/"Vorteil"), die auch bei Tennis
+    // und Fechten in der Tabelle standen, obwohl `art.wertungTabelle` bei Fechten eine
+    // FUNKTION ist (kein Objekt mit `.duellWort` o.ae.) und bei Tennis gar nicht gesetzt
+    // ist -- `w.duellWort` etc. griffen dort also nie, nur der Default "Brett" kam durch.
+    // `duellWorte(art)` liest stattdessen direkt `art.tennis`/`art.fechten`.
+    const worte=duellWorte(art);
     const bisher=(u)=>u.runden.slice(0,Math.max(0,u.aktuell+1));
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,brett:u.brett??0,
       r:bisher(u), fertig:paarFertig(u,art)}));
     return {namen:"Teilnehmer", zeilen, sortierung:(a,b)=>a.brett-b.brett,
       spalten:[
-        {id:"brett",kopf:w.duellWort||"Brett", titel:"gegen wen", wert:z=>(w.duellWort||"B").slice(0,1)+(z.brett+1)},
-        {id:"zug",  kopf:"Zug",  titel:"gespielte Züge", wert:z=>z.r.length+"/"+art.rundenN},
+        {id:"brett",kopf:w.duellWort||worte.brett, titel:"gegen wen", wert:z=>(w.duellWort||worte.brett).slice(0,1)+(z.brett+1)},
+        {id:"zug",  kopf:worte.zug,  titel:worte.zugTitel, wert:z=>z.r.length+"/"+art.rundenN},
         {id:"pkt",  kopf:"Pkt",  top:true, titel:"eigene Punkte bisher", wert:z=>z.u.summe||null},
         {id:"stark",kopf:w.erfolgKopf||"Stark", titel:art.erfolgWort, wert:z=>z.r.filter(r=>r.ereignis===art.erfolgWort).length||null},
         {id:"fail", kopf:w.failKopf||"Fehl", titel:art.failWort, wert:z=>z.r.filter(r=>r.ereignis===art.failWort).length||null},
-        {id:"best", kopf:"Best", top:true, titel:"stärkster Zug bisher", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
-        {id:"vort", kopf:"Vort", titel:"laufender Vorteil gegen den Gegner in dieser Zeile",
-          wert:z=>z.r.length&&z.u.verlauf?z.u.verlauf[z.r.length-1]:0,
+        {id:"best", kopf:"Best", top:true, titel:"stärkster "+worte.zug+" bisher", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
+        // FECHTEN ZEIGT HIER DEN TREFFERUNTERSCHIED, NICHT `verlauf` (30.09., F1-Fix
+        // 26.09. fortgesetzt): genau die Tabellenzelle, die im Audit als "VORT +109 neben
+        // einem verlorenen Gefecht" auffiel — der laufende Vorteil (`u.verlauf`) ist fuer
+        // Fechten seit F1 eine interne Rechengroesse, keine Anzeigegroesse (s. Auftrag).
+        // Schach/Tennis lesen unveraendert `u.verlauf`, nur das Spaltenwort wechselt.
+        {id:"vort", kopf:worte.vort, titel:worte.vortTitel,
+          wert:z=>{
+            if(!art.fechten)return z.r.length&&z.u.verlauf?z.u.verlauf[z.r.length-1]:0;
+            if(!z.r.length)return 0;
+            const gegner=TEILNEHMER.find(x=>x.brett===z.u.brett&&x.side!==z.u.side);
+            return (z.u.treffer||0)-(gegner?gegner.treffer||0:0);
+          },
           fmt:v=>(v>0?"+":"")+v, farbe:v=>v>0?"var(--ok)":v<0?"var(--crit)":null},
-        {id:"stand",kopf:"Stand", titel:"Brett entschieden (+ Sieg, = Remis, − Niederlage)",
+        {id:"stand",kopf:"Stand", titel:worte.brett+" entschieden (+ Sieg, = Remis, − Niederlage)",
           wert:z=>!z.fertig?"…":(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"="),
           farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null},
         {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
           farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
         {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:w.fuss||"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."};
+      fuss:w.fuss||worte.fuss};
   }
 
   // AUFTRITT (Wettessen, Showcase, Eiskunstlauf, Breaking): kein Duell, jeder Teilnehmer
@@ -24306,15 +24403,18 @@
       ctx.font="700 7.5px 'IBM Plex Mono',monospace"; ctx.textBaseline="alphabetic";
       if(stehenderTxt[0]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="left"; ctx.fillText(stehenderTxt[0],16,topY+42); }
       if(stehenderTxt[1]){ ctx.fillStyle="#eef3fa"; ctx.textAlign="right"; ctx.fillText(stehenderTxt[1],W-16,topY+42); }
-      // MITTIG: Kampf-Nummer und Rennstand -- "Kampf 5", "noch 4:2 im Rennen", die Zahl, die
-      // beim Kachinuki die Tafel traegt (Doku B1).
+      // MITTIG: Kampf-Nummer und Ueberlebensstand -- "Kampf 5", "noch 4:2 im Ring", die Zahl,
+      // die beim Kachinuki die Tafel traegt (Doku B1). VOKABULAR-FIX (30.09.,
+      // docs/design/f1-broadcast-audit-runde-2-30-09.md Prio-2-Punkt-11): Breaking ist
+      // Folter/Survival, kein Rennen (s. CLAUDE.md, Chris 13.09.) -- "im Rennen" war hier
+      // reines Textrelikt aus einer frueheren Formulierung, keine Zahl aendert sich.
       const nochLinks=(gauntletReihen[0]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
       const nochRechts=(gauntletReihen[1]||[]).filter(u=>!(u.aktuell>=0&&gauntletRausJetzt(u))).length;
       ctx.font="700 10px 'Barlow Condensed',sans-serif"; ctx.fillStyle="#f2d75a";
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText("KAMPF "+aktuellerBout,W/2,topY+7);
       ctx.font="400 8.5px 'IBM Plex Mono',monospace"; ctx.fillStyle="#c7ccd6";
-      ctx.fillText("noch "+nochLinks+" : "+nochRechts+" im Rennen",W/2,topY+19);
+      ctx.fillText("noch "+nochLinks+" : "+nochRechts+" im Ring",W/2,topY+19);
       ctx.textBaseline="alphabetic";
 
       // ================== B2: HP-BALKEN IM KAMPFSPIEL-STIL (Broadcast-Optik-Recherche
