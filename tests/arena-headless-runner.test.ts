@@ -486,4 +486,43 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der echte Spieltagswurf
+   * erreicht die Simulation — auch ab dem zweiten Fixture eines Batches (Neu-Einhaengen der
+   * Engine) — und wirkt nur auf Spieler, deren Traits ihn treffen. Die Heimseite traegt hier
+   * zusaetzlich "Healthy", die Gastseite nicht; ein Wurf mit "Healthy" macht also NUR die
+   * Heimseite staerker. Ohne `mutatoren` ist das Ergebnis identisch zu `mutatoren: []` (kein
+   * engine-eigener Ersatzwurf).
+   */
+  it(
+    "reicht den Spieltagswurf in die Simulation: nur getroffene Spieler werden staerker",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+      for (const player of gameState.players) {
+        if (player.id.startsWith("Heim-")) player.traitsPositive = ["Loyal", "Healthy"];
+      }
+      const fixtures = ["m1", "m2", "m3", "m4"].map((seed) => ({ homeTeamId: "team-heim", awayTeamId: "team-gast", seed }));
+
+      const ohne = await runArenaFixtures(gameState, fixtures, "basketball");
+      const leer = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: [] });
+      const mit = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: ["Healthy", "Sexy"] });
+      const mitNochmal = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: ["Healthy", "Sexy"] });
+
+      expect(leer).toEqual(ohne);
+      expect(mitNochmal).toEqual(mit);
+      // In JEDEM Fixture aendert sich etwas — auch in denen ab Index 1, die ueber
+      // `haengeMotorNeuEin()` laufen und den Wurf dort erneut mitbekommen muessen.
+      for (let index = 0; index < fixtures.length; index += 1) {
+        expect(mit[index]).not.toEqual(ohne[index]);
+      }
+      const heimSumme = (ergebnisse: ArenaFixtureResult[]) =>
+        ergebnisse.reduce((summe, ergebnis) => summe + ergebnis.seiten[0] - ergebnis.seiten[1], 0);
+      expect(heimSumme(mit)).toBeGreaterThan(heimSumme(ohne));
+    },
+    LAUF_TIMEOUT_MS * 2,
+  );
 });

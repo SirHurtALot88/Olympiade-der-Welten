@@ -84,6 +84,8 @@ export type PlayerDisciplinePerformanceWritePayload = {
   finalPlayerScore: number;
   mutatorScoreBonus: number | null;
   mutatorPpsBonus: number | null;
+  /** MUTATOR ORGANISCH (29.09.): Trefferzahl 0/1/2, s. `PlayerDisciplinePerformanceRecord.mutatorHits`. */
+  mutatorHits: number | null;
   scoreContribution: number;
   rankInTeam: number;
   rankInDiscipline: number;
@@ -244,6 +246,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
         finalPlayerScore: player.finalPlayerScore,
         mutatorScoreBonus: player.mutatorBonus ?? null,
         mutatorPpsBonus: player.mutatorPpsBonus ?? null,
+        mutatorHits: player.mutatorHits ?? null,
         scoreContribution: player.pointsAwarded ?? player.scoreContribution,
         rankInTeam: player.rankInTeam,
         rankInDiscipline: player.rankInDiscipline,

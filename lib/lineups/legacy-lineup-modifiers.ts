@@ -335,7 +335,8 @@ export function getLegacyMutatorSourceSummary(): LegacyModifierSourceSummary {
     selectionStatus: "ready",
     effectStatus: "ready",
     sourceLabel:
-      "Matchday-Mutatoren: 2 Traits werden einmal pro Spieltag und Disziplin-Seite für alle Teams ausgewürfelt; +6 Score pro passendem Trait je eingesetztem Spieler und +0,3 Player-PPs pro betroffenem Spieler.",
+      "Matchday-Mutatoren: 2 Traits werden einmal pro Spieltag und Disziplin-Seite für alle Teams ausgewürfelt; +6 Score pro passendem Trait je eingesetztem Spieler und +0,3 Player-PPs pro betroffenem Spieler. " +
+      "Im Battle-Modus wirkt ein Treffer in den simulierten Disziplinen stattdessen als Attributbonus im Spiel selbst.",
     warnings: [],
   };
 }
@@ -395,6 +396,57 @@ export function buildMatchdayMutatorTraitsBySide(input: {
       disciplineSide: "d2",
       disciplineId: input.d2DisciplineId,
     }),
+  };
+}
+
+/**
+ * Der Spieltagswurf GENAU EINER Disziplin — derselbe, den `buildMatchdayMutatorTraitsBySide()` fuer
+ * ihre Seite (d1/d2) liefert. `null`, wenn die Disziplin an diesem Spieltag weder d1 noch d2 ist.
+ * Gebraucht vom Battle-Arena-Pfad (MUTATOR ORGANISCH, 29.09.), der den Wurf VOR dem Resolve in die
+ * Simulation reichen muss und dabei exakt dieselben Traits sehen soll wie spaeter der Resolve.
+ */
+export function resolveMatchdayMutatorTraitsForDiscipline(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  d1DisciplineId?: string | null;
+  d2DisciplineId?: string | null;
+  disciplineId: string;
+}): [string, string] | null {
+  const side: LineupDisciplineSide | null =
+    input.d1DisciplineId === input.disciplineId ? "d1" : input.d2DisciplineId === input.disciplineId ? "d2" : null;
+  if (!side) {
+    return null;
+  }
+  return buildMatchdayMutatorTraitsBySide(input)[side];
+}
+
+/**
+ * MUTATOR ORGANISCH IM BATTLE-MODUS (29.09., lib/battle/battle-mutator-organisch.ts): fuer eine
+ * Seite, deren Ergebnis die Arena-Engine SIMULIERT, ist der Mutator bereits als Attributbonus in
+ * die Simulation eingegangen. Der flache Nachschlag (`+6 Score` je Treffer im Seiten-Score,
+ * `+0,3 PP` je Treffer in der Tabelle) wuerde denselben Treffer ein zweites Mal buchen — Chris:
+ * "ja genau das soll das ersetzen". Deshalb hier auf 0: Score-Bonus, PP-Bonus, Seiten-Summe und
+ * die Slot-Ausweise. Die TREFFER selbst (wer hat getroffen, wie oft) bleiben stehen, damit
+ * Spielplan und Anzeige weiter sehen, wen der Mutator an diesem Spieltag besser gemacht hat.
+ *
+ * `mutatorModifier` wird 0, nicht `null`: `null` bedeutet in der Score-Engine "Quelle fehlt" und
+ * wuerde eine Warnung/Missing-Source-Markierung ausloesen, obwohl die Quelle da ist.
+ */
+export function toBattleArenaOrganicMutatorResult<
+  T extends {
+    mutatorModifier: number;
+    playerMutatorBonuses: Record<string, number>;
+    playerMutatorPpsBonuses: Record<string, number>;
+    mutatorSlots: LegacyMutatorSlotEffect[];
+  },
+>(result: T): T {
+  return {
+    ...result,
+    mutatorModifier: 0,
+    playerMutatorBonuses: {},
+    playerMutatorPpsBonuses: {},
+    mutatorSlots: result.mutatorSlots.map((slot) => ({ ...slot, scoreModifier: 0, playerPpsModifier: 0 })),
   };
 }
 
@@ -926,6 +978,13 @@ export function calculateMutatorModifierForSide(input: {
   mutatorModifier: number;
   playerMutatorBonuses: Record<string, number>;
   playerMutatorPpsBonuses: Record<string, number>;
+  /**
+   * MUTATOR ORGANISCH (29.09.): die reine Trefferzahl je Spieler (1 oder 2; Spieler ohne Treffer
+   * fehlen). Unabhaengig von der Waehrung — die flachen Boni oben sind `hits*6`/`hits*0,3`, im
+   * Battle-Arena-Pfad entfallen sie (s. `toBattleArenaOrganicMutatorResult()`), die Trefferzahl
+   * bleibt fuer Anzeige und Spielplan erhalten.
+   */
+  playerMutatorHits: Record<string, number>;
   mutatorSlots: LegacyMutatorSlotEffect[];
   teamPpsModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
@@ -970,6 +1029,7 @@ export function calculateMutatorModifierForSide(input: {
   const playerById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
   const playerMutatorBonuses: Record<string, number> = {};
   const playerMutatorPpsBonuses: Record<string, number> = {};
+  const playerMutatorHits: Record<string, number> = {};
   const affectedPlayerIdsByTrait = new Map<string, Set<string>>();
   const hitCountByTrait = new Map<string, number>();
   const ppsPlayerIdsByTrait = new Map<string, Set<string>>();
@@ -990,6 +1050,7 @@ export function calculateMutatorModifierForSide(input: {
       // nicht unterschiedlich zaehlen.
       playerMutatorBonuses[playerId] = Number((hits * 6).toFixed(1));
       playerMutatorPpsBonuses[playerId] = Number((hits * 0.3).toFixed(2));
+      playerMutatorHits[playerId] = hits;
     }
     if (player) {
       const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));
@@ -1037,6 +1098,7 @@ export function calculateMutatorModifierForSide(input: {
     mutatorModifier: Number((totalHits * 6).toFixed(1)),
     playerMutatorBonuses,
     playerMutatorPpsBonuses,
+    playerMutatorHits,
     mutatorSlots,
     /**
      * IMMER `null` — und das ist kein Versehen, sondern die einzige richtige Antwort.
@@ -1078,6 +1140,7 @@ export function calculateMvpForcedMutatorModifierForSide(input: {
   mutatorModifier: number;
   playerMutatorBonuses: Record<string, number>;
   playerMutatorPpsBonuses: Record<string, number>;
+  playerMutatorHits: Record<string, number>;
   mutatorSlots: LegacyMutatorSlotEffect[];
   teamPpsModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
@@ -1161,6 +1224,7 @@ export function calculateMvpForcedMutatorModifierForSide(input: {
     mutatorModifier: result.mutatorModifier,
     playerMutatorBonuses: result.playerMutatorBonuses,
     playerMutatorPpsBonuses: result.playerMutatorPpsBonuses,
+    playerMutatorHits: result.playerMutatorHits,
     mutatorSlots: result.mutatorSlots,
     teamPpsModifier: result.teamPpsModifier,
     teamPpsStatus: result.teamPpsStatus,

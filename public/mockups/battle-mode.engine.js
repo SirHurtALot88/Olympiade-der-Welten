@@ -4652,6 +4652,11 @@
   const mitKit=(spieler)=>spieler.map(p=>({...p,skills:MATRIARCH}));
   if(echterKader&&Array.isArray(echterKader.heim)&&echterKader.heim.length)SQUAD=mitKit(echterKader.heim);
   if(echterKader&&Array.isArray(echterKader.gast)&&echterKader.gast.length)OPP=mitKit(echterKader.gast);
+  // DER ECHTE SPIELTAGSWURF (MUTATOR ORGANISCH, 29.09.): optional im selben Umschlag. Fehlt das
+  // Feld, bleibt alles wie vorher (die Engine zieht selbst, s. mutatorenGrundzustand()); ist es
+  // da, gilt es — auch leer. `let`, weil kaderSetzen() es fuer Messungen austauschen darf.
+  const alsMutatorListe=(m)=>Array.isArray(m)?m.map(t=>String(t==null?"":t).trim()).filter(Boolean).slice(0,2):null;
+  let kaderMutatoren=echterKader?alsMutatorListe(echterKader.mutatoren):null;
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
   // widerspricht sich selbst, sobald echte Teams eingespeist wurden. Der Host schickt die
   // Namen im selben Umschlag mit (meta.heimName/gastName); ohne sie (Standalone/Artefakt)
@@ -5514,24 +5519,36 @@
   // TRAITS WIRKEN — und zwar dort, wo der Slot hinzeigt.
   //
   // Traits sind im Spiel nicht kosmetisch. Je Spieltag werden Mutator-Traits gezogen;
-  // wer einen davon hat, bekommt SECHS Punkte auf seinen Disziplinwert, positiv wie
-  // negativ (legacy-lineup-modifiers.ts: `hits * 6`). Die 18 + 18 Namen unten sind
-  // dieselben Listen, nicht meine Auswahl.
+  // wer einen davon hat, tritt seit dem 29.09. mit JEDEM Attribut staerker an (MUTATOR
+  // ORGANISCH, s. unten) — positiv wie negativ gelistete Traits gleich. Bis dahin waren es
+  // SECHS Punkte auf den Disziplinwert (legacy-lineup-modifiers.ts: `hits * 6`, so gilt es im
+  // Manager-Modus weiter). Die 18 + 18 Namen unten sind dieselben Listen, nicht meine Auswahl.
   const MUTATOR_POS=["Altruistic","Ambitious","Caring","Cool","Diligent","Disciplined",
     "Eloquent","Fair","FanFavorite","Fearless","FiredUp","Flexible","Healthy","Loyal",
     "Motivated","Relaxed","Resourceful","Sexy"];
   const MUTATOR_NEG=["Timid","Cheater","ColdBlooded","Cruel","Devious","Diva","Egomaniac",
     "FaintHearted","Feisty","Gambler","Lazy","Manipulative","Mercenary","Obsessive",
     "Paranoid","Renegade","Scandalous","Vindictive"];
-  const TRAIT_PUNKTE=6;
+  // (TRAIT_PUNKTE=6 — der flache +6-Weg — ist seit dem 29.09. durch MUTATOR_ORGANISCH ersetzt.)
 
   // Zwei gezogene Traits je Spieltag, wie im Spiel. Deterministisch aus der Saat, damit
   // dieselbe Aufstellung denselben Verlauf hat.
   let MUTATOREN=["Diligent","ColdBlooded"];
   // Einmal je Spieltag gezogen, nicht je Kampf — sonst zeigen Tafel und Arena Verschiedenes.
+  // Seit 29.09. wie im Spiel "2 verschiedene aus 36" (zieheMutatorenWieSpiel, s. unten) statt
+  // 1 positiv + 1 negativ — zwei positive oder zwei negative Traits konnte die Engine vorher
+  // nie ziehen, die Produktion schon.
   function zieheMutatoren(saat){
-    const r=(n)=>{saat=(Math.imul(saat,1103515245)+12345)&0x7fffffff;return saat%n;};
-    MUTATOREN=[MUTATOR_POS[r(MUTATOR_POS.length)], MUTATOR_NEG[r(MUTATOR_NEG.length)]];
+    MUTATOREN=zieheMutatorenWieSpiel(saat);
+  }
+  // GRUNDZUSTAND: hat der Host den ECHTEN Spieltagswurf mitgegeben
+  // (`window.__olyArenaKader.mutatoren`, s. "BRUECKE ZUR ECHTEN APP" — der produktive
+  // Headless-Lauf tut das immer, lib/battle/arena-headless-runner.ts), gilt genau dieser, auch
+  // ein leerer (= an diesem Spieltag trifft niemand). Nur ohne das Feld (Mockup, Artefakt,
+  // Messskripte ohne Kader) zieht die Engine selbst, mit der festen Ladesaat wie bisher.
+  function mutatorenGrundzustand(){
+    if(kaderMutatoren)MUTATOREN=[...kaderMutatoren];
+    else zieheMutatoren(20260823);
   }
 
   // Wie viel ein Spieler durch die gezogenen Traits gewinnt — NIE verliert. Chris am
@@ -5545,10 +5562,105 @@
   // Mutator-Treffer — im Widerspruch zum eigenen Kommentar direkt ueber MUTATOR_POS
   // ("positiv wie negativ") und zu Chris' Entscheidung. Gemeldet als Anzeigefehler in
   // der Battle-Arena-Vorschau, Ursache war aber die Zahl selbst, nicht nur die Anzeige.
+  // SEIT 29.09. (MUTATOR ORGANISCH, s. unten) NUR NOCH ANZEIGE: welche Traits greifen und
+  // wie viel Eignung das bringt. `netto` ist der tatsaechliche Eignungszuschlag des flachen
+  // Attributbonus (h * jeTreffer), nicht mehr die alten +6 je Treffer. Verglichen wird wie in
+  // mutatorTreffer() klein geschrieben, damit Anzeige und Wirkung nie auseinanderlaufen.
   function traitTreffer(p){
-    const pos=(p.tp||[]).filter(t=>MUTATOREN.includes(t));
-    const neg=(p.tn||[]).filter(t=>MUTATOREN.includes(t));
-    return {pos, neg, netto:(pos.length+neg.length)*TRAIT_PUNKTE};
+    const gezogen=new Set((MUTATOREN||[]).map(mutatorSchluessel).filter(Boolean));
+    const pos=(p.tp||[]).filter(t=>gezogen.has(mutatorSchluessel(t)));
+    const neg=(p.tn||[]).filter(t=>gezogen.has(mutatorSchluessel(t)));
+    const h=mutatorTreffer(p);
+    return {pos, neg, treffer:h, netto:MUTATOR_REGEL.art==="flach"?h*MUTATOR_REGEL.jeTreffer:0};
+  }
+
+  // ===================================================================================
+  // MUTATOR ORGANISCH (29.09., docs/design/mutator-trait-organische-performance-konzept-29-09.md,
+  // Abschnitt "Chris' Entscheidungen"/"Finale Umsetzung").
+  //
+  // Chris, woertlich: "ja genau das soll das ersetzen, deswegen soll der spieler quasi von
+  // seinen stats 5-8% besser werden" / "vom Skillwert bzw jedem Attribut" / Manager-Modus
+  // "nein". Der Mutator ist in der Simulation kein Nachschlag mehr, sondern ein EINGANG: ein
+  // Spieler, dessen Traits den Spieltagswurf treffen, tritt mit JEDEM seiner zwoelf Attribute
+  // etwas staerker an, und was er daraus macht (Punkte, Duelle, Laufzeit), entscheidet die
+  // Simulation. Die flachen +6 Score/+0,3 PP entfallen dafuer fuer jede arena-aufgeloeste
+  // Battle-Disziplin (lib/resolve/legacy-matchday-resolve-engine.ts) — sonst Doppelbuchung.
+  //
+  // FLACH, NICHT PROZENTUAL — entschieden an echten Kadern, nicht angenommen (Messwerte im
+  // Konzeptdokument, Abschnitt "Finale Umsetzung"): prozentual bekaeme ein starker Spieler je
+  // Disziplin im Mittel das 3,8-Fache an Eignungspunkten eines schwachen (6,5 % = 1,0 gegen
+  // 3,9 Punkte, P10 gegen P90 der Live-Kader), der Bonus waere also genau dort am groessten,
+  // wo er am wenigsten gebraucht wird ("nicht zu stark"). Die abgeloesten 0,3 PP waren
+  // ausserdem fuer jeden Spieler gleich viel wert; ein flacher Attributbonus bleibt dem am
+  // naechsten. Die Hoehe ist so gewaehlt, dass ein Treffer im Mittel ueber die 15
+  // arena-aufgeloesten Disziplinen ungefaehr die abgeloesten 0,3 PP einbringt.
+  //
+  // DERSELBE EINGANG WIE DER PP-HEBEL, AUS PRINZIP: der Bonus faehrt ueber `gehoben()` (die
+  // EINE Stelle, an der alle vier Chassis Rohattribute lesen) und ueber `eigMutator()` genau
+  // dort in die Eignung, wo auch `eigHebung()` hineinfaehrt. Damit erreicht er exakt die
+  // Kanaele, die `einflussVon()` misst — nicht mehr, nicht weniger —, und ein fuer alle zwoelf
+  // Attribute gleicher Zuschlag verschiebt deren Anteile zueinander nicht. Die gesperrte
+  // Eignungsmatrix wird nirgends beruehrt.
+  //
+  // Die Konstante spiegelt `BATTLE_MUTATOR_ATTRIBUT_BONUS_JE_TREFFER` in
+  // lib/battle/battle-mutator-organisch.ts (Gleichheitstest: tests/battle-mutator-organisch.test.ts).
+  const MUTATOR_ORGANISCH={art:"flach", jeTreffer:3.5};
+  const MUTATOR_ATTRIBUTE=["power","health","stamina","intelligence","awareness","determination",
+    "speed","dexterity","charisma","will","spirit","torment"];
+  // Nur fuer Messungen umstellbar (window.__arena.mutatorRegel), im Spielbetrieb immer die
+  // Konstante oben.
+  let MUTATOR_REGEL={...MUTATOR_ORGANISCH};
+  // MESSHEBEL wie ATTR_HEBUNG: zwingt fuer EINEN benannten Spieler eine Trefferzahl und
+  // schaltet fuer alle anderen die Mutatoren ab (Gegenfaktus-Sonde, mutatorGegenfaktus()).
+  // Im Spielbetrieb immer null.
+  let MUTATOR_ZWANG=null;
+  // Normalisierung wie `normalizeTraitKey` in legacy-lineup-modifiers.ts: getrimmt, klein.
+  const mutatorSchluessel=(t)=>String(t==null?"":t).trim().toLowerCase();
+  // Trefferzahl 0/1/2 — Spiegel von `countTraitHits()` (legacy-lineup-modifiers.ts): alle
+  // positiven UND negativen Traits des Spielers, klein geschrieben, dedupliziert. Anders als
+  // `traitTreffer()` oben, das exakt nach Schreibweise vergleicht und nur noch die Anzeige
+  // (Trait-Chips) bedient.
+  function mutatorTreffer(p){
+    if(!p)return 0;
+    if(MUTATOR_ZWANG)return MUTATOR_ZWANG.wer===p.n?(MUTATOR_ZWANG.treffer||0):0;
+    const gezogen=new Set((MUTATOREN||[]).map(mutatorSchluessel).filter(Boolean));
+    if(!gezogen.size)return 0;
+    const eigene=new Set([...(p.tp||[]),...(p.tn||[])].map(mutatorSchluessel).filter(Boolean));
+    let h=0; for(const t of eigene)if(gezogen.has(t))h++;
+    return h;
+  }
+  // Hebt JEDES der zwoelf Attribute um den Tagesbonus. Kein Deckel bei 99/100: effektive
+  // Attribute duerfen wie bei mitAufschlag() ueber 100 gehen (s. dort), die 1–99-Klemme der
+  // Rezeptwerte in mische() bleibt die einzige Obergrenze.
+  function mitMutator(a,h){
+    if(!h)return a;
+    const r=MUTATOR_REGEL, b={...a};
+    for(const k of MUTATOR_ATTRIBUTE){
+      const v=a[k]||0;
+      b[k]=r.art==="prozent"?v*(1+r.jeTreffer*h):v+r.jeTreffer*h;
+    }
+    return b;
+  }
+  // Was der Tagesbonus an Eignung bringt — dieselbe gewichtete Summe, aus der die Eignung
+  // selbst entsteht (gewichtet(), s. oben), einmal mit und einmal ohne Bonus. Beim flachen
+  // Bonus ist das exakt `jeTreffer*h`.
+  function eigMutator(p,d){
+    const h=mutatorTreffer(p); if(!h)return 0;
+    const W=BASIS_JE_DISC[d]||{};
+    const ohne=hebungRoh(p);
+    return gewichtet(mitMutator(ohne,h),W)-gewichtet(ohne,W);
+  }
+  // Ziehung wie im Spiel: ZWEI VERSCHIEDENE Traits aus dem gemeinsamen 36er-Pool
+  // (rollMatchdayMutatorTraitsForSide), nicht 1 positiv + 1 negativ. Obere Bits des
+  // Kongruenzgenerators wie in zieheFormkarten() (dort begruendet: die unteren Bits haben eine
+  // winzige Periode).
+  const MUTATOR_POOL=[...MUTATOR_POS,...MUTATOR_NEG];
+  function zieheMutatorenWieSpiel(saat){
+    let z=saat>>>0;
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
+    const i=r(MUTATOR_POOL.length);
+    const rest=MUTATOR_POOL.filter((_,j)=>j!==i);
+    return [MUTATOR_POOL[i], rest[r(rest.length)]];
   }
 
   // WOHIN der Bonus geht. Nicht pauschal auf alles — sondern in die Kampfwerte, die von
@@ -7582,7 +7694,7 @@
         // faehrt in KEINE hier oben schon berechnete Zahl ein (eig/R2 stehen VOR dieser
         // Zeile fest) — kann also nichts an TDM/Formkarte/Slot-Rechnung aendern.
         groesse:p.groesse??null,
-        eig:basisWert+engP+breitP,...R2,
+        eig:basisWert+engP+breitP,mutatorTreffer:mutatorTreffer(p),...R2,
         // `slotId` haelt fest, AUF WELCHEN Slot dieser Spieler gesetzt wurde — bisher
         // wurde die Rolle nur zum Berechnen des Aufschlags gebraucht und danach
         // weggeworfen. Der Torwart ist aber ein Slot, kein Attributwert: der Motor muss
@@ -14767,7 +14879,7 @@
         // Buehnen-Disziplinen aendert sich dadurch nicht: ihre Durchgangspunkte rechnen
         // aus den Sub-Skills (R2), nicht aus `eig`.
         eig:(p.d[buehneDisc]!=null?p.d[buehneDisc]:gewichtet(p.a,BASIS_JE_DISC[buehneDisc]||{}))
-            +engP+breitP,...R2,
+            +engP+breitP,mutatorTreffer:mutatorTreffer(p),...R2,
         runden:[], summe:0, aktuell:-1};
       // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
       // die Logik einfach — kein "wer ist als naechstes dran" ueber mehrere Frames — und
@@ -24934,11 +25046,13 @@
             tz.appendChild(el("span","tleer","Keine der gezogenen Eigenschaften greift"));
           } else {
             // "+"-Praefix fuer BEIDE Listen: die Klasse (auf/ab) faerbt nur ein, ob der
-            // Trait thematisch als positiv oder negativ gilt — die Wirkung ist immer +6,
-            // siehe traitTreffer(). Ein "−" hier waere derselbe Anzeigefehler nochmal.
+            // Trait thematisch als positiv oder negativ gilt — die Wirkung ist immer dieselbe,
+            // siehe mutatorTreffer(). Ein "−" hier waere derselbe Anzeigefehler nochmal.
             for(const t of ta.tr.pos)tz.appendChild(el("span","tchip auf","+"+t));
             for(const t of ta.tr.neg)tz.appendChild(el("span","tchip ab","+"+t));
-            const attrNeu=mitAufschlag(p.a,ta.netto,betroffeneAttribute(sl,disc,true),disc);
+            // MUTATOR ORGANISCH (29.09.): gezeigt wird, was der Tagesbonus wirklich tut — alle
+            // zwoelf Attribute um den Bonus hoeher (mitMutator), die Kampfwerte daraus neu.
+            const attrNeu=mitMutator(p.a,ta.tr.treffer);
             const vorher=stats(p,disc), nachher=stats({...p,a:attrNeu},disc);
             const wohin=KEYS.map(k=>[k,nachher[k]-vorher[k]]).filter(([,v])=>Math.abs(v)>=0.05)
               .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
@@ -24947,13 +25061,13 @@
             // Treffer sich addieren statt aufzurechnen, ist ta.netto in diesem Zweig immer
             // positiv (mindestens ein Treffer liegt vor, sonst waeren wir im ersten Zweig
             // oben) — der Fall bleibt hier nur als Kommentar, damit niemand ihn vermisst.
-            const text = wohin ? (ta.breit?wohin+" (breit verteilt)":wohin) : "kein passender Kampfwert";
+            const text = wohin || "kein passender Kampfwert";
             const z2=el("span","twohin",text);
             z2.tabIndex=0;
-            tipOn(z2,"Warum dorthin",
-              "Der Aufschlag von "+(ta.netto>0?"+":"")+ta.netto+" geht in die Kampfwerte, die von den "+
-              "Fokus-Attributen dieses Slots gespeist werden ("+(SLOTVON[sl]?SLOTVON[sl].gross+" und "+SLOTVON[sl].klein:"—")+"). "+
-              "Auf einer offensiven Position wirkt dieselbe Eigenschaft also anders als auf einer defensiven.");
+            tipOn(z2,"Was der Mutator tut",
+              "Jeder Treffer hebt an diesem Spieltag ALLE zwoelf Attribute um +"+MUTATOR_REGEL.jeTreffer+
+              " (hier "+ta.tr.treffer+" Treffer). Wie viel davon in welchem Kampfwert ankommt, ergibt sich "+
+              "aus denselben Rezepten wie immer — was der Spieler daraus macht, entscheidet das Spiel.");
             tz.appendChild(z2);
           }
           u.appendChild(tz);
@@ -25614,12 +25728,16 @@
   // anfasst, umgeht Slot-Aufschlag, Form und Stufe — und misst dann eine kuerzere Kette,
   // als das Spiel sie rechnet. Im Spielbetrieb ist der Hebel immer null.
   let ATTR_HEBUNG=null;
-  const gehoben=(p)=>{
+  const hebungRoh=(p)=>{
     if(!ATTR_HEBUNG||ATTR_HEBUNG.wer!==p.n)return p.a;
     const a={...p.a};
     a[ATTR_HEBUNG.attribut]=Math.min(100,(a[ATTR_HEBUNG.attribut]||0)+ATTR_HEBUNG.plus);
     return a;
   };
+  // MUTATOR ORGANISCH (29.09.): der Tagesbonus eines Mutator-Treffers sitzt an GENAU DIESER
+  // Stelle — nach dem Messhebel, vor Slot-/Form-Aufschlag und vor jedem Rezept. Ohne Treffer
+  // gibt mitMutator() dasselbe Objekt zurueck, der Pfad ist dann bitgleich zu vorher.
+  const gehoben=(p)=>mitMutator(hebungRoh(p),mutatorTreffer(p));
 
   // DIE EIGNUNG MUSS MITGEHEN — sonst misst die Abnahme das Gegenteil von dem, was sie soll.
   //
@@ -25650,8 +25768,13 @@
   function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
     const d=dId||"tdm";
     const bh=behav(p.n);
-    const tr=traitTreffer(p);
-    const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
+    // MUTATOR ORGANISCH (29.09.): hier stand `+tr.netto` — der flache +6-Weg ueber die zwei
+    // Slot-Fokus-Attribute ("eng"). Er ist ERSETZT, nicht ergaenzt: der Mutator wirkt jetzt in
+    // allen vier Chassis gleich, ueber gehoben() auf alle zwoelf Attribute und ueber
+    // eigMutator() auf die Eignung (s. MUTATOR_ORGANISCH). Beides nebeneinander waere dieselbe
+    // Doppelbuchung, die das Konzeptdokument (Abschnitt 5.2) benennt — und der eng-Weg hob zwei
+    // Attribute staerker als die uebrigen, verschob also Einflussanteile gegen die Matrix.
+    const engPunkte=(slId?slotAufschlag(p,slId,d):0);             // haengt an der Position
     const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
     // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
     // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
@@ -25662,8 +25785,9 @@
     //
     // Und hier faellt der Fehler schwerer als in den anderen drei Chassis: `eigWert` geht
     // ueber aufEignung() direkt in die KAMPFWERTE ein, ist also nicht nur Anzeige.
-    const eigWert=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+    const eigOhneMutator=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
+    const eigWert=eigOhneMutator+eigMutator(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
@@ -25678,7 +25802,7 @@
     // PLATZHALTER_ARCHETYP — s. Kommentar dort. `arch` ist reines Debug-/Mess-Feld (u.a.
     // disziplinProbe(), s. window.__arena weiter unten), veraendert kein Kampfverhalten.
     const archetyp=kampfArchetypVon(p);
-    return {id,n:p.n,side,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId||null,
+    return {id,n:p.n,side,row,eig:eigWert,eigOhneMutator,mutatorTreffer:mutatorTreffer(p),charisma:p.a.charisma||0,slot:slId||null,
       // groesse (s. groesseFaktor/bauFeldspiel::bauSpieler): reine Zeichen-Angabe, rein
       // additiv nach allen Kampfwerten oben berechnet.
       groesse:p.groesse??null,
@@ -32916,7 +33040,7 @@
       // Form UND Menge, Eignung nur Anzeige" unveraendert, das ist eine offene Frage an
       // Chris (Bericht Teil 6, Frage 1), nicht Teil dieser Aenderung.
       if(art.staffel){
-        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d);
+        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d)+eigMutator(p,d);
         const m=0.73*w.ANTRITT+0.27*w.ENDTEMPO;      // die effektive Tempoformel eines 1,7-s-Beins
         const f=m>0?eigW/m:1;
         for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
@@ -32931,7 +33055,7 @@
       // docs/design/staffel-offene-fragen-plus-takeshis-castle-05-09.md, Teil 3.3, Schritt 2
       // (T1a), zusammen mit den nachgezogenen Budgets (T1f) im BAHN_ART-Block.
       if(art.mengeAusEignung){
-        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d);
+        const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d)+eigMutator(p,d);
         const ks=Object.keys(w); const m=ks.reduce((s,k)=>s+w[k],0)/ks.length;   // Mittel der sieben, nicht der Tempo-Mix
         const f=m>0?eigW/m:1;
         for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
@@ -32968,7 +33092,12 @@
         // Zeichen fuer Zeichen wie in bauFeldspiel und bauBuehne. Das VERHALTEN der
         // Rennen aendert sich dadurch nicht: die Laufwerte kommen aus dem Rezept (R2),
         // nicht aus `eig`.
-        eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
+        // MUTATOR ORGANISCH (29.09.): `eig` traegt den Tagesbonus mit (wie eigHebung), die
+        // Rangtreue-Sonde misst aber gegen `eigOhneMutator` — der Mutator soll absichtlich
+        // von der Eignung abweichen, und genau diese Abweichung soll die Abnahme sehen.
+        eig:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d)+eigMutator(p,d),
+        eigOhneMutator:(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d),
+        mutatorTreffer:mutatorTreffer(p),
         // BALANCE/HOECHSTMARKE (Climbing-Neubau PR 2): harmlose Init-Felder fuer JEDE Bahn
         // — nur Climbing liest/schreibt sie in stepSpurt weiter (`BA().balanceSteigungGrad`/
         // `BA().climbing`), jede andere Bahn traegt sie nur ungenutzt mit.
@@ -36403,7 +36532,8 @@
     if(!istGegner){
       const tr=traitTreffer(p);
       if(tr.netto)teile.push(["Mutator",tr.netto,
-        [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"+"+t)].join(", ")]);
+        [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"+"+t)].join(", ")+
+        " — +"+MUTATOR_REGEL.jeTreffer+" auf jedes Attribut je Treffer"]);
       const iv=stufenWert();
       if(iv)teile.push(["Intensität",iv,INTENSITAET[STUFE].label]);
     }
@@ -36686,10 +36816,10 @@
       let mz=eg.querySelector(".emutator");
       if(!mz){mz=el("div","emutator");eg.appendChild(mz);}
       mz.textContent="";
-      // Beide mit "+": der zweite Mutator ist nur FARBLICH als "ab" markiert (thematisch
-      // negativ gelistet), seine Wirkung ist genau wie beim ersten +6 — siehe traitTreffer().
-      mz.appendChild(el("span","tchip auf","+"+MUTATOREN[0]));
-      mz.appendChild(el("span","tchip ab","+"+MUTATOREN[1]));
+      // Beide mit "+": "ab" ist nur die FARBE eines thematisch negativ gelisteten Traits, die
+      // Wirkung ist dieselbe — siehe mutatorTreffer(). Seit "2 aus 36" (29.09.) kann jeder der
+      // beiden positiv oder negativ sein, deshalb je Trait nachgesehen statt nach Position.
+      for(const t of MUTATOREN)mz.appendChild(el("span","tchip "+(MUTATOR_NEG.includes(t)?"ab":"auf"),"+"+t));
     }
   }
   const zeigeEinlauf=(an)=>{const e=document.getElementById("einlauf");if(e)e.hidden=!an;};
@@ -38086,6 +38216,17 @@
   // uebergibt seine Saat weiterhin explizit als Funktionsargument und liest `echterKader`
   // hierfuer nicht; `scripts/miss-alle-disziplinen.mjs` und `runArenaFixtures()` sind von dieser
   // Aenderung deshalb unberuehrt (nachgemessen, s. PR-Beschreibung).
+  // DERSELBE GEDANKE FUER DEN MUTATOR-WURF (MUTATOR ORGANISCH, 29.09.): der Host reicht je
+  // Disziplin des Spieltags den ECHTEN Wurf (`echterKader.mutatorenByDisciplineId`, derselbe wie
+  // im Spielplan und in der Wertung). Hat er eine Karte geschickt, gilt fuer eine Disziplin ohne
+  // Eintrag (an diesem Spieltag nicht gespielt) ausdruecklich KEIN Mutator — kein Ersatzwurf, der
+  // Spieler besser aussehen liesse, als sie an diesem Spieltag waeren. Ohne Karte bleibt es beim
+  // Grundzustand (Headless-Lauf mit `mutatoren`, Mockup mit eigener Ziehung).
+  function mutatorenFuerAktuelleDisziplin(){
+    const karte=echterKader&&echterKader.mutatorenByDisciplineId;
+    if(!karte||typeof karte!=="object"){mutatorenGrundzustand();return;}
+    MUTATOREN=alsMutatorListe(karte[disc])||[];
+  }
   function gebuchteSaatFuerAktuelleDisziplin(){
     const karte=echterKader&&echterKader.seedByDisciplineId;
     if(!karte||typeof karte!=="object")return undefined;
@@ -38235,6 +38376,7 @@
     // ISPY_VISUELLES_LAYOUT bei JEDEM I-Spy-Spiel unbedingt neu (s. Kommentar bei
     // ISPY_LAYOUT_VARIANTEN), bevor bodenSchatzsuche()/stepSchatzsuche() es lesen koennen.
     ISPY_VISUELLES_LAYOUT=null;
+    mutatorenFuerAktuelleDisziplin();
     build(gebuchteSaatFuerAktuelleDisziplin());
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
@@ -38365,7 +38507,7 @@
   }));
 
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
-  zieheMutatoren(20260823);
+  mutatorenGrundzustand();
   zieheFormkarten(20260823);
   renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
@@ -38398,7 +38540,7 @@
       //
       // Chris: "renegade ist n mutator wie jeder andere und bringt 6 score punkte und 0,3
       // PPs das bleibt auch weiter so". Die Mechanik stimmt also (`hits * 6` und
-      // `hits * 0.3` in legacy-lineup-modifiers.ts, hier als TRAIT_PUNKTE=6) — nur gilt
+      // `hits * 0.3` in legacy-lineup-modifiers.ts; hier seit 29.09. als MUTATOR_ORGANISCH) — nur gilt
       // sie im Spiel JE SPIELTAG, genau wie die Formkarte. Also gehoert sie an den Kampf.
       zieheMutatoren(20260823+i*15485863);
       zieheFormkarten(20260823+i*104729);
@@ -38437,7 +38579,7 @@
       }
     }
     disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
-    zieheMutatoren(20260823);
+    mutatorenGrundzustand();
     zieheFormkarten(20260823);
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
     return {disziplin:d||alt.disc,plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
@@ -38465,7 +38607,7 @@
   function zielansageLauf(saat,ansageName,d){
     const alt={disc,U,pfeile,t,done,seed,freigabe};
     if(d)disc=d;
-    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    mutatorenGrundzustand(); zieheFormkarten(20260823);
     build(saat||1337);
     if(ansageName){
       const z=U.find(x=>x.side===1&&x.n===ansageName);
@@ -38506,7 +38648,7 @@
         [n,{mittel:+(a.summe/Math.max(1,a.lebtFrames)).toFixed(2),max:a.max}])),
       signatur:signatur.join(";")};
     disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
-    zieheMutatoren(20260823); zieheFormkarten(20260823);
+    mutatorenGrundzustand(); zieheFormkarten(20260823);
     return erg;
   }
 
@@ -39264,11 +39406,18 @@
   // kombinieren" (s. Kommentar bei ISPY_REIHENFOLGE_NERVEN_ANTEIL) durch einen einzigen,
   // eingebauten Parameter — geprueft: einflussVon(d,n) und einflussVon(d,n,undefined,0)
   // liefern dieselben Zahlen.
-  function einflussVon(dId,n,plus,saatVersatz){
+  // `mutatorModus` (MUTATOR ORGANISCH, 29.09., Konzept Abschnitt 6.3): wie die Mutatoren
+  // waehrend der Messung stehen. "je-lauf" (Standard): Lauf i zieht seinen Spieltagswurf wie im
+  // Spiel ("2 aus 36"), mit einer Saat, die NUR von i und dem Versatz abhaengt — Grundlauf und
+  // JEDER Hebungslauf sehen in Lauf i also denselben Wurf, der Vergleich bleibt gepaart und der
+  // Mutator kann den Attributgewinn nicht kontaminieren. "aus": niemand trifft (Referenz A, die
+  // reine Matrixfrage). "fest": der geladene Wurf bleibt stehen (das Verhalten vor dem 29.09.).
+  function einflussVon(dId,n,plus,saatVersatz,mutatorModus){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
     const hoehe=plus||15; const versatz=saatVersatz||0;
-    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
+    const modus=mutatorModus||"je-lauf";
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG; const mutatorenVorher=MUTATOREN;
     if(M.vorher)M.vorher();
 
     const durchlauf=(wer,attribut)=>{
@@ -39276,6 +39425,8 @@
       const w={};
       for(let i=0;i<n;i++){
         zieheFormkarten(20260823+versatz+i*104729);
+        if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+        else if(modus==="aus")MUTATOREN=[];
         M.bau(1337+versatz+i*7919);
         M.lauf();
         const e=M.wert();
@@ -39293,7 +39444,7 @@
       return {attribut:at, gewinn:+(summe/namen.length).toFixed(3)};
     });
 
-    ATTR_HEBUNG=hebungVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    ATTR_HEBUNG=hebungVorher; MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
     const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
     const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
                     .sort((a,b)=>b.gewinn-a.gewinn);
@@ -39304,7 +39455,7 @@
     const W=BASIS_JE_DISC[dId]||{};
     const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
       s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
-    return {disziplin:dId, laeufe:n, anhebung:hoehe,
+    return {disziplin:dId, laeufe:n, anhebung:hoehe, mutatorModus:modus, saatVersatz:versatz,
       abweichungPp:Math.round(abweichung*10)/10, reihen};
   }
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
@@ -40790,12 +40941,93 @@
       // Time-Trial/Climbing lesen dasselbe Feld, ohne dass es dort etwas bewirkt — s.
       // PR-Beschreibung fuer den Nachweis per Vorher/Nachher-Messung).
       neuPersBerechnen();
+      // MUTATOR ORGANISCH (29.09.): wie beim Laden optional der echte Spieltagswurf — ohne das
+      // Feld bleibt der bisherige Wurf unangetastet.
+      if(kader&&Array.isArray(kader.mutatoren)){kaderMutatoren=alsMutatorListe(kader.mutatoren);mutatorenGrundzustand();}
       return {heim:SQUAD.length,gast:OPP.length};
+    },
+    // MUTATOR ORGANISCH — MESSHEBEL (29.09.). `mutatorRegel(r)` stellt die Regel fuer eine
+    // Messung um ({art:"flach"|"prozent", jeTreffer}) und liefert die vorherige zurueck;
+    // `mutatorRegel(null)` setzt auf die Spielkonstante zurueck. Im Spielbetrieb ruft das niemand.
+    mutatorRegel:(r)=>{
+      const vorher={...MUTATOR_REGEL};
+      MUTATOR_REGEL=r&&(r.art==="flach"||r.art==="prozent")&&Number.isFinite(r.jeTreffer)
+        ?{art:r.art,jeTreffer:r.jeTreffer}:{...MUTATOR_ORGANISCH};
+      return vorher;
+    },
+    mutatorKonstante:()=>({...MUTATOR_ORGANISCH}),
+    mutatorTrefferVon:(name)=>{const p=[...SQUAD,...OPP].find(x=>x.n===name);return p?mutatorTreffer(p):null;},
+    // GEGENFAKTUS-SONDE (Konzept Abschnitt 7.3): "was ist ein Treffer wert?" — dieselbe Saat,
+    // derselbe Kader, einmal ohne jeden Mutator und einmal mit `treffer` Treffern fuer GENAU
+    // EINEN Spieler, reihum fuer jeden Teilnehmer. Gespielt wird ueber DIESELBEN Einstiege wie
+    // im produktiven Headless-Lauf (spieleFeldspiel/spieleBuehne*/spieleBahn), damit der
+    // Boxscore-Wert genau der ist, den battle-mode-arena-team-points.ts in PP umrechnet. Die
+    // Umrechnung selbst macht der Aufrufer (scripts/miss-mutator-wirkung.ts), weil die
+    // PPS-Referenzen und Kurvenregler dort leben, nicht in der Engine.
+    mutatorGegenfaktus:(dId,opt)=>{
+      const o=opt||{}, n=o.n||12, treffer=o.treffer||1, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const A=window.__arena;
+      const einstieg=typeof BAHN_ART!=="undefined"&&BAHN_ART[dId]?A.spieleBahn
+        :typeof BUEHNE_ART!=="undefined"&&BUEHNE_ART[dId]?(BUEHNE_ART[dId].heben?A.spieleBuehneHeben
+          :BUEHNE_ART[dId].duell?A.spieleBuehneDuell:BUEHNE_ART[dId].gauntlet?A.spieleBuehneGauntlet:A.spieleBuehneAuftritt)
+        :typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[dId]?A.spieleFeldspiel:null;
+      if(!einstieg)return {disziplin:dId,fehler:"kein produktiver Einstieg fuer diese Disziplin"};
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[{label:null,heim:null,gast:null}];
+      const kaderVorher={SQUAD,OPP}, mutatorenVorher=MUTATOREN, zwangVorher=MUTATOR_ZWANG, regelVorher=MUTATOR_REGEL;
+      if(o.regel)MUTATOR_REGEL={art:o.regel.art,jeTreffer:o.regel.jeTreffer};
+      const eigNach=(name)=>{const p=[...SQUAD,...OPP].find(x=>x.n===name);
+        return p?(p.d&&p.d[dId]!=null?p.d[dId]:gewichtet(p.a,BASIS_JE_DISC[dId]||{})):null;};
+      const zuMap=(e)=>Object.fromEntries(e.boxscore.map(b=>[b.name,b.wert]));
+      const varianten=[];
+      try{
+        for(const v of familie){
+          if(v&&Array.isArray(v.heim)&&v.heim.length)SQUAD=mitKit(v.heim);
+          if(v&&Array.isArray(v.gast)&&v.gast.length)OPP=mitKit(v.gast);
+          neuPersBerechnen();
+          const heimNamen=new Set(SQUAD.map(p=>p.n));
+          const spiele=[];
+          for(let i=0;i<n;i++){
+            const saat=saat0+i*schritt;
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=[]; MUTATOR_ZWANG=null;
+            const basis=einstieg(dId,saat);
+            if(!basis)continue;
+            const laeufe=[];
+            for(const b of basis.boxscore){
+              MUTATOR_ZWANG={wer:b.name,treffer};
+              const mit=einstieg(dId,saat);
+              MUTATOR_ZWANG=null;
+              if(!mit)continue;
+              laeufe.push({wer:b.name, seite:heimNamen.has(b.name)?0:1, eig:eigNach(b.name),
+                seiten:mit.seiten, gesamtKg:mit.gesamtKg||null, boxscore:zuMap(mit)});
+            }
+            spiele.push({saat, seiten:basis.seiten, gesamtKg:basis.gesamtKg||null,
+              torwart:basis.boxscore.filter(b=>b.torwart).map(b=>b.name),
+              boxscore:zuMap(basis), laeufe});
+          }
+          varianten.push({label:(v&&v.label)||null, spiele});
+        }
+      } finally {
+        MUTATOR_ZWANG=zwangVorher; MUTATOREN=mutatorenVorher; MUTATOR_REGEL=regelVorher;
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen(); zieheFormkarten(20260823);
+      }
+      return {disziplin:dId, treffer, regel:{...(o.regel||MUTATOR_REGEL)}, varianten};
     },
     disziplinProbe:(dId,opt)=>{
       const M=MOTOREN[dId];
       if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
       const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      // MUTATOR ORGANISCH (29.09., Konzept Abschnitt 7.2): `o.mutatoren` = "je-spiel" (Standard,
+      // spielnah: jedes Spiel zieht seinen eigenen Wurf "2 aus 36", wie die Formkarte), "aus"
+      // (niemand trifft, Referenz V0) oder "fest" (der geladene Wurf gilt fuer alle Spiele, das
+      // Verhalten vor dem 29.09.). rho wird in jedem Fall gegen `eigOhneMutator` gemessen: der
+      // Mutator weicht absichtlich von der Eignung ab, die Abnahme soll das sehen, nicht
+      // wegrechnen.
+      const mutatorModus=o.mutatoren||"je-spiel";
+      // `o.mutatorSaat`: Versatz fuer einen unabhaengigen Mutator-Saatstrom (Standard 0) — trennt
+      // Mutator-Ziehungsrauschen von einer echten Wirkung, ohne Formkarten/Bau-Saaten zu aendern.
+      const mutatorSaat=o.mutatorSaat||0;
+      const mutatorenVorher=MUTATOREN;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();
       // `o.jeSeite` faehrt dieselbe Kadergroessen-Probe wie feldspielProbe (2v2/4v4/6v6):
@@ -40827,6 +41059,8 @@
         const spiele=[];
         for(let i=0;i<n;i++){
           zieheFormkarten(20260823+i*104729);
+          if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+mutatorSaat+i*15485863);
+          else if(mutatorModus==="aus")MUTATOREN=[];
           M.bau(saat0+i*schritt);
           M.lauf();
           const w=M.wert();
@@ -40835,20 +41069,21 @@
           // ist, `etappenZeit`, wie lange er dafuer gebraucht hat. Erst damit laesst sich
           // pruefen, ob eine Staffel den Abschnitt misst oder den Laeufer. Ausserhalb der
           // Staffel bleiben beide null.
-          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:u.eig,
+          const eigVon=(u)=>u.eigOhneMutator!=null?u.eigOhneMutator:u.eig;
+          const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:eigVon(u),
             bein:u.bein??null, etappe:u.etappenZeit??null}))
-            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:u.eig}))
+            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:eigVon(u)}))
             // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
             // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
             // und macht die Teilnehmerliste dort ununterscheidbar von vorher.
-            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:u.eig,torwart:!!u.torwart}))
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart}))
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
             // dorthin stellt, wo sie etwas bewirken koennen. `arch` (Backlog #156, Schritt 1)
             // ist der aufgeloeste Kampf-Archetyp-Name — reines Diagnosefeld fuer
             // scripts/pruefe-kampf-archetyp-abgleich.ts, veraendert kein Kampfverhalten.
-            :U.map(u=>({n:u.n,seite:u.side,eig:u.eig,reihe:u.row,arch:u.arch??null}));
+            :U.map(u=>({n:u.n,seite:u.side,eig:eigVon(u),reihe:u.row,arch:u.arch??null}));
           spiele.push({saat:saat0+i*schritt,
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
@@ -40880,6 +41115,7 @@
           ergebnis=einSpieldurchlauf();
         }
       } finally {
+        MUTATOREN=mutatorenVorher;
         M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
         if(art&&o.kursIndex!=null)art.kurse=altKurse;
         if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}

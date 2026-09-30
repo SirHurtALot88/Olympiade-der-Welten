@@ -70,7 +70,12 @@ const BOOTSTRAP_UNSICHERHEIT = roheArgs.includes("--bootstrap-unsicherheit");
 // 6, 4 UND 2 je Seite" (Plan 8.1), jetzt mit Median+Spannweite statt Einzelkader.
 const jeSeiteArg = roheArgs.find((a) => a.startsWith("--je-seite="));
 const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite="));
+// --mutatoren=je-spiel|aus|fest (MUTATOR ORGANISCH, 29.09., additiv): wie die Mutator-Traits
+// waehrend der Probe stehen, s. disziplinProbe in battle-mode.engine.js. Ohne den Schalter gilt
+// der Standard der Engine ("je-spiel": jedes Spiel zieht seinen eigenen Wurf wie im Spiel).
+const mutatorenArg = roheArgs.find((a) => a.startsWith("--mutatoren="));
+const MUTATOREN = mutatorenArg ? mutatorenArg.split("=")[1] : null;
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren="));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -105,6 +110,7 @@ try {
     zeilen.push(await disziplinMessen(seite, d, {
       n: SPIELE, kaderFamilie: EINZELKADER ? null : kaderFamilie,
       ...(JE_SEITE ? { jeSeite: JE_SEITE } : {}),
+      ...(MUTATOREN ? { mutatoren: MUTATOREN } : {}),
     }));
   }
 } finally {
@@ -114,7 +120,7 @@ try {
 const titel = EINZELKADER
   ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
   : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
-console.log(titel + "\n");
+console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }

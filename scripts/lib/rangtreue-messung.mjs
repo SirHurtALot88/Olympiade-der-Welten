@@ -194,14 +194,18 @@ function feldOnlyZusatz(gruppen) {
  * Einzelkader-Weg) und fasst sie zu Median/Spannweite zusammen. `seite` ist eine
  * Playwright-Page mit bereits geladenem `window.__arena`.
  */
-export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite }) {
+export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite, mutatoren }) {
   let x;
   try {
+    // `mutatoren` (MUTATOR ORGANISCH, 29.09.): "je-spiel" | "aus" | "fest", s. disziplinProbe in
+    // battle-mode.engine.js. Weggelassen -> der Standard der Engine ("je-spiel"; eine Engine von
+    // vor dem 29.09. kennt die Option nicht und ignoriert sie).
     x = await seite.evaluate(
-      ([d, n, familie, js]) => window.__arena.disziplinProbe(d, {
+      ([d, n, familie, js, mut]) => window.__arena.disziplinProbe(d, {
         n, ...(familie ? { kaderFamilie: familie } : {}), ...(js ? { jeSeite: js } : {}),
+        ...(mut ? { mutatoren: mut } : {}),
       }),
-      [d, n, kaderFamilie || null, jeSeite || null],
+      [d, n, kaderFamilie || null, jeSeite || null, mutatoren || null],
     );
   } catch (e) {
     return { d, fehler: String(e).slice(0, 60) };

@@ -322,6 +322,15 @@ export type RunArenaFixturesOptions = {
   chromiumExecutablePath?: string;
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
   seitenTimeoutMs?: number;
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
+   * dieser Disziplin-Seite (`rollMatchdayMutatorTraitsForSide()`, zwei Traits aus dem 36er-Pool,
+   * fuer alle Teams gleich). Er faehrt als `window.__olyArenaKader.mutatoren` in die Engine, die
+   * getroffene Spieler daraufhin mit hoeheren Attributen antreten laesst. Weggelassen -> `[]`,
+   * also AUSDRUECKLICH kein Mutator — nie der engine-eigene Ersatzwurf: ein Lauf ohne echten Wurf
+   * (Referenzziehungen, Tests) soll niemanden zufaellig besser machen.
+   */
+  mutatoren?: readonly string[];
 };
 
 type VorbereitetesFixture = {
@@ -441,6 +450,8 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
   }[];
   disziplin: string;
+  /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
+  mutatoren: string[];
   // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
   // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` /
   // `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS` / `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche
@@ -479,6 +490,7 @@ async function simuliereFixturesImBrowser(payload: {
       heim: kader.heim,
       gast: kader.gast,
       aufstellung: kader.aufstellung,
+      mutatoren: payload.mutatoren,
     };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
@@ -548,6 +560,7 @@ export async function runArenaFixtures(
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
   }
   const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
 
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
   try {
@@ -581,6 +594,7 @@ export async function runArenaFixtures(
       heim: vorbereitet[0].heim,
       gast: vorbereitet[0].gast,
       aufstellung: vorbereitet[0].aufstellung,
+      mutatoren,
     });
 
     await page.goto(pathToFileURL(seitenPfad).href);
@@ -606,6 +620,7 @@ export async function runArenaFixtures(
         aufstellung,
       })),
       disziplin,
+      mutatoren,
       chassis,
       timeoutMs,
     });
@@ -845,7 +860,9 @@ export async function runMiniDmFfaPodFixtures(
       (kader) => {
         (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
       },
-      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {} },
+      // `mutatoren: []` (29.09.): kein engine-eigener Ersatzwurf — dieser Runner ist reine
+      // Praesentation und kennt den echten Spieltagswurf nicht, s. `RunArenaFixturesOptions.mutatoren`.
+      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {}, mutatoren: [] },
     );
 
     await page.goto(pathToFileURL(seitenPfad).href);
