@@ -12556,9 +12556,29 @@
     // dem alten Stand steht -- ohne diese Abfrage wuerde die Restzeit hier fuer einen
     // Wimpernschlag fast eine ganze Periode weit "voll" anzeigen. 0:00 waehrend der Pause ist
     // die ehrlichere Anzeige (die Pause selbst zeigt ohnehin ihr eigenes Countdown-Overlay).
-    const restSek=fsLive.viertelpause?0:Math.max(0,fsLive.viertel*L.periodenDauer-fsT);
     const periodeLabel=(L.periodeWort==="Drittel")?(periodeNr+". Drittel"):("Q"+periodeNr);
-    return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(Math.floor(restSek%60)).padStart(2,"0");
+    if(fsLive.viertelpause)return periodeLabel+" · 0:00";
+    // UHR-SKALIERUNG (Broadcast-Audit Runde 2, Punkt 10, 30.09.): `restRoh` stand bisher
+    // direkt als Sekunden da, obwohl `L.periodenDauer` SIMULATIONSSEKUNDEN sind (s.
+    // ZEIT_DEHNUNG.hockey-Kommentar: "240 s Simulationszeit werden ... zu rund 8 Minuten
+    // Zuschauzeit") -- Kampf/Bahn skalieren ihre Uhr laengst mit `zeitFaktor()`
+    // (s. updateHud()/updateHudBahn()), diese Periodenuhr tat es nicht. Bei
+    // ZEIT_DEHNUNG.hockey=2 tickte sie dadurch nur halb so schnell wie die Sendezeit ablief.
+    const restRoh=fsLive.viertel*L.periodenDauer-fsT;
+    if(restRoh<0){
+      // LETZTE PERIODE OHNE PAUSEN-KLEMME (Audit-Fund: "Football-Viertel-Uhr steht ... auf
+      // 0:00, waehrend noch Spielzuege laufen" -- Anzeige-Bug, kein Sim-Bug). Die
+      // Viertelgrenzen-Pruefung in `naechsterAngriff()` greift nur VOR der letzten Periode
+      // (`fsLive.viertel<L.perioden`); danach laeuft die Simulation unveraendert bis zum
+      // tatsaechlichen Spielende weiter, waehrend die alte Anzeige ab dem Ueberschreiten fuer
+      // den Rest des Spiels bei "0:00" einfror. Zeigt die ueberzogene Zeit jetzt als
+      // Nachspielzeit ("+0:07"), ausschliesslich aus vorhandenem fsT/L hergeleitet -- kein
+      // neuer Zustand, kein Ruecklesen in die Simulation.
+      const ueberSek=Math.floor(-restRoh*zeitFaktor());
+      return periodeLabel+" · +"+Math.floor(ueberSek/60)+":"+String(ueberSek%60).padStart(2,"0");
+    }
+    const restSek=Math.floor(restRoh*zeitFaktor());
+    return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(restSek%60).padStart(2,"0");
   }
   // B1 -- SHOT-CLOCK (Basketball, A, Prio 1): `null` waehrend Freiwurf/Viertelpause/nach
   // Spielende, sonst die Restzeit bis zum erzwungenen Abschluss. Dieselbe Formel treibt die
@@ -12775,15 +12795,20 @@
           bbugWechselTimer=setTimeout(()=>mitte.classList.remove("wechsel"),600);
         }
         bbugLetzteFuehrung=fuehrend;
-        const restzeile=feldspielRestzeitAbwaerts();
-        if(restzeile){
-          const zusatz=feldspielKontextZusatz();
+        // EIN-UHR-REDUKTION (Broadcast-Audit Runde 2, Punkt 10, 30.09.): hier stand bislang
+        // ZUSAETZLICH `feldspielRestzeitAbwaerts()` ("Q3 · 4:12") -- exakt dieselbe Periodenuhr,
+        // die `clockTxt` (aus #clock, s. updateHudFeldspiel()) zwei Zeilen darueber JETZT SCHON
+        // in der Bug-Hauptzeile zeigt ("9 : 6 · Q3 · 4:12"). Diese kleine Zeile bleibt nur noch
+        // fuer den disziplineigenen ZUSATZ (Shot-Clock/Powerplay/Down & Distance) -- ohne die
+        // Wiederholung der Uhr.
+        const zusatz=feldspielKontextZusatz();
+        if(zusatz){
           const klein=document.createElement("small");
           // innerHTML statt textContent (Nachtrag 27.09.): feldspielKontextZusatz() kann fuer
           // Basketball unter 5s einen <span class="knapp"> einstreuen (Rotfaerbung wie die
-          // Canvas-Ziffernbox, s. dort). restzeile/zusatz bestehen sonst nur aus festen Labels
-          // und Zahlen, nie aus Spieler-/Team-Text -- unbedenklich fuer innerHTML.
-          klein.innerHTML=zusatz?restzeile+" · "+zusatz:restzeile;
+          // Canvas-Ziffernbox, s. dort). `zusatz` besteht sonst nur aus festen Labels und
+          // Zahlen, nie aus Spieler-/Team-Text -- unbedenklich fuer innerHTML.
+          klein.innerHTML=zusatz;
           mitte.appendChild(klein);
         }
       }
@@ -12840,8 +12865,26 @@
   }
 
   function updateHudFeldspiel(){
-    document.getElementById("clock").textContent=
-      Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
+    // UHR-ANGLEICHUNG + EIN-UHR-REDUKTION (Broadcast-Audit Runde 2, Punkt 10, 30.09.): hier
+    // stand bisher eine rohe, hochzaehlende `fsT`-Uhr, WAEHREND der Score-Bug direkt darunter
+    // (aktualisiereBbug(), `feldspielRestzeitAbwaerts()`) bereits eine zweite, periodenbasierte
+    // Countdown-Uhr zeigte -- "Feldspiel zeigt eine hochzaehlende Gesamtuhr PLUS eine
+    // Periodenuhr ('Q3 · 0:00') gleichzeitig" (Audit-Fund). Die Periodenuhr ist die
+    // Fernseh-uebliche Anzeige (Q3/Drittel + Restzeit statt einer nackten Gesamtsekundenzahl)
+    // und war schon korrekt zeitFaktor-skaliert bzw. wird das mit derselben Aenderung an
+    // `feldspielRestzeitAbwaerts()` jetzt auch -- sie wird hier zur EINZIGEN Hauptanzeige;
+    // die Kopie im Bug (weiter unten in dieser Funktion) faellt weg, s. dortigen Kommentar.
+    const periodentext=feldspielRestzeitAbwaerts();
+    if(periodentext){
+      document.getElementById("clock").textContent=periodentext;
+    } else {
+      // Fallback nur fuer den unwahrscheinlichen Fall, dass LIVE()/fsLive noch nicht steht
+      // (z.B. ein Frame waehrend eines Discipline-Wechsels) -- dieselbe Skalierung wie oben,
+      // ohne Perioden-Label.
+      const fsTAnzeige=fsT*zeitFaktor();
+      document.getElementById("clock").textContent=
+        Math.floor(fsTAnzeige/60)+":"+String(Math.floor(fsTAnzeige%60)).padStart(2,"0");
+    }
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     // Fable-Playtest (25.08.): der Play-Button blieb nach Spielende auf "Pause" stehen,
     // weil nur ein Klick seinen Text setzt (Zeile ~8417) — anders als im Kampf, wo
@@ -18842,8 +18885,29 @@
   }
 
   function updateHudBuehne(){
-    document.getElementById("clock").textContent=
-      Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
+    // UHR-ANGLEICHUNG (Broadcast-Audit Runde 2, Punkt 10, 30.09.): bislang stand hier rohes
+    // `buehneT` (Simulationssekunden) -- Kampf/Bahn zeigen seit dem Arena-Zeit-Fix (27.09.)
+    // laengst `t*zeitFaktor()`/`rennT*zeitFaktor()` (s. updateHud()/updateHudBahn()), also die
+    // fuer den Zuschauer "gefuehlte" Zeit. Bei ZEIT_DEHNUNG.gewichtheben=4/fechten=1,62 tickte
+    // die Buehnen-Uhr dadurch 4x/1,6x zu langsam (gemessen: Gewichtheben 7:11 Sendezeit endet
+    // bei "1:50", Fechten 1:35 bei "0:59"). `*zeitFaktor()` bringt sie auf dasselbe Muster;
+    // fuer jede Buehne ohne ZEIT_DEHNUNG-Eintrag (Faktor 1) aendert sich dadurch nichts.
+    const buehneTAnzeige=buehneT*zeitFaktor();
+    if(BB().wettessen){
+      // ZWEI UHREN GLEICHZEITIG (Audit-Fund, Bild 11): der Bug zeigte "0:37" (rohe buehneT-
+      // Sekunden), die Leinwand gleichzeitig die grosse, dramatische "10:00-Uhr" (Chris'
+      // eigene Vorgabe, S3-Gegencheck Abschnitt 5: "eine grosse Countdown-Uhr ueber dem
+      // Tisch") samt Minutenlabel und Rot-Puls in den letzten zehn Sekunden -- zwei
+      // widerspruechliche Uhrzeiten fuer denselben Moment. Die Leinwand bleibt die EINE
+      // sichtbare Uhr (`zeichneWettessenUhr`, unveraendert); der Bug zeigt hier stattdessen
+      // nur noch die Minute als Kontext, keine zweite Sekundenanzeige mehr.
+      const minutenFertig=Math.max(0,(TEILNEHMER[0]&&TEILNEHMER[0].aktuell+1)||0);
+      document.getElementById("clock").textContent=
+        "Minute "+Math.min(BB().rundenN,minutenFertig+(done?0:1))+"/"+BB().rundenN;
+    } else {
+      document.getElementById("clock").textContent=
+        Math.floor(buehneTAnzeige/60)+":"+String(Math.floor(buehneTAnzeige%60)).padStart(2,"0");
+    }
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
     // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
@@ -18914,7 +18978,23 @@
       // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
       const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
-      document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
+      // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
+      // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
+      // alle Bretter laufen parallel im selben Takt: fast keins ist fertig, bis fast alle es
+      // gleichzeitig kurz vor Schluss werden (Messanhang 6.3: "0 : 0" von Start bis Ende).
+      // `u.verlauf[u.aktuell]` ist dieselbe LAUFENDE Vorteilszahl, die die Canvas-Karte jedes
+      // Spielers schon zeigt ("+12 Vorteil", Kommentar ":20001" -- ausdruecklich NICHT
+      // `u.vorteil`, das der ENDWERT der ganzen Partie ist und "das Ergebnis verraet, bevor
+      // auch nur ein Zug gezeigt wurde"), also derselbe kein-Spoiler-Wert. Ihre Summe je Seite
+      // bewegt sich mit jedem enthuellten Zug, statt bis kurz vor Schluss auf 0 zu stehen. Der
+      // ECHTE Endstand (sobald `done`) bleibt unveraendert bei den Brettsiegen.
+      if(done){
+        document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
+      } else {
+        const laufendVorteil=(u)=>(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+        const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+laufendVorteil(u),0);
+        document.getElementById("score").textContent=summe(0)+" : "+summe(1);
+      }
     } else if(BB().gauntlet){
       // GAUNTLET: der Punktestand zaehlt NOCH STEHENDE KAEMPFER, nicht Punkte -- "wer uebrig
       // bleibt, scored einen Punkt" ist eine Ueberlebensfrage, keine Summenfrage. KEIN
@@ -23115,6 +23195,32 @@
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.font="400 11px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
+
+    // TOTE STRECKEN FUELLEN (Broadcast-Audit Runde 2, Punkt 19, 30.09.): Gewichtheben steht
+    // laut Messung 95 % der Sendezeit als Standbild, bis zu 30 s am Stueck ohne sichtbare
+    // Aenderung (Tabelle 6.2) -- im echten Fernsehen laeuft in dieser Zeit die Versuchsuhr,
+    // die Hantel wird "geladen" und der letzte Versuch nachbesprochen. Alle drei Elemente
+    // hier lesen AUSSCHLIESSLICH bereits vorhandenen Zustand: `buehneAkt`/`art.rundenDauer`
+    // treiben die Enthuellungsanimation ohnehin schon (s. hebePhase() oben), `zeitFaktor()`
+    // ist dieselbe Umrechnung, mit der auch die Uhr im HUD rechnet (s. updateHudBuehne()), und
+    // `letzterHebenZug.r.ereignis` ist derselbe Text, den der Ticker beim Enthuellen bereits
+    // schreibt (s. "u.runden.push({...ereignis:..." oben) -- keine neue Simulation, kein
+    // rr(), kein zweites Protokoll.
+    {
+      const restEcht=Math.max(0,buehneAkt*zeitFaktor());
+      const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
+      const uhrY=H*0.27;
+      ctx.font="700 9.5px 'IBM Plex Mono',monospace";ctx.fillStyle="#d6ac36";
+      ctx.fillText("Nächster Versuch in "+restEcht.toFixed(1).replace(".",",")+" s",W/2,uhrY);
+      const barW=150,barH=5,barX=W/2-barW/2,barY=uhrY+11;
+      ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(barX,barY,barW,barH);
+      ctx.fillStyle="#d6ac36";ctx.fillRect(barX,barY,barW*fortschritt,barH);
+      if(letzterHebenZug&&letzterHebenZug.r){
+        ctx.font="400 9px 'Barlow Condensed',sans-serif";ctx.fillStyle="#8a93a3";
+        ctx.fillText("Zuletzt: "+letzterHebenZug.u.n.split(" ")[0]+" — "+letzterHebenZug.r.ereignis,
+          W/2,barY+17);
+      }
+    }
 
     // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
     // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
@@ -28592,6 +28698,15 @@
   // Hot Seat NUR aus echten Zielzeiten entsteht (bahnHotSeat(), s. dort) und nie aus der
   // Hochrechnung, die `bahnFuehrenderId` fuer Spurt/Climbing weiter nutzt.
   let bahnHotSeatId=null;
+  // BAUCHBINDE FUER STILLE STRECKEN (Broadcast-Audit Runde 2, Punkt 19, 30.09.): Staffel,
+  // Spurt und Time-Trial haben laut Messung 17-22 s VOLLSTAENDIGE Stille (kein Banner, keine
+  // neue Tickerzeile, Tabelle 6.1) -- reiner Anzeige-Rundlauf ueber `callout()` (denselben
+  // Kanal, den die Messung als "Banner" zaehlt), der nur greift, wenn dort gerade NICHTS
+  // Echtes steht. `bahnBauchbindeIdx` waehlt reihum den Nachrichtentyp,
+  // `bahnBauchbindeNaechste` haelt den naechsten erlaubten `jetztMs()`-Zeitpunkt, damit die
+  // Bauchbinde nicht jeden Frame neu ansetzt.
+  const BAHN_BAUCHBINDE_PAUSE_MS=6000;
+  let bahnBauchbindeIdx=0, bahnBauchbindeNaechste=0;
   // TT-1: ZWISCHENZEIT-TAFELN (Abschnitt 2.3). Haelt fest, welche "Laeufer|Checkpoint"-Paare
   // schon eine Tafel bekommen haben, damit `updateHudBahn()` jeden ZZ-Durchgang genau einmal
   // meldet. Liest nur `u.zz[]`, das `stepSpurt` fuer eine andere Anzeige (Panel, Ticker-
@@ -28703,7 +28818,7 @@
       const beideVollstaendig=seitenZahl[0]>0&&seitenZahl[1]>0
         &&voll[0]===seitenZahl[0]&&voll[1]===seitenZahl[1];
       const seiten=[0,0];
-      let zusatz=null;
+      let zusatz=null,delta=null,deltaSeite=null;
       if(beideVollstaendig){
         if(summe[0]<summe[1])seiten[0]=1;
         else if(summe[1]<summe[0])seiten[1]=1;
@@ -28712,9 +28827,17 @@
         // nur im ECHTEN Endstand (`alleFertig`), ein Hochrechnungs-Gleichstand waehrend des
         // Rennens ist reiner Zufall zweier Schaetzungen und keine Aussage.
         zusatz=fmtDauer(summe[0])+" gegen "+fmtDauer(summe[1]);
+        // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): `delta`/`deltaSeite` sind derselbe
+        // Zeitrueckstand, den `zusatz` als "X gegen Y" schon ausschreibt -- hier zusaetzlich
+        // als reine Differenz (Simulationssekunden, `fmtDauer()` skaliert beim Anzeigen mit
+        // `zeitFaktor()`), damit updateHudBahn() daraus einen "+7,7 s"-Stand bauen kann statt
+        // der binaeren 1:0-Fuehrungsanzeige in `seiten`. Kein neuer Wert, nur derselbe
+        // `summe`-Vergleich ein zweites Mal gelesen.
+        delta=Math.abs(summe[0]-summe[1]);
+        deltaSeite=summe[0]<summe[1]?0:summe[1]<summe[0]?1:null;
       }
       return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
-        punkte:w.punkte, gewertet:alleFertig, zusatz};
+        punkte:w.punkte, gewertet:alleFertig, zusatz, delta, deltaSeite};
     }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
@@ -29021,8 +29144,31 @@
     document.getElementById("klsuffix").textContent=
       stand.suffix+(rangSpiel?" (von "+(LAEUFER.length*(LAEUFER.length+1)/2)+")":"")
       +(stand.gewertet&&!done?" · vorläufig":"");
-    document.getElementById("score").textContent=
-      stand.seiten[0]+(rangSpiel?" · ":" : ")+stand.seiten[1];
+    // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): Time-Trial und Staffel zeigten hier waehrend
+    // des laufenden Rennens "0 : 1" -- eine binaere Fuehrungsanzeige ohne Einheit, obwohl der
+    // echte Zeitabstand laengst berechnet wird (`staffelZeitDelta()` fuer die Staffel, dieselbe
+    // Team-Zeitsumme, aus der `stand.delta`/`stand.zusatz` fuer Time-Trial entstehen) -- bisher
+    // nur im separaten Bahn-HUD sichtbar (`#bhDelta`, und das auch nur bei der Staffel
+    // ueberhaupt eingeblendet). Reine Anzeige: derselbe Vergleich, nur ein zweites Mal
+    // gelesen. Der ECHTE Zieleinlauf (`done`) bleibt unten unveraendert bei "1 : 0" -- ein
+    // entschiedenes Rennen darf weiter so heissen, das ist keine "0:1"-Verwechslung mehr.
+    const scoreEl0=document.getElementById("score");
+    if(!done&&BA().wertung==="etappe"){
+      const d=staffelZeitDelta();
+      if(d.unklar||d.delta<=0){ scoreEl0.textContent="Kopf an Kopf"; scoreEl0.style.color=""; }
+      else {
+        scoreEl0.textContent="+"+fmtDauer(d.delta);
+        scoreEl0.style.color=d.seite===0?"var(--home)":"var(--away)";
+      }
+    } else if(!done&&BA().wertung==="zeit"&&stand.delta!=null){
+      scoreEl0.textContent="+"+fmtDauer(stand.delta);
+      scoreEl0.style.color=stand.deltaSeite===0?"var(--home)":stand.deltaSeite===1?"var(--away)":"";
+    } else if(!done&&BA().wertung==="zeit"){
+      scoreEl0.textContent="Kopf an Kopf"; scoreEl0.style.color="";
+    } else {
+      scoreEl0.textContent=stand.seiten[0]+(rangSpiel?" · ":" : ")+stand.seiten[1];
+      scoreEl0.style.color="";
+    }
     if(done&&!bahnEndeGemeldet){
       bahnEndeGemeldet=true;
       const [pL,pR]=stand.seiten;
@@ -29125,10 +29271,92 @@
         }
       }
     }
+    // PUNKT 19 (Broadcast-Audit Runde 2, 30.09.): Staffel/Spurt/Time-Trial haben laut Messung
+    // 17-22 s VOLLSTAENDIGE Stille (kein Banner, keine neue Tickerzeile, Tabelle 6.1). Die
+    // rotierende Bauchbinde (s. bahnBauchbindeText()) nutzt denselben Callout-Kanal, den die
+    // Messung als "Banner" zaehlt -- sie greift NUR, wenn dort gerade nichts Echtes steht
+    // (Fuehrungswechsel/Hot-Seat/Anker-Meldungen oben behalten Vorrang) und hoechstens alle
+    // BAHN_BAUCHBINDE_PAUSE_MS. Reine Anzeige, liest nur Rangliste/Positionen/Zeitabstaende.
+    if(!done&&(BA().spurt||BA().startAbstand||BA().staffel)){
+      const banner=document.getElementById("bbugcallout");
+      const jetzt=jetztMs();
+      if(banner&&banner.hidden&&jetzt>=bahnBauchbindeNaechste){
+        const txt=bahnBauchbindeText();
+        bahnBauchbindeNaechste=jetzt+BAHN_BAUCHBINDE_PAUSE_MS;
+        if(txt){ callout(txt); bahnBauchbindeIdx++; }
+      }
+    }
     renderWertungTabelle();
     renderKader();
     aktualisiereBbug();
     renderZeitfahrenPanel();
+  }
+  // BAUCHBINDE-TEXTE (Punkt 19, s. Aufrufstelle oben): reihum drei Nachrichtentypen, alle aus
+  // bereits vorhandenem Zustand -- Rangliste (bahnRangliste()/u.pos), Zeitabstand
+  // (bahnHochrechnung(), dieselbe Projektion wie bahnTeamstand()s "zeit"-Zweig) und
+  // Zwischenzeiten (bahnBesteZeit(), nur wo `BA().zwischenzeiten` existiert). Liefert `null`,
+  // wenn fuer den aktuellen Typ gerade keine sinnvolle Aussage moeglich ist (z.B. noch kein
+  // zweiter Laeufer unterwegs) -- der Aufrufer laesst den Callout dann einfach aus.
+  function bahnBauchbindeText(){
+    const typ=bahnBauchbindeIdx%3;
+    if(BA().staffel){
+      if(typ===0){
+        const d=staffelZeitDelta();
+        if(d.unklar||d.delta<=0)return "Kopf an Kopf — noch kein Abstand";
+        return "Abstand zum Führenden: "+VEREIN[d.seite].name+" führt um "+fmtDauer(d.delta);
+      }
+      if(typ===1){
+        const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
+        const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
+        if(!aktivBein)return null;
+        return "Positionskampf: "+VEREIN[voran].name+" führt auf Bein "
+          +(aktivBein.bein+1)+"/"+(BA().jeSeite||6);
+      }
+      if(!staffelWechselAnzeige)return null;
+      return "Letzter Wechsel: Bein "+staffelWechselAnzeige.bein
+        +(staffelWechselAnzeige.verpatzt?" — verpatzt":" — sauber");
+    }
+    // SPURT / TIME-TRIAL: generisch ueber u.pos/bahnHochrechnung, keine Staffel-Sonderfelder.
+    const aktiv=LAEUFER.filter(u=>!u.raus);
+    if(aktiv.length<2)return null;
+    const rang=[...aktiv].sort((a,b)=>{
+      const fa=a.fertig!=null, fb=b.fertig!=null;
+      if(fa&&fb)return bahnZeit(a)-bahnZeit(b);
+      if(fa!==fb)return fa?-1:1;
+      return b.pos-a.pos;
+    });
+    if(typ===0){
+      const fuehrer=rang[0], zweiter=rang[1];
+      if(!fuehrer||!zweiter)return null;
+      if(fuehrer.fertig!=null&&zweiter.fertig!=null){
+        return "Abstand zum Führenden: "+zweiter.n+" "+fmtDauer(bahnZeit(zweiter)-bahnZeit(fuehrer))+" zurück";
+      }
+      if(fuehrer.fertig!=null||zweiter.pos<=0||fuehrer.pos<=zweiter.pos)return null;
+      const luecke=(fuehrer.pos-zweiter.pos)*bahnHochrechnung(zweiter);
+      if(!isFinite(luecke)||luecke<=0)return null;
+      return "Abstand zum Führenden: "+zweiter.n+" "+fmtDauer(luecke)+" hinter "+fuehrer.n;
+    }
+    if(typ===1&&BA().zwischenzeiten&&BA().zwischenzeiten.length){
+      for(let ci=BA().zwischenzeiten.length-1;ci>=0;ci--){
+        const best=bahnBesteZeit(ci);
+        if(best==null)continue;
+        const halter=aktiv.find(u=>u.zz&&u.zz[ci]===best);
+        if(!halter)continue;
+        return "Zwischenzeit ZZ"+(ci+1)+": "+halter.n+" in "+fmtDauer(best)+" — Bestzeit im Feld";
+      }
+      return null;
+    }
+    // POSITIONSKAMPF: das engste Paar unter den noch nicht im Ziel angekommenen Laeufern.
+    const laufend=rang.filter(u=>u.fertig==null);
+    let bestesPaar=null,kleinsteLuecke=Infinity;
+    for(let i=0;i<laufend.length-1;i++){
+      const x=laufend[i],y=laufend[i+1];
+      if(x.pos<=0||y.pos<=0)continue;
+      const luecke=(x.pos-y.pos)*bahnHochrechnung(y);
+      if(isFinite(luecke)&&luecke>=0&&luecke<kleinsteLuecke){kleinsteLuecke=luecke;bestesPaar=[x,y];}
+    }
+    if(!bestesPaar)return null;
+    return "Positionskampf: "+bestesPaar[1].n+" "+fmtDauer(kleinsteLuecke)+" hinter "+bestesPaar[0].n;
   }
 
   function updateHud(){
@@ -33301,6 +33529,7 @@
     // Fuehrungswechsel-Variablen oben -- jede dieser Anzeigen darf beim naechsten Rennen
     // nicht mehr vom vorigen wissen.
     bahnHotSeatId=null; bahnZzGemeldet=new Set();
+    bahnBauchbindeIdx=0; bahnBauchbindeNaechste=0;
     bahnFalleGemeldet=new Set(); bahnFalleAnzeige=null;
     staffelAktivVorher=[null,null]; staffelWechselAnzeige=null;
     // PRIO-2 BROADCAST-OPTIK (27.09., Abschnitt 4.3/3.3): dieselbe Rueckstell-Stelle wie
