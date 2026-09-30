@@ -13447,6 +13447,30 @@
     const namensAnker=fsLive
       ? (fsLive.ball.traeger||(fsLive.freiwurf&&fsLive.freiwurf.schuetze)||null)
       : null;
+    // KNAEUEL-OBERGRENZE (Broadcast-Audit Runde 2, Punkt 14, 30.09.): NAME_NAH_RADIUS
+    // (s. oben) zeigt den Namen jeder Figur IM BALLBEREICH -- das reicht, solange sich der
+    // Ballbereich lichtet, versagt aber genau dann, wenn er es nicht tut: unter dem eigenen
+    // Korb draengen sich leicht alle zwoelf Feldspieler gleichzeitig in den Radius (Audit
+    // Bild 10, "alle zwoelf unter einem Korb, Namen unlesbar") und NAME_NAH_RADIUS zeigt
+    // dann weiterhin ALLE ihre Namen. Deshalb zusaetzlich eine harte Obergrenze: von den
+    // Spielern IM Ballbereich werden nur die KNAEUEL_MAX_NAMEN naechsten zum Ball
+    // beschriftet (Ballfuehrer und der fokussierte Gegner zaehlen ohnehin immer, s.
+    // `istFokus`/`u===namensAnker` unten), der Rest bekommt statt einer eigenen Zeile eine
+    // einzige kompakte Sammelanzeige ("+N weitere") am Ballbereich. Reine Anzeigeauswahl,
+    // liest nur Positionen, die stepFeldspielLive ohnehin schon fuehrt -- keine neue
+    // Simulation, kein rr()-Bezug, `namensAnkerXY` wird unten in der Spieler-Schleife
+    // gefuellt (dieselbe "Position kommt aus der Schleife"-Bauart wie `fokusMarke`).
+    const KNAEUEL_MAX_NAMEN=4;
+    let knaeuelErlaubt=null, knaeuelVersteckt=0, namensAnkerXY=null;
+    if(namensAnker){
+      const nah=[...FSTEAM[0],...FSTEAM[1]]
+        .filter(u=>u!==namensAnker&&dist(u,namensAnker)<NAME_NAH_RADIUS)
+        .sort((a,b)=>dist(a,namensAnker)-dist(b,namensAnker));
+      if(nah.length>KNAEUEL_MAX_NAMEN){
+        knaeuelErlaubt=new Set(nah.slice(0,KNAEUEL_MAX_NAMEN).map(u=>u.id));
+        knaeuelVersteckt=nah.length-KNAEUEL_MAX_NAMEN;
+      }
+    }
     // ZEICHENREIHENFOLGE NACH y STATT NACH TEAM. Vorher zeichnete Team 0 komplett vor
     // Team 1 — wer "dahinter" stand, konnte trotzdem obenauf liegen, und der von Chris
     // erlaubte Rest-Versatz ("einer etwas dahinter") las sich als Fehler statt als Tiefe.
@@ -13593,8 +13617,15 @@
         // Optikkorrektur daran, wessen Name erscheint. Der fokussierte Gegner behaelt
         // seinen Namen immer: er ist die eine Figur, die der Nutzer selbst markiert hat.
         const istFokus=fsLive&&effektiverFokus(0)===u.id;
-        const zeigName=!namensAnker||u===namensAnker||istFokus
-          ||dist(u,namensAnker)<NAME_NAH_RADIUS;
+        if(namensAnker&&u===namensAnker)namensAnkerXY={x,y};
+        // KNAEUEL-DECKEL (s. Kommentar an KNAEUEL_MAX_NAMEN oben): ein naher Spieler, der
+        // NICHT zu den KNAEUEL_MAX_NAMEN naechsten gehoert, verliert seinen Namen an die
+        // Sammelanzeige -- ausser er ist der Ballfuehrer oder der markierte Fokus-Gegner,
+        // die zaehlen immer.
+        const nahAmBall=namensAnker&&dist(u,namensAnker)<NAME_NAH_RADIUS;
+        const verdecktImKnaeuel=nahAmBall&&knaeuelErlaubt&&u!==namensAnker&&!istFokus
+          &&!knaeuelErlaubt.has(u.id);
+        const zeigName=(!namensAnker||u===namensAnker||istFokus||nahAmBall)&&!verdecktImKnaeuel;
         if(zeigName)schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
         // Chris' Fund (29.08.): eine Box-Score-Zeile UNTER JEDER der zwoelf Figuren
         // gleichzeitig war unlesbar — zwoelf ueberlappende Zahlenwolken auf engem Raum.
@@ -13623,6 +13654,18 @@
       ctx.beginPath();ctx.moveTo(x,pf+11);ctx.lineTo(x-7,pf);ctx.lineTo(x+7,pf);ctx.closePath();
       ctx.stroke();ctx.fill();
       ctx.restore();
+    }
+    // KNAEUEL-SAMMELANZEIGE (s. Kommentar an KNAEUEL_MAX_NAMEN oben): EINE kompakte Zeile
+    // statt der unterdrueckten Einzelnamen, direkt unter dem Ballbereich -- derselbe Grund,
+    // warum die Fokus-Markierung erst HIER (nach der Spieler-Schleife) gezeichnet wird:
+    // keine spaeter gezeichnete Figur soll sie verdecken.
+    if(knaeuelVersteckt>0&&namensAnkerXY){
+      const txt="+"+knaeuelVersteckt+" weitere";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="700 9px 'IBM Plex Mono',monospace";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      ctx.strokeText(txt,namensAnkerXY.x,namensAnkerXY.y+58);
+      ctx.fillStyle="#c7d0dd";ctx.fillText(txt,namensAnkerXY.x,namensAnkerXY.y+58);
     }
     // H1 -- STRAFBANK-KASTEN (Bauplan Abschnitt 5, Klasse A, Prio 1): NACH den Spielern,
     // damit die Box die zur Bande gefahrene Figur nicht verdeckt, sondern sie beschriftet.
@@ -26844,6 +26887,14 @@
   let KFOKUS=null;      // u.id des angesagten GEGNERISCHEN Kaempfers, oder null
   let KFOKUS_CD=0;      // Restsperre bis zur naechsten Ansage, in Kampfsekunden
   const KF_CD=7;        // Sperre je Ansage (s.o.: FM-Verhaeltnis auf 60 s Kampf gerechnet)
+  // MAUS-FOKUS FUER BEFEHLS-ETIKETTEN (Broadcast-Audit Runde 2, Punkt 13b, 30.09.): u.id
+  // der Figur, ueber der die Maus gerade steht, oder null. Rein fuer draw()s
+  // Befehls-Etikett ("MIT DER LINIE"/"FLANKE"/"VERFOLGEN", s. dort) -- KEINE Interaktions-
+  // logik, kein rr()-Bezug, greift in kein Ziel/Ansage-System ein (bleibt strikt getrennt
+  // von KFOKUS oben, das den ANGESAGTEN GEGNER fuer die Zielansage-Mechanik traegt und
+  // absichtlich nur Seite 1 erlaubt). Gesetzt/geloescht ausschliesslich in
+  // verdrahteKampfHover() unten (mousemove/mouseleave auf #cv), gilt fuer BEIDE Seiten.
+  let kampfHoverId=null;
   // WIE WEIT DER RUF TRAEGT — der eine Regler, der ueber "Bias" oder "Sperre" entscheidet.
   //
   // NACHGEMESSEN, nicht geschaetzt (zielansageLauf, s.u.: fuer JEDEN der sechs bzw. vier
@@ -27375,7 +27426,22 @@
       u.y=Math.max(34,Math.min(H-34,u.y+ay/L*w*vor));
     }
     for(const e of sk.wirkung)if(e.art==="unverwundbar")u.invuln=e.dauer;
-    schwebe({x:u.x,y:u.y-30,txt:sk.name,life:1.0,skill:true});
+    // SKILL-SCHWEBETEXT NUR FUER BESONDERE SKILLS (Broadcast-Audit Runde 2, Punkt 13a,
+    // 30.09.): vorher feuerte dieser Aufruf fuer JEDE Skill-Ausfuehrung, auch fuer den
+    // gewoehnlichen Grundangriff (slash/fslash/shoot, ki.rolle:"grundangriff") -- mit
+    // seiner kurzen Abklingzeit (0,3-0,35 s) und bis zu zehn gleichzeitig kaempfenden
+    // Einheiten stapelte sich "Paladin Slash (aufgeladen)" & Co. zehnfach uebereinander
+    // (Audit Bild 03). Die Kollisionsvermeidung fuer Schwebetexte (labelSchwebeBoxen/
+    // floatPositionen in draw(), Phase 5) staffelt sie zwar sauber untereinander statt sie
+    // wirklich zu ueberlagern, aendert aber nichts an der schieren MENGE. Reine
+    // Haeufigkeits-Drossel an der Quelle statt einer weiteren Kollisionsregel: der
+    // Grundangriff bleibt stumm (er zeigt ohnehin schon seinen Schaden als eigener
+    // Schwebetext, s. wirkeAus()/hitTeil() unten), jeder BENANNTE Spezial-/Wucht-Skill
+    // (Ausweichen, Schild, schwerer Schlag, Sturmangriff, ...) behaelt seinen Namensruf.
+    // Reine Anzeige-Haeufigkeit: `sk.ki.rolle` fliesst nirgends in rr()/wert() ein, nur
+    // hier in die Sichtbarkeit dieses einen Schwebetexts.
+    if(!sk.ki||sk.ki.rolle!=="grundangriff")
+      schwebe({x:u.x,y:u.y-30,txt:sk.name,life:1.0,skill:true});
 
     // Zauberzeit: Wirkung folgt spaeter
     if(t.castzeit){u.cast=sk.id;u.castZiel=wahl.ziele[0]||null;u.castLeft=t.castzeit;u.castZiele=wahl.ziele;return;}
@@ -35438,9 +35504,36 @@
     // nicht als 32-px-Sprite verloren geht. Bei Zoom 1 ist sie so gross wie bisher.
     // Name, Plan und Sterne bleiben im Bildschirmraum, skalieren also NICHT mit.
     const sk0=istRoute()?Math.min(1.3,0.9+0.12*cam.zoom):1;
+    // ETIKETTEN-KOLLISIONSVERMEIDUNG (Broadcast-Audit Runde 2, Punkt 14, 30.09.): dasselbe
+    // Muster wie Phase 5 im Kampf (draw()s labelPositionen/labelVersatz, s. dortiger
+    // Kommentar) -- hier fuer die Bahn uebernommen, wo es bislang GAR KEINE Kollisions-
+    // vermeidung gab (Audit Bild 12/13: an einer Takeshi-Falle bzw. der Time-Trial-
+    // Ziellinie stapelten sich Name/Plan/Platz mehrerer Laeufer und der GEIST-Marker exakt
+    // uebereinander). Jede weitere Figur, die einem schon gezeichneten Laeufer in x/y zu
+    // nahe kommt, staffelt ihren GESAMTEN Etikettenblock (Name/Plan/Badge-Zeile) um eine
+    // Zeilenhoehe weiter vom Kopf weg -- gedeckelt bei BAHN_LABEL_MAX_VERSATZ, damit ein
+    // Zehnerpulk (Takeshi-Falle) keinen unlesbar hohen Turm aufbaut, sondern die
+    // ueberzaehligen Etiketten ab dort denselben Versatz teilen. Frei stehende Laeufer
+    // (Normalfall) bekommen Versatz 0 und damit exakt dieselbe Position wie vorher. Reine
+    // Anzeige: liest nur die schon berechneten Bildschirmpositionen aus laeuferXY(),
+    // schreibt nichts in u.pos/u.fertig/rr()/MOTOREN[...].wert() zurueck.
+    const BAHN_LABEL_KLUSTER_DX=42,BAHN_LABEL_KLUSTER_DY=20,BAHN_LABEL_ZEILENHOEHE=11,
+      BAHN_LABEL_MAX_VERSATZ=3;
+    const bahnLabelPositionen=[];
+    // ZWEITE HAELFTE DESSELBEN MUSTERS (wie labelSchwebeBoxen im Kampf): die tatsaechlich
+    // gezeichnete Box der beiden breitesten Zeilen -- Name und die Platz-/Status-Zeile --
+    // damit Schwebetexte weiter unten ihnen ausweichen, statt sie zu ueberdecken.
+    const bahnLabelSchwebeBoxen=[];
     for(const u of reihe){
       const platz=rennFertig.indexOf(u);
       let {x,y}=laeuferXY(u);
+      let bahnLabelVersatz=0;
+      for(const p of bahnLabelPositionen){
+        if(Math.abs(x-p.x)<BAHN_LABEL_KLUSTER_DX&&Math.abs(y-p.y)<BAHN_LABEL_KLUSTER_DY)bahnLabelVersatz++;
+      }
+      bahnLabelVersatz=Math.min(bahnLabelVersatz,BAHN_LABEL_MAX_VERSATZ);
+      bahnLabelPositionen.push({x,y});
+      const bahnLabelDy=bahnLabelVersatz*BAHN_LABEL_ZEILENHOEHE;
       // TT-2: HOT SEAT (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Der aktuelle
       // Bestzeithalter bekommt eine eigene, erhoehte Stelle -- ein Podest -- statt in der
       // Ziel-Warteschlange unterzugehen. Reine Positions-Verschiebung fuer DIESE Zeichnung;
@@ -35774,7 +35867,7 @@
         ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
         const txt="Start in "+bahnZeitText(bahnSpanneAnzeige(u.vizRampe));
-        ctx.strokeText(txt,x,y-19); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19);
+        ctx.strokeText(txt,x,y-19-bahnLabelDy); ctx.fillStyle="#e0c46a"; ctx.fillText(txt,x,y-19-bahnLabelDy);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // TT-1: ZWISCHENZEIT-TAFEL (broadcast-optik-bahn-27-09.md Abschnitt 2.3). Reine
@@ -35788,15 +35881,17 @@
           (fz.delta?(" · "+(fz.neueBest?"−":"+")+fmtDauer(Math.abs(fz.delta))):"");
         ctx.font="700 9px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
         ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
-        ctx.strokeText(txt,x,y-19);
-        ctx.fillStyle=fz.neueBest?"#f2d75a":"#c0504a"; ctx.fillText(txt,x,y-19);
+        ctx.strokeText(txt,x,y-19-bahnLabelDy);
+        ctx.fillStyle=fz.neueBest?"#f2d75a":"#c0504a"; ctx.fillText(txt,x,y-19-bahnLabelDy);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       ctx.textAlign="center";
       ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
-      ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
+      const nameY=y-30-bahnLabelDy;
+      ctx.strokeText(txt,x,nameY);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,nameY);
+      bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
       //
       // ER LIEST u.plan JEDES BILD NEU — deshalb braucht die Rennplan-Ansage hier gar
@@ -35809,9 +35904,9 @@
         ctx.font=(frisch?"700 9px":"400 8px")+" 'IBM Plex Mono',monospace";
         const pl=((BA().plaene)[u.plan]||{}).label||"";
         const zus=frisch?" ◂ neu":(u.leer?" · leer":(u.imSchatten?" · Sog":""));
-        ctx.strokeText(pl+zus,x,y-40);
+        ctx.strokeText(pl+zus,x,y-40-bahnLabelDy);
         ctx.fillStyle=frisch?ANSAGE_FARBE:(u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9"));
-        ctx.fillText(pl+zus,x,y-40);
+        ctx.fillText(pl+zus,x,y-40-bahnLabelDy);
         ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // BURGPUNKTE AM LAEUFER (Teil B.6 des Plans): laufend waehrend des Rennens neben
@@ -35820,7 +35915,7 @@
       if(BA().takeshi&&u.fertig==null){
         const bpz="★ "+burgpunkte(u).toFixed(1).replace(/\.0$/,"");
         ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
-        ctx.strokeText(bpz,x+16,y-19); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19);
+        ctx.strokeText(bpz,x+16,y-19-bahnLabelDy); ctx.fillStyle="#f2d75a"; ctx.fillText(bpz,x+16,y-19-bahnLabelDy);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // "RAUS" STATT STILLSCHWEIGEN (Opus-Review 27.09.): auf der Route gab es fuer einen
@@ -35830,7 +35925,7 @@
       // (das nur fuer `u.fertig==null` gilt und fuer Ausgeschiedene deshalb ohnehin fehlt).
       if(raus){
         ctx.font="600 9px 'IBM Plex Mono',monospace"; ctx.textAlign="left";
-        ctx.strokeText("✕ Raus",x+16,y-19); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19);
+        ctx.strokeText("✕ Raus",x+16,y-19-bahnLabelDy); ctx.fillStyle="#8795A9"; ctx.fillText("✕ Raus",x+16,y-19-bahnLabelDy);
         ctx.textAlign="center"; ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       }
       // EINGELAUFENE STEHEN AUF DER ROUTE OHNE TEXTZEILE im Burghof (Plan 6.1): zwoelf
@@ -35849,7 +35944,9 @@
       if(u.fertig!=null&&!istRoute()){const pt=hotSeat?"HOT SEAT · "+fmtZielzeit(bahnZeit(u))
         :"Platz "+(rennFertig.indexOf(u)+1)+" · "+fmtZielzeit(bahnZeit(u))+
         (BA().takeshi?" · ★ "+burgwertung(u).toFixed(1).replace(/\.0$/,""):"");
-        ctx.strokeText(pt,x,y-19);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,y-19);}
+        const ptY=y-19-bahnLabelDy;
+        ctx.strokeText(pt,x,ptY);ctx.fillStyle=hotSeat?"#f2d75a":"#e0c46a";ctx.fillText(pt,x,ptY);
+        bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
     // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3, "das
@@ -35898,6 +35995,11 @@
           ctx.textAlign="center"; ctx.font="700 8px 'IBM Plex Mono',monospace";
           ctx.lineWidth=2.4; ctx.strokeStyle="rgba(8,10,14,.85)";
           ctx.strokeText("GEIST · "+hs.u.n,gx,gy-33); ctx.fillText("GEIST · "+hs.u.n,gx,gy-33);
+          // In dieselbe Kollisionsvermeidung wie Name/Platz aufgenommen (s. Kommentar an
+          // bahnLabelSchwebeBoxen oben): der GEIST-Marker liegt haeufig direkt neben dem
+          // fokussierten Laeufer, genau die Ueberlagerung aus Audit Bild 13 ("GEIST" ueber
+          // "eingebrochen"/"fängt sich"). Schwebetexte weichen ihm dadurch aus.
+          bahnLabelSchwebeBoxen.push({x:gx,y:gy-33,halbBreite:ctx.measureText("GEIST · "+hs.u.n).width/2+4});
           ctx.restore(); ctx.font="400 9.5px 'IBM Plex Mono',monospace";
         }
       }
@@ -35941,6 +36043,20 @@
     // des Ereignisses: die Bahnkamera zoomt und schwenkt (kameraUpdate), ein fester
     // Punkt waere schon nach einem halben Sekundenbruchteil neben der Figur. Dieselbe
     // Loesung wie im Feldspiel (_spieler dort). Ohne Anker bleibt x/y als Rueckfall.
+    // KOLLISIONSVERMEIDUNG FUER SCHWEBETEXTE (Broadcast-Audit Runde 2, Punkt 14, 30.09.,
+    // dieselbe zweite Haelfte des Phase-5-Musters wie im Kampf, s. draw()s
+    // floatPositionen-Kommentar dort): bislang gab es auf der Bahn UEBERHAUPT keine
+    // Kollisionspruefung fuer Schwebetexte -- an einer Takeshi-Falle mit mehreren
+    // gleichzeitig auftreffenden Laeufern ("gerammt"/"haelt stand"/"stolpert") lagen ihre
+    // Schwebetexte deckungsgleich uebereinander. `bahnFloatPositionen` sammelt die bereits
+    // versetzte Endposition jedes in DIESEM Frame gezeichneten Schwebetexts; kollidiert der
+    // naechste (gleiche Bahn-Reihe UND ueberlappende gemessene Breite) mit einem schon
+    // gezeichneten ODER mit einer der Name-/Platz-/GEIST-Boxen aus `bahnLabelSchwebeBoxen`
+    // oben, wandert er eine Zeile weiter vom Kopf weg -- exakt dieselbe Bauart wie im Kampf,
+    // nur dass hier Text rechtsbuendig NACH LINKS waechst (textAlign:"right") bzw. bei der
+    // Ansage nach rechts, statt zentriert nach oben.
+    const BAHN_FLOAT_DY_TOL=13,BAHN_FLOAT_ZEILENHOEHE=14,BAHN_FLOAT_SICHERHEIT=5;
+    const bahnFloatPositionen=[];
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.ansage?ANSAGE_FARBE:f.crit?css("--crit"):css("--ink");
@@ -35958,6 +36074,22 @@
         if(u){ const p=laeuferXY(u); fx=p.x+(f.ansage?20:-20);
                fy=p.y-22-((1-f.life)*14); }
       }
+      const halbBreite=ctx.measureText(f.txt).width/2+BAHN_FLOAT_SICHERHEIT;
+      let versatz=0,frei=false;
+      while(!frei){
+        frei=true;
+        for(const p of bahnFloatPositionen){
+          if(Math.abs(fy-versatz*BAHN_FLOAT_ZEILENHOEHE-p.fy)<BAHN_FLOAT_DY_TOL
+            &&Math.abs(fx-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+        }
+        if(frei)for(const p of bahnLabelSchwebeBoxen){
+          if(Math.abs(fy-versatz*BAHN_FLOAT_ZEILENHOEHE-p.y)<BAHN_FLOAT_DY_TOL
+            &&Math.abs(fx-p.x)<halbBreite+p.halbBreite){frei=false;break;}
+        }
+        if(!frei)versatz++;
+      }
+      fy-=versatz*BAHN_FLOAT_ZEILENHOEHE;
+      bahnFloatPositionen.push({x:fx,fy,halbBreite});
       ctx.fillText(f.txt,fx,fy);
       ctx.globalAlpha=1;
     }
@@ -36252,8 +36384,19 @@
       labelSchwebeBoxen.push({x,y:y+nameDy,halbBreite:nameHalb});
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
+      //
+      // NUR FUER DIE FOKUSSIERTE FIGUR (Broadcast-Audit Runde 2, Punkt 13b, 30.09.): vorher
+      // stand dieses Etikett unter JEDER der bis zu zwoelf Figuren gleichzeitig ("MIT DER
+      // LINIE"/"FLANKE"/"VERFOLGEN", Bilder 01/03) -- ein Dutzend Befehlszeilen, die kein
+      // Zuschauer auf einen Blick liest. "Fokussiert" ist entweder die von der Maus gerade
+      // beruehrte Figur (kampfHoverId, s. verdrahteKampfHover() unten) oder die per
+      // Zielansage markierte (kfZ, oben in dieser Funktion schon berechnet) -- eigene wie
+      // gegnerische Figur gleichermassen, kampfHoverId kennt keine Seite. "HEILER" bleibt
+      // IMMER sichtbar: das ist eine Rollenkennung (wenige Traeger je Seite), kein
+      // Befehls-Etikett, und war nie Teil des Audit-Befunds.
       const statusDy=55+labelVersatz*LABEL_ZEILENHOEHE;
-      const statusTxt=u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():"");
+      const zeigeBefehl=u.id===kampfHoverId||(kfZ&&u===kfZ);
+      const statusTxt=u.heiler?"HEILER":(zeigeBefehl&&ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():"");
       const statusHalb=schrift(statusTxt,statusDy,u.heiler?css("--ok"):"#a9b6c6",8.5);
       if(statusTxt)labelSchwebeBoxen.push({x,y:y+statusDy,halbBreite:statusHalb});
       ctx.globalAlpha=1;
@@ -37883,6 +38026,26 @@
     });
   }
 
+  // MAUS-FOKUS FUERS BEFEHLS-ETIKETT (Broadcast-Audit Runde 2, Punkt 13b, 30.09.): setzt
+  // NUR `kampfHoverId` (s. Deklaration oben) -- keine neue Interaktion, keine Aenderung an
+  // Ziel/Ansage/KI. Dieselbe Klick-Geometrie wie die Zielansage (leinwandTreffer(), KF_GREIF),
+  // aber auf BEIDE Seiten und auf mousemove statt click, weil Hovern kein Ereignis ist,
+  // sondern ein Zustand ("gerade darueber" vs. "nicht mehr darueber"). `istKampf(disc)`
+  // gatet die Leinwand exklusiv fuer TDM/Mini-DM/Battlefield -- fuer jede andere Disziplin,
+  // die dieselbe #cv-Leinwand benutzt, bleibt kampfHoverId ungenutzt (draw() liest sie nur
+  // im Kampf-Zweig). mouseleave raeumt auf, falls die Maus die Leinwand ohne ein letztes
+  // mousemove-Ereignis auf einer Figur verlaesst.
+  function verdrahteKampfHover(){
+    const leinwand=document.getElementById("cv");
+    if(!leinwand)return;
+    leinwand.addEventListener("mousemove",ev=>{
+      if(!istKampf(disc)||U.length===0){ kampfHoverId=null; return; }
+      const treffer=leinwandTreffer(leinwand,ev,U.filter(u=>!u.down),KF_GREIF);
+      kampfHoverId=treffer?treffer.id:null;
+    });
+    leinwand.addEventListener("mouseleave",()=>{ kampfHoverId=null; });
+  }
+
   // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
   // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
   // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
@@ -38903,6 +39066,7 @@
   verdrahteZeitfahrenFokus();
   verdrahteSchachPin();
   verdrahteZielansage();
+  verdrahteKampfHover();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;

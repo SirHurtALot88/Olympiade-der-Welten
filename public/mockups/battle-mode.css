@@ -1071,6 +1071,29 @@
      Team schon. */
   .oly-battle-arena.oly-battle-arena .untenraum{display:grid;grid-template-columns:340px 1fr;border-top:1px solid var(--line-soft)}
   @media (max-width:960px){.oly-battle-arena.oly-battle-arena .untenraum{grid-template-columns:1fr}}
+  /* KOMPAKTES SENDUNGSLAYOUT (Broadcast-Audit Runde 2, Punkt 16, 30.09.): das Arena-Panel
+     (Canvas+Bug+Kaderleiste in .arenaHaupt, davor/danach Kopf- und Bedienzeile) mass laut
+     DOM-Sonde je Disziplin 1098-1320px, bei nur 900px Viewporthoehe -- Ticker/Tabelle standen
+     IMMER darunter, nie neben Canvas+Kaderleiste sichtbar. `.arenaHaupt` (reine
+     Gruppierungs-Huelle, s. battle-mode.html) und `.untenraum` sind BEIDE direkte Kinder von
+     `.frame`; ab genug Breite legt ein zweispaltiges Grid sie NEBENEINANDER statt
+     untereinander, ohne die DOM-Reihenfolge oder eine einzige ID zu aendern. Zwei zusaetzliche
+     Effekte helfen mit: die Leinwand skaliert responsiv (canvas{width:100%}, `#cv`
+     1240x470-Seitenverhaeltnis) und wird in der schmaleren linken Spalte automatisch NIEDRIGER
+     -- misst nach dieser Aenderung erneut per DOM-Sonde (s. PR-Beschreibung fuer die Zahlen je
+     Disziplin). Unter 960px (schmales Fenster/Handy) bleibt die alte, gestapelte Reihenfolge
+     unveraendert (kein Grid greift), exakt wie beim .untenraum-Umbruch direkt darueber. */
+  @media (min-width:960px){
+    .oly-battle-arena.oly-battle-arena #p2 .frame{display:grid;grid-template-columns:minmax(0,1fr) 320px;align-items:start;column-gap:0}
+    .oly-battle-arena.oly-battle-arena #p2 .frame>.arenaHaupt{min-width:0}
+    /* Ueberschreibt die 340px/1fr-Zweispaltigkeit von .untenraum: in der 320px-Seitenspalte
+       ist dafuer kein Platz, Ticker und Tabelle stapeln sich hier stattdessen UNTEREINANDER
+       (dieselbe Umschaltung wie die <960px-Regel oben, nur aus einem anderen Grund). Die
+       hoehere Selektor-Spezifitaet (`#p2 .frame>`) gewinnt unabhaengig von der Regel-
+       Reihenfolge gegen die generische `.untenraum`-Regel weiter oben. */
+    .oly-battle-arena.oly-battle-arena #p2 .frame>.untenraum{grid-template-columns:1fr;
+      border-top:0;border-left:1px solid var(--line-soft)}
+  }
   .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
   .oly-battle-arena.oly-battle-arena .wertung{border-left:1px solid var(--line-soft);padding:9px 14px;height:210px;overflow-y:auto;display:flex;flex-direction:column;
     border-top:3px solid var(--wakzent, transparent)}
@@ -1088,6 +1111,28 @@
      rechten). overflow-x:auto haelt jede Tabelle in ihrer eigenen Spalte, mit
      eigenem horizontalen Scrollbalken statt Bluten in den Nachbarblock. */
   .oly-battle-arena.oly-battle-arena .wteam .tbl-wrap{overflow-x:auto}
+  /* SICHTBARER SCROLL-HINWEIS (Broadcast-Audit Runde 2, Punkt 20, 30.09.): `.tbl-wrap` konnte
+     schon immer horizontal scrollen (overflow-x:auto, s. Kommentar oben), aber nichts zeigte
+     das an -- bei vierzehn Spalten (Breaking) und den drei nachgezogenen Takeshi-Spalten
+     (s. WERTUNG_AUFTRITT/BAHN_ART.takeshi-Kommentare in battle-mode.engine.js) wirkte das
+     abgeschnittene Tabellenende wie ein Layoutfehler statt wie eine Einladung zu scrollen
+     (Audit Bild 14, DOM-Tabelle 6.3: 72px/25px horizontaler Ueberhang). Reines CSS, kein
+     JS-Overflow-Check noetig: der klassische Vier-Schicht-"Scroll-Schatten"-Trick (zwei
+     rechtsseitige Farbverlaeufe uebereinander, einer `background-attachment:local` (wandert
+     MIT dem Tabelleninhalt und deckt den zweiten Schatten ab, sobald man ganz nach rechts
+     gescrollt hat), der andere `scroll` (bleibt am rechten Rand des SICHTBAREN Ausschnitts
+     stehen) -- der Schatten ist also von selbst weg, sobald nichts mehr zu scrollen bleibt,
+     und erscheint von selbst wieder, sobald eine Spalte den sichtbaren Rand ueberragt. Reine
+     Anzeige: liest/aendert keine Spalte, Sortierung oder Zahl, nur `background-image` auf dem
+     ohnehin schon `overflow-x:auto`-Element. */
+  .oly-battle-arena.oly-battle-arena .wteam .tbl-wrap{
+    background-image:
+      linear-gradient(to left,var(--surface),var(--surface) 60%,transparent),
+      linear-gradient(to left,rgba(0,0,0,.4),transparent);
+    background-repeat:no-repeat;
+    background-size:26px 100%,14px 100%;
+    background-position:100% 0,100% 0;
+    background-attachment:local,scroll}
   .oly-battle-arena.oly-battle-arena .wteam{display:flex;flex-direction:column;min-width:0;overflow:hidden}
   .oly-battle-arena.oly-battle-arena .wteam:first-child{border-right:1px solid var(--line-soft);padding-right:16px}
   .oly-battle-arena.oly-battle-arena .wteamlabel{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
