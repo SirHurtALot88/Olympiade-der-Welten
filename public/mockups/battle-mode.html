@@ -226,6 +226,12 @@
                fuer Bahn-Spiele (renderEndstandBahn()) leer und hidden, weil Bahn-Ereignisse
                nie ein `kind` tragen. -->
           <div class="eszene" id="eszene" hidden></div>
+          <!-- ALTERNATIV-RECHNER (Klasse A*, docs/design/fable-ideen-bahn-30-09.md Abschnitt
+               1.3, 01.10.): "was haette der andere Plan gebracht?" — je Heimlaeufer eine
+               Zeile, gefuellt von renderEndstandBahn()/bahnAlternativZeilen(). Dieselbe
+               CSS-Klasse wie #ehighlights direkt darunter (kein neues CSS), nur fuer Bahn
+               befuellt; bleibt fuer Kampf/Buehne leer und hidden. -->
+          <div class="ehighlights" id="ealternativ" hidden></div>
           <!-- HOEHEPUNKTE. Text-Rueckblick auf alle big-Ereignisse dieses Spiels (HIGHLIGHTS[],
                gefuellt aus feed()) -- bewusst eine Textliste, kein Bild-Replay, s. Abschnitt 4.3
                derselben Recherche. Nur befuellt/sichtbar, wo dieses Endstand-Overlay ueberhaupt
