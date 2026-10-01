@@ -92,6 +92,20 @@ gegen `messe-arena-einfluss.mjs` gemessen, bevor der nächste Schritt gewählt w
 | 40 000 000 | 24,7 | **7,9** |
 | **Mittel** | **24,9** | **9,6** |
 
+**Korrektur nach Review (unabhängig nachgemessen):** Die Spalte "Pp vorher" ist wörtlich
+aus `gewichtheben-pp-regression-befund-01-10.md` (PR #1101) übernommen, das auf einem
+ÄLTEREN Commit (`7c5f0a85`) gemessen wurde. Zwischen diesem Commit und dem tatsächlichen
+Basis-Commit dieser PR (`9ecdd857`) liegen zwei fremde, bereits gemergte Commits
+(Climbing-Kalibrierrunde, Bühne-Duell Paket 1 "Regie & Bild", zusammen 537 Zeilen
+`battle-mode.engine.js`), die den gemessenen Gewichtheben-Pp-Wert spürbar verschoben haben
+— ohne den Gewichtheben-Rezeptcode selbst zu berühren. Der echte, unmittelbare Vorher-Wert
+auf `9ecdd857` liegt für mindestens zwei der fünf Ströme bereits bei/über der Schranke
+(Strom 0: 25,3 statt 21,4; Strom 10 000 000: 25,0 statt 27,5), unabhängig nachgemessen.
+Das ändert nichts am entscheidenden Befund — dem "Nachher" (8,5-11,4 Pp, bitgenau
+reproduziert) —, nur die Vorher-Erzählung war unpräzise. Siehe auch das analoge,
+vorher bereits korrigierte Muster bei der Climbing-Kalibrierung
+(`climbing-kalibrierung-tempospanne-01-10`, Pp-Dokumentationsfehler).
+
 Attributabweichung, Strom 0 (vorher → nachher):
 
 | Attribut | Matrix | vorher | nachher |
