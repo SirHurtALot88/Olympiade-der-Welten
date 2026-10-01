@@ -42,7 +42,17 @@ if (!motoren.includes(disziplin)) {
 
 const start = Date.now();
 const e = await seite.evaluate(
-  ([d, n, v]) => window.__arena.einflussVon(d, n, undefined, v),
+  // setTimeout fuer diesen einen synchronen Aufruf als No-Op (s. messe-arena-einfluss.mjs):
+  // kein dort angelegter Timer koennte vor dem fertigen Ergebnis feuern, sie stapelten sich nur.
+  ([d, n, v]) => {
+    const st = window.setTimeout;
+    window.setTimeout = () => 0;
+    try {
+      return window.__arena.einflussVon(d, n, undefined, v);
+    } finally {
+      window.setTimeout = st;
+    }
+  },
   [disziplin, laeufe, versatz],
 );
 const dauer = ((Date.now() - start) / 1000).toFixed(0);

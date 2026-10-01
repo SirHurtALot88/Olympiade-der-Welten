@@ -103,8 +103,23 @@ if (!motoren.includes(disziplin)) {
 }
 
 const start = Date.now();
+// ZWEITE HAELFTE DESSELBEN LECKS: Timer. Auch ohne AudioContext legt die Anzeige-Schicht
+// je Ereignis einen setTimeout an (Breaking: der zweite Herzschlag-Ton, ~30 000 je Lauf, dazu
+// das Ausblenden der Callouts). Waehrend des einen synchronen Aufrufs kann keiner davon
+// feuern -- sie stapeln sich (n=48: ~1,5 Mio., gemessen ~1,5-2 GB nach elf Minuten) und
+// liefen erst NACH dem fertigen Ergebnis los. Deshalb ist es fuer die Messwerte gleich, ob
+// sie angelegt werden: setTimeout ist fuer genau diesen Aufruf ein No-Op und wird danach
+// wiederhergestellt.
 const e = await seite.evaluate(
-  ([d, n, versatz, modus]) => window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined),
+  ([d, n, versatz, modus]) => {
+    const st = window.setTimeout;
+    window.setTimeout = () => 0;
+    try {
+      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined);
+    } finally {
+      window.setTimeout = st;
+    }
+  },
   [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS],
 );
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
