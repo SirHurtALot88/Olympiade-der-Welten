@@ -78,8 +78,17 @@ const ABNAHME_OFFEN = new Map([
     + "docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md (Basketball, Gameplay)"],
   ["hockey", "unter 0,80, Abnahme ueber Star-/Paartreue statt nackter rho — "
     + "docs/design/hockey-opus-review-nhl.md Abschnitt 5.3, CLAUDE.md"],
-  ["climbing", "Validitaetsproblem schon VOR dem Mutator (#1078): 0,814 ohne, 0,791 mit Mutator — "
-    + "eigene Kalibrierrunde geplant, s. docs/design/climbing-opus-gegencheck-24-09.md"],
+  // "climbing" HIER ENTFERNT (Kalibrierrunde 01.10.): das Validitaetsproblem aus dem
+  // Gegencheck/Mutator (0,814 ohne, 0,791 mit Mutator) ist behoben — `tempoSpanne`
+  // 0,80 -> 2,20 (s. BAHN_ART.climbing in battle-mode.engine.js fuer die volle
+  // Herleitung/Messung), rho je Spiel jetzt 0,828-0,856 ueber vier unabhaengige
+  // Saatstroeme MIT Mutator (Mittel 0,839), Pp 14,2/11,1 ueber zwei Saatstroeme.
+  // Basislinie-Eintrag fuer "climbing" in rangtreue-basislinie.json von HAND nachgezogen,
+  // NICHT ueber `baue-rangtreue-basislinie.mjs 24 climbing` -- dessen eigener
+  // Kopfkommentar warnt, dass ein Aufruf mit einer Disziplinliste die GANZE Datei
+  // ueberschreibt (nur die genannten Disziplinen landen im Ergebnis), nicht nur eine
+  // Zeile. Ein echter Lauf damit haette die Basislinien der uebrigen 19 Disziplinen
+  // geloescht.
 ]);
 
 // G1-Stufen der Scorecard-Methodik (docs/design/gesamtstand-fertigstellungsgrad-alle-
