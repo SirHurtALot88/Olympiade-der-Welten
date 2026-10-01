@@ -28054,6 +28054,18 @@
   // Respawn-Zyklen je Kaempfer, ohne den Kampf leerzuraeumen.
   const TDM_RESPAWN_SEK=5, TDM_SPAWN_SCHUTZ_SEK=1.5;
 
+  // DER "TRADE" ALS BENANNTES EREIGNIS (T-4, Fable-Ideen Arena/I-Spy 30.09., Klasse A: reine
+  // Anzeige, liest nur Daten, die schalteAus() ohnehin schon hat -- kein neuer Einfluss auf
+  // Zielwahl/Timing/Schaden). Faellt ein Kaempfer, und raecht ein Kamerad ihn innerhalb von
+  // KAMPF_TRADE_FENSTER_SEK, indem er dessen Angreifer ausschaltet, ist das ein "Trade"
+  // (KAST-Statistik, Counter-Strike). `letzteAusschaltungen` ist ein kleines Anzeige-
+  // Gedaechtnis der juengsten KOs (Angreifer, Opfername, Opferseite, Zeitpunkt) -- es
+  // schreibt nichts in U/stepSim/rr() zurueck, nur in den Ticker/die HIGHLIGHTS-Buchung
+  // (s. schalteAus() unten). Bei reset() geleert (s. dort), damit ein neues Spiel nicht die
+  // KOs des letzten zum Trade erklaert.
+  const KAMPF_TRADE_FENSTER_SEK=5;
+  let letzteAusschaltungen=[];
+
   function reviveUnit(u){
     u.down=false; u.downBis=null;
     u.hp=u.max;
@@ -28349,6 +28361,26 @@
     // Wirkt nur auf Anzeige-Etikett und Szene-Auswahl, `big` bleibt unberuehrt.
     const kind=(ersteAusschaltung&&!entscheidend&&!mehrfachkill)?"ersteAusschaltung"
       :kampfKoKind(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung);
+
+    // TRADE (T-4, s. KAMPF_TRADE_FENSTER_SEK/letzteAusschaltungen oben): hat `tg` (wer
+    // jetzt faellt) innerhalb des Fensters selbst schon jemanden ausgeschaltet, und ist
+    // `von` (der jetzige Angreifer) ein Kamerad dieses frueheren Opfers, dann raecht `von`
+    // ihn gerade -- ein "Trade" (KAST-Statistik, Counter-Strike). Reine Ticker-/Highlight-
+    // Meldung ueber den bestehenden Cooldown (kampfGrossDrosseln) -- kein Einfluss auf
+    // Schaden/Ziel/Timing. Nur TDM (s. Kommentar an KAMPF_TRADE_FENSTER_SEK): erst der
+    // Respawn macht aus der Vergeltung ein Ereignis mit Folgen.
+    if(disc==="tdm"){
+      const geraecht=letzteAusschaltungen.find(e=>e.angreifer===tg && von.side===e.opferSeite
+        && (t-e.t)<=KAMPF_TRADE_FENSTER_SEK);
+      if(geraecht){
+        feed(von.side,von.n+" vergilt "+geraecht.opferName,
+          kampfGrossDrosseln(true,false),undefined,"trade",undefined,von.n,"ereignis");
+      }
+      letzteAusschaltungen.push({angreifer:von,opferName:tg.n,opferSeite:tg.side,t});
+      // Nur das Fenster behalten -- das Array bleibt so klein wie die KOs der letzten
+      // KAMPF_TRADE_FENSTER_SEK Sekunden, nie der ganzen Spielhistorie.
+      letzteAusschaltungen=letzteAusschaltungen.filter(e=>(t-e.t)<=KAMPF_TRADE_FENSTER_SEK);
+    }
 
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
@@ -38384,6 +38416,17 @@
     }
   }
 
+  // DIE FRONT ALS LINIE AM BODEN (T-5, Fable-Ideen Arena/I-Spy 30.09., Klasse A: reine
+  // Zeichnung, liest nur teamFront() -- einen Wert, den die Formationsleine seit dem
+  // 13.09.-Fund ohnehin schon je Tick berechnet, keine neue Simulationszahl). Nur TDM: bei
+  // sechs gegen sechs ist das die einzige Arena-Kopfzahl, in der "Fronten druecken"
+  // (Vanguard/Breaker) ueberhaupt sichtbar waere (s. Dokument Abschnitt 3, T-5). Die Farbe
+  // zeigt, welche Seite die Linie ZULETZT in die gegnerische Haelfte gedrueckt hat --
+  // dafuer merkt sich draw() hier die x-Position des letzten Frames; "gedrueckt" heisst
+  // "naeher an der gegnerischen Grundlinie", Heim drueckt also nach rechts (steigendes x),
+  // Gast nach links (fallendes x). Bei reset() auf null gestellt (s. dort).
+  let tdmFrontLetzteX=null, tdmFrontFarbe=null;
+
   function draw(){
     ctx.clearRect(0,0,W,H);
     // TEAM-FEIER-WACKELN (Konzept team-publikum-feiermomente 2.5): mitTeamFeierWackeln() ruft
@@ -38393,6 +38436,18 @@
     if(istBahn(disc)){mitTeamFeierWackeln(zeichneSpurt);return;}
     zeichneBoden();
     if(KP)zeichneKontrollpunkt();
+    if(disc==="tdm"){
+      const frontX=(teamFront(0)+teamFront(1))/2;
+      if(tdmFrontLetzteX!=null && Math.abs(frontX-tdmFrontLetzteX)>0.05){
+        tdmFrontFarbe=frontX>tdmFrontLetzteX?0:1;
+      }
+      tdmFrontLetzteX=frontX;
+      const frontFarbe=tdmFrontFarbe===0?css("--home"):tdmFrontFarbe===1?css("--away"):"rgba(255,255,255,.5)";
+      ctx.save();
+      ctx.strokeStyle=frontFarbe;ctx.globalAlpha=.3;ctx.lineWidth=3;ctx.setLineDash([2,10]);ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(frontX,28);ctx.lineTo(frontX,H-28);ctx.stroke();
+      ctx.restore();
+    }
 
     // ZIELLINIEN. Ein duenner Strich von jedem Kaempfer zu dem, den er gerade meint.
     //
@@ -38463,8 +38518,27 @@
     // umgekehrt vor Schwebern ausweichen, wuerde der Anker bei jedem neuen Skill-Text
     // zittern statt ruhig zu stehen.
     const labelSchwebeBoxen=[];
+    // AUFKLAERUNGS-NEBEL (B-5, Fable-Ideen Arena/I-Spy 30.09., Klasse A: reine Zeichnung,
+    // keine Wirkung auf Zielwahl/Treffer/Schaden -- nur eine Sicht-Buchhaltung, WER zuletzt
+    // gesehen wurde). Nur Battlefield, nur aus Sicht der eigenen Seite (Seite 0, wie die
+    // Zielansage auch nur fuer sie gilt): eine gegnerische Figur bleibt Silhouette, bis eine
+    // eigene Figur ihr innerhalb von NEBEL_SICHT_RADIUS nahegekommen ist, danach
+    // NEBEL_SICHT_DAUER_SEK lang scharf. `nebelSichtBis` ist ein neues Feld auf dem
+    // Einheiten-Objekt (dieselbe Bauart wie u.lastHit), aber reine Anzeige-Buchhaltung --
+    // kein Baustein ausser der Silhouette unten liest es, kein rr()/wert()/stepSim-Bezug.
+    const NEBEL_SICHT_RADIUS=260, NEBEL_SICHT_DAUER_SEK=6;
+    if(disc==="battlefield"){
+      for(const z of U){
+        if(z.side!==1)continue;
+        for(const u of U){
+          if(u.side!==0||u.down)continue;
+          if(dist(u,z)<=NEBEL_SICHT_RADIUS){z.nebelSichtBis=t+NEBEL_SICHT_DAUER_SEK;break;}
+        }
+      }
+    }
     for(const u of U){
       const c=u.side===0?css("--home"):css("--away");
+      const imNebel=disc==="battlefield"&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
       let x=u.x,y=u.y;
       if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
         const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
@@ -38555,6 +38629,22 @@
       const statusHalb=schrift(statusTxt,statusDy,u.heiler?css("--ok"):"#a9b6c6",8.5);
       if(statusTxt)labelSchwebeBoxen.push({x,y:y+statusDy,halbBreite:statusHalb});
       ctx.globalAlpha=1;
+      // SILHOUETTE (B-5, s. NEBEL_SICHT_RADIUS oben): deckt Sprite, Balken und
+      // Beschriftung dieser EINEN Figur mit einer blickdichten Flaeche ab -- einfacher
+      // nachtraeglicher Overlay-Schritt statt die Zeichnung der Figur selbst (Balken,
+      // Name/Status-Kollisionsvermeidung) umzubauen, die genau diese Reihenfolge schon
+      // fuer alle anderen Faelle sauber loest.
+      if(imNebel){
+        ctx.globalAlpha=1;
+        ctx.fillStyle="#12151b";
+        ctx.beginPath();ctx.ellipse(x,y-6,20,30,0,0,6.3);ctx.fill();
+        ctx.strokeStyle="rgba(0,0,0,.65)";ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.ellipse(x,y-6,20,30,0,0,6.3);ctx.stroke();
+        ctx.fillStyle="rgba(230,230,235,.55)";
+        ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText("?",x,y-6);
+      }
     }
     // ZIELANSAGE-MARKIERUNG, zweiter Durchgang. Bewusst DERSELBE Baustein wie beim
     // Fokus-Doppeln (s. dort, gleiche Farbe FOKUS_FARBE, gleicher gestrichelter Ring r=27
@@ -38817,6 +38907,7 @@
     grosserTreffer:"GROSSER TREFFER",
     kontrollpunkt:"KONTROLLPUNKT",
     zielansage:"ZIELANSAGE",
+    trade:"TRADE",
     // FELDSPIEL (basketball, hockey, football)
     tor:"TOR",
     dreier:"DREIER",
@@ -41468,6 +41559,13 @@
     // ABGELAUFENEN Spiel und darf im naechsten Endstand nicht mehr auftauchen; ein noch
     // sichtbarer Callout aus dem letzten Spiel darf nicht ueber den neuen Einlauf stehen.
     HIGHLIGHTS=[];
+    // T-4/T-5 (Arena Paket 1 "Arena sichtbar", Klasse A): dieselbe Logik wie bei HIGHLIGHTS
+    // darueber -- die Anzeige-Gedaechtnisse gehoeren zum ABGELAUFENEN Spiel (alte
+    // Einheiten-Referenzen in letzteAusschaltungen wuerden sonst nie mehr zu einem `tg`
+    // des naechsten Spiels passen, und die Frontlinie wuerde im ersten Frame des neuen
+    // Spiels mit der letzten Farbe/Position des vorigen aufblitzen).
+    letzteAusschaltungen=[];
+    tdmFrontLetzteX=null;tdmFrontFarbe=null;
     if(calloutTimer){clearTimeout(calloutTimer);calloutTimer=null;}
     const bc=document.getElementById("bbugcallout");
     if(bc){bc.hidden=true;bc.classList.remove("zu");}
