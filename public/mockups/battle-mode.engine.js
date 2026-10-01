@@ -8476,7 +8476,7 @@
         // big" -- bisher lief diese Zeile ohne big-Flag, obwohl es laut Bauplan "der
         // dramatischste Moment [ist], den Hockey jetzt hat". Nur das dritte Argument
         // aendert sich (kein neuer Text, kein neuer Zweig).
-        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.",true);
+        feed(seite,"Torwart raus! "+tw.n+" spielt jetzt als sechster Feldspieler.",true,undefined,"torwartRaus");
         schwebe({x:0,y:0,txt:"TORWART RAUS",life:1.6,crit:true,_spieler:tw.id});
       }
     }
@@ -9443,7 +9443,7 @@
       if(traeger)traeger.punkte+=6;
       fsPunkte[fb.side]+=6;
       feed(fb.side,(traeger?traeger.n:"")+" — TOUCHDOWN!",true,
-        traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined);
+        traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined,"touchdown");
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
       if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feedEreignis(fb.side,"Extra-Punkt ist gut."); }
@@ -9468,7 +9468,7 @@
     if(erg.typ==="fg"){
       if(erg.erfolg){
         fsPunkte[fb.side]+=3;
-        feed(fb.side,"Field Goal von "+Math.round(erg.distanz)+" Yards ist gut — drei Punkte!",true);
+        feed(fb.side,"Field Goal von "+Math.round(erg.distanz)+" Yards ist gut — drei Punkte!",true,undefined,"fieldGoal");
         schwebe({x:0,y:0,txt:"FIELD GOAL!",life:1.4,crit:true,_gross:true});
         // KEIN Kicker-Slot (Football-Plan D) — logZug() BRAUCHT trotzdem einen echten
         // Spieler (die Boxscore-Sonde liest e.spieler.id ungeprueft, s.
@@ -9494,7 +9494,7 @@
     if(erg.typ==="sack"){
       erg.spieler.passYards+=erg.yards; erg.verteidiger.bloecke++;
       if(fsFbLog)fsFbLog.sacks++;
-      feed(erg.verteidiger.side,erg.verteidiger.n+" sackt "+erg.spieler.n+" — "+FB().wortBlock+"!",true);
+      feed(erg.verteidiger.side,erg.verteidiger.n+" sackt "+erg.spieler.n+" — "+FB().wortBlock+"!",true,undefined,"sack");
       schwebe({x:0,y:0,txt:FB().wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"block",{verteidiger:erg.verteidiger,spieler:erg.spieler});
       footballDownWeiter(fb,erg.yards);
@@ -9509,7 +9509,7 @@
       if(fsFbLog&&gewinntDef)fsFbLog.fumblesLost++;
       const recover=gewinntDef?fkLos(def,"ABWEHR_LAUF"):fkLos(off,"BALLSICHERHEIT");
       recover.rebounds++;
-      feed(recover.side,erg.spieler.n+" verliert den Ball — "+recover.n+" mit der "+FB().wortRebound+"!",true);
+      feed(recover.side,erg.spieler.n+" verliert den Ball — "+recover.n+" mit der "+FB().wortRebound+"!",true,undefined,"fumble");
       schwebe({x:0,y:0,txt:"FUMBLE!",life:1.2,crit:true,_spieler:erg.spieler.id});
       logZug(recover.side,"steal",{verteidiger:recover,spieler:erg.spieler});
       // BUG GEFUNDEN UND BEHOBEN (Rezept-Feinkalibrierung, docs/design/football-rezept-
@@ -9529,7 +9529,7 @@
     if(erg.typ==="interception"){
       erg.spieler.verluste++; erg.verteidiger.steals++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passInt++; }
-      feed(erg.verteidiger.side,erg.verteidiger.n+" fängt den Pass ab — Interception!",true);
+      feed(erg.verteidiger.side,erg.verteidiger.n+" fängt den Pass ab — Interception!",true,undefined,"interception");
       schwebe({x:0,y:0,txt:"INTERCEPTION!",life:1.3,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"steal",{verteidiger:erg.verteidiger,spieler:erg.spieler});
       fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
@@ -9898,7 +9898,7 @@
     // "Viertel" stand hier fest, obwohl die Disziplin ihr eigenes Wort mitbringt — im
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
-    feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true);
+    feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true,undefined,"zwischenstand");
     // PUSTE IN DER PAUSE (Chris: „man laedt in pausen etwas auf"). Bewusst eine EINMALIGE
     // Gutschrift am Drittelwechsel und NICHT eine laengere Simulationspause: der
     // Kommentar an FELDSPIEL_ART.basketball.live haelt nachgemessen fest, dass schon eine
@@ -11347,7 +11347,7 @@
       if(a2){a2.assists++; a2.assists2++;}
       if(tw)tw.gegentore++;
       feed(schuetze.side,schuetze.n+" trifft"+(a1?" nach Vorlage von "+a1.n:"")+" — TOR!"+torKennung,true,
-        waehleCaption(CAPTION_TOR,schuetze.n,a1?a1.n:null));
+        waehleCaption(CAPTION_TOR,schuetze.n,a1?a1.n:null),"tor");
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:a1,zweitpassgeber:a2,punkte:1,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
         deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
@@ -11503,8 +11503,9 @@
       // Big nur bei: einem einstudierten Spielzug (szDef), einem Dunk, einem Dreier oder
       // einem Fuehrungswechsel -- sonst false. Ersetzt "jeder Korb ist big" (Konzept
       // Abschnitt 4.3, Nachzug 3).
-      feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung,
-        undefined,undefined,undefined,undefined,"ereignis");
+      feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung,undefined,
+        szDef?"spielzug":flug.tier==="dunk"?"dunk":flug.fern?"dreier":"fuehrungswechsel",
+        undefined,undefined,"ereignis");
       // B2 -- "LAUF"-GRAFIK (A, Prio 2, Bauplan Abschnitt 4): Feed-Meldung GENAU EINMAL
       // beim Ueberschreiten der 8-Punkte-Schwelle des EIGENEN fortlaufenden Laufs, bzw.
       // GENAU EINMAL, wenn dieser Korb einen laufenden GEGNERISCHEN Lauf (>=8) beendet.
@@ -11514,9 +11515,9 @@
       const vorLauf=basketballLaufRoh();
       if(vorLauf&&vorLauf.seite===schuetze.side){
         if(vorLauf.punkte<8&&vorLauf.punkte+flug.punkte>=8)
-          feed(schuetze.side,(vorLauf.punkte+flug.punkte)+":0-Lauf "+(schuetze.side===0?"Heim":"Gast")+"!",true);
+          feed(schuetze.side,(vorLauf.punkte+flug.punkte)+":0-Lauf "+(schuetze.side===0?"Heim":"Gast")+"!",true,undefined,"lauf");
       } else if(vorLauf&&vorLauf.seite!==schuetze.side&&vorLauf.punkte>=8){
-        feed(schuetze.side,"Lauf beendet — "+vorLauf.punkte+":0.",true);
+        feed(schuetze.side,"Lauf beendet — "+vorLauf.punkte+":0.",true,undefined,"laufGestoppt");
       }
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
         tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
@@ -11535,7 +11536,7 @@
         logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
         // AND-ONE ist selten und sofort verstaendlich -- immer big (Konzept Abschnitt 4.3,
         // Nachzug 3).
-        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!",true);
+        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!",true,undefined,"undEins");
         // Der Zusatz-Freiwurf laeuft jetzt sichtbar ab (Standphase) statt im Hintergrund;
         // der Ballwechsel danach passiert in beendeFreiwuerfe, nicht mehr hier.
         starteFreiwuerfe(schuetze,1,verteidiger,true);
@@ -12139,7 +12140,7 @@
       // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
       const sieger=fsPunkte[0]>fsPunkte[1]?VEREIN[0].name:fsPunkte[1]>fsPunkte[0]?VEREIN[1].name:null;
       feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
-        +fsPunkte[0]+":"+fsPunkte[1]+".",true);
+        +fsPunkte[0]+":"+fsPunkte[1]+".",true,undefined,"endstand");
       return; }
     // FOOTBALL: eigene Zustandsmaschine statt der Basketball/Hockey-Dribbel-/Pass-
     // Entscheidungskette darunter (entscheideBallaktion & Co. — strukturell auf
@@ -12519,7 +12520,7 @@
         else if(e.art==="rebound")txt=vor+e.rebounder.n+" holt den "+art.wortRebound+".";
         else txt=vor+e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
       }
-      feed(e.seite,txt,e.art==="treffer");
+      feed(e.seite,txt,e.art==="treffer",undefined,szDef?"spielzug":e.fern?"dreier":istHockey()?"tor":"korb");
       if(e.art==="treffer"){
         // Groesserer, laenger stehender Jubel-Text bei einem gelungenen Spielzug — das
         // "noch mehr Jubel bei was Besonderem", das Chris fuer die Zuschauer wollte.
@@ -13928,32 +13929,49 @@
   // woertlich Chris' eigene Beispiele (Saege, grosser Hammer). Rein praesentational: keine
   // dieser Zahlen fliesst in rezept/wert()/punkte ein.
   const FOLTER_HOLZ="#6b4a2e", FOLTER_METALL="#aab4c4", FOLTER_GLUT="#ff6a2a";
+  // DREI FAMILIEN (B1, Fable-Ideendokument 30.09., docs/design/
+  // fable-ideen-heben-breaking-climbing-30-09.md Abschnitt 3, Paket 3): jedes Geraet gehoert
+  // zu einer von drei Familien, die seit dieser Runde zusaetzlich bestimmt, WELCHER Kanal des
+  // Ertragenden geprueft wird (s. gauntletRunde() unten) -- dasselbe hindernisTypen/
+  // fallenKoennen-Prinzip, das Takeshi und Climbing schon fahren, nur erstmals auf der
+  // Buehne. ZERMUERBUNG (langsam, anhaltend) prueft NERVEN, HIEB (kurz, scharf) prueft
+  // TECHNIK, WUCHT (koerperlich, brechend) prueft SPITZENMOMENT -- die drei Kanaele, die das
+  // Breaking-Rezept oben ohnehin schon fuehrt, kein neuer Kanal, keine Matrixaenderung.
+  // `farbe` ist rein optisch (Tischbeschriftung/Ticker, s. zeichneBreaking()).
+  //
+  // NACHJUSTIERT (erster Messdurchgang): BRANDEISEN urspruenglich bei Wucht (4 Geraete),
+  // nach dem power-Ueberschwung (s. GAUNTLET_FAMILIE_GEWICHT-Kommentar bei gauntletRunde())
+  // zu Hieb verschoben -- WUCHT jetzt 3 Geraete (Keil/Saege/Vorschlaghammer), HIEB 4
+  // (Rute/Peitsche/Brandeisen/Nagelkeule), ZERMUERBUNG weiter 3 (Strick/Daumenschraube/
+  // Zange). Thematisch passt der kurze, scharfe Schmerz des Brandeisens ohnehin eher zu
+  // HIEB als zur langsam brechenden WUCHT.
+  const FOLTER_FAMILIE_FARBE={zermuerbung:"#8db3ff",hieb:"#ff9a4a",wucht:"#ff5a5a"};
   const FOLTER_GERAETE=[
-    {name:"STRICK", zeichne(c){
+    {name:"STRICK", familie:"zermuerbung", zeichne(c){
       c.strokeStyle="#c9b48a"; c.lineWidth=2; c.lineCap="round";
       c.beginPath(); c.moveTo(0,0); c.lineTo(8,0); c.stroke();
       c.beginPath(); c.arc(14,0,6,0,6.2832); c.stroke(); c.lineCap="butt";
     }},
-    {name:"RUTE", zeichne(c){
+    {name:"RUTE", familie:"hieb", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=2.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
       c.strokeStyle="#8d6b41"; c.lineWidth=1.2;
       for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(6,0); c.quadraticCurveTo(14,(i-1)*3,22,(i-1)*6); c.stroke(); }
     }},
-    {name:"PEITSCHE", zeichne(c){
+    {name:"PEITSCHE", familie:"hieb", zeichne(c){
       c.strokeStyle="#3c3026"; c.lineWidth=3;
       c.beginPath(); c.moveTo(0,0); c.lineTo(7,0); c.stroke();
       c.strokeStyle="#5a4634"; c.lineWidth=1.6;
       c.beginPath(); c.moveTo(7,0); c.bezierCurveTo(15,-6,22,6,28,-2); c.stroke();
     }},
-    {name:"DAUMENSCHRAUBE", zeichne(c){
+    {name:"DAUMENSCHRAUBE", familie:"zermuerbung", zeichne(c){
       c.fillStyle=FOLTER_METALL; c.fillRect(6,-6,10,12);
       c.strokeStyle="#7f8a9c"; c.lineWidth=1.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
       c.beginPath(); c.moveTo(11,-9); c.lineTo(11,-6); c.stroke();
       c.beginPath(); c.arc(11,-11,3,0,6.2832); c.stroke();
     }},
-    {name:"ZANGE", zeichne(c){
+    {name:"ZANGE", familie:"zermuerbung", zeichne(c){
       c.strokeStyle=FOLTER_METALL; c.lineWidth=2.2; c.lineCap="round";
       c.beginPath(); c.moveTo(0,-3); c.lineTo(12,-1); c.lineTo(24,-7); c.stroke();
       c.beginPath(); c.moveTo(0, 3); c.lineTo(12, 1); c.lineTo(24, 7); c.stroke();
@@ -13962,19 +13980,19 @@
       c.beginPath(); c.arc(24, 7,2,0,6.2832); c.fill();
       c.globalAlpha=1; c.lineCap="butt";
     }},
-    {name:"BRANDEISEN", zeichne(c){
+    {name:"BRANDEISEN", familie:"hieb", zeichne(c){
       c.strokeStyle="#4a4f59"; c.lineWidth=2.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(17,0); c.stroke();
       c.fillStyle=FOLTER_GLUT; c.fillRect(17,-5,8,10);
       c.globalAlpha=0.45; c.fillStyle="#ffb066"; c.fillRect(15,-7,12,14); c.globalAlpha=1;
     }},
-    {name:"KEIL", zeichne(c){
+    {name:"KEIL", familie:"wucht", zeichne(c){
       c.fillStyle=FOLTER_HOLZ; c.fillRect(0,-3,8,6);
       c.fillStyle=FOLTER_METALL;
       c.beginPath(); c.moveTo(8,-7); c.lineTo(26,0); c.lineTo(8,7); c.closePath(); c.fill();
       c.strokeStyle="#7f8a9c"; c.lineWidth=1; c.stroke();
     }},
-    {name:"NAGELKEULE", zeichne(c){
+    {name:"NAGELKEULE", familie:"hieb", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3;
       c.beginPath(); c.moveTo(0,0); c.lineTo(13,0); c.stroke();
       c.fillStyle="#54402b"; c.beginPath(); c.ellipse(20,0,8,7,0,0,6.2832); c.fill();
@@ -13983,7 +14001,7 @@
         c.beginPath(); c.moveTo(20+Math.cos(a)*6,Math.sin(a)*5);
         c.lineTo(20+Math.cos(a)*12,Math.sin(a)*10); c.stroke(); }
     }},
-    {name:"SÄGE", zeichne(c){
+    {name:"SÄGE", familie:"wucht", zeichne(c){
       c.fillStyle="#3c3026"; c.fillRect(0,-4,8,8);
       c.fillStyle=FOLTER_METALL;
       c.beginPath(); c.moveTo(8,-5); c.lineTo(30,-3); c.lineTo(30,2); c.lineTo(8,2); c.closePath(); c.fill();
@@ -13992,7 +14010,7 @@
       for(let i=0;i<9;i++){ c.moveTo(9+i*2.4,2); c.lineTo(10.2+i*2.4,6); }
       c.stroke();
     }},
-    {name:"VORSCHLAGHAMMER", zeichne(c){
+    {name:"VORSCHLAGHAMMER", familie:"wucht", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(22,0); c.stroke();
       c.fillStyle="#8f99a9"; c.fillRect(21,-10,12,20);
@@ -14304,10 +14322,22 @@
       // `n=4` ist eine bewusst kleine Stichprobe fuer die Kalibrierung selbst (schnelle
       // Iteration in dieser stark ausgelasteten Sandbox); die Abnahme-Pflichtzahl fuer die
       // PR-Beschreibung kommt aus zwei groesseren, unabhaengigen Saatstaemmen.
+      //
+      // VIERTER SCHLIFF (Paket 3, Fable 30.09., B1/gauntletRunde()): seit B1 ist TECHNIK nicht
+      // mehr NUR eine Punktbonus-Quelle, sondern fuer die Hieb-Familie auch ein direkter
+      // Erfolgschance-Kanal -- power sass damit gleichzeitig in SPITZENMOMENT (Wucht-Familie,
+      // ebenfalls Erfolgschance) UND TECHNIK (Hieb-Familie), also ZWEIFACH im
+      // Ueberlebensdauer-Hebel. Gemessen: power 17,9/18,3 % gegen Matrix 10 (+7,9/+8,3 Pp),
+      // health 12,9 % gegen 18 (-5,1), rho 0,808->0,784 (unter die Schranke). Power aus TECHNIK
+      // genommen (0 statt 15), die freien 15 Punkte proportional auf torment/determination
+      // verteilt (50:35 -> 59:41) -- power sitzt jetzt nur noch in SPITZENMOMENT/WAGNIS, nicht
+      // mehr zusaetzlich in TECHNIK. Zusammen mit `GAUNTLET_FAMILIE_GEWICHT` 0,5->0,35 (s. dort)
+      // und der Wucht-Familie 4->3 Geraete (s. FOLTER_GERAETE oben) die Gegenmessung fuer die
+      // PR-Beschreibung.
       rezept:{
         GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
         SPITZENMOMENT:{power:55,will:45},
-        TECHNIK:      {torment:50,power:15,determination:35},
+        TECHNIK:      {torment:59,determination:41},
         PUBLIKUM:     {will:60,torment:40},
         NERVEN:       {will:50,health:50},
         AUSDAUER:     {stamina:65,determination:35},
@@ -16674,6 +16704,78 @@
   // realistischem Schaden je Zug (10..24) brauchen rund 60-100 Zuege -- 600 ist ein
   // Vielfaches davon, nie ein reales Limit.
   const GAUNTLET_MAX_ANSCHLAEGE=600;
+  // B2 (Fable 30.09., Paket 3): "der Peiniger wirkt" -- die Wucht des ZUFUeGENDEN skaliert den
+  // HP-Verlust des Ertragenden, um den heutigen Wert bei SPITZENMOMENT 50. Kein zweiter
+  // rr()-Aufruf, keine Aenderung am Erfolgswurf des Ertragenden selbst -- nur die FOLGE eines
+  // bereits gewuerfelten Ausgangs wird skaliert, s. baueGauntlet(). Vorher war der Peiniger
+  // mechanisch nicht vorhanden (Chris' Satz hat zwei Beteiligte, die Mechanik nur einen).
+  //
+  // DECKEL VON ±20 % AUF ±5 % GESENKT (erster Messdurchgang, Paket 3): genau das vom
+  // Ideendokument selbst benannte Risiko ("Paarungsrauschen... wenn die Messung Spannweite
+  // > 0,30 zeigt, auf ±10 % oder ganz zurueck"). Isolationstest (B1/B4/B5 unveraendert, nur
+  // dieser Faktor testweise auf 1 gesetzt): rho 0,784 -> 0,802 (ueber die Schranke) -- B2 ist
+  // damit der Haupttreiber des rho-Einbruchs, NICHT B1 (B1 alleine aus machte rho sogar
+  // schlechter, 0,757, B1 ist also eher rho-foerderlich, s. Kommentar bei
+  // GAUNTLET_FAMILIE_GEWICHT). Stufenweise gesenkt statt B2 ganz zu entfernen (es ist Chris'
+  // eigenes Bild: "einer fuegt Schmerz zu, der andere muss es aushalten"): ±10 % (der von der
+  // Doku selbst vorgeschlagene Fallback) mass immer noch 0,792 -- unter der Schranke, weil der
+  // Gauntlet ANDERS als die generischen Buehnen-Disziplinen ist, fuer die ±10% kalibriert war:
+  // die Kette gibt dem Peiniger-Effekt ueber viele Anschlaege Zeit, sich aufzusummieren
+  // (laengere Ueberlebensdauer wirkt selbst wieder verstaerkend, derselbe Hebel wie bei
+  // GAUNTLET_HP_MAX). Erst ±5 % (0,801, knapp aber reproduzierbar -- diese Messung ist
+  // deterministisch, kein Stichprobenrauschen zwischen Wiederholungen) haelt die Schranke.
+  const GAUNTLET_PEINIGER_DECKEL=0.05;
+  function gauntletSchadenFaktor(peiniger){
+    return Math.max(1-GAUNTLET_PEINIGER_DECKEL,Math.min(1+GAUNTLET_PEINIGER_DECKEL,
+      1+2*GAUNTLET_PEINIGER_DECKEL*((peiniger.SPITZENMOMENT-50)/100)));
+  }
+  // B4 (Fable 30.09., Paket 3): "Verschnaufen zwischen den Bouts" -- der UEBERLEBENDE eines
+  // Bouts bekommt, bevor der naechste frische Herausforderer antritt, eine kleine,
+  // deterministische Regeneration (kein rr()): 2-4 % seiner HP, je nach AUSDAUER. Kein Heilen
+  // ("angeschlagen in die Kaempfe" bleibt), nur ein Durchatmen in der Ringecke -- AUSDAUER
+  // (Matrixgewicht 8) wirkte bisher nur als Ermuedungsdeckel, nie als sichtbares Plus.
+  const GAUNTLET_VERSCHNAUFEN_ANTEIL=0.04;
+  function gauntletVerschnaufen(u){
+    return Math.round(u.hpMax*GAUNTLET_VERSCHNAUFEN_ANTEIL*(0.5+u.AUSDAUER/200));
+  }
+  // B5 (Fable 30.09., Paket 3): "Provokation" -- bei hohem WAGNIS fordert der Ertragende das
+  // naechste Geraet der Leiter eine Stufe frueher (deterministisch, kein eigener rr(), s.
+  // baueGauntlet()) und bekommt dafuer einen Aufschlag auf den SPITZENMOMENT-Bonus, WENN er
+  // haelt -- das ist die ausstehende Angleichung an den generischen WAGNIS-Trade-off
+  // (BUEHNE_WAGNIS_RISIKO/_ERTRAG vor bauBuehne()), auf Breaking-Art: das Risiko ist nicht ein
+  // zusaetzlicher Erfolgsabzug, sondern die haertere Stufe selbst (s. GAUNTLET_STUFE_ABZUG
+  // unten), der Ertrag ein groesserer Bonus bei Erfolg.
+  const GAUNTLET_PROVOKATION_SCHWELLE=58;
+  const GAUNTLET_PROVOKATION_ERTRAG=0.22;
+  // B1 (Fable 30.09., Paket 3, "staerkste Idee"): DREI FAMILIEN, DREI WEGE. Bisher war
+  // `erfolg` immer derselbe TECHNIK/NERVEN-Mix, egal welches der zehn Geraete gerade auf dem
+  // Tisch lag -- der Vorschlaghammer war so leicht auszuhalten wie der Strick. Jetzt bestimmt
+  // die FAMILIE des gerade benutzten Geraets (`geraet.familie`, s. FOLTER_GERAETE oben) zur
+  // Haelfte mit, welcher Kanal zaehlt: ZERMUERBUNG -> NERVEN, HIEB -> TECHNIK, WUCHT ->
+  // SPITZENMOMENT -- exakt die drei Kanaele, die das Rezept oben ohnehin schon fuehrt
+  // (NERVEN={will,health}, TECHNIK={torment,power,determination}, SPITZENMOMENT=
+  // {power,will}), kein neuer Sub-Skill, keine Matrixaenderung. Die andere Haelfte bleibt der
+  // bisherige TECHNIK/NERVEN-Mix (`mixAlt`) -- der Wurf wird dadurch "breiter, nicht lauter"
+  // (Doku-Wortlaut): wer in seiner Familie schwach ist, haelt seltener stand, unabhaengig vom
+  // alten Mix. GAUNTLET_STUFE_ABZUG zieht zusaetzlich je Eskalationsstufe INNERHALB DES BOUTS
+  // (`geraet.stufe`, dieselbe Leiter wie `folterStufe()`/`gauntletZugImBout()`, 0..9) ab
+  // Erfolgschance ab -- "ein langer Bout endet, weil das Aushalten schwerer wird, nicht weil
+  // der HP-Verlust waechst" (Doku). Der HP-Verlust selbst (GAUNTLET_SCHADEN_ERFOLG/FAIL) bleibt
+  // UNVERAeNDERT fuer alle zehn Stufen -- das schuetzt den Reliabilitaets-Hebel, fuer den
+  // GAUNTLET_HP_MAX 100 -> 400 gesetzt wurde (s. Kommentar oben).
+  const GAUNTLET_STUFE_ABZUG=0.02;
+  // NACHGEMESSEN, NACHJUSTIERT (erster Messdurchgang, Paket 3): mit Familiengewicht 0,5 kippte
+  // power doppelt in den Erfolgswurf -- einmal ueber TECHNIK (Hieb-Familie, power:15) und
+  // einmal ueber SPITZENMOMENT (Wucht-Familie, power:55), zusaetzlich zum schon bestehenden
+  // Punktbonus `L.SPITZENMOMENT*0.35*bonus`. Gemessen: rho 0,808->0,784 (unter die Schranke),
+  // Pp 12,7/13,5 -> 25,0/26,8 (ein Strom ueber der Schranke), power +7,9/+8,3 Pp ueber Matrix,
+  // health -5,1 Pp darunter -- exakt der "Ueberlebensdauer-Hebel", den das Ideendokument fuer
+  // power vorab als Risiko benannt hat (Abschnitt B1, "Erste/Zweite Schraube"). Beide dort
+  // vorgeschlagenen Schrauben angewandt: `GAUNTLET_FAMILIE_GEWICHT` 0,5 -> 0,35 (Familienkanal
+  // zaehlt weniger stark, der alte TECHNIK/NERVEN-Mix mehr), UND power aus dem TECHNIK-Rezept
+  // genommen (s. `rezept.TECHNIK` bei BUEHNE_ART.breaking, auf torment/determination verteilt)
+  // -- power sitzt danach nur noch in SPITZENMOMENT, nicht mehr zusaetzlich in TECHNIK.
+  const GAUNTLET_FAMILIE_GEWICHT=0.35;
 
   // IDENTISCHE FORMEL wie der generische Auftritt-Block (bauBuehne(), s. `for(let ri=0;
   // ri<art.rundenN;ri++)` weiter oben) -- nur der Rundenindex `ri` kommt hier aus der Laenge
@@ -16683,16 +16785,33 @@
   // dieselbe Pp-Abweichung zur Matrix wie zuvor (s. PR-Beschreibung fuer die Nachmessung).
   // AUSNAHME SEIT 26.09.: der generische Block rechnet WAGNIS jetzt als echten Trade-off
   // (BUEHNE_WAGNIS_RISIKO/_ERTRAG, s. vor bauBuehne()). Breaking fuehrt hier BEWUSST noch die
-  // alte Formel (WAGNIS nur im Erfolgsbonus) — die Umstellung war auf die sechs Geschwister
-  // des generischen Blocks beschraenkt und abgenommen; Breaking braucht vor einem Nachziehen
-  // eine eigene rho-/Pp-Abnahme (Gauntlet-Kaskade: ein Fehlschlag kostet hier HP).
-  function gauntletRunde(L,ri,art){
+  // alte Grundformel (WAGNIS nur im Erfolgsbonus, jetzt ueber B5/`geraet.provoziert` erweitert)
+  // — die Umstellung auf den vollen generischen Trade-off war auf die sechs Geschwister des
+  // generischen Blocks beschraenkt; die B1/B2/B4/B5-Runde (Paket 3, 30.09.) ist Breakings
+  // EIGENE Abnahme dieser Kaskade (Gauntlet: ein Fehlschlag kostet hier HP, s. PR-Beschreibung
+  // fuer die Vorher/Nachher-Messung).
+  //
+  // `geraet` (B1/B5, neu): {stufe, familie, provoziert} des gerade von baueGauntlet()
+  // gewaehlten Foltergeraets fuer DIESEN Zug -- optional, damit ein Aufruf ohne drittes
+  // Argument (sollte es ihn je geben) auf das alte Verhalten (familienlos, stufe 0)
+  // zurueckfaellt, statt zu crashen.
+  function gauntletRunde(L,ri,art,geraet){
     const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*Math.min(1,ri/GAUNTLET_ERMUED_ANSCHLAEGE);
     const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
-    const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+    const stufe=geraet&&geraet.stufe!=null?geraet.stufe:0;
+    const familienKanal=!geraet?0
+      :geraet.familie==="zermuerbung"?L.NERVEN
+      :geraet.familie==="hieb"?L.TECHNIK
+      :L.SPITZENMOMENT;
+    const mixAlt=L.TECHNIK*0.0055+L.NERVEN*0.0035;
+    const erfolg=Math.max(0.05,Math.min(0.94,
+      0.15+(1-GAUNTLET_FAMILIE_GEWICHT)*mixAlt+GAUNTLET_FAMILIE_GEWICHT*familienKanal*0.009
+      -stufe*GAUNTLET_STUFE_ABZUG));
     let punkte,ereignis,haelt;
     if(rr()<erfolg){
-      punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+      let bonus=0.4+L.WAGNIS*0.006;
+      if(geraet&&geraet.provoziert)bonus*=(1+GAUNTLET_PROVOKATION_ERTRAG);
+      punkte=basis+L.SPITZENMOMENT*0.35*bonus;
       ereignis=art.erfolgWort; haelt=true;
     } else {
       punkte=basis*art.failAbzug;
@@ -16734,15 +16853,40 @@
       const ertragende=ertragenderIstX?x:y, peiniger=ertragenderIstX?y:x;
       ertragende.gegnerN=peiniger.n; peiniger.gegnerN=ertragende.n;
       const ri=ertragende.runden.length;
-      const r=gauntletRunde(ertragende,ri,art);
+      // B1/B5 (Fable 30.09., Paket 3): WELCHES Geraet liegt diesen Zug auf dem Tisch? Die
+      // Leiter zaehlt INNERHALB DES BOUTS (nicht ueber die ganze Kette, s. B4.1-Kommentar bei
+      // `gauntletZugImBout()` weiter unten) -- `zugImBout` ist dieselbe 0-basierte Zaehlung,
+      // nur VOR dem Push dieser Runde gebildet (die Runden desselben, noch laufenden Bouts
+      // liegen als EIN zusammenhaengender Block am Ende von `ertragende.runden`). B5:
+      // provoziert der Ertragende (WAGNIS >= GAUNTLET_PROVOKATION_SCHWELLE, deterministisch,
+      // kein rr()), liegt die naechste Stufe der Leiter schon JETZT auf dem Tisch statt erst
+      // naechsten Zug -- "gib mir die Saege".
+      let zugImBout=0;
+      for(let j=ertragende.runden.length-1;j>=0&&ertragende.runden[j].bout===ertragende.bout;j--)zugImBout++;
+      const stufeGrund=folterStufe(zugImBout,art.rundenN);
+      const provoziert=ertragende.WAGNIS>=GAUNTLET_PROVOKATION_SCHWELLE;
+      const stufe=provoziert?Math.min(FOLTER_GERAETE.length-1,stufeGrund+1):stufeGrund;
+      const geraet={stufe,familie:FOLTER_GERAETE[stufe].familie,provoziert};
+      const r=gauntletRunde(ertragende,ri,art,geraet);
       const hpVor=ertragende.hp;
-      ertragende.hp=Math.max(0,ertragende.hp-(r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL));
+      // B2 (Fable 30.09., Paket 3): der Schaden skaliert jetzt mit der Wucht des PEINIGERS
+      // (gauntletSchadenFaktor(), ±20 % um den alten Festwert), nicht mehr nur mit dem Erfolg/
+      // Fail-Ausgang des Ertragenden -- derselbe gewuerfelte Ausgang (`r.haelt`), nur die FOLGE
+      // skaliert durch den, der gerade zufuegt.
+      const schaden=Math.round((r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL)*gauntletSchadenFaktor(peiniger));
+      ertragende.hp=Math.max(0,ertragende.hp-schaden);
       // `hpVor`/`hpNach`/`gegnerN`/`bout` reisen PRO RUNDE mit (nicht nur auf `u` selbst) --
       // stepBuehne()/zeichneBreaking() enthuellen chronologisch und muessen fuer eine LAENGST
       // vergangene Runde denselben Gegner/HP-Stand zeigen koennen, den diese Runde damals
-      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`.
+      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`. `stufe`/
+      // `familie`/`provoziert`/`schaden` reisen aus demselben Grund mit (B1/B2/B5, Paket 3):
+      // die Anzeige (zeichneBreaking(), s.u.) muss fuer eine laengst vergangene, aber gerade
+      // erst enthuellte Runde GENAU das Geraet und den Schaden zeigen, das/den dieser Zug
+      // tatsaechlich benutzt/verursacht hat -- nicht neu aus dem (moeglicherweise ueberholten)
+      // Endzustand rekonstruieren.
       ertragende.runden.push({punkte:r.punkte,ereignis:r.ereignis,
-        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax});
+        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax,
+        stufe,familie:geraet.familie,provoziert,schaden});
       buehneQueue.push(ertragende);
       if(ertragende.hp<=0){
         ertragende.raus=true;
@@ -16751,11 +16895,16 @@
           if(bi>=B.length)break; // Team Gast komplett aufgebraucht -> Team Heim gewinnt.
           y=B[bi]; bout++; x.bout=bout; y.bout=bout;
           ertragenderIstX=false; // der frische Herausforderer ertraegt zuerst.
+          // B4 (Fable 30.09., Paket 3): der Ueberlebende (x) verschnauft, bevor der naechste
+          // Herausforderer antritt -- deterministisch, kein rr(), gedeckelt auf hpMax.
+          x.hp=Math.min(x.hpMax,x.hp+gauntletVerschnaufen(x));
         } else {
           ai++;
           if(ai>=A.length)break; // Team Heim komplett aufgebraucht -> Team Gast gewinnt.
           x=A[ai]; bout++; x.bout=bout; y.bout=bout;
           ertragenderIstX=true;
+          // B4: derselbe Verschnaufer, hier fuer den UEBERLEBENDEN y (Team Gast).
+          y.hp=Math.min(y.hpMax,y.hp+gauntletVerschnaufen(y));
         }
       } else {
         ertragenderIstX=!ertragenderIstX;
@@ -16869,12 +17018,18 @@
   //   1. DIE/DER FUEHRENDE STUERZT.
   //   2. UEBERNIMMT DIE ZWISCHENFUEHRUNG -- buehneWurdeFuehrend(), s. dort.
   //   3. LETZTES ELEMENT DES FUEHRENDEN -- der Abschluss des bislang besten Auftritts.
+  //
+  // RUECKGABE SEIT C3 (Highlight-Titel, 01.10.): statt true die MOMENTART als String --
+  // "patzer" (1.), "fuehrungswechsel" (2.), "bestmarke" (3.) -- und statt false `null`.
+  // Dieselben drei Bedingungen in derselben Reihenfolge, nur benannt: jede Aufrufstelle
+  // liest den Wert weiter als Wahrheitswert (big ja/nein) und reicht ihn zusaetzlich als
+  // feed()s `kind` durch. Keine neue Rechnung, keine zusaetzliche TEILNEHMER-Runde.
   function buehneAuftrittBig(u,r,vorherSumme){
     const bester=Math.max(0,...TEILNEHMER.filter(x=>x.id!==u.id&&x.aktuell>=0).map(x=>x.summe||0));
-    if(r.ereignis===BB().failWort)return vorherSumme>=bester;
-    if(buehneWurdeFuehrend(u,vorherSumme,u.summe,bester))return true;
-    if(u.aktuell+1>=BB().rundenN && (u.summe||0)>=bester)return true;
-    return false;
+    if(r.ereignis===BB().failWort)return vorherSumme>=bester?"patzer":null;
+    if(buehneWurdeFuehrend(u,vorherSumme,u.summe,bester))return "fuehrungswechsel";
+    if(u.aktuell+1>=BB().rundenN && (u.summe||0)>=bester)return "bestmarke";
+    return null;
   }
   function gauntletRausJetzt(u){
     const r=gauntletZugJetzt(u);
@@ -17006,7 +17161,8 @@
         const scheiterTxt=r.scheiterOrt?(" ("+r.scheiterOrt+" gescheitert)"):"";
         feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
           +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")+scheiterTxt
-          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig);
+          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig,undefined,
+          r.kuehn?"kuehnerVersuch":"letzterVersuch");
         // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD SICHTBAR"
         // -- der Poker-Moment am Meldetisch. `r.ansageAlt` ist nur gesetzt, wenn der
         // Duellstand die geplante Ansage DIESES Versuchs tatsaechlich ueberschrieben hat (s.
@@ -17026,15 +17182,16 @@
         // das Ausgleichskilo), unabhaengig vom Ausgang — immer big, s. versuchBig oben.
         if(r.kuehn){
           if(r.punktesieg)
-            feed(u.side,"KÜHNER VERSUCH GEGLÜCKT — "+u.n+" wagt mehr als nötig, um zu gewinnen. Punktesieg!",true);
+            feed(u.side,"KÜHNER VERSUCH GEGLÜCKT — "+u.n+" wagt mehr als nötig, um zu gewinnen. Punktesieg!",true,undefined,"punktesieg");
           else if(r.verletzt)
-            feed(u.side,"KÜHNER VERSUCH GESCHEITERT — "+u.n+" verletzt sich beim Wagnis!",true);
+            feed(u.side,"KÜHNER VERSUCH GESCHEITERT — "+u.n+" verletzt sich beim Wagnis!",true,undefined,"verletzt");
           else
-            feed(u.side,"Kühner Versuch von "+u.n+" scheitert knapp.",true);
+            feed(u.side,"Kühner Versuch von "+u.n+" scheitert knapp.",true,undefined,"knappVorbei");
         }
         if(u.aktuell+1>=BB().rundenN)
           feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
-            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true);
+            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true,undefined,
+            u.nullwertung?"nullwertung":"zweikampf");
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
         // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
@@ -17110,7 +17267,8 @@
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · "+statText
           +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,undefined,undefined,undefined,
+          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,
+          BB().schach?"kippZug":"fuehrungswechsel",undefined,undefined,
           BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
@@ -17161,7 +17319,7 @@
               // eines stummen Laufs hinaus ueberlebt.
               if(stumm){
                 feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
-                  ": Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true);
+                  ": Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true,undefined,"zwischenstand");
               } else {
                 fechtPeriodenAnstossen({periode,seite0,seite1},BB().jeSeite);
               }
@@ -17210,7 +17368,7 @@
               ?worte.vort+" "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)
               :worte.vort+" "+(v>0?"+":"")+v;
             feed(u.side,u.n+": "+worte.brett+" "+((u.brett??0)+1)+" "+brettText+" ("+statEnde+").",
-              buehneBahnGrossDrosseln(true,true));
+              buehneBahnGrossDrosseln(true,true),undefined,brettText==="unentschieden"?"remis":"entschieden");
           }
         }
       } else if(BB().showcase&&u.vizAct){
@@ -17222,10 +17380,11 @@
         // -- vor dem ersten stepShowcase()-Durchlauf (erster Frame) faellt dieser Zweig auf
         // den generischen Text im else-Zweig unten zurueck.
         const ACT=SHOWCASE_ACTS.find(a=>a.id===u.vizAct);
+        const showMoment=buehneAuftrittBig(u,r,vorherSumme);
         const zier=ACT?ACT.text[r.ereignis===BB().erfolgWort?"erfolg":"fail"]:null;
         feed(u.side,u.n+" — "+(ACT?ACT.label+": "+zier:r.ereignis)
           +" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneAuftrittBig(u,r,vorherSumme));
+          !!showMoment,undefined,showMoment);
       } else if(BB().schatzsuche){
         // TICKER-FEINSCHLIFF (PR 4, Konzept Abschnitt 4/7.2): ispyTickerZeile() baut das
         // Textmuster aus dem Konzept, s. Kommentar dort. `r.ereignis` bleibt UNVERAENDERT
@@ -17249,7 +17408,8 @@
         const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
         // TICKER-STUFE (Punkt 8, s. feed()): eine erfolglose Untersuchung ist Routine und steht
         // nur im Protokoll; jeder Fund (Punkte) bleibt im Ticker, solange das Budget reicht.
-        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel,undefined,undefined,undefined,undefined,
+        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel,undefined,
+          versuchBig?"tresor":"fuehrungswechsel",undefined,undefined,
           r.ereignis===BUEHNE_ART["i-spy"].erfolgWort?undefined:"routine");
       } else if(BB().gauntlet){
         // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
@@ -17279,16 +17439,32 @@
         // TICKER-STUFE (Punkt 8): "haelt stand" ist Routine (gut die Haelfte aller Breaking-
         // Zeilen, nur im Protokoll); "bricht ein" bleibt im Ticker, solange das Budget reicht,
         // Stufenwechsel (big) und das Aufgeben (darunter, big mit Vorrang) immer.
-        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
-          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),
-          undefined,undefined,undefined,undefined,
+        // B1 (Fable 30.09., Paket 3): der Ticker nennt jetzt zusaetzlich das Geraet dieses Zuges
+        // ("hält stand (Zange)" / "bricht ein (Brandeisen)", bei B5-Provokation zusaetzlich
+        // "provoziert") -- reiner Textzusatz aus `r.stufe`/`r.provoziert`, `r.ereignis` selbst
+        // bleibt UNVERAENDERT dasselbe Feld, gegen das ausschliesslich `art.erfolgWort`/
+        // `art.failWort` verglichen werden (s. RANGTREUE-NEUTRAL-Kommentar bei
+        // BUEHNE_ART.breaking oben) -- und damit auch unveraendert dasselbe Feld, das die
+        // TICKER-STUFE direkt darueber fuer die Routine/Ereignis-Einstufung liest.
+        //
+        // C3 (Fable 01.10., Highlight-Titel): `kind="angeschlagen"` macht denselben Aufruf
+        // zusaetzlich zur Quelle fuer den Highlight-Callout/Protokoll-Titel dieses Chassis --
+        // reiner fuenfter Parameter neben dem Geraetetext oben, beide aendern nichts
+        // aneinander (Text kommt aus `geraetHinweis`, Titel-Klasse aus `kind`).
+        const geraetName=FOLTER_GERAETE[r.stufe]?FOLTER_GERAETE[r.stufe].name:null;
+        const geraetHinweis=geraetName?" ("+geraetName+(r.provoziert?", provoziert":"")+")":"";
+        feed(u.side,u.n+" — "+r.ereignis+geraetHinweis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
+          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),undefined,
+          "angeschlagen",undefined,undefined,
           r.ereignis===BB().erfolgWort?"routine":undefined);
         if(r.hpNach<=0){
           // B3: "GIBT AUF" ODER "GEBROCHEN" (s. gauntletAusscheidenWort()-Kommentar oben) --
-          // reine Beschriftung desselben Ausscheidens, kein zweiter Zustand.
+          // reine Beschriftung desselben Ausscheidens, kein zweiter Zustand. Highlight-Titel
+          // (C3) bleibt einheitlich "gebrochen" -- HIGHLIGHT_TITEL kennt keinen eigenen
+          // "aufgegeben"-Eintrag, der Ticker-Satz selbst traegt die Unterscheidung.
           const wort=gauntletAusscheidenWort(u);
           feed(u.side,u.n+" — "+wort+" — scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
-            buehneBahnGrossDrosseln(true,true));
+            buehneBahnGrossDrosseln(true,true),undefined,"gebrochen");
         }
       } else if(BB().duett){
         // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
@@ -17320,7 +17496,11 @@
         // im Ticker, big-Elemente sowieso.
         feed(u.side,u.n+" — "+element.name+" — "+ereignisText
           +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
-          duettBig,undefined,undefined,undefined,undefined,
+          !!duettBig,undefined,
+          // STURZ statt PATZER (C3): nur ein deutlich verpatzter SPRUNG ist ein Sturz --
+          // dieselbe Unterscheidung wie `ereignisText` oben ("unterdreht" ist keiner).
+          duettBig==="patzer"&&element.typ==="sprung"&&!r.knapp?"sturz":duettBig,
+          undefined,undefined,
           r.ereignis===bb.erfolgWort?"routine":undefined);
       } else {
         // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
@@ -17333,7 +17513,7 @@
         // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
         const wettBig=buehneAuftrittBig(u,r,vorherSumme);
         if(wettBig){
-          feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true);
+          feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
         } else {
           wettBuendel.push({u,r});
         }
@@ -19320,7 +19500,7 @@
       buehneEndeGemeldet=true;
       const sieger=buehneSieger(), stand=buehneStand();
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
-        +stand.text+".",true);
+        +stand.text+".",true,undefined,"endstand");
       renderEndstandBuehne();
     }
   }
@@ -22667,7 +22847,7 @@
                 showcaseGoldVergeben=true;
                 u.vizGoldBuzzer=true; u.vizGoldBuzzerSeit=buehneT;
                 sfx("showcase","goldbuzzer");
-                feed(u.side,"GOLDENER BUZZER — "+u.n+"!",true);
+                feed(u.side,"GOLDENER BUZZER — "+u.n+"!",true,undefined,"goldenerBuzzer");
               }
             }
           }
@@ -25036,9 +25216,18 @@
     // Bei art.rundenN=8 erreicht ein Kampf, der laenger als acht eigene Zuege dauert, damit
     // wieder den Hammer (statt schon beim ersten Anschlag des naechsten Kampfes dort zu
     // kleben) -- exakt dieselbe Skalierung wie zuvor, nur pro Kampf statt pro Karriere.
-    const stufe=paar&&paar.ertraeger
-      ?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0;
+    // B1/B5 (Fable 30.09., Paket 3): die ANZEIGE liest jetzt dieselbe Stufe, die der Zug
+    // tatsaechlich BENUTZT hat (`r.stufe`, von baueGauntlet() je Runde mitgefuehrt, s.
+    // Kommentar dort) -- vorher rechnete die Anzeige `folterStufe(gauntletZugImBout(...))`
+    // unabhaengig neu und haette eine B5-Provokation (die das Geraet einen Zug frueher
+    // wechseln laesst) nicht gezeigt. Vor der allerersten Enthuellung (noch keine Runde
+    // gezogen) faellt die Anzeige auf die alte Herleitung zurueck, exakt wie zuvor.
+    const ertragerZugFolter=paar&&paar.ertraeger?gauntletZugJetzt(paar.ertraeger):null;
+    const stufe=ertragerZugFolter&&ertragerZugFolter.stufe!=null?ertragerZugFolter.stufe
+      :(paar&&paar.ertraeger?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0);
     const geraet=FOLTER_GERAETE[stufe];
+    const folterFarbe=FOLTER_FAMILIE_FARBE[geraet.familie]||"#f2d75a";
+    const geraetProvoziert=!!(ertragerZugFolter&&ertragerZugFolter.provoziert);
     const tischB=Math.min(W*0.84,920), tischX=cx-tischB/2, tischY=H-24;
     const fachB=tischB/FOLTER_GERAETE.length;
     ctx.fillStyle="#2c2129"; ctx.fillRect(tischX,tischY,tischB,9);
@@ -25080,10 +25269,20 @@
       ctx.restore();
     }
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.font="800 10px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+    // B1 (Paket 3): der Geraetename traegt jetzt die FAMILIENFARBE statt des einheitlichen
+    // Golds (ZERMUERBUNG blau, HIEB orange, WUCHT rot, s. FOLTER_FAMILIE_FARBE oben) -- "man
+    // soll sehen, welcher Kanal hier gerade geprueft wird", ohne eine Zahl lesen zu muessen.
+    ctx.font="800 10px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=folterFarbe;
     ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length+"  ·  QUAL "+qualAnzeige(QUAL_ZAHLEN[stufe]),cx,tischY-30);
     ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(214,170,255,.6)";
     ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
+    // B5 (Paket 3): "gib mir die Saege" -- sichtbarer Hinweis, dass der Ertragende selbst zu
+    // diesem haerteren Geraet provoziert hat (hohes WAGNIS), statt dass die Leiter von allein
+    // dorthin gelangt waere.
+    if(geraetProvoziert){
+      ctx.font="800 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#ff9a4a";
+      ctx.textAlign="right"; ctx.fillText("PROVOZIERT",tischX+tischB,tischY-30);
+    }
 
     // ---------- RANG 2: die beiden, um die es gerade geht ----------
     const ertraeger=paar?paar.ertraeger:null, peiniger=paar?paar.peiniger:null;
@@ -25448,6 +25647,22 @@
       };
       zeichneHpBalken(stehend[0],true);
       zeichneHpBalken(stehend[1],false);
+      // B2 (Fable 30.09., Paket 3): "der Peiniger wirkt" -- die tatsaechliche Schadenszahl
+      // dieses Zuges wird jetzt sichtbar, GROSS und rot bei einem harten Peiniger (`schaden`
+      // deutlich ueber dem alten Festwert, s. gauntletSchadenFaktor() oben). Vorher liess sich
+      // nur aus der Balkenbreite erahnen, wie viel HP gerade verloren ging; jetzt steht die
+      // Zahl daneben, auf der Seite des Ertragenden. `ertragerZugFolter` ist derselbe,
+      // reveal-gegatete Zug, den auch die Folterbank oben liest.
+      if(ertragerZugFolter&&ertragerZugFolter.schaden!=null&&paar&&paar.ertraeger){
+        const seite=paar.ertraeger.side;
+        const basisSchaden=ertragerZugFolter.ereignis===art.erfolgWort?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL;
+        const hart=ertragerZugFolter.schaden>basisSchaden*1.08;
+        const bx0=seite===0?16:W-16-balkenB;
+        ctx.font=(hart?"800 11px":"700 9px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.fillStyle=hart?"#ff5a4a":"#eef3fa";
+        ctx.textAlign=seite===0?"left":"right"; ctx.textBaseline="alphabetic";
+        ctx.fillText("-"+ertragerZugFolter.schaden+" HP",seite===0?bx0:bx0+balkenB,balkenY+balkenH+11);
+      }
     }
 
     // TEAM-FEIER-EFFEKTE (Konzept team-publikum-feiermomente 3.2): NACH der Vignette (sonst
@@ -27284,7 +27499,7 @@
       // kurzen Sammel-Zeitversatz verzoegert.
       const x=buendel[0];
       feed(0,"Periode "+x.periode+" beendet — "+x.seite0.n+" gegen "+x.seite1.n+
-        ": Treffer "+x.seite0.treffer+":"+(x.seite1.treffer||0)+".",true);
+        ": Treffer "+x.seite0.treffer+":"+(x.seite1.treffer||0)+".",true,undefined,"zwischenstand");
     } else {
       // MEHRERE Bahnen im selben Fenster: EIN Sammelbanner statt N verlorener Einzelbanner
       // (Audit-Beispiel: "Periodenende: 3 Bahnen entschieden"), mit einer kurzen
@@ -27293,7 +27508,7 @@
       const kurz=buendel.map(x=>x.seite0.n.split(" ")[0]+" "+x.seite0.treffer+":"+(x.seite1.treffer||0)
         +" "+x.seite1.n.split(" ")[0]).join(", ");
       feed(0,(gleichePeriode?"Periode "+buendel[0].periode+" beendet":"Periodenende")
-        +" — "+buendel.length+" Bahnen entschieden: "+kurz+".",true);
+        +" — "+buendel.length+" Bahnen entschieden: "+kurz+".",true,undefined,"zwischenstand");
     }
   }
 
@@ -27319,7 +27534,12 @@
   // 3/K5) ist damit automatisch erfuellt: find() liefert je Prioritaetsstufe den ersten
   // (also fruehesten) Treffer. Reiner Leser von HIGHLIGHTS/kind, kein rr(), kein neuer
   // Zustand -- wird nur im Endstand aufgerufen (renderEndstand(), s.u.), nie im stummen Pfad.
+  // NUR IM KAMPF (C3, 01.10.): seit dem Highlight-Titel-Paket tragen auch Bahn/Buehne/
+  // Feldspiel ein `kind`, darunter dasselbe Wort "fuehrungswechsel". Ohne diese Schranke
+  // haette die Kampf-Prioritaet dort ploetzlich den FRUEHESTEN Fuehrungswechsel zur Szene
+  // gemacht statt -- wie bisher -- den letzten Wendepunkt (waehleSzeneDesSpielsGenerisch()).
   function waehleSzeneDesSpiels(){
+    if(!istKampf(disc))return null;
     for(const kind of KAMPF_KIND_PRIORITAET){
       const treffer=HIGHLIGHTS.find(h=>h.kind===kind);
       if(treffer)return treffer;
@@ -27359,7 +27579,17 @@
     // dieser Runde). Reines Anzeige-Etikett fuer HIGHLIGHTS/waehleSzeneDesSpiels() unten --
     // `big` selbst (ob ueberhaupt ein Banner/Highlight entsteht) bleibt unveraendert von
     // kampfGrossDrosseln() bestimmt.
-    const kind=kampfKoKind(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung);
+    //
+    // FIRST BLOOD ZUERST, WENN SONST NICHTS BESONDERES IST (C3, 01.10.): die erste
+    // Ausschaltung des Spiels ist per Definition IMMER auch ein Fuehrungswechsel (0:0 ->
+    // 1:0), kampfKoKind() reiht "fuehrungswechsel" aber vor "ersteAusschaltung" -- das
+    // Etikett "First Blood" konnte deshalb nie entstehen (Sichtpruefung 01.10.: der erste
+    // TDM-Callout hiess "FÜHRUNGSWECHSEL"). Mit dem Highlight-Titel ist das Etikett jetzt
+    // sichtbar, also gewinnt First Blood ueber den trivialen 0:0-Fuehrungswechsel;
+    // entscheidend/mehrfachkill (beim ersten Treffer praktisch nie) behalten Vorrang.
+    // Wirkt nur auf Anzeige-Etikett und Szene-Auswahl, `big` bleibt unberuehrt.
+    const kind=(ersteAusschaltung&&!entscheidend&&!mehrfachkill)?"ersteAusschaltung"
+      :kampfKoKind(entscheidend,mehrfachkill,fuehrungswechsel,ersteAusschaltung);
 
     if(disc==="tdm"){
       tg.downBis=t+TDM_RESPAWN_SEK;
@@ -27433,8 +27663,12 @@
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
-    feedRoutine(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
-      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false));
+    // KOMBINIERT (Merge #1093/#1095): kind="grosserTreffer" fuer den Highlight-Titel UND
+    // stufe="routine" fuer den Ticker/Protokoll-Filter -- feedRoutine() kennt keinen
+    // kind-Parameter, deshalb hier feed() direkt mit beiden Werten.
+    feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
+      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false),undefined,
+      "grosserTreffer",undefined,undefined,"routine");
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -27673,7 +27907,7 @@
         // -- die Drosselung nahm dort das einzige zweite Ereignis weg, ohne irgendwo eine
         // Flut zu verhindern, die es gar nicht gab. Deshalb bleibt diese Zeile UNVERAENDERT
         // gegenueber dem Ausgangs-PR: immer big, wie zuvor.
-        feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true);
+        feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true,undefined,"kontrollpunkt");
       }
     }
     // ziel===KP.besitz (der eigene Punkt wird gehalten), ziel===null (umkaempft oder leer):
@@ -28089,9 +28323,13 @@
         // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
         // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
         // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
-        feedRoutine(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
+        // feedRoutine() kennt keinen kind-Parameter (nur 3 Argumente) -- die zusaetzlichen
+        // Argumente wuerden beim Aufruf stillschweigend verworfen, genau wie bei nahschlag()
+        // oben dokumentiert. Deshalb hier feed() direkt mit kind UND stufe.
+        feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
-          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false));
+          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false),undefined,
+          "grosserTreffer",undefined,undefined,"routine");
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
@@ -29846,7 +30084,7 @@
           if(staffelFuehrendeSeite==null){ staffelFuehrendeSeite=d.seite; }
           else if(d.seite!==staffelFuehrendeSeite && (rennT-bahnFuehrenderSeit)>2){
             staffelFuehrendeSeite=d.seite; bahnFuehrenderSeit=rennT;
-            feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true);
+            feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true,undefined,"fuehrungswechsel");
           }
         }
         // ST-4: FUEHRUNGSVERLAUF (Abschnitt 4.3). Ein Punkt je Frame, exakt wie im Konzept
@@ -29914,7 +30152,7 @@
           if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
           else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
             bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
-            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true,undefined,"fuehrungswechsel");
           }
         }
         // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). Sobald (mindestens) ein Laeufer eine
@@ -29951,7 +30189,7 @@
             const diff=alt?bahnZeit(alt)-hs.zeit:null;
             bahnHotSeatId=hs.u.id;
             feed(hs.u.seite,hs.u.n+" verdrängt "+(alt?alt.n:"?")+" vom Hot Seat"+
-              (diff!=null&&diff>0?" — −"+fmtDauer(diff):"")+".",true);
+              (diff!=null&&diff>0?" — −"+fmtDauer(diff):"")+".",true,undefined,"hotSeat");
           }
         }
       } else {
@@ -29960,7 +30198,7 @@
           if(bahnFuehrenderId==null){ bahnFuehrenderId=fuehrer.id; }
           else if(fuehrer.id!==bahnFuehrenderId && (rennT-bahnFuehrenderSeit)>2){
             bahnFuehrenderId=fuehrer.id; bahnFuehrenderSeit=rennT;
-            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true);
+            feed(fuehrer.seite,fuehrer.n+" übernimmt die Führung.",true,undefined,"fuehrungswechsel");
           }
         }
       }
@@ -29995,7 +30233,7 @@
           u.vizZzFlash={ci,rang,neueBest,delta,bis:rennT+3/zeitFaktor()};
           feed(u.seite,u.n+" an ZZ"+(ci+1)+": "+(neueBest?"Bestzeit":(rang+"."))+
             (bestVorher!=null?" · "+(neueBest?"−":"+")+fmtDauer(Math.abs(delta)):""),
-            neueBest);
+            neueBest,undefined,"bestzeit");
         }
       });
     }
@@ -30056,7 +30294,7 @@
           +fmtSeite(pL)+":"+fmtSeite(pR)+" "+stand.suffix
         : "Rennen beendet — "+fmtSeite(pL)+":"+fmtSeite(pR)+" "+stand.suffix
           +" (für diese Disziplin gibt es noch keine Wertung)",true,
-        siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined);
+        siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined,"endstand");
       renderEndstandBahn();
     }
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
@@ -35163,7 +35401,7 @@
         // ohnehin schon kein `true` hier, dieser Vergleich ist neu). `bahnRangliste()` ist
         // dieselbe Rangliste, die HUD/Endstand lesen -- kein neuer Vergleich.
         feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.",
-          bahnRangliste().reihe[0]?.id===u.id);
+          bahnRangliste().reihe[0]?.id===u.id,undefined,"einbruch");
       }
       // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
       // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
@@ -35648,7 +35886,7 @@
             // nur der Callout wartet (s. feed()s sechster Parameter, nach K5s `kind`).
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.",true,
-              waehleCaption(CAPTION_AUSSCHEIDEN,u.n),undefined,400);
+              waehleCaption(CAPTION_AUSSCHEIDEN,u.n),"ausgeschieden",400);
             break;
           }
           // TON (Ziel 3, A4): Laeufer stuerzt (nicht ausgeschieden). Diese Zeile laeuft fuer
@@ -35669,7 +35907,7 @@
           // Bannerzeilen weiter unten/oben. Die Spurt-Wassergraben-Caption (anderes Chassis,
           // eigene, deutlich seltenere Bedingung) bleibt unveraendert.
           if(A.spurt && (A.hindernisBilder||[])[meldeStation]==="wasser"){
-            callout(u.n+" stolpert!",waehleCaption(CAPTION_STURZ_WASSER,u.n));
+            callout(u.n+" stolpert!",waehleCaption(CAPTION_STURZ_WASSER,u.n),highlightTitel("sturz"));
           }
           // Die Gegenzeile zur Glanzzeile oben: er liegt an genau der Falle, die seine
           // schwaechste Seite abfragt. Ersetzt die Standardzeile, statt sie zu verdoppeln.
@@ -35798,7 +36036,7 @@
               // Fuehrungswechsel, also nicht mehr big. Spurt (deutlich seltener, "selten genug"
               // trifft dort weiter zu) bleibt unveraendert.
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
-                                                :" räumt "+o.n+" von der Bahn."),!TA.takeshi);
+                                                :" räumt "+o.n+" von der Bahn."),!TA.takeshi,undefined,"rempler");
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
               feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
@@ -35890,7 +36128,7 @@
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): eine verpatzte
             // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
             // selten (nur bei `patzer`) und sofort verstaendlich.
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true);
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
           } else {
             schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feedEreignis(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
@@ -35910,7 +36148,7 @@
           // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): der erste
           // Zieleinlauf einer Seite ist bei der Staffel ein EINMALIGES Ereignis (die
           // Mannschaft ist im Ziel, nicht ein Einzelner) -- immer big.
-          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".",true);
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".",true,undefined,"zieleinlauf");
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
@@ -35928,8 +36166,12 @@
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
             // drei Ziel-Plaetze sind big -- sonst wird der Zieleinlauf wieder ein Protokoll
             // (Doc-Vorgabe Abschnitt 4.3.1: "Einzel: nur Platz 1-3").
-            feedEreignis(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
-              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3);
+            // KOMBINIERT (Merge #1093/#1095): kind="zieleinlauf" fuer den Highlight-Titel UND
+            // stufe="ereignis" (wie feedEreignis()) fuer den Ticker/Protokoll-Filter --
+            // feedEreignis() kennt keinen kind-Parameter, deshalb hier feed() direkt.
+            feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3,undefined,
+              "zieleinlauf",undefined,undefined,"ereignis");
           } else {
             // ZEITSKALA-FIX (Chris' Fund 22.09., zwei Screenshots desselben Rennens: Ticker
             // "14,8 s.", Endstand "2:22,4 min." fuer denselben Laeufer). Der Ticker schrieb
@@ -35955,8 +36197,10 @@
             // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
             // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
             const zielPlatz=rennFertig.filter(x=>!x.raus).length;
-            feedEreignis(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
-              zielPlatz<=3);
+            // KOMBINIERT (Merge #1093/#1095): kind="zieleinlauf" UND stufe="ereignis", s.
+            // Kommentar am startAbstand-Zweig oben.
+            feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
+              zielPlatz<=3,undefined,"zieleinlauf",undefined,undefined,"ereignis");
           }
         }
       }
@@ -37624,22 +37868,36 @@
     // urspruenglichen #bbug/#bbugcallout-Overlap oben, nur fuer ein zweites Kopf-Overlay.
     // [hidden] fuer jede Buehne ausser I-Spy (s. aktualisiereIspyHud()), also ohne
     // Wirkung auf jede andere Disziplin.
-    const ispyUhr=document.getElementById("ispyZugUhr");
-    if(ispyUhr&&!ispyUhr.hidden){
-      const ispyUnten=ispyUhr.getBoundingClientRect().bottom;
-      unten=unten==null?ispyUnten:Math.max(unten,ispyUnten);
+    // #bahnHud (Fable-Randnotiz 30.09., Abschnitt 6 Punkt 1, behoben 01.10.): dieselbe
+    // Kopfzone (top:15%) traegt bei der Staffel das Broadcast-HUD mit dem Delta-Feld -- das
+    // Callout ("... übernimmt die Führung.") lag genau darueber. Dritte Bezugskante nach
+    // demselben Muster; die tiefste sichtbare Unterkante gewinnt (Math.max). Ein
+    // Element ohne Hoehe (per CSS weggeblendet) zaehlt nicht mit.
+    for(const id of ["ispyZugUhr","bahnHud"]){
+      const ref=document.getElementById(id);
+      if(!ref||ref.hidden)continue;
+      const r=ref.getBoundingClientRect();
+      if(!r.height)continue;
+      unten=unten==null?r.bottom:Math.max(unten,r.bottom);
     }
     if(unten==null){ banner.style.top=""; return; }
     const bezugOben=bezug.getBoundingClientRect().top;
     const abstand=8;
     banner.style.top=Math.max(0,unten-bezugOben+abstand)+"px";
   }
-  function callout(txt,caption){
+  // TITEL (C3, 01.10., s. HIGHLIGHT_TITEL): optionaler dritter Parameter. Mit Titel steht
+  // das Titelwort gross oben (.cotitel, dieselbe Schrift/Grossschreibung wie .esieger), der
+  // bisherige Satz rutscht als Caption darunter (.cosatz), die Kommentar-Caption (`em`)
+  // bleibt die dritte, kleinste Zeile. Ohne Titel exakt das alte Bild.
+  function callout(txt,caption,titel){
     if(stumm)return;
     const banner=document.getElementById("bbugcallout");
     if(!banner)return;
     banner.textContent="";
-    banner.appendChild(document.createTextNode(txt));
+    if(titel){
+      banner.appendChild(el("span","cotitel",titel));
+      banner.appendChild(el("span","cosatz",satzOhneTitel(txt,titel)));
+    } else banner.appendChild(document.createTextNode(txt));
     if(caption){
       const em=document.createElement("em");
       em.textContent=caption;
@@ -37708,14 +37966,85 @@
     (s)=>"Platsch — "+s+" landet im Wasser.",
   ];
 
-  // BESCHRIFTUNG JE MOMENTART (K5 Stufe 1) fuer renderSzeneDesSpiels() unten -- dieselben
-  // vier Kinds wie KAMPF_KIND_PRIORITAET/kampfKoKind bei kampfGrossDrosseln().
-  const KAMPF_KIND_LABEL={
-    entscheidend:"Spielentscheidend",
-    mehrfachkill:"Mehrfachausschaltung",
-    fuehrungswechsel:"Führungswechsel",
-    ersteAusschaltung:"First Blood",
+  // HIGHLIGHT-TITEL JE MOMENTART (C3, docs/design/fable-ideen-broadcast-praesentation-30-09.md
+  // Abschnitt 4/C3, 01.10.): ein big-Ereignis trug bisher nur seinen Ticker-Satz ("Johanna
+  // trifft Greenkraut · 9") -- Play-by-Play, kein Titel. Jetzt setzt JEDE big-Aufrufstelle
+  // aller vier Chassis feed()s fuenftes Argument `kind` (vorher nur der Kampf, s.
+  // kampfKoKind()), und diese Tabelle bildet es auf das Wort ab, das ein Sender einblendet:
+  // gross im Callout (#bbugcallout, der Satz wandert als Caption darunter), als Kicker vor
+  // dem Zeitstempel jedes Endstand-Chips und als Etikett der "Szene des Spiels". Ersetzt
+  // KAMPF_KIND_LABEL (dieselben vier Kampf-Momentarten, jetzt in Grossbuchstaben wie jede
+  // andere Zeile). Reine Beschriftung: `kind` entscheidet NICHT, ob ein Ereignis big ist
+  // (das bleibt allein beim jeweiligen Aufrufer und seinen Drosseln), es wird nur gelesen,
+  // wenn feed() ohnehin schon den Banner zeigt -- im stummen Messpfad nie (feed() kehrt dort
+  // in seiner ersten Zeile zurueck). Ein `kind` ohne Eintrag hier (oder gar keins) faellt
+  // still auf das alte Bild zurueck: Satz allein, kein Titel.
+  const HIGHLIGHT_TITEL={
+    // KAMPF (tdm, mini-dm, battlefield)
+    ersteAusschaltung:"FIRST BLOOD",
+    fuehrungswechsel:"FÜHRUNGSWECHSEL",
+    mehrfachkill:"MEHRFACHAUSSCHALTUNG",
+    entscheidend:"SPIELENTSCHEIDEND",
+    grosserTreffer:"GROSSER TREFFER",
+    kontrollpunkt:"KONTROLLPUNKT",
+    zielansage:"ZIELANSAGE",
+    // FELDSPIEL (basketball, hockey, football)
+    tor:"TOR",
+    dreier:"DREIER",
+    dunk:"DUNK",
+    spielzug:"SPIELZUG",
+    korb:"KORB",
+    lauf:"LAUF",
+    laufGestoppt:"LAUF GESTOPPT",
+    undEins:"UND EINS",
+    torwartRaus:"TORWART RAUS",
+    touchdown:"TOUCHDOWN",
+    fieldGoal:"FIELD GOAL",
+    sack:"SACK",
+    fumble:"FUMBLE",
+    interception:"INTERCEPTION",
+    // BAHN (spurt, time-trial, climbing, staffel, takeshis-castle)
+    zieleinlauf:"ZIELEINLAUF",
+    uebergabeVerpatzt:"ÜBERGABE VERPATZT",
+    sturz:"STURZ",
+    einbruch:"EINBRUCH",
+    ausgeschieden:"AUSGESCHIEDEN",
+    rempler:"REMPLER",
+    bestzeit:"BESTZEIT",
+    hotSeat:"HOT SEAT",
+    // BUEHNE (gewichtheben, showcase, eiskunstlauf, breaking, wettessen, speed-schach,
+    // i-spy, tennis, fechten)
+    gebrochen:"GEBROCHEN",
+    angeschlagen:"ANGESCHLAGEN",
+    tresor:"TRESOR",
+    kippZug:"KIPP-ZUG",
+    entschieden:"ENTSCHIEDEN",
+    remis:"REMIS",
+    goldenerBuzzer:"GOLDENER BUZZER",
+    patzer:"PATZER",
+    bestmarke:"BESTMARKE",
+    letzterVersuch:"LETZTER VERSUCH",
+    kuehnerVersuch:"KÜHNER VERSUCH",
+    punktesieg:"PUNKTESIEG",
+    verletzt:"VERLETZT",
+    knappVorbei:"KNAPP VORBEI",
+    zweikampf:"ZWEIKAMPF",
+    nullwertung:"NULLWERTUNG",
+    // CHASSIS-UEBERGREIFEND
+    zwischenstand:"ZWISCHENSTAND",
+    endstand:"ENDSTAND",
   };
+  const highlightTitel=(kind)=>(kind&&HIGHLIGHT_TITEL[kind])||null;
+  // DOPPELUNG VERMEIDEN: einige Ticker-Saetze beginnen schon mit genau dem Titelwort
+  // ("GOLDENER BUZZER — Name!", "Torwart raus! ...", "Zielansage: alles auf ..."). Unter dem
+  // grossen Titel stuende das Wort dann zweimal uebereinander -- fuer Callout/Chip/Szene wird
+  // es deshalb abgeschnitten, aber NUR, wenn ein echtes Trennzeichen folgt ("Field Goal von
+  // 42 Yards" bleibt ganz). Der Ticker (#feed) selbst zeigt weiter den vollen Satz.
+  function satzOhneTitel(txt,titel){
+    if(!titel||txt.slice(0,titel.length).toUpperCase()!==titel)return txt;
+    const m=txt.slice(titel.length).match(/^(?:[!:.]\s+|\s+—\s+)/);
+    return m?txt.slice(titel.length+m[0].length):txt;
+  }
 
   // TK-4: der Callout soll "0,4 s NACH dem Schwebetext 'ausgeschieden' erscheinen, nicht
   // gleichzeitig" (die Pointe folgt dem Platscher, wie bei Craig Charles) -- ein optionaler
@@ -37861,13 +38190,17 @@
     if(big){
       // KIND (K5, Broadcast-Optik-Recherche 27.09., Abschnitt 3/K5 Stufe 1): welche
       // Momentart dieses Ereignis traegt -- nur ein optionales Anzeige-Etikett fuer
-      // waehleSzeneDesSpiels() (s.u.), kein Einfluss auf big/HIGHLIGHTS-Aufnahme selbst
-      // (die entscheidet ausschliesslich kampfGrossDrosseln() beim Aufrufer). Jeder
-      // andere feed()-Aufruf (Bahn/Feldspiel/Buehne) laesst kind einfach weg -- die
-      // Szene-Auswahl findet dort dann nichts und bleibt leer.
+      // waehleSzeneDesSpiels() (s.u.) und den Highlight-Titel (C3), kein Einfluss auf
+      // big/HIGHLIGHTS-Aufnahme selbst (die entscheidet ausschliesslich der Aufrufer und
+      // seine Drossel). waehleSzeneDesSpiels() wertet `kind` nur im Kampf aus (s. dort).
+      // C3 (01.10.): `kind` ist seit dem Highlight-Titel-Paket an JEDER big-Aufrufstelle
+      // aller vier Chassis gesetzt (s. HIGHLIGHT_TITEL oben) -- der Banner bekommt daraus
+      // seinen grossen Titel, die HIGHLIGHTS-Buchung traegt `kind` unveraendert weiter
+      // (renderHighlights()/renderSzeneDesSpiels() lesen den Titel erst beim Endstand nach).
       HIGHLIGHTS.push({side,txt,t:anzeigeT,kind,akteur});
-      if(verzoegerungMs)setTimeout(()=>callout(txt,caption),verzoegerungMs);
-      else callout(txt,caption);
+      const titel=highlightTitel(kind);
+      if(verzoegerungMs)setTimeout(()=>callout(txt,caption,titel),verzoegerungMs);
+      else callout(txt,caption,titel);
     }
   }
 
@@ -37886,7 +38219,7 @@
         :(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)
           ?"— Kontrollpunkt-Punktelimit erreicht ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")"
           :"— nach Zeitablauf mehr Kontrollpunkt-Punkte ("+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])+")";
-      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true);
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+grund,true,undefined,"endstand");
       // OFF-BY-ONE-FIX (Messmethoden-Review, 27.09.): renderEndstand()/renderHighlights()
       // oben hat den #ehighlights-Snapshot schon VOR dieser Sieg-Zeile gebaut, die per
       // feed(...,true) immer ungedrosselt (big=true) durchlaeuft. Die Sieg-Zeile landet
@@ -37909,7 +38242,7 @@
       const scoreL=U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0);
       const scoreR=U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0);
       const sieger=kampfSieger();
-      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true);
+      feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+scoreL+":"+scoreR+" Ausschaltungen",true,undefined,"endstand");
       // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Sieg-Zeile-fehlt-
       // im-Snapshot-Luecke, hier fuer TDM.
       renderHighlights();
@@ -37919,7 +38252,7 @@
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
     const sieger=kampfSieger();
-    feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true,undefined,"endstand");
     // OFF-BY-ONE-FIX (s. Kommentar im Domination-Zweig oben): dieselbe Luecke fuer den
     // generischen Elimination-Zweig (Battlefield ohne Kontrollpunkte, u.a.).
     renderHighlights();
@@ -39142,7 +39475,7 @@
     // eigener Farbe und Groesse — der Moment des Markierens ist der einzige, in dem die
     // Ansage ein Ereignis ist; danach ist sie ein Zustand (Ring, Linien, Zeile).
     schwebe({x:z.x,y:z.y-58,txt:"FOKUSFEUER!",life:1.7,ansage:true});
-    feed(0,"Zielansage: alles auf "+z.n+"!",true);
+    feed(0,"Zielansage: alles auf "+z.n+"!",true,undefined,"zielansage");
     renderKader();
   }
   // Die Zeile unter der Kaderleiste. Sagt in Worten, was Ring und Linien auf der Leinwand
@@ -39719,9 +40052,13 @@
     box.hidden=false; box.textContent="";
     box.appendChild(el("h5",null,"Szene des Spiels"));
     const zeile=el("div","ehzeile "+(szene.side===0?"h":"a"));
-    const label=KAMPF_KIND_LABEL[szene.kind]||"";
-    if(label)zeile.appendChild(el("span","eht",label));
-    zeile.appendChild(el("span",null,szene.akteur?szene.akteur+" — "+szene.txt:szene.txt));
+    // C3 (01.10.): Etikett aus HIGHLIGHT_TITEL statt KAMPF_KIND_LABEL -- dieselben vier
+    // Kampf-Momentarten wie bisher, jetzt aber auch fuer Bahn/Buehne/Feldspiel, deren
+    // generisch gewaehlte Szene seit C3 ebenfalls ein `kind` traegt.
+    const titel=highlightTitel(szene.kind);
+    if(titel)zeile.appendChild(el("span","eht ehkick",titel));
+    const satz=satzOhneTitel(szene.txt,titel);
+    zeile.appendChild(el("span",null,szene.akteur?szene.akteur+" — "+satz:satz));
     box.appendChild(zeile);
   }
 
@@ -39852,10 +40189,15 @@
     box.appendChild(el("h5",null,"Höhepunkte"));
     const liste=el("div","ehlist");
     for(const h of sichtbar){
-      const zeile=el("div","ehzeile "+(h.side===0?"h":"a"));
+      // C3 (01.10.): der Highlight-Titel steht als Kicker VOR dem Zeitstempel ("TOR · 1:42 ·
+      // Cassandra trifft ..."), der Satz verliert dabei ein doppeltes Titelwort am Anfang
+      // (satzOhneTitel()). Ohne `kind` bleibt der Chip wie bisher.
+      const titel=highlightTitel(h.kind);
+      const zeile=el("div","ehzeile "+(h.side===0?"h":"a")+(titel?" mitkick":""));
+      if(titel)zeile.appendChild(el("span","ehkick",titel));
       zeile.appendChild(el("span","eht",
         Math.floor(h.t/60)+":"+String(Math.floor(h.t%60)).padStart(2,"0")));
-      zeile.appendChild(el("span",null,h.txt));
+      zeile.appendChild(el("span",null,satzOhneTitel(h.txt,titel)));
       liste.appendChild(zeile);
     }
     box.appendChild(liste);
@@ -42552,6 +42894,17 @@
     // ueber jede Sample-Reihe nie > 1 sein. Reines Lesen, kein Einfluss auf die Simulation.
     cypherVizProbe:()=>TEILNEHMER.map(u=>({id:u.id,n:u.n,phase:u.vizPhase,
       r:Math.round(u.vizR),a:Math.round((u.vizA||0)*100)/100,summe:u.summe,aktuell:u.aktuell})),
+    // GAUNTLET-ZUG-PROBE (B1/B2/B4/B5, Fable 30.09., Paket 3): rein diagnostisch, wie
+    // cypherVizProbe direkt darueber -- liest `stufe`/`familie`/`provoziert`/`schaden` der
+    // komplett vorberechneten Runden aller Breaking-Teilnehmer von aussen (Playwright, ohne
+    // UI), damit sich die neuen Felder nachweisen lassen, ohne den Canvas-Text zu parsen.
+    // Reines Lesen aus bereits von baueGauntlet() vorberechneten Daten, kein Einfluss auf
+    // die Simulation.
+    gauntletZugProbe:()=>TEILNEHMER.filter(u=>u.runden&&u.runden.length).map(u=>({
+      n:u.n,bout:u.bout,aktuell:u.aktuell,zuege:u.runden.length,
+      stufen:u.runden.map(r=>r.stufe),familien:u.runden.map(r=>r.familie),
+      provoziertAnzahl:u.runden.filter(r=>r.provoziert).length,
+      schadenReihe:u.runden.map(r=>r.schaden)})),
     // STAFFEL-VIZ-PROBE (Ziel 6, Opus-Plan Abschnitt 5.2/6): rein diagnostisch, wie
     // cypherVizProbe direkt oberhalb — liest die stepStaffel()-eigenen viz*-Felder aller
     // LAEUFER von aussen. `vizInitDoneGesetzt:false` bei EINEM Laeufer beweist bereits, dass
