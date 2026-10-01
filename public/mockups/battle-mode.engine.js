@@ -14089,13 +14089,60 @@
       // Nullwertungen stiegen 3,1 -> 4,2 %, und rho (gesamt, jeSeite 6) sank leicht von
       // 0,800 auf 0,789 — eine Verbesserung bei Pp, aber eine Verschlechterung bei
       // Korridor UND Rangtreue. Nicht eingebaut (CLAUDE.md-Grundsatz: keine Aenderung,
-      // die etwas vorher Gutes schlechter macht). Der Rezept-Split bleibt darum wie von
-      // Fable entworfen; die Kalibrierung unten wirkt nur ueber die Koeffizienten.
+      // die etwas vorher Gutes schlechter macht). Der Rezept-Split blieb danach wie von
+      // Fable entworfen, bis zur Kalibrierrunde unten.
+      //
+      // KALIBRIERRUNDE 01.10. (docs/design/gewichtheben-pp-regression-befund-01-10.md,
+      // docs/design/gewichtheben-kalibrierung-ansage-kanal-01-10.md): die Pp-Pflichtpruefung
+      // bei korrektem n=48 ueber fuenf unabhaengige Saatstroeme lag im Mittel bei 24,9 Pp,
+      // auf der Schranke statt sicher darunter (zwei von fuenf Stroemen ueber 25). Das
+      // Abweichungsmuster war in JEDEM der fuenf Stroeme identisch: speed (Matrixgewicht nur
+      // 6) trug durchgehend 11-12 % statt 6 % bei (+5 bis +6,3 Pp), power und charisma lasen
+      // ebenfalls durchgehend ueber ihrem Gewicht, dexterity/will/health durchgehend darunter.
+      //
+      // DIAGNOSE: ANSAGE ist kein Sub-Skill wie die anderen vier, sondern ein Kanal mit
+      // SECHS getrennten Hebeln auf das Endergebnis -- HEBEN_TAGESMAX_ANSAGE_K (skaliert die
+      // Tagesmax-DECKE selbst, nicht nur eine Erfolgschance), HEBEN_ANSAGE_EROEFFNUNG (die
+      // Eroeffnungshoehe), HEBEN_WAGNIS_ANSAGE_FLEX (dehnt den Risiko-Massstab GLEICH ZWEIMAL,
+      // in mutDeckel UND in risikoMax), HEBEN_ANSAGE_SPRUNG (die Sprunggroesse) und
+      // HEBEN_WAGNIS_ANSAGE_K (der kuehne-Versuch-Kilo-Bonus). TECHNIK/NERVEN/ERHOLUNG haben
+      // dagegen je nur EINEN Hebel: eine kleine additive Verschiebung auf eine einzelne
+      // Erfolgschance. ANSAGE ist dadurch der mit Abstand staerkste Kanal -- und seine alte
+      // Besetzung (charisma 60/power 15/speed 25) legte diesen gesamten Hebel exakt auf die
+      // drei Attribute, die SCHON ANDERSWO einen starken Kanal hatten (power in LAST, der
+      // direkten Tagesmax-Basis; charisma in NERVEN) oder gar keinen eigenen brauchten (speed
+      // war ohnehin schon in TECHNIK vertreten) -- waehrend dexterity/will/health, die drei
+      // unterrepraesentierten Attribute, in ANSAGE ueberhaupt nicht vorkamen.
+      //
+      // FIX: speed komplett aus ANSAGE entfernt (sein Gewicht dort war der groesste
+      // Einzeltreiber der Abweichung) und in TECHNIK verdoppelt, wo derselbe Anteil nur
+      // ueber den schwachen Einzelhebel wirkt, statt ueber sechs starke. ANSAGE bekam im
+      // Gegenzug eine kleine, verteilte Beimischung aus genau den drei unterrepraesentierten
+      // Attributen (will/dexterity/health) plus einen Rest-speed, bei gleichzeitig
+      // reduziertem power-Anteil (15->8, power bleibt der mit Abstand groesste Posten in
+      // LAST) -- NICHT durch Entfernen von power/charisma aus ANSAGE (das war der oben
+      // verworfene Versuch), sondern durch Umschichtung innerhalb des Kanals. Reine
+      // Rezept-Prozente, keine der sechs ANSAGE-Konstanten oder sonst eine Koeffiziente
+      // angefasst -- die Erfolgskurven, Deckel und Zuschlaege bleiben Zeichen fuer Zeichen,
+      // wie sie waren, nur WELCHE Attribute ueber ANSAGE hineinwirken, hat sich verschoben.
+      //
+      // NACHGEMESSEN, fuenf unabhaengige Saatstroeme bei n=48 (vorher 21,4/27,5/26,6/24,5/
+      // 24,7, Mittel 24,9): 8,5/10,0/11,4/10,1/7,9 Pp, Mittel 9,6 -- jeder einzelne Strom
+      // klar unter der Schranke, keiner mehr auch nur in ihrer Naehe. rho (kaderfamilienfest,
+      // 24 Spiele) stieg dabei von 0,849 auf 0,865 (Median je Spiel) und die Spannweite ueber
+      // die Kaderfamilie schrumpfte von 0,228 auf 0,143 -- die Aenderung hat also nicht nur
+      // Pp verbessert, sondern auch die Rangtreue stabiler gemacht, nicht schlechter.
+      // Korridor (scripts/miss-gewichtheben-korridor.mjs, 200 Spiele) VOR/NACH im direkten
+      // Vorher-Nachher-Vergleich auf demselben Lauf praktisch unveraendert: Reissen
+      // 85,6/79,7/61,5 -> 85,8/79,9/61,8 %, Stossen 87,3/76,5/60,9 -> 87,7/76,0/61,5 %,
+      // Nullwertungen 1,8 -> 1,8 %, Reissen-Anteil 46,7 -> 46,8 % (alle vier Werte weiterhin
+      // im Zielkorridor) -- anders als beim oben verworfenen Versuch wird hier nichts
+      // vorher Gutes schlechter.
       rezept:{
         LAST:     {power:60,health:25,determination:15},
-        TECHNIK:  {dexterity:45,speed:30,determination:20,power:5},
+        TECHNIK:  {dexterity:45,speed:70,determination:20,power:5},
         NERVEN:   {charisma:35,will:35,determination:20,health:10},
-        ANSAGE:   {charisma:60,power:15,speed:25},
+        ANSAGE:   {charisma:53,power:8,will:13,dexterity:9,health:10,speed:7},
         ERHOLUNG: {stamina:40,health:35,will:25}
       }
     },
