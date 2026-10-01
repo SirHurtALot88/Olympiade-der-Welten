@@ -907,6 +907,17 @@
   .oly-battle-arena.oly-battle-arena .bbugcallout em{display:block;font-style:normal;
     font-size:.78em;font-weight:500;color:#c3ccd8;letter-spacing:0;margin-top:2px;
     text-transform:none}
+  /* HIGHLIGHT-TITEL (C3, Fable-Ideen Broadcast-Praesentation 30.09., umgesetzt 01.10.): ein
+     big-Ereignis mit `kind` zeigt oben das Titelwort gross -- dieselbe Schrift, dasselbe
+     Gewicht und dieselbe Grossschreibung wie .esieger im Endstand, in --warn wie der
+     Callout-Rahmen --, darunter den bisherigen Ticker-Satz als Caption (.cosatz). Die
+     Kommentar-Caption (em) bleibt die dritte, kleinste Zeile. Ohne `kind` rendert
+     callout() keinen der beiden Spans, das alte Bild bleibt unveraendert. */
+  .oly-battle-arena.oly-battle-arena .bbugcallout .cotitel{display:block;
+    font:700 clamp(17px,2.7vw,28px)/1.1 "RaniraSeason",Georgia,"Times New Roman",serif;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .bbugcallout .cosatz{display:block;font-size:.88em;
+    font-weight:600;margin-top:3px;letter-spacing:.01em}
 
   /* SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09.): dieselbe Zeilen-Optik
      wie .ehighlights direkt darunter, aber als eigene, hervorgehobene Karte (--warn-Rahmen,
@@ -944,6 +955,18 @@
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h .eht{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a{border-color:color-mix(in srgb,var(--away) 45%,var(--line-soft))}
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a .eht{color:var(--away)}
+  /* KICKER VOR DEM ZEITSTEMPEL (C3, 01.10.): der Highlight-Titel des Chips, klein, fett,
+     gesperrt und in der Seitenfarbe -- dieselbe Kicker-Typografie wie .kicker oben, nur
+     fett. .mitkick gibt dem Chip links Luft, weil dort jetzt Text statt der runden
+     Zeitstempel-Pille am Rand sitzt. In der Szene des Spiels traegt das Etikett (.eht)
+     dieselbe Klasse und damit dieselbe Lesart. */
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.mitkick{padding-left:11px}
+  .oly-battle-arena.oly-battle-arena .ehkick{flex:none;font-weight:700;font-size:9.5px;
+    letter-spacing:.12em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h .ehkick{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a .ehkick{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht.ehkick{color:var(--warn);min-width:0;
+    font-size:10.5px}
   .oly-battle-arena.oly-battle-arena .ehzeile{display:flex;gap:9px}
   .oly-battle-arena.oly-battle-arena .ehzeile .eht{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .ehzeile.h{color:var(--home)}
