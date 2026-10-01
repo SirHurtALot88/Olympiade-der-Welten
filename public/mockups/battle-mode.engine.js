@@ -13928,32 +13928,49 @@
   // woertlich Chris' eigene Beispiele (Saege, grosser Hammer). Rein praesentational: keine
   // dieser Zahlen fliesst in rezept/wert()/punkte ein.
   const FOLTER_HOLZ="#6b4a2e", FOLTER_METALL="#aab4c4", FOLTER_GLUT="#ff6a2a";
+  // DREI FAMILIEN (B1, Fable-Ideendokument 30.09., docs/design/
+  // fable-ideen-heben-breaking-climbing-30-09.md Abschnitt 3, Paket 3): jedes Geraet gehoert
+  // zu einer von drei Familien, die seit dieser Runde zusaetzlich bestimmt, WELCHER Kanal des
+  // Ertragenden geprueft wird (s. gauntletRunde() unten) -- dasselbe hindernisTypen/
+  // fallenKoennen-Prinzip, das Takeshi und Climbing schon fahren, nur erstmals auf der
+  // Buehne. ZERMUERBUNG (langsam, anhaltend) prueft NERVEN, HIEB (kurz, scharf) prueft
+  // TECHNIK, WUCHT (koerperlich, brechend) prueft SPITZENMOMENT -- die drei Kanaele, die das
+  // Breaking-Rezept oben ohnehin schon fuehrt, kein neuer Kanal, keine Matrixaenderung.
+  // `farbe` ist rein optisch (Tischbeschriftung/Ticker, s. zeichneBreaking()).
+  //
+  // NACHJUSTIERT (erster Messdurchgang): BRANDEISEN urspruenglich bei Wucht (4 Geraete),
+  // nach dem power-Ueberschwung (s. GAUNTLET_FAMILIE_GEWICHT-Kommentar bei gauntletRunde())
+  // zu Hieb verschoben -- WUCHT jetzt 3 Geraete (Keil/Saege/Vorschlaghammer), HIEB 4
+  // (Rute/Peitsche/Brandeisen/Nagelkeule), ZERMUERBUNG weiter 3 (Strick/Daumenschraube/
+  // Zange). Thematisch passt der kurze, scharfe Schmerz des Brandeisens ohnehin eher zu
+  // HIEB als zur langsam brechenden WUCHT.
+  const FOLTER_FAMILIE_FARBE={zermuerbung:"#8db3ff",hieb:"#ff9a4a",wucht:"#ff5a5a"};
   const FOLTER_GERAETE=[
-    {name:"STRICK", zeichne(c){
+    {name:"STRICK", familie:"zermuerbung", zeichne(c){
       c.strokeStyle="#c9b48a"; c.lineWidth=2; c.lineCap="round";
       c.beginPath(); c.moveTo(0,0); c.lineTo(8,0); c.stroke();
       c.beginPath(); c.arc(14,0,6,0,6.2832); c.stroke(); c.lineCap="butt";
     }},
-    {name:"RUTE", zeichne(c){
+    {name:"RUTE", familie:"hieb", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=2.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
       c.strokeStyle="#8d6b41"; c.lineWidth=1.2;
       for(let i=0;i<3;i++){ c.beginPath(); c.moveTo(6,0); c.quadraticCurveTo(14,(i-1)*3,22,(i-1)*6); c.stroke(); }
     }},
-    {name:"PEITSCHE", zeichne(c){
+    {name:"PEITSCHE", familie:"hieb", zeichne(c){
       c.strokeStyle="#3c3026"; c.lineWidth=3;
       c.beginPath(); c.moveTo(0,0); c.lineTo(7,0); c.stroke();
       c.strokeStyle="#5a4634"; c.lineWidth=1.6;
       c.beginPath(); c.moveTo(7,0); c.bezierCurveTo(15,-6,22,6,28,-2); c.stroke();
     }},
-    {name:"DAUMENSCHRAUBE", zeichne(c){
+    {name:"DAUMENSCHRAUBE", familie:"zermuerbung", zeichne(c){
       c.fillStyle=FOLTER_METALL; c.fillRect(6,-6,10,12);
       c.strokeStyle="#7f8a9c"; c.lineWidth=1.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(6,0); c.stroke();
       c.beginPath(); c.moveTo(11,-9); c.lineTo(11,-6); c.stroke();
       c.beginPath(); c.arc(11,-11,3,0,6.2832); c.stroke();
     }},
-    {name:"ZANGE", zeichne(c){
+    {name:"ZANGE", familie:"zermuerbung", zeichne(c){
       c.strokeStyle=FOLTER_METALL; c.lineWidth=2.2; c.lineCap="round";
       c.beginPath(); c.moveTo(0,-3); c.lineTo(12,-1); c.lineTo(24,-7); c.stroke();
       c.beginPath(); c.moveTo(0, 3); c.lineTo(12, 1); c.lineTo(24, 7); c.stroke();
@@ -13962,19 +13979,19 @@
       c.beginPath(); c.arc(24, 7,2,0,6.2832); c.fill();
       c.globalAlpha=1; c.lineCap="butt";
     }},
-    {name:"BRANDEISEN", zeichne(c){
+    {name:"BRANDEISEN", familie:"hieb", zeichne(c){
       c.strokeStyle="#4a4f59"; c.lineWidth=2.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(17,0); c.stroke();
       c.fillStyle=FOLTER_GLUT; c.fillRect(17,-5,8,10);
       c.globalAlpha=0.45; c.fillStyle="#ffb066"; c.fillRect(15,-7,12,14); c.globalAlpha=1;
     }},
-    {name:"KEIL", zeichne(c){
+    {name:"KEIL", familie:"wucht", zeichne(c){
       c.fillStyle=FOLTER_HOLZ; c.fillRect(0,-3,8,6);
       c.fillStyle=FOLTER_METALL;
       c.beginPath(); c.moveTo(8,-7); c.lineTo(26,0); c.lineTo(8,7); c.closePath(); c.fill();
       c.strokeStyle="#7f8a9c"; c.lineWidth=1; c.stroke();
     }},
-    {name:"NAGELKEULE", zeichne(c){
+    {name:"NAGELKEULE", familie:"hieb", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3;
       c.beginPath(); c.moveTo(0,0); c.lineTo(13,0); c.stroke();
       c.fillStyle="#54402b"; c.beginPath(); c.ellipse(20,0,8,7,0,0,6.2832); c.fill();
@@ -13983,7 +14000,7 @@
         c.beginPath(); c.moveTo(20+Math.cos(a)*6,Math.sin(a)*5);
         c.lineTo(20+Math.cos(a)*12,Math.sin(a)*10); c.stroke(); }
     }},
-    {name:"SÄGE", zeichne(c){
+    {name:"SÄGE", familie:"wucht", zeichne(c){
       c.fillStyle="#3c3026"; c.fillRect(0,-4,8,8);
       c.fillStyle=FOLTER_METALL;
       c.beginPath(); c.moveTo(8,-5); c.lineTo(30,-3); c.lineTo(30,2); c.lineTo(8,2); c.closePath(); c.fill();
@@ -13992,7 +14009,7 @@
       for(let i=0;i<9;i++){ c.moveTo(9+i*2.4,2); c.lineTo(10.2+i*2.4,6); }
       c.stroke();
     }},
-    {name:"VORSCHLAGHAMMER", zeichne(c){
+    {name:"VORSCHLAGHAMMER", familie:"wucht", zeichne(c){
       c.strokeStyle=FOLTER_HOLZ; c.lineWidth=3.4;
       c.beginPath(); c.moveTo(0,0); c.lineTo(22,0); c.stroke();
       c.fillStyle="#8f99a9"; c.fillRect(21,-10,12,20);
@@ -14304,10 +14321,22 @@
       // `n=4` ist eine bewusst kleine Stichprobe fuer die Kalibrierung selbst (schnelle
       // Iteration in dieser stark ausgelasteten Sandbox); die Abnahme-Pflichtzahl fuer die
       // PR-Beschreibung kommt aus zwei groesseren, unabhaengigen Saatstaemmen.
+      //
+      // VIERTER SCHLIFF (Paket 3, Fable 30.09., B1/gauntletRunde()): seit B1 ist TECHNIK nicht
+      // mehr NUR eine Punktbonus-Quelle, sondern fuer die Hieb-Familie auch ein direkter
+      // Erfolgschance-Kanal -- power sass damit gleichzeitig in SPITZENMOMENT (Wucht-Familie,
+      // ebenfalls Erfolgschance) UND TECHNIK (Hieb-Familie), also ZWEIFACH im
+      // Ueberlebensdauer-Hebel. Gemessen: power 17,9/18,3 % gegen Matrix 10 (+7,9/+8,3 Pp),
+      // health 12,9 % gegen 18 (-5,1), rho 0,808->0,784 (unter die Schranke). Power aus TECHNIK
+      // genommen (0 statt 15), die freien 15 Punkte proportional auf torment/determination
+      // verteilt (50:35 -> 59:41) -- power sitzt jetzt nur noch in SPITZENMOMENT/WAGNIS, nicht
+      // mehr zusaetzlich in TECHNIK. Zusammen mit `GAUNTLET_FAMILIE_GEWICHT` 0,5->0,35 (s. dort)
+      // und der Wucht-Familie 4->3 Geraete (s. FOLTER_GERAETE oben) die Gegenmessung fuer die
+      // PR-Beschreibung.
       rezept:{
         GRUNDLAGE:    {will:35,torment:20,health:30,stamina:15},
         SPITZENMOMENT:{power:55,will:45},
-        TECHNIK:      {torment:50,power:15,determination:35},
+        TECHNIK:      {torment:59,determination:41},
         PUBLIKUM:     {will:60,torment:40},
         NERVEN:       {will:50,health:50},
         AUSDAUER:     {stamina:65,determination:35},
@@ -16646,6 +16675,78 @@
   // realistischem Schaden je Zug (10..24) brauchen rund 60-100 Zuege -- 600 ist ein
   // Vielfaches davon, nie ein reales Limit.
   const GAUNTLET_MAX_ANSCHLAEGE=600;
+  // B2 (Fable 30.09., Paket 3): "der Peiniger wirkt" -- die Wucht des ZUFUeGENDEN skaliert den
+  // HP-Verlust des Ertragenden, um den heutigen Wert bei SPITZENMOMENT 50. Kein zweiter
+  // rr()-Aufruf, keine Aenderung am Erfolgswurf des Ertragenden selbst -- nur die FOLGE eines
+  // bereits gewuerfelten Ausgangs wird skaliert, s. baueGauntlet(). Vorher war der Peiniger
+  // mechanisch nicht vorhanden (Chris' Satz hat zwei Beteiligte, die Mechanik nur einen).
+  //
+  // DECKEL VON ±20 % AUF ±5 % GESENKT (erster Messdurchgang, Paket 3): genau das vom
+  // Ideendokument selbst benannte Risiko ("Paarungsrauschen... wenn die Messung Spannweite
+  // > 0,30 zeigt, auf ±10 % oder ganz zurueck"). Isolationstest (B1/B4/B5 unveraendert, nur
+  // dieser Faktor testweise auf 1 gesetzt): rho 0,784 -> 0,802 (ueber die Schranke) -- B2 ist
+  // damit der Haupttreiber des rho-Einbruchs, NICHT B1 (B1 alleine aus machte rho sogar
+  // schlechter, 0,757, B1 ist also eher rho-foerderlich, s. Kommentar bei
+  // GAUNTLET_FAMILIE_GEWICHT). Stufenweise gesenkt statt B2 ganz zu entfernen (es ist Chris'
+  // eigenes Bild: "einer fuegt Schmerz zu, der andere muss es aushalten"): ±10 % (der von der
+  // Doku selbst vorgeschlagene Fallback) mass immer noch 0,792 -- unter der Schranke, weil der
+  // Gauntlet ANDERS als die generischen Buehnen-Disziplinen ist, fuer die ±10% kalibriert war:
+  // die Kette gibt dem Peiniger-Effekt ueber viele Anschlaege Zeit, sich aufzusummieren
+  // (laengere Ueberlebensdauer wirkt selbst wieder verstaerkend, derselbe Hebel wie bei
+  // GAUNTLET_HP_MAX). Erst ±5 % (0,801, knapp aber reproduzierbar -- diese Messung ist
+  // deterministisch, kein Stichprobenrauschen zwischen Wiederholungen) haelt die Schranke.
+  const GAUNTLET_PEINIGER_DECKEL=0.05;
+  function gauntletSchadenFaktor(peiniger){
+    return Math.max(1-GAUNTLET_PEINIGER_DECKEL,Math.min(1+GAUNTLET_PEINIGER_DECKEL,
+      1+2*GAUNTLET_PEINIGER_DECKEL*((peiniger.SPITZENMOMENT-50)/100)));
+  }
+  // B4 (Fable 30.09., Paket 3): "Verschnaufen zwischen den Bouts" -- der UEBERLEBENDE eines
+  // Bouts bekommt, bevor der naechste frische Herausforderer antritt, eine kleine,
+  // deterministische Regeneration (kein rr()): 2-4 % seiner HP, je nach AUSDAUER. Kein Heilen
+  // ("angeschlagen in die Kaempfe" bleibt), nur ein Durchatmen in der Ringecke -- AUSDAUER
+  // (Matrixgewicht 8) wirkte bisher nur als Ermuedungsdeckel, nie als sichtbares Plus.
+  const GAUNTLET_VERSCHNAUFEN_ANTEIL=0.04;
+  function gauntletVerschnaufen(u){
+    return Math.round(u.hpMax*GAUNTLET_VERSCHNAUFEN_ANTEIL*(0.5+u.AUSDAUER/200));
+  }
+  // B5 (Fable 30.09., Paket 3): "Provokation" -- bei hohem WAGNIS fordert der Ertragende das
+  // naechste Geraet der Leiter eine Stufe frueher (deterministisch, kein eigener rr(), s.
+  // baueGauntlet()) und bekommt dafuer einen Aufschlag auf den SPITZENMOMENT-Bonus, WENN er
+  // haelt -- das ist die ausstehende Angleichung an den generischen WAGNIS-Trade-off
+  // (BUEHNE_WAGNIS_RISIKO/_ERTRAG vor bauBuehne()), auf Breaking-Art: das Risiko ist nicht ein
+  // zusaetzlicher Erfolgsabzug, sondern die haertere Stufe selbst (s. GAUNTLET_STUFE_ABZUG
+  // unten), der Ertrag ein groesserer Bonus bei Erfolg.
+  const GAUNTLET_PROVOKATION_SCHWELLE=58;
+  const GAUNTLET_PROVOKATION_ERTRAG=0.22;
+  // B1 (Fable 30.09., Paket 3, "staerkste Idee"): DREI FAMILIEN, DREI WEGE. Bisher war
+  // `erfolg` immer derselbe TECHNIK/NERVEN-Mix, egal welches der zehn Geraete gerade auf dem
+  // Tisch lag -- der Vorschlaghammer war so leicht auszuhalten wie der Strick. Jetzt bestimmt
+  // die FAMILIE des gerade benutzten Geraets (`geraet.familie`, s. FOLTER_GERAETE oben) zur
+  // Haelfte mit, welcher Kanal zaehlt: ZERMUERBUNG -> NERVEN, HIEB -> TECHNIK, WUCHT ->
+  // SPITZENMOMENT -- exakt die drei Kanaele, die das Rezept oben ohnehin schon fuehrt
+  // (NERVEN={will,health}, TECHNIK={torment,power,determination}, SPITZENMOMENT=
+  // {power,will}), kein neuer Sub-Skill, keine Matrixaenderung. Die andere Haelfte bleibt der
+  // bisherige TECHNIK/NERVEN-Mix (`mixAlt`) -- der Wurf wird dadurch "breiter, nicht lauter"
+  // (Doku-Wortlaut): wer in seiner Familie schwach ist, haelt seltener stand, unabhaengig vom
+  // alten Mix. GAUNTLET_STUFE_ABZUG zieht zusaetzlich je Eskalationsstufe INNERHALB DES BOUTS
+  // (`geraet.stufe`, dieselbe Leiter wie `folterStufe()`/`gauntletZugImBout()`, 0..9) ab
+  // Erfolgschance ab -- "ein langer Bout endet, weil das Aushalten schwerer wird, nicht weil
+  // der HP-Verlust waechst" (Doku). Der HP-Verlust selbst (GAUNTLET_SCHADEN_ERFOLG/FAIL) bleibt
+  // UNVERAeNDERT fuer alle zehn Stufen -- das schuetzt den Reliabilitaets-Hebel, fuer den
+  // GAUNTLET_HP_MAX 100 -> 400 gesetzt wurde (s. Kommentar oben).
+  const GAUNTLET_STUFE_ABZUG=0.02;
+  // NACHGEMESSEN, NACHJUSTIERT (erster Messdurchgang, Paket 3): mit Familiengewicht 0,5 kippte
+  // power doppelt in den Erfolgswurf -- einmal ueber TECHNIK (Hieb-Familie, power:15) und
+  // einmal ueber SPITZENMOMENT (Wucht-Familie, power:55), zusaetzlich zum schon bestehenden
+  // Punktbonus `L.SPITZENMOMENT*0.35*bonus`. Gemessen: rho 0,808->0,784 (unter die Schranke),
+  // Pp 12,7/13,5 -> 25,0/26,8 (ein Strom ueber der Schranke), power +7,9/+8,3 Pp ueber Matrix,
+  // health -5,1 Pp darunter -- exakt der "Ueberlebensdauer-Hebel", den das Ideendokument fuer
+  // power vorab als Risiko benannt hat (Abschnitt B1, "Erste/Zweite Schraube"). Beide dort
+  // vorgeschlagenen Schrauben angewandt: `GAUNTLET_FAMILIE_GEWICHT` 0,5 -> 0,35 (Familienkanal
+  // zaehlt weniger stark, der alte TECHNIK/NERVEN-Mix mehr), UND power aus dem TECHNIK-Rezept
+  // genommen (s. `rezept.TECHNIK` bei BUEHNE_ART.breaking, auf torment/determination verteilt)
+  // -- power sitzt danach nur noch in SPITZENMOMENT, nicht mehr zusaetzlich in TECHNIK.
+  const GAUNTLET_FAMILIE_GEWICHT=0.35;
 
   // IDENTISCHE FORMEL wie der generische Auftritt-Block (bauBuehne(), s. `for(let ri=0;
   // ri<art.rundenN;ri++)` weiter oben) -- nur der Rundenindex `ri` kommt hier aus der Laenge
@@ -16655,16 +16756,33 @@
   // dieselbe Pp-Abweichung zur Matrix wie zuvor (s. PR-Beschreibung fuer die Nachmessung).
   // AUSNAHME SEIT 26.09.: der generische Block rechnet WAGNIS jetzt als echten Trade-off
   // (BUEHNE_WAGNIS_RISIKO/_ERTRAG, s. vor bauBuehne()). Breaking fuehrt hier BEWUSST noch die
-  // alte Formel (WAGNIS nur im Erfolgsbonus) — die Umstellung war auf die sechs Geschwister
-  // des generischen Blocks beschraenkt und abgenommen; Breaking braucht vor einem Nachziehen
-  // eine eigene rho-/Pp-Abnahme (Gauntlet-Kaskade: ein Fehlschlag kostet hier HP).
-  function gauntletRunde(L,ri,art){
+  // alte Grundformel (WAGNIS nur im Erfolgsbonus, jetzt ueber B5/`geraet.provoziert` erweitert)
+  // — die Umstellung auf den vollen generischen Trade-off war auf die sechs Geschwister des
+  // generischen Blocks beschraenkt; die B1/B2/B4/B5-Runde (Paket 3, 30.09.) ist Breakings
+  // EIGENE Abnahme dieser Kaskade (Gauntlet: ein Fehlschlag kostet hier HP, s. PR-Beschreibung
+  // fuer die Vorher/Nachher-Messung).
+  //
+  // `geraet` (B1/B5, neu): {stufe, familie, provoziert} des gerade von baueGauntlet()
+  // gewaehlten Foltergeraets fuer DIESEN Zug -- optional, damit ein Aufruf ohne drittes
+  // Argument (sollte es ihn je geben) auf das alte Verhalten (familienlos, stufe 0)
+  // zurueckfaellt, statt zu crashen.
+  function gauntletRunde(L,ri,art,geraet){
     const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*Math.min(1,ri/GAUNTLET_ERMUED_ANSCHLAEGE);
     const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
-    const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+    const stufe=geraet&&geraet.stufe!=null?geraet.stufe:0;
+    const familienKanal=!geraet?0
+      :geraet.familie==="zermuerbung"?L.NERVEN
+      :geraet.familie==="hieb"?L.TECHNIK
+      :L.SPITZENMOMENT;
+    const mixAlt=L.TECHNIK*0.0055+L.NERVEN*0.0035;
+    const erfolg=Math.max(0.05,Math.min(0.94,
+      0.15+(1-GAUNTLET_FAMILIE_GEWICHT)*mixAlt+GAUNTLET_FAMILIE_GEWICHT*familienKanal*0.009
+      -stufe*GAUNTLET_STUFE_ABZUG));
     let punkte,ereignis,haelt;
     if(rr()<erfolg){
-      punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+      let bonus=0.4+L.WAGNIS*0.006;
+      if(geraet&&geraet.provoziert)bonus*=(1+GAUNTLET_PROVOKATION_ERTRAG);
+      punkte=basis+L.SPITZENMOMENT*0.35*bonus;
       ereignis=art.erfolgWort; haelt=true;
     } else {
       punkte=basis*art.failAbzug;
@@ -16706,15 +16824,40 @@
       const ertragende=ertragenderIstX?x:y, peiniger=ertragenderIstX?y:x;
       ertragende.gegnerN=peiniger.n; peiniger.gegnerN=ertragende.n;
       const ri=ertragende.runden.length;
-      const r=gauntletRunde(ertragende,ri,art);
+      // B1/B5 (Fable 30.09., Paket 3): WELCHES Geraet liegt diesen Zug auf dem Tisch? Die
+      // Leiter zaehlt INNERHALB DES BOUTS (nicht ueber die ganze Kette, s. B4.1-Kommentar bei
+      // `gauntletZugImBout()` weiter unten) -- `zugImBout` ist dieselbe 0-basierte Zaehlung,
+      // nur VOR dem Push dieser Runde gebildet (die Runden desselben, noch laufenden Bouts
+      // liegen als EIN zusammenhaengender Block am Ende von `ertragende.runden`). B5:
+      // provoziert der Ertragende (WAGNIS >= GAUNTLET_PROVOKATION_SCHWELLE, deterministisch,
+      // kein rr()), liegt die naechste Stufe der Leiter schon JETZT auf dem Tisch statt erst
+      // naechsten Zug -- "gib mir die Saege".
+      let zugImBout=0;
+      for(let j=ertragende.runden.length-1;j>=0&&ertragende.runden[j].bout===ertragende.bout;j--)zugImBout++;
+      const stufeGrund=folterStufe(zugImBout,art.rundenN);
+      const provoziert=ertragende.WAGNIS>=GAUNTLET_PROVOKATION_SCHWELLE;
+      const stufe=provoziert?Math.min(FOLTER_GERAETE.length-1,stufeGrund+1):stufeGrund;
+      const geraet={stufe,familie:FOLTER_GERAETE[stufe].familie,provoziert};
+      const r=gauntletRunde(ertragende,ri,art,geraet);
       const hpVor=ertragende.hp;
-      ertragende.hp=Math.max(0,ertragende.hp-(r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL));
+      // B2 (Fable 30.09., Paket 3): der Schaden skaliert jetzt mit der Wucht des PEINIGERS
+      // (gauntletSchadenFaktor(), ±20 % um den alten Festwert), nicht mehr nur mit dem Erfolg/
+      // Fail-Ausgang des Ertragenden -- derselbe gewuerfelte Ausgang (`r.haelt`), nur die FOLGE
+      // skaliert durch den, der gerade zufuegt.
+      const schaden=Math.round((r.haelt?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL)*gauntletSchadenFaktor(peiniger));
+      ertragende.hp=Math.max(0,ertragende.hp-schaden);
       // `hpVor`/`hpNach`/`gegnerN`/`bout` reisen PRO RUNDE mit (nicht nur auf `u` selbst) --
       // stepBuehne()/zeichneBreaking() enthuellen chronologisch und muessen fuer eine LAENGST
       // vergangene Runde denselben Gegner/HP-Stand zeigen koennen, den diese Runde damals
-      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`.
+      // hatte, nicht den (moeglicherweise laengst ueberholten) Endstand von `u`. `stufe`/
+      // `familie`/`provoziert`/`schaden` reisen aus demselben Grund mit (B1/B2/B5, Paket 3):
+      // die Anzeige (zeichneBreaking(), s.u.) muss fuer eine laengst vergangene, aber gerade
+      // erst enthuellte Runde GENAU das Geraet und den Schaden zeigen, das/den dieser Zug
+      // tatsaechlich benutzt/verursacht hat -- nicht neu aus dem (moeglicherweise ueberholten)
+      // Endzustand rekonstruieren.
       ertragende.runden.push({punkte:r.punkte,ereignis:r.ereignis,
-        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax});
+        gegnerN:peiniger.n,bout:ertragende.bout,hpVor,hpNach:ertragende.hp,hpMax:ertragende.hpMax,
+        stufe,familie:geraet.familie,provoziert,schaden});
       buehneQueue.push(ertragende);
       if(ertragende.hp<=0){
         ertragende.raus=true;
@@ -16723,11 +16866,16 @@
           if(bi>=B.length)break; // Team Gast komplett aufgebraucht -> Team Heim gewinnt.
           y=B[bi]; bout++; x.bout=bout; y.bout=bout;
           ertragenderIstX=false; // der frische Herausforderer ertraegt zuerst.
+          // B4 (Fable 30.09., Paket 3): der Ueberlebende (x) verschnauft, bevor der naechste
+          // Herausforderer antritt -- deterministisch, kein rr(), gedeckelt auf hpMax.
+          x.hp=Math.min(x.hpMax,x.hp+gauntletVerschnaufen(x));
         } else {
           ai++;
           if(ai>=A.length)break; // Team Heim komplett aufgebraucht -> Team Gast gewinnt.
           x=A[ai]; bout++; x.bout=bout; y.bout=bout;
           ertragenderIstX=true;
+          // B4: derselbe Verschnaufer, hier fuer den UEBERLEBENDEN y (Team Gast).
+          y.hp=Math.min(y.hpMax,y.hp+gauntletVerschnaufen(y));
         }
       } else {
         ertragenderIstX=!ertragenderIstX;
@@ -17217,7 +17365,16 @@
         // TICKER-STUFE (Punkt 8): "haelt stand" ist Routine (gut die Haelfte aller Breaking-
         // Zeilen, nur im Protokoll); "bricht ein" bleibt im Ticker, solange das Budget reicht,
         // Stufenwechsel (big) und das Aufgeben (darunter, big mit Vorrang) immer.
-        feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
+        // B1 (Fable 30.09., Paket 3): der Ticker nennt jetzt zusaetzlich das Geraet dieses Zuges
+        // ("hält stand (Zange)" / "bricht ein (Brandeisen)", bei B5-Provokation zusaetzlich
+        // "provoziert") -- reiner Textzusatz aus `r.stufe`/`r.provoziert`, `r.ereignis` selbst
+        // bleibt UNVERAENDERT dasselbe Feld, gegen das ausschliesslich `art.erfolgWort`/
+        // `art.failWort` verglichen werden (s. RANGTREUE-NEUTRAL-Kommentar bei
+        // BUEHNE_ART.breaking oben) -- und damit auch unveraendert dasselbe Feld, das die
+        // TICKER-STUFE direkt darueber fuer die Routine/Ereignis-Einstufung liest.
+        const geraetName=FOLTER_GERAETE[r.stufe]?FOLTER_GERAETE[r.stufe].name:null;
+        const geraetHinweis=geraetName?" ("+geraetName+(r.provoziert?", provoziert":"")+")":"";
+        feed(u.side,u.n+" — "+r.ereignis+geraetHinweis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
           +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),
           undefined,undefined,undefined,undefined,
           r.ereignis===BB().erfolgWort?"routine":undefined);
@@ -24938,9 +25095,18 @@
     // Bei art.rundenN=8 erreicht ein Kampf, der laenger als acht eigene Zuege dauert, damit
     // wieder den Hammer (statt schon beim ersten Anschlag des naechsten Kampfes dort zu
     // kleben) -- exakt dieselbe Skalierung wie zuvor, nur pro Kampf statt pro Karriere.
-    const stufe=paar&&paar.ertraeger
-      ?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0;
+    // B1/B5 (Fable 30.09., Paket 3): die ANZEIGE liest jetzt dieselbe Stufe, die der Zug
+    // tatsaechlich BENUTZT hat (`r.stufe`, von baueGauntlet() je Runde mitgefuehrt, s.
+    // Kommentar dort) -- vorher rechnete die Anzeige `folterStufe(gauntletZugImBout(...))`
+    // unabhaengig neu und haette eine B5-Provokation (die das Geraet einen Zug frueher
+    // wechseln laesst) nicht gezeigt. Vor der allerersten Enthuellung (noch keine Runde
+    // gezogen) faellt die Anzeige auf die alte Herleitung zurueck, exakt wie zuvor.
+    const ertragerZugFolter=paar&&paar.ertraeger?gauntletZugJetzt(paar.ertraeger):null;
+    const stufe=ertragerZugFolter&&ertragerZugFolter.stufe!=null?ertragerZugFolter.stufe
+      :(paar&&paar.ertraeger?folterStufe(gauntletZugImBout(paar.ertraeger,paar.ertraeger.aktuell),art.rundenN):0);
     const geraet=FOLTER_GERAETE[stufe];
+    const folterFarbe=FOLTER_FAMILIE_FARBE[geraet.familie]||"#f2d75a";
+    const geraetProvoziert=!!(ertragerZugFolter&&ertragerZugFolter.provoziert);
     const tischB=Math.min(W*0.84,920), tischX=cx-tischB/2, tischY=H-24;
     const fachB=tischB/FOLTER_GERAETE.length;
     ctx.fillStyle="#2c2129"; ctx.fillRect(tischX,tischY,tischB,9);
@@ -24982,10 +25148,20 @@
       ctx.restore();
     }
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
-    ctx.font="800 10px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+    // B1 (Paket 3): der Geraetename traegt jetzt die FAMILIENFARBE statt des einheitlichen
+    // Golds (ZERMUERBUNG blau, HIEB orange, WUCHT rot, s. FOLTER_FAMILIE_FARBE oben) -- "man
+    // soll sehen, welcher Kanal hier gerade geprueft wird", ohne eine Zahl lesen zu muessen.
+    ctx.font="800 10px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=folterFarbe;
     ctx.fillText(geraet.name+"  ·  STUFE "+(stufe+1)+"/"+FOLTER_GERAETE.length+"  ·  QUAL "+qualAnzeige(QUAL_ZAHLEN[stufe]),cx,tischY-30);
     ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(214,170,255,.6)";
     ctx.textAlign="left"; ctx.fillText("FOLTERBANK",tischX,tischY-30);
+    // B5 (Paket 3): "gib mir die Saege" -- sichtbarer Hinweis, dass der Ertragende selbst zu
+    // diesem haerteren Geraet provoziert hat (hohes WAGNIS), statt dass die Leiter von allein
+    // dorthin gelangt waere.
+    if(geraetProvoziert){
+      ctx.font="800 8px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#ff9a4a";
+      ctx.textAlign="right"; ctx.fillText("PROVOZIERT",tischX+tischB,tischY-30);
+    }
 
     // ---------- RANG 2: die beiden, um die es gerade geht ----------
     const ertraeger=paar?paar.ertraeger:null, peiniger=paar?paar.peiniger:null;
@@ -25350,6 +25526,22 @@
       };
       zeichneHpBalken(stehend[0],true);
       zeichneHpBalken(stehend[1],false);
+      // B2 (Fable 30.09., Paket 3): "der Peiniger wirkt" -- die tatsaechliche Schadenszahl
+      // dieses Zuges wird jetzt sichtbar, GROSS und rot bei einem harten Peiniger (`schaden`
+      // deutlich ueber dem alten Festwert, s. gauntletSchadenFaktor() oben). Vorher liess sich
+      // nur aus der Balkenbreite erahnen, wie viel HP gerade verloren ging; jetzt steht die
+      // Zahl daneben, auf der Seite des Ertragenden. `ertragerZugFolter` ist derselbe,
+      // reveal-gegatete Zug, den auch die Folterbank oben liest.
+      if(ertragerZugFolter&&ertragerZugFolter.schaden!=null&&paar&&paar.ertraeger){
+        const seite=paar.ertraeger.side;
+        const basisSchaden=ertragerZugFolter.ereignis===art.erfolgWort?GAUNTLET_SCHADEN_ERFOLG:GAUNTLET_SCHADEN_FAIL;
+        const hart=ertragerZugFolter.schaden>basisSchaden*1.08;
+        const bx0=seite===0?16:W-16-balkenB;
+        ctx.font=(hart?"800 11px":"700 9px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.fillStyle=hart?"#ff5a4a":"#eef3fa";
+        ctx.textAlign=seite===0?"left":"right"; ctx.textBaseline="alphabetic";
+        ctx.fillText("-"+ertragerZugFolter.schaden+" HP",seite===0?bx0:bx0+balkenB,balkenY+balkenH+11);
+      }
     }
 
     // TEAM-FEIER-EFFEKTE (Konzept team-publikum-feiermomente 3.2): NACH der Vignette (sonst
@@ -42421,6 +42613,17 @@
     // ueber jede Sample-Reihe nie > 1 sein. Reines Lesen, kein Einfluss auf die Simulation.
     cypherVizProbe:()=>TEILNEHMER.map(u=>({id:u.id,n:u.n,phase:u.vizPhase,
       r:Math.round(u.vizR),a:Math.round((u.vizA||0)*100)/100,summe:u.summe,aktuell:u.aktuell})),
+    // GAUNTLET-ZUG-PROBE (B1/B2/B4/B5, Fable 30.09., Paket 3): rein diagnostisch, wie
+    // cypherVizProbe direkt darueber -- liest `stufe`/`familie`/`provoziert`/`schaden` der
+    // komplett vorberechneten Runden aller Breaking-Teilnehmer von aussen (Playwright, ohne
+    // UI), damit sich die neuen Felder nachweisen lassen, ohne den Canvas-Text zu parsen.
+    // Reines Lesen aus bereits von baueGauntlet() vorberechneten Daten, kein Einfluss auf
+    // die Simulation.
+    gauntletZugProbe:()=>TEILNEHMER.filter(u=>u.runden&&u.runden.length).map(u=>({
+      n:u.n,bout:u.bout,aktuell:u.aktuell,zuege:u.runden.length,
+      stufen:u.runden.map(r=>r.stufe),familien:u.runden.map(r=>r.familie),
+      provoziertAnzahl:u.runden.filter(r=>r.provoziert).length,
+      schadenReihe:u.runden.map(r=>r.schaden)})),
     // STAFFEL-VIZ-PROBE (Ziel 6, Opus-Plan Abschnitt 5.2/6): rein diagnostisch, wie
     // cypherVizProbe direkt oberhalb — liest die stepStaffel()-eigenen viz*-Felder aller
     // LAEUFER von aussen. `vizInitDoneGesetzt:false` bei EINEM Laeufer beweist bereits, dass
