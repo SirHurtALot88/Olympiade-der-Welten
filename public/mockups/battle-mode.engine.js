@@ -14938,6 +14938,11 @@
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // G1 (Fable-Ideen 30.09., Paket 2): einmal je Duell ein Ticker-Banner, wenn `teamLage`
+  // "entscheidend" oder "entschieden" ist -- reiner Anzeige-Dedup (a und b enthuellen ihren
+  // ersten Versuch unabhaengig voneinander, dieses Set verhindert die doppelte Zeile), kein
+  // Einfluss auf hebeUebung()/baueHebenDuelle() selbst.
+  const hebenTeamBannerGezeigt=new Set();
   // KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A): dasselbe Muster wie
   // letzterHebenZug oben, nur fuer den Gauntlet. `letzterGauntletZug` haelt den zuletzt
   // ENTHUELLTEN Anschlag fest (reveal-gegatet, s. Aufruf in stepBuehne unten) -- exakt das,
@@ -15034,7 +15039,7 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
-    floats.length=0; letzterHebenZug=null; letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    floats.length=0; letzterHebenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -15559,7 +15564,23 @@
   const HEBEN_INJURY_BASIS=0.02;    // Grundrisiko bei jedem MISSLUNGENEN kuehnen Versuch
   const HEBEN_INJURY_K=0.10;        // zusaetzliches Risiko je Anteil UEBER der Risikokapazitaet
   const HEBEN_INJURY_CAP=0.12;      // hoechstens 12 % Verletzungsrisiko je misslungenem kuehnen Versuch
-  const HEBEN_WIEDERHOLUNG=0.19;  // Zuschlag, wenn dieselbe Last nach einem Fehlversuch wiederholt wird
+  // G4 (Fable-Ideen 30.09., Paket 2, Klasse M, klein): "DER WEG ZURUECK NACH DEM
+  // FEHLVERSUCH LAEUFT UEBER ERHOLUNG". Der Zuschlag war bis hierher FLACH (0,19 fuer jeden
+  // Heber gleich) -- im echten Sport entscheidet die Erholung in den zwei Minuten zwischen
+  // zwei Versuchen, ob die Wiederholung gelingt, und das ist Physis, nicht Technik. ERHOLUNG
+  // (stamina 40/health 35/will 25, Z. ~14100) hat heute genau EIN Zuhause (HEBEN_ERHOLUNG_K
+  // oben, nur das Stossen-Maximum) -- das ist ein zweites, UNABHAENGIGES "mehrere Wege"-Ende
+  // desselben Kanals: der Zaehe, der einen Fehlversuch wegsteckt und dieselbe Last beim
+  // zweiten Mal hebt, bekommt damit einen eigenen Kanal, obwohl die Slot-Rolle "Grip Anchor"
+  // genau diese Geschichte schon erzaehlt (Dokument-Abschnitt G4). NULLSTELLE BEI ERHOLUNG 50:
+  // 0,12+(50/100)*0,14 = 0,12+0,07 = 0,19, exakt der alte Flachwert -- ein Heber mit
+  // mittlerer ERHOLUNG hebt bit-identisch zu vor G4, nur die Raender (niedrige/hohe
+  // ERHOLUNG) bewegen sich auseinander.
+  // KORRIDOR-PFLICHT (Dokument-Abschnitt G4): die Nullwertungsquote (heute 1,6-3,1 %, Ziel
+  // <=3 %) haengt direkt an diesem Bonus -- niedrige ERHOLUNG heisst mehr Nullwertungen,
+  // deshalb die symmetrische Form um 0,19 statt eines einseitigen Auf- oder Abschlags.
+  const HEBEN_WIEDERHOLUNG_BASIS=0.12;      // Sockel, unabhaengig von ERHOLUNG
+  const HEBEN_WIEDERHOLUNG_ERHOLUNG_K=0.14; // Spanne ueber den vollen ERHOLUNG-Bereich (0..100)
   // NACH EINEM FEHLVERSUCH SENKEN, NICHT WIEDERHOLEN (Chris' Fund, 06.09., woertlich: "wenn
   // jemand zb wie gram 117kg nicht schafft sollte der naechste versuch dann zb 110 sein und
   // nicht 127kg weil das schafft er eh nicht und kostet ihn nur einen versuch"). Die
@@ -15629,6 +15650,46 @@
   // Ein-Zeilen-Umkehr: HEBEN_DUELL_EROEFFNUNG_MAX auf 0 setzen.
   const HEBEN_DUELL_EROEFFNUNG_K=0.30;   // Anteilsversatz je Anteil Kraeftevorsprung
   const HEBEN_DUELL_EROEFFNUNG_MAX=0.05; // Deckel des Versatzes in beide Richtungen
+  // G1 (Fable-Ideen 30.09., Paket 2, Klasse M): "DER HEBER LIEST DIE MANNSCHAFTSTAFEL".
+  // Die sechs Duelle waren bis hierher sechs Inseln -- jeder Heber plante, als gaebe es nur
+  // sein eigenes Duell. `hebenTeamLage(paar,i)` liest denselben Duellstand, den die Buehne
+  // ohnehin Duell fuer Duell enthuellt (Chris sieht ihn nach Duell 4), und gibt ihn an
+  // hebeUebung() weiter -- NICHT als neuer Sub-Skill/Kanal, sondern als dritte Lage neben der
+  // schon bestehenden Duell-Staerke `lage` (A) oben: "offen" (Duell 1-3, UNVERAENDERT, s.u.),
+  // "entschieden" (die Mannschaft kann das Gesamtergebnis nicht mehr drehen -- "fuer die
+  // Tafel" heben, das Wagnis-Fenster oeffnet sich WEITER) oder "entscheidend" (3:3 ist noch
+  // moeglich/droht -- beide Heber sichern, Eroeffnung sicherer, GENAU der `versatz`-
+  // Mechanismus aus (B) oben, nur in Richtung "sichern" statt richtungsabhaengig von der
+  // eigenen Duellstaerke). Ausdruecklich KEIN kuehner Versuch fuer den FUEHRENDEN in seinem
+  // EIGENEN Duell -- das ist der 13.09.-Befund (Recherche 5.6) und bleibt verworfen; hier geht
+  // es um das TEAM, nicht um das eigene Duell, und wirkt nur in den beiden Lagen oben, nie in
+  // "offen".
+  //
+  // "UNEINHOLBAR" IST STRENG, NICHT OPTIMISTISCH: eine Seite gilt erst dann als entschieden
+  // fuehrend/hinten, wenn selbst ein 3:3-Patt (uebrige Duelle komplett an die andere Seite)
+  // nicht mehr erreichbar ist -- siegeMine > siegeGegner + rest. Ein 3:0-Stand vor Duell 4
+  // zaehlt deshalb bewusst NOCH als "entscheidend" (3:3 bliebe rechnerisch moeglich, der
+  // Gesamt-kg-Tiebreak, s. `arenaTeamPointsForFixtureMitTiebreak()`, koennte dann noch kippen)
+  // -- das ist die vorsichtigere, nicht die bequemere Lesart.
+  //
+  // NEBENFUND AUS DEM IDEENPAPIER GEPRUEFT: der Team-Tiebreak bei 3:3 ueber die Gesamt-
+  // Kilogramm existiert bereits (Z. ~19390/42330, `arenaTeamPointsForFixtureMitTiebreak()`,
+  // `gesamtKg`) -- ein Entscheidungsduell ohne Entscheidung waere sonst der falsche Witz,
+  // ist hier aber keiner: der Fall ist produktiv abgedeckt, nichts zu ergaenzen.
+  const HEBEN_TEAM_SICHERN_VERSATZ=0.04;    // zusaetzlicher Eroeffnungs-Versatz Richtung sicher, nur in "entscheidend"
+  const HEBEN_TEAM_OFFEN_WAGNIS_FAKTOR=2.0; // Vervielfacher des Wagnis-Fensters (HEBEN_WAGNIS_MAX_KG), nur in "entschieden"
+  function hebenTeamLage(paar,i){
+    const n=paar.length;
+    if(i<3||n<4)return "offen"; // Duell 1-3 (ZeroIdx 0-2): wie heute, unveraendert
+    let siegeMine=0, siegeGegner=0;
+    for(let k=0;k<i;k++){
+      const [ak,bk]=paar[k];
+      if(ak.duellGewonnen)siegeMine++; else if(bk.duellGewonnen)siegeGegner++;
+    }
+    const rest=n-i; // uebrige Duelle, dieses eingeschlossen
+    if(siegeMine>siegeGegner+rest||siegeGegner>siegeMine+rest)return "entschieden";
+    return "entscheidend";
+  }
   // ANSAGE UND DIE PHYSISCHE OBERGRENZE — die von der letzten Runde offen gelassene
   // Architekturfrage (docs/design/gewichtheben-gameplay-fertig.md, "gehoert
   // Selbstvertrauen auch in die physische Obergrenze?"). Beide Interpretationen gemessen
@@ -15672,7 +15733,12 @@
       a.gegnerN=b.n; b.gegnerN=a.n;
       paar.push([a,b,plan]);
     }
-    for(const [a,b,plan] of paar){
+    for(let i=0;i<paar.length;i++){
+      const [a,b,plan]=paar[i];
+      // G1: die Lage VOR diesem Duell -- liest nur bereits entschiedene Duelle (k<i), die
+      // Reihenfolge der Schleife garantiert das (jedes Duell setzt duellGewonnen erst am
+      // Ende seiner eigenen Iteration, s.u.).
+      const teamLage=hebenTeamLage(paar,i);
       for(const u of [a,b]){
         u.runden=[]; u.summe=0; u.aktuell=-1;
         u.tagesmax=(HEBEN_KG_BASIS+u.LAST*HEBEN_KG_PRO_LAST)*(1+(u.ANSAGE-50)*HEBEN_TAGESMAX_ANSAGE_K);
@@ -15686,9 +15752,12 @@
         // sind additiv fuer Ticker/Buehnenbild/Boxscore, wie u.torwart es fuer Hockey ist
         // (battle-mode-arena-team-points.ts, ArenaFixtureBoxscoreEintrag).
         u.kuehneVersuche=0; u.kuehneErfolge=0; u.kuehnVerletzt=0;
+        // G1: nur fuer Ticker/Banner (s. zeichneHeben()) -- liest hebeUebung() nicht selbst,
+        // die Mechanikfunktion bekommt `teamLage` direkt als Parameter.
+        u.teamLage=teamLage;
       }
-      hebeUebung(a,b,plan,"reissen");
-      hebeUebung(a,b,plan,"stossen");
+      hebeUebung(a,b,plan,"reissen",teamLage);
+      hebeUebung(a,b,plan,"stossen",teamLage);
       for(const u of [a,b]){
         u.nullwertung=(u.besteReissen<=0||u.besteStossen<=0);
         u.zweikampf=u.nullwertung?0:Math.round(u.besteReissen+u.besteStossen);
@@ -15740,7 +15809,11 @@
   // einmal nachziehen (nur aufwaerts, wie im Wettkampf). Gleiche Ansage: das Los, seeded ueber
   // rr() (die Losnummer der Wiegung). Das letzte Wort hat damit, wer mehr angesagt hat — in
   // der Regel der Fuehrende, und das ist verdient, nicht die Seite. Spiegeltest danach 349:326.
-  function hebeUebung(a,b,plan,uebung){
+  function hebeUebung(a,b,plan,uebung,teamLage){
+    // G1: Standardwert "offen" fuer jeden anderen/aelteren Aufrufer (es gibt heute nur die
+    // zwei aus baueHebenDuelle oben, aber Default haelt die Funktion fuer sich genommen
+    // unveraendert aufrufbar) -- bei "offen" ist jede Zeile unten bit-identisch zu vor G1.
+    teamLage=teamLage||"offen";
     const max=(u)=>uebung==="reissen"?u.maxReissen:u.maxStossen;
     const beste=(u)=>uebung==="reissen"?u.besteReissen:u.besteStossen;
     const setzeBeste=(u,kg)=>{ if(uebung==="reissen")u.besteReissen=kg; else u.besteStossen=kg; };
@@ -15775,8 +15848,17 @@
       const gegner=u===a?b:a;
       const kraftU=gebucht(u)+max(u), kraftG=gebucht(gegner)+max(gegner);
       const lage=kraftG>0?kraftU/kraftG-1:0;
-      const versatz=Math.max(-HEBEN_DUELL_EROEFFNUNG_MAX,
-        Math.min(HEBEN_DUELL_EROEFFNUNG_MAX,-HEBEN_DUELL_EROEFFNUNG_K*lage));
+      // G1, LAGE "entscheidend": zusaetzlicher Versatz Richtung SICHER fuer BEIDE Heber,
+      // unabhaengig von der eigenen Duellstaerke -- "sichern, nicht zocken" (Dokument-
+      // Tabelle, Zeile 3). Die normale, duellstaerke-abhaengige Richtung (lage oben) bleibt
+      // unveraendert bestehen; der Bias kommt nur OBENDRAUF und nur nach unten (der obere
+      // Deckel HEBEN_DUELL_EROEFFNUNG_MAX bleibt exakt wie zuvor, keine aggressivere
+      // Eroeffnung wird dadurch moeglich). Bei "offen"/"entschieden" ist der Bias 0 und die
+      // Zeile unten bit-identisch zur Basisformel.
+      const teamBias=(teamLage==="entscheidend")?-HEBEN_TEAM_SICHERN_VERSATZ:0;
+      const versatzMin=-HEBEN_DUELL_EROEFFNUNG_MAX+Math.min(0,teamBias);
+      const versatz=Math.max(versatzMin,
+        Math.min(HEBEN_DUELL_EROEFFNUNG_MAX,-HEBEN_DUELL_EROEFFNUNG_K*lage+teamBias));
       // MUTIGER EROEFFNEN JA, UEBER DIE EIGENE SICHERHEIT HINAUS NEIN. Die Lehrmeinung ist an
       // dieser Stelle eindeutig: die Eroeffnung ist "ein Gewicht, das der Heber schon oft
       // gemacht hat und dem er voll vertraut" (Greg Everett) — "missing an opener is a bad way
@@ -15854,7 +15936,16 @@
         // KUEHNER VERSUCH: freiwilliger Zuschlag ueber das Ausgleichskilo hinaus,
         // deterministisch aus ANSAGE — ein selbstbewusster Heber wagt mehr, kein
         // zusaetzlicher Wuerfel an dieser Stelle (s. HEBEN_WAGNIS_MAX_KG oben).
-        const zuschlag=Math.min(HEBEN_WAGNIS_MAX_KG, Math.max(0,u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_K);
+        // G1: das Wagnis-FENSTER (der Deckel, nicht die ANSAGE-Nutzung darunter) atmet mit
+        // der Team-Lage -- "entscheidend" schliesst es auf das nackte Ausgleichskilo (0
+        // Zuschlag, sichern statt zocken), "entschieden" oeffnet es weiter (das Team-Ergebnis
+        // steht ohnehin fest, "fuer die Tafel" heben), "offen" laesst es wie heute. ANSAGE
+        // entscheidet weiterhin unveraendert, WIE VIEL von einem gegebenen Fenster genutzt
+        // wird (derselbe HEBEN_WAGNIS_ANSAGE_K-Koeffizient).
+        const wagnisMaxKg=teamLage==="entscheidend"?0
+          :teamLage==="entschieden"?HEBEN_WAGNIS_MAX_KG*HEBEN_TEAM_OFFEN_WAGNIS_FAKTOR
+          :HEBEN_WAGNIS_MAX_KG;
+        const zuschlag=Math.min(wagnisMaxKg, Math.max(0,u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_K);
         const ziel=basisZiel+Math.round(zuschlag);
         if(ziel<=max(u)*1.06){
           // G3: die geplante Ansage, BEVOR der Duellstand sie ueberschreibt -- nur gesetzt,
@@ -15903,7 +15994,10 @@
           // seinem urspruenglichen Plan liegt. Ohne diesen Zuschlag lagen die
           // Nullwertungen bei 4,4 % (Ziel hoechstens 3): wer einmal riss, riss meist
           // wieder, weil dieselbe Zahl mit derselben Wahrscheinlichkeit gewuerfelt wurde.
-          +(kg<=u.letzteLast?HEBEN_WIEDERHOLUNG:0)
+          // G4: der Zuschlag selbst atmet jetzt mit ERHOLUNG statt flach 0,19 zu sein (s.
+          // HEBEN_WIEDERHOLUNG_BASIS-Kommentar oben) -- bei ERHOLUNG 50 bit-identisch zum
+          // alten Flachwert.
+          +(kg<=u.letzteLast?(HEBEN_WIEDERHOLUNG_BASIS+(u.ERHOLUNG/100)*HEBEN_WIEDERHOLUNG_ERHOLUNG_K):0)
           -ueber*HEBEN_WAGNIS_K));
         u.letzteLast=kg;
         // G2 (Fable-Ideen 30.09., Politur A, Klasse A): "DREI KAMPFRICHTER, DREI LAMPEN, EIN
@@ -17156,6 +17250,21 @@
         // sinclairAnzeige) — ein Zwerg hebt weniger Kilo und trotzdem relativ genauso
         // viel. Entschieden wird auf den normierten, angezeigt auf den echten.
         const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
+        // G1 (Fable-Ideen 30.09., Paket 2, Klasse M): Banner einmal je Duell, beim allerersten
+        // enthuellten Versuch (Reissen, 1. Versuch) -- `hebenTeamBannerGezeigt` verhindert die
+        // doppelte Zeile, weil a und b unabhaengig voneinander enthuellt werden. Reine Anzeige
+        // der schon in baueHebenDuelle() gesetzten `u.teamLage` ("offen" zeigt nichts, wie
+        // heute).
+        if(r.uebung==="reissen"&&r.versuch===1&&!hebenTeamBannerGezeigt.has(u.duellNr)){
+          hebenTeamBannerGezeigt.add(u.duellNr);
+          if(u.teamLage==="entscheidend"){
+            feed(u.side,"ENTSCHEIDUNGSDUELL — Duell "+((u.duellNr??0)+1)+": "+u.n+" gegen "+u.gegnerN
+              +" kann die Mannschaftswertung entscheiden. Beide sichern die Eröffnung.",true);
+          } else if(u.teamLage==="entschieden"){
+            feed(u.side,"Die Mannschaftswertung ist entschieden — Duell "+((u.duellNr??0)+1)
+              +" wird für die Tafel gehoben, ohne Rücksicht auf das eigene Risiko.",true);
+          }
+        }
         // G2, ZUSATZ "WO ES SCHEITERT" (Fable-Ideen 30.09., Politur A, Klasse A): reine
         // Textbeschriftung eines Stossen-Fehlversuchs, s. `scheiterOrt` in hebeUebung().
         const scheiterTxt=r.scheiterOrt?(" ("+r.scheiterOrt+" gescheitert)"):"";
