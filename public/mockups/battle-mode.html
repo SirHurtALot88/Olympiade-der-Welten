@@ -1,8 +1,15 @@
 <meta charset="utf-8">
 <title>Battle Mode Taktikbrett</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<!-- NUR NOCH RaniraSeason (Chris, 30.09.: "nutz nur den Font, den ich fuer alles
+     vorgegeben hatte" -- gemeint ist die Schrift, die schon app/globals.css global auf
+     Body/Foundation-Shell setzt, s. docs/pm-briefings/SPIELBAR-STATUS.md Zeile 34).
+     Kein Google-Fonts-Link mehr noetig: RaniraSeason ist eine lokale OTF-Datei, das
+     @font-face liegt in battle-mode.css. Vorher trug die Chrome IBM Plex Mono/Sans, der
+     Canvas seit Punkt 24 Barlow Condensed -- jetzt EIN Font ueberall, s.
+     font-vereinheitlichung-raniraseason-30-09. RaniraSeason hat nur EINEN Schnitt
+     (700 italic, s. @font-face); jede andere angeforderte Staerke/Neigung faellt auf
+     genau diesen einen Schnitt zurueck, wie es app/globals.css fuer den Rest der App
+     schon tut. -->
 <link rel="stylesheet" href="battle-mode.css">
 
 <div class="oly-battle-arena">
@@ -66,12 +73,53 @@
 
   <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
     <div class="frame">
+      <!-- ARENAHAUPT (Broadcast-Audit Runde 2, Punkt 16, 30.09.): reine Gruppierungs-Huelle
+           um alles, was bisher als lose Geschwister-Kette VOR .untenraum stand (Kopfzeile,
+           Scoreline, Leinwand, Kaderleiste, Bedienzeile) -- keine der IDs darin aendert sich,
+           kein Skript liest ihre bisherige Geschwister-Position, s. Grep-Beleg in der
+           PR-Beschreibung. Der einzige Zweck ist, dass battle-mode.css ab einer Mindestbreite
+           EIN Element (statt zehn einzelner Geschwister) einer Grid-Spalte zuweisen kann,
+           damit .untenraum (Ticker+Tabelle) DANEBEN statt darunter steht -- s.
+           .oly-battle-arena .frame Kommentar dort. Unterhalb 900px bleibt die Kette exakt so
+           gestapelt wie vorher (kein Grid, .arenaHaupt zeichnet sich nicht ab). -->
+      <div class="arenaHaupt">
       <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
+      <!-- MINI-DM 4-TEAM-FFA (Bugfix 22.09.): Mini-DM ist kein Zwei-Seiten-Kampf wie
+           TDM/Battlefield, sondern Chris' eigens beschlossenes Vier-Team-Free-for-All
+           (docs/design/mini-dm-4-team-ffa-recherche-06-09.md). Der klassische
+           .scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl/.untenraum-Rahmen darunter ist
+           fuer GENAU ZWEI Seiten gebaut (siehe deren eigene Kommentare zu css("--home")/
+           css("--away")) — ein echter, live animierter Vier-Ecken-Kampf mit eigenen Farben
+           je Team wuerde diesen Rahmen an vielen Stellen aufbrechen, s. PR-Beschreibung fuer
+           den vollen Befund. Diese Ansicht zeigt stattdessen das ECHTE, bereits gebaute
+           FFA-Ergebnis (spieleMiniDmFfaEvent — dieselbe Funktion, die auch
+           arena-headless-runner.ts fuer die zaehlende Simulation nutzt): vier Runden, eine
+           je Rolle, alle vier Teams nebeneinander, 2-1-0-0-Ligapunkte am Ende. renderReset()
+           blendet sie ein und den klassischen Rahmen aus, sobald disc==="mini-dm" ist. -->
+      <div class="minidmffa" id="minidmffa" hidden>
+        <p class="honest">Mini-DM läuft als 4-Team-Free-for-All: eine Ecke je Team, vier
+          Runden (eine je Rolle) werden nacheinander aufgedeckt, am Ende 2-1-0-0-Ligapunkte
+          für die Endplatzierung — echte Simulation, dieselbe Funktion wie in der zählenden
+          Messung. Eine Live-Grafik mit vier gleichzeitig sichtbaren, animierten Ecken folgt
+          in einer späteren Runde.</p>
+        <div class="mdffa-teams" id="mdffaTeams"></div>
+        <div class="mdffa-runden" id="mdffaRunden"></div>
+        <div class="mdffa-endstand" id="mdffaEndstand"></div>
+      </div>
       <div class="scoreline">
         <div class="tname" id="tnameL">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
-        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small></div>
+        <!-- KONTROLLPUNKT-NEBENZEILE (ARENA-ZEIT-FIX, 27.09.): Battlefields Sieg haengt laut
+             kampfSieger()/dominationSieger() zuerst an Ausschaltungen, das Kontrollpunkt-
+             Punktelimit greift nur, wenn niemand komplett am Boden liegt — beobachtet stand
+             der KP-Stand in einem Testspiel bis kurz vor Schluss bei 0:0, waehrend die
+             Ausschaltungen den Ausgang laengst 4:0 entschieden hatten. Die grosse Zahl
+             (#score) zeigt seitdem fuer alle drei Kampf-Disziplinen dieselben Ausschaltungen;
+             diese kleine Zeile bleibt nur fuer Battlefield sichtbar (KP gesetzt, s.
+             updateHud()) und zeigt den Kontrollpunkt-Stand als Nebeninfo, nicht als Sieger-
+             Massstab. -->
+        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small><small id="kpzeile" style="display:none">Kontrollpunkte <span id="kpscore">0 : 0</span></small></div>
         <div class="tname r" id="tnameR">Armageddon Aftermath<em><span id="aliveR">6</span> im Kampf · A-A</em></div>
       </div>
       <div class="hpbars">
@@ -94,7 +142,7 @@
              waehrend des laufenden Spiels (weder vor dem Anpfiff noch nach Spielende).
              s. docs/design/broadcast-praesentation-uebergreifend-recherche-06-09.md
              Abschnitt 3. -->
-        <div class="bbug" id="bbug" hidden>
+        <div class="bbug hud-in" id="bbug" hidden>
           <div class="seite l" id="bbugL"></div>
           <div class="bbugmitte" id="bbugMitte"></div>
           <div class="seite r" id="bbugR"></div>
@@ -104,6 +152,12 @@
              (s. Abschnitt 4 derselben Recherche). Blendet sich automatisch nach ein paar
              Sekunden wieder aus (s. callout() in der Engine). -->
         <div class="bbugcallout" id="bbugcallout" hidden></div>
+        <!-- B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2, docs/design/broadcast-optik-
+             feldspiel-27-09.md Abschnitt 4): Band unter dem Bug, sichtbar nur waehrend
+             eine Seite gerade >= 8 Punkte in Folge erzielt (basketballLaufInfo() in der
+             Engine, reine Lesung von fsZuege). Gefuellt/ein-/ausgeblendet in
+             aktualisiereBbug(), keine eigene Zeichenschleife. -->
+        <div class="bbuglauf hud-in" id="bbugLauf" hidden></div>
         <!-- BROADCAST-HUD DER STAFFEL (Recherche 06.09., docs/design/staffel-oval-
              broadcast-hud-recherche-06-09.md Abschnitt 4). Zeigt aktuellen und
              naechsten Laeufer je Seite mit ihrer festen Eignung, dazu das live
@@ -116,7 +170,7 @@
              Uhr, hier geht es um laeuferspezifische Werte (Eignung, Wechsel-Delta) --
              beide sind gleichzeitig sichtbar, ohne sich zu ueberschneiden (Bug oben
              links/rechts schmal, dieses Panel darunter volle Breite). -->
-        <div class="bahnhud" id="bahnHud" hidden>
+        <div class="bahnhud hud-in" id="bahnHud" hidden>
           <div class="bhside bhL">
             <div class="bhrow"><span class="bhtag">Aktuell</span><span class="bhname" id="bhLcurName"></span><span class="bheig" id="bhLcurEig"></span></div>
             <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhLnextName"></span><span class="bheig" id="bhLnextEig"></span></div>
@@ -127,6 +181,21 @@
             <div class="bhrow bhdim"><span class="bhtag">Nächste</span><span class="bhname" id="bhRnextName"></span><span class="bheig" id="bhRnextEig"></span></div>
           </div>
         </div>
+        <!-- I-SPY ZUG-UHR (I2, Broadcast-Optik-Recherche 27.09., Abschnitt 4). Die
+             Crystal-Maze-Zonenuhr: "Zug 6 / 8" und ein Balken, der innerhalb des Zugs
+             ablaeuft, im letzten Zug rot und pulsierend. Inhalt kommt aus
+             aktualisiereIspyHud() (battle-mode.engine.js), aufgerufen am Ende von
+             updateHudBuehne() -- [hidden] fuer jede Buehne ausser I-Spy. -->
+        <div class="ispyzuguhr hud-in" id="ispyZugUhr" hidden>
+          <span id="ispyZugText">Zug 1 / 8</span>
+          <div class="ispyzugbar"><s id="ispyZugBarFill"></s></div>
+        </div>
+        <!-- I-SPY SPLIT-TAFEL (I3, Broadcast-Optik-Recherche 27.09., Abschnitt 4). Der
+             Speedrun-Split: Team-Punkte je bereits vollstaendig enthuelltem Zug und das
+             Delta zum Gegner im selben Zug, Gold fuer den besten Zug eines Teams. Noch
+             nicht enthuellte Zuege zeigen "·" statt einer Zahl (Spoiler-Schutz, s.
+             aktualisiereIspyHud()). -->
+        <div class="ispysplit hud-in" id="ispySplit" hidden></div>
         <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
              die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
              Leinwand und verschwindet beim Anpfiff. -->
@@ -150,6 +219,13 @@
             <div class="etafel" id="etafelL"></div>
             <div class="etafel" id="etafelR"></div>
           </div>
+          <!-- SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09., Abschnitt 3):
+               EIN Moment aus den Hoehepunkten, ausgewaehlt nach Momentart statt nach Sieg/
+               Gesamtwert (Overwatchs "Play of the Game"-Prinzip) -- renderSzeneDesSpiels()
+               in battle-mode.engine.js. Nur fuer Kampf befuellt (renderEndstand()); bleibt
+               fuer Bahn-Spiele (renderEndstandBahn()) leer und hidden, weil Bahn-Ereignisse
+               nie ein `kind` tragen. -->
+          <div class="eszene" id="eszene" hidden></div>
           <!-- HOEHEPUNKTE. Text-Rueckblick auf alle big-Ereignisse dieses Spiels (HIGHLIGHTS[],
                gefuellt aus feed()) -- bewusst eine Textliste, kein Bild-Replay, s. Abschnitt 4.3
                derselben Recherche. Nur befuellt/sichtbar, wo dieses Endstand-Overlay ueberhaupt
@@ -186,7 +262,7 @@
            der Preis der Ansage und muss deshalb sichtbar sein, nicht nur spuerbar), rechts
            der eigene Aufheben-Knopf. Der Basketball-Knopf daneben bleibt unberuehrt; beide
            blenden sich gegenseitig aus, je nachdem welche Disziplin laeuft. -->
-      <div class="fokuszeile" id="fokuszeile" hidden>
+      <div class="fokuszeile hud-in" id="fokuszeile" hidden>
         <span class="ansageuhr" id="ansageuhr" hidden title="Sperre bis zur nächsten Zielansage"><b id="ansageuhrzahl"></b></span>
         <span id="fokustext"></span>
         <button class="btn g" id="fokusweg" type="button">Fokus aufheben</button>
@@ -198,7 +274,7 @@
            Grund direkt unter der Kaderleiste — dort liegen die Namen, ueber die man
            auswaehlt. Die Knopfreihe fuellt die Engine aus BAHN_ART, weil jede Bahn
            ihre eigenen drei Plaene mit eigenen Namen hat. -->
-      <div class="rennplanzeile" id="rennplanzeile" hidden>
+      <div class="rennplanzeile hud-in" id="rennplanzeile" hidden>
         <span id="rennplantext"></span>
         <span class="rpknoepfe" id="rennplanknoepfe"></span>
         <button class="btn g" id="rennplanzu" type="button" hidden>Schließen</button>
@@ -208,7 +284,7 @@
            Zwischenzeiten mit Diff zur Bestzeit im Feld. Chris' Auftrag woertlich: "man
            alle spieler einzeln sieht wie sie auf einer strecke fahren ... eingebettet die
            zeiten der anderen ... mit so 2 chrono zwischenzeiten". -->
-      <div class="ttfokus" id="ttfokus" hidden>
+      <div class="ttfokus hud-in" id="ttfokus" hidden>
         <div class="ttkopf">
           <b id="ttname">—</b><span id="ttplan"></span>
           <span class="ttnav">
@@ -222,6 +298,11 @@
              Kraftreserve — die drei Groessen, an denen man ein Zeitfahren wirklich
              mitliest, statt einer Rangpunktesumme im Uhr-Feld. -->
         <div class="ttstand" id="ttstand">—</div>
+        <!-- TT-4: "ZEIT FUER DEN TEAMSIEG" (Broadcast-Optik-Recherche 27.09., Abschnitt 2.3,
+             SMT-Vorbild "time to take the yellow jersey"). Nur sichtbar, sobald eine Seite
+             komplett im Ziel ist und die andere noch faehrt -- s. bahnZeitFuerSieg() in
+             battle-mode.engine.js, aufgerufen aus renderZeitfahrenPanel(). -->
+        <div class="ttteamsieg" id="ttteamsieg" hidden></div>
         <div class="ttroster" id="ttroster"></div>
         <div class="ttprofil" id="ttprofil"></div>
         <div class="ttsplits" id="ttsplits"></div>
@@ -234,9 +315,14 @@
         <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
           style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">
       </div>
+      </div><!-- /.arenaHaupt -->
       <div class="untenraum">
         <div class="feed" id="feed"></div>
-        <div class="wertung">
+        <!-- id="wertungBox" (Broadcast-Optik-Audit, Punkt 9, 28.09.): reiner CSS-Hook fuer
+             die Disziplin-Akzentfarbe (--wakzent, s. battle-mode.css). renderWertungTabelle()
+             setzt data-disc darauf, sobald sich die Disziplin aendert -- Spalten/Sortierung/
+             Zeilenquellen bleiben unberuehrt, das ist ausschliesslich Anzeige. -->
+        <div class="wertung" id="wertungBox">
           <div class="wtitel">Wertung <em>laufend</em></div>
           <!-- ZWEI BLOECKE STATT EINER GEMEINSAMEN TABELLE (Chris' Fund, 29.08.): bei
                zwoelf gemischt sortierten Zeilen musste man erst die Team-Farbe der
@@ -256,11 +342,23 @@
               <div class="tbl-wrap"><table class="wtbl"><thead><tr id="wkopfR"></tr></thead><tbody id="wbodyR"></tbody></table></div>
             </div>
           </div>
-          <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          <!-- EINKLAPPBAR (Broadcast-Audit Runde 2, Punkt 15, 30.09.): die Spalten-
+               Fussnote stand vorher dauerhaft ausgeschrieben unter der Live-Tabelle.
+               renderWertungTabelle() setzt weiterhin nur #wfuss.textContent — das
+               <details>-Element drumherum aendert daran nichts. -->
+          <details class="wfussbox"><summary>Spalten-Erklärung</summary>
+            <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          </details>
         </div>
       </div>
     </div>
-    <div class="notes">
+    <!-- TDM-ENTWICKLERPANELS (Opus-Review 27.09.): die drei Notizen hier unten dokumentieren
+         Nutzwert-Waechter, Verhaltensmodell und das provisorische Einheits-Kit — alles
+         TDM-spezifische Entwurfs-/Designdokumentation, die fuer die uebrigen neunzehn
+         Disziplinen keinen Sinn ergibt. `id` hier NUR zum Gaten in reset()
+         (battle-mode.engine.js, "TDM-ENTWICKLERPANELS NUR FUER TDM"); Inhalt bleibt
+         unangetastet fuer TDM. -->
+    <div class="notes" id="tdmEntwurfNotes">
       <div class="note">
         <h3>Nutzwert je Skill — der Wächter gegen zu starke Kits</h3>
         <p class="muted" style="font-size:12px;margin:0 0 8px">Aus den Wechselkursen ausgerechnet,

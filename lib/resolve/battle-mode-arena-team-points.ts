@@ -120,11 +120,13 @@ import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   runArenaFixtures,
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   ARENA_BUEHNE_DUELL_DISCIPLINE_IDS,
   ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS,
+  ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS,
   ARENA_BAHN_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
@@ -202,6 +204,7 @@ for (const [mengenName, menge] of [
   ["ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS", ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS],
   ["ARENA_BUEHNE_DUELL_DISCIPLINE_IDS", ARENA_BUEHNE_DUELL_DISCIPLINE_IDS],
   ["ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS", ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS],
+  ["ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS", ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS],
   ["ARENA_BAHN_DISCIPLINE_IDS", ARENA_BAHN_DISCIPLINE_IDS],
 ] as const) {
   for (const disziplinId of menge) {
@@ -1242,7 +1245,44 @@ export type RunBattleModeArenaMatchdayInput = {
   /** Injektionspunkt fuer Tests — Default ist der echte, Playwright-gestuetzte Runner. */
   runArenaFixturesImpl?: typeof runArenaFixtures;
   runArenaFixturesOptions?: RunArenaFixturesOptions;
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der Spieltagswurf dieser
+   * Disziplin-Seite, der als Attributbonus in die Simulation geht. Der produktive Aufrufer
+   * (`arena-matchday-resolve-service.ts`) berechnet ihn aus DENSELBEN geladenen Contexts, aus denen
+   * spaeter der Resolve wuerfelt, und reicht ihn explizit durch. Weggelassen -> aus dem Spielplan
+   * dieses Spieltags abgeleitet (`resolveMutatorTraitsFromSchedule()`); `null` -> ausdruecklich
+   * kein Mutator.
+   */
+  matchdayMutatorTraits?: readonly string[] | null;
 };
+
+/**
+ * Rueckfall fuer `RunBattleModeArenaMatchdayInput.matchdayMutatorTraits`: derselbe Wurf, den der
+ * Resolve fuer diese Disziplin sieht (`buildMatchdayMutatorTraitsBySide()` mit d1/d2 des
+ * Spieltags), hier aus dem Spielplan-Eintrag statt aus einem geladenen Context gelesen. `[]`, wenn
+ * die Disziplin an diesem Spieltag in keinem Slot steht.
+ */
+export function resolveMutatorTraitsFromSchedule(input: {
+  gameState: Pick<GameState, "seasonState">;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  disciplineId: string;
+}): string[] {
+  const row = (input.gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.matchdayId === input.matchdayId && (!entry.seasonId || entry.seasonId === input.seasonId),
+  );
+  return (
+    resolveMatchdayMutatorTraitsForDiscipline({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      d1DisciplineId: row?.discipline1?.disciplineId ?? null,
+      d2DisciplineId: row?.discipline2?.disciplineId ?? null,
+      disciplineId: input.disciplineId,
+    }) ?? []
+  );
+}
 
 export type RunBattleModeArenaMatchdayResult = {
   overridesByTeamId: Map<string, ArenaTeamPointsOverride>;
@@ -1277,6 +1317,13 @@ export async function runBattleModeArenaMatchday(
   const overridesByTeamId = new Map<string, ArenaTeamPointsOverride>();
   const alleFixtureErgebnisse: ArenaFixtureResult[] = [];
   const warnings: string[] = [];
+  // MUTATOR ORGANISCH (29.09.): EIN Wurf fuer alle Fixtures dieser Disziplin (fuer alle 32 Teams
+  // derselbe, s. rollMatchdayMutatorTraitsForSide).
+  const mutatoren =
+    input.matchdayMutatorTraits === undefined
+      ? resolveMutatorTraitsFromSchedule({ gameState, saveId, seasonId, matchdayId, disciplineId })
+      : [...(input.matchdayMutatorTraits ?? [])];
+  const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren };
 
   for (const tier of LEAGUE_TIERS) {
     const fixtures = findLeagueFixturesForMatchday(gameState, tier, matchdayId);
@@ -1300,7 +1347,7 @@ export async function runBattleModeArenaMatchday(
 
     let fixtureResults: ArenaFixtureResult[];
     try {
-      fixtureResults = await runImpl(gameState, fixtureInputs, disciplineId, input.runArenaFixturesOptions);
+      fixtureResults = await runImpl(gameState, fixtureInputs, disciplineId, runOptions);
     } catch (error) {
       warnings.push(
         `arena_matchday_league_failed:${tier}:${error instanceof Error ? error.message : String(error)}`,

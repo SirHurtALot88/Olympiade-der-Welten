@@ -443,4 +443,86 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
     },
     LAUF_TIMEOUT_MS,
   );
+
+  /**
+   * GAUNTLET-UMBAU (22.09., Chris' Vorgabe): das fuenfte Buehnen-Chassis fuer `art.gauntlet`
+   * (bisher nur Breaking, `spieleBuehneGauntlet()` im Motor,
+   * `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS` im Runner) -- WEDER Duell-/Brettzaehlung noch
+   * Punktsumme wie die Chassis oben, sondern eine Ueberlebenden-Zaehlung: das Team mit dem
+   * letzten Kaempfer im Ring gewinnt, s. Kommentar am Motor-Einstiegspunkt selbst.
+   */
+  it(
+    "simuliert Breaking ueber das Buehnen-Gauntlet-Chassis: Seitenstand ist eine Ueberlebenden-Zaehlung, nie 0:0",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+
+      const [ergebnis] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "breaking-gauntlet-chassis-abnahme" }],
+        "breaking",
+      );
+
+      pruefeErgebnisForm(ergebnis, "team-heim", "team-gast");
+      // Ueberlebenden-Zaehlung: hoechstens jeSeite (6), und GENAU EINE Seite hat 0 -- ein
+      // Gauntlet laeuft immer bis ein Team komplett aufgebraucht ist, ein 0:0 (beide Teams
+      // leer) ist bei einer echten Aufstellung praktisch ausgeschlossen.
+      for (const seite of ergebnis.seiten) {
+        expect(seite).toBeGreaterThanOrEqual(0);
+        expect(seite).toBeLessThanOrEqual(6);
+      }
+      expect(ergebnis.seiten[0] === 0 || ergebnis.seiten[1] === 0).toBe(true);
+      expect(ergebnis.seiten[0] > 0 || ergebnis.seiten[1] > 0).toBe(true);
+      // `gesamtKg` ist NUR fuer das Buehnen-Heben-Chassis gesetzt.
+      expect(ergebnis.gesamtKg).toBeUndefined();
+      // Boxscore-Werte sind die eigenen Punkte jedes Kaempfers (u.summe) -- nicht negativ,
+      // aber anders als bei den unabhaengigen Auftritt-Buehnen stark ungleich verteilt (ein
+      // langer Ueberlebender traegt den grossen Teil).
+      for (const eintrag of ergebnis.boxscore) {
+        expect(eintrag.wert).toBeGreaterThanOrEqual(0);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der echte Spieltagswurf
+   * erreicht die Simulation — auch ab dem zweiten Fixture eines Batches (Neu-Einhaengen der
+   * Engine) — und wirkt nur auf Spieler, deren Traits ihn treffen. Die Heimseite traegt hier
+   * zusaetzlich "Healthy", die Gastseite nicht; ein Wurf mit "Healthy" macht also NUR die
+   * Heimseite staerker. Ohne `mutatoren` ist das Ergebnis identisch zu `mutatoren: []` (kein
+   * engine-eigener Ersatzwurf).
+   */
+  it(
+    "reicht den Spieltagswurf in die Simulation: nur getroffene Spieler werden staerker",
+    async () => {
+      const gameState = baueGameState(
+        { teamId: "team-heim", prefix: "Heim" },
+        { teamId: "team-gast", prefix: "Gast" },
+      );
+      for (const player of gameState.players) {
+        if (player.id.startsWith("Heim-")) player.traitsPositive = ["Loyal", "Healthy"];
+      }
+      const fixtures = ["m1", "m2", "m3", "m4"].map((seed) => ({ homeTeamId: "team-heim", awayTeamId: "team-gast", seed }));
+
+      const ohne = await runArenaFixtures(gameState, fixtures, "basketball");
+      const leer = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: [] });
+      const mit = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: ["Healthy", "Sexy"] });
+      const mitNochmal = await runArenaFixtures(gameState, fixtures, "basketball", { mutatoren: ["Healthy", "Sexy"] });
+
+      expect(leer).toEqual(ohne);
+      expect(mitNochmal).toEqual(mit);
+      // In JEDEM Fixture aendert sich etwas — auch in denen ab Index 1, die ueber
+      // `haengeMotorNeuEin()` laufen und den Wurf dort erneut mitbekommen muessen.
+      for (let index = 0; index < fixtures.length; index += 1) {
+        expect(mit[index]).not.toEqual(ohne[index]);
+      }
+      const heimSumme = (ergebnisse: ArenaFixtureResult[]) =>
+        ergebnisse.reduce((summe, ergebnis) => summe + ergebnis.seiten[0] - ergebnis.seiten[1], 0);
+      expect(heimSumme(mit)).toBeGreaterThan(heimSumme(ohne));
+    },
+    LAUF_TIMEOUT_MS * 2,
+  );
 });

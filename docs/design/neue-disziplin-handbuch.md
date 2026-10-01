@@ -91,11 +91,18 @@ Bühne-Disziplinen** (`bauBuehne`, :7969-7981):
 ```
 ermued  = 1 − max(0, 60−AUSDAUER)·0,0035·(ri/(rundenN−1))
 basis   = (20 + GRUNDLAGE·0,7) · max(0,4, ermued)
-erfolg  = min(0,94; 0,15 + TECHNIK·0,0055 + NERVEN·0,0035)
-gelingt : punkte = basis + SPITZENMOMENT·0,35·(0,4 + WAGNIS·0,006)
+erfolg  = min(0,94; 0,15 + TECHNIK·0,0055 + NERVEN·0,0035 − (WAGNIS−50)·0,0015)   [≥ 0,05]
+gelingt : punkte = basis + SPITZENMOMENT·0,35·(0,7 + (WAGNIS−50)·0,014)
 misslingt: punkte = basis · failAbzug          (Gewichtheben: failAbzug 0)
 immer   : + PUBLIKUM·0,12, gerundet, ≥ 0
 ```
+
+**Seit 26.09.:** WAGNIS ist im generischen Block ein echter Trade-off (`BUEHNE_WAGNIS_RISIKO` /
+`BUEHNE_WAGNIS_ERTRAG` vor `bauBuehne()`): über 50 seltener Erfolg, aber höherer Bonus; unter 50
+umgekehrt. Bei WAGNIS 50 sind beide Zeilen exakt die alten Werte (`0,4 + 50·0,006 = 0,7`).
+Vorher stand WAGNIS nur im Bonus — mehr Wagnis brachte nie einen Fehlschlag mehr (Befund B,
+`buehne-auftritt-opus-konzeptreview-26-09.md`). Breaking (`gauntletRunde()`) führt die alte
+Formel bewusst weiter.
 
 Gewichtheben-eigen ist nur die Zeile in `BUEHNE_ART` (:7791-7817): `rundenN:3`,
 `rundenDauer:1.65`, `failAbzug:0` („echtes Gewichtheben kennt keine Teilpunkte für eine

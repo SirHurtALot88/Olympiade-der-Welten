@@ -154,12 +154,30 @@ export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
  * noch `.duell`, `spieleBuehneAuftritt()` ist damit der richtige und einzige Einstiegspunkt.
  * Die Namensaehnlichkeit `duett`/`duell` ist die eine Falle dieser Welle; sie ist hier
  * ausdruecklich benannt, damit ein kuenftiger Leser sie nicht fuer einen Copy-Paste-Fehler haelt.
+ *
+ * BREAKING WIEDER RAUS (22.09., Gauntlet-Umbau): `BUEHNE_ART.breaking` traegt jetzt
+ * `gauntlet:true` (Chris' Vorgabe -- Slot 1 gegen Slot 1, der Sieger bleibt mit seinem
+ * aktuellen HP-Stand im Ring, s. `public/mockups/battle-mode.engine.js`). Eine Summenwertung
+ * (was `spieleBuehneAuftritt()` liefert) bildet "wer uebrig bleibt scored einen Punkt" nicht
+ * ab -- ein Team koennte mit weniger Ueberlebenden trotzdem die hoehere Punktsumme haben.
+ * Breaking laeuft deshalb ab hier ueber `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS`/
+ * `spieleBuehneGauntlet()` (s.u.), das einzige Chassis, das ueber ein `.gauntlet`-Flag geht.
  */
 export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "showcase",
   "eiskunstlauf",
-  "breaking",
   "wettessen",
+]);
+
+/**
+ * FUENFTE BUeHNEN-CHASSIS-MENGE (22.09., Gauntlet-Umbau): fuer `BUEHNE_ART[d].gauntlet` --
+ * bisher nur Breaking. `window.__arena.spieleBuehneGauntlet()` liest den Seitenstand als
+ * Ueberlebenden-Zaehlung (`u.raus`), nicht als Punktsumme oder Duell-/Brettzaehlung -- ein
+ * eigenes, viertes Muster neben Heben/Duell/Auftritt, s. Kommentar am Motor-Einstiegspunkt
+ * selbst (battle-mode.engine.js) fuer die volle Herleitung.
+ */
+export const ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "breaking",
 ]);
 
 /**
@@ -304,6 +322,15 @@ export type RunArenaFixturesOptions = {
   chromiumExecutablePath?: string;
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
   seitenTimeoutMs?: number;
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
+   * dieser Disziplin-Seite (`rollMatchdayMutatorTraitsForSide()`, zwei Traits aus dem 36er-Pool,
+   * fuer alle Teams gleich). Er faehrt als `window.__olyArenaKader.mutatoren` in die Engine, die
+   * getroffene Spieler daraufhin mit hoeheren Attributen antreten laesst. Weggelassen -> `[]`,
+   * also AUSDRUECKLICH kein Mutator — nie der engine-eigene Ersatzwurf: ein Lauf ohne echten Wurf
+   * (Referenzziehungen, Tests) soll niemanden zufaellig besser machen.
+   */
+  mutatoren?: readonly string[];
 };
 
 type VorbereitetesFixture = {
@@ -423,11 +450,13 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
   }[];
   disziplin: string;
+  /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
+  mutatoren: string[];
   // Welche Browser-Funktion je Fixture aufgerufen wird -- s. `ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS`
   // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` /
-  // `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche entscheidet, keine Disziplins-ID-Kenntnis
-  // im Browser-Code selbst.
-  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn";
+  // `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS` / `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche
+  // entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
+  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn";
   timeoutMs: number;
 }): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
@@ -436,6 +465,7 @@ async function simuliereFixturesImBrowser(payload: {
       spieleBuehneHeben: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneDuell: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneAuftritt: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleBuehneGauntlet: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBahn: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
     };
     __olyArenaKader?: unknown;
@@ -460,6 +490,7 @@ async function simuliereFixturesImBrowser(payload: {
       heim: kader.heim,
       gast: kader.gast,
       aufstellung: kader.aufstellung,
+      mutatoren: payload.mutatoren,
     };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
@@ -488,6 +519,8 @@ async function simuliereFixturesImBrowser(payload: {
         ? fenster.__arena.spieleBuehneDuell(payload.disziplin, fixture.seed)
         : payload.chassis === "buehneAuftritt"
         ? fenster.__arena.spieleBuehneAuftritt(payload.disziplin, fixture.seed)
+        : payload.chassis === "buehneGauntlet"
+        ? fenster.__arena.spieleBuehneGauntlet(payload.disziplin, fixture.seed)
         : payload.chassis === "bahn"
         ? fenster.__arena.spieleBahn(payload.disziplin, fixture.seed)
         : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
@@ -527,6 +560,7 @@ export async function runArenaFixtures(
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
   }
   const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
 
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
   try {
@@ -560,11 +594,12 @@ export async function runArenaFixtures(
       heim: vorbereitet[0].heim,
       gast: vorbereitet[0].gast,
       aufstellung: vorbereitet[0].aufstellung,
+      mutatoren,
     });
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
+    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
       disziplin,
     )
       ? "buehneHeben"
@@ -572,6 +607,8 @@ export async function runArenaFixtures(
       ? "buehneDuell"
       : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
       ? "buehneAuftritt"
+      : ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS.has(disziplin)
+      ? "buehneGauntlet"
       : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
       ? "bahn"
       : "feldspiel";
@@ -583,6 +620,7 @@ export async function runArenaFixtures(
         aufstellung,
       })),
       disziplin,
+      mutatoren,
       chassis,
       timeoutMs,
     });
@@ -600,6 +638,8 @@ export async function runArenaFixtures(
         ? "spieleBuehneDuell"
         : chassis === "buehneAuftritt"
         ? "spieleBuehneAuftritt"
+        : chassis === "buehneGauntlet"
+        ? "spieleBuehneGauntlet"
         : chassis === "bahn"
         ? "spieleBahn"
         : "spieleFeldspiel";
@@ -820,7 +860,9 @@ export async function runMiniDmFfaPodFixtures(
       (kader) => {
         (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
       },
-      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {} },
+      // `mutatoren: []` (29.09.): kein engine-eigener Ersatzwurf — dieser Runner ist reine
+      // Praesentation und kennt den echten Spieltagswurf nicht, s. `RunArenaFixturesOptions.mutatoren`.
+      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {}, mutatoren: [] },
     );
 
     await page.goto(pathToFileURL(seitenPfad).href);

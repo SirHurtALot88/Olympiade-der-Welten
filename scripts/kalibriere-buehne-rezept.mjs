@@ -56,6 +56,18 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCKUP = path.join(WURZEL, "public/mockups");
 const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
 
+// WAGNIS-TRADE-OFF (26.09., BUEHNE_WAGNIS_RISIKO/_ERTRAG in battle-mode.engine.js): WAGNIS senkt
+// die Erfolgschance und hebt den Bonus bei Gelingen, beides symmetrisch um 50. Die zwei
+// Konstanten werden aus der Motor-Datei gelesen, nicht hier ein zweites Mal gepflegt — sonst
+// laeuft die Nachbildung still auseinander (`--vergleich` wuerde es melden).
+const WAGNIS_K = (() => {
+  const q = readFileSync(path.join(MOCKUP, "battle-mode.engine.js"), "utf8");
+  const z = (name) => { const m = q.match(new RegExp(`const ${name}=([0-9.]+)`)); if (!m) throw new Error(`${name} nicht in battle-mode.engine.js gefunden.`); return Number(m[1]); };
+  return { risiko: z("BUEHNE_WAGNIS_RISIKO"), ertrag: z("BUEHNE_WAGNIS_ERTRAG") };
+})();
+const erfolgVon = (L) => Math.max(0.05, Math.min(0.94, 0.15 + L.TECHNIK * 0.0055 + L.NERVEN * 0.0035 - (L.WAGNIS - 50) * WAGNIS_K.risiko));
+const wagnisFaktor = (L) => Math.max(0, 0.7 + (L.WAGNIS - 50) * WAGNIS_K.ertrag);
+
 // ---------------------------------------------------------------------------------
 // Aufruf
 // ---------------------------------------------------------------------------------
@@ -199,9 +211,9 @@ function spieleSpiel(motor, spiel, R, opt = {}) {
     for (let ri = 0; ri < rundenN; ri++) {
       const ermued = 1 - Math.max(0, (60 - L.AUSDAUER)) * 0.0035 * (ri / Math.max(1, rundenN - 1));
       const basis = (20 + L.GRUNDLAGE * 0.7) * Math.max(0.4, ermued);
-      const erfolg = Math.min(0.94, 0.15 + L.TECHNIK * 0.0055 + L.NERVEN * 0.0035);
+      const erfolg = erfolgVon(L);
       let punkte;
-      if (rr() < erfolg) punkte = basis + L.SPITZENMOMENT * 0.35 * (0.4 + L.WAGNIS * 0.006);
+      if (rr() < erfolg) punkte = basis + L.SPITZENMOMENT * 0.35 * wagnisFaktor(L);
       else punkte = basis * failAbzug;
       runden.push(Math.max(0, Math.round(punkte + L.PUBLIKUM * 0.12)));
     }
@@ -239,8 +251,8 @@ function zerlege(motor, varianten, R, opt = {}) {
       for (let ri = 0; ri < rn; ri++) {
         const erm = 1 - Math.max(0, 60 - L.AUSDAUER) * 0.0035 * (ri / Math.max(1, rn - 1));
         const basis = (20 + L.GRUNDLAGE * 0.7) * Math.max(0.4, erm);
-        const p = Math.min(0.94, 0.15 + L.TECHNIK * 0.0055 + L.NERVEN * 0.0035);
-        const swing = basis * (1 - fa) + L.SPITZENMOMENT * 0.35 * (0.4 + L.WAGNIS * 0.006);
+        const p = erfolgVon(L);
+        const swing = basis * (1 - fa) + L.SPITZENMOMENT * 0.35 * wagnisFaktor(L);
         e += basis * fa + p * swing + L.PUBLIKUM * 0.12; va += p * (1 - p) * swing * swing;
       }
       return { eig: t.eig, wert: e, va };
@@ -256,7 +268,7 @@ function zerlege(motor, varianten, R, opt = {}) {
 // um +10 anheben, mittleren Gewinn am Erwartungswert messen, auf 100 normieren.
 function sondiere(motor, varianten, R) {
   const art = motor.art; const rn = art.rundenN, fa = art.failAbzug;
-  const erwartung = (L) => { let e = 0; for (let ri = 0; ri < rn; ri++) { const erm = 1 - Math.max(0, 60 - L.AUSDAUER) * 0.0035 * (ri / Math.max(1, rn - 1)); const basis = (20 + L.GRUNDLAGE * 0.7) * Math.max(0.4, erm); const p = Math.min(0.94, 0.15 + L.TECHNIK * 0.0055 + L.NERVEN * 0.0035); e += basis * fa + p * (basis * (1 - fa) + L.SPITZENMOMENT * 0.35 * (0.4 + L.WAGNIS * 0.006)) + L.PUBLIKUM * 0.12; } return e; };
+  const erwartung = (L) => { let e = 0; for (let ri = 0; ri < rn; ri++) { const erm = 1 - Math.max(0, 60 - L.AUSDAUER) * 0.0035 * (ri / Math.max(1, rn - 1)); const basis = (20 + L.GRUNDLAGE * 0.7) * Math.max(0.4, erm); const p = erfolgVon(L); e += basis * fa + p * (basis * (1 - fa) + L.SPITZENMOMENT * 0.35 * wagnisFaktor(L)) + L.PUBLIKUM * 0.12; } return e; };
   const gewinn = {}; for (const k in R) gewinn[k] = 0; let n = 0;
   for (const v of varianten) for (const s of v.spiele.slice(0, 4)) for (const t of s.teilnehmer) {
     const L = {}; for (const k in R) L[k] = mische(t.attr, R[k]); const e0 = erwartung(L);
