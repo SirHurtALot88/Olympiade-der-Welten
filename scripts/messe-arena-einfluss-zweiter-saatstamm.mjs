@@ -21,6 +21,13 @@ const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
 const browser = await chromium.launch({ executablePath: fest });
 const seite = await browser.newPage();
+// Kein AudioContext im Messlauf -- derselbe Speicherleck-Fix wie in messe-arena-einfluss.mjs
+// (s. dortiger Kommentar): sonst haelt der eine lange einflussVon()-Aufruf jeden WebAudio-
+// Knoten der Ton-Schicht bis zum Ende fest. Messwerte unveraendert (Ton ruft nie rr()).
+await seite.addInitScript(() => {
+  window.AudioContext = undefined;
+  window.webkitAudioContext = undefined;
+});
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(datei, { waitUntil: "networkidle" });
