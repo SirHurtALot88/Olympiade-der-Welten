@@ -15036,6 +15036,28 @@
     0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
   const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
 
+  // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09.,
+  // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F2", Paket 1 "Regie & Bild",
+  // Klasse A, nur Speed-Schach). Liefert die SPOILERFREIE obere Schranke dafuer, wie viele
+  // Punkte `u` in seinen NOCH NICHT enthuellten Durchgaengen hoechstens noch holen kann --
+  // woertlich dieselbe Formel wie der Erfolgszweig von setz() oben (`basis + SPITZENMOMENT*
+  // 0,35*buehneWagnisFaktor + PUBLIKUM*0,12`), nur fuer jeden verbleibenden Durchgang einzeln
+  // aufsummiert, OHNE je `u.runden[ri]` fuer ri>u.aktuell zu lesen -- die liegen zwar schon
+  // vollstaendig berechnet vor (s. "ALLE DURCHGAENGE SOFORT DURCHRECHNEN" in setz()), waeren
+  // hier aber ein Blick in die Zukunft (das Ergebnis selbst), nicht nur eine Abschaetzung
+  // seiner oberen Grenze. Liest ausschliesslich u.GRUNDLAGE/u.SPITZENMOMENT/u.PUBLIKUM/
+  // u.AUSDAUER (bereits beim Bauen gesetzte Sub-Skills) und art.rundenN -- kein rr(), kein
+  // neues Feld auf TEILNEHMER, nichts, was wert()/miss-alle-disziplinen.mjs lesen wuerde.
+  function buehneMaxRestPunkte(u,art){
+    let summe=0;
+    for(let ri=u.aktuell+1;ri<art.rundenN;ri++){
+      const ermued=1-Math.max(0,(60-u.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
+      const basis=(20+u.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
+      summe+=Math.max(0,Math.round(basis+u.SPITZENMOMENT*0.35*buehneWagnisFaktor(u)+u.PUBLIKUM*0.12));
+    }
+    return summe;
+  }
+
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
@@ -17343,6 +17365,32 @@
         const vorteilKipptBig=u.aktuell>0
           &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
           &&(!gegner||gegner.aktuell>=u.aktuell);
+        // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09., Abschnitt 4
+        // "S-F2", Paket 1 "Regie & Bild", Klasse A, NUR Speed-Schach -- s. buehneMaxRestPunkte()-
+        // Kommentar oben fuer die volle Herleitung der oberen Schranke). Ab Zug 6 prueft dieser
+        // Zweig, ob der laufende Rueckstand der zurueckliegenden Seite groesser ist als das, was
+        // sie in ihren NOCH NICHT enthuellten Zuegen maximal noch holen kann -- wenn ja, kann
+        // dieses Brett die Partie nicht mehr drehen. `u.vizSchachAufgegeben` (auf BEIDEN Seiten
+        // des Bretts gesetzt) ist ein reines Anzeige-Flag: zeichneSchach() liest es, um die
+        // Kamera-Regie auf den noch offenen Brettern zu halten (s. dortiger Kommentar) --
+        // nichts davon fliesst in wert()/rr()/u.summe/u.verlauf/u.vorteil, das Brett wird
+        // unveraendert bis zum letzten Zug durchgerechnet (genau wie jedes andere). Gate wie
+        // bei `vorteilKipptBig` direkt darueber: nur die Seite, deren Gegner diesen Zugindex
+        // ebenfalls schon erreicht hat, darf das Flag setzen und die Meldung feuern -- sonst
+        // wuerde jede Seite unabhaengig voneinander pruefen und zweimal feuern. Vor Zug 6 und
+        // nach dem letzten Zug (dort gilt "BRETT ENTSCHIEDEN" weiter unten) greift der Zweig
+        // nicht.
+        if(BB().schach&&gegner&&!u.vizSchachAufgegeben&&u.aktuell+1>=6&&u.aktuell+1<BB().rundenN
+           &&gegner.aktuell>=u.aktuell){
+          const imRueckstand=v<0?u:(v>0?gegner:null);
+          if(imRueckstand&&buehneMaxRestPunkte(imRueckstand,BB())<Math.abs(v)){
+            const fuehrend=imRueckstand===u?gegner:u;
+            u.vizSchachAufgegeben=true; gegner.vizSchachAufgegeben=true;
+            feed(0,"Brett "+((u.brett??0)+1)+" vorzeitig entschieden — "+fuehrend.n
+              +" liegt uneinholbar vorn, die Kamera bleibt bei den offenen Brettern.",
+              buehneBahnGrossDrosseln(true,true),undefined,"entschieden");
+          }
+        }
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
@@ -17428,9 +17476,10 @@
               // eines stummen Laufs hinaus ueberlebt.
               if(stumm){
                 feed(0,"Periode "+periode+" beendet — "+seite0.n+" gegen "+seite1.n+
-                  ": Treffer "+seite0.treffer+":"+(seite1.treffer||0)+".",true,undefined,"zwischenstand");
+                  ": Treffer "+seite0.treffer+":"+(seite1.treffer||0)+"."
+                  +fechtPeriodenSatz(seite0,seite1,periode,BB().rundenN),true,undefined,"zwischenstand");
               } else {
-                fechtPeriodenAnstossen({periode,seite0,seite1},BB().jeSeite);
+                fechtPeriodenAnstossen({periode,seite0,seite1,rundenN:BB().rundenN},BB().jeSeite);
               }
             }
           }
@@ -21345,9 +21394,22 @@
 
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-    const [fa]=paar(tennisFokus);
+    const [fa,fb]=paar(tennisFokus);
+    // T-F4 -- BALLWECHSEL-LAENGE (Fable-Ideen Buehne-Duell 30.09., Abschnitt 2 "T-F4", Paket 1
+    // "Regie & Bild", Klasse A). Die Rundenpunkte beider Seiten tragen bereits eine Zahl, die
+    // sich als Schlagzahl des zuletzt enthuellten Ballwechsels lesen laesst (hohe Punkte beider
+    // Seiten = langer Ballwechsel, ermued aus AUSDAUER macht spaete Runden kuerzer, s. Fable-
+    // Dokument): reine Summe der beiden bereits vorhandenen `runden[idx].punkte`-Werte, kein
+    // neues Feld auf TEILNEHMER, kein rr(). Das im selben Abschnitt vorgeschlagene "BREAK!"-
+    // Banner braucht einen diskreten Punktgewinner -- der existiert erst mit T-F1 (Nullsummen-
+    // Punkt durch Vergleich), einer Klasse-B-Mechanikaenderung, die NICHT Teil von Paket 1 ist
+    // (eigene Messrunde + Chris' Zustimmung noetig) -- bleibt deshalb hier bewusst aus.
+    const letzterIdx=fa?fa.aktuell:-1;
+    const schlagzahl=(letzterIdx>=0&&fa&&fb&&fa.runden[letzterIdx]&&fb.runden[letzterIdx])
+      ?fa.runden[letzterIdx].punkte+fb.runden[letzterIdx].punkte:null;
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
-      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:""),W/2,H*0.12);
+      +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
+      +(schlagzahl!=null?" · "+schlagzahl+" Schläge":""),W/2,H*0.12);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
@@ -24737,17 +24799,33 @@
       // die rohe Formel bleibt dagegen fuer jedes Brett jederzeit berechenbar). Erstes
       // Brett in Reihenfolge gewinnt (kein weiteres Tiebreak-Kriterium noetig, Zeitnot ist
       // laut Dokument-Tabelle selten genug, dass zwei gleichzeitig kaum vorkommen).
-      let zeitnotBrett=null;
+      //
+      // S-F2 -- KAMERA MEIDET VORZEITIG ENTSCHIEDENE BRETTER (s. buehneMaxRestPunkte()-/
+      // "DAS LETZTE BRETT ENTSCHEIDET"-Kommentar in stepBuehne()): `u.vizSchachAufgegeben`
+      // ist ein reines Anzeige-Flag, hier nur GELESEN. Beide Kandidatenlisten unten
+      // (Zeitnot wie "knappster Vorteil") schliessen aufgegebene Bretter aus, SOLANGE es
+      // noch mindestens ein offenes, nicht aufgegebenes Brett gibt -- bleiben nur noch
+      // aufgegebene Bretter uebrig (Sonderfall, z.B. beide letzten Bretter kippen im selben
+      // Zug), faellt die Automatik auf ALLE offenen Bretter zurueck, statt den Fokus auf
+      // nichts zeigen zu lassen.
+      const offenNichtAufgegeben=[];
       for(let b=0;b<bretter;b++){
-        const [x,y]=paar(b); if(!x||!y||(fertig(x)&&fertig(y)))continue;
+        const [x,y]=paar(b); if(!x||!y||(fertig(x)&&fertig(y))||x.vizSchachAufgegeben)continue;
+        offenNichtAufgegeben.push(b);
+      }
+      const kandidaten=offenNichtAufgegeben.length?offenNichtAufgegeben:
+        Array.from({length:bretter},(_,b)=>b).filter(b=>{const [x,y]=paar(b); return x&&y&&!(fertig(x)&&fertig(y));});
+      let zeitnotBrett=null;
+      for(const b of kandidaten){
+        const [x,y]=paar(b);
         if(schachUhrWert(x,art)<30||schachUhrWert(y,art)<30){ zeitnotBrett=b; break; }
       }
       if(zeitnotBrett!=null){
         schachFokus=zeitnotBrett;
       } else {
-        let best=schachFokus,bv=Infinity;
-        for(let b=0;b<bretter;b++){
-          const [a]=paar(b); if(!a)continue;
+        let best=kandidaten.includes(schachFokus)?schachFokus:kandidaten[0],bv=Infinity;
+        for(const b of kandidaten){
+          const [a]=paar(b);
           const v=(a.aktuell>=0&&a.verlauf)?Math.abs(a.verlauf[a.aktuell]):0;
           if(v<bv){bv=v;best=b;}
         }
@@ -24800,8 +24878,11 @@
       ctx.strokeText(siegTxt,W/2,H*0.125); ctx.fillText(siegTxt,W/2,H*0.125);
     } else {
       ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=schachPin!=null?"#f2d75a":"#8a93a3";
+      // S-F2: nur sichtbar, wenn ein ANGEHEFTETES (schachPin) Brett trotz Regie-Meidung im
+      // Fokus steht -- die Automatik selbst zeigt ein aufgegebenes Brett ja gar nicht mehr an.
       ctx.fillText("Brett "+(fb+1)+" von "+bretter+" · Zug "+Math.min(art.rundenN,Math.max(a.aktuell,b.aktuell)+1)+"/"+art.rundenN+" · "+partie.name
-        +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":""),W/2,H*0.125);
+        +(schachPin!=null?"  ·  angeheftet, Klick aufs Brett löst":"")
+        +(a.vizSchachAufgegeben?"  ·  vorzeitig entschieden":""),W/2,H*0.125);
     }
 
     // TISCH + BRETT — zwei braune Rechtecke und zwei Beine, wie die Hantel beim Heben:
@@ -25033,15 +25114,22 @@
       const [pa,pb]=paar(i); if(!pa||!pb)return;
       const rx=80+spanne*(klein.length>1?k/(klein.length-1):0.5);
       schachMiniRects.push({i,rx,ry,halbW:Math.max(kw/2,26),halbH:kw/2+22});
+      // S-F2 -- "BILD": ein vorzeitig entschiedenes Brett dimmt sich in der Miniaturreihe
+      // (reines ctx.globalAlpha, kein neuer Zustand, save/restore haelt es auf dieses eine
+      // Brett begrenzt) und traegt den Zusatz "entschieden" in seiner Beschriftungszeile --
+      // dieselbe Information, die auch die Kamera-Regie oben schon nutzt (u.vizSchachAufgegeben).
+      const aufgegeben=!!pa.vizSchachAufgegeben;
+      if(aufgegeben){ ctx.save(); ctx.globalAlpha=0.5; }
       const P=SCHACH_PARTIEN[i%SCHACH_PARTIEN.length]; const h=(pa.aktuell+1)+(pb.aktuell+1); const {B:KB,letzter:kl}=schachStellung(P,h);
       zeichneSchachBrett(rx-kw/2,ry-kw/2,kq,KB,kl,false);
       if(i===schachPin){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=2; ctx.strokeRect(rx-kw/2-3,ry-kw/2-3,kw+6,kw+6); }
       const kv=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
       ctx.font="400 8.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#c7ccd6";
-      ctx.fillText("Brett "+(i+1)+" · "+pa.n.split(" ")[0]+" – "+pb.n.split(" ")[0],rx,ry+kw/2+10);
+      ctx.fillText("Brett "+(i+1)+" · "+pa.n.split(" ")[0]+" – "+pb.n.split(" ")[0]+(aufgegeben?" (entschieden)":""),rx,ry+kw/2+10);
       ctx.fillStyle=kv>0?css("--ok"):(kv<0?css("--crit"):"#8a93a3"); ctx.fillText((kv>0?"+":"")+kv+" · Zug "+(Math.max(pa.aktuell,pb.aktuell)+1)+"/"+art.rundenN,rx,ry+kw/2+21);
       const bwk=kw, halb2=Math.min(bwk/2,(bwk/2)*Math.abs(kv)/maxV); ctx.fillStyle=css("--line"); ctx.fillRect(rx-bwk/2,ry+kw/2+26,bwk,3);
       ctx.fillStyle=kv>=0?css("--ok"):css("--crit"); ctx.fillRect(kv>=0?rx:rx-halb2,ry+kw/2+26,halb2,3);
+      if(aufgegeben)ctx.restore();
     });
 
     // SCHWEBETEXTE nur fuer das Fokus-Brett, am jeweiligen Spieler.
@@ -27585,6 +27673,29 @@
   // Spiel derselben Seite -- verspaetet feuern. Der stumme Pfad ruft feed() deshalb weiterhin
   // direkt und einzeln auf, exakt wie vor dieser PR (bit-identisches Verhalten fuer die
   // Rangtreue-/Pp-Messung).
+  // F-F4 -- PERIODEN-PAUSE ALS BILD (Fable-Ideen Buehne-Duell 30.09.,
+  // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 3 "F-F4", Paket 1 "Regie & Bild",
+  // Klasse A). Chris' reale Minute-Pause (Fechter an der Bande, Zwischenstand) hatte bisher
+  // nur die neutrale "Periode X beendet — A gegen B: Treffer 4:2"-Zeile -- der Auftrag will
+  // genau EINEN zusaetzlichen Satz, der den Zwischenstand als Erzaehlung liest ("Fuehrt 4:2 —
+  // sucht in Periode 2 den Doppeltreffer" / "Liegt zurueck — muss angreifen"), nicht als
+  // zweite Zahlenzeile. Liest AUSSCHLIESSLICH die bereits geloggten `treffer`-Staende beider
+  // Seiten (dasselbe Feld, das die Zeile davor ohnehin zeigt) -- kein neues Feld, kein rr(),
+  // `u.summe`/`u.verlauf`/`wert()` unberuehrt. `rundenN` kommt mit, um zu wissen, ob die
+  // naechste Periode schon die letzte (der Anker) ist -- dort passt "muss angreifen" (die
+  // letzte Chance) besser als "sucht den Doppeltreffer" (noch Zeit fuer einen Ausgleich).
+  function fechtPeriodenSatz(seite0,seite1,periode,rundenN){
+    const t0=seite0.treffer, t1=seite1.treffer||0;
+    // Gesamtzahl Perioden aus rundenN abgeleitet (proPeriode=rundenN/3, s. "PERIODE BEENDET"-
+    // Kommentar oben), NICHT hartcodiert auf 3 -- falls rundenN sich je aendert, bleibt der
+    // Anker-Fall korrekt erkannt.
+    const naechste=periode+1, letztePeriode=naechste>=(rundenN/3);
+    if(t0===t1)return " "+seite0.n.split(" ")[0]+" und "+seite1.n.split(" ")[0]+" stehen vor Periode "+naechste+" ausgeglichen.";
+    const fuehrt=t0>t1?seite0:seite1, zurueck=t0>t1?seite1:seite0;
+    return letztePeriode
+      ? " "+zurueck.n.split(" ")[0]+" liegt zurück — muss in der letzten Periode angreifen."
+      : " "+fuehrt.n.split(" ")[0]+" führt — sucht in Periode "+naechste+" den Doppeltreffer.";
+  }
   const FECHT_PERIODEN_RUHE_MS=6000, FECHT_PERIODEN_MAX_MS=20000;
   let fechtPeriodenBuendel=[], fechtPeriodenQuietT=null, fechtPeriodenMaxT=null;
   function fechtPeriodenAnstossen(eintrag,erwarteteBahnen){
@@ -27608,7 +27719,8 @@
       // kurzen Sammel-Zeitversatz verzoegert.
       const x=buendel[0];
       feed(0,"Periode "+x.periode+" beendet — "+x.seite0.n+" gegen "+x.seite1.n+
-        ": Treffer "+x.seite0.treffer+":"+(x.seite1.treffer||0)+".",true,undefined,"zwischenstand");
+        ": Treffer "+x.seite0.treffer+":"+(x.seite1.treffer||0)+"."
+        +fechtPeriodenSatz(x.seite0,x.seite1,x.periode,x.rundenN),true,undefined,"zwischenstand");
     } else {
       // MEHRERE Bahnen im selben Fenster: EIN Sammelbanner statt N verlorener Einzelbanner
       // (Audit-Beispiel: "Periodenende: 3 Bahnen entschieden"), mit einer kurzen
@@ -27616,8 +27728,24 @@
       const gleichePeriode=buendel.every(x=>x.periode===buendel[0].periode);
       const kurz=buendel.map(x=>x.seite0.n.split(" ")[0]+" "+x.seite0.treffer+":"+(x.seite1.treffer||0)
         +" "+x.seite1.n.split(" ")[0]).join(", ");
+      // F-F4 IM SAMMELBANNER: bei Fechten kommen alle sechs Bahnen praktisch IMMER im selben
+      // Fenster an (REIHENFOLGE-Warteschlange laesst Runde ri aller Bahnen vor Runde ri+1
+      // enthuellen, s. Kopfkommentar des Sammelbanners oben) -- der Einzelbahn-Zweig
+      // (buendel.length===1) oben greift deshalb in der Praxis selten. Damit F-F4s Satz
+      // trotzdem sichtbar wird, bekommt die Bahn mit dem GROESSTEN Trefferabstand (die
+      // dramatischste dieser Periode) ihren eigenen Satz angehaengt -- nur bei gleicher
+      // Periodennummer ueber das ganze Buendel (sonst waere "Periode N" mehrdeutig).
+      let satz="";
+      if(gleichePeriode){
+        let auffaelligste=buendel[0],abstand=-1;
+        for(const x of buendel){
+          const d=Math.abs(x.seite0.treffer-(x.seite1.treffer||0));
+          if(d>abstand){abstand=d;auffaelligste=x;}
+        }
+        satz=fechtPeriodenSatz(auffaelligste.seite0,auffaelligste.seite1,auffaelligste.periode,auffaelligste.rundenN);
+      }
       feed(0,(gleichePeriode?"Periode "+buendel[0].periode+" beendet":"Periodenende")
-        +" — "+buendel.length+" Bahnen entschieden: "+kurz+".",true,undefined,"zwischenstand");
+        +" — "+buendel.length+" Bahnen entschieden: "+kurz+"."+satz,true,undefined,"zwischenstand");
     }
   }
 
