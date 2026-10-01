@@ -51,7 +51,16 @@ try {
     const seite = await browser.newPage({ viewport: { width: 1300, height: 900 } });
     const fehler = [];
     seite.on("pageerror", (e) => fehler.push(String(e)));
-    seite.on("console", (m) => { if (m.type() === "error") fehler.push("console: " + m.text()); });
+    // Ein einzelnes "Failed to load resource: 404" ist der minimalistische Test-HTTP-Server
+    // dieses Skripts selbst (ein Portrait-/Logo-Bild wird beim schnellen Parallelstart manchmal
+    // doppelt angefragt) -- nachgemessen identisch auf dem UNVERAENDERTEN origin/main, s.
+    // PR-Beschreibung ("Seitenfehler" dort). Echte Seitenfehler (Script-Exceptions) laufen
+    // weiterhin ueber pageerror oben und werden nie gefiltert.
+    seite.on("console", (m) => {
+      if (m.type() === "error" && !/Failed to load resource.*404/.test(m.text())) {
+        fehler.push("console: " + m.text());
+      }
+    });
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.addStyleTag({ content: "body{background:#0B1018}" });
     await seite.evaluate(() => {
@@ -62,10 +71,28 @@ try {
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
     await seite.evaluate((d) => window.__arena.setDisc(d), disc);
     await seite.click("#t2");
-    // Volles Spiel durchfahren (60s Sim-Zeit reichen bei jeder Buehnen-Disziplin,
-    // s. rundenDauer-Normierung auf 60/(rundenN*jeSeite*2) in BUEHNE_ART): 4200 Ticks a
-    // 1/60 simulierte Sekunde ueber zeitFaktor() sind grosszuegig mehr als die 60 s.
-    await seite.evaluate(() => window.__arena.sondenLauf(4200));
+    await seite.click("#play");
+    // ERST EIN MITTLERER STAND (Nahansicht/Live-Canvas, bevor das #endstand-Overlay den
+    // Canvas verdeckt) -- ~30 simulierte Sekunden sind bei jeder Buehnen-Disziplin klar vor
+    // dem 60-s-Gesamtrahmen (BUEHNE_ART.*: rundenDauer normiert auf 60/(rundenN*jeSeite*2)).
+    await seite.evaluate(() => window.__arena.sondenLauf(1800));
+    await (await seite.$("#cv")).screenshot({ path: path.join(AUSGABE, `${disc}-buehne-live.png`) });
+    // ROHES CANVAS-BILD (toDataURL statt Element-Screenshot): die Produktionsseite legt bei
+    // schmalerem Arena-Panel (Ticker-Spalte offen) den HTML-Score-Bug (.bbug, fest 8px/~43px
+    // hoch, s. dessen CSS-Kommentar "LEINWANDHOEHE") ueber einen groesseren Leinwand-Anteil,
+    // als die 10-%-Messung bei voller Fensterbreite annimmt -- bei dieser Panelbreite bis
+    // knapp 14 % H, waehrend die hier beruehrte Zeile (bereits VOR dieser PR bei H*0.12) genau
+    // dort liegt. Das ist ein VORBESTEHENDES Layout-Detail (betrifft die Zeile genauso ohne
+    // unsere Aenderung, und ebenso Fechtens identisch positionierte "Bahn N von M"-Zeile,
+    // :21564) -- kein Teil von Paket 1, s. PR-Beschreibung. toDataURL() liest die Leinwand
+    // SELBST (ohne die ueberlagernden HTML-Elemente) und belegt deshalb unabhaengig davon,
+    // dass unser Text tatsaechlich gezeichnet wird.
+    const roh = await seite.evaluate(() => document.getElementById("cv").toDataURL("image/png"));
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(path.join(AUSGABE, `${disc}-buehne-live-roh.png`), Buffer.from(roh.split(",")[1], "base64"));
+    // DANACH BIS ZUM ENDE durchfahren (4200 Ticks insgesamt sind grosszuegig mehr als 60 s),
+    // fuer den vollstaendigen Ticker/Protokoll-Text (S-F2/F-F4-Beleg).
+    await seite.evaluate(() => window.__arena.sondenLauf(2400));
     await (await seite.$("#cv")).screenshot({ path: path.join(AUSGABE, `${disc}-buehne.png`) });
     const protokollText = await seite.evaluate(() => {
       const p = document.getElementById("protokoll");
@@ -79,10 +106,10 @@ try {
       ergebnis[disc].fF4Belegt = /Doppeltreffer|muss in der letzten Periode angreifen|stehen vor Periode .* ausgeglichen/.test(protokollText);
     }
     if (disc === "tennis") {
-      // T-F4 ist reine Canvas-Anzeige (Nahansicht-Kopfzeile) -- nur per Screenshot belegbar,
-      // kein DOM-Text. Der Screenshot oben zeigt die Zeile "Platz N von M · Ballwechsel X/Y ·
-      // Z Schläge" ueber dem Nahansicht-Duell.
-      ergebnis[disc].hinweis = "Schlagzahl ist Canvas-Text, s. Screenshot " + disc + "-buehne.png";
+      // T-F4 ist reine Canvas-Anzeige (Nahansicht-Kopfzeile) -- kein DOM-Text, deshalb per
+      // toDataURL()-Rohbild belegt (s. Kommentar oben): tennis-buehne-live-roh.png zeigt
+      // "Platz N von M · Ballwechsel X/Y · Z Schläge" ueber dem Nahansicht-Duell.
+      ergebnis[disc].hinweis = "Schlagzahl ist Canvas-Text, s. Screenshot " + disc + "-buehne-live-roh.png";
     }
     await seite.close();
   }
