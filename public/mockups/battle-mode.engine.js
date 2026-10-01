@@ -27883,7 +27883,7 @@
     KFOKUS=null; KFOKUS_CD=0;
     if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
-    if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
+    if(istBahn(disc)){bahnDisc=disc; bahnAktuelleSaat=saat; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
     // zu GENAU diesem Spiel — ohne den Reset bliebe er nach dem ersten Kampf einer Sitzung
@@ -34668,6 +34668,16 @@
   let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
+  // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
+  // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
+  // Saat weiterhin als eigenes Funktionsargument fuehren (derselbe Vertrag wie bei
+  // gebuchteSaatFuerAktuelleDisziplin: "jeder headless Mess-/Wertungspfad uebergibt seine
+  // Saat explizit und liest diesen Zustand nicht"). renderEndstandBahn() liest ihn NUR nach
+  // Rennende, um das soeben beendete Rennen mit identischer Aufstellung/Zufallslage fuer
+  // die Alternativ-Anzeige erneut anzustossen — kein Simulationszustand, reine Anzeige-
+  // Buchhaltung wie bahnFallenTypen/bahnKursChaos oben.
+  let bahnAktuelleSaat=null;
   // BROADCAST-HUD DER STAFFEL: ZEIT-DELTA. Fortschritt-Zeit-Verlaufspuffer je Seite,
   // dieselbe Methode, mit der Radsport-/Zeitfahren-Uebertragungen den Rueckstand
   // in Echtzeit einblenden (Recherche-Dokument Abschnitt 4.2). Nur befuellt und
@@ -41214,6 +41224,7 @@
     }
     renderSzeneDesSpiels();
     renderHighlights();
+    renderAlternativRechner();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -41229,6 +41240,136 @@
   // statt eine Zahl zu erfinden, die zur jeweiligen Wertung nicht passt. Kommt spaeter eine
   // eigene Wertung dazu, reicht eine Erweiterung von bahnTeamstand() — diese Funktion hier
   // muss dafuer nicht angefasst werden.
+
+  // =================================================================================
+  // ALTERNATIV-RECHNER — "Was haette der andere Plan gebracht?" (Klasse A*,
+  // docs/design/fable-ideen-bahn-30-09.md Abschnitt 1.3, 01.10.). Opus' Plan-Sonde
+  // (Review Anhang A, headless) als ANZEIGE im Endstand: je Heimlaeufer eine Zeile.
+  //
+  // ISOLATION (Klasse A* verlangt den Nachweis, nicht nur die Behauptung): jeder
+  // Zweitlauf geht ausschliesslich ueber bahnLauf() — dieselbe Funktion, die auch
+  // window.__arena.bahnLauf() oeffentlich macht und die Opus' eigene Plan-Sonde schon
+  // nutzt. bahnLauf() sichert den kompletten Renn-Zustand (M.sichern(): disc, bahnDisc,
+  // LAEUFER, rennFertig, rennT, done), baut mit M.bau(saat) EINE NEUE LAEUFER-Liste in
+  // einer neuen Variable auf (die alte Liste bleibt als Objekt unberuehrt im Sicherungs-
+  // Schnappschuss liegen) und spielt am Ende GENAU DIESEN Schnappschuss mit M.zurueck()
+  // zurueck — das echte, bereits beendete Rennen (die Werte, die bahnRangliste()/
+  // bahnTeamstand()/die Saison lesen) ist nach jedem Zweitlauf bit-identisch zum Zustand
+  // VOR dem Zweitlauf. Das ist keine neue Konstruktion dieser Aenderung, sondern dasselbe
+  // Sichern/Bauen/Zuruecksetzen-Muster, das JEDE Sonde dieser Datei fuer JEDE Disziplin
+  // schon verwendet (s. MOTOREN[...].sichern/zurueck ueberall in dieser Datei).
+  //
+  // Die einzige globale Groesse, die ein Zweitlauf NICHT zuruecksetzt, ist der geteilte
+  // Zufallsstrom (`seed`/`rr()`, EIN LCG fuer alle vier Chassis, s. dessen Kommentar) —
+  // aber das muss er nicht: JEDE Simulation, echt oder Sonde, beginnt mit `bau(saat)`
+  // (bauFeldspiel/bauBuehne/bauSpurt/build), und das setzt `seed` unbedingt aus der
+  // EIGENEN Saat dieses Aufrufs neu — nie aus dem, was vorher im Strom stand. Ein
+  // Zweitlauf hinterlaesst `seed` also in irgendeinem Zustand, aber das naechste `bau()`
+  // (die naechste echte Disziplin, egal welche) ueberschreibt ihn so oder so, bevor
+  // irgendein `rr()`-Aufruf etwas davon liest. Dasselbe gilt fuer `FORMKARTE`, falls ein
+  // Zweitlauf sie beruehrt: der naechste `bau()` zieht sie aus ihrer EIGENEN Saat neu.
+  //
+  // UND diese Funktionen laufen NUR hier, im Rendern des Endstand-Overlays, aufgerufen
+  // von renderAlternativRechner() unten, das wiederum NUR aus renderEndstand()/
+  // renderEndstandBuehne()/renderEndstandBahn() aufgerufen wird — denselben drei
+  // Funktionen, die auch renderSzeneDesSpiels()/renderHighlights() aufrufen. KEIN
+  // headless Mess-/Wertungspfad (disziplinProbe, window.__arena.spiele*, bahnLauf direkt,
+  // runArenaFixtures/arena-headless-runner) ruft jemals eine render*()-Funktion auf — die
+  // Messung liest ihre Werte aus MOTOREN[...].wert()/bahnRangliste() direkt, nie aus dem
+  // DOM. Der Alternativ-Rechner kann die ZAEHLENDE Simulation deshalb strukturell nicht
+  // erreichen, nicht nur zufaellig: `node scripts/miss-alle-disziplinen.mjs` und
+  // `node scripts/messe-arena-einfluss.mjs` rufen bahnAlternativZeilen() an keiner Stelle
+  // ihres Pfades auf (s. PR-Beschreibung fuer den Vorher/Nachher-Beleg).
+  //
+  // PLAN-LISTEN: Zeichen fuer Zeichen Opus' `PL` aus Anhang A — nur diese vier Bahnen
+  // haben ueberhaupt ein `plaene`-Woerterbuch (Climbing nicht, s. BAHN_ART.climbing).
+  const BAHN_ALT_PLAENE={
+    spurt:["vorn","schatten","kick"], "time-trial":["gleich","negativ","attacke"],
+    staffel:["halten","angehen","schluss"], "takeshis-castle":["vorsicht","stetig","wild"]
+  };
+  // MESSGROESSE JE DISZIPLIN — Zeichen fuer Zeichen `mass()` aus Anhang A: Staffel liest
+  // die Etappenzeit (kleiner ist besser), Takeshi die Burgpunkte (groesser ist besser),
+  // jede andere Bahn die eigene Laufzeit (kleiner ist besser).
+  function bahnAltMass(bd,u){
+    if(BAHN_ART[bd].staffel)return u.etappe;
+    if(BAHN_ART[bd].takeshi)return u.burg?u.burg.stern+u.burg.bonus:0;
+    return u.zeit??99;
+  }
+  function bahnAltBesser(bd,alt,basis){
+    if(alt==null||basis==null)return false;
+    return BAHN_ART[bd].takeshi?alt>basis:alt<basis;
+  }
+  // Liefert fertige, uebersetzte Anzeigezeilen fuer renderAlternativRechner() — oder ein
+  // leeres Array, wenn es fuer diese Disziplin/dieses Rennen nichts Ehrliches zu zeigen
+  // gibt (kein `plaene`-Woerterbuch, kein einziger echter Heim-Finisher). "Lieber nichts
+  // als eine falsche Zahl" (Dokument 1.3) gilt deshalb strukturell, nicht nur als Vorsatz.
+  function bahnAlternativZeilen(bd){
+    const plaene=BAHN_ALT_PLAENE[bd];
+    if(!plaene||!BAHN_ART[bd]||!BAHN_ART[bd].plaene)return [];
+    const heim=bahnRangliste().reihe.filter(u=>
+      u.seite===0&&u.fertig!=null&&!u.raus&&plaene.includes(u.plan));
+    if(!heim.length)return [];
+    const label=(p)=>(BAHN_ART[bd].plaene[p]||{}).label||p;
+    const zeilen=[];
+    // ZEITFAHREN: EXAKT (Dokument 1.3 — "waehrend des Rennens faellt kein rr()"). EIN
+    // Zweitlauf je Alternativplan, mit DERSELBEN Saat wie das echte Rennen: bit-identisch
+    // bis auf den einen angesagten Laeufer, dessen Alternativzeit deshalb exakt ist, kein
+    // Mittelwert noetig.
+    if(bd==="time-trial"){
+      for(const h of heim){
+        const teile=[];
+        for(const p of plaene){
+          if(p===h.plan)continue;
+          const r=bahnLauf(bd,bahnAktuelleSaat,[{n:h.n,plan:p,bei:0}]);
+          const ru=r.laeufer.find(x=>x.n===h.n);
+          if(ru&&ru.zeit!=null)teile.push("mit "+label(p)+" "+bahnZeitText(ru.zeit*zeitFaktor()));
+        }
+        if(teile.length)
+          zeilen.push(h.n+" — "+label(h.plan)+": "+bahnZeitText(bahnZeit(h)*zeitFaktor())
+            +" · "+teile.join(" · "));
+      }
+      return zeilen;
+    }
+    // SPURT/STAFFEL/TAKESHI: eine einzelne Alternativzahl waere Wuerfelrauschen (Dokument
+    // 1.3). Stattdessen eine ueber DREI UNABHAENGIGE Saaten gemittelte Tendenz — jede Saat
+    // ein eigenes Paar aus Basislauf (dieselben Laeufer, ECHTE Plaene) und Alternativlauf
+    // (derselbe eine Laeufer, anderer Plan), unabhaengig vom Wuerfel dieses einen Rennens.
+    // Dieselbe Vergleichsmethode wie Anhang A, nur auf drei statt 24 Saaten verkuerzt, weil
+    // dies eine interaktive Anzeige ist, keine Offline-Messung.
+    const basis=normalisiereSaat(bahnAktuelleSaat==null?1337:bahnAktuelleSaat)>>>0;
+    const SAATEN=[0,1,2].map(i=>(basis+i*7919)>>>0);
+    for(const h of heim){
+      for(const p of plaene){
+        if(p===h.plan)continue;
+        let gewinne=0,n=0;
+        for(const s of SAATEN){
+          const b=bahnLauf(bd,s), bu=b.laeufer.find(x=>x.n===h.n);
+          if(!bu)continue;
+          const a=bahnLauf(bd,s,[{n:h.n,plan:p,bei:0}]), au=a.laeufer.find(x=>x.n===h.n);
+          if(!au)continue;
+          n++;
+          if(bahnAltBesser(bd,bahnAltMass(bd,au),bahnAltMass(bd,bu)))gewinne++;
+        }
+        if(n>0)zeilen.push(h.n+": mit "+label(p)+" hätte "+gewinne+" von "+n+" Saaten gewonnen");
+      }
+    }
+    return zeilen;
+  }
+  // GEMEINSAME ANZEIGEFUNKTION FUER ALLE DREI ENDSTAND-OVERLAYS (wie renderHighlights()/
+  // renderSzeneDesSpiels() daneben): entscheidet selbst, ob es etwas zu zeigen gibt, und
+  // raeumt bei Kampf/Buehne (oder einem Bahn-Rennen ohne Alternativ-Zeilen) auf — ohne
+  // dieses Aufraeumen bliebe eine STALE Zeile vom vorigen Bahn-Rennen sichtbar stehen,
+  // sobald als naechstes ein Kampf/eine Buehne denselben #endstand erneut oeffnet.
+  function renderAlternativRechner(){
+    const box=document.getElementById("ealternativ");
+    if(!box)return;
+    const zeilen=istBahn(disc)?bahnAlternativZeilen(disc):[];
+    if(!zeilen.length){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false; box.textContent="";
+    box.appendChild(el("h5",null,"Alternativ-Rechner"));
+    for(const z of zeilen)box.appendChild(el("div","ehzeile",z));
+  }
+
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
@@ -41306,6 +41447,7 @@
     }
     renderSzeneDesSpiels();
     renderHighlights();
+    renderAlternativRechner();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -41405,6 +41547,7 @@
     }
     renderSzeneDesSpiels();
     renderHighlights();
+    renderAlternativRechner();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -41484,6 +41627,7 @@
     }
     renderSzeneDesSpiels();
     renderHighlights();
+    renderAlternativRechner();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -42640,6 +42784,89 @@
       }
     };
   }
+
+  // ABNAHME DER RENNPLAN-ANSAGE. Spielt EIN Rennen einer beliebigen Bahn headless
+  // durch (feste 1/60-Ticks, kein Rendering — dasselbe Muster wie spieleBasketball
+  // in window.__arena) und kann dabei Ansagen ausloesen: `ansagen` ist eine Liste
+  // {n, plan, bei}, also "wenn <n> die Streckenmarke <bei> (0..1) erreicht hat, sag
+  // ihm <plan> an". Ohne die Liste ist der Durchlauf zeichenweise der von vorher —
+  // genau das ist die Determinismus-Kontrolle: zweimal derselbe Aufruf, einmal mit und
+  // einmal ohne Liste, und ohne Liste muessen alle Zeiten identisch sein.
+  //
+  // Geht durch planWechsel(), also durch DIESELBE Funktion, die auch der Klick in der
+  // UI aufruft — es gibt keine zweite Wechsel-Logik fuer die Messung.
+  //
+  // STANDALONE FUNKTIONSDEKLARATION statt Objekt-Methode auf window.__arena (01.10.,
+  // Alternativ-Rechner, Abschnitt 1.3 des Fable-Dokuments): Funktionsdeklarationen
+  // werden in diesem IIFE gehoben, genau wie `rr()`/`seed` weiter unten in derselben
+  // Datei schon vor ihrer eigenen Textzeile aufrufbar sind (s. deren Kommentar) — jeder
+  // Aufrufer in DIESEM Modul, der vor dem window.__arena-Objekt steht (renderEndstandBahn
+  // weiter oben), kann `bahnLauf(...)` deshalb schon beim Laden referenzieren, ohne dass
+  // sich am Zeitpunkt der tatsaechlichen AUSFUEHRUNG (immer erst nach vollstaendigem
+  // Laden des Moduls) etwas aendert. window.__arena.bahnLauf (s. dort, "bahnLauf,") ist
+  // exakt dieselbe Funktion, kein zweiter Code-Pfad, kein Verhaltensunterschied.
+  function bahnLauf(d,saat,ansagen){
+    const bd=d||"spurt";
+    if(!BAHN_ART[bd])throw new Error("bahnLauf: \""+bd+"\" ist keine Bahn-Disziplin");
+    const M=MOTOREN[bd];
+    const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+    const offen=(ansagen||[]).map(a=>({n:a.n,plan:a.plan,bei:a.bei||0,getan:false}));
+    let guard=0;
+    // stumm: die Messung soll den Ticker nicht vollschreiben und keine Schwebetexte
+    // hinterlassen — dieselbe Klammer wie stepSimStumm im Kampf.
+    stumm=true;
+    try{
+      while(!done&&rennT<90&&guard<20000){
+        for(const a of offen){
+          if(a.getan)continue;
+          const u=LAEUFER.find(x=>x.n===a.n&&x.seite===0&&x.fertig==null);
+          if(u&&u.pos>=a.bei)a.getan=planWechsel(u,a.plan);
+        }
+        stepSpurt(1/60); guard++;
+      }
+    } finally { stumm=false; }
+    // DIE SONDE MELDET, WAS DAS SPIEL WERTET — nicht, was bahnRangliste rechnen KANN.
+    // `seiten` kam vorher immer aus bahnRangliste, auch bei Staffel/Takeshi: die Sonde
+    // sagte dann `wertung:"zieleinlauf"` und lieferte im selben Objekt Rangpunkte
+    // (Staffel z.B. 21:57), waehrend die Anzeige 6:6 zeigte. Ein Test darauf haette den
+    // falschen Vertrag festgeschrieben. Jetzt kommen `seiten` und `punkte` aus
+    // bahnTeamstand — demselben Dispatch, den HUD, Kader und Overlay lesen; `punkte` ist
+    // null, wo es (noch) keine Punkte je Laeufer gibt. Die Reihenfolge/`platz` kommt aus
+    // bahnRangliste.reihe, damit die Sonde exakt die Plaetze des Overlays nennt statt
+    // einer zweiten, leicht abweichenden Sortierung (fertig??99 ordnete Unfertige nicht
+    // nach Strecke).
+    const w=bahnRangliste(), st=bahnTeamstand();
+    const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
+      wertung:BAHN_ART[bd].wertung||"zieleinlauf", seiten:st.seiten, gewertet:st.gewertet,
+      laeufer:w.reihe.map((u,pl)=>({
+        platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
+        punkte:st.punkte?st.punkte.get(u.id):null, rangpunkte:w.punkte.get(u.id),
+        raus:!!u.raus,
+        ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
+        // Ausgeschiedene: kein `zeit`. u.fertig traegt bei ihnen nur den Sortierschluessel
+        // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit. `zeit` ist die
+        // EIGENE Laufzeit (bahnZeit), nicht die Zieluhrzeit — bei gestaffeltem Start
+        // (Zeitfahren) sonst durch die Startzeit verzerrt; fuer jede andere Bahn
+        // bit-identisch, weil `startT` dort 0 bleibt.
+        zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4), pos:+u.pos.toFixed(5),
+        startT:+(u.startT||0).toFixed(3),
+        zwischenzeiten:(u.zz||[]).map(v=>v==null?null:+v.toFixed(4)),
+        bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
+        etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
+        wechselKonto:+(u.wechselKonto||0).toFixed(4),
+        burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
+        reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
+        // Wie oft er sich nach einem Einbruch wieder gefangen hat (13.09., s.
+        // `pusteFangen` in stepSpurt) — die Zahl, an der sich "manche laufen aus und
+        // muessen kurz regenerieren" ueberhaupt erst messen laesst. Ohne
+        // Puste-Erholung immer 0.
+        gefangen:u.gefangen||0,
+        sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
+        ansagen:u.ansagen||0}))};
+    M.zurueck(gesichert);
+    return erg;
+  }
+
   // JEDE BUeHNE-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen. Die Wertung ist hier
   // am einfachsten von allen: die Summe der Durchgangspunkte ist bereits eine Zahl, bei
   // der groesser besser heisst, keine Platzierung noetig.
@@ -44181,67 +44408,19 @@
     //
     // Geht durch planWechsel(), also durch DIESELBE Funktion, die auch der Klick in der
     // UI aufruft — es gibt keine zweite Wechsel-Logik fuer die Messung.
-    bahnLauf:(d,saat,ansagen)=>{
-      const bd=d||"spurt";
-      if(!BAHN_ART[bd])throw new Error("bahnLauf: \""+bd+"\" ist keine Bahn-Disziplin");
-      const M=MOTOREN[bd];
-      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
-      const offen=(ansagen||[]).map(a=>({n:a.n,plan:a.plan,bei:a.bei||0,getan:false}));
-      let guard=0;
-      // stumm: die Messung soll den Ticker nicht vollschreiben und keine Schwebetexte
-      // hinterlassen — dieselbe Klammer wie stepSimStumm im Kampf.
-      stumm=true;
-      try{
-        while(!done&&rennT<90&&guard<20000){
-          for(const a of offen){
-            if(a.getan)continue;
-            const u=LAEUFER.find(x=>x.n===a.n&&x.seite===0&&x.fertig==null);
-            if(u&&u.pos>=a.bei)a.getan=planWechsel(u,a.plan);
-          }
-          stepSpurt(1/60); guard++;
-        }
-      } finally { stumm=false; }
-      // DIE SONDE MELDET, WAS DAS SPIEL WERTET — nicht, was bahnRangliste rechnen KANN.
-      // `seiten` kam vorher immer aus bahnRangliste, auch bei Staffel/Takeshi: die Sonde
-      // sagte dann `wertung:"zieleinlauf"` und lieferte im selben Objekt Rangpunkte
-      // (Staffel z.B. 21:57), waehrend die Anzeige 6:6 zeigte. Ein Test darauf haette den
-      // falschen Vertrag festgeschrieben. Jetzt kommen `seiten` und `punkte` aus
-      // bahnTeamstand — demselben Dispatch, den HUD, Kader und Overlay lesen; `punkte` ist
-      // null, wo es (noch) keine Punkte je Laeufer gibt. Die Reihenfolge/`platz` kommt aus
-      // bahnRangliste.reihe, damit die Sonde exakt die Plaetze des Overlays nennt statt
-      // einer zweiten, leicht abweichenden Sortierung (fertig??99 ordnete Unfertige nicht
-      // nach Strecke).
-      const w=bahnRangliste(), st=bahnTeamstand();
-      const erg={disziplin:bd, saat:saat||1337, zeit:+rennT.toFixed(3),
-        wertung:BAHN_ART[bd].wertung||"zieleinlauf", seiten:st.seiten, gewertet:st.gewertet,
-        laeufer:w.reihe.map((u,pl)=>({
-          platz:pl+1, n:u.n, seite:u.seite, plan:u.plan,
-          punkte:st.punkte?st.punkte.get(u.id):null, rangpunkte:w.punkte.get(u.id),
-          raus:!!u.raus,
-          ab:+u.ab.toFixed(4), tempo:u.tempo, sucht:u.sucht,
-          // Ausgeschiedene: kein `zeit`. u.fertig traegt bei ihnen nur den Sortierschluessel
-          // 90..100 (s. renderEndstandBahn), das ist keine gelaufene Zeit. `zeit` ist die
-          // EIGENE Laufzeit (bahnZeit), nicht die Zieluhrzeit — bei gestaffeltem Start
-          // (Zeitfahren) sonst durch die Startzeit verzerrt; fuer jede andere Bahn
-          // bit-identisch, weil `startT` dort 0 bleibt.
-          zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4), pos:+u.pos.toFixed(5),
-          startT:+(u.startT||0).toFixed(3),
-          zwischenzeiten:(u.zz||[]).map(v=>v==null?null:+v.toFixed(4)),
-          bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
-          etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
-          wechselKonto:+(u.wechselKonto||0).toFixed(4),
-          burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
-          reserve:Math.round(u.reserve), reserveMax:u.reserveMax, leer:!!u.leer,
-          // Wie oft er sich nach einem Einbruch wieder gefangen hat (13.09., s.
-          // `pusteFangen` in stepSpurt) — die Zahl, an der sich "manche laufen aus und
-          // muessen kurz regenerieren" ueberhaupt erst messen laesst. Ohne
-          // Puste-Erholung immer 0.
-          gefangen:u.gefangen||0,
-          sogAnteil:+(u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS)).toFixed(3),
-          ansagen:u.ansagen||0}))};
-      M.zurueck(gesichert);
-      return erg;
-    },
+    // Standalone Funktionsdeklaration bei den MOTOREN[bd] der Bahn (s. dort) — hier nur
+    // als Methode referenziert, damit window.__arena.bahnLauf unveraendert bleibt UND
+    // renderEndstandBahn() (Alternativ-Rechner, Abschnitt 1.3) denselben Aufruf intern
+    // nutzen kann, ohne ueber window.__arena zu gehen.
+    bahnLauf,
+    // ISOLATIONSNACHWEIS-WERKZEUG FUER DEN ALTERNATIV-RECHNER (Klasse A*, Abschnitt 1.3,
+    // 01.10.), READ-ONLY wie bahnWahl/kampfAnsage daneben: der rohe Zustand des EINEN
+    // geteilten Zufallsstroms (`seed`, s. dessen Kommentar — ein LCG fuer alle vier
+    // Chassis). Dient ausschliesslich dem Nachweis in scripts/pruefe-bahn-alternativ-
+    // isolation.mjs, dass ein Zweitlauf des Alternativ-Rechners `seed` zwar veraendert,
+    // aber NIE in ein spaeteres `bau(saat)` hineinwirkt (jedes `bau()` ueberschreibt ihn
+    // unbedingt aus der eigenen Saat). Schreibt nichts, liest nur.
+    rngZustand:()=>seed,
     // Read-only wie fsFokus daneben: wer gerade fuer eine Ansage ausgewaehlt ist und
     // welchen Plan die eigenen Laeufer fahren — damit sich ein Klick in der UI von
     // aussen (Playwright) abnehmen laesst, ohne in die Leinwand hineinzumessen.
