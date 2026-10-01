@@ -18,7 +18,7 @@ dem Gegencheck zu halten (neu: 44,4 % bei k=1,29, fast exakt wie die urspruengli
 Eichung). **Gemessen** (kaderfest, live-save-Kaderfamilie, n=24, Mutatoren „je-spiel" wie im
 Spiel, vier unabhaengige Saatstroeme): rho je Spiel 0,828/0,835/0,837/0,856, Mittel **0,839**
 (vorher 0,791/0,796/0,791/0,807, Mittel 0,796) — die zuvor schwaechste Paarung
-(„coldsteel-direlegion") stieg von 0,66-0,70 auf 0,776. Pp **10,7-14,2** ueber zwei unabhaengige
+(„coldsteel-direlegion") stieg von 0,66-0,70 auf 0,776. Pp **14,2/11,1** ueber zwei unabhaengige
 Saatstroeme (vorher 16,4/16,9) — die Aenderung hat die Pp-Abweichung VERBESSERT statt
 verschlechtert, weil ENDTEMPO der Kanal ist, der der Matrix ohnehin am naechsten liegt. Die
 uebrigen vier Bahn-Disziplinen (Spurt, Staffel, Time-Trial, Takeshi's Castle) bleiben

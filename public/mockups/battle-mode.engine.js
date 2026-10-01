@@ -33162,10 +33162,11 @@
       // nicht nur im Schnitt treuer, sondern auch UNTEREINANDER konsistenter.
       //
       // Pp-ABWEICHUNG VERBESSERT SICH MIT (nicht trotz) DER AENDERUNG: 16,4/16,9 (alte
-      // Scorecard) -> 10,7 (messe-arena-einfluss.mjs climbing 48, erster Saatstrom, nach
-      // dieser Runde) -- ENDTEMPO ist der Kanal, der der Matrix ohnehin am naechsten liegt,
+      // Scorecard) -> 14,2 (messe-arena-einfluss.mjs climbing 48, erster Saatstrom) / 11,1
+      // (messe-arena-einfluss-zweiter-saatstamm.mjs climbing 48, zweiter Saatstrom) nach
+      // dieser Runde -- ENDTEMPO ist der Kanal, der der Matrix ohnehin am naechsten liegt,
       // ihn zu verstaerken zieht die GESAMTE Mechanik naeher an die Matrix heran, statt sie
-      // zu verzerren. Zweiter, unabhaengiger Saatstrom s. PR-Beschreibung.
+      // zu verzerren.
       //
       // WARUM GENAU 2,20 (nicht mehr, nicht weniger): 1,10/1,25/1,40 wurden zuerst probiert
       // (rho-Mittel 0,816/0,833/0,836) -- schon besser, aber mit weniger Puffer. 3,00 wurde
