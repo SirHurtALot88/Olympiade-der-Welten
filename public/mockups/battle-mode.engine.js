@@ -14985,6 +14985,13 @@
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // LAMPEN-FASSUNG VON letzterHebenZug (Folgefund zu PR #1091, Task #35, 01.10.): die
+  // "Zuletzt: ..."-Zeile in zeichneHeben() las bislang `letzterHebenZug.r.ereignis` direkt --
+  // dasselbe woertliche "gueltig"/"ungueltig" im Text, schon bei der Enthuellung sichtbar,
+  // ANTRITT_T+ZUG_T vor der Lampe (s. hebenTickerAmUrteil()-Kommentar). Diese Variable wird
+  // NUR in hebenTickerAmUrteil() (stepHeben(), Lampen-Moment) gesetzt, nie an der Enthuellung,
+  // und ist damit fuer diese eine Zeile das, was letzterHebenZug fuer den Rest der Buehne ist.
+  let letzterHebenLampenZug=null;
   // G1 (Fable-Ideen 30.09., Paket 2): einmal je Duell ein Ticker-Banner, wenn `teamLage`
   // "entscheidend" oder "entschieden" ist -- reiner Anzeige-Dedup (a und b enthuellen ihren
   // ersten Versuch unabhaengig voneinander, dieses Set verhindert die doppelte Zeile), kein
@@ -15136,7 +15143,7 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
-    floats.length=0; letzterHebenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -17394,38 +17401,38 @@
       // bei HEBEN_WAGNIS_MAX_KG oben), also einfach hier mit ODER angehaengt statt einer
       // zweiten Bedingung.
       const versuchBig=BB().heben?((r.gueltig&&r.versuch===3)||r.kuehn):(r.punkte>=60);
-      if(BB().heben)schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
-        crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
-      else if(BB().duett){
-        // E-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das Kuerzel des GERADE ENTHUELLTEN
-        // Elements steht klein vor dem Punkte-Schweber ("3Lz +71"/"3Lz< +40"), <=unterdreht,
-        // F=echter Sturz -- nur fuer Sprungelemente unterschieden (Pirouette/Schritte/Choreo
-        // heissen im Fehlschlag nie "stuerzt", s. Feed-Zweig unten). Reiner Textzusatz auf
-        // demselben Schweber, kein neuer rr()-Zug, keine neue Anzeige.
-        const elS=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
-        const symS=(r.ereignis===BB().failWort&&elS.typ==="sprung")?(r.knapp?"<":"F"):"";
-        schwebe({x:0,y:0,txt:elS.kuerzel+symS+" +"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+      // GEWICHTHEBEN, FOLGEFUND ZU PR #1091 ("Ein moeglicher Folgepunkt, wenn das einheitlich
+      // sein soll", PR-Beschreibung Abschnitt "Begruendete Entscheidungen"): der kg/X-Schweber
+      // hier an der ENTHUELLUNG las `r.gueltig` direkt -- derselbe Fehlertyp wie `u.summe` in
+      // PR #1091, nur ueber den Schweber statt ueber die Kaderleiste ausgeplaudert, und bis zu
+      // ANTRITT_T+ZUG_T (~2s, PR #1091 misst 6964ms Ticker gegen 8955ms Lampen-Moment) VOR den
+      // Kampfrichterlampen/der Versuchstafel/hebenFeierAmUrteil() sichtbar. Jetzt in
+      // hebenTickerAmUrteil() (stepHeben(), Uebergang zug->hoch|ablage, GENAU der Lampen-
+      // Moment) -- deshalb hier bewusst KEIN schwebe()-Aufruf fuer Heben.
+      if(!BB().heben){
+        if(BB().duett){
+          // E-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): das Kuerzel des GERADE ENTHUELLTEN
+          // Elements steht klein vor dem Punkte-Schweber ("3Lz +71"/"3Lz< +40"), <=unterdreht,
+          // F=echter Sturz -- nur fuer Sprungelemente unterschieden (Pirouette/Schritte/Choreo
+          // heissen im Fehlschlag nie "stuerzt", s. Feed-Zweig unten). Reiner Textzusatz auf
+          // demselben Schweber, kein neuer rr()-Zug, keine neue Anzeige.
+          const elS=KUER_ELEMENTE[u.aktuell]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
+          const symS=(r.ereignis===BB().failWort&&elS.typ==="sprung")?(r.knapp?"<":"F"):"";
+          schwebe({x:0,y:0,txt:elS.kuerzel+symS+" +"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+        }
+        else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
       }
-      else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
-      // KUEHNER VERSUCH — eigener, staerkerer Pop zusaetzlich zum kg-Schweber oben, GENAU
-      // fuer den Ausgang (Punktesieg xor Verletzung), nie beides. Beide sind rein optisch:
-      // keins von beiden aendert u.summe/u.zweikampf oder einen kuenftigen Versuch (s.
-      // Kommentar bei HEBEN_WAGNIS_MAX_KG/im hebeUebung()-Rundenrechner oben).
-      if(BB().heben&&r.punktesieg)schwebe({x:0,y:0,txt:"PUNKTESIEG!",life:1.3,crit:true,_teilnehmer:u.id});
-      if(BB().heben&&r.verletzt)schwebe({x:0,y:0,txt:"VERLETZT!",life:1.3,crit:true,_def:true,_teilnehmer:u.id});
+      // KUEHNER VERSUCH — PUNKTESIEG!/VERLETZT!-Pops: aus demselben Grund wie der kg/X-
+      // Schweber oben jetzt in hebenTickerAmUrteil() (Lampen-Moment), nicht mehr hier.
       // DUELL: statt "X Punkte" die laufende Vorteils-Anzeige — dieselbe Zahl, die auch
       // fuer wert() zaehlt, damit Anzeige und Messung nie auseinanderlaufen.
       if(BB().heben){
-        // Der Ticker liest sich wie ein Wettkampf: "Reissen, 2. Versuch, 152 kg —
-        // gueltig". Die angezeigten Kilogramm sind die groessennormierten (s.
-        // sinclairAnzeige) — ein Zwerg hebt weniger Kilo und trotzdem relativ genauso
-        // viel. Entschieden wird auf den normierten, angezeigt auf den echten.
-        const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
         // G1 (Fable-Ideen 30.09., Paket 2, Klasse M): Banner einmal je Duell, beim allerersten
         // enthuellten Versuch (Reissen, 1. Versuch) -- `hebenTeamBannerGezeigt` verhindert die
         // doppelte Zeile, weil a und b unabhaengig voneinander enthuellt werden. Reine Anzeige
         // der schon in baueHebenDuelle() gesetzten `u.teamLage` ("offen" zeigt nichts, wie
-        // heute).
+        // heute). KEIN Spoiler fuer DIESEN Versuch: `u.teamLage` haengt nur an schon
+        // ENTSCHIEDENEN frueheren Duellen (hebenTeamLage() liest `k<i`), nie am laufenden.
         if(r.uebung==="reissen"&&r.versuch===1&&!hebenTeamBannerGezeigt.has(u.duellNr)){
           hebenTeamBannerGezeigt.add(u.duellNr);
           if(u.teamLage==="entscheidend"){
@@ -17436,42 +17443,25 @@
               +" wird für die Tafel gehoben, ohne Rücksicht auf das eigene Risiko.",true);
           }
         }
-        // G2, ZUSATZ "WO ES SCHEITERT" (Fable-Ideen 30.09., Politur A, Klasse A): reine
-        // Textbeschriftung eines Stossen-Fehlversuchs, s. `scheiterOrt` in hebeUebung().
-        const scheiterTxt=r.scheiterOrt?(" ("+r.scheiterOrt+" gescheitert)"):"";
-        feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
-          +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")+scheiterTxt
-          +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig,undefined,
-          r.kuehn?"kuehnerVersuch":"letzterVersuch");
         // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD SICHTBAR"
         // -- der Poker-Moment am Meldetisch. `r.ansageAlt` ist nur gesetzt, wenn der
         // Duellstand die geplante Ansage DIESES Versuchs tatsaechlich ueberschrieben hat (s.
         // lastFuer()-Kommentar oben); eigene Ticker-Zeile, immer big, derselbe Rang wie der
         // kuehne Versuch direkt darunter. Reine Anzeige: `r.ansageAlt`/`r.kg` stehen schon
-        // fest, kein rr(), kein Einfluss auf Wertung.
+        // fest, kein rr(), kein Einfluss auf Wertung. KEIN Spoiler: die Ansage ist die VOR dem
+        // Versuch oeffentliche Zielzahl, nicht sein Ausgang (dieselbe Unterscheidung wie beim
+        // "laufend"-Kaestchen der Versuchstafel, s. zeichneHeben()).
         if(r.ansageAlt!=null){
           feed(u.side,u.n+" zieht nach: Ansage "+sinclairAnzeige(r.ansageAlt,u.groesse)
-            +" kg — geändert auf "+zeigeKg+" kg.",true);
+            +" kg — geändert auf "+sinclairAnzeige(r.kg,u.groesse)+" kg.",true);
           sfx("gewichtheben","kreide");
         }
-        // ZWEIKAMPF ENTSCHIEDEN: das Endergebnis eines Hebers (Gesamtkilo oder Nullwertung)
-        // ist immer big — kein "vielleicht wichtig", sondern der Abschluss seines ganzen
-        // Auftritts, analog zum K.o./Zieleinlauf anderer Chassis.
-        // KUEHNER VERSUCH, EIGENE TICKER-ZEILE (Recherche 2.5: "eigene Ereigniszeile").
-        // Nur bei einem tatsaechlich kuehnen Versuch (u.ANSAGE trieb einen Zuschlag ueber
-        // das Ausgleichskilo), unabhaengig vom Ausgang — immer big, s. versuchBig oben.
-        if(r.kuehn){
-          if(r.punktesieg)
-            feed(u.side,"KÜHNER VERSUCH GEGLÜCKT — "+u.n+" wagt mehr als nötig, um zu gewinnen. Punktesieg!",true,undefined,"punktesieg");
-          else if(r.verletzt)
-            feed(u.side,"KÜHNER VERSUCH GESCHEITERT — "+u.n+" verletzt sich beim Wagnis!",true,undefined,"verletzt");
-          else
-            feed(u.side,"Kühner Versuch von "+u.n+" scheitert knapp.",true,undefined,"knappVorbei");
-        }
-        if(u.aktuell+1>=BB().rundenN)
-          feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
-            :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true,undefined,
-            u.nullwertung?"nullwertung":"zweikampf");
+        // Der eigentliche Versuchs-Ticker ("... gueltig/ungueltig" -- das Wort steht woertlich
+        // in `r.ereignis`), die KUEHNER-VERSUCH-Ausgangszeilen und die abschliessende
+        // "Zweikampf .../NULLWERTUNG"-Zeile verraten alle r.gueltig/r.punktesieg/r.verletzt/
+        // u.zweikampf/u.nullwertung -- genau wie der Schweber oben jetzt in
+        // hebenTickerAmUrteil() (stepHeben(), Lampen-Moment), NICHT mehr hier an der
+        // Enthuellung.
       } else if(BB().duell&&u.verlauf){
         const v=u.verlauf[u.aktuell];
         // GEGNER, GENERISCH FUER ALLE DUELL-DISZIPLINEN (Fix 27.09., Opus-Review
@@ -18982,6 +18972,10 @@
           // schalten Kampfrichterlampen, Versuchstafel und Ton um -- NICHT an der Enthuellung in
           // stepBuehne() (Spoiler-Regel H1/H2.2). Liest nur, schreibt nur `teamFeiern`.
           hebenFeierAmUrteil(u,r);
+          // TICKER/SCHWEBER AM LAMPEN-MOMENT, AUS DEMSELBEN GRUND (Folgefund zu PR #1091, s.
+          // hebenTickerAmUrteil()-Kommentar dort): der Versuchs-Ticker/die kg-Pops wandern aus
+          // stepBuehne() genau hierher, denselben Frame wie die Team-Feier.
+          hebenTickerAmUrteil(u,r);
         }
       } else if(u.vizPhase==="hoch"){
         if(u.vizPhaseT>=HEBEN_HOCH_T*dauer){ u.vizPhase="ablage"; u.vizPhaseT=0; }
@@ -19035,6 +19029,79 @@
     }
     if(r.kuehn&&r.punktesieg)teamFeierAusloesen(u.side,"mittel",null);
     else if(r.gueltig)teamFeierAusloesen(u.side,"klein",null);
+  }
+
+  // TICKER/SCHWEBER AM LAMPEN-MOMENT, NICHT AN DER ENTHUELLUNG (Folgefund zu PR #1091, Task
+  // #35, 01.10.). PR #1091 selbst nennt das unter "Begruendete Entscheidungen" woertlich als
+  // offenen Punkt: "Ticker unveraendert. Der Ticker schreibt bei Heben generell zur
+  // Enthuellung, auch die Zeile 'Zweikampf ...' beim 6. Versuch. Das liegt ausserhalb dieses
+  // Punktes." -- UND: "Lampen-Moment statt Enthuellung ... Ein moeglicher Folgepunkt, wenn
+  // das einheitlich sein soll."
+  //
+  // DER FUND: stepBuehne() rief bislang an der ENTHUELLUNG (`u.aktuell++`, Uebergang
+  // boden->antritt) direkt vier Dinge auf, die r.gueltig/r.punktesieg/r.verletzt/u.zweikampf/
+  // u.nullwertung lesen und damit das Urteil VOR der Lampe verraten:
+  //   1. Der kg/X-Schweber (`schwebe({txt:r.gueltig?r.kg+" kg":"X", _def:!r.gueltig, ...})`) --
+  //      zeigt "X" (durchgestrichen/rot, `_def`) sofort bei einem Fehlversuch.
+  //   2/3. Die PUNKTESIEG!/VERLETZT!-Pops.
+  //   4. Die Ticker-Zeile selbst: `r.ereignis` traegt WOERTLICH "gueltig"/"ungueltig" im Text
+  //      ("Reißen, 2. Versuch, 152 kg — gültig"), dazu die KUEHNER-VERSUCH-Ausgangszeilen und
+  //      die abschliessende "Zweikampf .../NULLWERTUNG"-Zeile beim 6. Versuch (dieselbe
+  //      `u.zweikampf`/`u.nullwertung`, die PR #1091 fuer die Kaderleiste schon gegatet hat).
+  // Nachgemessen (Playwright, Produktionsmodus): die Ticker-Zeile und der Schweber standen
+  // schon im selben Frame wie die Enthuellung, rund ANTRITT_T+ZUG_T (~2s bei Standardtempo,
+  // PR #1091 misst exakt 6964ms Ticker gegen 8955ms Lampen-Moment fuer denselben Versuch) VOR
+  // dem Uebergang zug->hoch|ablage, an dem Kampfrichterlampen (bodenHeben()), Versuchstafel
+  // (zeichneHeben()) und Team-Feier (hebenFeierAmUrteil() oben) erst umschalten.
+  //
+  // DER FIX: exakt dasselbe Muster wie hebenFeierAmUrteil() direkt darueber -- diese Funktion
+  // lebt in stepHeben() und wird GENAU am Uebergang zug->hoch|ablage aufgerufen (s.
+  // Aufrufstelle oben), also im selben Frame, in dem auch Lampen/Versuchstafel/Team-Feier
+  // umschalten. stepBuehne() loest an der Enthuellung nur noch das aus, was KEIN Spoiler fuer
+  // DIESEN Versuch ist: den Ansage-Gong, `letzterHebenZug`/`u.lunge` (fuer die Antritt-
+  // Animation/Versuchstafel noetig, die ihre Faerbung selbst ueber `vizPhase` gatet), den
+  // G1-Team-Banner (haengt nur an schon ENTSCHIEDENEN frueheren Duellen) und die G3-Ansage-
+  // Aenderung (die angesagte Last ist die VOR dem Versuch oeffentliche Zielzahl, nicht ihr
+  // Ausgang -- derselbe Unterschied, den auch das "laufend"-Kaestchen der Versuchstafel macht).
+  //
+  // KEIN rr(), keine Schreibzugriffe auf u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/
+  // u.lunge/buehneAkt/buehneZeiger/done (Vertrag aus buehnenBewegung()-Kommentar) -- `feed()`/
+  // `schwebe()` pruefen `stumm` selbst und sind damit im Messpfad (disziplinProbe()/
+  // miss-alle-disziplinen.mjs durchlaufen buehnenBewegung()/stepHeben() mit) wirkungslose
+  // No-Ops, exakt wie beim schon bestehenden `sfx("gewichtheben","ansage")` in stepBuehne().
+  // Volle feed()-Signatur durchgereicht (`side,txt,big,caption,kind`), kein verkuerzter
+  // Wrapper (Silent-Argument-Truncation-Falle bei zusaetzlichen Parametern).
+  function hebenTickerAmUrteil(u,r){
+    if(!r)return;
+    // Immer gesetzt, auch bei `stumm` (billige Zuweisung, kein rr(), keine U-/TEILNEHMER-
+    // Mutation) -- genau das Muster, mit dem stepBuehne() `letzterHebenZug` schon ungegated
+    // setzt. Gelesen wird die Variable ohnehin nur beim Zeichnen (zeichneHeben()), also nie im
+    // Messpfad.
+    letzterHebenLampenZug={u,r};
+    if(stumm)return;
+    const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
+    const versuchBig=(r.gueltig&&r.versuch===3)||r.kuehn;
+    schwebe({x:0,y:0,txt:r.gueltig?r.kg+" kg":"X",life:1,
+      crit:versuchBig,_def:!r.gueltig,_teilnehmer:u.id});
+    if(r.punktesieg)schwebe({x:0,y:0,txt:"PUNKTESIEG!",life:1.3,crit:true,_teilnehmer:u.id});
+    if(r.verletzt)schwebe({x:0,y:0,txt:"VERLETZT!",life:1.3,crit:true,_def:true,_teilnehmer:u.id});
+    const scheiterTxt=r.scheiterOrt?(" ("+r.scheiterOrt+" gescheitert)"):"";
+    feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
+      +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")+scheiterTxt
+      +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig,undefined,
+      r.kuehn?"kuehnerVersuch":"letzterVersuch");
+    if(r.kuehn){
+      if(r.punktesieg)
+        feed(u.side,"KÜHNER VERSUCH GEGLÜCKT — "+u.n+" wagt mehr als nötig, um zu gewinnen. Punktesieg!",true,undefined,"punktesieg");
+      else if(r.verletzt)
+        feed(u.side,"KÜHNER VERSUCH GESCHEITERT — "+u.n+" verletzt sich beim Wagnis!",true,undefined,"verletzt");
+      else
+        feed(u.side,"Kühner Versuch von "+u.n+" scheitert knapp.",true,undefined,"knappVorbei");
+    }
+    if(u.aktuell+1>=BB().rundenN)
+      feed(u.side,u.n+": Zweikampf "+(u.nullwertung?"NULLWERTUNG"
+        :sinclairAnzeige(u.zweikampf,u.groesse)+" kg ("+u.zweikampf+" Sinclair)")+".",true,undefined,
+        u.nullwertung?"nullwertung":"zweikampf");
   }
 
   // SICHTBARER ZWEIKAMPF (F1-Broadcast-Audit Runde 2, 30.09., Punkt 2: "Gewichtheben verraet
@@ -24288,9 +24355,34 @@
   // Duellstand gross, Gesamtlast klein, die wartenden Paare klein am Rand — genau die
   // Liste aus Plan Abschnitt 7. Kein neues Sprite-Rendering: zeichneSprite() von den
   // Auftritts-Disziplinen wird nur GROESSER und MITTIGER platziert.
+  //
+  // LAMPEN-GRENZE, NICHT ENTHUELLUNGS-GRENZE (Folgefund zu PR #1091, Task #35, 01.10.): die
+  // hoechste Runden-Nummer, die ein Leser auf dieser Buehne ansehen darf, OHNE dem laufenden
+  // Versuch vorzugreifen -- dieselbe Formel wie in hebenSichtbareSumme() (s. dort),
+  // hier ausgelagert, weil bestBisher()/die Versuchstafel (zeichneHeben(), "besteIdx"-Block
+  // unten) sie jetzt BEIDE brauchen, statt sie je fuer sich zu wiederholen. Waehrend
+  // "antritt"/"zug" steht das Urteil des laufenden Versuchs im Motor zwar schon fest
+  // (`u.runden[u.aktuell].gueltig`), ist aber erst am Uebergang zu "hoch"/"ablage" GEZEIGT
+  // (Kampfrichterlampen/Versuchstafel/Team-Feier/Ticker schalten dort um, s.
+  // hebenFeierAmUrteil()/hebenTickerAmUrteil()) -- bis dahin zaehlt nur der VORHERIGE Versuch.
+  // Nach `done` gilt wie dort nur die Enthuellung (dann ist ohnehin alles gezeigt).
+  function hebenLampenIndex(u){
+    if(!u)return -1;
+    const n=u.aktuell==null?-1:u.aktuell;
+    return (n>=0&&!done&&(u.vizPhase==="antritt"||u.vizPhase==="zug"))?n-1:n;
+  }
+  // BESTES GUELTIGES GEWICHT BIS ZUR LAMPE (nicht bis zur Enthuellung): vor dem Folgefund
+  // zaehlte diese Funktion `i<=u.aktuell`, also auch den gerade erst enthuellten, noch nicht
+  // lampen-entschiedenen Versuch -- die Wertungstabelle (Reiss/Stoss/Zwei), die Zweikampf-
+  // Zeile unter jedem Heber und die Bedarfszeile ("braucht X kg") sprangen dadurch schon
+  // waehrend "antritt"/"zug" auf den neuen Wert, bis zu ANTRITT_T+ZUG_T (~2s) vor der Lampe --
+  // derselbe Fehlertyp wie `u.summe` in PR #1091, hier nur eine Enthuellung statt des ganzen
+  // Duells zu frueh. Alle sechs Aufrufstellen lesen ausschliesslich diese eine Funktion, kein
+  // rr(), kein Schreibzugriff.
   function bestBisher(u,uebung){
+    const n=hebenLampenIndex(u);
     let m=0;
-    for(let i=0;i<=u.aktuell;i++){const r=u.runden[i];
+    for(let i=0;i<=n;i++){const r=u.runden[i];
       if(r&&r.uebung===uebung&&r.gueltig)m=Math.max(m,r.kg);}
     return m;
   }
@@ -24475,8 +24567,21 @@
   // vorberechneten Runden ist).
   function WERTUNG_HEBEN(art){
     const w=art.wertungTabelle||{};
+    // `hebenDuellEntschieden(u,true)` STATT des generischen `paarFertig()` (Folgefund zu
+    // PR #1091, Task #35, 01.10.): `paarFertig()` synchronisiert nur die ENTHUELLUNG beider
+    // Duellanten (06.09.-Fund, s. Kommentar dort) -- fuer Heben kam seitdem mit
+    // hebenFeierAmUrteil()/der Lampen-Moment-Regel (30.09./01.10.) eine STRENGERE Grenze
+    // dazu: das Urteil des jeweils letzten Versuchs muss nicht nur enthuellt, sondern
+    // LAMPEN-GEZEIGT sein (vizPhase nicht mehr antritt/zug). Mit `paarFertig()` sprang die
+    // "Stand"-Spalte (Sieg/Niederlage, liest `u.duellGewonnen` -- genau wie `u.summe` schon ab
+    // baueHebenDuelle() der FERTIGE Ausgang) auf den Endstand, sobald beide Heber ihren
+    // sechsten Versuch enthuellt hatten, bis zu ANTRITT_T+ZUG_T (~2s) bevor die letzte Lampe
+    // tatsaechlich zeigt, wer gewonnen hat -- derselbe Fehlertyp wie `u.summe` in PR #1091,
+    // hier aber mit dem Spielausgang selbst statt nur einer Zwischensumme. `#score` (HUD) und
+    // hebenFeierAmUrteil() nutzen `hebenDuellEntschieden(u,true)` schon dafuer; diese Tabelle
+    // jetzt auch.
     const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,
-      fertig:paarFertig(u,art)}));
+      fertig:hebenDuellEntschieden(u,true)}));
     return {namen:"Heber", zeilen, sortierung:(a,b)=>(a.u.duellNr??0)-(b.u.duellNr??0)||a.u.side-b.u.side,
       spalten:[
         {id:"duell",kopf:"Duell", titel:"Duell-Nummer, gegen wen", wert:z=>z.u.duellNr!=null?"D"+(z.u.duellNr+1):null},
@@ -24485,12 +24590,18 @@
           wert:z=>{const kg=bestBisher(z.u,"reissen"); return kg?sinclairAnzeige(kg,z.u.groesse):null;}},
         {id:"stoss",kopf:"Stoß", top:true, titel:"bestes gültiges Stoßen bisher",
           wert:z=>{const kg=bestBisher(z.u,"stossen"); return kg?sinclairAnzeige(kg,z.u.groesse):null;}},
+        // LAMPEN-GEGATET, NICHT ENTHUELLUNGS-GEGATET (Folgefund zu PR #1091, Task #35,
+        // 01.10.): beide Spalten lasen vorher `z.u.aktuell` direkt -- "Vers" zaehlte den
+        // gerade erst enthuellten, noch nicht lampen-entschiedenen Versuch schon im Nenner
+        // UND im Zaehler mit ("2/3" sprang auf "3/3", noch bevor die Lampe zeigte, ob er
+        // gueltig war), "Last" zeigte dessen `r.gueltig` genauso frueh (eine Zahl = Erfolg,
+        // leer = Fehlversuch). `hebenLampenIndex()` ist dieselbe Grenze wie bei bestBisher().
         {id:"vers", kopf:"Vers", titel:"gültige Versuche von den bisher gezeigten",
-          wert:z=>{const bis=z.u.runden.slice(0,Math.max(0,z.u.aktuell+1)); return bis.length?bis.filter(r=>r.gueltig).length+"/"+bis.length:null;}},
+          wert:z=>{const bis=z.u.runden.slice(0,hebenLampenIndex(z.u)+1); return bis.length?bis.filter(r=>r.gueltig).length+"/"+bis.length:null;}},
         {id:"zwei", kopf:"Zwei", top:true, titel:"Zweikampf bisher (Reißen + Stoßen)",
           wert:z=>{const st=bestBisher(z.u,"stossen"); if(!st)return null; return sinclairAnzeige(bestBisher(z.u,"reissen")+st,z.u.groesse);}},
         {id:"last", kopf:"Last", titel:"zuletzt gehobene Last (nicht die angesagte nächste)",
-          wert:z=>{const r=z.u.aktuell>=0?z.u.runden[z.u.aktuell]:null; return r&&r.gueltig?sinclairAnzeige(r.kg,z.u.groesse):null;}},
+          wert:z=>{const n=hebenLampenIndex(z.u); const r=n>=0?z.u.runden[n]:null; return r&&r.gueltig?sinclairAnzeige(r.kg,z.u.groesse):null;}},
         {id:"stand",kopf:"Stand", titel:"Duell entschieden?", wert:z=>!z.fertig?"…":(z.u.duellGewonnen?"Sieg":"Niederlage"),
           farbe:v=>v==="Sieg"?"var(--ok)":v==="Niederlage"?"var(--crit)":null},
         {id:"eig",  kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
@@ -24581,9 +24692,18 @@
     // hier lesen AUSSCHLIESSLICH bereits vorhandenen Zustand: `buehneAkt`/`art.rundenDauer`
     // treiben die Enthuellungsanimation ohnehin schon (s. hebePhase() oben), `zeitFaktor()`
     // ist dieselbe Umrechnung, mit der auch die Uhr im HUD rechnet (s. updateHudBuehne()), und
-    // `letzterHebenZug.r.ereignis` ist derselbe Text, den der Ticker beim Enthuellen bereits
-    // schreibt (s. "u.runden.push({...ereignis:..." oben) -- keine neue Simulation, kein
-    // rr(), kein zweites Protokoll.
+    // `letzterHebenLampenZug.r.ereignis` ist derselbe Text, den der Ticker am Lampen-Moment
+    // schreibt (s. hebenTickerAmUrteil()) -- keine neue Simulation, kein rr(), kein zweites
+    // Protokoll.
+    //
+    // LAMPEN-GEGATET, NICHT ENTHUELLUNGS-GEGATET (Folgefund zu PR #1091, Task #35, 01.10.):
+    // vorher stand hier `letzterHebenZug` -- derselbe Transient, den stepBuehne() schon AN DER
+    // ENTHUELLUNG setzt, also VOR der Lampe. `r.ereignis` traegt woertlich "gueltig"/
+    // "ungueltig"; diese Zeile verriet das Urteil damit genauso frueh wie der (inzwischen
+    // verschobene) Haupt-Ticker. `letzterHebenLampenZug` wird dagegen nur in
+    // hebenTickerAmUrteil() gesetzt, also GENAU am Uebergang zug->hoch|ablage -- waehrend des
+    // laufenden Versuchs zeigt dieses Feld deshalb noch den VORHERIGEN, bereits entschiedenen
+    // Versuch (oder nichts, vor dem allerersten).
     {
       const restEcht=Math.max(0,buehneAkt*zeitFaktor());
       const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
@@ -24593,9 +24713,9 @@
       const barW=150,barH=5,barX=W/2-barW/2,barY=uhrY+11;
       ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(barX,barY,barW,barH);
       ctx.fillStyle="#d6ac36";ctx.fillRect(barX,barY,barW*fortschritt,barH);
-      if(letzterHebenZug&&letzterHebenZug.r){
+      if(letzterHebenLampenZug&&letzterHebenLampenZug.r){
         ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Zuletzt: "+letzterHebenZug.u.n.split(" ")[0]+" — "+letzterHebenZug.r.ereignis,
+        ctx.fillText("Zuletzt: "+letzterHebenLampenZug.u.n.split(" ")[0]+" — "+letzterHebenLampenZug.r.ereignis,
           W/2,barY+17);
       }
     }
@@ -24604,8 +24724,9 @@
     // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
     // (Abschnitt 2.1) "aus einem Versuch ein Finale macht". Nur im Stossen, und nur sobald
     // der Gegner seinen letzten Versuch gemacht hat ODER der aktive Heber selbst im dritten
-    // Versuch steht (Doku H2.1). Reine Ableitung aus bereits enthuellten Bestwerten
-    // (bestBisher(), dieselbe Spoiler-Grenze wie ueberall sonst auf dieser Buehne) — nichts
+    // Versuch steht (Doku H2.1). Reine Ableitung aus bereits LAMPEN-ENTSCHIEDENEN Bestwerten
+    // (bestBisher(), seit dem Folgefund zu PR #1091 auf die Lampen- statt die Enthuellungs-
+    // Grenze gegated, dieselbe Spoiler-Grenze wie ueberall sonst auf dieser Buehne) — nichts
     // Neues wird geschrieben, nur gelesen und gezeichnet.
     //
     // EINHEIT (H2.1-Warnung im Dokument woertlich): gerechnet wird in RAW kg, GENAU der
@@ -24714,11 +24835,15 @@
         // (Spoiler-Falle, H1: "Das Kästchen des laufenden Versuchs wird erst nach dem
         // Übergang … eingefärbt, also im selben Moment wie die Lampen").
         const aufgeloest=!istAktiverZug||phaseJetzt==="hoch"||phaseJetzt==="ablage";
-        // BESTES GUELTIGES KAESTCHEN je Uebung — nur unter den bereits enthuellten
-        // Versuchen (i<=u.aktuell), denn nur das zaehlt zum Zweikampf (bestBisher() zieht
-        // dieselbe Grenze).
+        // BESTES GUELTIGES KAESTCHEN je Uebung — nur unter den schon LAMPEN-ENTSCHIEDENEN
+        // Versuchen (hebenLampenIndex(u), dieselbe Grenze wie bestBisher()), NICHT nur
+        // enthuellten (i<=u.aktuell). FOLGEFUND ZU PR #1091 (Task #35, 01.10.): die alte
+        // Grenze liess den GOLD-RAHMEN schon ans laufende, noch graue "laufend"-Kaestchen
+        // (s. `laufend`/`aufgeloest` oben) springen, sobald der im Motor schon feststehende
+        // Versuch gueltig UND besser als der bisherige Bestwert war -- ein Rahmen um ein noch
+        // graues Kaestchen verriet "gueltig", bevor es nach `aufgeloest` gruen umschlaegt.
         const besteIdx={reissen:-1,stossen:-1}, besteKg={reissen:-1,stossen:-1};
-        for(let i=0;i<=Math.min(u.aktuell,5);i++){
+        for(let i=0;i<=Math.min(hebenLampenIndex(u),5);i++){
           const r0=u.runden[i]; if(!r0||!r0.gueltig)continue;
           if(r0.kg>besteKg[r0.uebung]){besteKg[r0.uebung]=r0.kg;besteIdx[r0.uebung]=i;}
         }
@@ -43900,6 +44025,18 @@
     bahnPlaene:()=>LAEUFER.map(u=>({id:u.id,n:u.n,seite:u.seite,plan:u.plan,
       ab:+u.ab.toFixed(4),pos:+u.pos.toFixed(4),ansagen:u.ansagen||0})),
     setDisc:(d)=>{ disc=d; reset(); },
+    // GEWICHTHEBEN: LAMPEN-STATUS, READ-ONLY (Folgefund zu PR #1091, Task #35, 01.10.) —
+    // dasselbe Playwright-Abnahme-Muster wie kampfAnsage()/fsFokus()/bahnWahl() daneben: macht
+    // von AUSSEN sichtbar, was sonst nur im Motor steckt, damit eine Playwright-Probe den
+    // Abstand zwischen ENTHUELLUNG (`letzterHebenZug`, von stepBuehne() an jedem `u.aktuell++`
+    // gesetzt) und LAMPEN-MOMENT (`letzterHebenLampenZug`, von hebenTickerAmUrteil() erst am
+    // Uebergang zug->hoch|ablage gesetzt) exakt vermessen kann. Liest nur diese beiden bereits
+    // bestehenden, rein praesentationalen Transients, schreibt nichts, kein rr().
+    hebenZustand:()=>{
+      const pack=(z)=>(z&&z.r)?{n:z.u.n,ereignis:z.r.ereignis,gueltig:z.r.gueltig,
+        versuch:z.r.versuch,uebung:z.r.uebung,duellNr:z.u.duellNr,vizPhase:z.u.vizPhase}:null;
+      return {enthuellt:pack(letzterHebenZug), lampe:pack(letzterHebenLampenZug)};
+    },
     debugZiele:(an)=>{ FS_DEBUG_ZIELE=!!an; },
     // Nur fuer die Wurfmechanik-Abnahme (Fable, 25.08.): rohes Ereignisprotokoll der
     // Basketball-Live-Engine, dieselbe Quelle wie fsBisher(). Read-only, wie kader()/
