@@ -15814,10 +15814,20 @@
     // Die Last des naechsten Versuchs — die geplante Ansage, im dritten Versuch dazu die
     // Reaktion auf den Duellstand. Als Funktion, weil die Reihenfolge des dritten Versuchs
     // (s.u.) beide Ansagen kennen muss, BEVOR einer von beiden gehoben hat.
+    // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD SICHTBAR".
+    // Haelt NUR fest, was die geplante Ansage VOR der Duellstand-Reaktion war, wenn genau
+    // diese Reaktion sie tatsaechlich ueberschreibt (der "Ansage 126 — geaendert auf 128"-
+    // Moment am Meldetisch) -- reine Lesebuchfuehrung auf einer lokalen Map, kein rr(), kein
+    // Einfluss auf kg/u.summe/wert(). `ansageAltMap[u.id]` wird wie `kuehnFlag[u.id]` bei
+    // JEDEM Aufruf von lastFuer() neu gesetzt; da der fuer die Anzeige/den Boxscore relevante
+    // Aufruf der LETZTE vor dem Lesen ist (exakt dasselbe Vertragsmuster wie kuehnFlag, s.
+    // Schleife unten), spiegelt sie immer den tatsaechlich genutzten Stand.
+    const ansageAltMap={};
     const lastFuer=(u,v)=>{
       const gegner=u===a?b:a;
       let kg=ansage[u.id];
       kuehnFlag[u.id]=false;
+      ansageAltMap[u.id]=null;
       // REAKTION AUF DEN DUELLSTAND: liegt der Heber vor dem dritten Versuch hinter dem
       // Gegner, zieht er auf dessen Last plus ein Kilo. Das ist die IWF-Idee "nimm ein
       // Kilo mehr fuer den Sieg" — und es macht aus zwei Nebeneinander-Auftritten ein
@@ -15847,6 +15857,9 @@
         const zuschlag=Math.min(HEBEN_WAGNIS_MAX_KG, Math.max(0,u.ANSAGE-50)*HEBEN_WAGNIS_ANSAGE_K);
         const ziel=basisZiel+Math.round(zuschlag);
         if(ziel<=max(u)*1.06){
+          // G3: die geplante Ansage, BEVOR der Duellstand sie ueberschreibt -- nur gesetzt,
+          // wenn `ziel` sie tatsaechlich anhebt (reiner Vorher-Wert fuer die Anzeige).
+          if(ziel>kg)ansageAltMap[u.id]=kg;
           kg=Math.max(kg,ziel);
           // "kuehn" heisst: der tatsaechlich genutzte Zielwert liegt ECHT ueber dem nackten
           // Ausgleichskilo — nicht nur die unveraenderte Minimalreaktion.
@@ -15893,7 +15906,15 @@
           +(kg<=u.letzteLast?HEBEN_WIEDERHOLUNG:0)
           -ueber*HEBEN_WAGNIS_K));
         u.letzteLast=kg;
-        const gueltig=rr()<p;
+        // G2 (Fable-Ideen 30.09., Politur A, Klasse A): "DREI KAMPFRICHTER, DREI LAMPEN, EIN
+        // KNAPP!". `wurf` ist GENAU derselbe einzelne rr()-Zug, der gueltig/gueltig vorher
+        // ohne Zwischenspeicherung bestimmt hat -- nur jetzt in einer Variablen gehalten, die
+        // rr()-Reihenfolge/der Verbrauch ist bit-identisch unveraendert. `marge` (Abstand zur
+        // Schwelle) ist reine Anzeigeableitung fuer die drei Kampfrichterlampen in
+        // bodenHeben() -- fliesst in keine Formel/kein wert() ein.
+        const wurf=rr();
+        const gueltig=wurf<p;
+        const marge=p-wurf;
         // PUNKTESIEG/VERLETZUNG: nur beim kuehnen Versuch, und nur je einer der beiden je
         // Versuch (Erfolg schliesst Verletzung aus, s. HEBEN_INJURY_BASIS-Kommentar oben).
         let punktesieg=false, verletzt=false;
@@ -15935,7 +15956,14 @@
           // eine bereits erfolgreich gehobene Last faellt.
           ansage[u.id]=Math.max(1,Math.round(kg*(1-HEBEN_FEHL_REDUKTION)));
         }
-        u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt,
+        // G2, ZUSATZ "WO ES SCHEITERT": rein ableitend aus bereits vorhandenen Sub-Skills
+        // (TECHNIK vs. LAST), kein neuer Wurf. Nur fuer einen Stossen-Fehlversuch belegt --
+        // ein schwacher Techniker scheitert im Umsetzen (Clean), ein schwacher Kraftheber im
+        // Ausstoss (Jerk). Reine Beschriftung der Fehlversuch-Zeile im Ticker.
+        const scheiterOrt=(uebung==="stossen"&&!gueltig)
+          ?(u.TECHNIK<u.LAST?"Umsetzen":"Ausstoß"):null;
+        u.runden.push({kg, gueltig, uebung, versuch:v+1, kuehn, punktesieg, verletzt, marge,
+          ansageAlt:ansageAltMap[u.id], scheiterOrt,
           punkte:gueltig?kg:0,
           ereignis:(uebung==="reissen"?"Reißen":"Stoßen")+", "+(v+1)+". Versuch, "+kg+" kg — "
                    +(gueltig?"gültig":"ungültig")+(kuehn?" (kühner Versuch)":"")});
@@ -16900,6 +16928,19 @@
       return hpVor>schwelle && hpNach<=schwelle;
     });
   }
+  // B3 (Fable-Ideen 30.09., Politur A, Klasse A): „GIBT AUF" ODER „GEBROCHEN". Chris: „bis
+  // einer aufgibt" -- heute faellt jeder bei HP 0 unter demselben Stempel aus dem Ring.
+  // AUSDRUECKLICH BEWUSST KEINE MECHANIK (s. Dokument 3.7/B3-Begruendung): der Ausscheidende
+  // kaempft in JEDEM Fall bis HP 0 (Ausgang/Kette unveraendert), nur die BESCHRIFTUNG des
+  // immer gleichen Ausscheidens liest `u.NERVEN` -- ein Sub-Skill, der fuer die gesamte
+  // Begegnung FEST steht (kein neuer Kanal, kein rr(), kein Einfluss auf gauntletRunde()/
+  // baueGauntlet()/wert()). Schwelle 50 (Skala-Mitte, wie ueberall sonst im Motor
+  // "ueber/unter 50" liest, z.B. HEBEN_TECHNIK_K): hohes NERVEN kaempft bis zuletzt
+  // (GEBROCHEN), niedriges winkt vorher ab (GIBT AUF) -- reine Text-/Ton-Verzweigung.
+  const GAUNTLET_NERVEN_SCHWELLE=50;
+  function gauntletAusscheidenWort(u){
+    return (u&&u.NERVEN>=GAUNTLET_NERVEN_SCHWELLE)?"GEBROCHEN":"GIBT AUF";
+  }
   // HP-Stand EINES Teilnehmers, so wie er GERADE ENTHUELLT ist -- liest `hpNach` aus der
   // zuletzt enthuellten eigenen Runde (baueGauntlet() fuehrt das je Runde mit, s. dortiger
   // Kommentar), nicht `u.hp` selbst (das haelt schon den fertigen ENDSTAND der ganzen Kette).
@@ -17037,7 +17078,11 @@
       // _tonPhase: rein praesentationale Buchfuehrung fuer sfx() bei zeichneHeben() (s.
       // dort) — auf dem transienten {u,r}-Container, nicht auf u/TEILNEHMER, s. Vertrag
       // bei buehnenBewegung. "ansage" (Ansage-Gong) feuert einmal pro enthuelltem Versuch.
-      if(BB().heben){ letzterHebenZug={u,r,_tonPhase:"boden"}; sfx("gewichtheben","ansage"); }
+      // `_revealT` (G2, Fable-Ideen 30.09., Politur A, Klasse A): Buehnen-Zeitstempel dieser
+      // Enthuellung, NUR fuer die 0,4s-Verzoegerung der abweichenden Kampfrichterlampe bei
+      // einem knappen Urteil (s. bodenHeben()) -- dieselbe Kategorie wie `bruchT` bei
+      // letzterGauntletBruch, rein zeichnerisch, kein rr(), kein Einfluss auf stepHeben().
+      if(BB().heben){ letzterHebenZug={u,r,_tonPhase:"boden",_revealT:buehneT}; sfx("gewichtheben","ansage"); }
       // KETTENLEISTE (B1): derselbe Kniff wie letzterHebenZug direkt darueber, nur global
       // (die Kampf-Nummer haengt an der ganzen Kette, nicht an einem einzelnen Teilnehmer) --
       // reine Buchfuehrung, kein rr(), keine neue Zahl (r.bout steht schon seit baueGauntlet()
@@ -17058,6 +17103,9 @@
           // erscheint. teamFeierAusloesen() kehrt bei `stumm` sofort zurueck und schreibt nur
           // `teamFeiern` (Anzeige-Zustand), kein rr(), keine Wertung.
           teamFeierAusloesen(1-u.side,"gross",null,{funken:true});
+          // B3 (Fable-Ideen 30.09., Politur A, Klasse A): eigener Ton je nach Ausscheide-Wort
+          // (s. gauntletAusscheidenWort()) -- derselbe Enthuellungs-Frame wie der Stempel.
+          sfx("breaking",gauntletAusscheidenWort(u)==="GEBROCHEN"?"gebrochen":"gibtauf");
         }
       }
       // GEWICHTHEBEN ZAEHLT NICHT AUF. `summe` ist dort der fertige Zweikampf (bestes
@@ -17108,10 +17156,24 @@
         // sinclairAnzeige) — ein Zwerg hebt weniger Kilo und trotzdem relativ genauso
         // viel. Entschieden wird auf den normierten, angezeigt auf den echten.
         const zeigeKg=sinclairAnzeige(r.kg,u.groesse);
+        // G2, ZUSATZ "WO ES SCHEITERT" (Fable-Ideen 30.09., Politur A, Klasse A): reine
+        // Textbeschriftung eines Stossen-Fehlversuchs, s. `scheiterOrt` in hebeUebung().
+        const scheiterTxt=r.scheiterOrt?(" ("+r.scheiterOrt+" gescheitert)"):"";
         feed(u.side,u.n+" ("+(u.rolle||"Heber")+") — "
-          +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")
+          +r.ereignis.replace(r.kg+" kg",zeigeKg+" kg")+scheiterTxt
           +" · gegen "+u.gegnerN+", Duell "+((u.duellNr??0)+1)+".",versuchBig,undefined,
           r.kuehn?"kuehnerVersuch":"letzterVersuch");
+        // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD SICHTBAR"
+        // -- der Poker-Moment am Meldetisch. `r.ansageAlt` ist nur gesetzt, wenn der
+        // Duellstand die geplante Ansage DIESES Versuchs tatsaechlich ueberschrieben hat (s.
+        // lastFuer()-Kommentar oben); eigene Ticker-Zeile, immer big, derselbe Rang wie der
+        // kuehne Versuch direkt darunter. Reine Anzeige: `r.ansageAlt`/`r.kg` stehen schon
+        // fest, kein rr(), kein Einfluss auf Wertung.
+        if(r.ansageAlt!=null){
+          feed(u.side,u.n+" zieht nach: Ansage "+sinclairAnzeige(r.ansageAlt,u.groesse)
+            +" kg — geändert auf "+zeigeKg+" kg.",true);
+          sfx("gewichtheben","kreide");
+        }
         // ZWEIKAMPF ENTSCHIEDEN: das Endergebnis eines Hebers (Gesamtkilo oder Nullwertung)
         // ist immer big — kein "vielleicht wichtig", sondern der Abschluss seines ganzen
         // Auftritts, analog zum K.o./Zieleinlauf anderer Chassis.
@@ -17395,9 +17457,15 @@
           +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),undefined,
           "angeschlagen",undefined,undefined,
           r.ereignis===BB().erfolgWort?"routine":undefined);
-        if(r.hpNach<=0)
-          feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
+        if(r.hpNach<=0){
+          // B3: "GIBT AUF" ODER "GEBROCHEN" (s. gauntletAusscheidenWort()-Kommentar oben) --
+          // reine Beschriftung desselben Ausscheidens, kein zweiter Zustand. Highlight-Titel
+          // (C3) bleibt einheitlich "gebrochen" -- HIGHLIGHT_TITEL kennt keinen eigenen
+          // "aufgegeben"-Eintrag, der Ticker-Satz selbst traegt die Unterscheidung.
+          const wort=gauntletAusscheidenWort(u);
+          feed(u.side,u.n+" — "+wort+" — scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
             buehneBahnGrossDrosseln(true,true),undefined,"gebrochen");
+        }
       } else if(BB().duett){
         // EISKUNSTLAUF-ELEMENTNAME STATT "Durchgang X/Y" (E0, Buehne-Auftritt-Konzeptreview
         // 26.09., Abschnitt 2.4): reiner Textersatz -- `r.ereignis`/`r.punkte`/
@@ -20501,20 +20569,48 @@
     // DREI KAMPFRICHTERLAMPEN ueber der Plattform — weiss/rot je nach zug.r.gueltig. Das
     // ist die IWF-Geste, die es heute nur als "✓ gültig"-Text gibt (bleibt zusaetzlich
     // bestehen, s. zeichneHeben() Textkarte).
+    //
+    // G2 (Fable-Ideen 30.09., Politur A, Klasse A): "DREI KAMPFRICHTER, DREI LAMPEN, EIN
+    // KNAPP!". Bisher schalteten alle drei Lampen gemeinsam weiss/rot (reiner Binaerwurf
+    // r.gueltig). `r.marge` (= Schwelle minus Wurf, s. hebeUebung()) ist reine Anzeige-
+    // ableitung desselben, bereits gezogenen `rr()`-Wurfs -- kein zweiter Zufallszug, keine
+    // neue Formel, derselbe gueltig-Wert wie bisher bleibt die Wertungsgrundlage. Bei einem
+    // KNAPPEN Urteil (Marge nahe der Schwelle) zeigen zwei Lampen sofort die Mehrheit, die
+    // DRITTE (abweichende) schaltet erst 0,4s spaeter um ("Kampfrichter uneins") --
+    // `zug._revealT` ist derselbe Enthuellungs-Zeitstempel, den jeder andere Lampen-/
+    // Tafel-Wechsel dieser Buehne ohnehin schon reveal-gegatet liest.
     const zug=letzterHebenZug;
     const gueltig=zug?zug.r.gueltig:null;
+    const marge=zug?zug.r.marge:null;
+    const KNAPP_SCHWELLE_GUELTIG=0.15, KNAPP_SCHWELLE_UNGUELTIG=-0.10;
+    const KNAPP_VERZOEGERUNG=0.4;
+    let dissentIdx=null, mehrheitWeiss=gueltig;
+    if(gueltig!=null && marge!=null){
+      if(gueltig && marge<=KNAPP_SCHWELLE_GUELTIG){ mehrheitWeiss=true; dissentIdx=2; }
+      else if(!gueltig && marge>=KNAPP_SCHWELLE_UNGUELTIG){ mehrheitWeiss=false; dissentIdx=0; }
+    }
+    const seitEnthuellung=zug?(buehneT-(zug._revealT||0)):0;
+    const dissentAktiv=dissentIdx!=null && seitEnthuellung>=KNAPP_VERZOEGERUNG;
     const lampY=platY-24;
-    [-1,0,1].forEach(i=>{
+    [-1,0,1].forEach((i,idx)=>{
       const lx=W/2+i*22;
+      const lampenWeiss=gueltig==null?null:((dissentAktiv&&idx===dissentIdx)?!mehrheitWeiss:mehrheitWeiss);
       ctx.beginPath();ctx.arc(lx,lampY,7,0,Math.PI*2);
-      ctx.fillStyle=gueltig==null?"#3a3d46":(gueltig?"#f2ede0":"#c0392b");
+      ctx.fillStyle=lampenWeiss==null?"#3a3d46":(lampenWeiss?"#f2ede0":"#c0392b");
       ctx.fill();
       ctx.lineWidth=1.5;ctx.strokeStyle="#15161a";ctx.stroke();
-      if(gueltig!=null){
-        ctx.save();ctx.globalAlpha=0.5;ctx.fillStyle=gueltig?"#fff9e8":"#ff5b45";
+      if(lampenWeiss!=null){
+        ctx.save();ctx.globalAlpha=0.5;ctx.fillStyle=lampenWeiss?"#fff9e8":"#ff5b45";
         ctx.beginPath();ctx.arc(lx,lampY,12,0,Math.PI*2);ctx.fill();ctx.restore();
       }
     });
+    // "KAMPFRICHTER UNEINS" — Hinweistext, nur waehrend die abweichende Lampe tatsaechlich
+    // zeigt (also erst nach der 0,4s-Verzoegerung, dasselbe Fenster wie oben).
+    if(dissentAktiv){
+      ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.textAlign="center";ctx.fillStyle="#c7ccd6";
+      ctx.fillText(gueltig?"knapp gültig — Kampfrichter uneins":"so knapp ungültig",W/2,lampY-14);
+    }
     // ANZEIGETAFEL oben rechts: Uebung, Versuch, angesagte kg — liest ausschliesslich
     // letzterHebenZug, dieselbe Datenquelle wie die Textkarte in zeichneHeben().
     // tafelY unter der HTML-Team-Karte oben rechts (".card"/aufgetreten-Zeile, DOM-Overlay
@@ -20571,20 +20667,24 @@
           ctx.fillText("Nächster:",tafelX+10,tafelY+58);
           ctx.fillStyle="#c7ccd6";
           ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69);
-          // "ZIEHT NACH" (H2.3): der Motor kennt heute genau eine Ansage-Aenderung, die aus
-          // dem Duellstand selbst folgt — der reaktive Zuschlag im dritten Versuch
-          // (kuehnFlag/HEBEN_WAGNIS_MAX_KG, s. hebeUebung()). Sichtbar als kurzes gelbes
-          // "↑ +N kg" GEGENUEBER DEM EIGENEN vorigen Versuch derselben Uebung — reine
-          // Ansage-Information (kein Ergebnis), also kein weiterer Spoiler.
-          if(naechsteR.kuehn&&naechsterU.aktuell>=0){
-            const vorige=naechsterU.runden[naechsterU.aktuell];
-            if(vorige&&vorige.uebung===naechsteR.uebung){
-              const deltaKg=sinclairAnzeige(naechsteR.kg-vorige.kg,naechsterU.groesse);
-              if(deltaKg>0){
-                ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#d6ac36";
-                ctx.fillText("↑ zieht nach, +"+deltaKg+" kg",tafelX+10,tafelY+91);
-              }
-            }
+          // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD
+          // SICHTBAR" — ersetzt die vorherige reine Delta-Zeile ("↑ zieht nach, +N kg",
+          // gegen den EIGENEN vorigen Versuch) durch den tatsaechlichen Meldetisch-Moment:
+          // die geplante Ansage, bevor der Duellstand sie ueberschrieben hat
+          // (`naechsteR.ansageAlt`, s. lastFuer()-Kommentar in hebeUebung()), durchgestrichen,
+          // dahinter der neue Wert. Reine Anzeige: beide Zahlen stehen schon fest, kein
+          // Spoiler des ERGEBNISSES (nur der Last, wie die Zeile darueber).
+          if(naechsteR.ansageAlt!=null){
+            const altTxt=sinclairAnzeige(naechsteR.ansageAlt,naechsterU.groesse)+" kg";
+            const neuTxt=" → "+sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
+            ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+            ctx.fillStyle="#8a93a3";
+            ctx.fillText(altTxt,tafelX+10,tafelY+91);
+            const altW=ctx.measureText(altTxt).width;
+            ctx.strokeStyle="#8a93a3";ctx.lineWidth=1;
+            ctx.beginPath();ctx.moveTo(tafelX+10,tafelY+91);ctx.lineTo(tafelX+10+altW,tafelY+91);ctx.stroke();
+            ctx.fillStyle="#d6ac36";
+            ctx.fillText(neuTxt,tafelX+10+altW,tafelY+91);
           }
         }
       }
@@ -25592,13 +25692,18 @@
         ctx.fillStyle="rgba(8,3,5,"+(0.40*p).toFixed(3)+")";
         ctx.fillRect(0,0,W,H);
         ctx.textAlign="center"; ctx.textBaseline="middle";
+        // B3 (Fable-Ideen 30.09., Politur A, Klasse A): derselbe Stempel, aber mit dem Wort,
+        // das `gauntletAusscheidenWort()` fuer DIESEN Ausscheidenden liest -- "GEBROCHEN"
+        // (hohes NERVEN, kaempft bis HP 0) oder "GIBT AUF" (niedriges NERVEN, winkt ab).
+        // Reine Textwahl, derselbe Stempel-Ablauf/dieselbe Dauer/derselbe Ausgang fuer beide.
+        const bruchWort=gauntletAusscheidenWort(letzterGauntletBruch.u);
         ctx.save();
         ctx.translate(cx,cy); ctx.rotate(-0.07);
         ctx.font="900 34px 'RaniraSeason',Georgia,'Times New Roman',serif";
         ctx.globalAlpha=Math.min(1,p*1.8);
         ctx.lineWidth=4; ctx.strokeStyle="rgba(8,4,4,.88)"; ctx.lineJoin="round";
-        ctx.strokeText("GEBROCHEN",0,0);
-        ctx.fillStyle="#ff3b3b"; ctx.fillText("GEBROCHEN",0,0);
+        ctx.strokeText(bruchWort,0,0);
+        ctx.fillStyle="#ff3b3b"; ctx.fillText(bruchWort,0,0);
         ctx.restore();
         ctx.globalAlpha=Math.min(1,p*1.8);
         ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
@@ -30748,7 +30853,12 @@
       //    auswertet).
       klatschen: {synth:(vol)=>tonKlick(vol,2800,0.05)},
       ausbruch:  {synth:(vol)=>tonRauschen(vol,900,0.55,false)},
-      raunen:    {synth:(vol)=>tonRauschen((vol??0.6)*0.7,220,0.4,false)}
+      raunen:    {synth:(vol)=>tonRauschen((vol??0.6)*0.7,220,0.4,false)},
+      // G3 (Fable-Ideen 30.09., Politur A): KREIDE-KLICK, wenn die Ansage am Meldetisch
+      // nachgezogen wird (s. `r.ansageAlt`-Aufruf). Kurzer, heller Klick wie `klatschen`,
+      // aber auf einer eigenen, tieferen Tonhoehe, damit beide Ereignisse unterscheidbar
+      // bleiben.
+      kreide:    {synth:(vol)=>tonKlick(vol,1800,0.04)}
     },
     eiskunstlauf:{
       kufe:     {synth:(vol)=>tonKlick(vol,3200,0.05)},
@@ -30779,7 +30889,13 @@
       herzschlag:{synth:(vol)=>{
         tonSchlag(vol,85,45,0.09);
         setTimeout(()=>{try{tonSchlag((vol??0.6)*0.75,70,38,0.08);}catch(e){}},110);
-      }}
+      }},
+      // B3 (Fable-Ideen 30.09., Politur A): zwei unterscheidbare Ausscheide-Toene, s.
+      // gauntletAusscheidenWort(). "gebrochen" ist tiefer/haerter (kaempft bis HP 0),
+      // "gibtauf" ein kurzes, resigniertes Abfallen -- dieselben fuenf Primitive wie
+      // ueberall im Katalog, kein neues Audio-Asset.
+      gebrochen: {synth:(vol)=>{ tonSchlag(vol,120,35,0.32); tonRauschen((vol??0.6)*0.5,200,0.35,false); }},
+      gibtauf:   {synth:(vol)=>tonSchlag((vol??0.6)*0.75,180,55,0.22)}
     },
     "takeshis-castle":{
       falle:    {synth:(vol)=>{ tonSchlag(vol,180,70,0.14); tonKlick((vol??0.6)*0.7,1200,0.05); }},
@@ -35648,11 +35764,28 @@
             u.reserve=Math.max(0,u.reserve-(A.stolperKraft??8)*robustFaktor);
             u.gestolpert++;
             u.balance=Math.min(u.balance??1,A.abrutschBalanceDeckel??0.6);
-            schwebe({...laeuferSchwebeXY(u,-20),txt:"rutscht ab",life:1.0,crit:true,_laeufer:u.id});
-            if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+            // C2 (Fable-Ideen 30.09., Politur A, Klasse A): "MAN SIEHT, WARUM EINER FAELLT".
+            // Liest ausschliesslich Werte, die dieser Frame bereits berechnet hat
+            // (pusteAbzug/balanceAbzug oben, meldeTyp weiter oben) -- reine Text-/
+            // Schwebetext-Verzweigung, kein rr(), kein neues Feld in der Wertung/in
+            // bahnRangliste()/MOTOREN.climbing.wert(). Schwelle 0,01 filtert nur
+            // Rundungsrauschen um exakt 0. Reihenfolge: Pump vor Balance vor Koennen,
+            // weil Pump/Balance die Schwelle schon VOR dem Koennen-Wurf verschoben haben
+            // (s. `technik=...-pusteAbzug-balanceAbzug` oben) -- die dominante Ursache ist
+            // die, die den groesseren Abzug beigetragen hat.
+            const pumpePct=u.reserveMax>0?Math.round(Math.max(0,1-u.reserve/u.reserveMax)*100):0;
+            if(pusteAbzug>0.01 && pusteAbzug>=balanceAbzug){
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"Hand öffnet sich",life:1.0,crit:true,_laeufer:u.id});
+              feed(u.seite,u.n+" — die Hand geht auf, rutscht ab — Pumpe "+pumpePct+" %.");
+            } else if(balanceAbzug>0.01 && balanceAbzug>pusteAbzug){
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"zögert — fällt",life:1.0,crit:true,_laeufer:u.id});
+              feed(u.seite,u.n+" zögert an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+" — und fällt.");
+            } else if(meldeTyp==="schwach" && !bahnKoennenGemeldet.has(meldeStation+"|schwach")){
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"Fuß rutscht",life:1.0,crit:true,_laeufer:u.id});
               melde("schwach",u.n+" rutscht an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
                 " ab — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
             } else {
+              schwebe({...laeuferSchwebeXY(u,-20),txt:"rutscht ab",life:1.0,crit:true,_laeufer:u.id});
               feed(u.seite,u.n+" rutscht ab und fällt ins Seil bis zur letzten Exe zurück.");
             }
           } else {
