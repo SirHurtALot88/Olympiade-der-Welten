@@ -28021,9 +28021,13 @@
         // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
         // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
         // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
-        feedRoutine(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
+        // feedRoutine() kennt keinen kind-Parameter (nur 3 Argumente) -- die zusaetzlichen
+        // Argumente wuerden beim Aufruf stillschweigend verworfen, genau wie bei nahschlag()
+        // oben dokumentiert. Deshalb hier feed() direkt mit kind UND stufe.
+        feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
-          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false),undefined,"grosserTreffer");
+          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false),undefined,
+          "grosserTreffer",undefined,undefined,"routine");
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
