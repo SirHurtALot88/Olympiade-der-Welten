@@ -14,6 +14,11 @@ import type {
   TeamPowerTargetMode,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+// `import type` -- wird beim Bauen vollstaendig entfernt (reine Typ-Information), zieht also
+// NICHT die Playwright-/`node:fs`-Importe von arena-headless-runner.ts in irgendein Bundle, das
+// diese Datei importiert (derselbe Grund, aus dem `seedZuZahl`/`buildArenaMatchSeed` als
+// LAUFZEIT-Funktionen eigens nach arena-seed.ts verschoben wurden -- hier reicht der Typ).
+import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 
 export type DisciplineSide = "d1" | "d2";
 
@@ -578,7 +583,10 @@ export type LegacyResolvePreviewOptions = {
    *
    * `undefined`/leer/kein Eintrag fuer die aktuelle Disziplin aendert nichts am PPS-Pfad.
    */
-  arenaTeamPointsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string }>> | null;
+  arenaTeamPointsByDisciplineId?: ReadonlyMap<
+    string,
+    ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string; momente?: ArenaMomentEintrag[] }>
+  > | null;
   /**
    * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7) — SEIT
    * docs/design/pps-skalierung-umsetzung.md auf V2 umgestellt, seit WEG B (s. Kommentar an

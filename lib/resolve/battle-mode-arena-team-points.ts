@@ -130,6 +130,7 @@ import {
   ARENA_BAHN_DISCIPLINE_IDS,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
+  type ArenaMomentEintrag,
   type RunArenaFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import basketballPpsReferenzJson from "@/data/generated/basketball-pps-referenz.json";
@@ -947,6 +948,14 @@ export type ArenaTeamPointsOverride = {
   /** Punktestand [dieses Team, Gegner] — fuer Anzeige/Tie-Breaking, NICHT fuer die Punktevergabe selbst. */
   seiten: [number, number];
   outcome: "win" | "draw" | "loss";
+  /**
+   * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
+   * Klasse A): direktes Passthrough von `ArenaFixtureResult.momente` -- IDENTISCH fuer beide
+   * Overrides eines Fixtures (Heim UND Gast teilen sich dasselbe Duell, `teamId` je Moment ist
+   * bereits aufgeloest, s. dort), kein Side-Mapping noetig. `undefined` fuer jedes Nicht-Feldspiel-
+   * Chassis (Gewichtheben, Buehne, Bahn) -- unveraendertes Verhalten dort.
+   */
+  momente?: ArenaMomentEintrag[];
 };
 
 /**
@@ -1049,6 +1058,7 @@ export function computeArenaTeamPointsFromFixtureResults(
       opponentTeamId: result.awayTeamId,
       seiten: result.seiten,
       outcome: heimOutcome,
+      ...(result.momente ? { momente: result.momente } : {}),
     });
     overridesByTeamId.set(result.awayTeamId, {
       teamPoints: gastPunkte,
@@ -1056,6 +1066,7 @@ export function computeArenaTeamPointsFromFixtureResults(
       opponentTeamId: result.homeTeamId,
       seiten: [result.seiten[1], result.seiten[0]],
       outcome: gastOutcome,
+      ...(result.momente ? { momente: result.momente } : {}),
     });
   }
   return overridesByTeamId;

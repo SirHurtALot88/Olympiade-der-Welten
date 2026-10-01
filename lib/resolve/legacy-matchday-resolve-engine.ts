@@ -795,6 +795,8 @@ export function buildLegacyMatchdayResolvePreview(
         pointSource: arenaOverride ? "battle_mode_arena_win_draw_loss" : "rank_to_points_final_score_share",
         resolutionSource: arenaOverride ? "arena" : "pps",
         arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
+        // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): s. `ArenaMomentEintrag`-Kommentar.
+        momente: arenaOverride?.momente ?? null,
       };
     });
 

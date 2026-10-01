@@ -9,6 +9,7 @@ import type { LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchda
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { PlayerHistoryDisciplineValues } from "@/lib/season/season-discipline-area-groups";
 import type { DisciplineHighlightCandidate, LegacyMatchdayResolvePreview, ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
+import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 
 // T-075 (Performance): PlayerDetailDrawer ist 3617 Zeilen und chart-schwer —
 // per next/dynamic laden statt statisch. Verhalten identisch: PlayerDetailDrawer
@@ -216,6 +217,26 @@ function formatScore(value: number) {
 
 function flattenHighlights(preview: LegacyMatchdayResolvePreview): DisciplineHighlightCandidate[] {
   return preview.disciplinePreviews.flatMap((discipline) => discipline.highlightCandidates);
+}
+
+const ARENA_MOMENT_LABEL: Record<ArenaMomentEintrag["typ"], string> = {
+  fuehrungswechsel: "Führungswechsel",
+  fuehrungswechselEntscheidend: "Führungswechsel & Entscheidung",
+  entscheidend: "Entscheidend",
+  turnover: "Turnover",
+};
+
+/**
+ * "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): reine Textformatierung eines bereits
+ * durchgereichten `ArenaMomentEintrag` -- `eigenesTeamId` ist die Id des gerade betrachteten
+ * Teams (`selectedTeamDetail.teamId`), damit der Moment relativ ("eigenes Team"/"Gegner")
+ * statt mit einer zweiten, hier nicht vorliegenden Team-Namens-Aufloesung beschriftet wird.
+ */
+function formatArenaMomentEintrag(moment: ArenaMomentEintrag, eigenesTeamId?: string): string {
+  const label = ARENA_MOMENT_LABEL[moment.typ];
+  const seite = moment.teamId == null ? null : moment.teamId === eigenesTeamId ? "eigenes Team" : "Gegner";
+  const spieler = moment.spieler ?? "unbekannt";
+  return seite ? `${label}: ${seite} — ${spieler}` : `${label}: ${spieler}`;
 }
 
 export default function LegacyResolveLabClient({
@@ -786,6 +807,21 @@ export default function LegacyResolveLabClient({
                           <p className="muted" data-testid="battle-mode-arena-match-seed-line">
                             Arena-Match-Seed: {side.preview.arenaMatchSeed ?? "—"}
                           </p>
+                        ) : null}
+                        {/* "SPIEL DES TAGES" — DREI MOMENTE (Task #31 Paket 1, docs/design/
+                            fable-ideen-feldspiel-30-09.md Abschnitt 2.1, Klasse A): reine Anzeige
+                            von `ArenaTeamResolvePreview.momente`, das die Resolve-Pipeline additiv
+                            aus dem bereits gelaufenen Arena-Duell durchreicht (s. Kommentar an
+                            `ArenaMomentEintrag`, lib/battle/arena-headless-runner.ts). Leer/`null`
+                            (aeltere Zeilen, Nicht-Feldspiel-Chassis) zeigt schlicht nichts. */}
+                        {side.preview?.resolutionSource === "arena" && side.preview.momente?.length ? (
+                          <ul className="muted compact-list" data-testid="battle-mode-arena-momente-list">
+                            {side.preview.momente.map((moment, index) => (
+                              <li key={`${side.key}-moment-${index}`} data-testid="battle-mode-arena-moment-entry">
+                                {formatArenaMomentEintrag(moment, selectedTeamDetail.teamId)}
+                              </li>
+                            ))}
+                          </ul>
                         ) : null}
                       </div>
                     </div>
