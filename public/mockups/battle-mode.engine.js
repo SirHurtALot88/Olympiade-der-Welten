@@ -8411,7 +8411,7 @@
     // TON (Assets 80->100, TON_KATALOG.hockey.pfiff): genau hier wird "wirklich gepfiffen"
     // (s. Funktionskommentar oben) — reine Praesentation, kein rr()-Aufruf.
     sfx("hockey","pfiff");
-    feed(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
+    feedEreignis(opfer.side,taeter.n+" muss auf die Strafbank — "+grund+".");
     schwebe({x:0,y:0,txt:"STRAFE!",life:1.2,crit:true,_def:true,_spieler:taeter.id});
     logZug(opfer.side,"strafe",{verteidiger:taeter,spieler:opfer});
     // Beide Seiten neu aufstellen: die bestrafte Seite hat einen Mann weniger (die
@@ -8464,7 +8464,7 @@
       const alt=torwartRoh(fsLive.hockeyEndphase);
       if(alt&&alt.imTor===false){
         alt.imTor=true;
-        feed(fsLive.hockeyEndphase,alt.n+" kommt zurück ins Tor.");
+        feedEreignis(fsLive.hockeyEndphase,alt.n+" kommt zurück ins Tor.");
       }
     }
     fsLive.hockeyEndphase=seite;
@@ -8865,7 +8865,7 @@
         const chance=1/(1+Math.exp(-(c0.TECHNIK-c1.TECHNIK)*HK_BULLY_K));
         const gewinner=rr()<chance?c0:c1;
         gewinner.x=x; gewinner.y=y;
-        feed(gewinner.side,gewinner.n+" gewinnt den Bully.");
+        feedRoutine(gewinner.side,gewinner.n+" gewinnt den Bully.");
         logZug(gewinner.side,"bully",{spieler:gewinner});
         fsLive.angriffSeit=0;
         ballUebernehmen(gewinner);
@@ -9446,7 +9446,7 @@
         traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined,"touchdown");
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
-      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feed(fb.side,"Extra-Punkt ist gut."); }
+      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feedEreignis(fb.side,"Extra-Punkt ist gut."); }
       if(fsFbLog)fsFbLog.tds++;
       fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
@@ -9459,7 +9459,7 @@
     }
     fb.spot=neuerSpot; fb.toGo=Math.min(neuesToGo,neuerSpot); fb.down++;
     if(fb.down>fb.max){
-      feed(fb.side,"Turnover on Downs.");
+      feedEreignis(fb.side,"Turnover on Downs.");
       fkNaechsterSpot=100-neuerSpot; fsLive.football=null; naechsterAngriff(1-fb.side);
     }
   }
@@ -9478,7 +9478,7 @@
         if(fsFbLog){ fsFbLog.fgAtt++; fsFbLog.fgMade++; }
         fsLive.football=null; naechsterAngriff(1-fb.side);
       } else {
-        feed(fb.side,"Field-Goal-Versuch von "+Math.round(erg.distanz)+" Yards verfehlt.");
+        feedEreignis(fb.side,"Field-Goal-Versuch von "+Math.round(erg.distanz)+" Yards verfehlt.");
         if(fsFbLog)fsFbLog.fgAtt++;
         fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
       }
@@ -10162,7 +10162,7 @@
       // Klaeren: der Puck fliegt an die Bande in der eigenen Haelfte und ist wieder frei.
       const k=RINK();
       fsLive.ball.traeger=null; u.hatBall=false; u.lunge=0.4;
-      feed(u.side,u.n+" klärt den Puck an die Bande.");
+      feedRoutine(u.side,u.n+" klärt den Puck an die Bande.");
       fsLive.ball.frei=haltePuckImFeld({x:u.x+(u.side===0?90:-90),
         y:u.y<H/2?k.o+20:k.u-20, vonSeite:u.side});
       return;
@@ -10835,8 +10835,8 @@
   // einer, den die Sichtbarkeits-Runde nebenbei mitkippt).
   function beendeFreiwuerfe(){
     const fw=fsLive.freiwurf, schuetze=fw.schuetze;
-    if(fw.undEins)feed(schuetze.side,schuetze.n+(fw.gemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
-    else feed(schuetze.side,schuetze.n+" verwandelt "+fw.gemacht+" von "+fw.anzahl+" Freiwürfen.");
+    if(fw.undEins)feedEreignis(schuetze.side,schuetze.n+(fw.gemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+    else feedEreignis(schuetze.side,schuetze.n+" verwandelt "+fw.gemacht+" von "+fw.anzahl+" Freiwürfen.");
     fsLive.phase="laufend"; fsLive.freiwurf=null;
     fsBall={sichtbar:false,x:0,y:0};
     naechsterAngriff(1-schuetze.side);
@@ -11481,7 +11481,7 @@
         flug.ziel.frischerPassAbwehr=flug.passLinienAbwehr;
       }
       flug.ziel.lunge=0.2;
-      feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
+      feedRoutine(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
       fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
       return;
     }
@@ -11504,7 +11504,8 @@
       // einem Fuehrungswechsel -- sonst false. Ersetzt "jeder Korb ist big" (Konzept
       // Abschnitt 4.3, Nachzug 3).
       feed(schuetze.side,txt,!!szDef||flug.tier==="dunk"||!!flug.fern||nachFuehrung!==vorFuehrung,undefined,
-        szDef?"spielzug":flug.tier==="dunk"?"dunk":flug.fern?"dreier":"fuehrungswechsel");
+        szDef?"spielzug":flug.tier==="dunk"?"dunk":flug.fern?"dreier":"fuehrungswechsel",
+        undefined,undefined,"ereignis");
       // B2 -- "LAUF"-GRAFIK (A, Prio 2, Bauplan Abschnitt 4): Feed-Meldung GENAU EINMAL
       // beim Ueberschreiten der 8-Punkte-Schwelle des EIGENEN fortlaufenden Laufs, bzw.
       // GENAU EINMAL, wenn dieser Korb einen laufenden GEGNERISCHEN Lauf (>=8) beendet.
@@ -12075,7 +12076,7 @@
       // wird — nur so laesst sich die Aufstellung genau einmal neu machen.
       if(u.strafeBis&&fsT>=u.strafeBis){
         u.strafeBis=0;
-        feed(u.side,u.n+" ist wieder auf dem Eis.");
+        feedEreignis(u.side,u.n+" ist wieder auf dem Eis.");
         zuordneSlots(u.side,liegtZurueck(u.side)); zuordneDeckung(true);
       }
       if(u.schussSeit!=null){
@@ -12222,8 +12223,8 @@
         const beideSeiten=nah.some(u=>u.side===0)&&nah.some(u=>u.side===1);
         const duell=anBande&&beideSeiten;
         fsLive.reboundKampf={t:0,dauer:duell?HK_BANDENDUELL_DAUER:(nah.length>1?0.55:0.40),duell}; // PLATZHALTER
-        if(duell)feed(f.vonSeite,"Zweikampf an der Bande — sie kämpfen um den Puck!");
-        else if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
+        if(duell)feedRoutine(f.vonSeite,"Zweikampf an der Bande — sie kämpfen um den Puck!");
+        else if(nah.length>1)feedRoutine(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
         fsLive.reboundKampf.t+=dt;
@@ -12317,7 +12318,7 @@
           if(duellVerloren)for(const k of kandidaten)
             if(k!==gewinner&&k.side!==gewinner.side)k.taumeltBis=fsT+HK_DUELL_TAUMEL;
           const eigen=gewinner.side===f.vonSeite;
-          feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
+          feedRoutine(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
           // `offensiv` rein additiv fuer die Abnahme (s. basketballProbe): das reale
           // Verhaeltnis Defensiv- zu Offensiv-Rebound (~74:26, NBA-Liga-Mittel und im
           // NBA2K-Reverse-Engineering bestaetigt) ist eine Eigenschaft des SPIELS, nicht
@@ -17049,10 +17050,16 @@
         const statText=BB().fechten
           ?worte.vort+" "+u.treffer+":"+(fechtGegner?fechtGegner.treffer||0:0)
           :worte.vort+" "+(v>0?"+":"")+v;
+        // TICKER-STUFE (Punkt 8, s. feed()): jeder einzelne Zug/Ballwechsel/Gang ist Routine
+        // und steht nur im Protokoll -- im Ticker bleiben die entschiedenen Bretter/Plaetze/
+        // Bahnen (big, s.u.), gekippte Vorteile (big) und im Fechten der Treffer selbst, der
+        // dort als einziger zaehlt (der Trefferstand ist die Wertung, s. Kommentar oben).
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · "+statText
           +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,BB().schach?"kippZug":"fuehrungswechsel");
+          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,
+          BB().schach?"kippZug":"fuehrungswechsel",undefined,undefined,
+          BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
@@ -17189,7 +17196,11 @@
         const vorherSeite=ispyFuehrungMit(u.side===0?-r.punkte:0,u.side===1?-r.punkte:0);
         const nachherSeite=ispyFuehrungMit(0,0);
         const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
-        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel,undefined,versuchBig?"tresor":"fuehrungswechsel");
+        // TICKER-STUFE (Punkt 8, s. feed()): eine erfolglose Untersuchung ist Routine und steht
+        // nur im Protokoll; jeder Fund (Punkte) bleibt im Ticker, solange das Budget reicht.
+        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel,undefined,
+          versuchBig?"tresor":"fuehrungswechsel",undefined,undefined,
+          r.ereignis===BUEHNE_ART["i-spy"].erfolgWort?undefined:"routine");
       } else if(BB().gauntlet){
         // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
         // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner und den HP-Stand (aus
@@ -17215,8 +17226,13 @@
         // GESPIEGELTE Balken") zeigt den HP-Stand ohnehin schon grafisch.
         const hpJetzt=Math.max(0,r.hpNach);
         const stufenwechsel=gauntletStufenwechsel(r.hpVor,r.hpNach,r.hpMax);
+        // TICKER-STUFE (Punkt 8): "haelt stand" ist Routine (gut die Haelfte aller Breaking-
+        // Zeilen, nur im Protokoll); "bricht ein" bleibt im Ticker, solange das Budget reicht,
+        // Stufenwechsel (big) und das Aufgeben (darunter, big mit Vorrang) immer.
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
-          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),undefined,"angeschlagen");
+          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),undefined,
+          "angeschlagen",undefined,undefined,
+          r.ereignis===BB().erfolgWort?"routine":undefined);
         if(r.hpNach<=0)
           feed(u.side,u.n+" scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
             buehneBahnGrossDrosseln(true,true),undefined,"gebrochen");
@@ -17245,12 +17261,17 @@
         // die Regel mehrfach fuer dasselbe Paar, gewinnt das LETZTE Element -- deterministisch,
         // kein rr().
         if(duettBig)u.vizBigIdx=u.aktuell;
+        // TICKER-STUFE (Punkt 8, s. feed()): ein sauber gestandenes Element ist Routine (gut
+        // 60 % aller Eiskunstlauf-Zeilen) und steht nur im Protokoll; Fehler/Stuerze bleiben
+        // im Ticker, big-Elemente sowieso.
         feed(u.side,u.n+" — "+element.name+" — "+ereignisText
           +" ("+r.punkte+" Punkte, Element "+(u.aktuell+1)+"/"+bb.rundenN+").",
           !!duettBig,undefined,
           // STURZ statt PATZER (C3): nur ein deutlich verpatzter SPRUNG ist ein Sturz --
           // dieselbe Unterscheidung wie `ereignisText` oben ("unterdreht" ist keiner).
-          duettBig==="patzer"&&element.typ==="sprung"&&!r.knapp?"sturz":duettBig);
+          duettBig==="patzer"&&element.typ==="sprung"&&!r.knapp?"sturz":duettBig,
+          undefined,undefined,
+          r.ereignis===bb.erfolgWort?"routine":undefined);
       } else {
         // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
         // oben -- s. buehneAuftrittBig()-Kommentar.
@@ -18376,6 +18397,44 @@
     else if(r.gueltig)teamFeierAusloesen(u.side,"klein",null);
   }
 
+  // SICHTBARER ZWEIKAMPF (F1-Broadcast-Audit Runde 2, 30.09., Punkt 2: "Gewichtheben verraet
+  // das Ergebnis vor dem Start"). `u.summe` ist bei Gewichtheben schon ab baueHebenDuelle()
+  // der FERTIGE Zweikampf (s. dort -- und so muss es bleiben, MOTOREN[...].wert() und damit die
+  // Rangtreue lesen genau diese Zahl; stepBuehne() zaehlt sie fuer Heben bewusst nicht auf).
+  // Kaderleiste (#kmitte, Kachelzahl, Kachelbalken) und die Team-Balken ueber dem Canvas
+  // lasen sie aber direkt und zeigten damit die Endwerte aller zwoelf Heber schon im Einlauf
+  // (Audit Bild 05, Tabelle 6.3: "0 : 0 / 2244 : 1812" vor dem ersten Versuch).
+  //
+  // Diese Funktion ist die ANZEIGE-Fassung derselben Groesse: bestes gueltiges Reissen plus
+  // bestes gueltiges Stossen, aber nur aus Versuchen, deren URTEIL schon gezeigt ist -- also
+  // derselbe Lampen-Moment wie hebenFeierAmUrteil()/hebenDuellEntschieden(u,true): ein frisch
+  // enthuellter Versuch zaehlt erst, wenn stepHeben() ihn aus "antritt"/"zug" entlassen hat
+  // (Spoiler-Regel: Kampfrichterlampe, Versuchstafel, Team-Feier und jetzt auch die Kaderleiste
+  // schalten im selben Frame). Nach `done` gilt wie dort nur die Enthuellung.
+  // NULLWERTUNG, sobald sie feststeht: ist eine Uebung mit allen ihren Versuchen gezeigt und
+  // keiner war gueltig, steht der Heber bei 0 -- dieselbe Regel wie `u.nullwertung` in
+  // baueHebenDuelle(), nur zum Zeitpunkt, an dem sie der Zuschauer kennt.
+  // Am Ende (alle Versuche gezeigt) ist das Ergebnis damit identisch mit `u.summe`: die Lasten
+  // steigen nach einem gueltigen Versuch strikt (lastFuer(): mindestens beste+1), das Maximum
+  // der gueltigen Versuche ist also genau besteReissen/besteStossen.
+  // Reine Anzeige: liest nur u.aktuell/u.runden/u.vizPhase/done, schreibt nichts, kein rr().
+  function hebenSichtbareSumme(u){
+    if(!u||!u.runden)return 0;
+    let n=Math.max(0,Math.min(u.runden.length,u.aktuell+1));
+    if(n>0&&!done&&(u.vizPhase==="antritt"||u.vizPhase==="zug"))n--;
+    const beste={reissen:0,stossen:0}, gezeigt={reissen:0,stossen:0}, gesamt={reissen:0,stossen:0};
+    u.runden.forEach((r,i)=>{
+      if(!r||!(r.uebung in gesamt))return;
+      gesamt[r.uebung]++;
+      if(i>=n)return;
+      gezeigt[r.uebung]++;
+      if(r.gueltig&&r.kg>beste[r.uebung])beste[r.uebung]=r.kg;
+    });
+    for(const ue of ["reissen","stossen"])
+      if(gesamt[ue]>0&&gezeigt[ue]>=gesamt[ue]&&beste[ue]<=0)return 0;
+    return Math.round(beste.reissen+beste.stossen);
+  }
+
   // ================== ZIEL 5: SPEED-SCHACH BEWEGT SICH (stepSchach) ==================
   // Opus-Plan "opus-plan-zehn-disziplinen-alle-kategorien-09-10.md" Abschnitt 5.1 (Platz 5,
   // Movement 80 -> 95, M2+M4). Vierter Zweig in buehnenBewegung() (:art.schach-Gate, PR 0.3
@@ -19183,9 +19242,13 @@
       document.getElementById("thpL").style.width=(frac(0)*100)+"%";
       document.getElementById("thpR").style.width=(frac(1)*100)+"%";
     } else {
-      const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+      // GEWICHTHEBEN (Broadcast-Audit Runde 2, Punkt 2): die Team-Balken standen aus dem
+      // fertigen `summe` schon im Einlauf auf ihrem Endstand (z. B. 69 % gegen 55 %) --
+      // derselbe Spoiler wie in der Kaderleiste, dieselbe Anzeige-Fassung als Abhilfe.
+      const sw=BB().heben?hebenSichtbareSumme:(u=>u.summe);
+      const maxSumme=Math.max(1,...TEILNEHMER.map(sw));
       const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
-        return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+        return g.length?g.reduce((a,u)=>a+sw(u),0)/(g.length*maxSumme):0;};
       document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
       document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     }
@@ -20120,13 +20183,35 @@
   // sehr konkreten, jedem bekannten Kulisse. Wettkampfplattform, drei Kampfrichterlampen,
   // Anzeigetafel (liest ausschliesslich letzterHebenZug, dieselbe Quelle wie die Textkarte
   // in zeichneHeben()), Kreide-/Magnesiakiste, Hantelstaender, Publikumssilhouetten.
+  //
+  // POLITUR-RUNDE 22.09. (Chris, dringend: "gewichtheben bitte dringend die arena bzw
+  // buehne verbessern und die darstellung optisch noch schoener gestalten" — kein
+  // Einzelfehler, allgemeine optische Aufwertung im Vergleich zu den spaeter gebauten
+  // Buehnen wie Fechten/Speed-Schach/Eiskunstlauf/Showcase, die alle ein eigenes
+  // Buehnenbild mit Requisiten/Scheinwerfern/Publikum bekommen haben). Sicht-QA-Befund am
+  // Screenshot: die 26 Publikums-Punkte (#1c1f27 auf #14171d-Grund) unterschieden sich
+  // kaum vom Hintergrund und lasen sich wie "verstreute graue Punkte", nicht wie ein
+  // Publikum; bodenHeben() hatte KEINE Lichtfuehrung (bodenBuehne/bodenEis tragen das
+  // Drei-Kegel-Muster; Tennis/Wettessen/I-Spy verzichten bewusst darauf, haben aber
+  // eigenes Platz-/Kerzen-/Lampenlicht, s. Kommentar bei den Kegeln unten); die Plattform
+  // war eine reine Flaeche ohne Wettkampf-Zierstreifen/Riffelung; der Hantelstaender ohne
+  // Quertraeger/Grundplatte war leicht mit einem Stuhl zu verwechseln. Alle vier Punkte
+  // rein optisch behoben, WIEDERVERWENDET wird dabei bewusst dasselbe Muster, das die
+  // anderen Buehnen schon zeigen (Drei-Kegel wie bodenBuehne()/bodenEis(), Rang-mit-Gang-
+  // Linien wie bodenBuehne()s Zuschauerblock) statt neuer Pixel-Art-Assets (s.
+  // public/sprites/ — dort gibt es keine wiederverwendbaren Publikums-/Scheinwerfer-
+  // Sprites, alle Buehnen-Kulissen sind reine Canvas-Primitiven, dasselbe Prinzip bleibt
+  // hier gewahrt). NICHTS an der Zweikampf-Logik/wert()/Wertung angefasst — reine
+  // Zeichenroutine, gegengemessen mit scripts/miss-alle-disziplinen.mjs (s. PR-Beschreibung).
   let hebenPublikumAn=false; // rein praesentational, s. bodenBuehne() oben fuer den Stop.
   function bodenHeben(){
     if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#14171d");g.addColorStop(1,"#0a0b0e");
+    g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    // Publikumssilhouetten im Dunkeln, oberer Rand.
+    // PUBLIKUMS-REAKTION. Merge 01.10. (PR #1007 auf main): die frueheren 26 Punkt-
+    // Silhouetten sind durch die Tribuene weiter unten ersetzt; die H3-Reaktion unten wirkt
+    // seitdem unveraendert auf deren Zuschauerreihen (s. zuschauerReihe()).
     //
     // H3 (Broadcast-Optik-Recherche 27.09., Klasse A): PUBLIKUM REAGIERT AUF DIE PHASE
     // (Doku Abschnitt 4: "Silhouetten wippen im Takt" beim Antritt, stehen still beim Zug,
@@ -20149,13 +20234,60 @@
     // ein kurzes, abklingendes Absacken -- das "Raunen" im Bild.
     const hebenDroop=(hebenPhase==="ablage"&&hebenZug&&!hebenZug.r.gueltig)
       ?Math.max(0,1-(hebenZug.u.vizPhaseT||0)/0.35)*3:0;
-    ctx.fillStyle="#1c1f27";
-    for(let i=0;i<26;i++){
-      const px=(i+0.5)*W/26, py=H*0.06+Math.sin(i*1.7)*4-klatschWippe-hebenSprung+hebenDroop;
-      ctx.beginPath();ctx.arc(px,py,7,0,Math.PI*2);ctx.fill();
-    }
-    // WETTKAMPFPLATTFORM: helles Quadrat mit Kante, mittig in der Bildebene der Heber.
+    const publikumDy=-klatschWippe-hebenSprung+hebenDroop;
+
+    // WETTKAMPFPLATTFORM-Geometrie vorgezogen — die Tribuene unten braucht platY, um genau
+    // bis an den Plattform-Schatten heranzureichen, ohne zu ueberlappen.
     const platY=H*0.40, platW=W*0.46, platH=H*0.40;
+
+    // TRIBUENE STATT VERSTREUTER PUNKTE: ein deutlich hellerer Rang-Block oben (dasselbe
+    // "Block mit Gang-Linien"-Muster wie bodenBuehne()s Zuschauerraum, hier oben statt
+    // unten, weil die Plattform hier mittig sitzt) mit ZWEI Sitzreihen aus Kopf+Rumpf statt
+    // anonymer Punkte — in einer kleinen Farbpalette fuer Vielfalt, deutlich heller als der
+    // Hintergrund, damit sie als Publikum lesbar bleiben.
+    //
+    // MITTLERE RUECKWAND OHNE PUBLIKUM (Merge 01.10.): die erste Fassung (22.09.) liess nur
+    // die oberen ~35 % frei, fuer die damalige Duellstand-Zeile bei H*0.10. Seitdem stehen in
+    // der Mittelspalte ueber der Plattform VIER Textebenen bis hinunter auf H*0.33 (Duell-
+    // Zeile H*0.155, Bedarfszeile H*0.183, kuehn-/kg-Kopfzeile H*0.20/0.245 ueber den Hebern
+    // bei HEBEN_SPALTE 0.38/0.62, Versuchsuhr+Balken+"Zuletzt" H*0.27..0.33) -- die zweite
+    // Sitzreihe lag genau hinter Uhrbalken und "Zuletzt"-Zeile, die Koepfe liefen durch den
+    // Text (Playwright-Abgleich gegen main). Deshalb ist die Mitte W*0.29..0.71 jetzt eine
+    // dunkle Buehnen-Rueckwand (wie die Sponsorwand hinter einer echten IWF-Plattform), das
+    // Publikum sitzt auf den beiden Fluegeln -- genau ueber den Teambaenken aus #1089, die
+    // links/rechts der Plattform stehen. Die Scheinwerfer bei W*0.30/0.70 rahmen die Wand.
+    const tribueneH=H*0.34;
+    const wandX0=W*0.29, wandX1=W*0.71;
+    ctx.fillStyle="#20242e"; ctx.fillRect(0,0,W,tribueneH);
+    ctx.strokeStyle="rgba(255,255,255,.07)"; ctx.lineWidth=1;
+    for(let i=1;i<12;i++){ ctx.beginPath(); ctx.moveTo(i*W/12,0); ctx.lineTo(i*W/12,tribueneH); ctx.stroke(); }
+    ctx.fillStyle="#13161c"; ctx.fillRect(wandX0,0,wandX1-wandX0,tribueneH);
+    ctx.strokeStyle="rgba(255,255,255,.09)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(wandX0+0.5,0); ctx.lineTo(wandX0+0.5,tribueneH);
+    ctx.moveTo(wandX1-0.5,0); ctx.lineTo(wandX1-0.5,tribueneH); ctx.stroke();
+    const TRIB_FARBEN=["#6b7690","#8a7a63","#6f8878","#8a6b76","#5f7488"];
+    const zuschauerReihe=(rowY,n,r,phase)=>{
+      for(let i=0;i<n;i++){
+        const px=(i+0.5)*W/n, py=rowY+Math.sin(i*2.1+phase)*3+publikumDy;
+        if(px+r*1.2>wandX0&&px-r*1.2<wandX1)continue; // Mitte bleibt Rueckwand, s. oben
+        ctx.fillStyle=TRIB_FARBEN[i%TRIB_FARBEN.length];
+        ctx.beginPath();ctx.ellipse(px,py+r*0.9,r*1.15,r*0.7,0,0,Math.PI*2);ctx.fill(); // Rumpf
+        ctx.fillStyle="#d9c3a0";
+        ctx.beginPath();ctx.arc(px,py,r*0.6,0,Math.PI*2);ctx.fill(); // Kopf
+      }
+    };
+    zuschauerReihe(tribueneH*0.60,26,6,0);
+    zuschauerReihe(tribueneH*0.92,32,7,1.4);
+    ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,tribueneH); ctx.lineTo(W,tribueneH); ctx.stroke();
+
+    // HALLENDACH: dunkler Traeger ganz oben mit drei Lampenpunkten — die Lichtquellen der
+    // Scheinwerferkegel direkt darunter.
+    ctx.fillStyle="#0c0e12"; ctx.fillRect(0,0,W,6);
+    [W*0.30,W*0.5,W*0.70].forEach(x=>{
+      ctx.fillStyle="#3a3f4c"; ctx.beginPath(); ctx.arc(x,6,3.5,0,Math.PI*2); ctx.fill();
+    });
+
     ctx.fillStyle="#3a3f4c";
     ctx.fillRect(W/2-platW/2-4,platY-4,platW+8,platH+8);
     const pg=ctx.createLinearGradient(0,platY,0,platY+platH);
@@ -20164,6 +20296,46 @@
     ctx.fillRect(W/2-platW/2,platY,platW,platH);
     ctx.strokeStyle="#8f8560";ctx.lineWidth=2;
     ctx.strokeRect(W/2-platW/2,platY,platW,platH);
+    // WETTKAMPF-ZIERSTREIFEN, wie die farbige Bordueré echter IWF-Plattformen, plus eine
+    // diagonale Riffelung (Gummimatte statt glatter Flaeche) — Materialtreue fuer die
+    // Plattform selbst, ergaenzend zur bereits vorhandenen IWF-Scheibenfarbstaffel an der
+    // Hantel (s. HEBEN_SCHEIBEN_STUFEN/IWF_FARBEN oben).
+    ctx.strokeStyle="rgba(192,57,43,.55)"; ctx.lineWidth=3;
+    ctx.strokeRect(W/2-platW/2+5,platY+5,platW-10,platH-10);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(W/2-platW/2,platY,platW,platH); ctx.clip();
+    ctx.strokeStyle="rgba(143,133,96,.30)"; ctx.lineWidth=1;
+    for(let i=-2;i<14;i++){
+      ctx.beginPath();
+      ctx.moveTo(W/2-platW/2+i*16, platY+platH);
+      ctx.lineTo(W/2-platW/2+i*16+platH, platY);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // SCHEINWERFERKEGEL AUF DIE PLATTFORM: drei Kegel von den Dachlampen, dasselbe Muster
+    // wie bodenBuehne()/bodenEis() (bislang hatte bodenHeben() gar keine Lichtfuehrung;
+    // Nachpruefung 01.10.: bodenTennis()/bodenWettessen()/bodenSchatzsuche() verzichten zwar
+    // ebenfalls auf Kegel, aber bewusst und mit eigenem Licht -- Freiplatz, Kerzen-/
+    // Lampenlicht -- die Halle hier hatte keins) — neutral-kaltes Hallenlicht statt bodenBuehne()s warmem
+    // Theaterlicht, weil eine Wettkampfhalle keine Show ist. Alle drei laufen auf denselben
+    // Punkt auf der Plattform zusammen, dort wo Hantel und Heber stehen.
+    [W*0.30,W*0.5,W*0.70].forEach(x=>{
+      const s=ctx.createRadialGradient(x,6,4,x,platY+platH*0.35,W*0.22);
+      s.addColorStop(0,"rgba(224,234,248,.16)");s.addColorStop(1,"rgba(224,234,248,0)");
+      ctx.fillStyle=s;
+      ctx.beginPath();ctx.moveTo(x,6);ctx.lineTo(x-64,platY+platH*0.55);ctx.lineTo(x+64,platY+platH*0.55);
+      ctx.closePath();ctx.fill();
+    });
+    // Heller Lichtfleck DIREKT AUF der Plattform — der eigentliche "Kegel trifft die
+    // Hantel"-Effekt, additiv ueber die Matte gelegt, auf die Plattformflaeche geclippt.
+    ctx.save();
+    ctx.beginPath(); ctx.rect(W/2-platW/2,platY,platW,platH); ctx.clip();
+    const poolG=ctx.createRadialGradient(W/2,platY+platH*0.42,4,W/2,platY+platH*0.42,platW*0.36);
+    poolG.addColorStop(0,"rgba(255,250,235,.28)"); poolG.addColorStop(1,"rgba(255,250,235,0)");
+    ctx.fillStyle=poolG;
+    ctx.fillRect(W/2-platW/2,platY,platW,platH);
+    ctx.restore();
     // DREI KAMPFRICHTERLAMPEN ueber der Plattform — weiss/rot je nach zug.r.gueltig. Das
     // ist die IWF-Geste, die es heute nur als "✓ gültig"-Text gibt (bleibt zusaetzlich
     // bestehen, s. zeichneHeben() Textkarte).
@@ -20193,6 +20365,11 @@
     const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
+    // GOLDENER ZIERSTREIFEN oben, wie die goldene Bandenkante bei bodenEis() — dasselbe
+    // Akzent-Prinzip, hier auf die Anzeigetafel uebertragen, damit sie zur restlichen
+    // Buehnen-Goldakzentuierung passt statt als reine Graubox zu stehen.
+    ctx.strokeStyle="rgba(242,195,77,.75)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(tafelX,tafelY+1);ctx.lineTo(tafelX+tafelW,tafelY+1);ctx.stroke();
     ctx.textAlign="left";ctx.textBaseline="middle";
     ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";
     ctx.fillStyle="#f2c34d";
@@ -20253,15 +20430,22 @@
     // KREIDE-/MAGNESIAKISTE, unten links auf der Plattformkante.
     ctx.fillStyle="#e9e6de";ctx.fillRect(W*0.08,platY+platH-14,26,14);
     ctx.strokeStyle="#9a9788";ctx.lineWidth=1;ctx.strokeRect(W*0.08,platY+platH-14,26,14);
-    // HANTELSTAENDER am rechten Rand — zwei Saeulen mit je drei liegenden Scheiben.
+    // HANTELSTAENDER am rechten Rand — zwei Saeulen mit je drei liegenden Scheiben, jetzt MIT
+    // Quertraeger oben und Grundplatte unten (Chris' Sicht-QA-Notiz: die zwei blossen
+    // Staender-Stangen ohne Verbindung lasen sich wie ein einzelner Stuhl; ein Quertraeger
+    // plus Standflaeche macht daraus eindeutig ein Gewichtbaum-Gestell).
+    const staX=W*0.90, staTopY=platY+platH-40, staBotY=platY+platH-2;
+    ctx.fillStyle="#241f18"; ctx.fillRect(staX-6,staBotY,30,4);
     ctx.strokeStyle="#5c5346";ctx.lineWidth=3;
     for(const dx of [0,18]){
-      ctx.beginPath();ctx.moveTo(W*0.90+dx,platY+platH-2);ctx.lineTo(W*0.90+dx,platY+platH-40);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(staX+dx,staBotY);ctx.lineTo(staX+dx,staTopY);ctx.stroke();
     }
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.moveTo(staX-4,staTopY);ctx.lineTo(staX+22,staTopY);ctx.stroke();
     ctx.fillStyle="#3a3227";
     for(const dy of [0,7,14]){
-      ctx.beginPath();ctx.ellipse(W*0.90+3,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.ellipse(W*0.90+15,platY+platH-40+dy,9,3,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(staX+3,staTopY+dy,9,3,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(staX+15,staTopY+dy,9,3,0,0,Math.PI*2);ctx.fill();
     }
   }
 
@@ -26862,7 +27046,7 @@
     // einen alten Zauber "im Gedaechtnis" — Ziel kann tot/ausser Reichweite sein, castLeft
     // falsch. Dieselben Felder wie bei der Frischerzeugung (s. baueEinheit oben).
     u.cast=null; u.castLeft=0; u.castZiel=null; u.castZiele=null;
-    feed(u.side,u.n+" ist zurück im Kampf.");
+    feedRoutine(u.side,u.n+" ist zurück im Kampf.");
   }
 
   // GEMEINSAME AUSSCHALTUNG fuer nahschlag() und den Pfeiltreffer in schrittPfeile() —
@@ -27126,9 +27310,9 @@
       // Blood/spielentscheidend) die Leistung des ANGREIFERS auszeichnet (Audit-Beispiel:
       // "Mehrfachausschaltung — Rhyx'Tal fällt" nannte den Getroffenen, nie den Treffer-
       // geber). Der Ticker-Text selbst bleibt unangetastet.
-      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n);
+      feed(tg.side,tg.n+" fällt — zurück in "+respawnAnzeige+" s.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n,"ereignis");
     } else {
-      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n);
+      feed(tg.side,tg.n+" ist ausgeschieden.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von.n,"ereignis");
     }
   }
 
@@ -27177,8 +27361,12 @@
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
+    // KOMBINIERT (Merge #1093/#1095): kind="grosserTreffer" fuer den Highlight-Titel UND
+    // stufe="routine" fuer den Ticker/Protokoll-Filter -- feedRoutine() kennt keinen
+    // kind-Parameter, deshalb hier feed() direkt mit beiden Werten.
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
-      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false),undefined,"grosserTreffer");
+      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false),undefined,
+      "grosserTreffer",undefined,undefined,"routine");
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -27833,7 +28021,7 @@
         // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
         // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
         // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
-        feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
+        feedRoutine(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
           kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false),undefined,"grosserTreffer");
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
@@ -27844,7 +28032,7 @@
       if(pf.rest<=0||pf.x<18||pf.x>W-18||pf.y<18||pf.y>H-18){
         pf.tot=true;
         schwebe({x:pf.x,y:pf.y-10,txt:"daneben",life:.6});
-        feed(pf.von.side,pf.von.n+" schießt daneben.");
+        feedRoutine(pf.von.side,pf.von.n+" schießt daneben.");
       }
     }
     pfeile=pfeile.filter(pf=>!pf.tot);
@@ -28069,7 +28257,7 @@
       if(e.art==="schild"){
         for(const z of ziele){z.schild=e.staerke;z.schildT=e.dauer;z.schildVon=u;
           schwebe({x:z.x,y:z.y-34,txt:"+Schild "+e.staerke,life:1.1,heil:true});
-          feed(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+e.staerke+" für "+e.dauer+" s.");}
+          feedRoutine(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+e.staerke+" für "+e.dauer+" s.");}
         continue;
       }
       if(e.art==="heilung"){
@@ -28077,7 +28265,7 @@
           const echt=Math.min(h,z.max-z.hp); z.hp=Math.min(z.max,z.hp+h); u.st.heal+=echt;
           gegenZaehler(u,z.n,"heil",echt);
           schwebe({x:z.x,y:z.y-26,txt:"+"+h,life:.95,heil:true});
-          feed(u.side,u.n+" heilt "+z.n+" · "+h);}
+          feedRoutine(u.side,u.n+" heilt "+z.n+" · "+h);}
         continue;
       }
       if(e.art==="schaden"){
@@ -28207,7 +28395,7 @@
     for(const seite of [0,1]){
       const neu=fuehrungVon(seite), alt=FUEHRUNG[seite];
       if(alt.wer&&alt.wer!==neu.wer&&alt.wer.down)
-        feed(seite,alt.wer.n+" ist raus — die Ordnung bricht.");
+        feedEreignis(seite,alt.wer.n+" ist raus — die Ordnung bricht.");
       FUEHRUNG[seite]=neu;
       // WER FUEHRT, LEISTET ETWAS — und bis hierher sah die Wertung davon nichts.
       // Genau dieselbe Luecke hatten die Tanks, bis "verhindert" dazukam: Baumkopf haelt
@@ -28247,7 +28435,7 @@
     if(KFOKUS!=null&&!kfZiel()){
       const gefallen=U.find(x=>x.id===KFOKUS);
       KFOKUS=null;
-      if(gefallen)feed(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
+      if(gefallen)feedEreignis(0,"Zielansage erledigt: "+gefallen.n+" ist unten.");
     }
     // TDM-RESPAWN (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): VOR der Kontakt- und
     // Zielwahl-Berechnung weiter unten, damit ein frisch respawnter Kaempfer noch im selben
@@ -28406,7 +28594,7 @@
       if(u.cdTrenn>0)u.cdTrenn-=dt;
       u.bindAn=gegner(u).find(f=>!f.fern&&dist(u,f)<=f.reichNah*1.15)||null;
       if(u.bindAn&&!u.durch&&u.retreat<=0&&u.tgt!==u.bindAn&&u.opp>=55){
-        if(u.tgt!==u.bindAn)feed(u.side,u.n+" wird von "+u.bindAn.n+" gestellt und nimmt den Kampf an.");
+        if(u.tgt!==u.bindAn)feedRoutine(u.side,u.n+" wird von "+u.bindAn.n+" gestellt und nimmt den Kampf an.");
         u.tgt=u.bindAn; u.reev=0.6;
       }
 
@@ -28602,7 +28790,7 @@
             const z=u.castZiel&&!u.castZiel.down?u.castZiel:u;
             z.schild=SKILLS.shield.schild;z.schildT=SKILLS.shield.dauer;z.schildVon=u;
             schwebe({x:z.x,y:z.y-34,txt:"+Schild "+SKILLS.shield.schild,life:1.1,heil:true});
-            feed(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+SKILLS.shield.schild+" für "+SKILLS.shield.dauer+" s.");
+            feedRoutine(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+SKILLS.shield.schild+" für "+SKILLS.shield.dauer+" s.");
           }else feuerSkill(u,u.cast);
           u.cast=null;u.castZiel=null;
         }
@@ -28635,7 +28823,7 @@
           u.st.heal+=echt;
           gegenZaehler(u,ziel.n,"heil",echt);
           schwebe({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,heil:true});
-          feed(u.side,u.n+" heilt "+ziel.n+" · "+heal);
+          feedRoutine(u.side,u.n+" heilt "+ziel.n+" · "+heal);
           continue;
         }
       }
@@ -28679,7 +28867,7 @@
           st.bereit+=(u.bereit[wahl.id]||0);
           if(!stumm&&wahl.zweiter){
             const g=wahl.gruende.length?" ("+wahl.gruende.join(", ")+")":"";
-            feed(u.side,u.n+" — "+wahl.sk.name+" ["+Math.round(wahl.jeSek)+"] statt "+
+            feedRoutine(u.side,u.n+" — "+wahl.sk.name+" ["+Math.round(wahl.jeSek)+"] statt "+
               wahl.zweiter.sk.name+" ["+Math.round(wahl.zweiter.jeSek)+"]"+g+
               (wahl.ziele.length>1?" · "+wahl.ziele.length+" Ziele":""));
           }
@@ -35021,7 +35209,7 @@
               u.huerde=Math.max(u.huerde,(A.rastZeit??1.2));
               u.rastCount=(u.rastCount||0)+1;
               if(A.balanceSteigungGrad)u.balance=Math.min(1,(u.balance??1)+0.40*(0.5+(u.GLEICHGEWICHT||0)/200));
-              feed(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
+              feedRoutine(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
             }
             u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
@@ -35214,7 +35402,7 @@
                 if(u.fallen&&u.fallen.length)u.fallen[u.fallen.length-1].aus='durchbruch';
                 u.balance=Math.max(0,(u.balance??1)-(A.balanceKraftzug??0));
                 schwebe({...laeuferSchwebeXY(u,-20),txt:"zieht durch",life:.8,crit:false,_laeufer:u.id});
-                feed(u.seite,u.n+" zieht den Kraftzug durch.");
+                feedRoutine(u.seite,u.n+" zieht den Kraftzug durch.");
                 continue;
               }
             }
@@ -35294,7 +35482,7 @@
             // SP-2: derselbe Zaehler wie oben, nur der WUCHT-Nebenweg ("⚡").
             if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).durch++;
             schwebe({...laeuferSchwebeXY(u,-20),txt:"bricht durch",life:.8,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" nimmt "+(wortAkk||(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort))+" mit Gewalt.");
+            feedRoutine(u.seite,u.n+" nimmt "+(wortAkk||(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort))+" mit Gewalt.");
             continue;
           }
           // WIE LANGE ER LIEGT, haengt an demselben Koennen wie das Gelingen — mit
@@ -35517,7 +35705,7 @@
                                                 :" räumt "+o.n+" von der Bahn."),!TA.takeshi,undefined,"rempler");
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
-              feed(o.seite,o.n+" steckt den Rempler weg.");
+              feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
             }
           }
         }
@@ -35609,7 +35797,7 @@
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
           } else {
             schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
-            feed(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
+            feedEreignis(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
         continue;
@@ -35644,8 +35832,12 @@
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): nur die ersten
             // drei Ziel-Plaetze sind big -- sonst wird der Zieleinlauf wieder ein Protokoll
             // (Doc-Vorgabe Abschnitt 4.3.1: "Einzel: nur Platz 1-3").
+            // KOMBINIERT (Merge #1093/#1095): kind="zieleinlauf" fuer den Highlight-Titel UND
+            // stufe="ereignis" (wie feedEreignis()) fuer den Ticker/Protokoll-Filter --
+            // feedEreignis() kennt keinen kind-Parameter, deshalb hier feed() direkt.
             feed(u.seite,u.n+" im Ziel — "+bahnZeitText(bahnZeitAnzeige(u))
-              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3,undefined,"zieleinlauf");
+              +", vorläufig Rang "+rang+" von "+LAEUFER.length+".",rang<=3,undefined,
+              "zieleinlauf",undefined,undefined,"ereignis");
           } else {
             // ZEITSKALA-FIX (Chris' Fund 22.09., zwei Screenshots desselben Rennens: Ticker
             // "14,8 s.", Endstand "2:22,4 min." fuer denselben Laeufer). Der Ticker schrieb
@@ -35671,8 +35863,10 @@
             // hohen Platz (real Platz 2 -> Ticker "Platz 3"). Dieselbe `!x.raus`-Filterung wie
             // zielbonus() (":26191") und bahnRangliste() (":28393") schon nutzen.
             const zielPlatz=rennFertig.filter(x=>!x.raus).length;
+            // KOMBINIERT (Merge #1093/#1095): kind="zieleinlauf" UND stufe="ereignis", s.
+            // Kommentar am startAbstand-Zweig oben.
             feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
-              zielPlatz<=3,undefined,"zieleinlauf");
+              zielPlatz<=3,undefined,"zieleinlauf",undefined,undefined,"ereignis");
           }
         }
       }
@@ -36025,7 +36219,7 @@
           // bahnZeit()/die Zwischenzeiten der anderen Bahnen ihre Differenzen bilden.
           for(let k=u.vizExeN;k<geklinkt;k++)u.vizExeT[k]=rennT;
           u.vizExeN=geklinkt;
-          feed(u.seite,u.n+" klinkt die "+(geklinkt===1?"erste":geklinkt===2?"zweite":"dritte")+" Exe.");
+          feedRoutine(u.seite,u.n+" klinkt die "+(geklinkt===1?"erste":geklinkt===2?"zweite":"dritte")+" Exe.");
         }
       }
       // ---- TOPOUT-TON (TON_KATALOG.climbing.topout), einmalig wie ueberall sonst.
@@ -37533,7 +37727,82 @@
   // Treffer gesetzt hat, s. Kommentar bei schalteAus()). Reine Zusatzbeschriftung, kein
   // neuer Sim-Zustand, kein rr()-Aufruf -- jeder bestehende feed()-Aufruf laesst den
   // Parameter weg (undefined), bit-identisch fuer alle ~40 anderen Aufrufstellen.
-  function feed(side,txt,big,caption,kind,verzoegerungMs,akteur){
+  //
+  // TICKER ENTSCHLACKEN + PROTOKOLL-REITER (F1-Broadcast-Audit Runde 2, 30.09., Prio-1-
+  // Punkt 8, Messanhang 6.1): "gewoehnliche Treffer/Paesse/Heilungen nicht in den sichtbaren
+  // Ticker (TDM 449 Zeilen/min), nur Ereignisse (Ausschaltung, Tor, Wechsel, Rekord); der
+  // volle Verlauf gehoert in einen einklappbaren 'Protokoll'-Reiter. Zielband <= 30
+  // Zeilen/min." Nachgemessen vor dieser Aenderung (scripts/miss-ticker-dichte.mjs,
+  // deterministisch, Tempo-1x-Sendezeit): TDM 487, Battlefield 180, Eiskunstlauf 140,
+  // Schach/Tennis/Takeshi um 120 Zeilen je Minute.
+  //
+  // JEDE Zeile landet weiterhin vollstaendig in #protokoll (nichts geht verloren, keine
+  // Deckelung). Ob sie AUCH im sichtbaren Ticker #feed steht, entscheidet ihre STUFE --
+  // optionaler achter Parameter, jede bestehende Aufrufstelle ohne ihn bleibt "normal":
+  //   * "ereignis" -- immer im Ticker. Automatisch fuer jede big-Zeile (Banner/HIGHLIGHTS,
+  //     die Drosseln kampfGrossDrosseln/buehneBahnGrossDrosseln haben schon entschieden)
+  //     und jede Zeile mit Momentart `kind`; ausdruecklich gesetzt an den Ereignis-
+  //     Aufrufstellen der Audit-Liste (Ausschaltung, Tor, Wechsel, Rekord ...).
+  //   * "routine" -- nur im Protokoll (ausser sie ist big): die Massenzeilen, die der Audit
+  //     ausdruecklich nennt -- gewoehnlicher Treffer, Heilung, Pass, Skillwahl.
+  //   * "normal" (Vorgabe) -- im Ticker, solange das Zeilenbudget reicht.
+  // ZEILENBUDGET: ein Token-Eimer ueber die SENDEZEIT (tickerSendeT, s.u.), der sich mit
+  // TICKER_ZEILEN_JE_MIN/60 Zeilen je Sekunde fuellt und hoechstens TICKER_BUDGET_VORRAT
+  // Zeilen vorhaelt (so gehen gleichzeitige Zeilen in ruhigen Disziplinen nicht verloren,
+  // z.B. Wettessens Minutenzeile neben einem Durchgang). "normal"-Zeilen brauchen ein volles
+  // Token. Ereignisse kommen IMMER durch, ziehen aber ebenfalls ein Token ab -- bis hinunter
+  // zu TICKER_BUDGET_SCHULD: nach einer Ereignis-Haeufung schweigen die "normal"-Zeilen, bis
+  // die Schuld abgetragen ist (hoechstens ~17 s), statt den Ticker ueber das Band zu
+  // schieben (Eiskunstlauf: zehn big-Elemente in den ersten zehn Sekunden). 28 statt glatt
+  // 30 je Minute: zwei Zeilen Reserve fuer Eroeffnungs- und Schlusszeile ("Aufstellung
+  // steht.", "... gewinnt"), die in einem Ein-Minuten-Spiel sonst allein das Band reissen.
+  // Stille Disziplinen (Staffel 5/min, Gewichtheben 12/min) verlieren gar nichts -- dort
+  // reicht das Budget immer.
+  //
+  // SENDEZEIT STATT WANDUHR: tickerSendeT waechst um GENAU 1/60 je stepSim()-Aufruf aus
+  // loop() bzw. sondenLauf() -- bei Tempo 1x ist das exakt eine echte Sechzigstelsekunde
+  // (loop(): acc+=dt*speed, je 1/60 ein stepSim()). Die Auswahl ist damit deterministisch
+  // (gleicher Verlauf -> derselbe Ticker), unabhaengig von Tempo und Bildrate, und laeuft in
+  // allen vier Chassis auf derselben Uhr -- die Anzeige-Uhren (t*zeitFaktor()/rennT/
+  // buehneT/fsT) taugen dafuer nicht, Buehne und Feldspiel zaehlen dort ungedehnte
+  // Simulationszeit (Audit 3.7).
+  //
+  // REINE ANZEIGE (Klasse A): kein rr()-Aufruf, kein Simulationszustand; `big`, Callout und
+  // HIGHLIGHTS bleiben exakt wie vorher, und im stummen Messpfad (miss-alle-disziplinen.mjs)
+  // kehrt feed() wie bisher sofort zurueck.
+  const TICKER_ZEILEN_JE_MIN=28, TICKER_BUDGET_VORRAT=4, TICKER_BUDGET_SCHULD=-8, TICKER_BUDGET_START=2;
+  let tickerSendeT=0, tickerBudget=TICKER_BUDGET_START, tickerBudgetT=0, tickerNurProtokoll=0;
+  function tickerZeigt(stufe){
+    tickerBudget=Math.min(TICKER_BUDGET_VORRAT,
+      tickerBudget+(tickerSendeT-tickerBudgetT)*TICKER_ZEILEN_JE_MIN/60);
+    tickerBudgetT=tickerSendeT;
+    if(stufe==="ereignis"){ tickerBudget=Math.max(TICKER_BUDGET_SCHULD,tickerBudget-1); return true; }
+    if(stufe==="routine")return false;
+    if(tickerBudget>=1){ tickerBudget-=1; return true; }
+    return false;
+  }
+  function tickerZuruecksetzen(){
+    tickerSendeT=0; tickerBudget=TICKER_BUDGET_START; tickerBudgetT=0; tickerNurProtokoll=0;
+    const p=document.getElementById("protokoll"); if(p)p.textContent="";
+    protokollZaehlerZeigen();
+  }
+  // "+N" am Protokoll-Reiter: wie viele Zeilen dieses Spiels NUR im Protokoll stehen --
+  // dasselbe "+N weitere statt stillschweigend abschneiden" wie kuratiereHighlights().
+  function protokollZaehlerZeigen(){
+    const m=document.getElementById("protmehr"); if(!m)return;
+    m.hidden=tickerNurProtokoll===0;
+    m.textContent="+"+tickerNurProtokoll.toLocaleString("de-DE");
+    const tb=document.getElementById("ftProtokoll");
+    if(tb)tb.title=tickerNurProtokoll
+      ?tickerNurProtokoll+" Zeilen stehen nur im Protokoll, nicht im Ticker"
+      :"Vollständiger Spielverlauf";
+  }
+  // Kurzformen fuer die beiden ausdruecklichen Stufen -- alle uebrigen Parameter wie feed().
+  // Funktionsdeklarationen (gehoben), damit sie wie feed() selbst von jeder Stelle aus
+  // aufrufbar sind, unabhaengig davon, wo im Modul der Aufruf steht.
+  function feedRoutine(side,txt,big){ feed(side,txt,big,undefined,undefined,undefined,undefined,"routine"); }
+  function feedEreignis(side,txt,big,caption){ feed(side,txt,big,caption,undefined,undefined,undefined,"ereignis"); }
+  function feed(side,txt,big,caption,kind,verzoegerungMs,akteur,stufe){
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
@@ -37556,9 +37825,29 @@
     // Umrechnung wie dort, nur hier fuer den Ticker-Zeitstempel.
     d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
     d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
-    f.appendChild(d);
-    while(f.children.length>140)f.removeChild(f.firstChild);
-    f.scrollTop=f.scrollHeight;
+    // PUNKT 8 (s. Kopfkommentar bei TICKER_ZEILEN_JE_MIN): erst ins vollstaendige Protokoll,
+    // dann -- je nach Stufe und Budget -- eine Kopie in den sichtbaren Ticker.
+    // Ohne #protokoll (aeltere, zwischengespeicherte battle-mode.html-Huelle) gibt es keinen
+    // Ort fuer ausgeblendete Zeilen -- dann bleibt alles im Ticker wie vorher.
+    const p=document.getElementById("protokoll");
+    const imTicker=!p||tickerZeigt(big||kind?"ereignis":stufe);
+    if(p){
+      const pd=d.cloneNode(true);
+      if(!imTicker)pd.classList.add("nurprot");
+      // Nur mitscrollen, wenn der Leser gerade unten steht -- wer im Protokoll
+      // zurueckliest, wird nicht bei jeder neuen Zeile ans Ende gerissen.
+      const unten=p.hidden||p.scrollHeight-p.scrollTop-p.clientHeight<24;
+      p.appendChild(pd);
+      if(unten&&!p.hidden)p.scrollTop=p.scrollHeight;
+    }
+    if(imTicker){
+      f.appendChild(d);
+      while(f.children.length>140)f.removeChild(f.firstChild);
+      f.scrollTop=f.scrollHeight;
+    }else{
+      tickerNurProtokoll++;
+      protokollZaehlerZeigen();
+    }
     // BROADCAST-CALLOUT + HOEHEPUNKTE: dasselbe big-Flag, das oben schon die Ticker-Zeile
     // fett setzt, loest hier zusaetzlich den kurzen Banner aus und sammelt das Ereignis
     // fuer den Endstand-Rueckblick (Abschnitt 4.3/4.4). Reine Anzeige-Folge desselben
@@ -37790,7 +38079,9 @@
     if(running){
       acc+=dt*speed;
       const zf=zeitFaktor();
-      while(acc>=1/60){stepSim((1/60)/zf);acc-=1/60;}
+      // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
+      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
+      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;}
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
@@ -39130,10 +39421,18 @@
             // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
             // echter Finisher bekommt weiterhin den vollen Balken.
             fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
-        :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
-          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
-          leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
-                  zusatz:Math.round(x.summe*10)/10+""}}))
+        // GEWICHTHEBEN: der bisher GEZEIGTE Zweikampf statt des vorab feststehenden `summe`
+        // (Broadcast-Audit Runde 2, Punkt 2, s. hebenSichtbareSumme()) -- fuer Zahl, Balken
+        // UND Balken-Massstab, sonst verriete schon die Balkenlaenge relativ zum (fertigen)
+        // Maximum das Ergebnis. Jede andere Buehne liest unveraendert `summe`.
+        :istBuehne(disc)?(()=>{
+          const kw=BB().heben?hebenSichtbareSumme:(y=>y.summe);
+          const kmax=Math.max(1,...TEILNEHMER.map(kw));
+          return TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
+            hp:kw(x),max:kmax,
+            leiste:{wert:kw(x),max:kmax,wort:BB().heben?"kg Zweikampf bisher":"Punkte",
+                    zusatz:Math.round(kw(x)*10)/10+""}}));
+        })()
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
@@ -39319,9 +39618,12 @@
       ? (BB().wettessen
         ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0)))
+        // PUNKT 2 (derselbe Audit): nicht `x.summe` (der fertige Zweikampf, steht ab dem
+        // Einlauf fest), sondern der bis zur letzten gezeigten Lampe aufgebaute Wert, s.
+        // hebenSichtbareSumme(). Startet bei "KG 0 : 0" und waechst Versuch fuer Versuch.
         : BB().heben
-        ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
-           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+        ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+hebenSichtbareSumme(x),0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+hebenSichtbareSumme(x),0)))
         : BB().gauntlet
         ? ("PKT "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
@@ -40154,6 +40456,8 @@
     // Gating, keine Aenderung an running/stepSim/rr() selbst.
     aktualisiereTdmNotizen();
     document.getElementById("feed").textContent="";
+    // Punkt 8: Protokoll, Zeilenbudget und Sendezeit gehoeren zum abgelaufenen Spiel.
+    tickerZuruecksetzen();
     // STARTKNOPF JE CHASSIS (Broadcast-Audit Runde 2, Punkt 12, 30.09.): vorher ueberall
     // "Kampf starten", auch dort, wo niemand kaempft (Wettessen, Schach, Eiskunstlauf …).
     // Nur die drei echten Kampf-Disziplinen (tdm/mini-dm/battlefield) behalten den Namen,
@@ -40254,6 +40558,16 @@
     tabs.forEach(o=>{const on=o===tb;o.setAttribute("aria-selected",on?"true":"false");
       document.getElementById(o.getAttribute("aria-controls")).hidden=!on;});
     if(tb.id==="t2")reset();
+  }));
+  // TICKER/PROTOKOLL-REITER (Punkt 8, s. feed()): dasselbe Umschaltmuster wie die
+  // Seiten-Reiter direkt darueber, nur fuer die zwei Listen im Ticker-Kasten -- und ohne
+  // reset(), das Spiel laeuft beim Umschalten ungestoert weiter.
+  const ftabs=[...document.querySelectorAll(".ftab")];
+  ftabs.forEach(tb=>tb.addEventListener("click",()=>{
+    ftabs.forEach(o=>{const on=o===tb;o.setAttribute("aria-selected",on?"true":"false");
+      const panel=document.getElementById(o.getAttribute("aria-controls")); if(panel)panel.hidden=!on;});
+    const ziel=document.getElementById(tb.getAttribute("aria-controls"));
+    if(ziel)ziel.scrollTop=ziel.scrollHeight;
   }));
 
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
@@ -42110,6 +42424,7 @@
       const zf=zeitFaktor();
       for(let i=0;i<n;i++){
         sondenSimMs+=1000/60;
+        tickerSendeT+=1/60;
         stepSim((1/60)/zf);
         stepFloats();
         // Dieselbe HUD-Nachfuehrung wie in loop() (s. dort): fuer den Kampf ruft stepSim()
