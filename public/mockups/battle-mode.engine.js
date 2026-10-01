@@ -15083,6 +15083,34 @@
     0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
   const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
 
+  // ================== PAKET 1 (30.09.): "STARTREIHENFOLGE NACH ERGEBNIS" ==================
+  // Fable-Ideen Buehne-AUFTRITT 30.09. (docs/design/fable-ideen-buehne-auftritt-30-09.md,
+  // Showcase/Eiskunstlauf/Wettessen -- NICHT zu verwechseln mit dem gleichnamigen Buehne-
+  // DUELL-Papier vom selben Tag, dessen eigenes "S-F2" direkt unterhalb steht), Abschnitt 1
+  // ("Reihenfolge aus dem Ergebnis, nicht aus der Eignung"): Showcase und Eiskunstlauf
+  // sortierten ihre Auftrittsreihenfolge bisher aufsteigend nach der VERSTECKTEN
+  // Eignungszahl `eig` -- ein Spoiler (der letzte Startplatz verriet, wer der Beste ist,
+  // bevor irgendjemand aufgetreten war) ohne jede Erzaehlung (ein Ueberraschungssieg von
+  // Startplatz 3 sah im Bild nicht anders aus als ein erwarteter von Platz 6). E-F1
+  // (Eiskunstlauf) und S-F1 (Showcase) loesen das, wie es der jeweilige echte Sport tut: ein
+  // kurzer erster Block (Kurzprogramm bzw. Casting) legt ein ERGEBNIS vor, und der zweite,
+  // laengere Block (Kuer bzw. Show) wird danach aufsteigend GEORDNET -- wer im ersten Block
+  // am meisten Eindruck gemacht hat, bekommt den Schlussplatz ("pimp slot"/letzte Kuer-
+  // Startgruppe). Beide Konstanten unten legen fest, wie viele der `rundenN` Durchgaenge auf
+  // den ersten Block entfallen.
+  //
+  // KLASSE A, PER KONSTRUKTION RANGTREUE-NEUTRAL (Papier, Abschnitt 1, "das laesst sich ohne
+  // eine einzige Punktaenderung nachbauen"): `setz()` wenige Zeilen unten rechnet ALLE
+  // `rundenN` Durchgaenge eines Teilnehmers sofort und vollstaendig durch, BEVOR irgendetwas
+  // von alldem enthuellt wird -- die Reihenfolge, in der `buehneQueue` diese bereits fertigen
+  // `runden[]`-Eintraege spaeter freigibt, aendert nichts an WAS gewuerfelt wurde oder WIEVIEL
+  // rr() verbraucht wurde, nur WANN es sichtbar wird. Deshalb duerfen die beiden Blockgrenzen
+  // unten sogar das ERGEBNIS des ersten Blocks lesen (`runden[0..n-1]`, Zwischenstand), ohne
+  // die Messung zu beruehren: `scripts/miss-alle-disziplinen.mjs` ruft `stepBuehne()` direkt
+  // und liest `u.summe` -- bit-identisch vorher/nachher (s. PR-Beschreibung).
+  const EISKUNSTLAUF_KURZPROGRAMM_N=4; // Elemente 1-4 = Kurzprogramm (ISU), Rest = Kuer
+  const SHOWCASE_CASTING_N=1;          // Durchgang 1 = Casting-Montage, Rest = die Show
+
   // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09.,
   // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F2", Paket 1 "Regie & Bild",
   // Klasse A, nur Speed-Schach). Liefert die SPOILERFREIE obere Schranke dafuer, wie viele
@@ -15435,23 +15463,61 @@
       // die Gruppenliste je Seite deshalb nur umgedreht und dann seitenweise verzahnt,
       // damit kein Team geschlossen zuerst dran ist (dieselbe Absicht wie im generischen
       // Zweig unten).
-      const gruppenJeSeite=[0,1].map(seite=>{
+      const baueGruppenJeSeite=()=>[0,1].map(seite=>{
         const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
         const grp=[];
         for(let i=0;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
         return grp.reverse();
       });
+      // E-F1 (Paket 1, 30.09., Klasse A, s. Kommentar bei EISKUNSTLAUF_KURZPROGRAMM_N oben):
+      // KURZPROGRAMM UND KUER STATT EINEM EINZIGEN PROGRAMM. `kurzN<1` ist ein reines
+      // Sicherheitsnetz (heute unerreichbar, art.rundenN steht fest auf 12) -- faellt
+      // `rundenN` je auf 1 oder 0, bleibt es beim alten Einzelblock, ohne dass unten ein
+      // Sonderfall fuer "kein Kurzprogramm moeglich" noetig waere.
+      const kurzN=Math.min(EISKUNSTLAUF_KURZPROGRAMM_N,art.rundenN-1);
+      if(kurzN<1){
+        const gruppenJeSeite=baueGruppenJeSeite();
+        buehneQueue=[];
+        const maxGrp=Math.max(gruppenJeSeite[0].length,gruppenJeSeite[1].length);
+        for(let gi=0;gi<maxGrp;gi++){
+          for(const seite of [0,1]){
+            const grp=gruppenJeSeite[seite][gi];
+            if(!grp)continue;
+            for(let r=0;r<art.rundenN;r++)for(const u of grp)buehneQueue.push(u);
+          }
+        }
+        return;
+      }
+      // BLOCK 1, KURZPROGRAMM: Startreihenfolge wie bisher (schwaechste Eignung zuerst,
+      // Seiten verzahnt) -- das ISU-Kurzprogramm selbst wird ausgelost/nach Eignung
+      // gesetzt, nur die KUER-Reihenfolge wird im echten Sport verdient. Nur die ersten
+      // `kurzN` der `rundenN` Elemente je Paar.
+      const gruppenKurz=baueGruppenJeSeite();
       buehneQueue=[];
-      const maxGrp=Math.max(gruppenJeSeite[0].length,gruppenJeSeite[1].length);
-      for(let gi=0;gi<maxGrp;gi++){
+      const maxGrpKurz=Math.max(gruppenKurz[0].length,gruppenKurz[1].length);
+      for(let gi=0;gi<maxGrpKurz;gi++){
         for(const seite of [0,1]){
-          const grp=gruppenJeSeite[seite][gi];
+          const grp=gruppenKurz[seite][gi];
           if(!grp)continue;
-          // Ein Programm am Stueck: Durchgang fuer Durchgang, innerhalb eines Durchgangs
-          // beide Partner — so entsteht genau EIN zusammenhaengender Auftritt je Paar
-          // (bei rundenN 12 und zwei Partnern 24 Enthuellungen x 0,425 s ≈ 10 s, die
-          // Groessenordnung eines echten Kuerprogramms).
-          for(let r=0;r<art.rundenN;r++)for(const u of grp)buehneQueue.push(u);
+          for(let r=0;r<kurzN;r++)for(const u of grp)buehneQueue.push(u);
+        }
+      }
+      // ZWISCHENRANG: Teilsumme der ersten `kurzN` Elemente je Paar -- bereits vollstaendig
+      // vorberechnet (s. "ALLE DURCHGAENGE SOFORT DURCHRECHNEN" oben in setz()), hier nur
+      // GELESEN, kein rr(). BLOCK 2, KUER: je Seite aufsteigend nach dieser Teilsumme neu
+      // geordnet (die Besten des Kurzprogramms laufen zuletzt, E-F1) statt nach der
+      // versteckten Gesamteignung -- derselbe Seiten-Verzahnungs-Rhythmus wie oben, nur mit
+      // der neuen Reihenfolge je Seite. Nur die restlichen `rundenN-kurzN` Elemente.
+      const zwischenSumme=(grp)=>grp.reduce((s,u)=>
+        s+u.runden.slice(0,kurzN).reduce((s2,r)=>s2+(r?r.punkte:0),0),0);
+      const gruppenKuer=[0,1].map(seite=>
+        gruppenKurz[seite].slice().sort((a,b)=>zwischenSumme(a)-zwischenSumme(b)));
+      const maxGrpKuer=Math.max(gruppenKuer[0].length,gruppenKuer[1].length);
+      for(let gi=0;gi<maxGrpKuer;gi++){
+        for(const seite of [0,1]){
+          const grp=gruppenKuer[seite][gi];
+          if(!grp)continue;
+          for(let r=kurzN;r<art.rundenN;r++)for(const u of grp)buehneQueue.push(u);
         }
       }
       return;
@@ -15470,18 +15536,54 @@
     // rr(). Laenge und Spieldauer bleiben identisch (12 Teilnehmer x rundenN Eintraege).
     // Deshalb liefert miss-alle-disziplinen.mjs eine bit-identische Zahl fuer Showcase.
     if(art.showcase){
-      const jeSeiteAufsteigend=[0,1].map(seite=>
+      const baueJeSeiteAufsteigend=()=>[0,1].map(seite=>
         TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>x.eig-y.eig));
+      // S-F1 (Paket 1, 30.09., Klasse A, s. Kommentar bei SHOWCASE_CASTING_N oben): CASTING
+      // UND SHOW STATT EINEM EINZIGEN AUFTRITT. `castingN<1` ist dasselbe Sicherheitsnetz
+      // wie bei E-F1 oben (heute unerreichbar, art.rundenN steht fest auf 5).
+      const castingN=Math.min(SHOWCASE_CASTING_N,art.rundenN-1);
+      if(castingN<1){
+        const jeSeiteAufsteigend=baueJeSeiteAufsteigend();
+        buehneQueue=[];
+        const maxLen=Math.max(jeSeiteAufsteigend[0].length,jeSeiteAufsteigend[1].length);
+        for(let i=0;i<maxLen;i++){
+          for(const seite of [0,1]){
+            const u=jeSeiteAufsteigend[seite][i];
+            if(!u)continue;
+            for(let r=0;r<art.rundenN;r++)buehneQueue.push(u);
+          }
+        }
+        return;
+      }
+      // BLOCK 1, CASTING: alle zwoelf Acts, Seiten verzahnt -- nur der erste der `rundenN`
+      // Durchgaenge je Act, kurz angerissen wie eine Audition-Montage. Die Ausgangsreihenfolge
+      // selbst ist hier ohne Bedeutung (ein einzelner Durchgang verraet noch keine Eignung),
+      // bleibt aber aus Konsistenzgruenden dieselbe aufsteigende Eignungs-Setzliste wie
+      // bisher.
+      const jeSeiteCasting=baueJeSeiteAufsteigend();
       buehneQueue=[];
-      const maxLen=Math.max(jeSeiteAufsteigend[0].length,jeSeiteAufsteigend[1].length);
-      for(let i=0;i<maxLen;i++){
+      const maxLenC=Math.max(jeSeiteCasting[0].length,jeSeiteCasting[1].length);
+      for(let i=0;i<maxLenC;i++){
         for(const seite of [0,1]){
-          const u=jeSeiteAufsteigend[seite][i];
+          const u=jeSeiteCasting[seite][i];
           if(!u)continue;
-          // Ein Auftritt am Stueck: alle rundenN Enthuellungen dieses Teilnehmers
-          // hintereinander, statt ueber das ganze Spiel verteilt (die generische
-          // Setzlisten-Reihenfolge direkt unten).
-          for(let r=0;r<art.rundenN;r++)buehneQueue.push(u);
+          for(let r=0;r<castingN;r++)buehneQueue.push(u);
+        }
+      }
+      // BLOCK 2, SHOW: je Seite aufsteigend nach dem Casting-Ergebnis (`runden[0..castingN-1]`,
+      // bereits vollstaendig vorberechnet, hier nur GELESEN, kein rr()) statt nach der
+      // versteckten Eignung -- der "pimp slot": wer im Casting am meisten Eindruck gemacht
+      // hat, bekommt den Schlussplatz. Jeder Act laeuft seine restlichen `rundenN-castingN`
+      // Durchgaenge weiterhin am Stueck.
+      const castingSumme=(u)=>u.runden.slice(0,castingN).reduce((s,r)=>s+(r?r.punkte:0),0);
+      const jeSeiteShow=[0,1].map(seite=>
+        jeSeiteCasting[seite].slice().sort((a,b)=>castingSumme(a)-castingSumme(b)));
+      const maxLenS=Math.max(jeSeiteShow[0].length,jeSeiteShow[1].length);
+      for(let i=0;i<maxLenS;i++){
+        for(const seite of [0,1]){
+          const u=jeSeiteShow[seite][i];
+          if(!u)continue;
+          for(let r=castingN;r<art.rundenN;r++)buehneQueue.push(u);
         }
       }
       return;
@@ -18039,6 +18141,56 @@
     for(let i=0;i<gruppen.length;i++)if(gruppen[i].indexOf(u)>=0)return i;
     return 0;
   }
+  // ---- BESUCHE (E-F1, Paket 1, 30.09.) ----------------------------------------------
+  // `kuerStartliste()`/`kuerAktiveGruppe()` oben bleiben UNVERAENDERT und werden weiter von
+  // der Tafel/dem Replay/der L-C-Zeile benutzt (zeichneEisStand/kuerZwischenstandZeilen/
+  // kuerLC/kuerEisFuehrung/zeichneDuett) -- sie identifizieren ein Paar ueber seine FESTE
+  // Identitaet (die Paarzusammensetzung), nicht ueber seine Position in der Warteschlange,
+  // und bleiben deshalb auch bei zwei Besuchen je Paar richtig (ein Paar bleibt "Paar 3",
+  // egal in welcher Reihenfolge seine beiden Besuche kommen).
+  //
+  // Die SPOTLIGHT-ROLLE (wer steht gerade auf dem Eis/wartet/sitzt im Kiss & Cry/ist weg,
+  // s. Durchgang 1/3 in stepKuer()) kann sich darauf dagegen NICHT mehr verlassen: ohne
+  // E-F1 betritt jedes Paar das Eis GENAU EINMAL, und seine feste Identitaet IST zugleich
+  // seine Position in einer streng monoton durchlaufenen Reihenfolge -- ein Vergleich
+  // "Paar-Index vs. aktiver Paar-Index" reichte deshalb aus. Mit E-F1 betritt ein Paar das
+  // Eis ZWEIMAL (Kurzprogramm, spaeter Kuer), und die Kuer-Reihenfolge muss nicht mit der
+  // Kurzprogramm-Reihenfolge uebereinstimmen (das ist der ganze Witz der Idee) -- die feste
+  // Paar-Identitaet reicht als Positionsmass dann nicht mehr.
+  //
+  // `kuerBesuchsliste()` zerlegt `buehneQueue` deshalb stattdessen in zusammenhaengende
+  // BESUCHE: ein Besuch ist eine ununterbrochene Folge von Enthuellungen DESSELBEN Paares.
+  // Ein Paar ohne E-F1 (oder vor seinem ersten Umbau) hat genau einen Besuch -- identisches
+  // Verhalten zu vorher, weil `kuerAktiverBesuch()` sich dann exakt wie `kuerAktiveGruppe()`
+  // verhaelt. Ein Paar mit E-F1 hat zwei, in der Reihenfolge, in der `buehneQueue` sie
+  // tatsaechlich enthaelt (Kurzprogramm-Besuch zuerst, Kuer-Besuch an seiner neuen Stelle).
+  // ZWISCHENGESPEICHERT wie kuerStartliste() oben, an derselben buehneQueue-Identitaet.
+  let kuerBesucheCache=null, kuerBesucheQuelle=null;
+  function kuerBesuchsliste(){
+    if(kuerBesucheQuelle===buehneQueue && kuerBesucheCache)return kuerBesucheCache;
+    const besuche=[]; let i=0;
+    while(i<buehneQueue.length){
+      const u=buehneQueue[i];
+      if(!u){ i++; continue; }
+      const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+      const mitglieder=partner?[u,partner]:[u];
+      const ids=new Set(mitglieder.map(x=>x.id));
+      let j=i;
+      while(j<buehneQueue.length && buehneQueue[j] && ids.has(buehneQueue[j].id))j++;
+      besuche.push(mitglieder);
+      i=j;
+    }
+    kuerBesucheQuelle=buehneQueue; kuerBesucheCache=besuche;
+    return besuche;
+  }
+  // Wortgleiches Gegenstueck zu kuerAktiveGruppe(), nur ueber `besuche` statt `gruppen`.
+  function kuerAktiverBesuch(besuche){
+    if(!buehneQueue.length)return 0;
+    const u=buehneQueue[Math.min(Math.max(buehneZeiger-1,0),buehneQueue.length-1)];
+    if(!u)return 0;
+    for(let i=0;i<besuche.length;i++)if(besuche[i].indexOf(u)>=0)return i;
+    return 0;
+  }
   // ---- PHASENENDE: EIN KLANG, ZWEI AUSLOESER (14.09.) -------------------------------
   // Hier endet eine laufende Phase: der passende Klang faellt und die Figur geht zurueck
   // ins Gleiten. Die Klangregeln sind woertlich die aus PR #903 und stehen bewusst an
@@ -18085,13 +18237,27 @@
   // Fuehrungsermittlung ueber alle Paare hinweg zu rekonstruieren. Schritt 2 (Sturz mit dem
   // groessten Punktverlust) und Schritt 3 (Element mit den meisten Punkten) bleiben
   // woertlich die im Papier beschriebene Rangfolge.
-  function kuerBerechneReplay(grp){
+  //
+  // `grenze` (E-F1, Paket 1, 30.09.): OBERE SCHRANKE fuer den Elementindex, standardmaessig
+  // unbegrenzt (Infinity) -- unveraendertes Verhalten fuer den alten Einzelblock-Aufruf, bei
+  // dem "das Paar hat seine Kuer komplett durchlaufen" (s. Kommentar oben) tatsaechlich
+  // stimmt. Mit E-F1 wird diese Funktion jetzt auch am ENDE DES KURZPROGRAMMS aufgerufen
+  // (die erste der beiden Kiss-&-Cry-Sitzungen, s. stepKuer() Durchgang 2) -- dort hat das
+  // Paar nur die ersten `kurzN` Elemente geschafft, `u.runden` traegt wegen "ALLE DURCHGAENGE
+  // SOFORT DURCHRECHNEN" (bauBuehne()) aber schon alle zwoelf, inklusive der spaeteren Kuer.
+  // Ohne diese Schranke wuerde die Zeitlupen-Wiederholung nach dem Kurzprogramm ein Element
+  // zeigen koennen, das live erst in der Kuer passiert -- ein echter Spoiler, nicht nur ein
+  // kosmetischer Fehler. Der Aufrufer uebergibt die Zahl der bislang tatsaechlich
+  // enthuellten Elemente dieses Besuchs.
+  function kuerBerechneReplay(grp,grenze){
+    const limit=grenze==null?Infinity:grenze;
     let owner=null, idx=-1;
-    for(const u of grp){ if(u.vizBigIdx!=null){ owner=u; idx=u.vizBigIdx; break; } }
+    for(const u of grp){ if(u.vizBigIdx!=null&&u.vizBigIdx<limit){ owner=u; idx=u.vizBigIdx; break; } }
     if(owner==null){
       let bestSturz=null;
       for(const u of grp){
         (u.runden||[]).forEach((r,i)=>{
+          if(i>=limit)return;
           const el=KUER_ELEMENTE[i]||KUER_ELEMENTE[KUER_ELEMENTE.length-1];
           if(r&&r.ereignis===BB().failWort&&!r.knapp&&el.typ==="sprung"){
             if(!bestSturz||r.punkte<bestSturz.r.punkte)bestSturz={u,idx:i,r};
@@ -18103,7 +18269,7 @@
     if(owner==null){
       let best=null;
       for(const u of grp){
-        (u.runden||[]).forEach((r,i)=>{ if(r&&(!best||r.punkte>best.r.punkte))best={u,idx:i,r}; });
+        (u.runden||[]).forEach((r,i)=>{ if(i>=limit)return; if(r&&(!best||r.punkte>best.r.punkte))best={u,idx:i,r}; });
       }
       if(best){ owner=best.u; idx=best.idx; }
     }
@@ -18137,6 +18303,12 @@
     const B=kuerBahn();
     const gruppen=kuerStartliste();
     const aktiv=kuerAktiveGruppe(gruppen);
+    // E-F1 (Paket 1, 30.09.): `besuche`/`aktivBesuch` treiben ab hier Rolle und Position
+    // (Durchgang 1/3) -- `gruppen`/`aktiv` bleiben daneben bestehen und werden weiter von
+    // Durchgang 2s Bahnuhr-Schleife sowie von der Tafel/dem Replay/der L-C-Zeile gelesen (s.
+    // Kommentar bei kuerBesuchsliste()).
+    const besuche=kuerBesuchsliste();
+    const aktivBesuch=kuerAktiverBesuch(besuche);
 
     // ---- DURCHGANG 1: Rolle, Elementphase, Haltezustand -----------------------------
     // Bewusst ein eigener Durchgang VOR der Bewegung: die Bahnuhr eines Paares (Schritt 2)
@@ -18150,18 +18322,30 @@
         u.vizSpur=[]; u.vizPhase="einlauf"; u.vizPhaseT=1.0; u.vizSturz=false; u.vizWackler=false; u.vizAktuell=-1;
         u.vizX=B.cx; u.vizY=B.cy; u.vizRi=0; u.vizNeu=true; u.vizAus=1; u.vizBahnT=0;
       }
-      // ROLLE IN DER ROTATION. `vizGrp` (Startnummer der eigenen Gruppe, 0-basiert) und
-      // `vizRolle` sind beides neue viz*-Felder; zeichneDuett() liest nur sie und muss die
-      // Startliste nicht ein zweites Mal auswerten.
-      let gi=0;
-      for(let i=0;i<gruppen.length;i++)if(gruppen[i].indexOf(u)>=0){gi=i;break;}
-      u.vizGrp=gi; u.vizGrpN=gruppen.length;
+      // ROLLE IN DER ROTATION. `vizGrp`/`vizRolle` sind beides neue viz*-Felder; zeichneDuett()
+      // liest nur sie und muss die Startliste nicht ein zweites Mal auswerten.
+      //
+      // E-F1 (Paket 1, 30.09.): GENERALISIERT AUF "BESUCHE" STATT AUF DIE FESTE PAAR-
+      // IDENTITAET (s. Kommentar bei kuerBesuchsliste()). Ohne E-F1 betritt ein Paar das Eis
+      // GENAU EINMAL, und seine feste Identitaet IST zugleich seine Position in einer streng
+      // monoton durchlaufenen Reihenfolge -- ein Indexvergleich reichte. Mit E-F1 kann ein
+      // Paar zwei BESUCHE haben (Kurzprogramm, dann an neuer Stelle die Kuer), also wird hier
+      // der fuer DIESEN Moment relevante Besuch gesucht: der gerade aktive, sonst der zuletzt
+      // abgeschlossene (fuer "kiss"), sonst der naechste noch bevorstehende (fuer "warte"),
+      // sonst (alle Besuche laenger vorbei) der letzte vergangene (fuer "weg").
+      let meineBesuche=[];
+      for(let i=0;i<besuche.length;i++)if(besuche[i].indexOf(u)>=0)meineBesuche.push(i);
+      let vi=meineBesuche.length?meineBesuche[meineBesuche.length-1]:0;
+      if(meineBesuche.indexOf(aktivBesuch)>=0)vi=aktivBesuch;
+      else if(meineBesuche.indexOf(aktivBesuch-1)>=0)vi=aktivBesuch-1;
+      else { const kuenftig=meineBesuche.find(v=>v>aktivBesuch); if(kuenftig!=null)vi=kuenftig; }
+      u.vizGrp=vi; u.vizGrpN=besuche.length;
       //   "kuer"  — laeuft gerade das Programm
       //   "warte" — steht am Startbereich an der Bande, noch nicht dran
       //   "kiss"  — eben fertig, wartet im Kiss-and-Cry auf die Wertung
       //   "weg"   — schon laenger fertig, verlaesst das Bild (die Zahlen bleiben im
       //             Zwischenstand stehen, s. zeichneEisStand)
-      u.vizRolle=gi>aktiv?"warte":(gi===aktiv?"kuer":(gi===aktiv-1?"kiss":"weg"));
+      u.vizRolle=vi>aktivBesuch?"warte":(vi===aktivBesuch?"kuer":(vi===aktivBesuch-1?"kiss":"weg"));
       // AUSBLENDEN statt Verschwinden: eine Figur, die von einem Bild aufs naechste weg
       // ist, liest sich als Fehler. 0,8 s Ueberblendung, rein zeichnerisch.
       u.vizAus=u.vizRolle==="weg"?Math.max(0,(u.vizAus??1)-dt/0.8):1;
@@ -18169,8 +18353,14 @@
       // dieses Paar schon im Kiss & Cry -- steuert die drei Enthuellungsstufen ("WERTUNG
       // FOLGT" -> Gesamt/Stuerze -> PLATZ-Plakette) in zeichneDuett(). Reiner neuer viz*-
       // Wert aus einem Rollenwechsel-Kantentreffer, kein rr(), keine Wirkung auf u.summe.
+      // `vizKissBesuch` (E-F1) zaehlt mit, WIE OFT dieses Paar schon frisch in "kiss"
+      // eingetreten ist -- ohne E-F1 immer hoechstens einmal (unveraendertes Verhalten),
+      // mit E-F1 zweimal (Kurzprogramm-Zwischenstand, dann Kuer-Endstand). Durchgang 2
+      // braucht das, um die Zeitlupen-Wiederholung beim ZWEITEN Mal neu zu berechnen statt
+      // den Stand des ersten Mals stehenzulassen.
       if(u.vizRolle==="kiss"){
         u.vizKissT=u.vizRolleVorher==="kiss"?(u.vizKissT||0)+dt:0;
+        if(u.vizRolleVorher!=="kiss")u.vizKissBesuch=(u.vizKissBesuch||0)+1;
       }
       u.vizRolleVorher=u.vizRolle;
 
@@ -18308,18 +18498,33 @@
       if(grp[0].vizRolle==="kiss"){
         const t=grp[0].vizKissT||0;
         if(t>=3 && t-dt<3) sfx("eiskunstlauf","plakette");
-        // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL berechnet, beim allerersten
-        // Bild in der Rolle "kiss" (grp[0].vizReplayClip ist dann noch nie gesetzt worden --
-        // TEILNEHMER sind je Spiel frische Objekte, s. N1-Reset-Konvention dieser Datei,
-        // ein Rueckfall auf `undefined` braucht deshalb keinen eigenen reset()-Eintrag).
-        // Danach bleibt der Clip fuer die ganze Kiss-&-Cry-Dauer unveraendert stehen --
-        // zeichneKuerReplay() liest ihn nur, schreibt ihn nie.
-        if(grp[0].vizReplayClip===undefined)grp[0].vizReplayClip=kuerBerechneReplay(grp)||null;
+        // E-B4 (Broadcast-Optik Buehne-Auftritt 27.09.): EINMAL BERECHNET JE KISS-BESUCH
+        // (`vizReplayClipBesuch` haelt fest, fuer welchen `vizKissBesuch`-Stand der Clip
+        // zuletzt berechnet wurde -- ohne E-F1 gibt es nur einen Besuch, unveraendertes
+        // Verhalten). Mit E-F1 (Paket 1, 30.09.) sitzt dasselbe Paar zweimal im Kiss & Cry
+        // (Kurzprogramm-Zwischenstand, dann Kuer-Endstand); ohne diese Unterscheidung bliebe
+        // nach dem ersten Mal fuer immer derselbe Clip stehen. `grenze` begrenzt
+        // kuerBerechneReplay() zusaetzlich auf die bislang tatsaechlich enthuellten Elemente
+        // dieses Paares (beide Partner enthuellen im Gleichschritt, s. Durchgang 1/3, `u.
+        // aktuell` ist deshalb bei Eintritt in "kiss" fuer beide bereits gleich) -- sonst
+        // koennte die Zeitlupe nach dem Kurzprogramm ein Element aus der erst spaeter
+        // laufenden Kuer zeigen, ein echter Spoiler (s. Kommentar bei kuerBerechneReplay()).
+        if(grp[0].vizReplayClipBesuch!==grp[0].vizKissBesuch){
+          grp[0].vizReplayClipBesuch=grp[0].vizKissBesuch;
+          const grenze=Math.max(0,...grp.map(x=>(x.aktuell??-1)+1));
+          grp[0].vizReplayClip=kuerBerechneReplay(grp,grenze)||null;
+        }
       }
     }
 
     // ---- DURCHGANG 3: Zielpunkt und Bewegung ----------------------------------------
     for(const u of TEILNEHMER){
+      // `gi`/`aktivBesuch` statt `aktiv` (E-F1, Paket 1, 30.09.): `vizGrp` traegt seit
+      // Durchgang 1 den BESUCHS-Index, nicht mehr die feste Paar-Identitaet -- der
+      // Warteplatz-Offset unten muss deshalb gegen `aktivBesuch` rechnen, sonst stuende ein
+      // Paar, dessen Kuer-Besuch weit hinten in der neuen Reihenfolge liegt, am falschen
+      // Warteplatz (oder ploetzlich wieder "vorn", wenn die alte Paar-Identitaet zufaellig
+      // kleiner als die Besuchsposition waere).
       const gi=u.vizGrp||0, rolle=u.vizRolle;
       const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
       const paarId=partner?Math.min(u.id,partner.id):u.id;
@@ -18358,7 +18563,7 @@
         zielX=grundX+u.vizVersatz*eigenR*(0.75+0.25*Math.cos(rot));
         zielY=grundY+u.vizVersatz*eigenR*0.3*Math.sin(rot);
       } else {
-        const p=rolle==="warte"?kuerWarte(gi-aktiv-1):kuerKiss();
+        const p=rolle==="warte"?kuerWarte(gi-aktivBesuch-1):kuerKiss();
         zielX=p.x+u.vizVersatz*14; zielY=p.y;
       }
       // Allererstes Bild: direkt auf den eigenen Platz setzen, statt ihn von der
@@ -22938,14 +23143,19 @@
     for(const u of TEILNEHMER){
       if(u.vizAct==null){
         u.vizAct=actVon(u).act;
-        // TON-MERKER (PR S3, Konzept Abschnitt 5): zwei reine Einmal-/Kanten-Kennungen,
-        // dasselbe Init-Muster wie vizStartTon/vizZone bei stepZeitfahren. vizAuftrittTon
-        // ist ein EINWEG-Merker (bleibt fuer immer true, wie vizStartTon dort) -- jeder
-        // Teilnehmer wird ueber ein ganzes Spiel genau einmal aktiv (buehneQueue gruppiert
-        // seine rundenN Enthuellungen zusammenhaengend, PR S0), ein Rueckfall auf false
-        // ist deshalb nie noetig. vizShowcaseTonAktuell haelt den zuletzt VERTONTEN
-        // Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
-        u.vizAuftrittTon=false; u.vizShowcaseTonAktuell=-1;
+        // TON-MERKER (PR S3, Konzept Abschnitt 5): vizShowcaseTonAktuell haelt den zuletzt
+        // VERTONTEN Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
+        // vizWarAktiv (umgebaut fuer S-F1, Paket 1, 30.09.) hielt bis dahin EINWEG fest, ob
+        // der Auftritts-Jingle schon gespielt wurde -- richtig, solange jeder Teilnehmer ueber
+        // ein ganzes Spiel GENAU EINMAL aktiv wird (buehneQueue gruppierte seine rundenN
+        // Enthuellungen zusammenhaengend, PR S0). Mit S-F1 wird ein Act jetzt ZWEIMAL aktiv
+        // (kurzer Casting-Durchgang, spaeter die zusammenhaengende Show) -- ein Einweg-Merker
+        // haette den Jingle beim Wiedereintritt in die Mitte fuer die Show verschluckt.
+        // vizWarAktiv haelt stattdessen nur den AKTIV-Zustand DES LETZTEN BILDES fest; der
+        // Jingle feuert an der steigenden Flanke (`istAktiv && !vizWarAktiv`, s.u.) -- das
+        // ist fuer den alten Einzelblock-Fall (genau eine steigende Flanke pro Spiel)
+        // dieselbe Bedingung wie vorher, und feuert mit S-F1 zusaetzlich ein zweites Mal.
+        u.vizWarAktiv=false; u.vizShowcaseTonAktuell=-1;
         // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): Zaehler fuer die X-Wand dieses
         // Acts, s. Kante "frisch enthuellt" unten.
         u.vizXWand=0; u.vizXFlutSeit=null;
@@ -22958,12 +23168,16 @@
       // Nachleuchten der Requisite/Pose beim naechsten Auftritt eines anderen). Kein rr(),
       // reine Ableitung aus u.vizAct/BAU/istHeiler()/u.lunge (alles erlaubte Lesequellen).
       const istAktiv=(u===aktiver);
-      // AUFTRITTS-JINGLE (TON_KATALOG.showcase.auftritt, PR S3): feuert an der Kante
-      // "wird aktiv" -- also genau EINMAL je Teilnehmer, sobald `showcaseAktiver()` ihn
-      // zum ersten Mal liefert (vor der allerersten Enthuellung zaehlt bereits der erste
+      // AUFTRITTS-JINGLE (TON_KATALOG.showcase.auftritt, PR S3): feuert an der STEIGENDEN
+      // FLANKE "wird aktiv" (vor der allerersten Enthuellung zaehlt bereits der erste
       // Warteschlangeneintrag als aktiv, s. showcaseAktiver()-Kommentar, deshalb feuert der
       // Jingle fuer den allerersten Performer schon im allerersten stepShowcase()-Frame).
-      if(istAktiv && !u.vizAuftrittTon){ u.vizAuftrittTon=true; sfx("showcase","auftritt"); }
+      // Mit S-F1 (Paket 1, 30.09., s. vizWarAktiv-Kommentar oben) feuert er je Act zweimal:
+      // einmal beim kurzen Casting-Durchgang, ein zweites Mal beim Wiedereintritt in die
+      // Mitte fuer die Show -- im echten Talentshow-Bild zwei getrennte Auftritte, zwei
+      // Fanfaren.
+      if(istAktiv && !u.vizWarAktiv)sfx("showcase","auftritt");
+      u.vizWarAktiv=istAktiv;
       const b=BAU[u.n]||BAU_STD;
       u.vizWaffe=(istAktiv&&(u.vizAct==="kampfkunst"||u.vizAct==="schuetzenkunst"))?b.waffe:undefined;
       // FEHLZUENDER BEI "VERPATZT" (Konzept Abschnitt 3.1: "Bei 'verpatzt' ein kurzer
@@ -23494,8 +23708,24 @@
   // und die Tafel selbst niemals unterschiedliche Fuehrende zeigen koennen. Reine
   // Ableseung von `u.summe`/`side`, keine neue Formel.
   function kuerZwischenstandZeilen(gruppen,aktiv){
+    // E-F1 (Paket 1, 30.09.): "gelaufen" war `i<=aktiv` -- eine reine Positions-Annahme, die
+    // voraussetzte, dass jedes Paar GENAU EINMAL auftritt und die Paare streng der Reihe
+    // nach (Index 0,1,2,...) besucht werden. Seit die Kuer-Startreihenfolge aus dem
+    // Kurzprogramm-Zwischenstand kommt (aufsteigend, s. bauBuehne()), kann ein Paar mit
+    // NIEDRIGEM Index seine Kuer SPAETER laufen als eines mit hohem Index -- `i<=aktiv`
+    // wuerde dann faelschlich "schon fertig" fuer ein Paar zeigen, das seine Kuer noch gar
+    // nicht begonnen hat. Der robuste Ersatz fragt den ZUSTAND statt der Position: "hat
+    // dieses Paar ueberhaupt schon eine Enthuellung gehabt" (`u.aktuell>=0`). Fuer den alten
+    // Einzelblock-Fall (jede andere Buehnen-Disziplin, und Eiskunstlauf vor E-F1) ist das
+    // exakt dieselbe Menge wie `i<=aktiv`, weil dort "schon dran gewesen" und "Index<=aktiv"
+    // zusammenfallen (Gruppen werden dort streng der Reihe nach besucht) -- unveraendertes
+    // Verhalten. Fuer E-F1s zwei Besuche bleibt es richtig: ein Paar zaehlt ab seinem ERSTEN
+    // Kurzprogramm-Element als "gelaufen" (zeigt ab da seine laufend wachsende Punktsumme)
+    // und bleibt es ueber die Wartezeit vor der Kuer hinweg -- genau das Verhalten, das
+    // "PLATZ n nach dem Kurzprogramm" (E-B3-Plakette, s. zeichneDuett()) jetzt braucht, ohne
+    // eine eigene neue Plakette schreiben zu muessen.
     const zeilen=gruppen.map((grp,i)=>({
-      grp, i, gelaufen:i<=aktiv,
+      grp, i, gelaufen:grp.some(u=>(u.aktuell??-1)>=0),
       pkt:grp.reduce((s,u)=>s+(u.summe||0),0),
       side:grp[0].side
     }));
@@ -42690,6 +42920,40 @@
       return {ziel:z?{id:z.id,n:z.n,seite:z.side}:null, sperre:+KFOKUS_CD.toFixed(2),
         folgen:z?U.filter(a=>!a.down&&a.side===0&&a.tgt===z).length:0}; },
     namenVon:(dId)=>{const M=MOTOREN[dId]; if(!M)return []; const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337); const namen=M.namen(); M.zurueck(g); return namen;},
+    // STARTREIHENFOLGE-SONDE (Paket 1, 30.09., E-F1/S-F1): zerlegt `buehneQueue` in
+    // zusammenhaengende BESUCHE (ein Besuch = eine ununterbrochene Folge von Enthuellungen
+    // desselben Teilnehmers bzw. -- bei Eiskunstlauf -- desselben Paares, dasselbe Prinzip
+    // wie kuerBesuchsliste() weiter oben) und gibt sie in genau der Reihenfolge zurueck, in
+    // der `bauBuehne()` sie angelegt hat. Vor E-F1/S-F1 hatte jeder Teilnehmer GENAU EINEN
+    // Besuch (die ganze alte "Startreihenfolge nach Eignung"); mit ihnen hat ein Eiskunstlauf-
+    // Paar zwei (Kurzprogramm, dann die neu geordnete Kuer) und ein Showcase-Act zwei
+    // (Casting, dann die neu geordnete Show) -- genau das macht diese Sonde sichtbar. Reine
+    // Diagnose fuer die Playwright-Abnahme (verify-buehne-startreihenfolge-paket1-...mjs),
+    // dasselbe Sicher/Bauen/Zuruecksetzen-Muster wie namenVon direkt darueber, kein rr(),
+    // kein Gameplay-Zugriff, keine Wirkung auf einen laufenden Spielstand.
+    buehneReihenfolge:(dId,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[dId])return null;
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat||1337);
+      const besuche=[]; let i=0;
+      while(i<buehneQueue.length){
+        const u=buehneQueue[i];
+        if(!u){ i++; continue; }
+        const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+        const mitglieder=partner?[u,partner]:[u];
+        const ids=new Set(mitglieder.map(x=>x.id));
+        let j=i; while(j<buehneQueue.length && buehneQueue[j] && ids.has(buehneQueue[j].id))j++;
+        besuche.push({
+          namen:mitglieder.map(x=>x.n), seite:u.side,
+          eig:Math.round(mitglieder.reduce((s,x)=>s+(x.eig||0),0)/mitglieder.length*100)/100,
+          laenge:j-i
+        });
+        i=j;
+      }
+      M.zurueck(g);
+      return besuche;
+    },
     // AUFGABE-1-ABNAHME: reine Diagnose (kein Gameplay-Zugriff) — die Sub-Skill-Werte
     // (u.AUFBAU/SCHUSS_NAH/SCHUSS_FERN/...) einer frisch gebauten Feldspiel-Aufstellung,
     // damit sich von aussen pruefen laesst, dass SCHUSS_NAH/SCHUSS_FERN tatsaechlich
