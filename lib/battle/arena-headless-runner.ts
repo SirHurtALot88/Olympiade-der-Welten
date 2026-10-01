@@ -269,6 +269,23 @@ export type ArenaFixtureBoxscoreEintrag = {
   torwart?: boolean;
 };
 
+/**
+ * "SPIEL DES TAGES" — DREI MOMENTE (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md
+ * Abschnitt 2.1, Klasse A): direktes Passthrough von `window.__arena.spieleFeldspiel()`s neuem
+ * `momente`-Feld (s. `berechneFeldspielMomente()`, battle-mode.engine.js) — reine Nachlese aus dem
+ * Ereignisprotokoll des bereits gelaufenen Fixtures, kein neuer `rr()`-Wurf. `teamId` ersetzt hier
+ * das rohe `seite` (0/1) des Motors, aufgeloest ueber `fixture.homeTeamId`/`awayTeamId` -- derselbe
+ * Grund, aus dem `ArenaFixtureBoxscoreEintrag.side` schon "home"/"away" statt 0/1 traegt. `null` nur
+ * dann, wenn der Motor fuer diesen Moment keinen Spieler nennen konnte (sollte an einem echten
+ * Fixture nicht vorkommen, s. Motor-Kommentar). NUR fuer das Feldspiel-Chassis gesetzt -- jedes
+ * andere Chassis (Buehne/Bahn) liefert dieses Feld nie, weil nur `spieleFeldspiel()` es befuellt.
+ */
+export type ArenaMomentEintrag = {
+  typ: "fuehrungswechsel" | "fuehrungswechselEntscheidend" | "entscheidend" | "turnover";
+  teamId: string | null;
+  spieler: string | null;
+};
+
 export type ArenaFixtureResult = {
   homeTeamId: string;
   awayTeamId: string;
@@ -282,6 +299,8 @@ export type ArenaFixtureResult = {
    * `undefined` fuer jedes Feldspiel-Chassis (Basketball) — unveraendertes Verhalten dort.
    */
   gesamtKg?: [number, number];
+  /** S. `ArenaMomentEintrag` — nur fuer das Feldspiel-Chassis gesetzt, sonst `undefined`. */
+  momente?: ArenaMomentEintrag[];
 };
 
 /**
@@ -423,11 +442,15 @@ function bereiteFixturesVor(
  * wenn `false` (s. battle-mode.engine.js, `spieleFeldspiel()`) -- deshalb optional hier.
  */
 type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean };
+/** Rohform von `ArenaMomentEintrag` vor der `teamId`-Aufloesung (s. dort): `seite` ist hier noch 0/1. */
+type RoherBrowserMomentEintrag = { typ: ArenaMomentEintrag["typ"]; seite: 0 | 1; spieler: string | null };
 type RoherBrowserFixtureErgebnis = {
   disziplin: string;
   seiten: [number, number];
   boxscore: RoherBrowserBoxscoreEintrag[];
   gesamtKg?: [number, number];
+  /** Nur fuer `spieleFeldspiel()` gesetzt, s. `ArenaMomentEintrag`. */
+  momente?: RoherBrowserMomentEintrag[];
 };
 
 /**
@@ -663,12 +686,20 @@ export async function runArenaFixtures(
           torwart: !!eintrag.torwart,
         };
       });
+      // "SPIEL DES TAGES" (Task #31 Paket 1, s. `ArenaMomentEintrag`): `seite` 0/1 wird hier,
+      // genau wie `side` bei der Boxscore oben, auf die echte `teamId` dieses Fixtures aufgeloest.
+      const momente: ArenaMomentEintrag[] | undefined = ergebnis.momente?.map((moment) => ({
+        typ: moment.typ,
+        teamId: moment.seite === 0 ? vorbereitet[index].homeTeamId : vorbereitet[index].awayTeamId,
+        spieler: moment.spieler,
+      }));
       return {
         homeTeamId: vorbereitet[index].homeTeamId,
         awayTeamId: vorbereitet[index].awayTeamId,
         seiten: ergebnis.seiten,
         boxscore,
         ...(ergebnis.gesamtKg ? { gesamtKg: ergebnis.gesamtKg } : {}),
+        ...(momente ? { momente } : {}),
       };
     });
   } finally {

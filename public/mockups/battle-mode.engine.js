@@ -9998,6 +9998,98 @@
     fsZeiger=fsZuege.length;
   }
 
+  // "SPIEL DES TAGES" — DREI MOMENTE (Fable-Konzeptpapier docs/design/fable-ideen-feldspiel-
+  // 30-09.md, Abschnitt 2.1, Task #31 Paket 1; hier bewusst NUR dieser Teil umgesetzt, s.
+  // PR-Beschreibung fuer die Begruendung, warum der zweite Teil des Papiers -- eine spaeter
+  // nachgespielte, Sekunde-fuer-Sekunde-identische Bild-Wiederholung -- NICHT gebaut wurde).
+  //
+  // KLASSE A, REINE NACHLESE: liest ausschliesslich `fsZuege` (das Ereignisprotokoll), das der
+  // bereits gelaufene `M.lauf()`-Durchgang in `spieleFeldspiel()` ohnehin vollstaendig
+  // geschrieben hat, bevor diese Funktion aufgerufen wird -- kein `rr()`, kein neuer Zustand,
+  // keine zweite Simulation, keine Aenderung an `fsPunkte`/`wert()`/`feldspielWert()`. Exakt das
+  // Muster, das `kuerBerechneReplay()` (Eiskunstlauf, PR #1103) fuer dieselbe Klasseneinstufung
+  // vormacht: bereits enthuellte/berechnete Ereignisse werden nur noch ausgewaehlt und erzaehlt,
+  // nicht neu gewuerfelt.
+  //
+  // WARUM KEIN "WIRKLICHER" REPLAY (das Papier selbst, nicht belastbar gepruefte Annahme "es ist
+  // woertlich dieselbe Simulation"): zwei am Code nachgemessene Gruende, beide vom Papier selbst
+  // als "nicht gelesen" offengelassen.
+  //   1. `buildArenaTeam()`/`buildArenaAufstellungBeide()` (arena-kader-adapter.ts /
+  //      arena-aufstellung-adapter.ts) lesen den AKTUELLEN Spielstand, keine zum Spieltag
+  //      eingefrorene Kopie -- ein spaeter erneut mit demselben Seed gestarteter Lauf wuerde nach
+  //      einer Verletzung, einem Transfer oder einem Attributsprung einen ANDEREN Kader
+  //      simulieren und damit ein anderes Ergebnis zeigen als das gebuchte.
+  //   2. Hockeys `ZEIT_DEHNUNG.hockey=2` (reine Sendezeit-Streckung fuer den interaktiven
+  //      `loop()`) liesse `stepSim()` beim Nachspielen mit halbiertem `dt` je Tick laufen statt
+  //      mit dem festen 1/60, das `M.lauf()`/die Headless-Wertung nutzen -- andere `dt`-Folge,
+  //      andere `rr()`-Ziehungen, ein anderer Spielverlauf fuer dieselbe Saat.
+  // Beides liesse sich beheben (eingefrorene Attribut-Boegen, ein eigener dt=1/60-Treiber ohne
+  // ZEIT_DEHNUNG), ist aber neue Architektur, keine reine Anzeige -- und genau dafuer sagt der
+  // Auftrag "falls unklar ist, ob es nur Anzeige ist, BAUE ES NICHT".
+  //
+  // AUSWAHL (bewusst einfach und ohne Punktezahl, s.u.):
+  //   Fuehrungswechsel  -> der ERSTE "treffer"-Zug, der eine Seite erstmals in Fuehrung bringt.
+  //   Entscheidend      -> der LETZTE Fuehrungswechsel zugunsten der Seite, die laut `finaleSeiten`
+  //                        (der echten `fsPunkte`-Endzaehlung, NICHT der hier genaeherten Zaehlung)
+  //                        tatsaechlich gewinnt. Bei Unentschieden gibt es keinen.
+  //   Turnover          -> der Ballverlust unmittelbar VOR diesem Treffer (sonst der letzte
+  //                        Ballverlust des Spiels); "turnover" (Basketball-Fehlpass) und "steal"
+  //                        (Basketball/Football/Hockey-Stoerung) zaehlen gleichermassen.
+  // Faellt der entscheidende Treffer mit dem ersten Fuehrungswechsel zusammen (eine Seite fuehrt
+  // von da an durch), werden beide zu EINEM Moment zusammengefasst statt denselben Zug zweimal zu
+  // nennen.
+  //
+  // KEINE PUNKTEZAHL IN DER AUSGABE: `fsZuege` erfasst nicht jeden Punktzuwachs (Footballs
+  // Extra-Punkt haengt `fsPunkte` hoch, ruft aber nie `logZug()` auf, s. Kommentar bei
+  // `updateHudFeldspiel()`, "GEPRUEFT, F1-BROADCAST-AUDIT RUNDE 2") -- eine aus `fsZuege`
+  // nachgerechnete laufende Punktzahl koennte deshalb vom echten Endstand abweichen. Diese
+  // Funktion nennt deshalb nur WER und WAS, nie eine Zwischenpunktzahl.
+  function berechneFeldspielMomente(zuege,finaleSeiten){
+    const naeherung=[0,0];
+    let fuehrung=null;
+    const fuehrungswechsel=[];
+    for(let i=0;i<zuege.length;i++){
+      const z=zuege[i];
+      if(z.art!=="treffer"||typeof z.punkte!=="number")continue;
+      naeherung[z.seite]+=z.punkte;
+      const neu=naeherung[0]===naeherung[1]?null:(naeherung[0]>naeherung[1]?0:1);
+      if(neu!==null&&neu!==fuehrung)fuehrungswechsel.push({idx:i,zug:z,seite:neu});
+      fuehrung=neu;
+    }
+    const momente=[];
+    if(fuehrungswechsel.length){
+      const erster=fuehrungswechsel[0];
+      momente.push({typ:"fuehrungswechsel",seite:erster.seite,spieler:erster.zug.spieler?.n??null});
+    }
+    const gewinner=finaleSeiten[0]===finaleSeiten[1]?null:(finaleSeiten[0]>finaleSeiten[1]?0:1);
+    let entscheidend=null;
+    if(gewinner!=null){
+      for(let i=fuehrungswechsel.length-1;i>=0;i--){
+        if(fuehrungswechsel[i].seite===gewinner){ entscheidend=fuehrungswechsel[i]; break; }
+      }
+    }
+    if(entscheidend&&fuehrungswechsel.length&&entscheidend.idx===fuehrungswechsel[0].idx){
+      // Derselbe Zug wie der Fuehrungswechsel oben -- nicht doppelt nennen, nur umbenennen.
+      momente[0].typ="fuehrungswechselEntscheidend";
+    } else if(entscheidend){
+      momente.push({typ:"entscheidend",seite:entscheidend.seite,spieler:entscheidend.zug.spieler?.n??null});
+    }
+    const istTurnover=(z)=>z.art==="turnover"||z.art==="steal";
+    let turnoverZug=null;
+    const suchGrenze=entscheidend?entscheidend.idx:zuege.length;
+    for(let i=suchGrenze-1;i>=0;i--){ if(istTurnover(zuege[i])){ turnoverZug=zuege[i]; break; } }
+    if(!turnoverZug){
+      for(let i=zuege.length-1;i>=0;i--){ if(istTurnover(zuege[i])){ turnoverZug=zuege[i]; break; } }
+    }
+    if(turnoverZug){
+      // "steal" traegt die Seite des STOERENDEN Verteidigers, nicht die des Ballverlierers --
+      // bei "turnover" (Basketball-Fehlpass) ist `seite` bereits die Seite des Verlierers.
+      const verliererSeite=turnoverZug.art==="steal"?1-turnoverZug.seite:turnoverZug.seite;
+      momente.push({typ:"turnover",seite:verliererSeite,spieler:turnoverZug.spieler?.n??null});
+    }
+    return momente;
+  }
+
   // Wie offen EIN Mitspieler fuer einen Pass VON `von` ist: sein eigener Deckerabstand
   // (naeher dran = weniger offen) MAL ein Abschlag, falls irgendein Verteidiger nah an
   // der geraden Passlinie zwischen `von` und ihm steht (distZuLinie existiert bereits
@@ -43360,8 +43452,12 @@
       const torwartNamen=new Set([...FSTEAM[0],...FSTEAM[1]].filter(u=>u.torwart).map(u=>u.n));
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0,...(torwartNamen.has(n)?{torwart:true}:{})}));
       const seiten=[fsPunkte[0],fsPunkte[1]];
+      // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A, s. Kommentar bei
+      // berechneFeldspielMomente() oben): VOR M.zurueck(), das `fsZuege` auf den Stand vor
+      // diesem Aufruf zuruecksetzt -- die Nachlese muss das Protokoll DIESES Laufs lesen.
+      const momente=berechneFeldspielMomente(fsZuege.slice(0,fsZeiger),seiten);
       M.zurueck(g);
-      return {disziplin:fd, seiten, boxscore};
+      return {disziplin:fd, seiten, boxscore, momente};
     },
     // BATTLEFIELD-DOMINATION-PROBE: dasselbe "ein Spiel, ein Ergebnis"-Muster wie
     // spieleFeldspiel() direkt darueber, hier fuer den Kontrollpunkt-Sieg (ARENA_DOMINATION).
