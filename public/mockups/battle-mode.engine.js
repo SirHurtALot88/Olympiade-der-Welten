@@ -27577,7 +27577,10 @@
   // letzte Chance) besser als "sucht den Doppeltreffer" (noch Zeit fuer einen Ausgleich).
   function fechtPeriodenSatz(seite0,seite1,periode,rundenN){
     const t0=seite0.treffer, t1=seite1.treffer||0;
-    const naechste=periode+1, letztePeriode=naechste>=3;
+    // Gesamtzahl Perioden aus rundenN abgeleitet (proPeriode=rundenN/3, s. "PERIODE BEENDET"-
+    // Kommentar oben), NICHT hartcodiert auf 3 -- falls rundenN sich je aendert, bleibt der
+    // Anker-Fall korrekt erkannt.
+    const naechste=periode+1, letztePeriode=naechste>=(rundenN/3);
     if(t0===t1)return " "+seite0.n.split(" ")[0]+" und "+seite1.n.split(" ")[0]+" stehen vor Periode "+naechste+" ausgeglichen.";
     const fuehrt=t0>t1?seite0:seite1, zurueck=t0>t1?seite1:seite0;
     return letztePeriode
