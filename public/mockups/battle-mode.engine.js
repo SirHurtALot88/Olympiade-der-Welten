@@ -27616,8 +27616,24 @@
       const gleichePeriode=buendel.every(x=>x.periode===buendel[0].periode);
       const kurz=buendel.map(x=>x.seite0.n.split(" ")[0]+" "+x.seite0.treffer+":"+(x.seite1.treffer||0)
         +" "+x.seite1.n.split(" ")[0]).join(", ");
+      // F-F4 IM SAMMELBANNER: bei Fechten kommen alle sechs Bahnen praktisch IMMER im selben
+      // Fenster an (REIHENFOLGE-Warteschlange laesst Runde ri aller Bahnen vor Runde ri+1
+      // enthuellen, s. Kopfkommentar des Sammelbanners oben) -- der Einzelbahn-Zweig
+      // (buendel.length===1) oben greift deshalb in der Praxis selten. Damit F-F4s Satz
+      // trotzdem sichtbar wird, bekommt die Bahn mit dem GROESSTEN Trefferabstand (die
+      // dramatischste dieser Periode) ihren eigenen Satz angehaengt -- nur bei gleicher
+      // Periodennummer ueber das ganze Buendel (sonst waere "Periode N" mehrdeutig).
+      let satz="";
+      if(gleichePeriode){
+        let auffaelligste=buendel[0],abstand=-1;
+        for(const x of buendel){
+          const d=Math.abs(x.seite0.treffer-(x.seite1.treffer||0));
+          if(d>abstand){abstand=d;auffaelligste=x;}
+        }
+        satz=fechtPeriodenSatz(auffaelligste.seite0,auffaelligste.seite1,auffaelligste.periode,auffaelligste.rundenN);
+      }
       feed(0,(gleichePeriode?"Periode "+buendel[0].periode+" beendet":"Periodenende")
-        +" — "+buendel.length+" Bahnen entschieden: "+kurz+".",true,undefined,"zwischenstand");
+        +" — "+buendel.length+" Bahnen entschieden: "+kurz+"."+satz,true,undefined,"zwischenstand");
     }
   }
 
