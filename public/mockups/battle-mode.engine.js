@@ -18363,6 +18363,44 @@
     else if(r.gueltig)teamFeierAusloesen(u.side,"klein",null);
   }
 
+  // SICHTBARER ZWEIKAMPF (F1-Broadcast-Audit Runde 2, 30.09., Punkt 2: "Gewichtheben verraet
+  // das Ergebnis vor dem Start"). `u.summe` ist bei Gewichtheben schon ab baueHebenDuelle()
+  // der FERTIGE Zweikampf (s. dort -- und so muss es bleiben, MOTOREN[...].wert() und damit die
+  // Rangtreue lesen genau diese Zahl; stepBuehne() zaehlt sie fuer Heben bewusst nicht auf).
+  // Kaderleiste (#kmitte, Kachelzahl, Kachelbalken) und die Team-Balken ueber dem Canvas
+  // lasen sie aber direkt und zeigten damit die Endwerte aller zwoelf Heber schon im Einlauf
+  // (Audit Bild 05, Tabelle 6.3: "0 : 0 / 2244 : 1812" vor dem ersten Versuch).
+  //
+  // Diese Funktion ist die ANZEIGE-Fassung derselben Groesse: bestes gueltiges Reissen plus
+  // bestes gueltiges Stossen, aber nur aus Versuchen, deren URTEIL schon gezeigt ist -- also
+  // derselbe Lampen-Moment wie hebenFeierAmUrteil()/hebenDuellEntschieden(u,true): ein frisch
+  // enthuellter Versuch zaehlt erst, wenn stepHeben() ihn aus "antritt"/"zug" entlassen hat
+  // (Spoiler-Regel: Kampfrichterlampe, Versuchstafel, Team-Feier und jetzt auch die Kaderleiste
+  // schalten im selben Frame). Nach `done` gilt wie dort nur die Enthuellung.
+  // NULLWERTUNG, sobald sie feststeht: ist eine Uebung mit allen ihren Versuchen gezeigt und
+  // keiner war gueltig, steht der Heber bei 0 -- dieselbe Regel wie `u.nullwertung` in
+  // baueHebenDuelle(), nur zum Zeitpunkt, an dem sie der Zuschauer kennt.
+  // Am Ende (alle Versuche gezeigt) ist das Ergebnis damit identisch mit `u.summe`: die Lasten
+  // steigen nach einem gueltigen Versuch strikt (lastFuer(): mindestens beste+1), das Maximum
+  // der gueltigen Versuche ist also genau besteReissen/besteStossen.
+  // Reine Anzeige: liest nur u.aktuell/u.runden/u.vizPhase/done, schreibt nichts, kein rr().
+  function hebenSichtbareSumme(u){
+    if(!u||!u.runden)return 0;
+    let n=Math.max(0,Math.min(u.runden.length,u.aktuell+1));
+    if(n>0&&!done&&(u.vizPhase==="antritt"||u.vizPhase==="zug"))n--;
+    const beste={reissen:0,stossen:0}, gezeigt={reissen:0,stossen:0}, gesamt={reissen:0,stossen:0};
+    u.runden.forEach((r,i)=>{
+      if(!r||!(r.uebung in gesamt))return;
+      gesamt[r.uebung]++;
+      if(i>=n)return;
+      gezeigt[r.uebung]++;
+      if(r.gueltig&&r.kg>beste[r.uebung])beste[r.uebung]=r.kg;
+    });
+    for(const ue of ["reissen","stossen"])
+      if(gesamt[ue]>0&&gezeigt[ue]>=gesamt[ue]&&beste[ue]<=0)return 0;
+    return Math.round(beste.reissen+beste.stossen);
+  }
+
   // ================== ZIEL 5: SPEED-SCHACH BEWEGT SICH (stepSchach) ==================
   // Opus-Plan "opus-plan-zehn-disziplinen-alle-kategorien-09-10.md" Abschnitt 5.1 (Platz 5,
   // Movement 80 -> 95, M2+M4). Vierter Zweig in buehnenBewegung() (:art.schach-Gate, PR 0.3
@@ -19170,9 +19208,13 @@
       document.getElementById("thpL").style.width=(frac(0)*100)+"%";
       document.getElementById("thpR").style.width=(frac(1)*100)+"%";
     } else {
-      const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+      // GEWICHTHEBEN (Broadcast-Audit Runde 2, Punkt 2): die Team-Balken standen aus dem
+      // fertigen `summe` schon im Einlauf auf ihrem Endstand (z. B. 69 % gegen 55 %) --
+      // derselbe Spoiler wie in der Kaderleiste, dieselbe Anzeige-Fassung als Abhilfe.
+      const sw=BB().heben?hebenSichtbareSumme:(u=>u.summe);
+      const maxSumme=Math.max(1,...TEILNEHMER.map(sw));
       const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
-        return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+        return g.length?g.reduce((a,u)=>a+sw(u),0)/(g.length*maxSumme):0;};
       document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
       document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
     }
@@ -39013,10 +39055,18 @@
             // Rennens `x.pos` (0..1, die tatsaechlich erreichte Streckenstelle); nur ein
             // echter Finisher bekommt weiterhin den vollen Balken.
             fortschritt:(x.fertig!=null&&!x.raus)?1:Math.max(0,Math.min(1,x.pos))}))
-        :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
-          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),
-          leiste:{wert:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe)),wort:"Punkte",
-                  zusatz:Math.round(x.summe*10)/10+""}}))
+        // GEWICHTHEBEN: der bisher GEZEIGTE Zweikampf statt des vorab feststehenden `summe`
+        // (Broadcast-Audit Runde 2, Punkt 2, s. hebenSichtbareSumme()) -- fuer Zahl, Balken
+        // UND Balken-Massstab, sonst verriete schon die Balkenlaenge relativ zum (fertigen)
+        // Maximum das Ergebnis. Jede andere Buehne liest unveraendert `summe`.
+        :istBuehne(disc)?(()=>{
+          const kw=BB().heben?hebenSichtbareSumme:(y=>y.summe);
+          const kmax=Math.max(1,...TEILNEHMER.map(kw));
+          return TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
+            hp:kw(x),max:kmax,
+            leiste:{wert:kw(x),max:kmax,wort:BB().heben?"kg Zweikampf bisher":"Punkte",
+                    zusatz:Math.round(kw(x)*10)/10+""}}));
+        })()
         :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,id:x.id,
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
@@ -39202,9 +39252,12 @@
       ? (BB().wettessen
         ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0)))
+        // PUNKT 2 (derselbe Audit): nicht `x.summe` (der fertige Zweikampf, steht ab dem
+        // Einlauf fest), sondern der bis zur letzten gezeigten Lampe aufgebaute Wert, s.
+        // hebenSichtbareSumme(). Startet bei "KG 0 : 0" und waechst Versuch fuer Versuch.
         : BB().heben
-        ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
-           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+        ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+hebenSichtbareSumme(x),0))+" : "+
+           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+hebenSichtbareSumme(x),0)))
         : BB().gauntlet
         ? ("PKT "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
