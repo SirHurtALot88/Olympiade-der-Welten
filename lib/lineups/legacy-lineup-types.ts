@@ -153,6 +153,12 @@ export type LegacyLineupEntryScore = {
   captainBonus?: number | null;
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
+  /**
+   * MUTATOR ORGANISCH (29.09.): Trefferzahl dieses Spielers gegen den Spieltagswurf (0/1/2),
+   * unabhaengig davon, ob der Treffer als flacher Bonus (`mutatorBonus`/`mutatorPpsBonus`) oder —
+   * im Battle-Arena-Pfad — als Attributbonus IN der Simulation gewirkt hat.
+   */
+  mutatorHits?: number | null;
   formShare?: number | null; // pro Spieler angewandter Form-Anteil (flacher Kartenwert + Jitter)
   /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
   intensityShare?: number | null;

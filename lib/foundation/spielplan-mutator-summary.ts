@@ -15,8 +15,8 @@ import {
  *   Resolve-Engine über `buildMatchdayMutatorTraitsBySide` nutzt. Die Labels
  *   stehen damit auch für zukünftige Spieltage fest (kein Zufall zur Laufzeit).
  * - Treffer: die GESPEICHERTEN `playerDisciplinePerformances` der applied
- *   Matchday-Results (`mutatorScoreBonus`, +6 je Treffer laut
- *   `calculateMutatorModifierForSide`) — also das, was wirklich gewertet wurde,
+ *   Matchday-Results (`mutatorHits`, seit 29.09.; aeltere Zeilen ueber
+ *   `mutatorScoreBonus`, +6 je Treffer laut `calculateMutatorModifierForSide`) — also das, was wirklich gewertet wurde,
  *   keine Nachrechnung, die bei Engine-Änderungen driften könnte. Gezählt sind
  *   dadurch automatisch nur AUFGESTELLTE Spieler (die Engine iteriert nur über
  *   `input.entries`; Bankspieler bekommen nie einen Bonus) — das ist korrekt so.
@@ -90,8 +90,15 @@ export function buildSpielplanMutatorSummaries(input: {
     if (!matchdayId) {
       continue;
     }
+    // MUTATOR ORGANISCH (29.09.): die gespeicherte Trefferzahl hat Vorrang. Im Battle-Arena-Pfad
+    // ist `mutatorScoreBonus` 0 (der Treffer wirkt dort als Attributbonus in der Simulation, nicht
+    // als +6), ein Treffer waere ueber den Bonus allein unsichtbar. Aeltere Zeilen ohne das Feld
+    // fallen auf den bisherigen Weg Bonus/6 zurueck.
     const bonus = performance.mutatorScoreBonus ?? 0;
-    if (!(bonus > 0)) {
+    const gespeicherteTreffer =
+      typeof performance.mutatorHits === "number" && Number.isFinite(performance.mutatorHits) ? performance.mutatorHits : null;
+    const hits = gespeicherteTreffer ?? (bonus > 0 ? Math.max(1, Math.round(bonus / 6)) : 0);
+    if (!(hits > 0)) {
       continue;
     }
     const key = `${matchdayId}::${performance.disciplineId}`;
@@ -99,8 +106,7 @@ export function buildSpielplanMutatorSummaries(input: {
     bucket.push({
       playerId: performance.playerId,
       teamId: performance.teamId,
-      // +6 Score je Treffer (calculateMutatorModifierForSide) → Bonus/6 = Trefferzahl.
-      hits: Math.max(1, Math.round(bonus / 6)),
+      hits,
     });
     hitRowsByKey.set(key, bucket);
   }

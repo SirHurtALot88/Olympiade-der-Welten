@@ -9,6 +9,7 @@ import {
   resolveEffectiveLineupModifiers,
   calculateMutatorModifierForSide,
   buildMatchdayMutatorTraitsBySide,
+  toBattleArenaOrganicMutatorResult,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
@@ -490,7 +491,17 @@ export function buildLegacyMatchdayResolvePreview(
             playerCount: sideEntries.length,
             formCards: context.formCards ?? [],
           });
-          const mutatorResult =
+          // MUTATOR ORGANISCH IM BATTLE-MODUS (29.09., lib/battle/battle-mutator-organisch.ts):
+          // simuliert die Arena-Engine das Ergebnis DIESES Teams in DIESER Disziplin (Battle-Save
+          // UND ein Arena-Override fuer genau dieses Team), ist der Mutator dort schon als
+          // Attributbonus ins Spiel eingegangen. Der flache +6/+0,3-Nachschlag entfaellt dann
+          // (Chris: "ja genau das soll das ersetzen"), die Trefferzahl bleibt. Kein Override ->
+          // unveraendert: Manager-Modus, die fuenf nicht simulierten Battle-Disziplinen und ein
+          // Team, dessen Arena-Lauf ausgefallen ist (PPS-Rueckfall ohne Simulation).
+          const arenaSimuliertDieseSeite =
+            isBattleModeArenaEligible &&
+            (resolveOptions.arenaTeamPointsByDisciplineId?.get(meta.disciplineId)?.has(context.team.id) ?? false);
+          const rohMutatorResult =
             resolveOptions.modifierMode === "mvp_forced_mutators"
               ? calculateMvpForcedMutatorModifierForSide({
                 disciplineId: meta.disciplineId,
@@ -506,6 +517,9 @@ export function buildLegacyMatchdayResolvePreview(
                   rosterPlayers: context.rosterPlayers,
                   matchdayMutatorTraits: matchdayMutatorTraitsBySide[meta.disciplineSide],
                 });
+          const mutatorResult = arenaSimuliertDieseSeite
+            ? toBattleArenaOrganicMutatorResult(rohMutatorResult)
+            : rohMutatorResult;
           const effectiveMutatorModifier =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
           const effectiveMutatorBonuses = context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
@@ -552,6 +566,8 @@ export function buildLegacyMatchdayResolvePreview(
             mutatorSlots: context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorSlots : [],
             mutatorBonusByPlayerId: effectiveMutatorBonuses,
             mutatorPpsBonusByPlayerId: effectiveMutatorPpsBonuses,
+            mutatorHitsByPlayerId:
+              context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorHits : null,
             teamPowerSelected: teamPowerResult.teamPowerSelected,
             teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
             teamPowerLabel: teamPowerLabelWithPassive,
@@ -711,6 +727,7 @@ export function buildLegacyMatchdayResolvePreview(
           captainBonus: entry.captainBonus ?? null,
           mutatorBonus: entry.mutatorBonus ?? null,
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+          mutatorHits: entry.mutatorHits ?? null,
           formShare: entry.formShare ?? null,
           intensityShare: entry.intensityShare ?? null,
           slotRoleShare: entry.slotRoleShare ?? null,
@@ -857,6 +874,7 @@ export function buildLegacyMatchdayResolvePreview(
         captainBonus: entry.captainBonus ?? null,
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+        mutatorHits: entry.mutatorHits ?? null,
         formShare: entry.formShare ?? null,
         intensityShare: entry.intensityShare ?? null,
         slotRoleShare: entry.slotRoleShare ?? null,

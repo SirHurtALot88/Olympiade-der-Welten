@@ -11,6 +11,7 @@ import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -324,6 +325,27 @@ export default function FoundationBattleArenaHost({
     gastTeamId,
   ]);
 
+  // MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
+  // je Disziplin dieses Spieltags — dieselbe Funktion mit denselben Argumenten wie Resolve
+  // (`buildLegacyMatchdayResolvePreview`) und Spielplan (`rollMatchdayMutatorTraitsForSide`). Ohne
+  // ihn wuerfelte der eingebettete Motor selbst und zeigte Mutator-Treffer, die es an diesem
+  // Spieltag nicht gibt. Gelesen von `mutatorenFuerAktuelleDisziplin()` in battle-mode.engine.js;
+  // eine Disziplin, die an diesem Spieltag nicht gespielt wird, bekommt dort keinen Mutator.
+  const mutatorenByDisciplineId = useMemo(() => {
+    const karte: Record<string, string[]> = {};
+    const seasonId = gameState.season?.id;
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!saveId || saveId === "loading-save" || !seasonId || !matchdayId) return karte;
+    const spieltag = gameState.seasonState?.disciplineSchedule?.find((eintrag) => eintrag.matchdayId === matchdayId);
+    if (!spieltag) return karte;
+    const d1DisciplineId = spieltag.discipline1?.disciplineId ?? null;
+    const d2DisciplineId = spieltag.discipline2?.disciplineId ?? null;
+    const wurf = buildMatchdayMutatorTraitsBySide({ saveId, seasonId, matchdayId, d1DisciplineId, d2DisciplineId });
+    if (d1DisciplineId) karte[d1DisciplineId] = [...wurf.d1];
+    if (d2DisciplineId) karte[d2DisciplineId] = [...wurf.d2];
+    return karte;
+  }, [saveId, gameState.season?.id, gameState.matchdayState?.matchdayId, gameState.seasonState?.disciplineSchedule]);
+
   const keineTeams = teams.length === 0;
   // "Vollstaendig geladen, aber leer" (Team hat wirklich keinen Spieler mit Attribut-Bogen)
   // nur waehrend NICHT gerade nachgeladen wird — sonst zeigt buildArenaTeam() eine falsche
@@ -496,6 +518,8 @@ export default function FoundationBattleArenaHost({
         // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
         // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
         seedByDisciplineId: arenaSeedByDisciplineId,
+        // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
+        mutatorenByDisciplineId,
       };
       motorLiefBereitsRef.current = true;
       for (const src of huelle.scriptSrcs) {
@@ -520,7 +544,7 @@ export default function FoundationBattleArenaHost({
     return () => {
       abgebrochen = true;
     };
-  }, [gerenderterKader, huelle, teams, gameState, arenaSeedByDisciplineId, miniDmFfaTeams]);
+  }, [gerenderterKader, huelle, teams, gameState, arenaSeedByDisciplineId, mutatorenByDisciplineId, miniDmFfaTeams]);
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
   // Dependency-Array), nicht bei jedem Team-Wechsel — der raeumt sich selbst auf (s. oben).

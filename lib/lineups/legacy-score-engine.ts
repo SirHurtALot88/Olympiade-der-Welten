@@ -65,6 +65,8 @@ type ScoreSideInput = {
   mutatorSlots?: LegacyMutatorSlotEffect[] | null;
   mutatorBonusByPlayerId?: Record<string, number> | null;
   mutatorPpsBonusByPlayerId?: Record<string, number> | null;
+  /** MUTATOR ORGANISCH (29.09.): Trefferzahl je Spieler, rein zum Durchreichen (Anzeige/Spielplan). */
+  mutatorHitsByPlayerId?: Record<string, number> | null;
   teamPowerSelected?: number | null;
   teamPowerStatus?: "ready" | "missing_source";
   teamPowerLabel?: string | null;
@@ -360,6 +362,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       const mutatorBonus = roundPreviewScore(input.mutatorBonusByPlayerId?.[entry.playerId] ?? 0);
       entry.mutatorBonus = mutatorBonus;
       entry.mutatorPpsBonus = roundPreviewScore(input.mutatorPpsBonusByPlayerId?.[entry.playerId] ?? 0);
+      entry.mutatorHits = input.mutatorHitsByPlayerId?.[entry.playerId] ?? 0;
       entry.finalContribution =
         entry.finalContribution == null ? null : roundPreviewScore((entry.finalContribution ?? 0) + mutatorBonus);
       entry.score = entry.finalContribution;

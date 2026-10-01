@@ -1,5 +1,18 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Dreizehnter Nachtrag 29.09. — Mutator organisch (Battle-Modus), rho-Probe misst jetzt mit
+Mutatoren.** Seit `docs/design/mutator-trait-organische-performance-konzept-29-09.md` (Abschnitt 11)
+zieht `disziplinProbe` je Spiel einen Mutator-Wurf wie im Spiel (Standard `mutatoren:"je-spiel"`,
++3,5 auf jedes Attribut je Treffer, rho gegen die Eignung **ohne** Mutator); `einflussVon` zieht je
+Lauf gepaart. Neumessung `miss-alle-disziplinen.mjs 24` (vorher = `main` direkt davor): Time-Trial
+0,929→0,923, Speed-Schach 0,906→0,898, Spurt 0,906→0,880, Staffel 0,899→0,898, Eiskunstlauf
+0,878→0,866, Takeshi 0,874→0,871, Wettessen 0,872→0,866, Showcase 0,845→0,835, Gewichtheben
+0,843→0,836, Breaking 0,833→0,808, Fechten 0,832→0,860, Tennis 0,827→0,813, Football 0,818→0,814,
+**Climbing 0,814→0,791**, Basketball 0,769→0,756, I-Spy 0,756→0,750, Hockey 0,686→0,640, TDM
+0,306→0,404, Battlefield 0,392→0,399, Mini-DM 0,394→0,321. Gepaart über sechs Saatsätze liegt
+Climbing ohne Mutator bei 0,808, mit bei 0,801 (Δ −0,007) — der Einzelsatz überzeichnet; Climbing
+steht auf der Schranke (Konzeptdokument 11.3/11.4). Pp: s. dort, Abschnitt 11.3.
+
 **Zwoelfter Nachtrag 26.09. (Abend) — komplette rho-Neumessung nach 13 gemergten PRs, erste
 vollstaendige Pp-Abweichungs-Sondierung ueber alle zwanzig Disziplinen.** Ein Container-Neustart
 hatte mehrere zuvor laufende Hintergrundmessungen unterbrochen; dieser Nachtrag setzt sie fort,

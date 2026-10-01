@@ -2593,6 +2593,14 @@ export type PlayerDisciplinePerformanceRecord = {
   finalPlayerScore: number;
   mutatorScoreBonus?: number | null;
   mutatorPpsBonus?: number | null;
+  /**
+   * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): Trefferzahl 0/1/2 gegen den
+   * Spieltagswurf. Noetig, seit im Battle-Arena-Pfad kein flacher Bonus mehr gebucht wird
+   * (`mutatorScoreBonus`/`mutatorPpsBonus` sind dort 0) — ohne dieses Feld liesse sich ein Treffer
+   * dort nicht mehr erkennen. Optional: aeltere Zeilen tragen es nicht, Leser fallen dann auf
+   * `mutatorScoreBonus / 6` zurueck (s. spielplan-mutator-summary.ts).
+   */
+  mutatorHits?: number | null;
   scoreContribution: number;
   rankInTeam: number;
   rankInDiscipline: number;
