@@ -20218,6 +20218,12 @@
   // Datei), sonst haette das zweite Showcase-Spiel einer Session nie wieder einen goldenen
   // Buzzer, weil die Sperre noch vom vorigen Spiel stuende.
   let showcaseGoldVergeben=false;
+  // ETIKETTEN (S-F2, "Buehne-Auftritt: Etiketten und Stimmen", Paket 2, 01.10., Klasse A):
+  // dasselbe "hoechstens einmal je Spiel"-Muster wie showcaseGoldVergeben direkt darueber --
+  // MUSS in reset() auf false zurueckgesetzt werden (N1-Fix-Konvention), sonst wuerde das
+  // zweite Showcase-Spiel einer Session nie wieder eine Ticker-Zeile fuer die Kategoriepreise
+  // bekommen, weil die Sperre noch vom vorigen Spiel stuende.
+  let showcaseEtikettenVergeben=false;
   // BUZZER-POSITIONEN: eigene Funktion statt Literale an zwei Stellen (bodenShowcase()
   // zeichnet das Pult, zeichneShowcase() zuendet die Reaktion darauf) -- dieselbe
   // "eine Quelle statt zweier Literale"-Regel wie posMap bei zeichneFechten().
@@ -20236,6 +20242,82 @@
   // zeichneShowcaseTop3() stattdessen eine eigene "laeuft"-Zeile.
   function showcaseTop3(){
     return showcaseFertige().slice().sort((a,b)=>(b.summe||0)-(a.summe||0)).slice(0,3);
+  }
+  // S-F2 (Bester Act je Kategorie, "Etiketten und Stimmen" Paket 2, 01.10., Klasse A):
+  // nach dem Punktesieg-Etikett-Muster aus Gewichtheben, nur reine Anzeige -- der Act
+  // (`u.vizAct`) ist bewusst NICHT Teil von `eig`/`wert()` (Konzept Abschnitt 4.1, actVon()-
+  // Kommentar), ein Kategoriepreis darauf aendert deshalb nichts an der Wertung. Gruppiert
+  // TEILNEHMER nach ihrem (bereits deterministisch gesetzten) Act, hoechste u.summe gewinnt;
+  // bei Gleichstand entscheidet derselbe Hash-statt-rr()-Weg wie actVon()s eigene
+  // Gleichstandsregel (cypherHash statt nacktem u.id, s. dortiger Kommentar). Liest nur
+  // u.vizAct/u.summe, schreibt nichts, ruft nie rr() auf.
+  function showcaseKategoriesieger(){
+    const gruppen={};
+    for(const u of TEILNEHMER){
+      if(u.vizAct==null)continue;
+      (gruppen[u.vizAct]=gruppen[u.vizAct]||[]).push(u);
+    }
+    const sieger={};
+    for(const act in gruppen){
+      const g=gruppen[act];
+      let best=-Infinity, beste=[];
+      for(const u of g){
+        const s=u.summe||0;
+        if(s>best){best=s;beste=[u];}
+        else if(s===best)beste.push(u);
+      }
+      let actSalt=0; for(let i=0;i<act.length;i++)actSalt=(actSalt*31+act.charCodeAt(i))|0;
+      sieger[act]=beste.length>1?beste[cypherHash(beste[0].id,actSalt)%beste.length]:beste[0];
+    }
+    return sieger;
+  }
+  // Alle Acts bereits enthuellt -- erst DANN steht der Kategoriepreis fest (ein frueherer
+  // Zeitpunkt wuerde einen Act bevorzugen, der nur noch nicht enthuellte Konkurrenz hat,
+  // und damit einen falschen Sieger zeigen, nicht bloss einen verfruehten). Dieselbe
+  // Spoiler-Regel wie showcaseFertige()/showcaseTop3(), nur ueber ALLE statt der besten drei.
+  function showcaseAlleFertig(){
+    return TEILNEHMER.length>0 && TEILNEHMER.every(u=>u.runden&&u.aktuell+1>=u.runden.length);
+  }
+  // S-F3 (Jury-Spruch mit Standbezug, "Etiketten und Stimmen" Paket 2, 01.10., Klasse A):
+  // deterministisch aus dem Rang unter den bereits fertigen Acts (inklusive dem soeben
+  // fertig gewordenen, s. Aufrufstelle in stepShowcase()), der Fehlschlagzahl und der Act-
+  // Kategorie; `cypherHash(u.id, ...)` waehlt wie ueberall in dieser Datei nur noch die
+  // Variante INNERHALB des einmal feststehenden Topfs, nie den Topf selbst. Liest
+  // ausschliesslich u.runden/u.summe/u.vizAct (alles bereits enthuellt), schreibt nichts,
+  // ruft nie rr() auf -- exakt derselbe Vertrag wie actVon().
+  const SHOWCASE_JURY_SPITZE=[
+    "Das war die beste Nummer des Abends — bisher.",
+    "So hat heute noch niemand die Bühne verlassen.",
+    "{Akt} vom Feinsten — das wird schwer zu toppen."
+  ];
+  const SHOWCASE_JURY_SICHER=[
+    "Du hast auf Sicherheit gespielt.",
+    "Sauber durchgezogen, kein einziges Risiko.",
+    "Eine solide {Akt}-Nummer, ohne ein einziges Wagnis."
+  ];
+  const SHOWCASE_JURY_COMEBACK=[
+    "Nach dem Anfang hätte ich nicht gedacht, dass du das noch drehst.",
+    "Schwacher Start, starkes Ende — Respekt.",
+    "{Akt} mit Schrecken begonnen, mit Applaus beendet."
+  ];
+  const SHOWCASE_JURY_NORMAL=[
+    "Das Publikum hat gesehen, was es gesehen hat.",
+    "Eine {Akt}-Nummer wie einige heute Abend.",
+    "Nicht die schlechteste Nummer des Abends, aber auch nicht die beste."
+  ];
+  function showcaseJurySpruch(u,art){
+    const fertige=showcaseFertige();
+    const rang=1+fertige.filter(x=>x!==u&&(x.summe||0)>(u.summe||0)).length;
+    const fehler=(u.runden||[]).filter(r=>r&&r.ereignis===art.failWort).length;
+    const halbe=Math.max(1,Math.ceil(fertige.length/2));
+    const pool=rang===1?SHOWCASE_JURY_SPITZE
+      :fehler===0?SHOWCASE_JURY_SICHER
+      :rang<=halbe?SHOWCASE_JURY_COMEBACK
+      :SHOWCASE_JURY_NORMAL;
+    const ACT=SHOWCASE_ACTS.find(a=>a.id===u.vizAct);
+    const txt=pool[cypherHash(u.id,pool.length+7)%pool.length]
+      .replace("{Akt}",ACT?ACT.label:"Nummer");
+    return "„"+txt+"“";
   }
   // VORHANGSAUM-FUEHRUNG (S-B3): welche Seite hat gerade die hoehere bislang enthuellte
   // Summe -- dieselbe Ablesung wie kuerEisFuehrung() fuer Eiskunstlauf, hier ueber ALLE
@@ -23262,6 +23344,13 @@
         if(u.aktuell+1>=art.rundenN){
           u.vizUrteilSeit=buehneT;
           sfx("showcase","trommel");
+          // S-F3 (Jury-Spruch mit Standbezug, "Etiketten und Stimmen" Paket 2, 01.10.,
+          // Klasse A): EIN Satz je Act, genau an dieser Kante (Act gerade fertig), ueber
+          // feed() -- kein Punkt, kein Wuerfel, s. showcaseJurySpruch()-Kommentar oben.
+          // `kind` (statt leer) erzwingt die "ereignis"-Ticker-Stufe (feed()s tickerZeigt()),
+          // damit der Spruch nicht vom Routine-Budget verschluckt wird, waehrend `big`
+          // bewusst false bleibt -- das ist Kommentar, kein Banner wie der goldene Buzzer.
+          feed(u.side,showcaseJurySpruch(u,art),false,undefined,"jurystimme");
           // S-B5 (Goldener Buzzer als Bildereignis, Prio 2, Klasse A): hoechstens EINMAL je
           // Spiel (showcaseGoldVergeben, N1-Reset s. reset()), fuer den ERSTEN Act, der (a)
           // ALLE seine Durchgaenge fehlerfrei steht UND (b) mit seiner Endsumme JEDEN bereits
@@ -23281,6 +23370,22 @@
                 sfx("showcase","goldbuzzer");
                 feed(u.side,"GOLDENER BUZZER — "+u.n+"!",true,undefined,"goldenerBuzzer");
               }
+            }
+          }
+          // S-F2 (Bester Act je Kategorie, "Etiketten und Stimmen" Paket 2, 01.10., Klasse A):
+          // erst ab dem Act, der ALLE anderen zu fertigen macht (showcaseAlleFertig()), steht
+          // der Kategoriesieger ueberhaupt fest -- ein frueherer Zeitpunkt wuerde eine noch
+          // nicht enthuellte Konkurrenz uebersehen (dieselbe Spoiler-Regel wie ueberall sonst
+          // in dieser Datei). Hoechstens EINMAL je Spiel (showcaseEtikettenVergeben, N1-Reset
+          // s. reset()) -- eine Ticker-Zeile je Kategorie mit mindestens einem Teilnehmer, die
+          // Wertungstabelle zeigt dasselbe Etikett dauerhaft (s. WERTUNG_AUFTRITT()-Spalte
+          // "etikett"). Reine Anzeige: liest nur u.vizAct/u.summe, schreibt kein Punktefeld.
+          if(!showcaseEtikettenVergeben && showcaseAlleFertig()){
+            showcaseEtikettenVergeben=true;
+            const sieger=showcaseKategoriesieger();
+            for(const A of SHOWCASE_ACTS){
+              const w=sieger[A.id];
+              if(w)feed(w.side,"Bester "+A.label+": "+w.n,false,undefined,"kategoriesieg");
             }
           }
         }
@@ -24415,6 +24520,21 @@
         ...(art.wettessen?[
           {id:"wuerstchen",kopf:"Wü", titel:"Würstchen (Anzeige-Skala aus „Pkt“, s. Fußnote)",
             wert:z=>z.u.summe?wettessenWuerstchenText(wettessenWuerstchen(z.u.summe)):null}
+        ]:[]),
+        // S-F2 (Bester Act je Kategorie, "Etiketten und Stimmen" Paket 2, 01.10., Klasse A):
+        // dieselbe Tabellenspiegelung der Ticker-Zeile (s. stepShowcase()-Kommentar
+        // "showcaseEtikettenVergeben") -- reine Anzeige, steht erst, sobald alle Acts fertig
+        // sind (showcaseAlleFertig(), dieselbe Spoiler-Regel wie "funde"/"reak" bei I-Spy
+        // unten). `art.showcase` ist der einzige Nutzer dieser Spalte.
+        ...(art.showcase?[
+          {id:"etikett",kopf:"Etikett", titel:"Bester Act seiner Kategorie (steht erst, wenn alle Acts fertig sind)",
+            wert:z=>{
+              if(!showcaseAlleFertig())return null;
+              const sieger=showcaseKategoriesieger();
+              if(sieger[z.u.vizAct]!==z.u)return null;
+              const ACT=SHOWCASE_ACTS.find(a=>a.id===z.u.vizAct);
+              return "🏆 "+(ACT?ACT.label:z.u.vizAct);
+            }}
         ]:[]),
         // GAUNTLET-SPALTEN: HP/Kampf/Gegner/Status machen die Kette auch in der Tabelle
         // nachvollziehbar, nicht nur im Ticker/Buehnenbild -- dieselbe "Praesentation
@@ -41305,6 +41425,12 @@
     // wieder einen goldenen Buzzer vergeben. Reiner Praesentationszustand, kein Einfluss auf
     // rr() oder Rangtreue.
     showcaseGoldVergeben=false;
+    // DASSELBE N1-MUSTER FUER DIE SHOWCASE-ETIKETTEN (S-F2, "Etiketten und Stimmen" Paket 2,
+    // 01.10.): ohne diese Zeile bliebe die "hoechstens einmal je Spiel"-Sperre vom VORIGEN
+    // Showcase-Spiel gesetzt, und kein zweites Spiel derselben Session bekaeme je wieder eine
+    // Kategoriepreis-Ticker-Zeile. Reiner Praesentationszustand, kein Einfluss auf rr() oder
+    // Rangtreue.
+    showcaseEtikettenVergeben=false;
     // DASSELBE N1-MUSTER FUER DIE WETTESSEN-SCHLUSSHUPE (W-B3, Broadcast-Optik 27.09.):
     // wettessenEndeSeit koennte sonst noch den buehneT-Wert des VORIGEN Wettessen-Spiels
     // tragen und die Jubelpose faelschlich unterdruecken/dauerhaft zeigen.
