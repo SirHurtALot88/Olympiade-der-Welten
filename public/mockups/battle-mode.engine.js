@@ -33302,7 +33302,20 @@
       // im Standardkader) -> 16,3 Sim-s, mitten im 40-55-%-Korridor. Das alte
       // Konzeptlimit (1,6x) waere auf DIESEM Rezept ebenfalls zu lasch gewesen (s.
       // PR-Beschreibung fuer die volle Tabelle).
-      zeitlimit:16.3,
+      //
+      // NEU GEEICHT (Kalibrierrunde 01.10., Validitaets-Fix `tempoSpanne` s. dort): die auf
+      // 2,20 angehobene `tempoSpanne` beschleunigt jeden Kletterer (ENDTEMPO traegt die ganze
+      // Kletterzeit, s. tempoVon()) -- der Siegerzeit-Median sank dadurch auf 8,22 Sim-s im
+      // Standardkader (vorher 12,18-12,63 je nach Lauf), und das alte 16,3-s-Limit haette
+      // damit ~weit ueber 55 % Top-out erlaubt -- genau das Risiko aus dem Gegencheck ("dann
+      // entscheidet die Uhr, Climbing bleibt Speed"). Neu gegen denselben 40-55-%-Korridor
+      // geeicht, ueber wandProbe({n:300,k:[...]}) auf dem FERTIGEN (tempoSpanne 2,20)
+      // Rezept: Top-out 44,4 % bei k=1,29 -> 10,6 Sim-s, fast exakt derselbe Platz im
+      // Korridor wie die urspruengliche 44,8-%-Eichung. Reine Nachfuehrung derselben bereits
+      // beschlossenen Eichregel (Gegencheck 3.5), keine neue Zeit-/Rundenregel -- die Dauer
+      // einer Climbing-Runde/eines Spieltags aendert sich dadurch nicht, nur WANN innerhalb
+      // des Rennens die Uhr fuer einen einzelnen Kletterer ablaeuft.
+      zeitlimit:10.6,
       // RAST-SCHWELLEN JE PLAN (Gegencheck 3.11): `rastUnter` ist das vierte Feld im
       // `planWechsel()`-Vertrag (s. dort) — an einer Henkel-Exe wird zusaetzlich gerastet,
       // wenn die Reserve darunter faellt. `rastZeit` ist die zusaetzliche Stoppzeit, in der
@@ -33340,7 +33353,64 @@
       mengeAusEignung:true,
       label:"Climbing", jeSeite:6, climbing:true,
       hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
-      hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
+      hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80,
+      // ====================================================================================
+      // VALIDITAETS-KALIBRIERUNG (01.10., ABNAHME_OFFEN aus pruefe-rangtreue-schranke.mjs):
+      // Opus hatte VOR dem Mutator-Feature schon 0,814 gemessen, danach (Mutator #1078, "je
+      // Spiel gezogen wie im Spiel") fiel rho je Spiel auf 0,79-0,81 ueber vier unabhaengige
+      // Saatstroeme (saat0 1337/424242/9001/7777777) -- UNTER der 0,80-Schranke, Puffer
+      // praktisch null. DIAGNOSE: `gehoben()` hebt bei einem Mutator-Treffer ALLE zwoelf
+      // Rohattribute um einen FLACHEN Betrag (+3,5/+7, `MUTATOR_ORGANISCH`, s. dort) -- fuer
+      // ~18 % der Teilnehmer, eignungsUNABHAENGIG. Climbings eigene Paarungen liegen oft nur
+      // 5-15 Eignungspunkte auseinander (CLAUDE.md: "Paare unter zwei Punkten Abstand kann
+      // kein Motor der Welt ordnen", aber schon 9,5 Punkte massen hier nur 0,68 rho) -- ein
+      // Mutator-Treffer ist dafuer OFT GROESSER als der ganze Eignungsabstand der Paarung und
+      // kippt die Reihenfolge. Das ist kein Bug im Mutator (der ist Produktentscheidung, fuer
+      // ALLE 15 arena-aufgeloesten Disziplinen gleich, hier nicht angefasst), sondern ein
+      // Climbing-eigenes Signal-Problem: zu WENIG vom Eignungsunterschied kommt ÜBERHAUPT in
+      // der Kletterzeit an, verglichen mit dem Rauschen aus Mutator UND den vielen rr()-Griff-
+      // Wuerfen. `tempoVon()` traegt ueber `grund*tempoSpanne` die GANZE Kletterzeit (ENDTEMPO
+      // dominiert nach 3,2 s Anfahrt) -- das ist der einzige KONTINUIERLICHE, hochgradig
+      // eignungsgetreue Kanal (ENDTEMPO spiegelt seit dem Climbing-PR-2-Pp-Fix beinahe die
+      // Matrix selbst, 22/18/13/11/10/9/9/8 ~ 26/16/12/12/10/8/8/8). Ihn zu verstaerken reicht
+      // GENAU das Signal, das CLAUDE.md verlangt ("Attribut-Signal bei knappen Paarungen
+      // staerker durchreichen"), staerker durch, OHNE den Zufallsanteil der Griffe/des
+      // Mutators anzutasten (`CLAUDE.md`: "nicht den Zufallsanteil komplett entfernen" --
+      // Verlaesslichkeit bleibt unberuehrt, nur die Validitaet steigt).
+      //
+      // GEMESSEN (kaderfest, Kader-Familie live-save, n=24, vier unabhaengige Saatstroeme,
+      // Mutatoren "je-spiel" wie im echten Spiel):
+      //   tempoSpanne 0,80 (vorher): rho je Spiel 0,791 / 0,796 / 0,791 / 0,807 -- Mittel 0,796
+      //   tempoSpanne 2,20 (jetzt):  rho je Spiel 0,837 / 0,828 / 0,835 / 0,856 -- Mittel 0,839
+      // Mittel +0,043, jeder einzelne Strom ueber 0,80 MIT Puffer (Opus-Ziel 0,83 erreicht),
+      // UND die Kaderrauschen-Spannweite sank (0,21 -> 0,12-0,13) -- die Paarungen wurden
+      // nicht nur im Schnitt treuer, sondern auch UNTEREINANDER konsistenter.
+      //
+      // Pp-ABWEICHUNG VERBESSERT SICH MIT (nicht trotz) DER AENDERUNG: 16,4/16,9 (alte
+      // Scorecard) -> 14,2 (messe-arena-einfluss.mjs climbing 48, erster Saatstrom) / 11,1
+      // (messe-arena-einfluss-zweiter-saatstamm.mjs climbing 48, zweiter Saatstrom) nach
+      // dieser Runde -- ENDTEMPO ist der Kanal, der der Matrix ohnehin am naechsten liegt,
+      // ihn zu verstaerken zieht die GESAMTE Mechanik naeher an die Matrix heran, statt sie
+      // zu verzerren.
+      //
+      // WARUM GENAU 2,20 (nicht mehr, nicht weniger): 1,10/1,25/1,40 wurden zuerst probiert
+      // (rho-Mittel 0,816/0,833/0,836) -- schon besser, aber mit weniger Puffer. 3,00 wurde
+      // versucht und VERWORFEN: das Feld spreizt sich dabei unrealistisch weit (Zeit-zu-
+      // Sieger-Median 1,51 und Zeit-zu-Sieger-Maximum 1,90 statt der im Gegencheck
+      // recherchierten echten Lead-Werte ~1,25/~1,68, s. climbing-opus-gegencheck-24-09.md
+      // Abschnitt 1.3/2.1) UND der Top-out-Korridor liess sich im sinnvollen k-Bereich nicht
+      // mehr treffen (flach bei ~11 % ueber k=1,22-1,29). Bei 2,20 bleibt die Zeitverteilung
+      // NAH AN DER NULLLINIE (Zeit-zu-Sieger-Median 1,30, Maximum 1,67 -- fast deckungsgleich
+      // mit den recherchierten echten Werten), nur das Zeitlimit musste nachgezogen werden
+      // (s. dort), weil die absolute Siegerzeit sank (12,6 -> 8,2 Sim-s im Standardkader).
+      //
+      // NUR CLIMBING BETROFFEN: `tempoSpanne` steht in JEDER `BAHN_ART`-Disziplin einzeln
+      // (Spurt/Staffel/Zeitfahren/Takeshi fuehren ihre eigenen Werte an eigener Stelle) --
+      // diese Zeile aendert ausschliesslich `BAHN_ART.climbing.tempoSpanne`, jede andere Bahn
+      // bleibt bit-identisch (nachgemessen: miss-alle-disziplinen.mjs ohne "climbing" liefert
+      // fuer alle uebrigen 19 Disziplinen exakt dieselben Zahlen wie vor dieser Aenderung).
+      // ====================================================================================
+      tempoSpanne:2.20,
       steigung:0.85,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
       // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.

@@ -1,5 +1,32 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Vierzehnter Nachtrag 01.10. — Climbing-Kalibrierrunde, von ABNAHME_OFFEN zurueck zu
+„bestanden" mit Puffer.** Opus hatte Climbing nach dem Mutator-Feature (Dreizehnter Nachtrag)
+als Validitaetsproblem markiert (`ABNAHME_OFFEN` in `scripts/pruefe-rangtreue-schranke.mjs`):
+0,814 ohne Mutator, 0,791 mit — unter der 0,80-Schranke mit praktisch null Puffer, und zwar
+bereits vor dem Mutator ein latentes Problem. **Diagnose:** `gehoben()` hebt bei einem
+Mutator-Treffer alle zwoelf Rohattribute um einen FLACHEN, eignungsunabhaengigen Betrag
+(+3,5/+7 je Treffer, ~18 % der Teilnehmer). Climbings Paarungen liegen oft nur 5-15
+Eignungspunkte auseinander — ein Mutator-Treffer ist dafuer oft groesser als der ganze
+Eignungsabstand der Paarung und kippt die Reihenfolge. Ursache war nicht der (projektweit
+gleiche, hier nicht angefasste) Mutator, sondern dass zu wenig vom echten Eignungsunterschied
+ueberhaupt in der Kletterzeit ankam. **Fix (ausschliesslich `BAHN_ART.climbing` in
+`public/mockups/battle-mode.engine.js`):** `tempoSpanne` (der Kanal, ueber den ENDTEMPO — nahezu
+matrixtreu seit dem Climbing-PR-2-Pp-Fix — die gesamte Kletterzeit traegt) von 0,80 auf 2,20
+angehoben; `zeitlimit` von 16,3 auf 10,6 Sim-s nachgezogen, um den 40-55-%-Top-out-Korridor aus
+dem Gegencheck zu halten (neu: 44,4 % bei k=1,29, fast exakt wie die urspruengliche 44,8-%-
+Eichung). **Gemessen** (kaderfest, live-save-Kaderfamilie, n=24, Mutatoren „je-spiel" wie im
+Spiel, vier unabhaengige Saatstroeme): rho je Spiel 0,828/0,835/0,837/0,856, Mittel **0,839**
+(vorher 0,791/0,796/0,791/0,807, Mittel 0,796) — die zuvor schwaechste Paarung
+(„coldsteel-direlegion") stieg von 0,66-0,70 auf 0,776. Pp **14,2/11,1** ueber zwei unabhaengige
+Saatstroeme (vorher 16,4/16,9) — die Aenderung hat die Pp-Abweichung VERBESSERT statt
+verschlechtert, weil ENDTEMPO der Kanal ist, der der Matrix ohnehin am naechsten liegt. Die
+uebrigen vier Bahn-Disziplinen (Spurt, Staffel, Time-Trial, Takeshi's Castle) bleiben
+bit-identisch (nachgemessen gegen die bestehende Basislinie). Climbing ist aus `ABNAHME_OFFEN`
+entfernt, die Basislinie fuer Climbing in `data/generated/rangtreue-basislinie.json` von Hand
+nachgezogen (das Baubauskript ueberschreibt beim Aufruf mit nur einer Disziplin die GANZE Datei,
+s. dessen eigener Kopfkommentar — deshalb Handpflege statt Skriptlauf).
+
 **Dreizehnter Nachtrag 29.09. — Mutator organisch (Battle-Modus), rho-Probe misst jetzt mit
 Mutatoren.** Seit `docs/design/mutator-trait-organische-performance-konzept-29-09.md` (Abschnitt 11)
 zieht `disziplinProbe` je Spiel einen Mutator-Wurf wie im Spiel (Standard `mutatoren:"je-spiel"`,
