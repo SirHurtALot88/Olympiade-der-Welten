@@ -17,9 +17,11 @@
 // ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine Saison"). Der zweite Waechter unten prueft
 // deshalb ZUSAETZLICH, unabhaengig von jeder Spannweite: faellt eine Disziplin, die als
 // arena-resolved gilt (`ARENA_RESOLVED_DISCIPLINE_IDS`, lib/resolve/battle-mode-arena-team-
-// points.ts — sie MUSS die Abnahme bestanden haben, um dort zu stehen) und deren Basislinie
-// bereits >=0,80 stand, jetzt unter 0,80, ist das ein Fehlschlag — komplett unabhaengig davon,
-// wie gross ihre Kaderfest-Spannweite ist. Der relative Waechter bleibt unveraendert daneben
+// points.ts — sie MUSS die Abnahme bestanden haben, um dort zu stehen) und NICHT ausdruecklich
+// auf der Liste ABNAHME_OFFEN steht (01.10., s. dort; vorher still ueber "Basislinie >=0,80"),
+// jetzt unter 0,80, ist das ein Fehlschlag — komplett unabhaengig davon, wie gross ihre
+// Kaderfest-Spannweite ist und wo ihre Basislinie steht. Die Disziplinen auf ABNAHME_OFFEN
+// meldet jeder Lauf in einem eigenen Info-Block mit ihrem aktuellen Wert. Der relative Waechter bleibt unveraendert daneben
 // bestehen (er faengt schleichende Regression frueher als 0,80); dieser hier faengt Stufenbrueche
 // unter die harte Abnahmeschranke, die der relative durchlassen wuerde.
 //
@@ -46,7 +48,8 @@
 //   (entspricht: node --import tsx scripts/pruefe-rangtreue-schranke.mjs)
 //
 // Exit-Code 0: keine Disziplin ist relativ um mehr als ihre Schranke gefallen UND keine
-// arena-resolved Disziplin ist absolut unter 0,80 gefallen (Verbesserungen sind immer erlaubt).
+// arena-resolved Disziplin ausserhalb von ABNAHME_OFFEN liegt unter 0,80 (Verbesserungen sind
+// immer erlaubt).
 // Exit-Code 1: mindestens einer der beiden Waechter schlaegt an — die Tabelle nennt welche und
 // um wie viel.
 // ===================================================================================
@@ -60,6 +63,24 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS } from "../lib/resolve/battle-mode-arena-
 // Die harte Abnahmeschranke aus CLAUDE.md ("Die Abnahme jeder Disziplin: ein Spiel, nicht eine
 // Saison") — rho kaderfest in EINEM Spiel, Ziel > 0,80.
 const SCHRANKE_ABSOLUT = 0.80;
+
+// ABNAHME OFFEN (01.10.) — arena-resolved Disziplinen, die die 0,80-Schranke BEKANNTERMASSEN noch
+// nicht erfuellen und deshalb vom absoluten Waechter ausgenommen sind. Vorher geschah diese
+// Ausnahme STILL: der absolute Waechter griff nur, wenn die Basislinie selbst >=0,80 stand
+// (`bisherBestanden`). Jede Disziplin, deren Basislinie unter 0,80 neu gezogen wurde, fiel damit
+// unbemerkt aus dem Sicherheitsnetz — bei Climbing (Basislinie 01.10. unter 0,80) waere genau das
+// passiert. Jetzt gilt umgekehrt: arena-resolved UND unter 0,80 UND NICHT auf dieser Liste ist
+// rot, egal wo die Basislinie steht. Wer hier einen Eintrag ergaenzt, schreibt den Grund und den
+// Verweis dazu; wer eine Disziplin ueber 0,80 hebt, nimmt sie wieder herunter (das Skript meldet
+// das unten von selbst). Der RELATIVE Waechter gilt fuer diese Disziplinen unveraendert weiter.
+const ABNAHME_OFFEN = new Map([
+  ["basketball", "unter 0,80, von Chris fuer den Live-Betrieb abgenommen — "
+    + "docs/design/gesamtstand-fertigstellungsgrad-alle-disziplinen-09-10.md (Basketball, Gameplay)"],
+  ["hockey", "unter 0,80, Abnahme ueber Star-/Paartreue statt nackter rho — "
+    + "docs/design/hockey-opus-review-nhl.md Abschnitt 5.3, CLAUDE.md"],
+  ["climbing", "Validitaetsproblem schon VOR dem Mutator (#1078): 0,814 ohne, 0,791 mit Mutator — "
+    + "eigene Kalibrierrunde geplant, s. docs/design/climbing-opus-gegencheck-24-09.md"],
+]);
 
 // G1-Stufen der Scorecard-Methodik (docs/design/gesamtstand-fertigstellungsgrad-alle-
 // disziplinen-09-10.md Abschnitt 0, Zeile "G1 (40)"), absteigend sortiert.
@@ -121,17 +142,14 @@ try {
     const gefallen = rueckgang > basis.schranke;
     if (gefallen) rot = true;
 
-    // ABSOLUTER WAECHTER (s. Kopfkommentar): nur relevant fuer Disziplinen, die arena-resolved
-    // sind UND deren Basislinie die 0,80-Schranke bereits erfuellte. "arena-resolved" heisst
-    // NICHT automatisch "bisherBestanden" — Basketball (0,769) und Hockey (0,669) sind bewusste,
-    // von Chris fuer den Live-Betrieb abgenommene Gegenbeispiele (s. gesamtstand-fertigstellungs-
-    // grad-alle-disziplinen-09-10.md). Deshalb der eigenstaendige bisherBestanden-Check unten —
-    // ihn zu entfernen wuerde diese beiden bekannten Ausnahmen versehentlich unter den absoluten
-    // Waechter fallen lassen.
+    // ABSOLUTER WAECHTER (s. Kopfkommentar): jede arena-resolved Disziplin unter 0,80 ist rot —
+    // AUSSER sie steht ausdruecklich auf ABNAHME_OFFEN (oben). Bis 01.10. hing die Ausnahme still
+    // an `bisherBestanden` (Basislinie >=0,80); das ist ersetzt durch die sichtbare Liste, damit
+    // ein Neuziehen der Basislinie niemanden mehr unbemerkt aus dem Sicherheitsnetz nimmt.
     const arenaResolved = ARENA_RESOLVED_DISCIPLINE_IDS.has(d);
-    const bisherBestanden = basis.spielMedian >= SCHRANKE_ABSOLUT;
+    const abnahmeOffen = ABNAHME_OFFEN.has(d);
     const jetztBestanden = z.spielMed >= SCHRANKE_ABSOLUT;
-    const absolutGerissen = arenaResolved && bisherBestanden && !jetztBestanden;
+    const absolutGerissen = arenaResolved && !abnahmeOffen && !jetztBestanden;
     if (absolutGerissen) rot = true;
 
     // G1-STUFENWARNUNG (Info, kein CI-Abbruch): fuer ALLE Disziplinen der Basislinie, nicht nur
@@ -142,7 +160,7 @@ try {
 
     zeilen.push({
       d, basis: basis.spielMedian, jetzt: z.spielMed, rueckgang, schranke: basis.schranke, gefallen,
-      arenaResolved, absolutGerissen, stufeVorher, stufeJetzt, stufeGefallen,
+      arenaResolved, abnahmeOffen, jetztBestanden, absolutGerissen, stufeVorher, stufeJetzt, stufeGefallen,
     });
   }
 } finally {
@@ -174,12 +192,31 @@ console.log("\nAbsolute 0,80-Schranke (arena-resolved Disziplinen, CLAUDE.md \"D
 console.log("Disziplin\") — unabhaengig von der Kaderfest-Spannweite der relativen Pruefung oben:");
 if (absoluteVerstoesse.length) {
   for (const z of absoluteVerstoesse) {
-    console.log(`  GERISSEN: ${z.d} — Basislinie ${z.basis.toFixed(3)} (>=0,80, arena-resolved) `
-      + `-> jetzt ${z.jetzt.toFixed(3)} (<0,80)`);
+    console.log(`  GERISSEN: ${z.d} — arena-resolved, nicht auf ABNAHME_OFFEN, jetzt ${z.jetzt.toFixed(3)} `
+      + `(<0,80; Basislinie ${z.basis.toFixed(3)})`);
   }
 } else {
-  console.log("  ok — keine arena-resolved Disziplin, die die 0,80-Schranke in der Basislinie");
-  console.log("  erfuellte, ist jetzt darunter gefallen.");
+  console.log("  ok — keine arena-resolved Disziplin ausserhalb von ABNAHME_OFFEN liegt unter 0,80.");
+}
+
+// ABNAHME OFFEN: in JEDEM Lauf ausgeben, nicht nur bei Treffern — damit die bekannten Ausnahmen
+// nicht dadurch in Vergessenheit geraten, dass die CI gruen ist.
+console.log("\nAbnahme offen (vom absoluten Waechter ausgenommen, s. ABNAHME_OFFEN in diesem Skript)");
+console.log("— Info, kein CI-Abbruch; der relative Waechter gilt fuer sie weiter:");
+for (const [d, notiz] of ABNAHME_OFFEN) {
+  const z = zeilen.find((zeile) => zeile.d === d);
+  let wert;
+  if (!z) wert = "nicht in der Basislinie";
+  else if (z.fehler) wert = `Messfehler: ${z.fehler}`;
+  else wert = `rho ${z.jetzt.toFixed(3)} (Basislinie ${z.basis.toFixed(3)})`;
+  console.log(`  ${d.padEnd(12)} ${wert}`);
+  console.log(`  ${"".padEnd(12)} ${notiz}`);
+  if (z && !z.fehler && z.jetztBestanden) {
+    console.log(`  ${"".padEnd(12)} HINWEIS: liegt jetzt >=0,80 — kann von ABNAHME_OFFEN genommen werden.`);
+  }
+  if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(d)) {
+    console.log(`  ${"".padEnd(12)} HINWEIS: nicht arena-resolved — der Eintrag hat keine Wirkung.`);
+  }
 }
 
 // G1-STUFENWARNUNG: reine Information fuer den naechsten Scorecard-Nachtrag, kein Fehlschlag.
@@ -195,10 +232,12 @@ if (stufenWarnungen.length) {
 
 if (rot) {
   console.log("\nFEHLGESCHLAGEN: mindestens eine Disziplin ist um mehr als ihre Schranke gefallen,");
-  console.log("liefert keine Spiele mehr, oder eine arena-resolved Disziplin ist unter die absolute");
-  console.log("0,80-Schranke gefallen. Basislinie neu ziehen nur, wenn der Rueckgang gewollt ist:");
-  console.log("node scripts/baue-rangtreue-basislinie.mjs");
+  console.log("liefert keine Spiele mehr, oder eine arena-resolved Disziplin ausserhalb von");
+  console.log("ABNAHME_OFFEN liegt unter der absoluten 0,80-Schranke. Basislinie neu ziehen nur, wenn");
+  console.log("ein relativer Rueckgang gewollt ist: node scripts/baue-rangtreue-basislinie.mjs");
+  console.log("(das Neuziehen heilt den absoluten Waechter NICHT — dafuer braucht es einen begruendeten");
+  console.log("Eintrag in ABNAHME_OFFEN oder eine Kalibrierung ueber 0,80).");
   process.exit(1);
 }
 console.log("\nBestanden: keine Disziplin ist um mehr als ihre Schranke gefallen, und keine");
-console.log("arena-resolved Disziplin ist unter die absolute 0,80-Schranke gefallen.");
+console.log("arena-resolved Disziplin ausserhalb von ABNAHME_OFFEN liegt unter 0,80.");
