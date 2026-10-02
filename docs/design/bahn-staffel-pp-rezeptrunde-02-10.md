@@ -1,20 +1,25 @@
 # Bahn-Staffel: Pp-Kalibrierungsrunde (Task #40, 02.10.)
 
-## Auftrag und erster Befund: die zitierte Quelle stimmt nicht, die Zahl schon
+## Bestätigungsmessung
 
 Der Auftrag berief sich auf einen "Fünfzehnter Nachtrag 02.10." in
 `docs/design/stand-aller-disziplinen.md` und auf PR #1109 als Beleg dafür, dass Staffels
-Pp-Abweichung von 61,9 bereits zuverlässig bei n=48 gemessen sei. Beides stimmt nicht:
+Pp-Abweichung von 61,9 bereits zuverlässig bei n=48 gemessen sei.
 
-- `stand-aller-disziplinen.md` geht nur bis zum **Dreizehnten** Nachtrag (29.09.); es gibt
-  keinen Fünfzehnten. Die dort dokumentierte Staffel-Pp-Zahl ist **60,4 bei n=24**, explizit
-  als "strukturell unsicher" markiert, mit der eigenen Empfehlung des Mess-Skripts, mit
-  n=144 statt n=24 zu messen (Abschnitt "Staffel/Takeshi's Castle", Zwölfter Nachtrag).
-- PR #1109 ("Bahn: Alternativ-Rechner 'Was hätte der andere Plan gebracht?'", Task #27) hat
-  mit einer Pp-Messung nichts zu tun — es ist der Alternativ-Rechner für die Bahn-HUD.
+**Korrektur einer eigenen Fehleinschätzung:** eine frühere Fassung dieses Abschnitts
+behauptete, dieser Nachtrag existiere nicht. Das war falsch — ich hatte beim ersten
+Nachsehen versehentlich einen veralteten lokalen Checkout geprüft (einen älteren
+Feature-Branch in einem anderen Arbeitsverzeichnis, der nicht auf dem aktuellen `main`
+beruhte), nicht den tatsächlichen `main`-Stand. Der Fünfzehnter Nachtrag (Commit
+`146dd787`, Task #43/#44) ist tatsächlich ein Vorfahre des PR-Basis-Commits `83bfa315` und
+enthält genau die zitierte Zeile: "Staffel | 61,9 | 48 (PR #1109 bit-identisch bestaetigt,
+s. Fuenfzehnter Nachtrag) | VERLETZT, klar verletzt". Die ursprüngliche Auftragsquelle war
+also korrekt — meine erste "Quellenkorrektur" nicht. Danke an die unabhängige Review für
+den `git merge-base --is-ancestor`-Nachweis, der den Fehler aufgedeckt hat.
 
-Trotzdem: **die Zahl 61,9 selbst ist real.** Bestätigungsmessung auf dem aktuellen `main`
-(nach #1109/#1115/#1116/#1119/#1120/#1121, Commit `83bfa315`):
+Unabhängig davon bleibt die eigene Bestätigungsmessung auf dem aktuellen `main` (nach
+#1109/#1115/#1116/#1119/#1120/#1121, Commit `83bfa315`) richtig und war ohnehin die
+Grundlage für die Rezeptkalibrierung selbst:
 
 | Messung | Wert |
 |---|---|
@@ -24,10 +29,7 @@ Trotzdem: **die Zahl 61,9 selbst ist real.** Bestätigungsmessung auf dem aktuel
 | rho/Spiel, n=24 (kaderfest, Median über 5 Paarungen) | 0,898 |
 | rho/Spiel, n=48 | 0,888 |
 
-Die alte "strukturell unsicher"-Warnung galt der Messmethodik von vor dem 26.09.
-(Mutator-Umbau/je-Lauf-Ziehung); inzwischen ist die Zahl über n=48/144 und zwei Saatströme
-stabil auf ±1 Pp. Die Aufgabe selbst (Rezeptkalibrierung) ist also berechtigt, auch wenn
-ihre Begründung im Prompt falsch zitiert war.
+Die Zahl ist über n=48/144 und zwei Saatströme stabil auf ±1 Pp.
 
 ## Ursache
 
@@ -91,11 +93,65 @@ const m = ks.reduce((s,k) => s+w[k], 0) / ks.length;
 
 rho bleibt in beiden n deutlich über der 0,80-Schranke und bewegt sich innerhalb des
 Kaderrauschens (die Spannweite wächst, der Median bleibt im selben Band) — die
-Kalibrierung ist aus rho-Sicht neutral bis leicht positiv.
+Kalibrierung ist aus rho-Sicht neutral bis leicht positiv **im Median**. Der nächste
+Abschnitt zeigt, dass diese gewachsene Spannweite kein reines Rauschen ist, sondern an
+einer bestimmten Paarung hängt.
 
 **Ziel <=25 Pp nicht erreicht.** 37,7/41,1 ist eine Verbesserung um rund 38 % gegenüber
 61,9, aber keine vollständige Schliessung. Siehe "Weitere Versuche" unten für die
 Diagnose, warum, und was eine Folgerunde bräuchte.
+
+## Nebenbefund: "vigilante-armageddon" fällt neu unter die Schranke
+
+Die gewachsene Kader-Spannweite (0,081→0,208 bei n=24, 0,092→0,222 bei n=48) ist kein
+gleichmässiges Rauschen über alle fünf Paarungen — sie konzentriert sich auf eine einzige:
+**vigilante-armageddon** (Chris' historisches Referenzteam). Einzelpaarungs-Aufschlüsselung
+(`disziplinMessen()` liefert das bereits je Paarung über `.varianten`, hier direkt
+ausgelesen statt nur Median/Spannweite):
+
+**n=24:**
+
+| Paarung | rho/Spiel vorher | rho/Spiel nachher | rho/Saison vorher | rho/Saison nachher |
+|---|---:|---:|---:|---:|
+| vigilante-armageddon | 0,821 | **0,716** | 0,890 | **0,690** |
+| coldsteel-direlegion | 0,902 | 0,848 | 0,951 | 0,860 |
+| goldengladiators-silversoldiers | 0,898 | 0,924 | 0,944 | 0,944 |
+| mortalsin-natureswrath | 0,880 | 0,899 | 0,888 | 0,930 |
+| piratecrew-raginglunatics | 0,900 | 0,893 | 0,972 | 0,923 |
+
+**n=48:**
+
+| Paarung | rho/Spiel vorher | rho/Spiel nachher | rho/Saison vorher | rho/Saison nachher |
+|---|---:|---:|---:|---:|
+| vigilante-armageddon | 0,807 | **0,698** | 0,881 | **0,678** |
+| coldsteel-direlegion | 0,899 | 0,851 | 0,958 | 0,860 |
+| goldengladiators-silversoldiers | 0,895 | 0,920 | 0,944 | 0,930 |
+| mortalsin-natureswrath | 0,877 | 0,895 | 0,923 | 0,930 |
+| piratecrew-raginglunatics | 0,888 | 0,897 | 0,986 | 0,944 |
+
+**vigilante-armageddon fällt bei BEIDEN n sowohl im rho/Spiel als auch im rho/Saison neu
+unter 0,80** — vorher stand keine einzige der fünf Paarungen unter der Schranke, danach
+genau diese eine, reproduzierbar bei zwei verschiedenen `n`. Der Gesamt-Median bleibt nach
+CLAUDE.md formal bestanden (>0,80 über die Kader-Familie), aber das ist kein Freibrief:
+eine einzelne, real abstürzende Paarung ist ein echter Effekt der Änderung, kein
+Zufallsrauschen, und sollte nicht nur als "Spannweite gewachsen" in einer Summenzahl
+verschwinden.
+
+**Vermutete Ursache (nicht isoliert nachgewiesen):** das Mittel-der-Sieben macht die
+Menge-Skalierung jetzt auch von TECHNIK/WENDIGKEIT/STEHEN/ROBUST abhängig — Sub-Skills, die
+vorher (0,73×ANTRITT+0,27×ENDTEMPO) gar nicht in `m` einflossen. Wenn die Kaderpaarung
+vigilante-armageddon ungewöhnlich schiefe Attributprofile mitbringt (z.B. wenige, aber
+extreme Ausreisser in genau den fünf Attributen, die nur über TECHNIK/WENDIGKEIT/STEHEN/
+ROBUST wirken), reagiert `m` jetzt stärker auf diese Schiefe als vorher. Das ist eine
+Hypothese, keine Messung — eine Attributprofil-Analyse dieser Paarung wurde in dieser
+Runde nicht durchgeführt.
+
+**Empfehlung für die nächste Runde:** eine künftige Kalibrierung der `WECHSEL_*`/`KURVE_*`-
+Platzhalterkonstanten (s. "Weitere Versuche" unten) sollte **vigilante-armageddon explizit
+als Sentinel-Fall gegenprüfen** — jede Änderung, die die Pp-Abweichung weiter senkt, aber
+diese Paarung nicht zurück über 0,80 bringt (oder eine andere Paarung neu darunter
+drückt), tauscht eine Pp-Verbesserung gegen eine neue rho-Schwachstelle und sollte nicht
+ohne weitere Prüfung gemerged werden.
 
 ## Weitere Versuche (verworfen, dokumentiert)
 
@@ -153,8 +209,10 @@ Messgrössen).
 ## Abnahme
 
 - `node --check public/mockups/battle-mode.engine.js`: grün.
-- rho/Spiel n=24: 0,893 (>0,80). rho/Spiel n=48: 0,895 (>0,80). Beide innerhalb des
-  Kaderrauschens gegenüber der Basis (0,898/0,888).
+- rho/Spiel n=24: 0,893 (>0,80, Median). rho/Spiel n=48: 0,895 (>0,80, Median). Beide
+  Mediane innerhalb des Kaderrauschens gegenüber der Basis (0,898/0,888) — ABER: die
+  Einzelpaarung vigilante-armageddon fällt bei beiden n neu unter 0,80 (s. "Nebenbefund"
+  oben), formal durch den Median gedeckt, aber ein realer Effekt, kein Rauschen.
 - Pp n=48, zwei Saatströme: 37,7 / 41,1 (Ziel <=25 NICHT erreicht, aber deutliche
   Verbesserung von 61,9/61,9).
 - Isolationsnachweis time-trial/spurt/takeshis-castle/climbing: bit-identisch vor/nach.
@@ -162,11 +220,14 @@ Messgrössen).
 
 ## Ehrliches Fazit
 
-Dies ist eine **Teilverbesserung, kein abgeschlossener Fix**. rho bleibt sicher über der
-Schranke und verbessert sich sogar leicht; Pp sinkt um 38 %, bleibt aber über dem Ziel.
-Die Diagnose (TECHNIK/WENDIGKEIT sind durch Team-Mittelung und Ein-von-fünf-Beteiligung
+Dies ist eine **Teilverbesserung, kein abgeschlossener Fix**. Der rho-Median bleibt sicher
+über der Schranke und verbessert sich sogar leicht; Pp sinkt um 38 %, bleibt aber über dem
+Ziel; und eine einzelne Kaderpaarung (vigilante-armageddon) fällt neu unter 0,80 — formal
+vom Median gedeckt, aber ein realer, reproduzierbarer Nebeneffekt, kein Rauschen. Die
+Diagnose (TECHNIK/WENDIGKEIT sind durch Team-Mittelung und Ein-von-fünf-Beteiligung
 strukturell verdünnt, ihre Zeitkosten-Konstanten sind unkalibrierte Platzhalter) ist der
 Hinweis für die nächste Runde, nicht nur für diese: eine dedizierte Messung dieser
 WECHSEL_*/KURVE_*-Konstanten gegen Pp (nach demselben Muster wie Spurts `huerdePreis`
 1,00 -> 1,45) ist der wahrscheinlichste nächste Schritt, um unter 25 zu kommen, geht aber
-über eine reine Rezeptkalibrierung hinaus.
+über eine reine Rezeptkalibrierung hinaus — und sollte vigilante-armageddon als
+Sentinel-Fall gegenprüfen (s. "Nebenbefund" oben).
