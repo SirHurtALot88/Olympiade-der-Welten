@@ -29420,7 +29420,22 @@
     return foes.filter(f=>(f.row||0)===max);
   }
 
+  // ZUGANGS-ZAEHLER (Teil 2 der Opus-Konsultation Task #26, 02.10., reine Lese-Diagnose nach
+  // dem Vorbild von takeshiWuchtDiag() aus PR #1121): `ZIEL_DIAG` ist `null`, ausser waehrend
+  // eines Diagnose-Laufs (s. `window.__arena.disziplinProbe(..., {zielDiag:true})`), und wird
+  // dort ausschliesslich GELESEN/addiert — nie geschrieben, bevor `chooseTargetKern()` ihr
+  // Ergebnis berechnet hat. `chooseTarget` selbst ist nur noch ein duenner Zaehl-Wrapper um die
+  // byte-identisch gebliebene `chooseTargetKern()` (das ist die bisherige `chooseTarget`-
+  // Funktion, Zeichen fuer Zeichen); jeder bestehende Aufrufer ruft weiterhin `chooseTarget(u)`
+  // auf und bekommt exakt dasselbe Ergebnis wie vorher — der Zaehler ist ein reiner Seiteneffekt
+  // ohne jeden Einfluss auf Rueckgabewert, Zielwahl-Entscheidung oder RNG.
+  let ZIEL_DIAG=null;
   function chooseTarget(u){
+    const t=chooseTargetKern(u);
+    if(ZIEL_DIAG&&t)ZIEL_DIAG[t.n]=(ZIEL_DIAG[t.n]||0)+1;
+    return t;
+  }
+  function chooseTargetKern(u){
     const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
     const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
@@ -45465,6 +45480,15 @@
       const M=MOTOREN[dId];
       if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spiele:[]};
       const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      // ZUGANGS-DIAGNOSE (Teil 2, Opus-Konsultation Task #26, 02.10.): additiv, Standard
+      // `false` — ohne `o.zielDiag` laeuft disziplinProbe byte-identisch zu vorher (ZIEL_DIAG
+      // bleibt `null`, der Zaehl-Wrapper um chooseTarget ist dann ein reiner No-Op). Mit der
+      // Option zaehlt die Sonde je Arena-Spiel, wie oft jede Einheit tatsaechlich als Ziel
+      // gewaehlt wurde (`ZIEL_DIAG`, s. chooseTarget oben) und reicht zusaetzlich die
+      // Persoenlichkeits-Kategorie (`persOf`) und — fuer Heiler — die Unterklasse durch, fuer
+      // scripts/miss-arena-rangvarianz-aufschluesselung.mjs.
+      const zielDiagAktiv=!!o.zielDiag;
+      const spielerVonName=(name)=>SQUAD.find(p=>p.n===name)||OPP.find(p=>p.n===name);
       // MUTATOR ORGANISCH (29.09., Konzept Abschnitt 7.2): `o.mutatoren` = "je-spiel" (Standard,
       // spielnah: jedes Spiel zieht seinen eigenen Wurf "2 aus 36", wie die Formkarte), "aus"
       // (niemand trifft, Referenz V0) oder "fest" (der geladene Wurf gilt fuer alle Spiele, das
@@ -45509,6 +45533,9 @@
           zieheFormkarten(20260823+i*104729);
           if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+mutatorSaat+i*15485863);
           else if(mutatorModus==="aus")MUTATOREN=[];
+          // Je Spiel neu geleert — "Zugang" ist eine EINZELSPIEL-Groesse (s. teilnehmer
+          // unten), kein Lauf-Gesamtwert.
+          if(zielDiagAktiv)ZIEL_DIAG={};
           M.bau(saat0+i*schritt);
           M.lauf();
           const w=M.wert();
@@ -45537,7 +45564,12 @@
             // dorthin stellt, wo sie etwas bewirken koennen. `arch` (Backlog #156, Schritt 1)
             // ist der aufgeloeste Kampf-Archetyp-Name — reines Diagnosefeld fuer
             // scripts/pruefe-kampf-archetyp-abgleich.ts, veraendert kein Kampfverhalten.
-            :U.map(u=>({n:u.n,seite:u.side,eig:eigVon(u),reihe:u.row,arch:u.arch??null}));
+            :U.map(u=>({n:u.n,seite:u.side,eig:eigVon(u),reihe:u.row,arch:u.arch??null,
+              // ZUGANGS-DIAGNOSE (s. Kopfkommentar oben): nur gefuellt, wenn `o.zielDiag`
+              // gesetzt ist — sonst bleiben alle drei Felder weg wie bisher.
+              ...(zielDiagAktiv?{zugang:(ZIEL_DIAG&&ZIEL_DIAG[u.n])||0,
+                persTyp:persOf[u.n]||null,
+                heilerSub:u.heiler?(((spielerVonName(u.n)||{}).sub||[]).find(s=>HEILER.has(s))||null):null}:{})}));
           spiele.push({saat:saat0+i*schritt,
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
@@ -45551,7 +45583,10 @@
               // dieselbe Weiterleitung wie `torwart`/`reihe`/`arch` darueber — ohne diese
               // Zeile haette das Feld oben die Einheit NIE erreicht, weil GENAU hier aus
               // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
-              ...(u.slotId!=null?{slotId:u.slotId}:{})}))});
+              ...(u.slotId!=null?{slotId:u.slotId}:{}),
+              // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine
+              // Zahl (>=0) wenn `o.zielDiag` gesetzt war, deshalb reicht `!=null` als Schalter.
+              ...(u.zugang!=null?{zugang:u.zugang,persTyp:u.persTyp??null,heilerSub:u.heilerSub??null}:{})}))});
         }
         return spiele;
       };
@@ -45568,7 +45603,68 @@
             // bauSpurt()s eigene persOf-Lesestelle, Spurt/Takeshi's Castle — s. Kommentar an
             // kaderSetzen oben) und faellt auf den generischen "duellant"-Fallback zurueck.
             neuPersBerechnen();
-            return {label:(v&&v.label)||null, spiele:einSpieldurchlauf()};
+            // P0-FIX HEIM/GAST-ZIELWAHL-ASYMMETRIE IN DER KADERFAMILIE-SONDE (Opus-
+            // Konsultation Task #26, 02.10., verifiziert in dieser Runde): `schlachtplan()`
+            // (die Taktik, die build() der GAST-Seite als `zielP` mitgibt, s. dort "DIE
+            // GEGNERSEITE") steht und faellt mit `gegnerVorschau()`, und die liest
+            // AUSSCHLIESSLICH `inDisc("tdm")` — fest verdrahtet auf die Zeichenkette "tdm",
+            // nicht auf die gerade gemessene Disziplin, und zwar NUR von der SQUAD(heim)-
+            // Seite (`inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d)`, s. dort).
+            // Im echten Spiel steht dort immer etwas, weil der Mensch seine TDM-Aufstellung
+            // wirklich setzt. Diese Sonde tauscht SQUAD aber ueber eine Kader-Familie aus,
+            // OHNE `place` fuer die neuen Namen zu fuellen (dasselbe gilt fuer den
+            // Einzelkader-Pfad, s. kaderSetzen) — `inDisc("tdm")` ist dadurch fuer jede
+            // Paarung AUSSER der ersten (deren Namen zufaellig mit dem hartkodierten
+            // SQUAD-Default uebereinstimmen) leer, `schlachtplan()` liefert `null`, und die
+            // GAST-Einheiten fallen in chooseTarget() komplett aus dem `if(u.zielP)`-Zweig
+            // heraus auf den letzten Fallback `return nearest(foes)` zurueck — reine
+            // Geometrie, nicht einmal die generische `u.ziel`-Neigung (die existiert fuer
+            // Arena-Einheiten gar nicht). Die HEIM-Seite haengt nie an `schlachtplan()` —
+            // ihr `zielP` kommt direkt aus der PERSZIEL-Persoenlichkeit (`baueEinheit()`,
+            // "UNSERE SEITE") und bleibt die ganze Zeit individuell. Gemessen wurde dadurch
+            // nie "Eignung gegen Eignung", sondern "individualisierte Zielwahl (heim) gegen
+            // reine Naechster-Geometrie (gast)" — eine Verzerrung, die an der ROLLE haengt,
+            // nicht an der Eignung, und jede rho-Zahl nach unten zieht, ohne dass es am
+            // Zielwahl-REZEPT selbst liegt.
+            //
+            // FIX NUR IN DIESER MESS-SONDE: `chooseTarget`/`PERSZIEL`/`bedrohungVon`/
+            // `schlachtplan` bleiben byte-identisch unangetastet. Stattdessen fuellt die
+            // Sonde `place[]` fuer die SQUAD-Seite VOR dem Spieldurchlauf so, wie es die
+            // echte Aufstellung (und bis zur ersten Paarung zufaellig auch diese Sonde)
+            // ohnehin tut: die besten `jeSeiteVon(dId)` Namen nach TDM-Eignung (`d.tdm`,
+            // dieselbe Groesse, die `gegnerVorschau()` selbst liest), mit GENAU dem Slot,
+            // den der bisherige Eignungs-Rueckfall in build() (`ersatz`/`slotFuer`) ohnehin
+            // vergeben haette (`slotsVon(dId)` nach Rang) — fuer TDM selbst dadurch
+            // ergebnisgleich zum bisherigen Rueckfall (nur spaeter, explizit statt implizit
+            // gesetzt), fuer Mini-DM/Battlefield wirkungslos fuer die EIGENE Aufstellung
+            // (deren `place`-Eintrag traegt `d:"tdm"`, nicht `d:dId`, `inDisc(dId)` matcht
+            // also nicht — nur `gegnerVorschau()`s hartkodiertes `inDisc("tdm")` sieht sie).
+            // Einzige Wirkung: `schlachtplan()` bekommt wieder eine echte Vorschau und damit
+            // eine echte Taktik fuer die GAST-Seite, symmetrisch zur immer-individuellen
+            // HEIM-Seite — genau das, was im echten Spiel (und in Paarung 1 dieser Sonde,
+            // zufaellig) ohnehin passiert. Nach dem Spieldurchlauf wird jeder beruehrte
+            // `place`-Eintrag auf seinen Stand davor zurueckgesetzt (meist "nicht vorhanden"),
+            // damit nichts in die naechste Paarung oder einen spaeteren Probe-Aufruf
+            // durchsickert.
+            let zielwahlPlatzAlt=null;
+            if(ARENA_ART[dId]){
+              zielwahlPlatzAlt={};
+              const nFuerPlatz=jeSeiteVon(dId);
+              const slotsFuerPlatz=slotsVon(dId);
+              const topNachTdmEignung=[...SQUAD].sort((a,b)=>(b.d.tdm||0)-(a.d.tdm||0)).slice(0,nFuerPlatz);
+              topNachTdmEignung.forEach((p,i)=>{
+                zielwahlPlatzAlt[p.n]=place[p.n];
+                place[p.n]={d:"tdm",slot:(slotsFuerPlatz[i%Math.max(1,slotsFuerPlatz.length)]||{}).id||null};
+              });
+            }
+            const zielwahlEintrag={label:(v&&v.label)||null, spiele:einSpieldurchlauf()};
+            if(zielwahlPlatzAlt){
+              for(const name in zielwahlPlatzAlt){
+                if(zielwahlPlatzAlt[name]===undefined)delete place[name];
+                else place[name]=zielwahlPlatzAlt[name];
+              }
+            }
+            return zielwahlEintrag;
           });
         } else {
           ergebnis=einSpieldurchlauf();
@@ -45578,6 +45674,7 @@
         M.zurueck(gesichert); zieheFormkarten(20260823); if(art&&o.jeSeite)art.jeSeite=altJeSeite;
         if(art&&o.kursIndex!=null)art.kurse=altKurse;
         if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}
+        ZIEL_DIAG=null;
       }
       const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
         :istFeldspiel(dId)?"feldspiel":"arena";
