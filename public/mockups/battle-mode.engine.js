@@ -15210,6 +15210,17 @@
   const EISKUNSTLAUF_KURZPROGRAMM_N=4; // Elemente 1-4 = Kurzprogramm (ISU), Rest = Kuer
   const SHOWCASE_CASTING_N=1;          // Durchgang 1 = Casting-Montage, Rest = die Show
 
+  // F-F2 -- DIE MENSUR, VARIANTE A (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+  // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt F-F2, Klasse B): einziger
+  // Kalibrierhebel fuer den Mensur-Zustand im `art.fechten`-Zweig unten in bauBuehne() --
+  // je Gang verschiebt sich `mensur` um (Rundenpunkt-Differenz dieses Gangs) / diese Zahl,
+  // bei |mensur|>=1 faellt ein zusaetzlicher Treffer und `mensur` faellt auf 0 zurueck
+  // (die En-garde-Linien, wie real nach jedem Treffer). NACHGEMESSEN (PR-Beschreibung,
+  // scripts/miss-fechten-mensur-haeufigkeit.mjs): Kalibrierziel aus dem Dokument ist
+  // hoechstens ein bis zwei Bahnende-Treffer je Gefecht im Mittel -- diese Zahl wurde EMPIRISCH
+  // auf dieses Ziel hin gesetzt, nicht freihaendig geraten.
+  const FECHTEN_MENSUR_SKALA=100;
+
   // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09.,
   // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F2", Paket 1 "Regie & Bild",
   // Klasse A, nur Speed-Schach). Liefert die SPOILERFREIE obere Schranke dafuer, wie viele
@@ -15232,6 +15243,24 @@
     return summe;
   }
 
+  // ================== PAKET 3 (01.10.2026): "FECHTEN-FORMAT" ==================
+  // Fable-Ideen Buehne-Duell 30.09. (docs/design/fable-ideen-buehne-duell-30-09.md), Abschnitt
+  // 3: F-F1 (Die Fechtstaffel) und F-F2 (Die Mensur, Variante A) -- beide dort ausdruecklich
+  // als KLASSE B eingestuft ("echte Mechanik-Aenderung, braucht Chris' Zustimmung und eine
+  // Messrunde vor dem Merge"), anders als Paket 1 "Regie & Bild" (4881a108, Klasse A). Beide
+  // setzen NACH `setz()` an (im Paarungsblock unten bzw. in `spieleBuehneDuell()`), ziehen
+  // kein zusaetzliches `rr()` fuer die Formkarten-/Ereignis-Reihenfolge und veraendern
+  // `u.summe`/`u.runden[].punkte` nie -- miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs
+  // sind damit PER KONSTRUKTION unberuehrt (s. die beiden Kommentare an den jeweiligen
+  // Stellen unten). Gemessen werden muessen trotzdem (Projektregel, CLAUDE.md): Spiegel-
+  // symmetrie (scripts/miss-arena-buehne-spiegel.mjs), die Mensur-Haeufigkeit (Kalibrierziel
+  // 1-2 Bahnende-Treffer je Gefecht) und die Teamsieg-Verteilung der Staffel -- alle drei in
+  // der PR-Beschreibung.
+  //
+  // KEINE KLASSE-T-AENDERUNG: `art.rundenN` (9) und `art.rundenDauer` (60/(9*6*2)) bei
+  // BUEHNE_ART.fechten oben bleiben Zeichen fuer Zeichen unveraendert -- diese PR fasst keine
+  // einzige Wanduhr-Taktungskonstante an, braucht also keine gesonderte Freigabe ausserhalb
+  // der normalen Klasse-B-Messrunde.
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
@@ -15457,6 +15486,43 @@
         if(art.fechten){
           const ta=a.runden.filter(r=>r.ereignis===art.erfolgWort).length;
           const tb=b.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          // F-F2 -- DIE MENSUR, VARIANTE A (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+          // Abschnitt F-F2, Klasse B): Chris' Tauzieh-Auftrag vom 22.09., woertlich "der
+          // gewinnende spieler [soll] den anderen immer weiter zurueck draengen", war bisher
+          // reine Anzeige -- buehneTauziehVersatz() liest seit F-B2 (Broadcast-Optik-Dokument
+          // 27-09, s. dortiger Kommentar bei zeichneFechten()) ohnehin schon die laufende
+          // TREFFERDIFFERENZ, nicht mehr `vorteil`. Im echten Degenfechten ist das
+          // Zurueckdraengen aber eine REGEL, keine Zierde: wer mit beiden Fuessen die hintere
+          // Endlinie ueberschreitet, gibt dem Gegner einen Treffer. `mensur` bildet das nach:
+          // ein gedachter Zustand in [-1,+1] (0 = Bahnmitte), der sich JEDEN Gang um die
+          // PUNKT-DIFFERENZ dieses einen Gangs verschiebt (dieselbe Groesse, aus der `lauf`
+          // oben kumulativ `verlauf[]` bildet -- hier nur nicht kumuliert, sondern je Gang auf
+          // FECHTEN_MENSUR_SKALA normiert und bei Grenzueberschreitung auf 0 zurueckgesetzt,
+          // wie real nach jedem Treffer). VARIANTE A (Dokument: "ich wuerde mit A anfangen"):
+          // liest NUR die bereits fertige Rundenpunkt-Differenz -- kein neuer Attributkanal,
+          // Torment traegt dadurch nicht staerker als heute, messe-arena-einfluss.mjs sieht
+          // diese Aenderung nicht.
+          //
+          // NUR IN u.treffer/gefechtSieg, NIE IN u.summe: `a.runden[r].punkte`/
+          // `b.runden[r].punkte` werden hier nicht veraendert -- `lauf`/`verlauf` (zwei Zeilen
+          // oben) und `wert()` (liest u.summe) bleiben bit-identisch, miss-alle-
+          // disziplinen.mjs sieht diese Aenderung ebenfalls nicht. Der Mensur-Treffer ist ein
+          // ZUSAETZLICHER Treffer, additiv auf demselben Feld wie ein gewoehnlicher
+          // erfolgWort-Treffer (s. TREFFERSTAND-Kommentar bei BUEHNE_ART.fechten oben) --
+          // stepBuehne() zaehlt ihn beim Enthuellen in `r.mensurTreffer` getrennt UND
+          // zusaetzlich zu `r.ereignis===art.erfolgWort` hoch (s. dortiger Kommentar), damit
+          // ein Gang, der beides zugleich ist (ein gelandeter Treffer UND die Grenzueber-
+          // schreitung desselben Gangs), auch beide zaehlt -- exakt das hier vorberechnete
+          // `taM`/`tbM`.
+          let mensur=0, mensurTrefferA=0, mensurTrefferB=0;
+          for(let r=0;r<art.rundenN;r++){
+            const diffGang=(a.runden[r]?a.runden[r].punkte:0)-(b.runden[r]?b.runden[r].punkte:0);
+            mensur+=diffGang/FECHTEN_MENSUR_SKALA;
+            if(mensur>=1){ a.runden[r].mensurTreffer=true; mensurTrefferA++; mensur=0; }
+            else if(mensur<=-1){ b.runden[r].mensurTreffer=true; mensurTrefferB++; mensur=0; }
+          }
+          a.mensurTreffer=mensurTrefferA; b.mensurTreffer=mensurTrefferB;
+          const taM=ta+mensurTrefferA, tbM=tb+mensurTrefferB;
           // ECHTE DEGEN-ZUSATZREGEL bei Treffergleichstand (FIE-Prioritaetsminute, Review
           // Abschnitt 3.2 Punkt 5): eine Zusatzminute, Prioritaet per Los, bei ausbleibendem
           // Treffer gewinnt die Seite mit Prioritaet. Die Zusatzminute selbst wird hier nicht
@@ -15465,10 +15531,13 @@
           // entscheidet nur, wenn der Trefferstand danach immer noch gleich steht. `rr()` ruehrt
           // damit die deterministische Formkarten-/Ereignis-Reihenfolge dieses Gefechts nicht an
           // -- alle Punkte/Treffer beider Fechter stehen zu diesem Zeitpunkt schon fest.
-          const gleichstand=ta===tb;
+          // GELESEN WIRD DER ENDSTAND NACH MENSUR (`taM`/`tbM`), NICHT `ta`/`tb`: die Mensur ist
+          // seit F-F2 Teil des echten Trefferstands, der Gleichstand/die Prioritaet muessen
+          // denselben Stand lesen wie `gefechtSieg` gleich darunter.
+          const gleichstand=taM===tbM;
           const prioA=gleichstand?rr()<0.5:null;
-          a.gefechtSieg=ta>tb||(prioA===true);
-          b.gefechtSieg=tb>ta||(prioA===false);
+          a.gefechtSieg=taM>tbM||(prioA===true);
+          b.gefechtSieg=tbM>taM||(prioA===false);
           // NUR BEI TATSAECHLICHEM TREFFERGLEICHSTAND gesetzt (sonst bliebe `prioA` `null` und
           // beide Seiten straeflich auf `false` stehen) -- die Ticker-/Tabellen-Texte lesen
           // dieses Feld, um "Sieg nach Prioritaet" nur zu zeigen, wenn es auch einen Losentscheid
@@ -15477,6 +15546,51 @@
           a.prioritaet=prioA===true; b.prioritaet=prioA===false;
         }
       }
+    }
+
+    // F-F1 -- DIE FECHTSTAFFEL (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+    // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt F-F1, Klasse B): das olympische
+    // Mannschaftsfechten ist real keine Reihe paralleler Einzelgefechte, sondern eine
+    // STAFFEL -- die Gefechte laufen nacheinander auf einer Bahn. Ersetzt fuer Fechten NUR die
+    // ENTHUELLUNGSREIHENFOLGE: Gefecht 1 komplett (alle `art.rundenN` Gaenge beider Fechter),
+    // dann Gefecht 2, ... statt des generischen "Durchgang 1 aller Bahnen, dann Durchgang
+    // 2"-Rhythmus (REIHENFOLGE-Block unten) -- dasselbe Startreihenfolge-Muster, das
+    // Eiskunstlauf (E-F1)/Showcase (S-F1) oben schon nutzen (eigener fruehzeitiger `return`,
+    // bevor der generische Block greift). `mine[i]`/`gegner[i]` stehen bereits in Chris'
+    // Aufstellungsreihenfolge (Slot 1 zuerst, s. `slotFuer()` oben) -- Slot 1 eroeffnet die
+    // Staffel, der letzte gesetzte Slot ist der Anker, der real einen Rueckstand noch drehen
+    // kann, genau das Drama, das Chris am 22.09. fuer Breaking bestellt hat ("so kann zb ein
+    // starker spieler auf slot 6 noch mal richtig aufholen"), hier aber das REALE Format der
+    // Sportart, keine Uebertragung.
+    //
+    // RANGTREUE-NEUTRAL AUS DEMSELBEN GRUND WIE E-F1/S-F1 (Paket 1, s. deren Kommentare oben):
+    // `setz()` hat beide `runden[]`-Arrays schon VOLLSTAENDIG vorberechnet, bevor diese Stelle
+    // ueberhaupt laeuft -- die Reihenfolge, in der `buehneQueue` sie freigibt, aendert nichts an
+    // WAS gewuerfelt wurde oder WIEVIEL rr() verbraucht wurde, nur WANN es sichtbar wird.
+    // `u.summe`/`u.vorteil`/`u.verlauf`/`MOTOREN[...].wert()` bleiben bit-identisch --
+    // miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs sehen diese Aenderung nicht. GESAMT-
+    // DAUER UNVERAENDERT: `buehneQueue` traegt exakt so viele Eintraege wie vorher
+    // (`duellBretter*art.rundenN*2`), nur anders sortiert, bei unveraendertem `art.rundenDauer`
+    // -- keine Klasse-T-Aenderung, keine Wanduhr-Taktungskonstante wird beruehrt.
+    //
+    // NUR DIE GLOBALE REIHENFOLGE AENDERT SICH, NICHT DIE BAHN-LOKALE: innerhalb eines
+    // Gefechts bleibt die Abfolge a-Gang-r, b-Gang-r, a-Gang-r+1, b-Gang-r+1, ... exakt wie im
+    // generischen Block unten -- die Doppelfeuer-Gates weiter unten (vorteilKipptBig,
+    // "PERIODE BEENDET", "BRETT ENTSCHIEDEN"), die `gegner.aktuell` gegen `u.aktuell`
+    // vergleichen, vergleichen beide Seiten DESSELBEN Gefechts und bleiben deshalb unveraendert
+    // korrekt -- veraendert ist nur, WANN das naechste Gefecht ueberhaupt an die Reihe kommt.
+    if(art.fechten){
+      buehneQueue=[];
+      const duellBretter=Math.min(mine.length,gegner.length);
+      for(let i=0;i<duellBretter;i++){
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        for(let r=0;r<art.rundenN;r++){
+          if(a)buehneQueue.push(a);
+          if(b)buehneQueue.push(b);
+        }
+      }
+      return;
     }
 
     // DUETT (Eiskunstlauf, #856/#857) — FUSION AUF RUNDENEBENE, NICHT AUF SUMME. Die
@@ -17628,6 +17742,14 @@
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
+        // F-F2 -- MENSUR-TREFFER (Paket 3, s. der grosse Kommentar bei `art.fechten` in
+        // bauBuehne() oben): eigener, ZUSAETZLICHER Zaehler, bewusst nicht per `else if` an
+        // den Zweig direkt darueber gehaengt -- ein Gang kann zugleich ein gelandeter
+        // erfolgWort-Treffer UND die Grenzueberschreitung sein, dann zaehlt `u.treffer` beides
+        // einzeln, genau wie es `taM`/`tbM` bei der `gefechtSieg`-Berechnung in bauBuehne()
+        // schon vorwegnimmt. `r.mensurTreffer` steht bereits vollstaendig fest (bauBuehne()
+        // rechnet die ganze Mensur-Simulation vorab durch), hier nur gelesen, kein rr().
+        if(BB().fechten&&r.mensurTreffer)u.treffer++;
         const fechtGegner=BB().fechten?gegner:null;
         // VOKABULAR JE DUELL-ART (30.09., duellWorte()-Kommentar oben): Schach/Tennis
         // zeigen weiterhin den laufenden Wert aus `v`/`u.verlauf`, nur das Wort wechselt
@@ -43801,6 +43923,16 @@
       const wert=M.wert();
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      // F-F1 -- DIAGNOSEFELDER FUeR DIE FECHTSTAFFEL (Paket 3, s. der grosse Kommentar bei
+      // `art.fechten` in bauBuehne() oben): reines Zusatzfeld fuer Messskripte (Mensur-
+      // Haeufigkeit, Mirror-Test) -- `boxscore`-Reihen ausserhalb von Fechten bleiben
+      // unveraendert (`treffer`/`mensurTreffer` stehen nur hier, `wert`/`name` wie immer).
+      if(BUEHNE_ART[bd].fechten){
+        for(const row of boxscore){
+          const u=TEILNEHMER.find(x=>x.n===row.name);
+          if(u){ row.treffer=u.treffer||0; row.mensurTreffer=u.mensurTreffer||0; }
+        }
+      }
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, Opus-Konzeptreview 26.09., s.
       // "F1"-Kommentar bei `art.duell` in bauBuehne()): der Trefferstand entscheidet das Brett
       // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
@@ -43808,7 +43940,22 @@
       // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
       const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
-      const seiten=[bretter(0),bretter(1)];
+      // F-F1 -- TEAMSTAND = KUMULIERTE TREFFER, NICHT GEWONNENE BAHNEN (Paket 3, Fable-Ideen
+      // Buehne-Duell 30.09., Abschnitt F-F1, Klasse B): die Fechtstaffel ist real EIN
+      // Mannschaftsgefecht mit einem gemeinsamen, kumulierten Trefferstand (Ziel 45 bei neun
+      // Gefechten), kein "Bahnen gewonnen"-Mannschaftsschach wie bisher uebernommen. NUR fuer
+      // Fechten (`BUEHNE_ART[bd].fechten`, dieselbe Weiche wie `brettSieg` oben) -- Speed-
+      // Schach/Tennis bleiben bei `bretter()`, der gewonnenen-Bretter-Zaehlung.
+      //
+      // RANGTREUE-/Pp-NEUTRAL: `u.treffer` fliesst nirgends in `wert()` (liest u.summe) oder
+      // `eig` ein -- `einflussVon()`/`disziplinProbe()` lesen beide ausschliesslich `wert()`,
+      // nie `seiten`. Diese Aenderung wirkt ausschliesslich auf den ARENA-Mannschaftsvergleich
+      // (den Teamstand, der ueber die Disziplin in einem Spieltag entscheidet), nicht auf die
+      // individuelle Rangtreue-Messung. Gemessen werden muessen deshalb Spiegelsymmetrie
+      // (scripts/miss-arena-buehne-spiegel.mjs, derselbe Code-Pfad) und die Verteilung der
+      // Teamsiege selbst -- s. PR-Beschreibung.
+      const treffer=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+(u.treffer||0),0);
+      const seiten=BUEHNE_ART[bd].fechten?[treffer(0),treffer(1)]:[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
