@@ -7416,6 +7416,40 @@
   }
   const STEAL_TRAUBE=0.06;         // Abzug auf die Ballsicherheit je Decker ueber den ersten hinaus (nur in Unterzahl wirksam)
   const STEAL_REICHWEITE=45;        // wie nah ein Decker sein muss, um es auf einen Steal ankommen zu lassen
+  // BASKETBALL-STEAL-KALIBRIERUNG (02.10., Fable-Recherche
+  // docs/design/basketball-finalisierung-recherche-fable.md Abschnitt 4.1): NBA-Referenz ist
+  // ~14 Ballverluste je 100 Ballbesitze, davon ~55% Steals (Rest Fehlpaesse u.ae.) — gemessen
+  // lieferte der Motor vor dieser Runde 30-37 Ballverluste bei 84-87% Steal-Anteil, weil JEDER
+  // Decker JEDEN Tick gegen eine feste 2,0-Sekunden-Abklingzeit auf 45 px Reichweite wuerfelt.
+  // Eine reine Konstantenfamilie fuer Basketball, ueber dieselbe `feldspielDisc==="basketball"`-
+  // Weiche wie ueberall sonst im Motor (z.B. BK_DRIBBEL_*) — KEIN neuer rr()-Aufruf, KEINE neue
+  // Mechanik, Hockeys Stockcheck laeuft ueber denselben Code weiterhin mit STEAL_REICHWEITE/
+  // STEAL_TRAUBE und der festen 2,0-Sekunden-Abklingzeit unveraendert. Basketball bekommt:
+  // (a) eine kuerzere Reichweite (weniger Gelegenheiten je Zug), (b) eine laengere Abklingzeit
+  // (seltenere Versuche je Decker), (c) einen Skalar auf `proVersuch` (haelt die Rangfolge der
+  // Formel — AUFBAU/ABWEHR/TEAMGEIST/TRAUBE — unveraendert, senkt nur die absolute Hoehe, damit
+  // die Matrixgewichte ihr Verhaeltnis zueinander behalten, s. messe-arena-einfluss.mjs).
+  const BK_STEAL_REICHWEITE=22;      // runter von STEAL_REICHWEITE 45
+  const BK_STEAL_CD=5.5;             // hoch von den festen 2,0 s
+  const BK_STEAL_SKALA=0.22;         // Faktor auf proVersuch, NACH der 1-basis^(1/3)-Formel
+  // EIGENE FEHLPAESSE (Rest-Turnover-Anteil, s. passeAb/eigenerFehler): derselbe Zweig wie fuer
+  // Hockey, aber mit hoeherer Rate — real stammt gut die Haelfte aller Ballverluste NICHT aus
+  // einem Steal (schlechter Pass, Travel, Schrittfehler, 24-Sekunden-Verstoss — alles, was der
+  // Motor bisher nicht einzeln modelliert und hier zusammen in den Fehlpass-Zweig faellt). Basis
+  // UND Deckel um denselben Faktor angehoben, damit sich an der AUFBAU-Abhaengigkeit nichts
+  // dreht (ein Spielmacher mit AUFBAU 85 bleibt relativ sicherer als einer mit AUFBAU 30).
+  const BK_FEHLPASS_SKALA=0.85;
+  // PASS-INTERCEPTION (s. passeAb/PASSLINIE_RADIUS unten): Messung waehrend dieser Runde
+  // zeigte, dass der weit groessere Teil der "Steals" im Basketball-Boxscore ueberhaupt
+  // nicht aus versucheSteal() stammt, sondern aus genau dieser Passlinien-Abfangchance —
+  // mit BK_STEAL_SKALA=0 (versucheSteal komplett stumm) blieben 17,8 von 18,7 Steals je
+  // Spiel stehen. Dieselbe Konstantenfamilie wie oben, nur fuer den zweiten, tatsaechlich
+  // dominanten Kanal: `BK_PASSLINIE_SKALA` sitzt NACH der bestehenden Formel (Form bleibt,
+  // nur die Hoehe sinkt), `BK_PASSLINIE_RADIUS` ersetzt PASSLINIE_RADIUS nur fuer
+  // Basketball. Hockey (passeAb wird von beiden Disziplinen aufgerufen) behaelt die alte
+  // Formel und PASSLINIE_RADIUS unveraendert.
+  const BK_PASSLINIE_RADIUS=38;      // runter von PASSLINIE_RADIUS 55
+  const BK_PASSLINIE_SKALA=0.25;     // Faktor auf die Abfangchance, NACH der bestehenden Formel
   const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
@@ -11283,9 +11317,16 @@
       const d=distZuLinie(v,von,nach);
       if(d<minD){minD=d;waechter=v;}
     }
-    if(waechter&&minD<PASSLINIE_RADIUS){
+    // BASKETBALL-STEAL-KALIBRIERUNG (02.10., s. BK_PASSLINIE_* oben): eigener Radius und
+    // eigener Skalar NUR fuer Basketball — Hockeys Passabfangen (hockeyPassQualBonus-
+    // Nachbarschaft) laeuft ueber denselben Code unveraendert mit PASSLINIE_RADIUS/der alten
+    // Formelhoehe weiter.
+    const passlinieRadius=feldspielDisc==="basketball"?BK_PASSLINIE_RADIUS:PASSLINIE_RADIUS;
+    const passlinieSkala=feldspielDisc==="basketball"?BK_PASSLINIE_SKALA:1;
+    if(waechter&&minD<passlinieRadius){
       const chance=Math.min(0.32+druckBonus,Math.max(0.03,
-        0.04+(waechter.ABWEHR-50)*0.0025+(PASSLINIE_RADIUS-minD)/PASSLINIE_RADIUS*0.12+druckBonus)); // PLATZHALTER
+        0.04+(waechter.ABWEHR-50)*0.0025+(passlinieRadius-minD)/passlinieRadius*0.12+druckBonus))
+        *passlinieSkala; // PLATZHALTER
       if(rr()<chance)abgefangenVon=waechter;
     }
     // EIGENER FEHLPASS (Chris' Fund: "Turnovers... nicht nur ueber Steals"): ein
@@ -11303,7 +11344,13 @@
     // 3,9 % der Paesse selbst weg (Deckel unveraendert bei 1,5 %), ein schwacher mit
     // AUFBAU 30 in 5,0 % — der Ballverlust zieht im Mass 0,8 ab und war vorher praktisch
     // skillunabhaengig.
-    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0016);
+    // BASKETBALL-STEAL-KALIBRIERUNG (02.10., s. BK_STEAL_*/BK_FEHLPASS_SKALA oben): Basis UND
+    // Deckel um BK_FEHLPASS_SKALA angehoben, damit der Rest-Turnover-Anteil (kein Steal, s.
+    // Fable-Recherche 4.1) mitwaechst, waehrend die Steal-Zahl selbst sinkt — sonst kippt der
+    // Steal-Anteil an den Ballverlusten nicht in Richtung der NBA-55%, sondern bleibt nur
+    // insgesamt niedriger. Ausserhalb von Basketball (Hockey) bitgleich die alte Formel.
+    const fehlpassSkala=feldspielDisc==="basketball"?BK_FEHLPASS_SKALA:1;
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015*fehlpassSkala,0.05*fehlpassSkala-(von.AUFBAU-50)*0.0016);
     // PASSDAUER NACH STRECKE, nur im Eishockey. Die feste Drittelsekunde traegt auf einem
     // Basketballcourt, weil dort kein Pass weit ist. Auf der Eisflaeche misst der laengste
     // gemessene Pass 992 px — in 0,3 s waeren das 3300 px/s, also ein Teleport, und genau
@@ -11350,8 +11397,16 @@
     const basis=Math.min(0.94,Math.max(0.20,
       0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0050+traeger.TEAMGEIST*0.0060
       -(traube-1)*STEAL_TRAUBE));
-    const proVersuch=1-Math.pow(basis,1/3);
-    decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
+    // BASKETBALL-STEAL-KALIBRIERUNG (02.10., s. BK_STEAL_* oben): `BK_STEAL_SKALA` sitzt
+    // NACH der 1-basis^(1/3)-Umrechnung und veraendert deshalb nur die absolute Hoehe von
+    // `proVersuch`, nicht die Form der Formel darueber — AUFBAU, ABWEHR, TEAMGEIST und TRAUBE
+    // wirken im selben Verhaeltnis zueinander wie vorher, nur das gesamte Ergebnis ist
+    // kleiner. Ausserhalb von Basketball (Hockey) bleibt proVersuch bitgleich die alte Zahl.
+    const proVersuch=(1-Math.pow(basis,1/3))*(feldspielDisc==="basketball"?BK_STEAL_SKALA:1);
+    // Abklingzeit NACH Disziplin: Basketball bekommt die laengere BK_STEAL_CD (s. oben),
+    // Hockeys Stockcheck behaelt die alten, festen 2,0 s unveraendert (PLATZHALTER, kein
+    // Jitter, s. Kommentar unten).
+    decker.stealCd=feldspielDisc==="basketball"?BK_STEAL_CD:2.0;
     // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
     // Zahlenwurf ohne sichtbare Aktion — bei Misserfolg passierte optisch NICHTS, bei
     // Erfolg zuckte der Decker erst nachtraeglich. `lunge` treibt in zeichneSprite()
@@ -12679,9 +12734,12 @@
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>((LIVE()||{}).schussuhr||SCHUSSUHR_BASKETBALL);
         if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
+        // BASKETBALL-STEAL-KALIBRIERUNG (02.10.): kuerzere Reichweite nur fuer Basketball,
+        // s. BK_STEAL_REICHWEITE oben — Hockeys Stockcheck behaelt STEAL_REICHWEITE (45 px).
+        const stealReichweite=feldspielDisc==="basketball"?BK_STEAL_REICHWEITE:STEAL_REICHWEITE;
         for(const v of deckerAlle){
           if(fsLive.ball.traeger!==traeger)break;
-          if(v.stealCd<=0&&dist(v,traeger)<STEAL_REICHWEITE)versucheSteal(v,traeger,art);
+          if(v.stealCd<=0&&dist(v,traeger)<stealReichweite)versucheSteal(v,traeger,art);
         }
       }
     }
