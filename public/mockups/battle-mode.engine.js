@@ -36237,7 +36237,48 @@
       // Chris (Bericht Teil 6, Frage 1), nicht Teil dieser Aenderung.
       if(art.staffel){
         const eigW=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engP+breitP+eigHebung(p,d)+eigMutator(p,d);
-        const m=0.73*w.ANTRITT+0.27*w.ENDTEMPO;      // die effektive Tempoformel eines 1,7-s-Beins
+        // PP-KALIBRIERUNG (Task #40, 02.10.): `m` war 0,73*ANTRITT+0,27*ENDTEMPO, also nur
+        // Speed/Spirit/Stamina/Will (ANTRITT/ENDTEMPO lesen kein Awareness/Dexterity/
+        // Charisma/Determination/Health). Gemessen (messe-arena-einfluss.mjs staffel 48, zwei
+        // Saatstroeme) stand die Abweichung zur Matrix bei 61,9 Pp: Speed (Matrix 24) kam
+        // nur auf 8,9 %, Spirit (Matrix 16) auf 3,5 % — beide sitzen SOWOHL im Zaehler
+        // (eigW, ueber die Matrix) ALS AUCH im Nenner (m, ueber ANTRITT/ENDTEMPO) und damit
+        // kuerzt sich ihr Einfluss auf f=eigW/m grossteils weg. Awareness/Dexterity/
+        // Charisma/Determination/Health sitzen NUR im Zaehler (ueber TECHNIK/WENDIGKEIT/
+        // STEHEN/ROBUST) und wurden dadurch ungedaempft durchgereicht: Awareness mass
+        // 21,2 % gegen Matrix 12, Dexterity 15,8 % gegen 8, Determination 10,4 % gegen 4.
+        //
+        // FIX: `m` jetzt wie bei Takeshi/Climbing (`art.mengeAusEignung` unten) das
+        // GLEICHGEWICHTETE Mittel ALLER sieben Sub-Skills statt nur der zwei Tempo-Werte —
+        // dann sitzt jedes Attribut, das in irgendeinem Sub-Skill vorkommt, auch im Nenner.
+        // Gemessen (messe-arena-einfluss.mjs staffel 48, zwei Saatstroeme, s. PR-
+        // Beschreibung): 37,7/41,1 Pp (vorher 61,9/61,9) bei rho/Spiel weiterhin > 0,80
+        // (0,893/0,895 kaderfest gegen Basis 0,898/0,888) — eine deutliche Verbesserung,
+        // aber NICHT das Ziel <=25.
+        //
+        // WEITERE VERSUCHE (dokumentiert, nicht gewaehlt, s. PR-Beschreibung fuer die
+        // vollstaendigen Messwerte): (a) ein per kleinsten-Quadraten GEWICHTETES statt
+        // gleichgewichtetes Mittel der sieben Sub-Skills — verschlechterte auf 47-50 Pp,
+        // weil `m`s eigene Attribut-Zusammensetzung kein guter Stellvertreter fuer den
+        // tatsaechlich simulierten Einfluss ist; (b) Speed aus WENDIGKEIT/WUCHT entfernen
+        // (Entflechtung von ANTRITT/ENDTEMPO) — verschlechterte auf 49-50 Pp, weil es Speeds
+        // Praesenz im Nenner SENKT statt hebt und die Daempfung damit schwaecht statt
+        // staerkt; (c) Rezept-Anteile direkt umschichten (Speed/Stamina runter, Awareness/
+        // Dexterity/Charisma/Health rauf, innerhalb derselben Sub-Skills) — 42 Pp, ebenfalls
+        // schlechter, UND gegenlaeufig zur Richtung der Verschiebung (Dexterity/Charisma
+        // sanken trotz hoeherem Rezeptanteil). Der gemeinsame Befund: TECHNIK/WENDIGKEIT
+        // wirken ueber den Schnitt ZWEIER Laeufer und nur an ihren eigenen ein bis zwei von
+        // fuenf Wechseln/Kurven — eine strukturelle Verduennung, die keine Rezept- oder
+        // Nenner-Umschichtung innerhalb der bestehenden Kanaele auflösen kann; eine echte
+        // Schliessung auf <=25 braucht entweder eine groessere Mechanik-Aenderung (ausserhalb
+        // dieser Klasse-A-Runde) oder eine eigene Messung der WECHSEL_*/KURVE_*-Konstanten
+        // (als "PLATZHALTER" markiert, s. oben), die diese Runde nicht mehr geschafft hat.
+        //
+        // Eigenes `if`, nicht `art.mengeAusEignung` selbst (das bleibt allein Takeshi/
+        // Climbing vorbehalten) — Spurt/Zeitfahren/Climbing/Takeshi bleiben dadurch
+        // unberuehrt, bit-identisch bestaetigt (`miss-alle-disziplinen.mjs 24 spurt
+        // time-trial takeshis-castle climbing` vor/nach, s. PR-Beschreibung).
+        const ks=Object.keys(w); const m=ks.reduce((s,k)=>s+w[k],0)/ks.length;
         const f=m>0?eigW/m:1;
         for(const k in w)w[k]=Math.round(Math.max(1,Math.min(100,w[k]*f)));
       }
