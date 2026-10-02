@@ -39785,55 +39785,19 @@
     for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
   }
 
-  // D7 -- "LETZTE MINUTE IN ECHTZEIT" (Fable-Ideen-Broadcast-Praesentation 30.09.,
-  // Abschnitt 5, D7; Reihenfolge Abschnitt 7, Reihe 1). Klasse A, "nur speed": `speed` ist
-  // reiner Wandzeit-/UI-Zustand (s. dessen Deklaration oben) -- er bestimmt nur, wie viele
-  // Simulationssekunden ein Realzeit-Frame ueberbrueckt (`acc+=dt*speed` in loop()).
-  // stepSim()/die Tick-Folge selbst bleiben in jedem Fall unveraendert: bei Tempo 1x/2x/4x
-  // laufen exakt dieselben Ticks in derselben Reihenfolge, nur in unterschiedlich viel
-  // Wandzeit -- und die hier ergaenzte Drosselung mutiert `speed` selbst NICHT, sondern
-  // nur den fuer EINEN Frame wirksamen Multiplikator, s. Aufrufstelle in loop(). Headless-
-  // Messungen (miss-alle-disziplinen.mjs & Co.) rufen loop()/requestAnimationFrame() nie
-  // auf -- `speed` und diese Funktion existieren fuer sie gar nicht.
-  //
-  // SCOPE-ENTSCHEIDUNG (diese Runde): Kampf-/Bahn-/Buehnen-Uhren zaehlen aufwaerts ohne
-  // eine im HUD-Pfad bereits bekannte Restzeit (Kampf endet durch Elimination/Punktelimit/
-  // Zeitablauf, nicht durch eine feste Uhr mit Countdown; Bahn/Buehne haben aus demselben
-  // Grund keine "Restzeit bis Spielende" -- nur das Feldspiel hat mit
-  // `feldspielRestzeitAbwaerts()` schon eine gepruefte Countdown-Berechnung, aus der sich
-  // "letzte 30 Sekunden" ableiten laesst, ohne neue Annahmen ueber Spielende zu treffen.
-  // Die Doku nennt daneben "letztes Bein" (Staffel) und "letztes Duell" (Buehne) als
-  // Beispiele -- die brauchen je eine eigene, chassis-eigene Regel und sind bewusst nicht
-  // Teil dieser Runde (s. PR-Beschreibung).
-  //
-  // "Knapp": der Rueckstand liesse sich mit EINER ueblichen Aktion der Disziplin noch
-  // ausgleichen -- ein Dreier (Basketball, Differenz <= 3), ein Treffer (Hockey, <= 1) oder
-  // ein Touchdown mit Zwei-Punkte-Versuch (Football, <= 8).
-  function feldspielFinaleKnapp(){
-    if(!istFeldspiel(disc)||!running||done||!fsLive)return false;
-    const L=LIVE(); if(!L)return false;
-    if(fsLive.viertel<L.perioden||fsLive.viertelpause)return false; // nicht die letzte Periode, oder gerade Pause
-    const restRoh=fsLive.viertel*L.periodenDauer-fsT;
-    if(restRoh<0||restRoh*zeitFaktor()>30)return false; // Nachspielzeit, oder noch nicht in den letzten 30s
-    const team=fsBisher().team;
-    const schwelle=feldspielDisc==="basketball"?3:feldspielDisc==="hockey"?1:8;
-    return Math.abs(team[0]-team[1])<=schwelle;
-  }
-  // Anzeige-Merker (A*-artig, aber reiner Button-Text -- kein neuer Simulations- oder
-  // Spielstandszustand): nur fuer den Uebergang "Finale"-Zusatz an/aus am #spd-Label.
-  let tempoFinaleAktiv=false;
+  // D7 ("Finale in Echtzeit", Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 5) ist
+  // NICHT Teil dieser Runde: das Fable-Papier stuft es selbst als "Klasse A, nur speed" ein,
+  // aber es aendert die vom Zuschauer erlebte Wandzeit-/Spielfluss-Taktung (sperrt das
+  // Tempo in der Schlussphase auf 1x) -- genau das, was CLAUDE.md als Klasse T fasst und
+  // ausdruecklich NUR mit Chris' eigener, expliziter Zustimmung bauen laesst, nicht per
+  // Build-Agent-Selbsteinstufung (dieselbe Falle wie beim Fechten-Format, PR #1111). Separat
+  // als Task fuer Chris vorgemerkt; hier bewusst nicht implementiert.
 
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
     if(running){
-      const finaleKnapp=feldspielFinaleKnapp();
-      if(finaleKnapp!==tempoFinaleAktiv){
-        tempoFinaleAktiv=finaleKnapp;
-        const spdBtn=document.getElementById("spd");
-        if(spdBtn)spdBtn.textContent="Tempo "+(finaleKnapp?1:speed)+"×"+(finaleKnapp?" · Finale":"");
-      }
-      acc+=dt*(finaleKnapp?1:speed);
+      acc+=dt*speed;
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
       // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
@@ -42466,12 +42430,6 @@
   verdrahteKampfHover();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
-    // D7: waehrend der automatische Finale-Ruecksprung greift (s. feldspielFinaleKnapp()/
-    // loop()), bleibt der Klick wirkungslos -- "keine Uebertragung spult das Finale vor".
-    // `speed` selbst zaehlt im Hintergrund trotzdem weiter normal hoch, falls der Klick auf
-    // genau diesen Frame fiel, waere sonst der naechste Klick (nach dem Finale) um einen
-    // Schritt verschoben; stattdessen wird dieser eine Klick schlicht ignoriert.
-    if(tempoFinaleAktiv)return;
     speed=speed===1?2:speed===2?4:1;
     document.getElementById("spd").textContent="Tempo "+speed+"×";
   });
