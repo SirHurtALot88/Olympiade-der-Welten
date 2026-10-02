@@ -1,5 +1,41 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Fuenfzehnter Nachtrag 02.10. — reine Doku-Pflege: Staffel-Pp bei n=48 bestaetigt, Breaking-Pp
+nach dem Speicherleck-Fix neu gemessen.** Zwei offene Positionen aus fruaheren Nachtraegen
+nachgezogen, keine Code-Aenderung in `battle-mode.engine.js`.
+
+1. **Staffel.** Der Elfte-Nachtrag-Tabellenwert (60,4 Pp bei n=24, "strukturell unsicher", weil
+   das Skript fuer sechs an einem Teamergebnis haengende Laeufer selbst n=144 empfiehlt) ist
+   ueberholt: PR #1109 (Bahn-Alternativ-Rechner, 01.10., reine Endstand-Anzeige, kein Rezept
+   beruehrt) hat **61,9 Pp bei n=48** gemessen und als bit-identisch zum Vorher-Stand bestaetigt
+   (`node scripts/messe-arena-einfluss.mjs staffel 48`, unabhaengig in dieser Runde erneut
+   nachgerechnet: exakt 61,9 Pp, gleicher Attributvektor). Status bleibt **VERLETZT** — die Zahl
+   ist jetzt nur nicht mehr unbestaetigt. Die vom Skript fuer Staffel empfohlene n=144-Messung
+   (zwei unabhaengige Saatstroeme) bleibt eine offene Position fuer eine kuenftige
+   Staffel-Kalibrierrunde; dieser Nachtrag ist reine Bestandsaufnahme, kein Rezept wurde
+   angefasst.
+
+2. **Breaking.** Seit PR #1092 (B0, 01.10.) ist das Speicherleck im Messskript selbst behoben
+   (`AudioContext`/`setTimeout` liefen im Messpfad unbegrenzt mit und trieben den Chrome-Renderer
+   in den Cgroup-OOM-Kill ab `n≥12`) — Breaking laeuft seitdem bei n=48 glatt durch, keine
+   Engine-Aenderung. Frisch gemessen in dieser Runde auf dem aktuellen Stand (der die Breaking-
+   Gauntlet-Mechanik aus PR #1097, 01.10., bereits enthaelt):
+   - `node scripts/messe-arena-einfluss.mjs breaking 48` → **14,3 Pp** (296 s, keine
+     Seitenfehler) — bit-identisch zur Zahl aus PR #1097.
+   - `node scripts/messe-arena-einfluss-zweiter-saatstamm.mjs breaking 48` → **13,9 Pp**,
+     deckungsgleich mit dem zweiten Saatstrom aus PR #1097 (identisches Skript, identischer
+     Default-Versatz, Engine seit PR #1097 fuer Breaking unveraendert — bestaetigt per
+     `git log` ueber `public/mockups/battle-mode.engine.js` seit `eb583702`).
+
+   **Beide Werte liegen klar unter der 25-Pp-Schranke — Breaking besteht die Pp-Pflichtpruefung
+   bei n=48 ueber zwei unabhaengige Saatstroeme.** Kein Hinweis auf eine notwendige
+   Kalibrierrunde; anders als bei Gewichtheben/Climbing ist hier **keine** Folgeaufgabe noetig.
+   Die alte, in diesem Dokument zwischenzeitlich kursierende n=1/n=2-Zeile (13,9/14,9) und die
+   noch aeltere n=12-Vorher-Messung (26,8, Neunter Nachtrag, vor dem Gauntlet-Umbau) sind damit
+   endgueltig durch die n=48-Zweistrom-Messung ersetzt. Hockey und TDM sind von diesem
+   Speicherleck-Fix **nicht** betroffen (ihr OOM sitzt an anderer Stelle, s.u.) und bleiben bei
+   kleinem `n` offen.
+
 **Vierzehnter Nachtrag 01.10. — Climbing-Kalibrierrunde, von ABNAHME_OFFEN zurueck zu
 „bestanden" mit Puffer.** Opus hatte Climbing nach dem Mutator-Feature (Dreizehnter Nachtrag)
 als Validitaetsproblem markiert (`ABNAHME_OFFEN` in `scripts/pruefe-rangtreue-schranke.mjs`):
@@ -79,7 +115,7 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
 | Spurt | 11,4 | 24 | bestanden |
 | I-Spy | 13,6 | 12 (n=24 zweimal an Chromium-Abstuerzen gescheitert, s.u.) | bestanden |
 | Wettessen | 13,6 / 14,7 | 48, 2 Saatstroeme | bestanden |
-| Breaking | 13,9 / 14,9 | 1, 2 (n≥12 stuerzt reproduzierbar ab, s.u.) | bestanden, Zahl sehr klein |
+| Breaking | 14,3 / 13,9 | 48, 2 Saatstroeme (Speicherleck behoben, s. Fuenfzehnter Nachtrag) | bestanden |
 | Climbing | 16,4 / 16,9 | 24, 2 Saatstroeme | bestanden |
 | Speed-Schach | 17,3 / 18,3 | 48, 2 Saatstroeme | bestanden |
 | Eiskunstlauf | 20,2 / 20,2 | 48, 2 Saatstroeme | bestanden |
@@ -94,7 +130,7 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
 | TDM | 51,4 | 2 (n=6/24 an OOM-Abstuerzen gescheitert, s.u.) | VERLETZT, Zahl sehr klein |
 | Tennis | 53,9 / 56,4 | 48, 2 Saatstroeme | VERLETZT |
 | Battlefield | 54 | 24 | VERLETZT |
-| Staffel | 60,4 | 24 (strukturell unsicher, s.u., n=144 diese Runde nicht wiederholt) | VERLETZT, Zahl unsicher |
+| Staffel | 61,9 | 48 (PR #1109 bit-identisch bestaetigt, s. Fuenfzehnter Nachtrag) | VERLETZT, klar verletzt |
 | Mini-DM | 115 | 24 | VERLETZT, deutlichste Verletzung im Feld |
 
 **Ursachen, wo bekannt:**
@@ -122,7 +158,11 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
   Zahl ist strukturell unsicher — dasselbe Verlaesslichkeitsproblem wie bei der rho-Messung:
   sechs Laeufer teilen sich ein Team-Ergebnis, das Skript empfiehlt selbst n=144 statt n=24
   (`messe-arena-einfluss.mjs`-Kommentar zu `VORGABE.staffel`); diese Runde hatte dafuer keine
-  Zeit mehr, s. „Was diese Runde nicht geschafft hat" unten.
+  Zeit mehr, s. „Was diese Runde nicht geschafft hat" unten. **Nachtrag 02.10. (PR #1109,
+  Bahn-Alternativ-Rechner):** bei n=48 bit-identisch bestaetigt (61,9 Pp, vorher/nachher gleich,
+  s. Fuenfzehnter Nachtrag) — die Zahl ist damit nicht mehr „strukturell unsicher" im Sinne von
+  „unbestaetigt", bleibt aber klar ueber der 25-Pp-Schranke; die vom Skript empfohlene
+  n=144-Messung steht fuer eine kuenftige Kalibrierrunde weiter offen.
 - **TDM/Mini-DM/Battlefield:** dieselbe seit Monaten bekannte Ursache wie bei der niedrigen
   rho dieser drei (Abschnitt 5 Punkt 1) — Zielwahl ist Geometrie statt Bedrohung, nicht an der
   Eignung ausgerichtet. Mini-DMs 115 Pp ist die mit Abstand deutlichste Verletzung im gesamten
@@ -138,11 +178,18 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
   gewoehnlichem Sandbox-Rauschen — ein eigener Befund fuer eine kommende Runde, hier nur
   dokumentiert, nicht verfolgt. Die gemeldeten Pp-Werte fuer diese drei stammen deshalb aus
   bewusst kleinen `n` (1–6) und sind entsprechend weniger belastbar als die uebrigen Zeilen.
+  **Nachtrag 02.10.:** fuer Breaking ist das inzwischen behoben (PR #1092/B0, echtes
+  WebAudio-/Timer-Speicherleck im Messskript selbst, keine Engine-Aenderung) — n=48 laeuft seitdem
+  glatt durch, s. Fuenfzehnter Nachtrag. Hockey und TDM sind von diesem Fix unberuehrt (ihr Leck
+  sitzt an anderer Stelle) und bleiben offen.
 
 **Was diese Runde nicht geschafft hat:** die von Chris/CLAUDE.md gewuenschte Staffel-Nachmessung
 bei n=144 (fuer eine belastbare Pp-Zahl statt der strukturell unsicheren n=24-60,4) — bei der
 Gesamtlaufzeit dieser Runde (Hockey/TDM/Breaking brauchten je mehrere Anlaeufe) war dafuer keine
-Zeit mehr; das bleibt fuer die naechste Runde offen.
+Zeit mehr; das bleibt fuer die naechste Runde offen. **Nachtrag 02.10.:** eine n=48-Messung kam
+stattdessen ueber PR #1109 (Bahn-Alternativ-Rechner) nebenbei zustande und bestaetigte den Wert
+bit-identisch bei 61,9 Pp (s. Fuenfzehnter Nachtrag) — die volle n=144-Messung bleibt trotzdem
+eine offene Position.
 
 **Was diese Runde NICHT ist:** eine Reparaturrunde. Kein Rezept wurde angefasst, die gesperrte
 Matrix bleibt unveraendert. Jede Pp-Verletzung oben ist ab jetzt eine offene Position fuer die
