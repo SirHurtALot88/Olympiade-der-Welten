@@ -14701,19 +14701,27 @@
       // Schwaeche eines einzigen Mitspielers nehmen — dieselbe Fehlerklasse wie Takeshis
       // `tackleNerven`, 0,937 -> 0,902, nur ueber die ganze Seite statt einen Zug). `bild` wird
       // vom Motor in PR 1 nicht gelesen — reine Datenzeile fuer PR 3 (Bühnenbild).
+      // HINWEISTEXTE (I-5 "Die Fallakte", Task #42, Konzept-Abschnitt s.o.): reine
+      // Datenzeile je Fundort, GENAU wie `bild:"tuer"` zwei Zeilen weiter unten schon
+      // "vom Motor in PR 1 nicht gelesen" ist -- kein rr()-verbrauchender Code liest
+      // `hinweis`, nur die neue Anzeige an der Enthuellung (ispyFallakteVermerken(), s.
+      // bei ISPY_FALLAKTE_KATEGORIE). Cluedo-Kategorien je Raetselart (1.5-Verteilung
+      // oben: Logik 5/Verhoer 3/Mechanik 4 Fundorte): LOGIK->Womit (die Tatwaffe, per
+      // Deduktion), VERHOER->Wer (die/der Verdaechtige, durch Befragung), MECHANIK->Wo
+      // (der Tatort, am Schloss/an der Tuer erschlossen).
       fundorte:[
-        {x:0.12,y:0.30,art:"logik",   stufe:1},
-        {x:0.30,y:0.18,art:"logik",   stufe:2},
-        {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT"},
-        {x:0.70,y:0.18,art:"logik",   stufe:2},
-        {x:0.88,y:0.30,art:"logik",   stufe:1},
-        {x:0.20,y:0.62,art:"mechanik",stufe:1},
-        {x:0.38,y:0.80,art:"verhoer", stufe:2},
-        {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK"},
-        {x:0.62,y:0.80,art:"verhoer", stufe:2},
-        {x:0.80,y:0.62,art:"mechanik",stufe:1},
-        {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer"},
-        {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer"}
+        {x:0.12,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Seil"},
+        {x:0.30,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Kerzenleuchter"},
+        {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT", hinweis:"mit der Pistole"},
+        {x:0.70,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Dolch"},
+        {x:0.88,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Rohr"},
+        {x:0.20,y:0.62,art:"mechanik",stufe:1, hinweis:"im Weinkeller"},
+        {x:0.38,y:0.80,art:"verhoer", stufe:2, hinweis:"die Köchin"},
+        {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK", hinweis:"der Gärtner"},
+        {x:0.62,y:0.80,art:"verhoer", stufe:2, hinweis:"der Butler"},
+        {x:0.80,y:0.62,art:"mechanik",stufe:1, hinweis:"auf der Terrasse"},
+        {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"im Salon"},
+        {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"in der Bibliothek"}
       ],
       // WERTUNGSTABELLE (nur Woerter, wie bei Wettessen/Speed-Schach — Spalten kommen
       // unveraendert aus WERTUNG_AUFTRITT, s. Kommentar dort: "keine Aenderung an der
@@ -15077,6 +15085,18 @@
   // S2 (Buehnenbild Gewichtheben): der zuletzt enthuellte Versuch, fuer die grosse
   // Last-Anzeige auf der Buehne (zeichneHeben liest nur das, kein zweites Protokoll).
   let letzterHebenZug=null;
+  // DIE FALLAKTE (I-5, Task #42, docs/design/fable-ideen-arena-ispy-30-09.md Abschnitt
+  // "I-5 · Die Fallakte — A, klein"): reine Anzeige, rein additiv, GENAU dieselbe Kategorie
+  // wie letzterHebenZug direkt darueber -- gesetzt/gelesen ausschliesslich an der
+  // ENTHUELLUNG (stepBuehne(), BB().schatzsuche-Zweig), NIE in baueSchatzsuche()/
+  // ispySeiteTick() (dem rr()-verbrauchenden Gameplay-Rechner selbst). Kein rr()-Aufruf,
+  // kein Einfluss auf u.summe/MOTOREN["i-spy"].wert() -- die Abnahme (miss-alle-
+  // disziplinen.mjs/messe-arena-einfluss.mjs) ruft M.lauf() mit `stumm=true`, feed() kehrt
+  // dort sofort zurueck (s. Kopf von feed()), die Set-/Objekt-Schreibzugriffe hier bleiben
+  // folgenlos fuer jede gemessene Zahl. {0:{gefunden:Set<fundortIdx>, kategorien:{Wer/Wo/
+  // Womit: Hinweistext}, gesamt:Zahl aktiver Fundorte}, 1:{...}} -- je Seite, neu gesetzt
+  // in baueSchatzsuche() (s. dort).
+  let ispyFallakte={0:null,1:null};
   // LAMPEN-FASSUNG VON letzterHebenZug (Folgefund zu PR #1091, Task #35, 01.10.): die
   // "Zuletzt: ..."-Zeile in zeichneHeben() las bislang `letzterHebenZug.r.ereignis` direkt --
   // dasselbe woertliche "gueltig"/"ungueltig" im Text, schon bei der Enthuellung sichtbar,
@@ -16953,6 +16973,15 @@
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
     const mineRaum=ispyBaueRaum(art,mineT);
     const gegnerRaum=ispyBaueRaum(art,gegnerT);
+    // FALLAKTE ZURUECKGESETZT (I-5, Task #42): reines Anlegen eines leeren Anzeige-
+    // Zustands je Seite, `.gesamt` liest nur `.length` der schon gebauten Raeume (kein
+    // zusaetzlicher rr()-Verbrauch, kein neuer Zufallszug) -- s. Kommentar bei
+    // `ispyFallakte` oben fuer die Begruendung, warum das folgenlos fuer jede gemessene
+    // Zahl bleibt.
+    ispyFallakte={
+      0:{gefunden:new Set(), kategorien:{}, gesamt:mineRaum.length},
+      1:{gefunden:new Set(), kategorien:{}, gesamt:gegnerRaum.length}
+    };
     const avg=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+u[feld],0)/arr.length:0;
     const mineTeamgeist=avg(mineT,"TEAMGEIST"), gegnerTeamgeist=avg(gegnerT,"TEAMGEIST");
     // VERZAHNTE TICK-SCHLEIFE (Konzept 3.4, Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG"): anders
@@ -17038,6 +17067,48 @@
   const ISPY_ART_LABEL={logik:"Logik",verhoer:"Verhör",mechanik:"Mechanik"};
   const ISPY_STUFE_AKK={1:"die Notiz",2:"die Akte",3:"den Tresor"};
   const ISPY_STUFE_AN={1:"an der Notiz",2:"an der Akte",3:"am Tresor"};
+
+  // ================== I-5 "DIE FALLAKTE" (Task #42, Klasse A — reine Anzeige) ==================
+  // docs/design/fable-ideen-arena-ispy-30-09.md, Abschnitt "I-5 · Die Fallakte": "Jede Truhe
+  // traegt einen kleinen Hinweistext (Cluedo-Kategorien: Wer / Wo / Womit, je Art einer), und
+  // die HUD-Leiste zeigt je Seite eine Fallakte '7 von 12 Hinweisen', die sich mit jedem Fund
+  // fuellt; am Ende blendet der Ticker [...] ein -- rein narrativ, aus den geknackten Arten
+  // zusammengesetzt, ohne einen Punkt zu aendern." Alle drei Funktionen hier LESEN nur bereits
+  // enthuellte `r.art`/`r.fundort`/`r.ereignis` (dieselben Felder, die ispyTickerZeile() direkt
+  // oberhalb schon liest) und SCHREIBEN ausschliesslich in `ispyFallakte` (s. dort) -- nie in
+  // u.summe, u.runden, oder irgendein von wert()/rr() gelesenes Feld. Aufrufstelle: der
+  // BB().schatzsuche-Zweig der Enthuellungs-Warteschlange in stepBuehne() (s. dort).
+  const ISPY_FALLAKTE_KATEGORIE={logik:"Womit",verhoer:"Wer",mechanik:"Wo"};
+  // Vermerkt einen ENTHUELLTEN Fund (nicht den rohen Gameplay-Tick -- der ist laengst in
+  // baueSchatzsuche() gelaufen) in der Fallakte der jeweiligen Seite. Jeder Fundort zaehlt
+  // nur EINMAL (Nachfuellung kann denselben `idx` im Lauf des Spiels mehrfach knacken lassen,
+  // "7 von 12" zaehlt Hinweise, nicht Ereignisse) -- der ERSTE enthuellte Fund einer Kategorie
+  // setzt ihren Hinweistext, ein spaeterer erfolgreicher Fund derselben Kategorie aendert ihn
+  // nicht mehr (die Fallakte "entscheidet" sich fuer den ersten Hinweis, wie eine echte Akte).
+  function ispyFallakteVermerken(side,r){
+    const fa=ispyFallakte[side];
+    if(!fa||r.fundort==null||r.art==null)return;
+    if(fa.gefunden.has(r.fundort))return;
+    fa.gefunden.add(r.fundort);
+    const kategorie=ISPY_FALLAKTE_KATEGORIE[r.art];
+    if(kategorie&&!fa.kategorien[kategorie]){
+      const f=BUEHNE_ART["i-spy"].fundorte[r.fundort];
+      fa.kategorien[kategorie]=(f&&f.hinweis)||null;
+    }
+  }
+  // "7 von 12 Hinweisen" -- Zaehlertext fuer den Ticker-Anhang an jedem enthuellten Fund.
+  function ispyFallakteStand(side){
+    const fa=ispyFallakte[side];
+    return fa?fa.gefunden.size+" von "+fa.gesamt+" Hinweisen":null;
+  }
+  // "Team X loest den Fall: der Gaertner, im Salon, mit dem Kerzenleuchter" -- am Ende
+  // zusammengesetzt aus den bis dahin gefuellten Kategorien; eine noch offene Kategorie
+  // bleibt "???" (die Akte ist dann unvollstaendig, kein Fehler, keine Sonderbehandlung).
+  function ispyFallakteSatz(side){
+    const fa=ispyFallakte[side];
+    if(!fa)return null;
+    return ["Wer","Wo","Womit"].map(k=>fa.kategorien[k]||"???").join(", ");
+  }
 
   // ================== BREAKING WIRD ZUM GAUNTLET (22.09.) ==================
   // s. Kommentar an BUEHNE_ART.breaking.gauntlet fuer Chris' Wortlaut und die Herleitung.
@@ -17795,11 +17866,30 @@
         const vorherSeite=ispyFuehrungMit(u.side===0?-r.punkte:0,u.side===1?-r.punkte:0);
         const nachherSeite=ispyFuehrungMit(0,0);
         const fuehrungswechsel=vorherSeite!=null&&nachherSeite!=null&&vorherSeite!==nachherSeite;
+        // I-5 "DIE FALLAKTE" (Task #42, Klasse A): nur bei einem ENTHUELLTEN Fund (nicht bei
+        // einem Fehlschlag) vermerkt und an die bestehende Ticker-Zeile angehaengt -- "die
+        // sich mit jedem Fund fuellt". Reine Textzierde wie die ACT-Zierde im Showcase-Zweig
+        // oberhalb: `ispyTickerZeile(u,r)` selbst bleibt unveraendert, nur der Anhang ist neu.
+        const ispyErfolg=r.ereignis===BUEHNE_ART["i-spy"].erfolgWort;
+        if(ispyErfolg)ispyFallakteVermerken(u.side,r);
+        const fallakteAnhang=(ispyErfolg&&ispyFallakteStand(u.side))
+          ?" — Fallakte "+ispyFallakteStand(u.side):"";
         // TICKER-STUFE (Punkt 8, s. feed()): eine erfolglose Untersuchung ist Routine und steht
         // nur im Protokoll; jeder Fund (Punkte) bleibt im Ticker, solange das Budget reicht.
-        feed(u.side,ispyTickerZeile(u,r),versuchBig||fuehrungswechsel,undefined,
+        feed(u.side,ispyTickerZeile(u,r)+fallakteAnhang,versuchBig||fuehrungswechsel,undefined,
           versuchBig?"tresor":"fuehrungswechsel",undefined,undefined,
           r.ereignis===BUEHNE_ART["i-spy"].erfolgWort?undefined:"routine");
+        // AM ENDE DER ENTHUELLUNG (Konzept: "am Ende blendet der Ticker [...] ein"): die
+        // generische Enthuellungs-Warteschlange (s. Kopfkommentar bei BUEHNE_ART["i-spy"])
+        // hat hier ihren letzten Eintrag ausgegeben -- `buehneZeiger` wurde bereits oben
+        // (vor diesem ganzen if/else) inkrementiert, `>=buehneQueue.length` ist deshalb schon
+        // jetzt wahr, nicht erst einen Frame spaeter. Zwei zusaetzliche, rein narrative
+        // Zeilen -- eine je Seite -- NACH der letzten regulaeren Ticker-Zeile, kein Einfluss
+        // auf `done`/u.summe/MOTOREN["i-spy"].wert().
+        if(buehneZeiger>=buehneQueue.length){
+          feed(0,"Team Heim löst den Fall: "+ispyFallakteSatz(0)+".",false);
+          feed(1,"Team Gast löst den Fall: "+ispyFallakteSatz(1)+".",false);
+        }
       } else if(BB().gauntlet){
         // GAUNTLET-KETTE, NACHVOLLZIEHBAR (Praesentations-Vorgabe, s. BUEHNE_ART.breaking.
         // gauntlet-Kommentar): jede Zeile nennt Kaempfer, Gegner und den HP-Stand (aus
