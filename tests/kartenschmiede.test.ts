@@ -240,6 +240,7 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     // Gegner werden als Postkarte gedruckt: Querformat im Verhältnis 3:2 und eine eigene Seitengröße 15 × 10 cm
     expect(kopf + rumpf).toContain(".card.land { aspect-ratio: 3 / 2;");
     expect(kopf + rumpf).toContain("@page postkarte-quer { size: 150mm 100mm;");
+    expect(kopf + rumpf).toContain("aspect-ratio: 2 / 3;");
     // Es gibt nur Held und Gegner zur Auswahl; Gefährten entstehen in der Gruppe
     expect(rumpf).not.toContain('<option value="companion">');
   });

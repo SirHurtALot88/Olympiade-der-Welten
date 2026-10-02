@@ -195,8 +195,8 @@
         </div>
         <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
         ${tier >= 3 ? ["tl", "tr", "bl", "br"].map(c => sym(tier === 6 ? "c-crown" : tier === 5 ? "c-filigree" : "c-bracket", "corner " + c)).join("") : ""}
-        ${tier === 6 ? sym("i-horns", "crest", "width:34%;height:auto;top:calc(var(--u)*-7)")
-          : tier === 5 ? sym("i-gem", "crest", "width:18%;height:auto;top:calc(var(--u)*-4.6)") : ""}
+        ${tier === 6 ? sym("i-horns", "crest", "width:26%;height:auto;top:calc(var(--u)*.4)")
+          : tier === 5 ? sym("i-gem", "crest", "width:14%;height:auto;top:calc(var(--u)*.6)") : ""}
       </article>
     </div>`;
   }
@@ -255,7 +255,7 @@
       ``,
       `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 5:7, head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
       ``,
       `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
@@ -619,29 +619,42 @@
     }
     $("outMany").innerHTML = bilder.map((src, i) => `<img src="${src}" alt="${esc(karten[i].name)}">`).join("");
   }
-  // Drucken: Gegner sind fix als Postkarte (15 × 10 cm), Helden auf A5 oder A4; „Bogen“ legt mehrere kleine Karten auf A4
-  const DRUCKFORMATE = [
-    ["auto", "Gegner Postkarte, Helden A5"], ["postkarte", "Postkarte 15 × 10 cm"], ["a5", "DIN A5"], ["a4", "DIN A4"], ["bogen", "Mehrere auf A4"],
-  ];
-  // Kartenbreite je Seite. Oben bleibt Platz für Krone und Punkte-Abzeichen, die über den Kartenrand ragen.
-  const DRUCKBREITE = { "postkarte-quer": "132mm", "postkarte-hoch": "92mm", "a5-quer": "196mm", "a5-hoch": "136mm", "a4-quer": "276mm", "a4-hoch": "196mm" };
-  const druckFormat = () => { try { return localStorage.getItem("kartenschmiede-druck") || "auto"; } catch { return "auto"; } };
+  // Drucken: Karten immer im Postkartenformat (Gegner quer 15 × 10 cm, Helden hoch 10 × 15 cm), mit 2 mm Rand.
+  // Helden gibt es zusätzlich als Heldenbogen auf A4 – der ändert sich mit dem Helden und wird vor dem Spiel neu gedruckt.
+  const DRUCKFORMATE = [["auto", "Helden als Heldenbogen A4, Gegner als Postkarte"], ["postkarte", "Alles als Postkarte 15 × 10 cm"]];
+  const DRUCKBREITE = { "postkarte-quer": "144mm", "postkarte-hoch": "96mm" };
+  const druckFormat = () => { try { const f = localStorage.getItem("kartenschmiede-druck"); return DRUCKFORMATE.some(([id]) => id === f) ? f : "auto"; } catch { return "auto"; } };
+  const stufeVon = k => R.stufeFuerPunkte(R.punkte(k).pts);
+  function heldenbogen(k) {
+    const zaeh = (parseInt(k.tough, 10) || 1) * (parseInt(k.size, 10) || 1);
+    const kaestchen = (n, rund) => `<div class="kaestchen${rund ? " rund" : ""}">${"<i></i>".repeat(n)}</div>`;
+    const skills = Array.isArray(k.skills) ? k.skills : [];
+    return `<div class="heldenbogen">
+      <div class="hb-karte">${renderCard(k, stufeVon(k), { snap: true, land: false })}</div>
+      <div class="hb-seite">
+        <h2>${esc(k.name || "Held")}</h2>
+        <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
+        <h3>Erfahrung</h3>${kaestchen(20)}
+        <h3>Power</h3>${kaestchen(6, true)}
+        <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
+        <h3>Ausrüstung und Beute</h3><div class="linien">${"<div></div>".repeat(5)}</div>
+        <h3>Notizen</h3><div class="linien">${"<div></div>".repeat(6)}</div>
+      </div>
+      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${esc(f.text || "")}</p>`).join("")}</div></div>` : ""}
+    </div>`;
+  }
   function drucken(karten, format = druckFormat()) {
     const bereich = $("printArea");
-    const karte = k => renderCard(k, R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: k.orient === "land" });
-    if (format === "bogen") {
-      bereich.innerHTML = `<div class="bogen">${karten.map(k => `<div style="width:${k.orient === "land" ? 88 : 63}mm">${karte(k)}</div>`).join("")}</div>`;
-    } else {
-      bereich.innerHTML = karten.map(k => {
-        const f = format === "auto" ? (k.role === "hero" ? "a5" : "postkarte") : format;
-        const seite = `${f}-${k.orient === "land" ? "quer" : "hoch"}`;
-        return `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${karte(k)}</div>`;
-      }).join("");
-    }
+    bereich.innerHTML = karten.map(k => {
+      if (format === "auto" && k.role === "hero") return heldenbogen(k);
+      const seite = k.orient === "land" ? "postkarte-quer" : "postkarte-hoch";
+      return `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${renderCard(k, stufeVon(k), { snap: true, land: k.orient === "land" })}</div>`;
+    }).join("");
     bereich.classList.add("bereit");
     passeAn(bereich);
     requestAnimationFrame(() => window.print());
   }
+
 
 
   // ---------- Tag-Filter und Prägung (gemeinsam für Werkstatt, Baukasten, Gruppe) ----------
@@ -815,7 +828,7 @@
         c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
         c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
         state.upload = c.toDataURL("image/jpeg", .88);
-        state.art = "upload"; state.ax = 50; state.ay = 30; state.zoom = 100;
+        state.art = "upload"; state.ax = 50; state.ay = 35; state.zoom = 100;
         insFormular(); alles();
       };
       img.src = rd.result;
