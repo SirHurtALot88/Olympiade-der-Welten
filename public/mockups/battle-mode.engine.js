@@ -45604,48 +45604,72 @@
             // kaderSetzen oben) und faellt auf den generischen "duellant"-Fallback zurueck.
             neuPersBerechnen();
             // P0-FIX HEIM/GAST-ZIELWAHL-ASYMMETRIE IN DER KADERFAMILIE-SONDE (Opus-
-            // Konsultation Task #26, 02.10., verifiziert in dieser Runde): `schlachtplan()`
-            // (die Taktik, die build() der GAST-Seite als `zielP` mitgibt, s. dort "DIE
-            // GEGNERSEITE") steht und faellt mit `gegnerVorschau()`, und die liest
-            // AUSSCHLIESSLICH `inDisc("tdm")` — fest verdrahtet auf die Zeichenkette "tdm",
-            // nicht auf die gerade gemessene Disziplin, und zwar NUR von der SQUAD(heim)-
-            // Seite (`inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d)`, s. dort).
-            // Im echten Spiel steht dort immer etwas, weil der Mensch seine TDM-Aufstellung
-            // wirklich setzt. Diese Sonde tauscht SQUAD aber ueber eine Kader-Familie aus,
-            // OHNE `place` fuer die neuen Namen zu fuellen (dasselbe gilt fuer den
-            // Einzelkader-Pfad, s. kaderSetzen) — `inDisc("tdm")` ist dadurch fuer jede
-            // Paarung AUSSER der ersten (deren Namen zufaellig mit dem hartkodierten
-            // SQUAD-Default uebereinstimmen) leer, `schlachtplan()` liefert `null`, und die
-            // GAST-Einheiten fallen in chooseTarget() komplett aus dem `if(u.zielP)`-Zweig
-            // heraus auf den letzten Fallback `return nearest(foes)` zurueck — reine
-            // Geometrie, nicht einmal die generische `u.ziel`-Neigung (die existiert fuer
-            // Arena-Einheiten gar nicht). Die HEIM-Seite haengt nie an `schlachtplan()` —
-            // ihr `zielP` kommt direkt aus der PERSZIEL-Persoenlichkeit (`baueEinheit()`,
-            // "UNSERE SEITE") und bleibt die ganze Zeit individuell. Gemessen wurde dadurch
-            // nie "Eignung gegen Eignung", sondern "individualisierte Zielwahl (heim) gegen
-            // reine Naechster-Geometrie (gast)" — eine Verzerrung, die an der ROLLE haengt,
-            // nicht an der Eignung, und jede rho-Zahl nach unten zieht, ohne dass es am
-            // Zielwahl-REZEPT selbst liegt.
+            // Konsultation Task #26, 02.10.; Kausalerzaehlung einer ersten Fassung dieses
+            // Kommentars am 02.10. per Review korrigiert — s.u. "RICHTIGSTELLUNG"):
+            // `schlachtplan()` (die TEAM-KOORDINIERTE Taktik, die build() der GAST-Seite ueber
+            // `zielP`/`ord` mitgibt, s. dort "DIE GEGNERSEITE") steht und faellt mit
+            // `gegnerVorschau()`, und die liest AUSSCHLIESSLICH `inDisc("tdm")` — fest
+            // verdrahtet auf die Zeichenkette "tdm", nicht auf die gerade gemessene Disziplin,
+            // und zwar NUR von der SQUAD(heim)-Seite
+            // (`inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d)`, s. dort). Im echten
+            // Spiel steht dort immer etwas, weil der Mensch seine TDM-Aufstellung wirklich
+            // setzt. Diese Sonde tauscht SQUAD aber ueber eine Kader-Familie aus, OHNE `place`
+            // fuer die neuen Namen zu fuellen (dasselbe gilt fuer den Einzelkader-Pfad, s.
+            // kaderSetzen) — `inDisc("tdm")` ist dadurch fuer jede Paarung AUSSER der ersten
+            // (deren Namen zufaellig mit dem hartkodierten SQUAD-Default uebereinstimmen) leer,
+            // `schlachtplan()` liefert `null`.
+            //
+            // RICHTIGSTELLUNG (nicht "Taktik vs. Geometrie"): eine erste Fassung dieses
+            // Kommentars behauptete, die GAST-Seite falle dadurch in chooseTarget() komplett
+            // auf `return nearest(foes)` zurueck ("reine Geometrie"). Das ist falsch und durch
+            // eigenes Code-Lesen widerlegt: `baueEinheit()`s letztes Feld
+            // `zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"]` greift fuer GAST GENAUSO wie
+            // fuer HEIM — ist der von `schlachtplan()` kommende `zielPers`-Parameter `null`
+            // (gebrochener Plan), faellt `zielP` auf den PERSZIEL-Wert der PERSOENLICHKEIT
+            // dieser EINEN Einheit zurueck (bollwerk->naechster, draufgaenger->speer,
+            // duellant->bedrohung, schleicher->hinten, beschuetzer->schild,
+            // opportunist->schwach) — nicht bedingungslos auf "naechster". Die einzige echte
+            // Ausnahme ist die Persoenlichkeit "bollwerk" (->"naechster", reine Geometrie) —
+            // und die degeneriert IDENTISCH auch fuer HEIM, weil `zielOf[p.n]` (die manuelle
+            // Uebersteuerung) in der automatisierten Sonde nie gesetzt ist.
+            //
+            // Die REALE, kleinere Luecke: ohne `schlachtplan()` verliert die GAST-Seite die
+            // TEAM-KOORDINIERTE Zuteilung (wer bindet den Zaehesten/"fels", wer flankiert wen,
+            // `ord:"mitlinie"`/`"flanke"` nach Team-Analyse statt nach Slot-Vorgabe) und faellt
+            // auf INDIVIDUELLE, nicht team-abgestimmte Persoenlichkeits-Zielwahl zurueck —
+            // "Team-Plan vs. Einzelverhalten", nicht "Taktik vs. Geometrie". Die HEIM-Seite
+            // nutzt ohnehin immer nur die individuelle PERSZIEL-Zielwahl (nie `schlachtplan()`)
+            // — der Unterschied ist also nicht "individuell vs. geometrisch", sondern
+            // "team-abgestimmt vs. individuell", und zwar NUR auf der GAST-Seite.
             //
             // FIX NUR IN DIESER MESS-SONDE: `chooseTarget`/`PERSZIEL`/`bedrohungVon`/
-            // `schlachtplan` bleiben byte-identisch unangetastet. Stattdessen fuellt die
-            // Sonde `place[]` fuer die SQUAD-Seite VOR dem Spieldurchlauf so, wie es die
-            // echte Aufstellung (und bis zur ersten Paarung zufaellig auch diese Sonde)
+            // `schlachtplan`/`gegnerVorschau` bleiben byte-identisch unangetastet. Stattdessen
+            // fuellt die Sonde `place[]` fuer die SQUAD-Seite VOR dem Spieldurchlauf so, wie es
+            // die echte Aufstellung (und bis zur ersten Paarung zufaellig auch diese Sonde)
             // ohnehin tut: die besten `jeSeiteVon(dId)` Namen nach TDM-Eignung (`d.tdm`,
-            // dieselbe Groesse, die `gegnerVorschau()` selbst liest), mit GENAU dem Slot,
-            // den der bisherige Eignungs-Rueckfall in build() (`ersatz`/`slotFuer`) ohnehin
-            // vergeben haette (`slotsVon(dId)` nach Rang) — fuer TDM selbst dadurch
-            // ergebnisgleich zum bisherigen Rueckfall (nur spaeter, explizit statt implizit
-            // gesetzt), fuer Mini-DM/Battlefield wirkungslos fuer die EIGENE Aufstellung
-            // (deren `place`-Eintrag traegt `d:"tdm"`, nicht `d:dId`, `inDisc(dId)` matcht
-            // also nicht — nur `gegnerVorschau()`s hartkodiertes `inDisc("tdm")` sieht sie).
-            // Einzige Wirkung: `schlachtplan()` bekommt wieder eine echte Vorschau und damit
-            // eine echte Taktik fuer die GAST-Seite, symmetrisch zur immer-individuellen
-            // HEIM-Seite — genau das, was im echten Spiel (und in Paarung 1 dieser Sonde,
-            // zufaellig) ohnehin passiert. Nach dem Spieldurchlauf wird jeder beruehrte
-            // `place`-Eintrag auf seinen Stand davor zurueckgesetzt (meist "nicht vorhanden"),
-            // damit nichts in die naechste Paarung oder einen spaeteren Probe-Aufruf
-            // durchsickert.
+            // dieselbe Groesse, die `gegnerVorschau()` selbst liest), mit dem Slot, den
+            // `slotsVon(dId)` nach Eignungs-Rang vergeben wuerde — fuer Mini-DM/Battlefield
+            // wirkungslos fuer die EIGENE Aufstellung (deren `place`-Eintrag traegt `d:"tdm"`,
+            // nicht `d:dId`, `inDisc(dId)` matcht also nicht — nur `gegnerVorschau()`s
+            // hartkodiertes `inDisc("tdm")` sieht sie). Einzige WIRKUNG, die beabsichtigt ist:
+            // `schlachtplan()` bekommt wieder eine echte Vorschau und damit wieder eine echte
+            // TEAM-Taktik fuer die GAST-Seite, so wie es im echten Spiel (und in Paarung 1
+            // dieser Sonde, zufaellig) ohnehin passiert.
+            //
+            // GEMESSENE WIRKUNG IST NICHT EINDEUTIG GERICHTET (Review 02.10., node
+            // scripts/miss-alle-disziplinen.mjs 24 <disz>, isoliert ohne Parallellast): TDM
+            // rho je Spiel 0,404->0,324 (Median, Spannweite 0,912->0,861), Mini-DM
+            // 0,321->0,365, Battlefield 0,399->0,399 (unveraendert) — derselbe Fix-Mechanismus
+            // bewegt die drei Disziplinen NICHT in dieselbe Richtung. Das spricht dafuer, dass
+            // der Fix die Kader-Familie-SLOT-Zuteilung (welcher Name welchen Rang/Slot bekommt,
+            // s. `topNachTdmEignung`/`slotsFuerPlatz` oben) inzidentell neu durchmischt, nicht
+            // fuer eine prinzipiengeleitete Korrektur. Dieser Fix ist deshalb eine Aenderung
+            // der MESSGRUNDLAGE mit unklarem Vorzeichen, keine validierte Verbesserung der
+            // Rangtreue — volle Zahlen und Einordnung:
+            // docs/design/arena-zielwahl-messsonde-02-10.md. Nach dem Spieldurchlauf wird
+            // jeder beruehrte `place`-Eintrag auf seinen Stand davor zurueckgesetzt (meist
+            // "nicht vorhanden"), damit nichts in die naechste Paarung oder einen spaeteren
+            // Probe-Aufruf durchsickert.
             let zielwahlPlatzAlt=null;
             if(ARENA_ART[dId]){
               zielwahlPlatzAlt={};

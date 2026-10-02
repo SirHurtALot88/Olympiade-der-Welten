@@ -4,9 +4,15 @@ Reine Mess-/Diagnose-Runde, ausgelöst durch eine Opus-Konsultation (Task #26, 0
 Arena-Kämpfe (TDM/Mini-DM/Battlefield) mit einer bindenden rho-Verletzung fand (TDM rho=0,404
 gegen die CLAUDE.md-Schranke 0,80, s. `docs/design/tdm-pp-rezeptrunde-diagnose-02-10.md`
 Abschnitt 3) und vermutete, dass der "Zugang" zu Kämpfen (wie oft ein Spieler als Ziel gewählt
-wird) kaum mit Eignung zusammenhängt. **Weder `chooseTarget`, `PERSZIEL`, `bedrohungVon` noch
-`schlachtplan` wurden inhaltlich angefasst** — beide Teile dieser Runde sind Mess-Sonden-Arbeit
-(Klasse A).
+wird) kaum mit Eignung zusammenhängt. **`chooseTarget`, `PERSZIEL`, `bedrohungVon` und
+`schlachtplan` wurden inhaltlich nicht angefasst** — beide Teile dieser Runde sind
+Mess-Sonden-Arbeit (Klasse A).
+
+**Nachtrag (02.10., nach unabhängiger Review):** die erste Fassung dieses Dokuments enthielt
+eine falsche Kausalerzählung ("GAST = reine Geometrie") und zwei zu optimistische Aussagen
+("ergebnisgleich für TDM", Verifikation ohne den eigentlich nötigen Rollentausch-Lauf nach dem
+Fix). Alle drei sind unten korrigiert; die Code-Änderung selbst war davon nicht betroffen und
+blieb unverändert.
 
 ## Teil 1: P0-Bugfix — Heim/Gast-Zielwahl-Asymmetrie in der Kader-Familie-Sonde
 
@@ -14,91 +20,123 @@ wird) kaum mit Eignung zusammenhängt. **Weder `chooseTarget`, `PERSZIEL`, `bedr
 
 `disziplinProbe()`s Kader-Familie-Pfad tauscht `SQUAD`/`OPP` für jede Paarung aus, füllt dabei
 aber **nie `place[]`** (die Aufstellungstabelle) für die neuen Namen. Das bricht `schlachtplan()`
-(die KI-Taktik, die der GAST-Seite ihr `zielP` gibt) lautlos:
+lautlos:
 
 - `schlachtplan()` ruft `gegnerVorschau()`, und die liest ausschließlich `inDisc("tdm")` —
   fest verdrahtet auf die Zeichenkette `"tdm"`, nicht auf die gerade gemessene Disziplin, und
   nur von der **SQUAD(heim)**-Seite (`inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d)`).
 - Ohne `place`-Einträge für die SQUAD-Namen ist `inDisc("tdm")` leer, `gegnerVorschau()` liefert
   `[]`, `schlachtplan()` liefert `null`.
-- In `build()` heißt das für die GAST-Seite: `z.zielP||(o.jagd?"bedrohung":null)` — `z` ist
-  `{}`, und `o.jagd` wird **im gesamten Motor nirgends gesetzt** (verifiziert: kein einziges
-  `.jagd=`/`jagd:` im ganzen Quelltext außer dieser einen Lesestelle — ein totes Flag). `zielP`
-  bleibt also für **jede einzelne** GAST-Einheit `null`/`undefined`.
-- In `chooseTarget()` fällt eine Einheit ohne `zielP` (und ohne die nie gesetzte generische
-  `u.ziel`-Neigung, die für Arena-Einheiten gar nicht existiert) komplett auf den letzten
-  Fallback `return nearest(foes)` zurück — **reine Geometrie statt Taktik, ausnahmslos.**
 
-Die HEIM-Seite hängt nie an `schlachtplan()` — ihr `zielP` kommt direkt aus der
-PERSZIEL-Persönlichkeit (`baueEinheit()`, "UNSERE SEITE") und bleibt die ganze Zeit
-individuell (sechs verschiedene Zielwahl-Archetypen). Gemessen wurde also nie "Eignung gegen
-Eignung", sondern **"individualisierte Zielwahl (heim) gegen reine Nächster-Geometrie
-(gast)"** — eine Verzerrung, die an der ROLLE hängt, nicht an der Eignung.
+**Was das NICHT bedeutet (Korrektur gegenüber der ersten Fassung dieses Dokuments):** die
+GAST-Seite fällt dadurch NICHT auf reine Geometrie zurück. `baueEinheit()`s
+`zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"]` greift für GAST genauso wie für HEIM — ist
+der von `schlachtplan()` kommende `zielPers`-Parameter `null` (gebrochener Plan), fällt `zielP`
+auf den **PERSZIEL-Wert der Persönlichkeit dieser einen Einheit** zurück (bollwerk→naechster,
+draufgaenger→speer, duellant→bedrohung, schleicher→hinten, beschuetzer→schild,
+opportunist→schwach) — nicht bedingungslos auf `nearest(foes)`. Die einzige echte Ausnahme ist
+die Persönlichkeit "bollwerk" (→"naechster", reine Geometrie) — und die degeneriert IDENTISCH
+auch für HEIM, weil `zielOf[p.n]` (die manuelle Übersteuerung) in der automatisierten Sonde nie
+gesetzt ist.
+
+**Was es tatsächlich bedeutet:** ohne `schlachtplan()` verliert die GAST-Seite die
+TEAM-KOORDINIERTE Zuteilung (wer bindet den Zähesten/"fels", wer flankiert wen gezielt,
+`ord:"mitlinie"`/`"flanke"` nach Team-Analyse der eigenen und gegnerischen Stärken statt nach
+reiner Slot-Vorgabe) und fällt auf INDIVIDUELLE, nicht team-abgestimmte
+Persönlichkeits-Zielwahl zurück. Die HEIM-Seite nutzt ohnehin immer nur die individuelle
+PERSZIEL-Zielwahl (nie `schlachtplan()`). Der Unterschied ist also **"Team-Plan vs.
+Einzelverhalten"**, nicht "Taktik vs. Geometrie" — eine reale, aber kleinere Lücke als zuerst
+beschrieben.
 
 Betroffen sind **vier von fünf** Kader-Paarungen in `data/generated/kaderfamilie-live-save.json`
 — die erste ("vigilante-armageddon") trägt zufällig dieselben Namen wie der alte hartkodierte
 SQUAD/OPP-Testkader (für den `place[]` beim Modul-Start sechs feste Einträge bekommt), die
-anderen vier nicht. Der Bug besteht seit der Umstellung auf die Kader-Familien-Methodik
-(03.09.2026) und hat seither jede TDM/Mini-DM/Battlefield-Rangtreue-Messung des Projekts
-mitverzerrt — vermutlich ein Teil der Erklärung, warum TDM in keiner dokumentierten Messung
-auch nur in die Nähe von 0,80 kam.
+anderen vier nicht. Der Zustand besteht seit der Umstellung auf die Kader-Familien-Methodik
+(03.09.2026) und betrifft seither jede TDM/Mini-DM/Battlefield-Rangtreue-Messung des Projekts.
 
-### Verifikation
+### Verifikation (vollständig: Rollentausch VOR und NACH dem Fix)
 
-Ein Rollentausch derselben Kader-Paarung (heim↔gast, sonst identisch) zeigt auf dem
-unveränderten Code für Paarungen ohne funktionierenden `schlachtplan()` einen konsistenten
-Heim-Vorteil, unabhängig davon, welches Team gerade "heim" ist — z. B. coldsteel-direlegion:
-Team A als heim 8,24 Punkte Anteil / als gast 7,88; Team B als gast 8,43 / als heim 8,79
-(**beide Richtungen "heim > gast"**, wie es ein rollengebundener statt eignungsgebundener
-Effekt erwarten lässt). Ein Spiegeltest mit byte-identischen, aber generischen Platzhalter-
-Kadern zeigt dagegen 50:50 — erwartbar, weil alle sechs Platzhalter auf dieselbe
-PERSZIEL-Kategorie fallen und "bedrohung" in einem einfachen symmetrischen Gefecht praktisch
-mit "nächster" zusammenfällt; der Effekt braucht echte, gemischte Persönlichkeiten, um
-sichtbar zu werden.
+Ein Rollentausch derselben Kader-Paarung (heim↔gast, sonst identisch), coldsteel-direlegion,
+n=8, beide Orientierungen (eigenständig nachgemessen, nicht nur aus der Review übernommen):
+
+| | "coldsteel=heim" | "direlegion=heim" (getauscht) |
+|---|---:|---:|
+| main (vor dem Fix) | −1,78 Pp (gast vorn) | +4,01 Pp (heim vorn) |
+| PR (nach dem Fix) | +0,57 Pp (heim knapp vorn) | +3,77 Pp (heim vorn) |
+
+(Score-Anteil-Überschuss von "heim" über 50 %, je Orientierung; positiv = heim im Vorteil.)
+Die unabhängige Review maß auf derselben Paarung mit einer eigenen Methode/Metrik ähnliche
+Größenordnungen (main ≈+2,2 Pp, PR ≈+4,3 Pp, dort vermutlich über beide Orientierungen
+gemittelt oder anders normiert — die genaue Kennzahl war in der Review-Rückmeldung nicht
+spezifiziert).
+
+**Der rollengebundene Heim-Vorteil verschwindet durch den Fix NICHT.** Auf `main` ist der
+Effekt zwischen den beiden Orientierungen sogar WIDERSPRÜCHLICH gerichtet (−1,78 vs. +4,01) —
+bei n=8 ist nicht klar, ob überhaupt ein konsistenter Rolleneffekt vorliegt oder nur
+Kaderrauschen (die beiden Teams sind nicht gleich stark). Nach dem Fix zeigen BEIDE
+Orientierungen einen Heim-Vorteil (+0,57 und +3,77) — der Effekt wird also eher
+KONSISTENTER sichtbar, nicht kleiner. Das widerspricht der ursprünglichen Erwartung dieser
+Verifikation (die erste Fassung dieses Dokuments zeigte nur EINE Richtung und behauptete
+fälschlich, der Effekt sei durch die Rolle allein erklärt und werde durch den Fix adressiert).
+Die wahrscheinlichste Erklärung nach der Korrektur in Abschnitt "Befund": der Fix behebt eine
+ECHTE, aber kleinere Lücke (Team-Plan vs. Einzelverhalten auf der GAST-Seite); der hier
+gemessene Heim-Vorteil hat mindestens eine weitere, von diesem Fix unberührte Ursache (denkbar:
+die allgemeine Heim-Aufstellungslogik in `build()`, oder schlicht Kaderrauschen bei n=8 — nicht
+in dieser Runde weiter untersucht, da außerhalb des Fix-Umfangs). Diese Beobachtung relativiert,
+wie viel die Teil-1-Korrektur an der rollengebundenen Verzerrung tatsächlich auflöst.
 
 ### Fix (nur in der Mess-Sonde)
 
-`disziplinProbe()`s Kader-Familie-Zweig füllt `place[]` jetzt für die SQUAD-Seite vor jedem
+`disziplinProbe()`s Kader-Familie-Zweig füllt `place[]` für die SQUAD-Seite vor jedem
 Spieldurchlauf — mit `d:"tdm"` (passend zu `gegnerVorschau()`s hartkodierter Lesestelle) für
-die besten `jeSeiteVon(dId)` Namen nach TDM-Eignung, mit genau dem Slot, den der bisherige
-Eignungs-Rückfall in `build()` (`ersatz`/`slotFuer`) ohnehin vergeben hätte
-(`slotsVon(dId)` nach Rang) — für TDM selbst dadurch ergebnisgleich zum bisherigen Rückfall
-(nur explizit statt implizit gesetzt; einzige Nebenwirkung: die Links-Rechts-Reihenfolge
-INNERHALB einer Reihe kann sich geringfügig verschieben, Slot und Reihe selbst bleiben pro
-Spieler gleich), für Mini-DM/Battlefield wirkungslos für die EIGENE Aufstellung (deren
-`place`-Eintrag trägt `d:"tdm"`, nicht `d:dId` — nur `gegnerVorschau()`s hartkodiertes
-`inDisc("tdm")` sieht sie). Einzige Wirkung: `schlachtplan()` bekommt wieder eine echte
-Vorschau und damit eine echte Taktik für die GAST-Seite, symmetrisch zur immer-individuellen
-HEIM-Seite — genau das, was im echten Spiel (und zufällig in Paarung 1 dieser Sonde) ohnehin
-passiert. Jeder berührte `place`-Eintrag wird danach auf seinen Stand davor zurückgesetzt
-(meist "nicht vorhanden").
+die besten `jeSeiteVon(dId)` Namen nach TDM-Eignung, mit dem Slot, den `slotsVon(dId)` nach
+Eignungs-Rang vergeben würde. Für Mini-DM/Battlefield ist das für die EIGENE Aufstellung
+wirkungslos (deren `place`-Eintrag trägt `d:"tdm"`, nicht `d:dId` — nur `gegnerVorschau()`s
+hartkodiertes `inDisc("tdm")` sieht ihn). Die beabsichtigte Wirkung: `schlachtplan()` bekommt
+wieder eine echte Vorschau und damit wieder eine echte TEAM-Taktik für die GAST-Seite. Jeder
+berührte `place`-Eintrag wird danach auf seinen Stand davor zurückgesetzt.
 
-`chooseTarget`/`PERSZIEL`/`bedrohungVon`/`schlachtplan`/`gegnerVorschau` bleiben byte-identisch.
+`chooseTarget`/`PERSZIEL`/`bedrohungVon`/`schlachtplan`/`gegnerVorschau` bleiben byte-identisch
+— das ist unabhängig bestätigt (Review 02.10.), inklusive des neuen `ZIEL_DIAG`-Zähl-Wrappers
+aus Teil 2, der ohne `zielDiag:true` ein reiner No-Op ist.
 
-### Wirkung gemessen (TDM, n=8 Spiele je Paarung, 5 Paarungen)
+### Gemessene Wirkung — NICHT eindeutig gerichtet, keine validierte Verbesserung
 
-| Paarung | Score-Anteil VORHER (heim/gast) | Score-Anteil NACHHER (heim/gast) |
-|---|---:|---:|
-| vigilante-armageddon | 49,8 % / 50,2 % | 49,1 % / 50,9 % |
-| coldsteel-direlegion | 48,2 % / 51,8 % | 50,6 % / 49,4 % |
-| goldengladiators-silversoldiers | 50,1 % / 49,9 % | 47,9 % / 52,1 % |
-| mortalsin-natureswrath | 48,6 % / 51,4 % | 49,3 % / 50,7 % |
-| piratecrew-raginglunatics | 47,4 % / 52,6 % | 45,3 % / 54,7 % |
+`node scripts/miss-alle-disziplinen.mjs 24 <disziplin>`, isoliert ohne Parallellast gemessen
+(deterministische Saaten — die folgenden Zahlen sind reproduzierbare Codefolgen, kein
+Zufallsrauschen):
 
-Der rohe Score-Anteil bewegt sich bei n=8 kaum (beide Spalten liegen im selben, von
-Kaderstärke und Zufallsrauschen dominierten Band) — erwartbar, weil die Team-GESAMTPUNKTZAHL
-stark von der allgemeinen Kaderstärke und der Matchlänge abhängt, nicht nur von der
-Zielwahl-Mechanik. Die eigentliche Wirkung des Fixes zeigt sich erst in Teil 2, an der
-Seite-eta² (unten): die Rolle als Erklärfaktor der EIGNUNGS-UNABHÄNGIGEN Rangvarianz ist nach
-dem Fix klein (0,011–0,023), nicht groß — genau das Ergebnis, das ein korrigierter, jetzt
-beidseitig taktischer Zielwahl-Mechanismus erwarten lässt.
+| Disziplin | rho je Spiel (Median) VOR | NACH | Spannweite VOR | NACH |
+|---|---:|---:|---:|---:|
+| TDM | 0,404 | **0,324** | 0,912 | 0,861 |
+| Mini-DM | 0,321 | **0,365** | — | — |
+| Battlefield | 0,399 | **0,399** (unverändert) | — | — |
+
+**Derselbe Fix-Mechanismus bewegt die drei Disziplinen NICHT in dieselbe Richtung:** TDM
+sinkt, Mini-DM steigt, Battlefield bleibt gleich. Das spricht dafür, dass der Fix vor allem die
+Kader-Familie-SLOT-Zuteilung (welcher Name welchen Rang/Slot bekommt) inzidentell neu
+durchmischt, statt eine prinzipiengeleitete Korrektur der Zielwahl zu sein. **Dies wird
+deshalb ausdrücklich NICHT als validierte Verbesserung der Rangtreue dargestellt, sondern als
+Änderung der Mess-Grundlage mit unklarem Vorzeichen.** Die TDM-Verschiebung (0,404→0,324) liegt
+außerdem innerhalb der für TDM selbst dokumentierten Kader-Familie-Spannweite (≈0,86–0,91) und
+ist damit nach der projekteigenen Regel ("eine Änderung, die kleiner bewegt als die
+Spannweite, ist von Null nicht unterscheidbar") nicht von Rauschen zu unterscheiden.
+
+**Bezug zu PR #1124:** solange #1125 nicht gemergt ist, liefert `main` unverändert 0,404 —
+#1124s Befund (rho-Schranke klar verfehlt, Ursache Zielwahl-Logik nicht Rezept) bleibt für den
+aktuellen `main`-Stand vollständig korrekt, keine Korrektur nötig. Erst nach einem Merge einer
+überarbeiteten Fassung bräuchte #1124 einen kurzen Nachtrag mit dem neuen Wert UND der
+Erklärung, dass der Unterschied aus einer Mess-Sonden-Korrektur stammt, nicht aus einer
+Rezeptänderung.
 
 ## Teil 2: Neue Diagnose-Sonde — Rangvarianz-Aufschlüsselung
 
 `scripts/miss-arena-rangvarianz-aufschluesselung.mjs`, nach dem Vorbild von
 `miss-rangtreue-nach-rolle.mjs`/`miss-star-paartreue.mjs` (kaderfeste Methodik,
-`scripts/lib/rangtreue-messung.mjs`). Zwei Messungen je Disziplin (tdm/mini-dm/battlefield,
-n=12 Spiele je der 5 Kader-Paarungen, NACH dem P0-Fix):
+`scripts/lib/rangtreue-messung.mjs`). Methodisch unabhängig bestätigt (Review 02.10.) — nur
+die begleitende Interpretation unten wurde an die Korrektur aus Teil 1 angepasst. Zwei
+Messungen je Disziplin (tdm/mini-dm/battlefield, n=12 Spiele je der 5 Kader-Paarungen, auf dem
+Stand NACH dem Teil-1-Fix):
 
 1. **rho(Eignung, Zugang)**: Spearman zwischen Eignung und der Zahl, wie oft eine Einheit
    tatsächlich als Ziel gewählt wurde — gezählt direkt an den `chooseTarget()`-Rückgaben über
@@ -125,7 +163,7 @@ n=12 Spiele je der 5 Kader-Paarungen, NACH dem P0-Fix):
 **Antwort auf die Opus-Vermutung:** rho(Eignung, Zugang) ist in allen drei Disziplinen schwach
 UND vorzeichen-instabil über die Paarungen (TDM-Spannweite 1,18 bei nur fünf Paarungen,
 Mini-DM/Battlefield sogar überwiegend NEGATIV) — Eignung sagt kaum voraus, wie oft jemand zum
-Ziel wird, selbst nachdem der P0-Fix die Zielwahl wieder symmetrisch gemacht hat.
+Ziel wird, auch auf dem Stand nach dem Teil-1-Fix.
 
 **Persönlichkeit (PERSZIEL-Typ) dominiert tatsächlich** — mit Abstand der größte der vier
 gemessenen Faktoren in allen drei Disziplinen (0,295/0,241/0,154, "groß" bis "mittel" nach
@@ -133,10 +171,17 @@ Cohen), und zwar in dieselbe Richtung: "beschuetzer"/"duellant" liegen im Rest-R
 durchgehend über dem Mittel, "draufgaenger"/"schleicher" durchgehend darunter. **Heiler-
 Unterklasse dominiert NICHT** — ihr eta² ist in allen drei Disziplinen klein (0,001–0,090),
 auch wenn die Stichprobe dort am kleinsten ist (n=5–10 Heiler über alle Paarungen). Reihe/Slot
-ist durchgehend klein bis mittel (0,003–0,077). **Seite (Heim/Gast) ist nach dem P0-Fix die
-mit Abstand kleinste Kategorie (0,011–0,023)** — ein Nebenbefund, der den Fix aus Teil 1
-unabhängig bestätigt: vor dem Fix wäre dieser Faktor (reine Rollen-Zielwahl ohne jeden
-Eignungs-Bezug für die gesamte Gast-Seite) strukturell groß gewesen.
+ist durchgehend klein bis mittel (0,003–0,077).
+
+**Seite (Heim/Gast) ist mit Abstand die kleinste Kategorie (0,011–0,023) — das ist auf dem
+NACH-Fix-Stand gemessen, und die Teil-1-Verifikation zeigt, dass der Rollentausch-Effekt bei
+n=8 trotzdem bestehen bleibt (siehe oben).** Die kleine eta²-Zahl und der fortbestehende
+Rollentausch-Effekt widersprechen sich nicht zwangsläufig: eta² misst hier den Anteil an der
+GESAMTEN Rest-Rangvarianz über alle fünf Paarungen gepoolt (n=60/40), während der
+Rollentausch-Befund eine EINZELNE Paarung bei n=8 betrifft — ein in dieser Runde nicht
+aufgelöster Unterschied in der Auflösung, kein Widerspruch in den Rohdaten. Die Aussage "der
+Fix macht Seite zum kleinsten Faktor" wird deshalb NICHT mehr als unabhängige Bestätigung des
+Fixes verkauft (wie in der ersten Fassung), sondern nur noch als Messwert berichtet.
 
 **Einordnung für die nächste Chris-Entscheidung:** die Daten stützen eher eine P1-Zielwahl-
 Korrektur an der PERSZIEL-Dimension (der eine Faktor, der in allen drei Disziplinen groß bis
@@ -146,13 +191,15 @@ nachweisbar, verschlechterte Mini-DM/Battlefield aber messbar. Eine Korrektur, d
 der Persönlichkeits-Varianz ansetzt (z. B. die Streuung der sechs Archetypen verkleinern, ohne
 sie auf eine einzige Neigung zusammenzulegen), trifft laut dieser Messung den größten Hebel,
 ohne den bereits zweimal gescheiterten Weg zu wiederholen. Das ist eine Beobachtung dieser
-Mess-Runde, keine Empfehlung für eine konkrete Umsetzung — die bleibt Chris' Entscheidung
-(Klasse B).
+Mess-Runde, keine Empfehlung für eine konkrete Umsetzung — die Zielwahl-Mechanik selbst bleibt
+Chris' Entscheidung (Klasse B).
 
 ## Pflichtprüfungen
 
 - `node --check public/mockups/battle-mode.engine.js`: OK.
-- `npx vitest run`: s. PR-Beschreibung für das Ergebnis dieser Runde.
+- `npx vitest run`: 8224 bestanden, 23 übersprungen, 1 Fehlschlag
+  (`matchday-auto-run-service.test.ts`, Timeout durch Ressourcen-Konkurrenz mit der eigenen
+  Chromium-Messung im selben Lauf — isoliert erneut gelaufen: 9/9 bestanden, keine Regression).
 
 ## Reproduktion
 
@@ -160,4 +207,5 @@ Mess-Runde, keine Empfehlung für eine konkrete Umsetzung — die bleibt Chris' 
 git worktree add /tmp/wt-arena-zielwahl <branch> --detach
 ln -s <repo>/node_modules /tmp/wt-arena-zielwahl/node_modules
 node /tmp/wt-arena-zielwahl/scripts/miss-arena-rangvarianz-aufschluesselung.mjs 24 tdm mini-dm battlefield
+node /tmp/wt-arena-zielwahl/scripts/miss-alle-disziplinen.mjs 24 tdm mini-dm battlefield
 ```
