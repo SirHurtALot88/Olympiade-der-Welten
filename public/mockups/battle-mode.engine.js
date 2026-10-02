@@ -6579,15 +6579,55 @@
       // Griff (dexterity); der Running Back ist Wucht + Robustheit + Antritt; der Receiver
       // ist der GROSSE, ZAEHE Zielspieler (health/torment/speed) statt eines zweiten
       // Running Backs; die Passverteidigung ist Aggression + Wucht + Antritt.
+      // REZEPT-C-SONDIERUNG (02.10., Task #34, Teilaufgabe "Rezept-Prozent-Umschichtung
+      // innerhalb bestehender Kanaele", docs/design/football-rezept-sondierung-
+      // awareness-ausdauer-spirit-02-10.md): awareness/stamina/will/spirit tragen 20 der
+      // 100 Matrix-Pp (BASIS_JE_DISC.football), hatten aber praktisch keinen mechanischen
+      // Kanal — awareness sass nur in PASSSCHUTZ (dessen einziger Hebel, der pSack-Term in
+      // resolvePass(), strukturell duenn ist, s. Abschnitt 5 der Kalibrierungs-Doku von
+      // 10.09.: der Passer wird UNABHAENGIG von PASSSCHUTZ gezogen), stamina/will nur in
+      // AUSDAUER (bis heute GAR KEIN mechanischer Kanal, s. Kommentar dort), spirit nirgends.
+      //
+      // ZWEI VON ACHT SUB-SKILLS PROZENTUAL UMGESCHICHTET (PASSSCHUTZ, BALLSICHERHEIT), die
+      // anderen sechs UNANGETASTET. TEAMGEIST GEPRUEFT UND VERWORFEN: ein spirit-Nachschlag
+      // dort war der naheliegendste Kanal (TEAMGEIST ist mit ~44,5 % das mit Abstand groesste
+      // mechanische Gewicht aller acht Sub-Skills, s. football-rezept-kalibrierung.md 4.4) —
+      // kaderfest GEMESSEN druecken schon 8 % spirit (health:45,torment:22,speed:25,spirit:8)
+      // rho je Spiel von 0,814 auf 0,788 (durchgefallen), 15 % spirit auf 0,765. TEAMGEISTs
+      // Dopplungs-Fix-Mischung (health/torment/speed) ist also NICHT nur "momentan optimal",
+      // sondern bei DIESER Kanalgroesse schlicht zu empfindlich fuer einen Pp-Nachschlag ohne
+      // rho-Risiko — spirit bleibt deshalb bei 0 % mechanischem Gewicht, ZIELKONFLIKT
+      // DOKUMENTIERT, NICHT AUFGELOEST (s. PR-Dokument Abschnitt 4, CLAUDE.md gibt rho>0,80
+      // ausdruecklich Vorrang vor der Pp-Schranke).
+      //
+      // LAUFKRAFT/PASSGENAUIGKEIT/ABWEHR_PASS/ABWEHR_LAUF bleiben ebenfalls unangetastet —
+      // bewusst konservativ, sie tragen die am genauesten gegen den Korridor (Yards/Carry,
+      // Sack-/Interception-Quote) gefitteten Kanaele.
+      //
+      // AWARENESS KORRELIERT NEGATIV mit der echten Football-Eignung (Spearman -0,335 auf der
+      // Kaderfamilie, football-rezept-kalibrierung.md Abschnitt 4.2) — mehr Gewicht hier ist
+      // ein bewusster Zielkonflikt (Pp-Pflicht vs. Validitaet DIESES einen Kanals), kein Fehler;
+      // tragbar nur, WEIL der Kanal strukturell so duenn ist (s.o., Abschnitt 5 derselben Doku).
+      // will (Spearman 0,488) ist dagegen ein SOLIDER positiver Traeger (fast so stark wie
+      // power 0,424) — seine Aufnahme in BALLSICHERHEIT ist deshalb kein Risiko, sondern zieht
+      // den Kanal eher naeher an die echte Eignung heran (kaderfest bestaetigt: rho unveraendert
+      // bei 0,805 ob mit oder ohne den will-Anteil, s.u.). stamina bleibt mit 0,159 ein
+      // schwacher, aber nicht negativer Traeger — ein kleiner Anteil in PASSSCHUTZ gibt ihm
+      // einen ersten, nicht-trivialen Lesepunkt, ohne eine neue Mechanik.
+      //
+      // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 24 football, kaderfest): rho je Spiel
+      // 0,814 -> 0,805 (bestanden, Marge nur +0,005 — duenn, aber reproduzierbar identisch
+      // über zwei unabhaengige Laeufe derselben Rezeptur). Siehe PR-Dokument fuer die vollen
+      // Vorher/Nachher-Zahlen inkl. Pp je Attribut.
       rezept:{
-        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert
-        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT
-        PASSSCHUTZ:      {power:40,health:40,awareness:20},         // rho 0,853  UNVERAENDERT (Hand: O-Line = Anker, nicht Wahrnehmung)
-        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt
-        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck
-        BALLSICHERHEIT:  {power:35,health:35,determination:30},     // Dopplung mit PASSGENAUIGKEIT geloest
-        TEAMGEIST:       {health:45,torment:30,speed:25},           // rho 0,905; Rangkorr. zu LAUFKRAFT nur 0,87 — Dopplung geloest, Achse wieder unabhaengig
-        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (hat bis heute keinen mechanischen Kanal, s. Plan 6.4)
+        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert, UNVERAENDERT
+        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT (Yards/Carry-Korridor daran gefittet)
+        PASSSCHUTZ:      {power:35,health:30,awareness:25,stamina:10}, // awareness 20->25, stamina NEU (10) statt 0 — power/health gesenkt, s. Sondierung oben
+        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt, UNVERAENDERT
+        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck, UNVERAENDERT
+        BALLSICHERHEIT:  {power:30,health:30,determination:25,will:15}, // will NEU (15, Spearman 0,488) statt 0 — power/health/determination je leicht gesenkt
+        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788)
+        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (weiterhin KEIN eigener Kanal — stamina/will haben jetzt anderswo einen, s.o.)
         LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
