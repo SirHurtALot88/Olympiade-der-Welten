@@ -196,6 +196,10 @@ details.mehr summary:hover { color: var(--brass); }
 .elem { display: inline-grid; place-items: center; width: 1.35em; height: 1.35em; border-radius: 50%; vertical-align: middle; flex: none;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--el) 50%, #fff) 0%, var(--el) 48%, color-mix(in srgb, var(--el) 55%, #000) 100%);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 6px color-mix(in srgb, var(--el) 55%, transparent); }
+.elem.eckig { border-radius: 28%; }
+.chip-f.kat { font-size: 15px; padding: 7px 12px; }
+.chip-f.kat svg { width: 17px; height: 17px; color: var(--brass); }
+.chip-f.kat[aria-pressed="true"] svg { color: var(--bg); }
 .elem > svg { width: 68% !important; height: 68% !important; color: #17110a !important; }
 .tagzeile .elem, .werte .elem, .tagleiste .elem, .chip-f .elem { width: 20px; height: 20px; }
 .el-tabelle .el-name { display: inline-flex; gap: 8px; align-items: center; }
@@ -891,9 +895,9 @@ fieldset.checks legend { margin-bottom: 6px; }
       <div class="dbx">
         <aside class="dbx-filter">
           <label class="f">Suchen <input type="search" id="dbSuche" placeholder="Name oder Regeltext"></label>
-          <div class="f">Typ <div class="chipset" id="dbTypen"></div></div>
+          <div class="f">Kategorie <div class="chipset" id="dbTypen"></div></div>
           <div class="f">Tags <div class="chipset" id="dbTags"></div></div>
-          <div class="f">Für <div class="chipset" id="dbRollen"></div></div>
+          <div class="f" id="dbRollenRow">Für <div class="chipset" id="dbRollen"></div></div>
           <p class="hint" id="dbAnzahl"></p>
         </aside>
         <div class="dbx-main">

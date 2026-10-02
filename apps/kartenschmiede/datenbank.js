@@ -7,7 +7,8 @@
   const { R, esc, ico, TAG, KAT, ROLLEN, STUFEN } = KS;
   const $ = id => document.getElementById(id);
 
-  const filter = { q: "", typ: "", tags: new Set(), rolle: "" };
+  // Start mit den Einheiten; „kat“ ist eine Kategorie aus KAT.KATEGORIEN oder "" für alle
+  const filter = { q: "", kat: "einheit", tags: new Set(), rolle: "" };
   let serverKarten = [];
   let vorschlag = null;
   let bereit = false;
@@ -42,7 +43,7 @@
     return einheiten.concat(KS.alleEintraege());
   }
   function passt(e) {
-    if (filter.typ && e.typ !== filter.typ) return false;
+    if (filter.kat && KAT.kategorieVon(e.typ) !== filter.kat) return false;
     if (filter.rolle && !(e.fuer || []).includes(filter.rolle)) return false;
     for (const t of filter.tags) if (!(e.tags || []).includes(t)) return false;
     const q = filter.q.trim().toLowerCase();
@@ -95,10 +96,14 @@
   }
   function zeigeFilter() {
     const alle = eintraege();
-    const zahl = typ => alle.filter(e => e.typ === typ).length;
-    $("dbTypen").innerHTML = [`<button type="button" class="chip-f" data-typ="" aria-pressed="${!filter.typ}">Alle</button>`]
-      .concat(KAT.TYPEN.map(t => `<button type="button" class="chip-f" data-typ="${t.id}" aria-pressed="${filter.typ === t.id}">${esc(t.name)} <small>${zahl(t.id)}</small></button>`)).join("");
-    $("dbTags").innerHTML = KAT.TAGS.map(t => `<button type="button" class="chip-f" data-tag="${t.id}" aria-pressed="${filter.tags.has(t.id)}" data-tip="${esc(t.name)}">${KS.tagIco(t.id)}${esc(t.name)}</button>`).join("");
+    const zahl = kat => alle.filter(e => KAT.kategorieVon(e.typ) === kat).length;
+    $("dbTypen").innerHTML = KAT.KATEGORIEN.map(k => `<button type="button" class="chip-f kat" data-kat="${k.id}" aria-pressed="${filter.kat === k.id}">${ico(k.icon)}${esc(k.name)} <small>${zahl(k.id)}</small></button>`).join("")
+      + `<button type="button" class="chip-f kat" data-kat="" aria-pressed="${!filter.kat}">Alle <small>${alle.length}</small></button>`;
+    // Nur Tags zeigen, die in der gewählten Kategorie vorkommen
+    const inKat = alle.filter(e => !filter.kat || KAT.kategorieVon(e.typ) === filter.kat);
+    $("dbTags").innerHTML = KAT.TAGS.filter(t => filter.tags.has(t.id) || inKat.some(e => (e.tags || []).includes(t.id)))
+      .map(t => `<button type="button" class="chip-f" data-tag="${t.id}" aria-pressed="${filter.tags.has(t.id)}" data-tip="${esc(t.name)}">${KS.tagIco(t.id)}${esc(t.name)}</button>`).join("");
+    $("dbRollenRow").hidden = filter.kat === "fraktion";
     $("dbRollen").innerHTML = [["", "Alle"], ["hero", "Held"], ["companion", "Gefährte"], ["enemy", "Gegner"]]
       .map(([r, n]) => `<button type="button" class="chip-f" data-rolle="${r}" aria-pressed="${filter.rolle === r}">${n}</button>`).join("");
   }
@@ -183,7 +188,7 @@
     const symbole = [...new Set(KAT.TAGS.map(t => t.icon).concat(KAT.FRAKTIONEN.map(f => f.icon), ["crown", "sword", "target"]))];
     $("dbIcon").innerHTML = symbole.map(s => `<option value="${s}">${s}</option>`).join("");
     $("dbSuche").addEventListener("input", e => { filter.q = e.target.value; zeigeListe(); });
-    $("dbTypen").addEventListener("click", e => { const b = e.target.closest("[data-typ]"); if (!b) return; filter.typ = b.dataset.typ; alles(); });
+    $("dbTypen").addEventListener("click", e => { const b = e.target.closest("[data-kat]"); if (!b) return; filter.kat = b.dataset.kat; filter.tags.clear(); if (filter.kat === "fraktion") filter.rolle = ""; alles(); });
     $("dbTags").addEventListener("click", e => { const b = e.target.closest("[data-tag]"); if (!b) return; const t = b.dataset.tag; if (filter.tags.has(t)) filter.tags.delete(t); else filter.tags.add(t); alles(); });
     $("dbRollen").addEventListener("click", e => { const b = e.target.closest("[data-rolle]"); if (!b) return; filter.rolle = b.dataset.rolle; alles(); });
     $("genTyp").addEventListener("change", genFelder);

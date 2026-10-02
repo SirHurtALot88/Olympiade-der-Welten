@@ -130,7 +130,8 @@
   const symbolFuer = s => (SYMBOLE.find(([re]) => re.test(s)) || [0, "rune"])[1];
   // Tag-Symbole: auf der Karte und in Listen statt ausgeschriebener Schlagworte, Name per Hover
   // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
-  const tagIco = t => TAG[t] && TAG[t].element ? `<span class="elem" style="--el:${TAG[t].farbe}">${ico(TAG[t].icon)}</span>` : TAG[t] ? ico(TAG[t].icon) : "";
+  // Jeder Tag als farbiges Abzeichen: Elemente rund, alle anderen Tags eckig
+  const tagIco = t => TAG[t] ? `<span class="elem${TAG[t].element ? "" : " eckig"}" style="--el:${TAG[t].farbe || "#c9a35b"}">${ico(TAG[t].icon)}</span>` : "";
   const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
     ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${tagIco(t)}</span>` : tagIco(t)).join("")}</span>` : "";
   const tipText = f => `<b>${esc(f.name)}</b>${esc(f.text || "")}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
@@ -601,16 +602,17 @@
   // Jede Liste hat ihren eigenen Filter; ein Klick auf einen Tag zeichnet die Liste über ihren Rückruf neu.
   const FILTER = {}, NEU_ZEICHNEN = {};
   const filterVon = schluessel => FILTER[schluessel] || (FILTER[schluessel] = { tags: new Set(), typ: "" });
-  const TYP_KURZ = [["faehigkeit", "Fähigkeiten"], ["zauber", "Zauber"], ["gegenstand", "Gegenstände"]];
+  // Dieselben Kategorien wie im Reiter „Datenbank“
+  const TYP_KURZ = KAT.KATEGORIEN.filter(k => k.id === "faehigkeiten" || k.id === "ausruestung").map(k => [k.id, k.name, k.typen]);
   function tagLeiste(schluessel, eintraege, neuZeichnen) {
     NEU_ZEICHNEN[schluessel] = neuZeichnen;
     const f = filterVon(schluessel);
     const tags = KAT.TAGS.filter(t => eintraege.some(e => (e.tags || []).includes(t.id)));
-    const typen = TYP_KURZ.filter(([id]) => eintraege.some(e => e.typ === id));
+    const typen = TYP_KURZ.filter(([, , t]) => eintraege.some(e => t.includes(e.typ)));
     return `<div class="tagleiste" data-leiste="${schluessel}">${typen.length > 1 ? typen.map(([id, n]) => `<button type="button" class="chip-f" data-ftyp="${id}" aria-pressed="${f.typ === id}">${n}</button>`).join("") : ""}${tags.map(t =>
       `<button type="button" class="chip-f" data-ftag="${t.id}" aria-pressed="${f.tags.has(t.id)}" data-tip="${esc(t.name)}">${tagIco(t.id)}</button>`).join("")}${f.tags.size || f.typ ? `<button type="button" class="chip-f" data-freset="1">× Filter</button>` : ""}</div>`;
   }
-  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || e.typ === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
+  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || KAT.kategorieVon(e.typ) === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
   document.addEventListener("click", e => {
     const b = e.target.closest(".tagleiste button"); if (!b) return;
     const schluessel = b.closest(".tagleiste").dataset.leiste, f = filterVon(schluessel);

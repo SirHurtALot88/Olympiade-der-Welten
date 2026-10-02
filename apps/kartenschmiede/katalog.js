@@ -14,31 +14,31 @@
 
   // Tags: kurze Schlagworte mit Symbol, damit man auf der Karte nichts ausschreiben muss und filtern kann
   const TAGS = [
-    { id: "nahkampf", name: "Nahkampf", icon: "sword" },
-    { id: "fernkampf", name: "Fernkampf", icon: "target" },
-    { id: "flaeche", name: "Fläche", icon: "burst" },
-    { id: "betaeubung", name: "Betäubung", icon: "spiral" },
-    { id: "aura", name: "Aura", icon: "rings" },
-    { id: "heilung", name: "Heilung", icon: "heart" },
-    { id: "schutz", name: "Schutz", icon: "shield" },
-    { id: "staerkung", name: "Stärkung", icon: "up" },
-    { id: "schwaechung", name: "Schwächung", icon: "down" },
-    { id: "bewegung", name: "Bewegung", icon: "wing" },
-    { id: "furcht", name: "Furcht", icon: "skull" },
+    { id: "nahkampf", name: "Nahkampf", icon: "sword", farbe: "#d9534f" },
+    { id: "fernkampf", name: "Fernkampf", icon: "target", farbe: "#c2a878" },
+    { id: "flaeche", name: "Fläche", icon: "burst", farbe: "#f0883e" },
+    { id: "betaeubung", name: "Betäubung", icon: "spiral", farbe: "#9fb4ff" },
+    { id: "aura", name: "Aura", icon: "rings", farbe: "#7fd6c2" },
+    { id: "heilung", name: "Heilung", icon: "heart", farbe: "#ff8fb1" },
+    { id: "schutz", name: "Schutz", icon: "shield", farbe: "#8fa9c4" },
+    { id: "staerkung", name: "Stärkung", icon: "up", farbe: "#f4b860" },
+    { id: "schwaechung", name: "Schwächung", icon: "down", farbe: "#9a86b8" },
+    { id: "bewegung", name: "Bewegung", icon: "wing", farbe: "#9ad0f5" },
+    { id: "furcht", name: "Furcht", icon: "skull", farbe: "#8b909b" },
     { id: "gift", name: "Gift", icon: "drop" },
     { id: "feuer", name: "Feuer", icon: "flame" },
     { id: "frost", name: "Frost", icon: "snow" },
     { id: "magie", name: "Magie", icon: "rune" },
-    { id: "beschwoerung", name: "Beschwörung", icon: "portal" },
-    { id: "reaktion", name: "Reaktion", icon: "bolt" },
-    { id: "tarnung", name: "Tarnung", icon: "eye" },
-    { id: "einmalig", name: "Einmalig", icon: "potion" },
+    { id: "beschwoerung", name: "Beschwörung", icon: "portal", farbe: "#b98cff" },
+    { id: "reaktion", name: "Reaktion", icon: "bolt", farbe: "#ffd166" },
+    { id: "tarnung", name: "Tarnung", icon: "eye", farbe: "#6f9c88" },
+    { id: "einmalig", name: "Einmalig", icon: "potion", farbe: "#d4a373" },
     { id: "technik", name: "Sci-Fi", icon: "cog" },
     { id: "licht", name: "Licht", icon: "sun" },
     { id: "schatten", name: "Schatten", icon: "moon" },
     { id: "natur", name: "Natur", icon: "leaf" },
   ];
-  // Element-Tags bekommen ihre Farbe aus regeln.js (farbiges Abzeichen statt Messing-Symbol)
+  // Jeder Tag ist ein farbiges Abzeichen. Elemente (rund) holen Farbe aus regeln.js, die übrigen Tags (eckig) haben ihre eigene.
   for (const t of TAGS) { const e = Regeln.ELEMENT[t.id]; if (e) { t.farbe = e.farbe; t.element = true; } }
 
   // Prägung einer Einheit: was sie ihrem Wesen nach ist (ein Feuerelementar ist „Feuer“). Einträge mit dem
@@ -225,6 +225,14 @@
     { id: "gross", name: "Groß", fest: 15, prozent: 20 },
     { id: "elite", name: "Elite", fest: 20, prozent: 30 },
   ];
+  // Kategorien der Datenbank: Fähigkeiten und Zauber zusammen, Gegenstände und Waffen zusammen
+  const KATEGORIEN = [
+    { id: "einheit", name: "Einheiten", icon: "skull", typen: ["einheit"] },
+    { id: "faehigkeiten", name: "Fähigkeiten & Zauber", icon: "rune", typen: ["faehigkeit", "zauber"] },
+    { id: "ausruestung", name: "Gegenstände & Waffen", icon: "sword", typen: ["gegenstand", "waffe"] },
+    { id: "fraktion", name: "Fraktionen", icon: "shield", typen: ["fraktion"] },
+  ];
+  const kategorieVon = typ => (KATEGORIEN.find(k => k.typen.includes(typ)) || KATEGORIEN[1]).id;
   const TYPEN = [
     { id: "einheit", name: "Einheiten", einzahl: "Einheit" },
     { id: "faehigkeit", name: "Fähigkeiten", einzahl: "Fähigkeit" },
@@ -243,7 +251,7 @@
     return t;
   }
 
-  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
+  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, KATEGORIEN, kategorieVon, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
   if (typeof module !== "undefined" && module.exports) module.exports = Katalog;
   else root.Katalog = Katalog;
 })(typeof globalThis !== "undefined" ? globalThis : this);
