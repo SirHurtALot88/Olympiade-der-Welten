@@ -34536,6 +34536,13 @@
       // fallenKoennen) und `fallenStolper` (Sturzdauer nach Typ: 0,869) — alle drei
       // unter den 0,883 von `fallenKoennen` allein.
       //
+      // BAHN PAKET 2 (Task #28, 01.10.): `fallenDurchbruch` wurde fuer Pp bei vier
+      // Werten (0,4 / 0,55 / 0,75, je zwei unabhaengige Saatstroeme n=48) GEMESSEN UND
+      // WIEDER VERWORFEN — die Abweichung bewegt sich dabei nicht monoton und nicht
+      // stromstabil (0,4: 31,5/23,5 — 0,55: 32,7/26,3 — 0,75: 24,4/36,3, gegen 32,0/31,8
+      // ungesetzt). Kein getesteter Wert bringt BEIDE Stroeme unter die 25-Schranke.
+      // Diagnose und volle Messreihe: docs/design/bahn-takeshi-pp-paket2-kalibrierung-01-10.md.
+      //
       // Ab wann eine Falle eine Ticker-Zeile bekommt: der Sub-Skill dieser Falle muss
       // `fallenMelden` Punkte ueber (Glanz) oder unter (Patzer) dem Mittel seiner fuenf
       // Fallen-Sub-Skills liegen UND sein hoechster bzw. niedrigster sein. Reine Anzeige.
