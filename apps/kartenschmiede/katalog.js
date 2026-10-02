@@ -336,7 +336,45 @@
     return { karte: s, neu, weg };
   }
 
-  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, KATEGORIEN, kategorieVon, skaliere, FAEHIGKEITEN_JE_STUFE, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
+
+  // ---------- Gegnerwelle würfeln ----------
+  // Stellt aus den vorhandenen Gegnern eine Welle zusammen, deren Punkte möglichst nah am Ziel liegen (±10 %).
+  // Die Schwierigkeit begrenzt die Seltenheit (Anfänger bis Magisch … Legendär mit Boss), höchstens ein Boss,
+  // jede Gegnerart höchstens dreimal. Ab „Experte“ führt ein Anführer der höchsten erlaubten Stufe die Welle an.
+  const MAX_STUFE_JE_SCHWIERIGKEIT = [0, 3, 4, 5, 6];
+  function welleWuerfeln(pool, ziel, opt = {}) {
+    const schw = Math.min(4, Math.max(1, opt.schwierigkeit || 2));
+    let seed = (opt.seed || 1) >>> 0;
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const erlaubt = pool.filter(g => g.pts > 0 && g.stufe <= MAX_STUFE_JE_SCHWIERIGKEIT[schw] && (!opt.fraktion || g.faction === opt.fraktion));
+    if (!erlaubt.length || ziel <= 0) return { einheiten: [], summe: 0, ziel };
+    let beste = null;
+    for (let versuch = 0; versuch < 300; versuch++) {
+      const zahl = new Map(); let summe = 0, boss = false;
+      const nimm = g => { zahl.set(g.key, (zahl.get(g.key) || 0) + 1); summe += g.pts; if (g.stufe === 6) boss = true; };
+      if (schw >= 3) {
+        const fuehrer = erlaubt.filter(g => g.stufe >= MAX_STUFE_JE_SCHWIERIGKEIT[schw] - 1 && g.pts <= ziel * 0.65);
+        if (fuehrer.length) nimm(fuehrer[Math.floor(rnd() * fuehrer.length)]);
+      }
+      for (let i = 0; i < 40 && summe < ziel * 0.9; i++) {
+        const frei = erlaubt.filter(g => (zahl.get(g.key) || 0) < 3 && summe + g.pts <= ziel * 1.1 && !(boss && g.stufe === 6));
+        if (!frei.length) break;
+        // Kleinere Gegner etwas wahrscheinlicher, damit die Welle aus mehreren Figuren besteht
+        const gewicht = frei.map(g => 1 / Math.sqrt(g.pts));
+        let x = rnd() * gewicht.reduce((a, b) => a + b, 0), k = 0;
+        while (x > gewicht[k] && k < frei.length - 1) x -= gewicht[k++];
+        nimm(frei[k]);
+      }
+      const abstand = Math.abs(summe - ziel) - zahl.size * 0.5;
+      if (!beste || abstand < beste.abstand) beste = { zahl, summe, abstand };
+      if (Math.abs(summe - ziel) <= ziel * 0.03 && zahl.size >= 2) break;
+    }
+    const einheiten = [...beste.zahl].map(([key, anzahl]) => ({ ...erlaubt.find(g => g.key === key), anzahl }))
+      .sort((a, b) => b.stufe - a.stufe || b.pts - a.pts);
+    return { einheiten, summe: beste.summe, ziel };
+  }
+
+  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, KATEGORIEN, kategorieVon, skaliere, FAEHIGKEITEN_JE_STUFE, welleWuerfeln, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
   if (typeof module !== "undefined" && module.exports) module.exports = Katalog;
   else root.Katalog = Katalog;
 })(typeof globalThis !== "undefined" ? globalThis : this);

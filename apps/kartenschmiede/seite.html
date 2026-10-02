@@ -203,6 +203,33 @@ details.mehr summary:hover { color: var(--brass); }
 .g-gm { display: grid; gap: 8px; padding: 12px 14px; border: 1px dashed var(--brass); border-radius: 8px; }
 .g-gm h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
 .gm-schalter { margin-left: auto; }
+.g-welle { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.g-welle h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.g-welle h4 small { color: var(--dim); letter-spacing: .04em; text-transform: none; font-weight: 600; margin-left: 8px; }
+.g-welle-zeile { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.g-welle-zeile select, .g-welle-zeile input { width: auto; flex: 1; min-width: 160px; }
+.g-welle-liste { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-family: var(--ui); }
+.g-welle-liste small { color: var(--dim); }
+.g-fortschritt { display: grid; gap: 8px; }
+.g-ep { display: flex; align-items: center; gap: 8px; font-family: var(--ui); }
+.g-ep span { color: var(--dim); font-size: 14px; }
+.g-ep b { font-size: 20px; min-width: 2ch; text-align: center; }
+.g-verlauf { margin: 0; padding-left: 1.1em; font-family: var(--ui); font-size: 14px; display: grid; gap: 2px; }
+.g-verlauf small { color: var(--dim); margin-right: 6px; }
+.heldenbogen .kaestchen i.voll { background: #7a5a1a; }
+.heldenbogen .linien div { font-size: 9.5pt; display: flex; align-items: end; padding-bottom: .6mm; }
+label.check.klein { font-size: 13px; gap: 5px; }
+label.check.klein input { width: 15px; height: 15px; }
+/* Kartenrückseite */
+.card .face.rueck-face { display: grid; grid-template-rows: auto auto auto; grid-template-columns: 1fr; grid-template-areas: none; place-items: center; align-content: center; gap: calc(var(--u)*2.4); text-align: center;
+  background: radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--acc) 30%, rgb(var(--panel))), rgb(var(--panel)) 75%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 calc(var(--u)*.5), transparent calc(var(--u)*.5) calc(var(--u)*2.2)); }
+.card.rueck .face::before, .card.rueck .face::after { display: none; }
+.rueck-symbol svg { width: calc(var(--u)*30); height: calc(var(--u)*30); color: var(--acc); filter: drop-shadow(0 0 calc(var(--u)*3) color-mix(in srgb, var(--acc) 60%, transparent)); }
+.land .rueck-symbol svg { width: calc(var(--u)*24); height: calc(var(--u)*24); }
+.rueck-name { font: 800 calc(var(--u)*6.4) var(--disp); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-c); padding-inline: calc(var(--u)*8); }
+.rueck-stufe { display: flex; gap: calc(var(--u)*1.6); align-items: center; font-size: calc(var(--u)*3); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--acc); }
+.rueck-fuss { position: absolute; bottom: calc(var(--u)*4); left: 0; right: 0; font-size: calc(var(--u)*2.2); letter-spacing: .2em; text-transform: uppercase; color: var(--sub); }
 .druck-format { width: auto; font-size: 13px; padding: 6px 8px; }
 /* Symbole im Regeltext: {A2} → Schwert 2, {V+1} → Schild +1 … */
 .sym { display: inline-flex; align-items: center; gap: .12em; padding: 0 .28em 0 .18em; margin: 0 .05em; border-radius: .35em; background: rgba(255,255,255,.11);
@@ -740,7 +767,7 @@ fieldset.checks legend { margin-bottom: 6px; }
             <details class="mehr">
               <summary>Eigene Sonderregel</summary>
               <label class="f">Name <input type="text" id="bossName"></label>
-              <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
+              <label class="f"><span>Regeltext <span class="info" data-tip="Kürzel werden zu Symbolen: {P1} Power, {A2} Treffer, {DS1} Durchschlag, {V+1} Verteidigung, {T-1} auf Treffer, {HW3} heilen, {R12} Reichweite, {F3} Umkreis, {B6} Bewegung, {X} betäubt, {D4} Wurf, {S} einmal pro Spiel, {RU} einmal pro Runde. Die ganze Liste steht im Reiter Regeln.">ⓘ</span></span><textarea id="bossText" rows="2" placeholder="z. B. {RU} Feind {R6}: {A2} {DS1}"></textarea></label>
               <label class="f">Stärke
                 <select id="special">
                   <option value="0">Keine oder nur Flavour</option><option value="5">Klein, +5 %</option><option value="10">Mittel, +10 %</option>
@@ -801,6 +828,7 @@ fieldset.checks legend { margin-bottom: 6px; }
           <button type="button" class="btn sm" id="exportBtn">PNG</button>
           <button type="button" class="btn ghost sm" id="druckBtn">Drucken</button>
           <select id="druckFormat" aria-label="Druckformat" class="druck-format"></select>
+          <label class="check klein" data-tip="Druckt nach jeder Postkarte ihre Rückseite: für beidseitigen Druck (an der langen Kante wenden)."><input type="checkbox" id="rueckBox"> Rückseite</label>
           <button type="button" class="btn ghost sm" id="saveBtn" hidden>Speichern</button>
         </div>
         <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
@@ -871,6 +899,7 @@ fieldset.checks legend { margin-bottom: 6px; }
         <div class="copyrow">
           <button type="button" class="btn" id="simRun">Würfeln</button>
           <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
+          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an Zäh bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
       </div>
