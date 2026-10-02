@@ -14934,6 +14934,26 @@
       // Isolationsnachweis: `node scripts/miss-alle-disziplinen.mjs 24` (alle zwanzig, vor
       // und nach dieser PR) — nur i-spy bewegt sich, die anderen neunzehn Zeilen sind
       // bit-identisch (s. PR-Beschreibung).
+      //
+      // NACHGEZOGEN, NICHTS GEAENDERT (Task #46, 02.10., docs/design/i-spy-pp-rezeptrunde-
+      // diagnose-02-10.md). Aktueller Ist-Stand kaderfest (n=24): rho je Spiel 0,750 (Spannw.
+      // 0,177), rho Saison 0,881 (Spannw. 0,210) — "knapp" (0,70-0,80), dieselbe Groessenordnung
+      // wie am 26.09. (0,756/0,909), Abweichung liegt innerhalb der Kaderrauschen-Spannweite,
+      // keine Regression (data/generated/rangtreue-basislinie.json traegt exakt diese Zahlen).
+      // Pp sauber im Budget: 16,6/12,8 (zwei unabhaengige Saatstroeme, n=48) — der
+      // Ziel-konflikt-Fall (rho vs. Pp, CLAUDE.md) liegt hier NICHT vor, das Rezept belohnt
+      // bereits die richtigen Attribute. Getestet, in einer isolierten Kopie, NICHT committet:
+      // ein additiver EV-Bonus (F2, Fable-Idee I-6, "Rotation der Raetselart nach jedem
+      // Versuch") auf die zuletzt NICHT gespielte Raetselart, 0,1/0,2/0,4 Staerke — rho je
+      // Spiel blieb bei 0,760/0,740/0,747, flach und innerhalb der eigenen Kaderrauschen-
+      // Spannweite, kein Hebel. Grund (Diagnose-Dokument Abschnitt 3): der GETEILTE
+      // Truhen-Pool erzwingt die Durchmischung ueber die drei Raetselarten bereits (derselbe
+      // Mechanismus, dessen FEHLEN den P1-Prototyp Saison-Validitaet gekostet hat) — ein
+      // zusaetzlicher expliziter Bonus traegt ueber diese bereits vorhandene Durchmischung
+      // hinaus nichts weiter bei. Die verbleibende Luecke (Verlaesslichkeit 0,724, noetig
+      // fuer 0,80 bei der gemessenen Validitaet waere 0,825) ist eine Konzeptfrage (Fable,
+      // fable-ideen-arena-ispy-30-09.md, I-1/I-2/I-3/I-4 — allesamt Klasse M, Chris'
+      // Entscheidung), keine Rezept-/Zahlenfrage mehr.
       rezept:{
         SPUERSINN:        {intelligence:60,torment:30,awareness:10},
         LOGIK:            {intelligence:22,will:48,determination:30},
