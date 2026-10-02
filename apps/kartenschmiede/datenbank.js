@@ -88,7 +88,7 @@
         <span class="preis" data-tip="${esc(preisTip(e))}">${preisVon(e)}</span></div>
       ${e.typ === "waffe" ? waffenWerte(e.waffe) : ""}
       ${tags.length ? `<div class="tagzeile">${tags.map(t => `<span data-tip="${esc(TAG[t].name)}">${KS.tagIco(t)}</span>`).join("")}</div>` : ""}
-      ${e.text ? `<p>${esc(e.text)}</p>` : ""}
+      ${e.text ? `<p>${KS.symText(e.text)}</p>` : ""}
       ${e.fuer && e.typ !== "fraktion" && e.typ !== "einheit" && !(e.fuer.includes("hero") && e.fuer.includes("enemy")) ? `<p><small>Nur für: ${e.fuer.filter(r => r !== "companion").map(r => ROLLEN[r]).join(", ")}</small></p>` : ""}
       ${opts.neu ? `<div class="acts"><button type="button" class="btn sm" data-aufnehmen="1">In die Datenbank</button><button type="button" class="btn ghost sm" data-vorschlag-karte="1" data-tip="${esc(knopfTip(e))}">+ Zur Karte</button><button type="button" class="btn ghost sm" data-neu-wuerfeln="1">Neu würfeln</button></div>`
         : `<div class="acts">${aktion}${eigen ? `<button type="button" class="btn ghost sm" data-loeschen="${esc(e.id)}">Löschen</button>` : ""}</div>`}

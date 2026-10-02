@@ -133,6 +133,14 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     expect(klein.weg.length).toBe(4);
   });
 
+  it("nutzt in Regeltexten nur bekannte Symbol-Kürzel", () => {
+    // Muss zu SYMBOLTEXT in apps/kartenschmiede/app.js passen
+    const gueltig = /^\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}$/;
+    const texte = [...F.GRUNDBESTAND.map(f => f.text)];
+    for (const typ of ["faehigkeit", "zauber", "gegenstand"]) for (let i = 1; i < 30; i++) texte.push(G.generiere(R, typ, { stufe: 1 + (i % 6), seed: i, rolle: i % 2 ? "enemy" : "hero", tag: i % 5 ? undefined : "technik" }).text);
+    for (const t of texte) for (const k of t.match(/\{[^}]*\}/g) || []) expect(k, t).toMatch(gueltig);
+  });
+
   it("gibt jeder Fraktion genau ein eigenes Symbol", () => {
     const symbole = F.FRAKTIONEN.map(f => f.icon);
     expect(new Set(symbole).size).toBe(symbole.length);

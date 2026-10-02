@@ -129,12 +129,37 @@
   ];
   const symbolFuer = s => (SYMBOLE.find(([re]) => re.test(s)) || [0, "rune"])[1];
   // Tag-Symbole: auf der Karte und in Listen statt ausgeschriebener Schlagworte, Name per Hover
+  // Symbole im Regeltext: {P1} kostet 1 Power, {A2} 2 Treffer, {V+1} +1 Verteidigung … Macht Texte kurz und lesbar.
+  const minus = w => w.replace(/^-/, "−");
+  const SYMBOLTEXT = {
+    P: { icon: "power", name: "Power", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Power` : `kostet ${w} Power` },
+    Z: { icon: "rune", name: "Zauberwurf", zeige: w => w + "+", tip: w => `Zauberwurf ${w}+: gelingt bei ${w}+, sonst verpufft der Zauber` },
+    S: { icon: "potion", name: "Einmal pro Spiel", zeige: () => "1×", tip: () => "einmal pro Spiel" },
+    RU: { icon: "runde", name: "Einmal pro Runde", zeige: () => "1×", tip: () => "einmal pro Runde" },
+    A: { icon: "sword", name: "Treffer / Attacken", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Attacke je Waffe` : `${w} Treffer (bei Waffen: ${w} Attacken je Modell)` },
+    DS: { icon: "down", name: "Durchschlag", zeige: w => w, tip: w => `Durchschlag ${w.replace("+", "+ ")}: Ziel −${w.replace("+", "")} auf Verteidigung` },
+    V: { icon: "shield", name: "Verteidigung", zeige: minus, tip: w => `${minus(w)} Verteidigung` },
+    T: { icon: "target", name: "auf Treffer", zeige: minus, tip: w => `${minus(w)} auf Treffer` },
+    H: { icon: "heart", name: "Heilen", zeige: w => w, tip: w => `heilt ${w} Wunden` },
+    W: { icon: "fang", name: "Wunde", zeige: w => w, tip: w => `erleidet ${w} Wunde${w === "1" ? "" : "n"}` },
+    R: { icon: "reach", name: "Reichweite", zeige: w => w + '"', tip: w => w.startsWith("+") ? `${w} Zoll Reichweite` : `in ${w} Zoll Reichweite` },
+    F: { icon: "burst", name: "Umkreis", zeige: w => w + '"', tip: w => `alle im Umkreis von ${w} Zoll` },
+    B: { icon: "wing", name: "Bewegung", zeige: w => minus(w) + '"', tip: w => /^[+-]/.test(w) ? `${minus(w)} Zoll Bewegung` : `bis ${w} Zoll bewegen` },
+    X: { icon: "spiral", name: "Betäubt", zeige: () => "", tip: () => "betäubt: darf sich bei der nächsten Aktivierung nur bewegen" },
+    D: { icon: "dice", name: "Wurf", zeige: w => w + "+", tip: w => `bei einem Wurf von ${w}+` },
+  };
+  const SYMBOL_MUSTER = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}/g;
+  const symbol = (k, w) => { const d = SYMBOLTEXT[k], z = d.zeige(w); return `<span class="sym" data-tip="${esc(d.tip(w))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`; };
+  const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
+  // Für Stellen ohne Symbole (Prompt, Suche): Klartext
+  const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => SYMBOLTEXT[k].tip(w));
+
   // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
   // Jeder Tag als farbiges Abzeichen: Elemente rund, alle anderen Tags eckig
   const tagIco = t => TAG[t] ? `<span class="elem${TAG[t].element ? "" : " eckig"}" style="--el:${TAG[t].farbe || "#c9a35b"}">${ico(TAG[t].icon)}</span>` : "";
   const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
     ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${tagIco(t)}</span>` : tagIco(t)).join("")}</span>` : "";
-  const tipText = f => `<b>${esc(f.name)}</b>${esc(f.text || "")}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
+  const tipText = f => `<b>${esc(f.name)}</b>${symText(f.text)}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
 
   let state = {};
   const SPEICHER = "kartenschmiede-v3";
@@ -185,11 +210,12 @@
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
               const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${r.element && TAG[r.element] ? tagIco(r.element) : ""}${esc(t)}</span>` : esc(t); };
-              const unter = [nah ? "" : esc(w.reichweite + '"'), "A" + w.a].concat(regeln.split(",").map(t => t.trim()).filter(Boolean).map(mitTip)).filter(Boolean).join(", ");
+              const werte = symText(`${nah ? "" : `{R${w.reichweite}} `}{A${w.a}}${w.ds ? ` {DS${w.ds}}` : ""}`);
+              const unter = [werte].concat(regeln.split(",").map(t => t.trim()).filter(t => t && !/^(DS|AP)\s*\(/i.test(t)).map(mitTip)).join(" ");
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
-            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
+            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
             <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${tagIco(t)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
@@ -640,7 +666,7 @@
         <h3>Ausrüstung und Beute</h3><div class="linien">${"<div></div>".repeat(5)}</div>
         <h3>Notizen</h3><div class="linien">${"<div></div>".repeat(6)}</div>
       </div>
-      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${esc(f.text || "")}</p>`).join("")}</div></div>` : ""}
+      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${symText(f.text)}</p>`).join("")}</div></div>` : ""}
     </div>`;
   }
   function drucken(karten, format = druckFormat()) {
@@ -942,7 +968,11 @@
       <p><b>Prägung</b> – was eine Einheit ihrem Wesen nach ist. Sie sperrt alle Fähigkeiten, Zauber, Gegenstände und Waffen mit dem Gegen-Element: Ein Feuerelementar lernt keine Frostzauber, eine Sci-Fi-Einheit keine Magie. Die Fraktion schlägt eine Prägung vor (Dämonen Feuer, Frostvolk Frost, Untote Schatten, Elfen Natur, Urwild Gift).</p>
       <p><b>Element einer Waffe</b> – ein Wort bei den Regeln, zum Beispiel <code>Frostklauen | Nahkampf | A4 | Reißend, Frost</code>. Trifft die Waffe eine Einheit derselben Prägung, würfelt das Ziel seine Verteidigung mit +1, bei der Gegen-Prägung mit −1. Alle anderen Ziele: keine Änderung.</p>
       <p><b>Punkte</b> – Elemente kosten nichts: Mal nützen sie, mal schaden sie. Der Duell-Simulator würfelt sie mit.</p>
-    </div>`;
+        </div>
+    <h3 style="margin-top:28px">Symbole in Regeltexten</h3>
+    <p class="hint">Statt „erleidet 2 Treffer mit Durchschlag 1“ steht auf der Karte ein Schwert mit 2 und ein Durchschlag-Pfeil mit 1. Beim Hovern erscheint die Erklärung. Eigene Texte nutzen dieselben Kürzel in geschweiften Klammern.</p>
+    <div class="sym-legende">${[["P1"], ["Z4"], ["S"], ["RU"], ["A2"], ["A+1"], ["DS1"], ["V+1"], ["T-1"], ["HW3"], ["W1"], ["R12"], ["F3"], ["B6"], ["X"], ["D4"]]
+      .map(([c]) => { const m = c.match(/^(RU|DS|[A-Z])(.*)$/); return `<div>${symbol(m[1], m[2])}<span>${esc(SYMBOLTEXT[m[1]].tip(m[2]))}</span> <code>{${c}}</code></div>`; }).join("")}</div>`;
   }
 
   // Reiter
@@ -958,7 +988,7 @@
 
   // Schnittstelle für den Reiter „Gruppe“ (gruppe.js)
   window.KS = {
-    tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon, tagIco, ladeKarte, loescheKarte,
+    symText, klarText, SYMBOLTEXT, symbol, tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon, tagIco, ladeKarte, loescheKarte,
     serverKarten: () => serverKarten,
     vorlageLaden: key => { vorlage(key); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     R, IMG, SERVER, STUFEN, ROLLEN, TAG, KAT, esc, ico, renderCard, passeAn, alleFaehigkeiten, alleEintraege, findeFaehigkeit, skillKopie, kostenText,

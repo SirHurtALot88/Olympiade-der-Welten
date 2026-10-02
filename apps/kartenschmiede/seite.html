@@ -204,6 +204,16 @@ details.mehr summary:hover { color: var(--brass); }
 .g-gm h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
 .gm-schalter { margin-left: auto; }
 .druck-format { width: auto; font-size: 13px; padding: 6px 8px; }
+/* Symbole im Regeltext: {A2} → Schwert 2, {V+1} → Schild +1 … */
+.sym { display: inline-flex; align-items: center; gap: .12em; padding: 0 .28em 0 .18em; margin: 0 .05em; border-radius: .35em; background: rgba(255,255,255,.11);
+  white-space: nowrap; vertical-align: -.12em; line-height: 1.25; font-family: var(--ui); font-weight: 800; font-style: normal; }
+.sym svg { width: 1.05em !important; height: 1.05em !important; color: var(--acc, var(--brass)) !important; flex: none; }
+.sym b { font-weight: 800; }
+.heldenbogen .sym { background: rgba(0,0,0,.07); }
+.heldenbogen .sym svg { color: #7a5a1a !important; }
+.sym-legende { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 20px; margin-top: 18px; font-family: var(--ui); font-size: 15px; }
+.sym-legende div { display: flex; gap: 10px; align-items: center; }
+.sym-legende code { color: var(--dim); font-size: 13px; }
 .save-wahl { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; vertical-align: middle; }
 .chip-f.kat { font-size: 15px; padding: 7px 12px; }
 .chip-f.kat svg { width: 17px; height: 17px; color: var(--brass); }
@@ -323,27 +333,38 @@ table.charaktere tbody tr { cursor: default; }
 .foot .fac svg { width: calc(var(--u)*4.4*var(--k)); height: calc(var(--u)*4.4*var(--k)); }
 .foot q { font-family: var(--prose); font-style: italic; font-size: calc(var(--u)*2.7*var(--k)); line-height: 1.2; color: var(--sub); quotes: none; padding-left: calc(var(--u)*2); border-left: calc(var(--u)*.25) solid rgba(255,255,255,.14); }
 
-/* Querformat: Text links (56 %), Bild rechts schmaler, damit sich auch Hochformat-Bilder zurechtschieben lassen.
+/* Querformat: Text links (50 %), Bild rechts schmaler, damit sich auch Hochformat-Bilder zurechtschieben lassen.
    Schräge Kante mit Leuchtlinie in der Seltenheitsfarbe, Panel mit Farbschimmer statt flacher Fläche. */
-.land .face { grid-template-columns: 56% 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head gap" "panel gap"; }
+.land .face { grid-template-columns: 50% 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head gap" "panel gap"; }
 .land .face::before, .land .face::after { content: ""; position: absolute; inset: 0 auto 0 0; clip-path: polygon(0 0, 100% 0, 93% 100%, 0 100%); pointer-events: none; }
-.land .face::before { z-index: 2; width: 60%;
+.land .face::before { z-index: 2; width: 54%;
   background:
     radial-gradient(90% 55% at 0% 0%, color-mix(in srgb, var(--acc) 20%, transparent), transparent 70%),
     radial-gradient(80% 45% at 0% 100%, color-mix(in srgb, var(--acc2) 22%, transparent), transparent 75%),
     repeating-linear-gradient(135deg, rgba(255,255,255,.022) 0 calc(var(--u)*.35), transparent calc(var(--u)*.35) calc(var(--u)*1.6)),
     linear-gradient(165deg, rgb(var(--panel)), color-mix(in srgb, rgb(var(--panel)) 80%, #000)); }
-.land .face::after { z-index: 1; width: calc(60% + var(--u)*.8);
+.land .face::after { z-index: 1; width: calc(54% + var(--u)*.8);
   background: linear-gradient(to bottom, var(--acc), var(--acc2) 55%, color-mix(in srgb, var(--acc2) 30%, transparent)); }
-.land .art { left: 52%; -webkit-mask-image: linear-gradient(to right, transparent, #000 9%); mask-image: linear-gradient(to right, transparent, #000 9%); }
+.land .art { left: 46%; -webkit-mask-image: linear-gradient(to right, transparent, #000 9%); mask-image: linear-gradient(to right, transparent, #000 9%); }
 .land .head { padding-right: calc(var(--u)*6); background: none; }
 .land .panel { padding-top: calc(var(--u)*1); padding-right: calc(var(--u)*6); background: none; align-content: start; }
 .land .stat { border-radius: calc(var(--u)*.8); background: linear-gradient(to bottom, rgba(255,255,255,.1), rgba(255,255,255,.03)); }
 .land .wep, .land .boss { border-radius: calc(var(--u)*.8); }
+/* Querformat kompakter: kleinerer Name, flachere Wertefelder und Waffenzeilen, damit Regeltexte groß bleiben */
+.land .name { font-size: calc(var(--u)*6.6*var(--k)); }
+.land.t6 .name { font-size: calc(var(--u)*7.8*var(--k)); }
+.land .head { padding-bottom: calc(var(--u)*1.6); }
+.land .panel { gap: calc(var(--u)*1.25*var(--k)); }
+.land .stat { padding: calc(var(--u)*.6) 0 calc(var(--u)*.8); }
+.land .stat b { font-size: calc(var(--u)*4.8*var(--k)); }
+.land .wep { padding-block: calc(var(--u)*.7*var(--k)); }
+.land .wep svg { width: calc(var(--u)*3.8*var(--k)); height: calc(var(--u)*3.8*var(--k)); }
+.land .boss { padding: calc(var(--u)*1.1) calc(var(--u)*1.5); }
+.land .boss p .tico { margin-right: calc(var(--u)*.6); }
 .land .wep { background: linear-gradient(to right, rgba(255,255,255,.08), rgba(255,255,255,.02)); }
 /* Krone, Edelstein und Boss-Banner sitzen im Querformat über dem Bild, nicht über dem Namen */
-.land .crest { left: 78%; width: 22% !important; }
-.land .ribbon { left: 78%; top: calc(var(--u)*11); }
+.land .crest { left: 75%; width: 24% !important; }
+.land .ribbon { left: 75%; top: calc(var(--u)*11.5); }
 
 /* Ornamente (standardmäßig aus) */
 .corner, .crest, .foil, .sheen, .embers, .halo, .ribbon { display: none; }
@@ -638,6 +659,9 @@ fieldset.checks legend { margin-bottom: 6px; }
     <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1.5 8 8.5-11h-6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
     <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="8.5" cy="8.5" r="1.6" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2.5l2.4 7.1 7.1 2.4-7.1 2.4L12 21.5l-2.4-7.1L2.5 12l7.1-2.4z" fill="currentColor"/></symbol>
+    <symbol id="i-runde" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.8 3.8v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-reach" viewBox="0 0 24 24"><path d="M3 12h18M7 7.5L2.5 12 7 16.5M17 7.5l4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-hammer" viewBox="0 0 24 24"><path d="M4 7.5l4-4 7 7-4 4zM11.5 11l8.5 8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
     <symbol id="i-axe" viewBox="0 0 24 24"><path d="M9 21L19 5M14 6c2.5-2.5 6-2 7 .5-1 3-3.5 4.5-6.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-fang" viewBox="0 0 24 24"><path d="M4 5h16c-1 6-3.5 11-5.5 14-.8-3-1.6-5-2.5-5s-1.7 2-2.5 5C7.5 16 5 11 4 5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
