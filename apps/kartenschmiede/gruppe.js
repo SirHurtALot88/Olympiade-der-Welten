@@ -139,7 +139,7 @@
     };
     const anteil = Math.max(0, Math.min(100, roh / aktiv.budget * 100));
     return `<div class="g-member">
-      <div class="cwrap">${renderCard(k, k.tier || 1, {})}</div>
+      <div class="cwrap">${renderCard(k, R.stufeFuerPunkte(R.punkte(k).pts), { land: k.orient === "land" })}</div>
       ${held ? `<div class="meter" role="img" aria-label="${Math.round(roh)} von ${aktiv.budget} Punkten"><i style="width:${anteil}%"></i></div>
         <div class="g-budget"><b>${Math.round(roh)}</b> von ${aktiv.budget} Punkten · <b>${rest}</b> übrig</div>`
         : `<div class="g-budget"><b>${k.points}</b> Punkte · ${k.gefaehrte ? "Gefährte" : ROLLEN[k.role || "enemy"]} · ${STUFEN[k.tier || 1]}</div>`}

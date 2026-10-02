@@ -228,7 +228,6 @@
     FELDER.forEach(f => { const el = $(f); if (el) el.value = state[f] ?? ""; });
     if (!["0", "5", "10", "20"].includes(String(state.special))) $("special").value = "0";
     if (!state.role) $("role").value = "enemy";
-    $("autoTier").checked = state.autoTier !== false;
     document.querySelectorAll("#tiers button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.t === state.tier)));
     document.querySelectorAll(".toolbar .seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.o === (state.orient || "port"))));
   }
@@ -279,8 +278,8 @@
 
   function alles() {
     state.points = R.punkte(state).pts;
-    if (state.autoTier !== false) state.tier = R.stufeFuerPunkte(+state.points || 0);
-    state.tier = Math.min(6, Math.max(1, state.tier || 1));
+    // Der Rahmen hängt fest an den Punkten: jede Stufe hat ihre feste Punktespanne
+    state.tier = R.stufeFuerPunkte(+state.points || 0);
     document.querySelectorAll("#tiers button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.t === state.tier)));
     zeigeRechnung();
     const land = state.orient === "land";
@@ -299,7 +298,7 @@
       $("fitNote").textContent = ueberlauf ? "Zu viel Text für die Karte: Der untere Teil wird abgeschnitten. Kürze Regeltexte oder nimm eine Fähigkeit weg."
         : kleinste < 0.8 ? `Viel Text: Die Schrift ist auf ${Math.round(kleinste * 100)} % verkleinert, damit alles passt. Beim Druck bleibt es lesbar bis etwa 70 %.` : "";
     });
-    $("suggest").dataset.tip = `${state.points || 0} Punkte ergeben: ${STUFEN[R.stufeFuerPunkte(+state.points || 0)]}. Staffel: ${R.GRENZEN_TEXT.slice(1).join(" · ")}.`;
+    $("suggest").textContent = `${state.points || 0} Punkte = ${STUFEN[state.tier]}.`;
     $("tierNote").innerHTML = NOTIZEN[state.tier];
     $("prompt").value = prompt();
     zeigeSkills();
@@ -310,7 +309,7 @@
 
   function vorlage(key) {
     const v = VORLAGEN.find(x => x.key === key) || VORLAGEN[0];
-    state = Object.assign({ upload: null, autoTier: true }, JSON.parse(JSON.stringify(v.d)));
+    state = Object.assign({ upload: null }, JSON.parse(JSON.stringify(v.d)));
     state.orient = formatFuer(state.role);
     delete state.altPunkte;
     $("preset").value = v.key;
@@ -468,7 +467,7 @@
     modellUebernehmen();
   }
   function frisch(rolle) {
-    state = Object.assign({}, state, { orient: formatFuer(rolle), id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
+    state = Object.assign({}, state, { orient: formatFuer(rolle), id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null });
     bModell = { rolle, budget: +state.budget || 100, q: 5, d: 6, t: rolle === "hero" ? 3 : 1, n: 1,
       waffen: [{ name: "Handwaffe", reichweite: 0, a: 1, ds: 0, rest: [] }], faeh: new Set(), rest: [], special: "0", skills: [] };
     modellUebernehmen();
@@ -594,7 +593,7 @@
     const r = await fetch(`${API}/${encodeURIComponent(id)}`, { credentials: "same-origin" });
     if (!r.ok) { $("saveMsg").textContent = "Die Karte ließ sich nicht laden."; return; }
     const { karte } = await r.json();
-    state = Object.assign({ orient: formatFuer(karte.role) }, karte, { autoTier: true });
+    state = Object.assign({ orient: formatFuer(karte.role) }, karte);
     bModell = null; insFormular(); alles();
     reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" });
   }
@@ -613,7 +612,7 @@
       const halter = document.createElement("div");
       const quer = k.orient === "land";
       halter.style.cssText = `position:fixed;left:-10000px;top:0;width:${quer ? 840 : 600}px;padding:60px 30px 30px;background:transparent`;
-      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: quer });
+      halter.innerHTML = renderCard(k, R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: quer });
       document.body.appendChild(halter); passeAn(halter);
       try { await document.fonts.ready; bilder.push(await htmlToImage.toPng(halter, { pixelRatio: 2, style: { position: "static", left: "0", top: "0" } })); }
       catch { /* eine Karte überspringen */ } finally { halter.remove(); }
@@ -629,7 +628,7 @@
   const druckFormat = () => { try { return localStorage.getItem("kartenschmiede-druck") || "auto"; } catch { return "auto"; } };
   function drucken(karten, format = druckFormat()) {
     const bereich = $("printArea");
-    const karte = k => renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: k.orient === "land" });
+    const karte = k => renderCard(k, R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: k.orient === "land" });
     if (format === "bogen") {
       bereich.innerHTML = `<div class="bogen">${karten.map(k => `<div style="width:${k.orient === "land" ? 88 : 63}mm">${karte(k)}</div>`).join("")}</div>`;
     } else {
@@ -766,7 +765,7 @@
       if (typeof k === "object" && k.name) { const e = await nimmAuf(k); neu.push(e.name); skills.push(skillKopie(e)); }
     }
     const behalte = { upload: state.upload, art: state.art, ax: state.ax, ay: state.ay, zoom: state.zoom, orient: state.orient };
-    state = Object.assign({ autoTier: true, special: "0", bossName: "", bossText: "", flavor: "", look: "", size: "1", role: "enemy" }, d, behalte, { skills, id: undefined });
+    state = Object.assign({ special: "0", bossName: "", bossText: "", flavor: "", look: "", size: "1", role: "enemy" }, d, behalte, { skills, id: undefined });
     if (d.art && IMG[d.art]) state.art = d.art;
     if (!d.orient) state.orient = formatFuer(state.role);
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
@@ -778,15 +777,12 @@
 
   // ---------- Verdrahtung ----------
   $("preset").innerHTML = VORLAGEN.map(v => `<option value="${v.key}">${esc(v.label)}</option>`).join("");
-  $("tiers").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `<button type="button" data-t="${t}" aria-pressed="false">${STUFEN[t]}</button>`).join("");
+  $("tiers").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `<button type="button" data-t="${t}" aria-pressed="false">${STUFEN[t]}<small>${R.GRENZEN_TEXT[t]}</small></button>`).join("");
   $("preset").addEventListener("change", e => vorlage(e.target.value));
-  $("autoTier").addEventListener("change", e => { state.autoTier = e.target.checked; alles(); });
-  // Stufe wählen: Folgt die Stufe den Punkten (Standard), passt sich die Einheit an – Werte und Zahl der Fähigkeiten.
-  // Ist der Haken aus, wechselt nur der Rahmen.
+  // Stufe wählen: Der Rahmen hängt fest an den Punkten, also passt ein Klick die Einheit an – Werte und Zahl der Fähigkeiten
   const stufeWaehlen = t => {
-    if (state.autoTier === false) { state.tier = t; insFormular(); alles(); return; }
     const { karte, neu, weg } = KAT.skaliere(state, t, alleFaehigkeiten());
-    state = Object.assign(state, karte, { autoTier: true });
+    state = Object.assign(state, karte);
     bModell = null; insFormular(); alles(); simOptionen();
     $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, Zäh ${state.tough}.`
       + (neu.length ? ` Neu: ${neu.join(", ")}.` : "") + (weg.length ? ` Entfernt: ${weg.join(", ")}.` : "");
@@ -958,13 +954,13 @@
     async loescheEigenen(id) { eigene = eigene.filter(f => f.id !== id); await sichereEigene(); alles(); },
     nachAenderung() { insFormular(); alles(); simOptionen(); },
     zeigeReiter: name => reiter(name),
-    oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte)), { autoTier: true }); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
+    oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
     zeigePngs, drucken, DRUCKFORMATE, druckFormat,
   };
 
   const gemerkt = lade();
-  if (gemerkt && gemerkt.name !== undefined) { state = Object.assign(gemerkt, { autoTier: true }); insFormular(); alles(); } else vorlage("frostfang");
+  if (gemerkt && gemerkt.name !== undefined) { state = gemerkt; insFormular(); alles(); } else vorlage("frostfang");
   simOptionen();
   ladeEigene().then(() => { insFormular(); alles(); if (window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.neu(); });
   if (location.hash === "#gruppe") reiter("gruppe");
