@@ -1,5 +1,21 @@
 # TDM Pp-Kalibrierrunde: Diagnose-Befund, kein Rezept geändert (Task #39, 02.10.)
 
+**Nachtrag (02.10., nach PR #1125):** PR #1125 behob einen P0-Bug in `disziplinProbe()`s
+Kader-Familie-Pfad — `place[]` wurde für die SQUAD-Seite nie gefüllt, was `schlachtplan()`
+lautlos auf `null` brechen ließ und die GAST-Seite auf individuelle statt team-koordinierte
+Zielwahl zurückfallen ließ (Details: `docs/design/arena-zielwahl-messsonde-02-10.md`). Die in
+Abschnitt 3 unten dokumentierte Zahl **rho=0,404 war auf dem fehlerhaften Stand der Sonde
+gemessen.** Nach dem Fix liefert dieselbe Sonde (`node scripts/miss-alle-disziplinen.mjs 24
+tdm`, isoliert gemessen, deterministische Saaten) **rho je Spiel = 0,324** (Spannweite 0,861,
+vorher 0,912). Dieser Unterschied kommt aus einer Korrektur der Messgrundlage, nicht aus
+einer Rezept- oder Mechanikänderung — **die Kernaussage dieses Dokuments bleibt unverändert:
+rho verfehlt die CLAUDE.md-Schranke 0,80 weiterhin krass (jetzt sogar etwas deutlicher als
+zuvor), und die dokumentierte Ursache (Zielwahl ist Geometrie/individuell statt an Eignung
+ausgerichtet) bleibt dieselbe.** Alle folgenden Abschnitte spiegeln den Stand vor diesem
+Nachtrag und sind historisch zu lesen, außer wo hier korrigiert.
+
+---
+
 Auftrag: die in `docs/design/stand-aller-disziplinen.md` dokumentierte TDM-Pp-Abweichung
 (51,4/54,2 Pp, **n=2/n=12**, als "VERLETZT, Zahl sehr klein" markiert) zuerst bei n=48 mit zwei
 unabhängigen Saatströmen neu messen (Lehre aus dem Gewichtheben-n=24-vs-n=48-Befund,
@@ -127,6 +143,10 @@ gibt keine plausible Flugbahn, auf der TDM bei n=48 unter 25 Pp fiele.
 
 ## 3. rho: 0,404 bei n=24 — die eigentlich bindende Verletzung
 
+**(Historischer Stand vor PR #1125 — s. Nachtrag oben: nach dem Mess-Sonden-Fix liefert
+dieselbe Sonde 0,324, nicht 0,404. Die Tabelle unten bleibt als Dokumentation des damaligen
+Mess-Stands stehen.)**
+
 `node scripts/miss-alle-disziplinen.mjs 24 tdm` (Kader-Familie, 5 echte Team-Paarungen aus
 dem live-save-Abbild):
 
@@ -253,5 +273,5 @@ ln -s <repo>/node_modules /tmp/wt-tdm-diagnose/node_modules
 node /tmp/wt-tdm-diagnose/scripts/messe-arena-einfluss.mjs tdm 2                        # 65,9 Pp, 1363s
 node /tmp/wt-tdm-diagnose/scripts/messe-arena-einfluss.mjs tdm 6                        # 69,9 Pp, 4738s
 node /tmp/wt-tdm-diagnose/scripts/messe-arena-einfluss-zweiter-saatstamm.mjs tdm 6      # 75,8 Pp, 4723s
-node /tmp/wt-tdm-diagnose/scripts/miss-alle-disziplinen.mjs 24 tdm                      # rho 0,404
+node /tmp/wt-tdm-diagnose/scripts/miss-alle-disziplinen.mjs 24 tdm                      # rho 0,404 (VOR PR #1125; danach 0,324, s. Nachtrag oben)
 ```
