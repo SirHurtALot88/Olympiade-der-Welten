@@ -43817,6 +43817,20 @@
       if(!art)throw new Error("feldspielProbe: \""+id+"\" ist keine Feldspiel-Disziplin. "
         +"Vorhanden: "+Object.keys(FELDSPIEL_ART).join(", "));
       const o=opt||{};
+      // MUTATOR ORGANISCH, NACHGEZOGEN FUER feldspielProbe() (Task #47, Messsonden-Fix,
+      // 02.10.): disziplinProbe() bekam diesen Umbau am 29.09. (s. dort), feldspielProbe()
+      // nie -- jede ueber diese Sonde gefahrene Messserie vererbte seitdem denselben, beim
+      // letzten Seitenladen zufaellig geladenen Mutator-Zweier an ALLE n Spiele, statt ihn
+      // wie im echten Spiel je Spiel neu zu ziehen (`zieheMutatoren(` kam im gesamten Motor
+      // nur in serieVon() und disziplinProbe() vor). Reiner Sondenfehler, kein Rezeptfehler
+      // -- dieselbe, bereits etablierte Zieh-Logik, nur additiv uebertragen: `o.mutatoren` =
+      // "je-spiel" (Standard, spielnah), "aus" (Referenz V0) oder "fest" (der beim Aufruf
+      // geladene Wurf gilt fuer alle Spiele, das bisherige, fehlerhafte Verhalten dieser
+      // Sonde). `o.mutatorSaat` trennt wie bei disziplinProbe() einen unabhaengigen
+      // Mutator-Saatstrom vom Rest.
+      const mutatorModus=o.mutatoren||"je-spiel";
+      const mutatorSaat=o.mutatorSaat||0;
+      const mutatorenVorher=MUTATOREN;
       // SPIELDAUER JE DISZIPLIN. Basketball hat als einzige eine eigene Konstante (vier
       // Viertel a 1:30); die Vorab-Disziplinen brauchen nur so viel Zeit, wie ihre
       // vorberechneten Zuege zum Abspielen kosten — art.zuegeJeSeite*2 Zuege a
@@ -43854,6 +43868,8 @@
       try{
         for(let i=0;i<n;i++){
           zieheFormkarten(20260823+i*104729);
+          if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+mutatorSaat+i*15485863);
+          else if(mutatorModus==="aus")MUTATOREN=[];
           feldspielDisc=id; bauFeldspiel(saat0+i*schritt);
           const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
           let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
@@ -43989,6 +44005,7 @@
             football:fsFbLog?{...fsFbLog}:null});
         }
       } finally {
+        MUTATOREN=mutatorenVorher;
         art.jeSeite=altJeSeite; M.zurueck(gesichert); zieheFormkarten(20260823);
       }
       // WAS DIESER LAUF NICHT LIEFERN KONNTE — ausdruecklich benannt statt still mit
