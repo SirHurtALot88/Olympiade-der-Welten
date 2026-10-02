@@ -12909,7 +12909,8 @@
   // Protokoll (fsZeiger < hkTorlichtGesehen) setzt den Zaehler von selbst zurueck, ohne an
   // jede der bestehenden fsZuege=[]-Reset-Stellen einen weiteren Reset anhaengen zu muessen.
   let bbugLetzteFuehrung=null, bbugWechselTimer=null,
-    hkTorlichtSeite=null, hkTorlichtBisMs=0, hkTorlichtGesehen=0;
+    hkTorlichtSeite=null, hkTorlichtBisMs=0, hkTorlichtGesehen=0,
+    bbugLetzterScoreTxt=null;
   function aktualisiereBbug(){
     const bug=document.getElementById("bbug");
     if(!bug)return;
@@ -12947,8 +12948,11 @@
     };
     const bl=document.getElementById("bbugL"),br=document.getElementById("bbugR"),
       mitte=document.getElementById("bbugMitte");
-    if(bl)bl.innerHTML=zeile("tnameL")+pipsHtml(0);
-    if(br)br.innerHTML=zeile("tnameR")+pipsHtml(1);
+    // C2: Wappen vor dem Namen, wie im Einlauf -- bbugWappenHtml() cached das Ergebnis
+    // selbst (s. dort), aktualisiereBbug() ruft es trotz des 60x/Sekunde-Takts hier also
+    // unbesorgt bei jedem Tick auf.
+    if(bl)bl.innerHTML=bbugWappenHtml(0)+zeile("tnameL")+pipsHtml(0);
+    if(br)br.innerHTML=bbugWappenHtml(1)+zeile("tnameR")+pipsHtml(1);
     if(mitte){
       const scoreTxt=txt("score"), istFs=istFeldspiel(disc);
       let fuehrend=null;
@@ -12961,8 +12965,17 @@
         const scoreEl=document.createElement("b");
         scoreEl.textContent=scoreTxt;
         if(fuehrend!=null)scoreEl.style.color="var(--"+(fuehrend===0?"home":"away")+")";
+        // C2 -- ZIFFERN-ROLL (Abschnitt 4, C2, zweiter Teil): die alte Ziffer rollt nach
+        // oben raus, die neue von unten rein, reines CSS (`.ziffernroll`-Keyframe), 200ms.
+        // `mitte` wird HIER OHNEHIN JEDEN TICK neu aufgebaut (s. `mitte.textContent=""`
+        // zwei Zeilen darueber) -- die Klasse kommt deshalb nur auf einen frischen Knoten,
+        // genau in dem einen Tick, in dem sich der Text wirklich aendert (Vergleich mit
+        // `bbugLetzterScoreTxt`); in jedem anderen Tick entsteht derselbe Knoten ohne
+        // Klasse, keine Animation spielt erneut.
+        if(bbugLetzterScoreTxt!=null&&scoreTxt!==bbugLetzterScoreTxt)scoreEl.classList.add("ziffernroll");
         mitte.appendChild(scoreEl);
       }
+      bbugLetzterScoreTxt=scoreTxt||bbugLetzterScoreTxt;
       const clockTxt=txt("clock");
       if(clockTxt){
         if(scoreTxt)mitte.appendChild(document.createTextNode(" · "));
@@ -32303,6 +32316,31 @@
         osc.start(t0); osc.stop(t0+d+0.05);
       }},
       publikum: {loop:true, synth:(vol)=>tonRauschen(vol,260,0,true)}
+    },
+    // D3 -- SENDER-STINGS (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 5, D3;
+    // Reihenfolge Abschnitt 7, Reihe 1). Kein einundzwanzigster Disziplin-Katalog -- ein
+    // Katalog UEBER den Disziplinen: EIN Jingle je Momentart, das in jeder Sportart
+    // gleich klingt (dieselben fuenf Bausteine wie ueberall oben, keine neue Primitve).
+    // Abgefeuert in feed() ZUSAETZLICH zum vorhandenen Disziplin-Ton, s. dortiger Aufruf.
+    broadcast:{
+      // Aufsteigender Doppelton + ein Hauch Metall-Beiklang -- der Fuehrungswechsel-Sting.
+      fuehrungswechsel: {synth:(vol)=>{ tonDoppelton(vol,520,780,0.32); tonMetall((vol??0.6)*0.45,950,0.2); }},
+      // "Kurzer heller Klick-Lauf": drei enger werdende Klicks statt eines einzelnen --
+      // dieselbe Anstiegs-Idee wie die Klatsch-Serie in TON_KATALOG.gewichtheben, nur hier
+      // reiner Ton ohne Spielzustand dahinter (keine Phasenabfrage, fester Rhythmus).
+      erstesEreignis: {synth:(vol)=>{
+        tonKlick(vol,2600,0.04);
+        setTimeout(()=>tonKlick(vol,2900,0.04),70);
+        setTimeout(()=>tonKlick(vol,3300,0.05),130);
+      }},
+      // Tiefer Gong (tonMetall auf niedriger Frequenz) + Rauschen darunter -- "jetzt wird
+      // es ernst", derselbe Gedanke wie die Letterbox (B4), nur als Ton statt als Bild.
+      entscheidend: {synth:(vol)=>{ tonMetall(vol,230,0.6); tonRauschen((vol??0.6)*0.5,180,0.5,false); }},
+      // Derselbe Doppelton wie fuehrungswechsel, eine grosse Terz hoeher (Faktor 2^(4/12)
+      // ≈ 1,26) -- erkennbar verwandt, aber unterscheidbar: "das ist etwas Besonderes".
+      rekord: {synth:(vol)=>tonDoppelton(vol,655,982,0.32)},
+      // Sirene aus Buzzer + Ton, fuer den Schlusspfiff-Moment.
+      schluss: {synth:(vol)=>{ tonBuzzer(vol,0.35); tonTon((vol??0.6)*0.7,660,0.4); }}
     }
   };
 
@@ -39350,6 +39388,20 @@
     endstand:"ENDSTAND",
   };
   const highlightTitel=(kind)=>(kind&&HIGHLIGHT_TITEL[kind])||null;
+  // D3 -- welcher Sender-Sting (TON_KATALOG.broadcast, s.o.) zu welchem `kind` gehoert.
+  // Bewusst nur die fuenf Momentarten, die D3 selbst benennt -- nicht jedes `kind`, das
+  // HIGHLIGHT_TITEL kennt: ein Sting je `big`-Ereignis waere wieder Play-by-Play-Laerm,
+  // genau das, was ein Sender NICHT macht (der spart den Sting fuer die grossen Momente
+  // auf). `bestzeit`/`bestmarke` teilen sich den "rekord"-Sting (beides "das ist die
+  // beste je gemessene Marke"), `endstand` bekommt den "schluss"-Sting.
+  const STING_FUER_KIND={
+    fuehrungswechsel:"fuehrungswechsel",
+    ersteAusschaltung:"erstesEreignis",
+    entscheidend:"entscheidend",
+    bestzeit:"rekord",
+    bestmarke:"rekord",
+    endstand:"schluss",
+  };
   // DOPPELUNG VERMEIDEN: einige Ticker-Saetze beginnen schon mit genau dem Titelwort
   // ("GOLDENER BUZZER — Name!", "Torwart raus! ...", "Zielansage: alles auf ..."). Unter dem
   // grossen Titel stuende das Wort dann zweimal uebereinander -- fuer Callout/Chip/Szene wird
@@ -39516,6 +39568,17 @@
       const titel=highlightTitel(kind);
       if(verzoegerungMs)setTimeout(()=>callout(txt,caption,titel),verzoegerungMs);
       else callout(txt,caption,titel);
+      // D3 -- SENDER-STING: ZUSAETZLICH zum vorhandenen Disziplin-Ton (TON_KATALOG[disc],
+      // von den Aufrufern dieser Funktion selbst schon vorher per sfx() abgefeuert), 30%
+      // leiser als der Standardpegel (Chris' Voreinstellung, Abschnitt 8 Punkt 5: "der
+      // Disziplin-Ton sagt WAS, der Sting sagt WIE WICHTIG"). Dieselbe Verzoegerung wie
+      // der Callout oben, damit beide im selben Moment einsetzen; `sfx()` ist bereits
+      // try/catch-abgesichert und ein No-Op ohne AudioContext/vor der ersten Nutzergeste.
+      const stingKey=STING_FUER_KIND[kind];
+      if(stingKey){
+        if(verzoegerungMs)setTimeout(()=>sfx("broadcast",stingKey,0.42),verzoegerungMs);
+        else sfx("broadcast",stingKey,0.42);
+      }
     }
   }
 
@@ -39722,11 +39785,55 @@
     for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
   }
 
+  // D7 -- "LETZTE MINUTE IN ECHTZEIT" (Fable-Ideen-Broadcast-Praesentation 30.09.,
+  // Abschnitt 5, D7; Reihenfolge Abschnitt 7, Reihe 1). Klasse A, "nur speed": `speed` ist
+  // reiner Wandzeit-/UI-Zustand (s. dessen Deklaration oben) -- er bestimmt nur, wie viele
+  // Simulationssekunden ein Realzeit-Frame ueberbrueckt (`acc+=dt*speed` in loop()).
+  // stepSim()/die Tick-Folge selbst bleiben in jedem Fall unveraendert: bei Tempo 1x/2x/4x
+  // laufen exakt dieselben Ticks in derselben Reihenfolge, nur in unterschiedlich viel
+  // Wandzeit -- und die hier ergaenzte Drosselung mutiert `speed` selbst NICHT, sondern
+  // nur den fuer EINEN Frame wirksamen Multiplikator, s. Aufrufstelle in loop(). Headless-
+  // Messungen (miss-alle-disziplinen.mjs & Co.) rufen loop()/requestAnimationFrame() nie
+  // auf -- `speed` und diese Funktion existieren fuer sie gar nicht.
+  //
+  // SCOPE-ENTSCHEIDUNG (diese Runde): Kampf-/Bahn-/Buehnen-Uhren zaehlen aufwaerts ohne
+  // eine im HUD-Pfad bereits bekannte Restzeit (Kampf endet durch Elimination/Punktelimit/
+  // Zeitablauf, nicht durch eine feste Uhr mit Countdown; Bahn/Buehne haben aus demselben
+  // Grund keine "Restzeit bis Spielende" -- nur das Feldspiel hat mit
+  // `feldspielRestzeitAbwaerts()` schon eine gepruefte Countdown-Berechnung, aus der sich
+  // "letzte 30 Sekunden" ableiten laesst, ohne neue Annahmen ueber Spielende zu treffen.
+  // Die Doku nennt daneben "letztes Bein" (Staffel) und "letztes Duell" (Buehne) als
+  // Beispiele -- die brauchen je eine eigene, chassis-eigene Regel und sind bewusst nicht
+  // Teil dieser Runde (s. PR-Beschreibung).
+  //
+  // "Knapp": der Rueckstand liesse sich mit EINER ueblichen Aktion der Disziplin noch
+  // ausgleichen -- ein Dreier (Basketball, Differenz <= 3), ein Treffer (Hockey, <= 1) oder
+  // ein Touchdown mit Zwei-Punkte-Versuch (Football, <= 8).
+  function feldspielFinaleKnapp(){
+    if(!istFeldspiel(disc)||!running||done||!fsLive)return false;
+    const L=LIVE(); if(!L)return false;
+    if(fsLive.viertel<L.perioden||fsLive.viertelpause)return false; // nicht die letzte Periode, oder gerade Pause
+    const restRoh=fsLive.viertel*L.periodenDauer-fsT;
+    if(restRoh<0||restRoh*zeitFaktor()>30)return false; // Nachspielzeit, oder noch nicht in den letzten 30s
+    const team=fsBisher().team;
+    const schwelle=feldspielDisc==="basketball"?3:feldspielDisc==="hockey"?1:8;
+    return Math.abs(team[0]-team[1])<=schwelle;
+  }
+  // Anzeige-Merker (A*-artig, aber reiner Button-Text -- kein neuer Simulations- oder
+  // Spielstandszustand): nur fuer den Uebergang "Finale"-Zusatz an/aus am #spd-Label.
+  let tempoFinaleAktiv=false;
+
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
     if(running){
-      acc+=dt*speed;
+      const finaleKnapp=feldspielFinaleKnapp();
+      if(finaleKnapp!==tempoFinaleAktiv){
+        tempoFinaleAktiv=finaleKnapp;
+        const spdBtn=document.getElementById("spd");
+        if(spdBtn)spdBtn.textContent="Tempo "+(finaleKnapp?1:speed)+"×"+(finaleKnapp?" · Finale":"");
+      }
+      acc+=dt*(finaleKnapp?1:speed);
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
       // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
@@ -39794,6 +39901,32 @@
       b.src=im.src;b.alt=v.name;box.parentNode.replaceChild(b,box);} };
     im.src="/team-logos/"+v.kurz+".jpg";
     return box;
+  }
+
+  // C2 (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4, C2; Reihenfolge Abschnitt
+  // 7, Reihe 2) -- dasselbe Wappen wie im Einlauf, jetzt auch im Score-Bug. Anders als
+  // wappen() oben baut diese Variante eine HTML-STRING-Kachel statt eines DOM-Knotens:
+  // aktualisiereBbug() setzt #bbugL/#bbugR per `innerHTML=` NEU bei JEDEM Tick (bis zu 60x/
+  // Sekunde, solange running) -- ein per appendChild() eingehaengter wappen()-Knoten wuerde
+  // dabei bei jedem einzelnen Frame zerstoert und durch ein frisches `new Image()` ersetzt
+  // (staendiges Neuladen/Neu-Decodieren, nur um danach doch dasselbe Bild zu zeigen). Diese
+  // Variante probiert das Logo deshalb GENAU EINMAL je Seite und merkt sich das Ergebnis
+  // (Bild-Tag oder Monogramm) in `bbugWappenCache` -- aktualisiereBbug() liest danach nur
+  // noch den fertigen String. Der Cache wird in reset() geleert, damit ein Team-/
+  // Disziplinwechsel nicht das Wappen des vorigen Spiels zeigt.
+  let bbugWappenCache=[null,null];
+  function bbugWappenHtml(seite){
+    if(bbugWappenCache[seite]!=null)return bbugWappenCache[seite];
+    const v=VEREIN[seite];
+    const kurz=((v&&v.kurz)||"").replace(/[^A-Za-z0-9\-_]/g,"");
+    const monogramm="<i class=\"bbugwappen mono\">"+(kurz||"?")+"</i>";
+    bbugWappenCache[seite]=monogramm; // Platzhalter, bis die Probe unten geantwortet hat
+    if(!kurz)return monogramm;
+    const probe=new Image();
+    probe.onload=()=>{ bbugWappenCache[seite]="<img class=\"bbugwappen\" src=\"/team-logos/"+kurz+".jpg\" alt=\"\">"; aktualisiereBbug(); };
+    probe.onerror=()=>{ /* bleibt beim Monogramm-Platzhalter oben */ };
+    probe.src="/team-logos/"+kurz+".jpg";
+    return monogramm;
   }
 
   // Woraus sich der Wert eines Spielers zusammensetzt — dieselbe Aufschluesselung, die
@@ -42095,6 +42228,12 @@
     // Spiels mit der letzten Farbe/Position des vorigen aufblitzen).
     letzteAusschaltungen=[];
     tdmFrontLetzteX=null;tdmFrontFarbe=null;
+    // C2 (Score-Ziffer-Roll + Wappen-Cache): beide gehoeren zum ABGELAUFENEN Spiel -- ohne
+    // diesen Reset wuerde der erste Tick des naechsten Spiels (z.B. "0:0") faelschlich als
+    // "Aenderung" vom alten Endstand gelten und sofort rollen, und ein Teamwechsel wuerde
+    // weiter das alte Wappen zeigen (bbugWappenHtml() gibt sonst seinen Cache zurueck).
+    bbugLetzterScoreTxt=null;
+    bbugWappenCache=[null,null];
     if(calloutTimer){clearTimeout(calloutTimer);calloutTimer=null;}
     const bc=document.getElementById("bbugcallout");
     if(bc){bc.hidden=true;bc.classList.remove("zu");}
@@ -42327,6 +42466,12 @@
   verdrahteKampfHover();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
+    // D7: waehrend der automatische Finale-Ruecksprung greift (s. feldspielFinaleKnapp()/
+    // loop()), bleibt der Klick wirkungslos -- "keine Uebertragung spult das Finale vor".
+    // `speed` selbst zaehlt im Hintergrund trotzdem weiter normal hoch, falls der Klick auf
+    // genau diesen Frame fiel, waere sonst der naechste Klick (nach dem Finale) um einen
+    // Schritt verschoben; stattdessen wird dieser eine Klick schlicht ignoriert.
+    if(tempoFinaleAktiv)return;
     speed=speed===1?2:speed===2?4:1;
     document.getElementById("spd").textContent="Tempo "+speed+"×";
   });

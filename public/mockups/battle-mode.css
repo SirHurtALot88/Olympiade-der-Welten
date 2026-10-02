@@ -777,6 +777,14 @@
   .oly-battle-arena.oly-battle-arena .bbug .seite b{color:#fff;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bbug .seite small{display:block;color:#c3ccd8;font-size:9px;
     white-space:normal}
+  /* C2 (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4): Wappen vor dem Namen im
+     Score-Bug, wie jeder TV-Bug eins zeigt -- `wappen()`/`bbugWappenHtml()` im Motor liefern
+     entweder dieses <img> oder, ohne Logo-Datei, ein <i class="mono"> mit dem Kuerzel. */
+  .oly-battle-arena.oly-battle-arena .bbug .bbugwappen{display:inline-block;width:16px;
+    height:16px;border-radius:3px;vertical-align:-3px;margin-right:4px;object-fit:cover}
+  .oly-battle-arena.oly-battle-arena .bbug i.bbugwappen.mono{background:rgba(255,255,255,.16);
+    color:#fff;font-style:normal;font-weight:700;font-size:7px;line-height:16px;
+    text-align:center;letter-spacing:.2px}
   /* LEBENS-PIPS (K2, Broadcast-Optik-Recherche 27.09., Abschnitt 3): eine CS-Scorebar-
      Reihe je Seite, ein Punkt je Kaempfer -- die dritte Zeile im Score-Bug, unter Name
      und Zusatzzeile (dasselbe display:block-Zeilenmuster wie ".seite small" darueber,
@@ -838,6 +846,18 @@
      die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
   .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
     0 0 14px 2px var(--warn)}
+  /* C2 -- ZIFFERN-ROLL (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4, C2,
+     zweiter Teil): die alte Ziffer rollt nach oben raus, die neue von unten rein -- wie an
+     einem NHL/NBA-Bug. `aktualisiereBbug()` setzt die Klasse nur in dem einen Tick, in dem
+     sich der Score-Text aendert, auf einen frisch erzeugten Knoten (s. dortiger Kommentar);
+     die globale `prefers-reduced-motion`-Regel am Dateiende deckt diese Animation mit ab. */
+  @keyframes ziffernroll{
+    0%{transform:translateY(-60%);opacity:0}
+    40%{transform:translateY(0);opacity:1}
+    100%{transform:translateY(0);opacity:1}
+  }
+  .oly-battle-arena.oly-battle-arena .bbugmitte b.ziffernroll{display:inline-block;
+    animation:ziffernroll .2s ease-out}
   /* UEBERZAHL-KENNUNG (K2): "4 : 3" in der Farbe der Seite mit mehr Lebenden, nur wenn
      die Zahlen ungleich sind (aktualisiereBbug() haengt <small> nur dann ueberhaupt an).
      Eigene Zeile unter Score/Uhr, dasselbe display:block-Muster wie oben. */
