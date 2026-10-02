@@ -8677,6 +8677,34 @@
   // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
   const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
+  // H5 (Hockey-Opus-Review Abschnitt 3.3/6, 02.10.): das Verhaeltnis in
+  // `punkte*1.5+xg*1.5` wurde beim Einbau (K3) nie gegen Alternativen gesweept — nur
+  // "ganz statt halb" wurde verglichen (0,649, schlechter). "Ein Sweep ueber das
+  // Verhaeltnis (etwa 1,0/2,0 und 2,0/1,0) ist billig, ohne rr()-Risiko und ohne
+  // Rezeptberuehrung." Als MUTIERBARE Konstante statt zweier Literale, exakt dasselbe
+  // Muster wie MUTATOR_ORGANISCH/MUTATOR_REGEL weiter unten: die Spielkonstante ist fix,
+  // `window.__arena.hockeyTorGewicht(r)` darf sie NUR fuer eine Messung umstellen.
+  const HK_TOR_GEWICHT_KONSTANTE={punkte:1.5, xg:1.5};
+  let HK_TOR_GEWICHT={...HK_TOR_GEWICHT_KONSTANTE};
+
+  // H2 (Hockey-Opus-Review Abschnitt 2.3/6, 02.10.): "Der beste Torwart-Posten der echten
+  // Analytik [...] Bauform identisch zu K3: ein Zaehler, eine Zeile, kein neuer rr()."
+  // GSAx (erwartete Gegentore laut Schusslage MINUS tatsaechliche Gegentore, s.
+  // `tw.xgGegen` in hockeySchussAusgang) ersetzt GSAA (erwartete Gegentore laut
+  // LIGA-FANGQUOTE minus tatsaechliche) als Torwart-Posten. Als MESSHEBEL hinter der
+  // Spielkonstante "gsaa" (unveraendertes Verhalten), damit die Umstellung erst nach
+  // gemessenem Vorzeichen/Groessenordnung (docs/design/hockey-h4-h5-messung-02-10.md)
+  // zur neuen Spielkonstante wird, nicht vorher.
+  const HK_TORWART_FORMEL_KONSTANTE="gsaa";
+  let HK_TORWART_FORMEL=HK_TORWART_FORMEL_KONSTANTE;
+  // GSAx braucht eine EIGENE Spreizungskonstante (nicht zwingend 2,0 wie HK_TW_GSAA_K,
+  // s. dessen Herleitung oben): GSAx wird aus `technik*HK_TOR_SKALA` je Schuss aufsummiert,
+  // GSAA aus der Liga-Fangquote mal Schusszahl — beide in "Toren", aber nicht notwendig
+  // mit derselben Streuung je Spiel. Platzhalter 2,0 (wie GSAA), gegen die gemessene
+  // Streuung noch zu pruefen (s. Messdokument).
+  const HK_TW_GSAX_K_KONSTANTE=2.0;
+  let HK_TW_GSAX_K=HK_TW_GSAX_K_KONSTANTE;
+
   const istHockey=()=>feldspielDisc==="hockey";
   const istFootball=()=>feldspielDisc==="football";
   // GEWICHTHEBEN — ANDERS ALS istHockey()/istFootball(): die Buehne kennt kein eigenes
@@ -8772,11 +8800,18 @@
       // NHL. Nach jeder Kalibrierung der Torzahl gehoert er nachgezogen; laeuft er weg,
       // verschiebt sich nur der Nullpunkt, nicht die Reihenfolge.
       if(u.torwart){
-        const schuesse=u.saves+u.gegentore;
-        const gsaa=schuesse*(1-HK_TW_REF)-u.gegentore;
+        // H2 — GSAx statt GSAA (s. Konstanten-Kommentar oben): `u.xgGegen` ist die Summe
+        // der torwartUNABHAENGIGEN Torwahrscheinlichkeit jedes Schusses, der ihn erreicht
+        // hat (hockeySchussAusgang, ohne paradeFaktor) — exakt der Nenner, den die echte
+        // Analytik fuer GSAx nimmt. Faellt auf GSAA zurueck, solange HK_TORWART_FORMEL
+        // (Messhebel, Spielkonstante "gsaa") nicht auf "gsax" steht.
+        const gsaa=()=>{ const schuesse=u.saves+u.gegentore; return schuesse*(1-HK_TW_REF)-u.gegentore; };
+        const impact=HK_TORWART_FORMEL==="gsax"
+          ?((u.xgGegen||0)-u.gegentore)*HK_TW_GSAX_K
+          :gsaa()*HK_TW_GSAA_K;
         // A1/A2 getrennt gewichtet wie beim Feldspieler unten (s. dort) — ein Torwart
         // bekommt in der Praxis fast nie eine Vorlage, die Formel bleibt trotzdem konsistent.
-        return HK_TW_BASIS+gsaa*HK_TW_GSAA_K+u.punkte*3+u.assists1*2+u.assists2*1.5;
+        return HK_TW_BASIS+impact+u.punkte*3+u.assists1*2+u.assists2*1.5;
       }
       // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
       //
@@ -8809,7 +8844,9 @@
       // Unterschied ist die tatsaechlich gesenkte Streuung, nicht eine Restwertung nach
       // unten) und senkt gemessen die Spiel-zu-Spiel-Verlaesslichkeit der Feldspieler von
       // 0,661 auf 0,710 (miss-alle-disziplinen.mjs, kaderfest, n=24, Kader-Familie).
-      return u.punkte*1.5+u.xg*1.5+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
+      // `HK_TOR_GEWICHT` statt der frueheren Literale 1.5/1.5 (H5, s. Konstante oben) —
+      // im Spielbetrieb bit-identisch, weil die Konstante mit denselben Werten startet.
+      return u.punkte*HK_TOR_GEWICHT.punkte+u.xg*HK_TOR_GEWICHT.xg+u.assists1*2+u.assists2*1.5+u.steals*0.5+u.feldwuerfe*0.3
             // GEWICHT DER GEWONNENEN PUCKS: 0,5 -> 0,2, und zwar an der realen Formel
       // ausgerichtet statt geschaetzt. Der NHL Game Score (Luszczyszyn 2016) kennt einen
       // Posten "loser Puck gewonnen" UEBERHAUPT NICHT — er zaehlt Tore (0,75), Vorlagen
@@ -11469,6 +11506,20 @@
     const paradeFaktor=tw?1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060)):1;
     const pTor=Math.max(0.01,Math.min(0.60,
       technik*(tw?HK_TOR_SKALA:HK_TOR_SKALA_LEER)*paradeFaktor));
+    // H2 (Hockey-Opus-Review Abschnitt 2.3/6, 02.10.): GSAx statt GSAA fuer die
+    // Torwart-Wertung (feldspielWert, s. dort). GSAx braucht erwartete Gegentore OHNE
+    // die Guete DIESES Torwarts — nimmt man `pTor` wie es ist, steckt `paradeFaktor`
+    // schon im Erwartungswert und GSAx hebt sich selbst auf (die exakt gleiche Falle,
+    // die MoneyPuck/Evolving-Hockey mit ihrer torwartfreien xG-Modellierung vermeiden,
+    // s. Abschnitt 3.1). Deshalb hier dieselbe Formel OHNE `paradeFaktor`, akkumuliert
+    // direkt auf dem Torwart — kein neuer `rr()`-Aufruf, keine Verschiebung der
+    // bestehenden Wuerfe, nur ein zusaetzlicher Zaehler fuer jeden Schuss, der ihn
+    // ueberhaupt erreicht (also nicht geblockt und nicht "vorbei" davor, s. Kommentar
+    // oben zu `schuesse=saves+gegentore` an HK_TW_REF) — exakt derselbe Nenner wie GSAA.
+    if(tw){
+      const pTorNeutral=Math.max(0.01,Math.min(0.60,technik*HK_TOR_SKALA));
+      tw.xgGegen=(tw.xgGegen||0)+pTorNeutral;
+    }
     if(rr()<pTor)return {ausgang:"tor",torwart:tw,pTor};
     if(!tw)return {ausgang:"vorbei",torwart:null,pTor};
     return {ausgang:(rr()<HK_ABPRALLER)?"abpraller":"fest",torwart:tw,pTor};
@@ -43741,6 +43792,10 @@
               // Torwart-Zaehler existiert an jeder Einheit, wird aber nur dort gefuellt.
               torwart:!!u.torwart, saves:u.saves, gegentore:u.gegentore, checks:u.checks,
               strafminuten:u.strafminuten, xg:+((u.xg||0).toFixed(3)),
+              // `xgGegen` (H2, 02.10.): nur am Torwart gefuellt — Summe der
+              // torwartunabhaengigen Torwahrscheinlichkeit jedes Schusses, der ihn
+              // erreicht hat (s. HK_TORWART_FORMEL-Kommentar an feldspielWert).
+              xgGegen:+((u.xgGegen||0).toFixed(3)),
               // PUSTE (s. FELDSPIEL_ART.hockey.puste): Endstand, tiefster Stand und die
               // tatsaechlich gelaufene Strecke in Pixeln — die drei Zahlen, aus denen die
               // Kalibrierung besteht (scripts/miss-hockey-puste.mjs). Ausserhalb einer
@@ -44944,6 +44999,32 @@
     },
     mutatorKonstante:()=>({...MUTATOR_ORGANISCH}),
     mutatorTrefferVon:(name)=>{const p=[...SQUAD,...OPP].find(x=>x.n===name);return p?mutatorTreffer(p):null;},
+    // H5 — MESSHEBEL, exakt dasselbe Muster wie mutatorRegel() darueber: `hockeyTorGewicht(r)`
+    // stellt das punkte/xg-Verhaeltnis in feldspielWert("hockey") fuer eine Messung um
+    // ({punkte,xg}) und liefert das vorherige zurueck; `hockeyTorGewicht(null)` setzt auf die
+    // Spielkonstante zurueck. Im Spielbetrieb ruft das niemand.
+    hockeyTorGewicht:(r)=>{
+      const vorher={...HK_TOR_GEWICHT};
+      HK_TOR_GEWICHT=r&&Number.isFinite(r.punkte)&&Number.isFinite(r.xg)
+        ?{punkte:r.punkte,xg:r.xg}:{...HK_TOR_GEWICHT_KONSTANTE};
+      return vorher;
+    },
+    hockeyTorGewichtKonstante:()=>({...HK_TOR_GEWICHT_KONSTANTE}),
+    // H2 — MESSHEBEL, dasselbe Muster: `hockeyTorwartFormel("gsax"|"gsaa"|null)` stellt
+    // die Torwart-Wertformel fuer eine Messung um und liefert die vorherige zurueck;
+    // `null` setzt auf die Spielkonstante ("gsaa") zurueck. Im Spielbetrieb ruft das niemand.
+    hockeyTorwartFormel:(f)=>{
+      const vorher=HK_TORWART_FORMEL;
+      HK_TORWART_FORMEL=(f==="gsax"||f==="gsaa")?f:HK_TORWART_FORMEL_KONSTANTE;
+      return vorher;
+    },
+    // GSAx-Spreizungskonstante, dasselbe Muster — nur fuer die Kalibrierung dieser einen
+    // Zahl gebraucht (die Streuung von `xgGegen-gegentore` gegen die Feldspieler-Streuung).
+    hockeyTwGsaxK:(k)=>{
+      const vorher=HK_TW_GSAX_K;
+      HK_TW_GSAX_K=Number.isFinite(k)?k:HK_TW_GSAX_K_KONSTANTE;
+      return vorher;
+    },
     // GEGENFAKTUS-SONDE (Konzept Abschnitt 7.3): "was ist ein Treffer wert?" — dieselbe Saat,
     // derselbe Kader, einmal ohne jeden Mutator und einmal mit `treffer` Treffern fuer GENAU
     // EINEN Spieler, reihum fuer jeden Teilnehmer. Gespielt wird ueber DIESELBEN Einstiege wie
@@ -45063,7 +45144,13 @@
             // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
             // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
             // und macht die Teilnehmerliste dort ununterscheidbar von vorher.
-            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart}))
+            // `slotId` NEU (Hockey-Opus-Review Abschnitt 4.4/H4, 02.10.): "eine
+            // Rangtreue-Zeile je Slot-Gruppe waere der naechste Split — dieselbe Bauform
+            // wie feldOnlyZusatz(), nur nach slotId statt nach torwart." Additiv wie
+            // `torwart` darueber: liest ein an jeder Einheit ohnehin vorhandenes Feld
+            // (s. `bauSpieler`, slotId:sl) nur aus, veraendert keine Mechanik und keinen
+            // rr()-Aufruf. Fuer jede andere Disziplin einfach der dort gesetzte Slot.
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null}))
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
@@ -45079,7 +45166,12 @@
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
               ...(u.reihe!=null?{reihe:u.reihe}:{}),
               ...(u.arch!=null?{arch:u.arch}:{}),
-              ...(u.torwart?{torwart:true}:{})}))});
+              ...(u.torwart?{torwart:true}:{}),
+              // `slotId` NEU (H4, s. Kommentar an der Stelle, wo `feld` oben gebaut wird):
+              // dieselbe Weiterleitung wie `torwart`/`reihe`/`arch` darueber — ohne diese
+              // Zeile haette das Feld oben die Einheit NIE erreicht, weil GENAU hier aus
+              // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
+              ...(u.slotId!=null?{slotId:u.slotId}:{})}))});
         }
         return spiele;
       };
