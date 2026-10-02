@@ -6053,6 +6053,14 @@
     // damit die einzige der drei Zieldisziplinen ueber 15 Pp — offener Befund fuer eine
     // naechste Runde, die vermutlich am Chassis (aufEignung/TMP-AUS-Normierung) ansetzen
     // muesste statt an den Rezeptgewichten.
+    //
+    // NACHGEZOGEN, NICHTS GEAENDERT (Task #39, 02.10., docs/design/tdm-pp-rezeptrunde-
+    // diagnose-02-10.md). n=48 war an der Laufzeit nicht erreichbar (~785s/Lauf, ~10,5h je
+    // Saatstrom) — das fruehere Speicherleck ist fuer TDM mitbehoben (ea10d442). Best
+    // erreichbare Messung (n=2/n=6, zwei Stroeme): 65,9/69,9/75,8 Pp, klar ueber der
+    // Schranke und in der Richtung, die bei groesserem n eher waechst als schrumpft. rho
+    // je Spiel 0,404 (n=24) bleibt die eigentlich bindende Verletzung (CLAUDE.md: rho vor
+    // Pp) und haengt an der Zielwahl (Geometrie statt Bedrohung/Eignung), nicht am Rezept.
     tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
 
     "mini-dm":{
