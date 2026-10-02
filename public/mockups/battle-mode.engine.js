@@ -6579,15 +6579,72 @@
       // Griff (dexterity); der Running Back ist Wucht + Robustheit + Antritt; der Receiver
       // ist der GROSSE, ZAEHE Zielspieler (health/torment/speed) statt eines zweiten
       // Running Backs; die Passverteidigung ist Aggression + Wucht + Antritt.
+      // REZEPT-C-SONDIERUNG (02.10., Task #34, Teilaufgabe "Rezept-Prozent-Umschichtung
+      // innerhalb bestehender Kanaele", docs/design/football-rezept-sondierung-
+      // awareness-ausdauer-spirit-02-10.md): awareness/stamina/will/spirit tragen 20 der
+      // 100 Matrix-Pp (BASIS_JE_DISC.football), hatten aber praktisch keinen mechanischen
+      // Kanal — awareness sass nur in PASSSCHUTZ (dessen einziger Hebel, der pSack-Term in
+      // resolvePass(), strukturell duenn ist, s. Abschnitt 5 der Kalibrierungs-Doku von
+      // 10.09.: der Passer wird UNABHAENGIG von PASSSCHUTZ gezogen), stamina/will nur in
+      // AUSDAUER (bis heute GAR KEIN mechanischer Kanal, s. Kommentar dort), spirit nirgends.
+      //
+      // ZURUECKGEZOGENE ERSTE FASSUNG (unabhaengiges Review der ersten PR-Version, 02.10.):
+      // PASSSCHUTZ {power:35,health:30,awareness:25,stamina:10} + BALLSICHERHEIT
+      // {power:30,health:30,determination:25,will:15} mass bei n=24 rho 0,805 (bestanden) —
+      // bei n=48 (groessere Stichprobe, vom Review nachgemessen UND hier selbst reproduziert)
+      // faellt das auf 0,788 (DURCHGEFALLEN). Die Baseline selbst liegt bei n=48 nur bei 0,804
+      // (+0,004 Marge) — Football stand schon vorher auf der Messerschneide, n=24 hatte fuer
+      // diese duenne Marge schlicht nicht genug statistische Power (Bootstrap-90%-CI bei n=24:
+      // [0,706; 0,848], die 0,80-Schranke lag mitten im Rauschen). AB JETZT IST n=48 PFLICHT
+      // FUER DIE RHO-ABNAHME DIESER DISZIPLIN, nicht n=24.
+      //
+      // ISOLATIONSMESSUNG (n=48, jede Teilaenderung einzeln kaderfest nachgemessen, s.
+      // PR-Dokument): PASSSCHUTZ allein (awareness 20->25, stamina 0->10) senkt rho bereits auf
+      // 0,799 (knapp durchgefallen) — AWARENESS IST DER TREIBER, nicht stamina: ein reiner
+      // stamina-Zusatz OHNE jede Awareness-Erhoehung (power:38,health:36,awareness:20,
+      // stamina:6) mass dagegen 0,808, SOGAR UEBER der Baseline. Ein zusaetzlicher
+      // BALLSICHERHEIT-will-Zusatz von nur 6 % (statt 15 %) oben drauf aendert daran nichts
+      // (ebenfalls 0,808, zweimal unabhaengig reproduziert). Das Risiko war also NICHT
+      // "zu viel Umschichtung insgesamt", sondern konkret "awareness bekommt mehr Gewicht" —
+      // bei JEDER getesteten Groesse (+5 UND +2) durchgefallen, nicht nur bei der grossen.
+      //
+      // FINALE ENTSCHEIDUNG: awareness bleibt bei seinem URSPRUENGLICHEN Anteil (20 % in
+      // PASSSCHUTZ) UNVERAENDERT stehen — CLAUDE.md gibt rho>0,80 ausdruecklich Vorrang vor der
+      // Pp-Schranke, und awareness korreliert NEGATIV mit der echten Football-Eignung (Spearman
+      // -0,335, football-rezept-kalibrierung.md Abschnitt 4.2), jede getestete Erhoehung kostet
+      // messbar rho-Marge, die diese Disziplin nicht hat. Die Aufgabe „gib awareness mehr
+      // Gewicht" wird damit NICHT erfuellt — bewusst, dokumentiert, mit Messbeleg, nicht
+      // stillschweigend ignoriert. stamina UND will bekommen stattdessen je einen kleinen,
+      // nachweislich sicheren Lesepunkt (PASSSCHUTZ bzw. BALLSICHERHEIT).
+      //
+      // ZWEI VON ACHT SUB-SKILLS PROZENTUAL UMGESCHICHTET (PASSSCHUTZ, BALLSICHERHEIT), die
+      // anderen sechs UNANGETASTET. TEAMGEIST GEPRUEFT UND VERWORFEN: ein spirit-Nachschlag
+      // dort war der naheliegendste Kanal (TEAMGEIST ist mit ~44,5 % das mit Abstand groesste
+      // mechanische Gewicht aller acht Sub-Skills, s. football-rezept-kalibrierung.md 4.4) —
+      // kaderfest GEMESSEN druecken schon 8 % spirit (health:45,torment:22,speed:25,spirit:8)
+      // rho je Spiel von 0,814 auf 0,788 (durchgefallen, n=24-Messung), 15 % spirit auf 0,765.
+      // spirit bleibt deshalb bei 0 % mechanischem Gewicht, ZIELKONFLIKT DOKUMENTIERT, NICHT
+      // AUFGELOEST (s. PR-Dokument).
+      //
+      // LAUFKRAFT/PASSGENAUIGKEIT/ABWEHR_PASS/ABWEHR_LAUF bleiben ebenfalls unangetastet —
+      // bewusst konservativ, sie tragen die am genauesten gegen den Korridor (Yards/Carry,
+      // Sack-/Interception-Quote) gefitteten Kanaele.
+      //
+      // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 48 football, kaderfest, ZWEIMAL
+      // unabhaengig reproduziert, bit-identisch): rho je Spiel 0,804 (Baseline) -> 0,808
+      // (bestanden, MEHR Marge als die Baseline selbst). Pp (messe-arena-einfluss.mjs, n=48,
+      // 2 Saatstroeme): Mittel 57,05 -> 54,75 — kleiner als in der zurueckgezogenen ersten
+      // Fassung (die rho gekostet haette), aber real und sicher. Siehe PR-Dokument fuer die
+      // vollen Vorher/Nachher-Zahlen inkl. Pp je Attribut.
       rezept:{
-        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert
-        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT
-        PASSSCHUTZ:      {power:40,health:40,awareness:20},         // rho 0,853  UNVERAENDERT (Hand: O-Line = Anker, nicht Wahrnehmung)
-        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt
-        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck
-        BALLSICHERHEIT:  {power:35,health:35,determination:30},     // Dopplung mit PASSGENAUIGKEIT geloest
-        TEAMGEIST:       {health:45,torment:30,speed:25},           // rho 0,905; Rangkorr. zu LAUFKRAFT nur 0,87 — Dopplung geloest, Achse wieder unabhaengig
-        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (hat bis heute keinen mechanischen Kanal, s. Plan 6.4)
+        PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert, UNVERAENDERT
+        LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT (Yards/Carry-Korridor daran gefittet)
+        PASSSCHUTZ:      {power:38,health:36,awareness:20,stamina:6}, // stamina NEU (6, sicher), awareness UNVERAENDERT (Erhoehung kaderfest durchgefallen, s. Kommentar oben)
+        ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt, UNVERAENDERT
+        ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck, UNVERAENDERT
+        BALLSICHERHEIT:  {power:33,health:33,determination:28,will:6}, // will NEU (6, reduziert von urspruenglich erwogenen 15 — s. Kommentar oben), power/health/determination nur leicht gesenkt
+        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788)
+        AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (weiterhin KEIN eigener Kanal — stamina/will haben jetzt anderswo einen, s.o.)
         LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
       },
       // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
