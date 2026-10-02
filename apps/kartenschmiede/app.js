@@ -91,16 +91,24 @@
     5: "<b>Legendär, Diablo-Orange:</b> glühende Bronze, Filigran-Ecken, Edelstein oben, Holo-Folie und ein Lichtstreif über die Karte.",
     6: "<b>Boss, rot:</b> blutroter Rahmen mit Goldbeschlägen, Hörnerkrone, Boss-Banner, Frakturschrift, glühender Kranz und Funkenflug.",
   };
+  // Stimmung je Seltenheit: nur Kamera und Licht, keine zusätzlichen Effekte im Hintergrund
   const STIMMUNG = {
-    1: "unremarkable grunt of its kind, eye-level camera, quiet low light, simple dark background",
-    2: "a tougher specimen, eye-level camera, faint green-tinted rim light",
-    3: "a creature touched by magic, slightly low camera, cool blue rim light, a few glowing particles",
-    4: "confident, threatening stance, low camera, warm golden key light and a brighter glowing accent",
-    5: "powerful and dangerous, low camera angle, strong orange backlight glow behind it, sparks drifting in the air",
-    6: "overwhelming boss presence, very low camera angle looking up, deep red and orange glow behind it, embers and ash in the air, the creature fills the frame and the viewer should feel small",
+    1: "an ordinary specimen of its kind, eye-level camera, quiet dim light",
+    2: "a tougher specimen, eye-level camera, faint cool rim light",
+    3: "a creature touched by magic, slightly low camera, soft blue rim light",
+    4: "confident, threatening stance, low camera, warm golden key light from one side",
+    5: "powerful and dangerous, low camera angle, strong warm backlight outlining the silhouette",
+    6: "overwhelming boss presence, very low camera angle looking up, deep red backlight outlining the silhouette, the creature fills the frame and the viewer should feel small",
   };
-  // Stil wie die Olympiade-Bilder: Filmstill, dunkel, warmes Licht, genau ein leuchtender Sci-Fi-Akzent
-  const STIL = "photorealistic cinematic film still from a dark fantasy movie with a subtle science-fiction edge. Real creature with practical-effects texture (skin, scales, fur, cloth, metal all physically real), shot on a full-frame cinema camera with an 85mm lens, shallow depth of field, softly blurred background, dark and moody low-key lighting, warm practical light from lanterns, candles or embers, plus exactly one glowing accent (runes, energy veins, lava cracks or tech inlays) that hints at sci-fi, haze and floating dust in the air, rich detail, natural colour grade, no over-sharpening.";
+  // Stil wie die Olympiade-Bilder: Standbild aus einem Realfilm, dunkel, warmes Licht, genau ein leuchtender Akzent
+  const STIL = "a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the creature is a real, physical being made with practical effects (real skin, fur, scales, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.";
+  // Der eine leuchtende Akzent folgt der Prägung, damit Bild und Element-Symbol zusammenpassen
+  const AKZENT = {
+    feuer: "glowing orange lava cracks", frost: "pale blue frost glowing in the cracks of its skin or armour", natur: "faint green bioluminescent veins",
+    gift: "a sickly yellow-green toxic glow", licht: "warm golden glowing runes", schatten: "wisps of violet shadow-fire",
+    magie: "softly glowing magenta arcane runes", technik: "thin cyan glowing tech inlays",
+  };
+  const akzentVon = s => { const p = (Array.isArray(s.praegung) ? s.praegung : []).find(t => AKZENT[t]); return p ? AKZENT[p] : "one subtle glowing detail such as runes, energy veins or tech inlays"; };
 
   // ---------- Hilfen ----------
   const $ = id => document.getElementById(id);
@@ -231,20 +239,26 @@
 
   function prompt() {
     const s = state;
+    const quer = s.orient === "land";
     return [
-      `Turn the attached photo of my hand-painted tabletop miniature into a photorealistic cinematic film still of this creature as a real, living being. Keep its pose, silhouette, proportions, colour scheme and distinctive details (weapons, chains, armour, the ground of its base) clearly recognisable.`,
+      `Create one image: ${STIL}`,
+      ``,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep its pose, silhouette, proportions, paint colours and distinctive details (weapons, chains, armour) clearly recognisable, but show it as a living creature, not a figure. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
       ``,
-      `Mood: ${STIMMUNG[s.tier]}.`,
+      `Mood and camera: ${STIMMUNG[s.tier]}.`,
       ``,
-      `Style anchor (identical for every card in the set): ${STIL}`,
+      `Glowing accent: exactly one, ${akzentVon(s)}. Nothing else in the image glows.`,
       ``,
-      `Composition: ${s.orient === "land" ? "landscape 7:5, creature on the right half, left half darker and calm so text can sit on top" : "portrait 5:7, creature fills the upper two thirds, lower third darker and calm so text can sit on top"}.`,
+      `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Avoid: painterly or illustrated look, plastic or toy look, cluttered background, spaceships or cities in the sky, oversaturated colours. No lettering, numbers, logos, card frame, border or user interface. Only the image.`,
+      `Composition: ${quer ? "landscape 7:5, creature on the right half, head and weapons in the upper half, left half dark and calm" : "portrait 5:7, head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      ``,
+      `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
   }
+
 
   function neigen() {
     const cw = $("stage").querySelector(".cw");
